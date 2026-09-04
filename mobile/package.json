@@ -1,0 +1,21 @@
+{
+  "name": "vtos-mobile",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Vỏ ứng dụng di động VTOS (Capacitor) bọc bản web PWA – build Android/iOS sau khi có tên miền",
+  "scripts": {
+    "add:android": "npx cap add android",
+    "add:ios": "npx cap add ios",
+    "sync": "npx cap sync",
+    "open:android": "npx cap open android",
+    "open:ios": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/ios": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}

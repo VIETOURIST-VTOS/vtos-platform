@@ -1,0 +1,41 @@
+"""Phụ thuộc chung: CSDL, người dùng hiện tại, kiểm tra vai trò."""
+from fastapi import Depends, HTTPException, Header, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.core.security import decode_token
+from app.core.config import settings
+from app.models.core import User, ROLES
+
+oauth2 = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+
+def current_user(token: str = Depends(oauth2), db: Session = Depends(get_db)) -> User:
+    data = decode_token(token)
+    if not data:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Phiên đăng nhập hết hạn hoặc không hợp lệ")
+    u = db.execute(select(User).where(User.username == data["sub"], User.active == True)).scalars().first()
+    if not u:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Tài khoản không tồn tại hoặc đã khóa")
+    return u
+
+
+def require_roles(*roles: str):
+    def dep(u: User = Depends(current_user)) -> User:
+        if roles and u.role not in roles:
+            raise HTTPException(status.HTTP_403_FORBIDDEN,
+                                f"Vai trò {ROLES.get(u.role, u.role)} không có quyền thực hiện thao tác này")
+        return u
+    return dep
+
+
+def robot_auth(x_robot_token: str | None = Header(default=None)):
+    if x_robot_token != settings.ROBOT_TOKEN:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sai ROBOT_TOKEN")
+
+
+class Gate(HTTPException):
+    """Cổng chặn nghiệp vụ – trả 422 kèm mã cổng để giao diện hiển thị."""
+    def __init__(self, code: str, detail: str):
+        super().__init__(422, {"gate": code, "message": detail})

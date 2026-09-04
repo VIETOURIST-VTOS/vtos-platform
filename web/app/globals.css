@@ -1,0 +1,31 @@
+:root{--navy:#1F3A5F;--navy2:#2B4E7A;--teal:#1B8A7A;--orange:#D9822B;--red:#B84A3A;--ink:#1B2733;--ink2:#5A6B7B;--line:#D9E1EA;--ground:#F5F7FA;--panel:#FFFFFF;--panel2:#EEF3F8;--okbg:#E4F3F0;--warnbg:#FCF1E3;--redbg:#FBEAE7}
+@media (prefers-color-scheme: dark){:root{--navy:#8FB3DE;--navy2:#2B4E7A;--teal:#4FBFAE;--orange:#E9A15A;--red:#E07A6A;--ink:#E6EDF3;--ink2:#9FB0C0;--line:#2A3A4C;--ground:#0F161E;--panel:#17212C;--panel2:#1E2A37;--okbg:#153530;--warnbg:#3A2A14;--redbg:#3B1E1A}}
+*{box-sizing:border-box}html,body{margin:0}
+body{font-family:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:14px;line-height:1.45;color:var(--ink);background:var(--ground)}
+a{color:var(--navy);font-weight:600}
+.top{background:#1F3A5F;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+.top .brand{font-weight:700;letter-spacing:.06em}.top .brand small{font-weight:400;opacity:.7;margin-left:8px;letter-spacing:0}
+.top .right{margin-left:auto;font-size:12.5px}.top .right b{color:#ffd9a8}.top .right a{color:#ffd9a8;margin-left:10px}
+nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:48px;z-index:4}
+nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:13px;color:var(--ink2);text-decoration:none;white-space:nowrap;font-weight:500}
+nav.tabs a.on{color:var(--navy);border-color:var(--orange);font-weight:600}
+main{max-width:1180px;margin:0 auto;padding:16px}
+h1{font-size:19px;margin:4px 0 12px;color:var(--navy)}h2{font-size:14.5px;margin:0 0 10px;color:var(--teal)}h3{font-size:12.5px;color:var(--ink2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}.kpi b{font-size:24px;color:var(--navy);font-variant-numeric:tabular-nums}.kpi span{display:block;font-size:12px;color:var(--ink2)}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:7px 8px;font-weight:600;color:var(--ink2);border-bottom:2px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}.num{text-align:right;font-variant-numeric:tabular-nums}.wrap{overflow-x:auto}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:var(--panel2);color:var(--ink2);white-space:nowrap}
+.tag.ok{background:var(--okbg);color:var(--teal)}.tag.warn{background:var(--warnbg);color:var(--orange)}.tag.red{background:var(--redbg);color:var(--red)}.tag.navy{background:var(--navy2);color:#fff}
+.gate{border-left:4px solid var(--orange);background:var(--warnbg);padding:8px 12px;border-radius:4px;margin:8px 0;font-size:13px}.gate.pass{border-color:var(--teal);background:var(--okbg)}.gate.fail{border-color:var(--red);background:var(--redbg)}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:92vw;padding:11px 16px;border-radius:8px;font-weight:600;font-size:13.5px;box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:20;background:var(--okbg);color:var(--teal);border:1px solid var(--teal)}
+.toast.err{background:var(--redbg);color:var(--red);border-color:var(--red)}
+label{display:block;font-size:12px;color:var(--ink2);margin-top:8px}
+input,select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:5px;font:inherit;font-size:13.5px;background:var(--panel);color:var(--ink)}textarea{min-height:72px}
+button.act{background:var(--navy2);color:#fff;border:0;border-radius:5px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer;margin:6px 6px 0 0}
+button.act.teal{background:var(--teal)}button.act.orange{background:var(--orange)}button.act.red{background:var(--red)}button.act.grey{background:var(--ink2)}button.act:disabled{opacity:.5;cursor:default}
+.muted{color:var(--ink2);font-size:12.5px}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
+@media (max-width:640px){main{padding:10px}td,th{padding:6px 5px}nav.tabs{top:0}.top{position:static}}
