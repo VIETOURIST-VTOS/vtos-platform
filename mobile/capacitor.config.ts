@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
   appName: "VTOS",
   webDir: "www",
   server: {
-    url: process.env.VTOS_WEB_URL || "https://vtos.example.com",
+    url: process.env.VTOS_WEB_URL || "https://vtos.infinitytours.org",
     cleartext: false,
   },
   android: { allowMixedContent: false },
