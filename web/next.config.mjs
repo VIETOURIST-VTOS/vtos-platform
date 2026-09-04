@@ -3,7 +3,7 @@ const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   async rewrites() {
-    // Khi chạy dev không qua Caddy: chuyển /api/* sang backend
+    // Chuyển /api/* sang backend (dev: localhost:8000; Vercel: đặt API_INTERNAL_URL = địa chỉ Render)
     const api = process.env.API_INTERNAL_URL || "http://localhost:8000";
     return [{ source: "/api/:path*", destination: `${api}/api/:path*` }];
   },
