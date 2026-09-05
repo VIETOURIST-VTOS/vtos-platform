@@ -11,6 +11,7 @@ from app.core.security import verify_password, create_token, hash_password
 from app.models.core import User, Tour, ServiceRequest, Booking, Param, Alert, AuditLog, ROLES, TOUR_TYPES, TOUR_STATUS
 from app.services import rules as R
 from app.services import tours as T
+from app.services import bookings as BK
 
 router = APIRouter(prefix="/api/v1")
 
@@ -179,7 +180,7 @@ def booking_out(b: Booking) -> dict:
     return {"id": b.id, "code": b.code, "tour_id": b.tour_id, "tour_code": b.tour.code if b.tour else "", "customer_name": b.customer_name,
             "customer_phone": b.customer_phone, "source": b.source, "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code,
             "sales_name": b.sales.full_name if b.sales else "", "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok, "counts_for_target": b.counts_for_target, "created_at": b.created_at, "paid": b.paid, "due": b.amount - b.discount - b.paid,
-            "adl": b.adl, "chd": b.chd, "inf": b.inf, "pmt_status": b.pmt_status, "cancelled": b.cancelled, "vietrip_id": b.vietrip_id}
+            "adl": b.adl, "chd": b.chd, "inf": b.inf, "vietrip_id": b.vietrip_id, "tour_start": b.tour.start_date if b.tour else None, **BK.booking_view(b)}
 
 
 @router.get("/requests", tags=["bookings"])
@@ -204,8 +205,99 @@ def create_booking(rid: int, u: User = Depends(current_user), db: Session = Depe
 
 
 @router.get("/bookings", tags=["bookings"])
-def list_bookings(limit: int = 100, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return [booking_out(b) for b in db.execute(select(Booking).order_by(desc(Booking.created_at)).limit(limit)).scalars()]
+def list_bookings(limit: int = 100, q: str = "", status: str = "", tour_id: int | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """status: unpaid / depo / paid / cancelled / locked / due (còn phải thu, chưa hủy)."""
+    qs = select(Booking).order_by(desc(Booking.created_at))
+    if tour_id: qs = qs.where(Booking.tour_id == tour_id)
+    if q:
+        like = f"%{q.strip()}%"
+        qs = qs.join(Tour, Tour.id == Booking.tour_id).where((Booking.code.ilike(like)) | (Booking.customer_name.ilike(like)) | (Booking.customer_phone.ilike(like)) | (Tour.code.ilike(like)))
+    if status == "cancelled": qs = qs.where(Booking.cancelled == True)
+    elif status == "locked": qs = qs.where(Booking.locked == True, Booking.cancelled == False)
+    elif status in ("unpaid", "depo", "paid"): qs = qs.where(Booking.pmt_status == status.upper(), Booking.cancelled == False)
+    elif status == "due": qs = qs.where(Booking.cancelled == False, Booking.pmt_status != "PAID")
+    return [booking_out(b) for b in db.execute(qs.limit(min(limit, 1000))).scalars()]
+
+
+def _booking(db: Session, bid: int) -> Booking:
+    b = db.get(Booking, bid)
+    if not b: raise HTTPException(404, "Không có booking")
+    return b
+
+
+@router.get("/bookings/{bid}", tags=["bookings"])
+def get_booking(bid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    b = _booking(db, bid); v = booking_out(b)
+    from app.models.payments import Receipt, Retention
+    v["receipts"] = [{"id": r.id, "code": r.code, "amount": r.amount, "method": r.method, "status": r.status, "payer": r.payer, "note": r.note, "created_at": r.created_at} for r in db.execute(select(Receipt).where(Receipt.booking_id == b.id).order_by(Receipt.id)).scalars()]
+    v["retentions"] = [BK.retention_out(r, db) for r in db.execute(select(Retention).where(Retention.booking_id == b.id)).scalars()]
+    return v
+
+
+@router.put("/bookings/{bid}", tags=["bookings"])
+def update_booking(bid: int, data: S.BookingCustomerIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return booking_out(BK.update_customer(db, u, _booking(db, bid), data.model_dump(exclude_none=True)))
+
+
+@router.post("/bookings/{bid}/cancel", tags=["bookings"])
+def cancel_booking(bid: int, data: S.BookingCancelIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return BK.cancel(db, u, _booking(db, bid), data.reason, data.charge, data.retain, data.expires_days)
+
+
+@router.post("/bookings/{bid}/unlock", tags=["bookings"])
+def unlock_booking(bid: int, data: S.ActionNote, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {"message": BK.unlock(db, u, _booking(db, bid), data.note)}
+
+
+@router.post("/bookings/{bid}/lock", tags=["bookings"])
+def lock_booking(bid: int, data: S.ActionNote, u: User = Depends(require_roles("nv_dh", "tp_dh", "gd_kd", "cntt")), db: Session = Depends(get_db)):
+    b = _booking(db, bid); BK.lock(db, b, data.note or f"Khóa bởi {u.username}", u.username); db.commit()
+    return {"message": f"Đã khóa {b.code}"}
+
+
+@router.post("/bookings/check", tags=["bookings"])
+def bookings_check(u: User = Depends(require_roles("tp_dh", "nv_dh", "gd_kd", "ketoan", "cntt", "tgd")), db: Session = Depends(get_db)):
+    return BK.robot_check(db)
+
+
+@router.post("/robot/bookings/check", tags=["robot"], dependencies=[Depends(robot_auth)])
+def robot_bookings_check(db: Session = Depends(get_db)):
+    return BK.robot_check(db)
+
+
+# ---------- tiền bảo lưu ----------
+@router.get("/retentions", tags=["bookings"])
+def list_retentions(status: str = "hieu_luc", q: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+    from app.models.payments import Retention
+    qs = select(Retention).order_by(desc(Retention.created_at))
+    if status and status != "all": qs = qs.where(Retention.status == status)
+    if q:
+        like = f"%{q.strip()}%"; qs = qs.where((Retention.code.ilike(like)) | (Retention.customer_name.ilike(like)) | (Retention.customer_phone.ilike(like)) | (Retention.tour_code.ilike(like)))
+    return {"summary": BK.retention_summary(db), "rows": [BK.retention_out(r, db) for r in db.execute(qs.limit(500)).scalars()]}
+
+
+def _ret(db: Session, rid: int):
+    from app.models.payments import Retention
+    r = db.get(Retention, rid)
+    if not r: raise HTTPException(404, "Không có khoản bảo lưu")
+    return r
+
+
+@router.post("/retentions/{rid}/apply", tags=["bookings"])
+def apply_retention(rid: int, data: S.RetentionApplyIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    rc = BK.apply_retention(db, u, _ret(db, rid), _booking(db, data.booking_id), data.amount)
+    return {"message": f"Đã dùng {rc.amount:,.0f} đ bảo lưu cho booking – phiếu thu {rc.code}", "receipt": rc.code}
+
+
+@router.post("/retentions/{rid}/refund", tags=["bookings"])
+def refund_retention(rid: int, data: S.RetentionRefundIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    pr = BK.refund_retention(db, u, _ret(db, rid), data.amount, data.note)
+    return {"message": f"Đã lập đề nghị hoàn tiền {pr.code} ({pr.amount:,.0f} đ) – chờ xác nhận/duyệt/chi", "request": pr.code}
+
+
+@router.post("/retentions/{rid}/cancel", tags=["bookings"])
+def cancel_retention(rid: int, data: S.ActionNote, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {"message": BK.cancel_retention(db, u, _ret(db, rid), data.note)}
 
 
 # ---------- params ----------

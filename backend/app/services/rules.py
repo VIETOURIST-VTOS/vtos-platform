@@ -14,6 +14,10 @@ DEFAULT_PARAMS = [
     ("sla_booking_phut", "120", "Điều hành tạo booking sau khi nhận yêu cầu", "phút làm việc", "ĐH Điều 2"),
     ("moc_d7", "7", "Mốc D-n kiểm tra chuyến dưới hòa vốn", "ngày", "ĐH Điều 13"),
     ("han_muc_mkt", "5000000", "Hạn mức chi Marketing cần 2 chữ ký", "đồng", "MKT Điều 8"),
+    ("coc_mac_dinh_pct", "30", "Tỷ lệ cọc mặc định khi sản phẩm không quy định", "%", "Vận hành Vietrip"),
+    ("han_coc_gio", "24", "Hạn khách đặt cọc sau khi tạo booking (quá → cảnh báo sale/ĐH)", "giờ", "Vận hành Vietrip"),
+    ("han_huy_cho_ngay", "3", "Deadline hủy chỗ / thu đủ trước khởi hành (đóng tour, khóa booking)", "ngày", "Vận hành Vietrip"),
+    ("bao_luu_han_ngay", "90", "Hạn hiệu lực tiền bảo lưu (cảnh báo trước 7 ngày)", "ngày", "Vận hành Vietrip"),
     ("quy_dh_le_noi_dia", "0.02", "Quỹ thưởng Điều hành – tour lẻ nội địa", "tỷ lệ LN", "ĐH Điều 5"),
     ("quy_dh_le_nuoc_ngoai", "0.01", "Quỹ thưởng Điều hành – tour lẻ nước ngoài", "tỷ lệ LN", "ĐH Điều 5"),
     ("quy_dh_doan", "0.01", "Quỹ thưởng Điều hành – tour đoàn (không phụ thuộc biên)", "tỷ lệ LN", "ĐH Điều 5; ĐC Điều 7"),
@@ -126,7 +130,7 @@ def calc(tour: Tour, threshold: float) -> dict:
 
 
 def booked_pax(tour: Tour) -> int:
-    return sum(b.pax for b in tour.bookings)
+    return sum(b.pax for b in tour.bookings if not b.cancelled)
 
 
 def settlement_deadline(db: Session, tour: Tour) -> date:
@@ -193,6 +197,11 @@ def run_robots(db: Session) -> int:
     for t in db.execute(select(Tour).where(Tour.status == "da_dong_so")).scalars():
         if t.closed_at and (today - t.closed_at.date()).days > int(get_param(db, "han_kt_xac_nhan")):
             add("kt_cham", "warn", t.code, f"{t.code}: Kế toán chưa xác nhận sau {get_param(db,'han_kt_xac_nhan'):.0f} ngày làm việc", "ketoan,tgd")
+    try:
+        from app.services import bookings as BK
+        created += BK.robot_check(db)["new_alerts"]
+    except Exception as ex:   # không để lỗi R4 chặn các cảnh báo khác
+        audit(db, "robot", "robot", "robot_r4_loi", "robot", after={"ly_do": str(ex)[:200]})
     sla = int(get_param(db, "sla_booking_phut"))
     for r in db.execute(select(ServiceRequest).where(ServiceRequest.booking_id == None)).scalars():
         mins = (datetime.now() - r.created_at).total_seconds() / 60

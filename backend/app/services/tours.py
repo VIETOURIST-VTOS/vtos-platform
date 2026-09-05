@@ -225,6 +225,8 @@ def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, st
                 pax=r.pax, amount=t.price_per_pax * r.pax, discount=r.discount, promo_code=r.promo_code, campaign_code=r.campaign_code,
                 counts_for_target=not t.below_margin, sla_minutes=mins, sla_ok=mins <= sla)
     db.add(b); db.flush(); r.booking_id = b.id
+    from app.services import bookings as BK
+    BK.init_terms(db, b, t)
     for a in db.execute(select(Alert).where(Alert.kind == "sla_booking", Alert.ref == f"YC-{r.id}")).scalars(): a.resolved = True
     R.audit(db, u.username, u.role, "tao_booking", f"booking:{b.code}", after={"tour": t.code, "pax": b.pax, "amount": b.amount, "sla_phut": mins, "sla_ok": b.sla_ok, "tinh_chi_tieu": b.counts_for_target}); db.commit(); db.refresh(b)
     return b, f"Đã tạo {b.code} sau {mins} phút" + ("" if b.sla_ok else " – QUÁ 2 GIỜ, ghi vào tiêu chí đánh giá")

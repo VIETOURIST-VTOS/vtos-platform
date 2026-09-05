@@ -205,6 +205,9 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         r.status, r.paid_at, r.paid_ref = "da_chi", datetime.now(), reason
         r.paid_method = "tien_mat" if reason.lower().startswith("tm") else "chuyen_khoan"
         _post_payment(db, r)
+        if r.category == "hoan_tien":
+            from app.services import bookings as BK
+            BK.on_refund_paid(db, r)
         msg = f"{r.code} đã chi ({r.paid_ref or 'không có mã GD'})"
     else:
         raise ValueError("Hành động không hợp lệ")

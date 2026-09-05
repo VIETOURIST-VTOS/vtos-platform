@@ -1,6 +1,6 @@
 """Thu tiền: giao dịch ngân hàng (SePay) và phiếu thu."""
-from datetime import datetime
-from sqlalchemy import String, Integer, Float, DateTime, Boolean, Text, ForeignKey, JSON
+from datetime import datetime, date
+from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
@@ -41,3 +41,27 @@ class Receipt(Base):
     confirmed_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Retention(Base):
+    """Tiền bảo lưu (theo màn hình Vietrip 'Tiền bảo lưu'): khách hủy/dời tour nhưng giữ tiền đã nộp để dùng cho booking sau,
+    hoàn tiền (qua đề nghị chi hoàn tiền) hoặc hủy bảo lưu (khách bỏ – ghi thu nhập khác)."""
+    __tablename__ = "retentions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True)                   # BL2609-0001
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id"), index=True)  # booking gốc
+    tour_code: Mapped[str] = mapped_column(String(30), default="")
+    customer_name: Mapped[str] = mapped_column(String(120), default="")
+    customer_phone: Mapped[str] = mapped_column(String(30), default="")
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    remaining: Mapped[float] = mapped_column(Float, default=0)
+    note: Mapped[str] = mapped_column(String(300), default="")
+    status: Mapped[str] = mapped_column(String(20), default="hieu_luc")          # hieu_luc / tat_toan / huy
+    expires_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    refund_request_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # đề nghị chi hoàn tiền
+    applied_booking_id: Mapped[int | None] = mapped_column(Integer, nullable=True) # booking mới đã dùng tiền
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    resolved_by: Mapped[str] = mapped_column(String(50), default="")
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolve_note: Mapped[str] = mapped_column(String(300), default="")

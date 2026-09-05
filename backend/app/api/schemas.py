@@ -107,6 +107,33 @@ class RequestCreate(BaseModel):
     discount: float = 0
 
 
+class BookingCustomerIn(BaseModel):
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    care_note: str | None = None
+    services_note: str | None = None
+    adl: int | None = None
+    chd: int | None = None
+    inf: int | None = None
+
+
+class BookingCancelIn(BaseModel):
+    reason: str
+    charge: float = 0            # phí hủy giữ lại (đ)
+    retain: bool = True          # True: bảo lưu phần còn lại; False: đề nghị hoàn tiền
+    expires_days: int | None = None
+
+
+class RetentionApplyIn(BaseModel):
+    booking_id: int
+    amount: float | None = None  # mặc định: min(còn lại, còn phải thu)
+
+
+class RetentionRefundIn(BaseModel):
+    amount: float | None = None
+    note: str = ""
+
+
 class ParamPropose(BaseModel):
     key: str
     value: str

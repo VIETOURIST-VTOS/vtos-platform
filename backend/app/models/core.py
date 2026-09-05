@@ -235,6 +235,12 @@ class Booking(Base):
     cancel_deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled: Mapped[bool] = mapped_column(Boolean, default=False)
     services_note: Mapped[str] = mapped_column(String(200), default="")    # dịch vụ lẻ
+    deposit_pct: Mapped[float] = mapped_column(Float, default=30)           # % cọc theo sản phẩm
+    locked: Mapped[bool] = mapped_column(Boolean, default=False)            # khóa cập nhật thông tin khách (đóng tour / thu đủ)
+    lock_reason: Mapped[str] = mapped_column(String(120), default="")
+    cancel_reason: Mapped[str] = mapped_column(String(200), default="")
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancel_charge: Mapped[float] = mapped_column(Float, default=0)          # phí hủy giữ lại làm doanh thu
     tour: Mapped["Tour"] = relationship(back_populates="bookings")
     sales: Mapped["User"] = relationship(foreign_keys=[sales_id])
 
