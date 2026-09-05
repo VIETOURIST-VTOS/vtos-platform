@@ -243,7 +243,7 @@ def apply_bookings(db: Session, limit: int = 400) -> int:
 
 
 def apply_receipts(db: Session, limit: int = 400) -> int:
-    n = 0
+    n = 0; touched = set()
     bk = {b.vietrip_id: b for b in db.execute(select(Booking).where(Booking.vietrip_id != None)).scalars()}
     for r in db.execute(select(VtRecord).where(VtRecord.entity == "receipt", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw
@@ -263,15 +263,19 @@ def apply_receipts(db: Session, limit: int = 400) -> int:
         rc = db.execute(select(Receipt).where(Receipt.code == code)).scalars().first()
         if not rc:
             rc = Receipt(code=code, booking_id=b.id); db.add(rc)
+        touched.add(b.id)
         rc.amount = float(raw.get("SoTien") or 0); rc.method = "tien_mat" if "mặt" in (raw.get("HinhThuc") or "").lower() else "chuyen_khoan"
         rc.payer = (raw.get("NguoiThanhToan") or b.customer_name)[:120]; rc.note = f"Vietrip {raw.get('TaiKhoanCongTy') or ''} {raw.get('GhiChu') or ''}".strip()[:200]
         rc.status = "ke_toan_xac_nhan"; rc.created_by = "vietrip"; rc.confirmed_by = (raw.get("FstUser") or "vietrip")[:50]
         rc.created_at = _dt(raw.get("FstUpdate")) or datetime.now(); rc.confirmed_at = rc.created_at
         r.applied, r.apply_note = True, code; n += 1
     db.flush()
-    # cập nhật đã thu theo booking
-    for b in bk.values():
-        b.paid = db.execute(select(func.coalesce(func.sum(Receipt.amount), 0)).where(Receipt.booking_id == b.id, Receipt.status != "huy")).scalar() or 0.0
+    # cập nhật đã thu cho các booking vừa chạm (1 truy vấn gộp)
+    if touched:
+        sums = dict(db.execute(select(Receipt.booking_id, func.coalesce(func.sum(Receipt.amount), 0)).where(Receipt.booking_id.in_(list(touched)), Receipt.status != "huy").group_by(Receipt.booking_id)).all())
+        by_id = {b.id: b for b in bk.values()}
+        for bid in touched:
+            if bid in by_id: by_id[bid].paid = float(sums.get(bid, 0) or 0)
     db.commit()
     return n
 
