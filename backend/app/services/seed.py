@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 from app.core.security import hash_password
 from sqlalchemy import select
 from app.models.core import User, Tour, ServiceRequest, Booking
+from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, DispatchOrder
 from app.services import rules as core
 
 USERS = [
@@ -25,6 +26,13 @@ USERS = [
 
 def seed_all(db):
     if db.execute(select(User)).scalars().first():
+        # CSDL đã có dữ liệu (bản demo trên cloud): chỉ bổ sung phần nhân sự nếu chưa có
+        if not db.execute(select(Employee)).scalars().first():
+            users = {u.username: u for u in db.execute(select(User)).scalars()}
+            tours = {t.code: t for t in db.execute(select(Tour)).scalars()}
+            if "DL-0825" in tours and "kd.hoa" in users:
+                seed_hr(db, users, [tours.get("PT-DL-0912"), tours.get("TL-BKK-1005"), tours.get("DN-HCM-0820"), tours["DL-0825"]], date.today())
+                db.commit()
         return
     pw = hash_password("123456")
     users = {}
@@ -98,6 +106,48 @@ def seed_all(db):
     # yêu cầu chưa tạo booking (quá 2 giờ)
     db.add(ServiceRequest(tour_id=tours[0].id, sales_id=hoa.id, customer_name="Võ Thị D", customer_phone="0977000111",
                           source="Website", care_note="Cần xuất hóa đơn công ty", pax=2, created_at=datetime.now() - timedelta(hours=3)))
+    seed_hr(db, users, tours, today)
     core.audit(db, "seed", "cntt", "khoi_tao_du_lieu_mau", "system", after={"users": len(USERS), "tours": len(tours)})
     db.commit()
     core.run_robots(db)
+
+
+def seed_hr(db, users, tours, today):
+    """Hồ sơ nhân sự mẫu gắn tài khoản, 2 HDV CTV, 2 xe + tài xế, hồ sơ visa, phân chuyến và lệnh điều xe cho tour Đà Lạt đã khóa."""
+    E = []
+    def emp(code, name, dept, pos, office="hcm", ct="hdld", sal=0, user=None, **kw):
+        e = Employee(code=code, full_name=name, department=dept, position=pos, office=office, contract_type=ct, base_salary=sal,
+                     user_id=users[user].id if user else None, start_date=date(2025, 1, 6), **kw)
+        db.add(e); E.append(e); return e
+    emp("NS0001", "Giám đốc Kinh doanh", "kd_le", "gd_kd", sal=12_000_000, user="gd.kd")
+    emp("NS0002", "Lê Thị Hoa (sale lẻ HCM)", "kd_le", "nv", sal=7_000_000, user="kd.hoa")
+    emp("NS0003", "Phạm Anh Tuấn (sale đoàn)", "kd_doan", "nv", sal=9_000_000, user="kd.tuan")
+    emp("NS0004", "Phó TGĐ tour đoàn", "kd_doan", "ptgd_doan", sal=12_000_000, user="ptgd.doan")
+    emp("NS0005", "Trưởng phòng Điều hành", "dieu_hanh", "tp", sal=12_000_000, user="tp.dieuhanh")
+    emp("NS0006", "Nguyễn Thị Lan (điều hành nội địa)", "dieu_hanh", "nv", sal=8_000_000, user="dh.lan")
+    emp("NS0007", "Trần Văn Minh (điều hành outbound)", "dieu_hanh", "nv", sal=8_500_000, user="dh.minh")
+    v1 = emp("NS0008", "Đỗ Thị Vy (visa HCM)", "visa", "visa", sal=8_000_000)
+    v2 = emp("NS0009", "Bùi Văn Nam (visa HCM)", "visa", "visa", sal=7_500_000)
+    v3 = emp("NS0010", "Hoàng Lan Anh (visa Hà Nội)", "visa", "visa", office="hanoi", sal=8_000_000)
+    h1 = emp("NS0011", "Võ Minh Khang (HDV nội địa)", "huong_dan", "hdv", ct="ctv", card_no="HDV-NĐ-2023-0451", card_type="noi_dia",
+             card_expiry=date(2028, 3, 1), member_org=True, ctv_contract=True, advance_limit=5_000_000)
+    h2 = emp("NS0012", "Ngô Thu Hà (HDV quốc tế – thẻ hết hạn)", "huong_dan", "hdv", ct="ctv", card_no="HDV-QT-2020-0102", card_type="quoc_te",
+             card_expiry=date(2025, 12, 31), member_org=True, ctv_contract=True)
+    d1 = emp("NS0013", "Lý Văn Sơn (tài xế)", "doi_xe", "tai_xe", ct="hdld", sal=7_000_000)
+    d2 = emp("NS0014", "Trương Công Bình (tài xế)", "doi_xe", "tai_xe", ct="hdld", sal=7_000_000)
+    emp("NS0015", "Kế toán tổng hợp", "ketoan", "nv", sal=10_000_000, user="ketoan")
+    emp("NS0016", "Nhân sự Hành chính", "hcns", "nv", sal=9_000_000, user="hcns")
+    db.flush()
+    x1 = Vehicle(plate="51B-123.45", seats=45, driver_id=d1.id, internal_rate_per_day=3_500_000)
+    x2 = Vehicle(plate="51B-678.90", seats=45, driver_id=d2.id, internal_rate_per_day=3_500_000)
+    db.add_all([x1, x2]); db.flush()
+    dalat = tours[3]
+    db.add(GuideAssignment(tour_id=dalat.id, guide_id=h1.id, days=3, rate_per_day=450_000, assigned_by="dh.lan", status="da_xac_nhan",
+                           confirmed_at=datetime.combine(dalat.start_date - timedelta(days=5), datetime.min.time()), report_submitted=True, advance_settled=True))
+    db.add(DispatchOrder(tour_id=dalat.id, vehicle_id=x1.id, driver_id=d1.id, date_from=dalat.start_date, date_to=dalat.end_date, internal_price=3 * 3_500_000,
+                         created_by="dh.lan", status="hoan_thanh", confirmed_at=datetime.combine(dalat.start_date - timedelta(days=3), datetime.min.time())))
+    for i, (cus, mk, me, hd, off, al) in enumerate([("Nguyễn Văn E", "Schengen (Pháp)", "tu_xu_ly", v1, "hcm", False), ("Trần Thị F", "Úc", "gui_doi_tac", v2, "hcm", False),
+                                                     ("Công ty G (liên minh)", "Anh", "tu_xu_ly", v1, "hcm", True), ("Lê Văn H", "Hàn Quốc", "tu_xu_ly", v3, "hanoi", False)]):
+        db.add(VisaFile(code=f"VS{i+1:04d}", customer_name=cus, market=mk, method=me, handler_id=hd.id, office=off, alliance=al, revenue=2_500_000,
+                        status="hoan_thanh", completed_at=dalat.kt_confirmed_at.date() - timedelta(days=i)))
+    db.add(VisaFile(code="VS0005", customer_name="Phạm Thị I", market="Nhật Bản", method="tu_xu_ly", handler_id=v2.id, office="hcm", revenue=1_800_000))

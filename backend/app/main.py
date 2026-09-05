@@ -8,6 +8,7 @@ from app.db.session import SessionLocal, engine, Base
 from app.api.v1.routes import router
 from app.api.v1.payments import router as payments_router
 from app.api.v1.accounting import router as accounting_router
+from app.api.v1.hr import router as hr_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -46,6 +47,7 @@ app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.CO
 app.include_router(router)
 app.include_router(payments_router)
 app.include_router(accounting_router)
+app.include_router(hr_router)
 
 
 @app.get("/", include_in_schema=False)

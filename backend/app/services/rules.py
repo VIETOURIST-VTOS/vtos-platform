@@ -28,6 +28,12 @@ DEFAULT_PARAMS = [
     ("moc_chi_tieu_cantho", "120000000", "Mốc chỉ tiêu doanh thu NV Cần Thơ", "đồng/tháng", "KD Lẻ"),
     ("ca_truc_phut", "5", "Thời gian trả lời khách trong ca trực page", "phút", "KD Lẻ Điều 2a"),
     ("tai_xe_cong_tac_phi", "200000", "Công tác phí tài xế mỗi ngày tour", "đồng/ngày", "Đội xe"),
+    ("moc_luong_doan", "30000000", "Mốc bình quân LN quyết toán 3 tháng để hưởng đủ lương NV kinh doanh đoàn", "đồng", "Đoàn Điều 5"),
+    ("phat_su_vu", "1000000", "Chế tài mỗi sự vụ từ mức 2 (chỉ trừ hoa hồng)", "đồng/vụ", "KD Lẻ"),
+    ("visa_lien_minh", "300000", "Đơn giá hồ sơ visa khách liên minh", "đồng/hồ sơ", "ĐH Điều 7"),
+    ("hdv_tncn", "0.10", "Khấu trừ TNCN thù lao HDV cộng tác viên", "tỷ lệ", "Bảng thuê ngoài 04-LĐTL"),
+    ("gd_kd_thuong_50", "3000000", "Thưởng GĐ KD khi 50–85% NV đạt chỉ tiêu", "đồng", "Chính sách GĐ KD"),
+    ("gd_kd_thuong_85", "6000000", "Thưởng GĐ KD khi ≥ 85% NV đạt chỉ tiêu", "đồng", "Chính sách GĐ KD"),
     ("thue_gtgt", "0.10", "Thuế suất GTGT dịch vụ lữ hành (Kế toán chỉnh theo mức giảm thuế hiện hành)", "tỷ lệ", "Luật Thuế GTGT"),
 ]
 

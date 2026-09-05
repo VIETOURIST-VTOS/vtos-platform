@@ -32,3 +32,17 @@ Kế toán TT99 + hóa đơn điện tử → thang lương f, visa, HDV, đội
 - Sổ cái theo TK (S03b), Bảng cân đối số phát sinh (S06) theo kỳ; khóa kỳ (chặn khi còn nháp; kỳ khóa không ghi sổ).
 - Hóa đơn GTGT từ booking: giá đã gồm thuế, tách thuế theo tham số `thue_gtgt` (mặc định 10%, Kế toán chỉnh theo mức giảm thuế hiện hành hoặc nhập riêng từng hóa đơn); ký hiệu 1C26TVT; hủy → bút toán đảo. Adapter `noi_bo` cấp số – khi ký nhà cung cấp HĐĐT thay adapter gọi API.
 - Trang web tab **Kế toán** (5 mục). Test: 6 kịch bản; tổng 20 test pass. Migration 932fede91a23.
+
+---
+# Giai đoạn 2.3: Nhân sự – Lương (robot R6) – 05/9/2026
+
+- Hồ sơ nhân sự (phòng, chức danh, văn phòng, HĐLĐ/CTV, lương công việc, thử việc 85%, thẻ HDV/hội viên/hợp đồng CTV), gắn tài khoản đăng nhập.
+- Bảng lương tháng theo mục 6.4 Thiết kế v1.7, tính từ chuyến Kế toán đã xác nhận trong tháng (tháng quyết toán):
+  - KD Lẻ: thang giảm Phụ lục C (mỗi 20 triệu/12 triệu dưới mốc −700k NV / −800k TL / −1 triệu TP, tới 0); hoa hồng thang f0–f19 × (DT tính chỉ tiêu − mốc), trần 5% từ 1000%; booking thiếu 4 trường không tính; chuyến duyệt chạy dưới biên → 10% LN booking; mã KM tính theo DT đã giảm; sự vụ ≥ mức 2 −1 triệu/vụ chỉ trừ hoa hồng; Cần Thơ +10% LN đoàn tự chốt; GĐ KD +3/+6 triệu theo % NV đạt chỉ tiêu (phần % LN Công ty nhập tay khi TGĐ duyệt).
+  - KD Đoàn: hoa hồng 10% × (LN đoàn tháng − 20 triệu); thang lương f9–f0 theo bình quân LN 3 tháng / mốc 30 triệu; PTGĐ 5% (−0,5 điểm/tiêu chí sự vụ), Sale Admin 2%.
+  - Điều hành: quỹ 2%/1%/1% chia 70/30. Ban Visa: quỹ 200k/50k (+300k liên minh) theo tháng hoàn thành, HCM chia đều, Hà Nội riêng.
+  - HDV CTV: đơn giá tuyến × ngày (lễ ×2), TNCN 10%, treo khi thiếu báo cáo tour/chưa hoàn ứng; cổng 13 chặn phân chuyến khi thẻ hết hạn/không hội viên/chưa ký HĐ CTV.
+  - Tài xế: công tác phí 200k × ngày tour từ lệnh điều xe (xác nhận 4 giờ); Đội xe = trung tâm lợi nhuận (doanh thu nội bộ theo bảng giá xe).
+- Luồng: robot nháp → Kế toán xác nhận cơ sở → HCNS lập → TGĐ ký lô → bút toán Nợ 642/Có 334, Nợ 632/Có 338 (CTV), Nợ 338/Có 3335 (TNCN).
+- **Chờ anh nạp tham số:** Bảng B.1 ngưỡng bậc f0–f19 (hiện tạm 100% + 45%×k mốc), đơn giá HDV 23 tuyến (nhập khi phân công), bảng giá xe nội bộ (nhập ở hồ sơ xe), bảng phân mức sự vụ chung.
+- Trang web tab **Nhân sự – Lương** (6 mục). Test: 6 kịch bản; tổng 26 test pass. Migration 856b08720cb7.

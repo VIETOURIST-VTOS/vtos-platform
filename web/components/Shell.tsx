@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getUser, clearSession, type User } from "@/lib/api";
 
-const NAV = [["/", "Bảng điều khiển"], ["/tours", "Tour & dự toán"], ["/requests", "Yêu cầu & booking"], ["/collections", "Thu tiền"], ["/accounting", "Kế toán"], ["/alerts", "Cảnh báo"], ["/params", "Tham số chính sách"], ["/payroll", "Lương nháp"], ["/audit", "Nhật ký"]];
+const NAV = [["/", "Bảng điều khiển"], ["/tours", "Tour & dự toán"], ["/requests", "Yêu cầu & booking"], ["/collections", "Thu tiền"], ["/accounting", "Kế toán"], ["/alerts", "Cảnh báo"], ["/params", "Tham số chính sách"], ["/hr", "Nhân sự – Lương"], ["/audit", "Nhật ký"]];
 
 type Toast = { msg: string; err?: boolean } | null;
 const Ctx = createContext<{ user: User | null; toast: (m: string, err?: boolean) => void }>({ user: null, toast: () => {} });
