@@ -17,16 +17,22 @@ from app.api.v1.settlement import router as settlement_router
 from app.api.v1.nonpackage import router as nonpackage_router
 from app.api.v1.sales_reports import router as sales_reports_router
 from app.api.v1.crm import router as crm_router
+from app.api.v1.inbox import router as inbox_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
 
 
 async def robot_loop():
+    i = 0
     while True:
-        await asyncio.sleep(600)
+        await asyncio.sleep(60); i += 1
         try:
-            db = SessionLocal(); R.run_robots(db); db.close()
+            db = SessionLocal()
+            from app.services import inbox as IB
+            IB.robot_check(db)                      # R12 mỗi phút: AI trả lời thay khi sale trễ SLA
+            if i % 10 == 0: R.run_robots(db)         # các robot khác mỗi 10 phút
+            db.close()
         except Exception as e:  # noqa
             print("robot error", e)
 
@@ -68,6 +74,7 @@ app.include_router(settlement_router)
 app.include_router(nonpackage_router)
 app.include_router(sales_reports_router)
 app.include_router(crm_router)
+app.include_router(inbox_router)
 app.include_router(payments_router)
 app.include_router(accounting_router)
 app.include_router(hr_router)

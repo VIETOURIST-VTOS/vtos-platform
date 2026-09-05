@@ -100,6 +100,11 @@ def on_webhook(db: Session, ev: dict) -> dict:
     """Sự kiện OA: follow → lead kênh Zalo OA (chưa có SĐT); user_send_text → cập nhật last_contact; user_submit_info (chia sẻ SĐT) → gắn SĐT vào lead."""
     name = ev.get("event_name") or ""; uid = str((ev.get("follower") or ev.get("sender") or {}).get("id") or ev.get("user_id") or "")
     if not uid: return {"ignored": True}
+    if name in ("user_send_text", "user_send_image", "user_send_sticker"):
+        try:
+            from app.services import inbox as IB
+            IB.inbound(db, "zalo", uid, (ev.get("message") or {}).get("text") or f"[{name}]", ext_msg_id=str((ev.get("message") or {}).get("msg_id") or ""))
+        except Exception as ex: return {"inbox_error": str(ex)[:200]}
     lead = db.execute(select(Lead).where(Lead.zalo_uid == uid).order_by(Lead.id.desc())).scalars().first()
     month = f"{datetime.now():%Y-%m}"; out = {"event": name, "uid": uid}
     if name == "follow":
@@ -125,6 +130,7 @@ def on_webhook(db: Session, ev: dict) -> dict:
 
 
 def _attach_phone(db: Session, lead: Lead, ph: str) -> None:
-    other = db.execute(select(Lead).where(Lead.phone == ph, Lead.id != lead.id).order_by(Lead.id.desc())).scalars().first()
-    if other and not other.zalo_uid: other.zalo_uid, other.zalo_follow = lead.zalo_uid, lead.zalo_follow
-    lead.phone = ph
+    for other in db.execute(select(Lead).where(Lead.phone == ph, Lead.id != lead.id).order_by(Lead.id.desc())).scalars():
+        if not other.zalo_uid: other.zalo_uid, other.zalo_follow = lead.zalo_uid, lead.zalo_follow
+    dup = db.execute(select(Lead).where(Lead.phone == ph, Lead.lead_month == lead.lead_month, Lead.channel == lead.channel, Lead.id != lead.id)).scalars().first()
+    if not dup: lead.phone = ph

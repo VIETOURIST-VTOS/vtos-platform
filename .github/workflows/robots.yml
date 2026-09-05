@@ -41,6 +41,6 @@ jobs:
           case "$J" in
             vietrip) curl -sf -m 120 -X POST "$API/robot/vietrip/sync" -H "$H" -H "$C" -d '{"settlements_days":10}'; sleep 600; curl -sf -m 170 -X POST "$API/robot/run" -H "$H"; curl -sf -m 170 -X POST "$API/robot/bookings/check" -H "$H"; curl -sf -m 170 -X POST "$API/robot/r9/auto" -H "$H" ;;
             vietrip_products) curl -sf -m 120 -X POST "$API/robot/vietrip/sync" -H "$H" -H "$C" -d '{"products":true,"settlements_days":10}' ;;
-            sepay) curl -sf -m 120 -X POST "$API/robot/sepay/pull" -H "$H" -H "$C" -d '{}'; curl -sf -m 60 -X POST "$API/robot/incidents/finalize" -H "$H" ;;
+            sepay) curl -sf -m 120 -X POST "$API/robot/sepay/pull" -H "$H" -H "$C" -d '{}'; curl -sf -m 60 -X POST "$API/robot/incidents/finalize" -H "$H"; curl -sf -m 60 -X POST "$API/robot/inbox/check" -H "$H"; curl -sf -m 60 -X POST "$API/robot/zalo/send-pending" -H "$H" ;;
             ngay|tuan|thang) curl -sf -m 170 -X POST "$API/robot/report/$J" -H "$H" -H "$C" -d '{}' ;;
           esac

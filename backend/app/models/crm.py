@@ -63,3 +63,43 @@ class ZaloMessage(Base):
     created_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Conversation(Base):
+    """Hộp thư đa kênh: một hội thoại với khách trên Facebook Messenger / Zalo OA / web chat…; gắn lead, sale phụ trách, đồng hồ SLA trả lời."""
+    __tablename__ = "conversations"
+    __table_args__ = (UniqueConstraint("channel", "external_id", name="uq_conv_channel_ext"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    channel: Mapped[str] = mapped_column(String(20), index=True)                # facebook / zalo / web / vchat
+    external_id: Mapped[str] = mapped_column(String(80))                        # PSID (Messenger) / user_id (Zalo)
+    page_id: Mapped[str] = mapped_column(String(40), default="")
+    customer_name: Mapped[str] = mapped_column(String(120), default="")
+    phone: Mapped[str] = mapped_column(String(20), default="", index=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sales_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="mo")                # mo / cho_sale / ai_da_tra_loi / dong
+    last_in_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)   # tin khách gần nhất
+    last_out_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # tin công ty gần nhất
+    sla_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)   # hạn sale phải trả lời
+    unanswered: Mapped[bool] = mapped_column(Boolean, default=False)
+    ai_replies: Mapped[int] = mapped_column(Integer, default=0)
+    ai_off: Mapped[bool] = mapped_column(Boolean, default=False)                 # sale tắt AI cho hội thoại này
+    summary: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class Message(Base):
+    __tablename__ = "messages"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    direction: Mapped[str] = mapped_column(String(3))                            # in / out
+    sender: Mapped[str] = mapped_column(String(20), default="khach")             # khach / sale / ai / he_thong
+    sender_name: Mapped[str] = mapped_column(String(80), default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+    attachments: Mapped[list] = mapped_column(JSON, default=list)
+    external_id: Mapped[str] = mapped_column(String(80), default="")
+    status: Mapped[str] = mapped_column(String(20), default="da_nhan")           # da_nhan / da_gui / loi
+    response: Mapped[str] = mapped_column(Text, default="")
+    ai_review: Mapped[dict] = mapped_column(JSON, default=dict)                  # AI chấm câu trả lời của sale
+    at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)

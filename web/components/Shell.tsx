@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getUser, clearSession, type User } from "@/lib/api";
 
-const NAV = [["/", "Bảng điều khiển"], ["/products", "Sản phẩm"], ["/tours", "Tour & dự toán"], ["/requests", "Yêu cầu & booking"], ["/bookings", "Booking & bảo lưu"], ["/non-package", "Dịch vụ lẻ"], ["/collections", "Thu tiền"], ["/expenses", "Chi tiền"], ["/accounting", "Kế toán"], ["/finance", "Tài chính"], ["/alerts", "Cảnh báo"], ["/params", "Tham số chính sách"], ["/hr", "Nhân sự – Lương"], ["/leads", "CRM – Lead & Zalo"], ["/sales-reports", "Báo cáo bán hàng"], ["/reports", "Báo cáo ngày"], ["/robot-reports", "Robot báo cáo"], ["/vietrip", "Đồng bộ Vietrip"], ["/audit", "Nhật ký"]];
+const NAV = [["/", "Bảng điều khiển"], ["/products", "Sản phẩm"], ["/tours", "Tour & dự toán"], ["/requests", "Yêu cầu & booking"], ["/bookings", "Booking & bảo lưu"], ["/non-package", "Dịch vụ lẻ"], ["/collections", "Thu tiền"], ["/expenses", "Chi tiền"], ["/accounting", "Kế toán"], ["/finance", "Tài chính"], ["/alerts", "Cảnh báo"], ["/params", "Tham số chính sách"], ["/hr", "Nhân sự – Lương"], ["/inbox", "Hộp thư đa kênh"], ["/leads", "CRM – Lead & Zalo"], ["/sales-reports", "Báo cáo bán hàng"], ["/reports", "Báo cáo ngày"], ["/robot-reports", "Robot báo cáo"], ["/vietrip", "Đồng bộ Vietrip"], ["/audit", "Nhật ký"]];
 
 type Toast = { msg: string; err?: boolean } | null;
 const Ctx = createContext<{ user: User | null; toast: (m: string, err?: boolean) => void }>({ user: null, toast: () => {} });
