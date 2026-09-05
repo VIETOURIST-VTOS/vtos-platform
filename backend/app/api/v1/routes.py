@@ -157,7 +157,7 @@ def req_out(r: ServiceRequest) -> dict:
 def booking_out(b: Booking) -> dict:
     return {"id": b.id, "code": b.code, "tour_id": b.tour_id, "tour_code": b.tour.code if b.tour else "", "customer_name": b.customer_name,
             "customer_phone": b.customer_phone, "source": b.source, "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code,
-            "sales_name": b.sales.full_name if b.sales else "", "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok, "counts_for_target": b.counts_for_target, "created_at": b.created_at}
+            "sales_name": b.sales.full_name if b.sales else "", "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok, "counts_for_target": b.counts_for_target, "created_at": b.created_at, "paid": b.paid, "due": b.amount - b.discount - b.paid}
 
 
 @router.get("/requests", tags=["bookings"])

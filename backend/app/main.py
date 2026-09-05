@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.session import SessionLocal, engine, Base
 from app.api.v1.routes import router
+from app.api.v1.payments import router as payments_router
 from app.services import rules as R
 from app.services.seed import seed_all
 
@@ -40,6 +41,7 @@ app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, lifespan=li
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",")],
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
+app.include_router(payments_router)
 
 
 @app.get("/", include_in_schema=False)

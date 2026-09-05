@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     SEED_DEMO: bool = True
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
     TZ: str = "Asia/Ho_Chi_Minh"
+    SEPAY_WEBHOOK_KEY: str = ""            # khóa đặt trong SePay → Webhook → Authorization: Apikey <key>
 
 
 settings = Settings()
