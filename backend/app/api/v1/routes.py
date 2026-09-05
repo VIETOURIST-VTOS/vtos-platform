@@ -244,7 +244,8 @@ def resolve_alert(aid: int, u: User = Depends(current_user), db: Session = Depen
 
 @router.post("/robots/run", tags=["alerts"])
 def run_robots(u: User = Depends(require_roles("cntt", "tgd", "chutich")), db: Session = Depends(get_db)):
-    n = R.run_robots(db)
+    from app.services import ops as OPS
+    n = R.run_robots(db) + OPS.check_missing_reports(db)
     R.audit(db, u.username, u.role, "chay_robot", "robot", after={"canh_bao_moi": n}); db.commit()
     return {"new_alerts": n, "message": f"Robot đã chạy, {n} cảnh báo mới"}
 

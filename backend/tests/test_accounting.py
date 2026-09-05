@@ -77,7 +77,7 @@ def test_settlement_posts_154_331_and_632():
     es = [x for x in journal() if x["source_ref"] == "tour:DN-HCM-0820"]
     assert len(es) == 2
     pairs = {(l["account"], l["debit"], l["credit"]) for e in es for l in e["lines"]}
-    assert {("154", 158000000, 0), ("331", 0, 158000000), ("632", 158000000, 0), ("154", 0, 158000000)} <= pairs
+    assert {("154", 158000000, 0), ("335", 0, 158000000), ("632", 158000000, 0), ("154", 0, 158000000)} <= pairs   # chưa có đề nghị chi → toàn bộ trích trước 335
     led = client.get("/api/v1/ledger", params={"account": "154", "period": P}, headers=login("tgd")).json()
     assert led["closing"] == 0 and led["total_debit"] == 158000000
 

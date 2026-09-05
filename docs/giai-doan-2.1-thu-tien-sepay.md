@@ -46,3 +46,13 @@ Kế toán TT99 + hóa đơn điện tử → thang lương f, visa, HDV, đội
 - Luồng: robot nháp → Kế toán xác nhận cơ sở → HCNS lập → TGĐ ký lô → bút toán Nợ 642/Có 334, Nợ 632/Có 338 (CTV), Nợ 338/Có 3335 (TNCN).
 - **Chờ anh nạp tham số:** Bảng B.1 ngưỡng bậc f0–f19 (hiện tạm 100% + 45%×k mốc), đơn giá HDV 23 tuyến (nhập khi phân công), bảng giá xe nội bộ (nhập ở hồ sơ xe), bảng phân mức sự vụ chung.
 - Trang web tab **Nhân sự – Lương** (6 mục). Test: 6 kịch bản; tổng 26 test pass. Migration 856b08720cb7.
+
+---
+# Giai đoạn 2.4: Báo cáo ngày (Điều 12) · Ca trực page (cổng 11) · Đề nghị chi – Lệnh chi (robot R3, cổng 14/15) – 05/9/2026
+
+- **Báo cáo ngày**: nộp 4 phần trên VTOS trước 20:00 (Thứ Hai–Thứ Bảy) cho khối KD Lẻ, Đoàn, Điều hành, Marketing, CNTT; robot chấm nháp 0–10 (mỗi phần ≥ 20 ký tự = 2 điểm, đúng giờ = 2); trưởng phòng chấm chính thức (không sửa sau khi chấm); tổng hợp tháng xếp loại A/B/C/D (≥8,5 / ≥7 / ≥5) làm cảnh báo sớm; robot rà thiếu: 1 ngày → nhắc nhở TP, 2 ngày liên tiếp → cảnh báo đỏ HCNS/TGĐ (chạy cùng nút "Chạy robot").
+- **Ca trực page**: GĐ KD phân ca (sáng/chiều/tối); CNTT/robot quét số lượt sót > 5 phút; chế tài 1–3: −100k/lượt, 4–5: −200k/lượt, ≥6: loại ca tháng sau; NV phản hồi trong 3 ngày; tiền phạt tự trừ vào hoa hồng trên bảng lương (không trừ lương cơ bản).
+- **Đề nghị chi (05-TT) & lệnh chi**: bắt buộc mã tour với chi tour/hoàn tiền (cổng 14), NCC có MST, chứng từ đính kèm (Kế toán chặn nếu thiếu). Robot R3 xếp cấp: vượt dự toán tour (cố định + biến đổi × max(khách dự toán, khách đã chốt)) hoặc Marketing ≥ hạn mức 5 triệu → 2 chữ ký Chủ tịch + TGĐ (cổng 15). Luồng: bộ phận (TP ĐH / PTGĐ MKT / HCNS) → Kế toán kiểm tra → TGĐ (+Chủ tịch) → lệnh chi chờ → Kế toán chi (nhập mã GD) hoặc SePay tiền ra có mã DC… + đúng số tiền tự khớp. Từ chối phải có lý do.
+- **Bút toán**: duyệt → Nợ 154 (tour) / 641 (MKT) / 642 (HC) – Có 331 NCC (ghi chú "không hóa đơn – không trừ TNDN"); chi → Nợ 331 – Có 112/111; hoàn tiền khách → Nợ 131 – Có 112. Quyết toán tour nay chỉ trích trước **335** phần chi phí chưa qua đề nghị chi, rồi kết chuyển 632/154; chi phí quyết toán nhỏ hơn đề nghị chi đã duyệt → cảnh báo Kế toán rà soát.
+- **Bảng dòng tiền tour** (mọi cấp duyệt xem): doanh thu booking, đã thu, đã chi, lệnh chi chờ, đang trình, tiền còn lại, dự toán, LN dự kiến; đỏ khi chi + lệnh chi vượt tiền đã thu.
+- Trang web: tab **Chi tiền** (đề nghị chi, dòng tiền) và **Báo cáo ngày** (của tôi, tổng hợp phòng, ca trực). Test 4 kịch bản; tổng 30 test. Migration b3d8461c1b41.

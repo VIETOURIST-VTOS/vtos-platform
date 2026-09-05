@@ -9,6 +9,7 @@ from app.api.v1.routes import router
 from app.api.v1.payments import router as payments_router
 from app.api.v1.accounting import router as accounting_router
 from app.api.v1.hr import router as hr_router
+from app.api.v1.ops import router as ops_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -48,6 +49,7 @@ app.include_router(router)
 app.include_router(payments_router)
 app.include_router(accounting_router)
 app.include_router(hr_router)
+app.include_router(ops_router)
 
 
 @app.get("/", include_in_schema=False)

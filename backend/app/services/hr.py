@@ -69,6 +69,8 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
     moc_hcm = R.get_param(db, "moc_chi_tieu_hcm"); moc_ct = R.get_param(db, "moc_chi_tieu_cantho")
     thr = R.get_param(db, "nguong_bien")
     phat_su_vu = R.get_param(db, "phat_su_vu")
+    from app.services.ops import shift_penalties_for_month
+    shift_pen = shift_penalties_for_month(db, y, m)
 
     # ---------- Lương cơ bản mọi nhân sự HĐLĐ (thử việc 85%) ----------
     for e in emps.values():
@@ -119,6 +121,11 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
             if n_inc:
                 pen = min(row(e)["bien_doi"], n_inc * phat_su_vu)
                 if pen: add(e, f"Chế tài sự vụ ≥ mức 2 ({n_inc} vụ) – chỉ trừ hoa hồng", -pen)
+            if e.id in shift_pen:
+                p_amt, n_miss, kicked = shift_pen[e.id]
+                pen = min(max(row(e)["bien_doi"], 0), p_amt)
+                if pen: add(e, f"Chế tài ca trực page: {n_miss} lượt sót – chỉ trừ hoa hồng", -pen)
+                if kicked: row(e)["ghi_chu"].append("≥ 6 lượt sót: loại khỏi ca trực tháng sau, điều chỉnh chỉ tiêu")
         elif e.position == "gd_kd":
             staff = [x for x in emps.values() if x.department == "kd_le" and x.position in ("nv", "tl", "tp") and x.contract_type == "hdld"]
             hit = sum(1 for x in staff if rev_by_sales.get(x.user_id, 0) >= (moc_ct if x.office == "cantho" else moc_hcm))

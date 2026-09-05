@@ -59,7 +59,15 @@ def ingest_sepay(db: Session, payload: dict) -> tuple[BankTransaction, bool]:
     if ttype == "in":
         match_transaction(db, txn)
     else:
-        txn.match_status, txn.match_note = "bo_qua", "Tiền ra – theo dõi ở phân hệ chi"
+        from app.services import ops as OPS
+        pr = OPS.match_outgoing(db, txn.content, txn.amount)
+        if pr:
+            pr.status, pr.paid_at, pr.paid_ref, pr.paid_method = "da_chi", txn.transaction_date, f"SePay {sid}", "chuyen_khoan"
+            OPS._post_payment(db, pr)
+            txn.match_status, txn.match_note = "da_khop", f"Tiền ra khớp lệnh chi {pr.code}"
+            R.audit(db, "robot", "robot", "khop_lenh_chi_tu_dong", f"dc:{pr.code}", after={"so_tien": txn.amount, "sepay": sid})
+        else:
+            txn.match_status, txn.match_note = "bo_qua", "Tiền ra – không khớp lệnh chi nào (Kế toán theo dõi)"
     db.commit()
     return txn, True
 

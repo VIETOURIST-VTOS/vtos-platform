@@ -132,18 +132,24 @@ def on_invoice_issued(db: Session, inv: Invoice) -> JournalEntry:
 
 
 def on_settlement_confirmed(db: Session, t: Tour, actor: str, role: str) -> list[JournalEntry]:
-    """Kế toán xác nhận quyết toán tour → tập hợp chi phí tour và kết chuyển giá vốn:
-       Nợ 154 – Có 331 (chi phí NCC theo quyết toán, chưa gồm mã KM – mã KM là dòng giá vốn quản trị nội bộ)
-       Nợ 632 – Có 154 (kết chuyển khi chuyến hoàn thành)."""
+    """Kế toán xác nhận quyết toán tour:
+       - phần chi phí quyết toán chưa ghi qua đề nghị chi (NCC chưa có hóa đơn) → Nợ 154 – Có 335 (trích trước);
+       - kết chuyển giá vốn: Nợ 632 – Có 154 theo toàn bộ chi phí quyết toán.
+       Mã KM là dòng giá vốn quản trị nội bộ, không ghi sổ."""
     if db.execute(select(JournalEntry).where(JournalEntry.source_ref == f"tour:{t.code}", JournalEntry.source_type == "quyet_toan")).scalars().first():
         return []
+    from app.services.ops import posted_tour_cost
     d = (t.kt_confirmed_at or datetime.now()).date()
     out = []
     if t.actual_cost > 0:
         try:
-            out.append(post_entry(db, "robot", "robot", d, f"Chi phí tour {t.code} theo quyết toán",
-                                  [{"account": "154", "debit": t.actual_cost, "tour_id": t.id}, {"account": "331", "credit": t.actual_cost, "partner": "NCC dịch vụ tour", "tour_id": t.id}],
-                                  "quyet_toan", f"tour:{t.code}", t.id))
+            diff = t.actual_cost - posted_tour_cost(db, t.id)
+            if diff > 0:
+                out.append(post_entry(db, "robot", "robot", d, f"Chi phí tour {t.code} chưa có hóa đơn NCC theo quyết toán (trích trước)",
+                                      [{"account": "154", "debit": diff, "tour_id": t.id}, {"account": "335", "credit": diff, "partner": "NCC dịch vụ tour", "tour_id": t.id}],
+                                      "quyet_toan", f"tour:{t.code}", t.id))
+            elif diff < 0:
+                R.audit(db, actor, role, "canh_bao_quyet_toan", f"tour:{t.code}", after={"ly_do": f"Chi phí quyết toán {t.actual_cost:,.0f} nhỏ hơn đề nghị chi đã duyệt {t.actual_cost - diff:,.0f} – Kế toán rà soát"})
             out.append(post_entry(db, "robot", "robot", d, f"Kết chuyển giá vốn tour {t.code}",
                                   [{"account": "632", "debit": t.actual_cost, "tour_id": t.id}, {"account": "154", "credit": t.actual_cost, "tour_id": t.id}],
                                   "quyet_toan", f"tour:{t.code}", t.id))
