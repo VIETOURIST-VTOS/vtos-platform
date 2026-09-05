@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.api.deps import current_user, require_roles
 from app.models.core import User, Tour
 from app.models.vietrip import VtRecord, TourCostLine
+from app.models.hr import Employee
 from app.services import vietrip as VT
 from app.services import rules as R
 
@@ -26,6 +27,24 @@ def apply(limit: int = 400, u: User = Depends(require_roles("cntt", "ketoan")), 
     except Exception as e:   # trả lỗi có nội dung để robot/CNTT chẩn đoán (không lộ dữ liệu nhạy cảm)
         db.rollback()
         raise HTTPException(500, f"Ánh xạ lỗi: {type(e).__name__}: {str(e)[:600]}")
+
+
+@router.delete("/import/vietrip/records/{entity}/{vietrip_id}")
+def delete_record(entity: str, vietrip_id: str, u: User = Depends(require_roles("cntt")), db: Session = Depends(get_db)):
+    """CNTT gỡ bản ghi nạp thử/nhầm: xóa bản ghi thô; với user → xóa hồ sơ nhân sự VT#### và khóa tài khoản tạo từ Vietrip (không xóa dữ liệu nghiệp vụ khác)."""
+    r = db.execute(select(VtRecord).where(VtRecord.entity == entity, VtRecord.vietrip_id == vietrip_id)).scalars().first()
+    if not r: raise HTTPException(404, "Không có bản ghi")
+    removed = {"vt_record": vietrip_id}
+    if entity == "user" and vietrip_id.isdigit():
+        e = db.execute(select(Employee).where(Employee.code == f"VT{int(vietrip_id):04d}")).scalars().first()
+        if e:
+            usr = db.execute(select(User).where(User.id == e.user_id)).scalars().first()
+            db.delete(e); removed["employee"] = e.code
+            if usr and usr.username not in ("chutich", "tgd", "cntt", "ketoan"):
+                usr.active = False; removed["user_locked"] = usr.username
+    db.delete(r)
+    R.audit(db, u.username, u.role, "dong_bo_vietrip_xoa", entity, after=removed); db.commit()
+    return removed
 
 
 @router.get("/import/vietrip/records")

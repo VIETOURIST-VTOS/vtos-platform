@@ -90,3 +90,13 @@ def test_duplicate_rows_in_batch():
     r = client.post("/api/v1/import/vietrip/receipt", json={"rows": [dup, dict(dup)]}, headers=h).json(); assert r["new"] == 1
     res = client.post("/api/v1/import/vietrip/apply?limit=50", headers=h).json()["applied"]; assert res["receipts"] == 1
     assert len([x for x in client.get("/api/v1/receipts", headers=h).json() if x["code"] == "VTPT88499"]) == 1
+
+
+def test_delete_test_user():
+    h = login("cntt")
+    client.post("/api/v1/import/vietrip/user", json={"rows": [{"recID": 99998, "hoTen": "Test Seq", "phone": "0900000098", "chucVu": "NV", "phongBan": "IT"}]}, headers=h)
+    client.post("/api/v1/import/vietrip/apply?limit=50", headers=h)
+    assert any(e["code"] == "VT99998" for e in client.get("/api/v1/employees", headers=login("hcns")).json())
+    r = client.delete("/api/v1/import/vietrip/records/user/99998", headers=h); assert r.status_code == 200 and r.json()["employee"] == "VT99998"
+    assert not any(e["code"] == "VT99998" for e in client.get("/api/v1/employees", headers=login("hcns")).json())
+    assert client.delete("/api/v1/import/vietrip/records/user/99998", headers=h).status_code == 404
