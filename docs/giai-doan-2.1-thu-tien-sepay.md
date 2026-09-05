@@ -80,3 +80,17 @@ Kế toán TT99 + hóa đơn điện tử → thang lương f, visa, HDV, đội
 - Dashboard: "Việc chờ tôi xử lý" gom mọi phân hệ theo vai trò (tham số, giá xe, đề nghị chi, dự toán, bảng lương, SePay, phiếu thu, chứng từ nháp, quyết toán, báo cáo ngày…); KPI HĐQT/BĐH (tiền, vay, phải thu, cảnh báo 13 tuần, LN kế toán) + KPI vận hành; khối theo phòng (KD Lẻ theo mốc, ĐH chuyến 21 ngày tới & quá hạn quyết toán, HCNS tỷ lệ báo cáo ngày).
 - Robot R7: báo cáo ngày / tuần / tháng (markdown + số liệu + nhận xét; Claude API nếu đặt ANTHROPIC_API_KEY, không thì nhận xét theo quy tắc). API cho n8n: `POST /api/v1/robot/report/{ngay|tuan|thang}` (X-Robot-Token) → gửi Zalo/Email. Lịch đề xuất: 20:30 hằng ngày, Thứ Bảy, ngày 10.
 - Test: 36 kịch bản. Migration 720517874278.
+
+---
+# Đồng bộ Vietrip → VTOS (05/9/2026)
+
+**Cấu trúc Vietrip (app.vietrip.com.vn) đã phân tích** – 154 người dùng, 10 xe, ~10.060 tour, ~70.000 phiếu thu khách, ~6.000 lệnh chi NCC:
+- Quản lý User (`/api/users/all`: họ tên, chức vụ, phòng ban Kế toán/Điều hành/Tour/Tour MICE/Hướng dẫn/CSKH/IT/Marketing/Giám đốc), Quản lý Xe (`/api/vehicles/filter`: biển số, đời xe, tài xế, tổng km).
+- Quản lý Tour: Sản phẩm (mã, loại tour, phương tiện, số ngày), Đặt tour, Booking (`/api/booking/search`: bookingID, tourcode, người book, SĐT, ADL/CHD/INF, tổng tiền, tình trạng TT UNPAID/DEPO/PAID, deadline hủy chỗ, người tạo, trạng thái OK/hủy), Non-package, Mở khóa booking.
+- Điều hành: Thông tin tour (`/operations/OperationsTour/GetToursData`: tourcode = mã SP.số thứ tự+ngày, khởi hành/kết thúc/đóng tour, loại tour TOURLE/NonPackage/MICE, số chỗ mở bán & KM, giá ADL/CHD/INF & KM, vé MB, land, LSQ, bảo hiểm, quà tặng, tổng CP, doanh thu, LN, cờ quyết toán/duyệt chi), Tiền bảo lưu, Đề xuất chi NCC; Quyết toán chi tiết tour (`/tour-settlement/spreadsheet/{id}`: dòng chi phí mô tả, cố định/theo khách, loại DV GUIDE/HOTEL/LAND…, NCC kèm MST, đơn giá, SL, hệ số, thực chi, đã thanh toán; luồng trình – duyệt – từ chối).
+- Kế toán: Xác nhận thu chi khách (`GetPaymentData`: phiếu thu/phiếu chi, chờ/đã xác nhận, hình thức CK/tiền mặt, TK công ty TPBank/MB, file UNC), Xác nhận chi NCC (DevExpress: OrgID, FOP BTF/DBT/CSH, TK NCC, trạng thái KC/QQ/XX/GD), Thông tin booking, Duyệt đề xuất chi (loại VEHICLE/…, GĐ và Kế toán duyệt).
+- Marketing/CSKH: phân loại khách, hồ sơ khách, khách đã đi tour, chiến dịch, khuyến mãi, Zalo; Báo cáo tour lẻ / điều hành / marketing.
+
+**Bổ sung vào VTOS:** tour thêm mã sản phẩm, loại xe, điểm KH, phương tiện, số ngày, chỗ mở bán/KM, giá CHD/INF/KM, nước, cờ quyết toán Vietrip; booking thêm ADL/CHD/INF, tình trạng TT, deadline hủy chỗ, cờ hủy, dịch vụ lẻ; bảng **dòng chi phí tour** (tour_cost_lines) theo mẫu quyết toán Vietrip; bảng trung gian vt_records giữ bản gốc; API `/import/vietrip/*`; trang **Đồng bộ Vietrip**; kịch bản `docs/vietrip-sync.js` chạy trong trình duyệt đã đăng nhập Vietrip (không lưu mật khẩu).
+
+**Ánh xạ:** user → tài khoản + hồ sơ nhân sự (mật khẩu ngẫu nhiên, HCNS cấp lại); xe → đội xe + tài xế; tour → tours (trạng thái: duyệt chi → khóa; quyết toán → KT xác nhận; đã kết thúc → chờ quyết toán; chưa → đang bán); quyết toán chi tiết → dòng chi phí + chi phí cố định/theo khách; booking → bookings (mã VT<id>, hủy = 0 đ); phiếu thu KC → phiếu thu KT xác nhận (VTPT<id>), phiếu chi khách → hoàn tiền đã chi (VTPC<id>); chi NCC KC → đề nghị chi đã chi (VTDC<id>), GD → lệnh chi chờ, QQ → chờ duyệt. Không sinh bút toán cho dữ liệu nhập.

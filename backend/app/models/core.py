@@ -104,6 +104,21 @@ class Tour(Base):
     kt_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cntt_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    # Bổ sung theo cấu trúc Vietrip (05/9/2026)
+    vietrip_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    product_code: Mapped[str] = mapped_column(String(30), default="")      # mã sản phẩm (PT001, MICEVH…)
+    vehicle_type: Mapped[str] = mapped_column(String(40), default="")
+    departure_point: Mapped[str] = mapped_column(String(80), default="")
+    transport: Mapped[str] = mapped_column(String(40), default="")
+    days: Mapped[int] = mapped_column(Integer, default=0)
+    seats_open: Mapped[int] = mapped_column(Integer, default=0)            # số chỗ mở bán
+    seats_promo: Mapped[int] = mapped_column(Integer, default=0)           # số chỗ khuyến mãi
+    price_chd: Mapped[float] = mapped_column(Float, default=0)
+    price_inf: Mapped[float] = mapped_column(Float, default=0)
+    price_promo: Mapped[float] = mapped_column(Float, default=0)
+    country: Mapped[str] = mapped_column(String(60), default="")
+    settled_vietrip: Mapped[bool] = mapped_column(Boolean, default=False)  # Vietrip: quyết toán / duyệt chi
+    imported: Mapped[bool] = mapped_column(Boolean, default=False)         # nhập từ Vietrip – không qua cổng duyệt VTOS
 
     operator: Mapped["User"] = relationship()
     bookings: Mapped[list["Booking"]] = relationship(back_populates="tour")
@@ -152,6 +167,15 @@ class Booking(Base):
     sla_ok: Mapped[bool] = mapped_column(Boolean, default=True)
     paid: Mapped[float] = mapped_column(Float, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    # Bổ sung theo cấu trúc Vietrip
+    vietrip_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    adl: Mapped[int] = mapped_column(Integer, default=0)
+    chd: Mapped[int] = mapped_column(Integer, default=0)
+    inf: Mapped[int] = mapped_column(Integer, default=0)
+    pmt_status: Mapped[str] = mapped_column(String(10), default="")        # UNPAID / DEPO / PAID
+    cancel_deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancelled: Mapped[bool] = mapped_column(Boolean, default=False)
+    services_note: Mapped[str] = mapped_column(String(200), default="")    # dịch vụ lẻ
     tour: Mapped["Tour"] = relationship(back_populates="bookings")
     sales: Mapped["User"] = relationship(foreign_keys=[sales_id])
 
