@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
     TZ: str = "Asia/Ho_Chi_Minh"
     SEPAY_WEBHOOK_KEY: str = ""            # khóa đặt trong SePay → Webhook → Authorization: Apikey <key>
+    COMPANY_NAME: str = "CÔNG TY CỔ PHẦN DU LỊCH VIETOURIST"
+    COMPANY_TAX_CODE: str = ""
+    ANTHROPIC_API_KEY: str = ""            # robot R7 viết nhận xét báo cáo (không có → nhận xét theo quy tắc)
+    ANTHROPIC_MODEL: str = "claude-sonnet-4-5"             # MST pháp nhân – điền trong .env / Render env
 
 
 settings = Settings()

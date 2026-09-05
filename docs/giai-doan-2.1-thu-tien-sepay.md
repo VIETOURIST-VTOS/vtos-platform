@@ -61,3 +61,22 @@ Kế toán TT99 + hóa đơn điện tử → thang lương f, visa, HDV, đội
 # Bảng giá xe nội bộ – nạp 05/9/2026 (ảnh gốc: docs/bang-gia-xe-6-5-2026.jpg)
 - 29 tuyến từ bảng giá 6/5/2026: cột **xe Vietrip – VTD** và cột **xe hợp tác hỗ trợ** (từ 5/8/2026, xe 50E-955.31, 50H-496.23). Đội xe nội bộ mẫu: 50F-009.60, 50E-957.34.
 - Bảng giá là master data: đề xuất (CNTT/HCNS/TP ĐH) → Chủ tịch + TGĐ ký → hiệu lực theo ngày, thay giá cũ cùng tuyến. Lệnh điều xe chọn tuyến → giá theo loại xe (nội bộ / hợp tác); tuyến không có trong bảng → giá theo ngày ở hồ sơ xe. Xe hợp tác không tính công tác phí tài xế Vietrip.
+
+---
+# Giai đoạn 3: BCTC & thuế (a) · Ngân quỹ – tài chính (b) · Dashboard & robot báo cáo (c) – 05/9/2026
+
+**(a) BCTC + tờ khai thuế (robot R5/R7)** – tab Kế toán › BCTC / Tờ khai thuế
+- B02-DN (KQKD) theo kỳ, tách lãi vay & khấu hao → "LN sau lãi vay trước khấu hao" (căn cứ thưởng GĐ KD); B01-DN (BCĐKT) cuối kỳ, tự cân bằng cả lãi/lỗ chưa kết chuyển; B03-DN (LCTT trực tiếp) phân loại theo tài khoản đối ứng của 111/112, đối chiếu tiền đầu/cuối kỳ. Mẫu rút gọn theo TK cấp 1 – KTT đối chiếu mẫu đầy đủ TT99 trước khi phát hành.
+- Robot lập chứng từ kết chuyển 911 (nháp) → KTT ghi sổ.
+- 01/GTGT: đầu ra từ HĐĐT đã phát hành, đầu vào từ 133, khấu trừ chuyển kỳ; 05/KK-TNCN từ 3335. Xuất XML (mã chỉ tiêu → giá trị) để nạp HTKK/eTax; KTT ký số & nộp. Biến môi trường COMPANY_TAX_CODE.
+
+**(b) Ngân quỹ – tài chính (mục 3.4, 3.9)** – tab Tài chính
+- Hồ sơ hợp đồng tài chính: khế ước vay (tự sinh lịch trả gốc đều + lãi dư nợ giảm dần; nhập đè lịch ngân hàng), đầu tư liên kết, hợp tác KD, ký quỹ, cọc, cho vay, phải thu bán cổ phần, vốn phát hành – bắt buộc nghị quyết HĐQT (trừ vay), cờ bên liên quan (GDLK).
+- Thực hiện lịch (đối chiếu GD ngân hàng) → bút toán 341/635/112, 222/138/244/128 – 112; cập nhật dư nợ; quá hạn tự đánh dấu.
+- Dự báo dòng tiền 13 tuần: booking còn phải thu (D-7), đề nghị chi + dự toán tour sắp chạy, lịch vay/đầu tư, bảng lương gần nhất, khoản kế hoạch Kế toán nhập (lặp tháng); cảnh báo âm / dưới ngưỡng `so_du_tien_toi_thieu` (500 triệu, tham số 2 chữ ký).
+- Báo cáo tài chính tuần (mục 6.6): tiền, vay, hạn 4 tuần, 10 khoản phải thu lớn nhất, danh mục đầu tư cho HĐQT, 154/335 tồn đọng, quá hạn.
+
+**(c) Dashboard theo cấp + robot R7** – Bảng điều khiển, tab Robot báo cáo
+- Dashboard: "Việc chờ tôi xử lý" gom mọi phân hệ theo vai trò (tham số, giá xe, đề nghị chi, dự toán, bảng lương, SePay, phiếu thu, chứng từ nháp, quyết toán, báo cáo ngày…); KPI HĐQT/BĐH (tiền, vay, phải thu, cảnh báo 13 tuần, LN kế toán) + KPI vận hành; khối theo phòng (KD Lẻ theo mốc, ĐH chuyến 21 ngày tới & quá hạn quyết toán, HCNS tỷ lệ báo cáo ngày).
+- Robot R7: báo cáo ngày / tuần / tháng (markdown + số liệu + nhận xét; Claude API nếu đặt ANTHROPIC_API_KEY, không thì nhận xét theo quy tắc). API cho n8n: `POST /api/v1/robot/report/{ngay|tuan|thang}` (X-Robot-Token) → gửi Zalo/Email. Lịch đề xuất: 20:30 hằng ngày, Thứ Bảy, ngày 10.
+- Test: 36 kịch bản. Migration 720517874278.

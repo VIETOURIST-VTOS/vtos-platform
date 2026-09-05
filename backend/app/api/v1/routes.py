@@ -68,10 +68,12 @@ def dashboard(u: User = Depends(current_user), db: Session = Depends(get_db)):
                 todo.append({"tour_id": t.id, "code": t.code, "name": t.name, "action": a})
     counts = {}
     for t in tours: counts[t.status] = counts.get(t.status, 0) + 1
+    from app.services import dashboard as DB_
+    extra = DB_.build(db, u)
     return {"counts": counts, "n_tours": len(tours), "todo": todo,
             "pending_requests": db.execute(select(func.count()).select_from(ServiceRequest).where(ServiceRequest.booking_id == None)).scalar(),
             "pending_params": db.execute(select(func.count()).select_from(Param).where(Param.status == "pending")).scalar(),
-            "alerts": [alert_out(a) for a in alerts], "threshold": R.get_param(db, "nguong_bien")}
+            "alerts": [alert_out(a) for a in alerts], "threshold": R.get_param(db, "nguong_bien"), **extra}
 
 
 # ---------- tours ----------
@@ -295,3 +297,39 @@ def robot_tours(db: Session = Depends(get_db)):
     for t in db.execute(select(Tour)).scalars():
         v = T.tour_view(db, t); v.pop("bookings", None); out.append(v)
     return out
+
+
+# ---------- Robot R7 – báo cáo tự động ----------
+from app.models.reports_auto import AutoReport
+
+
+def _rep_out(r: AutoReport) -> dict:
+    return {"id": r.id, "kind": r.kind, "period": r.period, "content": r.content, "comment": r.comment, "data": r.data, "created_by": r.created_by, "created_at": r.created_at}
+
+
+@router.get("/auto-reports", tags=["robot"])
+def auto_reports(kind: str | None = None, limit: int = 30, u: User = Depends(require_roles("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "ketoan", "cntt", "bks", "hcns", "tp_dh", "gd_kd")), db: Session = Depends(get_db)):
+    q = select(AutoReport).order_by(desc(AutoReport.created_at))
+    if kind: q = q.where(AutoReport.kind == kind)
+    return [_rep_out(r) for r in db.execute(q.limit(limit)).scalars()]
+
+
+@router.post("/auto-reports/{kind}", tags=["robot"])
+def auto_report_run(kind: str, u: User = Depends(require_roles("cntt", "tgd", "chutich", "ketoan")), db: Session = Depends(get_db)):
+    from app.services import dashboard as DB_
+    try:
+        r = DB_.run_report(db, kind, u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"message": f"Robot đã lập báo cáo {kind} {r.period}", "report": _rep_out(r)}
+
+
+@router.post("/robot/report/{kind}", tags=["robot"], dependencies=[Depends(robot_auth)])
+def robot_report(kind: str, db: Session = Depends(get_db)):
+    """n8n gọi theo lịch: 20:30 hằng ngày (ngay), thứ Bảy (tuan), ngày 10 (thang). Trả markdown để gửi Zalo/Email."""
+    from app.services import dashboard as DB_
+    try:
+        r = DB_.run_report(db, kind)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"period": r.period, "markdown": r.content, "comment": r.comment}

@@ -27,16 +27,19 @@ CHART = [
     ("511", "Doanh thu bán hàng và cung cấp dịch vụ", "DT", ""), ("515", "Doanh thu hoạt động tài chính", "DT", ""),
     ("632", "Giá vốn hàng bán (giá vốn tour)", "CP", ""), ("635", "Chi phí tài chính", "CP", ""),
     ("641", "Chi phí bán hàng", "CP", ""), ("642", "Chi phí quản lý doanh nghiệp", "CP", ""),
+    ("128", "Đầu tư nắm giữ đến ngày đáo hạn / cho vay", "TS", ""), ("222", "Đầu tư vào công ty liên kết, liên doanh", "TS", ""),
+    ("244", "Cầm cố, thế chấp, ký quỹ, ký cược", "TS", ""), ("413", "Chênh lệch tỷ giá hối đoái", "NV", ""),
     ("711", "Thu nhập khác", "DT", ""), ("811", "Chi phí khác", "CP", ""),
     ("821", "Chi phí thuế TNDN", "CP", ""), ("911", "Xác định kết quả kinh doanh", "XD", ""),
 ]
 
 
 def seed_accounts(db: Session):
-    if db.get(Account, "111"):
-        return
+    """Bổ sung tài khoản còn thiếu trong danh mục (chạy được nhiều lần)."""
+    have = {a.code for a in db.execute(select(Account)).scalars()}
     for c, n, k, p in CHART:
-        db.add(Account(code=c, name=n, kind=k, parent=p))
+        if c not in have:
+            db.add(Account(code=c, name=n, kind=k, parent=p))
     db.commit()
 
 

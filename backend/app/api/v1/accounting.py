@@ -9,6 +9,8 @@ from app.api.deps import current_user, require_roles
 from app.models.core import Booking, User
 from app.models.accounting import Account, JournalEntry, Invoice, PeriodLock
 from app.services import accounting as ACC
+from app.services import rules as R_
+from app.core.config import settings
 
 router = APIRouter(prefix="/api/v1", tags=["ke-toan"])
 READ = ("ketoan", "cntt", "tgd", "chutich", "bks", "ptgd_doan", "hcns")
@@ -184,3 +186,51 @@ def lock(period: str, data: LockIn, u: User = Depends(require_roles("ketoan")), 
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"message": f"Đã khóa kỳ {period}"}
+
+
+# ---------- BCTC & tờ khai thuế (robot R5/R7) ----------
+from fastapi import Response
+from app.services import reports as RP
+
+
+@router.get("/reports/balance-sheet")
+def balance_sheet(period: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return RP.balance_sheet(db, period)
+
+
+@router.get("/reports/income-statement")
+def income_statement(period: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return RP.income_statement(db, period)
+
+
+@router.get("/reports/cash-flow")
+def cash_flow(period: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return RP.cash_flow(db, period)
+
+
+@router.post("/reports/closing-entries/{period}")
+def closing(period: str, u: User = Depends(require_roles("ketoan")), db: Session = Depends(get_db)):
+    try:
+        es = RP.closing_entries_draft(db, u, period)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"message": f"Robot đã lập {len(es)} chứng từ kết chuyển NHÁP kỳ {period} – Kế toán trưởng kiểm tra rồi ghi sổ", "entries": [entry_out(e) for e in es]}
+
+
+@router.get("/tax/vat")
+def vat(period: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return RP.vat_return(db, period)
+
+
+@router.get("/tax/pit")
+def pit(period: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return RP.pit_return(db, period)
+
+
+@router.get("/tax/{kind}/xml")
+def tax_xml(kind: str, period: str, u: User = Depends(require_roles("ketoan", "cntt", "tgd")), db: Session = Depends(get_db)):
+    ret = RP.vat_return(db, period) if kind == "vat" else RP.pit_return(db, period) if kind == "pit" else None
+    if not ret: raise HTTPException(404, "Loại tờ khai: vat / pit")
+    R_.audit(db, u.username, u.role, "xuat_xml_to_khai", f"tax:{kind}:{period}", after={"mau": ret["form"]}); db.commit()
+    return Response(content=RP.to_xml(ret, tax_code=settings.COMPANY_TAX_CODE, company=settings.COMPANY_NAME), media_type="application/xml",
+                    headers={"Content-Disposition": f'attachment; filename="{kind}_{period}.xml"'})

@@ -4,11 +4,11 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
-const SRC: Record<string, string> = { thu_tien: "Thu tiền (R1)", hoa_don: "Hóa đơn", quyet_toan: "Quyết toán tour", thu_cong: "Kế toán lập", dao: "Bút toán đảo" };
+const SRC: Record<string, string> = { thu_tien: "Thu tiền (R1)", hoa_don: "Hóa đơn", quyet_toan: "Quyết toán tour", thu_cong: "Kế toán lập", dao: "Bút toán đảo", de_nghi_chi: "Đề nghị chi (R3)", lenh_chi: "Lệnh chi", luong: "Bảng lương (R6)", ket_chuyen: "Kết chuyển 911" };
 const EST: Record<string, [string, string]> = { nhap: ["Nháp", "warn"], da_ghi_so: ["Đã ghi sổ", "ok"], huy: ["Hủy", "red"] };
 const IST: Record<string, [string, string]> = { nhap: ["Nháp", "warn"], da_phat_hanh: ["Đã phát hành", "ok"], huy: ["Hủy", "red"] };
 const thisPeriod = () => new Date().toISOString().slice(0, 7);
-const TABS = [["journal", "Chứng từ ghi sổ"], ["ledger", "Sổ cái"], ["tb", "Cân đối phát sinh"], ["invoices", "Hóa đơn điện tử"], ["periods", "Khóa kỳ"]];
+const TABS = [["journal", "Chứng từ ghi sổ"], ["ledger", "Sổ cái"], ["tb", "Cân đối phát sinh"], ["invoices", "Hóa đơn điện tử"], ["fs", "BCTC"], ["tax", "Tờ khai thuế"], ["periods", "Khóa kỳ"]];
 
 function Accounting() {
   const { user, toast } = useShell();
@@ -23,6 +23,8 @@ function Accounting() {
   const [tb, setTb] = useState<any>(null);
   const [invs, setInvs] = useState<any[]>([]);
   const [periods, setPeriods] = useState<any[]>([]);
+  const [fs, setFs] = useState<any>({});
+  const [tax, setTax] = useState<any>({});
   const [bookings, setBookings] = useState<any[]>([]);
   const [lines, setLines] = useState([{ account: "642", debit: "", credit: "" }, { account: "111", debit: "", credit: "" }]);
   const [desc, setDesc] = useState("");
@@ -35,6 +37,8 @@ function Accounting() {
     if (tab === "tb") api(`/trial-balance?period=${period}`).then(setTb);
     if (tab === "invoices") { api("/invoices").then(setInvs); api("/collections/summary").then((s) => setBookings(s.bookings)); }
     if (tab === "periods") api("/periods").then(setPeriods);
+    if (tab === "fs") Promise.all([api(`/reports/balance-sheet?period=${period}`), api(`/reports/income-statement?period=${period}`), api(`/reports/cash-flow?period=${period}`)]).then(([bs, pl, cf]) => setFs({ bs, pl, cf }));
+    if (tab === "tax") Promise.all([api(`/tax/vat?period=${period}`), api(`/tax/pit?period=${period}`)]).then(([vat, pit]) => setTax({ vat, pit }));
   }, [tab, period, acc, accounts.length]);
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
@@ -99,6 +103,30 @@ function Accounting() {
           <td><Tag cls={IST[i.status]?.[1]}>{IST[i.status]?.[0]}</Tag></td><td className="mono muted">{i.provider_ref}</td>
           {isKT && <td>{i.status === "nhap" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/invoices/${i.id}/issue`)}>Phát hành</button>}{i.status !== "huy" && <button className="act grey" style={{ margin: "0 0 0 4px" }} onClick={() => { const r = prompt("Lý do hủy hóa đơn?"); if (r) post(`/invoices/${i.id}/cancel`, { reason: r }); }}>Hủy</button>}</td>}</tr>) : <tr><td colSpan={10} className="muted">Chưa có hóa đơn.</td></tr>}</tbody></table></div>
       <p className="muted">Bản pilot cấp số nội bộ (adapter <code>noi_bo</code>). Khi ký hợp đồng nhà cung cấp HĐĐT (Viettel / VNPT / MISA meInvoice…) thay adapter gọi API, số hóa đơn và mã CQT lấy từ nhà cung cấp.</p>
+    </>}
+
+    {tab === "fs" && fs.bs && <>
+      <h2>Báo cáo kết quả kinh doanh (B02-DN) – kỳ {period}</h2>
+      <div className="panel wrap"><table><tbody>{fs.pl.rows.map((r: any) => <tr key={r[0]} style={{ fontWeight: ["20", "30", "50", "60"].includes(r[0]) ? 700 : 400 }}><td className="mono">{r[0]}</td><td>{r[1]}</td><td style={{ textAlign: "right" }}>{vnd(r[2])}</td></tr>)}</tbody></table>
+        <p className="muted">Quản trị: lãi vay {vnd(fs.pl.management.interest)} · khấu hao {vnd(fs.pl.management.depreciation)} · LN sau lãi vay trước khấu hao <b>{vnd(fs.pl.management.profit_after_interest_before_dep)}</b> (căn cứ thưởng GĐ KD).</p></div>
+      <h2>Bảng cân đối kế toán (B01-DN) – cuối kỳ {period} {fs.bs.balanced ? <Tag cls="ok">Cân</Tag> : <Tag cls="red">LỆCH</Tag>}</h2>
+      <div className="grid">
+        <div className="panel wrap"><b>TÀI SẢN</b><table><tbody>{fs.bs.assets.map((r: any) => <tr key={r[0]}><td>{r[1]}</td><td style={{ textAlign: "right" }}>{vnd(r[2])}</td></tr>)}<tr><td><b>Tổng tài sản</b></td><td style={{ textAlign: "right" }}><b>{vnd(fs.bs.total_assets)}</b></td></tr></tbody></table></div>
+        <div className="panel wrap"><b>NGUỒN VỐN</b><table><tbody>{fs.bs.liabilities.map((r: any) => <tr key={r[0]}><td>{r[1]}</td><td style={{ textAlign: "right" }}>{vnd(r[2])}</td></tr>)}{fs.bs.equity.map((r: any) => <tr key={r[0]}><td>{r[1]}</td><td style={{ textAlign: "right" }}>{vnd(r[2])}</td></tr>)}<tr><td><b>Tổng nguồn vốn</b></td><td style={{ textAlign: "right" }}><b>{vnd(fs.bs.total_liabilities + fs.bs.total_equity)}</b></td></tr></tbody></table></div>
+      </div>
+      <h2>Lưu chuyển tiền tệ trực tiếp (B03-DN) {fs.cf.reconciled ? <Tag cls="ok">Khớp tiền đầu/cuối kỳ</Tag> : <Tag cls="red">Chưa khớp</Tag>}</h2>
+      <div className="panel wrap"><table><tbody>{fs.cf.rows.map((r: any) => <tr key={r[0]} style={{ fontWeight: ["20", "30", "40", "50", "70"].includes(r[0]) ? 700 : 400 }}><td className="mono">{r[0]}</td><td>{r[1]}</td><td style={{ textAlign: "right" }}>{vnd(r[2])}</td></tr>)}</tbody></table></div>
+      {isKT && <button className="act orange" onClick={() => post(`/reports/closing-entries/${period}`)}>Robot lập chứng từ kết chuyển 911 (nháp)</button>}
+      <p className="muted">Mẫu rút gọn theo nhóm tài khoản cấp 1 từ chứng từ đã ghi sổ; số dư đầu kỳ chuyển từ MISA/BCTC kiểm toán nhập khi cắt chuyển. Kế toán trưởng đối chiếu mẫu đầy đủ TT99/2025 trước khi phát hành; hợp nhất 2 pháp nhân và công ty liên kết làm ở giai đoạn 4.</p>
+    </>}
+
+    {tab === "tax" && tax.vat && <>
+      <h2>Tờ khai GTGT (01/GTGT) – kỳ {period} · {tax.vat.invoices} hóa đơn đầu ra</h2>
+      <div className="panel wrap"><table><tbody>{tax.vat.rows.map((r: any) => <tr key={r[0]} style={{ fontWeight: ["[40]", "[43]"].includes(r[0]) ? 700 : 400 }}><td className="mono">{r[0]}</td><td>{r[1]}</td><td style={{ textAlign: "right" }}>{vnd(r[2])}</td></tr>)}</tbody></table><p className="muted">{tax.vat.note}</p>
+        {isKT && <a className="act" style={{ display: "inline-block", textDecoration: "none" }} href={`/api/v1/tax/vat/xml?period=${period}`} onClick={(e) => { e.preventDefault(); fetch(`/api/v1/tax/vat/xml?period=${period}`, { headers: { Authorization: `Bearer ${localStorage.getItem("vtos_token")}` } }).then((r) => r.blob()).then((b) => { const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `01GTGT_${period}.xml`; a.click(); }); }}>Xuất XML nạp HTKK/eTax</a>}</div>
+      <h2>Tờ khai TNCN (05/KK-TNCN)</h2>
+      <div className="panel wrap"><table><tbody>{tax.pit.rows.map((r: any) => <tr key={r[0]}><td className="mono">{r[0]}</td><td>{r[1]}</td><td style={{ textAlign: "right" }}>{vnd(r[2])}</td></tr>)}</tbody></table><p className="muted">{tax.pit.note}</p></div>
+      <p className="muted">Robot R5 chỉ lập tờ khai từ sổ và xuất XML; Kế toán trưởng kiểm tra, ký số bằng token công ty và nộp trên eTax; lưu biên nhận vào kho chứng từ. Cấu trúc XML cần đối chiếu với phiên bản HTKK hiện hành trước lần nộp đầu.</p>
     </>}
 
     {tab === "periods" && <div className="panel wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Khóa bởi</th><th>Lúc</th><th>Ghi chú</th>{isKT && <th></th>}</tr></thead>

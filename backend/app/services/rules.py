@@ -34,6 +34,7 @@ DEFAULT_PARAMS = [
     ("hdv_tncn", "0.10", "Khấu trừ TNCN thù lao HDV cộng tác viên", "tỷ lệ", "Bảng thuê ngoài 04-LĐTL"),
     ("gd_kd_thuong_50", "3000000", "Thưởng GĐ KD khi 50–85% NV đạt chỉ tiêu", "đồng", "Chính sách GĐ KD"),
     ("gd_kd_thuong_85", "6000000", "Thưởng GĐ KD khi ≥ 85% NV đạt chỉ tiêu", "đồng", "Chính sách GĐ KD"),
+    ("so_du_tien_toi_thieu", "500000000", "Ngưỡng số dư tiền tối thiểu – cảnh báo dự báo dòng tiền 13 tuần", "đồng", "Thiết kế 3.4"),
     ("thue_gtgt", "0.10", "Thuế suất GTGT dịch vụ lữ hành (Kế toán chỉnh theo mức giảm thuế hiện hành)", "tỷ lệ", "Luật Thuế GTGT"),
 ]
 
