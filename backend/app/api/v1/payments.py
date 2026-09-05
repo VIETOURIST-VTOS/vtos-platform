@@ -102,6 +102,14 @@ def list_txns(status: str | None = None, limit: int = 200, u: User = Depends(cur
     return [txn_out(t, db) for t in db.execute(q.limit(limit)).scalars()]
 
 
+@router.get("/bank-transactions/{tid}/raw")
+def txn_raw(tid: int, u: User = Depends(require_roles("ketoan", "cntt", "bks")), db: Session = Depends(get_db)):
+    """Gói tin gốc SePay của giao dịch (đối chiếu/kiểm toán)."""
+    t = db.get(BankTransaction, tid)
+    if not t: raise HTTPException(404, "Không có giao dịch")
+    return {"id": t.id, "sepay_id": t.sepay_id, "raw": t.raw}
+
+
 class AssignIn(BaseModel):
     booking_id: int
     note: str = ""

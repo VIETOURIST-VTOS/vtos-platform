@@ -53,13 +53,21 @@ def list_transactions(from_date: date | None, to_date: date | None, account_numb
     return data.get("transactions", [])
 
 
+def _first(t: dict, *keys) -> str:
+    for k in keys:
+        v = t.get(k)
+        if v is not None and str(v).strip() and str(v).strip().lower() != "null": return str(v).strip()
+    return ""
+
+
 def to_webhook_payload(t: dict) -> dict:
     """Chuẩn hóa bản ghi User API về dạng webhook để dùng chung ingest_sepay."""
     amt_in = float(t.get("amount_in") or 0); amt_out = float(t.get("amount_out") or 0)
+    content = _first(t, "transaction_content", "content", "description", "transaction_description", "note", "memo", "remark")
     return {"id": t.get("id"), "gateway": t.get("bank_brand_name") or t.get("bank_short_name") or "", "transactionDate": t.get("transaction_date"),
             "accountNumber": t.get("account_number") or "", "subAccount": t.get("sub_account"), "transferType": "in" if amt_in > 0 else "out",
             "transferAmount": amt_in if amt_in > 0 else amt_out, "accumulated": t.get("accumulated"), "code": t.get("code"),
-            "content": t.get("transaction_content") or "", "referenceCode": t.get("reference_number") or "", "description": t.get("transaction_content") or "",
+            "content": content, "referenceCode": _first(t, "reference_number", "reference_code", "ref_no"), "description": content,
             "_source": "sepay_api"}
 
 
@@ -67,7 +75,12 @@ def pull(db: Session, from_date: date | None, to_date: date | None, account_numb
     rows = list_transactions(from_date, to_date, account_number)
     new = matched = pending = 0
     for t in sorted(rows, key=lambda x: str(x.get("transaction_date") or "")):
-        txn, created = P.ingest_sepay(db, to_webhook_payload(t))
+        pl = to_webhook_payload(t)
+        txn, created = P.ingest_sepay(db, pl)
+        if not created and (txn.content or "").strip().lower() in ("", "null") and pl["content"]:
+            txn.content, txn.reference_code, txn.raw = pl["content"], pl["referenceCode"], t   # bổ sung nội dung cho bản ghi kéo trước đó
+            if txn.transfer_type == "in" and txn.match_status in ("cho_ke_toan", "chua_khop"): P.match_transaction(db, txn)
+            db.commit()
         if created:
             new += 1
             if txn.match_status == "da_khop": matched += 1
