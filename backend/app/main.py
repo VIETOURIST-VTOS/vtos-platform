@@ -16,6 +16,7 @@ from app.api.v1.products import router as products_router
 from app.api.v1.settlement import router as settlement_router
 from app.api.v1.nonpackage import router as nonpackage_router
 from app.api.v1.sales_reports import router as sales_reports_router
+from app.api.v1.crm import router as crm_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -66,6 +67,7 @@ app.include_router(products_router)
 app.include_router(settlement_router)
 app.include_router(nonpackage_router)
 app.include_router(sales_reports_router)
+app.include_router(crm_router)
 app.include_router(payments_router)
 app.include_router(accounting_router)
 app.include_router(hr_router)

@@ -22,7 +22,13 @@ class Settings(BaseSettings):
     COMPANY_NAME: str = "CÔNG TY CỔ PHẦN DU LỊCH VIETOURIST"
     COMPANY_TAX_CODE: str = ""
     ANTHROPIC_API_KEY: str = ""            # robot R7 viết nhận xét báo cáo (không có → nhận xét theo quy tắc)
-    ANTHROPIC_MODEL: str = "claude-sonnet-4-5"             # MST pháp nhân – điền trong .env / Render env
+    ANTHROPIC_MODEL: str = "claude-sonnet-4-5"
+    ZALO_OA_ACCESS_TOKEN: str = ""         # Zalo Official Account – access token (developers.zalo.me); anh tự dán vào Render env
+    ZALO_OA_REFRESH_TOKEN: str = ""
+    ZALO_APP_ID: str = ""
+    ZALO_APP_SECRET: str = ""
+    ZALO_OA_SECRET_KEY: str = ""           # khóa xác thực webhook OA (X-ZEvent-Signature)
+    ZALO_ZNS_TEMPLATES: str = ""           # "nhac_coc:1234,xac_nhan_booking:2345" – mẫu ZNS đã duyệt             # MST pháp nhân – điền trong .env / Render env
 
 
 settings = Settings()
