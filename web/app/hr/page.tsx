@@ -27,7 +27,10 @@ function HR() {
   const [tours, setTours] = useState<any[]>([]);
   const [fEmp, setFEmp] = useState<any>({ full_name: "", department: "kd_le", position: "nv", office: "hcm", contract_type: "hdld", base_salary: "" });
   const [fVisa, setFVisa] = useState<any>({ customer_name: "", market: "", method: "tu_xu_ly", handler_id: "", office: "hcm", alliance: false, revenue: "" });
-  const [fAsg, setFAsg] = useState<any>({ tour_id: "", guide_id: "", days: "1", rate_per_day: "450000", holiday: false });
+  const [fAsg, setFAsg] = useState<any>({ tour_id: "", guide_id: "", days: "", rate_per_day: "", rate_id: "", holiday: false });
+  const [grates, setGrates] = useState<any[]>([]);
+  const [fGrate, setFGrate] = useState<any>({ route: "", days: "", rate_per_day: "", old_rate_per_day: "", effective_from: new Date().toISOString().slice(0, 10) });
+  const [incMeta, setIncMeta] = useState<any>(null);
   const [fDisp, setFDisp] = useState<any>({ tour_id: "", vehicle_id: "", date_from: "", date_to: "", rate_id: "" });
   const [rates, setRates] = useState<any[]>([]);
   const [fRate, setFRate] = useState<any>({ route: "", days: "", internal_price: "", partner_price: "", effective_from: new Date().toISOString().slice(0, 10) });
@@ -41,9 +44,9 @@ function HR() {
     if (tab === "payroll") api(`/payroll-runs/${period}`).then(setRun).catch((e) => toast(errMsg(e), true));
     if (tab === "employees") api("/employees").then(setEmps);
     if (tab === "visa") api("/visa").then(setVisa);
-    if (tab === "guides") api("/guide-assignments").then(setAsg);
+    if (tab === "guides") { api("/guide-assignments").then(setAsg); api("/guide-rates").then(setGrates); }
     if (tab === "fleet") { api("/vehicles").then(setVeh); api("/dispatch").then(setDisp); api("/vehicle-rates").then(setRates); api(`/fleet/summary?period=${period}`).then(setFleet); }
-    if (tab === "incidents") api("/incidents").then(setInc);
+    if (tab === "incidents") { api("/incidents").then(setInc); api("/incident-levels").then(setIncMeta); }
   }, [tab, period]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any, method = "POST") => { try { const r = await api(path, { method, json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
@@ -110,14 +113,27 @@ function HR() {
       {canDH && <div className="panel"><h2>Văn bản phân công HDV (cổng 13 – kiểm tra thẻ, hội viên, hợp đồng CTV)</h2><div className="grid">
         <label>Tour<select value={fAsg.tour_id} onChange={(e) => setFAsg({ ...fAsg, tour_id: e.target.value })}><option value="">–</option>{tours.map((t) => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}</select></label>
         <label>HDV<select value={fAsg.guide_id} onChange={(e) => setFAsg({ ...fAsg, guide_id: e.target.value })}><option value="">–</option>{guides.map((g) => <option key={g.id} value={g.id}>{g.full_name} {g.guide_ok ? "" : "(không đủ điều kiện)"}</option>)}</select></label>
+        <label>Tuyến (bảng giá HDV)<select value={fAsg.rate_id} onChange={(e) => { const r = grates.find((x) => String(x.id) === e.target.value); setFAsg({ ...fAsg, rate_id: e.target.value, rate_per_day: r ? String(r.rate_per_day) : fAsg.rate_per_day, days: r ? String(Math.round(r.days)) : fAsg.days }); }}><option value="">– ngoài bảng giá (nhập tay) –</option>{grates.filter((r) => r.status === "active").map((r) => <option key={r.id} value={r.id}>{r.route} · {vnd(r.rate_per_day)}/ngày · {r.days} ngày</option>)}</select></label>
         <label>Số ngày<input type="number" value={fAsg.days} onChange={(e) => setFAsg({ ...fAsg, days: e.target.value })} /></label>
-        <label>Đơn giá/ngày (Phụ lục A)<input type="number" value={fAsg.rate_per_day} onChange={(e) => setFAsg({ ...fAsg, rate_per_day: e.target.value })} /></label>
+        <label>Đơn giá/ngày<input type="number" value={fAsg.rate_per_day} disabled={!!fAsg.rate_id} onChange={(e) => setFAsg({ ...fAsg, rate_per_day: e.target.value })} /></label>
         <label><input type="checkbox" checked={fAsg.holiday} onChange={(e) => setFAsg({ ...fAsg, holiday: e.target.checked })} /> Lễ Tết ×2</label>
-      </div><button className="act" disabled={!fAsg.tour_id || !fAsg.guide_id} onClick={() => post("/guide-assignments", { tour_id: Number(fAsg.tour_id), guide_id: Number(fAsg.guide_id), days: Number(fAsg.days), rate_per_day: Number(fAsg.rate_per_day), holiday: fAsg.holiday })}>Phân công</button></div>}
+      </div><button className="act" disabled={!fAsg.tour_id || !fAsg.guide_id || (!fAsg.rate_id && !fAsg.rate_per_day)} onClick={() => post("/guide-assignments", { tour_id: Number(fAsg.tour_id), guide_id: Number(fAsg.guide_id), days: Number(fAsg.days) || 0, rate_per_day: Number(fAsg.rate_per_day) || 0, rate_id: fAsg.rate_id ? Number(fAsg.rate_id) : null, holiday: fAsg.holiday })}>Phân công</button></div>}
       <div className="panel wrap"><table><thead><tr><th>Tour</th><th>HDV</th><th>Ngày × đơn giá</th><th style={{ textAlign: "right" }}>Thù lao</th><th>Trạng thái</th><th>Báo cáo tour</th><th>Hoàn ứng</th><th>Phân công</th>{canDH && <th></th>}</tr></thead>
         <tbody>{asg.map((a) => <tr key={a.id}><td><b>{a.tour_code}</b><div className="muted">{a.tour_name}</div></td><td>{a.guide}</td><td>{a.days} × {vnd(a.rate_per_day)}{a.holiday && " ×2"}</td><td style={{ textAlign: "right" }}>{vnd(a.amount)}</td>
           <td>{a.status === "da_xac_nhan" ? <Tag cls="ok">HDV đã xác nhận</Tag> : a.status === "huy" ? <Tag cls="red">Hủy</Tag> : <Tag cls="warn">Chờ xác nhận 24h</Tag>}</td><td>{a.report_submitted ? "✔" : <Tag cls="warn">thiếu → treo</Tag>}</td><td>{a.advance_settled ? "✔" : <Tag cls="warn">chưa → treo</Tag>}</td><td className="muted">{a.assigned_by} {fmtDT(a.assigned_at)}</td>
           {canDH && <td>{a.status === "cho_xac_nhan" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/guide-assignments/${a.id}/update`, { confirm: true })}>HDV xác nhận</button>}{!a.report_submitted && <button className="act grey" style={{ margin: "0 0 0 4px" }} onClick={() => post(`/guide-assignments/${a.id}/update`, { report_submitted: true })}>Đã nộp báo cáo</button>}</td>}</tr>)}</tbody></table></div>
+      <h2>Bảng giá thù lao HDV theo tuyến (đồng/ngày, lễ Tết ×2) – Chủ tịch + TGĐ ký, hiệu lực theo ngày</h2>
+      {["hcns", "cntt", "tp_dh"].includes(role) && <div className="panel"><div className="grid">
+        <label>Tuyến<input value={fGrate.route} onChange={(e) => setFGrate({ ...fGrate, route: e.target.value })} /></label>
+        <label>Số ngày<input type="number" step="0.5" value={fGrate.days} onChange={(e) => setFGrate({ ...fGrate, days: e.target.value })} /></label>
+        <label>Đơn giá mới/ngày<input type="number" value={fGrate.rate_per_day} onChange={(e) => setFGrate({ ...fGrate, rate_per_day: e.target.value })} /></label>
+        <label>Đơn giá cũ (đối chiếu)<input type="number" value={fGrate.old_rate_per_day} onChange={(e) => setFGrate({ ...fGrate, old_rate_per_day: e.target.value })} /></label>
+        <label>Hiệu lực từ<input type="date" value={fGrate.effective_from} onChange={(e) => setFGrate({ ...fGrate, effective_from: e.target.value })} /></label>
+      </div><button className="act orange" disabled={!fGrate.route || !fGrate.rate_per_day} onClick={() => post("/guide-rates", { ...fGrate, days: Number(fGrate.days) || 0, rate_per_day: Number(fGrate.rate_per_day), old_rate_per_day: Number(fGrate.old_rate_per_day) || 0 }).then((r) => r && setFGrate({ ...fGrate, route: "", days: "", rate_per_day: "", old_rate_per_day: "" }))}>Trình Chủ tịch + TGĐ</button></div>}
+      <div className="panel wrap"><table><thead><tr><th>Tuyến</th><th>Số ngày</th><th style={{ textAlign: "right" }}>Giá cũ</th><th style={{ textAlign: "right" }}>Giá mới/ngày</th><th style={{ textAlign: "right" }}>Chênh lệch</th><th>Hiệu lực</th><th>Trạng thái</th><th>Ghi chú</th>{["chutich", "tgd"].includes(role) && <th></th>}</tr></thead>
+        <tbody>{grates.map((r) => <tr key={r.id} style={{ opacity: r.status === "rejected" ? 0.5 : 1 }}><td><b>{r.route}</b></td><td>{r.days}</td><td style={{ textAlign: "right" }}>{vnd(r.old_rate_per_day)}</td><td style={{ textAlign: "right" }}><b>{vnd(r.rate_per_day)}</b></td><td style={{ textAlign: "right" }}>{vnd(r.rate_per_day - r.old_rate_per_day)}</td><td>{fmtD(r.effective_from)}</td>
+          <td>{r.status === "active" ? <Tag cls="ok">Hiệu lực</Tag> : r.status === "pending" ? <Tag cls="warn">{r.signed_chutich ? "CT ✔ " : ""}{r.signed_tgd ? "TGĐ ✔ " : ""}chờ ký</Tag> : <Tag>Hết hiệu lực</Tag>}</td><td className="muted">{r.note}</td>
+          {["chutich", "tgd"].includes(role) && <td>{r.status === "pending" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/guide-rates/${r.id}/sign`)}>Ký</button>}</td>}</tr>)}</tbody></table></div>
     </>}
 
     {tab === "fleet" && <>
@@ -149,16 +165,29 @@ function HR() {
     </>}
 
     {tab === "incidents" && <>
-      {["hcns", "tp_dh", "gd_kd", "ptgd_doan", "tgd", "cntt"].includes(role) && <div className="panel"><h2>Ghi nhận sự vụ khách hàng</h2><div className="grid">
+      {incMeta && <div className="panel"><h2>Bảng phân mức sự vụ (áp dụng từ 05/9/2026 – Chủ tịch + TGĐ ban hành)</h2>
+        <table><thead><tr><th>Mức</th><th>Hành vi điển hình</th><th>Chế tài</th><th>Thẩm quyền duyệt</th></tr></thead><tbody>
+          {Object.entries(incMeta.levels).map(([k, v]: any) => <tr key={k}><td><Tag cls={k === "3" ? "red" : k === "2" ? "warn" : ""}>{v.ten}</Tag></td><td>{v.mo_ta}</td><td>{v.che_tai}</td><td className="muted">{v.duyet.length ? v.duyet.join(", ") : "không cần duyệt"}</td></tr>)}</tbody></table>
+        <p className="muted">{incMeta.quy_trinh}. Người bị lập biên bản được ghi ý kiến; khiếu nại trong 3 ngày làm việc → chế tài treo tới khi cấp trên một bậc kết luận.</p></div>}
+      {["hcns", "tp_dh", "gd_kd", "ptgd_doan", "tgd", "cntt", "tp"].includes(role) && <div className="panel"><h2>Lập biên bản sự vụ</h2><div className="grid">
         <label>Nhân sự<select value={fInc.employee_id} onChange={(e) => setFInc({ ...fInc, employee_id: e.target.value })}><option value="">–</option>{emps.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.full_name}</option>)}</select></label>
-        <label>Mức (1–4)<select value={fInc.level} onChange={(e) => setFInc({ ...fInc, level: e.target.value })}>{[1, 2, 3, 4].map((l) => <option key={l} value={l}>Mức {l}{l >= 2 ? " (chế tài thưởng)" : ""}</option>)}</select></label>
+        <label>Mức<select value={fInc.level} onChange={(e) => setFInc({ ...fInc, level: e.target.value })}>{[1, 2, 3].map((l) => <option key={l} value={l}>Mức {l}{l === 2 ? " (−1 triệu hoa hồng)" : l === 3 ? " (mất hoa hồng booking, kỷ luật)" : " (nhắc nhở)"}</option>)}</select></label>
+        <label>Tour liên quan<select value={fInc.tour_id || ""} onChange={(e) => setFInc({ ...fInc, tour_id: e.target.value })}><option value="">–</option>{tours.map((t) => <option key={t.id} value={t.id}>{t.code}</option>)}</select></label>
         <label>Ngày<input type="date" value={fInc.occurred_on} onChange={(e) => setFInc({ ...fInc, occurred_on: e.target.value })} /></label>
         <label>Mô tả<input value={fInc.description} onChange={(e) => setFInc({ ...fInc, description: e.target.value })} /></label>
-      </div><button className="act orange" disabled={!fInc.employee_id || !fInc.description} onClick={() => post("/incidents", { employee_id: Number(fInc.employee_id), level: Number(fInc.level), description: fInc.description, occurred_on: fInc.occurred_on }).then((r) => r && setFInc({ ...fInc, description: "" }))}>Ghi nhận</button></div>}
-      <div className="panel wrap"><table><thead><tr><th>Ngày</th><th>Nhân sự</th><th>Mức</th><th>Mô tả</th><th>Người ghi</th><th>HCNS xác nhận</th>{role === "hcns" && <th></th>}</tr></thead>
-        <tbody>{inc.length ? inc.map((i) => <tr key={i.id}><td>{fmtD(i.occurred_on)}</td><td>{i.employee}</td><td><Tag cls={i.level >= 2 ? "red" : ""}>Mức {i.level}</Tag></td><td>{i.description}</td><td className="muted">{i.created_by}</td><td>{i.confirmed_by ? <Tag cls="ok">{i.confirmed_by}</Tag> : <Tag cls="warn">chờ</Tag>}</td>
-          {role === "hcns" && <td>{!i.confirmed_by && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/incidents/${i.id}/confirm`)}>Xác nhận</button>}</td>}</tr>) : <tr><td colSpan={7} className="muted">Chưa có sự vụ.</td></tr>}</tbody></table></div>
-      <p className="muted">Bảng phân mức sự vụ chung chờ HCNS ban hành (Phụ lục E #9) – tạm dùng thang HDV 1–4.</p>
+      </div><button className="act orange" disabled={!fInc.employee_id || !fInc.description} onClick={() => post("/incidents", { employee_id: Number(fInc.employee_id), level: Number(fInc.level), description: fInc.description, occurred_on: fInc.occurred_on, tour_id: fInc.tour_id ? Number(fInc.tour_id) : null }).then((r) => r && setFInc({ ...fInc, description: "" }))}>Lập biên bản</button></div>}
+      <div className="panel wrap"><table><thead><tr><th>Ngày</th><th>Nhân sự</th><th>Mức</th><th>Mô tả</th><th>Lập / HCNS / duyệt</th><th>Trạng thái</th><th>Ý kiến – khiếu nại</th><th></th></tr></thead>
+        <tbody>{inc.length ? inc.map((i) => <tr key={i.id}><td>{fmtD(i.occurred_on)}</td><td>{i.employee}</td><td><Tag cls={i.level >= 3 ? "red" : i.level === 2 ? "warn" : ""}>Mức {i.level}</Tag></td><td>{i.description}</td>
+          <td className="muted">{i.created_by}{i.confirmed_by && ` / ${i.confirmed_by}`}{i.approved_by && ` / ${i.approved_by}`}</td>
+          <td>{i.status === "hieu_luc" ? <Tag cls="ok">{i.status_name}</Tag> : i.status === "huy" ? <Tag>{i.status_name}</Tag> : i.status === "khieu_nai" ? <Tag cls="red">{i.status_name}</Tag> : <Tag cls="warn">{i.status_name}{i.status === "cho_khieu_nai" && i.appeal_deadline ? ` (đến ${fmtD(i.appeal_deadline)})` : ""}</Tag>}</td>
+          <td className="muted">{i.employee_opinion && <div>Ý kiến: {i.employee_opinion}</div>}{i.appeal_note && <div>Khiếu nại: {i.appeal_note}</div>}{i.appeal_result && <div>Kết luận: {i.appeal_result}</div>}</td>
+          <td style={{ whiteSpace: "nowrap" }}>
+            {role === "hcns" && i.status === "lap" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/incidents/${i.id}/confirm`)}>HCNS xác nhận</button>}
+            {["gd_kd", "ptgd_doan", "tgd", "chutich"].includes(role) && i.status === "hcns_xac_nhan" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/incidents/${i.id}/approve`)}>Duyệt</button>}
+            {["gd_kd", "ptgd_doan", "tgd", "chutich"].includes(role) && ["khieu_nai", "cho_khieu_nai"].includes(i.status) && <><button className="act grey" style={{ margin: "0 4px 0 0" }} onClick={() => { const n = prompt("Kết luận (giữ nguyên chế tài):"); if (n !== null) post(`/incidents/${i.id}/resolve`, { accept: false, result: n }); }}>Giữ nguyên</button>{i.status === "khieu_nai" && <button className="act grey" style={{ margin: 0 }} onClick={() => { const n = prompt("Kết luận (chấp nhận khiếu nại, hủy chế tài):"); if (n !== null) post(`/incidents/${i.id}/resolve`, { accept: true, result: n }); }}>Chấp nhận KN</button>}</>}
+            {i.is_mine && ["lap", "hcns_xac_nhan", "cho_khieu_nai"].includes(i.status) && <button className="act orange" style={{ margin: "0 0 0 4px" }} onClick={() => { const o = prompt("Ý kiến của anh/chị về biên bản:") || ""; const a = prompt("Khiếu nại (để trống nếu không):") || ""; if (o || a) post(`/incidents/${i.id}/opinion`, { opinion: o, appeal: a }); }}>Ghi ý kiến / khiếu nại</button>}
+          </td></tr>) : <tr><td colSpan={8} className="muted">Chưa có sự vụ.</td></tr>}</tbody></table></div>
+      {["hcns", "cntt"].includes(role) && <button className="act grey" onClick={() => post("/incidents/finalize-expired")}>Chốt hiệu lực sự vụ hết hạn khiếu nại</button>}
     </>}
   </>);
 }

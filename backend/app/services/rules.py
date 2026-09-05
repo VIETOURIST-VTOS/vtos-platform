@@ -25,7 +25,9 @@ DEFAULT_PARAMS = [
     ("visa_tu_xu_ly", "200000", "Đơn giá visa – hồ sơ tự xử lý", "đồng/hồ sơ", "ĐH Điều 7"),
     ("visa_gui_doi_tac", "50000", "Đơn giá visa – gửi đối tác", "đồng/hồ sơ", "ĐH Điều 7"),
     ("moc_chi_tieu_hcm", "200000000", "Mốc chỉ tiêu doanh thu NV kinh doanh lẻ HCM", "đồng/tháng", "KD Lẻ"),
-    ("moc_chi_tieu_cantho", "120000000", "Mốc chỉ tiêu doanh thu NV Cần Thơ", "đồng/tháng", "KD Lẻ"),
+    ("moc_chi_tieu_cantho", "120000000", "Mốc chỉ tiêu doanh thu NV Cần Thơ và văn phòng tỉnh (Bình Dương khách lẻ dùng mốc HCM)", "đồng/tháng", "KD Lẻ Phụ lục B.2"),
+    ("thang_f_bang", "65:0,70:0,90:0,100:0,110:0.5,130:0.8,160:1.1,200:1.4,250:1.7,300:2,350:2.3,400:2.6,450:2.9,500:3.2,550:3.5,600:3.8,700:4.1,800:4.4,900:4.7,1000:5",
+     "Bảng B.1 thang f: 'ngưỡng % mốc:hệ số %' từ f1 đến f19 và trần 1000%; f0 dưới ngưỡng đầu; ngưỡng tiền = % × mốc văn phòng", "bảng", "KD Lẻ Phụ lục A, B.1"),
     ("ca_truc_phut", "5", "Thời gian trả lời khách trong ca trực page", "phút", "KD Lẻ Điều 2a"),
     ("tai_xe_cong_tac_phi", "200000", "Công tác phí tài xế mỗi ngày tour", "đồng/ngày", "Đội xe"),
     ("moc_luong_doan", "30000000", "Mốc bình quân LN quyết toán 3 tháng để hưởng đủ lương NV kinh doanh đoàn", "đồng", "Đoàn Điều 5"),
@@ -50,6 +52,17 @@ def get_param(db: Session, key: str, on: date | None = None) -> float:
                 return float(v)
         raise KeyError(key)
     return float(row.value)
+
+
+def get_param_text(db: Session, key: str, on: date | None = None) -> str:
+    on = on or date.today()
+    row = db.execute(select(Param).where(Param.key == key, Param.status == "active", Param.effective_from <= on)
+                     .order_by(desc(Param.effective_from), desc(Param.id))).scalars().first()
+    if row is None:
+        for k, v, *_ in DEFAULT_PARAMS:
+            if k == key: return v
+        raise KeyError(key)
+    return row.value
 
 
 def seed_params(db: Session):

@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 from app.core.security import hash_password
 from sqlalchemy import select
 from app.models.core import User, Tour, ServiceRequest, Booking
-from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder
+from app.models.hr import GuideRate, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder
 from app.services import rules as core
 
 USERS = [
@@ -27,7 +27,7 @@ USERS = [
 def seed_all(db):
     if db.execute(select(User)).scalars().first():
         # CSDL đã có dữ liệu (bản demo trên cloud): chỉ bổ sung phần nhân sự nếu chưa có
-        seed_vehicle_rates(db); db.commit()
+        seed_vehicle_rates(db); seed_guide_rates(db); db.commit()
         if not db.execute(select(Employee)).scalars().first():
             users = {u.username: u for u in db.execute(select(User)).scalars()}
             tours = {t.code: t for t in db.execute(select(Tour)).scalars()}
@@ -144,7 +144,7 @@ def seed_hr(db, users, tours, today):
     x3 = Vehicle(plate="50E-955.31", seats=45, kind="hop_tac", driver_id=None, internal_rate_per_day=0)
     x4 = Vehicle(plate="50H-496.23", seats=45, kind="hop_tac", driver_id=None, internal_rate_per_day=0)
     db.add_all([x1, x2, x3, x4]); db.flush()
-    seed_vehicle_rates(db)
+    seed_vehicle_rates(db); seed_guide_rates(db)
     dalat = tours[3]
     db.add(GuideAssignment(tour_id=dalat.id, guide_id=h1.id, days=3, rate_per_day=450_000, assigned_by="dh.lan", status="da_xac_nhan",
                            confirmed_at=datetime.combine(dalat.start_date - timedelta(days=5), datetime.min.time()), report_submitted=True, advance_settled=True))
@@ -170,6 +170,23 @@ VEHICLE_RATES = [
     ("Châu Đốc", 3, 12_000_000, 16_000_000), ("Nam Cát Tiên", 1, 6_000_000, 7_000_000), ("La Ngâu (mới)", 0, 8_000_000, 10_000_000),
     ("Bảo Lộc", 0, 8_000_000, 10_000_000), ("Mỹ Tho 1 ngày", 1, 5_000_000, 5_000_000),
 ]
+
+
+# Bảng giá thù lao HDV theo tuyến (đồng/ngày) – giá mới áp dụng 01/9/2026 (giá cũ để đối chiếu), lễ Tết ×2
+GUIDE_RATES = [("Phan Thiết", 3, 350000, 500000), ("Đà Lạt 3N2Đ", 3, 350000, 600000), ("Đà Lạt Phan Thiết 4N3Đ", 4, 350000, 500000), ("Đà Lạt Nha Trang 5N4Đ", 5, 350000, 500000),
+               ("Đà Lạt Vĩnh Hy 4N3Đ", 4, 350000, 500000), ("Miền Tây 3N2Đ", 3, 400000, 600000), ("Vĩnh Hy 3N2Đ", 3, 400000, 600000), ("Quy Nhơn Phú Yên 4N3Đ", 4, 400000, 700000),
+               ("Tây Nguyên Miền Trung 7N6Đ", 7, 500000, 700000), ("Tây Nguyên 4N3Đ", 4, 500000, 800000), ("Nha Trang 3N2Đ", 3, 400000, 600000), ("Tánh Linh Tà Pao 2N1Đ", 2, 400000, 500000),
+               ("Hồ Tràm 2N1Đ", 2, 400000, 600000), ("Tây Ninh 1N", 1, 500000, 600000), ("Nam Cát Tiên 1N", 1, 500000, 700000), ("Miền Tây 1N", 1, 500000, 600000),
+               ("Buôn Mê – Nha Trang", 4, 400000, 500000), ("Sapa – TQ", 5, 500000, 800000), ("Di sản Miền Trung", 6, 500000, 700000), ("Tây Nguyên – Tà Đùng", 5, 500000, 700000),
+               ("Tà Đùng – Đà Lạt – Phan Thiết", 4, 350000, 600000), ("Phú Yên 3N2Đ", 3, 400000, 700000), ("Đà Lạt 3N3Đ", 3.5, 350000, 500000)]
+
+
+def seed_guide_rates(db):
+    if db.execute(select(GuideRate)).scalars().first():
+        return
+    for route, days, old, new in GUIDE_RATES:
+        db.add(GuideRate(route=route, days=days, rate_per_day=new, old_rate_per_day=old, effective_from=date(2026, 9, 1), status="active",
+                         signed_chutich=True, signed_tgd=True, proposed_by="seed", note="Bảng giá HDV 23 tuyến – giá mới từ 01/9/2026; lễ Tết ×2"))
 
 
 def seed_vehicle_rates(db):

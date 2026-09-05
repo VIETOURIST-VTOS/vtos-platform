@@ -39,15 +39,21 @@ def row(r, code):
     return next(x for x in r["rows"] if x["ma"] == code)
 
 
-def test_f_rate_and_salary_scale_units():
-    assert H.f_rate(150_000_000, 200_000_000) == (0, 0.0)          # dưới mốc: không hoa hồng
-    assert H.f_rate(200_000_000, 200_000_000)[1] == 0.0             # f0
-    assert H.f_rate(650_000_000, 200_000_000) == (5, 0.005)         # 325% mốc → f5
-    assert H.f_rate(2_000_000_000, 200_000_000) == (20, 0.05)       # ≥ 1000% → trần 5%
-    class E: base_salary = 7_000_000
-    assert H.base_salary_le(E(), 200_000_000, 200_000_000, 20_000_000, 700_000) == 7_000_000
-    assert H.base_salary_le(E(), 150_000_000, 200_000_000, 20_000_000, 700_000) == 7_000_000 - 3 * 700_000
-    assert H.base_salary_le(E(), 0, 200_000_000, 20_000_000, 700_000) == 0
+def test_f_rate_official_table():
+    T = H.parse_f_table("65:0,70:0,90:0,100:0,110:0.5,130:0.8,160:1.1,200:1.4,250:1.7,300:2,350:2.3,400:2.6,450:2.9,500:3.2,550:3.5,600:3.8,700:4.1,800:4.4,900:4.7,1000:5")
+    assert len(T) == 20
+    assert H.f_rate(120_000_000, 200_000_000, T) == (0, 0.0)          # < 65% → f0
+    assert H.f_rate(200_000_000, 200_000_000, T) == (4, 0.0)          # 100% → f4, hệ số 0
+    assert H.f_rate(650_000_000, 200_000_000, T) == (10, 0.02)        # 325% → f10 = 2,0% (ví dụ chính sách: 2% × 450tr = 9tr)
+    assert round(0.02 * (650_000_000 - 200_000_000)) == 9_000_000
+    assert H.f_rate(1_999_999_999, 200_000_000, T) == (19, 0.047)     # 900–<1000% → f19
+    assert H.f_rate(2_000_000_000, 200_000_000, T) == (20, 0.05)      # ≥ 1000% → trần 5%
+    assert H.f_rate(156_000_000, 120_000_000, T) == (6, 0.008)        # Cần Thơ mốc 120tr: 130% → f6 (B.2 = 60% cột HCM)
+    class E: pass
+    e = E(); e.office = "binhduong"; assert H.moc_of(e, 200e6, 120e6) == 200e6
+    e.office = "hanoi"; assert H.moc_of(e, 200e6, 120e6) == 120e6
+    assert H.base_salary_le(type("X", (), {"base_salary": 7_000_000})(), 150_000_000, 200_000_000, 20_000_000, 700_000) == 7_000_000 - 3 * 700_000
+    assert str(H.add_working_days(date(2026, 9, 5), 3)) == "2026-09-09"   # T7 5/9 → T2 7, T3 8, T4 9 (bỏ CN)
 
 
 def test_draft_from_seed():
@@ -76,12 +82,57 @@ def test_gate13_guide_conditions_and_pending_hold():
     assert ok.status_code == 201
 
 
-def test_incident_penalty_only_hits_commission():
+def test_incident_workflow_and_penalty():
     emps = {e["code"]: e for e in client.get("/api/v1/employees", headers=login("hcns")).json()}
-    client.post("/api/v1/incidents", json={"employee_id": emps["NS0002"]["id"], "level": 2, "description": "Khách khiếu nại", "occurred_on": str(date.today())}, headers=login("hcns"))
-    r = run(refresh=True)
-    hoa = row(r, "NS0002")
-    assert hoa["bien_doi"] >= 0 and hoa["luong_cb"] > 0      # không trừ lương cơ bản (Điều 127.2 BLLĐ)
+    lv = client.get("/api/v1/incident-levels", headers=login("kd.hoa")).json(); assert set(lv["levels"]) == {"1", "2", "3"} or set(lv["levels"]) == {1, 2, 3}
+    # Trưởng phòng lập biên bản mức 2 → HCNS xác nhận → GĐ KD duyệt → chờ khiếu nại (chưa hiệu lực, chưa trừ)
+    r = client.post("/api/v1/incidents", json={"employee_id": emps["NS0002"]["id"], "level": 2, "description": "Báo giá sai phải bù chi phí", "occurred_on": f"{P}-03"}, headers=login("tp.dieuhanh"))
+    assert r.status_code == 201
+    iid = client.get("/api/v1/incidents", headers=login("hcns")).json()[0]["id"]
+    assert client.post(f"/api/v1/incidents/{iid}/approve", headers=login("gd.kd")).status_code == 404     # chưa HCNS xác nhận
+    assert client.post(f"/api/v1/incidents/{iid}/confirm", headers=login("hcns")).status_code == 200
+    assert client.post(f"/api/v1/incidents/{iid}/approve", headers=login("tp.dieuhanh")).status_code == 403   # không đúng thẩm quyền
+    assert client.post(f"/api/v1/incidents/{iid}/approve", headers=login("gd.kd")).status_code == 200
+    i = next(x for x in client.get("/api/v1/incidents", headers=login("hcns")).json() if x["id"] == iid); assert i["status"] == "cho_khieu_nai"
+    before = row(run(refresh=True), "NS0002")
+    assert not any("sự vụ" in k["ten"] for k in before["khoan"])       # đang trong hạn khiếu nại → chưa trừ
+    # nhân viên khiếu nại → treo; cấp trên bác → hiệu lực → trừ 1 triệu chỉ vào hoa hồng
+    me = client.post(f"/api/v1/incidents/{iid}/opinion", json={"opinion": "Tôi không đồng ý", "appeal": "Khách tự đổi ngày"}, headers=login("kd.hoa"))
+    assert me.status_code == 200
+    assert client.post(f"/api/v1/incidents/{iid}/opinion", json={"appeal": "x"}, headers=login("kd.tuan")).status_code == 403
+    assert client.post(f"/api/v1/incidents/{iid}/resolve", json={"accept": False, "result": "Giữ nguyên"}, headers=login("gd.kd")).status_code == 200
+    after = row(run(refresh=True), "NS0002")
+    assert "Sự vụ ≥ mức 2: 1 vụ" in str(after["ghi_chu"]) or any("sự vụ" in k["ten"] and k["tien"] < 0 for k in after["khoan"])
+    assert after["luong_cb"] > 0 and after["bien_doi"] >= 0            # chỉ trừ hoa hồng, không trừ lương cơ bản
+    # mức 3 cần 2 chữ ký Chủ tịch + TGĐ; mức 1 hiệu lực ngay, không chế tài
+    r3 = client.post("/api/v1/incidents", json={"employee_id": emps["NS0002"]["id"], "level": 3, "description": "Thu tiền ngoài hệ thống", "occurred_on": str(date.today())}, headers=login("hcns"))
+    i3 = client.get("/api/v1/incidents", headers=login("hcns")).json()[0]["id"]
+    assert client.post(f"/api/v1/incidents/{i3}/approve", headers=login("tgd")).json()["message"].startswith("Đã ký")
+    assert client.post(f"/api/v1/incidents/{i3}/approve", headers=login("chutich")).status_code == 200
+    assert next(x for x in client.get("/api/v1/incidents", headers=login("hcns")).json() if x["id"] == i3)["status"] == "cho_khieu_nai"
+    client.post("/api/v1/incidents", json={"employee_id": emps["NS0002"]["id"], "level": 1, "description": "Thiếu báo cáo 1 ngày", "occurred_on": str(date.today())}, headers=login("hcns"))
+    assert client.get("/api/v1/incidents", headers=login("hcns")).json()[0]["status"] == "hieu_luc"
+    assert client.post("/api/v1/incidents", json={"employee_id": emps["NS0002"]["id"], "level": 4, "description": "x", "occurred_on": str(date.today())}, headers=login("hcns")).status_code == 422
+
+
+def test_guide_rate_table_and_assignment():
+    rates = client.get("/api/v1/guide-rates", headers=login("hcns")).json()
+    assert len([r for r in rates if r["status"] == "active"]) == 23
+    dl = next(r for r in rates if r["route"] == "Đà Lạt 3N2Đ"); assert dl["rate_per_day"] == 600000 and dl["old_rate_per_day"] == 350000 and str(dl["effective_from"]) == "2026-09-01"
+    emps = client.get("/api/v1/employees", headers=login("hcns")).json()
+    g = next(e for e in emps if e["department"] == "huong_dan" and e["guide_ok"])
+    t = client.get("/api/v1/tours", headers=login("hcns")).json()[0]
+    r = client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": g["id"], "days": 0, "rate_per_day": 0, "rate_id": dl["id"], "holiday": True}, headers=login("tp.dieuhanh"))
+    assert r.status_code == 201, r.text
+    a = client.get("/api/v1/guide-assignments", headers=login("hcns")).json()[0]
+    assert a["rate_per_day"] == 600000 and a["days"] == 3 and a["amount"] == 600000 * 3 * 2
+    assert client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": g["id"], "days": 2, "rate_per_day": 0, "holiday": False}, headers=login("tp.dieuhanh")).status_code == 422
+    # đề xuất giá mới 2 chữ ký thay giá cũ cùng tuyến
+    r = client.post("/api/v1/guide-rates", json={"route": "Đà Lạt 3N2Đ", "days": 3, "rate_per_day": 650000, "old_rate_per_day": 600000, "effective_from": "2026-12-01"}, headers=login("hcns")); assert r.status_code == 201
+    nid = [x for x in client.get("/api/v1/guide-rates", headers=login("hcns")).json() if x["status"] == "pending"][0]["id"]
+    client.post(f"/api/v1/guide-rates/{nid}/sign", headers=login("chutich")); client.post(f"/api/v1/guide-rates/{nid}/sign", headers=login("tgd"))
+    st = {x["id"]: x["status"] for x in client.get("/api/v1/guide-rates", headers=login("hcns")).json()}
+    assert st[nid] == "active" and st[dl["id"]] == "rejected"
 
 
 def test_payroll_flow_roles_and_journal():

@@ -11,25 +11,42 @@ from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, Dispatch
 from app.services import rules as R
 from app.services import accounting as ACC
 
-# ---- Thang f bậc sàn KD Lẻ (Bảng B.1 – ngưỡng tạm theo % mốc, chờ HCNS nạp bảng chính thức; tỷ lệ theo chính sách) ----
-# f0–f4 = 0%; f5 = 0,5% … f19 = 4,7% (bước 0,3%); ≥ 1000% mốc = 5,0%; không nội suy.
-F_RATES = [0, 0, 0, 0, 0] + [round(0.005 + 0.003 * i, 4) for i in range(15)]      # 20 bậc
-F_STEP_PCT = 0.45      # ngưỡng bậc k = 100% + 45% × k của mốc (tạm) → f19 = 955%
-F_CAP_PCT = 10.0       # ≥ 1000% → 5,0%
-F_CAP_RATE = 0.05
+# ---- Thang f bậc sàn KD Lẻ – Bảng B.1 chính thức (tham số thang_f_bang: "ngưỡng%:hệ số%", f1…f19 + trần) ----
+def parse_f_table(text: str) -> list[tuple[float, float]]:
+    """'65:0,70:0,…,1000:5' → [(0.65, 0.0), (0.70, 0.0), …, (10.0, 0.05)] – ngưỡng dưới của f1…f19 và trần."""
+    out = []
+    for part in text.split(","):
+        if ":" not in part: continue
+        a, b = part.split(":"); out.append((float(a) / 100, float(b) / 100))
+    return sorted(out)
+
+
+def f_rate(rev: float, moc: float, table: list[tuple[float, float]]) -> tuple[int, float]:
+    """(bậc, hệ số) theo doanh thu tính chỉ tiêu / mốc; bậc sàn, không nội suy; dưới ngưỡng f1 → f0 = 0."""
+    if moc <= 0: return 0, 0.0
+    ratio = rev / moc; k, rate = 0, 0.0
+    for i, (thr, r) in enumerate(table):
+        if ratio >= thr: k, rate = i + 1, r
+        else: break
+    return k, rate
+
+
 # Thang lương NV kinh doanh đoàn theo bình quân LN 3 tháng / mốc 30 triệu: f9…f0
 DOAN_F = [(1.0, 1.0), (0.9, 0.95), (0.8, 0.88), (0.7, 0.80), (0.6, 0.71), (0.5, 0.61), (0.4, 0.50), (0.3, 0.38), (0.2, 0.26), (0.1, 0.13), (0.0, 0.0)]
 
 
-def f_rate(rev: float, moc: float) -> tuple[int, float]:
-    """Trả về (bậc, tỷ lệ) theo doanh thu tính chỉ tiêu so với mốc."""
-    if moc <= 0 or rev < moc:
-        return 0, 0.0
-    ratio = rev / moc
-    if ratio >= F_CAP_PCT:
-        return 20, F_CAP_RATE
-    k = min(19, int((ratio - 1.0) / F_STEP_PCT))
-    return k, F_RATES[k]
+def add_working_days(d: date, n: int) -> date:
+    """Cộng n ngày làm việc (bỏ Chủ nhật; Thứ Bảy vẫn là ngày làm việc theo lịch Công ty)."""
+    from datetime import timedelta
+    while n > 0:
+        d += timedelta(days=1)
+        if d.weekday() != 6: n -= 1
+    return d
+
+
+def moc_of(e: Employee, moc_hcm: float, moc_tinh: float) -> float:
+    """Mốc chỉ tiêu theo văn phòng: HCM và Bình Dương (khách lẻ) 200 triệu; Cần Thơ và văn phòng tỉnh 120 triệu (B.2 = 60% HCM)."""
+    return moc_hcm if e.office in ("hcm", "binhduong") else moc_tinh
 
 
 def base_salary_le(emp: Employee, rev: float, moc: float, step_amt: float, cut: float) -> float:
@@ -46,9 +63,14 @@ def month_tours(db: Session, y: int, m: int) -> list[Tour]:
 
 
 def incidents_of(db: Session, emp_id: int, y: int, m: int, min_level: int = 2) -> int:
-    """Số sự vụ đã được HCNS xác nhận, mức ≥ min_level, trong tháng."""
-    return sum(1 for i in db.execute(select(Incident).where(Incident.employee_id == emp_id, Incident.level >= min_level, Incident.confirmed_by != "")).scalars()
+    """Số sự vụ ĐÃ CÓ HIỆU LỰC (HCNS xác nhận + cấp có thẩm quyền duyệt, hết thời gian khiếu nại/khiếu nại bị bác), mức ≥ min_level, trong tháng."""
+    return sum(1 for i in db.execute(select(Incident).where(Incident.employee_id == emp_id, Incident.level >= min_level, Incident.status == "hieu_luc")).scalars()
                if i.occurred_on.year == y and i.occurred_on.month == m)
+
+
+def level3_tours(db: Session, y: int, m: int) -> set[tuple[int, int]]:
+    """(employee_id, tour_id) có sự vụ mức 3 hiệu lực → không phát sinh hoa hồng của chính booking/đoàn đó."""
+    return {(i.employee_id, i.tour_id) for i in db.execute(select(Incident).where(Incident.level >= 3, Incident.status == "hieu_luc", Incident.tour_id != None)).scalars()}
 
 
 def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
@@ -69,6 +91,8 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
     moc_hcm = R.get_param(db, "moc_chi_tieu_hcm"); moc_ct = R.get_param(db, "moc_chi_tieu_cantho")
     thr = R.get_param(db, "nguong_bien")
     phat_su_vu = R.get_param(db, "phat_su_vu")
+    f_table = parse_f_table(R.get_param_text(db, "thang_f_bang"))
+    l3 = level3_tours(db, y, m); emp_by_user = {e.user_id: e.id for e in emps.values()}
     from app.services.ops import shift_penalties_for_month
     shift_pen = shift_penalties_for_month(db, y, m)
 
@@ -89,6 +113,8 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
                 continue
             if not b.counts_for_target:
                 continue                         # thiếu 4 trường → không chỉ tiêu, không hoa hồng
+            if (emp_by_user.get(b.sales_id), t.id) in l3:
+                continue                         # sự vụ mức 3 trên chính booking/đoàn này → không hoa hồng
             net = b.amount - b.discount           # mã KM: tính theo doanh thu đã giảm
             if t.below_margin and not t.strategic and s["margin"] < thr:
                 share_by_sales[b.sales_id] = share_by_sales.get(b.sales_id, 0) + max(0.0, s["profit"] * (b.amount / s["revenue"] if s["revenue"] else 0)) * 0.10
@@ -102,14 +128,14 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
             continue
         rev = rev_by_sales.get(e.user_id, 0.0)
         if e.position in ("nv", "tl", "tp"):
-            moc = moc_ct if e.office == "cantho" else moc_hcm
-            step_amt = 12_000_000 if e.office == "cantho" else 20_000_000
+            moc = moc_of(e, moc_hcm, moc_ct)
+            step_amt = moc * 0.10                # bậc thang giảm = 10% mốc (20 triệu HCM / 12 triệu tỉnh)
             cut = {"nv": 700_000, "tl": 800_000, "tp": 1_000_000}[e.position]
             base = base_salary_le(e, rev, moc, step_amt, cut)
             row(e)["luong_cb"] = round(base * (0.85 if e.probation else 1.0))
             if base < e.base_salary:
                 row(e)["ghi_chu"].append(f"Thang giảm Phụ lục C: doanh thu {rev:,.0f} < mốc {moc:,.0f}")
-            k, rate = f_rate(rev, moc)
+            k, rate = f_rate(rev, moc, f_table)
             comm = rate * max(0.0, rev - moc)
             if comm > 0:
                 add(e, f"Hoa hồng thang f{k} ({rate*100:.1f}%) × (DT {rev:,.0f} − mốc)", comm)
@@ -119,8 +145,9 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
                 add(e, "10% lợi nhuận đoàn tự chốt (Cần Thơ)", doan_profit_by_sales[e.user_id] * 0.10)
             n_inc = incidents_of(db, e.id, y, m)
             if n_inc:
-                pen = min(row(e)["bien_doi"], n_inc * phat_su_vu)
+                pen = min(max(row(e)["bien_doi"], 0), n_inc * phat_su_vu)
                 if pen: add(e, f"Chế tài sự vụ ≥ mức 2 ({n_inc} vụ) – chỉ trừ hoa hồng", -pen)
+                if pen < n_inc * phat_su_vu: row(e)["ghi_chu"].append(f"Sự vụ ≥ mức 2: {n_inc} vụ, chế tài {n_inc * phat_su_vu:,.0f} nhưng hoa hồng chỉ {pen:,.0f} – không trừ lương cơ bản (Điều 127.2 BLLĐ)")
             if e.id in shift_pen:
                 p_amt, n_miss, kicked = shift_pen[e.id]
                 pen = min(max(row(e)["bien_doi"], 0), p_amt)
@@ -128,7 +155,7 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
                 if kicked: row(e)["ghi_chu"].append("≥ 6 lượt sót: loại khỏi ca trực tháng sau, điều chỉnh chỉ tiêu")
         elif e.position == "gd_kd":
             staff = [x for x in emps.values() if x.department == "kd_le" and x.position in ("nv", "tl", "tp") and x.contract_type == "hdld"]
-            hit = sum(1 for x in staff if rev_by_sales.get(x.user_id, 0) >= (moc_ct if x.office == "cantho" else moc_hcm))
+            hit = sum(1 for x in staff if rev_by_sales.get(x.user_id, 0) >= moc_of(x, moc_hcm, moc_ct))
             pct = hit / len(staff) if staff else 0
             if pct >= 0.85: add(e, f"Thưởng GĐ KD: {pct*100:.0f}% NV đạt chỉ tiêu (≥85%)", R.get_param(db, "gd_kd_thuong_85"), "+1% LN Công ty theo BCKQKD tháng – nhập tay khi TGĐ duyệt")
             elif pct >= 0.5: add(e, f"Thưởng GĐ KD: {pct*100:.0f}% NV đạt chỉ tiêu (50–85%)", R.get_param(db, "gd_kd_thuong_50"), "+0,5% LN Công ty – nhập tay khi TGĐ duyệt")

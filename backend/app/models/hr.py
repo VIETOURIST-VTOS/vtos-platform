@@ -62,6 +62,7 @@ class GuideAssignment(Base):
     guide_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
     days: Mapped[int] = mapped_column(Integer, default=1)
     rate_per_day: Mapped[float] = mapped_column(Float, default=0)
+    rate_id: Mapped[int | None] = mapped_column(ForeignKey("guide_rates.id"), nullable=True)   # tuyến trong bảng giá HDV
     holiday: Mapped[bool] = mapped_column(Boolean, default=False)
     assigned_by: Mapped[str] = mapped_column(String(50), default="")
     assigned_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -99,6 +100,23 @@ class VehicleRate(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
+class GuideRate(Base):
+    """Bảng giá thù lao HDV theo tuyến (đồng/ngày) – master data, Chủ tịch + TGĐ ký, hiệu lực theo ngày; lễ Tết ×2."""
+    __tablename__ = "guide_rates"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    route: Mapped[str] = mapped_column(String(80))
+    days: Mapped[float] = mapped_column(Float, default=0)
+    rate_per_day: Mapped[float] = mapped_column(Float, default=0)
+    old_rate_per_day: Mapped[float] = mapped_column(Float, default=0)
+    effective_from: Mapped[date] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(20), default="pending")       # pending / active / rejected
+    signed_chutich: Mapped[bool] = mapped_column(Boolean, default=False)
+    signed_tgd: Mapped[bool] = mapped_column(Boolean, default=False)
+    note: Mapped[str] = mapped_column(String(200), default="")
+    proposed_by: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
 class DispatchOrder(Base):
     """Lệnh điều xe theo lịch khởi hành (xác nhận trong 4 giờ); số ngày → công tác phí tài xế; doanh thu nội bộ Đội xe."""
     __tablename__ = "dispatch_orders"
@@ -117,8 +135,21 @@ class DispatchOrder(Base):
     incident_note: Mapped[str] = mapped_column(String(300), default="")
 
 
+INCIDENT_LEVELS = {
+    1: {"ten": "Mức 1 – Sai sót nội bộ", "mo_ta": "Khách chưa bị ảnh hưởng hoặc đã xử lý xong trong ngày: nhập thiếu thông tin booking rồi tự sửa, sai sót giấy tờ sửa được trước khởi hành không phát sinh chi phí, thiếu báo cáo một ngày, trả lời khách trễ trong ca trực",
+        "che_tai": "Nhắc nhở, ghi hồ sơ đánh giá 3 tháng; không trừ tiền", "duyet": []},
+    2: {"ten": "Mức 2 – Khách bị ảnh hưởng / phát sinh chi phí", "mo_ta": "Chuyến vẫn chạy: tư vấn sai khiến khách khiếu nại bằng văn bản, báo giá sai phải bù chi phí, sai tên/ngày trên vé và voucher phải đổi có phí, quên đặt hoặc đặt trùng dịch vụ, bỏ sót khách trong danh sách đoàn, không đôn đốc khiến khách nợ quá hạn",
+        "che_tai": "Trừ 1.000.000 đ vào hoa hồng mỗi vụ (có biên bản); quản lý liên đới −0,5 điểm % phần thưởng theo lợi nhuận", "duyet": ["gd_kd", "ptgd_doan", "tgd"]},
+    3: {"ten": "Mức 3 – Khách mất chuyến / mất tiền lớn / gian dối", "mo_ta": "Khách không đi được do lỗi nhân viên (quên đặt vé, không kiểm hộ chiếu–visa), Công ty phải hoàn tiền/bồi thường, khiếu nại tới cơ quan quản lý hoặc đăng công khai, thu tiền ngoài hệ thống, khai khống chi phí hoặc sửa số quyết toán, chuyển khách/data cho đơn vị ngoài",
+        "che_tai": "Không phát sinh hoa hồng của chính booking/đoàn đó; kỷ luật lao động theo nội quy; bồi thường theo Điều 129 BLLĐ; dấu hiệu gian dối chuyển Pháp chế", "duyet": ["chutich", "tgd"]},
+}
+INCIDENT_STATUS = {"lap": "Đã lập biên bản", "hcns_xac_nhan": "HCNS đã xác nhận – chờ duyệt", "cho_khieu_nai": "Đã duyệt – trong 3 ngày khiếu nại", "khieu_nai": "Đang khiếu nại – treo chế tài",
+                   "hieu_luc": "Có hiệu lực", "huy": "Hủy / khiếu nại được chấp nhận"}
+
+
 class Incident(Base):
-    """Sự vụ khách hàng (mức 1–4) – HCNS xác nhận; mức ≥ 2 chế tài vào thưởng/hoa hồng."""
+    """Sự vụ (mức 1–3, bảng phân mức 05/9/2026): trưởng bộ phận lập biên bản → HCNS xác nhận (≥ mức 2) → cấp có thẩm quyền duyệt
+    (mức 2: GĐ KD / PTGĐ; mức 3: Chủ tịch + TGĐ) → người bị lập được ghi ý kiến, khiếu nại lên cấp trên 1 bậc trong 3 ngày làm việc (treo chế tài) → hiệu lực."""
     __tablename__ = "incidents"
     id: Mapped[int] = mapped_column(primary_key=True)
     employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
@@ -128,6 +159,13 @@ class Incident(Base):
     occurred_on: Mapped[date] = mapped_column(Date)
     confirmed_by: Mapped[str] = mapped_column(String(50), default="")     # HCNS
     created_by: Mapped[str] = mapped_column(String(50), default="")
+    status: Mapped[str] = mapped_column(String(20), default="lap")
+    approved_by: Mapped[str] = mapped_column(String(120), default="")     # người duyệt (mức 3: 2 chữ ký, cách nhau dấu phẩy)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    employee_opinion: Mapped[str] = mapped_column(String(300), default="")   # ý kiến người bị lập biên bản
+    appeal_note: Mapped[str] = mapped_column(String(300), default="")        # nội dung khiếu nại
+    appeal_result: Mapped[str] = mapped_column(String(300), default="")      # kết luận cấp trên
+    effective_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class PayrollRun(Base):
