@@ -20,8 +20,12 @@ def status(u: User = Depends(require_roles(*SYNC_ROLES, "bks")), db: Session = D
 
 
 @router.post("/import/vietrip/apply")
-def apply(u: User = Depends(require_roles("cntt", "ketoan")), db: Session = Depends(get_db)):
-    return {"applied": VT.apply_all(db, u.username), "message": "Đã ánh xạ dữ liệu Vietrip vào VTOS"}
+def apply(limit: int = 400, u: User = Depends(require_roles("cntt", "ketoan")), db: Session = Depends(get_db)):
+    try:
+        return {"applied": VT.apply_all(db, u.username, limit=max(1, min(limit, 2000))), "message": "Đã ánh xạ dữ liệu Vietrip vào VTOS"}
+    except Exception as e:   # trả lỗi có nội dung để robot/CNTT chẩn đoán (không lộ dữ liệu nhạy cảm)
+        db.rollback()
+        raise HTTPException(500, f"Ánh xạ lỗi: {type(e).__name__}: {str(e)[:600]}")
 
 
 @router.get("/import/vietrip/records")
