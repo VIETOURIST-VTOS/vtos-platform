@@ -22,6 +22,10 @@ services:
         value: "*"
       - key: TZ
         value: Asia/Ho_Chi_Minh
+      - key: SEPAY_API_TOKEN
+        sync: false
+      - key: SEPAY_ACCOUNT_NUMBER
+        sync: false
       - key: SEPAY_WEBHOOK_KEY
         generateValue: true
       - key: DATABASE_URL

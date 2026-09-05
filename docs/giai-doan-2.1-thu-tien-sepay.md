@@ -100,3 +100,11 @@ Kế toán TT99 + hóa đơn điện tử → thang lương f, visa, HDV, đội
 - Còn lại: 205 phiếu thu "chưa có booking" (booking đặt trước 1/6 hoặc phát sinh sau lúc quét; sẽ tự ánh xạ ở lần đồng bộ sau), 2 đề xuất chi (chưa ánh xạ). 245 booking của tour đã hủy/gộp: 235 booking hủy bỏ qua, 10 booking còn hiệu lực tạo tour tạm từ mã.
 - Hạn chế API Vietrip đã ghi vào kịch bản: danh sách phiếu thu chỉ lọc từ ngày, `start` bị giới hạn ~1.100 và `length` lớn hơn ~3.000 bị lỗi → bổ sung quét theo từng booking (`/api/bookings/{id}/payments`); danh sách tour không trả doanh thu/cờ quyết toán (lấy từ bảng quyết toán); bảng quyết toán ~10 giây/tour → quét 6 luồng.
 - Việc CNTT: xóa 2 user test (recID 99991–99998, họ tên "Test…") trong vt_records/users; đặt lịch chạy lại kịch bản hằng ngày (idempotent) tới ngày cắt chuyển.
+
+---
+# Kết nối API SePay – hai chiều (05/9/2026)
+- **Chiều đẩy (webhook)**: SePay → `POST https://vtos-api.onrender.com/api/v1/sepay/webhook`, xác thực `Authorization: Apikey <SEPAY_WEBHOOK_KEY>` (khóa nằm ở Render → vtos-api → Environment). Cấu hình tại my.sepay.vn → Webhooks → Thêm webhook: sự kiện "Có tiền vào" + "Có tiền ra", kiểu xác thực **Api Key**, dán khóa.
+- **Chiều kéo (User API)**: VTOS gọi `https://my.sepay.vn/userapi/transactions/list` bằng `SEPAY_API_TOKEN` (my.sepay.vn → Cấu hình → API Access → Tạo token; dán vào Render Environment). Dùng để nạp lịch sử khi mới kết nối, bù khi webhook lỗi, và robot đối chiếu định kỳ. API: `GET /sepay/status` (tình trạng, danh sách TK), `POST /sepay/pull {from_date,to_date,account_number}` (Kế toán/CNTT), `POST /robot/sepay/pull` (n8n, X-Robot-Token, mặc định 3 ngày gần nhất). Cùng đi qua robot R1 (khớp mã booking + số tiền) – idempotent theo id giao dịch SePay.
+- Màn hình: tab Thu tiền › khối "Kết nối SePay" (trạng thái webhook/API, tài khoản ngân hàng, giao dịch gần nhất, nút "Kéo giao dịch từ SePay" theo khoảng ngày).
+- Lịch n8n đề xuất: mỗi 30 phút gọi `/robot/sepay/pull` (from = hôm qua) để không sót giao dịch.
+- Lưu ý: dữ liệu Vietrip nhập về đã có phiếu thu VTPT… nên khi kéo lịch sử SePay 6–9/2026, giao dịch sẽ treo "chờ Kế toán" (booking đã thu đủ) – chỉ nên kéo từ ngày bắt đầu chạy song song (9/2026) trở đi.

@@ -19,6 +19,11 @@ function Collections() {
   const [filter, setFilter] = useState("cho_ke_toan");
   const [assign, setAssign] = useState<Record<number, { booking_id: string; note: string }>>({});
   const [cash, setCash] = useState({ booking_id: "", amount: "", payer: "", note: "" });
+  const [sp, setSp] = useState<any>(null);
+  const [pull, setPull] = useState({ from_date: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), to_date: new Date().toISOString().slice(0, 10) });
+  const [pulling, setPulling] = useState(false);
+  const loadSp = useCallback(() => { if (["ketoan", "cntt", "tgd", "chutich", "bks"].includes(user?.role || "")) api("/sepay/status").then(setSp).catch(() => setSp(null)); }, [user]);
+  useEffect(() => { loadSp(); }, [loadSp]);
   const load = useCallback(() => Promise.all([api("/collections/summary").then(setSum), api(`/bank-transactions${filter ? `?status=${filter}` : ""}`).then(setTxns), api("/receipts").then(setRcs)]), [filter]);
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); } catch (x) { toast(errMsg(x), true); } };
@@ -32,6 +37,20 @@ function Collections() {
       <div className="kpi"><b style={{ color: sum?.pending_txns ? "var(--orange)" : undefined }}>{sum?.pending_txns ?? "…"}</b><span>Giao dịch chờ Kế toán</span></div>
       <div className="kpi"><b>{sum?.pending_receipts ?? "…"}</b><span>Phiếu thu robot chờ xác nhận</span></div>
     </div>
+
+    {sp && <><h2>Kết nối SePay</h2>
+      <div className="panel"><div className="grid">
+        <div><b>Webhook (SePay đẩy về)</b><div>{sp.webhook_key_set ? <Tag cls="ok">Đã đặt khóa</Tag> : <Tag cls="red">Chưa đặt SEPAY_WEBHOOK_KEY</Tag>}</div><div className="muted">URL: https://vtos-api.onrender.com{sp.webhook_url} · Xác thực: Api Key</div></div>
+        <div><b>User API (VTOS kéo về)</b><div>{sp.api_token_set ? (sp.error ? <Tag cls="red">Lỗi: {sp.error}</Tag> : <Tag cls="ok">Đã kết nối</Tag>) : <Tag cls="warn">Chưa đặt SEPAY_API_TOKEN</Tag>}</div>
+          <div className="muted">{sp.accounts?.length ? sp.accounts.map((a: any) => `${a.bank} ${a.account_number} (${a.holder})`).join(" · ") : "my.sepay.vn → Cấu hình → API Access → tạo token → Render → Environment"}</div></div>
+        <div><b>Giao dịch đã nhận</b><div>{sp.transactions}</div><div className="muted">{sp.last_transaction ? `Gần nhất ${fmtDT(sp.last_transaction.date)} · ${vnd(sp.last_transaction.amount)} · ${sp.last_transaction.content}` : "Chưa có giao dịch"}</div></div>
+      </div>
+      {isKT && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+        <label>Từ <input type="date" value={pull.from_date} onChange={(e) => setPull({ ...pull, from_date: e.target.value })} /></label>
+        <label>Đến <input type="date" value={pull.to_date} onChange={(e) => setPull({ ...pull, to_date: e.target.value })} /></label>
+        <button className="act" style={{ margin: 0 }} disabled={pulling || !sp.api_token_set} onClick={async () => { setPulling(true); try { const r = await api("/sepay/pull", { method: "POST", json: pull }); toast(r.message); load(); loadSp(); } catch (x) { toast(errMsg(x), true); } setPulling(false); }}>{pulling ? "Đang kéo…" : "Kéo giao dịch từ SePay"}</button>
+        <span className="muted">Kéo lại lịch sử khi mới kết nối hoặc webhook lỗi – không nhân bản giao dịch.</span></div>}
+      </div></>}
 
     <h2>Giao dịch ngân hàng (SePay)</h2>
     <div>{[["cho_ke_toan", "Chờ Kế toán"], ["da_khop", "Đã khớp"], ["bo_qua", "Bỏ qua"], ["", "Tất cả"]].map(([v, l]) => <button key={v} className={"act " + (filter === v ? "" : "grey")} onClick={() => setFilter(v)}>{l}</button>)}</div>

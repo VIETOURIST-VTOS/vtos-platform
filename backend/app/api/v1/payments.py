@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.models.core import Booking, User
 from app.models.payments import BankTransaction, Receipt
 from app.services import payments as P
+from app.services import sepay as SP
 
 router = APIRouter(prefix="/api/v1", tags=["thu-tien"])
 
@@ -42,6 +43,49 @@ async def sepay_webhook(request: Request, authorization: str | None = Header(def
     except ValueError as e:
         raise HTTPException(422, str(e))
     return {"success": True, "new": created, "match_status": txn.match_status, "note": txn.match_note}
+
+
+# ---------- Kết nối API SePay (kéo) ----------
+@router.get("/sepay/status")
+def sepay_status(u: User = Depends(require_roles("ketoan", "cntt", "tgd", "chutich", "bks")), db: Session = Depends(get_db)):
+    return SP.status(db)
+
+
+class PullIn(BaseModel):
+    from_date: str | None = None   # YYYY-MM-DD
+    to_date: str | None = None
+    account_number: str = ""
+
+
+@router.post("/sepay/pull")
+def sepay_pull(data: PullIn, u: User = Depends(require_roles("ketoan", "cntt")), db: Session = Depends(get_db)):
+    """Kéo giao dịch từ SePay User API vào VTOS (idempotent). Robot R1 đối chiếu như webhook."""
+    from datetime import date as _d
+    try:
+        f = _d.fromisoformat(data.from_date) if data.from_date else None
+        t = _d.fromisoformat(data.to_date) if data.to_date else None
+        res = SP.pull(db, f, t, data.account_number or settings.SEPAY_ACCOUNT_NUMBER)
+    except ValueError as e:
+        raise HTTPException(422, f"Ngày không hợp lệ: {e}")
+    except SP.SePayError as e:
+        raise HTTPException(502, str(e))
+    from app.services import rules as R
+    R.audit(db, u.username, u.role, "sepay_keo_giao_dich", "sepay", after=res); db.commit()
+    res["message"] = f"Đã kéo {res['fetched']} giao dịch, mới {res['new']} (khớp {res['matched']}, chờ Kế toán {res['pending']})"
+    return res
+
+
+@router.post("/robot/sepay/pull")
+def robot_sepay_pull(data: PullIn, x_robot_token: str | None = Header(default=None), db: Session = Depends(get_db)):
+    """n8n gọi định kỳ (X-Robot-Token) để đối chiếu bù khi webhook lỗi."""
+    if not settings.ROBOT_TOKEN or x_robot_token != settings.ROBOT_TOKEN: raise HTTPException(401, "Sai robot token")
+    from datetime import date as _d, timedelta
+    f = _d.fromisoformat(data.from_date) if data.from_date else _d.today() - timedelta(days=3)
+    t = _d.fromisoformat(data.to_date) if data.to_date else _d.today()
+    try:
+        return SP.pull(db, f, t, data.account_number or settings.SEPAY_ACCOUNT_NUMBER)
+    except SP.SePayError as e:
+        raise HTTPException(502, str(e))
 
 
 # ---------- Kế toán ----------
