@@ -203,6 +203,8 @@ def run_robots(db: Session) -> int:
     try:
         from app.services import bookings as BK
         created += BK.robot_check(db)["new_alerts"]
+        from app.services import sales_reports as SR
+        created += SR.r9_run(db)["new_alerts"]
     except Exception as ex:   # không để lỗi R4 chặn các cảnh báo khác
         audit(db, "robot", "robot", "robot_r4_loi", "robot", after={"ly_do": str(ex)[:200]})
     sla = int(get_param(db, "sla_booking_phut"))
