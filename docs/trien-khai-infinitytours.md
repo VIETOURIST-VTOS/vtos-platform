@@ -45,3 +45,13 @@ CI (`.github/workflows/ci.yml`) tự chạy pytest, build web, build Docker ở 
 | PostgreSQL | vtos-db (Render free, hết hạn sau 90 ngày) | Render |
 
 Tự động: mỗi lần push `main` lên GitHub, Vercel và Render đều build lại. Gói free của Render ngủ sau 15 phút không dùng → lần mở đầu chậm ~30–50 giây. Muốn gắn `vtos.infinitytours.org` ngay: Vercel → Project → Domains → thêm domain, rồi tạo bản ghi CNAME `vtos` → `cname.vercel-dns.com` tại halink.
+
+## Kết nối SePay – robot R1 thu tiền (giai đoạn 2.1)
+1. Render → service `vtos-api` → Environment → copy giá trị `SEPAY_WEBHOOK_KEY` (Blueprint tự sinh; có thể đổi thành chuỗi tự chọn).
+2. Đăng nhập https://my.sepay.vn → Webhooks → Thêm webhook:
+   - URL: `https://vtos-api.onrender.com/api/v1/sepay/webhook`
+   - Kiểu chứng thực: **API Key** → Authorization: `Apikey <SEPAY_WEBHOOK_KEY>`
+   - Sự kiện: Có tiền vào (và tiền ra nếu muốn theo dõi).
+3. Thử: SePay → webhook → "Gửi thử" → VTOS tab **Thu tiền** hiện giao dịch mới.
+4. Quy tắc robot: nội dung CK có mã `BKxxxxxxxx` + số tiền = còn phải thu → phiếu thu tự động (Kế toán xác nhận sau); khác số tiền / không mã → hàng chờ Kế toán gán tay hoặc bỏ qua. Giao dịch ngân hàng không bao giờ sửa/xóa; mọi thao tác ghi audit hash-chain.
+5. Khi chuyển VPS: giữ nguyên URL webhook, chỉ đổi host.
