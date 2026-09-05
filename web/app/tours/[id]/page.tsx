@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
-import { api, pct, vnd, fmtD, fmtDT } from "@/lib/api";
+import { api, pct, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
 import { ROLES, TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
 import { Tag, Gate, errMsg } from "@/components/ui";
 
@@ -77,10 +77,10 @@ function TourDetail() {
         {can("close") && <><h3>Đóng số quyết toán · một cửa · hạn {fmtD(t.settlement_deadline)} {new Date().toISOString().slice(0, 10) > t.settlement_deadline && <Tag cls="red">ĐÃ QUÁ HẠN</Tag>}</h3>
           <form onSubmit={closeTour}><div className="grid">
             <div><label>Doanh thu thực tế (đ)</label><input type="number" name="actual_revenue" step="1000" defaultValue={Math.round(t.actual_revenue || bookedAmount)} required /></div>
-            <div><label>Giá vốn thực tế (đ)</label><input type="number" name="actual_cost" step="1000" defaultValue={Math.round(sm.cost_actual || t.fixed_cost + t.var_cost_per_pax * t.booked_pax)} required /></div>
+            <div><label>Giá vốn thực tế (đ){t.settlement_edit?.summary?.lines > 0 && <span className="muted"> – lấy từ {t.settlement_edit.summary.lines} dòng NCC ở tab Chi NCC & quyết toán</span>}</label><input type="number" name="actual_cost" step="1000" defaultValue={Math.round(t.settlement_edit?.summary?.lines > 0 ? t.settlement_edit.summary.actual : (sm.cost_actual || t.fixed_cost + t.var_cost_per_pax * t.booked_pax))} readOnly={t.settlement_edit?.summary?.lines > 0} required /></div>
             <div><label>Giảm giá / mã KM (đ)</label><input type="number" name="promo_value" step="1000" defaultValue={0} /></div>
           </div><NoteBox /><button className="act teal">Đóng số → Kế toán</button></form></>}
-        {can("kt_confirm") && <><NoteBox /><button className="act teal" onClick={() => run("kt-confirm")}>Kế toán xác nhận (3 ngày làm việc)</button></>}
+        {can("kt_confirm") && <><NoteBox /><button className="act teal" onClick={() => run("kt-confirm")}>Kế toán xác nhận (3 ngày làm việc)</button> <button className="act grey" onClick={() => run("kt-return")}>Trả lại Điều hành sửa (ghi lý do)</button></>}
         {can("cntt_check") && <><NoteBox /><button className="act teal" onClick={() => run("cntt-check")}>CNTT đối chiếu độc lập & khóa</button></>}
         {s && <><h3>Quyết toán và quỹ thưởng</h3><table><tbody>
           <tr><td>Doanh thu thực tế</td><td className="num">{vnd(s.revenue)}</td><td>Đóng số</td><td>{fmtDT(t.closed_at)} · {s.on_time ? "đúng hạn" : <b>QUÁ HẠN</b>}</td></tr>
@@ -128,9 +128,7 @@ function TourDetail() {
       <div className="panel wrap"><h2>Đề nghị chi / lệnh chi NCC ({t.payment_requests.length}) · đã chi {vnd(sm.cost_paid)}</h2>
         <table><thead><tr><th>Mã</th><th>NCC</th><th>Nội dung</th><th className="num">Số tiền</th><th>Trạng thái</th><th>Lập</th><th>Chi</th></tr></thead>
           <tbody>{t.payment_requests.map((r: any) => <tr key={r.id}><td>{r.code}</td><td>{r.supplier_name}</td><td>{r.description}</td><td className="num">{vnd(r.amount)}</td><td><Tag cls={r.status === "da_chi" ? "ok" : "warn"}>{PR_ST[r.status] || r.status}</Tag></td><td>{fmtDT(r.created_at)}</td><td>{fmtDT(r.paid_at)}</td></tr>)}</tbody></table></div>
-      <div className="panel wrap"><h2>Quyết toán chi phí thực tế theo NCC ({t.cost_lines.length} dòng) · thực chi {vnd(t.cost_total.actual)} · đã thanh toán {vnd(t.cost_total.paid)}</h2>
-        <table><thead><tr><th>#</th><th>Mô tả</th><th>Loại DV</th><th>NCC (MST)</th><th className="num">Đơn giá</th><th className="num">SL</th><th className="num">HS</th><th className="num">Thực chi</th><th className="num">Đã TT</th><th>Ghi chú</th></tr></thead>
-          <tbody>{t.cost_lines.length ? t.cost_lines.map((l: any) => <tr key={l.line_no}><td>{l.line_no}</td><td>{l.description} <Tag>{l.cost_kind === "theo_khach" ? "theo khách" : "cố định"}</Tag></td><td>{l.service_type}</td><td>{l.supplier_name}{l.supplier_tax_code && <span className="muted"> ({l.supplier_tax_code})</span>}</td><td className="num">{vnd(l.unit_price)}</td><td className="num">{l.qty}</td><td className="num">{l.coef}</td><td className="num">{vnd(l.actual)}</td><td className="num">{vnd(l.paid)}</td><td className="muted">{l.note}</td></tr>) : <tr><td colSpan={10} className="muted">Chưa có dòng quyết toán (đồng bộ từ Vietrip hoặc nhập khi đóng số).</td></tr>}</tbody></table></div>
+      <Settlement t={t} note={note} NoteBox={NoteBox} run={run} load={load} toast={toast} />
     </>}
 
     {tab === "ops" && <div className="grid">
@@ -152,4 +150,74 @@ function TourDetail() {
     </>}
   </>);
 }
+const EMPTY = { description: "", service_type: "HOTEL", cost_kind: "theo_khach", supplier_name: "", supplier_tax_code: "", unit_price: 0, qty: 0, coef: 1, budget: 0, note: "" };
+function Settlement({ t, note, NoteBox, run, load, toast }: any) {
+  const se = t.settlement_edit || {}; const sm = se.summary || {}; const checks: any[] = se.checks || []; const st: Record<string, string> = se.service_types || {};
+  const [edit, setEdit] = useState<any>(null);
+  const [showCancelled, setShowCancelled] = useState(false);
+  const base = `/tours/${t.id}/settlement`;
+  const lines = (t.cost_lines || []).filter((l: any) => showCancelled || l.status === "hd");
+  const calc = (f: any) => Math.round(f.cost_kind === "theo_khach" ? f.unit_price * f.qty * f.coef : f.unit_price * f.coef);
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const body = { ...edit }; ["unit_price", "qty", "coef", "budget"].forEach((k) => (body[k] = Number(body[k] || 0)));
+    try { await api(edit.id ? `${base}/lines/${edit.id}` : `${base}/lines`, { method: edit.id ? "PUT" : "POST", json: body }); toast(edit.id ? "Đã sửa dòng" : "Đã thêm dòng"); setEdit(null); load(); } catch (x) { toast(errMsg(x), true); }
+  };
+  const cancel = async (l: any) => { const r = prompt(`Lý do hủy dòng ${l.line_no} – ${l.description}?`); if (!r) return; try { await api(`${base}/lines/${l.id}/cancel`, { method: "POST", json: { note: r } }); toast("Đã hủy dòng"); load(); } catch (x) { toast(errMsg(x), true); } };
+  const upload = (l: any) => {
+    const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*,application/pdf";
+    inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; if (f.size > 1_500_000) { toast("Tệp quá 1,5 MB – hãy chụp/nén nhỏ hơn", true); return; }
+      const data = await new Promise<string>((res) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result)); rd.readAsDataURL(f); });
+      try { await api(`${base}/lines/${l.id}/doc`, { method: "POST", json: { name: f.name, data } }); toast("Đã gắn chứng từ"); load(); } catch (x) { toast(errMsg(x), true); } };
+    inp.click();
+  };
+  const matchPaid = async () => { try { const r = await api(`${base}/match-paid`, { method: "POST" }); toast(r.message); load(); } catch (x) { toast(errMsg(x), true); } };
+  const viewDoc = async (l: any) => { try { const r = await fetch(`/api/v1${base}/lines/${l.id}/doc`, { headers: { Authorization: `Bearer ${getToken() || ""}` } }); if (!r.ok) throw new Error("Không tải được chứng từ"); const u = URL.createObjectURL(await r.blob()); window.open(u, "_blank"); } catch (x: any) { toast(x.message || String(x), true); } };
+  const F = (k: string, label: string, type = "text", extra: any = {}) => <div><label>{label}</label><input type={type} value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} {...extra} /></div>;
+  return (<div className="panel wrap">
+    <h2>Quyết toán chi phí thực tế sau tour <Tag cls="navy">V.{String(sm.version || 1).padStart(2, "0")}</Tag> · {sm.lines || 0} dòng · thực chi <b>{vnd(sm.actual)}</b> · đã thanh toán {vnd(sm.paid)} · còn phải trả <b>{vnd(sm.remaining)}</b></h2>
+    <div className="kpis">
+      <div className="kpi"><b>{vnd(sm.revenue)}</b><span>Tổng thu (booking)</span></div>
+      <div className="kpi"><b>{vnd(sm.actual)}</b><span>Tổng chi (dòng NCC)</span></div>
+      <div className="kpi"><b style={{ color: sm.profit < 0 ? "var(--red)" : undefined }}>{vnd(sm.profit)} · {pct(sm.margin)}</b><span>Lợi nhuận</span></div>
+      <div className="kpi"><b style={{ color: sm.variance > 0 ? "var(--red)" : undefined }}>{vnd(sm.variance)} ({pct(sm.variance_pct)})</b><span>Lệch so dự toán {sm.budget_source === "dong" ? "(theo dòng)" : "(3 con số)"} {vnd(sm.budget)}</span></div>
+      <div className="kpi"><b>{sm.with_doc || 0}/{sm.lines || 0}</b><span>Dòng có chứng từ</span></div>
+    </div>
+    {checks.length > 0 && <div style={{ marginBottom: 8 }}>{checks.map((c, i) => <Gate key={i} ok={c.level === "info"}>{c.level === "block" ? "CHẶN ĐÓNG SỐ – " : c.level === "warn" ? "Lưu ý – " : ""}{c.msg}</Gate>)}</div>}
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      {se.can_edit && <button className="act teal" style={{ margin: 0 }} onClick={() => setEdit({ ...EMPTY, qty: t.booked_pax || t.seats?.booked || 0 })}>+ Thêm dòng chi phí</button>}
+      <button className="act grey" style={{ margin: 0 }} onClick={matchPaid}>Khớp “Đã thanh toán” với lệnh chi / tạm ứng</button>
+      <label style={{ margin: 0 }}><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> hiện dòng đã hủy</label>
+      {!se.can_edit && <span className="muted">{t.status === "da_dong_so" ? "Đã đóng số – chờ Kế toán xác nhận (Kế toán có thể trả lại để sửa)" : ["kt_xac_nhan", "khoa"].includes(t.status) ? "Kế toán đã xác nhận – số này là căn cứ duy nhất, không sửa" : "Chỉ người điều hành chuyến soạn quyết toán sau khi tour được duyệt"}</span>}
+    </div>
+    {edit && <form onSubmit={save} className="panel" style={{ marginTop: 8 }}>
+      <h3>{edit.id ? `Sửa dòng ${edit.line_no}` : "Thêm chi phí quyết toán thực tế"}</h3>
+      <div className="grid">
+        {F("description", "Mô tả chi tiết *")}
+        <div><label>Loại dịch vụ *</label><select value={edit.service_type} onChange={(e) => setEdit({ ...edit, service_type: e.target.value })}>{Object.entries(st).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+        {F("supplier_name", "Nhà cung cấp *")}{F("supplier_tax_code", "Mã số thuế NCC")}
+        <div><label>Cách tính chi *</label><select value={edit.cost_kind} onChange={(e) => setEdit({ ...edit, cost_kind: e.target.value })}><option value="theo_khach">Theo khách (đơn giá × pax × hệ số)</option><option value="co_dinh">Cố định (đơn giá × hệ số)</option></select></div>
+        {F("unit_price", "Đơn giá thực tế (đ)", "number", { step: 1000, min: 0 })}{F("qty", "Số khách (pax)", "number", { min: 0 })}{F("coef", "Hệ số / số lượng", "number", { step: "0.5", min: 0 })}
+        {F("budget", "Dự toán của dòng (đ)", "number", { step: 1000, min: 0 })}
+        <div><label>Thực chi</label><input value={vnd(calc({ ...edit, unit_price: Number(edit.unit_price || 0), qty: Number(edit.qty || 0), coef: Number(edit.coef || 0) }))} readOnly /></div>
+      </div>
+      <label>Ghi chú / lời giải trình (bắt buộc khi vượt dự toán)</label><input value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} />
+      <button className="act teal" type="submit">Lưu dòng</button> <button type="button" className="act grey" onClick={() => setEdit(null)}>Đóng</button>
+    </form>}
+    <table style={{ marginTop: 8 }}><thead><tr><th>#</th><th>Mô tả</th><th>Loại DV</th><th>NCC (MST)</th><th className="num">Đơn giá</th><th className="num">SL</th><th className="num">HS</th><th className="num">Dự toán</th><th className="num">Thực chi</th><th className="num">Đã TT</th><th>Chứng từ</th><th>Ghi chú</th><th></th></tr></thead>
+      <tbody>{lines.length ? lines.map((l: any) => <tr key={l.id} style={{ opacity: l.status === "hd" ? 1 : 0.45 }}>
+        <td>{l.line_no}</td><td>{l.description} <Tag>{l.cost_kind === "theo_khach" ? "theo khách" : "cố định"}</Tag>{l.source === "vietrip" && <Tag>Vietrip</Tag>}</td><td>{l.service_name || l.service_type}</td>
+        <td>{l.supplier_name}{l.supplier_tax_code && <span className="muted"> ({l.supplier_tax_code})</span>}</td>
+        <td className="num">{vnd(l.unit_price)}</td><td className="num">{l.qty}</td><td className="num">{l.coef}</td><td className="num muted">{l.budget ? vnd(l.budget) : "–"}</td>
+        <td className="num"><b style={{ color: l.budget && l.over_pct > 0.1 ? "var(--red)" : undefined }}>{vnd(l.actual)}</b></td>
+        <td className="num">{l.remaining > 0 ? <Tag cls="warn">{vnd(l.paid)}</Tag> : <Tag cls="ok">{vnd(l.paid)}</Tag>}</td>
+        <td>{l.has_doc ? <a href="#" onClick={(e) => { e.preventDefault(); viewDoc(l); }}>📎 {l.doc_name || "xem"}</a> : <span className="muted">–</span>} {(se.can_edit || t.status === "da_dong_so") && l.status === "hd" && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => upload(l)}>tải</button>}</td>
+        <td className="muted">{l.note}</td>
+        <td>{se.can_edit && l.status === "hd" && <><button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setEdit({ ...l })}>sửa</button> <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => cancel(l)}>hủy</button></>}</td>
+      </tr>) : <tr><td colSpan={13} className="muted">Chưa có dòng quyết toán – bấm “Thêm dòng chi phí” (cùng bố cục bảng Vietrip) hoặc đồng bộ từ Vietrip.</td></tr>}</tbody>
+      <tfoot><tr><td colSpan={8}><b>TỔNG CỘNG</b></td><td className="num"><b>{vnd(sm.actual)}</b></td><td className="num"><b>{vnd(sm.paid)}</b></td><td colSpan={3}>Còn lại cần thanh toán: <b>{vnd(sm.remaining)}</b></td></tr></tfoot></table>
+    <p className="muted">Nguyên tắc: một cửa – chỉ người điều hành chuyến soạn; đóng số lấy tổng dòng làm giá vốn thực tế; vượt dự toán dòng &gt; 10% phải giải trình; Kế toán trả lại → phiên bản mới; sau Kế toán xác nhận không sửa.</p>
+  </div>);
+}
+
 export default function Page() { return <Shell><TourDetail /></Shell>; }

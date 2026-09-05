@@ -38,4 +38,10 @@ class TourCostLine(Base):
     paid: Mapped[float] = mapped_column(Float, default=0)
     note: Mapped[str] = mapped_column(String(200), default="")
     source: Mapped[str] = mapped_column(String(20), default="vietrip")
+    budget: Mapped[float] = mapped_column(Float, default=0)                 # dự toán của dòng (để so lệch)
+    status: Mapped[str] = mapped_column(String(10), default="hd")           # hd (hiệu lực) / huy
+    version: Mapped[int] = mapped_column(Integer, default=1)                # phiên bản quyết toán khi tạo/sửa dòng
+    doc_name: Mapped[str] = mapped_column(String(160), default="")          # tên tệp chứng từ
+    doc_data: Mapped[str] = mapped_column(Text, default="")                 # data URL (ảnh/PDF ≤ 1,5 MB)
+    updated_by: Mapped[str] = mapped_column(String(50), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)

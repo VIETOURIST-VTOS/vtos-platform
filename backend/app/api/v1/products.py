@@ -90,7 +90,11 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     lines = db.execute(select(TourCostLine).where(TourCostLine.tour_id == t.id).order_by(TourCostLine.line_no)).scalars().all()
     v["cost_lines"] = [{"line_no": l.line_no, "description": l.description, "cost_kind": l.cost_kind, "service_type": l.service_type, "supplier_name": l.supplier_name, "supplier_tax_code": l.supplier_tax_code,
                         "unit_price": l.unit_price, "qty": l.qty, "coef": l.coef, "actual": l.actual, "paid": l.paid, "note": l.note} for l in lines]
+    from app.services import settlement as ST
+    lines = [l for l in lines if l.status == "hd"]
+    v["cost_lines"] = [ST.line_out(l) for l in ST.lines_of(db, t)]
     v["cost_total"] = {"actual": sum(l.actual for l in lines), "paid": sum(l.paid for l in lines)}
+    v["settlement_edit"] = {"can_edit": ST.can_edit(u, t), "version": t.settlement_version, "service_types": ST.SERVICE_TYPES, "summary": ST.summary(db, t), "checks": ST.checks(db, t)}
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
     v["guides"] = [{"id": a.id, "guide": emps.get(a.guide_id, ""), "days": a.days, "rate_per_day": a.rate_per_day, "holiday": a.holiday, "status": a.status, "amount": a.rate_per_day * a.days * (2 if a.holiday else 1)}
                    for a in db.execute(select(GuideAssignment).where(GuideAssignment.tour_id == t.id)).scalars()]

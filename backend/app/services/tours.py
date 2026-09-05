@@ -52,7 +52,8 @@ def allowed_actions(db: Session, t: Tour, u: User) -> list[str]:
         if t.below_margin and u.role in ("chutich", "tgd") and not getattr(t, f"signed_{u.role}"): a.append("sign")
         if not t.below_margin and u.role == R.approver_role(t): a.append("approve")
     if t.status in ("ket_thuc", "da_duyet") and u.id == t.operator_id and date.today() >= t.end_date: a.append("close")
-    if t.status == "da_dong_so" and u.role == "ketoan": a.append("kt_confirm")
+    if t.status == "da_dong_so" and u.role == "ketoan": a += ["kt_confirm", "kt_return"]
+    if t.status in ("da_duyet", "ket_thuc") and u.id == t.operator_id: a.append("edit_settlement")
     if t.status == "kt_xac_nhan" and u.role == "cntt": a.append("cntt_check")
     if t.status == "da_duyet" and u.role in ("chutich", "tp_dh") and not t.chairman_run_decision: a.append("d7")
     return a
@@ -152,10 +153,16 @@ def close(db: Session, u: User, t: Tour, data, note: str = "") -> str:
     if t.status not in ("ket_thuc", "da_duyet"): raise Gate("TRANG_THAI", "Chưa đến bước quyết toán")
     if u.id != t.operator_id: raise Gate("CONG_6", f"Một cửa: chỉ người điều hành chuyến ({t.operator.full_name}) mới được nhập quyết toán")
     if date.today() < t.end_date: raise Gate("CONG_6", "Chuyến chưa kết thúc")
+    from app.services import settlement as ST
+    blocks = [c["msg"] for c in ST.checks(db, t) if c["level"] == "block"]
+    if blocks: raise Gate("QT_NHAP", blocks[0])
     before = snap(t)
-    t.actual_revenue, t.actual_cost, t.promo_value = data.actual_revenue, data.actual_cost, data.promo_value
+    sm = ST.summary(db, t)
+    t.actual_revenue, t.promo_value = data.actual_revenue, data.promo_value
+    t.actual_cost = sm["actual"] if sm["lines"] else data.actual_cost   # có bảng dòng NCC → tổng dòng là giá vốn thực tế (không nhập tay)
     t.closed_at, t.status = datetime.now(), "da_dong_so"
-    EV(db, t, "dong_so", u.username, note)
+    tag = f"Quyết toán V.{t.settlement_version:02d}: {sm['lines']} dòng NCC, thực chi {t.actual_cost:,.0f} đ, đã trả {sm['paid']:,.0f} đ, dự toán {sm['budget']:,.0f} đ ({sm['variance_pct'] * 100:+.0f}%), {sm['with_doc']}/{sm['lines']} dòng có chứng từ"
+    EV(db, t, "dong_so", u.username, (note + " | " if note else "") + tag)
     R.audit(db, u.username, u.role, "dong_so_quyet_toan", f"tour:{t.code}", before=before, after=snap(t)); db.commit()
     late = date.today() > R.settlement_deadline(db, t)
     return "Đã đóng số, chuyển Kế toán xác nhận" + (" – QUÁ HẠN quyết toán, mất thưởng chuyến" if late else "")

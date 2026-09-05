@@ -146,6 +146,11 @@ def on_settlement_confirmed(db: Session, t: Tour, actor: str, role: str) -> list
     out = []
     if t.actual_cost > 0:
         try:
+            from app.models.ops import PaymentRequest
+            adv = sum(r.amount for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.category == "tam_ung", PaymentRequest.status == "da_chi")).scalars())
+            if adv > 0:   # hoàn ứng: tạm ứng đã chi trở thành chi phí tour
+                out.append(post_entry(db, "robot", "robot", d, f"Hoàn ứng tour {t.code} theo quyết toán",
+                                      [{"account": "154", "debit": adv, "tour_id": t.id}, {"account": "141", "credit": adv, "partner": "Tạm ứng tour", "tour_id": t.id}], "quyet_toan", f"tour:{t.code}", t.id))
             diff = t.actual_cost - posted_tour_cost(db, t.id)
             if diff > 0:
                 out.append(post_entry(db, "robot", "robot", d, f"Chi phí tour {t.code} chưa có hóa đơn NCC theo quyết toán (trích trước)",

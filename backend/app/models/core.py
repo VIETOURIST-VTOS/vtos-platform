@@ -160,6 +160,7 @@ class Tour(Base):
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     kt_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cntt_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    settlement_version: Mapped[int] = mapped_column(Integer, default=1)    # V.01, V.02… mỗi lần Kế toán trả lại
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     # Bổ sung theo cấu trúc Vietrip (05/9/2026)
     vietrip_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)

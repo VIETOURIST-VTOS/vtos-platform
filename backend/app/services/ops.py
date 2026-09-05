@@ -14,8 +14,8 @@ from app.services import accounting as ACC
 
 REPORT_DEADLINE = time(20, 0)
 NO_TIMESHEET_DEPTS = ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt")   # khối bỏ chấm công → báo cáo ngày bắt buộc
-CATEGORY_ACCOUNT = {"chi_tour": "154", "marketing": "641", "hanh_chinh": "642"}
-CATEGORY_CONFIRMER = {"chi_tour": ("tp_dh",), "marketing": ("ptgd_mkt",), "hanh_chinh": ("hcns",), "hoan_tien": ("gd_kd", "tp_dh")}
+CATEGORY_ACCOUNT = {"chi_tour": "154", "marketing": "641", "hanh_chinh": "642"}   # tam_ung: ghi 141 khi chi, hoàn ứng vào 154 khi Kế toán xác nhận quyết toán
+CATEGORY_CONFIRMER = {"chi_tour": ("tp_dh",), "marketing": ("ptgd_mkt",), "hanh_chinh": ("hcns",), "hoan_tien": ("gd_kd", "tp_dh"), "tam_ung": ("tp_dh",)}
 
 
 # ====================== BÁO CÁO NGÀY ======================
@@ -145,8 +145,10 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     cat = data["category"]
     if cat not in CATEGORY_CONFIRMER: raise ValueError("Loại chi không hợp lệ")
     t = db.get(Tour, data.get("tour_id")) if data.get("tour_id") else None
-    if cat in ("chi_tour", "hoan_tien") and not t:
-        raise ValueError("Chi phí tour / hoàn tiền bắt buộc gắn mã tour (cổng 14)")
+    if cat in ("chi_tour", "hoan_tien", "tam_ung") and not t:
+        raise ValueError("Chi phí tour / hoàn tiền / tạm ứng bắt buộc gắn mã tour (cổng 14)")
+    if cat == "tam_ung" and t and t.status in ("da_dong_so", "kt_xac_nhan", "khoa"):
+        raise ValueError("Tour đã đóng số quyết toán – không tạm ứng thêm")
     if data["amount"] <= 0: raise ValueError("Số tiền phải > 0")
     if not data.get("supplier_name"): raise ValueError("Thiếu nhà cung cấp / người thụ hưởng")
     r = PaymentRequest(code=_next_code(db), category=cat, tour_id=t.id if t else None, supplier_name=data["supplier_name"], supplier_tax_code=data.get("supplier_tax_code", ""),
@@ -155,7 +157,7 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     # R3: xếp cấp duyệt
     if cat == "marketing" and r.amount >= R.get_param(db, "han_muc_mkt"):
         r.two_signatures = True
-    if t and cat == "chi_tour":
+    if t and cat in ("chi_tour", "tam_ung"):
         cf = tour_cashflow(db, t)
         if cf["paid"] + cf["committed"] + cf["pending"] + r.amount > cf["budget"] + 1:
             r.over_budget, r.two_signatures = True, True
@@ -182,7 +184,7 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         if r.status != "cho_kt": raise ValueError("Không ở bước Kế toán kiểm tra")
         if u.role != "ketoan": raise ValueError("Chỉ Kế toán kiểm tra")
         if not r.has_document: raise ValueError("Thiếu chứng từ đính kèm (hợp đồng/hóa đơn/báo giá) – không chuyển duyệt")
-        if r.category != "hoan_tien" and not r.supplier_tax_code: raise ValueError("NCC chưa có MST – phải xác nhận trước khi thanh toán")
+        if r.category not in ("hoan_tien", "tam_ung") and not r.supplier_tax_code: raise ValueError("NCC chưa có MST – phải xác nhận trước khi thanh toán")
         r.status, r.kt_by = "cho_duyet", u.username
         msg = f"{r.code}: Kế toán đã kiểm tra, trình {'Chủ tịch + TGĐ' if r.two_signatures else 'TGĐ'} duyệt"
     elif action == "approve":
@@ -229,6 +231,8 @@ def _post_payment(db: Session, r: PaymentRequest):
     cash = "111" if r.paid_method == "tien_mat" else "112"
     if r.category == "hoan_tien":
         lines = [{"account": "131", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
+    elif r.category == "tam_ung":   # tạm ứng HDV/NCC trước tour: Nợ 141 – Có 111/112; hoàn ứng khi Kế toán xác nhận quyết toán
+        lines = [{"account": "141", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
     else:
         lines = [{"account": "331", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
     try:
@@ -240,7 +244,7 @@ def _post_payment(db: Session, r: PaymentRequest):
 
 def posted_tour_cost(db: Session, tour_id: int) -> float:
     """Chi phí tour đã ghi 154 qua đề nghị chi đã duyệt (để quyết toán chỉ ghi phần chênh lệch vào 335)."""
-    return sum(r.amount for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == tour_id, PaymentRequest.category == "chi_tour",
+    return sum(r.amount for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == tour_id, PaymentRequest.category.in_(["chi_tour", "tam_ung"]),
                                                                           PaymentRequest.status.in_(["cho_chi", "da_chi"]))).scalars())
 
 

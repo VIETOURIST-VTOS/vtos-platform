@@ -9,7 +9,7 @@ from app.services import rules as R
 
 STEP_TITLES = {"khoi_tao": "Khởi tạo tour / dự toán", "trinh_du_toan": "Đề nghị phê duyệt dự toán", "tp_xac_nhan": "Trưởng phòng Điều hành xác nhận",
                "duyet": "Phê duyệt dự toán", "ky": "Ký duyệt chuyến dưới biên", "d7": "Quyết định mốc D-7", "dong_so": "Đóng số quyết toán",
-               "kt_xac_nhan": "Kế toán xác nhận quyết toán", "cntt_khoa": "CNTT đối chiếu & khóa tour", "sua_du_toan": "Sửa dự toán", "vietrip": "Vietrip"}
+               "kt_xac_nhan": "Kế toán xác nhận quyết toán", "cntt_khoa": "CNTT đối chiếu & khóa tour", "kt_tra_lai": "Kế toán trả lại quyết toán", "sua_du_toan": "Sửa dự toán", "vietrip": "Vietrip"}
 
 
 def event(db: Session, t: Tour, step: str, actor: str, note: str = "", source: str = "vtos", at: datetime | None = None, title: str | None = None):

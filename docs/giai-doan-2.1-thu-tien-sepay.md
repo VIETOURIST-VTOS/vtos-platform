@@ -127,3 +127,16 @@ Kế toán TT99 + hóa đơn điện tử → thang lương f, visa, HDV, đội
 - **Lịch tự động** `.github/workflows/robots.yml` (GitHub Actions, miễn phí): 03:00 đồng bộ Vietrip; 30 phút/lần kéo SePay + chốt sự vụ hết hạn khiếu nại; 20:30 báo cáo ngày; T7 báo cáo tuần; ngày 10 báo cáo tháng. Cần secret ROBOT_TOKEN (GitHub) = ROBOT_TOKEN (Render).
 - **Bảng điều khiển**: cache 5 phút theo vai trò, làm mới sau mọi thao tác ghi; chỉ xét tour đang trong luồng; truy vấn booking gộp → hết "Đang tải…" 75 giây.
 - Migration 6d29554fe3aa; 50 test.
+
+## Tuần 2 – Quyết toán tour soạn trên VTOS (05/9/2026)
+
+Theo bố cục bảng "Quyết toán chi phí thực tế sau Tour" của Vietrip, bổ sung để Điều hành soạn thẳng trên VTOS:
+
+- Dòng chi phí NCC: mô tả, loại DV (11 loại), NCC + MST, cách tính (cố định = đơn giá × hệ số; theo khách = đơn giá × pax × hệ số), dự toán, thực chi, đã thanh toán, ghi chú. Kiểm tra nhập theo dòng như Vietrip (bắt buộc mô tả/loại/NCC/cách tính; đơn giá ≥ 0; hệ số > 0; pax > 0).
+- Một cửa: chỉ người điều hành chuyến thêm/sửa/hủy dòng (hủy phải có lý do, lưu vết). Sửa được tới khi đóng số; sau đóng số chỉ Kế toán trả lại (`POST /tours/{id}/kt-return`, ghi lý do) → phiên bản V.02, ghi vào Quy trình & lịch sử.
+- Chứng từ theo dòng: ảnh/PDF ≤ 1,5 MB (`POST/GET /tours/{id}/settlement/lines/{lid}/doc`), xem trực tiếp; Kế toán được gắn bổ sung sau đóng số.
+- Khớp "Đã thanh toán": `POST /tours/{id}/settlement/match-paid` gắn lệnh chi NCC và tạm ứng đã chi vào dòng theo MST rồi theo tên NCC; báo dòng chưa có lệnh chi và lệnh chi chưa gắn dòng.
+- Tạm ứng: loại đề nghị chi `tam_ung` (TP ĐH xác nhận → KT → TGĐ → chi; không cần MST), ghi Nợ 141 – Có 111/112; khi Kế toán xác nhận quyết toán tự hoàn ứng Nợ 154 – Có 141; phần chưa có lệnh chi trích 335; kết chuyển 632.
+- Chấm quyết toán (`checks`): dòng vượt dự toán > ngưỡng biên (10%) mà không giải trình → chặn đóng số; cảnh báo NCC thiếu MST (chi ≥ 5 triệu), dòng thiếu chứng từ, đã trả > thực chi, tổng vượt dự toán; đóng số lấy tổng dòng làm giá vốn thực tế (không nhập tay) và ghi tóm tắt V.xx vào lịch sử.
+- API: `GET /tours/{id}/settlement`, `POST /tours/{id}/settlement/lines`, `PUT …/lines/{lid}`, `POST …/lines/{lid}/cancel`; chi tiết tour có `settlement_edit` (can_edit, version, summary, checks). Web: tab "Chi NCC & quyết toán" có bảng soạn, KPI thu–chi–lợi nhuận–lệch dự toán–chứng từ, nút khớp thanh toán; tab Thông tin có nút Kế toán "Trả lại". Migration 7f1a2b3c4d5e. Test: tests/test_settlement.py (54 test toàn bộ).
+- Còn lại tuần 2: tiền bảo lưu, deadline hủy chỗ, mở khóa booking, % cọc; non-package; báo cáo bán tour lẻ; R9; Zalo/n8n; số dư đầu kỳ MISA. Tuần 3: OCR chứng từ điền dòng, AI so giá NCC lịch sử.
