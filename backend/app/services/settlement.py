@@ -157,10 +157,11 @@ def checks(db: Session, t: Tour) -> list[dict]:
             out.append({"level": "block", "line": l.line_no, "msg": f"Dòng {l.line_no} {l.description}: thực chi vượt dự toán {((l.actual - l.budget) / l.budget) * 100:.0f}% – phải ghi lời giải trình ở Ghi chú"})
         if not l.supplier_tax_code and l.service_type in ("HOTEL", "RESTAURANT", "VEHICLE", "FLIGHT", "LAND", "INSURANCE") and l.actual >= 5_000_000:
             out.append({"level": "warn", "line": l.line_no, "msg": f"Dòng {l.line_no}: NCC {l.supplier_name} chưa có MST (chi ≥ 5 triệu cần hóa đơn)"})
-        if not l.doc_data and l.actual > 0:
-            out.append({"level": "warn", "line": l.line_no, "msg": f"Dòng {l.line_no}: chưa gắn chứng từ"})
         if l.paid > l.actual + 1:
             out.append({"level": "warn", "line": l.line_no, "msg": f"Dòng {l.line_no}: đã thanh toán {l.paid:,.0f} lớn hơn thực chi {l.actual:,.0f}"})
+    nodoc = [l.line_no for l in ls if not l.doc_data and l.actual > 0]
+    if nodoc:
+        out.append({"level": "warn", "line": 0, "msg": f"{len(nodoc)}/{len(ls)} dòng chưa gắn chứng từ (dòng {', '.join(map(str, nodoc[:12]))}{'…' if len(nodoc) > 12 else ''})"})
     s = summary(db, t)
     if s["budget"] and s["variance_pct"] > thr:
         out.append({"level": "warn", "line": 0, "msg": f"Tổng thực chi vượt dự toán {s['variance_pct'] * 100:.0f}% (> {thr * 100:.0f}%) – TGĐ xem khi Kế toán xác nhận"})
