@@ -152,3 +152,12 @@ Theo màn hình Vietrip "Tiền bảo lưu" (/operations/bao-luu) và "BookingID
 - Cảnh báo R4: `chua_coc` (quá `han_coc_gio` 24 giờ chưa cọc), `sap_deadline_thu` (48 giờ), `qua_deadline_thu` (đỏ), `bao_luu_sap_het_han` (7 ngày), `bao_luu_het_han`.
 - Web: trang "Booking & bảo lưu" (tìm theo mã/khách/SĐT/tour, lọc trạng thái, sửa khách, mở khóa, hủy có phí, chạy R4; bảng bảo lưu với 4 KPI và 3 thao tác). Migration 8a2b3c4d5e6f; test tests/test_bookings.py (57 test toàn bộ).
 - Lưu ý: booking nạp từ Vietrip giữ deadline Vietrip; trạng thái thanh toán được tính lại từ phiếu thu VTOS khi robot chạy (205 phiếu thu Vietrip chưa nối booking có thể làm vài booking hiện "chưa cọc" – CNTT rà ở tab Đồng bộ).
+
+## Tuần 2 – Dịch vụ lẻ Non-package (05/9/2026)
+
+Theo màn hình Vietrip /operations/non-package (mã KLEddmmyy[_n], sale, khách, loại dịch vụ Visa/Vé máy bay/Khách sạn/Xe/Nhà hàng/Land/HDV/Khác, nước, giá, trạng thái TT Đặt cọc/Đã thanh toán, xem – thanh toán – in phiếu – hủy):
+
+- Mỗi dịch vụ lẻ = tour loại `non_package` mã KLE… (giữ đúng cách Vietrip; 70+ tour KLE nhập từ Vietrip được đổi loại bằng migration) + booking (thu tiền SePay/tiền mặt, bảo lưu, khóa dùng chung) + dòng chi phí NCC trên tour đó (quyết toán dùng chung). Booking thêm: service_type, country, customer_email, service_date, cost_amount, supplier_name.
+- API: `GET /non-package?month&service_type&paid&q` (danh sách + tổng hợp theo loại: số DV, doanh thu, đã thu, giá vốn, lợi nhuận, biên), `POST /non-package` (Kinh doanh/Điều hành; bắt buộc khách, SĐT, nguồn – 4 trường), `PUT /non-package/{id}` (đổi giá bị chặn khi booking đã khóa), `GET /non-package/{id}/print` (phiếu xác nhận dịch vụ, tự mở hộp in), hủy dùng `/bookings/{id}/cancel` (phí hủy → bảo lưu), `POST /non-package/close-month` (Kế toán/TP ĐH chốt tháng đã kết thúc: đóng số + xác nhận hàng loạt các KLE đã thu đủ → bút toán 154/335/632; dịch vụ còn nợ để lại và báo).
+- Robot: KLE không sinh cảnh báo D-7 / quá hạn quyết toán; danh sách tour mặc định ẩn KLE (tìm "KLE…" hoặc tour_type=non_package để xem). Quỹ thưởng nếu có tính như tour lẻ nội địa.
+- Web: trang "Dịch vụ lẻ" (5 KPI tháng, lọc tháng/loại/trạng thái/tìm, tạo, sửa, in phiếu, hủy, chốt tháng, bảng tổng hợp theo loại). Migration 9b3c4d5e6f70; test tests/test_nonpackage.py (59 test toàn bộ).

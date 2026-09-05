@@ -94,6 +94,7 @@ def _strip_accents(s: str) -> str:
 
 def tour_type_of(raw: dict) -> str:
     code = (raw.get("tourcode") or "").upper(); nuoc = (raw.get("nuoc") or "").strip()
+    if code.startswith("KLE"): return "non_package"   # Vietrip: dịch vụ Non-package tạo mã KLEddmmyy[_n]
     doan = code.startswith("MICE") or "MICE" in (raw.get("tenSanPham") or "").upper()
     if doan: return "doan_nuoc_ngoai" if nuoc else "doan_noi_dia"
     return "le_nuoc_ngoai" if nuoc else "le_noi_dia"

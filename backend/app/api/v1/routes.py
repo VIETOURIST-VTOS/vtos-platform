@@ -93,10 +93,12 @@ def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Sessio
 
 # ---------- tours ----------
 @router.get("/tours", tags=["tours"])
-def list_tours(status: str | None = None, q: str = "", month: str = "", limit: int = 300, offset: int = 0, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    """Danh sách tour có phân trang/tìm kiếm (mặc định 300 chuyến mới nhất) – 1.200+ tour nhập từ Vietrip."""
+def list_tours(status: str | None = None, q: str = "", month: str = "", limit: int = 300, offset: int = 0, tour_type: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Danh sách tour có phân trang/tìm kiếm (mặc định 300 chuyến mới nhất) – 1.200+ tour nhập từ Vietrip. Mặc định ẩn dịch vụ lẻ (KLE) trừ khi tìm theo mã hoặc chọn tour_type."""
     from sqlalchemy import or_
     qs = select(Tour).order_by(desc(Tour.start_date))
+    if tour_type: qs = qs.where(Tour.tour_type == tour_type)
+    elif not (q and q.upper().startswith("KLE")): qs = qs.where(Tour.tour_type != "non_package")
     if status: qs = qs.where(Tour.status.in_(status.split(",")))
     if q: qs = qs.where(or_(Tour.code.ilike(f"%{q}%"), Tour.name.ilike(f"%{q}%"), Tour.product_code.ilike(f"%{q}%")))
     if month:

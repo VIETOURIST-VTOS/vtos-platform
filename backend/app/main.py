@@ -14,6 +14,7 @@ from app.api.v1.finance import router as finance_router
 from app.api.v1.vietrip import router as vietrip_router
 from app.api.v1.products import router as products_router
 from app.api.v1.settlement import router as settlement_router
+from app.api.v1.nonpackage import router as nonpackage_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -62,6 +63,7 @@ app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.CO
 app.include_router(router)
 app.include_router(products_router)
 app.include_router(settlement_router)
+app.include_router(nonpackage_router)
 app.include_router(payments_router)
 app.include_router(accounting_router)
 app.include_router(hr_router)

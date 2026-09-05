@@ -56,7 +56,9 @@ TOUR_TYPES = {
     "le_nuoc_ngoai": "Tour lẻ nước ngoài",
     "doan_noi_dia": "Tour đoàn nội địa",
     "doan_nuoc_ngoai": "Tour đoàn nước ngoài",
+    "non_package": "Dịch vụ lẻ (Non-package)",
 }
+SERVICE_KINDS = {"VISA": "Visa", "FLIGHT": "Vé máy bay", "HOTEL": "Khách sạn", "VEHICLE": "Xe", "RESTAURANT": "Nhà hàng", "LAND": "Land", "GUIDE": "Hướng dẫn viên", "OTHER": "Khác"}
 TOUR_STATUS = {
     "nhap": "Nháp (Điều hành đang lập dự toán)",
     "cho_xac_nhan": "Chờ Trưởng phòng ĐH xác nhận",
@@ -241,6 +243,12 @@ class Booking(Base):
     cancel_reason: Mapped[str] = mapped_column(String(200), default="")
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancel_charge: Mapped[float] = mapped_column(Float, default=0)          # phí hủy giữ lại làm doanh thu
+    service_type: Mapped[str] = mapped_column(String(20), default="")       # non-package: VISA/FLIGHT/HOTEL/VEHICLE/RESTAURANT/LAND/GUIDE/OTHER
+    country: Mapped[str] = mapped_column(String(60), default="")
+    customer_email: Mapped[str] = mapped_column(String(120), default="")
+    service_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    cost_amount: Mapped[float] = mapped_column(Float, default=0)            # giá vốn NCC của dịch vụ lẻ
+    supplier_name: Mapped[str] = mapped_column(String(160), default="")
     tour: Mapped["Tour"] = relationship(back_populates="bookings")
     sales: Mapped["User"] = relationship(foreign_keys=[sales_id])
 

@@ -30,6 +30,8 @@ def _make_receipt(db: Session, booking: Booking, txn: BankTransaction | None, am
                 status=status, created_by=actor)
     db.add(r); db.flush()
     booking.paid = paid_amount(db, booking.id)
+    from app.services.bookings import refresh_status
+    refresh_status(booking)
     return r
 
 

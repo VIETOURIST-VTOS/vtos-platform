@@ -152,7 +152,7 @@ def settlement_summary(db: Session, tour: Tour) -> dict:
     thr = get_param(db, "nguong_bien", tour.end_date)
     deadline = settlement_deadline(db, tour)
     on_time = tour.closed_at is not None and tour.closed_at.date() <= deadline
-    key = {"le_noi_dia": "quy_dh_le_noi_dia", "le_nuoc_ngoai": "quy_dh_le_nuoc_ngoai"}.get(tour.tour_type, "quy_dh_doan")
+    key = {"le_noi_dia": "quy_dh_le_noi_dia", "le_nuoc_ngoai": "quy_dh_le_nuoc_ngoai", "non_package": "quy_dh_le_noi_dia"}.get(tour.tour_type, "quy_dh_doan")
     rate = get_param(db, key, tour.end_date)
     # ĐC Điều 7: tour lẻ < ngưỡng hoặc duyệt dưới biên → không quỹ; đoàn không phụ thuộc biên. Quá hạn → mất thưởng chuyến.
     eligible = on_time and (is_doan(tour) or (margin >= thr and not tour.below_margin))
@@ -178,6 +178,9 @@ def run_robots(db: Session) -> int:
 
     d7 = int(get_param(db, "moc_d7"))
     for t in db.execute(select(Tour).where(Tour.status == "da_duyet")).scalars():
+        if t.tour_type == "non_package":
+            if t.end_date < today: t.status = "ket_thuc"
+            continue
         thr = get_param(db, "nguong_bien", t.start_date)
         c = calc(t, thr)
         days_left = (t.start_date - today).days
@@ -188,7 +191,7 @@ def run_robots(db: Session) -> int:
                 "tp_dh,gd_kd,tgd,chutich")
         if t.end_date < today:
             t.status = "ket_thuc"
-    for t in db.execute(select(Tour).where(Tour.status == "ket_thuc")).scalars():
+    for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.tour_type != "non_package")).scalars():
         dl = settlement_deadline(db, t)
         if today > dl:
             add("qua_han_qt", "red", t.code,
