@@ -39,9 +39,11 @@ def upsert(db: Session, entity: str, rows: list[dict]) -> tuple[int, int]:
     key = {"tour": "recID", "booking": "recID", "receipt": "RecID", "supplier_payment": "RecID", "user": "recID", "vehicle": "recID", "proposal": "proposalId", "settlement": "tourId"}[entity]
     new = upd = 0
     existing = {r.vietrip_id: r for r in db.execute(select(VtRecord).where(VtRecord.entity == entity)).scalars()}
+    seen = set()
     for raw in rows:
         vid = str(raw.get(key) or "")
-        if not vid: continue
+        if not vid or vid in seen: continue
+        seen.add(vid)
         ref = str(raw.get("tourcode") or raw.get("Tourcode") or raw.get("BookingID") or raw.get("licensePlate") or "")
         on = _d(raw.get("fstUpdate") or raw.get("FstUpdate") or raw.get("ngayKhoiHanh") or raw.get("submittedAt") or raw.get("lstUpdate"))
         amt = float(raw.get("totalDue") or raw.get("SoTien") or raw.get("Amount") or raw.get("amount") or raw.get("doanhThu") or 0)
@@ -243,7 +245,7 @@ def apply_bookings(db: Session, limit: int = 400) -> int:
 
 
 def apply_receipts(db: Session, limit: int = 400) -> int:
-    n = 0; touched = set()
+    n = 0; touched = set(); made = set()
     bk = {b.vietrip_id: b for b in db.execute(select(Booking).where(Booking.vietrip_id != None)).scalars()}
     for r in db.execute(select(VtRecord).where(VtRecord.entity == "receipt", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw
@@ -260,10 +262,11 @@ def apply_receipts(db: Session, limit: int = 400) -> int:
             pr.created_at = _dt(raw.get("FstUpdate")) or datetime.now(); pr.paid_at = pr.created_at; pr.paid_method = "tien_mat" if "mặt" in (raw.get("HinhThuc") or "").lower() else "chuyen_khoan"
             r.applied, r.apply_note = True, code; n += 1; continue
         code = f"VTPT{int(raw['RecID'])}"
+        if code in made: r.applied, r.apply_note = True, f"{code} (trùng)"; continue
         rc = db.execute(select(Receipt).where(Receipt.code == code)).scalars().first()
         if not rc:
             rc = Receipt(code=code, booking_id=b.id); db.add(rc)
-        touched.add(b.id)
+        made.add(code); touched.add(b.id)
         rc.amount = float(raw.get("SoTien") or 0); rc.method = "tien_mat" if "mặt" in (raw.get("HinhThuc") or "").lower() else "chuyen_khoan"
         rc.payer = (raw.get("NguoiThanhToan") or b.customer_name)[:120]; rc.note = f"Vietrip {raw.get('TaiKhoanCongTy') or ''} {raw.get('GhiChu') or ''}".strip()[:200]
         rc.status = "ke_toan_xac_nhan"; rc.created_by = "vietrip"; rc.confirmed_by = (raw.get("FstUser") or "vietrip")[:50]

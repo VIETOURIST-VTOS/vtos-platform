@@ -81,3 +81,12 @@ def test_booking_without_tour():
     assert bk["VT130001"]["amount"] == 50000000 and "VT130002" not in bk
     rec = client.get("/api/v1/import/vietrip/records?entity=booking&limit=5", headers=h).json()
     assert any(r["vietrip_id"] == "130002" and r["applied"] and "hủy" in r["apply_note"] for r in rec)
+
+
+def test_duplicate_rows_in_batch():
+    """Cùng một phiếu thu xuất hiện 2 lần trong 1 lô (trùng trang) → chỉ 1 receipt, không lỗi unique."""
+    h = login("cntt")
+    dup = {**REC, "RecID": "88499", "SoTien": 500000}
+    r = client.post("/api/v1/import/vietrip/receipt", json={"rows": [dup, dict(dup)]}, headers=h).json(); assert r["new"] == 1
+    res = client.post("/api/v1/import/vietrip/apply?limit=50", headers=h).json()["applied"]; assert res["receipts"] == 1
+    assert len([x for x in client.get("/api/v1/receipts", headers=h).json() if x["code"] == "VTPT88499"]) == 1
