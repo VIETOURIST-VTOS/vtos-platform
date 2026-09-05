@@ -66,9 +66,10 @@ def get_param_text(db: Session, key: str, on: date | None = None) -> str:
 
 
 def seed_params(db: Session):
-    if db.execute(select(Param)).scalars().first():
-        return
+    """Nạp tham số mặc định; CSDL đã có thì chỉ bổ sung khóa mới xuất hiện trong bộ chính sách (không đè giá trị đang hiệu lực)."""
+    have = {p.key for p in db.execute(select(Param)).scalars()}
     for k, v, label, unit, src in DEFAULT_PARAMS:
+        if k in have: continue
         db.add(Param(key=k, value=v, label=label, unit=unit, effective_from=date(2026, 9, 1),
                      source=src, status="active", signed_chutich=True, signed_tgd=True, proposed_by="seed"))
     db.commit()
