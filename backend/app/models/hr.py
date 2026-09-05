@@ -76,9 +76,27 @@ class Vehicle(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     plate: Mapped[str] = mapped_column(String(20), unique=True)
     seats: Mapped[int] = mapped_column(Integer, default=45)
+    kind: Mapped[str] = mapped_column(String(10), default="noi_bo")            # noi_bo (Vietrip) / hop_tac (xe hợp tác hỗ trợ)
     driver_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
-    internal_rate_per_day: Mapped[float] = mapped_column(Float, default=0)   # bảng giá xe nội bộ (chờ duyệt)
+    internal_rate_per_day: Mapped[float] = mapped_column(Float, default=0)   # dùng khi tuyến không có trong bảng giá
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class VehicleRate(Base):
+    """Bảng giá xe nội bộ theo tuyến (giá trọn chuyến): cột xe Vietrip – VTD và cột xe hợp tác. Master data, Chủ tịch + TGĐ duyệt, hiệu lực theo ngày."""
+    __tablename__ = "vehicle_rates"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    route: Mapped[str] = mapped_column(String(80))
+    days: Mapped[int] = mapped_column(Integer, default=0)
+    internal_price: Mapped[float] = mapped_column(Float, default=0)          # xe nội bộ Vietrip – VTD
+    partner_price: Mapped[float] = mapped_column(Float, default=0)           # xe hợp tác hỗ trợ (0 = không áp dụng)
+    effective_from: Mapped[date] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(20), default="pending")       # pending / active / rejected
+    signed_chutich: Mapped[bool] = mapped_column(Boolean, default=False)
+    signed_tgd: Mapped[bool] = mapped_column(Boolean, default=False)
+    note: Mapped[str] = mapped_column(String(200), default="")
+    proposed_by: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class DispatchOrder(Base):
@@ -90,6 +108,7 @@ class DispatchOrder(Base):
     driver_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
     date_from: Mapped[date] = mapped_column(Date)
     date_to: Mapped[date] = mapped_column(Date)
+    rate_id: Mapped[int | None] = mapped_column(ForeignKey("vehicle_rates.id"), nullable=True)   # tuyến trong bảng giá
     internal_price: Mapped[float] = mapped_column(Float, default=0)         # giá thuê nội bộ cả chuyến
     created_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

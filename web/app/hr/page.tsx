@@ -28,7 +28,9 @@ function HR() {
   const [fEmp, setFEmp] = useState<any>({ full_name: "", department: "kd_le", position: "nv", office: "hcm", contract_type: "hdld", base_salary: "" });
   const [fVisa, setFVisa] = useState<any>({ customer_name: "", market: "", method: "tu_xu_ly", handler_id: "", office: "hcm", alliance: false, revenue: "" });
   const [fAsg, setFAsg] = useState<any>({ tour_id: "", guide_id: "", days: "1", rate_per_day: "450000", holiday: false });
-  const [fDisp, setFDisp] = useState<any>({ tour_id: "", vehicle_id: "", date_from: "", date_to: "" });
+  const [fDisp, setFDisp] = useState<any>({ tour_id: "", vehicle_id: "", date_from: "", date_to: "", rate_id: "" });
+  const [rates, setRates] = useState<any[]>([]);
+  const [fRate, setFRate] = useState<any>({ route: "", days: "", internal_price: "", partner_price: "", effective_from: new Date().toISOString().slice(0, 10) });
   const [fInc, setFInc] = useState<any>({ employee_id: "", level: "2", description: "", occurred_on: new Date().toISOString().slice(0, 10) });
   const canHR = ["hcns", "cntt"].includes(role), canDH = ["nv_dh", "tp_dh", "hcns", "cntt"].includes(role);
 
@@ -40,7 +42,7 @@ function HR() {
     if (tab === "employees") api("/employees").then(setEmps);
     if (tab === "visa") api("/visa").then(setVisa);
     if (tab === "guides") api("/guide-assignments").then(setAsg);
-    if (tab === "fleet") { api("/vehicles").then(setVeh); api("/dispatch").then(setDisp); api(`/fleet/summary?period=${period}`).then(setFleet); }
+    if (tab === "fleet") { api("/vehicles").then(setVeh); api("/dispatch").then(setDisp); api("/vehicle-rates").then(setRates); api(`/fleet/summary?period=${period}`).then(setFleet); }
     if (tab === "incidents") api("/incidents").then(setInc);
   }, [tab, period]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
@@ -122,15 +124,28 @@ function HR() {
       {fleet && <div className="kpis"><div className="kpi"><b>{vnd(fleet.total_revenue)}</b><span>Doanh thu nội bộ Đội xe {period}</span></div>{fleet.rows.map((r: any) => <div className="kpi" key={r.vehicle}><b>{r.days} ngày</b><span>{r.vehicle} · {r.driver} · {r.trips} chuyến · CTP {vnd(r.driver_allowance)}</span></div>)}</div>}
       {["nv_dh", "tp_dh", "cntt"].includes(role) && <div className="panel"><h2>Lệnh điều xe (Đội xe xác nhận trong 4 giờ)</h2><div className="grid">
         <label>Tour<select value={fDisp.tour_id} onChange={(e) => setFDisp({ ...fDisp, tour_id: e.target.value })}><option value="">–</option>{tours.map((t) => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}</select></label>
-        <label>Xe<select value={fDisp.vehicle_id} onChange={(e) => setFDisp({ ...fDisp, vehicle_id: e.target.value })}><option value="">–</option>{veh.map((v) => <option key={v.id} value={v.id}>{v.plate} · {v.driver} · {vnd(v.internal_rate_per_day)}/ngày</option>)}</select></label>
+        <label>Xe<select value={fDisp.vehicle_id} onChange={(e) => setFDisp({ ...fDisp, vehicle_id: e.target.value })}><option value="">–</option>{veh.map((v) => <option key={v.id} value={v.id}>{v.plate} · {v.kind === "hop_tac" ? "xe hợp tác" : v.driver}</option>)}</select></label>
+        <label>Tuyến (bảng giá xe)<select value={fDisp.rate_id} onChange={(e) => setFDisp({ ...fDisp, rate_id: e.target.value })}><option value="">– theo ngày –</option>{rates.filter((r) => r.status === "active").map((r) => <option key={r.id} value={r.id}>{r.route}{r.days ? ` ${r.days}N` : ""} · {vnd(r.internal_price)} / HT {r.partner_price ? vnd(r.partner_price) : "–"}</option>)}</select></label>
         <label>Từ ngày<input type="date" value={fDisp.date_from} onChange={(e) => setFDisp({ ...fDisp, date_from: e.target.value })} /></label>
         <label>Đến ngày<input type="date" value={fDisp.date_to} onChange={(e) => setFDisp({ ...fDisp, date_to: e.target.value })} /></label>
-      </div><button className="act" disabled={!fDisp.tour_id || !fDisp.vehicle_id || !fDisp.date_from || !fDisp.date_to} onClick={() => post("/dispatch", { tour_id: Number(fDisp.tour_id), vehicle_id: Number(fDisp.vehicle_id), date_from: fDisp.date_from, date_to: fDisp.date_to })}>Lập lệnh</button></div>}
-      <div className="panel wrap"><table><thead><tr><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Thời gian</th><th style={{ textAlign: "right" }}>Giá nội bộ</th><th>Trạng thái</th><th>Sự cố</th>{["cntt", "tp_dh", "nv_dh", "hcns"].includes(role) && <th></th>}</tr></thead>
-        <tbody>{disp.map((d) => <tr key={d.id}><td><b>{d.tour_code}</b></td><td>{d.vehicle}</td><td>{d.driver}</td><td>{fmtD(d.date_from)} → {fmtD(d.date_to)} ({d.days} ngày)</td><td style={{ textAlign: "right" }}>{vnd(d.internal_price)}</td>
+      </div><button className="act" disabled={!fDisp.tour_id || !fDisp.vehicle_id || !fDisp.date_from || !fDisp.date_to} onClick={() => post("/dispatch", { tour_id: Number(fDisp.tour_id), vehicle_id: Number(fDisp.vehicle_id), date_from: fDisp.date_from, date_to: fDisp.date_to, rate_id: fDisp.rate_id ? Number(fDisp.rate_id) : null })}>Lập lệnh</button></div>}
+      <div className="panel wrap"><table><thead><tr><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Tuyến</th><th>Thời gian</th><th style={{ textAlign: "right" }}>Giá nội bộ</th><th>Trạng thái</th><th>Sự cố</th>{["cntt", "tp_dh", "nv_dh", "hcns"].includes(role) && <th></th>}</tr></thead>
+        <tbody>{disp.map((d) => <tr key={d.id}><td><b>{d.tour_code}</b></td><td>{d.vehicle}</td><td>{d.driver}</td><td className="muted">{d.route}</td><td>{fmtD(d.date_from)} → {fmtD(d.date_to)} ({d.days} ngày)</td><td style={{ textAlign: "right" }}>{vnd(d.internal_price)}</td>
           <td>{d.status === "hoan_thanh" ? <Tag cls="ok">Hoàn thành</Tag> : d.status === "da_xac_nhan" ? <Tag cls="navy">Đã xác nhận</Tag> : d.status === "huy" ? <Tag cls="red">Hủy</Tag> : <Tag cls="warn">Chờ xác nhận 4h</Tag>}</td><td className="muted">{d.incident_note}</td>
           {["cntt", "tp_dh", "nv_dh", "hcns"].includes(role) && <td>{d.status === "cho_xac_nhan" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/dispatch/${d.id}/update`, { status: "da_xac_nhan" })}>Xác nhận</button>}{d.status === "da_xac_nhan" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/dispatch/${d.id}/update`, { status: "hoan_thanh" })}>Hoàn thành</button>}</td>}</tr>)}</tbody></table></div>
-      <p className="muted">Đội xe Vietrip hạch toán riêng như trung tâm lợi nhuận; giá nội bộ theo bảng giá xe (chờ Chủ tịch + TGĐ duyệt, nhập ở hồ sơ xe); quyết toán tháng do CNTT/AI.</p>
+      <h2>Bảng giá xe nội bộ theo tuyến (Chủ tịch + TGĐ duyệt, hiệu lực theo ngày)</h2>
+      {["cntt", "hcns", "tp_dh"].includes(role) && <div className="panel"><div className="grid">
+        <label>Tuyến<input value={fRate.route} onChange={(e) => setFRate({ ...fRate, route: e.target.value })} /></label>
+        <label>Số ngày<input type="number" value={fRate.days} onChange={(e) => setFRate({ ...fRate, days: e.target.value })} /></label>
+        <label>Giá xe Vietrip – VTD<input type="number" value={fRate.internal_price} onChange={(e) => setFRate({ ...fRate, internal_price: e.target.value })} /></label>
+        <label>Giá xe hợp tác<input type="number" value={fRate.partner_price} onChange={(e) => setFRate({ ...fRate, partner_price: e.target.value })} /></label>
+        <label>Hiệu lực từ<input type="date" value={fRate.effective_from} onChange={(e) => setFRate({ ...fRate, effective_from: e.target.value })} /></label>
+      </div><button className="act orange" disabled={!fRate.route || !fRate.internal_price} onClick={() => post("/vehicle-rates", { ...fRate, days: Number(fRate.days) || 0, internal_price: Number(fRate.internal_price), partner_price: Number(fRate.partner_price) || 0 }).then((r) => r && setFRate({ ...fRate, route: "", days: "", internal_price: "", partner_price: "" }))}>Trình Chủ tịch + TGĐ</button></div>}
+      <div className="panel wrap"><table><thead><tr><th>Tuyến</th><th>Ngày</th><th style={{ textAlign: "right" }}>Xe Vietrip – VTD</th><th style={{ textAlign: "right" }}>Xe hợp tác</th><th>Hiệu lực</th><th>Trạng thái</th><th>Chữ ký</th>{["chutich", "tgd"].includes(role) && <th></th>}</tr></thead>
+        <tbody>{rates.map((r) => <tr key={r.id} style={{ opacity: r.status === "rejected" ? 0.5 : 1 }}><td><b>{r.route}</b></td><td>{r.days || "–"}</td><td style={{ textAlign: "right" }}>{vnd(r.internal_price)}</td><td style={{ textAlign: "right" }}>{r.partner_price ? vnd(r.partner_price) : "–"}</td><td>{fmtD(r.effective_from)}</td>
+          <td><Tag cls={r.status === "active" ? "ok" : r.status === "pending" ? "warn" : ""}>{r.status === "active" ? "Hiệu lực" : r.status === "pending" ? "Chờ ký" : "Hết hiệu lực"}</Tag></td><td>CT {r.signed_chutich ? "✔" : "…"} · TGĐ {r.signed_tgd ? "✔" : "…"}</td>
+          {["chutich", "tgd"].includes(role) && <td>{r.status === "pending" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/vehicle-rates/${r.id}/sign`)}>Ký</button>}</td>}</tr>)}</tbody></table></div>
+      <p className="muted">Bảng giá 6/5/2026 (anh Tuấn cung cấp 05/9/2026); cột xe hợp tác áp dụng từ 5/8/2026 cho 50E-955.31, 50H-496.23. Đội xe Vietrip hạch toán riêng như trung tâm lợi nhuận; lệnh điều xe lấy giá theo tuyến và loại xe; tuyến không có trong bảng → giá theo ngày ở hồ sơ xe. Quyết toán tháng do CNTT/AI.</p>
     </>}
 
     {tab === "incidents" && <>

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles
 from app.models.core import Tour, User
-from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, DispatchOrder, Incident, PayrollRun, DEPARTMENTS, POSITIONS, OFFICES
+from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, DEPARTMENTS, POSITIONS, OFFICES
 from app.services import hr as H
 from app.services import rules as R
 
@@ -174,13 +174,14 @@ def assign_update(aid: int, data: AssignUpdate, u: User = Depends(require_roles(
 @router.get("/vehicles")
 def vehicles(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
-    return [{"id": v.id, "plate": v.plate, "seats": v.seats, "driver_id": v.driver_id, "driver": emps.get(v.driver_id, ""), "internal_rate_per_day": v.internal_rate_per_day, "active": v.active}
+    return [{"id": v.id, "plate": v.plate, "seats": v.seats, "kind": v.kind, "driver_id": v.driver_id, "driver": emps.get(v.driver_id, ""), "internal_rate_per_day": v.internal_rate_per_day, "active": v.active}
             for v in db.execute(select(Vehicle).order_by(Vehicle.plate)).scalars()]
 
 
 class VehicleIn(BaseModel):
     plate: str
     seats: int = 45
+    kind: str = "noi_bo"
     driver_id: int | None = None
     internal_rate_per_day: float = 0
 
@@ -192,6 +193,47 @@ def vehicle_create(data: VehicleIn, u: User = Depends(require_roles("cntt", "hcn
     return {"message": f"Đã thêm xe {v.plate}"}
 
 
+# ---------- Bảng giá xe nội bộ (master data, Chủ tịch + TGĐ duyệt) ----------
+def rate_out(r: VehicleRate) -> dict:
+    return {"id": r.id, "route": r.route, "days": r.days, "internal_price": r.internal_price, "partner_price": r.partner_price, "effective_from": r.effective_from,
+            "status": r.status, "signed_chutich": r.signed_chutich, "signed_tgd": r.signed_tgd, "note": r.note, "proposed_by": r.proposed_by}
+
+
+@router.get("/vehicle-rates")
+def vehicle_rates(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return [rate_out(r) for r in db.execute(select(VehicleRate).order_by(VehicleRate.status.desc(), VehicleRate.id)).scalars()]
+
+
+class RateIn(BaseModel):
+    route: str
+    days: int = 0
+    internal_price: float
+    partner_price: float = 0
+    effective_from: date
+    note: str = ""
+
+
+@router.post("/vehicle-rates", status_code=201)
+def rate_propose(data: RateIn, u: User = Depends(require_roles("cntt", "hcns", "tp_dh")), db: Session = Depends(get_db)):
+    r = VehicleRate(**data.model_dump(), proposed_by=u.username); db.add(r); db.flush()
+    R.audit(db, u.username, u.role, "de_xuat_gia_xe", f"rate:{r.id}", after=data.model_dump(mode="json")); db.commit()
+    return {"message": f"Đã trình giá tuyến {r.route} – chờ Chủ tịch + TGĐ ký"}
+
+
+@router.post("/vehicle-rates/{rid}/sign")
+def rate_sign(rid: int, u: User = Depends(require_roles("chutich", "tgd")), db: Session = Depends(get_db)):
+    r = db.get(VehicleRate, rid)
+    if not r or r.status != "pending": raise HTTPException(404, "Không có đề xuất chờ ký")
+    if u.role == "chutich": r.signed_chutich = True
+    else: r.signed_tgd = True
+    if r.signed_chutich and r.signed_tgd:
+        for old in db.execute(select(VehicleRate).where(VehicleRate.route == r.route, VehicleRate.status == "active", VehicleRate.id != r.id)).scalars():
+            if old.effective_from <= r.effective_from: old.status = "rejected"; old.note = (old.note + f" | thay bởi #{r.id}")[:200]
+        r.status = "active"
+    R.audit(db, u.username, u.role, "ky_gia_xe", f"rate:{r.id}", after={"trang_thai": r.status}); db.commit()
+    return {"message": "Đã ký" + (" – bảng giá có hiệu lực" if r.status == "active" else ", chờ chữ ký còn lại")}
+
+
 @router.get("/dispatch")
 def dispatch_list(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
@@ -199,7 +241,8 @@ def dispatch_list(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Sessi
     out = []
     for d in db.execute(select(DispatchOrder).order_by(desc(DispatchOrder.id))).scalars():
         t = db.get(Tour, d.tour_id)
-        out.append({"id": d.id, "tour_code": t.code if t else "", "vehicle": veh.get(d.vehicle_id, ""), "driver": emps.get(d.driver_id, ""), "date_from": d.date_from, "date_to": d.date_to,
+        rt = db.get(VehicleRate, d.rate_id) if d.rate_id else None
+        out.append({"id": d.id, "tour_code": t.code if t else "", "vehicle": veh.get(d.vehicle_id, ""), "driver": emps.get(d.driver_id, ""), "date_from": d.date_from, "date_to": d.date_to, "route": rt.route if rt else "",
                     "days": (d.date_to - d.date_from).days + 1, "internal_price": d.internal_price, "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at, "incident_note": d.incident_note})
     return out
 
@@ -209,6 +252,7 @@ class DispatchIn(BaseModel):
     vehicle_id: int
     date_from: date
     date_to: date
+    rate_id: int | None = None
     internal_price: float = 0
 
 
@@ -216,12 +260,23 @@ class DispatchIn(BaseModel):
 def dispatch_create(data: DispatchIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "cntt")), db: Session = Depends(get_db)):
     v = db.get(Vehicle, data.vehicle_id); t = db.get(Tour, data.tour_id)
     if not v or not t: raise HTTPException(404, "Không có xe hoặc tour")
-    if not v.driver_id: raise HTTPException(422, "Xe chưa gán tài xế")
     if data.date_to < data.date_from: raise HTTPException(422, "Ngày không hợp lệ")
-    price = data.internal_price or v.internal_rate_per_day * ((data.date_to - data.date_from).days + 1)
-    d = DispatchOrder(tour_id=t.id, vehicle_id=v.id, driver_id=v.driver_id, date_from=data.date_from, date_to=data.date_to, internal_price=price, created_by=u.username)
+    rt = db.get(VehicleRate, data.rate_id) if data.rate_id else None
+    if rt and rt.status != "active": raise HTTPException(422, "Tuyến trong bảng giá chưa được Chủ tịch + TGĐ duyệt")
+    if rt:
+        price = rt.partner_price if v.kind == "hop_tac" else rt.internal_price
+        if price <= 0: raise HTTPException(422, f"Tuyến {rt.route} không có giá cho loại xe {v.kind}")
+    else:
+        price = data.internal_price or v.internal_rate_per_day * ((data.date_to - data.date_from).days + 1)
+    if v.kind != "hop_tac" and not v.driver_id: raise HTTPException(422, "Xe chưa gán tài xế")
+    driver_id = v.driver_id
+    if not driver_id:   # xe hợp tác: tài xế của đối tác – ghi vào hồ sơ xe khi có; tạm gắn người lập lệnh để theo dõi
+        drv = db.execute(select(Employee).where(Employee.department == "doi_xe").order_by(Employee.id)).scalars().first()
+        if not drv: raise HTTPException(422, "Chưa có hồ sơ tài xế")
+        driver_id = drv.id
+    d = DispatchOrder(tour_id=t.id, vehicle_id=v.id, driver_id=driver_id, date_from=data.date_from, date_to=data.date_to, rate_id=rt.id if rt else None, internal_price=price, created_by=u.username)
     db.add(d); db.flush()
-    R.audit(db, u.username, u.role, "lenh_dieu_xe", f"tour:{t.code}", after={"xe": v.plate, "tu": str(data.date_from), "den": str(data.date_to), "gia_noi_bo": price})
+    R.audit(db, u.username, u.role, "lenh_dieu_xe", f"tour:{t.code}", after={"xe": v.plate, "tuyen": rt.route if rt else "", "tu": str(data.date_from), "den": str(data.date_to), "gia_noi_bo": price})
     db.commit()
     return {"message": f"Đã lập lệnh điều xe {v.plate} cho {t.code} – Đội xe xác nhận trong 4 giờ"}
 

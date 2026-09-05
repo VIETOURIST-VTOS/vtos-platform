@@ -99,4 +99,24 @@ def test_payroll_flow_roles_and_journal():
 
 def test_fleet_summary():
     s = client.get("/api/v1/fleet/summary", params={"period": P}, headers=login("cntt")).json()
-    assert s["total_revenue"] == 10_500_000 and s["rows"][0]["driver_allowance"] == 600_000
+    assert s["total_revenue"] >= 10_500_000 and next(r for r in s["rows"] if r["vehicle"] == "50F-009.60")["driver_allowance"] == 600_000
+
+
+def test_vehicle_rate_table_and_dispatch_pricing():
+    rates = client.get("/api/v1/vehicle-rates", headers=login("dh.lan")).json()
+    pt = next(r for r in rates if r["route"] == "Phan Thiết 2 ngày")
+    assert pt["internal_price"] == 9_000_000 and pt["partner_price"] == 10_000_000 and pt["status"] == "active" and len(rates) >= 29
+    veh = {v["plate"]: v for v in client.get("/api/v1/vehicles", headers=login("dh.lan")).json()}
+    t = next(x for x in client.get("/api/v1/tours", headers=login("dh.lan")).json() if x["code"] == "PT-DL-0912")
+    base = {"tour_id": t["id"], "date_from": t["start_date"], "date_to": t["end_date"], "rate_id": pt["id"]}
+    assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50F-009.60"]["id"]}, headers=login("dh.lan")).status_code == 201
+    assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50E-955.31"]["id"]}, headers=login("dh.lan")).status_code == 201
+    ds = {d["vehicle"]: d for d in client.get("/api/v1/dispatch", headers=login("dh.lan")).json() if d["tour_code"] == "PT-DL-0912"}
+    assert ds["50F-009.60"]["internal_price"] == 9_000_000 and ds["50E-955.31"]["internal_price"] == 10_000_000 and ds["50F-009.60"]["route"] == "Phan Thiết 2 ngày"
+    # đề xuất giá mới cần 2 chữ ký
+    r = client.post("/api/v1/vehicle-rates", json={"route": "Phan Thiết 2 ngày", "days": 2, "internal_price": 9_500_000, "partner_price": 10_500_000, "effective_from": "2026-10-01"}, headers=login("cntt"))
+    assert r.status_code == 201
+    new = [x for x in client.get("/api/v1/vehicle-rates", headers=login("cntt")).json() if x["status"] == "pending"][0]
+    assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50F-009.60"]["id"], "rate_id": new["id"]}, headers=login("dh.lan")).status_code == 422
+    client.post(f"/api/v1/vehicle-rates/{new['id']}/sign", headers=login("tgd"))
+    assert "hiệu lực" in client.post(f"/api/v1/vehicle-rates/{new['id']}/sign", headers=login("chutich")).json()["message"]

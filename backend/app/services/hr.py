@@ -209,6 +209,9 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
     ctp = R.get_param(db, "tai_xe_cong_tac_phi")
     days_by_driver: dict[int, int] = {}
     for d in db.execute(select(DispatchOrder).where(DispatchOrder.status.in_(["da_xac_nhan", "hoan_thanh"]))).scalars():
+        v = db.get(Vehicle, d.vehicle_id)
+        if v and v.kind == "hop_tac":
+            continue                                  # xe hợp tác: tài xế đối tác, không tính công tác phí
         if d.date_to.year == y and d.date_to.month == m:
             days_by_driver[d.driver_id] = days_by_driver.get(d.driver_id, 0) + (d.date_to - d.date_from).days + 1
     for eid, n in days_by_driver.items():

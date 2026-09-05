@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 from app.core.security import hash_password
 from sqlalchemy import select
 from app.models.core import User, Tour, ServiceRequest, Booking
-from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, DispatchOrder
+from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder
 from app.services import rules as core
 
 USERS = [
@@ -27,6 +27,7 @@ USERS = [
 def seed_all(db):
     if db.execute(select(User)).scalars().first():
         # CSDL đã có dữ liệu (bản demo trên cloud): chỉ bổ sung phần nhân sự nếu chưa có
+        seed_vehicle_rates(db); db.commit()
         if not db.execute(select(Employee)).scalars().first():
             users = {u.username: u for u in db.execute(select(User)).scalars()}
             tours = {t.code: t for t in db.execute(select(Tour)).scalars()}
@@ -138,9 +139,12 @@ def seed_hr(db, users, tours, today):
     emp("NS0015", "Kế toán tổng hợp", "ketoan", "nv", sal=10_000_000, user="ketoan")
     emp("NS0016", "Nhân sự Hành chính", "hcns", "nv", sal=9_000_000, user="hcns")
     db.flush()
-    x1 = Vehicle(plate="51B-123.45", seats=45, driver_id=d1.id, internal_rate_per_day=3_500_000)
-    x2 = Vehicle(plate="51B-678.90", seats=45, driver_id=d2.id, internal_rate_per_day=3_500_000)
-    db.add_all([x1, x2]); db.flush()
+    x1 = Vehicle(plate="50F-009.60", seats=45, kind="noi_bo", driver_id=d1.id, internal_rate_per_day=3_500_000)
+    x2 = Vehicle(plate="50E-957.34", seats=45, kind="noi_bo", driver_id=d2.id, internal_rate_per_day=3_500_000)
+    x3 = Vehicle(plate="50E-955.31", seats=45, kind="hop_tac", driver_id=None, internal_rate_per_day=0)
+    x4 = Vehicle(plate="50H-496.23", seats=45, kind="hop_tac", driver_id=None, internal_rate_per_day=0)
+    db.add_all([x1, x2, x3, x4]); db.flush()
+    seed_vehicle_rates(db)
     dalat = tours[3]
     db.add(GuideAssignment(tour_id=dalat.id, guide_id=h1.id, days=3, rate_per_day=450_000, assigned_by="dh.lan", status="da_xac_nhan",
                            confirmed_at=datetime.combine(dalat.start_date - timedelta(days=5), datetime.min.time()), report_submitted=True, advance_settled=True))
@@ -151,3 +155,26 @@ def seed_hr(db, users, tours, today):
         db.add(VisaFile(code=f"VS{i+1:04d}", customer_name=cus, market=mk, method=me, handler_id=hd.id, office=off, alliance=al, revenue=2_500_000,
                         status="hoan_thanh", completed_at=dalat.kt_confirmed_at.date() - timedelta(days=i)))
     db.add(VisaFile(code="VS0005", customer_name="Phạm Thị I", market="Nhật Bản", method="tu_xu_ly", handler_id=v2.id, office="hcm", revenue=1_800_000))
+
+
+# Bảng giá xe (6/5/2026) – anh Tuấn cung cấp 05/9/2026: (tuyến, số ngày, giá xe nội bộ Vietrip–VTD, giá xe hợp tác hỗ trợ từ 5/8/2026)
+VEHICLE_RATES = [
+    ("Tây Nguyên", 4, 22_000_000, 23_000_000), ("Tây Nguyên – Tà Đùng", 5, 23_000_000, 24_000_000), ("Tuy Hòa – Quy Nhơn", 4, 23_000_000, 24_000_000),
+    ("Di sản miền Trung", 7, 38_000_000, 0), ("Di sản miền Trung – New", 7, 44_000_000, 0), ("Tây Nguyên – miền Trung", 7, 31_000_000, 0),
+    ("Nha Trang – Đà Lạt", 5, 20_000_000, 20_000_000), ("Nha Trang", 3, 15_000_000, 17_000_000), ("Đà Lạt – Vĩnh Hy", 4, 16_000_000, 18_000_000),
+    ("Đà Lạt", 4, 13_000_000, 16_000_000), ("Vĩnh Hy", 3, 14_000_000, 15_000_000), ("Bình Hưng", 3, 14_000_000, 0),
+    ("Miền Tây", 3, 16_000_000, 18_000_000), ("Miền Tây 5N", 5, 20_000_000, 22_000_000), ("Buôn Ma Thuột – Nha Trang", 4, 21_000_000, 21_000_000),
+    ("Đà Lạt – Phan Thiết", 4, 15_000_000, 17_000_000), ("Hòn Cò 2N", 2, 12_000_000, 13_000_000), ("Hòn Cò 3N", 3, 15_000_000, 15_000_000),
+    ("Phan Thiết 2 ngày", 2, 9_000_000, 10_000_000), ("Phan Thiết 3 ngày", 3, 9_000_000, 10_000_000), ("Tây Ninh", 1, 5_000_000, 6_000_000),
+    ("Hồ Tràm", 2, 7_000_000, 8_000_000), ("Đà Lạt 4 ngày", 4, 16_000_000, 18_000_000), ("Tà Đùng – Đà Lạt – Phan Thiết", 4, 17_000_000, 18_000_000),
+    ("Châu Đốc", 3, 12_000_000, 16_000_000), ("Nam Cát Tiên", 1, 6_000_000, 7_000_000), ("La Ngâu (mới)", 0, 8_000_000, 10_000_000),
+    ("Bảo Lộc", 0, 8_000_000, 10_000_000), ("Mỹ Tho 1 ngày", 1, 5_000_000, 5_000_000),
+]
+
+
+def seed_vehicle_rates(db):
+    if db.execute(select(VehicleRate)).scalars().first():
+        return
+    for route, days, ip, pp in VEHICLE_RATES:
+        db.add(VehicleRate(route=route, days=days, internal_price=ip, partner_price=pp, effective_from=date(2026, 5, 6), status="active",
+                           signed_chutich=True, signed_tgd=True, proposed_by="seed", note="Bảng giá xe 6/5/2026; cột hợp tác áp dụng từ 5/8/2026 (50E-955.31, 50H-496.23)"))

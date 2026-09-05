@@ -56,3 +56,8 @@ Kế toán TT99 + hóa đơn điện tử → thang lương f, visa, HDV, đội
 - **Bút toán**: duyệt → Nợ 154 (tour) / 641 (MKT) / 642 (HC) – Có 331 NCC (ghi chú "không hóa đơn – không trừ TNDN"); chi → Nợ 331 – Có 112/111; hoàn tiền khách → Nợ 131 – Có 112. Quyết toán tour nay chỉ trích trước **335** phần chi phí chưa qua đề nghị chi, rồi kết chuyển 632/154; chi phí quyết toán nhỏ hơn đề nghị chi đã duyệt → cảnh báo Kế toán rà soát.
 - **Bảng dòng tiền tour** (mọi cấp duyệt xem): doanh thu booking, đã thu, đã chi, lệnh chi chờ, đang trình, tiền còn lại, dự toán, LN dự kiến; đỏ khi chi + lệnh chi vượt tiền đã thu.
 - Trang web: tab **Chi tiền** (đề nghị chi, dòng tiền) và **Báo cáo ngày** (của tôi, tổng hợp phòng, ca trực). Test 4 kịch bản; tổng 30 test. Migration b3d8461c1b41.
+
+---
+# Bảng giá xe nội bộ – nạp 05/9/2026 (ảnh gốc: docs/bang-gia-xe-6-5-2026.jpg)
+- 29 tuyến từ bảng giá 6/5/2026: cột **xe Vietrip – VTD** và cột **xe hợp tác hỗ trợ** (từ 5/8/2026, xe 50E-955.31, 50H-496.23). Đội xe nội bộ mẫu: 50F-009.60, 50E-957.34.
+- Bảng giá là master data: đề xuất (CNTT/HCNS/TP ĐH) → Chủ tịch + TGĐ ký → hiệu lực theo ngày, thay giá cũ cùng tuyến. Lệnh điều xe chọn tuyến → giá theo loại xe (nội bộ / hợp tác); tuyến không có trong bảng → giá theo ngày ở hồ sơ xe. Xe hợp tác không tính công tác phí tài xế Vietrip.
