@@ -45,6 +45,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, lifespan=lifespan,
               docs_url="/api/docs", redoc_url="/api/redoc", openapi_url="/api/openapi.json")
+@app.middleware("http")
+async def _invalidate_dashboard_cache(request, call_next):
+    """Mọi thao tác ghi (POST/PUT/DELETE) làm mới bảng điều khiển đang cache."""
+    resp = await call_next(request)
+    if request.method != "GET":
+        from app.api.v1 import routes as _r
+        _r._DASH_CACHE.clear()
+    return resp
+
+
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",")],
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)

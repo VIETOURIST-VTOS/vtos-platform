@@ -80,15 +80,16 @@ def build(db: Session, u: User) -> dict:
     sett = [R.settlement_summary(db, t) for t in tours_m]
     k["doanh_thu_thang"] = sum(s["revenue"] for s in sett); k["loi_nhuan_thang"] = sum(s["profit"] for s in sett); k["so_chuyen_thang"] = len(tours_m)
     k["chuyen_duoi_10"] = sum(1 for s in sett if s["margin"] < R.get_param(db, "nguong_bien"))
-    bk = [b for b in db.execute(select(Booking)).scalars() if b.created_at.year == today.year and b.created_at.month == today.month]
-    k["booking_thang"] = len(bk); k["doanh_thu_booking_thang"] = sum(b.amount - b.discount for b in bk)
+    m0 = datetime(today.year, today.month, 1)
+    row = db.execute(select(func.count(), func.coalesce(func.sum(Booking.amount - Booking.discount), 0)).where(Booking.created_at >= m0, Booking.cancelled == False)).one()
+    k["booking_thang"] = int(row[0]); k["doanh_thu_booking_thang"] = float(row[1])
     k["canh_bao_do"] = db.execute(select(func.count()).select_from(Alert).where(Alert.resolved == False, Alert.level == "red")).scalar()
     if role in ("chutich", "tgd", "ketoan", "bks", "cntt"):
         b = RP.balances(db, p)
         k["tien"] = sum(b.get(c, 0.0) for c in ("111", "112"))
         from app.models.finance import FinContract
         k["no_vay"] = sum(c.outstanding for c in db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars())
-        k["phai_thu"] = sum(max(0.0, (x.amount - x.discount) - x.paid) for x in db.execute(select(Booking)).scalars())
+        k["phai_thu"] = float(db.execute(select(func.coalesce(func.sum(Booking.amount - Booking.discount - Booking.paid), 0)).where(Booking.cancelled == False, (Booking.amount - Booking.discount - Booking.paid) > 0)).scalar() or 0)
         fc = FIN.forecast_13w(db); k["du_bao_canh_bao"] = len(fc["alerts"]); k["so_du_tuan_13"] = fc["closing"]
         pl = RP.income_statement(db, p); k["ln_ke_toan_thang"] = dict((r[0], r[2]) for r in pl["rows"])["50"]
     # --- phần theo phòng ---
@@ -103,11 +104,11 @@ def build(db: Session, u: User) -> dict:
         sec["kd_le"] = sorted([{"sales": users.get(i, i), "revenue": v, "pct": v / moc if moc else 0} for i, v in by.items()], key=lambda r: -r["revenue"])
     if role in ("tp_dh", "nv_dh", "chutich", "tgd"):
         d7 = int(R.get_param(db, "moc_d7")); rows = []
-        for t in db.execute(select(Tour).where(Tour.status == "da_duyet")).scalars():
+        for t in db.execute(select(Tour).where(Tour.status == "da_duyet", Tour.start_date >= today, Tour.start_date <= today + timedelta(days=21))).scalars():
             c = R.calc(t, R.get_param(db, "nguong_bien", t.start_date)); left = (t.start_date - today).days
-            if 0 <= left <= 21: rows.append({"code": t.code, "start": t.start_date, "days_left": left, "booked": R.booked_pax(t), "breakeven": c["breakeven_pax"], "below": R.booked_pax(t) < (c["breakeven_pax"] or 0)})
+            rows.append({"code": t.code, "start": t.start_date, "days_left": left, "booked": R.booked_pax(t), "breakeven": c["breakeven_pax"], "below": R.booked_pax(t) < (c["breakeven_pax"] or 0)})
         sec["sap_khoi_hanh"] = sorted(rows, key=lambda r: r["days_left"])
-        sec["qua_han_qt"] = [{"code": t.code, "deadline": R.settlement_deadline(db, t)} for t in db.execute(select(Tour).where(Tour.status == "ket_thuc")).scalars() if today > R.settlement_deadline(db, t)]
+        sec["qua_han_qt"] = [{"code": t.code, "deadline": R.settlement_deadline(db, t)} for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.end_date < today).order_by(desc(Tour.end_date)).limit(400)).scalars() if today > R.settlement_deadline(db, t)][:100]
     if role in ("hcns", "chutich", "tgd"):
         s = OPS.work_days_in(today.year, today.month, until=today)
         emps = db.execute(select(Employee).where(Employee.active == True, Employee.department.in_(OPS.NO_TIMESHEET_DEPTS), Employee.user_id != None)).scalars().all()

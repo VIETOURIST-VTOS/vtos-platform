@@ -1,5 +1,5 @@
 """API v1 – toàn bộ endpoint JSON cho web/app/n8n."""
-from datetime import date, datetime
+from datetime import timedelta, date, datetime
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select, desc, func
@@ -56,24 +56,38 @@ def users(role: str | None = None, u: User = Depends(current_user), db: Session 
 
 
 # ---------- dashboard ----------
+_DASH_CACHE: dict = {}   # role → (ts, payload) – bảng điều khiển tính nặng (10.000+ booking), giữ 5 phút
+
+
 @router.get("/dashboard", tags=["dashboard"])
-def dashboard(u: User = Depends(current_user), db: Session = Depends(get_db)):
-    tours = db.execute(select(Tour)).scalars().all()
-    alerts = [a for a in db.execute(select(Alert).where(Alert.resolved == False).order_by(desc(Alert.created_at))).scalars()
-              if u.role in a.to_roles.split(",") or u.role in ("chutich", "tgd", "cntt", "bks")]
+def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    import time
+    key = (u.role, u.id if u.role in ("nv_dh", "tp_dh", "nv_kd") else 0)
+    hit = _DASH_CACHE.get(key)
+    if hit and not refresh and time.time() - hit[0] < 300:
+        return {**hit[1], "cached": True}
+    # việc chờ tôi xử lý: chỉ xét tour đang trong luồng (không quét tour đã kết thúc / đã duyệt hàng loạt)
+    active = db.execute(select(Tour).where(Tour.status.in_(["nhap", "cho_xac_nhan", "cho_duyet", "da_dong_so", "kt_xac_nhan"]))).scalars().all()
+    if u.role in ("chutich", "tp_dh"):
+        active += db.execute(select(Tour).where(Tour.status == "da_duyet", Tour.chairman_run_decision == False, Tour.start_date >= date.today(), Tour.start_date <= date.today() + timedelta(days=7))).scalars().all()
+    if u.role in ("nv_dh", "tp_dh"):
+        active += db.execute(select(Tour).where(Tour.status.in_(["ket_thuc", "da_duyet"]), Tour.operator_id == u.id, Tour.end_date <= date.today())).scalars().all()
     todo = []
-    for t in tours:
+    for t in active:
         for a in T.allowed_actions(db, t, u):
             if a in ("confirm", "sign", "approve", "close", "kt_confirm", "cntt_check"):
                 todo.append({"tour_id": t.id, "code": t.code, "name": t.name, "action": a})
-    counts = {}
-    for t in tours: counts[t.status] = counts.get(t.status, 0) + 1
+    counts = {st: n for st, n in db.execute(select(Tour.status, func.count()).group_by(Tour.status)).all()}
+    alerts = [a for a in db.execute(select(Alert).where(Alert.resolved == False).order_by(desc(Alert.created_at)).limit(300)).scalars()
+              if u.role in a.to_roles.split(",") or u.role in ("chutich", "tgd", "cntt", "bks")][:60]
     from app.services import dashboard as DB_
     extra = DB_.build(db, u)
-    return {"counts": counts, "n_tours": len(tours), "todo": todo,
-            "pending_requests": db.execute(select(func.count()).select_from(ServiceRequest).where(ServiceRequest.booking_id == None)).scalar(),
-            "pending_params": db.execute(select(func.count()).select_from(Param).where(Param.status == "pending")).scalar(),
-            "alerts": [alert_out(a) for a in alerts], "threshold": R.get_param(db, "nguong_bien"), **extra}
+    payload = {"counts": counts, "n_tours": sum(counts.values()), "todo": todo[:100],
+               "pending_requests": db.execute(select(func.count()).select_from(ServiceRequest).where(ServiceRequest.booking_id == None)).scalar(),
+               "pending_params": db.execute(select(func.count()).select_from(Param).where(Param.status == "pending")).scalar(),
+               "alerts": [alert_out(a) for a in alerts], "threshold": R.get_param(db, "nguong_bien"), **extra}
+    _DASH_CACHE[key] = (time.time(), payload)
+    return payload
 
 
 # ---------- tours ----------
