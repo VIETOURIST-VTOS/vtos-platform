@@ -7,7 +7,9 @@ from app.core.config import settings
 from app.db.session import SessionLocal, engine, Base
 from app.api.v1.routes import router
 from app.api.v1.payments import router as payments_router
+from app.api.v1.accounting import router as accounting_router
 from app.services import rules as R
+from app.services import accounting as ACC
 from app.services.seed import seed_all
 
 
@@ -27,6 +29,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         R.seed_params(db)
+        ACC.seed_accounts(db)
         if settings.SEED_DEMO:
             seed_all(db)
     finally:
@@ -42,6 +45,7 @@ app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.CO
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
 app.include_router(payments_router)
+app.include_router(accounting_router)
 
 
 @app.get("/", include_in_schema=False)

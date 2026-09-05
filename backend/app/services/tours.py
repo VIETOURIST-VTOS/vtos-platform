@@ -4,6 +4,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.core import Tour, User, ServiceRequest, Booking, Alert, AuditLog, ROLES
 from app.services import rules as R
+from app.services import accounting as ACC
 from app.api.deps import Gate
 from fastapi import HTTPException
 
@@ -154,7 +155,8 @@ def kt_confirm(db: Session, u: User, t: Tour) -> str:
     if u.role != "ketoan": raise HTTPException(403, "Chỉ Kế toán xác nhận quyết toán")
     if t.status != "da_dong_so": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     t.status, t.kt_confirmed_at = "kt_xac_nhan", datetime.now()
-    R.audit(db, u.username, u.role, "ke_toan_xac_nhan", f"tour:{t.code}", after=snap(t)); db.commit()
+    R.audit(db, u.username, u.role, "ke_toan_xac_nhan", f"tour:{t.code}", after=snap(t))
+    ACC.on_settlement_confirmed(db, t, u.username, u.role); db.commit()
     return "Kế toán đã xác nhận – số liệu này là căn cứ duy nhất tính thưởng"
 
 

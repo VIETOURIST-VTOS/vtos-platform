@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.core import Booking, User
 from app.models.payments import BankTransaction, Receipt
 from app.services import rules as R
+from app.services import accounting as ACC
 
 BOOKING_RE = re.compile(r"BK\s?(\d{8})", re.IGNORECASE)
 
@@ -92,6 +93,7 @@ def accountant_assign(db: Session, u: User, txn: BankTransaction, booking: Booki
     r.confirmed_by, r.confirmed_at = u.username, datetime.now()
     txn.match_status, txn.booking_id, txn.match_note = "da_khop", booking.id, f"Kế toán gán: {r.code}"
     R.audit(db, u.username, u.role, "ke_toan_gan_giao_dich", f"receipt:{r.code}", after={"booking": booking.code, "so_tien": txn.amount, "ghi_chu": note})
+    ACC.on_receipt_confirmed(db, r, u.username, u.role)
     db.commit(); db.refresh(r)
     return r
 
@@ -101,6 +103,7 @@ def accountant_confirm(db: Session, u: User, r: Receipt) -> Receipt:
         raise ValueError("Phiếu thu không ở trạng thái chờ xác nhận")
     r.status, r.confirmed_by, r.confirmed_at = "ke_toan_xac_nhan", u.username, datetime.now()
     R.audit(db, u.username, u.role, "ke_toan_xac_nhan_phieu_thu", f"receipt:{r.code}", after={"so_tien": r.amount})
+    ACC.on_receipt_confirmed(db, r, u.username, u.role)
     db.commit()
     return r
 
@@ -110,6 +113,7 @@ def cash_receipt(db: Session, u: User, booking: Booking, amount: float, payer: s
     r = _make_receipt(db, booking, None, amount, u.username, "ke_toan_xac_nhan", payer=payer, note=note)
     r.confirmed_by, r.confirmed_at = u.username, datetime.now()
     R.audit(db, u.username, u.role, "lap_phieu_thu_tien_mat", f"receipt:{r.code}", after={"booking": booking.code, "so_tien": amount})
+    ACC.on_receipt_confirmed(db, r, u.username, u.role)
     db.commit(); db.refresh(r)
     return r
 

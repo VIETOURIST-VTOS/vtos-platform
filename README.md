@@ -61,7 +61,7 @@ Giai đoạn 2 (chưa có): kế toán TT99 + hóa đơn điện tử, SePay/thu
 ## 4. Kiểm thử
 
 ```bash
-cd backend && pytest -q          # 9 kịch bản cổng chặn qua API
+cd backend && bash tests/run_all.sh   # cổng chặn · thu tiền SePay · kế toán TT99
 cd web && npm run build          # kiểm tra TypeScript + build
 ```
 CI trên GitHub chạy cả hai và build Docker mỗi lần đẩy mã.
