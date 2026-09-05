@@ -49,3 +49,10 @@ def test_pull_and_status(monkeypatch):
 def test_pull_without_token(monkeypatch):
     monkeypatch.setattr(SP.settings, "SEPAY_API_TOKEN", "")
     r = client.post("/api/v1/sepay/pull", json={"from_date": "2026-09-01"}, headers=login("cntt")); assert r.status_code == 502 and "SEPAY_API_TOKEN" in r.json()["detail"]
+
+
+def test_webhook_ping_without_id(monkeypatch):
+    monkeypatch.setattr(SP.settings, "SEPAY_WEBHOOK_KEY", "k1")
+    r = client.post("/api/v1/sepay/webhook", json={"gateway": "TPBank", "content": "test"}, headers={"Authorization": "Apikey k1"})
+    assert r.status_code == 201 and r.json()["test"] is True
+    assert client.post("/api/v1/sepay/webhook", json={"id": 1}, headers={"Authorization": "Apikey sai"}).status_code == 401

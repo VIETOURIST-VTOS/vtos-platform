@@ -37,7 +37,13 @@ async def sepay_webhook(request: Request, authorization: str | None = Header(def
     expected = f"Apikey {settings.SEPAY_WEBHOOK_KEY}"
     if not settings.SEPAY_WEBHOOK_KEY or authorization != expected:
         raise HTTPException(401, "Sai khóa webhook SePay")
-    payload = await request.json()
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(422, "Body không phải JSON")
+    if not isinstance(payload, dict) or not (payload.get("id") or payload.get("sepay_id")):
+        # SePay "Gửi thử" / ping không có id giao dịch → xác nhận kết nối, không ghi
+        return {"success": True, "test": True, "note": "Kết nối OK – gói tin không có id giao dịch nên không ghi nhận"}
     try:
         txn, created = P.ingest_sepay(db, payload)
     except ValueError as e:
