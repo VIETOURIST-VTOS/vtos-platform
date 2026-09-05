@@ -65,3 +65,19 @@ def test_ingest_idempotent_and_apply():
     res2 = client.post("/api/v1/import/vietrip/apply", headers=h).json()["applied"]
     assert res2["tours"] == 0 and len([b for b in client.get("/api/v1/bookings", headers=h).json() if b["code"] == "VT125204"]) == 1
     assert client.get("/api/v1/audit", headers=login("bks")).json()["chain_ok"] is True
+
+
+def test_booking_without_tour():
+    """Tour không còn trong danh sách điều hành: booking hủy bỏ qua; booking OK tạo tour tạm từ mã (NNddmmyy)."""
+    h = login("cntt")
+    b_ok = {**BOOK, "recID": 130001, "tourcode": "MICEMT5N4D.05090826", "tourID": 13707, "status": "OK", "totalDue": 50000000}
+    b_xx = {**BOOK, "recID": 130002, "tourcode": "HT001.02250826", "tourID": 11988, "status": "XX"}
+    assert client.post("/api/v1/import/vietrip/booking", json={"rows": [b_ok, b_xx]}, headers=h).status_code == 200
+    res = client.post("/api/v1/import/vietrip/apply", headers=h).json()["applied"]
+    assert res["bookings"] == 1 and res["blocked"] == 0
+    t = next(x for x in client.get("/api/v1/tours", headers=h).json() if x["code"] == "MICEMT5N4D.05090826")
+    assert t["start_date"] == "2026-08-09" and t["end_date"] == "2026-08-13" and t["tour_type"] == "doan_noi_dia" and t["status"] == "ket_thuc"
+    bk = {b["code"]: b for b in client.get("/api/v1/bookings", headers=h).json()}
+    assert bk["VT130001"]["amount"] == 50000000 and "VT130002" not in bk
+    rec = client.get("/api/v1/import/vietrip/records?entity=booking&limit=5", headers=h).json()
+    assert any(r["vietrip_id"] == "130002" and r["applied"] and "hủy" in r["apply_note"] for r in rec)

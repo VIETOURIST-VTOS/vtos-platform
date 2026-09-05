@@ -97,6 +97,26 @@ def tour_type_of(raw: dict) -> str:
     return "le_nuoc_ngoai" if nuoc else "le_noi_dia"
 
 
+def _stub_tour(db: Session, raw: dict, cache: dict):
+    """Tạo tour tạm từ mã tour Vietrip (dạng MÃSP.NNddmmyy – NN số ngày) khi tour không còn trong danh sách điều hành."""
+    code = raw.get("tourcode") or ""
+    m = re.search(r"\.(\d{2})(\d{2})(\d{2})(\d{2})", code)
+    if not m: return None
+    try: start = date(2000 + int(m.group(4)), int(m.group(3)), int(m.group(2)))
+    except ValueError: return None
+    from datetime import timedelta
+    days = max(int(m.group(1)), 1); end = start + timedelta(days=days - 1)
+    t = db.execute(select(Tour).where(Tour.code == code)).scalars().first()
+    if t: return t
+    op = _user_for(db, "Điều hành Vietrip", cache)
+    t = Tour(code=code, operator_id=op.id, name=f"{code} (tour không còn trong danh sách điều hành Vietrip)", tour_type=tour_type_of(raw), start_date=start, end_date=end,
+             product_code=code.split(".")[0], days=days, imported=True, confirmed_by="vietrip", approved_by="vietrip",
+             status="ket_thuc" if end < date.today() else "da_duyet")
+    if str(raw.get("tourID") or "").isdigit(): t.vietrip_id = int(raw["tourID"])
+    db.add(t); db.flush()
+    return t
+
+
 def apply_users(db: Session, limit: int = 400) -> int:
     n = 0; cache = {}
     for r in db.execute(select(VtRecord).where(VtRecord.entity == "user", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
@@ -199,7 +219,12 @@ def apply_bookings(db: Session, limit: int = 400) -> int:
     tours = {t.code: t for t in db.execute(select(Tour)).scalars()}
     for r in db.execute(select(VtRecord).where(VtRecord.entity == "booking", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw; t = tours.get(raw.get("tourcode") or "")
-        if not t: r.apply_note = "chưa có tour"; continue
+        if not t:
+            # Tour không còn trong danh sách điều hành Vietrip (đã hủy/gộp): booking hủy → bỏ qua; booking OK → tạo tour tạm từ mã tour
+            if (raw.get("status") or "OK") != "OK": r.applied, r.apply_note = True, "tour đã hủy – bỏ qua"; continue
+            t = _stub_tour(db, raw, cache)
+            if not t: r.apply_note = "chưa có tour"; continue
+            tours[t.code] = t
         code = f"VT{int(raw['recID'])}"
         b = db.execute(select(Booking).where(Booking.code == code)).scalars().first()
         sales = _user_for(db, raw.get("fstUser") or "", cache)
