@@ -49,7 +49,8 @@ function Collections() {
         <label>Từ <input type="date" value={pull.from_date} onChange={(e) => setPull({ ...pull, from_date: e.target.value })} /></label>
         <label>Đến <input type="date" value={pull.to_date} onChange={(e) => setPull({ ...pull, to_date: e.target.value })} /></label>
         <button className="act" style={{ margin: 0 }} disabled={pulling || !sp.api_token_set} onClick={async () => { setPulling(true); try { const r = await api("/sepay/pull", { method: "POST", json: pull }); toast(r.message); load(); loadSp(); } catch (x) { toast(errMsg(x), true); } setPulling(false); }}>{pulling ? "Đang kéo…" : "Kéo giao dịch từ SePay"}</button>
-        <span className="muted">Kéo lại lịch sử khi mới kết nối hoặc webhook lỗi – không nhân bản giao dịch.</span></div>}
+        <button className="act grey" style={{ margin: 0 }} onClick={() => post("/bank-transactions/rematch")}>Xét lại giao dịch chờ</button>
+        <span className="muted">Kéo lại lịch sử khi mới kết nối hoặc webhook lỗi – không nhân bản giao dịch. Robot khớp theo mã booking VTOS hoặc mã tour Vietrip + đúng số tiền còn phải thu.</span></div>}
       </div></>}
 
     <h2>Giao dịch ngân hàng (SePay)</h2>

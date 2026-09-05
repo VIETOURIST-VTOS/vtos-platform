@@ -102,6 +102,18 @@ def list_txns(status: str | None = None, limit: int = 200, u: User = Depends(cur
     return [txn_out(t, db) for t in db.execute(q.limit(limit)).scalars()]
 
 
+@router.post("/bank-transactions/rematch")
+def rematch(u: User = Depends(require_roles("ketoan", "cntt")), db: Session = Depends(get_db)):
+    """Chạy lại robot R1 cho các giao dịch tiền vào đang chờ (sau khi nạp booking mới / cải tiến quy tắc khớp)."""
+    n = m = 0
+    for t in db.execute(select(BankTransaction).where(BankTransaction.transfer_type == "in", BankTransaction.match_status.in_(["cho_ke_toan", "chua_khop"]))).scalars():
+        P.match_transaction(db, t); n += 1
+        if t.match_status == "da_khop": m += 1
+    from app.services import rules as R
+    R.audit(db, u.username, u.role, "chay_lai_khop_giao_dich", "sepay", after={"xet": n, "khop": m}); db.commit()
+    return {"checked": n, "matched": m, "message": f"Đã xét lại {n} giao dịch, khớp thêm {m}"}
+
+
 @router.get("/bank-transactions/{tid}/raw")
 def txn_raw(tid: int, u: User = Depends(require_roles("ketoan", "cntt", "bks")), db: Session = Depends(get_db)):
     """Gói tin gốc SePay của giao dịch (đối chiếu/kiểm toán)."""

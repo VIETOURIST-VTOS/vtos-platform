@@ -56,3 +56,24 @@ def test_webhook_ping_without_id(monkeypatch):
     r = client.post("/api/v1/sepay/webhook", json={"gateway": "TPBank", "content": "test"}, headers={"Authorization": "Apikey k1"})
     assert r.status_code == 201 and r.json()["test"] is True
     assert client.post("/api/v1/sepay/webhook", json={"id": 1}, headers={"Authorization": "Apikey sai"}).status_code == 401
+
+
+def test_match_by_vietrip_tour_code(monkeypatch):
+    """Khách CK ghi mã tour Vietrip (không dấu chấm) → khớp booking của tour còn phải thu đúng số tiền."""
+    monkeypatch.setattr(SP.settings, "SEPAY_WEBHOOK_KEY", "k1")
+    h = login("cntt")
+    tour = {"recID": 5001, "tourcode": "NT001.03110926", "ngayKhoiHanh": "2026-09-11T00:00:00", "ngayKetThuc": "2026-09-13T00:00:00", "soChoMoBan": 40, "loaiTour": "TOURLE", "nuoc": "", "fstUser": "A", "adl": 3990000, "tenSanPham": "NHA TRANG", "soNgay": 3}
+    bks = [{"recID": 140001, "tourcode": "NT001.03110926", "tenNguoiBook": "KH A", "phone": "0901", "adl": 2, "chd": 0, "inf": 0, "totalDue": 7980000, "pmtStatus": "UNPAID", "fstUser": "B", "fstUpdate": "2026-09-01T10:00:00", "status": "OK", "tourID": 5001},
+           {"recID": 140002, "tourcode": "NT001.03110926", "tenNguoiBook": "KH B", "phone": "0902", "adl": 1, "chd": 0, "inf": 0, "totalDue": 3990000, "pmtStatus": "UNPAID", "fstUser": "B", "fstUpdate": "2026-09-01T10:00:00", "status": "OK", "tourID": 5001}]
+    client.post("/api/v1/import/vietrip/tour", json={"rows": [tour]}, headers=h); client.post("/api/v1/import/vietrip/booking", json={"rows": bks}, headers=h)
+    client.post("/api/v1/import/vietrip/apply?limit=50", headers=h)
+    wh = lambda pl: client.post("/api/v1/sepay/webhook", json=pl, headers={"Authorization": "Apikey k1"}).json()
+    r = wh({"id": 9101, "gateway": "TPBank", "transactionDate": "2026-09-05 18:05:40", "transferType": "in", "transferAmount": 7980000, "content": "NT00103110926 KH A", "referenceCode": "FT9"})
+    assert r["match_status"] == "da_khop", r
+    r2 = wh({"id": 9102, "gateway": "TPBank", "transactionDate": "2026-09-05 18:06:00", "transferType": "in", "transferAmount": 1000000, "content": "QR - NT00103110926", "referenceCode": "FT10"})
+    assert r2["match_status"] == "cho_ke_toan" and "không booking nào" in r2["note"]
+    bk = next(b for b in client.get("/api/v1/bookings", headers=h).json() if b["code"] == "VT140001"); assert bk["paid"] == 7980000
+
+
+def test_rematch_endpoint():
+    r = client.post("/api/v1/bank-transactions/rematch", headers=login("ketoan")); assert r.status_code == 200 and "checked" in r.json()

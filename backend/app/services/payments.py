@@ -7,7 +7,7 @@ import re
 from datetime import datetime, date
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from app.models.core import Booking, User
+from app.models.core import Booking, Tour, User
 from app.models.payments import BankTransaction, Receipt
 from app.services import rules as R
 from app.services import accounting as ACC
@@ -76,8 +76,7 @@ def match_transaction(db: Session, txn: BankTransaction) -> None:
     """R1: tìm mã BKxxxxxxxx trong nội dung; khớp tuyệt đối số tiền còn phải thu → phiếu thu tự động."""
     m = BOOKING_RE.search(txn.content.replace(" ", "") if txn.content else "")
     if not m:
-        txn.match_status, txn.match_note = "cho_ke_toan", "Không thấy mã booking trong nội dung chuyển khoản"
-        return
+        return _match_by_tour_code(db, txn)
     code = "BK" + m.group(1)
     b = db.execute(select(Booking).where(Booking.code == code)).scalars().first()
     if not b:
@@ -91,6 +90,35 @@ def match_transaction(db: Session, txn: BankTransaction) -> None:
     else:
         txn.match_status, txn.booking_id = "cho_ke_toan", b.id
         txn.match_note = f"Số tiền {txn.amount:,.0f} ≠ còn phải thu {due:,.0f} của {code} – Kế toán quyết định"
+
+
+TOUR_RE = re.compile(r"([A-Z]{2,8}\d{3})\.?(\d{8})")   # mã tour Vietrip: MÃSP+3 số . NNddmmyy (khách thường bỏ dấu chấm)
+
+
+def _match_by_tour_code(db: Session, txn: BankTransaction) -> None:
+    """Giai đoạn chạy song song: khách ghi mã tour Vietrip (vd NT00103110926) → tìm booking của tour còn phải thu đúng số tiền."""
+    m = TOUR_RE.search((txn.content or "").upper().replace(" ", ""))
+    if not m:
+        txn.match_status, txn.match_note = "cho_ke_toan", "Không thấy mã booking trong nội dung chuyển khoản"
+        return
+    tcode = f"{m.group(1)}.{m.group(2)}"
+    t = db.execute(select(Tour).where(Tour.code == tcode)).scalars().first()
+    if not t:
+        txn.match_status, txn.match_note = "cho_ke_toan", f"Mã tour {tcode} không có trong VTOS"
+        return
+    cands = []
+    for b in db.execute(select(Booking).where(Booking.tour_id == t.id, Booking.cancelled == False)).scalars():
+        due = (b.amount - b.discount) - paid_amount(db, b.id)
+        if due > 0 and abs(txn.amount - due) < 1: cands.append(b)
+    if len(cands) == 1:
+        b = cands[0]
+        r = _make_receipt(db, b, txn, txn.amount, "robot", "tu_dong", note=f"Khớp mã tour {tcode} + đúng số tiền còn phải thu")
+        txn.match_status, txn.booking_id, txn.match_note = "da_khop", b.id, f"Tự động theo mã tour: {r.code} ({b.code})"
+        R.audit(db, "robot", "robot", "sinh_phieu_thu_tu_dong", f"receipt:{r.code}", after={"booking": b.code, "tour": tcode, "so_tien": txn.amount})
+    elif cands:
+        txn.match_status, txn.match_note = "cho_ke_toan", f"Tour {tcode}: {len(cands)} booking cùng còn phải thu {txn.amount:,.0f} – Kế toán chọn"
+    else:
+        txn.match_status, txn.match_note = "cho_ke_toan", f"Tour {tcode}: không booking nào còn phải thu đúng {txn.amount:,.0f}"
 
 
 def accountant_assign(db: Session, u: User, txn: BankTransaction, booking: Booking, note: str = "") -> Receipt:
