@@ -97,9 +97,9 @@ def tour_type_of(raw: dict) -> str:
     return "le_nuoc_ngoai" if nuoc else "le_noi_dia"
 
 
-def apply_users(db: Session) -> int:
+def apply_users(db: Session, limit: int = 400) -> int:
     n = 0; cache = {}
-    for r in db.execute(select(VtRecord).where(VtRecord.entity == "user", VtRecord.applied == False)).scalars():
+    for r in db.execute(select(VtRecord).where(VtRecord.entity == "user", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw; name = raw.get("hoTen") or ""
         dept, role = DEPT_MAP.get(raw.get("phongBan") or "", ("kd_le", "nv_kd"))
         cv = raw.get("chucVu") or ""
@@ -118,9 +118,9 @@ def apply_users(db: Session) -> int:
     return n
 
 
-def apply_vehicles(db: Session) -> int:
+def apply_vehicles(db: Session, limit: int = 400) -> int:
     n = 0
-    for r in db.execute(select(VtRecord).where(VtRecord.entity == "vehicle", VtRecord.applied == False)).scalars():
+    for r in db.execute(select(VtRecord).where(VtRecord.entity == "vehicle", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw; plate = (raw.get("licensePlate") or "").replace(" ", "-")
         v = db.execute(select(Vehicle).where(Vehicle.plate == plate)).scalars().first()
         if not v:
@@ -138,9 +138,9 @@ def apply_vehicles(db: Session) -> int:
     return n
 
 
-def apply_tours(db: Session, only_from: date | None = None) -> int:
+def apply_tours(db: Session, only_from: date | None = None, limit: int = 400) -> int:
     n = 0; cache = {}
-    for r in db.execute(select(VtRecord).where(VtRecord.entity == "tour", VtRecord.applied == False)).scalars():
+    for r in db.execute(select(VtRecord).where(VtRecord.entity == "tour", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw; code = raw.get("tourcode") or ""
         start, end = _d(raw.get("ngayKhoiHanh")), _d(raw.get("ngayKetThuc"))
         if not code or not start: r.applied, r.apply_note = True, "bỏ qua: thiếu mã/ngày"; continue
@@ -168,10 +168,10 @@ def apply_tours(db: Session, only_from: date | None = None) -> int:
     return n
 
 
-def apply_settlements(db: Session) -> int:
+def apply_settlements(db: Session, limit: int = 400) -> int:
     """Dòng chi phí quyết toán theo tour → tour_cost_lines; suy ra chi phí cố định / theo khách cho dự toán VTOS."""
     n = 0
-    for r in db.execute(select(VtRecord).where(VtRecord.entity == "settlement", VtRecord.applied == False)).scalars():
+    for r in db.execute(select(VtRecord).where(VtRecord.entity == "settlement", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw; t = db.execute(select(Tour).where(Tour.code == raw.get("tourcode"))).scalars().first()
         if not t: r.apply_note = "chưa có tour"; continue
         db.execute(TourCostLine.__table__.delete().where(TourCostLine.tour_id == t.id, TourCostLine.source == "vietrip"))
@@ -194,10 +194,10 @@ def apply_settlements(db: Session) -> int:
     return n
 
 
-def apply_bookings(db: Session) -> int:
+def apply_bookings(db: Session, limit: int = 400) -> int:
     n = 0; cache = {}
     tours = {t.code: t for t in db.execute(select(Tour)).scalars()}
-    for r in db.execute(select(VtRecord).where(VtRecord.entity == "booking", VtRecord.applied == False)).scalars():
+    for r in db.execute(select(VtRecord).where(VtRecord.entity == "booking", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw; t = tours.get(raw.get("tourcode") or "")
         if not t: r.apply_note = "chưa có tour"; continue
         code = f"VT{int(raw['recID'])}"
@@ -217,10 +217,10 @@ def apply_bookings(db: Session) -> int:
     return n
 
 
-def apply_receipts(db: Session) -> int:
+def apply_receipts(db: Session, limit: int = 400) -> int:
     n = 0
     bk = {b.vietrip_id: b for b in db.execute(select(Booking).where(Booking.vietrip_id != None)).scalars()}
-    for r in db.execute(select(VtRecord).where(VtRecord.entity == "receipt", VtRecord.applied == False)).scalars():
+    for r in db.execute(select(VtRecord).where(VtRecord.entity == "receipt", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw
         if raw.get("Status") != "KC": r.applied, r.apply_note = True, "chưa xác nhận – bỏ qua"; continue
         b = bk.get(int(raw.get("BookingID") or 0))
@@ -251,10 +251,10 @@ def apply_receipts(db: Session) -> int:
     return n
 
 
-def apply_supplier_payments(db: Session) -> int:
+def apply_supplier_payments(db: Session, limit: int = 400) -> int:
     n = 0
     tours = {t.code: t for t in db.execute(select(Tour)).scalars()}
-    for r in db.execute(select(VtRecord).where(VtRecord.entity == "supplier_payment", VtRecord.applied == False)).scalars():
+    for r in db.execute(select(VtRecord).where(VtRecord.entity == "supplier_payment", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw; code = f"VTDC{int(raw['RecID'])}"
         if raw.get("Status") == "XX": r.applied, r.apply_note = True, "từ chối – bỏ qua"; continue
         pr = db.execute(select(PaymentRequest).where(PaymentRequest.code == code)).scalars().first()
@@ -274,8 +274,12 @@ def apply_supplier_payments(db: Session) -> int:
     return n
 
 
-def apply_all(db: Session, actor: str) -> dict:
-    out = {"users": apply_users(db), "vehicles": apply_vehicles(db), "tours": apply_tours(db), "settlements": apply_settlements(db),
-           "bookings": apply_bookings(db), "receipts": apply_receipts(db), "supplier_payments": apply_supplier_payments(db)}
+def apply_all(db: Session, actor: str, limit: int = 400) -> dict:
+    """Ánh xạ theo lô (mỗi lần tối đa `limit` bản ghi mỗi loại) để không quá thời gian request; gọi lặp tới khi remaining = 0."""
+    out = {"users": apply_users(db, limit), "vehicles": apply_vehicles(db, limit), "tours": apply_tours(db, limit=limit), "settlements": apply_settlements(db, limit),
+           "bookings": apply_bookings(db, limit), "receipts": apply_receipts(db, limit), "supplier_payments": apply_supplier_payments(db, limit)}
+    out["remaining"] = db.execute(select(func.count()).select_from(VtRecord).where(VtRecord.applied == False, VtRecord.entity != "proposal",
+                                                                                  ~VtRecord.apply_note.in_(["chưa có tour", "chưa có booking"]))).scalar()
+    out["blocked"] = db.execute(select(func.count()).select_from(VtRecord).where(VtRecord.applied == False, VtRecord.apply_note.in_(["chưa có tour", "chưa có booking"]))).scalar()
     R.audit(db, actor, "cntt", "dong_bo_vietrip_ap_dung", "vietrip", after=out); db.commit()
     return out

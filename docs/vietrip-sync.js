@@ -72,7 +72,12 @@ async function vtosSync(cfg) {
   }
   if (sets.length) await push('settlement', sets);
   // 8. Ánh xạ
-  const ap = await (await fetch(`${cfg.api}/api/v1/import/vietrip/apply`, { method: 'POST', headers: H })).json();
-  log('ÁNH XẠ: ' + JSON.stringify(ap.applied));
-  return { users: (users.data || users).length, tours: tours.length, bookings: bks.length, supplier_payments: sp.length, settlements: done.length, applied: ap.applied };
+  let ap, total = {}, guard = 0;
+  do {
+    ap = await (await fetch(`${cfg.api}/api/v1/import/vietrip/apply`, { method: 'POST', headers: H })).json();
+    for (const [k, v] of Object.entries(ap.applied)) total[k] = (total[k] || 0) + (typeof v === 'number' && !['remaining', 'blocked'].includes(k) ? v : 0);
+    log(`ánh xạ lô ${++guard}: còn ${ap.applied.remaining}, chờ tour/booking: ${ap.applied.blocked}`);
+  } while (ap.applied.remaining > 0 && guard < 200);
+  log('ÁNH XẠ XONG: ' + JSON.stringify(total));
+  return { users: (users.data || users).length, tours: tours.length, bookings: bks.length, supplier_payments: sp.length, settlements: done.length, applied: total, blocked: ap.applied.blocked };
 }
