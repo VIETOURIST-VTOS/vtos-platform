@@ -70,6 +70,63 @@ TOUR_STATUS = {
 }
 
 
+COST_ITEMS = [("ve_may_bay", "Vé máy bay"), ("land", "Land"), ("phi_lsq", "Phí LSQ"), ("bao_hiem", "Bảo hiểm"), ("qua_tang", "Quà tặng"), ("phi_tl", "Phí TL"),
+              ("hop_doan", "Họp đoàn"), ("dieu_hanh", "Điều hành"), ("dich_thuat", "Dịch thuật"), ("hoa_hong_ve", "Hoa hồng vé"), ("phi_ck", "Phí CK"), ("khac", "Khác")]
+
+
+class Product(Base):
+    """Sản phẩm tour (tour cha) theo mẫu Vietrip: thông tin cơ bản + cơ cấu chi phí 11 khoản + dòng chi phí theo NCC (cố định / theo khách) + chương trình giá.
+    Mở tour (chuyến) từ sản phẩm → dự toán 3 con số tự sinh."""
+    __tablename__ = "products"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True)
+    name: Mapped[str] = mapped_column(String(200))
+    vietrip_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    tour_type: Mapped[str] = mapped_column(String(20), default="le_noi_dia")     # le_noi_dia / le_nuoc_ngoai / doan_noi_dia / doan_nuoc_ngoai
+    departure_point: Mapped[str] = mapped_column(String(80), default="TP HCM")
+    region: Mapped[str] = mapped_column(String(80), default="")
+    country: Mapped[str] = mapped_column(String(60), default="")
+    sale_point: Mapped[str] = mapped_column(String(80), default="TP HCM")
+    transport: Mapped[str] = mapped_column(String(40), default="Xe")
+    vehicle_type: Mapped[str] = mapped_column(String(40), default="")
+    length_text: Mapped[str] = mapped_column(String(20), default="")            # 3N2Đ
+    days: Mapped[int] = mapped_column(Integer, default=1)
+    reference_price: Mapped[float] = mapped_column(Float, default=0)
+    deposit_pct: Mapped[float] = mapped_column(Float, default=30)
+    days_to_close: Mapped[int] = mapped_column(Integer, default=3)
+    requires_confirmation: Mapped[bool] = mapped_column(Boolean, default=False)
+    cost_structure: Mapped[dict] = mapped_column(JSON, default=dict)             # {ve_may_bay: 0, land: 0, …} – đồng/khách (cơ cấu tham khảo)
+    cost_lines: Mapped[list] = mapped_column(JSON, default=list)                 # [{loai, ncc, mst, kind: co_dinh|theo_khach, mo_ta, don_gia, sl, so_tien}]
+    program: Mapped[str] = mapped_column(Text, default="")                       # chương trình / thông tin giá (văn bản)
+    services: Mapped[str] = mapped_column(String(300), default="")
+    status: Mapped[str] = mapped_column(String(20), default="active")            # active / inactive
+    operator_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)   # NV điều hành phụ trách sản phẩm
+    source: Mapped[str] = mapped_column(String(20), default="vtos")              # vtos / vietrip
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    def fixed_cost(self) -> float:
+        return sum(float(l.get("so_tien") or (float(l.get("don_gia") or 0) * float(l.get("sl") or 1))) for l in (self.cost_lines or []) if l.get("kind") == "co_dinh")
+
+    def var_cost_per_pax(self) -> float:
+        lines = sum(float(l.get("don_gia") or 0) * float(l.get("sl") or 1) for l in (self.cost_lines or []) if l.get("kind") == "theo_khach")
+        struct = sum(float(v or 0) for v in (self.cost_structure or {}).values())
+        return lines or struct
+
+
+class TourEvent(Base):
+    """Lịch sử quy trình tour (bước, hành động, người, lời giải trình) – hiển thị như 'Quy trình & Lịch sử' của Vietrip; nguồn vtos / vietrip."""
+    __tablename__ = "tour_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"), index=True)
+    step: Mapped[str] = mapped_column(String(40))                                # khoi_tao / trinh_du_toan / tp_xac_nhan / duyet / ky / d7 / dong_so / kt_xac_nhan / cntt_khoa / vietrip
+    title: Mapped[str] = mapped_column(String(200))
+    note: Mapped[str] = mapped_column(Text, default="")
+    actor: Mapped[str] = mapped_column(String(120), default="")
+    source: Mapped[str] = mapped_column(String(20), default="vtos")
+    at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
 class Tour(Base):
     __tablename__ = "tours"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -107,6 +164,7 @@ class Tour(Base):
     # Bổ sung theo cấu trúc Vietrip (05/9/2026)
     vietrip_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     product_code: Mapped[str] = mapped_column(String(30), default="")      # mã sản phẩm (PT001, MICEVH…)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), nullable=True)
     vehicle_type: Mapped[str] = mapped_column(String(40), default="")
     departure_point: Mapped[str] = mapped_column(String(80), default="")
     transport: Mapped[str] = mapped_column(String(40), default="")

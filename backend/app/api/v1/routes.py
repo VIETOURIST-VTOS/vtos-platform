@@ -92,11 +92,16 @@ def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Sessio
 
 # ---------- tours ----------
 @router.get("/tours", tags=["tours"])
-def list_tours(status: str | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    q = select(Tour).order_by(desc(Tour.start_date))
-    if status: q = q.where(Tour.status.in_(status.split(",")))
+def list_tours(status: str | None = None, q: str = "", month: str = "", limit: int = 300, offset: int = 0, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Danh sách tour có phân trang/tìm kiếm (mặc định 300 chuyến mới nhất) – 1.200+ tour nhập từ Vietrip."""
+    from sqlalchemy import or_
+    qs = select(Tour).order_by(desc(Tour.start_date))
+    if status: qs = qs.where(Tour.status.in_(status.split(",")))
+    if q: qs = qs.where(or_(Tour.code.ilike(f"%{q}%"), Tour.name.ilike(f"%{q}%"), Tour.product_code.ilike(f"%{q}%")))
+    if month:
+        y, m = map(int, month.split("-")); qs = qs.where(func.extract("year", Tour.start_date) == y, func.extract("month", Tour.start_date) == m)
     out = []
-    for t in db.execute(q).scalars():
+    for t in db.execute(qs.offset(offset).limit(min(limit, 1000))).scalars():
         v = T.tour_view(db, t)
         v.pop("bookings", None)
         out.append(v)
@@ -128,38 +133,38 @@ def edit_tour(tid: int, data: S.TourEdit, u: User = Depends(current_user), db: S
 
 
 @router.post("/tours/{tid}/submit", tags=["tours"])
-def submit_tour(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return {"message": T.submit(db, u, _tour(db, tid))}
+def submit_tour(tid: int, data: S.ActionNote | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {"message": T.submit(db, u, _tour(db, tid), (data.note if data else ""))}
 
 
 @router.post("/tours/{tid}/confirm", tags=["tours"])
-def confirm_tour(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return {"message": T.confirm(db, u, _tour(db, tid))}
+def confirm_tour(tid: int, data: S.ActionNote | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {"message": T.confirm(db, u, _tour(db, tid), (data.note if data else ""))}
 
 
 @router.post("/tours/{tid}/approve", tags=["tours"])
-def approve_tour(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return {"message": T.approve(db, u, _tour(db, tid))}
+def approve_tour(tid: int, data: S.ActionNote | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {"message": T.approve(db, u, _tour(db, tid), (data.note if data else ""))}
 
 
 @router.post("/tours/{tid}/d7", tags=["tours"])
 def d7_tour(tid: int, data: S.D7Decision, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return {"message": T.d7(db, u, _tour(db, tid), data.decision)}
+    return {"message": T.d7(db, u, _tour(db, tid), data.decision, getattr(data, "note", "") or "")}
 
 
 @router.post("/tours/{tid}/close", tags=["tours"])
 def close_tour(tid: int, data: S.TourClose, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return {"message": T.close(db, u, _tour(db, tid), data)}
+    return {"message": T.close(db, u, _tour(db, tid), data, getattr(data, "note", "") or "")}
 
 
 @router.post("/tours/{tid}/kt-confirm", tags=["tours"])
-def kt_tour(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return {"message": T.kt_confirm(db, u, _tour(db, tid))}
+def kt_tour(tid: int, data: S.ActionNote | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {"message": T.kt_confirm(db, u, _tour(db, tid), (data.note if data else ""))}
 
 
 @router.post("/tours/{tid}/cntt-check", tags=["tours"])
-def cntt_tour(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return {"message": T.cntt_check(db, u, _tour(db, tid))}
+def cntt_tour(tid: int, data: S.ActionNote | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {"message": T.cntt_check(db, u, _tour(db, tid), (data.note if data else ""))}
 
 
 # ---------- requests & bookings ----------

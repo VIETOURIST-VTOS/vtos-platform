@@ -9,7 +9,7 @@ import re, secrets
 from datetime import datetime, date
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from app.models.core import Tour, Booking, User
+from app.models.core import Tour, Booking, User, Product, TourEvent
 from app.models.payments import Receipt
 from app.models.ops import PaymentRequest
 from app.models.hr import Employee, Vehicle
@@ -17,7 +17,7 @@ from app.models.vietrip import VtRecord, TourCostLine
 from app.core.security import hash_password
 from app.services import rules as R
 
-ENTITIES = ("tour", "booking", "receipt", "supplier_payment", "user", "vehicle", "proposal", "settlement")
+ENTITIES = ("tour", "booking", "receipt", "supplier_payment", "user", "vehicle", "proposal", "settlement", "product")
 DEPT_MAP = {"Kế toán": ("ketoan", "ketoan"), "Điều hành": ("dieu_hanh", "nv_dh"), "Tour": ("kd_le", "nv_kd"), "Tour MICE": ("kd_doan", "nv_kd"), "Hướng dẫn": ("huong_dan", "nv_kd"),
             "CSKH": ("marketing", "nv_kd"), "IT": ("cntt", "cntt"), "Giám đốc": ("ban_tgd", "tgd"), "Kinh doanh": ("kd_le", "nv_kd"), "Marketing": ("marketing", "nv_kd"), "ĐỐI TÁC": ("kd_le", "nv_kd")}
 STATUS_TEXT = {"KC": "đã xác nhận", "QQ": "chờ duyệt", "XX": "từ chối/hủy", "GD": "GĐ duyệt"}
@@ -36,7 +36,7 @@ def _d(s):
 def upsert(db: Session, entity: str, rows: list[dict]) -> tuple[int, int]:
     """Nạp thô. Trả về (mới, cập nhật)."""
     if entity not in ENTITIES: raise ValueError("entity không hợp lệ")
-    key = {"tour": "recID", "booking": "recID", "receipt": "RecID", "supplier_payment": "RecID", "user": "recID", "vehicle": "recID", "proposal": "proposalId", "settlement": "tourId"}[entity]
+    key = {"tour": "recID", "booking": "recID", "receipt": "RecID", "supplier_payment": "RecID", "user": "recID", "vehicle": "recID", "proposal": "proposalId", "settlement": "tourId", "product": "id"}[entity]
     new = upd = 0
     existing = {r.vietrip_id: r for r in db.execute(select(VtRecord).where(VtRecord.entity == entity)).scalars()}
     seen = set()
@@ -119,6 +119,36 @@ def _stub_tour(db: Session, raw: dict, cache: dict):
     return t
 
 
+def apply_products(db: Session, limit: int = 400) -> int:
+    """Sản phẩm Vietrip (/product/edit/{id}) → products: thông tin cơ bản, cơ cấu chi phí 11 khoản, dòng chi phí NCC, chương trình giá; nối tour cùng mã."""
+    from app.services.products import guess_type
+    n = 0; cache = {}
+    for r in db.execute(select(VtRecord).where(VtRecord.entity == "product", VtRecord.applied == False).order_by(VtRecord.id).limit(limit)).scalars():
+        raw = r.raw; code = (raw.get("ProductCode") or "").strip().upper()
+        if not code: r.applied, r.apply_note = True, "bỏ qua: thiếu mã"; continue
+        p = db.execute(select(Product).where(Product.code == code)).scalars().first()
+        if not p: p = Product(code=code, name=raw.get("ProductName") or code, source="vietrip"); db.add(p)
+        p.name = (raw.get("ProductName") or code)[:200]; p.vietrip_id = int(raw.get("id") or 0) or None
+        p.tour_type = guess_type(code, raw.get("TourType") or "", p.name)
+        p.departure_point = (raw.get("DeparturePoint") or "")[:80]; p.region = (raw.get("Region") or "")[:80]; p.country = (raw.get("Country") or "")[:60]; p.sale_point = (raw.get("SalePoint") or "")[:80]
+        p.transport = (raw.get("Transportation") or "")[:40]; p.vehicle_type = (raw.get("VehicleType") or "")[:40]; p.length_text = (raw.get("TourLength") or "")[:20]
+        p.days = int(float(raw.get("Duration") or 0) or 0) or max(1, p.days)
+        num = lambda v: float(str(v or "0").replace(",", "").replace(".", "") or 0) if isinstance(v, str) and "," in str(v) else float(v or 0)
+        p.reference_price = num(raw.get("ReferencePrice")); p.deposit_pct = float(raw.get("DepositPercentage") or 0); p.days_to_close = int(float(raw.get("DaysToCloseTour") or 0))
+        p.requires_confirmation = str(raw.get("RequiresConfirmation")).lower() in ("true", "1", "on")
+        keys = {"ve_may_bay": "Flight", "land": "Land", "phi_lsq": "LSQFee", "bao_hiem": "Insurance", "qua_tang": "Gift", "phi_tl": "TLFee", "hop_doan": "GroupMeeting", "dieu_hanh": "Operating", "dich_thuat": "Translation", "hoa_hong_ve": "TicketCommission", "phi_ck": "CKFee", "khac": "OtherCost"}
+        p.cost_structure = {k: num(raw.get(v)) for k, v in keys.items()}
+        p.cost_lines = [{"loai": l.get("loai") or "", "ncc": l.get("ncc") or "", "mst": l.get("mst") or "", "kind": "theo_khach" if str(l.get("kind") or "").lower().startswith("per") or l.get("kind") == "theo_khach" else "co_dinh",
+                         "mo_ta": l.get("mo_ta") or "", "don_gia": num(l.get("don_gia")), "sl": float(l.get("sl") or 1), "so_tien": num(l.get("so_tien"))} for l in (raw.get("cost_lines") or [])][:200]
+        p.program = (raw.get("PriceInfoText") or "")[:20000]; p.services = (raw.get("services") or "")[:300]; p.status = "active" if str(raw.get("status") or "Hoạt động").lower().startswith("hoạt") else "inactive"
+        if raw.get("NVDH_name"): p.operator_id = _user_for(db, raw["NVDH_name"], cache).id
+        db.flush()
+        for t in db.execute(select(Tour).where(Tour.product_code == code, Tour.product_id == None)).scalars(): t.product_id = p.id
+        r.applied, r.apply_note = True, f"product:{code}"; n += 1
+    db.commit()
+    return n
+
+
 def apply_users(db: Session, limit: int = 400) -> int:
     n = 0; cache = {}
     for r in db.execute(select(VtRecord).where(VtRecord.entity == "user", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
@@ -175,7 +205,11 @@ def apply_tours(db: Session, only_from: date | None = None, limit: int = 400) ->
         t.tour_type = tour_type_of(raw); t.start_date, t.end_date = start, end or start
         t.price_per_pax = float(raw.get("adl") or 0); t.price_chd = float(raw.get("chd") or 0); t.price_inf = float(raw.get("inf") or 0); t.price_promo = float(raw.get("adl_KM") or 0)
         t.planned_pax = int(raw.get("soChoMoBan") or 0); t.seats_open = int(raw.get("soChoMoBan") or 0); t.seats_promo = int(raw.get("soChoMoBan_KM") or 0)
-        t.product_code = code.split(".")[0]; t.vehicle_type = raw.get("loaiXe") or ""; t.departure_point = raw.get("diemKhoiHanh") or ""; t.transport = raw.get("phuongTien") or ""
+        t.product_code = code.split(".")[0]
+        if not t.product_id:
+            pr = db.execute(select(Product).where(Product.code == t.product_code)).scalars().first()
+            if pr: t.product_id = pr.id
+        t.vehicle_type = raw.get("loaiXe") or ""; t.departure_point = raw.get("diemKhoiHanh") or ""; t.transport = raw.get("phuongTien") or ""
         t.days = int(raw.get("soNgay") or 0); t.country = raw.get("nuoc") or ""; t.vietrip_id = int(raw["recID"]); t.imported = True
         t.actual_revenue = float(raw.get("doanhThu") or 0); t.actual_cost = float(raw.get("tongChiPhi") or 0)
         t.settled_vietrip = bool(raw.get("quyetToan")) or bool(raw.get("duyetChi"))
@@ -210,8 +244,18 @@ def apply_settlements(db: Session, limit: int = 400) -> int:
         if fixed or var:
             t.fixed_cost, t.var_cost_per_pax = fixed, var
         if raw.get("tong_thu"): t.actual_revenue = float(raw["tong_thu"])
+        total_lines = sum(float(l.get("thuc_chi") or 0) for l in (raw.get("lines") or []))
         if raw.get("tong_chi"): t.actual_cost = float(raw["tong_chi"])
-        r.applied, r.apply_note = True, f"{len(raw.get('lines') or [])} dòng"; n += 1
+        elif total_lines: t.actual_cost = total_lines
+        # lịch sử quy trình Vietrip → tour_events (nguồn vietrip), không nhân bản
+        hist = raw.get("history") or []
+        if hist:
+            db.execute(TourEvent.__table__.delete().where(TourEvent.tour_id == t.id, TourEvent.source == "vietrip"))
+            for h in hist[:60]:
+                db.add(TourEvent(tour_id=t.id, step="vietrip", title=(h.get("title") or "")[:200], note=(h.get("note") or "")[:2000], actor=(h.get("actor") or "")[:120], source="vietrip", at=_dt(h.get("at")) or datetime.now()))
+        if raw.get("step"): r.apply_note = f"{len(raw.get('lines') or [])} dòng – {raw['step'][:60]}"
+        else: r.apply_note = f"{len(raw.get('lines') or [])} dòng"
+        r.applied = True; n += 1
     db.commit()
     return n
 
@@ -308,7 +352,7 @@ def apply_supplier_payments(db: Session, limit: int = 400) -> int:
 
 def apply_all(db: Session, actor: str, limit: int = 400) -> dict:
     """Ánh xạ theo lô (mỗi lần tối đa `limit` bản ghi mỗi loại) để không quá thời gian request; gọi lặp tới khi remaining = 0."""
-    out = {"users": apply_users(db, limit), "vehicles": apply_vehicles(db, limit), "tours": apply_tours(db, limit=limit), "settlements": apply_settlements(db, limit),
+    out = {"users": apply_users(db, limit), "vehicles": apply_vehicles(db, limit), "products": apply_products(db, limit), "tours": apply_tours(db, limit=limit), "settlements": apply_settlements(db, limit),
            "bookings": apply_bookings(db, limit), "receipts": apply_receipts(db, limit), "supplier_payments": apply_supplier_payments(db, limit)}
     out["remaining"] = db.execute(select(func.count()).select_from(VtRecord).where(VtRecord.applied == False, VtRecord.entity != "proposal",
                                                                                   ~VtRecord.apply_note.in_(["chưa có tour", "chưa có booking"]))).scalar()

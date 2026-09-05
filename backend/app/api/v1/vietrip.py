@@ -1,5 +1,5 @@
 """API đồng bộ Vietrip → VTOS: nạp thô theo entity, xem trạng thái, ánh xạ sang nghiệp vụ, dòng chi phí tour."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
@@ -45,6 +45,47 @@ def delete_record(entity: str, vietrip_id: str, u: User = Depends(require_roles(
     db.delete(r)
     R.audit(db, u.username, u.role, "dong_bo_vietrip_xoa", entity, after=removed); db.commit()
     return removed
+
+
+# ---------- robot đồng bộ phía máy chủ (không cần trình duyệt) ----------
+class SyncIn(BaseModel):
+    from_date: str | None = None   # mặc định 7 ngày gần nhất
+    to_date: str | None = None
+    products: bool = False         # kéo lại 354 sản phẩm (chậm ~10 phút) – bật khi cần
+    settlements_days: int = 10     # quét bảng quyết toán tour kết thúc trong N ngày
+
+
+def _dates(data: SyncIn):
+    from datetime import date as _d, timedelta
+    t = _d.fromisoformat(data.to_date) if data.to_date else _d.today()
+    f = _d.fromisoformat(data.from_date) if data.from_date else t - timedelta(days=7)
+    return f, t
+
+
+@router.post("/import/vietrip/sync")
+def vietrip_sync(data: SyncIn, u: User = Depends(require_roles("cntt", "ketoan")), db: Session = Depends(get_db)):
+    from app.services import vietrip_client as VC
+    f, t = _dates(data)
+    if not VC.start_background(f, t, data.products, data.settlements_days): raise HTTPException(409, "Robot đang chạy – xem trạng thái")
+    R.audit(db, u.username, u.role, "chay_robot_vietrip", "vietrip", after={"tu": str(f), "den": str(t)}); db.commit()
+    return {"message": f"Robot đồng bộ Vietrip đã chạy nền ({f} → {t}) – theo dõi ở Trạng thái robot"}
+
+
+@router.post("/robot/vietrip/sync")
+def robot_vietrip_sync(data: SyncIn, x_robot_token: str | None = Header(default=None)):
+    """GitHub Actions / n8n gọi hằng ngày (X-Robot-Token)."""
+    from app.core.config import settings
+    from app.services import vietrip_client as VC
+    if not settings.ROBOT_TOKEN or x_robot_token != settings.ROBOT_TOKEN: raise HTTPException(401, "Sai robot token")
+    f, t = _dates(data)
+    return {"started": VC.start_background(f, t, data.products, data.settlements_days), "from": str(f), "to": str(t)}
+
+
+@router.get("/import/vietrip/robot-status")
+def robot_status(u: User = Depends(require_roles(*SYNC_ROLES, "bks")), db: Session = Depends(get_db)):
+    from app.services import vietrip_client as VC
+    from app.core.config import settings
+    return {**{k: v for k, v in VC.STATE.items() if k != "log"}, "log": VC.STATE["log"][-40:], "credentials_set": bool(settings.VIETRIP_PHONE and settings.VIETRIP_PASSWORD)}
 
 
 @router.get("/import/vietrip/records")

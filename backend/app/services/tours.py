@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.core import Tour, User, ServiceRequest, Booking, Alert, AuditLog, ROLES
 from app.services import rules as R
 from app.services import accounting as ACC
+from app.services.products import event as EV
 from app.api.deps import Gate
 from fastapi import HTTPException
 
@@ -32,6 +33,7 @@ def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
         "closed_at": t.closed_at, "kt_confirmed_at": t.kt_confirmed_at, "cntt_checked_at": t.cntt_checked_at,
         "calc": c, "booked_pax": bk, "days_left": days_left, "settlement_deadline": R.settlement_deadline(db, t),
         "approver_role": R.approver_role(t), "settlement": s, "is_doan": R.is_doan(t),
+        "imported": t.imported, "product_code": t.product_code, "product_id": t.product_id, "days": t.days, "transport": t.transport, "vehicle_type": t.vehicle_type, "departure_point": t.departure_point,
         "d7_flag": bool(c["breakeven_pax"] and bk < c["breakeven_pax"] and 0 <= days_left <= int(R.get_param(db, "moc_d7")) and t.status == "da_duyet"),
         "bookings": [{"id": b.id, "code": b.code, "customer_name": b.customer_name, "customer_phone": b.customer_phone, "source": b.source,
                       "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code, "sales_name": b.sales.full_name if b.sales else "",
@@ -66,6 +68,7 @@ def create(db: Session, u: User, data) -> Tour:
              operator_id=data.operator_id, price_per_pax=data.price_per_pax, fixed_cost=data.fixed_cost,
              var_cost_per_pax=data.var_cost_per_pax, planned_pax=data.planned_pax, rest_stops=data.rest_stops)
     db.add(t); db.flush()
+    EV(db, t, "khoi_tao", u.username, getattr(data, "note", "") or "")
     R.audit(db, u.username, u.role, "tao_tour", f"tour:{t.code}", after=snap(t)); db.commit(); db.refresh(t)
     return t
 
@@ -78,11 +81,12 @@ def edit(db: Session, u: User, t: Tour, data) -> Tour:
     before = snap(t)
     t.price_per_pax, t.fixed_cost, t.var_cost_per_pax, t.planned_pax = data.price_per_pax, data.fixed_cost, data.var_cost_per_pax, data.planned_pax
     t.rest_stops, t.justification = data.rest_stops, data.justification
+    EV(db, t, "sua_du_toan", u.username, "")
     R.audit(db, u.username, u.role, "sua_du_toan", f"tour:{t.code}", before=before, after=snap(t)); db.commit()
     return t
 
 
-def submit(db: Session, u: User, t: Tour) -> str:
+def submit(db: Session, u: User, t: Tour, note: str = "") -> str:
     if u.role not in ("nv_dh", "tp_dh"): raise HTTPException(403, "Chỉ Điều hành trình dự toán")
     if t.status != "nhap": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     c = R.calc(t, R.get_param(db, "nguong_bien", t.start_date))
@@ -93,25 +97,28 @@ def submit(db: Session, u: User, t: Tour) -> str:
     if not c["pass_gate"] and len(t.justification.strip()) < 30:
         raise Gate("CONG_1_2", f"Biên kế hoạch {c['margin']*100:.1f}% dưới {c['threshold']*100:.0f}%: phải có giải trình 4 mục (lý do · khoản làm mỏng biên · phương án bù · lỗ tối đa) mới trình được")
     t.below_margin = not c["pass_gate"]; t.status = "cho_xac_nhan"
+    EV(db, t, "trinh_du_toan", u.username, note or (t.justification if not c["pass_gate"] else ""))
     R.audit(db, u.username, u.role, "trinh_du_toan", f"tour:{t.code}", after=snap(t)); db.commit()
     return "Đã trình Trưởng phòng Điều hành xác nhận"
 
 
-def confirm(db: Session, u: User, t: Tour) -> str:
+def confirm(db: Session, u: User, t: Tour, note: str = "") -> str:
     if u.role != "tp_dh": raise HTTPException(403, "Chỉ Trưởng phòng Điều hành xác nhận dự toán")
     if t.status != "cho_xac_nhan": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     t.status, t.confirmed_by = "cho_duyet", u.username
+    EV(db, t, "tp_xac_nhan", u.username, note)
     R.audit(db, u.username, u.role, "tp_xac_nhan", f"tour:{t.code}", after=snap(t)); db.commit()
     return "Đã xác nhận, chuyển " + ("Chủ tịch + TGĐ (2 chữ ký)" if t.below_margin else ROLES[R.approver_role(t)]) + " duyệt"
 
 
-def approve(db: Session, u: User, t: Tour) -> str:
+def approve(db: Session, u: User, t: Tour, note: str = "") -> str:
     if t.status != "cho_duyet": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     if t.below_margin:
         if u.role not in ("chutich", "tgd"):
             raise Gate("CONG_1", "Chuyến dưới biên 10% chỉ Chủ tịch và Tổng giám đốc được ký")
         if getattr(t, f"signed_{u.role}"): raise Gate("DA_KY", "Đã ký rồi")
         setattr(t, f"signed_{u.role}", True)
+        EV(db, t, "ky", u.username, note, title=f"Ký duyệt chuyến dưới biên ({ROLES[u.role]})")
         R.audit(db, u.username, u.role, "ky_duyet_duoi_bien", f"tour:{t.code}", after=snap(t))
         if t.signed_chutich and t.signed_tgd:
             t.status, t.approved_by = "da_duyet", "chutich+tgd"
@@ -121,11 +128,12 @@ def approve(db: Session, u: User, t: Tour) -> str:
     need = R.approver_role(t)
     if u.role != need: raise Gate("PHAN_QUYEN", f"Dự toán này do {ROLES[need]} duyệt (Văn bản đính chính Điều 4)")
     t.status, t.approved_by = "da_duyet", u.username
+    EV(db, t, "duyet", u.username, note)
     R.audit(db, u.username, u.role, "duyet_du_toan", f"tour:{t.code}", after=snap(t)); db.commit()
     return "Đã duyệt – Kinh doanh có thể chốt khách; 3 con số công bố trên lịch khởi hành"
 
 
-def d7(db: Session, u: User, t: Tour, decision: str) -> str:
+def d7(db: Session, u: User, t: Tour, decision: str, note: str = "") -> str:
     if u.role not in ("chutich", "tp_dh"): raise HTTPException(403, "Chỉ TP Điều hành (ghép/dời/hủy) hoặc Chủ tịch")
     if decision == "chay":
         if u.role != "chutich": raise Gate("CONG_8", "Chuyến dưới hòa vốn muốn chạy tiếp phải do Chủ tịch duyệt")
@@ -135,39 +143,43 @@ def d7(db: Session, u: User, t: Tour, decision: str) -> str:
     else:
         raise Gate("D7", "Quyết định không hợp lệ")
     for a in db.execute(select(Alert).where(Alert.kind == "d7", Alert.ref == t.code)).scalars(): a.resolved = True
+    EV(db, t, "d7", u.username, note, title=f"Quyết định mốc D-7: {decision}")
     R.audit(db, u.username, u.role, f"d7_{decision}", f"tour:{t.code}", after=snap(t)); db.commit()
     return "Đã ghi quyết định D-7"
 
 
-def close(db: Session, u: User, t: Tour, data) -> str:
+def close(db: Session, u: User, t: Tour, data, note: str = "") -> str:
     if t.status not in ("ket_thuc", "da_duyet"): raise Gate("TRANG_THAI", "Chưa đến bước quyết toán")
     if u.id != t.operator_id: raise Gate("CONG_6", f"Một cửa: chỉ người điều hành chuyến ({t.operator.full_name}) mới được nhập quyết toán")
     if date.today() < t.end_date: raise Gate("CONG_6", "Chuyến chưa kết thúc")
     before = snap(t)
     t.actual_revenue, t.actual_cost, t.promo_value = data.actual_revenue, data.actual_cost, data.promo_value
     t.closed_at, t.status = datetime.now(), "da_dong_so"
+    EV(db, t, "dong_so", u.username, note)
     R.audit(db, u.username, u.role, "dong_so_quyet_toan", f"tour:{t.code}", before=before, after=snap(t)); db.commit()
     late = date.today() > R.settlement_deadline(db, t)
     return "Đã đóng số, chuyển Kế toán xác nhận" + (" – QUÁ HẠN quyết toán, mất thưởng chuyến" if late else "")
 
 
-def kt_confirm(db: Session, u: User, t: Tour) -> str:
+def kt_confirm(db: Session, u: User, t: Tour, note: str = "") -> str:
     if u.role != "ketoan": raise HTTPException(403, "Chỉ Kế toán xác nhận quyết toán")
     if t.status != "da_dong_so": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     t.status, t.kt_confirmed_at = "kt_xac_nhan", datetime.now()
+    EV(db, t, "kt_xac_nhan", u.username, note)
     R.audit(db, u.username, u.role, "ke_toan_xac_nhan", f"tour:{t.code}", after=snap(t))
     ACC.on_settlement_confirmed(db, t, u.username, u.role); db.commit()
     return "Kế toán đã xác nhận – số liệu này là căn cứ duy nhất tính thưởng"
 
 
-def cntt_check(db: Session, u: User, t: Tour) -> str:
+def cntt_check(db: Session, u: User, t: Tour, note: str = "") -> str:
     if u.role != "cntt": raise HTTPException(403, "Chỉ CNTT đối chiếu độc lập")
     if t.status != "kt_xac_nhan": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     bk = sum(b.amount - b.discount for b in t.bookings)
-    note = {"doanh_thu_booking": bk, "doanh_thu_quyet_toan": t.actual_revenue, "lech": round(t.actual_revenue - bk)}
+    chk = {"doanh_thu_booking": bk, "doanh_thu_quyet_toan": t.actual_revenue, "lech": round(t.actual_revenue - bk)}
     t.status, t.cntt_checked_at = "khoa", datetime.now()
-    R.audit(db, u.username, u.role, "cntt_doi_chieu_khoa", f"tour:{t.code}", after=note); db.commit()
-    return f"Đã đối chiếu và khóa. Lệch doanh thu booking/quyết toán: {note['lech']:,.0f} đ" + (" → đã ghi nhật ký trình TGĐ" if abs(note["lech"]) > 1000 else "")
+    EV(db, t, "cntt_khoa", u.username, (note + " | " if note else "") + f"Lệch doanh thu booking/quyết toán: {chk['lech']:,.0f} đ")
+    R.audit(db, u.username, u.role, "cntt_doi_chieu_khoa", f"tour:{t.code}", after=chk); db.commit()
+    return f"Đã đối chiếu và khóa. Lệch doanh thu booking/quyết toán: {chk['lech']:,.0f} đ" + (" → đã ghi nhật ký trình TGĐ" if abs(chk["lech"]) > 1000 else "")
 
 
 # ---------- yêu cầu & booking ----------

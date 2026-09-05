@@ -12,6 +12,7 @@ from app.api.v1.hr import router as hr_router
 from app.api.v1.ops import router as ops_router
 from app.api.v1.finance import router as finance_router
 from app.api.v1.vietrip import router as vietrip_router
+from app.api.v1.products import router as products_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -58,6 +59,7 @@ async def _invalidate_dashboard_cache(request, call_next):
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",")],
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
+app.include_router(products_router)
 app.include_router(payments_router)
 app.include_router(accounting_router)
 app.include_router(hr_router)

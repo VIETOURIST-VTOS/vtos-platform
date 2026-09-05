@@ -9,8 +9,10 @@ import { Tag, errMsg } from "@/components/ui";
 function Tours() {
   const { user, toast } = useShell();
   const [rows, setRows] = useState<any[]>([]); const [ops, setOps] = useState<any[]>([]); const [open, setOpen] = useState(false);
-  const load = () => api("/tours").then(setRows).catch(() => {});
-  useEffect(() => { load(); api("/users?role=nv_dh,tp_dh").then(setOps).catch(() => {}); }, []);
+  const [q, setQ] = useState(""); const [month, setMonth] = useState(""); const [st, setSt] = useState("");
+  const load = () => api(`/tours?limit=300&q=${encodeURIComponent(q)}&month=${month}&status=${st}`).then(setRows).catch(() => {});
+  useEffect(() => { load(); }, [q, month, st]); // eslint-disable-line
+  useEffect(() => { api("/users?role=nv_dh,tp_dh").then(setOps).catch(() => {}); }, []);
   const canCreate = ["nv_dh", "tp_dh"].includes(user?.role || "");
   async function create(e: React.FormEvent) {
     e.preventDefault(); const f = new FormData(e.target as HTMLFormElement); const d: any = Object.fromEntries(f.entries());
@@ -20,6 +22,13 @@ function Tours() {
   const today = new Date().toISOString().slice(0, 10);
   return (<>
     <h1>Tour & dự toán</h1>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <input placeholder="Tìm mã tour / tên / mã sản phẩm…" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 300 }} />
+      <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+      <select value={st} onChange={(e) => setSt(e.target.value)}><option value="">Mọi trạng thái</option>{Object.entries(TOUR_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+      <span className="muted">{rows.length} chuyến (tối đa 300 mới nhất)</span>
+      {canCreate && <Link href="/products" className="act" style={{ margin: 0 }}>Mở chuyến từ sản phẩm →</Link>}
+    </div>
     {canCreate && <details className="panel" open={open} onToggle={(e) => setOpen((e.target as any).open)}>
       <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--navy)" }}>+ Tạo tour / dự toán (chỉ Điều hành)</summary>
       <form onSubmit={create}>

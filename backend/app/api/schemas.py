@@ -45,10 +45,54 @@ class TourClose(BaseModel):
     actual_revenue: float
     actual_cost: float
     promo_value: float = 0
+    note: str = ""
+
+
+class ActionNote(BaseModel):
+    note: str = ""          # lời giải trình / ghi chú của bước (hiển thị ở Quy trình & Lịch sử)
+
+
+class ProductIn(BaseModel):
+    code: str
+    name: str
+    tour_type: str = "le_noi_dia"
+    departure_point: str = "TP HCM"
+    region: str = ""
+    country: str = ""
+    sale_point: str = "TP HCM"
+    transport: str = "Xe"
+    vehicle_type: str = ""
+    length_text: str = ""
+    days: int = 1
+    reference_price: float = 0
+    deposit_pct: float = 30
+    days_to_close: int = 3
+    requires_confirmation: bool = False
+    cost_structure: dict = {}
+    cost_lines: list = []
+    program: str = ""
+    services: str = ""
+    status: str = "active"
+    operator_id: int | None = None
+
+
+class OpenTourIn(BaseModel):
+    start_date: date
+    seats: int = 0
+    price_adl: float | None = None
+    price_chd: float = 0
+    price_inf: float = 0
+    seats_promo: int = 0
+    price_promo: float = 0
+    operator_id: int | None = None
+    note: str = ""
+    date_to: date | None = None          # có → mở theo lịch lặp
+    weekdays: list[int] = []             # 0 = Thứ Hai … 6 = Chủ nhật
 
 
 class D7Decision(BaseModel):
     decision: str  # ghep | doi | huy | chay
+    note: str = ""
 
 
 class RequestCreate(BaseModel):

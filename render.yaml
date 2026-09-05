@@ -26,6 +26,10 @@ services:
         sync: false
       - key: SEPAY_ACCOUNT_NUMBER
         sync: false
+      - key: VIETRIP_PHONE
+        sync: false
+      - key: VIETRIP_PASSWORD
+        sync: false
       - key: SEPAY_WEBHOOK_KEY
         generateValue: true
       - key: DATABASE_URL

@@ -1,6 +1,6 @@
 """API nhân sự – lương: hồ sơ, visa, HDV & phân chuyến, đội xe & lệnh điều xe, sự vụ, bảng lương (robot R6)."""
 from datetime import date, datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
@@ -469,6 +469,17 @@ def incident_resolve(iid: int, data: ResolveIn, u: User = Depends(require_roles(
     else: i.status, i.effective_at = "hieu_luc", datetime.now()
     R.audit(db, u.username, u.role, "ket_luan_su_vu", f"incident:{i.id}", after={"chap_nhan": data.accept, "ket_luan": data.result}); db.commit()
     return {"message": "Khiếu nại được chấp nhận – hủy chế tài" if data.accept else "Sự vụ có hiệu lực – chế tài áp dụng kỳ lương tháng phát sinh"}
+
+
+@router.post("/robot/incidents/finalize")
+def robot_incidents_finalize(x_robot_token: str | None = Header(default=None), db: Session = Depends(get_db)):
+    from app.core.config import settings
+    if not settings.ROBOT_TOKEN or x_robot_token != settings.ROBOT_TOKEN: raise HTTPException(401, "Sai robot token")
+    n = 0
+    for i in db.execute(select(Incident).where(Incident.status == "cho_khieu_nai")).scalars():
+        if i.approved_at and date.today() > H.add_working_days(i.approved_at.date(), 3): i.status, i.effective_at = "hieu_luc", datetime.now(); n += 1
+    R.audit(db, "robot", "robot", "chot_su_vu_het_han_khieu_nai", "incidents", after={"so_luong": n}); db.commit()
+    return {"count": n}
 
 
 @router.post("/incidents/finalize-expired")

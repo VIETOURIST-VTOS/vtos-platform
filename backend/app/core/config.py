@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     TZ: str = "Asia/Ho_Chi_Minh"
     SEPAY_WEBHOOK_KEY: str = ""            # khóa đặt trong SePay → Webhook → Authorization: Apikey <key>
     SEPAY_API_TOKEN: str = ""              # token User API (my.sepay.vn → Cấu hình → API Access) để VTOS kéo giao dịch
-    SEPAY_ACCOUNT_NUMBER: str = ""         # số TK ngân hàng mặc định khi kéo (trống = mọi TK trong SePay)
+    SEPAY_ACCOUNT_NUMBER: str = ""
+    VIETRIP_PHONE: str = ""                # tài khoản robot Vietrip (chỉ đọc – Kế toán/Giám đốc) để đồng bộ tự động
+    VIETRIP_PASSWORD: str = ""         # số TK ngân hàng mặc định khi kéo (trống = mọi TK trong SePay)
     COMPANY_NAME: str = "CÔNG TY CỔ PHẦN DU LỊCH VIETOURIST"
     COMPANY_TAX_CODE: str = ""
     ANTHROPIC_API_KEY: str = ""            # robot R7 viết nhận xét báo cáo (không có → nhận xét theo quy tắc)

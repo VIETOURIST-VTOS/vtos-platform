@@ -1,0 +1,46 @@
+name: VTOS robots (lịch tự động)
+# Lịch chạy robot trên web thật – không tốn hạ tầng: GitHub Actions gọi API VTOS bằng ROBOT_TOKEN (Settings → Secrets → ROBOT_TOKEN, cùng giá trị Render).
+on:
+  schedule:
+    - cron: "0 20 * * *"      # 03:00 giờ VN: đồng bộ Vietrip 3 ngày gần nhất + quyết toán tour kết thúc 10 ngày
+    - cron: "*/30 0-15 * * *" # mỗi 30 phút giờ hành chính VN (07:00–22:00): kéo bù SePay, chốt sự vụ hết hạn
+    - cron: "30 13 * * *"     # 20:30 giờ VN: robot R7 báo cáo ngày
+    - cron: "0 2 * * 6"       # Thứ Bảy 09:00 VN: báo cáo tuần
+    - cron: "0 2 10 * *"      # ngày 10 hằng tháng 09:00 VN: báo cáo tháng
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "vietrip | sepay | ngay | tuan | thang | vietrip_products"
+        default: "vietrip"
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      API: https://vtos-api.onrender.com/api/v1
+      TOKEN: ${{ secrets.ROBOT_TOKEN }}
+    steps:
+      - name: Đánh thức API (Render free ngủ khi rảnh)
+        run: curl -s -o /dev/null -m 90 "$API/health" || true; sleep 20
+      - name: Chọn việc theo lịch
+        id: pick
+        run: |
+          J="${{ github.event.inputs.job }}"
+          if [ -z "$J" ]; then
+            case "${{ github.event.schedule }}" in
+              "0 20 * * *") J=vietrip ;;
+              "*/30 0-15 * * *") J=sepay ;;
+              "30 13 * * *") J=ngay ;;
+              "0 2 * * 6") J=tuan ;;
+              "0 2 10 * *") J=thang ;;
+            esac
+          fi
+          echo "job=$J" >> $GITHUB_OUTPUT
+      - name: Chạy robot
+        run: |
+          J="${{ steps.pick.outputs.job }}"; H="X-Robot-Token: $TOKEN"; C="Content-Type: application/json"
+          case "$J" in
+            vietrip) curl -sf -m 120 -X POST "$API/robot/vietrip/sync" -H "$H" -H "$C" -d '{"settlements_days":10}' ;;
+            vietrip_products) curl -sf -m 120 -X POST "$API/robot/vietrip/sync" -H "$H" -H "$C" -d '{"products":true,"settlements_days":10}' ;;
+            sepay) curl -sf -m 120 -X POST "$API/robot/sepay/pull" -H "$H" -H "$C" -d '{}'; curl -sf -m 60 -X POST "$API/robot/incidents/finalize" -H "$H" ;;
+            ngay|tuan|thang) curl -sf -m 170 -X POST "$API/robot/report/$J" -H "$H" -H "$C" -d '{}' ;;
+          esac
