@@ -132,7 +132,7 @@ def apply_products(db: Session, limit: int = 400) -> int:
         p.tour_type = guess_type(code, raw.get("TourType") or "", p.name)
         p.departure_point = (raw.get("DeparturePoint") or "")[:80]; p.region = (raw.get("Region") or "")[:80]; p.country = (raw.get("Country") or "")[:60]; p.sale_point = (raw.get("SalePoint") or "")[:80]
         p.transport = (raw.get("Transportation") or "")[:40]; p.vehicle_type = (raw.get("VehicleType") or "")[:40]; p.length_text = (raw.get("TourLength") or "")[:20]
-        p.days = int(float(raw.get("Duration") or 0) or 0) or max(1, p.days)
+        p.days = int(float(raw.get("Duration") or 0) or 0) or max(1, p.days or 1)
         num = lambda v: float(str(v or "0").replace(",", "").replace(".", "") or 0) if isinstance(v, str) and "," in str(v) else float(v or 0)
         p.reference_price = num(raw.get("ReferencePrice")); p.deposit_pct = float(raw.get("DepositPercentage") or 0); p.days_to_close = int(float(raw.get("DaysToCloseTour") or 0))
         p.requires_confirmation = str(raw.get("RequiresConfirmation")).lower() in ("true", "1", "on")
