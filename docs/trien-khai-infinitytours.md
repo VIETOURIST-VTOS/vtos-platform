@@ -36,3 +36,12 @@ git remote add origin git@github.com:vietourist/vtos-platform.git
 git push -u origin main
 ```
 CI (`.github/workflows/ci.yml`) tự chạy pytest, build web, build Docker ở mỗi lần push.
+
+## Bản demo đang chạy trên web (05/9/2026 – gói miễn phí)
+| Thành phần | Địa chỉ | Nền tảng |
+|---|---|---|
+| Web | https://vtos-platform.vercel.app | Vercel (team infinis-pathway, root `web`, env `API_INTERNAL_URL`) |
+| API | https://vtos-api.onrender.com/api/docs | Render (Blueprint `render.yaml`, Docker, Singapore) |
+| PostgreSQL | vtos-db (Render free, hết hạn sau 90 ngày) | Render |
+
+Tự động: mỗi lần push `main` lên GitHub, Vercel và Render đều build lại. Gói free của Render ngủ sau 15 phút không dùng → lần mở đầu chậm ~30–50 giây. Muốn gắn `vtos.infinitytours.org` ngay: Vercel → Project → Domains → thêm domain, rồi tạo bản ghi CNAME `vtos` → `cname.vercel-dns.com` tại halink.
