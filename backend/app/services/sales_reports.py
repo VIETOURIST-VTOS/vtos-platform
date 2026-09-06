@@ -178,7 +178,7 @@ def r9_anomalies(db: Session) -> list[dict]:
         if n >= 3: add("r9_thieu_4_truong", "warn", f"sale:{s}", f"Sale {s} có {n} booking thiếu 4 trường trong tháng – không tính chỉ tiêu, cần chấn chỉnh")
     # 3. Tour chạy dưới hòa vốn không có quyết định D-7 (đã khởi hành)
     for t in db.execute(select(Tour).where(Tour.status.in_(["da_duyet", "ket_thuc"]), Tour.start_date <= today, Tour.start_date >= today - timedelta(days=30), Tour.tour_type.in_(["le_noi_dia", "le_nuoc_ngoai"]))).scalars():
-        c = R.calc(t, R.get_param(db, "nguong_bien", t.start_date))
+        c = R.calc_db(db, t, R.get_param(db, "nguong_bien", t.start_date))
         if c["breakeven_pax"] and R.booked_pax(t) < c["breakeven_pax"] and not t.chairman_run_decision and not t.vietrip_id:
             add("r9_chay_duoi_hoa_von", "red", f"tour:{t.code}", f"{t.code} khởi hành {t.start_date:%d/%m} với {R.booked_pax(t)}/{c['breakeven_pax']} khách hòa vốn mà không có quyết định D-7")
     # 4. Lệnh chi cho NCC lạ (lần đầu xuất hiện) ≥ 20 triệu, hoặc chi vượt dự toán tour > 10%

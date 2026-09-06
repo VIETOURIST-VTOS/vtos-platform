@@ -120,18 +120,66 @@ def is_doan(tour: Tour) -> bool:
     return tour.tour_type.startswith("doan")
 
 
-def calc(tour: Tour, threshold: float) -> dict:
-    p, f, v, n = tour.price_per_pax, tour.fixed_cost, tour.var_cost_per_pax, tour.planned_pax
+BUDGET_SOURCES = {"du_toan_tour": "dự toán của chuyến", "san_pham": "cơ cấu chi phí sản phẩm (tham chiếu)", "chua_co": "chưa có dự toán"}
+
+
+def calc(tour: Tour, threshold: float, fixed: float | None = None, var: float | None = None, source: str | None = None) -> dict:
+    """Ba con số dự toán và cổng biên.
+
+    THIẾU CHI PHÍ KHÔNG PHẢI LÀ CHI PHÍ BẰNG 0 (Ý kiến thẩm định 06/9/2026, B1): giá vốn 0 từng cho
+    biên 100% nên cổng biên luôn báo "ĐẠT" – vô hiệu hóa cổng chặn số 1. Nay dự toán thiếu giá vốn
+    có complete=False và gate_state="chua_du_co_so"; pass_gate chỉ đúng khi dự toán đủ cơ sở tính.
+    """
+    p, n = tour.price_per_pax, tour.planned_pax
+    f = tour.fixed_cost if fixed is None else fixed
+    v = tour.var_cost_per_pax if var is None else var
+    if source is None:
+        source = "du_toan_tour" if (f > 0 or v > 0) else "chua_co"
     revenue = p * n
     cost = f + v * n
+    has_cost = f > 0 or v > 0
     margin = (revenue - cost) / revenue if revenue else 0.0
     unit = p - v
     breakeven = math.ceil(f / unit) if unit > 0 else None
     unit10 = p * (1 - threshold) - v
     pax_margin = math.ceil(f / unit10) if unit10 > 0 else None
+    complete = all([p > 0, n > 0, has_cost]) and breakeven is not None
+    passed = complete and margin >= threshold
     return {"revenue": revenue, "cost": cost, "profit": revenue - cost, "margin": margin,
             "breakeven_pax": breakeven, "pax_for_margin": pax_margin, "threshold": threshold,
-            "pass_gate": margin >= threshold, "complete": all([p > 0, n > 0]) and breakeven is not None}
+            "fixed_cost": f, "var_cost_per_pax": v, "has_cost": has_cost,
+            "budget_source": source, "budget_source_label": BUDGET_SOURCES.get(source, source),
+            "pass_gate": passed, "complete": complete,
+            "gate_state": "dat" if passed else ("chua_du_co_so" if not complete else "khong_dat")}
+
+
+def budget_of(db: Session, t: Tour) -> tuple[float, float, str]:
+    """Dự toán của chuyến và NGUỒN của nó – tách hẳn khỏi chi phí thực chi (B2).
+
+    Trước đây dự toán của tour nhập từ Vietrip được suy ngược từ dòng quyết toán, nên biên kế hoạch
+    luôn bằng biên thực tế và cảnh báo vượt dự toán không bao giờ kích hoạt. Nay: dự toán do Điều hành
+    lập; nếu chuyến chưa có thì lấy cơ cấu chi phí sản phẩm làm dự toán THAM CHIẾU (ghi rõ nguồn);
+    không có nữa thì trả về "chưa có dự toán", không suy ra số 0.
+    """
+    if t.fixed_cost > 0 or t.var_cost_per_pax > 0:
+        return t.fixed_cost, t.var_cost_per_pax, "du_toan_tour"
+    from app.models.core import Product
+    p = None
+    if t.product_id: p = db.get(Product, t.product_id)
+    if p is None and t.product_code:
+        p = db.execute(select(Product).where(Product.code == t.product_code)).scalars().first()
+    if p is not None:
+        f, v = p.fixed_cost(), p.var_cost_per_pax()
+        if f > 0 or v > 0:
+            return f, v, "san_pham"
+    return 0.0, 0.0, "chua_co"
+
+
+def calc_db(db: Session, t: Tour, threshold: float) -> dict:
+    """calc() có tra cứu dự toán tham chiếu từ sản phẩm – dùng cho hiển thị, báo cáo và robot.
+    Riêng bước TRÌNH dự toán vẫn dùng calc() thuần: Điều hành phải tự nhập đủ ba con số."""
+    f, v, src = budget_of(db, t)
+    return calc(t, threshold, f, v, src)
 
 
 def booked_pax(tour: Tour) -> int:
@@ -187,7 +235,7 @@ def run_robots(db: Session) -> int:
             if t.end_date < today: t.status = "ket_thuc"
             continue
         thr = get_param(db, "nguong_bien", t.start_date)
-        c = calc(t, thr)
+        c = calc_db(db, t, thr)
         days_left = (t.start_date - today).days
         if 0 <= days_left <= d7 and c["breakeven_pax"] and booked_pax(t) < c["breakeven_pax"] and not t.chairman_run_decision:
             level = "red" if days_left <= d7 - 1 else "warn"

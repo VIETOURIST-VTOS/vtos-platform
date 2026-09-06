@@ -139,12 +139,15 @@ def summary(db: Session, t: Tour) -> dict:
     ls = lines_of(db, t, active_only=True)
     actual = sum(l.actual for l in ls); paid = sum(l.paid for l in ls)
     budget_lines = sum(l.budget for l in ls)
-    budget_tour = t.fixed_cost + t.var_cost_per_pax * R.booked_pax(t)
+    f, v, src = R.budget_of(db, t)          # dự toán tách hẳn khỏi thực chi (B2), có ghi nguồn
+    budget_tour = f + v * R.booked_pax(t)
     budget = budget_lines or budget_tour
+    b_src = "dong" if budget_lines else src
     rev = sum(b.amount - b.discount for b in t.bookings if not b.cancelled)
     profit = rev - actual - t.promo_value
     return {"lines": len(ls), "cancelled": sum(1 for l in lines_of(db, t) if l.status != "hd"), "actual": actual, "paid": paid, "remaining": max(0.0, actual - paid),
-            "budget": budget, "budget_source": "dong" if budget_lines else "du_toan_tour", "variance": actual - budget, "variance_pct": (actual - budget) / budget if budget else 0,
+            "budget": budget, "budget_source": b_src, "budget_source_label": {"dong": "tổng dự toán theo dòng"}.get(b_src, R.BUDGET_SOURCES.get(b_src, b_src)),
+            "has_budget": budget > 0, "variance": actual - budget, "variance_pct": (actual - budget) / budget if budget else 0,
             "revenue": rev, "profit": profit, "margin": profit / rev if rev else 0, "version": t.settlement_version, "with_doc": sum(1 for l in ls if l.doc_data)}
 
 
@@ -163,8 +166,10 @@ def checks(db: Session, t: Tour) -> list[dict]:
     if nodoc:
         out.append({"level": "warn", "line": 0, "msg": f"{len(nodoc)}/{len(ls)} dòng chưa gắn chứng từ (dòng {', '.join(map(str, nodoc[:12]))}{'…' if len(nodoc) > 12 else ''})"})
     s = summary(db, t)
-    if s["budget"] and s["variance_pct"] > thr:
-        out.append({"level": "warn", "line": 0, "msg": f"Tổng thực chi vượt dự toán {s['variance_pct'] * 100:.0f}% (> {thr * 100:.0f}%) – TGĐ xem khi Kế toán xác nhận"})
+    if not s["has_budget"]:
+        out.append({"level": "warn", "line": 0, "msg": "Chuyến chưa có dự toán để so sánh – không đánh giá được mức vượt chi (không coi dự toán thiếu là 0)"})
+    elif s["variance_pct"] > thr:
+        out.append({"level": "warn", "line": 0, "msg": f"Tổng thực chi vượt dự toán {s['variance_pct'] * 100:.0f}% (> {thr * 100:.0f}%, {s['budget_source_label']}) – TGĐ xem khi Kế toán xác nhận"})
     if s["remaining"] > 0:
         out.append({"level": "info", "line": 0, "msg": f"Còn lại cần thanh toán NCC: {s['remaining']:,.0f} đ"})
     return out

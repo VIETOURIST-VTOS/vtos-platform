@@ -232,7 +232,6 @@ def apply_settlements(db: Session, limit: int = 400) -> int:
         raw = r.raw; t = db.execute(select(Tour).where(Tour.code == raw.get("tourcode"))).scalars().first()
         if not t: r.apply_note = "chưa có tour"; continue
         db.execute(TourCostLine.__table__.delete().where(TourCostLine.tour_id == t.id, TourCostLine.source == "vietrip"))
-        fixed = var = 0.0
         for i, l in enumerate(raw.get("lines") or [], 1):
             sup = l.get("ncc") or ""; m = re.search(r"\((\d{10,14})\)\s*$", sup)
             kind = "theo_khach" if "theo khách" in (l.get("mo_ta") or "").lower() else "co_dinh"
@@ -240,10 +239,10 @@ def apply_settlements(db: Session, limit: int = 400) -> int:
             db.add(TourCostLine(tour_id=t.id, line_no=i, description=(l.get("mo_ta") or "").split("|")[0].strip()[:200], cost_kind=kind, service_type=l.get("loai") or "",
                                 supplier_name=re.sub(r"\s*\(\d{10,14}\)\s*$", "", sup)[:200], supplier_tax_code=m.group(1) if m else "", unit_price=float(l.get("don_gia") or 0),
                                 qty=float(l.get("sl") or 0), coef=float(l.get("hs") or 1), actual=actual, paid=float(l.get("da_tt") or 0), note=(l.get("ghi_chu") or "")[:200]))
-            if kind == "theo_khach": var += float(l.get("don_gia") or 0) * float(l.get("hs") or 1)
-            else: fixed += actual
-        if fixed or var:
-            t.fixed_cost, t.var_cost_per_pax = fixed, var
+        # KHÔNG suy ngược dự toán từ dòng quyết toán (Ý kiến thẩm định 06/9/2026, B2): làm vậy thì
+        # "dự toán" chính là số thực chi, biên kế hoạch luôn bằng biên thực tế và cảnh báo vượt dự toán
+        # không bao giờ kích hoạt. Dự toán do Điều hành lập; thiếu thì lấy cơ cấu chi phí sản phẩm làm
+        # tham chiếu (rules.budget_of), ghi rõ nguồn.
         if raw.get("tong_thu"): t.actual_revenue = float(raw["tong_thu"])
         total_lines = sum(float(l.get("thuc_chi") or 0) for l in (raw.get("lines") or []))
         if raw.get("tong_chi"): t.actual_cost = float(raw["tong_chi"])
@@ -259,6 +258,25 @@ def apply_settlements(db: Session, limit: int = 400) -> int:
         r.applied = True; n += 1
     db.commit()
     return n
+
+
+def repair_derived_budgets(db: Session, actor: str = "cntt") -> dict:
+    """Dọn dữ liệu cũ của B2: các tour nhập từ Vietrip có dự toán được suy ngược từ dòng quyết toán
+    (bản trước 06/9/2026). Đặt lại về rỗng để hệ thống dùng cơ cấu chi phí sản phẩm làm dự toán tham
+    chiếu, hoặc ghi rõ "chưa có dự toán" – thay vì trình bày số thực chi như thể là dự toán.
+    Chạy một lần sau khi triển khai; chỉ đụng tới tour có cờ imported và có dòng chi phí nguồn vietrip.
+    """
+    from app.services import rules as R
+    n = 0
+    tour_ids = {r[0] for r in db.execute(select(TourCostLine.tour_id).where(TourCostLine.source == "vietrip")).all()}
+    for t in db.execute(select(Tour).where(Tour.imported == True)).scalars():
+        if t.id in tour_ids and (t.fixed_cost > 0 or t.var_cost_per_pax > 0):
+            t.fixed_cost, t.var_cost_per_pax = 0.0, 0.0
+            n += 1
+    R.audit(db, actor, "cntt", "don_du_toan_suy_nguoc_vietrip", "vietrip", after={"so_tour": n})
+    db.commit()
+    return {"tours": n, "message": f"Đã xóa dự toán suy ngược từ quyết toán ở {n} tour nhập từ Vietrip – "
+                                   f"hệ thống chuyển sang dùng cơ cấu chi phí sản phẩm làm dự toán tham chiếu"}
 
 
 def apply_bookings(db: Session, limit: int = 400) -> int:

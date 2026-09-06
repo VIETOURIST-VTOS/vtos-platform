@@ -105,7 +105,7 @@ def build(db: Session, u: User) -> dict:
     if role in ("tp_dh", "nv_dh", "chutich", "tgd"):
         d7 = int(R.get_param(db, "moc_d7")); rows = []
         for t in db.execute(select(Tour).where(Tour.status == "da_duyet", Tour.start_date >= today, Tour.start_date <= today + timedelta(days=21))).scalars():
-            c = R.calc(t, R.get_param(db, "nguong_bien", t.start_date)); left = (t.start_date - today).days
+            c = R.calc_db(db, t, R.get_param(db, "nguong_bien", t.start_date)); left = (t.start_date - today).days
             rows.append({"code": t.code, "start": t.start_date, "days_left": left, "booked": R.booked_pax(t), "breakeven": c["breakeven_pax"], "below": R.booked_pax(t) < (c["breakeven_pax"] or 0)})
         sec["sap_khoi_hanh"] = sorted(rows, key=lambda r: r["days_left"])
         sec["qua_han_qt"] = [{"code": t.code, "deadline": R.settlement_deadline(db, t)} for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.end_date < today).order_by(desc(Tour.end_date)).limit(400)).scalars() if today > R.settlement_deadline(db, t)][:100]
@@ -142,7 +142,7 @@ def compose(db: Session, kind: str) -> tuple[str, dict]:
                   f"- Cảnh báo mở: {len(alerts)} (đỏ: {data['alerts_red']})"] + [f"  - [{a.level}] {a.message}" for a in alerts[:8]]
     elif kind == "tuan":
         w = FIN.weekly_finance(db); fc = FIN.forecast_13w(db)
-        d7 = [t for t in db.execute(select(Tour).where(Tour.status == "da_duyet")).scalars() if 0 <= (t.start_date - today).days <= 7 and R.booked_pax(t) < (R.calc(t, R.get_param(db, "nguong_bien"))["breakeven_pax"] or 0)]
+        d7 = [t for t in db.execute(select(Tour).where(Tour.status == "da_duyet")).scalars() if 0 <= (t.start_date - today).days <= 7 and R.booked_pax(t) < (R.calc_db(db, t, R.get_param(db, "nguong_bien"))["breakeven_pax"] or 0)]
         qh = [t for t in db.execute(select(Tour).where(Tour.status == "ket_thuc")).scalars() if today > R.settlement_deadline(db, t)]
         bk = [b for b in db.execute(select(Booking)).scalars() if (today - b.created_at.date()).days < 7]
         data.update({"tien": w["cash"], "no_vay": w["total_loans"], "phai_thu": w["receivables_total"], "dau_tu": w["investments_total"], "wip_154": w["wip_154"], "accrued_335": w["accrued_335"],

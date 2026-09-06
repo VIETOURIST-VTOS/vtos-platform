@@ -62,16 +62,29 @@ function MisaPanel({ toast, isKT }: { toast: (m: string, e?: boolean) => void; i
   </>;
 }
 
-function BctcPanel({ toast }: { toast: (m: string, e?: boolean) => void }) {
-  const [upto, setUpto] = useState("2026-06-30");
-  const [since, setSince] = useState("2026-01-01");
+/** Kỳ hiệu lực của cả màn hình quyết định khoảng ngày báo cáo (B6 – Ý kiến thẩm định 06/9/2026):
+ *  BCTC lũy kế từ 01/01 của năm thuộc kỳ đến ngày cuối kỳ. Kế toán có thể đổi tay, khi đó hiện cảnh báo lệch. */
+function rangeOfPeriod(period: string) {
+  const [y, m] = period.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  return { since: `${y}-01-01`, upto: last };
+}
+
+function BctcPanel({ toast, period }: { toast: (m: string, e?: boolean) => void; period: string }) {
+  const def = rangeOfPeriod(period);
+  const [upto, setUpto] = useState(def.upto);
+  const [since, setSince] = useState(def.since);
   const [rep, setRep] = useState<any>(null);
   const load = () => api(`/reports/bctc?upto=${upto}&since=${since}`).then(setRep).catch((x) => toast(errMsg(x), true));
-  useEffect(() => { load(); }, []);
+  useEffect(() => { const d = rangeOfPeriod(period); setSince(d.since); setUpto(d.upto); }, [period]);
+  useEffect(() => { load(); }, [since, upto]); // eslint-disable-line
+  const lech = since !== def.since || upto !== def.upto;
   const row = (r: any) => <tr key={r.code + r.name} style={{ fontWeight: r.group ? 700 : 400 }}><td>{r.name}</td><td className="mono">{r.code}</td><td className="muted">{r.note}</td><td style={{ textAlign: "right" }}>{r.now === null ? "" : vnd(r.now)}</td><td style={{ textAlign: "right" }}>{r.prev === null ? "" : vnd(r.prev)}</td></tr>;
   return <>
     <p className="muted">Mẫu Thông tư 99/2025 đúng cấu trúc bộ đã nộp UBCK: mỗi tài khoản chi tiết ánh xạ mã chỉ tiêu (dư Nợ / dư Có); 131, 331, 1388, 3388, 141 xét theo từng đối tượng; lãi/lỗ chưa kết chuyển cộng vào 420.</p>
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><label>Từ <input type="date" value={since} onChange={(e) => setSince(e.target.value)} /></label><label>đến <input type="date" value={upto} onChange={(e) => setUpto(e.target.value)} /></label><button className="act" onClick={load}>Lập báo cáo</button><button className="act grey" onClick={() => dl(`/reports/bctc.xlsx?upto=${upto}&since=${since}`, `BCTC_TT99_${upto}.xlsx`)}>Xuất Excel (bố cục UBCK)</button>{rep && (rep.balanced ? <Tag cls="ok">Cân: 280 = 440</Tag> : <Tag cls="red">LỆCH 280 ≠ 440</Tag>)}</div>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><label>Từ <input type="date" value={since} onChange={(e) => setSince(e.target.value)} /></label><label>đến <input type="date" value={upto} onChange={(e) => setUpto(e.target.value)} /></label><button className="act" onClick={load}>Lập báo cáo</button><button className="act grey" onClick={() => dl(`/reports/bctc.xlsx?upto=${upto}&since=${since}`, `BCTC_TT99_${upto}.xlsx`)}>Xuất Excel (bố cục UBCK)</button>{rep && (rep.balanced ? <Tag cls="ok">Cân: 280 = 440</Tag> : <Tag cls="red">LỆCH 280 ≠ 440</Tag>)}
+      {lech ? <Tag cls="warn">Khoảng ngày khác kỳ {period} đang chọn ({fmtD(def.since)}–{fmtD(def.upto)})</Tag> : <Tag>Theo kỳ {period}</Tag>}
+      {lech && <button className="act grey" style={{ margin: 0 }} onClick={() => { setSince(def.since); setUpto(def.upto); }}>Về đúng kỳ</button>}</div>
     {rep && <>
       <h2>Báo cáo tình hình tài chính – tại {fmtD(rep.upto)} (so với {fmtD(rep.compare_upto)})</h2>
       <div className="panel wrap"><table><thead><tr><th>Chỉ tiêu</th><th>Mã</th><th>TM</th><th>Số cuối kỳ</th><th>Số đầu năm</th></tr></thead><tbody>{rep.thtc.map(row)}</tbody></table></div>
@@ -202,7 +215,7 @@ function Accounting() {
     </>}
 
     {tab === "misa" && <MisaPanel toast={toast} isKT={isKT || user?.role === "cntt"} />}
-    {tab === "bctc" && <BctcPanel toast={toast} />}
+    {tab === "bctc" && <BctcPanel toast={toast} period={period} />}
 
     {tab === "periods" && <div className="panel wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Khóa bởi</th><th>Lúc</th><th>Ghi chú</th>{isKT && <th></th>}</tr></thead>
       <tbody>{periods.map((p) => <tr key={p.period}><td><b>{p.period}</b></td><td>{p.locked ? <Tag cls="navy">Đã khóa</Tag> : <Tag cls="ok">Mở</Tag>}</td><td>{p.locked_by}</td><td>{fmtDT(p.locked_at)}</td><td className="muted">{p.note}</td>

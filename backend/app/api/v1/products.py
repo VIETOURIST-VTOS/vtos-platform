@@ -108,9 +108,25 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
                      for d in db.execute(select(DispatchOrder).where(DispatchOrder.tour_id == t.id)).scalars()]
     v["events"] = [{"id": e.id, "step": e.step, "title": e.title, "note": e.note, "actor": e.actor, "source": e.source, "at": e.at}
                    for e in db.execute(select(TourEvent).where(TourEvent.tour_id == t.id).order_by(desc(TourEvent.at), desc(TourEvent.id))).scalars()]
+    # B3 – Ý kiến thẩm định 06/9/2026: chi phí trên đầu trang là chi phí ĐÃ GHI NHẬN, không phải giá vốn
+    # đầy đủ của chuyến. Với tour đang bán chưa có dòng quyết toán, số này gần 0 nên "lợi nhuận" xấp xỉ
+    # toàn bộ doanh thu – phải ghi rõ là TẠM TÍNH và cảnh báo ngay cạnh chỉ tiêu.
     v["summary"] = {"revenue_booking": sum(b["amount"] - b["discount"] for b in v["bookings"] if not b["cancelled"]), "collected": sum(b["paid"] for b in v["bookings"]),
                     "cost_actual": v["cost_total"]["actual"] or t.actual_cost, "cost_paid": sum(r.amount for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.status == "da_chi")).scalars())}
     v["summary"]["profit"] = (t.actual_revenue or v["summary"]["revenue_booking"]) - v["summary"]["cost_actual"]
+    confirmed = t.status in ("kt_xac_nhan", "khoa")
+    n_lines = len(lines)
+    v["summary"]["cost_lines"] = n_lines
+    v["summary"]["profit_state"] = "xac_nhan" if confirmed else "tam_tinh"
+    v["summary"]["cost_basis"] = ("quyet_toan" if n_lines else ("tong_hop_vietrip" if t.actual_cost else "chua_co"))
+    if confirmed:
+        v["summary"]["warning"] = ""
+    elif not n_lines and not t.actual_cost:
+        v["summary"]["warning"] = "Chuyến chưa có dòng chi phí quyết toán – lợi nhuận chỉ là chênh lệch doanh thu trừ chi phí đã ghi nhận, KHÔNG phải lợi nhuận của chuyến"
+    elif t.end_date >= date.today():
+        v["summary"]["warning"] = "Chuyến chưa kết thúc – chi phí còn phát sinh, lợi nhuận là số tạm tính"
+    else:
+        v["summary"]["warning"] = "Quyết toán chưa được Kế toán xác nhận – lợi nhuận là số tạm tính"
     from app.models.core import AuditLog
     v["audit"] = [{"id": l.id, "ts": l.ts, "actor": l.actor, "role": l.role, "action": l.action, "before": l.before, "after": l.after}
                   for l in db.execute(select(AuditLog).where(AuditLog.entity == f"tour:{t.code}").order_by(desc(AuditLog.id)).limit(100)).scalars()]

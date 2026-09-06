@@ -43,9 +43,10 @@ function TourDetail() {
       <div className="kpi"><b>{t.seats.booked}/{t.seats.open || t.planned_pax}</b><span>Đã bán / mở bán · còn {t.seats.left}</span></div>
       <div className="kpi"><b>{vnd(bookedAmount)}</b><span>Doanh thu booking</span></div>
       <div className="kpi"><b>{vnd(sm.collected)}</b><span>Đã thu</span></div>
-      <div className="kpi"><b>{vnd(sm.cost_actual)}</b><span>Chi phí thực tế (quyết toán)</span></div>
-      <div className="kpi"><b style={{ color: sm.profit < 0 ? "var(--red)" : undefined }}>{vnd(sm.profit)}</b><span>Lợi nhuận ước</span></div>
+      <div className="kpi"><b>{vnd(sm.cost_actual)}</b><span>Chi phí đã ghi nhận{sm.cost_lines ? ` (${sm.cost_lines} dòng quyết toán)` : sm.cost_basis === "tong_hop_vietrip" ? " (tổng hợp Vietrip)" : " (chưa có dòng nào)"}</span></div>
+      <div className="kpi"><b style={{ color: sm.profit < 0 ? "var(--red)" : undefined }}>{vnd(sm.profit)}</b><span>{sm.profit_state === "xac_nhan" ? "Lợi nhuận đã xác nhận" : "Lợi nhuận tạm tính"}</span></div>
     </div>
+    {sm.warning && <Gate ok={false}>{sm.warning}</Gate>}
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{tabs.map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
 
     {tab === "info" && <div className="grid">
@@ -100,10 +101,13 @@ function TourDetail() {
           <tr><td>Số khách hòa vốn</td><td className="num"><b>{c.breakeven_pax ?? "–"}</b></td></tr>
           <tr><td>Số khách đạt biên {pct(c.threshold)}</td><td className="num"><b>{c.pax_for_margin ?? "–"}</b></td></tr>
           <tr><td>Doanh thu kế hoạch</td><td className="num">{vnd(c.revenue)}</td></tr>
-          <tr><td>Giá vốn kế hoạch (cố định {vnd(t.fixed_cost)} + {vnd(t.var_cost_per_pax)}/khách)</td><td className="num">{vnd(c.cost)}</td></tr>
-          <tr><td>Lợi nhuận / biên kế hoạch</td><td className="num">{vnd(c.profit)} · <b>{pct(c.margin)}</b></td></tr>
+          <tr><td>Giá vốn kế hoạch (cố định {vnd(c.fixed_cost)} + {vnd(c.var_cost_per_pax)}/khách)</td><td className="num">{c.has_cost ? vnd(c.cost) : <span className="muted">chưa có</span>}</td></tr>
+          <tr><td>Lợi nhuận / biên kế hoạch</td><td className="num">{c.complete ? <>{vnd(c.profit)} · <b>{pct(c.margin)}</b></> : <span className="muted">chưa đủ cơ sở tính</span>}</td></tr>
         </tbody></table>
-        <Gate ok={c.pass_gate}>CỔNG 1 – Biên {pct(c.threshold)}: {c.pass_gate ? `ĐẠT → ${ROLES[t.approver_role]} duyệt` : "KHÔNG ĐẠT → giải trình + 2 chữ ký Chủ tịch và TGĐ"}</Gate>
+        <Gate ok={c.gate_state === "chua_du_co_so" ? null : c.pass_gate}>CỔNG 1 – Biên {pct(c.threshold)}: {c.gate_state === "chua_du_co_so"
+          ? "CHƯA ĐỦ CƠ SỞ TÍNH – dự toán thiếu giá vốn. Thiếu chi phí không phải là chi phí bằng 0: cổng không thể ĐẠT khi chưa có giá vốn."
+          : c.pass_gate ? `ĐẠT → ${ROLES[t.approver_role]} duyệt` : "KHÔNG ĐẠT → giải trình + 2 chữ ký Chủ tịch và TGĐ"}</Gate>
+        <p className="muted">Nguồn dự toán: <b>{c.budget_source_label}</b>{c.budget_source === "san_pham" && " – chuyến chưa có dự toán riêng, đang lấy cơ cấu chi phí sản phẩm làm tham chiếu"}</p>
         {t.product && <p className="muted">Cơ cấu chi phí sản phẩm {t.product.code}: cố định {vnd(t.product.fixed_cost)} · theo khách {vnd(t.product.var_cost_per_pax)} · giá tham khảo {vnd(t.product.reference_price)}</p>}
       </div>
       <div className="panel"><h2>Sửa dự toán</h2>
@@ -182,7 +186,7 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
       <div className="kpi"><b>{vnd(sm.revenue)}</b><span>Tổng thu (booking)</span></div>
       <div className="kpi"><b>{vnd(sm.actual)}</b><span>Tổng chi (dòng NCC)</span></div>
       <div className="kpi"><b style={{ color: sm.profit < 0 ? "var(--red)" : undefined }}>{vnd(sm.profit)} · {pct(sm.margin)}</b><span>Lợi nhuận</span></div>
-      <div className="kpi"><b style={{ color: sm.variance > 0 ? "var(--red)" : undefined }}>{vnd(sm.variance)} ({pct(sm.variance_pct)})</b><span>Lệch so dự toán {sm.budget_source === "dong" ? "(theo dòng)" : "(3 con số)"} {vnd(sm.budget)}</span></div>
+      <div className="kpi"><b style={{ color: sm.variance > 0 ? "var(--red)" : undefined }}>{vnd(sm.variance)} ({pct(sm.variance_pct)})</b><span>{sm.has_budget ? <>Lệch so dự toán ({sm.budget_source_label}) {vnd(sm.budget)}</> : "Chưa có dự toán để so sánh"}</span></div>
       <div className="kpi"><b>{sm.with_doc || 0}/{sm.lines || 0}</b><span>Dòng có chứng từ</span></div>
     </div>
     {checks.length > 0 && <div style={{ marginBottom: 8 }}>{checks.map((c, i) => <Gate key={i} ok={c.level === "info"}>{c.level === "block" ? "CHẶN ĐÓNG SỐ – " : c.level === "warn" ? "Lưu ý – " : ""}{c.msg}</Gate>)}</div>}

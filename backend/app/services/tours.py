@@ -18,7 +18,7 @@ def snap(t: Tour) -> dict:
 
 def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
     thr = R.get_param(db, "nguong_bien", t.start_date)
-    c = R.calc(t, thr)
+    c = R.calc_db(db, t, thr)
     s = R.settlement_summary(db, t) if t.status in ("da_dong_so", "kt_xac_nhan", "khoa") else None
     bk = R.booked_pax(t)
     days_left = (t.start_date - date.today()).days
@@ -92,9 +92,12 @@ def edit(db: Session, u: User, t: Tour, data) -> Tour:
 def submit(db: Session, u: User, t: Tour, note: str = "") -> str:
     if u.role not in ("nv_dh", "tp_dh"): raise HTTPException(403, "Chỉ Điều hành trình dự toán")
     if t.status != "nhap": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
-    c = R.calc(t, R.get_param(db, "nguong_bien", t.start_date))
+    c = R.calc(t, R.get_param(db, "nguong_bien", t.start_date))   # bước trình: dùng đúng số Điều hành nhập, không mượn dự toán sản phẩm
     if not c["complete"]:
-        raise Gate("CONG_5", "Thiếu 3 con số dự toán: giá bán, số khách, chi phí cố định/theo khách phải > 0 và giá bán > chi phí theo khách")
+        thieu = [n for n, ok in (("giá bán/khách", t.price_per_pax > 0), ("số khách dự toán", t.planned_pax > 0),
+                                 ("chi phí cố định hoặc chi phí theo khách", c["has_cost"]),
+                                 ("giá bán phải lớn hơn chi phí theo khách", c["breakeven_pax"] is not None)) if not ok]
+        raise Gate("CONG_5", "Dự toán chưa đủ cơ sở tính, thiếu: " + "; ".join(thieu) + ". Không có giá vốn thì không tính được biên – cổng biên không thể ĐẠT")
     if not t.rest_stops.strip():
         raise Gate("CONG_5", "Dự toán phải ghi điểm dừng nghỉ (ĐH Điều 11)")
     if not c["pass_gate"] and len(t.justification.strip()) < 30:
@@ -214,8 +217,18 @@ def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, st
     t = db.get(Tour, r.tour_id)
     if t.status != "da_duyet": raise Gate("CONG_1", "Tour chưa được duyệt dự toán, không thể tạo booking")
     thr = R.get_param(db, "nguong_bien", t.start_date)
+    cb = R.calc_db(db, t, thr)
+    if not cb["complete"]:
+        # Chuyến do VTOS lập phải có dự toán mới được bán; chuyến nhập từ Vietrip đang bán thì ghi cảnh báo
+        # (chặn cứng sẽ đóng băng hơn 1.200 tour đang chạy – việc bổ sung dự toán thuộc Đợt 1 kế hoạch điều chỉnh).
+        if not t.imported:
+            raise Gate("CONG_1", "Chuyến chưa có dự toán đủ cơ sở tính (thiếu giá vốn) – không mở bán được")
+        if not db.execute(select(Alert).where(Alert.kind == "thieu_du_toan", Alert.ref == t.code, Alert.resolved == False)).scalars().first():
+            db.add(Alert(kind="thieu_du_toan", level="warn", ref=t.code,
+                         message=f"{t.code} đang bán nhưng chưa có dự toán ({R.BUDGET_SOURCES['chua_co']}) – không đánh giá được biên, cần Điều hành bổ sung",
+                         to_roles="tp_dh,nv_dh,gd_kd,tgd"))
     if r.discount > 0:
-        c = R.calc(t, thr)
+        c = cb
         nr = c["revenue"] - r.discount
         nm = (nr - c["cost"]) / nr if nr > 0 else 0
         if nm < thr:

@@ -12,13 +12,19 @@ function Bookings() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const [rows, setRows] = useState<any[]>([]); const [q, setQ] = useState(""); const [st, setSt] = useState("due");
+  const [cnt, setCnt] = useState<any>({ total: null, filtered: null }); const [page, setPage] = useState(0);
+  const PAGE = 300;
   const [ret, setRet] = useState<any>({ summary: {}, rows: [] }); const [rst, setRst] = useState("hieu_luc");
   const [edit, setEdit] = useState<any>(null); const [cancel, setCancel] = useState<any>(null); const [apply, setApply] = useState<any>(null); const [cands, setCands] = useState<any[]>([]);
   const openApply = (r: any) => { setApply(r); api(`/bookings?status=due&limit=50&q=${encodeURIComponent(r.customer_phone || r.customer_name)}`).then((x) => setCands(x.filter((b: any) => b.id !== r.booking_id))).catch(() => setCands([])); };
   const load = useCallback(() => {
-    api(`/bookings?limit=300&q=${encodeURIComponent(q)}&status=${st}`).then(setRows).catch((e) => toast(errMsg(e), true));
+    api(`/bookings?limit=${PAGE}&offset=0&q=${encodeURIComponent(q)}&status=${st}`).then((x) => { setRows(x); setPage(0); }).catch((e) => toast(errMsg(e), true));
+    api(`/bookings/count?q=${encodeURIComponent(q)}&status=${st}`).then(setCnt).catch(() => setCnt({ total: null, filtered: null }));
     api(`/retentions?status=${rst}`).then(setRet).catch(() => {});
   }, [q, st, rst, toast]);
+  const more = async () => {
+    try { const x = await api(`/bookings?limit=${PAGE}&offset=${(page + 1) * PAGE}&q=${encodeURIComponent(q)}&status=${st}`); setRows((r) => [...r, ...x]); setPage((p) => p + 1); } catch (e) { toast(errMsg(e), true); }
+  };
   useEffect(() => { load(); }, [load]);
   const isDH = ["nv_dh", "tp_dh"].includes(role), canUnlock = ["tp_dh", "gd_kd", "cntt", "tgd"].includes(role), canRt = ["nv_dh", "tp_dh", "ketoan"].includes(role), canRtCancel = ["tp_dh", "gd_kd", "tgd", "ketoan"].includes(role);
   const run = async (path: string, json: any, ok?: string) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || ok || "Xong"); load(); return true; } catch (e) { toast(errMsg(e), true); return false; } };
@@ -46,7 +52,8 @@ function Bookings() {
         <label>Trạng thái<select value={st} onChange={(e) => setSt(e.target.value)}><option value="due">Còn phải thu</option><option value="unpaid">Chưa cọc</option><option value="depo">Đã cọc</option><option value="paid">Đủ tiền</option><option value="locked">Đã khóa</option><option value="cancelled">Đã hủy</option><option value="">Tất cả</option></select></label>
         {(isDH || ["gd_kd", "ketoan", "cntt", "tgd"].includes(role)) && <button className="act grey" style={{ margin: 0 }} onClick={() => run("/bookings/check", {}, "Đã chạy kiểm tra cọc – deadline – khóa")}>Chạy robot R4 ngay</button>}
       </div>
-      <h2 style={{ marginTop: 10 }}>Booking ({rows.length})</h2>
+      <h2 style={{ marginTop: 10 }}>Booking – đang xem {rows.length}{cnt.filtered != null && <> / thỏa bộ lọc <b>{cnt.filtered.toLocaleString("vi-VN")}</b> / tổng toàn hệ thống <b>{cnt.total.toLocaleString("vi-VN")}</b></>}</h2>
+      {cnt.filtered != null && rows.length < cnt.filtered && <p className="muted">Đang hiển thị {rows.length} dòng mới nhất – <b>không dùng số này làm tổng</b>. <button className="act grey" style={{ margin: 0 }} onClick={more}>Tải thêm {PAGE} dòng</button></p>}
       <table><thead><tr><th>Mã</th><th>Tour · KH</th><th>Khách</th><th className="num">Pax</th><th className="num">Tiền</th><th className="num">Cọc {""}</th><th className="num">Đã thu</th><th className="num">Còn lại</th><th>Trạng thái</th><th>Deadline hủy chỗ</th><th>Khóa</th><th>Sale</th><th></th></tr></thead>
         <tbody>{rows.length ? rows.map((b) => { const [pl, pc] = PMT[b.pmt_status] || [b.pmt_status, ""]; return <tr key={b.id} style={{ opacity: b.cancelled ? 0.55 : 1 }}>
           <td><b>{b.code}</b><div className="muted">{fmtDT(b.created_at)}</div></td>

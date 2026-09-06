@@ -63,6 +63,13 @@ def _dates(data: SyncIn):
     return f, t
 
 
+@router.post("/import/vietrip/repair-budget")
+def repair_budget(u: User = Depends(require_roles(*SYNC_ROLES)), db: Session = Depends(get_db)):
+    """Chạy MỘT LẦN sau khi triển khai bản sửa B2: xóa dự toán được suy ngược từ dòng quyết toán
+    ở các tour nhập từ Vietrip, để dự toán và thực chi là hai số độc lập."""
+    return VT.repair_derived_budgets(db, u.username)
+
+
 @router.post("/import/vietrip/sync")
 def vietrip_sync(data: SyncIn, u: User = Depends(require_roles("cntt", "ketoan")), db: Session = Depends(get_db)):
     from app.services import vietrip_client as VC

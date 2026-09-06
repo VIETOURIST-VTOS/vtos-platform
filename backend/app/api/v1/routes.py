@@ -243,10 +243,7 @@ def create_booking(rid: int, u: User = Depends(current_user), db: Session = Depe
     return {"booking": booking_out(b), "message": msg}
 
 
-@router.get("/bookings", tags=["bookings"])
-def list_bookings(limit: int = 100, q: str = "", status: str = "", tour_id: int | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    """status: unpaid / depo / paid / cancelled / locked / due (còn phải thu, chưa hủy)."""
-    AC.require(u, AC.BOOKING_ROLES, "danh sách booking")
+def _bookings_query(db: Session, u: User, q: str, status: str, tour_id: int | None):
     qs = select(Booking).order_by(desc(Booking.created_at))
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: qs = qs.where(Booking.sales_id.in_(vis))   # NV KD: của mình; trưởng nhóm: của nhóm
@@ -258,7 +255,26 @@ def list_bookings(limit: int = 100, q: str = "", status: str = "", tour_id: int 
     elif status == "locked": qs = qs.where(Booking.locked == True, Booking.cancelled == False)
     elif status in ("unpaid", "depo", "paid"): qs = qs.where(Booking.pmt_status == status.upper(), Booking.cancelled == False)
     elif status == "due": qs = qs.where(Booking.cancelled == False, Booking.pmt_status != "PAID")
-    return [booking_out(b) for b in db.execute(qs.limit(min(limit, 1000))).scalars()]
+    return qs
+
+
+@router.get("/bookings", tags=["bookings"])
+def list_bookings(limit: int = 100, offset: int = 0, q: str = "", status: str = "", tour_id: int | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """status: unpaid / depo / paid / cancelled / locked / due (còn phải thu, chưa hủy).
+    Danh sách có phân trang – tổng số lấy ở /bookings/count, KHÔNG suy từ số dòng đang hiển thị (B7)."""
+    AC.require(u, AC.BOOKING_ROLES, "danh sách booking")
+    qs = _bookings_query(db, u, q, status, tour_id)
+    return [booking_out(b) for b in db.execute(qs.offset(offset).limit(min(limit, 1000))).scalars()]
+
+
+@router.get("/bookings/count", tags=["bookings"])
+def count_bookings(q: str = "", status: str = "", tour_id: int | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Tổng số booking trong phạm vi người dùng được xem và số thỏa bộ lọc – để giao diện không lấy
+    số dòng đang tải làm tổng toàn hệ thống (Ý kiến thẩm định 06/9/2026, B7)."""
+    AC.require(u, AC.BOOKING_ROLES, "danh sách booking")
+    def n(query):
+        return db.execute(select(func.count()).select_from(query.order_by(None).subquery())).scalar() or 0
+    return {"total": n(_bookings_query(db, u, "", "", None)), "filtered": n(_bookings_query(db, u, q, status, tour_id))}
 
 
 def _booking(db: Session, bid: int) -> Booking:
