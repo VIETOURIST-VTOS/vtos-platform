@@ -21,7 +21,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Hợp đồng", ""], ["Báo cáo bán hàng", "/sales-reports"]] },
   { key: "dieuhanh", label: "4. Điều hành", items: [
     ["Yêu cầu chờ xử lý", "/requests"], ["Chuyến tour & dự toán", "/tours"], ["Nhà cung cấp & đặt dịch vụ", ""],
-    ["Hồ sơ visa", "/ops?tab=visa"], ["HDV & phân chuyến", "/ops?tab=guides"], ["Đội xe", "/ops?tab=fleet"],
+    ["Hồ sơ visa", "/visa"], ["HDV & phân chuyến", "/ops?tab=guides"], ["Đội xe", "/ops?tab=fleet"],
     ["Sự cố tour", ""], ["Quyết toán tour", "/tours"]] },
   { key: "taichinh", label: "5. Tài chính & Kế toán", items: [
     ["Thu & đối soát", "/collections"], ["Đề nghị chi & thanh toán", "/expenses"], ["Công nợ", ""],

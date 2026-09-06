@@ -23,6 +23,7 @@ from app.api.v1.nonpackage import router as nonpackage_router
 from app.api.v1.sales_reports import router as sales_reports_router
 from app.api.v1.crm import router as crm_router
 from app.api.v1.inbox import router as inbox_router
+from app.api.v1.visa import router as visa_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -50,6 +51,8 @@ async def lifespan(app: FastAPI):
     try:
         R.seed_params(db)
         ACC.seed_accounts(db)
+        from app.services.visa import seed_visa
+        seed_visa(db)          # thị trường UK + mẫu checklist UK (phạm vi đầu tiên của phân hệ Visa)
         if settings.SEED_DEMO:
             seed_all(db)
     finally:
@@ -91,6 +94,7 @@ app.include_router(hrm_router)
 app.include_router(ops_router)
 app.include_router(finance_router)
 app.include_router(vietrip_router)
+app.include_router(visa_router)
 
 
 @app.get("/", include_in_schema=False)

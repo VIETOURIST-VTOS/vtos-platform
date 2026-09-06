@@ -10,3 +10,4 @@ mobile/android/
 mobile/ios/
 infra/backups/*.sql.gz
 .DS_Store
+backend/visa_docs/

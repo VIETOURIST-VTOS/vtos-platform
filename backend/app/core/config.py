@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     SEED_DEMO: bool = True
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
     TZ: str = "Asia/Ho_Chi_Minh"
+    # Nơi lưu tài liệu hồ sơ Visa. Ổ đĩa của Render là TẠM – mất khi deploy lại. Trước khi dùng thật phải trỏ
+    # vào ổ đĩa gắn kèm (Render Disk) hoặc thay bằng S3. Hệ thống lưu sha256 nên phát hiện được tệp mất/đổi.
+    VISA_DOC_DIR: str = ""
+    # Nơi lưu tài liệu hồ sơ Visa. Ổ đĩa Render là TẠM (mất khi deploy lại) – trước khi dùng thật phải trỏ
+    # vào Render Disk gắn kèm hoặc thay bằng S3. Hệ thống lưu sha256 nên phát hiện được tệp mất/đổi.
+    VISA_DOC_DIR: str = ""
     SEPAY_WEBHOOK_KEY: str = ""            # khóa đặt trong SePay → Webhook → Authorization: Apikey <key>
     SEPAY_API_TOKEN: str = ""              # token User API (my.sepay.vn → Cấu hình → API Access) để VTOS kéo giao dịch
     SEPAY_ACCOUNT_NUMBER: str = ""
