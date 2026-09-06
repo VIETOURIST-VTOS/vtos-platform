@@ -40,12 +40,21 @@ def get_or_create(db: Session, channel: str, external_id: str, page_id: str = ""
     return c
 
 
-def inbound(db: Session, channel: str, external_id: str, text: str, page_id: str = "", name: str = "", ext_msg_id: str = "", attachments: list | None = None) -> Message:
+STALE_MINUTES = 120   # tin cũ hơn 2 giờ (nạp bù từ Graph) không tính SLA, không để AI trả lời
+
+
+def inbound(db: Session, channel: str, external_id: str, text: str, page_id: str = "", name: str = "", ext_msg_id: str = "", attachments: list | None = None, at: datetime | None = None) -> Message:
     c = get_or_create(db, channel, external_id, page_id, name)
     if ext_msg_id and db.execute(select(Message).where(Message.external_id == ext_msg_id)).scalars().first(): return None
     m = Message(conversation_id=c.id, direction="in", sender="khach", sender_name=c.customer_name, text=(text or "")[:4000], attachments=attachments or [], external_id=ext_msg_id[:80])
-    db.add(m); now = datetime.now()
-    c.last_in_at = now; c.unanswered = True; c.status = "cho_sale"; c.sla_due_at = now + timedelta(minutes=sla_minutes(db, now))
+    if at: m.created_at = at
+    db.add(m); now = datetime.now(); when = at or now
+    if c.last_in_at is None or when >= c.last_in_at:
+        c.last_in_at = when
+        if now - when <= timedelta(minutes=STALE_MINUTES):
+            c.unanswered = True; c.status = "cho_sale"; c.sla_due_at = when + timedelta(minutes=sla_minutes(db, when))
+        else:   # tin cũ nạp bù: chỉ lưu lịch sử
+            c.unanswered = False; c.sla_due_at = None
     import re
     mph = re.search(r"(?<!\d)(0\d{9}|84\d{9})(?!\d)", (text or "").replace(".", "").replace(" ", "")) or re.search(r"(?<!\d)(0\d{9})(?!\d)", text or "")
     ph = norm_phone(mph.group(1)) if mph else ""
@@ -157,15 +166,19 @@ def fb_profile(psid: str) -> str:
     except Exception: return ""
 
 
-def outbound_external(db: Session, channel: str, external_id: str, text: str, page_id: str = "", ext_msg_id: str = "", app_id: str = "") -> Message | None:
+def outbound_external(db: Session, channel: str, external_id: str, text: str, page_id: str = "", ext_msg_id: str = "", app_id: str = "", at: datetime | None = None) -> Message | None:
     """Tin do Page gửi qua công cụ khác (chatbot, Fanpage inbox, app khác) – echo/standby: ghi nhận là đã trả lời để SLA không báo sai."""
     c = db.execute(select(Conversation).where(Conversation.channel == channel, Conversation.external_id == external_id)).scalars().first()
     if not c: return None
     if ext_msg_id and db.execute(select(Message).where(Message.external_id == ext_msg_id)).scalars().first(): return None
     who = "chatbot/app khác" if app_id and app_id != str(settings.FB_APP_ID or "") else "Page (ngoài VTOS)"
     m = Message(conversation_id=c.id, direction="out", sender="sale", sender_name=who, text=(text or "")[:4000], status="da_gui", external_id=ext_msg_id[:80])
-    db.add(m); now = datetime.now(); c.last_out_at = now; c.unanswered = False; c.sla_due_at = None
-    if c.status == "cho_sale": c.status = "mo"
+    if at: m.created_at = at
+    db.add(m); when = at or datetime.now()
+    if c.last_out_at is None or when >= c.last_out_at: c.last_out_at = when
+    if c.last_in_at is None or when >= c.last_in_at:   # Page trả lời sau tin khách → đã trả lời
+        c.unanswered = False; c.sla_due_at = None
+        if c.status == "cho_sale": c.status = "mo"
     db.commit(); db.refresh(m); return m
 
 
@@ -268,13 +281,18 @@ def fb_poll(db: Session, limit: int = 25) -> dict:
         for m in msgs:
             frm = str((m.get("from") or {}).get("id") or ""); mid = m.get("id") or ""
             text = m.get("message") or ""
+            at = None
+            try:
+                ct = m.get("created_time") or ""
+                at = datetime.strptime(ct[:19], "%Y-%m-%dT%H:%M:%S") if ct else None   # Graph trả UTC; máy chủ cũng chạy UTC (datetime.now)
+            except ValueError: at = None
             atts = [{"type": a.get("mime_type", "file"), "url": (a.get("image_data") or {}).get("url") or a.get("file_url")} for a in (m.get("attachments") or {}).get("data", [])]
             if not text and atts: text = "[khách gửi tệp]" if frm != page_id else "[Page gửi tệp]"
             if not text: continue
             if frm == page_id:
-                if outbound_external(db, "facebook", psid, text, page_id, mid, "poll"): n_out += 1
+                if outbound_external(db, "facebook", psid, text, page_id, mid, "poll", at): n_out += 1
             else:
-                if inbound(db, "facebook", psid, text, page_id, name, mid, atts): n_in += 1
+                if inbound(db, "facebook", psid, text, page_id, name, mid, atts, at): n_in += 1
     return {"conversations": len(r["data"]), "new_in": n_in, "new_out": n_out}
 
 
@@ -286,7 +304,8 @@ def robot_check(db: Session) -> dict:
     except Exception as ex: poll = {"error": str(ex)[:200]}
     on = R.get_param(db, "ai_tra_loi_bat") >= 1
     for c in db.execute(select(Conversation).where(Conversation.unanswered == True, Conversation.sla_due_at != None, Conversation.sla_due_at <= now, Conversation.status != "dong")).scalars():
-        if on and not c.ai_off and c.ai_replies < 3:
+        stale = c.last_in_at is None or now - c.last_in_at > timedelta(minutes=STALE_MINUTES)
+        if on and not c.ai_off and c.ai_replies < 3 and not stale:
             text, src = draft_reply(db, c); _send(db, c, text, "ai", "Trợ lý AI Vietourist"); replied += 1
             c.summary = (c.summary + " | " if c.summary else "") + f"{now:%d/%m %H:%M} AI trả lời thay ({src})"
         ref = f"conv:{c.id}"

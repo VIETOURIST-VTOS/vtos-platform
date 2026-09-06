@@ -95,4 +95,14 @@ def test_fb_poll_fallback(monkeypatch):
     r = client.post("/api/v1/facebook/poll", headers=login("cntt")).json(); assert r["new_in"] == 1 and r["new_out"] == 1
     h = login("gd.kd"); c = next(x for x in client.get("/api/v1/inbox", headers=h).json() if x["external_id"] == "PSID900")
     assert c["customer_name"] == "Tuấn Trần" and c["unanswered"] is False
+    # tin cũ (nạp bù) khách nhắn sau cùng → không tính SLA, AI không trả lời; tin mới (vừa xong) → tính SLA
+    from datetime import datetime, timedelta
+    old = (datetime.now() - timedelta(hours=5, minutes=0)).strftime("%Y-%m-%dT%H:%M:%S+0000")
+    data["data"].append({"participants": {"data": [{"id": "PSID901", "name": "Khách Cũ"}, {"id": "PAGE1"}]}, "messages": {"data": [{"id": "mid.9", "message": "hỏi tour cũ", "from": {"id": "PSID901"}, "created_time": old}]}})
+    fresh = (datetime.now() - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%S+0000")
+    data["data"].append({"participants": {"data": [{"id": "PSID902", "name": "Khách Mới"}, {"id": "PAGE1"}]}, "messages": {"data": [{"id": "mid.10", "message": "hỏi tour mới", "from": {"id": "PSID902"}, "created_time": fresh}]}})
+    client.post("/api/v1/facebook/poll", headers=login("cntt"))
+    rows = {x["external_id"]: x for x in client.get("/api/v1/inbox", headers=h).json()}
+    assert rows["PSID901"]["unanswered"] is False and rows["PSID901"]["sla_due_at"] is None
+    assert rows["PSID902"]["unanswered"] is True and rows["PSID902"]["sla_due_at"]
     assert client.post("/api/v1/facebook/poll", headers=login("cntt")).json()["new_in"] == 0
