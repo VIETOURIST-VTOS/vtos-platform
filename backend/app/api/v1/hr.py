@@ -6,7 +6,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles
-from app.models.core import Tour, User
+from app.models.core import Tour, User, Company
 from app.models.hr import SALES_GROUPS, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, GuideRate, INCIDENT_LEVELS, INCIDENT_STATUS, DEPARTMENTS, POSITIONS, OFFICES
 from app.services import hr as H
 from app.services import rules as R
@@ -21,7 +21,8 @@ def emp_out(e: Employee) -> dict:
             "position": e.position, "position_name": POSITIONS.get(e.position, e.position), "title": e.title, "sales_group": e.sales_group, "office": e.office, "office_name": OFFICES.get(e.office, e.office),
             "contract_type": e.contract_type, "base_salary": e.base_salary, "start_date": e.start_date, "probation": e.probation, "transition_list": e.transition_list,
             "card_no": e.card_no, "card_type": e.card_type, "card_expiry": e.card_expiry, "member_org": e.member_org, "ctv_contract": e.ctv_contract,
-            "advance_limit": e.advance_limit, "active": e.active, "guide_ok": H.guide_eligible(e, date.today())[0] if e.department == "huong_dan" else None}
+            "advance_limit": e.advance_limit, "active": e.active, "company_id": e.company_id,
+            "guide_ok": H.guide_eligible(e, date.today())[0] if e.department == "huong_dan" else None}
 
 
 @router.get("/hr/meta")
@@ -31,7 +32,7 @@ def hr_meta(u: User = Depends(current_user)):
 
 # ---------- Hồ sơ nhân sự ----------
 @router.get("/employees")
-def employees(department: str | None = None, u: User = Depends(require_roles(*HR_READ)), db: Session = Depends(get_db)):
+def employees(department: str | None = None, u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
     q = select(Employee).order_by(Employee.department, Employee.code)
     if department: q = q.where(Employee.department == department)
     return [emp_out(e) for e in db.execute(q).scalars()]
@@ -216,7 +217,10 @@ def assign_update(aid: int, data: AssignUpdate, u: User = Depends(require_roles(
 @router.get("/vehicles")
 def vehicles(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
-    return [{"id": v.id, "plate": v.plate, "seats": v.seats, "kind": v.kind, "driver_id": v.driver_id, "driver": emps.get(v.driver_id, ""), "internal_rate_per_day": v.internal_rate_per_day, "active": v.active}
+    cos = {c.id: c for c in db.execute(select(Company)).scalars()}
+    return [{"id": v.id, "plate": v.plate, "seats": v.seats, "kind": v.kind, "driver_id": v.driver_id, "driver": emps.get(v.driver_id, ""),
+             "internal_rate_per_day": v.internal_rate_per_day, "active": v.active, "company_id": v.company_id,
+             "company": cos[v.company_id].name if v.company_id in cos else "", "company_code": cos[v.company_id].code if v.company_id in cos else ""}
             for v in db.execute(select(Vehicle).order_by(Vehicle.plate)).scalars()]
 
 
@@ -317,16 +321,27 @@ def rate_sign(rid: int, u: User = Depends(require_roles("chutich", "tgd")), db: 
     return {"message": "Đã ký" + (" – bảng giá có hiệu lực" if r.status == "active" else ", chờ chữ ký còn lại")}
 
 
+def _owner(v, cos: dict) -> dict:
+    """Xe của một pháp nhân trong phạm vi hợp nhất → lệnh điều xe là giao dịch nội bộ, phải loại trừ khi hợp nhất."""
+    c = cos.get(v.company_id) if v is not None and v.company_id else None
+    return {"company": c.name if c else "", "company_code": c.code if c else "",
+            "noi_bo": bool(c and c.in_group()),
+            "canh_bao": "" if c else "Xe chưa gán công ty chủ quản – chưa xác định được đây có phải giao dịch nội bộ hay không"}
+
+
 @router.get("/dispatch")
 def dispatch_list(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
-    veh = {v.id: v.plate for v in db.execute(select(Vehicle)).scalars()}
+    vobj = {v.id: v for v in db.execute(select(Vehicle)).scalars()}
+    veh = {i: v.plate for i, v in vobj.items()}
+    cos = {c.id: c for c in db.execute(select(Company)).scalars()}
     out = []
     for d in db.execute(select(DispatchOrder).order_by(desc(DispatchOrder.id))).scalars():
         t = db.get(Tour, d.tour_id)
         rt = db.get(VehicleRate, d.rate_id) if d.rate_id else None
         out.append({"id": d.id, "tour_code": t.code if t else "", "vehicle": veh.get(d.vehicle_id, ""), "driver": emps.get(d.driver_id, ""), "date_from": d.date_from, "date_to": d.date_to, "route": rt.route if rt else "",
-                    "days": (d.date_to - d.date_from).days + 1, "internal_price": d.internal_price, "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at, "incident_note": d.incident_note})
+                    "days": (d.date_to - d.date_from).days + 1, "internal_price": d.internal_price, "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at, "incident_note": d.incident_note,
+                    **_owner(vobj.get(d.vehicle_id), cos)})
     return out
 
 

@@ -24,6 +24,7 @@ class Employee(Base):
     sales_group: Mapped[str] = mapped_column(String(20), default="")      # KD1–KD5, VPCT, VPHN, VPBD, VPHP, DOAN_OB, DOAN_ND
     office: Mapped[str] = mapped_column(String(20), default="hcm")
     contract_type: Mapped[str] = mapped_column(String(10), default="hdld")   # hdld / ctv / doi_tac
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)   # pháp nhân chủ quản (HDV cộng tác viên ghi theo công ty ký hợp đồng)
     base_salary: Mapped[float] = mapped_column(Float, default=0)             # lương công việc (gắn chức vụ)
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     probation: Mapped[bool] = mapped_column(Boolean, default=False)          # thử việc 85%
@@ -81,6 +82,7 @@ class Vehicle(Base):
     plate: Mapped[str] = mapped_column(String(20), unique=True)
     seats: Mapped[int] = mapped_column(Integer, default=45)
     kind: Mapped[str] = mapped_column(String(10), default="noi_bo")            # noi_bo (Vietrip) / hop_tac (xe hợp tác hỗ trợ)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)   # pháp nhân sở hữu xe
     driver_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
     internal_rate_per_day: Mapped[float] = mapped_column(Float, default=0)   # dùng khi tuyến không có trong bảng giá
     active: Mapped[bool] = mapped_column(Boolean, default=True)

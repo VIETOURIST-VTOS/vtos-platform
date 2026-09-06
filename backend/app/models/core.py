@@ -4,6 +4,34 @@ from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, Text, Fo
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
+# ---------- Pháp nhân trong tập đoàn ----------
+COMPANY_KINDS = {"me": "Công ty mẹ", "con": "Công ty con", "lien_ket": "Công ty liên kết", "chi_nhanh": "Chi nhánh / đơn vị trực thuộc"}
+
+
+class Company(Base):
+    """Danh mục pháp nhân (Ý kiến thẩm định 06/9/2026, mục C1 và Đợt 2).
+
+    Đội xe thuộc Công ty TNHH Vận tải Vietrip – một pháp nhân riêng trong phạm vi hợp nhất – nên xe và
+    hướng dẫn viên phải ghi rõ công ty chủ quản; giao dịch thuê xe giữa hai pháp nhân trong tập đoàn là
+    giao dịch nội bộ, phải nhận diện để loại trừ khi lập báo cáo hợp nhất.
+    """
+    __tablename__ = "companies"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True)
+    name: Mapped[str] = mapped_column(String(200))
+    tax_code: Mapped[str] = mapped_column(String(20), default="")
+    kind: Mapped[str] = mapped_column(String(12), default="con")           # me / con / lien_ket / chi_nhanh
+    ownership_pct: Mapped[float] = mapped_column(Float, default=0)         # tỷ lệ sở hữu của công ty mẹ
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)   # quan hệ sở hữu có thời gian hiệu lực
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+
+    def in_group(self) -> bool:
+        """Nằm trong phạm vi hợp nhất (mẹ, con, chi nhánh) – liên kết áp dụng phương pháp vốn chủ sở hữu."""
+        return self.kind in ("me", "con", "chi_nhanh")
+
+
 # ---------- Nhân sự & phân quyền ----------
 ROLES = {
     "chutich": "Chủ tịch HĐQT",

@@ -12,6 +12,7 @@ from app.api.v1.assets import router as assets_router
 from app.api.v1.books import router as books_router
 from app.api.v1.banks import router as banks_router
 from app.api.v1.hr import router as hr_router
+from app.api.v1.companies import router as companies_router
 from app.api.v1.hrm import router as hrm_router
 from app.api.v1.ops import router as ops_router
 from app.api.v1.finance import router as finance_router
@@ -85,6 +86,7 @@ app.include_router(assets_router)
 app.include_router(books_router)
 app.include_router(banks_router)
 app.include_router(hr_router)
+app.include_router(companies_router)
 app.include_router(hrm_router)
 app.include_router(ops_router)
 app.include_router(finance_router)

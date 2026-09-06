@@ -16,6 +16,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const TABS = scope === "ops" ? TABS_OPS : TABS_HR;
   const { user, toast } = useShell();
   const role = user?.role || "";
+  const [cos, setCos] = useState<any[]>([]);
   const [tab, setTab] = useState(scope === "ops" ? "visa" : "payroll");
   // mở đúng tab khi vào từ menu bên trái (?tab=...)
   useEffect(() => { const q = new URLSearchParams(window.location.search).get("tab"); if (q) setTab(q); }, []);
@@ -51,7 +52,8 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     if (tab === "employees") api("/employees").then(setEmps);
     if (tab === "visa") api("/visa").then(setVisa);
     if (tab === "guides") { api("/guide-assignments").then(setAsg); api("/guide-rates").then(setGrates); }
-    if (tab === "fleet") { api("/vehicles").then(setVeh); api("/dispatch").then(setDisp); api("/vehicle-rates").then(setRates); api(`/fleet/summary?period=${period}`).then(setFleet); }
+    if (tab === "fleet") { api("/vehicles").then(setVeh); api("/dispatch").then(setDisp); api("/vehicle-rates").then(setRates); api(`/fleet/summary?period=${period}`).then(setFleet); api("/companies").then(setCos).catch(() => {}); }
+    if (tab === "guides") api("/companies").then(setCos).catch(() => {});
     if (tab === "incidents") { api("/incidents").then(setInc); api("/incident-levels").then(setIncMeta); }
   }, [tab, period]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
@@ -127,6 +129,15 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         <label>Đơn giá/ngày<input type="number" value={fAsg.rate_per_day} disabled={!!fAsg.rate_id} onChange={(e) => setFAsg({ ...fAsg, rate_per_day: e.target.value })} /></label>
         <label><input type="checkbox" checked={fAsg.holiday} onChange={(e) => setFAsg({ ...fAsg, holiday: e.target.checked })} /> Lễ Tết ×2</label>
       </div><button className="act" disabled={!fAsg.tour_id || !fAsg.guide_id || (!fAsg.rate_id && !fAsg.rate_per_day)} onClick={() => post("/guide-assignments", { tour_id: Number(fAsg.tour_id), guide_id: Number(fAsg.guide_id), days: Number(fAsg.days) || 0, rate_per_day: Number(fAsg.rate_per_day) || 0, rate_id: fAsg.rate_id ? Number(fAsg.rate_id) : null, holiday: fAsg.holiday })}>Phân công</button></div>}
+      <div className="panel wrap"><h2>Pháp nhân chủ quản của hướng dẫn viên</h2>
+        <table><thead><tr><th>HDV</th><th>Loại hợp đồng</th><th>Thẻ</th><th>Pháp nhân chủ quản</th>{["cntt", "ketoan", "tgd", "chutich", "hcns"].includes(role) && <th></th>}</tr></thead>
+          <tbody>{guides.length ? guides.map((g) => <tr key={g.id}><td><b>{g.full_name}</b></td><td>{g.contract_type === "ctv" ? "Cộng tác viên" : g.contract_type === "doi_tac" ? "Đối tác" : "Hợp đồng lao động"}</td><td className="muted">{g.card_no || "–"}</td>
+            <td>{cos.find((c) => c.id === g.company_id)?.name || <Tag cls="warn">chưa gán</Tag>}</td>
+            {["cntt", "ketoan", "tgd", "chutich", "hcns"].includes(role) && <td>
+              <select value={g.company_id || ""} onChange={(e) => post(`/employees/${g.id}/company`, { company_id: e.target.value ? Number(e.target.value) : null })}>
+                <option value="">– chưa gán –</option>{cos.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+              </select></td>}</tr>) : <tr><td colSpan={5} className="muted">Chưa có hướng dẫn viên trong hồ sơ nhân sự.</td></tr>}</tbody></table>
+        <p className="muted">Hệ thống không tự gán chủ quản cho hướng dẫn viên – phải chọn theo công ty đứng tên ký hợp đồng cộng tác. Thù lao HDV do pháp nhân nào chi trả sẽ quyết định bên ghi nhận chi phí khi hợp nhất.</p></div>
       <div className="panel wrap"><table><thead><tr><th>Tour</th><th>HDV</th><th>Ngày × đơn giá</th><th style={{ textAlign: "right" }}>Thù lao</th><th>Trạng thái</th><th>Báo cáo tour</th><th>Hoàn ứng</th><th>Phân công</th>{canDH && <th></th>}</tr></thead>
         <tbody>{asg.map((a) => <tr key={a.id}><td><b>{a.tour_code}</b><div className="muted">{a.tour_name}</div></td><td>{a.guide}</td><td>{a.days} × {vnd(a.rate_per_day)}{a.holiday && " ×2"}</td><td style={{ textAlign: "right" }}>{vnd(a.amount)}</td>
           <td>{a.status === "da_xac_nhan" ? <Tag cls="ok">HDV đã xác nhận</Tag> : a.status === "huy" ? <Tag cls="red">Hủy</Tag> : <Tag cls="warn">Chờ xác nhận 24h</Tag>}</td><td>{a.report_submitted ? "✔" : <Tag cls="warn">thiếu → treo</Tag>}</td><td>{a.advance_settled ? "✔" : <Tag cls="warn">chưa → treo</Tag>}</td><td className="muted">{a.assigned_by} {fmtDT(a.assigned_at)}</td>
@@ -154,10 +165,20 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         <label>Từ ngày<input type="date" value={fDisp.date_from} onChange={(e) => setFDisp({ ...fDisp, date_from: e.target.value })} /></label>
         <label>Đến ngày<input type="date" value={fDisp.date_to} onChange={(e) => setFDisp({ ...fDisp, date_to: e.target.value })} /></label>
       </div><button className="act" disabled={!fDisp.tour_id || !fDisp.vehicle_id || !fDisp.date_from || !fDisp.date_to} onClick={() => post("/dispatch", { tour_id: Number(fDisp.tour_id), vehicle_id: Number(fDisp.vehicle_id), date_from: fDisp.date_from, date_to: fDisp.date_to, rate_id: fDisp.rate_id ? Number(fDisp.rate_id) : null })}>Lập lệnh</button></div>}
-      <div className="panel wrap"><table><thead><tr><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Tuyến</th><th>Thời gian</th><th style={{ textAlign: "right" }}>Giá nội bộ</th><th>Trạng thái</th><th>Sự cố</th>{["cntt", "tp_dh", "nv_dh", "hcns"].includes(role) && <th></th>}</tr></thead>
+      <div className="panel wrap"><table><thead><tr><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Tuyến</th><th>Thời gian</th><th style={{ textAlign: "right" }}>Giá nội bộ</th><th>Pháp nhân sở hữu xe</th><th>Trạng thái</th><th>Sự cố</th>{["cntt", "tp_dh", "nv_dh", "hcns"].includes(role) && <th></th>}</tr></thead>
         <tbody>{disp.map((d) => <tr key={d.id}><td><b>{d.tour_code}</b></td><td>{d.vehicle}</td><td>{d.driver}</td><td className="muted">{d.route}</td><td>{fmtD(d.date_from)} → {fmtD(d.date_to)} ({d.days} ngày)</td><td style={{ textAlign: "right" }}>{vnd(d.internal_price)}</td>
+          <td>{d.company ? <>{d.company_code} {d.noi_bo && <Tag cls="navy">nội bộ</Tag>}</> : <Tag cls="warn">chưa gán</Tag>}</td>
           <td>{d.status === "hoan_thanh" ? <Tag cls="ok">Hoàn thành</Tag> : d.status === "da_xac_nhan" ? <Tag cls="navy">Đã xác nhận</Tag> : d.status === "huy" ? <Tag cls="red">Hủy</Tag> : <Tag cls="warn">Chờ xác nhận 4h</Tag>}</td><td className="muted">{d.incident_note}</td>
           {["cntt", "tp_dh", "nv_dh", "hcns"].includes(role) && <td>{d.status === "cho_xac_nhan" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/dispatch/${d.id}/update`, { status: "da_xac_nhan" })}>Xác nhận</button>}{d.status === "da_xac_nhan" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/dispatch/${d.id}/update`, { status: "hoan_thanh" })}>Hoàn thành</button>}</td>}</tr>)}</tbody></table></div>
+      <div className="panel wrap"><h2>Hồ sơ xe & pháp nhân sở hữu</h2>
+        <table><thead><tr><th>Biển số</th><th className="num">Chỗ</th><th>Loại</th><th>Tài xế</th><th>Pháp nhân sở hữu</th>{["cntt", "ketoan", "tgd", "chutich", "hcns", "tp_dh"].includes(role) && <th></th>}</tr></thead>
+          <tbody>{veh.map((v) => <tr key={v.id}><td><b>{v.plate}</b></td><td className="num">{v.seats}</td><td>{v.kind === "hop_tac" ? "Xe hợp tác (thuê ngoài)" : "Xe nội bộ"}</td><td>{v.driver}</td>
+            <td>{v.company ? v.company : <Tag cls="warn">chưa gán</Tag>}</td>
+            {["cntt", "ketoan", "tgd", "chutich", "hcns", "tp_dh"].includes(role) && <td>
+              <select value={v.company_id || ""} onChange={(e) => post(`/vehicles/${v.id}/company`, { company_id: e.target.value ? Number(e.target.value) : null })}>
+                <option value="">– chưa gán –</option>{cos.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+              </select></td>}</tr>)}</tbody></table>
+        <p className="muted">Xe thuộc pháp nhân trong phạm vi hợp nhất (mẹ, con, chi nhánh) thì lệnh điều xe là <b>giao dịch nội bộ</b> – phải nhận diện để loại trừ khi lập báo cáo hợp nhất. Xe hợp tác là xe thuê ngoài, không gán pháp nhân trong tập đoàn.</p></div>
       <h2>Bảng giá xe nội bộ theo tuyến (Chủ tịch + TGĐ duyệt, hiệu lực theo ngày)</h2>
       {["cntt", "hcns", "tp_dh"].includes(role) && <div className="panel"><div className="grid">
         <label>Tuyến<input value={fRate.route} onChange={(e) => setFRate({ ...fRate, route: e.target.value })} /></label>

@@ -27,7 +27,7 @@ USERS = [
 def seed_all(db):
     if db.execute(select(User)).scalars().first():
         # CSDL đã có dữ liệu (bản demo trên cloud): chỉ bổ sung phần nhân sự nếu chưa có
-        seed_vehicle_rates(db); seed_guide_rates(db); db.commit()
+        seed_vehicle_rates(db); seed_guide_rates(db); db.commit(); seed_companies(db)
         if not db.execute(select(Employee)).scalars().first():
             users = {u.username: u for u in db.execute(select(User)).scalars()}
             tours = {t.code: t for t in db.execute(select(Tour)).scalars()}
@@ -145,6 +145,7 @@ def seed_hr(db, users, tours, today):
     x4 = Vehicle(plate="50H-496.23", seats=45, kind="hop_tac", driver_id=None, internal_rate_per_day=0)
     db.add_all([x1, x2, x3, x4]); db.flush()
     seed_vehicle_rates(db); seed_guide_rates(db)
+    seed_companies(db)
     dalat = tours[3]
     db.add(GuideAssignment(tour_id=dalat.id, guide_id=h1.id, days=3, rate_per_day=450_000, assigned_by="dh.lan", status="da_xac_nhan",
                            confirmed_at=datetime.combine(dalat.start_date - timedelta(days=5), datetime.min.time()), report_submitted=True, advance_settled=True))
@@ -195,3 +196,31 @@ def seed_vehicle_rates(db):
     for route, days, ip, pp in VEHICLE_RATES:
         db.add(VehicleRate(route=route, days=days, internal_price=ip, partner_price=pp, effective_from=date(2026, 5, 6), status="active",
                            signed_chutich=True, signed_tgd=True, proposed_by="seed", note="Bảng giá xe 6/5/2026; cột hợp tác áp dụng từ 5/8/2026 (50E-955.31, 50H-496.23)"))
+
+def seed_companies(db):
+    """Danh mục pháp nhân tối thiểu và gán chủ quản cho xe (Ý kiến thẩm định 06/9/2026, C1).
+
+    Chỉ gán xe: trường kind của xe đã phân sẵn noi_bo (Vietrip) / hop_tac (xe thuê ngoài) nên suy ra
+    chủ quản là an toàn. Hướng dẫn viên KHÔNG tự gán – phải do HCNS chọn theo công ty ký hợp đồng.
+    Mã số thuế để trống cho Kế toán điền.
+    """
+    from app.models.core import Company
+    from app.models.hr import Vehicle
+    have = {c.code for c in db.execute(select(Company)).scalars()}
+    if "VTD" not in have:
+        db.add(Company(code="VTD", name="Công ty Cổ phần Du lịch Vietourist", kind="me", ownership_pct=100,
+                       note="Công ty mẹ – mã chứng khoán VTD, niêm yết UPCoM"))
+    db.flush()
+    me = db.execute(select(Company).where(Company.code == "VTD")).scalars().first()
+    if "VTRIP-VT" not in have:
+        db.add(Company(code="VTRIP-VT", name="Công ty TNHH Vận tải Vietrip", kind="con", ownership_pct=100,
+                       parent_id=me.id if me else None, note="Sở hữu đội xe; thuê xe cho công ty mẹ là giao dịch nội bộ"))
+    db.flush()
+    vt = db.execute(select(Company).where(Company.code == "VTRIP-VT")).scalars().first()
+    n = 0
+    if vt:
+        for v in db.execute(select(Vehicle).where(Vehicle.company_id == None)).scalars():
+            if v.kind == "noi_bo":            # xe hợp tác là xe thuê ngoài, không thuộc pháp nhân trong tập đoàn
+                v.company_id = vt.id; n += 1
+    db.commit()
+    return n
