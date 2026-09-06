@@ -229,12 +229,18 @@ def ACC_KIND(code: str) -> str:
 def import_journal(db: Session, u: User, data: bytes, date_from: date | None = None, date_to: date | None = None, dry_run: bool = False, limit: int | None = None) -> dict:
     """Sổ nhật ký chung MISA (Ngày hạch toán, Ngày CT, Số CT, Diễn giải, Tài khoản, TK đối ứng, PS Nợ, PS Có, Mã đối tượng, Tên đối tượng)
     → mỗi số chứng từ + ngày = một chứng từ VTOS (nguồn misa, ref misa:<số CT>). Bỏ qua chứng từ đã nạp. Tài khoản chưa có → tạo."""
-    rows = _rows(data)
-    h = _find_header(rows, "số chứng từ", "tài khoản")
-    hdr = [str(c or "").strip().lower() for c in rows[h]]
+    # đọc luồng (không giữ toàn bộ 80.000 dòng trong bộ nhớ – máy chủ 512 MB) và lọc theo khoảng ngày ngay khi đọc
+    wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True); ws = wb.worksheets[0]
+    it = ws.iter_rows(values_only=True); hdr = None
+    for r in it:
+        cells = [str(c).strip().lower() for c in r if c is not None]
+        if any("số chứng từ" in c for c in cells) and any("tài khoản" in c for c in cells):
+            hdr = [str(c or "").strip().lower() for c in r]; break
+    if hdr is None: raise ValueError("Không tìm thấy dòng tiêu đề Sổ nhật ký chung – đúng tệp MISA chưa?")
     ix = {k: next((i for i, c in enumerate(hdr) if c.startswith(k)), None) for k in ("ngày hạch toán", "ngày chứng từ", "số chứng từ", "diễn giải", "tài khoản", "tk đối ứng", "phát sinh nợ", "phát sinh có", "mã đối tượng", "tên đối tượng", "mã công trình")}
     docs: dict[tuple, dict] = {}
-    for r in rows[h + 1:]:
+    for r in it:
+        if r is None or len(r) <= ix["tài khoản"]: continue
         no = str(r[ix["số chứng từ"]] or "").strip(); d = _date(r[ix["ngày hạch toán"]])
         if not no or not d: continue
         if date_from and d < date_from: continue
@@ -278,6 +284,8 @@ def import_journal(db: Session, u: User, data: bytes, date_from: date | None = N
     if not dry_run:
         R.audit(db, u.username, u.role, "nap_so_nhat_ky_misa", "journal", after={k: (str(v) if isinstance(v, date) else v) for k, v in stat.items()})
         db.commit()
+    wb.close(); del docs
+    import gc; gc.collect()
     return stat
 
 
