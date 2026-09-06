@@ -16,6 +16,9 @@ class UserOut(BaseModel):
     role: str
     role_name: str
     department: str
+    hidden_menus: list[str] = []
+    can_see_cost: bool = True
+    read_only: bool = False
 
 
 class TourCreate(BaseModel):
