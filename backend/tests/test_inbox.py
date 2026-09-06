@@ -68,3 +68,16 @@ def test_simulate_web_and_zalo_route():
     z = {"event_name": "user_send_text", "sender": {"id": "9000000000000000001"}, "message": {"text": "Tư vấn tour Nha Trang", "msg_id": "z1"}, "timestamp": "1"}
     assert client.post("/api/v1/zalo/webhook", json=z).status_code == 200
     lst = client.get("/api/v1/inbox?channel=zalo", headers=h).json(); assert any(x["external_id"] == "9000000000000000001" for x in lst)
+
+
+def test_standby_and_echo_when_other_app_is_primary():
+    """VTOS là Người nhận phụ: tin khách đến qua entry.standby; chatbot/app khác trả lời → echo → ghi nhận đã trả lời, SLA tắt."""
+    ev = {"object": "page", "entry": [{"id": "PAGE1", "standby": [{"sender": {"id": "PSID777"}, "recipient": {"id": "PAGE1"}, "message": {"mid": "s1", "text": "Tour Đà Lạt tháng 10 3n2d giá bao nhiêu?"}}]}]}
+    assert client.post("/api/v1/facebook/webhook", json=ev).json()["received"] == 1
+    h = login("gd.kd")
+    c = next(x for x in client.get("/api/v1/inbox", headers=h).json() if x["external_id"] == "PSID777"); assert c["unanswered"]
+    echo = {"object": "page", "entry": [{"id": "PAGE1", "standby": [{"sender": {"id": "PAGE1"}, "recipient": {"id": "PSID777"}, "message": {"mid": "e1", "is_echo": True, "app_id": 999, "text": "Dạ. Em chào Anh/Chị, em là Thu Tuyết…"}}]}]}
+    r = client.post("/api/v1/facebook/webhook", json=echo).json(); assert r["received"] == 0 and r["echoes"] == 1
+    d = client.get(f"/api/v1/inbox/{c['id']}", headers=h).json()
+    assert d["unanswered"] is False and d["messages"][-1]["direction"] == "out" and "chatbot" in d["messages"][-1]["sender_name"]
+    assert client.post("/api/v1/facebook/webhook", json=echo).json()["echoes"] == 0   # trùng mid

@@ -31,7 +31,8 @@ class Settings(BaseSettings):
     ZALO_ZNS_TEMPLATES: str = ""
     FB_PAGE_ACCESS_TOKEN: str = ""         # Facebook Page (Messenger Platform) – token trang, anh tự dán vào Render
     FB_PAGE_ID: str = ""
-    FB_APP_SECRET: str = ""                # xác thực chữ ký webhook (X-Hub-Signature-256)
+    FB_APP_SECRET: str = ""
+    FB_APP_ID: str = ""                # xác thực chữ ký webhook (X-Hub-Signature-256)
     FB_VERIFY_TOKEN: str = "vtos-fb-verify"  # chuỗi xác minh khi đăng ký webhook trên Meta for Developers           # "nhac_coc:1234,xac_nhan_booking:2345" – mẫu ZNS đã duyệt             # MST pháp nhân – điền trong .env / Render env
 
 

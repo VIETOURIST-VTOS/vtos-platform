@@ -93,15 +93,34 @@ def fb_verify_signature(body: bytes, sig: str) -> bool:
     return hmac.compare_digest("sha256=" + mac, sig or "")
 
 
-def fb_send(psid: str, text: str) -> dict:
+def fb_take_thread_control(psid: str) -> dict:
+    """Khi VTOS là Người nhận phụ (chatbot khác giữ hội thoại): xin quyền hội thoại trước khi trả lời (Handover Protocol)."""
+    if not settings.FB_PAGE_ACCESS_TOKEN: return {"error": -1}
+    body = json.dumps({"recipient": {"id": psid}, "metadata": "VTOS tra loi"}).encode()
+    req = urllib.request.Request(f"{GRAPH}/me/take_thread_control?access_token={urllib.parse.quote(settings.FB_PAGE_ACCESS_TOKEN)}", data=body, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r: return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        try: return json.loads(e.read().decode()).get("error", {"error": e.code})
+        except Exception: return {"error": e.code}
+    except Exception as ex: return {"error": -1, "message": str(ex)}
+
+
+def fb_send(psid: str, text: str, _retry: bool = True) -> dict:
     if not settings.FB_PAGE_ACCESS_TOKEN: return {"error": -1, "error_name": "chua_cau_hinh", "message": "Chưa có FB_PAGE_ACCESS_TOKEN"}
     body = json.dumps({"recipient": {"id": psid}, "messaging_type": "RESPONSE", "message": {"text": text[:2000]}}).encode()
     req = urllib.request.Request(f"{GRAPH}/me/messages?access_token={urllib.parse.quote(settings.FB_PAGE_ACCESS_TOKEN)}", data=body, headers={"Content-Type": "application/json"}, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=20) as r: return json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        try: return {"error": e.code, "error_name": "http", "detail": json.loads(e.read().decode())}
-        except Exception: return {"error": e.code, "error_name": "http"}
+        try: detail = json.loads(e.read().decode())
+        except Exception: detail = {}
+        err = (detail or {}).get("error", {}) if isinstance(detail, dict) else {}
+        if _retry and (str(err.get("error_subcode") or "") in ("2018300", "2018065") or "thread" in str(err.get("message", "")).lower()):   # không giữ hội thoại (app khác là Người nhận chính) → xin quyền rồi gửi lại
+            tc = fb_take_thread_control(psid)
+            if tc.get("success"): return fb_send(psid, text, _retry=False)
+            detail = {"detail": detail, "take_thread_control": tc}
+        return {"error": e.code, "error_name": "http", "detail": detail}
 
 
 def fb_profile(psid: str) -> str:
@@ -112,16 +131,32 @@ def fb_profile(psid: str) -> str:
     except Exception: return ""
 
 
+def outbound_external(db: Session, channel: str, external_id: str, text: str, page_id: str = "", ext_msg_id: str = "", app_id: str = "") -> Message | None:
+    """Tin do Page gửi qua công cụ khác (chatbot, Fanpage inbox, app khác) – echo/standby: ghi nhận là đã trả lời để SLA không báo sai."""
+    c = db.execute(select(Conversation).where(Conversation.channel == channel, Conversation.external_id == external_id)).scalars().first()
+    if not c: return None
+    if ext_msg_id and db.execute(select(Message).where(Message.external_id == ext_msg_id)).scalars().first(): return None
+    who = "chatbot/app khác" if app_id and app_id != str(settings.FB_APP_ID or "") else "Page (ngoài VTOS)"
+    m = Message(conversation_id=c.id, direction="out", sender="sale", sender_name=who, text=(text or "")[:4000], status="da_gui", external_id=ext_msg_id[:80])
+    db.add(m); now = datetime.now(); c.last_out_at = now; c.unanswered = False; c.sla_due_at = None
+    if c.status == "cho_sale": c.status = "mo"
+    db.commit(); db.refresh(m); return m
+
+
 def fb_webhook(db: Session, payload: dict) -> dict:
-    """Sự kiện Messenger: entry[].messaging[] {sender.id, recipient.id, message{mid,text,attachments}, postback{payload}}. Bỏ qua echo (tin do Page gửi)."""
-    n = 0
+    """Sự kiện Messenger: entry[].messaging[] (app là Người nhận chính) hoặc entry[].standby[] (app là Người nhận phụ – nhận bản sao mọi tin khi chatbot khác giữ hội thoại).
+    Echo (tin do Page gửi qua app khác) được ghi nhận là đã trả lời."""
+    n = 0; echoes = 0
     for entry in payload.get("entry") or []:
         page_id = str(entry.get("id") or "")
-        for ev in entry.get("messaging") or []:
+        for ev in (entry.get("messaging") or []) + (entry.get("standby") or []):
             msg = ev.get("message") or {}; pb = ev.get("postback") or {}
-            if msg.get("is_echo"): continue
-            psid = str((ev.get("sender") or {}).get("id") or "")
-            if not psid or psid == page_id: continue
+            sender = str((ev.get("sender") or {}).get("id") or ""); recipient = str((ev.get("recipient") or {}).get("id") or "")
+            if msg.get("is_echo") or sender == page_id:
+                if outbound_external(db, "facebook", recipient, msg.get("text") or ("[Page gửi tệp]" if msg.get("attachments") else ""), page_id, msg.get("mid") or "", str(msg.get("app_id") or "")): echoes += 1
+                continue
+            psid = sender
+            if not psid: continue
             text = msg.get("text") or pb.get("title") or pb.get("payload") or ""
             atts = [{"type": a.get("type"), "url": (a.get("payload") or {}).get("url")} for a in msg.get("attachments") or []]
             if not text and atts: text = "[khách gửi " + ", ".join(a["type"] or "tệp" for a in atts) + "]"
@@ -129,7 +164,7 @@ def fb_webhook(db: Session, payload: dict) -> dict:
             c = db.execute(select(Conversation).where(Conversation.channel == "facebook", Conversation.external_id == psid)).scalars().first()
             name = c.customer_name if c and c.customer_name else fb_profile(psid)
             if inbound(db, "facebook", psid, text, page_id, name, msg.get("mid") or "", atts): n += 1
-    return {"received": n}
+    return {"received": n, "echoes": echoes}
 
 
 # ---------- AI ----------
