@@ -64,6 +64,7 @@ def test_goi_y_tu_so_hien_co(seeded):
     # Tên ngân hàng trong diễn giải được gợi ý ra để Kế toán biết cần mở tài khoản nào
     hints = {x["bank"] for x in j["bank_hints"]}
     assert "TPBANK" in hints and "MB" in hints, hints
+    assert j["hint_sample"] > 0
 
 
 def test_mo_tai_khoan_sinh_tieu_khoan_112_va_khong_doi_bctc(seeded):

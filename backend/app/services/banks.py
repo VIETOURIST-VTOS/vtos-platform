@@ -102,33 +102,49 @@ def create_bank_account(db: Session, u: User, data: dict) -> BankAccount:
 
 # ---------- Gợi ý từ sổ hiện có ----------
 
+HINT_SAMPLE = 4000       # số dòng lấy mẫu để dò tên ngân hàng trong diễn giải
+
+
 def suggest_from_ledger(db: Session, since: date, upto: date, top: int = 25) -> dict:
     """Thống kê tiền tố số chứng từ và tên ngân hàng xuất hiện trên sổ 112, để Kế toán biết cần mở những
-    tài khoản ngân hàng nào. Sổ MISA đánh số chứng từ theo tài khoản ngân hàng nên tiền tố là căn cứ tốt nhất."""
+    tài khoản ngân hàng nào. Sổ MISA đánh số chứng từ theo tài khoản ngân hàng nên tiền tố là căn cứ tốt nhất.
+
+    Hiệu năng: đếm tiền tố gộp nhóm theo SỐ CHỨNG TỪ (cột hẹp) chứ không theo diễn giải (300 ký tự) – gộp nhóm
+    trên cột rộng làm câu truy vấn chậm hàng chục giây trên sổ thật. Phần dò tên ngân hàng chỉ lấy mẫu có giới
+    hạn vì nó chỉ để GỢI Ý cho Kế toán, không dùng để gán."""
     codes = _subtree_codes(db, BANK_ROOT)
+    base = (JournalEntry.status == POSTED, JournalEntry.entry_date >= since,
+            JournalEntry.entry_date <= upto, JournalLine.account_code.in_(codes))
+    total = int(db.execute(select(func.count(JournalLine.id))
+                           .join(JournalEntry, JournalLine.entry_id == JournalEntry.id)
+                           .where(*base)).scalar() or 0)
     rows = db.execute(
-        select(JournalEntry.code, JournalEntry.description, func.count(JournalLine.id))
+        select(JournalEntry.code, func.count(JournalLine.id))
         .join(JournalLine, JournalLine.entry_id == JournalEntry.id)
-        .where(JournalEntry.status == POSTED, JournalEntry.entry_date >= since, JournalEntry.entry_date <= upto,
-               JournalLine.account_code.in_(codes))
-        .group_by(JournalEntry.code, JournalEntry.description)).all()
-    pre, hints, total = Counter(), Counter(), 0
-    for code, desc, n in rows:
-        total += n
+        .where(*base).group_by(JournalEntry.code)).all()
+    pre = Counter()
+    for code, n in rows:
         head = re.sub(r"^MISA-", "", (code or "").upper()).split("-")[0]
         head = re.sub(r"\d{4,}.*$", "#", head)                   # gộp dãy số dài thành #
         if head:
             pre[head] += n
+    sample = db.execute(
+        select(JournalEntry.code, JournalEntry.description)
+        .join(JournalLine, JournalLine.entry_id == JournalEntry.id)
+        .where(*base).limit(HINT_SAMPLE)).all()
+    hints = Counter()
+    for code, desc in sample:
         text = f"{code or ''} {desc or ''}".upper()
         for b in BANK_HINTS:
             if re.search(rf"\b{re.escape(b)}", text):
-                hints[b] += n
+                hints[b] += 1
                 break
     taken = {p for b in db.execute(select(BankAccount)).scalars() for p in (b.match_prefixes or [])}
     return {"since": since, "upto": upto, "total_lines": total,
             "prefixes": [{"prefix": k, "lines": v, "share": round(100 * v / total, 1) if total else 0,
                           "da_gan": k in taken} for k, v in pre.most_common(top)],
-            "bank_hints": [{"bank": k, "lines": v} for k, v in hints.most_common(top)]}
+            "hint_sample": len(sample),
+            "bank_hints": [{"bank": k, "lines_in_sample": v} for k, v in hints.most_common(top)]}
 
 
 def _subtree_codes(db: Session, root: str) -> list[str]:

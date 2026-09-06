@@ -26,7 +26,7 @@ class JournalEntry(Base):
     __tablename__ = "journal_entries"
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(30), unique=True)            # CT2609-0001
-    entry_date: Mapped[date] = mapped_column(Date)
+    entry_date: Mapped[date] = mapped_column(Date, index=True)   # mọi sổ kế toán đều lọc theo khoảng ngày
     period: Mapped[str] = mapped_column(String(7), index=True)            # 2026-09
     description: Mapped[str] = mapped_column(String(300))
     source_type: Mapped[str] = mapped_column(String(30), default="thu_cong")  # thu_tien / hoa_don / quyet_toan / thu_cong / dao
