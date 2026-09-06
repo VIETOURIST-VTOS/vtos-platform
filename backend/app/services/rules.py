@@ -45,6 +45,8 @@ DEFAULT_PARAMS = [
     ("gd_kd_thuong_85", "6000000", "Thưởng GĐ KD khi ≥ 85% NV đạt chỉ tiêu", "đồng", "Chính sách GĐ KD"),
     ("so_du_tien_toi_thieu", "500000000", "Ngưỡng số dư tiền tối thiểu – cảnh báo dự báo dòng tiền 13 tuần", "đồng", "Thiết kế 3.4"),
     ("thue_gtgt", "0.10", "Thuế suất GTGT dịch vụ lữ hành (Kế toán chỉnh theo mức giảm thuế hiện hành)", "tỷ lệ", "Luật Thuế GTGT"),
+    ("giam_tru_ban_than", "11000000", "Giảm trừ gia cảnh cho bản thân người nộp thuế TNCN (Kế toán chỉnh khi Nhà nước nâng mức)", "đồng/tháng", "NQ 954/2020/UBTVQH14"),
+    ("giam_tru_nguoi_phu_thuoc", "4400000", "Giảm trừ gia cảnh cho mỗi người phụ thuộc (Kế toán chỉnh khi Nhà nước nâng mức)", "đồng/tháng/người", "NQ 954/2020/UBTVQH14"),
 ]
 
 
