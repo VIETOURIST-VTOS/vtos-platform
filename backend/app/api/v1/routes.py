@@ -129,7 +129,8 @@ def get_tour(tid: int, u: User = Depends(current_user), db: Session = Depends(ge
     v = T.tour_view(db, t, u)
     if not AC.can_see_cost(u):   # Kinh doanh / HCNS: không xem cơ cấu chi phí, quyết toán, bút toán
         for k in ("settlement", "fixed_cost", "var_cost_per_pax", "actual_cost", "promo_value", "calc", "justification"): v[k] = None
-        if AC.own_only(u): v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") == u.id]
+        vis = AC.sales_ids_visible(db, u)
+        if vis is not None: v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") in vis]
     else:
         v["audit"] = [audit_out(l) for l in db.execute(select(AuditLog).where(AuditLog.entity == f"tour:{t.code}").order_by(desc(AuditLog.id))).scalars()]
     return v
@@ -194,7 +195,8 @@ def booking_out(b: Booking) -> dict:
 def list_requests(open_only: bool = False, u: User = Depends(current_user), db: Session = Depends(get_db)):
     AC.require(u, AC.BOOKING_ROLES, "yêu cầu đặt dịch vụ")
     q = select(ServiceRequest).order_by(desc(ServiceRequest.created_at))
-    if AC.own_only(u): q = q.where(ServiceRequest.sales_id == u.id)
+    vis = AC.sales_ids_visible(db, u)
+    if vis is not None: q = q.where(ServiceRequest.sales_id.in_(vis))
     if open_only: q = q.where(ServiceRequest.booking_id == None)
     return [req_out(r) for r in db.execute(q).scalars()]
 
@@ -218,7 +220,8 @@ def list_bookings(limit: int = 100, q: str = "", status: str = "", tour_id: int 
     """status: unpaid / depo / paid / cancelled / locked / due (còn phải thu, chưa hủy)."""
     AC.require(u, AC.BOOKING_ROLES, "danh sách booking")
     qs = select(Booking).order_by(desc(Booking.created_at))
-    if AC.own_only(u): qs = qs.where(Booking.sales_id == u.id)   # NV kinh doanh chỉ thấy booking mình phụ trách
+    vis = AC.sales_ids_visible(db, u)
+    if vis is not None: qs = qs.where(Booking.sales_id.in_(vis))   # NV KD: của mình; trưởng nhóm: của nhóm
     if tour_id: qs = qs.where(Booking.tour_id == tour_id)
     if q:
         like = f"%{q.strip()}%"
@@ -240,7 +243,8 @@ def _booking(db: Session, bid: int) -> Booking:
 def get_booking(bid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
     b = _booking(db, bid)
     AC.require(u, AC.BOOKING_ROLES, "booking")
-    if AC.own_only(u) and b.sales_id != u.id: raise HTTPException(403, "Chỉ xem được booking do mình phụ trách")
+    vis = AC.sales_ids_visible(db, u)
+    if vis is not None and b.sales_id not in vis: raise HTTPException(403, "Chỉ xem được booking do mình / nhóm mình phụ trách")
     v = booking_out(b)
     from app.models.payments import Receipt, Retention
     v["receipts"] = [{"id": r.id, "code": r.code, "amount": r.amount, "method": r.method, "status": r.status, "payer": r.payer, "note": r.note, "created_at": r.created_at} for r in db.execute(select(Receipt).where(Receipt.booking_id == b.id).order_by(Receipt.id)).scalars()]
@@ -264,13 +268,13 @@ def unlock_booking(bid: int, data: S.ActionNote, u: User = Depends(current_user)
 
 
 @router.post("/bookings/{bid}/lock", tags=["bookings"])
-def lock_booking(bid: int, data: S.ActionNote, u: User = Depends(require_roles("nv_dh", "tp_dh", "gd_kd", "cntt")), db: Session = Depends(get_db)):
+def lock_booking(bid: int, data: S.ActionNote, u: User = Depends(require_roles("nv_dh", "tp_dh", "gd_kd", "tp_kd", "cntt")), db: Session = Depends(get_db)):
     b = _booking(db, bid); BK.lock(db, b, data.note or f"Khóa bởi {u.username}", u.username); db.commit()
     return {"message": f"Đã khóa {b.code}"}
 
 
 @router.post("/bookings/check", tags=["bookings"])
-def bookings_check(u: User = Depends(require_roles("tp_dh", "nv_dh", "gd_kd", "ketoan", "cntt", "tgd")), db: Session = Depends(get_db)):
+def bookings_check(u: User = Depends(require_roles("tp_dh", "nv_dh", "gd_kd", "tp_kd", "ketoan", "cntt", "tgd")), db: Session = Depends(get_db)):
     return BK.robot_check(db)
 
 
@@ -285,7 +289,8 @@ def list_retentions(status: str = "hieu_luc", q: str = "", u: User = Depends(cur
     from app.models.payments import Retention
     AC.require(u, AC.BOOKING_ROLES, "tiền bảo lưu")
     qs = select(Retention).order_by(desc(Retention.created_at))
-    if AC.own_only(u): qs = qs.join(Booking, Booking.id == Retention.booking_id).where(Booking.sales_id == u.id)
+    vis = AC.sales_ids_visible(db, u)
+    if vis is not None: qs = qs.join(Booking, Booking.id == Retention.booking_id).where(Booking.sales_id.in_(vis))
     if status and status != "all": qs = qs.where(Retention.status == status)
     if q:
         like = f"%{q.strip()}%"; qs = qs.where((Retention.code.ilike(like)) | (Retention.customer_name.ilike(like)) | (Retention.customer_phone.ilike(like)) | (Retention.tour_code.ilike(like)))
@@ -440,7 +445,7 @@ def _rep_out(r: AutoReport) -> dict:
 
 
 @router.get("/auto-reports", tags=["robot"])
-def auto_reports(kind: str | None = None, limit: int = 30, u: User = Depends(require_roles("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "ketoan", "cntt", "bks", "hcns", "tp_dh", "gd_kd")), db: Session = Depends(get_db)):
+def auto_reports(kind: str | None = None, limit: int = 30, u: User = Depends(require_roles("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "ketoan", "cntt", "bks", "hcns", "tp_dh", "gd_kd", "tp_kd")), db: Session = Depends(get_db)):
     q = select(AutoReport).order_by(desc(AutoReport.created_at))
     if kind: q = q.where(AutoReport.kind == kind)
     return [_rep_out(r) for r in db.execute(q.limit(limit)).scalars()]

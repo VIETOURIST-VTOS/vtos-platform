@@ -14,7 +14,8 @@ from app.models.core import User
 LEADERSHIP = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt")
 CONTROL = ("ketoan", "cntt", "bks")
 OPERATIONS = ("tp_dh", "nv_dh")
-SALES = ("gd_kd", "nv_kd")
+SALES = ("gd_kd", "tp_kd", "tn_kd", "nv_kd")
+MARKETING = ("nv_mkt",)
 
 ALL_SEEING = LEADERSHIP + CONTROL                       # xem mọi dữ liệu
 COST_ROLES = ALL_SEEING + OPERATIONS                    # cơ cấu chi phí NCC, quyết toán, dòng tiền tour
@@ -33,12 +34,26 @@ def require(u: User, roles: tuple, what: str = "dữ liệu này") -> None:
 
 
 def sees_all_sales(u: User) -> bool:
-    """True nếu người dùng thấy mọi booking/khách; NV kinh doanh chỉ thấy phần mình phụ trách."""
-    return u.role != "nv_kd"
+    """True nếu người dùng thấy mọi booking/khách; NV kinh doanh chỉ thấy phần mình, trưởng nhóm thấy nhóm mình."""
+    return u.role not in ("nv_kd", "tn_kd")
 
 
 def own_only(u: User) -> bool:
     return u.role == "nv_kd"
+
+
+def group_only(u: User) -> bool:
+    return u.role == "tn_kd" and bool(u.sales_group)
+
+
+def sales_ids_visible(db, u: User) -> list[int] | None:
+    """None = thấy tất cả; danh sách id sale = chỉ thấy booking/phiếu thu của các sale này."""
+    from sqlalchemy import select
+    if u.role == "nv_kd": return [u.id]
+    if u.role == "tn_kd":
+        if not u.sales_group: return [u.id]
+        return [x for x in db.execute(select(User.id).where(User.sales_group == u.sales_group)).scalars()] or [u.id]
+    return None
 
 
 def can_see_cost(u: User) -> bool:
@@ -85,8 +100,8 @@ MENU_ROLES = {
     "/finance": LEADERSHIP + CONTROL,
     "/params": PARAM_ROLES,
     "/hr": ALL_SEEING + ("hcns", "tp_dh", "gd_kd"),
-    "/inbox": ALL_SEEING + SALES + OPERATIONS,
-    "/leads": ALL_SEEING + SALES + OPERATIONS,
+    "/inbox": ALL_SEEING + SALES + OPERATIONS + MARKETING,
+    "/leads": ALL_SEEING + SALES + OPERATIONS + MARKETING,
     "/sales-reports": ALL_SEEING + SALES + OPERATIONS + ("hcns",),
     "/robot-reports": ALL_SEEING + ("tp_dh", "gd_kd", "hcns"),
     "/vietrip": ("cntt", "tgd", "chutich", "tp_dh", "ketoan"),

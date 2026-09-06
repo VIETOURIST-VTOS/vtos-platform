@@ -60,11 +60,11 @@ def build(db: Session, u: User) -> dict:
         if r: ap.append({"label": f"Bảng lương {r.period} chờ HCNS lập", "href": "/hr"})
         n = db.execute(select(func.count()).select_from(Alert).where(Alert.kind == "bc_ngay_2", Alert.resolved == False)).scalar()
         if n: ap.append({"label": f"{n} nhân sự thiếu báo cáo 2 ngày liên tiếp", "href": "/reports"})
-    if role in ("tp_dh", "ptgd_mkt", "gd_kd"):
+    if role in ("tp_dh", "ptgd_mkt", "gd_kd", "tp_kd", "tn_kd"):
         conf = [k for k, v in OPS.CATEGORY_CONFIRMER.items() if role in v]
         n = db.execute(select(func.count()).select_from(PaymentRequest).where(PaymentRequest.status == "cho_tp", PaymentRequest.category.in_(conf))).scalar()
         if n: ap.append({"label": f"{n} đề nghị chi chờ bộ phận xác nhận", "href": "/expenses"})
-    if role in ("tp_dh", "gd_kd", "ptgd_doan", "ptgd_mkt", "hcns"):
+    if role in ("tp_dh", "gd_kd", "tp_kd", "tn_kd", "ptgd_doan", "ptgd_mkt", "hcns"):
         n = sum(1 for r in db.execute(select(DailyReport).where(DailyReport.reviewed_by == "")).scalars())
         if n: ap.append({"label": f"{n} báo cáo ngày chưa chấm", "href": "/reports"})
     if role == "cntt":
@@ -94,7 +94,7 @@ def build(db: Session, u: User) -> dict:
         pl = RP.income_statement(db, p); k["ln_ke_toan_thang"] = dict((r[0], r[2]) for r in pl["rows"])["50"]
     # --- phần theo phòng ---
     sec = out["sections"]
-    if role in ("gd_kd", "nv_kd", "chutich", "tgd"):
+    if role in ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "chutich", "tgd"):
         moc = R.get_param(db, "moc_chi_tieu_hcm"); by = {}
         for t in tours_m:
             if R.is_doan(t): continue

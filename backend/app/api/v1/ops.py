@@ -14,15 +14,17 @@ from app.services import access as AC
 from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1", tags=["van-hanh"])
-MANAGERS = ("tp_dh", "gd_kd", "ptgd_doan", "ptgd_mkt", "tgd", "chutich", "hcns", "cntt", "bks")
+MANAGERS = ("tp_dh", "gd_kd", "tp_kd", "tn_kd", "ptgd_doan", "ptgd_mkt", "tgd", "chutich", "hcns", "cntt", "bks")
 DEPT_OF_ROLE = {"nv_kd": ("Kinh doanh Lẻ", "Kinh doanh Đoàn"), "nv_dh": ("Điều hành",)}
 
 
 # ---------- Báo cáo ngày ----------
 def report_out(r: DailyReport, users: dict) -> dict:
     u = users.get(r.user_id)
-    return {"id": r.id, "user_id": r.user_id, "user": u.full_name if u else r.user_id, "department": u.department if u else "", "role": u.role if u else "",
-            "report_date": r.report_date, "part1_done": r.part1_done, "part2_numbers": r.part2_numbers, "part3_issues": r.part3_issues, "part4_plan": r.part4_plan,
+    p2 = O.parse_part2(r.part2_numbers)
+    return {"id": r.id, "user_id": r.user_id, "user": u.full_name if u else r.user_id, "department": u.department if u else "", "role": u.role if u else "", "staff_code": u.staff_code if u else "",
+            "department_name": O.DEPT_FORMS.get(u.department, {}).get("name", u.department) if u else "",
+            "report_date": r.report_date, "part1_done": r.part1_done, "part2_numbers": r.part2_numbers, "part2": p2, "part3_issues": r.part3_issues, "part4_plan": r.part4_plan,
             "submitted_at": r.submitted_at, "on_time": r.on_time, "robot_score": r.robot_score, "robot_note": r.robot_note, "manager_score": r.manager_score,
             "manager_note": r.manager_note, "reviewed_by": r.reviewed_by, "reviewed_at": r.reviewed_at}
 
@@ -30,18 +32,50 @@ def report_out(r: DailyReport, users: dict) -> dict:
 class ReportIn(BaseModel):
     report_date: date
     part1_done: str
-    part2_numbers: str = ""
-    part3_issues: str = ""
-    part4_plan: str
+    part2_numbers: str | dict = ""      # dict {nhãn: giá trị} theo mẫu phòng (form mới) hoặc văn bản (cũ)
+    part3_issues: str = ""              # vướng mắc – đề xuất (Phần 4 của form)
+    part4_plan: str                      # việc ngày mai (Phần 3 của form)
+    department: str | None = None        # phòng của mẫu (mặc định theo hồ sơ)
+
+
+@router.get("/daily-reports/form")
+def report_form(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Mẫu báo cáo của người đăng nhập: phòng, mã NV, các trường Phần 2, hạn 20h, báo cáo hôm nay (nếu đã nộp)."""
+    dept = O.dept_of_user(db, u)
+    from datetime import datetime as _dt
+    now = _dt.now(); deadline = _dt.combine(now.date(), O.REPORT_DEADLINE)
+    today = db.execute(select(DailyReport).where(DailyReport.user_id == u.id, DailyReport.report_date == date.today())).scalars().first()
+    users = {u.id: u}
+    return {"department": dept, "forms": {k: {"name": v["name"], "fields": v["fields"], "hint": v["hint"]} for k, v in O.DEPT_FORMS.items()},
+            "full_name": u.full_name, "staff_code": u.staff_code, "deadline": "20:00", "seconds_left": max(0, int((deadline - now).total_seconds())),
+            "today": report_out(today, users) if today else None, "titles": O.PART_TITLES}
 
 
 @router.post("/daily-reports", status_code=201)
 def submit(data: ReportIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    import json
+    dept = data.department if data.department in O.DEPT_FORMS else O.dept_of_user(db, u)
+    p2 = data.part2_numbers if isinstance(data.part2_numbers, dict) else O.parse_part2(data.part2_numbers)
+    p2 = {k: str(v or "").strip() for k, v in p2.items()}
     try:
-        r = O.submit_report(db, u, data.report_date, data.part1_done, data.part2_numbers, data.part3_issues, data.part4_plan)
+        r = O.submit_report(db, u, data.report_date, data.part1_done, json.dumps(p2, ensure_ascii=False), data.part3_issues, data.part4_plan)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
-    return {"message": f"Đã nộp báo cáo {r.report_date:%d/%m} – điểm nháp robot {r.robot_score:.0f}/10 ({r.robot_note})", "report": report_out(r, {u.id: u})}
+    subject, body = O.mail_text(u, dept, r.report_date, r.part1_done, p2, r.part4_plan, r.part3_issues, u.staff_code)
+    return {"message": f"Đã nộp báo cáo {r.report_date:%d/%m} – điểm nháp robot {r.robot_score:.0f}/10 ({r.robot_note})", "report": report_out(r, {u.id: u}), "mail_subject": subject, "mail_body": body}
+
+
+class PreviewIn(ReportIn):
+    pass
+
+
+@router.post("/daily-reports/preview")
+def preview(data: PreviewIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Xem trước 'Nội dung thư' đúng bố cục form Google (không lưu)."""
+    dept = data.department if data.department in O.DEPT_FORMS else O.dept_of_user(db, u)
+    p2 = data.part2_numbers if isinstance(data.part2_numbers, dict) else O.parse_part2(data.part2_numbers)
+    subject, body = O.mail_text(u, dept, data.report_date, data.part1_done, p2, data.part4_plan, data.part3_issues, u.staff_code)
+    return {"subject": subject, "body": body, "lines": body.count("\n") + 1}
 
 
 @router.get("/daily-reports")
@@ -112,7 +146,7 @@ class ShiftIn(BaseModel):
 
 
 @router.post("/page-shifts", status_code=201)
-def create_shift(data: ShiftIn, u: User = Depends(require_roles("gd_kd", "cntt")), db: Session = Depends(get_db)):
+def create_shift(data: ShiftIn, u: User = Depends(require_roles("gd_kd", "tp_kd", "cntt")), db: Session = Depends(get_db)):
     if data.slot not in ("sang", "chieu", "toi"): raise HTTPException(422, "Ca: sang / chieu / toi")
     s = PageShift(**data.model_dump(), assigned_by=u.username); db.add(s); db.flush()
     R.audit(db, u.username, u.role, "phan_ca_truc_page", f"shift:{s.id}", after=data.model_dump(mode="json")); db.commit()
@@ -125,7 +159,7 @@ class ScanIn(BaseModel):
 
 
 @router.post("/page-shifts/{sid}/scan")
-def scan(sid: int, data: ScanIn, u: User = Depends(require_roles("cntt", "gd_kd")), db: Session = Depends(get_db)):
+def scan(sid: int, data: ScanIn, u: User = Depends(require_roles("cntt", "gd_kd", "tp_kd")), db: Session = Depends(get_db)):
     """Robot AI quét fanpage (hoặc CNTT nhập) số lượt sót > 5 phút của ca."""
     s = db.get(PageShift, sid)
     if not s: raise HTTPException(404, "Không có ca")
@@ -164,7 +198,7 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
 def list_pr(status: str | None = None, tour_id: int | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
     AC.require(u, AC.PAYMENT_REQUEST_ROLES, "đề nghị chi")
     q = select(PaymentRequest).order_by(desc(PaymentRequest.id))
-    if u.role in ("gd_kd", "ptgd_mkt", "hcns"): q = q.where(PaymentRequest.created_by == u.username)   # bộ phận ngoài Điều hành chỉ thấy đề nghị mình lập
+    if u.role in ("gd_kd", "tp_kd", "ptgd_mkt", "hcns"): q = q.where(PaymentRequest.created_by == u.username)   # bộ phận ngoài Điều hành chỉ thấy đề nghị mình lập
     if status: q = q.where(PaymentRequest.status.in_(status.split(",")))
     if tour_id: q = q.where(PaymentRequest.tour_id == tour_id)
     return [pr_out(r, db) for r in db.execute(q.limit(300)).scalars()]
@@ -184,7 +218,7 @@ class PRIn(BaseModel):
 
 
 @router.post("/payment-requests", status_code=201)
-def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptgd_mkt", "hcns", "cntt", "gd_kd", "nv_kd")), db: Session = Depends(get_db)):
+def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptgd_mkt", "hcns", "cntt", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt")), db: Session = Depends(get_db)):
     try:
         r = O.create_request(db, u, data.model_dump())
     except ValueError as ex:

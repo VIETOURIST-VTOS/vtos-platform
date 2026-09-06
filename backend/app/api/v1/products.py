@@ -75,7 +75,8 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     v = T.tour_view(db, t, u)
     if not AC.can_see_cost(u):
         for k in ("settlement", "fixed_cost", "var_cost_per_pax", "actual_cost", "promo_value", "calc", "justification"): v[k] = None
-        if AC.own_only(u): v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") == u.id]
+        vis = AC.sales_ids_visible(db, u)
+        if vis is not None: v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") in vis]
     p = db.get(Product, t.product_id) if t.product_id else db.execute(select(Product).where(Product.code == t.product_code)).scalars().first() if t.product_code else None
     v["product"] = AC.mask_product(PS.product_out(p), u) if p else None
     v["seats"] = {"open": t.seats_open, "promo": t.seats_promo, "booked": R.booked_pax(t), "left": max(0, (t.seats_open or t.planned_pax) - R.booked_pax(t))}

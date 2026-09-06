@@ -14,20 +14,79 @@ from app.services import accounting as ACC
 
 REPORT_DEADLINE = time(20, 0)
 NO_TIMESHEET_DEPTS = ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt")   # khối bỏ chấm công → báo cáo ngày bắt buộc
+REPORT_DEPTS = ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt", "ketoan", "hcns")   # 7 phòng có mẫu báo cáo (như form Google)
+
+# Mẫu "Phần 2 – Số liệu trong ngày" theo phòng (đúng nhãn của form Google "Báo cáo công việc hằng ngày · Vietourist")
+DEPT_FORMS = {
+    "kd_le": {"name": "Kinh doanh Lẻ", "fields": ["Lead nhận trong ngày", "Lead đã liên hệ", "Booking chốt trong ngày", "Doanh thu chốt trong ngày", "Doanh thu luỹ kế tháng", "Ca trực page hôm nay", "Khách sắp khởi hành cần đôn đốc thanh toán"],
+              "hint": "Việc gắn với khách, booking hoặc đoàn thì ghi kèm mã để đối chiếu được trên Vietrip/VTOS."},
+    "kd_doan": {"name": "Kinh doanh Đoàn", "fields": ["Khách đang tiếp cận, báo giá gửi đi trong ngày", "Đoàn chốt trong ngày", "Đoàn đang chạy", "Đoàn đã kết thúc chờ quyết toán", "Công nợ cần đôn đốc", "Lợi nhuận quyết toán luỹ kế tháng"],
+                "hint": "Mỗi đoàn ghi tên khách hàng, số khách, ngày dự kiến, giá trị."},
+    "dieu_hanh": {"name": "Điều hành", "fields": ["Dự toán đã lập", "Dịch vụ đã đặt", "Chuyến đang chạy cần theo dõi", "Quyết toán đã đóng trong ngày", "Quyết toán còn treo quá hạn", "Hồ sơ visa trong ngày", "Sự vụ phát sinh"],
+                  "hint": "Ghi mã tour cho dự toán, dịch vụ, quyết toán."},
+    "marketing": {"name": "Marketing", "fields": ["Chi phí quảng cáo trong ngày", "Số lead thu được trong ngày", "Số lead đã chuyển về Vietrip", "Chiến dịch bật, tắt hoặc chỉnh ngân sách", "Nội dung và mạng xã hội", "Thiết kế", "Web và tối ưu công cụ tìm kiếm"],
+                  "hint": "Chi phí và lead ghi theo kênh (Facebook, Google, TikTok, Zalo…)."},
+    "cntt": {"name": "Công nghệ thông tin", "fields": ["Yêu cầu tiếp nhận trong ngày", "Yêu cầu đã xử lý xong", "Yêu cầu đang xử lý", "Sự cố hệ thống", "Thay đổi phân quyền đã thực hiện", "Cổng chặn đang lập trình", "Sao lưu hôm nay"],
+             "hint": "Ghi rõ hệ thống (Vietrip, VTOS, SePay, website) và người yêu cầu."},
+    "ketoan": {"name": "Kế toán", "fields": ["Phiếu thu đã xác nhận trong ngày", "Lệnh chi / thanh toán NCC đã thực hiện", "Quyết toán tour đã xác nhận", "Hóa đơn đã xuất trong ngày", "Công nợ khách hàng và NCC cần đôn đốc", "Thuế, BHXH, ngân hàng", "Tồn quỹ tiền mặt cuối ngày"],
+               "hint": "Ghi mã booking / mã tour / số hóa đơn để đối chiếu."},
+    "hcns": {"name": "Nhân sự Hành chính", "fields": ["Tuyển dụng", "Hồ sơ lao động đã xử lý", "Chấm công, phép và bảng lương", "Bảo hiểm xã hội và việc với cơ quan nhà nước", "Hành chính, văn thư và con dấu", "Sự vụ nhân sự cần báo cáo", "Thu chi tiền mặt và tồn quỹ cuối ngày"],
+             "hint": "Không có phát sinh thì ghi 'không'."},
+}
+PART_TITLES = {1: "VIỆC ĐÃ LÀM HÔM NAY", 2: "SỐ LIỆU TRONG NGÀY", 3: "VIỆC NGÀY MAI", 4: "VƯỚNG MẮC – ĐỀ XUẤT"}
+
+
+def dept_of_user(db: Session, u: User) -> str:
+    """Phòng dùng cho mẫu báo cáo: theo hồ sơ nhân sự, rồi theo vai trò."""
+    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    if e and e.department in DEPT_FORMS: return e.department
+    if u.department in DEPT_FORMS: return u.department
+    return {"nv_kd": "kd_le", "tn_kd": "kd_le", "tp_kd": "kd_le", "gd_kd": "kd_le", "ptgd_doan": "kd_doan", "nv_dh": "dieu_hanh", "tp_dh": "dieu_hanh", "nv_mkt": "marketing", "ptgd_mkt": "marketing",
+            "cntt": "cntt", "ketoan": "ketoan", "hcns": "hcns"}.get(u.role, "kd_le")
+
+
+def parse_part2(raw: str) -> dict:
+    """part2_numbers lưu JSON {nhãn: giá trị}; dữ liệu cũ dạng văn bản → {'Số liệu': text}."""
+    import json
+    if not raw: return {}
+    try:
+        v = json.loads(raw)
+        return v if isinstance(v, dict) else {"Số liệu": str(v)}
+    except ValueError:
+        return {"Số liệu": raw}
+
+
+def mail_text(u: User, dept: str, d: date, p1: str, p2: dict, p3: str, p4: str, staff_code: str = "") -> tuple[str, str]:
+    """Tiêu đề + nội dung thư đúng bố cục form Google (để gửi email baocao@ và lưu kèm)."""
+    name = DEPT_FORMS.get(dept, {}).get("name", dept)
+    subject = f"Báo cáo ngày · {u.full_name} · {name} · {d:%d/%m/%Y}"
+    lines = [f"PHẦN 1 — {PART_TITLES[1]}", p1.strip() or "(trống)", "", f"PHẦN 2 — {PART_TITLES[2]}"]
+    for k in DEPT_FORMS.get(dept, {}).get("fields", []) or list(p2.keys()):
+        lines.append(f"{k}: {str(p2.get(k, '')).strip() or 'không'}")
+    lines += ["", f"PHẦN 3 — {PART_TITLES[3]}", p3.strip() or "(trống)", "", f"PHẦN 4 — {PART_TITLES[4]}", p4.strip() or "không", "",
+              f"— {u.full_name}" + (f" · Mã NV {staff_code}" if staff_code else "") + f" · {name}"]
+    return subject, "\n".join(lines)
+
 CATEGORY_ACCOUNT = {"chi_tour": "154", "marketing": "641", "hanh_chinh": "642"}   # tam_ung: ghi 141 khi chi, hoàn ứng vào 154 khi Kế toán xác nhận quyết toán
-CATEGORY_CONFIRMER = {"chi_tour": ("tp_dh",), "marketing": ("ptgd_mkt",), "hanh_chinh": ("hcns",), "hoan_tien": ("gd_kd", "tp_dh"), "tam_ung": ("tp_dh",)}
+CATEGORY_CONFIRMER = {"chi_tour": ("tp_dh",), "marketing": ("ptgd_mkt",), "hanh_chinh": ("hcns",), "hoan_tien": ("gd_kd", "tp_kd", "tp_dh"), "tam_ung": ("tp_dh",)}
 
 
 # ====================== BÁO CÁO NGÀY ======================
 def robot_score(r: DailyReport) -> tuple[float, str]:
-    """Điểm nháp 0–10: mỗi phần có nội dung ≥ 20 ký tự = 2 điểm (8), nộp trước 20h = 2 điểm."""
-    parts = [r.part1_done, r.part2_numbers, r.part3_issues, r.part4_plan]
-    filled = sum(1 for p in parts if len((p or "").strip()) >= 20)
-    score = filled * 2 + (2 if r.on_time else 0)
+    """Điểm nháp 0–10: Phần 1 ≥ 20 ký tự = 3; Phần 2 điền ≥ 2/3 số trường = 2 (điền hết = 3); Phần 3 ≥ 20 ký tự = 2; nộp trước 20h = 2."""
+    p2 = parse_part2(r.part2_numbers)
+    filled2 = sum(1 for v in p2.values() if str(v or "").strip())
+    n2 = max(len(p2), 1)
+    s1 = 3 if len((r.part1_done or "").strip()) >= 20 else 0
+    s2 = 3 if filled2 >= n2 else 2 if filled2 * 3 >= n2 * 2 else 1 if filled2 else 0
+    s3 = 2 if len((r.part4_plan or "").strip()) >= 20 else 0   # part4_plan = việc ngày mai (Phần 3 của form)
+    score = s1 + s2 + s3 + (2 if r.on_time else 0)
     notes = []
-    if filled < 4: notes.append(f"thiếu/quá ngắn {4 - filled} phần")
+    if not s1: notes.append("Phần 1 quá ngắn")
+    if s2 < 3: notes.append(f"Phần 2 điền {filled2}/{n2} mục")
+    if not s3: notes.append("Việc ngày mai quá ngắn")
     if not r.on_time: notes.append("nộp sau 20:00")
-    return float(score), "; ".join(notes) or "Đủ 4 phần, đúng giờ"
+    return float(min(score, 10)), "; ".join(notes) or "Đủ 4 phần, đúng giờ"
 
 
 def submit_report(db: Session, u: User, d: date, p1: str, p2: str, p3: str, p4: str) -> DailyReport:

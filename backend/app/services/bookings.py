@@ -11,7 +11,7 @@ from app.services import rules as R
 from app.services import accounting as ACC
 from app.services import payments as PAY
 
-UNLOCK_ROLES = ("tp_dh", "gd_kd", "cntt", "tgd")
+UNLOCK_ROLES = ("tp_dh", "gd_kd", "tp_kd", "cntt", "tgd")
 CANCEL_ROLES = ("nv_dh", "tp_dh")
 
 
@@ -175,7 +175,7 @@ def apply_retention(db: Session, u: User, rt: Retention, nb: Booking, amount: fl
 
 def refund_retention(db: Session, u: User, rt: Retention, amount: float | None, note: str) -> PaymentRequest:
     """Đề xuất hoàn tiền cho khách (đi luồng đề nghị chi hoàn tiền: GĐ KD/TP ĐH xác nhận → Kế toán → TGĐ → chi)."""
-    if u.role not in ("nv_dh", "tp_dh", "nv_kd", "gd_kd", "ketoan"): raise HTTPException(403, "Không có quyền đề xuất hoàn tiền")
+    if u.role not in ("nv_dh", "tp_dh", "nv_kd", "tn_kd", "tp_kd", "gd_kd", "ketoan"): raise HTTPException(403, "Không có quyền đề xuất hoàn tiền")
     if rt.status != "hieu_luc": raise Gate("BAO_LUU", "Khoản bảo lưu không còn hiệu lực")
     if rt.refund_request_id:
         pr = db.get(PaymentRequest, rt.refund_request_id)
@@ -201,7 +201,7 @@ def on_refund_paid(db: Session, pr: PaymentRequest) -> None:
 
 def cancel_retention(db: Session, u: User, rt: Retention, note: str) -> str:
     """Hủy bảo lưu (khách bỏ / hết hạn): số còn lại ghi thu nhập khác (Nợ 131 – Có 711)."""
-    if u.role not in ("tp_dh", "gd_kd", "tgd", "ketoan"): raise HTTPException(403, "Chỉ TP ĐH / GĐ KD / Kế toán / TGĐ hủy bảo lưu")
+    if u.role not in ("tp_dh", "gd_kd", "tp_kd", "tgd", "ketoan"): raise HTTPException(403, "Chỉ TP ĐH / GĐ KD / Kế toán / TGĐ hủy bảo lưu")
     if rt.status != "hieu_luc": raise Gate("BAO_LUU", "Khoản bảo lưu không còn hiệu lực")
     if not (note or "").strip(): raise Gate("BAO_LUU", "Hủy bảo lưu phải ghi lý do")
     amt = round(rt.remaining)

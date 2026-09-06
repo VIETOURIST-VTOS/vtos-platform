@@ -1,0 +1,1279 @@
+{
+ "nguon": "File lương gốc T08/2026 (HCNS lập, Phan Ngọc Duy) – chỉ lấy mã, họ tên, chức vụ, phòng, nhóm; không có lương",
+ "ngay": "2026-09-06",
+ "nhan_su": [
+  {
+   "ma": "1",
+   "ten": "Trần Văn Tuấn",
+   "chuc_vu": "CTHĐQT",
+   "phong": "ban_tgd",
+   "vi_tri": "khac",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "chutich"
+  },
+  {
+   "ma": "2",
+   "ten": "Nguyễn Dương Trung Hiếu",
+   "chuc_vu": "T.Giám Đốc",
+   "phong": "ban_tgd",
+   "vi_tri": "khac",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "tgd"
+  },
+  {
+   "ma": "294",
+   "ten": "Lê Xuân Minh",
+   "chuc_vu": "IT Leader",
+   "phong": "cntt",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "cntt"
+  },
+  {
+   "ma": "300",
+   "ten": "Huỳnh Tuấn Kiệt",
+   "chuc_vu": "TTS IT",
+   "phong": "cntt",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "cntt"
+  },
+  {
+   "ma": "25",
+   "ten": "Nguyễn Thị Mai",
+   "chuc_vu": "ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "26",
+   "ten": "Nguyễn Hữu Khoa Vinh",
+   "chuc_vu": "TP ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "tp",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "tp_dh"
+  },
+  {
+   "ma": "36",
+   "ten": "Đặng Ngọc Thúy Vy",
+   "chuc_vu": "ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "108",
+   "ten": "Nguyễn Lâm Hồng Vy",
+   "chuc_vu": "ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "172",
+   "ten": "Mai Thị Yến Nhi",
+   "chuc_vu": "ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "174",
+   "ten": "Lê Thị Diễm Trang",
+   "chuc_vu": "ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "175",
+   "ten": "Vũ Tuyết Nhi",
+   "chuc_vu": "ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "176",
+   "ten": "Nguyễn Thị Kiều Nga",
+   "chuc_vu": "ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "177",
+   "ten": "Nguyễn Phương Bảo Trâm",
+   "chuc_vu": "ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "219",
+   "ten": "Trần Thị Lệ Thi",
+   "chuc_vu": "ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "222",
+   "ten": "Phạm Thị Thúy Vy",
+   "chuc_vu": "ĐH",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "261",
+   "ten": "Lê Văn Lực",
+   "chuc_vu": "Dịch Thuật",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "62",
+   "ten": "Bùi Thị Thảo",
+   "chuc_vu": "ĐH Hà Nội",
+   "phong": "dieu_hanh",
+   "vi_tri": "nv",
+   "nhom": "VPHN",
+   "van_phong": "hanoi",
+   "vai_tro": "nv_dh"
+  },
+  {
+   "ma": "53",
+   "ten": "Nguyễn Hồng Huấn",
+   "chuc_vu": "GĐ ĐH xe",
+   "phong": "doi_xe",
+   "vi_tri": "tp",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "75",
+   "ten": "Đoàn Hoàng Minh",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "76",
+   "ten": "Châu Hữu Hồng Sang",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "77",
+   "ten": "Võ Thanh Long",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "80",
+   "ten": "Nguyễn Thanh Quang",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "81",
+   "ten": "Lê Tùng Phương",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "84",
+   "ten": "Bùi Nguyễn Duy Trường",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "87",
+   "ten": "Lê Anh Tú",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "93",
+   "ten": "Trần Văn Sáng",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "121",
+   "ten": "Phan Tấn Thuận",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "206",
+   "ten": "Đoàn Hoàng Tuấn",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "207",
+   "ten": "Nguyễn Phú Minh Duy",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "208",
+   "ten": "Trần Văn Dễ",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "249",
+   "ten": "Nguyễn Thanh Phong",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "250",
+   "ten": "Nguyễn Hoàng Ân",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "251",
+   "ten": "Võ Đình Phục",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "256",
+   "ten": "Nguyễn Ngọc Quang",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "293",
+   "ten": "Nguyễn Long Hồ",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "295",
+   "ten": "Đặng Nguyễn Vinh Hiển",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "296",
+   "ten": "Trần Vinh",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "297",
+   "ten": "Trần Vinh",
+   "chuc_vu": "Tài xế Vietrip",
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "301",
+   "ten": "Cao Huỳnh Quang",
+   "chuc_vu": "Tài xế Vietrip",
+   "thu_viec": true,
+   "phong": "doi_xe",
+   "vi_tri": "tai_xe",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "15",
+   "ten": "Vũ Văn Vinh",
+   "chuc_vu": "Bảo vệ - THĐ",
+   "phong": "hcns",
+   "vi_tri": "khac",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "17",
+   "ten": "Trần Văn Lữu",
+   "chuc_vu": "Bảo vệ - THĐ",
+   "phong": "hcns",
+   "vi_tri": "khac",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "205",
+   "ten": "Phạm Thị Hoàng Oanh",
+   "chuc_vu": "Pháp chế",
+   "phong": "hcns",
+   "vi_tri": "khac",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "231",
+   "ten": "Phạm Văn Xuân",
+   "chuc_vu": "Bảo vệ - LVS",
+   "phong": "hcns",
+   "vi_tri": "khac",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "275",
+   "ten": "Phạm Thị Hữu Loan",
+   "chuc_vu": "QH nhà đầu tư",
+   "phong": "hcns",
+   "vi_tri": "khac",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "285",
+   "ten": "Trần Thị Thùy Trang",
+   "chuc_vu": "HCNS",
+   "phong": "hcns",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "hcns"
+  },
+  {
+   "ma": "290",
+   "ten": "Phan Ngọc Duy",
+   "chuc_vu": "HCNS",
+   "phong": "hcns",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "hcns"
+  },
+  {
+   "ma": "287",
+   "ten": "Vũ Lý Bảo Trâm",
+   "chuc_vu": "HCNS - Vận hành",
+   "phong": "hcns",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "hcns"
+  },
+  {
+   "ma": "54",
+   "ten": "Nguyễn Tất Thắng",
+   "chuc_vu": "P. PHDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "55",
+   "ten": "Lê Hoàng Anh",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "57",
+   "ten": "Phạm Xuân Trường",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "58",
+   "ten": "Nguyễn Đức",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "113",
+   "ten": "Lê Phước Hậu",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "123",
+   "ten": "Nguyễn Minh Chiến",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "152",
+   "ten": "Lê Minh Quân",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "156",
+   "ten": "Đặng Huy Thông",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "157",
+   "ten": "Trần Quang Sang",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "158",
+   "ten": "Đặng Minh Phương",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "194",
+   "ten": "Dương Hoàng Anh Tín",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "241",
+   "ten": "Nguyễn Hữu Phúc",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "242",
+   "ten": "Ngô Quang Tuấn",
+   "chuc_vu": "HDV",
+   "phong": "huong_dan",
+   "vi_tri": "hdv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": ""
+  },
+  {
+   "ma": "7",
+   "ten": "Nguyễn Mạnh Huỳnh",
+   "chuc_vu": "PTGD",
+   "phong": "kd_doan",
+   "vi_tri": "ptgd_doan",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "ptgd_doan"
+  },
+  {
+   "ma": "16",
+   "ten": "Trần Mỹ Duyên",
+   "chuc_vu": "NVNN",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "128",
+   "ten": "Phạm Thị Hồng Nghiệp",
+   "chuc_vu": "NVKD ĐOÀN NĐ",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_ND",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "129",
+   "ten": "Lê Kim Oanh",
+   "chuc_vu": "NVKD ĐOÀN NĐ",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_ND",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "147",
+   "ten": "Nguyễn Quang Lâm",
+   "chuc_vu": "NVKD ĐOÀN NĐ",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_ND",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "191",
+   "ten": "Mai Thị Diệu Trinh",
+   "chuc_vu": "NVKD ĐOÀN NĐ",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_ND",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "30",
+   "ten": "Mã Huệ Linh",
+   "chuc_vu": "NVKD ĐOÀN OB",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_OB",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "106",
+   "ten": "Nguyễn An Bình Giang",
+   "chuc_vu": "NVKD ĐOÀN OB",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_OB",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "160",
+   "ten": "Phạm Thị Thanh Nhàn",
+   "chuc_vu": "NVKD ĐOÀN OB",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_OB",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "220",
+   "ten": "Đào Thị Cẩm Thu",
+   "chuc_vu": "NVKD ĐOÀN OB",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_OB",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "224",
+   "ten": "Nguyễn Thị Ngọc Linh",
+   "chuc_vu": "NVKD ĐOÀN OB",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_OB",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "253",
+   "ten": "Lê Đoàn Hoàng Hiệp",
+   "chuc_vu": "NVKD ĐOÀN OB",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_OB",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "306",
+   "ten": "Trần Thị Yến Nhi",
+   "chuc_vu": "NVKD ĐOÀN OB",
+   "phong": "kd_doan",
+   "vi_tri": "nv",
+   "nhom": "DOAN_OB",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "8",
+   "ten": "Lê Thịnh",
+   "chuc_vu": "GĐKD",
+   "phong": "kd_le",
+   "vi_tri": "gd_kd",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "gd_kd"
+  },
+  {
+   "ma": "37",
+   "ten": "Trương Hải Đăng",
+   "chuc_vu": "TPKD",
+   "phong": "kd_le",
+   "vi_tri": "tp",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "tp_kd"
+  },
+  {
+   "ma": "114",
+   "ten": "Nguyễn Ngọc Thạnh",
+   "chuc_vu": "TL Team KD 1",
+   "phong": "kd_le",
+   "vi_tri": "tl",
+   "nhom": "KD1",
+   "van_phong": "hcm",
+   "vai_tro": "tn_kd"
+  },
+  {
+   "ma": "134",
+   "ten": "Văn Thị Tố Uyên",
+   "chuc_vu": "NVKD 1",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD1",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "136",
+   "ten": "Lê Thị Uyển Nhi",
+   "chuc_vu": "NVKD 1",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD1",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "195",
+   "ten": "Phạm Hoàng Tẩu Nam",
+   "chuc_vu": "NVKD 1",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD1",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "210",
+   "ten": "Lưu Toàn Huy",
+   "chuc_vu": "NVKD 1",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD1",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "269",
+   "ten": "Nguyễn Ngọc Vân Anh",
+   "chuc_vu": "NVKD 1",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD1",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "102",
+   "ten": "Nguyễn Thành Luân",
+   "chuc_vu": "TL Team KD 2",
+   "phong": "kd_le",
+   "vi_tri": "tl",
+   "nhom": "KD2",
+   "van_phong": "hcm",
+   "vai_tro": "tn_kd"
+  },
+  {
+   "ma": "163",
+   "ten": "Nguyễn Thị Thùy",
+   "chuc_vu": "NVKD 2",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD2",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "165",
+   "ten": "Nguyễn Thị Thùy Linh",
+   "chuc_vu": "NVKD 2",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD2",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "166",
+   "ten": "Trần Lâm Ngọc Ngân",
+   "chuc_vu": "NVKD 2",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD2",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "197",
+   "ten": "Phạm Ngọc Ánh",
+   "chuc_vu": "NVKD 2",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD2",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "229",
+   "ten": "Mai Thị Thu Tuyết",
+   "chuc_vu": "NVKD 2",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD2",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "271",
+   "ten": "Trần Hoàng Anh",
+   "chuc_vu": "NVKD 2",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD2",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "116",
+   "ten": "Lê Minh Hoàng",
+   "chuc_vu": "NVKD 3",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD3",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "117",
+   "ten": "Hồ Bảo Hà",
+   "chuc_vu": "NVKD 3",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD3",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "135",
+   "ten": "Ninh Nữ Lệ Giang",
+   "chuc_vu": "TL Team KD 3",
+   "phong": "kd_le",
+   "vi_tri": "tl",
+   "nhom": "KD3",
+   "van_phong": "hcm",
+   "vai_tro": "tn_kd"
+  },
+  {
+   "ma": "138",
+   "ten": "Trần Thị Mận",
+   "chuc_vu": "NVKD 3",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD3",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "161",
+   "ten": "Hồ Thị Gia Mẩn",
+   "chuc_vu": "NVKD 3",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD3",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "188",
+   "ten": "Nguyễn Hoàng Bảo Vi",
+   "chuc_vu": "NVKD 3",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD3",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "200",
+   "ten": "Đặng Thị Thu Hồng",
+   "chuc_vu": "NVKD 3",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD3",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "49",
+   "ten": "Quách Thị Thuỳ Trang",
+   "chuc_vu": "TL Team KD 4",
+   "phong": "kd_le",
+   "vi_tri": "tl",
+   "nhom": "KD4",
+   "van_phong": "hcm",
+   "vai_tro": "tn_kd"
+  },
+  {
+   "ma": "115",
+   "ten": "Trần Thị Kim Hồng",
+   "chuc_vu": "NVKD 4",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD4",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "211",
+   "ten": "Nguyễn Huỳnh Đức Thành",
+   "chuc_vu": "NVKD 4",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD4",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "216",
+   "ten": "Lê Thị Nhị Ngọc",
+   "chuc_vu": "NVKD 4",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD4",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "298",
+   "ten": "Đặng Thủy Tiên",
+   "chuc_vu": "NVKD 4",
+   "thu_viec": true,
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD4",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "10",
+   "ten": "Trần Vũ Hoài Thương",
+   "chuc_vu": "TL Team KD 5",
+   "phong": "kd_le",
+   "vi_tri": "tl",
+   "nhom": "KD5",
+   "van_phong": "hcm",
+   "vai_tro": "tn_kd"
+  },
+  {
+   "ma": "199",
+   "ten": "Mai Trung Hiếu",
+   "chuc_vu": "NVKD 5",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD5",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "203",
+   "ten": "Hồ Quốc Anh",
+   "chuc_vu": "NVKD 5",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "KD5",
+   "van_phong": "hcm",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "52",
+   "ten": "Đoàn Phương Nhi",
+   "chuc_vu": "NVKD - VP Bình Dương",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "VPBD",
+   "van_phong": "binhduong",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "246",
+   "ten": "Nguyễn Ngọc Yến",
+   "chuc_vu": "NVKD - VPCT",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "VPCT",
+   "van_phong": "cantho",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "247",
+   "ten": "Trần Văn Vẹn",
+   "chuc_vu": "NVKD - VPCT",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "VPCT",
+   "van_phong": "cantho",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "303",
+   "ten": "Bùi Phúc Bửu Lâm",
+   "chuc_vu": "NVKD - VP Cần Thơ",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "VPCT",
+   "van_phong": "cantho",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "304",
+   "ten": "Trần Thị Kiều Tiên",
+   "chuc_vu": "NVKD - VP Cần Thơ",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "VPCT",
+   "van_phong": "cantho",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "270",
+   "ten": "Đỗ Thị Hồng Nhung",
+   "chuc_vu": "NVKD - VPHN",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "VPHN",
+   "van_phong": "hanoi",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "223",
+   "ten": "Phạm Thu Hà",
+   "chuc_vu": "VPHP",
+   "phong": "kd_le",
+   "vi_tri": "nv",
+   "nhom": "VPHP",
+   "van_phong": "haiphong",
+   "vai_tro": "nv_kd"
+  },
+  {
+   "ma": "18",
+   "ten": "Nguyễn Ngọc Huyền",
+   "chuc_vu": "Kế toán",
+   "phong": "ketoan",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "ketoan"
+  },
+  {
+   "ma": "100",
+   "ten": "Nguyễn Văn Chệch",
+   "chuc_vu": "GĐTC",
+   "phong": "ketoan",
+   "vi_tri": "tp",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "ketoan"
+  },
+  {
+   "ma": "276",
+   "ten": "Bạc Cầm Duy Di",
+   "chuc_vu": "Kế toán",
+   "phong": "ketoan",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "ketoan"
+  },
+  {
+   "ma": "289",
+   "ten": "Nguyễn Thanh Hoài",
+   "chuc_vu": "Kế toán",
+   "phong": "ketoan",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "ketoan"
+  },
+  {
+   "ma": "305",
+   "ten": "Đoàn Thị Lan Phương",
+   "chuc_vu": "Kế toán",
+   "phong": "ketoan",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "ketoan"
+  },
+  {
+   "ma": "307",
+   "ten": "Phan Thị Minh Hương",
+   "chuc_vu": "KẾ TOÁN",
+   "phong": "ketoan",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "ketoan"
+  },
+  {
+   "ma": "44",
+   "ten": "Phan Ngọc Tuấn",
+   "chuc_vu": "P. TGĐ marketing",
+   "phong": "marketing",
+   "vi_tri": "khac",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "ptgd_mkt"
+  },
+  {
+   "ma": "70",
+   "ten": "Hoàng Thị Thu Thảo",
+   "chuc_vu": "Marketing",
+   "phong": "marketing",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_mkt"
+  },
+  {
+   "ma": "71",
+   "ten": "Nguyễn Tấn Hưng",
+   "chuc_vu": "Marketing",
+   "phong": "marketing",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_mkt"
+  },
+  {
+   "ma": "72",
+   "ten": "Nguyễn Thị Ngọc Trâm",
+   "chuc_vu": "CTV",
+   "hop_dong": "ctv",
+   "phong": "marketing",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_mkt"
+  },
+  {
+   "ma": "74",
+   "ten": "Bùi Gia Phát",
+   "chuc_vu": "Marketing",
+   "phong": "marketing",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_mkt"
+  },
+  {
+   "ma": "78",
+   "ten": "Ngô Thị Diễm Hằng",
+   "chuc_vu": "Marketing",
+   "phong": "marketing",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_mkt"
+  },
+  {
+   "ma": "99",
+   "ten": "Bùi Ngọc Khánh Tâm",
+   "chuc_vu": "Marketing",
+   "phong": "marketing",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_mkt"
+  },
+  {
+   "ma": "154",
+   "ten": "Võ Huỳnh Minh Anh",
+   "chuc_vu": "Marketing",
+   "phong": "marketing",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_mkt"
+  },
+  {
+   "ma": "228",
+   "ten": "Lý Thị Kim Thoa",
+   "chuc_vu": "Marketing",
+   "phong": "marketing",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_mkt"
+  },
+  {
+   "ma": "234",
+   "ten": "Lê Phan Văn Khánh",
+   "chuc_vu": "Marketing",
+   "phong": "marketing",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_mkt"
+  },
+  {
+   "ma": "267",
+   "ten": "Hà Ngọc Mỹ Huyền",
+   "chuc_vu": "CSKH",
+   "phong": "marketing",
+   "vi_tri": "nv",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_mkt"
+  }
+ ]
+}

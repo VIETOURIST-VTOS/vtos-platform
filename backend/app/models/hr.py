@@ -8,7 +8,8 @@ DEPARTMENTS = {"kd_le": "Kinh doanh Lẻ", "kd_doan": "Kinh doanh Đoàn", "dieu
                "cntt": "CNTT", "ketoan": "Kế toán", "hcns": "HCNS", "huong_dan": "Hướng dẫn", "doi_xe": "Đội xe", "ban_tgd": "Ban TGĐ"}
 POSITIONS = {"nv": "Nhân viên", "tl": "Team Leader", "tp": "Trưởng phòng", "gd_kd": "Giám đốc Kinh doanh", "ptgd_doan": "Phó TGĐ tour đoàn",
              "sale_admin": "Sale Admin", "visa": "Chuyên viên visa", "hdv": "Hướng dẫn viên", "tai_xe": "Tài xế", "khac": "Khác"}
-OFFICES = {"hcm": "TP.HCM", "cantho": "Cần Thơ", "binhduong": "Bình Dương", "hanoi": "Hà Nội"}
+OFFICES = {"hcm": "TP.HCM", "cantho": "Cần Thơ", "binhduong": "Bình Dương", "hanoi": "Hà Nội", "haiphong": "Hải Phòng"}
+SALES_GROUPS = {"KD1": "Nhóm KD 1", "KD2": "Nhóm KD 2", "KD3": "Nhóm KD 3", "KD4": "Nhóm KD 4", "KD5": "Nhóm KD 5", "VPCT": "VP Cần Thơ", "VPHN": "VP Hà Nội", "VPHP": "VP Hải Phòng", "VPBD": "VP Bình Dương", "DOAN_OB": "Đoàn Outbound", "DOAN_ND": "Đoàn Nội địa"}
 
 
 class Employee(Base):
@@ -19,6 +20,8 @@ class Employee(Base):
     full_name: Mapped[str] = mapped_column(String(120))
     department: Mapped[str] = mapped_column(String(20))
     position: Mapped[str] = mapped_column(String(20), default="nv")
+    title: Mapped[str] = mapped_column(String(60), default="")             # chức vụ ghi trên bảng lương (NVKD 2, TL Team KD 1, ĐH…)
+    sales_group: Mapped[str] = mapped_column(String(20), default="")      # KD1–KD5, VPCT, VPHN, VPBD, VPHP, DOAN_OB, DOAN_ND
     office: Mapped[str] = mapped_column(String(20), default="hcm")
     contract_type: Mapped[str] = mapped_column(String(10), default="hdld")   # hdld / ctv / doi_tac
     base_salary: Mapped[float] = mapped_column(Float, default=0)             # lương công việc (gắn chức vụ)

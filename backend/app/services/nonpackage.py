@@ -11,7 +11,7 @@ from app.services import rules as R
 from app.services import bookings as BK
 from app.services.products import event as EV
 
-CREATE_ROLES = ("nv_kd", "gd_kd", "nv_dh", "tp_dh")
+CREATE_ROLES = ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_dh", "tp_dh")
 
 
 class Gate(HTTPException):
@@ -67,7 +67,7 @@ def update(db: Session, u: User, b: Booking, d: dict) -> Booking:
     if t.tour_type != "non_package": raise Gate("NP", "Không phải dịch vụ lẻ")
     if b.cancelled: raise Gate("TRANG_THAI", "Dịch vụ đã hủy")
     if t.status not in ("da_duyet", "ket_thuc"): raise Gate("TRANG_THAI", "Dịch vụ đã chốt – không sửa")
-    if u.role not in ("nv_dh", "tp_dh", "gd_kd") and u.id != b.sales_id: raise HTTPException(403, "Chỉ sale phụ trách / Điều hành sửa")
+    if u.role not in ("nv_dh", "tp_dh", "gd_kd", "tp_kd", "tn_kd") and u.id != b.sales_id: raise HTTPException(403, "Chỉ sale phụ trách / Điều hành sửa")
     before = {"gia": b.amount, "gia_von": b.cost_amount, "loai": b.service_type}
     if d.get("service_type"):
         st = d["service_type"].upper()

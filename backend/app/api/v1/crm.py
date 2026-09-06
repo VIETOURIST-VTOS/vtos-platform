@@ -9,12 +9,13 @@ from app.api.deps import current_user, require_roles, robot_auth
 from app.models.core import User, Booking
 from app.models.crm import Lead, LeadChannelStat, ZaloMessage, LEAD_CHANNELS, LEAD_STATUS
 from app.services import leads as L
+from app.services import access as AC
 from app.services import zalo as Z
 from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1", tags=["crm"])
-CRM_ROLES = ("nv_kd", "gd_kd", "ptgd_mkt", "tgd", "chutich", "cntt", "tp_dh", "nv_dh", "bks", "hcns")
-EDIT_ROLES = ("nv_kd", "gd_kd", "ptgd_mkt", "cntt", "tgd")
+CRM_ROLES = ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_mkt", "ptgd_mkt", "tgd", "chutich", "cntt", "tp_dh", "nv_dh", "bks", "hcns")
+EDIT_ROLES = ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_mkt", "ptgd_mkt", "cntt", "tgd")
 
 
 class LeadIn(BaseModel):
@@ -66,7 +67,9 @@ def list_leads(month: str = "", channel: str = "", status: str = "", q: str = ""
     if month: qs = qs.where(Lead.lead_month == month)
     if channel: qs = qs.where(Lead.channel == channel)
     if status: qs = qs.where(Lead.status == status)
-    if mine or u.role == "nv_kd": qs = qs.where(Lead.sales_id == u.id)
+    vis = AC.sales_ids_visible(db, u)
+    if mine: qs = qs.where(Lead.sales_id == u.id)
+    elif vis is not None: qs = qs.where(Lead.sales_id.in_(vis))   # NV KD: lead của mình; trưởng nhóm: của nhóm
     if q:
         like = f"%{q.strip()}%"; qs = qs.where((Lead.phone.ilike(like)) | (Lead.name.ilike(like)) | (Lead.interest.ilike(like)))
     rows = list(db.execute(qs.limit(min(limit, 2000))).scalars())
@@ -95,7 +98,8 @@ async def import_leads(file: UploadFile = File(...), default_month: str = "", u:
 def patch_lead(lid: int, data: LeadPatch, u: User = Depends(require_roles(*EDIT_ROLES)), db: Session = Depends(get_db)):
     l = db.get(Lead, lid)
     if not l: raise HTTPException(404, "Không có lead")
-    if u.role == "nv_kd" and l.sales_id not in (None, u.id): raise HTTPException(403, "Lead của sale khác")
+    vis = AC.sales_ids_visible(db, u)
+    if vis is not None and l.sales_id not in (None, *vis): raise HTTPException(403, "Lead của sale khác nhóm")
     d = data.model_dump(exclude_none=True)
     if "status" in d and d["status"] not in LEAD_STATUS: raise HTTPException(422, "Trạng thái không hợp lệ")
     for k, v in d.items(): setattr(l, k, v)
@@ -168,7 +172,7 @@ def zalo_messages(status: str = "", limit: int = 100, u: User = Depends(require_
 
 
 @router.post("/zalo/send-pending")
-def zalo_send_pending(u: User = Depends(require_roles("cntt", "ptgd_mkt", "gd_kd", "tgd")), db: Session = Depends(get_db)):
+def zalo_send_pending(u: User = Depends(require_roles("cntt", "ptgd_mkt", "gd_kd", "tp_kd", "tgd")), db: Session = Depends(get_db)):
     return Z.send_pending(db)
 
 

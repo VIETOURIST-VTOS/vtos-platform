@@ -7,18 +7,18 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles
 from app.models.core import Tour, User
-from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, GuideRate, INCIDENT_LEVELS, INCIDENT_STATUS, DEPARTMENTS, POSITIONS, OFFICES
+from app.models.hr import SALES_GROUPS, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, GuideRate, INCIDENT_LEVELS, INCIDENT_STATUS, DEPARTMENTS, POSITIONS, OFFICES
 from app.services import hr as H
 from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1", tags=["nhan-su"])
 HR_WRITE = ("hcns", "cntt")
-HR_READ = ("hcns", "cntt", "ketoan", "tgd", "chutich", "bks", "tp_dh", "gd_kd", "ptgd_doan")
+HR_READ = ("hcns", "cntt", "ketoan", "tgd", "chutich", "bks", "tp_dh", "gd_kd", "tp_kd", "ptgd_doan")
 
 
 def emp_out(e: Employee) -> dict:
     return {"id": e.id, "code": e.code, "user_id": e.user_id, "full_name": e.full_name, "department": e.department, "department_name": DEPARTMENTS.get(e.department, e.department),
-            "position": e.position, "position_name": POSITIONS.get(e.position, e.position), "office": e.office, "office_name": OFFICES.get(e.office, e.office),
+            "position": e.position, "position_name": POSITIONS.get(e.position, e.position), "title": e.title, "sales_group": e.sales_group, "office": e.office, "office_name": OFFICES.get(e.office, e.office),
             "contract_type": e.contract_type, "base_salary": e.base_salary, "start_date": e.start_date, "probation": e.probation, "transition_list": e.transition_list,
             "card_no": e.card_no, "card_type": e.card_type, "card_expiry": e.card_expiry, "member_org": e.member_org, "ctv_contract": e.ctv_contract,
             "advance_limit": e.advance_limit, "active": e.active, "guide_ok": H.guide_eligible(e, date.today())[0] if e.department == "huong_dan" else None}
@@ -53,6 +53,21 @@ class EmployeeIn(BaseModel):
     member_org: bool = False
     ctv_contract: bool = False
     advance_limit: float = 0
+
+
+@router.get("/staff")
+def staff_directory(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Danh bạ nhân viên (mã NV, họ tên, phòng, nhóm) – mọi người đăng nhập đều xem được để chọn người/ghi báo cáo."""
+    from app.services import staff as STF
+    return {"rows": STF.staff_directory(db), "departments": DEPARTMENTS, "groups": SALES_GROUPS}
+
+
+@router.post("/employees/import-master")
+def import_master(u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
+    """Nạp danh sách nhân viên chính thức từ bảng lương HCNS (app/data/nhan_su_*.json): mã NV, phòng, nhóm, chức vụ; ghép/tạo tài khoản."""
+    from app.services import staff as STF
+    st = STF.import_master(db, u)
+    return {"message": f"Đã nạp: cập nhật {st['updated']}, tạo mới {st['created']} hồ sơ; ghép {st['users_linked']} tài khoản, tạo {st['users_created']} tài khoản mới (mật khẩu = mã NV)", **st}
 
 
 @router.post("/employees", status_code=201)
@@ -394,7 +409,7 @@ class IncidentIn(BaseModel):
 
 
 @router.post("/incidents", status_code=201)
-def incident_create(data: IncidentIn, u: User = Depends(require_roles("hcns", "tp_dh", "gd_kd", "ptgd_doan", "tgd", "cntt", "tp")), db: Session = Depends(get_db)):
+def incident_create(data: IncidentIn, u: User = Depends(require_roles("hcns", "tp_dh", "gd_kd", "tp_kd", "tn_kd", "ptgd_doan", "tgd", "cntt", "tp")), db: Session = Depends(get_db)):
     """Trưởng bộ phận nơi phát sinh lập biên bản (TP KD với tour lẻ, PTGĐ đoàn với Phòng Đoàn, TP ĐH với Điều hành, phụ trách Phòng HD với HDV)."""
     if data.level not in INCIDENT_LEVELS: raise HTTPException(422, "Mức sự vụ 1–3 theo bảng phân mức")
     i = Incident(**data.model_dump(), created_by=u.username)

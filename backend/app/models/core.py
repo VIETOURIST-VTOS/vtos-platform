@@ -13,7 +13,10 @@ ROLES = {
     "tp_dh": "Trưởng phòng Điều hành",
     "nv_dh": "Nhân viên điều hành",
     "nv_kd": "Nhân viên kinh doanh",
+    "tn_kd": "Trưởng nhóm Kinh doanh",
+    "tp_kd": "Trưởng phòng Kinh doanh",
     "gd_kd": "Giám đốc Kinh doanh",
+    "nv_mkt": "Nhân viên Marketing",
     "ketoan": "Kế toán",
     "hcns": "Nhân sự Hành chính",
     "cntt": "Công nghệ thông tin",
@@ -28,6 +31,8 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(30))
     department: Mapped[str] = mapped_column(String(60), default="")
+    sales_group: Mapped[str] = mapped_column(String(20), default="")   # nhóm kinh doanh KD1–KD5 / VPCT / VPHN / VPBD / DOAN_OB / DOAN_ND
+    staff_code: Mapped[str] = mapped_column(String(20), default="")    # mã nhân viên HCNS (bảng lương), vd 114
     password_hash: Mapped[str] = mapped_column(String(200))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 

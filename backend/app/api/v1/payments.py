@@ -156,7 +156,8 @@ def ignore_txn(tid: int, data: IgnoreIn, u: User = Depends(require_roles("ketoan
 def list_receipts(limit: int = 200, u: User = Depends(current_user), db: Session = Depends(get_db)):
     AC.require(u, AC.BOOKING_ROLES, "phiếu thu")
     q = select(Receipt).order_by(desc(Receipt.created_at))
-    if AC.own_only(u): q = q.join(Booking, Booking.id == Receipt.booking_id).where(Booking.sales_id == u.id)   # sale chỉ thấy phiếu thu của khách mình
+    vis = AC.sales_ids_visible(db, u)
+    if vis is not None: q = q.join(Booking, Booking.id == Receipt.booking_id).where(Booking.sales_id.in_(vis))   # sale/nhóm chỉ thấy phiếu thu của khách mình
     return [receipt_out(r, db) for r in db.execute(q.limit(limit)).scalars()]
 
 
@@ -193,7 +194,8 @@ def collections_summary(u: User = Depends(current_user), db: Session = Depends(g
     AC.require(u, AC.BOOKING_ROLES, "tổng quan thu tiền")
     rows = []
     qb = select(Booking).order_by(desc(Booking.created_at))
-    if AC.own_only(u): qb = qb.where(Booking.sales_id == u.id)
+    vis = AC.sales_ids_visible(db, u)
+    if vis is not None: qb = qb.where(Booking.sales_id.in_(vis))
     for b in db.execute(qb).scalars():
         due = (b.amount - b.discount) - P.paid_amount(db, b.id)
         rows.append({"booking_id": b.id, "code": b.code, "tour_code": b.tour.code if b.tour else "", "customer_name": b.customer_name,

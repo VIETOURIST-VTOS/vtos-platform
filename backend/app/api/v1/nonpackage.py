@@ -58,7 +58,8 @@ def _b(db: Session, bid: int) -> Booking:
 def list_np(month: str = "", service_type: str = "", paid: str = "", q: str = "", limit: int = 500, u: User = Depends(current_user), db: Session = Depends(get_db)):
     AC.require(u, AC.BOOKING_ROLES, "dịch vụ lẻ")
     rows = NP.list_rows(db, month, service_type, paid, q, min(limit, 2000))
-    if AC.own_only(u): rows = [b for b in rows if b.sales_id == u.id]
+    vis = AC.sales_ids_visible(db, u)
+    if vis is not None: rows = [b for b in rows if b.sales_id in vis]
     return {"kinds": SERVICE_KINDS, "rows": [NP.row(b) for b in rows], "summary": NP.summary(rows)}
 
 

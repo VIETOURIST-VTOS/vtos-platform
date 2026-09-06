@@ -13,7 +13,7 @@ from app.services import inbox as IB
 from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1", tags=["inbox"])
-ROLES = ("nv_kd", "gd_kd", "ptgd_mkt", "tgd", "chutich", "cntt", "tp_dh", "nv_dh", "bks")
+ROLES = ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_mkt", "ptgd_mkt", "tgd", "chutich", "cntt", "tp_dh", "nv_dh", "bks")
 
 
 class ReplyIn(BaseModel):
@@ -82,7 +82,7 @@ def get_conv(cid: int, u: User = Depends(require_roles(*ROLES)), db: Session = D
 
 
 @router.post("/inbox/{cid}/reply")
-def reply(cid: int, data: ReplyIn, u: User = Depends(require_roles("nv_kd", "gd_kd", "ptgd_mkt", "tp_dh", "nv_dh", "tgd", "cntt")), db: Session = Depends(get_db)):
+def reply(cid: int, data: ReplyIn, u: User = Depends(require_roles("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_mkt", "ptgd_mkt", "tp_dh", "nv_dh", "tgd", "cntt")), db: Session = Depends(get_db)):
     try: m = IB.reply(db, u, _c(db, cid), data.text)
     except ValueError as ex: raise HTTPException(422, str(ex))
     return {"message": "Đã gửi" if m.status == "da_gui" else f"Gửi lỗi: {m.response[:120]}", "msg": IB.msg_out(m)}
@@ -94,7 +94,7 @@ def ai_draft(cid: int, u: User = Depends(require_roles(*ROLES)), db: Session = D
 
 
 @router.post("/inbox/{cid}/assign")
-def assign(cid: int, data: AssignIn, u: User = Depends(require_roles("nv_kd", "gd_kd", "ptgd_mkt", "tp_dh", "tgd", "cntt")), db: Session = Depends(get_db)):
+def assign(cid: int, data: AssignIn, u: User = Depends(require_roles("nv_kd", "tn_kd", "tp_kd", "gd_kd", "ptgd_mkt", "tp_dh", "tgd", "cntt")), db: Session = Depends(get_db)):
     c = _c(db, cid)
     if data.sales_id is not None: c.sales_id = data.sales_id or None
     if data.ai_off is not None: c.ai_off = data.ai_off
@@ -104,14 +104,14 @@ def assign(cid: int, data: AssignIn, u: User = Depends(require_roles("nv_kd", "g
 
 
 @router.post("/inbox/simulate", status_code=201)
-def simulate(data: SimIn, u: User = Depends(require_roles("cntt", "ptgd_mkt", "gd_kd", "tgd")), db: Session = Depends(get_db)):
+def simulate(data: SimIn, u: User = Depends(require_roles("cntt", "ptgd_mkt", "gd_kd", "tp_kd", "tgd")), db: Session = Depends(get_db)):
     """Giả lập tin khách (kênh web / kiểm thử) – dùng khi chưa nối Facebook."""
     m = IB.inbound(db, data.channel, data.external_id, data.text, name=data.name)
     return {"message": "Đã ghi nhận tin khách", "msg": IB.msg_out(m) if m else None}
 
 
 @router.post("/inbox/check")
-def check(u: User = Depends(require_roles("cntt", "ptgd_mkt", "gd_kd", "tp_dh", "tgd")), db: Session = Depends(get_db)):
+def check(u: User = Depends(require_roles("cntt", "ptgd_mkt", "gd_kd", "tp_kd", "tp_dh", "tgd")), db: Session = Depends(get_db)):
     return IB.robot_check(db)
 
 

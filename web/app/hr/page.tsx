@@ -81,6 +81,8 @@ function HR() {
     </>}
 
     {tab === "employees" && <>
+      {canHR && <div className="panel"><h2>Danh sách nhân viên chính thức (bảng lương HCNS)</h2><p className="muted">Nạp mã NV / phòng / nhóm kinh doanh / chức vụ từ bảng lương HCNS đã đưa vào hệ thống (tháng 9/2026); ghép tài khoản theo họ tên, tạo tài khoản mới cho khối phải báo cáo ngày (mật khẩu ban đầu = mã NV). Nhân sự không còn trên bảng lương → ngưng hoạt động (không xóa).</p>
+        <button className="act orange" onClick={() => post("/employees/import-master").then(() => api("/employees").then(setEmps))}>Nạp / cập nhật danh sách nhân viên</button></div>}
       {canHR && <div className="panel"><h2>Thêm hồ sơ</h2><div className="grid">
         <label>Họ tên<input value={fEmp.full_name} onChange={(e) => setFEmp({ ...fEmp, full_name: e.target.value })} /></label>
         <label>Phòng<select value={fEmp.department} onChange={(e) => setFEmp({ ...fEmp, department: e.target.value })}>{Object.entries(meta.departments).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
@@ -89,8 +91,8 @@ function HR() {
         <label>Hợp đồng<select value={fEmp.contract_type} onChange={(e) => setFEmp({ ...fEmp, contract_type: e.target.value })}><option value="hdld">HĐLĐ</option><option value="ctv">Cộng tác viên</option><option value="doi_tac">Đối tác</option></select></label>
         <label>Lương công việc (đ)<input type="number" value={fEmp.base_salary} onChange={(e) => setFEmp({ ...fEmp, base_salary: e.target.value })} /></label>
       </div><button className="act" disabled={!fEmp.full_name} onClick={() => post("/employees", { ...fEmp, base_salary: Number(fEmp.base_salary) || 0 }).then((r) => r && setFEmp({ ...fEmp, full_name: "", base_salary: "" }))}>Tạo hồ sơ</button></div>}
-      <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th>Chức danh</th><th>VP</th><th>HĐ</th><th style={{ textAlign: "right" }}>Lương CV</th><th>Thẻ HDV</th><th>Trạng thái</th></tr></thead>
-        <tbody>{emps.map((e) => <tr key={e.id}><td className="mono">{e.code}</td><td><b>{e.full_name}</b></td><td>{e.department_name}</td><td>{e.position_name}</td><td>{e.office_name}</td><td>{e.contract_type === "hdld" ? "HĐLĐ" : e.contract_type === "ctv" ? "CTV" : "Đối tác"}</td><td style={{ textAlign: "right" }}>{e.base_salary ? vnd(e.base_salary) : ""}</td>
+      <div className="panel wrap"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Phòng</th><th>Nhóm</th><th>Chức vụ</th><th>VP</th><th>HĐ</th><th style={{ textAlign: "right" }}>Lương CV</th><th>Thẻ HDV</th><th>Trạng thái</th></tr></thead>
+        <tbody>{emps.map((e) => <tr key={e.id} style={{ opacity: e.active ? 1 : 0.55 }}><td className="mono">{e.code}</td><td><b>{e.full_name}</b></td><td>{e.department_name}</td><td>{e.sales_group}</td><td>{e.title || e.position_name}</td><td>{e.office_name}</td><td>{e.contract_type === "hdld" ? "HĐLĐ" : e.contract_type === "ctv" ? "CTV" : "Đối tác"}</td><td style={{ textAlign: "right" }}>{e.base_salary ? vnd(e.base_salary) : ""}</td>
           <td>{e.department === "huong_dan" && <>{e.card_no} <span className="muted">hạn {fmtD(e.card_expiry)}</span> {e.guide_ok ? <Tag cls="ok">Đủ điều kiện</Tag> : <Tag cls="red">Cổng 13</Tag>}</>}</td><td>{e.probation && <Tag cls="warn">Thử việc 85%</Tag>}{e.active ? "" : <Tag cls="red">Nghỉ</Tag>}</td></tr>)}</tbody></table></div>
     </>}
 
