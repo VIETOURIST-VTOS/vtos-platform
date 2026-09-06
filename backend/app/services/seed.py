@@ -204,28 +204,49 @@ def seed_companies(db):
     sở hữu; công ty độc lập cùng nhóm quản trị nhưng không hợp nhất – giao dịch với hai nhóm này là
     giao dịch với bên liên quan, phải thuyết minh chứ không loại trừ.
 
-    Tên pháp lý đầy đủ, mã số thuế và tỷ lệ sở hữu để Kế toán bổ sung; hệ thống không tự suy đoán.
+    Tên pháp lý và mã số thuế lấy từ hồ sơ 8 pháp nhân anh Tuấn cung cấp 06/9/2026. Tỷ lệ sở hữu công ty
+    con và công ty liên kết lấy từ Thuyết minh I.5a–5b của Báo cáo tài chính hợp nhất giữa niên độ
+    6 tháng đầu năm 2026 (A&C soát xét, phát hành 28/8/2026) – không suy đoán.
     """
     from app.models.core import Company
     from app.models.hr import Employee, Vehicle
     DS = [
-        ("VTD", "Công ty Cổ phần Du lịch Vietourist (Vietourist Holdings)", "me", 100, True, "Công ty mẹ – mã chứng khoán VTD, niêm yết UPCoM"),
-        ("VTRIP-VT", "Công ty TNHH Vận tải Vietrip", "con", 100, True, "Sở hữu đội xe; cho công ty mẹ thuê xe là giao dịch nội bộ, loại trừ khi hợp nhất"),
-        ("NNX-TN", "Du lịch Nông nghiệp Xanh Tây Nguyên", "doc_lap", 0, True, "Bổ sung tên pháp lý đầy đủ, MST và tỷ lệ sở hữu"),
-        ("LH-VTR", "Lữ hành Vietourist", "doc_lap", 0, False, "ĐANG TẠM NGƯNG hoạt động; giữ hồ sơ lịch sử"),
-        ("LANGAU", "Retreat & Wellness La Ngâu", "lien_ket", 0, True, "Vốn chủ sở hữu – cần tỷ lệ sở hữu để áp dụng phương pháp"),
-        ("HKTN", "Xã hội Hoàng Kim Tây Nguyên", "lien_ket", 0, True, "Vốn chủ sở hữu – cần tỷ lệ sở hữu để áp dụng phương pháp"),
-        ("LAVENDER", "Khách sạn Lavender Đà Lạt", "doc_lap", 0, True, "Bổ sung tên pháp lý đầy đủ, MST và tỷ lệ sở hữu"),
-        ("BUFFALO", "Việt Nam Buffalotours", "doc_lap", 0, True, "Bổ sung tên pháp lý đầy đủ, MST và tỷ lệ sở hữu"),
+        # code, tên pháp lý, MST, loại, tỷ lệ sở hữu, đang hoạt động, ghi chú
+        ("VTD", "Công ty Cổ phần Vietourist Holdings", "0311273634", "me", 100, True,
+         "Công ty mẹ – mã chứng khoán VTD, UPCoM. ĐKDN 26/10/2011, thay đổi lần 16 ngày 12/3/2025"),
+        ("VTRIP-VT", "Công ty TNHH Vận tải Vietrip", "0317478116", "con", 100, True,
+         "Công ty con duy nhất được hợp nhất; tỷ lệ lợi ích và quyền biểu quyết 100% (BCTC hợp nhất bán niên 2026, TM I.5a). Sở hữu đội xe"),
+        ("MEDICSHARE", "Công ty Cổ phần Dịch vụ và Giải pháp Y tế Medicshare", "", "lien_ket", 48.14, True,
+         "Liên kết theo BCTC hợp nhất bán niên 2026 (TM I.5b): vốn góp / sở hữu / biểu quyết đều 48,14%. Không có trong danh sách 8 pháp nhân anh Tuấn đưa 06/9 – cần đối chiếu"),
+        ("VMUINE", "Công ty Cổ phần Nhà hàng Việt Mũi Né", "", "lien_ket", 40, True,
+         "Liên kết theo BCTC hợp nhất bán niên 2026 (TM I.5b): 40%. Không có trong danh sách 8 pháp nhân anh Tuấn đưa 06/9 – cần đối chiếu"),
+        ("LANGAU", "Công ty Cổ phần Retreat & Wellness La Ngâu", "3401269941", "lien_ket", 45, True,
+         "Liên kết – 45% theo BCTC hợp nhất bán niên 2026 (TM I.5b)"),
+        ("HKTN", "Công ty Cổ phần Xã hội Hoàng Kim Tây Nguyên", "5901054923", "lien_ket", 45.33, True,
+         "Liên kết – 45,33% theo BCTC hợp nhất bán niên 2026 (TM I.5b)"),
+        ("NNX-TN", "Công ty Cổ phần Du lịch Nông nghiệp Xanh Tây Nguyên", "5901168039", "doc_lap", 0, True,
+         "Đổi tên từ CTCP Khách sạn Tre Xanh Gia Lai, thay đổi lần 6 ngày 01/10/2025. KHÔNG xuất hiện trên BCTC hợp nhất bán niên 2026"),
+        ("LAVENDER", "Công ty TNHH Khách sạn Lavender Đà Lạt", "5801480861", "doc_lap", 0, True,
+         "KHÔNG xuất hiện trên BCTC hợp nhất bán niên 2026"),
+        ("BUFFALO", "Công ty Cổ phần Việt Nam Buffalotours", "0319297570", "doc_lap", 0, True,
+         "KHÔNG xuất hiện trên BCTC hợp nhất bán niên 2026. MST nguồn lưu 9 chữ số, đã thêm 0 đầu – đối chiếu giấy ĐKDN"),
+        ("LH-VTR", "Công ty Cổ phần Lữ hành Vietourist", "0316063542", "doc_lap", 0, False,
+         "ĐANG TẠM NGƯNG theo anh Tuấn (Drive còn ghi Hoạt động, chưa có thời hạn). KHÔNG xuất hiện trên BCTC hợp nhất bán niên 2026"),
     ]
     have = {c.code: c for c in db.execute(select(Company)).scalars()}
-    for code, name, kind, pct, active, note in DS:
-        if code in have: continue
-        db.add(Company(code=code, name=name, kind=kind, ownership_pct=pct, active=active, note=note))
+    for code, name, mst, kind, pct, active, note in DS:
+        c = have.get(code)
+        if c is None:
+            db.add(Company(code=code, name=name, tax_code=mst, kind=kind, ownership_pct=pct, active=active, note=note))
+        else:
+            # cập nhật số liệu đã kiểm chứng (hồ sơ pháp nhân + BCTC hợp nhất) lên bản ghi cũ
+            c.name, c.kind, c.active, c.note = name, kind, active, note
+            if mst: c.tax_code = mst
+            if pct: c.ownership_pct = pct
     db.flush()
     cos = {c.code: c for c in db.execute(select(Company)).scalars()}
     me, vt = cos.get("VTD"), cos.get("VTRIP-VT")
-    for code in ("VTRIP-VT", "NNX-TN", "LH-VTR", "LANGAU", "HKTN", "LAVENDER", "BUFFALO"):
+    for code in ("VTRIP-VT", "MEDICSHARE", "VMUINE", "NNX-TN", "LH-VTR", "LANGAU", "HKTN", "LAVENDER", "BUFFALO"):
         c = cos.get(code)
         if c is not None and c.parent_id is None and me is not None and c.code != "VTD":
             c.parent_id = me.id

@@ -30,20 +30,46 @@ def test_danh_muc_du_8_phap_nhan_dung_loai():
     cs = client.get("/api/v1/companies", headers=login("cntt")).json()
     codes = {c["code"]: c for c in cs}
     mong_doi = {"VTD": "me", "VTRIP-VT": "con", "NNX-TN": "doc_lap", "LH-VTR": "doc_lap",
-                "LANGAU": "lien_ket", "HKTN": "lien_ket", "LAVENDER": "doc_lap", "BUFFALO": "doc_lap"}
+                "LANGAU": "lien_ket", "HKTN": "lien_ket", "LAVENDER": "doc_lap", "BUFFALO": "doc_lap",
+                "MEDICSHARE": "lien_ket", "VMUINE": "lien_ket"}
     for code, kind in mong_doi.items():
         assert code in codes, f"thiếu pháp nhân {code}"
         assert codes[code]["kind"] == kind, f"{code} phải là {kind}"
     assert codes["LH-VTR"]["active"] is False, "Lữ hành Vietourist đang tạm ngưng"
 
 
+def test_ty_le_so_huu_dung_bctc_hop_nhat_ban_nien_2026():
+    """Thuyết minh I.5a–5b, BCTC hợp nhất giữa niên độ 6 tháng đầu 2026 (A&C soát xét 28/8/2026)."""
+    cs = client.get("/api/v1/companies", headers=login("ketoan")).json()
+    codes = {c["code"]: c for c in cs}
+    assert codes["VTRIP-VT"]["ownership_pct"] == 100, "công ty con duy nhất – 100%"
+    assert codes["MEDICSHARE"]["ownership_pct"] == 48.14
+    assert codes["VMUINE"]["ownership_pct"] == 40
+    assert codes["LANGAU"]["ownership_pct"] == 45
+    assert codes["HKTN"]["ownership_pct"] == 45.33
+    # bốn công ty độc lập không nằm trên BCTC hợp nhất nên không có tỷ lệ
+    for code in ("NNX-TN", "LAVENDER", "BUFFALO", "LH-VTR"):
+        assert codes[code]["ownership_pct"] == 0
+
+
+def test_ma_so_thue_day_du_tru_hai_lien_ket_moi():
+    cs = client.get("/api/v1/companies", headers=login("ketoan")).json()
+    codes = {c["code"]: c for c in cs}
+    for code in ("VTD", "VTRIP-VT", "LANGAU", "HKTN", "NNX-TN", "LAVENDER", "BUFFALO", "LH-VTR"):
+        assert codes[code]["tax_code"], f"{code} phải có mã số thuế theo hồ sơ pháp nhân"
+    assert codes["VTD"]["tax_code"] == "0311273634"
+    # hai công ty liên kết lấy từ BCTC chưa có hồ sơ pháp nhân → chưa có MST
+    for code in ("MEDICSHARE", "VMUINE"):
+        assert codes[code]["tax_code"] == ""
+
+
 def test_pham_vi_hop_nhat_va_ben_lien_quan():
     cs = client.get("/api/v1/companies", headers=login("cntt")).json()
     codes = {c["code"]: c for c in cs}
     # chỉ mẹ + con nằm trong phạm vi hợp nhất
-    assert [c["code"] for c in cs if c["in_group"]] == ["VTRIP-VT", "VTD"] or set(c["code"] for c in cs if c["in_group"]) == {"VTD", "VTRIP-VT"}
+    assert set(c["code"] for c in cs if c["in_group"]) == {"VTD", "VTRIP-VT"}
     # liên kết và độc lập là bên liên quan – thuyết minh, KHÔNG loại trừ
-    for code in ("LANGAU", "HKTN", "NNX-TN", "LAVENDER", "BUFFALO", "LH-VTR"):
+    for code in ("LANGAU", "HKTN", "MEDICSHARE", "VMUINE", "NNX-TN", "LAVENDER", "BUFFALO", "LH-VTR"):
         assert codes[code]["related_party"] is True and codes[code]["in_group"] is False
     assert codes["VTRIP-VT"]["parent_id"] == codes["VTD"]["id"]
     assert codes["VTRIP-VT"]["ownership_pct"] == 100
@@ -100,8 +126,8 @@ def test_bao_cao_do_phu_chu_quan():
     c = client.get("/api/v1/companies/coverage", headers=login("tgd")).json()
     assert c["xe"]["tong"] >= 1 and c["xe"]["da_gan"] >= 1
     assert c["hdv"]["tong"] >= 1 and c["hdv"]["chua_gan"] == 0
-    assert c["phap_nhan"]["tong"] == 8 and c["phap_nhan"]["hop_nhat"] == 2 and c["phap_nhan"]["ben_lien_quan"] == 6
-    assert c["phap_nhan"]["thieu_mst"] == 8, "chưa pháp nhân nào có mã số thuế – Kế toán bổ sung"
+    assert c["phap_nhan"]["tong"] == 10 and c["phap_nhan"]["hop_nhat"] == 2 and c["phap_nhan"]["ben_lien_quan"] == 8
+    assert c["phap_nhan"]["thieu_mst"] == 2, "chỉ còn Medicshare và Việt Mũi Né chưa có MST"
     assert c["phap_nhan"]["tam_ngung"] == 1
 
 
