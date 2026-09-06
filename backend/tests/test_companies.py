@@ -66,23 +66,26 @@ def test_gan_va_go_chu_quan_xe():
     assert client.put(f"/api/v1/vehicles/{v['id']}/company", json={"company_id": 99999}, headers=login("ketoan")).status_code == 422
 
 
-def test_hdv_khong_tu_gan_chu_quan():
-    """Không suy đoán công ty ký hợp đồng với HDV – phải do HCNS chọn."""
+def test_hdv_thuoc_cong_ty_me():
+    """Anh Tuấn chốt 06/9/2026: HDV vẫn thuộc Công ty Cổ phần Du lịch Vietourist, kể cả khi là cộng tác viên."""
     emps = client.get("/api/v1/employees", headers=login("cntt")).json()
     hdv = [e for e in emps if e["department"] == "huong_dan"]
     assert hdv, "dữ liệu mẫu phải có HDV"
-    assert all(e["company_id"] is None for e in hdv)
     cs = client.get("/api/v1/companies", headers=login("cntt")).json()
+    me = next(c for c in cs if c["code"] == "VTD")
+    assert all(e["company_id"] == me["id"] for e in hdv), "HDV mặc định thuộc công ty mẹ"
+    # HCNS vẫn đổi được sang pháp nhân khác khi ký qua công ty con
     vt = next(c for c in cs if c["code"] == "VTRIP-VT")
     assert client.put(f"/api/v1/employees/{hdv[0]['id']}/company", json={"company_id": vt["id"]}, headers=login("hcns")).status_code == 200
     emps = client.get("/api/v1/employees", headers=login("cntt")).json()
     assert next(e for e in emps if e["id"] == hdv[0]["id"])["company_id"] == vt["id"]
+    client.put(f"/api/v1/employees/{hdv[0]['id']}/company", json={"company_id": me["id"]}, headers=login("hcns"))
 
 
 def test_bao_cao_do_phu_chu_quan():
     c = client.get("/api/v1/companies/coverage", headers=login("tgd")).json()
     assert c["xe"]["tong"] >= 1 and c["xe"]["da_gan"] >= 1
-    assert c["hdv"]["tong"] >= 1
+    assert c["hdv"]["tong"] >= 1 and c["hdv"]["chua_gan"] == 0
 
 
 def test_vai_tro_khong_duoc_tao_phap_nhan():

@@ -200,12 +200,13 @@ def seed_vehicle_rates(db):
 def seed_companies(db):
     """Danh mục pháp nhân tối thiểu và gán chủ quản cho xe (Ý kiến thẩm định 06/9/2026, C1).
 
-    Chỉ gán xe: trường kind của xe đã phân sẵn noi_bo (Vietrip) / hop_tac (xe thuê ngoài) nên suy ra
-    chủ quản là an toàn. Hướng dẫn viên KHÔNG tự gán – phải do HCNS chọn theo công ty ký hợp đồng.
+    Xe: trường kind đã phân sẵn noi_bo (Vietrip) / hop_tac (xe thuê ngoài) nên suy ra chủ quản là an toàn.
+    Hướng dẫn viên: anh Tuấn chốt 06/9/2026 – HDV vẫn thuộc Công ty Cổ phần Du lịch Vietourist (công ty mẹ),
+    kể cả khi chuyển sang cộng tác viên; HCNS đổi được từng người nếu sau này ký qua pháp nhân khác.
     Mã số thuế để trống cho Kế toán điền.
     """
     from app.models.core import Company
-    from app.models.hr import Vehicle
+    from app.models.hr import Employee, Vehicle
     have = {c.code for c in db.execute(select(Company)).scalars()}
     if "VTD" not in have:
         db.add(Company(code="VTD", name="Công ty Cổ phần Du lịch Vietourist", kind="me", ownership_pct=100,
@@ -217,10 +218,13 @@ def seed_companies(db):
                        parent_id=me.id if me else None, note="Sở hữu đội xe; thuê xe cho công ty mẹ là giao dịch nội bộ"))
     db.flush()
     vt = db.execute(select(Company).where(Company.code == "VTRIP-VT")).scalars().first()
-    n = 0
+    n = h = 0
     if vt:
         for v in db.execute(select(Vehicle).where(Vehicle.company_id == None)).scalars():
             if v.kind == "noi_bo":            # xe hợp tác là xe thuê ngoài, không thuộc pháp nhân trong tập đoàn
                 v.company_id = vt.id; n += 1
+    if me:
+        for e in db.execute(select(Employee).where(Employee.company_id == None, Employee.department == "huong_dan")).scalars():
+            e.company_id = me.id; h += 1
     db.commit()
-    return n
+    return {"xe": n, "hdv": h}
