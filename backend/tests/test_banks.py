@@ -252,3 +252,28 @@ def test_nap_file_sai_dinh_dang_bao_loi_ro(seeded):
                     files={"file": ("linh_tinh.xlsx", b.getvalue(),
                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
     assert r.status_code == 422 and "Tài khoản ngân hàng" in r.json()["detail"]
+
+
+def test_nap_duoc_ca_csv(seeded):
+    """Bảng 22.000 dòng ở dạng CSV nhẹ hơn Excel nhiều lần; đọc CSV phải ra đúng kết quả như Excel."""
+    from app.services.banks import parse_bank_book
+    rows = [("0181126", "Ngan hang Tien Phong", [("D001", 100, 0), ("D002", 0, 50)]),
+            ("1601100", "Ngan hang Quan doi", [("D003", 70, 0)])]
+    x = parse_bank_book(_so_tien_gui_xlsx(rows))
+    csv_text = "Ngày hạch toán,Ngày chứng từ,Số chứng từ,Diễn giải,TK đối ứng,Thu,Chi,Tồn\n"
+    for bank, name, lines in rows:
+        csv_text += f"Tài khoản ngân hàng: {bank} - {name},,,,,,,\n"
+        csv_text += ",,,Số dư đầu kỳ,,0,0,0\n"
+        for doc, thu, chi in lines:
+            csv_text += f"2028-05-03,2028-05-03,{doc},dien giai,131,{thu},{chi},0\n"
+    c = parse_bank_book(csv_text.encode("utf-8"))
+    assert c["accounts"] == x["accounts"]
+    assert c["entries"] == x["entries"]
+    assert c["docs"] == x["docs"] == 3
+
+    bad = parse_bank_book  # tệp không phải sổ tiền gửi thì báo lỗi rõ ràng
+    try:
+        bad(b"cot1,cot2\n1,2\n")
+        assert False, "phải báo lỗi"
+    except ValueError as ex:
+        assert "Tài khoản ngân hàng" in str(ex)

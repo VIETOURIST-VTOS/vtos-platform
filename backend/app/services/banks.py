@@ -15,6 +15,7 @@ Nguyên tắc an toàn của bước 3 – đây là thao tác động vào sổ
     trống còn hơn gán sai làm sai sổ tiền gửi.
   - Ghi nhật ký kiểm toán và trả về đủ thông tin để hoàn tác (revert) nếu Kế toán thấy sai.
 """
+import csv
 import io
 import re
 from collections import Counter, defaultdict
@@ -360,19 +361,40 @@ def since_minus(d: date) -> date:
 SECTION = "tài khoản ngân hàng:"
 
 
+
+def _sheet_rows(data: bytes):
+    """Duyệt từng dòng của file Excel (.xlsx) hoặc CSV. Nhận cả hai vì bảng 22.000 dòng ở dạng CSV nhẹ hơn
+    nhiều lần, mà MISA xuất được cả hai định dạng."""
+    if data[:2] == b"PK":                                  # .xlsx là tệp nén, luôn bắt đầu bằng "PK"
+        wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        yield from wb.worksheets[0].iter_rows(values_only=True)
+        return
+    for enc in ("utf-8-sig", "utf-8", "cp1258", "latin-1"):
+        try:
+            text = data.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise ValueError("Không đọc được nội dung tệp – hãy xuất lại dạng Excel (.xlsx) hoặc CSV UTF-8")
+    sample = text[:4000]
+    delim = max([",", ";", "\t"], key=sample.count)
+    for row in csv.reader(io.StringIO(text), delimiter=delim):
+        yield tuple(row)
+
+
 def parse_bank_book(data: bytes) -> dict:
     """Đọc file "Sổ tiền gửi ngân hàng" xuất từ MISA.
 
+    Nhận cả .xlsx lẫn .csv.
     Bố cục: các dòng phát sinh được chia thành từng đoạn, mở đầu mỗi đoạn là ô "Tài khoản ngân hàng:
     <số tài khoản> - <tên ngân hàng>". Các cột: Ngày hạch toán, Ngày chứng từ, Số chứng từ, Diễn giải,
     TK đối ứng, Thu, Chi, Tồn. Dòng không có số chứng từ là dòng số dư đầu kỳ / cộng phát sinh – bỏ qua.
     """
-    wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
-    ws = wb.worksheets[0]
     accounts: dict[str, str] = {}
     entries: list[dict] = []
     cur = ""
-    for row in ws.iter_rows(values_only=True):
+    for row in _sheet_rows(data):
         if not row:
             continue
         a0 = str(row[0] or "").strip()
