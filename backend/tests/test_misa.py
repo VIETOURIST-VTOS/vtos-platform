@@ -169,3 +169,13 @@ def test_kiem_toan_checkpoint():
     assert abs(v["130"] - 168818037699) < 10000
     assert abs(v["311"] - 13459932467) < 10000
     assert abs(v["132"] - 73783036624) < 10000
+    # ---- LCTT gián tiếp: dòng 70 (tiền cuối kỳ) phải khớp đúng tiền mặt+tiền gửi thực tế 30/06/2026 ----
+    assert "lctt" in rep and rep["lctt"]
+    lv = {x["code"]: x["now"] for x in rep["lctt"]}
+    cash_end = v.get("110", 0.0)  # 110 = tiền và tương đương tiền (THTC)
+    assert abs(lv["70"] - cash_end) < 10000, f"LCTT dòng 70 ({lv['70']:,.0f}) phải khớp tiền cuối kỳ THTC ({cash_end:,.0f})"
+    assert abs(lv["50"] - (lv["20"] + lv["30"] + lv["40"])) < 1
+    assert abs(lv["70"] - (lv["50"] + lv["60"] + lv["61"])) < 1
+    # ---- Chi tiết vay 341 theo ngân hàng: tổng dư cuối kỳ phải khớp đúng tổng 3 tiểu khoản kiểm toán ----
+    vay = client.get("/api/v1/reports/vay-341?upto=2026-06-30&since=2026-01-01", headers=h).json()
+    assert abs(vay["total"]["close"] - (57378198822 + 11833359977 + 5203246120)) < 10000

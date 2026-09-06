@@ -353,3 +353,17 @@ def bctc_xlsx(upto: date, since: date | None = None, compare_upto: date | None =
     r = BCTC.bctc(db, upto, since, compare_upto)
     R_.audit(db, u.username, u.role, "xuat_bctc_tt99", f"bctc:{upto}", after={"since": str(r["since"])}); db.commit()
     return _xlsx(BCTC.bctc_xlsx(r), f"BCTC_TT99_{upto:%Y%m%d}.xlsx")
+
+
+@router.get("/reports/vay-341")
+def vay_341(upto: date, since: date | None = None, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    since = since or date(upto.year, 1, 1)
+    return BCTC.loan_bank_detail_341(db, since, upto)
+
+
+@router.get("/reports/vay-341.xlsx")
+def vay_341_xlsx(upto: date, since: date | None = None, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    since = since or date(upto.year, 1, 1)
+    r = BCTC.loan_bank_detail_341(db, since, upto)
+    R_.audit(db, u.username, u.role, "xuat_chi_tiet_vay_341", f"vay341:{upto}", after={"since": str(since)}); db.commit()
+    return _xlsx(BCTC.loan_bank_detail_xlsx(r), f"CHI_TIET_VAY_341_{since:%d%m}_{upto:%d%m%Y}.xlsx")
