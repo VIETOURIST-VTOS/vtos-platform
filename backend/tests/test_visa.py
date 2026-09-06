@@ -170,6 +170,7 @@ def test_nghiem_thu_3_va_4_nop_lai_va_khach_bao_khong_nop():
                     json={"checklist_item_id": tc["id"], "reason": "Khách không có sổ tiết kiệm"})
     assert w.status_code == 201 and w.json()["quyet_dinh"] == "PENDING"
     assert items(cid)["chung_minh_tai_chinh"]["trang_thai"] == "WAIVER_REQUESTED"
+    # Còn mục bắt buộc chưa nộp thì chưa gửi kiểm tra được (lý do là các mục MISSING, không phải đề nghị treo)
     assert client.post(f"/api/v1/visa/ho-so/{cid}/gui-kiem-tra", headers=login("dh.lan")).status_code == 422
 
     # Chuyên viên KHÔNG được tự duyệt ngoại lệ; phải người có thẩm quyền
@@ -179,6 +180,43 @@ def test_nghiem_thu_3_va_4_nop_lai_va_khach_bao_khong_nop():
     ok = client.post(f"/api/v1/visa/ho-so/{cid}/ngoai-le/{wid}/quyet-dinh", headers=login("tp.dieuhanh"),
                      json={"approve": True, "note": "Chấp nhận bảng lương thay thế"})
     assert ok.status_code == 200 and items(cid)["chung_minh_tai_chinh"]["trang_thai"] == "WAIVED"
+
+
+def test_nghiem_thu_4_de_nghi_treo_khong_qua_duoc_cua_kiem_tra():
+    """Tiêu chí 4, tách riêng: mọi mục khác đã ĐẠT, chỉ còn một mục đang đề nghị miễn nộp.
+
+    Theo mục 5.1 của đặc tả, bước «Thu thập tài liệu» xong khi các mục đã nộp HOẶC có đề nghị ngoại lệ, nên
+    gửi kiểm tra vẫn qua. Cửa chặn thật nằm ở «Kiểm tra trước khai/nộp»: chừng nào đề nghị chưa được người có
+    thẩm quyền quyết định thì không ai qua được. Test trước đó chạm vào tình huống này nhưng lỗi 422 khi ấy đến
+    từ các mục còn MISSING, nên không chứng minh được điều đang cần – đây mới là phép thử đúng.
+    """
+    cid = new_case("Ngoai Le Treo", dob="1984-04-04")["case"]["id"]
+    to_stage_thu_thap(cid)
+    it = items(cid)
+    for key, i in it.items():
+        if not i["bat_buoc"] or key == "chung_minh_tai_chinh":
+            continue
+        doc = upload(cid, i["id"])
+        client.post(f"/api/v1/visa/ho-so/{cid}/tai-lieu/{doc['id']}/kiem-tra", headers=login("tp.dieuhanh"),
+                    json={"decision": "ACCEPTED"})
+    w = client.post(f"/api/v1/visa/ho-so/{cid}/ngoai-le", headers=login("dh.lan"),
+                    json={"checklist_item_id": it["chung_minh_tai_chinh"]["id"],
+                          "reason": "Khách không có sổ tiết kiệm"}).json()
+    # Gửi kiểm tra: QUA – đúng theo điều kiện hoàn thành của bước thu thập tài liệu
+    assert client.post(f"/api/v1/visa/ho-so/{cid}/gui-kiem-tra", headers=login("dh.lan")).status_code == 200
+    # Kiểm tra đạt: CHẶN – đề nghị còn treo thì mục bắt buộc chưa coi là xong
+    r = client.post(f"/api/v1/visa/ho-so/{cid}/kiem-tra-dat", headers=login("tp.dieuhanh"))
+    assert r.status_code == 422 and "chung_minh_tai_chinh" in r.json()["detail"]
+    # Từ chối miễn nộp thì mục quay về chưa nộp, vẫn không qua được
+    client.post(f"/api/v1/visa/ho-so/{cid}/ngoai-le/{w['id']}/quyet-dinh", headers=login("tp.dieuhanh"),
+                json={"approve": False, "note": "Bảng lương chưa đủ căn cứ"})
+    assert items(cid)["chung_minh_tai_chinh"]["trang_thai"] == "MISSING"
+    assert client.post(f"/api/v1/visa/ho-so/{cid}/kiem-tra-dat", headers=login("tp.dieuhanh")).status_code == 422
+    # Nộp bổ sung và được chấp nhận thì mới qua
+    doc = upload(cid, it["chung_minh_tai_chinh"]["id"])
+    client.post(f"/api/v1/visa/ho-so/{cid}/tai-lieu/{doc['id']}/kiem-tra", headers=login("tp.dieuhanh"),
+                json={"decision": "ACCEPTED"})
+    assert client.post(f"/api/v1/visa/ho-so/{cid}/kiem-tra-dat", headers=login("tp.dieuhanh")).status_code == 200
 
 
 def test_nghiem_thu_5_doi_thong_tin_quan_trong_phai_xac_nhan_lai():
