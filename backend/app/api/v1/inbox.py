@@ -50,6 +50,20 @@ async def fb_webhook(request: Request, db: Session = Depends(get_db), x_hub_sign
     return IB.fb_webhook(db, payload)
 
 
+@router.get("/facebook/status")
+def facebook_status(u: User = Depends(require_roles("cntt", "tgd", "chutich", "ptgd_mkt")), db: Session = Depends(get_db)):
+    """Page đang nối + các app đã đăng ký webhook (trường nào)."""
+    return IB.fb_status()
+
+
+@router.post("/facebook/subscribe")
+def facebook_subscribe(u: User = Depends(require_roles("cntt", "tgd", "ptgd_mkt")), db: Session = Depends(get_db)):
+    """Đăng ký (lại) webhook cho Page: messages, messaging_postbacks, standby, messaging_handovers."""
+    r = IB.fb_subscribe()
+    R.audit(db, u.username, u.role, "fb_dang_ky_webhook", "facebook", after=r); db.commit()
+    return {"result": r, "status": IB.fb_status()}
+
+
 @router.get("/inbox/status")
 def status(u: User = Depends(require_roles(*ROLES)), db: Session = Depends(get_db)):
     cnt = dict(db.execute(select(Conversation.status, func.count()).group_by(Conversation.status)).all())

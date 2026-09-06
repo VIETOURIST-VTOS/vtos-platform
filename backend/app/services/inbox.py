@@ -93,6 +93,32 @@ def fb_verify_signature(body: bytes, sig: str) -> bool:
     return hmac.compare_digest("sha256=" + mac, sig or "")
 
 
+def _graph(method: str, path: str, body: dict | None = None) -> dict:
+    if not settings.FB_PAGE_ACCESS_TOKEN: return {"error": -1, "message": "Chưa có FB_PAGE_ACCESS_TOKEN"}
+    url = f"{GRAPH}/{path}{'&' if '?' in path else '?'}access_token={urllib.parse.quote(settings.FB_PAGE_ACCESS_TOKEN)}"
+    req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None, headers={"Content-Type": "application/json"}, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r: return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        try: return json.loads(e.read().decode()).get("error", {"error": e.code})
+        except Exception: return {"error": e.code}
+    except Exception as ex: return {"error": -1, "message": str(ex)}
+
+
+FB_FIELDS = "messages,messaging_postbacks,standby,messaging_handovers"
+
+
+def fb_subscribe(fields: str = FB_FIELDS) -> dict:
+    """Đăng ký app nhận webhook cho Page (kể cả standby khi app khác là Người nhận chính) – dùng token Page trên máy chủ, không cần thao tác trên Meta."""
+    return _graph("POST", f"me/subscribed_apps?subscribed_fields={urllib.parse.quote(fields)}")
+
+
+def fb_status() -> dict:
+    me = _graph("GET", "me?fields=id,name")
+    apps = _graph("GET", "me/subscribed_apps")
+    return {"page": me, "subscribed_apps": apps.get("data", apps)}
+
+
 def fb_take_thread_control(psid: str) -> dict:
     """Khi VTOS là Người nhận phụ (chatbot khác giữ hội thoại): xin quyền hội thoại trước khi trả lời (Handover Protocol)."""
     if not settings.FB_PAGE_ACCESS_TOKEN: return {"error": -1}
