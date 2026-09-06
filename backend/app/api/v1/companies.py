@@ -122,3 +122,23 @@ def drivers_reconcile(data: DriverBatch, u: User = Depends(require_roles(*WRITE,
 def drivers_apply(data: DriverBatch, u: User = Depends(require_roles(*WRITE, "hcns")), db: Session = Depends(get_db)):
     from app.services import drivers as D
     return D.apply(db, [r.model_dump() for r in data.rows], u.username, u.role, data.tao_xe_thieu)
+
+
+class FleetRow(BaseModel):
+    plate: str
+    company_code: str = ""       # mã pháp nhân ĐỨNG TÊN trên giấy đăng ký xe
+    phap_nhan: str = ""          # tên pháp nhân ghi trong hồ sơ nguồn (để đối chiếu)
+    driver: str = ""
+    seats: int = 0
+
+
+class FleetBatch(BaseModel):
+    rows: list[FleetRow]
+    ngung_xe_ngoai_ds: bool = False
+
+
+@router.post("/fleet/apply")
+def fleet_apply(data: FleetBatch, u: User = Depends(require_roles(*WRITE, "hcns", "tp_dh")), db: Session = Depends(get_db)):
+    """Chốt đội xe theo hồ sơ đăng ký xe: pháp nhân đứng tên, tài xế phụ trách, xe ngưng khai thác."""
+    from app.services import drivers as D
+    return D.fleet_apply(db, [r.model_dump() for r in data.rows], u.username, u.role, data.ngung_xe_ngoai_ds)

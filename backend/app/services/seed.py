@@ -251,10 +251,9 @@ def seed_companies(db):
         if c is not None and c.parent_id is None and me is not None and c.code != "VTD":
             c.parent_id = me.id
     n = h = 0
-    if vt:
-        for v in db.execute(select(Vehicle).where(Vehicle.company_id == None)).scalars():
-            if v.kind == "noi_bo":            # xe hợp tác là xe thuê ngoài, không thuộc pháp nhân trong tập đoàn
-                v.company_id = vt.id; n += 1
+    # KHÔNG suy pháp nhân đứng tên xe từ cờ nội bộ/hợp tác: hồ sơ đội xe 06/9/2026 cho thấy chỉ 1 trong
+    # 11 xe đứng tên Vận tải Vietrip, còn lại đứng tên Vietourist. Chủ quản xe nạp từ giấy đăng ký qua
+    # POST /fleet/apply (services/drivers.fleet_apply).
     if me:
         # Anh Tuấn chốt 06/9/2026: hướng dẫn viên (kể cả cộng tác viên) VÀ tài xế đều hưởng lương ở công ty
         # mẹ, dù xe thuộc Vận tải Vietrip. Tách bạch: TÀI SẢN (xe) thuộc công ty con, CON NGƯỜI thuộc công ty

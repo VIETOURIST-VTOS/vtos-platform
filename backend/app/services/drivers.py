@@ -112,3 +112,60 @@ def apply(db: Session, rows: list[dict], actor: str, role: str, tao_xe_thieu: bo
             "message": f"Đã cập nhật {ns} hồ sơ tài xế, gán {gan_xe} xe"
                        + (f", tạo mới {len(xe_moi)} xe (số chỗ = 0, cần bổ sung)" if xe_moi else "")
                        + (f"; bỏ qua {len(bo_qua)} dòng" if bo_qua else "")}
+
+
+# ---------- Đội xe: pháp nhân đứng tên và danh sách xe đang khai thác ----------
+def fleet_apply(db: Session, rows: list[dict], actor: str, role: str, ngung_xe_ngoai_ds: bool = False) -> dict:
+    """Chốt đội xe theo hồ sơ đăng ký xe.
+
+    Pháp nhân đứng tên phải lấy từ GIẤY ĐĂNG KÝ XE, không suy từ cờ nội bộ / hợp tác: hồ sơ ngày 06/9/2026
+    cho thấy chỉ 1 trong 11 xe đứng tên Vận tải Vietrip, phần còn lại đứng tên Vietourist – suy đoán theo
+    cờ nội bộ sẽ ghi nhầm tài sản sang công ty con và làm sai báo cáo hợp nhất.
+
+    Xe không còn trong danh sách (đã bán, dữ liệu mẫu) chỉ được ĐÁNH DẤU NGƯNG KHAI THÁC, không xóa –
+    lịch sử lệnh điều xe và quyết toán tour vẫn phải tra được.
+    """
+    cos = {c.code: c for c in db.execute(select(Company)).scalars()}
+    emps = list(db.execute(select(Employee)).scalars())
+    by_name: dict[str, list[Employee]] = {}
+    for e in emps: by_name.setdefault(norm_name(e.full_name), []).append(e)
+    veh = {norm_plate(v.plate): v for v in db.execute(select(Vehicle)).scalars()}
+    ds = set()
+    tao, doi_phap_nhan, gan_tx, chua_ro = [], [], 0, []
+    for r in rows:
+        pl = norm_plate(r.get("plate") or "")
+        if not pl: continue
+        ds.add(pl)
+        ma_cty = (r.get("company_code") or "").strip()
+        if not ma_cty:
+            chua_ro.append({"bien_so": r.get("plate"), "phap_nhan": r.get("phap_nhan", "")}); continue
+        c = cos.get(ma_cty)
+        if c is None:
+            chua_ro.append({"bien_so": r.get("plate"), "ly_do": f"không có pháp nhân {ma_cty}"}); continue
+        v = veh.get(pl)
+        if v is None:
+            v = Vehicle(plate=pretty_plate(r.get("plate") or ""), seats=int(r.get("seats") or 0),
+                        kind="noi_bo", company_id=c.id, active=True)
+            db.add(v); db.flush(); veh[pl] = v; tao.append(v.plate)
+        else:
+            if v.company_id != c.id:
+                doi_phap_nhan.append({"bien_so": v.plate, "tu": next((k for k, x in cos.items() if x.id == v.company_id), "chưa gán"), "sang": ma_cty})
+                v.company_id = c.id
+            v.plate = pretty_plate(v.plate)
+            v.active = True
+        ten = (r.get("driver") or "").strip()
+        cand = by_name.get(norm_name(ten), []) if ten else []
+        if len(cand) == 1:
+            v.driver_id = cand[0].id; gan_tx += 1
+        elif ten:
+            chua_ro.append({"bien_so": v.plate, "tai_xe": ten, "ly_do": "không có hồ sơ" if not cand else f"trùng {len(cand)} hồ sơ"})
+    ngung = []
+    if ngung_xe_ngoai_ds:
+        for pl, v in veh.items():
+            if pl not in ds and v.active:
+                v.active = False; ngung.append(v.plate)
+    R.audit(db, actor, role, "chot_doi_xe", "doi_xe",
+            after={"tao": tao, "doi_phap_nhan": doi_phap_nhan, "gan_tai_xe": gan_tx, "ngung_khai_thac": ngung, "chua_ro": chua_ro})
+    db.commit()
+    return {"xe_trong_danh_sach": len(ds), "tao_moi": tao, "doi_phap_nhan": doi_phap_nhan,
+            "gan_tai_xe": gan_tx, "ngung_khai_thac": ngung, "chua_ro": chua_ro}

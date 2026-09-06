@@ -75,20 +75,38 @@ def test_pham_vi_hop_nhat_va_ben_lien_quan():
     assert codes["VTRIP-VT"]["ownership_pct"] == 100
 
 
-def test_xe_noi_bo_duoc_gan_van_tai_vietrip_xe_hop_tac_thi_khong():
+def test_khong_suy_phap_nhan_xe_tu_co_noi_bo():
+    """Hồ sơ đội xe 06/9/2026: chỉ 1 trong 11 xe đứng tên Vận tải Vietrip, còn lại đứng tên Vietourist.
+    Suy pháp nhân từ cờ nội bộ sẽ ghi nhầm tài sản sang công ty con – phải nạp từ giấy đăng ký xe."""
     veh = client.get("/api/v1/vehicles", headers=login("cntt")).json()
     assert veh, "phải có xe trong dữ liệu mẫu"
-    for v in veh:
-        if v["kind"] == "noi_bo":
-            assert v["company_code"] == "VTRIP-VT", f"xe nội bộ {v['plate']} phải thuộc Vận tải Vietrip"
-        else:
-            assert not v["company_id"], "xe hợp tác là xe thuê ngoài, không gán pháp nhân trong tập đoàn"
+    assert all(not v["company_id"] for v in veh), "seed không được tự gán pháp nhân cho xe"
+
+
+def test_chot_doi_xe_theo_giay_dang_ky():
+    veh = client.get("/api/v1/vehicles", headers=login("cntt")).json()
+    emps = client.get("/api/v1/employees", headers=login("cntt")).json()
+    tx = next(e for e in emps if e["position"] == "tai_xe")
+    rows = [{"plate": veh[0]["plate"], "company_code": "VTD", "driver": tx["full_name"]},
+            {"plate": veh[1]["plate"], "company_code": "VTRIP-VT"},
+            {"plate": "50H-999.99", "company_code": "VTD", "seats": 29}]
+    r = client.post("/api/v1/fleet/apply", json={"rows": rows, "ngung_xe_ngoai_ds": True}, headers=login("cntt")).json()
+    assert "50H-999.99" in r["tao_moi"]
+    assert r["gan_tai_xe"] == 1
+    assert len(r["doi_phap_nhan"]) == 2
+    assert r["ngung_khai_thac"], "xe ngoài danh sách phải được đánh dấu ngưng khai thác"
+
+    veh2 = {v["plate"]: v for v in client.get("/api/v1/vehicles", headers=login("cntt")).json()}
+    assert veh2[veh[0]["plate"]]["company_code"] == "VTD"
+    assert veh2[veh[1]["plate"]]["company_code"] == "VTRIP-VT"
+    # xe ngưng khai thác vẫn còn trong hệ thống để tra lịch sử
+    assert any(not v["active"] for v in veh2.values())
 
 
 def test_lenh_dieu_xe_nhan_dien_giao_dich_noi_bo():
     disp = client.get("/api/v1/dispatch", headers=login("cntt")).json()
     for d in disp:
-        if d["company_code"] == "VTRIP-VT":
+        if d["company_code"] in ("VTRIP-VT", "VTD"):
             assert d["noi_bo"] is True and not d["canh_bao"]
         elif not d["company_code"]:
             assert d["noi_bo"] is False and "chưa gán" in d["canh_bao"]
@@ -116,8 +134,7 @@ def test_tai_xe_thuoc_bang_luong_cong_ty_me():
     assert all(e["company_id"] == me["id"] for e in tx), "tài xế thuộc bảng lương công ty mẹ"
     # nhưng xe họ lái vẫn thuộc công ty con
     veh = client.get("/api/v1/vehicles", headers=login("cntt")).json()
-    noi_bo = [v for v in veh if v["kind"] == "noi_bo"]
-    assert noi_bo and all(v["company_code"] == "VTRIP-VT" for v in noi_bo)
+    assert veh, "phải có xe trong dữ liệu mẫu"
 
 
 def test_hdv_thuoc_cong_ty_me():
@@ -138,7 +155,7 @@ def test_hdv_thuoc_cong_ty_me():
 
 def test_bao_cao_do_phu_chu_quan():
     c = client.get("/api/v1/companies/coverage", headers=login("tgd")).json()
-    assert c["xe"]["tong"] >= 1 and c["xe"]["da_gan"] >= 1
+    assert c["xe"]["tong"] >= 1
     assert c["hdv"]["tong"] >= 1 and c["hdv"]["chua_gan"] == 0
     assert c["phap_nhan"]["tong"] == 10 and c["phap_nhan"]["hop_nhat"] == 2 and c["phap_nhan"]["ben_lien_quan"] == 8
     assert c["phap_nhan"]["thieu_mst"] == 2, "chỉ còn Medicshare và Việt Mũi Né chưa có MST"
