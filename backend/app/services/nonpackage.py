@@ -49,7 +49,8 @@ def create(db: Session, u: User, d: dict) -> tuple[Tour, Booking]:
     b = Booking(code=f"BK{date.today():%y%m}{n:04d}", tour_id=t.id, request_id=0, sales_id=sales_id, created_by=u.id, customer_name=name[:120], customer_phone=phone[:30],
                 source=(d.get("source") or "")[:60], care_note=(d.get("note") or "")[:2000], pax=int(d.get("pax") or 1), adl=int(d.get("pax") or 1), amount=amount, discount=float(d.get("discount") or 0),
                 counts_for_target=bool(d.get("counts_for_target", True)), sla_minutes=0, sla_ok=True, service_type=st, country=(d.get("country") or "")[:60], customer_email=(d.get("customer_email") or "")[:120],
-                service_date=sd, cost_amount=cost, supplier_name=(d.get("supplier_name") or "")[:160], services_note=desc)
+                service_date=sd, cost_amount=cost, supplier_name=(d.get("supplier_name") or "")[:160], services_note=desc,
+                company_id=t.company_id)
     db.add(b); db.flush()
     BK.init_terms(db, b, t)
     b.cancel_deadline = datetime.combine(sd, time(17, 0))   # deadline = ngày sử dụng dịch vụ

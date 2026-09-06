@@ -158,7 +158,8 @@ def apply_retention(db: Session, u: User, rt: Retention, nb: Booking, amount: fl
     if amt > rt.remaining + 1: raise Gate("BAO_LUU", f"Vượt số bảo lưu còn lại {rt.remaining:,.0f} đ")
     if amt > due + 1: raise Gate("BAO_LUU", f"Vượt số còn phải thu của booking {due:,.0f} đ")
     rc = Receipt(code=PAY._next_receipt_code(db), booking_id=nb.id, amount=amt, method="bao_luu", payer=rt.customer_name, note=f"Dùng bảo lưu {rt.code} (booking gốc {rt.tour_code})",
-                 status="ke_toan_xac_nhan", created_by=u.username, confirmed_by=u.username, confirmed_at=datetime.now())
+                 status="ke_toan_xac_nhan", created_by=u.username, confirmed_by=u.username, confirmed_at=datetime.now(),
+                 company_id=nb.company_id)
     db.add(rc); db.flush()
     nb.paid = PAY.paid_amount(db, nb.id); refresh_status(nb)
     try:

@@ -9,7 +9,7 @@ import { getUser, clearSession, type User } from "@/lib/api";
  *  không bấm được) – giữ trong menu để lãnh đạo thấy toàn bộ lộ trình. */
 export const GROUPS: { key: string; label: string; items: [string, string][] }[] = [
   { key: "holdings", label: "1. Điều hành Holdings", items: [
-    ["Tổng quan", "/"], ["Công ty thành viên & liên kết", ""], ["Kết quả từng đơn vị", ""],
+    ["Tổng quan", "/"], ["Công ty thành viên & liên kết", "/companies"], ["Kết quả từng đơn vị", ""],
     ["Báo cáo quản trị", "/robot-reports"], ["Chỉ đạo & theo dõi thực hiện", ""]] },
   { key: "marketing", label: "2. Marketing & CSKH", items: [
     ["Kế hoạch & ngân sách", ""], ["Chiến dịch", ""], ["Nội dung & thương hiệu", ""],
@@ -35,7 +35,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Chính sách & định mức", "/params"], ["Cảnh báo nghiệp vụ", "/alerts"], ["Kiểm tra & đối chiếu", "/accounting?tab=misa"],
     ["Ngoại lệ cần xử lý", ""], ["Nhật ký nghiệp vụ", "/audit"]] },
   { key: "hethong", label: "8. Hệ thống & Tích hợp", items: [
-    ["Cấu hình tổ chức", ""], ["Tài khoản & phân quyền", ""], ["Vị trí AI & quyền hạn", ""],
+    ["Cấu hình tổ chức", "/companies"], ["Tài khoản & phân quyền", ""], ["Vị trí AI & quyền hạn", ""],
     ["Đồng bộ Vietrip", "/vietrip"], ["Kết nối MISA và các kênh", "/accounting?tab=misa"],
     ["Lịch tự động hóa", ""], ["Nhật ký kỹ thuật", ""]] },
 ];

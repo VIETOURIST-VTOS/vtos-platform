@@ -208,6 +208,7 @@ class Tour(Base):
     actual_cost: Mapped[float] = mapped_column(Float, default=0)
     promo_value: Mapped[float] = mapped_column(Float, default=0)          # giảm giá/mã KM → dòng giá vốn
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)  # pháp nhân chủ quản – rỗng là CHƯA XÁC ĐỊNH, không mặc định về công ty mẹ
     kt_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cntt_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     settlement_version: Mapped[int] = mapped_column(Integer, default=1)    # V.01, V.02… mỗi lần Kế toán trả lại
@@ -285,6 +286,7 @@ class Booking(Base):
     cancel_deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled: Mapped[bool] = mapped_column(Boolean, default=False)
     services_note: Mapped[str] = mapped_column(String(200), default="")    # dịch vụ lẻ
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)  # pháp nhân chủ quản – rỗng là CHƯA XÁC ĐỊNH, không mặc định về công ty mẹ
     deposit_pct: Mapped[float] = mapped_column(Float, default=30)           # % cọc theo sản phẩm
     locked: Mapped[bool] = mapped_column(Boolean, default=False)            # khóa cập nhật thông tin khách (đóng tour / thu đủ)
     lock_reason: Mapped[str] = mapped_column(String(120), default="")

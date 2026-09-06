@@ -41,6 +41,7 @@ class Receipt(Base):
     confirmed_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)  # pháp nhân chủ quản – rỗng là CHƯA XÁC ĐỊNH, không mặc định về công ty mẹ
 
 
 class Retention(Base):

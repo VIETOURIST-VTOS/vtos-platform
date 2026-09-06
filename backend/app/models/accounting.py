@@ -37,6 +37,7 @@ class JournalEntry(Base):
     posted_by: Mapped[str] = mapped_column(String(50), default="")
     posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reversed_by_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # id chứng từ đảo
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)  # pháp nhân chủ quản – rỗng là CHƯA XÁC ĐỊNH, không mặc định về công ty mẹ
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     lines: Mapped[list["JournalLine"]] = relationship(back_populates="entry", cascade="all, delete-orphan", order_by="JournalLine.id")
 

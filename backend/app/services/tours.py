@@ -67,7 +67,8 @@ def create(db: Session, u: User, data) -> Tour:
         raise Gate("MA_TOUR", "Mã tour đã tồn tại")
     t = Tour(code=code, name=data.name, tour_type=data.tour_type, start_date=data.start_date, end_date=data.end_date,
              operator_id=data.operator_id, price_per_pax=data.price_per_pax, fixed_cost=data.fixed_cost,
-             var_cost_per_pax=data.var_cost_per_pax, planned_pax=data.planned_pax, rest_stops=data.rest_stops)
+             var_cost_per_pax=data.var_cost_per_pax, planned_pax=data.planned_pax, rest_stops=data.rest_stops,
+             company_id=getattr(data, "company_id", None))   # bỏ trống → tour vào danh sách đối chiếu pháp nhân
     db.add(t); db.flush()
     from app.services.misa import ensure_project_for_tour
     ensure_project_for_tour(db, t)   # mỗi tour = một công trình (mã công trình = mã tour)
@@ -239,7 +240,8 @@ def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, st
     b = Booking(code=f"BK{date.today():%y%m}{n:04d}", tour_id=t.id, request_id=r.id, sales_id=r.sales_id, created_by=u.id,
                 customer_name=r.customer_name, customer_phone=r.customer_phone, source=r.source, care_note=r.care_note,
                 pax=r.pax, amount=t.price_per_pax * r.pax, discount=r.discount, promo_code=r.promo_code, campaign_code=r.campaign_code,
-                counts_for_target=not t.below_margin, sla_minutes=mins, sla_ok=mins <= sla)
+                counts_for_target=not t.below_margin, sla_minutes=mins, sla_ok=mins <= sla,
+                company_id=t.company_id)      # doanh thu booking thuộc pháp nhân của chuyến
     db.add(b); db.flush(); r.booking_id = b.id
     from app.services import bookings as BK
     BK.init_terms(db, b, t)

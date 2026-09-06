@@ -212,7 +212,8 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     if not data.get("supplier_name"): raise ValueError("Thiếu nhà cung cấp / người thụ hưởng")
     r = PaymentRequest(code=_next_code(db), category=cat, tour_id=t.id if t else None, supplier_name=data["supplier_name"], supplier_tax_code=data.get("supplier_tax_code", ""),
                        supplier_bank=data.get("supplier_bank", ""), amount=float(data["amount"]), description=data["description"], has_document=bool(data.get("has_document")),
-                       document_ref=data.get("document_ref", ""), has_invoice=bool(data.get("has_invoice")), created_by=u.username)
+                       document_ref=data.get("document_ref", ""), has_invoice=bool(data.get("has_invoice")), created_by=u.username,
+                       company_id=t.company_id if t else None)
     # R3: xếp cấp duyệt
     if cat == "marketing" and r.amount >= R.get_param(db, "han_muc_mkt"):
         r.two_signatures = True

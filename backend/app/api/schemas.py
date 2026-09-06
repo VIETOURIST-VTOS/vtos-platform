@@ -33,6 +33,7 @@ class TourCreate(BaseModel):
     var_cost_per_pax: float = 0
     planned_pax: int = 0
     rest_stops: str = ""
+    company_id: int | None = None      # pháp nhân chủ quản; bỏ trống thì tour vào danh sách đối chiếu
 
 
 class TourEdit(BaseModel):

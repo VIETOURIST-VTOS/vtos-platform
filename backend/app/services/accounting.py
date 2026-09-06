@@ -78,6 +78,15 @@ def is_locked(db: Session, period: str) -> bool:
     return db.get(PeriodLock, period) is not None
 
 
+def _company_of_tour(db: Session, tour_id):
+    """Chứng từ của một tour thuộc pháp nhân của tour đó. Tour chưa xác định pháp nhân thì chứng từ
+    cũng để trống – không đoán, không mặc định về công ty mẹ."""
+    if not tour_id: return None
+    from app.models.core import Tour
+    t = db.get(Tour, tour_id)
+    return t.company_id if t else None
+
+
 def _next_code(db: Session, prefix: str, d: date) -> str:
     n = db.execute(select(func.count()).select_from(JournalEntry)).scalar() + 1
     return f"{prefix}{d:%y%m}-{n:04d}"
@@ -106,7 +115,8 @@ def post_entry(db: Session, actor: str, role: str, entry_date: date, description
         account_rule_check(db, acc.code, l, source_type)
     e = JournalEntry(code=_next_code(db, "CT", entry_date), entry_date=entry_date, period=period, description=description[:300],
                      source_type=source_type, source_ref=source_ref, tour_id=tour_id, created_by=actor,
-                     status="da_ghi_so" if post else "nhap", posted_by=actor if post else "", posted_at=datetime.now() if post else None)
+                     status="da_ghi_so" if post else "nhap", posted_by=actor if post else "", posted_at=datetime.now() if post else None,
+                     company_id=_company_of_tour(db, tour_id))
     for l in lines:
         e.lines.append(JournalLine(account_code=str(l["account"]), debit=float(l.get("debit") or 0), credit=float(l.get("credit") or 0),
                                    partner=(l.get("partner") or "")[:160], partner_code=(l.get("partner_code") or "")[:60], project_code=(l.get("project_code") or "")[:40],

@@ -68,5 +68,6 @@ class PaymentRequest(Base):
     reject_reason: Mapped[str] = mapped_column(String(300), default="")
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     paid_ref: Mapped[str] = mapped_column(String(120), default="")        # mã giao dịch ngân hàng / SePay
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)  # pháp nhân chủ quản – rỗng là CHƯA XÁC ĐỊNH, không mặc định về công ty mẹ
     paid_method: Mapped[str] = mapped_column(String(20), default="")      # chuyen_khoan / tien_mat
     entry_ids: Mapped[list] = mapped_column(JSON, default=list)

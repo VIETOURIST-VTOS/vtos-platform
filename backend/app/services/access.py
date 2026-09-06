@@ -110,6 +110,7 @@ MENU_ROLES = {
     "/robot-reports": ALL_SEEING + ("tp_dh", "gd_kd", "hcns"),
     "/vietrip": ("cntt", "tgd", "chutich", "tp_dh", "ketoan"),
     "/audit": AUDIT_ROLES,
+    "/companies": ALL_SEEING + ("tp_dh", "hcns"),   # danh mục pháp nhân và đối chiếu công ty chủ quản
 }
 
 

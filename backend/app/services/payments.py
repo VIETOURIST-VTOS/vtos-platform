@@ -27,7 +27,7 @@ def _next_receipt_code(db: Session) -> str:
 def _make_receipt(db: Session, booking: Booking, txn: BankTransaction | None, amount: float, actor: str, status: str, payer: str = "", note: str = "") -> Receipt:
     r = Receipt(code=_next_receipt_code(db), booking_id=booking.id, bank_txn_id=txn.id if txn else None, amount=amount,
                 method="chuyen_khoan" if txn else "tien_mat", payer=payer or booking.customer_name, note=note,
-                status=status, created_by=actor)
+                status=status, created_by=actor, company_id=booking.company_id)
     db.add(r); db.flush()
     booking.paid = paid_amount(db, booking.id)
     from app.services.bookings import refresh_status

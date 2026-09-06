@@ -1,8 +1,11 @@
-"""Danh mục pháp nhân và gắn công ty chủ quản cho xe / hướng dẫn viên.
+"""Danh mục pháp nhân và gắn công ty chủ quản cho hồ sơ (Ý kiến thẩm định 06/9/2026 – C1, Đợt 2 mục 2).
 
-Ý kiến thẩm định 06/9/2026 mục C1. Nguyên tắc: đội xe thuộc Công ty TNHH Vận tải Vietrip là pháp nhân
-riêng; xe thuê ngoài không thuộc pháp nhân nào trong tập đoàn. Lệnh điều xe dùng xe của một pháp nhân
-trong phạm vi hợp nhất là GIAO DỊCH NỘI BỘ, phải nhận diện để loại trừ khi lập báo cáo hợp nhất.
+Pháp nhân đứng tên xe lấy từ giấy đăng ký xe, không suy từ cờ "xe nội bộ"; xe thuê ngoài không thuộc
+pháp nhân nào trong tập đoàn. Lệnh điều xe dùng xe của một pháp nhân trong phạm vi hợp nhất là GIAO
+DỊCH NỘI BỘ, phải nhận diện để loại trừ khi lập báo cáo hợp nhất.
+
+Với hồ sơ nghiệp vụ (tour, booking, phiếu thu, đề nghị chi, chứng từ ghi sổ): rỗng nghĩa là CHƯA XÁC
+ĐỊNH, không phải công ty mẹ – xem app/services/company_scope.py.
 """
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +17,7 @@ from app.db.session import get_db
 from app.models.core import User, Company, COMPANY_KINDS
 from app.models.hr import Vehicle, Employee
 from app.services import rules as R
+from app.services import company_scope as CS
 
 router = APIRouter(prefix="/api/v1", tags=["companies"])
 WRITE = ("cntt", "ketoan", "tgd", "chutich")
@@ -96,6 +100,63 @@ def coverage(u: User = Depends(current_user), db: Session = Depends(get_db)):
             "hdv": {"tong": len(hdv), "da_gan": sum(1 for e in hdv if e.company_id), "chua_gan": sum(1 for e in hdv if not e.company_id)},
             "phap_nhan": {"tong": len(cos), "hop_nhat": sum(1 for c in cos if c.in_group()), "ben_lien_quan": sum(1 for c in cos if c.related_party()),
                           "thieu_mst": sum(1 for c in cos if not c.tax_code), "tam_ngung": sum(1 for c in cos if not c.active)}}
+
+# ---------- Công ty chủ quản của hồ sơ nghiệp vụ (Đợt 2 mục 2) ----------
+SCOPE_WRITE = ("cntt", "ketoan", "tgd", "chutich", "tp_dh", "ptgd_doan")
+
+
+@router.get("/companies/scope/coverage")
+def scope_coverage(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Từng loại hồ sơ còn bao nhiêu bản ghi chưa xác định pháp nhân – đây là danh sách đối chiếu."""
+    return CS.coverage(db)
+
+
+@router.get("/companies/scope/{kind}/pending")
+def scope_pending(kind: str, limit: int = 100, offset: int = 0, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    if kind not in CS.KINDS: raise HTTPException(404, "Loại hồ sơ không hợp lệ")
+    return CS.pending(db, kind, min(limit, 500), offset)
+
+
+@router.post("/companies/scope/derive")
+def scope_derive(u: User = Depends(require_roles(*SCOPE_WRITE)), db: Session = Depends(get_db)):
+    """Suy pháp nhân từ hồ sơ cha đã xác định (booking ← tour, phiếu thu ← booking…).
+    Không đụng tới hồ sơ đã có pháp nhân và không suy được cho tour."""
+    return CS.derive(db, u)
+
+
+class ScopeAssign(BaseModel):
+    ids: list[int]
+    company_id: int | None = None      # None = gỡ về "chưa xác định"
+
+
+@router.post("/companies/scope/{kind}/assign")
+def scope_assign(kind: str, data: ScopeAssign, u: User = Depends(require_roles(*SCOPE_WRITE)), db: Session = Depends(get_db)):
+    if kind not in CS.KINDS: raise HTTPException(404, "Loại hồ sơ không hợp lệ")
+    try:
+        return CS.assign(db, kind, data.ids, data.company_id, u)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+class TourScopeFilter(BaseModel):
+    company_id: int
+    nguon: str = ""                    # vietrip / vtos / rỗng = tất cả
+    tu_ngay: date | None = None
+    den_ngay: date | None = None
+    loai: str = ""
+    chi_chua_gan: bool = True
+
+
+@router.post("/companies/scope/tour/assign-filter")
+def scope_assign_tours(data: TourScopeFilter, u: User = Depends(require_roles(*SCOPE_WRITE)), db: Session = Depends(get_db)):
+    """Gán pháp nhân cho một lô tour theo tiêu chí (nguồn, khoảng khởi hành, loại tour).
+    Tiêu chí được ghi vào nhật ký để sau này truy lại được căn cứ."""
+    try:
+        return CS.assign_tours_by_filter(db, data.company_id, u, data.nguon, data.tu_ngay, data.den_ngay,
+                                         data.loai, data.chi_chua_gan)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
 
 # ---------- Nạp danh sách tài xế – xe ----------
 class DriverRow(BaseModel):
