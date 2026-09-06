@@ -141,3 +141,49 @@ def assign_tours_by_filter(db: Session, company_id: int, u, nguon: str = "", tu_
     db.commit()
     return {"da_gan": n, "tieu_chi": tieu_chi,
             "message": f"Đã gán pháp nhân cho {n} chuyến tour theo tiêu chí đã nêu"}
+
+
+def assign_by_filter(db: Session, kind: str, company_id: int, u, tu_ky: str = "", den_ky: str = "",
+                     nguon: str = "", nhom: str = "", khong_co_tour: bool = False, chi_chua_gan: bool = True) -> dict:
+    """Gán pháp nhân theo tiêu chí cho chứng từ ghi sổ và đề nghị chi – hai loại còn lại sau khi suy
+    từ hồ sơ cha, vì chúng có thể không gắn với tour nào (chi hành chính, chứng từ nạp từ MISA).
+
+    Tiêu chí là kỳ kế toán, nguồn chứng từ và nhóm chi – đều là thứ Kế toán nhìn vào là biết thuộc sổ
+    của pháp nhân nào, khác hẳn với việc đoán. Toàn bộ tiêu chí vào nhật ký cùng số hồ sơ bị ảnh hưởng.
+    """
+    if kind not in ("chung_tu", "chi"): raise ValueError("Chỉ áp dụng cho chứng từ ghi sổ và đề nghị chi")
+    if db.get(Company, company_id) is None: raise ValueError("Không có pháp nhân này trong danh mục")
+    m = KINDS[kind]["model"]
+    dk = []
+    if chi_chua_gan: dk.append(m.company_id.is_(None))
+    if khong_co_tour: dk.append(m.tour_id.is_(None))
+    if kind == "chung_tu":
+        if tu_ky: dk.append(JournalEntry.period >= tu_ky)
+        if den_ky: dk.append(JournalEntry.period <= den_ky)
+        if nguon: dk.append(JournalEntry.source_type == nguon)
+    else:
+        if nhom: dk.append(PaymentRequest.category == nhom)
+    n = db.execute(update(m).where(*dk).values(company_id=company_id)
+                   .execution_options(synchronize_session=False)).rowcount or 0
+    tieu_chi = {"loai_ho_so": KINDS[kind]["label"], "tu_ky": tu_ky or "", "den_ky": den_ky or "",
+                "nguon": nguon or "tất cả", "nhom": nhom or "tất cả",
+                "khong_co_tour": khong_co_tour, "chi_chua_gan": chi_chua_gan}
+    R.audit(db, u.username, u.role, "gan_phap_nhan_lo_ho_so", f"{kind}:company:{company_id}",
+            before=tieu_chi, after={"so_ho_so": n})
+    db.commit()
+    return {"da_gan": n, "tieu_chi": tieu_chi,
+            "message": f"Đã gán pháp nhân cho {n} {KINDS[kind]['label'].lower()} theo tiêu chí đã nêu"}
+
+
+def nhom_con_lai(db: Session, kind: str) -> dict:
+    """Nhóm các hồ sơ chưa xác định theo tiêu chí có sẵn, để biết cần bao nhiêu lần gán chứ không phải
+    bao nhiêu nghìn dòng phải bấm."""
+    if kind == "chung_tu":
+        q = select(JournalEntry.source_type, JournalEntry.period, func.count()).where(JournalEntry.company_id.is_(None)).group_by(JournalEntry.source_type, JournalEntry.period)
+        return {"kind": kind, "theo": "nguồn chứng từ × kỳ",
+                "rows": [{"nguon": a or "(trống)", "ky": b or "(trống)", "so_luong": c} for a, b, c in db.execute(q)]}
+    if kind == "chi":
+        q = select(PaymentRequest.category, func.count()).where(PaymentRequest.company_id.is_(None)).group_by(PaymentRequest.category)
+        return {"kind": kind, "theo": "nhóm chi",
+                "rows": [{"nhom": a or "(trống)", "so_luong": b} for a, b in db.execute(q)]}
+    return {"kind": kind, "theo": "", "rows": []}

@@ -152,3 +152,42 @@ def test_vai_tro_khong_co_quyen_khong_gan_duoc():
     t = new_tour("KT-PN-0006")
     r = client.post("/api/v1/companies/scope/tour/assign", json={"ids": [t["id"]], "company_id": cos()["VTD"]["id"]}, headers=login("kd.hoa"))
     assert r.status_code == 403
+
+
+def test_gan_lo_chung_tu_va_de_nghi_chi_khong_gan_tour():
+    """Chứng từ nạp từ MISA và chi hành chính không gắn tour nên không suy được – phải gán theo kỳ / nhóm chi."""
+    from app.db.session import SessionLocal
+    from app.models.accounting import JournalEntry
+    vtd = cos()["VTD"]["id"]
+
+    nhom = client.get("/api/v1/companies/scope/chung_tu/groups", headers=login("ketoan")).json()
+    assert nhom["theo"] == "nguồn chứng từ × kỳ"
+
+    db = SessionLocal()
+    tong_truoc = db.query(JournalEntry).filter(JournalEntry.company_id.is_(None)).count()
+    db.close()
+
+    r = client.post("/api/v1/companies/scope/chung_tu/assign-batch",
+                    json={"company_id": vtd, "khong_co_tour": True, "chi_chua_gan": True}, headers=login("ketoan"))
+    assert r.status_code == 200, r.text
+    assert r.json()["da_gan"] <= tong_truoc
+    assert r.json()["tieu_chi"]["khong_co_tour"] is True
+
+    # chạy lại: không còn hồ sơ nào thỏa điều kiện nên không gán thêm
+    r2 = client.post("/api/v1/companies/scope/chung_tu/assign-batch",
+                     json={"company_id": vtd, "khong_co_tour": True, "chi_chua_gan": True}, headers=login("ketoan"))
+    assert r2.json()["da_gan"] == 0
+
+    rc = client.post("/api/v1/companies/scope/chi/assign-batch",
+                     json={"company_id": vtd, "nhom": "hanh_chinh", "chi_chua_gan": True}, headers=login("ketoan"))
+    assert rc.status_code == 200, rc.text
+
+    # loại hồ sơ không thuộc diện gán theo lô thì bị từ chối, không âm thầm gán bừa
+    rt = client.post("/api/v1/companies/scope/tour/assign-batch", json={"company_id": vtd}, headers=login("ketoan"))
+    assert rt.status_code == 422
+
+
+def test_gan_lo_ho_so_can_quyen():
+    r = client.post("/api/v1/companies/scope/chung_tu/assign-batch",
+                    json={"company_id": cos()["VTD"]["id"]}, headers=login("kd.hoa"))
+    assert r.status_code == 403

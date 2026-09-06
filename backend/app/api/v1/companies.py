@@ -158,6 +158,33 @@ def scope_assign_tours(data: TourScopeFilter, u: User = Depends(require_roles(*S
         raise HTTPException(422, str(e))
 
 
+class HoSoScopeFilter(BaseModel):
+    company_id: int
+    tu_ky: str = ""            # 2026-01 (chứng từ ghi sổ)
+    den_ky: str = ""
+    nguon: str = ""            # source_type của chứng từ
+    nhom: str = ""             # category của đề nghị chi
+    khong_co_tour: bool = False
+    chi_chua_gan: bool = True
+
+
+@router.get("/companies/scope/{kind}/groups")
+def scope_groups(kind: str, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Hồ sơ chưa xác định gom theo tiêu chí – để biết cần bao nhiêu lần gán, không phải bao nhiêu dòng."""
+    if kind not in CS.KINDS: raise HTTPException(404, "Loại hồ sơ không hợp lệ")
+    return CS.nhom_con_lai(db, kind)
+
+
+@router.post("/companies/scope/{kind}/assign-batch")
+def scope_assign_batch(kind: str, data: HoSoScopeFilter, u: User = Depends(require_roles(*SCOPE_WRITE)), db: Session = Depends(get_db)):
+    """Gán theo lô cho chứng từ ghi sổ / đề nghị chi không gắn tour (chi hành chính, chứng từ nạp từ MISA)."""
+    try:
+        return CS.assign_by_filter(db, kind, data.company_id, u, data.tu_ky, data.den_ky, data.nguon,
+                                   data.nhom, data.khong_co_tour, data.chi_chua_gan)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
 # ---------- Nạp danh sách tài xế – xe ----------
 class DriverRow(BaseModel):
     full_name: str

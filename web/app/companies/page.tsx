@@ -21,6 +21,8 @@ function Companies() {
   const [sel, setSel] = useState<number[]>([]);
   const [co, setCo] = useState("");
   const [lo, setLo] = useState<any>({ company_id: "", nguon: "vietrip", tu_ngay: "", den_ngay: "", loai: "", chi_chua_gan: true });
+  const [grp, setGrp] = useState<any>(null);
+  const [lo2, setLo2] = useState<any>({ company_id: "", tu_ky: "", den_ky: "", nguon: "", nhom: "", khong_co_tour: true, chi_chua_gan: true });
 
   const load = useCallback(() => {
     api("/companies").then(setCos).catch(() => {});
@@ -28,7 +30,11 @@ function Companies() {
     api("/companies/coverage").then(setHr).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
-  const loadPend = useCallback(() => { setSel([]); api(`/companies/scope/${kind}/pending?limit=200`).then(setPend).catch(() => {}); }, [kind]);
+  const loadPend = useCallback(() => {
+    setSel([]); setGrp(null);
+    api(`/companies/scope/${kind}/pending?limit=200`).then(setPend).catch(() => {});
+    if (kind === "chung_tu" || kind === "chi") api(`/companies/scope/${kind}/groups`).then(setGrp).catch(() => {});
+  }, [kind]);
   useEffect(() => { loadPend(); }, [loadPend]);
 
   const post = async (path: string, json?: any) => {
@@ -82,6 +88,28 @@ function Companies() {
       {canWrite && <div className="grid" style={{ marginTop: 8 }}>
         <label>Gán {sel.length} hồ sơ đang chọn cho<select value={co} onChange={(e) => setCo(e.target.value)}><option value="">– chọn pháp nhân –</option>{cos.filter((c) => c.active).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
         <div><button className="act" disabled={!sel.length || !co} onClick={gan}>Gán cho hồ sơ đã chọn</button></div>
+      </div>}
+      {grp && grp.rows.length > 0 && <div style={{ margin: "8px 0" }}>
+        <table><thead><tr><th>{grp.theo}</th><th className="num">Số hồ sơ chưa xác định</th></tr></thead>
+          <tbody>{grp.rows.map((r: any, i: number) => <tr key={i}><td>{kind === "chung_tu" ? `${r.nguon} · kỳ ${r.ky}` : r.nhom}</td><td className="num">{r.so_luong}</td></tr>)}</tbody></table>
+        <p className="muted">Nhóm theo tiêu chí để thấy cần bao nhiêu lần gán, chứ không phải bao nhiêu nghìn dòng phải bấm.</p>
+      </div>}
+      {canWrite && (kind === "chung_tu" || kind === "chi") && <div className="panel" style={{ marginBottom: 8 }}>
+        <h3>Gán theo lô cho hồ sơ không gắn tour</h3>
+        <div className="grid">
+          <label>Pháp nhân<select value={lo2.company_id} onChange={(e) => setLo2({ ...lo2, company_id: e.target.value })}><option value="">– chọn –</option>{cos.filter((c) => c.active).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
+          {kind === "chung_tu" && <><label>Kỳ từ<input placeholder="2026-01" value={lo2.tu_ky} onChange={(e) => setLo2({ ...lo2, tu_ky: e.target.value })} /></label>
+            <label>Kỳ đến<input placeholder="2026-08" value={lo2.den_ky} onChange={(e) => setLo2({ ...lo2, den_ky: e.target.value })} /></label>
+            <label>Nguồn chứng từ<input placeholder="misa, thu_tien…" value={lo2.nguon} onChange={(e) => setLo2({ ...lo2, nguon: e.target.value })} /></label></>}
+          {kind === "chi" && <label>Nhóm chi<input placeholder="hanh_chinh, marketing…" value={lo2.nhom} onChange={(e) => setLo2({ ...lo2, nhom: e.target.value })} /></label>}
+          <label><input type="checkbox" checked={lo2.khong_co_tour} onChange={(e) => setLo2({ ...lo2, khong_co_tour: e.target.checked })} /> Chỉ hồ sơ không gắn tour</label>
+        </div>
+        <button className="act orange" disabled={!lo2.company_id} onClick={() => {
+          const c = cos.find((x) => x.id === Number(lo2.company_id));
+          if (confirm(`Gán ${c?.name} cho toàn bộ hồ sơ thỏa tiêu chí đang chọn? Tiêu chí và số hồ sơ sẽ được ghi vào nhật ký.`))
+            post(`/companies/scope/${kind}/assign-batch`, { ...lo2, company_id: Number(lo2.company_id) });
+        }}>Gán theo lô</button>
+        <p className="muted">Hồ sơ gắn tour đã đi theo tour ở bước &quot;suy từ hồ sơ cha&quot;. Phần còn lại là chi hành chính, chi marketing và chứng từ nạp từ MISA – Kế toán nhìn kỳ và nguồn chứng từ là biết thuộc sổ của pháp nhân nào.</p>
       </div>}
       <table><thead><tr>{canWrite && <th><input type="checkbox" checked={!!pend?.rows?.length && sel.length === pend.rows.length} onChange={(e) => setSel(e.target.checked ? (pend?.rows || []).map((r: any) => r.id) : [])} /></th>}<th>Mã</th><th>Nội dung</th></tr></thead>
         <tbody>{(pend?.rows || []).map((r: any) => <tr key={r.id}>{canWrite && <td><input type="checkbox" checked={sel.includes(r.id)} onChange={() => toggle(r.id)} /></td>}<td className="mono">{r.code}</td><td>{r.mo_ta}</td></tr>)}</tbody></table>
