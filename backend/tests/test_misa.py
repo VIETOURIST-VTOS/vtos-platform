@@ -176,6 +176,12 @@ def test_kiem_toan_checkpoint():
     assert abs(lv["70"] - cash_end) < 10000, f"LCTT dòng 70 ({lv['70']:,.0f}) phải khớp tiền cuối kỳ THTC ({cash_end:,.0f})"
     assert abs(lv["50"] - (lv["20"] + lv["30"] + lv["40"])) < 1
     assert abs(lv["70"] - (lv["50"] + lv["60"] + lv["61"])) < 1
+    # residual_plug trừ đi phần TÁC ĐỘNG TIỀN đã biết trước của bút toán chốt sổ kiểm toán (bình thường, vì
+    # LCTT loại bút toán này khỏi các chỉ tiêu HĐKD/đầu tư/tài chính – xem cash_flow_indirect_tt99) phải nhỏ;
+    # nếu còn lớn bất thường nghĩa là có nhóm tài khoản khác chưa phân loại đúng theo chỉ tiêu BCTC (như lỗi
+    # 3411→34111/34112/34113 đã gặp trên dữ liệu thật)
+    unexplained = rep["lctt_residual_plug"] - rep["lctt_kiem_toan_restatement_cash_effect"]
+    assert abs(unexplained) < 5_000_000_000, f"LCTT residual chưa lý giải được bất thường lớn ({unexplained:,.0f})"
     # ---- Chi tiết vay 341 theo ngân hàng: tổng dư cuối kỳ phải khớp đúng tổng 3 tiểu khoản kiểm toán ----
     vay = client.get("/api/v1/reports/vay-341?upto=2026-06-30&since=2026-01-01", headers=h).json()
     assert abs(vay["total"]["close"] - (57378198822 + 11833359977 + 5203246120)) < 10000

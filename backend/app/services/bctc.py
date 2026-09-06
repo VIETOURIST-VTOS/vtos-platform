@@ -21,20 +21,29 @@ BY_PARTNER = ("131", "331", "1388", "3388", "141", "1281", "1283", "136")   # x�
 PL_PREFIX = ("5", "6", "7", "8", "9")
 
 
-def _lines(db: Session, upto: date, since: date | None = None, exclude_closing: bool = False):
-    q = select(JournalLine, JournalEntry.entry_date, JournalEntry.source_type, JournalEntry.id).join(JournalEntry).where(JournalEntry.status == "da_ghi_so", JournalEntry.entry_date <= upto)
+def _lines(db: Session, upto: date, since: date | None = None, exclude_closing: bool = False, exclude_kiem_toan: bool = False):
+    q = select(JournalLine, JournalEntry.entry_date, JournalEntry.source_type, JournalEntry.id, JournalEntry.source_ref, JournalEntry.description).join(JournalEntry).where(JournalEntry.status == "da_ghi_so", JournalEntry.entry_date <= upto)
     if since: q = q.where(JournalEntry.entry_date >= since)
     rows = db.execute(q).all()
     if exclude_closing:
-        closing_ids = {eid for l, d, st, eid in rows if l.account_code.startswith("911") or st == "ket_chuyen"}
+        closing_ids = {eid for l, d, st, eid, ref, desc in rows if l.account_code.startswith("911") or st == "ket_chuyen"}
         rows = [r for r in rows if r[3] not in closing_ids]
+    if exclude_kiem_toan:
+        # Bút toán "chốt sổ theo BCTC kiểm toán" (điều chỉnh CHÊNH LỆCH một lần, nguồn 'kiem_toan') và bút
+        # toán kết chuyển KQKD còn treo đi kèm (source_ref bắt đầu "kt-close:") KHÔNG phải dòng tiền phát
+        # sinh thật trong kỳ – đây là bút toán RESTATEMENT một lần để khớp sổ với BCTC đã kiểm toán/soát xét,
+        # nếu tính vào biến động số dư sẽ làm LCTT hiểu nhầm thành phát sinh/thu chi khổng lồ trong kỳ. Loại
+        # các bút toán này (và các bút toán "dao" đảo lại chúng khi nạp lại mốc chốt sổ) khỏi LCTT.
+        kt_ids = {eid for l, d, st, eid, ref, desc in rows
+                  if st == "kiem_toan" or (ref or "").startswith(("kt:", "kt-close:")) or (st == "dao" and "nạp lại mốc kiểm toán" in (desc or ""))}
+        rows = [r for r in rows if r[3] not in kt_ids]
     return rows
 
 
-def account_balances(db: Session, upto: date) -> dict:
+def account_balances(db: Session, upto: date, exclude_kiem_toan: bool = False) -> dict:
     """{account: {"net": Nợ−Có, "by_partner": {code: net}}} cho tài khoản chi tiết đã ghi sổ."""
     out: dict[str, dict] = {}
-    for l, d, st, eid in _lines(db, upto):
+    for l, d, st, eid, ref, desc in _lines(db, upto, exclude_kiem_toan=exclude_kiem_toan):
         a = out.setdefault(l.account_code, {"net": 0.0, "by_partner": {}})
         a["net"] += l.debit - l.credit
         if l.account_code.startswith(BY_PARTNER):
@@ -43,10 +52,14 @@ def account_balances(db: Session, upto: date) -> dict:
     return out
 
 
-def balance_sheet_tt99(db: Session, upto: date) -> dict:
-    """Trả về {code: value} cho mọi chỉ tiêu THTC + chi tiết tài khoản → chỉ tiêu (để thuyết minh)."""
+def balance_sheet_tt99(db: Session, upto: date, exclude_kiem_toan: bool = False) -> dict:
+    """Trả về {code: value} cho mọi chỉ tiêu THTC + chi tiết tài khoản → chỉ tiêu (để thuyết minh).
+
+    exclude_kiem_toan=True bỏ qua bút toán chốt sổ theo BCTC kiểm toán (xem _lines) – dùng riêng cho LCTT
+    gián tiếp (cash_flow_indirect_tt99) để không hiểu nhầm bút toán restatement một lần thành dòng tiền
+    trong kỳ; KHÔNG dùng cho báo cáo THTC chính thức (phải phản ánh đúng số dư sổ sách tại ngày báo cáo)."""
     accs = {a.code: a for a in db.execute(select(Account)).scalars()}
-    bal = account_balances(db, upto)
+    bal = account_balances(db, upto, exclude_kiem_toan=exclude_kiem_toan)
     v: dict[str, float] = {}
     detail: dict[str, list] = {}
     pl_open = 0.0
@@ -85,7 +98,7 @@ def balance_sheet_tt99(db: Session, upto: date) -> dict:
 def income_statement_tt99(db: Session, since: date, upto: date) -> dict:
     accs = {a.code: a for a in db.execute(select(Account)).scalars()}
     v: dict[str, float] = {}
-    for l, d, st, eid in _lines(db, upto, since, exclude_closing=True):
+    for l, d, st, eid, ref, desc in _lines(db, upto, since, exclude_closing=True):
         a = accs.get(l.account_code)
         if not a or not l.account_code.startswith(PL_PREFIX) or l.account_code.startswith("911"): continue
         code = a.pl_code; p = a
@@ -119,7 +132,8 @@ def bctc(db: Session, upto: date, since: date | None = None, compare_upto: date 
     GROUP_LCTT = {"08", "20", "30", "40", "50", "70"}
     lctt = [{"code": m["code"], "name": m["name"], "note": m["note"], "now": cf["values"].get(m["code"], 0.0), "group": m["code"] in GROUP_LCTT} for m in MAU["lctt"]]
     return {"company": settings.COMPANY_NAME, "tax_code": settings.COMPANY_TAX_CODE, "since": since, "upto": upto, "compare_upto": compare_upto,
-            "thtc": thtc, "kqkd": kqkd, "lctt": lctt, "lctt_residual_plug": cf["residual_plug"], "balanced": bs["balanced"], "unposted_pl": bs["unposted_pl"], "detail": bs["detail"]}
+            "thtc": thtc, "kqkd": kqkd, "lctt": lctt, "lctt_residual_plug": cf["residual_plug"], "lctt_kiem_toan_restatement_cash_effect": cf["kiem_toan_restatement_cash_effect"],
+            "balanced": bs["balanced"], "unposted_pl": bs["unposted_pl"], "detail": bs["detail"]}
 
 
 # ---------- Báo cáo lưu chuyển tiền tệ gián tiếp (B03-DN, mẫu MAU["lctt"] 37 chỉ tiêu) ----------
@@ -156,7 +170,12 @@ def cash_flow_indirect_tt99(db: Session, since: date, upto: date) -> dict:
       trưởng rà soát thêm nếu cần.
     """
     end0 = since - timedelta(days=1)
-    bs0, bs1 = balance_sheet_tt99(db, end0), balance_sheet_tt99(db, upto)
+    # exclude_kiem_toan=True: loại bút toán chốt sổ theo BCTC kiểm toán (restatement một lần, không phải dòng
+    # tiền phát sinh trong kỳ) khỏi các chỉ tiêu dùng để tính biến động HĐKD/đầu tư/tài chính bên dưới.
+    # bs1_true (KHÔNG loại) dùng riêng để lấy đúng số dư tiền thực tế cuối kỳ, khớp với báo cáo THTC chính thức.
+    bs0 = balance_sheet_tt99(db, end0, exclude_kiem_toan=True)
+    bs1 = balance_sheet_tt99(db, upto, exclude_kiem_toan=True)
+    bs1_true = balance_sheet_tt99(db, upto)
     v0, v1 = bs0["values"], bs1["values"]
     pl = income_statement_tt99(db, since, upto)["values"]
     lntt = pl.get("50", 0.0)
@@ -174,7 +193,7 @@ def cash_flow_indirect_tt99(db: Session, since: date, upto: date) -> dict:
 
     # Tài khoản cụ thể (không qua chỉ tiêu BCTC dùng chung) chỉ dùng cho lãi vay/thuế TNDN đã trả bằng tiền –
     # nếu sổ không tách riêng tài khoản lãi vay phải trả (3352) thì coi như đã trả hết bằng tiền trong kỳ.
-    bal0_raw, bal1_raw = account_balances(db, end0), account_balances(db, upto)
+    bal0_raw, bal1_raw = account_balances(db, end0, exclude_kiem_toan=True), account_balances(db, upto, exclude_kiem_toan=True)
     accrued_interest_up = _net_by_prefix(bal0_raw, ("3352",)) - _net_by_prefix(bal1_raw, ("3352",))
     accrued_cit_up = _net_by_prefix(bal0_raw, ("3334",)) - _net_by_prefix(bal1_raw, ("3334",))
 
@@ -226,14 +245,16 @@ def cash_flow_indirect_tt99(db: Session, since: date, upto: date) -> dict:
     v["60"] = v0.get("110", 0.0)
     v["61"] = 0.0
     v["50"] = v["20"] + v["30"] + v["40"]
-    cash_end_actual = v1.get("110", 0.0)
-    residual = (cash_end_actual - v["60"] - v["61"]) - v["50"]   # phần chưa được các mục trên phản ánh hết
+    cash_end_actual = bs1_true["values"].get("110", 0.0)   # số dư tiền THẬT cuối kỳ (khớp báo cáo THTC chính thức)
+    kt_cash_effect = cash_end_actual - v1.get("110", 0.0)  # phần tiền bị bút toán chốt sổ kiểm toán điều chỉnh trực tiếp (nếu có)
+    residual = (cash_end_actual - v["60"] - v["61"]) - v["50"]   # phần chưa được các mục trên phản ánh hết (gồm cả kt_cash_effect)
     if residual >= 0: v["16"] += residual
     else: v["17"] += residual
     v["20"] = v["08"] + sum(v[c] for c in ("09", "10", "11", "12", "13", "14", "15", "16", "17"))
     v["50"] = v["20"] + v["30"] + v["40"]
     v["70"] = v["50"] + v["60"] + v["61"]
-    return {"since": since, "upto": upto, "values": v, "residual_plug": residual, "cash_begin": v["60"], "cash_end": v["70"], "cash_end_actual": cash_end_actual}
+    return {"since": since, "upto": upto, "values": v, "residual_plug": residual, "kiem_toan_restatement_cash_effect": kt_cash_effect,
+            "cash_begin": v["60"], "cash_end": v["70"], "cash_end_actual": cash_end_actual}
 
 
 # ---------- Chi tiết vay và nợ thuê tài chính theo ngân hàng – TK 341 (đúng bố cục MISA xuất) ----------
