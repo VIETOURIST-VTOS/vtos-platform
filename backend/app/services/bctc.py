@@ -133,6 +133,7 @@ def bctc(db: Session, upto: date, since: date | None = None, compare_upto: date 
     lctt = [{"code": m["code"], "name": m["name"], "note": m["note"], "now": cf["values"].get(m["code"], 0.0), "group": m["code"] in GROUP_LCTT} for m in MAU["lctt"]]
     return {"company": settings.COMPANY_NAME, "tax_code": settings.COMPANY_TAX_CODE, "since": since, "upto": upto, "compare_upto": compare_upto,
             "thtc": thtc, "kqkd": kqkd, "lctt": lctt, "lctt_residual_plug": cf["residual_plug"], "lctt_kiem_toan_restatement_cash_effect": cf["kiem_toan_restatement_cash_effect"],
+            "lctt_debug_v0": cf.get("debug_v0"), "lctt_debug_v1": cf.get("debug_v1"),
             "balanced": bs["balanced"], "unposted_pl": bs["unposted_pl"], "detail": bs["detail"]}
 
 
@@ -254,7 +255,8 @@ def cash_flow_indirect_tt99(db: Session, since: date, upto: date) -> dict:
     v["50"] = v["20"] + v["30"] + v["40"]
     v["70"] = v["50"] + v["60"] + v["61"]
     return {"since": since, "upto": upto, "values": v, "residual_plug": residual, "kiem_toan_restatement_cash_effect": kt_cash_effect,
-            "cash_begin": v["60"], "cash_end": v["70"], "cash_end_actual": cash_end_actual}
+            "cash_begin": v["60"], "cash_end": v["70"], "cash_end_actual": cash_end_actual,
+            "debug_v0": v0, "debug_v1": v1}
 
 
 # ---------- Chi tiết vay và nợ thuê tài chính theo ngân hàng – TK 341 (đúng bố cục MISA xuất) ----------
