@@ -32,6 +32,10 @@ def catalog(u: User = Depends(require_roles(*READ))):
         {"key": "so-tien-gui", "ten": "Sổ tiền gửi ngân hàng", "mau": "S08-DN", "path": "/api/v1/books/so-tien-gui", "tham_so": ["partner_code"]},
         {"key": "cong-no", "ten": "Sổ chi tiết công nợ theo đối tượng", "mau": "S31-DN / S51-DN", "path": "/api/v1/books/cong-no", "tham_so": ["account", "partner_code"]},
         {"key": "cong-no-tong-hop", "ten": "Sổ tổng hợp công nợ theo đối tượng", "mau": "Tổng hợp", "path": "/api/v1/books/cong-no-tong-hop", "tham_so": ["account"]},
+        {"key": "can-doi-tai-khoan", "ten": "Bảng cân đối tài khoản", "mau": "S06-DN", "path": "/api/v1/books/can-doi-tai-khoan", "tham_so": ["level"]},
+        {"key": "nhat-ky-tien", "ten": "Sổ nhật ký thu tiền / chi tiền", "mau": "S03a1-DN / S03a2-DN", "path": "/api/v1/books/nhat-ky-tien", "tham_so": ["direction"]},
+        {"key": "cong-trinh", "ten": "Sổ chi tiết theo công trình (tour)", "mau": "Chi tiết công trình", "path": "/api/v1/books/cong-trinh", "tham_so": ["project_code"]},
+        {"key": "cong-trinh-tong-hop", "ten": "Tổng hợp doanh thu – chi phí – lãi lỗ theo công trình", "mau": "Tổng hợp", "path": "/api/v1/books/cong-trinh-tong-hop"},
     ]
 
 
@@ -172,3 +176,63 @@ def partner_summary_xlsx(account: str, since: date, upto: date, min_amount: floa
         raise HTTPException(404, str(ex))
     R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"congno:{account}", after={"so_doi_tuong": len(rep["rows"])}); db.commit()
     return _xlsx(BK.partner_summary_xlsx(rep), f"TONG_HOP_CONG_NO_{account}_{_tag(since, upto)}.xlsx")
+
+
+# ---------- Bảng cân đối tài khoản (S06-DN) ----------
+
+@router.get("/can-doi-tai-khoan")
+def trial_balance(since: date, upto: date, level: int = 0, non_zero: bool = True,
+                  u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return BK.trial_balance_range(db, since, upto, level, non_zero)
+
+
+@router.get("/can-doi-tai-khoan.xlsx")
+def trial_balance_xlsx(since: date, upto: date, level: int = 0, non_zero: bool = True,
+                       u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    rep = BK.trial_balance_range(db, since, upto, level, non_zero)
+    R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"cdtk:{since}:{upto}", after={"can_doi": rep["balanced"]}); db.commit()
+    return _xlsx(BK.trial_balance_xlsx(rep), f"BANG_CAN_DOI_TAI_KHOAN_{_tag(since, upto)}.xlsx")
+
+
+# ---------- Nhật ký thu tiền / chi tiền (S03a1, S03a2) ----------
+
+@router.get("/nhat-ky-tien")
+def cash_journal(since: date, upto: date, direction: str = "thu",
+                 u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    try:
+        return BK.cash_journal(db, since, upto, direction)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+
+
+@router.get("/nhat-ky-tien.xlsx")
+def cash_journal_xlsx(since: date, upto: date, direction: str = "thu",
+                      u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    try:
+        rep = BK.cash_journal(db, since, upto, direction)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    ten = "THU_TIEN" if direction == "thu" else "CHI_TIEN"
+    return _xlsx(BK.cash_journal_xlsx(rep), f"SO_NHAT_KY_{ten}_{_tag(since, upto)}.xlsx")
+
+
+# ---------- Sổ theo công trình (tour/đoàn) ----------
+
+@router.get("/cong-trinh")
+def project_book(project_code: str, since: date, upto: date,
+                 u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return BK.project_book(db, project_code, since, upto)
+
+
+@router.get("/cong-trinh-tong-hop")
+def project_summary(since: date, upto: date, min_amount: float = 0,
+                    u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return BK.project_summary(db, since, upto, min_amount)
+
+
+@router.get("/cong-trinh-tong-hop.xlsx")
+def project_summary_xlsx(since: date, upto: date, min_amount: float = 0,
+                         u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    rep = BK.project_summary(db, since, upto, min_amount)
+    R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"congtrinh:{since}:{upto}", after={"so_cong_trinh": len(rep["rows"])}); db.commit()
+    return _xlsx(BK.project_summary_xlsx(rep), f"TONG_HOP_CONG_TRINH_{_tag(since, upto)}.xlsx")

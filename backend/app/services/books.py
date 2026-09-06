@@ -325,3 +325,165 @@ def partner_summary_xlsx(rep: dict) -> bytes:
                  _head(title, rep["since"], rep["upto"], f"Tài khoản {rep['account']}"),
                  ["STT", "Mã đối tượng", "Tên đối tượng", "Dư đầu kỳ", "Phát sinh Nợ", "Phát sinh Có", "Dư cuối kỳ"],
                  [6, 22, 46, 18, 18, 18, 18], data, total)
+
+
+# ---------- S06: Bảng cân đối tài khoản theo khoảng ngày ----------
+
+def trial_balance_range(db: Session, since: date, upto: date, level: int = 0, non_zero: bool = True) -> dict:
+    """Bảng cân đối tài khoản (S06-DN) theo KHOẢNG NGÀY bất kỳ, không bó theo tháng như hàm cũ.
+    level > 0 thì chỉ lấy tài khoản tới bậc đó (MISA cho chọn xem bậc 1/2/3) và cộng dồn số của tài khoản con
+    lên tài khoản cha, để tổng Nợ = tổng Có ở mọi bậc."""
+    accs = {a.code: a for a in db.execute(select(Account).order_by(Account.code)).scalars()}
+    agg = {c: {"open": 0.0, "debit": 0.0, "credit": 0.0} for c in accs}
+    for l, e in _entry_rows(db, upto):
+        code = l.account_code
+        if code not in agg:
+            continue
+        if e.entry_date < since:
+            agg[code]["open"] += (l.debit or 0) - (l.credit or 0)
+        else:
+            agg[code]["debit"] += l.debit or 0
+            agg[code]["credit"] += l.credit or 0
+
+    def roll_up(code: str) -> dict:
+        """Số của một tài khoản gồm cả tài khoản con (để tài khoản cha có số như MISA in)."""
+        tot = {"open": 0.0, "debit": 0.0, "credit": 0.0}
+        for c in account_subtree(db, code):
+            for k in tot:
+                tot[k] += agg[c][k]
+        return tot
+
+    rows = []
+    for code, a in sorted(accs.items()):
+        if level and a.level > level:
+            continue
+        t = roll_up(code)
+        open_net = round(t["open"], 0)
+        close_net = round(open_net + t["debit"] - t["credit"], 0)
+        r = {"account": code, "name": a.name, "kind": a.kind, "level": a.level, "parent": a.parent,
+             "open_debit": max(open_net, 0.0), "open_credit": max(-open_net, 0.0),
+             "debit": round(t["debit"], 0), "credit": round(t["credit"], 0),
+             "close_debit": max(close_net, 0.0), "close_credit": max(-close_net, 0.0)}
+        if non_zero and not any(abs(r[k]) > 0 for k in ("open_debit", "open_credit", "debit", "credit", "close_debit", "close_credit")):
+            continue
+        rows.append(r)
+    # Tổng cộng chỉ lấy tài khoản bậc 1 để không cộng trùng tài khoản cha với tài khoản con
+    tops = [r for r in rows if not r["parent"]]
+    total = {k: round(sum(r[k] for r in tops), 0)
+             for k in ("open_debit", "open_credit", "debit", "credit", "close_debit", "close_credit")}
+    return {"since": since, "upto": upto, "level": level, "rows": rows, "total": total,
+            "balanced": abs(total["debit"] - total["credit"]) < 1 and abs(total["close_debit"] - total["close_credit"]) < 1}
+
+
+def trial_balance_xlsx(rep: dict) -> bytes:
+    data = [[r["account"], r["name"], r["open_debit"], r["open_credit"], r["debit"], r["credit"],
+             r["close_debit"], r["close_credit"]] for r in rep["rows"]]
+    t = rep["total"]
+    total = ["", "TỔNG CỘNG", t["open_debit"], t["open_credit"], t["debit"], t["credit"], t["close_debit"], t["close_credit"]]
+    return _book("BANG CAN DOI TAI KHOAN",
+                 _head("BẢNG CÂN ĐỐI TÀI KHOẢN (Mẫu số S06-DN)", rep["since"], rep["upto"]),
+                 ["Số hiệu TK", "Tên tài khoản", "Dư đầu Nợ", "Dư đầu Có", "Phát sinh Nợ", "Phát sinh Có",
+                  "Dư cuối Nợ", "Dư cuối Có"],
+                 [12, 46, 18, 18, 18, 18, 18, 18], data, total)
+
+
+# ---------- S03a1 / S03a2: Nhật ký thu tiền, chi tiền ----------
+
+def cash_journal(db: Session, since: date, upto: date, direction: str = "thu") -> dict:
+    """Nhật ký thu tiền (S03a1) / chi tiền (S03a2): các chứng từ có động vào tiền, kèm TK đối ứng.
+    direction='thu' lấy dòng ghi Nợ tiền (tiền vào), 'chi' lấy dòng ghi Có tiền (tiền ra)."""
+    if direction not in ("thu", "chi"):
+        raise ValueError("direction chỉ nhận 'thu' hoặc 'chi'")
+    codes = set(account_subtree(db, CASH_ACCOUNT)) | set(account_subtree(db, BANK_ACCOUNT))
+    rows_raw = [(l, e) for l, e in _entry_rows(db, upto, since)
+                if l.account_code in codes and ((l.debit or 0) > 0 if direction == "thu" else (l.credit or 0) > 0)]
+    contra = _contra_map(db, {e.id for _, e in rows_raw})
+    rows, total = [], 0.0
+    for l, e in rows_raw:
+        amount = (l.debit or 0) if direction == "thu" else (l.credit or 0)
+        total += amount
+        rows.append({"date": e.entry_date, "code": e.code, "doc_no": l.doc_no, "description": e.description,
+                     "account": l.account_code, "contra": _contra_of(contra, e.id, l),
+                     "partner": l.partner, "partner_code": l.partner_code, "project_code": l.project_code,
+                     "amount": amount, "entry_id": e.id})
+    return {"direction": direction, "since": since, "upto": upto, "rows": rows, "total": round(total, 0)}
+
+
+def cash_journal_xlsx(rep: dict) -> bytes:
+    thu = rep["direction"] == "thu"
+    title = ("SỔ NHẬT KÝ THU TIỀN (Mẫu số S03a1-DN)" if thu else "SỔ NHẬT KÝ CHI TIỀN (Mẫu số S03a2-DN)")
+    data = [[r["date"], r["code"], r["doc_no"], r["description"], r["account"], r["contra"],
+             r["partner"], r["project_code"], r["amount"]] for r in rep["rows"]]
+    total = ["", "", "", "TỔNG CỘNG", "", "", "", "", rep["total"]]
+    return _book("NHAT KY THU TIEN" if thu else "NHAT KY CHI TIEN",
+                 _head(title, rep["since"], rep["upto"]),
+                 ["Ngày", "Số chứng từ", "Số CT gốc", "Diễn giải", "TK tiền", "TK đối ứng",
+                  "Đối tượng", "Công trình", "Số tiền thu" if thu else "Số tiền chi"],
+                 [14, 16, 14, 46, 12, 14, 30, 16, 18], data, total)
+
+
+# ---------- Sổ theo công trình (tour/đoàn) ----------
+
+def project_book(db: Session, project_code: str, since: date, upto: date) -> dict:
+    """Sổ chi tiết theo công trình: mọi phát sinh gắn mã công trình (mã tour), tách doanh thu – chi phí."""
+    accs = {a.code: a for a in db.execute(select(Account)).scalars()}
+    rows_raw = [(l, e) for l, e in _entry_rows(db, upto, since) if l.project_code == project_code]
+    contra = _contra_map(db, {e.id for _, e in rows_raw})
+    rows, revenue, cost = [], 0.0, 0.0
+    for l, e in rows_raw:
+        a = accs.get(l.account_code)
+        kind = a.kind if a else ""
+        if kind == "DT":
+            revenue += (l.credit or 0) - (l.debit or 0)
+        elif kind == "CP":
+            cost += (l.debit or 0) - (l.credit or 0)
+        rows.append({"date": e.entry_date, "code": e.code, "doc_no": l.doc_no, "description": e.description,
+                     "account": l.account_code, "account_name": a.name if a else "", "account_kind": kind,
+                     "contra": _contra_of(contra, e.id, l), "partner": l.partner, "partner_code": l.partner_code,
+                     "debit": l.debit, "credit": l.credit, "entry_id": e.id})
+    revenue, cost = round(revenue, 0), round(cost, 0)
+    return {"project_code": project_code, "since": since, "upto": upto, "rows": rows,
+            "revenue": revenue, "cost": cost, "profit": round(revenue - cost, 0)}
+
+
+def project_summary(db: Session, since: date, upto: date, min_amount: float = 0) -> dict:
+    """Tổng hợp doanh thu – chi phí – lãi lỗ theo từng công trình (tour/đoàn) trong kỳ.
+    Đây là bảng Kế toán và Điều hành cần để biết tour nào thực sự có lãi trên SỔ, không phải trên bảng tính tay."""
+    accs = {a.code: a.kind for a in db.execute(select(Account)).scalars()}
+    agg: dict[str, dict] = {}
+    for l, e in _entry_rows(db, upto, since):
+        code = l.project_code or ""
+        if not code:
+            continue
+        kind = accs.get(l.account_code, "")
+        if kind not in ("DT", "CP"):
+            continue
+        s = agg.setdefault(code, {"project_code": code, "revenue": 0.0, "cost": 0.0})
+        if kind == "DT":
+            s["revenue"] += (l.credit or 0) - (l.debit or 0)
+        else:
+            s["cost"] += (l.debit or 0) - (l.credit or 0)
+    rows = []
+    for s in agg.values():
+        s["revenue"], s["cost"] = round(s["revenue"], 0), round(s["cost"], 0)
+        s["profit"] = round(s["revenue"] - s["cost"], 0)
+        s["margin"] = round(100 * s["profit"] / s["revenue"], 1) if s["revenue"] else 0.0
+        if abs(s["revenue"]) > min_amount or abs(s["cost"]) > min_amount:
+            rows.append(s)
+    rows.sort(key=lambda x: -x["revenue"])
+    return {"since": since, "upto": upto, "rows": rows,
+            "total": {"revenue": round(sum(r["revenue"] for r in rows), 0),
+                      "cost": round(sum(r["cost"] for r in rows), 0),
+                      "profit": round(sum(r["profit"] for r in rows), 0)}}
+
+
+def project_summary_xlsx(rep: dict) -> bytes:
+    data = [[i, r["project_code"], r["revenue"], r["cost"], r["profit"], r["margin"]]
+            for i, r in enumerate(rep["rows"], 1)]
+    t = rep["total"]
+    total = ["", "TỔNG CỘNG", t["revenue"], t["cost"], t["profit"],
+             round(100 * t["profit"] / t["revenue"], 1) if t["revenue"] else 0.0]
+    return _book("TONG HOP THEO CONG TRINH",
+                 _head("TỔNG HỢP DOANH THU – CHI PHÍ – LÃI LỖ THEO CÔNG TRÌNH (TOUR)", rep["since"], rep["upto"]),
+                 ["STT", "Mã công trình", "Doanh thu", "Chi phí", "Lãi/lỗ", "Tỷ suất %"],
+                 [6, 28, 20, 20, 20, 12], data, total)
