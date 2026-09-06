@@ -44,7 +44,9 @@ function TourDetail() {
       <div className="kpi"><b>{vnd(bookedAmount)}</b><span>Doanh thu booking</span></div>
       <div className="kpi"><b>{vnd(sm.collected)}</b><span>Đã thu</span></div>
       <div className="kpi"><b>{vnd(sm.cost_actual)}</b><span>Chi phí đã ghi nhận{sm.cost_lines ? ` (${sm.cost_lines} dòng quyết toán)` : sm.cost_basis === "tong_hop_vietrip" ? " (tổng hợp Vietrip)" : " (chưa có dòng nào)"}</span></div>
-      <div className="kpi"><b style={{ color: sm.profit < 0 ? "var(--red)" : undefined }}>{vnd(sm.profit)}</b><span>{sm.profit_state === "xac_nhan" ? "Lợi nhuận đã xác nhận" : "Lợi nhuận tạm tính"}</span></div>
+      <div className="kpi">{sm.cost_basis === "chua_co"
+        ? <><b className="muted">–</b><span>Chưa tính được lợi nhuận (chưa ghi nhận chi phí nào)</span></>
+        : <><b style={{ color: sm.profit < 0 ? "var(--red)" : undefined }}>{vnd(sm.profit)}</b><span>{sm.profit_state === "xac_nhan" ? "Lợi nhuận đã xác nhận" : "Lợi nhuận tạm tính"}</span></>}</div>
     </div>
     {sm.warning && <Gate ok={false}>{sm.warning}</Gate>}
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{tabs.map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
