@@ -19,8 +19,18 @@ jobs:
       API: https://vtos-api.onrender.com/api/v1
       TOKEN: ${{ secrets.ROBOT_TOKEN }}
     steps:
-      - name: Đánh thức API (Render free ngủ khi rảnh)
-        run: curl -s -o /dev/null -m 90 "$API/health" || true; sleep 20
+      - name: Đánh thức API và CHỜ tới khi thật sự sẵn sàng
+        # Render free ngủ khi rảnh, và máy chủ 512 MB có thể đang khởi động lại sau khi quá bộ nhớ.
+        # Gọi robot ngay lúc đó sẽ dính 502 và làm hỏng cả lượt chạy, nên phải chờ /health trả 200 rồi mới chạy.
+        run: |
+          for i in $(seq 1 15); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 30 "$API/health" || echo 000)
+            echo "lần $i: /health → $CODE"
+            [ "$CODE" = "200" ] && sleep 5 && exit 0
+            sleep 20
+          done
+          echo "::error::API không sẵn sàng sau ~5 phút – bỏ lượt chạy này"
+          exit 1
       - name: Chọn việc theo lịch
         id: pick
         run: |
@@ -38,9 +48,32 @@ jobs:
       - name: Chạy robot
         run: |
           J="${{ steps.pick.outputs.job }}"; H="X-Robot-Token: $TOKEN"; C="Content-Type: application/json"
+          FAIL=0
+          # Gọi một API robot: thử lại 3 lần (Render có thể đang khởi động lại), ghi rõ việc nào hỏng
+          # thay vì để cả lượt chạy chết ở lệnh curl đầu tiên như trước.
+          call() {
+            ten="$1"; shift
+            if curl -sS --fail-with-body --retry 3 --retry-delay 15 --retry-all-errors "$@"; then
+              echo "✔ $ten"
+            else
+              echo "::error::✘ $ten thất bại"; FAIL=1
+            fi
+          }
           case "$J" in
-            vietrip) curl -sf -m 120 -X POST "$API/robot/vietrip/sync" -H "$H" -H "$C" -d '{"settlements_days":10}'; sleep 600; curl -sf -m 170 -X POST "$API/robot/run" -H "$H"; curl -sf -m 170 -X POST "$API/robot/bookings/check" -H "$H"; curl -sf -m 170 -X POST "$API/robot/r9/auto" -H "$H" ;;
-            vietrip_products) curl -sf -m 120 -X POST "$API/robot/vietrip/sync" -H "$H" -H "$C" -d '{"products":true,"settlements_days":10}' ;;
-            sepay) curl -sf -m 120 -X POST "$API/robot/sepay/pull" -H "$H" -H "$C" -d '{}'; curl -sf -m 60 -X POST "$API/robot/incidents/finalize" -H "$H"; curl -sf -m 60 -X POST "$API/robot/inbox/check" -H "$H"; curl -sf -m 60 -X POST "$API/robot/zalo/send-pending" -H "$H" ;;
-            ngay|tuan|thang) curl -sf -m 170 -X POST "$API/robot/report/$J" -H "$H" -H "$C" -d '{}' ;;
+            vietrip)
+              call "đồng bộ Vietrip" -m 120 -X POST "$API/robot/vietrip/sync" -H "$H" -H "$C" -d '{"settlements_days":10}'
+              sleep 600
+              call "robot chạy nền" -m 170 -X POST "$API/robot/run" -H "$H"
+              call "soát booking" -m 170 -X POST "$API/robot/bookings/check" -H "$H"
+              call "robot R9" -m 170 -X POST "$API/robot/r9/auto" -H "$H" ;;
+            vietrip_products)
+              call "đồng bộ sản phẩm Vietrip" -m 120 -X POST "$API/robot/vietrip/sync" -H "$H" -H "$C" -d '{"products":true,"settlements_days":10}' ;;
+            sepay)
+              call "kéo giao dịch SePay" -m 120 -X POST "$API/robot/sepay/pull" -H "$H" -H "$C" -d '{}'
+              call "chốt sự vụ hết hạn" -m 60 -X POST "$API/robot/incidents/finalize" -H "$H"
+              call "soát hộp thư" -m 60 -X POST "$API/robot/inbox/check" -H "$H"
+              call "gửi Zalo còn treo" -m 60 -X POST "$API/robot/zalo/send-pending" -H "$H" ;;
+            ngay|tuan|thang)
+              call "báo cáo $J" -m 170 -X POST "$API/robot/report/$J" -H "$H" -H "$C" -d '{}' ;;
           esac
+          exit $FAIL

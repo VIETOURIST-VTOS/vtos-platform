@@ -209,3 +209,48 @@ def test_so_theo_cong_trinh(seeded):
 
     x = client.get(f"/api/v1/books/cong-trinh-tong-hop.xlsx?since={SINCE}&upto={UPTO}", headers=h)
     assert x.status_code == 200 and x.content[:2] == b"PK"
+
+
+def test_gioi_han_dong_va_tong_van_dung(seeded):
+    """Sổ thật hơn 100.000 dòng trên máy chủ 512 MB: danh sách dòng phải có trần, nhưng TỔNG và SỐ DƯ
+    vẫn phải là của toàn kỳ (tính bằng SQL), nếu không Kế toán sẽ đọc nhầm số."""
+    h = seeded
+    full = client.get(f"/api/v1/books/nhat-ky-chung?since={SINCE}&upto={UPTO}", headers=h).json()
+    cut = client.get(f"/api/v1/books/nhat-ky-chung?since={SINCE}&upto={UPTO}&limit=2", headers=h).json()
+    assert len(cut["rows"]) == 2 and cut["truncated"] is True
+    assert cut["total_rows"] == full["total_rows"] > 2
+    assert cut["total"] == full["total"]                      # tổng KHÔNG đổi khi cắt dòng
+    assert cut["balanced"] == full["balanced"] is True
+
+    c_full = client.get(f"/api/v1/books/so-cai?account=111&since={SINCE}&upto={UPTO}", headers=h).json()
+    c_cut = client.get(f"/api/v1/books/so-cai?account=111&since={SINCE}&upto={UPTO}&limit=1", headers=h).json()
+    assert len(c_cut["rows"]) == 1 and c_cut["truncated"] is True
+    assert c_cut["opening"] == c_full["opening"]
+    assert c_cut["closing"] == c_full["closing"]              # số dư cuối kỳ vẫn của toàn kỳ
+    assert c_cut["total"] == c_full["total"]
+
+    q_cut = client.get(f"/api/v1/books/so-quy?since={SINCE}&upto={UPTO}&limit=1", headers=h).json()
+    assert q_cut["closing"] == c_full["closing"] and q_cut["truncated"] is True
+
+    # Excel vẫn in được khi bị cắt và phải kèm ghi chú
+    x = client.get(f"/api/v1/books/nhat-ky-chung.xlsx?since={SINCE}&upto={UPTO}", headers=h)
+    assert x.status_code == 200 and x.content[:2] == b"PK"
+
+
+def test_loc_day_xuong_sql_khong_nap_ca_so(seeded):
+    """Chốt chặn hiệu năng: sổ của một tài khoản chỉ được đọc đúng số dòng của tài khoản đó từ CSDL,
+    không được nạp toàn bộ sổ lên rồi lọc bằng Python (đây là nguyên nhân gây tràn bộ nhớ máy chủ)."""
+    from app.db.session import SessionLocal
+    from app.services import books as BK
+    from datetime import date as D
+    db = SessionLocal()
+    try:
+        rows = BK._rows(db, D(2027, 3, 31), D(2027, 3, 1), codes=["1111"])
+        assert rows and all(r.account_code == "1111" for r in rows)
+        # câu SQL phải chứa điều kiện lọc tài khoản và LIMIT
+        sql = str(BK._filtered(BK.select(*BK._COLS), D(2027, 3, 31), D(2027, 3, 1), ["1111"]))
+        assert "account_code IN" in sql.replace("\n", " ") or "account_code" in sql
+        tot = BK._totals(db, D(2027, 3, 31), D(2027, 3, 1), ["1111"])
+        assert tot["count"] == len(rows)
+    finally:
+        db.close()

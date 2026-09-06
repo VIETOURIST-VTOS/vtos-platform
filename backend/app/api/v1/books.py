@@ -42,13 +42,13 @@ def catalog(u: User = Depends(require_roles(*READ))):
 # ---------- Nhật ký chung ----------
 
 @router.get("/nhat-ky-chung")
-def journal(since: date, upto: date, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
-    return BK.journal_book(db, since, upto)
+def journal(since: date, upto: date, limit: int = BK.PAGE_LIMIT, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return BK.journal_book(db, since, upto, limit)
 
 
 @router.get("/nhat-ky-chung.xlsx")
 def journal_xlsx(since: date, upto: date, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
-    rep = BK.journal_book(db, since, upto)
+    rep = BK.journal_book(db, since, upto, BK.XLSX_LIMIT)
     R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"nkc:{since}:{upto}", after={"so_dong": len(rep["rows"])}); db.commit()
     return _xlsx(BK.journal_book_xlsx(rep), f"SO_NHAT_KY_CHUNG_{_tag(since, upto)}.xlsx")
 
@@ -56,9 +56,9 @@ def journal_xlsx(since: date, upto: date, u: User = Depends(require_roles(*READ)
 # ---------- Sổ Cái / Sổ chi tiết tài khoản ----------
 
 @router.get("/so-cai")
-def general_ledger(account: str, since: date, upto: date, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+def general_ledger(account: str, since: date, upto: date, limit: int = BK.PAGE_LIMIT, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        return BK.account_book(db, account, since, upto)
+        return BK.account_book(db, account, since, upto, limit=limit)
     except ValueError as ex:
         raise HTTPException(404, str(ex))
 
@@ -66,7 +66,7 @@ def general_ledger(account: str, since: date, upto: date, u: User = Depends(requ
 @router.get("/so-cai.xlsx")
 def general_ledger_xlsx(account: str, since: date, upto: date, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        rep = BK.account_book(db, account, since, upto)
+        rep = BK.account_book(db, account, since, upto, limit=BK.XLSX_LIMIT)
     except ValueError as ex:
         raise HTTPException(404, str(ex))
     return _xlsx(BK.account_book_xlsx(rep), f"SO_CAI_{account}_{_tag(since, upto)}.xlsx")
@@ -74,9 +74,9 @@ def general_ledger_xlsx(account: str, since: date, upto: date, u: User = Depends
 
 @router.get("/so-chi-tiet")
 def account_detail(account: str, since: date, upto: date, partner_code: str = "", project_code: str = "",
-                   u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+                   limit: int = BK.PAGE_LIMIT, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        return BK.account_book(db, account, since, upto, partner_code, project_code, detail=True)
+        return BK.account_book(db, account, since, upto, partner_code, project_code, detail=True, limit=limit)
     except ValueError as ex:
         raise HTTPException(404, str(ex))
 
@@ -85,7 +85,7 @@ def account_detail(account: str, since: date, upto: date, partner_code: str = ""
 def account_detail_xlsx(account: str, since: date, upto: date, partner_code: str = "", project_code: str = "",
                         u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        rep = BK.account_book(db, account, since, upto, partner_code, project_code, detail=True)
+        rep = BK.account_book(db, account, since, upto, partner_code, project_code, detail=True, limit=BK.XLSX_LIMIT)
     except ValueError as ex:
         raise HTTPException(404, str(ex))
     return _xlsx(BK.account_book_xlsx(rep), f"SO_CHI_TIET_TK_{account}_{_tag(since, upto)}.xlsx")
@@ -94,10 +94,10 @@ def account_detail_xlsx(account: str, since: date, upto: date, partner_code: str
 # ---------- Sổ quỹ tiền mặt / Sổ tiền gửi ----------
 
 @router.get("/so-quy")
-def cash_book(since: date, upto: date, account: str = BK.CASH_ACCOUNT,
+def cash_book(since: date, upto: date, account: str = BK.CASH_ACCOUNT, limit: int = BK.PAGE_LIMIT,
               u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        return BK.cash_book(db, since, upto, account)
+        return BK.cash_book(db, since, upto, account, limit=limit)
     except ValueError as ex:
         raise HTTPException(404, str(ex))
 
@@ -106,7 +106,7 @@ def cash_book(since: date, upto: date, account: str = BK.CASH_ACCOUNT,
 def cash_book_xlsx(since: date, upto: date, account: str = BK.CASH_ACCOUNT,
                    u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        rep = BK.cash_book(db, since, upto, account)
+        rep = BK.cash_book(db, since, upto, account, limit=BK.XLSX_LIMIT)
     except ValueError as ex:
         raise HTTPException(404, str(ex))
     return _xlsx(BK.cash_book_xlsx(rep), f"SO_QUY_TIEN_MAT_{_tag(since, upto)}.xlsx")
@@ -114,9 +114,9 @@ def cash_book_xlsx(since: date, upto: date, account: str = BK.CASH_ACCOUNT,
 
 @router.get("/so-tien-gui")
 def bank_book(since: date, upto: date, partner_code: str = "", account: str = BK.BANK_ACCOUNT,
-              u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+              limit: int = BK.PAGE_LIMIT, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        return BK.cash_book(db, since, upto, account, partner_code)
+        return BK.cash_book(db, since, upto, account, partner_code, limit)
     except ValueError as ex:
         raise HTTPException(404, str(ex))
 
@@ -125,7 +125,7 @@ def bank_book(since: date, upto: date, partner_code: str = "", account: str = BK
 def bank_book_xlsx(since: date, upto: date, partner_code: str = "", account: str = BK.BANK_ACCOUNT,
                    u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        rep = BK.cash_book(db, since, upto, account, partner_code)
+        rep = BK.cash_book(db, since, upto, account, partner_code, BK.XLSX_LIMIT)
     except ValueError as ex:
         raise HTTPException(404, str(ex))
     return _xlsx(BK.cash_book_xlsx(rep), f"SO_TIEN_GUI_{partner_code or 'TATCA'}_{_tag(since, upto)}.xlsx")
@@ -152,7 +152,7 @@ def partner_ledger(account: str, partner_code: str, since: date, upto: date,
 def partner_ledger_xlsx(account: str, partner_code: str, since: date, upto: date,
                         u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        rep = BK.partner_ledger(db, account, partner_code, since, upto)
+        rep = BK.partner_ledger(db, account, partner_code, since, upto, BK.XLSX_LIMIT)
     except ValueError as ex:
         raise HTTPException(404, str(ex))
     return _xlsx(BK.account_book_xlsx(rep), f"SO_CONG_NO_{account}_{partner_code}_{_tag(since, upto)}.xlsx")
@@ -197,10 +197,10 @@ def trial_balance_xlsx(since: date, upto: date, level: int = 0, non_zero: bool =
 # ---------- Nhật ký thu tiền / chi tiền (S03a1, S03a2) ----------
 
 @router.get("/nhat-ky-tien")
-def cash_journal(since: date, upto: date, direction: str = "thu",
+def cash_journal(since: date, upto: date, direction: str = "thu", limit: int = BK.PAGE_LIMIT,
                  u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        return BK.cash_journal(db, since, upto, direction)
+        return BK.cash_journal(db, since, upto, direction, limit)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
 
@@ -209,7 +209,7 @@ def cash_journal(since: date, upto: date, direction: str = "thu",
 def cash_journal_xlsx(since: date, upto: date, direction: str = "thu",
                       u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     try:
-        rep = BK.cash_journal(db, since, upto, direction)
+        rep = BK.cash_journal(db, since, upto, direction, BK.XLSX_LIMIT)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     ten = "THU_TIEN" if direction == "thu" else "CHI_TIEN"
@@ -219,9 +219,9 @@ def cash_journal_xlsx(since: date, upto: date, direction: str = "thu",
 # ---------- Sổ theo công trình (tour/đoàn) ----------
 
 @router.get("/cong-trinh")
-def project_book(project_code: str, since: date, upto: date,
+def project_book(project_code: str, since: date, upto: date, limit: int = BK.PAGE_LIMIT,
                  u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
-    return BK.project_book(db, project_code, since, upto)
+    return BK.project_book(db, project_code, since, upto, limit)
 
 
 @router.get("/cong-trinh-tong-hop")
