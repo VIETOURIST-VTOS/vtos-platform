@@ -109,7 +109,7 @@ def post_entry(db: Session, actor: str, role: str, entry_date: date, description
                      status="da_ghi_so" if post else "nhap", posted_by=actor if post else "", posted_at=datetime.now() if post else None)
     for l in lines:
         e.lines.append(JournalLine(account_code=str(l["account"]), debit=float(l.get("debit") or 0), credit=float(l.get("credit") or 0),
-                                   partner=(l.get("partner") or "")[:160], partner_code=(l.get("partner_code") or "")[:40], project_code=(l.get("project_code") or "")[:40],
+                                   partner=(l.get("partner") or "")[:160], partner_code=(l.get("partner_code") or "")[:60], project_code=(l.get("project_code") or "")[:40],
                                    item_code=(l.get("item_code") or "")[:40], doc_no=(l.get("doc_no") or "")[:40],
                                    booking_id=l.get("booking_id"), tour_id=l.get("tour_id") or tour_id, note=(l.get("note") or "")[:200]))
     db.add(e); db.flush()

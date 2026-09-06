@@ -100,13 +100,13 @@ def import_partners(db: Session, data: bytes, kind: str = "auto") -> dict:
         ci = {k: hdr.index(k) for k in ("tên ncc", "mst") if k in hdr}
         legal = next((i for i, c in enumerate(hdr) if "pháp nhân" in c), None); addr = next((i for i, c in enumerate(hdr) if "địa chỉ" in c), None)
         for r in rows[1:]:
-            code = str(r[ci["mst"]] or "").strip(); trade = str(r[ci["tên ncc"]] or "").strip()
+            code = str(r[ci["mst"]] or "").strip()[:60]; trade = str(r[ci["tên ncc"]] or "").strip()
             if not code or not trade: continue
             p = have.get(code)
             if p is None: p = Partner(code=code, name=trade, kind="ncc", source="data_ncc"); db.add(p); have[code] = p; stat["created"] += 1
             else: stat["updated"] += 1
-            p.is_supplier, p.trade_name, p.tax_code = True, trade, code
-            if legal is not None and r[legal]: p.name = str(r[legal]).strip()
+            p.is_supplier, p.trade_name, p.tax_code = True, trade[:200], code[:20]
+            if legal is not None and r[legal]: p.name = str(r[legal]).strip()[:300]
             if addr is not None and r[addr]: p.address = str(r[addr]).strip()[:300]
         db.commit(); return stat
     h = _find_header(rows, "mã", "tên")
@@ -119,7 +119,7 @@ def import_partners(db: Session, data: bytes, kind: str = "auto") -> dict:
     iint = next((i for i, c in enumerate(hdr) if "nội bộ" in c), None)
     k = kind if kind != "auto" else ("ncc" if "nhà cung cấp" in hdr[ic] else "kh")
     for r in rows[h + 1:]:
-        code = str(r[ic] or "").strip(); name = str(r[iname] or "").strip()
+        code = str(r[ic] or "").strip()[:60]; name = str(r[iname] or "").strip()
         if not code or not name or code.lower() == "stt": continue
         p = have.get(code)
         if p is None: p = Partner(code=code, name=name, kind=k); db.add(p); have[code] = p; stat["created"] += 1
@@ -271,7 +271,7 @@ def import_journal(db: Session, u: User, data: bytes, date_from: date | None = N
         e = JournalEntry(code=code, entry_date=d, period=ACC.period_of(d), description=doc["desc"] or f"Chứng từ MISA {no}", source_type="misa", source_ref=ref,
                          status="da_ghi_so", created_by="misa", posted_by=u.username, posted_at=datetime.now())
         for l in doc["lines"]:
-            e.lines.append(JournalLine(account_code=l["account"], debit=l["debit"], credit=l["credit"], partner=l["partner"][:160], partner_code=l["partner_code"][:40], project_code=l["project_code"][:40], note=l["note"]))
+            e.lines.append(JournalLine(account_code=l["account"], debit=l["debit"], credit=l["credit"], partner=l["partner"][:160], partner_code=l["partner_code"][:60], project_code=l["project_code"][:40], note=l["note"]))
         db.add(e); n += 1
         if n % 500 == 0: db.flush()
         if limit and n >= limit: break

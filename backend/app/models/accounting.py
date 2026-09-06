@@ -49,7 +49,7 @@ class JournalLine(Base):
     debit: Mapped[float] = mapped_column(Float, default=0)
     credit: Mapped[float] = mapped_column(Float, default=0)
     partner: Mapped[str] = mapped_column(String(160), default="")         # tên đối tượng: khách / NCC
-    partner_code: Mapped[str] = mapped_column(String(40), default="", index=True)   # mã đối tượng MISA (MST/CCCD/mã NV/mã ngân hàng)
+    partner_code: Mapped[str] = mapped_column(String(60), default="", index=True)   # mã đối tượng MISA (MST/CCCD/mã NV/mã ngân hàng)
     project_code: Mapped[str] = mapped_column(String(40), default="", index=True)   # mã công trình MISA = mã tour
     item_code: Mapped[str] = mapped_column(String(40), default="")        # mã khoản mục chi phí / mã hàng hóa dịch vụ
     doc_no: Mapped[str] = mapped_column(String(40), default="")           # số hóa đơn / số chứng từ gốc
@@ -99,7 +99,7 @@ class Partner(Base):
     """Đối tượng kế toán (danh mục khách hàng / nhà cung cấp / nhân viên / ngân hàng) – cùng mã với MISA (MST, CCCD…)."""
     __tablename__ = "partners"
     id: Mapped[int] = mapped_column(primary_key=True)
-    code: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    code: Mapped[str] = mapped_column(String(60), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(300))
     kind: Mapped[str] = mapped_column(String(10), default="kh")          # kh / ncc / nv / nh / khac
     is_customer: Mapped[bool] = mapped_column(Boolean, default=False)
