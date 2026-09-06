@@ -256,8 +256,11 @@ def seed_companies(db):
             if v.kind == "noi_bo":            # xe hợp tác là xe thuê ngoài, không thuộc pháp nhân trong tập đoàn
                 v.company_id = vt.id; n += 1
     if me:
-        # Anh Tuấn chốt 06/9/2026: HDV vẫn thuộc công ty mẹ, kể cả khi chuyển sang cộng tác viên
-        for e in db.execute(select(Employee).where(Employee.company_id == None, Employee.department == "huong_dan")).scalars():
-            e.company_id = me.id; h += 1
+        # Anh Tuấn chốt 06/9/2026: hướng dẫn viên (kể cả cộng tác viên) VÀ tài xế đều hưởng lương ở công ty
+        # mẹ, dù xe thuộc Vận tải Vietrip. Tách bạch: TÀI SẢN (xe) thuộc công ty con, CON NGƯỜI thuộc công ty
+        # mẹ – khi hợp nhất, chi phí lương nằm ở sổ mẹ còn khấu hao xe nằm ở sổ con.
+        for e in db.execute(select(Employee).where(Employee.company_id == None)).scalars():
+            if e.department in ("huong_dan", "doi_xe") or e.position == "tai_xe":
+                e.company_id = me.id; h += 1
     db.commit()
     return {"xe": n, "hdv": h}

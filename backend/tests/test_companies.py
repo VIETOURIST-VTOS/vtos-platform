@@ -106,6 +106,20 @@ def test_gan_va_go_chu_quan_xe():
     assert client.put(f"/api/v1/vehicles/{v['id']}/company", json={"company_id": 99999}, headers=login("ketoan")).status_code == 422
 
 
+def test_tai_xe_thuoc_bang_luong_cong_ty_me():
+    """Anh Tuấn chốt 06/9/2026: xe thuộc Vận tải Vietrip nhưng tài xế hưởng lương ở công ty mẹ."""
+    emps = client.get("/api/v1/employees", headers=login("cntt")).json()
+    cs = client.get("/api/v1/companies", headers=login("cntt")).json()
+    me = next(c for c in cs if c["code"] == "VTD")
+    tx = [e for e in emps if e["department"] == "doi_xe" or e["position"] == "tai_xe"]
+    assert tx, "dữ liệu mẫu phải có tài xế"
+    assert all(e["company_id"] == me["id"] for e in tx), "tài xế thuộc bảng lương công ty mẹ"
+    # nhưng xe họ lái vẫn thuộc công ty con
+    veh = client.get("/api/v1/vehicles", headers=login("cntt")).json()
+    noi_bo = [v for v in veh if v["kind"] == "noi_bo"]
+    assert noi_bo and all(v["company_code"] == "VTRIP-VT" for v in noi_bo)
+
+
 def test_hdv_thuoc_cong_ty_me():
     """Anh Tuấn chốt 06/9/2026: HDV vẫn thuộc Công ty Cổ phần Du lịch Vietourist, kể cả khi là cộng tác viên."""
     emps = client.get("/api/v1/employees", headers=login("cntt")).json()

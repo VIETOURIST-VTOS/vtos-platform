@@ -178,7 +178,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
               <select value={v.company_id || ""} onChange={(e) => post(`/vehicles/${v.id}/company`, { company_id: e.target.value ? Number(e.target.value) : null })}>
                 <option value="">– chưa gán –</option>{cos.filter((c) => c.active || c.id === v.company_id).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}{c.active ? "" : " (tạm ngưng)"}</option>)}
               </select></td>}</tr>)}</tbody></table>
-        <p className="muted">Xe thuộc pháp nhân trong phạm vi hợp nhất (mẹ, con, chi nhánh) thì lệnh điều xe là <b>giao dịch nội bộ</b> – phải nhận diện để loại trừ khi lập báo cáo hợp nhất. Xe hợp tác là xe thuê ngoài, không gán pháp nhân trong tập đoàn.</p></div>
+        <p className="muted">Xe thuộc Vận tải Vietrip nhưng <b>tài xế hưởng lương ở công ty mẹ</b> – tài sản thuộc công ty con, con người thuộc công ty mẹ. Xe thuộc pháp nhân trong phạm vi hợp nhất (mẹ, con, chi nhánh) thì lệnh điều xe là <b>giao dịch nội bộ</b> – phải nhận diện để loại trừ khi lập báo cáo hợp nhất. Xe hợp tác là xe thuê ngoài, không gán pháp nhân trong tập đoàn.</p></div>
       <h2>Bảng giá xe nội bộ theo tuyến (Chủ tịch + TGĐ duyệt, hiệu lực theo ngày)</h2>
       {["cntt", "hcns", "tp_dh"].includes(role) && <div className="panel"><div className="grid">
         <label>Tuyến<input value={fRate.route} onChange={(e) => setFRate({ ...fRate, route: e.target.value })} /></label>
