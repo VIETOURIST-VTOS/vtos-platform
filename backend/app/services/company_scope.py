@@ -14,7 +14,7 @@ Tour KHÔNG có hồ sơ cha nên không suy được – phải do Điều hàn
 từ Vietrip vì thế sẽ nằm trong danh sách đối chiếu cho tới khi lãnh đạo chốt, và đó là trạng thái
 đúng: hệ thống nói thật rằng nó chưa biết, thay vì đoán.
 """
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.orm import Session
 from app.models.core import Tour, Booking, Company
 from app.models.ops import PaymentRequest
@@ -73,19 +73,24 @@ def _mo_ta(kind: str, r) -> str:
 
 def derive(db: Session, u=None) -> dict:
     """Suy pháp nhân từ hồ sơ cha đã xác định. Chạy lại nhiều lần vẫn cho cùng kết quả, và
-    KHÔNG bao giờ ghi đè pháp nhân đã có – hồ sơ đã được người gán tay là quyết định cuối cùng."""
+    KHÔNG bao giờ ghi đè pháp nhân đã có – hồ sơ đã được người gán tay là quyết định cuối cùng.
+
+    Viết bằng một câu lệnh cập nhật cho mỗi loại hồ sơ thay vì duyệt từng bản ghi: khối dữ liệu đã nạp
+    có hơn 25.000 chứng từ ghi sổ, nạp ngần ấy đối tượng vào bộ nhớ đủ làm sập máy chủ 512 MB.
+    """
     ket_qua = {}
     for key in ("booking", "receipt", "chi", "chung_tu"):
         cfg = KINDS[key]
         m, (fk, pm) = cfg["model"], cfg["parent"]
-        n = 0
-        for r in db.execute(select(m).where(m.company_id.is_(None))).scalars():
-            pid = getattr(r, fk, None)
-            if not pid: continue
-            p = db.get(pm, pid)
-            if p is not None and p.company_id:
-                r.company_id = p.company_id; n += 1
-        ket_qua[key] = n
+        col = getattr(m, fk)
+        cha_da_xac_dinh = select(pm.id).where(pm.id == col, pm.company_id.is_not(None))
+        r = db.execute(
+            update(m)
+            .where(m.company_id.is_(None), col.is_not(None), cha_da_xac_dinh.exists())
+            .values(company_id=select(pm.company_id).where(pm.id == col).scalar_subquery())
+            .execution_options(synchronize_session=False)
+        )
+        ket_qua[key] = r.rowcount or 0
     if u is not None and sum(ket_qua.values()):
         R.audit(db, u.username, u.role, "suy_phap_nhan_tu_ho_so_cha", "company_scope", after=ket_qua)
     db.commit()
@@ -120,19 +125,19 @@ def assign_tours_by_filter(db: Session, company_id: int, u, nguon: str = "", tu_
     truy lại được vì sao một tour thuộc pháp nhân này chứ không phải pháp nhân kia.
     """
     if db.get(Company, company_id) is None: raise ValueError("Không có pháp nhân này trong danh mục")
-    q = select(Tour)
-    if chi_chua_gan: q = q.where(Tour.company_id.is_(None))
-    if nguon == "vietrip": q = q.where(Tour.vietrip_id.is_not(None))
-    elif nguon == "vtos": q = q.where(Tour.vietrip_id.is_(None))
-    if tu_ngay: q = q.where(Tour.start_date >= tu_ngay)
-    if den_ngay: q = q.where(Tour.start_date <= den_ngay)
-    if loai: q = q.where(Tour.tour_type == loai)
-    rows = list(db.execute(q).scalars())
-    for t in rows: t.company_id = company_id
+    dk = []
+    if chi_chua_gan: dk.append(Tour.company_id.is_(None))
+    if nguon == "vietrip": dk.append(Tour.vietrip_id.is_not(None))
+    elif nguon == "vtos": dk.append(Tour.vietrip_id.is_(None))
+    if tu_ngay: dk.append(Tour.start_date >= tu_ngay)
+    if den_ngay: dk.append(Tour.start_date <= den_ngay)
+    if loai: dk.append(Tour.tour_type == loai)
+    n = db.execute(update(Tour).where(*dk).values(company_id=company_id)
+                   .execution_options(synchronize_session=False)).rowcount or 0
     tieu_chi = {"nguon": nguon or "tất cả", "tu_ngay": str(tu_ngay or ""), "den_ngay": str(den_ngay or ""),
                 "loai": loai or "tất cả", "chi_chua_gan": chi_chua_gan}
     R.audit(db, u.username, u.role, "gan_phap_nhan_lo_tour", f"company:{company_id}",
-            before=tieu_chi, after={"so_tour": len(rows)})
+            before=tieu_chi, after={"so_tour": n})
     db.commit()
-    return {"da_gan": len(rows), "tieu_chi": tieu_chi,
-            "message": f"Đã gán pháp nhân cho {len(rows)} chuyến tour theo tiêu chí đã nêu"}
+    return {"da_gan": n, "tieu_chi": tieu_chi,
+            "message": f"Đã gán pháp nhân cho {n} chuyến tour theo tiêu chí đã nêu"}
