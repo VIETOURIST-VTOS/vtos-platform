@@ -277,3 +277,20 @@ def test_nap_duoc_ca_csv(seeded):
         assert False, "phải báo lỗi"
     except ValueError as ex:
         assert "Tài khoản ngân hàng" in str(ex)
+
+
+def test_chu_tich_lam_duoc_thao_tac_ghi_tren_phan_he_ngan_hang(seeded):
+    """Chủ tịch được mở quyền ghi trên phân hệ ngân hàng; vai trò kinh doanh thì vẫn không."""
+    ct = client.post("/api/v1/auth/login", data={"username": "chutich", "password": "123456"})
+    assert ct.status_code == 200, ct.text
+    h = {"Authorization": f"Bearer {ct.json()['access_token']}"}
+    r = client.post("/api/v1/bank-accounts", headers=h, json={
+        "code": "CTTEST", "bank_name": "Ngan hang thu nghiem", "account_number": "123"})
+    assert r.status_code == 201, r.text
+    assert client.get(f"/api/v1/bank-accounts/phan-loai/xem-truoc?since={SINCE}&upto={UPTO}", headers=h).status_code == 200
+
+    kd = client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "123456"})
+    if kd.status_code == 200:
+        hk = {"Authorization": f"Bearer {kd.json()['access_token']}"}
+        assert client.post("/api/v1/bank-accounts", headers=hk,
+                           json={"code": "KDTEST", "bank_name": "X"}).status_code == 403

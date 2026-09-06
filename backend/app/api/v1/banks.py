@@ -12,6 +12,9 @@ from app.services import banks as BA
 
 router = APIRouter(prefix="/api/v1/bank-accounts", tags=["tai-khoan-ngan-hang"])
 READ = ("ketoan", "cntt", "tgd", "chutich", "bks", "ptgd_doan")
+# Chủ tịch được thực hiện cả thao tác ghi trên phân hệ này (quyết định của Chủ tịch ngày 06/9/2026).
+# Mọi thao tác vẫn ghi nhật ký kiểm toán kèm tên người thực hiện nên vẫn truy được trách nhiệm.
+WRITE = ("ketoan", "chutich")
 
 
 def out(b: BankAccount) -> dict:
@@ -56,7 +59,7 @@ def list_banks(u: User = Depends(require_roles(*READ)), db: Session = Depends(ge
 
 
 @router.post("", status_code=201)
-def add_bank(data: BankIn, u: User = Depends(require_roles("ketoan")), db: Session = Depends(get_db)):
+def add_bank(data: BankIn, u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
     try:
         b = BA.create_bank_account(db, u, data.model_dump())
     except ValueError as ex:
@@ -65,7 +68,7 @@ def add_bank(data: BankIn, u: User = Depends(require_roles("ketoan")), db: Sessi
 
 
 @router.patch("/{code}")
-def edit_bank(code: str, data: BankPatch, u: User = Depends(require_roles("ketoan")), db: Session = Depends(get_db)):
+def edit_bank(code: str, data: BankPatch, u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
     b = db.execute(select(BankAccount).where(BankAccount.code == code.upper())).scalar_one_or_none()
     if not b:
         raise HTTPException(404, "Không có tài khoản ngân hàng này")
@@ -98,7 +101,7 @@ def preview(since: date, upto: date, u: User = Depends(require_roles(*READ)), db
 
 
 @router.post("/phan-loai/thuc-hien")
-def apply(since: date, upto: date, u: User = Depends(require_roles("ketoan")), db: Session = Depends(get_db)):
+def apply(since: date, upto: date, u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
     """Thực hiện gán. Chỉ đổi mã tài khoản trong cây 112; nếu số dư 112 thay đổi thì tự hoàn tác."""
     try:
         return BA.classify(db, since, upto, apply=True, u=u)
@@ -107,7 +110,7 @@ def apply(since: date, upto: date, u: User = Depends(require_roles("ketoan")), d
 
 
 @router.post("/{code}/huy-phan-loai")
-def revert(code: str, since: date, upto: date, u: User = Depends(require_roles("ketoan")), db: Session = Depends(get_db)):
+def revert(code: str, since: date, upto: date, u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
     """Trả các dòng của một ngân hàng về lại tài khoản cha (khi gán nhầm)."""
     try:
         return BA.revert(db, u, code, since, upto)
@@ -124,7 +127,7 @@ def balances(since: date, upto: date, u: User = Depends(require_roles(*READ)), d
 # ---------- Nạp bản đồ chứng từ → ngân hàng từ Sổ tiền gửi của MISA ----------
 
 @router.post("/nap-so-tien-gui")
-async def import_bank_book(file: UploadFile = File(...), u: User = Depends(require_roles("ketoan")),
+async def import_bank_book(file: UploadFile = File(...), u: User = Depends(require_roles(*WRITE)),
                            db: Session = Depends(get_db)):
     """Nạp file "Sổ tiền gửi ngân hàng" xuất từ MISA (in theo từng tài khoản ngân hàng).
 
