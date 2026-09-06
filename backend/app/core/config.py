@@ -14,9 +14,17 @@ class Settings(BaseSettings):
     SEED_DEMO: bool = True
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
     TZ: str = "Asia/Ho_Chi_Minh"
-    # Nơi lưu tài liệu hồ sơ Visa. Ổ đĩa của Render là TẠM – mất khi deploy lại. Trước khi dùng thật phải trỏ
-    # vào ổ đĩa gắn kèm (Render Disk) hoặc thay bằng S3. Hệ thống lưu sha256 nên phát hiện được tệp mất/đổi.
-    VISA_DOC_DIR: str = ""
+    # Lưu tài liệu hồ sơ Visa. Ổ đĩa của Render là TẠM – deploy lại là mất, nên tài liệu thật của khách phải
+    # nằm trên kho đối tượng (Cloudflare R2 / Amazon S3). Quyết định của Chủ tịch ngày 06/9/2026.
+    #   VISA_STORAGE = auto  -> có đủ bucket + khóa thì dùng S3, không thì dùng thư mục (máy lập trình, test)
+    #   VISA_STORAGE = s3    -> BẮT BUỘC dùng S3, thiếu cấu hình là báo lỗi ngay thay vì âm thầm ghi vào ổ tạm
+    VISA_STORAGE: str = "auto"                 # auto | s3 | local
+    VISA_DOC_DIR: str = ""                     # chỉ dùng cho nền "local"
+    S3_BUCKET: str = ""
+    S3_ENDPOINT_URL: str = ""                  # R2: https://<account_id>.r2.cloudflarestorage.com
+    S3_REGION: str = "auto"
+    S3_ACCESS_KEY_ID: str = ""
+    S3_SECRET_ACCESS_KEY: str = ""
     # Nơi lưu tài liệu hồ sơ Visa. Ổ đĩa Render là TẠM (mất khi deploy lại) – trước khi dùng thật phải trỏ
     # vào Render Disk gắn kèm hoặc thay bằng S3. Hệ thống lưu sha256 nên phát hiện được tệp mất/đổi.
     VISA_DOC_DIR: str = ""

@@ -5,7 +5,6 @@ tiếp bằng một hành động nghiệp vụ, và hành động đó tự ki�
 và AI đều gọi cùng các hàm này nên không ai vượt được quy trình bằng cách gửi trạng thái tùy ý.
 """
 import hashlib
-import os
 import re
 import secrets
 from datetime import datetime, date, timedelta
@@ -19,6 +18,7 @@ from app.models.visa import (VisaMarket, VisaFamilyGroup, VisaCase, VisaFormVers
                              VisaHandover, VisaAccessLink, VisaAiSuggestion,
                              STAGES, STAGE_ORDER, DOC_SATISFIED, DEFAULT_COMPANY)
 from app.services import rules as R
+from app.services import storage as ST
 
 MAX_DOC_BYTES = 15 * 1024 * 1024
 # Trường form mà thay đổi thì phải xin khách xác nhận lại (mục 6.1).
@@ -28,15 +28,6 @@ CRITICAL_FIELDS = ("ho_ten", "ngay_sinh", "so_ho_chieu", "ngay_het_han_ho_chieu"
 
 class VisaError(ValueError):
     """Vi phạm điều kiện nghiệp vụ – API trả 422 kèm thông điệp tiếng Việt."""
-
-
-# ---------- Lưu tệp ----------
-# LƯU Ý TRIỂN KHAI: ổ đĩa của Render là tạm, mất khi deploy lại. Trước khi dùng thật phải trỏ VISA_DOC_DIR vào
-# ổ đĩa gắn kèm (Render Disk) hoặc thay bằng S3. Hệ thống lưu băm sha256 nên phát hiện được tệp mất/đổi.
-def _doc_dir() -> str:
-    d = getattr(settings, "VISA_DOC_DIR", "") or os.path.join(os.getcwd(), "visa_docs")
-    os.makedirs(d, exist_ok=True)
-    return d
 
 
 # ---------- Tiện ích ----------
@@ -460,10 +451,14 @@ def add_document(db: Session, u: User, c: VisaCase, item_id: int | None, content
     db.add(doc)
     db.flush()
     # Tên tệp KHÔNG dùng làm định danh: đặt theo id + băm để khách không đoán được đường dẫn của hồ sơ khác.
-    path = os.path.join(_doc_dir(), f"{c.id}_{doc.id}_{checksum[:16]}.bin")
-    with open(path, "wb") as f:
-        f.write(content)
-    doc.storage_path = path
+    try:
+        st = ST.put_document(c.id, doc.id, content, content_type)
+    except ST.StorageError as ex:
+        # Không ghi bản ghi tài liệu khi tệp chưa nằm an toàn trên kho – thà báo lỗi còn hơn để lại một dòng
+        # trỏ vào chỗ trống rồi tới lúc nộp lãnh sự quán mới phát hiện mất tệp.
+        db.rollback()
+        raise VisaError(f"Chưa lưu được tệp nên chưa ghi nhận tài liệu. {ex}")
+    doc.storage_path = st.key
     if last:
         last.superseded_by = doc.id
     if item:
@@ -1070,6 +1065,36 @@ def case_audit(db: Session, c: VisaCase, limit: int = 200) -> list[dict]:
                       .order_by(AuditLog.id.desc()).limit(limit)).scalars()
     return [{"ts": l.ts, "actor": l.actor, "role": l.role, "action": l.action,
              "before": l.before, "after": l.after} for l in rows]
+
+
+# ---------- Tình trạng kho lưu trữ ----------
+
+def storage_status(db: Session, sample: int = 40) -> dict:
+    """Kho đang dùng có bền vững không, và các tệp đã nộp còn nguyên không.
+
+    Kiểm mẫu chứ không quét toàn bộ: đủ để phát hiện sớm "kho trống mà CSDL vẫn còn bản ghi" – dấu hiệu kinh
+    điển của việc đang ghi vào ổ đĩa tạm. Ai đọc số này cũng nên hiểu: `thieu` > 0 nghĩa là tài liệu ĐÃ MẤT."""
+    try:
+        st = ST.storage()
+        info = st.describe()
+    except ST.StorageError as ex:
+        return {"ok": False, "loi": str(ex), "ben_vung": False}
+    total = int(db.execute(select(func.count(VisaDocument.id))).scalar() or 0)
+    rows = list(db.execute(select(VisaDocument.id, VisaDocument.storage_path)
+                           .order_by(VisaDocument.id.desc()).limit(sample)).all())
+    missing = [i for i, key in rows if not key or not st.exists(key)]
+    # Hai vấn đề này ĐỘC LẬP nhau và có thể cùng xảy ra, nên liệt kê đủ chứ không chọn một cái để báo:
+    # kho không bền vững là chuyện tương lai (deploy tới sẽ mất), tệp thiếu là chuyện đã rồi.
+    findings = []
+    if not info["durable"]:
+        findings.append("Kho hiện KHÔNG bền vững: tài liệu sẽ mất sau lần deploy tới.")
+    if missing:
+        findings.append(f"Có {len(missing)}/{len(rows)} tài liệu trong mẫu kiểm tra không còn trên kho.")
+    return {"ok": bool(info["durable"]) and not missing,
+            "ben_vung": info["durable"], "nen": info["kind"], "noi_luu": info["noi_luu"],
+            "canh_bao": info["canh_bao"], "tong_tai_lieu": total, "da_kiem": len(rows),
+            "thieu": len(missing), "tai_lieu_thieu": missing[:10],
+            "ket_luan": " ".join(findings) or "Kho lưu trữ bền vững, mẫu kiểm tra còn đủ tệp."}
 
 
 # ---------- AI (mục 10) ----------

@@ -27,6 +27,7 @@ function Visa() {
   const [tong, setTong] = useState<any>(null);
   const [ds, setDs] = useState<any>(null);
   const [ct, setCt] = useState<any>(null);          // chi tiết hồ sơ đang mở
+  const [kho, setKho] = useState<any>(null);        // tình trạng kho lưu tài liệu
   const [loc, setLoc] = useState({ q: "", market_code: "", stage: "", lifecycle_status: "" });
   const [busy, setBusy] = useState("");
   const canWrite = !user?.read_only;
@@ -40,7 +41,12 @@ function Visa() {
       if (keepId) setCt(await api(`/visa/ho-so/${keepId}`));
     } catch (x) { toast(errMsg(x), true); }
   };
-  useEffect(() => { api("/visa/danh-muc").then(setCat).catch((x) => toast(errMsg(x), true)); reload(); }, []); // eslint-disable-line
+  useEffect(() => {
+    api("/visa/danh-muc").then(setCat).catch((x) => toast(errMsg(x), true));
+    // Tình trạng kho chỉ lãnh đạo/CNTT xem được; nhân viên nghiệp vụ nhận 403 thì bỏ qua lặng lẽ.
+    api("/visa/luu-tru").then(setKho).catch(() => {});
+    reload();
+  }, []); // eslint-disable-line
 
   const open = async (id: number) => { try { setCt(await api(`/visa/ho-so/${id}`)); } catch (x) { toast(errMsg(x), true); } };
 
@@ -62,6 +68,19 @@ function Visa() {
     <p className="muted">Hồ sơ Visa theo <b>từng đương đơn</b>: mỗi người một form, một checklist, một lịch hẹn và một kết quả –
       kể cả khi cả nhà đi chung một booking. Khách hàng, booking, tour và chứng từ thu chi vẫn lấy từ các phân hệ sẵn có
       của VTOS, phân hệ này không giữ bản sao.</p>
+
+    {kho && !kho.ben_vung && <div className="panel">
+      <p><Tag cls="red">Kho lưu tài liệu chưa bền vững</Tag> {kho.ket_luan}</p>
+      <p className="muted">{kho.canh_bao} Nơi lưu hiện tại: <b>{kho.noi_luu}</b>.
+        <b> Chưa cho khách nộp hộ chiếu và sao kê thật lên hệ thống</b> cho tới khi mục này chuyển sang xanh –
+        đặt biến S3_BUCKET, S3_ENDPOINT_URL, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY trên máy chủ là xong.</p>
+    </div>}
+
+    {kho && kho.ben_vung && !!kho.thieu && <div className="panel">
+      <p><Tag cls="red">Thiếu tệp trên kho</Tag> {kho.ket_luan}</p>
+      <p className="muted">Mã tài liệu không còn đọc được: {(kho.tai_lieu_thieu || []).join(", ")} –
+        phải xin khách nộp lại đúng những mục này.</p>
+    </div>}
 
     {tong && <div className="panel">
       <h3>Tổng quan</h3>

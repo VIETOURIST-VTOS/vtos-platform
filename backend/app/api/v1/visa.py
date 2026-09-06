@@ -270,6 +270,16 @@ async def upload_document(case_id: int, file: UploadFile = File(...), checklist_
     return {"id": doc.id, "version": doc.version, "sha256": doc.checksum, "dung_luong": doc.size_bytes}
 
 
+@router.get("/luu-tru")
+def storage_status(u: User = Depends(require_roles("chutich", "tgd", "tp_dh", "cntt", "bks")),
+                   db: Session = Depends(get_db)):
+    """Kho lưu tài liệu đang dùng có bền vững không, và các tệp đã nộp còn nguyên không.
+
+    Để mở đầu mỗi ngày làm việc mà biết ngay: nếu "ben_vung" là false thì tuyệt đối chưa cho khách nộp
+    hộ chiếu thật lên, vì lần deploy tới là mất."""
+    return VS.storage_status(db)
+
+
 @router.get("/tai-lieu/{doc_id}/tep")
 def download_document(doc_id: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     """Tải tệp cũng phải qua kiểm quyền theo hồ sơ – không có đường vòng bằng id tài liệu."""
@@ -277,11 +287,13 @@ def download_document(doc_id: int, u: User = Depends(require_roles(*READ)), db: 
     if not doc:
         raise HTTPException(404, "Không có tài liệu này")
     _case(db, u, doc.case_id)
+    from app.services import storage as ST
     try:
-        with open(doc.storage_path, "rb") as f:
-            data = f.read()
-    except OSError:
-        raise HTTPException(410, "Tệp không còn trên ổ lưu trữ – kiểm tra cấu hình VISA_DOC_DIR")
+        data = ST.get_document(doc.storage_path, doc.checksum)
+    except ST.StorageError as ex:
+        # 410: tệp từng có nhưng nay không lấy được. Nói rõ để người dùng biết phải xin khách nộp lại,
+        # thay vì tưởng hệ thống lỗi vặt rồi bấm lại mãi.
+        raise HTTPException(410, f"Không lấy được tệp này. {ex}")
     return Response(content=data, media_type=doc.content_type or "application/octet-stream",
                     headers={"Content-Disposition": f'attachment; filename="{doc.file_name}"'})
 
