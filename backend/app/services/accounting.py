@@ -3,7 +3,9 @@
 Nguyên tắc: mọi bút toán sinh từ nghiệp vụ đã được Kế toán xác nhận (phiếu thu, hóa đơn phát hành, quyết toán tour);
 chứng từ đã ghi sổ là bất biến – sai thì lập chứng từ đảo. Kỳ đã khóa không ghi sổ.
 """
+import json
 from datetime import date, datetime
+from pathlib import Path
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import Session
 from app.models.core import Tour, Booking, User
@@ -34,13 +36,38 @@ CHART = [
 ]
 
 
+MISA_CHART = Path(__file__).resolve().parent.parent / "data" / "misa_tai_khoan.json"
+# Tài khoản bắt buộc có đối tượng / công trình (định hướng 06/9/2026 – 4 chiều đối tượng)
+NEED_PARTNER = ("131", "331", "1388", "141", "3388", "341", "1281", "1283", "136", "222", "221", "244")
+NEED_PROJECT = ("154", "5113", "632")
+
+
 def seed_accounts(db: Session):
-    """Bổ sung tài khoản còn thiếu trong danh mục (chạy được nhiều lần)."""
-    have = {a.code for a in db.execute(select(Account)).scalars()}
+    """Nạp danh mục tài khoản theo cấu trúc MISA (124 TK, phân cấp, ánh xạ TT99) + bổ sung TK rút gọn cũ. Chạy được nhiều lần."""
+    have = {a.code: a for a in db.execute(select(Account)).scalars()}
+    rows = json.loads(MISA_CHART.read_text(encoding="utf-8"))["tai_khoan"]
+    parents = {r["parent"] for r in rows if r["parent"]}
+    for r in rows:
+        a = have.get(r["code"])
+        if a is None:
+            a = Account(code=r["code"], name=r["name"], kind=r["kind"], parent=r["parent"]); db.add(a); have[r["code"]] = a
+        a.name, a.kind, a.parent, a.level = r["name"], r["kind"], r["parent"], r["level"]
+        a.bs_debit, a.bs_credit, a.pl_code = r.get("bs_debit") or "", r.get("bs_credit") or "", r.get("pl_code") or ""
+        a.is_detail, a.misa = r["code"] not in parents, True
     for c, n, k, p in CHART:
         if c not in have:
-            db.add(Account(code=c, name=n, kind=k, parent=p))
+            db.add(Account(code=c, name=n, kind=k, parent=p, level=len(c) - 2, is_detail=True))
     db.commit()
+
+
+def account_rule_check(db: Session, account: str, l: dict, source_type: str) -> None:
+    """Kiểm tra chiều đối tượng: công nợ phải có đối tượng; chi phí tour / doanh thu / giá vốn phải có công trình (tour)."""
+    if source_type in ("misa", "so_du_dau_ky", "kiem_toan", "dao", "luong", "ket_chuyen"):
+        return
+    if account.startswith(NEED_PARTNER) and not (l.get("partner_code") or l.get("partner") or l.get("booking_id")):
+        raise ValueError(f"Tài khoản {account} phải ghi mã đối tượng (khách / NCC / nhân viên / ngân hàng)")
+    if account.startswith(NEED_PROJECT) and not (l.get("project_code") or l.get("tour_id")):
+        raise ValueError(f"Tài khoản {account} phải ghi mã công trình (mã tour)")
 
 
 def period_of(d: date) -> str:
@@ -66,15 +93,25 @@ def post_entry(db: Session, actor: str, role: str, entry_date: date, description
     tc = round(sum(float(l.get("credit") or 0) for l in lines), 0)
     if td <= 0 or abs(td - tc) >= 1:
         raise ValueError(f"Bút toán không cân: Nợ {td:,.0f} ≠ Có {tc:,.0f}")
+    tcode = ""
+    if tour_id:
+        t = db.get(Tour, tour_id); tcode = t.code if t else ""
     for l in lines:
-        if not db.get(Account, str(l["account"])):
+        if not l.get("project_code") and (l.get("tour_id") or tour_id):
+            tt = db.get(Tour, l["tour_id"]) if l.get("tour_id") and l.get("tour_id") != tour_id else None
+            l["project_code"] = tt.code if tt else tcode
+        acc = db.get(Account, str(l["account"]))
+        if not acc:
             raise ValueError(f"Tài khoản {l['account']} không có trong danh mục")
+        account_rule_check(db, acc.code, l, source_type)
     e = JournalEntry(code=_next_code(db, "CT", entry_date), entry_date=entry_date, period=period, description=description[:300],
                      source_type=source_type, source_ref=source_ref, tour_id=tour_id, created_by=actor,
                      status="da_ghi_so" if post else "nhap", posted_by=actor if post else "", posted_at=datetime.now() if post else None)
     for l in lines:
         e.lines.append(JournalLine(account_code=str(l["account"]), debit=float(l.get("debit") or 0), credit=float(l.get("credit") or 0),
-                                   partner=l.get("partner") or "", booking_id=l.get("booking_id"), tour_id=l.get("tour_id") or tour_id, note=l.get("note") or ""))
+                                   partner=(l.get("partner") or "")[:160], partner_code=(l.get("partner_code") or "")[:40], project_code=(l.get("project_code") or "")[:40],
+                                   item_code=(l.get("item_code") or "")[:40], doc_no=(l.get("doc_no") or "")[:40],
+                                   booking_id=l.get("booking_id"), tour_id=l.get("tour_id") or tour_id, note=(l.get("note") or "")[:200]))
     db.add(e); db.flush()
     R.audit(db, actor, role, "ghi_so" if post else "lap_chung_tu", f"entry:{e.code}",
             after={"nguon": source_type, "ref": source_ref, "so_tien": td, "dong": [(l["account"], l.get("debit") or 0, l.get("credit") or 0) for l in lines]})
@@ -98,8 +135,8 @@ def reverse_entry(db: Session, u: User, e: JournalEntry, reason: str) -> Journal
         raise ValueError("Chỉ đảo chứng từ đã ghi sổ")
     if e.reversed_by_id:
         raise ValueError("Chứng từ đã được đảo")
-    lines = [{"account": l.account_code, "debit": l.credit, "credit": l.debit, "partner": l.partner, "booking_id": l.booking_id,
-              "tour_id": l.tour_id, "note": f"Đảo {e.code}"} for l in e.lines]
+    lines = [{"account": l.account_code, "debit": l.credit, "credit": l.debit, "partner": l.partner, "partner_code": l.partner_code, "project_code": l.project_code,
+              "item_code": l.item_code, "doc_no": l.doc_no, "booking_id": l.booking_id, "tour_id": l.tour_id, "note": f"Đảo {e.code}"} for l in e.lines]
     r = post_entry(db, u.username, u.role, date.today(), f"Đảo {e.code}: {reason}", lines, "dao", f"entry:{e.code}", e.tour_id)
     e.reversed_by_id = r.id
     db.commit()
@@ -115,9 +152,10 @@ def on_receipt_confirmed(db: Session, r: Receipt, actor: str, role: str) -> Jour
     cash = "111" if r.method == "tien_mat" else "112"
     d = (r.confirmed_at or r.created_at or datetime.now()).date()
     try:
+        pc = b.tour.code if b and b.tour else ""
         return post_entry(db, "robot", "robot", d, f"Thu tiền {b.code if b else ''} – {r.payer}",
-                          [{"account": cash, "debit": r.amount, "partner": r.payer, "booking_id": r.booking_id},
-                           {"account": "131", "credit": r.amount, "partner": b.customer_name if b else r.payer, "booking_id": r.booking_id}],
+                          [{"account": cash, "debit": r.amount, "partner": r.payer, "booking_id": r.booking_id, "project_code": pc},
+                           {"account": "131", "credit": r.amount, "partner": b.customer_name if b else r.payer, "partner_code": (b.customer_phone if b and getattr(b, "customer_phone", "") else ""), "booking_id": r.booking_id, "project_code": pc}],
                           "thu_tien", f"receipt:{r.code}", b.tour_id if b else None)
     except ValueError as ex:  # kỳ khóa → cảnh báo, không chặn nghiệp vụ thu tiền
         R.audit(db, actor, role, "ghi_so_that_bai", f"receipt:{r.code}", after={"ly_do": str(ex)})

@@ -69,6 +69,8 @@ def create(db: Session, u: User, data) -> Tour:
              operator_id=data.operator_id, price_per_pax=data.price_per_pax, fixed_cost=data.fixed_cost,
              var_cost_per_pax=data.var_cost_per_pax, planned_pax=data.planned_pax, rest_stops=data.rest_stops)
     db.add(t); db.flush()
+    from app.services.misa import ensure_project_for_tour
+    ensure_project_for_tour(db, t)   # mỗi tour = một công trình (mã công trình = mã tour)
     EV(db, t, "khoi_tao", u.username, getattr(data, "note", "") or "")
     R.audit(db, u.username, u.role, "tao_tour", f"tour:{t.code}", after=snap(t)); db.commit(); db.refresh(t)
     return t

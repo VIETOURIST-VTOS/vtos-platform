@@ -20,7 +20,7 @@ def entry_out(e: JournalEntry) -> dict:
     return {"id": e.id, "code": e.code, "entry_date": e.entry_date, "period": e.period, "description": e.description, "source_type": e.source_type,
             "source_ref": e.source_ref, "tour_id": e.tour_id, "status": e.status, "created_by": e.created_by, "posted_by": e.posted_by, "posted_at": e.posted_at,
             "reversed_by_id": e.reversed_by_id, "amount": sum(l.debit for l in e.lines),
-            "lines": [{"id": l.id, "account": l.account_code, "debit": l.debit, "credit": l.credit, "partner": l.partner, "booking_id": l.booking_id, "note": l.note} for l in e.lines]}
+            "lines": [{"id": l.id, "account": l.account_code, "debit": l.debit, "credit": l.credit, "partner": l.partner, "partner_code": l.partner_code, "project_code": l.project_code, "item_code": l.item_code, "doc_no": l.doc_no, "booking_id": l.booking_id, "note": l.note} for l in e.lines]}
 
 
 def invoice_out(i: Invoice, db: Session) -> dict:
@@ -34,7 +34,8 @@ def invoice_out(i: Invoice, db: Session) -> dict:
 
 @router.get("/accounts")
 def accounts(u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return [{"code": a.code, "name": a.name, "kind": a.kind, "parent": a.parent} for a in db.execute(select(Account).order_by(Account.code)).scalars()]
+    return [{"code": a.code, "name": a.name, "kind": a.kind, "parent": a.parent, "level": a.level, "is_detail": a.is_detail, "bs_debit": a.bs_debit, "bs_credit": a.bs_credit, "pl_code": a.pl_code, "misa": a.misa}
+            for a in db.execute(select(Account).order_by(Account.code)).scalars()]
 
 
 # ---------- Chứng từ ----------
@@ -51,6 +52,10 @@ class LineIn(BaseModel):
     debit: float = 0
     credit: float = 0
     partner: str = ""
+    partner_code: str = ""
+    project_code: str = ""
+    item_code: str = ""
+    doc_no: str = ""
     note: str = ""
     booking_id: int | None = None
     tour_id: int | None = None
@@ -234,3 +239,108 @@ def tax_xml(kind: str, period: str, u: User = Depends(require_roles("ketoan", "c
     R_.audit(db, u.username, u.role, "xuat_xml_to_khai", f"tax:{kind}:{period}", after={"mau": ret["form"]}); db.commit()
     return Response(content=RP.to_xml(ret, tax_code=settings.COMPANY_TAX_CODE, company=settings.COMPANY_NAME), media_type="application/xml",
                     headers={"Content-Disposition": f'attachment; filename="{kind}_{period}.xml"'})
+
+
+# ---------- MISA ↔ VTOS (định hướng 06/9/2026) ----------
+from fastapi import UploadFile, File, Form
+from app.services import misa as MISA
+from app.services import bctc as BCTC
+from app.models.accounting import Partner, Project
+
+MISA_WRITE = ("ketoan", "cntt")
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx(content: bytes, name: str) -> Response:
+    return Response(content=content, media_type=XLSX, headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@router.post("/misa/trial-balance/preview")
+async def misa_tb_preview(file: UploadFile = File(...), u: User = Depends(require_roles(*READ))):
+    try: p = MISA.parse_trial_balance(await file.read())
+    except ValueError as ex: raise HTTPException(422, str(ex))
+    leafs = MISA.leaf_rows(p["rows"])
+    return {"period": p["period"], "accounts": len(p["rows"]), "detail_accounts": len(leafs),
+            "open_debit": sum(r["open_d"] for r in leafs), "open_credit": sum(r["open_c"] for r in leafs), "close_debit": sum(r["close_d"] for r in leafs), "close_credit": sum(r["close_c"] for r in leafs), "rows": p["rows"]}
+
+
+@router.post("/misa/opening-balance")
+async def misa_opening(file: UploadFile = File(...), objects: UploadFile | None = File(default=None), as_of: date = Form(...), column: str = Form("close"), replace: bool = Form(False),
+                       u: User = Depends(require_roles(*MISA_WRITE)), db: Session = Depends(get_db)):
+    try:
+        return {"message": "Đã ghi số dư đầu kỳ từ MISA", **MISA.import_opening_balance(db, u, await file.read(), as_of, column, await objects.read() if objects else None, replace)}
+    except ValueError as ex: raise HTTPException(422, str(ex))
+
+
+@router.post("/misa/partners")
+async def misa_partners(file: UploadFile = File(...), kind: str = Form("auto"), u: User = Depends(require_roles(*MISA_WRITE)), db: Session = Depends(get_db)):
+    try: return {"message": "Đã nạp danh mục đối tượng", **MISA.import_partners(db, await file.read(), kind)}
+    except (ValueError, StopIteration) as ex: raise HTTPException(422, f"Không đọc được tệp danh mục: {ex}")
+
+
+@router.post("/misa/projects")
+async def misa_projects(file: UploadFile = File(...), u: User = Depends(require_roles(*MISA_WRITE)), db: Session = Depends(get_db)):
+    try: return {"message": "Đã nạp danh mục công trình", **MISA.import_projects(db, await file.read())}
+    except (ValueError, StopIteration) as ex: raise HTTPException(422, f"Không đọc được tệp công trình: {ex}")
+
+
+@router.post("/misa/journal")
+async def misa_journal(file: UploadFile = File(...), date_from: date | None = Form(None), date_to: date | None = Form(None), dry_run: bool = Form(False), limit: int | None = Form(None),
+                       u: User = Depends(require_roles(*MISA_WRITE)), db: Session = Depends(get_db)):
+    try: return {"message": "Đã đọc sổ nhật ký chung" if dry_run else "Đã nạp sổ nhật ký chung MISA", **MISA.import_journal(db, u, await file.read(), date_from, date_to, dry_run, limit)}
+    except ValueError as ex: raise HTTPException(422, str(ex))
+
+
+@router.post("/misa/reconcile")
+async def misa_reconcile(file: UploadFile = File(...), column: str = Form("close"), u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    try: return MISA.reconcile(db, await file.read(), column)
+    except ValueError as ex: raise HTTPException(422, str(ex))
+
+
+@router.get("/misa/export/purchases.xlsx")
+def misa_export_purchases(date_from: date, date_to: date, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return _xlsx(MISA.export_purchases(db, date_from, date_to), f"Import_MISA_MuaDichVu_{date_from:%d%m}_{date_to:%d%m%Y}.xlsx")
+
+
+@router.get("/misa/export/projects.xlsx")
+def misa_export_projects(date_from: date | None = None, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return _xlsx(MISA.export_projects(db, date_from), "Import_DanhMuc_CongTrinh_VTOS.xlsx")
+
+
+@router.get("/misa/export/entries.xlsx")
+def misa_export_entries(date_from: date, date_to: date, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return _xlsx(MISA.export_general_entries(db, date_from, date_to), f"Import_MISA_ButToan_{date_from:%d%m}_{date_to:%d%m%Y}.xlsx")
+
+
+@router.get("/partners")
+def partners(q: str = "", kind: str | None = None, limit: int = 30, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return MISA.partner_lookup(db, q, kind, limit)
+
+
+@router.get("/partners/stats")
+def partners_stats(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    from sqlalchemy import func
+    return {"partners": db.execute(select(func.count()).select_from(Partner)).scalar(), "customers": db.execute(select(func.count()).select_from(Partner).where(Partner.is_customer == True)).scalar(),
+            "suppliers": db.execute(select(func.count()).select_from(Partner).where(Partner.is_supplier == True)).scalar(), "projects": db.execute(select(func.count()).select_from(Project)).scalar(),
+            "projects_linked": db.execute(select(func.count()).select_from(Project).where(Project.tour_id != None)).scalar(),
+            "misa_entries": db.execute(select(func.count()).select_from(JournalEntry).where(JournalEntry.source_type == "misa")).scalar(),
+            "opening_entries": [e.code for e in db.execute(select(JournalEntry).where(JournalEntry.source_type == "so_du_dau_ky", JournalEntry.status == "da_ghi_so")).scalars()]}
+
+
+@router.get("/projects")
+def projects(q: str = "", limit: int = 50, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    s = select(Project)
+    if q: s = s.where((Project.code.ilike(f"%{q}%")) | (Project.name.ilike(f"%{q}%")))
+    return [{"code": p.code, "name": p.name, "start_date": p.start_date, "end_date": p.end_date, "status": p.status, "tour_id": p.tour_id, "technical": p.technical} for p in db.execute(s.order_by(Project.code).limit(limit)).scalars()]
+
+
+@router.get("/reports/bctc")
+def bctc_report(upto: date, since: date | None = None, compare_upto: date | None = None, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    r = BCTC.bctc(db, upto, since, compare_upto); r.pop("detail", None); return r
+
+
+@router.get("/reports/bctc.xlsx")
+def bctc_xlsx(upto: date, since: date | None = None, compare_upto: date | None = None, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    r = BCTC.bctc(db, upto, since, compare_upto)
+    R_.audit(db, u.username, u.role, "xuat_bctc_tt99", f"bctc:{upto}", after={"since": str(r["since"])}); db.commit()
+    return _xlsx(BCTC.bctc_xlsx(r), f"BCTC_TT99_{upto:%Y%m%d}.xlsx")

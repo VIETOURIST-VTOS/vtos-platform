@@ -8,7 +8,76 @@ const SRC: Record<string, string> = { thu_tien: "Thu tiền (R1)", hoa_don: "Hó
 const EST: Record<string, [string, string]> = { nhap: ["Nháp", "warn"], da_ghi_so: ["Đã ghi sổ", "ok"], huy: ["Hủy", "red"] };
 const IST: Record<string, [string, string]> = { nhap: ["Nháp", "warn"], da_phat_hanh: ["Đã phát hành", "ok"], huy: ["Hủy", "red"] };
 const thisPeriod = () => new Date().toISOString().slice(0, 7);
-const TABS = [["journal", "Chứng từ ghi sổ"], ["ledger", "Sổ cái"], ["tb", "Cân đối phát sinh"], ["invoices", "Hóa đơn điện tử"], ["fs", "BCTC"], ["tax", "Tờ khai thuế"], ["periods", "Khóa kỳ"]];
+const TABS = [["journal", "Chứng từ ghi sổ"], ["ledger", "Sổ cái"], ["tb", "Cân đối phát sinh"], ["invoices", "Hóa đơn điện tử"], ["bctc", "BCTC TT99"], ["fs", "BCTC rút gọn"], ["tax", "Tờ khai thuế"], ["misa", "MISA ↔ VTOS"], ["periods", "Khóa kỳ"]];
+const SRC2: Record<string, string> = { misa: "Sổ MISA", so_du_dau_ky: "Số dư đầu kỳ", kiem_toan: "Điều chỉnh kiểm toán" };
+const dl = (path: string, name: string) => fetch(`/api/v1${path}`, { headers: { Authorization: `Bearer ${localStorage.getItem("vtos_token")}` } }).then((r) => r.blob()).then((b) => { const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = name; a.click(); });
+
+function MisaPanel({ toast, isKT }: { toast: (m: string, e?: boolean) => void; isKT: boolean }) {
+  const [stats, setStats] = useState<any>(null);
+  const [res, setRes] = useState<any>(null);
+  const [busy, setBusy] = useState("");
+  const [asOf, setAsOf] = useState("2026-06-30");
+  const [col, setCol] = useState("close");
+  const [replace, setReplace] = useState(false);
+  const [range, setRange] = useState({ from: "2026-01-01", to: "2026-06-30" });
+  const files = useState<Record<string, File | null>>({})[0];
+  const reload = () => api("/partners/stats").then(setStats);
+  useEffect(() => { reload(); }, []);
+  const send = async (path: string, key: string, extra: Record<string, string> = {}, objKey?: string) => {
+    const f = files[key]; if (!f) { toast("Chọn tệp Excel trước", true); return; }
+    const fd = new FormData(); fd.append("file", f); if (objKey && files[objKey]) fd.append("objects", files[objKey]!);
+    Object.entries(extra).forEach(([k, v]) => fd.append(k, v));
+    setBusy(path);
+    try { const r = await api(path, { method: "POST", body: fd }); setRes(r); toast(r.message || "Xong"); reload(); } catch (x) { toast(errMsg(x), true); }
+    setBusy("");
+  };
+  const pick = (key: string) => <input type="file" accept=".xlsx" onChange={(e) => { files[key] = e.target.files?.[0] || null; }} />;
+  return <>
+    <p className="muted">Một cấu trúc dữ liệu với MISA (định hướng 06/9/2026): cùng số hiệu tài khoản, mã đối tượng (MST/CCCD), mã công trình = mã tour. Nạp các tệp Excel xuất từ MISA AMIS – không cần API.</p>
+    {stats && <div className="panel"><b>Hiện có:</b> {stats.partners} đối tượng ({stats.customers} khách, {stats.suppliers} NCC) · {stats.projects} công trình ({stats.projects_linked} đã gắn tour) · {stats.misa_entries} chứng từ nạp từ sổ MISA · số dư đầu kỳ: {stats.opening_entries.join(", ") || "chưa nhập"}</div>}
+    <div className="grid">
+      <div className="panel"><h3>1. Danh mục đối tượng</h3><p className="muted">“Danh sách khách hàng”, “Danh sách nhà cung cấp” (MISA) hoặc DataNCC của Điều hành.</p>{pick("p")}{isKT && <button className="act" disabled={!!busy} onClick={() => send("/misa/partners", "p")}>Nạp</button>}</div>
+      <div className="panel"><h3>2. Danh mục công trình (tour)</h3><p className="muted">“Danh sách công trình” MISA. Mã trùng mã tour VTOS → tự gắn.</p>{pick("c")}{isKT && <button className="act" disabled={!!busy} onClick={() => send("/misa/projects", "c")}>Nạp</button>}</div>
+      <div className="panel"><h3>3. Số dư đầu kỳ</h3><p className="muted">“Bảng cân đối tài khoản (mẫu quản trị)” + tùy chọn “Tổng hợp công nợ theo đối tượng” để tách 131/331/1388/141 theo từng khách/NCC. Chỉ ghi tài khoản chi tiết.</p>
+        Bảng cân đối: {pick("tb")}<br />Công nợ theo đối tượng: {pick("ob")}<br />
+        <label>Ngày số dư <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label> <label>Lấy cột <select value={col} onChange={(e) => setCol(e.target.value)}><option value="close">Cuối kỳ</option><option value="open">Đầu kỳ</option></select></label> <label><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Thay thế số dư đã nhập</label><br />
+        <button className="act grey" disabled={!!busy} onClick={() => send("/misa/trial-balance/preview", "tb")}>Xem trước</button> {isKT && <button className="act orange" disabled={!!busy} onClick={() => send("/misa/opening-balance", "tb", { as_of: asOf, column: col, replace: String(replace) }, "ob")}>Ghi số dư đầu kỳ</button>}</div>
+      <div className="panel"><h3>4. Sổ nhật ký chung</h3><p className="muted">“Sổ nhật ký chung” MISA (có Mã đối tượng). Mỗi số chứng từ = một chứng từ VTOS nguồn “Sổ MISA”; đã nạp thì bỏ qua. Nên chạy “Đọc thử” trước.</p>{pick("j")}<br />
+        <label>Từ <input type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} /></label> <label>đến <input type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} /></label><br />
+        <button className="act grey" disabled={!!busy} onClick={() => send("/misa/journal", "j", { dry_run: "true", date_from: range.from, date_to: range.to })}>Đọc thử</button> {isKT && <button className="act orange" disabled={!!busy} onClick={() => send("/misa/journal", "j", { date_from: range.from, date_to: range.to })}>Nạp vào sổ</button>}</div>
+      <div className="panel"><h3>5. Đối chiếu VTOS – MISA</h3><p className="muted">Nạp “Bảng cân đối tài khoản” MISA của kỳ cần so; liệt kê tài khoản lệch.</p>{pick("r")}<br /><button className="act" disabled={!!busy} onClick={() => send("/misa/reconcile", "r", { column: col })}>Đối chiếu</button></div>
+      <div className="panel"><h3>6. Xuất ngược sang MISA (mẫu Import)</h3><p className="muted">Kế toán nhập vào MISA trong thời gian chạy song song.</p>
+        <button className="act grey" onClick={() => dl(`/misa/export/purchases.xlsx?date_from=${range.from}&date_to=${range.to}`, "Import_MISA_MuaDichVu.xlsx")}>Mua dịch vụ (57 cột)</button>
+        <button className="act grey" onClick={() => dl(`/misa/export/entries.xlsx?date_from=${range.from}&date_to=${range.to}`, "Import_MISA_ButToan.xlsx")}>Bút toán tổng hợp</button>
+        <button className="act grey" onClick={() => dl(`/misa/export/projects.xlsx?date_from=${range.from}`, "Import_DanhMuc_CongTrinh.xlsx")}>Danh mục công trình</button></div>
+    </div>
+    {busy && <p className="muted">Đang xử lý {busy}… (sổ nhật ký lớn có thể mất vài phút)</p>}
+    {res && <div className="panel wrap"><h3>Kết quả</h3>
+      {res.rows && res.diff_count !== undefined ? <><p>{res.period} · {res.accounts} tài khoản · <b>{res.diff_count} lệch</b> · tổng lệch {vnd(res.diff_total)}</p><table><thead><tr><th>TK</th><th>Tên</th><th>MISA</th><th>VTOS</th><th>Lệch</th></tr></thead><tbody>{res.rows.map((r: any) => <tr key={r.account}><td className="mono">{r.account}</td><td>{r.name}</td><td style={{ textAlign: "right" }}>{vnd(r.misa)}</td><td style={{ textAlign: "right" }}>{vnd(r.vtos)}</td><td style={{ textAlign: "right", color: "#b00" }}>{vnd(r.diff)}</td></tr>)}</tbody></table></>
+        : res.rows ? <><p>{res.period} · {res.accounts} TK ({res.detail_accounts} chi tiết) · đầu kỳ Nợ {vnd(res.open_debit)} / Có {vnd(res.open_credit)} · cuối kỳ Nợ {vnd(res.close_debit)} / Có {vnd(res.close_credit)}</p><table><thead><tr><th>TK</th><th>Tên</th><th>ĐK Nợ</th><th>ĐK Có</th><th>CK Nợ</th><th>CK Có</th></tr></thead><tbody>{res.rows.map((r: any) => <tr key={r.code}><td className="mono">{r.code}</td><td>{r.name}</td><td style={{ textAlign: "right" }}>{vnd(r.open_d)}</td><td style={{ textAlign: "right" }}>{vnd(r.open_c)}</td><td style={{ textAlign: "right" }}>{vnd(r.close_d)}</td><td style={{ textAlign: "right" }}>{vnd(r.close_c)}</td></tr>)}</tbody></table></>
+        : <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(res, null, 1)}</pre>}</div>}
+  </>;
+}
+
+function BctcPanel({ toast }: { toast: (m: string, e?: boolean) => void }) {
+  const [upto, setUpto] = useState("2026-06-30");
+  const [since, setSince] = useState("2026-01-01");
+  const [rep, setRep] = useState<any>(null);
+  const load = () => api(`/reports/bctc?upto=${upto}&since=${since}`).then(setRep).catch((x) => toast(errMsg(x), true));
+  useEffect(() => { load(); }, []);
+  const row = (r: any) => <tr key={r.code + r.name} style={{ fontWeight: r.group ? 700 : 400 }}><td>{r.name}</td><td className="mono">{r.code}</td><td className="muted">{r.note}</td><td style={{ textAlign: "right" }}>{r.now === null ? "" : vnd(r.now)}</td><td style={{ textAlign: "right" }}>{r.prev === null ? "" : vnd(r.prev)}</td></tr>;
+  return <>
+    <p className="muted">Mẫu Thông tư 99/2025 đúng cấu trúc bộ đã nộp UBCK: mỗi tài khoản chi tiết ánh xạ mã chỉ tiêu (dư Nợ / dư Có); 131, 331, 1388, 3388, 141 xét theo từng đối tượng; lãi/lỗ chưa kết chuyển cộng vào 420.</p>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><label>Từ <input type="date" value={since} onChange={(e) => setSince(e.target.value)} /></label><label>đến <input type="date" value={upto} onChange={(e) => setUpto(e.target.value)} /></label><button className="act" onClick={load}>Lập báo cáo</button><button className="act grey" onClick={() => dl(`/reports/bctc.xlsx?upto=${upto}&since=${since}`, `BCTC_TT99_${upto}.xlsx`)}>Xuất Excel (bố cục UBCK)</button>{rep && (rep.balanced ? <Tag cls="ok">Cân: 280 = 440</Tag> : <Tag cls="red">LỆCH 280 ≠ 440</Tag>)}</div>
+    {rep && <>
+      <h2>Báo cáo tình hình tài chính – tại {fmtD(rep.upto)} (so với {fmtD(rep.compare_upto)})</h2>
+      <div className="panel wrap"><table><thead><tr><th>Chỉ tiêu</th><th>Mã</th><th>TM</th><th>Số cuối kỳ</th><th>Số đầu năm</th></tr></thead><tbody>{rep.thtc.map(row)}</tbody></table></div>
+      <h2>Báo cáo kết quả hoạt động kinh doanh – từ {fmtD(rep.since)} đến {fmtD(rep.upto)}</h2>
+      <div className="panel wrap"><table><thead><tr><th>Chỉ tiêu</th><th>Mã</th><th>TM</th><th>Kỳ này</th><th>Cùng kỳ năm trước</th></tr></thead><tbody>{rep.kqkd.map(row)}</tbody></table></div>
+      <p className="muted">Lãi/lỗ chưa kết chuyển tính vào 420: {vnd(rep.unposted_pl)}. Lưu chuyển tiền tệ gián tiếp và thuyết minh B09 làm ở bước tiếp theo.</p>
+    </>}
+  </>;
+}
 
 function Accounting() {
   const { user, toast } = useShell();
@@ -69,11 +138,11 @@ function Accounting() {
       </div>}
       <div className="panel wrap"><table><thead><tr><th>Số CT</th><th>Ngày</th><th>Diễn giải</th><th>Nguồn</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Trạng thái</th><th>Người ghi</th><th></th></tr></thead>
         <tbody>{entries.length ? entries.map((e) => <>
-          <tr key={e.id} style={{ cursor: "pointer" }} onClick={() => setOpen(open === e.id ? null : e.id)}><td><b>{e.code}</b></td><td>{fmtD(e.entry_date)}</td><td>{e.description}</td><td className="muted">{SRC[e.source_type] || e.source_type}<div>{e.source_ref}</div></td><td style={{ textAlign: "right" }}>{vnd(e.amount)}</td>
+          <tr key={e.id} style={{ cursor: "pointer" }} onClick={() => setOpen(open === e.id ? null : e.id)}><td><b>{e.code}</b></td><td>{fmtD(e.entry_date)}</td><td>{e.description}</td><td className="muted">{SRC[e.source_type] || SRC2[e.source_type] || e.source_type}<div>{e.source_ref}</div></td><td style={{ textAlign: "right" }}>{vnd(e.amount)}</td>
             <td><Tag cls={EST[e.status]?.[1]}>{EST[e.status]?.[0]}</Tag>{e.reversed_by_id && <Tag cls="red">đã đảo</Tag>}</td><td className="muted">{e.posted_by || e.created_by}</td>
             <td onClick={(ev) => ev.stopPropagation()}>{isKT && e.status === "nhap" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/journal/${e.id}/post`)}>Ghi sổ</button>}
               {isKT && e.status === "da_ghi_so" && !e.reversed_by_id && <button className="act grey" style={{ margin: 0 }} onClick={() => { const r = prompt("Lý do đảo bút toán?"); if (r) post(`/journal/${e.id}/reverse`, { reason: r }); }}>Đảo</button>}</td></tr>
-          {open === e.id && <tr key={e.id + "l"}><td colSpan={8}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}><tbody>{e.lines.map((l: any) => <tr key={l.id}><td className="mono">{l.account}</td><td>{accounts.find((a) => a.code === l.account)?.name}</td><td style={{ textAlign: "right" }}>{l.debit ? "Nợ " + vnd(l.debit) : ""}</td><td style={{ textAlign: "right" }}>{l.credit ? "Có " + vnd(l.credit) : ""}</td><td className="muted">{l.partner} {l.note}</td></tr>)}</tbody></table></td></tr>}
+          {open === e.id && <tr key={e.id + "l"}><td colSpan={8}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}><tbody>{e.lines.map((l: any) => <tr key={l.id}><td className="mono">{l.account}</td><td>{accounts.find((a) => a.code === l.account)?.name}</td><td style={{ textAlign: "right" }}>{l.debit ? "Nợ " + vnd(l.debit) : ""}</td><td style={{ textAlign: "right" }}>{l.credit ? "Có " + vnd(l.credit) : ""}</td><td className="muted">{l.partner_code && <code>{l.partner_code}</code>} {l.partner} {l.project_code && <Tag cls="grey">{l.project_code}</Tag>} {l.note}</td></tr>)}</tbody></table></td></tr>}
         </>) : <tr><td colSpan={8} className="muted">Chưa có chứng từ trong kỳ.</td></tr>}</tbody></table></div>
     </>}
 
@@ -128,6 +197,9 @@ function Accounting() {
       <div className="panel wrap"><table><tbody>{tax.pit.rows.map((r: any) => <tr key={r[0]}><td className="mono">{r[0]}</td><td>{r[1]}</td><td style={{ textAlign: "right" }}>{vnd(r[2])}</td></tr>)}</tbody></table><p className="muted">{tax.pit.note}</p></div>
       <p className="muted">Robot R5 chỉ lập tờ khai từ sổ và xuất XML; Kế toán trưởng kiểm tra, ký số bằng token công ty và nộp trên eTax; lưu biên nhận vào kho chứng từ. Cấu trúc XML cần đối chiếu với phiên bản HTKK hiện hành trước lần nộp đầu.</p>
     </>}
+
+    {tab === "misa" && <MisaPanel toast={toast} isKT={isKT || user?.role === "cntt"} />}
+    {tab === "bctc" && <BctcPanel toast={toast} />}
 
     {tab === "periods" && <div className="panel wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Khóa bởi</th><th>Lúc</th><th>Ghi chú</th>{isKT && <th></th>}</tr></thead>
       <tbody>{periods.map((p) => <tr key={p.period}><td><b>{p.period}</b></td><td>{p.locked ? <Tag cls="navy">Đã khóa</Tag> : <Tag cls="ok">Mở</Tag>}</td><td>{p.locked_by}</td><td>{fmtDT(p.locked_at)}</td><td className="muted">{p.note}</td>

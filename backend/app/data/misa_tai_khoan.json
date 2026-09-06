@@ -1,0 +1,1245 @@
+{
+ "nguon": "MISA AMIS Vietourist Holdings – Bảng cân đối tài khoản 2024–H1/2026 (122 TK có phát sinh) + TT200; ánh xạ mã chỉ tiêu Báo cáo tình hình tài chính/KQKD theo TT99/2025 (mẫu nộp UBCK H1/2026)",
+ "tai_khoan": [
+  {
+   "code": "111",
+   "name": "Tiền mặt",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "111",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "1111",
+   "name": "Tiền Việt Nam",
+   "kind": "TS",
+   "parent": "111",
+   "level": 2,
+   "bs_debit": "111",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "112",
+   "name": "Tiền gửi Ngân hàng",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "111",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "1121",
+   "name": "Tiền Việt Nam",
+   "kind": "TS",
+   "parent": "112",
+   "level": 2,
+   "bs_debit": "111",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "1122",
+   "name": "Ngoại tệ",
+   "kind": "TS",
+   "parent": "112",
+   "level": 2,
+   "bs_debit": "111",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "128",
+   "name": "Đầu tư nắm giữ đến ngày đáo hạn",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "123",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "1281",
+   "name": "Tiền gửi có kỳ hạn",
+   "kind": "TS",
+   "parent": "128",
+   "level": 2,
+   "bs_debit": "123",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "1283",
+   "name": "Cho vay",
+   "kind": "TS",
+   "parent": "128",
+   "level": 2,
+   "bs_debit": "135",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "131",
+   "name": "Phải thu của khách hàng",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "131",
+   "bs_credit": "312",
+   "pl_code": null
+  },
+  {
+   "code": "133",
+   "name": "Thuế GTGT được khấu trừ",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "162",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "1331",
+   "name": "Thuế GTGT được khấu trừ của hàng hóa, dịch vụ",
+   "kind": "TS",
+   "parent": "133",
+   "level": 2,
+   "bs_debit": "162",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "136",
+   "name": "Phải thu nội bộ",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "133",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "1368",
+   "name": "Phải thu nội bộ khác",
+   "kind": "TS",
+   "parent": "136",
+   "level": 2,
+   "bs_debit": "133",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "138",
+   "name": "Phải thu khác",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "135",
+   "bs_credit": "320",
+   "pl_code": null
+  },
+  {
+   "code": "1388",
+   "name": "Phải thu khác",
+   "kind": "TS",
+   "parent": "138",
+   "level": 2,
+   "bs_debit": "135",
+   "bs_credit": "320",
+   "pl_code": null
+  },
+  {
+   "code": "141",
+   "name": "Tạm ứng",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "135",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "154",
+   "name": "Chi phí sản xuất, kinh doanh dở dang",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "141",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "1541",
+   "name": "Chi phí sản xuất, kinh doanh dở dang",
+   "kind": "TS",
+   "parent": "154",
+   "level": 2,
+   "bs_debit": "141",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "156",
+   "name": "Hàng hóa",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "141",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "1561",
+   "name": "Giá mua hàng hóa",
+   "kind": "TS",
+   "parent": "156",
+   "level": 2,
+   "bs_debit": "141",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "211",
+   "name": "Tài sản cố định hữu hình",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "222",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2111",
+   "name": "Nhà cửa, vật kiến trúc",
+   "kind": "TS",
+   "parent": "211",
+   "level": 2,
+   "bs_debit": "222",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2112",
+   "name": "Máy móc, thiết bị",
+   "kind": "TS",
+   "parent": "211",
+   "level": 2,
+   "bs_debit": "222",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2113",
+   "name": "Phương tiện vận tải, truyền dẫn",
+   "kind": "TS",
+   "parent": "211",
+   "level": 2,
+   "bs_debit": "222",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "213",
+   "name": "Tài sản cố định vô hình",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "228",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2131",
+   "name": "Quyền sử dụng đất",
+   "kind": "TS",
+   "parent": "213",
+   "level": 2,
+   "bs_debit": "228",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "214",
+   "name": "Hao mòn tài sản cố định",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "223",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2141",
+   "name": "Hao mòn TSCĐ hữu hình",
+   "kind": "TS",
+   "parent": "214",
+   "level": 2,
+   "bs_debit": "223",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "221",
+   "name": "Đầu tư vào công ty con",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "261",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "222",
+   "name": "Đầu tư vào công ty liên doanh, liên kết",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "262",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "228",
+   "name": "Đầu tư góp vốn vào đơn vị khác",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "263",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2281",
+   "name": "Đầu tư góp vốn vào đơn vị khác",
+   "kind": "TS",
+   "parent": "228",
+   "level": 2,
+   "bs_debit": "263",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "229",
+   "name": "Dự phòng tổn thất tài sản",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "264",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2291",
+   "name": "Dự phòng giảm giá chứng khoán kinh doanh",
+   "kind": "TS",
+   "parent": "229",
+   "level": 2,
+   "bs_debit": "122",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2292",
+   "name": "Dự phòng tổn thất đầu tư vào đơn vị khác",
+   "kind": "TS",
+   "parent": "229",
+   "level": 2,
+   "bs_debit": "264",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "241",
+   "name": "Xây dựng cơ bản dở dang",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "252",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2411",
+   "name": "Mua sắm TSCĐ",
+   "kind": "TS",
+   "parent": "241",
+   "level": 2,
+   "bs_debit": "252",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "242",
+   "name": "Chi phí trả trước",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "161",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2421",
+   "name": "Chi phí trả trước ngắn hạn",
+   "kind": "TS",
+   "parent": "242",
+   "level": 2,
+   "bs_debit": "161",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2422",
+   "name": "Chi phí trả trước dài hạn",
+   "kind": "TS",
+   "parent": "242",
+   "level": 2,
+   "bs_debit": "271",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "244",
+   "name": "Cầm cố, thế chấp, ký quỹ, ký cược",
+   "kind": "TS",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "135",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2441",
+   "name": "Cầm cố, thế chấp, ký quỹ, ký cược dài hạn",
+   "kind": "TS",
+   "parent": "244",
+   "level": 2,
+   "bs_debit": "215",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "2442",
+   "name": "Cầm cố, thế chấp, ký quỹ, ký cược ngắn hạn",
+   "kind": "TS",
+   "parent": "244",
+   "level": 2,
+   "bs_debit": "135",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "331",
+   "name": "Phải trả cho người bán",
+   "kind": "NV",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "132",
+   "bs_credit": "311",
+   "pl_code": null
+  },
+  {
+   "code": "333",
+   "name": "Thuế và các khoản phải nộp Nhà nước",
+   "kind": "NV",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "163",
+   "bs_credit": "314",
+   "pl_code": null
+  },
+  {
+   "code": "3331",
+   "name": "Thuế giá trị gia tăng phải nộp",
+   "kind": "NV",
+   "parent": "333",
+   "level": 2,
+   "bs_debit": "163",
+   "bs_credit": "314",
+   "pl_code": null
+  },
+  {
+   "code": "33311",
+   "name": "Thuế GTGT đầu ra",
+   "kind": "NV",
+   "parent": "3331",
+   "level": 3,
+   "bs_debit": "163",
+   "bs_credit": "314",
+   "pl_code": null
+  },
+  {
+   "code": "3334",
+   "name": "Thuế thu nhập doanh nghiệp",
+   "kind": "NV",
+   "parent": "333",
+   "level": 2,
+   "bs_debit": "163",
+   "bs_credit": "314",
+   "pl_code": null
+  },
+  {
+   "code": "3335",
+   "name": "Thuế thu nhập cá nhân",
+   "kind": "NV",
+   "parent": "333",
+   "level": 2,
+   "bs_debit": "163",
+   "bs_credit": "314",
+   "pl_code": null
+  },
+  {
+   "code": "3338",
+   "name": "Thuế bảo vệ môi trường và các loại thuế khác",
+   "kind": "NV",
+   "parent": "333",
+   "level": 2,
+   "bs_debit": "163",
+   "bs_credit": "314",
+   "pl_code": null
+  },
+  {
+   "code": "33382",
+   "name": "Các loại thuế khác",
+   "kind": "NV",
+   "parent": "3338",
+   "level": 3,
+   "bs_debit": "163",
+   "bs_credit": "314",
+   "pl_code": null
+  },
+  {
+   "code": "334",
+   "name": "Phải trả người lao động",
+   "kind": "NV",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": "315",
+   "pl_code": null
+  },
+  {
+   "code": "3341",
+   "name": "Phải trả công nhân viên",
+   "kind": "NV",
+   "parent": "334",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": "315",
+   "pl_code": null
+  },
+  {
+   "code": "3348",
+   "name": "Phải trả người lao động khác",
+   "kind": "NV",
+   "parent": "334",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": "315",
+   "pl_code": null
+  },
+  {
+   "code": "335",
+   "name": "Chi phí phải trả",
+   "kind": "NV",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": "316",
+   "pl_code": null
+  },
+  {
+   "code": "338",
+   "name": "Phải trả, phải nộp khác",
+   "kind": "NV",
+   "parent": "",
+   "level": 1,
+   "bs_debit": "135",
+   "bs_credit": "320",
+   "pl_code": null
+  },
+  {
+   "code": "3382",
+   "name": "Kinh phí công đoàn",
+   "kind": "NV",
+   "parent": "338",
+   "level": 2,
+   "bs_debit": "135",
+   "bs_credit": "320",
+   "pl_code": null
+  },
+  {
+   "code": "3383",
+   "name": "Bảo hiểm xã hội",
+   "kind": "NV",
+   "parent": "338",
+   "level": 2,
+   "bs_debit": "135",
+   "bs_credit": "320",
+   "pl_code": null
+  },
+  {
+   "code": "3384",
+   "name": "Bảo hiểm y tế",
+   "kind": "NV",
+   "parent": "338",
+   "level": 2,
+   "bs_debit": "135",
+   "bs_credit": "320",
+   "pl_code": null
+  },
+  {
+   "code": "3386",
+   "name": "Bảo hiểm thất nghiệp",
+   "kind": "NV",
+   "parent": "338",
+   "level": 2,
+   "bs_debit": "135",
+   "bs_credit": "320",
+   "pl_code": null
+  },
+  {
+   "code": "3387",
+   "name": "Doanh thu chưa thực hiện",
+   "kind": "NV",
+   "parent": "338",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": "319",
+   "pl_code": null
+  },
+  {
+   "code": "3388",
+   "name": "Phải trả, phải nộp khác",
+   "kind": "NV",
+   "parent": "338",
+   "level": 2,
+   "bs_debit": "135",
+   "bs_credit": "320",
+   "pl_code": null
+  },
+  {
+   "code": "341",
+   "name": "Vay và nợ thuê tài chính",
+   "kind": "NV",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": "321",
+   "pl_code": null
+  },
+  {
+   "code": "3411",
+   "name": "Các khoản đi vay",
+   "kind": "NV",
+   "parent": "341",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": "321",
+   "pl_code": null
+  },
+  {
+   "code": "34111",
+   "name": "Các khoản đi vay ngắn hạn",
+   "kind": "NV",
+   "parent": "3411",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": "321",
+   "pl_code": null
+  },
+  {
+   "code": "34112",
+   "name": "Các khoản đi vay dài hạn",
+   "kind": "NV",
+   "parent": "3411",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": "339",
+   "pl_code": null
+  },
+  {
+   "code": "34113",
+   "name": "Nợ dài hạn đến hạn trả",
+   "kind": "NV",
+   "parent": "3411",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": "321",
+   "pl_code": null
+  },
+  {
+   "code": "411",
+   "name": "Vốn đầu tư của chủ sở hữu",
+   "kind": "NV",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": "411",
+   "pl_code": null
+  },
+  {
+   "code": "4111",
+   "name": "Vốn góp của chủ sở hữu",
+   "kind": "NV",
+   "parent": "411",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": "411",
+   "pl_code": null
+  },
+  {
+   "code": "41111",
+   "name": "Cổ phiếu phổ thông có quyền biểu quyết",
+   "kind": "NV",
+   "parent": "4111",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": "411",
+   "pl_code": null
+  },
+  {
+   "code": "4112",
+   "name": "Thặng dư vốn cổ phần",
+   "kind": "NV",
+   "parent": "411",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": "412",
+   "pl_code": null
+  },
+  {
+   "code": "413",
+   "name": "Chênh lệch tỷ giá hối đoái",
+   "kind": "NV",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": "417",
+   "pl_code": null
+  },
+  {
+   "code": "4131",
+   "name": "Chênh lệch tỷ giá đánh giá lại cuối năm",
+   "kind": "NV",
+   "parent": "413",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": "417",
+   "pl_code": null
+  },
+  {
+   "code": "421",
+   "name": "Lợi nhuận sau thuế chưa phân phối",
+   "kind": "NV",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": "420",
+   "pl_code": null
+  },
+  {
+   "code": "4211",
+   "name": "Lợi nhuận sau thuế chưa phân phối năm trước",
+   "kind": "NV",
+   "parent": "421",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": "420",
+   "pl_code": null
+  },
+  {
+   "code": "4212",
+   "name": "Lợi nhuận sau thuế chưa phân phối năm nay",
+   "kind": "NV",
+   "parent": "421",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": "420",
+   "pl_code": null
+  },
+  {
+   "code": "511",
+   "name": "Doanh thu bán hàng và cung cấp dịch vụ",
+   "kind": "DT",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "5111",
+   "name": "Doanh thu bán hàng hóa",
+   "kind": "DT",
+   "parent": "511",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "5113",
+   "name": "Doanh thu cung cấp dịch vụ",
+   "kind": "DT",
+   "parent": "511",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "51131",
+   "name": "Doanh thu dịch vụ du lịch nội địa",
+   "kind": "DT",
+   "parent": "5113",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "51132",
+   "name": "Doanh thu bán vé máy bay (MISA tự mở – KT xác nhận tên)",
+   "kind": "DT",
+   "parent": "5113",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "51133",
+   "name": "Doanh thu cho thuê xe (MISA tự mở – KT xác nhận tên)",
+   "kind": "DT",
+   "parent": "5113",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "51134",
+   "name": "Doanh thu khách sạn",
+   "kind": "DT",
+   "parent": "5113",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "51136",
+   "name": "Doanh thu dịch vụ khác (MISA tự mở – KT xác nhận tên)",
+   "kind": "DT",
+   "parent": "5113",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "51137",
+   "name": "Doanh thu dịch vụ du lịch nước ngoài",
+   "kind": "DT",
+   "parent": "5113",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "51138",
+   "name": "Doanh thu cho thuê mặt bằng / khác (MISA tự mở – KT xác nhận tên)",
+   "kind": "DT",
+   "parent": "5113",
+   "level": 3,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "5118",
+   "name": "Doanh thu khác",
+   "kind": "DT",
+   "parent": "511",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "01"
+  },
+  {
+   "code": "515",
+   "name": "Doanh thu hoạt động tài chính",
+   "kind": "DT",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "22"
+  },
+  {
+   "code": "5151",
+   "name": "Lãi tiền gửi",
+   "kind": "DT",
+   "parent": "515",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "22"
+  },
+  {
+   "code": "5152",
+   "name": "Lãi cho vay",
+   "kind": "DT",
+   "parent": "515",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "22"
+  },
+  {
+   "code": "5153",
+   "name": "Doanh thu hoạt động tài chính khác",
+   "kind": "DT",
+   "parent": "515",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "22"
+  },
+  {
+   "code": "5154",
+   "name": "Lãi tỷ giá",
+   "kind": "DT",
+   "parent": "515",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "22"
+  },
+  {
+   "code": "632",
+   "name": "Giá vốn hàng bán",
+   "kind": "CP",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "11"
+  },
+  {
+   "code": "6321",
+   "name": "Giá vốn dịch vụ du lịch nội địa",
+   "kind": "CP",
+   "parent": "632",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "11"
+  },
+  {
+   "code": "6322",
+   "name": "Giá vốn bán vé máy bay (MISA tự mở – KT xác nhận tên)",
+   "kind": "CP",
+   "parent": "632",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "11"
+  },
+  {
+   "code": "6323",
+   "name": "Giá vốn dịch vụ cho thuê xe",
+   "kind": "CP",
+   "parent": "632",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "11"
+  },
+  {
+   "code": "6324",
+   "name": "Giá vốn dịch vụ khách sạn",
+   "kind": "CP",
+   "parent": "632",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "11"
+  },
+  {
+   "code": "6326",
+   "name": "Giá vốn dịch vụ khác",
+   "kind": "CP",
+   "parent": "632",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "11"
+  },
+  {
+   "code": "6327",
+   "name": "Giá vốn dịch vụ khác 2 (MISA tự mở – KT xác nhận tên)",
+   "kind": "CP",
+   "parent": "632",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "11"
+  },
+  {
+   "code": "6328",
+   "name": "Giá vốn dịch vụ du lịch nước ngoài",
+   "kind": "CP",
+   "parent": "632",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "11"
+  },
+  {
+   "code": "635",
+   "name": "Chi phí tài chính",
+   "kind": "CP",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "23"
+  },
+  {
+   "code": "6351",
+   "name": "Chi phí lãi vay",
+   "kind": "CP",
+   "parent": "635",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "23"
+  },
+  {
+   "code": "6352",
+   "name": "Lỗ tỷ giá",
+   "kind": "CP",
+   "parent": "635",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "23"
+  },
+  {
+   "code": "6353",
+   "name": "Chi phí tài chính khác",
+   "kind": "CP",
+   "parent": "635",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "23"
+  },
+  {
+   "code": "641",
+   "name": "Chi phí bán hàng",
+   "kind": "CP",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "25"
+  },
+  {
+   "code": "6411",
+   "name": "Chi phí nhân viên bán hàng",
+   "kind": "CP",
+   "parent": "641",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "25"
+  },
+  {
+   "code": "6412",
+   "name": "Chi phí vật liệu, bao bì",
+   "kind": "CP",
+   "parent": "641",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "25"
+  },
+  {
+   "code": "6413",
+   "name": "Chi phí dụng cụ, đồ dùng",
+   "kind": "CP",
+   "parent": "641",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "25"
+  },
+  {
+   "code": "6414",
+   "name": "Chi phí khấu hao TSCĐ",
+   "kind": "CP",
+   "parent": "641",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "25"
+  },
+  {
+   "code": "6417",
+   "name": "Chi phí dịch vụ mua ngoài",
+   "kind": "CP",
+   "parent": "641",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "25"
+  },
+  {
+   "code": "6418",
+   "name": "Chi phí bằng tiền khác",
+   "kind": "CP",
+   "parent": "641",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "25"
+  },
+  {
+   "code": "642",
+   "name": "Chi phí quản lý doanh nghiệp",
+   "kind": "CP",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "26"
+  },
+  {
+   "code": "6421",
+   "name": "Chi phí nhân viên quản lý",
+   "kind": "CP",
+   "parent": "642",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "26"
+  },
+  {
+   "code": "6422",
+   "name": "Chi phí thuê văn phòng",
+   "kind": "CP",
+   "parent": "642",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "26"
+  },
+  {
+   "code": "6423",
+   "name": "Chi phí đồ dùng văn phòng",
+   "kind": "CP",
+   "parent": "642",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "26"
+  },
+  {
+   "code": "6424",
+   "name": "Chi phí khấu hao TSCĐ",
+   "kind": "CP",
+   "parent": "642",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "26"
+  },
+  {
+   "code": "6425",
+   "name": "Thuế, phí và lệ phí",
+   "kind": "CP",
+   "parent": "642",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "26"
+  },
+  {
+   "code": "6427",
+   "name": "Chi phí dịch vụ mua ngoài",
+   "kind": "CP",
+   "parent": "642",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "26"
+  },
+  {
+   "code": "6428",
+   "name": "Chi phí bằng tiền khác",
+   "kind": "CP",
+   "parent": "642",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "26"
+  },
+  {
+   "code": "711",
+   "name": "Thu nhập khác",
+   "kind": "DT",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "31"
+  },
+  {
+   "code": "811",
+   "name": "Chi phí khác",
+   "kind": "CP",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "32"
+  },
+  {
+   "code": "821",
+   "name": "Chi phí thuế thu nhập doanh nghiệp",
+   "kind": "CP",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "51"
+  },
+  {
+   "code": "8211",
+   "name": "Chi phí thuế TNDN hiện hành",
+   "kind": "CP",
+   "parent": "821",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "51"
+  },
+  {
+   "code": "911",
+   "name": "Xác định kết quả kinh doanh",
+   "kind": "XD",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": null
+  }
+ ]
+}

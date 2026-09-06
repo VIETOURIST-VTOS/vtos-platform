@@ -12,6 +12,13 @@ class Account(Base):
     name: Mapped[str] = mapped_column(String(200))
     kind: Mapped[str] = mapped_column(String(10))                        # TS (tài sản) / NV (nguồn vốn) / DT / CP / XD
     parent: Mapped[str] = mapped_column(String(10), default="")
+    # Cấu trúc MISA + ánh xạ Báo cáo tình hình tài chính / KQKD theo TT99 (mẫu nộp UBCK)
+    level: Mapped[int] = mapped_column(Integer, default=1)                # bậc 1–5 (số chữ số − 2)
+    is_detail: Mapped[bool] = mapped_column(Boolean, default=True)        # TK chi tiết (không có TK con) – chỉ TK chi tiết được ghi sổ
+    bs_debit: Mapped[str] = mapped_column(String(6), default="")          # mã chỉ tiêu THTC khi dư Nợ (vd 131, 132, 135…)
+    bs_credit: Mapped[str] = mapped_column(String(6), default="")         # mã chỉ tiêu THTC khi dư Có (vd 311, 312, 320…)
+    pl_code: Mapped[str] = mapped_column(String(6), default="")           # mã chỉ tiêu KQKD (01, 11, 22, 23, 25, 26, 31, 32, 51)
+    misa: Mapped[bool] = mapped_column(Boolean, default=False)            # có trên sổ MISA của Vietourist
 
 
 class JournalEntry(Base):
@@ -41,7 +48,11 @@ class JournalLine(Base):
     account_code: Mapped[str] = mapped_column(ForeignKey("accounts.code"), index=True)
     debit: Mapped[float] = mapped_column(Float, default=0)
     credit: Mapped[float] = mapped_column(Float, default=0)
-    partner: Mapped[str] = mapped_column(String(160), default="")         # đối tượng: khách / NCC
+    partner: Mapped[str] = mapped_column(String(160), default="")         # tên đối tượng: khách / NCC
+    partner_code: Mapped[str] = mapped_column(String(40), default="", index=True)   # mã đối tượng MISA (MST/CCCD/mã NV/mã ngân hàng)
+    project_code: Mapped[str] = mapped_column(String(40), default="", index=True)   # mã công trình MISA = mã tour
+    item_code: Mapped[str] = mapped_column(String(40), default="")        # mã khoản mục chi phí / mã hàng hóa dịch vụ
+    doc_no: Mapped[str] = mapped_column(String(40), default="")           # số hóa đơn / số chứng từ gốc
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True)
     tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True)
     note: Mapped[str] = mapped_column(String(200), default="")
@@ -82,3 +93,37 @@ class PeriodLock(Base):
     locked_by: Mapped[str] = mapped_column(String(50))
     locked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     note: Mapped[str] = mapped_column(String(200), default="")
+
+
+class Partner(Base):
+    """Đối tượng kế toán (danh mục khách hàng / nhà cung cấp / nhân viên / ngân hàng) – cùng mã với MISA (MST, CCCD…)."""
+    __tablename__ = "partners"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(300))
+    kind: Mapped[str] = mapped_column(String(10), default="kh")          # kh / ncc / nv / nh / khac
+    is_customer: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_supplier: Mapped[bool] = mapped_column(Boolean, default=False)
+    tax_code: Mapped[str] = mapped_column(String(20), default="")
+    address: Mapped[str] = mapped_column(String(300), default="")
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    trade_name: Mapped[str] = mapped_column(String(200), default="")     # tên thương mại (DataNCC: "RESORT VĨNH HY")
+    internal: Mapped[bool] = mapped_column(Boolean, default=False)       # đối tượng nội bộ / bên liên quan
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    source: Mapped[str] = mapped_column(String(20), default="misa")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class Project(Base):
+    """Công trình MISA = tour/đoàn (chiều tập hợp chi phí – doanh thu). Mã chuẩn SP.NHÓM.DDMMYY; mã cũ giữ để đọc lịch sử."""
+    __tablename__ = "projects"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(300))
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="dang_thuc_hien")
+    tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True, index=True)
+    technical: Mapped[bool] = mapped_column(Boolean, default=False)      # mã kỹ thuật (0000, CHUA RO, CPXD…) – không phải tour
+    source: Mapped[str] = mapped_column(String(20), default="misa")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
