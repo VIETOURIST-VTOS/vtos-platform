@@ -212,8 +212,15 @@ def apply_tours(db: Session, only_from: date | None = None, limit: int = 400) ->
             if pr: t.product_id = pr.id
         t.vehicle_type = raw.get("loaiXe") or ""; t.departure_point = raw.get("diemKhoiHanh") or ""; t.transport = raw.get("phuongTien") or ""
         t.days = int(raw.get("soNgay") or 0); t.country = raw.get("nuoc") or ""; t.vietrip_id = int(raw["recID"]); t.imported = True
-        t.actual_revenue = float(raw.get("doanhThu") or 0); t.actual_cost = float(raw.get("tongChiPhi") or 0)
         t.settled_vietrip = bool(raw.get("quyetToan")) or bool(raw.get("duyetChi"))
+        # Với tour CHƯA quyết toán, trường tongChiPhi của Vietrip chỉ là các khoản phí nhập sẵn theo khách
+        # (bảo hiểm, vé máy bay, land, quà tặng, phí LSQ) chứ không phải giá vốn chuyến – tour DL001.03130926
+        # có tongChiPhi = 6.500 chính là phí bảo hiểm. Lấy số đó làm giá vốn thì lợi nhuận xấp xỉ toàn bộ
+        # doanh thu (Ý kiến thẩm định 06/9/2026, B3). Chỉ nhận doanh thu/giá vốn khi Vietrip đã quyết toán.
+        if t.settled_vietrip:
+            t.actual_revenue = float(raw.get("doanhThu") or 0); t.actual_cost = float(raw.get("tongChiPhi") or 0)
+        else:
+            t.actual_revenue = t.actual_cost = 0.0
         t.confirmed_by, t.approved_by = "vietrip", "vietrip"
         today = date.today()
         if raw.get("duyetChi"): t.status = "khoa"; t.closed_at = t.closed_at or _dt(raw.get("ngayDuyetChi")) or datetime.combine(t.end_date, datetime.min.time()); t.kt_confirmed_at = t.kt_confirmed_at or _dt(raw.get("ngayDuyetChi")); t.cntt_checked_at = t.cntt_checked_at or _dt(raw.get("ngayDuyetChi"))
@@ -267,16 +274,20 @@ def repair_derived_budgets(db: Session, actor: str = "cntt") -> dict:
     Chạy một lần sau khi triển khai; chỉ đụng tới tour có cờ imported và có dòng chi phí nguồn vietrip.
     """
     from app.services import rules as R
-    n = 0
+    n = m = 0
     tour_ids = {r[0] for r in db.execute(select(TourCostLine.tour_id).where(TourCostLine.source == "vietrip")).all()}
     for t in db.execute(select(Tour).where(Tour.imported == True)).scalars():
         if t.id in tour_ids and (t.fixed_cost > 0 or t.var_cost_per_pax > 0):
             t.fixed_cost, t.var_cost_per_pax = 0.0, 0.0
             n += 1
-    R.audit(db, actor, "cntt", "don_du_toan_suy_nguoc_vietrip", "vietrip", after={"so_tour": n})
+        if not t.settled_vietrip and t.id not in tour_ids and (t.actual_cost or t.actual_revenue):
+            t.actual_cost = t.actual_revenue = 0.0      # phí nhập sẵn theo khách bị nhận nhầm là giá vốn
+            m += 1
+    R.audit(db, actor, "cntt", "don_du_toan_suy_nguoc_vietrip", "vietrip", after={"du_toan_suy_nguoc": n, "gia_von_gia": m})
     db.commit()
-    return {"tours": n, "message": f"Đã xóa dự toán suy ngược từ quyết toán ở {n} tour nhập từ Vietrip – "
-                                   f"hệ thống chuyển sang dùng cơ cấu chi phí sản phẩm làm dự toán tham chiếu"}
+    return {"tours": n, "gia_von_gia": m,
+            "message": f"Đã xóa dự toán suy ngược từ quyết toán ở {n} tour và giá vốn giả (phí nhập sẵn theo khách) "
+                       f"ở {m} tour chưa quyết toán – dự toán và thực chi nay là hai số độc lập"}
 
 
 def apply_bookings(db: Session, limit: int = 400) -> int:

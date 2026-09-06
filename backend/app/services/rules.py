@@ -143,12 +143,17 @@ def calc(tour: Tour, threshold: float, fixed: float | None = None, var: float | 
     breakeven = math.ceil(f / unit) if unit > 0 else None
     unit10 = p * (1 - threshold) - v
     pax_margin = math.ceil(f / unit10) if unit10 > 0 else None
-    complete = all([p > 0, n > 0, has_cost]) and breakeven is not None
+    # Dự toán tham chiếu lấy từ cơ cấu chi phí sản phẩm KHÔNG đủ tư cách cho cổng biên: dữ liệu sản phẩm
+    # hiện chỉ 21/313 mã có cơ cấu chi phí và phần lớn sai (có mã ghi 11 đ/khách → biên 99,99%). Dùng nó
+    # để mở cổng thì cổng lại bị vô hiệu hóa lần nữa – chỉ hiển thị tham chiếu, cổng vẫn "chưa đủ cơ sở".
+    own = source == "du_toan_tour"
+    complete = all([p > 0, n > 0, has_cost, own]) and breakeven is not None
     passed = complete and margin >= threshold
     return {"revenue": revenue, "cost": cost, "profit": revenue - cost, "margin": margin,
             "breakeven_pax": breakeven, "pax_for_margin": pax_margin, "threshold": threshold,
             "fixed_cost": f, "var_cost_per_pax": v, "has_cost": has_cost,
             "budget_source": source, "budget_source_label": BUDGET_SOURCES.get(source, source),
+            "reference_only": source == "san_pham",
             "pass_gate": passed, "complete": complete,
             "gate_state": "dat" if passed else ("chua_du_co_so" if not complete else "khong_dat")}
 

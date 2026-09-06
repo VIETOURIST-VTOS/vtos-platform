@@ -107,7 +107,7 @@ function TourDetail() {
         <Gate ok={c.gate_state === "chua_du_co_so" ? null : c.pass_gate}>CỔNG 1 – Biên {pct(c.threshold)}: {c.gate_state === "chua_du_co_so"
           ? "CHƯA ĐỦ CƠ SỞ TÍNH – dự toán thiếu giá vốn. Thiếu chi phí không phải là chi phí bằng 0: cổng không thể ĐẠT khi chưa có giá vốn."
           : c.pass_gate ? `ĐẠT → ${ROLES[t.approver_role]} duyệt` : "KHÔNG ĐẠT → giải trình + 2 chữ ký Chủ tịch và TGĐ"}</Gate>
-        <p className="muted">Nguồn dự toán: <b>{c.budget_source_label}</b>{c.budget_source === "san_pham" && " – chuyến chưa có dự toán riêng, đang lấy cơ cấu chi phí sản phẩm làm tham chiếu"}</p>
+        <p className="muted">Nguồn dự toán: <b>{c.budget_source_label}</b>{c.reference_only && " – chuyến chưa có dự toán riêng; số lấy từ cơ cấu chi phí sản phẩm chỉ để tham chiếu và KHÔNG dùng để mở cổng biên"}</p>
         {t.product && <p className="muted">Cơ cấu chi phí sản phẩm {t.product.code}: cố định {vnd(t.product.fixed_cost)} · theo khách {vnd(t.product.var_cost_per_pax)} · giá tham khảo {vnd(t.product.reference_price)}</p>}
       </div>
       <div className="panel"><h2>Sửa dự toán</h2>

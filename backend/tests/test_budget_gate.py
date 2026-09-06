@@ -117,3 +117,40 @@ def test_b7_tong_booking_lay_tu_truy_van_tong():
         assert trang2 and trang2[0]["code"] != một_dòng[0]["code"], "phân trang phải trả trang khác nhau"
     loc = client.get("/api/v1/bookings/count?status=cancelled", headers=login("cntt")).json()
     assert loc["filtered"] <= loc["total"]
+
+
+def test_b1_du_toan_tham_chieu_tu_san_pham_khong_mo_cong_bien():
+    """Cơ cấu chi phí sản phẩm chỉ để tham chiếu: 21/313 mã có số và phần lớn sai (có mã ghi 11 đ/khách
+    → biên 99,99%). Dùng nó mở cổng thì cổng lại bị vô hiệu hóa lần nữa."""
+    from app.db.session import SessionLocal
+    from app.models.core import Product, Tour
+    from app.services import rules as R
+    db = SessionLocal()
+    p = Product(code="SP-KT-9001", name="Sản phẩm kiểm thử", reference_price=2_000_000,
+                cost_structure={"xe": 11}, source="vtos")
+    db.add(p); db.commit()
+    t = db.execute(__import__("sqlalchemy").select(Tour).where(Tour.code == "KT-B1-0001")).scalars().first()
+    t.product_code = "SP-KT-9001"; t.product_id = p.id; db.commit()
+    f, v, src = R.budget_of(db, t)
+    assert src == "san_pham" and v == 11
+    c = R.calc_db(db, t, 0.10)
+    assert c["reference_only"] is True
+    assert c["margin"] > 0.9, "số tham chiếu cho biên rất cao – đúng là dữ liệu sản phẩm đang sai"
+    assert c["complete"] is False and c["pass_gate"] is False, "tham chiếu không được mở cổng biên"
+    assert c["gate_state"] == "chua_du_co_so"
+    db.close()
+
+
+def test_b3_tong_chi_phi_vietrip_khong_phai_gia_von_khi_chua_quyet_toan():
+    """tour DL001.03130926 có tongChiPhi = 6.500 chính là phí bảo hiểm/khách, không phải giá vốn chuyến."""
+    d = date.today() + timedelta(days=20)
+    rows = [{"recID": 880002, "tourcode": "KT-B3-VT02", "tenSanPham": "Tour đang bán", "loaiTour": "TOURLE",
+             "ngayKhoiHanh": d.strftime("%Y-%m-%d"), "ngayKetThuc": (d + timedelta(days=2)).strftime("%Y-%m-%d"),
+             "fstUser": "NGUYỄN THỊ LAN", "adl": 1_290_000, "chd": 0, "inf": 0, "soChoMoBan": 44,
+             "quyetToan": False, "duyetChi": False, "doanhThu": 0, "tongChiPhi": 6500, "baoHiem": 6500, "nuoc": ""}]
+    assert client.post("/api/v1/import/vietrip/tour", json={"rows": rows}, headers=login("cntt")).status_code == 200
+    assert client.post("/api/v1/import/vietrip/apply", headers=login("cntt")).status_code == 200
+    t = next(x for x in client.get("/api/v1/tours?limit=1000", headers=login("cntt")).json() if x["code"] == "KT-B3-VT02")
+    assert t["actual_cost"] == 0, "phí bảo hiểm 6.500 không được nhận là giá vốn chuyến"
+    det = client.get(f"/api/v1/tours/{t['id']}/detail", headers=login("cntt")).json()
+    assert det["summary"]["profit_state"] == "tam_tinh" and det["summary"]["warning"]

@@ -147,7 +147,7 @@ def summary(db: Session, t: Tour) -> dict:
     profit = rev - actual - t.promo_value
     return {"lines": len(ls), "cancelled": sum(1 for l in lines_of(db, t) if l.status != "hd"), "actual": actual, "paid": paid, "remaining": max(0.0, actual - paid),
             "budget": budget, "budget_source": b_src, "budget_source_label": {"dong": "tổng dự toán theo dòng"}.get(b_src, R.BUDGET_SOURCES.get(b_src, b_src)),
-            "has_budget": budget > 0, "variance": actual - budget, "variance_pct": (actual - budget) / budget if budget else 0,
+            "has_budget": budget > 0 and b_src in ("dong", "du_toan_tour"), "variance": actual - budget, "variance_pct": (actual - budget) / budget if budget else 0,
             "revenue": rev, "profit": profit, "margin": profit / rev if rev else 0, "version": t.settlement_version, "with_doc": sum(1 for l in ls if l.doc_data)}
 
 
