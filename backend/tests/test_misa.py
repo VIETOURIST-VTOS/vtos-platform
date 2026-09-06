@@ -139,6 +139,14 @@ def test_dimension_rules_and_exports():
 
 def test_kiem_toan_checkpoint():
     h = login("ketoan")
+    # có doanh thu/chi phí thật còn treo trong kỳ (chưa kết chuyển 911) trước khi chốt sổ – mô phỏng
+    # đúng tình huống production (bug cộng dồn cũ chỉ lộ ra khi có số dư P&L thật ở kỳ chốt sổ)
+    ok = client.post("/api/v1/journal", json={"entry_date": "2026-03-15", "description": "DT test", "lines": [
+        {"account": "131", "debit": 500000, "partner_code": "0301234567"}, {"account": "51131", "credit": 500000, "project_code": "EU0014.09.170626"}]}, headers=h)
+    assert ok.status_code == 201, ok.text
+    ok2 = client.post("/api/v1/journal", json={"entry_date": "2026-03-16", "description": "CP test", "lines": [
+        {"account": "6421", "debit": 120000}, {"account": "1111", "credit": 120000}]}, headers=h)
+    assert ok2.status_code == 201, ok2.text
     r = client.post("/api/v1/misa/kiem-toan-checkpoint", data={"column": "close"}, headers=h)
     assert r.status_code == 200, r.text
     js = r.json(); assert js["total"] > 0 and js["accounts"] > 0

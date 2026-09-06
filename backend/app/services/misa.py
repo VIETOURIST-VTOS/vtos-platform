@@ -276,9 +276,10 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
         close_lines.append({"account": code, "debit": max(-net, 0), "credit": max(net, 0), "note": "Kết chuyển doanh thu/chi phí để chốt sổ kiểm toán"})
         kq += net
     if close_lines:
-        close_lines.append({"account": "911", "debit": max(kq, 0), "credit": max(-kq, 0), "note": "Kết chuyển xác định KQKD (chốt sổ kiểm toán)"})
-        close_lines.append({"account": "421", "debit": max(-kq, 0), "credit": max(kq, 0), "note": "Kết chuyển KQKD vào lợi nhuận sau thuế chưa phân phối"})
-        ACC.post_entry(db, u.username, u.role, as_of, f"Kết chuyển 911 để chốt sổ kiểm toán {as_of:%d/%m/%Y}", close_lines, "ket_chuyen", ref_close)
+        # Đóng thẳng phần doanh thu/chi phí còn treo vào 421 (không cần qua 911 vì đây là 1 bút toán):
+        # tổng các dòng xóa số dư P&L ở trên có (Nợ − Có) = −kq, nên dòng 421 cần (Nợ − Có) = +kq để tự cân.
+        close_lines.append({"account": "421", "debit": max(kq, 0), "credit": max(-kq, 0), "note": "Kết chuyển KQKD còn treo vào lợi nhuận sau thuế chưa phân phối (chốt sổ kiểm toán)"})
+        ACC.post_entry(db, u.username, u.role, as_of, f"Kết chuyển KQKD để chốt sổ kiểm toán {as_of:%d/%m/%Y}", close_lines, "ket_chuyen", ref_close)
         db.flush()
 
     # 2) Điều chỉnh CHÊNH LỆCH cho từng tài khoản trong bộ kiểm toán so với số dư hiện tại của VTOS
