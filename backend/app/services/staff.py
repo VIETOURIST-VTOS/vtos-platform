@@ -32,7 +32,7 @@ def load_master() -> list[dict]:
     return json.loads(DATA.read_text(encoding="utf-8"))["nhan_su"]
 
 
-def import_master(db: Session, actor: User | None = None, create_accounts: bool = True) -> dict:
+def import_master(db: Session, actor: User | None = None, create_accounts: bool = True, reset_passwords: bool = False) -> dict:
     rows = load_master()
     emps = list(db.execute(select(Employee)).scalars())
     by_code = {e.code: e for e in emps}
@@ -42,7 +42,7 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
     u_by_name = {}
     for u in users: u_by_name.setdefault(name_key(u.full_name), u)
     u_by_code = {u.staff_code: u for u in users if u.staff_code}
-    stat = {"updated": 0, "created": 0, "users_linked": 0, "users_created": 0, "roles_changed": [], "skipped": []}
+    stat = {"updated": 0, "created": 0, "users_linked": 0, "users_created": 0, "passwords_reset": 0, "roles_changed": [], "skipped": []}
     for r in rows:
         code, name = str(r["ma"]), r["ten"].strip()
         e = by_code.get(code) or by_name.get(name_key(name))
@@ -75,6 +75,8 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
                 stat["roles_changed"].append(f"{u.username}: {ROLES.get(u.role, u.role)} → {ROLES.get(role, role)}"); u.role = role
             u.department, u.sales_group, u.staff_code = r["phong"], r.get("nhom", ""), code
             u.full_name = name
+            if reset_passwords and u.role not in ("chutich", "tgd", "cntt"):   # đặt lại mật khẩu = mã NV (tài khoản nạp từ Vietrip có mật khẩu ngẫu nhiên)
+                u.password_hash = hash_password(code); stat["passwords_reset"] += 1
     # nhân sự không còn trong danh sách chính thức → đánh dấu nghỉ (không xóa)
     codes = {str(r["ma"]) for r in rows}
     names = {name_key(r["ten"]) for r in rows}

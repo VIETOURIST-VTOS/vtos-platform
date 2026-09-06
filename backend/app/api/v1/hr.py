@@ -63,11 +63,30 @@ def staff_directory(u: User = Depends(current_user), db: Session = Depends(get_d
 
 
 @router.post("/employees/import-master")
-def import_master(u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
-    """Nạp danh sách nhân viên chính thức từ bảng lương HCNS (app/data/nhan_su_*.json): mã NV, phòng, nhóm, chức vụ; ghép/tạo tài khoản."""
+def import_master(reset_passwords: bool = False, u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
+    """Nạp danh sách nhân viên chính thức từ bảng lương HCNS (app/data/nhan_su_*.json): mã NV, phòng, nhóm, chức vụ; ghép/tạo tài khoản.
+    reset_passwords=true: đặt lại mật khẩu mọi tài khoản trong danh sách = mã NV (trừ Chủ tịch/TGĐ/CNTT) – dùng khi cấp tài khoản lần đầu."""
     from app.services import staff as STF
-    st = STF.import_master(db, u)
-    return {"message": f"Đã nạp: cập nhật {st['updated']}, tạo mới {st['created']} hồ sơ; ghép {st['users_linked']} tài khoản, tạo {st['users_created']} tài khoản mới (mật khẩu = mã NV)", **st}
+    st = STF.import_master(db, u, reset_passwords=reset_passwords)
+    return {"message": f"Đã nạp: cập nhật {st['updated']}, tạo mới {st['created']} hồ sơ; ghép {st['users_linked']} tài khoản, tạo {st['users_created']} tài khoản mới" + (f", đặt lại {st['passwords_reset']} mật khẩu = mã NV" if reset_passwords else ""), **st}
+
+
+class ResetPwIn(BaseModel):
+    new_password: str = ""      # trống = mã NV
+
+
+@router.post("/users/{uid}/reset-password")
+def reset_password(uid: int, data: ResetPwIn, u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
+    """HCNS/CNTT đặt lại mật khẩu cho một tài khoản (mặc định = mã NV)."""
+    from app.core.security import hash_password
+    t = db.get(User, uid)
+    if not t: raise HTTPException(404, "Không có tài khoản")
+    if t.role in ("chutich", "tgd") and u.role != "cntt": raise HTTPException(403, "Chỉ CNTT đặt lại mật khẩu lãnh đạo")
+    pw = data.new_password.strip() or t.staff_code
+    if not pw or len(pw) < 3: raise HTTPException(422, "Chưa có mã NV – nhập mật khẩu mới")
+    t.password_hash = hash_password(pw)
+    R.audit(db, u.username, u.role, "dat_lai_mat_khau", f"user:{t.username}"); db.commit()
+    return {"message": f"Đã đặt lại mật khẩu cho {t.full_name} ({t.username})" + (" = mã NV" if not data.new_password.strip() else "")}
 
 
 @router.post("/employees", status_code=201)

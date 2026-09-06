@@ -42,6 +42,11 @@ def test_import_master_and_group_scope():
     assert all(x["sales_id"] != hoa_id for x in b)
     # trưởng phòng KD thấy tất cả
     assert len(client.get("/api/v1/bookings?limit=500", headers=login("truonghaidang", "37")).json()) > 0
+    # đặt lại mật khẩu = mã NV cho tài khoản có sẵn (kd.hoa không trong bảng lương nên không đổi); endpoint lẻ
+    hoa_uid = hoa_id
+    assert client.post(f"/api/v1/users/{hoa_uid}/reset-password", json={"new_password": "abc123"}, headers=login("hcns")).status_code == 200
+    assert client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "abc123"}).status_code == 200
+    r3 = client.post("/api/v1/employees/import-master?reset_passwords=true", headers=login("hcns")).json(); assert r3["passwords_reset"] > 50
     # nạp lần 2 không tạo trùng
     r2 = client.post("/api/v1/employees/import-master", headers=login("cntt")).json()
     assert r2["created"] == 0 and r2["users_created"] == 0

@@ -82,7 +82,8 @@ function HR() {
 
     {tab === "employees" && <>
       {canHR && <div className="panel"><h2>Danh sách nhân viên chính thức (bảng lương HCNS)</h2><p className="muted">Nạp mã NV / phòng / nhóm kinh doanh / chức vụ từ bảng lương HCNS đã đưa vào hệ thống (tháng 9/2026); ghép tài khoản theo họ tên, tạo tài khoản mới cho khối phải báo cáo ngày (mật khẩu ban đầu = mã NV). Nhân sự không còn trên bảng lương → ngưng hoạt động (không xóa).</p>
-        <button className="act orange" onClick={() => post("/employees/import-master").then(() => api("/employees").then(setEmps))}>Nạp / cập nhật danh sách nhân viên</button></div>}
+        <button className="act orange" onClick={() => post("/employees/import-master").then(() => api("/employees").then(setEmps))}>Nạp / cập nhật danh sách nhân viên</button>
+        <button className="act red" onClick={() => { if (confirm("Đặt lại mật khẩu = mã NV cho TẤT CẢ tài khoản trong danh sách (trừ Chủ tịch/TGĐ/CNTT)? Dùng khi cấp tài khoản lần đầu.")) post("/employees/import-master?reset_passwords=true").then(() => api("/employees").then(setEmps)); }}>Nạp + đặt lại mật khẩu = mã NV</button></div>}
       {canHR && <div className="panel"><h2>Thêm hồ sơ</h2><div className="grid">
         <label>Họ tên<input value={fEmp.full_name} onChange={(e) => setFEmp({ ...fEmp, full_name: e.target.value })} /></label>
         <label>Phòng<select value={fEmp.department} onChange={(e) => setFEmp({ ...fEmp, department: e.target.value })}>{Object.entries(meta.departments).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
