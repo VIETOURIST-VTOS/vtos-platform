@@ -15,13 +15,15 @@ Nguyên tắc an toàn của bước 3 – đây là thao tác động vào sổ
     trống còn hơn gán sai làm sai sổ tiền gửi.
   - Ghi nhật ký kiểm toán và trả về đủ thông tin để hoàn tác (revert) nếu Kế toán thấy sai.
 """
+import io
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import date
-from sqlalchemy import select, func, update
+from openpyxl import load_workbook
+from sqlalchemy import select, func, update, delete
 from sqlalchemy.orm import Session
 from app.models.accounting import Account, JournalEntry, JournalLine
-from app.models.banks import BankAccount, CURRENCIES
+from app.models.banks import BankAccount, BankDocMap, CURRENCIES
 from app.models.core import User
 from app.services import rules as R
 
@@ -162,22 +164,43 @@ def _subtree_codes(db: Session, root: str) -> list[str]:
 
 # ---------- Gán lại sổ cũ về đúng tiểu khoản ----------
 
-def _match(banks: list[BankAccount], entry_code: str, description: str, parent: str) -> tuple[BankAccount | None, str]:
-    """Tìm tài khoản ngân hàng khớp. Ưu tiên tiền tố số chứng từ (đáng tin), sau mới tới từ khóa diễn giải."""
+def _match(banks: list[BankAccount], entry_code: str, description: str, parent: str,
+           amount: float = 0.0, side: str = "", exact: dict | None = None, single: dict | None = None
+           ) -> tuple[BankAccount | None, str]:
+    """Tìm tài khoản ngân hàng của một dòng sổ, theo thứ tự tin cậy giảm dần:
+
+    1. BẢN ĐỒ từ Sổ tiền gửi MISA khớp đủ (số chứng từ, số tiền, chiều thu/chi) – chính xác tuyệt đối, kể cả
+       chứng từ chuyển tiền nội bộ có mặt ở hai ngân hàng.
+    2. Bản đồ chỉ theo số chứng từ, khi chứng từ đó chỉ thuộc MỘT ngân hàng (số tiền có thể lệch do ghi sổ
+       tách dòng) – vẫn chắc chắn vì không có ngân hàng nào khác dùng số chứng từ này.
+    3. Tiền tố số chứng từ / từ khóa diễn giải do Kế toán khai – CHỈ dùng khi không có bản đồ, và phải hiểu
+       đây là suy đoán: đo trên sổ thật, tiền tố "FT…" xuất hiện ở 6 ngân hàng khác nhau nên tuyệt đối không
+       nên dựa vào nếu đã có file Sổ tiền gửi.
+    """
+    by_code = {b.code: b for b in banks}
+    doc = _doc_of(entry_code)
+    if exact and side:
+        bc = exact.get((doc, round(amount, 0), side))
+        if bc and bc in by_code:
+            return by_code[bc], "khớp Sổ tiền gửi MISA (chứng từ + số tiền + thu/chi)"
+    if single:
+        bc = single.get(doc)
+        if bc and bc in by_code:
+            return by_code[bc], "khớp Sổ tiền gửi MISA (số chứng từ chỉ thuộc 1 ngân hàng)"
     code_u = re.sub(r"^MISA-", "", (entry_code or "").upper())
     for b in banks:
         if b.parent_account != parent:
             continue
         for p in (b.match_prefixes or []):
             if code_u.startswith(p):
-                return b, f"số chứng từ bắt đầu bằng {p}"
+                return b, f"suy đoán theo tiền tố {p}"
     text = f"{entry_code or ''} {description or ''}".upper()
     for b in banks:
         if b.parent_account != parent:
             continue
         for k in (b.match_keywords or []):
             if re.search(rf"\b{re.escape(k)}", text):
-                return b, f"diễn giải chứa {k}"
+                return b, f"suy đoán theo diễn giải chứa {k}"
     return None, ""
 
 
@@ -194,7 +217,9 @@ def classify(db: Session, since: date, upto: date, apply: bool = False, u: User 
     parents = sorted({b.parent_account for b in banks})
     before = _balance(db, _subtree_codes(db, BANK_ROOT), upto)
 
-    q = (select(JournalLine.id, JournalLine.account_code, JournalEntry.code, JournalEntry.description)
+    exact, single = load_doc_map(db)
+    q = (select(JournalLine.id, JournalLine.account_code, JournalEntry.code, JournalEntry.description,
+                JournalLine.debit, JournalLine.credit)
          .join(JournalEntry, JournalLine.entry_id == JournalEntry.id)
          .where(JournalEntry.status == POSTED, JournalEntry.entry_date >= since, JournalEntry.entry_date <= upto,
                 JournalLine.account_code.in_(parents)))
@@ -203,9 +228,11 @@ def classify(db: Session, since: date, upto: date, apply: bool = False, u: User 
     samples: dict[str, list] = {}
     unmatched, scanned = 0, 0
     unmatched_prefix: Counter = Counter()
-    for lid, acc, ecode, desc in db.execute(q).all():
+    for lid, acc, ecode, desc, dr, cr in db.execute(q).all():
         scanned += 1
-        b, why = _match(banks, ecode, desc, acc)
+        amount = float(dr or 0) if (dr or 0) > 0 else float(cr or 0)
+        side = "thu" if (dr or 0) > 0 else "chi"
+        b, why = _match(banks, ecode, desc, acc, amount, side, exact, single)
         if not b:
             unmatched += 1
             head = re.sub(r"^MISA-", "", (ecode or "").upper()).split("-")[0]
@@ -221,13 +248,15 @@ def classify(db: Session, since: date, upto: date, apply: bool = False, u: User 
                 "account_code": next(b.account_code for b in banks if b.code == c),
                 "lines": len(ids), "samples": samples.get(c, [])} for c, ids in sorted(hit.items())]
     out = {"since": since, "upto": upto, "applied": False, "scanned": scanned,
+           "co_ban_do_misa": len(exact) > 0, "so_dong_ban_do": len(exact),
            "matched": sum(len(v) for v in hit.values()), "unmatched": unmatched,
            "by_bank": by_bank, "reasons": dict(reasons.most_common(20)),
            "unmatched_prefixes": [{"prefix": k, "lines": v} for k, v in unmatched_prefix.most_common(15)],
            "balance_before": before}
     if not apply:
         out["ghi_chu"] = ("Đây mới là bản xem trước, chưa đụng vào sổ. Dòng không nhận diện được vẫn nằm ở tài "
-                          "khoản cha – bổ sung tiền tố/từ khóa cho tài khoản ngân hàng rồi xem lại.")
+                          "khoản cha." + ("" if exact else " CHƯA nạp Sổ tiền gửi ngân hàng của MISA nên đang phải "
+                          "suy đoán theo tiền tố – nạp file đó vào sẽ gán chính xác gần như tuyệt đối."))
         return out
 
     if not u:
@@ -324,3 +353,110 @@ def balances(db: Session, since: date, upto: date) -> dict:
 def since_minus(d: date) -> date:
     from datetime import timedelta
     return d - timedelta(days=1)
+
+
+# ---------- Nạp bản đồ chứng từ → ngân hàng từ "Sổ tiền gửi ngân hàng" của MISA ----------
+
+SECTION = "tài khoản ngân hàng:"
+
+
+def parse_bank_book(data: bytes) -> dict:
+    """Đọc file "Sổ tiền gửi ngân hàng" xuất từ MISA.
+
+    Bố cục: các dòng phát sinh được chia thành từng đoạn, mở đầu mỗi đoạn là ô "Tài khoản ngân hàng:
+    <số tài khoản> - <tên ngân hàng>". Các cột: Ngày hạch toán, Ngày chứng từ, Số chứng từ, Diễn giải,
+    TK đối ứng, Thu, Chi, Tồn. Dòng không có số chứng từ là dòng số dư đầu kỳ / cộng phát sinh – bỏ qua.
+    """
+    wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    ws = wb.worksheets[0]
+    accounts: dict[str, str] = {}
+    entries: list[dict] = []
+    cur = ""
+    for row in ws.iter_rows(values_only=True):
+        if not row:
+            continue
+        a0 = str(row[0] or "").strip()
+        if a0.lower().startswith(SECTION):
+            label = a0.split(":", 1)[1].strip()
+            no, _, name = label.partition("-")
+            cur = no.strip()[:20]
+            if cur:
+                accounts.setdefault(cur, name.strip()[:120] or "Ngân hàng")
+            continue
+        if not cur or len(row) < 7 or not row[2]:
+            continue
+        doc = str(row[2]).strip()
+        if not doc or doc.lower().startswith(("số dư", "cộng", "tổng")):
+            continue
+
+        def num(x):
+            try:
+                return round(float(x or 0), 0)
+            except (TypeError, ValueError):
+                return 0.0
+        thu, chi = num(row[5]), num(row[6])
+        if thu > 0:
+            entries.append({"bank_code": cur, "doc_no": doc[:60], "amount": thu, "side": "thu"})
+        if chi > 0:
+            entries.append({"bank_code": cur, "doc_no": doc[:60], "amount": chi, "side": "chi"})
+    if not accounts:
+        raise ValueError('Không thấy dòng "Tài khoản ngân hàng:" nào – đây có phải file Sổ tiền gửi ngân hàng '
+                         'xuất từ MISA không? Cần bản in THEO TỪNG TÀI KHOẢN NGÂN HÀNG.')
+    by_doc: dict[str, set] = defaultdict(set)
+    for e in entries:
+        by_doc[e["doc_no"]].add(e["bank_code"])
+    return {"accounts": accounts, "entries": entries,
+            "docs": len(by_doc), "multi_bank_docs": sum(1 for v in by_doc.values() if len(v) > 1)}
+
+
+def import_bank_book(db: Session, u: User, data: bytes, filename: str = "") -> dict:
+    """Nạp file Sổ tiền gửi: tự mở tài khoản ngân hàng còn thiếu (kèm tiểu khoản 112) và ghi bản đồ chứng từ.
+
+    Nạp lại cùng một ngân hàng thì THAY THẾ bản đồ cũ của ngân hàng đó, để chạy lại nhiều lần vẫn ra một kết
+    quả. Việc này KHÔNG đụng vào sổ – chỉ dựng bản đồ; muốn đổi sổ phải chạy tiếp bước gán và có xem trước."""
+    parsed = parse_bank_book(data)
+    created = []
+    for code, name in parsed["accounts"].items():
+        b = db.execute(select(BankAccount).where(BankAccount.code == code)).scalar_one_or_none()
+        if b is None:
+            b = BankAccount(code=code, bank_name=name, account_number=code, currency="VND",
+                            parent_account=_parent_of("VND"), match_prefixes=[], match_keywords=[],
+                            created_by=u.username, note="Tự mở khi nạp Sổ tiền gửi ngân hàng từ MISA")
+            db.add(b); db.flush()
+            created.append(code)
+        elif not b.bank_name:
+            b.bank_name = name
+        ensure_sub_account(db, b)
+    db.execute(delete(BankDocMap).where(BankDocMap.bank_code.in_(list(parsed["accounts"]))))
+    db.flush()
+    for e in parsed["entries"]:
+        db.add(BankDocMap(bank_code=e["bank_code"], doc_no=e["doc_no"], amount=e["amount"],
+                          side=e["side"], source_file=filename[:120]))
+    R.audit(db, u.username, u.role, "nap_so_tien_gui_misa", f"nh:{filename[:40]}",
+            after={"so_tai_khoan": len(parsed["accounts"]), "moi_mo": created,
+                   "so_dong_ban_do": len(parsed["entries"]), "so_chung_tu": parsed["docs"]})
+    db.commit()
+    banks = {b.code: b for b in db.execute(select(BankAccount)).scalars()}
+    return {"accounts": [{"code": c, "bank_name": parsed["accounts"][c],
+                          "account_code": banks[c].account_code if c in banks else "",
+                          "moi_mo": c in created,
+                          "lines": sum(1 for e in parsed["entries"] if e["bank_code"] == c)}
+                         for c in sorted(parsed["accounts"], key=lambda c: -sum(1 for e in parsed["entries"] if e["bank_code"] == c))],
+            "map_rows": len(parsed["entries"]), "docs": parsed["docs"],
+            "multi_bank_docs": parsed["multi_bank_docs"], "created": created}
+
+
+def _doc_of(entry_code: str) -> str:
+    """Số chứng từ MISA nằm trong mã chứng từ VTOS dưới dạng "MISA-<số chứng từ>"."""
+    return re.sub(r"^MISA-", "", (entry_code or "").strip())
+
+
+def load_doc_map(db: Session) -> tuple[dict, dict]:
+    """(bản đồ khớp đủ 3 yếu tố, bản đồ chỉ theo số chứng từ khi chứng từ đó chỉ thuộc 1 ngân hàng)."""
+    exact: dict[tuple, str] = {}
+    by_doc: dict[str, set] = defaultdict(set)
+    for m in db.execute(select(BankDocMap)).scalars():
+        exact[(m.doc_no, round(m.amount, 0), m.side)] = m.bank_code
+        by_doc[m.doc_no].add(m.bank_code)
+    single = {d: next(iter(v)) for d, v in by_doc.items() if len(v) == 1}
+    return exact, single

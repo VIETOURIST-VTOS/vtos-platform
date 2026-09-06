@@ -40,3 +40,25 @@ class BankAccount(Base):
     note: Mapped[str] = mapped_column(String(300), default="")
     created_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class BankDocMap(Base):
+    """Bản đồ CHỨNG TỪ → TÀI KHOẢN NGÂN HÀNG, nạp từ "Sổ tiền gửi ngân hàng" của MISA.
+
+    Sổ nhật ký chung xuất từ MISA không mang cột ngân hàng, còn số chứng từ thì KHÔNG suy ra được ngân hàng:
+    đo trên sổ thật 22.095 dòng, tiền tố "FT…" xuất hiện ở 6 ngân hàng khác nhau, "PT07/PC07" ở gần hết.
+    Vì vậy không đoán theo tiền tố mà lấy thẳng bản đồ từ báo cáo Sổ tiền gửi của MISA – báo cáo này in theo
+    TỪNG tài khoản ngân hàng nên cho biết chính xác mỗi chứng từ thuộc tài khoản nào.
+
+    Khoá đối chiếu là (số chứng từ, số tiền, chiều thu/chi): 99% chứng từ chỉ thuộc một tài khoản, 1% còn lại
+    là chuyển tiền nội bộ giữa hai tài khoản của công ty – chứng từ đó có mặt ở cả hai bên, và chiều thu/chi
+    tách được đúng bên nào là bên nhận, bên nào là bên chi.
+    """
+    __tablename__ = "bank_doc_map"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bank_code: Mapped[str] = mapped_column(String(20), index=True)     # = BankAccount.code (số tài khoản)
+    doc_no: Mapped[str] = mapped_column(String(60), index=True)        # số chứng từ trên MISA (không có tiền tố MISA-)
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    side: Mapped[str] = mapped_column(String(4), default="thu")        # thu (ghi Nợ 112) / chi (ghi Có 112)
+    source_file: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

@@ -180,3 +180,75 @@ def test_goi_y_co_tran_quet_va_noi_ro_la_mau(seeded):
         assert sum(x["lines"] for x in cut["prefixes"]) == 2
     finally:
         db.close()
+
+
+def _so_tien_gui_xlsx(rows):
+    """Dựng file giống bố cục "Sổ tiền gửi ngân hàng" của MISA: từng đoạn mở đầu bằng
+    "Tài khoản ngân hàng: <số TK> - <tên>", rồi tới các dòng phát sinh."""
+    import io as _io
+    from openpyxl import Workbook
+    wb = Workbook(); ws = wb.active; ws.title = "SỔ TIỀN GỬI NGÂN HÀNG"
+    ws.append(["SỔ TIỀN GỬI NGÂN HÀNG"]); ws.append(["Tài khoản: 112"]); ws.append([])
+    ws.append(["Ngày hạch toán", "Ngày chứng từ", "Số chứng từ", "Diễn giải", "TK đối ứng", "Thu", "Chi", "Tồn"])
+    for bank, name, lines in rows:
+        ws.append([f"Tài khoản ngân hàng: {bank} - {name}"])
+        ws.append(["", "", "", "Số dư đầu kỳ", "", 0, 0, 0])       # dòng không có số chứng từ – phải bỏ qua
+        for doc, thu, chi in lines:
+            ws.append(["2028-05-03", "2028-05-03", doc, "dien giai", "131", thu, chi, 0])
+    b = _io.BytesIO(); wb.save(b); return b.getvalue()
+
+
+def test_nap_so_tien_gui_misa_va_gan_chinh_xac(seeded):
+    """Nạp Sổ tiền gửi của MISA thì gán theo BẢN ĐỒ chứng từ, không còn đoán theo tiền tố."""
+    h = login("ketoan")
+    # Trả các dòng đã gán ở test trước về tài khoản cha để thử lại từ đầu
+    for code in ("TPB1", "MB1"):
+        client.post(f"/api/v1/bank-accounts/{code}/huy-phan-loai?since={SINCE}&upto={UPTO}", headers=h)
+
+    codes = _codes(h)                       # {diễn giải: số chứng từ VTOS}
+    doc = lambda desc: codes[desc].replace("MISA-", "")
+    xlsx = _so_tien_gui_xlsx([
+        ("0181126", "Ngan hang Tien Phong", [(doc("Khách chuyển khoản TPBank"), 300_000_000, 0),
+                                             (doc("Chi trả NCC qua TPBank"), 0, 100_000_000)]),
+        ("1601100", "Ngan hang Quan doi", [(doc("Thu qua MB Bank"), 50_000_000, 0)]),
+    ])
+    r = client.post("/api/v1/bank-accounts/nap-so-tien-gui", headers=h,
+                    files={"file": ("So_tien_gui.xlsx", xlsx,
+                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["map_rows"] == 3 and j["docs"] == 3
+    assert set(j["created"]) == {"0181126", "1601100"}          # tự mở 2 tài khoản ngân hàng
+    assert all(a["account_code"] for a in j["accounts"])        # kèm tiểu khoản 112
+
+    st = client.get("/api/v1/bank-accounts/ban-do", headers=h).json()
+    assert st["map_rows"] == 3 and st["docs_single_bank"] == 3
+
+    pv = client.get(f"/api/v1/bank-accounts/phan-loai/xem-truoc?since={SINCE}&upto={UPTO}", headers=h).json()
+    assert pv["co_ban_do_misa"] is True
+    by = {x["code"]: x for x in pv["by_bank"]}
+    assert by["0181126"]["lines"] == 2 and by["1601100"]["lines"] == 1
+    assert any("Sổ tiền gửi MISA" in k for k in pv["reasons"]), pv["reasons"]
+
+    ap = client.post(f"/api/v1/bank-accounts/phan-loai/thuc-hien?since={SINCE}&upto={UPTO}", headers=h)
+    assert ap.status_code == 200, ap.text
+    assert ap.json()["balance_before"] == ap.json()["balance_after"]
+
+    sd = client.get(f"/api/v1/bank-accounts/so-du?since={SINCE}&upto={UPTO}", headers=h).json()
+    by = {x["code"]: x for x in sd["rows"]}
+    assert by["0181126"]["closing"] == 200_000_000
+    assert by["1601100"]["closing"] == 50_000_000
+    assert sd["unassigned"]["closing"] == 7_000_000            # dòng không có trong sổ MISA vẫn để nguyên
+    assert sd["total_closing"] == sd["check_112"]
+
+
+def test_nap_file_sai_dinh_dang_bao_loi_ro(seeded):
+    h = login("ketoan")
+    import io as _io
+    from openpyxl import Workbook
+    wb = Workbook(); wb.active.append(["Ngày", "Số chứng từ", "Số tiền"])
+    b = _io.BytesIO(); wb.save(b)
+    r = client.post("/api/v1/bank-accounts/nap-so-tien-gui", headers=h,
+                    files={"file": ("linh_tinh.xlsx", b.getvalue(),
+                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 422 and "Tài khoản ngân hàng" in r.json()["detail"]
