@@ -96,3 +96,28 @@ def coverage(u: User = Depends(current_user), db: Session = Depends(get_db)):
             "hdv": {"tong": len(hdv), "da_gan": sum(1 for e in hdv if e.company_id), "chua_gan": sum(1 for e in hdv if not e.company_id)},
             "phap_nhan": {"tong": len(cos), "hop_nhat": sum(1 for c in cos if c.in_group()), "ben_lien_quan": sum(1 for c in cos if c.related_party()),
                           "thieu_mst": sum(1 for c in cos if not c.tax_code), "tam_ngung": sum(1 for c in cos if not c.active)}}
+
+# ---------- Nạp danh sách tài xế – xe ----------
+class DriverRow(BaseModel):
+    full_name: str
+    plate: str = ""
+    birth_date: str | None = None
+    phone: str = ""
+
+
+class DriverBatch(BaseModel):
+    rows: list[DriverRow]
+    tao_xe_thieu: bool = False
+
+
+@router.post("/drivers/reconcile")
+def drivers_reconcile(data: DriverBatch, u: User = Depends(require_roles(*WRITE, "hcns", "tp_dh")), db: Session = Depends(get_db)):
+    """Đối chiếu danh sách tài xế với dữ liệu đang có – chỉ đọc, xem trước khi nạp."""
+    from app.services import drivers as D
+    return D.reconcile(db, [r.model_dump() for r in data.rows])
+
+
+@router.post("/drivers/apply")
+def drivers_apply(data: DriverBatch, u: User = Depends(require_roles(*WRITE, "hcns")), db: Session = Depends(get_db)):
+    from app.services import drivers as D
+    return D.apply(db, [r.model_dump() for r in data.rows], u.username, u.role, data.tao_xe_thieu)

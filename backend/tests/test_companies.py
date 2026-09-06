@@ -148,3 +148,32 @@ def test_bao_cao_do_phu_chu_quan():
 def test_vai_tro_khong_duoc_tao_phap_nhan():
     r = client.post("/api/v1/companies", json={"code": "X1", "name": "Thử", "kind": "con"}, headers=login("kd.hoa"))
     assert r.status_code == 403
+
+
+def test_doi_chieu_va_nap_danh_sach_tai_xe():
+    """Đối chiếu trước, nạp sau; không tạo hồ sơ nhân sự mới, không đoán khi trùng tên."""
+    emps = client.get("/api/v1/employees", headers=login("cntt")).json()
+    tx = [e for e in emps if e["position"] == "tai_xe"]
+    veh = client.get("/api/v1/vehicles", headers=login("cntt")).json()
+    assert tx and veh
+    rows = [{"full_name": tx[0]["full_name"], "plate": veh[0]["plate"], "birth_date": "09/02/1992", "phone": "0945979310"},
+            {"full_name": "NGƯỜI KHÔNG CÓ TRONG HỒ SƠ", "plate": "99Z-999.99"}]
+    rc = client.post("/api/v1/drivers/reconcile", json={"rows": rows}, headers=login("hcns")).json()
+    assert rc["trong_danh_sach"] == 2
+    assert any(x["ten"] == "NGƯỜI KHÔNG CÓ TRONG HỒ SƠ" for x in rc["chua_co_ho_so_nhan_su"])
+    assert any(x["bien_so"] == "99Z-999.99" for x in rc["thieu_xe_trong_he_thong"])
+
+    r = client.post("/api/v1/drivers/apply", json={"rows": rows}, headers=login("hcns")).json()
+    assert r["cap_nhat_nhan_su"] == 1 and r["gan_tai_xe_cho_xe"] == 1
+    assert r["xe_tao_moi"] == [], "không tạo xe khi chưa được yêu cầu"
+    assert any(b["ly_do"] == "không có hồ sơ" for b in r["bo_qua"])
+    e = next(x for x in client.get("/api/v1/employees", headers=login("cntt")).json() if x["id"] == tx[0]["id"])
+    assert e["phone"] == "0945979310" and e["birth_date"] == "1992-02-09"
+    cs = client.get("/api/v1/companies", headers=login("cntt")).json()
+    assert e["company_id"] == next(c for c in cs if c["code"] == "VTD")["id"]
+
+
+def test_bien_so_so_khop_khong_phu_thuoc_dau_gach():
+    from app.services.drivers import norm_plate, norm_name
+    assert norm_plate("50F022.59") == norm_plate("50F-022.59") == norm_plate("50f 022,59")
+    assert norm_name("NGUYỄN LONG HỒ") == norm_name("Nguyễn Long Hồ")

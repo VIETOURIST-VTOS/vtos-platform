@@ -21,7 +21,7 @@ def emp_out(e: Employee) -> dict:
             "position": e.position, "position_name": POSITIONS.get(e.position, e.position), "title": e.title, "sales_group": e.sales_group, "office": e.office, "office_name": OFFICES.get(e.office, e.office),
             "contract_type": e.contract_type, "base_salary": e.base_salary, "start_date": e.start_date, "probation": e.probation, "transition_list": e.transition_list,
             "card_no": e.card_no, "card_type": e.card_type, "card_expiry": e.card_expiry, "member_org": e.member_org, "ctv_contract": e.ctv_contract,
-            "advance_limit": e.advance_limit, "active": e.active, "company_id": e.company_id,
+            "advance_limit": e.advance_limit, "active": e.active, "company_id": e.company_id, "birth_date": e.birth_date, "phone": e.phone,
             "guide_ok": H.guide_eligible(e, date.today())[0] if e.department == "huong_dan" else None}
 
 

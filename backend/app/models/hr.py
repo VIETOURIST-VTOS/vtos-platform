@@ -27,6 +27,8 @@ class Employee(Base):
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)   # pháp nhân chủ quản (HDV cộng tác viên ghi theo công ty ký hợp đồng)
     base_salary: Mapped[float] = mapped_column(Float, default=0)             # lương công việc (gắn chức vụ)
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    phone: Mapped[str] = mapped_column(String(30), default="")
     probation: Mapped[bool] = mapped_column(Boolean, default=False)          # thử việc 85%
     transition_list: Mapped[bool] = mapped_column(Boolean, default=False)    # danh sách chuyển tiếp (chính sách cũ)
     # HDV
