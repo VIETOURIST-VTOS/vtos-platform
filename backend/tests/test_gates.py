@@ -112,3 +112,32 @@ def test_audit_chain_intact_and_robot_api():
     assert client.post("/api/v1/robot/run", headers={"X-Robot-Token": "wrong"}).status_code == 401
     assert client.post("/api/v1/robot/run", headers={"X-Robot-Token": "doi-robot-token"}).status_code == 200
     assert client.get("/api/v1/payroll", headers=login("hcns")).status_code == 200
+
+
+def test_chu_tich_toan_quyen_moi_phan_he():
+    """Chủ tịch HĐQT có toàn quyền (quyết định 06/9/2026) – nhưng các chốt an toàn khác KHÔNG nới theo:
+    kỳ đã khóa vẫn không ghi được, và vai trò khác vẫn bị chặn như cũ."""
+    ct = client.post("/api/v1/auth/login", data={"username": "chutich", "password": "123456"})
+    assert ct.status_code == 200, ct.text
+    h = {"Authorization": f"Bearer {ct.json()['access_token']}"}
+
+    # Thao tác vốn chỉ dành cho kế toán: lập và ghi sổ chứng từ
+    r = client.post("/api/v1/journal", headers=h, json={
+        "entry_date": "2029-04-05", "description": "Chu tich lap chung tu", "post": True,
+        "lines": [{"account": "1111", "debit": 1_000_000}, {"account": "1121", "credit": 1_000_000}]})
+    assert r.status_code == 201, r.text
+    # Thao tác vốn chỉ dành cho HCNS
+    assert client.get("/api/v1/hrm/profile-gaps", headers=h).status_code == 200
+
+    # Kỳ đã khóa thì Chủ tịch cũng không ghi được – toàn quyền không phá chốt an toàn kế toán
+    assert client.post("/api/v1/periods/2029-05/lock", headers=h, json={"note": "test"}).status_code == 200
+    r2 = client.post("/api/v1/journal", headers=h, json={
+        "entry_date": "2029-05-05", "description": "Ghi vao ky da khoa", "post": True,
+        "lines": [{"account": "1111", "debit": 1_000}, {"account": "1121", "credit": 1_000}]})
+    assert r2.status_code == 422 and "khóa" in str(r2.json()["detail"])
+
+    # Vai trò khác vẫn bị chặn như cũ
+    kd = client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "123456"})
+    if kd.status_code == 200:
+        hk = {"Authorization": f"Bearer {kd.json()['access_token']}"}
+        assert client.get("/api/v1/hrm/profile-gaps", headers=hk).status_code == 403

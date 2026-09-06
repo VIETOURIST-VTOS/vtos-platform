@@ -23,9 +23,17 @@ def current_user(request: Request, token: str = Depends(oauth2), db: Session = D
     return u
 
 
+# Chủ tịch HĐQT có toàn quyền trên mọi phân hệ (quyết định của Chủ tịch ngày 06/9/2026).
+# Đặt ở ĐÚNG MỘT CHỖ này thay vì thêm "chutich" vào từng endpoint, để về sau không có endpoint nào bị bỏ sót
+# và cũng không ai phải nhớ sửa hai nơi. Các chốt an toàn khác KHÔNG bị nới theo: kỳ đã khóa vẫn không ghi
+# được, chứng từ đã ghi sổ vẫn bất biến (sai thì lập bút toán đảo), Ban Kiểm soát vẫn chỉ đọc, và mọi thao
+# tác vẫn ghi nhật ký kiểm toán kèm tên người thực hiện nên vẫn truy được trách nhiệm.
+FULL_ACCESS = ("chutich",)
+
+
 def require_roles(*roles: str):
     def dep(u: User = Depends(current_user)) -> User:
-        if roles and u.role not in roles:
+        if roles and u.role not in roles and u.role not in FULL_ACCESS:
             raise HTTPException(status.HTTP_403_FORBIDDEN,
                                 f"Vai trò {ROLES.get(u.role, u.role)} không có quyền thực hiện thao tác này")
         return u

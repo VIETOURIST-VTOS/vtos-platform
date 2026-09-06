@@ -12,9 +12,7 @@ from app.services import banks as BA
 
 router = APIRouter(prefix="/api/v1/bank-accounts", tags=["tai-khoan-ngan-hang"])
 READ = ("ketoan", "cntt", "tgd", "chutich", "bks", "ptgd_doan")
-# Chủ tịch được thực hiện cả thao tác ghi trên phân hệ này (quyết định của Chủ tịch ngày 06/9/2026).
-# Mọi thao tác vẫn ghi nhật ký kiểm toán kèm tên người thực hiện nên vẫn truy được trách nhiệm.
-WRITE = ("ketoan", "chutich")
+WRITE = ("ketoan",)      # Chủ tịch vẫn qua được – xem FULL_ACCESS trong app/api/deps.py
 
 
 def out(b: BankAccount) -> dict:
