@@ -64,7 +64,7 @@ def test_goi_y_tu_so_hien_co(seeded):
     # Tên ngân hàng trong diễn giải được gợi ý ra để Kế toán biết cần mở tài khoản nào
     hints = {x["bank"] for x in j["bank_hints"]}
     assert "TPBANK" in hints and "MB" in hints, hints
-    assert j["hint_sample"] > 0
+    assert j["scanned"] == 4 and j["sampled"] is False
 
 
 def test_mo_tai_khoan_sinh_tieu_khoan_112_va_khong_doi_bctc(seeded):
@@ -162,3 +162,21 @@ def test_chua_khai_bao_ngan_hang_thi_khong_cho_gan():
     assert r.status_code in (200, 422)
     if r.status_code == 422:
         assert "tài khoản ngân hàng" in r.json()["detail"]
+
+
+def test_goi_y_co_tran_quet_va_noi_ro_la_mau(seeded):
+    """Công cụ gợi ý chỉ quét tối đa scan_limit dòng để không làm nghẽn máy chủ; tổng số dòng vẫn đếm đúng,
+    và phải nói rõ đây là mẫu chứ không giấu."""
+    from app.db.session import SessionLocal
+    from app.services import banks as BA
+    from datetime import date as D
+    db = SessionLocal()
+    try:
+        full = BA.suggest_from_ledger(db, D(2028, 5, 1), D(2028, 5, 31))
+        assert full["total_lines"] == 4 and full["scanned"] == 4 and full["sampled"] is False
+        cut = BA.suggest_from_ledger(db, D(2028, 5, 1), D(2028, 5, 31), scan_limit=2)
+        assert cut["total_lines"] == 4          # tổng vẫn đếm chính xác bằng COUNT
+        assert cut["scanned"] == 2 and cut["sampled"] is True
+        assert sum(x["lines"] for x in cut["prefixes"]) == 2
+    finally:
+        db.close()
