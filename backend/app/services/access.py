@@ -22,7 +22,9 @@ COST_ROLES = ALL_SEEING + OPERATIONS                    # cơ cấu chi phí NCC
 FINANCE_ROLES = ALL_SEEING + ("tp_dh",)                 # giao dịch ngân hàng, tổng hợp thu tiền toàn công ty
 AUDIT_ROLES = LEADERSHIP + CONTROL                      # nhật ký kiểm toán
 PARAM_ROLES = ALL_SEEING + ("tp_dh", "gd_kd", "hcns")   # bảng tham số chính sách
-BOOKING_ROLES = ALL_SEEING + OPERATIONS + SALES         # booking, yêu cầu đặt dịch vụ, bảo lưu
+BOOKING_ROLES = ALL_SEEING + OPERATIONS + SALES         # booking, yêu cầu đặt dịch vụ, bảo lưu (xem)
+REQUEST_CREATE_ROLES = OPERATIONS + SALES               # được GỬI yêu cầu đặt dịch vụ: Điều hành + toàn khối Kinh doanh
+                                                        # (nguồn duy nhất – máy chủ và giao diện dùng chung, tránh lệch vai trò)
 PAYMENT_REQUEST_ROLES = ALL_SEEING + OPERATIONS + ("gd_kd", "ptgd_mkt", "hcns")   # đề nghị chi / lệnh chi
 READ_ONLY_ROLES = ("bks",)
 WRITE_ALLOWED_FOR_READ_ONLY = ("/api/v1/auth/password", "/api/v1/auth/login", "/api/v1/robot/r9")   # BKS được chạy robot giám sát R9 (chỉ sinh cảnh báo)

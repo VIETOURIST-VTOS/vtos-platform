@@ -193,7 +193,8 @@ def cntt_check(db: Session, u: User, t: Tour, note: str = "") -> str:
 
 # ---------- yêu cầu & booking ----------
 def create_request(db: Session, u: User, data) -> ServiceRequest:
-    if u.role not in ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_dh", "tp_dh"): raise HTTPException(403, "Vai trò này không gửi yêu cầu đặt dịch vụ")
+    from app.services import access as AC
+    if u.role not in AC.REQUEST_CREATE_ROLES: raise HTTPException(403, "Vai trò này không gửi yêu cầu đặt dịch vụ")
     missing = [n for n, v in (("số điện thoại khách", data.customer_phone), ("nguồn khách", data.source), ("ghi chú chăm sóc", data.care_note)) if not v.strip()]
     if missing:
         raise Gate("CONG_4", "Thiếu trường bắt buộc: " + ", ".join(missing) + " (booking sẽ không tính chỉ tiêu, không hoa hồng)")

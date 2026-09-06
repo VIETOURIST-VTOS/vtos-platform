@@ -33,7 +33,8 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 
 @router.get("/auth/me", tags=["auth"])
 def me(u: User = Depends(current_user)):
-    return {**user_out(u), "hidden_menus": AC.hidden_menus_for(u), "can_see_cost": AC.can_see_cost(u), "read_only": u.role in AC.READ_ONLY_ROLES}
+    return {**user_out(u), "hidden_menus": AC.hidden_menus_for(u), "can_see_cost": AC.can_see_cost(u), "read_only": u.role in AC.READ_ONLY_ROLES,
+            "can_create_request": u.role in AC.REQUEST_CREATE_ROLES, "can_create_booking": u.role in AC.OPERATIONS}
 
 
 @router.post("/auth/password", tags=["auth"])
@@ -177,28 +178,55 @@ def cntt_tour(tid: int, data: S.ActionNote | None = None, u: User = Depends(curr
 
 
 # ---------- requests & bookings ----------
-def req_out(r: ServiceRequest) -> dict:
-    return {"id": r.id, "tour_id": r.tour_id, "tour_code": r.tour.code if r.tour else "", "sales_name": r.sales.full_name if r.sales else "",
+def req_out(r: ServiceRequest, sla: int = 120, db: Session | None = None) -> dict:
+    """Một yêu cầu luôn phải trả về: ai chịu trách nhiệm nhận việc, hạn xử lý và bước tiếp theo –
+    không chỉ hiển thị thời gian chờ (Đề xuất 06/9 mục 4)."""
+    t = r.tour
+    waited = int((datetime.now() - r.created_at).total_seconds() / 60)
+    deadline = r.created_at + timedelta(minutes=sla)
+    op = t.operator if t and t.operator else None
+    bk = db.get(Booking, r.booking_id) if (db and r.booking_id) else None
+    if r.booking_id:
+        view, sla_state = "hoan_tat", "hoan_tat"
+        used = bk.sla_minutes if bk else None
+        next_step = f"Đã tạo booking {bk.code}" + (f" sau {used} phút" if used is not None else "") if bk else "Đã tạo booking"
+    else:
+        ratio = waited / sla if sla else 0
+        view = sla_state = "qua_han" if ratio >= 1 else "sap_qua_han" if ratio >= 0.75 else "cho_phan_cong"
+        next_step = f"Điều hành tạo booking – phụ trách {op.full_name}" if op else "Điều hành tạo booking – chưa xác định người phụ trách"
+    return {"id": r.id, "tour_id": r.tour_id, "tour_code": t.code if t else "", "tour_name": t.name if t else "",
+            "tour_start": t.start_date if t else None, "sales_id": r.sales_id, "sales_name": r.sales.full_name if r.sales else "",
+            "operator_id": op.id if op else None, "operator_name": op.full_name if op else "",
             "customer_name": r.customer_name, "customer_phone": r.customer_phone, "source": r.source, "care_note": r.care_note, "pax": r.pax,
             "campaign_code": r.campaign_code, "promo_code": r.promo_code, "discount": r.discount, "created_at": r.created_at, "booking_id": r.booking_id,
-            "waited_minutes": int((datetime.now() - r.created_at).total_seconds() / 60)}
+            "booking_code": bk.code if bk else "", "amount": max(0.0, (t.price_per_pax * r.pax - r.discount) if t else 0.0),
+            "waited_minutes": waited, "deadline": deadline, "sla_minutes": sla, "sla_state": sla_state, "view": view, "next_step": next_step}
 
 
 def booking_out(b: Booking) -> dict:
+    """sla_known=False: booking nhập từ hệ thống khác (Vietrip) không mang mốc tiếp nhận yêu cầu
+    → giao diện ghi 'Chưa đủ dữ liệu', không hiển thị là xử lý trong 0 phút."""
     return {"id": b.id, "code": b.code, "tour_id": b.tour_id, "sales_id": b.sales_id, "tour_code": b.tour.code if b.tour else "", "customer_name": b.customer_name,
             "customer_phone": b.customer_phone, "source": b.source, "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code,
-            "sales_name": b.sales.full_name if b.sales else "", "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok, "counts_for_target": b.counts_for_target, "created_at": b.created_at, "paid": b.paid, "due": b.amount - b.discount - b.paid,
+            "sales_name": b.sales.full_name if b.sales else "", "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok,
+            "sla_known": bool(b.request_id),
+            "counts_for_target": b.counts_for_target, "created_at": b.created_at, "paid": b.paid, "due": b.amount - b.discount - b.paid,
             "adl": b.adl, "chd": b.chd, "inf": b.inf, "vietrip_id": b.vietrip_id, "tour_start": b.tour.start_date if b.tour else None, **BK.booking_view(b)}
 
 
 @router.get("/requests", tags=["bookings"])
-def list_requests(open_only: bool = False, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_requests(open_only: bool = False, view: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """view: cho_phan_cong / sap_qua_han / qua_han / hoan_tat / cua_toi (rỗng = tất cả)."""
     AC.require(u, AC.BOOKING_ROLES, "yêu cầu đặt dịch vụ")
     q = select(ServiceRequest).order_by(desc(ServiceRequest.created_at))
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: q = q.where(ServiceRequest.sales_id.in_(vis))
     if open_only: q = q.where(ServiceRequest.booking_id == None)
-    return [req_out(r) for r in db.execute(q).scalars()]
+    sla = int(R.get_param(db, "sla_booking_phut"))
+    rows = [req_out(r, sla, db) for r in db.execute(q).scalars()]
+    if view == "cua_toi": rows = [r for r in rows if u.id in (r["sales_id"], r["operator_id"])]
+    elif view: rows = [r for r in rows if r["view"] == view]
+    return rows
 
 
 @router.post("/requests", tags=["bookings"], status_code=201)

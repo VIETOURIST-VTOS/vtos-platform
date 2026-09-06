@@ -5,7 +5,7 @@ export type ApiError = { status: number; gate?: string; message: string };
 const TOKEN_KEY = "vtos_token";
 const USER_KEY = "vtos_user";
 
-export type User = { id: number; username: string; full_name: string; role: string; role_name: string; department: string; hidden_menus?: string[]; can_see_cost?: boolean; read_only?: boolean };
+export type User = { id: number; username: string; full_name: string; role: string; role_name: string; department: string; hidden_menus?: string[]; can_see_cost?: boolean; read_only?: boolean; can_create_request?: boolean; can_create_booking?: boolean };
 
 export function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
 export function getUser(): User | null { try { const s = localStorage.getItem(USER_KEY); return s ? JSON.parse(s) : null; } catch { return null; } }
