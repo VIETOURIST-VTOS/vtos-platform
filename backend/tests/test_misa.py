@@ -150,3 +150,9 @@ def test_kiem_toan_checkpoint():
     # BCTC tại 30/6/2026 vẫn phải cân đối (280 == 440) sau khi chốt sổ kiểm toán
     rep = client.get("/api/v1/reports/bctc?upto=2026-06-30&since=2026-01-01", headers=h).json()
     assert rep["balanced"]
+    v = {x["code"]: x["now"] for x in rep["thtc"]}
+    # điều chỉnh theo CHÊNH LỆCH nên phải khớp tuyệt đối số kiểm toán dù sổ đã có bút toán khác từ trước
+    # cho phép sai số nhỏ do các bút toán thử nghiệm khác trong cùng phiên test (không liên quan chốt sổ)
+    assert abs(v["280"] - 348712228082) < 10000 and abs(v["440"] - 348712228082) < 10000
+    assert abs(v["411"] - 240000000000) < 1
+    assert abs(v["420"] - 14037369907) < 10000

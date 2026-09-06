@@ -229,47 +229,96 @@ def ACC_KIND(code: str) -> str:
 KIEM_TOAN_FILE = Path(__file__).resolve().parent.parent / "data" / "kiem_toan_2026h1.json"
 
 
+def _account_net_balances(db: Session, upto: date, exclude_refs: tuple = ()) -> dict:
+    """Số dư ròng (Nợ − Có) từng tài khoản từ TẤT CẢ bút toán đã ghi sổ đến hết ngày upto (bỏ qua các
+    chứng từ có source_ref nằm trong exclude_refs – dùng khi nạp lại mốc chốt kiểm toán để không tính
+    trùng lần chốt trước). Vì mọi bút toán đều cân Nợ = Có nên tổng số dư ròng trên TOÀN BỘ tài khoản
+    luôn bằng 0 – đây là điều kiện để bút toán điều chỉnh kiểm toán tính theo chênh lệch cũng tự cân."""
+    q = (select(JournalLine.account_code, func.sum(JournalLine.debit - JournalLine.credit))
+         .join(JournalEntry).where(JournalEntry.status == "da_ghi_so", JournalEntry.entry_date <= upto))
+    if exclude_refs:
+        q = q.where(~JournalEntry.source_ref.in_(exclude_refs))
+    return {code: float(net or 0) for code, net in db.execute(q.group_by(JournalLine.account_code)).all()}
+
+
 def import_audited_checkpoint(db: Session, u: User, column: str = "close", replace: bool = False, path=None) -> dict:
-    """Nạp mốc chốt sổ theo BCTC ĐÃ KIỂM TOÁN/SOÁT XÉT (không phải số MISA thô) – dùng khi số liệu MISA
-    chưa chuẩn (thiếu phân loại vay ngắn/dài hạn, thiếu trích trước, v.v.). Ghi chứng từ nguồn 'kiem_toan',
-    mã KT-yyyymmdd, tại ngày as_of ghi trong tệp dữ liệu (app/data/kiem_toan_2026h1.json). Đè lên các bút toán
-    'so_du_dau_ky'/'misa' trước đó tại cùng thời điểm bằng cách đảo (không xóa) các bút toán nguồn misa/so_du_dau_ky
-    có ngày <= as_of nếu replace=True chỉ áp dụng cho lần nạp kiểm toán trước đó (không đảo dữ liệu MISA gốc)."""
+    """Chốt sổ theo BCTC ĐÃ KIỂM TOÁN/SOÁT XÉT (không phải số MISA thô) – dùng khi số liệu MISA chưa chuẩn
+    (thiếu phân loại vay ngắn/dài hạn đúng khế ước, thiếu trích trước, sai lệch do gộp nhiều lần export…).
+
+    Cách làm: ĐIỀU CHỈNH THEO CHÊNH LỆCH, không ghi đè thô — (1) kết chuyển mọi tài khoản doanh thu/chi phí
+    (5xx-9xx, trừ 911) còn dư đến ngày as_of sang 911 (nguồn 'ket_chuyen', không tính vào KQKD của kỳ vì
+    income_statement_tt99 loại trừ nguồn này); (2) với từng tài khoản trong bộ số liệu kiểm toán, tính
+    chênh lệch = số kiểm toán − số dư hiện tại trên sổ VTOS rồi ghi đúng phần CHÊNH LỆCH đó (nguồn 'kiem_toan').
+    Vì tổng số dư ròng toàn bộ tài khoản trước và sau khi kết chuyển đều bằng 0 (mọi bút toán tự cân Nợ=Có)
+    và bộ số liệu kiểm toán cũng cân (Tài sản = Nguồn vốn), nên bút toán điều chỉnh luôn tự cân — không phá
+    vỡ BCTC hiện có, và không cần đảo toàn bộ dữ liệu MISA gốc. Gọi lại với replace=True khi kiểm toán có
+    số liệu mới hoặc phải nạp lại (đảo đúng 2 chứng từ 'kết chuyển' + 'điều chỉnh kiểm toán' lần trước)."""
     data = json.loads(Path(path or KIEM_TOAN_FILE).read_text(encoding="utf-8"))
     as_of = _date(data["as_of"]) or datetime.strptime(data["as_of"], "%Y-%m-%d").date()
     key_d, key_c = ("close_d", "close_c") if column == "close" else ("open_d", "open_c")
-    ref = f"kt:{as_of:%Y%m%d}"
-    old = db.execute(select(JournalEntry).where(JournalEntry.source_ref == ref, JournalEntry.status == "da_ghi_so")).scalars().all()
-    if old and not replace:
-        raise ValueError(f"Đã có mốc chốt kiểm toán ngày {as_of:%d/%m/%Y} ({old[0].code}) – chọn 'thay thế' để nạp lại")
-    for e in old:
+    ref_close, ref_adj = f"kt-close:{as_of:%Y%m%d}", f"kt:{as_of:%Y%m%d}"
+    old_adj = db.execute(select(JournalEntry).where(JournalEntry.source_ref == ref_adj, JournalEntry.status == "da_ghi_so")).scalars().all()
+    if old_adj and not replace:
+        raise ValueError(f"Đã có mốc chốt kiểm toán ngày {as_of:%d/%m/%Y} ({old_adj[0].code}) – chọn 'thay thế' để nạp lại")
+    old_close = db.execute(select(JournalEntry).where(JournalEntry.source_ref == ref_close, JournalEntry.status == "da_ghi_so")).scalars().all()
+    for e in (*old_close, *old_adj):
         rl = [{"account": l.account_code, "debit": l.credit, "credit": l.debit, "partner": l.partner, "partner_code": l.partner_code, "note": f"Đảo {e.code} – nạp lại mốc kiểm toán"} for l in e.lines]
         r = ACC.post_entry(db, u.username, u.role, as_of, f"Đảo {e.code}: nạp lại mốc kiểm toán", rl, "dao", f"entry:{e.code}")
-        e.reversed_by_id = r.id; e.source_ref = f"{ref}:old"
+        e.reversed_by_id = r.id; e.source_ref = f"{e.source_ref}:old"
+    db.flush()
+
+    # 1) Kết chuyển doanh thu/chi phí còn dư (chưa kết chuyển 911) đến as_of, để 420 (LNST chưa PP)
+    #    trong bộ kiểm toán phản ánh đúng số cuối cùng, không bị cộng trùng với phần P&L còn treo trên MISA.
+    pl_bal = _account_net_balances(db, as_of)
+    close_lines, kq = [], 0.0
+    for code, net in pl_bal.items():
+        if code == "911" or code[0] not in "56789" or abs(net) < 1: continue
+        close_lines.append({"account": code, "debit": max(-net, 0), "credit": max(net, 0), "note": "Kết chuyển doanh thu/chi phí để chốt sổ kiểm toán"})
+        kq += net
+    if close_lines:
+        close_lines.append({"account": "911", "debit": max(kq, 0), "credit": max(-kq, 0), "note": "Kết chuyển xác định KQKD (chốt sổ kiểm toán)"})
+        close_lines.append({"account": "421", "debit": max(-kq, 0), "credit": max(kq, 0), "note": "Kết chuyển KQKD vào lợi nhuận sau thuế chưa phân phối"})
+        ACC.post_entry(db, u.username, u.role, as_of, f"Kết chuyển 911 để chốt sổ kiểm toán {as_of:%d/%m/%Y}", close_lines, "ket_chuyen", ref_close)
+        db.flush()
+
+    # 2) Điều chỉnh CHÊNH LỆCH cho từng tài khoản trong bộ kiểm toán so với số dư hiện tại của VTOS
+    current = _account_net_balances(db, as_of)
     names = {p.code: p.name for p in db.execute(select(Partner)).scalars()}
     lines, stat = [], {"accounts": 0, "object_lines": 0, "created_accounts": 0}
     for a in data["tai_khoan"]:
-        code, d, c = a["code"], a[key_d], a[key_c]
-        if not d and not c and "doi_tuong" not in a: continue
+        code = a["code"]
+        target = a[key_d] - a[key_c]
         if not db.get(Account, code):
             k = ACC_KIND(code); db.add(Account(code=code, name=a["name"], kind=k, parent=code[:-1] if len(code) > 3 else "", level=len(code) - 2, misa=True)); db.flush(); stat["created_accounts"] += 1
+        cur = current.pop(code, 0.0)
+        delta = target - cur
         stat["accounts"] += 1
         parts = a.get("doi_tuong", [])
-        if parts:
+        if parts and abs(delta) >= 1:
+            # Ghi chênh lệch theo đối tượng có trong bộ kiểm toán (không có số dư "hiện tại" theo đối tượng
+            # để so trực tiếp vì mã đối tượng MISA khác mã dùng ở đây) + 1 dòng gộp bù phần chênh lệch còn lại
             for o in parts:
-                pd_, pc_ = o[key_d], o[key_c]
-                if not pd_ and not pc_: continue
-                lines.append({"account": code, "debit": pd_, "credit": pc_, "partner_code": o["ma"], "partner": names.get(o["ma"], o["ten"]), "note": f"Chốt sổ kiểm toán ({data['nguon']})"}); stat["object_lines"] += 1
-            sd = sum(o[key_d] for o in parts); sc = sum(o[key_c] for o in parts)
-            gap = (d - c) - (sd - sc)
+                d_, c_ = o[key_d], o[key_c]
+                if not d_ and not c_: continue
+                lines.append({"account": code, "debit": d_, "credit": c_, "partner_code": o["ma"], "partner": names.get(o["ma"], o["ten"]), "note": f"Chốt sổ kiểm toán ({data['nguon']})"}); stat["object_lines"] += 1
+            sd = sum(o[key_d] - o[key_c] for o in parts)
+            gap = delta - sd
             if abs(gap) >= 1:
-                lines.append({"account": code, "debit": max(gap, 0), "credit": max(-gap, 0), "note": "Chênh lệch tổng TK − tổng đối tượng (kiểm toán)"})
-        else:
-            lines.append({"account": code, "debit": d, "credit": c, "note": f"Chốt sổ kiểm toán ({data['nguon']})"})
+                lines.append({"account": code, "debit": max(gap, 0), "credit": max(-gap, 0), "note": "Điều chỉnh phần còn lại (không tách được theo đối tượng)"})
+        elif abs(delta) >= 1:
+            lines.append({"account": code, "debit": max(delta, 0), "credit": max(-delta, 0), "note": f"Điều chỉnh theo BCTC kiểm toán ({data['nguon']})"})
+    # Mọi tài khoản KHÁC (không có trong bộ kiểm toán) mà VTOS vẫn còn dư ở nhóm tài sản/nguồn vốn (1-4)
+    # → coi số kiểm toán = 0 (đã gộp vào các chỉ tiêu trên) để tổng chênh lệch luôn tự cân.
+    for code, cur in current.items():
+        if code[0] in "1234" and abs(cur) >= 1:
+            lines.append({"account": code, "debit": max(-cur, 0), "credit": max(cur, 0), "note": "Điều chỉnh về 0 (không có trong bộ số liệu kiểm toán)"})
     td = sum(l["debit"] for l in lines); tc = sum(l["credit"] for l in lines)
     if abs(td - tc) >= 1:
-        raise ValueError(f"Mốc chốt kiểm toán không cân: Nợ {td:,.0f} ≠ Có {tc:,.0f}")
-    e = ACC.post_entry(db, u.username, u.role, as_of, f"Chốt sổ theo BCTC kiểm toán/soát xét tại {as_of:%d/%m/%Y} ({data['nguon']})", lines, "kiem_toan", ref)
+        raise ValueError(f"Bút toán điều chỉnh kiểm toán không cân: Nợ {td:,.0f} ≠ Có {tc:,.0f}")
+    if not lines:
+        db.commit()
+        return {"entry": None, "as_of": as_of, "total": 0, "lines": 0, "source": data["nguon"], "message_extra": "Sổ VTOS đã khớp đúng số kiểm toán, không cần điều chỉnh", **stat}
+    e = ACC.post_entry(db, u.username, u.role, as_of, f"Điều chỉnh chốt sổ theo BCTC kiểm toán/soát xét tại {as_of:%d/%m/%Y} ({data['nguon']})", lines, "kiem_toan", ref_adj)
     db.commit()
     return {"entry": e.code, "as_of": as_of, "total": td, "lines": len(lines), "source": data["nguon"], **stat}
 
