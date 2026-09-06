@@ -99,6 +99,8 @@ function Accounting() {
   const { user, toast } = useShell();
   const isKT = user?.role === "ketoan";
   const [tab, setTab] = useState("journal");
+  // mở đúng tab khi vào từ menu bên trái (?tab=...)
+  useEffect(() => { const q = new URLSearchParams(window.location.search).get("tab"); if (q) setTab(q); }, []);
   const [period, setPeriod] = useState(thisPeriod());
   const [accounts, setAccounts] = useState<any[]>([]);
   const [entries, setEntries] = useState<any[]>([]);

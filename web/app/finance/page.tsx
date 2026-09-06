@@ -14,6 +14,8 @@ function Finance() {
   const role = user?.role || "";
   const isKT = role === "ketoan";
   const [tab, setTab] = useState("forecast");
+  // mở đúng tab khi vào từ menu bên trái (?tab=...)
+  useEffect(() => { const q = new URLSearchParams(window.location.search).get("tab"); if (q) setTab(q); }, []);
   const [fc, setFc] = useState<any>(null);
   const [wk, setWk] = useState<any>(null);
   const [cs, setCs] = useState<any[]>([]);

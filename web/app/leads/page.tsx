@@ -12,6 +12,8 @@ function Leads() {
   const [meta, setMeta] = useState<any>({ channels: [], status: {}, zalo: {} });
   const month0 = new Date().toISOString().slice(0, 7);
   const [tab, setTab] = useState("leads");
+  // mở đúng tab khi vào từ menu bên trái (?tab=...)
+  useEffect(() => { const q = new URLSearchParams(window.location.search).get("tab"); if (q) setTab(q); }, []);
   const [month, setMonth] = useState(month0); const [channel, setChannel] = useState(""); const [status, setStatus] = useState(""); const [q, setQ] = useState("");
   const [data, setData] = useState<any>({ rows: [], counts: {} });
   const [rep, setRep] = useState<any>(null); const [repMonth, setRepMonth] = useState(month0);

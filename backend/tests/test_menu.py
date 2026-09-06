@@ -12,9 +12,11 @@ SHELL = os.path.join(ROOT, "web", "components", "Shell.tsx")
 
 
 def menu_paths():
+    """Đường dẫn trong menu, bỏ phần ?tab=; mục có đường dẫn rỗng là phần chưa xây ("sắp có")."""
     src = open(SHELL, encoding="utf-8").read()
-    block = src[src.index("export const GROUPS"):src.index("const isOn")]
-    return set(re.findall(r'\["(/[^"]*)",', block)), block
+    block = src[src.index("export const GROUPS"):src.index("/** Vai trò")]
+    hrefs = re.findall(r',\s*"(/[^"]*)"\]', block)
+    return {h.split("?")[0] for h in hrefs}, block
 
 
 def test_moi_man_hinh_deu_co_loi_vao():
@@ -39,5 +41,14 @@ def test_du_tam_nhom_va_dat_ten_theo_de_xuat():
                 "Tài chính & Kế toán", "Hành chính & Nhân sự", "Kiểm soát & Chính sách", "Hệ thống & Tích hợp"):
         assert ten in block, f"thiếu nhóm {ten}"
     # ba mục đổi tên theo đề xuất
-    assert "Báo cáo quản trị tự động" in block and "Báo cáo công việc" in block and "Chính sách & định mức" in block
+    assert "Báo cáo quản trị" in block and "Báo cáo công việc" in block and "Chính sách & định mức" in block
     assert "Robot báo cáo" not in block and "Tham số chính sách" not in block and "Báo cáo ngày" not in block
+
+
+def test_muc_chua_xay_duoc_danh_dau_khong_phai_link_hong():
+    """Mục chưa có màn hình phải để đường dẫn rỗng (hiện nhãn 'sắp có'), không được trỏ bừa."""
+    _, block = menu_paths()
+    chua_xay = re.findall(r'"([^"]+)",\s*""\]', block)
+    for ten in ("Công ty thành viên & liên kết", "Tài khoản & phân quyền", "Vị trí AI & quyền hạn", "Báo giá", "Hợp đồng"):
+        assert ten in chua_xay, f"{ten} phải nằm trong nhóm mục chưa xây"
+    assert len(chua_xay) >= 18

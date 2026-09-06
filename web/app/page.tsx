@@ -15,7 +15,7 @@ function Dash() {
   const k = d.kpis || {}; const sec = d.sections || {};
   return (<>
     <h1>Bảng điều khiển · {user?.role_name}</h1>
-    {d.approvals?.length > 0 && <div className="panel" style={{ borderColor: "var(--orange)" }}><b>Việc chờ tôi xử lý:</b> {d.approvals.map((a: any, i: number) => <Link key={i} href={a.href} className="act orange" style={{ display: "inline-block", textDecoration: "none", margin: "4px 6px 0 0" }}>{a.label}</Link>)}</div>}
+    {d.approvals?.length > 0 && <div id="cho-toi-duyet" className="panel" style={{ borderColor: "var(--orange)" }}><b>Việc chờ tôi xử lý:</b> {d.approvals.map((a: any, i: number) => <Link key={i} href={a.href} className="act orange" style={{ display: "inline-block", textDecoration: "none", margin: "4px 6px 0 0" }}>{a.label}</Link>)}</div>}
     {"tien" in k && <div className="kpis">
       <div className="kpi"><b>{vnd(k.tien)}</b><span>Tiền (111+112)</span></div><div className="kpi"><b>{vnd(k.no_vay)}</b><span>Dư nợ vay</span></div><div className="kpi"><b>{vnd(k.phai_thu)}</b><span>Phải thu khách</span></div>
       <div className="kpi"><b style={{ color: k.du_bao_canh_bao ? "var(--red)" : undefined }}>{k.du_bao_canh_bao}</b><span>Tuần cảnh báo dòng tiền (13 tuần)</span></div><div className="kpi"><b>{vnd(k.ln_ke_toan_thang)}</b><span>LN kế toán tháng (trước thuế)</span></div>
@@ -32,7 +32,7 @@ function Dash() {
       <div className="kpi"><b style={{ color: "var(--red)" }}>{d.alerts.length}</b><span>cảnh báo mở cho vai trò này</span></div>
     </div>
     <div className="grid" style={{ marginTop: 14 }}>
-      <div className="panel"><h2>Việc cần xử lý</h2>
+      <div id="viec-cua-toi" className="panel"><h2>Việc cần xử lý</h2>
         {d.todo.length ? <ul>{d.todo.map((t: any, i: number) => <li key={i}><Link href={`/tours/${t.tour_id}`}>{t.code}</Link> – {t.name}: <b>{ACTION_LABEL[t.action] || t.action}</b></li>)}</ul> : <p className="muted">Không có việc chờ ở vai trò này.</p>}
         {d.pending_params > 0 && ["chutich", "tgd"].includes(user?.role || "") && <p><Link href="/params">{d.pending_params} tham số chính sách chờ ký</Link></p>}
       </div>

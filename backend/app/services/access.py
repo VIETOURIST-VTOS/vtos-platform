@@ -102,6 +102,8 @@ MENU_ROLES = {
     "/finance": LEADERSHIP + CONTROL,
     "/params": PARAM_ROLES,
     "/hr": ALL_SEEING + ("hcns", "tp_dh", "gd_kd"),
+    "/ops": ALL_SEEING + OPERATIONS + ("hcns",),          # visa, HDV & phân chuyến, đội xe – nghiệp vụ của Điều hành
+
     "/inbox": ALL_SEEING + SALES + OPERATIONS + MARKETING,
     "/leads": ALL_SEEING + SALES + OPERATIONS + MARKETING,
     "/sales-reports": ALL_SEEING + SALES + OPERATIONS + ("hcns",),

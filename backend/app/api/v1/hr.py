@@ -381,7 +381,7 @@ def dispatch_update(did: int, data: DispatchUpdate, u: User = Depends(require_ro
 
 
 @router.get("/fleet/summary")
-def fleet_summary(period: str, u: User = Depends(require_roles(*HR_READ)), db: Session = Depends(get_db)):
+def fleet_summary(period: str, u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
     """Trung tâm lợi nhuận Đội xe: doanh thu nội bộ và số ngày tour tài xế trong tháng (CNTT quyết toán)."""
     y, m = map(int, period.split("-"))
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
