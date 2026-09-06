@@ -63,6 +63,12 @@ def facebook_graph(path: str, u: User = Depends(require_roles("cntt")), db: Sess
     return IB._graph("GET", path)
 
 
+@router.post("/facebook/poll")
+def facebook_poll(u: User = Depends(require_roles("cntt", "tgd", "ptgd_mkt", "gd_kd", "tp_kd")), db: Session = Depends(get_db)):
+    """Kéo hội thoại Messenger của Page qua Graph ngay (dự phòng webhook)."""
+    return IB.fb_poll(db)
+
+
 @router.post("/facebook/subscribe")
 def facebook_subscribe(u: User = Depends(require_roles("cntt", "tgd", "ptgd_mkt")), db: Session = Depends(get_db)):
     """Đăng ký (lại) webhook cho Page: messages, messaging_postbacks, standby, messaging_handovers."""

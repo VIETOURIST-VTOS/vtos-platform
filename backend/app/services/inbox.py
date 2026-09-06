@@ -253,9 +253,37 @@ def review_reply(db: Session, c: Conversation, text: str) -> dict:
 
 
 # ---------- robot R12 ----------
+def fb_poll(db: Session, limit: int = 25) -> dict:
+    """Dự phòng khi webhook không tới: kéo hội thoại Messenger của Page qua Graph (pages_messaging) – tin khách → inbound, tin Page → đã trả lời. Trùng mid → bỏ qua."""
+    if not settings.FB_PAGE_ACCESS_TOKEN: return {"skipped": "chưa có token"}
+    page_id = str(settings.FB_PAGE_ID or "")
+    r = _graph("GET", f"me/conversations?platform=messenger&limit={limit}&fields=updated_time,participants,messages.limit(10){{id,message,from,created_time,attachments}}")
+    if "data" not in r: return {"error": r}
+    n_in = n_out = 0
+    for conv in r["data"]:
+        parts = [p for p in (conv.get("participants") or {}).get("data", []) if str(p.get("id")) != page_id]
+        if not parts: continue
+        psid, name = str(parts[0]["id"]), parts[0].get("name") or ""
+        msgs = sorted((conv.get("messages") or {}).get("data", []), key=lambda m: m.get("created_time") or "")
+        for m in msgs:
+            frm = str((m.get("from") or {}).get("id") or ""); mid = m.get("id") or ""
+            text = m.get("message") or ""
+            atts = [{"type": a.get("mime_type", "file"), "url": (a.get("image_data") or {}).get("url") or a.get("file_url")} for a in (m.get("attachments") or {}).get("data", [])]
+            if not text and atts: text = "[khách gửi tệp]" if frm != page_id else "[Page gửi tệp]"
+            if not text: continue
+            if frm == page_id:
+                if outbound_external(db, "facebook", psid, text, page_id, mid, "poll"): n_out += 1
+            else:
+                if inbound(db, "facebook", psid, text, page_id, name, mid, atts): n_in += 1
+    return {"conversations": len(r["data"]), "new_in": n_in, "new_out": n_out}
+
+
 def robot_check(db: Session) -> dict:
     """Hội thoại khách nhắn mà sale chưa trả lời quá SLA → AI trả lời thay (nếu bật, hội thoại không tắt AI), cảnh báo sale/TP."""
     now = datetime.now(); replied = 0; alerts = 0
+    poll = {}
+    try: poll = fb_poll(db)
+    except Exception as ex: poll = {"error": str(ex)[:200]}
     on = R.get_param(db, "ai_tra_loi_bat") >= 1
     for c in db.execute(select(Conversation).where(Conversation.unanswered == True, Conversation.sla_due_at != None, Conversation.sla_due_at <= now, Conversation.status != "dong")).scalars():
         if on and not c.ai_off and c.ai_replies < 3:
@@ -264,7 +292,7 @@ def robot_check(db: Session) -> dict:
         ref = f"conv:{c.id}"
         if not db.execute(select(Alert).where(Alert.kind == "sale_tra_loi_cham", Alert.ref == ref, Alert.resolved == False)).scalars().first():
             db.add(Alert(kind="sale_tra_loi_cham", level="warn", ref=ref, message=f"Khách {c.customer_name or c.external_id} ({c.channel}) chưa được trả lời sau {sla_minutes(db, now)} phút" + (" – AI đã trả lời thay" if on and not c.ai_off else ""), to_roles="nv_kd,gd_kd,ptgd_mkt,tp_dh")); alerts += 1
-    db.commit(); return {"ai_replied": replied, "new_alerts": alerts}
+    db.commit(); return {"ai_replied": replied, "new_alerts": alerts, "fb_poll": poll}
 
 
 def conv_out(c: Conversation, db: Session | None = None) -> dict:

@@ -81,3 +81,18 @@ def test_standby_and_echo_when_other_app_is_primary():
     d = client.get(f"/api/v1/inbox/{c['id']}", headers=h).json()
     assert d["unanswered"] is False and d["messages"][-1]["direction"] == "out" and "chatbot" in d["messages"][-1]["sender_name"]
     assert client.post("/api/v1/facebook/webhook", json=echo).json()["echoes"] == 0   # trùng mid
+
+
+def test_fb_poll_fallback(monkeypatch):
+    """Kéo hội thoại qua Graph khi webhook không tới: tin khách → hộp thư, tin Page → đã trả lời, trùng mid bỏ qua."""
+    from app.services import inbox as IB
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "FB_PAGE_ACCESS_TOKEN", "x"); monkeypatch.setattr(settings, "FB_PAGE_ID", "PAGE1")
+    data = {"data": [{"updated_time": "2026-09-06T13:00:00+0000", "participants": {"data": [{"id": "PSID900", "name": "Tuấn Trần"}, {"id": "PAGE1", "name": "Vietourist"}]},
+             "messages": {"data": [{"id": "mid.2", "message": "Dạ em gửi chương trình tour ạ", "from": {"id": "PAGE1"}, "created_time": "2026-09-06T12:59:00+0000"},
+                                   {"id": "mid.1", "message": "test 2 - tour Đà Lạt", "from": {"id": "PSID900", "name": "Tuấn Trần"}, "created_time": "2026-09-06T12:58:00+0000"}]}}]}
+    monkeypatch.setattr(IB, "_graph", lambda method, path, body=None: data)
+    r = client.post("/api/v1/facebook/poll", headers=login("cntt")).json(); assert r["new_in"] == 1 and r["new_out"] == 1
+    h = login("gd.kd"); c = next(x for x in client.get("/api/v1/inbox", headers=h).json() if x["external_id"] == "PSID900")
+    assert c["customer_name"] == "Tuấn Trần" and c["unanswered"] is False
+    assert client.post("/api/v1/facebook/poll", headers=login("cntt")).json()["new_in"] == 0
