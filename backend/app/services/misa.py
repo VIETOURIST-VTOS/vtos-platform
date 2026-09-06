@@ -282,8 +282,23 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
         ACC.post_entry(db, u.username, u.role, as_of, f"Kết chuyển KQKD để chốt sổ kiểm toán {as_of:%d/%m/%Y}", close_lines, "ket_chuyen", ref_close)
         db.flush()
 
-    # 2) Điều chỉnh CHÊNH LỆCH cho từng tài khoản trong bộ kiểm toán so với số dư hiện tại của VTOS
     current = _account_net_balances(db, as_of)
+    # 2) Điều chỉnh CHÊNH LỆCH cho từng tài khoản trong bộ kiểm toán so với số dư hiện tại của VTOS.
+    #    Với tài khoản xét theo đối tượng (131/331…) BCTC tách dòng Nợ/Có THEO TỪNG ĐỐI TƯỢNG (không theo
+    #    tổng tài khoản) – nếu chỉ bù chênh lệch ở mức tổng tài khoản thì các đối tượng cũ (mã MISA) và đối
+    #    tượng mới (mã kiểm toán) cộng dồn hai chiều, làm phồng cả hai chỉ tiêu 132/311 (đã gặp lỗi này khi
+    #    chạy trên dữ liệu thật). Nên với các TK này: đảo về 0 TỪNG đối tượng đang có số dư, rồi ghi lại đúng
+    #    số kiểm toán theo từng đối tượng mới — tổng 2 phần này đúng bằng target vì target được tính sẵn bằng
+    #    tổng các đối tượng trong tệp kiểm toán.
+    partner_accounts = [a["code"] for a in data["tai_khoan"] if a.get("doi_tuong")]
+    cur_by_partner: dict[str, dict[str, float]] = {}
+    if partner_accounts:
+        q = (select(JournalLine.account_code, JournalLine.partner_code, func.sum(JournalLine.debit - JournalLine.credit))
+             .join(JournalEntry).where(JournalEntry.status == "da_ghi_so", JournalEntry.entry_date <= as_of, JournalLine.account_code.in_(partner_accounts))
+             .group_by(JournalLine.account_code, JournalLine.partner_code))
+        for code, pcode, net in db.execute(q).all():
+            cur_by_partner.setdefault(code, {})[pcode or ""] = float(net or 0)
+
     names = {p.code: p.name for p in db.execute(select(Partner)).scalars()}
     lines, stat = [], {"accounts": 0, "object_lines": 0, "created_accounts": 0}
     for a in data["tai_khoan"]:
@@ -292,22 +307,24 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
         if not db.get(Account, code):
             k = ACC_KIND(code); db.add(Account(code=code, name=a["name"], kind=k, parent=code[:-1] if len(code) > 3 else "", level=len(code) - 2, misa=True)); db.flush(); stat["created_accounts"] += 1
         cur = current.pop(code, 0.0)
-        delta = target - cur
         stat["accounts"] += 1
         parts = a.get("doi_tuong", [])
-        if parts and abs(delta) >= 1:
-            # Ghi chênh lệch theo đối tượng có trong bộ kiểm toán (không có số dư "hiện tại" theo đối tượng
-            # để so trực tiếp vì mã đối tượng MISA khác mã dùng ở đây) + 1 dòng gộp bù phần chênh lệch còn lại
+        if parts:
+            # đảo về 0 từng đối tượng (kể cả mã "" chưa gán đối tượng) đang có số dư trên tài khoản này
+            for pcode, net in cur_by_partner.get(code, {}).items():
+                if abs(net) < 1: continue
+                ln = {"account": code, "debit": max(-net, 0), "credit": max(net, 0), "note": "Đảo số dư cũ theo đối tượng để chốt sổ kiểm toán"}
+                if pcode: ln["partner_code"] = pcode
+                lines.append(ln); stat["object_lines"] += 1
+            # ghi đúng số kiểm toán theo từng đối tượng mới
             for o in parts:
                 d_, c_ = o[key_d], o[key_c]
                 if not d_ and not c_: continue
                 lines.append({"account": code, "debit": d_, "credit": c_, "partner_code": o["ma"], "partner": names.get(o["ma"], o["ten"]), "note": f"Chốt sổ kiểm toán ({data['nguon']})"}); stat["object_lines"] += 1
-            sd = sum(o[key_d] - o[key_c] for o in parts)
-            gap = delta - sd
-            if abs(gap) >= 1:
-                lines.append({"account": code, "debit": max(gap, 0), "credit": max(-gap, 0), "note": "Điều chỉnh phần còn lại (không tách được theo đối tượng)"})
-        elif abs(delta) >= 1:
-            lines.append({"account": code, "debit": max(delta, 0), "credit": max(-delta, 0), "note": f"Điều chỉnh theo BCTC kiểm toán ({data['nguon']})"})
+        else:
+            delta = target - cur
+            if abs(delta) >= 1:
+                lines.append({"account": code, "debit": max(delta, 0), "credit": max(-delta, 0), "note": f"Điều chỉnh theo BCTC kiểm toán ({data['nguon']})"})
     # Mọi tài khoản KHÁC (không có trong bộ kiểm toán) mà VTOS vẫn còn dư ở nhóm tài sản/nguồn vốn (1-4)
     # → coi số kiểm toán = 0 (đã gộp vào các chỉ tiêu trên) để tổng chênh lệch luôn tự cân.
     for code, cur in current.items():

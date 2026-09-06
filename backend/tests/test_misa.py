@@ -164,3 +164,8 @@ def test_kiem_toan_checkpoint():
     assert abs(v["280"] - 348712228082) < 10000 and abs(v["440"] - 348712228082) < 10000
     assert abs(v["411"] - 240000000000) < 1
     assert abs(v["420"] - 14037369907) < 10000
+    # TK xét theo đối tượng (131 có số dư cũ từ "DT test" ở trên, mã đối tượng khác mã kiểm toán) không được
+    # cộng dồn hai chiều: 130/311/312 phải khớp sát số kiểm toán, không phồng lên do đối tượng cũ + mới
+    assert abs(v["130"] - 168818037699) < 10000
+    assert abs(v["311"] - 13459932467) < 10000
+    assert abs(v["132"] - 73783036624) < 10000

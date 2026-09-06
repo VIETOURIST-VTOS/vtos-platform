@@ -22,18 +22,10 @@
     },
     {
       "code": "1281",
-      "name": "Tiền gửi có kỳ hạn ≤3 tháng (tương đương tiền)",
-      "close_d": 4203801096,
+      "name": "Tiền gửi có kỳ hạn (tương đương tiền ≤3 tháng + đầu tư nắm giữ đến ngày đáo hạn NH >3 tháng – gộp vì bảng TK MISA chỉ có 1 mã 1281 ánh xạ chỉ tiêu 123)",
+      "close_d": 4712156652,
       "close_c": 0,
-      "open_d": 702100000,
-      "open_c": 0
-    },
-    {
-      "code": "1283",
-      "name": "Tiền gửi có kỳ hạn >3 tháng (đầu tư nắm giữ đến ngày đáo hạn NH)",
-      "close_d": 508355556,
-      "close_c": 0,
-      "open_d": 520366667,
+      "open_d": 1222466667,
       "open_c": 0
     },
     {
