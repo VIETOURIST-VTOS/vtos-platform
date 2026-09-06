@@ -17,7 +17,7 @@ function Params() {
   async function sign(id: number) { try { const r = await api(`/params/${id}/sign`, { method: "POST" }); toast(r.message); load(); } catch (x) { toast(errMsg(x), true); } }
   const canSign = ["chutich", "tgd"].includes(user?.role || "");
   return (<>
-    <h1>Tham số chính sách – hiệu lực theo ngày, đổi phải đủ 2 chữ ký</h1>
+    <h1>Chính sách &amp; định mức – hiệu lực theo ngày, đổi phải đủ 2 chữ ký</h1>
     <div className="panel"><h2>Đề xuất thay đổi</h2>
       <form onSubmit={propose}><div className="grid">
         <div><label>Tham số</label><select name="key">{keys.map((k) => <option key={k} value={k}>{k} – {active.find((p) => p.key === k)?.label}</option>)}</select></div>

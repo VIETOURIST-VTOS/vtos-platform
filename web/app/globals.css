@@ -6,7 +6,11 @@ a{color:var(--navy);font-weight:600}
 .top{background:#1F3A5F;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
 .top .brand{font-weight:700;letter-spacing:.06em}.top .brand small{font-weight:400;opacity:.7;margin-left:8px;letter-spacing:0}
 .top .right{margin-left:auto;font-size:12.5px}.top .right b{color:#ffd9a8}.top .right a{color:#ffd9a8;margin-left:10px}
-nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:48px;z-index:4}
+nav.groups{display:flex;gap:2px;padding:0 10px;background:var(--navy2,#2b4a72);overflow-x:auto;position:sticky;top:48px;z-index:5}
+nav.groups button{border:0;background:none;color:rgba(255,255,255,.72);padding:9px 12px;font-size:12.5px;white-space:nowrap;cursor:pointer;font-weight:500;border-bottom:3px solid transparent;font-family:inherit}
+nav.groups button.on{color:#fff;font-weight:700;border-color:var(--orange)}
+nav.groups button:hover{color:#fff}
+nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:86px;z-index:4}
 nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:13px;color:var(--ink2);text-decoration:none;white-space:nowrap;font-weight:500}
 nav.tabs a.on{color:var(--navy);border-color:var(--orange);font-weight:600}
 main{max-width:1180px;margin:0 auto;padding:16px}
@@ -28,4 +32,4 @@ button.act{background:var(--navy2);color:#fff;border:0;border-radius:5px;padding
 button.act.teal{background:var(--teal)}button.act.orange{background:var(--orange)}button.act.red{background:var(--red)}button.act.grey{background:var(--ink2)}button.act:disabled{opacity:.5;cursor:default}
 .muted{color:var(--ink2);font-size:12.5px}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
-@media (max-width:640px){main{padding:10px}td,th{padding:6px 5px}nav.tabs{top:0}.top{position:static}}
+@media (max-width:640px){main{padding:10px}td,th{padding:6px 5px}nav.groups{top:0}nav.tabs{top:38px}.top{position:static}}

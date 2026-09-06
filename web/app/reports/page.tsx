@@ -103,7 +103,7 @@ function Reports() {
   const score = (r: any) => r.manager_score ?? r.robot_score;
 
   return (<>
-    <h1>Báo cáo ngày (Điều 12) &amp; ca trực page</h1>
+    <h1>Báo cáo công việc (Điều 12) &amp; ca trực page</h1>
     <p className="muted">Khối Kinh doanh, Đoàn, Điều hành, Marketing, CNTT: nộp báo cáo 4 phần <b>trước 20:00</b> mỗi ngày làm việc (Thứ Hai – Thứ Bảy) thay chấm công. Robot chấm điểm nháp, trưởng phòng chấm chính thức; thiếu 1 ngày → nhắc nhở, 2 ngày liên tiếp → chuyển HCNS. Xếp loại tháng A/B/C/D là cảnh báo sớm, căn cứ đánh giá 3 tháng.</p>
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
       {[["mine", "Báo cáo của tôi"], ...(isMgr ? [["all", "Tổng hợp phòng"]] : []), ["shifts", "Ca trực page"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
