@@ -24,6 +24,13 @@ def norm_plate(s: str) -> str:
     return re.sub(r"[^0-9A-Z]", "", (s or "").upper())
 
 
+def pretty_plate(s: str) -> str:
+    """Viết biển số theo đúng kiểu đang dùng trong hệ thống: 50H934.08 → 50H-934.08."""
+    raw = norm_plate(s)
+    m = re.fullmatch(r"(\d{2}[A-Z]{1,2})(\d{3})(\d{2})", raw)
+    return f"{m.group(1)}-{m.group(2)}.{m.group(3)}" if m else (s or "").strip()
+
+
 def _dob(v) -> date | None:
     if isinstance(v, datetime): return v.date()
     if isinstance(v, date): return v
@@ -76,9 +83,11 @@ def apply(db: Session, rows: list[dict], actor: str, role: str, tao_xe_thieu: bo
     for r in rows:
         ten = r.get("full_name") or r.get("ten") or ""
         bien = r.get("plate") or r.get("bien_so") or ""
-        cand = by_name.get(norm_name(ten), [])
+        ma = (r.get("employee_code") or "").strip()
+        cand = [x for x in emps if x.code == ma] if ma else by_name.get(norm_name(ten), [])
         if len(cand) != 1:
-            bo_qua.append({"ten": ten, "ly_do": "không có hồ sơ" if not cand else f"trùng {len(cand)} hồ sơ"})
+            ly_do = "không có hồ sơ" if not cand else f"trùng {len(cand)} hồ sơ – ghi rõ mã nhân sự để chỉ đích danh"
+            bo_qua.append({"ten": ten, "ly_do": ly_do})
             continue
         e = cand[0]
         d = _dob(r.get("birth_date") or r.get("ngay_sinh"))
@@ -89,7 +98,7 @@ def apply(db: Session, rows: list[dict], actor: str, role: str, tao_xe_thieu: bo
         ns += 1
         v = by_plate.get(norm_plate(bien))
         if v is None and tao_xe_thieu and bien.strip():
-            v = Vehicle(plate=bien.strip(), seats=0, kind="noi_bo", company_id=vt.id if vt else None)
+            v = Vehicle(plate=pretty_plate(bien), seats=0, kind="noi_bo", company_id=vt.id if vt else None)
             db.add(v); db.flush(); by_plate[norm_plate(bien)] = v
             xe_moi.append(v.plate)
         if v is not None:

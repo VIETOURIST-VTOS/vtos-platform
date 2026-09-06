@@ -239,6 +239,29 @@ def vehicle_create(data: VehicleIn, u: User = Depends(require_roles("cntt", "hcn
     return {"message": f"Đã thêm xe {v.plate}"}
 
 
+class VehicleUpdate(BaseModel):
+    plate: str | None = None
+    seats: int | None = None
+    kind: str | None = None
+    driver_id: int | None = None
+    internal_rate_per_day: float | None = None
+    active: bool | None = None
+
+
+@router.put("/vehicles/{vid}")
+def vehicle_update(vid: int, data: VehicleUpdate, u: User = Depends(require_roles("cntt", "hcns", "tp_dh")), db: Session = Depends(get_db)):
+    """Sửa hồ sơ xe – dùng để bổ sung số chỗ cho xe mới nạp và sửa loại xe nội bộ / hợp tác.
+    Đổi loại sang xe hợp tác thì gỡ luôn pháp nhân sở hữu: xe thuê ngoài không phải tài sản của tập đoàn."""
+    v = db.get(Vehicle, vid)
+    if not v: raise HTTPException(404, "Không có xe")
+    before = {"plate": v.plate, "seats": v.seats, "kind": v.kind, "driver_id": v.driver_id, "company_id": v.company_id}
+    for k, val in data.model_dump(exclude_none=True).items(): setattr(v, k, val)
+    if v.kind == "hop_tac": v.company_id = None
+    R.audit(db, u.username, u.role, "sua_ho_so_xe", f"vehicle:{v.plate}", before=before,
+            after={"plate": v.plate, "seats": v.seats, "kind": v.kind, "driver_id": v.driver_id, "company_id": v.company_id}); db.commit()
+    return {"message": f"Đã cập nhật xe {v.plate}"}
+
+
 # ---------- Bảng giá xe nội bộ (master data, Chủ tịch + TGĐ duyệt) ----------
 def rate_out(r: VehicleRate) -> dict:
     return {"id": r.id, "route": r.route, "days": r.days, "internal_price": r.internal_price, "partner_price": r.partner_price, "effective_from": r.effective_from,

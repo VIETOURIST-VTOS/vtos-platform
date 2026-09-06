@@ -177,3 +177,45 @@ def test_bien_so_so_khop_khong_phu_thuoc_dau_gach():
     from app.services.drivers import norm_plate, norm_name
     assert norm_plate("50F022.59") == norm_plate("50F-022.59") == norm_plate("50f 022,59")
     assert norm_name("NGUYỄN LONG HỒ") == norm_name("Nguyễn Long Hồ")
+
+
+def test_bien_so_xe_tao_moi_dung_kieu_dang_dung():
+    from app.services.drivers import pretty_plate
+    assert pretty_plate("50H934.08") == "50H-934.08"
+    assert pretty_plate("50h 944,58") == "50H-944.58"
+    assert pretty_plate("51B-123.45") == "51B-123.45"
+
+
+def test_chi_dich_danh_ho_so_khi_trung_ten():
+    """Trùng tên thì phải ghi mã nhân sự; không có mã thì bỏ qua chứ không đoán."""
+    from app.db.session import SessionLocal
+    from app.models.hr import Employee
+    db = SessionLocal()
+    a = Employee(code="TX9001", full_name="Người Trùng Tên", department="doi_xe", position="tai_xe")
+    b = Employee(code="TX9002", full_name="Người Trùng Tên", department="doi_xe", position="tai_xe")
+    db.add_all([a, b]); db.commit(); ma_b = b.code; db.close()
+
+    r = client.post("/api/v1/drivers/apply", json={"rows": [{"full_name": "Người Trùng Tên", "phone": "0900000000"}]},
+                    headers=login("hcns")).json()
+    assert r["cap_nhat_nhan_su"] == 0 and "trùng 2 hồ sơ" in r["bo_qua"][0]["ly_do"]
+
+    r = client.post("/api/v1/drivers/apply", json={"rows": [{"full_name": "Người Trùng Tên", "employee_code": ma_b, "phone": "0900000000"}]},
+                    headers=login("hcns")).json()
+    assert r["cap_nhat_nhan_su"] == 1 and not r["bo_qua"]
+    emps = client.get("/api/v1/employees", headers=login("cntt")).json()
+    assert next(e for e in emps if e["code"] == ma_b)["phone"] == "0900000000"
+    assert next(e for e in emps if e["code"] == "TX9001")["phone"] == ""
+
+
+def test_sua_ho_so_xe_va_xe_hop_tac_khong_phai_tai_san_tap_doan():
+    veh = client.get("/api/v1/vehicles", headers=login("cntt")).json()
+    v = next(x for x in veh if x["kind"] == "noi_bo")
+    assert client.put(f"/api/v1/vehicles/{v['id']}", json={"seats": 29}, headers=login("cntt")).status_code == 200
+    veh = client.get("/api/v1/vehicles", headers=login("cntt")).json()
+    assert next(x for x in veh if x["id"] == v["id"])["seats"] == 29
+    # chuyển sang xe hợp tác → gỡ pháp nhân sở hữu
+    client.put(f"/api/v1/vehicles/{v['id']}", json={"kind": "hop_tac"}, headers=login("cntt"))
+    veh = client.get("/api/v1/vehicles", headers=login("cntt")).json()
+    x = next(y for y in veh if y["id"] == v["id"])
+    assert x["kind"] == "hop_tac" and not x["company_id"]
+    client.put(f"/api/v1/vehicles/{v['id']}", json={"kind": "noi_bo"}, headers=login("cntt"))

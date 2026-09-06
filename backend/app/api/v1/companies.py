@@ -103,6 +103,7 @@ class DriverRow(BaseModel):
     plate: str = ""
     birth_date: str | None = None
     phone: str = ""
+    employee_code: str = ""      # chỉ đích danh hồ sơ khi có nhiều người trùng tên
 
 
 class DriverBatch(BaseModel):
