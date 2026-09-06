@@ -123,40 +123,41 @@ def bctc(db: Session, upto: date, since: date | None = None, compare_upto: date 
 
 
 # ---------- Báo cáo lưu chuyển tiền tệ gián tiếp (B03-DN, mẫu MAU["lctt"] 37 chỉ tiêu) ----------
-CASH_EQUIV = ("111", "112")                                             # tiền và tương đương tiền (chỉ tiêu 110 THTC)
-ST_INVEST_ACC = ("1281", "1283")                                        # tiền gửi có kỳ hạn/đầu tư ngắn hạn (chỉ tiêu 120 THTC, KHÔNG phải tiền) → dòng 23/24
-RECEIVABLE_OP = ("131", "1388", "1331", "141")                          # phải thu HĐKD
-INVENTORY_ACC = ("152", "153", "154", "156")
-PREPAID_ACC = ("242",)
-PAYABLE_OP = ("331", "3388", "334", "3351", "33311", "3335", "3387")    # phải trả HĐKD, KHÔNG kể lãi vay (3352) và thuế TNDN (3334) và vay (341x)
-FIXED_ASSET_ACC = ("211", "213")                                        # nguyên giá TSCĐ hữu hình/vô hình
-LONG_INVEST_ACC = ("221", "222", "2441")                                # đầu tư công ty con/liên kết + ký quỹ dài hạn
-LOAN_ACC = ("34111", "34112", "34113")
-EQUITY_ACC = ("4111", "4112")
-
-
 def _net_by_prefix(bal: dict, prefixes: tuple) -> float:
     return sum(v["net"] for c, v in bal.items() if c.startswith(prefixes))
 
 
 def cash_flow_indirect_tt99(db: Session, since: date, upto: date) -> dict:
-    """LCTT gián tiếp theo mẫu B03-DN (TT99), tính tự động từ sổ VTOS bằng cách so sánh số dư TÀI KHOẢN
-    (không phải chỉ tiêu BCTC) tại đầu kỳ (since−1 ngày) và cuối kỳ (upto):
+    """LCTT gián tiếp theo mẫu B03-DN (TT99), tính tự động từ sổ VTOS.
 
-    - Mục 1 (01-08): LNTT (KQKD mã 50) + cộng lại khấu hao/dự phòng (biến động 214/229) + lãi vay (KQKD mã 24)
-      − lãi/lỗ HĐ tài chính (KQKD mã 22, chuyển sang mục đầu tư dòng 27 cho khớp).
-    - Mục 09-15: biến động các khoản phải thu/tồn kho/phải trả/trả trước HĐKD, lãi vay đã trả, thuế TNDN đã nộp
-      (trừ phần còn treo trên tài khoản phải trả tương ứng 3352/3334 – tức tính THEO DÒNG TIỀN THỰC, không phải
-      theo phát sinh kế toán).
-    - Mục 21-27 (đầu tư): biến động nguyên giá TSCĐ (211/213) và đầu tư dài hạn (221/222/2441).
-    - Mục 31-36 (tài chính): biến động vốn góp (4111/4112), dư nợ vay (34111/34112/34113), và phần LNST kỳ này
-      không giữ lại trong 421 (coi là cổ tức/lợi nhuận đã chia – ước tính).
-    - Dòng 16/17 (thu/chi khác từ HĐKD) là phần CHÊNH LỆCH TỰ ĐỘNG để dòng 70 (tiền cuối kỳ) LUÔN khớp đúng số
-      dư thực tế 111+112+1281 cuối kỳ – các tài khoản chưa được phân loại rõ ở trên (nếu có) sẽ rơi vào đây;
-      "residual_plug" trong kết quả trả về cho biết độ lớn phần chênh lệch này để Kế toán trưởng rà soát thêm.
+    QUAN TRỌNG: phân loại theo CHỈ TIÊU BCTC (kết quả balance_sheet_tt99, đi qua đúng cây tài khoản
+    Account.bs_debit/bs_credit – GIỐNG HỆT cách THTC tính), KHÔNG dùng tiền tố mã tài khoản cứng. Lý do:
+    bộ mã tài khoản MISA có thể đổi qua các thời kỳ (ví dụ vay ngân hàng ghi ở "3411" (2025) rồi tách thành
+    "34111/34112/34113" từ mốc chốt kiểm toán 30/06/2026) – nếu so sánh theo tiền tố mã tài khoản cố định,
+    một khoản mục chỉ đổi TÊN MÃ (không thực sự phát sinh) sẽ bị hiểu nhầm thành dòng tiền phát sinh mới,
+    làm sai lệch nghiêm trọng cả phần HĐKD lẫn HĐ tài chính (đã phát hiện khi so với dữ liệu thật: TK vay
+    3411 (2025) không khớp tiền tố với 34111/34112/34113 (2026) dù CÙNG một khoản dư nợ). Đi qua chỉ tiêu
+    BCTC tránh được lỗi này vì bản đồ tài khoản → chỉ tiêu áp dụng nhất quán cho MỌI kỳ.
+
+    - Mục 1 (01-08): LNTT (KQKD mã 50) + cộng lại khấu hao/dự phòng (biến động chỉ tiêu 223/229/122/124/126/
+      142/216 trong THTC) + lãi vay (KQKD mã 24) − lãi/lỗ HĐ tài chính (KQKD mã 22, chuyển sang mục đầu tư
+      dòng 27 cho khớp).
+    - Mục 09-15: biến động chỉ tiêu phải thu (130+162+210), tồn kho (140), phải trả HĐKD (310+330 trừ phần
+      vay 321/339), trả trước (161+271); lãi vay/thuế TNDN đã trả bằng tiền thực tế (trừ phần còn treo trên
+      tài khoản 3352/3334 nếu sổ có tách riêng).
+    - Mục 21-27 (đầu tư): biến động NGUYÊN GIÁ TSCĐ (chỉ tiêu 222+225+228, không dùng giá trị còn lại để
+      tránh trùng với khấu hao ở dòng 02), đầu tư tài chính ngắn hạn (chỉ tiêu 120 – gồm tiền gửi có kỳ hạn),
+      đầu tư dài hạn (chỉ tiêu 261+262+263).
+    - Mục 31-36 (tài chính): biến động vốn góp (chỉ tiêu 411+412), dư nợ vay (chỉ tiêu 321+339), và phần LNST
+      kỳ này không giữ lại trong chỉ tiêu 420 (coi là cổ tức/lợi nhuận đã chia – ước tính).
+    - Dòng 16/17 (thu/chi khác từ HĐKD) là phần CHÊNH LỆCH TỰ ĐỘNG để dòng 70 (tiền cuối kỳ) LUÔN khớp đúng
+      chỉ tiêu 110 (tiền và tương đương tiền) THTC cuối kỳ – khoản mục nào chưa được phân loại rõ ở trên (nếu
+      có) sẽ rơi vào đây; "residual_plug" trong kết quả trả về cho biết độ lớn phần chênh lệch này để Kế toán
+      trưởng rà soát thêm nếu cần.
     """
     end0 = since - timedelta(days=1)
-    bal0, bal1 = account_balances(db, end0), account_balances(db, upto)
+    bs0, bs1 = balance_sheet_tt99(db, end0), balance_sheet_tt99(db, upto)
+    v0, v1 = bs0["values"], bs1["values"]
     pl = income_statement_tt99(db, since, upto)["values"]
     lntt = pl.get("50", 0.0)
     interest_expense = pl.get("24", 0.0)
@@ -164,59 +165,68 @@ def cash_flow_indirect_tt99(db: Session, since: date, upto: date) -> dict:
     fin_income = pl.get("22", 0.0)          # doanh thu HĐ tài chính (lãi tiền gửi, cổ tức…) – chuyển sang mục đầu tư dòng 27
     lnst = pl.get("60", 0.0)
 
-    def delta(prefixes: tuple) -> float:
-        """Biến động dạng 'tăng thì dương' cho cả TK tài sản (dư Nợ) lẫn TK nguồn vốn/nợ phải trả (dư Có)."""
-        return _net_by_prefix(bal0, prefixes) - _net_by_prefix(bal1, prefixes)
+    def g(vals: dict, *codes: str) -> float:
+        return sum(vals.get(c, 0.0) for c in codes)
+
+    def d(*codes: str) -> float:
+        """Biến động chỉ tiêu BCTC 'tăng thì dương' giữa đầu kỳ và cuối kỳ (đúng chiều Nợ/Có của v["x"])."""
+        return g(v1, *codes) - g(v0, *codes)
+
+    # Tài khoản cụ thể (không qua chỉ tiêu BCTC dùng chung) chỉ dùng cho lãi vay/thuế TNDN đã trả bằng tiền –
+    # nếu sổ không tách riêng tài khoản lãi vay phải trả (3352) thì coi như đã trả hết bằng tiền trong kỳ.
+    bal0_raw, bal1_raw = account_balances(db, end0), account_balances(db, upto)
+    accrued_interest_up = _net_by_prefix(bal0_raw, ("3352",)) - _net_by_prefix(bal1_raw, ("3352",))
+    accrued_cit_up = _net_by_prefix(bal0_raw, ("3334",)) - _net_by_prefix(bal1_raw, ("3334",))
 
     v: dict[str, float] = {}
     v["01"] = lntt
-    v["02"] = delta(("214",))                                  # tăng hao mòn lũy kế (dư Có tăng) → cộng lại
-    v["03"] = delta(("229",))                                  # tăng dự phòng (dư Có tăng) → cộng lại
+    # 223/226/229 = giá trị hao mòn lũy kế (chỉ tiêu âm) của TSCĐ hữu hình/thuê TC/vô hình – tăng khấu hao
+    # trong kỳ làm các chỉ tiêu này ÂM HƠN (giảm thêm) nên cộng lại bằng -d(...)
+    v["02"] = -d("223") - d("226") - d("229")
+    v["03"] = -d("122") - d("124") - d("126") - d("142") - d("216") - d("264")  # tăng các khoản dự phòng (đều là chỉ tiêu âm "(*)")
     v["04"] = 0.0
     v["05"] = -fin_income                                      # trừ lãi HĐ tài chính ra khỏi LN kỳ, đưa sang dòng 27
     v["06"] = interest_expense
     v["07"] = 0.0                                               # dành làm dự phòng, không dùng làm số dư tự động (xem dòng 16/17)
     v["08"] = sum(v[c] for c in ("01", "02", "03", "04", "05", "06", "07"))
-    v["09"] = delta(RECEIVABLE_OP)
-    v["10"] = delta(INVENTORY_ACC)
-    v["11"] = delta(PAYABLE_OP)
-    v["12"] = delta(PREPAID_ACC)
+    v["09"] = d("130", "162", "210")                            # phải thu ngắn hạn + thuế GTGT khấu trừ + phải thu dài hạn (gồm ký quỹ dài hạn)
+    v["10"] = d("140")
+    v["11"] = d("310", "330") - d("321", "339")                 # phải trả ngắn+dài hạn, TRỪ vay (321/339 → mục tài chính)
+    v["12"] = d("161", "271")
     v["13"] = 0.0
-    accrued_interest_up = delta(("3352",))                      # tăng lãi vay phải trả còn treo (chưa trả tiền)
     v["14"] = -(interest_expense - accrued_interest_up)
-    accrued_cit_up = delta(("3334",))
     v["15"] = -(cit_expense - accrued_cit_up)
     v["16"] = 0.0
     v["17"] = 0.0
     v["20"] = v["08"] + sum(v[c] for c in ("09", "10", "11", "12", "13", "14", "15", "16", "17"))
 
-    d_fa = _net_by_prefix(bal1, FIXED_ASSET_ACC) - _net_by_prefix(bal0, FIXED_ASSET_ACC)
+    d_fa = d("222", "225", "228")                               # nguyên giá TSCĐ hữu hình + thuê TC + vô hình
     v["21"] = -d_fa if d_fa > 0 else 0.0
     v["22"] = -d_fa if d_fa < 0 else 0.0
-    d_stinv = _net_by_prefix(bal1, ST_INVEST_ACC) - _net_by_prefix(bal0, ST_INVEST_ACC)
-    v["23"] = -d_stinv if d_stinv > 0 else 0.0   # gửi thêm tiền có kỳ hạn / mua thêm công cụ nợ ngắn hạn
-    v["24"] = -d_stinv if d_stinv < 0 else 0.0   # rút tiền gửi có kỳ hạn / thu hồi công cụ nợ ngắn hạn
-    d_inv = _net_by_prefix(bal1, LONG_INVEST_ACC) - _net_by_prefix(bal0, LONG_INVEST_ACC)
+    d_stinv = d("120")                                          # đầu tư tài chính NH (gồm tiền gửi có kỳ hạn, KHÔNG phải tiền)
+    v["23"] = -d_stinv if d_stinv > 0 else 0.0
+    v["24"] = -d_stinv if d_stinv < 0 else 0.0
+    d_inv = d("261", "262", "263")                              # đầu tư công ty con/liên kết/góp vốn khác
     v["25"] = -d_inv if d_inv > 0 else 0.0
     v["26"] = -d_inv if d_inv < 0 else 0.0
     v["27"] = fin_income                                        # ước tính đã thu bằng đúng phần ghi nhận trong kỳ
     v["30"] = sum(v[c] for c in ("21", "22", "23", "24", "25", "26", "27"))
 
-    d_equity = delta(EQUITY_ACC)
+    d_equity = d("411", "412")
     v["31"] = d_equity if d_equity > 0 else 0.0
     v["32"] = d_equity if d_equity < 0 else 0.0
-    d_loan = delta(LOAN_ACC)
+    d_loan = d("321", "339")
     v["33"] = d_loan if d_loan > 0 else 0.0
     v["34"] = d_loan if d_loan < 0 else 0.0
     v["35"] = 0.0
-    d_421 = delta(("421",))
-    v["36"] = d_421 - lnst                                       # phần 421 tăng KHÔNG đến từ LNST kỳ này → coi là đã chia/điều chỉnh
+    d_420 = d("420")
+    v["36"] = d_420 - lnst                                       # phần 420 tăng KHÔNG đến từ LNST kỳ này → coi là đã chia/điều chỉnh
     v["40"] = sum(v[c] for c in ("31", "32", "33", "34", "35", "36"))
 
-    v["60"] = _net_by_prefix(bal0, CASH_EQUIV)
+    v["60"] = v0.get("110", 0.0)
     v["61"] = 0.0
     v["50"] = v["20"] + v["30"] + v["40"]
-    cash_end_actual = _net_by_prefix(bal1, CASH_EQUIV)
+    cash_end_actual = v1.get("110", 0.0)
     residual = (cash_end_actual - v["60"] - v["61"]) - v["50"]   # phần chưa được các mục trên phản ánh hết
     if residual >= 0: v["16"] += residual
     else: v["17"] += residual
@@ -232,29 +242,40 @@ LOAN_KIND_BS = {"34111": "320", "34112": "339", "34113": "321"}   # chỉ tiêu 
 
 
 def loan_bank_detail_341(db: Session, since: date, upto: date) -> dict:
-    """Chi tiết vay/nợ thuê tài chính (341) theo TỪNG NGÂN HÀNG + tiểu khoản (34111/34112/34113), đúng bố cục
-    báo cáo MISA 'CHI TIẾT VAY VÀ NỢ THUÊ TÀI CHÍNH THEO NGÂN HÀNG – TÀI KHOẢN 341': dư đầu kỳ (Có), trả nợ
-    trong kỳ (Nợ), vay thêm trong kỳ (Có), dư cuối kỳ (Có) – theo từng (ngân hàng, tiểu khoản)."""
+    """Chi tiết vay/nợ thuê tài chính theo TỪNG NGÂN HÀNG + tiểu khoản, đúng bố cục báo cáo MISA 'CHI TIẾT
+    VAY VÀ NỢ THUÊ TÀI CHÍNH THEO NGÂN HÀNG – TÀI KHOẢN 341': dư đầu kỳ (Có), trả nợ trong kỳ (Nợ), vay thêm
+    trong kỳ (Có), dư cuối kỳ (Có) – theo từng (ngân hàng, tiểu khoản).
+
+    Tài khoản vay được xác định ĐỘNG theo Account.bs_credit ∈ {"321" (vay/nợ thuê TC ngắn hạn – gồm cả nợ dài
+    hạn đến hạn trả), "339" (vay/nợ thuê TC dài hạn)} thay vì liệt kê cứng mã tài khoản – vì bộ mã MISA có thể
+    đổi qua các thời kỳ (vd "3411" gộp chung trước 30/06/2026 → tách "34111/34112/34113" từ mốc chốt kiểm toán)
+    nhưng ánh xạ chỉ tiêu BCTC luôn nhất quán."""
     names = {p.code: (p.trade_name or p.name) for p in db.execute(select(Partner)).scalars()}
+    accs = {a.code: a for a in db.execute(select(Account)).scalars()}
+    loan_codes = [c for c, a in accs.items() if a.bs_credit in ("321", "339")]
+    if not loan_codes:
+        return {"since": since, "upto": upto, "rows": [], "by_kind": {}, "total": {"open": 0.0, "debit_in_period": 0.0, "credit_in_period": 0.0, "close": 0.0}}
     end0 = since - timedelta(days=1)
     q = (select(JournalLine, JournalEntry.entry_date).join(JournalEntry)
-         .where(JournalEntry.status == "da_ghi_so", JournalEntry.entry_date <= upto, JournalLine.account_code.in_(LOAN_KIND_NAME)))
+         .where(JournalEntry.status == "da_ghi_so", JournalEntry.entry_date <= upto, JournalLine.account_code.in_(loan_codes)))
     groups: dict[tuple, dict] = {}
-    for l, d in db.execute(q).all():
+    for l, dt in db.execute(q).all():
         pcode = l.partner_code or ""
         key = (pcode, l.account_code)
         g = groups.setdefault(key, {"bank": names.get(pcode) or l.partner or "Đối tượng nội bộ chưa phân loại ngân hàng",
                                      "account": l.account_code, "open": 0.0, "debit": 0.0, "credit": 0.0})
-        if d <= end0:
+        if dt <= end0:
             g["open"] += l.debit - l.credit
-        elif since <= d <= upto:
+        elif since <= dt <= upto:
             g["debit"] += l.debit; g["credit"] += l.credit
     rows = []
     for (pcode, acc), g in sorted(groups.items(), key=lambda x: (x[1]["bank"], x[0][1])):
         open_c = -g["open"]                       # dư Có = -(Nợ-Có)
         close_c = -(g["open"] + g["debit"] - g["credit"])
         if abs(open_c) < 1 and abs(close_c) < 1 and abs(g["debit"]) < 1 and abs(g["credit"]) < 1: continue
-        rows.append({"bank": g["bank"], "partner_code": pcode, "account": acc, "kind": LOAN_KIND_NAME.get(acc, acc),
+        a = accs.get(acc)
+        kind = LOAN_KIND_NAME.get(acc) or (a.name if a else acc) or ("Vay và nợ thuê tài chính dài hạn" if a and a.bs_credit == "339" else "Vay và nợ thuê tài chính ngắn hạn")
+        rows.append({"bank": g["bank"], "partner_code": pcode, "account": acc, "kind": kind,
                      "open": open_c, "debit_in_period": g["debit"], "credit_in_period": g["credit"], "close": close_c})
     by_kind: dict[str, dict] = {}
     for r in rows:
