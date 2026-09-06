@@ -39,6 +39,8 @@ def employees(department: str | None = None, u: User = Depends(require_roles(*HR
 
 
 class EmployeeIn(BaseModel):
+    """Sửa hồ sơ chỉ ghi đè những trường được gửi lên (exclude_unset), nên màn hình cũ gửi thiếu
+    trường mới sẽ không xóa mất dữ liệu đã nạp (ngày sinh, điện thoại, pháp nhân, chức danh)."""
     full_name: str
     department: str
     position: str = "nv"
@@ -54,6 +56,12 @@ class EmployeeIn(BaseModel):
     member_org: bool = False
     ctv_contract: bool = False
     advance_limit: float = 0
+    title: str | None = None
+    sales_group: str | None = None
+    phone: str | None = None
+    birth_date: date | None = None
+    company_id: int | None = None
+    active: bool | None = None
 
 
 @router.get("/staff")
@@ -93,7 +101,7 @@ def reset_password(uid: int, data: ResetPwIn, u: User = Depends(require_roles(*H
 @router.post("/employees", status_code=201)
 def create_employee(data: EmployeeIn, u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
     if data.department not in DEPARTMENTS or data.position not in POSITIONS: raise HTTPException(422, "Phòng/chức danh không hợp lệ")
-    e = Employee(code=H.next_code(db, Employee, "NS"), **data.model_dump())
+    e = Employee(code=H.next_code(db, Employee, "NS"), **data.model_dump(exclude_none=True))
     db.add(e); db.flush()
     R.audit(db, u.username, u.role, "tao_ho_so_nhan_su", f"emp:{e.code}", after={"ten": e.full_name, "phong": e.department, "luong": e.base_salary})
     db.commit(); db.refresh(e)
@@ -104,11 +112,17 @@ def create_employee(data: EmployeeIn, u: User = Depends(require_roles(*HR_WRITE)
 def update_employee(eid: int, data: EmployeeIn, u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
     e = db.get(Employee, eid)
     if not e: raise HTTPException(404, "Không có hồ sơ")
-    before = {"luong": e.base_salary, "chuc_vu": e.position, "phong": e.department}
-    for k, v in data.model_dump().items(): setattr(e, k, v)
-    R.audit(db, u.username, u.role, "sua_ho_so_nhan_su", f"emp:{e.code}", before=before, after={"luong": e.base_salary, "chuc_vu": e.position, "phong": e.department})
+    fields = data.model_dump(exclude_unset=True)
+    if fields.get("active") is False and e.active:
+        xe = db.execute(select(Vehicle).where(Vehicle.driver_id == e.id, Vehicle.active == True)).scalars().all()
+        if xe: raise HTTPException(422, f"{e.full_name} đang là tài xế của xe {', '.join(v.plate for v in xe)} – giao xe cho người khác trước khi ngưng hồ sơ")
+    before = {"luong": e.base_salary, "chuc_vu": e.position, "phong": e.department, "dang_lam": e.active}
+    for k, v in fields.items(): setattr(e, k, v)
+    R.audit(db, u.username, u.role, "sua_ho_so_nhan_su", f"emp:{e.code}", before=before,
+            after={"luong": e.base_salary, "chuc_vu": e.position, "phong": e.department, "dang_lam": e.active})
     db.commit()
-    return {"employee": emp_out(e), "message": "Đã cập nhật (tăng lương/điều chỉnh nhân sự cần Chủ tịch duyệt theo Điều 9 – ghi nhật ký)"}
+    ngung = " – hồ sơ đã chuyển sang Ngưng làm việc" if e.active is False else ""
+    return {"employee": emp_out(e), "message": "Đã cập nhật (tăng lương/điều chỉnh nhân sự cần Chủ tịch duyệt theo Điều 9 – ghi nhật ký)" + ngung}
 
 
 # ---------- Hồ sơ visa ----------
@@ -255,7 +269,9 @@ def vehicle_update(vid: int, data: VehicleUpdate, u: User = Depends(require_role
     v = db.get(Vehicle, vid)
     if not v: raise HTTPException(404, "Không có xe")
     before = {"plate": v.plate, "seats": v.seats, "kind": v.kind, "driver_id": v.driver_id, "company_id": v.company_id}
-    for k, val in data.model_dump(exclude_none=True).items(): setattr(v, k, val)
+    # exclude_unset: gửi driver_id = null là GỠ tài xế khỏi xe; trường không gửi thì giữ nguyên.
+    # (exclude_none trước đây khiến không bao giờ gỡ được tài xế đã gán nhầm.)
+    for k, val in data.model_dump(exclude_unset=True).items(): setattr(v, k, val)
     if v.kind == "hop_tac": v.company_id = None
     R.audit(db, u.username, u.role, "sua_ho_so_xe", f"vehicle:{v.plate}", before=before,
             after={"plate": v.plate, "seats": v.seats, "kind": v.kind, "driver_id": v.driver_id, "company_id": v.company_id}); db.commit()

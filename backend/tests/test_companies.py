@@ -1,7 +1,8 @@
 """Danh mục pháp nhân và công ty chủ quản của xe / HDV (Ý kiến thẩm định 06/9/2026, mục C1).
 
-Đội xe thuộc Công ty TNHH Vận tải Vietrip – pháp nhân riêng trong phạm vi hợp nhất – nên lệnh điều xe
-dùng xe đó là giao dịch nội bộ, phải nhận diện để loại trừ khi lập báo cáo hợp nhất.
+Pháp nhân đứng tên xe lấy từ giấy đăng ký xe, không suy từ cờ "xe nội bộ": theo hồ sơ 11 xe tháng 9/2026,
+10 xe đứng tên Công ty CP Vietourist Holdings và 1 xe đứng tên Vận tải Vietrip. Xe thuộc pháp nhân trong
+phạm vi hợp nhất thì lệnh điều xe là giao dịch nội bộ, phải nhận diện để loại trừ khi lập báo cáo hợp nhất.
 """
 import os, sys
 os.environ["DATABASE_URL"] = "sqlite:///./test_companies.db"; os.environ["SEED_DEMO"] = "1"; os.environ["ENV"] = "dev"

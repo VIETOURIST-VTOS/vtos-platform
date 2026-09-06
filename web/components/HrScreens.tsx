@@ -100,9 +100,13 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         <label>Hợp đồng<select value={fEmp.contract_type} onChange={(e) => setFEmp({ ...fEmp, contract_type: e.target.value })}><option value="hdld">HĐLĐ</option><option value="ctv">Cộng tác viên</option><option value="doi_tac">Đối tác</option></select></label>
         <label>Lương công việc (đ)<input type="number" value={fEmp.base_salary} onChange={(e) => setFEmp({ ...fEmp, base_salary: e.target.value })} /></label>
       </div><button className="act" disabled={!fEmp.full_name} onClick={() => post("/employees", { ...fEmp, base_salary: Number(fEmp.base_salary) || 0 }).then((r) => r && setFEmp({ ...fEmp, full_name: "", base_salary: "" }))}>Tạo hồ sơ</button></div>}
-      <div className="panel wrap"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Phòng</th><th>Nhóm</th><th>Chức vụ</th><th>VP</th><th>HĐ</th><th style={{ textAlign: "right" }}>Lương CV</th><th>Thẻ HDV</th><th>Trạng thái</th></tr></thead>
+      <div className="panel wrap"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Phòng</th><th>Nhóm</th><th>Chức vụ</th><th>VP</th><th>HĐ</th><th style={{ textAlign: "right" }}>Lương CV</th><th>Ngày sinh</th><th>Điện thoại</th><th>Thẻ HDV</th><th>Trạng thái</th>{canHR && <th></th>}</tr></thead>
         <tbody>{emps.map((e) => <tr key={e.id} style={{ opacity: e.active ? 1 : 0.55 }}><td className="mono">{e.code}</td><td><b>{e.full_name}</b></td><td>{e.department_name}</td><td>{e.sales_group}</td><td>{e.title || e.position_name}</td><td>{e.office_name}</td><td>{e.contract_type === "hdld" ? "HĐLĐ" : e.contract_type === "ctv" ? "CTV" : "Đối tác"}</td><td style={{ textAlign: "right" }}>{e.base_salary ? vnd(e.base_salary) : ""}</td>
-          <td>{e.department === "huong_dan" && <>{e.card_no} <span className="muted">hạn {fmtD(e.card_expiry)}</span> {e.guide_ok ? <Tag cls="ok">Đủ điều kiện</Tag> : <Tag cls="red">Cổng 13</Tag>}</>}</td><td>{e.probation && <Tag cls="warn">Thử việc 85%</Tag>}{e.active ? "" : <Tag cls="red">Nghỉ</Tag>}</td></tr>)}</tbody></table></div>
+          <td>{fmtD(e.birth_date)}</td><td className="mono">{e.phone}</td>
+          <td>{e.department === "huong_dan" && <>{e.card_no} <span className="muted">hạn {fmtD(e.card_expiry)}</span> {e.guide_ok ? <Tag cls="ok">Đủ điều kiện</Tag> : <Tag cls="red">Cổng 13</Tag>}</>}</td><td>{e.probation && <Tag cls="warn">Thử việc 85%</Tag>}{e.active ? "" : <Tag cls="red">Nghỉ</Tag>}</td>
+          {canHR && <td>{e.active
+            ? <button className="act red" style={{ margin: 0 }} title="Ngưng hồ sơ (không xóa) – dùng khi trùng hồ sơ hoặc nghỉ việc" onClick={() => { if (confirm(`Ngưng hồ sơ ${e.code} – ${e.full_name}? Hồ sơ vẫn được giữ để tra cứu lịch sử.`)) post(`/employees/${e.id}`, { full_name: e.full_name, department: e.department, active: false }, "PUT"); }}>Ngưng</button>
+            : <button className="act" style={{ margin: 0 }} onClick={() => post(`/employees/${e.id}`, { full_name: e.full_name, department: e.department, active: true }, "PUT")}>Mở lại</button>}</td>}</tr>)}</tbody></table></div>
     </>}
 
     {tab === "visa" && <>
@@ -171,14 +175,22 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
           <td>{d.status === "hoan_thanh" ? <Tag cls="ok">Hoàn thành</Tag> : d.status === "da_xac_nhan" ? <Tag cls="navy">Đã xác nhận</Tag> : d.status === "huy" ? <Tag cls="red">Hủy</Tag> : <Tag cls="warn">Chờ xác nhận 4h</Tag>}</td><td className="muted">{d.incident_note}</td>
           {["cntt", "tp_dh", "nv_dh", "hcns"].includes(role) && <td>{d.status === "cho_xac_nhan" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/dispatch/${d.id}/update`, { status: "da_xac_nhan" })}>Xác nhận</button>}{d.status === "da_xac_nhan" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/dispatch/${d.id}/update`, { status: "hoan_thanh" })}>Hoàn thành</button>}</td>}</tr>)}</tbody></table></div>
       <div className="panel wrap"><h2>Hồ sơ xe & pháp nhân sở hữu</h2>
-        <table><thead><tr><th>Biển số</th><th className="num">Chỗ</th><th>Loại</th><th>Tài xế</th><th>Pháp nhân sở hữu</th>{["cntt", "ketoan", "tgd", "chutich", "hcns", "tp_dh"].includes(role) && <th></th>}</tr></thead>
-          <tbody>{veh.map((v) => <tr key={v.id}><td><b>{v.plate}</b></td><td className="num">{v.seats}</td><td>{v.kind === "hop_tac" ? "Xe hợp tác (thuê ngoài)" : "Xe nội bộ"}</td><td>{v.driver}</td>
+        <table><thead><tr><th>Biển số</th><th className="num">Chỗ</th><th>Loại</th><th>Tài xế đứng lái</th><th>Pháp nhân sở hữu</th><th>Trạng thái</th>{["cntt", "ketoan", "tgd", "chutich", "hcns", "tp_dh"].includes(role) && <th></th>}</tr></thead>
+          <tbody>{veh.map((v) => <tr key={v.id} style={{ opacity: v.active ? 1 : 0.55 }}><td><b>{v.plate}</b></td><td className="num">{v.seats}</td><td>{v.kind === "hop_tac" ? "Xe hợp tác (thuê ngoài)" : "Xe nội bộ"}</td>
+            <td>{["cntt", "ketoan", "tgd", "chutich", "hcns", "tp_dh"].includes(role)
+              ? <select value={v.driver_id || ""} onChange={(e) => post(`/vehicles/${v.id}`, { driver_id: e.target.value ? Number(e.target.value) : null }, "PUT")}>
+                  <option value="">– chưa gán –</option>{emps.filter((x) => x.active && (x.department === "doi_xe" || x.position === "tai_xe" || x.id === v.driver_id)).map((x) => <option key={x.id} value={x.id}>{x.code} · {x.full_name}</option>)}
+                </select>
+              : (v.driver || <Tag cls="warn">chưa gán</Tag>)}</td>
             <td>{v.company ? v.company : <Tag cls="warn">chưa gán</Tag>}</td>
+            <td>{v.active ? <Tag cls="ok">Đang khai thác</Tag> : <Tag cls="red">Ngưng khai thác</Tag>}</td>
             {["cntt", "ketoan", "tgd", "chutich", "hcns", "tp_dh"].includes(role) && <td>
               <select value={v.company_id || ""} onChange={(e) => post(`/vehicles/${v.id}/company`, { company_id: e.target.value ? Number(e.target.value) : null })}>
                 <option value="">– chưa gán –</option>{cos.filter((c) => c.active || c.id === v.company_id).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}{c.active ? "" : " (tạm ngưng)"}</option>)}
-              </select></td>}</tr>)}</tbody></table>
-        <p className="muted">Xe thuộc Vận tải Vietrip nhưng <b>tài xế hưởng lương ở công ty mẹ</b> – tài sản thuộc công ty con, con người thuộc công ty mẹ. Xe thuộc pháp nhân trong phạm vi hợp nhất (mẹ, con, chi nhánh) thì lệnh điều xe là <b>giao dịch nội bộ</b> – phải nhận diện để loại trừ khi lập báo cáo hợp nhất. Xe hợp tác là xe thuê ngoài, không gán pháp nhân trong tập đoàn.</p></div>
+              </select>
+              <button className={v.active ? "act red" : "act"} style={{ margin: "0 0 0 6px" }} onClick={() => { if (!v.active || confirm(`Ngưng khai thác xe ${v.plate}? Xe vẫn được giữ để tra cứu lệnh điều xe cũ.`)) post(`/vehicles/${v.id}`, { active: !v.active }, "PUT"); }}>{v.active ? "Ngưng" : "Mở lại"}</button>
+            </td>}</tr>)}</tbody></table>
+        <p className="muted">Pháp nhân sở hữu lấy theo <b>giấy đăng ký xe</b>, không suy từ việc xe là xe nội bộ hay thuê ngoài: hiện phần lớn đội xe đứng tên Công ty CP Vietourist Holdings, chỉ một xe đứng tên Vận tải Vietrip. <b>Tài xế hưởng lương ở công ty mẹ</b> dù xe đứng tên pháp nhân nào. Xe thuộc pháp nhân trong phạm vi hợp nhất (mẹ, con, chi nhánh) thì lệnh điều xe là <b>giao dịch nội bộ</b> – phải nhận diện để loại trừ khi lập báo cáo hợp nhất. Xe hợp tác là xe thuê ngoài, không gán pháp nhân trong tập đoàn.</p></div>
       <h2>Bảng giá xe nội bộ theo tuyến (Chủ tịch + TGĐ duyệt, hiệu lực theo ngày)</h2>
       {["cntt", "hcns", "tp_dh"].includes(role) && <div className="panel"><div className="grid">
         <label>Tuyến<input value={fRate.route} onChange={(e) => setFRate({ ...fRate, route: e.target.value })} /></label>
