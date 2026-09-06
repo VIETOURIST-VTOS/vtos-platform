@@ -1,5 +1,5 @@
 """Phụ thuộc chung: CSDL, người dùng hiện tại, kiểm tra vai trò."""
-from fastapi import Depends, HTTPException, Header, status
+from fastapi import Depends, HTTPException, Header, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,13 +11,15 @@ from app.models.core import User, ROLES
 oauth2 = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
-def current_user(token: str = Depends(oauth2), db: Session = Depends(get_db)) -> User:
+def current_user(request: Request, token: str = Depends(oauth2), db: Session = Depends(get_db)) -> User:
     data = decode_token(token)
     if not data:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Phiên đăng nhập hết hạn hoặc không hợp lệ")
     u = db.execute(select(User).where(User.username == data["sub"], User.active == True)).scalars().first()
     if not u:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Tài khoản không tồn tại hoặc đã khóa")
+    from app.services.access import check_readonly_write
+    check_readonly_write(u, request.method, request.url.path)   # Ban Kiểm soát chỉ đọc
     return u
 
 
@@ -31,7 +33,7 @@ def require_roles(*roles: str):
 
 
 def robot_auth(x_robot_token: str | None = Header(default=None)):
-    if x_robot_token != settings.ROBOT_TOKEN:
+    if not settings.ROBOT_TOKEN or not x_robot_token or x_robot_token != settings.ROBOT_TOKEN:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sai ROBOT_TOKEN")
 
 

@@ -8,6 +8,7 @@ from app.api.deps import current_user
 from app.models.core import User, Tour
 from app.models.vietrip import TourCostLine
 from app.services import settlement as ST
+from app.services import access as AC
 
 router = APIRouter(prefix="/api/v1", tags=["settlement"])
 
@@ -50,6 +51,7 @@ def _line(db: Session, t: Tour, lid: int) -> TourCostLine:
 @router.get("/tours/{tid}/settlement")
 def get_settlement(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
     t = _tour(db, tid)
+    AC.require(u, AC.COST_ROLES, "quyết toán tour")
     return {"tour": t.code, "status": t.status, "version": t.settlement_version, "can_edit": ST.can_edit(u, t), "service_types": ST.SERVICE_TYPES,
             "lines": [ST.line_out(l) for l in ST.lines_of(db, t)], "summary": ST.summary(db, t), "checks": ST.checks(db, t)}
 

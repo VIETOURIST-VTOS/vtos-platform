@@ -16,7 +16,12 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const [t, setT] = useState<Toast>(null);
   const path = usePathname();
   const router = useRouter();
-  useEffect(() => { const u = getUser(); if (!u) router.replace("/login"); else { setUser(u); setReady(true); } }, [router]);
+  useEffect(() => {
+    const u = getUser(); if (!u) { router.replace("/login"); return; }
+    setUser(u); setReady(true);
+    // làm mới quyền (menu ẩn/hiện) từ máy chủ mỗi lần mở – phòng khi ma trận phân quyền đổi sau khi đăng nhập
+    fetch("/api/v1/auth/me", { headers: { Authorization: `Bearer ${localStorage.getItem("vtos_token") || ""}` } }).then((r) => r.ok ? r.json() : null).then((m) => { if (m) { localStorage.setItem("vtos_user", JSON.stringify(m)); setUser(m); } }).catch(() => {});
+  }, [router]);
   const toast = useCallback((msg: string, err?: boolean) => { setT({ msg, err }); setTimeout(() => setT(null), err ? 6500 : 4000); }, []);
   if (!ready) return <main className="muted">Đang tải…</main>;
   return (
@@ -25,7 +30,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         <span className="brand">VTOS <small>Vietourist Operating System</small></span>
         <span className="right">{user?.full_name} · <b>{user?.role_name}</b><a href="/login" onClick={() => clearSession()}>Thoát</a></span>
       </div>
-      <nav className="tabs">{NAV.map(([h, l]) => <Link key={h} href={h} className={(h === "/" ? path === "/" : path.startsWith(h)) ? "on" : ""}>{l}</Link>)}</nav>
+      <nav className="tabs">{NAV.filter(([h]) => !(user?.hidden_menus || []).includes(h)).map(([h, l]) => <Link key={h} href={h} className={(h === "/" ? path === "/" : path.startsWith(h)) ? "on" : ""}>{l}</Link>)}</nav>
       <main>{children}</main>
       {t && <div className={"toast" + (t.err ? " err" : "")} role="status">{t.msg}</div>}
     </Ctx.Provider>

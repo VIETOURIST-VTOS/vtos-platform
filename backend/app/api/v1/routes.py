@@ -12,6 +12,7 @@ from app.models.core import User, Tour, ServiceRequest, Booking, Param, Alert, A
 from app.services import rules as R
 from app.services import tours as T
 from app.services import bookings as BK
+from app.services import access as AC
 
 router = APIRouter(prefix="/api/v1")
 
@@ -27,12 +28,12 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     if not u or not verify_password(form.password, u.password_hash):
         raise HTTPException(401, "Sai tên đăng nhập hoặc mật khẩu")
     R.audit(db, u.username, u.role, "dang_nhap", "user"); db.commit()
-    return {"access_token": create_token(u.username, u.role), "token_type": "bearer", "user": user_out(u)}
+    return {"access_token": create_token(u.username, u.role), "token_type": "bearer", "user": me(u)}
 
 
 @router.get("/auth/me", tags=["auth"])
 def me(u: User = Depends(current_user)):
-    return user_out(u)
+    return {**user_out(u), "hidden_menus": AC.hidden_menus_for(u), "can_see_cost": AC.can_see_cost(u), "read_only": u.role in AC.READ_ONLY_ROLES}
 
 
 @router.post("/auth/password", tags=["auth"])
@@ -126,7 +127,11 @@ def _tour(db: Session, tid: int) -> Tour:
 def get_tour(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
     t = _tour(db, tid)
     v = T.tour_view(db, t, u)
-    v["audit"] = [audit_out(l) for l in db.execute(select(AuditLog).where(AuditLog.entity == f"tour:{t.code}").order_by(desc(AuditLog.id))).scalars()]
+    if not AC.can_see_cost(u):   # Kinh doanh / HCNS: không xem cơ cấu chi phí, quyết toán, bút toán
+        for k in ("settlement", "fixed_cost", "var_cost_per_pax", "actual_cost", "promo_value", "calc", "justification"): v[k] = None
+        if AC.own_only(u): v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") == u.id]
+    else:
+        v["audit"] = [audit_out(l) for l in db.execute(select(AuditLog).where(AuditLog.entity == f"tour:{t.code}").order_by(desc(AuditLog.id))).scalars()]
     return v
 
 
@@ -179,7 +184,7 @@ def req_out(r: ServiceRequest) -> dict:
 
 
 def booking_out(b: Booking) -> dict:
-    return {"id": b.id, "code": b.code, "tour_id": b.tour_id, "tour_code": b.tour.code if b.tour else "", "customer_name": b.customer_name,
+    return {"id": b.id, "code": b.code, "tour_id": b.tour_id, "sales_id": b.sales_id, "tour_code": b.tour.code if b.tour else "", "customer_name": b.customer_name,
             "customer_phone": b.customer_phone, "source": b.source, "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code,
             "sales_name": b.sales.full_name if b.sales else "", "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok, "counts_for_target": b.counts_for_target, "created_at": b.created_at, "paid": b.paid, "due": b.amount - b.discount - b.paid,
             "adl": b.adl, "chd": b.chd, "inf": b.inf, "vietrip_id": b.vietrip_id, "tour_start": b.tour.start_date if b.tour else None, **BK.booking_view(b)}
@@ -187,7 +192,9 @@ def booking_out(b: Booking) -> dict:
 
 @router.get("/requests", tags=["bookings"])
 def list_requests(open_only: bool = False, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    AC.require(u, AC.BOOKING_ROLES, "yêu cầu đặt dịch vụ")
     q = select(ServiceRequest).order_by(desc(ServiceRequest.created_at))
+    if AC.own_only(u): q = q.where(ServiceRequest.sales_id == u.id)
     if open_only: q = q.where(ServiceRequest.booking_id == None)
     return [req_out(r) for r in db.execute(q).scalars()]
 
@@ -209,7 +216,9 @@ def create_booking(rid: int, u: User = Depends(current_user), db: Session = Depe
 @router.get("/bookings", tags=["bookings"])
 def list_bookings(limit: int = 100, q: str = "", status: str = "", tour_id: int | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
     """status: unpaid / depo / paid / cancelled / locked / due (còn phải thu, chưa hủy)."""
+    AC.require(u, AC.BOOKING_ROLES, "danh sách booking")
     qs = select(Booking).order_by(desc(Booking.created_at))
+    if AC.own_only(u): qs = qs.where(Booking.sales_id == u.id)   # NV kinh doanh chỉ thấy booking mình phụ trách
     if tour_id: qs = qs.where(Booking.tour_id == tour_id)
     if q:
         like = f"%{q.strip()}%"
@@ -229,7 +238,10 @@ def _booking(db: Session, bid: int) -> Booking:
 
 @router.get("/bookings/{bid}", tags=["bookings"])
 def get_booking(bid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    b = _booking(db, bid); v = booking_out(b)
+    b = _booking(db, bid)
+    AC.require(u, AC.BOOKING_ROLES, "booking")
+    if AC.own_only(u) and b.sales_id != u.id: raise HTTPException(403, "Chỉ xem được booking do mình phụ trách")
+    v = booking_out(b)
     from app.models.payments import Receipt, Retention
     v["receipts"] = [{"id": r.id, "code": r.code, "amount": r.amount, "method": r.method, "status": r.status, "payer": r.payer, "note": r.note, "created_at": r.created_at} for r in db.execute(select(Receipt).where(Receipt.booking_id == b.id).order_by(Receipt.id)).scalars()]
     v["retentions"] = [BK.retention_out(r, db) for r in db.execute(select(Retention).where(Retention.booking_id == b.id)).scalars()]
@@ -271,7 +283,9 @@ def robot_bookings_check(db: Session = Depends(get_db)):
 @router.get("/retentions", tags=["bookings"])
 def list_retentions(status: str = "hieu_luc", q: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
     from app.models.payments import Retention
+    AC.require(u, AC.BOOKING_ROLES, "tiền bảo lưu")
     qs = select(Retention).order_by(desc(Retention.created_at))
+    if AC.own_only(u): qs = qs.join(Booking, Booking.id == Retention.booking_id).where(Booking.sales_id == u.id)
     if status and status != "all": qs = qs.where(Retention.status == status)
     if q:
         like = f"%{q.strip()}%"; qs = qs.where((Retention.code.ilike(like)) | (Retention.customer_name.ilike(like)) | (Retention.customer_phone.ilike(like)) | (Retention.tour_code.ilike(like)))
@@ -310,6 +324,7 @@ def param_out(p: Param) -> dict:
 
 @router.get("/params", tags=["params"])
 def list_params(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    AC.require(u, AC.PARAM_ROLES, "bảng tham số chính sách")
     return [param_out(p) for p in db.execute(select(Param).order_by(Param.key, desc(Param.effective_from), desc(Param.id))).scalars()]
 
 
@@ -346,7 +361,9 @@ def alert_out(a: Alert) -> dict:
 
 @router.get("/alerts", tags=["alerts"])
 def list_alerts(u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return [alert_out(a) for a in db.execute(select(Alert).order_by(Alert.resolved, desc(Alert.created_at))).scalars()]
+    rows = db.execute(select(Alert).order_by(Alert.resolved, desc(Alert.created_at))).scalars()
+    if u.role in AC.ALL_SEEING: return [alert_out(a) for a in rows]
+    return [alert_out(a) for a in rows if u.role in (a.to_roles or "").split(",")]   # chỉ cảnh báo gửi tới vai trò của mình
 
 
 @router.post("/alerts/{aid}/resolve", tags=["alerts"])
@@ -373,6 +390,7 @@ def audit_out(l: AuditLog) -> dict:
 
 @router.get("/audit", tags=["audit"])
 def list_audit(limit: int = 300, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    AC.require(u, AC.AUDIT_ROLES, "nhật ký kiểm toán")
     ok, n, msg = R.verify_chain(db)
     return {"chain_ok": ok, "records": n, "chain_message": msg,
             "rows": [audit_out(l) for l in db.execute(select(AuditLog).order_by(desc(AuditLog.id)).limit(limit)).scalars()]}

@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.api.deps import current_user, require_roles
 from app.models.core import User, Booking, SERVICE_KINDS
 from app.services import nonpackage as NP
+from app.services import access as AC
 
 router = APIRouter(prefix="/api/v1", tags=["non-package"])
 
@@ -55,7 +56,9 @@ def _b(db: Session, bid: int) -> Booking:
 
 @router.get("/non-package")
 def list_np(month: str = "", service_type: str = "", paid: str = "", q: str = "", limit: int = 500, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    AC.require(u, AC.BOOKING_ROLES, "dịch vụ lẻ")
     rows = NP.list_rows(db, month, service_type, paid, q, min(limit, 2000))
+    if AC.own_only(u): rows = [b for b in rows if b.sales_id == u.id]
     return {"kinds": SERVICE_KINDS, "rows": [NP.row(b) for b in rows], "summary": NP.summary(rows)}
 
 

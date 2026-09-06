@@ -19,7 +19,9 @@ function TourDetail() {
   const load = useCallback(() => api(`/tours/${id}/detail`).then(setT).catch((e) => toast(errMsg(e), true)), [id, toast]);
   useEffect(() => { load(); }, [load]);
   if (!t) return <p className="muted">Đang tải…</p>;
-  const c = t.calc, s = t.settlement, act: string[] = t.actions || [], sm = t.summary || {};
+  const seeCost = t.calc != null;   // Kinh doanh / HCNS: máy chủ ẩn cơ cấu chi phí → không hiện tab dự toán & chi NCC
+  const c = t.calc || {}, s = t.settlement, act: string[] = t.actions || [], sm = t.summary || {};
+  const tabs = TABS.filter(([k]) => seeCost || !["budget", "cost"].includes(k));
   const can = (a: string) => act.includes(a);
   const run = async (path: string, json?: any) => { try { const r = await api(`/tours/${t.id}/${path}`, { method: "POST", json: { note, ...(json || {}) } }); toast(r.message); setNote(""); load(); } catch (e) { toast(errMsg(e), true); } };
   const saveEdit = async (e: React.FormEvent) => {
@@ -44,7 +46,7 @@ function TourDetail() {
       <div className="kpi"><b>{vnd(sm.cost_actual)}</b><span>Chi phí thực tế (quyết toán)</span></div>
       <div className="kpi"><b style={{ color: sm.profit < 0 ? "var(--red)" : undefined }}>{vnd(sm.profit)}</b><span>Lợi nhuận ước</span></div>
     </div>
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{TABS.map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{tabs.map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
 
     {tab === "info" && <div className="grid">
       <div className="panel"><h2>Thông tin tour</h2>

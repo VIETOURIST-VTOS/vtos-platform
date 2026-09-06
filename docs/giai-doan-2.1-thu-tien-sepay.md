@@ -184,3 +184,22 @@ Theo file "Báo cáo Lead & Chuyển đổi Tháng 8/2026" của Marketing (kên
 - AI: Claude (ANTHROPIC_API_KEY) với chính sách cố định (chỉ dùng dữ liệu VTOS: tour sắp khởi hành 45 ngày, giá công bố, chỗ còn, sản phẩm khớp từ khóa, chính sách cọc/hủy/bảo lưu; không giảm giá, không hứa KM; xin tên + SĐT; ≤120 từ); không có khóa → câu mẫu. AI chấm câu trả lời của sale (điểm 1–10, cờ giảm giá tự ý/cam kết sai) lưu vào tin. SĐT khách nhắn trong tin tự gắn vào hội thoại và lead.
 - Web: trang "Hộp thư đa kênh" (danh sách hội thoại có đèn SLA, khung chat, trả lời Ctrl+Enter, AI gợi ý trả lời, nhận xử lý, bật/tắt AI, đóng; tự làm mới 20 giây). Migration b2c3d4e5f6a7; test tests/test_inbox.py (65 test toàn bộ).
 - Anh cần làm trên Meta for Developers (em không dán khóa hộ): tạo App (Business) → thêm Messenger → kết nối Page vietourist.com.vn → tạo Page access token (quyền pages_messaging) → dán FB_PAGE_ACCESS_TOKEN, FB_PAGE_ID, FB_APP_SECRET vào Render; Webhooks → Callback URL https://vtos-api.onrender.com/api/v1/facebook/webhook, Verify token = FB_VERIFY_TOKEN (mặc định vtos-fb-verify), đăng ký messages + messaging_postbacks; App Review cho pages_messaging khi dùng chính thức (trong lúc chờ, tài khoản admin/tester của app vẫn nhắn thử được).
+
+### Trạng thái kết nối Facebook (06/9/2026)
+
+- Meta app "VTOS Vietourist" (ID 28248722768120890, use case Messenger) đã tạo dưới tài khoản developer của anh Tuấn; webhook `https://vtos-api.onrender.com/api/v1/facebook/webhook` đã xác minh; Page **Vietourist** (ID 204936216246441) đã kết nối, đăng ký `messages` + `messaging_postbacks`; Render đã có FB_PAGE_ACCESS_TOKEN / FB_PAGE_ID / FB_APP_SECRET, `/inbox/status` trả `facebook: true`.
+- Các page chi nhánh cũng đã được cấp quyền cho app (Du Lịch Gia Lai 105463664389257, VieTourist Hải Phòng 1736325966644089, Vietourist – Beyond Journey 345473292665910, Nha Trang 2054840418098800, Cần Thơ 1652754198379820, Quy Nhơn 944696959019439…) nhưng chưa đăng ký webhook/tạo mã — muốn gom inbox chi nhánh cần hỗ trợ nhiều page (nhiều token) trong VTOS.
+- Còn lại: kiểm thử nhắn từ tài khoản admin vào Page → /inbox; App Review `pages_messaging` để khách công khai nhắn được; đổi lại token (token đầu đã gửi qua chat) sau khi chạy ổn; ANTHROPIC_API_KEY để AI trả lời thật.
+
+## Tuần 3 – Rà phân quyền toàn hệ thống (06/9/2026)
+
+- Quét tự động 199 endpoint (kịch bản introspection FastAPI) → mọi thao tác ghi đều đã có kiểm tra vai trò trong service; bổ sung lớp **nhìn thấy dữ liệu** `app/services/access.py` (ma trận vai trò × nhóm dữ liệu, dùng chung cho API và menu web):
+  - Lãnh đạo (Chủ tịch, TGĐ, 2 Phó TGĐ), Kế toán, CNTT, Ban Kiểm soát: xem toàn bộ.
+  - Điều hành: tour, booking, chi phí NCC, quyết toán, dòng tiền tour; không xem giao dịch ngân hàng, nhật ký kiểm toán.
+  - Kinh doanh: GĐ KD thấy toàn khối; **NV KD chỉ thấy booking / yêu cầu / phiếu thu / bảo lưu / dịch vụ lẻ do mình phụ trách**; chi tiết tour & sản phẩm bị ẩn cơ cấu chi phí, dự toán 3 con số, quyết toán (chỉ thấy giá bán, chỗ, chương trình); cảnh báo chỉ hiện loại gửi tới nv_kd.
+  - HCNS: nhân sự, lương, báo cáo ngày, sự vụ, tham số; không xem booking, chi phí, ngân hàng.
+  - **Ban Kiểm soát chỉ đọc**: mọi POST/PUT/DELETE bị chặn ở tầng xác thực (trừ đổi mật khẩu và chạy robot giám sát R9).
+  - Đề nghị chi: bộ phận ngoài Điều hành (GĐ KD, PTGĐ MKT, HCNS) chỉ thấy đề nghị mình lập.
+- Robot token: chặn lời gọi khi máy chủ chưa đặt ROBOT_TOKEN hoặc header rỗng (trước đây header rỗng + token rỗng lọt).
+- `/auth/me` trả `hidden_menus`, `can_see_cost`, `read_only`; web ẩn menu theo vai trò và ẩn tab "Dự toán 3 con số" / "Chi NCC & quyết toán" khi máy chủ không trả chi phí. Test mới `tests/test_access.py` (ma trận đọc, sale chỉ thấy của mình, BKS chỉ đọc, robot token) – 68 test toàn bộ.
+- Còn để anh chốt với HCNS: ánh xạ 154 user Vietrip → 12 vai trò VTOS (hiện theo phòng ban Vietrip), có cần vai trò "Trưởng nhóm KD" thấy booking của nhóm hay không.

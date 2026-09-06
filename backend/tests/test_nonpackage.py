@@ -31,7 +31,9 @@ def test_create_pay_print_edit_cancel_summary():
     r2 = client.post("/api/v1/non-package", json={"service_type": "FLIGHT", "description": "Vé SGN–BKK", "country": "THÁI LAN", "customer_name": "Trần Mai Linh", "customer_phone": "0969662280", "source": "Zalo", "amount": 4448000, "cost_amount": 4000000}, headers=login("dh.lan")).json()["row"]
     assert r2["tour_code"] == f"KLE{date.today():%d%m%y}_2"
     # dòng chi phí sinh trên tour KLE; tour loại non_package
-    st = client.get(f"/api/v1/tours/{row['tour_id']}/settlement", headers=h).json(); assert st["lines"][0]["actual"] == 4500000 and st["lines"][0]["supplier_name"] == "Đại lý visa ABC"
+    assert client.get(f"/api/v1/tours/{row['tour_id']}/settlement", headers=h).status_code == 403   # sale không xem cơ cấu chi phí
+    kt = login("ketoan")
+    st = client.get(f"/api/v1/tours/{row['tour_id']}/settlement", headers=kt).json(); assert st["lines"][0]["actual"] == 4500000 and st["lines"][0]["supplier_name"] == "Đại lý visa ABC"
     t = client.get(f"/api/v1/tours/{row['tour_id']}/detail", headers=h).json(); assert t["tour_type"] == "non_package"
     # thu tiền → PAID; in phiếu
     assert client.post("/api/v1/receipts/cash", json={"booking_id": row["id"], "amount": 7000000, "payer": "Nam", "note": "TM"}, headers=login("ketoan")).status_code == 201
@@ -39,7 +41,7 @@ def test_create_pay_print_edit_cancel_summary():
     p = client.get(f"/api/v1/non-package/{row['id']}/print", headers=h); assert p.status_code == 200 and "PHIẾU XÁC NHẬN DỊCH VỤ" in p.text and "7,000,000" in p.text
     # sửa giá vốn → dòng chi phí cập nhật; đổi giá khi đã khóa bị chặn
     e = client.put(f"/api/v1/non-package/{row['id']}", json={"cost_amount": 4800000}, headers=h).json(); assert e["cost_amount"] == 4800000 and e["profit"] == 2200000
-    assert client.get(f"/api/v1/tours/{row['tour_id']}/settlement", headers=h).json()["summary"]["actual"] == 4800000
+    assert client.get(f"/api/v1/tours/{row['tour_id']}/settlement", headers=kt).json()["summary"]["actual"] == 4800000
     client.post("/api/v1/bookings/check", headers=login("tp.dieuhanh"))
     assert client.put(f"/api/v1/non-package/{row['id']}", json={"amount": 7500000}, headers=h).json()["detail"]["gate"] == "KHOA_BOOKING"
     # tổng hợp theo loại

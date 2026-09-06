@@ -9,6 +9,7 @@ from app.models.core import User, Tour
 from app.models.vietrip import VtRecord, TourCostLine
 from app.models.hr import Employee
 from app.services import vietrip as VT
+from app.services import access as AC
 from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1", tags=["vietrip"])
@@ -100,6 +101,7 @@ def records(entity: str, limit: int = 50, unapplied: bool = False, u: User = Dep
 def cost_lines(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
     t = db.get(Tour, tid)
     if not t: raise HTTPException(404, "Không có tour")
+    AC.require(u, AC.COST_ROLES, "cơ cấu chi phí tour")
     rows = db.execute(select(TourCostLine).where(TourCostLine.tour_id == tid).order_by(TourCostLine.line_no)).scalars().all()
     return {"tour": t.code, "rows": [{"id": l.id, "line_no": l.line_no, "description": l.description, "cost_kind": l.cost_kind, "service_type": l.service_type, "supplier_name": l.supplier_name,
                                       "supplier_tax_code": l.supplier_tax_code, "unit_price": l.unit_price, "qty": l.qty, "coef": l.coef, "actual": l.actual, "paid": l.paid, "note": l.note, "source": l.source} for l in rows],

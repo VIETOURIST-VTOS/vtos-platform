@@ -35,7 +35,7 @@ def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
         "approver_role": R.approver_role(t), "settlement": s, "is_doan": R.is_doan(t),
         "imported": t.imported, "product_code": t.product_code, "product_id": t.product_id, "days": t.days, "transport": t.transport, "vehicle_type": t.vehicle_type, "departure_point": t.departure_point,
         "d7_flag": bool(c["breakeven_pax"] and bk < c["breakeven_pax"] and 0 <= days_left <= int(R.get_param(db, "moc_d7")) and t.status == "da_duyet"),
-        "bookings": [{"id": b.id, "code": b.code, "customer_name": b.customer_name, "customer_phone": b.customer_phone, "source": b.source,
+        "bookings": [{"id": b.id, "code": b.code, "sales_id": b.sales_id, "customer_name": b.customer_name, "customer_phone": b.customer_phone, "source": b.source,
                       "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code, "sales_name": b.sales.full_name if b.sales else "",
                       "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok, "counts_for_target": b.counts_for_target, "created_at": b.created_at} for b in t.bookings],
     }
