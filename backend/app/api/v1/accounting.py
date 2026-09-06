@@ -272,6 +272,15 @@ async def misa_opening(file: UploadFile = File(...), objects: UploadFile | None 
     except ValueError as ex: raise HTTPException(422, str(ex))
 
 
+@router.post("/misa/kiem-toan-checkpoint")
+async def misa_kiem_toan(column: str = Form("close"), replace: bool = Form(False),
+                          u: User = Depends(require_roles(*MISA_WRITE)), db: Session = Depends(get_db)):
+    """Chốt sổ theo BCTC đã kiểm toán/soát xét (thay vì số MISA thô) – dùng khi phát hiện số MISA chưa chuẩn."""
+    try:
+        return {"message": "Đã chốt sổ theo BCTC kiểm toán/soát xét", **MISA.import_audited_checkpoint(db, u, column, replace)}
+    except ValueError as ex: raise HTTPException(422, str(ex))
+
+
 @router.post("/misa/partners")
 async def misa_partners(file: UploadFile = File(...), kind: str = Form("auto"), u: User = Depends(require_roles(*MISA_WRITE)), db: Session = Depends(get_db)):
     try: return {"message": "Đã nạp danh mục đối tượng", **MISA.import_partners(db, await file.read(), kind)}

@@ -50,6 +50,9 @@ function MisaPanel({ toast, isKT }: { toast: (m: string, e?: boolean) => void; i
         <button className="act grey" onClick={() => dl(`/misa/export/purchases.xlsx?date_from=${range.from}&date_to=${range.to}`, "Import_MISA_MuaDichVu.xlsx")}>Mua dịch vụ (57 cột)</button>
         <button className="act grey" onClick={() => dl(`/misa/export/entries.xlsx?date_from=${range.from}&date_to=${range.to}`, "Import_MISA_ButToan.xlsx")}>Bút toán tổng hợp</button>
         <button className="act grey" onClick={() => dl(`/misa/export/projects.xlsx?date_from=${range.from}`, "Import_DanhMuc_CongTrinh.xlsx")}>Danh mục công trình</button></div>
+      <div className="panel"><h3>7. Chốt sổ theo BCTC kiểm toán/soát xét</h3><p className="muted">Dùng khi số MISA thô chưa chuẩn (thiếu phân loại vay ngắn/dài hạn, thiếu trích trước…). Ghi đè mốc 30/06/2026 bằng đúng số trên BCTC riêng đã soát xét (Baker Tilly A&C). Nguồn “Điều chỉnh kiểm toán” trên Chứng từ ghi sổ.</p>
+        <label><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Thay thế nếu đã chốt</label><br />
+        {isKT && <button className="act orange" disabled={!!busy} onClick={async () => { const fd = new FormData(); fd.append("column", col); fd.append("replace", String(replace)); setBusy("kt"); try { const r = await api("/misa/kiem-toan-checkpoint", { method: "POST", body: fd }); setRes(r); toast(r.message || "Xong"); reload(); } catch (x) { toast(errMsg(x), true); } setBusy(""); }}>Chốt sổ theo BCTC kiểm toán</button>}</div>
     </div>
     {busy && <p className="muted">Đang xử lý {busy}… (sổ nhật ký lớn có thể mất vài phút)</p>}
     {res && <div className="panel wrap"><h3>Kết quả</h3>

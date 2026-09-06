@@ -135,3 +135,18 @@ def test_dimension_rules_and_exports():
     assert any(p["code"] == t["code"] for p in client.get(f"/api/v1/projects?q={t['code']}", headers=h).json())
     # NV kinh doanh không được nạp
     assert client.post("/api/v1/misa/partners", files={"file": ("a.xlsx", b"x")}, headers=login("kd.hoa")).status_code == 403
+
+
+def test_kiem_toan_checkpoint():
+    h = login("ketoan")
+    r = client.post("/api/v1/misa/kiem-toan-checkpoint", data={"column": "close"}, headers=h)
+    assert r.status_code == 200, r.text
+    js = r.json(); assert js["total"] > 0 and js["accounts"] > 0
+    # trùng lần 2 không replace → lỗi
+    assert client.post("/api/v1/misa/kiem-toan-checkpoint", data={"column": "close"}, headers=h).status_code == 422
+    # replace=True → ghi lại được
+    r2 = client.post("/api/v1/misa/kiem-toan-checkpoint", data={"column": "close", "replace": "true"}, headers=h)
+    assert r2.status_code == 200
+    # BCTC tại 30/6/2026 vẫn phải cân đối (280 == 440) sau khi chốt sổ kiểm toán
+    rep = client.get("/api/v1/reports/bctc?upto=2026-06-30&since=2026-01-01", headers=h).json()
+    assert rep["balanced"]

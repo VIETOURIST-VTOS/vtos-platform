@@ -5,7 +5,8 @@
 - Nạp số dư đầu kỳ (chứng từ SDDK, nguồn so_du_dau_ky), nạp chứng từ lịch sử (nguồn misa), đối chiếu số dư VTOS – MISA.
 - Xuất ngược sang MISA theo đúng mẫu Import (Mua dịch vụ 57 cột, Bút toán tổng hợp, Danh mục công trình).
 """
-import io, re, unicodedata
+import io, re, unicodedata, json
+from pathlib import Path
 from datetime import date, datetime
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -223,6 +224,54 @@ def import_opening_balance(db: Session, u: User, tb: bytes, as_of: date, column:
 
 def ACC_KIND(code: str) -> str:
     return {"1": "TS", "2": "TS", "3": "NV", "4": "NV", "5": "DT", "6": "CP", "7": "DT", "8": "CP", "9": "XD"}[code[0]]
+
+
+KIEM_TOAN_FILE = Path(__file__).resolve().parent.parent / "data" / "kiem_toan_2026h1.json"
+
+
+def import_audited_checkpoint(db: Session, u: User, column: str = "close", replace: bool = False, path=None) -> dict:
+    """Nạp mốc chốt sổ theo BCTC ĐÃ KIỂM TOÁN/SOÁT XÉT (không phải số MISA thô) – dùng khi số liệu MISA
+    chưa chuẩn (thiếu phân loại vay ngắn/dài hạn, thiếu trích trước, v.v.). Ghi chứng từ nguồn 'kiem_toan',
+    mã KT-yyyymmdd, tại ngày as_of ghi trong tệp dữ liệu (app/data/kiem_toan_2026h1.json). Đè lên các bút toán
+    'so_du_dau_ky'/'misa' trước đó tại cùng thời điểm bằng cách đảo (không xóa) các bút toán nguồn misa/so_du_dau_ky
+    có ngày <= as_of nếu replace=True chỉ áp dụng cho lần nạp kiểm toán trước đó (không đảo dữ liệu MISA gốc)."""
+    data = json.loads(Path(path or KIEM_TOAN_FILE).read_text(encoding="utf-8"))
+    as_of = _date(data["as_of"]) or datetime.strptime(data["as_of"], "%Y-%m-%d").date()
+    key_d, key_c = ("close_d", "close_c") if column == "close" else ("open_d", "open_c")
+    ref = f"kt:{as_of:%Y%m%d}"
+    old = db.execute(select(JournalEntry).where(JournalEntry.source_ref == ref, JournalEntry.status == "da_ghi_so")).scalars().all()
+    if old and not replace:
+        raise ValueError(f"Đã có mốc chốt kiểm toán ngày {as_of:%d/%m/%Y} ({old[0].code}) – chọn 'thay thế' để nạp lại")
+    for e in old:
+        rl = [{"account": l.account_code, "debit": l.credit, "credit": l.debit, "partner": l.partner, "partner_code": l.partner_code, "note": f"Đảo {e.code} – nạp lại mốc kiểm toán"} for l in e.lines]
+        r = ACC.post_entry(db, u.username, u.role, as_of, f"Đảo {e.code}: nạp lại mốc kiểm toán", rl, "dao", f"entry:{e.code}")
+        e.reversed_by_id = r.id; e.source_ref = f"{ref}:old"
+    names = {p.code: p.name for p in db.execute(select(Partner)).scalars()}
+    lines, stat = [], {"accounts": 0, "object_lines": 0, "created_accounts": 0}
+    for a in data["tai_khoan"]:
+        code, d, c = a["code"], a[key_d], a[key_c]
+        if not d and not c and "doi_tuong" not in a: continue
+        if not db.get(Account, code):
+            k = ACC_KIND(code); db.add(Account(code=code, name=a["name"], kind=k, parent=code[:-1] if len(code) > 3 else "", level=len(code) - 2, misa=True)); db.flush(); stat["created_accounts"] += 1
+        stat["accounts"] += 1
+        parts = a.get("doi_tuong", [])
+        if parts:
+            for o in parts:
+                pd_, pc_ = o[key_d], o[key_c]
+                if not pd_ and not pc_: continue
+                lines.append({"account": code, "debit": pd_, "credit": pc_, "partner_code": o["ma"], "partner": names.get(o["ma"], o["ten"]), "note": f"Chốt sổ kiểm toán ({data['nguon']})"}); stat["object_lines"] += 1
+            sd = sum(o[key_d] for o in parts); sc = sum(o[key_c] for o in parts)
+            gap = (d - c) - (sd - sc)
+            if abs(gap) >= 1:
+                lines.append({"account": code, "debit": max(gap, 0), "credit": max(-gap, 0), "note": "Chênh lệch tổng TK − tổng đối tượng (kiểm toán)"})
+        else:
+            lines.append({"account": code, "debit": d, "credit": c, "note": f"Chốt sổ kiểm toán ({data['nguon']})"})
+    td = sum(l["debit"] for l in lines); tc = sum(l["credit"] for l in lines)
+    if abs(td - tc) >= 1:
+        raise ValueError(f"Mốc chốt kiểm toán không cân: Nợ {td:,.0f} ≠ Có {tc:,.0f}")
+    e = ACC.post_entry(db, u.username, u.role, as_of, f"Chốt sổ theo BCTC kiểm toán/soát xét tại {as_of:%d/%m/%Y} ({data['nguon']})", lines, "kiem_toan", ref)
+    db.commit()
+    return {"entry": e.code, "as_of": as_of, "total": td, "lines": len(lines), "source": data["nguon"], **stat}
 
 
 # ---------- 5. Sổ nhật ký chung ----------
