@@ -56,6 +56,13 @@ def facebook_status(u: User = Depends(require_roles("cntt", "tgd", "chutich", "p
     return IB.fb_status()
 
 
+@router.get("/facebook/graph")
+def facebook_graph(path: str, u: User = Depends(require_roles("cntt")), db: Session = Depends(get_db)):
+    """CNTT chẩn đoán: gọi Graph API GET bằng token Page (vd path=me/secondary_receivers, me/thread_owner?recipient=PSID)."""
+    if not path.startswith("me"): raise HTTPException(422, "Chỉ cho phép path bắt đầu bằng me")
+    return IB._graph("GET", path)
+
+
 @router.post("/facebook/subscribe")
 def facebook_subscribe(u: User = Depends(require_roles("cntt", "tgd", "ptgd_mkt")), db: Session = Depends(get_db)):
     """Đăng ký (lại) webhook cho Page: messages, messaging_postbacks, standby, messaging_handovers."""
