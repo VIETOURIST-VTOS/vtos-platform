@@ -5,7 +5,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
 # ---------- Pháp nhân trong tập đoàn ----------
-COMPANY_KINDS = {"me": "Công ty mẹ", "con": "Công ty con", "lien_ket": "Công ty liên kết", "chi_nhanh": "Chi nhánh / đơn vị trực thuộc"}
+COMPANY_KINDS = {
+    "me": "Công ty mẹ",
+    "con": "Công ty con",                    # hợp nhất toàn bộ
+    "lien_ket": "Công ty liên kết",          # phương pháp vốn chủ sở hữu, không cộng gộp
+    "doc_lap": "Công ty độc lập",            # cùng nhóm quản trị nhưng NGOÀI phạm vi hợp nhất
+    "chi_nhanh": "Chi nhánh / đơn vị trực thuộc",
+}
 
 
 class Company(Base):
@@ -28,8 +34,17 @@ class Company(Base):
     note: Mapped[str] = mapped_column(Text, default="")
 
     def in_group(self) -> bool:
-        """Nằm trong phạm vi hợp nhất (mẹ, con, chi nhánh) – liên kết áp dụng phương pháp vốn chủ sở hữu."""
+        """Nằm trong phạm vi hợp nhất: mẹ, công ty con, chi nhánh.
+
+        Công ty liên kết áp dụng phương pháp vốn chủ sở hữu; công ty độc lập cùng nhóm quản trị nhưng
+        không hợp nhất – cả hai loại này giao dịch với công ty mẹ là giao dịch với BÊN LIÊN QUAN,
+        phải thuyết minh chứ không loại trừ.
+        """
         return self.kind in ("me", "con", "chi_nhanh")
+
+    def related_party(self) -> bool:
+        """Bên liên quan cần thuyết minh trên báo cáo tài chính."""
+        return self.kind in ("lien_ket", "doc_lap")
 
 
 # ---------- Nhân sự & phân quyền ----------

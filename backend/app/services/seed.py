@@ -198,32 +198,44 @@ def seed_vehicle_rates(db):
                            signed_chutich=True, signed_tgd=True, proposed_by="seed", note="Bảng giá xe 6/5/2026; cột hợp tác áp dụng từ 5/8/2026 (50E-955.31, 50H-496.23)"))
 
 def seed_companies(db):
-    """Danh mục pháp nhân tối thiểu và gán chủ quản cho xe (Ý kiến thẩm định 06/9/2026, C1).
+    """Danh mục pháp nhân của tập đoàn (anh Tuấn cung cấp 06/9/2026) và gắn chủ quản cho xe / HDV.
 
-    Xe: trường kind đã phân sẵn noi_bo (Vietrip) / hop_tac (xe thuê ngoài) nên suy ra chủ quản là an toàn.
-    Hướng dẫn viên: anh Tuấn chốt 06/9/2026 – HDV vẫn thuộc Công ty Cổ phần Du lịch Vietourist (công ty mẹ),
-    kể cả khi chuyển sang cộng tác viên; HCNS đổi được từng người nếu sau này ký qua pháp nhân khác.
-    Mã số thuế để trống cho Kế toán điền.
+    Phạm vi hợp nhất chỉ gồm công ty mẹ và công ty con. Công ty liên kết áp dụng phương pháp vốn chủ
+    sở hữu; công ty độc lập cùng nhóm quản trị nhưng không hợp nhất – giao dịch với hai nhóm này là
+    giao dịch với bên liên quan, phải thuyết minh chứ không loại trừ.
+
+    Tên pháp lý đầy đủ, mã số thuế và tỷ lệ sở hữu để Kế toán bổ sung; hệ thống không tự suy đoán.
     """
     from app.models.core import Company
     from app.models.hr import Employee, Vehicle
-    have = {c.code for c in db.execute(select(Company)).scalars()}
-    if "VTD" not in have:
-        db.add(Company(code="VTD", name="Công ty Cổ phần Du lịch Vietourist", kind="me", ownership_pct=100,
-                       note="Công ty mẹ – mã chứng khoán VTD, niêm yết UPCoM"))
+    DS = [
+        ("VTD", "Công ty Cổ phần Du lịch Vietourist (Vietourist Holdings)", "me", 100, True, "Công ty mẹ – mã chứng khoán VTD, niêm yết UPCoM"),
+        ("VTRIP-VT", "Công ty TNHH Vận tải Vietrip", "con", 100, True, "Sở hữu đội xe; cho công ty mẹ thuê xe là giao dịch nội bộ, loại trừ khi hợp nhất"),
+        ("NNX-TN", "Du lịch Nông nghiệp Xanh Tây Nguyên", "doc_lap", 0, True, "Bổ sung tên pháp lý đầy đủ, MST và tỷ lệ sở hữu"),
+        ("LH-VTR", "Lữ hành Vietourist", "doc_lap", 0, False, "ĐANG TẠM NGƯNG hoạt động; giữ hồ sơ lịch sử"),
+        ("LANGAU", "Retreat & Wellness La Ngâu", "lien_ket", 0, True, "Vốn chủ sở hữu – cần tỷ lệ sở hữu để áp dụng phương pháp"),
+        ("HKTN", "Xã hội Hoàng Kim Tây Nguyên", "lien_ket", 0, True, "Vốn chủ sở hữu – cần tỷ lệ sở hữu để áp dụng phương pháp"),
+        ("LAVENDER", "Khách sạn Lavender Đà Lạt", "doc_lap", 0, True, "Bổ sung tên pháp lý đầy đủ, MST và tỷ lệ sở hữu"),
+        ("BUFFALO", "Việt Nam Buffalotours", "doc_lap", 0, True, "Bổ sung tên pháp lý đầy đủ, MST và tỷ lệ sở hữu"),
+    ]
+    have = {c.code: c for c in db.execute(select(Company)).scalars()}
+    for code, name, kind, pct, active, note in DS:
+        if code in have: continue
+        db.add(Company(code=code, name=name, kind=kind, ownership_pct=pct, active=active, note=note))
     db.flush()
-    me = db.execute(select(Company).where(Company.code == "VTD")).scalars().first()
-    if "VTRIP-VT" not in have:
-        db.add(Company(code="VTRIP-VT", name="Công ty TNHH Vận tải Vietrip", kind="con", ownership_pct=100,
-                       parent_id=me.id if me else None, note="Sở hữu đội xe; thuê xe cho công ty mẹ là giao dịch nội bộ"))
-    db.flush()
-    vt = db.execute(select(Company).where(Company.code == "VTRIP-VT")).scalars().first()
+    cos = {c.code: c for c in db.execute(select(Company)).scalars()}
+    me, vt = cos.get("VTD"), cos.get("VTRIP-VT")
+    for code in ("VTRIP-VT", "NNX-TN", "LH-VTR", "LANGAU", "HKTN", "LAVENDER", "BUFFALO"):
+        c = cos.get(code)
+        if c is not None and c.parent_id is None and me is not None and c.code != "VTD":
+            c.parent_id = me.id
     n = h = 0
     if vt:
         for v in db.execute(select(Vehicle).where(Vehicle.company_id == None)).scalars():
             if v.kind == "noi_bo":            # xe hợp tác là xe thuê ngoài, không thuộc pháp nhân trong tập đoàn
                 v.company_id = vt.id; n += 1
     if me:
+        # Anh Tuấn chốt 06/9/2026: HDV vẫn thuộc công ty mẹ, kể cả khi chuyển sang cộng tác viên
         for e in db.execute(select(Employee).where(Employee.company_id == None, Employee.department == "huong_dan")).scalars():
             e.company_id = me.id; h += 1
     db.commit()

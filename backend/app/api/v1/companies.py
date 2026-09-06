@@ -23,7 +23,7 @@ def out(c: Company) -> dict:
     return {"id": c.id, "code": c.code, "name": c.name, "tax_code": c.tax_code, "kind": c.kind,
             "kind_label": COMPANY_KINDS.get(c.kind, c.kind), "ownership_pct": c.ownership_pct,
             "parent_id": c.parent_id, "effective_from": c.effective_from, "active": c.active,
-            "in_group": c.in_group(), "note": c.note}
+            "in_group": c.in_group(), "related_party": c.related_party(), "note": c.note}
 
 
 @router.get("/companies")
@@ -91,5 +91,8 @@ def coverage(u: User = Depends(current_user), db: Session = Depends(get_db)):
     """Bao nhiêu xe và HDV đã có công ty chủ quản – để biết còn phải gán tay bao nhiêu."""
     veh = list(db.execute(select(Vehicle)).scalars())
     hdv = [e for e in db.execute(select(Employee)).scalars() if e.card_no]
+    cos = list(db.execute(select(Company)).scalars())
     return {"xe": {"tong": len(veh), "da_gan": sum(1 for v in veh if v.company_id), "chua_gan": sum(1 for v in veh if not v.company_id)},
-            "hdv": {"tong": len(hdv), "da_gan": sum(1 for e in hdv if e.company_id), "chua_gan": sum(1 for e in hdv if not e.company_id)}}
+            "hdv": {"tong": len(hdv), "da_gan": sum(1 for e in hdv if e.company_id), "chua_gan": sum(1 for e in hdv if not e.company_id)},
+            "phap_nhan": {"tong": len(cos), "hop_nhat": sum(1 for c in cos if c.in_group()), "ben_lien_quan": sum(1 for c in cos if c.related_party()),
+                          "thieu_mst": sum(1 for c in cos if not c.tax_code), "tam_ngung": sum(1 for c in cos if not c.active)}}

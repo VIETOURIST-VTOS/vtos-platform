@@ -135,7 +135,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
             <td>{cos.find((c) => c.id === g.company_id)?.name || <Tag cls="warn">chưa gán</Tag>}</td>
             {["cntt", "ketoan", "tgd", "chutich", "hcns"].includes(role) && <td>
               <select value={g.company_id || ""} onChange={(e) => post(`/employees/${g.id}/company`, { company_id: e.target.value ? Number(e.target.value) : null })}>
-                <option value="">– chưa gán –</option>{cos.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                <option value="">– chưa gán –</option>{cos.filter((c) => c.active || c.id === g.company_id).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}{c.active ? "" : " (tạm ngưng)"}</option>)}
               </select></td>}</tr>) : <tr><td colSpan={5} className="muted">Chưa có hướng dẫn viên trong hồ sơ nhân sự.</td></tr>}</tbody></table>
         <p className="muted">Hướng dẫn viên mặc định thuộc Công ty Cổ phần Du lịch Vietourist (công ty mẹ), kể cả khi ký cộng tác viên. Đổi được từng người nếu sau này ký qua pháp nhân khác – thù lao do pháp nhân nào chi trả sẽ quyết định bên ghi nhận chi phí khi hợp nhất.</p></div>
       <div className="panel wrap"><table><thead><tr><th>Tour</th><th>HDV</th><th>Ngày × đơn giá</th><th style={{ textAlign: "right" }}>Thù lao</th><th>Trạng thái</th><th>Báo cáo tour</th><th>Hoàn ứng</th><th>Phân công</th>{canDH && <th></th>}</tr></thead>
@@ -176,7 +176,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
             <td>{v.company ? v.company : <Tag cls="warn">chưa gán</Tag>}</td>
             {["cntt", "ketoan", "tgd", "chutich", "hcns", "tp_dh"].includes(role) && <td>
               <select value={v.company_id || ""} onChange={(e) => post(`/vehicles/${v.id}/company`, { company_id: e.target.value ? Number(e.target.value) : null })}>
-                <option value="">– chưa gán –</option>{cos.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                <option value="">– chưa gán –</option>{cos.filter((c) => c.active || c.id === v.company_id).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}{c.active ? "" : " (tạm ngưng)"}</option>)}
               </select></td>}</tr>)}</tbody></table>
         <p className="muted">Xe thuộc pháp nhân trong phạm vi hợp nhất (mẹ, con, chi nhánh) thì lệnh điều xe là <b>giao dịch nội bộ</b> – phải nhận diện để loại trừ khi lập báo cáo hợp nhất. Xe hợp tác là xe thuê ngoài, không gán pháp nhân trong tập đoàn.</p></div>
       <h2>Bảng giá xe nội bộ theo tuyến (Chủ tịch + TGĐ duyệt, hiệu lực theo ngày)</h2>

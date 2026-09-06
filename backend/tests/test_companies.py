@@ -25,14 +25,28 @@ def _startup():
         global client; client = c; yield
 
 
-def test_danh_muc_phap_nhan_co_me_va_van_tai_vietrip():
+def test_danh_muc_du_8_phap_nhan_dung_loai():
+    """Danh sách anh Tuấn cung cấp 06/9/2026."""
     cs = client.get("/api/v1/companies", headers=login("cntt")).json()
     codes = {c["code"]: c for c in cs}
-    assert "VTD" in codes and codes["VTD"]["kind"] == "me"
-    vt = codes.get("VTRIP-VT")
-    assert vt and vt["kind"] == "con" and vt["ownership_pct"] == 100
-    assert vt["parent_id"] == codes["VTD"]["id"]
-    assert vt["in_group"] is True, "công ty con nằm trong phạm vi hợp nhất"
+    mong_doi = {"VTD": "me", "VTRIP-VT": "con", "NNX-TN": "doc_lap", "LH-VTR": "doc_lap",
+                "LANGAU": "lien_ket", "HKTN": "lien_ket", "LAVENDER": "doc_lap", "BUFFALO": "doc_lap"}
+    for code, kind in mong_doi.items():
+        assert code in codes, f"thiếu pháp nhân {code}"
+        assert codes[code]["kind"] == kind, f"{code} phải là {kind}"
+    assert codes["LH-VTR"]["active"] is False, "Lữ hành Vietourist đang tạm ngưng"
+
+
+def test_pham_vi_hop_nhat_va_ben_lien_quan():
+    cs = client.get("/api/v1/companies", headers=login("cntt")).json()
+    codes = {c["code"]: c for c in cs}
+    # chỉ mẹ + con nằm trong phạm vi hợp nhất
+    assert [c["code"] for c in cs if c["in_group"]] == ["VTRIP-VT", "VTD"] or set(c["code"] for c in cs if c["in_group"]) == {"VTD", "VTRIP-VT"}
+    # liên kết và độc lập là bên liên quan – thuyết minh, KHÔNG loại trừ
+    for code in ("LANGAU", "HKTN", "NNX-TN", "LAVENDER", "BUFFALO", "LH-VTR"):
+        assert codes[code]["related_party"] is True and codes[code]["in_group"] is False
+    assert codes["VTRIP-VT"]["parent_id"] == codes["VTD"]["id"]
+    assert codes["VTRIP-VT"]["ownership_pct"] == 100
 
 
 def test_xe_noi_bo_duoc_gan_van_tai_vietrip_xe_hop_tac_thi_khong():
@@ -86,6 +100,9 @@ def test_bao_cao_do_phu_chu_quan():
     c = client.get("/api/v1/companies/coverage", headers=login("tgd")).json()
     assert c["xe"]["tong"] >= 1 and c["xe"]["da_gan"] >= 1
     assert c["hdv"]["tong"] >= 1 and c["hdv"]["chua_gan"] == 0
+    assert c["phap_nhan"]["tong"] == 8 and c["phap_nhan"]["hop_nhat"] == 2 and c["phap_nhan"]["ben_lien_quan"] == 6
+    assert c["phap_nhan"]["thieu_mst"] == 8, "chưa pháp nhân nào có mã số thuế – Kế toán bổ sung"
+    assert c["phap_nhan"]["tam_ngung"] == 1
 
 
 def test_vai_tro_khong_duoc_tao_phap_nhan():
