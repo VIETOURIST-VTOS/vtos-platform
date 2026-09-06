@@ -16,6 +16,7 @@ from app.models.accounting import Account, JournalEntry, JournalLine, Partner, P
 from app.models.ops import PaymentRequest
 from app.services import accounting as ACC
 from app.services import rules as R
+from app.services.bctc import BY_PARTNER
 
 TECHNICAL_PROJECTS = ("0000", "CHUA RO", "CHUARO", "CPXD", "CPCD", "CPBH", "CPQL", "CHOTHUEMATBANG", "DLPTLUHANH")
 PROJECT_STD = re.compile(r"^[A-Z]{2,8}\d{3,4}\.\d{2}\.?\d{6}$")   # mã công trình chuẩn SP.NHÓM.DDMMYY (vd EU0014.09.170626)
@@ -290,7 +291,11 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
     #    chạy trên dữ liệu thật). Nên với các TK này: đảo về 0 TỪNG đối tượng đang có số dư, rồi ghi lại đúng
     #    số kiểm toán theo từng đối tượng mới — tổng 2 phần này đúng bằng target vì target được tính sẵn bằng
     #    tổng các đối tượng trong tệp kiểm toán.
-    partner_accounts = [a["code"] for a in data["tai_khoan"] if a.get("doi_tuong")]
+    # Đảo số dư cũ theo đối tượng cho MỌI tài khoản xét-theo-đối-tượng (BY_PARTNER trong bctc.py) có mặt
+    # trong bộ kiểm toán, kể cả khi bộ kiểm toán không tách chi tiết đối tượng cho tài khoản đó (ví dụ 1388,
+    # 3388) – nếu không đảo hết theo đối tượng, các đối tượng cũ (mã MISA) vẫn còn dư và bị bctc.py cộng dồn
+    # sang cả 2 phía Nợ/Có theo đối tượng (dù tổng ròng tài khoản đã đúng), làm phồng cả tài sản lẫn nguồn vốn.
+    partner_accounts = [a["code"] for a in data["tai_khoan"] if a["code"].startswith(BY_PARTNER)]
     cur_by_partner: dict[str, dict[str, float]] = {}
     if partner_accounts:
         q = (select(JournalLine.account_code, JournalLine.partner_code, func.sum(JournalLine.debit - JournalLine.credit))
@@ -309,18 +314,25 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
         cur = current.pop(code, 0.0)
         stat["accounts"] += 1
         parts = a.get("doi_tuong", [])
-        if parts:
-            # đảo về 0 từng đối tượng (kể cả mã "" chưa gán đối tượng) đang có số dư trên tài khoản này
+        if code.startswith(BY_PARTNER):
+            # đảo về 0 từng đối tượng (kể cả mã "" chưa gán đối tượng) đang có số dư trên tài khoản này –
+            # bắt buộc với MỌI tài khoản BY_PARTNER, kể cả khi bộ kiểm toán không tách chi tiết đối tượng
             for pcode, net in cur_by_partner.get(code, {}).items():
                 if abs(net) < 1: continue
                 ln = {"account": code, "debit": max(-net, 0), "credit": max(net, 0), "note": "Đảo số dư cũ theo đối tượng để chốt sổ kiểm toán"}
                 if pcode: ln["partner_code"] = pcode
                 lines.append(ln); stat["object_lines"] += 1
-            # ghi đúng số kiểm toán theo từng đối tượng mới
-            for o in parts:
-                d_, c_ = o[key_d], o[key_c]
-                if not d_ and not c_: continue
-                lines.append({"account": code, "debit": d_, "credit": c_, "partner_code": o["ma"], "partner": names.get(o["ma"], o["ten"]), "note": f"Chốt sổ kiểm toán ({data['nguon']})"}); stat["object_lines"] += 1
+            if parts:
+                # ghi đúng số kiểm toán theo từng đối tượng mới
+                for o in parts:
+                    d_, c_ = o[key_d], o[key_c]
+                    if not d_ and not c_: continue
+                    lines.append({"account": code, "debit": d_, "credit": c_, "partner_code": o["ma"], "partner": names.get(o["ma"], o["ten"]), "note": f"Chốt sổ kiểm toán ({data['nguon']})"}); stat["object_lines"] += 1
+            else:
+                # bộ kiểm toán không tách đối tượng cho TK này – sau khi đảo hết về 0 ở trên, ghi 1 dòng
+                # bằng đúng target dưới dạng "chưa gán đối tượng" (không có partner_code)
+                if abs(target) >= 1:
+                    lines.append({"account": code, "debit": max(target, 0), "credit": max(-target, 0), "note": f"Điều chỉnh theo BCTC kiểm toán ({data['nguon']})"})
         else:
             delta = target - cur
             if abs(delta) >= 1:
