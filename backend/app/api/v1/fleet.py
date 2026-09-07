@@ -495,3 +495,378 @@ def ds_giao_dich(source: str = "", chua_khop: bool = False, gom_ban_trung: bool 
                       "co": t.co, "trung": t.trung, "ghi_chu": t.ghi_chu} for t in rows],
             "tong_tien": sum(t.so_tien for t in rows),
             "ghi_chu": "Số liệu này đã loại bản ghi lặp. Thêm gom_ban_trung=true để xem cả bản đã loại."}
+
+
+# ====================== ĐỢT 3: CHỦ XE, CÔNG NỢ, CẤN TRỪ, THẾ CHẤP, QUYẾT TOÁN ======================
+from app.models.fleet import (PartnerOwner, SaleCase, Collateral, RepaymentPlan, RepaymentInstallment,
+                              OffsetApplication, Settlement, SettlementLine, SharedInvoice, SharedInvoiceLine,
+                              SALE_STAGES, PLAN_STATUS, SETTLE_STATUS, SETTLE_LINE_KINDS)
+from app.models.finance import FinContract
+from app.services import fleet_settlement as QT
+
+# Quyết toán và cấn trừ là việc của Kế toán; duyệt nội bộ và đóng kỳ là việc của lãnh đạo.
+QT_WRITE = ("ketoan", "cntt")
+QT_DUYET = ("chutich", "tgd", "ketoan")
+
+
+@router.get("/danh-muc-dot3")
+def danh_muc_dot3(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    ai, ly_do = FL.nguoi_duoc_lap_lenh(db)
+    return {"giai_doan_ban_xe": SALE_STAGES, "trang_thai_lich": PLAN_STATUS,
+            "trang_thai_quyet_toan": SETTLE_STATUS, "loai_dong": SETTLE_LINE_KINDS,
+            "nguoi_lap_lenh": [{"username": x.username, "full_name": x.full_name} for x in ai],
+            "nguoi_lap_lenh_ghi_chu": ly_do}
+
+
+class ChuXeIn(BaseModel):
+    ho_ten: str
+    tax_code: str = ""
+    phone: str = ""
+    company_id: int | None = None
+    note: str = ""
+
+
+@router.get("/chu-xe")
+def ds_chu_xe(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    cos = {c.id: c.name for c in db.execute(select(Company)).scalars()}
+    out = []
+    for p in db.execute(select(PartnerOwner).order_by(PartnerOwner.ho_ten)).scalars():
+        xes = list(db.execute(select(Vehicle).where(Vehicle.partner_id == p.id)).scalars())
+        no = 0.0
+        for pl in db.execute(select(RepaymentPlan).where(RepaymentPlan.partner_id == p.id,
+                                                          RepaymentPlan.status == "hieu_luc")).scalars():
+            no += QT.con_lai(db, pl)
+        out.append({"id": p.id, "ho_ten": p.ho_ten, "tax_code": p.tax_code, "phone": p.phone,
+                    "company": cos.get(p.company_id, ""), "company_id": p.company_id, "xac_minh": p.xac_minh,
+                    "so_xe": len(xes), "xe": [v.plate for v in xes], "cong_no_con_lai": round(no),
+                    "note": p.note})
+    return out
+
+
+@router.post("/chu-xe", status_code=201)
+def them_chu_xe(data: ChuXeIn, u: User = Depends(require_roles(*WRITE, *QT_WRITE)), db: Session = Depends(get_db)):
+    p = PartnerOwner(**data.model_dump()); db.add(p); db.flush()
+    R.audit(db, u.username, u.role, "them_chu_xe_hop_tac", f"partner:{p.id}", after=data.model_dump(mode="json"))
+    db.commit()
+    return {"id": p.id, "message": f"Đã thêm chủ xe hợp tác {p.ho_ten}"}
+
+
+class GanXeIn(BaseModel):
+    vehicle_id: int
+    partner_id: int | None = None
+
+
+@router.post("/chu-xe/gan-xe")
+def gan_xe(data: GanXeIn, u: User = Depends(require_roles(*WRITE, *QT_WRITE)), db: Session = Depends(get_db)):
+    v = db.get(Vehicle, data.vehicle_id)
+    if not v: raise HTTPException(404, "Không có xe")
+    if data.partner_id and not db.get(PartnerOwner, data.partner_id): raise HTTPException(404, "Không có chủ xe")
+    v.partner_id = data.partner_id
+    R.audit(db, u.username, u.role, "gan_xe_cho_chu_xe", f"vehicle:{v.code or v.plate}",
+            after={"partner_id": data.partner_id}); db.commit()
+    return {"message": f"Đã gán xe {v.plate}" + (f" cho chủ xe #{data.partner_id}" if data.partner_id else " về không có chủ xe hợp tác")}
+
+
+class LichIn(BaseModel):
+    partner_id: int
+    ten: str
+    principal: float
+    so_ky: int = 0
+    moi_ky: float = 0
+    bat_dau: date | None = None
+    creditor_company_id: int | None = None
+    sale_case_id: int | None = None
+    nguon: str = ""
+
+
+@router.post("/lich-can-tru", status_code=201)
+def tao_lich(data: LichIn, u: User = Depends(require_roles(*QT_WRITE)), db: Session = Depends(get_db)):
+    """Lịch cấn trừ. Chưa có ngày bắt đầu hợp lệ thì giữ trạng thái nháp và KHÔNG phát cảnh báo quá hạn –
+    báo quá hạn cho một lịch chưa ai xác nhận là cách nhanh nhất làm người dùng bỏ qua mọi cảnh báo."""
+    if not db.get(PartnerOwner, data.partner_id): raise HTTPException(404, "Không có chủ xe")
+    if data.principal <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
+    if not data.so_ky and not data.moi_ky: raise HTTPException(422, "Phải có số kỳ hoặc số tiền mỗi kỳ")
+    pl = RepaymentPlan(**data.model_dump(), created_by=u.username)
+    pl.status = "hieu_luc" if data.bat_dau else "nhap_chua_xac_nhan"
+    db.add(pl); db.flush()
+    ks = QT.tao_ky_cho_lich(db, pl)
+    R.audit(db, u.username, u.role, "tao_lich_can_tru", f"plan:{pl.id}", after=data.model_dump(mode="json"))
+    db.commit()
+    return {"id": pl.id, "status": pl.status, "so_ky": len(ks),
+            "cac_ky": [{"ky": k.ky, "due_date": k.due_date, "amount_due": k.amount_due} for k in ks],
+            "message": f"Đã tạo lịch {len(ks)} kỳ" + ("" if data.bat_dau else
+                       " – chưa có ngày bắt đầu nên giữ trạng thái nháp, chưa phát cảnh báo quá hạn")}
+
+
+@router.get("/lich-can-tru")
+def ds_lich(partner_id: int | None = None, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    q = select(RepaymentPlan).order_by(RepaymentPlan.id)
+    if partner_id: q = q.where(RepaymentPlan.partner_id == partner_id)
+    out = []
+    for pl in db.execute(q).scalars():
+        ks = list(db.execute(select(RepaymentInstallment).where(RepaymentInstallment.plan_id == pl.id)
+                             .order_by(RepaymentInstallment.ky)).scalars())
+        out.append({"id": pl.id, "partner_id": pl.partner_id, "ten": pl.ten, "principal": pl.principal,
+                    "status": pl.status, "status_ten": PLAN_STATUS.get(pl.status, pl.status),
+                    "da_ap_dung": QT.da_ap_dung(db, pl.id), "con_lai": QT.con_lai(db, pl),
+                    "cac_ky": [{"ky": k.ky, "due_date": k.due_date, "amount_due": k.amount_due,
+                                "amount_applied": k.amount_applied} for k in ks]})
+    return out
+
+
+class HoaDonChungIn(BaseModel):
+    so_hoa_don: str
+    ngay: date
+    nha_cung_cap: str = ""
+    company_id: int | None = None
+    loai: str = "giu_xe"
+    tong_tien: float = 0
+    vat: float = 0
+    xe: list[dict] = []          # [{vehicle_id, amount?, he_so?}] – lấy từ PHỤ LỤC hóa đơn
+
+
+@router.post("/hoa-don-chung", status_code=201)
+def them_hoa_don_chung(data: HoaDonChungIn, u: User = Depends(require_roles(*QT_WRITE)), db: Session = Depends(get_db)):
+    """Hóa đơn dùng chung nhiều xe.
+
+    Quy tắc sinh ra từ lỗi phân bổ tiền nước tháng 8/2026: chỉ chia cho những xe CÓ TÊN trên chính hóa đơn đó.
+    Vì vậy đường này bắt gửi DANH SÁCH XE, không nhận "số lượng xe" – có ô số lượng là có ngày ai đó gõ 11 và
+    chi phí chạy sang cả những xe không nằm trên hóa đơn, kể cả xe của pháp nhân khác."""
+    if not data.xe: raise HTTPException(422, "Phải chọn danh sách xe từ phụ lục hóa đơn – không nhận số lượng xe")
+    ids = [x.get("vehicle_id") for x in data.xe]
+    if len(set(ids)) != len(ids): raise HTTPException(422, "Một xe xuất hiện hai lần trong phụ lục")
+    cos = set()
+    for vid in ids:
+        v = db.get(Vehicle, vid)
+        if not v: raise HTTPException(404, f"Không có xe id={vid}")
+        if v.company_id: cos.add(v.company_id)
+    if len(cos) > 1:
+        raise HTTPException(422, "Phụ lục có xe của hai pháp nhân khác nhau – không chia chéo giữa hai pháp nhân. "
+                                 "Tách thành hai hóa đơn theo đúng pháp nhân.")
+    inv = SharedInvoice(**data.model_dump(exclude={"xe"}), created_by=u.username)
+    db.add(inv); db.flush()
+    for x in data.xe:
+        db.add(SharedInvoiceLine(invoice_id=inv.id, vehicle_id=x["vehicle_id"],
+                                 amount=float(x.get("amount") or 0), he_so=float(x.get("he_so") or 1)))
+    db.flush()
+    pb = QT.phan_bo_hoa_don_chung(db, inv)
+    R.audit(db, u.username, u.role, "hoa_don_dung_chung", f"invoice:{inv.so_hoa_don}",
+            after={"so_xe": len(ids), "tong": data.tong_tien + data.vat})
+    db.commit()
+    return {"id": inv.id, "phan_bo": pb, "message": f"Đã ghi hóa đơn {inv.so_hoa_don} và phân bổ cho {len(pb)} xe có tên trên phụ lục"}
+
+
+class TheChapIn(BaseModel):
+    contract_id: int
+    vehicle_id: int
+    tu_ngay: date | None = None
+    phuong_an_rut_tai_san: str = ""
+    nguon: str = ""
+
+
+@router.post("/the-chap", status_code=201)
+def them_the_chap(data: TheChapIn, u: User = Depends(require_roles(*QT_WRITE, "chutich", "tgd")), db: Session = Depends(get_db)):
+    if not db.get(FinContract, data.contract_id): raise HTTPException(404, "Không có khế ước")
+    if not db.get(Vehicle, data.vehicle_id): raise HTTPException(404, "Không có xe")
+    c = Collateral(**data.model_dump()); db.add(c); db.flush()
+    R.audit(db, u.username, u.role, "ghi_tai_san_the_chap", f"collateral:{c.id}", after=data.model_dump(mode="json"))
+    db.commit()
+    return {"id": c.id, "message": "Đã ghi xe vào tài sản thế chấp của khế ước"}
+
+
+class GiaiChapIn(BaseModel):
+    van_ban: str
+
+
+@router.post("/the-chap/{cid}/giai-chap")
+def giai_chap(cid: int, data: GiaiChapIn, u: User = Depends(require_roles("chutich", "tgd", "ketoan")), db: Session = Depends(get_db)):
+    """Đánh dấu giải chấp. Bắt buộc có số văn bản: đặc tả nói rõ không tự coi tài sản không thấy trong danh
+    sách ngân hàng là đã giải chấp."""
+    c = db.get(Collateral, cid)
+    if not c: raise HTTPException(404, "Không có bản ghi thế chấp")
+    if not (data.van_ban or "").strip(): raise HTTPException(422, "Phải có số văn bản giải chấp của ngân hàng")
+    from datetime import date as _d
+    c.den_ngay = _d.today(); c.van_ban_giai_chap = data.van_ban; c.duyet_boi = u.username
+    R.audit(db, u.username, u.role, "giai_chap_tai_san", f"collateral:{cid}", after={"van_ban": data.van_ban})
+    db.commit()
+    return {"message": "Đã ghi nhận giải chấp"}
+
+
+class BanXeIn(BaseModel):
+    vehicle_id: int
+    partner_id: int | None = None
+    seller_company_id: int | None = None
+    ngay_ky: date | None = None
+    gia_ban: float = 0
+    da_thu: float = 0
+    nguon: str = ""
+
+
+@router.post("/ban-xe", status_code=201)
+def tao_ho_so_ban(data: BanXeIn, u: User = Depends(require_roles(*QT_WRITE, "chutich", "tgd")), db: Session = Depends(get_db)):
+    if not db.get(Vehicle, data.vehicle_id): raise HTTPException(404, "Không có xe")
+    sc = SaleCase(**data.model_dump(), created_by=u.username)
+    db.add(sc); db.flush()
+    canh_bao = QT.kiem_ban_xe(db, sc)
+    R.audit(db, u.username, u.role, "ho_so_ban_xe", f"sale:{sc.id}", after=data.model_dump(mode="json"))
+    db.commit()
+    return {"id": sc.id, "canh_bao": canh_bao,
+            "message": "Đã tạo hồ sơ bán xe – các trục hợp đồng, thu tiền, bàn giao, giải chấp, sang tên theo dõi riêng"}
+
+
+class ChuyenBuocBanIn(BaseModel):
+    stage: str
+    van_ban_giai_chap: str = ""
+    ly_do_vuot: str = ""
+
+
+@router.post("/ban-xe/{sid}/chuyen-buoc")
+def chuyen_buoc_ban(sid: int, data: ChuyenBuocBanIn, u: User = Depends(require_roles("chutich", "tgd", "ketoan")),
+                    db: Session = Depends(get_db)):
+    """Chuyển bước hồ sơ bán xe. Bước SANG TÊN đi qua chặn cứng B7 và B8."""
+    sc = db.get(SaleCase, sid)
+    if not sc: raise HTTPException(404, "Không có hồ sơ bán xe")
+    if data.stage not in SALE_STAGES: raise HTTPException(422, f"Bước không hợp lệ. Chỉ nhận {', '.join(SALE_STAGES)}")
+    if data.van_ban_giai_chap: sc.van_ban_giai_chap = data.van_ban_giai_chap
+    if data.stage == "sang_ten":
+        loi = [x for x in QT.kiem_ban_xe(db, sc, muon_sang_ten=True) if x["level"] == FL.BLOCK]
+        if loi:
+            raise HTTPException(422, {"message": "Không đủ điều kiện sang tên xe", "vi_pham": loi})
+        sc.da_sang_ten = True
+    if data.stage == "giai_chap":
+        if not (sc.van_ban_giai_chap or "").strip():
+            raise HTTPException(422, "Phải có văn bản giải chấp của ngân hàng – không suy ra từ việc không thấy xe trong danh sách")
+        sc.da_giai_chap = True
+    if data.stage == "ban_giao": sc.da_ban_giao = True
+    sc.stage = data.stage
+    R.audit(db, u.username, u.role, "chuyen_buoc_ban_xe", f"sale:{sid}", after=data.model_dump(mode="json"))
+    db.commit()
+    return {"message": f"Đã chuyển sang bước: {SALE_STAGES[data.stage]}"}
+
+
+@router.post("/quyet-toan/{ky}/{partner_id}/dung")
+def dung_ky(ky: str, partner_id: int, u: User = Depends(require_roles(*QT_WRITE)), db: Session = Depends(get_db)):
+    """Dựng (hoặc dựng lại) bảng quyết toán nháp của một kỳ. Dựng lại KHÔNG cấn trừ thêm lần nào."""
+    try:
+        st = QT.dung_quyet_toan(db, partner_id, ky, u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    R.audit(db, u.username, u.role, "dung_quyet_toan_chu_xe", f"settlement:{st.id}",
+            after={"ky": ky, "truoc_can_tru": st.truoc_can_tru})
+    db.commit()
+    return _qt_out(db, st)
+
+
+def _qt_out(db: Session, st: Settlement) -> dict:
+    veh = {v.id: v.plate for v in db.execute(select(Vehicle)).scalars()}
+    p = db.get(PartnerOwner, st.partner_id)
+    lines = list(db.execute(select(SettlementLine).where(SettlementLine.settlement_id == st.id)
+                            .order_by(SettlementLine.kind, SettlementLine.id)).scalars())
+    return {"id": st.id, "ky": st.ky, "chu_xe": p.ho_ten if p else "", "partner_id": st.partner_id,
+            "status": st.status, "status_ten": SETTLE_STATUS.get(st.status, st.status),
+            "doanh_thu": st.doanh_thu, "doi_tac_huong": st.doi_tac_huong, "doi_tac_chiu": st.doi_tac_chiu,
+            "dieu_chinh": st.dieu_chinh, "truoc_can_tru": st.truoc_can_tru, "can_tru": st.can_tru,
+            "sau_can_tru": st.sau_can_tru, "chuyen_ky_sau": st.chuyen_ky_sau, "ghi_chu": st.ghi_chu,
+            "cong_thuc": "Trước cấn trừ = đối tác được hưởng − đối tác phải chịu + điều chỉnh được duyệt. "
+                         "Sau cấn trừ = trước cấn trừ − cấn trừ đủ điều kiện. Số âm ghi phải thu và chuyển "
+                         "kỳ sau, KHÔNG tạo phiếu chi âm.",
+            "dong": [{"id": l.id, "kind": l.kind, "kind_ten": SETTLE_LINE_KINDS.get(l.kind, l.kind),
+                      "xe": veh.get(l.vehicle_id, ""), "trip_id": l.trip_id, "mo_ta": l.mo_ta,
+                      "amount": l.amount, "ben_chiu": l.ben_chiu, "chung_tu": l.chung_tu,
+                      "duyet_boi": l.duyet_boi} for l in lines]}
+
+
+@router.get("/quyet-toan")
+def ds_quyet_toan(ky: str = "", partner_id: int | None = None, u: User = Depends(require_roles(*READ)),
+                  db: Session = Depends(get_db)):
+    q = select(Settlement).order_by(Settlement.ky.desc(), Settlement.id.desc())
+    if ky: q = q.where(Settlement.ky == ky)
+    if partner_id: q = q.where(Settlement.partner_id == partner_id)
+    return [_qt_out(db, s) for s in db.execute(q.limit(200)).scalars()]
+
+
+class CanTruIn(BaseModel):
+    plan_id: int
+    so_tien: float = 0        # 0 = lấy tối đa theo số phải trả của kỳ
+
+
+@router.post("/quyet-toan/{sid}/can-tru", status_code=201)
+def can_tru(sid: int, data: CanTruIn, u: User = Depends(require_roles(*QT_WRITE)), db: Session = Depends(get_db)):
+    """Áp dụng cấn trừ vào một kỳ quyết toán.
+
+    Ba điều kiện phải đúng cùng lúc: cùng đối tác, cùng pháp nhân, và kỳ chưa đóng. Không tự bù nợ của công ty
+    này vào khoản công ty kia phải trả – hai pháp nhân là hai túi tiền khác nhau."""
+    st = db.get(Settlement, sid)
+    if not st: raise HTTPException(404, "Không có kỳ quyết toán")
+    if st.status == "dong_ky": raise HTTPException(422, "Kỳ đã đóng – phải tạo bút toán điều chỉnh ở kỳ sau")
+    pl = db.get(RepaymentPlan, data.plan_id)
+    if not pl: raise HTTPException(404, "Không có lịch cấn trừ")
+    if pl.partner_id != st.partner_id:
+        raise HTTPException(422, "Lịch cấn trừ thuộc đối tác khác – không bù nợ của người này vào khoản người kia")
+    if pl.creditor_company_id and st.company_id and pl.creditor_company_id != st.company_id:
+        raise HTTPException(422, "Lịch cấn trừ thuộc pháp nhân khác với kỳ quyết toán – hai pháp nhân là hai túi tiền")
+    so_tien = data.so_tien if data.so_tien > 0 else max(0.0, st.truoc_can_tru - st.can_tru)
+    kq = QT.ap_dung_can_tru(db, pl, so_tien, idem_key=f"qt{st.id}:plan{pl.id}:{round(so_tien)}",
+                            boi=u.username, settlement_id=st.id, chung_tu=f"Quyết toán {st.ky}")
+    QT.dung_quyet_toan(db, st.partner_id, st.ky, u.username)
+    R.audit(db, u.username, u.role, "can_tru_quyet_toan", f"settlement:{st.id}",
+            after={"plan_id": pl.id, "da_tru": kq["da_tru"], "lap_lai": kq["lap_lai"]})
+    db.commit()
+    return {**kq, "quyet_toan": _qt_out(db, db.get(Settlement, sid))}
+
+
+class DieuChinhIn(BaseModel):
+    mo_ta: str
+    amount: float
+    chung_tu: str = ""
+
+
+@router.post("/quyet-toan/{sid}/dieu-chinh", status_code=201)
+def them_dieu_chinh(sid: int, data: DieuChinhIn, u: User = Depends(require_roles(*QT_DUYET)), db: Session = Depends(get_db)):
+    """Dòng điều chỉnh phải có người duyệt – đó là điều kiện đóng kỳ (B9)."""
+    st = db.get(Settlement, sid)
+    if not st: raise HTTPException(404, "Không có kỳ quyết toán")
+    if st.status == "dong_ky": raise HTTPException(422, "Kỳ đã đóng – điều chỉnh phải ghi vào kỳ sau")
+    if not (data.mo_ta or "").strip(): raise HTTPException(422, "Phải ghi lý do điều chỉnh")
+    db.add(SettlementLine(settlement_id=sid, kind="dieu_chinh", mo_ta=data.mo_ta, amount=data.amount,
+                          chung_tu=data.chung_tu, duyet_boi=u.username))
+    db.flush()
+    QT.dung_quyet_toan(db, st.partner_id, st.ky, u.username)
+    R.audit(db, u.username, u.role, "dieu_chinh_quyet_toan", f"settlement:{sid}", after=data.model_dump(mode="json"))
+    db.commit()
+    return {"message": "Đã ghi dòng điều chỉnh", "quyet_toan": _qt_out(db, db.get(Settlement, sid))}
+
+
+@router.post("/quyet-toan/{sid}/dong-ky")
+def dong_ky(sid: int, u: User = Depends(require_roles("chutich", "tgd", "ketoan")), db: Session = Depends(get_db)):
+    """Đóng kỳ. Chặn cứng B9: còn cờ đỏ chưa xử lý thì không đóng được.
+
+    Đóng rồi thì khóa: sửa phải tạo bút toán điều chỉnh ở kỳ sau, không sửa ngược vào một con số đã chốt với
+    đối tác."""
+    st = db.get(Settlement, sid)
+    if not st: raise HTTPException(404, "Không có kỳ quyết toán")
+    if st.status == "dong_ky": return {"message": "Kỳ này đã đóng trước đó"}
+    loi = QT.kiem_dong_ky(db, st)
+    if loi: raise HTTPException(422, {"message": "Không đóng được kỳ", "vi_pham": loi})
+    from datetime import datetime as _dt
+    st.status = "dong_ky"; st.closed_at = _dt.now(); st.closed_by = u.username
+    R.audit(db, u.username, u.role, "dong_ky_quyet_toan", f"settlement:{sid}",
+            after={"ky": st.ky, "sau_can_tru": st.sau_can_tru, "chuyen_ky_sau": st.chuyen_ky_sau})
+    db.commit()
+    return {"message": f"Đã đóng kỳ {st.ky}", "quyet_toan": _qt_out(db, st)}
+
+
+class KiemChiIn(BaseModel):
+    tour_id: int | None = None
+    so_tien: float
+    partner_id: int | None = None
+    co_dong_khau_tru: bool = False
+    chung_tu: str = ""
+
+
+@router.post("/kiem-chi")
+def kiem_chi(data: KiemChiIn, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Chạy chặn cứng B4, B5, B6 cho một đề nghị chi trước khi đưa lên bàn duyệt. Chỉ kiểm, không ghi gì."""
+    items = QT.kiem_chi(db, data.tour_id, data.so_tien, data.partner_id, data.co_dong_khau_tru, data.chung_tu)
+    muc = FL.BLOCK if any(i["level"] == FL.BLOCK for i in items) else (FL.OK if not items else FL.REVIEW)
+    return {"muc": muc, "muc_ten": FL.MUC_TEN[muc], "items": items}

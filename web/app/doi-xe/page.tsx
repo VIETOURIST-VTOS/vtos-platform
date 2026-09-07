@@ -18,9 +18,12 @@ function DoiXe() {
   const [xe, setXe] = useState<any[]>([]);
   const [chon, setChon] = useState<any>(null);
   const [xm, setXm] = useState<any[]>([]);
-  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich">("xe");
+  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan">("xe");
   const [chuyen, setChuyen] = useState<any[]>([]);
   const [gd, setGd] = useState<any>(null);
+  const [chuXe, setChuXe] = useState<any[]>([]);
+  const [qt, setQt] = useState<any[]>([]);
+  const [dm3, setDm3] = useState<any>(null);
   const canWrite = ["cntt", "hcns", "tp_dh", "nv_dh"].includes(user?.role || "");
 
   const load = useCallback(async () => {
@@ -30,6 +33,9 @@ function DoiXe() {
       setXm(await api("/fleet/xac-minh"));
       setChuyen(await api("/fleet/chuyen"));
       setGd(await api("/fleet/giao-dich"));
+      setChuXe(await api("/fleet/chu-xe"));
+      setQt(await api("/fleet/quyet-toan"));
+      setDm3(await api("/fleet/danh-muc-dot3"));
     } catch (e) { toast(errMsg(e), true); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
@@ -58,7 +64,7 @@ function DoiXe() {
     <p className="muted">{tq.ghi_chu}{tq.chan_khi_thieu_giay ? " Đang BẬT chế độ chặn khi thiếu giấy tờ." : " Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo, chưa dừng lệnh điều xe."}</p>
 
     <div style={{ display: "flex", gap: 8, margin: "10px 0" }}>
-      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`]] as const)
+      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`]] as const)
         .map(([k, ten]) => <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} onClick={() => setTab(k as any)}>{ten}</button>)}
     </div>
 
@@ -89,6 +95,41 @@ function DoiXe() {
             {r.ghi_chu && <div className="muted">{r.ghi_chu}</div>}</td>
         </tr>) : <tr><td colSpan={7} className="muted">Chưa nhập sao kê thẻ dầu hoặc báo cáo ePass nào.</td></tr>}</tbody></table>
     </div>}
+
+    {tab === "quyettoan" && <>
+      {dm3 && <div className="panel"><h2>Người được tạo và chốt lệnh điều xe</h2>
+        {dm3.nguoi_lap_lenh?.length
+          ? <p>{dm3.nguoi_lap_lenh.map((x: any) => <Tag key={x.username} cls="ok">{x.full_name} ({x.username})</Tag>)} <span className="muted">— chỉ đạo 07/9/2026. Thay người phụ trách thì sửa tham số chính sách <code>xe_nguoi_lap_lenh</code>, không phải sửa phần mềm.</span></p>
+          : <p><Tag cls="warn">Chưa áp dụng</Tag> <span className="muted">{dm3.nguoi_lap_lenh_ghi_chu}</span></p>}
+      </div>}
+
+      <div className="panel wrap"><h2>Chủ xe hợp tác ({chuXe.length})</h2>
+        <table><thead><tr><th>Chủ xe</th><th>Pháp nhân đối ứng</th><th>Xe</th><th>Công nợ còn lại</th><th>Định danh</th></tr></thead>
+          <tbody>{chuXe.length ? chuXe.map((p) => <tr key={p.id}>
+            <td><b>{p.ho_ten}</b>{p.phone && <div className="muted">{p.phone}</div>}</td>
+            <td>{p.company || <span className="muted">chưa xác định</span>}</td>
+            <td>{p.xe.join(", ") || <span className="muted">chưa gán xe</span>}</td>
+            <td className="num">{p.cong_no_con_lai.toLocaleString("vi-VN")}</td>
+            <td>{p.xac_minh === "da_xac_minh" ? <Tag cls="ok">đã đối chiếu</Tag> : <Tag cls="warn">theo nguồn</Tag>}</td>
+          </tr>) : <tr><td colSpan={5} className="muted">Chưa có chủ xe hợp tác nào trong hệ thống.</td></tr>}</tbody></table>
+      </div>
+
+      <div className="panel wrap"><h2>Quyết toán chủ xe theo kỳ ({qt.length})</h2>
+        <p className="muted">Kỳ là tháng dương lịch, chuyến gán theo ngày khởi hành. <b>Số âm ghi thành phải thu và chuyển kỳ sau, không tạo phiếu chi âm.</b> Đóng kỳ rồi thì khóa — sửa phải ghi bút toán điều chỉnh ở kỳ sau.</p>
+        <table><thead><tr><th>Kỳ</th><th>Chủ xe</th><th>Doanh thu</th><th>Đối tác chịu</th><th>Điều chỉnh</th><th>Trước cấn trừ</th><th>Cấn trừ</th><th>Phải trả</th><th>Chuyển kỳ sau</th><th>Trạng thái</th></tr></thead>
+          <tbody>{qt.length ? qt.map((s) => <tr key={s.id}>
+            <td>{s.ky}</td><td>{s.chu_xe}</td>
+            <td className="num">{s.doanh_thu.toLocaleString("vi-VN")}</td>
+            <td className="num">{s.doi_tac_chiu.toLocaleString("vi-VN")}</td>
+            <td className="num">{s.dieu_chinh.toLocaleString("vi-VN")}</td>
+            <td className="num">{s.truoc_can_tru.toLocaleString("vi-VN")}</td>
+            <td className="num">{s.can_tru.toLocaleString("vi-VN")}</td>
+            <td className="num"><b>{s.sau_can_tru.toLocaleString("vi-VN")}</b></td>
+            <td className="num">{s.chuyen_ky_sau ? <Tag cls="warn">{s.chuyen_ky_sau.toLocaleString("vi-VN")}</Tag> : ""}</td>
+            <td>{s.status === "dong_ky" ? <Tag cls="ok">{s.status_ten}</Tag> : <Tag cls="warn">{s.status_ten}</Tag>}</td>
+          </tr>) : <tr><td colSpan={10} className="muted">Chưa dựng kỳ quyết toán nào.</td></tr>}</tbody></table>
+      </div>
+    </>}
 
     {tab === "xe" && <div className="panel wrap"><h2>Danh sách xe ({xe.length})</h2>
       <table><thead><tr><th>Mã xe</th><th>Biển đang dùng</th><th>Quyền khai thác</th><th>Vòng đời</th><th>Pháp nhân sở hữu</th><th>Đối tác</th><th>Hợp đồng</th><th>Tài xế</th><th>Điều kiện hôm nay</th></tr></thead>

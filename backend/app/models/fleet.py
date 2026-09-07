@@ -218,3 +218,205 @@ class ExternalTxn(Base):
     ghi_chu: Mapped[str] = mapped_column(String(300), default="")
     imported_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     imported_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+# ====================== ĐỢT 3: CHỦ XE HỢP TÁC, CÔNG NỢ, CẤN TRỪ, THẾ CHẤP, QUYẾT TOÁN ======================
+# Ba quy tắc sinh ra từ sự cố thực tế, và cả ba đều nằm ở cách DỰNG BẢNG chứ không ở màn hình:
+#
+#   1. Phân bổ chi phí chung: chỉ chia cho những xe CÓ TÊN trên chính hóa đơn đó. Vì vậy hóa đơn dùng chung
+#      có bảng dòng riêng ghi rõ từng xe, chứ không có ô "số lượng xe" để người nhập gõ tay.
+#   2. Cấn trừ trước khi chi: khoản cấn trừ là BẢN GHI có lịch, có trạng thái áp dụng, không phải một con số
+#      trừ trong đầu lúc lập phiếu.
+#   3. Một khoản chỉ được áp dụng MỘT LẦN, kể cả khi chạy lại tác vụ tự động – nên mỗi lần áp dụng có khóa
+#      chống lặp riêng.
+SALE_STAGES = {"hop_dong": "Đã ký hợp đồng", "thu_tien": "Đang thu tiền", "ban_giao": "Đã bàn giao",
+               "giai_chap": "Đã giải chấp", "sang_ten": "Đã sang tên", "huy": "Hủy"}
+PLAN_STATUS = {"nhap_chua_xac_nhan": "Nháp – chưa đủ căn cứ", "hieu_luc": "Đang hiệu lực",
+               "tat_toan": "Đã tất toán", "huy": "Hủy"}
+SETTLE_STATUS = {"nhap": "Nháp", "dh_xac_nhan": "Điều hành đã xác nhận", "kt_doi_soat": "Kế toán đã đối soát",
+                 "da_duyet": "Đã duyệt nội bộ", "da_gui_doi_tac": "Đã gửi đối tác", "dong_ky": "Đã đóng kỳ"}
+SETTLE_LINE_KINDS = {"doanh_thu": "Doanh thu đủ điều kiện", "chi_ho": "Khoản công ty chi hộ",
+                     "chu_xe_chiu": "Khoản chủ xe tự chịu", "dieu_chinh": "Điều chỉnh được duyệt",
+                     "phan_bo": "Phân bổ chi phí chung"}
+
+
+class PartnerOwner(Base):
+    """Chủ xe hợp tác. Pháp nhân đối ứng nằm ở đây chứ không suy từ xe: cấn trừ chỉ được thực hiện trên đúng
+    pháp nhân, đúng đối tác, đúng hợp đồng – không tự bù nợ công ty A vào khoản công ty B phải trả."""
+    __tablename__ = "fleet_partners"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ho_ten: Mapped[str] = mapped_column(String(160))
+    tax_code: Mapped[str] = mapped_column(String(20), default="")
+    phone: Mapped[str] = mapped_column(String(30), default="")
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)  # pháp nhân đối ứng
+    xac_minh: Mapped[str] = mapped_column(String(20), default="nguon_ghi")   # định danh đã đối chiếu chưa
+    note: Mapped[str] = mapped_column(String(300), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class SaleCase(Base):
+    """Hồ sơ bán xe. Năm trục TÁCH RỜI, không gộp vào một cột trạng thái, vì chúng đi không cùng nhịp:
+    hợp đồng, thu tiền, bàn giao, giải chấp, sang tên. Xe có thể đã bàn giao mà chưa giải chấp, và đó chính
+    là ca mà chặn cứng B7 tồn tại để ngăn."""
+    __tablename__ = "fleet_sale_cases"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
+    partner_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_partners.id"), nullable=True)
+    seller_company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    ngay_ky: Mapped[date | None] = mapped_column(Date, nullable=True)
+    gia_ban: Mapped[float] = mapped_column(Float, default=0)
+    da_thu: Mapped[float] = mapped_column(Float, default=0)
+    stage: Mapped[str] = mapped_column(String(20), default="hop_dong")
+    da_ban_giao: Mapped[bool] = mapped_column(Boolean, default=False)
+    da_giai_chap: Mapped[bool] = mapped_column(Boolean, default=False)
+    van_ban_giai_chap: Mapped[str] = mapped_column(String(200), default="")
+    da_sang_ten: Mapped[bool] = mapped_column(Boolean, default=False)
+    quyen_khai_thac_tiep: Mapped[bool] = mapped_column(Boolean, default=False)
+    nguon: Mapped[str] = mapped_column(String(200), default="")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+class Collateral(Base):
+    """Bảng nhiều–nhiều xe ↔ khế ước. Đặc tả gọi đây là trái tim của hai chặn cứng B7 và B8, và đúng như vậy:
+    không có bảng này thì không trả lời được câu "chiếc xe sắp sang tên có đang nằm trong tài sản bảo đảm nào
+    không", và câu đó chỉ hỏi được khi quan hệ là nhiều–nhiều chứ không phải một ô chữ trên hồ sơ vay."""
+    __tablename__ = "fleet_collaterals"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contract_id: Mapped[int] = mapped_column(ForeignKey("fin_contracts.id"))
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
+    tu_ngay: Mapped[date | None] = mapped_column(Date, nullable=True)
+    den_ngay: Mapped[date | None] = mapped_column(Date, nullable=True)     # rỗng = còn thế chấp
+    van_ban_giai_chap: Mapped[str] = mapped_column(String(200), default="")
+    phuong_an_rut_tai_san: Mapped[str] = mapped_column(String(300), default="")
+    duyet_boi: Mapped[str] = mapped_column(String(50), default="")
+    nguon: Mapped[str] = mapped_column(String(200), default="")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class RepaymentPlan(Base):
+    """Lịch thu nợ / cấn trừ theo hợp đồng. Chưa có ngày bắt đầu hoặc kỳ hạn hợp lệ thì giữ trạng thái nháp và
+    KHÔNG phát thông báo quá hạn – báo quá hạn cho một lịch chưa ai xác nhận là làm hỏng lòng tin vào cảnh báo."""
+    __tablename__ = "fleet_repayment_plans"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    partner_id: Mapped[int] = mapped_column(ForeignKey("fleet_partners.id"))
+    sale_case_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_sale_cases.id"), nullable=True)
+    creditor_company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    ten: Mapped[str] = mapped_column(String(200), default="")
+    principal: Mapped[float] = mapped_column(Float, default=0)
+    so_ky: Mapped[int] = mapped_column(Integer, default=0)
+    moi_ky: Mapped[float] = mapped_column(Float, default=0)
+    bat_dau: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(24), default="nhap_chua_xac_nhan")
+    can_tru_tu_dong: Mapped[bool] = mapped_column(Boolean, default=True)
+    nguon: Mapped[str] = mapped_column(String(200), default="")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+class RepaymentInstallment(Base):
+    """Từng kỳ của lịch. Để trong bảng chứ không trong một ô JSON – đặc tả yêu cầu đúng như vậy, vì mỗi kỳ có
+    trạng thái áp dụng riêng và phải truy được về chứng từ đã duyệt."""
+    __tablename__ = "fleet_repayment_installments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("fleet_repayment_plans.id"))
+    ky: Mapped[int] = mapped_column(Integer)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    amount_due: Mapped[float] = mapped_column(Float, default=0)
+    amount_applied: Mapped[float] = mapped_column(Float, default=0)
+    note: Mapped[str] = mapped_column(String(200), default="")
+
+
+class OffsetApplication(Base):
+    """Một lần áp dụng cấn trừ. `idem_key` là khóa chống lặp: chạy lại tác vụ với cùng bối cảnh sẽ không trừ
+    lần thứ hai. Không có nó thì mỗi lần dựng lại quyết toán là một lần trừ thêm của đối tác."""
+    __tablename__ = "fleet_offset_applications"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    idem_key: Mapped[str] = mapped_column(String(160), unique=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("fleet_repayment_plans.id"))
+    installment_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_repayment_installments.id"), nullable=True)
+    settlement_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_settlements.id"), nullable=True)
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    chung_tu: Mapped[str] = mapped_column(String(200), default="")
+    reversed_of: Mapped[int | None] = mapped_column(Integer, nullable=True)   # bút toán đảo, giữ liên kết gốc
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+class Settlement(Base):
+    """Kỳ quyết toán chủ xe hợp tác. Kỳ là THÁNG DƯƠNG LỊCH (chốt 07/9/2026), chuyến gán theo ngày khởi hành.
+
+    Đóng kỳ rồi thì khóa: sửa phải tạo bút toán điều chỉnh ở kỳ sau, không sửa ngược vào kỳ đã chốt với đối
+    tác. Đó là ranh giới giữa một con số đã thỏa thuận và một con số còn đang tính."""
+    __tablename__ = "fleet_settlements"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ky: Mapped[str] = mapped_column(String(7))                        # YYYY-MM
+    partner_id: Mapped[int] = mapped_column(ForeignKey("fleet_partners.id"))
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(24), default="nhap")
+    co: Mapped[str] = mapped_column(String(10), default="vang")
+    doanh_thu: Mapped[float] = mapped_column(Float, default=0)
+    doi_tac_huong: Mapped[float] = mapped_column(Float, default=0)
+    doi_tac_chiu: Mapped[float] = mapped_column(Float, default=0)
+    dieu_chinh: Mapped[float] = mapped_column(Float, default=0)
+    truoc_can_tru: Mapped[float] = mapped_column(Float, default=0)
+    can_tru: Mapped[float] = mapped_column(Float, default=0)
+    sau_can_tru: Mapped[float] = mapped_column(Float, default=0)
+    chuyen_ky_sau: Mapped[float] = mapped_column(Float, default=0)    # số âm KHÔNG tạo phiếu chi âm
+    ghi_chu: Mapped[Text] = mapped_column(Text, default="")
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    closed_by: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+class SettlementLine(Base):
+    """Từng dòng nguồn của kỳ. Bảng tổng không được là một con số không mở ra được: mỗi dòng phải nói rõ nó
+    đến từ xe nào, chuyến nào, ai chịu, và chứng từ ở đâu."""
+    __tablename__ = "fleet_settlement_lines"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    settlement_id: Mapped[int] = mapped_column(ForeignKey("fleet_settlements.id"))
+    kind: Mapped[str] = mapped_column(String(20))
+    vehicle_id: Mapped[int | None] = mapped_column(ForeignKey("vehicles.id"), nullable=True)
+    trip_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_trips.id"), nullable=True)
+    mo_ta: Mapped[str] = mapped_column(String(300), default="")
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    ben_chiu: Mapped[str] = mapped_column(String(24), default="")
+    chung_tu: Mapped[str] = mapped_column(String(200), default="")
+    duyet_boi: Mapped[str] = mapped_column(String(50), default="")     # dòng điều chỉnh phải có người duyệt
+
+
+class SharedInvoice(Base):
+    """Hóa đơn dùng chung nhiều xe (bãi xe, tiện ích).
+
+    Quy tắc sinh ra từ lỗi phân bổ tiền nước tháng 8/2026: chỉ chia cho những xe CÓ TÊN trên chính hóa đơn đó,
+    không chia chéo giữa hai pháp nhân, không suy đoán xe thuộc nhóm nào. Vì vậy danh sách xe là các DÒNG của
+    hóa đơn (bảng dưới), không phải một ô "số lượng xe" cho người nhập gõ."""
+    __tablename__ = "fleet_shared_invoices"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    so_hoa_don: Mapped[str] = mapped_column(String(60))
+    ngay: Mapped[date] = mapped_column(Date)
+    nha_cung_cap: Mapped[str] = mapped_column(String(160), default="")
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    loai: Mapped[str] = mapped_column(String(20), default="giu_xe")
+    tong_tien: Mapped[float] = mapped_column(Float, default=0)
+    vat: Mapped[float] = mapped_column(Float, default=0)
+    tieu_thuc: Mapped[str] = mapped_column(String(40), default="deu")    # deu / km / thoa_thuan
+    ghi_chu: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+class SharedInvoiceLine(Base):
+    """Một xe có tên trên phụ lục hóa đơn dùng chung."""
+    __tablename__ = "fleet_shared_invoice_lines"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("fleet_shared_invoices.id"))
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    he_so: Mapped[float] = mapped_column(Float, default=1)

@@ -99,6 +99,9 @@ class Vehicle(Base):
     op_right: Mapped[str] = mapped_column(String(20), default="so_huu")      # quyền KHAI THÁC (khác vòng đời)
     operator_company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
     partner_name: Mapped[str] = mapped_column(String(120), default="")       # đối tác khai thác/chủ xe ngoài
+    # Đợt 3: trỏ về hồ sơ chủ xe hợp tác. Tên đối tác dạng chữ ở trên chỉ để hiển thị và giữ nguyên văn
+    # nguồn; cấn trừ và quyết toán đi theo ID này vì phải đúng đối tác và đúng pháp nhân.
+    partner_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_partners.id"), nullable=True)
     contract_ref: Mapped[str] = mapped_column(String(60), default="")        # số hợp đồng hợp tác
     contract_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     contract_to: Mapped[date | None] = mapped_column(Date, nullable=True)

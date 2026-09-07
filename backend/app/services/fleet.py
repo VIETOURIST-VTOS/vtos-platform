@@ -384,3 +384,26 @@ def kiem_chuyen(db: Session, t) -> dict:
     if not cps:
         vang("Chuyến chưa có dòng chi phí nào")
     return {"co": muc, "ly_do": ly_do}
+
+
+def nguoi_duoc_lap_lenh(db: Session) -> tuple[list, str]:
+    """Ai được tạo và chốt lệnh điều xe (chỉ đạo Chủ tịch 07/9/2026).
+
+    Tham số `xe_nguoi_lap_lenh` nhận tài khoản hoặc mã nhân viên, ngăn bởi dấu phẩy. Ghi trong tham số chứ
+    không viết tên người vào mã: thay người phụ trách thì sửa một dòng cấu hình, không phải triển khai lại.
+
+    Nếu tham số có giá trị nhưng KHÔNG khớp tài khoản đang hoạt động nào (dữ liệu demo, hoặc người phụ trách
+    đã nghỉ), hàm trả về danh sách rỗng kèm lý do. Nơi gọi khi đó giữ quy tắc theo vai trò như cũ và NÓI RA –
+    im lặng bỏ qua thì chỉ đạo "chỉ một người" âm thầm hết hiệu lực mà không ai biết; còn chặn sạch thì cả
+    đội xe đứng vì một ô cấu hình gõ sai."""
+    from app.models.core import User as U
+    raw = (R.get_param_text(db, "xe_nguoi_lap_lenh") or "").strip()
+    if not raw:
+        return [], "Chưa cấu hình người lập lệnh – áp dụng quy tắc theo vai trò"
+    keys = [k.strip() for k in raw.split(",") if k.strip()]
+    users = list(db.execute(select(U).where(U.active == True,
+                                            or_(U.username.in_(keys), U.staff_code.in_(keys)))).scalars())
+    if not users:
+        return [], (f"Tham số xe_nguoi_lap_lenh đang đặt là \"{raw}\" nhưng không khớp tài khoản đang hoạt "
+                    "động nào – tạm áp dụng quy tắc theo vai trò, cần sửa lại tham số")
+    return users, ""

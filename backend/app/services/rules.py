@@ -63,6 +63,11 @@ DEFAULT_PARAMS = [
     ("xe_vay_tra_goc_ngay", "10", "Cảnh báo trước kỳ trả gốc", "ngày", "Đội xe v1.3 – A8"),
     ("xe_chung_tu_bat_buoc_tu", "10000000", "Khoản chi từ mức này bắt buộc có chứng từ gốc đính kèm", "đồng", "Đội xe v1.3 – B6"),
     ("xe_chenh_gia_ban_vang", "0.20", "Giá chào bán thấp hơn định giá nội bộ quá mức này → cờ vàng bắt buộc giải trình", "tỷ lệ", "Đội xe v1.3 – A9"),
+    # Chỉ đạo Chủ tịch 07/9/2026: GĐ điều hành đội xe là người DUY NHẤT được tạo và chốt lệnh điều xe.
+    # Ghi bằng tài khoản/mã nhân viên trong tham số chứ KHÔNG viết tên một người vào mã nguồn – thay người
+    # phụ trách thì sửa tham số, không phải sửa phần mềm và triển khai lại. Nhận nhiều giá trị, ngăn bởi dấu
+    # phẩy; để trống là giữ nguyên quy tắc theo vai trò như trước.
+    ("xe_nguoi_lap_lenh", "53", "Tài khoản (hoặc mã nhân viên) được tạo và chốt lệnh điều xe – để trống là theo vai trò", "danh sách", "Chủ tịch 07/9/2026"),
     ("moc_luong_doan", "30000000", "Mốc bình quân LN quyết toán 3 tháng để hưởng đủ lương NV kinh doanh đoàn", "đồng", "Đoàn Điều 5"),
     ("phat_su_vu", "1000000", "Chế tài mỗi sự vụ từ mức 2 (chỉ trừ hoa hồng)", "đồng/vụ", "KD Lẻ"),
     ("visa_lien_minh", "300000", "Đơn giá hồ sơ visa khách liên minh", "đồng/hồ sơ", "ĐH Điều 7"),

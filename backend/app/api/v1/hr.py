@@ -501,6 +501,12 @@ def dispatch_create(data: DispatchIn, u: User = Depends(require_roles("nv_dh", "
     # Bộ điều kiện phát lệnh (Đợt 1 đội xe, đặc tả §7). Mức BLOCK chặn thật, không có nút vượt chung; các mức
     # còn lại đi kèm lệnh để người điều hành thấy, và được ghi vào nhật ký cùng lệnh.
     from app.services import fleet as FL
+    # Chỉ đạo Chủ tịch 07/9/2026: GĐ điều hành đội xe là người DUY NHẤT được tạo và chốt lệnh điều xe.
+    ai, ly_do = FL.nguoi_duoc_lap_lenh(db)
+    if ai and u.id not in {x.id for x in ai}:
+        ten = ", ".join(f"{x.full_name} ({x.username})" for x in ai)
+        raise HTTPException(403, f"Chỉ {ten} được tạo lệnh điều xe (chỉ đạo 07/9/2026). "
+                                 "Đổi người phụ trách thì sửa tham số chính sách xe_nguoi_lap_lenh.")
     # Truyền tài xế THẬT của xe, không truyền người thay thế ở trên. Với xe hợp tác do đối tác tự lái, hệ
     # thống đang tạm gắn một nhân sự đội xe chỉ để có chỗ ghi – gọi đó là "tài xế" khi kiểm trùng lịch thì
     # hai xe hợp tác chạy cùng ngày sẽ báo tài xế trùng lịch, trong khi ngoài đời là hai người khác nhau.
@@ -515,6 +521,7 @@ def dispatch_create(data: DispatchIn, u: User = Depends(require_roles("nv_dh", "
     R.audit(db, u.username, u.role, "lenh_dieu_xe", f"tour:{t.code}", after={"xe": v.plate, "tuyen": rt.route if rt else "", "tu": str(data.date_from), "den": str(data.date_to), "gia_noi_bo": price, "kiem_tra": kt["muc"]})
     db.commit()
     canh_bao = [i["msg"] for i in kt["items"]]
+    if ly_do: canh_bao.append(ly_do)      # cấu hình người lập lệnh sai thì nói ra, không im lặng bỏ qua
     return {"message": f"Đã lập lệnh điều xe {v.plate} cho {t.code} – Đội xe xác nhận trong 4 giờ",
             "kiem_tra": {"muc": kt["muc"], "muc_ten": kt["muc_ten"], "canh_bao": canh_bao}}
 
@@ -529,6 +536,13 @@ def dispatch_update(did: int, data: DispatchUpdate, u: User = Depends(require_ro
     d = db.get(DispatchOrder, did)
     if not d: raise HTTPException(404, "Không có lệnh")
     if data.status not in ("da_xac_nhan", "hoan_thanh", "huy"): raise HTTPException(422, "Trạng thái không hợp lệ")
+    if data.status == "da_xac_nhan":
+        # "Tạo VÀ CHỐT" – chốt lệnh cũng chỉ một người, nếu không thì siết cửa vào mà bỏ ngỏ cửa ra.
+        from app.services import fleet as FL
+        ai, _ = FL.nguoi_duoc_lap_lenh(db)
+        if ai and u.id not in {x.id for x in ai}:
+            ten = ", ".join(f"{x.full_name} ({x.username})" for x in ai)
+            raise HTTPException(403, f"Chỉ {ten} được chốt lệnh điều xe (chỉ đạo 07/9/2026)")
     if data.status == "da_xac_nhan": d.confirmed_at = datetime.now()
     d.status = data.status; d.incident_note = data.incident_note or d.incident_note
     R.audit(db, u.username, u.role, "cap_nhat_lenh_dieu_xe", f"dispatch:{d.id}", after=data.model_dump(mode="json")); db.commit()
