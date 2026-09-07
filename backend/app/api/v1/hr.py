@@ -14,6 +14,15 @@ from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1", tags=["nhan-su"])
 HR_WRITE = ("hcns", "cntt")
+
+# Bảng lương tách khỏi hồ sơ nhân sự (chỉ đạo 07/9/2026): theo VAI TRÒ chỉ còn HCNS, Chủ tịch, TGĐ và
+# Ban Kiểm soát. Kế toán trưởng xem toàn công ty bằng NGOẠI LỆ THEO NGƯỜI, vì vai trò "ketoan" có nhiều
+# người mà quyền chỉ cấp cho một. Không dùng require_roles được vì quyết định phụ thuộc dữ liệu.
+def bang_luong(u: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
+    from app.services import access as AC
+    if "payroll" not in AC.hr_tabs_for(db, u):
+        raise HTTPException(403, "Vai trò của bạn không được xem bảng lương toàn công ty")
+    return u
 HR_READ = ("hcns", "cntt", "ketoan", "tgd", "chutich", "bks", "tp_dh", "gd_kd", "tp_kd", "ptgd_doan")
 
 
@@ -110,7 +119,8 @@ def update_user(uid: int, data: TaiKhoanIn, u: User = Depends(require_roles(*HR_
     if t.role in ("chutich", "tgd") and u.role != "cntt": raise HTTPException(403, "Chỉ CNTT thao tác trên tài khoản lãnh đạo")
     if data.role is not None and data.role not in R_: raise HTTPException(422, f"Vai trò không hợp lệ: {data.role}")
     before = {"vai_tro": t.role, "hoat_dong": t.active}
-    if data.role is not None: t.role = data.role
+    if data.role is not None and data.role != t.role:
+        t.role, t.role_changed_at, t.role_changed_by = data.role, datetime.now(), u.username
     if data.active is not None: t.active = data.active
     R.audit(db, u.username, u.role, "sua_tai_khoan", f"user:{t.username}", before=before,
             after={"vai_tro": t.role, "hoat_dong": t.active})
@@ -133,8 +143,10 @@ def reset_password(uid: int, data: ResetPwIn, u: User = Depends(require_roles(*H
     pw = data.new_password.strip() or t.staff_code
     if not pw or len(pw) < 3: raise HTTPException(422, "Chưa có mã NV – nhập mật khẩu mới")
     t.password_hash = hash_password(pw)
-    R.audit(db, u.username, u.role, "dat_lai_mat_khau", f"user:{t.username}"); db.commit()
-    return {"message": f"Đã đặt lại mật khẩu cho {t.full_name} ({t.username})" + (" = mã NV" if not data.new_password.strip() else "")}
+    t.must_change_password = True      # mật khẩu do người khác đặt là mật khẩu TẠM, phải đổi ở lần đăng nhập đầu
+    R.audit(db, u.username, u.role, "dat_lai_mat_khau", f"user:{t.username}", after={"buoc_doi": True}); db.commit()
+    return {"message": f"Đã đặt lại mật khẩu cho {t.full_name} ({t.username})" + (" = mã NV" if not data.new_password.strip() else "")
+                       + " – người dùng phải đổi mật khẩu ở lần đăng nhập kế tiếp"}
 
 
 @router.post("/employees", status_code=201)
@@ -756,7 +768,7 @@ def run_out(r: PayrollRun) -> dict:
 
 
 @router.get("/payroll-runs/{period}")
-def payroll_run(period: str, refresh: bool = False, u: User = Depends(require_roles("ketoan", "hcns", "tgd", "chutich", "cntt", "bks")), db: Session = Depends(get_db)):
+def payroll_run(period: str, refresh: bool = False, u: User = Depends(bang_luong), db: Session = Depends(get_db)):
     try:
         return run_out(H.get_or_draft(db, period, refresh=refresh))
     except ValueError as ex:
@@ -798,7 +810,8 @@ def khoan_treo(u: User = Depends(current_user), db: Session = Depends(get_db)):
     khoản treo không hiện trên phiếu lương nào."""
     from app.services import luong as L
     kq = L.khoan_treo(db)
-    if u.role not in ("ketoan", "hcns", "tgd", "chutich", "cntt", "bks", "gd_kd", "tp_kd", "tp_dh", "ptgd_doan"):
+    from app.services import access as AC
+    if "payroll" not in AC.hr_tabs_for(db, u) and u.role not in ("gd_kd", "tp_kd", "tp_dh", "ptgd_doan"):
         e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
         ma = e.code if e else "\u0000"
         kq["rows"] = [r for r in kq["rows"] if r["ma"] == ma]
@@ -808,7 +821,7 @@ def khoan_treo(u: User = Depends(current_user), db: Session = Depends(get_db)):
 
 
 @router.get("/payroll/xung-dot-ho-so")
-def payroll_conflicts(u: User = Depends(require_roles("hcns", "cntt", "ketoan", "tgd", "chutich", "bks")), db: Session = Depends(get_db)):
+def payroll_conflicts(u: User = Depends(bang_luong), db: Session = Depends(get_db)):
     """Xung đột hồ sơ chặn chạy kỳ lương: một mã dùng cho hai người, một tài khoản gắn hai hồ sơ."""
     from app.services import luong as L
     ds = L.xung_dot_ho_so(db)
@@ -917,7 +930,8 @@ def phieu_luong(period: str, ma: str = "", u: User = Depends(current_user), db: 
     lương ở đây hiển thị luôn phần treo bên cạnh phần được trả.
     """
     from app.services import luong as L
-    quan_tri = u.role in ("ketoan", "hcns", "tgd", "chutich", "cntt", "bks")
+    from app.services import access as AC
+    quan_tri = "payroll" in AC.hr_tabs_for(db, u)      # xem phiếu lương của NGƯỜI KHÁC; phiếu của chính mình luôn xem được
     e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
     if not e and u.staff_code:
         e = db.execute(select(Employee).where(Employee.code == u.staff_code)).scalars().first()
@@ -955,7 +969,7 @@ def phieu_luong(period: str, ma: str = "", u: User = Depends(current_user), db: 
 
 
 @router.get("/payroll-runs/{period}/theo-phap-nhan")
-def payroll_by_company(period: str, u: User = Depends(require_roles("ketoan", "hcns", "tgd", "chutich", "cntt", "bks")), db: Session = Depends(get_db)):
+def payroll_by_company(period: str, u: User = Depends(bang_luong), db: Session = Depends(get_db)):
     """Bảng lương chia theo pháp nhân trả lương – đối chiếu trước khi TGĐ ký lô và ghi sổ."""
     run = H.get_or_draft(db, period)
     return {"period": period, "rows": H.but_toan_theo_phap_nhan(db, run),

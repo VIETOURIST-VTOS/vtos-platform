@@ -28,22 +28,30 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     u = db.execute(select(User).where(User.username == form.username, User.active == True)).scalars().first()
     if not u or not verify_password(form.password, u.password_hash):
         raise HTTPException(401, "Sai tên đăng nhập hoặc mật khẩu")
+    u.last_login = datetime.now()          # để rà được tài khoản bỏ hoang và người đã nghỉ chưa khóa
     R.audit(db, u.username, u.role, "dang_nhap", "user"); db.commit()
-    return {"access_token": create_token(u.username, u.role), "token_type": "bearer", "user": me(u)}
+    return {"access_token": create_token(u.username, u.role), "token_type": "bearer", "user": me(u, db)}
 
 
 @router.get("/auth/me", tags=["auth"])
-def me(u: User = Depends(current_user)):
-    return {**user_out(u), "hidden_menus": AC.hidden_menus_for(u), "can_see_cost": AC.can_see_cost(u), "read_only": u.role in AC.READ_ONLY_ROLES,
-            "can_create_request": u.role in AC.REQUEST_CREATE_ROLES, "can_create_booking": u.role in AC.OPERATIONS}
+def me(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {**user_out(u), "hidden_menus": AC.hidden_menus_for(u, db), "can_see_cost": AC.can_see_cost(u), "read_only": u.role in AC.READ_ONLY_ROLES,
+            "can_create_request": u.role in AC.REQUEST_CREATE_ROLES, "can_create_booking": u.role in AC.OPERATIONS,
+            "must_change_password": bool(u.must_change_password), "hr_tabs": AC.hr_tabs_for(db, u),
+            "company_id": u.company_id, "ngoai_bien_che": bool(u.ngoai_bien_che)}
 
 
 @router.post("/auth/password", tags=["auth"])
 def change_password(data: S.PasswordChange, u: User = Depends(current_user), db: Session = Depends(get_db)):
     if not verify_password(data.old_password, u.password_hash): raise HTTPException(400, "Mật khẩu cũ không đúng")
+    if len(data.new_password or "") < 6:
+        raise HTTPException(422, "Mật khẩu mới phải từ 6 ký tự")
+    if data.new_password == u.staff_code:
+        raise HTTPException(422, "Không đặt mật khẩu bằng mã nhân viên – mã này nằm công khai trên bảng lương")
     u.password_hash = hash_password(data.new_password)
+    u.must_change_password = False
     R.audit(db, u.username, u.role, "doi_mat_khau", "user"); db.commit()
-    return {"ok": True}
+    return {"ok": True, "must_change_password": False}
 
 
 @router.get("/meta", tags=["meta"])
@@ -498,6 +506,72 @@ def payroll(ym: str | None = None, u: User = Depends(require_roles("ketoan", "hc
 
 
 # ---------- robot API (n8n) ----------
+# ---------- Ngoại lệ quyền có thời hạn (chỉ đạo 07/9/2026) ----------
+class GrantIn(BaseModel):
+    user_id: int
+    kind: str                    # menu / capability
+    value: str
+    to_date: date
+    reason: str
+    from_date: date | None = None
+
+
+@router.get("/access/grants", tags=["access"])
+def grants_list(con_hieu_luc: bool = False, u: User = Depends(require_roles("chutich", "tgd", "cntt", "hcns", "bks")),
+                db: Session = Depends(get_db)):
+    from app.models.core import UserGrant, CAPABILITIES, GRANT_KINDS, GRANT_MAX_DAYS
+    rows = list(db.execute(select(UserGrant).order_by(UserGrant.id.desc())).scalars())
+    if con_hieu_luc: rows = [g for g in rows if g.hieu_luc()]
+    ten = {x.id: x for x in db.execute(select(User)).scalars()}
+    return {"rows": [{"id": g.id, "user_id": g.user_id,
+                      "ho_ten": ten[g.user_id].full_name if g.user_id in ten else "",
+                      "username": ten[g.user_id].username if g.user_id in ten else "",
+                      "kind": g.kind, "value": g.value,
+                      "ten_quyen": CAPABILITIES.get(g.value, g.value) if g.kind == "capability" else g.value,
+                      "from_date": g.from_date, "to_date": g.to_date, "reason": g.reason,
+                      "granted_by": g.granted_by, "approved_by": g.approved_by,
+                      "active": g.active, "hieu_luc": g.hieu_luc()} for g in rows],
+            "kinds": GRANT_KINDS, "capabilities": CAPABILITIES, "max_days": GRANT_MAX_DAYS}
+
+
+@router.post("/access/grants", status_code=201, tags=["access"])
+def grant_create(data: GrantIn, u: User = Depends(require_roles("chutich", "tgd")), db: Session = Depends(get_db)):
+    """Cấp ngoại lệ quyền cho MỘT người, có thời hạn. Chỉ Chủ tịch hoặc TGĐ – người cấp cũng là người duyệt,
+    nên không có bước chờ; điều bắt buộc là phải có hạn và có lý do bằng lời."""
+    from app.models.core import UserGrant, CAPABILITIES, GRANT_MAX_DAYS
+    t = db.get(User, data.user_id)
+    if not t: raise HTTPException(404, "Không có tài khoản")
+    if data.kind not in ("menu", "capability"): raise HTTPException(422, "kind: menu / capability")
+    if data.kind == "capability" and data.value not in CAPABILITIES:
+        raise HTTPException(422, f"Năng lực không hợp lệ: {data.value}")
+    if data.kind == "menu" and data.value not in AC.ALL_MENU_PATHS:
+        raise HTTPException(422, f"Không có màn hình {data.value}")
+    if not (data.reason or "").strip(): raise HTTPException(422, "Phải ghi lý do cấp quyền")
+    tu = data.from_date or date.today()
+    if data.to_date < tu: raise HTTPException(422, "Ngày hết hạn phải sau ngày bắt đầu")
+    if (data.to_date - tu).days > GRANT_MAX_DAYS:
+        raise HTTPException(422, f"Ngoại lệ quyền tối đa {GRANT_MAX_DAYS} ngày – cần lâu hơn thì đổi vai trò hoặc sửa ma trận quyền")
+    g = UserGrant(user_id=t.id, kind=data.kind, value=data.value, from_date=tu, to_date=data.to_date,
+                  reason=data.reason.strip()[:300], granted_by=u.username, approved_by=u.username)
+    db.add(g); db.flush()
+    R.audit(db, u.username, u.role, "cap_ngoai_le_quyen", f"user:{t.username}",
+            after={"kind": g.kind, "value": g.value, "den_ngay": str(g.to_date), "ly_do": g.reason})
+    db.commit(); db.refresh(g)
+    return {"id": g.id, "message": f"Đã cấp cho {t.full_name}: {g.value}, hết hiệu lực ngày {g.to_date:%d/%m/%Y}"}
+
+
+@router.delete("/access/grants/{gid}", tags=["access"])
+def grant_revoke(gid: int, u: User = Depends(require_roles("chutich", "tgd")), db: Session = Depends(get_db)):
+    """Thu hồi sớm. Tắt cờ chứ không xóa dòng – phải truy được là quyền đã từng được cấp."""
+    from app.models.core import UserGrant
+    g = db.get(UserGrant, gid)
+    if not g: raise HTTPException(404, "Không có ngoại lệ này")
+    g.active = False
+    R.audit(db, u.username, u.role, "thu_hoi_ngoai_le_quyen", f"grant:{gid}", after={"value": g.value})
+    db.commit()
+    return {"message": "Đã thu hồi ngoại lệ quyền", "id": gid}
+
+
 # ---------- Nhật ký AI (chỉ đạo 07/9/2026) ----------
 AI_LOG_ROLES = ("chutich", "tgd", "bks", "cntt", "ptgd_mkt")
 

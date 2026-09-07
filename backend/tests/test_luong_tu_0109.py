@@ -5,6 +5,8 @@ Mã phép thử giữ nguyên quy ước VT01…VT14 của phụ lục để gh�
 phải khoản trừ. Nếu mô hình hoá thành dòng trừ thì về hình thức là cắt lương thay xử lý kỷ luật – hành
 vi bị cấm tại Điều 127 khoản 2 Bộ luật Lao động 2019.
 """
+# Từ 07/9/2026 bảng lương tách khỏi hồ sơ nhân sự và theo VAI TRÒ chỉ còn HCNS (cùng Chủ tịch, TGĐ,
+# Ban Kiểm soát). CNTT và Kế toán không còn mở được – nên các phép thử về lương đăng nhập bằng HCNS.
 import os, sys
 os.environ["DATABASE_URL"] = "sqlite:///./test_luong_tu_0109.db"; os.environ["SEED_DEMO"] = "1"; os.environ["ENV"] = "dev"
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -67,7 +69,7 @@ def test_vt02_phan_chenh_khong_bao_gio_la_dong_tru():
 
 
 def test_vt02_bang_luong_that_khong_co_dong_tru_tu_xep_bac():
-    r = client.get("/api/v1/payroll-runs/2026-09?refresh=true", headers=login("cntt"))
+    r = client.get("/api/v1/payroll-runs/2026-09?refresh=true", headers=login("hcns"))
     assert r.status_code == 200, r.text
     for row in r.json()["rows"]:
         assert L.kiem_tra_khong_phai_khoan_tru(row) == [], row["ma"]
@@ -103,7 +105,7 @@ def test_vt08_nam_phong_khong_yeu_cau_cham_cong():
     assert L.che_do_cong(nv(phong="huong_dan")) == L.THEO_CHUYEN
     assert L.che_do_cong(nv(phong="doi_xe")) == L.LUONG_CTP
 
-    run = client.get("/api/v1/payroll-runs/2026-09", headers=login("cntt")).json()
+    run = client.get("/api/v1/payroll-runs/2026-09", headers=login("hcns")).json()
     for row in run["rows"]:
         if row["phong"] in ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt"):
             assert row["che_do_cong"] == "bao_cao_ngay"
@@ -113,7 +115,7 @@ def test_vt08_nam_phong_khong_yeu_cau_cham_cong():
 
 
 def test_nhap_cong_chi_nhan_bo_phan_con_cham_cong():
-    run = client.get("/api/v1/payroll-runs/2026-09", headers=login("cntt")).json()
+    run = client.get("/api/v1/payroll-runs/2026-09", headers=login("hcns")).json()
     kt = next((r for r in run["rows"] if r["phong"] == "ketoan"), None)
     kd = next((r for r in run["rows"] if r["phong"] == "kd_le"), None)
     if kd:
@@ -129,7 +131,7 @@ def test_nhap_cong_chi_nhan_bo_phan_con_cham_cong():
 
 # ---------------------------------------------------------------- VT06
 def test_vt06_hoa_hong_qua_han_la_treo_va_hien_trong_bao_cao():
-    r = client.get("/api/v1/payroll/khoan-treo", headers=login("cntt"))
+    r = client.get("/api/v1/payroll/khoan-treo", headers=login("hcns"))
     assert r.status_code == 200, r.text
     kq = r.json()
     assert "HOÃN, không phải cắt" in kq["ghi_chu"]
@@ -159,14 +161,14 @@ def test_vt13_xung_dot_ho_so_chan_chay_ky_luong():
              user_id=mau.user_id, active=True)
     db.add(them); db.commit(); db.close()
 
-    ds = client.get("/api/v1/payroll/xung-dot-ho-so", headers=login("cntt")).json()
+    ds = client.get("/api/v1/payroll/xung-dot-ho-so", headers=login("hcns")).json()
     assert ds["so_luong"] >= 1 and any(x["loai"] == "trung_tai_khoan" for x in ds["rows"])
-    r = client.get("/api/v1/payroll-runs/2026-10?refresh=true", headers=login("cntt"))
+    r = client.get("/api/v1/payroll-runs/2026-10?refresh=true", headers=login("hcns"))
     assert r.status_code == 422 and "xung đột hồ sơ" in r.json()["detail"], r.text
 
     db = SessionLocal()
     x = db.query(E).filter(E.code == "KT-XD-01").first(); x.active = False; db.commit(); db.close()
-    assert client.get("/api/v1/payroll-runs/2026-10?refresh=true", headers=login("cntt")).status_code == 200
+    assert client.get("/api/v1/payroll-runs/2026-10?refresh=true", headers=login("hcns")).status_code == 200
 
 
 # ---------------------------------------------------------------- VT14
@@ -197,7 +199,7 @@ def test_chua_quyet_toan_thi_khong_duoc_hieu_la_doanh_thu_0():
 
 
 def test_bang_luong_liet_ke_nguoi_chua_du_co_so():
-    run = client.get("/api/v1/payroll-runs/2026-09?refresh=true", headers=login("cntt")).json()
+    run = client.get("/api/v1/payroll-runs/2026-09?refresh=true", headers=login("hcns")).json()
     assert "chua_du_co_so" in run["totals"]
     for r in run["rows"]:
         xd = r.get("xac_dinh_luong") or {}
@@ -209,7 +211,7 @@ def test_bang_luong_liet_ke_nguoi_chua_du_co_so():
 def test_khoan_treo_tach_cho_chot_va_chua_co_bang_quyet_toan():
     """Hai tình huống rất khác nhau về việc phải làm: bảng quyết toán đã có đủ số, chỉ thiếu thao tác chốt;
     và chưa ai lập bảng. Gộp lại thì Kế toán không biết bắt đầu từ đâu trong hàng trăm chuyến."""
-    kq = client.get("/api/v1/payroll/khoan-treo", headers=login("cntt")).json()
+    kq = client.get("/api/v1/payroll/khoan-treo", headers=login("hcns")).json()
     assert "cho_chot" in kq and "chua_co_bang_quyet_toan" in kq
     assert kq["cho_chot"] + kq["chua_co_bang_quyet_toan"] == kq["tong_chuyen"] - len(
         {r["tour_code"] for r in kq["rows"] if r["vai_tro"] == "Hướng dẫn viên"} -

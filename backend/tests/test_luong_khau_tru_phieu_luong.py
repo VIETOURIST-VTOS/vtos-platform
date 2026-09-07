@@ -6,6 +6,8 @@ Bốn việc hoàn thành ngày 07/9/2026 sau khi các văn bản đã đủ ch�
 3. Bút toán lương lập riêng theo từng pháp nhân trả lương.
 4. Bước duyệt đủ hai chữ ký, người trình không được ký hồ sơ mình trình.
 """
+# Từ 07/9/2026 bảng lương tách khỏi hồ sơ nhân sự và theo VAI TRÒ chỉ còn HCNS (cùng Chủ tịch, TGĐ,
+# Ban Kiểm soát). CNTT và Kế toán không còn mở được – nên các phép thử về lương đăng nhập bằng HCNS.
 import os, sys
 os.environ["DATABASE_URL"] = "sqlite:///./test_luong_khau_tru.db"; os.environ["SEED_DEMO"] = "1"; os.environ["ENV"] = "dev"
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -31,7 +33,7 @@ def _startup():
 
 
 def run(period="2026-09", refresh=True):
-    r = client.get(f"/api/v1/payroll-runs/{period}" + ("?refresh=true" if refresh else ""), headers=login("cntt"))
+    r = client.get(f"/api/v1/payroll-runs/{period}" + ("?refresh=true" if refresh else ""), headers=login("hcns"))
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -132,9 +134,9 @@ def test_phieu_luong_cua_chinh_minh():
     u.password_hash = __import__("app.core.security", fromlist=["x"]).hash_password("123456")
     db.commit(); db.close()
 
-    r = client.get("/api/v1/payroll-runs/2026-09/phieu-luong", headers=login("cntt"))
+    r = client.get("/api/v1/payroll-runs/2026-09/phieu-luong", headers=login("hcns"))
     assert r.status_code in (200, 404)
-    p = client.get(f"/api/v1/payroll-runs/2026-09/phieu-luong?ma={ma}", headers=login("cntt"))
+    p = client.get(f"/api/v1/payroll-runs/2026-09/phieu-luong?ma={ma}", headers=login("hcns"))
     assert p.status_code == 200, p.text
     d = p.json()
     assert d["nhan_su"]["ma"] == ma
@@ -152,7 +154,7 @@ def test_khong_xem_duoc_phieu_luong_nguoi_khac():
 
 # ---------------------------------------------------------------- 3. theo pháp nhân
 def test_bang_luong_tach_theo_phap_nhan():
-    r = client.get("/api/v1/payroll-runs/2026-09/theo-phap-nhan", headers=login("ketoan"))
+    r = client.get("/api/v1/payroll-runs/2026-09/theo-phap-nhan", headers=login("hcns"))
     assert r.status_code == 200, r.text
     d = r.json()
     assert d["rows"], "phải có ít nhất một nhóm"

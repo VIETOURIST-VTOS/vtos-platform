@@ -59,6 +59,8 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
   { key: "kiemsoat", label: "9. Kiểm soát & Chính sách", items: [
     ["Chính sách & định mức", "/params"], ["Cảnh báo nghiệp vụ", "/alerts"], ["Kiểm tra & đối chiếu", "/accounting?tab=misa"],
     ["Ngoại lệ cần xử lý", ""], ["Nhật ký nghiệp vụ", "/audit"]] },
+  { key: "taikhoan", label: "0. Tài khoản của tôi", items: [
+    ["Đổi mật khẩu", "/doi-mat-khau"]] },
   { key: "hethong", label: "10. Hệ thống & Tích hợp", items: [
     ["Cấu hình tổ chức", "/companies"], ["Tài khoản & phân quyền", ""], ["Vị trí AI & quyền hạn", ""],
     ["Đồng bộ Vietrip", "/vietrip"], ["Kết nối MISA và các kênh", "/accounting?tab=misa"],
@@ -88,11 +90,18 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const u = getUser(); if (!u) { router.replace("/login"); return; }
     setUser(u); setReady(true);
+    // Tài khoản còn mật khẩu tạm: đưa thẳng tới màn hình đổi mật khẩu. Máy chủ đã chặn mọi đường dẫn khác,
+    // nên nếu không chuyển hướng ở đây thì người dùng chỉ thấy một loạt lỗi 403 mà không hiểu vì sao.
+    if (u.must_change_password && path !== "/doi-mat-khau") { router.replace("/doi-mat-khau"); return; }
     const h = { Authorization: `Bearer ${localStorage.getItem("vtos_token") || ""}` };
     // làm mới quyền (menu ẩn/hiện) từ máy chủ mỗi lần mở – phòng khi ma trận phân quyền đổi sau khi đăng nhập
-    fetch("/api/v1/auth/me", { headers: h }).then((r) => r.ok ? r.json() : null).then((m) => { if (m) { localStorage.setItem("vtos_user", JSON.stringify(m)); setUser(m); } }).catch(() => {});
+    fetch("/api/v1/auth/me", { headers: h }).then((r) => r.ok ? r.json() : null).then((m) => {
+      if (!m) return;
+      localStorage.setItem("vtos_user", JSON.stringify(m)); setUser(m);
+      if (m.must_change_password && path !== "/doi-mat-khau") router.replace("/doi-mat-khau");
+    }).catch(() => {});
     fetch("/api/v1/alerts", { headers: h }).then((r) => r.ok ? r.json() : null).then((a) => { if (Array.isArray(a)) setAlerts(a.length); else if (a?.rows) setAlerts(a.rows.length); }).catch(() => {});
-  }, [router]);
+  }, [router, path]);
 
   const toast = useCallback((msg: string, err?: boolean) => { setT({ msg, err }); setTimeout(() => setT(null), err ? 6500 : 4000); }, []);
 

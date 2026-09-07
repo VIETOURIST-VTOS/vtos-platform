@@ -62,7 +62,9 @@ def test_vai_tro_bi_gioi_han_chi_thay_dung_mot_man_hinh():
     assert "/xe-hdv" not in an
     for trang in ("/payroll", "/bank-accounts", "/accounting", "/requests", "/tours", "/hr", "/ops", "/audit", "/companies", "/", "/alerts", "/reports"):
         assert trang in an, f"tài xế không được thấy {trang}"
-    assert AC.menus_for(type("U", (), {"role": "xe_hdv"})()) == ["/xe-hdv"]
+    # Từ 07/9/2026 danh sách cho phép có thêm màn hình đổi mật khẩu: tài xế cũng được HCNS đặt mật khẩu tạm,
+    # và nếu không có lối đổi thì họ bị khóa ngoài hệ thống chứ không phải bị giới hạn.
+    assert AC.menus_for(type("U", (), {"role": "xe_hdv"})()) == ["/xe-hdv", "/doi-mat-khau"]
 
 
 def test_visa_chi_thay_phan_he_visa():

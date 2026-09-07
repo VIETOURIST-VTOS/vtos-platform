@@ -83,6 +83,55 @@ class User(Base):
     staff_code: Mapped[str] = mapped_column(String(20), default="")    # mã nhân viên HCNS (bảng lương), vd 114
     password_hash: Mapped[str] = mapped_column(String(200))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Bổ sung 07/9/2026 (đặc tả Tài khoản & phân quyền, mục B3)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
+    # rỗng = CHƯA XÁC ĐỊNH, không mặc định về công ty mẹ – giữ đúng quy ước đã dùng ở tours, bookings, vehicles
+    last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Không có trường này thì không phát hiện được tài khoản bỏ hoang, hay người đã nghỉ mà tài khoản chưa khóa.
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Mật khẩu mặc định là MÃ NHÂN VIÊN, mà mã nhân viên nằm công khai trên bảng lương và danh bạ. Ai biết mã
+    # là đăng nhập được người khác, và mọi thao tác sau đó mang tên người bị mượn.
+    ngoai_bien_che: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Kế toán trưởng thuê ngoài, kiểm toán, tư vấn: có tài khoản nhưng không có trong bảng lương – đánh dấu
+    # để danh sách đối chiếu không báo lệch, và để rà quyền hằng tháng nhìn ra ngay ai là người ngoài.
+    role_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    role_changed_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+GRANT_KINDS = {"menu": "Màn hình", "capability": "Năng lực"}
+# Năng lực cấp lẻ được cho một người, không đi kèm vai trò.
+CAPABILITIES = {
+    "bang_luong": "Xem bảng lương toàn công ty",
+}
+GRANT_MAX_DAYS = 90
+
+
+class UserGrant(Base):
+    """Ngoại lệ quyền CÓ THỜI HẠN cho một người (chỉ đạo 07/9/2026).
+
+    Vì sao phải có bảng này chứ không sửa vai trò: quyền xem bảng lương toàn công ty được cấp cho RIÊNG
+    Kế toán trưởng, trong khi vai trò "ketoan" có nhiều người. Nếu chỉ có vai trò làm công cụ thì mở cho
+    một người là mở cho cả nhóm.
+
+    Vì sao BẮT BUỘC có hạn: không có hạn thì quyền chỉ nở ra chứ không co lại – người ta nhớ lúc cấp và
+    quên lúc thu. Hết hạn là tự mất hiệu lực, không chờ ai nhớ.
+    """
+    __tablename__ = "user_grants"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(12))            # menu / capability
+    value: Mapped[str] = mapped_column(String(80))           # đường dẫn màn hình, hoặc khóa trong CAPABILITIES
+    from_date: Mapped[date] = mapped_column(Date)
+    to_date: Mapped[date] = mapped_column(Date)              # BẮT BUỘC, tối đa GRANT_MAX_DAYS ngày
+    reason: Mapped[str] = mapped_column(String(300))         # lý do bằng lời, bắt buộc
+    granted_by: Mapped[str] = mapped_column(String(50), default="")
+    approved_by: Mapped[str] = mapped_column(String(50), default="")   # chỉ Chủ tịch hoặc TGĐ
+    active: Mapped[bool] = mapped_column(Boolean, default=True)        # thu hồi sớm thì tắt cờ, không xóa
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    def hieu_luc(self, hom_nay: date | None = None) -> bool:
+        d = hom_nay or date.today()
+        return bool(self.active and self.approved_by and self.from_date <= d <= self.to_date)
 
 
 # ---------- Tham số chính sách (rules engine) ----------

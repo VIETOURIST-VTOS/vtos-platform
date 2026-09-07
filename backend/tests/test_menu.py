@@ -42,7 +42,10 @@ def test_menu_khong_tro_toi_trang_khong_ton_tai():
 def test_du_tam_nhom_va_dat_ten_theo_de_xuat():
     _, block = menu_paths()
     keys = re.findall(r'key:\s*"([a-z_]+)"', block)
-    assert len(keys) == 10 and len(set(keys)) == 10, f"phải đủ 10 nhóm nghiệp vụ, đang có {keys}"
+    # 11 nhóm từ 07/9/2026: thêm nhóm "Tài khoản của tôi" chứa màn hình đổi mật khẩu. Nhóm này không phải
+    # nghiệp vụ – nó tồn tại vì tài khoản còn mật khẩu tạm bị chặn mọi màn hình khác, nên phải có đúng một
+    # lối đi mà mọi vai trò đều thấy, kể cả tài xế và chuyên viên visa vốn dùng danh sách cho phép.
+    assert len(keys) == 11 and len(set(keys)) == 11, f"phải đủ 11 nhóm, đang có {keys}"
     for ten in ("Điều hành Holdings", "Marketing & CSKH", "Kinh doanh Lẻ", "Kinh doanh Đoàn (MICE)",
                 "Điều hành", "Vận tải & Hướng dẫn viên",
                 "Tài chính & Kế toán", "Hành chính & Nhân sự", "Kiểm soát & Chính sách", "Hệ thống & Tích hợp"):

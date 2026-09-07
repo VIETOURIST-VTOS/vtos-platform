@@ -1,4 +1,6 @@
 """Robot R6 – nhân sự & lương: thang f, thang giảm, quỹ visa, HDV (cổng 13), tài xế, luồng bảng lương 3 bước, bút toán lương."""
+# Từ 07/9/2026 bảng lương tách khỏi hồ sơ nhân sự và theo VAI TRÒ chỉ còn HCNS (cùng Chủ tịch, TGĐ,
+# Ban Kiểm soát). CNTT và Kế toán không còn mở được – nên các phép thử về lương đăng nhập bằng HCNS.
 import os, sys
 from datetime import date, timedelta
 os.environ["DATABASE_URL"] = "sqlite:///./test_hr.db"
@@ -143,7 +145,7 @@ def test_payroll_flow_roles_and_journal():
     ds = client.get("/api/v1/employees?limit=1000", headers=login("cntt")).json()
     rows = [{"ma": e["code"], "muc": 5_310_000} for e in ds if e["active"] and e["contract_type"] == "hdld"]
     assert client.post("/api/v1/bhxh/nap", json={"rows": rows, "ky": "2026-08"}, headers=login("hcns")).status_code == 200
-    client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("cntt"))
+    client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("hcns"))
     assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("hcns")).status_code == 422   # chưa qua Kế toán
     assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("ketoan")).json()["run"]["status"] == "kt_xac_nhan"
     assert client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("hcns")).status_code == 422  # khóa tính lại

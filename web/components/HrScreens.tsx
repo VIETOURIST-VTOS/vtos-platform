@@ -14,13 +14,19 @@ const NEXT: Record<string, [string, string]> = { nhap: ["ketoan", "Kế toán x�
 const lastMonth = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); };
 
 export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
-  const TABS = scope === "ops" ? TABS_OPS : TABS_HR;
   const { user, toast } = useShell();
   const role = user?.role || "";
+  // Bảng lương tách khỏi hồ sơ nhân sự (chỉ đạo 07/9/2026): máy chủ nói tab nào người này mở được.
+  // Không tự suy từ vai trò ở giao diện – quyền xem bảng lương có thể là ngoại lệ cấp cho riêng một người,
+  // và hai nơi cùng suy ra một câu trả lời là hai nơi sẽ lệch nhau.
+  const hrTabs = user?.hr_tabs;
+  const TABS = scope === "ops" ? TABS_OPS : TABS_HR.filter(([k]) => !hrTabs || hrTabs.includes(k));
   const [cos, setCos] = useState<any[]>([]);
   const [tab, setTab] = useState(scope === "ops" ? "visa" : "payroll");
-  // mở đúng tab khi vào từ menu bên trái (?tab=...)
+  // mở đúng tab khi vào từ menu bên trái (?tab=...); tab không có quyền thì rơi về tab đầu tiên mở được,
+  // chứ không hiện màn hình trống rồi để người dùng đoán vì sao
   useEffect(() => { const q = new URLSearchParams(window.location.search).get("tab"); if (q) setTab(q); }, []);
+  useEffect(() => { if (TABS.length && !TABS.some(([k]) => k === tab)) setTab(TABS[0][0]); }, [TABS, tab]);
   const [period, setPeriod] = useState(lastMonth());
   const [meta, setMeta] = useState<any>({ departments: {}, positions: {}, offices: {} });
   const [run, setRun] = useState<any>(null);

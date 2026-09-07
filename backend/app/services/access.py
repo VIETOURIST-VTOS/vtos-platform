@@ -30,6 +30,18 @@ ALL_SEEING = LEADERSHIP + CONTROL                       # xem mọi dữ liệu
 FULL_VIEW = ("chutich", "tgd")                          # toàn quyền xem
 READ_ALL = ("bks",)                                     # đọc tất cả, bị chặn mọi thao tác ghi
 BASE_VIEW = FULL_VIEW + READ_ALL
+
+# Màn hình Nhân sự tách quyền theo TAB (chỉ đạo 07/9/2026). Trước bản này, ai mở được màn hình là thấy cả
+# ba tab – nên không có cách nào cho một người xem hồ sơ nhân sự mà không xem luôn bảng lương.
+# Bảng lương chỉ còn HCNS theo vai trò; Kế toán trưởng xem toàn công ty bằng NGOẠI LỆ THEO NGƯỜI
+# (năng lực "bang_luong"), vì vai trò "ketoan" có nhiều người mà quyền chỉ cấp cho một.
+HR_TABS = {"payroll": "Bảng lương", "employees": "Hồ sơ nhân sự", "incidents": "Đánh giá & sự vụ"}
+HR_TAB_ROLES = {
+    "payroll": BASE_VIEW + ("hcns",),
+    "employees": BASE_VIEW + ("ptgd_doan", "tp_dh", "gd_kd", "ketoan", "hcns", "cntt"),
+    "incidents": BASE_VIEW + ("ptgd_doan", "tp_dh", "gd_kd", "hcns", "cntt"),
+}
+HR_TAB_CAPABILITY = {"payroll": "bang_luong"}     # tab mở thêm được bằng ngoại lệ theo người
 COST_ROLES = ALL_SEEING + OPERATIONS                    # cơ cấu chi phí NCC, quyết toán, dòng tiền tour
 FINANCE_ROLES = ALL_SEEING + ("tp_dh",)                 # giao dịch ngân hàng, tổng hợp thu tiền toàn công ty
 AUDIT_ROLES = LEADERSHIP + CONTROL                      # nhật ký kiểm toán
@@ -129,7 +141,7 @@ MENU_ROLES = {
     "/accounting": ALL_SEEING + ("tp_dh",),
     "/finance": LEADERSHIP + CONTROL,
     "/params": PARAM_ROLES,
-    "/hr": ALL_SEEING + ("hcns", "tp_dh", "gd_kd"),
+    "/hr": HR_TAB_ROLES["payroll"] + HR_TAB_ROLES["employees"] + HR_TAB_ROLES["incidents"],
     "/ops": ALL_SEEING + OPERATIONS + ("hcns",),          # visa, HDV & phân chuyến, đội xe – nghiệp vụ của Điều hành
 
     "/inbox": ALL_SEEING + SALES + OPERATIONS + MARKETING,
@@ -155,7 +167,7 @@ MENU_ROLES = {
 }
 
 # Mọi trang có trong giao diện – kể cả trang không đặt điều kiện vai trò – để dựng danh sách ẩn cho vai trò bị giới hạn.
-ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll")
+ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/doi-mat-khau")
 
 
 # Vai trò bị giới hạn: chỉ được thấy đúng những trang liệt kê ở đây.
@@ -163,18 +175,54 @@ ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll")
 # viên văn phòng, nhưng SAI với tài xế, HDV và chuyên viên visa: nó cho họ thấy cả Bảng lương và Tài khoản
 # ngân hàng chỉ vì hai trang đó chưa được liệt kê. Với các vai trò dưới đây, danh sách là DANH SÁCH CHO PHÉP.
 RESTRICTED_ROLE_MENUS = {
-    "xe_hdv": ("/xe-hdv",),
-    "nv_visa": ("/visa",),
+    # Màn hình đổi mật khẩu có mặt ở cả hai danh sách: đây là danh sách CHO PHÉP, mà tài xế, HDV và chuyên
+    # viên visa cũng phải đổi được mật khẩu tạm của mình – thiếu dòng này là họ bị khóa ngoài hệ thống.
+    "xe_hdv": ("/xe-hdv", "/doi-mat-khau"),
+    "nv_visa": ("/visa", "/doi-mat-khau"),
 }
 
 
-def menus_for(u: User) -> list[str]:
-    if u.role in RESTRICTED_ROLE_MENUS: return list(RESTRICTED_ROLE_MENUS[u.role])
-    return [path for path, roles in MENU_ROLES.items() if u.role in roles]
+def _grants(db, u: User) -> list:
+    """Ngoại lệ còn hiệu lực của một người. db=None thì coi như không có – mọi chỗ gọi không có phiên
+    cơ sở dữ liệu vẫn chạy đúng theo vai trò, chỉ là không thấy phần cấp lẻ."""
+    if db is None: return []
+    try:
+        from sqlalchemy import select
+        from app.models.core import UserGrant
+        return [g for g in db.execute(select(UserGrant).where(UserGrant.user_id == u.id,
+                                                              UserGrant.active == True)).scalars() if g.hieu_luc()]
+    except Exception:      # noqa – bảng chưa có (cơ sở dữ liệu cũ) không được làm hỏng đăng nhập
+        return []
 
 
-def hidden_menus_for(u: User) -> list[str]:
+def co_quyen(db, u: User, nang_luc: str) -> bool:
+    """Năng lực cấp lẻ cho một người. Chủ tịch và TGĐ có sẵn mọi năng lực; Ban Kiểm soát ĐỌC được
+    nhưng lớp chặn ghi chung vẫn giữ nguyên, nên ở đây không phải kể ra riêng."""
+    if u.role in BASE_VIEW: return True
+    return any(g.kind == "capability" and g.value == nang_luc for g in _grants(db, u))
+
+
+def hr_tabs_for(db, u: User) -> list[str]:
+    """Tab nào của màn hình Nhân sự người này mở được."""
+    ra = []
+    for tab, roles in HR_TAB_ROLES.items():
+        cap = HR_TAB_CAPABILITY.get(tab)
+        if u.role in roles or (cap and co_quyen(db, u, cap)): ra.append(tab)
+    return ra
+
+
+def menus_for(u: User, db=None) -> list[str]:
+    ra = (list(RESTRICTED_ROLE_MENUS[u.role]) if u.role in RESTRICTED_ROLE_MENUS
+          else [path for path, roles in MENU_ROLES.items() if u.role in roles])
+    # Ngoại lệ cộng thêm cho CẢ vai trò bị giới hạn: nếu chỉ cộng ở một trong hai hàm thì danh sách hiện
+    # và danh sách ẩn sẽ nói hai điều khác nhau về cùng một người.
+    them = [g.value for g in _grants(db, u) if g.kind == "menu"]
+    return ra + [p for p in them if p not in ra]
+
+
+def hidden_menus_for(u: User, db=None) -> list[str]:
     if u.role in RESTRICTED_ROLE_MENUS:
-        cho_phep = set(RESTRICTED_ROLE_MENUS[u.role])
+        cho_phep = set(RESTRICTED_ROLE_MENUS[u.role]) | {g.value for g in _grants(db, u) if g.kind == "menu"}
         return [p for p in ALL_MENU_PATHS if p not in cho_phep]
-    return [path for path, roles in MENU_ROLES.items() if u.role not in roles]
+    mo = set(menus_for(u, db))
+    return [path for path in MENU_ROLES if path not in mo]

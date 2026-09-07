@@ -21,7 +21,20 @@ def current_user(request: Request, token: str = Depends(oauth2), db: Session = D
     from app.services.access import check_readonly_write, check_restricted_scope
     check_readonly_write(u, request.method, request.url.path)   # Ban Kiểm soát chỉ đọc
     check_restricted_scope(u, request.url.path)                 # tài xế / HDV / chuyên viên visa: chỉ màn hình của mình
+    check_must_change_password(u, request.url.path)             # còn mật khẩu tạm thì chưa vào được dữ liệu
     return u
+
+
+# Tài khoản còn mật khẩu tạm chỉ đi được đúng ba đường: xem mình là ai, đổi mật khẩu, và đăng xuất.
+# Mật khẩu mặc định là mã nhân viên – thứ nằm công khai trên bảng lương – nên trước khi đổi, phiên đăng
+# nhập này chưa chứng minh được người ngồi trước máy đúng là chủ tài khoản.
+PASSWORD_CHANGE_ALLOWED = ("/api/v1/auth/me", "/api/v1/auth/password", "/api/v1/auth/login", "/api/v1/health")
+
+
+def check_must_change_password(u: User, path: str) -> None:
+    if getattr(u, "must_change_password", False) and path not in PASSWORD_CHANGE_ALLOWED:
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            {"gate": "DOI_MAT_KHAU", "message": "Tài khoản đang dùng mật khẩu tạm – đổi mật khẩu rồi mới vào được hệ thống"})
 
 
 # Chủ tịch HĐQT có toàn quyền trên mọi phân hệ (quyết định của Chủ tịch ngày 06/9/2026).
