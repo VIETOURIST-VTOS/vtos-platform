@@ -870,3 +870,100 @@ def kiem_chi(data: KiemChiIn, u: User = Depends(require_roles(*READ)), db: Sessi
     items = QT.kiem_chi(db, data.tour_id, data.so_tien, data.partner_id, data.co_dong_khau_tru, data.chung_tu)
     muc = FL.BLOCK if any(i["level"] == FL.BLOCK for i in items) else (FL.OK if not items else FL.REVIEW)
     return {"muc": muc, "muc_ten": FL.MUC_TEN[muc], "items": items}
+
+
+# ====================== ĐỢT 4: LỆNH ĐIỀU XE, HIỆU QUẢ, BẢN TIN SÁNG ======================
+from app.models.hr import DispatchOrder
+from app.models.fleet import AiRunLog
+from app.services import fleet_ai as AI
+
+
+@router.get("/goi-y-dieu-xe")
+def goi_y_dieu_xe(date_from: date, date_to: date, so_khach: int = 0, km_du_kien: int = 0,
+                  u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Gợi ý xe cho một khoảng ngày: lọc cứng trước, xếp hạng sau, kèm lý do bằng lời.
+
+    Đây là GỢI Ý, không phải quyết định – người chốt lệnh vẫn là người quyết, và nếu chọn khác gợi ý thì hệ
+    thống bắt ghi lý do (xem POST /dispatch)."""
+    if date_to < date_from: raise HTTPException(422, "Ngày kết thúc trước ngày bắt đầu")
+    kq = AI.goi_y_dieu_xe(db, date_from, date_to, so_khach, km_du_kien)
+    AI.ghi_run(db, "A1", {"tu": str(date_from), "den": str(date_to), "khach": so_khach, "km": km_du_kien},
+               kq, len(kq["phuong_an"]) + len(kq["bi_loai"]), len(kq["bi_loai"]), u.username)
+    db.commit()
+    return kq
+
+
+@router.get("/hieu-qua")
+def hieu_qua(ky: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Hiệu quả xe và tài xế của một kỳ. Chỉ đọc và tính, không ghi số liệu nghiệp vụ nào."""
+    try:
+        QT.ky_range(ky)
+    except Exception:
+        raise HTTPException(422, "Kỳ phải có dạng YYYY-MM")
+    kq = AI.hieu_qua_ky(db, ky)
+    AI.ghi_run(db, "A9", {"ky": ky}, {"so_xe": len(kq["xe"]), "so_tai_xe": len(kq["tai_xe"])},
+               len(kq["xe"]) + len(kq["tai_xe"]), 0, u.username)
+    db.commit()
+    return kq
+
+
+class KhuyenNghiBanIn(BaseModel):
+    vehicle_id: int
+    gia_chao: float
+    dinh_gia_noi_bo: float = 0
+
+
+@router.post("/khuyen-nghi-ban-xe")
+def khuyen_nghi_ban(data: KhuyenNghiBanIn, u: User = Depends(require_roles("chutich", "tgd", "ketoan", "cntt")),
+                    db: Session = Depends(get_db)):
+    """So sánh giá chào bán với định giá nội bộ và lợi nhuận khai thác. Chỉ phân tích, không tạo hồ sơ bán."""
+    if not db.get(Vehicle, data.vehicle_id): raise HTTPException(404, "Không có xe")
+    return AI.khuyen_nghi_ban_xe(db, data.vehicle_id, data.gia_chao, data.dinh_gia_noi_bo)
+
+
+@router.get("/ban-tin-sang")
+def ban_tin_sang(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return AI.ban_tin_sang(db)
+
+
+@router.post("/nang-muc-canh-bao")
+def nang_muc(u: User = Depends(require_roles("cntt", "chutich", "tgd")), db: Session = Depends(get_db)):
+    """Nâng mức cảnh báo tồn quá 3 ngày – chỉ những cảnh báo đã có người nhận."""
+    kq = AI.nang_muc_canh_bao(db)
+    AI.ghi_run(db, "A0", {"ngay": str(date.today())}, kq, len(kq["da_nang"]) + len(kq["bo_qua"]),
+               len(kq["da_nang"]), u.username)
+    R.audit(db, u.username, u.role, "nang_muc_canh_bao_doi_xe", "alerts", after={"da_nang": len(kq["da_nang"])})
+    db.commit()
+    return kq
+
+
+@router.get("/nhat-ky-tu-dong")
+def nhat_ky_tu_dong(agent: str = "", limit: int = 100, u: User = Depends(require_roles(*READ)),
+                    db: Session = Depends(get_db)):
+    """Nhật ký các lần tác vụ tự động chạy. Có mã băm dữ liệu đầu vào để đối chiếu "chạy lại cùng dữ liệu
+    phải ra cùng kết quả" – không có bảng này thì không kiểm toán được phần mềm đã tự làm những gì."""
+    q = select(AiRunLog).order_by(AiRunLog.id.desc())
+    if agent: q = q.where(AiRunLog.agent == agent)
+    return [{"id": r.id, "agent": r.agent, "rule_version": r.rule_version, "thoi_diem": r.thoi_diem,
+             "dau_vao_hash": r.dau_vao_hash[:16], "so_ban_ghi": r.so_ban_ghi, "so_co": r.so_co,
+             "chay_boi": r.chay_boi, "loi": r.loi} for r in db.execute(q.limit(min(limit, 500))).scalars()]
+
+
+@router.get("/lenh-dieu-xe")
+def ds_lenh(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Lệnh điều xe kèm ghi vết gợi ý: máy đề xuất gì, người chọn gì, và lý do nếu chọn khác."""
+    veh = {v.id: v for v in db.execute(select(Vehicle)).scalars()}
+    emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
+    out = []
+    for d in db.execute(select(DispatchOrder).order_by(DispatchOrder.id.desc()).limit(300)).scalars():
+        v = veh.get(d.vehicle_id)
+        from app.models.core import Tour as _T
+        t = db.get(_T, d.tour_id)
+        out.append({"id": d.id, "tour": t.code if t else "", "xe": v.plate if v else "",
+                    "ma_xe": v.code if v else "", "tai_xe": emps.get(d.driver_id, ""),
+                    "date_from": d.date_from, "date_to": d.date_to,
+                    "so_ngay": (d.date_to - d.date_from).days + 1, "internal_price": d.internal_price,
+                    "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at,
+                    "theo_goi_y": bool(d.phuong_an_da_chon) and not d.ly_do_khac_goi_y,
+                    "phuong_an_da_chon": d.phuong_an_da_chon, "ly_do_khac_goi_y": d.ly_do_khac_goi_y})
+    return out

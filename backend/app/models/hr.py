@@ -160,6 +160,12 @@ class DispatchOrder(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="cho_xac_nhan")  # cho_xac_nhan / da_xac_nhan / hoan_thanh / huy
     incident_note: Mapped[str] = mapped_column(String(300), default="")
+    # Đợt 4: ghi vết gợi ý điều xe. Lưu CẢ phương án máy đề xuất lẫn phương án người chọn, và lý do khi chọn
+    # khác – đó là dữ liệu duy nhất để sau này biết thuật toán gợi ý có tốt lên hay không. Không có nó thì
+    # mỗi quý lại tranh luận bằng cảm nhận.
+    phuong_an_ai_goi_y: Mapped[str] = mapped_column(Text, default="")
+    phuong_an_da_chon: Mapped[str] = mapped_column(String(60), default="")
+    ly_do_khac_goi_y: Mapped[str] = mapped_column(String(300), default="")
 
 
 INCIDENT_LEVELS = {

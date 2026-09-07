@@ -1,4 +1,5 @@
 """API nhân sự – lương: hồ sơ, visa, HDV & phân chuyến, đội xe & lệnh điều xe, sự vụ, bảng lương (robot R6)."""
+import json
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
@@ -478,6 +479,11 @@ class DispatchIn(BaseModel):
     date_to: date
     rate_id: int | None = None
     internal_price: float = 0
+    # Đợt 4: chọn xe ngoài top gợi ý thì phải ghi lý do TRƯỚC khi lưu. Đây là dữ liệu duy nhất để sau mỗi quý
+    # biết thuật toán gợi ý có tốt lên không – không có nó thì chỉ còn tranh luận bằng cảm nhận.
+    ly_do_khac_goi_y: str = ""
+    km_du_kien: int = 0
+    so_khach: int = 0
 
 
 @router.post("/dispatch", status_code=201)
@@ -516,14 +522,42 @@ def dispatch_create(data: DispatchIn, u: User = Depends(require_roles("nv_dh", "
     if kt["muc"] == FL.BLOCK:
         raise HTTPException(422, {"message": "Không đủ điều kiện phát lệnh điều xe",
                                   "vi_pham": [i for i in kt["items"] if i["level"] == FL.BLOCK]})
-    d = DispatchOrder(tour_id=t.id, vehicle_id=v.id, driver_id=driver_id, date_from=data.date_from, date_to=data.date_to, rate_id=rt.id if rt else None, internal_price=price, created_by=u.username)
+    # Ghi vết gợi ý điều xe (đặc tả A1): chọn phương án hệ thống đánh giá THẤP HƠN nhóm đề xuất thì phải ghi
+    # lý do trước khi lưu.
+    #
+    # Chữ "thấp hơn" ở đây là có chủ đích, không phải chỉ "nằm ngoài top 3". Với đội xe nhỏ, hoặc khi các xe
+    # chưa có số liệu vận hành, điểm của chúng BẰNG NHAU – lúc đó bắt người chốt lệnh giải trình vì sao chọn
+    # xe này thay vì xe kia là bắt họ giải thích một khác biệt mà chính hệ thống không nhìn thấy. Kết quả chỉ
+    # là một ô lý do điền cho xong, và ít lâu sau là một tính năng bị tắt. Chỉ hỏi khi hệ thống thật sự có ý
+    # kiến khác: xe được chọn có điểm THẤP HƠN phương án thấp nhất trong nhóm đề xuất.
+    from app.services import fleet_ai as AI
+    gy = AI.goi_y_dieu_xe(db, data.date_from, data.date_to, data.so_khach, data.km_du_kien)
+    top_ids = [p["vehicle_id"] for p in gy["phuong_an"]]
+    pa_chon = next((p for p in gy.get("tat_ca", []) if p["vehicle_id"] == v.id), None)
+    diem_chon = pa_chon["diem"] if pa_chon else None
+    diem_thap_nhat_trong_top = min((p["diem"] for p in gy["phuong_an"]), default=None)
+    kem_hon = (top_ids and v.id not in top_ids and diem_chon is not None
+               and diem_thap_nhat_trong_top is not None and diem_chon < diem_thap_nhat_trong_top)
+    if kem_hon and not (data.ly_do_khac_goi_y or "").strip():
+        raise HTTPException(422, {"message": "Xe được chọn được hệ thống đánh giá thấp hơn nhóm đề xuất – "
+                                             "phải ghi lý do trước khi lưu",
+                                  "diem_xe_chon": diem_chon,
+                                  "diem_thap_nhat_trong_nhom_de_xuat": diem_thap_nhat_trong_top,
+                                  # Nói ra hệ thống chê điểm gì, chứ không chỉ đưa hai con số điểm: người
+                                  # chốt lệnh cần biết mình đang bác lại nhận xét nào để viết lý do cho đúng.
+                                  "he_thong_nhan_xet": pa_chon["ly_do"] if pa_chon else [],
+                                  "goi_y": gy["phuong_an"]})
+    d = DispatchOrder(tour_id=t.id, vehicle_id=v.id, driver_id=driver_id, date_from=data.date_from, date_to=data.date_to, rate_id=rt.id if rt else None, internal_price=price, created_by=u.username,
+                      phuong_an_ai_goi_y=json.dumps(gy["phuong_an"], ensure_ascii=False, default=str)[:8000],
+                      phuong_an_da_chon=v.code or v.plate, ly_do_khac_goi_y=data.ly_do_khac_goi_y.strip())
     db.add(d); db.flush()
     R.audit(db, u.username, u.role, "lenh_dieu_xe", f"tour:{t.code}", after={"xe": v.plate, "tuyen": rt.route if rt else "", "tu": str(data.date_from), "den": str(data.date_to), "gia_noi_bo": price, "kiem_tra": kt["muc"]})
     db.commit()
     canh_bao = [i["msg"] for i in kt["items"]]
     if ly_do: canh_bao.append(ly_do)      # cấu hình người lập lệnh sai thì nói ra, không im lặng bỏ qua
     return {"message": f"Đã lập lệnh điều xe {v.plate} cho {t.code} – Đội xe xác nhận trong 4 giờ",
-            "kiem_tra": {"muc": kt["muc"], "muc_ten": kt["muc_ten"], "canh_bao": canh_bao}}
+            "kiem_tra": {"muc": kt["muc"], "muc_ten": kt["muc_ten"], "canh_bao": canh_bao},
+            "theo_goi_y": v.id in top_ids, "kem_hon_de_xuat": bool(kem_hon), "goi_y": gy["phuong_an"]}
 
 
 class DispatchUpdate(BaseModel):

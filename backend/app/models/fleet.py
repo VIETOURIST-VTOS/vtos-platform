@@ -420,3 +420,24 @@ class SharedInvoiceLine(Base):
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
     amount: Mapped[float] = mapped_column(Float, default=0)
     he_so: Mapped[float] = mapped_column(Float, default=1)
+
+
+# ====================== ĐỢT 4: GHI VẾT TÁC VỤ TỰ ĐỘNG VÀ XẾP HẠNG ======================
+class AiRunLog(Base):
+    """Nhật ký mỗi lần một tác vụ tự động chạy.
+
+    Đặc tả yêu cầu: ghi thời điểm, phiên bản quy tắc, số bản ghi xử lý, số cờ sinh ra, và MÃ BĂM của dữ liệu
+    đầu vào – để "chạy lại cùng dữ liệu phải ra cùng kết quả" là một câu kiểm chứng được, không phải một lời
+    hứa. Không có bảng này thì không kiểm toán được việc phần mềm đã tự làm những gì.
+    """
+    __tablename__ = "fleet_ai_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    agent: Mapped[str] = mapped_column(String(20))
+    rule_version: Mapped[str] = mapped_column(String(20), default="")
+    thoi_diem: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    dau_vao_hash: Mapped[str] = mapped_column(String(64), default="")
+    so_ban_ghi: Mapped[int] = mapped_column(Integer, default=0)
+    so_co: Mapped[int] = mapped_column(Integer, default=0)
+    ket_qua: Mapped[str] = mapped_column(Text, default="")
+    loi: Mapped[str] = mapped_column(String(300), default="")
+    chay_boi: Mapped[str] = mapped_column(String(50), default="")

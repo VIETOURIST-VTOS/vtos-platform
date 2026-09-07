@@ -243,9 +243,12 @@ def test_lenh_hop_le_van_lap_duoc_va_kem_canh_bao_chua_du_du_lieu():
     """Chốt an toàn quan trọng nhất của đợt này: bật kiểm tra KHÔNG được làm đứng việc điều xe hằng ngày khi
     hồ sơ giấy tờ chưa nhập. Thiếu giấy là cảnh báo hiện rõ, không phải rào chặn."""
     v = xe("51B-123.45")
+    # ly_do_khac_goi_y: xe này đã có lệnh trước đó nên bộ gợi ý Đợt 4 xếp nó dưới nhóm đề xuất theo tiêu chí
+    # cân bằng ngày công tài xế. Một câu lý do là qua – đúng ý đồ "ghi vết", không phải rào chặn.
     r = client.post("/api/v1/dispatch", headers=login("dh.lan"),
                     json={"tour_id": 1, "vehicle_id": v["id"], "date_from": str(HOM_NAY + timedelta(days=40)),
-                          "date_to": str(HOM_NAY + timedelta(days=41)), "internal_price": 1_000_000})
+                          "date_to": str(HOM_NAY + timedelta(days=41)), "internal_price": 1_000_000,
+                          "ly_do_khac_goi_y": "Kiểm thử: chọn đúng xe này"})
     assert r.status_code == 201, r.text
     kt = r.json()["kiem_tra"]
     assert kt["muc"] in ("UNKNOWN", "REVIEW")

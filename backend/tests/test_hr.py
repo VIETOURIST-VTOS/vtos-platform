@@ -163,7 +163,12 @@ def test_vehicle_rate_table_and_dispatch_pricing():
     veh = {v["plate"]: v for v in client.get("/api/v1/vehicles", headers=login("dh.lan")).json()}
     t = next(x for x in client.get("/api/v1/tours", headers=login("dh.lan")).json() if x["code"] == "PT-DL-0912")
     base = {"tour_id": t["id"], "date_from": t["start_date"], "date_to": t["end_date"], "rate_id": pt["id"]}
-    assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50F-009.60"]["id"]}, headers=login("dh.lan")).status_code == 201
+    # Đợt 4 đội xe: xe này đã có lệnh trước đó nên tài xế của nó đang nhiều ngày công nhất, và bộ gợi ý xếp
+    # nó dưới nhóm đề xuất theo tiêu chí cân bằng ngày công. Chọn phương án hệ thống đánh giá thấp hơn thì
+    # phải ghi lý do – ghi vết bắt buộc của đặc tả A1, không phải rào chặn: một câu là qua.
+    assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50F-009.60"]["id"],
+                                                 "ly_do_khac_goi_y": "Kiểm thử bảng giá – chọn đúng xe này"},
+                       headers=login("dh.lan")).status_code == 201
     assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50E-955.31"]["id"]}, headers=login("dh.lan")).status_code == 201
     ds = {d["vehicle"]: d for d in client.get("/api/v1/dispatch", headers=login("dh.lan")).json() if d["tour_code"] == "PT-DL-0912"}
     assert ds["50F-009.60"]["internal_price"] == 9_000_000 and ds["50E-955.31"]["internal_price"] == 10_000_000 and ds["50F-009.60"]["route"] == "Phan Thiết 2 ngày"

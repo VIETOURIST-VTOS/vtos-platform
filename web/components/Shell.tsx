@@ -45,7 +45,9 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Hồ sơ xe & điều kiện khai thác", "/doi-xe"],
     ["Đội xe (bảng giá & lệnh)", "/ops?tab=fleet"], ["HDV & phân chuyến", "/ops?tab=guides"],
     ["Việc của tôi (tài xế & HDV)", "/xe-hdv"],
-    ["Lệnh điều xe", ""], ["Chi phí & hiệu quả đội xe", ""]] },
+    // Đợt 4 đội xe: hai mục này trước để trống. Gợi ý điều xe lọc cứng trước, xếp hạng sau, và ghi vết
+    // khi người chốt lệnh chọn khác gợi ý. Bảng hiệu quả ghi "chưa đủ dữ liệu" chứ không ghi 0.
+    ["Lệnh điều xe", "/lenh-dieu-xe"], ["Chi phí & hiệu quả đội xe", "/hieu-qua-doi-xe"]] },
   { key: "taichinh", label: "7. Tài chính & Kế toán", items: [
     ["Thu & đối soát", "/collections"], ["Đề nghị chi & thanh toán", "/expenses"], ["Công nợ", ""],
     ["Bảo lưu & hoàn tiền", "/bookings"], ["Dòng tiền", "/finance?tab=forecast"], ["Vay & đầu tư", "/finance?tab=contracts"],
