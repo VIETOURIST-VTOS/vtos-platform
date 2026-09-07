@@ -204,3 +204,16 @@ def test_bang_luong_liet_ke_nguoi_chua_du_co_so():
         if xd.get("chua_du_co_so"):
             assert r["ma"] in run["totals"]["chua_du_co_so"]
             assert "CHƯA ĐỦ CƠ SỞ TÍNH" in r["ghi_chu"]
+
+
+def test_khoan_treo_tach_cho_chot_va_chua_co_bang_quyet_toan():
+    """Hai tình huống rất khác nhau về việc phải làm: bảng quyết toán đã có đủ số, chỉ thiếu thao tác chốt;
+    và chưa ai lập bảng. Gộp lại thì Kế toán không biết bắt đầu từ đâu trong hàng trăm chuyến."""
+    kq = client.get("/api/v1/payroll/khoan-treo", headers=login("cntt")).json()
+    assert "cho_chot" in kq and "chua_co_bang_quyet_toan" in kq
+    assert kq["cho_chot"] + kq["chua_co_bang_quyet_toan"] == kq["tong_chuyen"] - len(
+        {r["tour_code"] for r in kq["rows"] if r["vai_tro"] == "Hướng dẫn viên"} -
+        {r["tour_code"] for r in kq["rows"] if r["vai_tro"] != "Hướng dẫn viên"})
+    for r in kq["rows"]:
+        if r["vai_tro"] != "Hướng dẫn viên":
+            assert r["buoc_tiep_theo"] in ("Đã có bảng quyết toán – chờ chốt", "Chưa có bảng quyết toán")

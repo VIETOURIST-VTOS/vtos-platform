@@ -113,10 +113,11 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         }}>Lưu công và tính lại</button></div>}
       {treo && treo.tong_dong > 0 && <div className="panel wrap"><h2>Khoản đang treo — {treo.tong_dong} dòng trên {treo.tong_chuyen} chuyến</h2>
         <p className="muted">{treo.ghi_chu}</p>
-        <table><thead><tr><th>Chuyến</th><th>Kết thúc</th><th>Hạn quyết toán</th><th className="num">Quá hạn</th><th>Người hưởng</th><th>Vai trò</th><th>Lý do</th></tr></thead>
+        {treo.viec_can_lam && <p><b>Việc cần làm:</b> {treo.viec_can_lam}</p>}
+        <table><thead><tr><th>Chuyến</th><th>Kết thúc</th><th>Hạn quyết toán</th><th className="num">Quá hạn</th><th>Người hưởng</th><th>Vai trò</th><th>Bước tiếp theo</th><th>Lý do</th></tr></thead>
           <tbody>{treo.rows.slice(0, 60).map((x: any, i: number) => <tr key={i}><td><b>{x.tour_code}</b><div className="muted">{x.tour_name}</div></td><td>{fmtD(x.ket_thuc)}</td><td>{fmtD(x.han_quyet_toan)}</td>
             <td className="num">{x.qua_han_ngay ? <Tag cls="red">{x.qua_han_ngay} ngày</Tag> : <Tag cls="warn">chưa tới hạn</Tag>}</td>
-            <td className="mono">{x.ma}<div className="muted">{x.ten}</div></td><td>{x.vai_tro}</td><td className="muted">{x.ly_do}</td></tr>)}</tbody></table>
+            <td className="mono">{x.ma}<div className="muted">{x.ten}</div></td><td>{x.vai_tro}</td><td>{x.buoc_tiep_theo ? <Tag cls={x.co_so_quyet_toan ? "warn" : ""}>{x.buoc_tiep_theo}</Tag> : ""}</td><td className="muted">{x.ly_do}</td></tr>)}</tbody></table>
         {treo.rows.length > 60 && <p className="muted">Đang hiển thị 60 dòng đầu trong {treo.rows.length}.</p>}</div>}
       <p className="muted">Thang f KD Lẻ: f0–f4 = 0%, f5 = 0,5% … f19 = 4,7%, ≥1000% mốc = 5%; ngưỡng bậc tạm theo % mốc – HCNS nạp Bảng B.1 chính thức trước kỳ lương đầu. Thang đoàn f9–f0 theo bình quân LN 3 tháng / 30 triệu.</p>
     </>}

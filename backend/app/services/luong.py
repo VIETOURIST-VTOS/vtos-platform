@@ -150,6 +150,12 @@ def khoan_treo(db: Session, den_ngay: date | None = None) -> dict:
             continue                                  # đã chốt – hoa hồng đã hoặc sẽ vào kỳ lương của tháng chốt
         han = R.settlement_deadline(db, t)
         qua_han = (hom_nay - han).days
+        # Phân biệt hai tình huống rất khác nhau về việc phải làm:
+        #  - "chờ chốt": bảng quyết toán đã có đủ số thu–chi trong hệ thống, chỉ còn thiếu người bấm chốt;
+        #  - "chưa có số": chưa ai lập bảng quyết toán.
+        # Gộp hai cái này lại thì Kế toán không biết bắt đầu từ đâu trong hàng trăm chuyến.
+        co_so = bool(t.actual_revenue or t.actual_cost)
+        buoc = "Đã có bảng quyết toán – chờ chốt" if co_so else "Chưa có bảng quyết toán"
         nguoi = {}
         for b in t.bookings:
             e = emps.get(b.sales_id)
@@ -160,11 +166,13 @@ def khoan_treo(db: Session, den_ngay: date | None = None) -> dict:
         for g in nguoi.values():
             rows.append({"tour_code": t.code, "tour_name": t.name, "ket_thuc": t.end_date, "han_quyet_toan": han,
                          "qua_han_ngay": max(0, qua_han), "vai_tro": "Kinh doanh", **g,
+                         "co_so_quyet_toan": co_so, "buoc_tiep_theo": buoc,
                          "trang_thai": "treo", "ly_do": "Chuyến chưa chốt quyết toán – hoa hồng chưa phát sinh, KHÔNG bị cắt"})
         if dh is not None:
             rows.append({"tour_code": t.code, "tour_name": t.name, "ket_thuc": t.end_date, "han_quyet_toan": han,
                          "qua_han_ngay": max(0, qua_han), "vai_tro": "Điều hành", "ma": dh.code, "ten": dh.full_name,
                          "phong": dh.department, "doanh_thu": 0.0, "so_booking": 0, "trang_thai": "treo",
+                         "co_so_quyet_toan": co_so, "buoc_tiep_theo": buoc,
                          "ly_do": "Thưởng chuyến chưa phát sinh – chờ quyết toán"})
     for a in db.execute(select(GuideAssignment).where(GuideAssignment.status == "da_xac_nhan")).scalars():
         if a.report_submitted and a.advance_settled: continue
@@ -184,8 +192,13 @@ def khoan_treo(db: Session, den_ngay: date | None = None) -> dict:
         g = theo_nguoi.setdefault(r["ma"], {"ma": r["ma"], "ten": r["ten"], "phong": r["phong"], "so_chuyen": 0, "qua_han": 0})
         g["so_chuyen"] += 1
         if r["qua_han_ngay"] > 0: g["qua_han"] += 1
+    cho_chot = {r["tour_code"] for r in rows if r.get("co_so_quyet_toan")}
+    chua_co_so = {r["tour_code"] for r in rows if not r.get("co_so_quyet_toan")}
     return {"rows": rows, "theo_nguoi": sorted(theo_nguoi.values(), key=lambda x: -x["so_chuyen"]),
             "tong_chuyen": len({r["tour_code"] for r in rows}), "tong_dong": len(rows),
+            "cho_chot": len(cho_chot), "chua_co_bang_quyet_toan": len(chua_co_so),
+            "viec_can_lam": (f"{len(cho_chot)} chuyến đã có bảng quyết toán với đủ số thu–chi, chỉ còn thiếu thao tác chốt "
+                             f"trên Vietrip; {len(chua_co_so)} chuyến chưa có bảng quyết toán."),
             "ghi_chu": "Khoản treo là cơ chế HOÃN, không phải cắt: chốt quyết toán xong thì kỳ lương tương ứng trả đủ. "
                        "Danh sách này suy từ chuyến chưa chốt nên không có cách nào làm khoản treo hết hiệu lực theo thời gian."}
 
