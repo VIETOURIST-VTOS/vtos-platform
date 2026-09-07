@@ -86,7 +86,9 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         cd = L.che_do_cong(e)
         return rows.setdefault(e.id, {"ma": e.code, "ten": e.full_name, "phong": e.department, "chuc_vu": e.position, "hop_dong": e.contract_type,
                                       "che_do_cong": cd, "che_do_cong_ten": L.CHE_DO_LABEL[cd], "xac_dinh_luong": None,
-                                      "luong_cb": 0.0, "khoan": [], "bien_doi": 0.0, "tncn": 0.0, "thuc_nhan": 0.0, "ghi_chu": []})
+                                      "luong_cb": 0.0, "khoan": [], "bien_doi": 0.0, "tncn": 0.0,
+                                      "bhxh": 0.0, "doan_phi": 0.0, "tru_su_vu": 0.0,
+                                      "thu_nhap": 0.0, "khoan_tru": 0.0, "thuc_nhan": 0.0, "ghi_chu": []})
 
     def add(e: Employee, ten: str, tien: float, note: str = ""):
         r = row(e); r["khoan"].append({"ten": ten, "tien": round(tien), "ghi_chu": note}); r["bien_doi"] += round(tien)
@@ -271,11 +273,26 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
     for eid, n in days_by_driver.items():
         if eid in emps: add(emps[eid], f"Công tác phí tài xế {n} ngày tour × {ctp:,.0f}", n * ctp, "Phụ cấp lễ/đêm theo luật do HCNS tính thêm")
 
+    # ---------- BƯỚC 3: khoản trừ của người lao động (Bộ tính lương từ 01/9/2026) ----------
+    # Khác hẳn với bước xác định mức lương ở trên: đây mới là khoản TRỪ thật – bảo hiểm xã hội phần người
+    # lao động và đoàn phí công đoàn. BHXH tính trên MỨC LƯƠNG HỢP ĐỒNG, không trên mức lương của kỳ.
+    ty_bhxh = R.get_param(db, "bhxh_nld"); muc_doan_phi = R.get_param(db, "doan_phi")
+    for e in emps.values():
+        if e.id not in rows: continue
+        r = rows[e.id]
+        if e.contract_type == "hdld":
+            r["bhxh"] = round(e.base_salary * ty_bhxh)
+            if e.member_org: r["doan_phi"] = round(muc_doan_phi)
+        # cộng tác viên (HDV) không thuộc diện đóng BHXH bắt buộc – chỉ khấu trừ TNCN 10%
+
     out = []
     vi_pham = []
     for r in rows.values():
         vi_pham += L.kiem_tra_khong_phai_khoan_tru(r)
-        r["thuc_nhan"] = round(r["luong_cb"] + r["bien_doi"] - r["tncn"])
+        r["tru_su_vu"] = round(-sum(k["tien"] for k in r["khoan"] if k["tien"] < 0))
+        r["thu_nhap"] = round(r["luong_cb"] + sum(k["tien"] for k in r["khoan"] if k["tien"] > 0))
+        r["khoan_tru"] = round(r["tru_su_vu"] + r["bhxh"] + r["doan_phi"] + r["tncn"])
+        r["thuc_nhan"] = round(r["thu_nhap"] - r["khoan_tru"])
         r["ghi_chu"] = "; ".join(r["ghi_chu"])
         out.append(r)
     out.sort(key=lambda r: (r["phong"], r["ma"]))
@@ -283,6 +300,9 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         # Ràng buộc pháp lý, kiểm ở tầng dữ liệu chứ không phải tầng giao diện (Điều 127.2 BLLĐ 2019).
         raise ValueError("Bảng lương có dòng trừ bắt nguồn từ xếp bậc theo doanh thu / lợi nhuận: " + "; ".join(vi_pham))
     totals = {"luong_cb": sum(r["luong_cb"] for r in out), "bien_doi": sum(r["bien_doi"] for r in out), "tncn": sum(r["tncn"] for r in out),
+              "bhxh": sum(r["bhxh"] for r in out), "doan_phi": sum(r["doan_phi"] for r in out),
+              "tru_su_vu": sum(r["tru_su_vu"] for r in out), "thu_nhap": sum(r["thu_nhap"] for r in out),
+              "khoan_tru": sum(r["khoan_tru"] for r in out),
               "thuc_nhan": sum(r["thuc_nhan"] for r in out), "so_nguoi": len(out), "so_chuyen": len(tours),
               "cong_chuan": cong_chuan, "thieu_cong": [r["ma"] for r in out if (r.get("xac_dinh_luong") or {}).get("thieu_du_lieu")],
               "chua_du_co_so": [r["ma"] for r in out if (r.get("xac_dinh_luong") or {}).get("chua_du_co_so")]}
@@ -331,22 +351,76 @@ def advance(db: Session, u: User, run: PayrollRun) -> str:
 
 
 def post_payroll_entries(db: Session, run: PayrollRun) -> list[int]:
-    """Bút toán lương: Nợ 642 – Có 334 (HĐLĐ); Nợ 632 – Có 338 thù lao CTV/HDV; Nợ 338 – Có 3335 TNCN khấu trừ 10%."""
+    """Bút toán lương, LẬP RIÊNG CHO TỪNG PHÁP NHÂN TRẢ LƯƠNG.
+
+    Nợ 642 – Có 334 (HĐLĐ); Nợ 632 – Có 338 thù lao CTV/HDV; Nợ 338 – Có 3335 TNCN khấu trừ 10%;
+    Nợ 334 – Có 3383 phần bảo hiểm xã hội người lao động; Nợ 334 – Có 3382 đoàn phí công đoàn.
+
+    Từ 01/9/2026 Đội xe và Giám đốc Điều hành xe nhận lương tại Công ty Vận tải Vietrip, phần còn lại tại
+    Vietourist Holdings. Gộp một bút toán chung là sai cả sổ lẫn thuế: hai pháp nhân là hai túi tiền, mỗi
+    bên có nghĩa vụ thuế và bảo hiểm riêng. Nên chia theo pháp nhân chủ quản của hồ sơ nhân sự, và người
+    chưa xác định pháp nhân thì ghi vào một chứng từ riêng có ghi rõ – không lặng lẽ dồn vào công ty mẹ.
+    """
+    from app.models.core import Company
     d = date.today()
-    hdld = sum(r["luong_cb"] + r["bien_doi"] for r in run.rows if r["hop_dong"] == "hdld")
-    ctv = sum(r["bien_doi"] for r in run.rows if r["hop_dong"] != "hdld")
-    tncn = sum(r["tncn"] for r in run.rows)
+    emps = {e.code: e for e in db.execute(select(Employee)).scalars()}
+    cos = {c.id: c for c in db.execute(select(Company)).scalars()}
+    nhom: dict[int | None, list[dict]] = {}
+    for r in run.rows:
+        e = emps.get(r["ma"])
+        nhom.setdefault(e.company_id if e else None, []).append(r)
+
     ids = []
-    try:
-        if hdld > 0:
-            ids.append(ACC.post_entry(db, "robot", "robot", d, f"Lương tháng {run.period} theo bảng lương TGĐ ký", [{"account": "642", "debit": hdld}, {"account": "334", "credit": hdld}], "luong", f"payroll:{run.period}").id)
-        if ctv > 0:
-            ids.append(ACC.post_entry(db, "robot", "robot", d, f"Thù lao HDV/CTV tháng {run.period}", [{"account": "632", "debit": ctv}, {"account": "338", "credit": ctv}], "luong", f"payroll:{run.period}").id)
-        if tncn > 0:
-            ids.append(ACC.post_entry(db, "robot", "robot", d, f"Khấu trừ TNCN 10% thù lao CTV tháng {run.period}", [{"account": "338", "debit": tncn}, {"account": "3335", "credit": tncn}], "luong", f"payroll:{run.period}").id)
-    except ValueError as ex:
-        R.audit(db, "robot", "robot", "ghi_so_that_bai", f"payroll:{run.period}", after={"ly_do": str(ex)})
+    for cid, rows_ in sorted(nhom.items(), key=lambda x: (x[0] is None, x[0] or 0)):
+        c = cos.get(cid)
+        ten = c.code if c else "CHƯA XÁC ĐỊNH PHÁP NHÂN"
+        hdld = sum(r["luong_cb"] + r["bien_doi"] for r in rows_ if r["hop_dong"] == "hdld")
+        ctv = sum(r["bien_doi"] for r in rows_ if r["hop_dong"] != "hdld")
+        tncn = sum(r.get("tncn", 0) for r in rows_)
+        bhxh = sum(r.get("bhxh", 0) for r in rows_)
+        doan_phi = sum(r.get("doan_phi", 0) for r in rows_)
+        try:
+            if hdld > 0:
+                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Lương tháng {run.period} – {ten}",
+                                          [{"account": "642", "debit": hdld}, {"account": "334", "credit": hdld}],
+                                          "luong", f"payroll:{run.period}:{ten}").id)
+            if ctv > 0:
+                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Thù lao HDV/CTV tháng {run.period} – {ten}",
+                                          [{"account": "632", "debit": ctv}, {"account": "338", "credit": ctv}],
+                                          "luong", f"payroll:{run.period}:{ten}").id)
+            if tncn > 0:
+                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Khấu trừ TNCN 10% thù lao CTV tháng {run.period} – {ten}",
+                                          [{"account": "338", "debit": tncn}, {"account": "3335", "credit": tncn}],
+                                          "luong", f"payroll:{run.period}:{ten}").id)
+            if bhxh > 0:
+                ids.append(ACC.post_entry(db, "robot", "robot", d, f"BHXH phần người lao động tháng {run.period} – {ten}",
+                                          [{"account": "334", "debit": bhxh}, {"account": "3383", "credit": bhxh}],
+                                          "luong", f"payroll:{run.period}:{ten}").id)
+            if doan_phi > 0:
+                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Đoàn phí công đoàn tháng {run.period} – {ten}",
+                                          [{"account": "334", "debit": doan_phi}, {"account": "3382", "credit": doan_phi}],
+                                          "luong", f"payroll:{run.period}:{ten}").id)
+        except ValueError as ex:
+            R.audit(db, "robot", "robot", "ghi_so_that_bai", f"payroll:{run.period}:{ten}", after={"ly_do": str(ex)})
     return ids
+
+
+def but_toan_theo_phap_nhan(db: Session, run: PayrollRun) -> list[dict]:
+    """Xem trước bảng lương chia theo pháp nhân trả lương, để đối chiếu trước khi TGĐ ký lô."""
+    from app.models.core import Company
+    emps = {e.code: e for e in db.execute(select(Employee)).scalars()}
+    cos = {c.id: c for c in db.execute(select(Company)).scalars()}
+    nhom: dict[int | None, dict] = {}
+    for r in run.rows:
+        e = emps.get(r["ma"]); cid = e.company_id if e else None
+        c = cos.get(cid)
+        g = nhom.setdefault(cid, {"company_id": cid, "company": c.name if c else "", "code": c.code if c else "",
+                                  "chua_xac_dinh": c is None, "so_nguoi": 0, "thu_nhap": 0.0, "khoan_tru": 0.0,
+                                  "bhxh": 0.0, "doan_phi": 0.0, "tncn": 0.0, "thuc_nhan": 0.0})
+        g["so_nguoi"] += 1
+        for k in ("thu_nhap", "khoan_tru", "bhxh", "doan_phi", "tncn", "thuc_nhan"):
+            g[k] += r.get(k, 0)
+    return sorted(nhom.values(), key=lambda g: (g["chua_xac_dinh"], g["code"]))
 
 
 # ---------- Cổng 13: điều kiện hành nghề HDV ----------

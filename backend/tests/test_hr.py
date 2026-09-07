@@ -144,10 +144,15 @@ def test_payroll_flow_roles_and_journal():
     assert client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("hcns")).status_code == 422  # khóa tính lại
     assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("hcns")).json()["run"]["status"] == "hcns_lap"
     res = client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("tgd")).json()
-    assert res["run"]["status"] == "tgd_ky" and len(res["run"]["entry_ids"]) == 3
-    js = [e for e in client.get("/api/v1/journal", headers=login("ketoan")).json() if e["source_ref"] == f"payroll:{P}"]
+    assert res["run"]["status"] == "tgd_ky" and len(res["run"]["entry_ids"]) >= 3
+    # Từ 07/9/2026 bút toán lương lập RIÊNG theo từng pháp nhân trả lương, và có thêm hai dòng khoản trừ
+    # của người lao động (BHXH 3383, đoàn phí 3382), nên số chứng từ nhiều hơn ba.
+    js = [e for e in client.get("/api/v1/journal", headers=login("ketoan")).json() if e["source_ref"].startswith(f"payroll:{P}")]
     acc = {(l["account"]) for e in js for l in e["lines"]}
     assert {"642", "334", "632", "338", "3335"} <= acc
+    assert "3383" in acc, "BHXH phần người lao động phải được ghi sổ"
+    phap_nhan = {e["source_ref"].split(":")[-1] for e in js}
+    assert phap_nhan, "mỗi pháp nhân một bộ chứng từ, ghi rõ ở source_ref"
     assert client.get("/api/v1/audit", headers=login("bks")).json()["chain_ok"] is True
 
 

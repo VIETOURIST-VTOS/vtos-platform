@@ -431,8 +431,12 @@ def propose_param(data: S.ParamPropose, u: User = Depends(require_roles("tp_dh",
 
 @router.post("/params/{pid}/sign", tags=["params"])
 def sign_param(pid: int, u: User = Depends(require_roles("chutich", "tgd")), db: Session = Depends(get_db)):
+    from app.services import chu_ky as CK
     p = db.get(Param, pid)
     if not p or p.status != "pending": raise Gate("TRANG_THAI", "Không ở trạng thái chờ ký")
+    # Người trình đề xuất không được tự ký duyệt đề xuất của chính mình (Phụ lục đối chiếu mục 3.2).
+    CK.kiem_tra_nguoi_ky(u, ("chutich", "tgd"), nguoi_trinh=p.proposed_by,
+                         da_ky={"chutich": "x" if p.signed_chutich else "", "tgd": "x" if p.signed_tgd else ""})
     setattr(p, f"signed_{u.role}", True)
     R.audit(db, u.username, u.role, "ky_tham_so", f"param:{p.key}", after={"id": p.id, "value": p.value})
     if p.signed_chutich and p.signed_tgd:

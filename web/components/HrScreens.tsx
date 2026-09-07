@@ -28,6 +28,8 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const [emps, setEmps] = useState<any[]>([]);
   const [khoa, setKhoa] = useState<any[]>([]);
   const [treo, setTreo] = useState<any>(null);
+  const [phieu, setPhieu] = useState<any>(null);
+  const [phapNhan, setPhapNhan] = useState<any>(null);
   const [xungDot, setXungDot] = useState<any>(null);
   const [cong, setCong] = useState<Record<string, string>>({});
   const [visa, setVisa] = useState<any[]>([]);
@@ -55,6 +57,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     if (!tours.length) api("/tours").then(setTours).catch(() => {});
     if (tab === "payroll") api(`/payroll-runs/${period}`).then(setRun).catch((e) => toast(errMsg(e), true));
     if (tab === "payroll") { api("/payroll/khoan-treo").then(setTreo).catch(() => {}); api("/payroll/xung-dot-ho-so").then(setXungDot).catch(() => {}); }
+    if (tab === "payroll") { api(`/payroll-runs/${period}/phieu-luong`).then(setPhieu).catch(() => setPhieu(null)); api(`/payroll-runs/${period}/theo-phap-nhan`).then(setPhapNhan).catch(() => setPhapNhan(null)); }
     if (tab === "employees") api("/employees").then(setEmps);
     if (tab === "employees") api("/users/khoa").then(setKhoa).catch(() => {});
     if (tab === "visa") api("/visa").then(setVisa);
@@ -81,17 +84,18 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         <div className="kpi"><b>{run.totals.so_nguoi}</b><span>Người · {run.totals.so_chuyen} chuyến KT xác nhận</span></div>
         <div className="kpi"><b>{vnd(run.totals.luong_cb)}</b><span>Lương cơ bản (sau thang giảm)</span></div>
         <div className="kpi"><b>{vnd(run.totals.bien_doi)}</b><span>Thu nhập biến đổi</span></div>
-        <div className="kpi"><b>{vnd(run.totals.thuc_nhan)}</b><span>Thực nhận (đã trừ TNCN CTV {vnd(run.totals.tncn)})</span></div>
+        <div className="kpi"><b>{vnd(run.totals.khoan_tru)}</b><span>Khoản trừ (BHXH {vnd(run.totals.bhxh)} · đoàn phí {vnd(run.totals.doan_phi)} · TNCN {vnd(run.totals.tncn)})</span></div>
+        <div className="kpi"><b>{vnd(run.totals.thuc_nhan)}</b><span>Thực nhận</span></div>
       </div>
       <p><Tag cls={PST[run.status]?.[1]}>{PST[run.status]?.[0]}</Tag> {run.kt_confirmed_by && <span className="muted"> · KT {run.kt_confirmed_by} {fmtDT(run.kt_confirmed_at)}</span>}{run.hcns_by && <span className="muted"> · HCNS {run.hcns_by} {fmtDT(run.hcns_at)}</span>}{run.tgd_by && <span className="muted"> · TGĐ {run.tgd_by} {fmtDT(run.tgd_at)} · {run.entry_ids?.length} chứng từ</span>}
         {run.status === "nhap" && ["hcns", "ketoan", "cntt"].includes(role) && <button className="act grey" onClick={() => api(`/payroll-runs/${period}?refresh=true`).then(setRun).then(() => toast("Đã tính lại nháp")).catch((e) => toast(errMsg(e), true))}>Tính lại nháp</button>}
         {NEXT[run.status] && NEXT[run.status][0] === role && <button className="act teal" onClick={() => post(`/payroll-runs/${period}/advance`)}>{NEXT[run.status][1]}</button>}</p>
-      <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th>HĐ</th><th>Chế độ công</th><th style={{ textAlign: "right" }}>Lương CB</th><th style={{ textAlign: "right" }}>Biến đổi</th><th style={{ textAlign: "right" }}>TNCN</th><th style={{ textAlign: "right" }}>Thực nhận</th><th>Ghi chú robot</th></tr></thead>
+      <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th>HĐ</th><th>Chế độ công</th><th style={{ textAlign: "right" }}>Lương CB</th><th style={{ textAlign: "right" }}>Biến đổi</th><th style={{ textAlign: "right" }}>BHXH</th><th style={{ textAlign: "right" }}>Đoàn phí</th><th style={{ textAlign: "right" }}>TNCN</th><th style={{ textAlign: "right" }}>Thực nhận</th><th>Ghi chú robot</th></tr></thead>
         <tbody>{run.rows.map((r: any) => <>
           <tr key={r.ma} style={{ cursor: "pointer" }} onClick={() => setOpen(open === r.ma ? null : r.ma)}><td className="mono">{r.ma}</td><td><b>{r.ten}</b></td><td>{meta.departments[r.phong] || r.phong}<div className="muted">{meta.positions[r.chuc_vu]}</div></td><td>{r.hop_dong === "hdld" ? "HĐLĐ" : "CTV"}</td><td className="muted">{CD[r.che_do_cong] || ""}</td>
-            <td style={{ textAlign: "right" }}>{vnd(r.luong_cb)}{r.xac_dinh_luong && r.xac_dinh_luong.muc_ky !== r.xac_dinh_luong.muc_hop_dong && <div className="muted" style={{ fontSize: 11 }}>HĐ {vnd(r.xac_dinh_luong.muc_hop_dong)}</div>}</td><td style={{ textAlign: "right" }}>{vnd(r.bien_doi)}</td><td style={{ textAlign: "right" }}>{r.tncn ? vnd(r.tncn) : ""}</td><td style={{ textAlign: "right" }}><b>{vnd(r.thuc_nhan)}</b></td><td className="muted" style={{ maxWidth: 320 }}>{r.ghi_chu}</td></tr>
-          {open === r.ma && <tr key={r.ma + "x"}><td colSpan={10} className="muted" style={{ padding: "2px 24px" }}><b>Xác định mức lương của kỳ:</b> {r.xac_dinh_luong ? r.xac_dinh_luong.giai_thich : "—"}{r.xac_dinh_luong?.lookback_inputs && <> · {r.xac_dinh_luong.lookback_inputs.map((x: any) => `${x.ky}: ${vnd(x.loi_nhuan)}`).join(" · ")}</>}</td></tr>}
-          {open === r.ma && r.khoan.length > 0 && <tr key={r.ma + "k"}><td colSpan={10}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}><tbody>{r.khoan.map((k: any, i: number) => <tr key={i}><td>{k.ten}</td><td style={{ textAlign: "right" }}>{vnd(k.tien)}</td><td className="muted">{k.ghi_chu}</td></tr>)}</tbody></table></td></tr>}
+            <td style={{ textAlign: "right" }}>{vnd(r.luong_cb)}{r.xac_dinh_luong && r.xac_dinh_luong.muc_ky !== r.xac_dinh_luong.muc_hop_dong && <div className="muted" style={{ fontSize: 11 }}>HĐ {vnd(r.xac_dinh_luong.muc_hop_dong)}</div>}</td><td style={{ textAlign: "right" }}>{vnd(r.bien_doi)}</td><td style={{ textAlign: "right" }}>{r.bhxh ? vnd(r.bhxh) : ""}</td><td style={{ textAlign: "right" }}>{r.doan_phi ? vnd(r.doan_phi) : ""}</td><td style={{ textAlign: "right" }}>{r.tncn ? vnd(r.tncn) : ""}</td><td style={{ textAlign: "right" }}><b>{vnd(r.thuc_nhan)}</b></td><td className="muted" style={{ maxWidth: 320 }}>{r.ghi_chu}</td></tr>
+          {open === r.ma && <tr key={r.ma + "x"}><td colSpan={12} className="muted" style={{ padding: "2px 24px" }}><b>Xác định mức lương của kỳ:</b> {r.xac_dinh_luong ? r.xac_dinh_luong.giai_thich : "—"}{r.xac_dinh_luong?.lookback_inputs && <> · {r.xac_dinh_luong.lookback_inputs.map((x: any) => `${x.ky}: ${vnd(x.loi_nhuan)}`).join(" · ")}</>}</td></tr>}
+          {open === r.ma && r.khoan.length > 0 && <tr key={r.ma + "k"}><td colSpan={12}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}><tbody>{r.khoan.map((k: any, i: number) => <tr key={i}><td>{k.ten}</td><td style={{ textAlign: "right" }}>{vnd(k.tien)}</td><td className="muted">{k.ghi_chu}</td></tr>)}</tbody></table></td></tr>}
         </>)}</tbody></table></div>
       {run.totals?.chua_du_co_so?.length > 0 && <div className="panel"><h2>Chưa đủ cơ sở tính lương cho {run.totals.chua_du_co_so.length} người</h2>
         <p className="muted">Doanh thu tính chỉ tiêu chỉ đếm chuyến Kế toán <b>đã xác nhận quyết toán</b>. Những người này còn chuyến chưa chốt nên doanh thu của họ chưa xác định được – <b>không được hiểu là bán được 0 đồng</b>. Kế toán phải chốt quyết toán trước khi trình ký kỳ lương này.</p>
@@ -119,6 +123,38 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
             <td className="num">{x.qua_han_ngay ? <Tag cls="red">{x.qua_han_ngay} ngày</Tag> : <Tag cls="warn">chưa tới hạn</Tag>}</td>
             <td className="mono">{x.ma}<div className="muted">{x.ten}</div></td><td>{x.vai_tro}</td><td>{x.buoc_tiep_theo ? <Tag cls={x.co_so_quyet_toan ? "warn" : ""}>{x.buoc_tiep_theo}</Tag> : ""}</td><td className="muted">{x.ly_do}</td></tr>)}</tbody></table>
         {treo.rows.length > 60 && <p className="muted">Đang hiển thị 60 dòng đầu trong {treo.rows.length}.</p>}</div>}
+      {phieu && <div className="panel"><h2>Phiếu lương của tôi — kỳ {phieu.period}</h2>
+        <p className="muted">{phieu.nhan_su.ten} · mã {phieu.nhan_su.ma} · {phieu.nhan_su.phong}{phieu.nhan_su.phap_nhan_tra_luong ? ` · trả lương tại ${phieu.nhan_su.phap_nhan_tra_luong}` : ""} · {phieu.nhan_su.che_do_cong}</p>
+        {phieu.xac_dinh_luong && <p><b>Cách xác định mức lương của kỳ:</b> {phieu.xac_dinh_luong.giai_thich}</p>}
+        <div className="grid">
+          <div><b>Thu nhập</b>
+            <table><tbody>
+              <tr><td>Lương cơ bản của kỳ</td><td style={{ textAlign: "right" }}>{vnd(phieu.thu_nhap.luong_co_ban_ky)}</td></tr>
+              {phieu.thu_nhap.cac_khoan.map((k: any, i: number) => <tr key={i}><td>{k.ten}</td><td style={{ textAlign: "right" }}>{vnd(k.tien)}</td></tr>)}
+              <tr><td><b>Tổng thu nhập</b></td><td style={{ textAlign: "right" }}><b>{vnd(phieu.thu_nhap.tong)}</b></td></tr>
+            </tbody></table></div>
+          <div><b>Khoản trừ</b>
+            <table><tbody>
+              {phieu.khoan_tru.chi_tiet_che_tai.map((k: any, i: number) => <tr key={i}><td>{k.ten}</td><td style={{ textAlign: "right" }}>{vnd(-k.tien)}</td></tr>)}
+              <tr><td>Bảo hiểm xã hội phần người lao động</td><td style={{ textAlign: "right" }}>{vnd(phieu.khoan_tru.bhxh_nguoi_lao_dong)}</td></tr>
+              <tr><td>Đoàn phí công đoàn</td><td style={{ textAlign: "right" }}>{vnd(phieu.khoan_tru.doan_phi_cong_doan)}</td></tr>
+              {phieu.khoan_tru.tncn_khau_tru > 0 && <tr><td>Thuế TNCN khấu trừ 10%</td><td style={{ textAlign: "right" }}>{vnd(phieu.khoan_tru.tncn_khau_tru)}</td></tr>}
+              <tr><td><b>Tổng khoản trừ</b></td><td style={{ textAlign: "right" }}><b>{vnd(phieu.khoan_tru.tong)}</b></td></tr>
+            </tbody></table></div>
+        </div>
+        <p style={{ fontSize: 18 }}><b>Phải trả: {vnd(phieu.thuc_nhan)}</b> {phieu.da_ky ? <Tag cls="ok">Đã ký lô</Tag> : <Tag cls="warn">Chưa ký lô</Tag>}</p>
+        {phieu.ghi_chu && <p className="muted">{phieu.ghi_chu}</p>}
+        {phieu.khoan_dang_treo?.length > 0 && <><p><b>Đang treo {phieu.khoan_dang_treo.length} khoản</b> — {phieu.luu_y}</p>
+          <div className="wrap"><table><thead><tr><th>Chuyến</th><th>Kết thúc</th><th>Hạn quyết toán</th><th className="num">Quá hạn</th><th>Bước tiếp theo</th></tr></thead>
+            <tbody>{phieu.khoan_dang_treo.slice(0, 20).map((x: any, i: number) => <tr key={i}><td><b>{x.tour_code}</b></td><td>{fmtD(x.ket_thuc)}</td><td>{fmtD(x.han_quyet_toan)}</td>
+              <td className="num">{x.qua_han_ngay ? <Tag cls="red">{x.qua_han_ngay} ngày</Tag> : "—"}</td><td className="muted">{x.buoc_tiep_theo || x.ly_do}</td></tr>)}</tbody></table></div></>}
+      </div>}
+      {phapNhan?.rows?.length > 0 && <div className="panel wrap"><h2>Bảng lương theo pháp nhân trả lương</h2>
+        <p className="muted">{phapNhan.ghi_chu}</p>
+        <table><thead><tr><th>Pháp nhân</th><th className="num">Người</th><th style={{ textAlign: "right" }}>Thu nhập</th><th style={{ textAlign: "right" }}>Khoản trừ</th><th style={{ textAlign: "right" }}>BHXH</th><th style={{ textAlign: "right" }}>Phải trả</th></tr></thead>
+          <tbody>{phapNhan.rows.map((g: any, i: number) => <tr key={i}><td>{g.chua_xac_dinh ? <Tag cls="warn">Chưa xác định pháp nhân</Tag> : <b>{g.code}</b>}<div className="muted">{g.company}</div></td>
+            <td className="num">{g.so_nguoi}</td><td style={{ textAlign: "right" }}>{vnd(g.thu_nhap)}</td><td style={{ textAlign: "right" }}>{vnd(g.khoan_tru)}</td>
+            <td style={{ textAlign: "right" }}>{vnd(g.bhxh)}</td><td style={{ textAlign: "right" }}><b>{vnd(g.thuc_nhan)}</b></td></tr>)}</tbody></table></div>}
       <p className="muted">Thang f KD Lẻ: f0–f4 = 0%, f5 = 0,5% … f19 = 4,7%, ≥1000% mốc = 5%; ngưỡng bậc tạm theo % mốc – HCNS nạp Bảng B.1 chính thức trước kỳ lương đầu. Thang đoàn f9–f0 theo bình quân LN 3 tháng / 30 triệu.</p>
     </>}
 

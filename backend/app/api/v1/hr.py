@@ -401,8 +401,11 @@ def guide_rate_propose(data: GuideRateIn, u: User = Depends(require_roles("cntt"
 
 @router.post("/guide-rates/{rid}/sign")
 def guide_rate_sign(rid: int, u: User = Depends(require_roles("chutich", "tgd")), db: Session = Depends(get_db)):
+    from app.services import chu_ky as CK
     r = db.get(GuideRate, rid)
     if not r or r.status != "pending": raise HTTPException(404, "Không có đề xuất chờ ký")
+    CK.kiem_tra_nguoi_ky(u, ("chutich", "tgd"), nguoi_trinh=r.proposed_by,
+                         da_ky={"chutich": "x" if r.signed_chutich else "", "tgd": "x" if r.signed_tgd else ""})
     if u.role == "chutich": r.signed_chutich = True
     else: r.signed_tgd = True
     if r.signed_chutich and r.signed_tgd:
@@ -436,8 +439,11 @@ def rate_propose(data: RateIn, u: User = Depends(require_roles("cntt", "hcns", "
 
 @router.post("/vehicle-rates/{rid}/sign")
 def rate_sign(rid: int, u: User = Depends(require_roles("chutich", "tgd")), db: Session = Depends(get_db)):
+    from app.services import chu_ky as CK
     r = db.get(VehicleRate, rid)
     if not r or r.status != "pending": raise HTTPException(404, "Không có đề xuất chờ ký")
+    CK.kiem_tra_nguoi_ky(u, ("chutich", "tgd"), nguoi_trinh=r.proposed_by,
+                         da_ky={"chutich": "x" if r.signed_chutich else "", "tgd": "x" if r.signed_tgd else ""})
     if u.role == "chutich": r.signed_chutich = True
     else: r.signed_tgd = True
     if r.signed_chutich and r.signed_tgd:
@@ -655,17 +661,24 @@ def incident_confirm(iid: int, u: User = Depends(require_roles("hcns")), db: Ses
 def incident_approve(iid: int, u: User = Depends(require_roles("gd_kd", "ptgd_doan", "tgd", "chutich")), db: Session = Depends(get_db)):
     i = db.get(Incident, iid)
     if not i or i.status != "hcns_xac_nhan": raise HTTPException(404, "Sự vụ chưa được HCNS xác nhận hoặc đã duyệt")
+    from app.services import chu_ky as CK
     allowed = INCIDENT_LEVELS[i.level]["duyet"]
-    if u.role not in allowed: raise HTTPException(403, f"Mức {i.level} do {', '.join(allowed)} duyệt")
     signers = [x for x in i.approved_by.split(",") if x]
-    if u.username not in signers: signers.append(u.username)
+    da_ky = {}
+    for x in signers:
+        usr = db.execute(select(User).where(User.username == x)).scalars().first()
+        if usr: da_ky[usr.role] = usr.username
+    # Mức 3 cần đủ chữ ký Chủ tịch + TGĐ; người lập biên bản không được nằm trong tập người ký.
+    CK.kiem_tra_nguoi_ky(u, tuple(allowed), nguoi_trinh=i.created_by, da_ky=da_ky)
+    signers.append(u.username); da_ky[u.role] = u.username
     i.approved_by = ",".join(signers)
-    need2 = i.level >= 3
-    roles_signed = {db.execute(select(User).where(User.username == x)).scalars().first().role for x in signers}
-    if not need2 or ({"chutich", "tgd"} <= roles_signed):
+    can = ("chutich", "tgd") if i.level >= 3 else tuple(allowed)
+    du = CK.du_chu_ky(da_ky, can) if i.level >= 3 else True
+    if du:
         i.status, i.approved_at = "cho_khieu_nai", datetime.now()
     R.audit(db, u.username, u.role, "duyet_su_vu", f"incident:{i.id}", after={"trang_thai": i.status}); db.commit()
-    return {"message": "Đã duyệt – người bị lập biên bản có 3 ngày làm việc để khiếu nại" if i.status == "cho_khieu_nai" else "Đã ký, chờ chữ ký còn lại (mức 3 cần Chủ tịch + TGĐ)"}
+    return {"message": "Đã duyệt – người bị lập biên bản có 3 ngày làm việc để khiếu nại" if i.status == "cho_khieu_nai"
+            else "Đã ký, còn chờ chữ ký của " + ", ".join(CK.con_thieu(da_ky, ("chutich", "tgd")))}
 
 
 class OpinionIn(BaseModel):
@@ -809,6 +822,62 @@ def payroll_delete(period: str, u: User = Depends(require_roles("cntt", "chutich
     R.audit(db, u.username, u.role, "xoa_bang_luong", f"payroll:{period}", before={"tong": run.totals})
     db.delete(run); db.commit()
     return {"message": f"Đã xóa bảng lương {period}"}
+
+
+@router.get("/payroll-runs/{period}/phieu-luong")
+def phieu_luong(period: str, ma: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Phiếu lương của CHÍNH người đăng nhập (hoặc của một mã NV, với Kế toán / HCNS / lãnh đạo).
+
+    Người lao động phải tự xem được lương của mình. Phiếu ghi đủ ba khối theo bộ tính lương: thu nhập,
+    khoản trừ, phải trả – kèm căn cứ xác định mức lương của kỳ và các khoản đang TREO của chính người đó.
+    Khoản treo không nằm trong phiếu lương nào là chỗ dễ mất tiền nhất mà không ai phát hiện, nên phiếu
+    lương ở đây hiển thị luôn phần treo bên cạnh phần được trả.
+    """
+    from app.services import luong as L
+    quan_tri = u.role in ("ketoan", "hcns", "tgd", "chutich", "cntt", "bks")
+    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    if not e and u.staff_code:
+        e = db.execute(select(Employee).where(Employee.code == u.staff_code)).scalars().first()
+    ma_can = (ma or "").strip() or (e.code if e else "")
+    if not ma_can: raise HTTPException(404, "Tài khoản chưa gắn hồ sơ nhân sự – báo HCNS ghép mã nhân viên")
+    if ma and not quan_tri and (not e or ma != e.code):
+        raise HTTPException(403, "Chỉ xem được phiếu lương của chính mình")
+
+    run = db.execute(select(PayrollRun).where(PayrollRun.period == period)).scalars().first()
+    if run is None: raise HTTPException(404, f"Chưa có bảng lương kỳ {period}")
+    if run.status == "nhap" and not quan_tri:
+        raise HTTPException(422, "Bảng lương kỳ này còn là bản nháp của robot – chờ Kế toán xác nhận cơ sở tính")
+    row = next((r for r in run.rows if r["ma"] == ma_can), None)
+    if row is None: raise HTTPException(404, f"Không có dòng lương của mã {ma_can} trong kỳ {period}")
+
+    emp = db.execute(select(Employee).where(Employee.code == ma_can)).scalars().first()
+    cty = db.get(Company, emp.company_id) if emp and emp.company_id else None
+    treo = [x for x in L.khoan_treo(db)["rows"] if x["ma"] == ma_can]
+    return {"period": period, "trang_thai_bang_luong": run.status, "da_ky": bool(run.tgd_by),
+            "nhan_su": {"ma": ma_can, "ten": row["ten"], "phong": DEPARTMENTS.get(row["phong"], row["phong"]),
+                        "chuc_vu": row.get("chuc_vu"), "hop_dong": row["hop_dong"],
+                        "phap_nhan_tra_luong": cty.name if cty else "", "che_do_cong": row.get("che_do_cong_ten")},
+            "xac_dinh_luong": row.get("xac_dinh_luong"),
+            "thu_nhap": {"luong_co_ban_ky": row["luong_cb"],
+                         "cac_khoan": [k for k in row["khoan"] if k["tien"] > 0],
+                         "tong": row.get("thu_nhap", row["luong_cb"] + row["bien_doi"])},
+            "khoan_tru": {"che_tai_su_vu": row.get("tru_su_vu", 0), "chi_tiet_che_tai": [k for k in row["khoan"] if k["tien"] < 0],
+                          "bhxh_nguoi_lao_dong": row.get("bhxh", 0), "doan_phi_cong_doan": row.get("doan_phi", 0),
+                          "tncn_khau_tru": row.get("tncn", 0), "tong": row.get("khoan_tru", 0)},
+            "thuc_nhan": row["thuc_nhan"], "ghi_chu": row.get("ghi_chu", ""),
+            "khoan_dang_treo": treo,
+            "luu_y": ("Khoản treo là hoa hồng và thưởng chuyến CHƯA phát sinh vì chuyến chưa chốt quyết toán. "
+                      "Đây là cơ chế hoãn, không phải cắt: chốt quyết toán xong thì kỳ lương tương ứng trả đủ.")
+            if treo else ""}
+
+
+@router.get("/payroll-runs/{period}/theo-phap-nhan")
+def payroll_by_company(period: str, u: User = Depends(require_roles("ketoan", "hcns", "tgd", "chutich", "cntt", "bks")), db: Session = Depends(get_db)):
+    """Bảng lương chia theo pháp nhân trả lương – đối chiếu trước khi TGĐ ký lô và ghi sổ."""
+    run = H.get_or_draft(db, period)
+    return {"period": period, "rows": H.but_toan_theo_phap_nhan(db, run),
+            "ghi_chu": "Mỗi pháp nhân là một bộ chứng từ lương riêng. Người chưa xác định pháp nhân được tách "
+                       "thành một dòng riêng, không dồn vào công ty mẹ."}
 
 
 @router.post("/payroll-runs/{period}/advance")
