@@ -238,8 +238,40 @@ BO_NAP = {
 }
 
 
+# Các bộ nạp của phòng ban khai báo ở tệp riêng: thêm loại dữ liệu mới không đụng vào luồng nạp.
+from app.services.intake_phong_ban import bo_nap as _bo_nap_phong_ban   # noqa: E402
+BO_NAP.update(_bo_nap_phong_ban(_c))
+
+
+# Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
+# không có nghĩa là nạp được mọi thứ. Kinh doanh nạp danh sách khách của mình, HCNS nạp hồ sơ nhân sự và
+# chấm công, Kế toán nạp sao kê – không ai nạp chéo sang sổ của phòng khác chỉ vì cùng thấy một cái nút.
+QUAN_TRI = ("chutich", "tgd", "cntt")
+VAI_TRO = {
+    "nha_cung_cap":     QUAN_TRI + ("tp_dh", "nv_dh", "ketoan"),
+    "don_dich_vu":      QUAN_TRI + ("tp_dh", "nv_dh", "ketoan"),
+    "chuyen_xe":        QUAN_TRI + ("gd_doi_xe", "tp_dh", "nv_dh", "ketoan"),
+    "nhan_su":          QUAN_TRI + ("hcns",),
+    "cham_cong":        QUAN_TRI + ("hcns",),
+    "khach_hang":       QUAN_TRI + ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "ptgd_mkt"),
+    "booking":          QUAN_TRI + ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "tp_dh", "nv_dh", "ptgd_doan"),
+    "sao_ke_ngan_hang": QUAN_TRI + ("ketoan",),
+}
+
+
+def duoc_nap(loai: str, vai_tro: str) -> bool:
+    return vai_tro in VAI_TRO.get(loai, QUAN_TRI)
+
+
+# Bộ nạp thuộc phòng ban nào – để màn hình xếp theo phòng và để mỗi phòng thấy phần của mình trước.
+PHONG_BAN = {"nha_cung_cap": "dieu_hanh", "don_dich_vu": "dieu_hanh", "chuyen_xe": "doi_xe",
+             "nhan_su": "hcns", "cham_cong": "hcns", "khach_hang": "kd_le", "booking": "kd_le",
+             "sao_ke_ngan_hang": "ketoan"}
+
+
 def danh_sach_bo_nap() -> list[dict]:
     return [{"ma": k, "ten": v["ten"], "mo_ta": v["mo_ta"], "khoa_chong_trung": v["khoa_chong_trung"],
+             "phong_ban": PHONG_BAN.get(k, ""), "vai_tro": list(VAI_TRO.get(k, QUAN_TRI)),
              "cot": v["cot"]} for k, v in BO_NAP.items()]
 
 

@@ -8,6 +8,15 @@ import { Tag, errMsg } from "@/components/ui";
  *
  *  Màn hình cố ý bắt đi hai bước: KIỂM TRA rồi mới NẠP. Bấm một nút rồi 500 dòng rác nằm trong sổ là
  *  chuyện của vài giây; dọn nó là chuyện của vài ngày. */
+const PHONG: Record<string, string> = { dieu_hanh: "Điều hành", doi_xe: "Đội xe", hcns: "Hành chính & Nhân sự",
+  kd_le: "Kinh doanh", ketoan: "Kế toán", visa: "Ban Visa", marketing: "Marketing", ban_tgd: "Ban TGĐ" };
+
+function theoPhong(ds: any[]) {
+  const g: Record<string, any[]> = {};
+  ds.forEach((b) => { (g[b.phong_ban || "khac"] ||= []).push(b); });
+  return g;
+}
+
 function NapDuLieu() {
   const { user, toast } = useShell();
   const [bo, setBo] = useState<any>(null);
@@ -18,7 +27,10 @@ function NapDuLieu() {
   const [ls, setLs] = useState<any[]>([]);
   const [boQua, setBoQua] = useState(false);
   const [dang, setDang] = useState(false);
-  const canNap = ["cntt", "ketoan", "tp_dh", "nv_dh", "hcns", "gd_doi_xe"].includes(user?.role || "");
+  // Quyền nạp đọc theo TỪNG BỘ NẠP do máy chủ công bố, không chép lại danh sách vai trò ở đây: chép là
+  // sớm muộn hai bên lệch nhau, và bên lỏng hơn luôn là bên người dùng nhìn thấy.
+  const chon0 = bo?.bo_nap?.find((b: any) => b.ma === loai);
+  const canNap = !!chon0?.vai_tro?.includes(user?.role || "");
 
   const load = useCallback(async () => {
     try { const d = await api<any>("/nap-du-lieu/bo-nap"); setBo(d); if (!loai) setLoai(d.bo_nap[0]?.ma || "");
@@ -27,7 +39,7 @@ function NapDuLieu() {
   }, [toast, loai]);
   useEffect(() => { load(); }, [load]);
 
-  const chon = bo?.bo_nap?.find((b: any) => b.ma === loai);
+  const chon = chon0;
 
   const taiMau = () => {
     const h = { Authorization: `Bearer ${localStorage.getItem("vtos_token") || ""}` };
@@ -73,11 +85,17 @@ function NapDuLieu() {
       <h2>1. Chọn loại dữ liệu</h2>
       <label>Loại
         <select value={loai} onChange={(e) => { setLoai(e.target.value); setKt(null); setRows([]); }}>
-          {bo.bo_nap.map((b: any) => <option key={b.ma} value={b.ma}>{b.ten}</option>)}
+          {Object.entries(theoPhong(bo.bo_nap)).map(([pb, ds]: any) =>
+            <optgroup key={pb} label={PHONG[pb] || pb}>
+              {ds.map((b: any) => <option key={b.ma} value={b.ma}>{b.ten}</option>)}
+            </optgroup>)}
         </select></label>
       {chon && <>
         <p className="muted">{chon.mo_ta}</p>
         <p className="muted">Khóa chống trùng: <b>{chon.khoa_chong_trung}</b></p>
+        {!canNap && <p className="muted"><Tag cls="warn">chỉ xem</Tag> Loại dữ liệu này thuộc {PHONG[chon.phong_ban] || "phòng khác"}.
+          Anh/chị xem được cấu trúc và kiểm tra thử, nhưng người nạp phải là người của phòng đó — để nhật ký
+          ghi đúng tên người chịu trách nhiệm về số liệu.</p>}
         <div className="wrap"><table>
           <thead><tr><th>Cột trong tệp</th><th>Bắt buộc</th><th>Ví dụ</th><th>Ghi chú</th></tr></thead>
           <tbody>{chon.cot.map((c: any) => <tr key={c.key}>

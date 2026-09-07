@@ -15,8 +15,12 @@ from app.services import intake as IN, rules as R
 
 router = APIRouter(prefix="/api/v1/nap-du-lieu", tags=["nap-du-lieu"])
 
-READ = ("chutich", "tgd", "ptgd_doan", "tp_dh", "nv_dh", "ketoan", "bks", "cntt", "hcns", "gd_doi_xe")
-WRITE = ("cntt", "ketoan", "tp_dh", "nv_dh", "hcns", "gd_doi_xe")
+# Mở màn hình rộng, chặn theo TỪNG BỘ NẠP (app/services/intake.VAI_TRO). Nếu chặn ở cửa màn hình thì
+# hoặc phải mở cho mọi phòng – ai cũng nạp được mọi thứ – hoặc phải đóng bớt phòng, và phòng bị đóng sẽ
+# nhờ người khác nạp hộ, tức là nhật ký ghi sai tên người chịu trách nhiệm.
+READ = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "ketoan", "bks", "cntt", "hcns",
+        "gd_doi_xe", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt")
+WRITE = READ
 
 
 @router.get("/bo-nap")
@@ -83,6 +87,10 @@ class NapIn(BaseModel):
 def nap(data: NapIn, u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
     """Nạp thật. Luôn kiểm tra lại ở máy chủ trước khi ghi – không tin kết quả xem trước gửi kèm."""
     if not data.rows: raise HTTPException(422, "Không có dòng nào để nạp")
+    if data.loai in IN.BO_NAP and not IN.duoc_nap(data.loai, u.role):
+        raise HTTPException(403, f"Vai trò của anh/chị không nạp được '{IN.BO_NAP[data.loai]['ten']}'. "
+                                 "Loại dữ liệu này thuộc phòng khác – nhờ họ nạp để nhật ký ghi đúng tên "
+                                 "người chịu trách nhiệm.")
     try:
         kq = IN.nap(db, data.loai, data.rows, u.username, data.bo_qua_dong_loi,
                     data.ten_tep, data.nguon, data.tac_nhan)
