@@ -22,6 +22,7 @@ function HuongDan() {
   const [chao, setChao] = useState<any[]>([]);
   const [tepHdv, setTepHdv] = useState("");
   const [form, setForm] = useState<any>(null);        // lời chào đang soạn
+  const [hs, setHs] = useState<any>(null);            // hồ sơ hành nghề đang sửa
   const [luu, setLuu] = useState(false);
   const canDieuPhoi = ["tp_hd", "tp_dh", "nv_dh", "hcns", "cntt"].includes(user?.role || "");
 
@@ -42,6 +43,22 @@ function HuongDan() {
         tour_id: Number(form.tour_id), guide_id: Number(form.guide_id), days: Number(form.days) || 1,
         rate_per_day: Number(form.rate_per_day) || 0, holiday: !!form.holiday } });
       toast(d.message); setForm(null); await load();
+    } catch (e) { toast(errMsg(e), true); } finally { setLuu(false); }
+  };
+
+  const luuHoSo = async () => {
+    setLuu(true);
+    try {
+      const body: any = { the_so: hs.the_so || "", the_loai: hs.the_loai || "",
+        the_het_han: hs.the_het_han || null, hoi_vien: !!hs.hoi_vien,
+        hop_dong_cong_tac: !!hs.hop_dong_cong_tac, dien_thoai: hs.dien_thoai || "",
+        tuyen_phu_trach: hs.tuyen_phu_trach || "",
+        han_muc_tam_ung: Number(hs.han_muc_tam_ung) || 0 };
+      const d = hs.id
+        ? await api<any>(`/huong-dan/hdv/${hs.id}`, { method: "PUT", json: body })
+        : await api<any>("/huong-dan/hdv", { method: "POST",
+            json: { ...body, ho_ten: hs.ho_ten, ma_nv: hs.ma_nv || "" } });
+      toast(d.message); setHs(null); await load();
     } catch (e) { toast(errMsg(e), true); } finally { setLuu(false); }
   };
 
@@ -76,6 +93,53 @@ function HuongDan() {
       {TABS.map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }}
                                     onClick={() => setTab(k)}>{l}</button>)}
     </div>
+
+    {hs && <div className="panel">
+      <h2>{hs.id ? `Hồ sơ hành nghề – ${hs.ho_ten}` : "Thêm hướng dẫn viên cộng tác"}</h2>
+      <p className="muted">Ba điều kiện của Điều 58 Luật Du lịch: thẻ hướng dẫn viên còn hạn, hội viên
+        tổ chức xã hội – nghề nghiệp, và hợp đồng cộng tác đã ký. Thiếu một điều là chuyến dẫn đó vi
+        phạm, và người bị xử phạt gồm cả doanh nghiệp — nên cổng 13 chặn theo dữ liệu ở đây.</p>
+      <div className="grid2">
+        {!hs.id && <label>Họ và tên
+          <input value={hs.ho_ten} onChange={(e) => setHs({ ...hs, ho_ten: e.target.value })} /></label>}
+        {!hs.id && <label>Mã nhân viên <span className="muted">(để trống thì hệ thống tự cấp)</span>
+          <input value={hs.ma_nv} onChange={(e) => setHs({ ...hs, ma_nv: e.target.value })} /></label>}
+        <label>Số thẻ hướng dẫn viên
+          <input value={hs.the_so} placeholder="VD: HDV-NĐ-2023-0451"
+                 onChange={(e) => setHs({ ...hs, the_so: e.target.value })} /></label>
+        <label>Loại thẻ
+          <select value={hs.the_loai} onChange={(e) => setHs({ ...hs, the_loai: e.target.value })}>
+            <option value="">— chưa ghi —</option>
+            <option value="noi_dia">Nội địa</option><option value="quoc_te">Quốc tế</option>
+          </select></label>
+        <label>Ngày hết hạn thẻ
+          <input type="date" value={hs.the_het_han}
+                 onChange={(e) => setHs({ ...hs, the_het_han: e.target.value })} /></label>
+        <label>Điện thoại
+          <input value={hs.dien_thoai} onChange={(e) => setHs({ ...hs, dien_thoai: e.target.value })} /></label>
+        <label>Tuyến phụ trách
+          <input value={hs.tuyen_phu_trach} placeholder="VD: Miền Trung, Tây Nguyên"
+                 onChange={(e) => setHs({ ...hs, tuyen_phu_trach: e.target.value })} /></label>
+        <label>Hạn mức tạm ứng
+          <input type="number" step={100000} value={hs.han_muc_tam_ung}
+                 onChange={(e) => setHs({ ...hs, han_muc_tam_ung: e.target.value })} /></label>
+      </div>
+      <label style={{ display: "block", marginTop: 6 }}>
+        <input type="checkbox" style={{ width: "auto", marginRight: 6 }} checked={!!hs.hoi_vien}
+               onChange={(e) => setHs({ ...hs, hoi_vien: e.target.checked })} />
+        Là hội viên tổ chức xã hội – nghề nghiệp về hướng dẫn du lịch
+      </label>
+      <label style={{ display: "block" }}>
+        <input type="checkbox" style={{ width: "auto", marginRight: 6 }} checked={!!hs.hop_dong_cong_tac}
+               onChange={(e) => setHs({ ...hs, hop_dong_cong_tac: e.target.checked })} />
+        Đã ký hợp đồng cộng tác với công ty
+      </label>
+      <p className="muted">Biểu mẫu này chỉ sửa hồ sơ hành nghề — không có ô lương, không đổi được
+        phòng ban hay loại hợp đồng. Ảnh thẻ và bản hợp đồng đính kèm ở nút <b>Tệp</b> của từng người.</p>
+      <button className="act teal" disabled={luu || (!hs.id && !hs.ho_ten.trim())}
+              onClick={luuHoSo}>{luu ? "Đang lưu…" : "Lưu hồ sơ"}</button>{" "}
+      <button className="act grey" onClick={() => setHs(null)}>Đóng</button>
+    </div>}
 
     {form && <div className="panel">
       <h2>Chào chuyến {form.tour_code}</h2>
@@ -129,6 +193,14 @@ function HuongDan() {
         <h2>Đội ngũ hướng dẫn viên</h2>
         <p className="muted">{hdv.ghi_chu} Ba điều kiện hiện thành ba cột riêng, không gộp thành một chữ
           &quot;đạt&quot; — người điều phối phải biết thiếu cái gì để đi đòi cái đó.</p>
+        {canDieuPhoi && <p><button className="act" onClick={() => setHs({
+          id: 0, ho_ten: "", ma_nv: "", the_so: "", the_loai: "noi_dia", the_het_han: "",
+          hoi_vien: false, hop_dong_cong_tac: false, dien_thoai: "", tuyen_phu_trach: "",
+          han_muc_tam_ung: "" })}>+ Thêm hướng dẫn viên</button></p>}
+        {hdv.du_dieu_kien === 0 && hdv.tong > 0 && <p className="muted">
+          <Tag cls="red">chưa ai đủ điều kiện</Tag> Chưa hồ sơ nào có số thẻ trong hệ thống, nên cổng 13
+          đang chặn mọi lời chào chuyến. Bấm <b>Sửa hồ sơ</b> ở từng dòng để nhập thẻ, hoặc tải cả danh
+          sách lên ở màn hình Nạp dữ liệu (bộ nạp &quot;Hướng dẫn viên cộng tác&quot;).</p>}
         <table><thead><tr><th>Mã</th><th>Họ tên</th><th>Thẻ HDV</th><th>Hạn thẻ</th><th>Hội viên</th>
           <th>Hợp đồng cộng tác</th><th>Hạn mức ứng</th><th>Hành nghề</th><th></th></tr></thead>
           <tbody>{hdv.rows.map((h: any) => <tr key={h.id} style={{ opacity: h.dang_lam ? 1 : 0.55 }}>
@@ -140,7 +212,14 @@ function HuongDan() {
             <td>{h.hop_dong_cong_tac ? <Tag cls="ok">đã ký</Tag> : <Tag cls="red">chưa ký</Tag>}</td>
             <td className="num muted">{h.han_muc_tam_ung ? vnd(h.han_muc_tam_ung) : "—"}</td>
             <td>{h.du_dieu_kien ? <Tag cls="ok">đủ điều kiện</Tag> : <Tag cls="red">{h.vi_sao}</Tag>}</td>
-            <td><button className="act grey" style={{ margin: 0 }} onClick={() => setTepHdv(h.code)}>Hồ sơ</button></td>
+            <td style={{ whiteSpace: "nowrap" }}>
+              {canDieuPhoi && <button className="act teal" style={{ margin: 0 }} onClick={() => setHs({
+                id: h.id, ho_ten: h.full_name, the_so: h.the_so || "", the_loai: h.the_loai || "",
+                the_het_han: h.the_het_han ? String(h.the_het_han).slice(0, 10) : "",
+                hoi_vien: h.hoi_vien, hop_dong_cong_tac: h.hop_dong_cong_tac,
+                dien_thoai: h.phone || "", tuyen_phu_trach: "",
+                han_muc_tam_ung: h.han_muc_tam_ung || "" })}>Sửa hồ sơ</button>}{" "}
+              <button className="act grey" style={{ margin: 0 }} onClick={() => setTepHdv(h.code)}>Tệp</button></td>
           </tr>)}</tbody></table>
       </div>
       {tepHdv && <DinhKem doiTuong="nhan_su" doiTuongId={tepHdv} loai="hop_dong"

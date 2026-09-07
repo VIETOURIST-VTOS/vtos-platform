@@ -218,3 +218,93 @@ def dong_loi_chao(aid: int, data: DongIn, u: User = Depends(require_roles(*DIEU_
     R.audit(db, u.username, u.role, "dong_loi_chao_hdv", f"assign:{a.id}", after={"ly_do": a.ly_do})
     db.commit()
     return {"message": "Đã đóng lời chào – chuyến này chào được cho người khác."}
+
+
+# ====================== FORM HỒ SƠ HÀNH NGHỀ ======================
+class HoSoIn(BaseModel):
+    """Đúng các trường của NGHỀ HƯỚNG DẪN, không có trường nào khác.
+
+    Cố ý không nhận full_name, department, base_salary, contract_type: form này để người phụ trách cập
+    nhật hồ sơ hành nghề, không phải để sửa lương hay chuyển phòng cho ai. Một biểu mẫu nhận cả những
+    trường nó không có nhiệm vụ sửa là biểu mẫu sớm muộn sẽ sửa nhầm chúng."""
+    the_so: str | None = None
+    the_loai: str | None = None
+    the_het_han: date | None = None
+    hoi_vien: bool | None = None
+    hop_dong_cong_tac: bool | None = None
+    dien_thoai: str | None = None
+    tuyen_phu_trach: str | None = None
+    han_muc_tam_ung: float | None = None
+
+
+def _kiem_ho_so(db: Session, data: HoSoIn, e: Employee | None = None) -> None:
+    if data.the_loai is not None and data.the_loai not in ("", "noi_dia", "quoc_te"):
+        raise HTTPException(422, "Loại thẻ phải là nội địa hoặc quốc tế")
+    if data.han_muc_tam_ung is not None and data.han_muc_tam_ung < 0:
+        raise HTTPException(422, "Hạn mức tạm ứng không được âm")
+    the = (data.the_so or "").strip()
+    if the:
+        trung = db.execute(select(Employee).where(Employee.card_no == the)).scalars().first()
+        if trung is not None and (e is None or trung.id != e.id):
+            raise HTTPException(422, f"Số thẻ {the} đã gắn với {trung.full_name} ({trung.code}). Một thẻ "
+                                     "chỉ thuộc một người – trùng thẻ là hai người cùng dẫn bằng một thẻ, "
+                                     "và cả hai chuyến đều sai hồ sơ.")
+
+
+def _ap_ho_so(e: Employee, data: HoSoIn) -> None:
+    if data.the_so is not None: e.card_no = data.the_so.strip()[:30]
+    if data.the_loai is not None: e.card_type = data.the_loai.strip()[:20]
+    if data.the_het_han is not None: e.card_expiry = data.the_het_han
+    if data.hoi_vien is not None: e.member_org = data.hoi_vien
+    if data.hop_dong_cong_tac is not None: e.ctv_contract = data.hop_dong_cong_tac
+    if data.dien_thoai is not None: e.phone = data.dien_thoai.strip()[:30]
+    if data.tuyen_phu_trach is not None: e.duties = data.tuyen_phu_trach.strip()
+    if data.han_muc_tam_ung is not None: e.advance_limit = data.han_muc_tam_ung
+
+
+@router.put("/hdv/{eid}")
+def sua_ho_so(eid: int, data: HoSoIn, u: User = Depends(require_roles(*DIEU_PHOI)),
+              db: Session = Depends(get_db)):
+    """Cập nhật hồ sơ hành nghề của một hướng dẫn viên."""
+    e = db.get(Employee, eid)
+    if e is None or e.department != "huong_dan":
+        raise HTTPException(404, "Không có hướng dẫn viên này")
+    _kiem_ho_so(db, data, e)
+    truoc = {"the_so": e.card_no, "the_het_han": str(e.card_expiry or ""), "hoi_vien": e.member_org,
+             "hop_dong_cong_tac": e.ctv_contract}
+    _ap_ho_so(e, data)
+    db.flush()
+    ok, vi_sao = H.guide_eligible(e, date.today())
+    R.audit(db, u.username, u.role, "sua_ho_so_hdv", f"employee:{e.code}", before=truoc,
+            after={"the_so": e.card_no, "the_het_han": str(e.card_expiry or ""),
+                   "hoi_vien": e.member_org, "hop_dong_cong_tac": e.ctv_contract})
+    db.commit()
+    return {**_hdv_ra(e, date.today()),
+            "message": ("Đã lưu. Đủ điều kiện hành nghề – chào chuyến được." if ok
+                        else f"Đã lưu, nhưng còn thiếu: {vi_sao}. Cổng 13 vẫn chặn chào chuyến.")}
+
+
+class HdvMoiIn(HoSoIn):
+    ho_ten: str
+    ma_nv: str = ""
+
+
+@router.post("/hdv", status_code=201)
+def them_hdv(data: HdvMoiIn, u: User = Depends(require_roles(*DIEU_PHOI)), db: Session = Depends(get_db)):
+    """Thêm một hướng dẫn viên cộng tác mới.
+
+    Loại hợp đồng ghi cứng là cộng tác viên: toàn bộ HDV đã chuyển sang cộng tác viên (07/9/2026), và
+    một ô chọn ở đây chỉ tạo ra đường mở lại quan hệ lao động mà không ai để ý."""
+    if not data.ho_ten.strip(): raise HTTPException(422, "Thiếu họ tên")
+    ma = (data.ma_nv or "").strip().upper()
+    if ma and db.execute(select(Employee).where(Employee.code == ma)).scalars().first() is not None:
+        raise HTTPException(422, f"Mã nhân viên {ma} đã có người dùng")
+    _kiem_ho_so(db, data, None)
+    e = Employee(code=ma or H.next_code(db, Employee, "NS"), full_name=data.ho_ten.strip()[:120],
+                 department="huong_dan", position="hdv", contract_type="ctv")
+    _ap_ho_so(e, data)
+    db.add(e); db.flush()
+    R.audit(db, u.username, u.role, "them_hdv", f"employee:{e.code}",
+            after={"ho_ten": e.full_name, "the_so": e.card_no})
+    db.commit()
+    return {**_hdv_ra(e, date.today()), "message": f"Đã tạo hồ sơ {e.code} – {e.full_name}."}

@@ -178,3 +178,67 @@ def test_hdv_doc_duoc_su_vu_cua_chinh_minh(_startup):
     assert "hdv" not in ROLES, "nếu sau này có vai trò tên 'hdv' thì phải xem lại hai chỗ lọc ở màn hình sự vụ"
     r = client.get("/api/v1/incidents", headers=login("hdv.khang"))
     assert r.status_code == 200, r.text
+
+
+# ---------------------------------------------------------------- Form hồ sơ hành nghề
+def test_form_ho_so_nhap_the_thi_qua_duoc_cong_13(_startup):
+    """Cổng 13 chặn theo DỮ LIỆU, nên nhập thẻ là việc đầu tiên phải làm được – và làm được ngay trên
+    màn hình của người phụ trách, không phải nhờ HCNS."""
+    h = login("tp.huongdan")
+    d = client.get("/api/v1/huong-dan/hdv", headers=h).json()
+    e = next(x for x in d["rows"] if not x["du_dieu_kien"])
+    r = client.put(f"/api/v1/huong-dan/hdv/{e['id']}", headers=h,
+                   json={"the_so": "HDV-QT-2026-0777", "the_loai": "quoc_te",
+                         "the_het_han": "2029-12-31", "hoi_vien": True,
+                         "hop_dong_cong_tac": True, "han_muc_tam_ung": 5_000_000})
+    assert r.status_code == 200, r.text
+    assert r.json()["du_dieu_kien"] is True and "chào chuyến được" in r.json()["message"]
+
+
+def test_thieu_dieu_kien_thi_luu_van_noi_ro_con_thieu_gi(_startup):
+    h = login("tp.huongdan")
+    r = client.post("/api/v1/huong-dan/hdv", headers=h,
+                    json={"ho_ten": "Nguyễn Văn Mới", "the_so": "HDV-NĐ-2026-0888",
+                          "the_loai": "noi_dia", "the_het_han": "2030-01-01"})
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["du_dieu_kien"] is False and "còn thiếu" not in d["message"]
+    assert d["vi_sao"], "phải nói rõ còn thiếu điều kiện nào"
+
+
+def test_khong_gan_trung_mot_so_the_cho_hai_nguoi(_startup):
+    """Hai người cùng dẫn bằng một thẻ thì cả hai chuyến đều sai hồ sơ."""
+    h = login("tp.huongdan")
+    r = client.post("/api/v1/huong-dan/hdv", headers=h,
+                    json={"ho_ten": "Người trùng thẻ", "the_so": "HDV-QT-2026-0777"})
+    assert r.status_code == 422 and "đã gắn với" in r.json()["detail"]
+
+
+def test_form_khong_sua_duoc_luong_hay_phong_ban(_startup):
+    """Biểu mẫu nhận cả trường nó không có nhiệm vụ sửa là biểu mẫu sớm muộn sẽ sửa nhầm chúng."""
+    h = login("tp.huongdan")
+    d = client.get("/api/v1/huong-dan/hdv", headers=h).json()
+    e = d["rows"][0]
+    from app.db.session import SessionLocal
+    from app.models.hr import Employee
+    with SessionLocal() as db:
+        truoc = db.get(Employee, e["id"])
+        luong, phong = truoc.base_salary, truoc.department
+    client.put(f"/api/v1/huong-dan/hdv/{e['id']}", headers=h,
+               json={"base_salary": 99_000_000, "department": "ketoan", "dien_thoai": "0900000000"})
+    with SessionLocal() as db:
+        sau = db.get(Employee, e["id"])
+        assert sau.base_salary == luong and sau.department == phong
+        assert sau.phone == "0900000000", "trường thuộc phạm vi form thì vẫn phải lưu được"
+
+
+def test_chi_sua_duoc_ho_so_thuoc_phong_huong_dan(_startup):
+    from app.db.session import SessionLocal
+    from app.models.hr import Employee
+    from sqlalchemy import select
+    with SessionLocal() as db:
+        ke_toan = db.execute(select(Employee).where(Employee.department == "ketoan")).scalars().first()
+    if ke_toan is None: pytest.skip("bản demo không có nhân sự phòng khác để kiểm")
+    r = client.put(f"/api/v1/huong-dan/hdv/{ke_toan.id}", headers=login("tp.huongdan"),
+                   json={"dien_thoai": "0911111111"})
+    assert r.status_code == 404
