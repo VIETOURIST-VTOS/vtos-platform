@@ -94,14 +94,29 @@ def build(db: Session, u: User) -> dict:
         pl = RP.income_statement(db, p); k["ln_ke_toan_thang"] = dict((r[0], r[2]) for r in pl["rows"])["50"]
     # --- phần theo phòng ---
     sec = out["sections"]
-    if role in ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "chutich", "tgd"):
-        moc = R.get_param(db, "moc_chi_tieu_hcm"); by = {}
-        for t in tours_m:
-            if R.is_doan(t): continue
+    # Hai phòng Kinh doanh được đo bằng hai thước đo khác nhau, nên màn hình phải hiện hai bảng khác nhau
+    # (chỉ đạo 07/9/2026). Phòng Lẻ: doanh thu tính chỉ tiêu so mốc → bậc thang hoa hồng. Phòng Đoàn: chia
+    # LỢI NHUẬN quyết toán, không có mốc doanh thu. Trước đây chỉ có bảng của phòng Lẻ, nên người phòng Đoàn
+    # mở trang chủ ra không thấy gì về phần việc của mình – đúng cách tính lương của họ cũng không thấy.
+    if role in ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "ptgd_doan", "chutich", "tgd"):
+        moc = R.get_param(db, "moc_chi_tieu_hcm")
+        le: dict[int, float] = {}; doan: dict[int, float] = {}; doan_tours = 0
+        for t, s in zip(tours_m, sett):                  # dùng lại `sett` đã tính, không gọi quyết toán lần hai
+            if R.is_doan(t):
+                doan_tours += 1
+                rev = s["revenue"]
+                for b in t.bookings:
+                    if b.cancelled: continue
+                    # Chia lợi nhuận theo tỷ trọng doanh thu booking – cùng công thức bảng lương (services/hr.py),
+                    # để con số trên trang chủ và con số trả lương không nói khác nhau.
+                    doan[b.sales_id] = doan.get(b.sales_id, 0.0) + s["profit"] * (b.amount / rev if rev else 0)
+                continue
             for b in t.bookings:
-                if b.counts_for_target: by[b.sales_id] = by.get(b.sales_id, 0) + b.amount - b.discount
+                if b.counts_for_target: le[b.sales_id] = le.get(b.sales_id, 0) + b.amount - b.discount
         users = {x.id: x.full_name for x in db.execute(select(User)).scalars()}
-        sec["kd_le"] = sorted([{"sales": users.get(i, i), "revenue": v, "pct": v / moc if moc else 0} for i, v in by.items()], key=lambda r: -r["revenue"])
+        sec["kd_le"] = sorted([{"sales": users.get(i, i), "revenue": v, "pct": v / moc if moc else 0} for i, v in le.items()], key=lambda r: -r["revenue"])
+        sec["kd_doan"] = {"so_chuyen": doan_tours,
+                          "rows": sorted([{"sales": users.get(i, i), "profit_share": v} for i, v in doan.items()], key=lambda r: -r["profit_share"])}
     if role in ("tp_dh", "nv_dh", "chutich", "tgd"):
         d7 = int(R.get_param(db, "moc_d7")); rows = []
         for t in db.execute(select(Tour).where(Tour.status == "da_duyet", Tour.start_date >= today, Tour.start_date <= today + timedelta(days=21))).scalars():
