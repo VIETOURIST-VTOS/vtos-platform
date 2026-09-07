@@ -191,6 +191,8 @@ MENU_ROLES = {
     "/robot-reports": BASE_VIEW + ("ptgd_doan", "ptgd_mkt", "tp_dh", "gd_kd", "ketoan", "hcns", "cntt"),
     "/companies": BASE_VIEW + ("ketoan", "tp_dh", "hcns", "hanh_chinh", "cntt"),
     "/vietrip": BASE_VIEW + ("tp_dh", "ketoan", "cntt"),
+    # Màn hình quản trị tài khoản: HCNS và CNTT thao tác, Chủ tịch và TGĐ quyết, Ban Kiểm soát chỉ đọc.
+    "/access": BASE_VIEW + ("hcns", "cntt"),
 }
 
 MATRIX = {

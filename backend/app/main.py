@@ -25,6 +25,7 @@ from app.api.v1.crm import router as crm_router
 from app.api.v1.inbox import router as inbox_router
 from app.api.v1.visa import router as visa_router
 from app.api.v1.fleet import router as fleet_router
+from app.api.v1.access import router as access_router
 from app.api.v1.debts import router as debts_router
 from app.api.v1.suppliers import router as ncc_router
 from app.services import rules as R
@@ -113,6 +114,7 @@ app.include_router(finance_router)
 app.include_router(vietrip_router)
 app.include_router(visa_router)
 app.include_router(fleet_router)
+app.include_router(access_router)
 app.include_router(debts_router)
 app.include_router(ncc_router)
 
