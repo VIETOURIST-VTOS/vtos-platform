@@ -510,7 +510,9 @@ class DispatchIn(BaseModel):
 
 
 @router.post("/dispatch", status_code=201)
-def dispatch_create(data: DispatchIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "cntt")), db: Session = Depends(get_db)):
+def dispatch_create(data: DispatchIn,
+                    u: User = Depends(require_roles("nv_dh", "tp_dh", "cntt", "gd_doi_xe")),
+                    db: Session = Depends(get_db)):
     v = db.get(Vehicle, data.vehicle_id); t = db.get(Tour, data.tour_id)
     if not v or not t: raise HTTPException(404, "Không có xe hoặc tour")
     if data.date_to < data.date_from: raise HTTPException(422, "Ngày không hợp lệ")
@@ -589,7 +591,9 @@ class DispatchUpdate(BaseModel):
 
 
 @router.post("/dispatch/{did}/update")
-def dispatch_update(did: int, data: DispatchUpdate, u: User = Depends(require_roles("cntt", "tp_dh", "nv_dh", "hcns")), db: Session = Depends(get_db)):
+def dispatch_update(did: int, data: DispatchUpdate,
+                    u: User = Depends(require_roles("cntt", "tp_dh", "nv_dh", "hcns", "gd_doi_xe")),
+                    db: Session = Depends(get_db)):
     d = db.get(DispatchOrder, did)
     if not d: raise HTTPException(404, "Không có lệnh")
     if data.status not in ("da_xac_nhan", "hoan_thanh", "huy"): raise HTTPException(422, "Trạng thái không hợp lệ")

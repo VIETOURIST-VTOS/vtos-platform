@@ -25,9 +25,12 @@ from app.services import rules as R
 router = APIRouter(prefix="/api/v1/fleet", tags=["fleet"])
 
 # Xem hồ sơ đội xe: Vận tải, Điều hành, Ban Giám đốc, Kế toán, BKS, CNTT, HCNS.
-READ = ("chutich", "tgd", "ptgd_doan", "tp_dh", "nv_dh", "ketoan", "bks", "cntt", "hcns")
+# "gd_doi_xe" mở 07/9/2026: Giám đốc điều hành đội xe phải đọc và ghi được chính phân hệ mình phụ trách.
+# Trước đó ông mang chung vai trò với tài xế nên bị khoá ngoài, trong khi tham số xe_nguoi_lap_lenh lại chỉ
+# định ông là người DUY NHẤT được lập lệnh điều xe – kết quả là không ai lập được lệnh.
+READ = ("chutich", "tgd", "ptgd_doan", "tp_dh", "nv_dh", "ketoan", "bks", "cntt", "hcns", "gd_doi_xe")
 # Sửa hồ sơ xe: người phụ trách đội xe và CNTT. Kế toán không sửa hồ sơ xe, BKS chỉ đọc.
-WRITE = ("cntt", "hcns", "tp_dh", "nv_dh")
+WRITE = ("cntt", "hcns", "tp_dh", "nv_dh", "gd_doi_xe")
 
 
 def _chan_khi_thieu_giay(db: Session) -> bool:
@@ -648,7 +651,7 @@ from app.models.finance import FinContract
 from app.services import fleet_settlement as QT
 
 # Quyết toán và cấn trừ là việc của Kế toán; duyệt nội bộ và đóng kỳ là việc của lãnh đạo.
-QT_WRITE = ("ketoan", "cntt")
+QT_WRITE = ("ketoan", "cntt", "gd_doi_xe")   # dựng bảng quyết toán; ĐÓNG kỳ vẫn là QT_DUYET
 QT_DUYET = ("chutich", "tgd", "ketoan")
 
 

@@ -67,6 +67,11 @@ ROLES = {
     # Hai vai trò mở ngày 07/9/2026 theo bảng lương T07-08: người ở hiện trường và ban visa cần đăng nhập,
     # nhưng không được thấy hàng đợi điều hành hay dữ liệu khách của phòng khác.
     "xe_hdv": "Tài xế & Hướng dẫn viên",
+    # Mở 07/9/2026. Trước bản này Giám đốc điều hành đội xe mang chung vai trò xe_hdv với tài xế, nên bị
+    # khoá ngoài đúng ba màn hình đội xe mà chính ông phụ trách – và vì tham số xe_nguoi_lap_lenh chỉ định
+    # ông là người duy nhất được lập lệnh điều xe, kết quả là KHÔNG AI lập được lệnh: người có quyền theo
+    # chỉ đạo thì không vào được cửa, người vào được cửa thì không có quyền theo chỉ đạo.
+    "gd_doi_xe": "Giám đốc điều hành đội xe",
     "nv_visa": "Chuyên viên Visa",
     "hanh_chinh": "Hành chính (không xem bảng lương)",
 }

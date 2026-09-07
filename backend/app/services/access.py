@@ -17,6 +17,8 @@ OPERATIONS = ("tp_dh", "nv_dh")
 SALES = ("gd_kd", "tp_kd", "tn_kd", "nv_kd")
 MARKETING = ("nv_mkt",)
 FIELD = ("xe_hdv",)                                     # tài xế & HDV: người ở hiện trường, chỉ xem việc của chính mình
+FLEET_MGR = ("gd_doi_xe",)                              # GĐ điều hành đội xe: toàn bộ phần đội xe, KHÔNG xem
+                                                        # dữ liệu khách, booking, bảng lương hay ngân hàng
 VISA_STAFF = ("nv_visa",)                               # chuyên viên visa: chỉ phân hệ Visa
 ADMIN_STAFF = ("hanh_chinh",)                           # bảo vệ, pháp chế, quan hệ nhà đầu tư: thuộc HCNS
                                                         # nhưng KHÔNG xem bảng lương (chỉ đạo 07/9/2026)
@@ -96,6 +98,11 @@ def check_readonly_write(u: User, method: str, path: str) -> None:
 # tour kèm dự toán. Đây là danh sách CHO PHÉP – endpoint mới mặc định nằm ngoài, không phải nằm trong.
 RESTRICTED_API_PREFIXES = {
     "xe_hdv": ("/api/v1/auth/", "/api/v1/xe-hdv/"),
+    # GĐ điều hành đội xe: cả phân hệ đội xe và lệnh điều xe, cộng danh mục xe để chọn trong form. Không có
+    # /tours, /bookings, /banks, /payroll – phạm vi công việc của ông là chiếc xe, không phải khách hàng và
+    # dòng tiền công ty.
+    "gd_doi_xe": ("/api/v1/auth/", "/api/v1/fleet", "/api/v1/xe-hdv/", "/api/v1/dispatch",
+                  "/api/v1/vehicles"),
     "nv_visa": ("/api/v1/auth/", "/api/v1/visa"),
 }
 
@@ -161,9 +168,9 @@ MENU_ROLES = {
     # quy ước "trang không liệt kê = mọi người đăng nhập đều thấy", nên tới hôm nay một nhân viên kinh doanh
     # vẫn mở được hồ sơ xe, lệnh điều xe và bảng giá vốn – lợi nhuận đội xe. Khai quyền theo bảng phân quyền
     # anh Tuấn duyệt ngày 07/9: giá vốn và hiệu quả chỉ dành cho người phải chịu trách nhiệm về con số đó.
-    "/doi-xe": BASE_VIEW + OPERATIONS + ("ketoan", "hcns", "cntt"),
-    "/lenh-dieu-xe": BASE_VIEW + OPERATIONS + ("hcns", "cntt"),
-    "/hieu-qua-doi-xe": BASE_VIEW + ("tp_dh", "ketoan", "hcns"),
+    "/doi-xe": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "hcns", "cntt"),
+    "/lenh-dieu-xe": BASE_VIEW + OPERATIONS + FLEET_MGR + ("hcns", "cntt"),
+    "/hieu-qua-doi-xe": BASE_VIEW + FLEET_MGR + ("tp_dh", "ketoan", "hcns"),
 }
 
 # Mọi trang có trong giao diện – kể cả trang không đặt điều kiện vai trò – để dựng danh sách ẩn cho vai trò bị giới hạn.
@@ -179,6 +186,7 @@ RESTRICTED_ROLE_MENUS = {
     # viên visa cũng phải đổi được mật khẩu tạm của mình – thiếu dòng này là họ bị khóa ngoài hệ thống.
     "xe_hdv": ("/xe-hdv", "/doi-mat-khau"),
     "nv_visa": ("/visa", "/doi-mat-khau"),
+    "gd_doi_xe": ("/doi-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/xe-hdv", "/doi-mat-khau"),
 }
 
 
