@@ -64,10 +64,36 @@ def test_nap_mac_dinh_du_19_vi_tri_va_6_nhom_viec():
         assert set(r["o"]) == set(AI_GROUPS)
 
 
-def test_chi_hai_o_muc_3_trong_bang_mac_dinh():
-    """Theo Phụ lục A: chỉ Phó TGĐ Marketing và NV Marketing ở mức 3, đều là việc gửi tin cho khách."""
+def test_moi_o_muc_3_deu_phai_duoc_liet_ke_o_day():
+    """Mức 3 là "AI tự làm, người hậu kiểm" – tức chỗ AI hành động thật. Danh sách phải NGẮN và phải
+    được liệt kê thẳng ở đây, để mỗi lần thêm một ô mức 3 là một lần có người phải sửa phép thử này và
+    tự hỏi vì sao. Một ô mức 3 lặng lẽ xuất hiện là cách quyền AI nở ra mà không ai quyết định.
+
+    Năm ô hiện tại:
+      - ptgd_mkt / nv_mkt × tin_khach : Marketing tự trả lời khách trong hạn mức (Phụ lục A)
+      - bks × hoi_dap, vb_noi_bo, cham_diem : vị trí Kiểm soát do AI giữ, chỉ đạo 07/9/2026 –
+        hỏi đáp trên dữ liệu, soạn báo cáo gửi Chủ tịch, chấm điểm phòng ban.
+    """
     ba = [(v, c) for v, mucs in AQ.MAC_DINH.items() for c, m in zip(AQ.COT, mucs) if m == 3]
-    assert set(ba) == {("ptgd_mkt", "tin_khach"), ("nv_mkt", "tin_khach")}
+    assert set(ba) == {("ptgd_mkt", "tin_khach"), ("nv_mkt", "tin_khach"),
+                       ("bks", "hoi_dap"), ("bks", "vb_noi_bo"), ("bks", "cham_diem")}
+
+
+def test_moi_o_muc_3_deu_co_du_han_muc_va_co_ten_nguoi_hau_kiem():
+    """Mức 3 không hạn mức chính là tình trạng trước 07/9: AI làm thật, không giới hạn, không ai hậu kiểm."""
+    from app.models.core import AI_HAN_MUC_BAT_BUOC
+    for vai, mucs in AQ.MAC_DINH.items():
+        for c, m in zip(AQ.COT, mucs):
+            if m != 3: continue
+            hm = AQ.HAN_MUC_KIEM_SOAT if vai == "bks" else AQ.HAN_MUC_MAC_DINH
+            thieu = [k for k in AI_HAN_MUC_BAT_BUOC if not str(hm.get(k) or "").strip()]
+            assert not thieu, f"{vai}/{c} ở mức 3 nhưng thiếu hạn mức: {thieu}"
+            assert hm["nguoi_hau_kiem"] in ROLES, f"{vai}/{c}: người hậu kiểm không phải một vai trò có thật"
+
+
+def test_vi_tri_kiem_soat_khong_bao_gio_noi_chuyen_voi_khach():
+    """Người đi giám sát mọi phòng ban không được là người nhắn tin cho khách hàng."""
+    assert AQ.MAC_DINH["bks"][AQ.COT.index("tin_khach")] == 0
 
 
 def test_mo_hinh_ngon_ngu_khong_bao_gio_len_muc_4():

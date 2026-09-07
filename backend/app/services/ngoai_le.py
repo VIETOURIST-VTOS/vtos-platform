@@ -62,9 +62,13 @@ LOAI: dict[str, dict] = {
                          "quy_tac": "Xe/tài xế thiếu giấy tờ còn hạn thì không được phát lệnh (Đội xe v1.3 §7)"},
     "xe_khac_goi_y": {"ten": "Chốt lệnh điều xe khác phương án gợi ý", "muc": "vang", "nhom": "an_toan",
                       "quy_tac": "Chọn khác gợi ý phải nêu lý do (đã có), cần rà để biết gợi ý sai ở đâu"},
+    # Robot Kiểm soát mở việc ra ở ĐÂY chứ không dựng một hàng đợi thứ hai: phòng ban đã có một cửa để
+    # trả lời, thêm cửa nữa là thêm chỗ để quên.
+    "ks_phat_hien": {"ten": "Robot Kiểm soát phát hiện", "muc": "do", "nhom": "kiem_soat",
+                     "quy_tac": "Việc do vòng quét của robot Kiểm soát tìm ra, phòng ban phải giải trình"},
 }
 NHOM = {"tien": "Tiền & quyết toán", "quyen": "Quyền hạn", "ai": "AI", "ho_so": "Hồ sơ",
-        "du_lieu": "Dữ liệu", "an_toan": "An toàn vận hành"}
+        "du_lieu": "Dữ liệu", "an_toan": "An toàn vận hành", "kiem_soat": "Robot Kiểm soát"}
 MUC = {"do": "Nghiêm trọng", "vang": "Cần rà soát"}
 
 # Ngoại lệ cũ hơn số ngày này thì không dò nữa (trừ loại đang còn hiệu lực: quyền, tắt khẩn, tham số).
@@ -224,6 +228,23 @@ def _tat_chan_giay_xe(db: Session) -> list[dict]:
              "duong_dan": "/params?q=xe_chan_khi_thieu_giay"}]
 
 
+def _ks_phat_hien(db: Session) -> list[dict]:
+    """Việc robot Kiểm soát đang thấy. Người quyết để RỖNG có chủ ý: chưa ai trả lời việc này."""
+    try:
+        from app.models.kiem_soat import KsPhatHien
+    except Exception:
+        return []
+    ra = []
+    for p in db.execute(select(KsPhatHien).where(KsPhatHien.con == True)).scalars():   # noqa: E712
+        ra.append({"ma": _mo("ks_phat_hien", p.ma), "loai": "ks_phat_hien",
+                   "muc": "do" if p.muc == "do" else "vang", "luc": p.lan_dau,
+                   "doi_tuong": f"{p.phong_ban or 'toàn hệ thống'} · {p.doi_tuong}",
+                   "nguoi_quyet": "", "ly_do": "",
+                   "tom_tat": p.tom_tat + (f" (thấy lại {p.so_lan} lần)" if p.so_lan > 1 else ""),
+                   "duong_dan": "/kiem-soat"})
+    return ra
+
+
 def _xe_khac_goi_y(db: Session, tu_ngay: datetime) -> list[dict]:
     try:
         from app.models.hr import DispatchOrder
@@ -268,6 +289,7 @@ def do_tim(db: Session, so_ngay: int = CUA_SO_NGAY) -> list[dict]:
         lambda: _nap_bo_qua(db, tu_ngay),
         lambda: _tat_chan_giay_xe(db),
         lambda: _xe_khac_goi_y(db, tu_ngay),
+        lambda: _ks_phat_hien(db),
     )
     for f in bo_do:
         try:

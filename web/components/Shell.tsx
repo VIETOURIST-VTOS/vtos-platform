@@ -59,7 +59,8 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Báo cáo công việc", "/reports"], ["Đánh giá & sự vụ", "/hr?tab=incidents"], ["Văn bản", ""], ["Tài sản & mua sắm", ""]] },
   { key: "kiemsoat", label: "9. Kiểm soát & Chính sách", items: [
     ["Chính sách & định mức", "/params"], ["Cảnh báo nghiệp vụ", "/alerts"], ["Kiểm tra & đối chiếu", "/accounting?tab=misa"],
-    ["Ngoại lệ cần xử lý", "/ngoai-le"], ["Nhật ký nghiệp vụ", "/audit"]] },
+    ["Ngoại lệ cần xử lý", "/ngoai-le"], ["Kiểm soát (robot)", "/kiem-soat"],
+    ["Nhật ký nghiệp vụ", "/audit"]] },
   { key: "taikhoan", label: "0. Tài khoản của tôi", items: [
     ["Đổi mật khẩu", "/doi-mat-khau"]] },
   { key: "hethong", label: "10. Hệ thống & Tích hợp", items: [

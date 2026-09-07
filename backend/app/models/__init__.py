@@ -17,3 +17,4 @@ from app.models.attachments import *  # noqa
 from app.models.marketing import *  # noqa
 from app.models.cskh import *  # noqa
 from app.models.ngoai_le import *  # noqa
+from app.models.kiem_soat import *  # noqa

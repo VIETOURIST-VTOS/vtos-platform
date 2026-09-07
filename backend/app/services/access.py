@@ -65,7 +65,22 @@ PAYMENT_REQUEST_ROLES = (BASE_VIEW + OPERATIONS +
                          ("ptgd_doan", "ptgd_mkt", "gd_kd", "ketoan", "hcns", "hanh_chinh", "cntt"))
 # hanh_chinh mới được thêm: nhóm chi "hành chính" là việc của họ, mà trước nay họ không có màn hình nào
 READ_ONLY_ROLES = ("bks",)
-WRITE_ALLOWED_FOR_READ_ONLY = ("/api/v1/auth/password", "/api/v1/auth/login", "/api/v1/robot/r9")   # BKS được chạy robot giám sát R9 (chỉ sinh cảnh báo)
+# Chặn-mặc-định vẫn giữ nguyên: Ban Kiểm soát không ghi được gì trừ đúng những đường dẫn dưới đây.
+#
+# Ngày 07/9/2026 anh Trần Tuấn giao vị trí Kiểm soát cho AI: kiểm tra, thử, giám sát và báo cáo mọi
+# phòng ban về Chủ tịch. Việc "mở ngoại lệ và yêu cầu phòng ban giải trình" là thao tác GHI, nên
+# danh sách này phải nới – nhưng nới đúng ba cửa, không nới nguyên tắc:
+#   /kiem-soat/quet     : chạy vòng quét (chỉ đọc dữ liệu nghiệp vụ, chỉ ghi bản ghi phát hiện của
+#                         chính robot)
+#   /kiem-soat/cham-diem: chấm điểm phòng ban – kết quả luôn ở trạng thái CHỜ HẬU KIỂM của Chủ tịch,
+#                         không phải kết luận
+#   /ngoai-le/ghi       : ghi giải trình vào ngoại lệ. KHÔNG có /ngoai-le/dong – robot mở việc ra
+#                         được, nhưng đóng lại là quyền của người.
+# Cố ý KHÔNG có: mọi đường dẫn nghiệp vụ. Robot kiểm soát không sửa được một con số nào của phòng ban
+# mà nó đang giám sát – đó là điều làm cho báo cáo của nó có giá trị.
+WRITE_ALLOWED_FOR_READ_ONLY = ("/api/v1/auth/password", "/api/v1/auth/login", "/api/v1/robot/r9",
+                               "/api/v1/kiem-soat/quet", "/api/v1/kiem-soat/cham-diem",
+                               "/api/v1/ngoai-le/ghi")
 
 
 def require(u: User, roles: tuple, what: str = "dữ liệu này") -> None:
@@ -214,6 +229,9 @@ MENU_ROLES = {
     # --- Kiểm soát & Chính sách ---
     "/params": PARAM_ROLES,
     "/audit": AUDIT_ROLES,
+    # Bàn làm việc của robot Kiểm soát. Trưởng phòng KHÔNG có mặt: đây là chỗ đọc kết quả giám sát
+    # chính phòng mình, việc phải làm thì hiện ở màn hình Ngoại lệ của họ.
+    "/kiem-soat": BASE_VIEW + ("cntt",),
     # Ngoại lệ cần xử lý: nơi gom mọi lần một quy tắc bị bẻ. Mở cho những vai trò CÓ THỂ trả lời được
     # câu "vì sao lúc đó phải bẻ": Kế toán (tiền), Điều hành (chuyến), hai Phó TGĐ (duyệt), CNTT (tham số
     # và AI). Khối Kinh doanh không có mặt – họ là bên xin ngoại lệ, không phải bên rà.

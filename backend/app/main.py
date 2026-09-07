@@ -34,6 +34,7 @@ from app.api.v1.intake import router as intake_router
 from app.api.v1.attachments import router as tep_router
 from app.api.v1.huong_dan import router as hd_router
 from app.api.v1.ngoai_le import router as ngoai_le_router
+from app.api.v1.kiem_soat import router as kiem_soat_router
 from app.api.v1.cskh import router as cskh_router
 from app.services import rules as R
 from app.services import accounting as ACC
@@ -138,6 +139,7 @@ app.include_router(fleet_router)
 app.include_router(access_router)
 app.include_router(ai_roles_router)
 app.include_router(ngoai_le_router)
+app.include_router(kiem_soat_router)
 app.include_router(cskh_router)
 app.include_router(debts_router)
 app.include_router(ncc_router)

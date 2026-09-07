@@ -19,7 +19,12 @@ MAC_DINH: dict[str, tuple] = {
     "tn_kd":      (1, 2, 1, 0, 0, 4), "nv_kd":      (1, 2, 1, 0, 0, 4),
     "nv_mkt":     (1, 3, 2, 0, 0, 4), "ketoan":     (2, 0, 2, 2, 0, 4),
     "hcns":       (1, 0, 2, 1, 1, 4), "hanh_chinh": (1, 0, 2, 1, 0, 4),
-    "cntt":       (2, 0, 2, 1, 0, 4), "bks":        (2, 0, 0, 0, 1, 4),
+    "cntt":       (2, 0, 2, 1, 0, 4),
+    # Vị trí Kiểm soát do AI giữ (chỉ đạo 07/9/2026): kiểm tra, thử, giám sát, báo cáo mọi phòng ban
+    # về Chủ tịch. Ba ô mức 3 – hỏi đáp trên dữ liệu, soạn báo cáo nội bộ, chấm điểm phòng ban – và
+    # mức 3 nghĩa là TỰ ĐỘNG TRONG HẠN MỨC, người hậu kiểm là Chủ tịch. Ô tin_khach để 0 và phải ở 0:
+    # người đi giám sát không nói chuyện với khách hàng. Ô cảnh báo là mức 4 vì đó là quy tắc xác định.
+    "bks":        (3, 0, 3, 2, 3, 4),
     "xe_hdv":     (1, 0, 0, 1, 0, 4), "gd_doi_xe":  (1, 0, 1, 1, 0, 4),
     "nv_visa":    (1, 2, 1, 2, 0, 4),
 }
@@ -38,6 +43,16 @@ HAN_MUC_MAC_DINH = {
 # lúc không, tùy hội thoại đó đã gán cho ai.
 CHU_QUAN_HOP_THU = "ptgd_mkt"
 
+# Hạn mức riêng cho vị trí Kiểm soát. Khác Marketing ở hai chỗ: không giới hạn khung giờ hẹp (sự cố
+# không chờ giờ hành chính) và người hậu kiểm là Chủ tịch, đúng đường báo cáo anh Tuấn giao.
+HAN_MUC_KIEM_SOAT = {
+    "khung_gio": "00:00-23:59",
+    "so_luot_ngay": 24,
+    "loai_noi_dung": "kết quả quét, kết quả kiểm thử vai trò, nhận xét và chấm điểm phòng ban, báo cáo "
+                     "gửi Chủ tịch. KHÔNG nội dung gửi khách hàng, KHÔNG kết luận kỷ luật",
+    "nguoi_hau_kiem": "chutich",
+}
+
 
 def nap_mac_dinh(db: Session) -> int:
     """Nạp bảng mặc định cho vai trò/tác vụ chưa có dòng. Không đụng tới dòng lãnh đạo đã sửa."""
@@ -46,8 +61,9 @@ def nap_mac_dinh(db: Session) -> int:
     for vai, mucs in MAC_DINH.items():
         for tac_vu, muc in zip(COT, mucs):
             if (vai, tac_vu) in co: continue
+            mac = HAN_MUC_KIEM_SOAT if vai == "bks" else HAN_MUC_MAC_DINH
             db.add(AiPosition(vai_tro=vai, tac_vu=tac_vu, muc=muc,
-                              han_muc=dict(HAN_MUC_MAC_DINH) if muc == 3 else {}))
+                              han_muc=dict(mac) if muc == 3 else {}))
             them += 1
     if them: db.flush()
     return them
