@@ -680,7 +680,8 @@ def incidents_finalize(u: User = Depends(require_roles("hcns", "cntt")), db: Ses
 
 # ---------- Bảng lương ----------
 def run_out(r: PayrollRun) -> dict:
-    return {"id": r.id, "period": r.period, "status": r.status, "rows": r.rows, "totals": r.totals, "kt_confirmed_by": r.kt_confirmed_by, "kt_confirmed_at": r.kt_confirmed_at,
+    return {"id": r.id, "period": r.period, "status": r.status, "rows": r.rows, "totals": r.totals, "inputs": r.inputs or {},
+            "kt_confirmed_by": r.kt_confirmed_by, "kt_confirmed_at": r.kt_confirmed_at,
             "hcns_by": r.hcns_by, "hcns_at": r.hcns_at, "tgd_by": r.tgd_by, "tgd_at": r.tgd_at, "entry_ids": r.entry_ids, "updated_at": r.updated_at}
 
 
@@ -690,6 +691,72 @@ def payroll_run(period: str, refresh: bool = False, u: User = Depends(require_ro
         return run_out(H.get_or_draft(db, period, refresh=refresh))
     except ValueError as ex:
         raise HTTPException(422, str(ex))
+
+
+class ChamCongIn(BaseModel):
+    cong_chuan: float | None = None
+    cong_thuc_te: dict[str, float] = {}      # mã NV → công thực tế
+
+
+@router.put("/payroll-runs/{period}/cham-cong")
+def payroll_attendance(period: str, data: ChamCongIn, u: User = Depends(require_roles("hcns", "cntt")), db: Session = Depends(get_db)):
+    """Công thực tế của Kế toán và Nhân sự Hành chính – hai bộ phận duy nhất còn chấm công theo ngày.
+
+    Năm phòng còn lại đã chuyển sang căn cứ báo cáo công việc trước 20 giờ (Điều 12), nên KHÔNG nhận
+    và cũng không cảnh báo thiếu công cho họ."""
+    run = H.get_or_draft(db, period)
+    if run.status != "nhap": raise HTTPException(422, "Bảng lương đã qua bước xác nhận – sửa công phải qua điều chỉnh")
+    from app.services import luong as L
+    emps = {e.code: e for e in db.execute(select(Employee).where(Employee.active == True)).scalars()}
+    sai = [ma for ma in data.cong_thuc_te if ma not in emps or L.che_do_cong(emps[ma]) != L.CHAM_CONG]
+    if sai: raise HTTPException(422, f"Những mã này không thuộc chế độ chấm công theo ngày: {', '.join(sorted(sai))}")
+    cur = dict(run.inputs or {})
+    if data.cong_chuan is not None: cur["cong_chuan"] = data.cong_chuan
+    cur["cong_thuc_te"] = {**(cur.get("cong_thuc_te") or {}), **data.cong_thuc_te}
+    run.inputs = cur
+    R.audit(db, u.username, u.role, "nhap_cong_bang_luong", f"payroll:{period}", after={"so_nguoi": len(data.cong_thuc_te)})
+    db.commit()
+    run = H.get_or_draft(db, period, refresh=True)
+    return {"message": f"Đã nhập công cho {len(data.cong_thuc_te)} người kỳ {period}", "run": run_out(run)}
+
+
+@router.get("/payroll/khoan-treo")
+def khoan_treo(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Hoa hồng và thưởng chuyến đang treo vì chuyến chưa chốt quyết toán.
+
+    Người lao động xem được phần của chính mình: đây là chỗ dễ mất tiền nhất mà không ai phát hiện, vì
+    khoản treo không hiện trên phiếu lương nào."""
+    from app.services import luong as L
+    kq = L.khoan_treo(db)
+    if u.role not in ("ketoan", "hcns", "tgd", "chutich", "cntt", "bks", "gd_kd", "tp_kd", "tp_dh", "ptgd_doan"):
+        e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+        ma = e.code if e else "\u0000"
+        kq["rows"] = [r for r in kq["rows"] if r["ma"] == ma]
+        kq["theo_nguoi"] = [r for r in kq["theo_nguoi"] if r["ma"] == ma]
+        kq["chi_cua_toi"] = True
+    return kq
+
+
+@router.get("/payroll/xung-dot-ho-so")
+def payroll_conflicts(u: User = Depends(require_roles("hcns", "cntt", "ketoan", "tgd", "chutich", "bks")), db: Session = Depends(get_db)):
+    """Xung đột hồ sơ chặn chạy kỳ lương: một mã dùng cho hai người, một tài khoản gắn hai hồ sơ."""
+    from app.services import luong as L
+    ds = L.xung_dot_ho_so(db)
+    return {"rows": ds, "so_luong": len(ds),
+            "ghi_chu": "Còn xung đột thì kỳ lương không chạy được – hệ thống không tự chọn hồ sơ nào." if ds else "Không còn xung đột."}
+
+
+@router.delete("/payroll-runs/{period}")
+def payroll_delete(period: str, u: User = Depends(require_roles("cntt", "chutich")), db: Session = Depends(get_db)):
+    """Xóa bảng lương – chặn trong thời hạn lưu trữ tối thiểu."""
+    from app.services import luong as L
+    ok, vi_sao = L.duoc_xoa_bang_luong(period)
+    if not ok: raise HTTPException(422, vi_sao)
+    run = db.execute(select(PayrollRun).where(PayrollRun.period == period)).scalars().first()
+    if run is None: raise HTTPException(404, "Không có bảng lương kỳ này")
+    R.audit(db, u.username, u.role, "xoa_bang_luong", f"payroll:{period}", before={"tong": run.totals})
+    db.delete(run); db.commit()
+    return {"message": f"Đã xóa bảng lương {period}"}
 
 
 @router.post("/payroll-runs/{period}/advance")

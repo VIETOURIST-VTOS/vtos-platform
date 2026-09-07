@@ -8,6 +8,7 @@ import { Tag, errMsg } from "@/components/ui";
  *  /ops với quyền của Điều hành; Nhân sự giữ hồ sơ lao động, lương và sự vụ. Cùng một màn hình, hai lối vào. */
 const TABS_HR: [string, string][] = [["payroll", "Bảng lương"], ["employees", "Hồ sơ nhân sự"], ["incidents", "Đánh giá & sự vụ"]];
 const TABS_OPS: [string, string][] = [["visa", "Hồ sơ visa"], ["guides", "HDV & phân chuyến"], ["fleet", "Đội xe"]];
+const CD: Record<string, string> = { cham_cong: "Chấm công ngày", bao_cao_ngay: "Báo cáo ngày", theo_chuyen: "Theo chuyến", luong_cong_tac_phi: "Lương + công tác phí" };
 const PST: Record<string, [string, string]> = { nhap: ["Robot nháp", "warn"], kt_xac_nhan: ["Kế toán đã xác nhận cơ sở", "navy"], hcns_lap: ["HCNS đã lập – chờ TGĐ", "warn"], tgd_ky: ["TGĐ đã ký lô", "ok"] };
 const NEXT: Record<string, [string, string]> = { nhap: ["ketoan", "Kế toán xác nhận cơ sở"], kt_xac_nhan: ["hcns", "HCNS lập bảng lương"], hcns_lap: ["tgd", "TGĐ ký lô & ghi sổ"] };
 const lastMonth = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); };
@@ -26,6 +27,9 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const [open, setOpen] = useState<string | null>(null);
   const [emps, setEmps] = useState<any[]>([]);
   const [khoa, setKhoa] = useState<any[]>([]);
+  const [treo, setTreo] = useState<any>(null);
+  const [xungDot, setXungDot] = useState<any>(null);
+  const [cong, setCong] = useState<Record<string, string>>({});
   const [visa, setVisa] = useState<any[]>([]);
   const [asg, setAsg] = useState<any[]>([]);
   const [veh, setVeh] = useState<any[]>([]);
@@ -50,6 +54,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     if (!emps.length) api("/employees").then(setEmps).catch(() => {});
     if (!tours.length) api("/tours").then(setTours).catch(() => {});
     if (tab === "payroll") api(`/payroll-runs/${period}`).then(setRun).catch((e) => toast(errMsg(e), true));
+    if (tab === "payroll") { api("/payroll/khoan-treo").then(setTreo).catch(() => {}); api("/payroll/xung-dot-ho-so").then(setXungDot).catch(() => {}); }
     if (tab === "employees") api("/employees").then(setEmps);
     if (tab === "employees") api("/users/khoa").then(setKhoa).catch(() => {});
     if (tab === "visa") api("/visa").then(setVisa);
@@ -81,12 +86,35 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
       <p><Tag cls={PST[run.status]?.[1]}>{PST[run.status]?.[0]}</Tag> {run.kt_confirmed_by && <span className="muted"> · KT {run.kt_confirmed_by} {fmtDT(run.kt_confirmed_at)}</span>}{run.hcns_by && <span className="muted"> · HCNS {run.hcns_by} {fmtDT(run.hcns_at)}</span>}{run.tgd_by && <span className="muted"> · TGĐ {run.tgd_by} {fmtDT(run.tgd_at)} · {run.entry_ids?.length} chứng từ</span>}
         {run.status === "nhap" && ["hcns", "ketoan", "cntt"].includes(role) && <button className="act grey" onClick={() => api(`/payroll-runs/${period}?refresh=true`).then(setRun).then(() => toast("Đã tính lại nháp")).catch((e) => toast(errMsg(e), true))}>Tính lại nháp</button>}
         {NEXT[run.status] && NEXT[run.status][0] === role && <button className="act teal" onClick={() => post(`/payroll-runs/${period}/advance`)}>{NEXT[run.status][1]}</button>}</p>
-      <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th>HĐ</th><th style={{ textAlign: "right" }}>Lương CB</th><th style={{ textAlign: "right" }}>Biến đổi</th><th style={{ textAlign: "right" }}>TNCN</th><th style={{ textAlign: "right" }}>Thực nhận</th><th>Ghi chú robot</th></tr></thead>
+      <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th>HĐ</th><th>Chế độ công</th><th style={{ textAlign: "right" }}>Lương CB</th><th style={{ textAlign: "right" }}>Biến đổi</th><th style={{ textAlign: "right" }}>TNCN</th><th style={{ textAlign: "right" }}>Thực nhận</th><th>Ghi chú robot</th></tr></thead>
         <tbody>{run.rows.map((r: any) => <>
-          <tr key={r.ma} style={{ cursor: "pointer" }} onClick={() => setOpen(open === r.ma ? null : r.ma)}><td className="mono">{r.ma}</td><td><b>{r.ten}</b></td><td>{meta.departments[r.phong] || r.phong}<div className="muted">{meta.positions[r.chuc_vu]}</div></td><td>{r.hop_dong === "hdld" ? "HĐLĐ" : "CTV"}</td>
-            <td style={{ textAlign: "right" }}>{vnd(r.luong_cb)}</td><td style={{ textAlign: "right" }}>{vnd(r.bien_doi)}</td><td style={{ textAlign: "right" }}>{r.tncn ? vnd(r.tncn) : ""}</td><td style={{ textAlign: "right" }}><b>{vnd(r.thuc_nhan)}</b></td><td className="muted" style={{ maxWidth: 320 }}>{r.ghi_chu}</td></tr>
-          {open === r.ma && r.khoan.length > 0 && <tr key={r.ma + "k"}><td colSpan={9}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}><tbody>{r.khoan.map((k: any, i: number) => <tr key={i}><td>{k.ten}</td><td style={{ textAlign: "right" }}>{vnd(k.tien)}</td><td className="muted">{k.ghi_chu}</td></tr>)}</tbody></table></td></tr>}
+          <tr key={r.ma} style={{ cursor: "pointer" }} onClick={() => setOpen(open === r.ma ? null : r.ma)}><td className="mono">{r.ma}</td><td><b>{r.ten}</b></td><td>{meta.departments[r.phong] || r.phong}<div className="muted">{meta.positions[r.chuc_vu]}</div></td><td>{r.hop_dong === "hdld" ? "HĐLĐ" : "CTV"}</td><td className="muted">{CD[r.che_do_cong] || ""}</td>
+            <td style={{ textAlign: "right" }}>{vnd(r.luong_cb)}{r.xac_dinh_luong && r.xac_dinh_luong.muc_ky !== r.xac_dinh_luong.muc_hop_dong && <div className="muted" style={{ fontSize: 11 }}>HĐ {vnd(r.xac_dinh_luong.muc_hop_dong)}</div>}</td><td style={{ textAlign: "right" }}>{vnd(r.bien_doi)}</td><td style={{ textAlign: "right" }}>{r.tncn ? vnd(r.tncn) : ""}</td><td style={{ textAlign: "right" }}><b>{vnd(r.thuc_nhan)}</b></td><td className="muted" style={{ maxWidth: 320 }}>{r.ghi_chu}</td></tr>
+          {open === r.ma && <tr key={r.ma + "x"}><td colSpan={10} className="muted" style={{ padding: "2px 24px" }}><b>Xác định mức lương của kỳ:</b> {r.xac_dinh_luong ? r.xac_dinh_luong.giai_thich : "—"}{r.xac_dinh_luong?.lookback_inputs && <> · {r.xac_dinh_luong.lookback_inputs.map((x: any) => `${x.ky}: ${vnd(x.loi_nhuan)}`).join(" · ")}</>}</td></tr>}
+          {open === r.ma && r.khoan.length > 0 && <tr key={r.ma + "k"}><td colSpan={10}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}><tbody>{r.khoan.map((k: any, i: number) => <tr key={i}><td>{k.ten}</td><td style={{ textAlign: "right" }}>{vnd(k.tien)}</td><td className="muted">{k.ghi_chu}</td></tr>)}</tbody></table></td></tr>}
         </>)}</tbody></table></div>
+      {xungDot?.so_luong > 0 && <div className="panel"><h2>Xung đột hồ sơ chặn chạy kỳ lương ({xungDot.so_luong})</h2>
+        <ul>{xungDot.rows.map((x: any, i: number) => <li key={i}>{x.thong_diep}</li>)}</ul>
+        <p className="muted">Một mã dùng cho hai người nghĩa là hệ thống không biết trả tiền cho ai. Hệ thống dừng và nói ra, không tự chọn hồ sơ đầu tiên.</p></div>}
+      {canHR && run.status === "nhap" && run.rows.some((r: any) => r.che_do_cong === "cham_cong") && <div className="panel wrap"><h2>Nhập công thực tế — Kế toán và Nhân sự Hành chính</h2>
+        <p className="muted">Hai bộ phận duy nhất còn chấm công theo ngày từ 01/9/2026. Năm phòng còn lại lấy căn cứ là báo cáo công việc trước 20 giờ (Điều 12) nên không có mẫu số công chuẩn.</p>
+        <table><thead><tr><th>Mã</th><th>Họ tên</th><th className="num">Công chuẩn</th><th className="num">Công thực tế</th><th style={{ textAlign: "right" }}>Lương của kỳ</th></tr></thead>
+          <tbody>{run.rows.filter((r: any) => r.che_do_cong === "cham_cong").map((r: any) => <tr key={r.ma}><td className="mono">{r.ma}</td><td>{r.ten}</td>
+            <td className="num">{run.totals?.cong_chuan || 26}</td>
+            <td className="num"><input style={{ width: 70 }} value={cong[r.ma] ?? (r.xac_dinh_luong?.can_cu?.cong_thuc_te ?? "")} onChange={(e) => setCong({ ...cong, [r.ma]: e.target.value })} /></td>
+            <td style={{ textAlign: "right" }}>{vnd(r.luong_cb)}{r.xac_dinh_luong?.thieu_du_lieu && <Tag cls="warn">chưa nhập công</Tag>}</td></tr>)}</tbody></table>
+        <button className="act orange" onClick={() => {
+          const gui: Record<string, number> = {};
+          for (const [k, v] of Object.entries(cong)) if (v !== "") gui[k] = Number(v);
+          post(`/payroll-runs/${period}/cham-cong`, { cong_thuc_te: gui }, "PUT").then((r) => { if (r?.run) setRun(r.run); setCong({}); });
+        }}>Lưu công và tính lại</button></div>}
+      {treo && treo.tong_dong > 0 && <div className="panel wrap"><h2>Khoản đang treo — {treo.tong_dong} dòng trên {treo.tong_chuyen} chuyến</h2>
+        <p className="muted">{treo.ghi_chu}</p>
+        <table><thead><tr><th>Chuyến</th><th>Kết thúc</th><th>Hạn quyết toán</th><th className="num">Quá hạn</th><th>Người hưởng</th><th>Vai trò</th><th>Lý do</th></tr></thead>
+          <tbody>{treo.rows.slice(0, 60).map((x: any, i: number) => <tr key={i}><td><b>{x.tour_code}</b><div className="muted">{x.tour_name}</div></td><td>{fmtD(x.ket_thuc)}</td><td>{fmtD(x.han_quyet_toan)}</td>
+            <td className="num">{x.qua_han_ngay ? <Tag cls="red">{x.qua_han_ngay} ngày</Tag> : <Tag cls="warn">chưa tới hạn</Tag>}</td>
+            <td className="mono">{x.ma}<div className="muted">{x.ten}</div></td><td>{x.vai_tro}</td><td className="muted">{x.ly_do}</td></tr>)}</tbody></table>
+        {treo.rows.length > 60 && <p className="muted">Đang hiển thị 60 dòng đầu trong {treo.rows.length}.</p>}</div>}
       <p className="muted">Thang f KD Lẻ: f0–f4 = 0%, f5 = 0,5% … f19 = 4,7%, ≥1000% mốc = 5%; ngưỡng bậc tạm theo % mốc – HCNS nạp Bảng B.1 chính thức trước kỳ lương đầu. Thang đoàn f9–f0 theo bình quân LN 3 tháng / 30 triệu.</p>
     </>}
 

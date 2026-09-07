@@ -204,5 +204,6 @@ class PayrollRun(Base):
     tgd_by: Mapped[str] = mapped_column(String(50), default="")
     tgd_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     entry_ids: Mapped[list] = mapped_column(JSON, default=list)
+    inputs: Mapped[dict] = mapped_column(JSON, default=dict)     # đầu vào do HCNS nhập: công chuẩn, công thực tế theo mã NV
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)

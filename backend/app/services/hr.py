@@ -10,6 +10,7 @@ from app.models.core import Tour, Booking, User
 from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, DispatchOrder, Incident, PayrollRun
 from app.services import rules as R
 from app.services import accounting as ACC
+from app.services import luong as L
 
 # ---- Thang f bậc sàn KD Lẻ – Bảng B.1 chính thức (tham số thang_f_bang: "ngưỡng%:hệ số%", f1…f19 + trần) ----
 def parse_f_table(text: str) -> list[tuple[float, float]]:
@@ -73,7 +74,7 @@ def level3_tours(db: Session, y: int, m: int) -> set[tuple[int, int]]:
     return {(i.employee_id, i.tour_id) for i in db.execute(select(Incident).where(Incident.level >= 3, Incident.status == "hieu_luc", Incident.tour_id != None)).scalars()}
 
 
-def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
+def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple[list[dict], dict]:
     """Bản nháp thu nhập tháng theo từng người. Mỗi dòng: {ma, ten, phong, khoan[], luong_cb, bien_doi, tncn, thuc_nhan, ghi_chu}."""
     y, m = map(int, period.split("-"))
     tours = month_tours(db, y, m)
@@ -82,7 +83,9 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
     rows: dict[int, dict] = {}
 
     def row(e: Employee) -> dict:
+        cd = L.che_do_cong(e)
         return rows.setdefault(e.id, {"ma": e.code, "ten": e.full_name, "phong": e.department, "chuc_vu": e.position, "hop_dong": e.contract_type,
+                                      "che_do_cong": cd, "che_do_cong_ten": L.CHE_DO_LABEL[cd], "xac_dinh_luong": None,
                                       "luong_cb": 0.0, "khoan": [], "bien_doi": 0.0, "tncn": 0.0, "thuc_nhan": 0.0, "ghi_chu": []})
 
     def add(e: Employee, ten: str, tien: float, note: str = ""):
@@ -96,10 +99,26 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
     from app.services.ops import shift_penalties_for_month
     shift_pen = shift_penalties_for_month(db, y, m)
 
-    # ---------- Lương cơ bản mọi nhân sự HĐLĐ (thử việc 85%) ----------
+    # ---------- BƯỚC 1: xác định mức lương cơ bản CỦA KỲ (Phụ lục đối chiếu 27/8/2026, mục 2.1) ----------
+    # Thứ tự bắt buộc: xác định mức lương của kỳ → tính thu nhập → tính khoản trừ → đối soát.
+    # Mức ghi trong hợp đồng là mức đầy đủ khi đạt chỉ tiêu, không phải mức chi cố định hằng tháng.
+    inputs = inputs or {}
+    try: mac_dinh_cong = R.get_param(db, "cong_chuan")
+    except KeyError: mac_dinh_cong = 26          # công chuẩn chưa cài tham số – dùng 26, HCNS chốt lại
+    cong_chuan = float(inputs.get("cong_chuan") or mac_dinh_cong)
+    cong_thuc_te = inputs.get("cong_thuc_te") or {}
     for e in emps.values():
-        if e.contract_type == "hdld":
-            row(e)["luong_cb"] = round(e.base_salary * (0.85 if e.probation else 1.0))
+        if e.contract_type != "hdld":
+            continue
+        r = row(e); cd = L.che_do_cong(e)
+        if cd == L.CHAM_CONG:
+            ct = cong_thuc_te.get(e.code)
+            xd = L.xac_dinh_theo_cong(e, cong_chuan, float(ct) if ct not in (None, "") else None)
+            if xd.get("thieu_du_lieu"): r["ghi_chu"].append(xd["giai_thich"])
+        else:
+            xd = L.xac_dinh_co_dinh(e)
+        r["xac_dinh_luong"] = xd
+        r["luong_cb"] = round(xd["muc_ky"] * (0.85 if e.probation else 1.0))
 
     # ---------- Kinh doanh Lẻ: doanh thu tính chỉ tiêu theo tháng quyết toán ----------
     rev_by_sales: dict[int, float] = {}; share_by_sales: dict[int, float] = {}
@@ -129,12 +148,12 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
         rev = rev_by_sales.get(e.user_id, 0.0)
         if e.position in ("nv", "tl", "tp"):
             moc = moc_of(e, moc_hcm, moc_ct)
-            step_amt = moc * 0.10                # bậc thang giảm = 10% mốc (20 triệu HCM / 12 triệu tỉnh)
             cut = {"nv": 700_000, "tl": 800_000, "tp": 1_000_000}[e.position]
-            base = base_salary_le(e, rev, moc, step_amt, cut)
-            row(e)["luong_cb"] = round(base * (0.85 if e.probation else 1.0))
-            if base < e.base_salary:
-                row(e)["ghi_chu"].append(f"Thang giảm Phụ lục C: doanh thu {rev:,.0f} < mốc {moc:,.0f}")
+            xd = L.xac_dinh_thang_doanh_thu(e, rev, moc, cut)
+            row(e)["xac_dinh_luong"] = xd
+            row(e)["luong_cb"] = round(xd["muc_ky"] * (0.85 if e.probation else 1.0))
+            if xd["cap"]:
+                row(e)["ghi_chu"].append(xd["giai_thich"])
             k, rate = f_rate(rev, moc, f_table)
             comm = rate * max(0.0, rev - moc)
             if comm > 0:
@@ -170,22 +189,21 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
             pr = doan_profit_by_sales.get(e.user_id, 0.0)
             # bình quân LN quyết toán 3 tháng (người < 3 tháng: bình quân số tháng thực có)
             hist = []
-            for k in range(3):
+            for k in range(2, -1, -1):
                 mm, yy = m - k, y
                 while mm <= 0: mm += 12; yy -= 1
                 if e.start_date and date(yy, mm, 1) < date(e.start_date.year, e.start_date.month, 1):
-                    break
+                    continue                      # chưa vào làm: KHÔNG dựng thêm kỳ 0 đồng rồi chia cho ba
                 tot = 0.0
                 for t in month_tours(db, yy, mm):
                     if R.is_doan(t):
                         s = R.settlement_summary(db, t)
                         tot += sum(s["profit"] * (b.amount / s["revenue"] if s["revenue"] else 0) for b in t.bookings if b.sales_id == e.user_id)
-                hist.append(tot)
-            avg = sum(hist) / len(hist) if hist else 0
-            ratio = avg / moc_luong_doan if moc_luong_doan else 0
-            coef = next(c for th, c in DOAN_F if ratio >= th)
-            row(e)["luong_cb"] = round(e.base_salary * coef * (0.85 if e.probation else 1.0))
-            if coef < 1: row(e)["ghi_chu"].append(f"Thang f đoàn: bình quân LN 3 tháng {avg:,.0f} = {ratio*100:.0f}% mốc → {coef*100:.0f}% lương")
+                hist.append({"ky": f"{yy:04d}-{mm:02d}", "loi_nhuan": round(tot)})
+            xd = L.xac_dinh_thang_loi_nhuan(e, hist, moc_luong_doan, sorted(DOAN_F))
+            row(e)["xac_dinh_luong"] = xd
+            row(e)["luong_cb"] = round(xd["muc_ky"] * (0.85 if e.probation else 1.0))
+            if xd["ty_le"] < 1: row(e)["ghi_chu"].append(xd["giai_thich"])
             if pr > moc_hh:
                 add(e, f"Hoa hồng đoàn {rate_hh*100:.0f}% × (LN {pr:,.0f} − {moc_hh:,.0f})", (pr - moc_hh) * rate_hh)
         elif e.position == "ptgd_doan" and doan_profit_total > 0:
@@ -245,13 +263,19 @@ def compute_draft(db: Session, period: str) -> tuple[list[dict], dict]:
         if eid in emps: add(emps[eid], f"Công tác phí tài xế {n} ngày tour × {ctp:,.0f}", n * ctp, "Phụ cấp lễ/đêm theo luật do HCNS tính thêm")
 
     out = []
+    vi_pham = []
     for r in rows.values():
+        vi_pham += L.kiem_tra_khong_phai_khoan_tru(r)
         r["thuc_nhan"] = round(r["luong_cb"] + r["bien_doi"] - r["tncn"])
         r["ghi_chu"] = "; ".join(r["ghi_chu"])
         out.append(r)
     out.sort(key=lambda r: (r["phong"], r["ma"]))
+    if vi_pham:
+        # Ràng buộc pháp lý, kiểm ở tầng dữ liệu chứ không phải tầng giao diện (Điều 127.2 BLLĐ 2019).
+        raise ValueError("Bảng lương có dòng trừ bắt nguồn từ xếp bậc theo doanh thu / lợi nhuận: " + "; ".join(vi_pham))
     totals = {"luong_cb": sum(r["luong_cb"] for r in out), "bien_doi": sum(r["bien_doi"] for r in out), "tncn": sum(r["tncn"] for r in out),
-              "thuc_nhan": sum(r["thuc_nhan"] for r in out), "so_nguoi": len(out), "so_chuyen": len(tours)}
+              "thuc_nhan": sum(r["thuc_nhan"] for r in out), "so_nguoi": len(out), "so_chuyen": len(tours),
+              "cong_chuan": cong_chuan, "thieu_cong": [r["ma"] for r in out if (r.get("xac_dinh_luong") or {}).get("thieu_du_lieu")]}
     return out, totals
 
 
@@ -260,7 +284,13 @@ def get_or_draft(db: Session, period: str, refresh: bool = False) -> PayrollRun:
     if run and run.status != "nhap" and refresh:
         raise ValueError("Bảng lương đã qua bước xác nhận – không tính lại")
     if run is None or refresh or run.status == "nhap":
-        rows, totals = compute_draft(db, period)
+        xung_dot = L.xung_dot_ho_so(db)
+        if xung_dot:
+            # Một mã dùng cho hai người nghĩa là hệ thống không biết trả tiền cho ai. Dừng và nói ra,
+            # không tự chọn hồ sơ đầu tiên (Phần IV Phụ lục – xung đột mã 294).
+            raise ValueError("Chưa chạy được kỳ lương, còn xung đột hồ sơ nhân sự: " +
+                             "; ".join(x["thong_diep"] for x in xung_dot[:5]))
+        rows, totals = compute_draft(db, period, (run.inputs if run else None) or {})
         if run is None:
             run = PayrollRun(period=period, rows=rows, totals=totals); db.add(run)
         else:

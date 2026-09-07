@@ -60,7 +60,10 @@ def test_draft_from_seed():
     r = run(refresh=True)
     assert r["status"] == "nhap" and r["totals"]["so_chuyen"] >= 1
     hoa = row(r, "NS0002")                          # sale lẻ: DT Đà Lạt 73,82 triệu < 200 triệu → thang giảm
-    assert hoa["luong_cb"] < 7_000_000 and "Thang giảm" in hoa["ghi_chu"]
+    # Từ 01/9/2026 phần chênh là KẾT QUẢ XÁC ĐỊNH MỨC LƯƠNG của kỳ, không phải khoản trừ (Điều 127.2 BLLĐ)
+    assert hoa["luong_cb"] < 7_000_000 and "Phụ lục C" in hoa["ghi_chu"]
+    assert hoa["xac_dinh_luong"]["che_do"] == "thang_doanh_thu" and hoa["xac_dinh_luong"]["cap"] > 0
+    assert hoa["xac_dinh_luong"]["muc_ky"] == hoa["luong_cb"]
     lan = row(r, "NS0006")                          # điều hành: thưởng chuyến 70%
     assert any("70%" in k["ten"] for k in lan["khoan"])
     hdv = row(r, "NS0011")                          # HDV CTV: 3 ngày × 450k, TNCN 10%
