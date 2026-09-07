@@ -401,3 +401,31 @@ def test_cau_hinh_tro_toi_tai_khoan_khong_ton_tai_thi_noi_ra_chu_khong_im_lang()
     d = client.get("/api/v1/fleet/danh-muc-dot3", headers=login("chutich")).json()
     assert d["nguoi_lap_lenh"] == []
     assert "không khớp tài khoản đang hoạt động nào" in d["nguoi_lap_lenh_ghi_chu"]
+
+
+# ------------------------------------------- Chốt lại cuối ngày 07/9/2026 (chỉ đạo Chủ tịch)
+def test_khong_dung_lai_ky_truoc_moc_ap_dung(bo_du_lieu):
+    """Tháng 7 và tháng 8/2026 đã quyết toán và trả tiền xong theo cách cắt kỳ cũ. Máy dựng lại các kỳ đó sẽ
+    cắt theo tháng dương lịch, ra một con số KHÁC con số đã trả – và đó chính là lúc phát sinh trả bù lần
+    hai. Cách cắt theo tháng dương lịch áp dụng từ 01/9/2026 trở đi."""
+    r = client.post(f"/api/v1/fleet/quyet-toan/2026-08/{bo_du_lieu['partner_id']}/dung", headers=login("ketoan"))
+    assert r.status_code == 422, r.text
+    assert "trước mốc áp dụng" in r.json()["detail"]
+    assert "dòng điều chỉnh ở kỳ hiện tại" in r.json()["detail"], "phải chỉ đường xử lý, không chỉ chặn"
+
+
+def test_sua_chua_chi_ho_vao_dung_cot_doi_tac_phai_hoan(bo_du_lieu):
+    """Chủ tịch chốt lại cuối ngày 07/9/2026: giữ cách chi hộ – Vietourist ứng tiền sửa chữa rồi cấn trừ vào
+    công nợ chủ xe. Khoản chi hộ phải vào cột "đối tác phải hoàn lại"; rơi nhầm sang cột "chủ xe tự chịu" là
+    công ty ứng tiền rồi không đòi lại được, mà bảng vẫn cân."""
+    h = login("ketoan")
+    truoc = client.post(f"/api/v1/fleet/quyet-toan/{KY}/{bo_du_lieu['partner_id']}/dung",
+                        headers=h).json()["doi_tac_chiu"]
+    r = client.post("/api/v1/fleet/bao-duong", headers=h,
+                    json={"vehicle_id": bo_du_lieu["vehicle_id"], "ngay": str(HOM_NAY), "kind": "sua_chua",
+                          "so_tien": 5_000_000, "noi_dung": "Thay bố thắng", "chung_tu": "HD-SC-QT"})
+    assert r.status_code == 201, r.text
+    assert r.json()["ben_chiu"] == "vietourist_tam_ung"
+    d = client.post(f"/api/v1/fleet/quyet-toan/{KY}/{bo_du_lieu['partner_id']}/dung", headers=h).json()
+    assert d["doi_tac_chiu"] == truoc + 5_000_000
+    assert any(l["kind"] == "chi_ho" and l["amount"] == 5_000_000 for l in d["dong"])

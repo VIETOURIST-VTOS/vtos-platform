@@ -100,15 +100,19 @@ class FleetVerification(Base):
 
 
 # ====================== ĐỢT 2: NHẬT TRÌNH, BẢO DƯỠNG, DỮ LIỆU NGUỒN NGOÀI ======================
-# Quy tắc chốt ngày 07/9/2026: Vietourist TẠM ỨNG nhiên liệu, cầu đường, công tác phí, bãi xe;
-# KHÔNG tạm ứng sửa chữa – chủ xe hợp tác tự chịu. Vì vậy "ai chịu khoản này" là một CỘT trên từng dòng chi
+# Quy tắc chốt ngày 07/9/2026: Vietourist TẠM ỨNG nhiên liệu, cầu đường, công tác phí, bãi xe.
+# Sửa chữa: bản chốt buổi sáng 07/9 là chủ xe tự chịu; CHỦ TỊCH CHỐT LẠI CUỐI NGÀY 07/9/2026 – giữ cách đang
+# làm, tức Vietourist CHI HỘ sửa chữa rồi cấn trừ vào công nợ chủ xe (khoản 22.291.048đ của 50H-496.23 đã
+# được chủ xe đồng ý và xử lý xong). Mặc định này để ở tham số `xe_sua_chua_ben_chiu` chứ không cứng trong
+# mã, vì đây là điều khoản hợp đồng – lần sau đổi thì đổi tham số, không phải sửa mã rồi triển khai lại.
+# Vì vậy "ai chịu khoản này" là một CỘT trên từng dòng chi
 # phí, không phải suy ra từ loại chi phí lúc quyết toán: cùng một loại chi phí có thể do hai bên chịu tùy
 # hợp đồng, và suy ra lúc quyết toán là lúc không còn ai nhớ để cãi.
 BEN_CHIU = {"vietourist_tam_ung": "Vietourist tạm ứng", "chu_xe": "Chủ xe tự chịu"}
 COST_KINDS = {"dau": "Nhiên liệu", "cong_tac_phi": "Công tác phí tài xế", "giu_xe": "Phí giữ/bãi xe",
               "cau_duong": "Phí cầu đường", "sua_chua": "Sửa chữa, bảo dưỡng", "khac": "Khác"}
-# Loại chi phí nào mặc định bên nào chịu. Sửa chữa mặc định CHỦ XE theo quy tắc đã chốt.
-BEN_CHIU_MAC_DINH = {"sua_chua": "chu_xe"}
+# Mặc định dự phòng khi chưa có tham số trong cơ sở dữ liệu. Nguồn thật là `xe_sua_chua_ben_chiu`.
+BEN_CHIU_MAC_DINH = {"sua_chua": "vietourist_tam_ung"}
 TRIP_STATUS = {"nhap": "Nháp – tài xế đang ghi", "cho_xac_nhan": "Chờ xác nhận",
                "da_xac_nhan": "Đã xác nhận", "huy": "Hủy"}
 # Ba cờ dùng thống nhất toàn hệ thống (đặc tả §1): xanh cho duyệt một chạm, vàng phải nhập lý do,

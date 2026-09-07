@@ -117,16 +117,22 @@ def _tao_chuyen(vid: int, di: date, ve: date, km_dau=None, km_cuoi=None, **kw) -
     return r.json()
 
 
-def test_sua_chua_mac_dinh_do_chu_xe_chiu_khong_phai_vietourist_tam_ung():
-    """Chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe – KHÔNG tạm ứng sửa
-    chữa. Nếu phần mềm mặc định ngược lại thì mỗi kỳ quyết toán lại trừ nhầm vào công nợ chủ xe, đúng như
-    khoản 22.291.048đ của xe 50H-496.23 tháng 8/2026."""
+def test_ben_chiu_sua_chua_lay_theo_tham_so_va_ghi_dung_cot_tren_tung_dong():
+    """Chủ tịch chốt lại cuối ngày 07/9/2026: giữ cách đang làm – Vietourist CHI HỘ sửa chữa rồi cấn trừ.
+    Điều cần giữ không phải là giá trị mặc định (nó là điều khoản hợp đồng, đổi được), mà là: bên chịu được
+    GHI THÀNH CỘT trên từng dòng lúc nhập, và cột đó nhập tay đè được mặc định. Suy ra bên chịu lúc quyết
+    toán là cách khoản 22.291.048đ của 50H-496.23 đi lạc mà bảng vẫn trông hợp lý."""
     vid = xe("50H-496.23")["id"]
     t = _tao_chuyen(vid, HOM_NAY + timedelta(days=60), HOM_NAY + timedelta(days=62), 100_000, 100_600)
     r = client.post(f"/api/v1/fleet/chuyen/{t['id']}/chi-phi", headers=login("cntt"),
                     json={"kind": "sua_chua", "amount": 3_000_000, "chung_tu": "HD-0001"})
     assert r.status_code == 201, r.text
-    assert r.json()["ben_chiu"] == "chu_xe"
+    assert r.json()["ben_chiu"] == "vietourist_tam_ung"
+
+    r = client.post(f"/api/v1/fleet/chuyen/{t['id']}/chi-phi", headers=login("cntt"),
+                    json={"kind": "sua_chua", "amount": 1_000_000, "chung_tu": "HD-0001B",
+                          "ben_chiu": "chu_xe"})
+    assert r.json()["ben_chiu"] == "chu_xe", "nhập tay phải đè được mặc định"
 
     r = client.post(f"/api/v1/fleet/chuyen/{t['id']}/chi-phi", headers=login("cntt"),
                     json={"kind": "dau", "amount": 2_000_000, "lit": 150, "chung_tu": "HD-0002"})
@@ -134,8 +140,8 @@ def test_sua_chua_mac_dinh_do_chu_xe_chiu_khong_phai_vietourist_tam_ung():
 
     ct = next(x for x in client.get(f"/api/v1/fleet/chuyen?vehicle_id={vid}", headers=login("cntt")).json()
               if x["id"] == t["id"])
-    assert ct["tong_chi_chu_xe"] == 3_000_000
-    assert ct["tong_chi_vietourist"] == 2_000_000
+    assert ct["tong_chi_chu_xe"] == 1_000_000
+    assert ct["tong_chi_vietourist"] == 5_000_000
 
 
 def test_khoan_chi_lon_khong_chung_tu_bi_chan_cung():
@@ -234,7 +240,7 @@ def test_moc_km_tren_phieu_lon_hon_dong_ho_thi_canh_bao_ghi_sai_ky():
                           "km_luc_lam": 130_300, "so_tien": 6_891_048, "chung_tu": "HD-SC-01"})
     assert r.status_code == 201, r.text
     assert any("kỳ phân bổ" in c for c in r.json()["canh_bao"])
-    assert r.json()["ben_chiu"] == "chu_xe", "xe hợp tác: sửa chữa do chủ xe chịu"
+    assert r.json()["ben_chiu"] == "vietourist_tam_ung", "chốt cuối ngày 07/9/2026: Vietourist chi hộ sửa chữa"
 
 
 # ---------------------------------------------------------------- Tài xế

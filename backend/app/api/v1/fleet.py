@@ -287,13 +287,26 @@ from app.models.fleet import (Trip, TripCost, Maintenance, ExternalTxn, BEN_CHIU
 KETOAN = ("ketoan",)
 
 
+def _mac_dinh_ben_chiu(db: Session, kind: str) -> str:
+    """Bên chịu mặc định của một loại chi phí. Sửa chữa đọc từ tham số nên đổi điều khoản hợp đồng là đổi
+    tham số, không phải sửa mã. Tham số ghi sai giá trị thì quay về mặc định trong mã chứ không ném lỗi
+    giữa lúc người ta đang nhập chi phí."""
+    if kind != "sua_chua":
+        return BEN_CHIU_MAC_DINH.get(kind, "vietourist_tam_ung")
+    v = (R.get_param_text(db, "xe_sua_chua_ben_chiu") or "").strip()
+    return v if v in BEN_CHIU else BEN_CHIU_MAC_DINH["sua_chua"]
+
+
 @router.get("/danh-muc-dot2")
-def danh_muc_dot2(u: User = Depends(require_roles(*READ))):
-    return {"ben_chiu": BEN_CHIU, "loai_chi_phi": COST_KINDS, "ben_chiu_mac_dinh": BEN_CHIU_MAC_DINH,
+def danh_muc_dot2(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    sc = _mac_dinh_ben_chiu(db, "sua_chua")
+    return {"ben_chiu": BEN_CHIU, "loai_chi_phi": COST_KINDS,
+            "ben_chiu_mac_dinh": {**BEN_CHIU_MAC_DINH, "sua_chua": sc},
             "trang_thai_chuyen": TRIP_STATUS, "co": CO, "loai_bao_duong": MAINT_KINDS,
             "ghi_chu": "Chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe. "
-                       "KHÔNG tạm ứng sửa chữa – chủ xe tự chịu, và không tự trừ vào công nợ nếu chưa có "
-                       "văn bản đồng ý của chủ xe."}
+                       f"Sửa chữa hiện đặt là \"{BEN_CHIU[sc]}\" (chủ tịch chốt lại cuối ngày 07/9/2026: giữ "
+                       "cách chi hộ rồi cấn trừ). Khoản chi hộ vẫn phải có chứng từ và có căn cứ đồng ý của "
+                       "chủ xe lưu trong hồ sơ."}
 
 
 class ChuyenIn(BaseModel):
@@ -373,13 +386,13 @@ class ChiPhiIn(BaseModel):
 
 @router.post("/chuyen/{tid}/chi-phi", status_code=201)
 def them_chi_phi(tid: int, data: ChiPhiIn, u: User = Depends(require_roles(*WRITE, *KETOAN)), db: Session = Depends(get_db)):
-    """Thêm một dòng chi phí. `ben_chiu` không truyền thì lấy mặc định theo loại chi phí – sửa chữa mặc định
-    là CHỦ XE theo quy tắc chốt 07/9/2026."""
+    """Thêm một dòng chi phí. `ben_chiu` không truyền thì lấy mặc định theo loại chi phí; riêng sửa chữa đọc
+    từ tham số `xe_sua_chua_ben_chiu` (mặc định Vietourist chi hộ – chủ tịch chốt lại cuối ngày 07/9/2026)."""
     t = db.get(Trip, tid)
     if not t: raise HTTPException(404, "Không có chuyến")
     if t.status == "da_xac_nhan": raise HTTPException(422, "Chuyến đã xác nhận – sửa phải qua điều chỉnh, không ghi đè")
     if data.kind not in COST_KINDS: raise HTTPException(422, f"Loại chi phí không hợp lệ. Chỉ nhận {', '.join(COST_KINDS)}")
-    bc = data.ben_chiu or BEN_CHIU_MAC_DINH.get(data.kind, "vietourist_tam_ung")
+    bc = data.ben_chiu or _mac_dinh_ben_chiu(db, data.kind)
     if bc not in BEN_CHIU: raise HTTPException(422, f"Bên chịu không hợp lệ. Chỉ nhận {', '.join(BEN_CHIU)}")
     nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
     if data.amount >= nguong and not (data.chung_tu or "").strip():
@@ -440,7 +453,8 @@ def them_bao_duong(data: BaoDuongIn, u: User = Depends(require_roles(*WRITE, *KE
     v = db.get(Vehicle, data.vehicle_id)
     if not v: raise HTTPException(404, "Không có xe")
     if data.kind not in MAINT_KINDS: raise HTTPException(422, f"Loại không hợp lệ. Chỉ nhận {', '.join(MAINT_KINDS)}")
-    bc = data.ben_chiu or ("chu_xe" if v.op_right == "hop_tac" else "vietourist_tam_ung")
+    # Xe hợp tác cũng theo tham số: chủ tịch chốt cuối ngày 07/9/2026 là giữ cách chi hộ rồi cấn trừ.
+    bc = data.ben_chiu or _mac_dinh_ben_chiu(db, "sua_chua")
     if bc not in BEN_CHIU: raise HTTPException(422, f"Bên chịu không hợp lệ. Chỉ nhận {', '.join(BEN_CHIU)}")
     # Mốc km ghi trên phiếu nhỏ hơn số km đồng hồ đã xác nhận là dấu hiệu ghi sai ngày hoặc sai kỳ –
     # đúng kiểu sai đã xảy ra với xe 50H-496.23 tháng 8/2026 (mốc 130.300 lớn hơn km cuối 130.245).

@@ -67,7 +67,11 @@ DEFAULT_PARAMS = [
     # Ghi bằng tài khoản/mã nhân viên trong tham số chứ KHÔNG viết tên một người vào mã nguồn – thay người
     # phụ trách thì sửa tham số, không phải sửa phần mềm và triển khai lại. Nhận nhiều giá trị, ngăn bởi dấu
     # phẩy; để trống là giữ nguyên quy tắc theo vai trò như trước.
-    ("xe_nguoi_lap_lenh", "53", "Tài khoản (hoặc mã nhân viên) được tạo và chốt lệnh điều xe – để trống là theo vai trò", "danh sách", "Chủ tịch 07/9/2026"),
+    ("xe_sua_chua_ben_chiu", "vietourist_tam_ung", "Sửa chữa/bảo dưỡng mặc định bên nào chịu",
+     "vietourist_tam_ung hoặc chu_xe", "Chủ tịch chốt lại cuối ngày 07/9/2026 – giữ cách chi hộ đang làm"),
+    ("xe_ky_quyet_toan_ap_dung_tu", "2026-09", "Kỳ đầu tiên áp dụng cách cắt kỳ theo tháng dương lịch; kỳ "
+     "trước mốc này đã quyết toán xong theo cách cũ nên máy không dựng lại", "YYYY-MM", "Chủ tịch 07/9/2026"),
+    ("xe_nguoi_lap_lenh", "53","Tài khoản (hoặc mã nhân viên) được tạo và chốt lệnh điều xe – để trống là theo vai trò", "danh sách", "Chủ tịch 07/9/2026"),
     ("moc_luong_doan", "30000000", "Mốc bình quân LN quyết toán 3 tháng để hưởng đủ lương NV kinh doanh đoàn", "đồng", "Đoàn Điều 5"),
     ("phat_su_vu", "1000000", "Chế tài mỗi sự vụ từ mức 2 (chỉ trừ hoa hồng)", "đồng/vụ", "KD Lẻ"),
     # Khoản trừ của NGƯỜI LAO ĐỘNG, áp từ kỳ lương 01/9/2026 (Bộ tính lương Vietourist, sheet Tham số).

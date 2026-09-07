@@ -32,6 +32,16 @@ def _q(x: float) -> float:
     return float(round(x))
 
 
+def ky_ap_dung(db: Session) -> str:
+    """Kỳ đầu tiên máy được phép dựng bảng quyết toán. Mặc định 2026-09 (chốt 07/9/2026: cách cắt kỳ theo
+    tháng dương lịch áp dụng từ 01/9; tháng 7 và tháng 8 đã xử lý xong tay theo cách cũ)."""
+    try:
+        v = (R.get_param_text(db, "xe_ky_quyet_toan_ap_dung_tu") or "").strip()
+    except KeyError:
+        v = ""
+    return v if len(v) == 7 and v[4] == "-" else "2026-09"
+
+
 def ky_range(ky: str) -> tuple[date, date]:
     """Kỳ là tháng dương lịch: [ngày 1, ngày cuối tháng]."""
     y, m = map(int, ky.split("-"))
@@ -169,6 +179,12 @@ def dung_quyet_toan(db: Session, partner_id: int, ky: str, boi: str) -> Settleme
     Dựng lại KHÔNG cấn trừ thêm lần nào: phần cấn trừ đọc từ các lần áp dụng đã ghi, không tính lại từ đầu."""
     p = db.get(PartnerOwner, partner_id)
     if p is None: raise ValueError("Không có chủ xe hợp tác này")
+    tu = ky_ap_dung(db)
+    if ky < tu:
+        # Kỳ trước mốc áp dụng đã quyết toán và trả tiền xong theo cách cắt kỳ cũ. Dựng lại bằng máy sẽ cắt
+        # theo tháng dương lịch, ra một con số khác con số đã trả, và đó là lúc người ta trả bù lần hai.
+        raise ValueError(f"Kỳ {ky} nằm trước mốc áp dụng {tu} – các kỳ này đã quyết toán xong theo cách cũ. "
+                         "Muốn điều chỉnh thì tạo dòng điều chỉnh ở kỳ hiện tại, không dựng lại kỳ cũ.")
     d1, d2 = ky_range(ky)
     st = db.execute(select(Settlement).where(Settlement.ky == ky, Settlement.partner_id == partner_id)).scalars().first()
     if st is None:
@@ -201,8 +217,9 @@ def dung_quyet_toan(db: Session, partner_id: int, ky: str, boi: str) -> Settleme
                                       ben_chiu=c.ben_chiu, chung_tu=c.chung_tu))
                 if c.ben_chiu == "vietourist_tam_ung": chi_ho += c.amount
                 else: chu_xe_chiu += c.amount
-        # Bảo dưỡng, sửa chữa trong kỳ. Chốt 07/9: Vietourist KHÔNG tạm ứng sửa chữa, nên khoản này mặc định
-        # là chủ xe tự chịu và KHÔNG tự trừ vào công nợ khi chưa có văn bản chủ xe đồng ý.
+        # Bảo dưỡng, sửa chữa trong kỳ. Chủ tịch chốt lại cuối ngày 07/9/2026: giữ cách đang làm, Vietourist
+        # CHI HỘ sửa chữa rồi cấn trừ vào công nợ chủ xe. Bên chịu vẫn đọc từ CỘT trên từng dòng chứ không
+        # suy ra ở đây – dòng ghi trước ngày chốt vẫn giữ đúng bên chịu lúc đó, không bị viết lại ngược.
         for m in db.execute(select(Maintenance).where(Maintenance.vehicle_id.in_(ids), Maintenance.ngay >= d1,
                                                       Maintenance.ngay <= d2)).scalars():
             kind = "chi_ho" if m.ben_chiu == "vietourist_tam_ung" else "chu_xe_chiu"
@@ -235,8 +252,8 @@ def dung_quyet_toan(db: Session, partner_id: int, ky: str, boi: str) -> Settleme
     # Số âm là khoản PHẢI THU, chuyển kỳ sau – không tạo phiếu chi âm.
     st.sau_can_tru = max(0.0, sau)
     st.chuyen_ky_sau = _q(-sau) if sau < 0 else 0.0
-    st.ghi_chu = ("Khoản chủ xe tự chịu (sửa chữa) không tự trừ vào công nợ khi chưa có văn bản chủ xe đồng ý. "
-                  f"Tổng khoản chủ xe tự chịu trong kỳ: {_q(chu_xe_chiu):,.0f} đ.")
+    st.ghi_chu = (f"Khoản Vietourist chi hộ trong kỳ: {_q(chi_ho):,.0f} đ (cấn trừ vào công nợ chủ xe theo "
+                  f"cách đang làm, chốt 07/9/2026). Khoản chủ xe tự chịu: {_q(chu_xe_chiu):,.0f} đ.")
     db.flush()
     return st
 
