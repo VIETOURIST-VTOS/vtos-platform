@@ -2,7 +2,7 @@
 from datetime import timedelta, date, datetime
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import select, desc, func
+from sqlalchemy import select, desc, func, text
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles, robot_auth, Gate
@@ -728,3 +728,34 @@ def robot_report(kind: str, db: Session = Depends(get_db)):
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"period": r.period, "markdown": r.content, "comment": r.comment}
+
+
+# ---------- dung lượng dữ liệu ----------
+@router.get("/he-thong/dung-luong", tags=["he-thong"])
+def dung_luong(u: User = Depends(require_roles("cntt", "chutich", "tgd", "bks", "ketoan")), db: Session = Depends(get_db)):
+    """Số dòng và dung lượng từng bảng, để biết chỗ nào đang phình trước khi nghĩ tới nâng cấu hình.
+
+    Chỉ ĐỌC. Cố ý không kèm nút xoá: xoá dữ liệu vận hành là việc phải quyết theo từng bảng cụ thể,
+    không phải một nút trên màn hình.
+    """
+    from app.db.session import Base
+    ten_bang = sorted(Base.metadata.tables.keys())
+    rows = []
+    for t in ten_bang:
+        try:
+            n = db.execute(text(f'SELECT count(*) FROM "{t}"')).scalar() or 0
+        except Exception:
+            db.rollback(); continue
+        rows.append({"bang": t, "so_dong": int(n)})
+    kich_thuoc = {}
+    try:    # PostgreSQL: kích thước thật trên đĩa, kể cả chỉ mục
+        for ten, byte_ in db.execute(text(
+                "SELECT relname, pg_total_relation_size(relid) FROM pg_catalog.pg_statio_user_tables")).all():
+            kich_thuoc[ten] = int(byte_)
+    except Exception:
+        db.rollback()
+    for r in rows:
+        r["bytes"] = kich_thuoc.get(r["bang"], 0)
+    rows.sort(key=lambda r: (-r["bytes"], -r["so_dong"]))
+    return {"tong_so_dong": sum(r["so_dong"] for r in rows), "tong_bytes": sum(r["bytes"] for r in rows),
+            "so_bang": len(rows), "bang": rows}
