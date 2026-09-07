@@ -1,7 +1,13 @@
-"""Menu 8 nhóm nghiệp vụ (Đề xuất 06/9/2026 mục 2 – Đợt 2 mục 5).
+"""Menu nhóm nghiệp vụ (Đề xuất 06/9/2026 mục 2 – Đợt 2 mục 5, cập nhật theo chỉ đạo 07/9/2026).
 
 Chốt chặn: mọi màn hình có trong ma trận phân quyền phải nằm trong một nhóm menu, nếu không
 người dùng không còn lối vào; và ngược lại, menu không được trỏ tới đường dẫn không tồn tại.
+
+Ngày 07/9/2026 Chủ tịch tách thêm hai đơn vị, nên bản đề xuất 8 nhóm ngày 06/9 thành 10 nhóm:
+  - "Kinh doanh & Sản phẩm" tách đôi thành "Kinh doanh Lẻ" và "Kinh doanh Đoàn (MICE)";
+  - xe và hướng dẫn viên rời "Điều hành" thành "Vận tải & Hướng dẫn viên".
+Phần khẳng định số nhóm và tên nhóm ở đây là ĐẶC TẢ tổ chức nên thay đổi theo chỉ đạo; hai phép thử
+lối vào và đường dẫn hỏng phía trên là chốt chặn kỹ thuật, không đổi.
 """
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -35,14 +41,19 @@ def test_menu_khong_tro_toi_trang_khong_ton_tai():
 
 def test_du_tam_nhom_va_dat_ten_theo_de_xuat():
     _, block = menu_paths()
-    keys = re.findall(r'key:\s*"([a-z]+)"', block)
-    assert len(keys) == 8 and len(set(keys)) == 8, f"phải đủ 8 nhóm nghiệp vụ, đang có {keys}"
-    for ten in ("Điều hành Holdings", "Marketing & CSKH", "Kinh doanh & Sản phẩm", "Điều hành",
+    keys = re.findall(r'key:\s*"([a-z_]+)"', block)
+    assert len(keys) == 10 and len(set(keys)) == 10, f"phải đủ 10 nhóm nghiệp vụ, đang có {keys}"
+    for ten in ("Điều hành Holdings", "Marketing & CSKH", "Kinh doanh Lẻ", "Kinh doanh Đoàn (MICE)",
+                "Điều hành", "Vận tải & Hướng dẫn viên",
                 "Tài chính & Kế toán", "Hành chính & Nhân sự", "Kiểm soát & Chính sách", "Hệ thống & Tích hợp"):
         assert ten in block, f"thiếu nhóm {ten}"
     # ba mục đổi tên theo đề xuất
     assert "Báo cáo quản trị" in block and "Báo cáo công việc" in block and "Chính sách & định mức" in block
     assert "Robot báo cáo" not in block and "Tham số chính sách" not in block and "Báo cáo ngày" not in block
+    # Hai phòng kinh doanh phải mở ĐÚNG mảng của mình, không cùng trỏ một danh sách rồi để người dùng tự lọc.
+    for path in ("/tours?mang=le", "/requests?mang=le", "/bookings?mang=le",
+                 "/tours?mang=doan", "/requests?mang=doan", "/bookings?mang=doan"):
+        assert path in block, f"menu hai phòng kinh doanh phải trỏ {path}"
 
 
 def test_muc_chua_xay_duoc_danh_dau_khong_phai_link_hong():

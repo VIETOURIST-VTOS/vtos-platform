@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT } from "@/lib/api";
-import { Tag, Gate, errMsg } from "@/components/ui";
+import { Tag, Gate, errMsg, MangTag } from "@/components/ui";
 
 const PMT: Record<string, [string, string]> = { UNPAID: ["Chưa cọc", "red"], DEPO: ["Đã cọc", "warn"], PAID: ["Đủ tiền", "ok"], CANCEL: ["Đã hủy", ""] };
 const RT_ST: Record<string, [string, string]> = { hieu_luc: ["Còn hiệu lực", "ok"], tat_toan: ["Đã tất toán", ""], huy: ["Đã hủy", "red"] };
@@ -11,6 +12,7 @@ const RT_ST: Record<string, [string, string]> = { hieu_luc: ["Còn hiệu lực"
 function Bookings() {
   const { user, toast } = useShell();
   const role = user?.role || "";
+  const mang = useSearchParams().get("mang") || "";
   const [rows, setRows] = useState<any[]>([]); const [q, setQ] = useState(""); const [st, setSt] = useState("due");
   const [cnt, setCnt] = useState<any>({ total: null, filtered: null }); const [page, setPage] = useState(0);
   const PAGE = 300;
@@ -18,12 +20,12 @@ function Bookings() {
   const [edit, setEdit] = useState<any>(null); const [cancel, setCancel] = useState<any>(null); const [apply, setApply] = useState<any>(null); const [cands, setCands] = useState<any[]>([]);
   const openApply = (r: any) => { setApply(r); api(`/bookings?status=due&limit=50&q=${encodeURIComponent(r.customer_phone || r.customer_name)}`).then((x) => setCands(x.filter((b: any) => b.id !== r.booking_id))).catch(() => setCands([])); };
   const load = useCallback(() => {
-    api(`/bookings?limit=${PAGE}&offset=0&q=${encodeURIComponent(q)}&status=${st}`).then((x) => { setRows(x); setPage(0); }).catch((e) => toast(errMsg(e), true));
-    api(`/bookings/count?q=${encodeURIComponent(q)}&status=${st}`).then(setCnt).catch(() => setCnt({ total: null, filtered: null }));
+    api(`/bookings?limit=${PAGE}&offset=0&q=${encodeURIComponent(q)}&status=${st}&mang=${mang}`).then((x) => { setRows(x); setPage(0); }).catch((e) => toast(errMsg(e), true));
+    api(`/bookings/count?q=${encodeURIComponent(q)}&status=${st}&mang=${mang}`).then(setCnt).catch(() => setCnt({ total: null, filtered: null }));
     api(`/retentions?status=${rst}`).then(setRet).catch(() => {});
-  }, [q, st, rst, toast]);
+  }, [q, st, rst, mang, toast]);      // thiếu `mang` ở đây là đổi menu mà danh sách không tải lại
   const more = async () => {
-    try { const x = await api(`/bookings?limit=${PAGE}&offset=${(page + 1) * PAGE}&q=${encodeURIComponent(q)}&status=${st}`); setRows((r) => [...r, ...x]); setPage((p) => p + 1); } catch (e) { toast(errMsg(e), true); }
+    try { const x = await api(`/bookings?limit=${PAGE}&offset=${(page + 1) * PAGE}&q=${encodeURIComponent(q)}&status=${st}&mang=${mang}`); setRows((r) => [...r, ...x]); setPage((p) => p + 1); } catch (e) { toast(errMsg(e), true); }
   };
   useEffect(() => { load(); }, [load]);
   const isDH = ["nv_dh", "tp_dh"].includes(role), canUnlock = ["tp_dh", "gd_kd", "cntt", "tgd"].includes(role), canRt = ["nv_dh", "tp_dh", "ketoan"].includes(role), canRtCancel = ["tp_dh", "gd_kd", "tgd", "ketoan"].includes(role);
@@ -44,6 +46,7 @@ function Bookings() {
   const s = ret.summary || {};
   return (<>
     <h1>Booking & tiền bảo lưu</h1>
+    <MangTag mang={mang} />
     <p className="muted">Theo vận hành Vietrip: % cọc theo sản phẩm → trạng thái Chưa cọc / Đã cọc / Đủ tiền; deadline hủy chỗ = khởi hành − số ngày đóng tour (17:00); robot R4 khóa booking khi đóng tour hoặc thu đủ, nhắc cọc quá hạn; Điều hành hủy booking (một cửa) → phí hủy giữ lại, phần còn lại bảo lưu hoặc hoàn tiền. <Link href="/requests">Tạo yêu cầu / booking mới →</Link></p>
 
     <div className="panel wrap">
@@ -116,4 +119,4 @@ function Bookings() {
   </>);
 }
 
-export default function Page() { return <Shell><Bookings /></Shell>; }
+export default function Page() { return <Shell><Suspense><Bookings /></Suspense></Shell>; }

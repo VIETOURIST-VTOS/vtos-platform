@@ -95,10 +95,16 @@ def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Sessio
 
 # ---------- tours ----------
 @router.get("/tours", tags=["tours"])
-def list_tours(status: str | None = None, q: str = "", month: str = "", limit: int = 300, offset: int = 0, tour_type: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_tours(status: str | None = None, q: str = "", month: str = "", limit: int = 300, offset: int = 0, tour_type: str = "", mang: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
     """Danh sách tour có phân trang/tìm kiếm (mặc định 300 chuyến mới nhất) – 1.200+ tour nhập từ Vietrip. Mặc định ẩn dịch vụ lẻ (KLE) trừ khi tìm theo mã hoặc chọn tour_type."""
     from sqlalchemy import or_
     qs = select(Tour).order_by(desc(Tour.start_date))
+    from app.services import segments as SEG
+    try:
+        cond = SEG.tour_cond(mang)          # mang=le / doan – lọc theo mảng kinh doanh
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    if cond is not None: qs = qs.where(cond)
     if tour_type: qs = qs.where(Tour.tour_type == tour_type)
     elif not (q and q.upper().startswith("KLE")): qs = qs.where(Tour.tour_type != "non_package")
     if status: qs = qs.where(Tour.status.in_(status.split(",")))
@@ -214,14 +220,33 @@ def booking_out(b: Booking) -> dict:
             "adl": b.adl, "chd": b.chd, "inf": b.inf, "vietrip_id": b.vietrip_id, "tour_start": b.tour.start_date if b.tour else None, **BK.booking_view(b)}
 
 
+@router.get("/mang", tags=["bookings"])
+def mang_catalog(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Danh mục mảng kinh doanh + đối chiếu hai quy tắc xác định mảng Đoàn.
+
+    Mảng Đoàn được nhận theo HỢP của hai quy tắc (loại chuyến là đoàn, HOẶC mã tour bắt đầu bằng MICE) nên
+    không tour nào bị rơi khỏi màn hình phòng Đoàn. Phần đối chiếu chỉ đích danh tour mà hai quy tắc bất đồng
+    để Kinh doanh sửa dữ liệu gốc."""
+    from app.services import segments as SEG
+    AC.require(u, AC.BOOKING_ROLES, "danh mục mảng kinh doanh")
+    return {"mang": SEG.MANG, "quy_tac_doan": {"loai_chuyen": list(SEG.DOAN_TYPES), "tien_to_ma": SEG.MICE_PREFIX},
+            "doi_chieu": SEG.lech_quy_tac(db)}
+
+
 @router.get("/requests", tags=["bookings"])
-def list_requests(open_only: bool = False, view: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_requests(open_only: bool = False, view: str = "", mang: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
     """view: cho_phan_cong / sap_qua_han / qua_han / hoan_tat / cua_toi (rỗng = tất cả)."""
     AC.require(u, AC.BOOKING_ROLES, "yêu cầu đặt dịch vụ")
     q = select(ServiceRequest).order_by(desc(ServiceRequest.created_at))
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: q = q.where(ServiceRequest.sales_id.in_(vis))
     if open_only: q = q.where(ServiceRequest.booking_id == None)
+    from app.services import segments as SEG
+    try:
+        cond = SEG.tour_cond(mang)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    if cond is not None: q = q.join(Tour, Tour.id == ServiceRequest.tour_id).where(cond)
     sla = int(R.get_param(db, "sla_booking_phut"))
     rows = [req_out(r, sla, db) for r in db.execute(q).scalars()]
     if view == "cua_toi": rows = [r for r in rows if u.id in (r["sales_id"], r["operator_id"])]
@@ -243,14 +268,19 @@ def create_booking(rid: int, u: User = Depends(current_user), db: Session = Depe
     return {"booking": booking_out(b), "message": msg}
 
 
-def _bookings_query(db: Session, u: User, q: str, status: str, tour_id: int | None):
+def _bookings_query(db: Session, u: User, q: str, status: str, tour_id: int | None, mang: str = ""):
+    from app.services import segments as SEG
     qs = select(Booking).order_by(desc(Booking.created_at))
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: qs = qs.where(Booking.sales_id.in_(vis))   # NV KD: của mình; trưởng nhóm: của nhóm
     if tour_id: qs = qs.where(Booking.tour_id == tour_id)
+    cond = SEG.tour_cond(mang)                       # mảng nằm ở TOUR nên phải nối bảng tours
+    if cond is not None or q:
+        qs = qs.join(Tour, Tour.id == Booking.tour_id)   # nối MỘT lần, kể cả khi vừa lọc mảng vừa tìm kiếm
+    if cond is not None: qs = qs.where(cond)
     if q:
         like = f"%{q.strip()}%"
-        qs = qs.join(Tour, Tour.id == Booking.tour_id).where((Booking.code.ilike(like)) | (Booking.customer_name.ilike(like)) | (Booking.customer_phone.ilike(like)) | (Tour.code.ilike(like)))
+        qs = qs.where((Booking.code.ilike(like)) | (Booking.customer_name.ilike(like)) | (Booking.customer_phone.ilike(like)) | (Tour.code.ilike(like)))
     if status == "cancelled": qs = qs.where(Booking.cancelled == True)
     elif status == "locked": qs = qs.where(Booking.locked == True, Booking.cancelled == False)
     elif status in ("unpaid", "depo", "paid"): qs = qs.where(Booking.pmt_status == status.upper(), Booking.cancelled == False)
@@ -259,22 +289,31 @@ def _bookings_query(db: Session, u: User, q: str, status: str, tour_id: int | No
 
 
 @router.get("/bookings", tags=["bookings"])
-def list_bookings(limit: int = 100, offset: int = 0, q: str = "", status: str = "", tour_id: int | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_bookings(limit: int = 100, offset: int = 0, q: str = "", status: str = "", tour_id: int | None = None, mang: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
     """status: unpaid / depo / paid / cancelled / locked / due (còn phải thu, chưa hủy).
     Danh sách có phân trang – tổng số lấy ở /bookings/count, KHÔNG suy từ số dòng đang hiển thị (B7)."""
     AC.require(u, AC.BOOKING_ROLES, "danh sách booking")
-    qs = _bookings_query(db, u, q, status, tour_id)
+    try:
+        qs = _bookings_query(db, u, q, status, tour_id, mang)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
     return [booking_out(b) for b in db.execute(qs.offset(offset).limit(min(limit, 1000))).scalars()]
 
 
 @router.get("/bookings/count", tags=["bookings"])
-def count_bookings(q: str = "", status: str = "", tour_id: int | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def count_bookings(q: str = "", status: str = "", tour_id: int | None = None, mang: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
     """Tổng số booking trong phạm vi người dùng được xem và số thỏa bộ lọc – để giao diện không lấy
     số dòng đang tải làm tổng toàn hệ thống (Ý kiến thẩm định 06/9/2026, B7)."""
     AC.require(u, AC.BOOKING_ROLES, "danh sách booking")
     def n(query):
         return db.execute(select(func.count()).select_from(query.order_by(None).subquery())).scalar() or 0
-    return {"total": n(_bookings_query(db, u, "", "", None)), "filtered": n(_bookings_query(db, u, q, status, tour_id))}
+    try:
+        # "total" giữ nguyên phạm vi MẢNG đang xem, chỉ bỏ bộ lọc tìm kiếm/trạng thái – nếu không thì phòng Đoàn
+        # thấy "12 / 10.074" và tưởng mình đang bị giấu dữ liệu.
+        return {"total": n(_bookings_query(db, u, "", "", None, mang)),
+                "filtered": n(_bookings_query(db, u, q, status, tour_id, mang))}
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
 
 
 def _booking(db: Session, bid: int) -> Booking:

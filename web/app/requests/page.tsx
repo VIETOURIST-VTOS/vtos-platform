@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { Suspense, useEffect, useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT } from "@/lib/api";
-import { Tag, errMsg } from "@/components/ui";
+import { Tag, errMsg, MangTag } from "@/components/ui";
 
 /** Góc nhìn theo vai trò (Đề xuất 06/9 mục 4). Chỉ mở những góc nhìn mà quy trình hiện có trạng thái tương ứng:
  *  "Đang xử lý" và "Chờ bổ sung" cần bổ sung trạng thái vào quy trình yêu cầu – chờ chính sách duyệt. */
@@ -25,6 +26,7 @@ const SLA_TAG: Record<string, [string, string]> = {
 
 function Requests() {
   const { user, toast } = useShell();
+  const mang = useSearchParams().get("mang") || "";
   const [reqs, setReqs] = useState<any[]>([]);
   const [tours, setTours] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -32,11 +34,11 @@ function Requests() {
   const [view, setView] = useState("cho_phan_cong");
 
   const load = useCallback(() => {
-    api("/requests").then(setReqs).catch((e) => toast(errMsg(e), true));
-    api("/tours?status=da_duyet").then(setTours).catch(() => {});
-    api("/bookings?limit=50").then(setBookings).catch(() => {});
+    api(`/requests?mang=${mang}`).then(setReqs).catch((e) => toast(errMsg(e), true));
+    api(`/tours?status=da_duyet&mang=${mang}`).then(setTours).catch(() => {});
+    api(`/bookings?limit=50&mang=${mang}`).then(setBookings).catch(() => {});
     api("/meta").then((m) => setSla(m.params.sla_booking_phut)).catch(() => {});
-  }, [toast]);
+  }, [mang, toast]);      // thiếu `mang` ở đây là đổi menu mà danh sách không tải lại
   useEffect(() => { load(); }, [load]);
 
   // Quyền lấy từ máy chủ (/auth/me) – không dựng lại danh sách vai trò ở giao diện để khỏi lệch với máy chủ.
@@ -70,6 +72,7 @@ function Requests() {
 
   return (<>
     <h1>Yêu cầu đặt dịch vụ & booking</h1>
+    <MangTag mang={mang} />
     <p className="muted">Mỗi yêu cầu hiển thị người chịu trách nhiệm nhận việc, hạn xử lý và bước tiếp theo – không chỉ thời gian chờ. Đồng hồ {sla} phút tính từ lúc Kinh doanh gửi yêu cầu (ĐH Điều 2).</p>
 
     {canReq && <div className="panel"><h2>Gửi yêu cầu đặt dịch vụ – 4 trường bắt buộc (KD Lẻ Điều 2)</h2>
@@ -117,4 +120,4 @@ function Requests() {
     </div>
   </>);
 }
-export default function Page() { return <Shell><Requests /></Shell>; }
+export default function Page() { return <Shell><Suspense><Requests /></Suspense></Shell>; }

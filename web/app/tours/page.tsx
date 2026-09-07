@@ -1,17 +1,19 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
 import { api, pct, fmtD } from "@/lib/api";
 import { TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
-import { Tag, errMsg } from "@/components/ui";
+import { Tag, errMsg, MangTag } from "@/components/ui";
 
 function Tours() {
   const { user, toast } = useShell();
   const [rows, setRows] = useState<any[]>([]); const [ops, setOps] = useState<any[]>([]); const [open, setOpen] = useState(false);
   const [q, setQ] = useState(""); const [month, setMonth] = useState(""); const [st, setSt] = useState("");
-  const load = () => api(`/tours?limit=300&q=${encodeURIComponent(q)}&month=${month}&status=${st}`).then(setRows).catch(() => {});
-  useEffect(() => { load(); }, [q, month, st]); // eslint-disable-line
+  const mang = useSearchParams().get("mang") || "";
+  const load = () => api(`/tours?limit=300&q=${encodeURIComponent(q)}&month=${month}&status=${st}&mang=${mang}`).then(setRows).catch(() => {});
+  useEffect(() => { load(); }, [q, month, st, mang]); // eslint-disable-line
   useEffect(() => { api("/users?role=nv_dh,tp_dh").then(setOps).catch(() => {}); }, []);
   const canCreate = ["nv_dh", "tp_dh"].includes(user?.role || "");
   async function create(e: React.FormEvent) {
@@ -43,6 +45,7 @@ function Tours() {
         <label>Điểm dừng nghỉ (bắt buộc)</label><input name="rest_stops" />
         <button className="act teal">Lưu nháp</button>
       </form></details>}
+    <MangTag mang={mang} />
     <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Tên</th><th>Loại</th><th>Khởi hành</th><th className="num">Biên KH</th><th className="num">Hòa vốn</th><th className="num">Đạt 10%</th><th className="num">Đã bán</th><th>Trạng thái</th><th>Hạn QT</th></tr></thead>
       <tbody>{rows.map((t) => { const c = t.calc; return <tr key={t.id}><td><Link href={`/tours/${t.id}`}>{t.code}</Link></td><td>{t.name}</td><td>{TOUR_TYPES[t.tour_type]}</td><td>{fmtD(t.start_date)}</td>
         <td className="num">{c.complete ? <Tag cls={c.pass_gate ? "ok" : "red"}>{pct(c.margin)}</Tag> : <Tag cls="warn">chưa đủ cơ sở</Tag>}</td><td className="num">{c.breakeven_pax ?? "–"}</td><td className="num">{c.pax_for_margin ?? "–"}</td>
@@ -50,4 +53,4 @@ function Tours() {
         <td>{fmtD(t.settlement_deadline)} {t.status === "ket_thuc" && today > t.settlement_deadline && <Tag cls="red">quá hạn</Tag>}</td></tr>; })}</tbody></table></div>
   </>);
 }
-export default function Page() { return <Shell><Tours /></Shell>; }
+export default function Page() { return <Shell><Suspense><Tours /></Suspense></Shell>; }
