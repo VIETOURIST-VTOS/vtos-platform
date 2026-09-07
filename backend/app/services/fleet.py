@@ -282,21 +282,28 @@ def nhap_giao_dich(db: Session, source: str, rows: list[dict], boi: str) -> dict
         elif r.get("the_4so"):
             v = db.execute(select(Vehicle).join(Employee, Employee.id == Vehicle.driver_id)
                            .where(Employee.fuel_card_last4 == r["the_4so"])).scalars().first()
+        khong_cp = bool(r.get("khong_phai_chi_phi"))
         t = ExternalTxn(source=source, ma_gd=ma, tai_khoan=r.get("tai_khoan", ""), the_4so=r.get("the_4so", ""),
                         bien_so=r.get("bien_so", ""), vehicle_id=v.id if v else None, thoi_diem=luc,
                         so_tien=float(r.get("so_tien") or 0), lit=float(r.get("lit") or 0),
                         mo_ta=r.get("mo_ta", ""), imported_by=boi,
+                        nhom=r.get("nhom", ""), khong_phai_chi_phi=khong_cp,
                         trung=goc is not None, trung_cua_id=goc,
-                        co="do" if (goc is None and v is None) else "vang",
+                        co="do" if (goc is None and v is None and not khong_cp) else "vang",
                         ghi_chu=("Bản ghi lặp – giữ lại để đối chiếu, KHÔNG đưa vào tính toán" if goc
-                                 else ("Chưa tra được xe từ biển số/số thẻ tại thời điểm giao dịch" if v is None else "")))
+                                 else ("Khoản điều chuyển tiền nội bộ – không phải chi phí, không quy về xe"
+                                       if khong_cp else
+                                       ("Chưa tra được xe từ biển số/số thẻ tại thời điểm giao dịch"
+                                        if v is None else ""))))
         db.add(t); db.flush()
         if goc is None:
             da_co[(source, ma)] = t.id; them += 1
         else:
             trung += 1
     return {"da_nhap": them, "ban_ghi_lap": trung,
-            "ghi_chu": "Bản ghi lặp được giữ trong bảng thô với cờ trùng và không cộng vào số liệu tính toán."}
+            "ghi_chu": "Bản ghi lặp được giữ trong bảng thô với cờ trùng và không cộng vào số liệu tính toán. "
+                       "Dòng đánh dấu không_phải_chi_phí (điều chuyển tiền nội bộ) cũng được giữ nhưng "
+                       "không cộng vào tổng chi phí."}
 
 
 def moc_bao_duong(db: Session, v: Vehicle) -> dict:

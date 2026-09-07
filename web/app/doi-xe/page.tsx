@@ -87,16 +87,26 @@ function DoiXe() {
     </div>}
 
     {tab === "giaodich" && gd && <div className="panel wrap"><h2>Đối soát dữ liệu nguồn ngoài</h2>
-      <p className="muted">{gd.ghi_chu} Tổng đã loại trùng: <b>{gd.tong_tien.toLocaleString("vi-VN")} đ</b>. Biển số được tra về xe theo <b>thời điểm giao dịch</b>, không theo biển hiện tại — xe đổi biển giữa kỳ vẫn gộp đúng về một chiếc.</p>
-      <table><thead><tr><th>Nguồn</th><th>Mã giao dịch</th><th>Thời điểm</th><th>Biển / thẻ</th><th>Xe</th><th>Số tiền</th><th>Trạng thái</th></tr></thead>
+      <div className="kpis">
+        <div className="kpi"><b>{Number(gd.tong_chi_phi || 0).toLocaleString("vi-VN")}</b><span>chi phí (đã loại bản ghi lặp)</span></div>
+        <div className="kpi"><b style={{ color: "var(--orange)" }}>{Number(gd.tong_chua_quy_ve_xe || 0).toLocaleString("vi-VN")}</b><span>chưa quy được về xe nào</span></div>
+        <div className="kpi"><b className="muted">{Number(gd.tong_dieu_chuyen || 0).toLocaleString("vi-VN")}</b><span>điều chuyển tiền nội bộ – KHÔNG phải chi phí</span></div>
+      </div>
+      <p className="muted">{gd.ghi_chu} Biển số được tra về xe theo <b>thời điểm giao dịch</b>, không theo biển hiện tại — xe đổi biển giữa kỳ vẫn gộp đúng về một chiếc.</p>
+      {gd.theo_nhom?.length > 1 && <table><thead><tr><th>Nhóm khoản</th><th>Số khoản</th><th>Số tiền</th></tr></thead>
+        <tbody>{gd.theo_nhom.map((n: any) => <tr key={n.nhom}>
+          <td>{n.nhom}</td><td>{n.so_khoan}</td><td className="num">{Number(n.so_tien).toLocaleString("vi-VN")}</td>
+        </tr>)}</tbody></table>}
+      <table><thead><tr><th>Nguồn</th><th>Mã giao dịch</th><th>Thời điểm</th><th>Biển / thẻ</th><th>Xe</th><th>Nhóm</th><th>Số tiền</th><th>Trạng thái</th></tr></thead>
         <tbody>{gd.rows.length ? gd.rows.map((r: any) => <tr key={r.id}>
-          <td>{r.source === "epass" ? "ePass/VETC" : "Thẻ dầu"}</td><td>{r.ma_gd}</td><td>{fmtDT(r.thoi_diem)}</td>
+          <td>{r.source_ten || (r.source === "epass" ? "ePass/VETC" : "Thẻ dầu")}</td><td>{r.ma_gd}</td><td>{fmtDT(r.thoi_diem)}</td>
           <td>{r.bien_so || (r.the_4so ? `••••${r.the_4so}` : "")}</td>
-          <td>{r.xe || <Tag cls="red">chưa tra được xe</Tag>}</td>
+          <td>{r.xe || (r.khong_phai_chi_phi ? <span className="muted">không thuộc xe nào</span> : <Tag cls="red">chưa tra được xe</Tag>)}</td>
+          <td className="muted">{r.nhom || ""}</td>
           <td className="num">{r.so_tien.toLocaleString("vi-VN")}</td>
           <td><Tag cls={r.co === "do" ? "red" : "warn"}>{r.khop === "da_khop" ? "Đã khớp chuyến" : "Chưa khớp chuyến"}</Tag>
             {r.ghi_chu && <div className="muted">{r.ghi_chu}</div>}</td>
-        </tr>) : <tr><td colSpan={7} className="muted">Chưa nhập sao kê thẻ dầu hoặc báo cáo ePass nào.</td></tr>}</tbody></table>
+        </tr>) : <tr><td colSpan={8} className="muted">Chưa nhập sao kê thẻ dầu, báo cáo ePass hay đề xuất chi Vietrip nào.</td></tr>}</tbody></table>
     </div>}
 
     {tab === "quyettoan" && <>

@@ -188,8 +188,13 @@ class Maintenance(Base):
     created_by: Mapped[str] = mapped_column(String(50), default="")
 
 
+NGUON_NGOAI = {"the_dau": "Sao kê thẻ dầu", "epass": "Báo cáo ePass/VETC",
+               "de_xuat_vietrip": "Đề xuất chi trên phần mềm Vietrip"}
+
+
 class ExternalTxn(Base):
-    """Giao dịch từ nguồn ngoài: thẻ dầu (sao kê ngân hàng) và trạm thu phí (ePass/VETC).
+    """Giao dịch từ nguồn ngoài: thẻ dầu (sao kê ngân hàng), trạm thu phí (ePass/VETC), và đề xuất chi
+    trên phần mềm Vietrip.
 
     Hai điều bắt buộc, đặc tả nêu đích danh vì cả hai đã gây sai số thật:
 
@@ -204,7 +209,7 @@ class ExternalTxn(Base):
     50E-955.31 ngày 13/08/2026."""
     __tablename__ = "fleet_external_txns"
     id: Mapped[int] = mapped_column(primary_key=True)
-    source: Mapped[str] = mapped_column(String(20))                    # the_dau / epass
+    source: Mapped[str] = mapped_column(String(20))                    # the_dau / epass / de_xuat_vietrip
     ma_gd: Mapped[str] = mapped_column(String(120))                    # mã giao dịch gốc của nhà cung cấp
     tai_khoan: Mapped[str] = mapped_column(String(40), default="")     # số tài khoản/ví (chỉ lưu phần cần)
     the_4so: Mapped[str] = mapped_column(String(8), default="")
@@ -222,6 +227,11 @@ class ExternalTxn(Base):
     ghi_chu: Mapped[str] = mapped_column(String(300), default="")
     imported_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     imported_by: Mapped[str] = mapped_column(String(50), default="")
+    # Hai cột dưới đây sinh ra từ bộ đề xuất chi tháng 8/2026 của Vietrip: trong cùng một danh sách có cả
+    # khoản chi thật lẫn khoản ĐIỀU CHUYỂN TIỀN giữa các tài khoản của chính công ty. Cộng gộp lại rồi gọi
+    # là "chi phí đội xe" là sai gần 130 triệu chỉ trong một tháng, mà bảng vẫn trông hợp lý.
+    nhom: Mapped[str] = mapped_column(String(60), default="")
+    khong_phai_chi_phi: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 # ====================== ĐỢT 3: CHỦ XE HỢP TÁC, CÔNG NỢ, CẤN TRỪ, THẾ CHẤP, QUYẾT TOÁN ======================

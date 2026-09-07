@@ -281,7 +281,7 @@ def ket_luan(xid: int, data: KetLuanIn, u: User = Depends(require_roles(*WRITE))
 
 
 # ====================== ĐỢT 2: NHẬT TRÌNH, BẢO DƯỠNG, NGUỒN NGOÀI ======================
-from app.models.fleet import (Trip, TripCost, Maintenance, ExternalTxn, BEN_CHIU, COST_KINDS,
+from app.models.fleet import (Trip, TripCost, Maintenance, ExternalTxn, BEN_CHIU, COST_KINDS, NGUON_NGOAI,
                               BEN_CHIU_MAC_DINH, TRIP_STATUS, CO, MAINT_KINDS)
 
 KETOAN = ("ketoan",)
@@ -473,7 +473,7 @@ def them_bao_duong(data: BaoDuongIn, u: User = Depends(require_roles(*WRITE, *KE
 
 
 class GiaoDichIn(BaseModel):
-    source: str                      # the_dau / epass
+    source: str                      # the_dau / epass / de_xuat_vietrip
     rows: list[dict]
 
 
@@ -483,7 +483,8 @@ def nhap_giao_dich(data: GiaoDichIn, u: User = Depends(require_roles(*WRITE, *KE
 
     Nghiệm thu của đặc tả: nhập lại CÙNG một file hai lần không sinh bản ghi trùng. Bản ghi lặp vẫn được giữ
     trong bảng thô với cờ trùng để còn chứng minh mình đã loại đúng cái gì."""
-    if data.source not in ("the_dau", "epass"): raise HTTPException(422, "Nguồn chỉ nhận the_dau hoặc epass")
+    if data.source not in NGUON_NGOAI:
+        raise HTTPException(422, f"Nguồn không hợp lệ. Chỉ nhận {', '.join(NGUON_NGOAI)}")
     if not data.rows: raise HTTPException(422, "Không có dòng nào để nhập")
     try:
         kq = FL.nhap_giao_dich(db, data.source, data.rows, u.username)
@@ -503,12 +504,24 @@ def ds_giao_dich(source: str = "", chua_khop: bool = False, gom_ban_trung: bool 
     if chua_khop: q = q.where(ExternalTxn.khop == "chua_khop")
     veh = {v.id: v.plate for v in db.execute(select(Vehicle)).scalars()}
     rows = list(db.execute(q.limit(1000)).scalars())
-    return {"rows": [{"id": t.id, "source": t.source, "ma_gd": t.ma_gd, "thoi_diem": t.thoi_diem,
+    return {"rows": [{"id": t.id, "source": t.source, "source_ten": NGUON_NGOAI.get(t.source, t.source),
+                      "ma_gd": t.ma_gd, "thoi_diem": t.thoi_diem,
                       "bien_so": t.bien_so, "the_4so": t.the_4so, "xe": veh.get(t.vehicle_id, ""),
                       "vehicle_id": t.vehicle_id, "so_tien": t.so_tien, "lit": t.lit, "khop": t.khop,
-                      "co": t.co, "trung": t.trung, "ghi_chu": t.ghi_chu} for t in rows],
-            "tong_tien": sum(t.so_tien for t in rows),
-            "ghi_chu": "Số liệu này đã loại bản ghi lặp. Thêm gom_ban_trung=true để xem cả bản đã loại."}
+                      "co": t.co, "trung": t.trung, "nhom": t.nhom,
+                      "khong_phai_chi_phi": t.khong_phai_chi_phi, "ghi_chu": t.ghi_chu} for t in rows],
+            "tong_chi_phi": sum(t.so_tien for t in rows if not t.khong_phai_chi_phi),
+            "tong_dieu_chuyen": sum(t.so_tien for t in rows if t.khong_phai_chi_phi),
+            "tong_chua_quy_ve_xe": sum(t.so_tien for t in rows
+                                       if not t.khong_phai_chi_phi and t.vehicle_id is None),
+            "theo_nhom": [{"nhom": n or "(không ghi nhóm)",
+                           "so_khoan": sum(1 for t in rows if (t.nhom or "") == n),
+                           "so_tien": sum(t.so_tien for t in rows if (t.nhom or "") == n)}
+                          for n in sorted({(t.nhom or "") for t in rows})],
+            "nguon": NGUON_NGOAI,
+            "ghi_chu": "Đã loại bản ghi lặp (thêm gom_ban_trung=true để xem cả bản đã loại). Tổng chi phí "
+                       "KHÔNG bao gồm khoản điều chuyển tiền nội bộ – hai thứ đó khác bản chất, cộng chung "
+                       "là báo cáo sai."}
 
 
 # ====================== ĐỢT 3: CHỦ XE, CÔNG NỢ, CẤN TRỪ, THẾ CHẤP, QUYẾT TOÁN ======================

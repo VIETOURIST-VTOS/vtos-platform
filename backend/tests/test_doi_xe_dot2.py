@@ -60,7 +60,9 @@ def test_nhap_lai_cung_mot_file_hai_lan_khong_sinh_ban_ghi_trung():
 
     d = client.get("/api/v1/fleet/giao-dich?source=epass", headers=h).json()
     assert len(d["rows"]) == 2, "danh sách mặc định phải đã loại bản lặp"
-    assert d["tong_tien"] == 218920 + 163800, "tổng tiền không được cộng gấp đôi"
+    # Trường đổi tên tong_tien -> tong_chi_phi khi thêm nguồn "đề xuất chi Vietrip": trong nguồn đó có cả
+    # khoản điều chuyển tiền nội bộ, nên "tổng tiền" là một cái tên nói không đủ và cộng nhầm được.
+    assert d["tong_chi_phi"] == 218920 + 163800, "tổng tiền không được cộng gấp đôi"
 
 
 def test_ban_ghi_lap_van_duoc_giu_lai_de_doi_chieu():
