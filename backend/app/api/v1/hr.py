@@ -23,6 +23,7 @@ def emp_out(e: Employee) -> dict:
             "contract_type": e.contract_type, "base_salary": e.base_salary, "start_date": e.start_date, "probation": e.probation, "transition_list": e.transition_list,
             "card_no": e.card_no, "card_type": e.card_type, "card_expiry": e.card_expiry, "member_org": e.member_org, "ctv_contract": e.ctv_contract,
             "advance_limit": e.advance_limit, "active": e.active, "company_id": e.company_id, "birth_date": e.birth_date, "phone": e.phone,
+            "bhxh_base": e.bhxh_base, "member_org": e.member_org,
             "guide_ok": H.guide_eligible(e, date.today())[0] if e.department == "huong_dan" else None}
 
 
@@ -824,6 +825,84 @@ def payroll_delete(period: str, u: User = Depends(require_roles("cntt", "chutich
     return {"message": f"Đã xóa bảng lương {period}"}
 
 
+class BhxhRow(BaseModel):
+    ma: str = ""
+    ten: str = ""
+    muc: float
+
+
+class BhxhBatch(BaseModel):
+    rows: list[BhxhRow]
+    ky: str = ""            # 2026-08 – chỉ để ghi nhật ký, mức áp dụng từ kỳ nạp trở đi
+
+
+@router.post("/bhxh/nap")
+def nap_muc_bhxh(data: BhxhBatch, u: User = Depends(require_roles("hcns", "ketoan", "cntt")), db: Session = Depends(get_db)):
+    """Nạp tiền lương làm căn cứ đóng BHXH bắt buộc từ danh sách đóng BHXH của kỳ.
+
+    Ghép theo mã nhân viên trước, không có mã thì theo họ tên không dấu. Người không ghép được KHÔNG bị bỏ
+    qua im lặng mà trả về để HCNS xử lý – bỏ sót một người là kỳ lương đó không trừ bảo hiểm của họ.
+    """
+    from app.services.staff import name_key
+    emps = list(db.execute(select(Employee).where(Employee.active == True)).scalars())
+    by_code = {e.code: e for e in emps}
+    by_name: dict[str, list[Employee]] = {}
+    for e in emps: by_name.setdefault(name_key(e.full_name), []).append(e)
+    da_nap, khong_ghep, trung_ten = 0, [], []
+    for r in data.rows:
+        e = by_code.get(r.ma.strip()) if r.ma.strip() else None
+        if e is None and r.ten.strip():
+            nhom = by_name.get(name_key(r.ten), [])
+            if len(nhom) == 1: e = nhom[0]
+            elif len(nhom) > 1: trung_ten.append(f"{r.ten} ({', '.join(x.code for x in nhom)})"); continue
+        if e is None:
+            khong_ghep.append(f"{r.ma} {r.ten}".strip()); continue
+        e.bhxh_base = float(r.muc); da_nap += 1
+    R.audit(db, u.username, u.role, "nap_muc_dong_bhxh", f"bhxh:{data.ky or 'khong_ghi_ky'}",
+            after={"da_nap": da_nap, "khong_ghep": len(khong_ghep), "trung_ten": len(trung_ten)})
+    db.commit()
+    con_thieu = [f"{e.code} {e.full_name}" for e in emps if e.contract_type == "hdld" and not e.bhxh_base]
+    return {"da_nap": da_nap, "khong_ghep_duoc": khong_ghep, "trung_ten_can_chi_dinh_ma": trung_ten,
+            "hdld_chua_co_muc_dong": con_thieu,
+            "message": f"Đã nạp mức đóng BHXH cho {da_nap} người" +
+                       (f"; {len(khong_ghep)} dòng chưa ghép được" if khong_ghep else "") +
+                       (f"; còn {len(con_thieu)} người HĐLĐ chưa có mức đóng" if con_thieu else "")}
+
+
+class DoanVienBatch(BaseModel):
+    ho_ten: list[str]
+    thay_the: bool = True    # True: danh sách này là toàn bộ đoàn viên hiện tại
+
+
+@router.post("/doan-vien/nap")
+def nap_doan_vien(data: DoanVienBatch, u: User = Depends(require_roles("hcns", "ketoan", "cntt")), db: Session = Depends(get_db)):
+    """Nạp danh sách đoàn viên đã ký thỏa thuận khấu trừ đoàn phí.
+
+    Chỉ nhận HỌ TÊN. Bản thỏa thuận có số căn cước và số điện thoại nhưng phân hệ lương không cần tới, nên
+    không đưa vào hệ thống: dữ liệu không cần thì không lưu.
+    """
+    from app.services.staff import name_key
+    emps = list(db.execute(select(Employee).where(Employee.active == True)).scalars())
+    by_name: dict[str, list[Employee]] = {}
+    for e in emps: by_name.setdefault(name_key(e.full_name), []).append(e)
+    danh_sach, khong_ghep, trung_ten = set(), [], []
+    for ten in data.ho_ten:
+        nhom = by_name.get(name_key(ten), [])
+        if len(nhom) == 1: danh_sach.add(nhom[0].id)
+        elif len(nhom) > 1: trung_ten.append(f"{ten} ({', '.join(x.code for x in nhom)})")
+        else: khong_ghep.append(ten)
+    n_bat, n_tat = 0, 0
+    for e in emps:
+        if e.id in danh_sach and not e.member_org: e.member_org = True; n_bat += 1
+        elif data.thay_the and e.id not in danh_sach and e.member_org: e.member_org = False; n_tat += 1
+    R.audit(db, u.username, u.role, "nap_danh_sach_doan_vien", "doan_phi",
+            after={"doan_vien": len(danh_sach), "bat_them": n_bat, "go": n_tat, "khong_ghep": len(khong_ghep)})
+    db.commit()
+    return {"doan_vien": len(danh_sach), "bat_them": n_bat, "go_khoi_danh_sach": n_tat,
+            "khong_ghep_duoc": khong_ghep, "trung_ten_can_chi_dinh_ma": trung_ten,
+            "message": f"Đã ghi nhận {len(danh_sach)} đoàn viên" + (f"; {len(khong_ghep)} tên chưa ghép được" if khong_ghep else "")}
+
+
 @router.get("/payroll-runs/{period}/phieu-luong")
 def phieu_luong(period: str, ma: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
     """Phiếu lương của CHÍNH người đăng nhập (hoặc của một mã NV, với Kế toán / HCNS / lãnh đạo).
@@ -857,7 +936,7 @@ def phieu_luong(period: str, ma: str = "", u: User = Depends(current_user), db: 
             "nhan_su": {"ma": ma_can, "ten": row["ten"], "phong": DEPARTMENTS.get(row["phong"], row["phong"]),
                         "chuc_vu": row.get("chuc_vu"), "hop_dong": row["hop_dong"],
                         "phap_nhan_tra_luong": cty.name if cty else "", "che_do_cong": row.get("che_do_cong_ten")},
-            "xac_dinh_luong": row.get("xac_dinh_luong"),
+            "xac_dinh_luong": row.get("xac_dinh_luong"), "muc_dong_bhxh": row.get("bhxh_base", 0),
             "thu_nhap": {"luong_co_ban_ky": row["luong_cb"],
                          "cac_khoan": [k for k in row["khoan"] if k["tien"] > 0],
                          "tong": row.get("thu_nhap", row["luong_cb"] + row["bien_doi"])},

@@ -22,6 +22,7 @@ class Employee(Base):
     position: Mapped[str] = mapped_column(String(20), default="nv")
     title: Mapped[str] = mapped_column(String(60), default="")             # chức vụ ghi trên bảng lương (NVKD 2, TL Team KD 1, ĐH…)
     duties: Mapped[str] = mapped_column(Text, default="")                 # công việc chính: tuyến/thị trường người này phụ trách
+    bhxh_base: Mapped[float] = mapped_column(Float, default=0)            # tiền lương làm căn cứ đóng BHXH bắt buộc (khác lương hợp đồng)
     sales_group: Mapped[str] = mapped_column(String(20), default="")      # KD1–KD5, VPCT, VPHN, VPBD, VPHP, DOAN_OB, DOAN_ND
     office: Mapped[str] = mapped_column(String(20), default="hcm")
     contract_type: Mapped[str] = mapped_column(String(10), default="hdld")   # hdld / ctv / doi_tac

@@ -87,7 +87,7 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         return rows.setdefault(e.id, {"ma": e.code, "ten": e.full_name, "phong": e.department, "chuc_vu": e.position, "hop_dong": e.contract_type,
                                       "che_do_cong": cd, "che_do_cong_ten": L.CHE_DO_LABEL[cd], "xac_dinh_luong": None,
                                       "luong_cb": 0.0, "khoan": [], "bien_doi": 0.0, "tncn": 0.0,
-                                      "bhxh": 0.0, "doan_phi": 0.0, "tru_su_vu": 0.0,
+                                      "bhxh": 0.0, "bhxh_base": 0.0, "doan_phi": 0.0, "tru_su_vu": 0.0,
                                       "thu_nhap": 0.0, "khoan_tru": 0.0, "thuc_nhan": 0.0, "ghi_chu": []})
 
     def add(e: Employee, ten: str, tien: float, note: str = ""):
@@ -276,14 +276,26 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
     # ---------- BƯỚC 3: khoản trừ của người lao động (Bộ tính lương từ 01/9/2026) ----------
     # Khác hẳn với bước xác định mức lương ở trên: đây mới là khoản TRỪ thật – bảo hiểm xã hội phần người
     # lao động và đoàn phí công đoàn. BHXH tính trên MỨC LƯƠNG HỢP ĐỒNG, không trên mức lương của kỳ.
-    ty_bhxh = R.get_param(db, "bhxh_nld"); muc_doan_phi = R.get_param(db, "doan_phi")
+    # Căn cứ tính là TIỀN LƯƠNG LÀM CĂN CỨ ĐÓNG BHXH BẮT BUỘC, không phải lương hợp đồng: danh sách đóng
+    # BHXH tháng 08/2026 ghi mức tham gia 5.310.000 trong khi lương hợp đồng nhiều người 15–25 triệu. Lấy
+    # lương hợp đồng làm căn cứ là trừ của người lao động gấp nhiều lần số phải trừ. Đoàn phí công đoàn cũng
+    # tính trên chính mức này theo thỏa thuận khấu trừ đã ký.
+    # Chưa có mức đóng thì KHÔNG trừ và ghi rõ – thiếu dữ liệu không phải là dữ liệu bằng 0, nhưng ở đây
+    # đoán thừa còn tệ hơn đoán thiếu: trừ nhầm là lấy tiền của người ta.
+    ty_bhxh = R.get_param(db, "bhxh_nld"); ty_doan_phi = R.get_param(db, "doan_phi_ty_le")
     for e in emps.values():
         if e.id not in rows: continue
         r = rows[e.id]
-        if e.contract_type == "hdld":
-            r["bhxh"] = round(e.base_salary * ty_bhxh)
-            if e.member_org: r["doan_phi"] = round(muc_doan_phi)
-        # cộng tác viên (HDV) không thuộc diện đóng BHXH bắt buộc – chỉ khấu trừ TNCN 10%
+        if e.contract_type != "hdld":
+            continue          # cộng tác viên (HDV) không thuộc diện đóng BHXH bắt buộc – chỉ khấu trừ TNCN 10%
+        if e.bhxh_base and e.bhxh_base > 0:
+            r["bhxh"] = round(e.bhxh_base * ty_bhxh)
+            r["bhxh_base"] = e.bhxh_base
+            if e.member_org: r["doan_phi"] = round(e.bhxh_base * ty_doan_phi)
+        else:
+            r["thieu_muc_bhxh"] = True
+            r["ghi_chu"].append("CHƯA CÓ MỨC ĐÓNG BHXH – chưa trừ bảo hiểm và đoàn phí; HCNS nạp danh sách "
+                                "đóng BHXH của kỳ trước khi trình ký")
 
     out = []
     vi_pham = []
@@ -305,7 +317,8 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
               "khoan_tru": sum(r["khoan_tru"] for r in out),
               "thuc_nhan": sum(r["thuc_nhan"] for r in out), "so_nguoi": len(out), "so_chuyen": len(tours),
               "cong_chuan": cong_chuan, "thieu_cong": [r["ma"] for r in out if (r.get("xac_dinh_luong") or {}).get("thieu_du_lieu")],
-              "chua_du_co_so": [r["ma"] for r in out if (r.get("xac_dinh_luong") or {}).get("chua_du_co_so")]}
+              "chua_du_co_so": [r["ma"] for r in out if (r.get("xac_dinh_luong") or {}).get("chua_du_co_so")],
+              "thieu_muc_bhxh": [r["ma"] for r in out if r.get("thieu_muc_bhxh")]}
     return out, totals
 
 

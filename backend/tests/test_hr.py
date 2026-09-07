@@ -139,6 +139,11 @@ def test_guide_rate_table_and_assignment():
 
 
 def test_payroll_flow_roles_and_journal():
+    # Mức đóng BHXH là dữ liệu riêng, không suy từ lương hợp đồng – nạp trước rồi mới tính lương.
+    ds = client.get("/api/v1/employees?limit=1000", headers=login("cntt")).json()
+    rows = [{"ma": e["code"], "muc": 5_310_000} for e in ds if e["active"] and e["contract_type"] == "hdld"]
+    assert client.post("/api/v1/bhxh/nap", json={"rows": rows, "ky": "2026-08"}, headers=login("hcns")).status_code == 200
+    client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("cntt"))
     assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("hcns")).status_code == 422   # chưa qua Kế toán
     assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("ketoan")).json()["run"]["status"] == "kt_xac_nhan"
     assert client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("hcns")).status_code == 422  # khóa tính lại

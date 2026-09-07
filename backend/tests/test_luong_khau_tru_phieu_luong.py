@@ -37,20 +37,39 @@ def run(period="2026-09", refresh=True):
 
 
 # ---------------------------------------------------------------- 1. khoản trừ
-def test_bhxh_tinh_tren_muc_luong_hop_dong_khong_phai_muc_cua_ky():
-    """Mức của kỳ thay đổi theo doanh thu; lấy nó làm căn cứ đóng BHXH là sai bản chất và sai số phải nộp."""
+def _nap_muc(ma, muc):
+    r = client.post("/api/v1/bhxh/nap", json={"rows": [{"ma": ma, "muc": muc}], "ky": "2026-08"}, headers=login("cntt"))
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_bhxh_tinh_tren_muc_dong_khong_phai_luong_hop_dong():
+    """Danh sách đóng BHXH tháng 08/2026 ghi mức tham gia 5.310.000 trong khi lương hợp đồng nhiều người
+    15–25 triệu. Lấy lương hợp đồng làm căn cứ là trừ của người lao động gấp nhiều lần số phải trừ."""
     from app.db.session import SessionLocal
     from app.models.hr import Employee
-    j = run()
     db = SessionLocal()
-    for r in j["rows"]:
-        if r["hop_dong"] != "hdld": continue
-        e = db.query(Employee).filter(Employee.code == r["ma"]).first()
-        if e is None: continue
-        assert r["bhxh"] == round(e.base_salary * 0.105), f"{r['ma']}"
-        if r.get("xac_dinh_luong") and r["xac_dinh_luong"]["muc_ky"] != r["xac_dinh_luong"]["muc_hop_dong"]:
-            assert r["bhxh"] != round(r["luong_cb"] * 0.105) or r["luong_cb"] == e.base_salary
+    e = db.query(Employee).filter(Employee.active == True, Employee.contract_type == "hdld",
+                                  Employee.base_salary > 6_000_000).first()
+    ma, luong_hd = e.code, e.base_salary
     db.close()
+    _nap_muc(ma, 5_310_000)
+    j = run()
+    r = next(x for x in j["rows"] if x["ma"] == ma)
+    assert r["bhxh"] == round(5_310_000 * 0.105) == 557_550
+    assert r["bhxh"] != round(luong_hd * 0.105), "không được lấy lương hợp đồng làm căn cứ đóng"
+    assert r["bhxh_base"] == 5_310_000
+
+
+def test_chua_co_muc_dong_thi_khong_tru_va_noi_ro():
+    """Đoán thừa còn tệ hơn đoán thiếu: trừ nhầm là lấy tiền của người ta."""
+    j = run(refresh=False)
+    thieu = [x for x in j["rows"] if x.get("thieu_muc_bhxh")]
+    assert thieu, "dữ liệu kiểm thử phải còn người chưa nạp mức đóng"
+    for x in thieu:
+        assert x["bhxh"] == 0 and x["doan_phi"] == 0
+        assert "CHƯA CÓ MỨC ĐÓNG BHXH" in x["ghi_chu"]
+        assert x["ma"] in j["totals"]["thieu_muc_bhxh"]
 
 
 def test_ctv_khong_dong_bhxh_chi_khau_tru_tncn():
@@ -60,16 +79,29 @@ def test_ctv_khong_dong_bhxh_chi_khau_tru_tncn():
             assert r["bhxh"] == 0 and r["doan_phi"] == 0
 
 
-def test_doan_phi_chi_tru_doan_vien():
+def test_doan_phi_tinh_tren_muc_dong_bhxh_va_chi_tru_doan_vien():
+    """Thỏa thuận khấu trừ ghi rõ: mức đoàn phí tính trên tiền lương làm căn cứ đóng BHXH bắt buộc."""
     from app.db.session import SessionLocal
     from app.models.hr import Employee
     db = SessionLocal()
     e = db.query(Employee).filter(Employee.active == True, Employee.contract_type == "hdld").first()
-    e.member_org = True; ma = e.code; db.commit(); db.close()
+    ten, ma = e.full_name, e.code
+    db.close()
+    _nap_muc(ma, 5_310_000)
+    r = client.post("/api/v1/doan-vien/nap", json={"ho_ten": [ten]}, headers=login("hcns"))
+    assert r.status_code == 200, r.text
     j = run()
-    dv = next(r for r in j["rows"] if r["ma"] == ma)
-    assert dv["doan_phi"] == 26550
-    assert all(r["doan_phi"] in (0, 26550) for r in j["rows"])
+    dv = next(x for x in j["rows"] if x["ma"] == ma)
+    assert dv["doan_phi"] == round(5_310_000 * 0.005) == 26_550
+    assert all(x["doan_phi"] == 0 for x in j["rows"] if x["ma"] != ma), "chỉ trừ đoàn viên trong danh sách"
+
+
+def test_nap_danh_sach_bao_lai_nguoi_chua_ghep_duoc():
+    r = client.post("/api/v1/bhxh/nap", json={"rows": [{"ma": "KHONG-CO", "ten": "Người Không Tồn Tại", "muc": 5310000}]},
+                    headers=login("hcns")).json()
+    assert r["da_nap"] == 0 and r["khong_ghep_duoc"], "không được bỏ qua im lặng"
+    d = client.post("/api/v1/doan-vien/nap", json={"ho_ten": ["Người Không Tồn Tại"], "thay_the": False}, headers=login("hcns")).json()
+    assert d["khong_ghep_duoc"] == ["Người Không Tồn Tại"]
 
 
 def test_phai_tra_bang_thu_nhap_tru_khoan_tru():

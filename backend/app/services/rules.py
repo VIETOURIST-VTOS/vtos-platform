@@ -74,7 +74,8 @@ DEFAULT_PARAMS = [
     # BHXH tính trên MỨC LƯƠNG HỢP ĐỒNG (tiền lương làm căn cứ đóng), không tính trên mức lương của kỳ:
     # mức của kỳ thay đổi theo doanh thu, lấy nó làm căn cứ đóng là sai bản chất và sai cả số phải nộp.
     ("bhxh_nld", "0.105", "Bảo hiểm xã hội phần người lao động", "tỷ lệ trên lương hợp đồng", "Bộ tính lương 01/9/2026"),
-    ("doan_phi", "26550", "Đoàn phí công đoàn (chỉ trừ đoàn viên)", "đồng/người/tháng", "Quyết định Ban chấp hành Công đoàn cơ sở"),
+    ("doan_phi_ty_le", "0.005", "Đoàn phí công đoàn – tỷ lệ trên tiền lương làm căn cứ đóng BHXH",
+     "tỷ lệ", "Thỏa thuận khấu trừ đoàn phí: mức theo quy định Tổng LĐLĐ, tính trên tiền lương đóng BHXH bắt buộc"),
     ("visa_lien_minh", "300000", "Đơn giá hồ sơ visa khách liên minh", "đồng/hồ sơ", "ĐH Điều 7"),
     ("hdv_tncn", "0.10", "Khấu trừ TNCN thù lao HDV cộng tác viên", "tỷ lệ", "Bảng thuê ngoài 04-LĐTL"),
     ("gd_kd_thuong_50", "3000000", "Thưởng GĐ KD khi 50–85% NV đạt chỉ tiêu", "đồng", "Chính sách GĐ KD"),
