@@ -28,7 +28,9 @@ function DoiXe() {
   const [soChuXe, setSoChuXe] = useState<any>(null);
   const canWrite = ["cntt", "hcns", "tp_dh", "nv_dh"].includes(user?.role || "");
   // Người được nhập và sửa số liệu đội xe: điều hành, kế toán, và lãnh đạo.
-  const canNhap = ["cntt", "hcns", "tp_dh", "nv_dh", "ketoan", "chutich", "tgd"].includes(user?.role || "");
+  // "gd_doi_xe" là chính người sẽ nhập số liệu đội xe hằng ngày – thiếu vai trò này thì nút nhập không hiện
+  // ra với đúng người mà form được làm cho, dù máy chủ đã cho phép.
+  const canNhap = ["cntt", "hcns", "tp_dh", "nv_dh", "ketoan", "chutich", "tgd", "gd_doi_xe"].includes(user?.role || "");
   const [form, setForm] = useState<any>(null);      // form nhật trình chuyến (thêm / sửa)
   const [formDX, setFormDX] = useState<any>(null);  // form đề xuất chi
   const [dangLuu, setDangLuu] = useState(false);
