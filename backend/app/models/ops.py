@@ -46,6 +46,9 @@ class PaymentRequest(Base):
     code: Mapped[str] = mapped_column(String(30), unique=True)        # DC2609-0001
     category: Mapped[str] = mapped_column(String(20))                 # chi_tour / marketing / hanh_chinh / hoan_tien
     tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True)
+    # Chi marketing gắn với chiến dịch nào. Không có ô này thì không bao giờ tính được chi phí thực tế
+    # theo chiến dịch, và ngân sách marketing chỉ còn là một con số tổng không dùng để quyết định được.
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True, index=True)
     supplier_name: Mapped[str] = mapped_column(String(160))
     supplier_tax_code: Mapped[str] = mapped_column(String(20), default="")
     supplier_bank: Mapped[str] = mapped_column(String(120), default="")   # số TK – ngân hàng (thay đổi cần 2 người xác nhận)

@@ -28,6 +28,7 @@ from app.api.v1.fleet import router as fleet_router
 from app.api.v1.access import router as access_router
 from app.api.v1.ai_roles import router as ai_roles_router
 from app.api.v1.debts import router as debts_router
+from app.api.v1.marketing import router as marketing_router
 from app.api.v1.suppliers import router as ncc_router
 from app.api.v1.intake import router as intake_router
 from app.api.v1.attachments import router as tep_router
@@ -117,6 +118,7 @@ app.include_router(banks_router)
 app.include_router(hr_router)
 app.include_router(companies_router)
 app.include_router(hrm_router)
+app.include_router(marketing_router)
 app.include_router(ops_router)
 app.include_router(finance_router)
 app.include_router(vietrip_router)

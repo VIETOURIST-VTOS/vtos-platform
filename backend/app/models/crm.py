@@ -18,7 +18,8 @@ class Lead(Base):
     channel: Mapped[str] = mapped_column(String(40), index=True)
     lead_month: Mapped[str] = mapped_column(String(7), index=True)             # YYYY-MM tháng phát sinh lead
     received_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
-    campaign: Mapped[str] = mapped_column(String(80), default="")
+    campaign: Mapped[str] = mapped_column(String(80), default="")            # ô chữ cũ – giữ nguyên để không mất dữ liệu đã nhập
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True, index=True)
     interest: Mapped[str] = mapped_column(String(200), default="")             # tour quan tâm
     sales_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="moi")

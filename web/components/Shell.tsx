@@ -16,7 +16,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Báo cáo bán hàng toàn hệ thống", "/sales-reports"],
     ["Chỉ đạo & theo dõi thực hiện", ""]] },
   { key: "marketing", label: "2. Marketing & CSKH", items: [
-    ["Kế hoạch & ngân sách", ""], ["Chiến dịch", ""], ["Nội dung & thương hiệu", ""],
+    ["Kế hoạch & ngân sách", ""], ["Chiến dịch", "/marketing"], ["Nội dung & thương hiệu", ""],
     ["Kênh & hộp thư", "/inbox"], ["Nguồn khách", "/leads?tab=leads"], ["Chăm sóc sau bán", ""],
     ["Phản hồi & khiếu nại", ""], ["Báo cáo hiệu quả", "/leads?tab=report"]] },
   // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và được nhận theo
