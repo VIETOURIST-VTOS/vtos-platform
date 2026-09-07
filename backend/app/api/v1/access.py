@@ -182,6 +182,43 @@ def gan_phap_nhan(uid: int, data: PhapNhanIn,
     return {"message": "Đã cập nhật pháp nhân chủ quản", "company_id": t.company_id}
 
 
+class HoSoIn(BaseModel):
+    ma_nv: str | None = None
+    ho_ten: str | None = None
+    department: str | None = None
+
+
+@router.put("/users/{uid}/ho-so")
+def sua_ho_so(uid: int, data: HoSoIn,
+              u: User = Depends(require_roles(*THAO_TAC, "chutich", "tgd")), db: Session = Depends(get_db)):
+    """Sửa mã nhân viên, họ tên, phòng của một tài khoản ĐÃ CÓ, và nối vào hồ sơ nhân sự cùng mã.
+
+    Vì sao cần: tài khoản nạp từ Vietrip hoặc tạo tay trước đây có thể không mang mã nhân viên nào. Mã
+    đó là khóa nối tài khoản với hồ sơ và bảng lương, nên thiếu nó thì người này nằm ngoài mọi đối chiếu
+    – và cũng không đặt lại mật khẩu mặc định được, vì mật khẩu mặc định chính là mã nhân viên.
+    """
+    from app.models.hr import Employee
+    t = db.get(User, uid)
+    if not t: raise HTTPException(404, "Không có tài khoản")
+    truoc = {"ma_nv": t.staff_code, "ho_ten": t.full_name, "phong": t.department}
+    if data.ma_nv is not None:
+        ma = data.ma_nv.strip()
+        if ma:
+            khac = db.execute(select(User).where(User.staff_code == ma, User.id != uid)).scalars().first()
+            if khac: raise HTTPException(422, f"Mã {ma} đã thuộc tài khoản {khac.username} ({khac.full_name})")
+        t.staff_code = ma
+        if ma:
+            e = db.execute(select(Employee).where(Employee.code == ma)).scalars().first()
+            if e is not None and e.user_id in (None, uid):
+                e.user_id = uid          # nối hồ sơ cùng mã, nếu hồ sơ đó chưa gắn cho ai khác
+    if data.ho_ten is not None and data.ho_ten.strip(): t.full_name = data.ho_ten.strip()
+    if data.department is not None: t.department = data.department.strip()
+    R.audit(db, u.username, u.role, "sua_tai_khoan", f"user:{t.username}", before=truoc,
+            after={"ma_nv": t.staff_code, "ho_ten": t.full_name, "phong": t.department})
+    db.commit()
+    return {"message": f"Đã cập nhật hồ sơ tài khoản {t.username}", "staff_code": t.staff_code}
+
+
 class BienCheIn(BaseModel):
     ngoai_bien_che: bool
 

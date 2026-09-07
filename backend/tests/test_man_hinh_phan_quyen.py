@@ -235,3 +235,26 @@ def test_ngoai_le_co_han_van_bi_chan_qua_90_ngay():
         "user_id": uid, "kind": "capability", "value": "bang_luong", "reason": "thử",
         "to_date": str(date.today() + timedelta(days=200))})
     assert r.status_code == 422
+
+
+def test_gan_ma_nhan_vien_cho_tai_khoan_da_co():
+    """Tài khoản nạp từ Vietrip có thể không mang mã nhân viên nào – thiếu mã là nằm ngoài mọi đối chiếu,
+    và cũng không đặt lại mật khẩu mặc định được vì mật khẩu mặc định chính là mã nhân viên."""
+    _, cntt = tk("cntt")
+    h = login(cntt)
+    r = client.post("/api/v1/access/accounts", headers=h, json={
+        "ho_ten": "Người Chưa Có Mã", "ma_nv": "KT886", "role": "nv_kd", "tao_ho_so": False})
+    uid = r.json()["id"]
+    assert client.put(f"/api/v1/access/users/{uid}/ho-so", headers=h, json={"ma_nv": "KT885"}).status_code == 200
+    row = [x for x in client.get("/api/v1/access/accounts", headers=h).json()["rows"] if x["id"] == uid][0]
+    assert row["staff_code"] == "KT885"
+
+
+def test_khong_gan_trung_ma_nhan_vien_cua_nguoi_khac():
+    _, cntt = tk("cntt")
+    h = login(cntt)
+    rows = client.get("/api/v1/access/accounts", headers=h).json()["rows"]
+    a = next(x for x in rows if x["staff_code"] == "KT885")
+    b = next(x for x in rows if x["staff_code"] == "KT888")
+    r = client.put(f"/api/v1/access/users/{b['id']}/ho-so", headers=h, json={"ma_nv": "KT885"})
+    assert r.status_code == 422 and "KT885" in r.json()["detail"]
