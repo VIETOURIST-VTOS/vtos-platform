@@ -200,3 +200,21 @@ def test_v12_xe_da_ban_con_the_chap_thi_canh_bao_noi_luon_con_phai_thu_bao_nhieu
     assert cb["ban_xe"]["con_phai_thu"] == 400_000_000 and cb["ban_xe"]["nguoi_mua"] == "Mr.Huỳnh"
     assert cb["ban_xe"]["qua_han_thu"] is False and cb["ban_xe"]["da_giai_chap"] is False
     assert "400,000,000" in cb["noi_dung"] and "31/12/2026" in cb["noi_dung"]
+
+
+def test_v13_ghi_dan_tien_thu_ban_xe_va_chan_thu_vuot_gia_ban():
+    """Kế toán ghi tiền thu dần theo từng lần khách trả, nên sửa hồ sơ là thao tác lặp lại.
+    Đã thu vượt giá bán bị chặn: để lọt thì 'còn phải thu' thành số âm và hồ sơ trông như đã thu xong."""
+    ds = client.get("/api/v1/fleet/ban-xe", headers=login("ketoan")).json()
+    sid = [x for x in ds if x["xe"] == "50H-496.23"][0]["id"]
+    r = client.put(f"/api/v1/fleet/ban-xe/{sid}", json={"gia_ban": 1_800_000_000, "da_thu": 1_400_000_000},
+                   headers=login("ketoan"))
+    assert r.status_code == 200 and r.json()["con_phai_thu"] == 400_000_000
+    assert client.put(f"/api/v1/fleet/ban-xe/{sid}", json={"da_thu": 2_000_000_000}, headers=login("ketoan")).status_code == 422
+    assert client.put(f"/api/v1/fleet/ban-xe/{sid}", json={"da_thu": 1_500_000_000}, headers=login("hcns")).status_code == 403
+    ds2 = client.get("/api/v1/fleet/ban-xe", headers=login("ketoan")).json()
+    row = [x for x in ds2 if x["id"] == sid][0]
+    assert row["con_phai_thu"] == 400_000_000 and row["chua_co_gia_ban"] is False
+    d = _lay()
+    cb = [c for c in d["canh_bao"] if c.get("xe") == "50H-496.23"][0]
+    assert cb["ban_xe"]["gia_ban"] == 1_800_000_000 and cb["ban_xe"]["con_phai_thu"] == 400_000_000

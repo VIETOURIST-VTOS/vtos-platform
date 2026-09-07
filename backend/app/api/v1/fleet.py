@@ -730,6 +730,61 @@ def tao_ho_so_ban(data: BanXeIn, u: User = Depends(require_roles(*QT_WRITE, "chu
             "message": "Đã tạo hồ sơ bán xe – các trục hợp đồng, thu tiền, bàn giao, giải chấp, sang tên theo dõi riêng"}
 
 
+class SuaHoSoBanIn(BaseModel):
+    nguoi_mua: str | None = None
+    gia_ban: float | None = None
+    da_thu: float | None = None
+    han_thu_du: date | None = None
+    ngay_ky: date | None = None
+    nguon: str | None = None
+    note: str | None = None
+
+
+@router.get("/ban-xe")
+def danh_sach_ban_xe(u: User = Depends(require_roles(*QT_WRITE, "chutich", "tgd", "ketoan", "bks", "cntt")), db: Session = Depends(get_db)):
+    """Hồ sơ bán xe kèm số còn phải thu. Không có màn hình đọc thì không ai biết hồ sơ nào còn dở."""
+    from datetime import date as _d
+    out = []
+    for sc in db.execute(select(SaleCase).order_by(SaleCase.id.desc())).scalars():
+        v = db.get(Vehicle, sc.vehicle_id)
+        con = (sc.gia_ban or 0) - (sc.da_thu or 0)
+        out.append({"id": sc.id, "xe": v.plate if v else "", "nguoi_mua": sc.nguoi_mua, "ngay_ky": sc.ngay_ky,
+                    "gia_ban": sc.gia_ban, "da_thu": sc.da_thu, "con_phai_thu": con, "han_thu_du": sc.han_thu_du,
+                    "qua_han_thu": bool(sc.han_thu_du and con > 0 and sc.han_thu_du < _d.today()),
+                    "stage": sc.stage, "da_ban_giao": sc.da_ban_giao, "da_giai_chap": sc.da_giai_chap,
+                    "van_ban_giai_chap": sc.van_ban_giai_chap, "da_sang_ten": sc.da_sang_ten,
+                    "chua_co_gia_ban": not (sc.gia_ban or 0), "nguon": sc.nguon, "note": sc.note})
+    return out
+
+
+@router.put("/ban-xe/{sid}")
+def sua_ho_so_ban(sid: int, data: SuaHoSoBanIn, u: User = Depends(require_roles("ketoan", "chutich", "tgd")),
+                  db: Session = Depends(get_db)):
+    """Cập nhật giá bán và số tiền đã thu. Kế toán ghi dần theo từng lần khách trả, nên đây là thao tác
+    lặp lại chứ không phải nhập một lần lúc tạo hồ sơ.
+
+    Đã thu KHÔNG được vượt giá bán: vượt nghĩa là một trong hai con số nhập sai, và nếu để lọt thì
+    "còn phải thu" thành số âm, hồ sơ trông như đã thu xong trong khi chưa.
+    """
+    sc = db.get(SaleCase, sid)
+    if not sc: raise HTTPException(404, "Không có hồ sơ bán xe")
+    d = data.model_dump(exclude_unset=True)
+    gia = d.get("gia_ban", sc.gia_ban) or 0
+    thu = d.get("da_thu", sc.da_thu) or 0
+    if gia and thu > gia:
+        raise HTTPException(422, f"Đã thu {thu:,.0f}đ vượt giá bán {gia:,.0f}đ – kiểm lại một trong hai con số")
+    if thu < 0 or gia < 0: raise HTTPException(422, "Giá bán và số đã thu không được âm")
+    before = {k: str(getattr(sc, k)) for k in d}
+    for k, val in d.items(): setattr(sc, k, val)
+    R.audit(db, u.username, u.role, "sua_ho_so_ban_xe", f"sale:{sid}", before=before,
+            after=data.model_dump(mode="json", exclude_unset=True))
+    db.commit()
+    con = (sc.gia_ban or 0) - (sc.da_thu or 0)
+    return {"id": sc.id, "con_phai_thu": con,
+            "message": f"Đã cập nhật hồ sơ bán xe – còn phải thu {con:,.0f}đ"
+                       + (f", hạn {sc.han_thu_du:%d/%m/%Y}" if sc.han_thu_du and con > 0 else "")}
+
+
 class ChuyenBuocBanIn(BaseModel):
     stage: str
     van_ban_giai_chap: str = ""
