@@ -217,6 +217,7 @@ def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
                                                         "lai_thang_phan_bo": round(lai_thang / len(rows)) if rows else 0,
                                                         "collateral_id": t.id, "maturity": c.maturity})
         ke_uoc.append({"id": c.id, "code": c.code, "contract_no": c.contract_no, "partner": c.partner, "entity": c.entity,
+                       "nhom": (c.loan_group or "").strip(),
                        "company": cty.get(c.company_id, "") if getattr(c, "company_id", None) else c.entity,
                        "du_no": c.outstanding, "lai_suat": c.interest_rate, "lai_thang": lai_thang,
                        "maturity": c.maturity, "con_ngay": con, "muc_do": _muc_do(con),
@@ -270,19 +271,27 @@ def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
                                      + ", ".join(x["xe"] for x in thieu_ho_so[:12]),
                          "viec": "Rà soát: đã giải chấp thật (có văn bản) hay chỉ là thiếu hồ sơ. Không thấy trong danh sách KHÔNG có nghĩa là đã được rút khỏi tài sản bảo đảm"})
 
-    theo_phap_nhan: dict[str, dict] = {}
-    for k in ke_uoc:
-        t = theo_phap_nhan.setdefault(k["company"] or k["entity"] or "Chưa gán pháp nhân", {"so_khe_uoc": 0, "du_no": 0.0, "lai_thang": 0.0})
-        t["so_khe_uoc"] += 1; t["du_no"] += k["du_no"]; t["lai_thang"] += k["lai_thang"]
-
     thu_tu = {"qua_han": 0, "gap": 1, "thieu_du_lieu": 2, "som": 3, "theo_doi": 4}
     canh_bao.sort(key=lambda x: thu_tu.get(x["muc"], 9))
+    # Xe ngoài đội 45 chỗ (Ford, Transit, KIA…) là vay xe thật nhưng không thuộc 12 xe khách đang
+    # theo dõi. Không giấu đi – giấu thì mất dấu một khoản nợ có tài sản là xe – nhưng để riêng, và
+    # TỔNG ở đầu màn hình chỉ cộng nhóm 12 xe, đúng con số lãnh đạo hỏi.
+    def _sap(ds): return sorted(ds, key=lambda k: (k["con_ngay"] is None, k["con_ngay"] if k["con_ngay"] is not None else 0))
+    nhom_chinh = [k for k in ke_uoc if k["nhom"] != "vay_xe_khac"]
+    nhom_khac = [k for k in ke_uoc if k["nhom"] == "vay_xe_khac"]
+    theo_phap_nhan = {}
+    for k in nhom_chinh:
+        t = theo_phap_nhan.setdefault(k["company"] or k["entity"] or "Chưa gán pháp nhân", {"so_khe_uoc": 0, "du_no": 0.0, "lai_thang": 0.0})
+        t["so_khe_uoc"] += 1; t["du_no"] += k["du_no"]; t["lai_thang"] += k["lai_thang"]
     return {"as_of": today,
-            "ke_uoc": sorted(ke_uoc, key=lambda k: (k["con_ngay"] is None, k["con_ngay"] if k["con_ngay"] is not None else 0)),
+            "ke_uoc": _sap(nhom_chinh),
+            "ke_uoc_xe_ngoai_doi": _sap(nhom_khac),
+            "tong_du_no_xe_ngoai_doi": sum(k["du_no"] for k in nhom_khac),
+            "tong_lai_thang_xe_ngoai_doi": sum(k["lai_thang"] for k in nhom_khac),
             "xe": sorted(([{"id": v.id, "plate": v.plate, "phap_nhan": cty.get(v.company_id, ""), "lifecycle": v.lifecycle,
                             "active": v.active, "khe_uoc": gan_xe.get(v.id, [])} for v in xe.values()]), key=lambda r: r["plate"]),
             "canh_bao": canh_bao, "thieu_ho_so": thieu_ho_so,
-            "tong_du_no": sum(k["du_no"] for k in ke_uoc), "tong_lai_thang": sum(k["lai_thang"] for k in ke_uoc),
+            "tong_du_no": sum(k["du_no"] for k in nhom_chinh), "tong_lai_thang": sum(k["lai_thang"] for k in nhom_chinh),
             "theo_phap_nhan": theo_phap_nhan}
 
 

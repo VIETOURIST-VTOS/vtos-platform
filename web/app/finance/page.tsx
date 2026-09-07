@@ -127,6 +127,12 @@ function Finance() {
           <td>{k.xe_the_chap.join(" · ") || <span className="muted">chưa gắn xe</span>}{k.xe_da_giai_chap.length > 0 && <div className="muted">đã giải chấp: {k.xe_da_giai_chap.join(" · ")}</div>}</td></tr>)}
         <tr><td colSpan={3}><b>TỔNG</b></td><td style={{ textAlign: "right" }}><b>{vnd(vx.tong_du_no)}</b></td><td></td><td style={{ textAlign: "right" }}><b>{vnd(vx.tong_lai_thang)}</b></td><td colSpan={2}></td></tr>
       </tbody></table></div>
+      {vx.ke_uoc_xe_ngoai_doi && vx.ke_uoc_xe_ngoai_doi.length > 0 && <>
+        <h2>Xe ngoài đội 45 chỗ — {vx.ke_uoc_xe_ngoai_doi.length} khế ước, dư nợ {vnd(vx.tong_du_no_xe_ngoai_doi)}, lãi {vnd(vx.tong_lai_thang_xe_ngoai_doi)}/tháng</h2>
+        <p className="muted">Vay có tài sản là xe nhưng không thuộc 12 xe khách 45 chỗ. Để riêng nên KHÔNG cộng vào các con số ở đầu màn hình.</p>
+        <div className="panel wrap"><table><thead><tr><th>Mã / Hợp đồng</th><th>Ngân hàng</th><th style={{ textAlign: "right" }}>Dư nợ</th><th style={{ textAlign: "right" }}>Lãi/tháng</th><th>Đáo hạn</th><th>Tài sản thế chấp</th></tr></thead><tbody>
+          {vx.ke_uoc_xe_ngoai_doi.map((k: any) => <tr key={k.id}><td>{k.contract_no || k.code}</td><td>{k.partner}</td><td style={{ textAlign: "right" }}>{vnd(k.du_no)}</td><td style={{ textAlign: "right" }}>{vnd(k.lai_thang)}</td><td>{k.maturity ? fmtD(k.maturity) : <Tag cls="warn">chưa có ngày</Tag>}</td><td className="muted">{k.collateral}</td></tr>)}
+        </tbody></table></div></>}
       <h2>Tách theo pháp nhân</h2>
       <div className="panel wrap"><table><thead><tr><th>Pháp nhân</th><th style={{ textAlign: "right" }}>Số khế ước</th><th style={{ textAlign: "right" }}>Dư nợ</th><th style={{ textAlign: "right" }}>Lãi/tháng</th></tr></thead><tbody>
         {Object.entries(vx.theo_phap_nhan).map(([ten, t]: any) => <tr key={ten}><td>{ten}</td><td style={{ textAlign: "right" }}>{t.so_khe_uoc}</td><td style={{ textAlign: "right" }}>{vnd(t.du_no)}</td><td style={{ textAlign: "right" }}>{vnd(t.lai_thang)}</td></tr>)}

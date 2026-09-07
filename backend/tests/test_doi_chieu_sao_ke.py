@@ -141,3 +141,19 @@ def test_s7_man_hinh_vay_xe_khong_om_khoan_vay_ngoai_doi_xe():
     assert "125/2025/GNN/Q4" in [k["contract_no"] for k in d["ke_uoc"]]
     # tổng đúng bằng ba khế ước vay xe, khoản bất động sản 12 tỷ không cộng vào
     assert d["tong_du_no"] == 8_711_111_104 + 2_247_887_320 + 1_767_406_654
+
+
+def test_s8_xe_ngoai_doi_45_cho_de_rieng_tong_dau_man_hinh_chi_cong_nhom_chinh():
+    """Xe ngoài đội 45 chỗ (Ford, Transit, KIA) là vay xe thật nhưng không thuộc 12 xe khách.
+    Không giấu đi – giấu là mất dấu một khoản nợ có tài sản là xe – nhưng để riêng, và tổng ở
+    đầu màn hình chỉ cộng nhóm 12 xe, đúng con số lãnh đạo hỏi."""
+    client.post("/api/v1/fin/vay-xe/nap", json={"nguon": "test", "khe_uoc": [
+        {"contract_no": "91/2024/GNN/Q4", "partner": "TPBank", "entity": "Vietourist Holdings",
+         "loan_group": "vay_xe_khac", "principal": 534_800_000, "outstanding": 319_394_438,
+         "interest_rate": 13.7, "collateral": "29K-008.29 (Ford Transit)", "xe": []}]}, headers=login("chutich"))
+    d = client.get("/api/v1/fin/vay-xe", headers=login("ketoan")).json()
+    assert "91/2024/GNN/Q4" not in [k["contract_no"] for k in d["ke_uoc"]]
+    assert "91/2024/GNN/Q4" in [k["contract_no"] for k in d["ke_uoc_xe_ngoai_doi"]]
+    assert d["tong_du_no_xe_ngoai_doi"] == 319_394_438
+    assert d["tong_du_no"] == 8_711_111_104 + 2_247_887_320 + 1_767_406_654   # vẫn chỉ nhóm chính
+    assert sum(t["du_no"] for t in d["theo_phap_nhan"].values()) == d["tong_du_no"]
