@@ -115,3 +115,159 @@ def lead_chua_gan(db: Session, thang: str = "") -> dict:
     rows = db.execute(q.group_by(Lead.campaign).order_by(func.count().desc())).all()
     return {"tong": sum(int(n) for _, n in rows),
             "nhom": [{"campaign_cu": (t or "(không ghi)"), "so_lead": int(n)} for t, n in rows]}
+
+
+# ====================== ĐỢT 2: KẾ HOẠCH & NGÂN SÁCH ======================
+from app.models.marketing import MarketingBudget, MarketingBudgetLine, HANG_MUC, BUDGET_STATUS
+
+
+def ky_hop_le(period: str) -> bool:
+    """2026-09 (tháng) hoặc 2026-Q4 (quý). Năm cả năm dùng 4 quý – không mở thêm dạng kỳ thứ ba."""
+    p = (period or "").strip()
+    if len(p) != 7 and len(p) != 7: return False
+    if p[4] != "-": return False
+    if p[5] == "Q": return p[6] in "1234" and p[:4].isdigit()
+    return p[5:].isdigit() and 1 <= int(p[5:]) <= 12 and p[:4].isdigit()
+
+
+def thang_cua_ky(period: str) -> list[str]:
+    """Các tháng YYYY-MM thuộc kỳ. Kỳ quý trải ra ba tháng để cộng chi phí cho đúng."""
+    if period[5] == "Q":
+        q = int(period[6]); return [f"{period[:4]}-{m:02d}" for m in range((q - 1) * 3 + 1, q * 3 + 1)]
+    return [period]
+
+
+def tao_ngan_sach(db: Session, u: User, data: dict) -> MarketingBudget:
+    period = (data.get("period") or "").strip()
+    if not ky_hop_le(period): raise ValueError("Kỳ phải dạng 2026-09 (tháng) hoặc 2026-Q4 (quý)")
+    dong = data.get("lines") or []
+    if not dong: raise ValueError("Phải có ít nhất một hạng mục chi")
+    for l in dong:
+        if l.get("hang_muc") not in HANG_MUC: raise ValueError(f"Hạng mục không hợp lệ: {l.get('hang_muc')}")
+        if (l.get("amount") or 0) <= 0: raise ValueError("Số tiền dự toán từng hạng mục phải lớn hơn 0")
+    if len({l["hang_muc"] for l in dong}) != len(dong): raise ValueError("Mỗi hạng mục chỉ được một dòng")
+    if (data.get("target_leads") or 0) <= 0:
+        raise ValueError("Phải có mục tiêu lead – không có mục tiêu thì không so được chi phí/lead kế hoạch với thực tế")
+    if not (data.get("rationale") or "").strip():
+        raise ValueError("Phải ghi căn cứ lập ngân sách – kỳ sau còn đối chiếu lại được")
+    nguon = (data.get("nguon_tao") or "nguoi").lower()
+    if nguon == "ai" and not (data.get("ai_ghi_chu") or "").strip():
+        raise ValueError("Bản do AI lập phải ghi căn cứ đề xuất")
+    # Một kỳ × một pháp nhân chỉ có MỘT ngân sách còn hiệu lực. Hai bản cùng hiệu lực là hai hạn mức
+    # khác nhau cho cùng một kỳ, và cổng vượt dự toán sẽ so với bản nào cũng đúng – tức là vô nghĩa.
+    trung = db.execute(select(MarketingBudget).where(
+        MarketingBudget.period == period, MarketingBudget.company_id == data.get("company_id"),
+        MarketingBudget.status.in_(["cho_duyet", "hieu_luc"]))).scalars().first()
+    if trung: raise ValueError(f"Kỳ {period} của pháp nhân này đã có ngân sách {BUDGET_STATUS[trung.status].lower()} (mã {trung.id})")
+    b = MarketingBudget(period=period, company_id=data.get("company_id"), target_leads=data.get("target_leads") or 0,
+                        target_revenue=data.get("target_revenue") or 0, rationale=data["rationale"],
+                        nguon_tao=nguon, ai_ghi_chu=data.get("ai_ghi_chu", ""), status="nhap", created_by=u.username)
+    db.add(b); db.flush()
+    for l in dong:
+        db.add(MarketingBudgetLine(budget_id=b.id, hang_muc=l["hang_muc"], amount=float(l["amount"]), note=l.get("note", "")))
+    R.audit(db, u.username, u.role, "lap_ngan_sach_marketing", f"mkt_budget:{b.id}",
+            after={"ky": period, "so_hang_muc": len(dong), "tong": sum(float(l["amount"]) for l in dong), "nguon": nguon})
+    db.commit(); db.refresh(b)
+    return b
+
+
+def duyet_ngan_sach(db: Session, u: User, b: MarketingBudget) -> MarketingBudget:
+    if b.status == "hieu_luc": raise ValueError("Ngân sách đã hiệu lực")
+    if b.created_by == u.username:
+        raise PermissionError("Người lập ngân sách không được tự duyệt – phải người khác có thẩm quyền")
+    if u.role not in ("tgd", "chutich"):
+        raise PermissionError("Chỉ TGĐ hoặc Chủ tịch duyệt ngân sách marketing")
+    b.status = "hieu_luc"; b.approved_by = u.username; b.approved_at = datetime.now()
+    R.audit(db, u.username, u.role, "duyet_ngan_sach_marketing", f"mkt_budget:{b.id}", after={"ky": b.period})
+    db.commit(); db.refresh(b)
+    return b
+
+
+def _khoang_ngay(period: str) -> tuple[datetime, datetime]:
+    """Mốc đầu và mốc sau-cuối của kỳ. So bằng khoảng ngày chứ không cắt chuỗi ngày tháng:
+    cắt chuỗi phụ thuộc cách từng cơ sở dữ liệu định dạng ngày, và sẽ im lặng trả về 0 khi khác định dạng."""
+    y = int(period[:4])
+    if period[5] == "Q":
+        q = int(period[6]); m1 = (q - 1) * 3 + 1
+        dau = datetime(y, m1, 1)
+        sau = datetime(y + 1, 1, 1) if q == 4 else datetime(y, m1 + 3, 1)
+    else:
+        m = int(period[5:]); dau = datetime(y, m, 1)
+        sau = datetime(y + 1, 1, 1) if m == 12 else datetime(y, m + 1, 1)
+    return dau, sau
+
+
+def _chi_theo_muc(db: Session, period: str, company_id: int | None) -> dict:
+    """Đã chi và đang treo của kỳ, tách theo hạng mục. Đọc từ đề nghị chi – không có đường nào khác."""
+    dau, sau = _khoang_ngay(period)
+    q = (select(PaymentRequest.marketing_muc, PaymentRequest.status,
+                func.coalesce(func.sum(PaymentRequest.amount), 0.0))
+         .where(PaymentRequest.category == "marketing",
+                PaymentRequest.created_at >= dau, PaymentRequest.created_at < sau))
+    if company_id: q = q.where(PaymentRequest.company_id == company_id)
+    rows = db.execute(q.group_by(PaymentRequest.marketing_muc, PaymentRequest.status)).all()
+    da_chi: dict[str, float] = {}; treo: dict[str, float] = {}
+    for muc, tt, tien in rows:
+        d = da_chi if tt == "da_chi" else (treo if tt in ("cho_tp", "cho_kt", "cho_duyet", "cho_chi") else None)
+        if d is None: continue          # từ chối thì không tính vào đâu cả
+        k = muc or "_chua_phan_muc"
+        d[k] = d.get(k, 0.0) + float(tien)
+    return {"da_chi": da_chi, "treo": treo}
+
+
+def bang_ngan_sach(db: Session, b: MarketingBudget) -> dict:
+    """Bảng theo dõi: dự toán – đã chi – đang treo – còn lại, theo từng hạng mục."""
+    lines = list(db.execute(select(MarketingBudgetLine).where(MarketingBudgetLine.budget_id == b.id)).scalars())
+    chi = _chi_theo_muc(db, b.period, b.company_id)
+    rows = []
+    for l in lines:
+        dc = chi["da_chi"].get(l.hang_muc, 0.0); tr = chi["treo"].get(l.hang_muc, 0.0)
+        rows.append({"hang_muc": l.hang_muc, "ten": HANG_MUC[l.hang_muc], "du_toan": l.amount,
+                     "da_chi": dc, "dang_treo": tr, "con_lai": l.amount - dc - tr,
+                     "vuot": (dc + tr) > l.amount, "note": l.note})
+    # Khoản chi marketing chưa ai gán hạng mục: nêu riêng, KHÔNG chia bừa vào các hạng mục đã có.
+    chua = {"da_chi": chi["da_chi"].get("_chua_phan_muc", 0.0), "dang_treo": chi["treo"].get("_chua_phan_muc", 0.0)}
+    # Hạng mục có chi nhưng không nằm trong ngân sách kỳ này – cũng phải nêu.
+    ngoai = [{"hang_muc": k, "ten": HANG_MUC.get(k, k), "da_chi": chi["da_chi"].get(k, 0.0),
+              "dang_treo": chi["treo"].get(k, 0.0)}
+             for k in set(list(chi["da_chi"]) + list(chi["treo"]))
+             if k != "_chua_phan_muc" and k not in {l.hang_muc for l in lines}]
+    tong_du_toan = sum(r["du_toan"] for r in rows)
+    tong_da_chi = sum(r["da_chi"] for r in rows) + chua["da_chi"] + sum(x["da_chi"] for x in ngoai)
+    tong_treo = sum(r["dang_treo"] for r in rows) + chua["dang_treo"] + sum(x["dang_treo"] for x in ngoai)
+    so_lead = _lead_trong_ky(db, b.period)
+    return {"rows": rows, "chua_phan_muc": chua, "ngoai_ngan_sach": ngoai,
+            "tong_du_toan": tong_du_toan, "tong_da_chi": tong_da_chi, "tong_treo": tong_treo,
+            "tong_con_lai": tong_du_toan - tong_da_chi - tong_treo,
+            "so_lead": so_lead,
+            "chi_phi_lead_ke_hoach": (tong_du_toan / b.target_leads) if b.target_leads else 0,
+            "chi_phi_lead_thuc_te": (tong_da_chi / so_lead) if so_lead else 0,
+            "vuot_tong": (tong_da_chi + tong_treo) > tong_du_toan}
+
+
+def _lead_trong_ky(db: Session, period: str) -> int:
+    thang = thang_cua_ky(period)
+    return int(db.execute(select(func.count()).select_from(Lead).where(Lead.lead_month.in_(thang))).scalar() or 0)
+
+
+def con_lai_hang_muc(db: Session, muc: str, company_id: int | None, luc: date | None = None) -> tuple[float, str]:
+    """Còn lại của một hạng mục ở kỳ đang hiệu lực – dùng cho cổng vượt dự toán khi lập đề nghị chi.
+
+    Không có ngân sách hiệu lực thì trả về (0, lý do) và người gọi KHÔNG được coi đó là "còn nhiều".
+    Chưa lập ngân sách không phải là ngân sách vô hạn.
+    """
+    hom_nay = luc or date.today()
+    ung_vien = [f"{hom_nay:%Y-%m}", f"{hom_nay.year}-Q{(hom_nay.month - 1)//3 + 1}"]
+    b = db.execute(select(MarketingBudget).where(MarketingBudget.period.in_(ung_vien),
+                                                 MarketingBudget.status == "hieu_luc",
+                                                 MarketingBudget.company_id == company_id)).scalars().first()
+    if b is None:
+        b = db.execute(select(MarketingBudget).where(MarketingBudget.period.in_(ung_vien),
+                                                     MarketingBudget.status == "hieu_luc")).scalars().first()
+    if b is None: return 0.0, "chưa có ngân sách marketing hiệu lực cho kỳ này"
+    l = db.execute(select(MarketingBudgetLine).where(MarketingBudgetLine.budget_id == b.id,
+                                                     MarketingBudgetLine.hang_muc == muc)).scalars().first()
+    if l is None: return 0.0, f"ngân sách kỳ {b.period} không có hạng mục này"
+    chi = _chi_theo_muc(db, b.period, b.company_id)
+    con = l.amount - chi["da_chi"].get(muc, 0.0) - chi["treo"].get(muc, 0.0)
+    return con, f"ngân sách kỳ {b.period}"

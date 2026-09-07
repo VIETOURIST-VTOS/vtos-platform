@@ -46,3 +46,41 @@ class Campaign(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     approved_by: Mapped[str] = mapped_column(String(50), default="")
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ---------- Đợt 2: KẾ HOẠCH & NGÂN SÁCH ----------
+HANG_MUC = {"quang_cao": "Quảng cáo trả phí", "noi_dung": "Nội dung – sản xuất", "su_kien": "Sự kiện",
+            "an_pham": "Ấn phẩm – quà tặng", "nghien_cuu": "Nghiên cứu thị trường", "khac": "Khác"}
+BUDGET_STATUS = {"nhap": "Nháp", "cho_duyet": "Chờ duyệt", "hieu_luc": "Đang hiệu lực", "dong": "Đã đóng kỳ"}
+
+
+class MarketingBudget(Base):
+    """Ngân sách marketing một kỳ, một pháp nhân.
+
+    Bảng này chỉ giữ phần DỰ TOÁN. Số ĐÃ CHI không nằm ở đây mà đọc từ đề nghị chi đã duyệt – hai nơi
+    giữ hai con số chi phí của cùng một kỳ là hai con số sẽ lệch nhau, và không ai biết tin con số nào.
+    """
+    __tablename__ = "mkt_budgets"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    period: Mapped[str] = mapped_column(String(8), index=True)              # 2026-09 hoặc 2026-Q4
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    target_leads: Mapped[int] = mapped_column(Integer, default=0)
+    target_revenue: Mapped[float] = mapped_column(Float, default=0)
+    rationale: Mapped[str] = mapped_column(Text, default="")               # căn cứ – bắt buộc
+    status: Mapped[str] = mapped_column(String(10), default="nhap")
+    nguon_tao: Mapped[str] = mapped_column(String(6), default="nguoi")
+    ai_ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    approved_by: Mapped[str] = mapped_column(String(50), default="")
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class MarketingBudgetLine(Base):
+    """Một hạng mục của ngân sách kỳ. Tổng không lưu thành cột riêng – tổng luôn cộng từ các dòng này."""
+    __tablename__ = "mkt_budget_lines"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    budget_id: Mapped[int] = mapped_column(ForeignKey("mkt_budgets.id"), index=True)
+    hang_muc: Mapped[str] = mapped_column(String(20))
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    note: Mapped[str] = mapped_column(String(300), default="")

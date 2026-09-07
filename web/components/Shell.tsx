@@ -16,7 +16,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Báo cáo bán hàng toàn hệ thống", "/sales-reports"],
     ["Chỉ đạo & theo dõi thực hiện", ""]] },
   { key: "marketing", label: "2. Marketing & CSKH", items: [
-    ["Kế hoạch & ngân sách", ""], ["Chiến dịch", "/marketing"], ["Nội dung & thương hiệu", ""],
+    ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"], ["Chiến dịch", "/marketing"], ["Nội dung & thương hiệu", ""],
     ["Kênh & hộp thư", "/inbox"], ["Nguồn khách", "/leads?tab=leads"], ["Chăm sóc sau bán", ""],
     ["Phản hồi & khiếu nại", ""], ["Báo cáo hiệu quả", "/leads?tab=report"]] },
   // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và được nhận theo
@@ -59,7 +59,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Báo cáo công việc", "/reports"], ["Đánh giá & sự vụ", "/hr?tab=incidents"], ["Văn bản", ""], ["Tài sản & mua sắm", ""]] },
   { key: "kiemsoat", label: "9. Kiểm soát & Chính sách", items: [
     ["Chính sách & định mức", "/params"], ["Cảnh báo nghiệp vụ", "/alerts"], ["Kiểm tra & đối chiếu", "/accounting?tab=misa"],
-    ["Ngoại lệ cần xử lý", ""], ["Nhật ký nghiệp vụ", "/audit"]] },
+    ["Ngoại lệ cần xử lý", "/ngoai-le"], ["Nhật ký nghiệp vụ", "/audit"]] },
   { key: "taikhoan", label: "0. Tài khoản của tôi", items: [
     ["Đổi mật khẩu", "/doi-mat-khau"]] },
   { key: "hethong", label: "10. Hệ thống & Tích hợp", items: [

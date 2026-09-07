@@ -191,7 +191,8 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
             "supplier_bank": r.supplier_bank, "amount": r.amount, "description": r.description, "has_document": r.has_document, "document_ref": r.document_ref, "has_invoice": r.has_invoice,
             "over_budget": r.over_budget, "two_signatures": r.two_signatures, "status": r.status, "next": nxt, "created_by": r.created_by, "created_at": r.created_at, "tp_by": r.tp_by,
             "kt_by": r.kt_by, "approved_by": r.approved_by, "signed_chutich": r.signed_chutich, "signed_tgd": r.signed_tgd, "approved_at": r.approved_at, "reject_reason": r.reject_reason,
-            "paid_at": r.paid_at, "paid_ref": r.paid_ref, "paid_method": r.paid_method, "entry_ids": r.entry_ids}
+            "paid_at": r.paid_at, "paid_ref": r.paid_ref, "paid_method": r.paid_method, "entry_ids": r.entry_ids,
+            "marketing_muc": r.marketing_muc, "campaign_id": r.campaign_id}
 
 
 @router.get("/payment-requests")
@@ -215,6 +216,10 @@ class PRIn(BaseModel):
     has_document: bool = False
     document_ref: str = ""
     has_invoice: bool = False
+    # Chỉ dùng cho chi marketing: hạng mục ngân sách và chiến dịch. Có hai ô này thì màn hình ngân sách
+    # mới biết hạng mục nào sắp vượt, và chiến dịch mới có chi phí thực tế.
+    marketing_muc: str = ""
+    campaign_id: int | None = None
 
 
 @router.post("/payment-requests", status_code=201)
@@ -224,8 +229,12 @@ def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptg
     except ValueError as ex:
         raise HTTPException(422, {"gate": "CONG_14", "message": str(ex)} if "cổng 14" in str(ex) else str(ex))
     flags = []
+    # Hai lý do KHÁC NHAU cùng dẫn tới hai chữ ký, nên nêu cả hai: vượt dự toán là chuyện của ngân sách,
+    # còn vượt hạn mức là chuyện của số tiền. Gộp làm một thì người duyệt không biết mình đang duyệt gì.
     if r.over_budget: flags.append("NGOÀI DỰ TOÁN → 2 chữ ký (cổng 15)")
-    if r.two_signatures and not r.over_budget: flags.append("≥ hạn mức Marketing → 2 chữ ký (cổng 15)")
+    if r.category == "marketing" and r.amount >= R.get_param(db, "han_muc_mkt"):
+        flags.append("≥ hạn mức Marketing → 2 chữ ký (cổng 15)")
+    elif r.two_signatures and not r.over_budget: flags.append("≥ hạn mức → 2 chữ ký (cổng 15)")
     return {"request": pr_out(r, db), "message": f"Đã lập {r.code}" + (" – " + "; ".join(flags) if flags else "")}
 
 

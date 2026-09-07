@@ -181,3 +181,95 @@ def gan_lead(cid: int, data: GanLeadIn, u: User = Depends(require_roles(*LAP)), 
             after={"so_lead": n, "theo_o_chu_cu": data.campaign_cu, "thang": data.thang})
     db.commit()
     return {"da_gan": n, "message": f"Đã gán {n} lead vào chiến dịch {c.code}"}
+
+
+# ---------- Đợt 2: Kế hoạch & ngân sách ----------
+from app.models.marketing import MarketingBudget, MarketingBudgetLine, HANG_MUC, BUDGET_STATUS
+
+
+def b_out(db: Session, b: MarketingBudget, kem_bang: bool = True) -> dict:
+    d = {"id": b.id, "period": b.period, "company_id": b.company_id, "target_leads": b.target_leads,
+         "target_revenue": b.target_revenue, "rationale": b.rationale, "status": b.status,
+         "status_ten": BUDGET_STATUS.get(b.status, b.status), "nguon_tao": b.nguon_tao,
+         "ai_ghi_chu": b.ai_ghi_chu, "created_by": b.created_by, "created_at": b.created_at,
+         "approved_by": b.approved_by, "approved_at": b.approved_at,
+         "lines": [{"hang_muc": l.hang_muc, "ten": HANG_MUC.get(l.hang_muc, l.hang_muc),
+                    "amount": l.amount, "note": l.note}
+                   for l in db.execute(select(MarketingBudgetLine).where(MarketingBudgetLine.budget_id == b.id)).scalars()]}
+    if kem_bang: d["bang"] = MK.bang_ngan_sach(db, b)
+    return d
+
+
+@router.get("/marketing/budgets")
+def ds_ngan_sach(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    return [b_out(db, b) for b in db.execute(select(MarketingBudget).order_by(desc(MarketingBudget.id))).scalars()]
+
+
+@router.get("/marketing/budgets/hang-muc")
+def ds_hang_muc(u: User = Depends(require_roles(*XEM, "nv_dh", "tp_dh"))):
+    return HANG_MUC
+
+
+@router.get("/marketing/budgets/{bid}")
+def chi_tiet_ngan_sach(bid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    b = db.get(MarketingBudget, bid)
+    if not b: raise HTTPException(404, "Không có ngân sách")
+    return b_out(db, b)
+
+
+class DongIn(BaseModel):
+    hang_muc: str
+    amount: float
+    note: str = ""
+
+
+class BudgetIn(BaseModel):
+    period: str
+    company_id: int | None = None
+    target_leads: int = 0
+    target_revenue: float = 0
+    rationale: str = ""
+    lines: list[DongIn] = []
+    nguon_tao: str = "nguoi"
+    ai_ghi_chu: str = ""
+
+
+@router.post("/marketing/budgets", status_code=201)
+def tao_ngan_sach(data: BudgetIn, u: User = Depends(require_roles(*LAP)), db: Session = Depends(get_db)):
+    try:
+        b = MK.tao_ngan_sach(db, u, data.model_dump())
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    if b.nguon_tao == "ai":
+        AL.ghi(db, tac_vu="vb_noi_bo", muc=2, nguon="tro_ly", vai_tro=u.role, nguoi=u.username,
+               ref=f"mkt_budget:{b.id}", ket_qua=f"Đề xuất ngân sách marketing kỳ {b.period}",
+               trang_thai="cho_hau_kiem")
+        db.commit()
+    return {"budget": b_out(db, b), "message":
+            f"Đã lập ngân sách marketing kỳ {b.period} ở trạng thái Nháp"
+            + (" – đề xuất do AI soạn, cần người có thẩm quyền duyệt" if b.nguon_tao == "ai" else "")}
+
+
+@router.post("/marketing/budgets/{bid}/trinh")
+def trinh(bid: int, u: User = Depends(require_roles(*LAP)), db: Session = Depends(get_db)):
+    b = db.get(MarketingBudget, bid)
+    if not b: raise HTTPException(404, "Không có ngân sách")
+    if b.status != "nhap": raise HTTPException(422, "Chỉ trình được bản đang ở Nháp")
+    b.status = "cho_duyet"
+    R.audit(db, u.username, u.role, "trinh_ngan_sach_marketing", f"mkt_budget:{b.id}", after={"ky": b.period})
+    db.commit()
+    return {"budget": b_out(db, b), "message": f"Đã trình ngân sách kỳ {b.period}"}
+
+
+@router.post("/marketing/budgets/{bid}/duyet")
+def duyet(bid: int, u: User = Depends(require_roles("tgd", "chutich")), db: Session = Depends(get_db)):
+    b = db.get(MarketingBudget, bid)
+    if not b: raise HTTPException(404, "Không có ngân sách")
+    if b.status != "cho_duyet": raise HTTPException(422, "Chỉ duyệt được bản đang chờ duyệt")
+    try:
+        b = MK.duyet_ngan_sach(db, u, b)
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"budget": b_out(db, b), "message": f"Ngân sách kỳ {b.period} đã có hiệu lực"}

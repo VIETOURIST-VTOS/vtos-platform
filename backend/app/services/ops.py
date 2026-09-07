@@ -215,8 +215,23 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
                        document_ref=data.get("document_ref", ""), has_invoice=bool(data.get("has_invoice")), created_by=u.username,
                        company_id=t.company_id if t else None)
     # R3: xếp cấp duyệt
-    if cat == "marketing" and r.amount >= R.get_param(db, "han_muc_mkt"):
-        r.two_signatures = True
+    if cat == "marketing":
+        r.marketing_muc = data.get("marketing_muc", "") or ""
+        r.campaign_id = data.get("campaign_id")
+        if r.amount >= R.get_param(db, "han_muc_mkt"):
+            r.two_signatures = True
+        # Cổng ngân sách marketing: vượt phần còn lại của HẠNG MỤC thì bật cờ ngoài dự toán và cần hai
+        # chữ ký – đúng cơ chế đã dùng cho chi phí tour. KHÔNG chặn cứng: có lúc phải chi thật; nhưng
+        # không cho chi âm thầm. Chưa gán hạng mục cũng tính là ngoài dự toán, vì không đối chiếu được
+        # với hạn mức nào – chưa lập ngân sách không phải là ngân sách vô hạn.
+        if r.marketing_muc:
+            from app.services import marketing as MK
+            con, vi_sao = MK.con_lai_hang_muc(db, r.marketing_muc, r.company_id)
+            if r.amount > con:
+                r.over_budget, r.two_signatures = True, True
+                r.description = (r.description + f" [ngoài dự toán: còn {con:,.0f}đ theo {vi_sao}]")[:300]
+        else:
+            r.over_budget, r.two_signatures = True, True
     if t and cat in ("chi_tour", "tam_ung"):
         cf = tour_cashflow(db, t)
         if cf["paid"] + cf["committed"] + cf["pending"] + r.amount > cf["budget"] + 1:

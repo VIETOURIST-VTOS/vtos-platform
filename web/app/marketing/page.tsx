@@ -21,15 +21,24 @@ function Marketing() {
   const [mo, setMo] = useState<number | null>(null);
   const [f, setF] = useState<any>({ ...RONG });
   const [hienForm, setHienForm] = useState(false);
+  const [tab, setTab] = useState("chiendich");
+  const [ns, setNs] = useState<any[]>([]);
+  const [hm, setHm] = useState<any>({});
+  const [moNs, setMoNs] = useState<number | null>(null);
+  const [fn, setFn] = useState<any>({ period: new Date().toISOString().slice(0, 7), target_leads: "", target_revenue: "", rationale: "", lines: {} as Record<string, string>, nguon_tao: "nguoi", ai_ghi_chu: "" });
+  const [hienNs, setHienNs] = useState(false);
 
   const load = useCallback(() => {
     api("/marketing/campaigns").then(setDs).catch((e) => toast(errMsg(e), true));
     api("/marketing/campaigns/lead-chua-gan").then(setChua).catch(() => {});
+    api("/marketing/budgets").then(setNs).catch(() => {});
   }, []); // eslint-disable-line
   useEffect(() => {
     api("/marketing/meta").then(setMeta).catch(() => {});
     api("/products").then((r) => setSp(Array.isArray(r) ? r : r.rows || [])).catch(() => {});
     api("/users").then((r) => setNv(Array.isArray(r) ? r : [])).catch(() => {});
+    api("/marketing/budgets/hang-muc").then(setHm).catch(() => {});
+    const q = new URLSearchParams(window.location.search).get("tab"); if (q) setTab(q);
     load();
   }, [load]);
 
@@ -46,8 +55,82 @@ function Marketing() {
 
   const mau: Record<string, string> = { nhap: "grey", cho_duyet: "warn", dang_chay: "ok", tam_dung: "warn", ket_thuc: "grey", da_danh_gia: "ok" };
 
+  const luuNs = () => {
+    const lines = Object.entries(fn.lines).filter(([, v]) => Number(v) > 0)
+      .map(([hang_muc, v]) => ({ hang_muc, amount: Number(v) }));
+    post("/marketing/budgets", { period: fn.period, target_leads: Number(fn.target_leads) || 0,
+      target_revenue: Number(fn.target_revenue) || 0, rationale: fn.rationale, lines,
+      nguon_tao: fn.nguon_tao, ai_ghi_chu: fn.ai_ghi_chu })
+      .then((r) => { if (r) { setFn({ ...fn, rationale: "", lines: {} }); setHienNs(false); } });
+  };
+
   return (<>
-    <h1>Marketing · Chiến dịch</h1>
+    <h1>Marketing</h1>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+      {[["chiendich", "Chiến dịch"], ["ngansach", "Kế hoạch & ngân sách"]].map(([k, l]) =>
+        <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
+    </div>
+
+    {tab === "ngansach" && <>
+      <p className="muted">Màn hình này chỉ giữ phần <b>dự toán</b>. Số <b>đã chi</b> đọc từ đề nghị chi đã duyệt — không có ô nào để gõ tay. Chi vượt phần còn lại của hạng mục sẽ tự bật cờ ngoài dự toán và cần hai chữ ký; hệ thống không chặn cứng việc chi, nhưng không cho chi âm thầm.</p>
+      {lapDuoc && <button className="act" onClick={() => setHienNs(!hienNs)}>{hienNs ? "Đóng biểu mẫu" : "+ Lập ngân sách kỳ"}</button>}
+      {hienNs && <div className="panel"><h2>Biểu mẫu ngân sách kỳ</h2>
+        <div className="grid">
+          <label>Kỳ *<input value={fn.period} onChange={(e) => setFn({ ...fn, period: e.target.value })} placeholder="2026-09 hoặc 2026-Q4" /></label>
+          <label>Mục tiêu lead *<input type="number" value={fn.target_leads} onChange={(e) => setFn({ ...fn, target_leads: e.target.value })} /></label>
+          <label>Mục tiêu doanh thu quy đổi<input type="number" value={fn.target_revenue} onChange={(e) => setFn({ ...fn, target_revenue: e.target.value })} /></label>
+        </div>
+        <b>Dự toán theo hạng mục *</b>
+        <div className="grid">{Object.entries(hm).map(([k, v]: any) =>
+          <label key={k}>{v}<input type="number" value={fn.lines[k] || ""} onChange={(e) => setFn({ ...fn, lines: { ...fn.lines, [k]: e.target.value } })} /></label>)}</div>
+        <p className="muted">Tổng dự toán: <b>{vnd(Object.values(fn.lines).reduce((s: number, v: any) => s + (Number(v) || 0), 0))}</b> — tổng tự cộng, không có ô gõ tay.</p>
+        <label>Căn cứ lập ngân sách *<textarea rows={2} style={{ width: "100%" }} value={fn.rationale}
+          onChange={(e) => setFn({ ...fn, rationale: e.target.value })} placeholder="Vì sao con số này – kỳ sau còn đối chiếu lại được" /></label>
+        <div className="panel" style={{ background: "var(--bg2)" }}>
+          <label><input type="checkbox" checked={fn.nguon_tao === "ai"} onChange={(e) => setFn({ ...fn, nguon_tao: e.target.checked ? "ai" : "nguoi" })} /> <b>Đề xuất do trợ lý AI soạn</b></label>
+          {fn.nguon_tao === "ai" && <label>Căn cứ đề xuất (bắt buộc)<textarea rows={2} style={{ width: "100%" }} value={fn.ai_ghi_chu} onChange={(e) => setFn({ ...fn, ai_ghi_chu: e.target.value })} /></label>}
+        </div>
+        <button className="act" disabled={!fn.rationale} onClick={luuNs}>Lưu ở trạng thái Nháp</button>
+      </div>}
+
+      {ns.map((b) => { const g = b.bang || {}; return <div className="panel" key={b.id}>
+        <h2>Kỳ {b.period} · <Tag cls={b.status === "hieu_luc" ? "ok" : b.status === "cho_duyet" ? "warn" : "grey"}>{b.status_ten}</Tag>
+          {b.nguon_tao === "ai" && <Tag cls="warn">AI</Tag>}</h2>
+        <div className="kpis">
+          <div className="kpi"><b>{vnd(g.tong_du_toan)}</b><span>Dự toán</span></div>
+          <div className="kpi"><b>{vnd(g.tong_da_chi)}</b><span>Đã chi</span></div>
+          <div className="kpi"><b>{vnd(g.tong_treo)}</b><span>Đang treo (đã cam kết)</span></div>
+          <div className="kpi"><b style={{ color: g.tong_con_lai < 0 ? "var(--red)" : undefined }}>{vnd(g.tong_con_lai)}</b><span>Còn lại</span></div>
+        </div>
+        <div className="wrap"><table><thead><tr><th>Hạng mục</th><th style={{ textAlign: "right" }}>Dự toán</th>
+          <th style={{ textAlign: "right" }}>Đã chi</th><th style={{ textAlign: "right" }}>Đang treo</th>
+          <th style={{ textAlign: "right" }}>Còn lại</th></tr></thead><tbody>
+          {(g.rows || []).map((r: any) => <tr key={r.hang_muc}>
+            <td>{r.ten}</td><td style={{ textAlign: "right" }}>{vnd(r.du_toan)}</td>
+            <td style={{ textAlign: "right" }}>{vnd(r.da_chi)}</td><td style={{ textAlign: "right" }}>{vnd(r.dang_treo)}</td>
+            <td style={{ textAlign: "right", color: r.vuot ? "var(--red)" : undefined }}><b>{vnd(r.con_lai)}</b>{r.vuot && <Tag cls="red">vượt</Tag>}</td></tr>)}
+          {g.chua_phan_muc && (g.chua_phan_muc.da_chi > 0 || g.chua_phan_muc.dang_treo > 0) && <tr>
+            <td><i>Chi marketing chưa gán hạng mục</i></td><td style={{ textAlign: "right" }}>—</td>
+            <td style={{ textAlign: "right" }}>{vnd(g.chua_phan_muc.da_chi)}</td>
+            <td style={{ textAlign: "right" }}>{vnd(g.chua_phan_muc.dang_treo)}</td>
+            <td style={{ textAlign: "right" }}><Tag cls="warn">cần gán</Tag></td></tr>}
+          {(g.ngoai_ngan_sach || []).map((x: any) => <tr key={x.hang_muc}>
+            <td><i>{x.ten} — ngoài ngân sách kỳ</i></td><td style={{ textAlign: "right" }}>—</td>
+            <td style={{ textAlign: "right" }}>{vnd(x.da_chi)}</td><td style={{ textAlign: "right" }}>{vnd(x.dang_treo)}</td>
+            <td style={{ textAlign: "right" }}><Tag cls="warn">ngoài</Tag></td></tr>)}
+        </tbody></table></div>
+        <p className="muted">Chi phí/lead kế hoạch <b>{vnd(g.chi_phi_lead_ke_hoach)}</b> · thực tế <b>{vnd(g.chi_phi_lead_thuc_te)}</b> ({g.so_lead} lead trong kỳ) · Mục tiêu {b.target_leads} lead</p>
+        <p className="muted"><b>Căn cứ:</b> {b.rationale}</p>
+        {b.ai_ghi_chu && <p className="muted"><b>Căn cứ AI:</b> {b.ai_ghi_chu}</p>}
+        <p className="muted">Người lập {b.created_by}{b.approved_by && ` · Duyệt bởi ${b.approved_by}`}</p>
+        {b.status === "nhap" && lapDuoc && <button className="act" onClick={() => post(`/marketing/budgets/${b.id}/trinh`)}>Trình duyệt</button>}
+        {b.status === "cho_duyet" && ["tgd", "chutich"].includes(role) && <button className="act" onClick={() => post(`/marketing/budgets/${b.id}/duyet`)}>Duyệt ngân sách</button>}
+      </div>; })}
+      {!ns.length && <p className="muted">Chưa có ngân sách kỳ nào.</p>}
+    </>}
+
+    {tab === "chiendich" && <>
+    <h2>Chiến dịch</h2>
     <p className="muted">Chiến dịch là trục nối tiền – khách – doanh thu. Chi phí đọc từ đề nghị chi đã duyệt, lead đọc từ Nguồn khách, doanh thu đọc từ booking đã chốt — <b>không có ô nào để gõ tay ba con số đó</b>.</p>
 
     {lapDuoc && <button className="act" onClick={() => setHienForm(!hienForm)}>{hienForm ? "Đóng biểu mẫu" : "+ Lập chiến dịch mới"}</button>}
@@ -133,6 +216,7 @@ function Marketing() {
       ]; })}
       {!ds.length && <tr><td colSpan={12} className="muted">Chưa có chiến dịch nào.</td></tr>}
     </tbody></table></div>
+    </>}
   </>);
 }
 export default function Page() { return <Shell><Marketing /></Shell>; }
