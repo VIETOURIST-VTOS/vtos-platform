@@ -79,3 +79,18 @@ def test_import_master_and_group_scope():
     # nạp lần 2 không tạo trùng, không khóa thêm ai
     r2 = client.post("/api/v1/employees/import-master", headers=login("cntt")).json()
     assert r2["created"] == 0 and r2["users_created"] == 0 and r2["users_closed"] == []
+
+
+def test_tai_khoan_trung_ten_bi_dong_du_ten_co_trong_bang_luong():
+    """Nạp từ Vietrip đẻ ra nhiều tài khoản trùng tên một người (lethinh2, lethinh3…). Chúng trùng tên với
+    người thật nên nếu xét theo tên thì sống sót – mà mỗi bản là một lối đăng nhập vào dữ liệu khách."""
+    from app.db.session import SessionLocal
+    from app.models.core import User
+    from app.core.security import hash_password
+    db = SessionLocal()
+    db.add(User(username="lethinh99", full_name="LÊ THỊNH ", role="nv_kd", department="kd_le",
+                password_hash=hash_password("x"), active=True))
+    db.commit(); db.close()
+    r = client.post("/api/v1/employees/import-master", headers=login("phanngocduy", "290")).json()
+    assert any("lethinh99" in x for x in r["users_closed"]), "bản trùng tên phải bị đóng"
+    assert client.post("/api/v1/auth/login", data={"username": "lethinh", "password": "8"}).status_code == 200, "tài khoản thật của người đó vẫn dùng được"

@@ -47,6 +47,8 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
     u_by_name = {}
     for u in users: u_by_name.setdefault(name_key(u.full_name), u)
     u_by_code = {u.staff_code: u for u in users if u.staff_code}
+    dang_gan: set[int] = set()      # id tài khoản ĐANG gắn với một người trong bảng lương – gom trong vòng lặp
+                                    # bên dưới chứ không truy vấn lại, vì phiên làm việc này không tự flush.
     stat = {"updated": 0, "created": 0, "users_linked": 0, "users_created": 0, "passwords_reset": 0, "roles_changed": [], "skipped": [], "users_closed": []}
     for r in rows:
         code, name = str(r["ma"]), r["ten"].strip()
@@ -75,6 +77,7 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
             u = User(username=uname, full_name=name, role=role, department=r["phong"], password_hash=hash_password(code), active=True)
             db.add(u); db.flush(); stat["users_created"] += 1; u_by_name[name_key(name)] = u
         if u is not None:
+            dang_gan.add(u.id)
             if e.user_id != u.id: e.user_id = u.id; stat["users_linked"] += 1
             if role and u.role != role and u.role not in GIU_TAI_KHOAN:   # không hạ quyền tài khoản hệ thống
                 stat["roles_changed"].append(f"{u.username}: {ROLES.get(u.role, u.role)} → {ROLES.get(role, role)}"); u.role = role
@@ -91,10 +94,12 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
     # và tài khoản của họ bị KHÓA – bảng lương là danh sách người đang làm việc, ai không có trong đó thì
     # không được đăng nhập nữa. Khóa chứ không xóa: nhật ký và chứng từ cũ vẫn phải truy ra được người thực hiện.
     if close_accounts:
-        giu = {u.id for u in users if u.role in GIU_TAI_KHOAN}
+        # Điều kiện giữ tài khoản là ĐANG GẮN với một hồ sơ trong bảng lương, không phải "trùng tên với ai đó
+        # trong bảng lương". Dữ liệu nạp từ Vietrip có nhiều tài khoản trùng tên một người (tên thừa dấu cách
+        # nên mỗi lần nạp lại đẻ thêm một bản: lethinh2..5, phamthithuyvy2..10); những bản dư ấy trùng tên với
+        # người thật nên nếu xét theo tên thì chúng sống sót, mà mỗi bản là một lối đăng nhập vào dữ liệu khách.
         for u in users:
-            if not u.active or u.id in giu: continue
-            if u.staff_code in codes or name_key(u.full_name) in names: continue
+            if not u.active or u.role in GIU_TAI_KHOAN or u.id in dang_gan: continue
             u.active = False; stat["users_closed"].append(f"{u.username} ({u.full_name})")
     if dry_run:
         # Xem trước: hoàn tác mọi thay đổi, chỉ trả về danh sách sẽ làm gì. Khóa tài khoản là việc không
