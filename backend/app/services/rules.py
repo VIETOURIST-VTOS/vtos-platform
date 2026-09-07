@@ -117,7 +117,18 @@ def verify_chain(db: Session) -> tuple[bool, int, str]:
 
 # ====================== DỰ TOÁN 3 CON SỐ & CỔNG BIÊN ======================
 def is_doan(tour: Tour) -> bool:
-    return tour.tour_type.startswith("doan")
+    """Tour có thuộc mảng Đoàn không – dùng cho định tuyến duyệt, hạn quyết toán, và cách tính hoa hồng.
+
+    Trước 07/9/2026 hàm này chỉ nhìn loại chuyến. Từ khi Kinh doanh tách hai phòng, "thuộc mảng nào" được
+    định nghĩa một chỗ duy nhất ở app/services/segments.py (hợp của loại chuyến đoàn VÀ quy ước mã MICE).
+    Nếu để hai định nghĩa song song thì sẽ có ngày một tour nằm ở màn hình phòng Đoàn nhưng lại được trả
+    hoa hồng theo bậc thang của phòng Lẻ – lệch tiền chứ không chỉ lệch màn hình.
+
+    Trên dữ liệu thật ngày 07/9/2026 hai định nghĩa cho kết quả GIỐNG HỆT nhau (115/115 tour mã MICE đều là
+    doan_noi_dia), nên thay đổi này không dịch một đồng nào của kỳ lương nào; nó chỉ chặn trường hợp nhập lệch
+    về sau. Muốn quay lại quy tắc cũ thì sửa đúng segments.py, không sửa riêng chỗ này."""
+    from app.services import segments as SEG
+    return SEG.mang_of(tour) == "doan"
 
 
 BUDGET_SOURCES = {"du_toan_tour": "dự toán của chuyến", "san_pham": "cơ cấu chi phí sản phẩm (tham chiếu)", "chua_co": "chưa có dự toán"}

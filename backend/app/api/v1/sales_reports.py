@@ -27,25 +27,32 @@ def _scope(db, u: User, rep: dict) -> None:
     rep["detail"] = [r for r in rep.get("detail", []) if r.get("sale", u.full_name) in names]
 
 
-def _params(from_: str | None, to: str | None, month: str | None) -> dict:
-    return {"from": from_, "to": to, "month": month}
+def _params(from_: str | None, to: str | None, month: str | None, mang: str) -> dict:
+    return {"from": from_, "to": to, "month": month, "mang": mang}
 
 
-@router.get("/sales-reports/{key}")
-def run_report(key: str, from_: str | None = Query(None, alias="from"), to: str | None = None, month: str | None = None, u: User = Depends(require_roles(*VIEW_ROLES)), db: Session = Depends(get_db)):
+def _run(db, key: str, u: User, p: dict) -> dict:
+    """Chạy báo cáo rồi thu hẹp theo quyền xem. Mảng gõ sai thì 422 chứ không lặng lẽ trả về toàn hệ thống –
+    người dùng tưởng đang xem phòng mình mà thật ra đang xem tất cả là kiểu sai khó phát hiện nhất."""
     if key not in SR.REPORTS: raise HTTPException(404, "Không có báo cáo")
-    rep = SR.run(db, key, _params(from_, to, month))
+    try:
+        rep = SR.run(db, key, p)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
     _scope(db, u, rep)
     return rep
 
 
+@router.get("/sales-reports/{key}")
+def run_report(key: str, from_: str | None = Query(None, alias="from"), to: str | None = None, month: str | None = None, mang: str = "", u: User = Depends(require_roles(*VIEW_ROLES)), db: Session = Depends(get_db)):
+    return _run(db, key, u, _params(from_, to, month, mang))
+
+
 @router.get("/sales-reports/{key}/xlsx")
-def export_report(key: str, from_: str | None = Query(None, alias="from"), to: str | None = None, month: str | None = None, u: User = Depends(require_roles(*VIEW_ROLES)), db: Session = Depends(get_db)):
-    if key not in SR.REPORTS: raise HTTPException(404, "Không có báo cáo")
-    rep = SR.run(db, key, _params(from_, to, month))
-    _scope(db, u, rep)
+def export_report(key: str, from_: str | None = Query(None, alias="from"), to: str | None = None, month: str | None = None, mang: str = "", u: User = Depends(require_roles(*VIEW_ROLES)), db: Session = Depends(get_db)):
+    rep = _run(db, key, u, _params(from_, to, month, mang))
     data = SR.to_xlsx(rep)
-    name = f"VTOS_{key}_{month or from_ or ''}.xlsx".replace("--", "-")
+    name = f"VTOS_{key}_{rep.get('mang') or 'toanhethong'}_{month or from_ or ''}.xlsx".replace("--", "-")
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename={name}"})
 
 

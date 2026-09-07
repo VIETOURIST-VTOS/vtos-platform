@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, pct, fmtD, fmtDT, getToken } from "@/lib/api";
-import { Tag, errMsg } from "@/components/ui";
+import { Tag, errMsg, MangTag } from "@/components/ui";
 
 const PCT_KEYS = new Set(["margin", "pct_moc", "rate"]);
 const DATE_KEYS = new Set(["created_at", "cancelled_at", "deadline", "start_date", "end_date"]);
@@ -22,16 +23,20 @@ function SalesReports() {
   const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(today.slice(0, 8) + "01"); const [to, setTo] = useState(today); const [month, setMonth] = useState(today.slice(0, 7));
   const [rep, setRep] = useState<any>(null); const [busy, setBusy] = useState(false);
+  // Mảng lấy từ đường dẫn (menu phòng Lẻ / phòng Đoàn trỏ vào ?mang=le / ?mang=doan). Next chỉ đổi query chứ
+  // không dựng lại trang khi chuyển giữa hai menu, nên `mang` phải nằm trong phụ thuộc của useCallback.
+  const mang = useSearchParams().get("mang") || "";
   useEffect(() => { api("/sales-reports").then(setList).catch(() => {}); }, []);
-  const qs = `from=${from}&to=${to}&month=${month}`;
-  const run = useCallback(async () => { setBusy(true); try { setRep(await api(`/sales-reports/${key}?${qs}`)); } catch (e) { toast(errMsg(e), true); } setBusy(false); }, [key, qs, toast]);
+  const qs = `from=${from}&to=${to}&month=${month}&mang=${mang}`;
+  const run = useCallback(async () => { setBusy(true); try { setRep(await api(`/sales-reports/${key}?${qs}`)); } catch (e) { setRep(null); toast(errMsg(e), true); } setBusy(false); }, [key, qs, toast]);
   useEffect(() => { run(); }, [run]);
-  const xlsx = async () => { try { const r = await fetch(`/api/v1/sales-reports/${key}/xlsx?${qs}`, { headers: { Authorization: `Bearer ${getToken() || ""}` } }); if (!r.ok) throw new Error("Không xuất được"); const u = URL.createObjectURL(await r.blob()); const a = document.createElement("a"); a.href = u; a.download = `VTOS_${key}_${month}.xlsx`; a.click(); } catch (e: any) { toast(e.message, true); } };
+  const xlsx = async () => { try { const r = await fetch(`/api/v1/sales-reports/${key}/xlsx?${qs}`, { headers: { Authorization: `Bearer ${getToken() || ""}` } }); if (!r.ok) throw new Error("Không xuất được"); const u = URL.createObjectURL(await r.blob()); const a = document.createElement("a"); a.href = u; a.download = `VTOS_${key}_${mang || "toanhethong"}_${month}.xlsx`; a.click(); } catch (e: any) { toast(e.message, true); } };
   const meta = list.find((x) => x.key === key) || {}; const P: string[] = meta.params || [];
   const T = rep?.total || {};
   return (<>
-    <h1>Báo cáo bán hàng</h1>
+    <h1>Báo cáo bán hàng{mang ? ` – ${mang === "doan" ? "Kinh doanh Đoàn (MICE)" : "Kinh doanh Lẻ"}` : ""}</h1>
     <p className="muted">Danh mục như Vietrip (Báo cáo › Tour lẻ / Điều hành): chọn báo cáo, kỳ, chạy và xuất Excel. Sale chỉ thấy số liệu của mình; Ban Giám đốc, Kế toán, BKS thấy toàn bộ.</p>
+    <MangTag mang={mang} />
     <div className="grid">
       <div className="panel"><h2>Danh sách báo cáo</h2>
         <table><thead><tr><th>Tên báo cáo</th><th>Loại</th></tr></thead><tbody>{list.map((x) => <tr key={x.key} onClick={() => setKey(x.key)} style={{ cursor: "pointer", background: x.key === key ? "var(--panel2, rgba(255,255,255,.06))" : undefined }}><td><b>{x.name}</b><div className="muted">{x.desc}</div></td><td>{x.kind}</td></tr>)}</tbody></table></div>
@@ -53,4 +58,4 @@ function SalesReports() {
   </>);
 }
 
-export default function Page() { return <Shell><SalesReports /></Shell>; }
+export default function Page() { return <Shell><Suspense><SalesReports /></Suspense></Shell>; }

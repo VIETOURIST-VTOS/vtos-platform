@@ -10,7 +10,11 @@ import { getUser, clearSession, type User } from "@/lib/api";
 export const GROUPS: { key: string; label: string; items: [string, string][] }[] = [
   { key: "holdings", label: "1. Điều hành Holdings", items: [
     ["Tổng quan", "/"], ["Công ty thành viên & liên kết", "/companies"], ["Kết quả từng đơn vị", ""],
-    ["Báo cáo quản trị", "/robot-reports"], ["Chỉ đạo & theo dõi thực hiện", ""]] },
+    ["Báo cáo quản trị", "/robot-reports"],
+    // Hai phòng Kinh doanh vào báo cáo qua menu của mình (?mang=le / ?mang=doan). Nếu chỉ có hai lối đó thì
+    // không còn đường nào tới con số HỢP NHẤT – nên Điều hành Holdings giữ một lối vào không kèm tham số.
+    ["Báo cáo bán hàng toàn hệ thống", "/sales-reports"],
+    ["Chỉ đạo & theo dõi thực hiện", ""]] },
   { key: "marketing", label: "2. Marketing & CSKH", items: [
     ["Kế hoạch & ngân sách", ""], ["Chiến dịch", ""], ["Nội dung & thương hiệu", ""],
     ["Kênh & hộp thư", "/inbox"], ["Nguồn khách", "/leads?tab=leads"], ["Chăm sóc sau bán", ""],
@@ -23,11 +27,11 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Khách hàng & cơ hội bán", "/leads?tab=leads"], ["Sản phẩm", "/products"],
     ["Tour lẻ", "/tours?mang=le"], ["Yêu cầu & booking", "/requests?mang=le"],
     ["Booking & bảo lưu", "/bookings?mang=le"], ["Dịch vụ lẻ", "/non-package"],
-    ["Giá & chính sách bán", ""], ["Báo giá", ""], ["Báo cáo bán hàng", "/sales-reports"]] },
+    ["Giá & chính sách bán", ""], ["Báo giá", ""], ["Báo cáo bán hàng", "/sales-reports?mang=le"]] },
   { key: "kd_doan", label: "4. Kinh doanh Đoàn (MICE)", items: [
     ["Tour đoàn", "/tours?mang=doan"], ["Yêu cầu & booking", "/requests?mang=doan"],
     ["Booking & bảo lưu", "/bookings?mang=doan"],
-    ["Báo giá đoàn", ""], ["Hợp đồng", ""], ["Báo cáo bán hàng", "/sales-reports"]] },
+    ["Báo giá đoàn", ""], ["Hợp đồng", ""], ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
   { key: "dieuhanh", label: "5. Điều hành", items: [
     ["Yêu cầu chờ xử lý", "/requests"], ["Chuyến tour & dự toán", "/tours"], ["Nhà cung cấp & đặt dịch vụ", ""],
     ["Hồ sơ visa", "/visa"],

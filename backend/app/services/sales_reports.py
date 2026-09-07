@@ -1,5 +1,13 @@
 """Báo cáo bán hàng (theo danh mục báo cáo Vietrip: bán tour lẻ, nhắc thu tiền khách, hủy chỗ của sale, kinh doanh) + xuất Excel,
-và robot R9 giám sát bất thường (số liệu lệch, hành vi rủi ro) cho Chủ tịch/TGĐ/BKS."""
+và robot R9 giám sát bất thường (số liệu lệch, hành vi rủi ro) cho Chủ tịch/TGĐ/BKS.
+
+Từ 07/9/2026 mỗi báo cáo nhận thêm tham số `mang` (le / doan) để hai phòng Kinh doanh xem đúng doanh số của
+mình. Không truyền `mang` thì báo cáo giữ nguyên phạm vi toàn hệ thống như trước – Ban Giám đốc, Kế toán và
+BKS vẫn có một con số hợp nhất để đối chiếu, chứ không phải cộng tay hai bản.
+
+Điều kiện lọc lấy từ app.services.segments – CÙNG một chỗ với bộ lọc trên màn hình danh sách. Nếu báo cáo tự
+định nghĩa lại "thế nào là tour đoàn" thì sẽ có ngày màn hình đếm 12 tour còn báo cáo đếm 11, và không ai
+biết bên nào đúng."""
 from datetime import datetime, date, timedelta
 from io import BytesIO
 from sqlalchemy import select, func
@@ -10,6 +18,7 @@ from app.models.ops import PaymentRequest
 from app.models.hr import Employee
 from app.services import rules as R
 from app.services import bookings as BK
+from app.services import segments as SEG
 
 REPORTS = {
     "ban_tour_le": {"name": "Báo cáo bán tour lẻ", "kind": "Ngày", "params": ["from", "to"], "desc": "Booking tạo trong kỳ theo từng sale: số booking, khách, doanh thu, đã thu, còn phải thu, hủy, đủ 4 trường"},
@@ -20,6 +29,9 @@ REPORTS = {
 }
 
 
+MANG_LABEL = SEG.MANG                                   # {"le": "Kinh doanh Lẻ", "doan": "Kinh doanh Đoàn"}
+
+
 def _sales_name(b: Booking) -> str: return b.sales.full_name if b.sales else ""
 
 
@@ -27,8 +39,10 @@ def _office_of(db: Session) -> dict[int, str]:
     return {e.user_id: e.office for e in db.execute(select(Employee).where(Employee.user_id != None)).scalars()}
 
 
-def ban_tour_le(db: Session, d1: date, d2: date) -> dict:
+def ban_tour_le(db: Session, d1: date, d2: date, mang: str = "") -> dict:
     q = select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.created_at >= datetime.combine(d1, datetime.min.time()), Booking.created_at < datetime.combine(d2 + timedelta(days=1), datetime.min.time()), Tour.tour_type != "non_package")
+    cond = SEG.tour_cond(mang)
+    if cond is not None: q = q.where(cond)
     rows = list(db.execute(q.order_by(Booking.created_at)).scalars())
     by: dict[str, dict] = {}
     for b in rows:
@@ -40,14 +54,16 @@ def ban_tour_le(db: Session, d1: date, d2: date) -> dict:
     detail = [{"created_at": b.created_at, "code": b.code, "tour_code": b.tour.code, "start_date": b.tour.start_date, "customer": b.customer_name, "phone": b.customer_phone, "source": b.source, "pax": b.pax,
                "revenue": b.amount - b.discount, "paid": b.paid, "due": max(0.0, b.amount - b.discount - b.paid), "status": BK.pmt_status_of(b), "sale": _sales_name(b), "counts": b.counts_for_target, "sla_ok": b.sla_ok, "cancelled": b.cancelled} for b in rows]
     tot = {"bookings": sum(s["bookings"] for s in summary), "pax": sum(s["pax"] for s in summary), "revenue": sum(s["revenue"] for s in summary), "paid": sum(s["paid"] for s in summary), "due": sum(s["due"] for s in summary), "cancelled": sum(s["cancelled"] for s in summary)}
-    return {"report": "ban_tour_le", "from": d1, "to": d2, "summary": summary, "total": tot, "detail": detail,
+    return {"report": "ban_tour_le", "from": d1, "to": d2, "mang": SEG.valid(mang), "summary": summary, "total": tot, "detail": detail,
             "columns": {"summary": [("sale", "Sale"), ("bookings", "Booking"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn phải thu"), ("cancelled", "Hủy"), ("du_4_truong", "Đủ 4 trường"), ("sla_qua", "Quá SLA 2h")],
                         "detail": [("created_at", "Ngày tạo"), ("code", "Booking"), ("tour_code", "Tour"), ("start_date", "Khởi hành"), ("customer", "Khách"), ("phone", "SĐT"), ("source", "Nguồn"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn lại"), ("status", "TT"), ("sale", "Sale")]}}
 
 
-def nhac_thu(db: Session) -> dict:
+def nhac_thu(db: Session, mang: str = "") -> dict:
     today = date.today(); now = datetime.now()
     q = select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.cancelled == False, Tour.start_date >= today - timedelta(days=1), Tour.status.in_(["da_duyet", "cho_duyet", "cho_xac_nhan", "ket_thuc"]))
+    cond = SEG.tour_cond(mang)
+    if cond is not None: q = q.where(cond)
     rows = []
     for b in db.execute(q).scalars():
         due = b.amount - b.discount - b.paid
@@ -60,13 +76,17 @@ def nhac_thu(db: Session) -> dict:
     for r in rows:
         s = by.setdefault(r["sale"] or "(không có sale)", {"sale": r["sale"] or "(không có sale)", "bookings": 0, "due": 0.0, "overdue": 0, "unpaid": 0})
         s["bookings"] += 1; s["due"] += r["due"]; s["overdue"] += 1 if r["overdue"] else 0; s["unpaid"] += 1 if r["status"] == "UNPAID" else 0
-    return {"report": "nhac_thu", "as_of": now, "summary": sorted(by.values(), key=lambda x: -x["due"]), "total": {"bookings": len(rows), "due": sum(r["due"] for r in rows), "overdue": sum(1 for r in rows if r["overdue"])}, "detail": rows,
+    return {"report": "nhac_thu", "as_of": now, "mang": SEG.valid(mang), "summary": sorted(by.values(), key=lambda x: -x["due"]), "total": {"bookings": len(rows), "due": sum(r["due"] for r in rows), "overdue": sum(1 for r in rows if r["overdue"])}, "detail": rows,
             "columns": {"summary": [("sale", "Sale"), ("bookings", "Booking còn nợ"), ("due", "Còn phải thu"), ("overdue", "Quá deadline"), ("unpaid", "Chưa cọc")],
                         "detail": [("deadline", "Deadline"), ("code", "Booking"), ("tour_code", "Tour"), ("start_date", "Khởi hành"), ("days_left", "Còn (ngày)"), ("customer", "Khách"), ("phone", "SĐT"), ("revenue", "Tiền tour"), ("deposit_due", "Cọc"), ("paid", "Đã thu"), ("due", "Còn lại"), ("status", "TT"), ("sale", "Sale")]}}
 
 
-def huy_cho(db: Session, d1: date, d2: date) -> dict:
+def huy_cho(db: Session, d1: date, d2: date, mang: str = "") -> dict:
     q = select(Booking).where(Booking.cancelled == True, Booking.cancelled_at >= datetime.combine(d1, datetime.min.time()), Booking.cancelled_at < datetime.combine(d2 + timedelta(days=1), datetime.min.time()))
+    cond = SEG.tour_cond(mang)
+    # Chỉ nối bảng tours khi thật sự lọc theo mảng: nối vô điều kiện sẽ đánh rơi booking không gắn tour
+    # khỏi báo cáo hủy toàn hệ thống – mà đó lại đúng là loại booking cần soi khi rà hủy chỗ.
+    if cond is not None: q = q.join(Tour, Tour.id == Booking.tour_id).where(cond)
     rows = list(db.execute(q.order_by(Booking.cancelled_at)).scalars())
     rts = {r.booking_id: r for r in db.execute(select(Retention).where(Retention.booking_id.in_([b.id for b in rows] or [0]))).scalars()}
     detail, by = [], {}
@@ -76,15 +96,17 @@ def huy_cho(db: Session, d1: date, d2: date) -> dict:
                        "retention": rt.code if rt else "", "retention_amt": rt.amount if rt else 0.0, "refund": max(0.0, b.paid - b.cancel_charge) if not rt else 0.0, "reason": b.cancel_reason, "late": late, "sale": _sales_name(b)})
         s = by.setdefault(_sales_name(b) or "(không có sale)", {"sale": _sales_name(b) or "(không có sale)", "cancelled": 0, "paid": 0.0, "charge": 0.0, "retained": 0.0, "late": 0})
         s["cancelled"] += 1; s["paid"] += b.paid; s["charge"] += b.cancel_charge; s["retained"] += rt.amount if rt else 0; s["late"] += 1 if late else 0
-    return {"report": "huy_cho", "from": d1, "to": d2, "summary": sorted(by.values(), key=lambda x: -x["cancelled"]), "total": {"cancelled": len(rows), "charge": sum(b.cancel_charge for b in rows), "retained": sum(r.amount for r in rts.values())}, "detail": detail,
+    return {"report": "huy_cho", "from": d1, "to": d2, "mang": SEG.valid(mang), "summary": sorted(by.values(), key=lambda x: -x["cancelled"]), "total": {"cancelled": len(rows), "charge": sum(b.cancel_charge for b in rows), "retained": sum(r.amount for r in rts.values())}, "detail": detail,
             "columns": {"summary": [("sale", "Sale"), ("cancelled", "Số hủy"), ("paid", "Đã thu trước hủy"), ("charge", "Phí hủy giữ lại"), ("retained", "Bảo lưu"), ("late", "Hủy sau deadline")],
                         "detail": [("cancelled_at", "Ngày hủy"), ("code", "Booking"), ("tour_code", "Tour"), ("start_date", "Khởi hành"), ("customer", "Khách"), ("phone", "SĐT"), ("paid", "Đã thu"), ("charge", "Phí hủy"), ("retention", "Bảo lưu"), ("retention_amt", "Tiền BL"), ("refund", "Hoàn"), ("reason", "Lý do"), ("late", "Sau deadline"), ("sale", "Sale")]}}
 
 
-def kinh_doanh(db: Session, month: str) -> dict:
+def kinh_doanh(db: Session, month: str, mang: str = "") -> dict:
     from app.services import hr as HR
     y, m = map(int, month.split("-")); d1 = date(y, m, 1); d2 = date(y + (m == 12), m % 12 + 1, 1)
     q = select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.created_at >= datetime.combine(d1, datetime.min.time()), Booking.created_at < datetime.combine(d2, datetime.min.time()), Booking.cancelled == False, Tour.tour_type != "non_package")
+    cond = SEG.tour_cond(mang)
+    if cond is not None: q = q.where(cond)
     emps = {e.user_id: e for e in db.execute(select(Employee).where(Employee.user_id != None)).scalars()}
     moc_hcm = R.get_param(db, "moc_chi_tieu_hcm"); moc_ct = R.get_param(db, "moc_chi_tieu_cantho"); table = HR.parse_f_table(R.get_param_text(db, "thang_f_bang"))
     by: dict[int, dict] = {}
@@ -99,14 +121,28 @@ def kinh_doanh(db: Session, month: str) -> dict:
         s["pct_moc"] = s["revenue_target"] / s["moc"] if s["moc"] else 0; s["f"] = f"f{lvl}"; s["rate"] = rate; s["commission_est"] = round(rate * max(0.0, s["revenue_target"] - s["moc"]))
         out.append(s)
     out.sort(key=lambda x: -x["revenue_target"])
-    return {"report": "kinh_doanh", "month": month, "summary": out, "total": {"bookings": sum(s["bookings"] for s in out), "revenue": sum(s["revenue"] for s in out), "revenue_target": sum(s["revenue_target"] for s in out), "commission_est": sum(s["commission_est"] for s in out)}, "detail": [],
-            "note": "Hoa hồng ước theo tháng tạo booking; hoa hồng chính thức tính theo tháng quyết toán (số Kế toán xác nhận) ở bảng lương.",
+    # Cột "DT tính chỉ tiêu" và hoa hồng bậc thang là cơ chế của mảng LẺ. Tour đoàn ăn theo chia lợi nhuận
+    # quyết toán (app/services/hr.py), nên khi xem mảng Đoàn hai cột này bằng 0 – phải nói ra, nếu không
+    # phòng Đoàn nhìn bảng trắng lại tưởng phần mềm quên tính hoa hồng cho họ.
+    note = "Hoa hồng ước theo tháng tạo booking; hoa hồng chính thức tính theo tháng quyết toán (số Kế toán xác nhận) ở bảng lương."
+    if SEG.valid(mang) == "doan":
+        note = ("Mảng Đoàn không hưởng hoa hồng theo bậc thang doanh thu mà theo chia lợi nhuận quyết toán, "
+                "nên hai cột \"DT tính chỉ tiêu\" và \"Hoa hồng ước\" ở đây bằng 0 – xem số chính thức ở bảng lương.")
+    return {"report": "kinh_doanh", "month": month, "mang": SEG.valid(mang), "summary": out, "total": {"bookings": sum(s["bookings"] for s in out), "revenue": sum(s["revenue"] for s in out), "revenue_target": sum(s["revenue_target"] for s in out), "commission_est": sum(s["commission_est"] for s in out)}, "detail": [],
+            "note": note,
             "columns": {"summary": [("sale", "Sale"), ("office", "VP"), ("bookings", "Booking"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("revenue_target", "DT tính chỉ tiêu"), ("moc", "Mốc"), ("pct_moc", "% mốc"), ("f", "Bậc"), ("rate", "Hệ số"), ("commission_est", "Hoa hồng ước"), ("paid", "Đã thu")], "detail": []}}
 
 
-def tour_le(db: Session, d1: date, d2: date) -> dict:
+def tour_le(db: Session, d1: date, d2: date, mang: str = "") -> dict:
+    """Hiệu quả từng chuyến khởi hành trong kỳ.
+
+    Không chọn mảng thì giữ nguyên phạm vi cũ (tour lẻ) để số liệu lịch sử không đổi. Chọn mảng thì dùng đúng
+    quy tắc của bộ lọc chung: mảng Lẻ loại luôn tour mã MICE bị ghi nhầm loại chuyến – nếu không, tour đó vừa
+    nằm ở màn hình phòng Đoàn vừa nằm trong báo cáo hiệu quả của phòng Lẻ."""
     from app.services import settlement as ST
-    ts = list(db.execute(select(Tour).where(Tour.start_date >= d1, Tour.start_date <= d2, Tour.tour_type.in_(["le_noi_dia", "le_nuoc_ngoai"])).order_by(Tour.start_date)).scalars())
+    cond = SEG.tour_cond(mang)
+    if cond is None: cond = Tour.tour_type.in_(SEG.LE_TYPES)
+    ts = list(db.execute(select(Tour).where(Tour.start_date >= d1, Tour.start_date <= d2, cond).order_by(Tour.start_date)).scalars())
     rows = []
     for t in ts:
         bs = [b for b in t.bookings if not b.cancelled]; rev = sum(b.amount - b.discount for b in bs); paid = sum(b.paid for b in bs)
@@ -114,7 +150,7 @@ def tour_le(db: Session, d1: date, d2: date) -> dict:
         rows.append({"tour_code": t.code, "name": t.name, "start_date": t.start_date, "end_date": t.end_date, "seats_open": t.seats_open or t.planned_pax, "pax": sum(b.pax for b in bs), "bookings": len(bs), "revenue": rev, "paid": paid, "due": rev - paid,
                      "cost": cost, "profit": rev - cost, "margin": (rev - cost) / rev if rev else 0, "status": t.status, "operator": t.operator.full_name if t.operator else "", "version": t.settlement_version})
     tot = {"tours": len(rows), "pax": sum(r["pax"] for r in rows), "revenue": sum(r["revenue"] for r in rows), "paid": sum(r["paid"] for r in rows), "cost": sum(r["cost"] for r in rows)}; tot["profit"] = tot["revenue"] - tot["cost"]
-    return {"report": "tour_le", "from": d1, "to": d2, "summary": rows, "total": tot, "detail": [],
+    return {"report": "tour_le", "from": d1, "to": d2, "mang": SEG.valid(mang), "summary": rows, "total": tot, "detail": [],
             "columns": {"summary": [("tour_code", "Tour"), ("name", "Tên"), ("start_date", "Khởi hành"), ("seats_open", "Mở bán"), ("pax", "Khách"), ("bookings", "Booking"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn lại"), ("cost", "Chi phí"), ("profit", "Lợi nhuận"), ("margin", "Biên"), ("status", "Trạng thái"), ("operator", "Điều hành")], "detail": []}}
 
 
@@ -122,11 +158,12 @@ def run(db: Session, key: str, params: dict) -> dict:
     today = date.today()
     d1 = date.fromisoformat(params.get("from")) if params.get("from") else today.replace(day=1)
     d2 = date.fromisoformat(params.get("to")) if params.get("to") else today
-    if key == "ban_tour_le": return ban_tour_le(db, d1, d2)
-    if key == "nhac_thu": return nhac_thu(db)
-    if key == "huy_cho": return huy_cho(db, d1, d2)
-    if key == "kinh_doanh": return kinh_doanh(db, params.get("month") or f"{today:%Y-%m}")
-    if key == "tour_le": return tour_le(db, d1, d2)
+    mang = SEG.valid(params.get("mang") or "")          # ValueError → API trả 422, không âm thầm bỏ qua
+    if key == "ban_tour_le": return ban_tour_le(db, d1, d2, mang)
+    if key == "nhac_thu": return nhac_thu(db, mang)
+    if key == "huy_cho": return huy_cho(db, d1, d2, mang)
+    if key == "kinh_doanh": return kinh_doanh(db, params.get("month") or f"{today:%Y-%m}", mang)
+    if key == "tour_le": return tour_le(db, d1, d2, mang)
     raise KeyError(key)
 
 
@@ -136,7 +173,11 @@ def to_xlsx(rep: dict) -> bytes:
     wb = Workbook(); meta = REPORTS[rep["report"]]
     def sheet(ws, title, cols, rows):
         ws.title = title[:30]; ws.append([meta["name"]]); ws["A1"].font = Font(bold=True, size=13)
-        ws.append([f"Kỳ: {rep.get('from', '')} → {rep.get('to', '')}" if rep.get("from") else (f"Tháng {rep.get('month')}" if rep.get("month") else f"Tính đến {rep.get('as_of', datetime.now()):%d/%m/%Y %H:%M}")]); ws.append([])
+        ky = f"Kỳ: {rep.get('from', '')} → {rep.get('to', '')}" if rep.get("from") else (f"Tháng {rep.get('month')}" if rep.get("month") else f"Tính đến {rep.get('as_of', datetime.now()):%d/%m/%Y %H:%M}")
+        # Phạm vi phải in ngay trên file: một bản Excel rời khỏi phần mềm mà không ghi đang xem phòng nào thì
+        # người nhận không có cách nào biết, và hai bản của hai phòng nhìn giống hệt nhau.
+        ky += f" – {MANG_LABEL[rep['mang']]}" if rep.get("mang") else " – Toàn hệ thống"
+        ws.append([ky]); ws.append([])
         ws.append([c[1] for c in cols])
         for cell in ws[4]: cell.font = Font(bold=True); cell.fill = PatternFill("solid", fgColor="D9E2F3"); cell.alignment = Alignment(horizontal="center", wrap_text=True)
         for r in rows:
