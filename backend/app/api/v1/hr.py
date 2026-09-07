@@ -498,11 +498,21 @@ def dispatch_create(data: DispatchIn, u: User = Depends(require_roles("nv_dh", "
         drv = db.execute(select(Employee).where(Employee.department == "doi_xe").order_by(Employee.id)).scalars().first()
         if not drv: raise HTTPException(422, "Chưa có hồ sơ tài xế")
         driver_id = drv.id
+    # Bộ điều kiện phát lệnh (Đợt 1 đội xe, đặc tả §7). Mức BLOCK chặn thật, không có nút vượt chung; các mức
+    # còn lại đi kèm lệnh để người điều hành thấy, và được ghi vào nhật ký cùng lệnh.
+    from app.services import fleet as FL
+    kt = FL.kiem_tra_dieu_xe(db, v, data.date_from, data.date_to, driver_id,
+                             chan_khi_thieu_giay=bool(R.get_param(db, "xe_chan_khi_thieu_giay")))
+    if kt["muc"] == FL.BLOCK:
+        raise HTTPException(422, {"message": "Không đủ điều kiện phát lệnh điều xe",
+                                  "vi_pham": [i for i in kt["items"] if i["level"] == FL.BLOCK]})
     d = DispatchOrder(tour_id=t.id, vehicle_id=v.id, driver_id=driver_id, date_from=data.date_from, date_to=data.date_to, rate_id=rt.id if rt else None, internal_price=price, created_by=u.username)
     db.add(d); db.flush()
-    R.audit(db, u.username, u.role, "lenh_dieu_xe", f"tour:{t.code}", after={"xe": v.plate, "tuyen": rt.route if rt else "", "tu": str(data.date_from), "den": str(data.date_to), "gia_noi_bo": price})
+    R.audit(db, u.username, u.role, "lenh_dieu_xe", f"tour:{t.code}", after={"xe": v.plate, "tuyen": rt.route if rt else "", "tu": str(data.date_from), "den": str(data.date_to), "gia_noi_bo": price, "kiem_tra": kt["muc"]})
     db.commit()
-    return {"message": f"Đã lập lệnh điều xe {v.plate} cho {t.code} – Đội xe xác nhận trong 4 giờ"}
+    canh_bao = [i["msg"] for i in kt["items"]]
+    return {"message": f"Đã lập lệnh điều xe {v.plate} cho {t.code} – Đội xe xác nhận trong 4 giờ",
+            "kiem_tra": {"muc": kt["muc"], "muc_ten": kt["muc_ten"], "canh_bao": canh_bao}}
 
 
 class DispatchUpdate(BaseModel):

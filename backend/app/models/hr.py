@@ -89,6 +89,19 @@ class Vehicle(Base):
     driver_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
     internal_rate_per_day: Mapped[float] = mapped_column(Float, default=0)   # dùng khi tuyến không có trong bảng giá
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # --- Đợt 1 đội xe (đặc tả 06/9/2026). Xem app/models/fleet.py để hiểu vì sao tách làm ba trục. ---
+    code: Mapped[str] = mapped_column(String(20), default="")                # mã xe cố định suốt vòng đời
+    vin: Mapped[str] = mapped_column(String(40), default="")                 # số khung – dùng để nhận ra xe cũ khi đổi biển
+    lifecycle: Mapped[str] = mapped_column(String(20), default="dang_khai_thac")   # vòng đời TÀI SẢN
+    op_right: Mapped[str] = mapped_column(String(20), default="so_huu")      # quyền KHAI THÁC (khác vòng đời)
+    operator_company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    partner_name: Mapped[str] = mapped_column(String(120), default="")       # đối tác khai thác/chủ xe ngoài
+    contract_ref: Mapped[str] = mapped_column(String(60), default="")        # số hợp đồng hợp tác
+    contract_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    contract_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    odo_km: Mapped[int] = mapped_column(Integer, default=0)                   # số km đồng hồ đã xác nhận
+    odo_at: Mapped[date | None] = mapped_column(Date, nullable=True)          # thời điểm của số km đó
+    source_note: Mapped[str] = mapped_column(String(200), default="")
 
 
 class VehicleRate(Base):

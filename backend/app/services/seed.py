@@ -4,6 +4,7 @@ from app.core.security import hash_password
 from sqlalchemy import select
 from app.models.core import User, Tour, ServiceRequest, Booking
 from app.models.hr import GuideRate, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder
+from app.models.fleet import VehiclePlate, FleetVerification
 from app.services import rules as core
 
 USERS = [
@@ -139,11 +140,15 @@ def seed_hr(db, users, tours, today):
     emp("NS0015", "Kế toán tổng hợp", "ketoan", "nv", sal=10_000_000, user="ketoan")
     emp("NS0016", "Nhân sự Hành chính", "hcns", "nv", sal=9_000_000, user="hcns")
     db.flush()
-    x1 = Vehicle(plate="50F-009.60", seats=45, kind="noi_bo", driver_id=d1.id, internal_rate_per_day=3_500_000)
-    x2 = Vehicle(plate="50E-957.34", seats=45, kind="noi_bo", driver_id=d2.id, internal_rate_per_day=3_500_000)
-    x3 = Vehicle(plate="50E-955.31", seats=45, kind="hop_tac", driver_id=None, internal_rate_per_day=0)
-    x4 = Vehicle(plate="50H-496.23", seats=45, kind="hop_tac", driver_id=None, internal_rate_per_day=0)
+    # Đội xe Đợt 1: mỗi xe có MÃ cố định, và quyền khai thác tách khỏi vòng đời tài sản.
+    x1 = Vehicle(plate="50F-009.60", code="XE0001", seats=45, kind="noi_bo", driver_id=d1.id, internal_rate_per_day=3_500_000, op_right="so_huu")
+    x2 = Vehicle(plate="50E-957.34", code="XE0002", seats=45, kind="noi_bo", driver_id=d2.id, internal_rate_per_day=3_500_000, op_right="so_huu")
+    x3 = Vehicle(plate="50E-955.31", code="XE0003", seats=45, kind="hop_tac", driver_id=None, internal_rate_per_day=0, op_right="hop_tac",
+                 partner_name="Đối tác hợp tác (chưa xác minh định danh đầy đủ)", source_note="hồ sơ 3 xe hợp tác")
+    x4 = Vehicle(plate="50H-496.23", code="XE0004", seats=45, kind="hop_tac", driver_id=None, internal_rate_per_day=0, op_right="hop_tac",
+                 partner_name="Đối tác hợp tác (chưa xác minh định danh đầy đủ)", source_note="hồ sơ 3 xe hợp tác")
     db.add_all([x1, x2, x3, x4]); db.flush()
+    seed_fleet_dot1(db, [x1, x2, x3, x4])
     seed_vehicle_rates(db); seed_guide_rates(db)
     seed_companies(db)
     dalat = tours[3]
@@ -263,3 +268,21 @@ def seed_companies(db):
                 e.company_id = me.id; h += 1
     db.commit()
     return {"xe": n, "hdv": h}
+
+
+def seed_fleet_dot1(db, xe: list) -> None:
+    """Dữ liệu nền Đợt 1 đội xe: lịch sử biển số cho xe đang có, và vài việc xác minh làm mẫu.
+
+    Cố ý KHÔNG nạp giấy tờ giả: nếu bản demo có sẵn đăng kiểm còn hạn thì màn hình sẽ hiện xanh và người xem
+    tưởng hệ thống đã kiểm tra hồ sơ thật. Để trống, xe sẽ ở mức "Chưa đủ dữ liệu" – đúng như thực tế hôm nay.
+    """
+    for v in xe:
+        db.add(VehiclePlate(vehicle_id=v.id, plate=v.plate, source="dữ liệu có sẵn trước Đợt 1",
+                            note="Biển đang dùng khi nạp Đợt 1; ngày bắt đầu chưa biết nên để trống thay vì đoán"))
+    db.add(FleetVerification(entity="vehicle", vehicle_id=xe[2].id, ref=xe[2].plate,
+                             issue="Xác minh định danh đầy đủ của đối tác hợp tác và pháp nhân đứng tên hợp đồng",
+                             source="hồ sơ 3 xe hợp tác"))
+    db.add(FleetVerification(entity="vehicle", vehicle_id=xe[3].id, ref=xe[3].plate,
+                             issue="Đối chiếu tên tài xế giữa hai nguồn và ngày bàn giao xe",
+                             source="hồ sơ 3 xe hợp tác"))
+    db.flush()

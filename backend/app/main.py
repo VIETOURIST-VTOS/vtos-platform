@@ -24,6 +24,7 @@ from app.api.v1.sales_reports import router as sales_reports_router
 from app.api.v1.crm import router as crm_router
 from app.api.v1.inbox import router as inbox_router
 from app.api.v1.visa import router as visa_router
+from app.api.v1.fleet import router as fleet_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -95,6 +96,7 @@ app.include_router(ops_router)
 app.include_router(finance_router)
 app.include_router(vietrip_router)
 app.include_router(visa_router)
+app.include_router(fleet_router)
 
 
 @app.get("/", include_in_schema=False)

@@ -13,6 +13,9 @@ DEFAULT_PARAMS = [
     ("han_kt_xac_nhan", "3", "Kế toán xác nhận sau khi đóng số", "ngày làm việc", "KT-HCNS; ĐC Điều 1"),
     ("sla_booking_phut", "120", "Điều hành tạo booking sau khi nhận yêu cầu", "phút làm việc", "ĐH Điều 2"),
     ("moc_d7", "7", "Mốc D-n kiểm tra chuyến dưới hòa vốn", "ngày", "ĐH Điều 13"),
+    # Đội xe Đợt 1: bật thành 1 khi hồ sơ giấy tờ 14 xe đã nhập đủ. Để 0 trong giai đoạn nhập liệu, vì chặn
+    # theo giấy tờ khi chưa có giấy tờ nào trong hệ thống thì mọi lệnh điều xe đều dừng.
+    ("xe_chan_khi_thieu_giay", "0", "Chặn phát lệnh khi thiếu dữ liệu giấy tờ xe/tài xế", "0 hoặc 1", "Đội xe Vietrip v1.3 §7"),
     ("han_muc_mkt", "5000000", "Hạn mức chi Marketing cần 2 chữ ký", "đồng", "MKT Điều 8"),
     ("coc_mac_dinh_pct", "30", "Tỷ lệ cọc mặc định khi sản phẩm không quy định", "%", "Vận hành Vietrip"),
     ("han_coc_gio", "24", "Hạn khách đặt cọc sau khi tạo booking (quá → cảnh báo sale/ĐH)", "giờ", "Vận hành Vietrip"),

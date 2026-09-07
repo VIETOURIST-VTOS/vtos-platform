@@ -40,7 +40,10 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
   // Công ty TNHH Vận tải Vietrip, còn hướng dẫn viên hưởng lương ở công ty mẹ – gom vào một nhóm menu để
   // người phụ trách có màn hình của mình, thay vì nằm lẫn trong nghiệp vụ tour.
   { key: "vantai", label: "6. Vận tải & Hướng dẫn viên", items: [
-    ["Đội xe", "/ops?tab=fleet"], ["HDV & phân chuyến", "/ops?tab=guides"],
+    // Hồ sơ đội xe theo đặc tả "Quản lý vận hành xe Vietrip" v1.3: mã xe cố định, lịch sử biển, giấy tờ có
+    // hạn và điều kiện khai thác. Màn hình /ops?tab=fleet cũ giữ nguyên cho phần bảng giá và lệnh điều xe.
+    ["Hồ sơ xe & điều kiện khai thác", "/doi-xe"],
+    ["Đội xe (bảng giá & lệnh)", "/ops?tab=fleet"], ["HDV & phân chuyến", "/ops?tab=guides"],
     ["Việc của tôi (tài xế & HDV)", "/xe-hdv"],
     ["Lệnh điều xe", ""], ["Chi phí & hiệu quả đội xe", ""]] },
   { key: "taichinh", label: "7. Tài chính & Kế toán", items: [
