@@ -10,7 +10,9 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "94f4b7de1960"
-down_revision = "0fa7043cb785"
+down_revision = "c1d2e3f4a5b6"   # 07/9/2026: bản này và c1d2e3f4a5b6 cùng nối 0fa7043cb785 nên kho có HAI đầu,
+                                 # mà Dockerfile chạy "alembic upgrade head" – hai đầu là container không khởi động
+                                 # được. Nối tiếp bản commit trước để mạch migration chỉ còn một đầu duy nhất.
 branch_labels = None
 depends_on = None
 
