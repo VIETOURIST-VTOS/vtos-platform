@@ -94,3 +94,24 @@ def test_nguon_khong_hop_le_thi_bao_ro(_startup):
     r = client.post("/api/v1/fleet/giao-dich/nhap", headers=login("ketoan"),
                     json={"source": "linh_tinh", "rows": [{"ma_gd": "x", "thoi_diem": "2026-08-01T00:00:00"}]})
     assert r.status_code == 422 and "de_xuat_vietrip" in r.json()["detail"]
+
+
+def test_bien_so_ghi_khac_dinh_dang_van_tra_dung_ve_mot_xe(_startup):
+    """Cùng một chiếc xe được ghi ba kiểu ở ba nguồn: "50F-009.60" trong VTOS, "50F 009.60" trên phần mềm
+    Vietrip, "50F00960" trong nội dung chuyển khoản. So khớp nguyên văn thì đó là ba xe khác nhau, và tiền
+    của một chiếc bị chẻ làm ba chỗ không ai cộng lại được."""
+    from app.services.fleet import chuan_bien
+    assert chuan_bien("50F-009.60") == chuan_bien("50F 009.60") == chuan_bien("50f00960") == "50F00960"
+
+    h = login("ketoan")
+    rows = [{"ma_gd": f"BIEN-TEST-{i}", "thoi_diem": "2026-08-15T00:00:00", "bien_so": b,
+             "so_tien": 1_000_000, "nhom": "Kiểm thử biển số"}
+            for i, b in enumerate(["50F-009.60", "50F 009.60", "50f00960"])]
+    r = client.post("/api/v1/fleet/giao-dich/nhap", headers=h,
+                    json={"source": "de_xuat_vietrip", "rows": rows})
+    assert r.status_code == 201 and r.json()["da_nhap"] == 3
+    d = client.get("/api/v1/fleet/giao-dich?source=de_xuat_vietrip", headers=h).json()
+    ba = [t for t in d["rows"] if t["ma_gd"].startswith("BIEN-TEST-")]
+    assert len(ba) == 3
+    assert len({t["vehicle_id"] for t in ba}) == 1, "ba cách ghi phải về đúng MỘT xe"
+    assert all(t["vehicle_id"] for t in ba)

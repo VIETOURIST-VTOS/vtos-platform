@@ -247,20 +247,30 @@ from datetime import datetime, timedelta
 from app.models.fleet import (Trip, TripCost, Maintenance, ExternalTxn, BEN_CHIU_MAC_DINH, COST_KINDS)
 
 
+def chuan_bien(bien: str) -> str:
+    """Biển số về một dạng duy nhất để so khớp: bỏ dấu cách, gạch, chấm và viết hoa.
+
+    Cùng một chiếc xe được ghi ba kiểu ở ba nguồn – "50F-017.37" trong VTOS, "50F 017.37" trên phần mềm
+    Vietrip, "50F01737" trong nội dung chuyển khoản. So khớp nguyên văn thì cả ba đều là ba xe khác nhau,
+    và tiền của một chiếc bị chẻ làm ba chỗ không ai cộng lại được. Chỉ dùng để SO KHỚP – biển số vẫn được
+    lưu nguyên văn theo nguồn, vì đó mới là cái đối chiếu được với giấy tờ."""
+    return "".join(c for c in (bien or "").upper() if c.isalnum())
+
+
 def xe_theo_bien(db: Session, bien: str, luc: date):
     """Tra xe từ biển số TẠI THỜI ĐIỂM giao dịch, không theo biển hiện tại.
 
     Đây là chỗ đối soát ePass vỡ nếu làm sai: xe đổi biển giữa kỳ mà tra theo biển hiện tại thì toàn bộ giao
     dịch nửa đầu kỳ rơi ra ngoài, và người đối chiếu sẽ đi tìm một khoản tiền không thuộc về ai."""
-    b = (bien or "").strip().upper()
+    b = chuan_bien(bien)
     if not b: return None
-    rows = db.execute(select(VehiclePlate).where(VehiclePlate.plate == b)).scalars().all()
+    rows = [p for p in db.execute(select(VehiclePlate)).scalars() if chuan_bien(p.plate) == b]
     for p in rows:
         if (p.from_date is None or p.from_date <= luc) and (p.to_date is None or luc <= p.to_date):
             return db.get(Vehicle, p.vehicle_id)
     if rows:                                   # có trong lịch sử nhưng ngoài khoảng ngày đã ghi
         return db.get(Vehicle, rows[0].vehicle_id)
-    return db.execute(select(Vehicle).where(Vehicle.plate == b)).scalars().first()
+    return next((v for v in db.execute(select(Vehicle)).scalars() if chuan_bien(v.plate) == b), None)
 
 
 def nhap_giao_dich(db: Session, source: str, rows: list[dict], boi: str) -> dict:
