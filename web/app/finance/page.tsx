@@ -116,7 +116,18 @@ function Finance() {
       {vx.canh_bao.length > 0 && <div className="panel wrap"><h2>Việc phải xử lý</h2><table><thead><tr><th>Mức</th><th>Nội dung</th><th>Việc phải làm</th></tr></thead><tbody>
         {vx.canh_bao.map((c: any, i: number) => <tr key={i}>
           <td><Tag cls={c.muc === "gap" || c.muc === "qua_han" ? "red" : c.muc === "thieu_du_lieu" ? "warn" : "warn"}>{c.muc === "gap" ? "GẤP" : c.muc === "qua_han" ? "QUÁ HẠN" : c.muc === "thieu_du_lieu" ? "THIẾU DỮ LIỆU" : "SỚM"}</Tag></td>
-          <td>{c.noi_dung}</td><td className="muted">{c.viec}</td></tr>)}
+          <td>{c.noi_dung}</td><td className="muted">{c.viec}
+            {c.loai === "xe_da_ra_khoi_doi_van_the_chap" && c.collateral_id && isKT && <div style={{ marginTop: 6 }}>
+              <button className="act grey" style={{ margin: 0, fontSize: 12 }} onClick={() => {
+                const so = prompt(`Số văn bản giải chấp của ngân hàng cho xe ${c.xe}:`);
+                if (so && so.trim()) post(`/fleet/the-chap/${c.collateral_id}/giai-chap`, { van_ban: so.trim() }).then(() => api("/fin/vay-xe").then(setVx));
+              }}>Ghi giải chấp (có văn bản)</button>
+              <button className="act grey" style={{ margin: "0 0 0 6px", fontSize: 12 }} onClick={() => {
+                const ly = prompt(`Gỡ ${c.xe} khỏi theo dõi thế chấp — ĐÂY KHÔNG PHẢI GIẢI CHẤP. Lý do:`);
+                if (ly && ly.trim()) post(`/fleet/the-chap/${c.collateral_id}/go-khoi-theo-doi`, { ly_do: ly.trim() }).then(() => api("/fin/vay-xe").then(setVx));
+              }}>Gỡ khỏi theo dõi</button>
+            </div>}
+          </td></tr>)}
       </tbody></table></div>}
       <h2>Khế ước – số liệu không trùng, dùng bảng này để cộng tổng</h2>
       <div className="panel wrap"><table><thead><tr><th>Mã / Hợp đồng</th><th>Ngân hàng</th><th>Pháp nhân</th><th style={{ textAlign: "right" }}>Dư nợ</th><th style={{ textAlign: "right" }}>Lãi/năm</th><th style={{ textAlign: "right" }}>Lãi/tháng</th><th>Đáo hạn</th><th>Xe thế chấp</th></tr></thead><tbody>

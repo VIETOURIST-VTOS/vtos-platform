@@ -259,6 +259,7 @@ def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
                             + (" – ĐÃ QUÁ HẠN" if ban["qua_han_thu"] else ""))
             for g in ds:
                 canh_bao.append({"muc": "gap", "loai": "xe_da_ra_khoi_doi_van_the_chap", "khe_uoc": g["code"], "xe": v.plate, "ban_xe": ban,
+                                 "collateral_id": g["collateral_id"],
                                  "noi_dung": f"Xe {v.plate} trạng thái '{trang_thai}' nhưng vẫn là tài sản bảo đảm của khế ước {g['contract_no'] or g['code']} ({g['partner']}, dư nợ {g['du_no']:,.0f}đ)" + them,
                                  "viec": "Xin văn bản giải chấp riêng của ngân hàng trước khi sang tên, hoặc tất toán khế ước"})
 

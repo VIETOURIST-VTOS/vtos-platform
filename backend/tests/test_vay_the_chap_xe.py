@@ -218,3 +218,32 @@ def test_v13_ghi_dan_tien_thu_ban_xe_va_chan_thu_vuot_gia_ban():
     d = _lay()
     cb = [c for c in d["canh_bao"] if c.get("xe") == "50H-496.23"][0]
     assert cb["ban_xe"]["gia_ban"] == 1_800_000_000 and cb["ban_xe"]["con_phai_thu"] == 400_000_000
+
+
+def test_v14_go_khoi_theo_doi_khac_han_giai_chap():
+    """Lãnh đạo có thể gỡ một xe khỏi danh sách theo dõi thế chấp. Nhưng bản ghi phải nói đúng
+    bản chất: đây KHÔNG phải giải chấp. Ghi nhầm thành giải chấp là đưa vào sổ một điều ngân hàng
+    chưa xác nhận, và sau này không ai phân biệt được xe nào thật sự đã được ngân hàng rút ra."""
+    vid = _xe("50F-046.92", lifecycle="da_ban")
+    kid = [x for x in _lay()["ke_uoc"] if x["contract_no"] == "LD2236078702"][0]["id"]
+    r = client.post("/api/v1/fleet/the-chap", json={"contract_id": kid, "vehicle_id": vid}, headers=login("chutich"))
+    assert r.status_code == 201
+    d = _lay()
+    cid = [x for x in d["xe"] if x["plate"] == "50F-046.92"][0]["khe_uoc"][0]["collateral_id"]
+    assert client.post(f"/api/v1/fleet/the-chap/{cid}/go-khoi-theo-doi", json={"ly_do": ""}, headers=login("chutich")).status_code == 422
+    assert client.post(f"/api/v1/fleet/the-chap/{cid}/go-khoi-theo-doi", json={"ly_do": "x"}, headers=login("ketoan")).status_code == 403
+    r = client.post(f"/api/v1/fleet/the-chap/{cid}/go-khoi-theo-doi",
+                    json={"ly_do": "Xe đã bán và giao 10/08/2026 – lãnh đạo quyết định thôi theo dõi"}, headers=login("chutich"))
+    assert r.status_code == 200 and "KHÔNG phải giải chấp" in r.json()["message"]
+    d2 = _lay()
+    # gỡ khỏi ĐÚNG khế ước đó thôi. Xe còn nằm trong tài sản bảo đảm của khế ước khác thì cảnh báo
+    # của khế ước kia vẫn phải kêu – gỡ một chỗ không được làm im cả những chỗ chưa ai đụng tới.
+    k = [x for x in d2["ke_uoc"] if x["id"] == kid][0]
+    assert "50F-046.92" not in k["xe_the_chap"] and "50F-046.92" in k["xe_da_giai_chap"]
+    assert not [c for c in d2["canh_bao"] if c.get("xe") == "50F-046.92" and c.get("khe_uoc") == k["code"]]
+    # gỡ hai lần bị chặn, và bản ghi KHÔNG bị gọi là đã giải chấp
+    assert client.post(f"/api/v1/fleet/the-chap/{cid}/go-khoi-theo-doi", json={"ly_do": "lại"}, headers=login("chutich")).status_code == 422
+    from app.db.session import SessionLocal
+    from app.models.fleet import Collateral
+    db = SessionLocal(); c = db.get(Collateral, cid)
+    assert c.van_ban_giai_chap.startswith("GỠ KHỎI THEO DÕI (không phải giải chấp)"); db.close()

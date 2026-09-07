@@ -719,6 +719,39 @@ def giai_chap(cid: int, data: GiaiChapIn, u: User = Depends(require_roles("chuti
     return {"message": "Đã ghi nhận giải chấp"}
 
 
+class GoTheoDoiIn(BaseModel):
+    ly_do: str
+
+
+@router.post("/the-chap/{cid}/go-khoi-theo-doi")
+def go_khoi_theo_doi(cid: int, data: GoTheoDoiIn, u: User = Depends(require_roles("chutich", "tgd")),
+                     db: Session = Depends(get_db)):
+    """Gỡ một xe khỏi danh sách tài sản bảo đảm ĐANG THEO DÕI, theo quyết định của lãnh đạo.
+
+    Đây KHÔNG phải giải chấp. Giải chấp là ngân hàng trả tài sản lại và phải có văn bản – đường đó
+    nằm ở /the-chap/{id}/giai-chap. Đường này chỉ nói: hồ sơ này thôi không theo dõi trên VTOS nữa.
+
+    Vì hai việc khác nhau nên bản ghi cũng khác nhau: gỡ theo dõi ghi rõ 'GỠ KHỎI THEO DÕI (không
+    phải giải chấp)' kèm lý do và người quyết định. Ghi nhầm thành giải chấp là đưa vào sổ một điều
+    ngân hàng chưa xác nhận, và sau này không ai phân biệt được xe nào thật sự đã được rút ra.
+    """
+    c = db.get(Collateral, cid)
+    if not c: raise HTTPException(404, "Không có bản ghi thế chấp")
+    if not (data.ly_do or "").strip(): raise HTTPException(422, "Phải ghi lý do gỡ khỏi theo dõi")
+    if c.den_ngay is not None: raise HTTPException(422, "Bản ghi này đã kết thúc theo dõi trước đó")
+    v = db.get(Vehicle, c.vehicle_id); ct = db.get(FinContract, c.contract_id)
+    from datetime import date as _d
+    c.den_ngay = _d.today()
+    c.van_ban_giai_chap = f"GỠ KHỎI THEO DÕI (không phải giải chấp) – {data.ly_do.strip()}"
+    c.duyet_boi = u.username
+    R.audit(db, u.username, u.role, "go_xe_khoi_theo_doi_the_chap", f"collateral:{cid}",
+            after={"xe": v.plate if v else "", "khe_uoc": ct.contract_no if ct else "", "ly_do": data.ly_do,
+                   "luu_y": "Không phải giải chấp – ngân hàng chưa xác nhận trả tài sản"})
+    db.commit()
+    return {"message": f"Đã gỡ xe {v.plate if v else cid} khỏi theo dõi thế chấp của khế ước "
+                       f"{ct.contract_no if ct else ''} – ghi rõ đây KHÔNG phải giải chấp"}
+
+
 class BanXeIn(BaseModel):
     vehicle_id: int
     partner_id: int | None = None
