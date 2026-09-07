@@ -1,12 +1,20 @@
-"""Ma trận nhìn thấy dữ liệu theo vai trò (rà phân quyền tuần 3).
+"""Ma trận nhìn thấy dữ liệu theo vai trò.
 
-Nguyên tắc (Mô hình quản trị 27/8/2026 + Thiết kế v1.7 mục 6):
-- Lãnh đạo (Chủ tịch, TGĐ, hai Phó TGĐ), Kế toán, CNTT, Ban Kiểm soát: xem toàn bộ.
-- Điều hành (TP/NV): xem tour, booking, chi phí, quyết toán, dòng tiền tour.
-- Kinh doanh: NV chỉ thấy booking/yêu cầu/dịch vụ lẻ/phiếu thu do mình phụ trách; GĐ KD thấy toàn bộ khối
-  kinh doanh; KHÔNG xem cơ cấu chi phí NCC, quyết toán, giao dịch ngân hàng.
-- HCNS: nhân sự, lương, báo cáo ngày, sự vụ; không xem chi phí tour / ngân hàng.
-- Ban Kiểm soát: chỉ đọc – mọi thao tác ghi bị chặn (trừ đổi mật khẩu).
+NGUYÊN TẮC HIỆN HÀNH (chỉ đạo của anh Trần Tuấn ngày 07/9/2026, bảng phân quyền đã duyệt):
+- Chủ tịch HĐQT và Tổng giám đốc: xem TẤT CẢ. Đúng hai người, không ai khác.
+- Ban Kiểm soát: ĐỌC tất cả, bị chặn mọi thao tác ghi (nghĩa vụ Luật Doanh nghiệp với công ty đại chúng).
+- Mọi vai trò còn lại: xem theo PHẠM VI CÔNG VIỆC, mỗi vai trò một danh sách màn hình.
+
+Nhóm ALL_SEEING cũ – gồm bảy vai trò: Chủ tịch, TGĐ, hai Phó TGĐ, Kế toán, CNTT, Ban Kiểm soát – đã được
+GIẢI THỂ. Nó là gốc của một lỗi lặp lại: mỗi lần thêm màn hình mới, viết "ALL_SEEING + ai đó" là xong,
+nên bảy vai trò cứ tự động nhìn thấy mọi thứ mới mà không ai quyết định điều đó. Hai Phó TGĐ vì vậy đang
+xem được dòng tiền, tài khoản ngân hàng, sổ kế toán và nhật ký nghiệp vụ.
+
+Điều KHÔNG đổi trong bản này, để không ai hiểu nhầm là đã nới:
+- Nhân viên kinh doanh vẫn chỉ thấy booking của mình, trưởng nhóm thấy nhóm mình (sales_ids_visible).
+- Khối Kinh doanh vẫn không thấy cơ cấu chi phí nhà cung cấp (mask_product).
+- Tài xế & HDV, Chuyên viên Visa vẫn dùng DANH SÁCH CHO PHÉP: màn hình mới thêm vào hệ thống sẽ không
+  tự động mở cho họ.
 """
 from fastapi import HTTPException
 from app.models.core import User
@@ -23,15 +31,9 @@ VISA_STAFF = ("nv_visa",)                               # chuyên viên visa: ch
 ADMIN_STAFF = ("hanh_chinh",)                           # bảo vệ, pháp chế, quan hệ nhà đầu tư: thuộc HCNS
                                                         # nhưng KHÔNG xem bảng lương (chỉ đạo 07/9/2026)
 
-ALL_SEEING = LEADERSHIP + CONTROL                       # xem mọi dữ liệu
-
-# Chỉ đạo 07/9/2026: nhóm "xem tất cả" thu về ĐÚNG hai người, Ban Kiểm soát đọc tất cả nhưng không ghi được;
-# các vai trò khác xem theo phạm vi công việc. Đợt này mới áp cho ba màn hình đội xe vừa khai quyền – phần
-# còn lại của ma trận chuyển sang BASE_VIEW ở đợt sau, làm một lần kèm thông báo cho từng phòng, vì đổi cả
-# ma trận cùng lúc là lấy mất màn hình quen tay của nhiều người mà không ai được báo trước.
-FULL_VIEW = ("chutich", "tgd")                          # toàn quyền xem
+FULL_VIEW = ("chutich", "tgd")                          # xem tất cả – đúng hai người
 READ_ALL = ("bks",)                                     # đọc tất cả, bị chặn mọi thao tác ghi
-BASE_VIEW = FULL_VIEW + READ_ALL
+BASE_VIEW = FULL_VIEW + READ_ALL                        # nền của MỌI dòng trong ma trận dưới đây
 
 # Màn hình Nhân sự tách quyền theo TAB (chỉ đạo 07/9/2026). Trước bản này, ai mở được màn hình là thấy cả
 # ba tab – nên không có cách nào cho một người xem hồ sơ nhân sự mà không xem luôn bảng lương.
@@ -44,14 +46,22 @@ HR_TAB_ROLES = {
     "incidents": BASE_VIEW + ("ptgd_doan", "tp_dh", "gd_kd", "hcns", "cntt"),
 }
 HR_TAB_CAPABILITY = {"payroll": "bang_luong"}     # tab mở thêm được bằng ngoại lệ theo người
-COST_ROLES = ALL_SEEING + OPERATIONS                    # cơ cấu chi phí NCC, quyết toán, dòng tiền tour
-FINANCE_ROLES = ALL_SEEING + ("tp_dh",)                 # giao dịch ngân hàng, tổng hợp thu tiền toàn công ty
-AUDIT_ROLES = LEADERSHIP + CONTROL                      # nhật ký kiểm toán
-PARAM_ROLES = ALL_SEEING + ("tp_dh", "gd_kd", "hcns")   # bảng tham số chính sách
-BOOKING_ROLES = ALL_SEEING + OPERATIONS + SALES         # booking, yêu cầu đặt dịch vụ, bảo lưu (xem)
+# Cơ cấu chi phí NCC, quyết toán, dòng tiền tour. Phó TGĐ tour đoàn GIỮ quyền này vì phải duyệt dự toán
+# đoàn; Phó TGĐ Marketing mất, vì duyệt chi marketing không cần nhìn giá vốn nhà cung cấp của tour.
+COST_ROLES = BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt")
+# Giao dịch ngân hàng và tổng hợp thu tiền toàn công ty: thu về Kế toán. Trưởng phòng Điều hành mất quyền
+# này – điều hành cần dòng tiền TỪNG TOUR (COST_ROLES ở trên), không cần sổ tiền gửi của công ty.
+FINANCE_ROLES = BASE_VIEW + ("ketoan",)
+AUDIT_ROLES = BASE_VIEW + ("ketoan", "cntt")            # nhật ký kiểm toán
+PARAM_ROLES = BASE_VIEW + ("ptgd_doan", "ptgd_mkt", "tp_dh", "gd_kd", "ketoan", "hcns", "cntt")
+# Dữ liệu booking (danh sách, phiếu thu, bảo lưu, dịch vụ lẻ). Rộng hơn từng màn hình một vì đây là lớp
+# DỮ LIỆU; màn hình nào ai mở được thì xem ở MENU_ROLES.
+BOOKING_ROLES = BASE_VIEW + OPERATIONS + SALES + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt")
 REQUEST_CREATE_ROLES = OPERATIONS + SALES               # được GỬI yêu cầu đặt dịch vụ: Điều hành + toàn khối Kinh doanh
                                                         # (nguồn duy nhất – máy chủ và giao diện dùng chung, tránh lệch vai trò)
-PAYMENT_REQUEST_ROLES = ALL_SEEING + OPERATIONS + ("gd_kd", "ptgd_mkt", "hcns")   # đề nghị chi / lệnh chi
+PAYMENT_REQUEST_ROLES = (BASE_VIEW + OPERATIONS +
+                         ("ptgd_doan", "ptgd_mkt", "gd_kd", "ketoan", "hcns", "hanh_chinh", "cntt"))
+# hanh_chinh mới được thêm: nhóm chi "hành chính" là việc của họ, mà trước nay họ không có màn hình nào
 READ_ONLY_ROLES = ("bks",)
 WRITE_ALLOWED_FOR_READ_ONLY = ("/api/v1/auth/password", "/api/v1/auth/login", "/api/v1/robot/r9")   # BKS được chạy robot giám sát R9 (chỉ sinh cảnh báo)
 
@@ -115,15 +125,6 @@ def check_restricted_scope(u: User, path: str) -> None:
 
 
 # Ma trận công bố cho giao diện / tài liệu (vai trò → nhóm màn hình được xem)
-MATRIX = {
-    "tours": BOOKING_ROLES + ("hcns",),
-    "bookings": BOOKING_ROLES,
-    "cost": COST_ROLES,
-    "finance": FINANCE_ROLES,
-    "audit": AUDIT_ROLES,
-    "params": PARAM_ROLES,
-    "payment_requests": PAYMENT_REQUEST_ROLES,
-}
 
 
 PRODUCT_COST_KEYS = ("cost_structure", "cost_lines", "fixed_cost", "var_cost_per_pax", "cost_items")
@@ -138,42 +139,66 @@ def mask_product(out: dict, u: User) -> dict:
 
 # Menu giao diện web theo vai trò (đường dẫn trang → vai trò được thấy). Trang không liệt kê = mọi vai trò đã đăng nhập.
 MENU_ROLES = {
-    "/products": BOOKING_ROLES + ("hcns",),
-    "/tours": BOOKING_ROLES + ("hcns",),
-    "/requests": BOOKING_ROLES,
-    "/bookings": BOOKING_ROLES,
-    "/non-package": BOOKING_ROLES,
-    "/collections": BOOKING_ROLES,
-    "/expenses": PAYMENT_REQUEST_ROLES,
-    "/accounting": ALL_SEEING + ("tp_dh",),
-    "/finance": LEADERSHIP + CONTROL,
-    "/params": PARAM_ROLES,
-    "/hr": HR_TAB_ROLES["payroll"] + HR_TAB_ROLES["employees"] + HR_TAB_ROLES["incidents"],
-    "/ops": ALL_SEEING + OPERATIONS + ("hcns",),          # visa, HDV & phân chuyến, đội xe – nghiệp vụ của Điều hành
+    # Mỗi dòng = BASE_VIEW (Chủ tịch, TGĐ, Ban Kiểm soát) + đúng những vai trò có việc trên màn hình đó.
+    # Viết thẳng tên vai trò thay vì cộng các nhóm lớn: nhóm lớn là thứ đã làm bảy vai trò tự động nhìn
+    # thấy mọi màn hình mới mà không ai quyết định. Dài hơn, nhưng đọc là biết ai xem được gì.
 
-    "/inbox": ALL_SEEING + SALES + OPERATIONS + MARKETING,
-    "/leads": ALL_SEEING + SALES + OPERATIONS + MARKETING,
-    "/sales-reports": ALL_SEEING + SALES + OPERATIONS + ("hcns",),
-    "/robot-reports": ALL_SEEING + ("tp_dh", "gd_kd", "hcns"),
-    "/vietrip": ("cntt", "tgd", "chutich", "tp_dh", "ketoan"),
-    "/audit": AUDIT_ROLES,
-    "/companies": ALL_SEEING + ("tp_dh", "hcns"),   # danh mục pháp nhân và đối chiếu công ty chủ quản
-    "/xe-hdv": ALL_SEEING + OPERATIONS + FIELD + ("hcns",),   # xe Vietrip & HDV – màn hình duy nhất của vai trò xe_hdv
-    "/visa": ALL_SEEING + OPERATIONS + VISA_STAFF + ("hcns",),
-    # Trang này trước đây không liệt kê, nghĩa là ai đăng nhập cũng thấy – trong khi nó là sổ tiền gửi và
-    # danh sách tài khoản ngân hàng của công ty. (/payroll chỉ là lối chuyển hướng sang /hr nên không liệt kê.)
-    "/bank-accounts": ALL_SEEING,
+    # --- Kinh doanh & sản phẩm ---
+    "/products": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt"),
+    "/tours": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt"),
+    "/requests": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "cntt"),
+    "/bookings": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt"),
+    "/non-package": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
+    "/sales-reports": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "hcns", "cntt"),
+
+    # --- Marketing & CSKH. Kế toán và CNTT KHÔNG có mặt: đây là dữ liệu khách của Marketing. ---
+    "/inbox": BASE_VIEW + SALES + OPERATIONS + MARKETING + ("ptgd_mkt", "cntt"),
+    "/leads": BASE_VIEW + SALES + OPERATIONS + MARKETING + ("ptgd_mkt", "cntt"),
+
+    # --- Điều hành ---
+    "/ops": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "hcns", "cntt"),
+    "/visa": BASE_VIEW + OPERATIONS + VISA_STAFF + ("ptgd_doan", "ketoan", "hcns", "cntt"),
+
+    # --- Vận tải & Hướng dẫn viên ---
+    "/xe-hdv": BASE_VIEW + OPERATIONS + FIELD + ("hcns", "cntt"),
+    # Ba màn hình dưới trước 07/9/2026 KHÔNG khai quyền, nên theo quy ước "trang không liệt kê = ai đăng
+    # nhập cũng thấy", một nhân viên kinh doanh vẫn mở được hồ sơ xe và bảng giá vốn – lợi nhuận đội xe.
+    "/doi-xe": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "hcns", "cntt"),
+    "/lenh-dieu-xe": BASE_VIEW + OPERATIONS + FLEET_MGR + ("hcns", "cntt"),
+    "/hieu-qua-doi-xe": BASE_VIEW + FLEET_MGR + ("tp_dh", "ketoan", "hcns"),
+
+    # --- Tài chính & Kế toán. Ba màn hình tiền thu về Kế toán; hai Phó TGĐ và CNTT không còn xem. ---
+    "/collections": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
+    "/expenses": PAYMENT_REQUEST_ROLES,
+    "/accounting": BASE_VIEW + ("ketoan", "tp_dh", "cntt"),
+    "/finance": FINANCE_ROLES,
+    "/bank-accounts": FINANCE_ROLES,
     # Sổ công nợ toàn hệ thống: phải thu của khách và phải trả nhà cung cấp là số tiền của cả công ty.
     # Nhân viên kinh doanh theo dõi booking của mình ở màn hình bán hàng, không mở sổ công nợ toàn công ty.
     "/cong-no": BASE_VIEW + ("ketoan", "ptgd_doan", "tp_dh", "cntt"),
 
-    # Ba màn hình đội xe (chỉ đạo 07/9/2026). Cùng một lỗi với /bank-accounts ở trên: chưa liệt kê thì theo
-    # quy ước "trang không liệt kê = mọi người đăng nhập đều thấy", nên tới hôm nay một nhân viên kinh doanh
-    # vẫn mở được hồ sơ xe, lệnh điều xe và bảng giá vốn – lợi nhuận đội xe. Khai quyền theo bảng phân quyền
-    # anh Tuấn duyệt ngày 07/9: giá vốn và hiệu quả chỉ dành cho người phải chịu trách nhiệm về con số đó.
-    "/doi-xe": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "hcns", "cntt"),
-    "/lenh-dieu-xe": BASE_VIEW + OPERATIONS + FLEET_MGR + ("hcns", "cntt"),
-    "/hieu-qua-doi-xe": BASE_VIEW + FLEET_MGR + ("tp_dh", "ketoan", "hcns"),
+    # --- Hành chính & Nhân sự (tách quyền theo tab, xem HR_TAB_ROLES) ---
+    "/hr": HR_TAB_ROLES["payroll"] + HR_TAB_ROLES["employees"] + HR_TAB_ROLES["incidents"],
+
+    # --- Kiểm soát & Chính sách ---
+    "/params": PARAM_ROLES,
+    "/audit": AUDIT_ROLES,
+
+    # --- Điều hành Holdings & Hệ thống ---
+    "/robot-reports": BASE_VIEW + ("ptgd_doan", "ptgd_mkt", "tp_dh", "gd_kd", "ketoan", "hcns", "cntt"),
+    "/companies": BASE_VIEW + ("ketoan", "tp_dh", "hcns", "hanh_chinh", "cntt"),
+    "/vietrip": BASE_VIEW + ("tp_dh", "ketoan", "cntt"),
+}
+
+MATRIX = {
+    "tours": MENU_ROLES["/tours"],
+    "bookings": BOOKING_ROLES,
+    "cost": COST_ROLES,
+    "finance": FINANCE_ROLES,
+    "audit": AUDIT_ROLES,
+    "params": PARAM_ROLES,
+    "payment_requests": PAYMENT_REQUEST_ROLES,
+    "payroll": HR_TAB_ROLES["payroll"],
 }
 
 # Mọi trang có trong giao diện – kể cả trang không đặt điều kiện vai trò – để dựng danh sách ẩn cho vai trò bị giới hạn.

@@ -468,7 +468,11 @@ def alert_out(a: Alert) -> dict:
 @router.get("/alerts", tags=["alerts"])
 def list_alerts(u: User = Depends(current_user), db: Session = Depends(get_db)):
     rows = db.execute(select(Alert).order_by(Alert.resolved, desc(Alert.created_at))).scalars()
-    if u.role in AC.ALL_SEEING: return [alert_out(a) for a in rows]
+    # Ai thấy MỌI cảnh báo, ai chỉ thấy cảnh báo gửi tới vai trò mình. Trước 07/9/2026 dùng nhóm "xem tất
+    # cả" cũ (bảy vai trò); nay nhóm đó đã giải thể nên liệt kê thẳng: lãnh đạo, Ban Kiểm soát, Kế toán, CNTT –
+    # bốn nhóm có trách nhiệm giám sát toàn hệ thống. Cảnh báo là thứ phải có người nhận, không phải thứ
+    # ai cũng đọc cho biết.
+    if u.role in AC.BASE_VIEW + ("ketoan", "cntt"): return [alert_out(a) for a in rows]
     return [alert_out(a) for a in rows if u.role in (a.to_roles or "").split(",")]   # chỉ cảnh báo gửi tới vai trò của mình
 
 

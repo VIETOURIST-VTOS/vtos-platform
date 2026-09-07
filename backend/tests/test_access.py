@@ -38,11 +38,17 @@ def test_read_matrix_cost_finance_audit():
     h = login("dh.lan")
     assert client.get(f"/api/v1/tours/{tid}/settlement", headers=h).status_code == 200
     assert client.get("/api/v1/bank-transactions", headers=h).status_code == 403 and client.get("/api/v1/audit", headers=h).status_code == 403
-    # Lãnh đạo, Kế toán, CNTT, BKS xem tất cả
-    for who in ("chutich", "tgd", "ketoan", "cntt", "bks"):
+    # Chủ tịch, TGĐ, Kế toán, Ban Kiểm soát: xem cả giao dịch ngân hàng
+    for who in ("chutich", "tgd", "ketoan", "bks"):
         h = login(who)
         for path in (f"/api/v1/tours/{tid}/settlement", "/api/v1/bank-transactions", "/api/v1/audit", "/api/v1/params"):
             assert client.get(path, headers=h).status_code == 200, (who, path)
+    # CNTT (chỉ đạo 07/9/2026): vẫn đối chiếu được quyết toán, nhật ký và tham số, nhưng KHÔNG còn xem
+    # giao dịch ngân hàng – vận hành hệ thống không cần nhìn sổ tiền gửi của công ty.
+    h = login("cntt")
+    for path in (f"/api/v1/tours/{tid}/settlement", "/api/v1/audit", "/api/v1/params"):
+        assert client.get(path, headers=h).status_code == 200, ("cntt", path)
+    assert client.get("/api/v1/bank-transactions", headers=h).status_code == 403
     # HCNS không xem booking; vẫn xem tham số
     assert client.get("/api/v1/bookings", headers=login("hcns")).status_code == 403
     assert client.get("/api/v1/params", headers=login("hcns")).status_code == 200
