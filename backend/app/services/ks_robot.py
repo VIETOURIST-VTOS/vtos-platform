@@ -90,17 +90,31 @@ def _quyen_lech(db: Session) -> list[dict]:
     return ra
 
 
+# Hai kiểu chặn vai trò cùng tồn tại trong kho, và bộ kiểm phải nhận ra CẢ HAI:
+#   1. khai ở chữ ký    : u: User = Depends(require_roles(*ROLES))
+#   2. gọi trong thân hàm: AC.require(u, AC.AUDIT_ROLES, "nhật ký kiểm toán")
+# Lần chạy đầu tiên trên hệ thống thật, bộ kiểm chỉ nhìn kiểu 1 nên báo 26 việc, trong đó có
+# GET /audit – vốn chặn đúng, chỉ là chặn ở kiểu 2. Một robot báo oan 26 lần trong lần chạy đầu thì
+# lần sau không ai đọc nó nữa, nên đây không phải lỗi nhỏ.
+CHAN_TRONG_THAN = ("AC.require(", "access.require(", "require_roles", "bang_luong", "_require(",
+                   "check_readonly_write", "hr_tabs_for", "co_quyen(")
+
+
 def _co_chan_vai_tro(route) -> bool:
-    """True nếu endpoint có khai require_roles / một dependency chặn vai trò."""
+    """True nếu endpoint có chặn vai trò, theo BẤT KỲ kiểu nào. Không đọc được thì trả True –
+    robot thà bỏ sót còn hơn tố oan; việc bỏ sót đã có bộ kiểm thử vai trò gọi thật để bắt."""
     try:
-        for d in getattr(route, "dependant", None).dependencies:
-            if getattr(d, "call", None) and getattr(d.call, "__qualname__", "").startswith("require_roles"):
+        dep = getattr(route, "dependant", None)
+        for d in (getattr(dep, "dependencies", None) or []):
+            if getattr(d, "call", None) and "require_roles" in getattr(d.call, "__qualname__", ""):
                 return True
-        for d in getattr(route, "dependencies", []) or []:
+        for d in (getattr(route, "dependencies", None) or []):
             if "require_roles" in str(d): return True
+        import inspect
+        src = inspect.getsource(route.endpoint)
+        return any(k in src for k in CHAN_TRONG_THAN)
     except Exception:
-        return True     # không đọc được thì coi như CÓ chặn – robot không tố oan
-    return False
+        return True
 
 
 def _vai_tro_trong(db: Session) -> list[dict]:

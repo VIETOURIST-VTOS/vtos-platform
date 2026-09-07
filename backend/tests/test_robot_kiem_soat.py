@@ -215,3 +215,34 @@ def test_menu_kiem_soat_theo_dung_ma_tran():
     assert "/kiem-soat" in MENU_ROLES
     for vai in ("chutich", "tgd", "bks", "cntt"): assert vai in MENU_ROLES["/kiem-soat"]
     for vai in ("nv_kd", "ketoan", "hcns", "tp_dh"): assert vai not in MENU_ROLES["/kiem-soat"]
+
+
+def test_khong_bao_oan_endpoint_da_chan_trong_than_ham():
+    """GET /audit chặn bằng AC.require() trong thân hàm chứ không khai ở chữ ký. Lần chạy đầu trên hệ
+    thống thật, bộ kiểm chỉ nhìn chữ ký nên báo oan 26 việc – một robot báo oan trong lần chạy đầu thì
+    lần sau không ai đọc nó nữa."""
+    from app.main import app
+    r = [x for x in app.routes if getattr(x, "path", "") == "/api/v1/audit"
+         and "GET" in (getattr(x, "methods", None) or set())]
+    assert r, "không tìm thấy GET /api/v1/audit"
+    assert KS._co_chan_vai_tro(r[0]), "bộ kiểm không nhận ra chặn vai trò viết trong thân hàm"
+
+
+def test_bo_kiem_quyen_lech_khop_voi_thuc_te_goi_that():
+    """Việc bộ kiểm tĩnh báo phải khớp với kết quả GỌI THẬT. Lệch nghĩa là một trong hai sai."""
+    from app.main import app
+    from app.models.core import ROLES
+    from app.services.access import MENU_ROLES
+    from app.db.session import SessionLocal
+    db = SessionLocal(); bao = KS._quyen_lech(db); db.close()
+    for b in bao:
+        vai, man = b["vai_tro"], b["doi_tuong"]
+        if vai not in ("bks", "chutich", "tgd") and vai in ("ketoan", "cntt", "nv_kd", "chutich"):
+            continue
+    # Với vai trò có tài khoản thử, gọi thật từng đường dẫn bị tố và xác nhận đúng là mở
+    for b in bao:
+        if b["vai_tro"] != "nv_kd": continue
+        h = login("nv_kd")
+        for e in (b.get("chi_tiet") or {}).get("duong_dan", [])[:5]:
+            assert client.get(e, headers=h).status_code < 400, \
+                f"bộ kiểm tố {e} là mở cho nv_kd nhưng gọi thật lại bị chặn – báo oan"
