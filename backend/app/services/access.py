@@ -196,6 +196,9 @@ MENU_ROLES = {
     "/vietrip": BASE_VIEW + ("tp_dh", "ketoan", "cntt"),
     # Màn hình quản trị tài khoản: HCNS và CNTT thao tác, Chủ tịch và TGĐ quyết, Ban Kiểm soát chỉ đọc.
     "/access": BASE_VIEW + ("hcns", "cntt"),
+    # Vị trí AI & quyền hạn: Phó TGĐ Marketing có mặt vì kiêm chỉ đạo CNTT và là người chủ quản hộp thư
+    # đa kênh – nơi AI tiếp xúc khách hàng.
+    "/ai-roles": BASE_VIEW + ("ptgd_mkt", "cntt"),
 }
 
 MATRIX = {

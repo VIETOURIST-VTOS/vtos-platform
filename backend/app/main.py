@@ -26,6 +26,7 @@ from app.api.v1.inbox import router as inbox_router
 from app.api.v1.visa import router as visa_router
 from app.api.v1.fleet import router as fleet_router
 from app.api.v1.access import router as access_router
+from app.api.v1.ai_roles import router as ai_roles_router
 from app.api.v1.debts import router as debts_router
 from app.api.v1.suppliers import router as ncc_router
 from app.api.v1.intake import router as intake_router
@@ -64,6 +65,11 @@ async def lifespan(app: FastAPI):
         ACC.seed_accounts(db)
         from app.services.visa import seed_visa
         seed_visa(db)          # thị trường UK + mẫu checklist UK (phạm vi đầu tiên của phân hệ Visa)
+        # Bảng quyền AI phải có mặt từ lúc khởi động, không đợi ai mở màn hình: robot hộp thư đọc bảng
+        # này trước mỗi lần định gửi, nên bảng rỗng nghĩa là sau một lần triển khai mới, AI im lặng mà
+        # không ai biết vì sao. Hàm chỉ thêm dòng còn thiếu, không đụng tới mức lãnh đạo đã sửa.
+        from app.services.ai_quyen import nap_mac_dinh as nap_quyen_ai
+        nap_quyen_ai(db); db.commit()
         if settings.SEED_DEMO:
             seed_all(db)
     finally:
@@ -116,6 +122,7 @@ app.include_router(vietrip_router)
 app.include_router(visa_router)
 app.include_router(fleet_router)
 app.include_router(access_router)
+app.include_router(ai_roles_router)
 app.include_router(debts_router)
 app.include_router(ncc_router)
 app.include_router(intake_router)

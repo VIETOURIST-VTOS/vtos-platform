@@ -331,21 +331,42 @@ def fb_poll(db: Session, limit: int = 25) -> dict:
 
 
 def robot_check(db: Session) -> dict:
-    """Hội thoại khách nhắn mà sale chưa trả lời quá SLA → AI trả lời thay (nếu bật, hội thoại không tắt AI), cảnh báo sale/TP."""
-    now = datetime.now(); replied = 0; alerts = 0
+    """Hội thoại khách nhắn mà sale chưa trả lời quá SLA → AI trả lời thay, cảnh báo sale/TP.
+
+    Từ 07/9/2026 việc AI CÓ ĐƯỢC TỰ GỬI hay không do bảng quyền AI theo vị trí quyết định, không còn do
+    một tham số nằm lẫn trong bảng chính sách. Bảng đó kiểm bốn điều: mức của ô "gửi tin cho khách" có
+    phải mức 3 không, hạn mức đã khai đủ chưa, đang trong khung giờ cho phép không, và hôm nay đã dùng
+    hết số lượt chưa. Không đủ điều kiện thì AI vẫn soạn, nhưng để ở NHÁP – tư vấn viên bấm gửi.
+
+    Tham số ai_tra_loi_bat cũ giữ lại làm công tắc tổng: tắt nó là tắt cả phần soạn nháp.
+    """
+    from app.services import ai_quyen as AQ
+    now = datetime.now(); replied = 0; drafted = 0; alerts = 0
     poll = {}
     try: poll = fb_poll(db)
     except Exception as ex: poll = {"error": str(ex)[:200]}
     on = R.get_param(db, "ai_tra_loi_bat") >= 1
+    tu_gui_duoc, ly_do = AQ.duoc_tu_gui(db, now)
     for c in db.execute(select(Conversation).where(Conversation.unanswered == True, Conversation.sla_due_at != None, Conversation.sla_due_at <= now, Conversation.status != "dong")).scalars():
         stale = c.last_in_at is None or now - c.last_in_at > timedelta(minutes=STALE_MINUTES)
         if on and not c.ai_off and c.ai_replies < 3 and not stale:
-            text, src = draft_reply(db, c, tu_dong=True); _send(db, c, text, "ai", "Trợ lý AI Vietourist"); replied += 1
-            c.summary = (c.summary + " | " if c.summary else "") + f"{now:%d/%m %H:%M} AI trả lời thay ({src})"
+            if tu_gui_duoc:
+                text, src = draft_reply(db, c, tu_dong=True)
+                _send(db, c, text, "ai", "Trợ lý AI Vietourist"); replied += 1
+                c.summary = (c.summary + " | " if c.summary else "") + f"{now:%d/%m %H:%M} AI trả lời thay ({src})"
+                # số lượt trong ngày đọc từ nhật ký AI, nên phải tính lại sau mỗi lần gửi: nếu không,
+                # một vòng robot có 50 hội thoại sẽ gửi hết 50 dù hạn mức chỉ cho 30.
+                tu_gui_duoc, ly_do = AQ.duoc_tu_gui(db, now)
+            else:
+                # AI vẫn soạn để tư vấn viên có sẵn nội dung, nhưng KHÔNG gửi ra ngoài công ty.
+                draft_reply(db, c, tu_dong=False); drafted += 1
+                c.summary = (c.summary + " | " if c.summary else "") + f"{now:%d/%m %H:%M} AI soạn nháp ({ly_do})"
         ref = f"conv:{c.id}"
         if not db.execute(select(Alert).where(Alert.kind == "sale_tra_loi_cham", Alert.ref == ref, Alert.resolved == False)).scalars().first():
-            db.add(Alert(kind="sale_tra_loi_cham", level="warn", ref=ref, message=f"Khách {c.customer_name or c.external_id} ({c.channel}) chưa được trả lời sau {sla_minutes(db, now)} phút" + (" – AI đã trả lời thay" if on and not c.ai_off else ""), to_roles="nv_kd,gd_kd,ptgd_mkt,tp_dh")); alerts += 1
-    db.commit(); return {"ai_replied": replied, "new_alerts": alerts, "fb_poll": poll}
+            db.add(Alert(kind="sale_tra_loi_cham", level="warn", ref=ref, message=f"Khách {c.customer_name or c.external_id} ({c.channel}) chưa được trả lời sau {sla_minutes(db, now)} phút" + (" – AI đã trả lời thay" if on and not c.ai_off and tu_gui_duoc else ""), to_roles="nv_kd,gd_kd,ptgd_mkt,tp_dh")); alerts += 1
+    db.commit()
+    return {"ai_replied": replied, "ai_soan_nhap": drafted, "new_alerts": alerts,
+            "tu_gui_duoc": tu_gui_duoc, "ly_do_khong_tu_gui": ly_do, "fb_poll": poll}
 
 
 def conv_out(c: Conversation, db: Session | None = None) -> dict:

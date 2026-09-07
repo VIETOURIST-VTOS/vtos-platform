@@ -44,6 +44,14 @@ def test_facebook_webhook_and_ai_fallback():
     from app.models.crm import Conversation
     with SessionLocal() as db:
         x = db.get(Conversation, c["id"]); x.sla_due_at = datetime.now() - timedelta(minutes=1); db.commit()
+    # Từ 07/9/2026 việc AI có tự gửi hay không do bảng quyền AI theo vị trí quyết định. Đặt khung giờ cả
+    # ngày để phép thử không phụ thuộc vào giờ chạy – nếu không, cùng một bộ mã sẽ xanh ban ngày và đỏ
+    # lúc chạy đêm, và người đọc sẽ tưởng mã hỏng.
+    from app.services import ai_quyen as AQ
+    assert client.put("/api/v1/ai/positions", headers=login("chutich"), json={
+        "vai_tro": AQ.CHU_QUAN_HOP_THU, "tac_vu": "tin_khach", "muc": 3,
+        "han_muc": {"khung_gio": "00:00-23:59", "so_luot_ngay": 50,
+                    "loai_noi_dung": "lịch khởi hành, giá công bố", "nguoi_hau_kiem": "ptgd_mkt"}}).status_code == 200
     res = client.post("/api/v1/inbox/check", headers=login("cntt")).json(); assert res["ai_replied"] == 1 and res["new_alerts"] == 1
     d = client.get(f"/api/v1/inbox/{c['id']}", headers=h).json()
     assert d["messages"][-1]["sender"] == "ai" and "Vietourist" in d["messages"][-1]["text"] and d["ai_replies"] == 1 and d["phone"] == "0903123456" and d["status"] == "ai_da_tra_loi"

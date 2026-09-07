@@ -118,8 +118,11 @@ def chenh_lech(db: Session) -> dict:
             "tong": sum(len(v) for v in ds.values()), "nguong_bo_hoang_ngay": NGAY_BO_HOANG}
 
 
+# Đổi quyền AI cũng là đổi quyền: cùng một câu hỏi "ai được làm gì", chỉ khác chủ thể là máy chứ không
+# phải người. Để ở nhật ký riêng thì lúc rà quyền hằng tháng sẽ nhìn sót đúng phần rủi ro nhất.
 HANH_DONG_QUYEN = ("dang_nhap", "sua_tai_khoan", "dat_lai_mat_khau", "doi_mat_khau",
-                   "cap_ngoai_le_quyen", "thu_hoi_ngoai_le_quyen", "hau_kiem_ai")
+                   "cap_ngoai_le_quyen", "thu_hoi_ngoai_le_quyen",
+                   "dat_quyen_ai", "tat_khan_ai", "hau_kiem_ai")
 
 
 def nhat_ky_quyen(db: Session, limit: int = 200, bo_dang_nhap: bool = True) -> list[dict]:

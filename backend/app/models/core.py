@@ -445,3 +445,60 @@ class AiRun(Base):
     hau_kiem_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     hau_kiem_ghi_chu: Mapped[str] = mapped_column(String(300), default="")
     loi: Mapped[str] = mapped_column(String(300), default="")
+
+
+# ---------- Quyền AI theo vị trí (chỉ đạo 07/9/2026, đặc tả phần C) ----------
+# Sáu nhóm việc AI có thể làm. Chia theo VIỆC chứ không theo công cụ: cùng một mô hình ngôn ngữ, nhưng
+# soạn tin gửi khách và tóm tắt số liệu nội bộ là hai mức rủi ro hoàn toàn khác nhau.
+AI_GROUPS = {
+    "hoi_dap": "Hỏi–đáp trên dữ liệu",
+    "tin_khach": "Soạn và gửi tin cho khách",
+    "vb_noi_bo": "Soạn văn bản nội bộ",
+    "doc_chung_tu": "Đọc chứng từ",
+    "cham_diem": "Nhận xét & chấm điểm con người",
+    "canh_bao": "Cảnh báo & nhắc việc",
+}
+# Bốn việc AI KHÔNG được làm ở bất kỳ mức nào – ghi vào mã để không ai phải nhớ:
+AI_CAM = (
+    "Quyết định cho tiền ra: duyệt đề nghị chi, lập lệnh chi, duyệt dự toán, mở cổng biên",
+    "Ghi hoặc sửa số kế toán đã xác nhận; khóa hoặc mở kỳ",
+    "Đổi tài khoản, vai trò, giá bán hoặc chính sách",
+    "Cam kết với khách những điều không có trong dữ liệu VTOS: giảm giá, giữ chỗ, hoàn tiền",
+)
+AI_HAN_MUC_BAT_BUOC = ("khung_gio", "so_luot_ngay", "loai_noi_dung", "nguoi_hau_kiem")
+
+
+class AiPosition(Base):
+    """Mức quyền AI của một VỊ TRÍ trên một NHÓM VIỆC.
+
+    Bảng này phải điều khiển hành vi thật, không phải bảng trang trí: robot trả lời khách đọc thẳng mức
+    ở đây để quyết định tự gửi hay chỉ để nháp. Một bảng phân quyền mà hệ thống không đọc thì đến lúc
+    có chuyện, nó chỉ chứng minh rằng người ta đã tưởng là mình kiểm soát được.
+
+    Mức 3 (tự động trong hạn mức) BẮT BUỘC khai đủ hạn mức – xem AI_HAN_MUC_BAT_BUOC. Mức 3 không hạn
+    mức chính là tình trạng trước ngày 07/9/2026: AI gửi tin cho khách thật, không giới hạn, không ai
+    hậu kiểm, không để lại vết.
+    """
+    __tablename__ = "ai_positions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vai_tro: Mapped[str] = mapped_column(String(30), index=True)
+    tac_vu: Mapped[str] = mapped_column(String(20), index=True)      # AI_GROUPS
+    muc: Mapped[int] = mapped_column(Integer, default=0)             # 0 không dùng … 4 robot mã xác định
+    han_muc: Mapped[dict] = mapped_column(JSON, default=dict)        # {khung_gio, so_luot_ngay, gia_tri_toi_da, loai_noi_dung, nguoi_hau_kiem}
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+class AiPause(Base):
+    """Nút tắt khẩn AI đối ngoại. Một dòng duy nhất (id = 1).
+
+    Hạ MỌI ô mức 3 xuống mức 2 ngay lập tức, không cần phát hành lại phần mềm. Trước bản này chỉ có một
+    tham số ai_tra_loi_bat nằm lẫn giữa bảng chính sách – không ai biết nó ở đó, và nó chỉ tắt được đúng
+    một việc.
+    """
+    __tablename__ = "ai_pause"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tam_dung: Mapped[bool] = mapped_column(Boolean, default=False)
+    ly_do: Mapped[str] = mapped_column(String(300), default="")
+    boi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
