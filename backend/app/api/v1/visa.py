@@ -23,9 +23,13 @@ router = APIRouter(prefix="/api/v1/visa", tags=["visa"])
 
 # Ai được vào phân hệ Visa. Kế toán và Ban Kiểm soát chỉ đọc phần cần cho nghiệp vụ của họ (mục 9);
 # Ban Kiểm soát còn bị chặn ghi ở tầng deps.current_user nên không cần liệt kê lại ở đây.
-READ = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "gd_kd", "tp_kd", "tn_kd", "nv_kd",
-        "ketoan", "cntt", "bks", "hcns")
-WRITE = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "cntt")
+# "nv_visa" (Chuyên viên Visa) là vai trò của chính những người làm nghề này. Họ chỉ gọi được tiền tố
+# /api/v1/visa và chỉ thấy menu /visa (app/services/access.py), nên nếu quên tên họ ở đây thì họ đăng nhập
+# vào, thấy đúng một mục menu, bấm vào và nhận 403 – phân hệ xây cho họ mà họ không vào được.
+READ = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "nv_visa", "gd_kd", "tp_kd", "tn_kd",
+        "nv_kd", "ketoan", "cntt", "bks", "hcns")
+WRITE = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "nv_visa", "gd_kd", "tp_kd", "tn_kd",
+         "nv_kd", "cntt")
 
 
 def _fail(ex: VS.VisaError):

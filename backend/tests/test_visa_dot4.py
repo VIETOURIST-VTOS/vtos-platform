@@ -208,3 +208,74 @@ def test_chi_lanh_dao_moi_duoc_nap_du_lieu():
     r = client.post("/api/v1/visa/nap-visa-portal", headers=login("dh.lan"),
                     files={"file": ("portal.csv", CSV, "text/csv")})
     assert r.status_code == 403
+
+
+# ---------- Vai trò Chuyên viên Visa (nv_visa) ----------
+
+def _tao_nv_visa():
+    """Vai trò nv_visa do phân hệ Nhân sự sinh ra từ bảng lương; ở đây tạo thẳng một tài khoản để kiểm quyền."""
+    from app.db.session import SessionLocal
+    from app.models.core import User
+    from app.core.security import hash_password
+    from sqlalchemy import select as sel
+    db = SessionLocal()
+    try:
+        if not db.execute(sel(User).where(User.username == "visa.chuyenvien")).scalars().first():
+            db.add(User(username="visa.chuyenvien", full_name="Chuyên viên Visa (kiểm thử)",
+                        role="nv_visa", department="Visa", password_hash=hash_password("123456")))
+            db.commit()
+        return db.execute(sel(User).where(User.username == "visa.chuyenvien")).scalars().first().id
+    finally:
+        db.close()
+
+
+def test_chuyen_vien_visa_dung_duoc_phan_he_cua_chinh_minh():
+    """Phân hệ xây cho họ thì họ phải vào được. Bỏ sót tên vai trò ở lớp API là họ nhận 403 ở đúng menu duy nhất."""
+    uid = _tao_nv_visa()
+    h = login("visa.chuyenvien")
+    assert client.get("/api/v1/visa/danh-muc", headers=h).status_code == 200
+    assert client.get("/api/v1/visa/ho-so", headers=h).status_code == 200
+    assert client.get("/api/v1/visa/tong-quan", headers=h).status_code == 200
+
+    # Chỉ thấy hồ sơ ĐƯỢC GIAO, không thấy hồ sơ của người khác
+    cid = new_case("Ho So Giao Chuyen Vien")
+    assert client.get("/api/v1/visa/ho-so", headers=h).json()["total"] == 0
+    assert client.get(f"/api/v1/visa/ho-so/{cid}", headers=h).status_code == 403
+    client.post(f"/api/v1/visa/ho-so/{cid}/phan-cong", headers=login("tp.dieuhanh"),
+                json={"visa_owner_user_id": uid})
+    assert client.get(f"/api/v1/visa/ho-so/{cid}", headers=h).status_code == 200
+    assert client.get("/api/v1/visa/ho-so", headers=h).json()["total"] == 1
+
+
+def test_chuyen_vien_visa_lam_duoc_viec_nghiep_vu_nhung_khong_dung_vao_tien():
+    """Duyệt tài liệu hồ sơ mình thì được; đụng vào phân bổ tiền hay nạp dữ liệu hàng loạt thì không."""
+    uid = _tao_nv_visa()
+    h = login("visa.chuyenvien")
+    bid = make_booking(3_000_000, 1_000_000, pax=1)
+    cid = new_case("Nghiep Vu Chuyen Vien", bid)
+    client.post(f"/api/v1/visa/ho-so/{cid}/phan-cong", headers=login("tp.dieuhanh"),
+                json={"visa_owner_user_id": uid})
+    # Khai form, gửi, khách xác nhận – việc thường ngày của chuyên viên
+    fv = client.post(f"/api/v1/visa/ho-so/{cid}/form", headers=h,
+                     json={"data": {"ho_ten": "X", "so_ho_chieu": "C9999999"}}).json()
+    assert client.post(f"/api/v1/visa/ho-so/{cid}/form/{fv['id']}/gui-khach", headers=h).status_code == 200
+    assert client.post(f"/api/v1/visa/ho-so/{cid}/xac-nhan-form", headers=h,
+                       json={"form_version_id": fv["id"], "confirmed_by_name": "Khách"}).status_code == 201
+    # Nộp và duyệt tài liệu
+    item = client.get(f"/api/v1/visa/ho-so/{cid}", headers=h).json()["checklist"][0]
+    up = client.post(f"/api/v1/visa/ho-so/{cid}/tai-lieu", headers=h,
+                     files={"file": ("hc.pdf", b"noi dung", "application/pdf")},
+                     data={"checklist_item_id": str(item["id"])})
+    assert up.status_code == 201
+    assert client.post(f"/api/v1/visa/ho-so/{cid}/tai-lieu/{up.json()['id']}/kiem-tra", headers=h,
+                       json={"decision": "ACCEPTED"}).status_code == 201
+
+    # Nhưng KHÔNG đụng được vào tiền và KHÔNG nạp dữ liệu hàng loạt
+    assert client.get(f"/api/v1/visa/ho-so/{cid}/thu-chi", headers=h).status_code == 403
+    assert client.post(f"/api/v1/visa/ho-so/{cid}/trong-so-phi", headers=h,
+                       json={"fee_weight": 2}).status_code == 403
+    assert client.post("/api/v1/visa/nap-visa-portal", headers=h,
+                       files={"file": ("p.csv", CSV, "text/csv")}).status_code == 403
+    # Và không hủy được hồ sơ – hủy là quyền của trưởng bộ phận
+    assert client.post(f"/api/v1/visa/ho-so/{cid}/huy", headers=h,
+                       json={"reason": "thử"}).status_code == 422

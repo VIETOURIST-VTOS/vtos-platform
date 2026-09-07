@@ -95,7 +95,7 @@ def _audit(db: Session, u: User, action: str, case: VisaCase, before=None, after
 # ---------- Phân quyền theo phạm vi (mục 9) ----------
 LEADERSHIP = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt")
 VISA_ALL = LEADERSHIP + ("cntt", "bks", "tp_dh", "ketoan")     # xem toàn bộ trong phạm vi công ty
-VISA_STAFF = ("nv_dh", "tp_dh")                                 # chuyên viên Visa nằm ở Điều hành
+VISA_STAFF = ("nv_visa", "nv_dh", "tp_dh")                       # người trực tiếp xử lý hồ sơ
 REVIEWER_ROLES = LEADERSHIP + ("tp_dh", "cntt")                 # duyệt tài liệu / ngoại lệ
 WAIVER_DECIDER = LEADERSHIP + ("tp_dh",)                        # quyết định miễn nộp
 ASSIGNER_ROLES = LEADERSHIP + ("tp_dh", "gd_kd")
@@ -477,7 +477,7 @@ def add_document(db: Session, u: User, c: VisaCase, item_id: int | None, content
 
 def review_document(db: Session, u: User, c: VisaCase, doc_id: int, decision: str, reason: str = "") -> VisaDocumentReview:
     """Người kiểm tra chấp nhận hoặc yêu cầu nộp lại. Đây là việc của chuyên viên, không phải của khách."""
-    _require(u, REVIEWER_ROLES + ("nv_dh",), "duyệt tài liệu")
+    _require(u, REVIEWER_ROLES + ("nv_dh", "nv_visa"), "duyệt tài liệu")
     _editable(c)
     doc = db.get(VisaDocument, doc_id)
     if not doc or doc.case_id != c.id:
@@ -561,7 +561,7 @@ def submit_for_review(db: Session, u: User, c: VisaCase) -> VisaCase:
 
 def pass_review(db: Session, u: User, c: VisaCase) -> VisaCase:
     """Xác nhận đã kiểm tra xong: mọi mục bắt buộc phải ACCEPTED, WAIVED (đã duyệt) hoặc NOT_APPLICABLE."""
-    _require(u, REVIEWER_ROLES + ("nv_dh",), "xác nhận kết quả kiểm tra hồ sơ")
+    _require(u, REVIEWER_ROLES + ("nv_dh", "nv_visa"), "xác nhận kết quả kiểm tra hồ sơ")
     _editable(c)
     if c.current_stage != "kiem_tra":
         raise VisaError(f"Hồ sơ đang ở bước «{STAGES.get(c.current_stage, c.current_stage)}»")
@@ -1112,7 +1112,7 @@ def ai_suggest(db: Session, u: User, c: VisaCase, agent: str, target: str, paylo
 
 
 def ai_decide(db: Session, u: User, c: VisaCase, suggestion_id: int, accept: bool) -> VisaAiSuggestion:
-    _require(u, REVIEWER_ROLES + ("nv_dh",), "chấp nhận hoặc bác bỏ đề xuất của AI")
+    _require(u, REVIEWER_ROLES + ("nv_dh", "nv_visa"), "chấp nhận hoặc bác bỏ đề xuất của AI")
     s = db.get(VisaAiSuggestion, suggestion_id)
     if not s or s.case_id != c.id:
         raise VisaError("Đề xuất không thuộc hồ sơ này")
