@@ -91,11 +91,31 @@ DEFAULT_PARAMS = [
 ]
 
 
+# Bộ nhớ đệm tham số. get_param bị gọi hàng nghìn lần trong một lần dựng bảng điều khiển –
+# mỗi chuyến quyết toán gọi 4 lần, mỗi lần là một chuyến đi–về tới PostgreSQL ở Singapore. Tham số
+# là master data đổi vài tháng một lần và mỗi lần đổi đều đi qua đúng một chỗ (ký duyệt tham số),
+# nên đệm được an toàn miễn là chỗ đó xoá đệm. TTL 60 giây để bản ghi do phiên khác ghi cũng vào.
+_PARAM_CACHE: dict[tuple[str, date], tuple[float, float]] = {}
+PARAM_CACHE_TTL = 60.0
+
+
+def clear_param_cache() -> None:
+    """Gọi ngay sau khi ghi/duyệt/huỷ một tham số. Quên gọi là hệ thống chạy bằng giá trị cũ tới 60 giây."""
+    _PARAM_CACHE.clear()
+
+
 def get_param(db: Session, key: str, on: date | None = None) -> float:
+    import time
     on = on or date.today()
+    ck = (key, on)
+    hit = _PARAM_CACHE.get(ck)
+    if hit is not None and time.time() - hit[1] < PARAM_CACHE_TTL:
+        return hit[0]
     row = db.execute(select(Param).where(Param.key == key, Param.status == "active",
                                           Param.effective_from <= on)
                      .order_by(desc(Param.effective_from), desc(Param.id))).scalars().first()
+    if row is not None:
+        _PARAM_CACHE[ck] = (float(row.value), time.time())
     if row is None:
         for k, v, *_ in DEFAULT_PARAMS:
             if k == key:
@@ -123,6 +143,7 @@ def seed_params(db: Session):
         db.add(Param(key=k, value=v, label=label, unit=unit, effective_from=date(2026, 9, 1),
                      source=src, status="active", signed_chutich=True, signed_tgd=True, proposed_by="seed"))
     db.commit()
+    clear_param_cache()
 
 
 # ====================== NHẬT KÝ BẤT BIẾN ======================

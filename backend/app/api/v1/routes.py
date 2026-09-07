@@ -81,7 +81,11 @@ def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Sessio
     # việc chờ tôi xử lý: chỉ xét tour đang trong luồng (không quét tour đã kết thúc / đã duyệt hàng loạt)
     active = db.execute(select(Tour).where(Tour.status.in_(["nhap", "cho_xac_nhan", "cho_duyet", "da_dong_so", "kt_xac_nhan"]))).scalars().all()
     if u.role in ("chutich", "tp_dh"):
-        active += db.execute(select(Tour).where(Tour.status == "da_duyet", Tour.chairman_run_decision == False, Tour.start_date >= date.today(), Tour.start_date <= date.today() + timedelta(days=7))).scalars().all()
+        # chairman_run_decision là CHUỖI ghi nội dung quyết định ("Chủ tịch duyệt chạy 07/09/2026"),
+        # không phải cờ đúng/sai. So với False thì SQLite âm thầm ép kiểu và chạy, còn PostgreSQL
+        # từ chối: 'operator does not exist: character varying = boolean' → toàn bộ bảng điều khiển
+        # của Chủ tịch và TP Điều hành trả lỗi 500 và trang chủ đứng ở "Đang tải…" vĩnh viễn.
+        active += db.execute(select(Tour).where(Tour.status == "da_duyet", Tour.chairman_run_decision == "", Tour.start_date >= date.today(), Tour.start_date <= date.today() + timedelta(days=7))).scalars().all()
     if u.role in ("nv_dh", "tp_dh"):
         active += db.execute(select(Tour).where(Tour.status.in_(["ket_thuc", "da_duyet"]), Tour.operator_id == u.id, Tour.end_date <= date.today())).scalars().all()
     todo = []
@@ -452,6 +456,7 @@ def sign_param(pid: int, u: User = Depends(require_roles("chutich", "tgd")), db:
         p.status = "active"
         R.audit(db, u.username, u.role, "tham_so_hieu_luc", f"param:{p.key}", after={"value": p.value, "hieu_luc": str(p.effective_from)})
     db.commit()
+    R.clear_param_cache()      # tham số vừa đổi – bỏ đệm ngay, không để hệ thống chạy bằng giá trị cũ
     return {"param": param_out(p), "message": "Đã ký" + (" – tham số có hiệu lực theo ngày đã ghi" if p.status == "active" else ", chờ chữ ký còn lại")}
 
 
