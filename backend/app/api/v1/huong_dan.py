@@ -13,15 +13,16 @@ NỘI DUNG quan hệ chứ không xét tên hợp đồng, và dữ liệu hệ 
 công ty quản lý, điều hành người mà công ty khai là cộng tác viên. Nên ở đây là "chào chuyến", và 24 giờ
 là HẠN HIỆU LỰC CỦA LỜI CHÀO, không phải hạn tuân thủ của người nhận.
 """
-from datetime import date, timedelta
-from fastapi import APIRouter, Depends
+from datetime import date, datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.core import User, Tour
 from app.models.hr import Employee, GuideAssignment, GuideRate
-from app.services import hr as H
+from app.services import hr as H, rules as R
 
 router = APIRouter(prefix="/api/v1/huong-dan", tags=["huong-dan"])
 
@@ -30,6 +31,16 @@ router = APIRouter(prefix="/api/v1/huong-dan", tags=["huong-dan"])
 READ = ("chutich", "tgd", "ptgd_doan", "tp_hd", "tp_dh", "nv_dh", "hcns", "ketoan", "bks", "cntt")
 
 SAP_HET_HAN = 60          # ngày: báo trước khi thẻ hành nghề hết hạn
+DIEU_PHOI = ("tp_hd", "tp_dh", "nv_dh", "hcns", "cntt")     # người được chào chuyến
+
+
+def han_tra_loi(db: Session, tu: datetime | None = None) -> datetime:
+    """Lời chào hết hiệu lực lúc nào. Đọc từ tham số, không viết cứng 24 giờ vào mã nguồn."""
+    try:
+        gio = R.get_param(db, "hdv_han_tra_loi_gio")
+    except KeyError:
+        gio = 24
+    return (tu or datetime.now()) + timedelta(hours=float(gio or 24))
 
 
 def _hdv_ra(e: Employee, hom_nay: date) -> dict:
@@ -95,8 +106,8 @@ def chao_chuyen(u: User = Depends(require_roles(*READ)), db: Session = Depends(g
     out = []
     for a in db.execute(select(GuideAssignment).order_by(desc(GuideAssignment.id)).limit(200)).scalars():
         t = db.get(Tour, a.tour_id)
-        qua_han = (a.status == "cho_xac_nhan"
-                   and (date.today() - a.assigned_at.date()).days >= 1)
+        qua_han = (a.status == "cho_xac_nhan" and a.han_tra_loi is not None
+                   and datetime.now() > a.han_tra_loi)
         tre_bao_cao = (a.status == "da_xac_nhan" and t is not None and t.end_date < hom_nay
                        and not a.report_submitted and (hom_nay - t.end_date).days > 3)
         out.append({"id": a.id, "tour_code": t.code if t else "", "tour_name": t.name if t else "",
@@ -104,7 +115,8 @@ def chao_chuyen(u: User = Depends(require_roles(*READ)), db: Session = Depends(g
                     "so_ngay": a.days, "don_gia": a.rate_per_day, "le_tet": a.holiday,
                     "thu_lao": a.rate_per_day * a.days * (2 if a.holiday else 1),
                     "trang_thai": a.status, "chao_luc": a.assigned_at, "nhan_luc": a.confirmed_at,
-                    "loi_chao_qua_han": qua_han, "da_bao_cao": a.report_submitted,
+                    "loi_chao_qua_han": qua_han, "han_tra_loi": a.han_tra_loi, "ly_do": a.ly_do,
+                    "da_bao_cao": a.report_submitted,
                     "tre_bao_cao": tre_bao_cao, "da_hoan_ung": a.advance_settled,
                     "treo_chao_moi": tre_bao_cao or not a.advance_settled})
     return out
@@ -126,3 +138,83 @@ def tong_quan(u: User = Depends(require_roles(*READ)), db: Session = Depends(get
             "dang_bi_treo": sum(1 for c in chao if c["treo_chao_moi"]),
             "tuyen_co_don_gia": len({g.route for g in gia}),
             "chuyen_chua_co_hdv": len(chuyen_can_hdv(30, u, db))}
+
+
+# ====================== CHÀO CHUYẾN ======================
+class ChaoIn(BaseModel):
+    tour_id: int
+    guide_id: int
+    days: int
+    rate_per_day: float
+    rate_id: int | None = None
+    holiday: bool = False
+
+
+@router.post("/chao-chuyen", status_code=201)
+def chao(data: ChaoIn, u: User = Depends(require_roles(*DIEU_PHOI)), db: Session = Depends(get_db)):
+    """Chào một chuyến cho một hướng dẫn viên.
+
+    Vẫn qua cổng 13: có quyền chào không có nghĩa là chào được cho người thiếu điều kiện hành nghề –
+    một chuyến dẫn thiếu thẻ hoặc thiếu hợp đồng thì cả doanh nghiệp lẫn người dẫn cùng bị xử phạt."""
+    e = db.get(Employee, data.guide_id); t = db.get(Tour, data.tour_id)
+    if e is None or t is None: raise HTTPException(404, "Không có hướng dẫn viên hoặc tour")
+    ok, vi_sao = H.guide_eligible(e, t.start_date)
+    if not ok: raise HTTPException(422, {"gate": "CONG_13", "message": f"Không chào chuyến được: {vi_sao}"})
+    dang_cho = db.execute(select(GuideAssignment).where(
+        GuideAssignment.tour_id == t.id,
+        GuideAssignment.status.in_(("cho_xac_nhan", "da_xac_nhan")))).scalars().first()
+    if dang_cho is not None:
+        raise HTTPException(422, "Chuyến này đang có lời chào chờ trả lời hoặc đã có người nhận. Đóng lời "
+                                 "chào cũ trước khi chào người khác – hai người cùng nhận một chuyến thì "
+                                 "công ty trả thù lao hai lần.")
+    treo = _dang_treo(db, e.id)
+    if treo:
+        raise HTTPException(422, f"Hướng dẫn viên đang bị treo chào chuyến: {treo}")
+    a = GuideAssignment(tour_id=t.id, guide_id=e.id, days=data.days, rate_per_day=data.rate_per_day,
+                        rate_id=data.rate_id, holiday=data.holiday, assigned_by=u.username,
+                        han_tra_loi=han_tra_loi(db))
+    db.add(a); db.flush()
+    R.audit(db, u.username, u.role, "chao_chuyen_hdv", f"tour:{t.code}",
+            after={"hdv": e.full_name, "so_ngay": a.days, "don_gia": a.rate_per_day,
+                   "han_tra_loi": f"{a.han_tra_loi:%Y-%m-%d %H:%M}"})
+    db.commit()
+    return {"id": a.id, "message": f"Đã chào chuyến {t.code} cho {e.full_name}. Lời chào có hiệu lực đến "
+                                   f"{a.han_tra_loi:%H:%M %d/%m/%Y}; quá hạn thì chào người khác."}
+
+
+def _dang_treo(db: Session, guide_id: int) -> str:
+    """Treo chào chuyến khi còn nợ báo cáo tour hoặc chưa hoàn ứng.
+
+    Đây là điều kiện của HỢP ĐỒNG DỊCH VỤ – chưa nghiệm thu xong việc trước thì chưa giao việc sau –
+    chứ không phải hình thức kỷ luật. Khác biệt đó quan trọng với một đội ngũ cộng tác viên."""
+    hom_nay = date.today()
+    for a in db.execute(select(GuideAssignment).where(
+            GuideAssignment.guide_id == guide_id, GuideAssignment.status == "da_xac_nhan")).scalars():
+        t = db.get(Tour, a.tour_id)
+        if t is None or t.end_date >= hom_nay: continue
+        qua = (hom_nay - t.end_date).days
+        if qua > 3 and not a.report_submitted:
+            return f"chưa nộp báo cáo tour {t.code} (kết thúc {t.end_date:%d/%m}, quá {qua} ngày)"
+        if not a.advance_settled:
+            return f"chưa hoàn ứng tour {t.code}"
+    return ""
+
+
+class DongIn(BaseModel):
+    ly_do: str = ""
+
+
+@router.post("/chao-chuyen/{aid}/dong")
+def dong_loi_chao(aid: int, data: DongIn, u: User = Depends(require_roles(*DIEU_PHOI)),
+                  db: Session = Depends(get_db)):
+    """Đóng một lời chào đã quá hạn để chào người khác.
+
+    Trạng thái ghi là HẾT HẠN, không phải vi phạm: lời chào là lời chào, hết hiệu lực thì thôi."""
+    a = db.get(GuideAssignment, aid)
+    if a is None: raise HTTPException(404, "Không có lời chào này")
+    if a.status != "cho_xac_nhan":
+        raise HTTPException(422, f"Lời chào đang ở trạng thái '{a.status}', không đóng được")
+    a.status = "het_han"; a.ly_do = (data.ly_do or "hết hạn trả lời")[:200]; a.tra_loi_luc = datetime.now()
+    R.audit(db, u.username, u.role, "dong_loi_chao_hdv", f"assign:{a.id}", after={"ly_do": a.ly_do})
+    db.commit()
+    return {"message": "Đã đóng lời chào – chuyến này chào được cho người khác."}

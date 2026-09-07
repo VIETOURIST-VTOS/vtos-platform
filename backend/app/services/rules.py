@@ -72,6 +72,12 @@ DEFAULT_PARAMS = [
     ("xe_ky_quyet_toan_ap_dung_tu", "2026-09", "Kỳ đầu tiên áp dụng cách cắt kỳ theo tháng dương lịch; kỳ "
      "trước mốc này đã quyết toán xong theo cách cũ nên máy không dựng lại", "YYYY-MM", "Chủ tịch 07/9/2026"),
     ("xe_nguoi_lap_lenh", "53","Tài khoản (hoặc mã nhân viên) được tạo và chốt lệnh điều xe – để trống là theo vai trò", "danh sách", "Chủ tịch 07/9/2026"),
+    # Hạn TRẢ LỜI của lời chào chuyến, không phải hạn tuân thủ của hướng dẫn viên: hết hạn thì lời chào
+    # hết hiệu lực và chuyến được chào cho người khác. Toàn bộ HDV là cộng tác viên (07/9/2026), nên một
+    # mốc thời gian mang nghĩa "bắt buộc phải trả lời" là dấu hiệu quản lý, điều hành – thứ mà luật nhìn
+    # vào để xác định lại quan hệ lao động bất kể hợp đồng mang tên gì.
+    ("hdv_han_tra_loi_gio", "24", "Lời chào chuyến hết hiệu lực sau bao nhiêu giờ", "giờ",
+     "Chính sách Phòng Hướng dẫn"),
     ("moc_luong_doan", "30000000", "Mốc bình quân LN quyết toán 3 tháng để hưởng đủ lương NV kinh doanh đoàn", "đồng", "Đoàn Điều 5"),
     ("phat_su_vu", "1000000", "Chế tài mỗi sự vụ từ mức 2 (chỉ trừ hoa hồng)", "đồng/vụ", "KD Lẻ"),
     # Khoản trừ của NGƯỜI LAO ĐỘNG, áp từ kỳ lương 01/9/2026 (Bộ tính lương Vietourist, sheet Tham số).

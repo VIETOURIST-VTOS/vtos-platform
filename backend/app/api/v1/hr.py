@@ -257,7 +257,10 @@ def xe_hdv_cua_toi(u: User = Depends(require_roles("xe_hdv", "nv_dh", "tp_dh", "
                        "start_date": t.start_date if t else None, "days": a.days, "holiday": a.holiday,
                        "amount": a.rate_per_day * a.days * (2 if a.holiday else 1), "status": a.status,
                        "confirmed_at": a.confirmed_at, "report_submitted": a.report_submitted,
-                       "advance_settled": a.advance_settled})
+                       "advance_settled": a.advance_settled, "ly_do": a.ly_do,
+                       "han_tra_loi": a.han_tra_loi,
+                       "con_tra_loi_duoc": (a.status == "cho_xac_nhan"
+                                            and (a.han_tra_loi is None or datetime.now() <= a.han_tra_loi))})
 
     the = None
     if e.department == "huong_dan":
@@ -265,6 +268,58 @@ def xe_hdv_cua_toi(u: User = Depends(require_roles("xe_hdv", "nv_dh", "tp_dh", "
         the = {"card_no": e.card_no, "card_expiry": e.card_expiry, "du_dieu_kien": ok, "vi_sao": vi_sao}
 
     return {"ho_so": ho_so, "xe": xe, "lenh_dieu_xe": lenh, "phan_chuyen": chuyen, "the_hdv": the}
+
+
+class TraLoiIn(BaseModel):
+    ly_do: str = ""
+
+
+def _loi_chao_cua_toi(db: Session, u: User, aid: int) -> GuideAssignment:
+    """Lấy lời chào và kiểm tra nó là của CHÍNH người đang đăng nhập.
+
+    Không kiểm chỗ này thì một hướng dẫn viên nhận thay chuyến của người khác chỉ bằng cách đổi số trên
+    đường dẫn – và người bị nhận thay là người phải đi dẫn."""
+    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    if e is None and u.staff_code:
+        e = db.execute(select(Employee).where(Employee.code == u.staff_code)).scalars().first()
+    if e is None:
+        raise HTTPException(404, "Tài khoản này chưa gắn với hồ sơ nhân sự – báo HCNS ghép mã nhân viên")
+    a = db.get(GuideAssignment, aid)
+    if a is None or a.guide_id != e.id:
+        raise HTTPException(404, "Không có lời chào này")
+    return a
+
+
+@router.post("/xe-hdv/chao-chuyen/{aid}/nhan")
+def nhan_chuyen(aid: int, u: User = Depends(require_roles("xe_hdv")), db: Session = Depends(get_db)):
+    """Hướng dẫn viên nhận chuyến được chào."""
+    a = _loi_chao_cua_toi(db, u, aid)
+    if a.status != "cho_xac_nhan":
+        raise HTTPException(422, f"Lời chào không còn chờ trả lời (đang ở '{a.status}')")
+    if a.han_tra_loi is not None and datetime.now() > a.han_tra_loi:
+        raise HTTPException(422, "Lời chào đã hết hiệu lực – liên hệ phòng Hướng dẫn để được chào lại. "
+                                 "Không phải lỗi của anh/chị, chỉ là chuyến cần chốt người sớm.")
+    a.status = "da_xac_nhan"; a.confirmed_at = datetime.now(); a.tra_loi_luc = a.confirmed_at
+    R.audit(db, u.username, u.role, "nhan_chuyen", f"assign:{a.id}"); db.commit()
+    return {"message": "Đã nhận chuyến."}
+
+
+@router.post("/xe-hdv/chao-chuyen/{aid}/tu-choi")
+def tu_choi_chuyen(aid: int, data: TraLoiIn, u: User = Depends(require_roles("xe_hdv")),
+                   db: Session = Depends(get_db)):
+    """Hướng dẫn viên từ chối lời chào.
+
+    KHÔNG kèm chế tài và không ghi vào hồ sơ đánh giá. Hướng dẫn viên là cộng tác viên: từ chối một
+    lời chào là quyền của người cung cấp dịch vụ. Một hệ thống phạt việc từ chối là một hệ thống ghi
+    lại bằng chứng rằng công ty giao việc chứ không phải đặt dịch vụ."""
+    a = _loi_chao_cua_toi(db, u, aid)
+    if a.status != "cho_xac_nhan":
+        raise HTTPException(422, f"Lời chào không còn chờ trả lời (đang ở '{a.status}')")
+    a.status = "tu_choi"; a.ly_do = (data.ly_do or "")[:200]; a.tra_loi_luc = datetime.now()
+    R.audit(db, u.username, u.role, "tu_choi_chuyen", f"assign:{a.id}", after={"ly_do": a.ly_do})
+    db.commit()
+    return {"message": "Đã ghi nhận từ chối. Chuyến sẽ được chào cho người khác – không có ghi chú bất "
+                       "lợi nào cho anh/chị."}
 
 
 # ---------- HDV & phân chuyến (cổng 13) ----------

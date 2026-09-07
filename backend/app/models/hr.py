@@ -80,7 +80,14 @@ class GuideAssignment(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)   # HDV xác nhận trong 24 giờ
     report_submitted: Mapped[bool] = mapped_column(Boolean, default=False)          # báo cáo tour 4 phần
     advance_settled: Mapped[bool] = mapped_column(Boolean, default=True)            # hoàn ứng xong
-    status: Mapped[str] = mapped_column(String(20), default="cho_xac_nhan")         # cho_xac_nhan / da_xac_nhan / huy
+    # cho_xac_nhan / da_xac_nhan / tu_choi / het_han / huy.
+    # "tu_choi" và "het_han" thêm ngày 07/9/2026 khi toàn bộ HDV thành cộng tác viên: từ chối một lời chào
+    # là quyền của người cung cấp dịch vụ, và phải ghi lại ĐƯỢC mà không kèm chế tài – nếu hệ thống chỉ có
+    # "chưa xác nhận" thì mọi lần từ chối trông như một lần chậm trễ, và đó là hồ sơ bất lợi cho chính công ty.
+    status: Mapped[str] = mapped_column(String(20), default="cho_xac_nhan")
+    ly_do: Mapped[str] = mapped_column(String(200), default="")                     # lý do từ chối, nếu có
+    han_tra_loi: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)   # lời chào hết hiệu lực lúc nào
+    tra_loi_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)   # nhận hoặc từ chối lúc nào
 
 
 class Vehicle(Base):

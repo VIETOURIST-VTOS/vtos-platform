@@ -26,6 +26,14 @@ from app.main import app
 client = TestClient(app); TOK = {}
 
 
+def _chua_co(db, username: str) -> bool:
+    """Bộ test chạy chung một tiến trình: tệp chạy TRƯỚC quyết định dùng CSDL nào, nên tệp chạy sau phải
+    chấp nhận dữ liệu đã có thay vì chèn trùng và làm hỏng cả hai."""
+    from app.models.core import User as _U
+    from sqlalchemy import select as _s
+    return db.execute(_s(_U).where(_U.username == username)).scalars().first() is None
+
+
 def login(u):
     if u not in TOK:
         r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
@@ -45,10 +53,12 @@ def _startup():
         from app.models.hr import Employee
         from sqlalchemy import select
         with SessionLocal() as db:
-            db.add(User(username="tp.huongdan", full_name="Trưởng phòng Hướng dẫn", role="tp_hd",
-                        department="Hướng dẫn", password_hash=hash_password("123456")))
+            if _chua_co(db, "tp.huongdan"):
+                db.add(User(username="tp.huongdan", full_name="Trưởng phòng Hướng dẫn", role="tp_hd",
+                            department="Hướng dẫn", password_hash=hash_password("123456")))
             hdv = db.execute(select(Employee).where(Employee.department == "huong_dan")).scalars().first()
-            db.add(User(username="hdv.khang", full_name=hdv.full_name, role="xe_hdv",
+            if _chua_co(db, "hdv.khang"):
+                db.add(User(username="hdv.khang", full_name=hdv.full_name, role="xe_hdv",
                         department="Hướng dẫn", staff_code=hdv.code,
                         password_hash=hash_password("123456")))
             db.commit()

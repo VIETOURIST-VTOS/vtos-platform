@@ -21,6 +21,8 @@ function HuongDan() {
   const [can, setCan] = useState<any[]>([]);
   const [chao, setChao] = useState<any[]>([]);
   const [tepHdv, setTepHdv] = useState("");
+  const [form, setForm] = useState<any>(null);        // lời chào đang soạn
+  const [luu, setLuu] = useState(false);
   const canDieuPhoi = ["tp_hd", "tp_dh", "nv_dh", "hcns", "cntt"].includes(user?.role || "");
 
   const load = useCallback(async () => {
@@ -32,6 +34,25 @@ function HuongDan() {
     } catch (e) { toast(errMsg(e), true); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
+
+  const chaoChuyen = async () => {
+    setLuu(true);
+    try {
+      const d = await api<any>("/huong-dan/chao-chuyen", { method: "POST", json: {
+        tour_id: Number(form.tour_id), guide_id: Number(form.guide_id), days: Number(form.days) || 1,
+        rate_per_day: Number(form.rate_per_day) || 0, holiday: !!form.holiday } });
+      toast(d.message); setForm(null); await load();
+    } catch (e) { toast(errMsg(e), true); } finally { setLuu(false); }
+  };
+
+  const dongLoiChao = async (id: number) => {
+    const ly_do = window.prompt("Đóng lời chào này vì lý do gì?\n\n" +
+      "Ghi nhận là LỜI CHÀO HẾT HIỆU LỰC, không phải hướng dẫn viên vi phạm.", "quá hạn trả lời");
+    if (ly_do === null) return;
+    try { const d = await api<any>(`/huong-dan/chao-chuyen/${id}/dong`, { method: "POST", json: { ly_do } });
+          toast(d.message); await load(); }
+    catch (e) { toast(errMsg(e), true); }
+  };
 
   if (!tq) return <p className="muted">Đang tải…</p>;
   return (<>
@@ -56,18 +77,51 @@ function HuongDan() {
                                     onClick={() => setTab(k)}>{l}</button>)}
     </div>
 
+    {form && <div className="panel">
+      <h2>Chào chuyến {form.tour_code}</h2>
+      <p className="muted">Chào tuyến, số ngày và đơn giá cho một hướng dẫn viên. Người nhận có quyền
+        từ chối mà không kèm hệ quả gì — đây là lời chào dịch vụ, không phải lệnh giao việc.</p>
+      <div className="grid2">
+        <label>Hướng dẫn viên
+          <select value={form.guide_id} onChange={(e) => setForm({ ...form, guide_id: e.target.value })}>
+            <option value="">— chọn người —</option>
+            {(hdv?.rows || []).filter((h: any) => h.du_dieu_kien && h.dang_lam)
+              .map((h: any) => <option key={h.id} value={h.id}>{h.code} · {h.full_name}</option>)}
+          </select></label>
+        <label>Số ngày
+          <input type="number" min={1} value={form.days}
+                 onChange={(e) => setForm({ ...form, days: e.target.value })} /></label>
+        <label>Đơn giá / ngày
+          <input type="number" step={10000} value={form.rate_per_day}
+                 onChange={(e) => setForm({ ...form, rate_per_day: e.target.value })} /></label>
+        <label>Lễ Tết (×2)
+          <select value={form.holiday ? "1" : "0"}
+                  onChange={(e) => setForm({ ...form, holiday: e.target.value === "1" })}>
+            <option value="0">Không</option><option value="1">Có – nhân đôi thù lao</option>
+          </select></label>
+      </div>
+      <p className="muted">Chỉ hiện những người đủ ba điều kiện hành nghề — cổng 13 sẽ chặn lần nữa ở
+        máy chủ, nên danh sách này là để đỡ mất công, không phải là chốt chặn duy nhất.</p>
+      <button className="act teal" disabled={luu || !form.guide_id || !form.rate_per_day}
+              onClick={chaoChuyen}>{luu ? "Đang gửi…" : "Gửi lời chào"}</button>{" "}
+      <button className="act grey" onClick={() => setForm(null)}>Đóng</button>
+    </div>}
+
     {tab === "viec" && <div className="panel wrap">
       <h2>Chuyến sắp khởi hành chưa có hướng dẫn viên</h2>
       <p className="muted">Xếp theo ngày gần nhất. Không hiện danh sách khách — chọn người cần biết tuyến,
         ngày và quy mô, không cần biết ai đi chuyến đó.</p>
       <table><thead><tr><th>Mã tour</th><th>Tuyến</th><th>Khởi hành</th><th>Số ngày</th>
-        <th>Khách dự kiến</th><th>Còn lại</th></tr></thead>
+        <th>Khách dự kiến</th><th>Còn lại</th>{canDieuPhoi && <th></th>}</tr></thead>
         <tbody>{can.length ? can.map((c) => <tr key={c.tour_id}>
           <td><b>{c.code}</b></td><td>{c.name}</td><td>{fmtD(c.start_date)}</td>
           <td className="num">{c.so_ngay}</td><td className="num muted">{c.so_khach_du_kien || "—"}</td>
           <td>{c.con_lai_ngay <= 3 ? <Tag cls="red">{c.con_lai_ngay} ngày</Tag>
             : <span className="muted">{c.con_lai_ngay} ngày</span>}</td>
-        </tr>) : <tr><td colSpan={6} className="muted">Mọi chuyến trong 30 ngày tới đều đã có người nhận.</td></tr>}</tbody></table>
+          {canDieuPhoi && <td><button className="act teal" style={{ margin: 0 }}
+            onClick={() => setForm({ tour_id: c.tour_id, tour_code: c.code, guide_id: "",
+                                     days: c.so_ngay, rate_per_day: "", holiday: false })}>Chào chuyến</button></td>}
+        </tr>) : <tr><td colSpan={canDieuPhoi ? 7 : 6} className="muted">Mọi chuyến trong 30 ngày tới đều đã có người nhận.</td></tr>}</tbody></table>
     </div>}
 
     {tab === "hdv" && hdv && <>
@@ -115,7 +169,11 @@ function HuongDan() {
             <div className="muted">{fmtDT(c.chao_luc)}</div></td>
           <td>{c.da_bao_cao ? <Tag cls="ok">đã báo cáo</Tag> : c.tre_bao_cao ? <Tag cls="red">trễ báo cáo</Tag> : <span className="muted">—</span>}
             {!c.da_hoan_ung && <div><Tag cls="warn">chưa hoàn ứng</Tag></div>}
-            {c.treo_chao_moi && <div className="muted">đang treo chào chuyến mới</div>}</td>
+            {c.treo_chao_moi && <div className="muted">đang treo chào chuyến mới</div>}
+            {c.ly_do && <div className="muted">{c.ly_do}</div>}
+            {canDieuPhoi && c.loi_chao_qua_han &&
+              <div><button className="act grey" style={{ margin: "4px 0 0" }}
+                           onClick={() => dongLoiChao(c.id)}>Đóng lời chào</button></div>}</td>
         </tr>) : <tr><td colSpan={8} className="muted">Chưa có lời chào nào.</td></tr>}</tbody></table>
       {!canDieuPhoi && <p className="muted">Anh/chị đang xem ở chế độ chỉ đọc.</p>}
     </div>}

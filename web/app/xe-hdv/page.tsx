@@ -11,11 +11,30 @@ function XeHdv() {
   const { toast } = useShell();
   const [d, setD] = useState<any>(null);
   const [err, setErr] = useState("");
-  useEffect(() => { api("/xe-hdv/cua-toi").then(setD).catch((x) => { setErr(errMsg(x)); toast(errMsg(x), true); }); }, []); // eslint-disable-line
+  const tai = () => api("/xe-hdv/cua-toi").then(setD).catch((x) => { setErr(errMsg(x)); toast(errMsg(x), true); });
+  useEffect(() => { tai(); }, []); // eslint-disable-line
+
+  /** Nhận hoặc từ chối một lời chào chuyến.
+   *  Từ chối KHÔNG kèm hệ quả gì: hướng dẫn viên là cộng tác viên, và từ chối một lời chào là quyền của
+   *  người cung cấp dịch vụ. Nút này nói rõ điều đó để không ai ngại bấm. */
+  const traLoi = async (id: number, nhan: boolean) => {
+    let ly_do = "";
+    if (!nhan) {
+      const v = window.prompt("Từ chối chuyến này. Ghi lý do nếu muốn (không bắt buộc).\n\n" +
+        "Từ chối không ảnh hưởng gì đến việc được chào chuyến sau.");
+      if (v === null) return;
+      ly_do = v;
+    }
+    try {
+      const d2 = await api<any>(`/xe-hdv/chao-chuyen/${id}/${nhan ? "nhan" : "tu-choi"}`,
+                                { method: "POST", json: nhan ? {} : { ly_do } });
+      toast(d2.message); await tai();
+    } catch (e) { toast(errMsg(e), true); }
+  };
 
   if (err) return <><h1>Xe Vietrip &amp; HDV</h1><p className="muted">{err}</p></>;
   if (!d) return <p className="muted">Đang tải…</p>;
-  const st = (s: string) => s === "hoan_thanh" ? <Tag cls="ok">Hoàn thành</Tag> : s === "da_xac_nhan" ? <Tag cls="navy">Đã xác nhận</Tag> : s === "huy" ? <Tag cls="red">Hủy</Tag> : <Tag cls="warn">Chờ xác nhận</Tag>;
+  const st = (s: string) => s === "hoan_thanh" ? <Tag cls="ok">Hoàn thành</Tag> : s === "da_xac_nhan" ? <Tag cls="navy">Đã nhận</Tag> : s === "huy" ? <Tag cls="red">Hủy</Tag> : s === "tu_choi" ? <Tag>Đã từ chối</Tag> : s === "het_han" ? <Tag>Lời chào hết hạn</Tag> : <Tag cls="warn">Đang chờ trả lời</Tag>;
 
   return (<>
     <h1>Xe Vietrip &amp; HDV</h1>
@@ -37,12 +56,20 @@ function XeHdv() {
         <tbody>{d.lenh_dieu_xe.map((x: any) => <tr key={x.id}><td><b>{x.tour_code}</b><div className="muted">{x.tour_name}</div></td><td className="mono">{x.vehicle}</td>
           <td>{fmtD(x.date_from)} → {fmtD(x.date_to)}</td><td className="num">{x.days}</td><td>{st(x.status)}</td><td>{fmtDT(x.confirmed_at)}</td><td className="muted">{x.incident_note}</td></tr>)}</tbody></table></div>}
 
-    {d.phan_chuyen.length > 0 && <div className="panel wrap"><h2>Chuyến tôi dẫn</h2>
-      <table><thead><tr><th>Tour</th><th>Khởi hành</th><th className="num">Số ngày</th><th className="num">Thù lao</th><th>Trạng thái</th><th>Báo cáo</th><th>Tạm ứng</th></tr></thead>
+    {d.phan_chuyen.length > 0 && <div className="panel wrap"><h2>Chuyến được chào cho tôi</h2>
+      <p className="muted">Mỗi dòng là một <b>lời chào</b>: nhận hoặc từ chối đều được. Từ chối không kèm
+        hệ quả gì và không ghi vào hồ sơ — quá hạn trả lời thì lời chào hết hiệu lực, chuyến được chào
+        cho người khác.</p>
+      <table><thead><tr><th>Tour</th><th>Khởi hành</th><th className="num">Số ngày</th><th className="num">Thù lao</th><th>Trạng thái</th><th>Báo cáo</th><th>Tạm ứng</th><th></th></tr></thead>
         <tbody>{d.phan_chuyen.map((x: any) => <tr key={x.id}><td><b>{x.tour_code}</b><div className="muted">{x.tour_name}</div></td><td>{fmtD(x.start_date)}</td>
           <td className="num">{x.days}{x.holiday && <Tag cls="warn">lễ ×2</Tag>}</td><td className="num">{vnd(x.amount)}</td><td>{st(x.status)}</td>
           <td>{x.report_submitted ? <Tag cls="ok">Đã nộp</Tag> : <Tag cls="warn">Chưa nộp</Tag>}</td>
-          <td>{x.advance_settled ? <Tag cls="ok">Đã quyết toán</Tag> : <Tag cls="warn">Chưa</Tag>}</td></tr>)}</tbody></table></div>}
+          <td>{x.advance_settled ? <Tag cls="ok">Đã quyết toán</Tag> : <Tag cls="warn">Chưa</Tag>}</td>
+          <td style={{ whiteSpace: "nowrap" }}>{x.con_tra_loi_duoc ? <>
+            <button className="act teal" style={{ margin: 0 }} onClick={() => traLoi(x.id, true)}>Nhận</button>{" "}
+            <button className="act grey" style={{ margin: 0 }} onClick={() => traLoi(x.id, false)}>Từ chối</button>
+            <div className="muted">trả lời trước {fmtDT(x.han_tra_loi)}</div>
+          </> : x.ly_do ? <span className="muted">{x.ly_do}</span> : null}</td></tr>)}</tbody></table></div>}
 
     {d.xe.length === 0 && d.lenh_dieu_xe.length === 0 && d.phan_chuyen.length === 0 &&
       <p className="muted">Chưa có xe, lệnh điều xe hay chuyến nào gắn với hồ sơ của bạn. Nếu sai, báo Điều hành hoặc HCNS.</p>}
