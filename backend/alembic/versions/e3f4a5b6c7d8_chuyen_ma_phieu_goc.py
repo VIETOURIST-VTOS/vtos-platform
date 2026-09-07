@@ -5,13 +5,16 @@ lại cùng một báo cáo mà sinh ra bộ chuyến thứ hai thì doanh thu v
 không ai nhìn ra ngay vì mỗi dòng đều trông đúng.
 
 Revision ID: e3f4a5b6c7d8
-Revises: b1c2d3e4f5a6
+Revises: d2e3f4a5b6c7
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "e3f4a5b6c7d8"
-down_revision = "b1c2d3e4f5a6"   # nối sau bản của phiên song song – giữ MỘT đầu duy nhất
+down_revision = "d2e3f4a5b6c7"
+# Nối sau bản ĐÃ CÓ TRÊN origin. Lần trước nối sau b1c2d3e4f5a6 – bản đó mới nằm trong cây làm việc của
+# phiên song song, CHƯA commit – nên máy chủ không có nó và alembic dừng ngay, deploy df31791 hỏng.
+# Bài học: kiểm đầu mạch theo NHỮNG GÌ ĐÃ Ở TRÊN origin, không theo tệp đang có trong thư mục.
 branch_labels = None
 depends_on = None
 
