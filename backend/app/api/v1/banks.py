@@ -11,7 +11,14 @@ from app.models.banks import BankAccount, CURRENCIES
 from app.services import banks as BA
 
 router = APIRouter(prefix="/api/v1/bank-accounts", tags=["tai-khoan-ngan-hang"])
-READ = ("ketoan", "cntt", "tgd", "chutich", "bks", "ptgd_doan")
+# Đọc = đúng ma trận phân quyền màn hình /bank-accounts (FINANCE_ROLES: Chủ tịch, TGĐ, Ban Kiểm soát,
+# Kế toán). Trước bản này danh sách ở đây rộng hơn menu – Đợt 3 đã gỡ Phó TGĐ tour đoàn và CNTT khỏi màn
+# hình Tài khoản ngân hàng, nhưng API vẫn cho họ đọc, nên ẩn menu chỉ là ẩn khỏi mắt chứ không chặn.
+# Robot kiểm thử vai trò (tests/test_robot_vai_tro.py) tìm ra chỗ này. Lấy thẳng từ access.py để không
+# còn hai danh sách phải nhớ đồng bộ bằng tay.
+from app.services.access import FINANCE_ROLES
+
+READ = FINANCE_ROLES
 WRITE = ("ketoan",)      # Chủ tịch vẫn qua được – xem FULL_ACCESS trong app/api/deps.py
 
 

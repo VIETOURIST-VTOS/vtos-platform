@@ -56,8 +56,19 @@ def change_password(data: S.PasswordChange, u: User = Depends(current_user), db:
 
 @router.get("/meta", tags=["meta"])
 def meta(db: Session = Depends(get_db)):
-    return {"roles": ROLES, "tour_types": TOUR_TYPES, "tour_status": TOUR_STATUS,
-            "params": {k: R.get_param(db, k) for k, *_ in R.DEFAULT_PARAMS}}
+    """Danh mục dùng chung cho giao diện.
+
+    KHÔNG ép mọi tham số về số. Bảng chính sách có cả tham số bằng lời – danh sách vai trò được ký chữ
+    ký thứ hai, bên chịu chi phí sửa xe – và một float() trên chuỗi đó làm cả endpoint trả 500. Endpoint
+    này là thứ giao diện gọi khi mở màn hình, nên hỏng ở đây là hỏng với mọi vai trò cùng lúc: thêm một
+    tham số bằng lời vào bảng chính sách không được phép là hành động làm sập hệ thống."""
+    ps: dict[str, float | str] = {}
+    for k, *_ in R.DEFAULT_PARAMS:
+        try:
+            ps[k] = R.get_param(db, k)
+        except (ValueError, TypeError):
+            ps[k] = R.get_param_text(db, k)
+    return {"roles": ROLES, "tour_types": TOUR_TYPES, "tour_status": TOUR_STATUS, "params": ps}
 
 
 @router.get("/users", tags=["users"])
