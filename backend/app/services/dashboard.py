@@ -136,7 +136,15 @@ def build(db: Session, u: User) -> dict:
             rows.append({"code": t.code, "start": t.start_date, "days_left": left, "booked": pax,
                          "breakeven": c["breakeven_pax"], "below": pax < (c["breakeven_pax"] or 0)})
         sec["sap_khoi_hanh"] = sorted(rows, key=lambda r: r["days_left"])
-        sec["qua_han_qt"] = [{"code": t.code, "deadline": R.settlement_deadline(db, t)} for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.end_date < today).order_by(desc(Tour.end_date)).limit(400)).scalars() if today > R.settlement_deadline(db, t)][:100]
+        # Quá hạn quyết toán. Hạn = ngày kết thúc + số ngày theo tham số (đoàn và lẻ khác nhau), nên
+        # lọc luôn bằng ngày kết thúc: chuyến kết thúc SAU today − hạn dài nhất thì chắc chắn chưa quá
+        # hạn, không cần nạp về. Bản cũ nạp 400 chuyến gần nhất rồi bỏ đi phần lớn.
+        han_le = int(R.get_param(db, "han_qt_le")); han_doan = int(R.get_param(db, "han_qt_doan"))
+        moc = today - timedelta(days=min(han_le, han_doan))
+        sec["qua_han_qt"] = [{"code": t.code, "deadline": R.settlement_deadline(db, t)}
+                             for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.end_date < moc)
+                                                 .order_by(desc(Tour.end_date)).limit(300)).scalars()
+                             if today > R.settlement_deadline(db, t)][:100]
     if role in ("hcns", "chutich", "tgd"):
         s = OPS.work_days_in(today.year, today.month, until=today)
         emps = db.execute(select(Employee).where(Employee.active == True, Employee.department.in_(OPS.NO_TIMESHEET_DEPTS), Employee.user_id != None)).scalars().all()

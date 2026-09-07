@@ -4,12 +4,22 @@ import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
 import { api, pct, vnd, fmtD, fmtDT } from "@/lib/api";
 import { ACTION_LABEL } from "@/lib/meta";
-import { Tag } from "@/components/ui";
+import { Tag, errMsg } from "@/components/ui";
 
 function Dash() {
   const { user } = useShell();
   const [d, setD] = useState<any>(null);
-  useEffect(() => { api("/dashboard").then(setD).catch(() => {}); }, []);
+  // Trước đây lỗi bị nuốt bằng .catch(() => {}) nên máy chủ trả 500 mà người dùng chỉ thấy
+  // "Đang tải…" đứng im vĩnh viễn – lỗi PostgreSQL ngày 07/9 sống sót nhiều ngày vì đúng chỗ này.
+  const [loi, setLoi] = useState<string>("");
+  const tai = () => { setLoi(""); api("/dashboard").then(setD).catch((e) => setLoi(errMsg(e) || "Không tải được bảng điều khiển")); };
+  useEffect(tai, []);
+  if (loi) return <div className="panel" style={{ borderColor: "var(--red)" }}>
+    <b style={{ color: "var(--red)" }}>Không tải được bảng điều khiển.</b>
+    <div className="muted" style={{ margin: "6px 0" }}>{loi}</div>
+    <div className="muted">Các màn hình khác vẫn dùng được. Nếu lặp lại, báo CNTT kèm nguyên văn dòng trên.</div>
+    <button className="act" onClick={tai}>Thử lại</button>
+  </div>;
   if (!d) return <p className="muted">Đang tải…</p>;
   const c = d.counts || {};
   const k = d.kpis || {}; const sec = d.sections || {};

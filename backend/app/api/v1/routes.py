@@ -68,16 +68,53 @@ def users(role: str | None = None, u: User = Depends(current_user), db: Session 
 
 
 # ---------- dashboard ----------
-_DASH_CACHE: dict = {}   # role → (ts, payload) – bảng điều khiển tính nặng (10.000+ booking), giữ 5 phút
+_DASH_CACHE: dict = {}   # (role, uid) → (ts, payload) – bảng điều khiển tính nặng, giữ 5 phút
+_DASH_DIRTY: bool = True  # có thao tác ghi kể từ lần dựng gần nhất → robot nền dựng lại
+
+
+# Khóa cache của một người dùng. Vai trò nào nhìn dữ liệu của riêng mình thì thêm id vào khóa.
+def dash_key(u: User) -> tuple:
+    return (u.role, u.id if u.role in ("nv_dh", "tp_dh", "nv_kd") else 0)
+
+
+def build_dashboard(db: Session, u: User) -> dict:
+    """Dựng bảng điều khiển và ghi vào cache. Tách ra khỏi endpoint để robot nền dựng sẵn được –
+    người mở trang không phải là người trả giá cho lần dựng đầu."""
+    import time
+    payload = _dashboard_payload(db, u)
+    _DASH_CACHE[dash_key(u)] = (time.time(), payload)
+    return payload
+
+
+def lam_moi_cache_nen(db: Session) -> int:
+    """Dựng lại đúng những khóa ĐANG có trong cache – tức những vai trò thật sự có người dùng.
+
+    Gọi từ vòng lặp robot. Không đoán trước vai trò nào sẽ đăng nhập: khóa nào đã từng được dựng
+    thì có người dùng nó, khóa nào chưa thì dựng sẵn cũng phí công trên máy chủ 512 MB.
+    """
+    from app.models.core import User as _U
+    n = 0
+    for role, uid in list(_DASH_CACHE.keys()):
+        u = db.get(_U, uid) if uid else db.execute(select(_U).where(_U.role == role, _U.active == True)).scalars().first()
+        if u is None: continue
+        try:
+            build_dashboard(db, u); n += 1
+        except Exception as e:   # noqa – một vai trò lỗi không được làm hỏng cả vòng lặp
+            print("lam_moi_cache_nen", role, e)
+    return n
 
 
 @router.get("/dashboard", tags=["dashboard"])
 def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Session = Depends(get_db)):
     import time
-    key = (u.role, u.id if u.role in ("nv_dh", "tp_dh", "nv_kd") else 0)
+    key = dash_key(u)
     hit = _DASH_CACHE.get(key)
     if hit and not refresh and time.time() - hit[0] < 300:
         return {**hit[1], "cached": True}
+    return build_dashboard(db, u)
+
+
+def _dashboard_payload(db: Session, u: User) -> dict:
     # việc chờ tôi xử lý: chỉ xét tour đang trong luồng (không quét tour đã kết thúc / đã duyệt hàng loạt)
     active = db.execute(select(Tour).where(Tour.status.in_(["nhap", "cho_xac_nhan", "cho_duyet", "da_dong_so", "kt_xac_nhan"]))).scalars().all()
     if u.role in ("chutich", "tp_dh"):
@@ -102,7 +139,6 @@ def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Sessio
                "pending_requests": db.execute(select(func.count()).select_from(ServiceRequest).where(ServiceRequest.booking_id == None)).scalar(),
                "pending_params": db.execute(select(func.count()).select_from(Param).where(Param.status == "pending")).scalar(),
                "alerts": [alert_out(a) for a in alerts], "threshold": R.get_param(db, "nguong_bien"), **extra}
-    _DASH_CACHE[key] = (time.time(), payload)
     return payload
 
 
