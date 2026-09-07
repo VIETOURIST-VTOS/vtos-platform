@@ -111,9 +111,25 @@ def chenh_lech(db: Session) -> dict:
     trung = [{"full_name": v[0].full_name, "department": v[0].department,
               "ma": [x.code for x in v], "so_luong": len(v)} for v in gom.values() if len(v) > 1]
 
+    # 7. ngoại lệ quyền KHÔNG THỜI HẠN – quyền duy nhất trong hệ thống không tự co lại, nên phải nổi lên
+    #    ở đây mỗi kỳ rà quyền. Đổi "tự hết hạn" lấy "không bao giờ bị quên".
+    from app.models.core import UserGrant, CAPABILITIES
+    ten_u = {x.id: x for x in users}
+    vo_han = []
+    for g in db.execute(select(UserGrant).where(UserGrant.active == True)).scalars():
+        if not (g.vo_han() and g.hieu_luc()): continue
+        x = ten_u.get(g.user_id)
+        vo_han.append({"id": g.id, "user_id": g.user_id,
+                       "full_name": x.full_name if x else f"user:{g.user_id}",
+                       "staff_code": x.staff_code if x else "",
+                       "role_name": ROLES.get(x.role, "") if x else "",
+                       "quyen": CAPABILITIES.get(g.value, g.value),
+                       "ly_do": f"cấp {g.from_date:%d/%m/%Y} bởi {g.approved_by} – {g.reason}"})
+
     ds = {"nhan_su_chua_co_tai_khoan": chua_tk, "tai_khoan_bo_quen": bo_quen,
           "con_mat_khau_tam": mat_khau_tam, "bo_hoang": bo_hoang,
-          "chua_gan_phap_nhan": chua_phap_nhan, "ho_so_trung": trung}
+          "chua_gan_phap_nhan": chua_phap_nhan, "ho_so_trung": trung,
+          "ngoai_le_vo_han": vo_han}
     return {"danh_sach": ds, "dem": {k: len(v) for k, v in ds.items()},
             "tong": sum(len(v) for v in ds.values()), "nguong_bo_hoang_ngay": NGAY_BO_HOANG}
 

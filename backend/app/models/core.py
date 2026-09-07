@@ -127,7 +127,10 @@ class UserGrant(Base):
     kind: Mapped[str] = mapped_column(String(12))            # menu / capability
     value: Mapped[str] = mapped_column(String(80))           # đường dẫn màn hình, hoặc khóa trong CAPABILITIES
     from_date: Mapped[date] = mapped_column(Date)
-    to_date: Mapped[date] = mapped_column(Date)              # BẮT BUỘC, tối đa GRANT_MAX_DAYS ngày
+    # Rỗng = KHÔNG THỜI HẠN. Mặc định vẫn là có hạn (tối đa GRANT_MAX_DAYS ngày) vì quyền có hạn thì tự
+    # co lại, còn quyền vô hạn thì chỉ nở ra. Chỉ Chủ tịch cấp được loại không thời hạn, và loại đó luôn
+    # nổi lên ở danh sách rà quyền hằng tháng – đổi "tự hết hạn" lấy "không bao giờ bị quên".
+    to_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     reason: Mapped[str] = mapped_column(String(300))         # lý do bằng lời, bắt buộc
     granted_by: Mapped[str] = mapped_column(String(50), default="")
     approved_by: Mapped[str] = mapped_column(String(50), default="")   # chỉ Chủ tịch hoặc TGĐ
@@ -136,7 +139,11 @@ class UserGrant(Base):
 
     def hieu_luc(self, hom_nay: date | None = None) -> bool:
         d = hom_nay or date.today()
-        return bool(self.active and self.approved_by and self.from_date <= d <= self.to_date)
+        if not (self.active and self.approved_by and self.from_date <= d): return False
+        return self.to_date is None or d <= self.to_date
+
+    def vo_han(self) -> bool:
+        return self.to_date is None
 
 
 # ---------- Tham số chính sách (rules engine) ----------

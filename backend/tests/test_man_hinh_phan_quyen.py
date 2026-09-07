@@ -176,3 +176,62 @@ def test_phap_nhan_khong_co_trong_danh_muc_bi_chan():
     _, cntt = tk("cntt")
     assert client.put(f"/api/v1/access/users/{uid}/company", headers=login(cntt),
                       json={"company_id": 999999}).status_code == 422
+
+
+# ---------- tạo tài khoản (bổ sung 07/9/2026) ----------
+def test_tao_tai_khoan_moi_co_mat_khau_tam_va_ho_so():
+    _, cntt = tk("cntt")
+    h = login(cntt)
+    r = client.post("/api/v1/access/accounts", headers=h, json={
+        "ho_ten": "Nguyễn Thị Kiểm Thử", "ma_nv": "KT888", "role": "nv_kd",
+        "department": "kd_le", "ngoai_bien_che": False})
+    assert r.status_code == 201, r.text
+    j = r.json()
+    assert j["username"] == "nguyenthikiemthu" and j["ho_so"] == "KT888"
+    # mật khẩu tạm = mã NV, và vào chưa được cho tới khi đổi
+    hh = login("nguyenthikiemthu", "KT888")
+    me = client.get("/api/v1/auth/me", headers=hh).json()
+    assert me["must_change_password"] is True
+    assert client.get("/api/v1/tours", headers=hh).status_code == 403
+
+
+def test_khong_tao_trung_ma_nhan_vien():
+    _, cntt = tk("cntt")
+    r = client.post("/api/v1/access/accounts", headers=login(cntt), json={
+        "ho_ten": "Người Trùng Mã", "ma_nv": "KT888", "role": "nv_kd"})
+    assert r.status_code == 422 and "KT888" in r.json()["detail"]
+
+
+def test_tao_tai_khoan_vai_tro_nhay_cam_phai_do_lanh_dao():
+    _, hcns = tk("hcns")
+    r = client.post("/api/v1/access/accounts", headers=login(hcns), json={
+        "ho_ten": "Kế Toán Kiểm Thử", "ma_nv": "KT887", "role": "ketoan"})
+    assert r.status_code == 403, "HCNS không tự tạo được tài khoản nhìn toàn bộ tiền"
+    r2 = client.post("/api/v1/access/accounts", headers=login("chutich"), json={
+        "ho_ten": "Kế Toán Kiểm Thử", "ma_nv": "KT887", "role": "ketoan", "ngoai_bien_che": True})
+    assert r2.status_code == 201, r2.text
+
+
+def test_ngoai_le_khong_thoi_han_chi_chu_tich_cap_duoc():
+    from datetime import date
+    uid, _ = tk("hcns")
+    _, tgd = tk("tgd")
+    body = {"user_id": uid, "kind": "capability", "value": "bang_luong",
+            "reason": "hợp đồng dịch vụ dài hạn", "to_date": None}
+    assert client.post("/api/v1/access/grants", headers=login(tgd), json=body).status_code == 403
+    r = client.post("/api/v1/access/grants", headers=login("chutich"), json=body)
+    assert r.status_code == 201, r.text
+    assert "KHÔNG THỜI HẠN" in r.json()["message"]
+    # và nó phải nổi lên ở danh sách rà quyền, vì đây là quyền duy nhất không tự co lại
+    g = client.get("/api/v1/access/gaps", headers=login("chutich")).json()
+    assert g["dem"]["ngoai_le_vo_han"] >= 1
+    client.delete(f"/api/v1/access/grants/{r.json()['id']}", headers=login("chutich"))
+
+
+def test_ngoai_le_co_han_van_bi_chan_qua_90_ngay():
+    from datetime import date, timedelta
+    uid, _ = tk("hcns")
+    r = client.post("/api/v1/access/grants", headers=login("chutich"), json={
+        "user_id": uid, "kind": "capability", "value": "bang_luong", "reason": "thử",
+        "to_date": str(date.today() + timedelta(days=200))})
+    assert r.status_code == 422

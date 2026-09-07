@@ -556,8 +556,8 @@ class GrantIn(BaseModel):
     user_id: int
     kind: str                    # menu / capability
     value: str
-    to_date: date
     reason: str
+    to_date: date | None = None      # rỗng = không thời hạn (chỉ Chủ tịch cấp được)
     from_date: date | None = None
 
 
@@ -573,7 +573,7 @@ def grants_list(con_hieu_luc: bool = False, u: User = Depends(require_roles("chu
                       "username": ten[g.user_id].username if g.user_id in ten else "",
                       "kind": g.kind, "value": g.value,
                       "ten_quyen": CAPABILITIES.get(g.value, g.value) if g.kind == "capability" else g.value,
-                      "from_date": g.from_date, "to_date": g.to_date, "reason": g.reason,
+                      "from_date": g.from_date, "to_date": g.to_date, "vo_han": g.vo_han(), "reason": g.reason,
                       "granted_by": g.granted_by, "approved_by": g.approved_by,
                       "active": g.active, "hieu_luc": g.hieu_luc()} for g in rows],
             "kinds": GRANT_KINDS, "capabilities": CAPABILITIES, "max_days": GRANT_MAX_DAYS}
@@ -593,16 +593,26 @@ def grant_create(data: GrantIn, u: User = Depends(require_roles("chutich", "tgd"
         raise HTTPException(422, f"Không có màn hình {data.value}")
     if not (data.reason or "").strip(): raise HTTPException(422, "Phải ghi lý do cấp quyền")
     tu = data.from_date or date.today()
-    if data.to_date < tu: raise HTTPException(422, "Ngày hết hạn phải sau ngày bắt đầu")
-    if (data.to_date - tu).days > GRANT_MAX_DAYS:
-        raise HTTPException(422, f"Ngoại lệ quyền tối đa {GRANT_MAX_DAYS} ngày – cần lâu hơn thì đổi vai trò hoặc sửa ma trận quyền")
+    if data.to_date is None:
+        # Không thời hạn: chỉ Chủ tịch, vì đây là quyền duy nhất trong hệ thống không tự co lại.
+        if u.role != "chutich":
+            raise HTTPException(403, "Ngoại lệ KHÔNG THỜI HẠN chỉ Chủ tịch HĐQT cấp được – "
+                                     "quyền không có hạn là quyền không tự thu về")
+    else:
+        if data.to_date < tu: raise HTTPException(422, "Ngày hết hạn phải sau ngày bắt đầu")
+        if (data.to_date - tu).days > GRANT_MAX_DAYS:
+            raise HTTPException(422, f"Ngoại lệ có thời hạn tối đa {GRANT_MAX_DAYS} ngày – "
+                                     f"cần lâu hơn thì để trống ngày hết hạn (Chủ tịch cấp), "
+                                     f"hoặc đổi vai trò, hoặc sửa ma trận quyền")
     g = UserGrant(user_id=t.id, kind=data.kind, value=data.value, from_date=tu, to_date=data.to_date,
                   reason=data.reason.strip()[:300], granted_by=u.username, approved_by=u.username)
     db.add(g); db.flush()
     R.audit(db, u.username, u.role, "cap_ngoai_le_quyen", f"user:{t.username}",
-            after={"kind": g.kind, "value": g.value, "den_ngay": str(g.to_date), "ly_do": g.reason})
+            after={"kind": g.kind, "value": g.value, "den_ngay": str(g.to_date) if g.to_date else "khong_thoi_han",
+                   "ly_do": g.reason})
     db.commit(); db.refresh(g)
-    return {"id": g.id, "message": f"Đã cấp cho {t.full_name}: {g.value}, hết hiệu lực ngày {g.to_date:%d/%m/%Y}"}
+    han = f"hết hiệu lực ngày {g.to_date:%d/%m/%Y}" if g.to_date else "KHÔNG THỜI HẠN – sẽ hiện ở danh sách rà quyền hằng tháng"
+    return {"id": g.id, "message": f"Đã cấp cho {t.full_name}: {g.value}, {han}"}
 
 
 @router.delete("/access/grants/{gid}", tags=["access"])

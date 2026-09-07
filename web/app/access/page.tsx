@@ -20,6 +20,7 @@ const GAP_TEN: Record<string, string> = {
   bo_hoang: "Chưa đăng nhập bao giờ, hoặc bỏ hoang",
   chua_gan_phap_nhan: "Chưa gán pháp nhân chủ quản",
   ho_so_trung: "Hồ sơ trùng: cùng tên, cùng phòng, hai mã",
+  ngoai_le_vo_han: "Ngoại lệ quyền KHÔNG THỜI HẠN – rà lại mỗi kỳ",
 };
 const ACT_TEN: Record<string, string> = {
   sua_tai_khoan: "Sửa tài khoản", dat_lai_mat_khau: "Đặt lại mật khẩu", doi_mat_khau: "Đổi mật khẩu",
@@ -65,6 +66,20 @@ export default function AccessPage() {
       "\n\nLý do (bắt buộc):", "");
     if (!ly_do || !ly_do.trim()) { toast("Chưa ghi lý do – không đổi", true); return; }
     send(`/access/role-change/${r.id}`, { role: moi, reason: ly_do.trim() });
+  };
+
+  const taoTaiKhoan = async () => {
+    const ho_ten = window.prompt("Họ tên đầy đủ:", ""); if (!ho_ten?.trim()) return;
+    const ma_nv = window.prompt("Mã nhân viên (cũng là mật khẩu tạm):", ""); if (!ma_nv?.trim()) return;
+    const role = window.prompt("Mã vai trò (ví dụ ketoan, nv_kd, hcns):", "ketoan"); if (!role?.trim()) return;
+    const department = window.prompt("Phòng (ví dụ ketoan, kd_le, dieu_hanh):", "ketoan") || "";
+    const ngoai = window.confirm("Người này NGOÀI biên chế (thuê ngoài, không có trong bảng lương)?\n\nOK = ngoài biên chế · Cancel = trong biên chế");
+    try {
+      const r = await api<any>("/access/accounts", { method: "POST", json: {
+        ho_ten: ho_ten.trim(), ma_nv: ma_nv.trim(), role: role.trim(),
+        department: department.trim(), ngoai_bien_che: ngoai } });
+      toast(r.message); loadAcc(); loadGaps();
+    } catch (e) { toast(errMsg(e), true); }
   };
 
   const taiExcel = async () => {
@@ -113,6 +128,7 @@ export default function AccessPage() {
           <option value="ngoai_bien_che">Ngoài biên chế</option>
         </select>
         <span className="muted">{rows.length} tài khoản</span>
+        {canWrite && <button className="act" style={{ margin: 0 }} onClick={taoTaiKhoan}>+ Tạo tài khoản</button>}
       </div>
       <div className="scroll"><table><thead><tr>
         <th>Mã NV</th><th>Họ tên</th><th>Tài khoản</th><th>Vai trò</th><th>Phòng</th><th>Pháp nhân</th>
@@ -143,7 +159,8 @@ export default function AccessPage() {
         <div className="scroll"><table><thead><tr>
           <th>Người</th><th>Quyền</th><th>Từ</th><th>Đến</th><th>Lý do</th><th>Người duyệt</th><th>Hiệu lực</th><th></th></tr></thead>
           <tbody>{grants.rows.map((g: any) => <tr key={g.id}>
-            <td>{g.ho_ten || g.username}</td><td>{g.ten_quyen}</td><td>{g.from_date}</td><td>{g.to_date}</td>
+            <td>{g.ho_ten || g.username}</td><td>{g.ten_quyen}</td><td>{g.from_date}</td>
+            <td>{g.vo_han ? <Tag cls="warn">không thời hạn</Tag> : g.to_date}</td>
             <td>{g.reason}</td><td>{g.approved_by || "—"}</td>
             <td>{g.hieu_luc ? <Tag cls="ok">còn hiệu lực</Tag> : <Tag cls="warn">hết / đã thu</Tag>}</td>
             <td>{laLanhDao && g.hieu_luc && <button className="act" style={{ margin: 0 }}

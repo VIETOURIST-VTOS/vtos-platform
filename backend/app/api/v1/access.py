@@ -61,6 +61,78 @@ def audit_log(limit: int = 200, ke_ca_dang_nhap: bool = False,
     return {"rows": AA.nhat_ky_quyen(db, limit, bo_dang_nhap=not ke_ca_dang_nhap)}
 
 
+class TaoTaiKhoanIn(BaseModel):
+    ho_ten: str
+    ma_nv: str                       # mã nhân viên HCNS – cũng là mật khẩu tạm
+    role: str
+    department: str = ""
+    username: str = ""               # để trống thì sinh từ họ tên không dấu
+    ngoai_bien_che: bool = False
+    company_id: int | None = None
+    tao_ho_so: bool = True           # tạo luôn hồ sơ nhân sự và nối vào tài khoản
+
+
+def _khong_dau(s: str) -> str:
+    import unicodedata, re
+    t = unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]", "", t)
+
+
+@router.post("/accounts", status_code=201)
+def tao_tai_khoan(data: TaoTaiKhoanIn,
+                  u: User = Depends(require_roles(*THAO_TAC, "chutich", "tgd")), db: Session = Depends(get_db)):
+    """Tạo tài khoản cho một người. Trước bản này chỉ có đường nạp cả danh sách từ bảng lương, nên thêm
+    MỘT người – kế toán trưởng thuê ngoài, người mới vào giữa kỳ – là không có cách nào ngoài sửa tệp dữ
+    liệu và nạp lại cả danh sách, mà lệnh nạp đó còn đóng tài khoản của người không có trong danh sách.
+
+    Mật khẩu tạm = mã nhân viên và cờ buộc đổi được bật sẵn: người dùng đổi ở lần đăng nhập đầu, trước
+    đó chưa vào được dữ liệu nào.
+    """
+    from app.core.security import hash_password
+    from app.models.hr import Employee
+    from app.services import hr as H
+    if data.role not in ROLES: raise HTTPException(422, f"Vai trò không hợp lệ: {data.role}")
+    if data.role in VAI_TRO_NHAY_CAM and u.role not in ("chutich", "tgd"):
+        raise HTTPException(403, f"Tạo tài khoản vai trò {ROLES[data.role]} phải do Chủ tịch hoặc Tổng giám đốc")
+    ho_ten = (data.ho_ten or "").strip()
+    ma = (data.ma_nv or "").strip()
+    if len(ho_ten) < 3: raise HTTPException(422, "Chưa nhập họ tên")
+    if len(ma) < 2: raise HTTPException(422, "Chưa nhập mã nhân viên – mã này cũng là mật khẩu tạm")
+    if data.company_id is not None and not db.get(Company, data.company_id):
+        raise HTTPException(422, "Pháp nhân không có trong danh mục")
+
+    uname = _khong_dau(data.username or ho_ten)[:24] or f"nv{ma}"
+    goc, n = uname, 1
+    while db.execute(select(User).where(User.username == uname)).scalars().first():
+        n += 1; uname = f"{goc}{n}"
+    if db.execute(select(User).where(User.staff_code == ma)).scalars().first():
+        raise HTTPException(422, f"Đã có tài khoản mang mã nhân viên {ma}")
+
+    t = User(username=uname, full_name=ho_ten, role=data.role, department=data.department or "",
+             staff_code=ma, password_hash=hash_password(ma), active=True,
+             must_change_password=True, ngoai_bien_che=data.ngoai_bien_che, company_id=data.company_id)
+    db.add(t); db.flush()
+
+    ho_so = ""
+    if data.tao_ho_so:
+        e = db.execute(select(Employee).where(Employee.code == ma)).scalars().first()
+        if e is None:
+            e = Employee(code=ma, full_name=ho_ten, department=data.department or "ketoan",
+                         position="nv", contract_type="doi_tac" if data.ngoai_bien_che else "hdld")
+            db.add(e); db.flush()
+        e.user_id, e.active = t.id, True
+        if data.company_id is not None: e.company_id = data.company_id
+        ho_so = e.code
+
+    R.audit(db, u.username, u.role, "tao_tai_khoan", f"user:{t.username}",
+            after={"ho_ten": ho_ten, "ma_nv": ma, "vai_tro": t.role,
+                   "ngoai_bien_che": t.ngoai_bien_che, "ho_so": ho_so})
+    db.commit()
+    return {"id": t.id, "username": t.username, "ho_so": ho_so,
+            "message": f"Đã tạo tài khoản {t.username} cho {ho_ten} – mật khẩu tạm là mã nhân viên {ma}, "
+                       f"người dùng phải đổi ở lần đăng nhập đầu"}
+
+
 class DoiVaiTroIn(BaseModel):
     role: str
     reason: str
