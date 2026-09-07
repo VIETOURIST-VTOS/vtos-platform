@@ -2,7 +2,7 @@
 import json
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Header
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -343,6 +343,10 @@ def vehicle_create(data: VehicleIn, u: User = Depends(require_roles("cntt", "hcn
 
 
 class VehicleUpdate(BaseModel):
+    # extra="forbid": gửi một trường không nhận ở đây (lifecycle, company_id, source_note… – những trường
+    # thuộc hồ sơ đội xe, sửa qua PUT /fleet/xe/{id}) sẽ báo 422 chứ không trả 200 rồi lặng lẽ bỏ qua.
+    # Một lần "Đã cập nhật xe" mà thực ra không sửa gì là cách chắc chắn nhất để người dùng tin nhầm.
+    model_config = ConfigDict(extra="forbid")
     plate: str | None = None
     seats: int | None = None
     kind: str | None = None

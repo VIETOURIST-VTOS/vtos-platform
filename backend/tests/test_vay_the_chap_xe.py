@@ -168,3 +168,17 @@ def test_v10_xe_ngung_khai_thac_ma_vong_doi_chua_cap_nhat_van_phai_keu():
     d = _lay()
     cb = [c for c in d["canh_bao"] if c.get("xe") == "50F-034.71"]
     assert cb and cb[0]["muc"] == "gap" and "chưa cập nhật" in cb[0]["noi_dung"]
+
+
+def test_v11_sua_xe_bang_truong_khong_nhan_thi_bao_loi_chu_khong_lang_le_bo_qua():
+    """PUT /vehicles chỉ nhận vài trường vận hành. Gửi lifecycle vào đây từng trả 200 'Đã cập nhật xe'
+    mà không sửa gì – phải báo 422 và chỉ sang PUT /fleet/xe/{id}."""
+    from app.db.session import SessionLocal
+    from app.models.hr import Vehicle
+    vid = _xe("50H-933.71")
+    assert client.put(f"/api/v1/vehicles/{vid}", json={"lifecycle": "da_ban"}, headers=login("cntt")).status_code == 422
+    assert client.put(f"/api/v1/vehicles/{vid}", json={"seats": 45}, headers=login("cntt")).status_code == 200
+    r = client.put(f"/api/v1/fleet/xe/{vid}", json={"lifecycle": "da_ban"}, headers=login("chutich"))
+    assert r.status_code == 200
+    d = _lay()
+    assert [c for c in d["canh_bao"] if c.get("xe") == "50H-933.71" and c["muc"] == "gap"]
