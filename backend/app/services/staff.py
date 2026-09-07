@@ -3,7 +3,10 @@
 - Mã NV = mã trên bảng lương HCNS (vd 114), dùng làm Employee.code và User.staff_code – khớp với ô "Mã nhân viên" của form báo cáo ngày.
 - Ghép với tài khoản VTOS theo họ tên (không dấu, không phân biệt hoa thường); người có tài khoản (Vietrip/seed) được cập nhật vai trò, phòng, nhóm.
 - Người chưa có tài khoản nhưng thuộc khối phải báo cáo ngày (KD, Đoàn, ĐH, MKT, CNTT, Kế toán, HCNS) → tạo tài khoản: username = họ tên không dấu, mật khẩu mặc định = mã NV (HCNS yêu cầu đổi khi đăng nhập lần đầu).
-- HDV, tài xế, bảo vệ: chỉ hồ sơ nhân sự, không tạo tài khoản.
+- Từ 07/9/2026: tài xế đang đứng tên lái xe, HDV và chuyên viên visa CÓ tài khoản (vai trò xe_hdv / nv_visa,
+  chỉ thấy màn hình của mình). Bảo vệ, pháp chế, QH nhà đầu tư chưa có vai trò → chỉ hồ sơ nhân sự.
+- Tài khoản của người không còn trong bảng lương bị KHÓA (active=False), không xóa: nhật ký nghiệp vụ và
+  chứng từ đã ghi vẫn trỏ tới tài khoản đó, xóa đi là mất dấu vết người thực hiện.
 """
 import json, re, unicodedata
 from pathlib import Path
@@ -15,8 +18,9 @@ from app.models.hr import Employee
 from app.services import rules as R
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "nhan_su_2026-09.json"
-ACCOUNT_DEPTS = ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt", "ketoan", "hcns", "ban_tgd")
-DEPT_ROLE_DEFAULT = {"kd_le": "nv_kd", "kd_doan": "nv_kd", "dieu_hanh": "nv_dh", "marketing": "nv_mkt", "cntt": "cntt", "ketoan": "ketoan", "hcns": "hcns"}
+ACCOUNT_DEPTS = ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt", "ketoan", "hcns", "ban_tgd", "doi_xe", "huong_dan", "visa")
+DEPT_ROLE_DEFAULT = {"kd_le": "nv_kd", "kd_doan": "nv_kd", "dieu_hanh": "nv_dh", "marketing": "nv_mkt", "cntt": "cntt", "ketoan": "ketoan", "hcns": "hcns", "visa": "nv_visa"}
+GIU_TAI_KHOAN = ("chutich", "tgd", "cntt")   # tài khoản hệ thống: không hạ quyền, không khóa theo bảng lương
 
 
 def strip_accents(s: str) -> str:
@@ -32,7 +36,8 @@ def load_master() -> list[dict]:
     return json.loads(DATA.read_text(encoding="utf-8"))["nhan_su"]
 
 
-def import_master(db: Session, actor: User | None = None, create_accounts: bool = True, reset_passwords: bool = False) -> dict:
+def import_master(db: Session, actor: User | None = None, create_accounts: bool = True, reset_passwords: bool = False,
+                  close_accounts: bool = True, dry_run: bool = False) -> dict:
     rows = load_master()
     emps = list(db.execute(select(Employee)).scalars())
     by_code = {e.code: e for e in emps}
@@ -42,7 +47,7 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
     u_by_name = {}
     for u in users: u_by_name.setdefault(name_key(u.full_name), u)
     u_by_code = {u.staff_code: u for u in users if u.staff_code}
-    stat = {"updated": 0, "created": 0, "users_linked": 0, "users_created": 0, "passwords_reset": 0, "roles_changed": [], "skipped": []}
+    stat = {"updated": 0, "created": 0, "users_linked": 0, "users_created": 0, "passwords_reset": 0, "roles_changed": [], "skipped": [], "users_closed": []}
     for r in rows:
         code, name = str(r["ma"]), r["ten"].strip()
         e = by_code.get(code) or by_name.get(name_key(name))
@@ -71,18 +76,31 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
             db.add(u); db.flush(); stat["users_created"] += 1; u_by_name[name_key(name)] = u
         if u is not None:
             if e.user_id != u.id: e.user_id = u.id; stat["users_linked"] += 1
-            if role and u.role != role and u.role not in ("chutich", "tgd", "cntt"):   # không hạ quyền tài khoản hệ thống
+            if role and u.role != role and u.role not in GIU_TAI_KHOAN:   # không hạ quyền tài khoản hệ thống
                 stat["roles_changed"].append(f"{u.username}: {ROLES.get(u.role, u.role)} → {ROLES.get(role, role)}"); u.role = role
             u.department, u.sales_group, u.staff_code = r["phong"], r.get("nhom", ""), code
-            u.full_name = name
-            if reset_passwords and u.role not in ("chutich", "tgd", "cntt"):   # đặt lại mật khẩu = mã NV (tài khoản nạp từ Vietrip có mật khẩu ngẫu nhiên)
+            u.full_name = name; u.active = True
+            if reset_passwords and u.role not in GIU_TAI_KHOAN:   # đặt lại mật khẩu = mã NV (tài khoản nạp từ Vietrip có mật khẩu ngẫu nhiên)
                 u.password_hash = hash_password(code); stat["passwords_reset"] += 1
     # nhân sự không còn trong danh sách chính thức → đánh dấu nghỉ (không xóa)
     codes = {str(r["ma"]) for r in rows}
     names = {name_key(r["ten"]) for r in rows}
     for e in emps:
-        if e.code not in codes and name_key(e.full_name) not in names and e.active and not e.code.startswith("NS"):
+        if e.code not in codes and name_key(e.full_name) not in names and e.active:
             e.active = False; stat["skipped"].append(f"{e.code} {e.full_name}: không có trong bảng lương → ngưng hoạt động")
+    # và tài khoản của họ bị KHÓA – bảng lương là danh sách người đang làm việc, ai không có trong đó thì
+    # không được đăng nhập nữa. Khóa chứ không xóa: nhật ký và chứng từ cũ vẫn phải truy ra được người thực hiện.
+    if close_accounts:
+        giu = {u.id for u in users if u.role in GIU_TAI_KHOAN}
+        for u in users:
+            if not u.active or u.id in giu: continue
+            if u.staff_code in codes or name_key(u.full_name) in names: continue
+            u.active = False; stat["users_closed"].append(f"{u.username} ({u.full_name})")
+    if dry_run:
+        # Xem trước: hoàn tác mọi thay đổi, chỉ trả về danh sách sẽ làm gì. Khóa tài khoản là việc không
+        # sửa lại được bằng một nút, nên phải nhìn thấy danh sách trước khi bấm.
+        db.rollback(); stat["xem_truoc"] = True
+        return stat
     if actor: R.audit(db, actor.username, actor.role, "nap_danh_sach_nhan_vien", "employees", after={k: (v if not isinstance(v, list) else len(v)) for k, v in stat.items()})
     db.commit()
     return stat

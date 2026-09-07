@@ -72,11 +72,12 @@ def staff_directory(u: User = Depends(current_user), db: Session = Depends(get_d
 
 
 @router.post("/employees/import-master")
-def import_master(reset_passwords: bool = False, u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
+def import_master(reset_passwords: bool = False, close_accounts: bool = True, dry_run: bool = False,
+                  u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
     """Nạp danh sách nhân viên chính thức từ bảng lương HCNS (app/data/nhan_su_*.json): mã NV, phòng, nhóm, chức vụ; ghép/tạo tài khoản.
     reset_passwords=true: đặt lại mật khẩu mọi tài khoản trong danh sách = mã NV (trừ Chủ tịch/TGĐ/CNTT) – dùng khi cấp tài khoản lần đầu."""
     from app.services import staff as STF
-    st = STF.import_master(db, u, reset_passwords=reset_passwords)
+    st = STF.import_master(db, u, reset_passwords=reset_passwords, close_accounts=close_accounts, dry_run=dry_run)
     return {"message": f"Đã nạp: cập nhật {st['updated']}, tạo mới {st['created']} hồ sơ; ghép {st['users_linked']} tài khoản, tạo {st['users_created']} tài khoản mới" + (f", đặt lại {st['passwords_reset']} mật khẩu = mã NV" if reset_passwords else ""), **st}
 
 
@@ -164,6 +165,56 @@ def visa_complete(vid: int, u: User = Depends(require_roles("nv_dh", "tp_dh", "h
     R.audit(db, u.username, u.role, "hoan_thanh_visa", f"visa:{f.code}", after={"thang": f"{f.completed_at:%Y-%m}", "cach": f.method})
     db.commit()
     return {"message": f"{f.code} hoàn thành – tính quỹ visa tháng {f.completed_at:%m/%Y}"}
+
+
+# ---------- Xe Vietrip & HDV: màn hình của chính người ở hiện trường ----------
+@router.get("/xe-hdv/cua-toi")
+def xe_hdv_cua_toi(u: User = Depends(require_roles("xe_hdv", "nv_dh", "tp_dh", "hcns", "cntt", "tgd", "chutich", "ketoan", "bks", "ptgd_doan", "ptgd_mkt")),
+                   db: Session = Depends(get_db)):
+    """Tài xế thấy xe mình đứng tên và lệnh điều xe của mình; HDV thấy phân chuyến và hạn thẻ của mình.
+
+    Chỉ trả về việc của CHÍNH người đăng nhập – không phải bản rút gọn của màn hình Điều hành. Người ở hiện
+    trường không có lý do gì phải nhìn thấy hàng đợi của cả đội, và cũng không được thấy giá xe nội bộ.
+    """
+    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    if e is None and u.staff_code:
+        e = db.execute(select(Employee).where(Employee.code == u.staff_code)).scalars().first()
+    if e is None:
+        raise HTTPException(404, "Tài khoản này chưa gắn với hồ sơ nhân sự – báo HCNS ghép mã nhân viên")
+
+    cos = {c.id: c for c in db.execute(select(Company)).scalars()}
+    ho_so = {"code": e.code, "full_name": e.full_name, "department": e.department,
+             "department_name": DEPARTMENTS.get(e.department, e.department),
+             "position_name": POSITIONS.get(e.position, e.position), "phone": e.phone, "birth_date": e.birth_date}
+
+    xe = [{"id": v.id, "plate": v.plate, "seats": v.seats, "active": v.active,
+           "company": (cos[v.company_id].name if v.company_id in cos else ""),
+           "kind": "Xe nội bộ" if v.kind != "hop_tac" else "Xe hợp tác"}
+          for v in db.execute(select(Vehicle).where(Vehicle.driver_id == e.id)).scalars()]
+
+    lenh = []
+    for d in db.execute(select(DispatchOrder).where(DispatchOrder.driver_id == e.id).order_by(desc(DispatchOrder.id)).limit(50)).scalars():
+        t = db.get(Tour, d.tour_id); v = db.get(Vehicle, d.vehicle_id)
+        lenh.append({"id": d.id, "tour_code": t.code if t else "", "tour_name": t.name if t else "",
+                     "vehicle": v.plate if v else "", "date_from": d.date_from, "date_to": d.date_to,
+                     "days": (d.date_to - d.date_from).days + 1, "status": d.status,
+                     "confirmed_at": d.confirmed_at, "incident_note": d.incident_note})
+
+    chuyen = []
+    for a in db.execute(select(GuideAssignment).where(GuideAssignment.guide_id == e.id).order_by(desc(GuideAssignment.id)).limit(50)).scalars():
+        t = db.get(Tour, a.tour_id)
+        chuyen.append({"id": a.id, "tour_code": t.code if t else "", "tour_name": t.name if t else "",
+                       "start_date": t.start_date if t else None, "days": a.days, "holiday": a.holiday,
+                       "amount": a.rate_per_day * a.days * (2 if a.holiday else 1), "status": a.status,
+                       "confirmed_at": a.confirmed_at, "report_submitted": a.report_submitted,
+                       "advance_settled": a.advance_settled})
+
+    the = None
+    if e.department == "huong_dan":
+        ok, vi_sao = H.guide_eligible(e, date.today())
+        the = {"card_no": e.card_no, "card_expiry": e.card_expiry, "du_dieu_kien": ok, "vi_sao": vi_sao}
+
+    return {"ho_so": ho_so, "xe": xe, "lenh_dieu_xe": lenh, "phan_chuyen": chuyen, "the_hdv": the}
 
 
 # ---------- HDV & phân chuyến (cổng 13) ----------

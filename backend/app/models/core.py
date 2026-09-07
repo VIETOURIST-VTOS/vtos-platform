@@ -64,6 +64,10 @@ ROLES = {
     "hcns": "Nhân sự Hành chính",
     "cntt": "Công nghệ thông tin",
     "bks": "Ban Kiểm soát (chỉ đọc)",
+    # Hai vai trò mở ngày 07/9/2026 theo bảng lương T07-08: người ở hiện trường và ban visa cần đăng nhập,
+    # nhưng không được thấy hàng đợi điều hành hay dữ liệu khách của phòng khác.
+    "xe_hdv": "Tài xế & Hướng dẫn viên",
+    "nv_visa": "Chuyên viên Visa",
 }
 
 

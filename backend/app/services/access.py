@@ -16,6 +16,8 @@ CONTROL = ("ketoan", "cntt", "bks")
 OPERATIONS = ("tp_dh", "nv_dh")
 SALES = ("gd_kd", "tp_kd", "tn_kd", "nv_kd")
 MARKETING = ("nv_mkt",)
+FIELD = ("xe_hdv",)                                     # tài xế & HDV: người ở hiện trường, chỉ xem việc của chính mình
+VISA_STAFF = ("nv_visa",)                               # chuyên viên visa: chỉ phân hệ Visa
 
 ALL_SEEING = LEADERSHIP + CONTROL                       # xem mọi dữ liệu
 COST_ROLES = ALL_SEEING + OPERATIONS                    # cơ cấu chi phí NCC, quyết toán, dòng tiền tour
@@ -67,6 +69,22 @@ def check_readonly_write(u: User, method: str, path: str) -> None:
         raise HTTPException(403, "Ban Kiểm soát chỉ có quyền đọc, không được thực hiện thao tác ghi")
 
 
+# Đường dẫn API mà vai trò bị giới hạn được gọi. Chặn ở MỘT chỗ thay vì sửa từng endpoint: phần lớn endpoint
+# chỉ yêu cầu "đã đăng nhập", nên mở một vai trò mới mà không có lớp này là vô tình cho họ đọc cả danh sách
+# tour kèm dự toán. Đây là danh sách CHO PHÉP – endpoint mới mặc định nằm ngoài, không phải nằm trong.
+RESTRICTED_API_PREFIXES = {
+    "xe_hdv": ("/api/v1/auth/", "/api/v1/xe-hdv/"),
+    "nv_visa": ("/api/v1/auth/", "/api/v1/visa"),
+}
+
+
+def check_restricted_scope(u: User, path: str) -> None:
+    cho_phep = RESTRICTED_API_PREFIXES.get(u.role)
+    if cho_phep is None: return
+    if not any(path.startswith(p) for p in cho_phep):
+        raise HTTPException(403, f"Vai trò {u.role} chỉ dùng được màn hình của mình, không truy cập được dữ liệu này")
+
+
 # Ma trận công bố cho giao diện / tài liệu (vai trò → nhóm màn hình được xem)
 MATRIX = {
     "tours": BOOKING_ROLES + ("hcns",),
@@ -111,12 +129,31 @@ MENU_ROLES = {
     "/vietrip": ("cntt", "tgd", "chutich", "tp_dh", "ketoan"),
     "/audit": AUDIT_ROLES,
     "/companies": ALL_SEEING + ("tp_dh", "hcns"),   # danh mục pháp nhân và đối chiếu công ty chủ quản
+    "/xe-hdv": ALL_SEEING + OPERATIONS + FIELD + ("hcns",),   # xe Vietrip & HDV – màn hình duy nhất của vai trò xe_hdv
+    "/visa": ALL_SEEING + OPERATIONS + VISA_STAFF + ("hcns",),
+}
+
+# Mọi trang có trong giao diện – kể cả trang không đặt điều kiện vai trò – để dựng danh sách ẩn cho vai trò bị giới hạn.
+ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/bank-accounts")
+
+
+# Vai trò bị giới hạn: chỉ được thấy đúng những trang liệt kê ở đây.
+# Quy ước mặc định "trang không liệt kê trong MENU_ROLES = mọi người đăng nhập đều thấy" là an toàn với nhân
+# viên văn phòng, nhưng SAI với tài xế, HDV và chuyên viên visa: nó cho họ thấy cả Bảng lương và Tài khoản
+# ngân hàng chỉ vì hai trang đó chưa được liệt kê. Với các vai trò dưới đây, danh sách là DANH SÁCH CHO PHÉP.
+RESTRICTED_ROLE_MENUS = {
+    "xe_hdv": ("/xe-hdv",),
+    "nv_visa": ("/visa",),
 }
 
 
 def menus_for(u: User) -> list[str]:
+    if u.role in RESTRICTED_ROLE_MENUS: return list(RESTRICTED_ROLE_MENUS[u.role])
     return [path for path, roles in MENU_ROLES.items() if u.role in roles]
 
 
 def hidden_menus_for(u: User) -> list[str]:
+    if u.role in RESTRICTED_ROLE_MENUS:
+        cho_phep = set(RESTRICTED_ROLE_MENUS[u.role])
+        return [p for p in ALL_MENU_PATHS if p not in cho_phep]
     return [path for path, roles in MENU_ROLES.items() if u.role not in roles]

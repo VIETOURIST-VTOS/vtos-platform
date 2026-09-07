@@ -18,8 +18,9 @@ def current_user(request: Request, token: str = Depends(oauth2), db: Session = D
     u = db.execute(select(User).where(User.username == data["sub"], User.active == True)).scalars().first()
     if not u:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Tài khoản không tồn tại hoặc đã khóa")
-    from app.services.access import check_readonly_write
+    from app.services.access import check_readonly_write, check_restricted_scope
     check_readonly_write(u, request.method, request.url.path)   # Ban Kiểm soát chỉ đọc
+    check_restricted_scope(u, request.url.path)                 # tài xế / HDV / chuyên viên visa: chỉ màn hình của mình
     return u
 
 
