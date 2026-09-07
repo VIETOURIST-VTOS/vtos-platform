@@ -27,6 +27,8 @@ MARKETING = ("nv_mkt",)
 FIELD = ("xe_hdv",)                                     # tài xế & HDV: người ở hiện trường, chỉ xem việc của chính mình
 FLEET_MGR = ("gd_doi_xe",)                              # GĐ điều hành đội xe: toàn bộ phần đội xe, KHÔNG xem
                                                         # dữ liệu khách, booking, bảng lương hay ngân hàng
+GUIDE_MGR = ("tp_hd",)                                  # Trưởng phòng Hướng dẫn: điều phối đội HDV cộng tác
+                                                        # viên; KHÔNG xem khách, booking, bảng lương, ngân hàng
 VISA_STAFF = ("nv_visa",)                               # chuyên viên visa: chỉ phân hệ Visa
 ADMIN_STAFF = ("hanh_chinh",)                           # bảo vệ, pháp chế, quan hệ nhà đầu tư: thuộc HCNS
                                                         # nhưng KHÔNG xem bảng lương (chỉ đạo 07/9/2026)
@@ -107,13 +109,20 @@ def check_readonly_write(u: User, method: str, path: str) -> None:
 # chỉ yêu cầu "đã đăng nhập", nên mở một vai trò mới mà không có lớp này là vô tình cho họ đọc cả danh sách
 # tour kèm dự toán. Đây là danh sách CHO PHÉP – endpoint mới mặc định nằm ngoài, không phải nằm trong.
 RESTRICTED_API_PREFIXES = {
-    "xe_hdv": ("/api/v1/auth/", "/api/v1/xe-hdv/"),
+    # /incidents có mặt vì màn hình sự vụ lọc sẵn về đúng người đăng nhập: người ở hiện trường phải đọc
+    # được sự vụ ghi cho CHÍNH MÌNH – bị ghi nhận một sự vụ mà không được xem nó là không đối chất được.
+    "xe_hdv": ("/api/v1/auth/", "/api/v1/xe-hdv/", "/api/v1/incidents"),
     # GĐ điều hành đội xe: cả phân hệ đội xe và lệnh điều xe, cộng danh mục xe để chọn trong form. Không có
     # /tours, /bookings, /banks, /payroll – phạm vi công việc của ông là chiếc xe, không phải khách hàng và
     # dòng tiền công ty.
     "gd_doi_xe": ("/api/v1/auth/", "/api/v1/fleet", "/api/v1/xe-hdv/", "/api/v1/dispatch",
                   "/api/v1/vehicles"),
     "nv_visa": ("/api/v1/auth/", "/api/v1/visa"),
+    # Trưởng phòng Hướng dẫn: phần hướng dẫn, chào chuyến, bảng giá tuyến, tệp đính kèm và bộ nạp dữ
+    # liệu của phòng. Không có /bookings, /tours, /payroll, /banks – ông chọn người cho chuyến, không
+    # quản khách và không quản tiền công ty.
+    "tp_hd": ("/api/v1/auth/", "/api/v1/huong-dan", "/api/v1/guide-assignments", "/api/v1/guide-rates",
+              "/api/v1/incidents", "/api/v1/tep", "/api/v1/nap-du-lieu", "/api/v1/xe-hdv/"),
 }
 
 
@@ -182,10 +191,14 @@ MENU_ROLES = {
     "/nha-cung-cap": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
     # Nạp dữ liệu: màn hình mở cho các phòng có dữ liệu để nạp, còn CHẶN THEO TỪNG BỘ NẠP nằm ở
     # app/services/intake.VAI_TRO – mở được trang không có nghĩa là nạp được sổ của phòng khác.
-    "/nap-du-lieu": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + ("ketoan", "hcns", "cntt", "nv_mkt"),
+    "/nap-du-lieu": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ketoan", "hcns", "cntt",
+                                                                              "nv_mkt"),
     # Tệp & hình ảnh: chứng từ đi kèm gần như mọi nghiệp vụ nên mở rộng; gỡ tệp thì hẹp hơn (xem API).
-    "/tep": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + ("ketoan", "hcns", "cntt", "nv_mkt", "nv_visa",
-                                                          "hanh_chinh"),
+    "/tep": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ketoan", "hcns", "cntt", "nv_mkt",
+                                                                      "nv_visa", "hanh_chinh"),
+    # Phòng Hướng dẫn: màn hình riêng của người điều phối. KHÔNG mở /ops cho vai trò này – màn hình đó
+    # lấy danh sách người từ /employees, tức là kèm luôn lương của mọi phòng.
+    "/huong-dan": BASE_VIEW + OPERATIONS + GUIDE_MGR + ("ptgd_doan", "hcns", "ketoan", "cntt"),
 
     # --- Hành chính & Nhân sự (tách quyền theo tab, xem HR_TAB_ROLES) ---
     "/hr": HR_TAB_ROLES["payroll"] + HR_TAB_ROLES["employees"] + HR_TAB_ROLES["incidents"],
@@ -230,6 +243,7 @@ RESTRICTED_ROLE_MENUS = {
     "xe_hdv": ("/xe-hdv", "/doi-mat-khau"),
     "nv_visa": ("/visa", "/doi-mat-khau"),
     "gd_doi_xe": ("/doi-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/xe-hdv", "/doi-mat-khau"),
+    "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/doi-mat-khau"),
 }
 
 

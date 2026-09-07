@@ -256,6 +256,7 @@ VAI_TRO = {
     "khach_hang":       QUAN_TRI + ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "ptgd_mkt"),
     "booking":          QUAN_TRI + ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "tp_dh", "nv_dh", "ptgd_doan"),
     "sao_ke_ngan_hang": QUAN_TRI + ("ketoan",),
+    "huong_dan_vien":   QUAN_TRI + ("tp_hd", "hcns", "tp_dh"),
 }
 
 
@@ -266,7 +267,7 @@ def duoc_nap(loai: str, vai_tro: str) -> bool:
 # Bộ nạp thuộc phòng ban nào – để màn hình xếp theo phòng và để mỗi phòng thấy phần của mình trước.
 PHONG_BAN = {"nha_cung_cap": "dieu_hanh", "don_dich_vu": "dieu_hanh", "chuyen_xe": "doi_xe",
              "nhan_su": "hcns", "cham_cong": "hcns", "khach_hang": "kd_le", "booking": "kd_le",
-             "sao_ke_ngan_hang": "ketoan"}
+             "sao_ke_ngan_hang": "ketoan", "huong_dan_vien": "huong_dan"}
 
 
 def danh_sach_bo_nap() -> list[dict]:

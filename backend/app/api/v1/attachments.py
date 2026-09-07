@@ -19,9 +19,9 @@ router = APIRouter(prefix="/api/v1/tep", tags=["tep-dinh-kem"])
 # Đính kèm chứng từ là việc của gần như mọi vai trò – chỗ chặn nằm ở chỗ khác: xem được hồ sơ nào thì
 # gắn được tệp vào hồ sơ đó. Riêng THU HỒI hẹp hơn: gỡ chứng từ khỏi hồ sơ không phải việc ai cũng làm.
 READ = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "ketoan", "bks", "cntt", "hcns",
-        "gd_doi_xe", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "nv_visa", "hanh_chinh")
+        "gd_doi_xe", "tp_hd", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "nv_visa", "hanh_chinh")
 WRITE = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "ketoan", "cntt", "hcns",
-         "gd_doi_xe", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "nv_visa", "hanh_chinh")
+         "gd_doi_xe", "tp_hd", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "nv_visa", "hanh_chinh")
 GO = ("chutich", "tgd", "cntt", "ketoan", "hcns", "tp_dh", "gd_doi_xe")
 
 

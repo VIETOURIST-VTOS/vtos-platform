@@ -72,6 +72,11 @@ ROLES = {
     # ông là người duy nhất được lập lệnh điều xe, kết quả là KHÔNG AI lập được lệnh: người có quyền theo
     # chỉ đạo thì không vào được cửa, người vào được cửa thì không có quyền theo chỉ đạo.
     "gd_doi_xe": "Giám đốc điều hành đội xe",
+    # Mở 07/9/2026 cùng với việc toàn bộ HDV chuyển sang cộng tác viên. Người điều phối chuyến là người
+    # DUY NHẤT trong phòng Hướng dẫn còn ký hợp đồng lao động – điều phối là công việc quản lý, và một
+    # cộng tác viên phân việc cho cộng tác viên khác thì vừa không có thẩm quyền, vừa là bằng chứng cho
+    # thấy quan hệ "cộng tác" thực chất là quan hệ lao động. Trước bản này chưa có vai trò cho vị trí đó.
+    "tp_hd": "Trưởng phòng Hướng dẫn",
     "nv_visa": "Chuyên viên Visa",
     "hanh_chinh": "Hành chính (không xem bảng lương)",
 }

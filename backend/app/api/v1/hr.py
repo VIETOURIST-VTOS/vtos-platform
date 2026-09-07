@@ -269,7 +269,7 @@ def xe_hdv_cua_toi(u: User = Depends(require_roles("xe_hdv", "nv_dh", "tp_dh", "
 
 # ---------- HDV & phân chuyến (cổng 13) ----------
 @router.get("/guide-assignments")
-def assignments(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
+def assignments(u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd")), db: Session = Depends(get_db)):
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
     out = []
     for a in db.execute(select(GuideAssignment).order_by(desc(GuideAssignment.id))).scalars():
@@ -292,7 +292,7 @@ class AssignIn(BaseModel):
 
 
 @router.post("/guide-assignments", status_code=201)
-def assign(data: AssignIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "hcns", "cntt")), db: Session = Depends(get_db)):
+def assign(data: AssignIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "tp_hd", "hcns", "cntt")), db: Session = Depends(get_db)):
     e = db.get(Employee, data.guide_id); t = db.get(Tour, data.tour_id)
     if not e or not t: raise HTTPException(404, "Không có HDV hoặc tour")
     ok, why = H.guide_eligible(e, t.start_date)
@@ -410,7 +410,7 @@ class GuideRateIn(BaseModel):
 
 
 @router.post("/guide-rates", status_code=201)
-def guide_rate_propose(data: GuideRateIn, u: User = Depends(require_roles("cntt", "hcns", "tp_dh")), db: Session = Depends(get_db)):
+def guide_rate_propose(data: GuideRateIn, u: User = Depends(require_roles("cntt", "hcns", "tp_dh", "tp_hd")), db: Session = Depends(get_db)):
     r = GuideRate(**data.model_dump(), proposed_by=u.username); db.add(r); db.flush()
     R.audit(db, u.username, u.role, "de_xuat_gia_hdv", f"grate:{r.id}", after=data.model_dump(mode="json")); db.commit()
     return {"message": f"Đã trình đơn giá HDV tuyến {r.route} – chờ Chủ tịch + TGĐ ký"}
@@ -640,11 +640,15 @@ def inc_out(i: Incident, emps: dict, my_emp_ids: set | None = None) -> dict:
 
 
 @router.get("/incidents")
-def incidents(u: User = Depends(require_roles(*HR_READ, "nv_kd", "nv_dh", "hdv")), db: Session = Depends(get_db)):
+# "hdv" là mã CHỨC DANH (POSITIONS), không phải mã vai trò – hệ thống không có vai trò nào tên như vậy,
+# nên trước bản này hướng dẫn viên (vai trò xe_hdv) không xem được sự vụ của chính mình, còn nhánh lọc
+# bên dưới thì không bao giờ chạy tới. Đây là kiểu lỗi im lặng: không báo gì, chỉ là một cánh cửa khóa.
+def incidents(u: User = Depends(require_roles(*HR_READ, "nv_kd", "nv_dh", "xe_hdv", "tp_hd")),
+              db: Session = Depends(get_db)):
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
     rows = db.execute(select(Incident).order_by(desc(Incident.id))).scalars().all()
     mine = {e.id for e in db.execute(select(Employee).where(Employee.user_id == u.id)).scalars()}
-    if u.role in ("nv_kd", "nv_dh", "hdv"):   # nhân viên chỉ xem sự vụ của mình
+    if u.role in ("nv_kd", "nv_dh", "xe_hdv"):   # nhân viên chỉ xem sự vụ của mình
         rows = [i for i in rows if i.employee_id in mine]
     return [inc_out(i, emps, mine) for i in rows]
 

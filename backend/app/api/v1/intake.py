@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/v1/nap-du-lieu", tags=["nap-du-lieu"])
 # hoặc phải mở cho mọi phòng – ai cũng nạp được mọi thứ – hoặc phải đóng bớt phòng, và phòng bị đóng sẽ
 # nhờ người khác nạp hộ, tức là nhật ký ghi sai tên người chịu trách nhiệm.
 READ = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "ketoan", "bks", "cntt", "hcns",
-        "gd_doi_xe", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt")
+        "gd_doi_xe", "tp_hd", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt")
 WRITE = READ
 
 

@@ -269,6 +269,55 @@ def _cc_nap(db: Session, r, boi):
     return f"{ky} · {ma} · {c:g} công"
 
 
+# ====================== HƯỚNG DẪN VIÊN ======================
+def _hdv_kiem(db: Session, r):
+    from app.models.hr import Employee
+    from app.services.intake import _so, _ngay
+    loi, cb = [], []
+    the = str(r.get("the_so") or "").strip()
+    if not the:
+        loi.append("Thiếu số thẻ hướng dẫn viên – không có thẻ thì không hành nghề được, và cũng không "
+                   "có khóa nào để nạp lại tệp mà không nhân đôi hồ sơ")
+    lt = str(r.get("the_loai") or "").strip()
+    if lt and lt not in ("noi_dia", "quoc_te"):
+        loi.append("Loại thẻ phải là noi_dia hoặc quoc_te")
+    try:
+        het = _ngay(r.get("the_het_han"))
+        if het is None:
+            loi.append("Thiếu ngày hết hạn thẻ")
+        else:
+            from datetime import date as _d
+            if het < _d.today():
+                cb.append(f"Thẻ đã hết hạn ngày {het:%d/%m/%Y} – nạp được nhưng cổng 13 sẽ chặn chào chuyến")
+    except ValueError as ex:
+        loi.append(str(ex))
+    if str(r.get("hoi_vien") or "").strip().lower() not in ("1", "x", "co", "có", "true", "roi", "rồi"):
+        cb.append("Chưa ghi nhận hội viên tổ chức xã hội – nghề nghiệp: thiếu điều kiện thứ ba của "
+                  "Điều 58 Luật Du lịch")
+    if _so(r.get("han_muc_tam_ung")) < 0: loi.append("Hạn mức tạm ứng không được âm")
+    trung = db.execute(select(Employee).where(Employee.card_no == the)).scalars().first() if the else None
+    return loi, cb, (trung.card_no if trung is not None else None)
+
+
+def _hdv_nap(db: Session, r, boi):
+    from app.models.hr import Employee
+    from app.services import hr as H
+    from app.services.intake import _so, _ngay
+    ma = str(r.get("ma_nv") or "").strip().upper() or H.next_code(db, Employee, "NS")
+    co = str(r.get("hop_dong_cong_tac") or "").strip().lower() in ("1", "x", "co", "có", "true", "roi", "rồi")
+    e = Employee(code=ma, full_name=str(r["ho_ten"]).strip()[:120], department="huong_dan",
+                 position="hdv", contract_type="ctv",     # toàn bộ HDV là cộng tác viên (chốt 07/9/2026)
+                 phone=str(r.get("dien_thoai") or "")[:30],
+                 card_no=str(r["the_so"]).strip()[:30], card_type=str(r.get("the_loai") or "")[:20],
+                 card_expiry=_ngay(r.get("the_het_han")),
+                 member_org=str(r.get("hoi_vien") or "").strip().lower() in
+                            ("1", "x", "co", "có", "true", "roi", "rồi"),
+                 ctv_contract=co, advance_limit=_so(r.get("han_muc_tam_ung")),
+                 duties=str(r.get("tuyen_phu_trach") or ""))
+    db.add(e); db.flush()
+    return f"{e.code} – {e.full_name} · thẻ {e.card_no}"
+
+
 # ====================== KHAI BÁO ======================
 def bo_nap(_c) -> dict:
     """Trả về các bộ nạp phòng ban. Nhận hàm _c của app/services/intake.py để mô tả cột cùng một kiểu."""
@@ -350,6 +399,26 @@ def bo_nap(_c) -> dict:
                     _c("noi_dung", "Nội dung chuyển khoản"),
                     _c("ma_tham_chieu", "Mã tham chiếu")],
             "kiem": _sk_kiem, "nap": _sk_nap,
+        },
+        "huong_dan_vien": {
+            "ten": "Hướng dẫn viên cộng tác",
+            "mo_ta": "Danh sách HDV. Nạp luôn ghi loại hợp đồng là cộng tác viên – toàn bộ HDV đã chuyển "
+                     "sang cộng tác viên từ 07/9/2026. Cố ý KHÔNG có bộ nạp bảng đơn giá tuyến: đơn giá "
+                     "phải có chữ ký Chủ tịch và Tổng giám đốc, một tệp tải lên không thay được chữ ký.",
+            "khoa_chong_trung": "Số thẻ hướng dẫn viên",
+            "cot": [_c("the_so", "Số thẻ HDV", True, vi_du="HDV-NĐ-2023-0451",
+                       ghi_chu="khóa chống trùng – mỗi thẻ chỉ có một người"),
+                    _c("ho_ten", "Họ và tên", True, vi_du="Võ Minh Khang"),
+                    _c("ma_nv", "Mã nhân viên", ghi_chu="để trống thì hệ thống tự cấp"),
+                    _c("the_loai", "Loại thẻ", vi_du="noi_dia", ghi_chu="noi_dia / quoc_te"),
+                    _c("the_het_han", "Ngày hết hạn thẻ", True, kieu="ngay", vi_du="31/12/2028"),
+                    _c("hoi_vien", "Hội viên tổ chức XH – nghề nghiệp",
+                       ghi_chu="ghi x nếu đã là hội viên (điều kiện thứ ba, Điều 58 Luật Du lịch)"),
+                    _c("hop_dong_cong_tac", "Đã ký hợp đồng cộng tác", ghi_chu="ghi x nếu đã ký"),
+                    _c("dien_thoai", "Điện thoại"),
+                    _c("tuyen_phu_trach", "Tuyến phụ trách", vi_du="Miền Trung, Tây Nguyên"),
+                    _c("han_muc_tam_ung", "Hạn mức tạm ứng", kieu="so", vi_du="5000000")],
+            "kiem": _hdv_kiem, "nap": _hdv_nap,
         },
         "cham_cong": {
             "ten": "Chấm công cho bảng lương",
