@@ -16,9 +16,9 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Báo cáo bán hàng toàn hệ thống", "/sales-reports"],
     ["Chỉ đạo & theo dõi thực hiện", ""]] },
   { key: "marketing", label: "2. Marketing & CSKH", items: [
-    ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"], ["Chiến dịch", "/marketing"], ["Nội dung & thương hiệu", ""],
-    ["Kênh & hộp thư", "/inbox"], ["Nguồn khách", "/leads?tab=leads"], ["Chăm sóc sau bán", ""],
-    ["Phản hồi & khiếu nại", ""], ["Báo cáo hiệu quả", "/leads?tab=report"]] },
+    ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"], ["Chiến dịch", "/marketing"], ["Nội dung & thương hiệu", "/noi-dung"],
+    ["Kênh & hộp thư", "/inbox"], ["Nguồn khách", "/leads?tab=leads"], ["Chăm sóc sau bán", "/cham-soc"],
+    ["Phản hồi & khiếu nại", "/khieu-nai"], ["Báo cáo hiệu quả", "/leads?tab=report"]] },
   // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và được nhận theo
   // HỢP của hai quy tắc: loại chuyến là đoàn, HOẶC mã tour bắt đầu bằng MICE (quy ước đặt mã của phòng Đoàn).
   // Đo ngày 07/9/2026: 115/115 tour có chữ MICE đều là tour đoàn, nên hôm nay hai quy tắc trùng nhau – lấy hợp

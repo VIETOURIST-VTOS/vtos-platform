@@ -271,3 +271,115 @@ def con_lai_hang_muc(db: Session, muc: str, company_id: int | None, luc: date | 
     chi = _chi_theo_muc(db, b.period, b.company_id)
     con = l.amount - chi["da_chi"].get(muc, 0.0) - chi["treo"].get(muc, 0.0)
     return con, f"ngân sách kỳ {b.period}"
+
+
+# ====================== ĐỢT 5: NỘI DUNG & THƯƠNG HIỆU ======================
+from app.models.marketing import ContentItem, ND_LOAI, ND_KENH, ND_TRANG_THAI
+
+ND_SOAN = ("nv_mkt", "ptgd_mkt", "cntt")
+ND_DUYET = ("ptgd_mkt", "tgd", "chutich", "hanh_chinh")     # hanh_chinh gồm pháp chế
+# "cho_ky_2" phải quay về được "nhap": người ký thứ hai không đồng ý thì phải có đường rút bản thảo về sửa.
+# Không có đường đó thì hồ sơ kẹt vĩnh viễn ở trạng thái chờ, và cách duy nhất để đăng là lập một hồ sơ mới
+# — tức là người ta sẽ bỏ qua chốt chặn bằng cách lập hồ sơ mới, đúng thứ chốt chặn này sinh ra để ngăn.
+ND_CHUYEN = {"nhap": ("cho_duyet",), "cho_duyet": ("nhap",), "cho_ky_2": ("nhap",),
+             "da_duyet": ("da_dang", "go"), "da_dang": ("go",), "go": ()}
+
+
+def nd_next_code(db: Session) -> str:
+    n = db.execute(select(func.count()).select_from(ContentItem)).scalar() + 1
+    return f"ND{date.today():%y%m}-{n:03d}"
+
+
+def nd_can_ky_2(n: ContentItem) -> bool:
+    """Nội dung có cam kết với khách hoặc có số liệu tài chính thì cần chữ ký thứ hai.
+
+    Đây là LÝ DO TỒN TẠI của màn hình này. Vietourist là công ty đại chúng (VTD, UPCoM): một bài hứa
+    'cam kết hoàn tiền 100%' hay một con số doanh thu đưa ra ngoài mà chưa ai duyệt là rủi ro pháp lý và
+    rủi ro công bố thông tin. Bỏ chốt này thì đây chỉ còn là một danh sách bài đăng.
+    """
+    return bool(n.co_cam_ket or n.co_so_lieu_tc)
+
+
+def nd_vai_tro_ky_2(db: Session) -> tuple:
+    """Vai trò được ký chữ ký thứ hai – lấy từ tham số chính sách, không viết cứng tên người vào mã."""
+    s = R.get_param_text(db, "nd_vai_tro_ky_2") or "tgd,chutich,hanh_chinh"
+    return tuple(x.strip() for x in s.split(",") if x.strip())
+
+
+def nd_kiem_du_lieu(d: dict) -> None:
+    if not (d.get("title") or "").strip(): raise ValueError("Phải có tiêu đề nội dung")
+    if d.get("loai") not in ND_LOAI: raise ValueError(f"Loại nội dung không hợp lệ. Chỉ nhận: {', '.join(ND_LOAI)}")
+    kenh = d.get("kenh") or []
+    if not kenh: raise ValueError("Phải chọn ít nhất một kênh đăng")
+    la = [k for k in kenh if k not in ND_KENH]
+    if la: raise ValueError(f"Kênh đăng không hợp lệ: {', '.join(la)}")
+    if not d.get("ngay_du_kien"): raise ValueError("Phải có ngày dự kiến đăng – đây là thứ dựng nên lịch nội dung")
+    if not (d.get("ban_thao") or "").strip():
+        raise ValueError("Phải đính kèm hoặc dán đường dẫn bản thảo – bản thảo không xem được thì không duyệt được")
+
+
+def nd_tao(db: Session, u: User, data: dict) -> ContentItem:
+    d = dict(data); nguon = (d.pop("nguon_tao", "") or "nguoi").lower()
+    if nguon not in ("nguoi", "ai"): raise ValueError("Nguồn tạo chỉ nhận 'nguoi' hoặc 'ai'")
+    nd_kiem_du_lieu(d)
+    if nguon == "ai" and not (d.get("ai_ghi_chu") or "").strip():
+        raise ValueError("Nội dung do AI soạn phải ghi căn cứ – người duyệt cần biết máy dựa vào đâu")
+    n = ContentItem(code=nd_next_code(db), title=d["title"], loai=d["loai"],
+                    campaign_id=d.get("campaign_id"), kenh=d["kenh"], ngay_du_kien=d["ngay_du_kien"],
+                    ban_thao=d["ban_thao"], co_cam_ket=bool(d.get("co_cam_ket")),
+                    co_so_lieu_tc=bool(d.get("co_so_lieu_tc")), nguoi_soan=u.username,
+                    note=d.get("note", ""), company_id=d.get("company_id"),
+                    nguon_tao=nguon, ai_ghi_chu=d.get("ai_ghi_chu", ""), status="nhap")
+    db.add(n); db.flush()
+    R.audit(db, u.username, u.role, "lap_noi_dung", f"content:{n.code}",
+            after={"tieu_de": n.title, "cam_ket": n.co_cam_ket, "so_lieu_tc": n.co_so_lieu_tc, "nguon": nguon})
+    db.commit(); db.refresh(n)
+    return n
+
+
+def nd_duyet(db: Session, u: User, n: ContentItem) -> tuple[ContentItem, str]:
+    if n.status not in ("cho_duyet", "cho_ky_2"):
+        raise ValueError(f"Chỉ duyệt được bản đang chờ duyệt, bản này đang ở '{ND_TRANG_THAI.get(n.status, n.status)}'")
+    if u.role not in ND_DUYET: raise PermissionError("Vai trò của bạn không được duyệt nội dung")
+    if u.username == n.nguoi_soan: raise PermissionError("Người soạn không được tự duyệt nội dung của mình")
+    ky = [x for x in (n.nguoi_duyet or "").split(",") if x]
+    if u.username in ky: raise ValueError("Bạn đã ký bản này rồi – cần chữ ký của người thứ hai")
+    if n.status == "cho_ky_2" and u.role not in nd_vai_tro_ky_2(db):
+        raise PermissionError("Chữ ký thứ hai cho nội dung có cam kết hoặc số liệu tài chính phải là "
+                              f"Ban TGĐ hoặc Pháp chế ({', '.join(nd_vai_tro_ky_2(db))})")
+    ky.append(u.username); n.nguoi_duyet = ",".join(ky)
+    if nd_can_ky_2(n) and len(ky) < 2:
+        n.status = "cho_ky_2"
+        tin = (f"Đã ghi chữ ký thứ nhất. Nội dung này có "
+               + " và ".join([x for x in ["cam kết với khách" if n.co_cam_ket else "",
+                                          "số liệu tài chính" if n.co_so_lieu_tc else ""] if x])
+               + " nên cần thêm chữ ký của Ban TGĐ hoặc Pháp chế.")
+    else:
+        n.status = "da_duyet"; n.approved_at = datetime.now()
+        tin = f"Nội dung {n.code} đã được duyệt"
+    R.audit(db, u.username, u.role, "duyet_noi_dung", f"content:{n.code}",
+            after={"trang_thai": n.status, "chu_ky": n.nguoi_duyet})
+    db.commit(); db.refresh(n)
+    return n, tin
+
+
+def nd_chuyen(db: Session, u: User, n: ContentItem, moi: str, link: str = "", ly_do: str = "") -> ContentItem:
+    if moi not in ND_TRANG_THAI: raise ValueError("Trạng thái không hợp lệ")
+    if moi in ("da_duyet", "cho_ky_2"): raise ValueError("Duyệt nội dung phải qua nút Duyệt – ở đó mới đếm chữ ký")
+    if moi not in ND_CHUYEN.get(n.status, ()):
+        raise ValueError(f"Không chuyển thẳng từ '{ND_TRANG_THAI[n.status]}' sang '{ND_TRANG_THAI[moi]}'")
+    if moi == "da_dang":
+        if not (link or n.link_dang or "").strip():
+            raise ValueError("Phải dán đường dẫn bài đã đăng – không có link thì sau này không ai kiểm được "
+                             "nội dung thực tế trên kênh có đúng bản đã duyệt hay không")
+        n.link_dang = (link or n.link_dang).strip()[:400]; n.posted_at = datetime.now()
+    if moi == "go":
+        if not (ly_do or "").strip(): raise ValueError("Phải ghi lý do gỡ nội dung")
+        n.ly_do_go = ly_do.strip()[:300]
+    # Rút bản thảo về Nháp thì mọi chữ ký cũ mất hiệu lực: chúng nói về bản thảo trước khi sửa.
+    if moi == "nhap": n.nguoi_duyet = ""
+    truoc = n.status; n.status = moi
+    R.audit(db, u.username, u.role, "chuyen_trang_thai_noi_dung", f"content:{n.code}",
+            before={"trang_thai": truoc}, after={"trang_thai": moi, "link": n.link_dang})
+    db.commit(); db.refresh(n)
+    return n

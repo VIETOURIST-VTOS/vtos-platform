@@ -17,6 +17,17 @@ DEFAULT_PARAMS = [
     # theo giấy tờ khi chưa có giấy tờ nào trong hệ thống thì mọi lệnh điều xe đều dừng.
     ("xe_chan_khi_thieu_giay", "0", "Chặn phát lệnh khi thiếu dữ liệu giấy tờ xe/tài xế", "0 hoặc 1", "Đội xe Vietrip v1.3 §7"),
     ("han_muc_mkt", "5000000", "Hạn mức chi Marketing cần 2 chữ ký", "đồng", "MKT Điều 8"),
+    # Marketing & CSKH Đợt 3–5. Bốn con số Ban TGĐ phải chốt (đề xuất 07/9/2026) nằm ở đây chứ KHÔNG viết
+    # cứng trong mã: đổi chính sách thì sửa tham số, ký duyệt theo quy trình đã có, không phải sửa phần mềm
+    # rồi triển khai lại. Giá trị dưới đây là ĐỀ XUẤT, còn hiệu lực cho tới khi Ban TGĐ ký con số khác.
+    ("cham_soc_han_ngay", "3", "Hạn liên hệ chăm sóc khách sau khi tour kết thúc", "ngày", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
+    ("cham_soc_hai_long_mo_kn", "3", "Điểm hài lòng DƯỚI mức này thì tự mở hồ sơ khiếu nại", "điểm (1–5)", "MKT/CSKH đề xuất 07/9/2026"),
+    ("kn_han_muc1_gio", "72", "Hạn phản hồi khách – khiếu nại mức 1 (góp ý)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
+    ("kn_han_muc2_gio", "24", "Hạn phản hồi khách – khiếu nại mức 2 (có thiệt hại)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
+    ("kn_han_muc3_gio", "4", "Hạn phản hồi khách – khiếu nại mức 3 (nghiêm trọng)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
+    # Ngưỡng tiền bồi thường KHÔNG có tham số riêng: hoàn tiền đi qua Đề nghị chi nhóm "hoan_tien" và dùng
+    # đúng ngưỡng hai chữ ký hiện hành. Đặt ngưỡng riêng ở đây là tạo đường tiền thứ hai.
+    ("nd_vai_tro_ky_2", "tgd,chutich,hanh_chinh", "Vai trò được ký chữ ký thứ hai cho nội dung có cam kết với khách hoặc có số liệu tài chính (hanh_chinh gồm pháp chế)", "danh sách vai trò", "MKT Đợt 5 – chờ Ban TGĐ chốt"),
     ("coc_mac_dinh_pct", "30", "Tỷ lệ cọc mặc định khi sản phẩm không quy định", "%", "Vận hành Vietrip"),
     ("han_coc_gio", "24", "Hạn khách đặt cọc sau khi tạo booking (quá → cảnh báo sale/ĐH)", "giờ", "Vận hành Vietrip"),
     ("han_huy_cho_ngay", "3", "Deadline hủy chỗ / thu đủ trước khởi hành (đóng tour, khóa booking)", "ngày", "Vận hành Vietrip"),

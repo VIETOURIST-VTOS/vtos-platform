@@ -273,3 +273,145 @@ def duyet(bid: int, u: User = Depends(require_roles("tgd", "chutich")), db: Sess
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"budget": b_out(db, b), "message": f"Ngân sách kỳ {b.period} đã có hiệu lực"}
+
+
+# ---------- Đợt 5: Nội dung & thương hiệu ----------
+from app.models.marketing import ContentItem, ND_LOAI, ND_KENH, ND_TRANG_THAI
+
+ND_XEM = XEM + ("hanh_chinh",)     # pháp chế nằm trong khối Hành chính – họ là người ký thứ hai
+
+
+def n_out(db: Session, n: ContentItem) -> dict:
+    c = db.get(Campaign, n.campaign_id) if n.campaign_id else None
+    return {"id": n.id, "code": n.code, "title": n.title, "loai": n.loai,
+            "loai_ten": ND_LOAI.get(n.loai, n.loai), "campaign_id": n.campaign_id,
+            "chien_dich": f"{c.code} · {c.name}" if c else "", "kenh": n.kenh or [],
+            "kenh_ten": [ND_KENH.get(k, k) for k in (n.kenh or [])],
+            "ngay_du_kien": n.ngay_du_kien, "ban_thao": n.ban_thao,
+            "co_cam_ket": n.co_cam_ket, "co_so_lieu_tc": n.co_so_lieu_tc,
+            "can_ky_2": MK.nd_can_ky_2(n), "vai_tro_ky_2": list(MK.nd_vai_tro_ky_2(db)),
+            "nguoi_soan": n.nguoi_soan, "nguoi_duyet": n.nguoi_duyet,
+            "status": n.status, "status_ten": ND_TRANG_THAI.get(n.status, n.status),
+            "link_dang": n.link_dang, "ly_do_go": n.ly_do_go, "note": n.note,
+            "nguon_tao": n.nguon_tao, "ai_ghi_chu": n.ai_ghi_chu,
+            "created_at": n.created_at, "approved_at": n.approved_at, "posted_at": n.posted_at,
+            "chuyen_duoc": list(MK.ND_CHUYEN.get(n.status, ()))}
+
+
+@router.get("/noi-dung/meta")
+def nd_meta(u: User = Depends(require_roles(*ND_XEM)), db: Session = Depends(get_db)):
+    return {"loai": ND_LOAI, "kenh": ND_KENH, "trang_thai": ND_TRANG_THAI,
+            "vai_tro_ky_2": list(MK.nd_vai_tro_ky_2(db))}
+
+
+@router.get("/noi-dung")
+def nd_ds(status: str = "", u: User = Depends(require_roles(*ND_XEM)), db: Session = Depends(get_db)):
+    q = select(ContentItem).order_by(desc(ContentItem.id))
+    if status: q = q.where(ContentItem.status == status)
+    return [n_out(db, n) for n in db.execute(q).scalars()]
+
+
+@router.get("/noi-dung/{nid}")
+def nd_chi_tiet(nid: int, u: User = Depends(require_roles(*ND_XEM)), db: Session = Depends(get_db)):
+    n = db.get(ContentItem, nid)
+    if not n: raise HTTPException(404, "Không có nội dung")
+    return n_out(db, n)
+
+
+class NoiDungIn(BaseModel):
+    title: str
+    loai: str
+    campaign_id: int | None = None
+    kenh: list[str] = []
+    ngay_du_kien: date
+    ban_thao: str = ""
+    co_cam_ket: bool = False
+    co_so_lieu_tc: bool = False
+    note: str = ""
+    company_id: int | None = None
+    nguon_tao: str = "nguoi"
+    ai_ghi_chu: str = ""
+
+
+@router.post("/noi-dung", status_code=201)
+def nd_tao(data: NoiDungIn, u: User = Depends(require_roles(*MK.ND_SOAN)), db: Session = Depends(get_db)):
+    try:
+        n = MK.nd_tao(db, u, data.model_dump())
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    if n.nguon_tao == "ai":
+        AL.ghi(db, tac_vu="vb_noi_bo", muc=2, nguon="tro_ly", vai_tro=u.role, nguoi=u.username,
+               ref=f"content:{n.code}", ket_qua=f"Soạn nội dung {n.code} – {n.title}", trang_thai="cho_hau_kiem")
+        db.commit()
+    nhac = (" – có cam kết/số liệu tài chính nên sẽ cần chữ ký thứ hai của Ban TGĐ hoặc Pháp chế"
+            if MK.nd_can_ky_2(n) else "")
+    return {"content": n_out(db, n), "message": f"Đã lập hồ sơ nội dung {n.code} ở trạng thái Nháp" + nhac}
+
+
+class NDSuaIn(BaseModel):
+    title: str | None = None
+    loai: str | None = None
+    campaign_id: int | None = None
+    kenh: list[str] | None = None
+    ngay_du_kien: date | None = None
+    ban_thao: str | None = None
+    co_cam_ket: bool | None = None
+    co_so_lieu_tc: bool | None = None
+    note: str | None = None
+
+
+@router.put("/noi-dung/{nid}")
+def nd_sua(nid: int, data: NDSuaIn, u: User = Depends(require_roles(*MK.ND_SOAN)), db: Session = Depends(get_db)):
+    n = db.get(ContentItem, nid)
+    if not n: raise HTTPException(404, "Không có nội dung")
+    if n.status not in ("nhap", "cho_duyet", "cho_ky_2"):
+        raise HTTPException(422, "Bản đã duyệt hoặc đã đăng thì không sửa được – lập bản mới")
+    d = data.model_dump(exclude_unset=True)
+    truoc = {k: str(getattr(n, k)) for k in d}
+    for k, v in d.items(): setattr(n, k, v)
+    try:
+        MK.nd_kiem_du_lieu({"title": n.title, "loai": n.loai, "kenh": n.kenh,
+                            "ngay_du_kien": n.ngay_du_kien, "ban_thao": n.ban_thao})
+    except ValueError as ex:
+        db.rollback(); raise HTTPException(422, str(ex))
+    # Sửa nội dung đang chờ duyệt mà đã có người ký thì chữ ký cũ không còn nói về bản này nữa.
+    if n.status in ("cho_duyet", "cho_ky_2") and n.nguoi_duyet:
+        n.nguoi_duyet = ""
+        # Sửa bản thảo khi đang chờ chữ ký thứ hai thì phải quay lại từ đầu: chữ ký thứ nhất đã ký một
+        # bản khác với bản sắp đăng.
+        if n.status == "cho_ky_2": n.status = "cho_duyet"
+    R.audit(db, u.username, u.role, "sua_noi_dung", f"content:{n.code}", before=truoc,
+            after=data.model_dump(mode="json", exclude_unset=True))
+    db.commit()
+    return {"content": n_out(db, n), "message": f"Đã cập nhật nội dung {n.code}"}
+
+
+@router.post("/noi-dung/{nid}/duyet")
+def nd_duyet(nid: int, u: User = Depends(require_roles(*MK.ND_DUYET)), db: Session = Depends(get_db)):
+    n = db.get(ContentItem, nid)
+    if not n: raise HTTPException(404, "Không có nội dung")
+    try:
+        n, tin = MK.nd_duyet(db, u, n)
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"content": n_out(db, n), "message": tin}
+
+
+class NDChuyenIn(BaseModel):
+    status: str
+    link_dang: str = ""
+    ly_do_go: str = ""
+
+
+@router.post("/noi-dung/{nid}/chuyen-trang-thai")
+def nd_chuyen(nid: int, data: NDChuyenIn, u: User = Depends(require_roles(*MK.ND_SOAN, "tgd", "chutich", "hanh_chinh")),
+              db: Session = Depends(get_db)):
+    n = db.get(ContentItem, nid)
+    if not n: raise HTTPException(404, "Không có nội dung")
+    try:
+        n = MK.nd_chuyen(db, u, n, data.status, data.link_dang, data.ly_do_go)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"content": n_out(db, n), "message": f"Nội dung {n.code} → {ND_TRANG_THAI[n.status]}"}

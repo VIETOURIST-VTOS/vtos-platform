@@ -34,6 +34,7 @@ from app.api.v1.intake import router as intake_router
 from app.api.v1.attachments import router as tep_router
 from app.api.v1.huong_dan import router as hd_router
 from app.api.v1.ngoai_le import router as ngoai_le_router
+from app.api.v1.cskh import router as cskh_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -48,6 +49,14 @@ async def robot_loop():
             from app.services import inbox as IB
             IB.robot_check(db)                      # R12 mỗi phút: AI trả lời thay khi sale trễ SLA
             if i % 10 == 0: R.run_robots(db)         # các robot khác mỗi 10 phút
+            if i % 10 == 0:
+                # Sinh phiếu chăm sóc cho tour vừa kết thúc và cảnh báo khiếu nại quá hạn phản hồi.
+                # Tách khỏi run_robots để một lỗi ở đây không làm chết cả cụm robot cũ.
+                try:
+                    from app.services import cskh as CS
+                    CS.robot_cskh(db)
+                except Exception as e:  # noqa
+                    print("robot cskh error", e)
             # Dựng sẵn bảng điều khiển mỗi 2 phút khi có thay đổi: người mở trang không phải là
             # người trả giá cho lần dựng đầu (4 giây trên dữ liệu thật).
             from app.api.v1 import routes as _r
@@ -129,6 +138,7 @@ app.include_router(fleet_router)
 app.include_router(access_router)
 app.include_router(ai_roles_router)
 app.include_router(ngoai_le_router)
+app.include_router(cskh_router)
 app.include_router(debts_router)
 app.include_router(ncc_router)
 app.include_router(intake_router)

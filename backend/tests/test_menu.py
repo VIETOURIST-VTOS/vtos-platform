@@ -63,12 +63,14 @@ def test_muc_chua_xay_duoc_danh_dau_khong_phai_link_hong():
     """Mục chưa có màn hình phải để đường dẫn rỗng (hiện nhãn 'sắp có'), không được trỏ bừa."""
     _, block = menu_paths()
     chua_xay = re.findall(r'"([^"]+)",\s*""\]', block)
-    for ten in ("Báo giá", "Hợp đồng", "Nội dung & thương hiệu"):
+    for ten in ("Báo giá", "Hợp đồng"):
         assert ten in chua_xay, f"{ten} phải nằm trong nhóm mục chưa xây"
-    assert len(chua_xay) >= 12
+    assert len(chua_xay) >= 9
     # Đã xây thì phải rời khỏi nhóm "sắp có" và trỏ đúng màn hình – không để cả hai trạng thái cùng lúc.
     for ten, path in (("Công ty thành viên & liên kết", "/companies"), ("Cấu hình tổ chức", "/companies"),
                       ("Tài khoản & phân quyền", "/access"), ("Vị trí AI & quyền hạn", "/ai-roles"),
-                      ("Chiến dịch", "/marketing"), ("Kế hoạch & ngân sách", "/marketing?tab=ngansach")):
+                      ("Chiến dịch", "/marketing"), ("Kế hoạch & ngân sách", "/marketing?tab=ngansach"),
+                      ("Nội dung & thương hiệu", "/noi-dung"), ("Chăm sóc sau bán", "/cham-soc"),
+                      ("Phản hồi & khiếu nại", "/khieu-nai")):
         assert ten not in chua_xay, f"{ten} đã có màn hình, không được để 'sắp có'"
         assert f'["{ten}", "{path}"]' in block

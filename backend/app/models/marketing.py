@@ -6,7 +6,7 @@ cộng được chi phí trên mỗi lead. Có mã rồi thì lead, đề nghị
 một chỗ, và câu hỏi "bỏ ra bao nhiêu, thu về bao nhiêu" mới trả lời được.
 """
 from datetime import datetime, date
-from sqlalchemy import String, Integer, Float, DateTime, Date, Text, ForeignKey, JSON
+from sqlalchemy import String, Integer, Float, DateTime, Date, Text, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 
@@ -84,3 +84,43 @@ class MarketingBudgetLine(Base):
     hang_muc: Mapped[str] = mapped_column(String(20))
     amount: Mapped[float] = mapped_column(Float, default=0)
     note: Mapped[str] = mapped_column(String(300), default="")
+
+
+# ---------- Đợt 5: NỘI DUNG & THƯƠNG HIỆU ----------
+# Vietourist là công ty đại chúng (mã VTD, sàn UPCoM). Một bài đăng hứa "cam kết hoàn tiền 100%" hay một
+# con số tài chính đưa ra ngoài mà chưa ai duyệt là rủi ro pháp lý và rủi ro công bố thông tin, không phải
+# chuyện nội bộ Marketing. Vì vậy bảng này là SỔ DUYỆT, không phải thư viện ảnh.
+ND_LOAI = {"bai_dang": "Bài đăng", "video": "Video", "an_pham": "Ấn phẩm in", "email": "Email",
+           "kich_ban": "Kịch bản tư vấn", "thong_cao": "Thông cáo báo chí"}
+ND_KENH = {"website": "Website", "facebook": "Facebook", "zalo": "Zalo OA", "tiktok": "TikTok",
+           "youtube": "YouTube", "in_an": "In ấn", "bao_chi": "Báo chí"}
+ND_TRANG_THAI = {"nhap": "Nháp", "cho_duyet": "Chờ duyệt", "cho_ky_2": "Chờ chữ ký thứ hai",
+                 "da_duyet": "Đã duyệt", "da_dang": "Đã đăng", "go": "Đã gỡ / hết hiệu lực"}
+
+
+class ContentItem(Base):
+    __tablename__ = "content_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(20), unique=True)              # ND2609-014
+    title: Mapped[str] = mapped_column(String(200))
+    loai: Mapped[str] = mapped_column(String(12))
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True, index=True)
+    kenh: Mapped[list] = mapped_column(JSON, default=list)
+    ngay_du_kien: Mapped[date] = mapped_column(Date)
+    ban_thao: Mapped[str] = mapped_column(String(400), default="")          # đường dẫn bản thảo – bắt buộc
+    # Hai ô quyết định có cần chữ ký thứ hai hay không. Trả lời "Có" ở một trong hai thì bản thảo phải qua
+    # người ký thứ hai (Ban TGĐ hoặc Pháp chế) trước khi được duyệt.
+    co_cam_ket: Mapped[bool] = mapped_column(Boolean, default=False)
+    co_so_lieu_tc: Mapped[bool] = mapped_column(Boolean, default=False)
+    nguoi_soan: Mapped[str] = mapped_column(String(50), default="")
+    nguoi_duyet: Mapped[str] = mapped_column(String(160), default="")       # nhiều chữ ký: ngăn bởi dấu phẩy
+    status: Mapped[str] = mapped_column(String(12), default="nhap")
+    link_dang: Mapped[str] = mapped_column(String(400), default="")
+    ly_do_go: Mapped[str] = mapped_column(String(300), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    nguon_tao: Mapped[str] = mapped_column(String(6), default="nguoi")
+    ai_ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
