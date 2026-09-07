@@ -176,3 +176,31 @@ def test_vt14_chan_xoa_bang_luong_trong_muoi_nam():
     assert L.duoc_xoa_bang_luong("2026-09", date(2036, 10, 1))[0] is True
     r = client.delete("/api/v1/payroll-runs/2026-09", headers=login("cntt"))
     assert r.status_code == 422 and "10 năm" in r.json()["detail"].replace("mười năm", "10 năm")
+
+
+def test_chua_quyet_toan_thi_khong_duoc_hieu_la_doanh_thu_0():
+    """Doanh thu tính chỉ tiêu chỉ đếm chuyến Kế toán ĐÃ xác nhận. Người còn chuyến chưa chốt mà ra 0 đồng
+    là CHƯA ĐỦ CƠ SỞ TÍNH, không phải bán được 0 – trả lương 0 trong tình huống đó là trả sai."""
+    e = nv()
+    xd = L.xac_dinh_thang_doanh_thu(e, 0, 200_000_000, 700_000, chuyen_chua_quyet_toan=12)
+    assert xd["chua_du_co_so"] is True
+    assert "CHƯA ĐỦ CƠ SỞ TÍNH" in xd["giai_thich"] and "12 chuyến" in xd["giai_thich"]
+    assert xd["can_cu"]["chuyen_chua_quyet_toan"] == 12
+
+    # bán thật mà dưới mốc thì vẫn là xếp bậc bình thường, không nhầm sang "chưa đủ cơ sở"
+    binh_thuong = L.xac_dinh_thang_doanh_thu(e, 150_000_000, 200_000_000, 700_000, chuyen_chua_quyet_toan=3)
+    assert binh_thuong["chua_du_co_so"] is False and binh_thuong["muc_ky"] == 4_900_000
+
+    # thật sự không có chuyến nào treo mà doanh thu 0 thì đúng là 0
+    that_su_0 = L.xac_dinh_thang_doanh_thu(e, 0, 200_000_000, 700_000, chuyen_chua_quyet_toan=0)
+    assert that_su_0["chua_du_co_so"] is False and that_su_0["muc_ky"] == 0
+
+
+def test_bang_luong_liet_ke_nguoi_chua_du_co_so():
+    run = client.get("/api/v1/payroll-runs/2026-09?refresh=true", headers=login("cntt")).json()
+    assert "chua_du_co_so" in run["totals"]
+    for r in run["rows"]:
+        xd = r.get("xac_dinh_luong") or {}
+        if xd.get("chua_du_co_so"):
+            assert r["ma"] in run["totals"]["chua_du_co_so"]
+            assert "CHƯA ĐỦ CƠ SỞ TÍNH" in r["ghi_chu"]

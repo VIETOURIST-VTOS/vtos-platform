@@ -142,6 +142,15 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         if R.is_doan(t) and s["profit"] > 0:
             doan_profit_total += s["profit"]
 
+    # Chuyến đã kết thúc nhưng CHƯA chốt quyết toán, theo người bán: doanh thu tính chỉ tiêu chưa gồm những
+    # chuyến này, nên "0 đồng" của người còn chuyến treo là CHƯA BIẾT chứ không phải bán được 0.
+    chua_qt: dict[int, int] = {}
+    hom_nay = date.today()
+    for t in db.execute(select(Tour).where(Tour.end_date <= hom_nay)).scalars():
+        if t.status in ("kt_xac_nhan", "khoa"): continue
+        for sid in {b.sales_id for b in t.bookings}:
+            chua_qt[sid] = chua_qt.get(sid, 0) + 1
+
     for e in emps.values():
         if e.department != "kd_le" or e.contract_type != "hdld":
             continue
@@ -149,10 +158,10 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         if e.position in ("nv", "tl", "tp"):
             moc = moc_of(e, moc_hcm, moc_ct)
             cut = {"nv": 700_000, "tl": 800_000, "tp": 1_000_000}[e.position]
-            xd = L.xac_dinh_thang_doanh_thu(e, rev, moc, cut)
+            xd = L.xac_dinh_thang_doanh_thu(e, rev, moc, cut, chua_qt.get(e.user_id, 0))
             row(e)["xac_dinh_luong"] = xd
             row(e)["luong_cb"] = round(xd["muc_ky"] * (0.85 if e.probation else 1.0))
-            if xd["cap"]:
+            if xd["cap"] or xd.get("chua_du_co_so"):
                 row(e)["ghi_chu"].append(xd["giai_thich"])
             k, rate = f_rate(rev, moc, f_table)
             comm = rate * max(0.0, rev - moc)
@@ -275,7 +284,8 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         raise ValueError("Bảng lương có dòng trừ bắt nguồn từ xếp bậc theo doanh thu / lợi nhuận: " + "; ".join(vi_pham))
     totals = {"luong_cb": sum(r["luong_cb"] for r in out), "bien_doi": sum(r["bien_doi"] for r in out), "tncn": sum(r["tncn"] for r in out),
               "thuc_nhan": sum(r["thuc_nhan"] for r in out), "so_nguoi": len(out), "so_chuyen": len(tours),
-              "cong_chuan": cong_chuan, "thieu_cong": [r["ma"] for r in out if (r.get("xac_dinh_luong") or {}).get("thieu_du_lieu")]}
+              "cong_chuan": cong_chuan, "thieu_cong": [r["ma"] for r in out if (r.get("xac_dinh_luong") or {}).get("thieu_du_lieu")],
+              "chua_du_co_so": [r["ma"] for r in out if (r.get("xac_dinh_luong") or {}).get("chua_du_co_so")]}
     return out, totals
 
 

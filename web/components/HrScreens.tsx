@@ -93,6 +93,9 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
           {open === r.ma && <tr key={r.ma + "x"}><td colSpan={10} className="muted" style={{ padding: "2px 24px" }}><b>Xác định mức lương của kỳ:</b> {r.xac_dinh_luong ? r.xac_dinh_luong.giai_thich : "—"}{r.xac_dinh_luong?.lookback_inputs && <> · {r.xac_dinh_luong.lookback_inputs.map((x: any) => `${x.ky}: ${vnd(x.loi_nhuan)}`).join(" · ")}</>}</td></tr>}
           {open === r.ma && r.khoan.length > 0 && <tr key={r.ma + "k"}><td colSpan={10}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}><tbody>{r.khoan.map((k: any, i: number) => <tr key={i}><td>{k.ten}</td><td style={{ textAlign: "right" }}>{vnd(k.tien)}</td><td className="muted">{k.ghi_chu}</td></tr>)}</tbody></table></td></tr>}
         </>)}</tbody></table></div>
+      {run.totals?.chua_du_co_so?.length > 0 && <div className="panel"><h2>Chưa đủ cơ sở tính lương cho {run.totals.chua_du_co_so.length} người</h2>
+        <p className="muted">Doanh thu tính chỉ tiêu chỉ đếm chuyến Kế toán <b>đã xác nhận quyết toán</b>. Những người này còn chuyến chưa chốt nên doanh thu của họ chưa xác định được – <b>không được hiểu là bán được 0 đồng</b>. Kế toán phải chốt quyết toán trước khi trình ký kỳ lương này.</p>
+        <p className="mono">{run.totals.chua_du_co_so.join(", ")}</p></div>}
       {xungDot?.so_luong > 0 && <div className="panel"><h2>Xung đột hồ sơ chặn chạy kỳ lương ({xungDot.so_luong})</h2>
         <ul>{xungDot.rows.map((x: any, i: number) => <li key={i}>{x.thong_diep}</li>)}</ul>
         <p className="muted">Một mã dùng cho hai người nghĩa là hệ thống không biết trả tiền cho ai. Hệ thống dừng và nói ra, không tự chọn hồ sơ đầu tiên.</p></div>}

@@ -51,7 +51,7 @@ def che_do_cong(e: Employee) -> str:
 
 
 # ------------------------------------------------- bước xác định mức lương kỳ
-def xac_dinh_thang_doanh_thu(e: Employee, doanh_thu: float, moc: float, cut: float) -> dict:
+def xac_dinh_thang_doanh_thu(e: Employee, doanh_thu: float, moc: float, cut: float, chuyen_chua_quyet_toan: int = 0) -> dict:
     """Phụ lục C – Kinh doanh Lẻ: mỗi 10% mốc doanh thu thiếu thì lương giảm một cấp, tới 0.
 
     Trả về MỨC LƯƠNG của kỳ, kèm căn cứ. Phần chênh so với mức hợp đồng KHÔNG được xuất hiện ở bất cứ đâu
@@ -60,9 +60,18 @@ def xac_dinh_thang_doanh_thu(e: Employee, doanh_thu: float, moc: float, cut: flo
     step = moc * 0.10
     cap = 0 if doanh_thu >= moc else min(10, math.ceil((moc - doanh_thu) / step)) if step else 0
     muc = max(0.0, e.base_salary - cap * cut) if cap else e.base_salary
+    # Doanh thu tính chỉ tiêu chỉ đếm chuyến Kế toán ĐÃ xác nhận quyết toán. Người còn chuyến chưa chốt thì
+    # con số 0 ở đây KHÔNG có nghĩa là bán được 0 đồng, mà là chưa đủ cơ sở tính – hai chuyện khác hẳn nhau,
+    # và cái sau mà trả ra lương 0 thì là trả sai. Hệ thống nói rõ chỗ nó chưa biết thay vì im lặng.
+    chua_du = chuyen_chua_quyet_toan > 0 and doanh_thu <= 0
     return {"che_do": "thang_doanh_thu", "muc_hop_dong": e.base_salary, "muc_ky": round(muc),
-            "cap": cap, "moc": moc, "can_cu": {"doanh_thu_tinh_chi_tieu": round(doanh_thu)},
-            "giai_thich": (f"Đạt mốc {moc:,.0f} – hưởng đủ mức hợp đồng" if cap == 0 else
+            "cap": cap, "moc": moc, "can_cu": {"doanh_thu_tinh_chi_tieu": round(doanh_thu),
+                                               "chuyen_chua_quyet_toan": chuyen_chua_quyet_toan},
+            "chua_du_co_so": chua_du,
+            "giai_thich": (f"CHƯA ĐỦ CƠ SỞ TÍNH: còn {chuyen_chua_quyet_toan} chuyến chưa chốt quyết toán nên doanh thu "
+                           f"tính chỉ tiêu chưa xác định được. Không được hiểu là doanh thu bằng 0 – Kế toán phải chốt "
+                           f"quyết toán trước khi trình ký kỳ lương này" if chua_du else
+                           f"Đạt mốc {moc:,.0f} – hưởng đủ mức hợp đồng" if cap == 0 else
                            f"Doanh thu {doanh_thu:,.0f} dưới mốc {moc:,.0f} → cấp {cap} Phụ lục C, "
                            f"mức lương của kỳ {muc:,.0f} (đây là mức lương, không phải khoản trừ)")}
 
