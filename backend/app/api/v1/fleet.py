@@ -1143,3 +1143,69 @@ def ghi_thanh_toan(data: ThanhToanIn, u: User = Depends(require_roles(*QT_DUYET)
                 after=data.model_dump(mode="json"))
     db.commit()
     return r
+
+
+# ====================== NẠP DỮ LIỆU THẬT TỪ BÁO CÁO NGOÀI ======================
+class NhapChuyenIn(BaseModel):
+    nguon: str = "bao_cao_vietrip"
+    tao_xe_thieu: bool = False
+    rows: list[dict]
+
+
+@router.post("/chuyen/nhap-hang-loat", status_code=201)
+def nhap_chuyen_hang_loat(data: NhapChuyenIn, u: User = Depends(require_roles(*QT_WRITE, "chutich", "tgd")),
+                          db: Session = Depends(get_db)):
+    """Nạp nhật trình chuyến từ báo cáo bên ngoài, khử trùng theo mã phiếu gốc.
+
+    `tao_xe_thieu` mặc định TẮT: biển số không tra ra xe thì hệ thống báo ra chứ không tự tạo xe mới, vì một
+    biển gõ sai mà tự tạo xe là từ đó số liệu của một chiếc chia làm hai chỗ."""
+    if not data.rows: raise HTTPException(422, "Không có dòng nào để nạp")
+    try:
+        kq = FL.nhap_chuyen_hang_loat(db, data.nguon, data.rows, u.username, data.tao_xe_thieu)
+    except (ValueError, TypeError) as ex:
+        raise HTTPException(422, str(ex))
+    R.audit(db, u.username, u.role, "nhap_chuyen_hang_loat", f"nguon:{data.nguon}",
+            after={k: v for k, v in kq.items() if k != "chi_tiet"})
+    db.commit()
+    return kq
+
+
+class PhanLoaiIn(BaseModel):
+    source: str
+    items: list[dict]                 # {ma_gd, nhom?, khong_phai_chi_phi?}
+
+
+@router.post("/giao-dich/phan-loai")
+def phan_loai_giao_dich(data: PhanLoaiIn, u: User = Depends(require_roles(*QT_WRITE, "chutich", "tgd")),
+                        db: Session = Depends(get_db)):
+    """Sửa lại NHÓM và cờ "không phải chi phí" của các dòng nguồn ngoài đã nạp.
+
+    Cần có vì phân loại là việc của người đọc chứng từ, không phải của lần nạp đầu tiên: một khoản "nạp thẻ
+    dầu 150 triệu" nhìn như chi phí nhiên liệu, nhưng thực chất là NẠP QUỸ – tiền dầu thật đã nằm ở phiếu
+    chi phí của từng chuyến. Xếp nhầm là cộng đúp tiền dầu của cả tháng.
+
+    Chỉ sửa hai cột phân loại. Số tiền, ngày và mã gốc KHÔNG sửa được ở đây – sửa số liệu gốc phải sửa ở
+    nguồn rồi nạp lại, để hai bên còn đối chiếu được với nhau."""
+    if data.source not in NGUON_NGOAI:
+        raise HTTPException(422, f"Nguồn không hợp lệ. Chỉ nhận {', '.join(NGUON_NGOAI)}")
+    theo_ma = {t.ma_gd: t for t in db.execute(
+        select(ExternalTxn).where(ExternalTxn.source == data.source, ExternalTxn.trung == False)).scalars()}
+    sua, khong_thay = 0, []
+    for it in data.items:
+        ma = (it.get("ma_gd") or "").strip()
+        t = theo_ma.get(ma)
+        if t is None:
+            khong_thay.append(ma); continue
+        if "nhom" in it: t.nhom = (it.get("nhom") or "")[:60]
+        if "khong_phai_chi_phi" in it:
+            t.khong_phai_chi_phi = bool(it["khong_phai_chi_phi"])
+            if t.khong_phai_chi_phi and t.co == "do" and t.vehicle_id is None:
+                t.co = "vang"
+                t.ghi_chu = "Không phải chi phí kỳ này – không cần tra về xe"
+        if it.get("ghi_chu"): t.ghi_chu = str(it["ghi_chu"])[:300]
+        sua += 1
+    R.audit(db, u.username, u.role, "phan_loai_giao_dich", f"nguon:{data.source}",
+            after={"da_sua": sua, "khong_thay": khong_thay})
+    db.commit()
+    return {"da_sua": sua, "khong_tim_thay": khong_thay,
+            "ghi_chu": "Chỉ sửa nhóm và cờ không-phải-chi-phí. Số tiền và ngày phải sửa ở nguồn rồi nạp lại."}

@@ -1,0 +1,183 @@
+[
+ {
+  "ma_gd": "VTRIP-DX-159",
+  "nhom": "Chi phí riêng của xe",
+  "khong_phai_chi_phi": false
+ },
+ {
+  "ma_gd": "VTRIP-DX-144",
+  "nhom": "Chi phí riêng của xe",
+  "khong_phai_chi_phi": false
+ },
+ {
+  "ma_gd": "VTRIP-DX-107",
+  "nhom": "Chi phí riêng của xe",
+  "khong_phai_chi_phi": false
+ },
+ {
+  "ma_gd": "VTRIP-DX-145",
+  "nhom": "Chi phí riêng của xe",
+  "khong_phai_chi_phi": false
+ },
+ {
+  "ma_gd": "VTRIP-DX-137",
+  "nhom": "Chi phí riêng của xe",
+  "khong_phai_chi_phi": false
+ },
+ {
+  "ma_gd": "VTRIP-DX-118",
+  "nhom": "Trùng chi phí đã có trong phiếu chuyến – không cộng lần 2",
+  "khong_phai_chi_phi": true,
+  "ghi_chu": "Tiền dầu 50F046.22 ngày 14/8 đã có trong phiếu chi phí chuyến #5"
+ },
+ {
+  "ma_gd": "VTRIP-DX-55",
+  "nhom": "Chi phí riêng của xe",
+  "khong_phai_chi_phi": false
+ },
+ {
+  "ma_gd": "VTRIP-DX-140",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-142",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-106",
+  "nhom": "Chi phí riêng của xe",
+  "khong_phai_chi_phi": false
+ },
+ {
+  "ma_gd": "VTRIP-DX-129",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-109",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-156",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-157",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-134",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-133",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-131",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-117",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-116",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-115",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-103",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-54",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-53",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-122",
+  "nhom": "Chi phí chung phân bổ đều 14 xe",
+  "khong_phai_chi_phi": false
+ },
+ {
+  "ma_gd": "VTRIP-DX-121",
+  "nhom": "Chi phí chung phân bổ đều 14 xe",
+  "khong_phai_chi_phi": false
+ },
+ {
+  "ma_gd": "VTRIP-DX-158",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-95",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-73",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-155",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-74",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-63",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-100",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-99",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-139",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-58",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ },
+ {
+  "ma_gd": "VTRIP-DX-146",
+  "nhom": "Nạp quỹ / tạm ứng / điều tiền / xe đối tác",
+  "khong_phai_chi_phi": true
+ }
+]

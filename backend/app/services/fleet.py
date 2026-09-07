@@ -424,3 +424,83 @@ def nguoi_duoc_lap_lenh(db: Session) -> tuple[list, str]:
         return [], (f"Tham số xe_nguoi_lap_lenh đang đặt là \"{raw}\" nhưng không khớp tài khoản đang hoạt "
                     "động nào – tạm áp dụng quy tắc theo vai trò, cần sửa lại tham số")
     return users, ""
+
+
+# ====================== NẠP NHẬT TRÌNH TỪ BÁO CÁO NGOÀI ======================
+CHI_PHI_CHUYEN = {"dau": "dau", "cau_duong": "cau_duong", "cong_tac_phi": "cong_tac_phi", "giu_xe": "giu_xe"}
+
+
+def nhap_chuyen_hang_loat(db: Session, nguon: str, rows: list[dict], boi: str,
+                          tao_xe_thieu: bool = False) -> dict:
+    """Nạp nhật trình chuyến từ một báo cáo bên ngoài (ví dụ báo cáo quyết toán xe của VieTrip).
+
+    Ba điều tệp này giữ, vì nạp dữ liệu là lúc dễ làm hỏng sổ nhất:
+
+      1. `ma_phieu` DUY NHẤT: nạp lại cùng một báo cáo không sinh ra bộ chuyến thứ hai. Đây là lỗi tốn kém
+         nhất của mọi lần nạp dữ liệu – doanh thu và chi phí đều nhân đôi, và không ai nhìn ra ngay.
+      2. KHÔNG tự tạo xe từ biển số trong file, trừ khi người nạp nói rõ. Một biển gõ sai mà hệ thống tự tạo
+         xe mới thì từ đó có hai chiếc xe cùng tồn tại và số liệu chia đôi.
+      3. Chuyến thiếu ngày KHÔNG bị bỏ im lặng: bỏ đi là mất doanh thu khỏi báo cáo mà không ai biết. Người
+         nạp phải gửi kèm ngày tạm và ghi chú; hệ thống gắn cờ đỏ để còn nhớ mà sửa.
+    """
+    from app.models.fleet import Trip, TripCost
+    da_co = {t.ma_phieu for t in db.execute(select(Trip).where(Trip.ma_phieu.isnot(None))).scalars()}
+    them = bo_qua = 0
+    thieu_xe: dict[str, int] = {}
+    da_tao_xe: list[str] = []
+    ket = []
+    for r in rows:
+        ma = (r.get("ma_phieu") or "").strip()
+        if not ma:
+            raise ValueError("Mỗi dòng phải có mã phiếu gốc – không có thì không chống được nạp trùng")
+        if ma in da_co:
+            bo_qua += 1; continue
+        bien = (r.get("bien_so") or "").strip()
+        d1 = r.get("ngay_di"); d2 = r.get("ngay_ve")
+        if isinstance(d1, str): d1 = date.fromisoformat(d1)
+        if isinstance(d2, str): d2 = date.fromisoformat(d2)
+        if d1 is None or d2 is None:
+            raise ValueError(f"Phiếu {ma} thiếu ngày đi hoặc ngày về – nguồn không ghi thì phải xử lý ở nguồn, "
+                             "hệ thống không tự đoán ngày")
+        v = xe_theo_bien(db, bien, d1)
+        if v is None:
+            if not tao_xe_thieu:
+                thieu_xe[bien] = thieu_xe.get(bien, 0) + 1
+                continue
+            v = Vehicle(plate=bien.strip().upper(), seats=int(r.get("so_cho") or 45), kind="noi_bo",
+                        op_right="so_huu", lifecycle="dang_khai_thac",
+                        source_note=f"Tạo khi nạp {nguon}")
+            db.add(v); db.flush()
+            db.add(VehiclePlate(vehicle_id=v.id, plate=v.plate, from_date=d1,
+                                source=f"Nạp từ {nguon}", verify="nguon_ghi"))
+            da_tao_xe.append(v.plate)
+
+        t = Trip(vehicle_id=v.id, driver_id=v.driver_id, ten_tour=(r.get("ten_tour") or "")[:160],
+                 ngay_di=d1, ngay_ve=d2, km_dau=r.get("km_dau"), km_cuoi=r.get("km_cuoi"),
+                 km_nguon="nhap_tay", doanh_thu=float(r.get("doanh_thu") or 0),
+                 status="da_xac_nhan", confirmed_at=datetime.now(), confirmed_by=boi,
+                 ma_phieu=ma, nguon=nguon, note=(r.get("note") or "")[:300],
+                 created_by=boi)
+        db.add(t); db.flush()
+        cp = r.get("chi_phi") or {}
+        for kind in CHI_PHI_CHUYEN:
+            tien = float(cp.get(kind) or 0)
+            if tien <= 0: continue
+            db.add(TripCost(trip_id=t.id, kind=kind, amount=tien,
+                            lit=float(cp.get("lit") or 0) if kind == "dau" else 0,
+                            ben_chiu="vietourist_tam_ung", nguon=nguon,
+                            chung_tu=ma, created_by=boi))
+        db.flush()
+        kt = kiem_chuyen(db, t)
+        t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
+        if r.get("co") == "do":                      # nguồn đã báo là dữ liệu chưa đủ
+            t.co = "do"
+            t.co_ly_do = ((r.get("co_ly_do") or "") + (" · " + t.co_ly_do if t.co_ly_do else ""))[:2000]
+        da_co.add(ma); them += 1
+        ket.append({"ma_phieu": ma, "trip_id": t.id, "xe": v.plate, "co": t.co})
+    return {"da_nhap": them, "bo_qua_da_co": bo_qua,
+            "xe_khong_tra_ra": [{"bien_so": b, "so_phieu": n} for b, n in sorted(thieu_xe.items())],
+            "da_tao_xe": da_tao_xe, "chi_tiet": ket,
+            "ghi_chu": ("Phiếu đã có mã trong hệ thống thì BỎ QUA, không ghi đè – nạp lại cùng báo cáo "
+                        "không nhân đôi doanh thu. Biển số không tra ra xe thì KHÔNG tự tạo xe, mà báo ra "
+                        "để người nạp quyết.")}

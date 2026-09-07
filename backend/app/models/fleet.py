@@ -145,6 +145,10 @@ class Trip(Base):
     co: Mapped[str] = mapped_column(String(10), default="vang")        # cờ tổng hợp của chuyến
     co_ly_do: Mapped[str] = mapped_column(Text, default="")
     note: Mapped[str] = mapped_column(String(300), default="")
+    # Mã phiếu gốc bên hệ thống nguồn (ví dụ phiếu chi phí xe #100 trên VieTrip). Duy nhất, để nạp lại cùng
+    # một báo cáo hai lần không sinh ra 92 chuyến thứ hai – và để mỗi dòng còn truy ngược được về phiếu gốc.
+    ma_phieu: Mapped[str | None] = mapped_column(String(60), nullable=True, unique=True)
+    nguon: Mapped[str] = mapped_column(String(40), default="nhap_tay")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     created_by: Mapped[str] = mapped_column(String(50), default="")
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
