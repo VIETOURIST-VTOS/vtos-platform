@@ -40,6 +40,29 @@ DEFAULT_PARAMS = [
      "Bảng B.1 thang f: 'ngưỡng % mốc:hệ số %' từ f1 đến f19 và trần 1000%; f0 dưới ngưỡng đầu; ngưỡng tiền = % × mốc văn phòng", "bảng", "KD Lẻ Phụ lục A, B.1"),
     ("ca_truc_phut", "5", "Thời gian trả lời khách trong ca trực page", "phút", "KD Lẻ Điều 2a"),
     ("tai_xe_cong_tac_phi", "200000", "Công tác phí tài xế mỗi ngày tour", "đồng/ngày", "Đội xe"),
+    # ---- Đội xe Vietrip Đợt 2. Đặc tả nói thẳng: "Toàn bộ số dưới đây phải nằm trong bảng cấu hình có giao
+    # diện sửa, kèm lịch sử thay đổi. Lập trình viên không được viết thẳng vào mã." Dùng luôn bảng tham số
+    # chính sách sẵn có thay vì dựng bảng cấu hình thứ hai: nó đã có hiệu lực theo ngày, có lịch sử và có
+    # chữ ký duyệt – mà mấy con số này là tiền, nên đi qua cửa ký là đúng chứ không phải phiền.
+    # Công tác phí tài xế dùng lại khóa tai_xe_cong_tac_phi ở trên (200.000 đ/ngày, khớp giá trị đã xác nhận).
+    ("xe_chu_ky_bao_duong_km", "9000", "Chu kỳ bảo dưỡng xe (mốc chung; xe có mốc riêng thì ghi ở hồ sơ xe)", "km", "Đội xe v1.3 – A1, A5"),
+    ("xe_bd_gap_km", "2000", "Còn dưới mốc này tới kỳ bảo dưỡng thì báo GẤP", "km", "Đội xe v1.3 – A5"),
+    ("xe_bd_theo_doi_km", "5000", "Còn dưới mốc này thì đưa vào diện theo dõi bảo dưỡng", "km", "Đội xe v1.3 – A5"),
+    ("xe_giay_to_vang_ngay", "30", "Giấy tờ xe/GPLX còn dưới số ngày này thì cảnh báo vàng", "ngày", "Đội xe v1.3 – A5"),
+    ("xe_giay_to_do_ngay", "7", "Giấy tờ còn dưới số ngày này (hoặc đã quá hạn) thì cảnh báo đỏ", "ngày", "Đội xe v1.3 – A5"),
+    ("xe_luong_khoan_hop_tac_thang", "7000000", "Lương khoán tài xế xe hợp tác", "đồng/xe/tháng", "Đội xe v1.3 – A6, chốt 07/9/2026"),
+    ("xe_phi_bai_dau_thang", "2000000", "Phí bãi đậu xe (chưa VAT)", "đồng/xe/tháng", "Đội xe v1.3 – A6, chốt 07/9/2026"),
+    ("xe_bai_dau_vat", "0.08", "Thuế suất VAT phí bãi đậu xe", "tỷ lệ", "Đội xe v1.3 – A6, chốt 07/9/2026"),
+    ("xe_tieu_hao_min", "2.5", "Cận dưới dải tiêu hao nhiên liệu hợp lý", "km/lít", "Đội xe v1.3 – A2"),
+    ("xe_tieu_hao_max", "4.5", "Cận trên dải tiêu hao nhiên liệu hợp lý", "km/lít", "Đội xe v1.3 – A2"),
+    ("xe_lech_dau_vang", "0.10", "Định mức dầu đ/km lệch quá mức này so với trung bình 6 tháng của CHÍNH xe đó → vàng", "tỷ lệ", "Đội xe v1.3 – A3"),
+    ("xe_lech_dau_do", "0.20", "Lệch quá mức này → đỏ", "tỷ lệ", "Đội xe v1.3 – A3"),
+    ("xe_lech_km_gps", "0.05", "Km đọc từ ảnh lệch km GPS quá mức này → đỏ", "tỷ lệ", "Đội xe v1.3 – A2"),
+    ("xe_lech_km_noi_chuyen", "50", "Km cuối chuyến trước lệch km đầu chuyến sau quá mức này → vàng (nghi có chuyến chưa khai)", "km", "Đội xe v1.3 – A2"),
+    ("xe_vay_dao_han_ngay", "60", "Cảnh báo trước ngày đáo hạn khế ước", "ngày", "Đội xe v1.3 – A8"),
+    ("xe_vay_tra_goc_ngay", "10", "Cảnh báo trước kỳ trả gốc", "ngày", "Đội xe v1.3 – A8"),
+    ("xe_chung_tu_bat_buoc_tu", "10000000", "Khoản chi từ mức này bắt buộc có chứng từ gốc đính kèm", "đồng", "Đội xe v1.3 – B6"),
+    ("xe_chenh_gia_ban_vang", "0.20", "Giá chào bán thấp hơn định giá nội bộ quá mức này → cờ vàng bắt buộc giải trình", "tỷ lệ", "Đội xe v1.3 – A9"),
     ("moc_luong_doan", "30000000", "Mốc bình quân LN quyết toán 3 tháng để hưởng đủ lương NV kinh doanh đoàn", "đồng", "Đoàn Điều 5"),
     ("phat_su_vu", "1000000", "Chế tài mỗi sự vụ từ mức 2 (chỉ trừ hoa hồng)", "đồng/vụ", "KD Lẻ"),
     ("visa_lien_minh", "300000", "Đơn giá hồ sơ visa khách liên minh", "đồng/hồ sơ", "ĐH Điều 7"),

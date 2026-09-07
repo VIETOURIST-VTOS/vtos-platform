@@ -40,6 +40,9 @@ class Employee(Base):
     ctv_contract: Mapped[bool] = mapped_column(Boolean, default=False)        # hợp đồng cộng tác đã ký
     advance_limit: Mapped[float] = mapped_column(Float, default=0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Đội xe Đợt 2: bốn số cuối thẻ dầu gắn với TÀI XẾ, không gắn với xe – đổi tài xế thì đổi luôn
+    # ánh xạ, nếu gắn vào xe thì mọi giao dịch thẻ sau ngày bàn giao sẽ gán nhầm chi phí sang người khác.
+    fuel_card_last4: Mapped[str] = mapped_column(String(8), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 

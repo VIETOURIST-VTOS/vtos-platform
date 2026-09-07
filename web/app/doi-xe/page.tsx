@@ -18,6 +18,9 @@ function DoiXe() {
   const [xe, setXe] = useState<any[]>([]);
   const [chon, setChon] = useState<any>(null);
   const [xm, setXm] = useState<any[]>([]);
+  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich">("xe");
+  const [chuyen, setChuyen] = useState<any[]>([]);
+  const [gd, setGd] = useState<any>(null);
   const canWrite = ["cntt", "hcns", "tp_dh", "nv_dh"].includes(user?.role || "");
 
   const load = useCallback(async () => {
@@ -25,6 +28,8 @@ function DoiXe() {
       setTq(await api("/fleet/tong-quan"));
       setXe(await api("/fleet/xe?kem_kiem_tra=true"));
       setXm(await api("/fleet/xac-minh"));
+      setChuyen(await api("/fleet/chuyen"));
+      setGd(await api("/fleet/giao-dich"));
     } catch (e) { toast(errMsg(e), true); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
@@ -52,7 +57,40 @@ function DoiXe() {
     </div>
     <p className="muted">{tq.ghi_chu}{tq.chan_khi_thieu_giay ? " Đang BẬT chế độ chặn khi thiếu giấy tờ." : " Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo, chưa dừng lệnh điều xe."}</p>
 
-    <div className="panel wrap"><h2>Danh sách xe ({xe.length})</h2>
+    <div style={{ display: "flex", gap: 8, margin: "10px 0" }}>
+      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`]] as const)
+        .map(([k, ten]) => <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} onClick={() => setTab(k as any)}>{ten}</button>)}
+    </div>
+
+    {tab === "chuyen" && <div className="panel wrap"><h2>Nhật trình chuyến</h2>
+      <p className="muted">Km để trống nghĩa là <b>chưa đo</b>, không phải bằng 0. Cột &quot;Vietourist tạm ứng&quot; và &quot;Chủ xe chịu&quot; tách theo quy tắc chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe; sửa chữa do chủ xe tự chịu.</p>
+      <table><thead><tr><th>Xe</th><th>Tour</th><th>Đi → về</th><th>Km chạy</th><th>Doanh thu</th><th>VTS tạm ứng</th><th>Chủ xe chịu</th><th>Cờ</th></tr></thead>
+        <tbody>{chuyen.length ? chuyen.map((t) => <tr key={t.id}>
+          <td>{t.xe}</td><td>{t.ten_tour || <span className="muted">—</span>}</td>
+          <td>{fmtD(t.ngay_di)} → {fmtD(t.ngay_ve)} <span className="muted">({t.so_ngay} ngày)</span></td>
+          <td className="num">{t.km_chay === null ? <span className="muted">chưa đo</span> : t.km_chay.toLocaleString("vi-VN")}</td>
+          <td className="num">{t.doanh_thu ? t.doanh_thu.toLocaleString("vi-VN") : ""}</td>
+          <td className="num">{t.tong_chi_vietourist.toLocaleString("vi-VN")}</td>
+          <td className="num">{t.tong_chi_chu_xe.toLocaleString("vi-VN")}</td>
+          <td><Tag cls={t.co === "xanh" ? "ok" : t.co === "do" ? "red" : "warn"}>{t.co === "xanh" ? "Xanh" : t.co === "do" ? "Đỏ" : "Vàng"}</Tag>
+            {t.co_ly_do && <div className="muted">{t.co_ly_do}</div>}</td>
+        </tr>) : <tr><td colSpan={8} className="muted">Chưa có chuyến nào được ghi nhật trình.</td></tr>}</tbody></table>
+    </div>}
+
+    {tab === "giaodich" && gd && <div className="panel wrap"><h2>Đối soát dữ liệu nguồn ngoài</h2>
+      <p className="muted">{gd.ghi_chu} Tổng đã loại trùng: <b>{gd.tong_tien.toLocaleString("vi-VN")} đ</b>. Biển số được tra về xe theo <b>thời điểm giao dịch</b>, không theo biển hiện tại — xe đổi biển giữa kỳ vẫn gộp đúng về một chiếc.</p>
+      <table><thead><tr><th>Nguồn</th><th>Mã giao dịch</th><th>Thời điểm</th><th>Biển / thẻ</th><th>Xe</th><th>Số tiền</th><th>Trạng thái</th></tr></thead>
+        <tbody>{gd.rows.length ? gd.rows.map((r: any) => <tr key={r.id}>
+          <td>{r.source === "epass" ? "ePass/VETC" : "Thẻ dầu"}</td><td>{r.ma_gd}</td><td>{fmtDT(r.thoi_diem)}</td>
+          <td>{r.bien_so || (r.the_4so ? `••••${r.the_4so}` : "")}</td>
+          <td>{r.xe || <Tag cls="red">chưa tra được xe</Tag>}</td>
+          <td className="num">{r.so_tien.toLocaleString("vi-VN")}</td>
+          <td><Tag cls={r.co === "do" ? "red" : "warn"}>{r.khop === "da_khop" ? "Đã khớp chuyến" : "Chưa khớp chuyến"}</Tag>
+            {r.ghi_chu && <div className="muted">{r.ghi_chu}</div>}</td>
+        </tr>) : <tr><td colSpan={7} className="muted">Chưa nhập sao kê thẻ dầu hoặc báo cáo ePass nào.</td></tr>}</tbody></table>
+    </div>}
+
+    {tab === "xe" && <div className="panel wrap"><h2>Danh sách xe ({xe.length})</h2>
       <table><thead><tr><th>Mã xe</th><th>Biển đang dùng</th><th>Quyền khai thác</th><th>Vòng đời</th><th>Pháp nhân sở hữu</th><th>Đối tác</th><th>Hợp đồng</th><th>Tài xế</th><th>Điều kiện hôm nay</th></tr></thead>
         <tbody>{xe.map((v) => <tr key={v.id} onClick={() => mo(v.id)} style={{ cursor: "pointer" }}>
           <td><b>{v.code || "—"}</b></td><td>{v.plate}</td><td>{v.op_right_ten}</td><td>{v.lifecycle_ten}</td>
@@ -61,9 +99,9 @@ function DoiXe() {
           <td><Tag cls={MUC_CLS[v.san_sang?.muc] || ""}>{MUC_TEN[v.san_sang?.muc] || v.san_sang?.muc}</Tag>
             {v.san_sang?.ly_do?.length > 0 && <div className="muted">{v.san_sang.ly_do[0]}</div>}</td>
         </tr>)}</tbody></table>
-    </div>
+    </div>}
 
-    {chon && <div className="panel"><h2>Hồ sơ xe {chon.code} · {chon.plate}</h2>
+    {tab === "xe" && chon && <div className="panel"><h2>Hồ sơ xe {chon.code} · {chon.plate}</h2>
       <p className="muted">Số khung {chon.vin || "chưa nhập"} · {chon.seats} chỗ · đồng hồ {chon.odo_km ? `${chon.odo_km.toLocaleString("vi-VN")} km` : "chưa nhập"}{chon.odo_at ? ` (ghi ngày ${fmtD(chon.odo_at)})` : ""}</p>
       <div className="grid">
         <div><h3>Lịch sử biển số</h3>
@@ -85,7 +123,7 @@ function DoiXe() {
       <button className="act grey" onClick={() => setChon(null)}>Đóng</button>
     </div>}
 
-    <div className="panel wrap"><h2>Hàng đợi xác minh hồ sơ ({xm.filter((x) => x.status !== "xong" && x.status !== "khong_ap_dung").length} còn treo)</h2>
+    {tab === "xe" && <div className="panel wrap"><h2>Hàng đợi xác minh hồ sơ ({xm.filter((x) => x.status !== "xong" && x.status !== "khong_ap_dung").length} còn treo)</h2>
       <p className="muted">Những việc hệ thống không tự quyết được và cần người trả lời. Hệ thống nói ra chỗ nó không chắc, thay vì tự điền cho đủ form.</p>
       <table><thead><tr><th>Đối tượng</th><th>Việc cần xác minh</th><th>Nguồn</th><th>Trạng thái</th><th>Kết luận</th>{canWrite && <th></th>}</tr></thead>
         <tbody>{xm.map((x) => <tr key={x.id} style={{ opacity: x.status === "xong" ? 0.55 : 1 }}>
@@ -94,7 +132,7 @@ function DoiXe() {
           <td className="muted">{x.resolution}{x.resolved_by ? ` — ${x.resolved_by}, ${fmtDT(x.resolved_at)}` : ""}</td>
           {canWrite && <td>{x.status !== "xong" && x.status !== "khong_ap_dung" && <button className="act teal" onClick={() => dongViec(x.id)}>Kết luận</button>}</td>}
         </tr>)}</tbody></table>
-    </div>
+    </div>}
   </>);
 }
 

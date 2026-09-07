@@ -17,11 +17,12 @@ Về việc CHẶN: hôm nay hồ sơ giấy tờ 14 xe chưa nhập vào hệ t
 khi Chủ tịch quyết. Những điều KHÔNG phụ thuộc nhập liệu – hết quyền khai thác, xe đã bán, trùng lịch – thì
 chặn ngay từ hôm nay, vì chúng đúng bất kể hồ sơ đã nhập đủ hay chưa.
 """
-from datetime import date
+from datetime import date, datetime, timedelta
 from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import Session
 from app.models.hr import Vehicle, Employee, DispatchOrder
 from app.models.fleet import VehiclePlate, VehicleDocument, FleetVerification, VEHICLE_DOCS, DRIVER_DOCS
+from app.services import rules as R
 
 BLOCK, APPROVAL, REVIEW, UNKNOWN, OK = "BLOCK", "APPROVAL_REQUIRED", "REVIEW", "UNKNOWN", "OK"
 NANG = {BLOCK: 4, APPROVAL: 3, REVIEW: 2, UNKNOWN: 1, OK: 0}      # để lấy mức nghiêm trọng nhất
@@ -69,6 +70,18 @@ def _giay(kq: list, chu_the: str, ten_loai: dict, docs: dict, den_ngay: date, ch
             kq.append(_mo(f"CHUA_DOI_CHIEU_{kind.upper()}", REVIEW,
                           f"{ten} của {chu_the} còn hạn theo dữ liệu nguồn nhưng chưa đối chiếu giấy gốc",
                           "Bộ phận phụ trách đối chiếu giấy gốc rồi đánh dấu đã xác minh"))
+
+
+def trung_lich_tai_xe(db: Session, driver_id: int, d1: date, d2: date, bo_qua: int | None = None) -> list[DispatchOrder]:
+    """Lệnh còn hiệu lực của cùng một TÀI XẾ chồng ngày với khoảng đang xét.
+
+    Chốt 07/9/2026: không đặt định mức giờ lái cố định (xe chạy theo tour, theo tuyến), nhưng một người vẫn
+    không thể ở hai chuyến cùng ngày."""
+    q = select(DispatchOrder).where(DispatchOrder.driver_id == driver_id,
+                                    DispatchOrder.status.in_(["cho_xac_nhan", "da_xac_nhan"]),
+                                    DispatchOrder.date_from <= d2, DispatchOrder.date_to >= d1)
+    if bo_qua: q = q.where(DispatchOrder.id != bo_qua)
+    return list(db.execute(q).scalars())
 
 
 def trung_lich(db: Session, vehicle_id: int, d1: date, d2: date, bo_qua: int | None = None) -> list[DispatchOrder]:
@@ -140,6 +153,45 @@ def kiem_tra_dieu_xe(db: Session, v: Vehicle, d1: date, d2: date, driver_id: int
         kq.append(_mo("TRUNG_LICH", BLOCK,
                       f"Xe {v.plate} đã có lệnh #{d.id} từ {d.date_from:%d/%m} đến {d.date_to:%d/%m}",
                       "Chọn xe khác hoặc hủy lệnh cũ trước"))
+    # 4b. Trùng lịch TÀI XẾ. Chốt 07/9/2026: bỏ ràng buộc giờ lái liên tục (xe chạy theo tour, theo tuyến),
+    # nhưng GIỮ ràng buộc một tài xế không nhận hai lệnh chồng ngày. Không có ràng buộc này thì một người bị
+    # xếp hai chuyến cùng ngày và chỉ vỡ ra vào sáng hôm khởi hành.
+    if did:
+        for d in trung_lich_tai_xe(db, did, d1, d2, bo_qua_lenh):
+            kq.append(_mo("TAI_XE_TRUNG_LICH", BLOCK,
+                          f"Tài xế đã có lệnh #{d.id} từ {d.date_from:%d/%m} đến {d.date_to:%d/%m}",
+                          "Chọn tài xế khác hoặc dời lịch"))
+    # 4c. Mốc bảo dưỡng (chặn cứng B3 của đặc tả). Chưa biết mốc thì là CHƯA ĐỦ DỮ LIỆU, không phải là đạt –
+    # đây đúng là chỗ dễ mặc định thành "không sao" rồi để xe chạy quá kỳ mà không ai biết.
+    bd = moc_bao_duong(db, v)
+    if bd["km_ky_toi"] is None:
+        kq.append(_mo("CHUA_BIET_MOC_BAO_DUONG", UNKNOWN,
+                      f"Xe {v.plate}: {bd.get('ghi_chu', 'chưa xác định được mốc bảo dưỡng kỳ tới')}",
+                      "Nhập phiếu bảo dưỡng gần nhất kèm số km lúc làm"))
+    elif not v.odo_km:
+        kq.append(_mo("CHUA_CO_SO_KM", UNKNOWN,
+                      f"Xe {v.plate} chưa có số km đồng hồ đã xác nhận nên không so được với mốc bảo dưỡng",
+                      "Cập nhật số km đồng hồ trước khi lập kế hoạch mới"))
+    elif v.odo_km > bd["km_ky_toi"]:
+        kq.append(_mo("VUOT_MOC_BAO_DUONG", BLOCK,
+                      f"Xe {v.plate} đã ở {v.odo_km:,} km, vượt mốc bảo dưỡng {bd['km_ky_toi']:,} km",
+                      "Làm bảo dưỡng hoặc đổi xe khác"))
+    else:
+        con = bd["km_ky_toi"] - v.odo_km
+        gap = int(R.get_param(db, "xe_bd_gap_km"))
+        if con <= gap:
+            kq.append(_mo("SAP_TOI_MOC_BAO_DUONG", REVIEW,
+                          f"Xe {v.plate} còn {con:,} km tới mốc bảo dưỡng {bd['km_ky_toi']:,} km",
+                          "Đặt lịch garage trước khi phát lệnh dài ngày"))
+
+    # 4d. Giấy tờ sắp hết hạn – vàng/đỏ theo tham số chính sách, tách khỏi nhánh ĐÃ hết hạn ở trên.
+    vang = int(R.get_param(db, "xe_giay_to_vang_ngay")); do = int(R.get_param(db, "xe_giay_to_do_ngay"))
+    for kind, ten in VEHICLE_DOCS.items():
+        g = _docs(db, v.id, None).get(kind)
+        if g and g.expires_on: _han_giay(kq, f"xe {v.plate}", ten, g.expires_on, d2, vang, do)
+    if did:
+        g = _docs(db, None, did).get("gplx")
+        if g and g.expires_on: _han_giay(kq, "tài xế", "Giấy phép lái xe", g.expires_on, d2, vang, do)
 
     # 5. Việc xác minh đang treo của chính chiếc xe này – không chặn, nhưng người điều hành phải thấy.
     n = db.execute(select(FleetVerification).where(FleetVerification.vehicle_id == v.id,
@@ -188,3 +240,147 @@ def doi_bien(db: Session, v: Vehicle, plate_moi: str, tu_ngay: date, nguon: str,
     db.add(moi)
     v.plate = plate_moi                              # `plate` trên hồ sơ xe = biển ĐANG dùng
     return moi
+
+
+# ====================== ĐỢT 2: KHỚP NGUỒN NGOÀI, BẢO DƯỠNG, CANH HẠN GIẤY TỜ ======================
+from datetime import datetime, timedelta
+from app.models.fleet import (Trip, TripCost, Maintenance, ExternalTxn, BEN_CHIU_MAC_DINH, COST_KINDS)
+
+
+def xe_theo_bien(db: Session, bien: str, luc: date):
+    """Tra xe từ biển số TẠI THỜI ĐIỂM giao dịch, không theo biển hiện tại.
+
+    Đây là chỗ đối soát ePass vỡ nếu làm sai: xe đổi biển giữa kỳ mà tra theo biển hiện tại thì toàn bộ giao
+    dịch nửa đầu kỳ rơi ra ngoài, và người đối chiếu sẽ đi tìm một khoản tiền không thuộc về ai."""
+    b = (bien or "").strip().upper()
+    if not b: return None
+    rows = db.execute(select(VehiclePlate).where(VehiclePlate.plate == b)).scalars().all()
+    for p in rows:
+        if (p.from_date is None or p.from_date <= luc) and (p.to_date is None or luc <= p.to_date):
+            return db.get(Vehicle, p.vehicle_id)
+    if rows:                                   # có trong lịch sử nhưng ngoài khoảng ngày đã ghi
+        return db.get(Vehicle, rows[0].vehicle_id)
+    return db.execute(select(Vehicle).where(Vehicle.plate == b)).scalars().first()
+
+
+def nhap_giao_dich(db: Session, source: str, rows: list[dict], boi: str) -> dict:
+    """Nhập giao dịch nguồn ngoài, khử trùng theo mã giao dịch gốc.
+
+    Bản ghi trùng KHÔNG bị bỏ đi: nó được ghi với cờ `trung=True` và trỏ về bản gốc. Bỏ đi là mất khả năng
+    chứng minh mình đã loại đúng cái gì – mà đây là dữ liệu dùng để chi tiền cho đối tác."""
+    da_co = {(t.source, t.ma_gd): t.id for t in
+             db.execute(select(ExternalTxn).where(ExternalTxn.source == source, ExternalTxn.trung == False)).scalars()}
+    them = trung = 0
+    for r in rows:
+        ma = (r.get("ma_gd") or "").strip()
+        if not ma: continue
+        luc = r.get("thoi_diem")
+        if isinstance(luc, str): luc = datetime.fromisoformat(luc)
+        goc = da_co.get((source, ma))
+        v = None
+        if r.get("bien_so"): v = xe_theo_bien(db, r["bien_so"], luc.date())
+        elif r.get("the_4so"):
+            v = db.execute(select(Vehicle).join(Employee, Employee.id == Vehicle.driver_id)
+                           .where(Employee.fuel_card_last4 == r["the_4so"])).scalars().first()
+        t = ExternalTxn(source=source, ma_gd=ma, tai_khoan=r.get("tai_khoan", ""), the_4so=r.get("the_4so", ""),
+                        bien_so=r.get("bien_so", ""), vehicle_id=v.id if v else None, thoi_diem=luc,
+                        so_tien=float(r.get("so_tien") or 0), lit=float(r.get("lit") or 0),
+                        mo_ta=r.get("mo_ta", ""), imported_by=boi,
+                        trung=goc is not None, trung_cua_id=goc,
+                        co="do" if (goc is None and v is None) else "vang",
+                        ghi_chu=("Bản ghi lặp – giữ lại để đối chiếu, KHÔNG đưa vào tính toán" if goc
+                                 else ("Chưa tra được xe từ biển số/số thẻ tại thời điểm giao dịch" if v is None else "")))
+        db.add(t); db.flush()
+        if goc is None:
+            da_co[(source, ma)] = t.id; them += 1
+        else:
+            trung += 1
+    return {"da_nhap": them, "ban_ghi_lap": trung,
+            "ghi_chu": "Bản ghi lặp được giữ trong bảng thô với cờ trùng và không cộng vào số liệu tính toán."}
+
+
+def moc_bao_duong(db: Session, v: Vehicle) -> dict:
+    """Mốc km của kỳ bảo dưỡng tới. Lấy từ lần bảo dưỡng gần nhất; chưa có lần nào thì CHƯA BIẾT.
+
+    Đặc tả cấm dùng 9.000 km cố định cho mọi xe vì nguồn ghi các mốc khác nhau – nên chu kỳ trong tham số chỉ
+    dùng khi chính lần bảo dưỡng trước không ghi mốc kế tiếp."""
+    bd = db.execute(select(Maintenance).where(Maintenance.vehicle_id == v.id, Maintenance.kind == "dinh_ky")
+                    .order_by(Maintenance.ngay.desc(), Maintenance.id.desc())).scalars().first()
+    if bd is None:
+        return {"km_ky_toi": None, "nguon": "chua_co_lich_su",
+                "ghi_chu": "Chưa có lịch sử bảo dưỡng nên chưa biết mốc kỳ tới – không suy ra từ chu kỳ chung"}
+    if bd.km_ky_toi:
+        return {"km_ky_toi": bd.km_ky_toi, "nguon": "ghi_tren_phieu", "lan_truoc": bd.ngay}
+    if bd.km_luc_lam:
+        chu_ky = int(R.get_param(db, "xe_chu_ky_bao_duong_km"))
+        return {"km_ky_toi": bd.km_luc_lam + chu_ky, "nguon": "chu_ky_chung", "lan_truoc": bd.ngay,
+                "ghi_chu": f"Phiếu lần trước không ghi mốc kế tiếp – tạm lấy chu kỳ chung {chu_ky:,} km"}
+    return {"km_ky_toi": None, "nguon": "phieu_thieu_km",
+            "ghi_chu": "Phiếu bảo dưỡng lần trước không ghi số km lúc làm – không tính được mốc kỳ tới"}
+
+
+def _han_giay(kq: list, chu_the: str, ten: str, het: date, den_ngay: date, vang: int, do: int):
+    con = (het - date.today()).days
+    if het < den_ngay:
+        return                                   # đã có nhánh HET_HAN xử lý ở kiểm tra Đợt 1
+    if con <= do:
+        kq.append(_mo(f"SAP_HET_HAN_{ten}", REVIEW, f"{ten} của {chu_the} còn {con} ngày (hết {het:%d/%m/%Y})",
+                      "Gia hạn ngay – dưới ngưỡng đỏ theo tham số chính sách"))
+    elif con <= vang:
+        kq.append(_mo(f"GAN_HET_HAN_{ten}", REVIEW, f"{ten} của {chu_the} còn {con} ngày (hết {het:%d/%m/%Y})",
+                      "Đưa vào lịch gia hạn"))
+
+
+def kiem_chuyen(db: Session, t) -> dict:
+    """Chấm cờ cho một chuyến theo ba mức xanh / vàng / đỏ của đặc tả §1.
+
+    Nguyên tắc giữ nguyên từ Đợt 1: thiếu số đo KHÔNG ra màu xanh. Một chuyến chưa đọc được km mà hiện xanh
+    thì người xác nhận tin rằng đã đối chiếu xong."""
+    ly_do: list[str] = []; muc = "xanh"
+
+    def vang(m):
+        nonlocal muc
+        ly_do.append(m)
+        if muc == "xanh": muc = "vang"
+
+    def do(m):
+        nonlocal muc
+        ly_do.append(m); muc = "do"
+
+    if t.km_dau is None or t.km_cuoi is None:
+        vang("Chưa có đủ số km đầu/cuối – chưa tính được quãng đường thực tế")
+    else:
+        km = t.km_cuoi - t.km_dau
+        if km < 0:
+            do(f"Km cuối nhỏ hơn km đầu ({t.km_cuoi:,} < {t.km_dau:,})")
+        elif t.km_gps:
+            lech = abs(km - t.km_gps) / t.km_gps if t.km_gps else 0
+            nguong = R.get_param(db, "xe_lech_km_gps")
+            if lech > nguong:
+                do(f"Km đọc từ đồng hồ lệch GPS {lech*100:.1f}% (ngưỡng {nguong*100:.0f}%)")
+        # Nối chuyến: km cuối chuyến trước phải khớp km đầu chuyến sau của cùng chiếc xe.
+        truoc = db.execute(select(Trip).where(Trip.vehicle_id == t.vehicle_id, Trip.id != t.id,
+                                              Trip.ngay_ve <= t.ngay_di)
+                           .order_by(Trip.ngay_ve.desc(), Trip.id.desc())).scalars().first()
+        if truoc is not None and truoc.km_cuoi is not None and t.km_dau is not None:
+            hut = t.km_dau - truoc.km_cuoi
+            nguong_km = int(R.get_param(db, "xe_lech_km_noi_chuyen"))
+            if abs(hut) > nguong_km:
+                vang(f"Km đầu chuyến này lệch km cuối chuyến trước {hut:,} km – có thể có chuyến chưa khai báo, "
+                     f"hoặc chặng chạy rỗng/đi garage chưa ghi")
+
+    cps = list(db.execute(select(TripCost).where(TripCost.trip_id == t.id)).scalars())
+    nguong_ct = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
+    for c in cps:
+        if c.amount >= nguong_ct and not (c.chung_tu or "").strip():
+            do(f"{COST_KINDS.get(c.kind, c.kind)} {c.amount:,.0f} đ không có chứng từ gốc (chặn cứng B6)")
+    # Tiêu hao nhiên liệu ngoài dải hợp lý – chỉ chấm khi có ĐỦ cả số lít lẫn quãng đường.
+    lit = sum(c.lit for c in cps if c.kind == "dau")
+    if lit > 0 and t.km_dau is not None and t.km_cuoi is not None and t.km_cuoi > t.km_dau:
+        km_l = (t.km_cuoi - t.km_dau) / lit
+        lo = R.get_param(db, "xe_tieu_hao_min"); hi = R.get_param(db, "xe_tieu_hao_max")
+        if km_l < lo or km_l > hi:
+            vang(f"Tiêu hao {km_l:.2f} km/lít nằm ngoài dải hợp lý {lo}–{hi} km/lít")
+    if not cps:
+        vang("Chuyến chưa có dòng chi phí nào")
+    return {"co": muc, "ly_do": ly_do}

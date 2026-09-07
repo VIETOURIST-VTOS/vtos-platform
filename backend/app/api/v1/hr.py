@@ -501,7 +501,11 @@ def dispatch_create(data: DispatchIn, u: User = Depends(require_roles("nv_dh", "
     # Bộ điều kiện phát lệnh (Đợt 1 đội xe, đặc tả §7). Mức BLOCK chặn thật, không có nút vượt chung; các mức
     # còn lại đi kèm lệnh để người điều hành thấy, và được ghi vào nhật ký cùng lệnh.
     from app.services import fleet as FL
-    kt = FL.kiem_tra_dieu_xe(db, v, data.date_from, data.date_to, driver_id,
+    # Truyền tài xế THẬT của xe, không truyền người thay thế ở trên. Với xe hợp tác do đối tác tự lái, hệ
+    # thống đang tạm gắn một nhân sự đội xe chỉ để có chỗ ghi – gọi đó là "tài xế" khi kiểm trùng lịch thì
+    # hai xe hợp tác chạy cùng ngày sẽ báo tài xế trùng lịch, trong khi ngoài đời là hai người khác nhau.
+    # Bộ kiểm tra vẫn nêu "chưa gán tài xế" ở mức chưa đủ dữ liệu, nên vấn đề không bị giấu đi.
+    kt = FL.kiem_tra_dieu_xe(db, v, data.date_from, data.date_to, v.driver_id,
                              chan_khi_thieu_giay=bool(R.get_param(db, "xe_chan_khi_thieu_giay")))
     if kt["muc"] == FL.BLOCK:
         raise HTTPException(422, {"message": "Không đủ điều kiện phát lệnh điều xe",

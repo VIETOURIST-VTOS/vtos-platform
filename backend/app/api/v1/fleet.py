@@ -278,3 +278,220 @@ def ket_luan(xid: int, data: KetLuanIn, u: User = Depends(require_roles(*WRITE))
     R.audit(db, u.username, u.role, "ket_luan_xac_minh_doi_xe", f"fleet_verify:{x.id}", after=data.model_dump(mode="json"))
     db.commit()
     return {"message": "Đã cập nhật việc xác minh"}
+
+
+# ====================== ĐỢT 2: NHẬT TRÌNH, BẢO DƯỠNG, NGUỒN NGOÀI ======================
+from app.models.fleet import (Trip, TripCost, Maintenance, ExternalTxn, BEN_CHIU, COST_KINDS,
+                              BEN_CHIU_MAC_DINH, TRIP_STATUS, CO, MAINT_KINDS)
+
+KETOAN = ("ketoan",)
+
+
+@router.get("/danh-muc-dot2")
+def danh_muc_dot2(u: User = Depends(require_roles(*READ))):
+    return {"ben_chiu": BEN_CHIU, "loai_chi_phi": COST_KINDS, "ben_chiu_mac_dinh": BEN_CHIU_MAC_DINH,
+            "trang_thai_chuyen": TRIP_STATUS, "co": CO, "loai_bao_duong": MAINT_KINDS,
+            "ghi_chu": "Chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe. "
+                       "KHÔNG tạm ứng sửa chữa – chủ xe tự chịu, và không tự trừ vào công nợ nếu chưa có "
+                       "văn bản đồng ý của chủ xe."}
+
+
+class ChuyenIn(BaseModel):
+    vehicle_id: int
+    driver_id: int | None = None
+    dispatch_id: int | None = None
+    tour_id: int | None = None
+    ten_tour: str = ""
+    ngay_di: date
+    ngay_ve: date
+    km_dau: int | None = None
+    km_cuoi: int | None = None
+    km_gps: int | None = None
+    km_nguon: str = "nhap_tay"
+    doanh_thu: float = 0
+    note: str = ""
+
+
+def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict) -> dict:
+    cps = list(db.execute(select(TripCost).where(TripCost.trip_id == t.id)).scalars())
+    return {"id": t.id, "vehicle_id": t.vehicle_id, "xe": veh.get(t.vehicle_id, ""),
+            "tai_xe": emps.get(t.driver_id, ""), "ten_tour": t.ten_tour, "ngay_di": t.ngay_di,
+            "ngay_ve": t.ngay_ve, "so_ngay": (t.ngay_ve - t.ngay_di).days + 1,
+            "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "km_gps": t.km_gps,
+            "km_chay": (t.km_cuoi - t.km_dau) if (t.km_dau is not None and t.km_cuoi is not None) else None,
+            "doanh_thu": t.doanh_thu, "status": t.status, "co": t.co, "co_ly_do": t.co_ly_do,
+            "chi_phi": [{"id": c.id, "kind": c.kind, "kind_ten": COST_KINDS.get(c.kind, c.kind),
+                         "amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu,
+                         "ben_chiu_ten": BEN_CHIU.get(c.ben_chiu, c.ben_chiu), "chung_tu": c.chung_tu,
+                         "nguon": c.nguon} for c in cps],
+            "tong_chi_vietourist": sum(c.amount for c in cps if c.ben_chiu == "vietourist_tam_ung"),
+            "tong_chi_chu_xe": sum(c.amount for c in cps if c.ben_chiu == "chu_xe")}
+
+
+@router.get("/chuyen")
+def danh_sach_chuyen(vehicle_id: int | None = None, tu: date | None = None, den: date | None = None,
+                     u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    q = select(Trip).order_by(Trip.ngay_di.desc(), Trip.id.desc())
+    if vehicle_id: q = q.where(Trip.vehicle_id == vehicle_id)
+    # Chuyến được gán vào kỳ theo NGÀY KHỞI HÀNH (đề nghị trong tài liệu 07/9 cho chuyến vắt qua hai tháng).
+    if tu: q = q.where(Trip.ngay_di >= tu)
+    if den: q = q.where(Trip.ngay_di <= den)
+    veh = {v.id: v.plate for v in db.execute(select(Vehicle)).scalars()}
+    emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
+    return [_chuyen_out(db, t, veh, emps) for t in db.execute(q.limit(500)).scalars()]
+
+
+@router.post("/chuyen", status_code=201)
+def tao_chuyen(data: ChuyenIn, u: User = Depends(require_roles(*WRITE, *KETOAN)), db: Session = Depends(get_db)):
+    """Nhật trình chuyến. Km đầu/cuối để trống nghĩa là CHƯA ĐO, không phải bằng 0 – nên hệ thống không tự
+    điền 0 và không tính ra quãng đường âm."""
+    v = db.get(Vehicle, data.vehicle_id)
+    if not v: raise HTTPException(404, "Không có xe")
+    if data.ngay_ve < data.ngay_di: raise HTTPException(422, "Ngày về trước ngày đi")
+    if data.km_dau is not None and data.km_cuoi is not None and data.km_cuoi < data.km_dau:
+        raise HTTPException(422, "Km cuối nhỏ hơn km đầu – kiểm tra lại số đọc trên đồng hồ")
+    t = Trip(**data.model_dump(), created_by=u.username)
+    db.add(t); db.flush()
+    kt = FL.kiem_chuyen(db, t)
+    t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
+    R.audit(db, u.username, u.role, "nhat_trinh_chuyen", f"vehicle:{v.code or v.plate}",
+            after={**data.model_dump(mode="json"), "co": t.co})
+    db.commit()
+    return {"id": t.id, "co": kt["co"], "ly_do": kt["ly_do"],
+            "message": f"Đã ghi nhật trình chuyến của xe {v.plate}"}
+
+
+class ChiPhiIn(BaseModel):
+    kind: str
+    amount: float
+    ben_chiu: str | None = None
+    lit: float = 0
+    chung_tu: str = ""
+    nguon: str = "nhap_tay"
+    note: str = ""
+
+
+@router.post("/chuyen/{tid}/chi-phi", status_code=201)
+def them_chi_phi(tid: int, data: ChiPhiIn, u: User = Depends(require_roles(*WRITE, *KETOAN)), db: Session = Depends(get_db)):
+    """Thêm một dòng chi phí. `ben_chiu` không truyền thì lấy mặc định theo loại chi phí – sửa chữa mặc định
+    là CHỦ XE theo quy tắc chốt 07/9/2026."""
+    t = db.get(Trip, tid)
+    if not t: raise HTTPException(404, "Không có chuyến")
+    if t.status == "da_xac_nhan": raise HTTPException(422, "Chuyến đã xác nhận – sửa phải qua điều chỉnh, không ghi đè")
+    if data.kind not in COST_KINDS: raise HTTPException(422, f"Loại chi phí không hợp lệ. Chỉ nhận {', '.join(COST_KINDS)}")
+    bc = data.ben_chiu or BEN_CHIU_MAC_DINH.get(data.kind, "vietourist_tam_ung")
+    if bc not in BEN_CHIU: raise HTTPException(422, f"Bên chịu không hợp lệ. Chỉ nhận {', '.join(BEN_CHIU)}")
+    nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
+    if data.amount >= nguong and not (data.chung_tu or "").strip():
+        raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc có chứng từ gốc đính kèm (chặn cứng B6)")
+    c = TripCost(trip_id=tid, **{**data.model_dump(exclude={"ben_chiu"}), "ben_chiu": bc}, created_by=u.username)
+    db.add(c); db.flush()
+    kt = FL.kiem_chuyen(db, t); t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
+    R.audit(db, u.username, u.role, "chi_phi_chuyen", f"trip:{tid}", after={**data.model_dump(mode="json"), "ben_chiu": bc})
+    db.commit()
+    return {"id": c.id, "ben_chiu": bc, "co_chuyen": kt["co"],
+            "message": f"Đã ghi {COST_KINDS[data.kind]} – {BEN_CHIU[bc]}"}
+
+
+@router.post("/chuyen/{tid}/xac-nhan")
+def xac_nhan_chuyen(tid: int, u: User = Depends(require_roles("cntt", "tp_dh", "nv_dh")), db: Session = Depends(get_db)):
+    t = db.get(Trip, tid)
+    if not t: raise HTTPException(404, "Không có chuyến")
+    kt = FL.kiem_chuyen(db, t)
+    if kt["co"] == "do":
+        raise HTTPException(422, {"message": "Chuyến còn cờ đỏ – không xác nhận được", "ly_do": kt["ly_do"]})
+    from datetime import datetime as _dt
+    t.status = "da_xac_nhan"; t.confirmed_at = _dt.now(); t.confirmed_by = u.username
+    t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
+    R.audit(db, u.username, u.role, "xac_nhan_chuyen", f"trip:{tid}", after={"co": kt["co"]})
+    db.commit()
+    return {"message": "Đã xác nhận chuyến", "co": kt["co"], "ly_do": kt["ly_do"]}
+
+
+class BaoDuongIn(BaseModel):
+    vehicle_id: int
+    ngay: date
+    kind: str = "dinh_ky"
+    km_luc_lam: int | None = None
+    km_ky_toi: int | None = None
+    noi_dung: str = ""
+    garage: str = ""
+    so_tien: float = 0
+    ben_chiu: str | None = None
+    chung_tu: str = ""
+
+
+@router.get("/bao-duong")
+def ds_bao_duong(vehicle_id: int | None = None, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    q = select(Maintenance).order_by(Maintenance.ngay.desc(), Maintenance.id.desc())
+    if vehicle_id: q = q.where(Maintenance.vehicle_id == vehicle_id)
+    veh = {v.id: v.plate for v in db.execute(select(Vehicle)).scalars()}
+    return [{"id": m.id, "xe": veh.get(m.vehicle_id, ""), "vehicle_id": m.vehicle_id, "ngay": m.ngay,
+             "kind": m.kind, "kind_ten": MAINT_KINDS.get(m.kind, m.kind), "km_luc_lam": m.km_luc_lam,
+             "km_ky_toi": m.km_ky_toi, "noi_dung": m.noi_dung, "garage": m.garage, "so_tien": m.so_tien,
+             "ben_chiu": m.ben_chiu, "ben_chiu_ten": BEN_CHIU.get(m.ben_chiu, m.ben_chiu),
+             "chung_tu": m.chung_tu} for m in db.execute(q.limit(500)).scalars()]
+
+
+@router.post("/bao-duong", status_code=201)
+def them_bao_duong(data: BaoDuongIn, u: User = Depends(require_roles(*WRITE, *KETOAN)), db: Session = Depends(get_db)):
+    """Ghi bảo dưỡng/sửa chữa. Không có số km lúc làm thì hệ thống nói thẳng là không tính được mốc kỳ tới,
+    thay vì im lặng suy ra từ chu kỳ chung – đó là cách chi phí bị ghi sai kỳ mà không ai phát hiện."""
+    v = db.get(Vehicle, data.vehicle_id)
+    if not v: raise HTTPException(404, "Không có xe")
+    if data.kind not in MAINT_KINDS: raise HTTPException(422, f"Loại không hợp lệ. Chỉ nhận {', '.join(MAINT_KINDS)}")
+    bc = data.ben_chiu or ("chu_xe" if v.op_right == "hop_tac" else "vietourist_tam_ung")
+    if bc not in BEN_CHIU: raise HTTPException(422, f"Bên chịu không hợp lệ. Chỉ nhận {', '.join(BEN_CHIU)}")
+    # Mốc km ghi trên phiếu nhỏ hơn số km đồng hồ đã xác nhận là dấu hiệu ghi sai ngày hoặc sai kỳ –
+    # đúng kiểu sai đã xảy ra với xe 50H-496.23 tháng 8/2026 (mốc 130.300 lớn hơn km cuối 130.245).
+    canh_bao = []
+    if data.km_luc_lam and v.odo_km and data.km_luc_lam > v.odo_km:
+        canh_bao.append(f"Km lúc làm ({data.km_luc_lam:,}) lớn hơn km đồng hồ đã xác nhận của xe ({v.odo_km:,}) "
+                        "– kiểm tra lại ngày thực hiện và kỳ phân bổ")
+    m = Maintenance(**{**data.model_dump(exclude={"ben_chiu"}), "ben_chiu": bc}, created_by=u.username)
+    db.add(m); db.flush()
+    R.audit(db, u.username, u.role, "bao_duong_xe", f"vehicle:{v.code or v.plate}",
+            after={**data.model_dump(mode="json"), "ben_chiu": bc})
+    db.commit()
+    return {"id": m.id, "ben_chiu": bc, "canh_bao": canh_bao,
+            "moc_ky_toi": FL.moc_bao_duong(db, v),
+            "message": f"Đã ghi {MAINT_KINDS[data.kind].lower()} cho xe {v.plate}"}
+
+
+class GiaoDichIn(BaseModel):
+    source: str                      # the_dau / epass
+    rows: list[dict]
+
+
+@router.post("/giao-dich/nhap", status_code=201)
+def nhap_giao_dich(data: GiaoDichIn, u: User = Depends(require_roles(*WRITE, *KETOAN)), db: Session = Depends(get_db)):
+    """Nhập sao kê thẻ dầu hoặc báo cáo ePass. Khử trùng theo mã giao dịch gốc.
+
+    Nghiệm thu của đặc tả: nhập lại CÙNG một file hai lần không sinh bản ghi trùng. Bản ghi lặp vẫn được giữ
+    trong bảng thô với cờ trùng để còn chứng minh mình đã loại đúng cái gì."""
+    if data.source not in ("the_dau", "epass"): raise HTTPException(422, "Nguồn chỉ nhận the_dau hoặc epass")
+    if not data.rows: raise HTTPException(422, "Không có dòng nào để nhập")
+    try:
+        kq = FL.nhap_giao_dich(db, data.source, data.rows, u.username)
+    except (ValueError, TypeError) as ex:
+        raise HTTPException(422, f"Dữ liệu nguồn không đọc được: {ex}")
+    R.audit(db, u.username, u.role, "nhap_giao_dich_doi_xe", f"nguon:{data.source}", after=kq)
+    db.commit()
+    return kq
+
+
+@router.get("/giao-dich")
+def ds_giao_dich(source: str = "", chua_khop: bool = False, gom_ban_trung: bool = False,
+                 u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    q = select(ExternalTxn).order_by(ExternalTxn.thoi_diem.desc(), ExternalTxn.id.desc())
+    if source: q = q.where(ExternalTxn.source == source)
+    if not gom_ban_trung: q = q.where(ExternalTxn.trung == False)   # mặc định KHÔNG hiện bản lặp
+    if chua_khop: q = q.where(ExternalTxn.khop == "chua_khop")
+    veh = {v.id: v.plate for v in db.execute(select(Vehicle)).scalars()}
+    rows = list(db.execute(q.limit(1000)).scalars())
+    return {"rows": [{"id": t.id, "source": t.source, "ma_gd": t.ma_gd, "thoi_diem": t.thoi_diem,
+                      "bien_so": t.bien_so, "the_4so": t.the_4so, "xe": veh.get(t.vehicle_id, ""),
+                      "vehicle_id": t.vehicle_id, "so_tien": t.so_tien, "lit": t.lit, "khop": t.khop,
+                      "co": t.co, "trung": t.trung, "ghi_chu": t.ghi_chu} for t in rows],
+            "tong_tien": sum(t.so_tien for t in rows),
+            "ghi_chu": "Số liệu này đã loại bản ghi lặp. Thêm gom_ban_trung=true để xem cả bản đã loại."}

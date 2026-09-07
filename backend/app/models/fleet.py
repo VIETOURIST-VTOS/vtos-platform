@@ -97,3 +97,124 @@ class FleetVerification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     resolved_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+# ====================== ĐỢT 2: NHẬT TRÌNH, BẢO DƯỠNG, DỮ LIỆU NGUỒN NGOÀI ======================
+# Quy tắc chốt ngày 07/9/2026: Vietourist TẠM ỨNG nhiên liệu, cầu đường, công tác phí, bãi xe;
+# KHÔNG tạm ứng sửa chữa – chủ xe hợp tác tự chịu. Vì vậy "ai chịu khoản này" là một CỘT trên từng dòng chi
+# phí, không phải suy ra từ loại chi phí lúc quyết toán: cùng một loại chi phí có thể do hai bên chịu tùy
+# hợp đồng, và suy ra lúc quyết toán là lúc không còn ai nhớ để cãi.
+BEN_CHIU = {"vietourist_tam_ung": "Vietourist tạm ứng", "chu_xe": "Chủ xe tự chịu"}
+COST_KINDS = {"dau": "Nhiên liệu", "cong_tac_phi": "Công tác phí tài xế", "giu_xe": "Phí giữ/bãi xe",
+              "cau_duong": "Phí cầu đường", "sua_chua": "Sửa chữa, bảo dưỡng", "khac": "Khác"}
+# Loại chi phí nào mặc định bên nào chịu. Sửa chữa mặc định CHỦ XE theo quy tắc đã chốt.
+BEN_CHIU_MAC_DINH = {"sua_chua": "chu_xe"}
+TRIP_STATUS = {"nhap": "Nháp – tài xế đang ghi", "cho_xac_nhan": "Chờ xác nhận",
+               "da_xac_nhan": "Đã xác nhận", "huy": "Hủy"}
+# Ba cờ dùng thống nhất toàn hệ thống (đặc tả §1): xanh cho duyệt một chạm, vàng phải nhập lý do,
+# đỏ chặn duyệt. Ánh xạ sang bốn mức của bộ kiểm tra Đợt 1 ở app/services/fleet.py.
+CO = {"xanh": "Xanh – đủ chứng từ, số khớp", "vang": "Vàng – lệch trong ngưỡng hoặc thiếu chứng từ phụ",
+      "do": "Đỏ – vi phạm quy tắc cứng, thiếu chứng từ chính, hoặc lệch vượt ngưỡng"}
+MAINT_KINDS = {"dinh_ky": "Bảo dưỡng định kỳ", "sua_chua": "Sửa chữa", "vo_xe": "Vỏ xe", "khac": "Khác"}
+
+
+class Trip(Base):
+    """Một chuyến xe – nhật trình. Km đầu/cuối là số ĐO, nên phải đi kèm nguồn và thời điểm.
+
+    `km_dau`/`km_cuoi` để rỗng nghĩa là chưa đo, không phải bằng 0. Dùng 0 làm "chưa có" là cách chắc chắn
+    nhất để một ngày nào đó hệ thống báo xe chạy âm mấy trăm nghìn km."""
+    __tablename__ = "fleet_trips"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
+    driver_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
+    dispatch_id: Mapped[int | None] = mapped_column(ForeignKey("dispatch_orders.id"), nullable=True)
+    tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True)
+    ten_tour: Mapped[str] = mapped_column(String(160), default="")
+    ngay_di: Mapped[date] = mapped_column(Date)
+    ngay_ve: Mapped[date] = mapped_column(Date)
+    km_dau: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    km_cuoi: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    km_gps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    km_nguon: Mapped[str] = mapped_column(String(40), default="")      # anh_dong_ho / nhap_tay / gps
+    doanh_thu: Mapped[float] = mapped_column(Float, default=0)
+    status: Mapped[str] = mapped_column(String(20), default="cho_xac_nhan")
+    co: Mapped[str] = mapped_column(String(10), default="vang")        # cờ tổng hợp của chuyến
+    co_ly_do: Mapped[str] = mapped_column(Text, default="")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    confirmed_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+class TripCost(Base):
+    """Một dòng chi phí của chuyến. Mỗi dòng phải trả lời được ba câu: loại gì, ai chịu, chứng từ đâu."""
+    __tablename__ = "fleet_trip_costs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trip_id: Mapped[int] = mapped_column(ForeignKey("fleet_trips.id"))
+    kind: Mapped[str] = mapped_column(String(20))
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    ben_chiu: Mapped[str] = mapped_column(String(24), default="vietourist_tam_ung")
+    lit: Mapped[float] = mapped_column(Float, default=0)               # chỉ dùng cho nhiên liệu
+    chung_tu: Mapped[str] = mapped_column(String(200), default="")     # mã/đường dẫn chứng từ gốc
+    nguon: Mapped[str] = mapped_column(String(40), default="nhap_tay")  # nhap_tay / the_dau / epass / ocr
+    ref_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # id giao dịch nguồn nếu khớp tự động
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+class Maintenance(Base):
+    """Bảo dưỡng, sửa chữa. `km_luc_lam` là bắt buộc về mặt nghiệp vụ – không có nó thì không phát hiện được
+    chi phí ghi sai kỳ, mà đó chính là lỗi đã xảy ra với xe 50H-496.23 tháng 8/2026."""
+    __tablename__ = "fleet_maintenance"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
+    ngay: Mapped[date] = mapped_column(Date)
+    kind: Mapped[str] = mapped_column(String(20), default="dinh_ky")
+    km_luc_lam: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    km_ky_toi: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    noi_dung: Mapped[str] = mapped_column(String(300), default="")
+    garage: Mapped[str] = mapped_column(String(120), default="")
+    so_tien: Mapped[float] = mapped_column(Float, default=0)
+    ben_chiu: Mapped[str] = mapped_column(String(24), default="chu_xe")
+    chung_tu: Mapped[str] = mapped_column(String(200), default="")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+
+
+class ExternalTxn(Base):
+    """Giao dịch từ nguồn ngoài: thẻ dầu (sao kê ngân hàng) và trạm thu phí (ePass/VETC).
+
+    Hai điều bắt buộc, đặc tả nêu đích danh vì cả hai đã gây sai số thật:
+
+      1. `ma_gd` DUY NHẤT theo từng nguồn – tải lại cùng một file sao kê hai lần không được sinh bản ghi thứ
+         hai. Báo cáo ePass tháng 8/2026 có 2 bản ghi lặp hoàn toàn (218.920đ và 163.800đ); không lọc là
+         tính dư đúng bằng số đó.
+      2. Bản ghi trùng vẫn được GIỮ trong bảng thô để đối chiếu, chỉ loại ở tầng tính – nên có cột `trung`
+         thay vì xóa đi. Xóa mất là mất luôn khả năng chứng minh mình đã loại đúng cái gì.
+
+    Biển số ánh xạ sang xe qua LỊCH SỬ BIỂN SỐ theo thời điểm giao dịch, không theo biển hiện tại. Xe đổi
+    biển giữa kỳ mà tra theo biển hiện tại thì nửa đầu kỳ rơi mất khỏi xe – đúng ca 50F-046.92 đổi thành
+    50E-955.31 ngày 13/08/2026."""
+    __tablename__ = "fleet_external_txns"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[str] = mapped_column(String(20))                    # the_dau / epass
+    ma_gd: Mapped[str] = mapped_column(String(120))                    # mã giao dịch gốc của nhà cung cấp
+    tai_khoan: Mapped[str] = mapped_column(String(40), default="")     # số tài khoản/ví (chỉ lưu phần cần)
+    the_4so: Mapped[str] = mapped_column(String(8), default="")
+    bien_so: Mapped[str] = mapped_column(String(20), default="")
+    vehicle_id: Mapped[int | None] = mapped_column(ForeignKey("vehicles.id"), nullable=True)
+    trip_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_trips.id"), nullable=True)
+    thoi_diem: Mapped[datetime] = mapped_column(DateTime)
+    so_tien: Mapped[float] = mapped_column(Float, default=0)
+    lit: Mapped[float] = mapped_column(Float, default=0)
+    mo_ta: Mapped[str] = mapped_column(String(300), default="")
+    trung: Mapped[bool] = mapped_column(Boolean, default=False)        # bản ghi lặp: giữ lại, không tính
+    trung_cua_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    khop: Mapped[str] = mapped_column(String(20), default="chua_khop")  # chua_khop / da_khop / khong_khop
+    co: Mapped[str] = mapped_column(String(10), default="vang")
+    ghi_chu: Mapped[str] = mapped_column(String(300), default="")
+    imported_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    imported_by: Mapped[str] = mapped_column(String(50), default="")
