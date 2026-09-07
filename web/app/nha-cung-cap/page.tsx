@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -19,6 +20,7 @@ function NhaCungCap() {
   const [dm, setDm] = useState<any>(null);
   const [tours, setTours] = useState<any[]>([]);
   const [tab, setTab] = useState<"ncc" | "don" | "tk">("ncc");
+  const [tepNcc, setTepNcc] = useState("");   // mã NCC đang xem hồ sơ tệp
   const [form, setForm] = useState<any>(null);       // form hồ sơ NCC
   const [formTk, setFormTk] = useState<any>(null);   // form đề nghị đổi tài khoản
   const [formDon, setFormDon] = useState<any>(null); // form đặt dịch vụ
@@ -213,6 +215,18 @@ function NhaCungCap() {
           </tr>) : <tr><td colSpan={canWrite ? 10 : 9} className="muted">Chưa có đơn đặt dịch vụ nào.</td></tr>}</tbody></table>
       </div>
     </>}
+
+    {tab === "ncc" && <div className="panel">
+      <h2>Hồ sơ giấy tờ nhà cung cấp</h2>
+      <p className="muted">Giấy phép, hợp đồng nguyên tắc, xác nhận số tài khoản, ảnh phòng/xe — nhập mã nhà
+        cung cấp để xem và đính kèm. Ảnh chứng từ nằm ở đây thì lúc cần chứng minh một khoản chi không phải
+        đi lục Zalo của người đã nghỉ việc.</p>
+      <label>Mã nhà cung cấp
+        <input value={tepNcc} onChange={(e) => setTepNcc(e.target.value)} placeholder="VD: NCC0007" /></label>
+    </div>}
+    {tab === "ncc" && tepNcc.trim() &&
+      <DinhKem doiTuong="nha_cung_cap" doiTuongId={tepNcc.trim()} loai="hop_dong"
+               tieuDe={`Tệp của nhà cung cấp ${tepNcc.trim()}`} />}
 
     {tab === "tk" && <div className="panel wrap">
       <h2>Đề nghị đổi số tài khoản chờ xác nhận</h2>

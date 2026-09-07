@@ -179,9 +179,12 @@ MENU_ROLES = {
     # Nhà cung cấp & đặt dịch vụ: Điều hành đặt dịch vụ, Kế toán xác nhận đổi tài khoản. Khối Kinh doanh
     # không xem – đây là cơ cấu chi phí nhà cung cấp.
     "/nha-cung-cap": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
-    # Nạp dữ liệu: ai được ghi vào hệ thống bằng tệp thì cũng phải mở được màn hình này. Khối Kinh doanh
-    # không nạp – dữ liệu của họ vào qua booking, không qua tệp.
-    "/nap-du-lieu": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "hcns", "cntt"),
+    # Nạp dữ liệu: màn hình mở cho các phòng có dữ liệu để nạp, còn CHẶN THEO TỪNG BỘ NẠP nằm ở
+    # app/services/intake.VAI_TRO – mở được trang không có nghĩa là nạp được sổ của phòng khác.
+    "/nap-du-lieu": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + ("ketoan", "hcns", "cntt", "nv_mkt"),
+    # Tệp & hình ảnh: chứng từ đi kèm gần như mọi nghiệp vụ nên mở rộng; gỡ tệp thì hẹp hơn (xem API).
+    "/tep": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + ("ketoan", "hcns", "cntt", "nv_mkt", "nv_visa",
+                                                          "hanh_chinh"),
 
     # --- Hành chính & Nhân sự (tách quyền theo tab, xem HR_TAB_ROLES) ---
     "/hr": HR_TAB_ROLES["payroll"] + HR_TAB_ROLES["employees"] + HR_TAB_ROLES["incidents"],

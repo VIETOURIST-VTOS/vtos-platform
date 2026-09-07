@@ -13,3 +13,4 @@ from app.models.crm import *  # noqa
 from app.models.visa import *  # noqa
 from app.models.suppliers import *  # noqa
 from app.models.intake import *  # noqa
+from app.models.attachments import *  # noqa

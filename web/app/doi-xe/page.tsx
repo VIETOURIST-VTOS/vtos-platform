@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -121,6 +122,10 @@ function DoiXe() {
     </div>
 
     {tab === "chuyen" && <>
+      {form?.id && <DinhKem doiTuong="chuyen_xe" doiTuongId={form.id}
+        tieuDe={`Chứng từ của phiếu chuyến #${form.id}`}
+        goi={"Ảnh hóa đơn dầu, vé cầu đường, phiếu gửi xe, ảnh đồng hồ km. Chứng từ nằm cùng phiếu thì " +
+             "đến kỳ quyết toán không phải đi tìm, và người duyệt nhìn thấy đúng thứ họ đang duyệt."} />}
       {form && <div className="panel">
         <h2>{form.id ? `Sửa phiếu chuyến #${form.id}` : "Phiếu chi phí xe – nhập mới"}</h2>
         <p className="muted">Đúng bộ trường của phiếu trên Vietrip. Ô để trống nghĩa là <b>chưa có số</b>, không phải bằng 0 –

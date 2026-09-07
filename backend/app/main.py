@@ -30,6 +30,7 @@ from app.api.v1.ai_roles import router as ai_roles_router
 from app.api.v1.debts import router as debts_router
 from app.api.v1.suppliers import router as ncc_router
 from app.api.v1.intake import router as intake_router
+from app.api.v1.attachments import router as tep_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -126,6 +127,7 @@ app.include_router(ai_roles_router)
 app.include_router(debts_router)
 app.include_router(ncc_router)
 app.include_router(intake_router)
+app.include_router(tep_router)
 
 
 @app.get("/", include_in_schema=False)

@@ -1,0 +1,173 @@
+"""Kho tệp & hình ảnh dùng chung: chứng từ ảnh của mọi phòng ban.
+
+Năm cách một kho chứng từ trở nên vô dụng, và bộ test này chặn cả năm:
+
+  1. Nhận tệp chạy được – kho chứng từ biến thành kho phát tán.
+  2. Nhận tệp nặng tùy ý – một ảnh 40 MB tải lên giữa giờ cao điểm là đủ làm chậm cả hệ thống 512 MB.
+  3. Cùng một ảnh tạo hai bản ghi – người đọc hồ sơ phải đoán hai bản giống nhau khác nhau chỗ nào.
+  4. Xóa cứng – chứng từ biến mất không dấu vết, kiểm toán bế tắc.
+  5. Trả về nội dung không khớp mã băm – hồ sơ "gần đúng" tệ hơn hồ sơ báo lỗi.
+"""
+import os, sys, io
+os.environ["DATABASE_URL"] = "sqlite:///./test_tep.db"; os.environ["SEED_DEMO"] = "1"; os.environ["ENV"] = "dev"
+os.environ["VISA_DOC_DIR"] = "./test_tep_kho"
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+if os.path.exists("test_tep.db"): os.remove("test_tep.db")
+import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app); TOK = {}
+# PNG 1×1 thật, không phải chuỗi giả – để phần đoán loại nội dung chạy đúng như lúc người dùng tải ảnh lên.
+ANH = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a4944415478"
+                    "9c63000100000500010d0a2db40000000049454e44ae426082")
+
+
+def login(u):
+    if u not in TOK:
+        r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
+        assert r.status_code == 200, r.text
+        TOK[u] = r.json()["access_token"]
+    return {"Authorization": f"Bearer {TOK[u]}"}
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _startup():
+    with TestClient(app) as c:
+        global client; client = c; yield
+
+
+def tai(who, ten, data, doi_tuong="chuyen_xe", dtid="1", loai="chung_tu", kieu="image/png", **kw):
+    return client.post("/api/v1/tep", headers=login(who),
+                       files={"tep": (ten, io.BytesIO(data), kieu)},
+                       data={"doi_tuong": doi_tuong, "doi_tuong_id": dtid, "loai": loai, **kw})
+
+
+# ---------------------------------------------------------------- Cấu hình
+def test_cau_hinh_du_de_mot_tac_vu_ai_biet_gioi_han_truoc_khi_gui(_startup):
+    d = client.get("/api/v1/tep/cau-hinh", headers=login("ketoan")).json()
+    assert d["gioi_han_mb"] > 0 and "pdf" in d["duoi_nhan"] and "exe" in d["duoi_tu_choi"]
+    assert {x["ma"] for x in d["doi_tuong"]} >= {"chuyen_xe", "booking", "nhan_su", "hoa_don"}
+    assert all(x["phong_ban"] for x in d["doi_tuong"])
+    assert "kho_luu" in d and "durable" in d["kho_luu"]
+
+
+# ---------------------------------------------------------------- Nhận tệp
+def test_gan_anh_vao_chung_tu_va_doc_lai_dung_noi_dung(_startup):
+    r = tai("ketoan", "hoa_don_dau.png", ANH)
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["moi"] and d["la_anh"] and d["kich_thuoc"] == len(ANH)
+    assert d["ten_tep"] == "hoa_don_dau.png"
+    ve = client.get(f"/api/v1/tep/{d['id']}/tai", headers=login("ketoan"))
+    assert ve.status_code == 200 and ve.content == ANH
+
+
+def test_ten_tep_khong_phai_la_cho_luu(_startup):
+    """Lấy tên người dùng đặt làm đường dẫn là mở cửa cho tên tệp lạ ghi đè tệp của hồ sơ khác."""
+    from app.db.session import SessionLocal
+    from app.models.attachments import Attachment
+    from sqlalchemy import select
+    with SessionLocal() as db:
+        a = db.execute(select(Attachment).order_by(Attachment.id.desc())).scalars().first()
+        assert "hoa_don_dau.png" not in a.khoa_luu
+        assert a.checksum[:16] in a.khoa_luu and a.doi_tuong in a.khoa_luu
+
+
+def test_cung_mot_anh_gan_hai_lan_khong_tao_ban_thu_hai(_startup):
+    r = tai("ketoan", "ten_khac_hoan_toan.png", ANH)
+    assert r.status_code == 201 and r.json()["moi"] is False
+    assert "đã có trong hồ sơ" in r.json()["message"]
+    ds = client.get("/api/v1/tep?doi_tuong=chuyen_xe&doi_tuong_id=1", headers=login("ketoan")).json()
+    assert len(ds) == 1
+
+
+def test_cung_anh_nhung_khac_ho_so_thi_van_la_hai_ban(_startup):
+    """Cùng tấm ảnh gắn cho hai chứng từ khác nhau là hai lần đính kèm thật – không gộp."""
+    r = tai("ketoan", "hoa_don_dau.png", ANH, dtid="2")
+    assert r.status_code == 201 and r.json()["moi"] is True
+
+
+def test_tu_choi_tep_chay_duoc(_startup):
+    r = tai("ketoan", "chay_di.exe", b"MZ" + b"\0" * 100, kieu="application/octet-stream")
+    assert r.status_code == 422 and "không chứa tệp chạy được" in r.json()["detail"]
+
+
+def test_tu_choi_tep_qua_nang_va_noi_ro_bao_nhieu(_startup):
+    from app.services import attachments as AT
+    r = tai("ketoan", "to_qua.png", b"\0" * ((AT.GIOI_HAN_MB + 1) * 1024 * 1024))
+    assert r.status_code == 422 and "vượt mức cho phép" in r.json()["detail"]
+
+
+def test_tu_choi_duoi_la(_startup):
+    r = tai("ketoan", "du_lieu.sqlite", b"x" * 10, kieu="application/octet-stream")
+    assert r.status_code == 422 and "Nhận: ảnh" in r.json()["detail"]
+
+
+def test_khong_gan_vao_doi_tuong_khong_khai_bao(_startup):
+    r = tai("ketoan", "a.png", ANH, doi_tuong="linh_tinh")
+    assert r.status_code == 422 and "đối tượng hợp lệ" in r.json()["detail"]
+
+
+def test_thieu_ma_ban_ghi_thi_tu_choi(_startup):
+    r = tai("ketoan", "a.png", ANH, dtid="  ")
+    assert r.status_code == 422
+
+
+# ---------------------------------------------------------------- Thu hồi
+def test_go_tep_phai_ghi_ly_do_va_khong_xoa_cung(_startup):
+    r = tai("ketoan", "nham.png", ANH + b"khac", dtid="9")
+    aid = r.json()["id"]
+    assert client.post(f"/api/v1/tep/{aid}/thu-hoi", headers=login("ketoan"),
+                       json={"ly_do": ""}).status_code == 422
+    r2 = client.post(f"/api/v1/tep/{aid}/thu-hoi", headers=login("ketoan"),
+                     json={"ly_do": "Gắn nhầm sang chuyến khác"})
+    assert r2.status_code == 200 and r2.json()["thu_hoi"] is True
+    con = client.get("/api/v1/tep?doi_tuong=chuyen_xe&doi_tuong_id=9", headers=login("ketoan")).json()
+    assert con == []
+    ke_ca = client.get("/api/v1/tep?doi_tuong=chuyen_xe&doi_tuong_id=9&ke_ca_thu_hoi=true",
+                       headers=login("ketoan")).json()
+    assert len(ke_ca) == 1 and ke_ca[0]["ly_do_thu_hoi"] == "Gắn nhầm sang chuyến khác"
+    assert client.get(f"/api/v1/tep/{aid}/tai", headers=login("ketoan")).status_code == 200, \
+        "bản ghi thu hồi vẫn phải đọc lại được để đối chiếu"
+
+
+def test_gan_lai_tep_da_thu_hoi_thi_giu_dau_vet(_startup):
+    """Gắn lại không được xóa lịch sử: người đọc hồ sơ phải thấy tệp này từng bị gỡ và vì sao."""
+    r = tai("ketoan", "nham.png", ANH + b"khac", dtid="9")
+    assert r.status_code == 201 and r.json()["thu_hoi"] is False
+    assert "trước đó thu hồi vì" in r.json()["mo_ta"]
+
+
+def test_go_hai_lan_thi_bao_ra(_startup):
+    ds = client.get("/api/v1/tep?doi_tuong=chuyen_xe&doi_tuong_id=2", headers=login("ketoan")).json()
+    aid = ds[0]["id"]
+    assert client.post(f"/api/v1/tep/{aid}/thu-hoi", headers=login("ketoan"),
+                       json={"ly_do": "x"}).status_code == 200
+    assert client.post(f"/api/v1/tep/{aid}/thu-hoi", headers=login("ketoan"),
+                       json={"ly_do": "x"}).status_code == 422
+
+
+# ---------------------------------------------------------------- Toàn vẹn
+def test_noi_dung_bi_doi_thi_bao_loi_chu_khong_tra_ve(_startup):
+    """Trả về nội dung "gần đúng" cho một hồ sơ pháp lý tệ hơn hẳn việc báo lỗi rõ ràng."""
+    from app.db.session import SessionLocal
+    from app.models.attachments import Attachment
+    from app.services.storage import storage
+    from sqlalchemy import select
+    with SessionLocal() as db:
+        a = db.execute(select(Attachment).where(Attachment.doi_tuong_id == "1")).scalars().first()
+        storage().put(a.khoa_luu, b"noi dung da bi thay the", "image/png")
+        aid = a.id
+    r = client.get(f"/api/v1/tep/{aid}/tai", headers=login("ketoan"))
+    assert r.status_code == 503 and "không khớp mã kiểm tra" in r.json()["detail"]
+
+
+# ---------------------------------------------------------------- Phân quyền
+def test_go_tep_hep_hon_gan_tep(_startup):
+    """Ai cũng gắn được chứng từ vào hồ sơ mình xử lý; gỡ chứng từ ra thì không."""
+    r = tai("kd.hoa", "bien_lai.png", ANH + b"kd", doi_tuong="booking", dtid="1")
+    assert r.status_code == 201, r.text
+    aid = r.json()["id"]
+    assert client.post(f"/api/v1/tep/{aid}/thu-hoi", headers=login("kd.hoa"),
+                       json={"ly_do": "thử gỡ"}).status_code == 403

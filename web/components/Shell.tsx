@@ -63,7 +63,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Đổi mật khẩu", "/doi-mat-khau"]] },
   { key: "hethong", label: "10. Hệ thống & Tích hợp", items: [
     ["Cấu hình tổ chức", "/companies"], ["Tài khoản & phân quyền", "/access"], ["Vị trí AI & quyền hạn", "/ai-roles"],
-    ["Nạp dữ liệu", "/nap-du-lieu"], ["Đồng bộ Vietrip", "/vietrip"], ["Kết nối MISA và các kênh", "/accounting?tab=misa"],
+    ["Nạp dữ liệu", "/nap-du-lieu"], ["Tệp & hình ảnh", "/tep"], ["Đồng bộ Vietrip", "/vietrip"], ["Kết nối MISA và các kênh", "/accounting?tab=misa"],
     ["Lịch tự động hóa", ""], ["Nhật ký kỹ thuật", ""]] },
 ];
 
