@@ -68,7 +68,9 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
         u = None
         if e.user_id: u = db.get(User, e.user_id)
         if u is None: u = u_by_code.get(code) or u_by_name.get(name_key(name))
-        role = r.get("vai_tro") or DEPT_ROLE_DEFAULT.get(r["phong"], "")
+        # vai_tro RỖNG là quyết định "chưa cấp quyền", khác hẳn với vai_tro KHÔNG CÓ trong dòng dữ liệu
+        # (lúc đó mới suy theo phòng). Gộp hai trường hợp bằng "or" là lý do bảo vệ được suy thành hcns.
+        role = r["vai_tro"] if "vai_tro" in r else DEPT_ROLE_DEFAULT.get(r["phong"], "")
         if u is None and create_accounts and r["phong"] in ACCOUNT_DEPTS and role:
             base = name_key(name)[:24] or f"nv{code}"
             uname = base; n = 1
@@ -77,12 +79,17 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
             u = User(username=uname, full_name=name, role=role, department=r["phong"], password_hash=hash_password(code), active=True)
             db.add(u); db.flush(); stat["users_created"] += 1; u_by_name[name_key(name)] = u
         if u is not None:
-            dang_gan.add(u.id)
+            # Chỉ giữ tài khoản khi bảng lương ĐÃ ghi vai trò. Người có tên trong bảng lương nhưng chưa được
+            # lãnh đạo chỉ định vai trò (bảo vệ, pháp chế, quan hệ nhà đầu tư) thì khóa tài khoản chờ chỉ định:
+            # bản nạp trước để họ giữ nguyên vai trò cũ, và thế là ba bảo vệ đang có quyền Nhân sự Hành chính,
+            # tức là xem được bảng lương của cả công ty.
+            if role: dang_gan.add(u.id)
             if e.user_id != u.id: e.user_id = u.id; stat["users_linked"] += 1
             if role and u.role != role and u.role not in GIU_TAI_KHOAN:   # không hạ quyền tài khoản hệ thống
                 stat["roles_changed"].append(f"{u.username}: {ROLES.get(u.role, u.role)} → {ROLES.get(role, role)}"); u.role = role
             u.department, u.sales_group, u.staff_code = r["phong"], r.get("nhom", ""), code
-            u.full_name = name; u.active = True
+            u.full_name = name
+            if role: u.active = True      # mở lại tài khoản người quay lại bảng lương; chưa có vai trò thì để bước khóa xử lý
             if reset_passwords and u.role not in GIU_TAI_KHOAN:   # đặt lại mật khẩu = mã NV (tài khoản nạp từ Vietrip có mật khẩu ngẫu nhiên)
                 u.password_hash = hash_password(code); stat["passwords_reset"] += 1
     # nhân sự không còn trong danh sách chính thức → đánh dấu nghỉ (không xóa)

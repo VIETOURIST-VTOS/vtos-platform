@@ -94,3 +94,22 @@ def test_tai_khoan_trung_ten_bi_dong_du_ten_co_trong_bang_luong():
     r = client.post("/api/v1/employees/import-master", headers=login("phanngocduy", "290")).json()
     assert any("lethinh99" in x for x in r["users_closed"]), "bản trùng tên phải bị đóng"
     assert client.post("/api/v1/auth/login", data={"username": "lethinh", "password": "8"}).status_code == 200, "tài khoản thật của người đó vẫn dùng được"
+
+
+def test_nguoi_chua_duoc_chi_dinh_vai_tro_thi_khoa_tai_khoan():
+    """Bảo vệ, pháp chế, quan hệ nhà đầu tư có tên trong bảng lương nhưng chưa có vai trò VTOS.
+    Bản nạp trước giữ nguyên vai trò cũ của họ – kết quả là ba bảo vệ đang mang quyền Nhân sự Hành chính,
+    tức xem được bảng lương cả công ty. Chưa chỉ định vai trò thì khóa, không phải giữ quyền cũ."""
+    from app.db.session import SessionLocal
+    from app.models.core import User
+    from app.models.hr import Employee
+    from app.services import staff as STF
+    from sqlalchemy import select
+    db = SessionLocal(); STF.import_master(db); db.close()
+    db = SessionLocal()
+    e = db.execute(select(Employee).where(Employee.code == "15")).scalars().first()   # Vũ Văn Vinh – bảo vệ
+    assert e is not None and e.active, "bảo vệ vẫn là nhân sự đang làm việc"
+    u = db.get(User, e.user_id) if e.user_id else None
+    assert u is None or u.active is False, "chưa có vai trò thì không được giữ tài khoản đang hoạt động"
+    if u is not None: assert u.role == "hcns", "vai trò cũ giữ nguyên để truy lại lịch sử, chỉ khóa đăng nhập"
+    db.close()
