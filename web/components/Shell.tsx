@@ -33,7 +33,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Booking & bảo lưu", "/bookings?mang=doan"],
     ["Báo giá đoàn", ""], ["Hợp đồng", ""], ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
   { key: "dieuhanh", label: "5. Điều hành", items: [
-    ["Yêu cầu chờ xử lý", "/requests"], ["Chuyến tour & dự toán", "/tours"], ["Nhà cung cấp & đặt dịch vụ", ""],
+    ["Yêu cầu chờ xử lý", "/requests"], ["Chuyến tour & dự toán", "/tours"], ["Nhà cung cấp & đặt dịch vụ", "/nha-cung-cap"],
     ["Hồ sơ visa", "/visa"],
     ["Sự cố tour", ""], ["Quyết toán tour", "/tours"]] },
   // Xe và hướng dẫn viên tách khỏi Điều hành thành đơn vị riêng (chỉ đạo 07/9/2026). Xe nội bộ thuộc pháp nhân

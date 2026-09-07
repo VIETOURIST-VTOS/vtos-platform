@@ -158,13 +158,21 @@ function DoiXe() {
         </div>
       </div>}
 
+      {chuyen.some((t: any) => t.nguon === "bao_cao_vietrip") && <div className="panel" style={{ borderColor: "var(--orange)" }}>
+        <b>Dữ liệu đối chiếu – CHƯA CHÍNH THỨC.</b>
+        <p className="muted">{chuyen.filter((t: any) => t.nguon === "bao_cao_vietrip").length} phiếu trong danh sách dưới
+          đây nạp từ báo cáo quyết toán xe của Vietrip để đối chiếu và chạy thử. Số liệu chính thức là phiếu do
+          người phụ trách nhập và xác nhận trên VTOS. Đừng lấy các con số này để báo cáo hay quyết toán khi
+          chưa được rà lại.</p>
+      </div>}
       <div className="panel wrap"><h2>Nhật trình chuyến</h2>
       <p className="muted">Km để trống nghĩa là <b>chưa đo</b>, không phải bằng 0. Cột &quot;Vietourist tạm ứng&quot; và &quot;Chủ xe chịu&quot; tách theo quy tắc chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe.</p>
       {canNhap && !form && <button className="act teal" style={{ marginBottom: 10 }}
         onClick={() => setForm({ ngay_di: "", ngay_ve: "" })}>+ Nhập phiếu chi phí xe</button>}
       <table><thead><tr><th>Phiếu</th><th>Xe</th><th>Tour</th><th>Đi → về</th><th>Km chạy</th><th>Doanh thu</th><th>VTS tạm ứng</th><th>Chủ xe chịu</th><th>Cờ</th>{canNhap && <th></th>}</tr></thead>
         <tbody>{chuyen.length ? chuyen.map((t) => <tr key={t.id}>
-          <td className="muted">{t.ma_phieu || `#${t.id}`}</td>
+          <td className="muted">{t.ma_phieu || `#${t.id}`}
+            {t.nguon === "bao_cao_vietrip" && <div><Tag cls="warn">dữ liệu thử</Tag></div>}</td>
           <td>{t.xe}</td><td>{t.ten_tour || <span className="muted">—</span>}</td>
           <td>{fmtD(t.ngay_di)} → {fmtD(t.ngay_ve)} <span className="muted">({t.so_ngay} ngày)</span></td>
           <td className="num">{t.km_chay === null ? <span className="muted">chưa đo</span> : t.km_chay.toLocaleString("vi-VN")}</td>
@@ -224,6 +232,12 @@ function DoiXe() {
         <button className="act teal" disabled={dangLuu} onClick={luuDeXuat}>{dangLuu ? "Đang lưu…" : "Lập đề xuất"}</button>
         <button className="act grey" onClick={() => setFormDX(null)}>Đóng</button>
       </div>
+    </div>}
+
+    {tab === "giaodich" && gd?.rows?.some((r: any) => r.source === "de_xuat_vietrip") && <div className="panel" style={{ borderColor: "var(--orange)" }}>
+      <b>Dữ liệu đối chiếu – CHƯA CHÍNH THỨC.</b>
+      <p className="muted">Các dòng nguồn &quot;Đề xuất chi trên phần mềm Vietrip&quot; là bản trích để đối chiếu và
+        chạy thử, không phải sổ chi phí đã duyệt của VTOS.</p>
     </div>}
 
     {tab === "giaodich" && gd && <div className="panel wrap"><h2>Đối soát dữ liệu nguồn ngoài</h2>
