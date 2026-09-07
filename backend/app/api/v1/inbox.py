@@ -145,3 +145,20 @@ def check(u: User = Depends(require_roles("cntt", "ptgd_mkt", "gd_kd", "tp_kd", 
 @router.post("/robot/inbox/check", dependencies=[Depends(robot_auth)])
 def robot_check(db: Session = Depends(get_db)):
     return IB.robot_check(db)
+
+
+@router.get("/inbox/tin-trung/kiem")
+def kiem_tin_trung(u: User = Depends(require_roles("cntt", "chutich", "tgd", "bks")), db: Session = Depends(get_db)):
+    """Đếm tin nhắn bị chèn lặp. Chỉ đọc."""
+    return IB.tin_trung(db, xoa=False)
+
+
+@router.post("/inbox/tin-trung/don")
+def don_tin_trung(u: User = Depends(require_roles("cntt", "chutich", "tgd")), db: Session = Depends(get_db)):
+    """Xoá bản trùng, giữ bản đầu tiên của mỗi nhóm. Ghi nhật ký kiểm toán."""
+    truoc = IB.tin_trung(db, xoa=False)
+    kq = IB.tin_trung(db, xoa=True)
+    R.audit(db, u.username, u.role, "don_tin_nhan_trung", "inbox",
+            before={"tong_tin": truoc["tong_tin"]}, after={"da_xoa": kq["da_xoa"], "con_lai": kq["tong_tin"] - kq["da_xoa"]})
+    db.commit()
+    return kq

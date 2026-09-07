@@ -46,9 +46,16 @@ STALE_MINUTES = 120   # tin cũ hơn 2 giờ (nạp bù từ Graph) không tính
 
 def inbound(db: Session, channel: str, external_id: str, text: str, page_id: str = "", name: str = "", ext_msg_id: str = "", attachments: list | None = None, at: datetime | None = None) -> Message:
     c = get_or_create(db, channel, external_id, page_id, name)
-    if ext_msg_id and db.execute(select(Message).where(Message.external_id == ext_msg_id)).scalars().first(): return None
-    m = Message(conversation_id=c.id, direction="in", sender="khach", sender_name=c.customer_name, text=(text or "")[:4000], attachments=attachments or [], external_id=ext_msg_id[:80])
-    if at: m.created_at = at
+    # So bằng ĐÚNG chuỗi đã lưu. Cột external_id chỉ 80 ký tự nên lúc ghi bị cắt bằng [:80], còn lúc
+    # kiểm trùng lại so với chuỗi ĐẦY ĐỦ – mid của Facebook dài hơn 80 nên không bao giờ khớp, và mỗi
+    # lượt kéo bù lại chèn thêm một bản của toàn bộ lịch sử hội thoại. Đây là lý do bảng messages có
+    # 117.208 dòng cho khoảng 1.500 tin thật.
+    ext = (ext_msg_id or "")[:80]
+    if ext and db.execute(select(Message).where(Message.external_id == ext)).scalars().first(): return None
+    m = Message(conversation_id=c.id, direction="in", sender="khach", sender_name=c.customer_name, text=(text or "")[:4000], attachments=attachments or [], external_id=ext)
+    # Cột thời điểm của tin nhắn tên là `at`, không phải `created_at`. Gán nhầm tên thì Python tạo một
+    # thuộc tính rời, không vào CSDL, nên mọi tin lịch sử kéo bù đều mang dấu thời gian "lúc nạp".
+    if at: m.at = at
     db.add(m); now = datetime.now(); when = at or now
     if c.last_in_at is None or when >= c.last_in_at:
         c.last_in_at = when
@@ -171,10 +178,11 @@ def outbound_external(db: Session, channel: str, external_id: str, text: str, pa
     """Tin do Page gửi qua công cụ khác (chatbot, Fanpage inbox, app khác) – echo/standby: ghi nhận là đã trả lời để SLA không báo sai."""
     c = db.execute(select(Conversation).where(Conversation.channel == channel, Conversation.external_id == external_id)).scalars().first()
     if not c: return None
-    if ext_msg_id and db.execute(select(Message).where(Message.external_id == ext_msg_id)).scalars().first(): return None
+    ext = (ext_msg_id or "")[:80]      # xem ghi chú ở inbound(): phải so đúng chuỗi đã lưu
+    if ext and db.execute(select(Message).where(Message.external_id == ext)).scalars().first(): return None
     who = "chatbot/app khác" if app_id and app_id != str(settings.FB_APP_ID or "") else "Page (ngoài VTOS)"
-    m = Message(conversation_id=c.id, direction="out", sender="sale", sender_name=who, text=(text or "")[:4000], status="da_gui", external_id=ext_msg_id[:80])
-    if at: m.created_at = at
+    m = Message(conversation_id=c.id, direction="out", sender="sale", sender_name=who, text=(text or "")[:4000], status="da_gui", external_id=ext)
+    if at: m.at = at
     db.add(m); when = at or datetime.now()
     if c.last_out_at is None or when >= c.last_out_at: c.last_out_at = when
     if c.last_in_at is None or when >= c.last_in_at:   # Page trả lời sau tin khách → đã trả lời
@@ -379,3 +387,36 @@ def conv_out(c: Conversation, db: Session | None = None) -> dict:
 
 def msg_out(m: Message) -> dict:
     return {"id": m.id, "direction": m.direction, "sender": m.sender, "sender_name": m.sender_name, "text": m.text, "attachments": m.attachments, "status": m.status, "response": m.response[:200], "ai_review": m.ai_review, "at": m.at}
+
+
+# ---------- dọn tin nhắn trùng ----------
+def tin_trung(db: Session, xoa: bool = False) -> dict:
+    """Đếm và (khi được yêu cầu) xoá tin nhắn bị chèn lặp bởi lỗi kiểm trùng của vòng kéo bù Facebook.
+
+    Giữ lại BẢN ĐẦU TIÊN của mỗi nhóm (id nhỏ nhất) – bản đó là bản có mặt sớm nhất, và mọi bản sau chỉ
+    là chính nó được chèn lại. Nhóm theo hội thoại + chiều + nội dung: không dùng external_id làm khoá
+    nhóm được, vì chính chỗ đó là nơi hỏng.
+
+    Mặc định CHỈ ĐẾM. Muốn xoá phải gọi lại với xoa=True – xoá tin của khách là việc không lùi lại được.
+    """
+    from sqlalchemy import func as _f, delete as _del
+    q = (select(Message.conversation_id, Message.direction, Message.text,
+                _f.count().label("n"), _f.min(Message.id).label("giu"))
+         .group_by(Message.conversation_id, Message.direction, Message.text)
+         .having(_f.count() > 1))
+    nhom = db.execute(q).all()
+    thua = sum(int(r.n) - 1 for r in nhom)
+    tong = db.execute(select(_f.count()).select_from(Message)).scalar() or 0
+    kq = {"tong_tin": int(tong), "so_nhom_trung": len(nhom), "so_ban_thua": thua,
+          "con_lai_sau_khi_don": int(tong) - thua, "da_xoa": 0,
+          "message": f"{thua:,} bản thừa trên tổng {tong:,} tin – còn lại {int(tong)-thua:,} tin thật"}
+    if not xoa: return kq
+    n = 0
+    for r in nhom:      # xoá theo từng nhóm: một câu lệnh cho mỗi nhóm, không nạp tin vào bộ nhớ
+        res = db.execute(_del(Message).where(Message.conversation_id == r.conversation_id,
+                                             Message.direction == r.direction,
+                                             Message.text == r.text, Message.id != r.giu))
+        n += res.rowcount or 0
+    db.commit()
+    kq["da_xoa"] = n; kq["message"] = f"Đã xoá {n:,} bản trùng, giữ lại bản đầu tiên của mỗi nhóm"
+    return kq
