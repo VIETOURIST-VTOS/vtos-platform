@@ -16,6 +16,7 @@ class FinContract(Base):
     code: Mapped[str] = mapped_column(String(30), unique=True)             # HD2609-0001
     kind: Mapped[str] = mapped_column(String(20))
     entity: Mapped[str] = mapped_column(String(80), default="Công ty mẹ")    # pháp nhân: Công ty mẹ / Vietrip
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)   # pháp nhân vay – dùng cho hợp nhất, cột entity ở trên giữ nguyên văn hồ sơ
     partner: Mapped[str] = mapped_column(String(160))                       # ngân hàng / đối tác
     contract_no: Mapped[str] = mapped_column(String(80), default="")
     signed_on: Mapped[date | None] = mapped_column(Date, nullable=True)

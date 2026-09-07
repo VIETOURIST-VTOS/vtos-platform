@@ -21,6 +21,7 @@ function Finance() {
   const [cs, setCs] = useState<any[]>([]);
   const [meta, setMeta] = useState<any>({ kinds: {} });
   const [plan, setPlan] = useState<any[]>([]);
+  const [vx, setVx] = useState<any>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [f, setF] = useState<any>({ kind: "vay", entity: "Công ty mẹ", partner: "", contract_no: "", principal: "", interest_rate: "", maturity: "", collateral: "", purpose: "", owner: "", approval_ref: "", related_party: false, months: "", first_due: "" });
   const [fp, setFp] = useState<any>({ due_date: today(), direction: "out", category: "luong", description: "", amount: "", recurring_monthly: true });
@@ -29,6 +30,7 @@ function Finance() {
     if (tab === "forecast") { api("/fin/forecast").then(setFc).catch((e) => toast(errMsg(e), true)); api("/fin/plan").then(setPlan); }
     if (tab === "contracts") api("/fin/contracts").then(setCs);
     if (tab === "weekly") api("/fin/weekly").then(setWk);
+    if (tab === "vayxe") api("/fin/vay-xe").then(setVx).catch((e) => toast(errMsg(e), true));
   }, [tab]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any, method = "POST") => { try { const r = await api(path, { method, json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
@@ -38,7 +40,7 @@ function Finance() {
   return (<>
     <h1>Ngân quỹ – Tài chính: dự báo 13 tuần, vay, đầu tư &amp; hợp tác (mục 3.9)</h1>
     <p className="muted">Dự báo dòng tiền lấy tự động từ: booking còn phải thu (dự kiến thu trước khởi hành 7 ngày), đề nghị chi & dự toán tour sắp chạy, lịch trả gốc/lãi từng khế ước, lịch thu hồi hợp tác/ký quỹ/cọc/cho vay, bảng lương gần nhất và các khoản Kế toán nhập (thuế, thuê văn phòng…). Cảnh báo khi số dư dự kiến âm hoặc dưới ngưỡng tối thiểu.</p>
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{[["forecast", "Dự báo 13 tuần"], ["contracts", "Hợp đồng vay & đầu tư"], ["weekly", "Báo cáo tài chính tuần"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{[["forecast", "Dự báo 13 tuần"], ["contracts", "Hợp đồng vay & đầu tư"], ["weekly", "Báo cáo tài chính tuần"], ["vayxe", "Vay & thế chấp xe"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
 
     {tab === "forecast" && fc && <>
       <div className="kpis"><div className="kpi"><b>{vnd(fc.opening)}</b><span>Tiền hiện có (111+112)</span></div><div className="kpi"><b style={{ color: fc.closing < 0 ? "var(--red)" : undefined }}>{vnd(fc.closing)}</b><span>Số dư dự kiến cuối tuần 13</span></div><div className="kpi"><b>{vnd(fc.min_cash)}</b><span>Ngưỡng tối thiểu (tham số)</span></div><div className="kpi"><b style={{ color: fc.alerts.length ? "var(--red)" : undefined }}>{fc.alerts.length}</b><span>Tuần cảnh báo</span></div></div>
@@ -100,6 +102,42 @@ function Finance() {
       <h2>Danh mục đầu tư – hợp tác (báo cáo HĐQT)</h2>
       <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Loại</th><th>Đối tác</th><th style={{ textAlign: "right" }}>Giá trị</th><th style={{ textAlign: "right" }}>Còn lại</th><th>Hạn thu hồi</th><th>NQ HĐQT</th><th>Phụ trách</th><th>Trạng thái</th></tr></thead><tbody>{wk.investments.map((c: any) => <tr key={c.code}><td>{c.code}</td><td>{c.kind}{c.related_party && <Tag cls="warn">GDLK</Tag>}</td><td>{c.partner}</td><td style={{ textAlign: "right" }}>{vnd(c.principal)}</td><td style={{ textAlign: "right" }}>{vnd(c.outstanding)}</td><td>{fmtD(c.maturity)}</td><td className="muted">{c.approval_ref}</td><td>{c.owner}</td><td><Tag cls={c.status === "qua_han" ? "red" : "ok"}>{c.status}</Tag></td></tr>)}</tbody></table></div>
       <p className="muted">Nội dung báo cáo tài chính hằng tuần cho Chủ tịch, TGĐ, KTT, BKS theo mục 6.6 Thiết kế v1.7 (số dư, vay, hạn 4 tuần, tuổi nợ, tiến độ thu hồi, 335/154 tồn đọng). Số dư đầu kỳ các khoản đầu tư nhập từ BCTC kiểm toán 2025 khi cắt chuyển.</p>
+    </>}
+
+    {tab === "vayxe" && vx && <>
+      <div className="kpis">
+        <div className="kpi"><b>{vnd(vx.tong_du_no)}</b><span>Tổng dư nợ vay có tài sản là xe</span></div>
+        <div className="kpi"><b>{vnd(vx.tong_lai_thang)}</b><span>Lãi phải trả mỗi tháng</span></div>
+        <div className="kpi"><b style={{ color: vx.canh_bao.filter((c: any) => c.muc === "gap" || c.muc === "qua_han").length ? "var(--red)" : undefined }}>{vx.canh_bao.filter((c: any) => c.muc === "gap" || c.muc === "qua_han").length}</b><span>Việc gấp</span></div>
+        <div className="kpi"><b style={{ color: vx.thieu_ho_so.length ? "var(--orange)" : undefined }}>{vx.thieu_ho_so.length}</b><span>Xe chưa rõ thuộc khế ước nào</span></div>
+      </div>
+      {vx.canh_bao.length > 0 && <div className="panel wrap"><h2>Việc phải xử lý</h2><table><thead><tr><th>Mức</th><th>Nội dung</th><th>Việc phải làm</th></tr></thead><tbody>
+        {vx.canh_bao.map((c: any, i: number) => <tr key={i}>
+          <td><Tag cls={c.muc === "gap" || c.muc === "qua_han" ? "red" : c.muc === "thieu_du_lieu" ? "warn" : "warn"}>{c.muc === "gap" ? "GẤP" : c.muc === "qua_han" ? "QUÁ HẠN" : c.muc === "thieu_du_lieu" ? "THIẾU DỮ LIỆU" : "SỚM"}</Tag></td>
+          <td>{c.noi_dung}</td><td className="muted">{c.viec}</td></tr>)}
+      </tbody></table></div>}
+      <h2>Khế ước – số liệu không trùng, dùng bảng này để cộng tổng</h2>
+      <div className="panel wrap"><table><thead><tr><th>Mã / Hợp đồng</th><th>Ngân hàng</th><th>Pháp nhân</th><th style={{ textAlign: "right" }}>Dư nợ</th><th style={{ textAlign: "right" }}>Lãi/năm</th><th style={{ textAlign: "right" }}>Lãi/tháng</th><th>Đáo hạn</th><th>Xe thế chấp</th></tr></thead><tbody>
+        {vx.ke_uoc.map((k: any) => <tr key={k.id}>
+          <td>{k.contract_no || k.code}<div className="muted">{k.code}</div></td><td>{k.partner}</td><td>{k.company || k.entity}</td>
+          <td style={{ textAlign: "right" }}>{vnd(k.du_no)}</td><td style={{ textAlign: "right" }}>{k.lai_suat}%</td><td style={{ textAlign: "right" }}>{vnd(k.lai_thang)}</td>
+          <td>{k.maturity ? <>{fmtD(k.maturity)}{k.con_ngay !== null && <div className={k.con_ngay <= 30 ? "" : "muted"} style={{ color: k.con_ngay <= 30 ? "var(--red)" : undefined }}>{k.con_ngay < 0 ? `quá ${-k.con_ngay} ngày` : `còn ${k.con_ngay} ngày`}</div>}</> : <Tag cls="warn">chưa có ngày</Tag>}</td>
+          <td>{k.xe_the_chap.join(" · ") || <span className="muted">chưa gắn xe</span>}{k.xe_da_giai_chap.length > 0 && <div className="muted">đã giải chấp: {k.xe_da_giai_chap.join(" · ")}</div>}</td></tr>)}
+        <tr><td colSpan={3}><b>TỔNG</b></td><td style={{ textAlign: "right" }}><b>{vnd(vx.tong_du_no)}</b></td><td></td><td style={{ textAlign: "right" }}><b>{vnd(vx.tong_lai_thang)}</b></td><td colSpan={2}></td></tr>
+      </tbody></table></div>
+      <h2>Tách theo pháp nhân</h2>
+      <div className="panel wrap"><table><thead><tr><th>Pháp nhân</th><th style={{ textAlign: "right" }}>Số khế ước</th><th style={{ textAlign: "right" }}>Dư nợ</th><th style={{ textAlign: "right" }}>Lãi/tháng</th></tr></thead><tbody>
+        {Object.entries(vx.theo_phap_nhan).map(([ten, t]: any) => <tr key={ten}><td>{ten}</td><td style={{ textAlign: "right" }}>{t.so_khe_uoc}</td><td style={{ textAlign: "right" }}>{vnd(t.du_no)}</td><td style={{ textAlign: "right" }}>{vnd(t.lai_thang)}</td></tr>)}
+      </tbody></table></div>
+      <h2>Từng xe gắn với khế ước nào</h2>
+      <div className="panel wrap"><table><thead><tr><th>Biển số</th><th>Pháp nhân</th><th>Vòng đời</th><th>Khế ước</th><th style={{ textAlign: "right" }}>Dư nợ phân bổ/xe (tham khảo)</th></tr></thead><tbody>
+        {vx.xe.filter((x: any) => x.active || x.khe_uoc.length).map((x: any) => <tr key={x.id}>
+          <td>{x.plate}</td><td>{x.phap_nhan || <span className="muted">—</span>}</td>
+          <td>{x.lifecycle !== "dang_khai_thac" ? <Tag cls="warn">{x.lifecycle}</Tag> : <span className="muted">đang khai thác</span>}</td>
+          <td>{x.khe_uoc.length ? x.khe_uoc.map((k: any) => <div key={k.collateral_id}>{k.contract_no || k.code} · {k.partner} <span className="muted">(gói {k.so_xe_trong_goi} xe)</span></div>) : <Tag cls="warn">chưa xác định</Tag>}</td>
+          <td style={{ textAlign: "right" }}>{x.khe_uoc.length ? vnd(x.khe_uoc.reduce((s: number, k: any) => s + k.du_no_phan_bo, 0)) : ""}</td></tr>)}
+      </tbody></table></div>
+      <p className="muted">Cột &quot;dư nợ phân bổ/xe&quot; chỉ để tham khảo – chia đều dư nợ khế ước cho số xe trong gói. Đây KHÔNG phải nghĩa vụ riêng của từng xe: ngân hàng nắm cả gói, giải chấp một xe phải thoả thuận riêng với ngân hàng. Xe không xuất hiện trong tài sản bảo đảm của khế ước nào KHÔNG có nghĩa là đã được giải chấp – phải có văn bản của ngân hàng mới ghi nhận giải chấp.</p>
     </>}
   </>);
 }

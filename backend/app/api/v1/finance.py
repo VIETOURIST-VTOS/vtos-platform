@@ -17,7 +17,7 @@ WRITE = ("ketoan",)
 
 
 def c_out(c: FinContract) -> dict:
-    return {"id": c.id, "code": c.code, "kind": c.kind, "kind_name": CONTRACT_KINDS.get(c.kind, c.kind), "entity": c.entity, "partner": c.partner, "contract_no": c.contract_no,
+    return {"id": c.id, "code": c.code, "kind": c.kind, "kind_name": CONTRACT_KINDS.get(c.kind, c.kind), "entity": c.entity, "company_id": c.company_id, "partner": c.partner, "contract_no": c.contract_no,
             "signed_on": c.signed_on, "principal": c.principal, "outstanding": c.outstanding, "interest_rate": c.interest_rate, "maturity": c.maturity, "collateral": c.collateral,
             "purpose": c.purpose, "owner": c.owner, "approval_ref": c.approval_ref, "related_party": c.related_party, "status": c.status, "note": c.note,
             "schedule": [{"id": s.id, "due_date": s.due_date, "kind": s.kind, "amount": s.amount, "status": s.status, "done_on": s.done_on, "bank_ref": s.bank_ref} for s in c.schedule]}
@@ -37,6 +37,7 @@ def contracts(u: User = Depends(require_roles(*READ)), db: Session = Depends(get
 class ContractIn(BaseModel):
     kind: str
     entity: str = "Công ty mẹ"
+    company_id: int | None = None
     partner: str
     contract_no: str = ""
     signed_on: date | None = None
@@ -135,3 +136,9 @@ def plan_del(pid: int, u: User = Depends(require_roles(*WRITE)), db: Session = D
     i = db.get(CashPlanItem, pid)
     if i: db.delete(i); db.commit()
     return {"message": "Đã xóa"}
+
+
+@router.get("/fin/vay-xe")
+def vay_xe(u: User = Depends(require_roles(*READ, "tp_dh")), db: Session = Depends(get_db)):
+    """Bản đồ khế ước vay ↔ xe thế chấp, cảnh báo đáo hạn và xe đã ra khỏi đội nhưng còn thế chấp."""
+    return F.vay_xe(db)

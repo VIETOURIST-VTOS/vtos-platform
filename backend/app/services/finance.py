@@ -166,3 +166,95 @@ def weekly_finance(db: Session) -> dict:
             "investments_total": sum(c.outstanding for c in invest),
             "wip_154": b.get("154", 0.0), "accrued_335": -b.get("335", 0.0),
             "overdue": [{"contract": s.contract.code, "partner": s.contract.partner, "kind": s.kind, "date": s.due_date, "amount": s.amount} for s in db.execute(select(FinSchedule).where(FinSchedule.status == "qua_han")).scalars()]}
+
+
+# ---------- Bản đồ vay – tài sản thế chấp là xe (hồ sơ khế ước 12 xe, 07/9/2026) ----------
+# Ba câu hỏi phải trả lời được ngay, vì mỗi câu là một rủi ro có thật trong hồ sơ hiện tại:
+#   1. Chiếc xe đã bán/đã giao có còn nằm trong tài sản bảo đảm của khế ước nào không?
+#   2. Khế ước nào sắp đáo hạn, khế ước nào hồ sơ không ghi ngày đáo hạn?
+#   3. Xe đang khai thác nào không xuất hiện trong bất kỳ tài sản bảo đảm nào – đã giải chấp hay thiếu hồ sơ?
+# Câu 3 cố tình KHÔNG kết luận "đã giải chấp": không thấy trong danh sách không có nghĩa là đã được rút ra.
+def _muc_do(con_ngay):
+    if con_ngay is None: return "thieu_du_lieu"
+    if con_ngay < 0: return "qua_han"
+    if con_ngay <= 30: return "gap"
+    if con_ngay <= 120: return "theo_doi"
+    return "binh_thuong"
+
+
+def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
+    from app.models.fleet import Collateral
+    from app.models.hr import Vehicle
+    from app.models.core import Company
+    today = hom_nay or date.today()
+    cty = {c.id: c.name for c in db.execute(select(Company)).scalars()}
+    xe = {v.id: v for v in db.execute(select(Vehicle)).scalars()}
+    loans = list(db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars())
+    tc = list(db.execute(select(Collateral)).scalars())
+    theo_ke_uoc: dict[int, list] = {}
+    for c in tc: theo_ke_uoc.setdefault(c.contract_id, []).append(c)
+
+    ke_uoc, canh_bao, gan_xe = [], [], {}
+    for c in loans:
+        rows = [t for t in theo_ke_uoc.get(c.id, []) if t.den_ngay is None]
+        da_giai = [t for t in theo_ke_uoc.get(c.id, []) if t.den_ngay is not None]
+        lai_thang = round(c.outstanding * (c.interest_rate / 100) / 12) if c.interest_rate else 0
+        con = (c.maturity - today).days if c.maturity else None
+        # Dư nợ phân bổ cho từng xe chỉ để tham khảo: ngân hàng nắm CẢ GÓI, giải chấp một xe
+        # phải thoả thuận riêng, nên con số này không phải nghĩa vụ riêng của chiếc xe đó.
+        pb = round(c.outstanding / len(rows)) if rows else 0
+        for t in rows:
+            gan_xe.setdefault(t.vehicle_id, []).append({"contract_id": c.id, "code": c.code, "contract_no": c.contract_no, "partner": c.partner,
+                                                        "du_no": c.outstanding, "so_xe_trong_goi": len(rows), "du_no_phan_bo": pb,
+                                                        "lai_thang_phan_bo": round(lai_thang / len(rows)) if rows else 0,
+                                                        "collateral_id": t.id, "maturity": c.maturity})
+        ke_uoc.append({"id": c.id, "code": c.code, "contract_no": c.contract_no, "partner": c.partner, "entity": c.entity,
+                       "company": cty.get(c.company_id, "") if getattr(c, "company_id", None) else c.entity,
+                       "du_no": c.outstanding, "lai_suat": c.interest_rate, "lai_thang": lai_thang,
+                       "maturity": c.maturity, "con_ngay": con, "muc_do": _muc_do(con),
+                       "xe_the_chap": [xe[t.vehicle_id].plate for t in rows if t.vehicle_id in xe],
+                       "xe_da_giai_chap": [xe[t.vehicle_id].plate for t in da_giai if t.vehicle_id in xe],
+                       "collateral": c.collateral, "status": c.status})
+        if con is not None and con <= 30:
+            canh_bao.append({"muc": "gap", "loai": "dao_han", "khe_uoc": c.code,
+                             "noi_dung": f"Khế ước {c.contract_no or c.code} ({c.partner}) dư nợ {c.outstanding:,.0f}đ đáo hạn {c.maturity:%d/%m/%Y}"
+                                         + (f" – còn {con} ngày" if con >= 0 else f" – ĐÃ QUÁ HẠN {-con} ngày"),
+                             "viec": "Chuẩn bị nguồn tất toán hoặc hồ sơ gia hạn"})
+        if not c.maturity:
+            canh_bao.append({"muc": "thieu_du_lieu", "loai": "thieu_ngay_dao_han", "khe_uoc": c.code,
+                             "noi_dung": f"Khế ước {c.contract_no or c.code} ({c.partner}) dư nợ {c.outstanding:,.0f}đ không có ngày đáo hạn trong hồ sơ",
+                             "viec": "Đề nghị ngân hàng xác nhận lịch trả nợ và ngày đáo hạn"})
+
+    # Xe đã bán / thanh lý / dừng khai thác mà vẫn còn là tài sản bảo đảm – rủi ro cao nhất.
+    for vid, ds in gan_xe.items():
+        v = xe.get(vid)
+        if v is None: continue
+        if v.lifecycle and v.lifecycle != "dang_khai_thac":
+            for g in ds:
+                canh_bao.append({"muc": "gap", "loai": "xe_da_ra_khoi_doi_van_the_chap", "khe_uoc": g["code"], "xe": v.plate,
+                                 "noi_dung": f"Xe {v.plate} trạng thái '{v.lifecycle}' nhưng vẫn là tài sản bảo đảm của khế ước {g['contract_no'] or g['code']} ({g['partner']}, dư nợ {g['du_no']:,.0f}đ)",
+                                 "viec": "Xin văn bản giải chấp riêng của ngân hàng trước khi sang tên, hoặc tất toán khế ước"})
+
+    # Xe đang khai thác không gắn khế ước nào.
+    thieu_ho_so = [{"xe": v.plate, "id": v.id, "phap_nhan": cty.get(v.company_id, ""), "doi_xe": getattr(v, "code", "")}
+                   for v in xe.values() if v.active and (not v.lifecycle or v.lifecycle == "dang_khai_thac") and v.id not in gan_xe]
+    if thieu_ho_so:
+        canh_bao.append({"muc": "som", "loai": "xe_khong_thuoc_khe_uoc_nao",
+                         "noi_dung": f"{len(thieu_ho_so)} xe đang khai thác không xuất hiện trong tài sản bảo đảm của bất kỳ khế ước nào: "
+                                     + ", ".join(x["xe"] for x in thieu_ho_so[:12]),
+                         "viec": "Rà soát: đã giải chấp thật (có văn bản) hay chỉ là thiếu hồ sơ. Không thấy trong danh sách KHÔNG có nghĩa là đã được rút khỏi tài sản bảo đảm"})
+
+    theo_phap_nhan: dict[str, dict] = {}
+    for k in ke_uoc:
+        t = theo_phap_nhan.setdefault(k["company"] or k["entity"] or "Chưa gán pháp nhân", {"so_khe_uoc": 0, "du_no": 0.0, "lai_thang": 0.0})
+        t["so_khe_uoc"] += 1; t["du_no"] += k["du_no"]; t["lai_thang"] += k["lai_thang"]
+
+    thu_tu = {"qua_han": 0, "gap": 1, "thieu_du_lieu": 2, "som": 3, "theo_doi": 4}
+    canh_bao.sort(key=lambda x: thu_tu.get(x["muc"], 9))
+    return {"as_of": today,
+            "ke_uoc": sorted(ke_uoc, key=lambda k: (k["con_ngay"] is None, k["con_ngay"] if k["con_ngay"] is not None else 0)),
+            "xe": sorted(([{"id": v.id, "plate": v.plate, "phap_nhan": cty.get(v.company_id, ""), "lifecycle": v.lifecycle,
+                            "active": v.active, "khe_uoc": gan_xe.get(v.id, [])} for v in xe.values()]), key=lambda r: r["plate"]),
+            "canh_bao": canh_bao, "thieu_ho_so": thieu_ho_so,
+            "tong_du_no": sum(k["du_no"] for k in ke_uoc), "tong_lai_thang": sum(k["lai_thang"] for k in ke_uoc),
+            "theo_phap_nhan": theo_phap_nhan}
