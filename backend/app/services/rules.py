@@ -22,6 +22,7 @@ DEFAULT_PARAMS = [
     # rồi triển khai lại. Giá trị dưới đây là ĐỀ XUẤT, còn hiệu lực cho tới khi Ban TGĐ ký con số khác.
     ("cham_soc_han_ngay", "3", "Hạn liên hệ chăm sóc khách sau khi tour kết thúc", "ngày", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("cham_soc_hai_long_mo_kn", "3", "Điểm hài lòng DƯỚI mức này thì tự mở hồ sơ khiếu nại", "điểm (1–5)", "MKT/CSKH đề xuất 07/9/2026"),
+    ("cham_soc_lui_ngay", "30", "Chỉ sinh phiếu chăm sóc cho tour kết thúc trong khoảng lùi này (chặn việc mở phiếu cho toàn bộ lịch sử chuyến đã đóng)", "ngày", "MKT/CSKH Đợt 4"),
     ("kn_han_muc1_gio", "72", "Hạn phản hồi khách – khiếu nại mức 1 (góp ý)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("kn_han_muc2_gio", "24", "Hạn phản hồi khách – khiếu nại mức 2 (có thiệt hại)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("kn_han_muc3_gio", "4", "Hạn phản hồi khách – khiếu nại mức 3 (nghiêm trọng)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),

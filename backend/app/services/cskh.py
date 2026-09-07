@@ -204,14 +204,24 @@ def chi_so(db: Session) -> dict:
 
 # ====================== ĐỢT 4: CHĂM SÓC SAU BÁN ======================
 def sinh_phieu(db: Session, tour_id: int | None = None) -> int:
-    """Sinh phiếu chăm sóc cho mọi booking chưa huỷ của các tour đã kết thúc.
+    """Sinh phiếu chăm sóc cho mọi booking chưa huỷ của các tour vừa kết thúc.
 
     Chạy được nhiều lần: mỗi booking chỉ một phiếu (cột booking_id là duy nhất), nên gọi lại không sinh
     trùng. Đây là hàm robot gọi, không phải nút người bấm.
+
+    CHỈ lấy tour kết thúc trong khoảng lùi gần đây (tham số `cham_soc_lui_ngay`). Không có giới hạn này
+    thì lần chạy đầu tiên sẽ mở phiếu cho TOÀN BỘ lịch sử chuyến đã đóng – hàng nghìn việc, tất cả đều
+    đã quá hạn liên hệ ngay từ lúc sinh ra. Một danh sách như thế không ai làm, và nó phá luôn chính con
+    số "bao nhiêu phiếu chưa ai đụng tới" mà màn hình này dùng để đo việc chăm sóc có làm thật hay không.
+    Gọi kèm `tour_id` thì bỏ qua giới hạn – đó là lúc có người chủ động xin bù phiếu cho một chuyến cũ.
     """
     han_ngay = int(R.get_param(db, "cham_soc_han_ngay") or 3)
     q = select(Tour).where(Tour.status == "ket_thuc")
-    if tour_id: q = q.where(Tour.id == tour_id)
+    if tour_id:
+        q = q.where(Tour.id == tour_id)
+    else:
+        lui = int(R.get_param(db, "cham_soc_lui_ngay") or 30)
+        q = q.where(Tour.end_date >= date.today() - timedelta(days=lui))
     tours = {t.id: t for t in db.execute(q).scalars()}
     if not tours: return 0
     da_co = {x for x in db.execute(select(CareTicket.booking_id).where(

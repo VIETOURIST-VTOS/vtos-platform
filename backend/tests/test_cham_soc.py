@@ -11,6 +11,7 @@ trong hai tuần đầu rồi thưa dần và bỏ hẳn – nên hệ thống c
   C6 hồ sơ tự mở KHÔNG đóng được khi chưa hỏi khách đề nghị của họ
   C7 chỉ số đo việc làm thật: tỷ lệ liên hệ được, số phiếu quá hạn
   C8 không có đường tạo phiếu chăm sóc cho một khách lẻ
+  C9 KHÔNG mở phiếu cho toàn bộ lịch sử chuyến đã đóng – chỉ chuyến kết thúc gần đây
 """
 import os, sys
 from datetime import date, timedelta
@@ -149,3 +150,29 @@ def test_c8_khong_co_duong_tao_phieu_cho_mot_khach_le():
     h = login("cntt")
     r = client.post("/api/v1/cham-soc", json={"booking_id": 1}, headers=h)
     assert r.status_code in (404, 405), "có nút thêm phiếu tay là mở đường cho một danh sách chỉ đầy đủ hai tuần đầu"
+
+
+def test_c9_khong_mo_phieu_cho_toan_bo_lich_su_chuyen_da_dong():
+    """Chuyến kết thúc từ lâu không tự sinh phiếu; muốn bù thì phải chỉ đích danh chuyến đó.
+
+    Không có giới hạn này thì lần chạy đầu trên dữ liệu thật sẽ mở hàng nghìn việc, tất cả đều quá hạn
+    liên hệ ngay từ lúc sinh ra – và con số "bao nhiêu phiếu chưa ai đụng tới" mất hết ý nghĩa.
+    """
+    from app.db.session import SessionLocal
+    from app.models.core import Tour, Booking, User
+    from sqlalchemy import select
+    h = login("cntt")
+    db = SessionLocal()
+    sale = db.execute(select(User).where(User.username == "kd.hoa")).scalars().first()
+    dh = db.execute(select(User).where(User.username == "dh.lan")).scalars().first()
+    t = Tour(code="CS-TEST-CU", name="Chuyến đóng từ năm ngoái", tour_type="le_noi_dia",
+             start_date=date.today() - timedelta(days=400), end_date=date.today() - timedelta(days=398),
+             operator_id=dh.id, price_per_pax=1_000_000, planned_pax=1, status="ket_thuc")
+    db.add(t); db.flush()
+    db.add(Booking(code="BKCSCU01", tour_id=t.id, request_id=0, sales_id=sale.id, created_by=dh.id,
+                   customer_name="Khách năm ngoái", customer_phone="0988000999", source="Zalo",
+                   pax=1, amount=1_000_000))
+    db.commit(); tid = t.id; db.close()
+    assert client.post("/api/v1/cham-soc/sinh-phieu", headers=h).json()["da_sinh"] == 0
+    # nhưng người phụ trách vẫn xin bù được cho đúng chuyến đó
+    assert client.post(f"/api/v1/cham-soc/sinh-phieu?tour_id={tid}", headers=h).json()["da_sinh"] == 1
