@@ -2,7 +2,7 @@
 import json, os
 from datetime import date, datetime, timedelta
 from sqlalchemy import select, func, desc
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from app.models.core import Tour, Booking, ServiceRequest, Alert, Param, User
 from app.models.payments import BankTransaction, Receipt
 from app.models.accounting import JournalEntry, Invoice
@@ -22,8 +22,11 @@ def _month_tours(db: Session, y: int, m: int) -> list[Tour]:
     chuyến đã xác nhận (hàng nghìn chuyến, kèm booking nạp lười theo sau) rồi mới bỏ đi hầu hết."""
     dau = datetime(y, m, 1)
     cuoi = datetime(y + (m == 12), 1 if m == 12 else m + 1, 1)
-    return list(db.execute(select(Tour).where(Tour.status.in_(["kt_xac_nhan", "khoa"]),
-                                              Tour.kt_confirmed_at >= dau, Tour.kt_confirmed_at < cuoi)).scalars())
+    # selectinload: các bảng phía dưới duyệt t.bookings của từng chuyến. Không nạp sẵn thì mỗi chuyến
+    # là một câu truy vấn riêng – vài trăm chuyến thành vài trăm chuyến đi–về tới Singapore.
+    return list(db.execute(select(Tour).options(selectinload(Tour.bookings))
+                           .where(Tour.status.in_(["kt_xac_nhan", "khoa"]),
+                                  Tour.kt_confirmed_at >= dau, Tour.kt_confirmed_at < cuoi)).scalars())
 
 
 def build(db: Session, u: User) -> dict:
@@ -125,9 +128,13 @@ def build(db: Session, u: User) -> dict:
                           "rows": sorted([{"sales": users.get(i, i), "profit_share": v} for i, v in doan.items()], key=lambda r: -r["profit_share"])}
     if role in ("tp_dh", "nv_dh", "chutich", "tgd"):
         d7 = int(R.get_param(db, "moc_d7")); rows = []
-        for t in db.execute(select(Tour).where(Tour.status == "da_duyet", Tour.start_date >= today, Tour.start_date <= today + timedelta(days=21))).scalars():
+        for t in db.execute(select(Tour).options(selectinload(Tour.bookings))
+                            .where(Tour.status == "da_duyet", Tour.start_date >= today,
+                                   Tour.start_date <= today + timedelta(days=21))).scalars():
             c = R.calc_db(db, t, R.get_param(db, "nguong_bien", t.start_date)); left = (t.start_date - today).days
-            rows.append({"code": t.code, "start": t.start_date, "days_left": left, "booked": R.booked_pax(t), "breakeven": c["breakeven_pax"], "below": R.booked_pax(t) < (c["breakeven_pax"] or 0)})
+            pax = R.booked_pax(t)
+            rows.append({"code": t.code, "start": t.start_date, "days_left": left, "booked": pax,
+                         "breakeven": c["breakeven_pax"], "below": pax < (c["breakeven_pax"] or 0)})
         sec["sap_khoi_hanh"] = sorted(rows, key=lambda r: r["days_left"])
         sec["qua_han_qt"] = [{"code": t.code, "deadline": R.settlement_deadline(db, t)} for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.end_date < today).order_by(desc(Tour.end_date)).limit(400)).scalars() if today > R.settlement_deadline(db, t)][:100]
     if role in ("hcns", "chutich", "tgd"):

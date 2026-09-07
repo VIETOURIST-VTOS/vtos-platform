@@ -111,13 +111,32 @@ def forecast_13w(db: Session, start: date | None = None) -> dict:
                    Tour.status.not_in(["huy", "khoa", "kt_xac_nhan", "da_dong_so"]))).all():
         put(max(date.today(), start_date - timedelta(days=7)), "in", "thu_booking", float(due))
     # Chi tour: lệnh chi chờ (tuần này) và đề nghị đang trình (tuần sau); chi dự toán còn lại của tour sắp chạy
-    from app.services.ops import tour_cashflow
     for pr in db.execute(select(PaymentRequest).where(PaymentRequest.status.in_(["cho_chi", "cho_tp", "cho_kt", "cho_duyet"]))).scalars():
         put(date.today() if pr.status == "cho_chi" else date.today() + timedelta(days=7), "out", "chi_ncc", pr.amount)
-    for t in db.execute(select(Tour).where(Tour.status == "da_duyet")).scalars():
-        cf = tour_cashflow(db, t)
-        rest = cf["budget"] - cf["paid"] - cf["committed"] - cf["pending"]
-        if rest > 0: put(max(date.today(), t.start_date - timedelta(days=3)), "out", "chi_tour_du_toan", rest)
+    # Chi dự toán còn lại của tour sắp chạy. Bản cũ gọi tour_cashflow() cho TỪNG tour đã duyệt: mỗi lần
+    # là ba chuyến đi–về tới cơ sở dữ liệu ở Singapore cộng một lần nạp lười danh sách booking. Với vài
+    # trăm tour đang mở, riêng vòng lặp này đã là hàng nghìn chuyến đi–về, mà kết quả chỉ cần đúng MỘT
+    # con số mỗi tour. Nay cộng đề nghị chi theo tour bằng một câu lệnh GROUP BY, và số khách cũng lấy
+    # sẵn theo tour thay vì đi qua quan hệ.
+    tours_dd = list(db.execute(select(Tour).where(Tour.status == "da_duyet")).scalars())
+    if tours_dd:
+        ids = [t.id for t in tours_dd]
+        da_dung: dict[int, float] = {}
+        for tid, amt in db.execute(
+                select(PaymentRequest.tour_id, func.coalesce(func.sum(PaymentRequest.amount), 0.0))
+                .where(PaymentRequest.tour_id.in_(ids),
+                       PaymentRequest.status.in_(["da_chi", "cho_chi", "cho_tp", "cho_kt", "cho_duyet"]))
+                .group_by(PaymentRequest.tour_id)).all():
+            da_dung[tid] = float(amt)
+        khach: dict[int, int] = {}
+        for tid, n in db.execute(select(Booking.tour_id, func.coalesce(func.sum(Booking.pax), 0))
+                                 .where(Booking.tour_id.in_(ids), Booking.cancelled == False)
+                                 .group_by(Booking.tour_id)).all():
+            khach[tid] = int(n)
+        for t in tours_dd:
+            budget = t.fixed_cost + t.var_cost_per_pax * max(t.planned_pax, khach.get(t.id, 0))
+            rest = budget - da_dung.get(t.id, 0.0)
+            if rest > 0: put(max(date.today(), t.start_date - timedelta(days=3)), "out", "chi_tour_du_toan", rest)
     # Lịch vay / đầu tư
     for s in db.execute(select(FinSchedule).where(FinSchedule.status.in_(["ke_hoach", "qua_han"]))).scalars():
         key = {"tra_goc": "tra_goc_vay", "tra_lai": "lai_vay", "nhan_vay": "nhan_vay", "giai_ngan": "giai_ngan_dau_tu", "thu_hoi": "thu_hoi_dau_tu"}[s.kind]
