@@ -15,7 +15,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "e0f1a2b3c4d5"
-down_revision = "0ac7b3a3346f"
+down_revision = "760b24f75c38"   # phiên song song: nối sau ngân sách Marketing để mạch migration chỉ có MỘT đầu
 branch_labels = None
 depends_on = None
 
