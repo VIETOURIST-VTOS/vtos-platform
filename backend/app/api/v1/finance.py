@@ -142,3 +142,84 @@ def plan_del(pid: int, u: User = Depends(require_roles(*WRITE)), db: Session = D
 def vay_xe(u: User = Depends(require_roles(*READ, "tp_dh")), db: Session = Depends(get_db)):
     """Bản đồ khế ước vay ↔ xe thế chấp, cảnh báo đáo hạn và xe đã ra khỏi đội nhưng còn thế chấp."""
     return F.vay_xe(db)
+
+
+class KheUocNapIn(BaseModel):
+    contract_no: str
+    partner: str
+    entity: str = "Công ty mẹ"
+    principal: float
+    outstanding: float = 0
+    interest_rate: float = 0
+    signed_on: date | None = None
+    maturity: date | None = None
+    collateral: str = ""
+    purpose: str = ""
+    note: str = ""
+    xe: list[str] = []
+
+
+class NapVayIn(BaseModel):
+    khe_uoc: list[KheUocNapIn]
+    nguon: str = ""
+    tao_xe_da_ban: list[dict] = []
+
+
+@router.post("/fin/vay-xe/nap")
+def nap_vay_xe(data: NapVayIn, u: User = Depends(require_roles("ketoan", "chutich", "tgd")), db: Session = Depends(get_db)):
+    """Nạp hồ sơ khế ước vay từ bộ hồ sơ ngân hàng, kèm danh sách xe là tài sản bảo đảm.
+
+    Khớp theo SỐ HỢP ĐỒNG: chạy lại lần hai chỉ cập nhật dư nợ/lãi suất/đáo hạn của khế ước đã có,
+    không tạo bản ghi trùng. Biển số không tìm thấy trong danh mục xe được trả về để rà chứ không
+    tự tạo xe – trừ những xe đã bán khai báo riêng ở `tao_xe_da_ban`, vì chính những xe đó mới là
+    lý do phải theo dõi: xe đã ra khỏi đội nhưng hồ sơ vay vẫn ghi là tài sản bảo đảm.
+    """
+    from app.models.hr import Vehicle
+    from app.models.fleet import Collateral
+    from app.models.core import Company
+    cty = {c.name.lower(): c.id for c in db.execute(select(Company)).scalars()}
+
+    def tim_cty(ten: str) -> int | None:
+        t = (ten or "").lower()
+        for name, cid in cty.items():
+            if t and (t in name or name in t): return cid
+        return None
+
+    tao_xe = []
+    for x in data.tao_xe_da_ban:
+        plate = (x.get("plate") or "").strip()
+        if not plate: continue
+        v = db.execute(select(Vehicle).where(Vehicle.plate == plate)).scalar_one_or_none()
+        if v is None:
+            v = Vehicle(plate=plate, seats=45, active=False, lifecycle="da_ban", source_note=x.get("note", ""))
+            db.add(v); db.flush(); tao_xe.append(plate)
+    db.flush()
+    xe_map = {v.plate: v for v in db.execute(select(Vehicle)).scalars()}
+
+    tao, cap_nhat, gan_xe, khong_thay_xe = [], [], 0, []
+    for k in data.khe_uoc:
+        c = db.execute(select(FinContract).where(FinContract.contract_no == k.contract_no, FinContract.kind == "vay")).scalar_one_or_none()
+        d = k.model_dump(); plates = d.pop("xe")
+        if c is None:
+            c = FinContract(code=F.next_code(db), kind="vay", created_by=u.username, **d)
+            if not c.outstanding: c.outstanding = c.principal
+            db.add(c); db.flush(); tao.append(c.contract_no)
+        else:
+            for f in ("partner", "entity", "principal", "outstanding", "interest_rate", "signed_on", "maturity", "collateral", "purpose", "note"):
+                if d.get(f) not in (None, "", 0): setattr(c, f, d[f])
+            cap_nhat.append(c.contract_no)
+        c.company_id = tim_cty(k.entity) or c.company_id
+        for plate in plates:
+            v = xe_map.get(plate)
+            if v is None:
+                khong_thay_xe.append(plate); continue
+            da_co = db.execute(select(Collateral).where(Collateral.contract_id == c.id, Collateral.vehicle_id == v.id,
+                                                        Collateral.den_ngay.is_(None))).scalar_one_or_none()
+            if da_co is None:
+                db.add(Collateral(contract_id=c.id, vehicle_id=v.id, nguon=data.nguon or "Hồ sơ khế ước ngân hàng")); gan_xe += 1
+    R.audit(db, u.username, u.role, "nap_ho_so_khe_uoc_vay", "fin:vay-xe",
+            after={"tao": tao, "cap_nhat": cap_nhat, "gan_xe": gan_xe, "nguon": data.nguon})
+    db.commit()
+    return {"tao_moi": tao, "cap_nhat": cap_nhat, "so_xe_gan_the_chap": gan_xe,
+            "xe_da_ban_tao_moi": tao_xe, "bien_so_khong_co_trong_danh_muc": khong_thay_xe,
+            "message": f"Đã nạp {len(tao)} khế ước mới, cập nhật {len(cap_nhat)} khế ước, gắn {gan_xe} xe vào tài sản bảo đảm"}

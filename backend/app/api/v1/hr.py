@@ -837,7 +837,7 @@ class BhxhBatch(BaseModel):
 
 
 @router.post("/bhxh/nap")
-def nap_muc_bhxh(data: BhxhBatch, u: User = Depends(require_roles("hcns", "ketoan", "cntt")), db: Session = Depends(get_db)):
+def nap_muc_bhxh(data: BhxhBatch, u: User = Depends(require_roles("hcns", "ketoan", "cntt", "chutich", "tgd")), db: Session = Depends(get_db)):
     """Nạp tiền lương làm căn cứ đóng BHXH bắt buộc từ danh sách đóng BHXH của kỳ.
 
     Ghép theo mã nhân viên trước, không có mã thì theo họ tên không dấu. Người không ghép được KHÔNG bị bỏ
@@ -875,7 +875,7 @@ class DoanVienBatch(BaseModel):
 
 
 @router.post("/doan-vien/nap")
-def nap_doan_vien(data: DoanVienBatch, u: User = Depends(require_roles("hcns", "ketoan", "cntt")), db: Session = Depends(get_db)):
+def nap_doan_vien(data: DoanVienBatch, u: User = Depends(require_roles("hcns", "ketoan", "cntt", "chutich", "tgd")), db: Session = Depends(get_db)):
     """Nạp danh sách đoàn viên đã ký thỏa thuận khấu trừ đoàn phí.
 
     Chỉ nhận HỌ TÊN. Bản thỏa thuận có số căn cước và số điện thoại nhưng phân hệ lương không cần tới, nên

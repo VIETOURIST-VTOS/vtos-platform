@@ -132,3 +132,26 @@ def test_v7_giai_chap_co_van_ban_thi_het_canh_bao():
 
 def test_v8_vai_tro_khong_duoc_xem():
     assert client.get("/api/v1/fin/vay-xe", headers=login("hcns")).status_code == 403
+
+
+def test_v9_nap_ho_so_khe_uoc_chay_lai_khong_tao_trung():
+    body = {"nguon": "Hồ sơ khế ước TPBank/MB 07/9/2026",
+            "tao_xe_da_ban": [{"plate": "50F-046.92", "note": "Đã sang tên và đổi biển 50E-955.31 ngày 13/08/2026"}],
+            "khe_uoc": [{"contract_no": "134/2023/GNN/Q4/01", "partner": "TPBank", "entity": "Vietourist Holdings",
+                         "principal": 1_767_406_654, "outstanding": 1_767_406_654, "interest_rate": 13.9,
+                         "collateral": "50F-046.92 + 50F-046.22", "xe": ["50F-046.92", "50F-999.99"]},
+                        {"contract_no": "125/2025/GNN/Q4", "partner": "TPBank", "entity": "Vietourist Holdings",
+                         "principal": 9_022_222_216, "outstanding": 8_900_000_000, "interest_rate": 13.5, "xe": []}]}
+    r = client.post("/api/v1/fin/vay-xe/nap", json=body, headers=login("chutich")).json()
+    assert r["tao_moi"] == ["134/2023/GNN/Q4/01"] and r["cap_nhat"] == ["125/2025/GNN/Q4"]
+    assert r["xe_da_ban_tao_moi"] == ["50F-046.92"] and r["bien_so_khong_co_trong_danh_muc"] == ["50F-999.99"]
+    assert r["so_xe_gan_the_chap"] == 1
+    r2 = client.post("/api/v1/fin/vay-xe/nap", json=body, headers=login("chutich")).json()
+    assert r2["tao_moi"] == [] and r2["so_xe_gan_the_chap"] == 0 and r2["xe_da_ban_tao_moi"] == []
+    d = _lay()
+    k = [x for x in d["ke_uoc"] if x["contract_no"] == "125/2025/GNN/Q4"][0]
+    assert k["du_no"] == 8_900_000_000                       # nạp lại thì cập nhật dư nợ, không tạo bản ghi thứ hai
+    assert len([x for x in d["ke_uoc"] if x["contract_no"] == "134/2023/GNN/Q4/01"]) == 1
+    # xe đã bán vẫn là tài sản bảo đảm → phải kêu gấp
+    assert [c for c in d["canh_bao"] if c.get("xe") == "50F-046.92" and c["muc"] == "gap"]
+    assert client.post("/api/v1/fin/vay-xe/nap", json=body, headers=login("hcns")).status_code == 403
