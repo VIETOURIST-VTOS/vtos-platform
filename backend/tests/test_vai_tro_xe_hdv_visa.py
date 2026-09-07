@@ -112,3 +112,23 @@ def test_tai_khoan_chua_ghep_ho_so_bao_loi_ro_rang():
     db.commit(); db.close()
     r = client.get("/api/v1/xe-hdv/cua-toi", headers=login("taixe.mocoi"))
     assert r.status_code == 404 and "HCNS" in r.json()["detail"]
+
+
+def test_hanh_chinh_khong_xem_duoc_bang_luong():
+    """Bảo vệ, pháp chế, quan hệ nhà đầu tư thuộc phòng Hành chính nhưng KHÔNG được xem bảng lương
+    (chỉ đạo 07/9/2026). Trước đây họ mang vai trò Nhân sự Hành chính nên thấy lương cả công ty."""
+    tao_tai_khoan("baove.kt", "hanh_chinh", "Bảo vệ kiểm thử", "hcns", "khac", "KT904")
+    me = client.get("/api/v1/auth/me", headers=login("baove.kt")).json()
+    an = set(me["hidden_menus"])
+    assert "/hr" in an, "không được thấy hồ sơ nhân sự và bảng lương (/payroll chỉ chuyển hướng sang /hr)"
+    assert "/bank-accounts" in an
+    assert "/reports" not in an, "vẫn phải nộp được báo cáo công việc"
+    for path in ("/api/v1/payroll-runs/2026-08", "/api/v1/employees"):
+        assert client.get(path, headers=login("baove.kt")).status_code == 403
+
+
+def test_bang_luong_va_ngan_hang_khong_con_la_trang_ai_cung_thay():
+    """Hai trang này trước đây không liệt kê trong ma trận, nghĩa là mọi vai trò đăng nhập đều thấy."""
+    from app.services.access import MENU_ROLES
+    assert "/bank-accounts" in MENU_ROLES and "nv_dh" not in MENU_ROLES["/bank-accounts"]
+    assert "nv_kd" not in MENU_ROLES["/hr"], "bảng lương nằm trong /hr – khối kinh doanh không được thấy"

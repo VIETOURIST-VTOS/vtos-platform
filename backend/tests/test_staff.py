@@ -27,7 +27,7 @@ def test_import_master_and_group_scope():
 
     # xem trước: phải nói rõ sẽ khóa những tài khoản nào, và KHÔNG được thay đổi gì
     xt = client.post("/api/v1/employees/import-master?dry_run=true", headers=login("hcns")).json()
-    assert xt["xem_truoc"] is True and xt["created"] + xt["updated"] >= 110
+    assert xt["xem_truoc"] is True and xt["created"] + xt["updated"] >= 105
     assert any("kd.hoa" in x for x in xt["users_closed"]), "tài khoản không có trong bảng lương phải nằm trong danh sách sẽ khóa"
     assert client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "123456"}).status_code == 200, "xem trước không được đổi gì"
 
@@ -37,7 +37,7 @@ def test_import_master_and_group_scope():
     assert client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "abc123"}).status_code == 200
 
     r = client.post("/api/v1/employees/import-master", headers=login("hcns")).json()
-    assert r["created"] + r["updated"] >= 110 and r["users_created"] > 40
+    assert r["created"] + r["updated"] >= 105 and r["users_created"] > 40
     # tài khoản hcns demo cũng không có trong bảng lương nên đã bị khóa – từ đây dùng HCNS thật
     assert client.get("/api/v1/staff", headers=login("hcns")).status_code == 401
     hcns = lambda: login("phanngocduy", "290")
@@ -96,10 +96,10 @@ def test_tai_khoan_trung_ten_bi_dong_du_ten_co_trong_bang_luong():
     assert client.post("/api/v1/auth/login", data={"username": "lethinh", "password": "8"}).status_code == 200, "tài khoản thật của người đó vẫn dùng được"
 
 
-def test_nguoi_chua_duoc_chi_dinh_vai_tro_thi_khoa_tai_khoan():
-    """Bảo vệ, pháp chế, quan hệ nhà đầu tư có tên trong bảng lương nhưng chưa có vai trò VTOS.
-    Bản nạp trước giữ nguyên vai trò cũ của họ – kết quả là ba bảo vệ đang mang quyền Nhân sự Hành chính,
-    tức xem được bảng lương cả công ty. Chưa chỉ định vai trò thì khóa, không phải giữ quyền cũ."""
+def test_bao_ve_thuoc_hanh_chinh_khong_mang_quyen_nhan_su():
+    """Bảo vệ, pháp chế, quan hệ nhà đầu tư thuộc phòng Hành chính (chỉ đạo 07/9/2026) nhưng không được
+    xem bảng lương. Bản nạp trước giữ nguyên vai trò cũ của họ – kết quả là ba bảo vệ mang quyền Nhân sự
+    Hành chính, tức xem được lương cả công ty."""
     from app.db.session import SessionLocal
     from app.models.core import User
     from app.models.hr import Employee
@@ -110,6 +110,5 @@ def test_nguoi_chua_duoc_chi_dinh_vai_tro_thi_khoa_tai_khoan():
     e = db.execute(select(Employee).where(Employee.code == "15")).scalars().first()   # Vũ Văn Vinh – bảo vệ
     assert e is not None and e.active, "bảo vệ vẫn là nhân sự đang làm việc"
     u = db.get(User, e.user_id) if e.user_id else None
-    assert u is None or u.active is False, "chưa có vai trò thì không được giữ tài khoản đang hoạt động"
-    if u is not None: assert u.role == "hcns", "vai trò cũ giữ nguyên để truy lại lịch sử, chỉ khóa đăng nhập"
+    assert u is not None and u.active and u.role == "hanh_chinh", "thuộc phòng hành chính, có tài khoản, không xem bảng lương"
     db.close()

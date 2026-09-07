@@ -27,7 +27,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
   { key: "taichinh", label: "5. Tài chính & Kế toán", items: [
     ["Thu & đối soát", "/collections"], ["Đề nghị chi & thanh toán", "/expenses"], ["Công nợ", ""],
     ["Bảo lưu & hoàn tiền", "/bookings"], ["Dòng tiền", "/finance?tab=forecast"], ["Vay & đầu tư", "/finance?tab=contracts"],
-    ["Sổ kế toán", "/accounting?tab=journal"], ["Hóa đơn & thuế", "/accounting?tab=invoices"],
+    ["Tài khoản ngân hàng", "/bank-accounts"], ["Sổ kế toán", "/accounting?tab=journal"], ["Hóa đơn & thuế", "/accounting?tab=invoices"],
     ["Báo cáo tài chính", "/accounting?tab=bctc"], ["Hồ sơ kiểm toán", ""], ["Khóa kỳ", "/accounting?tab=periods"]] },
   { key: "nhansu", label: "6. Hành chính & Nhân sự", items: [
     ["Hồ sơ nhân sự", "/hr?tab=employees"], ["Hợp đồng lao động", ""], ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],

@@ -18,7 +18,7 @@ HR_READ = ("hcns", "cntt", "ketoan", "tgd", "chutich", "bks", "tp_dh", "gd_kd", 
 
 def emp_out(e: Employee) -> dict:
     return {"id": e.id, "code": e.code, "user_id": e.user_id, "full_name": e.full_name, "department": e.department, "department_name": DEPARTMENTS.get(e.department, e.department),
-            "position": e.position, "position_name": POSITIONS.get(e.position, e.position), "title": e.title, "sales_group": e.sales_group, "office": e.office, "office_name": OFFICES.get(e.office, e.office),
+            "position": e.position, "position_name": POSITIONS.get(e.position, e.position), "title": e.title, "duties": e.duties, "sales_group": e.sales_group, "office": e.office, "office_name": OFFICES.get(e.office, e.office),
             "contract_type": e.contract_type, "base_salary": e.base_salary, "start_date": e.start_date, "probation": e.probation, "transition_list": e.transition_list,
             "card_no": e.card_no, "card_type": e.card_type, "card_expiry": e.card_expiry, "member_org": e.member_org, "ctv_contract": e.ctv_contract,
             "advance_limit": e.advance_limit, "active": e.active, "company_id": e.company_id, "birth_date": e.birth_date, "phone": e.phone,
@@ -57,6 +57,7 @@ class EmployeeIn(BaseModel):
     ctv_contract: bool = False
     advance_limit: float = 0
     title: str | None = None
+    duties: str | None = None
     sales_group: str | None = None
     phone: str | None = None
     birth_date: date | None = None

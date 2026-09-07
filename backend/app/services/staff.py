@@ -20,7 +20,8 @@ from app.services import rules as R
 DATA = Path(__file__).resolve().parent.parent / "data" / "nhan_su_2026-09.json"
 ACCOUNT_DEPTS = ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt", "ketoan", "hcns", "ban_tgd", "doi_xe", "huong_dan", "visa")
 DEPT_ROLE_DEFAULT = {"kd_le": "nv_kd", "kd_doan": "nv_kd", "dieu_hanh": "nv_dh", "marketing": "nv_mkt", "cntt": "cntt", "ketoan": "ketoan", "hcns": "hcns", "visa": "nv_visa"}
-GIU_TAI_KHOAN = ("chutich", "tgd", "cntt")   # tài khoản hệ thống: không hạ quyền, không khóa theo bảng lương
+GIU_TAI_KHOAN = ("chutich", "tgd", "cntt", "bks")   # tài khoản hệ thống (Ban Kiểm soát do AI vận hành):
+                                                    # không hạ quyền, không khóa theo bảng lương
 
 
 def strip_accents(s: str) -> str:
@@ -62,6 +63,7 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
             stat["updated"] += 1
         e.full_name, e.department, e.position = name, r["phong"], r["vi_tri"]
         e.title, e.sales_group, e.office = r.get("chuc_vu", ""), r.get("nhom", ""), r.get("van_phong", "hcm") or "hcm"
+        e.duties = r.get("cong_viec", "")      # công việc chính: tuyến / thị trường người này phụ trách
         e.contract_type = r.get("hop_dong") or ("ctv" if r["phong"] == "huong_dan" else "hdld")
         e.probation = bool(r.get("thu_viec")); e.active = True
         # tài khoản
@@ -122,5 +124,6 @@ def staff_directory(db: Session) -> list[dict]:
     """Danh sách gọn cho form báo cáo / chọn người: mã, họ tên, phòng, nhóm, chức vụ."""
     out = []
     for e in db.execute(select(Employee).where(Employee.active == True).order_by(Employee.department, Employee.sales_group, Employee.code)).scalars():
-        out.append({"code": e.code, "full_name": e.full_name, "department": e.department, "sales_group": e.sales_group, "title": e.title, "position": e.position, "office": e.office, "user_id": e.user_id})
+        out.append({"code": e.code, "full_name": e.full_name, "department": e.department, "sales_group": e.sales_group, "title": e.title,
+                    "duties": e.duties, "position": e.position, "office": e.office, "user_id": e.user_id})
     return out

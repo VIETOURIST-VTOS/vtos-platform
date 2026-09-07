@@ -68,6 +68,7 @@ ROLES = {
     # nhưng không được thấy hàng đợi điều hành hay dữ liệu khách của phòng khác.
     "xe_hdv": "Tài xế & Hướng dẫn viên",
     "nv_visa": "Chuyên viên Visa",
+    "hanh_chinh": "Hành chính (không xem bảng lương)",
 }
 
 

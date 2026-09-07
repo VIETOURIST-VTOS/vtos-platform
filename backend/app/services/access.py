@@ -18,6 +18,8 @@ SALES = ("gd_kd", "tp_kd", "tn_kd", "nv_kd")
 MARKETING = ("nv_mkt",)
 FIELD = ("xe_hdv",)                                     # tài xế & HDV: người ở hiện trường, chỉ xem việc của chính mình
 VISA_STAFF = ("nv_visa",)                               # chuyên viên visa: chỉ phân hệ Visa
+ADMIN_STAFF = ("hanh_chinh",)                           # bảo vệ, pháp chế, quan hệ nhà đầu tư: thuộc HCNS
+                                                        # nhưng KHÔNG xem bảng lương (chỉ đạo 07/9/2026)
 
 ALL_SEEING = LEADERSHIP + CONTROL                       # xem mọi dữ liệu
 COST_ROLES = ALL_SEEING + OPERATIONS                    # cơ cấu chi phí NCC, quyết toán, dòng tiền tour
@@ -131,10 +133,13 @@ MENU_ROLES = {
     "/companies": ALL_SEEING + ("tp_dh", "hcns"),   # danh mục pháp nhân và đối chiếu công ty chủ quản
     "/xe-hdv": ALL_SEEING + OPERATIONS + FIELD + ("hcns",),   # xe Vietrip & HDV – màn hình duy nhất của vai trò xe_hdv
     "/visa": ALL_SEEING + OPERATIONS + VISA_STAFF + ("hcns",),
+    # Trang này trước đây không liệt kê, nghĩa là ai đăng nhập cũng thấy – trong khi nó là sổ tiền gửi và
+    # danh sách tài khoản ngân hàng của công ty. (/payroll chỉ là lối chuyển hướng sang /hr nên không liệt kê.)
+    "/bank-accounts": ALL_SEEING,
 }
 
 # Mọi trang có trong giao diện – kể cả trang không đặt điều kiện vai trò – để dựng danh sách ẩn cho vai trò bị giới hạn.
-ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/bank-accounts")
+ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll")
 
 
 # Vai trò bị giới hạn: chỉ được thấy đúng những trang liệt kê ở đây.

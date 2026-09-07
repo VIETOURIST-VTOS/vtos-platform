@@ -1,5 +1,5 @@
 {
- "nguon": "Bảng lương T07-08/2026 (HCNS) – chỉ mã NV, họ tên, phòng, chức vụ; không chứa số lương",
+ "nguon": "Bảng lương T07-08/2026 (HCNS) + bảng phân công Điều hành & Visa 07/9/2026 – không chứa số lương",
  "ngay": "2026-09-07",
  "nhan_su": [
   {
@@ -91,7 +91,7 @@
    "vi_tri": "khac",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": ""
+   "vai_tro": "hanh_chinh"
   },
   {
    "ma": "17",
@@ -101,7 +101,7 @@
    "vi_tri": "khac",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": ""
+   "vai_tro": "hanh_chinh"
   },
   {
    "ma": "231",
@@ -111,7 +111,7 @@
    "vi_tri": "khac",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": ""
+   "vai_tro": "hanh_chinh"
   },
   {
    "ma": "275",
@@ -121,7 +121,7 @@
    "vi_tri": "khac",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": ""
+   "vai_tro": "hanh_chinh"
   },
   {
    "ma": "267",
@@ -174,16 +174,6 @@
    "vai_tro": "xe_hdv"
   },
   {
-   "ma": "80",
-   "ten": "Nguyễn Thanh Quang",
-   "chuc_vu": "Tài xế Vietrip",
-   "phong": "doi_xe",
-   "vi_tri": "tai_xe",
-   "nhom": "",
-   "van_phong": "hcm",
-   "vai_tro": ""
-  },
-  {
    "ma": "87",
    "ten": "Lê Anh Tú",
    "chuc_vu": "Tài xế Vietrip",
@@ -224,16 +214,6 @@
    "vai_tro": "xe_hdv"
   },
   {
-   "ma": "249",
-   "ten": "Nguyễn Thanh Phong",
-   "chuc_vu": "Tài xế Vietrip",
-   "phong": "doi_xe",
-   "vi_tri": "tai_xe",
-   "nhom": "",
-   "van_phong": "hcm",
-   "vai_tro": ""
-  },
-  {
    "ma": "250",
    "ten": "Nguyễn Hoàng Ân",
    "chuc_vu": "Tài xế Vietrip",
@@ -244,26 +224,6 @@
    "vai_tro": "xe_hdv"
   },
   {
-   "ma": "251",
-   "ten": "Võ Đình Phục",
-   "chuc_vu": "Tài xế Vietrip",
-   "phong": "doi_xe",
-   "vi_tri": "tai_xe",
-   "nhom": "",
-   "van_phong": "hcm",
-   "vai_tro": ""
-  },
-  {
-   "ma": "256",
-   "ten": "Nguyễn Ngọc Quang",
-   "chuc_vu": "Tài xế Vietrip",
-   "phong": "doi_xe",
-   "vi_tri": "tai_xe",
-   "nhom": "",
-   "van_phong": "hcm",
-   "vai_tro": ""
-  },
-  {
    "ma": "293",
    "ten": "Nguyễn Long Hồ",
    "chuc_vu": "Tài xế Vietrip",
@@ -272,16 +232,6 @@
    "nhom": "",
    "van_phong": "hcm",
    "vai_tro": "xe_hdv"
-  },
-  {
-   "ma": "295",
-   "ten": "Đặng Nguyễn Vinh Hiển",
-   "chuc_vu": "Tài xế Vietrip",
-   "phong": "doi_xe",
-   "vi_tri": "tai_xe",
-   "nhom": "",
-   "van_phong": "hcm",
-   "vai_tro": ""
   },
   {
    "ma": "297",
@@ -311,7 +261,7 @@
    "vi_tri": "khac",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": ""
+   "vai_tro": "hanh_chinh"
   },
   {
    "ma": "294",
@@ -919,123 +869,123 @@
   {
    "ma": "25",
    "ten": "Nguyễn Thị Mai",
-   "chuc_vu": "ĐH",
-   "phong": "dieu_hanh",
-   "vi_tri": "nv",
-   "nhom": "",
-   "van_phong": "hcm",
-   "vai_tro": "nv_dh"
-  },
-  {
-   "ma": "36",
-   "ten": "Đặng Ngọc Thúy Vy",
-   "chuc_vu": "ĐH",
-   "phong": "dieu_hanh",
-   "vi_tri": "nv",
-   "nhom": "",
-   "van_phong": "hcm",
-   "vai_tro": "nv_dh"
-  },
-  {
-   "ma": "172",
-   "ten": "Mai Thị Yến Nhi",
-   "chuc_vu": "ĐH",
+   "chuc_vu": "Điều hành outbound",
    "phong": "dieu_hanh",
    "vi_tri": "nv",
    "nhom": "",
    "van_phong": "hcm",
    "vai_tro": "nv_dh",
-   "hop_dong": "ctv"
+   "cong_viec": "Singapore – Malaysia, Canada – Mỹ, Thái Lan (gửi khách)"
+  },
+  {
+   "ma": "36",
+   "ten": "Đặng Ngọc Thúy Vy",
+   "chuc_vu": "Visa",
+   "phong": "visa",
+   "vi_tri": "visa",
+   "nhom": "",
+   "van_phong": "hcm",
+   "vai_tro": "nv_visa",
+   "cong_viec": "Visa + Dịch thuật; phỏng vấn khách Mỹ"
   },
   {
    "ma": "174",
    "ten": "Lê Thị Diễm Trang",
-   "chuc_vu": "ĐH",
+   "chuc_vu": "Điều hành nội địa",
    "phong": "dieu_hanh",
    "vi_tri": "nv",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": "nv_dh"
+   "vai_tro": "nv_dh",
+   "cong_viec": "Đà Lạt, Tuy Hòa, Phú Yên, La Ngâu, DSMT, Xuyên Việt; Đà Nẵng và Côn Đảo (gửi khách)"
   },
   {
    "ma": "175",
    "ten": "Vũ Tuyết Nhi",
-   "chuc_vu": "ĐH",
-   "phong": "dieu_hanh",
-   "vi_tri": "nv",
+   "chuc_vu": "Visa",
+   "phong": "visa",
+   "vi_tri": "visa",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": "nv_dh"
+   "vai_tro": "nv_visa",
+   "cong_viec": "Visa + Dịch thuật"
   },
   {
    "ma": "176",
    "ten": "Nguyễn Thị Kiều Nga",
-   "chuc_vu": "ĐH",
+   "chuc_vu": "Điều hành nội địa",
    "phong": "dieu_hanh",
    "vi_tri": "nv",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": "nv_dh"
+   "vai_tro": "nv_dh",
+   "cong_viec": "Tây Nguyên, Tây Nguyên TĐ, Tây Nguyên – Miền Trung, Miền Tây (1–3 ngày), DLPT, Hồ Tràm; Miền Bắc (gửi khách)"
   },
   {
    "ma": "177",
    "ten": "Nguyễn Phương Bảo Trâm",
-   "chuc_vu": "ĐH",
+   "chuc_vu": "Điều hành nội địa",
    "phong": "dieu_hanh",
    "vi_tri": "nv",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": "nv_dh"
+   "vai_tro": "nv_dh",
+   "cong_viec": "Phan Thiết, Phan Thiết – Phú Quý, Đà Lạt – Vĩnh Hy, Nam Cát Tiên, TĐ – ĐL – Phan Thiết, Vũng Tàu"
   },
   {
    "ma": "108",
    "ten": "Nguyễn Lâm Hồng Vy",
-   "chuc_vu": "ĐH",
+   "chuc_vu": "Điều hành nội địa",
    "phong": "dieu_hanh",
    "vi_tri": "nv",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": "nv_dh"
+   "vai_tro": "nv_dh",
+   "cong_viec": "Đà Lạt – Nha Trang, Hòn Cò, Buôn Mê – Nha Trang, Đảo Dực Sơn, Sapa – Trung Quốc; Trung Quốc, Đài Loan, Bali, Nga, Dubai (gửi khách)"
   },
   {
    "ma": "219",
    "ten": "Trần Thị Lệ Thi",
-   "chuc_vu": "ĐH",
-   "phong": "dieu_hanh",
-   "vi_tri": "nv",
+   "chuc_vu": "Visa",
+   "phong": "visa",
+   "vi_tri": "visa",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": "nv_dh"
+   "vai_tro": "nv_visa",
+   "cong_viec": "Visa + Dịch thuật; Land UK"
   },
   {
    "ma": "222",
    "ten": "Phạm Thị Thúy Vy",
-   "chuc_vu": "ĐH",
+   "chuc_vu": "Điều hành nội địa",
    "phong": "dieu_hanh",
    "vi_tri": "nv",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": "nv_dh"
+   "vai_tro": "nv_dh",
+   "cong_viec": "Nha Trang, Tây Ninh, Bảo Lộc; Hàn – Nhật – Hongkong – Campuchia (TNK gửi khách)"
   },
   {
    "ma": "261",
    "ten": "Lê Văn Lực",
-   "chuc_vu": "Dịch Thuật",
-   "phong": "dieu_hanh",
-   "vi_tri": "nv",
+   "chuc_vu": "Visa",
+   "phong": "visa",
+   "vi_tri": "visa",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": "nv_dh"
+   "vai_tro": "nv_visa",
+   "cong_viec": "Visa + Dịch thuật"
   },
   {
    "ma": "62",
    "ten": "Bùi Thị Thảo",
-   "chuc_vu": "ĐH Hà Nội",
-   "phong": "dieu_hanh",
-   "vi_tri": "nv",
-   "nhom": "VPHN",
+   "chuc_vu": "Visa",
+   "phong": "visa",
+   "vi_tri": "visa",
+   "nhom": "",
    "van_phong": "hanoi",
-   "vai_tro": "nv_dh"
+   "vai_tro": "nv_visa",
+   "cong_viec": "Visa + Dịch thuật; phỏng vấn khách Mỹ; đưa khách đầu Hà Nội"
   },
   {
    "ma": "7",
@@ -1120,12 +1070,13 @@
   {
    "ma": "16",
    "ten": "Trần Mỹ Duyên",
-   "chuc_vu": "NVNN",
-   "phong": "kd_doan",
+   "chuc_vu": "Điều hành outbound",
+   "phong": "dieu_hanh",
    "vi_tri": "nv",
    "nhom": "",
    "van_phong": "hcm",
-   "vai_tro": "nv_kd"
+   "vai_tro": "nv_dh",
+   "cong_viec": "Châu Âu, Mỹ, Canada; Land EU"
   },
   {
    "ma": "129",
