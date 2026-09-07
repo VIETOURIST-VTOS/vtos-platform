@@ -53,3 +53,7 @@ aside.side .sub .soon i{font-size:10.5px;font-style:normal;background:var(--pane
 @media (max-width:900px){.shell{display:block}.burger{display:inline-block}
   aside.side{position:static;width:auto;flex:none;max-height:none;border-right:0;border-bottom:1px solid var(--line)}
   aside.side.hide{display:none}.shell main{max-width:none}}
+
+/* Lưới hai cột cho các form nhập tay (phiếu chi phí xe, đề xuất chi). Một cột trên điện thoại,
+   vì phần lớn người nhập số liệu đội xe làm việc trên điện thoại ngoài bến. */
+.grid2{display:grid;gap:0 14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}

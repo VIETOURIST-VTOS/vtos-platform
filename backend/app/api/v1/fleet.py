@@ -11,7 +11,7 @@ dòng mới trong cùng một giao dịch – để giữa chừng có lỗi th�
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import require_roles
@@ -333,6 +333,7 @@ def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict) -> dict:
             "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "km_gps": t.km_gps,
             "km_chay": (t.km_cuoi - t.km_dau) if (t.km_dau is not None and t.km_cuoi is not None) else None,
             "doanh_thu": t.doanh_thu, "status": t.status, "co": t.co, "co_ly_do": t.co_ly_do,
+            "note": t.note, "ma_phieu": t.ma_phieu, "nguon": t.nguon,
             "chi_phi": [{"id": c.id, "kind": c.kind, "kind_ten": COST_KINDS.get(c.kind, c.kind),
                          "amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu,
                          "ben_chiu_ten": BEN_CHIU.get(c.ben_chiu, c.ben_chiu), "chung_tu": c.chung_tu,
@@ -404,6 +405,121 @@ def them_chi_phi(tid: int, data: ChiPhiIn, u: User = Depends(require_roles(*WRIT
     db.commit()
     return {"id": c.id, "ben_chiu": bc, "co_chuyen": kt["co"],
             "message": f"Đã ghi {COST_KINDS[data.kind]} – {BEN_CHIU[bc]}"}
+
+
+class SuaChuyenIn(BaseModel):
+    ten_tour: str | None = None
+    ngay_di: date | None = None
+    ngay_ve: date | None = None
+    km_dau: int | None = None
+    km_cuoi: int | None = None
+    doanh_thu: float | None = None
+    driver_id: int | None = None
+    note: str | None = None
+
+
+@router.put("/chuyen/{tid}")
+def sua_chuyen(tid: int, data: SuaChuyenIn, u: User = Depends(require_roles(*WRITE, *KETOAN, "chutich", "tgd")),
+               db: Session = Depends(get_db)):
+    """Sửa nhật trình một chuyến CHƯA xác nhận.
+
+    Chuyến đã xác nhận thì khoá: muốn sửa phải mở lại có lý do (POST /chuyen/{id}/mo-lai). Sửa thẳng vào
+    chuyến đã chốt là sửa con số hai bên đã đối chiếu xong mà không để lại dấu vết ai sửa, sửa gì."""
+    t = db.get(Trip, tid)
+    if not t: raise HTTPException(404, "Không có chuyến")
+    if t.status == "da_xac_nhan":
+        raise HTTPException(422, "Chuyến đã xác nhận – mở lại (kèm lý do) rồi mới sửa được")
+    truoc = {"ten_tour": t.ten_tour, "ngay_di": str(t.ngay_di), "ngay_ve": str(t.ngay_ve),
+             "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "doanh_thu": t.doanh_thu}
+    d = data.model_dump(exclude_none=True)
+    for k, v in d.items(): setattr(t, k, v)
+    if t.ngay_ve < t.ngay_di: raise HTTPException(422, "Ngày về trước ngày đi")
+    if t.km_dau is not None and t.km_cuoi is not None and t.km_cuoi < t.km_dau:
+        raise HTTPException(422, "Km cuối nhỏ hơn km đầu – kiểm tra lại số đọc trên đồng hồ")
+    db.flush()
+    kt = FL.kiem_chuyen(db, t); t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
+    R.audit(db, u.username, u.role, "sua_chuyen", f"trip:{tid}", before=truoc,
+            after=data.model_dump(mode="json", exclude_none=True))
+    db.commit()
+    return {"id": t.id, "co": t.co, "ly_do": kt["ly_do"], "message": "Đã cập nhật nhật trình chuyến"}
+
+
+class MoLaiIn(BaseModel):
+    ly_do: str
+
+
+@router.post("/chuyen/{tid}/mo-lai")
+def mo_lai_chuyen(tid: int, data: MoLaiIn, u: User = Depends(require_roles(*KETOAN, "chutich", "tgd", "tp_dh")),
+                  db: Session = Depends(get_db)):
+    """Mở lại một chuyến đã xác nhận để sửa. Bắt buộc có lý do, và lý do được ghi vào nhật ký chuyến.
+
+    Không cho mở lại chuyến thuộc kỳ quyết toán ĐÃ ĐÓNG: kỳ đóng là con số hai bên đã thỏa thuận, sửa ngược
+    vào đó là sửa một khoản đã trả tiền."""
+    t = db.get(Trip, tid)
+    if not t: raise HTTPException(404, "Không có chuyến")
+    if not (data.ly_do or "").strip():
+        raise HTTPException(422, "Phải ghi lý do mở lại – không có lý do thì sau này không ai biết vì sao số đổi")
+    ky = f"{t.ngay_di:%Y-%m}"
+    v = db.get(Vehicle, t.vehicle_id)
+    if v is not None and v.partner_id:
+        st = db.execute(select(Settlement).where(Settlement.ky == ky, Settlement.partner_id == v.partner_id,
+                                                 Settlement.status == "dong_ky")).scalars().first()
+        if st is not None:
+            raise HTTPException(422, f"Kỳ {ky} của chủ xe đã ĐÓNG – sửa phải tạo dòng điều chỉnh ở kỳ sau, "
+                                     "không sửa ngược vào chuyến đã quyết toán")
+    from datetime import datetime as _dt
+    t.status = "cho_xac_nhan"
+    t.note = (f"[Mở lại {_dt.now():%d/%m %H:%M} bởi {u.username}: {data.ly_do.strip()}] " + (t.note or ""))[:300]
+    R.audit(db, u.username, u.role, "mo_lai_chuyen", f"trip:{tid}", after={"ly_do": data.ly_do})
+    db.commit()
+    return {"id": t.id, "status": t.status, "message": "Đã mở lại chuyến để sửa – nhớ xác nhận lại sau khi sửa xong"}
+
+
+class SuaChiPhiIn(BaseModel):
+    amount: float | None = None
+    lit: float | None = None
+    ben_chiu: str | None = None
+    chung_tu: str | None = None
+    note: str | None = None
+
+
+@router.put("/chuyen/{tid}/chi-phi/{cid}")
+def sua_chi_phi(tid: int, cid: int, data: SuaChiPhiIn,
+                u: User = Depends(require_roles(*WRITE, *KETOAN, "chutich", "tgd")), db: Session = Depends(get_db)):
+    """Sửa một dòng chi phí của chuyến chưa xác nhận."""
+    t = db.get(Trip, tid); c = db.get(TripCost, cid)
+    if not t or not c or c.trip_id != tid: raise HTTPException(404, "Không có dòng chi phí này trong chuyến")
+    if t.status == "da_xac_nhan": raise HTTPException(422, "Chuyến đã xác nhận – mở lại rồi mới sửa được")
+    truoc = {"amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu}
+    d = data.model_dump(exclude_none=True)
+    if "ben_chiu" in d and d["ben_chiu"] not in BEN_CHIU:
+        raise HTTPException(422, f"Bên chịu không hợp lệ. Chỉ nhận {', '.join(BEN_CHIU)}")
+    for k, v in d.items(): setattr(c, k, v)
+    nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
+    if c.amount >= nguong and not (c.chung_tu or "").strip():
+        raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc có chứng từ gốc đính kèm (chặn cứng B6)")
+    db.flush()
+    kt = FL.kiem_chuyen(db, t); t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
+    R.audit(db, u.username, u.role, "sua_chi_phi_chuyen", f"trip:{tid}", before=truoc,
+            after=data.model_dump(mode="json", exclude_none=True))
+    db.commit()
+    return {"id": c.id, "co_chuyen": t.co, "message": "Đã cập nhật dòng chi phí"}
+
+
+@router.delete("/chuyen/{tid}/chi-phi/{cid}")
+def xoa_chi_phi(tid: int, cid: int, u: User = Depends(require_roles(*WRITE, *KETOAN, "chutich", "tgd")),
+                db: Session = Depends(get_db)):
+    """Xóa một dòng chi phí nhập nhầm, chỉ khi chuyến chưa xác nhận. Nhật ký kiểm toán giữ lại nội dung đã xóa."""
+    t = db.get(Trip, tid); c = db.get(TripCost, cid)
+    if not t or not c or c.trip_id != tid: raise HTTPException(404, "Không có dòng chi phí này trong chuyến")
+    if t.status == "da_xac_nhan": raise HTTPException(422, "Chuyến đã xác nhận – mở lại rồi mới xóa được")
+    R.audit(db, u.username, u.role, "xoa_chi_phi_chuyen", f"trip:{tid}",
+            before={"kind": c.kind, "amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu,
+                    "chung_tu": c.chung_tu})
+    db.delete(c); db.flush()
+    kt = FL.kiem_chuyen(db, t); t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
+    db.commit()
+    return {"co_chuyen": t.co, "message": "Đã xóa dòng chi phí"}
 
 
 @router.post("/chuyen/{tid}/xac-nhan")
@@ -1209,3 +1325,62 @@ def phan_loai_giao_dich(data: PhanLoaiIn, u: User = Depends(require_roles(*QT_WR
     db.commit()
     return {"da_sua": sua, "khong_tim_thay": khong_thay,
             "ghi_chu": "Chỉ sửa nhóm và cờ không-phải-chi-phí. Số tiền và ngày phải sửa ở nguồn rồi nạp lại."}
+
+
+class DeXuatChiIn(BaseModel):
+    """Một đề xuất chi nhập tay trên VTOS – cùng bộ trường với phiếu đề xuất chi trên phần mềm Vietrip."""
+    ngay: date
+    so_tien: float
+    noi_dung: str
+    bien_so: str = ""                 # để trống = đề xuất chung, không thuộc xe nào
+    nhom: str = ""
+    khong_phai_chi_phi: bool = False
+    nguoi_thu_huong: str = ""
+    so_tai_khoan: str = ""
+    ngan_hang: str = ""
+    chung_tu: str = ""
+    ma_gd: str = ""                   # để trống thì hệ thống tự sinh
+
+
+@router.post("/de-xuat-chi", status_code=201)
+def tao_de_xuat_chi(data: DeXuatChiIn, u: User = Depends(require_roles(*WRITE, *KETOAN, "chutich", "tgd")),
+                    db: Session = Depends(get_db)):
+    """Lập một đề xuất chi ngay trên VTOS, không phải nhập lại từ Vietrip.
+
+    Hai điều bắt buộc, và đều là điều kiện để con số sau này còn dùng được:
+      - Có NHÓM: "nạp thẻ dầu" và "sửa xe" nhìn giống nhau lúc lập phiếu nhưng một cái là nạp quỹ, một cái
+        là chi phí. Không phân loại lúc lập thì cuối tháng phải đọc lại từng phiếu để đoán.
+      - Số tiền lớn phải có chứng từ, đúng ngưỡng chặn cứng B6 đang áp cho chi phí chuyến.
+    """
+    if data.so_tien <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
+    if not (data.noi_dung or "").strip(): raise HTTPException(422, "Phải ghi nội dung đề xuất")
+    if not (data.nhom or "").strip():
+        raise HTTPException(422, "Phải chọn nhóm khoản chi – không phân loại lúc lập thì cuối tháng "
+                                 "phải đọc lại từng phiếu để đoán khoản nào là chi phí, khoản nào là nạp quỹ")
+    nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
+    if data.so_tien >= nguong and not (data.chung_tu or "").strip() and not data.khong_phai_chi_phi:
+        raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc ghi số chứng từ gốc (chặn cứng B6)")
+
+    ma = (data.ma_gd or "").strip()
+    if not ma:
+        n = db.execute(select(func.count(ExternalTxn.id))
+                       .where(ExternalTxn.source == "de_xuat_vietrip")).scalar() or 0
+        ma = f"VTOS-DX-{date.today():%Y%m}-{n + 1:04d}"
+    tk = " · ".join(x for x in [data.nguoi_thu_huong, data.so_tai_khoan, data.ngan_hang] if x.strip())
+    rows = [{"ma_gd": ma, "thoi_diem": f"{data.ngay}T00:00:00", "bien_so": data.bien_so,
+             "so_tien": data.so_tien, "nhom": data.nhom,
+             "khong_phai_chi_phi": data.khong_phai_chi_phi,
+             "tai_khoan": data.so_tai_khoan[:40],
+             "mo_ta": (data.noi_dung.strip() + (f" | Thụ hưởng: {tk}" if tk else ""))[:300]}]
+    try:
+        kq = FL.nhap_giao_dich(db, "de_xuat_vietrip", rows, u.username)
+    except (ValueError, TypeError) as ex:
+        raise HTTPException(422, f"Không ghi được đề xuất: {ex}")
+    if kq["da_nhap"] == 0:
+        raise HTTPException(422, f"Mã đề xuất {ma} đã tồn tại – đổi mã khác hoặc để trống cho hệ thống tự sinh")
+    if (data.chung_tu or "").strip():
+        t = db.execute(select(ExternalTxn).where(ExternalTxn.ma_gd == ma)).scalars().first()
+        if t is not None: t.ghi_chu = (f"Chứng từ: {data.chung_tu.strip()} · " + (t.ghi_chu or ""))[:300]
+    R.audit(db, u.username, u.role, "de_xuat_chi_xe", f"de_xuat:{ma}", after=data.model_dump(mode="json"))
+    db.commit()
+    return {"ma_gd": ma, "message": f"Đã lập đề xuất chi {ma} – {data.so_tien:,.0f} đ"}

@@ -27,6 +27,11 @@ function DoiXe() {
   const [cn, setCn] = useState<any>(null);
   const [soChuXe, setSoChuXe] = useState<any>(null);
   const canWrite = ["cntt", "hcns", "tp_dh", "nv_dh"].includes(user?.role || "");
+  // Người được nhập và sửa số liệu đội xe: điều hành, kế toán, và lãnh đạo.
+  const canNhap = ["cntt", "hcns", "tp_dh", "nv_dh", "ketoan", "chutich", "tgd"].includes(user?.role || "");
+  const [form, setForm] = useState<any>(null);      // form nhật trình chuyến (thêm / sửa)
+  const [formDX, setFormDX] = useState<any>(null);  // form đề xuất chi
+  const [dangLuu, setDangLuu] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -44,6 +49,48 @@ function DoiXe() {
   useEffect(() => { load(); }, [load]);
 
   const mo = async (id: number) => { try { setChon(await api(`/fleet/xe/${id}`)); } catch (e) { toast(errMsg(e), true); } };
+
+  const luuChuyen = async () => {
+    if (!form.vehicle_id) return toast("Chọn xe trước đã", true);
+    if (!form.ngay_di || !form.ngay_ve) return toast("Nhập ngày đi và ngày về", true);
+    setDangLuu(true);
+    try {
+      if (form.id) {
+        await api(`/fleet/chuyen/${form.id}`, { method: "PUT", json: {
+          ten_tour: form.ten_tour, ngay_di: form.ngay_di, ngay_ve: form.ngay_ve,
+          km_dau: form.km_dau, km_cuoi: form.km_cuoi, doanh_thu: form.doanh_thu, note: form.note } });
+        toast("Đã cập nhật phiếu chuyến");
+      } else {
+        const r = await api<any>("/fleet/chuyen", { method: "POST", json: {
+          vehicle_id: form.vehicle_id, ten_tour: form.ten_tour, ngay_di: form.ngay_di, ngay_ve: form.ngay_ve,
+          km_dau: form.km_dau, km_cuoi: form.km_cuoi, doanh_thu: form.doanh_thu, note: form.note } });
+        // Bốn khoản chi phí ghi thành bốn dòng riêng: mỗi dòng phải trả lời được loại gì, ai chịu, chứng từ đâu.
+        for (const k of ["dau", "cau_duong", "cong_tac_phi", "giu_xe"]) {
+          const tien = Number(form[k] || 0);
+          if (tien > 0) await api(`/fleet/chuyen/${r.id}/chi-phi`, { method: "POST", json: {
+            kind: k, amount: tien, lit: k === "dau" ? Number(form.lit || 0) : 0, chung_tu: form.chung_tu || "" } });
+        }
+        toast("Đã ghi phiếu chi phí xe");
+      }
+      setForm(null); load();
+    } catch (e) { toast(errMsg(e), true); } finally { setDangLuu(false); }
+  };
+
+  const moLai = async (id: number) => {
+    const ly = prompt("Lý do mở lại phiếu đã xác nhận (bắt buộc – để sau này còn biết vì sao số đổi):");
+    if (!ly) return;
+    try { await api(`/fleet/chuyen/${id}/mo-lai`, { method: "POST", json: { ly_do: ly } });
+          toast("Đã mở lại – sửa xong nhớ xác nhận lại"); load(); }
+    catch (e) { toast(errMsg(e), true); }
+  };
+
+  const luuDeXuat = async () => {
+    setDangLuu(true);
+    try {
+      const r = await api<any>("/fleet/de-xuat-chi", { method: "POST", json: formDX });
+      toast(r.message); setFormDX(null); load();
+    } catch (e) { toast(errMsg(e), true); } finally { setDangLuu(false); }
+  };
 
   const dongViec = async (id: number) => {
     const kl = prompt("Kết luận xác minh (bắt buộc – để lần sau còn biết việc đã xử lý thế nào):");
@@ -71,10 +118,51 @@ function DoiXe() {
         .map(([k, ten]) => <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} onClick={() => setTab(k as any)}>{ten}</button>)}
     </div>
 
-    {tab === "chuyen" && <div className="panel wrap"><h2>Nhật trình chuyến</h2>
-      <p className="muted">Km để trống nghĩa là <b>chưa đo</b>, không phải bằng 0. Cột &quot;Vietourist tạm ứng&quot; và &quot;Chủ xe chịu&quot; tách theo quy tắc chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe; sửa chữa do chủ xe tự chịu.</p>
-      <table><thead><tr><th>Xe</th><th>Tour</th><th>Đi → về</th><th>Km chạy</th><th>Doanh thu</th><th>VTS tạm ứng</th><th>Chủ xe chịu</th><th>Cờ</th></tr></thead>
+    {tab === "chuyen" && <>
+      {form && <div className="panel">
+        <h2>{form.id ? `Sửa phiếu chuyến #${form.id}` : "Phiếu chi phí xe – nhập mới"}</h2>
+        <p className="muted">Đúng bộ trường của phiếu trên Vietrip. Ô để trống nghĩa là <b>chưa có số</b>, không phải bằng 0 –
+          hệ thống không tự điền 0 và không tính ra quãng đường âm.</p>
+        <div className="grid2">
+          <label>Xe
+            <select value={form.vehicle_id || ""} onChange={(e) => setForm({ ...form, vehicle_id: Number(e.target.value) })} disabled={!!form.id}>
+              <option value="">— chọn xe —</option>
+              {xe.map((v: any) => <option key={v.id} value={v.id}>{v.plate}{v.code ? ` · ${v.code}` : ""}</option>)}
+            </select></label>
+          <label>Tour / khách hàng
+            <input value={form.ten_tour || ""} onChange={(e) => setForm({ ...form, ten_tour: e.target.value })} placeholder="Đà Lạt (lẻ)" /></label>
+          <label>Ngày đi<input type="date" value={form.ngay_di || ""} onChange={(e) => setForm({ ...form, ngay_di: e.target.value })} /></label>
+          <label>Ngày về<input type="date" value={form.ngay_ve || ""} onChange={(e) => setForm({ ...form, ngay_ve: e.target.value })} /></label>
+          <label>Km đầu<input type="number" value={form.km_dau ?? ""} onChange={(e) => setForm({ ...form, km_dau: e.target.value === "" ? null : Number(e.target.value) })} /></label>
+          <label>Km cuối<input type="number" value={form.km_cuoi ?? ""} onChange={(e) => setForm({ ...form, km_cuoi: e.target.value === "" ? null : Number(e.target.value) })} /></label>
+          <label>Doanh thu (đ)<input type="number" value={form.doanh_thu ?? ""} onChange={(e) => setForm({ ...form, doanh_thu: e.target.value === "" ? null : Number(e.target.value) })} /></label>
+          <label>Ghi chú<input value={form.note || ""} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+        </div>
+        {!form.id && <>
+          <h3>Chi phí chuyến</h3>
+          <p className="muted">Bốn khoản này Vietourist tạm ứng theo quy tắc chốt 07/9/2026. Để trống khoản nào thì không ghi dòng đó.</p>
+          <div className="grid2">
+            <label>Tiền dầu (đ)<input type="number" value={form.dau ?? ""} onChange={(e) => setForm({ ...form, dau: Number(e.target.value) })} /></label>
+            <label>Số lít<input type="number" step="0.001" value={form.lit ?? ""} onChange={(e) => setForm({ ...form, lit: Number(e.target.value) })} /></label>
+            <label>Phí cầu đường (đ)<input type="number" value={form.cau_duong ?? ""} onChange={(e) => setForm({ ...form, cau_duong: Number(e.target.value) })} /></label>
+            <label>Công tác phí tài xế (đ)<input type="number" value={form.cong_tac_phi ?? ""} onChange={(e) => setForm({ ...form, cong_tac_phi: Number(e.target.value) })} /></label>
+            <label>Phí gửi xe (đ)<input type="number" value={form.giu_xe ?? ""} onChange={(e) => setForm({ ...form, giu_xe: Number(e.target.value) })} /></label>
+            <label>Số chứng từ<input value={form.chung_tu || ""} onChange={(e) => setForm({ ...form, chung_tu: e.target.value })} /></label>
+          </div>
+        </>}
+        <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+          <button className="act teal" disabled={dangLuu} onClick={luuChuyen}>{dangLuu ? "Đang lưu…" : "Lưu phiếu"}</button>
+          <button className="act grey" onClick={() => setForm(null)}>Đóng</button>
+        </div>
+      </div>}
+
+      <div className="panel wrap"><h2>Nhật trình chuyến</h2>
+      <p className="muted">Km để trống nghĩa là <b>chưa đo</b>, không phải bằng 0. Cột &quot;Vietourist tạm ứng&quot; và &quot;Chủ xe chịu&quot; tách theo quy tắc chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe.</p>
+      {canNhap && !form && <button className="act teal" style={{ marginBottom: 10 }}
+        onClick={() => setForm({ ngay_di: "", ngay_ve: "" })}>+ Nhập phiếu chi phí xe</button>}
+      <table><thead><tr><th>Phiếu</th><th>Xe</th><th>Tour</th><th>Đi → về</th><th>Km chạy</th><th>Doanh thu</th><th>VTS tạm ứng</th><th>Chủ xe chịu</th><th>Cờ</th>{canNhap && <th></th>}</tr></thead>
         <tbody>{chuyen.length ? chuyen.map((t) => <tr key={t.id}>
+          <td className="muted">{t.ma_phieu || `#${t.id}`}</td>
           <td>{t.xe}</td><td>{t.ten_tour || <span className="muted">—</span>}</td>
           <td>{fmtD(t.ngay_di)} → {fmtD(t.ngay_ve)} <span className="muted">({t.so_ngay} ngày)</span></td>
           <td className="num">{t.km_chay === null ? <span className="muted">chưa đo</span> : t.km_chay.toLocaleString("vi-VN")}</td>
@@ -82,11 +170,63 @@ function DoiXe() {
           <td className="num">{t.tong_chi_vietourist.toLocaleString("vi-VN")}</td>
           <td className="num">{t.tong_chi_chu_xe.toLocaleString("vi-VN")}</td>
           <td><Tag cls={t.co === "xanh" ? "ok" : t.co === "do" ? "red" : "warn"}>{t.co === "xanh" ? "Xanh" : t.co === "do" ? "Đỏ" : "Vàng"}</Tag>
-            {t.co_ly_do && <div className="muted">{t.co_ly_do}</div>}</td>
-        </tr>) : <tr><td colSpan={8} className="muted">Chưa có chuyến nào được ghi nhật trình.</td></tr>}</tbody></table>
+            {t.co_ly_do && <div className="muted">{t.co_ly_do}</div>}
+            {t.note && <div className="muted">{t.note}</div>}</td>
+          {canNhap && <td>{t.status === "da_xac_nhan"
+            ? <button className="act grey" onClick={() => moLai(t.id)}>Mở lại để sửa</button>
+            : <button className="act grey" onClick={() => setForm({
+                id: t.id, vehicle_id: t.vehicle_id, ten_tour: t.ten_tour,
+                ngay_di: (t.ngay_di || "").slice(0, 10), ngay_ve: (t.ngay_ve || "").slice(0, 10),
+                km_dau: t.km_dau, km_cuoi: t.km_cuoi, doanh_thu: t.doanh_thu, note: t.note })}>Sửa</button>}</td>}
+        </tr>) : <tr><td colSpan={canNhap ? 10 : 9} className="muted">Chưa có chuyến nào được ghi nhật trình.</td></tr>}</tbody></table>
+      </div>
+    </>}
+
+    {tab === "giaodich" && formDX && <div className="panel">
+      <h2>Lập đề xuất chi</h2>
+      <p className="muted">Cùng bộ trường với phiếu đề xuất chi trên Vietrip. Bắt buộc chọn <b>nhóm</b>: &quot;nạp thẻ dầu&quot;
+        và &quot;sửa xe&quot; nhìn giống nhau lúc lập phiếu, nhưng một cái là nạp quỹ còn một cái là chi phí — không phân loại
+        ngay thì cuối tháng phải đọc lại từng phiếu để đoán.</p>
+      <div className="grid2">
+        <label>Ngày đề xuất<input type="date" value={formDX.ngay || ""} onChange={(e) => setFormDX({ ...formDX, ngay: e.target.value })} /></label>
+        <label>Số tiền (đ)<input type="number" value={formDX.so_tien ?? ""} onChange={(e) => setFormDX({ ...formDX, so_tien: Number(e.target.value) })} /></label>
+        <label>Xe (để trống = đề xuất chung)
+          <select value={formDX.bien_so || ""} onChange={(e) => setFormDX({ ...formDX, bien_so: e.target.value })}>
+            <option value="">— đề xuất chung, không thuộc xe nào —</option>
+            {xe.map((v: any) => <option key={v.id} value={v.plate}>{v.plate}</option>)}
+          </select></label>
+        <label>Nhóm khoản chi
+          <select value={formDX.nhom || ""} onChange={(e) => {
+            const n = e.target.value;
+            setFormDX({ ...formDX, nhom: n, khong_phai_chi_phi: n.startsWith("Nạp quỹ") || n.startsWith("Điều chuyển") });
+          }}>
+            <option value="">— chọn nhóm —</option>
+            <option>Chi phí riêng của xe</option>
+            <option>Chi phí chung phân bổ</option>
+            <option>Sửa chữa – bảo dưỡng</option>
+            <option>Tài xế (công tác phí, lương)</option>
+            <option>Quyết toán chủ xe / đối tác</option>
+            <option>Nạp quỹ / tạm ứng (không phải chi phí)</option>
+            <option>Điều chuyển tiền nội bộ (không phải chi phí)</option>
+          </select></label>
+        <label>Số chứng từ<input value={formDX.chung_tu || ""} onChange={(e) => setFormDX({ ...formDX, chung_tu: e.target.value })} placeholder="HĐ 0000xxxx" /></label>
+        <label>Người / đơn vị thụ hưởng<input value={formDX.nguoi_thu_huong || ""} onChange={(e) => setFormDX({ ...formDX, nguoi_thu_huong: e.target.value })} /></label>
+        <label>Số tài khoản<input value={formDX.so_tai_khoan || ""} onChange={(e) => setFormDX({ ...formDX, so_tai_khoan: e.target.value })} /></label>
+        <label>Ngân hàng<input value={formDX.ngan_hang || ""} onChange={(e) => setFormDX({ ...formDX, ngan_hang: e.target.value })} /></label>
+      </div>
+      <label style={{ display: "block", marginTop: 8 }}>Nội dung đề xuất
+        <textarea rows={4} value={formDX.noi_dung || ""} onChange={(e) => setFormDX({ ...formDX, noi_dung: e.target.value })} /></label>
+      {formDX.khong_phai_chi_phi && <p className="muted">Khoản này được đánh dấu <b>không phải chi phí kỳ này</b> nên
+        sẽ không cộng vào tổng chi phí đội xe — tiền dầu thật nằm ở phiếu chi phí của từng chuyến.</p>}
+      <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+        <button className="act teal" disabled={dangLuu} onClick={luuDeXuat}>{dangLuu ? "Đang lưu…" : "Lập đề xuất"}</button>
+        <button className="act grey" onClick={() => setFormDX(null)}>Đóng</button>
+      </div>
     </div>}
 
     {tab === "giaodich" && gd && <div className="panel wrap"><h2>Đối soát dữ liệu nguồn ngoài</h2>
+      {canNhap && !formDX && <button className="act teal" style={{ marginBottom: 10 }}
+        onClick={() => setFormDX({ ngay: new Date().toISOString().slice(0, 10) })}>+ Lập đề xuất chi</button>}
       <div className="kpis">
         <div className="kpi"><b>{Number(gd.tong_chi_phi || 0).toLocaleString("vi-VN")}</b><span>chi phí (đã loại bản ghi lặp)</span></div>
         <div className="kpi"><b style={{ color: "var(--orange)" }}>{Number(gd.tong_chua_quy_ve_xe || 0).toLocaleString("vi-VN")}</b><span>chưa quy được về xe nào</span></div>
