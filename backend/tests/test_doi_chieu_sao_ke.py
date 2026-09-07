@@ -111,3 +111,33 @@ def test_s5_doi_chieu_chi_doc_muon_ghi_phai_goi_buoc_rieng():
     assert [x for x in d2["khop"] if x["ke_uoc"] == "125/2025/GNN/Q4"]     # đối chiếu lại thì khớp
     # khế ước không có trên sao kê vẫn nguyên vẹn sau khi cập nhật
     assert [x for x in d2["khong_thay_tren_sao_ke"] if x["ke_uoc"] == "134/2023/GNN/Q4/01"]
+
+
+def test_s6_khoan_vay_bds_von_luu_dong_la_ngoai_pham_vi_chu_khong_phai_thieu_sot():
+    """Sao kê gộp chung vay mua xe, vay bất động sản và vay vốn lưu động. Dòng ngoài phạm vi phải
+    được gọi đúng tên: gộp chung với "chưa theo dõi" thì một việc thật chìm giữa 51 dòng không phải việc."""
+    dong = SAO_KE_TP + [
+        {"ke_uoc": "GNU9306258180806", "du_no": 4_000_000_000, "lai_suat": 9.6, "nhom": "von_luu_dong"},
+        {"ke_uoc": "BDS-2025-01", "du_no": 12_000_000_000, "lai_suat": 11.0, "nhom": "bds"},
+    ]
+    d = client.post("/api/v1/fin/doi-chieu-sao-ke", json={"ngan_hang": "TPBank", "dong": dong}, headers=login("ketoan")).json()
+    ma_ngoai = [x["ke_uoc"] for x in d["ngoai_pham_vi"]]
+    assert "GNU9306258180806" in ma_ngoai and "BDS-2025-01" in ma_ngoai
+    assert d["tong_ngoai_pham_vi"] == 16_000_000_000
+    # dòng không ghi nhóm vẫn nằm ở "chưa theo dõi" – không tự cho là ngoài phạm vi
+    assert "GNT8571286620162" in [x["ke_uoc"] for x in d["chua_theo_doi"]]
+    assert "ngoài phạm vi" in d["tom_tat"]
+
+
+def test_s7_man_hinh_vay_xe_khong_om_khoan_vay_ngoai_doi_xe():
+    """Khế ước xếp nhóm không phải vay xe thì không xuất hiện trên bản đồ vay – thế chấp xe."""
+    r = client.post("/api/v1/fin/vay-xe/nap", json={"nguon": "test", "khe_uoc": [
+        {"contract_no": "BDS-2025-01", "partner": "TPBank", "entity": "Vietourist Holdings",
+         "loan_group": "bds", "principal": 12_000_000_000, "outstanding": 12_000_000_000, "interest_rate": 11.0, "xe": []}]},
+        headers=login("chutich")).json()
+    assert r["tao_moi"] == ["BDS-2025-01"]
+    d = client.get("/api/v1/fin/vay-xe", headers=login("ketoan")).json()
+    assert "BDS-2025-01" not in [k["contract_no"] for k in d["ke_uoc"]]
+    assert "125/2025/GNN/Q4" in [k["contract_no"] for k in d["ke_uoc"]]
+    # tổng đúng bằng ba khế ước vay xe, khoản bất động sản 12 tỷ không cộng vào
+    assert d["tong_du_no"] == 8_711_111_104 + 2_247_887_320 + 1_767_406_654

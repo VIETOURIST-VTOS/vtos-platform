@@ -17,7 +17,7 @@ WRITE = ("ketoan",)
 
 
 def c_out(c: FinContract) -> dict:
-    return {"id": c.id, "code": c.code, "kind": c.kind, "kind_name": CONTRACT_KINDS.get(c.kind, c.kind), "entity": c.entity, "company_id": c.company_id, "partner": c.partner, "contract_no": c.contract_no,
+    return {"id": c.id, "code": c.code, "kind": c.kind, "kind_name": CONTRACT_KINDS.get(c.kind, c.kind), "entity": c.entity, "company_id": c.company_id, "loan_group": c.loan_group, "partner": c.partner, "contract_no": c.contract_no,
             "signed_on": c.signed_on, "principal": c.principal, "outstanding": c.outstanding, "interest_rate": c.interest_rate, "maturity": c.maturity, "collateral": c.collateral,
             "purpose": c.purpose, "owner": c.owner, "approval_ref": c.approval_ref, "related_party": c.related_party, "status": c.status, "note": c.note,
             "schedule": [{"id": s.id, "due_date": s.due_date, "kind": s.kind, "amount": s.amount, "status": s.status, "done_on": s.done_on, "bank_ref": s.bank_ref} for s in c.schedule]}
@@ -38,6 +38,7 @@ class ContractIn(BaseModel):
     kind: str
     entity: str = "Công ty mẹ"
     company_id: int | None = None
+    loan_group: str = ""
     partner: str
     contract_no: str = ""
     signed_on: date | None = None
@@ -148,6 +149,7 @@ class KheUocNapIn(BaseModel):
     contract_no: str
     partner: str
     entity: str = "Công ty mẹ"
+    loan_group: str = "vay_xe_45cho"
     principal: float
     outstanding: float = 0
     interest_rate: float = 0
@@ -205,7 +207,7 @@ def nap_vay_xe(data: NapVayIn, u: User = Depends(require_roles("ketoan", "chutic
             if not c.outstanding: c.outstanding = c.principal
             db.add(c); db.flush(); tao.append(c.contract_no)
         else:
-            for f in ("partner", "entity", "principal", "outstanding", "interest_rate", "signed_on", "maturity", "collateral", "purpose", "note"):
+            for f in ("partner", "entity", "loan_group", "principal", "outstanding", "interest_rate", "signed_on", "maturity", "collateral", "purpose", "note"):
                 if d.get(f) not in (None, "", 0): setattr(c, f, d[f])
             cap_nhat.append(c.contract_no)
         c.company_id = tim_cty(k.entity) or c.company_id
@@ -233,6 +235,7 @@ class SaoKeDong(BaseModel):
     giai_ngan: date | None = None
     muc_dich: str = ""
     loai: str = ""
+    nhom: str = ""      # von_luu_dong / bds / khac → xếp vào "ngoài phạm vi theo dõi vay xe"
 
 
 class SaoKeIn(BaseModel):

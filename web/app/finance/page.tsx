@@ -144,7 +144,7 @@ function Finance() {
 
     {tab === "doichieu" && <>
       <div className="panel"><h2>Dán sao kê khoản vay của ngân hàng</h2>
-        <p className="muted">Mỗi dòng một khế ước, ngăn bằng dấu chấm phẩy hoặc tab: <b>mã khế ước ; dư nợ ; lãi suất %/năm ; ngày đáo hạn (yyyy-mm-dd) ; mục đích</b>. Chỉ ba cột đầu là bắt buộc. Đối chiếu chỉ ĐỌC và so sánh — muốn ghi đè dư nợ phải bấm nút cập nhật riêng bên dưới.</p>
+        <p className="muted">Mỗi dòng một khế ước, ngăn bằng dấu chấm phẩy hoặc tab: <b>mã khế ước ; dư nợ ; lãi suất %/năm ; ngày đáo hạn (yyyy-mm-dd) ; nhóm</b>. Chỉ ba cột đầu là bắt buộc. Cột <b>nhóm</b> ghi <code>von_luu_dong</code>, <code>bds</code> hoặc <code>khac</code> cho khoản vay không thuộc đội xe — những dòng đó sẽ được xếp là &quot;ngoài phạm vi&quot; thay vì báo là thiếu sót. Đối chiếu chỉ ĐỌC và so sánh — muốn ghi đè dư nợ phải bấm nút cập nhật riêng bên dưới.</p>
         <div className="grid">
           <label>Ngân hàng<input value={sk.ngan_hang} onChange={(e) => setSk({ ...sk, ngan_hang: e.target.value })} /></label>
           <label>Sao kê đến ngày<input type="date" value={sk.den_ngay} onChange={(e) => setSk({ ...sk, den_ngay: e.target.value })} /></label>
@@ -152,7 +152,7 @@ function Finance() {
         <textarea rows={8} style={{ width: "100%", fontFamily: "monospace" }} placeholder={"125/2025/GNN/Q4 ; 8711111104 ; 13.7 ; 2031-05-09\n125/2025/GNN/Q4/02 ; 2247887320 ; 13.5 ; 2031-05-09"} value={sk.text} onChange={(e) => setSk({ ...sk, text: e.target.value })} />
         <button className="act" disabled={!sk.text.trim()} onClick={() => {
           const dong = sk.text.split("\n").map((l: string) => l.split(/[;\t]/).map((x: string) => x.trim())).filter((c: string[]) => c[0])
-            .map((c: string[]) => ({ ke_uoc: c[0], du_no: Number((c[1] || "0").replace(/[^0-9.]/g, "")) || 0, lai_suat: c[2] ? Number(c[2].replace(/[^0-9.]/g, "")) : null, dao_han: c[3] || null, muc_dich: c[4] || "" }));
+            .map((c: string[]) => ({ ke_uoc: c[0], du_no: Number((c[1] || "0").replace(/[^0-9.]/g, "")) || 0, lai_suat: c[2] ? Number(c[2].replace(/[^0-9.]/g, "")) : null, dao_han: c[3] || null, nhom: c[4] || "", muc_dich: c[5] || "" }));
           post("/fin/doi-chieu-sao-ke", { ngan_hang: sk.ngan_hang, den_ngay: sk.den_ngay, dong }).then((r) => r && setDc({ ...r, _dong: dong }));
         }}>Đối chiếu</button>
       </div>
@@ -174,6 +174,11 @@ function Finance() {
           <div className="panel" style={{ borderColor: "var(--red)" }}>{dc.khong_thay_tren_sao_ke.map((k: any) => <div key={k.ke_uoc} style={{ marginBottom: 8 }}>
             <Tag cls="red">!</Tag> <b>{k.ke_uoc}</b> · {k.partner} · dư nợ hệ thống {vnd(k.du_no_he_thong)}{k.the_chap && <> · TSTC: {k.the_chap}</>}
             <div className="muted">{k.y_nghia}</div></div>)}</div></>}
+        {dc.ngoai_pham_vi && dc.ngoai_pham_vi.length > 0 && <><h2>Ngoài phạm vi theo dõi vay xe — {dc.ngoai_pham_vi.length} khoản, cộng {vnd(dc.tong_ngoai_pham_vi)}</h2>
+          <p className="muted">Vay bất động sản và vay vốn lưu động. Nêu ra để thấy đủ bức tranh nợ ngân hàng, KHÔNG phải việc phải nạp vào phân hệ vay xe.</p>
+          <div className="panel wrap"><table><thead><tr><th>Khế ước</th><th style={{ textAlign: "right" }}>Dư nợ</th><th>Lãi suất</th><th>Đáo hạn</th></tr></thead><tbody>
+            {dc.ngoai_pham_vi.map((k: any) => <tr key={k.ke_uoc}><td>{k.ke_uoc}</td><td style={{ textAlign: "right" }}>{vnd(k.du_no)}</td><td>{k.lai_suat ? k.lai_suat + "%" : ""}</td><td>{k.dao_han ? fmtD(k.dao_han) : ""}</td></tr>)}
+          </tbody></table></div></>}
         {dc.chua_theo_doi.length > 0 && <><h2>Ngân hàng đang cho vay nhưng hệ thống chưa theo dõi — cộng {vnd(dc.tong_chua_theo_doi)}</h2>
           <div className="panel wrap"><table><thead><tr><th>Khế ước</th><th style={{ textAlign: "right" }}>Dư nợ</th><th>Lãi suất</th><th>Đáo hạn</th><th>Mục đích</th></tr></thead><tbody>
             {dc.chua_theo_doi.map((k: any) => <tr key={k.ke_uoc}><td>{k.ke_uoc}</td><td style={{ textAlign: "right" }}>{vnd(k.du_no)}</td><td>{k.lai_suat ? k.lai_suat + "%" : ""}</td><td>{k.dao_han ? fmtD(k.dao_han) : ""}</td><td className="muted">{k.muc_dich}</td></tr>)}

@@ -17,6 +17,10 @@ class FinContract(Base):
     kind: Mapped[str] = mapped_column(String(20))
     entity: Mapped[str] = mapped_column(String(80), default="Công ty mẹ")    # pháp nhân: Công ty mẹ / Vietrip
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)   # pháp nhân vay – dùng cho hợp nhất, cột entity ở trên giữ nguyên văn hồ sơ
+    # Nhóm khoản vay. Sao kê ngân hàng gộp chung vay mua xe, vay bất động sản và vay vốn lưu động;
+    # màn hình theo dõi vay xe chỉ được lấy đúng nhóm của mình, nếu không thì 51 khoản vay khác sẽ
+    # trôi vào đó và con số "nợ của đội xe" thành một con số không có nghĩa.
+    loan_group: Mapped[str] = mapped_column(String(24), default="")   # vay_xe_45cho / vay_xe_khac / von_luu_dong / bds / khac
     partner: Mapped[str] = mapped_column(String(160))                       # ngân hàng / đối tác
     contract_no: Mapped[str] = mapped_column(String(80), default="")
     signed_on: Mapped[date | None] = mapped_column(Date, nullable=True)

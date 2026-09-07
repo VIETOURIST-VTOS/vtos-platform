@@ -189,8 +189,16 @@ def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
     today = hom_nay or date.today()
     cty = {c.id: c.name for c in db.execute(select(Company)).scalars()}
     xe = {v.id: v for v in db.execute(select(Vehicle)).scalars()}
-    loans = list(db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars())
     tc = list(db.execute(select(Collateral)).scalars())
+    # Loại khoản vay KHÔNG thuộc đội xe. Sao kê ngân hàng gộp chung vay bất động sản và vay vốn lưu động;
+    # kéo hết vào đây thì "nợ của đội xe" thành một con số không ai dùng được.
+    #
+    # Quy tắc là LOẠI TRỪ chứ không phải chọn vào: chỉ khế ước được xếp rõ là bất động sản / vốn lưu động /
+    # khác mới bị bỏ ra. Khế ước chưa ai xếp nhóm vẫn hiện. Làm ngược lại – chỉ hiện khi đã xếp nhóm – thì
+    # một khoản vay quên xếp nhóm sẽ biến mất khỏi màn hình cùng với mọi cảnh báo của nó, và không ai biết.
+    NGOAI_DOI_XE = {"von_luu_dong", "bds", "khac"}
+    loans = [c for c in db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars()
+             if (c.loan_group or "").strip() not in NGOAI_DOI_XE]
     theo_ke_uoc: dict[int, list] = {}
     for c in tc: theo_ke_uoc.setdefault(c.contract_id, []).append(c)
 
@@ -293,7 +301,7 @@ def doi_chieu_sao_ke(db: Session, dong: list[dict], ngan_hang: str = "", den_nga
     loans = {c.contract_no.strip(): c for c in
              db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars()
              if (c.contract_no or "").strip()}
-    khop, lech, chua_theo_doi = [], [], []
+    khop, lech, chua_theo_doi, ngoai_pham_vi = [], [], [], []
     thay = set()
     for r in dong:
         ma = str(r.get("ke_uoc") or "").strip()
@@ -301,8 +309,12 @@ def doi_chieu_sao_ke(db: Session, dong: list[dict], ngan_hang: str = "", den_nga
         c = loans.get(ma)
         sk_du_no = float(r.get("du_no") or 0)
         if c is None:
-            chua_theo_doi.append({"ke_uoc": ma, "du_no": sk_du_no, "lai_suat": r.get("lai_suat"),
-                                  "dao_han": r.get("dao_han"), "muc_dich": r.get("muc_dich", ""), "loai": r.get("loai", "")})
+            # Dòng sao kê không có trong hệ thống có hai nghĩa rất khác nhau: khoản vay mua xe bị bỏ sót
+            # (phải nạp), hay khoản vay bất động sản / vốn lưu động vốn không thuộc phạm vi theo dõi vay xe
+            # (không phải nạp). Gộp làm một thì việc thật chìm trong danh sách 51 dòng không phải việc.
+            muc = {"ke_uoc": ma, "du_no": sk_du_no, "lai_suat": r.get("lai_suat"),
+                   "dao_han": r.get("dao_han"), "muc_dich": r.get("muc_dich", ""), "loai": r.get("loai", "")}
+            (ngoai_pham_vi if str(r.get("nhom") or "").strip() in ("von_luu_dong", "bds", "khac") else chua_theo_doi).append(muc)
             continue
         thay.add(ma)
         sai = []
@@ -329,5 +341,7 @@ def doi_chieu_sao_ke(db: Session, dong: list[dict], ngan_hang: str = "", den_nga
             "tong_sao_ke": sum(float(r.get("du_no") or 0) for r in dong),
             "khop": khop, "lech": lech, "khong_thay_tren_sao_ke": khong_thay, "chua_theo_doi": chua_theo_doi,
             "tong_chua_theo_doi": sum(x["du_no"] for x in chua_theo_doi),
+            "ngoai_pham_vi": ngoai_pham_vi, "tong_ngoai_pham_vi": sum(x["du_no"] for x in ngoai_pham_vi),
             "tom_tat": f"{len(khop)} khế ước khớp, {len(lech)} lệch số, {len(khong_thay)} khế ước hệ thống có mà sao kê không có, "
-                       f"{len(chua_theo_doi)} khoản vay ngân hàng đang có mà hệ thống chưa theo dõi"}
+                       f"{len(chua_theo_doi)} khoản vay chưa theo dõi"
+                       + (f", {len(ngoai_pham_vi)} khoản ngoài phạm vi theo dõi vay xe (cộng {sum(x['du_no'] for x in ngoai_pham_vi):,.0f}đ)" if ngoai_pham_vi else "")}
