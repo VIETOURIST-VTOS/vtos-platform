@@ -229,10 +229,15 @@ def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
     for vid, ds in gan_xe.items():
         v = xe.get(vid)
         if v is None: continue
-        if v.lifecycle and v.lifecycle != "dang_khai_thac":
+        # Xét CẢ hai dấu hiệu. Một chiếc xe bị ngưng khai thác mà vòng đời chưa ai cập nhật vẫn là xe
+        # đã ra khỏi đội trên thực tế – 50F-034.37 đã giao ngày 10/08 chính là trường hợp đó, và nếu chỉ
+        # nhìn vòng đời thì cảnh báo quan trọng nhất lại im lặng đúng lúc cần kêu.
+        ra_khoi_doi = (v.lifecycle and v.lifecycle != "dang_khai_thac") or not v.active
+        if ra_khoi_doi:
+            trang_thai = v.lifecycle if v.lifecycle and v.lifecycle != "dang_khai_thac" else "đã ngưng khai thác, vòng đời chưa cập nhật"
             for g in ds:
                 canh_bao.append({"muc": "gap", "loai": "xe_da_ra_khoi_doi_van_the_chap", "khe_uoc": g["code"], "xe": v.plate,
-                                 "noi_dung": f"Xe {v.plate} trạng thái '{v.lifecycle}' nhưng vẫn là tài sản bảo đảm của khế ước {g['contract_no'] or g['code']} ({g['partner']}, dư nợ {g['du_no']:,.0f}đ)",
+                                 "noi_dung": f"Xe {v.plate} trạng thái '{trang_thai}' nhưng vẫn là tài sản bảo đảm của khế ước {g['contract_no'] or g['code']} ({g['partner']}, dư nợ {g['du_no']:,.0f}đ)",
                                  "viec": "Xin văn bản giải chấp riêng của ngân hàng trước khi sang tên, hoặc tất toán khế ước"})
 
     # Xe đang khai thác không gắn khế ước nào.

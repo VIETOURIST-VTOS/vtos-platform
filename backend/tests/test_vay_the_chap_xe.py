@@ -155,3 +155,16 @@ def test_v9_nap_ho_so_khe_uoc_chay_lai_khong_tao_trung():
     # xe đã bán vẫn là tài sản bảo đảm → phải kêu gấp
     assert [c for c in d["canh_bao"] if c.get("xe") == "50F-046.92" and c["muc"] == "gap"]
     assert client.post("/api/v1/fin/vay-xe/nap", json=body, headers=login("hcns")).status_code == 403
+
+
+def test_v10_xe_ngung_khai_thac_ma_vong_doi_chua_cap_nhat_van_phai_keu():
+    """50F-034.37 trong hồ sơ thật: đã giao cho người mua, tài khoản xe bị ngưng, nhưng vòng đời vẫn
+    ghi 'đang khai thác'. Nếu chỉ nhìn vòng đời thì cảnh báo quan trọng nhất im lặng đúng lúc cần kêu."""
+    from app.db.session import SessionLocal
+    from app.models.hr import Vehicle
+    db = SessionLocal()
+    v = db.query(Vehicle).filter(Vehicle.plate == "50F-034.71").first()
+    v.active = False; v.lifecycle = "dang_khai_thac"; db.commit(); db.close()
+    d = _lay()
+    cb = [c for c in d["canh_bao"] if c.get("xe") == "50F-034.71"]
+    assert cb and cb[0]["muc"] == "gap" and "chưa cập nhật" in cb[0]["noi_dung"]
