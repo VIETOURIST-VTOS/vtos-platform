@@ -336,3 +336,58 @@ class AuditLog(Base):
     hash: Mapped[str] = mapped_column(String(64))
 
 
+
+# ---------- Nhật ký AI (chỉ đạo 07/9/2026) ----------
+AI_TASKS = {
+    "hoi_dap": "Hỏi–đáp trên dữ liệu",
+    "tin_khach": "Tin nhắn gửi khách",
+    "tin_khach_nhap": "Soạn nháp tin cho khách",
+    "vb_noi_bo": "Soạn văn bản nội bộ",
+    "doc_chung_tu": "Đọc chứng từ",
+    "cham_diem": "Nhận xét & chấm điểm",
+    "canh_bao": "Cảnh báo & nhắc việc",
+}
+# 1 quan sát · 2 soạn nháp (người bấm gửi) · 3 tự động trong hạn mức (người hậu kiểm) · 4 robot mã xác định
+AI_LEVELS = {1: "Quan sát", 2: "Soạn nháp", 3: "Tự động trong hạn mức", 4: "Tự động toàn phần (mã xác định)"}
+AI_REVIEW_STATES = {
+    "khong_can": "Không cần hậu kiểm",
+    "cho_hau_kiem": "Chờ hậu kiểm",
+    "chap_nhan": "Đã hậu kiểm – chấp nhận",
+    "da_sua": "Đã hậu kiểm – người sửa lại",
+    "thu_hoi": "Đã thu hồi",
+}
+
+
+class AiRun(Base):
+    """Mỗi lần phần mềm gọi mô hình ngôn ngữ hoặc gửi nội dung do AI sinh ra.
+
+    Trước bản này, ba chỗ dùng mô hình ngôn ngữ – trả lời khách trong hộp thư, chấm câu trả lời của tư vấn
+    viên, viết nhận xét báo cáo cho lãnh đạo – KHÔNG để lại vết nào. Trong đó chỗ thứ nhất gửi tin cho khách
+    hàng thật. Không có bảng này thì không trả lời được ba câu: AI đã nói gì với ai, ai chịu trách nhiệm hậu
+    kiểm, và có bao nhiêu nội dung bị người sửa lại (tỷ lệ bị sửa tăng là tín hiệu phải hạ mức, không phải
+    tín hiệu huấn luyện thêm).
+
+    `dau_vao_hash` là mã băm của dữ liệu đưa vào mô hình, lấy đúng khuôn mẫu đã dùng cho đội xe
+    (fleet_ai_runs): nó biến câu "chạy lại cùng dữ liệu phải ra cùng kết quả" thành điều kiểm chứng được
+    thay vì một lời hứa. Không lưu nguyên văn dữ liệu vào vì trong đó có tên và số điện thoại khách.
+    """
+    __tablename__ = "ai_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    tac_vu: Mapped[str] = mapped_column(String(20), index=True)          # AI_TASKS
+    muc: Mapped[int] = mapped_column(Integer, default=1)                 # AI_LEVELS – mức TẠI THỜI ĐIỂM CHẠY
+    ref: Mapped[str] = mapped_column(String(60), default="")             # conv:12, tour:DL001…
+    phuc_vu_vai_tro: Mapped[str] = mapped_column(String(30), default="")  # phục vụ vai trò nào
+    phuc_vu_nguoi: Mapped[str] = mapped_column(String(50), default="")    # tài khoản được phục vụ; rỗng = robot
+    mo_hinh: Mapped[str] = mapped_column(String(60), default="")          # tên mô hình, rỗng khi chạy theo quy tắc
+    nguon: Mapped[str] = mapped_column(String(12), default="")            # claude / quy_tac
+    dau_vao_hash: Mapped[str] = mapped_column(String(64), default="")
+    so_ban_ghi: Mapped[int] = mapped_column(Integer, default=0)
+    ket_qua: Mapped[str] = mapped_column(Text, default="")                # nội dung đã sinh, cắt ngắn
+    tokens_vao: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_ra: Mapped[int] = mapped_column(Integer, default=0)
+    trang_thai: Mapped[str] = mapped_column(String(16), default="khong_can", index=True)   # AI_REVIEW_STATES
+    hau_kiem_boi: Mapped[str] = mapped_column(String(50), default="")
+    hau_kiem_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    hau_kiem_ghi_chu: Mapped[str] = mapped_column(String(300), default="")
+    loi: Mapped[str] = mapped_column(String(300), default="")

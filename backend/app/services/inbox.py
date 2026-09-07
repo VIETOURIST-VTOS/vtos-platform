@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.models.core import User, Tour, Product, Alert
 from app.models.crm import Conversation, Message, Lead
 from app.services import rules as R
+from app.services import ai_log as AL
 from app.services.zalo import norm_phone
 
 GRAPH = "https://graph.facebook.com/v19.0"
@@ -223,15 +224,24 @@ def knowledge(db: Session, text: str) -> str:
     return ("Tour sắp khởi hành:\n" + "\n".join(lines) if lines else "Hiện chưa có lịch khởi hành phù hợp trong 45 ngày tới.") + "\n" + pol
 
 
-def _claude(prompt: str, max_tokens: int = 400) -> str | None:
-    if not settings.ANTHROPIC_API_KEY: return None
+def _claude_chi_tiet(prompt: str, max_tokens: int = 400) -> tuple[str | None, int, int, str]:
+    """(nội dung, token vào, token ra, lỗi). Trả cả lỗi để nhật ký AI ghi được lần gọi hỏng –
+    một lần gọi hỏng vẫn là một lần phần mềm định làm thay người, và im lặng thì không ai biết."""
+    if not settings.ANTHROPIC_API_KEY:
+        return None, 0, 0, "chưa cấu hình ANTHROPIC_API_KEY"
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
         msg = client.messages.create(model=settings.ANTHROPIC_MODEL, max_tokens=max_tokens, messages=[{"role": "user", "content": prompt}])
-        return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
+        u = getattr(msg, "usage", None)
+        return ("".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip(),
+                int(getattr(u, "input_tokens", 0) or 0), int(getattr(u, "output_tokens", 0) or 0), "")
     except Exception as ex:  # noqa
-        return None
+        return None, 0, 0, f"{type(ex).__name__}: {ex}"
+
+
+def _claude(prompt: str, max_tokens: int = 400) -> str | None:
+    return _claude_chi_tiet(prompt, max_tokens)[0]
 
 
 def history_text(db: Session, c: Conversation, n: int = 12) -> str:
@@ -239,16 +249,32 @@ def history_text(db: Session, c: Conversation, n: int = 12) -> str:
     return "\n".join(f"{'Khách' if m.direction == 'in' else ('AI' if m.sender == 'ai' else 'Tư vấn viên')}: {m.text}" for m in ms)
 
 
-def draft_reply(db: Session, c: Conversation) -> tuple[str, str]:
-    """(nội dung, nguồn 'claude'|'quy_tac')."""
+def draft_reply(db: Session, c: Conversation, *, tu_dong: bool = False, boi: str = "") -> tuple[str, str]:
+    """(nội dung, nguồn 'claude'|'quy_tac').
+
+    tu_dong=True là robot tự gửi cho khách (mức 3) – ghi nhật ký ở trạng thái CHỜ HẬU KIỂM.
+    tu_dong=False là người bấm xem nháp (mức 2) – nội dung chưa ra khỏi công ty nên không cần hậu kiểm.
+    """
     last = db.execute(select(Message).where(Message.conversation_id == c.id, Message.direction == "in").order_by(desc(Message.at))).scalars().first()
     q = last.text if last else ""
     kb = knowledge(db, q)
-    out = _claude(f"{AI_POLICY}\n\nDỮ LIỆU VTOS:\n{kb}\n\nHỘI THOẠI GẦN NHẤT:\n{history_text(db, c)}\n\nViết câu trả lời tiếp theo cho khách.")
-    if out: return out, "claude"
-    name = c.customer_name or "anh/chị"
-    first = kb.split("\n")[1] if "\n" in kb and kb.startswith("Tour") else ""
-    return (f"Vietourist chào {name}! Em đã nhận được tin nhắn, tư vấn viên sẽ trả lời ngay trong ít phút. " + (f"Trong lúc chờ, tour gần nhất: {first[2:]}. " if first else "") + "Anh/chị cho em xin tên và số điện thoại để em hỗ trợ nhanh hơn nhé?"), "quy_tac"
+    prompt = f"{AI_POLICY}\n\nDỮ LIỆU VTOS:\n{kb}\n\nHỘI THOẠI GẦN NHẤT:\n{history_text(db, c)}\n\nViết câu trả lời tiếp theo cho khách."
+    out, t_in, t_ra, loi = _claude_chi_tiet(prompt)
+    if not out:
+        name = c.customer_name or "anh/chị"
+        first = kb.split("\n")[1] if "\n" in kb and kb.startswith("Tour") else ""
+        out = (f"Vietourist chào {name}! Em đã nhận được tin nhắn, tư vấn viên sẽ trả lời ngay trong ít phút. "
+               + (f"Trong lúc chờ, tour gần nhất: {first[2:]}. " if first else "")
+               + "Anh/chị cho em xin tên và số điện thoại để em hỗ trợ nhanh hơn nhé?")
+        nguon = "quy_tac"
+    else:
+        nguon = "claude"
+    AL.ghi(db, tac_vu="tin_khach" if tu_dong else "tin_khach_nhap", muc=3 if tu_dong else 2,
+           dau_vao=prompt, ket_qua=out, nguon=nguon,
+           mo_hinh=settings.ANTHROPIC_MODEL if nguon == "claude" else "",
+           ref=f"conv:{c.id}", nguoi=boi,
+           trang_thai="cho_hau_kiem" if tu_dong else "khong_can", loi=loi if nguon == "quy_tac" else "")
+    return out, nguon
 
 
 def review_reply(db: Session, c: Conversation, text: str) -> dict:
@@ -257,12 +283,20 @@ def review_reply(db: Session, c: Conversation, text: str) -> dict:
                   "Trả về JSON duy nhất: {\"score\": số, \"flags\": [\"...\"], \"note\": \"1 câu\"}.\n\nDỮ LIỆU VTOS:\n" + knowledge(db, text) + "\n\nHỘI THOẠI:\n" + history_text(db, c) + "\n\nCÂU TRẢ LỜI CẦN CHẤM:\n" + text, 200)
     if out:
         try:
-            j = json.loads(out[out.index("{"): out.rindex("}") + 1]); return {"score": int(j.get("score", 0)), "flags": list(j.get("flags", []))[:5], "note": str(j.get("note", ""))[:200], "by": "claude"}
+            j = json.loads(out[out.index("{"): out.rindex("}") + 1])
+            kq = {"score": int(j.get("score", 0)), "flags": list(j.get("flags", []))[:5], "note": str(j.get("note", ""))[:200], "by": "claude"}
+            # Chấm điểm con người thì phải truy được: điểm này đi vào hồ sơ đánh giá tư vấn viên.
+            AL.ghi(db, tac_vu="cham_diem", muc=1, dau_vao=text, ket_qua=json.dumps(kq, ensure_ascii=False),
+                   nguon="claude", mo_hinh=settings.ANTHROPIC_MODEL, ref=f"conv:{c.id}")
+            return kq
         except Exception: pass
     flags = []; low = text.lower()
     if any(k in low for k in ("giảm giá", "giảm thêm", "bớt", "khuyến mãi riêng", "giá đặc biệt")): flags.append("có thể tự ý giảm giá – cần mã KM được duyệt")
     if any(k in low for k in ("chắc chắn", "đảm bảo", "cam kết")): flags.append("cam kết mạnh – kiểm tra có đúng chính sách")
-    return {"score": 7 if not flags else 4, "flags": flags, "note": "chấm theo quy tắc (chưa có Claude API)", "by": "quy_tac"}
+    kq = {"score": 7 if not flags else 4, "flags": flags, "note": "chấm theo quy tắc (chưa có Claude API)", "by": "quy_tac"}
+    AL.ghi(db, tac_vu="cham_diem", muc=1, dau_vao=text, ket_qua=json.dumps(kq, ensure_ascii=False),
+           nguon="quy_tac", ref=f"conv:{c.id}")
+    return kq
 
 
 # ---------- robot R12 ----------
@@ -306,7 +340,7 @@ def robot_check(db: Session) -> dict:
     for c in db.execute(select(Conversation).where(Conversation.unanswered == True, Conversation.sla_due_at != None, Conversation.sla_due_at <= now, Conversation.status != "dong")).scalars():
         stale = c.last_in_at is None or now - c.last_in_at > timedelta(minutes=STALE_MINUTES)
         if on and not c.ai_off and c.ai_replies < 3 and not stale:
-            text, src = draft_reply(db, c); _send(db, c, text, "ai", "Trợ lý AI Vietourist"); replied += 1
+            text, src = draft_reply(db, c, tu_dong=True); _send(db, c, text, "ai", "Trợ lý AI Vietourist"); replied += 1
             c.summary = (c.summary + " | " if c.summary else "") + f"{now:%d/%m %H:%M} AI trả lời thay ({src})"
         ref = f"conv:{c.id}"
         if not db.execute(select(Alert).where(Alert.kind == "sale_tra_loi_cham", Alert.ref == ref, Alert.resolved == False)).scalars().first():

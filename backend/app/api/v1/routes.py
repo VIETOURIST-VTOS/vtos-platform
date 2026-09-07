@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles, robot_auth, Gate
 from app.api import schemas as S
+from pydantic import BaseModel
 from app.core.security import verify_password, create_token, hash_password
 from app.models.core import User, Tour, ServiceRequest, Booking, Param, Alert, AuditLog, ROLES, TOUR_TYPES, TOUR_STATUS
 from app.services import rules as R
@@ -497,6 +498,57 @@ def payroll(ym: str | None = None, u: User = Depends(require_roles("ketoan", "hc
 
 
 # ---------- robot API (n8n) ----------
+# ---------- Nhật ký AI (chỉ đạo 07/9/2026) ----------
+AI_LOG_ROLES = ("chutich", "tgd", "bks", "cntt", "ptgd_mkt")
+
+
+@router.get("/ai/runs", tags=["ai"])
+def ai_runs(tac_vu: str = "", trang_thai: str = "", limit: int = 200,
+            u: User = Depends(require_roles(*AI_LOG_ROLES)), db: Session = Depends(get_db)):
+    """Nhật ký mọi lần phần mềm dùng mô hình ngôn ngữ. Không mở cho mọi người: nội dung tóm tắt có tên khách."""
+    from app.models.core import AiRun, AI_TASKS, AI_LEVELS, AI_REVIEW_STATES
+    from app.services import ai_log as AL
+    q = select(AiRun)
+    if tac_vu: q = q.where(AiRun.tac_vu.in_(tac_vu.split(",")))
+    if trang_thai: q = q.where(AiRun.trang_thai.in_(trang_thai.split(",")))
+    rows = list(db.execute(q.order_by(AiRun.id.desc()).limit(min(limit, 500))).scalars())
+    return {"rows": [{"id": r.id, "ts": r.ts, "tac_vu": r.tac_vu, "tac_vu_ten": AI_TASKS.get(r.tac_vu, r.tac_vu),
+                      "muc": r.muc, "muc_ten": AI_LEVELS.get(r.muc, str(r.muc)), "ref": r.ref,
+                      "phuc_vu_vai_tro": r.phuc_vu_vai_tro, "phuc_vu_nguoi": r.phuc_vu_nguoi,
+                      "mo_hinh": r.mo_hinh, "nguon": r.nguon, "dau_vao_hash": r.dau_vao_hash,
+                      "ket_qua": r.ket_qua, "tokens_vao": r.tokens_vao, "tokens_ra": r.tokens_ra,
+                      "trang_thai": r.trang_thai, "trang_thai_ten": AI_REVIEW_STATES.get(r.trang_thai, r.trang_thai),
+                      "hau_kiem_boi": r.hau_kiem_boi, "hau_kiem_luc": r.hau_kiem_luc,
+                      "hau_kiem_ghi_chu": r.hau_kiem_ghi_chu, "loi": r.loi} for r in rows],
+            "tong_hop": AL.tong_hop(db), "tac_vu": AI_TASKS, "muc": AI_LEVELS, "trang_thai_ten": AI_REVIEW_STATES}
+
+
+class HauKiemIn(BaseModel):
+    ket_luan: str                      # chap_nhan / da_sua / thu_hoi
+    ghi_chu: str = ""
+
+
+@router.post("/ai/runs/{rid}/hau-kiem", tags=["ai"])
+def ai_hau_kiem(rid: int, data: HauKiemIn,
+                u: User = Depends(require_roles("chutich", "tgd", "cntt", "ptgd_mkt", "gd_kd", "tp_kd")),
+                db: Session = Depends(get_db)):
+    """Người hậu kiểm chốt: chấp nhận / người đã sửa lại / thu hồi. Ban Kiểm soát KHÔNG có mặt ở đây –
+    họ đọc và giám sát, chứ không phải người chịu trách nhiệm về nội dung AI gửi cho khách."""
+    from app.models.core import AiRun, AI_REVIEW_STATES
+    ket_luan, ghi_chu = data.ket_luan, data.ghi_chu
+    if ket_luan not in ("chap_nhan", "da_sua", "thu_hoi"):
+        raise HTTPException(422, "ket_luan: chap_nhan / da_sua / thu_hoi")
+    r = db.get(AiRun, rid)
+    if not r: raise HTTPException(404, "Không có bản ghi nhật ký AI")
+    if r.trang_thai not in ("cho_hau_kiem", "chap_nhan", "da_sua", "thu_hoi"):
+        raise HTTPException(422, "Bản ghi này không thuộc diện phải hậu kiểm")
+    before = {"trang_thai": r.trang_thai}
+    r.trang_thai, r.hau_kiem_boi, r.hau_kiem_luc, r.hau_kiem_ghi_chu = ket_luan, u.username, datetime.now(), ghi_chu[:300]
+    R.audit(db, u.username, u.role, "hau_kiem_ai", f"ai_run:{rid}", before=before, after={"trang_thai": ket_luan, "ghi_chu": ghi_chu[:300]})
+    db.commit()
+    return {"message": f"Đã ghi nhận: {AI_REVIEW_STATES[ket_luan]}", "id": rid, "trang_thai": ket_luan}
+
+
 @router.get("/health", tags=["meta"])
 def health(db: Session = Depends(get_db)):
     ok, n, msg = R.verify_chain(db)

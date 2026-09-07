@@ -193,19 +193,42 @@ def compose(db: Session, kind: str) -> tuple[str, dict]:
     return "\n".join(lines), data
 
 
-def claude_comment(md: str, data: dict) -> str:
-    """Nhận xét ngắn bằng tiếng Việt qua Anthropic API nếu có khóa; không có khóa → nhận xét theo quy tắc."""
+def claude_comment(md: str, data: dict, db=None) -> str:
+    """Nhận xét ngắn bằng tiếng Việt qua Anthropic API nếu có khóa; không có khóa → nhận xét theo quy tắc.
+
+    Nhận xét này đi thẳng lên bàn Chủ tịch và TGĐ, nên phải để lại vết như mọi việc AI làm: truyền db vào
+    thì ghi nhật ký AI (chỉ đạo 07/9/2026). Để db=None thì vẫn chạy như cũ – hàm này còn được gọi từ chỗ
+    không có phiên cơ sở dữ liệu.
+    """
+    prompt = ("Bạn là robot báo cáo quản trị của Vietourist Holdings (công ty lữ hành). Đọc số liệu dưới đây và viết 3–5 câu nhận xét ngắn gọn bằng tiếng Việt cho Ban Điều hành: điểm cần chú ý, rủi ro, việc nên làm trong tuần. Không bịa số.\n\n" + md)
+
+    def _ghi(ket_qua: str, nguon: str, mo_hinh: str = "", t_in: int = 0, t_ra: int = 0, loi: str = ""):
+        if db is None: return
+        try:
+            from app.services import ai_log as AL
+            AL.ghi(db, tac_vu="vb_noi_bo", muc=1, dau_vao=prompt, ket_qua=ket_qua, nguon=nguon,
+                   mo_hinh=mo_hinh, ref="bao_cao_quan_tri", tokens_vao=t_in, tokens_ra=t_ra, loi=loi)
+        except Exception:  # noqa – nhật ký hỏng không được làm hỏng báo cáo
+            pass
+
     key = settings.ANTHROPIC_API_KEY
     if key:
         try:
             import anthropic
             client = anthropic.Anthropic(api_key=key)
-            msg = client.messages.create(model=settings.ANTHROPIC_MODEL, max_tokens=400, messages=[{"role": "user", "content":
-                "Bạn là robot báo cáo quản trị của Vietourist Holdings (công ty lữ hành). Đọc số liệu dưới đây và viết 3–5 câu nhận xét ngắn gọn bằng tiếng Việt cho Ban Điều hành: điểm cần chú ý, rủi ro, việc nên làm trong tuần. Không bịa số.\n\n" + md}])
-            return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
+            msg = client.messages.create(model=settings.ANTHROPIC_MODEL, max_tokens=400, messages=[{"role": "user", "content": prompt}])
+            out = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
+            u = getattr(msg, "usage", None)
+            _ghi(out, "claude", settings.ANTHROPIC_MODEL,
+                 int(getattr(u, "input_tokens", 0) or 0), int(getattr(u, "output_tokens", 0) or 0))
+            return out
         except Exception as ex:  # noqa
-            return f"(Không gọi được Claude API: {type(ex).__name__}) " + rule_comment(data)
-    return rule_comment(data)
+            out = f"(Không gọi được Claude API: {type(ex).__name__}) " + rule_comment(data)
+            _ghi(out, "quy_tac", loi=f"{type(ex).__name__}: {ex}")
+            return out
+    out = rule_comment(data)
+    _ghi(out, "quy_tac", loi="chưa cấu hình ANTHROPIC_API_KEY")
+    return out
 
 
 def rule_comment(d: dict) -> str:
@@ -222,7 +245,7 @@ def rule_comment(d: dict) -> str:
 def run_report(db: Session, kind: str, actor: str = "robot") -> AutoReport:
     if kind not in ("ngay", "tuan", "thang"): raise ValueError("kind: ngay / tuan / thang")
     md, data = compose(db, kind)
-    comment = claude_comment(md, data)
+    comment = claude_comment(md, data, db)
     md += "\n\n## Nhận xét của robot\n" + comment
     today = date.today()
     period = str(today) if kind == "ngay" else f"{today:%Y}-W{today.isocalendar()[1]:02d}" if kind == "tuan" else f"{today:%Y-%m}"

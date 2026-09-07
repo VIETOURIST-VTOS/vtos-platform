@@ -22,6 +22,14 @@ ADMIN_STAFF = ("hanh_chinh",)                           # bảo vệ, pháp ch�
                                                         # nhưng KHÔNG xem bảng lương (chỉ đạo 07/9/2026)
 
 ALL_SEEING = LEADERSHIP + CONTROL                       # xem mọi dữ liệu
+
+# Chỉ đạo 07/9/2026: nhóm "xem tất cả" thu về ĐÚNG hai người, Ban Kiểm soát đọc tất cả nhưng không ghi được;
+# các vai trò khác xem theo phạm vi công việc. Đợt này mới áp cho ba màn hình đội xe vừa khai quyền – phần
+# còn lại của ma trận chuyển sang BASE_VIEW ở đợt sau, làm một lần kèm thông báo cho từng phòng, vì đổi cả
+# ma trận cùng lúc là lấy mất màn hình quen tay của nhiều người mà không ai được báo trước.
+FULL_VIEW = ("chutich", "tgd")                          # toàn quyền xem
+READ_ALL = ("bks",)                                     # đọc tất cả, bị chặn mọi thao tác ghi
+BASE_VIEW = FULL_VIEW + READ_ALL
 COST_ROLES = ALL_SEEING + OPERATIONS                    # cơ cấu chi phí NCC, quyết toán, dòng tiền tour
 FINANCE_ROLES = ALL_SEEING + ("tp_dh",)                 # giao dịch ngân hàng, tổng hợp thu tiền toàn công ty
 AUDIT_ROLES = LEADERSHIP + CONTROL                      # nhật ký kiểm toán
@@ -136,6 +144,14 @@ MENU_ROLES = {
     # Trang này trước đây không liệt kê, nghĩa là ai đăng nhập cũng thấy – trong khi nó là sổ tiền gửi và
     # danh sách tài khoản ngân hàng của công ty. (/payroll chỉ là lối chuyển hướng sang /hr nên không liệt kê.)
     "/bank-accounts": ALL_SEEING,
+
+    # Ba màn hình đội xe (chỉ đạo 07/9/2026). Cùng một lỗi với /bank-accounts ở trên: chưa liệt kê thì theo
+    # quy ước "trang không liệt kê = mọi người đăng nhập đều thấy", nên tới hôm nay một nhân viên kinh doanh
+    # vẫn mở được hồ sơ xe, lệnh điều xe và bảng giá vốn – lợi nhuận đội xe. Khai quyền theo bảng phân quyền
+    # anh Tuấn duyệt ngày 07/9: giá vốn và hiệu quả chỉ dành cho người phải chịu trách nhiệm về con số đó.
+    "/doi-xe": BASE_VIEW + OPERATIONS + ("ketoan", "hcns", "cntt"),
+    "/lenh-dieu-xe": BASE_VIEW + OPERATIONS + ("hcns", "cntt"),
+    "/hieu-qua-doi-xe": BASE_VIEW + ("tp_dh", "ketoan", "hcns"),
 }
 
 # Mọi trang có trong giao diện – kể cả trang không đặt điều kiện vai trò – để dựng danh sách ẩn cho vai trò bị giới hạn.
