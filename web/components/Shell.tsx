@@ -49,7 +49,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     // khi người chốt lệnh chọn khác gợi ý. Bảng hiệu quả ghi "chưa đủ dữ liệu" chứ không ghi 0.
     ["Lệnh điều xe", "/lenh-dieu-xe"], ["Chi phí & hiệu quả đội xe", "/hieu-qua-doi-xe"]] },
   { key: "taichinh", label: "7. Tài chính & Kế toán", items: [
-    ["Thu & đối soát", "/collections"], ["Đề nghị chi & thanh toán", "/expenses"], ["Công nợ", ""],
+    ["Thu & đối soát", "/collections"], ["Đề nghị chi & thanh toán", "/expenses"], ["Công nợ", "/cong-no"],
     ["Bảo lưu & hoàn tiền", "/bookings"], ["Dòng tiền", "/finance?tab=forecast"], ["Vay & đầu tư", "/finance?tab=contracts"],
     ["Tài khoản ngân hàng", "/bank-accounts"], ["Sổ kế toán", "/accounting?tab=journal"], ["Hóa đơn & thuế", "/accounting?tab=invoices"],
     ["Báo cáo tài chính", "/accounting?tab=bctc"], ["Hồ sơ kiểm toán", ""], ["Khóa kỳ", "/accounting?tab=periods"]] },

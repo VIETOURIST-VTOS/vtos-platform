@@ -163,6 +163,9 @@ MENU_ROLES = {
     # Trang này trước đây không liệt kê, nghĩa là ai đăng nhập cũng thấy – trong khi nó là sổ tiền gửi và
     # danh sách tài khoản ngân hàng của công ty. (/payroll chỉ là lối chuyển hướng sang /hr nên không liệt kê.)
     "/bank-accounts": ALL_SEEING,
+    # Sổ công nợ toàn hệ thống: phải thu của khách và phải trả nhà cung cấp là số tiền của cả công ty.
+    # Nhân viên kinh doanh theo dõi booking của mình ở màn hình bán hàng, không mở sổ công nợ toàn công ty.
+    "/cong-no": BASE_VIEW + ("ketoan", "ptgd_doan", "tp_dh", "cntt"),
 
     # Ba màn hình đội xe (chỉ đạo 07/9/2026). Cùng một lỗi với /bank-accounts ở trên: chưa liệt kê thì theo
     # quy ước "trang không liệt kê = mọi người đăng nhập đều thấy", nên tới hôm nay một nhân viên kinh doanh

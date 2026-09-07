@@ -25,6 +25,7 @@ from app.api.v1.crm import router as crm_router
 from app.api.v1.inbox import router as inbox_router
 from app.api.v1.visa import router as visa_router
 from app.api.v1.fleet import router as fleet_router
+from app.api.v1.debts import router as debts_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -39,6 +40,12 @@ async def robot_loop():
             from app.services import inbox as IB
             IB.robot_check(db)                      # R12 mỗi phút: AI trả lời thay khi sale trễ SLA
             if i % 10 == 0: R.run_robots(db)         # các robot khác mỗi 10 phút
+            # Dựng sẵn bảng điều khiển mỗi 2 phút khi có thay đổi: người mở trang không phải là
+            # người trả giá cho lần dựng đầu (4 giây trên dữ liệu thật).
+            from app.api.v1 import routes as _r
+            if i % 2 == 0 and getattr(_r, "_DASH_DIRTY", True):
+                _r._DASH_DIRTY = False
+                _r.lam_moi_cache_nen(db)
             db.close()
         except Exception as e:  # noqa
             print("robot error", e)
@@ -66,12 +73,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, lifespan=lifespan,
               docs_url="/api/docs", redoc_url="/api/redoc", openapi_url="/api/openapi.json")
 @app.middleware("http")
-async def _invalidate_dashboard_cache(request, call_next):
-    """Mọi thao tác ghi (POST/PUT/DELETE) làm mới bảng điều khiển đang cache."""
+async def _danh_dau_dashboard_cu(request, call_next):
+    """Thao tác ghi làm bảng điều khiển CŨ ĐI, nhưng không xoá trắng cache.
+
+    Bản trước xoá sạch cache sau MỌI lần POST/PUT/DELETE. Trên hệ thống thật, nhân viên tạo booking,
+    ghi phiếu thu, gửi đề nghị chi suốt cả ngày – nghĩa là cache gần như luôn trống, và gần như ai mở
+    trang chủ cũng phải trả giá cho một lần dựng lại từ đầu. Đó là lý do trang "lúc nào cũng chậm".
+
+    Nay chỉ đánh dấu cũ. Robot nền dựng lại mỗi 2 phút, người mở trang luôn nhận bản có sẵn – chậm
+    nhất là cũ vài phút, đúng bản chất của một bảng điều khiển tổng hợp.
+    """
     resp = await call_next(request)
     if request.method != "GET":
         from app.api.v1 import routes as _r
-        _r._DASH_CACHE.clear()
+        _r._DASH_DIRTY = True
     return resp
 
 
@@ -97,6 +112,7 @@ app.include_router(finance_router)
 app.include_router(vietrip_router)
 app.include_router(visa_router)
 app.include_router(fleet_router)
+app.include_router(debts_router)
 
 
 @app.get("/", include_in_schema=False)
