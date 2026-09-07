@@ -978,14 +978,16 @@ def dashboard(db: Session, u: User, f: dict) -> dict:
                                                         VisaTask.status.in_(("open", "doing", "waiting")))).scalars()) if ids else []
     appts = list(db.execute(select(VisaAppointment).where(VisaAppointment.case_id.in_(ids or [0]),
                                                           VisaAppointment.status == "SCHEDULED")).scalars()) if ids else []
-    done_no_handover = 0
-    for c in cases:
-        if c.result_status != "NOT_AVAILABLE":
-            got = db.execute(select(VisaHandover).where(VisaHandover.case_id == c.id,
-                                                        VisaHandover.direction == "TRA_KHACH",
-                                                        VisaHandover.confirmed == True)).scalars().first()
-            if not got:
-                done_no_handover += 1
+    # Trước đây chỗ này hỏi cơ sở dữ liệu MỘT LẦN CHO MỖI hồ sơ đã có kết quả. Vài nghìn hồ sơ là vài nghìn
+    # lượt truy vấn cho một con số trên bảng điều khiển. Nay lấy một lần danh sách hồ sơ ĐÃ bàn giao rồi trừ ra.
+    co_ket_qua = [c.id for c in cases if c.result_status != "NOT_AVAILABLE"]
+    da_ban_giao = set()
+    if co_ket_qua:
+        da_ban_giao = {r[0] for r in db.execute(
+            select(VisaHandover.case_id).where(VisaHandover.case_id.in_(co_ket_qua),
+                                               VisaHandover.direction == "TRA_KHACH",
+                                               VisaHandover.confirmed == True).distinct()).all()}
+    done_no_handover = len([i for i in co_ket_qua if i not in da_ban_giao])
     return {
         "ho_so_ca_nhan_dang_xu_ly": len([c for c in cases if not c.family_group_id]),
         "ho_so_thuoc_nhom_dang_xu_ly": len([c for c in cases if c.family_group_id]),

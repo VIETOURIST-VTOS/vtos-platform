@@ -140,6 +140,10 @@ class VisaCase(Base):
     # VTOS đã có bảng visa_files (phân hệ Nhân sự) dùng để tính quỹ visa / hoa hồng người xử lý. Đó là bản ghi
     # THÙ LAO, không phải bản ghi nghiệp vụ – nên không gộp làm một, mà nối lại để khỏi nhập số liệu hai lần.
     hr_visa_file_id: Mapped[int | None] = mapped_column(ForeignKey("visa_files.id"), nullable=True)
+    # Phí thu của cả gia đình nằm trên MỘT booking. Muốn báo cáo theo từng người thì phải phân bổ, và phần
+    # phân bổ đó KHÔNG phải chứng từ – chứng từ vẫn là phiếu thu của booking. Để trống là chia đều; điền số
+    # là trọng số do Kế toán/Điều hành ấn định (ví dụ người lớn 1, trẻ em 0,5).
+    fee_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_test: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     row_version: Mapped[int] = mapped_column(Integer, default=1)                # chống ghi đè âm thầm
     created_by: Mapped[str] = mapped_column(String(50), default="")

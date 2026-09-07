@@ -75,18 +75,30 @@ class S3Storage:
 
     def __init__(self, bucket: str, endpoint: str = "", region: str = "auto",
                  key_id: str = "", secret: str = ""):
-        try:
-            import boto3
-            from botocore.config import Config
-        except ImportError:  # pragma: no cover - chỉ xảy ra khi thiếu thư viện
-            raise StorageError("Thiếu thư viện boto3 – thêm vào requirements.txt rồi deploy lại")
-        self.bucket = bucket
-        self.endpoint = endpoint
-        # R2 chỉ chấp nhận chữ ký phiên bản 4 và region "auto"; cấu hình này cũng đúng với Amazon S3.
-        self.client = boto3.client(
-            "s3", endpoint_url=endpoint or None, region_name=region or "auto",
-            aws_access_key_id=key_id or None, aws_secret_access_key=secret or None,
-            config=Config(signature_version="s3v4", retries={"max_attempts": 3, "mode": "standard"}))
+        self.bucket, self.endpoint, self.region = bucket, endpoint, region or "auto"
+        self._key_id, self._secret = key_id, secret
+        self._client = None
+
+    @property
+    def client(self):
+        """Dựng client ở lần dùng ĐẦU TIÊN, không dựng lúc khởi động.
+
+        Đo trên máy này: import boto3 tốn 25 MB, tạo client thêm 15 MB – tổng 40 MB, đúng 8% của máy 512 MB.
+        Phần lớn yêu cầu vào VTOS không đụng tới tệp nào, nên không có lý do bắt cả hệ thống gánh 40 MB đó
+        từ lúc khởi động. Máy càng sát ngưỡng thì mỗi chục MB tiết kiệm được càng đáng giá cho thao tác nặng
+        của phân hệ khác."""
+        if self._client is None:
+            try:
+                import boto3
+                from botocore.config import Config
+            except ImportError:  # pragma: no cover - chỉ xảy ra khi thiếu thư viện
+                raise StorageError("Thiếu thư viện boto3 – thêm vào requirements.txt rồi deploy lại")
+            # R2 chỉ chấp nhận chữ ký phiên bản 4 và region "auto"; cấu hình này cũng đúng với Amazon S3.
+            self._client = boto3.client(
+                "s3", endpoint_url=self.endpoint or None, region_name=self.region,
+                aws_access_key_id=self._key_id or None, aws_secret_access_key=self._secret or None,
+                config=Config(signature_version="s3v4", retries={"max_attempts": 3, "mode": "standard"}))
+        return self._client
 
     def put(self, key: str, data: bytes, content_type: str = "") -> Stored:
         try:
@@ -110,6 +122,7 @@ class S3Storage:
             return False
 
     def describe(self) -> dict:
+        # CỐ Ý không chạm tới self.client: xem tình trạng kho không được kéo theo 40 MB thư viện.
         return {"kind": self.kind, "durable": True,
                 "noi_luu": f"{self.endpoint or 'AWS S3'} / {self.bucket}", "canh_bao": ""}
 

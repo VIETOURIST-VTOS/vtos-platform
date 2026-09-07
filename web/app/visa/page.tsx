@@ -10,7 +10,7 @@
  */
 import { useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
-import { api } from "@/lib/api";
+import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 type Cat = { stages: Record<string, string>; lifecycle: Record<string, string>; results: Record<string, string>;
@@ -28,6 +28,8 @@ function Visa() {
   const [ds, setDs] = useState<any>(null);
   const [ct, setCt] = useState<any>(null);          // chi tiết hồ sơ đang mở
   const [kho, setKho] = useState<any>(null);        // tình trạng kho lưu tài liệu
+  const [tien, setTien] = useState<any>(null);      // thu – chi đọc từ phân hệ Tài chính
+  const [bc, setBc] = useState<any>(null);          // báo cáo Visa
   const [loc, setLoc] = useState({ q: "", market_code: "", stage: "", lifecycle_status: "" });
   const [busy, setBusy] = useState("");
   const canWrite = !user?.read_only;
@@ -48,7 +50,12 @@ function Visa() {
     reload();
   }, []); // eslint-disable-line
 
-  const open = async (id: number) => { try { setCt(await api(`/visa/ho-so/${id}`)); } catch (x) { toast(errMsg(x), true); } };
+  const open = async (id: number) => {
+    try { setCt(await api(`/visa/ho-so/${id}`)); } catch (x) { toast(errMsg(x), true); return; }
+    // Thu – chi chỉ vai trò được xem tiền mới gọi được; vai trò khác nhận 403 thì bỏ qua lặng lẽ.
+    setTien(null);
+    api(`/visa/ho-so/${id}/thu-chi`).then(setTien).catch(() => {});
+  };
 
   /** Gọi một hành động nghiệp vụ rồi tải lại – lỗi 422 của backend hiện nguyên văn cho người dùng đọc. */
   const act = async (label: string, path: string, json?: any, method = "POST") => {
@@ -95,6 +102,35 @@ function Visa() {
       </div>
       <p className="muted">{tong.ghi_chu}</p>
     </div>}
+
+    <div className="panel">
+      <h3>Báo cáo Visa</h3>
+      <p className="muted">Đếm theo <b>từng đương đơn</b>, không gộp nhóm gia đình. Tỉ lệ được cấp tính trên số
+        hồ sơ đã có kết quả – nếu tính cả hồ sơ đang xử lý thì tháng nào nhận nhiều hồ sơ mới cũng tự nhiên
+        thành “tỉ lệ đậu thấp”. Phần tiền chỉ hiện với vai trò được xem cơ cấu tiền.</p>
+      <button className="act grey" disabled={!!busy} onClick={async () => {
+        try { setBc(await api("/visa/bao-cao")); } catch (x) { toast(errMsg(x), true); }
+      }}>Xem báo cáo</button>
+      {bc && <>
+        <p>Tổng <b>{bc.tong_ho_so}</b> hồ sơ
+          {bc.tien && <> · doanh thu {vnd(bc.tien.doanh_thu)} · giá vốn {vnd(bc.tien.gia_von_ncc)} ·
+            đã thu {vnd(bc.tien.da_thu)} · còn phải thu {vnd(bc.tien.con_phai_thu)}</>}</p>
+        <table><thead><tr><th>Thị trường</th><th className="r">Tổng</th><th className="r">Được cấp</th>
+          <th className="r">Từ chối</th><th className="r">Đang xử lý</th><th className="r">Hủy</th>
+          <th className="r">Tỉ lệ cấp</th><th className="r">Ngày xử lý TB</th></tr></thead>
+          <tbody>{Object.entries(bc.theo_thi_truong).map(([k, v]: any) => <tr key={k}>
+            <td><b>{k}</b></td><td className="r">{v.tong}</td><td className="r">{v.duoc_cap}</td>
+            <td className="r">{v.tu_choi}</td><td className="r">{v.dang_xu_ly}</td><td className="r">{v.huy}</td>
+            <td className="r">{v.ty_le_duoc_cap === null ? "—" : v.ty_le_duoc_cap + "%"}</td>
+            <td className="r">{v.ngay_xu_ly_tb ?? "—"}</td></tr>)}</tbody></table>
+        <table><thead><tr><th>Chuyên viên</th><th className="r">Tổng</th><th className="r">Được cấp</th>
+          <th className="r">Đang xử lý</th><th className="r">Ngày xử lý TB</th></tr></thead>
+          <tbody>{Object.entries(bc.theo_chuyen_vien).map(([k, v]: any) => <tr key={k}>
+            <td>{k}</td><td className="r">{v.tong}</td><td className="r">{v.duoc_cap}</td>
+            <td className="r">{v.dang_xu_ly}</td><td className="r">{v.ngay_xu_ly_tb ?? "—"}</td></tr>)}</tbody></table>
+        {bc.tien && <p className="muted">{bc.tien.ghi_chu}</p>}
+      </>}
+    </div>
 
     <div className="panel">
       <input placeholder="Tìm tên đương đơn / mã hồ sơ" value={loc.q} onChange={(e) => setLoc({ ...loc, q: e.target.value })} />{" "}
@@ -171,6 +207,30 @@ function Visa() {
           onClick={() => act("tiếp tục", `/visa/ho-so/${ct.case.id}/tiep-tuc`)}>Bỏ tạm dừng</button>}
         <p className="muted">Không có ô đổi giai đoạn tùy ý: mỗi nút ở trên là một hành động nghiệp vụ, và backend
           vẫn kiểm điều kiện lần nữa trước khi cho qua.</p>
+      </div>}
+
+      {tien && <div className="panel">
+        <h4>Thu – chi liên quan</h4>
+        {!tien.co_booking ? <p className="muted">{tien.ghi_chu}</p> : <>
+          <p>Booking <b>{tien.booking.code}</b> · {tien.booking.khach} · {tien.booking.so_khach} khách</p>
+          <table><thead><tr><th></th><th className="r">Của cả booking</th><th className="r">Phân bổ cho hồ sơ này</th></tr></thead>
+            <tbody>
+              <tr><td>Doanh thu</td><td className="r">{vnd(tien.cua_booking.doanh_thu)}</td>
+                <td className="r"><b>{vnd(tien.phan_bo_cho_ho_so_nay.doanh_thu)}</b></td></tr>
+              <tr><td>Giá vốn NCC</td><td className="r">{vnd(tien.cua_booking.gia_von_ncc)}</td>
+                <td className="r">{vnd(tien.phan_bo_cho_ho_so_nay.gia_von_ncc)}</td></tr>
+              <tr><td>Đã thu</td><td className="r">{vnd(tien.cua_booking.da_thu)}</td>
+                <td className="r">{vnd(tien.phan_bo_cho_ho_so_nay.da_thu)}</td></tr>
+              <tr><td>Còn phải thu</td><td className="r">{vnd(tien.cua_booking.con_phai_thu)}</td><td></td></tr>
+              <tr><td><b>Lãi lỗ dự kiến</b></td><td></td>
+                <td className="r"><b>{vnd(tien.phan_bo_cho_ho_so_nay.lai_lo_du_kien)}</b></td></tr>
+            </tbody></table>
+          <p className="muted">Chia chung {tien.phan_bo_cho_ho_so_nay.so_ho_so_chia_chung} hồ sơ ·
+            trọng số {tien.phan_bo_cho_ho_so_nay.trong_so}. {tien.luu_y}</p>
+          {!!tien.phieu_thu.length && <table><thead><tr><th>Phiếu thu</th><th className="r">Số tiền</th><th>Hình thức</th><th>Người nộp</th><th>Trạng thái</th></tr></thead>
+            <tbody>{tien.phieu_thu.map((p: any) => <tr key={p.code}><td>{p.code}</td><td className="r">{vnd(p.so_tien)}</td>
+              <td>{p.hinh_thuc}</td><td>{p.nguoi_nop}</td><td>{p.trang_thai}</td></tr>)}</tbody></table>}
+        </>}
       </div>}
 
       <h4>Checklist & tài liệu</h4>

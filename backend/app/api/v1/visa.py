@@ -14,6 +14,7 @@ from app.models.core import User
 from app.models.visa import (VisaMarket, VisaChecklistTemplate, VisaFamilyGroup, VisaDocument, VisaCase,
                              STAGES, LIFECYCLE, RESULTS, SERVICE_MODES, DOC_STATUS, TASK_STATUS)
 from app.services import visa as VS
+from app.services import visa_finance as VF
 
 # Lưu ý: phân hệ Nhân sự đã chiếm sẵn ĐÚNG ba đường "/api/v1/visa", "/api/v1/visa" (POST) và
 # "/api/v1/visa/{vid}/complete" cho quỹ visa (thù lao người xử lý). Mọi đường của phân hệ này đều nằm sâu hơn
@@ -496,6 +497,81 @@ def link_hr(case_id: int, body: HrLinkIn, u: User = Depends(require_roles(*WRITE
     c = _case(db, u, case_id)
     _run(db, VS.link_hr_visa_file, db, u, c, body.hr_visa_file_id)
     return {"case_code": c.case_code, "hr_visa_file_id": c.hr_visa_file_id}
+
+
+# ---------- Đợt 4: Tài chính, báo cáo, chuyển dữ liệu ----------
+
+@router.get("/ho-so/{case_id}/thu-chi")
+def case_finance(case_id: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Thu – chi liên quan tới hồ sơ, ĐỌC từ phân hệ Tài chính & Kế toán qua booking. Visa không có sổ riêng."""
+    c = _case(db, u, case_id)
+    try:
+        return VF.finance_for_case(db, u, c)
+    except VS.VisaError as ex:
+        raise HTTPException(403 if "không được xem" in str(ex) else 422, str(ex))
+
+
+class WeightIn(BaseModel):
+    fee_weight: float | None = None      # None = chia đều
+
+
+# Đặt trọng số là quyết định TÀI CHÍNH nên Kế toán phải làm được, dù Kế toán không nằm trong nhóm ghi nghiệp
+# vụ Visa. Cổng vai trò thật nằm ở VF.MONEY_ROLES trong service; ở đây chỉ mở đủ rộng để service quyết định.
+@router.post("/ho-so/{case_id}/trong-so-phi")
+def set_weight(case_id: int, body: WeightIn, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Trọng số phân bổ phí gia đình (người lớn 1, trẻ em 0,5…). Để trống là chia đều."""
+    c = _case(db, u, case_id)
+    try:
+        VF.set_fee_weight(db, u, c, body.fee_weight)
+        db.commit()
+    except VS.VisaError as ex:
+        db.rollback()
+        raise HTTPException(403 if "không được" in str(ex) else 422, str(ex))
+    return {"case_code": c.case_code, "trong_so": c.fee_weight}
+
+
+@router.get("/doi-chieu-phan-bo/{booking_id}")
+def check_allocation(booking_id: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Nghiệm thu 14: tổng phân bổ của mọi hồ sơ cùng booking phải bằng đúng số của booking."""
+    try:
+        return VF.check_allocation(db, booking_id)
+    except VS.VisaError as ex:
+        raise HTTPException(422, str(ex))
+
+
+@router.get("/bao-cao")
+def visa_report(since: date | None = None, upto: date | None = None, market_code: str = "",
+                company_id: int | None = None, include_test: bool = False,
+                u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Báo cáo Visa: khối lượng, kết quả, thời gian xử lý theo thị trường và chuyên viên.
+
+    Phần tiền chỉ hiện với vai trò được xem cơ cấu tiền – Kinh doanh không thấy giá vốn."""
+    return VF.report(db, u, {"since": since, "upto": upto, "market_code": market_code,
+                             "company_id": company_id, "include_test": include_test})
+
+
+@router.post("/nap-visa-portal")
+async def import_portal(file: UploadFile = File(...), apply: bool = False,
+                        u: User = Depends(require_roles("chutich", "tgd", "tp_dh", "cntt")),
+                        db: Session = Depends(get_db)):
+    """Chuyển hồ sơ từ Visa Portal. MẶC ĐỊNH chỉ xem trước; ghi thật phải truyền apply=true."""
+    try:
+        out = VF.import_portal(db, u, await file.read(), file.filename or "", apply)
+        if apply:
+            db.commit()
+        else:
+            db.rollback()
+        return out
+    except VS.VisaError as ex:
+        db.rollback()
+        raise HTTPException(422, str(ex))
+
+
+@router.get("/doi-chieu-chuyen-doi")
+def reconcile(u: User = Depends(require_roles("chutich", "tgd", "tp_dh", "ketoan", "cntt", "bks")),
+              db: Session = Depends(get_db)):
+    """Báo cáo đối chiếu sau chuyển đổi: hồ sơ chưa ánh xạ, chưa gắn booking, trùng tên cần rà tay."""
+    return VF.reconcile_portal(db)
 
 
 # ---------- Nhóm gia đình ----------
