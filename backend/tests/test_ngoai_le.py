@@ -238,3 +238,17 @@ def test_menu_ngoai_le_theo_dung_ma_tran():
         assert vai in MENU_ROLES["/ngoai-le"]
     for vai in ("nv_kd", "xe_hdv", "nv_visa", "hanh_chinh"):
         assert vai not in MENU_ROLES["/ngoai-le"], f"{vai} không được thấy màn hình rà ngoại lệ"
+
+
+def test_cat_moi_loai_khong_lam_con_so_nho_di():
+    """Cắt để nhìn được, không phải để báo cáo nhỏ đi: dù chỉ trả 1 dòng mỗi loại, tổng hợp vẫn đếm đủ."""
+    h = login("chutich")
+    day = ds(h, cat_moi_loai=0)
+    cat = ds(h, cat_moi_loai=1)
+    assert cat["tong_hop"]["tong"] == day["tong_hop"]["tong"]
+    assert cat["tong_hop"]["khong_ai_ky"] == day["tong_hop"]["khong_ai_ky"]
+    assert len(cat["rows"]) <= len(day["rows"])
+    for loai, n in cat["tong_hop"]["theo_loai"].items():
+        assert len([r for r in cat["rows"] if r["loai"] == loai]) <= 1
+        if n > 1:
+            assert cat["tong_hop"]["bi_cat"].get(loai) == n - 1

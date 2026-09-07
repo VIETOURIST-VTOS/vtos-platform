@@ -288,8 +288,16 @@ def _ho_so(db: Session, ma_list: list[str]) -> dict[str, NgoaiLeXuLy]:
     return {r.ma: r for r in rows}
 
 
+# Một loại ngoại lệ có thể có hàng trăm dòng giống hệt nhau về bản chất – ví dụ "bán chuyến chưa có dự
+# toán đủ cơ sở" đang là 754 chuyến nhập từ Vietrip. Trả hết ra thì màn hình dài vô ích và phần còn lại
+# chìm nghỉm. Nên CẮT theo từng loại, nhưng CON SỐ TỔNG HỢP vẫn đếm trên toàn bộ: cắt để nhìn được, không
+# phải để báo cáo nhỏ đi.
+CAT_MOI_LOAI = 50
+
+
 def danh_sach(db: Session, trang_thai: str = "", loai: str = "", nhom: str = "",
-              chi_thieu_chu_ky: bool = False, so_ngay: int = CUA_SO_NGAY) -> dict:
+              chi_thieu_chu_ky: bool = False, so_ngay: int = CUA_SO_NGAY,
+              cat_moi_loai: int = CAT_MOI_LOAI) -> dict:
     items = do_tim(db, so_ngay)
     ho_so = _ho_so(db, [i["ma"] for i in items])
     ra = []
@@ -315,8 +323,20 @@ def danh_sach(db: Session, trang_thai: str = "", loai: str = "", nhom: str = "",
         if nhom and row["nhom"] != nhom: continue
         if chi_thieu_chu_ky and not thieu: continue
         ra.append(row)
-    return {"rows": ra, "tong_hop": _tong_hop(ra), "loai": LOAI, "nhom": NHOM,
-            "trang_thai": TRANG_THAI, "cua_so_ngay": so_ngay}
+    tong_hop = _tong_hop(ra)                      # đếm trên TOÀN BỘ, trước khi cắt
+    dem: dict[str, int] = {}
+    cat: dict[str, int] = {}
+    gon = []
+    for r in ra:
+        dem[r["loai"]] = dem.get(r["loai"], 0) + 1
+        if cat_moi_loai and dem[r["loai"]] > cat_moi_loai:
+            cat[r["loai"]] = cat.get(r["loai"], 0) + 1
+            continue
+        gon.append(r)
+    tong_hop["bi_cat"] = cat
+    tong_hop["theo_loai"] = dem
+    return {"rows": gon, "tong_hop": tong_hop, "loai": LOAI, "nhom": NHOM,
+            "trang_thai": TRANG_THAI, "cua_so_ngay": so_ngay, "cat_moi_loai": cat_moi_loai}
 
 
 def _tong_hop(rows: list[dict]) -> dict:

@@ -23,8 +23,10 @@ DONG = ("chutich", "tgd")
 @router.get("")
 def danh_sach(trang_thai: str = "", loai: str = "", nhom: str = "",
               chi_thieu_chu_ky: bool = False, so_ngay: int = Query(NL.CUA_SO_NGAY, ge=1, le=1095),
+              cat_moi_loai: int = Query(NL.CAT_MOI_LOAI, ge=0, le=5000),
               u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
-    return NL.danh_sach(db, trang_thai, loai, nhom, chi_thieu_chu_ky, so_ngay)
+    """cat_moi_loai = 0 nghĩa là lấy hết. Con số ở tong_hop luôn đếm trên toàn bộ, không phụ thuộc cắt."""
+    return NL.danh_sach(db, trang_thai, loai, nhom, chi_thieu_chu_ky, so_ngay, cat_moi_loai)
 
 
 class NhanIn(BaseModel):

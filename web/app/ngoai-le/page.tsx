@@ -128,6 +128,14 @@ export default function NgoaiLePage() {
       </div>
 
       {!d && !loi && <div className="panel muted">Đang dò…</div>}
+      {d?.tong_hop?.bi_cat && Object.keys(d.tong_hop.bi_cat).length > 0 && (
+        <div className="gate">
+          Có loại ngoại lệ quá nhiều dòng nên màn hình chỉ hiện {d.cat_moi_loai} dòng đầu mỗi loại – con số
+          thống kê phía trên vẫn đếm đủ:{" "}
+          {Object.entries(d.tong_hop.bi_cat).map(([k, n]) => `${d.loai?.[k]?.ten || k}: còn ${n} mục nữa`).join(" · ")}
+        </div>
+      )}
+
       {d && rows.length === 0 && (
         <div className="gate pass">Không có ngoại lệ nào khớp bộ lọc. Đây là kết quả tốt – nhưng hãy đọc kèm
           cửa sổ dò: bộ lọc đang chỉ nhìn {soNgay} ngày gần nhất.</div>
