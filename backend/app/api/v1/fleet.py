@@ -983,3 +983,62 @@ def ds_lenh(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_d
                     "theo_goi_y": bool(d.phuong_an_da_chon) and not d.ly_do_khac_goi_y,
                     "phuong_an_da_chon": d.phuong_an_da_chon, "ly_do_khac_goi_y": d.ly_do_khac_goi_y})
     return out
+
+
+# ====================== SỔ CÔNG NỢ ĐỘI XE ======================
+from app.models.fleet import DebtPayment, HUONG_TIEN
+from app.services import fleet_debt as CN
+
+
+@router.get("/cong-no")
+def so_cong_no(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Sổ công nợ đội xe: bốn túi nợ để riêng, không cộng chung thành một con số."""
+    return CN.so_cong_no(db)
+
+
+@router.get("/cong-no/chu-xe/{partner_id}")
+def cong_no_mot_chu_xe(partner_id: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Sổ chi tiết một chủ xe: từng kỳ, đã chốt hay chưa, đã trả bao nhiêu, còn lại bao nhiêu."""
+    p = db.get(PartnerOwner, partner_id)
+    if p is None: raise HTTPException(404, "Không có chủ xe này")
+    d = CN.cong_no_chu_xe(db, p)
+    d["thanh_toan"] = [{"id": x.id, "ngay": x.ngay.isoformat(), "huong": x.huong,
+                        "huong_ten": HUONG_TIEN.get(x.huong, x.huong), "so_tien": x.so_tien,
+                        "settlement_id": x.settlement_id, "chung_tu": x.chung_tu, "note": x.note,
+                        "boi": x.created_by}
+                       for x in db.execute(select(DebtPayment).where(DebtPayment.partner_id == partner_id)
+                                           .order_by(DebtPayment.ngay.desc(), DebtPayment.id.desc())).scalars()]
+    return d
+
+
+class ThanhToanIn(BaseModel):
+    huong: str
+    so_tien: float
+    ngay: date
+    idem_key: str
+    settlement_id: int | None = None
+    sale_case_id: int | None = None
+    partner_id: int | None = None
+    chung_tu: str = ""
+    note: str = ""
+
+
+@router.post("/cong-no/thanh-toan", status_code=201)
+def ghi_thanh_toan(data: ThanhToanIn, u: User = Depends(require_roles(*QT_DUYET)), db: Session = Depends(get_db)):
+    """Ghi một lần trả/thu tiền trên công nợ đội xe.
+
+    `idem_key` là bắt buộc và duy nhất ở cơ sở dữ liệu: bấm hai lần một nút, chạy lại một tác vụ, hay nhập
+    lại từ sao kê đều không được thành hai lần trả."""
+    if not (data.idem_key or "").strip():
+        raise HTTPException(422, "Thiếu khóa chống lặp (idem_key) – không ghi tiền khi không chống được lặp")
+    try:
+        r = CN.ghi_thanh_toan(db, data.huong, data.so_tien, data.ngay, data.idem_key.strip(), u.username,
+                              settlement_id=data.settlement_id, sale_case_id=data.sale_case_id,
+                              partner_id=data.partner_id, chung_tu=data.chung_tu, note=data.note)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    if not r["lap_lai"]:
+        R.audit(db, u.username, u.role, "thanh_toan_cong_no_xe", f"payment:{r['id']}",
+                after=data.model_dump(mode="json"))
+    db.commit()
+    return r

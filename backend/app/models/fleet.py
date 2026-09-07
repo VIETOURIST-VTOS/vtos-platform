@@ -449,3 +449,34 @@ class AiRunLog(Base):
     ket_qua: Mapped[str] = mapped_column(Text, default="")
     loi: Mapped[str] = mapped_column(String(300), default="")
     chay_boi: Mapped[str] = mapped_column(String(50), default="")
+
+
+# ====================== CÔNG NỢ ĐỘI XE: GHI NHẬN ĐÃ TRẢ / ĐÃ THU ======================
+HUONG_TIEN = {"tra_chu_xe": "Trả chủ xe (tiền ra)", "thu_chu_xe": "Thu của chủ xe (tiền vào)",
+              "thu_ban_xe": "Thu tiền bán xe (tiền vào)"}
+
+
+class DebtPayment(Base):
+    """Một lần trả tiền hoặc thu tiền trên công nợ đội xe.
+
+    Bảng này tồn tại vì thiếu nó thì sổ công nợ nói được "phải trả bao nhiêu" nhưng KHÔNG nói được "đã trả
+    chưa" – và một sổ công nợ không phân biệt được hai điều đó là sổ dẫn tới trả tiền hai lần. Bảng quyết
+    toán đóng kỳ chỉ có nghĩa hai bên đã thống nhất con số, không có nghĩa tiền đã đi.
+
+    `idem_key` duy nhất ở cơ sở dữ liệu, cùng lý do như bảng cấn trừ: chạy lại một tác vụ, bấm hai lần một
+    nút, hay nhập lại từ sao kê đều không được thành hai lần trả.
+    """
+    __tablename__ = "fleet_debt_payments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    idem_key: Mapped[str] = mapped_column(String(120), unique=True)
+    huong: Mapped[str] = mapped_column(String(16))                 # tra_chu_xe / thu_chu_xe / thu_ban_xe
+    partner_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_partners.id"), nullable=True)
+    settlement_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_settlements.id"), nullable=True)
+    sale_case_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_sale_cases.id"), nullable=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    ngay: Mapped[date] = mapped_column(Date)
+    so_tien: Mapped[float] = mapped_column(Float, default=0)
+    chung_tu: Mapped[str] = mapped_column(String(120), default="")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

@@ -18,12 +18,14 @@ function DoiXe() {
   const [xe, setXe] = useState<any[]>([]);
   const [chon, setChon] = useState<any>(null);
   const [xm, setXm] = useState<any[]>([]);
-  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan">("xe");
+  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan" | "congno">("xe");
   const [chuyen, setChuyen] = useState<any[]>([]);
   const [gd, setGd] = useState<any>(null);
   const [chuXe, setChuXe] = useState<any[]>([]);
   const [qt, setQt] = useState<any[]>([]);
   const [dm3, setDm3] = useState<any>(null);
+  const [cn, setCn] = useState<any>(null);
+  const [soChuXe, setSoChuXe] = useState<any>(null);
   const canWrite = ["cntt", "hcns", "tp_dh", "nv_dh"].includes(user?.role || "");
 
   const load = useCallback(async () => {
@@ -36,6 +38,7 @@ function DoiXe() {
       setChuXe(await api("/fleet/chu-xe"));
       setQt(await api("/fleet/quyet-toan"));
       setDm3(await api("/fleet/danh-muc-dot3"));
+      setCn(await api("/fleet/cong-no"));
     } catch (e) { toast(errMsg(e), true); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
@@ -64,7 +67,7 @@ function DoiXe() {
     <p className="muted">{tq.ghi_chu}{tq.chan_khi_thieu_giay ? " Đang BẬT chế độ chặn khi thiếu giấy tờ." : " Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo, chưa dừng lệnh điều xe."}</p>
 
     <div style={{ display: "flex", gap: 8, margin: "10px 0" }}>
-      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`]] as const)
+      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`], ["congno", "Công nợ đội xe"]] as const)
         .map(([k, ten]) => <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} onClick={() => setTab(k as any)}>{ten}</button>)}
     </div>
 
@@ -128,6 +131,126 @@ function DoiXe() {
             <td className="num">{s.chuyen_ky_sau ? <Tag cls="warn">{s.chuyen_ky_sau.toLocaleString("vi-VN")}</Tag> : ""}</td>
             <td>{s.status === "dong_ky" ? <Tag cls="ok">{s.status_ten}</Tag> : <Tag cls="warn">{s.status_ten}</Tag>}</td>
           </tr>) : <tr><td colSpan={10} className="muted">Chưa dựng kỳ quyết toán nào.</td></tr>}</tbody></table>
+      </div>
+    </>}
+
+    {tab === "congno" && cn && <>
+      <div className="panel">
+        <h2>Công nợ đội xe</h2>
+        <p className="muted">Bốn khoản dưới đây với bốn đối tượng khác nhau nên để riêng, KHÔNG cộng thành một
+          con số &quot;công nợ đội xe&quot;. Tính đến {fmtDT(cn.tinh_den)}.</p>
+        <div className="kpis">
+          <div className="kpi"><b>{Number(cn.voi_chu_xe.cong_ty_phai_tra).toLocaleString("vi-VN")}</b>
+            <span>công ty phải trả chủ xe (kỳ đã chốt, đã trừ phần đã chi)</span></div>
+          <div className="kpi"><b>{Number(cn.voi_chu_xe.chu_xe_phai_tra_cong_ty).toLocaleString("vi-VN")}</b>
+            <span>chủ xe phải trả công ty (chuyển kỳ sau + nợ theo lịch)</span></div>
+          <div className="kpi"><b>{Number(cn.ban_xe.con_phai_thu).toLocaleString("vi-VN")}</b>
+            <span>còn phải thu của người mua xe</span></div>
+          <div className="kpi"><b>{Number(cn.vay_the_chap_xe.du_no_theo_khe_uoc).toLocaleString("vi-VN")}</b>
+            <span>dư nợ ngân hàng có thế chấp xe (cộng theo khế ước)</span></div>
+        </div>
+        <div className="kpis">
+          <div className="kpi"><b style={{ color: "var(--orange)" }}>{Number(cn.voi_chu_xe.dang_tinh_chua_chot).toLocaleString("vi-VN")}</b>
+            <span>đang tính, chưa chốt với đối tác – chưa phải công nợ</span></div>
+          <div className="kpi"><b style={{ color: "var(--orange)" }}>{Number(cn.voi_chu_xe.chi_ho_chua_vao_ky).toLocaleString("vi-VN")}</b>
+            <span>công ty đã chi hộ nhưng tháng đó chưa dựng bảng quyết toán</span></div>
+          <div className="kpi"><b style={{ color: cn.voi_chu_xe.so_chu_xe_chua_co_bang ? "var(--orange)" : undefined }}>{cn.voi_chu_xe.so_chu_xe_chua_co_bang}</b>
+            <span>chủ xe chưa có bảng quyết toán nào (chưa biết, không phải bằng 0)</span></div>
+        </div>
+        <ul className="muted" style={{ marginTop: 8 }}>{cn.giai_thich.map((g: string, i: number) => <li key={i}>{g}</li>)}</ul>
+      </div>
+
+      <div className="panel wrap">
+        <h2>Theo chủ xe hợp tác</h2>
+        <table><thead><tr><th>Chủ xe</th><th>Xe</th><th>Công ty phải trả</th><th>Đang tính, chưa chốt</th>
+          <th>Chủ xe phải trả công ty</th><th>Chi hộ chưa vào kỳ</th><th>Tình trạng</th><th></th></tr></thead>
+          <tbody>{cn.voi_chu_xe.chi_tiet.length ? cn.voi_chu_xe.chi_tiet.map((c: any) => <tr key={c.partner_id}>
+            <td>{c.ho_ten}</td>
+            <td className="muted">{c.xe.map((x: any) => x.plate).join(", ") || "—"}</td>
+            <td>{Number(c.cong_ty_phai_tra).toLocaleString("vi-VN")}</td>
+            <td className="muted">{Number(c.dang_tinh_chua_chot).toLocaleString("vi-VN")}</td>
+            <td>{Number(c.chu_xe_phai_tra_cong_ty).toLocaleString("vi-VN")}</td>
+            <td className={c.tong_chi_ho_chua_vao_ky ? "" : "muted"}>{Number(c.tong_chi_ho_chua_vao_ky).toLocaleString("vi-VN")}</td>
+            <td>{c.tinh_trang === "chua_co_bang_quyet_toan"
+              ? <Tag cls="warn">Chưa có bảng quyết toán</Tag> : <Tag cls="ok">Có dữ liệu</Tag>}</td>
+            <td><button className="act grey" onClick={async () => {
+              try { setSoChuXe(await api(`/fleet/cong-no/chu-xe/${c.partner_id}`)); } catch (e) { toast(errMsg(e), true); }
+            }}>Sổ chi tiết</button></td>
+          </tr>) : <tr><td colSpan={8} className="muted">Chưa có chủ xe hợp tác nào.</td></tr>}</tbody></table>
+      </div>
+
+      {soChuXe && <div className="panel wrap">
+        <h2>Sổ chi tiết – {soChuXe.ho_ten}</h2>
+        {soChuXe.ghi_chu && <p className="muted">{soChuXe.ghi_chu}</p>}
+        <h3>Từng kỳ quyết toán</h3>
+        <table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Doanh thu</th><th>Đối tác chịu</th><th>Cấn trừ</th>
+          <th>Phải trả theo bảng</th><th>Đã trả</th><th>Còn phải trả</th><th>Chuyển kỳ sau</th></tr></thead>
+          <tbody>{soChuXe.cac_ky.length ? soChuXe.cac_ky.map((k: any) => <tr key={k.settlement_id}>
+            <td>{k.ky}</td>
+            <td>{k.da_chot ? <Tag cls="ok">Đã chốt</Tag> : <Tag cls="warn">Đang tính</Tag>}</td>
+            <td>{Number(k.doanh_thu).toLocaleString("vi-VN")}</td>
+            <td>{Number(k.doi_tac_chiu).toLocaleString("vi-VN")}</td>
+            <td>{Number(k.can_tru).toLocaleString("vi-VN")}</td>
+            <td>{Number(k.phai_tra_theo_bang).toLocaleString("vi-VN")}</td>
+            <td>{Number(k.da_tra).toLocaleString("vi-VN")}</td>
+            <td><b>{k.da_chot ? Number(k.con_phai_tra).toLocaleString("vi-VN") : "—"}</b></td>
+            <td className="muted">{Number(k.chuyen_ky_sau).toLocaleString("vi-VN")}</td>
+          </tr>) : <tr><td colSpan={9} className="muted">Chưa dựng kỳ nào cho chủ xe này.</td></tr>}</tbody></table>
+
+        {soChuXe.lich_can_tru.length > 0 && <><h3>Lịch cấn trừ (nợ mua xe)</h3>
+          <table><thead><tr><th>Lịch</th><th>Trạng thái</th><th>Gốc</th><th>Đã cấn trừ</th><th>Còn lại</th></tr></thead>
+            <tbody>{soChuXe.lich_can_tru.map((l: any) => <tr key={l.plan_id}>
+              <td>{l.ten}</td><td>{l.status}</td>
+              <td>{Number(l.principal).toLocaleString("vi-VN")}</td>
+              <td>{Number(l.da_can_tru).toLocaleString("vi-VN")}</td>
+              <td><b>{Number(l.con_lai).toLocaleString("vi-VN")}</b></td>
+            </tr>)}</tbody></table></>}
+
+        {soChuXe.chi_ho_chua_vao_ky.length > 0 && <><h3>Khoản đã chi hộ chưa vào kỳ quyết toán nào</h3>
+          <p className="muted">Tiền công ty đã bỏ ra nhưng tháng đó chưa ai dựng bảng – trên giấy tờ chưa ai nợ khoản này.</p>
+          <table><thead><tr><th>Tháng</th><th>Số tiền</th></tr></thead>
+            <tbody>{soChuXe.chi_ho_chua_vao_ky.map((x: any) => <tr key={x.ky}>
+              <td>{x.ky}</td><td>{Number(x.so_tien).toLocaleString("vi-VN")}</td></tr>)}</tbody></table></>}
+
+        <h3>Đã trả / đã thu</h3>
+        <table><thead><tr><th>Ngày</th><th>Hướng</th><th>Số tiền</th><th>Kỳ</th><th>Chứng từ</th><th>Người ghi</th></tr></thead>
+          <tbody>{soChuXe.thanh_toan?.length ? soChuXe.thanh_toan.map((t: any) => <tr key={t.id}>
+            <td>{fmtD(t.ngay)}</td><td>{t.huong_ten}</td>
+            <td>{Number(t.so_tien).toLocaleString("vi-VN")}</td>
+            <td className="muted">{t.settlement_id || "—"}</td>
+            <td className="muted">{t.chung_tu || "—"}</td><td className="muted">{t.boi}</td>
+          </tr>) : <tr><td colSpan={6} className="muted">Chưa ghi nhận lần trả/thu nào. Đóng kỳ KHÔNG có nghĩa là tiền đã đi.</td></tr>}</tbody></table>
+      </div>}
+
+      <div className="panel wrap">
+        <h2>Còn phải thu của người mua xe</h2>
+        <table><thead><tr><th>Xe</th><th>Giá bán</th><th>Đã thu</th><th>Còn phải thu</th><th>Bàn giao</th>
+          <th>Giải chấp</th><th>Sang tên</th><th>Cảnh báo</th></tr></thead>
+          <tbody>{cn.ban_xe.chi_tiet.length ? cn.ban_xe.chi_tiet.map((b: any) => <tr key={b.sale_case_id}>
+            <td>{b.xe}</td>
+            <td>{Number(b.gia_ban).toLocaleString("vi-VN")}</td>
+            <td>{Number(b.da_thu).toLocaleString("vi-VN")}</td>
+            <td><b>{Number(b.con_phai_thu).toLocaleString("vi-VN")}</b></td>
+            <td>{b.da_ban_giao ? "Rồi" : "Chưa"}</td>
+            <td>{b.da_giai_chap ? "Rồi" : "Chưa"}</td>
+            <td>{b.da_sang_ten ? "Rồi" : "Chưa"}</td>
+            <td>{b.canh_bao ? <Tag cls="red">{b.canh_bao}</Tag> : ""}</td>
+          </tr>) : <tr><td colSpan={8} className="muted">Không có hồ sơ bán xe nào còn phải thu.</td></tr>}</tbody></table>
+      </div>
+
+      <div className="panel wrap">
+        <h2>Dư nợ ngân hàng có thế chấp xe</h2>
+        <p className="muted">Cộng theo KHẾ ƯỚC. Ngân hàng nhận cả gói nhiều xe cho một khoản vay, nên chia dư nợ
+          về từng xe rồi cộng lại sẽ ra một con số không có thật.</p>
+        <table><thead><tr><th>Khế ước</th><th>Ngân hàng</th><th>Pháp nhân</th><th>Dư nợ</th><th>Lãi suất</th>
+          <th>Đáo hạn</th><th>Xe đang thế chấp</th></tr></thead>
+          <tbody>{cn.vay_the_chap_xe.chi_tiet.length ? cn.vay_the_chap_xe.chi_tiet.map((k: any) => <tr key={k.contract_id}>
+            <td>{k.code}</td><td>{k.ngan_hang}</td><td className="muted">{k.phap_nhan}</td>
+            <td><b>{Number(k.du_no).toLocaleString("vi-VN")}</b></td>
+            <td className="muted">{k.lai_suat}%</td>
+            <td className="muted">{k.dao_han ? fmtD(k.dao_han) : "Hồ sơ không ghi"}</td>
+            <td className="muted">{k.xe.map((x: any) => x.plate).join(", ")}</td>
+          </tr>) : <tr><td colSpan={7} className="muted">Không có khế ước nào đang thế chấp xe.</td></tr>}</tbody></table>
       </div>
     </>}
 
