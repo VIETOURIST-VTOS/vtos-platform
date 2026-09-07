@@ -713,6 +713,8 @@ class BanXeIn(BaseModel):
     ngay_ky: date | None = None
     gia_ban: float = 0
     da_thu: float = 0
+    nguoi_mua: str = ""
+    han_thu_du: date | None = None
     nguon: str = ""
 
 

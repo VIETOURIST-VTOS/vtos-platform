@@ -271,6 +271,10 @@ class SaleCase(Base):
     ngay_ky: Mapped[date | None] = mapped_column(Date, nullable=True)
     gia_ban: Mapped[float] = mapped_column(Float, default=0)
     da_thu: Mapped[float] = mapped_column(Float, default=0)
+    # Người mua ngoài (không phải đối tác hợp tác trong fleet_partners) và mốc cam kết trả đủ. Có mốc thì
+    # khoản còn phải thu mới theo dõi được như một khoản nợ có hạn, thay vì một dòng ghi chú không ai canh.
+    nguoi_mua: Mapped[str] = mapped_column(String(160), default="")
+    han_thu_du: Mapped[date | None] = mapped_column(Date, nullable=True)
     stage: Mapped[str] = mapped_column(String(20), default="hop_dong")
     da_ban_giao: Mapped[bool] = mapped_column(Boolean, default=False)
     da_giai_chap: Mapped[bool] = mapped_column(Boolean, default=False)

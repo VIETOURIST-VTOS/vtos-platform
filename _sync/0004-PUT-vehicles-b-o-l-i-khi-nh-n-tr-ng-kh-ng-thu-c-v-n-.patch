@@ -1,0 +1,77 @@
+From 86acad1a802788d7a2841b189e92a521dc1b2bbc Mon Sep 17 00:00:00 2001
+From: Claude Sonnet 5 <noreply@anthropic.com>
+Date: Mon, 7 Sep 2026 12:24:09 +0000
+Subject: [PATCH 4/4] =?UTF-8?q?PUT=20/vehicles=20b=C3=A1o=20l=E1=BB=97i=20?=
+ =?UTF-8?q?khi=20nh=E1=BA=ADn=20tr=C6=B0=E1=BB=9Dng=20kh=C3=B4ng=20thu?=
+ =?UTF-8?q?=E1=BB=99c=20v=E1=BB=81=20n=C3=B3,=20thay=20v=C3=AC=20tr?=
+ =?UTF-8?q?=E1=BA=A3=20200=20r=E1=BB=93i=20b=E1=BB=8F=20qua?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Khi sửa vòng đời hai xe đã bán trên production, PUT /vehicles/{id} nhận lifecycle,
+company_id, source_note và trả về "Đã cập nhật xe 50F-034.37" – nhưng không sửa gì, vì
+những trường đó thuộc hồ sơ đội xe và chỉ PUT /fleet/xe/{id} mới nhận. Một câu "đã cập
+nhật" cho một lần không cập nhật là cách chắc chắn nhất để người dùng tin nhầm là xong.
+
+extra="forbid" trên VehicleUpdate: gửi trường lạ nay báo 422 và người gọi biết phải đi
+đúng endpoint. Frontend chỉ gửi driver_id và active nên không ảnh hưởng.
+
+Kiểm thử V11 khoá hành vi này lại.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UnhZiuFEAVHRb7fXj8xVrx
+---
+ backend/app/api/v1/hr.py              |  6 +++++-
+ backend/tests/test_vay_the_chap_xe.py | 14 ++++++++++++++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/backend/app/api/v1/hr.py b/backend/app/api/v1/hr.py
+index 8dfe250..e00024e 100644
+--- a/backend/app/api/v1/hr.py
++++ b/backend/app/api/v1/hr.py
+@@ -2,7 +2,7 @@
+ import json
+ from datetime import date, datetime
+ from fastapi import APIRouter, Depends, HTTPException, Header
+-from pydantic import BaseModel
++from pydantic import BaseModel, ConfigDict
+ from sqlalchemy import select, desc
+ from sqlalchemy.orm import Session
+ from app.db.session import get_db
+@@ -343,6 +343,10 @@ def vehicle_create(data: VehicleIn, u: User = Depends(require_roles("cntt", "hcn
+ 
+ 
+ class VehicleUpdate(BaseModel):
++    # extra="forbid": gửi một trường không nhận ở đây (lifecycle, company_id, source_note… – những trường
++    # thuộc hồ sơ đội xe, sửa qua PUT /fleet/xe/{id}) sẽ báo 422 chứ không trả 200 rồi lặng lẽ bỏ qua.
++    # Một lần "Đã cập nhật xe" mà thực ra không sửa gì là cách chắc chắn nhất để người dùng tin nhầm.
++    model_config = ConfigDict(extra="forbid")
+     plate: str | None = None
+     seats: int | None = None
+     kind: str | None = None
+diff --git a/backend/tests/test_vay_the_chap_xe.py b/backend/tests/test_vay_the_chap_xe.py
+index ab97d45..897465d 100644
+--- a/backend/tests/test_vay_the_chap_xe.py
++++ b/backend/tests/test_vay_the_chap_xe.py
+@@ -168,3 +168,17 @@ def test_v10_xe_ngung_khai_thac_ma_vong_doi_chua_cap_nhat_van_phai_keu():
+     d = _lay()
+     cb = [c for c in d["canh_bao"] if c.get("xe") == "50F-034.71"]
+     assert cb and cb[0]["muc"] == "gap" and "chưa cập nhật" in cb[0]["noi_dung"]
++
++
++def test_v11_sua_xe_bang_truong_khong_nhan_thi_bao_loi_chu_khong_lang_le_bo_qua():
++    """PUT /vehicles chỉ nhận vài trường vận hành. Gửi lifecycle vào đây từng trả 200 'Đã cập nhật xe'
++    mà không sửa gì – phải báo 422 và chỉ sang PUT /fleet/xe/{id}."""
++    from app.db.session import SessionLocal
++    from app.models.hr import Vehicle
++    vid = _xe("50H-933.71")
++    assert client.put(f"/api/v1/vehicles/{vid}", json={"lifecycle": "da_ban"}, headers=login("cntt")).status_code == 422
++    assert client.put(f"/api/v1/vehicles/{vid}", json={"seats": 45}, headers=login("cntt")).status_code == 200
++    r = client.put(f"/api/v1/fleet/xe/{vid}", json={"lifecycle": "da_ban"}, headers=login("chutich"))
++    assert r.status_code == 200
++    d = _lay()
++    assert [c for c in d["canh_bao"] if c.get("xe") == "50H-933.71" and c["muc"] == "gap"]
+-- 
+2.34.1
+

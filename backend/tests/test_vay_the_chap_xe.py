@@ -182,3 +182,21 @@ def test_v11_sua_xe_bang_truong_khong_nhan_thi_bao_loi_chu_khong_lang_le_bo_qua(
     assert r.status_code == 200
     d = _lay()
     assert [c for c in d["canh_bao"] if c.get("xe") == "50H-933.71" and c["muc"] == "gap"]
+
+
+def test_v12_xe_da_ban_con_the_chap_thi_canh_bao_noi_luon_con_phai_thu_bao_nhieu():
+    """Ca 50H-496.23: đã bán cho người mua ngoài, chưa sang tên, còn nằm trong tài sản bảo đảm, và
+    người mua chưa trả đủ tiền. Ba việc đó là MỘT câu chuyện – cảnh báo phải nói cả ba, vì tách ra
+    thì người đọc phải tự ghép, và thường là không ghép."""
+    vid = _xe("50H-496.23", lifecycle="da_ban")
+    client.post("/api/v1/fleet/the-chap", json={"contract_id": CTX["vietrip"], "vehicle_id": vid}, headers=login("chutich"))
+    r = client.post("/api/v1/fleet/ban-xe", json={"vehicle_id": vid, "gia_ban": 900_000_000, "da_thu": 500_000_000,
+                                                  "nguoi_mua": "Mr.Huỳnh", "han_thu_du": "2026-12-31",
+                                                  "nguon": "Hồ sơ bán xe đội xe"}, headers=login("chutich"))
+    assert r.status_code == 201
+    d = _lay()
+    cb = [c for c in d["canh_bao"] if c.get("xe") == "50H-496.23"][0]
+    assert cb["muc"] == "gap"
+    assert cb["ban_xe"]["con_phai_thu"] == 400_000_000 and cb["ban_xe"]["nguoi_mua"] == "Mr.Huỳnh"
+    assert cb["ban_xe"]["qua_han_thu"] is False and cb["ban_xe"]["da_giai_chap"] is False
+    assert "400,000,000" in cb["noi_dung"] and "31/12/2026" in cb["noi_dung"]

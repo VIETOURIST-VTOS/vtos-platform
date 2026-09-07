@@ -223,3 +223,61 @@ def nap_vay_xe(data: NapVayIn, u: User = Depends(require_roles("ketoan", "chutic
     return {"tao_moi": tao, "cap_nhat": cap_nhat, "so_xe_gan_the_chap": gan_xe,
             "xe_da_ban_tao_moi": tao_xe, "bien_so_khong_co_trong_danh_muc": khong_thay_xe,
             "message": f"Đã nạp {len(tao)} khế ước mới, cập nhật {len(cap_nhat)} khế ước, gắn {gan_xe} xe vào tài sản bảo đảm"}
+
+
+class SaoKeDong(BaseModel):
+    ke_uoc: str
+    du_no: float = 0
+    lai_suat: float | None = None
+    dao_han: date | None = None
+    giai_ngan: date | None = None
+    muc_dich: str = ""
+    loai: str = ""
+
+
+class SaoKeIn(BaseModel):
+    ngan_hang: str = ""
+    phap_nhan: str = ""
+    den_ngay: date | None = None
+    dong: list[SaoKeDong]
+
+
+@router.post("/fin/doi-chieu-sao-ke")
+def doi_chieu_sao_ke(data: SaoKeIn, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """So sao kê khoản vay của ngân hàng với khế ước đang theo dõi. Chỉ đọc và báo cáo, không sửa dữ liệu."""
+    return F.doi_chieu_sao_ke(db, [d.model_dump() for d in data.dong], data.ngan_hang, data.den_ngay, data.phap_nhan)
+
+
+class CapNhatSauDoiChieuIn(BaseModel):
+    ngan_hang: str = ""
+    den_ngay: date | None = None
+    dong: list[SaoKeDong]
+
+
+@router.post("/fin/cap-nhat-theo-sao-ke")
+def cap_nhat_theo_sao_ke(data: CapNhatSauDoiChieuIn, u: User = Depends(require_roles("ketoan", "chutich", "tgd")), db: Session = Depends(get_db)):
+    """Ghi dư nợ / lãi suất / ngày đáo hạn theo sao kê cho những khế ước KHỚP MÃ.
+
+    Chỉ chạm vào khế ước có mã trùng: dòng sao kê lạ không tự tạo khế ước mới, và khế ước không có trên
+    sao kê không bị đóng – hai việc đó phải có người quyết định và có xác nhận của ngân hàng.
+    """
+    loans = {c.contract_no.strip(): c for c in
+             db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars()
+             if (c.contract_no or "").strip()}
+    da_sua, bo_qua = [], []
+    for d in data.dong:
+        c = loans.get(d.ke_uoc.strip())
+        if c is None: bo_qua.append(d.ke_uoc); continue
+        thay_doi = {}
+        if d.du_no and abs(c.outstanding - d.du_no) >= 1:
+            thay_doi["du_no"] = [c.outstanding, d.du_no]; c.outstanding = d.du_no
+        if d.lai_suat is not None and abs(c.interest_rate - d.lai_suat) >= 0.01:
+            thay_doi["lai_suat"] = [c.interest_rate, d.lai_suat]; c.interest_rate = d.lai_suat
+        if d.dao_han and c.maturity != d.dao_han:
+            thay_doi["dao_han"] = [str(c.maturity or ""), str(d.dao_han)]; c.maturity = d.dao_han
+        if thay_doi: da_sua.append({"ke_uoc": d.ke_uoc, "thay_doi": thay_doi})
+    R.audit(db, u.username, u.role, "cap_nhat_khe_uoc_theo_sao_ke", f"fin:sao-ke:{data.ngan_hang}",
+            after={"nguon": f"Sao kê {data.ngan_hang} đến {data.den_ngay}", "so_khe_uoc_sua": len(da_sua), "chi_tiet": da_sua})
+    db.commit()
+    return {"da_cap_nhat": da_sua, "khong_co_trong_he_thong": bo_qua,
+            "message": f"Đã cập nhật {len(da_sua)} khế ước theo sao kê {data.ngan_hang}"}

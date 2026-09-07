@@ -183,7 +183,7 @@ def _muc_do(con_ngay):
 
 
 def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
-    from app.models.fleet import Collateral
+    from app.models.fleet import Collateral, SaleCase
     from app.models.hr import Vehicle
     from app.models.core import Company
     today = hom_nay or date.today()
@@ -235,9 +235,22 @@ def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
         ra_khoi_doi = (v.lifecycle and v.lifecycle != "dang_khai_thac") or not v.active
         if ra_khoi_doi:
             trang_thai = v.lifecycle if v.lifecycle and v.lifecycle != "dang_khai_thac" else "đã ngưng khai thác, vòng đời chưa cập nhật"
+            # Hồ sơ bán xe đi kèm: tiền còn phải thu và hạn thu đủ thuộc CÙNG một câu chuyện với việc
+            # xe còn nằm trong tài sản bảo đảm. Tách ra hai chỗ thì người đọc phải tự ghép, và thường là không ghép.
+            sc = db.execute(select(SaleCase).where(SaleCase.vehicle_id == vid).order_by(SaleCase.id.desc())).scalars().first()
+            them, ban = "", None
+            if sc is not None:
+                con_thu = (sc.gia_ban or 0) - (sc.da_thu or 0)
+                ban = {"nguoi_mua": sc.nguoi_mua, "gia_ban": sc.gia_ban, "da_thu": sc.da_thu, "con_phai_thu": con_thu,
+                       "han_thu_du": sc.han_thu_du, "da_giai_chap": sc.da_giai_chap, "da_sang_ten": sc.da_sang_ten,
+                       "qua_han_thu": bool(sc.han_thu_du and con_thu > 0 and sc.han_thu_du < today)}
+                if con_thu > 0:
+                    them = (f". Người mua {sc.nguoi_mua or 'chưa ghi tên'} còn phải thu {con_thu:,.0f}đ"
+                            + (f", cam kết trả đủ {sc.han_thu_du:%d/%m/%Y}" if sc.han_thu_du else ", chưa có mốc cam kết trả đủ")
+                            + (" – ĐÃ QUÁ HẠN" if ban["qua_han_thu"] else ""))
             for g in ds:
-                canh_bao.append({"muc": "gap", "loai": "xe_da_ra_khoi_doi_van_the_chap", "khe_uoc": g["code"], "xe": v.plate,
-                                 "noi_dung": f"Xe {v.plate} trạng thái '{trang_thai}' nhưng vẫn là tài sản bảo đảm của khế ước {g['contract_no'] or g['code']} ({g['partner']}, dư nợ {g['du_no']:,.0f}đ)",
+                canh_bao.append({"muc": "gap", "loai": "xe_da_ra_khoi_doi_van_the_chap", "khe_uoc": g["code"], "xe": v.plate, "ban_xe": ban,
+                                 "noi_dung": f"Xe {v.plate} trạng thái '{trang_thai}' nhưng vẫn là tài sản bảo đảm của khế ước {g['contract_no'] or g['code']} ({g['partner']}, dư nợ {g['du_no']:,.0f}đ)" + them,
                                  "viec": "Xin văn bản giải chấp riêng của ngân hàng trước khi sang tên, hoặc tất toán khế ước"})
 
     # Xe đang khai thác không gắn khế ước nào.
@@ -263,3 +276,58 @@ def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
             "canh_bao": canh_bao, "thieu_ho_so": thieu_ho_so,
             "tong_du_no": sum(k["du_no"] for k in ke_uoc), "tong_lai_thang": sum(k["lai_thang"] for k in ke_uoc),
             "theo_phap_nhan": theo_phap_nhan}
+
+
+# ---------- Đối chiếu sao kê khoản vay của ngân hàng với khế ước đang theo dõi ----------
+# Ba câu trả lời, không gộp làm một, vì ba câu đó dẫn tới ba việc khác nhau:
+#   khớp nhưng LỆCH SỐ   → cập nhật dư nợ (hồ sơ nội bộ trễ so với ngân hàng là bình thường)
+#   hệ thống CÓ, sao kê KHÔNG → nghi đã tất toán hoặc khoản vay nằm ở pháp nhân/CIF khác. KHÔNG tự đóng.
+#   sao kê CÓ, hệ thống KHÔNG → khoản vay ngân hàng đang cho vay mà mình chưa theo dõi
+def doi_chieu_sao_ke(db: Session, dong: list[dict], ngan_hang: str = "", den_ngay: date | None = None,
+                     phap_nhan: str = "") -> dict:
+    """`dong`: mỗi dòng {ke_uoc, du_no, lai_suat?, dao_han?, giai_ngan?, muc_dich?, loai?}.
+
+    Chỉ SO SÁNH và báo cáo, không sửa gì – cập nhật là một bước riêng có người bấm, vì một dòng sao kê
+    đọc sai định dạng mà tự ghi đè dư nợ thì sổ sách sai theo mà không ai biết.
+    """
+    loans = {c.contract_no.strip(): c for c in
+             db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars()
+             if (c.contract_no or "").strip()}
+    khop, lech, chua_theo_doi = [], [], []
+    thay = set()
+    for r in dong:
+        ma = str(r.get("ke_uoc") or "").strip()
+        if not ma: continue
+        c = loans.get(ma)
+        sk_du_no = float(r.get("du_no") or 0)
+        if c is None:
+            chua_theo_doi.append({"ke_uoc": ma, "du_no": sk_du_no, "lai_suat": r.get("lai_suat"),
+                                  "dao_han": r.get("dao_han"), "muc_dich": r.get("muc_dich", ""), "loai": r.get("loai", "")})
+            continue
+        thay.add(ma)
+        sai = []
+        if abs(c.outstanding - sk_du_no) >= 1:
+            sai.append({"truong": "du_no", "he_thong": c.outstanding, "sao_ke": sk_du_no, "chenh": sk_du_no - c.outstanding})
+        ls = r.get("lai_suat")
+        if ls is not None and abs(float(ls) - c.interest_rate) >= 0.01:
+            sai.append({"truong": "lai_suat", "he_thong": c.interest_rate, "sao_ke": float(ls)})
+        dh = r.get("dao_han")
+        if dh and str(c.maturity or "") != str(dh):
+            sai.append({"truong": "dao_han", "he_thong": str(c.maturity or "chưa có"), "sao_ke": str(dh)})
+        (lech if sai else khop).append({"ke_uoc": ma, "code": c.code, "partner": c.partner, "entity": c.entity,
+                                        "du_no_he_thong": c.outstanding, "du_no_sao_ke": sk_du_no, "sai_lech": sai})
+    # Khế ước hệ thống đang theo dõi ở ngân hàng NÀY mà sao kê không có dòng nào.
+    nh = (ngan_hang or "").strip().lower()
+    khong_thay = [{"ke_uoc": ma, "code": c.code, "partner": c.partner, "entity": c.entity, "du_no_he_thong": c.outstanding,
+                   "the_chap": c.collateral,
+                   "y_nghia": "Không có trên sao kê – có thể đã tất toán, hoặc khoản vay thuộc pháp nhân/CIF khác. "
+                              "Phải có xác nhận của ngân hàng mới được đóng khế ước và giải chấp xe."}
+                  for ma, c in loans.items()
+                  if ma not in thay and (not nh or nh in (c.partner or "").lower())]
+    return {"ngan_hang": ngan_hang, "phap_nhan": phap_nhan, "den_ngay": den_ngay or date.today(),
+            "so_dong_sao_ke": len([r for r in dong if str(r.get("ke_uoc") or "").strip()]),
+            "tong_sao_ke": sum(float(r.get("du_no") or 0) for r in dong),
+            "khop": khop, "lech": lech, "khong_thay_tren_sao_ke": khong_thay, "chua_theo_doi": chua_theo_doi,
+            "tong_chua_theo_doi": sum(x["du_no"] for x in chua_theo_doi),
+            "tom_tat": f"{len(khop)} khế ước khớp, {len(lech)} lệch số, {len(khong_thay)} khế ước hệ thống có mà sao kê không có, "
+                       f"{len(chua_theo_doi)} khoản vay ngân hàng đang có mà hệ thống chưa theo dõi"}

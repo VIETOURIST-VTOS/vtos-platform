@@ -22,6 +22,8 @@ function Finance() {
   const [meta, setMeta] = useState<any>({ kinds: {} });
   const [plan, setPlan] = useState<any[]>([]);
   const [vx, setVx] = useState<any>(null);
+  const [dc, setDc] = useState<any>(null);
+  const [sk, setSk] = useState<any>({ ngan_hang: "TPBank", den_ngay: today(), text: "" });
   const [open, setOpen] = useState<number | null>(null);
   const [f, setF] = useState<any>({ kind: "vay", entity: "Công ty mẹ", partner: "", contract_no: "", principal: "", interest_rate: "", maturity: "", collateral: "", purpose: "", owner: "", approval_ref: "", related_party: false, months: "", first_due: "" });
   const [fp, setFp] = useState<any>({ due_date: today(), direction: "out", category: "luong", description: "", amount: "", recurring_monthly: true });
@@ -40,7 +42,7 @@ function Finance() {
   return (<>
     <h1>Ngân quỹ – Tài chính: dự báo 13 tuần, vay, đầu tư &amp; hợp tác (mục 3.9)</h1>
     <p className="muted">Dự báo dòng tiền lấy tự động từ: booking còn phải thu (dự kiến thu trước khởi hành 7 ngày), đề nghị chi & dự toán tour sắp chạy, lịch trả gốc/lãi từng khế ước, lịch thu hồi hợp tác/ký quỹ/cọc/cho vay, bảng lương gần nhất và các khoản Kế toán nhập (thuế, thuê văn phòng…). Cảnh báo khi số dư dự kiến âm hoặc dưới ngưỡng tối thiểu.</p>
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{[["forecast", "Dự báo 13 tuần"], ["contracts", "Hợp đồng vay & đầu tư"], ["weekly", "Báo cáo tài chính tuần"], ["vayxe", "Vay & thế chấp xe"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{[["forecast", "Dự báo 13 tuần"], ["contracts", "Hợp đồng vay & đầu tư"], ["weekly", "Báo cáo tài chính tuần"], ["vayxe", "Vay & thế chấp xe"], ["doichieu", "Đối chiếu sao kê vay"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
 
     {tab === "forecast" && fc && <>
       <div className="kpis"><div className="kpi"><b>{vnd(fc.opening)}</b><span>Tiền hiện có (111+112)</span></div><div className="kpi"><b style={{ color: fc.closing < 0 ? "var(--red)" : undefined }}>{vnd(fc.closing)}</b><span>Số dư dự kiến cuối tuần 13</span></div><div className="kpi"><b>{vnd(fc.min_cash)}</b><span>Ngưỡng tối thiểu (tham số)</span></div><div className="kpi"><b style={{ color: fc.alerts.length ? "var(--red)" : undefined }}>{fc.alerts.length}</b><span>Tuần cảnh báo</span></div></div>
@@ -138,6 +140,47 @@ function Finance() {
           <td style={{ textAlign: "right" }}>{x.khe_uoc.length ? vnd(x.khe_uoc.reduce((s: number, k: any) => s + k.du_no_phan_bo, 0)) : ""}</td></tr>)}
       </tbody></table></div>
       <p className="muted">Cột &quot;dư nợ phân bổ/xe&quot; chỉ để tham khảo – chia đều dư nợ khế ước cho số xe trong gói. Đây KHÔNG phải nghĩa vụ riêng của từng xe: ngân hàng nắm cả gói, giải chấp một xe phải thoả thuận riêng với ngân hàng. Xe không xuất hiện trong tài sản bảo đảm của khế ước nào KHÔNG có nghĩa là đã được giải chấp – phải có văn bản của ngân hàng mới ghi nhận giải chấp.</p>
+    </>}
+
+    {tab === "doichieu" && <>
+      <div className="panel"><h2>Dán sao kê khoản vay của ngân hàng</h2>
+        <p className="muted">Mỗi dòng một khế ước, ngăn bằng dấu chấm phẩy hoặc tab: <b>mã khế ước ; dư nợ ; lãi suất %/năm ; ngày đáo hạn (yyyy-mm-dd) ; mục đích</b>. Chỉ ba cột đầu là bắt buộc. Đối chiếu chỉ ĐỌC và so sánh — muốn ghi đè dư nợ phải bấm nút cập nhật riêng bên dưới.</p>
+        <div className="grid">
+          <label>Ngân hàng<input value={sk.ngan_hang} onChange={(e) => setSk({ ...sk, ngan_hang: e.target.value })} /></label>
+          <label>Sao kê đến ngày<input type="date" value={sk.den_ngay} onChange={(e) => setSk({ ...sk, den_ngay: e.target.value })} /></label>
+        </div>
+        <textarea rows={8} style={{ width: "100%", fontFamily: "monospace" }} placeholder={"125/2025/GNN/Q4 ; 8711111104 ; 13.7 ; 2031-05-09\n125/2025/GNN/Q4/02 ; 2247887320 ; 13.5 ; 2031-05-09"} value={sk.text} onChange={(e) => setSk({ ...sk, text: e.target.value })} />
+        <button className="act" disabled={!sk.text.trim()} onClick={() => {
+          const dong = sk.text.split("\n").map((l: string) => l.split(/[;\t]/).map((x: string) => x.trim())).filter((c: string[]) => c[0])
+            .map((c: string[]) => ({ ke_uoc: c[0], du_no: Number((c[1] || "0").replace(/[^0-9.]/g, "")) || 0, lai_suat: c[2] ? Number(c[2].replace(/[^0-9.]/g, "")) : null, dao_han: c[3] || null, muc_dich: c[4] || "" }));
+          post("/fin/doi-chieu-sao-ke", { ngan_hang: sk.ngan_hang, den_ngay: sk.den_ngay, dong }).then((r) => r && setDc({ ...r, _dong: dong }));
+        }}>Đối chiếu</button>
+      </div>
+      {dc && <>
+        <div className="kpis">
+          <div className="kpi"><b>{dc.khop.length}</b><span>Khớp</span></div>
+          <div className="kpi"><b style={{ color: dc.lech.length ? "var(--orange)" : undefined }}>{dc.lech.length}</b><span>Lệch số</span></div>
+          <div className="kpi"><b style={{ color: dc.khong_thay_tren_sao_ke.length ? "var(--red)" : undefined }}>{dc.khong_thay_tren_sao_ke.length}</b><span>Hệ thống có, sao kê không</span></div>
+          <div className="kpi"><b style={{ color: dc.chua_theo_doi.length ? "var(--orange)" : undefined }}>{dc.chua_theo_doi.length}</b><span>Ngân hàng có, hệ thống chưa theo dõi</span></div>
+        </div>
+        {dc.lech.length > 0 && <><h2>Lệch số — hồ sơ nội bộ trễ so với ngân hàng</h2>
+          <div className="panel wrap"><table><thead><tr><th>Khế ước</th><th>Đối tác</th><th>Sai lệch</th></tr></thead><tbody>
+            {dc.lech.map((l: any) => <tr key={l.ke_uoc}><td>{l.ke_uoc}</td><td>{l.partner}</td>
+              <td>{l.sai_lech.map((s: any, i: number) => <div key={i}>{s.truong === "du_no" ? <>Dư nợ: hệ thống {vnd(s.he_thong)} → sao kê {vnd(s.sao_ke)} <b style={{ color: s.chenh < 0 ? "var(--teal)" : "var(--red)" }}>({s.chenh > 0 ? "+" : ""}{vnd(s.chenh)})</b></> : s.truong === "lai_suat" ? <>Lãi suất: {s.he_thong}% → <b>{s.sao_ke}%</b></> : <>Đáo hạn: {s.he_thong} → <b>{s.sao_ke}</b></>}</div>)}</td></tr>)}
+          </tbody></table></div>
+          {isKT && <button className="act" onClick={() => { if (confirm(`Ghi dư nợ, lãi suất và ngày đáo hạn theo sao kê ${sk.ngan_hang} cho ${dc.lech.length} khế ước?`)) post("/fin/cap-nhat-theo-sao-ke", { ngan_hang: sk.ngan_hang, den_ngay: sk.den_ngay, dong: dc._dong }).then((r) => { if (r) { toast(r.message); setDc(null); } }); }}>Cập nhật hệ thống theo sao kê</button>}
+        </>}
+        {dc.khong_thay_tren_sao_ke.length > 0 && <><h2>Hệ thống đang theo dõi nhưng không có trên sao kê</h2>
+          <div className="panel" style={{ borderColor: "var(--red)" }}>{dc.khong_thay_tren_sao_ke.map((k: any) => <div key={k.ke_uoc} style={{ marginBottom: 8 }}>
+            <Tag cls="red">!</Tag> <b>{k.ke_uoc}</b> · {k.partner} · dư nợ hệ thống {vnd(k.du_no_he_thong)}{k.the_chap && <> · TSTC: {k.the_chap}</>}
+            <div className="muted">{k.y_nghia}</div></div>)}</div></>}
+        {dc.chua_theo_doi.length > 0 && <><h2>Ngân hàng đang cho vay nhưng hệ thống chưa theo dõi — cộng {vnd(dc.tong_chua_theo_doi)}</h2>
+          <div className="panel wrap"><table><thead><tr><th>Khế ước</th><th style={{ textAlign: "right" }}>Dư nợ</th><th>Lãi suất</th><th>Đáo hạn</th><th>Mục đích</th></tr></thead><tbody>
+            {dc.chua_theo_doi.map((k: any) => <tr key={k.ke_uoc}><td>{k.ke_uoc}</td><td style={{ textAlign: "right" }}>{vnd(k.du_no)}</td><td>{k.lai_suat ? k.lai_suat + "%" : ""}</td><td>{k.dao_han ? fmtD(k.dao_han) : ""}</td><td className="muted">{k.muc_dich}</td></tr>)}
+          </tbody></table></div>
+          <p className="muted">Dự báo dòng tiền 13 tuần chỉ tính được lịch trả gốc/lãi của khế ước đã có trong hệ thống. Khoản vay nào chưa nạp thì chưa xuất hiện trong dự báo.</p></>}
+        {dc.khop.length > 0 && <><h2>Khớp</h2><div className="panel">{dc.khop.map((k: any) => <div key={k.ke_uoc}><Tag cls="ok">✓</Tag> {k.ke_uoc} · {k.partner} · {vnd(k.du_no_sao_ke)}</div>)}</div></>}
+      </>}
     </>}
   </>);
 }
