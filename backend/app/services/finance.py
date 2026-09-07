@@ -99,12 +99,17 @@ def forecast_13w(db: Session, start: date | None = None) -> dict:
         i = min(12, (d - weeks[0][0]).days // 7)
         rows[i][side][key] = rows[i][side].get(key, 0.0) + amt
 
-    # Thu booking: phần còn phải thu, dự kiến thu trước khởi hành 7 ngày (D-7)
-    for bk in db.execute(select(Booking)).scalars():
-        t = bk.tour
-        if not t or t.status in ("huy", "khoa", "kt_xac_nhan", "da_dong_so"): continue
-        due = (bk.amount - bk.discount) - bk.paid
-        if due > 0: put(max(date.today(), t.start_date - timedelta(days=7)), "in", "thu_booking", due)
+    # Thu booking: phần còn phải thu, dự kiến thu trước khởi hành 7 ngày (D-7).
+    # Nối bảng và lọc ngay trong SQL, chỉ lấy 3 cột. Bản cũ nạp TOÀN BỘ booking (10.303 dòng trên dữ
+    # liệu thật) rồi mỗi dòng lại nạp thêm tour của nó – vừa chậm vừa là một trong những chỗ ngốn hết
+    # 512 MB bộ nhớ máy chủ khi mở trang Tổng quan.
+    con_thu = (Booking.amount - Booking.discount - Booking.paid)
+    for start_date, due in db.execute(
+            select(Tour.start_date, con_thu)
+            .join(Tour, Booking.tour_id == Tour.id)
+            .where(Booking.cancelled == False, con_thu > 0,
+                   Tour.status.not_in(["huy", "khoa", "kt_xac_nhan", "da_dong_so"]))).all():
+        put(max(date.today(), start_date - timedelta(days=7)), "in", "thu_booking", float(due))
     # Chi tour: lệnh chi chờ (tuần này) và đề nghị đang trình (tuần sau); chi dự toán còn lại của tour sắp chạy
     from app.services.ops import tour_cashflow
     for pr in db.execute(select(PaymentRequest).where(PaymentRequest.status.in_(["cho_chi", "cho_tp", "cho_kt", "cho_duyet"]))).scalars():

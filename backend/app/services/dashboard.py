@@ -18,7 +18,12 @@ from app.core.config import settings
 
 
 def _month_tours(db: Session, y: int, m: int) -> list[Tour]:
-    return [t for t in db.execute(select(Tour).where(Tour.status.in_(["kt_xac_nhan", "khoa"]))).scalars() if t.kt_confirmed_at and (t.kt_confirmed_at.year, t.kt_confirmed_at.month) == (y, m)]
+    """Chuyến Kế toán xác nhận trong THÁNG y-m. Lọc mốc thời gian ngay trong SQL: bản cũ nạp toàn bộ
+    chuyến đã xác nhận (hàng nghìn chuyến, kèm booking nạp lười theo sau) rồi mới bỏ đi hầu hết."""
+    dau = datetime(y, m, 1)
+    cuoi = datetime(y + (m == 12), 1 if m == 12 else m + 1, 1)
+    return list(db.execute(select(Tour).where(Tour.status.in_(["kt_xac_nhan", "khoa"]),
+                                              Tour.kt_confirmed_at >= dau, Tour.kt_confirmed_at < cuoi)).scalars())
 
 
 def build(db: Session, u: User) -> dict:
@@ -79,7 +84,8 @@ def build(db: Session, u: User) -> dict:
     tours_m = _month_tours(db, today.year, today.month)
     sett = [R.settlement_summary(db, t) for t in tours_m]
     k["doanh_thu_thang"] = sum(s["revenue"] for s in sett); k["loi_nhuan_thang"] = sum(s["profit"] for s in sett); k["so_chuyen_thang"] = len(tours_m)
-    k["chuyen_duoi_10"] = sum(1 for s in sett if s["margin"] < R.get_param(db, "nguong_bien"))
+    _nguong = R.get_param(db, "nguong_bien")
+    k["chuyen_duoi_10"] = sum(1 for s in sett if s["margin"] < _nguong)
     m0 = datetime(today.year, today.month, 1)
     row = db.execute(select(func.count(), func.coalesce(func.sum(Booking.amount - Booking.discount), 0)).where(Booking.created_at >= m0, Booking.cancelled == False)).one()
     k["booking_thang"] = int(row[0]); k["doanh_thu_booking_thang"] = float(row[1])
@@ -127,8 +133,11 @@ def build(db: Session, u: User) -> dict:
     if role in ("hcns", "chutich", "tgd"):
         s = OPS.work_days_in(today.year, today.month, until=today)
         emps = db.execute(select(Employee).where(Employee.active == True, Employee.department.in_(OPS.NO_TIMESHEET_DEPTS), Employee.user_id != None)).scalars().all()
-        reps = [r for r in db.execute(select(DailyReport)).scalars() if f"{r.report_date:%Y-%m}" == p]
-        sec["bao_cao_ngay"] = {"nhan_su": len(emps), "ngay_lam_viec": len(s), "ty_le_nop": (len(reps) / (len(emps) * len(s))) if emps and s else 0,
+        # Chỉ cần ĐẾM báo cáo trong tháng – đếm bằng SQL thay vì nạp toàn bộ bảng báo cáo ngày rồi lọc.
+        so_bao_cao = db.execute(select(func.count()).select_from(DailyReport)
+                                .where(DailyReport.report_date >= date(today.year, today.month, 1),
+                                       DailyReport.report_date <= today)).scalar() or 0
+        sec["bao_cao_ngay"] = {"nhan_su": len(emps), "ngay_lam_viec": len(s), "ty_le_nop": (so_bao_cao / (len(emps) * len(s))) if emps and s else 0,
                               "thieu_2_ngay": db.execute(select(func.count()).select_from(Alert).where(Alert.kind == "bc_ngay_2", Alert.resolved == False)).scalar()}
     return out
 

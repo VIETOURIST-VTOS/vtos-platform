@@ -7,7 +7,7 @@
 """
 from datetime import date
 from xml.sax.saxutils import escape
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.core import User
 from app.models.accounting import Account, JournalEntry, JournalLine, Invoice
@@ -29,22 +29,32 @@ def _lines(db: Session, upto_period: str | None = None, period: str | None = Non
     return rows
 
 
+def _cong_theo_tk(db: Session, upto_period: str | None = None, period: str | None = None):
+    """Cộng Nợ/Có theo tài khoản cấp 1 BẰNG SQL, không nạp bút toán vào bộ nhớ.
+
+    Bản cũ dùng _lines(): nạp TOÀN BỘ JournalLine + JournalEntry thành đối tượng Python rồi mới lọc kỳ.
+    Trên dữ liệu thật (25.728 chứng từ, hàng chục nghìn dòng) việc đó ngốn hết 512 MB của máy chủ và
+    tiến trình bị hệ điều hành kết liễu giữa chừng – bảng điều khiển gọi hàm này HAI lần (số dư và
+    kết quả kinh doanh), nên mỗi lần ai đó mở trang Tổng quan là một lần cả hệ thống khởi động lại.
+    Nay cơ sở dữ liệu cộng sẵn, trả về vài chục dòng.
+    """
+    q = (select(func.substr(JournalLine.account_code, 1, 3),
+                func.coalesce(func.sum(JournalLine.debit), 0.0),
+                func.coalesce(func.sum(JournalLine.credit), 0.0))
+         .join(JournalEntry, JournalLine.entry_id == JournalEntry.id)
+         .where(JournalEntry.status == "da_ghi_so"))
+    if period: q = q.where(JournalEntry.period == period)
+    elif upto_period: q = q.where(JournalEntry.period <= upto_period)
+    return db.execute(q.group_by(func.substr(JournalLine.account_code, 1, 3))).all()
+
+
 def balances(db: Session, upto_period: str) -> dict[str, float]:
     """Số dư (Nợ − Có) lũy kế đến hết kỳ theo tài khoản cấp 1 (gộp tiểu khoản 3331→333, 3387→338)."""
-    out: dict[str, float] = {}
-    for l, e in _lines(db, upto_period=upto_period):
-        k = l.account_code[:3]
-        out[k] = out.get(k, 0.0) + l.debit - l.credit
-    return out
+    return {k: float(d) - float(c) for k, d, c in _cong_theo_tk(db, upto_period=upto_period)}
 
 
 def movements(db: Session, period: str) -> dict[str, dict]:
-    out: dict[str, dict] = {}
-    for l, e in _lines(db, period=period):
-        k = l.account_code[:3]
-        r = out.setdefault(k, {"debit": 0.0, "credit": 0.0})
-        r["debit"] += l.debit; r["credit"] += l.credit
-    return out
+    return {k: {"debit": float(d), "credit": float(c)} for k, d, c in _cong_theo_tk(db, period=period)}
 
 
 def balance_sheet(db: Session, period: str) -> dict:
@@ -197,7 +207,11 @@ def pit_return(db: Session, period: str) -> dict:
     """05/KK-TNCN rút gọn: thuế TNCN khấu trừ trong kỳ từ TK 3335 (10% thù lao CTV/HDV; lương theo biểu lũy tiến – HCNS bổ sung)."""
     m = movements(db, period)
     withheld = m.get("333", {}).get("credit", 0.0)  # cấp 1 gộp; tách 3335
-    w3335 = sum(l.credit - l.debit for l, e in _lines(db, period=period) if l.account_code == "3335")
+    w3335 = float(db.execute(
+        select(func.coalesce(func.sum(JournalLine.credit - JournalLine.debit), 0.0))
+        .join(JournalEntry, JournalLine.entry_id == JournalEntry.id)
+        .where(JournalEntry.status == "da_ghi_so", JournalEntry.period == period,
+               JournalLine.account_code == "3335")).scalar() or 0)
     return {"period": period, "form": "05/KK-TNCN", "rows": [("[27]", "Tổng số thuế TNCN đã khấu trừ (thu nhập từ tiền lương, tiền công; CTV 10%)", w3335)],
             "note": "Thuế TNCN của người lao động theo biểu lũy tiến chưa tính tự động – HCNS/Kế toán bổ sung trước khi nộp."}
 
