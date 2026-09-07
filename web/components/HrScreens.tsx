@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useShell } from "@/components/Shell";
+import DinhKem from "@/components/DinhKem";
 import { api, vnd, fmtD, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
@@ -33,6 +34,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const [open, setOpen] = useState<string | null>(null);
   const [emps, setEmps] = useState<any[]>([]);
   const [khoa, setKhoa] = useState<any[]>([]);
+  const [tepNV, setTepNV] = useState("");   // mã NV đang mở hồ sơ giấy tờ
   const [treo, setTreo] = useState<any>(null);
   const [phieu, setPhieu] = useState<any>(null);
   const [phapNhan, setPhapNhan] = useState<any>(null);
@@ -86,6 +88,10 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     </div>
 
     {tab === "payroll" && run && <>
+      <DinhKem doiTuong="bang_luong" doiTuongId={period} loai="bang_bieu"
+        tieuDe={`Chứng từ bảng lương kỳ ${period}`}
+        goi={"Bảng chấm công gốc, quyết định thưởng/phạt, bảng lương đã ký, chứng từ nộp BHXH và TNCN. " +
+             "Lưu trong nhóm 06_Nhan_su — dữ liệu cá nhân, phân quyền riêng theo Nghị định 13/2023."} />
       <div className="kpis">
         <div className="kpi"><b>{run.totals.so_nguoi}</b><span>Người · {run.totals.so_chuyen} chuyến KT xác nhận</span></div>
         <div className="kpi"><b>{vnd(run.totals.luong_cb)}</b><span>Lương cơ bản (sau thang giảm)</span></div>
@@ -190,7 +196,13 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
           <td>{e.department === "huong_dan" && <>{e.card_no} <span className="muted">hạn {fmtD(e.card_expiry)}</span> {e.guide_ok ? <Tag cls="ok">Đủ điều kiện</Tag> : <Tag cls="red">Cổng 13</Tag>}</>}</td><td>{e.probation && <Tag cls="warn">Thử việc 85%</Tag>}{e.active ? "" : <Tag cls="red">Nghỉ</Tag>}</td>
           {canHR && <td>{e.active
             ? <button className="act red" style={{ margin: 0 }} title="Ngưng hồ sơ (không xóa) – dùng khi trùng hồ sơ hoặc nghỉ việc" onClick={() => { if (confirm(`Ngưng hồ sơ ${e.code} – ${e.full_name}? Hồ sơ vẫn được giữ để tra cứu lịch sử.`)) post(`/employees/${e.id}`, { full_name: e.full_name, department: e.department, active: false }, "PUT"); }}>Ngưng</button>
-            : <button className="act" style={{ margin: 0 }} onClick={() => post(`/employees/${e.id}`, { full_name: e.full_name, department: e.department, active: true }, "PUT")}>Mở lại</button>}</td>}</tr>)}</tbody></table></div>
+            : <button className="act" style={{ margin: 0 }} onClick={() => post(`/employees/${e.id}`, { full_name: e.full_name, department: e.department, active: true }, "PUT")}>Mở lại</button>}
+            {" "}<button className="act grey" style={{ margin: 0 }} title="Hồ sơ giấy tờ của người này" onClick={() => setTepNV(e.code)}>Giấy tờ</button></td>}</tr>)}</tbody></table></div>
+      {tepNV && <DinhKem doiTuong="nhan_su" doiTuongId={tepNV} loai="hop_dong"
+        tieuDe={`Hồ sơ giấy tờ – ${tepNV}`}
+        goi={"Hợp đồng lao động, phụ lục, quyết định bổ nhiệm, bằng cấp, thẻ HDV. Lưu theo mã nhân viên " +
+             "trong nhóm 06_Nhan_su, giữ trong thời gian làm việc + 5 năm. Đây là dữ liệu cá nhân theo " +
+             "Nghị định 13/2023 – chỉ HCNS, Ban TGĐ, Chủ tịch và Ban Kiểm soát đọc được."} />}
     </>}
 
     {tab === "visa" && <>

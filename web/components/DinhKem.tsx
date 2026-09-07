@@ -74,6 +74,14 @@ export default function DinhKem({ doiTuong, doiTuongId, tieuDe = "Tệp & hình 
         <input ref={inp} type="file" disabled={dang}
                accept=".png,.jpg,.jpeg,.webp,.heic,.pdf,.csv,.xls,.xlsx,.doc,.docx"
                onChange={(e) => { const f = e.target.files?.[0]; if (f) tai(f); }} />
+        {cf?.doi_tuong?.find((x: any) => x.ma === doiTuong) && (() => {
+          const dt = cf.doi_tuong.find((x: any) => x.ma === doiTuong);
+          const nh = cf.nhom_ho_so?.find((n: any) => n.ma === dt.nhom_ho_so);
+          return <p className="muted">Lưu vào nhóm <b>{dt.nhom_ho_so}</b>{nh ? ` (${nh.ten})` : ""} theo {dt.luu_theo},
+            giữ tối thiểu <b>{nh?.thoi_han_luu}</b>.
+            {dt.nhay_cam && <> <Tag cls="warn">dữ liệu cá nhân</Tag> Phân quyền riêng theo Nghị định 13/2023 —
+              chỉ HCNS, Ban TGĐ, Chủ tịch và Ban Kiểm soát đọc được.</>}</p>;
+        })()}
         {cf && <p className="muted">Nhận ảnh, PDF, Excel, Word — tối đa <b>{cf.gioi_han_mb} MB</b> mỗi tệp.
           Tải lại đúng tệp đã có thì hệ thống báo &quot;đã có&quot; chứ không tạo bản thứ hai.
           {cf.kho_luu?.durable === false && <> {" "}<Tag cls="warn">kho tạm</Tag> {cf.kho_luu.canh_bao}</>}</p>}

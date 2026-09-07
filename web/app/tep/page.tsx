@@ -16,6 +16,7 @@ function TepPage() {
   const [cf, setCf] = useState<any>(null);
   const [phong, setPhong] = useState("");
   const [doiTuong, setDoiTuong] = useState("");
+  const [nhom, setNhom] = useState("");
   const [maHoSo, setMaHoSo] = useState("");
   const [ds, setDs] = useState<any[]>([]);
   const [loi, setLoi] = useState("");
@@ -27,9 +28,10 @@ function TepPage() {
       const q = new URLSearchParams();
       if (phong) q.set("phong_ban", phong);
       if (doiTuong) q.set("doi_tuong", doiTuong);
+      if (nhom) q.set("nhom_ho_so", nhom);
       setDs(await api(`/tep?${q.toString()}`));
     } catch (e) { setLoi(errMsg(e)); }
-  }, [phong, doiTuong]);
+  }, [phong, doiTuong, nhom]);
   useEffect(() => { load(); }, [load]);
 
   const xem = (a: any) => {
@@ -47,11 +49,20 @@ function TepPage() {
     <p className="muted">Một kho chung cho chứng từ ảnh của mọi phòng ban. Tên tệp gốc chỉ để hiển thị; chỗ
       lưu do hệ thống sinh từ mã băm nội dung, và mỗi lần đọc ra đều đối chiếu lại mã băm — tệp lệch thì
       báo lỗi chứ không trả về nội dung &quot;gần đúng&quot;. Gỡ tệp là <b>thu hồi có ghi lý do</b>, không xóa cứng.</p>
+    {cf?.cau_truc_kho && <p className="muted">Cấu trúc kho: <b>{cf.cau_truc_kho}</b>. Chín nhóm hồ sơ giống
+      nhau ở mọi pháp nhân — nhờ vậy kiểm toán mở kho của một pháp nhân chưa từng làm việc cùng vẫn tìm
+      được hồ sơ mà không phải hỏi ai.</p>}
     {loi && <p className="muted"><Tag cls="red">{loi}</Tag></p>}
 
     <div className="panel">
       <h2>Tra cứu</h2>
       <div className="grid2">
+        <label>Nhóm hồ sơ
+          <select value={nhom} onChange={(e) => setNhom(e.target.value)}>
+            <option value="">Tất cả 9 nhóm</option>
+            {(cf?.nhom_ho_so || []).map((n: any) =>
+              <option key={n.ma} value={n.ma}>{n.ma} · {n.ten} — giữ {n.thoi_han_luu}</option>)}
+          </select></label>
         <label>Phòng ban
           <select value={phong} onChange={(e) => { setPhong(e.target.value); setDoiTuong(""); }}>
             <option value="">Tất cả</option>
@@ -64,18 +75,20 @@ function TepPage() {
           </select></label>
       </div>
       <div className="wrap"><table>
-        <thead><tr><th>Tệp</th><th>Gắn vào</th><th>Phòng</th><th>Loại</th><th>Dung lượng</th>
-          <th>Người tải</th><th>Lúc</th></tr></thead>
+        <thead><tr><th>Tệp</th><th>Gắn vào</th><th>Nhóm hồ sơ</th><th>Phòng</th><th>Loại</th>
+          <th>Dung lượng</th><th>Người tải</th><th>Lúc</th></tr></thead>
         <tbody>{ds.length ? ds.map((a) => <tr key={a.id}>
           <td><a href="#" onClick={(e) => { e.preventDefault(); xem(a); }}>{a.ten_tep}</a>
             {a.la_anh && <> <Tag cls="ok">ảnh</Tag></>}
             {a.nguon === "ai" && <> <Tag cls="warn">AI: {a.tac_nhan}</Tag></>}</td>
           <td>{a.doi_tuong_ten} <span className="muted">#{a.doi_tuong_id}</span></td>
+          <td className="muted">{a.nhom_ho_so}{a.nhay_cam && <> <Tag cls="warn">cá nhân</Tag></>}
+            <div className="muted">giữ {a.thoi_han_luu}</div></td>
           <td className="muted">{PHONG[a.phong_ban] || a.phong_ban}</td>
           <td className="muted">{a.loai_ten}</td>
           <td className="num muted">{(a.kich_thuoc / 1024).toFixed(0)} KB</td>
           <td className="muted">{a.boi}</td><td className="muted">{fmtDT(a.luc)}</td>
-        </tr>) : <tr><td colSpan={7} className="muted">Chưa có tệp nào khớp bộ lọc.</td></tr>}</tbody></table></div>
+        </tr>) : <tr><td colSpan={8} className="muted">Chưa có tệp nào khớp bộ lọc.</td></tr>}</tbody></table></div>
     </div>
 
     <div className="panel">

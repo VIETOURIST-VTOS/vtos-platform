@@ -71,7 +71,66 @@ def test_ten_tep_khong_phai_la_cho_luu(_startup):
     with SessionLocal() as db:
         a = db.execute(select(Attachment).order_by(Attachment.id.desc())).scalars().first()
         assert "hoa_don_dau.png" not in a.khoa_luu
-        assert a.checksum[:16] in a.khoa_luu and a.doi_tuong in a.khoa_luu
+        assert a.checksum[:12] in a.khoa_luu
+
+
+def test_duong_dan_dung_cau_truc_kho_ho_so(_startup):
+    """Mô hình quản trị số hóa mục 7.2: Pháp nhân / Năm / Nhóm hồ sơ / Tháng-hoặc-Mã đối tượng / Tệp.
+
+    Cấu trúc giống nhau ở mọi pháp nhân là điều kiện để kiểm toán viên mở kho của một pháp nhân họ chưa
+    từng làm việc cùng mà vẫn tìm ra hồ sơ, không phải hỏi ai."""
+    from app.db.session import SessionLocal
+    from app.models.attachments import Attachment
+    from sqlalchemy import select
+    with SessionLocal() as db:
+        a = db.execute(select(Attachment).order_by(Attachment.id.desc())).scalars().first()
+        phan = a.khoa_luu.split("/")
+        assert len(phan) == 5, a.khoa_luu
+        assert phan[0] == "CHUA_XAC_DINH", "chưa khai pháp nhân thì nói rõ, không mặc định về công ty mẹ"
+        assert phan[1].isdigit() and len(phan[1]) == 4
+        assert phan[2] == "05_Tour"          # chuyến xe thuộc nhóm hồ sơ tour
+        assert phan[3] == a.doi_tuong_id     # tour/nhân sự lưu theo mã đối tượng, không theo tháng
+        assert a.nhom_ho_so == "05_Tour" and a.nhay_cam is False
+
+
+def test_ho_so_nhan_su_luu_theo_ma_nv_va_danh_dau_nhay_cam(_startup):
+    """Nghị định 13/2023 và mục 7.3: hồ sơ nhân sự là dữ liệu cá nhân, phân quyền riêng."""
+    r = tai("hcns", "hop_dong_lao_dong.pdf", b"%PDF-1.4 hop dong", doi_tuong="nhan_su", dtid="NS0016",
+            loai="hop_dong", kieu="application/pdf")
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["nhom_ho_so"] == "06_Nhan_su" and d["nhay_cam"] is True
+    assert d["thoi_han_luu"].startswith("Thời gian làm việc")
+    from app.db.session import SessionLocal
+    from app.models.attachments import Attachment
+    with SessionLocal() as db:
+        a = db.get(Attachment, d["id"])
+        assert a.khoa_luu.split("/")[2:4] == ["06_Nhan_su", "NS0016"]
+
+
+def test_ho_so_nhan_su_khong_lo_ra_cho_vai_tro_khac(_startup):
+    """Xem được màn hình nhân sự KHÔNG đồng nghĩa với xem được hợp đồng lao động của từng người."""
+    ds = client.get("/api/v1/tep?doi_tuong=nhan_su&doi_tuong_id=NS0016", headers=login("hcns")).json()
+    assert len(ds) == 1
+    aid = ds[0]["id"]
+    for ai in ("ketoan", "kd.hoa", "cntt"):
+        assert client.get(f"/api/v1/tep?doi_tuong=nhan_su&doi_tuong_id=NS0016",
+                          headers=login(ai)).json() == [], f"{ai} không được thấy hồ sơ nhân sự"
+        assert client.get(f"/api/v1/tep/{aid}/tai", headers=login(ai)).status_code == 403, ai
+    assert client.get(f"/api/v1/tep/{aid}/tai", headers=login("hcns")).status_code == 200
+
+
+def test_vai_tro_khac_khong_gan_duoc_tep_vao_ho_so_nhan_su(_startup):
+    r = tai("ketoan", "gi_do.pdf", b"%PDF-1.4 x", doi_tuong="nhan_su", dtid="NS0002",
+            loai="hop_dong", kieu="application/pdf")
+    assert r.status_code == 403 and "Nghị định 13/2023" in r.json()["detail"]
+
+
+def test_cau_hinh_cong_bo_chin_nhom_ho_so_va_thoi_han_luu(_startup):
+    d = client.get("/api/v1/tep/cau-hinh", headers=login("ketoan")).json()
+    assert len(d["nhom_ho_so"]) == 9
+    assert all(n["thoi_han_luu"] for n in d["nhom_ho_so"])
+    assert "Pháp nhân / Năm / Nhóm hồ sơ" in d["cau_truc_kho"]
 
 
 def test_cung_mot_anh_gan_hai_lan_khong_tao_ban_thu_hai(_startup):

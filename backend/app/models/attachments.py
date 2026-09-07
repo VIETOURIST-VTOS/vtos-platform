@@ -20,23 +20,43 @@ from sqlalchemy import String, Integer, DateTime, Text, Boolean, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 
-# Đối tượng gắn tệp: mã → (tên hiển thị, phòng ban chủ quản). Thêm phân hệ mới là thêm một dòng.
-DOI_TUONG = {
-    "chuyen_xe":     ("Chuyến xe", "doi_xe"),
-    "xe":            ("Hồ sơ xe", "doi_xe"),
-    "nha_cung_cap":  ("Nhà cung cấp", "dieu_hanh"),
-    "don_dich_vu":   ("Đơn đặt dịch vụ", "dieu_hanh"),
-    "tour":          ("Tour", "dieu_hanh"),
-    "booking":       ("Booking", "kd_le"),
-    "khach_hang":    ("Khách hàng", "kd_le"),
-    "nhan_su":       ("Hồ sơ nhân sự", "hcns"),
-    "bang_luong":    ("Bảng lương", "hcns"),
-    "de_nghi_chi":   ("Đề nghị chi", "ketoan"),
-    "sao_ke":        ("Sao kê ngân hàng", "ketoan"),
-    "hoa_don":       ("Hóa đơn", "ketoan"),
-    "visa":          ("Hồ sơ visa", "visa"),
-    "van_ban":       ("Văn bản / quyết định", "ban_tgd"),
+# Chín nhóm hồ sơ CỐ ĐỊNH theo Mô hình quản trị số hóa mục 7 – giống nhau ở mọi pháp nhân. Nhóm cố định
+# là điều kiện để kiểm toán tìm được hồ sơ ở pháp nhân họ chưa từng mở: cấu trúc thư mục ở đâu cũng thế.
+NHOM_HO_SO = {
+    "01_Phap_ly":        ("Pháp lý", "Vĩnh viễn"),
+    "02_Ke_toan":        ("Kế toán", "10 năm (chứng từ ghi sổ)"),
+    "03_Thue":           ("Thuế & hóa đơn", "10 năm"),
+    "04_Ngan_hang_Vay":  ("Ngân hàng & vay", "10 năm"),
+    "05_Tour":           ("Tour & booking", "10 năm"),
+    "06_Nhan_su":        ("Nhân sự", "Thời gian làm việc + 5 năm"),
+    "07_Hop_dong":       ("Hợp đồng", "10 năm"),
+    "08_Kiem_toan":      ("Kiểm toán", "10 năm"),
+    "09_HDQT_Co_dong":   ("HĐQT & cổ đông", "Vĩnh viễn"),
 }
+
+# Đối tượng gắn tệp: mã → (tên hiển thị, phòng ban chủ quản, nhóm hồ sơ, lưu theo đối tượng?).
+# Cột cuối theo mục 7.2: tour và nhân sự lưu THEO ĐỐI TƯỢNG (mã tour, mã NV), các nhóm còn lại theo tháng.
+DOI_TUONG_DAY_DU = {
+    "chuyen_xe":     ("Chuyến xe", "doi_xe", "05_Tour", True),
+    "xe":            ("Hồ sơ xe", "doi_xe", "01_Phap_ly", True),
+    "nha_cung_cap":  ("Nhà cung cấp", "dieu_hanh", "07_Hop_dong", True),
+    "don_dich_vu":   ("Đơn đặt dịch vụ", "dieu_hanh", "05_Tour", True),
+    "tour":          ("Tour", "dieu_hanh", "05_Tour", True),
+    "booking":       ("Booking", "kd_le", "05_Tour", True),
+    "khach_hang":    ("Khách hàng", "kd_le", "05_Tour", True),
+    "nhan_su":       ("Hồ sơ nhân sự", "hcns", "06_Nhan_su", True),
+    "bang_luong":    ("Bảng lương", "hcns", "06_Nhan_su", False),
+    "de_nghi_chi":   ("Đề nghị chi", "ketoan", "02_Ke_toan", False),
+    "sao_ke":        ("Sao kê ngân hàng", "ketoan", "04_Ngan_hang_Vay", False),
+    "hoa_don":       ("Hóa đơn", "ketoan", "03_Thue", False),
+    "visa":          ("Hồ sơ visa", "visa", "05_Tour", True),
+    "van_ban":       ("Văn bản / quyết định", "ban_tgd", "09_HDQT_Co_dong", False),
+}
+DOI_TUONG = {k: (v[0], v[1]) for k, v in DOI_TUONG_DAY_DU.items()}
+
+# Nhóm hồ sơ chứa dữ liệu cá nhân phải PHÂN QUYỀN RIÊNG (Nghị định 13/2023, và mục 7.3 của Mô hình quản
+# trị số hóa). Không phải "ai xem được màn hình nhân sự cũng xem được hợp đồng lao động của từng người".
+NHOM_NHAY_CAM = {"06_Nhan_su"}
 
 LOAI_TEP = {"chung_tu": "Chứng từ gốc", "hoa_don": "Hóa đơn", "hop_dong": "Hợp đồng",
             "hinh_anh": "Hình ảnh", "bang_bieu": "Bảng biểu", "khac": "Khác"}
@@ -55,6 +75,12 @@ class Attachment(Base):
     doi_tuong: Mapped[str] = mapped_column(String(30))          # khóa trong DOI_TUONG
     doi_tuong_id: Mapped[str] = mapped_column(String(60))       # id hoặc mã của bản ghi được gắn
     phong_ban: Mapped[str] = mapped_column(String(20), default="")
+    # Ba trường dựng nên cấu trúc kho theo Mô hình quản trị số hóa mục 7.2:
+    #   Pháp nhân / Năm / Nhóm hồ sơ / Tháng hoặc Mã đối tượng / Tệp
+    phap_nhan: Mapped[str] = mapped_column(String(30), default="")   # mã pháp nhân; rỗng = CHƯA XÁC ĐỊNH
+    nam: Mapped[int] = mapped_column(Integer, default=0)
+    nhom_ho_so: Mapped[str] = mapped_column(String(20), default="")  # 01_Phap_ly … 09_HDQT_Co_dong
+    nhay_cam: Mapped[bool] = mapped_column(Boolean, default=False)   # dữ liệu cá nhân – phân quyền riêng
     loai: Mapped[str] = mapped_column(String(20), default="chung_tu")
     ten_tep: Mapped[str] = mapped_column(String(200))           # tên gốc, CHỈ để hiển thị
     kieu_noi_dung: Mapped[str] = mapped_column(String(80), default="")

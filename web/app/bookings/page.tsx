@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT } from "@/lib/api";
 import { Tag, Gate, errMsg, MangTag } from "@/components/ui";
@@ -82,6 +83,9 @@ function Bookings() {
       <label>Ghi chú chăm sóc</label><input name="care_note" defaultValue={edit.care_note || ""} /><label>Dịch vụ lẻ</label><input name="services_note" defaultValue={edit.services_note || ""} />
       <p className="muted">Tiền booking không tự tính lại khi đổi cơ cấu khách (giữ giá đã chốt). Booking đã khóa (đóng tour / thu đủ) phải được TP Điều hành / GĐ KD mở khóa.</p>
       <button className="act teal" type="submit">Lưu</button> <button type="button" className="act grey" onClick={() => setEdit(null)}>Đóng</button></form>}
+    {edit && <DinhKem doiTuong="booking" doiTuongId={edit.code} tieuDe={`Chứng từ của booking ${edit.code}`}
+      goi={"Ảnh ủy nhiệm chi, biên lai thu tiền, hợp đồng ký với khách, hộ chiếu/giấy tờ tùy thân. " +
+           "Chứng từ nằm cùng booking thì lúc đối chiếu tiền không phải đi hỏi từng người."} />}
 
     {cancel && <form onSubmit={doCancel} className="panel"><h2>Hủy booking {cancel.code} – {cancel.customer_name} · đã thu {vnd(cancel.paid)}</h2>
       {cancel.past_deadline && <Gate ok={false}>Đã qua deadline hủy chỗ {fmtDT(cancel.cancel_deadline)} – cân nhắc phí hủy theo điều kiện tour.</Gate>}

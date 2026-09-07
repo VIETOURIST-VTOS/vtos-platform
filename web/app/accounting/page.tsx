@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -109,6 +110,7 @@ function Accounting() {
   const [ledger, setLedger] = useState<any>(null);
   const [tb, setTb] = useState<any>(null);
   const [invs, setInvs] = useState<any[]>([]);
+  const [tepHD, setTepHD] = useState("");   // hóa đơn đang mở tệp kèm theo
   const [periods, setPeriods] = useState<any[]>([]);
   const [fs, setFs] = useState<any>({});
   const [tax, setTax] = useState<any>({});
@@ -188,7 +190,11 @@ function Accounting() {
       <div className="panel wrap"><table><thead><tr><th>Số HĐ</th><th>Ngày</th><th>Booking</th><th>Người mua</th><th style={{ textAlign: "right" }}>Chưa thuế</th><th style={{ textAlign: "right" }}>GTGT</th><th style={{ textAlign: "right" }}>Tổng</th><th>Trạng thái</th><th>Mã tra cứu</th>{isKT && <th></th>}</tr></thead>
         <tbody>{invs.length ? invs.map((i) => <tr key={i.id}><td><b>{i.no || "(nháp)"}</b></td><td>{fmtD(i.issue_date)}</td><td>{i.booking_code}<div className="muted">{i.tour_code}</div></td><td>{i.customer_name}<div className="muted">{i.customer_tax_code}</div></td><td style={{ textAlign: "right" }}>{vnd(i.pre_tax)}</td><td style={{ textAlign: "right" }}>{vnd(i.vat)} <span className="muted">({Math.round(i.vat_rate * 100)}%)</span></td><td style={{ textAlign: "right" }}><b>{vnd(i.total)}</b></td>
           <td><Tag cls={IST[i.status]?.[1]}>{IST[i.status]?.[0]}</Tag></td><td className="mono muted">{i.provider_ref}</td>
-          {isKT && <td>{i.status === "nhap" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/invoices/${i.id}/issue`)}>Phát hành</button>}{i.status !== "huy" && <button className="act grey" style={{ margin: "0 0 0 4px" }} onClick={() => { const r = prompt("Lý do hủy hóa đơn?"); if (r) post(`/invoices/${i.id}/cancel`, { reason: r }); }}>Hủy</button>}</td>}</tr>) : <tr><td colSpan={10} className="muted">Chưa có hóa đơn.</td></tr>}</tbody></table></div>
+          {isKT && <td>{i.status === "nhap" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/invoices/${i.id}/issue`)}>Phát hành</button>}{i.status !== "huy" && <button className="act grey" style={{ margin: "0 0 0 4px" }} onClick={() => { const r = prompt("Lý do hủy hóa đơn?"); if (r) post(`/invoices/${i.id}/cancel`, { reason: r }); }}>Hủy</button>}
+            {" "}<button className="act grey" style={{ margin: "0 0 0 4px" }} title="Tệp hóa đơn (PDF/XML) và chứng từ kèm" onClick={() => setTepHD(i.no || `nhap-${i.id}`)}>Tệp</button></td>}</tr>) : <tr><td colSpan={10} className="muted">Chưa có hóa đơn.</td></tr>}</tbody></table></div>
+      {tepHD && <DinhKem doiTuong="hoa_don" doiTuongId={tepHD} loai="hoa_don" tieuDe={`Tệp của hóa đơn ${tepHD}`}
+        goi={"Bản PDF và XML hóa đơn điện tử, biên bản điều chỉnh/hủy nếu có. Nhóm 03_Thue, giữ 10 năm " +
+             "theo thời hiệu truy thu thuế."} />}
       <p className="muted">Bản pilot cấp số nội bộ (adapter <code>noi_bo</code>). Khi ký hợp đồng nhà cung cấp HĐĐT (Viettel / VNPT / MISA meInvoice…) thay adapter gọi API, số hóa đơn và mã CQT lấy từ nhà cung cấp.</p>
     </>}
 

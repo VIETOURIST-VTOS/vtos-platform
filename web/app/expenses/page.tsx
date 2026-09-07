@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -12,6 +13,7 @@ function Expenses() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const [tab, setTab] = useState("requests");
+  const [tepDN, setTepDN] = useState("");   // mã đề nghị chi đang mở chứng từ
   const [filter, setFilter] = useState("cho_tp,cho_kt,cho_duyet,cho_chi");
   const [rows, setRows] = useState<any[]>([]);
   const [cf, setCf] = useState<any[]>([]);
@@ -58,7 +60,11 @@ function Expenses() {
         <tbody>{rows.length ? rows.map((r) => <tr key={r.id}><td><b>{r.code}</b><div className="muted">{fmtDT(r.created_at)}</div></td><td>{CAT[r.category]}<div className="muted">{r.tour_code}</div></td><td>{r.supplier_name}<div className="muted">{r.supplier_tax_code || <Tag cls="warn">chưa MST</Tag>}</div></td><td style={{ textAlign: "right" }}><b>{vnd(r.amount)}</b></td><td>{r.description}<div className="muted">{r.document_ref || <Tag cls="warn">thiếu chứng từ</Tag>}{!r.has_invoice && !["hoan_tien", "tam_ung"].includes(r.category) && <Tag cls="warn">không HĐ</Tag>}</div></td>
           <td>{r.over_budget && <Tag cls="red">Ngoài dự toán</Tag>}{r.two_signatures && <Tag cls="navy">2 chữ ký</Tag>}</td><td><Tag cls={ST[r.status]?.[1]}>{ST[r.status]?.[0]}</Tag><div className="muted">{r.next}{r.two_signatures && r.status === "cho_duyet" && ` (CT ${r.signed_chutich ? "✔" : "…"} · TGĐ ${r.signed_tgd ? "✔" : "…"})`}{r.reject_reason && ` – ${r.reject_reason}`}{r.paid_ref && ` – ${r.paid_ref}`}</div></td>
           <td className="muted">{r.created_by}{r.tp_by && ` → ${r.tp_by}`}{r.kt_by && ` → ${r.kt_by}`}{r.approved_by && ` → ${r.approved_by}`}</td>
-          <td>{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} onClick={() => { let reason = ""; if (a === "reject") { reason = prompt("Lý do từ chối (bắt buộc):") || ""; if (!reason) return; } if (a === "pay") { reason = prompt("Mã giao dịch ngân hàng (hoặc 'TM' nếu tiền mặt):") || ""; } step(r, a, reason); }}>{l}</button>)}</td></tr>) : <tr><td colSpan={9} className="muted">Không có đề nghị chi.</td></tr>}</tbody></table></div>
+          <td>{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} onClick={() => { let reason = ""; if (a === "reject") { reason = prompt("Lý do từ chối (bắt buộc):") || ""; if (!reason) return; } if (a === "pay") { reason = prompt("Mã giao dịch ngân hàng (hoặc 'TM' nếu tiền mặt):") || ""; } step(r, a, reason); }}>{l}</button>)}
+            {" "}<button className="act grey" style={{ margin: "0 4px 4px 0" }} title="Chứng từ kèm theo" onClick={() => setTepDN(r.code)}>Chứng từ</button></td></tr>) : <tr><td colSpan={9} className="muted">Không có đề nghị chi.</td></tr>}</tbody></table></div>
+      {tepDN && <DinhKem doiTuong="de_nghi_chi" doiTuongId={tepDN} tieuDe={`Chứng từ của đề nghị chi ${tepDN}`}
+        goi={"Hóa đơn, hợp đồng, báo giá, ủy nhiệm chi. Người duyệt nhìn thấy đúng chứng từ mình đang " +
+             "duyệt thay vì tin vào một dòng mô tả."} />}
     </>}
 
     {tab === "cashflow" && <div className="panel wrap"><table><thead><tr><th>Tour</th><th>Trạng thái</th><th style={{ textAlign: "right" }}>Doanh thu booking</th><th style={{ textAlign: "right" }}>Đã thu</th><th style={{ textAlign: "right" }}>Đã chi</th><th style={{ textAlign: "right" }}>Lệnh chi chờ</th><th style={{ textAlign: "right" }}>Đang trình</th><th style={{ textAlign: "right" }}>Tiền còn lại</th><th style={{ textAlign: "right" }}>Dự toán chi</th><th style={{ textAlign: "right" }}>LN dự kiến</th><th>Cảnh báo</th></tr></thead>
