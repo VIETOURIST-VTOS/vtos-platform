@@ -132,3 +132,30 @@ def test_bang_luong_va_ngan_hang_khong_con_la_trang_ai_cung_thay():
     from app.services.access import MENU_ROLES
     assert "/bank-accounts" in MENU_ROLES and "nv_dh" not in MENU_ROLES["/bank-accounts"]
     assert "nv_kd" not in MENU_ROLES["/hr"], "bảng lương nằm trong /hr – khối kinh doanh không được thấy"
+
+
+def test_mo_lai_tai_khoan_bi_khoa():
+    """GET /users chỉ trả tài khoản đang hoạt động, nên khóa xong là biến mất khỏi mọi màn hình – không mở
+    lại được người bị khóa nhầm. Phải có đường nhìn thấy và mở lại, kèm nhật ký."""
+    from app.db.session import SessionLocal
+    from app.models.core import User
+    from app.core.security import hash_password
+    db = SessionLocal()
+    db.add(User(username="bks.kt", full_name="Ban Kiểm soát kiểm thử", role="bks", department="bks",
+                password_hash=hash_password("123456"), active=False))
+    db.commit(); db.close()
+
+    ds = client.get("/api/v1/users/khoa", headers=login("hcns")).json()
+    row = next(x for x in ds if x["username"] == "bks.kt")
+    assert client.post("/api/v1/auth/login", data={"username": "bks.kt", "password": "123456"}).status_code == 401
+
+    r = client.put(f"/api/v1/users/{row['id']}", json={"active": True}, headers=login("hcns"))
+    assert r.status_code == 200 and r.json()["user"]["active"] is True, r.text
+    assert client.post("/api/v1/auth/login", data={"username": "bks.kt", "password": "123456"}).status_code == 200
+
+    # không tự khóa chính mình – tránh tự nhốt ra ngoài hệ thống
+    me = client.get("/api/v1/auth/me", headers=login("hcns")).json()
+    assert client.put(f"/api/v1/users/{me['id']}", json={"active": False}, headers=login("hcns")).status_code == 422
+    # vai trò không có trong danh mục thì từ chối, không im lặng ghi bừa
+    assert client.put(f"/api/v1/users/{row['id']}", json={"role": "sep_tong"}, headers=login("hcns")).status_code == 422
+    assert client.get("/api/v1/users/khoa", headers=login("kd.hoa")).status_code == 403

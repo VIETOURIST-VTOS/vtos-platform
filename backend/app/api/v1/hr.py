@@ -82,6 +82,41 @@ def import_master(reset_passwords: bool = False, close_accounts: bool = True, dr
     return {"message": f"Đã nạp: cập nhật {st['updated']}, tạo mới {st['created']} hồ sơ; ghép {st['users_linked']} tài khoản, tạo {st['users_created']} tài khoản mới" + (f", đặt lại {st['passwords_reset']} mật khẩu = mã NV" if reset_passwords else ""), **st}
 
 
+class TaiKhoanIn(BaseModel):
+    active: bool | None = None
+    role: str | None = None
+
+
+@router.get("/users/khoa")
+def users_locked(u: User = Depends(require_roles(*HR_WRITE, "tgd", "chutich", "bks")), db: Session = Depends(get_db)):
+    """Tài khoản đang bị khóa. GET /users chỉ trả tài khoản đang hoạt động nên khóa xong là không còn nhìn
+    thấy ở đâu – không mở lại được người bị khóa nhầm, cũng không rà được ai đã bị khóa."""
+    from app.models.core import ROLES as R_
+    rows = db.execute(select(User).where(User.active == False).order_by(User.username)).scalars()
+    return [{"id": x.id, "username": x.username, "full_name": x.full_name, "role": x.role,
+             "role_name": R_.get(x.role, x.role), "staff_code": x.staff_code, "department": x.department} for x in rows]
+
+
+@router.put("/users/{uid}")
+def update_user(uid: int, data: TaiKhoanIn, u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
+    """Khóa / mở khóa tài khoản và đổi vai trò. Khóa chứ không xóa: nhật ký và chứng từ cũ vẫn phải truy ra
+    được người thực hiện."""
+    from app.models.core import ROLES as R_
+    t = db.get(User, uid)
+    if not t: raise HTTPException(404, "Không có tài khoản")
+    if t.id == u.id: raise HTTPException(422, "Không tự đổi vai trò hoặc tự khóa tài khoản của mình")
+    if t.role in ("chutich", "tgd") and u.role != "cntt": raise HTTPException(403, "Chỉ CNTT thao tác trên tài khoản lãnh đạo")
+    if data.role is not None and data.role not in R_: raise HTTPException(422, f"Vai trò không hợp lệ: {data.role}")
+    before = {"vai_tro": t.role, "hoat_dong": t.active}
+    if data.role is not None: t.role = data.role
+    if data.active is not None: t.active = data.active
+    R.audit(db, u.username, u.role, "sua_tai_khoan", f"user:{t.username}", before=before,
+            after={"vai_tro": t.role, "hoat_dong": t.active})
+    db.commit()
+    return {"message": f"Đã cập nhật tài khoản {t.username}" + ("" if t.active else " – đã khóa đăng nhập"),
+            "user": {"id": t.id, "username": t.username, "role": t.role, "role_name": R_.get(t.role, t.role), "active": t.active}}
+
+
 class ResetPwIn(BaseModel):
     new_password: str = ""      # trống = mã NV
 
