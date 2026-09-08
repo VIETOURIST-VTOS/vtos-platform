@@ -351,7 +351,12 @@ MENU_ROLES = {
 
     # --- Điều hành ---
     "/ops": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "hcns", "cntt"),
-    "/visa": BASE_VIEW + OPERATIONS + VISA_STAFF + ("ptgd_doan", "ketoan", "hcns", "cntt"),
+    # Khối Kinh doanh có mặt vì hồ sơ visa mang cột sales_user_id và có nút phân công người bán: bên
+    # trong, visa.scope() chỉ cho họ thấy hồ sơ MÌNH ĐƯỢC GIAO, và cơ cấu giá vốn vẫn bị che
+    # (/ho-so/{id}/thu-chi trả 403). Bỏ họ khỏi dòng này thì ô phân công thành ô chết, và nhân viên bán
+    # hàng không trả lời được câu "hồ sơ visa của khách tôi tới đâu rồi" – trong khi máy chủ vẫn khai
+    # nv_kd ở visa.READ. Hai cửa nói ngược nhau thì cửa nào cũng mất nghĩa.
+    "/visa": BASE_VIEW + OPERATIONS + SALES + VISA_STAFF + ("ptgd_doan", "ketoan", "hcns", "cntt"),
 
     # --- Vận tải & Hướng dẫn viên ---
     "/xe-hdv": BASE_VIEW + OPERATIONS + FIELD + ("hcns", "cntt"),
