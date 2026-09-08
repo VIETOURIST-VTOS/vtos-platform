@@ -79,12 +79,21 @@ def test_ma_tran_cong_bo_khop_tung_o_voi_ma_nguon():
             assert row["man_hinh"][p] == (p in that), f"ô lệch: {vai} × {p}"
 
 
-def test_ma_tran_danh_dau_dung_ba_vai_tro_dac_biet():
+def test_ma_tran_danh_dau_dung_cac_vai_tro_dac_biet():
+    """Ma trận công bố phải đánh dấu đúng ai toàn quyền và ai chỉ đọc.
+
+    robot_ks vào nhóm CHỈ ĐỌC từ 09/9/2026 (Chủ tịch quyết: robot làm việc Ban Kiểm soát thì đọc được
+    thứ BKS đọc). Toàn quyền vẫn đúng hai người – và phải luôn đúng hai người: đó là quyền đi qua mọi
+    hàng rào, không phải quyền xem nhiều."""
+    from app.services import access as AC
     _, cntt = tk("cntt")
     mt = client.get("/api/v1/access/matrix", headers=login(cntt)).json()
     tq = {r["vai_tro"] for r in mt["rows"] if r["toan_quyen"]}
     cd = {r["vai_tro"] for r in mt["rows"] if r["chi_doc"]}
-    assert tq == {"chutich", "tgd"} and cd == {"bks"}
+    assert tq == {"chutich", "tgd"}, f"toàn quyền phải đúng hai người, đang là {sorted(tq)}"
+    assert cd == {"bks", "robot_ks"}, f"chỉ đọc: {sorted(cd)}"
+    for v in cd - {"bks"}:
+        assert AC.la_vai_tro_may(v), f"{v} vào nhóm chỉ đọc mà không phải vai trò máy"
 
 
 def test_xuat_excel_ma_tran_ra_tep_that():

@@ -39,7 +39,8 @@ def _startup():
         global client; client = c
         from app.core.security import hash_password
         db = _db()
-        for ma, ten in (("SPN_A", "Công ty A"), ("SPN_B", "Công ty B")):
+        for ma, ten in (("SPN_A", "Công ty A"), ("SPN_B", "Công ty B"),
+                        ("VTD", "Vietourist Holdings"), ("VTRIP-VT", "Công ty TNHH Vận tải Vietrip")):
             if db.execute(select(Company).where(Company.code == ma)).scalars().first() is None:
                 db.add(Company(code=ma, name=ten, kind="con"))
         db.commit()
@@ -78,7 +79,15 @@ def _startup():
         hs("SPN05", tk("spn_ho_so_nghi"), ID["A"], active=False)
         # 6. tài khoản ĐÃ CÓ pháp nhân B, hồ sơ nói A → LỆCH, báo ra chứ không tự sửa
         hs("SPN06", tk("spn_lech", cid=ID["B"]), ID["A"])
-        # 7. người bấm nút
+        # 7. QUY TẮC 09/9: phòng Đội xe → VTRIP-VT, còn lại → VTD
+        e = hs("SPN07", tk("spn_taixe", "xe_hdv"), None); e.department = "doi_xe"
+        e = hs("SPN08", tk("spn_gd_doi_xe", "gd_doi_xe"), None); e.department = "doi_xe"
+        e = hs("SPN09", tk("spn_hdv", "xe_hdv"), None); e.department = "huong_dan"
+        e = hs("SPN10", tk("spn_vanphong", "nv_kd"), None); e.department = "kd_le"
+        # hồ sơ ghi NGƯỢC quy tắc – phải nêu ra, không im lặng lấy bên nào
+        e = hs("SPN11", tk("spn_lech_quy_tac"), ID["A"]); e.department = "doi_xe"
+        db.commit()
+        # 8. người bấm nút
         tk("spn_cntt", "cntt")
         tk("spn_bks", "bks")
         db.close()
@@ -95,28 +104,55 @@ def nhom(kq, ten):
     return {d["username"]: d for d in kq[ten]}
 
 
+def go_phap_nhan(*usernames):
+    """Gỡ pháp nhân của vài tài khoản rồi trả về bảng xem trước.
+
+    Các phép thử trong tệp này chạy chung một cơ sở dữ liệu và vài phép trước đã BẤM NÚT GHI, nên tài
+    khoản đã có pháp nhân sẽ rơi khỏi nhóm 'suy_duoc' sang 'da_co'. Phép thử về QUY TẮC phải nói về
+    quy tắc, không nói về việc phép thử nào chạy trước – nên dọn trước khi hỏi."""
+    db = _db()
+    for un in usernames:
+        u = db.execute(select(User).where(User.username == un)).scalars().first()
+        if u: u.company_id = None
+    db.commit(); db.close()
+    return nhom(SPN.xem_truoc(_db()), "suy_duoc")
+
+
 # ---------------- Suy đúng cái suy được ----------------
-def test_suy_duoc_khi_noi_bang_user_id():
-    kq = SPN.xem_truoc(_db())
-    d = nhom(kq, "suy_duoc")["spn_uid"]
-    assert d["company_id"] == ID["A"] and d["noi_bang"] == "user_id"
+def test_noi_duoc_bang_user_id():
+    d = go_phap_nhan("spn_uid")["spn_uid"]
+    assert d["noi_bang"] == "user_id" and d["company"] == "VTD"
 
 
-def test_suy_duoc_khi_chi_noi_duoc_bang_ma_nhan_vien():
+def test_noi_duoc_bang_ma_nhan_vien_khi_ho_so_chua_gan_user_id():
     """Hai đường nối lệch nhau ở vài tài khoản là chuyện có thật, nên phải nối được cả hai đường –
     và theo đúng thứ tự mà phần còn lại của hệ thống đang dùng: user_id trước, mã sau."""
-    d = nhom(SPN.xem_truoc(_db()), "suy_duoc")["spn_ma"]
-    assert d["company_id"] == ID["B"] and d["noi_bang"] == "ma_nhan_vien"
+    d = go_phap_nhan("spn_ma")["spn_ma"]
+    assert d["noi_bang"] == "ma_nhan_vien" and d["company"] == "VTD"
 
 
 # ---------------- Bốn chỗ KHÔNG được làm ----------------
-def test_khong_doan_khi_ho_so_chua_co_phap_nhan():
-    """Suy từ phòng ban hay mặc định về công ty mẹ là cách một khoản của công ty này chạy sang báo
-    cáo của công ty kia mà không ai thấy."""
-    kq = SPN.xem_truoc(_db())
-    assert "spn_hs_trong" not in nhom(kq, "suy_duoc")
-    d = nhom(kq, "khong_suy_duoc")["spn_hs_trong"]
-    assert "SPN03" in d["ly_do"] and "chưa có pháp nhân" in d["ly_do"]
+def test_ho_so_chua_gan_phap_nhan_van_suy_duoc_theo_quy_tac():
+    """Đổi hướng so với bản đầu (08/9). Bản ấy chỉ suy khi HỒ SƠ đã có pháp nhân, và từ chối mọi
+    trường hợp khác vì "không đoán". Quyết định 09/9 của Chủ tịch làm cột company_id của hồ sơ không
+    còn là nguồn duy nhất: đã có một QUY TẮC nói thẳng phòng nào thuộc pháp nhân nào, nên suy theo quy
+    tắc không phải là đoán – đoán là khi không có quy tắc mà vẫn điền."""
+    d = go_phap_nhan("spn_hs_trong")["spn_hs_trong"]
+    assert d["company"] == "VTD", "hồ sơ chưa gán pháp nhân vẫn suy được theo phòng ban"
+
+
+def test_van_khong_doan_khi_danh_muc_thieu_phap_nhan():
+    """Ranh giới của "không đoán" nay nằm ở đây: quy tắc gọi tên một pháp nhân mà danh mục không có
+    thì DỪNG, không tự tạo và không lấy tạm công ty mẹ."""
+    goc = dict(SPN.PHONG_THEO_PHAP_NHAN)
+    SPN.PHONG_THEO_PHAP_NHAN["huong_dan"] = "KHONG-CO-TRONG-DANH-MUC"
+    try:
+        kq = SPN.xem_truoc(_db())
+        d = nhom(kq, "khong_suy_duoc")
+        assert "spn_hdv" in d, "quy tắc trỏ tới pháp nhân không có mà vẫn gán bừa"
+        assert "danh mục" in d["spn_hdv"]["ly_do"]
+    finally:
+        SPN.PHONG_THEO_PHAP_NHAN.clear(); SPN.PHONG_THEO_PHAP_NHAN.update(goc)
 
 
 def test_khong_doan_khi_khong_co_ho_so():
@@ -180,7 +216,8 @@ def test_ghi_duoc_cho_rieng_may_tai_khoan_da_chon():
                     json={"user_ids": [ID["spn_uid"]]}, headers=login("spn_cntt"))
     assert r.json()["da_ghi"] == 1
     db = _db()
-    assert db.get(User, ID["spn_uid"]).company_id == ID["A"]
+    vtd = db.execute(select(Company).where(Company.code == "VTD")).scalars().first()
+    assert db.get(User, ID["spn_uid"]).company_id == vtd.id
     assert db.get(User, ID["spn_ma"]).company_id is None, "ghi cả dòng không được chọn"
     db.close()
 
@@ -215,3 +252,86 @@ def test_moi_lan_ghi_deu_de_lai_nhat_ky():
     rows = r.json()["rows"] if isinstance(r.json(), dict) else r.json()
     assert any("suy_phap_nhan_tai_khoan_tu_ho_so" in str(x) for x in rows), \
         "gán pháp nhân hàng loạt mà không có dòng nhật ký nào"
+
+
+# ---------------- Quy tắc pháp nhân 09/9/2026 ----------------
+def test_phong_doi_xe_thuoc_cong_ty_van_tai():
+    """Chủ tịch chốt 09/9: tài xế và Giám đốc điều hành đội xe thuộc Công ty TNHH Vận tải Vietrip."""
+    d = go_phap_nhan("spn_taixe", "spn_gd_doi_xe")
+    for un in ("spn_taixe", "spn_gd_doi_xe"):
+        assert d[un]["company"] == "VTRIP-VT", f"{un} → {d[un]['company']}, phải là VTRIP-VT"
+
+
+def test_moi_phong_con_lai_thuoc_cong_ty_me():
+    d = go_phap_nhan("spn_vanphong")
+    assert d["spn_vanphong"]["company"] == "VTD"
+
+
+def test_huong_dan_vien_KHONG_bi_keo_sang_cong_ty_van_tai():
+    """Chỗ dễ sai nhất của quy tắc này. Vai trò xe_hdv gộp CẢ tài xế lẫn hướng dẫn viên vào một tên,
+    nên chốt theo vai trò là kéo toàn bộ HDV sang công ty vận tải – điều Chủ tịch không nói, và là
+    điều sai: HDV nay là cộng tác viên của phòng Hướng dẫn, không phải người của đội xe."""
+    d = go_phap_nhan("spn_hdv")
+    assert d["spn_hdv"]["company"] == "VTD", \
+        "hướng dẫn viên bị kéo sang công ty vận tải – quy tắc đang đọc theo vai trò thay vì phòng ban"
+    assert d["spn_hdv"]["phong"] == "huong_dan"
+
+
+def test_ho_so_ghi_khac_quy_tac_thi_neu_ra_chu_khong_im_lang():
+    """Hai nguồn nói khác nhau thì phải nói ra. Im lặng lấy một bên là chỗ một người mang pháp nhân sai
+    mà không ai biết – và pháp nhân sai thì bút toán lương chia sai, âm thầm."""
+    # Tình huống: TÀI KHOẢN chưa có pháp nhân, nhưng HỒ SƠ của người ấy ghi một pháp nhân khác với
+    # quy tắc. Quy tắc thắng, và chỗ lệch phải được nêu ra.
+    d = go_phap_nhan("spn_lech_quy_tac")
+    x = d["spn_lech_quy_tac"]
+    assert x["company"] == "VTRIP-VT", "quy tắc phải thắng số liệu hồ sơ cũ"
+    assert x.get("ho_so_company") == "SPN_A"
+    assert "quy tắc" in x.get("ly_do_quy_tac", ""), "không nêu được vì sao hai bên lệch"
+
+
+def test_quy_tac_duoc_cong_bo_ra_giao_dien():
+    """Người bấm nút phải đọc được quy tắc ngay tại chỗ bấm, không phải đi tra mã nguồn."""
+    kq = SPN.xem_truoc(_db())
+    assert kq["quy_tac"]["theo_phong"]["doi_xe"] == "VTRIP-VT"
+    assert kq["quy_tac"]["mac_dinh"] == "VTD"
+    assert "09/9/2026" in kq["quy_tac"]["cau"]
+
+
+# ---------------- Tài khoản cho vai trò máy ----------------
+def test_tao_tai_khoan_robot_mat_khau_ngau_nhien_va_khong_bat_doi():
+    r = client.post("/api/v1/access/accounts/robot", json={"role": "robot_ks"},
+                    headers=login("spn_cntt"))
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["username"] == "robot_ks"
+    assert len(d["mat_khau"]) >= 20, "mật khẩu robot phải dài và ngẫu nhiên, không phải mã nhân viên"
+    db = _db()
+    t = db.execute(select(User).where(User.username == "robot_ks")).scalars().first()
+    db.close()
+    assert t.must_change_password is False, \
+        "bắt robot đổi mật khẩu lần đầu là khoá cửa từ bên trong – không có ai ngồi bấm"
+    assert t.ngoai_bien_che is True, "robot không có trong bảng lương"
+    # và mật khẩu ấy đăng nhập được thật
+    assert client.post("/api/v1/auth/login",
+                       data={"username": "robot_ks", "password": d["mat_khau"]}).status_code == 200
+
+
+def test_khong_tao_hai_tai_khoan_cho_cung_mot_robot():
+    """Hai tài khoản cùng một vai trò máy thì không truy được lần chạy nào của bên nào."""
+    r = client.post("/api/v1/access/accounts/robot", json={"role": "robot_ks"},
+                    headers=login("spn_cntt"))
+    assert r.status_code == 409, r.text
+
+
+def test_khong_tao_duoc_tai_khoan_may_cho_vai_tro_nguoi():
+    """Cửa này sinh ra cho vai trò máy. Cho phép nó tạo tài khoản người là một đường tạo tài khoản
+    KHÔNG đi qua kiểm tra nào của cửa tạo tài khoản thường."""
+    r = client.post("/api/v1/access/accounts/robot", json={"role": "ketoan"},
+                    headers=login("spn_cntt"))
+    assert r.status_code == 422, r.text
+
+
+def test_khong_phai_ai_cung_tao_duoc_tai_khoan_robot():
+    r = client.post("/api/v1/access/accounts/robot", json={"role": "robot_vpm"},
+                    headers=login("spn_bks"))
+    assert r.status_code == 403, r.text

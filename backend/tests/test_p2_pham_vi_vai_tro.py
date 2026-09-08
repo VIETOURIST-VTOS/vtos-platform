@@ -126,7 +126,10 @@ PHAM_VI_DA_CHOT = {
     "ptgd_mkt": 38, "nv_kd": 39, "tn_kd": 39, "tp_kd": 39, "nv_mkt": 30,
     "gd_doi_xe": 24, "hanh_chinh": 24, "tp_hd": 22, "xe_hdv": 17, "nv_visa": 17,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
-    "robot_pq": 18, "robot_ks": 17, "robot_vpm": 17,
+    # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
+    # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
+    # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
+    "robot_pq": 18, "robot_ks": 96, "robot_vpm": 17,
 }
 
 
