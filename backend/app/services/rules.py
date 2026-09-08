@@ -28,6 +28,9 @@ DEFAULT_PARAMS = [
     ("kn_han_muc3_gio", "4", "Hạn phản hồi khách – khiếu nại mức 3 (nghiêm trọng)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     # Ngưỡng tiền bồi thường KHÔNG có tham số riêng: hoàn tiền đi qua Đề nghị chi nhóm "hoan_tien" và dùng
     # đúng ngưỡng hai chữ ký hiện hành. Đặt ngưỡng riêng ở đây là tạo đường tiền thứ hai.
+    # Lệnh Robot Kiểm soát 08/9/2026.
+    ("ky_thuat_cham_ms", "5000", "Đường dẫn chạy quá số mili giây này thì ghi sự kiện “chậm bất thường”", "mili giây", "Lệnh Kiểm soát K6"),
+    ("han_nhap_lieu_ngay", "5", "Ngày hàng tháng mà số liệu tháng trước coi như đã nhập đủ (mốc đo trễ để chấm điểm phòng ban)", "ngày trong tháng sau", "Chủ tịch chốt 08/9/2026"),
     ("nd_vai_tro_ky_2", "tgd,chutich,hanh_chinh", "Vai trò được ký chữ ký thứ hai cho nội dung có cam kết với khách hoặc có số liệu tài chính (hanh_chinh gồm pháp chế)", "danh sách vai trò", "MKT Đợt 5 – chờ Ban TGĐ chốt"),
     ("coc_mac_dinh_pct", "30", "Tỷ lệ cọc mặc định khi sản phẩm không quy định", "%", "Vận hành Vietrip"),
     ("han_coc_gio", "24", "Hạn khách đặt cọc sau khi tạo booking (quá → cảnh báo sale/ĐH)", "giờ", "Vận hành Vietrip"),
