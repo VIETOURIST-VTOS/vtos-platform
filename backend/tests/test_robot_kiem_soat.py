@@ -211,10 +211,41 @@ def test_vi_tri_kiem_soat_khai_dung_bang_quyen_ai():
 
 
 def test_menu_kiem_soat_theo_dung_ma_tran():
+    """Phòng ban không có mặt ở bàn làm việc giám sát. Kế toán là ngoại lệ CÓ LÝ DO, xem phép thử dưới."""
     from app.services.access import MENU_ROLES
     assert "/kiem-soat" in MENU_ROLES
     for vai in ("chutich", "tgd", "bks", "cntt"): assert vai in MENU_ROLES["/kiem-soat"]
-    for vai in ("nv_kd", "ketoan", "hcns", "tp_dh"): assert vai not in MENU_ROLES["/kiem-soat"]
+    for vai in ("nv_kd", "hcns", "tp_dh", "gd_kd", "ptgd_doan", "nv_dh"):
+        assert vai not in MENU_ROLES["/kiem-soat"], f"{vai} không được vào bàn làm việc giám sát"
+
+
+def test_ketoan_ra_soat_duoc_nhung_khong_doc_duoc_giam_sat():
+    """Nguyên tắc 07/9 – phòng ban không đọc kết quả giám sát chính mình – được bảo đảm ở lớp API,
+    KHÔNG ở dòng menu.
+
+    Vì sao phải nói rõ chỗ này: hai thứ khác nhau nằm chung một tiền tố đường dẫn. Bàn làm việc giám
+    sát (phát hiện, điểm phòng ban, báo cáo) và rà soát kỹ thuật của K1/K2 (một cột là tiền hay không).
+    Việc thứ hai là phán đoán KẾ TOÁN, và chính robot Kiểm soát chỉ định Kế toán trưởng làm người
+    quyết. Hàng rào phạm vi chỉ phân biệt tới mức tiền tố nên phải cho Kế toán chạm tiền tố.
+
+    Phép thử cũ canh điều này ở dòng menu – tức là canh ở chỗ nó KHÔNG được bảo đảm. Nay canh ở đúng
+    lớp: Kế toán rà soát được cột tiền, và KHÔNG đọc được phát hiện, điểm hay báo cáo.
+    """
+    h = login("ketoan")
+    assert client.get("/api/v1/kiem-soat/cot-tien", headers=h).status_code == 200
+    assert client.get("/api/v1/kiem-soat", headers=h).status_code == 403, \
+        "Kế toán đọc được bàn làm việc giám sát – phòng ban đang đọc kết quả giám sát chính mình"
+    assert client.post("/api/v1/kiem-soat/cham-diem", headers=h).status_code == 403
+    # và giao diện phải biết điều đó để không vẽ thẻ bấm vào là 403
+    r = client.get("/api/v1/kiem-soat/the", headers=h)
+    assert r.status_code == 200 and r.json()["the"] == ["ra_soat"], r.text
+
+
+def test_lanh_dao_va_robot_mo_duoc_ca_bon_the():
+    for vai in ("chutich", "cntt"):
+        r = client.get("/api/v1/kiem-soat/the", headers=login(vai))
+        assert r.status_code == 200 and set(r.json()["the"]) == {"phat_hien", "bao_cao", "diem", "ra_soat"}, \
+            f"{vai}: {r.text}"
 
 
 def test_khong_bao_oan_endpoint_da_chan_trong_than_ham():
