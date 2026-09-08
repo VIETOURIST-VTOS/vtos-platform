@@ -161,10 +161,8 @@ MAC_DINH = [
     ("PHI_VAY", "Phí gắn với khoản vay (thẩm định hồ sơ, thu xếp, cam kết)", "tien_ra",
      {"muc_chi": ["phi_vay"]}, "635", "1121", "", "", 0, "ngan_hang", False,
      "Phí khoản vay {ngan_hang}", 16,
-     CAN_CU_TT99 + " TK 635 nêu đích danh 'chi phí liên quan trực tiếp đến khoản vay (ngoài lãi vay phải "
-     "trả), như chi phí kiểm toán, thẩm định hồ sơ vay vốn, chi phí thu xếp khoản vay'. Quy ước này ghi "
-     "thẳng vào 635 cho khoản phí không vốn hóa và không phân bổ; phí lớn phải phân bổ dần thì ghi giảm "
-     "341 rồi phân bổ sang 635 – việc đó Kế toán lập tay, không tự động."),
+     CAN_CU_TT99 + " TK 635 nêu đích danh 'thẩm định hồ sơ vay vốn, chi phí thu xếp khoản vay'. Chỉ chạy "
+     "cho phí không vốn hóa; phí lớn phải phân bổ dần thì ghi giảm 341 rồi phân bổ, Kế toán lập tay."),
     ("NOP_THUE_GTGT", "Nộp thuế giá trị gia tăng", "tien_ra",
      {"muc_chi": ["nop_thue_gtgt"]}, "3331", "1121", "", "", 0, "", False,
      "Nộp thuế GTGT kỳ {ky}", 19, CAN_CU_TT99 + " TK 3331."),
@@ -202,6 +200,12 @@ def nap_mac_dinh(db: Session) -> int:
     for (ma, ten, nguon, dk, no, co_tk, thue, ben, tyle, dt, ct, dg, ut, cc) in MAC_DINH:
         if ma in co:
             continue
+        # Cắt theo đúng độ dài cột trước khi ghi. Không phải để làm đẹp: SQLite KHÔNG ép độ dài VARCHAR
+        # còn PostgreSQL thì có, nên một chuỗi quá dài đi qua toàn bộ phép thử ở máy rồi làm hỏng lệnh
+        # INSERT lúc khởi động trên máy chủ thật – và hàm này chạy trong lifespan, nên hỏng ở đây là
+        # CẢ API không lên được. Chuyện này đã xảy ra ngày 08/9/2026 với can_cu của PHI_VAY (363 ký tự).
+        # Phép thử test_moi_gia_tri_mac_dinh_vua_do_dai_cot canh để không bao giờ phải cắt thật.
+        ten, dg, cc = ten[:200], dg[:200], cc[:200]
         db.add(QuyTacHachToan(
             ma=ma, ten=ten, nguon=nguon, dieu_kien=dk, tk_no=no, tk_co=co_tk, tk_thue=thue,
             ben_thue=ben, ty_le_thue=tyle, doi_tuong=dt, can_cong_trinh=ct, dien_giai=dg,
