@@ -52,20 +52,44 @@ def _bang(ten: str):
     return Base.metadata.tables.get(ten)
 
 
-def _doc(db: Session, ng: dict, tu: datetime, den: datetime) -> list[dict]:
-    """Đọc các dòng của một nguồn trong khoảng thời gian NHẬP (không phải ngày chứng từ)."""
+TRAN_DONG = 50_000       # trần an toàn cho một nguồn trong một tháng
+
+
+def _doc(db: Session, ng: dict, tu: datetime, den: datetime, kho: dict | None = None) -> list[dict]:
+    """Đọc các dòng của một nguồn trong khoảng thời gian NHẬP (không phải ngày chứng từ).
+
+    `kho` là bộ đệm dùng chung trong MỘT lần quét. Bản đầu tiên không có nó và mỗi dấu hiệu tự đọc lại
+    bảng của mình – sáu dấu hiệu × sáu nguồn thành ba mươi sáu lần quét bảng, và trên dữ liệu thật thì
+    cổng trả 502 trước khi hàm kịp chạy xong. Đọc một lần, dùng chung.
+    """
+    if kho is not None:
+        k = (ng["ma"], tu, den)
+        if k in kho: return kho[k]
     t = _bang(ng["bang"])
     if t is None or ng["nguoi"] not in t.c or ng["luc"] not in t.c: return []
     cols = [t.c.id, t.c[ng["nguoi"]].label("nguoi"), t.c[ng["luc"]].label("luc")]
     cols.append((t.c[ng["tien"]] if ng["tien"] and ng["tien"] in t.c else func.cast(0, t.c.id.type)).label("tien"))
     cols.append((t.c[ng["ngay"]] if ng["ngay"] and ng["ngay"] in t.c else t.c[ng["luc"]]).label("ngay"))
-    q = select(*cols).where(t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den)
-    ra = []
-    for r in db.execute(q).all():
-        ng_uoi = (r.nguoi or "").strip().lower()
-        if ng_uoi in BO_QUA_NGUOI: continue
-        ra.append({"id": r.id, "nguoi": r.nguoi, "luc": r.luc, "tien": float(r.tien or 0), "ngay": r.ngay})
+    # Lọc tài khoản máy NGAY TRONG SQL, không đọc về rồi bỏ: trên hệ thống thật phần lớn dòng là do
+    # robot nạp, đọc hết về Python rồi vứt đi là trả giá cho đúng phần không dùng.
+    q = (select(*cols)
+         .where(t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den,
+                func.lower(func.coalesce(t.c[ng["nguoi"]], "")).notin_(BO_QUA_NGUOI))
+         .limit(TRAN_DONG + 1))
+    ra = [{"id": r.id, "nguoi": r.nguoi, "luc": r.luc, "tien": float(r.tien or 0), "ngay": r.ngay}
+          for r in db.execute(q).all()]
+    if kho is not None: kho[(ng["ma"], tu, den)] = ra
     return ra
+
+
+def _tong_tien(db: Session, ng: dict, tu: datetime, den: datetime) -> float:
+    """Tổng tiền của một nguồn trong khoảng – cộng bằng SQL, không nạp dòng nào về bộ nhớ."""
+    t = _bang(ng["bang"])
+    if t is None or not ng["tien"] or ng["tien"] not in t.c or ng["luc"] not in t.c: return 0.0
+    q = (select(func.coalesce(func.sum(t.c[ng["tien"]]), 0.0))
+         .where(t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den,
+                func.lower(func.coalesce(t.c[ng["nguoi"]], "")).notin_(BO_QUA_NGUOI)))
+    return float(db.execute(q).scalar() or 0)
 
 
 def _khoang_thang(thang: str) -> tuple[datetime, datetime]:
@@ -88,8 +112,8 @@ def _lech_ky(db: Session, thang: str, lan: float, toi_thieu: float) -> list[dict
     for ng in NGUON:
         if not ng["tien"]: continue
         a, b = _khoang_thang(thang); c, d = _khoang_thang(_thang_truoc(thang))
-        nay = sum(x["tien"] for x in _doc(db, ng, a, b))
-        truoc = sum(x["tien"] for x in _doc(db, ng, c, d))
+        nay = _tong_tien(db, ng, a, b)
+        truoc = _tong_tien(db, ng, c, d)
         if truoc <= 0 or nay <= 0: continue          # chưa có kỳ trước thì không có gì để so
         ty = nay / truoc
         if max(ty, 1 / ty) < lan: continue
@@ -103,14 +127,14 @@ def _lech_ky(db: Session, thang: str, lan: float, toi_thieu: float) -> list[dict
     return ra
 
 
-def _so_tron(db: Session, thang: str, tu_muc: float, lap: int) -> list[dict]:
+def _so_tron(db: Session, thang: str, tu_muc: float, lap: int, kho: dict | None = None) -> list[dict]:
     """Số chẵn triệu ở khoản lớn, cùng một người lặp lại nhiều dòng. Một con số tròn không nói lên gì;
     cùng một con số tròn lặp lại thì đó là người đang ƯỚC chứ không phải đang chép từ chứng từ."""
     a, b = _khoang_thang(thang); ra = []
     for ng in NGUON:
         if not ng["tien"]: continue
         dem: dict[tuple, int] = {}
-        for x in _doc(db, ng, a, b):
+        for x in _doc(db, ng, a, b, kho):
             if x["tien"] >= tu_muc and x["tien"] % 1_000_000 == 0:
                 k = (x["nguoi"], x["tien"]); dem[k] = dem.get(k, 0) + 1
         for (nguoi, tien), n in dem.items():
@@ -123,11 +147,11 @@ def _so_tron(db: Session, thang: str, tu_muc: float, lap: int) -> list[dict]:
     return ra
 
 
-def _ngoai_gio(db: Session, thang: str, gio_dau: int, gio_cuoi: int, don_dong: int) -> list[dict]:
+def _ngoai_gio(db: Session, thang: str, gio_dau: int, gio_cuoi: int, don_dong: int, kho: dict | None = None) -> list[dict]:
     """Ngoài giờ làm việc, hoặc nhập dồn nhiều dòng trong năm phút."""
     a, b = _khoang_thang(thang); ra = []
     for ng in NGUON:
-        rows = _doc(db, ng, a, b)
+        rows = _doc(db, ng, a, b, kho)
         ngoai: dict[str, int] = {}
         for x in rows:
             h = x["luc"].hour if isinstance(x["luc"], datetime) else None
@@ -158,7 +182,7 @@ def _ngoai_gio(db: Session, thang: str, gio_dau: int, gio_cuoi: int, don_dong: i
     return ra
 
 
-def _khac_phong(db: Session, thang: str) -> list[dict]:
+def _khac_phong(db: Session, thang: str, kho: dict | None = None) -> list[dict]:
     from app.models.core import User
     from app.services.ks_robot import PHONG_CUA_VAI_TRO
     a, b = _khoang_thang(thang)
@@ -167,7 +191,7 @@ def _khac_phong(db: Session, thang: str) -> list[dict]:
     for ng in NGUON:
         if not ng["phong"]: continue
         dem: dict[str, int] = {}
-        for x in _doc(db, ng, a, b):
+        for x in _doc(db, ng, a, b, kho):
             p = vai.get(x["nguoi"])
             # Không biết người này thuộc phòng nào thì IM LẶNG. Đoán rồi báo là cách nhanh nhất để
             # người ta thôi đọc bảng ngoại lệ.
@@ -182,7 +206,7 @@ def _khac_phong(db: Session, thang: str) -> list[dict]:
     return ra
 
 
-def _lui_ngay(db: Session, thang: str) -> list[dict]:
+def _lui_ngay(db: Session, thang: str, kho: dict | None = None) -> list[dict]:
     """Ngày chứng từ thuộc kỳ ĐÃ KHÓA mà dòng được nhập sau đó. Với quyết định "nhập là dùng luôn",
     kỳ khóa là chốt chặn cuối cùng còn lại – nên mọi lần lách nó phải hiện ra."""
     from app.models.accounting import PeriodLock
@@ -192,7 +216,7 @@ def _lui_ngay(db: Session, thang: str) -> list[dict]:
     ra = []
     for ng in NGUON:
         dem: dict[str, int] = {}
-        for x in _doc(db, ng, a, b):
+        for x in _doc(db, ng, a, b, kho):
             d = x["ngay"]
             ky = f"{d.year}-{d.month:02d}" if isinstance(d, (date, datetime)) else ""
             if ky and ky in khoa: dem[x["nguoi"]] = dem.get(x["nguoi"], 0) + 1
@@ -213,15 +237,17 @@ def _sua_da_chot(db: Session, thang: str) -> list[dict]:
     khoa = sorted({p.period for p in db.execute(select(PeriodLock)).scalars()})
     if not khoa: return []
     moc = max(khoa)
-    dem: dict[str, int] = {}
-    for lg in db.execute(select(AuditLog).where(AuditLog.ts >= a, AuditLog.ts < b)).scalars():
-        act = (lg.action or "").lower()
-        if not any(k in act for k in ("sua", "cap_nhat", "dieu_chinh", "mo_lai", "huy")): continue
-        if (lg.actor or "").strip().lower() in BO_QUA_NGUOI: continue
-        # chỉ tính khi nhật ký chỉ vào một kỳ đã khóa
-        noi_dung = f"{lg.entity} {lg.before} {lg.after}"
-        if any(k in noi_dung for k in khoa):
-            dem[lg.actor] = dem.get(lg.actor, 0) + 1
+    # Lọc trong SQL và CHỈ lấy hai cột. Nhật ký bất biến là bảng lớn nhất hệ thống; nạp cả cột
+    # before/after về Python để tìm chuỗi là cách chắc chắn làm cổng trả 502.
+    from sqlalchemy import or_
+    dieu_kien = or_(*[func.lower(AuditLog.action).like(f"%{k}%")
+                      for k in ("sua", "cap_nhat", "dieu_chinh", "mo_lai", "huy")])
+    ky_dieu_kien = or_(*[AuditLog.entity.like(f"%{k}%") for k in khoa])
+    q = (select(AuditLog.actor, func.count())
+         .where(AuditLog.ts >= a, AuditLog.ts < b, dieu_kien, ky_dieu_kien,
+                func.lower(func.coalesce(AuditLog.actor, "")).notin_(BO_QUA_NGUOI))
+         .group_by(AuditLog.actor))
+    dem = {actor: int(n) for actor, n in db.execute(q).all() if actor}
     return [{"loai": "nt_sua_da_chot", "nguon": "nhat_ky", "nguoi": ng,
              "tom_tat": f"{ng} có {n} thao tác sửa/điều chỉnh chạm vào kỳ đã khóa (tới {moc}) trong "
                         f"tháng {thang} – số đã lên báo cáo mà đổi thì báo cáo cũ không còn đúng",
@@ -238,14 +264,15 @@ def _nguong(db: Session) -> dict:
             "don_dong": int(g("ks_don_dong", 10))}
 
 
-def quet_thang(db: Session, thang: str, n: dict | None = None) -> list[dict]:
+def quet_thang(db: Session, thang: str, n: dict | None = None, kho: dict | None = None) -> list[dict]:
     n = n or _nguong(db)
+    kho = {} if kho is None else kho
     ra: list[dict] = []
     for f in (lambda: _lech_ky(db, thang, n["lan"], n["lech_toi_thieu"]),
-              lambda: _so_tron(db, thang, n["tron_tu"], n["tron_lap"]),
-              lambda: _ngoai_gio(db, thang, n["gio_dau"], n["gio_cuoi"], n["don_dong"]),
-              lambda: _khac_phong(db, thang),
-              lambda: _lui_ngay(db, thang),
+              lambda: _so_tron(db, thang, n["tron_tu"], n["tron_lap"], kho),
+              lambda: _ngoai_gio(db, thang, n["gio_dau"], n["gio_cuoi"], n["don_dong"], kho),
+              lambda: _khac_phong(db, thang, kho),
+              lambda: _lui_ngay(db, thang, kho),
               lambda: _sua_da_chot(db, thang)):
         try:
             ra += f()
@@ -274,9 +301,10 @@ def do_nguong(db: Session, thang: str, lan: str = "2,3,5,10") -> dict:
     """
     goc = _nguong(db)
     bang = []
+    kho: dict = {}       # đọc dữ liệu MỘT lần cho cả bảng đo, không mỗi ngưỡng một lần
     for x in [float(v) for v in lan.split(",") if v.strip()]:
         n = dict(goc, lan=x)
-        ds = quet_thang(db, thang, n)
+        ds = quet_thang(db, thang, n, kho)
         theo = {}
         for d in ds: theo[d["loai"]] = theo.get(d["loai"], 0) + 1
         bang.append({"lech_bao_nhieu_lan": x, "tong_dong": len(ds),

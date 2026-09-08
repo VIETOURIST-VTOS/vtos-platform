@@ -193,3 +193,50 @@ def test_kn9_da_gan_vao_vong_quet_va_mot_dau_hieu_hong_khong_lam_trang_ca_bo():
         NT._so_tron = goc
     r = client.post("/api/v1/kiem-soat/quet", headers=login("cntt")).json()
     assert not r["loi_bo_kiem"]
+
+
+def test_kn10_moi_bang_chi_doc_mot_lan_trong_mot_vong_quet():
+    """Chốt chặn cho đúng lỗi đã xảy ra: bản đầu tiên đọc lại cùng một bảng ở từng dấu hiệu, thành ba
+    mươi sáu lượt quét bảng cho một tháng, và cổng trả 502 trên dữ liệu thật trước khi hàm chạy xong.
+
+    Phép thử đếm số lượt đọc thật, không đếm thời gian: thời gian trên máy chạy thử không nói được gì
+    về máy chủ 0,5 CPU, còn số lượt đọc thì nói.
+    """
+    from app.services import ks_nhap_tay as NT
+    from app.db.session import SessionLocal
+    goc = NT._doc; dem = {"n": 0}
+
+    def dem_doc(db, ng, tu, den, kho=None):
+        if kho is None or (ng["ma"], tu, den) not in kho: dem["n"] += 1
+        return goc(db, ng, tu, den, kho)
+
+    NT._doc = dem_doc
+    try:
+        db = SessionLocal()
+        dem["n"] = 0; NT.quet_thang(db, THANG)
+        mot_thang = dem["n"]
+        assert mot_thang <= len(NT.NGUON), \
+            f"một vòng quét một tháng chỉ được đọc mỗi nguồn một lần ({len(NT.NGUON)}), đang đọc {mot_thang}"
+        # bảng đo bốn ngưỡng KHÔNG được nhân bốn số lượt đọc – chỉ dấu hiệu lệch-kỳ phụ thuộc ngưỡng
+        dem["n"] = 0; NT.do_nguong(db, THANG, "2,3,5,10")
+        assert dem["n"] <= len(NT.NGUON), \
+            f"đo bốn ngưỡng vẫn chỉ đọc mỗi nguồn một lần, đang đọc {dem['n']}"
+        db.close()
+    finally:
+        NT._doc = goc
+
+
+def test_kn11_tong_tien_cong_bang_sql_khong_nap_dong_nao():
+    """Dấu hiệu lệch-so-kỳ-trước chỉ cần TỔNG, nên phải cộng bằng SQL. Nạp từng dòng về chỉ để cộng là
+    trả giá cho toàn bộ bảng mỗi lần quét."""
+    from app.services import ks_nhap_tay as NT
+    from app.db.session import SessionLocal
+    goc = NT._doc; NT._doc = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("không được đọc dòng"))
+    try:
+        db = SessionLocal()
+        a, b = NT._khoang_thang(THANG)
+        t = NT._tong_tien(db, NT.NGUON[0], a, b)
+        assert t >= 0
+        db.close()
+    finally:
+        NT._doc = goc
