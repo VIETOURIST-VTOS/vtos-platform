@@ -211,10 +211,23 @@ def test_vi_tri_kiem_soat_khai_dung_bang_quyen_ai():
 
 
 def test_menu_kiem_soat_theo_dung_ma_tran():
+    """Ai mở được bàn làm việc của robot Kiểm soát.
+
+    Nguyên tắc 07/9 xếp Kế toán ra ngoài màn hình này. K1/K2 ngày 08/9 lại đặt Kế toán trưởng làm NGƯỜI
+    QUYẾT: một cột là tiền hay không, và sửa hay giữ, là câu hỏi nghiệp vụ kế toán – để CNTT quyết một
+    mình chính là kiểu sai mà cả hệ thống này dựng ra để chặn. Hai chỗ nói ngược nhau nên bàn làm việc
+    mở ra mà mọi nút bấm đều 403.
+
+    Chốt ngày 08/9/2026: Kế toán XEM được màn hình này. Quyền GHI không nới theo – nó vẫn nằm ở chữ ký
+    endpoint (ks_ra_soat.QUYET), và Ban Kiểm soát vẫn không có trong danh sách quyết: robot không tự chốt
+    xếp loại do chính nó đề xuất. Ba vai trò còn lại vẫn đứng ngoài.
+    """
     from app.services.access import MENU_ROLES
+    from app.api.v1 import ks_ra_soat as KR
     assert "/kiem-soat" in MENU_ROLES
-    for vai in ("chutich", "tgd", "bks", "cntt"): assert vai in MENU_ROLES["/kiem-soat"]
-    for vai in ("nv_kd", "ketoan", "hcns", "tp_dh"): assert vai not in MENU_ROLES["/kiem-soat"]
+    for vai in ("chutich", "tgd", "bks", "cntt", "ketoan"): assert vai in MENU_ROLES["/kiem-soat"]
+    for vai in ("nv_kd", "hcns", "tp_dh"): assert vai not in MENU_ROLES["/kiem-soat"]
+    assert "ketoan" in KR.QUYET and "bks" not in KR.QUYET
 
 
 def test_khong_bao_oan_endpoint_da_chan_trong_than_ham():

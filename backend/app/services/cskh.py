@@ -214,6 +214,10 @@ def sinh_phieu(db: Session, tour_id: int | None = None) -> int:
     đã quá hạn liên hệ ngay từ lúc sinh ra. Một danh sách như thế không ai làm, và nó phá luôn chính con
     số "bao nhiêu phiếu chưa ai đụng tới" mà màn hình này dùng để đo việc chăm sóc có làm thật hay không.
     Gọi kèm `tour_id` thì bỏ qua giới hạn – đó là lúc có người chủ động xin bù phiếu cho một chuyến cũ.
+
+    Hạn liên hệ đếm từ NGÀY MUỘN HƠN giữa ngày kết thúc chuyến và hôm nay. Đếm từ ngày kết thúc chuyến
+    thôi thì phiếu của chuyến đóng cách đây 20 ngày sinh ra đã trễ 17 ngày – không ai liên hệ được với
+    khách trước khi phiếu tồn tại, nên đó là món nợ hệ thống tự bịa ra rồi tự đi đòi.
     """
     han_ngay = int(R.get_param(db, "cham_soc_han_ngay") or 3)
     q = select(Tour).where(Tour.status == "ket_thuc")
@@ -233,8 +237,27 @@ def sinh_phieu(db: Session, tour_id: int | None = None) -> int:
         t = tours[b.tour_id]
         db.add(CareTicket(booking_id=b.id, tour_id=b.tour_id, customer_name=b.customer_name,
                           customer_phone=b.customer_phone, owner_id=b.sales_id,
-                          han_lien_he=(t.end_date or date.today()) + timedelta(days=han_ngay),
+                          han_lien_he=max(t.end_date or date.today(), date.today()) + timedelta(days=han_ngay),
                           company_id=b.company_id, status="moi"))
+        n += 1
+    if n: db.commit()
+    return n
+
+
+def va_han_lien_he(db: Session) -> int:
+    """Đẩy lại hạn cho những phiếu chăm sóc sinh ra đã quá hạn.
+
+    Chỉ chạm phiếu còn nguyên trạng "moi" và có hạn sớm hơn chính ngày phiếu được tạo. Không ai liên hệ
+    được với khách trước khi phiếu tồn tại, nên một hạn như vậy là lỗi của hệ thống chứ không phải việc
+    trễ của người – và mọi cảnh báo dựng trên nó đều là báo động giả. Phiếu ai đó đã đụng vào thì để
+    nguyên: hạn của nó là việc thật, sửa đi là xoá dấu vết trễ có thật.
+    """
+    han_ngay = int(R.get_param(db, "cham_soc_han_ngay") or 3)
+    n = 0
+    for t in db.execute(select(CareTicket).where(CareTicket.status == "moi")).scalars():
+        sinh = (t.created_at or datetime.now()).date()
+        if t.han_lien_he and t.han_lien_he >= sinh: continue
+        t.han_lien_he = sinh + timedelta(days=han_ngay)
         n += 1
     if n: db.commit()
     return n
@@ -337,6 +360,7 @@ def robot_cskh(db: Session) -> dict:
     cách một khiếu nại mức 3 trở thành một bài báo.
     """
     n_phieu = sinh_phieu(db)
+    n_va = va_han_lien_he(db)
     them = 0
 
     def add(kind, level, ref, msg, roles):
@@ -357,11 +381,20 @@ def robot_cskh(db: Session) -> dict:
             vai)
     # Phiếu chăm sóc quá hạn liên hệ: nhắc chính nhân viên đã bán, gom một cảnh báo cho mỗi tour để
     # không dội hàng trăm dòng cho một chuyến đông khách.
+    con_qua_han = set()
     for tid, so in db.execute(select(CareTicket.tour_id, func.count()).where(
             CareTicket.status.in_(["moi", "hen_lai"]), CareTicket.han_lien_he < date.today())
             .group_by(CareTicket.tour_id)).all():
+        con_qua_han.add(f"cs:{tid}")
         t = db.get(Tour, tid)
         add("cham_soc_qua_han", "warn", f"cs:{tid}",
             f"{so} phiếu chăm sóc sau bán của chuyến {t.code if t else tid} đã quá hạn liên hệ", "gd_kd,tp_kd,ptgd_mkt")
-    if them: db.commit()
-    return {"phieu_moi": n_phieu, "canh_bao_moi": them}
+    # Chuyến đã liên hệ xong – hoặc phiếu vừa được vá lại hạn – thì gỡ cảnh báo cũ xuống. Cảnh báo chỉ
+    # thêm mà không bao giờ tự rút thì bảng cảnh báo dài mãi, và người ta thôi đọc nó.
+    go = 0
+    for a in db.execute(select(Alert).where(Alert.kind == "cham_soc_qua_han",
+                                            Alert.resolved == False)).scalars():
+        if a.ref not in con_qua_han:
+            a.resolved = True; go += 1
+    if them or go: db.commit()
+    return {"phieu_moi": n_phieu, "phieu_va_han": n_va, "canh_bao_moi": them, "canh_bao_go": go}

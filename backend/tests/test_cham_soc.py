@@ -12,6 +12,8 @@ trong hai tuần đầu rồi thưa dần và bỏ hẳn – nên hệ thống c
   C7 chỉ số đo việc làm thật: tỷ lệ liên hệ được, số phiếu quá hạn
   C8 không có đường tạo phiếu chăm sóc cho một khách lẻ
   C9 KHÔNG mở phiếu cho toàn bộ lịch sử chuyến đã đóng – chỉ chuyến kết thúc gần đây
+  C10 phiếu bù cho chuyến cũ KHÔNG được sinh ra đã quá hạn
+  C11 phiếu lỡ sinh ra quá hạn thì robot vá lại hạn và gỡ cảnh báo giả xuống
 """
 import os, sys
 from datetime import date, timedelta
@@ -176,3 +178,71 @@ def test_c9_khong_mo_phieu_cho_toan_bo_lich_su_chuyen_da_dong():
     assert client.post("/api/v1/cham-soc/sinh-phieu", headers=h).json()["da_sinh"] == 0
     # nhưng người phụ trách vẫn xin bù được cho đúng chuyến đó
     assert client.post(f"/api/v1/cham-soc/sinh-phieu?tour_id={tid}", headers=h).json()["da_sinh"] == 1
+
+
+def test_c10_phieu_bu_cho_chuyen_cu_khong_duoc_sinh_ra_da_qua_han():
+    """Hạn liên hệ đếm từ ngày muộn hơn giữa ngày kết thúc chuyến và hôm nay.
+
+    C9 vừa bù phiếu cho một chuyến đóng cách đây 398 ngày. Nếu hạn đếm từ ngày kết thúc chuyến thì phiếu
+    ấy sinh ra đã trễ 395 ngày: một món nợ hệ thống tự bịa ra rồi tự đi đòi, và bảng cảnh báo đầy những
+    dòng không ai xử lý được vì không ai liên hệ được với khách trước khi phiếu tồn tại.
+    """
+    from app.db.session import SessionLocal
+    from app.models.cskh import CareTicket
+    from app.models.core import Tour
+    from sqlalchemy import select
+    db = SessionLocal()
+    t = db.execute(select(Tour).where(Tour.code == "CS-TEST-CU")).scalars().first()
+    p = db.execute(select(CareTicket).where(CareTicket.tour_id == t.id)).scalars().first()
+    han = p.han_lien_he; db.close()
+    assert han >= date.today(), f"phiếu bù sinh ra đã quá hạn: hạn {han}, hôm nay {date.today()}"
+
+
+def test_c11_robot_va_lai_han_va_go_canh_bao_gia():
+    """Phiếu lỡ mang hạn sớm hơn chính ngày nó được tạo thì robot phải vá, và rút cảnh báo dựng trên nó.
+
+    Đây là vá cho dữ liệu đã lỡ sinh sai trước bản sửa, và là lý do bảng cảnh báo trên máy chủ thật đang
+    đầy dòng cham_soc_qua_han. Phép thử dựng đúng cảnh báo cũ ấy rồi bắt robot dọn.
+
+    Kiểm cả chiều ngược: phiếu quá hạn THẬT – hạn muộn hơn ngày tạo nhưng đã trôi qua – thì không được
+    vá và cảnh báo phải giữ nguyên. Vá quá tay là xoá dấu vết trễ có thật.
+    """
+    from datetime import datetime
+    from app.db.session import SessionLocal
+    from app.services import cskh as CS
+    from app.models.cskh import CareTicket
+    from app.models.core import Alert, Tour
+    from sqlalchemy import select
+    db = SessionLocal()
+    t = db.execute(select(Tour).where(Tour.code == "CS-TEST-CU")).scalars().first()
+    tid = t.id
+    p = db.execute(select(CareTicket).where(CareTicket.tour_id == tid)).scalars().first()
+    pid = p.id
+    p.han_lien_he = date.today() - timedelta(days=395); p.status = "moi"
+    # đúng cảnh báo mà máy chủ thật đang treo
+    db.add(Alert(kind="cham_soc_qua_han", level="warn", ref=f"cs:{tid}",
+                 message="10 phiếu chăm sóc sau bán của chuyến CS-TEST-CU đã quá hạn liên hệ",
+                 to_roles="gd_kd,tp_kd,ptgd_mkt"))
+    db.commit()
+
+    r = CS.robot_cskh(db)
+    assert r["phieu_va_han"] >= 1, "phiếu mang hạn sớm hơn ngày nó ra đời mà robot không vá"
+    db.expire_all()
+    assert db.get(CareTicket, pid).han_lien_he >= date.today()
+    assert r["canh_bao_go"] >= 1, "cảnh báo chỉ thêm mà không bao giờ tự rút thì bảng cảnh báo dài mãi"
+    assert db.execute(select(Alert).where(Alert.kind == "cham_soc_qua_han", Alert.ref == f"cs:{tid}",
+                                          Alert.resolved == False)).scalars().first() is None
+
+    # chiều ngược: trễ thật thì phải để yên
+    p2 = db.get(CareTicket, pid)
+    p2.created_at = datetime.now() - timedelta(days=40)
+    p2.han_lien_he = date.today() - timedelta(days=30)
+    p2.status = "moi"; db.commit()
+    r2 = CS.robot_cskh(db)
+    db.expire_all()
+    assert db.get(CareTicket, pid).han_lien_he == date.today() - timedelta(days=30), \
+        "trễ thật mà bị vá hạn thì hệ thống đang xoá dấu vết chậm việc"
+    assert db.execute(select(Alert).where(Alert.kind == "cham_soc_qua_han", Alert.ref == f"cs:{tid}",
+                                          Alert.resolved == False)).scalars().first() is not None, \
+        "phiếu trễ thật mà không có cảnh báo thì cả chỉ số chăm sóc thành vô nghĩa"
+    db.close()

@@ -262,13 +262,16 @@ from app.services.ky_thuat import _su_kien_ky_thuat                       # noqa
 # K3 – lớp bảo vệ thay cho khâu trưởng phòng duyệt đã bỏ. Chạy trong cùng vòng quét chứ không thành
 # một lịch riêng: một bộ hậu kiểm có lịch riêng là một bộ hậu kiểm sẽ có ngày không ai chạy.
 from app.services.ks_nhap_tay import _hau_kiem_nhap_tay                   # noqa: E402
+from app.services.ks_do_dai import _do_dai_du_lieu                       # noqa: E402
+from app.services.ks_ma_tran import _ma_tran_quyen                       # noqa: E402
 
 # HỢP của hai nhánh, không phải chọn một: nhánh phân quyền thêm hai bộ kiểm về vai trò, nhánh kiểm
 # soát thêm bộ hậu kiểm số nhập tay. Gộp mà bỏ mất một bên thì bộ kiểm đó im lặng biến mất – và một
 # bộ kiểm biến mất không báo lỗi, nó chỉ ngừng tìm ra vấn đề.
 BO_KIEM = (_mach_migration, _quyen_lech, _vai_tro_trong, _vai_tro_khong_co_nguoi,
            _quyen_tung_vai_tro, _ngoai_le_ton, _ai_chua_hau_kiem,
-           _cot_tien_float, _thieu_khac_khong, _su_kien_ky_thuat, _hau_kiem_nhap_tay)
+           _cot_tien_float, _thieu_khac_khong, _su_kien_ky_thuat, _hau_kiem_nhap_tay,
+           _do_dai_du_lieu, _ma_tran_quyen)
 
 
 def quet(db: Session, boi: str = "robot_ks") -> dict:

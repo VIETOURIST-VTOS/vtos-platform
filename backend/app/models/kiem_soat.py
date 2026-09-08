@@ -29,6 +29,11 @@ LOAI_PHAT_HIEN = {
     "thieu_khac_0": "Cột tiền ghi 0 thay cho “chưa có số”",
     "vai_tro_khong_co_nguoi": "Vai trò có quyền nhưng chưa tài khoản nào giữ",
     "nhap_tay_bat_thuong": "Số nhân viên nhập tay có dấu hiệu bất thường",
+    "chuoi_qua_dai": "Dữ liệu dài hơn giới hạn cột – PostgreSQL sẽ từ chối",
+    "khoa_ngoai_treo": "Khoá ngoại trỏ tới dòng không tồn tại",
+    "bat_buoc_de_trong": "Cột bắt buộc nhưng đang để trống",
+    "quyen_thua_man_hinh": "Khai quyền cho màn hình không tồn tại",
+    "man_hinh_ho_quyen": "Màn hình không khai quyền – ai đăng nhập cũng thấy",
 }
 
 
