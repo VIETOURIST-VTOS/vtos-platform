@@ -3,6 +3,7 @@ from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 
 class BankTransaction(Base):
@@ -14,7 +15,7 @@ class BankTransaction(Base):
     account_number: Mapped[str] = mapped_column(String(40), default="")
     transaction_date: Mapped[datetime] = mapped_column(DateTime)
     transfer_type: Mapped[str] = mapped_column(String(10))                       # in / out
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[float] = mapped_column(TIEN)
     content: Mapped[str] = mapped_column(Text, default="")                       # nội dung chuyển khoản
     reference_code: Mapped[str] = mapped_column(String(80), default="")
     raw: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -32,7 +33,7 @@ class Receipt(Base):
     code: Mapped[str] = mapped_column(String(30), unique=True)                   # PT2609-0001
     booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id"))
     bank_txn_id: Mapped[int | None] = mapped_column(ForeignKey("bank_transactions.id"), nullable=True)
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[float] = mapped_column(TIEN)
     method: Mapped[str] = mapped_column(String(20), default="chuyen_khoan")      # chuyen_khoan / tien_mat
     payer: Mapped[str] = mapped_column(String(120), default="")
     note: Mapped[str] = mapped_column(String(200), default="")

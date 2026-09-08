@@ -54,10 +54,23 @@ def test_kt1_liet_ke_tung_cot_tien_kieu_float_kem_ten_bang_va_cot():
     assert d["so_float_tien"] > 0, "còn cột tiền kiểu Float thì bộ kiểm phải nói ra"
     for r in d["rows"][:5]:
         assert r["bang"] and r["cot"] and r["kieu"] == "Float"
-    # và phải chỉ đúng những chỗ nguy hiểm nhất: doanh thu, giá vốn, bút toán, lương
+    # Và phải chỉ đúng những chỗ nguy hiểm nhất – nhưng CHỈ những chỗ V9 CHƯA sửa.
+    #
+    # Bản đầu ghi cứng journal_lines.debit/credit làm ví dụ. V9 đợt 1 đổi đúng hai cột đó sang số
+    # thập phân, và phép thử lập tức đỏ – tức là nó biến VIỆC SỬA THÀNH LỖI. Cách nhanh nhất để làm
+    # xanh một phép thử như vậy là hoàn tác V9, và đó chính là điều không được để xảy ra.
+    #
+    # Nay danh sách ví dụ lấy từ mô hình HIỆN TẠI: cột nào còn là Float thì bộ kiểm phải thấy. Danh
+    # sách tự ngắn lại theo từng đợt V9, và tới đợt cuối thì so_float_tien về 0 – lúc đó nhánh dưới
+    # tự bỏ qua, không cần ai nhớ sửa phép thử này lần nữa.
+    from app.db.session import Base
+    from sqlalchemy import Float
+    from app.services.ks_cot_tien import xep_theo_ten
     ten = {f"{r['bang']}.{r['cot']}" for r in d["rows"]}
-    for x in ("tours.actual_revenue", "journal_lines.debit", "journal_lines.credit"):
-        assert x in ten, f"{x} là tiền mà bộ kiểm không thấy"
+    con_float_la_tien = {f"{t.name}.{c.name}" for t in Base.metadata.tables.values() for c in t.columns
+                         if isinstance(c.type, Float) and xep_theo_ten(c.name)[0] == "tien"}
+    thieu = con_float_la_tien - ten
+    assert not thieu, f"cột tiền còn kiểu Float mà bộ kiểm không thấy: {sorted(thieu)[:5]}"
 
 
 def test_kt2_cot_ro_rang_khong_phai_tien_thi_khong_bi_xep_nham():

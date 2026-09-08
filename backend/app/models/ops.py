@@ -3,6 +3,7 @@ from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 
 class DailyReport(Base):
@@ -55,7 +56,7 @@ class PaymentRequest(Base):
     supplier_name: Mapped[str] = mapped_column(String(160))
     supplier_tax_code: Mapped[str] = mapped_column(String(20), default="")
     supplier_bank: Mapped[str] = mapped_column(String(120), default="")   # số TK – ngân hàng (thay đổi cần 2 người xác nhận)
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[float] = mapped_column(TIEN)
     description: Mapped[str] = mapped_column(String(300))
     has_document: Mapped[bool] = mapped_column(Boolean, default=False)    # hợp đồng/hóa đơn/báo giá đính kèm
     document_ref: Mapped[str] = mapped_column(String(120), default="")
