@@ -71,17 +71,26 @@ def test_kt2_cot_ro_rang_khong_phai_tien_thi_khong_bi_xep_nham():
 
 
 def test_kt3_ten_cot_khong_noi_ro_thi_de_chua_ro_cho_nguoi_quyet():
-    d = so("chua_ro")
-    assert d["so_chua_ro"] > 0, "một bộ kiểm tự tin xếp loại đúng 100% cột chỉ bằng tên là bộ kiểm đang đoán"
-    ten = {f"{r['bang']}.{r['cot']}" for r in d["rows"]}
-    # đơn giá thuê theo ngày: chữ "rate" vừa là lãi suất vừa là đơn giá – một chữ không đủ để phân biệt
-    assert "guide_rates.rate_per_day" in ten
-    for r in d["rows"]:
-        assert r["quyet_nguoi"] == "" and "cần người quyết" in r["ly_do_may"]
+    """Robot ĐỀ XUẤT theo tên và dừng lại ở chỗ tên không nói đủ.
+
+    Tám cột này nay đã có người quyết (Chủ tịch, 08/9), nên phép thử soi vào ĐỀ XUẤT CỦA MÁY chứ không
+    soi số dòng đang chờ: điều phải giữ là robot không tự tin xếp loại thứ nó không phân biệt được.
+    """
+    from app.services.ks_cot_tien import xep_theo_ten
+    for cot in ("rate_per_day", "old_rate_per_day", "internal_rate_per_day", "moi_ky",
+                "doi_tac_huong", "doi_tac_chiu", "chuyen_ky_sau"):
+        xep, ly_do = xep_theo_ten(cot)
+        assert xep == "chua_ro" and "cần người quyết" in ly_do, f"{cot} bị máy tự xếp thành {xep}"
+    # và trong sổ, đề xuất của máy vẫn ghi "chưa rõ" kể cả sau khi người đã quyết – giữ được cả hai
+    # cột thì sau này còn đo được máy đoán đúng bao nhiêu phần trăm
+    d = so()
+    con = {f"{r['bang']}.{r['cot']}": r for r in d["rows"]}
+    x = con["guide_rates.rate_per_day"]
+    assert x["xep_may"] == "chua_ro" and x["xep"] == "tien" and x["quyet_nguoi"] == "tien"
 
 
 def test_kt4_robot_khong_duoc_quyet_xep_loai():
-    d = so("chua_ro"); i = d["rows"][0]["id"]
+    d = so("can_doi_kieu"); i = d["rows"][0]["id"]
     than = {"dong": [{"id": i, "quyet_nguoi": "tien"}]}
     assert client.post("/api/v1/kiem-soat/cot-tien/quyet", json=than, headers=login("bks")).status_code == 403, \
         "robot vừa xếp loại vừa chốt xếp loại thì con số nó báo lên Chủ tịch là con số nó tự đặt ra"
@@ -90,21 +99,27 @@ def test_kt4_robot_khong_duoc_quyet_xep_loai():
 
 def test_kt5_quyet_cua_nguoi_de_len_de_xuat_cua_may():
     truoc = so()
-    d = so("chua_ro")
-    assert d["rows"], "phép thử trước đã quyết hết rồi thì phép thử này vô nghĩa"
-    i = d["rows"][0]["id"]
+    # lấy một cột máy xếp là tiền rồi cho người đổi thành không phải tiền: quyết định của người thắng
+    d = so("can_doi_kieu")
+    chua = [r for r in d["rows"] if not r["quyet_nguoi"]]
+    assert chua, "không còn cột nào chưa ai quyết thì phép thử này không nói lên điều gì"
+    i = chua[0]["id"]; ten = f"{chua[0]['bang']}.{chua[0]['cot']}"
     r = client.post("/api/v1/kiem-soat/cot-tien/quyet",
-                    json={"dong": [{"id": i, "quyet_nguoi": "tien", "ghi_chu": "đơn giá theo ngày, là tiền"}]},
+                    json={"dong": [{"id": i, "quyet_nguoi": "khong_tien", "ghi_chu": "thử: người quyết khác máy"}]},
                     headers=login("ketoan"))
     assert r.status_code == 200 and r.json()["da_xep_loai"] == 1
     sau = so()
-    assert sau["so_chua_ro"] == truoc["so_chua_ro"] - 1
-    assert sau["so_tien"] == truoc["so_tien"] + 1
-    assert sau["so_nguoi_da_quyet"] >= 1
+    assert sau["so_tien"] == truoc["so_tien"] - 1 and sau["so_khong_tien"] == truoc["so_khong_tien"] + 1
+    assert sau["so_nguoi_da_quyet"] > truoc["so_nguoi_da_quyet"]
+    con = {f"{x['bang']}.{x['cot']}": x for x in sau["rows"]}
+    assert con[ten]["xep_may"] == "tien" and con[ten]["xep"] == "khong_tien"
     # "chưa rõ" là trạng thái CHỜ, không phải một quyết định
     assert client.post("/api/v1/kiem-soat/cot-tien/quyet",
                        json={"dong": [{"id": i, "quyet_nguoi": "chua_ro"}]},
                        headers=login("ketoan")).status_code == 422
+    # trả lại như cũ để phép thử sau không lệch
+    client.post("/api/v1/kiem-soat/cot-tien/quyet",
+                json={"dong": [{"id": i, "quyet_nguoi": "tien", "ghi_chu": ""}]}, headers=login("ketoan"))
 
 
 def test_kt6_thieu_khac_0_chi_tinh_cot_tien_va_giu_thi_phai_co_ly_do():
@@ -165,3 +180,43 @@ def test_kt11_ba_bo_kiem_moi_da_gan_vao_vong_quet():
     ten = {f.__name__ for f in KS.BO_KIEM}
     for x in ("_cot_tien_float", "_thieu_khac_khong", "_su_kien_ky_thuat"):
         assert x in ten, f"{x} viết xong mà không gắn vào vòng quét thì không ai chạy nó"
+
+
+def test_kt12_quyet_dinh_08_09_da_duoc_ghi_va_khong_de_len_nguoi_khac():
+    """Chủ tịch quyết ngày 08/9: tám cột “chưa rõ” là tiền, và toàn bộ cột tiền mặc định 0 thì SỬA.
+
+    Hai điều phải đúng cùng lúc: quyết định có mặt sau mỗi lần triển khai, và hàm nạp KHÔNG bao giờ
+    ghi đè lên quyết định người khác ghi sau đó – nạp mặc định mà đè quyết định của người là xoá dấu vết.
+    """
+    from app.services import ks_cot_tien as CT
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    try:
+        CT.nap_quyet_dinh(db)
+        d = CT.bang(db)
+        con = {f"{r['bang']}.{r['cot']}": r for r in d["rows"]}
+        for ten in CT.QUYET_08_09_2026:
+            assert con[ten]["xep"] == "tien" and con[ten]["quyet_nguoi"] == "tien", ten
+        assert d["so_chua_ro"] == 0, "tám cột chưa rõ đã có người quyết thì không còn dòng nào chờ"
+        # Quyết "sửa" KHÔNG làm cột biến mất: nó vẫn hỏng cho tới khi mô hình đổi thật. Thứ đo tiến độ
+        # của NGƯỜI là số cột chưa ai quyết.
+        assert d["so_thieu_thanh_0"] > 0, "chưa ai đổi kiểu thì danh sách phải còn nguyên"
+        # Cột thêm vào mô hình SAU ngày 08/9 thì KHÔNG bị quyết hộ – đây mới là điều phải giữ. Nếu
+        # danh sách viết thành quy tắc thay vì liệt kê từng cột, mọi cột mới sẽ tự động mang chữ ký
+        # của Chủ tịch mà ông chưa từng nhìn thấy chúng.
+        moi = [f"{r['bang']}.{r['cot']}" for r in d["rows"]
+               if r["thieu_thanh_0"] and f"{r['bang']}.{r['cot']}" not in CT.QUYET_K2_SUA_08_09_2026]
+        assert d["so_k2_chua_quyet"] == len(moi), \
+            f"cột chưa quyết phải đúng bằng số cột thêm sau ngày quyết. Đang chờ: {moi}"
+        # ghi đè: đổi một cột sang "giữ" rồi nạp lại, quyết định của người phải còn nguyên
+        from app.models.ra_soat_tien import KsCotTien
+        from sqlalchemy import select
+        r = db.execute(select(KsCotTien).where(KsCotTien.bang == "tours",
+                                               KsCotTien.cot == "actual_revenue")).scalars().first()
+        r.quyet_k2, r.quyet_k2_boi, r.ghi_chu = "giu", "ketoan", "thử ghi đè"
+        db.commit()
+        CT.nap_quyet_dinh(db); db.refresh(r)
+        assert r.quyet_k2 == "giu" and r.quyet_k2_boi == "ketoan"
+        r.quyet_k2, r.quyet_k2_boi = "sua", "chutich"; db.commit()
+    finally:
+        db.close()

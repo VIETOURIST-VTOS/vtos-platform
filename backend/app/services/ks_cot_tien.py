@@ -195,6 +195,10 @@ def bang(db: Session, loc: str = "") -> dict:
             "so_float_tien": sum(1 for x in tong if x["can_doi_kieu"]),
             "so_thieu_thanh_0": sum(1 for x in tong if x["thieu_thanh_0"]),
             "so_giu_co_ly_do": sum(1 for x in tong if x["da_quyet_giu"]),
+            # Quyết "sửa" KHÔNG làm cột biến mất khỏi danh sách: nó vẫn đang hỏng cho tới khi mô hình
+            # đổi thật. Con số đo tiến độ của người là "chưa ai quyết", con số đo tiến độ sửa là
+            # "so_thieu_thanh_0" ở trên – hai việc khác nhau, đừng gộp.
+            "so_k2_chua_quyet": sum(1 for x, r in zip(tong, rows) if x["thieu_thanh_0"] and not r.quyet_k2),
             "so_nguoi_da_quyet": sum(1 for r in rows if r.quyet_nguoi)}
 
 
@@ -224,3 +228,89 @@ def quyet(db: Session, u: User, ds: list[dict]) -> dict:
             after={"so_xep_loai": n1, "so_quyet_k2": n2})
     db.commit()
     return {"da_xep_loai": n1, "da_quyet_k2": n2}
+
+
+# ============================== QUYẾT ĐỊNH ĐÃ CÓ NGƯỜI KÝ ==============================
+# Chủ tịch quyết ngày 08/9/2026, ghi vào mã để lần triển khai nào cũng có mặt – KHÔNG phải để robot
+# tự quyết. Danh sách viết THẲNG RA từng cột chứ không viết thành quy tắc: quy tắc thì mọi cột thêm
+# về sau cũng bị quyết hộ, mà cột mới thì chưa ai xem.
+#
+# Tám cột dưới đây trước đó robot xếp "chưa rõ" vì chỉ nhìn tên thì không phân biệt được lãi suất với
+# đơn giá. Đọc trong mô hình mới rõ, và lý do đọc được ghi ngay cạnh để sau này còn đối chất.
+QUYET_08_09_2026 = {
+    "guide_assignments.rate_per_day":
+        "Đơn giá thù lao HDV theo ngày – lệnh phân công ghi rõ “thù lao = đơn giá tuyến × ngày”",
+    "guide_rates.rate_per_day": "Đơn giá HDV theo ngày trong bảng giá tuyến, có hai chữ ký duyệt",
+    "guide_rates.old_rate_per_day": "Đơn giá cũ giữ lại để đối chiếu khi đổi bảng giá",
+    "vehicles.internal_rate_per_day": "Đơn giá xe nội bộ theo ngày, dùng khi tuyến không có trong bảng giá",
+    "fleet_repayment_plans.moi_ky": "Số tiền phải trả mỗi kỳ – bằng gốc chia số kỳ",
+    "fleet_settlements.doi_tac_huong": "Phần doanh thu đối tác được hưởng trong kỳ quyết toán",
+    "fleet_settlements.doi_tac_chiu": "Phần chi phí đối tác chịu trong kỳ quyết toán",
+    "fleet_settlements.chuyen_ky_sau": "Số tiền còn lại chuyển sang kỳ sau",
+}
+
+# Chủ tịch quyết SỬA cho toàn bộ cột tiền đang mặc định 0 mà không cho rỗng, tính tại ngày 08/9/2026.
+# "Sửa" là hướng an toàn: cho phép để trống thì "chưa có số" nói được ra, chứ không mất số nào. Cột
+# nào cần GIỮ thì phải quay lại ghi lý do – chiều ngược lại mới là chiều phải giải trình.
+QUYET_K2_SUA_08_09_2026 = (
+    "asset_depreciations.accumulated", "asset_depreciations.amount", "asset_depreciations.remaining",
+    "bank_accounts_cat.opening_balance", "bank_doc_map.amount", "bookings.amount",
+    "bookings.cancel_charge", "bookings.cost_amount", "bookings.discount",
+    "bookings.paid", "campaigns.budget", "dispatch_orders.internal_price",
+    "employees.advance_limit", "employees.base_salary", "employees.bhxh_base",
+    "fin_contracts.outstanding", "fin_contracts.principal", "fixed_assets.cost",
+    "fixed_assets.opening_accumulated", "fixed_assets.salvage", "fleet_debt_payments.so_tien",
+    "fleet_external_txns.so_tien", "fleet_maintenance.so_tien", "fleet_offset_applications.amount",
+    "fleet_period_costs.so_tien", "fleet_repayment_installments.amount_applied",
+    "fleet_repayment_installments.amount_due",
+    "fleet_repayment_plans.moi_ky", "fleet_repayment_plans.principal", "fleet_sale_cases.da_thu",
+    "fleet_sale_cases.gia_ban", "fleet_settlement_lines.amount", "fleet_settlements.can_tru",
+    "fleet_settlements.chuyen_ky_sau", "fleet_settlements.dieu_chinh", "fleet_settlements.doanh_thu",
+    "fleet_settlements.doi_tac_chiu", "fleet_settlements.doi_tac_huong", "fleet_settlements.sau_can_tru",
+    "fleet_settlements.truoc_can_tru", "fleet_shared_invoice_lines.amount",
+    "fleet_shared_invoices.tong_tien",
+    "fleet_shared_invoices.vat", "fleet_trip_costs.amount", "fleet_trips.doanh_thu",
+    "guide_assignments.rate_per_day", "guide_rates.old_rate_per_day", "guide_rates.rate_per_day",
+    "invoices.pre_tax", "invoices.total", "invoices.vat",
+    "journal_lines.credit", "journal_lines.debit", "labor_contracts.allowance",
+    "labor_contracts.salary", "labor_contracts.si_salary", "lead_channel_stats.cost",
+    "mkt_budget_lines.amount", "mkt_budgets.target_revenue", "prepaid_allocations.allocated",
+    "prepaid_allocations.amount", "prepaid_allocations.remaining", "prepaid_expenses.amount",
+    "prepaid_expenses.opening_allocated", "products.reference_price", "retentions.amount",
+    "retentions.remaining", "service_orders.don_gia", "service_orders.thanh_tien",
+    "service_requests.discount", "thieu_gia_von.doanh_thu", "thieu_gia_von.gia_von",
+    "tour_cost_lines.actual", "tour_cost_lines.budget", "tour_cost_lines.paid",
+    "tour_cost_lines.unit_price", "tours.actual_cost", "tours.actual_revenue",
+    "tours.fixed_cost", "tours.price_chd", "tours.price_inf",
+    "tours.price_per_pax", "tours.price_promo", "tours.promo_value",
+    "tours.var_cost_per_pax", "vehicle_rates.internal_price", "vehicle_rates.partner_price",
+    "vehicles.internal_rate_per_day", "visa_files.revenue", "vt_records.amount",
+)
+
+
+def nap_quyet_dinh(db: Session) -> dict:
+    """Ghi các quyết định đã có người ký vào sổ rà soát. Chỉ điền ô CÒN TRỐNG.
+
+    Gọi lúc khởi động, sau khi đồng bộ. Không bao giờ đè lên quyết định người khác ghi sau đó – một
+    hàm nạp mặc định mà ghi đè quyết định của người là hàm xoá dấu vết.
+    """
+    dong_bo(db)
+    rows = {(r.bang, r.cot): r for r in db.execute(select(KsCotTien)).scalars()}
+    n1 = n2 = 0
+    for ten, ly_do in QUYET_08_09_2026.items():
+        bang, cot = ten.split(".", 1)
+        r = rows.get((bang, cot))
+        if r is None or r.quyet_nguoi: continue
+        r.quyet_nguoi, r.quyet_boi = "tien", "chutich"
+        r.quyet_luc = r.quyet_luc or datetime(2026, 9, 8)
+        r.ghi_chu = r.ghi_chu or ly_do
+        n1 += 1
+    for ten in QUYET_K2_SUA_08_09_2026:
+        bang, cot = ten.split(".", 1)
+        r = rows.get((bang, cot))
+        if r is None or r.quyet_k2: continue
+        r.quyet_k2, r.quyet_k2_boi = "sua", "chutich"
+        r.quyet_k2_luc = r.quyet_k2_luc or datetime(2026, 9, 8)
+        n2 += 1
+    if n1 or n2: db.commit()
+    return {"xep_loai": n1, "quyet_k2": n2}
