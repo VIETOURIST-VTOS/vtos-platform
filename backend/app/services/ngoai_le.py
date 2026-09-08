@@ -66,6 +66,10 @@ LOAI: dict[str, dict] = {
     # trả lời, thêm cửa nữa là thêm chỗ để quên.
     "ks_phat_hien": {"ten": "Robot Kiểm soát phát hiện", "muc": "do", "nhom": "kiem_soat",
                      "quy_tac": "Việc do vòng quét của robot Kiểm soát tìm ra, phòng ban phải giải trình"},
+    # Cổng chặn giá vốn: đơn có doanh thu mà chưa có giá vốn thì KHÔNG được ghi doanh thu. Mỗi dòng ở
+    # đây là một đơn đang bị giữ lại – để lâu là đến kỳ khóa sổ mà doanh thu vẫn chưa vào sổ.
+    "thieu_gia_von": {"ten": "Đơn có doanh thu nhưng chưa có giá vốn", "muc": "do", "nhom": "tien",
+                      "quy_tac": "Mọi đơn đều có doanh thu và giá vốn (Chủ tịch 08/9/2026) – thiếu giá vốn là thiếu dữ liệu, không phải bản chất khác"},
 }
 NHOM = {"tien": "Tiền & quyết toán", "quyen": "Quyền hạn", "ai": "AI", "ho_so": "Hồ sơ",
         "du_lieu": "Dữ liệu", "an_toan": "An toàn vận hành", "kiem_soat": "Robot Kiểm soát"}
@@ -275,6 +279,12 @@ TU_NHAT_KY = {
 }
 
 
+def _cong_chan_gia_von(db: Session) -> list[dict]:
+    """Hàng đợi cổng chặn giá vốn, đọc thẳng từ bảng thieu_gia_von – không chép sang bảng thứ hai."""
+    from app.services import cong_chan as CC
+    return CC.ngoai_le(db)
+
+
 def do_tim(db: Session, so_ngay: int = CUA_SO_NGAY) -> list[dict]:
     """Chạy toàn bộ bộ dò. Không ghi gì vào cơ sở dữ liệu – chỉ đọc."""
     tu_ngay = datetime.now() - timedelta(days=so_ngay)
@@ -290,6 +300,7 @@ def do_tim(db: Session, so_ngay: int = CUA_SO_NGAY) -> list[dict]:
         lambda: _tat_chan_giay_xe(db),
         lambda: _xe_khac_goi_y(db, tu_ngay),
         lambda: _ks_phat_hien(db),
+        lambda: _cong_chan_gia_von(db),
     )
     for f in bo_do:
         try:

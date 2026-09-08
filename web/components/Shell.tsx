@@ -60,6 +60,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
   { key: "kiemsoat", label: "9. Kiểm soát & Chính sách", items: [
     ["Chính sách & định mức", "/params"], ["Cảnh báo nghiệp vụ", "/alerts"], ["Kiểm tra & đối chiếu", "/accounting?tab=misa"],
     ["Ngoại lệ cần xử lý", "/ngoai-le"], ["Kiểm soát (robot)", "/kiem-soat"],
+    ["Quy ước hạch toán", "/hach-toan"],
     ["Nhật ký nghiệp vụ", "/audit"]] },
   { key: "taikhoan", label: "0. Tài khoản của tôi", items: [
     ["Đổi mật khẩu", "/doi-mat-khau"]] },

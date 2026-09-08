@@ -1,0 +1,313 @@
+"""Bộ quy tắc hạch toán – máy chạy quy ước, người sửa quy ước.
+
+Trước đây quy ước nằm trong một tệp Excel và trong đầu người: mỗi tháng hơn bốn nghìn dòng
+được phân loại thủ công. Ở đây quy ước là dữ liệu: mỗi dòng nói "gặp nghiệp vụ thế này thì
+ghi Nợ tài khoản này – Có tài khoản kia", có ngày hiệu lực và hai chữ ký như tham số chính sách.
+
+Bốn quyết định của Chủ tịch ngày 08/9/2026 mà bộ quy tắc này mã hóa:
+  1. Công ty là BÊN CHÍNH cho mọi dịch vụ – tour, tour gom khách lẻ, visa, vé máy bay, land.
+     Không có nghiệp vụ "đại lý ăn hoa hồng"; không dùng tiêu chí loại khách để chọn tài khoản.
+  2. Mọi đơn đều có doanh thu VÀ giá vốn. "Giá vốn bằng 0" là THIẾU DỮ LIỆU, không phải bản
+     chất khác – đơn đó bị cổng chặn giữ lại, không được ghi doanh thu (xem cong_chan.py).
+  3. Mọi khách đều đi qua 131/511, kèm cờ theo dõi hóa đơn (đã xuất / khách không lấy / chờ xuất).
+     "Có lấy hóa đơn hay không" là chuyện chứng từ, không phải chuyện bản chất.
+  4. Số bảo hiểm xã hội lấy từ bảng lương, không tính lại theo tỷ lệ.
+
+Căn cứ pháp lý: Thông tư 99/2025/TT-BTC (hiệu lực 01/01/2026) – bản chất quan trọng hơn hình thức;
+TK 511 không bao gồm các khoản thu hộ bên thứ ba (Điều về TK 511); TK 338 gồm 7 tài khoản cấp 2.
+"""
+from datetime import date, datetime
+from sqlalchemy import select, desc
+from sqlalchemy.orm import Session
+from app.models.hach_toan import QuyTacHachToan, NGUON, DOI_TUONG
+from app.models.core import User
+from app.services import rules as R
+
+CAN_CU_TT99 = "TT99/2025/TT-BTC"
+CAN_CU_QD = "Quyết định Chủ tịch 08/9/2026 – Công ty là bên chính, mọi đơn có doanh thu và giá vốn"
+
+VAT_DU_LICH = 0.08   # dịch vụ lữ hành nội địa – thuế suất ghi trên hóa đơn thực tế của Vietourist
+
+# ma, ten, nguon, dieu_kien, tk_no, tk_co, tk_thue, ben_thue, ty_le, doi_tuong, cong_trinh, dien_giai, uu_tien, can_cu
+MAC_DINH = [
+    # ---- Chặng 1: tiền vào ----
+    ("THU_KHACH", "Khách trả tiền – mọi khách, mọi loại dịch vụ", "tien_vao",
+     {"khop_don": True}, "1121", "131", "", "", 0, "khach", True,
+     "Thu tiền {ma} – {khach}", 10,
+     CAN_CU_QD + ". Không tách khách công ty / khách lẻ: cùng là bên chính nên cùng ghi 131."),
+    ("THU_CHUA_RO", "Tiền vào chưa nhận ra đơn nào", "tien_vao",
+     {"khop_don": False}, "1121", "3388", "", "", 0, "", False,
+     "Tiền vào chờ xác định – {noi_dung}", 90,
+     CAN_CU_TT99 + " TK 338. Treo chờ xác định, KHÔNG ghi doanh thu khi chưa biết của đơn nào."),
+    ("THU_BAO_LUU", "Khách hủy tour, giữ tiền bảo lưu", "tien_vao",
+     {"chua": ["bảo lưu", "bao luu"]}, "1121", "3387", "", "", 0, "khach", False,
+     "Bảo lưu {ma} – {khach}", 20,
+     CAN_CU_TT99 + " TK 3387 doanh thu chưa thực hiện."),
+
+    # ---- Chặng 2: chi phí mua vào ----
+    ("MUA_CO_HD", "Mua dịch vụ đầu vào, nhà cung cấp có hóa đơn GTGT", "mua_vao",
+     {"co_hoa_don": True}, "154", "331", "133", "no", VAT_DU_LICH, "ncc", True,
+     "Chi phí {ma} – {ncc}", 10,
+     CAN_CU_TT99 + " TK 154 tập hợp theo mã công trình = mã đơn."),
+    ("MUA_KHONG_HD", "Mua dịch vụ đầu vào, nhà cung cấp không xuất hóa đơn", "mua_vao",
+     {"co_hoa_don": False}, "154", "331", "", "", 0, "ncc", True,
+     "Chi phí {ma} – {ncc} (chưa có hóa đơn)", 20,
+     "Vẫn là chi phí của đơn. Thiếu hóa đơn là rủi ro thuế, ghi cờ theo dõi chứ không đổi tài khoản."),
+    ("TRICH_TRUOC", "Chi phí đã phát sinh, chứng từ về sau", "mua_vao",
+     {"trich_truoc": True}, "154", "335", "", "", 0, "ncc", True,
+     "Trích trước chi phí {ma} – {ncc}", 30,
+     CAN_CU_TT99 + " TK 335. Ghi đúng kỳ phát sinh, không đợi hóa đơn."),
+
+    # ---- Chặng 3: tạm ứng cho hướng dẫn viên / nhân viên ----
+    ("TAM_UNG", "Chi tạm ứng cho HDV / nhân viên đi đoàn", "tien_ra",
+     {"muc_chi": ["tam_ung"]}, "141", "1121", "", "", 0, "nhan_vien", False,
+     "Tạm ứng {ma} – {nhan_vien}", 10,
+     "Sửa quy ước cũ: tiền giao cho người của công ty là TẠM ỨNG (141), không phải phải thu khác (138)."),
+    ("HOAN_UNG", "Hoàn ứng theo quyết toán đoàn", "quyet_toan",
+     {"co_tam_ung": True}, "154", "141", "", "", 0, "nhan_vien", True,
+     "Hoàn ứng {ma} – {nhan_vien}", 20,
+     "Tạm ứng đã tiêu trở thành chi phí của đơn."),
+    ("CHI_PHI_CONG_TAC", "Vé máy bay / chi phí đi công tác của cán bộ công ty", "tien_ra",
+     {"muc_chi": ["cong_tac"]}, "642", "1121", "", "", 0, "nhan_vien", False,
+     "Công tác phí – {nhan_vien}", 15,
+     "Quyết định 08/9/2026: ba dòng vé máy bay của lãnh đạo là CHI PHÍ CÔNG TÁC, không phải doanh thu."),
+
+    # ---- Chặng 4: hoàn thành dịch vụ – doanh thu và giá vốn ----
+    ("DOANH_THU", "Hoàn thành dịch vụ – ghi doanh thu", "quyet_toan",
+     {"da_ket_thuc": True, "co_gia_von": True}, "131", "5113", "3331", "co", VAT_DU_LICH, "khach", True,
+     "Doanh thu {ma} – {ten}", 10,
+     CAN_CU_QD + ". Cổng chặn: chưa có giá vốn thì không chạy quy tắc này."),
+    ("GIA_VON", "Hoàn thành dịch vụ – kết chuyển giá vốn", "quyet_toan",
+     {"da_ket_thuc": True, "co_gia_von": True}, "632", "154", "", "", 0, "", True,
+     "Giá vốn {ma} – {ten}", 11,
+     CAN_CU_TT99 + " TK 632. Đi liền với DOANH_THU, cùng một mã công trình."),
+    ("HOA_HONG", "Hoa hồng trả đại lý / cộng tác viên bán tour", "mua_vao",
+     {"muc_chi": ["hoa_hong"]}, "641", "331", "", "", 0, "ncc", True,
+     "Hoa hồng {ma} – {ncc}", 25,
+     "Chi phí bán hàng, không trừ vào doanh thu."),
+
+    # ---- Chặng 5: lương và bảo hiểm ----
+    ("LUONG", "Lương phải trả người lao động", "luong",
+     {"phan": "luong"}, "642", "334", "", "", 0, "nhan_vien", False,
+     "Lương tháng {ky}", 10, "Số lấy từ bảng lương đã duyệt."),
+    ("BHXH_CTY", "Bảo hiểm phần công ty đóng", "luong",
+     {"phan": "bh_cong_ty"}, "642", "3383", "", "", 0, "", False,
+     "BHXH-BHYT-BHTN phần công ty tháng {ky}", 20,
+     "Quyết định 08/9/2026: lấy số từ BẢNG LƯƠNG, không tính lại theo tỷ lệ."),
+    ("BHXH_NLD", "Bảo hiểm khấu trừ vào lương người lao động", "luong",
+     {"phan": "bh_nguoi_lao_dong"}, "334", "3383", "", "", 0, "", False,
+     "BHXH phần người lao động tháng {ky}", 21,
+     "Quyết định 08/9/2026: lấy số từ bảng lương."),
+    ("TNCN", "Thuế thu nhập cá nhân khấu trừ tại nguồn", "luong",
+     {"phan": "tncn"}, "334", "3335", "", "", 0, "", False,
+     "Thuế TNCN tháng {ky}", 22, CAN_CU_TT99 + " TK 3335."),
+    ("TRA_LUONG", "Chi trả lương qua ngân hàng", "tien_ra",
+     {"muc_chi": ["luong"]}, "334", "1121", "", "", 0, "", False,
+     "Trả lương tháng {ky}", 30, ""),
+
+    # ---- Chặng 6: khấu hao và chi phí quản lý ----
+    ("KHAU_HAO", "Khấu hao tài sản cố định", "ket_chuyen",
+     {"phan": "khau_hao"}, "642", "2141", "", "", 0, "", False,
+     "Khấu hao TSCĐ tháng {ky}", 40,
+     "Khấu hao là khoản chênh lớn nhất giữa lãi gộp theo đoàn và lãi gộp trên sổ (3,46 tỷ / 6T-2026)."),
+    ("CHI_QLDN", "Chi phí quản lý doanh nghiệp trả bằng tiền", "tien_ra",
+     {"muc_chi": ["quan_ly"]}, "642", "1121", "", "", 0, "ncc", False,
+     "Chi phí quản lý – {noi_dung}", 40, ""),
+
+    # ---- Chặng 7: kết chuyển xác định kết quả ----
+    ("KC_DOANH_THU", "Kết chuyển doanh thu sang xác định kết quả", "ket_chuyen",
+     {"phan": "ket_chuyen", "buoc": 1}, "5113", "911", "", "", 0, "", False,
+     "Kết chuyển doanh thu kỳ {ky}", 50, CAN_CU_TT99 + " TK 911."),
+    ("KC_GIA_VON", "Kết chuyển giá vốn sang xác định kết quả", "ket_chuyen",
+     {"phan": "ket_chuyen", "buoc": 2}, "911", "632", "", "", 0, "", False,
+     "Kết chuyển giá vốn kỳ {ky}", 51, CAN_CU_TT99 + " TK 911."),
+    ("KC_CHI_PHI", "Kết chuyển chi phí bán hàng và quản lý", "ket_chuyen",
+     {"phan": "ket_chuyen", "buoc": 3}, "911", "642", "", "", 0, "", False,
+     "Kết chuyển chi phí quản lý kỳ {ky}", 52, CAN_CU_TT99 + " TK 911."),
+    ("KC_LAI", "Kết chuyển lãi sau thuế", "ket_chuyen",
+     {"phan": "ket_chuyen", "buoc": 4}, "911", "4212", "", "", 0, "", False,
+     "Kết chuyển lãi kỳ {ky}", 53, CAN_CU_TT99 + " TK 421."),
+]
+
+
+def nap_mac_dinh(db: Session) -> int:
+    """Nạp bộ quy tắc mặc định. Chạy được nhiều lần – đã có mã nào thì bỏ qua mã đó,
+    KHÔNG đè lên quy tắc đang hiệu lực (kế toán có thể đã sửa)."""
+    co = {q.ma for q in db.execute(select(QuyTacHachToan)).scalars()}
+    them = 0
+    for (ma, ten, nguon, dk, no, co_tk, thue, ben, tyle, dt, ct, dg, ut, cc) in MAC_DINH:
+        if ma in co:
+            continue
+        db.add(QuyTacHachToan(
+            ma=ma, ten=ten, nguon=nguon, dieu_kien=dk, tk_no=no, tk_co=co_tk, tk_thue=thue,
+            ben_thue=ben, ty_le_thue=tyle, doi_tuong=dt, can_cong_trinh=ct, dien_giai=dg,
+            uu_tien=ut, can_cu=cc, effective_from=date(2026, 1, 1),
+            status="active", signed_chutich=True, signed_tgd=True, proposed_by="quyet_dinh_08-9-2026"))
+        them += 1
+    if them:
+        db.commit()
+    return them
+
+
+def dang_hieu_luc(db: Session, nguon: str = "", on: date | None = None) -> list[QuyTacHachToan]:
+    """Quy tắc đang hiệu lực tại một ngày. Cùng một mã có nhiều bản theo ngày – lấy bản mới nhất
+    đã có hiệu lực, không lấy bản ký cho tương lai."""
+    on = on or date.today()
+    q = select(QuyTacHachToan).where(QuyTacHachToan.status == "active", QuyTacHachToan.effective_from <= on)
+    if nguon:
+        q = q.where(QuyTacHachToan.nguon == nguon)
+    rows = db.execute(q.order_by(desc(QuyTacHachToan.effective_from), desc(QuyTacHachToan.id))).scalars().all()
+    moi_nhat: dict[str, QuyTacHachToan] = {}
+    for r in rows:
+        moi_nhat.setdefault(r.ma, r)
+    return sorted(moi_nhat.values(), key=lambda r: (r.uu_tien, r.ma))
+
+
+def _khop(dk: dict | None, boi_canh: dict) -> bool:
+    """Điều kiện rỗng là khớp mọi thứ. Mỗi khóa trong điều kiện phải khớp; thiếu khóa trong
+    bối cảnh coi như KHÔNG khớp – không đoán."""
+    if not dk:
+        return True
+    noi_dung = str(boi_canh.get("noi_dung") or "").lower()
+    for k, v in dk.items():
+        if k == "chua":
+            if not any(str(x).lower() in noi_dung for x in v): return False
+        elif k == "khong_chua":
+            if any(str(x).lower() in noi_dung for x in v): return False
+        elif k == "ma_bat_dau":
+            ma = str(boi_canh.get("ma") or "").upper()
+            if not any(ma.startswith(str(x).upper()) for x in v): return False
+        elif k in ("muc_chi", "loai_tour"):
+            if boi_canh.get(k) not in v: return False
+        elif k == "buoc":
+            if boi_canh.get("buoc") != v: return False
+        else:
+            if k not in boi_canh or bool(boi_canh.get(k)) != bool(v): return False
+    return True
+
+
+def chon(db: Session, nguon: str, boi_canh: dict, on: date | None = None) -> QuyTacHachToan | None:
+    """Chọn quy tắc đầu tiên khớp bối cảnh, theo thứ tự ưu tiên. Không khớp thì trả None –
+    gọi bên ngoài phải đưa nghiệp vụ vào hàng chờ kế toán, tuyệt đối không đoán tài khoản."""
+    for q in dang_hieu_luc(db, nguon, on):
+        if _khop(q.dieu_kien, boi_canh):
+            return q
+    return None
+
+
+def _dien_giai(mau: str, boi_canh: dict) -> str:
+    out = mau or ""
+    for k, v in boi_canh.items():
+        out = out.replace("{" + k + "}", str(v or ""))
+    while "{" in out and "}" in out:      # khóa còn lại không có trong bối cảnh – bỏ đi
+        i, j = out.index("{"), out.index("}")
+        if j < i: break
+        out = out[:i] + out[j + 1:]
+    return " ".join(out.split())[:300]
+
+
+def dung_but_toan(q: QuyTacHachToan, so_tien: float, boi_canh: dict) -> dict:
+    """Dựng các dòng bút toán từ một quy tắc. so_tien là số tiền TỔNG (đã gồm thuế nếu quy tắc tách thuế).
+
+    Trả về {"dien_giai", "lines"} theo đúng dạng post_entry nhận – chưa ghi sổ.
+    """
+    so_tien = round(float(so_tien or 0), 0)
+    if so_tien <= 0:
+        raise ValueError("Số tiền phải lớn hơn 0")
+    truoc_thue, thue = so_tien, 0.0
+    if q.ty_le_thue and q.tk_thue:
+        truoc_thue = round(so_tien / (1 + q.ty_le_thue), 0)
+        thue = round(so_tien - truoc_thue, 0)
+    dt = {"khach": (boi_canh.get("khach"), boi_canh.get("ma_khach")),
+          "ncc": (boi_canh.get("ncc"), boi_canh.get("ma_ncc")),
+          "nhan_vien": (boi_canh.get("nhan_vien"), boi_canh.get("ma_nhan_vien")),
+          "ngan_hang": (boi_canh.get("ngan_hang"), boi_canh.get("ma_ngan_hang"))}.get(q.doi_tuong, ("", ""))
+    chung = {"partner": dt[0] or "", "partner_code": dt[1] or "",
+             "project_code": (boi_canh.get("ma") or "") if q.can_cong_trinh else "",
+             "booking_id": boi_canh.get("booking_id"), "tour_id": boi_canh.get("tour_id"),
+             "doc_no": boi_canh.get("so_chung_tu") or "", "note": f"quy tắc {q.ma}"}
+    if q.ben_thue == "co":          # thuế đầu ra: Nợ tổng – Có doanh thu + Có thuế
+        lines = [dict(chung, account=q.tk_no, debit=so_tien),
+                 dict(chung, account=q.tk_co, credit=truoc_thue)]
+        if thue: lines.append(dict(chung, account=q.tk_thue, credit=thue))
+    elif q.ben_thue == "no":        # thuế đầu vào: Nợ chi phí + Nợ thuế – Có tổng
+        lines = [dict(chung, account=q.tk_no, debit=truoc_thue)]
+        if thue: lines.append(dict(chung, account=q.tk_thue, debit=thue))
+        lines.append(dict(chung, account=q.tk_co, credit=so_tien))
+    else:
+        lines = [dict(chung, account=q.tk_no, debit=so_tien),
+                 dict(chung, account=q.tk_co, credit=so_tien)]
+    return {"quy_tac": q.ma, "dien_giai": _dien_giai(q.dien_giai, boi_canh), "lines": lines,
+            "truoc_thue": truoc_thue, "thue": thue, "tong": so_tien}
+
+
+def xem_truoc(db: Session, nguon: str, so_tien: float, boi_canh: dict, on: date | None = None) -> dict:
+    """Xem trước bút toán mà không ghi sổ. Không có quy tắc khớp thì nói thẳng là không có."""
+    q = chon(db, nguon, boi_canh, on)
+    if q is None:
+        return {"khop": False, "ly_do": "Không có quy tắc nào khớp – nghiệp vụ này phải do Kế toán định khoản tay",
+                "nguon": nguon, "boi_canh": boi_canh}
+    bt = dung_but_toan(q, so_tien, boi_canh)
+    bt.update({"khop": True, "ten_quy_tac": q.ten, "can_cu": q.can_cu, "hieu_luc_tu": str(q.effective_from)})
+    return bt
+
+
+def de_xuat(db: Session, u: User, data: dict) -> QuyTacHachToan:
+    """Đề xuất một quy tắc mới hoặc bản sửa của quy tắc cũ – chờ đủ hai chữ ký mới có hiệu lực."""
+    q = QuyTacHachToan(
+        ma=data["ma"].strip().upper()[:40], ten=data["ten"][:200], nguon=data["nguon"],
+        dieu_kien=data.get("dieu_kien") or {}, tk_no=str(data["tk_no"]), tk_co=str(data["tk_co"]),
+        tk_thue=str(data.get("tk_thue") or ""), ben_thue=data.get("ben_thue") or "",
+        ty_le_thue=float(data.get("ty_le_thue") or 0), doi_tuong=data.get("doi_tuong") or "",
+        can_cong_trinh=bool(data.get("can_cong_trinh")), dien_giai=(data.get("dien_giai") or "")[:200],
+        uu_tien=int(data.get("uu_tien") or 100), can_cu=(data.get("can_cu") or "")[:200],
+        ghi_chu=data.get("ghi_chu") or "", effective_from=data["effective_from"],
+        status="pending", proposed_by=u.username)
+    if q.nguon not in NGUON:
+        raise ValueError(f"Nguồn nghiệp vụ không hợp lệ: {q.nguon}")
+    if q.doi_tuong not in DOI_TUONG:
+        raise ValueError(f"Cách lấy đối tượng không hợp lệ: {q.doi_tuong}")
+    from app.models.accounting import Account
+    for tk in (q.tk_no, q.tk_co, q.tk_thue):
+        if tk and not db.get(Account, tk):
+            raise ValueError(f"Tài khoản {tk} không có trong danh mục")
+    db.add(q); db.flush()
+    R.audit(db, u.username, u.role, "de_xuat_quy_tac_hach_toan", f"quy_tac:{q.ma}",
+            after={"no": q.tk_no, "co": q.tk_co, "hieu_luc": str(q.effective_from)})
+    db.commit()
+    return q
+
+
+def ky(db: Session, u: User, qid: int) -> QuyTacHachToan:
+    from app.services import chu_ky as CK
+    q = db.get(QuyTacHachToan, qid)
+    if not q or q.status != "pending":
+        raise ValueError("Quy tắc không ở trạng thái chờ ký")
+    CK.kiem_tra_nguoi_ky(u, ("chutich", "tgd"), nguoi_trinh=q.proposed_by,
+                         da_ky={"chutich": "x" if q.signed_chutich else "", "tgd": "x" if q.signed_tgd else ""})
+    setattr(q, f"signed_{u.role}", True)
+    R.audit(db, u.username, u.role, "ky_quy_tac_hach_toan", f"quy_tac:{q.ma}", after={"id": q.id})
+    if q.signed_chutich and q.signed_tgd:
+        q.status = "active"
+        R.audit(db, u.username, u.role, "quy_tac_hach_toan_hieu_luc", f"quy_tac:{q.ma}",
+                after={"no": q.tk_no, "co": q.tk_co, "hieu_luc": str(q.effective_from)})
+    db.commit()
+    return q
+
+
+def bang(db: Session, on: date | None = None) -> dict:
+    """Bảng quy ước để đọc trên màn hình và để đối chiếu với kiểm toán."""
+    hl = {q.id for q in dang_hieu_luc(db, "", on)}
+    rows = db.execute(select(QuyTacHachToan).order_by(QuyTacHachToan.nguon, QuyTacHachToan.uu_tien, QuyTacHachToan.ma)).scalars().all()
+    return {
+        "nguon": NGUON, "doi_tuong": DOI_TUONG,
+        "quy_tac": [{
+            "id": q.id, "ma": q.ma, "ten": q.ten, "nguon": q.nguon, "nguon_ten": NGUON.get(q.nguon, q.nguon),
+            "dieu_kien": q.dieu_kien or {}, "tk_no": q.tk_no, "tk_co": q.tk_co, "tk_thue": q.tk_thue,
+            "ben_thue": q.ben_thue, "ty_le_thue": q.ty_le_thue, "doi_tuong": q.doi_tuong,
+            "can_cong_trinh": q.can_cong_trinh, "dien_giai": q.dien_giai, "uu_tien": q.uu_tien,
+            "can_cu": q.can_cu, "ghi_chu": q.ghi_chu, "effective_from": str(q.effective_from),
+            "status": q.status, "signed_chutich": q.signed_chutich, "signed_tgd": q.signed_tgd,
+            "proposed_by": q.proposed_by, "dang_dung": q.id in hl,
+        } for q in rows],
+    }

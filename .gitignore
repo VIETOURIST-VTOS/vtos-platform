@@ -11,3 +11,6 @@ mobile/ios/
 infra/backups/*.sql.gz
 .DS_Store
 backend/visa_docs/
+
+web_src.tgz
+_web_src.tgz

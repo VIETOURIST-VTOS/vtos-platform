@@ -35,6 +35,7 @@ from app.api.v1.attachments import router as tep_router
 from app.api.v1.huong_dan import router as hd_router
 from app.api.v1.ngoai_le import router as ngoai_le_router
 from app.api.v1.kiem_soat import router as kiem_soat_router
+from app.api.v1.hach_toan import router as hach_toan_router
 from app.api.v1.cskh import router as cskh_router
 from app.services import rules as R
 from app.services import accounting as ACC
@@ -84,6 +85,10 @@ async def lifespan(app: FastAPI):
         # không ai biết vì sao. Hàm chỉ thêm dòng còn thiếu, không đụng tới mức lãnh đạo đã sửa.
         from app.services.ai_quyen import nap_mac_dinh as nap_quyen_ai
         nap_quyen_ai(db); db.commit()
+        # Bộ quy ước hạch toán cũng phải có mặt từ lúc khởi động: bảng rỗng thì mọi nghiệp vụ đều rơi
+        # vào "không có quy tắc khớp" và kế toán lại định khoản tay – đúng cái việc bảng này thay thế.
+        from app.services.hach_toan import nap_mac_dinh as nap_quy_tac
+        nap_quy_tac(db)
         if settings.SEED_DEMO:
             seed_all(db)
     finally:
@@ -140,6 +145,7 @@ app.include_router(access_router)
 app.include_router(ai_roles_router)
 app.include_router(ngoai_le_router)
 app.include_router(kiem_soat_router)
+app.include_router(hach_toan_router)
 app.include_router(cskh_router)
 app.include_router(debts_router)
 app.include_router(ncc_router)

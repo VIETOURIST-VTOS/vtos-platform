@@ -80,6 +80,7 @@ READ_ONLY_ROLES = ("bks",)
 # mà nó đang giám sát – đó là điều làm cho báo cáo của nó có giá trị.
 WRITE_ALLOWED_FOR_READ_ONLY = ("/api/v1/auth/password", "/api/v1/auth/login", "/api/v1/robot/r9",
                                "/api/v1/kiem-soat/quet", "/api/v1/kiem-soat/cham-diem",
+                               "/api/v1/hach-toan/thieu-gia-von/quet",
                                "/api/v1/ngoai-le/ghi")
 
 
@@ -235,6 +236,9 @@ MENU_ROLES = {
     # Bàn làm việc của robot Kiểm soát. Trưởng phòng KHÔNG có mặt: đây là chỗ đọc kết quả giám sát
     # chính phòng mình, việc phải làm thì hiện ở màn hình Ngoại lệ của họ.
     "/kiem-soat": BASE_VIEW + ("cntt",),
+    # Bảng quy ước hạch toán + cổng chặn giá vốn. Điều hành (tp_dh) xem được vì hàng đợi thiếu giá vốn
+    # đứng tên phòng họ – bắt một phòng trả lời mà không cho họ nhìn thấy việc là cách chắc chắn để không ai trả lời.
+    "/hach-toan": BASE_VIEW + ("ketoan", "cntt", "tp_dh"),
     # Ngoại lệ cần xử lý: nơi gom mọi lần một quy tắc bị bẻ. Mở cho những vai trò CÓ THỂ trả lời được
     # câu "vì sao lúc đó phải bẻ": Kế toán (tiền), Điều hành (chuyến), hai Phó TGĐ (duyệt), CNTT (tham số
     # và AI). Khối Kinh doanh không có mặt – họ là bên xin ngoại lệ, không phải bên rà.
