@@ -80,6 +80,14 @@ ROLES = {
     "tp_hd": "Trưởng phòng Hướng dẫn",
     "nv_visa": "Chuyên viên Visa",
     "hanh_chinh": "Hành chính (không xem bảng lương)",
+    # Ba VAI TRÒ MÁY, mở 08/9/2026 (Đợt 2 mục P8). Trước bản này ba robot dùng chung tài khoản người:
+    # robot Kiểm soát mượn vai trò bks, robot Phân quyền và robot Viết phần mềm mượn vai trò cntt. Hậu
+    # quả không nằm ở quyền mà nằm ở NHẬT KÝ: mọi việc ba robot làm đều mang tên một con người, nên khi
+    # cần biết ai đã đổi cái gì thì câu trả lời là "cntt" – đúng nhưng vô dụng. Người vận hành bị ghi
+    # tên cho việc mình không làm, và robot thì không ai truy được.
+    "robot_pq": "Robot Phân quyền",
+    "robot_ks": "Robot Kiểm soát",
+    "robot_vpm": "Robot Viết phần mềm",
 }
 
 

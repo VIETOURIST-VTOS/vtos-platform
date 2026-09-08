@@ -136,9 +136,14 @@ def chenh_lech(db: Session) -> dict:
 
 # Đổi quyền AI cũng là đổi quyền: cùng một câu hỏi "ai được làm gì", chỉ khác chủ thể là máy chứ không
 # phải người. Để ở nhật ký riêng thì lúc rà quyền hằng tháng sẽ nhìn sót đúng phần rủi ro nhất.
+# Gán pháp nhân chủ quản cho tài khoản CŨNG là đổi quyền, dù nó không nằm trong ma trận vai trò:
+# từ 08/9/2026 pháp nhân của tài khoản quyết định người đó nhìn thấy dữ liệu của công ty nào. Một lần
+# gán hàng loạt cho hơn trăm tài khoản mà không hiện ở nhật ký quyền là đúng loại thay đổi lớn nhất
+# đi qua lặng lẽ nhất.
 HANH_DONG_QUYEN = ("dang_nhap", "sua_tai_khoan", "dat_lai_mat_khau", "doi_mat_khau",
                    "cap_ngoai_le_quyen", "thu_hoi_ngoai_le_quyen",
-                   "dat_quyen_ai", "tat_khan_ai", "hau_kiem_ai")
+                   "dat_quyen_ai", "tat_khan_ai", "hau_kiem_ai",
+                   "suy_phap_nhan_tai_khoan_tu_ho_so")
 
 
 def nhat_ky_quyen(db: Session, limit: int = 200, bo_dang_nhap: bool = True) -> list[dict]:

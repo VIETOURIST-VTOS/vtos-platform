@@ -19,7 +19,13 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "v10a7f3c9e1b48"
-down_revision = "v9b2e7c3a91d5"
+# GỘP 08/9/2026 – nối SAU bản kho token Zalo OA thay vì song song với nó.
+#
+# Hai nhánh cùng rẽ từ v9b2e7c3a91d5 nên mạch có hai đầu, và Dockerfile chạy "alembic upgrade head":
+# nhiều hơn một đầu là container KHÔNG khởi động được. Chuỗi V10 → V6 → V12 nối sau bản Zalo chứ
+# không ngược lại, vì bản Zalo đã nằm trên main và có thể đã chạy trên hệ thống thật – đổi cha của
+# một bản đã chạy là đổi thứ tự đã xảy ra rồi.
+down_revision = "za1b2c3d4e5f"
 branch_labels = None
 depends_on = None
 

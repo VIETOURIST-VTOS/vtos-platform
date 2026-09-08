@@ -23,8 +23,10 @@ from app.services import ks_ma_tran as MT
 # Việc ĐANG MỞ, tính tới 08/9/2026. Robot đo được và mở việc; sửa là việc của người (P11/V8b), nên phép
 # thử ghi nhận đúng hiện trạng thay vì đỏ mãi mãi – một phép thử đỏ thường trực là phép thử không ai đọc.
 # Sửa xong một dòng thì phép thử đỏ và phải xoá dòng đó khỏi đây: đó là cách nó không bị bỏ quên.
-KHAI_THIEU_MAN_HINH = []                # 08/9/2026: V8b đã dựng trang /ket-so nên xoá dòng khỏi
-                                        # đây, đúng quy ước ngay trên. Rỗng = đã trả xong nợ.
+# Rỗng từ 08/9/2026: /ket-so là mục cuối cùng trong danh sách này, và màn hình đã dựng (a3e5a16).
+# Danh sách rỗng là trạng thái ĐÚNG, không phải phép thử mất tác dụng: thêm một mục menu trỏ tới trang
+# chưa có thì nó đỏ ngay, và đó là lúc duy nhất bắt được lỗi ấy trước khi người dùng bấm vào.
+KHAI_THIEU_MAN_HINH: list[str] = []     # menu dẫn tới trang không có
 # Ba màn hình này KHÔNG khai trong MENU_ROLES mà khai qua MAN_HINH_MOI_NGUOI – chúng mở cho mọi tài
 # khoản đăng nhập theo đúng thiết kế, và bộ dò này chỉ đọc MENU_ROLES nên vẫn kể tên chúng ra.
 # phieu-luong vào danh sách ngày 08/9/2026 – màn hình phiếu lương của chính người đăng nhập.

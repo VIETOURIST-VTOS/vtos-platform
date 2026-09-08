@@ -13,7 +13,7 @@ from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1/ai", tags=["quyen-ai"])
 
-XEM = ("chutich", "tgd", "ptgd_mkt", "cntt", "bks")
+XEM = ("chutich", "tgd", "ptgd_mkt", "cntt", "bks", "robot_pq")
 SUA = ("chutich", "tgd", "cntt")            # đặt mức và hạn mức
 TAT_KHAN = ("chutich", "tgd", "cntt")
 

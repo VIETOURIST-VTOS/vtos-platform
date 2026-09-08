@@ -211,7 +211,14 @@ def test_vi_tri_kiem_soat_khai_dung_bang_quyen_ai():
 
 
 def test_menu_kiem_soat_theo_dung_ma_tran():
-    """Phòng ban không có mặt ở bàn làm việc giám sát. Kế toán là ngoại lệ CÓ LÝ DO, xem phép thử dưới."""
+    """Phòng ban không có mặt ở bàn làm việc giám sát.
+
+    GỘP 08/9/2026: bản trên nhánh main ghi ngược lại – "Kế toán có mặt trong menu /kiem-soat" – với
+    lý do rằng hàng rào phạm vi chỉ phân biệt tới mức tiền tố nên muốn Kế toán quyết cột tiền thì
+    buộc phải cho họ chạm tiền tố. Lý do ấy ĐÚNG với mã lúc đó, và đã hết đúng: bàn K1/K2 nay có địa
+    chỉ riêng /api/v1/ra-soat-cot-tien, nên hàng rào thô vẫn đủ mà Kế toán không phải vào màn hình
+    Kiểm soát. Chủ tịch quyết 08/9: Kế toán KHÔNG xem màn hình Kiểm soát – bản này theo quyết định đó.
+    """
     from app.services.access import MENU_ROLES
     from app.api.v1 import ks_ra_soat as KR
     assert "/kiem-soat" in MENU_ROLES

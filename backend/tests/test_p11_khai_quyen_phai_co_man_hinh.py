@@ -39,6 +39,10 @@ KHONG_KHAI_QUYEN = {
     "doi-mat-khau": "ai cũng vào được, kể cả tài khoản còn mật khẩu tạm",
     "alerts": "cảnh báo nghiệp vụ – mở cho mọi vai trò",
     "reports": "báo cáo công việc – mở cho mọi vai trò",
+    # Phiếu lương của CHÍNH người đăng nhập. Khai quyền qua MAN_HINH_MOI_NGUOI và
+    # MAN_HINH_KHONG_DUOC_AN chứ không qua MENU_ROLES, vì nó không thuộc vai trò nào – nó thuộc về
+    # từng người. Hai đường dẫn nó gọi đều tự lọc về đúng người ở lớp endpoint.
+    "phieu-luong": "phiếu lương của chính mình – mở cho mọi vai trò, tự lọc về đúng người",
     "robot-reports": "báo cáo quản trị – khai quyền trong MENU_ROLES ở tên khác",
     "tours": "khai quyền ở /tours trong MENU_ROLES",
 }

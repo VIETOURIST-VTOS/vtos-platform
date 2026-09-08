@@ -106,3 +106,29 @@ class Message(Base):
     response: Mapped[str] = mapped_column(Text, default="")
     ai_review: Mapped[dict] = mapped_column(JSON, default=dict)                  # AI chấm câu trả lời của sale
     at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+
+
+class ZaloOaToken(Base):
+    """Chỗ ở của token Zalo OA. MỘT dòng duy nhất, luôn đọc dòng mới nhất.
+
+    Vì sao phải có bảng này thay vì để token trong biến môi trường: Zalo cấp access token sống 25 giờ, và
+    refresh token ĐỔI MỚI sau mỗi lần dùng – dùng xong cái cũ chết. Máy chủ giữ token mới trong bộ nhớ thôi
+    thì mỗi lần khởi động lại (gói Render miễn phí ngủ khi vắng khách) nó đọc lại refresh token CŨ từ biến
+    môi trường, thứ mà Zalo đã vô hiệu hoá. Kết quả: chạy ngon đúng một ngày rồi Zalo OA lặng lẽ chết, không
+    cảnh báo, và tin khách nhắn vào không ai thấy. Đó là loại lỗi tệ nhất – nó không kêu.
+    """
+    __tablename__ = "zalo_oa_tokens"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    oa_id: Mapped[str] = mapped_column(String(40), default="", index=True)
+    access_token: Mapped[str] = mapped_column(Text, default="")
+    refresh_token: Mapped[str] = mapped_column(Text, default="")
+    het_han_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)      # access token
+    lan_lam_moi: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    so_lan_lam_moi: Mapped[int] = mapped_column(Integer, default=0)
+    # Chuỗi chống giả mạo của lần xin uỷ quyền đang mở. Không có nó thì bất kỳ ai gọi đúng đường dẫn trả về
+    # cũng đặt được token cho hệ thống.
+    ma_chong_gia: Mapped[str] = mapped_column(String(64), default="")
+    loi_cuoi: Mapped[str] = mapped_column(Text, default="")
+    cap_boi: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)

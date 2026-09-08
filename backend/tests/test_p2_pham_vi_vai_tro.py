@@ -108,36 +108,37 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 #
 # Bảng này KHÔNG phải để đóng băng quyền. Nó để mỗi lần nới là một lần có người phải sửa bảng – tức là
 # phải nhìn thấy mình đang nới cho ai, và ghi lại vì sao.
+# Chốt lại 08/9/2026 khi gộp nhánh robot-phanmem vào main. MỌI vai trò đều +2, ba vai trò kinh doanh
+# +3, và ba dòng mới cho vai trò máy. Ghi rõ từng phần cộng thêm, vì đó là toàn bộ công dụng của bảng
+# này – con số đổi mà không ai giải thích được thì lần sau người ta sửa số cho xanh rồi đi tiếp.
 #
-# Đo lại ngày 08/9/2026 sau khi gộp nhánh viết phần mềm vào main. Hai lý do, và chỉ hai:
+#   +1 mọi vai trò  /api/v1/pham-vi     – P6: ai cũng phải đọc được phạm vi pháp nhân của CHÍNH phiên
+#                                          mình, nếu không màn hình không nói được họ đang xem dữ liệu
+#                                          của công ty nào.
+#   +1 mọi vai trò  /api/v1/phieu-luong – phiếu lương của chính mình; tiền tố này chỉ chứa endpoint tự
+#                                          lọc về đúng người, KHÔNG chứa bảng lương toàn công ty.
+#   +1 nv_kd/tn_kd/tp_kd  /api/v1/visa  – sales phụ trách mở được hồ sơ visa của khách MÌNH (1259841).
 #
-#   1. +1 CHO CẢ HAI MƯƠI VAI TRÒ – nhóm "/api/v1/pham-vi" của P6 (phạm vi pháp nhân theo phiên đăng
-#      nhập) nằm trong nhóm API chung, nên mọi vai trò đều chạm. Không ai được thêm màn hình nào.
+# Ba vai trò máy (P8) vào bảng ngay từ lần đầu: chốt sớm thì mọi lần nới sau đều phải giải thích.
 #
-#   2. +1 RIÊNG NĂM VAI TRÒ chutich, tgd, bks, cntt, ketoan – màn hình "Rà soát cột tiền"
-#      (/api/v1/ra-soat-cot-tien) tách ra khỏi màn hình Kiểm soát.
-#      Và ketoan ĐỒNG THỜI MẤT "/api/v1/kiem-soat": Chủ tịch quyết ngày 08/9/2026 rằng Kế toán không
-#      xem màn hình Kiểm soát. Nên 78 → 79 là một lần bớt và hai lần thêm, không phải một lần nới.
+# ĐO LẠI 08/9/2026 khi gộp main vào nhánh Đợt 2. Ba nhóm thay đổi, mỗi nhóm một lý do, và không vai
+# trò nào đổi mà không thuộc một trong ba nhóm này:
 #
-# Nếu lần sau bảng này đỏ mà không giải thích được từng vai trò như trên thì đó là một lần nới nhầm.
-#
-# Đo lại lần nữa sau khi gộp main (bản đính chính P6 và hai màn hình của phiên Phân quyền). Hai lý do:
-#
-#   3. +1 CHO CẢ HAI MƯƠI VAI TRÒ – "/api/v1/phieu-luong": phiếu lương CÁ NHÂN, ai cũng xem của mình.
-#      Mở cho mọi vai trò là đúng ý nghĩa màn hình, không phải một lần nới.
-#   4. +1 THÊM CHO BỐN VAI TRÒ KINH DOANH nv_kd, tn_kd, tp_kd, gd_kd – "/api/v1/visa": sales phụ trách
-#      mở được hồ sơ visa của KHÁCH MÌNH. Đây là một lần nới thật, do phiên Phân quyền quyết và có
-#      phép thử riêng canh phạm vi (test_visa_sales_phu_trach). Ghi ra đây để nó không trôi qua im lặng.
-#
-#   5. V6 – chuỗi bán hàng "/api/v1/ban-hang": +1 cho ĐÚNG 14 vai trò được khai ba màn hình mới
-#      (bảng giá, báo giá, hợp đồng khách). Sáu vai trò KHÔNG liên quan tới bán hàng – hcns, xe_hdv,
-#      gd_doi_xe, tp_hd, nv_visa, hanh_chinh – giữ nguyên con số cũ. Một tiền tố cho cả ba màn hình
-#      chứ không ba tiền tố: ba tiền tố là ba dòng phải khai và ba chỗ để quên một dòng.
+#   +2  chutich, tgd, bks, cntt      – "/api/v1/ban-hang" (V6: bảng giá, báo giá, hợp đồng khách)
+#                                       và "/api/v1/ra-soat-cot-tien" (bàn K1/K2 tách ra địa chỉ riêng)
+#   +1  chín vai trò kinh doanh và điều hành – chỉ "/api/v1/ban-hang"
+#   +1  ketoan (80 → 81)             – được "/api/v1/ban-hang" và "/api/v1/ra-soat-cot-tien", ĐỒNG THỜI
+#                                       MẤT "/api/v1/kiem-soat" theo quyết định của Chủ tịch 08/9.
+#                                       Hai thêm một bớt, không phải một lần nới.
+#   +0  chín vai trò còn lại         – hcns, xe_hdv, gd_doi_xe, tp_hd, nv_visa, hanh_chinh và ba vai
+#                                       trò máy: không ai trong số này liên quan tới bán hàng.
 PHAM_VI_DA_CHOT = {
     "chutich": 98, "tgd": 98, "bks": 98, "cntt": 96,
     "ketoan": 81, "tp_dh": 78, "ptgd_doan": 58, "nv_dh": 54, "hcns": 52, "gd_kd": 52,
-    "nv_kd": 40, "tn_kd": 40, "tp_kd": 40, "ptgd_mkt": 39, "nv_mkt": 31,
+    "ptgd_mkt": 39, "nv_kd": 40, "tn_kd": 40, "tp_kd": 40, "nv_mkt": 31,
     "gd_doi_xe": 24, "hanh_chinh": 24, "tp_hd": 22, "xe_hdv": 17, "nv_visa": 17,
+    # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
+    "robot_pq": 18, "robot_ks": 17, "robot_vpm": 17,
 }
 
 
@@ -156,8 +157,11 @@ def test_pham_vi_tung_vai_tro_dung_nhu_da_chot():
                       f"ghi vì sao trong thông điệp ghi mã; nếu không thì đây là một lần nới nhầm: {lech}")
 
 
-def test_bang_chot_phu_du_hai_muoi_vai_tro():
-    """Thêm một vai trò mà quên chốt phạm vi thì vai trò đó nới bao nhiêu cũng không ai biết."""
+def test_bang_chot_phu_du_moi_vai_tro():
+    """Thêm một vai trò mà quên chốt phạm vi thì vai trò đó nới bao nhiêu cũng không ai biết.
+
+    Tên cũ của phép thử này là "phủ đủ hai mươi vai trò". Bỏ con số ra khỏi tên khi thêm ba vai trò
+    máy: một phép thử mang con số trong tên là một phép thử mà cách sửa nhanh nhất là đổi con số."""
     thieu = [v for v in ROLES if v not in PHAM_VI_DA_CHOT]
     thua = [v for v in PHAM_VI_DA_CHOT if v not in ROLES]
     assert not thieu and not thua, f"thiếu: {thieu} · thừa: {thua}"
