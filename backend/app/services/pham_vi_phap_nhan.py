@@ -14,8 +14,13 @@ Vì vậy module này có đúng ba quy tắc, và cả ba đều nói "không":
 
 2. **Không giấu.** Hồ sơ chưa xác định vẫn nằm trong danh sách người dùng nhìn thấy, có nhãn
    `chua_gan`. Lọc nó ra khỏi màn hình nghe có vẻ "an toàn" nhưng thực chất là làm nó biến mất khỏi
-   mọi con mắt – 1.200 tour nhập từ Vietrip đều chưa có pháp nhân, giấu đi là giấu gần như toàn bộ
-   dữ liệu, và người duy nhất còn có thể gán nó thì không còn nhìn thấy nó để mà gán.
+   mọi con mắt, và người duy nhất còn có thể gán nó thì không còn nhìn thấy nó để mà gán.
+
+   ĐÍNH CHÍNH 08/9/2026: bản đầu của đoạn này viết "1.200 tour nhập từ Vietrip đều chưa có pháp
+   nhân". ĐO trên hệ thống thật sau khi phát hành: 0 hồ sơ chưa gán trên cả năm loại – 1.258 tour,
+   10.074 booking, 5.664 phiếu thu, 4.659 đề nghị chi, 25.728 chứng từ ghi sổ đều đã có pháp nhân.
+   Con số kia là suy đoán chưa đo, và nó sai. Quy tắc thì vẫn giữ: nó không tốn gì khi danh sách
+   rỗng, và đúng vào ngày có hồ sơ đầu tiên chưa gán thì nó đã đứng sẵn ở đó.
 
 3. **Không khoá cửa bằng một cột chưa ai điền.** `users.company_id` được thêm ngày 07/9/2026,
    nullable, không có bước điền sẵn. Nếu bật lọc cứng ngay thì mọi tài khoản chưa gán sẽ thấy màn
