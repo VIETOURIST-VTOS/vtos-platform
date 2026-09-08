@@ -45,12 +45,57 @@ def check_must_change_password(u: User, path: str) -> None:
 FULL_ACCESS = ("chutich",)
 
 
-def require_roles(*roles: str):
+def require_roles(*roles: str, mo_ta: str = ""):
+    """Khai quyền cho MỘT endpoint, ở chữ ký hàm.
+
+    Đây là cách duy nhất được dùng trong kho (chỉ đạo P1, 08/9/2026). Trước đó tồn tại song song một
+    kiểu thứ hai – gọi AC.require(...) trong thân hàm – và hậu quả không phải lý thuyết: bộ kiểm quyền
+    của robot Kiểm soát chỉ nhìn thấy kiểu thứ nhất nên lần chạy đầu trên hệ thống thật nó báo oan 26
+    việc, trong đó có GET /audit vốn chặn đúng. Một robot giám sát kêu oan 26 lần ngay ngày đầu thì
+    lần sau không ai đọc nó nữa.
+
+    Khai ở chữ ký còn một cái lợi mà khai trong thân hàm không bao giờ có: máy ĐỌC ĐƯỢC danh sách vai
+    trò mà không phải phân tích mã nguồn hàm, nên bộ kiểm luôn thấy đúng những gì thực sự đang chặn.
+
+    mo_ta là tên màn hình / dữ liệu, để người bị chặn đọc được mình đang thiếu quyền gì thay vì một câu
+    chung chung.
+    """
     def dep(u: User = Depends(current_user)) -> User:
         if roles and u.role not in roles and u.role not in FULL_ACCESS:
+            ten = ROLES.get(u.role, u.role)
             raise HTTPException(status.HTTP_403_FORBIDDEN,
-                                f"Vai trò {ROLES.get(u.role, u.role)} không có quyền thực hiện thao tác này")
+                                f"Vai trò {ten} không được xem {mo_ta}" if mo_ta
+                                else f"Vai trò {ten} không có quyền thực hiện thao tác này")
         return u
+    dep.vai_tro_yeu_cau = tuple(roles)      # để bộ kiểm đọc được, không phải đoán từ mã nguồn
+    return dep
+
+
+def cong_chan_quyen(f):
+    """Đánh dấu một hàm phụ thuộc là CỔNG CHẶN QUYỀN, dù nó không nhận danh sách vai trò.
+
+    Có những cửa mà quyền phụ thuộc dữ liệu chứ không phụ thuộc vai trò – bảng lương là ví dụ: theo vai
+    trò chỉ HCNS và lãnh đạo xem được, còn Kế toán trưởng xem được bằng ngoại lệ cấp riêng cho MỘT người.
+    require_roles không diễn tả nổi việc đó. Nhưng cửa vẫn phải khai ở CHỮ KÝ để máy đọc được, nếu không
+    bộ kiểm quyền lại phải đi phân tích mã nguồn – đúng cái đã khiến robot báo oan 26 việc ngày 07/9.
+    """
+    f.la_cong_chan_quyen = True
+    return f
+
+
+def loc_theo_nguoi_dung(mo_ta: str = ""):
+    """Đánh dấu endpoint KHÔNG chặn theo vai trò mà LỌC dữ liệu theo người đăng nhập.
+
+    Khác nhau ở chỗ nào và vì sao phải nói rõ: một endpoint chặn thì người sai vai trò nhận 403; một
+    endpoint lọc thì ai gọi cũng được nhưng chỉ thấy phần của mình. Cả hai đều an toàn, nhưng nhìn từ
+    ngoài chúng giống hệt "không khai quyền gì cả". Không đánh dấu thì bộ kiểm hoặc phải đọc mã nguồn,
+    hoặc phải báo oan. Ví dụ: /auth/me chỉ trả về chính người gọi; khoản lương treo lọc về đúng mã
+    nhân viên của người đăng nhập.
+    """
+    def dep(u: User = Depends(current_user)) -> User:
+        return u
+    dep.la_cong_chan_quyen = True
+    dep.loc_theo_nguoi_dung = mo_ta or True
     return dep
 
 

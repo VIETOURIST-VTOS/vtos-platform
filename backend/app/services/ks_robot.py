@@ -90,31 +90,63 @@ def _quyen_lech(db: Session) -> list[dict]:
     return ra
 
 
-# Hai kiểu chặn vai trò cùng tồn tại trong kho, và bộ kiểm phải nhận ra CẢ HAI:
-#   1. khai ở chữ ký    : u: User = Depends(require_roles(*ROLES))
-#   2. gọi trong thân hàm: AC.require(u, AC.AUDIT_ROLES, "nhật ký kiểm toán")
-# Lần chạy đầu tiên trên hệ thống thật, bộ kiểm chỉ nhìn kiểu 1 nên báo 26 việc, trong đó có
-# GET /audit – vốn chặn đúng, chỉ là chặn ở kiểu 2. Một robot báo oan 26 lần trong lần chạy đầu thì
-# lần sau không ai đọc nó nữa, nên đây không phải lỗi nhỏ.
+# Lịch sử của hàm dưới đây, vì nó giải thích cả thiết kế lẫn một phép thử:
+#
+# Trong kho từng tồn tại HAI kiểu chặn vai trò – khai ở chữ ký, và gọi AC.require(...) trong thân hàm.
+# Bộ kiểm chỉ nhìn thấy kiểu thứ nhất, nên lần chạy đầu trên hệ thống thật nó báo oan 26 việc, trong
+# đó có GET /audit vốn chặn đúng. Vá tạm bằng cách đọc thêm mã nguồn hàm (df7f5f4). Ngày 08/9/2026,
+# việc P1 dọn hẳn: cả 16 chỗ chặn trong thân hàm đã chuyển lên chữ ký, kho chỉ còn MỘT kiểu khai.
+#
+# Vì sao vẫn giữ phần đọc mã nguồn: nó là lưới an toàn cho chặn phụ thuộc dữ liệu (ví dụ lọc theo tab
+# bảng lương) mà chữ ký không diễn tả được. Nhưng lưới đó phải RỖNG trong điều kiện bình thường – phép
+# thử test_khong_endpoint_nao_con_phai_doc_ma_nguon canh đúng chỗ ấy: có ai lại thêm một chỗ chặn
+# trong thân hàm thì phép thử đỏ, chứ không phải robot lặng lẽ mù đi một lần nữa.
 CHAN_TRONG_THAN = ("AC.require(", "access.require(", "require_roles", "bang_luong", "_require(",
                    "check_readonly_write", "hr_tabs_for", "co_quyen(")
 
 
-def _co_chan_vai_tro(route) -> bool:
-    """True nếu endpoint có chặn vai trò, theo BẤT KỲ kiểu nào. Không đọc được thì trả True –
-    robot thà bỏ sót còn hơn tố oan; việc bỏ sót đã có bộ kiểm thử vai trò gọi thật để bắt."""
+def chan_o_chu_ky(route) -> bool:
+    """Đọc quyền TỪ CHỮ KÝ, không phân tích mã nguồn. Đây là đường chính."""
     try:
         dep = getattr(route, "dependant", None)
         for d in (getattr(dep, "dependencies", None) or []):
-            if getattr(d, "call", None) and "require_roles" in getattr(d.call, "__qualname__", ""):
+            call = getattr(d, "call", None)
+            if call is None:
+                continue
+            if (hasattr(call, "vai_tro_yeu_cau") or getattr(call, "la_cong_chan_quyen", False)
+                    or "require_roles" in getattr(call, "__qualname__", "")):
                 return True
         for d in (getattr(route, "dependencies", None) or []):
-            if "require_roles" in str(d): return True
+            if "require_roles" in str(d):
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _doc_ma_nguon(route) -> bool:
+    try:
         import inspect
-        src = inspect.getsource(route.endpoint)
-        return any(k in src for k in CHAN_TRONG_THAN)
+        return any(k in inspect.getsource(route.endpoint) for k in CHAN_TRONG_THAN)
     except Exception:
         return True
+
+
+def _co_chan_vai_tro(route) -> bool:
+    """True nếu endpoint có chặn vai trò. Không đọc được thì trả True – robot thà bỏ sót còn hơn tố
+    oan; việc bỏ sót đã có bộ kiểm thử vai trò gọi thật để bắt."""
+    return chan_o_chu_ky(route) or _doc_ma_nguon(route)
+
+
+def endpoint_phai_doc_ma_nguon(app) -> list[str]:
+    """Những endpoint mà bộ kiểm chỉ nhận ra được nhờ đọc mã nguồn. Danh sách này phải RỖNG."""
+    ra = []
+    for r in app.routes:
+        if not hasattr(r, "endpoint") or not str(getattr(r, "path", "")).startswith("/api/v1"):
+            continue
+        if not chan_o_chu_ky(r) and _doc_ma_nguon(r):
+            ra.append(f"{sorted(getattr(r, 'methods', []) or [])} {r.path}")
+    return sorted(set(ra))
 
 
 def _vai_tro_trong(db: Session) -> list[dict]:

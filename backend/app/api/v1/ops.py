@@ -196,8 +196,7 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
 
 
 @router.get("/payment-requests")
-def list_pr(status: str | None = None, tour_id: int | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    AC.require(u, AC.PAYMENT_REQUEST_ROLES, "đề nghị chi")
+def list_pr(status: str | None = None, tour_id: int | None = None, u: User = Depends(require_roles(*AC.PAYMENT_REQUEST_ROLES, mo_ta="đề nghị chi")), db: Session = Depends(get_db)):
     q = select(PaymentRequest).order_by(desc(PaymentRequest.id))
     if u.role in ("gd_kd", "tp_kd", "ptgd_mkt", "hcns"): q = q.where(PaymentRequest.created_by == u.username)   # bộ phận ngoài Điều hành chỉ thấy đề nghị mình lập
     if status: q = q.where(PaymentRequest.status.in_(status.split(",")))
@@ -255,10 +254,9 @@ def pr_step(rid: int, data: StepIn, u: User = Depends(current_user), db: Session
 
 
 @router.get("/tours/{tid}/cashflow")
-def cashflow(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def cashflow(tid: int, u: User = Depends(require_roles(*AC.COST_ROLES, mo_ta="dòng tiền tour")), db: Session = Depends(get_db)):
     t = db.get(Tour, tid)
     if not t: raise HTTPException(404, "Không có tour")
-    AC.require(u, AC.COST_ROLES, "dòng tiền tour")
     cf = O.tour_cashflow(db, t)
     cf["requests"] = [pr_out(r, db) for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == tid).order_by(desc(PaymentRequest.id))).scalars()]
     return cf

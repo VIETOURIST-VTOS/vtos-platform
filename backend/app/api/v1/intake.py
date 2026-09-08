@@ -93,9 +93,15 @@ def nhap_mot_dong(data: MotDongIn, u: User = Depends(require_roles(*WRITE)),
         raise HTTPException(403, f"Vai trò của anh/chị không nhập được '{IN.BO_NAP[data.loai]['ten']}'. "
                                  "Loại dữ liệu này thuộc phòng khác.")
     if data.cua not in ("nhap_tay", "doc_anh"): raise HTTPException(422, "Cửa không hợp lệ")
-    if data.cua == "doc_anh" and not data.tac_nhan.strip():
-        raise HTTPException(422, "Số điền sẵn từ ảnh phải ghi tên tác vụ đã đọc – để sau này truy được "
-                                 "con số này do máy nào đọc và ai xác nhận.")
+    if data.cua == "doc_anh":
+        if not data.tac_nhan.strip():
+            raise HTTPException(422, "Số điền sẵn từ ảnh phải ghi tên tác vụ đã đọc – để sau này truy "
+                                     "được con số này do máy nào đọc và ai xác nhận.")
+        # P5: người vận hành mô hình không được là người xác nhận kết quả của chính nó.
+        if not IN.duoc_xac_nhan_anh(data.loai, u.role):
+            raise HTTPException(403, "Vai trò của anh/chị không xác nhận được số máy đọc từ ảnh cho loại "
+                                     "dữ liệu này. Xác nhận phải là người của phòng sở hữu con số – "
+                                     "CNTT vận hành mô hình nhưng không đứng tên số nó đọc ra.")
     try:
         kq = IN.nhap_mot_dong(db, data.loai, data.row, u.username, data.cua, data.tac_nhan)
     except ValueError as ex:
@@ -126,6 +132,12 @@ def nap(data: NapIn, u: User = Depends(require_roles(*WRITE)), db: Session = Dep
         raise HTTPException(403, f"Vai trò của anh/chị không nạp được '{IN.BO_NAP[data.loai]['ten']}'. "
                                  "Loại dữ liệu này thuộc phòng khác – nhờ họ nạp để nhật ký ghi đúng tên "
                                  "người chịu trách nhiệm.")
+    # Cửa tải tệp hẹp hơn cửa nhập tay đúng một bậc (P4): sai một dòng thì sửa một dòng, sai một tệp là
+    # cả tệp vào bảng cùng lúc và dùng ngay.
+    if data.loai in IN.BO_NAP and not IN.duoc_nap_tep(data.loai, u.role):
+        raise HTTPException(403, f"Vai trò của anh/chị nhập tay được '{IN.BO_NAP[data.loai]['ten']}' "
+                                 "nhưng không tải tệp hàng loạt được. Tải tệp là quyền của trưởng bộ "
+                                 "phận – một tệp sai là cả tệp vào bảng cùng lúc và dùng ngay.")
     try:
         kq = IN.nap(db, data.loai, data.rows, u.username, data.bo_qua_dong_loi,
                     data.ten_tep, data.nguon, data.tac_nhan)

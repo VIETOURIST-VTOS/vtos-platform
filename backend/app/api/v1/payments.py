@@ -97,8 +97,7 @@ def robot_sepay_pull(data: PullIn, x_robot_token: str | None = Header(default=No
 
 # ---------- Kế toán ----------
 @router.get("/bank-transactions")
-def list_txns(status: str | None = None, limit: int = 200, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    AC.require(u, AC.FINANCE_ROLES, "giao dịch ngân hàng")
+def list_txns(status: str | None = None, limit: int = 200, u: User = Depends(require_roles(*AC.FINANCE_ROLES, mo_ta="giao dịch ngân hàng")), db: Session = Depends(get_db)):
     q = select(BankTransaction).order_by(desc(BankTransaction.transaction_date))
     if status: q = q.where(BankTransaction.match_status.in_(status.split(",")))
     return [txn_out(t, db) for t in db.execute(q.limit(limit)).scalars()]
@@ -153,8 +152,7 @@ def ignore_txn(tid: int, data: IgnoreIn, u: User = Depends(require_roles("ketoan
 
 
 @router.get("/receipts")
-def list_receipts(limit: int = 200, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    AC.require(u, AC.BOOKING_ROLES, "phiếu thu")
+def list_receipts(limit: int = 200, u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="phiếu thu")), db: Session = Depends(get_db)):
     q = select(Receipt).order_by(desc(Receipt.created_at))
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: q = q.join(Booking, Booking.id == Receipt.booking_id).where(Booking.sales_id.in_(vis))   # sale/nhóm chỉ thấy phiếu thu của khách mình
@@ -189,9 +187,8 @@ def cash_receipt(data: CashIn, u: User = Depends(require_roles("ketoan",)), db: 
 
 
 @router.get("/collections/summary")
-def collections_summary(u: User = Depends(current_user), db: Session = Depends(get_db)):
+def collections_summary(u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="tổng quan thu tiền")), db: Session = Depends(get_db)):
     """Tổng quan thu tiền: booking còn phải thu, giao dịch chờ Kế toán, phiếu thu chờ xác nhận."""
-    AC.require(u, AC.BOOKING_ROLES, "tổng quan thu tiền")
     rows = []
     qb = select(Booking).order_by(desc(Booking.created_at))
     vis = AC.sales_ids_visible(db, u)

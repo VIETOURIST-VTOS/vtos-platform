@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.api.deps import current_user, require_roles
+from app.api.deps import current_user, require_roles, cong_chan_quyen, loc_theo_nguoi_dung
 from app.models.core import Tour, User, Company
 from app.models.hr import SALES_GROUPS, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, GuideRate, INCIDENT_LEVELS, INCIDENT_STATUS, DEPARTMENTS, POSITIONS, OFFICES
 from app.services import hr as H
@@ -18,6 +18,7 @@ HR_WRITE = ("hcns", "cntt")
 # Bảng lương tách khỏi hồ sơ nhân sự (chỉ đạo 07/9/2026): theo VAI TRÒ chỉ còn HCNS, Chủ tịch, TGĐ và
 # Ban Kiểm soát. Kế toán trưởng xem toàn công ty bằng NGOẠI LỆ THEO NGƯỜI, vì vai trò "ketoan" có nhiều
 # người mà quyền chỉ cấp cho một. Không dùng require_roles được vì quyết định phụ thuộc dữ liệu.
+@cong_chan_quyen
 def bang_luong(u: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
     from app.services import access as AC
     if "payroll" not in AC.hr_tabs_for(db, u):
@@ -866,7 +867,8 @@ def payroll_attendance(period: str, data: ChamCongIn, u: User = Depends(require_
 
 
 @router.get("/payroll/khoan-treo")
-def khoan_treo(u: User = Depends(current_user), db: Session = Depends(get_db)):
+def khoan_treo(u: User = Depends(loc_theo_nguoi_dung("khoản lương treo – ai không xem được bảng lương thì chỉ thấy phần của chính mình")),
+               db: Session = Depends(get_db)):
     """Hoa hồng và thưởng chuyến đang treo vì chuyến chưa chốt quyết toán.
 
     Người lao động xem được phần của chính mình: đây là chỗ dễ mất tiền nhất mà không ai phát hiện, vì
@@ -984,7 +986,9 @@ def nap_doan_vien(data: DoanVienBatch, u: User = Depends(require_roles("hcns", "
 
 
 @router.get("/payroll-runs/{period}/phieu-luong")
-def phieu_luong(period: str, ma: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+def phieu_luong(period: str, ma: str = "",
+                u: User = Depends(loc_theo_nguoi_dung("phiếu lương – phiếu của chính mình ai cũng xem được, phiếu người khác thì phải xem được bảng lương")),
+                db: Session = Depends(get_db)):
     """Phiếu lương của CHÍNH người đăng nhập (hoặc của một mã NV, với Kế toán / HCNS / lãnh đạo).
 
     Người lao động phải tự xem được lương của mình. Phiếu ghi đủ ba khối theo bộ tính lương: thu nhập,

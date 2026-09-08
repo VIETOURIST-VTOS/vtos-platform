@@ -281,8 +281,49 @@ VAI_TRO = {
 }
 
 
+# P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.
+#
+# Nhập tay sai một dòng thì sửa một dòng. Tải tệp sai một lần là cả tệp vào bảng cùng lúc – và với
+# quyết định "nhập là dùng luôn" của Chủ tịch thì số đó dùng ngay, không ai duyệt lại. Hai việc khác
+# hẳn nhau về hậu quả nên phải khác nhau về quyền.
+#
+# Nhưng KHÔNG siết tất cả. Bản đầu của quy tắc này bỏ nhân viên khỏi mọi cửa tải tệp, và ba phép thử
+# sẵn có lập tức đỏ: nhân viên kinh doanh nạp danh sách khách và booking của chính mình là việc thường
+# ngày, chặn đi thì họ nhờ người khác nạp hộ – và nhật ký ghi sai tên người chịu trách nhiệm, đúng cái
+# mà cả thiết kế này đang cố tránh.
+#
+# Tiêu chí đúng không phải CẤP BẬC mà là DỮ LIỆU ĐI ĐÂU. Lý do siết là "500 dòng vào sổ cùng lúc và
+# dùng ngay", nên nó chỉ áp cho những bộ nạp mà dòng dữ liệu chạm thẳng vào tiền: chi phí nhà cung cấp,
+# chi phí chuyến xe, quyết toán, sao kê, chấm công (đầu vào của bảng lương). Danh mục khách hàng, danh
+# mục nhà cung cấp, danh sách hướng dẫn viên thì không.
+BO_NAP_CHAM_TIEN = ("don_dich_vu", "chuyen_xe", "quyet_toan_tour", "sao_ke_ngan_hang", "cham_cong")
+NHAN_VIEN = ("nv_dh", "nv_kd", "tn_kd", "nv_mkt", "nv_visa", "xe_hdv", "hanh_chinh")
+# Suy ra từ VAI_TRO chứ không khai tay lần thứ hai: hai bảng khai tay thì sớm muộn cũng lệch, và lúc
+# lệch thì không ai biết bảng nào đúng.
+VAI_TRO_NAP_TEP = {k: (tuple(v for v in vs if v not in NHAN_VIEN) if k in BO_NAP_CHAM_TIEN else vs)
+                   for k, vs in VAI_TRO.items()}
+
+
 def duoc_nap(loai: str, vai_tro: str) -> bool:
+    """Cửa 1 – nhập tay từng dòng (và cửa 3 – xác nhận số đọc từ ảnh, vì nó đổ về đúng cửa 1)."""
     return vai_tro in VAI_TRO.get(loai, QUAN_TRI)
+
+
+def duoc_nap_tep(loai: str, vai_tro: str) -> bool:
+    """Cửa 2 – tải tệp hàng loạt. Hẹp hơn cửa 1 đúng một bậc: nhân viên nhập tay được, nạp tệp thì không."""
+    return vai_tro in VAI_TRO_NAP_TEP.get(loai, QUAN_TRI)
+
+
+# P5 (08/9/2026) – CNTT vận hành mô hình đọc ảnh nhưng KHÔNG xác nhận số nó đọc ra.
+# Xác nhận là hành vi nhập liệu: người bấm chịu trách nhiệm về con số, y như người gõ tay. Người vận
+# hành mô hình mà cũng là người xác nhận kết quả của nó thì không còn ai đứng ngoài để nói mô hình đọc
+# sai. Đây là lý do duy nhất, và nó đủ.
+KHONG_XAC_NHAN_ANH = ("cntt",)
+
+
+def duoc_xac_nhan_anh(loai: str, vai_tro: str) -> bool:
+    """Cửa 3 – bấm xác nhận số máy đọc từ ảnh. Phải là người của phòng SỞ HỮU con số."""
+    return duoc_nap(loai, vai_tro) and vai_tro not in KHONG_XAC_NHAN_ANH
 
 
 # Bộ nạp thuộc phòng ban nào – để màn hình xếp theo phòng và để mỗi phòng thấy phần của mình trước.
@@ -296,7 +337,9 @@ def danh_sach_bo_nap() -> list[dict]:
     return [{"ma": k, "ten": v["ten"], "mo_ta": v["mo_ta"], "khoa_chong_trung": v["khoa_chong_trung"],
              "phong_ban": v.get("phong_ban") or PHONG_BAN.get(k, ""),
              "bang_dich": v.get("bang_dich", ""),
-             "vai_tro": list(VAI_TRO.get(k, QUAN_TRI)), "cot": v["cot"]} for k, v in BO_NAP.items()]
+             "vai_tro": list(VAI_TRO.get(k, QUAN_TRI)),
+             "vai_tro_nap_tep": list(VAI_TRO_NAP_TEP.get(k, QUAN_TRI)),
+             "cot": v["cot"]} for k, v in BO_NAP.items()]
 
 
 def mau_csv(loai: str) -> str:

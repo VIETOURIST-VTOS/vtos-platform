@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select, desc, func, text
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.api.deps import current_user, require_roles, robot_auth, Gate
+from app.api.deps import current_user, require_roles, robot_auth, Gate, loc_theo_nguoi_dung
 from app.api import schemas as S
 from pydantic import BaseModel
 from app.core.security import verify_password, create_token, hash_password
@@ -34,7 +34,7 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 
 
 @router.get("/auth/me", tags=["auth"])
-def me(u: User = Depends(current_user), db: Session = Depends(get_db)):
+def me(u: User = Depends(loc_theo_nguoi_dung("hồ sơ của chính người đăng nhập")), db: Session = Depends(get_db)):
     return {**user_out(u), "hidden_menus": AC.hidden_menus_for(u, db), "can_see_cost": AC.can_see_cost(u), "read_only": u.role in AC.READ_ONLY_ROLES,
             "can_create_request": u.role in AC.REQUEST_CREATE_ROLES, "can_create_booking": u.role in AC.OPERATIONS,
             "must_change_password": bool(u.must_change_password), "hr_tabs": AC.hr_tabs_for(db, u),
@@ -281,22 +281,20 @@ def booking_out(b: Booking) -> dict:
 
 
 @router.get("/mang", tags=["bookings"])
-def mang_catalog(u: User = Depends(current_user), db: Session = Depends(get_db)):
+def mang_catalog(u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="danh mục mảng kinh doanh")), db: Session = Depends(get_db)):
     """Danh mục mảng kinh doanh + đối chiếu hai quy tắc xác định mảng Đoàn.
 
     Mảng Đoàn được nhận theo HỢP của hai quy tắc (loại chuyến là đoàn, HOẶC mã tour bắt đầu bằng MICE) nên
     không tour nào bị rơi khỏi màn hình phòng Đoàn. Phần đối chiếu chỉ đích danh tour mà hai quy tắc bất đồng
     để Kinh doanh sửa dữ liệu gốc."""
     from app.services import segments as SEG
-    AC.require(u, AC.BOOKING_ROLES, "danh mục mảng kinh doanh")
     return {"mang": SEG.MANG, "quy_tac_doan": {"loai_chuyen": list(SEG.DOAN_TYPES), "tien_to_ma": SEG.MICE_PREFIX},
             "doi_chieu": SEG.lech_quy_tac(db)}
 
 
 @router.get("/requests", tags=["bookings"])
-def list_requests(open_only: bool = False, view: str = "", mang: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_requests(open_only: bool = False, view: str = "", mang: str = "", u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="yêu cầu đặt dịch vụ")), db: Session = Depends(get_db)):
     """view: cho_phan_cong / sap_qua_han / qua_han / hoan_tat / cua_toi (rỗng = tất cả)."""
-    AC.require(u, AC.BOOKING_ROLES, "yêu cầu đặt dịch vụ")
     q = select(ServiceRequest).order_by(desc(ServiceRequest.created_at))
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: q = q.where(ServiceRequest.sales_id.in_(vis))
@@ -349,10 +347,9 @@ def _bookings_query(db: Session, u: User, q: str, status: str, tour_id: int | No
 
 
 @router.get("/bookings", tags=["bookings"])
-def list_bookings(limit: int = 100, offset: int = 0, q: str = "", status: str = "", tour_id: int | None = None, mang: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_bookings(limit: int = 100, offset: int = 0, q: str = "", status: str = "", tour_id: int | None = None, mang: str = "", u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="danh sách booking")), db: Session = Depends(get_db)):
     """status: unpaid / depo / paid / cancelled / locked / due (còn phải thu, chưa hủy).
     Danh sách có phân trang – tổng số lấy ở /bookings/count, KHÔNG suy từ số dòng đang hiển thị (B7)."""
-    AC.require(u, AC.BOOKING_ROLES, "danh sách booking")
     try:
         qs = _bookings_query(db, u, q, status, tour_id, mang)
     except ValueError as ex:
@@ -361,10 +358,9 @@ def list_bookings(limit: int = 100, offset: int = 0, q: str = "", status: str = 
 
 
 @router.get("/bookings/count", tags=["bookings"])
-def count_bookings(q: str = "", status: str = "", tour_id: int | None = None, mang: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+def count_bookings(q: str = "", status: str = "", tour_id: int | None = None, mang: str = "", u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="danh sách booking")), db: Session = Depends(get_db)):
     """Tổng số booking trong phạm vi người dùng được xem và số thỏa bộ lọc – để giao diện không lấy
     số dòng đang tải làm tổng toàn hệ thống (Ý kiến thẩm định 06/9/2026, B7)."""
-    AC.require(u, AC.BOOKING_ROLES, "danh sách booking")
     def n(query):
         return db.execute(select(func.count()).select_from(query.order_by(None).subquery())).scalar() or 0
     try:
@@ -383,9 +379,8 @@ def _booking(db: Session, bid: int) -> Booking:
 
 
 @router.get("/bookings/{bid}", tags=["bookings"])
-def get_booking(bid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def get_booking(bid: int, u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="booking")), db: Session = Depends(get_db)):
     b = _booking(db, bid)
-    AC.require(u, AC.BOOKING_ROLES, "booking")
     vis = AC.sales_ids_visible(db, u)
     if vis is not None and b.sales_id not in vis: raise HTTPException(403, "Chỉ xem được booking do mình / nhóm mình phụ trách")
     v = booking_out(b)
@@ -428,9 +423,8 @@ def robot_bookings_check(db: Session = Depends(get_db)):
 
 # ---------- tiền bảo lưu ----------
 @router.get("/retentions", tags=["bookings"])
-def list_retentions(status: str = "hieu_luc", q: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_retentions(status: str = "hieu_luc", q: str = "", u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="tiền bảo lưu")), db: Session = Depends(get_db)):
     from app.models.payments import Retention
-    AC.require(u, AC.BOOKING_ROLES, "tiền bảo lưu")
     qs = select(Retention).order_by(desc(Retention.created_at))
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: qs = qs.join(Booking, Booking.id == Retention.booking_id).where(Booking.sales_id.in_(vis))
@@ -471,8 +465,7 @@ def param_out(p: Param) -> dict:
 
 
 @router.get("/params", tags=["params"])
-def list_params(u: User = Depends(current_user), db: Session = Depends(get_db)):
-    AC.require(u, AC.PARAM_ROLES, "bảng tham số chính sách")
+def list_params(u: User = Depends(require_roles(*AC.PARAM_ROLES, mo_ta="bảng tham số chính sách")), db: Session = Depends(get_db)):
     return [param_out(p) for p in db.execute(select(Param).order_by(Param.key, desc(Param.effective_from), desc(Param.id))).scalars()]
 
 
@@ -546,8 +539,7 @@ def audit_out(l: AuditLog) -> dict:
 
 
 @router.get("/audit", tags=["audit"])
-def list_audit(limit: int = 300, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    AC.require(u, AC.AUDIT_ROLES, "nhật ký kiểm toán")
+def list_audit(limit: int = 300, u: User = Depends(require_roles(*AC.AUDIT_ROLES, mo_ta="nhật ký kiểm toán")), db: Session = Depends(get_db)):
     ok, n, msg = R.verify_chain(db)
     return {"chain_ok": ok, "records": n, "chain_message": msg,
             "rows": [audit_out(l) for l in db.execute(select(AuditLog).order_by(desc(AuditLog.id)).limit(limit)).scalars()]}
