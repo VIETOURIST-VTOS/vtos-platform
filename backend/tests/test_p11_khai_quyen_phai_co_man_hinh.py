@@ -81,7 +81,11 @@ def test_trang_co_that_ma_khong_ai_khai_quyen():
     """Chiều ngược lại: theo quy ước cũ, trang không khai quyền là 'ai đăng nhập cũng thấy'."""
     if not WEB_APP.exists():
         return
-    khai = {m.strip("/") for m in AC.MENU_ROLES}
+    # MENU_ROLES là một trong HAI chỗ khai quyền màn hình. Chỗ thứ hai là MAN_HINH_MOI_NGUOI –
+    # màn hình mở cho mọi vai trò, khai ở đó chứ không liệt kê 20 vai trò trong MENU_ROLES.
+    # Phép thử này trước chỉ đọc một chỗ, nên trang /phieu-luong đã khai đàng hoàng vẫn bị báo là
+    # chưa khai. Đọc thiếu nguồn quyền rồi kết luận là "chưa khai" thì đúng cái nó sinh ra để chặn.
+    khai = {m.strip("/") for m in AC.MENU_ROLES} | {m.strip("/") for m in AC.MAN_HINH_MOI_NGUOI}
     la = []
     for p in sorted(WEB_APP.glob("*/page.tsx")):
         ten = p.parent.name
