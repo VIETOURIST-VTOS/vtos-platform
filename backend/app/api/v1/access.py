@@ -237,3 +237,42 @@ def danh_dau_bien_che(uid: int, data: BienCheIn,
             after={"ngoai_bien_che": t.ngoai_bien_che})
     db.commit()
     return {"message": "Đã đánh dấu ngoài biên chế" if data.ngoai_bien_che else "Đã bỏ đánh dấu ngoài biên chế"}
+
+
+# ---------- P10: tra cứu ngược – chọn một người, hiện họ làm được gì và VÌ SAO ----------
+@router.get("/tra-cuu/{uid}")
+def tra_cuu_quyen_mot_nguoi(uid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Ba lớp quyền của một tài khoản, mỗi dòng kèm lý do chỉ thẳng vào dòng cho phép.
+
+    Quyền XEM chứ không phải THAO_TAC: người quản lý phải tra được quyền của nhân viên mình mà không
+    cần quyền sửa vai trò. Nếu buộc phải có quyền sửa mới tra được thì kỳ rà quyền hằng tháng chỉ hai
+    người làm được, và rà quyền một tháng một lần bởi hai người là không rà.
+    """
+    from app.services import tra_cuu_quyen as TC
+    t = db.get(User, uid)
+    if not t: raise HTTPException(404, "Không có tài khoản")
+    return TC.tra_cuu(db, t)
+
+
+@router.get("/tra-cuu-vai-tro/{vai_tro}")
+def tra_cuu_theo_vai_tro(vai_tro: str, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Chiều ngược lại của cùng câu hỏi: một VAI TRÒ vào được những đâu, và ai đang ở vai trò đó.
+
+    Cần cả hai chiều vì hai câu hỏi khác nhau xảy ra ở hai lúc khác nhau: "vì sao anh này vào được"
+    hỏi khi có sự cố, "đổi vai trò này thì ảnh hưởng bao nhiêu người" hỏi trước khi siết.
+    """
+    if vai_tro not in ROLES: raise HTTPException(404, "Không có vai trò này")
+    from app.services import tra_cuu_quyen as TC
+    nguoi = list(db.execute(select(User).where(User.role == vai_tro, User.active == True)).scalars())
+    mau = nguoi[0] if nguoi else User(id=0, username="(chưa ai)", full_name="(chưa ai ở vai trò này)",
+                                      role=vai_tro, department="", staff_code="", active=True,
+                                      ngoai_bien_che=False, company_id=None, password_hash="")
+    kq = TC.tra_cuu(db, mau)
+    return {"vai_tro": vai_tro, "vai_tro_ten": ROLES[vai_tro],
+            "so_nguoi": len(nguoi),
+            "nguoi": [{"id": x.id, "full_name": x.full_name, "staff_code": x.staff_code,
+                       "department": x.department} for x in nguoi],
+            "man_hinh": kq["man_hinh"], "api": kq["api"],
+            "dem": kq["dem"],
+            "canh_bao": (["Vai trò này chưa có ai – quyền đang mở cho một chỗ trống."] if not nguoi else [])
+                       + [c for c in kq["canh_bao"] if "Tài khoản đã khóa" not in c]}

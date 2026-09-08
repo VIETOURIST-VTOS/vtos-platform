@@ -495,9 +495,22 @@ def hr_tabs_for(db, u: User) -> list[str]:
     return ra
 
 
+# Màn hình KHÔNG được phép biến mất khỏi menu của bất kỳ ai, kể cả bốn vai trò dùng danh sách CHO PHÉP.
+# Phát hiện ngày 08/9/2026 khi làm P10: tài xế, HDV, chuyên viên visa và ba vai trò hẹp khác không có
+# lối vào /reports – tức là không có chỗ nộp BÁO CÁO CÔNG VIỆC HẰNG NGÀY mà Điều 12 bắt họ nộp. Hàng rào
+# API vẫn mở đúng nhóm /api/v1/daily-reports cho họ; chỉ menu là không có mục, nên họ nộp được nếu biết
+# gõ đường dẫn tay và không nộp được nếu không biết. Đó là siết đúng về nguyên tắc và sai về hậu quả.
+#
+# /payroll CỐ Ý không nằm ở đây: trang ấy hiện chỉ chuyển hướng sang /hr, mà /hr thì bốn vai trò này
+# không mở được – thêm vào menu là dẫn người ta tới một cửa đóng. Phiếu lương của chính mình phải có
+# lối vào riêng, và đó là việc của làn Viết phần mềm, không phải việc của phân quyền.
+MAN_HINH_KHONG_DUOC_AN = ("/", "/alerts", "/reports", "/doi-mat-khau")
+
+
 def menus_for(u: User, db=None) -> list[str]:
     ra = (list(RESTRICTED_ROLE_MENUS[u.role]) if u.role in RESTRICTED_ROLE_MENUS
           else [path for path, roles in MENU_ROLES.items() if u.role in roles])
+    ra += [p for p in MAN_HINH_KHONG_DUOC_AN if p not in ra]
     # Ngoại lệ cộng thêm cho CẢ vai trò bị giới hạn: nếu chỉ cộng ở một trong hai hàm thì danh sách hiện
     # và danh sách ẩn sẽ nói hai điều khác nhau về cùng một người.
     them = [g.value for g in _grants(db, u) if g.kind == "menu"]
@@ -506,7 +519,8 @@ def menus_for(u: User, db=None) -> list[str]:
 
 def hidden_menus_for(u: User, db=None) -> list[str]:
     if u.role in RESTRICTED_ROLE_MENUS:
-        cho_phep = set(RESTRICTED_ROLE_MENUS[u.role]) | {g.value for g in _grants(db, u) if g.kind == "menu"}
+        cho_phep = (set(RESTRICTED_ROLE_MENUS[u.role]) | set(MAN_HINH_KHONG_DUOC_AN)
+                    | {g.value for g in _grants(db, u) if g.kind == "menu"})
         return [p for p in ALL_MENU_PATHS if p not in cho_phep]
     mo = set(menus_for(u, db))
     return [path for path in MENU_ROLES if path not in mo]

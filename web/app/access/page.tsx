@@ -11,8 +11,19 @@ import { Tag, errMsg } from "@/components/ui";
  *  hay khóa, và pháp nhân chủ quản. */
 const TABS: [string, string][] = [
   ["accounts", "Tài khoản"], ["matrix", "Ma trận quyền"],
-  ["gaps", "Chênh lệch cần xử lý"], ["audit", "Nhật ký quyền"],
+  ["gaps", "Chênh lệch cần xử lý"], ["tracuu", "Tra cứu quyền"], ["audit", "Nhật ký quyền"],
 ];
+/* Vì sao có tab này (P10, 08/9/2026): quyền trong VTOS đến từ bốn nguồn không nguồn nào nhìn thấy ba
+   nguồn kia. Muốn biết một nhân viên vào được những đâu thì hôm nay phải đọc mã – mà đọc mã thì trong
+   kỳ rà quyền hằng tháng sẽ không ai đọc, và không rà thì quyền chỉ nở ra chứ không co lại.
+   Mỗi dòng dưới đây vì thế bắt buộc kèm cột "Vì sao": danh sách quyền không có lý do thì người rà chỉ
+   gật hoặc lắc được, không sửa được. */
+const NGUON_TEN: Record<string, string> = {
+  ma_tran_menu: "Ma trận quyền", danh_sach_hep_khai_tay: "Danh sách hẹp khai tay",
+  ngoai_le_theo_nguoi: "Ngoại lệ theo người", moi_nguoi: "Ai cũng có",
+  khong_duoc_an: "Không được ẩn", api_chung: "API chung", theo_man_hinh: "Theo màn hình",
+  khai_tay_con_lai: "Khai tay còn lại", vai_tro_nen: "Vai trò nền", khong_ro: "KHÔNG RÕ",
+};
 const GAP_TEN: Record<string, string> = {
   nhan_su_chua_co_tai_khoan: "Nhân sự đang làm việc chưa có tài khoản",
   tai_khoan_bo_quen: "Tài khoản hoạt động nhưng không có hồ sơ (hoặc hồ sơ đã nghỉ)",
@@ -41,6 +52,10 @@ function AccessPage() {
   const [q, setQ] = useState("");
   const [loc, setLoc] = useState("");          // bộ lọc nhanh
   const [grants, setGrants] = useState<any>(null);
+  const [tcUid, setTcUid] = useState<number | null>(null);
+  const [tc, setTc] = useState<any>(null);
+  const [tcVai, setTcVai] = useState("");
+  const [tcRole, setTcRole] = useState<any>(null);
 
   const loadAcc = useCallback(() => { api("/access/accounts").then(setAcc).catch((e) => toast(errMsg(e), true)); }, [toast]);
   const loadGaps = useCallback(() => { api("/access/gaps").then(setGaps).catch(() => {}); }, []);
@@ -49,6 +64,14 @@ function AccessPage() {
     if (tab === "matrix" && !mt) api("/access/matrix").then(setMt).catch((e) => toast(errMsg(e), true));
     if (tab === "audit") api("/access/audit").then(setLog).catch(() => {});
   }, [tab, mt, toast]);
+  useEffect(() => {
+    if (tcUid == null) { setTc(null); return; }
+    setTc(null); api(`/access/tra-cuu/${tcUid}`).then(setTc).catch((e) => toast(errMsg(e), true));
+  }, [tcUid, toast]);
+  useEffect(() => {
+    if (!tcVai) { setTcRole(null); return; }
+    setTcRole(null); api(`/access/tra-cuu-vai-tro/${tcVai}`).then(setTcRole).catch((e) => toast(errMsg(e), true));
+  }, [tcVai, toast]);
 
   const send = async (path: string, json: any, method = "POST") => {
     try {
@@ -149,8 +172,12 @@ function AccessPage() {
           <td>{r.last_login ? fmtDT(r.last_login) : <Tag cls="warn">chưa bao giờ</Tag>}</td>
           <td>{r.must_change_password ? <Tag cls="warn">tạm – phải đổi</Tag> : "đã đổi"}</td>
           <td>{r.ho_so || <Tag cls="warn">không có</Tag>}</td>
-          <td>{canWrite && <button className="act" style={{ margin: 0 }}
-            onClick={() => send(`/users/${r.id}`, { active: !r.active }, "PUT")}>{r.active ? "Khóa" : "Mở lại"}</button>}</td>
+          <td style={{ whiteSpace: "nowrap" }}>
+            <button className="act grey" style={{ margin: 0, marginRight: 4 }}
+              onClick={() => { setTcUid(r.id); setTab("tracuu"); }}>Xem quyền</button>
+            {canWrite && <button className="act" style={{ margin: 0 }}
+              onClick={() => send(`/users/${r.id}`, { active: !r.active }, "PUT")}>{r.active ? "Khóa" : "Mở lại"}</button>}
+          </td>
         </tr>)}</tbody></table></div>
 
       {grants?.rows?.length > 0 && <>
@@ -200,6 +227,86 @@ function AccessPage() {
             <span className="muted">gán ở thẻ Tài khoản</span>}</td>
         </tr>)}</tbody></table></div>
       </div>)}
+    </>}
+
+    {tab === "tracuu" && <>
+      <p className="muted">Chọn một người: hiện đủ ba lớp quyền – màn hình họ thấy, nhóm dữ liệu họ chạm được,
+        và năng lực cấp riêng. Cột <b>Vì sao</b> chỉ thẳng vào dòng cho phép, để người rà sửa được chứ không
+        chỉ gật hoặc lắc. Màn hình này chỉ ĐỌC, không cấp và không thu quyền của ai.</p>
+
+      <div className="row" style={{ gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+        <select value={tcUid ?? ""} onChange={(e) => { setTcUid(e.target.value ? Number(e.target.value) : null); setTcVai(""); }}
+          style={{ minWidth: 280 }}>
+          <option value="">— chọn một người —</option>
+          {(acc?.rows || []).filter((r: any) => r.active).map((r: any) =>
+            <option key={r.id} value={r.id}>{r.full_name} · {r.role_name}{r.staff_code ? ` · ${r.staff_code}` : ""}</option>)}
+        </select>
+        <span className="muted">hoặc theo vai trò:</span>
+        <select value={tcVai} onChange={(e) => { setTcVai(e.target.value); setTcUid(null); }} style={{ minWidth: 200 }}>
+          <option value="">— chọn một vai trò —</option>
+          {Object.entries(acc?.roles || {}).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+        </select>
+      </div>
+
+      {tc && <>
+        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
+          <h3 style={{ margin: 0 }}>{tc.tai_khoan.full_name}</h3>
+          <Tag cls="ok">{tc.tai_khoan.role_name}</Tag>
+          {!tc.tai_khoan.active && <Tag cls="warn">đã khóa</Tag>}
+          {tc.tai_khoan.ngoai_bien_che && <Tag cls="warn">ngoài biên chế</Tag>}
+          <span className="muted">{tc.tai_khoan.department || "—"} · {tc.tai_khoan.username}</span>
+        </div>
+        <p className="muted" style={{ marginTop: 4 }}>{tc.pham_vi_phap_nhan?.cau_hien_thi}</p>
+        {tc.canh_bao?.map((c: string, i: number) => <p key={i}><Tag cls="warn">Lưu ý</Tag> {c}</p>)}
+
+        <h4 style={{ marginTop: 16 }}>Màn hình thấy được ({tc.dem.man_hinh})</h4>
+        <div className="scroll"><table><thead><tr>
+          <th>Màn hình</th><th>Nguồn</th><th>Vì sao</th><th>Dòng cho phép</th></tr></thead>
+          <tbody>{tc.man_hinh.map((x: any) => <tr key={x.path}>
+            <td>{x.path}</td>
+            <td>{x.nguon === "khong_ro" ? <Tag cls="warn">{NGUON_TEN[x.nguon]}</Tag> : NGUON_TEN[x.nguon] || x.nguon}</td>
+            <td>{x.cau}</td>
+            <td className="muted" style={{ fontFamily: "monospace", fontSize: 12 }}>{x.dong || "—"}</td>
+          </tr>)}</tbody></table></div>
+
+        <h4 style={{ marginTop: 16 }}>Nhóm dữ liệu chạm được ({tc.dem.api})</h4>
+        <div className="scroll"><table><thead><tr>
+          <th>Nhóm</th><th>Nguồn</th><th>Vì sao</th></tr></thead>
+          <tbody>{tc.api.map((x: any) => <tr key={x.nhom}>
+            <td style={{ fontFamily: "monospace", fontSize: 12 }}>{x.nhom}</td>
+            <td>{["khong_ro", "khai_tay_con_lai"].includes(x.nguon)
+              ? <Tag cls="warn">{NGUON_TEN[x.nguon]}</Tag> : NGUON_TEN[x.nguon] || x.nguon}</td>
+            <td>{x.cau}</td>
+          </tr>)}</tbody></table></div>
+
+        <h4 style={{ marginTop: 16 }}>Năng lực cấp riêng ({tc.dem.nang_luc})</h4>
+        {tc.nang_luc.length === 0 ? <p className="muted">Không có năng lực nào cấp lẻ cho người này.</p> :
+          <div className="scroll"><table><thead><tr>
+            <th>Năng lực</th><th>Nguồn</th><th>Vì sao</th></tr></thead>
+            <tbody>{tc.nang_luc.map((x: any) => <tr key={x.ma}>
+              <td>{x.ten}</td><td>{NGUON_TEN[x.nguon] || x.nguon}</td><td>{x.cau}</td>
+            </tr>)}</tbody></table></div>}
+
+        {tc.man_hinh_bi_an?.length > 0 && <>
+          <h4 style={{ marginTop: 16 }}>Màn hình KHÔNG thấy ({tc.man_hinh_bi_an.length})</h4>
+          <p className="muted" style={{ fontFamily: "monospace", fontSize: 12 }}>{tc.man_hinh_bi_an.join(" · ")}</p>
+        </>}
+      </>}
+
+      {tcRole && <>
+        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
+          <h3 style={{ margin: 0 }}>{tcRole.vai_tro_ten}</h3>
+          <Tag cls={tcRole.so_nguoi ? "ok" : "warn"}>{tcRole.so_nguoi} người</Tag>
+        </div>
+        <p className="muted">Siết hay nới vai trò này là siết hay nới đúng {tcRole.so_nguoi} người:{" "}
+          {tcRole.nguoi.map((x: any) => x.full_name).join(" · ") || "chưa có ai"}</p>
+        {tcRole.canh_bao?.map((c: string, i: number) => <p key={i}><Tag cls="warn">Lưu ý</Tag> {c}</p>)}
+        <h4 style={{ marginTop: 12 }}>Màn hình ({tcRole.dem.man_hinh}) · Nhóm dữ liệu ({tcRole.dem.api})</h4>
+        <div className="scroll"><table><thead><tr>
+          <th>Màn hình</th><th>Vì sao</th></tr></thead>
+          <tbody>{tcRole.man_hinh.map((x: any) => <tr key={x.path}>
+            <td>{x.path}</td><td>{x.cau}</td></tr>)}</tbody></table></div>
+      </>}
     </>}
 
     {tab === "audit" && log && <>
