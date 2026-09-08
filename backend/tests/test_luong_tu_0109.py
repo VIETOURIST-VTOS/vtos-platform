@@ -143,8 +143,12 @@ def test_vt06_hoa_hong_qua_han_la_treo_va_hien_trong_bao_cao():
 
 
 def test_khoan_treo_nguoi_lao_dong_chi_thay_phan_cua_minh():
-    r = client.get("/api/v1/payroll/khoan-treo", headers=login("kd.hoa"))
-    assert r.status_code == 200
+    # Đổi đường dẫn 08/9/2026: bản cũ gọi /api/v1/payroll/khoan-treo và ĐANG ĐỎ – tiền tố
+    # /api/v1/payroll chỉ khai sau màn hình /hr, mà nhân viên kinh doanh không có /hr, nên hàng rào
+    # phạm vi ngoài chặn ở 403 dù thân hàm đã tự lọc đúng phần của họ. Nay khoản treo cá nhân có đường
+    # dẫn riêng dưới tiền tố /api/v1/phieu-luong, mở cho mọi vai trò và chỉ chứa việc của chính mình.
+    r = client.get("/api/v1/phieu-luong/khoan-treo", headers=login("kd.hoa"))
+    assert r.status_code == 200, r.text
     kq = r.json()
     assert kq.get("chi_cua_toi") is True
     ma = {x["ma"] for x in kq["rows"]}

@@ -191,7 +191,7 @@ API_CHUNG = ("/api/v1/auth", "/api/v1/health", "/api/v1/meta", "/api/v1/alerts",
              "/api/v1/pham-vi")
 # Màn hình ai đăng nhập cũng có (giống danh sách phụ trong ALL_MENU_PATHS): trang chủ, đổi mật khẩu,
 # cảnh báo, báo cáo công việc. Bảng lương cá nhân đi qua /payroll và tự lọc về đúng người.
-MAN_HINH_MOI_NGUOI = ("/", "/doi-mat-khau", "/alerts", "/reports", "/payroll")
+MAN_HINH_MOI_NGUOI = ("/", "/doi-mat-khau", "/alerts", "/reports", "/payroll", "/phieu-luong")
 
 # Màn hình → nhóm API nó gọi. Đo từ mã giao diện ngày 08/9/2026.
 MAN_HINH_API = {
@@ -248,6 +248,12 @@ MAN_HINH_API = {
     "/params": ("/api/v1/params",),
     "/products": ("/api/v1/products",),
     "/reports": ("/api/v1/daily-reports", "/api/v1/page-shifts", "/api/v1/employees"),
+    # Phiếu lương CỦA CHÍNH MÌNH – tiền tố riêng, chỉ chứa endpoint tự lọc về đúng người.
+    # KHÔNG khai /api/v1/payroll-runs hay /api/v1/payroll ở đây: hai tiền tố đó chứa cả bảng lương TOÀN
+    # CÔNG TY, mà hàng rào phạm vi ngoài chỉ phân biệt tới mức tiền tố – mở chúng cho mọi vai trò để
+    # tài xế xem được phiếu của mình là hạ hàng rào ngoài của cả bảng lương công ty, chỉ còn hàng rào
+    # trong đỡ.
+    "/phieu-luong": ("/api/v1/phieu-luong",),
     "/requests": ("/api/v1/requests", "/api/v1/bookings", "/api/v1/tours", "/api/v1/meta",
                   "/api/v1/mang"),
     "/robot-reports": ("/api/v1/auto-reports",),
@@ -448,7 +454,7 @@ MATRIX = {
 }
 
 # Mọi trang có trong giao diện – kể cả trang không đặt điều kiện vai trò – để dựng danh sách ẩn cho vai trò bị giới hạn.
-ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/doi-mat-khau")
+ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/phieu-luong", "/doi-mat-khau")
 
 
 # Vai trò bị giới hạn: chỉ được thấy đúng những trang liệt kê ở đây.
@@ -496,15 +502,18 @@ def hr_tabs_for(db, u: User) -> list[str]:
 
 
 # Màn hình KHÔNG được phép biến mất khỏi menu của bất kỳ ai, kể cả bốn vai trò dùng danh sách CHO PHÉP.
-# Phát hiện ngày 08/9/2026 khi làm P10: tài xế, HDV, chuyên viên visa và ba vai trò hẹp khác không có
-# lối vào /reports – tức là không có chỗ nộp BÁO CÁO CÔNG VIỆC HẰNG NGÀY mà Điều 12 bắt họ nộp. Hàng rào
-# API vẫn mở đúng nhóm /api/v1/daily-reports cho họ; chỉ menu là không có mục, nên họ nộp được nếu biết
-# gõ đường dẫn tay và không nộp được nếu không biết. Đó là siết đúng về nguyên tắc và sai về hậu quả.
+# Danh sách này phải NGẮN, và mỗi dòng phải là việc mà một con người có tài khoản buộc phải tự làm được:
+#   /doi-mat-khau  – mật khẩu tạm do HCNS đặt; không có lối đổi là bị khóa ngoài hệ thống.
+#   /phieu-luong   – phiếu lương của chính mình; tài xế và HDV đều nằm trong bảng lương.
 #
-# /payroll CỐ Ý không nằm ở đây: trang ấy hiện chỉ chuyển hướng sang /hr, mà /hr thì bốn vai trò này
-# không mở được – thêm vào menu là dẫn người ta tới một cửa đóng. Phiếu lương của chính mình phải có
-# lối vào riêng, và đó là việc của làn Viết phần mềm, không phải việc của phân quyền.
-MAN_HINH_KHONG_DUOC_AN = ("/", "/alerts", "/reports", "/doi-mat-khau")
+# ĐÍNH CHÍNH 08/9/2026. Bản trước của danh sách này có thêm "/", "/alerts" và "/reports", với lý do rằng
+# tài xế, HDV và chuyên viên visa không có chỗ nộp báo cáo công việc hằng ngày. Lý do ấy SAI: bộ mẫu
+# báo cáo ngày (ops.DEPT_FORMS) chỉ có bảy phòng văn phòng – kd_le, kd_doan, dieu_hanh, marketing,
+# ketoan, hcns, cntt – không có đội xe, hướng dẫn hay visa. Ba vai trò đó KHÔNG phải nộp báo cáo ngày,
+# nên ẩn /reports khỏi menu của họ là đúng, và ba phép thử vai trò nói vậy là ba phép thử đúng.
+# Bài học ghi lại ở đây vì nó sẽ lặp: thấy một phép thử chặn điều mình cho là quyền lợi, phải đi tìm
+# quyết định đằng sau nó trước, chứ không sửa phép thử cho khớp với suy đoán của mình.
+MAN_HINH_KHONG_DUOC_AN = ("/doi-mat-khau", "/phieu-luong")
 
 
 def menus_for(u: User, db=None) -> list[str]:
