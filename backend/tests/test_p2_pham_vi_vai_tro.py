@@ -128,10 +128,15 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 #   4. +1 THÊM CHO BỐN VAI TRÒ KINH DOANH nv_kd, tn_kd, tp_kd, gd_kd – "/api/v1/visa": sales phụ trách
 #      mở được hồ sơ visa của KHÁCH MÌNH. Đây là một lần nới thật, do phiên Phân quyền quyết và có
 #      phép thử riêng canh phạm vi (test_visa_sales_phu_trach). Ghi ra đây để nó không trôi qua im lặng.
+#
+#   5. V6 – chuỗi bán hàng "/api/v1/ban-hang": +1 cho ĐÚNG 14 vai trò được khai ba màn hình mới
+#      (bảng giá, báo giá, hợp đồng khách). Sáu vai trò KHÔNG liên quan tới bán hàng – hcns, xe_hdv,
+#      gd_doi_xe, tp_hd, nv_visa, hanh_chinh – giữ nguyên con số cũ. Một tiền tố cho cả ba màn hình
+#      chứ không ba tiền tố: ba tiền tố là ba dòng phải khai và ba chỗ để quên một dòng.
 PHAM_VI_DA_CHOT = {
-    "chutich": 97, "tgd": 97, "bks": 97, "cntt": 95,
-    "ketoan": 80, "tp_dh": 77, "ptgd_doan": 57, "nv_dh": 53, "hcns": 52, "gd_kd": 51,
-    "nv_kd": 39, "tn_kd": 39, "tp_kd": 39, "ptgd_mkt": 38, "nv_mkt": 30,
+    "chutich": 98, "tgd": 98, "bks": 98, "cntt": 96,
+    "ketoan": 81, "tp_dh": 78, "ptgd_doan": 58, "nv_dh": 54, "hcns": 52, "gd_kd": 52,
+    "nv_kd": 40, "tn_kd": 40, "tp_kd": 40, "ptgd_mkt": 39, "nv_mkt": 31,
     "gd_doi_xe": 24, "hanh_chinh": 24, "tp_hd": 22, "xe_hdv": 17, "nv_visa": 17,
 }
 

@@ -27,11 +27,13 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Khách hàng & cơ hội bán", "/leads?tab=leads"], ["Sản phẩm", "/products"],
     ["Tour lẻ", "/tours?mang=le"], ["Yêu cầu & booking", "/requests?mang=le"],
     ["Booking & bảo lưu", "/bookings?mang=le"], ["Dịch vụ lẻ", "/non-package"],
-    ["Giá & chính sách bán", ""], ["Báo giá", ""], ["Báo cáo bán hàng", "/sales-reports?mang=le"]] },
+    ["Giá & chính sách bán", "/bang-gia"], ["Báo giá", "/bao-gia?mang=kd_le"],
+    ["Báo cáo bán hàng", "/sales-reports?mang=le"]] },
   { key: "kd_doan", label: "4. Kinh doanh Đoàn (MICE)", items: [
     ["Tour đoàn", "/tours?mang=doan"], ["Yêu cầu & booking", "/requests?mang=doan"],
     ["Booking & bảo lưu", "/bookings?mang=doan"],
-    ["Báo giá đoàn", ""], ["Hợp đồng", ""], ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
+    ["Báo giá đoàn", "/bao-gia?mang=kd_doan"], ["Hợp đồng", "/hop-dong-khach"],
+    ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
   { key: "dieuhanh", label: "5. Điều hành", items: [
     ["Yêu cầu chờ xử lý", "/requests"], ["Chuyến tour & dự toán", "/tours"], ["Nhà cung cấp & đặt dịch vụ", "/nha-cung-cap"],
     ["Hồ sơ visa", "/visa"],

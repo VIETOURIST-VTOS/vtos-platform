@@ -234,6 +234,9 @@ MAN_HINH_API = {
     # Bàn quyết cột tiền K1/K2 – phạm vi API HẸP: chỉ nhánh /cot-tien và /the (để giao diện biết vẽ
     # thẻ nào). KHÔNG gồm kết quả quét, chấm điểm phòng ban hay hậu kiểm số nhập tay.
     "/ra-soat-cot-tien": ("/api/v1/ra-soat-cot-tien",),
+    "/bang-gia": ("/api/v1/ban-hang",),
+    "/bao-gia": ("/api/v1/ban-hang",),
+    "/hop-dong-khach": ("/api/v1/ban-hang",),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
@@ -449,6 +452,14 @@ MENU_ROLES = {
     # bảng chấm điểm, nhưng vẫn phải có bàn của mình.
     "/kiem-soat": BASE_VIEW + ("cntt",),
     "/ra-soat-cot-tien": BASE_VIEW + ("ketoan", "cntt"),
+    # V6 – chuỗi bán hàng. Bảng giá là CHÍNH SÁCH nên hẹp hơn báo giá: từng sale soạn báo giá
+    # được, nhưng đặt giá niêm yết thì không.
+    "/bang-gia": BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt", "ketoan", "cntt"),
+    "/bao-gia": BASE_VIEW + ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "ptgd_mkt", "nv_mkt",
+                             "tp_dh", "nv_dh", "ptgd_doan", "ketoan", "cntt"),
+    # Hợp đồng là căn cứ ghi nhận doanh thu nên Kế toán phải xem được.
+    "/hop-dong-khach": BASE_VIEW + ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "ptgd_mkt",
+                                    "ketoan", "cntt"),
     # Bảng quy ước hạch toán + cổng chặn giá vốn. Điều hành (tp_dh) xem được vì hàng đợi thiếu giá vốn
     # đứng tên phòng họ – bắt một phòng trả lời mà không cho họ nhìn thấy việc là cách chắc chắn để không ai trả lời.
     # Kết sổ một kỳ: sao kê vào sổ hàng loạt, kết chuyển, và trạng thái cả kỳ. Chỉ Kế toán GHI –

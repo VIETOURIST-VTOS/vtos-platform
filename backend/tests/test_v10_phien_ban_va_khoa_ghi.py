@@ -259,8 +259,9 @@ def test_ket_qua_nho_lai_du_de_man_hinh_ve_duoc():
 
 # ====================== 4. NÓI THẲNG PHẦN CÒN NỢ ======================
 def test_ghi_ro_moi_noi_duoc_MOT_duong_sua_va_con_muoi_mot_bang_chua_noi():
-    """V10 đặt xong cột và cơ chế, nhưng mới nối vào đường sửa dự toán tour. Con số này ở đây để lần
-    sau nối thêm là thấy nó đổi – chứ không phải để ai đó đọc mã rồi tưởng cả 12 bảng đã được canh."""
+    """V10 đặt xong cột và cơ chế, nhưng mới nối vào HAI đường sửa: dự toán tour (V10) và báo giá
+    (V6 – bảng bao_gia sinh ra đã mang cột phiên bản). Con số này ở đây để lần sau nối thêm là thấy
+    nó đổi – chứ không phải để ai đó đọc mã rồi tưởng mọi bảng đã được canh."""
     import pathlib, re
     goc = pathlib.Path(__file__).resolve().parents[1] / "app"
     noi = set()
@@ -268,6 +269,6 @@ def test_ghi_ro_moi_noi_duoc_MOT_duong_sua_va_con_muoi_mot_bang_chua_noi():
         if re.search(r"GML\.kiem_phien_ban|kiem_phien_ban\(", f.read_text(encoding="utf-8")) \
                 and "ghi_mot_lan" not in f.name:
             noi.add(f.name)
-    assert noi == {"tours.py"}, (
+    assert noi == {"tours.py", "ban_hang.py"}, (
         f"số đường sửa có kiểm phiên bản đã đổi: {sorted(noi)}. Nếu đúng ý thì sửa phép thử này và "
         "ghi vì sao trong thông điệp ghi mã – đừng để nó tự trôi.")

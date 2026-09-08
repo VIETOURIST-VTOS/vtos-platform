@@ -14,6 +14,7 @@ from app.models.visa import *  # noqa
 from app.models.suppliers import *  # noqa
 from app.models.intake import *  # noqa
 from app.models.ghi_mot_lan import *  # noqa
+from app.models.ban_hang import *  # noqa
 from app.models.attachments import *  # noqa
 from app.models.marketing import *  # noqa
 from app.models.cskh import *  # noqa
