@@ -120,11 +120,19 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 #      xem màn hình Kiểm soát. Nên 78 → 79 là một lần bớt và hai lần thêm, không phải một lần nới.
 #
 # Nếu lần sau bảng này đỏ mà không giải thích được từng vai trò như trên thì đó là một lần nới nhầm.
+#
+# Đo lại lần nữa sau khi gộp main (bản đính chính P6 và hai màn hình của phiên Phân quyền). Hai lý do:
+#
+#   3. +1 CHO CẢ HAI MƯƠI VAI TRÒ – "/api/v1/phieu-luong": phiếu lương CÁ NHÂN, ai cũng xem của mình.
+#      Mở cho mọi vai trò là đúng ý nghĩa màn hình, không phải một lần nới.
+#   4. +1 THÊM CHO BỐN VAI TRÒ KINH DOANH nv_kd, tn_kd, tp_kd, gd_kd – "/api/v1/visa": sales phụ trách
+#      mở được hồ sơ visa của KHÁCH MÌNH. Đây là một lần nới thật, do phiên Phân quyền quyết và có
+#      phép thử riêng canh phạm vi (test_visa_sales_phu_trach). Ghi ra đây để nó không trôi qua im lặng.
 PHAM_VI_DA_CHOT = {
-    "chutich": 96, "tgd": 96, "bks": 96, "cntt": 94,
-    "ketoan": 79, "tp_dh": 76, "ptgd_doan": 56, "nv_dh": 52, "hcns": 51, "gd_kd": 49,
-    "ptgd_mkt": 37, "nv_kd": 37, "tn_kd": 37, "tp_kd": 37, "nv_mkt": 29,
-    "gd_doi_xe": 23, "hanh_chinh": 23, "tp_hd": 21, "xe_hdv": 16, "nv_visa": 16,
+    "chutich": 97, "tgd": 97, "bks": 97, "cntt": 95,
+    "ketoan": 80, "tp_dh": 77, "ptgd_doan": 57, "nv_dh": 53, "hcns": 52, "gd_kd": 51,
+    "nv_kd": 39, "tn_kd": 39, "tp_kd": 39, "ptgd_mkt": 38, "nv_mkt": 30,
+    "gd_doi_xe": 24, "hanh_chinh": 24, "tp_hd": 22, "xe_hdv": 17, "nv_visa": 17,
 }
 
 
