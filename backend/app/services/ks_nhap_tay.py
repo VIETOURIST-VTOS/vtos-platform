@@ -32,8 +32,11 @@ NGUON = (
      "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": ""},
     {"ma": "thu", "ten": "Phiếu thu", "bang": "receipts", "tien": "amount",
      "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": "Kế toán"},
+    # `may_sinh`: cột nói dòng này do MÁY sinh hay do NGƯỜI gõ. Sổ bút toán là sổ duy nhất có cột đó,
+    # và nó là thứ phân biệt duy nhất đáng tin – xem ghi chú ở _chi_nguoi_go.
     {"ma": "but_toan", "ten": "Bút toán", "bang": "journal_entries", "tien": "",
-     "nguoi": "created_by", "luc": "created_at", "ngay": "entry_date", "phong": "Kế toán"},
+     "nguoi": "created_by", "luc": "created_at", "ngay": "entry_date", "phong": "Kế toán",
+     "may_sinh": "source_type"},
     {"ma": "chi_phi_chuyen", "ten": "Chi phí chuyến xe", "bang": "fleet_trip_costs", "tien": "amount",
      "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": "Đội xe"},
     {"ma": "bao_duong", "ten": "Bảo dưỡng xe", "bang": "fleet_maintenance", "tien": "so_tien",
@@ -44,6 +47,36 @@ NGUON = (
 # Tài khoản máy: robot nạp dữ liệu và các bộ đồng bộ. Không phải "người nhập", nên loại khỏi hậu kiểm –
 # để lại thì mọi dấu hiệu đều chỉ vào chúng và phần của con người chìm nghỉm.
 BO_QUA_NGUOI = ("robot", "", "system", "vietrip", "sepay", "dieuhanhvietrip")
+
+
+# Giá trị của cột `source_type` nghĩa là "người gõ tay". Mọi giá trị khác (misa, robot, ket_chuyen,
+# khau_hao, phan_bo, dao, quy_tac, kiem_toan…) là máy sinh ra.
+NGUOI_GO = "thu_cong"
+
+
+def _chi_nguoi_go(t, ng: dict):
+    """Điều kiện SQL giữ lại đúng những dòng do NGƯỜI gõ. Trả None nếu nguồn không có cột phân biệt.
+
+    Vì sao không lọc bằng tên tài khoản: bản đầu tiên chỉ có BO_QUA_NGUOI, một danh sách tên. Đo trên
+    máy chủ thật ngày 08/9/2026 thì tháng 9 có 25.728 "dòng nhập tay" – trong khi số người thật gõ vào
+    sổ bút toán tháng đó đếm trên đầu ngón tay. Toàn bộ phần còn lại là bản nạp MISA, chạy dưới tên
+    `misa`, một cái tên không có trong danh sách.
+
+    Danh sách tên luôn thiếu, vì mỗi lần nối thêm một hệ thống là thêm một cái tên phải nhớ bổ sung –
+    và không ai nhớ. Cột `source_type` thì ngược lại: nó do CHÍNH chỗ ghi sổ đặt, nên một nguồn máy mới
+    tự khai mình là máy mà không cần ai sửa tệp này.
+
+    Hậu quả của việc lọc sai không phải là báo thừa vài dòng. Hai mươi lăm nghìn dòng máy nạp đội lốt
+    số nhập tay thì mọi ngưỡng hiệu chỉnh trên đó đều hiệu chỉnh cho một hệ thống không tồn tại, và
+    người đọc bảng ngoại lệ chỉ thấy tên `misa` lặp lại – đọc vài lần rồi thôi đọc. Bộ kiểm soát chết
+    vì bị phớt lờ, không phải vì hỏng.
+
+    Dòng để trống cột này thì VẪN ĐEM RA HẬU KIỂM. Trong một bộ kiểm soát, im lặng phải do có bằng
+    chứng là máy sinh, chứ không do thiếu dữ liệu.
+    """
+    cot = ng.get("may_sinh")
+    if not cot or cot not in t.c: return None
+    return func.coalesce(t.c[cot], NGUOI_GO) == NGUOI_GO
 
 
 def _bang(ten: str):
@@ -72,10 +105,11 @@ def _doc(db: Session, ng: dict, tu: datetime, den: datetime, kho: dict | None = 
     cols.append((t.c[ng["ngay"]] if ng["ngay"] and ng["ngay"] in t.c else t.c[ng["luc"]]).label("ngay"))
     # Lọc tài khoản máy NGAY TRONG SQL, không đọc về rồi bỏ: trên hệ thống thật phần lớn dòng là do
     # robot nạp, đọc hết về Python rồi vứt đi là trả giá cho đúng phần không dùng.
-    q = (select(*cols)
-         .where(t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den,
-                func.lower(func.coalesce(t.c[ng["nguoi"]], "")).notin_(BO_QUA_NGUOI))
-         .limit(TRAN_DONG + 1))
+    dk = [t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den,
+          func.lower(func.coalesce(t.c[ng["nguoi"]], "")).notin_(BO_QUA_NGUOI)]
+    loc_may = _chi_nguoi_go(t, ng)
+    if loc_may is not None: dk.append(loc_may)
+    q = select(*cols).where(*dk).limit(TRAN_DONG + 1)
     ra = [{"id": r.id, "nguoi": r.nguoi, "luc": r.luc, "tien": float(r.tien or 0), "ngay": r.ngay}
           for r in db.execute(q).all()]
     if kho is not None: kho[(ng["ma"], tu, den)] = ra
@@ -86,10 +120,11 @@ def _tong_tien(db: Session, ng: dict, tu: datetime, den: datetime) -> float:
     """Tổng tiền của một nguồn trong khoảng – cộng bằng SQL, không nạp dòng nào về bộ nhớ."""
     t = _bang(ng["bang"])
     if t is None or not ng["tien"] or ng["tien"] not in t.c or ng["luc"] not in t.c: return 0.0
-    q = (select(func.coalesce(func.sum(t.c[ng["tien"]]), 0.0))
-         .where(t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den,
-                func.lower(func.coalesce(t.c[ng["nguoi"]], "")).notin_(BO_QUA_NGUOI)))
-    return float(db.execute(q).scalar() or 0)
+    dk = [t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den,
+          func.lower(func.coalesce(t.c[ng["nguoi"]], "")).notin_(BO_QUA_NGUOI)]
+    loc_may = _chi_nguoi_go(t, ng)
+    if loc_may is not None: dk.append(loc_may)
+    return float(db.execute(select(func.coalesce(func.sum(t.c[ng["tien"]]), 0.0)).where(*dk)).scalar() or 0)
 
 
 def thong_ke_nguoi(db: Session, ng: dict, tu: datetime, den: datetime, toi_da: int = 12) -> list[dict]:
@@ -111,9 +146,10 @@ def thong_ke_nguoi(db: Session, ng: dict, tu: datetime, den: datetime, toi_da: i
     cot = [n.label("nguoi"), func.count().label("so_dong"),
            func.min(l).label("dau"), func.max(l).label("cuoi")]
     if tien is not None: cot.append(func.coalesce(func.sum(tien), 0).label("tong"))
-    q = (select(*cot)
-         .where(l >= tu, l < den, func.lower(func.coalesce(n, "")).notin_(BO_QUA_NGUOI))
-         .group_by(n).order_by(func.count().desc()).limit(toi_da))
+    dk = [l >= tu, l < den, func.lower(func.coalesce(n, "")).notin_(BO_QUA_NGUOI)]
+    loc_may = _chi_nguoi_go(t, ng)
+    if loc_may is not None: dk.append(loc_may)
+    q = select(*cot).where(*dk).group_by(n).order_by(func.count().desc()).limit(toi_da)
     ra = []
     for r in db.execute(q).all():
         dau, cuoi = r.dau, r.cuoi

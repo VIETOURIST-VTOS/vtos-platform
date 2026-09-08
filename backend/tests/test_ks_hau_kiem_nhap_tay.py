@@ -344,3 +344,72 @@ def test_kn13_thong_ke_nguoi_phan_biet_may_do_vao_va_nguoi_go():
         assert x["so_dong"] >= 1 and "nhanh_nhat" in x and "cham_nhat" in x
         assert x["trai_dai_phut"] is None or x["trai_dai_phut"] >= 0
     db.close()
+
+
+def test_kn14_ban_nap_may_khong_bi_dem_ra_hau_kiem_nhap_tay():
+    """Chốt chặn cho đúng chuyện đã đo trên máy chủ thật ngày 08/9/2026.
+
+    Sổ bút toán tháng đó có 25.728 dòng bị bộ hậu kiểm coi là số nhân viên nhập tay. Số người thật gõ
+    vào sổ đếm trên đầu ngón tay; phần còn lại là bản nạp MISA chạy dưới tên `misa` – một cái tên không
+    có trong danh sách BO_QUA_NGUOI, nên lọt qua toàn bộ.
+
+    Hậu quả không phải là báo thừa vài dòng: ngưỡng hiệu chỉnh trên 25.728 dòng máy nạp là ngưỡng cho
+    một hệ thống không tồn tại, và bảng ngoại lệ chỉ toàn tên `misa` thì người ta đọc vài lần rồi thôi.
+    Nên phép thử này đòi bộ hậu kiểm phân biệt bằng CỘT NGUỒN, không bằng danh sách tên.
+    """
+    from app.services import ks_nhap_tay as NT
+    from app.services import accounting as ACC
+    from app.db.session import SessionLocal
+    from app.models.accounting import JournalEntry
+    from sqlalchemy import select as sel
+
+    db = SessionLocal()
+    a, b = NT._khoang_thang(THANG)
+    ng = [x for x in NT.NGUON if x["ma"] == "but_toan"][0]
+    truoc = len(NT._doc(db, ng, a, b))
+
+    # hai tài khoản tiền: không vướng quy tắc "phải ghi mã đối tượng", nên phép thử đo đúng thứ nó
+    # định đo thay vì đo lại quy tắc hạch toán
+    ln = [{"account": "111", "debit": 5_000_000, "credit": 0},
+          {"account": "112", "debit": 0, "credit": 5_000_000}]
+    # Cùng một người, cùng một ngày: khác nhau ĐÚNG ở cột nguồn – nên nếu bộ hậu kiểm phân biệt được
+    # thì chỉ có thể là nhờ cột đó.
+    tay = ACC.post_entry(db, "ketoan1", "ketoan", date.today(), "Người gõ tay", ln, "thu_cong", "")
+    may = ACC.post_entry(db, "ketoan1", "ketoan", date.today(), "Bản nạp MISA", ln, "misa", "misa:test")
+    db.commit()
+
+    sau = NT._doc(db, ng, a, b)
+    assert len(sau) == truoc + 1, "chỉ dòng người gõ được thêm vào hậu kiểm, dòng máy nạp thì không"
+    ids = {x["id"] for x in sau}
+    assert tay.id in ids, "dòng do người gõ phải nằm trong hậu kiểm"
+    assert may.id not in ids, "dòng do máy nạp (source_type='misa') không được coi là số nhập tay"
+
+    # thống kê người nhập cũng phải cùng một cách nhìn, nếu không thì hai bảng nói hai con số khác nhau
+    tk = {x["nguoi"]: x["so_dong"] for x in NT.thong_ke_nguoi(db, ng, a, b)}
+    assert tk.get("ketoan1", 0) == 1, f"thống kê người nhập phải đếm đúng một dòng, đang đếm {tk.get('ketoan1')}"
+
+    for e in (tay, may): db.delete(e)
+    db.commit(); db.close()
+
+
+def test_kn15_dong_thieu_cot_nguon_van_bi_dem_ra_hau_kiem():
+    """Để trống cột nguồn thì VẪN hậu kiểm. Trong một bộ kiểm soát, im lặng phải do có bằng chứng đây là
+    máy sinh, chứ không do thiếu dữ liệu – nếu không, cách dễ nhất để né hậu kiểm là bỏ trống một cột.
+    """
+    from app.services import ks_nhap_tay as NT
+    from app.db.session import SessionLocal
+    from app.models.accounting import JournalEntry
+    db = SessionLocal()
+    ng = [x for x in NT.NGUON if x["ma"] == "but_toan"][0]
+    t = NT._bang(ng["bang"])
+    dk = NT._chi_nguoi_go(t, ng)
+    assert dk is not None, "sổ bút toán phải có cột phân biệt máy sinh / người gõ"
+    # cột để trống → coalesce về "thu_cong" → điều kiện đúng → dòng vẫn được đem ra hậu kiểm
+    from sqlalchemy import select as sel, literal
+    assert db.execute(sel(literal(1)).where(
+        NT.func.coalesce(None, NT.NGUOI_GO) == NT.NGUOI_GO)).scalar() == 1
+    # nguồn không có cột đó thì không lọc gì cả, thay vì lọc sạch
+    khac = [x for x in NT.NGUON if x["ma"] == "thu"][0]
+    assert NT._chi_nguoi_go(NT._bang(khac["bang"]), khac) is None, \
+        "nguồn không có cột nguồn thì phải giữ nguyên mọi dòng, không được lọc rỗng"
+    db.close()
