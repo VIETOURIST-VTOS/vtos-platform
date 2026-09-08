@@ -19,6 +19,7 @@ from datetime import date, datetime
 from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 LOAI_NCC = {"khach_san": "Khách sạn / lưu trú", "nha_hang": "Nhà hàng", "van_chuyen": "Vận chuyển",
             "ve_tham_quan": "Vé tham quan", "hdv": "Hướng dẫn viên", "hang_khong": "Hàng không",
@@ -86,8 +87,8 @@ class ServiceOrder(Base):
     ngay_su_dung: Mapped[date | None] = mapped_column(Date, nullable=True)
     so_luong: Mapped[float] = mapped_column(Float, default=1)
     don_vi: Mapped[str] = mapped_column(String(30), default="")
-    don_gia: Mapped[float] = mapped_column(Float, default=0)
-    thanh_tien: Mapped[float] = mapped_column(Float, default=0)
+    don_gia: Mapped[float] = mapped_column(TIEN, default=0)
+    thanh_tien: Mapped[float] = mapped_column(TIEN, default=0)
     status: Mapped[str] = mapped_column(String(20), default="nhap")
     xac_nhan_ncc: Mapped[str] = mapped_column(String(200), default="")   # số/ảnh xác nhận của NCC
     payment_request_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

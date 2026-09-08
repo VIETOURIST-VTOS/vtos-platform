@@ -3,6 +3,7 @@ from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 DEPARTMENTS = {"kd_le": "Kinh doanh Lẻ", "kd_doan": "Kinh doanh Đoàn", "dieu_hanh": "Điều hành", "visa": "Ban Visa", "marketing": "Marketing",
                "cntt": "CNTT", "ketoan": "Kế toán", "hcns": "HCNS", "huong_dan": "Hướng dẫn", "doi_xe": "Đội xe", "ban_tgd": "Ban TGĐ"}
@@ -124,8 +125,8 @@ class VehicleRate(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     route: Mapped[str] = mapped_column(String(80))
     days: Mapped[int] = mapped_column(Integer, default=0)
-    internal_price: Mapped[float] = mapped_column(Float, default=0)          # xe nội bộ Vietrip – VTD
-    partner_price: Mapped[float] = mapped_column(Float, default=0)           # xe hợp tác hỗ trợ (0 = không áp dụng)
+    internal_price: Mapped[float] = mapped_column(TIEN, default=0)          # xe nội bộ Vietrip – VTD
+    partner_price: Mapped[float] = mapped_column(TIEN, default=0)           # xe hợp tác hỗ trợ (0 = không áp dụng)
     effective_from: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(20), default="pending")       # pending / active / rejected
     signed_chutich: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -162,7 +163,7 @@ class DispatchOrder(Base):
     date_from: Mapped[date] = mapped_column(Date)
     date_to: Mapped[date] = mapped_column(Date)
     rate_id: Mapped[int | None] = mapped_column(ForeignKey("vehicle_rates.id"), nullable=True)   # tuyến trong bảng giá
-    internal_price: Mapped[float] = mapped_column(Float, default=0)         # giá thuê nội bộ cả chuyến
+    internal_price: Mapped[float] = mapped_column(TIEN, default=0)         # giá thuê nội bộ cả chuyến
     created_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

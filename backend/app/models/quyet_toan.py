@@ -23,6 +23,7 @@ from datetime import date, datetime
 from sqlalchemy import String, Integer, Float, Date, DateTime, Text, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 LOAI_DON = {"tour": "Tour đoàn / tour ghép", "khach_le": "Khách lẻ do sale tự xử lý"}
 
@@ -57,9 +58,9 @@ class TourSettlement(Base):
     sale: Mapped[str] = mapped_column(String(120), default="")
     ngay_kh: Mapped[date | None] = mapped_column(Date, nullable=True)
     ngay_kt: Mapped[date | None] = mapped_column(Date, nullable=True)
-    doanh_thu: Mapped[float] = mapped_column(Float, default=0)
+    doanh_thu: Mapped[float] = mapped_column(TIEN, default=0)
     # NULL nghĩa là CHƯA CÓ SỐ. Đây là lý do tồn tại của cả bảng này.
-    gia_von: Mapped[float | None] = mapped_column(Float, nullable=True)
+    gia_von: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     trang_thai_qt: Mapped[str] = mapped_column(String(20), default="du_toan")
     phan_loai: Mapped[str] = mapped_column(String(30), default="")
     phan_loai_boi: Mapped[str] = mapped_column(String(50), default="")

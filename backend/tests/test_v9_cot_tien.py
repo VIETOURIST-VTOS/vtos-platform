@@ -84,28 +84,85 @@ def test_python_van_nhan_float_va_dieu_do_la_co_y():
         assert _cot(bang, cot).type.asdecimal is False
 
 
-def test_mo_hinh_va_ban_nang_cap_khong_duoc_lech_nhau():
-    """Ba chỗ cùng liệt kê tám cột. Lệch nhau là bản nâng cấp đổi một tập, mô hình khai một tập khác –
-    và cơ sở dữ liệu thật sẽ không giống mô hình mà không ai biết."""
+def _mig(ten: str):
     import importlib.util, pathlib
-    p = pathlib.Path(__file__).resolve().parents[1] / "alembic" / "versions" / \
-        "v9a1d6b4f8c02_v9_dot1_cot_tien_so_ke_toan.py"
-    spec = importlib.util.spec_from_file_location("v9mig", p)
+    p = pathlib.Path(__file__).resolve().parents[1] / "alembic" / "versions" / ten
+    spec = importlib.util.spec_from_file_location(ten, p)
     m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-    assert {(b, c) for b, c, _ in m.COT} == DOT1
-    assert (m.TIEN.precision, m.TIEN.scale) == (18, 2)
+    return m
+
+
+def test_mo_hinh_va_ban_nang_cap_khong_duoc_lech_nhau():
+    """Mô hình và bản nâng cấp cùng liệt kê danh sách cột. Lệch nhau là bản nâng cấp đổi một tập, mô
+    hình khai một tập khác – và cơ sở dữ liệu THẬT sẽ không giống mô hình mà không ai biết. Đây là
+    kiểu sai chỉ lộ ra khi có người đi tìm một con số không khớp, tức là quá muộn."""
+    from app.db.session import Base
+    from sqlalchemy import Numeric, Float
+    d1 = _mig("v9a1d6b4f8c02_v9_dot1_cot_tien_so_ke_toan.py")
+    d2 = _mig("v9b2e7c3a91d5_v9_dot2_tour_va_doi_xe.py")
+    assert {(b, c) for b, c, _ in d1.COT} == DOT1
+    for m in (d1, d2):
+        assert (m.TIEN.precision, m.TIEN.scale) == (18, 2)
+    # Hợp của MỌI bản nâng cấp phải bằng đúng tập cột đã khai kiểu số thập phân trong mô hình.
+    trong_mig = {(b, c) for m in (d1, d2) for b, c, _ in m.COT}
+    trong_mo_hinh = {(t.name, c.name) for t in Base.metadata.tables.values() for c in t.columns
+                     if isinstance(c.type, Numeric) and not isinstance(c.type, Float)}
+    assert trong_mig == trong_mo_hinh, {
+        "co trong ban nang cap ma mo hinh chua doi": sorted(trong_mig - trong_mo_hinh),
+        "mo hinh da doi ma khong co ban nang cap": sorted(trong_mo_hinh - trong_mig)}
+
+
+def test_hai_ban_nang_cap_khong_doi_trung_mot_cot():
+    """Đổi hai lần một cột thì lần sau chạy trên kiểu đã đổi – không hỏng, nhưng là dấu hiệu hai đợt
+    đang chồng lấn, và đợt sau sẽ khó nói mình đã đổi bao nhiêu cột."""
+    d1 = _mig("v9a1d6b4f8c02_v9_dot1_cot_tien_so_ke_toan.py")
+    d2 = _mig("v9b2e7c3a91d5_v9_dot2_tour_va_doi_xe.py")
+    a = {(b, c) for b, c, _ in d1.COT}
+    b_ = {(b, c) for b, c, _ in d2.COT}
+    assert not (a & b_), f"trùng giữa hai đợt: {sorted(a & b_)}"
+
+
+def test_dot2_lay_dung_nhom_tour_va_doi_xe():
+    """Đợt 2 lấy nhóm SINH RA con số của sổ: giá bán, giá vốn, tiền booking, quyết toán, và toàn bộ
+    tiền của đội xe. Không lấy lan sang nhóm khác – lan là đợt sau không còn đo được mình làm gì."""
+    d2 = _mig("v9b2e7c3a91d5_v9_dot2_tour_va_doi_xe.py")
+    KHOI = ("tour", "booking", "product", "service_", "fleet_", "vehicle_", "dispatch_")
+    la = [f"{b}.{c}" for b, c, _ in d2.COT if not b.startswith(KHOI)]
+    assert not la, f"cột ngoài nhóm tour/đội xe: {la}"
+    assert len(d2.COT) == 48
+
+
+def test_khong_doi_nham_so_do_va_ty_le_cua_doi_xe():
+    """Lít dầu, ki lô mét, ngày công, tỷ lệ – không phải tiền. K1 đã tách riêng, và đổi nhầm chúng
+    cũng tốn đúng một lần nâng cấp cơ sở dữ liệu."""
+    from sqlalchemy import Float
+    for bang, cot in (("fleet_trip_costs", "lit"), ("tour_cost_lines", "qty"),
+                      ("tour_cost_lines", "coef"), ("companies", "ownership_pct")):
+        assert isinstance(_cot(bang, cot).type, Float), f"{bang}.{cot} bị đổi nhầm"
 
 
 # ====================== 2. BỘ KIỂM K1 GIẢM ĐÚNG TÁM ======================
 def test_K1_giam_dung_so_cot_da_sua(db):
+    """Nghiệm thu V9: "bộ kiểm K1 giảm ĐÚNG số cột đã sửa" – không nhiều hơn, không ít hơn.
+
+    Đếm theo tập hợp chứ không theo con số: một phép thử đòi "K1 còn đúng 40" thì mỗi lần thêm một
+    bảng mới có cột tiền là nó đỏ, và cách nhanh nhất để làm xanh là sửa con số 40 thành 41 mà không
+    ai nhìn cột mới đó là gì."""
     from app.services import ks_cot_tien as CT
+    from app.db.session import Base
+    from sqlalchemy import Numeric, Float
     CT.dong_bo(db); CT.nap_quyet_dinh(db); db.flush()
     rows = CT._hieu_luc(db)
+    da_doi_mo_hinh = {(t.name, c.name) for t in Base.metadata.tables.values() for c in t.columns
+                      if isinstance(c.type, Numeric) and not isinstance(c.type, Float)}
     con_float = {(r.bang, r.cot) for r in rows if r.xep() == "tien" and r.kieu == "Float"}
-    assert not (con_float & DOT1), f"còn sót trong danh sách đợt 1: {con_float & DOT1}"
-    # Và tám cột đó phải có mặt trong sổ rà soát với kiểu MỚI – không phải biến mất khỏi sổ.
-    da_doi = {(r.bang, r.cot) for r in rows if r.kieu == "Numeric"}
-    assert DOT1 <= da_doi, f"thiếu khỏi sổ rà soát: {DOT1 - da_doi}"
+    assert not (con_float & da_doi_mo_hinh), \
+        f"K1 vẫn coi là Float những cột đã đổi: {sorted(con_float & da_doi_mo_hinh)[:5]}"
+    # Và các cột đã đổi phải CÒN trong sổ rà soát với kiểu mới – không phải biến mất khỏi sổ, vì
+    # biến mất là hết đo được và người đọc tưởng đã xong.
+    trong_so = {(r.bang, r.cot) for r in rows if r.kieu == "Numeric"}
+    assert da_doi_mo_hinh <= trong_so, f"thiếu khỏi sổ rà soát: {sorted(da_doi_mo_hinh - trong_so)[:5]}"
+    assert DOT1 <= da_doi_mo_hinh
 
 
 # ====================== 3. TỔNG TRƯỚC – SAU ======================

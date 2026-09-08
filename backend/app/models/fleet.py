@@ -21,6 +21,7 @@ from datetime import date, datetime
 from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, ForeignKey, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 # Vòng đời tài sản – trả lời "chiếc xe này còn là tài sản/trách nhiệm của ai"
 LIFECYCLE = {"dang_khai_thac": "Đang khai thác", "cho_kiem_tra": "Chờ kiểm tra", "da_ban": "Đã bán",
@@ -144,7 +145,7 @@ class Trip(Base):
     km_cuoi: Mapped[int | None] = mapped_column(Integer, nullable=True)
     km_gps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     km_nguon: Mapped[str] = mapped_column(String(40), default="")      # anh_dong_ho / nhap_tay / gps
-    doanh_thu: Mapped[float] = mapped_column(Float, default=0)
+    doanh_thu: Mapped[float] = mapped_column(TIEN, default=0)
     status: Mapped[str] = mapped_column(String(20), default="cho_xac_nhan")
     co: Mapped[str] = mapped_column(String(10), default="vang")        # cờ tổng hợp của chuyến
     co_ly_do: Mapped[str] = mapped_column(Text, default="")
@@ -165,7 +166,7 @@ class TripCost(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     trip_id: Mapped[int] = mapped_column(ForeignKey("fleet_trips.id"))
     kind: Mapped[str] = mapped_column(String(20))
-    amount: Mapped[float] = mapped_column(Float, default=0)
+    amount: Mapped[float] = mapped_column(TIEN, default=0)
     ben_chiu: Mapped[str] = mapped_column(String(24), default="vietourist_tam_ung")
     lit: Mapped[float] = mapped_column(Float, default=0)               # chỉ dùng cho nhiên liệu
     chung_tu: Mapped[str] = mapped_column(String(200), default="")     # mã/đường dẫn chứng từ gốc
@@ -188,7 +189,7 @@ class Maintenance(Base):
     km_ky_toi: Mapped[int | None] = mapped_column(Integer, nullable=True)
     noi_dung: Mapped[str] = mapped_column(String(300), default="")
     garage: Mapped[str] = mapped_column(String(120), default="")
-    so_tien: Mapped[float] = mapped_column(Float, default=0)
+    so_tien: Mapped[float] = mapped_column(TIEN, default=0)
     ben_chiu: Mapped[str] = mapped_column(String(24), default="chu_xe")
     chung_tu: Mapped[str] = mapped_column(String(200), default="")
     note: Mapped[str] = mapped_column(String(300), default="")
@@ -225,7 +226,7 @@ class ExternalTxn(Base):
     vehicle_id: Mapped[int | None] = mapped_column(ForeignKey("vehicles.id"), nullable=True)
     trip_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_trips.id"), nullable=True)
     thoi_diem: Mapped[datetime] = mapped_column(DateTime)
-    so_tien: Mapped[float] = mapped_column(Float, default=0)
+    so_tien: Mapped[float] = mapped_column(TIEN, default=0)
     lit: Mapped[float] = mapped_column(Float, default=0)
     mo_ta: Mapped[str] = mapped_column(String(300), default="")
     trung: Mapped[bool] = mapped_column(Boolean, default=False)        # bản ghi lặp: giữ lại, không tính
@@ -287,8 +288,8 @@ class SaleCase(Base):
     partner_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_partners.id"), nullable=True)
     seller_company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
     ngay_ky: Mapped[date | None] = mapped_column(Date, nullable=True)
-    gia_ban: Mapped[float] = mapped_column(Float, default=0)
-    da_thu: Mapped[float] = mapped_column(Float, default=0)
+    gia_ban: Mapped[float] = mapped_column(TIEN, default=0)
+    da_thu: Mapped[float] = mapped_column(TIEN, default=0)
     # Người mua ngoài (không phải đối tác hợp tác trong fleet_partners) và mốc cam kết trả đủ. Có mốc thì
     # khoản còn phải thu mới theo dõi được như một khoản nợ có hạn, thay vì một dòng ghi chú không ai canh.
     nguoi_mua: Mapped[str] = mapped_column(String(160), default="")
@@ -332,7 +333,7 @@ class RepaymentPlan(Base):
     sale_case_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_sale_cases.id"), nullable=True)
     creditor_company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
     ten: Mapped[str] = mapped_column(String(200), default="")
-    principal: Mapped[float] = mapped_column(Float, default=0)
+    principal: Mapped[float] = mapped_column(TIEN, default=0)
     so_ky: Mapped[int] = mapped_column(Integer, default=0)
     moi_ky: Mapped[float] = mapped_column(Float, default=0)
     bat_dau: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -352,8 +353,8 @@ class RepaymentInstallment(Base):
     plan_id: Mapped[int] = mapped_column(ForeignKey("fleet_repayment_plans.id"))
     ky: Mapped[int] = mapped_column(Integer)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    amount_due: Mapped[float] = mapped_column(Float, default=0)
-    amount_applied: Mapped[float] = mapped_column(Float, default=0)
+    amount_due: Mapped[float] = mapped_column(TIEN, default=0)
+    amount_applied: Mapped[float] = mapped_column(TIEN, default=0)
     note: Mapped[str] = mapped_column(String(200), default="")
 
 
@@ -366,7 +367,7 @@ class OffsetApplication(Base):
     plan_id: Mapped[int] = mapped_column(ForeignKey("fleet_repayment_plans.id"))
     installment_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_repayment_installments.id"), nullable=True)
     settlement_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_settlements.id"), nullable=True)
-    amount: Mapped[float] = mapped_column(Float, default=0)
+    amount: Mapped[float] = mapped_column(TIEN, default=0)
     chung_tu: Mapped[str] = mapped_column(String(200), default="")
     reversed_of: Mapped[int | None] = mapped_column(Integer, nullable=True)   # bút toán đảo, giữ liên kết gốc
     note: Mapped[str] = mapped_column(String(300), default="")
@@ -386,13 +387,13 @@ class Settlement(Base):
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(24), default="nhap")
     co: Mapped[str] = mapped_column(String(10), default="vang")
-    doanh_thu: Mapped[float] = mapped_column(Float, default=0)
+    doanh_thu: Mapped[float] = mapped_column(TIEN, default=0)
     doi_tac_huong: Mapped[float] = mapped_column(Float, default=0)
     doi_tac_chiu: Mapped[float] = mapped_column(Float, default=0)
-    dieu_chinh: Mapped[float] = mapped_column(Float, default=0)
-    truoc_can_tru: Mapped[float] = mapped_column(Float, default=0)
-    can_tru: Mapped[float] = mapped_column(Float, default=0)
-    sau_can_tru: Mapped[float] = mapped_column(Float, default=0)
+    dieu_chinh: Mapped[float] = mapped_column(TIEN, default=0)
+    truoc_can_tru: Mapped[float] = mapped_column(TIEN, default=0)
+    can_tru: Mapped[float] = mapped_column(TIEN, default=0)
+    sau_can_tru: Mapped[float] = mapped_column(TIEN, default=0)
     chuyen_ky_sau: Mapped[float] = mapped_column(Float, default=0)    # số âm KHÔNG tạo phiếu chi âm
     ghi_chu: Mapped[Text] = mapped_column(Text, default="")
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -411,7 +412,7 @@ class SettlementLine(Base):
     vehicle_id: Mapped[int | None] = mapped_column(ForeignKey("vehicles.id"), nullable=True)
     trip_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_trips.id"), nullable=True)
     mo_ta: Mapped[str] = mapped_column(String(300), default="")
-    amount: Mapped[float] = mapped_column(Float, default=0)
+    amount: Mapped[float] = mapped_column(TIEN, default=0)
     ben_chiu: Mapped[str] = mapped_column(String(24), default="")
     chung_tu: Mapped[str] = mapped_column(String(200), default="")
     duyet_boi: Mapped[str] = mapped_column(String(50), default="")     # dòng điều chỉnh phải có người duyệt
@@ -430,8 +431,8 @@ class SharedInvoice(Base):
     nha_cung_cap: Mapped[str] = mapped_column(String(160), default="")
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
     loai: Mapped[str] = mapped_column(String(20), default="giu_xe")
-    tong_tien: Mapped[float] = mapped_column(Float, default=0)
-    vat: Mapped[float] = mapped_column(Float, default=0)
+    tong_tien: Mapped[float] = mapped_column(TIEN, default=0)
+    vat: Mapped[float] = mapped_column(TIEN, default=0)
     tieu_thuc: Mapped[str] = mapped_column(String(40), default="deu")    # deu / km / thoa_thuan
     ghi_chu: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -444,7 +445,7 @@ class SharedInvoiceLine(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     invoice_id: Mapped[int] = mapped_column(ForeignKey("fleet_shared_invoices.id"))
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
-    amount: Mapped[float] = mapped_column(Float, default=0)
+    amount: Mapped[float] = mapped_column(TIEN, default=0)
     he_so: Mapped[float] = mapped_column(Float, default=1)
 
 
@@ -493,7 +494,7 @@ class DebtPayment(Base):
     sale_case_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_sale_cases.id"), nullable=True)
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
     ngay: Mapped[date] = mapped_column(Date)
-    so_tien: Mapped[float] = mapped_column(Float, default=0)
+    so_tien: Mapped[float] = mapped_column(TIEN, default=0)
     chung_tu: Mapped[str] = mapped_column(String(120), default="")
     note: Mapped[str] = mapped_column(String(300), default="")
     created_by: Mapped[str] = mapped_column(String(50), default="")
@@ -549,7 +550,7 @@ class FleetPeriodCost(Base):
     vehicle_id: Mapped[int | None] = mapped_column(ForeignKey("vehicles.id"), nullable=True)
     nhom: Mapped[str] = mapped_column(String(20))
     mo_ta: Mapped[str] = mapped_column(String(200), default="")
-    so_tien: Mapped[float] = mapped_column(Float, default=0)
+    so_tien: Mapped[float] = mapped_column(TIEN, default=0)
     chung_tu: Mapped[str] = mapped_column(String(200), default="")
     nguon: Mapped[str] = mapped_column(String(20), default="nhap_tay")     # nhap_tay / nap_tep / ai
     boi: Mapped[str] = mapped_column(String(50), default="")

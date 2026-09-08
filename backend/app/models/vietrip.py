@@ -3,6 +3,7 @@ from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 
 class VtRecord(Base):
@@ -31,14 +32,14 @@ class TourCostLine(Base):
     service_type: Mapped[str] = mapped_column(String(30), default="")        # GUIDE / HOTEL / LAND / BUS / MEAL / TICKET / VISA / INS…
     supplier_name: Mapped[str] = mapped_column(String(200), default="")
     supplier_tax_code: Mapped[str] = mapped_column(String(20), default="")
-    unit_price: Mapped[float] = mapped_column(Float, default=0)
+    unit_price: Mapped[float] = mapped_column(TIEN, default=0)
     qty: Mapped[float] = mapped_column(Float, default=0)
     coef: Mapped[float] = mapped_column(Float, default=1)
-    actual: Mapped[float] = mapped_column(Float, default=0)
-    paid: Mapped[float] = mapped_column(Float, default=0)
+    actual: Mapped[float] = mapped_column(TIEN, default=0)
+    paid: Mapped[float] = mapped_column(TIEN, default=0)
     note: Mapped[str] = mapped_column(String(200), default="")
     source: Mapped[str] = mapped_column(String(20), default="vietrip")
-    budget: Mapped[float] = mapped_column(Float, default=0)                 # dự toán của dòng (để so lệch)
+    budget: Mapped[float] = mapped_column(TIEN, default=0)                 # dự toán của dòng (để so lệch)
     status: Mapped[str] = mapped_column(String(10), default="hd")           # hd (hiệu lực) / huy
     version: Mapped[int] = mapped_column(Integer, default=1)                # phiên bản quyết toán khi tạo/sửa dòng
     doc_name: Mapped[str] = mapped_column(String(160), default="")          # tên tệp chứng từ
