@@ -31,6 +31,16 @@ DEFAULT_PARAMS = [
     # Lệnh Robot Kiểm soát 08/9/2026.
     ("ky_thuat_cham_ms", "5000", "Đường dẫn chạy quá số mili giây này thì ghi sự kiện “chậm bất thường”", "mili giây", "Lệnh Kiểm soát K6"),
     ("han_nhap_lieu_ngay", "5", "Ngày hàng tháng mà số liệu tháng trước coi như đã nhập đủ (mốc đo trễ để chấm điểm phòng ban)", "ngày trong tháng sau", "Chủ tịch chốt 08/9/2026"),
+    # K3 – hậu kiểm số nhập tay. Bảy ngưỡng, tất cả ở đây chứ không viết cứng: đặt chặt quá thì mỗi
+    # ngày hàng trăm dòng và không ai đọc, lỏng quá thì bỏ lọt. Dùng GET /kiem-soat/nhap-tay/do-nguong
+    # để xem trước mỗi ngưỡng ra bao nhiêu dòng rồi hãy chốt.
+    ("ks_lech_lan", "3", "Lệch quá bao nhiêu LẦN so với chính chỉ tiêu đó kỳ trước thì mở ngoại lệ", "lần", "Lệnh Kiểm soát K3 – đề xuất, chờ chốt sau một tháng chạy thật"),
+    ("ks_lech_toi_thieu", "20000000", "Lệch nhiều lần nhưng số tiền chênh dưới mức này thì bỏ qua", "đồng", "Lệnh Kiểm soát K3"),
+    ("ks_tron_tu", "10000000", "Số tròn triệu từ mức này trở lên mới coi là khoản lớn đáng ngờ", "đồng", "Lệnh Kiểm soát K3"),
+    ("ks_tron_lap", "3", "Cùng một người nhập cùng một số tròn bao nhiêu lần thì mở ngoại lệ", "lần", "Lệnh Kiểm soát K3"),
+    ("ks_gio_bat_dau", "7", "Giờ bắt đầu ngày làm việc – nhập trước giờ này là ngoài giờ", "giờ", "Lệnh Kiểm soát K3"),
+    ("ks_gio_ket_thuc", "21", "Giờ kết thúc ngày làm việc – nhập từ giờ này trở đi là ngoài giờ", "giờ", "Lệnh Kiểm soát K3"),
+    ("ks_don_dong", "10", "Bao nhiêu dòng trong 5 phút thì coi là nhập dồn", "dòng", "Lệnh Kiểm soát K3"),
     ("nd_vai_tro_ky_2", "tgd,chutich,hanh_chinh", "Vai trò được ký chữ ký thứ hai cho nội dung có cam kết với khách hoặc có số liệu tài chính (hanh_chinh gồm pháp chế)", "danh sách vai trò", "MKT Đợt 5 – chờ Ban TGĐ chốt"),
     ("coc_mac_dinh_pct", "30", "Tỷ lệ cọc mặc định khi sản phẩm không quy định", "%", "Vận hành Vietrip"),
     ("han_coc_gio", "24", "Hạn khách đặt cọc sau khi tạo booking (quá → cảnh báo sale/ĐH)", "giờ", "Vận hành Vietrip"),

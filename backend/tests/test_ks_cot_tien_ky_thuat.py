@@ -197,7 +197,13 @@ def test_kt12_quyet_dinh_08_09_da_duoc_ghi_va_khong_de_len_nguoi_khac():
         con = {f"{r['bang']}.{r['cot']}": r for r in d["rows"]}
         for ten in CT.QUYET_08_09_2026:
             assert con[ten]["xep"] == "tien" and con[ten]["quyet_nguoi"] == "tien", ten
-        assert d["so_chua_ro"] == 0, "tám cột chưa rõ đã có người quyết thì không còn dòng nào chờ"
+        # Tám cột của ngày 08/9 phải hết chờ. Nhưng KHÔNG đòi tổng số chờ bằng 0: mô hình còn lớn
+        # lên, và mỗi cột tiền thêm vào sau đó phải VÀO HÀNG CHỜ chứ không được quyết hộ – đúng điều
+        # chính phép thử này khẳng định ở đoạn dưới. Đòi tổng bằng 0 là vô tình biến "chưa ai quyết"
+        # thành lỗi, và cách nhanh nhất để sửa một lỗi như vậy là quyết bừa cho hết danh sách.
+        cho = {f"{r['bang']}.{r['cot']}" for r in d["rows"] if r["xep"] == "chua_ro"}
+        assert not (cho & set(CT.QUYET_08_09_2026)), \
+            f"cột đã có quyết định 08/9 mà vẫn nằm trong hàng chờ: {cho & set(CT.QUYET_08_09_2026)}"
         # Quyết "sửa" KHÔNG làm cột biến mất: nó vẫn hỏng cho tới khi mô hình đổi thật. Thứ đo tiến độ
         # của NGƯỜI là số cột chưa ai quyết.
         assert d["so_thieu_thanh_0"] > 0, "chưa ai đổi kiểu thì danh sách phải còn nguyên"

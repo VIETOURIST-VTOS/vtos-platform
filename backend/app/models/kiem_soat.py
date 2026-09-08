@@ -28,6 +28,7 @@ LOAI_PHAT_HIEN = {
     "cot_tien_float": "Cột tiền còn khai kiểu số thực nhị phân",
     "thieu_khac_0": "Cột tiền ghi 0 thay cho “chưa có số”",
     "vai_tro_khong_co_nguoi": "Vai trò có quyền nhưng chưa tài khoản nào giữ",
+    "nhap_tay_bat_thuong": "Số nhân viên nhập tay có dấu hiệu bất thường",
 }
 
 

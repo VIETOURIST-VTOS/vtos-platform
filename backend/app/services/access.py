@@ -407,7 +407,12 @@ MENU_ROLES = {
     "/audit": AUDIT_ROLES,
     # Bàn làm việc của robot Kiểm soát. Trưởng phòng KHÔNG có mặt: đây là chỗ đọc kết quả giám sát
     # chính phòng mình, việc phải làm thì hiện ở màn hình Ngoại lệ của họ.
-    "/kiem-soat": BASE_VIEW + ("cntt",),
+    # Kế toán có mặt vì K1/K2: người QUYẾT một cột là tiền hay không, và sửa hay giữ, là Kế toán
+    # trưởng (nghiệp vụ) cùng CNTT (kỹ thuật) – ks_ra_soat.py ghi rõ điều đó ở chữ ký endpoint.
+    # Thiếu dòng này thì hàng rào P2 chặn đúng người mà robot Kiểm soát chỉ định làm người quyết:
+    # bàn làm việc mở ra mà mọi nút bấm đều 403. Chỉ lộ ra khi gộp hai nhánh, không nhánh nào một
+    # mình thấy được.
+    "/kiem-soat": BASE_VIEW + ("ketoan", "cntt"),
     # Bảng quy ước hạch toán + cổng chặn giá vốn. Điều hành (tp_dh) xem được vì hàng đợi thiếu giá vốn
     # đứng tên phòng họ – bắt một phòng trả lời mà không cho họ nhìn thấy việc là cách chắc chắn để không ai trả lời.
     "/hach-toan": BASE_VIEW + ("ketoan", "cntt", "tp_dh"),
