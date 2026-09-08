@@ -683,6 +683,69 @@ def _kh_nap(db: Session, r, boi):
     return f"{a.code} · {d.period} · {st:,.0f} đ (còn lại {d.remaining:,.0f})"
 
 
+# ====================== ĐỘI XE – BẰNG LÁI XE ======================
+def _gplx_kiem(db: Session, r):
+    from app.models.fleet import VehicleDocument
+    from app.services.intake import _ngay
+    from app.services.hang_gplx import so_cho_toi_da, tach_hang
+    loi, cb = [], []
+    e = _nv(db, r.get("ma_nv"))
+    if e is None:
+        return [f"Không có nhân sự mã '{r.get('ma_nv')}' – nạp hồ sơ nhân sự trước rồi mới nạp bằng lái"], cb, None
+    so = str(r.get("so_gplx") or "").strip()
+    if so and not so.isdigit():
+        cb.append(f"Số GPLX '{so}' có ký tự không phải chữ số – giấy phép Việt Nam là dãy 12 chữ số")
+    elif so and len(so) != 12:
+        cb.append(f"Số GPLX '{so}' dài {len(so)} chữ số, giấy phép Việt Nam là 12 chữ số – kiểm tra lại")
+    cap = _ngay(r.get("ngay_cap"))
+    het = _ngay(r.get("ngay_het_han"))
+    if cap and het and het < cap:
+        loi.append("Ngày hết hạn trước ngày cấp")
+    if het is None:
+        cb.append("Chưa có ngày hết hạn – bản ghi sẽ hiện 'chưa đủ dữ liệu', không hiện màu xanh")
+    elif het < date.today():
+        cb.append(f"Bằng đã hết hạn từ {het:%d/%m/%Y} – tài xế này chưa được điều xe")
+    hang = str(r.get("hang") or "").strip()
+    if not hang:
+        cb.append("Chưa ghi hạng – cổng điều xe sẽ không kết luận được người này lái được xe bao nhiêu chỗ")
+    else:
+        toi_da, ly_do = so_cho_toi_da(hang, cap)
+        if toi_da == -1:
+            cb.append(ly_do)
+        elif toi_da == 0:
+            loi.append(ly_do)
+        elif toi_da is not None:
+            cb.append(f"{ly_do} – không điều được xe lớn hơn")
+    trung = db.execute(select(VehicleDocument).where(
+        VehicleDocument.employee_id == e.id, VehicleDocument.kind == "gplx",
+        func.upper(VehicleDocument.number) == so.upper())).scalars().first() if so else None
+    return loi, cb, (f"{e.code} · {so}" if trung is not None else None)
+
+
+def _gplx_nap(db: Session, r, boi):
+    from app.models.fleet import VehicleDocument
+    from app.services.intake import _ngay
+    e = _nv(db, r.get("ma_nv"))
+    het = _ngay(r.get("ngay_het_han"))
+    # Bằng mới thì bằng cũ của chính người đó thôi hiệu lực – nhưng KHÔNG xóa, chỉ tắt cờ active.
+    if het is not None:
+        for cu in db.execute(select(VehicleDocument).where(
+                VehicleDocument.employee_id == e.id, VehicleDocument.kind == "gplx",
+                VehicleDocument.active == True)).scalars():          # noqa: E712
+            if cu.expires_on is None or cu.expires_on <= het:
+                cu.active = False
+    g = VehicleDocument(employee_id=e.id, kind="gplx",
+                        number=str(r.get("so_gplx") or "").strip()[:60],
+                        hang=str(r.get("hang") or "").strip().upper()[:30],
+                        issued_on=_ngay(r.get("ngay_cap")), expires_on=het,
+                        source=str(r.get("nguon_giay") or "bản chụp giấy phép lái xe")[:120],
+                        verify="nguon_ghi", note=str(r.get("ghi_chu") or "").strip()[:300],
+                        created_by=boi)
+    db.add(g); db.flush()
+    return (f"{e.code} {e.full_name} · hạng {g.hang or '(chưa ghi)'} · "
+            + (f"hạn {het:%d/%m/%Y}" if het else "chưa có hạn"))
+
+
 # ====================== KHAI BÁO ======================
 def bo_nap(_c) -> dict:
     from app.models.fleet import NHOM_CHI_PHI_KY
@@ -781,6 +844,27 @@ def bo_nap(_c) -> dict:
                     _c("so_tien", "Số tiền", True, kieu="tien", min=0, vi_du="327000000"),
                     _c("chung_tu", "Chứng từ")],
             "kiem": _cpk_kiem, "nap": _cpk_nap,
+        },
+        "bang_lai_xe": {
+            "bang_dich": "vehicle_documents", "phong_ban": "doi_xe",
+            "ten": "Bằng lái xe của tài xế",
+            "mo_ta": "Giấy phép lái xe: số, HẠNG, ngày cấp, ngày hết hạn. Hạng và ngày cấp phải đi "
+                     "cùng nhau – chữ D đảo nghĩa giữa luật cũ (tối đa 30 chỗ) và luật mới từ "
+                     "01/01/2025 (hạng cao nhất), và ngày cấp là thứ duy nhất phân biệt được. Thiếu "
+                     "một trong hai thì cổng điều xe trả 'chưa đủ dữ liệu', không trả 'đạt'.",
+            "khoa_chong_trung": "Mã nhân viên + số GPLX",
+            "cot": [_c("ma_nv", "Mã nhân viên", True, vi_du="NS0013"),
+                    _c("so_gplx", "Số GPLX", True, vi_du="790118255611",
+                       ghi_chu="12 chữ số, in trên giấy phép"),
+                    _c("hang", "Hạng", True, vi_du="E",
+                       ghi_chu="chép NGUYÊN VĂN trên giấy: E / D / A1, E, FC / D, CE"),
+                    _c("ngay_cap", "Ngày cấp", True, kieu="ngay", vi_du="30/08/2022",
+                       ghi_chu="bắt buộc – quyết định đọc hạng theo luật cũ hay luật mới"),
+                    _c("ngay_het_han", "Ngày hết hạn", kieu="ngay", vi_du="30/08/2027",
+                       ghi_chu="để trống = CHƯA BIẾT, không phải còn hạn"),
+                    _c("nguon_giay", "Nguồn dữ liệu", vi_du="Bản chụp GPLX"),
+                    _c("ghi_chu", "Ghi chú")],
+            "kiem": _gplx_kiem, "nap": _gplx_nap,
         },
         # ---------- MARKETING ----------
         "chi_marketing_kenh": {
@@ -985,6 +1069,7 @@ def vai_tro(QUAN_TRI: tuple) -> dict:
         "bao_duong":            QUAN_TRI + ("gd_doi_xe", "ketoan"),
         "dang_kiem":            QUAN_TRI + ("gd_doi_xe",),
         "chi_phi_ky_doi_xe":    QUAN_TRI + ("gd_doi_xe", "ketoan"),
+        "bang_lai_xe":          QUAN_TRI + ("gd_doi_xe", "hcns"),
         "chi_marketing_kenh":   QUAN_TRI + ("ptgd_mkt", "nv_mkt", "ketoan"),
         "doanh_so_tu_van_vien": QUAN_TRI + ("gd_kd", "tp_kd", "ketoan"),
         "thu_lao_hdv":          QUAN_TRI + ("tp_hd", "tp_dh", "ketoan"),

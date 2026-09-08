@@ -72,6 +72,37 @@ def _giay(kq: list, chu_the: str, ten_loai: dict, docs: dict, den_ngay: date, ch
                           "Bộ phận phụ trách đối chiếu giấy gốc rồi đánh dấu đã xác minh"))
 
 
+def _hang_bang(kq: list, db: Session, g, v) -> None:
+    """Hạng trên giấy phép có đủ cho số chỗ của chiếc xe không.
+
+    Ba kết luận, và không có kết luận thứ tư: ĐỦ thì im lặng, KHÔNG ĐỦ thì chặn cứng, CHƯA ĐỌC ĐƯỢC
+    thì trả về 'chưa đủ dữ liệu'. Đặc biệt KHÔNG có nhánh 'chắc là đủ' – thiếu hạng hay thiếu ngày
+    cấp là thiếu, và người điều hành phải thấy mình đang thiếu cái gì."""
+    from app.services.hang_gplx import so_cho_toi_da
+    if g is None:
+        return                      # thiếu hẳn giấy đã có cổng THIEU_GPLX ở trên, không báo hai lần
+    so_cho = v.seats or 0
+    if not so_cho:
+        kq.append(_mo("XE_CHUA_CO_SO_CHO", UNKNOWN,
+                      f"Xe {v.plate} chưa ghi số chỗ nên không đối chiếu được với hạng bằng lái",
+                      "Nhập số chỗ của xe trong danh mục"))
+        return
+    toi_da, ly_do = so_cho_toi_da(g.hang, g.issued_on)
+    if toi_da == -1:
+        kq.append(_mo("CHUA_DOC_DUOC_HANG_BANG", UNKNOWN,
+                      f"Chưa kết luận được hạng bằng lái của tài xế: {ly_do}",
+                      "Bổ sung hạng và ngày cấp theo đúng giấy gốc"))
+        return
+    if toi_da is None:
+        return                      # không giới hạn số chỗ
+    if so_cho > toi_da:
+        kq.append(_mo("HANG_BANG_KHONG_DU", BLOCK,
+                      f"Xe {v.plate} có {so_cho} chỗ nhưng bằng lái của tài xế chỉ đủ {toi_da} chỗ "
+                      f"({ly_do})",
+                      "Đổi tài xế có hạng phù hợp; nâng hạng bằng là việc của người lái, không phải "
+                      "việc điều chỉnh trên phần mềm"))
+
+
 def trung_lich_tai_xe(db: Session, driver_id: int, d1: date, d2: date, bo_qua: int | None = None) -> list[DispatchOrder]:
     """Lệnh còn hiệu lực của cùng một TÀI XẾ chồng ngày với khoảng đang xét.
 
@@ -192,6 +223,12 @@ def kiem_tra_dieu_xe(db: Session, v: Vehicle, d1: date, d2: date, driver_id: int
     if did:
         g = _docs(db, None, did).get("gplx")
         if g and g.expires_on: _han_giay(kq, "tài xế", "Giấy phép lái xe", g.expires_on, d2, vang, do)
+        # 4e. HẠNG bằng có đủ cho số chỗ của chiếc xe này không.
+        #
+        # Trước bản này hệ thống chỉ hỏi "giấy còn hạn không". Một tấm giấy còn hạn mười năm mà hạng
+        # chỉ đủ 30 chỗ vẫn không cho phép cầm lái xe 45 chỗ – và đó mới là câu hỏi mà 45 hành khách
+        # trên xe quan tâm. Xem app/services/hang_gplx.py về việc chữ D đảo nghĩa giữa hai luật.
+        _hang_bang(kq, db, g, v)
 
     # 5. Việc xác minh đang treo của chính chiếc xe này – không chặn, nhưng người điều hành phải thấy.
     n = db.execute(select(FleetVerification).where(FleetVerification.vehicle_id == v.id,

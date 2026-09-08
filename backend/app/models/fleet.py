@@ -69,6 +69,10 @@ class VehicleDocument(Base):
     employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
     kind: Mapped[str] = mapped_column(String(20))
     number: Mapped[str] = mapped_column(String(60), default="")
+    # Hạng ghi trên giấy phép lái xe ("E", "D", "A1, E, FC"). Chỉ dùng cho kind="gplx".
+    # Phải lưu kèm `issued_on`: chữ D đảo nghĩa giữa luật cũ và luật mới, và ngày cấp là thứ DUY NHẤT
+    # phân biệt được hai hệ – xem app/services/hang_gplx.py.
+    hang: Mapped[str] = mapped_column(String(30), default="")
     issued_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     expires_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     source: Mapped[str] = mapped_column(String(120), default="")
