@@ -405,9 +405,14 @@ def test_kn15_dong_thieu_cot_nguon_van_bi_dem_ra_hau_kiem():
     dk = NT._chi_nguoi_go(t, ng)
     assert dk is not None, "sổ bút toán phải có cột phân biệt máy sinh / người gõ"
     # cột để trống → coalesce về "thu_cong" → điều kiện đúng → dòng vẫn được đem ra hậu kiểm
+    cot, nguoi_go = ng["may_sinh"]
     from sqlalchemy import select as sel, literal
     assert db.execute(sel(literal(1)).where(
-        NT.func.coalesce(None, NT.NGUOI_GO) == NT.NGUOI_GO)).scalar() == 1
+        NT.func.coalesce(None, nguoi_go) == nguoi_go)).scalar() == 1
+    # sổ chi phí chuyến xe gọi cột đó bằng tên khác và giá trị khác – cũng phải nhận ra
+    xe = [x for x in NT.NGUON if x["ma"] == "chi_phi_chuyen"][0]
+    assert NT._chi_nguoi_go(NT._bang(xe["bang"]), xe) is not None, \
+        "sổ chi phí chuyến xe có cột nguon, phải dùng nó thay vì coi mọi dòng là nhập tay"
     # nguồn không có cột đó thì không lọc gì cả, thay vì lọc sạch
     khac = [x for x in NT.NGUON if x["ma"] == "thu"][0]
     assert NT._chi_nguoi_go(NT._bang(khac["bang"]), khac) is None, \

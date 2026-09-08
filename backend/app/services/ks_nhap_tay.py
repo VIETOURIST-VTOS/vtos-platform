@@ -32,13 +32,16 @@ NGUON = (
      "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": ""},
     {"ma": "thu", "ten": "Phiếu thu", "bang": "receipts", "tien": "amount",
      "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": "Kế toán"},
-    # `may_sinh`: cột nói dòng này do MÁY sinh hay do NGƯỜI gõ. Sổ bút toán là sổ duy nhất có cột đó,
-    # và nó là thứ phân biệt duy nhất đáng tin – xem ghi chú ở _chi_nguoi_go.
+    # `may_sinh`: (tên cột, giá trị nghĩa là NGƯỜI GÕ). Cột này là thứ phân biệt máy nạp với người gõ
+    # duy nhất đáng tin – xem ghi chú ở _chi_nguoi_go. Nguồn không khai thì không lọc.
     {"ma": "but_toan", "ten": "Bút toán", "bang": "journal_entries", "tien": "",
      "nguoi": "created_by", "luc": "created_at", "ngay": "entry_date", "phong": "Kế toán",
-     "may_sinh": "source_type"},
+     "may_sinh": ("source_type", "thu_cong")},
+    # Sổ chi phí chuyến xe gọi cột đó là `nguon` và giá trị người-gõ là "nhap_tay" (máy: bao_cao_vietrip
+    # / the_dau / epass / ocr). Khác tên, khác giá trị, cùng một ý – nên khai theo từng nguồn.
     {"ma": "chi_phi_chuyen", "ten": "Chi phí chuyến xe", "bang": "fleet_trip_costs", "tien": "amount",
-     "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": "Đội xe"},
+     "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": "Đội xe",
+     "may_sinh": ("nguon", "nhap_tay")},
     {"ma": "bao_duong", "ten": "Bảo dưỡng xe", "bang": "fleet_maintenance", "tien": "so_tien",
      "nguoi": "created_by", "luc": "created_at", "ngay": "ngay", "phong": "Đội xe"},
     {"ma": "hoa_don", "ten": "Hóa đơn", "bang": "invoices", "tien": "total",
@@ -47,11 +50,6 @@ NGUON = (
 # Tài khoản máy: robot nạp dữ liệu và các bộ đồng bộ. Không phải "người nhập", nên loại khỏi hậu kiểm –
 # để lại thì mọi dấu hiệu đều chỉ vào chúng và phần của con người chìm nghỉm.
 BO_QUA_NGUOI = ("robot", "", "system", "vietrip", "sepay", "dieuhanhvietrip")
-
-
-# Giá trị của cột `source_type` nghĩa là "người gõ tay". Mọi giá trị khác (misa, robot, ket_chuyen,
-# khau_hao, phan_bo, dao, quy_tac, kiem_toan…) là máy sinh ra.
-NGUOI_GO = "thu_cong"
 
 
 def _chi_nguoi_go(t, ng: dict):
@@ -66,6 +64,10 @@ def _chi_nguoi_go(t, ng: dict):
     và không ai nhớ. Cột `source_type` thì ngược lại: nó do CHÍNH chỗ ghi sổ đặt, nên một nguồn máy mới
     tự khai mình là máy mà không cần ai sửa tệp này.
 
+    Cùng ngày, cùng cách đo, sổ chi phí chuyến xe cho ra 87 dòng "nhập tay" – toàn bộ đều mang
+    nguon="bao_cao_vietrip", tức bản nạp từ báo cáo VieTrip. Hai sổ, hai cái tên cột khác nhau, cùng một
+    kiểu nhầm.
+
     Hậu quả của việc lọc sai không phải là báo thừa vài dòng. Hai mươi lăm nghìn dòng máy nạp đội lốt
     số nhập tay thì mọi ngưỡng hiệu chỉnh trên đó đều hiệu chỉnh cho một hệ thống không tồn tại, và
     người đọc bảng ngoại lệ chỉ thấy tên `misa` lặp lại – đọc vài lần rồi thôi đọc. Bộ kiểm soát chết
@@ -74,9 +76,11 @@ def _chi_nguoi_go(t, ng: dict):
     Dòng để trống cột này thì VẪN ĐEM RA HẬU KIỂM. Trong một bộ kiểm soát, im lặng phải do có bằng
     chứng là máy sinh, chứ không do thiếu dữ liệu.
     """
-    cot = ng.get("may_sinh")
-    if not cot or cot not in t.c: return None
-    return func.coalesce(t.c[cot], NGUOI_GO) == NGUOI_GO
+    khai = ng.get("may_sinh")
+    if not khai: return None
+    cot, nguoi_go = khai
+    if cot not in t.c: return None
+    return func.coalesce(t.c[cot], nguoi_go) == nguoi_go
 
 
 def _bang(ten: str):
