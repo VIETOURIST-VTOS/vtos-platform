@@ -320,6 +320,7 @@ def _hdv_nap(db: Session, r, boi):
 
 # ====================== KHAI BÁO ======================
 def bo_nap(_c) -> dict:
+    from app.services import quyet_toan_tour as QTT
     """Trả về các bộ nạp phòng ban. Nhận hàm _c của app/services/intake.py để mô tả cột cùng một kiểu."""
     from app.models.hr import DEPARTMENTS, POSITIONS, OFFICES
     return {
@@ -424,6 +425,27 @@ def bo_nap(_c) -> dict:
                     _c("tuyen_phu_trach", "Tuyến phụ trách", vi_du="Miền Trung, Tây Nguyên"),
                     _c("han_muc_tam_ung", "Hạn mức tạm ứng", kieu="so", vi_du="5000000")],
             "kiem": _hdv_kiem, "nap": _hdv_nap,
+        },
+        "quyet_toan_tour": {
+            "bang_dich": "tour_settlements", "phong_ban": "dieu_hanh",
+            "lo": True,          # kiểm và nạp cả tệp một lần: tệp gốc là workbook nhiều sheet
+            "ten": "Quyết toán tour theo điều hành",
+            "mo_ta": "Tệp quyết toán tháng của Điều hành – mỗi điều hành viên một sheet, thêm sheet "
+                     "khách lẻ do sale tự xử lý. Sheet Tổng hợp bị bỏ qua (số cộng lại). Ô giá vốn "
+                     "bằng 0 đọc thành CHƯA CÓ SỐ, không phải 0 đồng.",
+            "khoa_chong_trung": "Mã tour",
+            "cot": [_c("ma_tour", "Mã tour", True, vi_du="MICEDL3N2D.03170726"),
+                    _c("ten_tour", "Tên tour", vi_du="ĐÀ LẠT 3 NGÀY 2 ĐÊM"),
+                    _c("ngay_kh", "Ngày KH", kieu="ngay", vi_du="17/07/2026"),
+                    _c("ngay_kt", "Ngày KT", True, kieu="ngay", vi_du="19/07/2026",
+                       ghi_chu="ngày kết thúc quyết định chuyến thuộc kỳ nào"),
+                    _c("doanh_thu", "Doanh thu", True, kieu="tien", min=0),
+                    _c("gia_von", "Giá vốn", kieu="tien", min=0,
+                       ghi_chu="để TRỐNG nếu chưa có số – đừng ghi 0"),
+                    _c("trang_thai_qt", "Trạng thái QT", vi_du="Đã quyết toán"),
+                    _c("sale", "Sale", ghi_chu="chỉ có ở sheet khách lẻ")],
+            "kiem": QTT.kiem, "nap": QTT.nap,      # không dùng ở chế độ lô, giữ để khai báo đủ
+            "kiem_lo": QTT.kiem, "nap_lo": QTT.nap, "doc_tep": QTT.doc_tep,
         },
         "cham_cong": {
             "bang_dich": "payroll_runs", "phong_ban": "hcns",

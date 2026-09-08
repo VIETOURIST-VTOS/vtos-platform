@@ -66,7 +66,7 @@ async def kiem_tra_tep(loai: str = Form(...), tep: UploadFile = File(...),
     if loai not in IN.BO_NAP: raise HTTPException(422, f"Không có bộ nạp '{loai}'")
     noi_dung = await tep.read()
     try:
-        rows = IN.doc_bang(noi_dung, tep.filename or "")
+        rows = IN.doc_theo_bo(loai, noi_dung, tep.filename or "")
     except Exception as ex:
         raise HTTPException(422, f"Không đọc được tệp: {ex}. Hỗ trợ .csv và .xlsx, hàng đầu là tên cột.")
     if not rows: raise HTTPException(422, "Tệp không có dòng dữ liệu nào (hàng đầu phải là tên cột)")

@@ -28,6 +28,19 @@ NGUON = {"nguoi_nhap": "Người nhập", "nhap_tay": "Nhập tay từng dòng",
 
 
 # ====================== ĐỌC TỆP ======================
+def doc_theo_bo(loai: str, noi_dung: bytes, ten_tep: str) -> list[dict]:
+    """Đọc tệp theo bộ nạp. Bộ nạp khai 'doc_tep' thì dùng bộ đọc riêng (ví dụ workbook nhiều sheet của
+    quyết toán tour); không khai thì dùng bộ đọc chuẩn một sheet.
+
+    Vẫn là MỘT cơ chế nạp: bốn bước, một bộ kiểm, một nhật ký. Chỉ khác ở chỗ đọc tệp – ép mọi tệp về
+    một sheet phẳng thì tệp quyết toán tour phải sửa tay trước khi nạp, và việc sửa tay đó chính là chỗ
+    số bị đổi mà không ai biết."""
+    bo = BO_NAP.get(loai) or {}
+    if bo.get("doc_tep"):
+        return bo["doc_tep"](noi_dung, ten_tep)
+    return doc_bang(noi_dung, ten_tep)
+
+
 def doc_bang(noi_dung: bytes, ten_tep: str) -> list[dict]:
     """Đọc .csv hoặc .xlsx thành danh sách dòng theo TÊN CỘT ở hàng đầu.
 
@@ -264,6 +277,7 @@ VAI_TRO = {
     "booking":          QUAN_TRI + ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "tp_dh", "nv_dh", "ptgd_doan"),
     "sao_ke_ngan_hang": QUAN_TRI + ("ketoan",),
     "huong_dan_vien":   QUAN_TRI + ("tp_hd", "hcns", "tp_dh"),
+    "quyet_toan_tour":  QUAN_TRI + ("tp_dh", "nv_dh", "ketoan", "ptgd_doan"),
 }
 
 
@@ -274,7 +288,8 @@ def duoc_nap(loai: str, vai_tro: str) -> bool:
 # Bộ nạp thuộc phòng ban nào – để màn hình xếp theo phòng và để mỗi phòng thấy phần của mình trước.
 PHONG_BAN = {"nha_cung_cap": "dieu_hanh", "don_dich_vu": "dieu_hanh", "chuyen_xe": "doi_xe",
              "nhan_su": "hcns", "cham_cong": "hcns", "khach_hang": "kd_le", "booking": "kd_le",
-             "sao_ke_ngan_hang": "ketoan", "huong_dan_vien": "huong_dan"}
+             "sao_ke_ngan_hang": "ketoan", "huong_dan_vien": "huong_dan",
+             "quyet_toan_tour": "dieu_hanh"}
 
 
 def danh_sach_bo_nap() -> list[dict]:
@@ -314,6 +329,14 @@ def _theo_key(bo: dict, rows: list[dict]) -> list[dict]:
 
 
 def kiem_tra(db: Session, loai: str, rows: list[dict]) -> dict:
+    if loai in BO_NAP and BO_NAP[loai].get("lo"):
+        bo = BO_NAP[loai]
+        return {**bo["kiem_lo"](db, rows), "loai": loai, "ten": bo["ten"], "cot_khong_dung": [],
+                "ghi_chu": "Đây là bước XEM TRƯỚC – chưa ghi gì vào hệ thống."}
+    return _kiem_tra_tung_dong(db, loai, rows)
+
+
+def _kiem_tra_tung_dong(db: Session, loai: str, rows: list[dict]) -> dict:
     """Kiểm tra toàn bộ, KHÔNG ghi gì. Trả về lỗi theo từng dòng kèm số dòng trong tệp."""
     if loai not in BO_NAP: raise ValueError(f"Không có bộ nạp '{loai}'")
     bo = BO_NAP[loai]
@@ -367,6 +390,18 @@ def nhap_mot_dong(db: Session, loai: str, row: dict, boi: str, cua: str = "nhap_
 def nap(db: Session, loai: str, rows: list[dict], boi: str, bo_qua_dong_loi: bool = False,
         ten_tep: str = "", nguon: str = "nguoi_nhap", tac_nhan: str = "") -> dict:
     """Nạp thật. Luôn kiểm tra lại trước khi ghi – không tin vào kết quả xem trước gửi kèm."""
+    if loai in BO_NAP and BO_NAP[loai].get("lo"):
+        bo = BO_NAP[loai]
+        kq = bo["nap_lo"](db, rows, boi, ten_tep, bo_qua_dong_loi)
+        noi_dung = json.dumps(rows, ensure_ascii=False, sort_keys=True, default=str)
+        run = IntakeRun(loai=loai, ten_tep=ten_tep[:200],
+                        nguon=nguon if nguon in NGUON else "nap_tep", tac_nhan=(tac_nhan or boi)[:80],
+                        so_dong=kq["so_dong"], da_nap=kq["da_nap"], bo_qua_da_co=kq["da_co"],
+                        dong_loi=kq["dong_loi"], bo_qua_dong_loi=bo_qua_dong_loi,
+                        dau_vao_hash=hashlib.sha256(noi_dung.encode("utf-8")).hexdigest(),
+                        ket_qua=json.dumps({"da_nap": kq["da_nap"]}, ensure_ascii=False), boi=boi)
+        db.add(run); db.flush()
+        return {**kq, "loai": loai, "ten": bo["ten"], "run_id": run.id}
     kt = kiem_tra(db, loai, rows)
     if kt["dong_loi"] and not bo_qua_dong_loi:
         return {**kt, "da_nap": 0,

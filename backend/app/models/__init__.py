@@ -21,3 +21,4 @@ from app.models.ky_thuat import *  # noqa
 from app.models.ngoai_le import *  # noqa
 from app.models.kiem_soat import *  # noqa
 from app.models.hach_toan import *  # noqa
+from app.models.quyet_toan import *  # noqa
