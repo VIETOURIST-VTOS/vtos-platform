@@ -55,8 +55,8 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Tài khoản ngân hàng", "/bank-accounts"], ["Sổ kế toán", "/accounting?tab=journal"], ["Hóa đơn & thuế", "/accounting?tab=invoices"],
     ["Báo cáo tài chính", "/accounting?tab=bctc"], ["Hồ sơ kiểm toán", ""], ["Khóa kỳ", "/accounting?tab=periods"]] },
   { key: "nhansu", label: "8. Hành chính & Nhân sự", items: [
-    ["Hồ sơ nhân sự", "/hr?tab=employees"], ["Hợp đồng lao động", ""], ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
-    ["Báo cáo công việc", "/reports"], ["Đánh giá & sự vụ", "/hr?tab=incidents"], ["Văn bản", ""], ["Tài sản & mua sắm", ""]] },
+    ["Hồ sơ nhân sự", "/hr?tab=employees"], ["Hợp đồng lao động", "/hop-dong-lao-dong"], ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
+    ["Báo cáo công việc", "/reports"], ["Đánh giá & sự vụ", "/hr?tab=incidents"], ["Văn bản", ""], ["Tài sản & mua sắm", "/tai-san"]] },
   { key: "kiemsoat", label: "9. Kiểm soát & Chính sách", items: [
     ["Chính sách & định mức", "/params"], ["Cảnh báo nghiệp vụ", "/alerts"], ["Kiểm tra & đối chiếu", "/accounting?tab=misa"],
     ["Ngoại lệ cần xử lý", "/ngoai-le"], ["Kiểm soát (robot)", "/kiem-soat"],

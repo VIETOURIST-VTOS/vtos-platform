@@ -230,6 +230,14 @@ MENU_ROLES = {
     # lấy danh sách người từ /employees, tức là kèm luôn lương của mọi phòng.
     "/huong-dan": BASE_VIEW + OPERATIONS + GUIDE_MGR + ("ptgd_doan", "hcns", "ketoan", "cntt"),
 
+    # Hợp đồng lao động: hồ sơ cá nhân của từng người, kèm bản scan trong nhóm 06_Nhan_su. HCNS giữ hồ
+    # sơ, Ban TGĐ và Chủ tịch điều hành, Ban Kiểm soát rà soát. Kế toán KHÔNG xem – lương lấy từ bảng
+    # lương, không cần đọc hợp đồng của từng người.
+    "/hop-dong-lao-dong": BASE_VIEW + ("hcns", "cntt"),
+    # Tài sản & mua sắm: nguyên giá, khấu hao và ghi sổ – việc của Kế toán. Hành chính xem để theo dõi
+    # tài sản đang ở bộ phận nào.
+    "/tai-san": BASE_VIEW + ("ketoan", "cntt", "hanh_chinh", "hcns"),
+
     # --- Hành chính & Nhân sự (tách quyền theo tab, xem HR_TAB_ROLES) ---
     "/hr": HR_TAB_ROLES["payroll"] + HR_TAB_ROLES["employees"] + HR_TAB_ROLES["incidents"],
 
