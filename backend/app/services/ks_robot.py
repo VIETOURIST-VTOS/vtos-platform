@@ -162,6 +162,65 @@ def _vai_tro_trong(db: Session) -> list[dict]:
     return ra
 
 
+def _vai_tro_khong_co_nguoi(db: Session) -> list[dict]:
+    """Vai trò có trong ma trận nhưng không tài khoản nào đang hoạt động giữ nó.
+
+    Vì sao đây là việc phải mở ra chứ không phải lập tài khoản giả cho đủ: một vai trò không có người
+    là một khoảng trống QUẢN LÝ – có màn hình, có quyền, có việc, mà không ai làm. Tạo tám tài khoản
+    đăng nhập được để "cho đủ bảng" thì bảng trông đẹp còn khoảng trống vẫn nguyên, và đổi lại hệ thống
+    của một công ty đại chúng có thêm tám lối vào mà không ai dùng – nghĩa là không ai để ý khi có người
+    dùng chúng.
+
+    Mức VÀNG chứ không đỏ: đây là việc bố trí người, không phải lỗ hổng bảo mật.
+    """
+    from app.models.core import User
+    ra = []
+    co_nguoi = {u.role for u in db.execute(select(User).where(User.active == True)).scalars()}   # noqa: E712
+    for vai in ROLES:
+        if vai in co_nguoi:
+            continue
+        so_man = len([m for m, cho in AC.MENU_ROLES.items() if vai in cho])
+        ra.append({"ma": f"vai_tro_khong_co_nguoi#{vai}", "loai": "vai_tro_khong_co_nguoi", "muc": "vang",
+                   "phong_ban": PHONG_CUA_VAI_TRO.get(vai, ""), "vai_tro": vai, "doi_tuong": vai,
+                   "tom_tat": f"{ROLES[vai]} được khai {so_man} màn hình trong ma trận nhưng chưa có "
+                              f"tài khoản nào giữ vai trò này – quyền đã cấp mà chưa ai nhận việc",
+                   "chi_tiet": {"so_man_hinh": so_man}})
+    return ra
+
+
+def _quyen_tung_vai_tro(db: Session) -> list[dict]:
+    """Quét quyền của TỪNG vai trò trên hệ thống thật, không cần tài khoản và không cần đăng nhập.
+
+    Bộ kiểm thử ở máy đã quét vai trò bằng cách tạo tài khoản robot rồi gọi thật. Trên hệ thống thật
+    thì không làm thế được – tạo tài khoản để robot đăng nhập là tạo lối vào thật, và cất mật khẩu cho
+    nó là một bài toán khác. Nhưng không cần: hai lớp chặn đều là hàm thuần của chuỗi vai trò, nên dựng
+    một User trong bộ nhớ rồi gọi thẳng hàng rào là đủ để biết vai trò đó đi được tới đâu.
+    """
+    from app.models.core import User
+    from fastapi import HTTPException
+    from app.main import app
+    ra = []
+    duong_dan = sorted({r.path for r in app.routes
+                        if str(getattr(r, "path", "")).startswith("/api/v1") and "{" not in r.path
+                        and "GET" in (getattr(r, "methods", None) or set())})
+    for vai in ROLES:
+        u = User(username=f"_quet_{vai}", full_name="quét quyền", role=vai, password_hash="")
+        mo = 0
+        for d in duong_dan:
+            try:
+                AC.check_restricted_scope(u, d)
+                mo += 1
+            except HTTPException:
+                pass
+        if mo == 0:
+            ra.append({"ma": f"quyen_tung_vai_tro#{vai}", "loai": "vai_tro_trong", "muc": "do",
+                       "phong_ban": PHONG_CUA_VAI_TRO.get(vai, ""), "vai_tro": vai, "doi_tuong": vai,
+                       "tom_tat": f"{ROLES[vai]} bị hàng rào phạm vi chặn ở MỌI đường dẫn – vai trò này "
+                                  f"đăng nhập vào là nhìn thấy hệ thống trống",
+                       "chi_tiet": {"so_duong_dan": len(duong_dan)}})
+    return ra
+
+
 def _ngoai_le_ton(db: Session) -> list[dict]:
     """Ngoại lệ nghiêm trọng để lâu không ai trả lời."""
     ra = []
@@ -200,7 +259,8 @@ def _ai_chua_hau_kiem(db: Session) -> list[dict]:
 from app.services.ks_cot_tien import _cot_tien_float, _thieu_khac_khong   # noqa: E402
 from app.services.ky_thuat import _su_kien_ky_thuat                       # noqa: E402
 
-BO_KIEM = (_mach_migration, _quyen_lech, _vai_tro_trong, _ngoai_le_ton, _ai_chua_hau_kiem,
+BO_KIEM = (_mach_migration, _quyen_lech, _vai_tro_trong, _vai_tro_khong_co_nguoi,
+           _quyen_tung_vai_tro, _ngoai_le_ton, _ai_chua_hau_kiem,
            _cot_tien_float, _thieu_khac_khong, _su_kien_ky_thuat)
 
 

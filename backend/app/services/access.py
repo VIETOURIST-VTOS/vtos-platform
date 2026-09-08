@@ -209,6 +209,7 @@ MAN_HINH_API = {
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
     "/marketing": ("/api/v1/marketing", "/api/v1/products", "/api/v1/users"),
     "/doc-chung-tu": ("/api/v1/doc-chung-tu", "/api/v1/nap-du-lieu", "/api/v1/tep"),
+    "/ket-so": ("/api/v1/ket-so", "/api/v1/accounting", "/api/v1/hach-toan"),
     "/nap-du-lieu": ("/api/v1/nap-du-lieu", "/api/v1/quyet-toan-tour"),
     "/ngoai-le": ("/api/v1/ngoai-le",),
     "/nha-cung-cap": ("/api/v1/ncc", "/api/v1/tours"),
@@ -360,6 +361,9 @@ MENU_ROLES = {
     # KHÔNG mở cho HCNS: bốn loại chứng từ đang mở không có loại nào của HCNS, và bảng lương với bảng
     # bảo hiểm thì cấm đọc bằng máy (Nghị định 13/2023) – mở màn hình cho họ là mời hiểu nhầm.
     "/doc-chung-tu": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "ptgd_doan", "cntt"),
+    # Khóa sổ một kỳ: sao kê vào sổ hàng loạt, kết chuyển, và trạng thái cả kỳ. Chỉ Kế toán GHI –
+    # Chủ tịch, TGĐ và Ban Kiểm soát xem chứ không ghi thay (chặn nằm ở API, không ở menu).
+    "/ket-so": BASE_VIEW + ("ketoan", "cntt"),
     # Tệp & hình ảnh: chứng từ đi kèm gần như mọi nghiệp vụ nên mở rộng; gỡ tệp thì hẹp hơn (xem API).
     "/tep": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ketoan", "hcns", "cntt", "nv_mkt",
                                                                       "nv_visa", "hanh_chinh"),
