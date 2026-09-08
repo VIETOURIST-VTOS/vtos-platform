@@ -162,7 +162,14 @@ def _ai_chua_hau_kiem(db: Session) -> list[dict]:
              "chi_tiet": {"so_luong": n}}]
 
 
-BO_KIEM = (_mach_migration, _quyen_lech, _vai_tro_trong, _ngoai_le_ton, _ai_chua_hau_kiem)
+# K1, K2, K6 (lệnh 08/9/2026). Ba bộ kiểm này viết TRƯỚC khi ai sửa mã, để đo được sửa tới đâu:
+# hai bộ đầu đếm cột tiền còn sai kiểu và cột "chưa có số" đang bị ghi thành 0; bộ thứ ba là chỗ robot
+# nhìn thấy sức khỏe của chính máy chủ chứ không chỉ số liệu của các phòng ban.
+from app.services.ks_cot_tien import _cot_tien_float, _thieu_khac_khong   # noqa: E402
+from app.services.ky_thuat import _su_kien_ky_thuat                       # noqa: E402
+
+BO_KIEM = (_mach_migration, _quyen_lech, _vai_tro_trong, _ngoai_le_ton, _ai_chua_hau_kiem,
+           _cot_tien_float, _thieu_khac_khong, _su_kien_ky_thuat)
 
 
 def quet(db: Session, boi: str = "robot_ks") -> dict:

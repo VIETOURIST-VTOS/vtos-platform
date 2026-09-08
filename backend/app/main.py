@@ -37,6 +37,7 @@ from app.api.v1.ngoai_le import router as ngoai_le_router
 from app.api.v1.kiem_soat import router as kiem_soat_router
 from app.api.v1.hach_toan import router as hach_toan_router
 from app.api.v1.cskh import router as cskh_router
+from app.api.v1.ks_ra_soat import router as ks_ra_soat_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -50,6 +51,8 @@ async def robot_loop():
             db = SessionLocal()
             from app.services import inbox as IB
             IB.robot_check(db)                      # R12 mỗi phút: AI trả lời thay khi sale trễ SLA
+            from app.services import ky_thuat as KT
+            KT.nap_nguong(db)       # ngưỡng "chậm bất thường" nằm ở tham số chính sách, không viết cứng
             if i % 10 == 0: R.run_robots(db)         # các robot khác mỗi 10 phút
             if i % 10 == 0:
                 # Sinh phiếu chăm sóc cho tour vừa kết thúc và cảnh báo khiếu nại quá hạn phản hồi.
@@ -68,6 +71,15 @@ async def robot_loop():
             db.close()
         except Exception as e:  # noqa
             print("robot error", e)
+            # Tác vụ nền hỏng thì không hiện trên màn hình nào – phải ghi lại, nếu không nó dừng lặng lẽ.
+            try:
+                import traceback
+                from app.services import ky_thuat as KT
+                KT.ghi_moi_phien("tac_vu_nen", muc="do", duong_dan="robot_loop",
+                                 thong_bao=f"{type(e).__name__}: {str(e)[:300]}",
+                                 dau_vet=traceback.format_exc())
+            except Exception:  # noqa
+                pass
 
 
 @asynccontextmanager
@@ -91,6 +103,13 @@ async def lifespan(app: FastAPI):
         nap_quy_tac(db)
         if settings.SEED_DEMO:
             seed_all(db)
+        # K6 – một dòng mỗi lần máy chủ lên, kèm trạng thái mạch nâng cấp. Đây là dữ kiện duy nhất
+        # về lần khởi động mà tiến trình này quan sát được, vì lệnh nâng cấp chạy trước nó.
+        try:
+            from app.services import ky_thuat as KT
+            KT.nap_nguong(db); KT.ghi_khoi_dong(db)
+        except Exception as e:  # noqa
+            print("ghi khoi dong error", e)
     finally:
         db.close()
     task = asyncio.create_task(robot_loop())
@@ -115,6 +134,45 @@ async def _danh_dau_dashboard_cu(request, call_next):
     if request.method != "GET":
         from app.api.v1 import routes as _r
         _r._DASH_DIRTY = True
+    return resp
+
+
+@app.middleware("http")
+async def _ghi_su_kien_ky_thuat(request, call_next):
+    """K6 – ghi lỗi máy chủ và đường dẫn chậm bất thường để robot Kiểm soát đọc được.
+
+    Trước lớp này robot mù hoàn toàn với sức khỏe máy chủ: ngày 07/9/2026 endpoint /meta trả 500 cho
+    mọi vai trò trên hệ thống thật, và thứ tìm ra nó là bộ quét vai trò chứ không phải bộ theo dõi lỗi.
+
+    Lớp này KHÔNG được làm hỏng yêu cầu nào. Ngoại lệ của người dùng vẫn ném lên như cũ; việc ghi nằm
+    trong try riêng và nuốt mọi lỗi của chính nó.
+    """
+    import time as _t
+    from app.services import ky_thuat as KT
+    t0 = _t.perf_counter()
+    try:
+        resp = await call_next(request)
+    except Exception as ex:      # noqa
+        import traceback
+        KT.ghi_moi_phien("loi_5xx", muc="do", duong_dan=request.url.path,
+                         phuong_thuc=request.method, ma_trang_thai=500,
+                         mili_giay=int((_t.perf_counter() - t0) * 1000),
+                         thong_bao=f"{type(ex).__name__}: {str(ex)[:300]}",
+                         dau_vet=traceback.format_exc())
+        raise
+    ms = int((_t.perf_counter() - t0) * 1000)
+    try:
+        p = request.url.path
+        if resp.status_code >= 500:
+            KT.ghi_moi_phien("loi_5xx", muc="do", duong_dan=p, phuong_thuc=request.method,
+                             ma_trang_thai=resp.status_code, mili_giay=ms,
+                             thong_bao=f"Máy chủ trả {resp.status_code}")
+        elif ms > KT.NGUONG_CHAM_MS and not any(p.startswith(x) for x in KT.BO_QUA_CHAM):
+            KT.ghi_moi_phien("cham", muc="vang", duong_dan=p, phuong_thuc=request.method,
+                             ma_trang_thai=resp.status_code, mili_giay=ms,
+                             thong_bao=f"Chạy {ms} mili giây, quá ngưỡng {KT.NGUONG_CHAM_MS}")
+    except Exception:      # noqa
+        pass
     return resp
 
 
@@ -147,6 +205,7 @@ app.include_router(ngoai_le_router)
 app.include_router(kiem_soat_router)
 app.include_router(hach_toan_router)
 app.include_router(cskh_router)
+app.include_router(ks_ra_soat_router)
 app.include_router(debts_router)
 app.include_router(ncc_router)
 app.include_router(intake_router)

@@ -25,6 +25,8 @@ LOAI_PHAT_HIEN = {
     "ngoai_le_ton": "Ngoại lệ nghiêm trọng tồn quá lâu không ai xử lý",
     "so_lieu_bat_thuong": "Số liệu bất thường của một phòng ban",
     "ai_chua_hau_kiem": "Nội dung AI mức 3 chưa ai hậu kiểm",
+    "cot_tien_float": "Cột tiền còn khai kiểu số thực nhị phân",
+    "thieu_khac_0": "Cột tiền ghi 0 thay cho “chưa có số”",
 }
 
 
