@@ -53,7 +53,10 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Thu & đối soát", "/collections"], ["Đề nghị chi & thanh toán", "/expenses"], ["Công nợ", "/cong-no"],
     ["Bảo lưu & hoàn tiền", "/bookings"], ["Dòng tiền", "/finance?tab=forecast"], ["Vay & đầu tư", "/finance?tab=contracts"],
     ["Tài khoản ngân hàng", "/bank-accounts"], ["Sổ kế toán", "/accounting?tab=journal"], ["Hóa đơn & thuế", "/accounting?tab=invoices"],
-    ["Báo cáo tài chính", "/accounting?tab=bctc"], ["Hồ sơ kiểm toán", ""], ["Khóa kỳ", "/accounting?tab=periods"]] },
+    ["Báo cáo tài chính", "/accounting?tab=bctc"], ["Hồ sơ kiểm toán", ""],
+    // Kết sổ đứng NGAY TRƯỚC Khóa kỳ vì đó là thứ tự thật của việc: đưa sao kê vào sổ, kết chuyển bốn
+    // bước, rồi mới khóa. Xếp ngược lại thì người dùng gặp nút khóa trước khi gặp việc phải làm.
+    ["Kết sổ kỳ", "/ket-so"], ["Khóa kỳ", "/accounting?tab=periods"]] },
   { key: "nhansu", label: "8. Hành chính & Nhân sự", items: [
     ["Hồ sơ nhân sự", "/hr?tab=employees"], ["Hợp đồng lao động", "/hop-dong-lao-dong"], ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
     ["Báo cáo công việc", "/reports"], ["Đánh giá & sự vụ", "/hr?tab=incidents"], ["Văn bản", ""], ["Tài sản & mua sắm", "/tai-san"]] },

@@ -20,11 +20,37 @@ router = APIRouter(prefix="/api/v1/kiem-soat", tags=["kiem-soat"])
 XEM = ("chutich", "tgd", "bks", "cntt", "robot_ks", "robot_pq", "robot_vpm")
 CHAY = ("bks", "cntt", "robot_ks")   # Chủ tịch và TGĐ vẫn qua được (FULL_ACCESS trong deps)
 HAU_KIEM = ("chutich", "tgd")
+# Rà soát kỹ thuật (K1/K2: một cột là tiền hay không) mở thêm cho Kế toán, vì đó là phán đoán kế toán
+# chứ không phải giám sát. Xem chú thích ở MENU_ROLES["/kiem-soat"].
+RA_SOAT = XEM + ("ketoan",)
+
+# Màn hình có bốn thẻ, và không phải ai mở được màn hình cũng mở được cả bốn. Trả danh sách này ra để
+# giao diện chỉ vẽ thẻ người dùng thật sự bấm được: một cái nút bấm vào là 403 còn khó chịu hơn không
+# có nút, và người dùng không phân biệt được "không có quyền" với "phần mềm hỏng".
+THE = {
+    "phat_hien": XEM,          # việc robot tìm ra
+    "bao_cao": XEM,            # báo cáo gửi Chủ tịch
+    "diem": XEM,               # chấm điểm phòng ban – phòng ban KHÔNG đọc điểm của chính mình
+    "ra_soat": RA_SOAT,        # rà soát cột tiền và sự kiện kỹ thuật
+}
+
+
+def the_duoc_xem(vai_tro: str) -> list[str]:
+    from app.api.deps import FULL_ACCESS
+    return [k for k, vt in THE.items() if vai_tro in vt or vai_tro in FULL_ACCESS]
+
+
+@router.get("/the")
+def the(u: User = Depends(require_roles(*RA_SOAT))):
+    """Thẻ nào người đang đăng nhập mở được. Giao diện gọi trước khi vẽ thanh thẻ."""
+    return {"the": the_duoc_xem(u.role)}
 
 
 @router.get("")
 def bang(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
-    return KS.bang(db)
+    ra = KS.bang(db)
+    ra["the_duoc_xem"] = the_duoc_xem(u.role)
+    return ra
 
 
 @router.post("/quet")

@@ -94,3 +94,72 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
         pv = AC.pham_vi_day_du(vai)
         mat = [x for x in cu if x not in pv]
         assert not mat, f"{vai} mất: {mat}"
+
+
+# ============================ P13 – CHỐT SỐ, KHÔNG ĐỂ NỚI ÂM THẦM ============================
+# Đo ngày 08/9/2026 sau khi màn hình kết sổ vào ma trận. Đây là số NHÓM API mỗi vai trò được chạm,
+# không phải số đường dẫn – số đường dẫn đổi mỗi lần thêm một endpoint, số nhóm chỉ đổi khi có người
+# quyết cho một vai trò thêm hoặc bớt một màn hình.
+#
+# Vì sao phải chốt: phép thử P2 chỉ canh tính NHẤT QUÁN – không nhóm mồ côi, bản đồ khớp giao diện,
+# bốn vai trò hẹp không mất quyền. Không có gì cản một lần nới đưa Kế toán từ 78 lên 92, và loại việc
+# đó đã xảy ra thật trong ngày: một vai trò được thêm vào một màn hình trong lúc gộp nhánh, không ai
+# thấy cho tới khi một phép thử khác đỏ.
+#
+# Bảng này KHÔNG phải để đóng băng quyền. Nó để mỗi lần nới là một lần có người phải sửa bảng – tức là
+# phải nhìn thấy mình đang nới cho ai, và ghi lại vì sao.
+# Chốt lại 08/9/2026 khi gộp nhánh robot-phanmem vào main. MỌI vai trò đều +2, ba vai trò kinh doanh
+# +3, và ba dòng mới cho vai trò máy. Ghi rõ từng phần cộng thêm, vì đó là toàn bộ công dụng của bảng
+# này – con số đổi mà không ai giải thích được thì lần sau người ta sửa số cho xanh rồi đi tiếp.
+#
+#   +1 mọi vai trò  /api/v1/pham-vi     – P6: ai cũng phải đọc được phạm vi pháp nhân của CHÍNH phiên
+#                                          mình, nếu không màn hình không nói được họ đang xem dữ liệu
+#                                          của công ty nào.
+#   +1 mọi vai trò  /api/v1/phieu-luong – phiếu lương của chính mình; tiền tố này chỉ chứa endpoint tự
+#                                          lọc về đúng người, KHÔNG chứa bảng lương toàn công ty.
+#   +1 nv_kd/tn_kd/tp_kd  /api/v1/visa  – sales phụ trách mở được hồ sơ visa của khách MÌNH (1259841).
+#
+# Ba vai trò máy (P8) vào bảng ngay từ lần đầu: chốt sớm thì mọi lần nới sau đều phải giải thích.
+PHAM_VI_DA_CHOT = {
+    "chutich": 96, "tgd": 96, "bks": 96, "cntt": 94,
+    "ketoan": 80, "tp_dh": 77, "ptgd_doan": 57, "nv_dh": 53, "hcns": 52, "gd_kd": 51,
+    "ptgd_mkt": 38, "nv_kd": 39, "tn_kd": 39, "tp_kd": 39, "nv_mkt": 30,
+    "gd_doi_xe": 24, "hanh_chinh": 24, "tp_hd": 22, "xe_hdv": 17, "nv_visa": 17,
+    # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
+    "robot_pq": 18, "robot_ks": 17, "robot_vpm": 17,
+}
+
+
+def test_pham_vi_tung_vai_tro_dung_nhu_da_chot():
+    """Lệch bảng này thì ĐỎ, và người sửa phải sửa cả bảng – đó chính là mục đích."""
+    lech = []
+    for vai in ROLES:
+        thuc = len(AC.pham_vi_day_du(vai))
+        chot = PHAM_VI_DA_CHOT.get(vai)
+        if chot is None:
+            lech.append(f"{vai}: vai trò mới, chưa có trong bảng chốt")
+        elif thuc != chot:
+            huong = "NỚI" if thuc > chot else "SIẾT"
+            lech.append(f"{vai}: {huong} {chot} → {thuc}")
+    assert not lech, ("Phạm vi vai trò đổi so với bảng đã chốt. Nếu đúng ý thì sửa PHAM_VI_DA_CHOT và "
+                      f"ghi vì sao trong thông điệp ghi mã; nếu không thì đây là một lần nới nhầm: {lech}")
+
+
+def test_bang_chot_phu_du_moi_vai_tro():
+    """Thêm một vai trò mà quên chốt phạm vi thì vai trò đó nới bao nhiêu cũng không ai biết.
+
+    Tên cũ của phép thử này là "phủ đủ hai mươi vai trò". Bỏ con số ra khỏi tên khi thêm ba vai trò
+    máy: một phép thử mang con số trong tên là một phép thử mà cách sửa nhanh nhất là đổi con số."""
+    thieu = [v for v in ROLES if v not in PHAM_VI_DA_CHOT]
+    thua = [v for v in PHAM_VI_DA_CHOT if v not in ROLES]
+    assert not thieu and not thua, f"thiếu: {thieu} · thừa: {thua}"
+
+
+def test_thu_tu_pham_vi_hop_ly():
+    """Ba phép so bất biến: lãnh đạo rộng nhất, người ở hiện trường hẹp nhất, và không vai trò nghiệp
+    vụ nào rộng bằng Chủ tịch. Ba câu này đúng bất kể con số thay đổi thế nào."""
+    pv = {v: len(AC.pham_vi_day_du(v)) for v in ROLES}
+    assert pv["chutich"] == pv["tgd"] == pv["bks"], "Chủ tịch, TGĐ và Ban Kiểm soát phải nhìn như nhau"
+    assert pv["xe_hdv"] < pv["nv_dh"] < pv["tp_dh"], "người ở hiện trường phải hẹp hơn văn phòng"
+    for vai in ("nv_kd", "nv_mkt", "hanh_chinh", "nv_visa", "xe_hdv", "gd_doi_xe", "tp_hd"):
+        assert pv[vai] < pv["chutich"], f"{vai} rộng bằng Chủ tịch"

@@ -211,23 +211,53 @@ def test_vi_tri_kiem_soat_khai_dung_bang_quyen_ai():
 
 
 def test_menu_kiem_soat_theo_dung_ma_tran():
-    """Ai mở được bàn làm việc của robot Kiểm soát.
+    """Ai mở được tiền tố /kiem-soat, và ai mở được BÀN LÀM VIỆC GIÁM SÁT – hai câu hỏi khác nhau.
 
-    Nguyên tắc 07/9 xếp Kế toán ra ngoài màn hình này. K1/K2 ngày 08/9 lại đặt Kế toán trưởng làm NGƯỜI
-    QUYẾT: một cột là tiền hay không, và sửa hay giữ, là câu hỏi nghiệp vụ kế toán – để CNTT quyết một
-    mình chính là kiểu sai mà cả hệ thống này dựng ra để chặn. Hai chỗ nói ngược nhau nên bàn làm việc
-    mở ra mà mọi nút bấm đều 403.
+    Hai nhánh đợt 2 sửa phép thử này theo hai hướng, và cả hai đều đúng một nửa. Gộp lại thì sự thật
+    đầy đủ là: hai thứ khác nhau đang nằm chung một tiền tố đường dẫn.
 
-    Chốt ngày 08/9/2026: Kế toán XEM được màn hình này. Quyền GHI không nới theo – nó vẫn nằm ở chữ ký
-    endpoint (ks_ra_soat.QUYET), và Ban Kiểm soát vẫn không có trong danh sách quyết: robot không tự chốt
-    xếp loại do chính nó đề xuất. Ba vai trò còn lại vẫn đứng ngoài.
+      · Bàn làm việc giám sát – phát hiện, điểm phòng ban, báo cáo. Nguyên tắc 07/9: phòng ban không
+        đọc kết quả giám sát chính mình. Kế toán KHÔNG có ở đây.
+      · Rà soát kỹ thuật K1/K2 – một cột là tiền hay không, sửa hay giữ. Đây là phán đoán KẾ TOÁN, và
+        chính robot Kiểm soát chỉ định Kế toán trưởng làm người quyết.
+
+    Hàng rào phạm vi chỉ phân biệt tới mức TIỀN TỐ, nên muốn Kế toán làm được việc thứ hai thì buộc
+    phải cho họ chạm tiền tố – tức là phải có mặt trong dòng menu. Ranh giới thật nằm ở chữ ký từng
+    đường dẫn, và phép thử dưới đây canh ở đúng đó chứ không canh ở dòng menu.
     """
     from app.services.access import MENU_ROLES
     from app.api.v1 import ks_ra_soat as KR
     assert "/kiem-soat" in MENU_ROLES
-    for vai in ("chutich", "tgd", "bks", "cntt", "ketoan"): assert vai in MENU_ROLES["/kiem-soat"]
-    for vai in ("nv_kd", "hcns", "tp_dh"): assert vai not in MENU_ROLES["/kiem-soat"]
+    for vai in ("chutich", "tgd", "bks", "cntt", "ketoan"):
+        assert vai in MENU_ROLES["/kiem-soat"]
+    for vai in ("nv_kd", "hcns", "tp_dh", "gd_kd", "ptgd_doan", "nv_dh"):
+        assert vai not in MENU_ROLES["/kiem-soat"], f"{vai} không được vào bàn làm việc giám sát"
+    # Ban Kiểm soát KHÔNG có trong danh sách quyết: robot không tự chốt xếp loại do chính nó đề xuất.
     assert "ketoan" in KR.QUYET and "bks" not in KR.QUYET
+
+
+def test_ketoan_ra_soat_duoc_nhung_khong_doc_duoc_giam_sat():
+    """Nguyên tắc 07/9 – phòng ban không đọc kết quả giám sát chính mình – được bảo đảm ở lớp API,
+    KHÔNG ở dòng menu.
+
+    Phép thử cũ canh điều này ở dòng menu, tức là canh ở chỗ nó KHÔNG được bảo đảm. Nay canh ở đúng
+    lớp: Kế toán rà soát được cột tiền, và KHÔNG đọc được phát hiện, điểm hay báo cáo.
+    """
+    h = login("ketoan")
+    assert client.get("/api/v1/kiem-soat/cot-tien", headers=h).status_code == 200
+    assert client.get("/api/v1/kiem-soat", headers=h).status_code == 403, \
+        "Kế toán đọc được bàn làm việc giám sát – phòng ban đang đọc kết quả giám sát chính mình"
+    assert client.post("/api/v1/kiem-soat/cham-diem", headers=h).status_code == 403
+    # và giao diện phải biết điều đó để không vẽ thẻ bấm vào là 403
+    r = client.get("/api/v1/kiem-soat/the", headers=h)
+    assert r.status_code == 200 and r.json()["the"] == ["ra_soat"], r.text
+
+
+def test_lanh_dao_va_robot_mo_duoc_ca_bon_the():
+    for vai in ("chutich", "cntt"):
+        r = client.get("/api/v1/kiem-soat/the", headers=login(vai))
+        assert r.status_code == 200 and set(r.json()["the"]) == {"phat_hien", "bao_cao", "diem", "ra_soat"}, \
+            f"{vai}: {r.text}"
 
 
 def test_khong_bao_oan_endpoint_da_chan_trong_than_ham():
