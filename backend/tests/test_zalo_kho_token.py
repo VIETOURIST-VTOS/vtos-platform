@@ -138,3 +138,15 @@ def test_zt7_duong_uy_quyen_tro_ve_domain_da_xac_thuc():
     assert "vtos.infinitytours.org" in Z.TRA_VE and Z.TRA_VE.startswith("https://")
     assert "vtos.infinitytours.org" in duong.replace("%3A", ":").replace("%2F", "/")
     db.close()
+
+
+def test_zt8_tep_xac_thuc_tien_to_url_tra_dung_chuoi_cua_ung_dung():
+    """Zalo bắt xác thực TIỀN TỐ URL /api/v1/zalo/ – tệp ấy phải do máy chủ trả, không phải giao diện.
+
+    Chiều ngược quan trọng hơn: trả lại đúng chuỗi người gọi đưa vào thì BẤT KỲ ứng dụng Zalo nào cũng
+    xác thực được tiền tố URL của công ty, tức là cướp được đường nhận uỷ quyền.
+    """
+    from app.api.v1.crm import ZALO_VERIFIER
+    r = client.get(f"/api/v1/zalo/zalo_verifier{ZALO_VERIFIER}.html")
+    assert r.status_code == 200 and r.text.strip() == ZALO_VERIFIER
+    assert client.get("/api/v1/zalo/zalo_verifierCHUOI_BIA_DAT.html").status_code == 404

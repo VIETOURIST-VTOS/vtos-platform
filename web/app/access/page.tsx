@@ -57,6 +57,7 @@ function AccessPage() {
   const [tcVai, setTcVai] = useState("");
   const [suy, setSuy] = useState<any>(null);
   const [dangSuy, setDangSuy] = useState(false);
+  const [mkRobot, setMkRobot] = useState<any>(null);   // mật khẩu robot – chỉ hiện MỘT lần
   const [tcRole, setTcRole] = useState<any>(null);
 
   const loadAcc = useCallback(() => { api("/access/accounts").then(setAcc).catch((e) => toast(errMsg(e), true)); }, [toast]);
@@ -226,9 +227,8 @@ function AccessPage() {
       {suy && (suy.dem.suy_duoc > 0 || suy.dem.khong_suy_duoc > 0 || suy.dem.lech_voi_ho_so > 0) && <div style={{ marginBottom: 18 }}>
         <h3>Gán pháp nhân cho tài khoản, suy từ hồ sơ nhân sự</h3>
         <p className="muted">Pháp nhân của tài khoản quyết định người đó nhìn thấy dữ liệu của công ty nào.
-          Chỉ suy khi tài khoản nối được với một hồ sơ nhân sự <b>đang làm việc</b> và hồ sơ ấy đã có pháp
-          nhân — không suy từ phòng ban hay vai trò, không mặc định về công ty mẹ, và không ghi đè giá trị
-          đã gán tay.</p>
+          Suy theo <b>phòng ban của hồ sơ nhân sự đang làm việc</b>, và không ghi đè giá trị đã gán tay.</p>
+        {suy.quy_tac && <p><Tag cls="ok">Quy tắc</Tag> {suy.quy_tac.cau}</p>}
         <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center", margin: "8px 0" }}>
           <Tag cls="ok">{suy.dem.suy_duoc} suy được</Tag>
           <Tag cls="warn">{suy.dem.khong_suy_duoc} phải gán tay</Tag>
@@ -246,12 +246,18 @@ function AccessPage() {
         </div>
 
         {suy.suy_duoc.length > 0 && <div className="scroll"><table><thead><tr>
-          <th>Mã NV</th><th>Họ tên</th><th>Vai trò</th><th>Hồ sơ</th><th>Sẽ gán</th><th>Nối bằng</th>
+          <th>Mã NV</th><th>Họ tên</th><th>Vai trò</th><th>Phòng</th><th>Sẽ gán</th><th>Ghi chú</th>
         </tr></thead><tbody>{suy.suy_duoc.map((x: any) => <tr key={x.user_id}>
           <td>{x.staff_code || "—"}</td><td>{x.full_name}</td><td>{x.role_name}</td>
-          <td>{x.ho_so}</td><td><b>{x.company}</b></td>
-          <td className="muted">{x.noi_bang === "user_id" ? "hồ sơ đã nối" : "mã nhân viên"}</td>
+          <td>{x.phong || "—"}</td><td><b>{x.company}</b></td>
+          <td className="muted">{x.ly_do_quy_tac
+            ? <><Tag cls="warn">hồ sơ ghi {x.ho_so_company}</Tag> {x.ly_do_quy_tac}</>
+            : (x.noi_bang === "user_id" ? "hồ sơ đã nối" : "nối bằng mã nhân viên")}</td>
         </tr>)}</tbody></table></div>}
+        {suy.suy_duoc.some((x: any) => x.ly_do_quy_tac) && <p className="muted">
+          Dòng có dấu <b>hồ sơ ghi …</b> là chỗ hồ sơ nhân sự ghi khác quy tắc. Quy tắc thắng ở bảng này,
+          nhưng nên báo HCNS sửa lại hồ sơ — vì hồ sơ mới là nơi con số ấy được dùng để chia bút toán lương.
+        </p>}
 
         {suy.lech_voi_ho_so.length > 0 && <>
           <h4 style={{ marginTop: 14 }}>Tài khoản và hồ sơ đang nói khác nhau ({suy.lech_voi_ho_so.length})</h4>
@@ -273,6 +279,40 @@ function AccessPage() {
             <td className="muted">{x.ly_do}</td>
           </tr>)}</tbody></table></div>
         </>}
+      </div>}
+
+      {/* Tài khoản cho ba vai trò máy. Chưa có tài khoản riêng thì robot vẫn chạy dưới tên một con
+          người, và nhật ký không phân biệt được ai làm gì – đúng vấn đề mà vai trò máy sinh ra để giải.
+          Mật khẩu ngẫu nhiên và hiện ĐÚNG MỘT LẦN: không lưu ở dạng đọc được, mất thì đặt lại. */}
+      {acc && <div style={{ marginBottom: 18 }}>
+        <h3>Tài khoản cho robot</h3>
+        <p className="muted">Mỗi vai trò máy MỘT tài khoản. Hai tài khoản cùng một vai trò thì không truy
+          được lần chạy nào của bên nào. Mật khẩu sinh ngẫu nhiên và chỉ hiện một lần ngay sau khi tạo.</p>
+        <div className="scroll"><table><thead><tr>
+          <th>Vai trò máy</th><th>Tài khoản</th><th></th></tr></thead><tbody>
+          {Object.entries(acc.roles || {}).filter(([k]: any) => k.startsWith("robot_")).map(([k, v]: any) => {
+            const co = (acc.rows || []).find((r: any) => r.role === k && r.active);
+            return <tr key={k}>
+              <td>{v}</td>
+              <td>{co ? co.username : <Tag cls="warn">chưa có</Tag>}</td>
+              <td>{!co && canWrite && <button className="act" style={{ margin: 0 }} onClick={async () => {
+                if (!confirm(`Tạo tài khoản đăng nhập cho ${v}? Mật khẩu chỉ hiện một lần.`)) return;
+                try {
+                  const r = await api<any>("/access/accounts/robot", { method: "POST", json: { role: k } });
+                  setMkRobot(r); loadAcc(); loadGaps();
+                } catch (e) { toast(errMsg(e), true); }
+              }}>Tạo tài khoản</button>}</td>
+            </tr>;
+          })}
+        </tbody></table></div>
+        {mkRobot && <div className="panel" style={{ marginTop: 10 }}>
+          <p><Tag cls="ok">Đã tạo</Tag> {mkRobot.message}</p>
+          <p>Tài khoản: <b>{mkRobot.username}</b></p>
+          <p>Mật khẩu: <code style={{ fontSize: 16, userSelect: "all" }}>{mkRobot.mat_khau}</code></p>
+          <p className="muted">{mkRobot.luu_y}</p>
+          <button className="act grey" style={{ margin: 0 }} onClick={() => setMkRobot(null)}>
+            Đã chép xong, ẩn đi</button>
+        </div>}
       </div>}
 
       {gaps.tong === 0 && <p>Không có chênh lệch nào.</p>}

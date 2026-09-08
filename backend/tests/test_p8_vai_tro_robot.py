@@ -119,7 +119,7 @@ def test_doc_danh_sach_nghiep_vu_cung_bi_chan_chu_khong_chi_ghi():
     """Bản nháp của tệp này gọi POST vào một đường dẫn KHÔNG TỒN TẠI và nhận 405, suýt đọc thành
     "đã bị chặn". 405 là bộ định tuyến trả lời, hàng rào quyền chưa chạy tới. Nên canh thêm bằng GET
     – đường dẫn chắc chắn có thật – để phép thử nói về hàng rào chứ không nói về bảng định tuyến."""
-    for vai in AC.VAI_TRO_MAY:
+    for vai in ("robot_pq", "robot_vpm"):
         h = login(vai)
         for path in ("/api/v1/tours", "/api/v1/bookings", "/api/v1/journal", "/api/v1/payment-requests"):
             r = client.get(path, headers=h)
@@ -139,10 +139,32 @@ def test_robot_phan_quyen_khong_tu_sua_duoc_quyen():
         assert r.status_code == 403, f"robot Phân quyền tự sửa được quyền qua {path}: {r.status_code}"
 
 
-def test_robot_kiem_soat_khong_tu_sua_duoc_quyen_cua_minh():
-    """Phân quyền là nguồn duy nhất của quyền – kể cả với robot đi soi người khác."""
-    r = client.get("/api/v1/access/accounts", headers=login("robot_ks"))
-    assert r.status_code == 403, f"robot Kiểm soát vào được màn hình phân quyền: {r.status_code}"
+def test_robot_kiem_soat_doc_duoc_moi_thu_nhung_khong_ghi_duoc_gi():
+    """Quyết định 09/9/2026: robot làm việc Ban Kiểm soát thì phải nhìn được thứ BKS nhìn.
+
+    Điều cấm của nó vì thế đổi KIỂU chứ không đổi mức chặt: không còn là "không được chạm tiền tố nào"
+    mà là "KHÔNG ĐƯỢC GHI GÌ CẢ" – rộng hơn và chặt hơn. Đọc bảng phân quyền là việc của người đi rà
+    quyền; SỬA bảng phân quyền thì không, kể cả với robot đi soi người khác.
+    """
+    h = login("robot_ks")
+    assert client.get("/api/v1/access/accounts", headers=h).status_code == 200, \
+        "robot Kiểm soát không đọc được bảng phân quyền thì rà quyền bằng gì"
+    for method, path, body in (
+            ("POST", "/api/v1/access/role-change/1", {"role": "chutich", "ly_do": "x"}),
+            ("PUT", "/api/v1/access/users/1/company", {"company_id": None}),
+            ("POST", "/api/v1/params", {"key": "x", "value": "1"}),
+            ("POST", "/api/v1/ngoai-le/dong", {"ma": "X", "ket_luan": "xong"})):
+        r = client.request(method, path, json=body, headers=h)
+        assert r.status_code == 403, f"robot Kiểm soát GHI được {method} {path}: {r.status_code}"
+
+
+def test_robot_kiem_soat_bi_chan_ghi_o_lop_chung_chu_khong_tung_cua():
+    """Hàng rào thật của robot_ks là READ_ONLY_ROLES – một lớp chặn MỌI phương thức ghi, không phải
+    một danh sách cửa phải nhớ liệt kê. Danh sách cửa thì luôn thiếu đúng cái cửa vừa thêm hôm qua."""
+    assert "robot_ks" in AC.READ_ONLY_ROLES
+    assert "robot_ks" in AC.BASE_VIEW, "đọc toàn bộ như BKS thì phải nằm trong nền của mọi dòng ma trận"
+    assert len(AC.pham_vi_day_du("robot_ks")) == len(AC.pham_vi_day_du("bks")), \
+        "robot Kiểm soát phải nhìn đúng bằng Ban Kiểm soát, không hơn không kém"
 
 
 # ---------------- Bảng điều cấm phải khớp hàng rào thật ----------------
@@ -157,10 +179,15 @@ def test_bang_dieu_cam_khop_voi_hang_rao_that():
             assert len(ly_do) > 30, f"{vai}/{tien_to}: điều cấm không ghi đủ lý do"
 
 
-def test_ba_robot_khong_nam_trong_nhom_quyen_lon():
+def test_khong_robot_nao_co_toan_quyen():
+    """KHÔNG robot nào có FULL_ACCESS – đó là quyền đi qua mọi hàng rào, và nó chỉ dành cho Chủ tịch.
+
+    robot_ks nằm trong BASE_VIEW từ 09/9/2026 (đọc toàn bộ như BKS) nhưng đó là quyền ĐỌC, chặn ghi
+    vẫn nguyên. Hai robot kia không có cả hai."""
     from app.api.deps import FULL_ACCESS
     for vai in AC.VAI_TRO_MAY:
-        assert vai not in FULL_ACCESS, f"{vai} có toàn quyền"
+        assert vai not in FULL_ACCESS, f"{vai} có toàn quyền – đi qua được mọi hàng rào"
+    for vai in ("robot_pq", "robot_vpm"):
         assert vai not in AC.BASE_VIEW, f"{vai} nằm trong nền BASE_VIEW – thấy mọi màn hình"
         assert vai not in AC.AUDIT_ROLES, f"{vai} đọc được nhật ký kiểm toán"
 

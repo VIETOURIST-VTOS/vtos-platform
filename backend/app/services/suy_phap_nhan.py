@@ -36,6 +36,28 @@ from app.models.core import User, Company, ROLES
 from app.models.hr import Employee
 from app.services import rules as R
 
+# QUY TẮC PHÁP NHÂN – Chủ tịch chốt ngày 09/9/2026.
+#
+#   "Tài xế và GĐ Huấn là pháp nhân Công ty TNHH Vận tải Vietrip, còn lại là Vietourist Holdings."
+#
+# Viết theo PHÒNG BAN chứ không theo vai trò, và đó là chỗ phải đọc kỹ: vai trò xe_hdv gộp CẢ tài xế
+# lẫn hướng dẫn viên vào một tên. Chốt theo vai trò thì toàn bộ HDV bị kéo sang công ty vận tải – điều
+# Chủ tịch không nói, và là điều sai: HDV nay là cộng tác viên của phòng Hướng dẫn, không phải người
+# của đội xe. Phòng ban phân biệt được hai nhóm ấy; vai trò thì không.
+#
+# Mã pháp nhân chứ không phải số thứ tự: số thứ tự đổi theo từng cơ sở dữ liệu, mã thì không.
+PHONG_THEO_PHAP_NHAN = {
+    "doi_xe": "VTRIP-VT",      # tài xế và Giám đốc điều hành đội xe
+}
+PHAP_NHAN_MAC_DINH = "VTD"     # Vietourist Holdings – mọi phòng còn lại
+
+
+def _theo_quy_tac(db: Session, e) -> tuple[int | None, str]:
+    """Pháp nhân mà QUY TẮC nói, kèm mã. (None, "") khi danh mục chưa có pháp nhân ấy."""
+    ma = PHONG_THEO_PHAP_NHAN.get(getattr(e, "department", "") or "", PHAP_NHAN_MAC_DINH)
+    c = db.execute(select(Company).where(Company.code == ma)).scalars().first()
+    return (c.id if c else None), ma
+
 
 def _ho_so_cua(db: Session) -> tuple[dict, dict]:
     """Hai bảng tra: theo user_id, và theo mã nhân viên. Chỉ lấy hồ sơ ĐANG LÀM VIỆC.
@@ -98,13 +120,26 @@ def xem_truoc(db: Session) -> dict:
                              + (f" (mã {u.staff_code} không có trong danh sách)" if u.staff_code
                                 else " và không có mã nhân viên"))
             khong_suy_duoc.append(dong)
-        elif not e.company_id:
-            dong["ly_do"] = f"Hồ sơ {e.code} cũng chưa có pháp nhân – phải gán ở màn hình Nhân sự trước"
+            continue
+
+        # Từ 09/9/2026 nguồn quyết định là QUY TẮC của Chủ tịch, không phải cột company_id của hồ sơ:
+        # quy tắc vừa được chốt, còn cột kia là số liệu cũ nhập rải rác từ trước và chưa chắc theo kịp.
+        # Hồ sơ vẫn được đọc, nhưng để ĐỐI CHIẾU – chỗ nào lệch thì nêu ra cho HCNS sửa hồ sơ, chứ
+        # không im lặng lấy bên nào.
+        qt_id, qt_ma = _theo_quy_tac(db, e)
+        if qt_id is None:
+            dong["ly_do"] = (f"Quy tắc nói pháp nhân {qt_ma} nhưng danh mục pháp nhân chưa có mã này – "
+                             f"thêm vào danh mục trước")
             khong_suy_duoc.append(dong)
-        else:
-            dong["company_id"] = e.company_id
-            dong["company"] = ten_cty.get(e.company_id, "")
-            suy_duoc.append(dong)
+            continue
+        dong["company_id"] = qt_id
+        dong["company"] = qt_ma
+        dong["phong"] = getattr(e, "department", "") or ""
+        if e.company_id and e.company_id != qt_id:
+            dong["ho_so_company"] = ten_cty.get(e.company_id, "")
+            dong["ly_do_quy_tac"] = (f"Phòng {dong['phong'] or '(trống)'} → {qt_ma} theo quy tắc 09/9; "
+                                     f"hồ sơ nhân sự đang ghi {dong['ho_so_company']}")
+        suy_duoc.append(dong)
 
     return {
         "suy_duoc": suy_duoc,
@@ -113,10 +148,15 @@ def xem_truoc(db: Session) -> dict:
         "lech_voi_ho_so": lech,
         "dem": {"suy_duoc": len(suy_duoc), "khong_suy_duoc": len(khong_suy_duoc),
                 "da_co": len(da_co), "lech_voi_ho_so": len(lech)},
-        "ghi_chu": ("Chỉ suy khi tài khoản nối được với một hồ sơ nhân sự đang làm việc VÀ hồ sơ ấy đã "
-                    "có pháp nhân. Không suy từ phòng ban hay vai trò, không mặc định về công ty mẹ. "
-                    "Tài khoản đã có pháp nhân thì không bị ghi đè – chỗ lệch với hồ sơ được liệt kê "
-                    "riêng để người quản trị xem, không tự sửa."),
+        "quy_tac": {"theo_phong": dict(PHONG_THEO_PHAP_NHAN), "mac_dinh": PHAP_NHAN_MAC_DINH,
+                    "cau": "Phòng Đội xe (tài xế và Giám đốc điều hành đội xe) thuộc Công ty TNHH Vận "
+                           "tải Vietrip; mọi phòng còn lại thuộc Vietourist Holdings. Chủ tịch chốt "
+                           "09/9/2026."},
+        "ghi_chu": ("Chỉ suy cho tài khoản nối được với một hồ sơ nhân sự ĐANG LÀM VIỆC – pháp nhân lấy "
+                    "theo PHÒNG BAN của hồ sơ đó, theo quy tắc trên. Tài khoản đã có pháp nhân thì "
+                    "không bị ghi đè; chỗ lệch được liệt kê riêng để người quản trị xem, không tự sửa. "
+                    "Dòng nào có 'ly_do_quy_tac' là chỗ hồ sơ nhân sự ghi khác quy tắc – nên báo HCNS "
+                    "sửa hồ sơ, vì hồ sơ mới là nơi con số ấy được dùng để chia bút toán lương."),
     }
 
 

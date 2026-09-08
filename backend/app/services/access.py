@@ -34,7 +34,15 @@ ADMIN_STAFF = ("hanh_chinh",)                           # bảo vệ, pháp ch�
                                                         # nhưng KHÔNG xem bảng lương (chỉ đạo 07/9/2026)
 
 FULL_VIEW = ("chutich", "tgd")                          # xem tất cả – đúng hai người
-READ_ALL = ("bks",)                                     # đọc tất cả, bị chặn mọi thao tác ghi
+# robot_ks vào đây theo quyết định của Chủ tịch ngày 09/9/2026: robot làm việc Ban Kiểm soát thì phải
+# nhìn được thứ Ban Kiểm soát nhìn, nếu không nó chỉ đọc lại kết quả vòng quét do chính máy chủ chạy –
+# tức là kiểm tra chính báo cáo của mình. Đọc TẤT CẢ, ghi thì KHÔNG (nó nằm trong READ_ONLY_ROLES ngay
+# dưới đây, cùng hàng rào với bks).
+#
+# Đây là một lần NỚI so với bản P8 hôm qua, và nó có giá: một tài khoản đọc được mọi số liệu công ty
+# thì mất mật khẩu là lộ hết. Đổi lại được hai thứ – robot kiểm tra được toàn hệ thống, và nhật ký vẫn
+# tách robot khỏi người, việc mà mượn thẳng tài khoản bks thì không làm được.
+READ_ALL = ("bks", "robot_ks")                          # đọc tất cả, bị chặn mọi thao tác ghi
 BASE_VIEW = FULL_VIEW + READ_ALL                        # nền của MỌI dòng trong ma trận dưới đây
 
 # Màn hình Nhân sự tách quyền theo TAB (chỉ đạo 07/9/2026). Trước bản này, ai mở được màn hình là thấy cả
@@ -64,7 +72,7 @@ REQUEST_CREATE_ROLES = OPERATIONS + SALES               # được GỬI yêu c�
 PAYMENT_REQUEST_ROLES = (BASE_VIEW + OPERATIONS +
                          ("ptgd_doan", "ptgd_mkt", "gd_kd", "ketoan", "hcns", "hanh_chinh", "cntt"))
 # hanh_chinh mới được thêm: nhóm chi "hành chính" là việc của họ, mà trước nay họ không có màn hình nào
-READ_ONLY_ROLES = ("bks",)
+READ_ONLY_ROLES = ("bks", "robot_ks")
 # Chặn-mặc-định vẫn giữ nguyên: Ban Kiểm soát không ghi được gì trừ đúng những đường dẫn dưới đây.
 #
 # Ngày 07/9/2026 anh Trần Tuấn giao vị trí Kiểm soát cho AI: kiểm tra, thử, giám sát và báo cáo mọi
@@ -153,7 +161,6 @@ RESTRICTED_API_PREFIXES = {
     # Cả ba đều KHÔNG nằm trong FULL_ACCESS, BASE_VIEW, AUDIT_ROLES. Các cửa GHI của màn hình phân quyền
     # (đổi vai trò, khoá/mở, gán pháp nhân) liệt kê vai trò đích danh nên robot_pq đọc được mà không ghi
     # được – hàng rào tiền tố lo phần thô, chữ ký từng đường dẫn lo phần tinh.
-    "robot_ks": ("/api/v1/auth/", "/api/v1/kiem-soat", "/api/v1/ngoai-le", "/api/v1/robot"),
     "robot_pq": ("/api/v1/auth/", "/api/v1/access", "/api/v1/ai", "/api/v1/kiem-soat"),
     "robot_vpm": ("/api/v1/auth/", "/api/v1/kiem-soat", "/api/v1/he-thong"),
     # Trưởng phòng Hướng dẫn: phần hướng dẫn, chào chuyến, bảng giá tuyến, tệp đính kèm và bộ nạp dữ
@@ -533,7 +540,6 @@ RESTRICTED_ROLE_MENUS = {
     # /doi-mat-khau có mặt ở cả ba vì tài khoản robot cũng được cấp mật khẩu tạm và cũng phải xoay
     # được mật khẩu của chính nó. Một tài khoản máy không đổi được mật khẩu là một mật khẩu đứng yên
     # vĩnh viễn trong hệ thống của công ty đại chúng.
-    "robot_ks": ("/kiem-soat", "/ngoai-le", "/doi-mat-khau"),
     "robot_pq": ("/access", "/ai-roles", "/kiem-soat", "/doi-mat-khau"),
     "robot_vpm": ("/kiem-soat", "/doi-mat-khau"),
 }
@@ -564,12 +570,10 @@ CAM_CUA_ROBOT: dict[str, dict[str, str]] = {
         "/api/v1/receipts": "Robot cầm chìa khoá quyền không được ghi số nghiệp vụ.",
         "/api/v1/payroll-runs": "Robot cầm chìa khoá quyền không được chạm bảng lương.",
     },
-    "robot_ks": {
-        "/api/v1/tours": "Kiểm soát đọc và mở việc, không sửa số nghiệp vụ – sửa được thì không còn ai đứng ngoài.",
-        "/api/v1/bookings": "Kiểm soát đọc và mở việc, không sửa số nghiệp vụ.",
-        "/api/v1/journal": "Kiểm soát đọc và mở việc, không sửa số nghiệp vụ.",
-        "/api/v1/access": "Kiểm soát không tự sửa quyền của mình – phân quyền là nguồn duy nhất của quyền.",
-    },
+    # robot_ks KHÔNG có dòng nào ở đây, và đó không phải sơ suất. Từ 09/9/2026 nó đọc toàn bộ như BKS,
+    # nên điều cấm của nó không còn là "không được chạm tiền tố nào" mà là "KHÔNG ĐƯỢC GHI GÌ CẢ" –
+    # một hàng rào rộng hơn và chặt hơn, thi hành bởi READ_ONLY_ROLES chứ không bởi bảng tiền tố.
+    # Phép thử tương ứng thử GHI vào nhiều cửa khác nhau thay vì đọc bảng này.
 }
 
 

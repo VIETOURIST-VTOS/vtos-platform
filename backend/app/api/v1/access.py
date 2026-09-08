@@ -22,7 +22,7 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 # robot_pq ĐỌC được màn hình phân quyền – đó là bàn làm việc của nó. Nó KHÔNG có trong THAO_TAC, nên
 # đổi vai trò, khoá/mở tài khoản, gán pháp nhân vẫn phải do người bấm. Robot đề xuất, người quyết.
-XEM = ("chutich", "tgd", "cntt", "hcns", "bks", "robot_pq")     # mở được màn hình
+XEM = ("chutich", "tgd", "cntt", "hcns", "bks", "robot_pq", "robot_ks")   # mở được màn hình
 THAO_TAC = ("cntt", "hcns")                          # đổi vai trò, khóa/mở, đặt lại mật khẩu
 # Ba vai trò còn phạm vi rộng nhất sau khi siết ma trận: đổi AI SANG một trong ba vai trò này phải do
 # Chủ tịch hoặc TGĐ làm. Quyền nhìn toàn bộ tiền và sổ sách tương đương quyền ký – một người ở HCNS
@@ -307,3 +307,55 @@ def ghi_suy_phap_nhan(data: SuyPhapNhanIn,
     """
     from app.services import suy_phap_nhan as SPN
     return SPN.ap_dung(db, u, data.user_ids)
+
+
+# ---------- Tài khoản cho vai trò máy (P8) ----------
+class TaoRobotIn(BaseModel):
+    role: str                        # phải là một vai trò máy
+    ho_ten: str = ""                 # để trống thì lấy tên vai trò
+
+
+@router.post("/accounts/robot", status_code=201)
+def tao_tai_khoan_robot(data: TaoRobotIn,
+                        u: User = Depends(require_roles("chutich", "tgd", "cntt")),
+                        db: Session = Depends(get_db)):
+    """Tạo tài khoản đăng nhập cho MỘT vai trò máy, mật khẩu ngẫu nhiên, hiện đúng một lần.
+
+    Ba điều khác hẳn tài khoản người, mỗi điều một lý do:
+
+    1. MẬT KHẨU NGẪU NHIÊN, không phải mã nhân viên. Tài khoản người dùng mã nhân viên làm mật khẩu
+       tạm vì người sẽ đổi ngay lần đăng nhập đầu; robot không có ai ngồi đổi hộ, nên mật khẩu ban đầu
+       CHÍNH LÀ mật khẩu lâu dài – lấy từ nguồn ngẫu nhiên mật mã, không phải từ một con số nằm công
+       khai trên bảng lương.
+
+    2. KHÔNG bắt đổi lần đầu. Với người, cờ ấy là hàng rào; với máy, nó là cái khoá cửa từ bên trong –
+       robot bị đẩy sang màn hình đổi mật khẩu mà không có ai bấm.
+
+    3. Đánh dấu NGOÀI BIÊN CHẾ: robot không có trong bảng lương, và danh sách đối chiếu nhân sự không
+       được báo lệch vì ba tài khoản không phải người.
+
+    Mật khẩu trả về ĐÚNG MỘT LẦN trong phản hồi này và không lưu ở đâu dưới dạng đọc được. Mất thì đặt
+    lại, không tra lại được – đó là chủ ý.
+    """
+    import secrets
+    from app.core.security import hash_password
+    if not AC.la_vai_tro_may(data.role):
+        raise HTTPException(422, f"{data.role} không phải vai trò máy. Chỉ tạo được cho: "
+                                 f"{', '.join(AC.VAI_TRO_MAY)}")
+    da_co = db.execute(select(User).where(User.role == data.role, User.active == True)).scalars().all()  # noqa: E712
+    if da_co:
+        raise HTTPException(409, f"{ROLES[data.role]} đã có tài khoản {da_co[0].username}. Một vai trò "
+                                 f"máy chỉ nên có MỘT tài khoản – hai cái thì không truy được lần chạy "
+                                 f"nào của bên nào.")
+    mat_khau = secrets.token_urlsafe(24)
+    t = User(username=data.role, full_name=data.ho_ten or ROLES[data.role], role=data.role,
+             department="", staff_code="", password_hash=hash_password(mat_khau),
+             active=True, must_change_password=False, ngoai_bien_che=True)
+    db.add(t)
+    R.audit(db, u.username, u.role, "sua_tai_khoan", f"user:{data.role}",
+            after={"tao_tai_khoan_robot": data.role, "ngoai_bien_che": True})
+    db.commit(); db.refresh(t)
+    return {"message": f"Đã tạo tài khoản {t.username} cho {ROLES[data.role]}. Chép mật khẩu ngay – "
+                       f"màn hình này là nơi duy nhất nó hiện ra.",
+            "username": t.username, "mat_khau": mat_khau, "role": t.role,
+            "luu_y": "Mật khẩu không lưu ở dạng đọc được. Mất thì đặt lại, không tra lại được."}

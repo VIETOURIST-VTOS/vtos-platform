@@ -22,11 +22,21 @@ def xem_duoc(vai: str) -> set:
 
 
 # ---------- xương sống ----------
-def test_chi_ba_vai_tro_xem_duoc_tat_ca():
+def test_chi_bon_vai_tro_xem_duoc_tat_ca():
+    """Ba người và một máy – không hơn.
+
+    Từ 09/9/2026 robot_ks xem được tất cả theo quyết định của Chủ tịch: robot làm việc Ban Kiểm soát
+    thì phải nhìn được thứ BKS nhìn. Danh sách này vẫn là chốt chặn, chỉ là nó chốt ở bốn thay vì ba –
+    và phép thử dưới đây đòi cái thứ tư phải là vai trò MÁY và phải CHỈ ĐỌC, để không ai lặng lẽ thêm
+    một vai trò người vào đây rồi nói rằng đã có tiền lệ.
+    """
     tat_ca = set(AC.MENU_ROLES)
     duoc = {r for r in ROLES if xem_duoc(r) == tat_ca}
-    assert duoc == {"chutich", "tgd", "bks"}, (
-        f"phải đúng Chủ tịch, TGĐ và Ban Kiểm soát xem được tất cả, đang là {sorted(duoc)}")
+    assert duoc == {"chutich", "tgd", "bks", "robot_ks"}, (
+        f"phải đúng Chủ tịch, TGĐ, Ban Kiểm soát và robot Kiểm soát, đang là {sorted(duoc)}")
+    for r in duoc - {"chutich", "tgd", "bks"}:
+        assert AC.la_vai_tro_may(r), f"{r} xem được tất cả mà không phải vai trò máy"
+        assert r in AC.READ_ONLY_ROLES, f"{r} xem được tất cả mà KHÔNG bị chặn ghi"
 
 
 def test_moi_man_hinh_deu_mo_cho_ba_vai_tro_nen():
@@ -98,7 +108,7 @@ def test_khong_vai_tro_nao_ngoai_ba_vai_tro_nen_xem_qua_mot_nua():
     """Chốt mềm: nếu một vai trò nghiệp vụ bỗng xem được gần hết màn hình thì ma trận đã bị nới ở đâu đó."""
     tong = len(AC.MENU_ROLES)
     for r in ROLES:
-        if r in ("chutich", "tgd", "bks"): continue
+        if r in ("chutich", "tgd", "bks", "robot_ks"): continue
         n = len(xem_duoc(r))
         assert n <= tong - 3, f"{r} xem được {n}/{tong} màn hình – rà lại xem có nới nhầm không"
 
