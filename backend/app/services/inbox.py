@@ -81,7 +81,7 @@ def _send(db: Session, c: Conversation, text: str, sender: str, sender_name: str
     try:
         if c.channel == "facebook": r = fb_send(c.external_id, text)
         elif c.channel == "zalo":
-            from app.services import zalo as Z; r = Z.send_oa_text(c.external_id, text)
+            from app.services import zalo as Z; r = Z.send_oa_text(db, c.external_id, text)
         else: r = {"skipped": "kênh web – hiển thị trên widget"}
         m.response = json.dumps(r, ensure_ascii=False)[:1500]
         m.status = "loi" if (r.get("error") not in (None, 0) or r.get("error_name")) else "da_gui"

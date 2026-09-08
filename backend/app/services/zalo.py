@@ -1,11 +1,12 @@
 """Kết nối Zalo: (1) OA – nhắn khách đã quan tâm OA (user_id) qua Open API v3; (2) ZNS – gửi mẫu đã duyệt theo SĐT (84…);
 (3) webhook OA nhận follow / tin nhắn / chia sẻ SĐT → tạo lead kênh 'Zalo OA'. Không có token → tin xếp 'chờ cấu hình' để gửi tay/sau."""
 import json, hmac, hashlib, urllib.request, urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.config import settings
-from app.models.crm import Lead, ZaloMessage
+from app.models.crm import Lead, ZaloMessage, ZaloOaToken
+from app.models.core import Alert
 from app.services import rules as R
 
 OA_API = "https://openapi.zalo.me/v3.0/oa"
@@ -25,9 +26,58 @@ def intl(p: str) -> str:
     return "84" + d[1:] if d.startswith("0") else d
 
 
-def configured() -> dict:
-    return {"oa": bool(settings.ZALO_OA_ACCESS_TOKEN), "zns_templates": dict(x.split(":", 1) for x in settings.ZALO_ZNS_TEMPLATES.split(",") if ":" in x), "webhook": bool(settings.ZALO_OA_SECRET_KEY),
-            "refresh": bool(settings.ZALO_OA_REFRESH_TOKEN and settings.ZALO_APP_SECRET)}
+# ============================== KHO TOKEN ==============================
+# Token sống trong cơ sở dữ liệu, KHÔNG phải trong biến môi trường. Lý do đầy đủ ghi ở docstring của
+# models.crm.ZaloOaToken; tóm tắt: refresh token của Zalo đổi mới sau mỗi lần dùng, giữ trong bộ nhớ thì
+# lần khởi động lại kế tiếp là mất.
+
+def kho(db: Session) -> ZaloOaToken:
+    """Dòng token duy nhất; chưa có thì tạo, và nạp sẵn từ biến môi trường nếu lần đầu."""
+    r = db.execute(select(ZaloOaToken).order_by(ZaloOaToken.id.desc())).scalars().first()
+    if r is None:
+        r = ZaloOaToken(access_token=settings.ZALO_OA_ACCESS_TOKEN or "",
+                        refresh_token=settings.ZALO_OA_REFRESH_TOKEN or "", cap_boi="bien_moi_truong")
+        db.add(r); db.flush()
+    return r
+
+
+def token(db: Session) -> str:
+    """Access token đang dùng. Ưu tiên cơ sở dữ liệu; biến môi trường chỉ là mồi cho lần chạy đầu."""
+    return kho(db).access_token or settings.ZALO_OA_ACCESS_TOKEN or ""
+
+
+def _luu(db: Session, j: dict, boi: str) -> str:
+    """Ghi cặp token mới. Zalo trả refresh token MỚI mỗi lần – ghi đè, đừng giữ cái cũ."""
+    r = kho(db)
+    if not j.get("access_token"): return ""
+    r.access_token = j["access_token"]
+    if j.get("refresh_token"): r.refresh_token = j["refresh_token"]
+    try: r.het_han_luc = datetime.now() + timedelta(seconds=int(j.get("expires_in") or 90000))
+    except (TypeError, ValueError): r.het_han_luc = datetime.now() + timedelta(hours=25)
+    r.lan_lam_moi = datetime.now(); r.so_lan_lam_moi += 1; r.loi_cuoi = ""; r.cap_boi = boi
+    # giữ cho lần gửi ngay sau đó trong cùng tiến trình không phải đọc lại
+    settings.ZALO_OA_ACCESS_TOKEN = r.access_token
+    settings.ZALO_OA_REFRESH_TOKEN = r.refresh_token
+    db.commit()
+    return r.access_token
+
+
+def _bao_hong(db: Session, ly_do: str) -> None:
+    """Token chết thì PHẢI có người biết. Không có dòng này thì Zalo OA ngừng chạy trong im lặng."""
+    r = kho(db); r.loi_cuoi = ly_do[:500]
+    co = db.execute(select(Alert).where(Alert.kind == "zalo_token_hong", Alert.resolved == False)).scalars().first()
+    if co is None:
+        db.add(Alert(kind="zalo_token_hong", level="red", ref="zalo_oa",
+                     message=f"Zalo OA mất quyền gửi/nhận tin: {ly_do[:200]}. Cần vào Zalo Developers uỷ quyền lại cho ứng dụng VTOS.",
+                     to_roles="cntt,ptgd_mkt,tgd,chutich"))
+    db.commit()
+
+
+def configured(db: Session | None = None) -> dict:
+    tk = token(db) if db is not None else settings.ZALO_OA_ACCESS_TOKEN
+    rf = (kho(db).refresh_token if db is not None else settings.ZALO_OA_REFRESH_TOKEN)
+    return {"oa": bool(tk), "zns_templates": dict(x.split(":", 1) for x in settings.ZALO_ZNS_TEMPLATES.split(",") if ":" in x), "webhook": bool(settings.ZALO_OA_SECRET_KEY),
+            "refresh": bool(rf and settings.ZALO_APP_SECRET)}
 
 
 def _post(url: str, body: dict, token: str, timeout: int = 20) -> dict:
@@ -36,57 +86,112 @@ def _post(url: str, body: dict, token: str, timeout: int = 20) -> dict:
         return json.loads(r.read().decode())
 
 
-def refresh_token() -> str:
-    """Đổi refresh token lấy access token mới (hết hạn 25 giờ). Trả access token hoặc ''."""
-    if not (settings.ZALO_OA_REFRESH_TOKEN and settings.ZALO_APP_ID and settings.ZALO_APP_SECRET): return ""
-    data = urllib.parse.urlencode({"refresh_token": settings.ZALO_OA_REFRESH_TOKEN, "app_id": settings.ZALO_APP_ID, "grant_type": "refresh_token"}).encode()
-    req = urllib.request.Request(OAUTH, data=data, headers={"Content-Type": "application/x-www-form-urlencoded", "secret_key": settings.ZALO_APP_SECRET}, method="POST")
+def _goi_oauth(body: dict) -> dict:
+    data = urllib.parse.urlencode(body).encode()
+    req = urllib.request.Request(OAUTH, data=data, headers={"Content-Type": "application/x-www-form-urlencoded",
+                                                            "secret_key": settings.ZALO_APP_SECRET}, method="POST")
     with urllib.request.urlopen(req, timeout=20) as r:
-        j = json.loads(r.read().decode())
-    if j.get("access_token"):
-        settings.ZALO_OA_ACCESS_TOKEN = j["access_token"]
-        if j.get("refresh_token"): settings.ZALO_OA_REFRESH_TOKEN = j["refresh_token"]
-    return settings.ZALO_OA_ACCESS_TOKEN
+        return json.loads(r.read().decode())
 
 
-def send_oa_text(uid: str, text: str) -> dict:
-    return _post(f"{OA_API}/message/cs", {"recipient": {"user_id": uid}, "message": {"text": text[:2000]}}, settings.ZALO_OA_ACCESS_TOKEN)
+PERMISSION = "https://oauth.zaloapp.com/v4/oa/permission"
+# Đường Zalo gọi ngược về sau khi người quản trị bấm Đồng ý. Phải nằm trong domain ĐÃ XÁC THỰC ở
+# Zalo Developers, nếu không Zalo từ chối ngay ở bước mở trang.
+TRA_VE = "https://vtos.infinitytours.org/api/v1/zalo/uy-quyen/tra-ve"
 
 
-def send_zns(phone: str, template_id: str, params: dict) -> dict:
-    return _post(ZNS_API, {"phone": intl(phone), "template_id": str(template_id), "template_data": params, "tracking_id": f"vtos-{datetime.now():%Y%m%d%H%M%S}"}, settings.ZALO_OA_ACCESS_TOKEN)
+def duong_uy_quyen(db: Session, boi: str = "") -> tuple[str, str]:
+    """Dựng đường cấp quyền kèm mã chống giả mạo dùng một lần."""
+    import secrets
+    if not settings.ZALO_APP_ID:
+        raise ValueError("Chưa khai ZALO_APP_ID trên máy chủ")
+    ma = secrets.token_urlsafe(24)
+    r = kho(db); r.ma_chong_gia = ma; r.cap_boi = boi or r.cap_boi
+    db.commit()
+    q = urllib.parse.urlencode({"app_id": settings.ZALO_APP_ID, "redirect_uri": TRA_VE, "state": ma})
+    return f"{PERMISSION}?{q}", ma
+
+
+def kiem_ma_chong_gia(db: Session, ma: str) -> bool:
+    """Đúng một lần: khớp thì xoá ngay, để một mã không dùng lại được."""
+    r = kho(db)
+    if not r.ma_chong_gia or not ma or ma != r.ma_chong_gia: return False
+    r.ma_chong_gia = ""; db.commit()
+    return True
+
+
+def doi_ma_uy_quyen(db: Session, ma: str, boi: str = "") -> dict:
+    """Đổi mã uỷ quyền (oauth_code) lấy cặp token đầu tiên. Chạy đúng một lần, sau khi người có quyền
+    quản trị OA bấm Đồng ý trên trang cấp quyền của Zalo. Mã sống vài phút và dùng một lần."""
+    if not (settings.ZALO_APP_ID and settings.ZALO_APP_SECRET):
+        raise ValueError("Chưa khai ZALO_APP_ID / ZALO_APP_SECRET trên máy chủ")
+    j = _goi_oauth({"code": ma, "app_id": settings.ZALO_APP_ID, "grant_type": "authorization_code"})
+    if not j.get("access_token"):
+        _bao_hong(db, f"Đổi mã uỷ quyền thất bại: {json.dumps(j, ensure_ascii=False)[:300]}")
+        raise ValueError(f"Zalo từ chối mã uỷ quyền: {j.get('error_name') or j.get('error') or j}")
+    _luu(db, j, boi or "uy_quyen")
+    return {"ok": True, "het_han_luc": str(kho(db).het_han_luc), "co_refresh": bool(kho(db).refresh_token)}
+
+
+def refresh_token(db: Session) -> str:
+    """Đổi refresh token lấy access token mới (access sống 25 giờ). Trả access token mới hoặc ''.
+
+    Token mới ghi thẳng xuống cơ sở dữ liệu. Zalo trả về refresh token MỚI và vô hiệu hoá cái vừa dùng,
+    nên không ghi lại là lần khởi động sau hệ thống cầm một chuỗi đã chết.
+    """
+    r = kho(db)
+    rf = r.refresh_token or settings.ZALO_OA_REFRESH_TOKEN
+    if not (rf and settings.ZALO_APP_ID and settings.ZALO_APP_SECRET):
+        _bao_hong(db, "Không có refresh token hoặc chưa khai app_id/app_secret"); return ""
+    try:
+        j = _goi_oauth({"refresh_token": rf, "app_id": settings.ZALO_APP_ID, "grant_type": "refresh_token"})
+    except Exception as ex:
+        _bao_hong(db, f"Gọi Zalo để làm mới token lỗi: {str(ex)[:200]}"); return ""
+    if not j.get("access_token"):
+        _bao_hong(db, f"Zalo từ chối làm mới token: {json.dumps(j, ensure_ascii=False)[:300]}"); return ""
+    return _luu(db, j, "tu_lam_moi")
+
+
+def send_oa_text(db: Session, uid: str, text: str) -> dict:
+    return _post(f"{OA_API}/message/cs", {"recipient": {"user_id": uid}, "message": {"text": text[:2000]}}, token(db))
+
+
+def send_zns(db: Session, phone: str, template_id: str, params: dict) -> dict:
+    return _post(ZNS_API, {"phone": intl(phone), "template_id": str(template_id), "template_data": params, "tracking_id": f"vtos-{datetime.now():%Y%m%d%H%M%S}"}, token(db))
 
 
 def queue(db: Session, actor: str, *, phone: str = "", zalo_uid: str = "", text: str = "", purpose: str = "", template: str = "", params: dict | None = None, lead_id: int | None = None, booking_id: int | None = None, send_now: bool = True) -> ZaloMessage:
     """Tạo tin và gửi ngay nếu có cấu hình: có uid → OA text; không có uid nhưng có mẫu ZNS cho mục đích → ZNS theo SĐT; còn lại → chờ cấu hình."""
-    cfg = configured(); kind = "oa" if zalo_uid else "zns"
+    cfg = configured(db); kind = "oa" if zalo_uid else "zns"
     tid = template or cfg["zns_templates"].get(purpose, "")
     m = ZaloMessage(kind=kind, phone=norm_phone(phone), zalo_uid=zalo_uid, lead_id=lead_id, booking_id=booking_id, template_id=tid, params=params or {}, text=text, purpose=purpose, created_by=actor,
                     status="cho_gui" if (cfg["oa"] and (zalo_uid or tid)) else "cho_cau_hinh")
     db.add(m); db.flush()
-    if send_now and m.status == "cho_gui": _send(m)
+    if send_now and m.status == "cho_gui": _send(db, m)
     return m
 
 
-def _send(m: ZaloMessage) -> None:
+def _send(db: Session, m: ZaloMessage) -> None:
+    def gui():
+        return send_oa_text(db, m.zalo_uid, m.text) if m.kind == "oa" else send_zns(db, m.phone, m.template_id, m.params)
     try:
-        r = send_oa_text(m.zalo_uid, m.text) if m.kind == "oa" else send_zns(m.phone, m.template_id, m.params)
+        r = gui()
         m.response = json.dumps(r, ensure_ascii=False)[:2000]
         ok = (r.get("error") in (0, None)) and not r.get("error_name")
-        if not ok and r.get("error") in (-216, -124) and refresh_token():   # token hết hạn → làm mới và gửi lại 1 lần
-            r = send_oa_text(m.zalo_uid, m.text) if m.kind == "oa" else send_zns(m.phone, m.template_id, m.params); ok = r.get("error") in (0, None); m.response = json.dumps(r, ensure_ascii=False)[:2000]
+        if not ok and r.get("error") in (-216, -124) and refresh_token(db):   # token hết hạn → làm mới và gửi lại 1 lần
+            r = gui(); ok = (r.get("error") in (0, None)) and not r.get("error_name"); m.response = json.dumps(r, ensure_ascii=False)[:2000]
         m.status, m.sent_at = ("da_gui" if ok else "loi"), datetime.now()
     except Exception as ex:
         m.status, m.response = "loi", str(ex)[:500]
 
 
 def send_pending(db: Session, limit: int = 100) -> dict:
-    cfg = configured(); n = 0
+    cfg = configured(db); n = 0
     for m in db.execute(select(ZaloMessage).where(ZaloMessage.status.in_(["cho_gui", "cho_cau_hinh"])).order_by(ZaloMessage.id).limit(limit)).scalars():
         if not cfg["oa"]: break
         if m.kind == "zns" and not m.template_id: m.template_id = cfg["zns_templates"].get(m.purpose, "")
         if m.kind == "zns" and not m.template_id: continue
-        _send(m); n += 1
+        _send(db, m); n += 1
     db.commit(); return {"sent": n}
 
 

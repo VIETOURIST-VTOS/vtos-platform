@@ -57,8 +57,8 @@ class ZaloSendIn(BaseModel):
 
 
 @router.get("/leads/meta")
-def meta(u: User = Depends(current_user)):
-    return {"channels": LEAD_CHANNELS, "status": LEAD_STATUS, "zalo": Z.configured()}
+def meta(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {"channels": LEAD_CHANNELS, "status": LEAD_STATUS, "zalo": Z.configured(db)}
 
 
 @router.get("/leads")
@@ -142,7 +142,7 @@ def conversion_xlsx(month: str, lead_months: str = "", u: User = Depends(require
 @router.get("/zalo/status")
 def zalo_status(u: User = Depends(require_roles(*CRM_ROLES, "ketoan")), db: Session = Depends(get_db)):
     cnt = dict(db.execute(select(ZaloMessage.status, func.count()).group_by(ZaloMessage.status)).all())
-    return {**Z.configured(), "messages": cnt, "webhook_url": "/api/v1/zalo/webhook"}
+    return {**Z.configured(db), "messages": cnt, "webhook_url": "/api/v1/zalo/webhook"}
 
 
 @router.post("/zalo/send", status_code=201)
@@ -155,7 +155,7 @@ def zalo_send(data: ZaloSendIn, u: User = Depends(require_roles(*EDIT_ROLES, "tp
         other = db.execute(select(Lead).where(Lead.phone == Z.norm_phone(phone), Lead.zalo_uid != "")).scalars().first()
         if other: uid = other.zalo_uid
     if not (phone or uid): raise HTTPException(422, "Thiếu SĐT / lead / booking")
-    if not data.text and not data.template_id and data.purpose not in Z.configured()["zns_templates"]: raise HTTPException(422, "Thiếu nội dung tin (hoặc mẫu ZNS cho mục đích này)")
+    if not data.text and not data.template_id and data.purpose not in Z.configured(db)["zns_templates"]: raise HTTPException(422, "Thiếu nội dung tin (hoặc mẫu ZNS cho mục đích này)")
     m = Z.queue(db, u.username, phone=phone, zalo_uid=uid, text=data.text, purpose=data.purpose, template=data.template_id, params=data.params, lead_id=data.lead_id, booking_id=data.booking_id)
     if lead: lead.last_contact_at = m.created_at
     R.audit(db, u.username, u.role, "gui_zalo", f"zalo:{m.id}", after={"kenh": m.kind, "sdt": m.phone[-4:], "muc_dich": m.purpose, "trang_thai": m.status}); db.commit()
@@ -179,6 +179,43 @@ def zalo_send_pending(u: User = Depends(require_roles("cntt", "ptgd_mkt", "gd_kd
 @router.post("/robot/zalo/send-pending", dependencies=[Depends(robot_auth)])
 def robot_zalo_send_pending(db: Session = Depends(get_db)):
     return Z.send_pending(db)
+
+
+# ---------- Uỷ quyền OA: một lần, do người có quyền quản trị OA bấm ----------
+UY_QUYEN_ROLES = ("cntt", "tgd", "chutich")
+
+
+@router.post("/zalo/uy-quyen/bat-dau")
+def zalo_uy_quyen_bat_dau(u: User = Depends(require_roles(*UY_QUYEN_ROLES)), db: Session = Depends(get_db)):
+    """Trả về đường dẫn để người quản trị OA bấm Đồng ý trên Zalo.
+
+    KHÔNG tự mở, KHÔNG tự đồng ý: cấp quyền cho một ứng dụng dùng OA của công ty là việc của người.
+    """
+    duong, ma = Z.duong_uy_quyen(db, u.username)
+    R.audit(db, u.username, u.role, "zalo_uy_quyen_bat_dau", "zalo_oa", after={"ma_chong_gia": ma[:8] + "…"})
+    db.commit()
+    return {"url": duong, "huong_dan": "Mở đường dẫn này bằng tài khoản Zalo có quyền quản trị OA, bấm Đồng ý. "
+                                       "Zalo sẽ tự gọi ngược về VTOS và lưu token."}
+
+
+@router.get("/zalo/uy-quyen/tra-ve")
+def zalo_uy_quyen_tra_ve(code: str = "", state: str = "", oa_id: str = "", db: Session = Depends(get_db)):
+    """Zalo gọi vào đây sau khi người quản trị bấm Đồng ý. KHÔNG có đăng nhập – nên phải kiểm mã chống giả mạo.
+
+    Thiếu bước kiểm đó thì bất kỳ ai gọi đúng đường dẫn này cũng đặt được token cho hệ thống.
+    """
+    if not code: raise HTTPException(400, "Thiếu mã uỷ quyền")
+    if not Z.kiem_ma_chong_gia(db, state):
+        raise HTTPException(403, "Mã chống giả mạo không khớp – hãy bấm 'Bắt đầu uỷ quyền' trong VTOS rồi làm lại")
+    try:
+        kq = Z.doi_ma_uy_quyen(db, code, boi="uy_quyen_oa")
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    if oa_id:
+        Z.kho(db).oa_id = oa_id[:40]; db.commit()
+    R.audit(db, "zalo", "he_thong", "zalo_uy_quyen_xong", "zalo_oa", after={"oa_id": oa_id, **kq})
+    db.commit()
+    return {"message": "Đã nhận quyền Zalo OA. Hộp thư đa kênh bắt đầu nhận tin khách nhắn vào OA.", **kq}
 
 
 @router.get("/zalo/webhook")
