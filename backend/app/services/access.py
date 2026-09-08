@@ -184,7 +184,11 @@ RESTRICTED_API_PREFIXES = {
 #     quên: nó khai đủ và lọc đủ. Chặn nó ở vòng ngoài chỉ khóa mất quyền đối chất của người bị ghi
 #     nhận sự vụ – họ không đọc được biên bản về mình, và không gửi được ý kiến hay khiếu nại.
 API_CHUNG = ("/api/v1/auth", "/api/v1/health", "/api/v1/meta", "/api/v1/alerts", "/api/v1/dashboard",
-             "/api/v1/incident-levels", "/api/v1/incidents")
+             "/api/v1/incident-levels", "/api/v1/incidents",
+             # P6: ai đăng nhập cũng phải đọc được phạm vi pháp nhân của CHÍNH phiên mình. Chặn
+             # nó lại thì màn hình không có cách nào nói cho người dùng biết họ đang xem dữ liệu
+             # của công ty nào – mà im lặng chính là thứ P6 sinh ra để chống.
+             "/api/v1/pham-vi")
 # Màn hình ai đăng nhập cũng có (giống danh sách phụ trong ALL_MENU_PATHS): trang chủ, đổi mật khẩu,
 # cảnh báo, báo cáo công việc. Bảng lương cá nhân đi qua /payroll và tự lọc về đúng người.
 MAN_HINH_MOI_NGUOI = ("/", "/doi-mat-khau", "/alerts", "/reports", "/payroll")

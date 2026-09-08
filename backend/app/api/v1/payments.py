@@ -11,6 +11,7 @@ from app.models.core import Booking, User
 from app.models.payments import BankTransaction, Receipt
 from app.services import payments as P
 from app.services import access as AC
+from app.services import pham_vi_phap_nhan as PV
 from app.services import sepay as SP
 
 router = APIRouter(prefix="/api/v1", tags=["thu-tien"])
@@ -154,6 +155,7 @@ def ignore_txn(tid: int, data: IgnoreIn, u: User = Depends(require_roles("ketoan
 @router.get("/receipts")
 def list_receipts(limit: int = 200, u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="phiếu thu")), db: Session = Depends(get_db)):
     q = select(Receipt).order_by(desc(Receipt.created_at))
+    q = PV.loc(q, Receipt, u)                # P6: phạm vi pháp nhân của phiên đăng nhập
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: q = q.join(Booking, Booking.id == Receipt.booking_id).where(Booking.sales_id.in_(vis))   # sale/nhóm chỉ thấy phiếu thu của khách mình
     return [receipt_out(r, db) for r in db.execute(q.limit(limit)).scalars()]

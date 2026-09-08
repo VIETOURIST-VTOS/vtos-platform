@@ -14,6 +14,7 @@ from app.services import rules as R
 from app.services import tours as T
 from app.services import bookings as BK
 from app.services import access as AC
+from app.services import pham_vi_phap_nhan as PV
 
 router = APIRouter(prefix="/api/v1")
 
@@ -38,7 +39,8 @@ def me(u: User = Depends(loc_theo_nguoi_dung("hồ sơ của chính người đ�
     return {**user_out(u), "hidden_menus": AC.hidden_menus_for(u, db), "can_see_cost": AC.can_see_cost(u), "read_only": u.role in AC.READ_ONLY_ROLES,
             "can_create_request": u.role in AC.REQUEST_CREATE_ROLES, "can_create_booking": u.role in AC.OPERATIONS,
             "must_change_password": bool(u.must_change_password), "hr_tabs": AC.hr_tabs_for(db, u),
-            "company_id": u.company_id, "ngoai_bien_che": bool(u.ngoai_bien_che)}
+            "company_id": u.company_id, "ngoai_bien_che": bool(u.ngoai_bien_che),
+            "pham_vi": PV.mo_ta(db, u)}
 
 
 @router.post("/auth/password", tags=["auth"])
@@ -159,6 +161,7 @@ def list_tours(status: str | None = None, q: str = "", month: str = "", limit: i
     """Danh sách tour có phân trang/tìm kiếm (mặc định 300 chuyến mới nhất) – 1.200+ tour nhập từ Vietrip. Mặc định ẩn dịch vụ lẻ (KLE) trừ khi tìm theo mã hoặc chọn tour_type."""
     from sqlalchemy import or_
     qs = select(Tour).order_by(desc(Tour.start_date))
+    qs = PV.loc(qs, Tour, u)                 # P6: phạm vi pháp nhân của phiên đăng nhập
     from app.services import segments as SEG
     try:
         cond = SEG.tour_cond(mang)          # mang=le / doan – lọc theo mảng kinh doanh
@@ -277,7 +280,8 @@ def booking_out(b: Booking) -> dict:
             "sales_name": b.sales.full_name if b.sales else "", "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok,
             "sla_known": bool(b.request_id),
             "counts_for_target": b.counts_for_target, "created_at": b.created_at, "paid": b.paid, "due": b.amount - b.discount - b.paid,
-            "adl": b.adl, "chd": b.chd, "inf": b.inf, "vietrip_id": b.vietrip_id, "tour_start": b.tour.start_date if b.tour else None, **BK.booking_view(b)}
+            "adl": b.adl, "chd": b.chd, "inf": b.inf, "vietrip_id": b.vietrip_id, "tour_start": b.tour.start_date if b.tour else None,
+            "company_id": b.company_id, "chua_gan_phap_nhan": b.company_id is None, **BK.booking_view(b)}
 
 
 @router.get("/mang", tags=["bookings"])
@@ -329,6 +333,7 @@ def create_booking(rid: int, u: User = Depends(current_user), db: Session = Depe
 def _bookings_query(db: Session, u: User, q: str, status: str, tour_id: int | None, mang: str = ""):
     from app.services import segments as SEG
     qs = select(Booking).order_by(desc(Booking.created_at))
+    qs = PV.loc(qs, Booking, u)              # P6: phạm vi pháp nhân của phiên đăng nhập
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: qs = qs.where(Booking.sales_id.in_(vis))   # NV KD: của mình; trưởng nhóm: của nhóm
     if tour_id: qs = qs.where(Booking.tour_id == tour_id)

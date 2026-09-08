@@ -33,6 +33,7 @@ def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
         "closed_at": t.closed_at, "kt_confirmed_at": t.kt_confirmed_at, "cntt_checked_at": t.cntt_checked_at,
         "calc": c, "booked_pax": bk, "days_left": days_left, "settlement_deadline": R.settlement_deadline(db, t),
         "approver_role": R.approver_role(t), "settlement": s, "is_doan": R.is_doan(t),
+        "company_id": t.company_id, "chua_gan_phap_nhan": t.company_id is None,   # P6: chưa xác định pháp nhân là một trạng thái phải nhìn thấy, không gộp về công ty mẹ
         "imported": t.imported, "product_code": t.product_code, "product_id": t.product_id, "days": t.days, "transport": t.transport, "vehicle_type": t.vehicle_type, "departure_point": t.departure_point,
         "d7_flag": bool(c["breakeven_pax"] and bk < c["breakeven_pax"] and 0 <= days_left <= int(R.get_param(db, "moc_d7")) and t.status == "da_duyet"),
         "bookings": [{"id": b.id, "code": b.code, "sales_id": b.sales_id, "customer_name": b.customer_name, "customer_phone": b.customer_phone, "source": b.source,

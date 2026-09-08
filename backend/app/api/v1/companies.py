@@ -230,3 +230,23 @@ def fleet_apply(data: FleetBatch, u: User = Depends(require_roles(*WRITE, "hcns"
     """Chốt đội xe theo hồ sơ đăng ký xe: pháp nhân đứng tên, tài xế phụ trách, xe ngưng khai thác."""
     from app.services import drivers as D
     return D.fleet_apply(db, [r.model_dump() for r in data.rows], u.username, u.role, data.ngung_xe_ngoai_ds)
+
+
+# ---------- P6: phạm vi pháp nhân của phiên đăng nhập ----------
+@router.get("/pham-vi")
+def pham_vi_phien(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Phiên này đang xem dữ liệu của ai, và còn bao nhiêu hồ sơ chưa xác định pháp nhân.
+
+    Hai con số ở đây KHÔNG được cộng lại thành một. Đó là toàn bộ lý do endpoint này tồn tại: nếu
+    màn hình chỉ hiện một tổng thì hồ sơ chưa xác định pháp nhân sẽ trôi vào con số của công ty mẹ
+    và không ai còn nhìn ra. `dem()` trả về hai khoá riêng và cố tình không trả về khoá "tong".
+    """
+    from app.services import pham_vi_phap_nhan as PV
+    dong = []
+    for key, cfg in CS.KINDS.items():
+        d = PV.dem(db, cfg["model"], u)
+        dong.append({"kind": key, "label": cfg["label"], **d})
+    return {"pham_vi": PV.mo_ta(db, u), "dong": dong,
+            "chua_gan_tong": sum(d["chua_gan"] for d in dong),
+            "ghi_chu": "Hồ sơ chưa xác định pháp nhân vẫn hiện trong danh sách và được đánh dấu "
+                       "'chua_gan'. Nó không thuộc công ty mẹ – phải do Điều hành/Kế toán gán."}

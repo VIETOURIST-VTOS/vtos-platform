@@ -11,6 +11,7 @@ from app.models.hr import Employee
 from app.models.ops import DailyReport, PageShift, PaymentRequest
 from app.services import ops as O
 from app.services import access as AC
+from app.services import pham_vi_phap_nhan as PV
 from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1", tags=["van-hanh"])
@@ -198,6 +199,7 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
 @router.get("/payment-requests")
 def list_pr(status: str | None = None, tour_id: int | None = None, u: User = Depends(require_roles(*AC.PAYMENT_REQUEST_ROLES, mo_ta="đề nghị chi")), db: Session = Depends(get_db)):
     q = select(PaymentRequest).order_by(desc(PaymentRequest.id))
+    q = PV.loc(q, PaymentRequest, u)         # P6: phạm vi pháp nhân của phiên đăng nhập
     if u.role in ("gd_kd", "tp_kd", "ptgd_mkt", "hcns"): q = q.where(PaymentRequest.created_by == u.username)   # bộ phận ngoài Điều hành chỉ thấy đề nghị mình lập
     if status: q = q.where(PaymentRequest.status.in_(status.split(",")))
     if tour_id: q = q.where(PaymentRequest.tour_id == tour_id)

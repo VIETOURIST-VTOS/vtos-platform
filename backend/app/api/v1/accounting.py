@@ -10,6 +10,7 @@ from app.models.core import Booking, User
 from app.models.accounting import Account, JournalEntry, Invoice, PeriodLock
 from app.services import accounting as ACC
 from app.services import rules as R_
+from app.services import pham_vi_phap_nhan as PV
 from app.core.config import settings
 
 router = APIRouter(prefix="/api/v1", tags=["ke-toan"])
@@ -42,6 +43,7 @@ def accounts(u: User = Depends(current_user), db: Session = Depends(get_db)):
 @router.get("/journal")
 def journal(period: str | None = None, status: str | None = None, limit: int = 300, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     q = select(JournalEntry).order_by(desc(JournalEntry.entry_date), desc(JournalEntry.id))
+    q = PV.loc(q, JournalEntry, u)           # P6: phạm vi pháp nhân của phiên đăng nhập
     if period: q = q.where(JournalEntry.period == period)
     if status: q = q.where(JournalEntry.status == status)
     return [entry_out(e) for e in db.execute(q.limit(limit)).scalars()]
