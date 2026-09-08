@@ -746,11 +746,73 @@ def _gplx_nap(db: Session, r, boi):
             + (f"hạn {het:%d/%m/%Y}" if het else "chưa có hạn"))
 
 
+# ====================== HCNS – HỢP ĐỒNG LAO ĐỘNG ======================
+def _hdld_kiem(db: Session, r):
+    from app.models.hrm import LaborContract, CONTRACT_KINDS
+    from app.services.intake import _so, _ngay
+    loi, cb = [], []
+    e = _nv(db, r.get("ma_nv"))
+    if e is None:
+        return [f"Không có nhân sự mã '{r.get('ma_nv')}' – nạp hồ sơ nhân sự trước rồi mới nạp hợp đồng"], cb, None
+    loai = str(r.get("loai") or "").strip()
+    if loai not in CONTRACT_KINDS:
+        return [f"Loại hợp đồng '{loai}' không hợp lệ ({', '.join(CONTRACT_KINDS)})"], cb, None
+    tu = _ngay(r.get("hieu_luc_tu"))
+    den = _ngay(r.get("hieu_luc_den"))
+    if tu and den and den < tu:
+        loi.append("Ngày hết hiệu lực trước ngày có hiệu lực")
+    if loai == "khong_xac_dinh" and den is not None:
+        loi.append("Hợp đồng KHÔNG XÁC ĐỊNH thời hạn thì không được ghi ngày hết hiệu lực – "
+                   "ghi vào là biến nó thành hợp đồng có thời hạn trên sổ")
+    if loai != "khong_xac_dinh" and den is None:
+        cb.append("Chưa có ngày hết hiệu lực – cảnh báo hợp đồng đến hạn sẽ KHÔNG chạy cho người này")
+    # Loại hợp đồng và loại ghi ở hồ sơ nhân sự phải cùng nói một điều. Lệch nhau là chỗ bảng lương và
+    # bảng bảo hiểm bắt đầu tính sai mà không ai thấy: hồ sơ nói cộng tác viên, hợp đồng nói HĐLĐ.
+    ctv_hd = loai in ("ctv", "khoan")
+    ctv_hs = e.contract_type == "ctv"
+    if ctv_hd != ctv_hs:
+        cb.append(f"Hồ sơ nhân sự ghi loại '{e.contract_type}' nhưng hợp đồng là '{CONTRACT_KINDS[loai]['ten']}' "
+                  "– một trong hai đang sai, và bảng lương lấy theo hồ sơ")
+    if CONTRACT_KINDS[loai]["bhxh"] and _so(r.get("luong_bhxh")) <= 0:
+        cb.append(f"{CONTRACT_KINDS[loai]['ten']} thuộc diện đóng bảo hiểm nhưng chưa ghi mức lương đóng")
+    ma = str(r.get("so_hop_dong") or "").strip()
+    trung = db.execute(select(LaborContract).where(
+        func.upper(LaborContract.code) == ma.upper())).scalars().first() if ma else None
+    return loi, cb, (trung.code if trung is not None else None)
+
+
+def _hdld_nap(db: Session, r, boi):
+    from app.models.hrm import LaborContract, CONTRACT_KINDS
+    from app.services.intake import _so, _ngay
+    e = _nv(db, r.get("ma_nv"))
+    loai = str(r.get("loai") or "").strip()
+    tu = _ngay(r.get("hieu_luc_tu"))
+    # Hợp đồng mới của cùng một người thì hợp đồng cũ chuyển sang "hết hạn" – KHÔNG xóa, và không đụng
+    # bản đã chấm dứt (chấm dứt và hết hạn là hai chuyện khác nhau trên hồ sơ lao động).
+    if tu is not None:
+        for cu in db.execute(select(LaborContract).where(
+                LaborContract.employee_id == e.id, LaborContract.status == "hieu_luc")).scalars():
+            if cu.effective_from <= tu:
+                cu.status = "het_han"
+    def _t(k):
+        return _so(r.get(k)) if str(r.get(k) or "").strip() != "" else 0.0
+    c = LaborContract(employee_id=e.id, code=str(r.get("so_hop_dong") or "").strip()[:40], kind=loai,
+                      signed_on=_ngay(r.get("ngay_ky")), effective_from=tu or date.today(),
+                      effective_to=_ngay(r.get("hieu_luc_den")),
+                      salary=_t("luong_chinh"), si_salary=_t("luong_bhxh"), allowance=_t("phu_cap"),
+                      annual_leave_days=(_so(r.get("ngay_phep_nam")) if str(r.get("ngay_phep_nam") or "").strip() else 12),
+                      note=str(r.get("ghi_chu") or "").strip()[:300], created_by=boi)
+    db.add(c); db.flush()
+    return (f"{c.code} · {e.code} {e.full_name} · {CONTRACT_KINDS[loai]['ten']}"
+            + (f" · đến {c.effective_to:%d/%m/%Y}" if c.effective_to else " · không thời hạn"))
+
+
 # ====================== KHAI BÁO ======================
 def bo_nap(_c) -> dict:
     from app.models.fleet import NHOM_CHI_PHI_KY
     from app.models.nap_bo_sung import KENH_MKT
     from app.models.assets import ASSET_KINDS, PREPAID_KINDS
+    from app.models.hrm import CONTRACT_KINDS
     nhom_ky = {k: v[0] + (" (theo xe)" if v[1] == "xe" else " (cả đội)") for k, v in NHOM_CHI_PHI_KY.items()}
     return {
         # ---------- ĐỘI XE ----------
@@ -993,6 +1055,30 @@ def bo_nap(_c) -> dict:
                     _c("ghi_chu", "Ghi chú")],
             "kiem": _bl_kiem, "nap": _bl_nap,
         },
+        "hop_dong_lao_dong": {
+            "bang_dich": "labor_contracts", "phong_ban": "hcns",
+            "ten": "Hợp đồng lao động",
+            "mo_ta": "Mỗi lần ký là một bản ghi, giữ đủ lịch sử. Nạp hợp đồng mới thì bản cũ còn hiệu "
+                     "lực của chính người đó chuyển sang HẾT HẠN – không xóa, và không đụng bản đã "
+                     "chấm dứt: chấm dứt và hết hạn là hai chuyện khác nhau trên hồ sơ lao động. "
+                     "Hợp đồng không xác định thời hạn thì KHÔNG được ghi ngày hết hiệu lực.",
+            "khoa_chong_trung": "Số hợp đồng",
+            "cot": [_c("so_hop_dong", "Số hợp đồng", True, vi_du="HDLD-2026-014"),
+                    _c("ma_nv", "Mã nhân viên", True, vi_du="NS0142"),
+                    _c("loai", "Loại hợp đồng", True, kieu="chon", vi_du="xac_dinh_12",
+                       chon={k: v["ten"] for k, v in CONTRACT_KINDS.items()}),
+                    _c("ngay_ky", "Ngày ký", kieu="ngay", vi_du="01/08/2026"),
+                    _c("hieu_luc_tu", "Hiệu lực từ", True, kieu="ngay", vi_du="01/08/2026"),
+                    _c("hieu_luc_den", "Hiệu lực đến", kieu="ngay", vi_du="31/07/2027",
+                       ghi_chu="để TRỐNG cho hợp đồng không xác định thời hạn"),
+                    _c("luong_chinh", "Lương chính", kieu="tien", min=0),
+                    _c("luong_bhxh", "Mức lương đóng BHXH", kieu="tien", min=0,
+                       ghi_chu="khác lương chính; loại thuộc diện đóng mà để trống sẽ bị cảnh báo"),
+                    _c("phu_cap", "Phụ cấp", kieu="tien", min=0),
+                    _c("ngay_phep_nam", "Ngày phép năm", kieu="so", vi_du="12"),
+                    _c("ghi_chu", "Ghi chú")],
+            "kiem": _hdld_kiem, "nap": _hdld_nap,
+        },
         # ---------- TÀI SẢN & MUA SẮM ----------
         "tai_san_co_dinh": {
             "bang_dich": "fixed_assets", "phong_ban": "ketoan",
@@ -1076,6 +1162,7 @@ def vai_tro(QUAN_TRI: tuple) -> dict:
         "hoa_don_dau_vao":      QUAN_TRI + ("ketoan",),
         "bao_hiem_ky":          QUAN_TRI + ("hcns", "ketoan"),
         "bang_luong":           QUAN_TRI + ("hcns",),
+        "hop_dong_lao_dong":    QUAN_TRI + ("hcns",),
         "tai_san_co_dinh":      QUAN_TRI + ("ketoan",),
         "cong_cu_dung_cu":      QUAN_TRI + ("ketoan",),
         "khau_hao_ky":          QUAN_TRI + ("ketoan",),
@@ -1085,4 +1172,4 @@ def vai_tro(QUAN_TRI: tuple) -> dict:
 # Bộ nạp nào CHẠM THẲNG VÀO TIỀN – nhân viên nhập tay được, tải tệp hàng loạt thì không (quy tắc P4).
 CHAM_TIEN = ("nhien_lieu", "phi_cau_duong", "bao_duong", "chi_phi_ky_doi_xe", "chi_marketing_kenh",
              "doanh_so_tu_van_vien", "thu_lao_hdv", "hoa_don_dau_vao", "bao_hiem_ky", "bang_luong",
-             "tai_san_co_dinh", "cong_cu_dung_cu", "khau_hao_ky")
+             "hop_dong_lao_dong", "tai_san_co_dinh", "cong_cu_dung_cu", "khau_hao_ky")
