@@ -468,3 +468,31 @@ def test_dieu_kien_danh_sach_phai_khop_theo_phan_tu():
     assert HT._khop({"khop_don": True}, {"khop_don": True}) is True
     assert HT._khop({"khop_don": False}, {"khop_don": True}) is False
     db.close()
+
+
+def test_moi_gia_tri_mac_dinh_vua_do_dai_cot():
+    """Mọi giá trị trong bộ quy ước mặc định phải vừa độ dài cột đã khai.
+
+    Vì sao cần phép thử này, và vì sao nó đọc độ dài từ chính mô hình chứ không chép số vào đây:
+    SQLite KHÔNG ép độ dài VARCHAR, PostgreSQL thì CÓ. Một chuỗi quá dài vì thế đi qua sạch sẽ toàn
+    bộ phép thử ở máy rồi làm hỏng lệnh INSERT lúc khởi động trên máy chủ thật. Mà nap_mac_dinh chạy
+    trong lifespan, nên hỏng ở đó là cả API không lên được – Render dừng ở "Exited with status 3" và
+    giữ nguyên bản cũ.
+
+    Đã xảy ra thật ngày 08/9/2026: can_cu của PHI_VAY dài 363 ký tự trên cột String(200). 37 phép
+    thử đều xanh, deploy vẫn hỏng.
+    """
+    from sqlalchemy import String
+    cot = {c.name: c.type.length for c in QuyTacHachToan.__table__.columns
+           if isinstance(c.type, String) and c.type.length}
+    ten_truong = ("ma", "ten", "nguon", "dieu_kien", "tk_no", "tk_co", "tk_thue", "ben_thue",
+                  "ty_le_thue", "doi_tuong", "can_cong_trinh", "dien_giai", "uu_tien", "can_cu")
+    qua_dai = []
+    for hang in HT.MAC_DINH:
+        d = dict(zip(ten_truong, hang))
+        for ten, gioi_han in cot.items():
+            v = d.get(ten)
+            if isinstance(v, str) and len(v) > gioi_han:
+                qua_dai.append(f"{d['ma']}.{ten}: {len(v)} ký tự > {gioi_han}")
+    assert not qua_dai, ("Giá trị dài quá cột – ở máy thì SQLite bỏ qua, lên PostgreSQL thì INSERT "
+                         f"hỏng và API không khởi động được: {qua_dai}")
