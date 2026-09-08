@@ -13,6 +13,15 @@ Bốn quyết định của Chủ tịch ngày 08/9/2026 mà bộ quy tắc này
      "Có lấy hóa đơn hay không" là chuyện chứng từ, không phải chuyện bản chất.
   4. Số bảo hiểm xã hội lấy từ bảng lương, không tính lại theo tỷ lệ.
 
+Ba quyết định bổ sung về nhóm tài chính (Chủ tịch, 08/9/2026):
+  5. LÃI VAY GHI KHI TRẢ, không trích trước theo kỳ. Hệ quả phải biết và không được giấu: tháng nào trả
+     lãi thì tháng đó gánh toàn bộ, tháng không trả thì lãi bằng 0 – nên lãi lỗ THEO THÁNG không dùng để
+     so sánh giữa các tháng. Số theo năm và theo kỳ báo cáo vẫn đúng.
+  6. Phí ngân hàng tách làm hai theo TT99: phí dịch vụ thông thường vào 6428; phí gắn với khoản vay vào
+     635, vì TT99 nêu đích danh khoản này trong nội dung TK 635.
+  7. Công ty KHÔNG dùng tiền vay ngoài ngân hàng để chạy đáo hạn. Cổng đáo hạn vì vậy chỉ canh hai chân
+     ngân hàng; nếu về sau có phát sinh thì phải khai thành một khoản vay thật đứng tên người cho vay.
+
 Căn cứ pháp lý: Thông tư 99/2025/TT-BTC (hiệu lực 01/01/2026) – bản chất quan trọng hơn hình thức;
 TK 511 không bao gồm các khoản thu hộ bên thứ ba (Điều về TK 511); TK 338 gồm 7 tài khoản cấp 2.
 """
@@ -135,11 +144,6 @@ MAC_DINH = [
     ("VAY_LAI", "Trả lãi vay", "tien_ra",
      {"muc_chi": ["lai_vay"]}, "635", "1121", "", "", 0, "ngan_hang", False,
      "Lãi vay {ngan_hang}", 14, CAN_CU_TT99 + " TK 635."),
-    ("VAY_LAI_TRICH", "Trích trước lãi vay phải trả theo kỳ", "ket_chuyen",
-     {"phan": "lai_vay_du_thu"}, "635", "335", "", "", 0, "ngan_hang", False,
-     "Trích lãi vay kỳ {ky}", 45,
-     "Lãi rơi đúng tháng phát sinh, không đợi ngày trả. Thiếu bút toán này thì tháng nào trả lãi tháng "
-     "đó lỗ, tháng không trả thì lãi giả."),
     ("KY_QUY_CHI", "Ký quỹ, thế chấp, đặt cọc dài hạn", "tien_ra",
      {"muc_chi": ["ky_quy"]}, "244", "1121", "", "", 0, "ncc", False,
      "Ký quỹ {ncc}", 17, CAN_CU_TT99 + " TK 244."),
@@ -149,11 +153,18 @@ MAC_DINH = [
     ("LAI_TIEN_GUI", "Lãi tiền gửi ngân hàng", "tien_vao",
      {"muc_thu": ["lai_tien_gui"]}, "1121", "515", "", "", 0, "ngan_hang", False,
      "Lãi tiền gửi {ngan_hang}", 14, CAN_CU_TT99 + " TK 515."),
-    ("PHI_NGAN_HANG", "Phí ngân hàng, phí chuyển tiền", "tien_ra",
+    ("PHI_NGAN_HANG", "Phí dịch vụ ngân hàng thông thường (chuyển tiền, quản lý tài khoản)", "tien_ra",
      {"muc_chi": ["phi_ngan_hang"]}, "6428", "1121", "", "", 0, "ngan_hang", False,
      "Phí ngân hàng {ngan_hang}", 18,
-     "CHỜ CHỦ TỊCH QUYẾT: phí gắn với khoản vay (phí thu xếp, phí giải ngân) nên vào 635 chứ không 6428. "
-     "Đang để 6428 cho phí chuyển tiền thông thường; nếu quyết khác thì thêm một quy ước riêng."),
+     CAN_CU_TT99 + " TK 6428 'Chi phí bằng tiền khác' – phí dịch vụ ngân hàng không gắn với khoản vay "
+     "thì là chi phí quản lý, không phải chi phí tài chính."),
+    ("PHI_VAY", "Phí gắn với khoản vay (thẩm định hồ sơ, thu xếp, cam kết)", "tien_ra",
+     {"muc_chi": ["phi_vay"]}, "635", "1121", "", "", 0, "ngan_hang", False,
+     "Phí khoản vay {ngan_hang}", 16,
+     CAN_CU_TT99 + " TK 635 nêu đích danh 'chi phí liên quan trực tiếp đến khoản vay (ngoài lãi vay phải "
+     "trả), như chi phí kiểm toán, thẩm định hồ sơ vay vốn, chi phí thu xếp khoản vay'. Quy ước này ghi "
+     "thẳng vào 635 cho khoản phí không vốn hóa và không phân bổ; phí lớn phải phân bổ dần thì ghi giảm "
+     "341 rồi phân bổ sang 635 – việc đó Kế toán lập tay, không tự động."),
     ("NOP_THUE_GTGT", "Nộp thuế giá trị gia tăng", "tien_ra",
      {"muc_chi": ["nop_thue_gtgt"]}, "3331", "1121", "", "", 0, "", False,
      "Nộp thuế GTGT kỳ {ky}", 19, CAN_CU_TT99 + " TK 3331."),

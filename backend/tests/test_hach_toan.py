@@ -377,7 +377,24 @@ def test_bo_quy_uoc_vay_du_ba_chan():
     assert HT.chon(db, "tien_vao", {"muc_thu": "giai_ngan_vay"}).tk_co == "3411"
     assert HT.chon(db, "tien_ra", {"muc_chi": "tra_goc_vay"}).tk_no == "3411"
     assert HT.chon(db, "tien_ra", {"muc_chi": "lai_vay"}).tk_no == "635"
-    assert HT.chon(db, "ket_chuyen", {"phan": "lai_vay_du_thu"}).tk_co == "335"
+    db.close()
+
+
+def test_lai_vay_ghi_khi_tra_khong_trich_truoc():
+    """Quyết định Chủ tịch 08/9: lãi vay ghi khi trả. Quy ước trích trước phải KHÔNG tồn tại –
+    để nửa vời (có quy ước nhưng không ai bật) là chỗ sau này có người bật nhầm."""
+    db = db_()
+    assert HT.chon(db, "ket_chuyen", {"phan": "lai_vay_du_thu"}) is None
+    assert not [q for q in db.execute(select(QuyTacHachToan)).scalars() if q.ma == "VAY_LAI_TRICH"]
+    db.close()
+
+
+def test_phi_vay_vao_635_phi_dich_vu_vao_6428():
+    """TT99 nêu đích danh 'chi phí liên quan trực tiếp đến khoản vay… thẩm định hồ sơ vay vốn, chi phí
+    thu xếp khoản vay' trong nội dung TK 635. Phí chuyển tiền thường thì không – nó là chi phí quản lý."""
+    db = db_()
+    assert HT.chon(db, "tien_ra", {"muc_chi": "phi_vay"}).tk_no == "635"
+    assert HT.chon(db, "tien_ra", {"muc_chi": "phi_ngan_hang"}).tk_no == "6428"
     db.close()
 
 
