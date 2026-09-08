@@ -105,15 +105,25 @@ def _thang_truoc(thang: str) -> str:
 
 
 # ============================== SÁU DẤU HIỆU ==============================
-def _lech_ky(db: Session, thang: str, lan: float, toi_thieu: float) -> list[dict]:
+def _tong_theo_nguon(db: Session, thang: str, kho: dict) -> dict:
+    """Tổng tiền tháng này và tháng trước của từng nguồn. Đệm lại: bảng đo bốn ngưỡng chỉ khác nhau ở
+    PHÉP SO, không khác nhau ở số liệu – tính lại bốn lần là trả giá bốn lần cho cùng một con số."""
+    k = ("tong", thang)
+    if k in kho: return kho[k]
+    a, b = _khoang_thang(thang); c, d = _khoang_thang(_thang_truoc(thang))
+    ra = {ng["ma"]: (_tong_tien(db, ng, a, b), _tong_tien(db, ng, c, d)) for ng in NGUON if ng["tien"]}
+    kho[k] = ra
+    return ra
+
+
+def _lech_ky(db: Session, thang: str, lan: float, toi_thieu: float, kho: dict | None = None) -> list[dict]:
     """Tổng tháng này so với tổng CHÍNH nguồn đó tháng trước. So với chính nó chứ không so giữa các
     phòng: mỗi phòng một quy mô, so chéo thì phòng lớn luôn bị báo và phòng nhỏ không bao giờ."""
     ra = []
+    tong = _tong_theo_nguon(db, thang, kho if kho is not None else {})
     for ng in NGUON:
         if not ng["tien"]: continue
-        a, b = _khoang_thang(thang); c, d = _khoang_thang(_thang_truoc(thang))
-        nay = _tong_tien(db, ng, a, b)
-        truoc = _tong_tien(db, ng, c, d)
+        nay, truoc = tong.get(ng["ma"], (0.0, 0.0))
         if truoc <= 0 or nay <= 0: continue          # chưa có kỳ trước thì không có gì để so
         ty = nay / truoc
         if max(ty, 1 / ty) < lan: continue
@@ -228,15 +238,21 @@ def _lui_ngay(db: Session, thang: str, kho: dict | None = None) -> list[dict]:
     return ra
 
 
-def _sua_da_chot(db: Session, thang: str) -> list[dict]:
+def _sua_da_chot(db: Session, thang: str, kho: dict | None = None) -> list[dict]:
     """Sửa một số đã dùng để lên báo cáo. Đọc từ nhật ký bất biến – đó là chỗ duy nhất còn giữ được
     việc một con số từng mang giá trị khác."""
+    if kho is not None and ("sua", thang) in kho: return kho[("sua", thang)]
     from app.models.core import AuditLog
     from app.models.accounting import PeriodLock
     a, b = _khoang_thang(thang)
     khoa = sorted({p.period for p in db.execute(select(PeriodLock)).scalars()})
-    if not khoa: return []
+    if not khoa:
+        if kho is not None: kho[("sua", thang)] = []
+        return []
     moc = max(khoa)
+    # Chỉ soi BA kỳ khóa gần nhất. Nhật ký bất biến là bảng lớn nhất hệ thống và mỗi kỳ thêm một mệnh
+    # đề LIKE không dùng được chỉ mục; soi hết mọi kỳ đã khóa từ đầu là cách chắc chắn làm cổng hết giờ.
+    khoa = khoa[-3:]
     # Lọc trong SQL và CHỈ lấy hai cột. Nhật ký bất biến là bảng lớn nhất hệ thống; nạp cả cột
     # before/after về Python để tìm chuỗi là cách chắc chắn làm cổng trả 502.
     from sqlalchemy import or_
@@ -248,11 +264,13 @@ def _sua_da_chot(db: Session, thang: str) -> list[dict]:
                 func.lower(func.coalesce(AuditLog.actor, "")).notin_(BO_QUA_NGUOI))
          .group_by(AuditLog.actor))
     dem = {actor: int(n) for actor, n in db.execute(q).all() if actor}
-    return [{"loai": "nt_sua_da_chot", "nguon": "nhat_ky", "nguoi": ng,
+    ket = [{"loai": "nt_sua_da_chot", "nguon": "nhat_ky", "nguoi": ng,
              "tom_tat": f"{ng} có {n} thao tác sửa/điều chỉnh chạm vào kỳ đã khóa (tới {moc}) trong "
                         f"tháng {thang} – số đã lên báo cáo mà đổi thì báo cáo cũ không còn đúng",
              "chi_tiet": {"thang": thang, "nguoi": ng, "so_thao_tac": n}}
-            for ng, n in dem.items() if n > 0]
+           for ng, n in dem.items() if n > 0]
+    if kho is not None: kho[("sua", thang)] = ket
+    return ket
 
 
 # ============================== CHẠY & ĐO ==============================
@@ -268,18 +286,23 @@ def quet_thang(db: Session, thang: str, n: dict | None = None, kho: dict | None 
     n = n or _nguong(db)
     kho = {} if kho is None else kho
     ra: list[dict] = []
-    for f in (lambda: _lech_ky(db, thang, n["lan"], n["lech_toi_thieu"]),
-              lambda: _so_tron(db, thang, n["tron_tu"], n["tron_lap"], kho),
-              lambda: _ngoai_gio(db, thang, n["gio_dau"], n["gio_cuoi"], n["don_dong"], kho),
-              lambda: _khac_phong(db, thang, kho),
-              lambda: _lui_ngay(db, thang, kho),
-              lambda: _sua_da_chot(db, thang)):
+    import time as _t
+    dong_ho = kho.setdefault("_dong_ho", {})
+    for ten, f in (("nt_lech_ky", lambda: _lech_ky(db, thang, n["lan"], n["lech_toi_thieu"], kho)),
+                   ("nt_so_tron", lambda: _so_tron(db, thang, n["tron_tu"], n["tron_lap"], kho)),
+                   ("nt_ngoai_gio", lambda: _ngoai_gio(db, thang, n["gio_dau"], n["gio_cuoi"], n["don_dong"], kho)),
+                   ("nt_khac_phong", lambda: _khac_phong(db, thang, kho)),
+                   ("nt_lui_ngay", lambda: _lui_ngay(db, thang, kho)),
+                   ("nt_sua_da_chot", lambda: _sua_da_chot(db, thang, kho))):
+        t0 = _t.perf_counter()
         try:
             ra += f()
         except Exception as ex:      # noqa – một dấu hiệu hỏng không được làm trắng cả bộ hậu kiểm
             ra.append({"loai": "nt_lech_ky", "nguon": "he_thong", "loi": True,
                        "tom_tat": f"Một dấu hiệu hậu kiểm lỗi, danh sách có thể THIẾU: {str(ex)[:160]}",
                        "chi_tiet": {}})
+        # Đo từng dấu hiệu và trả ra: đoán chỗ chậm là cách mất một lần triển khai cho mỗi lần đoán sai.
+        dong_ho[ten] = round(dong_ho.get(ten, 0.0) + (_t.perf_counter() - t0), 2)
     return ra
 
 

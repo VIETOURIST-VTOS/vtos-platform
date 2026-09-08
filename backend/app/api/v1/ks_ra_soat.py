@@ -67,14 +67,37 @@ def do_nguong(thang: str = "", lan: str = "2,3,5,10",
     return NT.do_nguong(db, thang or f"{date.today():%Y-%m}", lan)
 
 
+@router.get("/nhap-tay/nguon")
+def nhap_tay_nguon(thang: str = "", u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Mỗi nguồn có bao nhiêu dòng do NGƯỜI nhập trong tháng, và tổng tiền. Dùng để biết quy mô trước
+    khi chạy cả bộ hậu kiểm – một nguồn vài chục nghìn dòng thì phải xử lý khác."""
+    from datetime import date
+    from app.services import ks_nhap_tay as NT
+    th = thang or f"{date.today():%Y-%m}"
+    a, b = NT._khoang_thang(th); kho: dict = {}
+    ra = []
+    for ng in NT.NGUON:
+        import time as _t
+        t0 = _t.perf_counter()
+        rows = NT._doc(db, ng, a, b, kho)
+        ra.append({"nguon": ng["ma"], "ten": ng["ten"], "bang": ng["bang"], "so_dong": len(rows),
+                   "tong_tien": sum(x["tien"] for x in rows), "giay": round(_t.perf_counter() - t0, 2),
+                   "cham_tran": len(rows) > NT.TRAN_DONG})
+    return {"thang": th, "nguon": ra, "tong_giay": round(sum(x["giay"] for x in ra), 2)}
+
+
 @router.get("/nhap-tay")
 def nhap_tay(thang: str = "", u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
     """Danh sách dấu hiệu bất thường của một tháng, theo ngưỡng đang hiệu lực."""
     from datetime import date
     from app.services import ks_nhap_tay as NT
     th = thang or f"{date.today():%Y-%m}"
-    ds = NT.quet_thang(db, th)
+    kho: dict = {}
+    ds = NT.quet_thang(db, th, None, kho)
     theo = {}
     for d in ds: theo[d["loai"]] = theo.get(d["loai"], 0) + 1
     return {"thang": th, "loai": NT.LOAI_TEN, "nguon": {n["ma"]: n["ten"] for n in NT.NGUON},
-            "tong": len(ds), "theo_dau_hieu": theo, "rows": ds}
+            "tong": len(ds), "theo_dau_hieu": theo,
+            # Giây của từng dấu hiệu: bộ này chạy trong vòng quét robot trên máy chủ 0,5 CPU, nên
+            # "chậm ở đâu" là dữ kiện vận hành chứ không phải chuyện gỡ lỗi tạm thời.
+            "giay_moi_dau_hieu": kho.get("_dong_ho", {}), "rows": ds}
