@@ -55,6 +55,8 @@ function AccessPage() {
   const [tcUid, setTcUid] = useState<number | null>(null);
   const [tc, setTc] = useState<any>(null);
   const [tcVai, setTcVai] = useState("");
+  const [suy, setSuy] = useState<any>(null);
+  const [dangSuy, setDangSuy] = useState(false);
   const [tcRole, setTcRole] = useState<any>(null);
 
   const loadAcc = useCallback(() => { api("/access/accounts").then(setAcc).catch((e) => toast(errMsg(e), true)); }, [toast]);
@@ -63,7 +65,8 @@ function AccessPage() {
   useEffect(() => {
     if (tab === "matrix" && !mt) api("/access/matrix").then(setMt).catch((e) => toast(errMsg(e), true));
     if (tab === "audit") api("/access/audit").then(setLog).catch(() => {});
-  }, [tab, mt, toast]);
+    if (tab === "gaps" && !suy) api("/access/phap-nhan/suy-tu-ho-so").then(setSuy).catch(() => {});
+  }, [tab, mt, suy, toast]);
   useEffect(() => {
     if (tcUid == null) { setTc(null); return; }
     setTc(null); api(`/access/tra-cuu/${tcUid}`).then(setTc).catch((e) => toast(errMsg(e), true));
@@ -215,6 +218,63 @@ function AccessPage() {
     </>}
 
     {tab === "gaps" && gaps && <>
+      {/* Gán pháp nhân hàng loạt: người quản trị đã quyết ở hồ sơ nhân sự rồi, việc còn lại chỉ là chép
+          sang tài khoản. Bắt ngồi gán tay hơn trăm lần là cách chắc chắn để việc này không bao giờ xong,
+          và một hàng rào chưa bật thì bằng không có hàng rào.
+          XEM TRƯỚC rồi mới ghi: ghi hàng trăm dòng mà không ai nhìn trước là lúc sai không ai biết sai
+          ở đâu. Bảng dưới nói rõ cả phần KHÔNG suy được và lý do, chứ không chỉ khoe phần làm được. */}
+      {suy && (suy.dem.suy_duoc > 0 || suy.dem.khong_suy_duoc > 0 || suy.dem.lech_voi_ho_so > 0) && <div style={{ marginBottom: 18 }}>
+        <h3>Gán pháp nhân cho tài khoản, suy từ hồ sơ nhân sự</h3>
+        <p className="muted">Pháp nhân của tài khoản quyết định người đó nhìn thấy dữ liệu của công ty nào.
+          Chỉ suy khi tài khoản nối được với một hồ sơ nhân sự <b>đang làm việc</b> và hồ sơ ấy đã có pháp
+          nhân — không suy từ phòng ban hay vai trò, không mặc định về công ty mẹ, và không ghi đè giá trị
+          đã gán tay.</p>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center", margin: "8px 0" }}>
+          <Tag cls="ok">{suy.dem.suy_duoc} suy được</Tag>
+          <Tag cls="warn">{suy.dem.khong_suy_duoc} phải gán tay</Tag>
+          {suy.dem.lech_voi_ho_so > 0 && <Tag cls="warn">{suy.dem.lech_voi_ho_so} lệch với hồ sơ</Tag>}
+          <span className="muted">{suy.dem.da_co} tài khoản đã có</span>
+          {canWrite && suy.dem.suy_duoc > 0 && <button className="act" style={{ margin: 0 }} disabled={dangSuy}
+            onClick={async () => {
+              if (!confirm(`Gán pháp nhân cho ${suy.dem.suy_duoc} tài khoản theo bảng dưới?`)) return;
+              setDangSuy(true);
+              try {
+                const r = await api<any>("/access/phap-nhan/suy-tu-ho-so", { method: "POST", json: {} });
+                toast(r.message); setSuy(null); loadAcc(); loadGaps();
+              } catch (e) { toast(errMsg(e), true); } finally { setDangSuy(false); }
+            }}>{dangSuy ? "Đang ghi…" : `Gán cho ${suy.dem.suy_duoc} tài khoản`}</button>}
+        </div>
+
+        {suy.suy_duoc.length > 0 && <div className="scroll"><table><thead><tr>
+          <th>Mã NV</th><th>Họ tên</th><th>Vai trò</th><th>Hồ sơ</th><th>Sẽ gán</th><th>Nối bằng</th>
+        </tr></thead><tbody>{suy.suy_duoc.map((x: any) => <tr key={x.user_id}>
+          <td>{x.staff_code || "—"}</td><td>{x.full_name}</td><td>{x.role_name}</td>
+          <td>{x.ho_so}</td><td><b>{x.company}</b></td>
+          <td className="muted">{x.noi_bang === "user_id" ? "hồ sơ đã nối" : "mã nhân viên"}</td>
+        </tr>)}</tbody></table></div>}
+
+        {suy.lech_voi_ho_so.length > 0 && <>
+          <h4 style={{ marginTop: 14 }}>Tài khoản và hồ sơ đang nói khác nhau ({suy.lech_voi_ho_so.length})</h4>
+          <p className="muted">Không tự sửa: gán tay là quyết định của con người, suy tự động chỉ là phỏng
+            theo dữ liệu. Người quản trị xem rồi quyết bên nào đúng.</p>
+          <div className="scroll"><table><thead><tr>
+            <th>Họ tên</th><th>Tài khoản đang là</th><th>Hồ sơ nói là</th>
+          </tr></thead><tbody>{suy.lech_voi_ho_so.map((x: any) => <tr key={x.user_id}>
+            <td>{x.full_name}</td><td>{x.company}</td><td>{x.ho_so_company}</td>
+          </tr>)}</tbody></table></div>
+        </>}
+
+        {suy.khong_suy_duoc.length > 0 && <>
+          <h4 style={{ marginTop: 14 }}>Không suy được, phải gán tay ({suy.khong_suy_duoc.length})</h4>
+          <div className="scroll"><table><thead><tr>
+            <th>Mã NV</th><th>Họ tên</th><th>Vai trò</th><th>Vì sao không suy được</th>
+          </tr></thead><tbody>{suy.khong_suy_duoc.map((x: any) => <tr key={x.user_id}>
+            <td>{x.staff_code || "—"}</td><td>{x.full_name}</td><td>{x.role_name}</td>
+            <td className="muted">{x.ly_do}</td>
+          </tr>)}</tbody></table></div>
+        </>}
+      </div>}
+
       {gaps.tong === 0 && <p>Không có chênh lệch nào.</p>}
       {Object.entries(gaps.danh_sach).map(([k, v]: any) => v.length > 0 && <div key={k} style={{ marginBottom: 16 }}>
         <h3>{GAP_TEN[k] || k} <Tag cls="warn">{v.length}</Tag></h3>

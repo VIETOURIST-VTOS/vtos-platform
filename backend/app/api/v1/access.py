@@ -276,3 +276,32 @@ def tra_cuu_theo_vai_tro(vai_tro: str, u: User = Depends(require_roles(*XEM)), d
             "dem": kq["dem"],
             "canh_bao": (["Vai trò này chưa có ai – quyền đang mở cho một chỗ trống."] if not nguoi else [])
                        + [c for c in kq["canh_bao"] if "Tài khoản đã khóa" not in c]}
+
+
+# ---------- Suy pháp nhân cho tài khoản từ hồ sơ nhân sự ----------
+@router.get("/phap-nhan/suy-tu-ho-so")
+def xem_truoc_suy_phap_nhan(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Xem trước: tài khoản nào suy được pháp nhân từ hồ sơ, tài khoản nào không và vì sao.
+
+    Mở cho quyền XEM vì đây là bảng đối chiếu, không sửa gì. Ghi thì phải quyền THAO_TAC – hai việc
+    tách nhau để người rà quyền xem được danh sách mà không cần quyền ghi vào bảng tài khoản.
+    """
+    from app.services import suy_phap_nhan as SPN
+    return SPN.xem_truoc(db)
+
+
+class SuyPhapNhanIn(BaseModel):
+    user_ids: list[int] | None = None      # bỏ trống là ghi cho toàn bộ nhóm suy được
+
+
+@router.post("/phap-nhan/suy-tu-ho-so")
+def ghi_suy_phap_nhan(data: SuyPhapNhanIn,
+                      u: User = Depends(require_roles(*THAO_TAC, "chutich", "tgd")),
+                      db: Session = Depends(get_db)):
+    """Ghi pháp nhân đã suy vào tài khoản. Không đè giá trị đã gán tay, và có ghi nhật ký.
+
+    Cùng bộ vai trò với PUT /users/{uid}/company: đây là cùng một việc, chỉ khác là làm hàng loạt.
+    Cho phép nhóm rộng hơn ở đây thì hàng loạt trở thành đường vòng của lẻ.
+    """
+    from app.services import suy_phap_nhan as SPN
+    return SPN.ap_dung(db, u, data.user_ids)
