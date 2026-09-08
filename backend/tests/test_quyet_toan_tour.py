@@ -71,8 +71,16 @@ def _tep(noi_dung: bytes, who="tp.dieuhanh"):
                        data={"loai": "quyet_toan_tour"})
 
 
+# V10 – mỗi lần gọi là MỘT lần bấm nút nên mang khóa chống ghi trùng riêng. Phép thử
+# "nạp lại cùng tệp không cộng đôi" canh lớp chống trùng THEO DÒNG; để lớp khóa lô nuốt lời gọi thứ
+# hai thì lớp trong không còn được canh bởi phép thử nào.
+_lan = [0]
+
+
 def _nap(rows, who="tp.dieuhanh", bo_qua=False):
-    return client.post("/api/v1/nap-du-lieu/nap", headers=login(who),
+    _lan[0] += 1
+    return client.post("/api/v1/nap-du-lieu/nap",
+                       headers={**login(who), "X-Khoa-Ghi": f"thu-qt-{_lan[0]}"},
                        json={"loai": "quyet_toan_tour", "rows": rows, "bo_qua_dong_loi": bo_qua,
                              "ten_tep": "quyet_toan.xlsx", "nguon": "nap_tep"})
 

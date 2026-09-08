@@ -155,9 +155,14 @@ def test_bo_nap_hdv_khoa_theo_so_the_va_khong_de_ho_so_cu(_startup):
            "Loại thẻ": "noi_dia", "Ngày hết hạn thẻ": "31/12/2029",
            "Hội viên tổ chức XH – nghề nghiệp": "x", "Đã ký hợp đồng cộng tác": "x",
            "Hạn mức tạm ứng": "5.000.000"}
-    r = client.post("/api/v1/nap-du-lieu/nap", headers=h, json={"loai": "huong_dan_vien", "rows": [row]})
+    # V10 – hai lần bấm nút khác nhau mang khóa chống ghi trùng khác nhau. Điều phép thử này canh là
+    # lớp chống trùng THEO DÒNG (khóa = số thẻ HDV); để lớp khóa lô nuốt lời gọi thứ hai thì lớp trong
+    # không còn được canh bởi phép thử nào.
+    r = client.post("/api/v1/nap-du-lieu/nap", headers={**h, "X-Khoa-Ghi": "thu-hdv-1"},
+                    json={"loai": "huong_dan_vien", "rows": [row]})
     assert r.status_code == 201 and r.json()["da_nap"] == 1, r.text
-    r2 = client.post("/api/v1/nap-du-lieu/nap", headers=h, json={"loai": "huong_dan_vien", "rows": [row]})
+    r2 = client.post("/api/v1/nap-du-lieu/nap", headers={**h, "X-Khoa-Ghi": "thu-hdv-2"},
+                     json={"loai": "huong_dan_vien", "rows": [row]})
     assert r2.json()["da_nap"] == 0 and r2.json()["da_co"] == 1
 
 
