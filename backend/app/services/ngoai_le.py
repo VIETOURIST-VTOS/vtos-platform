@@ -68,6 +68,8 @@ LOAI: dict[str, dict] = {
                      "quy_tac": "Việc do vòng quét của robot Kiểm soát tìm ra, phòng ban phải giải trình"},
     # Cổng chặn giá vốn: đơn có doanh thu mà chưa có giá vốn thì KHÔNG được ghi doanh thu. Mỗi dòng ở
     # đây là một đơn đang bị giữ lại – để lâu là đến kỳ khóa sổ mà doanh thu vẫn chưa vào sổ.
+    "dao_han_thieu_chan": {"ten": "Đáo hạn ngân hàng chỉ ghi một chân", "muc": "do", "nhom": "tien",
+                           "quy_tac": "Đáo hạn là HAI bút toán – trả gốc khoản cũ và nhận giải ngân khoản mới. Bù trừ thành một dòng thì dư nợ vay không bao giờ đứng ở đỉnh"},
     "thieu_gia_von": {"ten": "Đơn có doanh thu nhưng chưa có giá vốn", "muc": "do", "nhom": "tien",
                       "quy_tac": "Mọi đơn đều có doanh thu và giá vốn (Chủ tịch 08/9/2026) – thiếu giá vốn là thiếu dữ liệu, không phải bản chất khác"},
 }
@@ -285,6 +287,11 @@ def _cong_chan_gia_von(db: Session) -> list[dict]:
     return CC.ngoai_le(db)
 
 
+def _dao_han_thieu_chan(db: Session) -> list[dict]:
+    from app.services import cong_chan as CC
+    return CC.dao_han_thieu_chan(db)
+
+
 def do_tim(db: Session, so_ngay: int = CUA_SO_NGAY) -> list[dict]:
     """Chạy toàn bộ bộ dò. Không ghi gì vào cơ sở dữ liệu – chỉ đọc."""
     tu_ngay = datetime.now() - timedelta(days=so_ngay)
@@ -301,6 +308,7 @@ def do_tim(db: Session, so_ngay: int = CUA_SO_NGAY) -> list[dict]:
         lambda: _xe_khac_goi_y(db, tu_ngay),
         lambda: _ks_phat_hien(db),
         lambda: _cong_chan_gia_von(db),
+        lambda: _dao_han_thieu_chan(db),
     )
     for f in bo_do:
         try:

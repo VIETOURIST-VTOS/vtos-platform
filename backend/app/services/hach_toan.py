@@ -114,6 +114,59 @@ MAC_DINH = [
      {"muc_chi": ["quan_ly"]}, "642", "1121", "", "", 0, "ncc", False,
      "Chi phí quản lý – {noi_dung}", 40, ""),
 
+    # ---- Chặng 6b: tài chính – vay, ngân hàng, trả nhà cung cấp ----
+    # Bổ sung 08/9/2026 theo chỉ ra của Chủ tịch: bảng quy ước ban đầu KHÔNG có dòng nào về tài chính.
+    # Nặng nhất là TRA_NCC: có quy ước ghi nợ phải trả lúc mua, nhưng không có quy ước ghi lúc trả tiền –
+    # nghĩa là tiền ra khỏi tài khoản mà công nợ nhà cung cấp không bao giờ giảm.
+    ("TRA_NCC", "Trả tiền / ứng trước cho nhà cung cấp", "tien_ra",
+     {"muc_chi": ["tra_ncc", "ung_ncc"]}, "331", "1121", "", "", 0, "ncc", False,
+     "Trả nhà cung cấp – {ncc}", 12,
+     "Ứng trước cũng ghi 331 và thể hiện bằng số dư NỢ 331 – đúng chỉ tiêu 'Trả trước cho người bán' "
+     "trên Báo cáo tình hình tài chính. Không tách sang tài khoản khác."),
+    ("VAY_NHAN", "Nhận giải ngân khoản vay", "tien_vao",
+     {"muc_thu": ["giai_ngan_vay"]}, "1121", "3411", "", "", 0, "ngan_hang", False,
+     "Nhận giải ngân {ngan_hang}", 12,
+     CAN_CU_TT99 + " TK 3411. Đối tượng là bên cho vay – ngân hàng hay cá nhân đều phải có tên."),
+    ("VAY_TRA_GOC", "Trả gốc khoản vay", "tien_ra",
+     {"muc_chi": ["tra_goc_vay"]}, "3411", "1121", "", "", 0, "ngan_hang", False,
+     "Trả gốc vay {ngan_hang}", 13,
+     "Đáo hạn KHÔNG bù trừ: trả khoản cũ và nhận khoản mới là hai bút toán, nối với nhau bằng mã đáo hạn. "
+     "Bù trừ thành một dòng thì dư nợ vay trên sổ không bao giờ đứng ở đỉnh và dòng tiền mất một vòng."),
+    ("VAY_LAI", "Trả lãi vay", "tien_ra",
+     {"muc_chi": ["lai_vay"]}, "635", "1121", "", "", 0, "ngan_hang", False,
+     "Lãi vay {ngan_hang}", 14, CAN_CU_TT99 + " TK 635."),
+    ("VAY_LAI_TRICH", "Trích trước lãi vay phải trả theo kỳ", "ket_chuyen",
+     {"phan": "lai_vay_du_thu"}, "635", "335", "", "", 0, "ngan_hang", False,
+     "Trích lãi vay kỳ {ky}", 45,
+     "Lãi rơi đúng tháng phát sinh, không đợi ngày trả. Thiếu bút toán này thì tháng nào trả lãi tháng "
+     "đó lỗ, tháng không trả thì lãi giả."),
+    ("KY_QUY_CHI", "Ký quỹ, thế chấp, đặt cọc dài hạn", "tien_ra",
+     {"muc_chi": ["ky_quy"]}, "244", "1121", "", "", 0, "ncc", False,
+     "Ký quỹ {ncc}", 17, CAN_CU_TT99 + " TK 244."),
+    ("KY_QUY_HOAN", "Nhận lại tiền ký quỹ", "tien_vao",
+     {"muc_thu": ["hoan_ky_quy"]}, "1121", "244", "", "", 0, "ncc", False,
+     "Hoàn ký quỹ {ncc}", 16, CAN_CU_TT99 + " TK 244."),
+    ("LAI_TIEN_GUI", "Lãi tiền gửi ngân hàng", "tien_vao",
+     {"muc_thu": ["lai_tien_gui"]}, "1121", "515", "", "", 0, "ngan_hang", False,
+     "Lãi tiền gửi {ngan_hang}", 14, CAN_CU_TT99 + " TK 515."),
+    ("PHI_NGAN_HANG", "Phí ngân hàng, phí chuyển tiền", "tien_ra",
+     {"muc_chi": ["phi_ngan_hang"]}, "6428", "1121", "", "", 0, "ngan_hang", False,
+     "Phí ngân hàng {ngan_hang}", 18,
+     "CHỜ CHỦ TỊCH QUYẾT: phí gắn với khoản vay (phí thu xếp, phí giải ngân) nên vào 635 chứ không 6428. "
+     "Đang để 6428 cho phí chuyển tiền thông thường; nếu quyết khác thì thêm một quy ước riêng."),
+    ("NOP_THUE_GTGT", "Nộp thuế giá trị gia tăng", "tien_ra",
+     {"muc_chi": ["nop_thue_gtgt"]}, "3331", "1121", "", "", 0, "", False,
+     "Nộp thuế GTGT kỳ {ky}", 19, CAN_CU_TT99 + " TK 3331."),
+    ("NOP_THUE_TNDN", "Nộp thuế thu nhập doanh nghiệp", "tien_ra",
+     {"muc_chi": ["nop_thue_tndn"]}, "3334", "1121", "", "", 0, "", False,
+     "Nộp thuế TNDN kỳ {ky}", 20, CAN_CU_TT99 + " TK 3334."),
+    ("NOP_THUE_TNCN", "Nộp thuế thu nhập cá nhân đã khấu trừ", "tien_ra",
+     {"muc_chi": ["nop_thue_tncn"]}, "3335", "1121", "", "", 0, "", False,
+     "Nộp thuế TNCN kỳ {ky}", 21, CAN_CU_TT99 + " TK 3335."),
+    ("NOP_BHXH", "Nộp bảo hiểm cho cơ quan bảo hiểm", "tien_ra",
+     {"muc_chi": ["nop_bhxh"]}, "3383", "1121", "", "", 0, "", False,
+     "Nộp bảo hiểm kỳ {ky}", 22, CAN_CU_TT99 + " TK 338."),
+
     # ---- Chặng 7: kết chuyển xác định kết quả ----
     ("KC_DOANH_THU", "Kết chuyển doanh thu sang xác định kết quả", "ket_chuyen",
      {"phan": "ket_chuyen", "buoc": 1}, "5113", "911", "", "", 0, "", False,
@@ -165,7 +218,14 @@ def dang_hieu_luc(db: Session, nguon: str = "", on: date | None = None) -> list[
 
 def _khop(dk: dict | None, boi_canh: dict) -> bool:
     """Điều kiện rỗng là khớp mọi thứ. Mỗi khóa trong điều kiện phải khớp; thiếu khóa trong
-    bối cảnh coi như KHÔNG khớp – không đoán."""
+    bối cảnh coi như KHÔNG khớp – không đoán.
+
+    Cách so THEO KIỂU của giá trị điều kiện, và đây là chỗ đã sai một lần ngày 08/9: điều kiện
+    đúng/sai so theo đúng/sai, danh sách so theo phần tử, còn lại so bằng nhau. Trước bản sửa,
+    mọi giá trị không nằm trong hai khóa được liệt kê sẵn đều rơi xuống phép so đúng/sai – nên
+    "muc_thu: hoan_ky_quy" khớp nhầm quy tắc giải ngân vay, và "phan: lai_vay_du_thu" khớp nhầm
+    quy tắc khấu hao, chỉ vì cả hai vế đều khác rỗng. Sai kiểu này không báo lỗi bao giờ; nó chỉ
+    lặng lẽ chọn nhầm tài khoản."""
     if not dk:
         return True
     noi_dung = str(boi_canh.get("noi_dung") or "").lower()
@@ -177,12 +237,13 @@ def _khop(dk: dict | None, boi_canh: dict) -> bool:
         elif k == "ma_bat_dau":
             ma = str(boi_canh.get("ma") or "").upper()
             if not any(ma.startswith(str(x).upper()) for x in v): return False
-        elif k in ("muc_chi", "loai_tour"):
+        elif isinstance(v, bool):
+            # Chỉ điều kiện kiểu ĐÚNG/SAI mới so theo đúng/sai.
+            if k not in boi_canh or bool(boi_canh.get(k)) != v: return False
+        elif isinstance(v, (list, tuple, set)):
             if boi_canh.get(k) not in v: return False
-        elif k == "buoc":
-            if boi_canh.get("buoc") != v: return False
         else:
-            if k not in boi_canh or bool(boi_canh.get(k)) != bool(v): return False
+            if boi_canh.get(k) != v: return False
     return True
 
 

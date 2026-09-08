@@ -358,3 +358,96 @@ def test_quy_tac_tro_vao_tai_khoan_khong_co_thi_tu_choi_ngay_luc_trinh():
         "ma": "BAY", "ten": "Tài khoản không tồn tại", "nguon": "tien_vao",
         "tk_no": "9999", "tk_co": "131", "effective_from": str(date.today())})
     assert r.status_code == 422 and "9999" in r.text
+
+# ============================ TÀI CHÍNH: VAY, NGÂN HÀNG, TRẢ NCC ============================
+def test_co_quy_uoc_tra_tien_nha_cung_cap():
+    """Thiếu quy ước này thì tiền ra khỏi tài khoản mà công nợ nhà cung cấp không bao giờ giảm –
+    chạy một tháng là bảng công nợ sai toàn bộ. Đây là chỗ thiếu Chủ tịch chỉ ra ngày 08/9."""
+    db = db_()
+    q = HT.chon(db, "tien_ra", {"muc_chi": "tra_ncc"})
+    assert q is not None and q.ma == "TRA_NCC"
+    assert q.tk_no == "331" and q.tk_co == "1121"
+    assert HT.chon(db, "tien_ra", {"muc_chi": "ung_ncc"}).ma == "TRA_NCC", "ứng trước cũng ghi 331"
+    db.close()
+
+
+def test_bo_quy_uoc_vay_du_ba_chan():
+    """Nhận giải ngân, trả gốc, trả lãi – thiếu một chân là dư nợ vay trên sổ sai."""
+    db = db_()
+    assert HT.chon(db, "tien_vao", {"muc_thu": "giai_ngan_vay"}).tk_co == "3411"
+    assert HT.chon(db, "tien_ra", {"muc_chi": "tra_goc_vay"}).tk_no == "3411"
+    assert HT.chon(db, "tien_ra", {"muc_chi": "lai_vay"}).tk_no == "635"
+    assert HT.chon(db, "ket_chuyen", {"phan": "lai_vay_du_thu"}).tk_co == "335"
+    db.close()
+
+
+def test_goc_va_lai_vay_khong_dung_chung_tai_khoan():
+    """Ghi lãi vào 341 thì dư nợ gốc phình lên; ghi gốc vào 635 thì lỗ giả."""
+    db = db_()
+    goc = HT.chon(db, "tien_ra", {"muc_chi": "tra_goc_vay"})
+    lai = HT.chon(db, "tien_ra", {"muc_chi": "lai_vay"})
+    assert goc.tk_no != lai.tk_no
+    db.close()
+
+
+def test_ky_quy_va_lai_tien_gui_va_nop_thue():
+    db = db_()
+    assert HT.chon(db, "tien_ra", {"muc_chi": "ky_quy"}).tk_no == "244"
+    assert HT.chon(db, "tien_vao", {"muc_thu": "hoan_ky_quy"}).tk_co == "244"
+    assert HT.chon(db, "tien_vao", {"muc_thu": "lai_tien_gui"}).tk_co == "515"
+    for muc, tk in (("nop_thue_gtgt", "3331"), ("nop_thue_tndn", "3334"),
+                    ("nop_thue_tncn", "3335"), ("nop_bhxh", "3383")):
+        assert HT.chon(db, "tien_ra", {"muc_chi": muc}).tk_no == tk, muc
+    db.close()
+
+
+def test_dao_han_ghi_mot_chan_thi_mo_ngoai_le():
+    """Đáo hạn là HAI bút toán. Bù trừ thành một dòng thì dư nợ vay không bao giờ đứng ở đỉnh và
+    dòng tiền mất hẳn một vòng ra–vào – cả hai đều là con số công bố của công ty đại chúng."""
+    from app.services import accounting as ACC
+    from app.services import cong_chan as CC
+    db = db_()
+    u = db.execute(select(User).where(User.username == "ht_ketoan")).scalars().first()
+    # chỉ ghi chân trả gốc
+    ACC.post_entry(db, u.username, u.role, date.today(), "Trả gốc đáo hạn",
+                   [{"account": "3411", "debit": 5_000_000_000, "partner": "TPBank", "partner_code": "TPB"},
+                    {"account": "1121", "credit": 5_000_000_000}],
+                   source_type="quy_tac", source_ref="dao_han:DH0826")
+    db.commit()
+    ra = {x["ma"] for x in CC.dao_han_thieu_chan(db)}
+    assert "dao_han_thieu_chan#DH0826" in ra
+    # ghi nốt chân nhận giải ngân
+    ACC.post_entry(db, u.username, u.role, date.today(), "Nhận giải ngân khoản mới",
+                   [{"account": "1121", "debit": 5_000_000_000},
+                    {"account": "3411", "credit": 5_000_000_000, "partner": "TPBank", "partner_code": "TPB"}],
+                   source_type="quy_tac", source_ref="dao_han:DH0826")
+    db.commit()
+    assert "dao_han_thieu_chan#DH0826" not in {x["ma"] for x in CC.dao_han_thieu_chan(db)}
+    db.close()
+
+
+def test_moi_quy_uoc_tai_chinh_deu_co_doi_tuong_khi_can():
+    """131, 331, 341, 244 là tài khoản công nợ – ghi mà không có đối tượng thì không đối chiếu được."""
+    db = db_()
+    CAN = ("131", "331", "341", "3411", "244")
+    for q in db.execute(select(QuyTacHachToan).where(QuyTacHachToan.status == "active")).scalars():
+        if q.tk_no.startswith(CAN) or q.tk_co.startswith(CAN):
+            assert q.doi_tuong, f"{q.ma} đụng tài khoản công nợ mà không khai cách lấy đối tượng"
+    db.close()
+
+
+def test_dieu_kien_danh_sach_phai_khop_theo_phan_tu():
+    """Lỗi thật ngày 08/9: mọi khóa điều kiện dạng danh sách trừ hai khóa được liệt kê sẵn đều rơi
+    xuống phép so đúng/sai, nên 'muc_thu: hoan_ky_quy' khớp nhầm vào quy tắc giải ngân vay. Sai kiểu
+    này không báo lỗi – nó chỉ lặng lẽ chọn nhầm tài khoản."""
+    db = db_()
+    assert HT._khop({"muc_thu": ["giai_ngan_vay"]}, {"muc_thu": "hoan_ky_quy"}) is False
+    assert HT._khop({"muc_thu": ["giai_ngan_vay"]}, {"muc_thu": "giai_ngan_vay"}) is True
+    assert HT._khop({"khoa_moi_chua_tung_co": ["x"]}, {"khoa_moi_chua_tung_co": "y"}) is False
+    # điều kiện là một CHUỖI thì so bằng nhau, không so khác-rỗng
+    assert HT._khop({"phan": "khau_hao"}, {"phan": "lai_vay_du_thu"}) is False
+    assert HT._khop({"phan": "khau_hao"}, {"phan": "khau_hao"}) is True
+    # điều kiện ĐÚNG/SAI vẫn so theo đúng/sai
+    assert HT._khop({"khop_don": True}, {"khop_don": True}) is True
+    assert HT._khop({"khop_don": False}, {"khop_don": True}) is False
+    db.close()

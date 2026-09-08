@@ -160,3 +160,36 @@ def ngoai_le(db: Session) -> list[dict]:
                    "tom_tat": f"{r.ma_don} – {LY_DO.get(r.ly_do, r.ly_do)}, doanh thu {float(r.doanh_thu or 0):,.0f}đ",
                    "duong_dan": f"/hach-toan?tab=thieu-gia-von&q={r.ma_don}"})
     return ra
+
+# ============================ CỔNG ĐÁO HẠN ============================
+# Đáo hạn ngân hàng là hai nghiệp vụ, không phải một: trả gốc khoản cũ, rồi nhận giải ngân khoản mới.
+# Cái sai của đáo hạn không nằm ở định khoản – hai chân đều đơn giản. Nó nằm ở chỗ BÙ TRỪ hai chân lại
+# thành một dòng cho gọn. Khi đó dư nợ vay trên sổ không bao giờ đứng ở đỉnh, và dòng tiền mất hẳn một
+# vòng ra rồi vào. Với công ty đại chúng thì cả hai con số đó đều là con số công bố.
+#
+# Cách nối hai chân: cả hai chứng từ mang cùng một source_ref "dao_han:<mã>". Thiếu một chân là ngoại lệ.
+CHAN_DAO_HAN = {"VAY_TRA_GOC": "tra_goc", "VAY_NHAN": "nhan_moi"}
+
+
+def dao_han_thieu_chan(db: Session) -> list[dict]:
+    """Tìm những lần đáo hạn chỉ ghi một chân. Đọc thẳng từ chứng từ, không dựng bảng thứ hai."""
+    from app.models.accounting import JournalEntry, JournalLine
+    ra = []
+    rows = db.execute(select(JournalEntry).where(JournalEntry.source_ref.like("dao_han:%"),
+                                                 JournalEntry.status == "da_ghi_so")).scalars().all()
+    theo_ma: dict[str, list] = {}
+    for e in rows:
+        theo_ma.setdefault(e.source_ref.split(":", 1)[1], []).append(e)
+    for ma, es in theo_ma.items():
+        co_tra = any(any(l.account_code.startswith("341") and l.debit for l in e.lines) for e in es)
+        co_nhan = any(any(l.account_code.startswith("341") and l.credit for l in e.lines) for e in es)
+        if co_tra and co_nhan:
+            continue
+        thieu = "nhận giải ngân khoản mới" if co_tra else "trả gốc khoản cũ"
+        so = max((sum(l.debit + l.credit for l in e.lines) for e in es), default=0) / 2
+        ra.append({"ma": f"dao_han_thieu_chan#{ma}", "loai": "dao_han_thieu_chan", "muc": "do",
+                   "luc": min(e.created_at for e in es), "doi_tuong": f"dao_han:{ma}",
+                   "nguoi_quyet": "", "ly_do": "",
+                   "tom_tat": f"Đáo hạn {ma} mới ghi một chân, thiếu chân {thieu} – khoảng {so:,.0f}đ",
+                   "duong_dan": f"/accounting?tab=journal&q=dao_han:{ma}"})
+    return ra
