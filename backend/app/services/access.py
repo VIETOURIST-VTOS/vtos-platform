@@ -17,7 +17,7 @@ xem được dòng tiền, tài khoản ngân hàng, sổ kế toán và nhật 
   tự động mở cho họ.
 """
 from fastapi import HTTPException
-from app.models.core import User
+from app.models.core import User, ROLES
 
 LEADERSHIP = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt")
 CONTROL = ("ketoan", "cntt", "bks")
@@ -135,7 +135,8 @@ RESTRICTED_API_PREFIXES = {
     # chuyến xe và kho chứng từ của xe). Thiếu hai prefix này thì menu hiện ra mà bấm vào là 403 – một
     # cánh cửa vẽ trên tường còn khó chịu hơn không có cửa.
     "gd_doi_xe": ("/api/v1/auth/", "/api/v1/fleet", "/api/v1/xe-hdv/", "/api/v1/dispatch",
-                  "/api/v1/vehicles", "/api/v1/nap-du-lieu", "/api/v1/tep"),
+                  "/api/v1/vehicles", "/api/v1/nap-du-lieu", "/api/v1/tep",
+                  "/api/v1/doc-chung-tu"),
     "nv_visa": ("/api/v1/auth/", "/api/v1/visa"),
     # Trưởng phòng Hướng dẫn: phần hướng dẫn, chào chuyến, bảng giá tuyến, tệp đính kèm và bộ nạp dữ
     # liệu của phòng. Không có /bookings, /tours, /payroll, /banks – ông chọn người cho chuyến, không
@@ -145,11 +146,142 @@ RESTRICTED_API_PREFIXES = {
 }
 
 
+# ============================ P2 – DANH SÁCH CHO PHÉP CHO MỌI VAI TRÒ ============================
+#
+# Trước bản này chỉ 4 trong 20 vai trò có danh sách đường dẫn được phép; 16 vai trò còn lại đi theo kiểu
+# chặn từng cửa. Nghĩa là thêm một endpoint mà quên khai quyền là endpoint đó mở cho mọi người đăng
+# nhập – và không ai biết, vì không có gì báo.
+#
+# Cách làm: KHÔNG khai tay danh sách cho từng vai trò. Danh sách được SUY RA từ hai thứ đã có:
+#   1. MENU_ROLES – vai trò nào mở được màn hình nào (bảng đã duyệt, là nguồn sự thật về quyền)
+#   2. MAN_HINH_API – màn hình nào gọi những nhóm API nào
+#
+# Bản đồ ở (2) không phải phỏng đoán: nó đo từ chính mã giao diện – mọi lời gọi api("/...") trong
+# web/app/<màn hình>/page.tsx và trong các thành phần dùng chung. Khai tay bản đồ này thì nó sẽ lệch
+# với giao diện ngay lần sửa màn hình tiếp theo, nên có phép thử đối chiếu lại với mã giao diện.
+#
+# Đây là hàng rào NGOÀI, thô: nó nói vai trò được CHẠM vào nhóm API nào. Quyền chi tiết vẫn nằm ở chỗ
+# cũ – require_roles ở chữ ký từng endpoint, chặn theo bộ nạp, cổng bảng lương. Hàng rào ngoài không
+# thay chúng, nó chỉ đảm bảo một endpoint mới quên khai quyền thì cũng không lọt ra ngoài phạm vi công
+# việc của vai trò.
+API_CHUNG = ("/api/v1/auth", "/api/v1/health", "/api/v1/meta", "/api/v1/alerts", "/api/v1/dashboard")
+# Màn hình ai đăng nhập cũng có (giống danh sách phụ trong ALL_MENU_PATHS): trang chủ, đổi mật khẩu,
+# cảnh báo, báo cáo công việc. Bảng lương cá nhân đi qua /payroll và tự lọc về đúng người.
+MAN_HINH_MOI_NGUOI = ("/", "/doi-mat-khau", "/alerts", "/reports", "/payroll")
+
+# Màn hình → nhóm API nó gọi. Đo từ mã giao diện ngày 08/9/2026.
+MAN_HINH_API = {
+    "/": ("/api/v1/dashboard",),
+    "/access": ("/api/v1/access", "/api/v1/users", "/api/v1/he-thong"),
+    "/accounting": ("/api/v1/accounts", "/api/v1/collections", "/api/v1/invoices", "/api/v1/journal",
+                    "/api/v1/ledger", "/api/v1/misa", "/api/v1/partners", "/api/v1/periods",
+                    "/api/v1/reports", "/api/v1/tax", "/api/v1/trial-balance", "/api/v1/projects",
+                    "/api/v1/books"),
+    "/ai-roles": ("/api/v1/ai",),
+    "/alerts": ("/api/v1/alerts", "/api/v1/robot", "/api/v1/robots"),
+    # Quyết toán tour (bộ nạp V3) chưa có mục menu riêng – gắn tạm vào hai màn hình đang dùng nó.
+    # Khi có màn hình riêng thì chuyển sang đó; phép thử nhóm API mồ côi canh để không ai quên.
+    "/audit": ("/api/v1/audit",),
+    "/bank-accounts": ("/api/v1/bank-accounts",),
+    "/bookings": ("/api/v1/bookings", "/api/v1/retentions", "/api/v1/receipts", "/api/v1/tours"),
+    "/cham-soc": ("/api/v1/cham-soc", "/api/v1/cskh"),
+    "/collections": ("/api/v1/bank-transactions", "/api/v1/collections", "/api/v1/receipts",
+                     "/api/v1/sepay", "/api/v1/bookings"),
+    "/companies": ("/api/v1/companies",),
+    "/cong-no": ("/api/v1/cong-no",),
+    "/doi-mat-khau": ("/api/v1/auth",),
+    "/doi-xe": ("/api/v1/fleet", "/api/v1/vehicles", "/api/v1/drivers"),
+    "/expenses": ("/api/v1/cashflow", "/api/v1/payment-requests", "/api/v1/tours"),
+    "/finance": ("/api/v1/fin", "/api/v1/cashflow"),
+    "/hach-toan": ("/api/v1/hach-toan",),
+    "/hieu-qua-doi-xe": ("/api/v1/fleet",),
+    "/hop-dong-lao-dong": ("/api/v1/employees", "/api/v1/hrm", "/api/v1/labor-contracts",
+                           "/api/v1/dependents", "/api/v1/leaves", "/api/v1/leave-balance"),
+    "/hr": ("/api/v1/hr", "/api/v1/employees", "/api/v1/payroll", "/api/v1/payroll-runs",
+            "/api/v1/incidents", "/api/v1/incident-levels", "/api/v1/companies", "/api/v1/users",
+            "/api/v1/attendance", "/api/v1/bhxh", "/api/v1/staff", "/api/v1/doan-vien"),
+    "/huong-dan": ("/api/v1/huong-dan", "/api/v1/guide-rates", "/api/v1/guide-assignments"),
+    "/inbox": ("/api/v1/inbox", "/api/v1/facebook", "/api/v1/zalo"),
+    "/khieu-nai": ("/api/v1/khieu-nai", "/api/v1/cskh", "/api/v1/bookings", "/api/v1/payment-requests"),
+    "/kiem-soat": ("/api/v1/kiem-soat",),
+    "/lai-lo-doi-xe": ("/api/v1/fleet",),
+    "/leads": ("/api/v1/leads", "/api/v1/zalo"),
+    "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
+    "/marketing": ("/api/v1/marketing", "/api/v1/products", "/api/v1/users"),
+    "/doc-chung-tu": ("/api/v1/doc-chung-tu", "/api/v1/nap-du-lieu", "/api/v1/tep"),
+    "/nap-du-lieu": ("/api/v1/nap-du-lieu", "/api/v1/quyet-toan-tour"),
+    "/ngoai-le": ("/api/v1/ngoai-le",),
+    "/nha-cung-cap": ("/api/v1/ncc", "/api/v1/tours"),
+    "/noi-dung": ("/api/v1/noi-dung", "/api/v1/marketing"),
+    "/non-package": ("/api/v1/non-package", "/api/v1/bookings", "/api/v1/tours"),
+    # /ops dùng chung thành phần với /hr (HrScreens) nên chạm cùng nhóm API. Quyền chi tiết vẫn tách:
+    # tab bảng lương có cổng riêng, nên chạm được nhóm /payroll không có nghĩa là đọc được bảng lương.
+    "/ops": ("/api/v1/hr", "/api/v1/employees", "/api/v1/incidents", "/api/v1/incident-levels",
+             "/api/v1/visa", "/api/v1/guide-assignments", "/api/v1/guide-rates", "/api/v1/fleet",
+             "/api/v1/vehicles", "/api/v1/vehicle-rates", "/api/v1/dispatch", "/api/v1/tours",
+             "/api/v1/companies", "/api/v1/users"),
+    "/params": ("/api/v1/params",),
+    "/products": ("/api/v1/products",),
+    "/reports": ("/api/v1/daily-reports", "/api/v1/page-shifts", "/api/v1/employees"),
+    "/requests": ("/api/v1/requests", "/api/v1/bookings", "/api/v1/tours", "/api/v1/meta",
+                  "/api/v1/mang"),
+    "/robot-reports": ("/api/v1/auto-reports",),
+    "/sales-reports": ("/api/v1/sales-reports",),
+    "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
+    "/tep": ("/api/v1/tep",),
+    "/tours": ("/api/v1/tours", "/api/v1/users", "/api/v1/products", "/api/v1/mang",
+               "/api/v1/quyet-toan-tour"),
+    "/vietrip": ("/api/v1/import",),
+    "/visa": ("/api/v1/visa",),
+    "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents"),
+}
+
+
+_PHAM_VI: dict[str, tuple[str, ...]] = {}
+
+
+def pham_vi_api(vai_tro: str = "") -> dict[str, tuple[str, ...]] | tuple[str, ...]:
+    """Danh sách nhóm API một vai trò được chạm, suy từ MENU_ROLES + MAN_HINH_API.
+
+    Tính một lần rồi nhớ: MENU_ROLES khai bằng hằng số trong mã, không đổi lúc chạy. Tính lười vì
+    MENU_ROLES nằm phía dưới trong tệp này – tính lúc nạp mô-đun thì gặp tên chưa khai.
+    """
+    from app.models.core import ROLES as _ROLES
+    if not _PHAM_VI:
+        for vai in _ROLES:
+            cho = set(API_CHUNG)
+            for man_chung in MAN_HINH_MOI_NGUOI:
+                cho |= set(MAN_HINH_API.get(man_chung, ()))
+            for man, vai_tro_cua_man in MENU_ROLES.items():
+                if vai in vai_tro_cua_man:
+                    cho |= set(MAN_HINH_API.get(man, ()))
+            _PHAM_VI[vai] = tuple(sorted(cho))
+    return _PHAM_VI[vai_tro] if vai_tro else dict(_PHAM_VI)
+
+
+def pham_vi_day_du(vai_tro: str) -> tuple[str, ...]:
+    """Phạm vi thật của một vai trò = suy từ ma trận menu, CỘNG những prefix khai tay còn lại.
+
+    Cộng chứ không thay: bốn vai trò hẹp đã có danh sách khai tay từ trước, và trong đó có vài prefix
+    ma trận menu không suy ra được. Thay thẳng thì họ mất quyền đang dùng mà không ai báo – nên giữ
+    phần khai tay làm phần BỔ SUNG, và mỗi dòng còn lại ở đó là một dòng cần rà rồi bỏ dần.
+    """
+    return tuple(sorted(set(pham_vi_api(vai_tro)) | set(RESTRICTED_API_PREFIXES.get(vai_tro, ()))))
+
+
 def check_restricted_scope(u: User, path: str) -> None:
-    cho_phep = RESTRICTED_API_PREFIXES.get(u.role)
-    if cho_phep is None: return
+    """Hàng rào ngoài: vai trò chỉ chạm được những nhóm API nằm sau màn hình của mình.
+
+    Trước 08/9/2026 hàng rào này chỉ dựng cho 4 trong 20 vai trò; 16 vai trò còn lại không có hàng rào
+    nào, nghĩa là thêm một endpoint mà quên khai quyền là endpoint đó mở cho mọi người đăng nhập. Đây
+    là chặn MẶC ĐỊNH: nhóm API mới không nằm trong bản đồ thì không ai vào được, chứ không phải ai cũng
+    vào được. Có phép thử liệt kê nhóm API chưa gắn màn hình nào, để không ai phải phát hiện bằng cách
+    gặp lỗi 403 trên hệ thống thật.
+    """
+    cho_phep = pham_vi_day_du(u.role)
     if not any(path.startswith(p) for p in cho_phep):
-        raise HTTPException(403, f"Vai trò {u.role} chỉ dùng được màn hình của mình, không truy cập được dữ liệu này")
+        raise HTTPException(403, f"Vai trò {ROLES.get(u.role, u.role)} không có màn hình nào dùng tới "
+                                 f"dữ liệu này ({path})")
 
 
 # Ma trận công bố cho giao diện / tài liệu (vai trò → nhóm màn hình được xem)
@@ -223,6 +355,11 @@ MENU_ROLES = {
     # app/services/intake.VAI_TRO – mở được trang không có nghĩa là nạp được sổ của phòng khác.
     "/nap-du-lieu": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ketoan", "hcns", "cntt",
                                                                               "nv_mkt"),
+    # Đọc chứng từ ảnh (cửa 3). Mở cho phòng SỞ HỮU con số, cộng CNTT vì CNTT vận hành mô hình – nhưng
+    # CNTT không bấm xác nhận được: chặn đó nằm ở intake.duoc_xac_nhan_anh, không nằm ở danh sách này.
+    # KHÔNG mở cho HCNS: bốn loại chứng từ đang mở không có loại nào của HCNS, và bảng lương với bảng
+    # bảo hiểm thì cấm đọc bằng máy (Nghị định 13/2023) – mở màn hình cho họ là mời hiểu nhầm.
+    "/doc-chung-tu": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "ptgd_doan", "cntt"),
     # Tệp & hình ảnh: chứng từ đi kèm gần như mọi nghiệp vụ nên mở rộng; gỡ tệp thì hẹp hơn (xem API).
     "/tep": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ketoan", "hcns", "cntt", "nv_mkt",
                                                                       "nv_visa", "hanh_chinh"),
@@ -291,7 +428,7 @@ RESTRICTED_ROLE_MENUS = {
     "xe_hdv": ("/xe-hdv", "/doi-mat-khau"),
     "nv_visa": ("/visa", "/doi-mat-khau"),
     "gd_doi_xe": ("/doi-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe", "/xe-hdv",
-                  "/nap-du-lieu", "/tep", "/doi-mat-khau"),
+                  "/nap-du-lieu", "/tep", "/doc-chung-tu", "/doi-mat-khau"),
     "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/doi-mat-khau"),
 }
 
