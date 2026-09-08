@@ -21,7 +21,23 @@ XEM = ("chutich", "tgd", "bks", "cntt", "ketoan")
 QUYET = ("ketoan", "cntt")
 
 
+# ============================ BÀN RÀ SOÁT CỘT TIỀN – ĐỊA CHỈ RIÊNG ============================
+#
+# Chủ tịch quyết 08/9/2026: Kế toán KHÔNG xem màn hình Kiểm soát. Nhưng Kế toán trưởng vẫn là người
+# QUYẾT một cột có phải tiền hay không.
+#
+# Hai việc đó ở chung một tiền tố đường dẫn thì không tách quyền được, vì hàng rào phạm vi ngoài chỉ
+# phân biệt tới ĐOẠN ĐẦU của đường dẫn (/api/v1/kiem-soat). Cho Kế toán chạm tiền tố đó là mở luôn
+# hậu kiểm số nhập tay và sự kiện kỹ thuật – tức là phòng ban đọc kết quả giám sát chính mình.
+#
+# Nên bàn rà soát có ĐỊA CHỈ RIÊNG. Cùng một hàm xử lý, khác đường vào: màn hình Kiểm soát của lãnh
+# đạo gọi đường cũ, màn hình Rà soát cột tiền của Kế toán gọi đường này. Đây không phải bí danh cho
+# gọn – nó là cách duy nhất để hàng rào ngoài nói được điều Chủ tịch đã quyết.
+rst = APIRouter(prefix="/api/v1/ra-soat-cot-tien", tags=["ra-soat-cot-tien"])
+
+
 @router.get("/cot-tien")
+@rst.get("")
 def cot_tien(loc: str = "", u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
     """Sổ rà soát cột tiền. loc: tien | khong_tien | chua_ro | thieu_thanh_0 | can_doi_kieu."""
     return CT.bang(db, loc)
@@ -39,6 +55,7 @@ class QuyetIn(BaseModel):
 
 
 @router.post("/cot-tien/quyet")
+@rst.post("/quyet")
 def quyet_cot_tien(data: QuyetIn, u: User = Depends(require_roles(*QUYET)),
                    db: Session = Depends(get_db)):
     if not data.dong: raise HTTPException(422, "Chưa chọn dòng nào để quyết")

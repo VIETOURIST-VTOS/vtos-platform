@@ -201,6 +201,9 @@ MAN_HINH_API = {
                     "/api/v1/ledger", "/api/v1/misa", "/api/v1/partners", "/api/v1/periods",
                     "/api/v1/reports", "/api/v1/tax", "/api/v1/trial-balance", "/api/v1/projects",
                     "/api/v1/books"),
+    # /api/v1/periods có mặt vì màn hình kết sổ có luôn nút khóa kỳ – khóa kỳ là bước cuối của chính
+    # việc kết sổ, tách sang màn hình khác thì người làm phải nhớ đi hai nơi.
+    "/ket-so": ("/api/v1/ket-so", "/api/v1/accounting", "/api/v1/hach-toan", "/api/v1/periods"),
     "/ai-roles": ("/api/v1/ai",),
     "/alerts": ("/api/v1/alerts", "/api/v1/robot", "/api/v1/robots"),
     # Quyết toán tour (bộ nạp V3) chưa có mục menu riêng – gắn tạm vào hai màn hình đang dùng nó.
@@ -228,12 +231,15 @@ MAN_HINH_API = {
     "/inbox": ("/api/v1/inbox", "/api/v1/facebook", "/api/v1/zalo"),
     "/khieu-nai": ("/api/v1/khieu-nai", "/api/v1/cskh", "/api/v1/bookings", "/api/v1/payment-requests"),
     "/kiem-soat": ("/api/v1/kiem-soat",),
+    # Bàn quyết cột tiền K1/K2 – phạm vi API HẸP: chỉ nhánh /cot-tien và /the (để giao diện biết vẽ
+    # thẻ nào). KHÔNG gồm kết quả quét, chấm điểm phòng ban hay hậu kiểm số nhập tay.
+    "/ra-soat-cot-tien": ("/api/v1/ra-soat-cot-tien",),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
     "/marketing": ("/api/v1/marketing", "/api/v1/products", "/api/v1/users"),
     "/doc-chung-tu": ("/api/v1/doc-chung-tu", "/api/v1/nap-du-lieu", "/api/v1/tep"),
-    "/ket-so": ("/api/v1/ket-so", "/api/v1/accounting", "/api/v1/hach-toan"),
+
     "/nap-du-lieu": ("/api/v1/nap-du-lieu", "/api/v1/quyet-toan-tour"),
     "/ngoai-le": ("/api/v1/ngoai-le",),
     "/nha-cung-cap": ("/api/v1/ncc", "/api/v1/tours"),
@@ -385,9 +391,6 @@ MENU_ROLES = {
     # KHÔNG mở cho HCNS: bốn loại chứng từ đang mở không có loại nào của HCNS, và bảng lương với bảng
     # bảo hiểm thì cấm đọc bằng máy (Nghị định 13/2023) – mở màn hình cho họ là mời hiểu nhầm.
     "/doc-chung-tu": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "ptgd_doan", "cntt"),
-    # Khóa sổ một kỳ: sao kê vào sổ hàng loạt, kết chuyển, và trạng thái cả kỳ. Chỉ Kế toán GHI –
-    # Chủ tịch, TGĐ và Ban Kiểm soát xem chứ không ghi thay (chặn nằm ở API, không ở menu).
-    "/ket-so": BASE_VIEW + ("ketoan", "cntt"),
     # Tệp & hình ảnh: chứng từ đi kèm gần như mọi nghiệp vụ nên mở rộng; gỡ tệp thì hẹp hơn (xem API).
     "/tep": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ketoan", "hcns", "cntt", "nv_mkt",
                                                                       "nv_visa", "hanh_chinh"),
@@ -409,16 +412,37 @@ MENU_ROLES = {
     # --- Kiểm soát & Chính sách ---
     "/params": PARAM_ROLES,
     "/audit": AUDIT_ROLES,
-    # Bàn làm việc của robot Kiểm soát. Trưởng phòng KHÔNG có mặt: đây là chỗ đọc kết quả giám sát
-    # chính phòng mình, việc phải làm thì hiện ở màn hình Ngoại lệ của họ.
-    # Kế toán có mặt vì K1/K2: người QUYẾT một cột là tiền hay không, và sửa hay giữ, là Kế toán
-    # trưởng (nghiệp vụ) cùng CNTT (kỹ thuật) – ks_ra_soat.py ghi rõ điều đó ở chữ ký endpoint.
-    # Thiếu dòng này thì hàng rào P2 chặn đúng người mà robot Kiểm soát chỉ định làm người quyết:
-    # bàn làm việc mở ra mà mọi nút bấm đều 403. Chỉ lộ ra khi gộp hai nhánh, không nhánh nào một
-    # mình thấy được.
-    "/kiem-soat": BASE_VIEW + ("ketoan", "cntt"),
+    # Bàn làm việc của robot Kiểm soát. Nguyên tắc 07/9 giữ nguyên và không bị nới ở đây: PHÒNG BAN
+    # KHÔNG ĐỌC KẾT QUẢ GIÁM SÁT CHÍNH MÌNH – việc phải làm thì hiện ở màn hình Ngoại lệ của họ.
+    #
+    # Kế toán có mặt trong dòng này, và điều đó KHÔNG trái nguyên tắc trên, vì hai thứ khác nhau đang
+    # nằm chung một tiền tố đường dẫn:
+    #   · /api/v1/kiem-soat            – bàn làm việc giám sát: phát hiện, ĐIỂM phòng ban, BÁO CÁO
+    #   · /api/v1/kiem-soat/cot-tien…  – rà soát kỹ thuật của K1/K2: một cột là tiền hay không
+    # Việc thứ hai là phán đoán KẾ TOÁN, và chính robot Kiểm soát chỉ định Kế toán trưởng làm người
+    # quyết. Hàng rào phạm vi (P2) chỉ phân biệt được tới mức tiền tố, nên muốn Kế toán làm được việc
+    # thứ hai thì phải cho họ chạm tiền tố – không có cách nào hẹp hơn ở lớp này.
+    #
+    # RANH GIỚI THẬT nằm ở lớp dưới, tại chữ ký từng đường dẫn: XEM của kiem_soat.py KHÔNG có ketoan,
+    # nên Kế toán mở được màn hình mà KHÔNG đọc được phát hiện, điểm hay báo cáo. Phép thử
+    # test_ketoan_ra_soat_duoc_nhung_khong_doc_duoc_giam_sat canh đúng chỗ đó – canh ở lớp API, không
+    # canh ở dòng menu này, vì dòng menu không phải chỗ điều đó được bảo đảm.
+    # Chủ tịch quyết 08/9/2026: KẾ TOÁN KHÔNG XEM MÀN HÌNH KIỂM SOÁT.
+    #
+    # Chặn ở tầng API vẫn giữ nguyên và vẫn là lớp thật (Kế toán gọi /api/v1/kiem-soat nhận 403).
+    # Nhưng để mục menu ở đó rồi chặn từng đường dẫn là vẽ một cánh cửa mở ra chỉ để đóng lại – và
+    # người dùng đọc cái MENU, không đọc bảng phân quyền.
+    #
+    # Kế toán trưởng vẫn là người QUYẾT một cột có phải tiền hay không (ks_ra_soat.QUYET). Việc đó
+    # sang màn hình riêng dưới nhóm Tài chính & Kế toán: người bị chấm điểm không ngồi cùng bàn với
+    # bảng chấm điểm, nhưng vẫn phải có bàn của mình.
+    "/kiem-soat": BASE_VIEW + ("cntt",),
+    "/ra-soat-cot-tien": BASE_VIEW + ("ketoan", "cntt"),
     # Bảng quy ước hạch toán + cổng chặn giá vốn. Điều hành (tp_dh) xem được vì hàng đợi thiếu giá vốn
     # đứng tên phòng họ – bắt một phòng trả lời mà không cho họ nhìn thấy việc là cách chắc chắn để không ai trả lời.
+    # Kết sổ một kỳ: sao kê vào sổ hàng loạt, kết chuyển, và trạng thái cả kỳ. Chỉ Kế toán GHI –
+    # Chủ tịch, TGĐ và Ban Kiểm soát xem chứ không ghi thay (chặn nằm ở API, không ở menu).
+    "/ket-so": BASE_VIEW + ("ketoan", "cntt"),
     "/hach-toan": BASE_VIEW + ("ketoan", "cntt", "tp_dh"),
     # Ngoại lệ cần xử lý: nơi gom mọi lần một quy tắc bị bẻ. Mở cho những vai trò CÓ THỂ trả lời được
     # câu "vì sao lúc đó phải bẻ": Kế toán (tiền), Điều hành (chuyến), hai Phó TGĐ (duyệt), CNTT (tham số

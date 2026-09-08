@@ -94,3 +94,67 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
         pv = AC.pham_vi_day_du(vai)
         mat = [x for x in cu if x not in pv]
         assert not mat, f"{vai} mất: {mat}"
+
+
+# ============================ P13 – CHỐT SỐ, KHÔNG ĐỂ NỚI ÂM THẦM ============================
+# Đo ngày 08/9/2026 sau khi màn hình kết sổ vào ma trận. Đây là số NHÓM API mỗi vai trò được chạm,
+# không phải số đường dẫn – số đường dẫn đổi mỗi lần thêm một endpoint, số nhóm chỉ đổi khi có người
+# quyết cho một vai trò thêm hoặc bớt một màn hình.
+#
+# Vì sao phải chốt: phép thử P2 chỉ canh tính NHẤT QUÁN – không nhóm mồ côi, bản đồ khớp giao diện,
+# bốn vai trò hẹp không mất quyền. Không có gì cản một lần nới đưa Kế toán từ 78 lên 92, và loại việc
+# đó đã xảy ra thật trong ngày: một vai trò được thêm vào một màn hình trong lúc gộp nhánh, không ai
+# thấy cho tới khi một phép thử khác đỏ.
+#
+# Bảng này KHÔNG phải để đóng băng quyền. Nó để mỗi lần nới là một lần có người phải sửa bảng – tức là
+# phải nhìn thấy mình đang nới cho ai, và ghi lại vì sao.
+#
+# Đo lại ngày 08/9/2026 sau khi gộp nhánh viết phần mềm vào main. Hai lý do, và chỉ hai:
+#
+#   1. +1 CHO CẢ HAI MƯƠI VAI TRÒ – nhóm "/api/v1/pham-vi" của P6 (phạm vi pháp nhân theo phiên đăng
+#      nhập) nằm trong nhóm API chung, nên mọi vai trò đều chạm. Không ai được thêm màn hình nào.
+#
+#   2. +1 RIÊNG NĂM VAI TRÒ chutich, tgd, bks, cntt, ketoan – màn hình "Rà soát cột tiền"
+#      (/api/v1/ra-soat-cot-tien) tách ra khỏi màn hình Kiểm soát.
+#      Và ketoan ĐỒNG THỜI MẤT "/api/v1/kiem-soat": Chủ tịch quyết ngày 08/9/2026 rằng Kế toán không
+#      xem màn hình Kiểm soát. Nên 78 → 79 là một lần bớt và hai lần thêm, không phải một lần nới.
+#
+# Nếu lần sau bảng này đỏ mà không giải thích được từng vai trò như trên thì đó là một lần nới nhầm.
+PHAM_VI_DA_CHOT = {
+    "chutich": 96, "tgd": 96, "bks": 96, "cntt": 94,
+    "ketoan": 79, "tp_dh": 76, "ptgd_doan": 56, "nv_dh": 52, "hcns": 51, "gd_kd": 49,
+    "ptgd_mkt": 37, "nv_kd": 37, "tn_kd": 37, "tp_kd": 37, "nv_mkt": 29,
+    "gd_doi_xe": 23, "hanh_chinh": 23, "tp_hd": 21, "xe_hdv": 16, "nv_visa": 16,
+}
+
+
+def test_pham_vi_tung_vai_tro_dung_nhu_da_chot():
+    """Lệch bảng này thì ĐỎ, và người sửa phải sửa cả bảng – đó chính là mục đích."""
+    lech = []
+    for vai in ROLES:
+        thuc = len(AC.pham_vi_day_du(vai))
+        chot = PHAM_VI_DA_CHOT.get(vai)
+        if chot is None:
+            lech.append(f"{vai}: vai trò mới, chưa có trong bảng chốt")
+        elif thuc != chot:
+            huong = "NỚI" if thuc > chot else "SIẾT"
+            lech.append(f"{vai}: {huong} {chot} → {thuc}")
+    assert not lech, ("Phạm vi vai trò đổi so với bảng đã chốt. Nếu đúng ý thì sửa PHAM_VI_DA_CHOT và "
+                      f"ghi vì sao trong thông điệp ghi mã; nếu không thì đây là một lần nới nhầm: {lech}")
+
+
+def test_bang_chot_phu_du_hai_muoi_vai_tro():
+    """Thêm một vai trò mà quên chốt phạm vi thì vai trò đó nới bao nhiêu cũng không ai biết."""
+    thieu = [v for v in ROLES if v not in PHAM_VI_DA_CHOT]
+    thua = [v for v in PHAM_VI_DA_CHOT if v not in ROLES]
+    assert not thieu and not thua, f"thiếu: {thieu} · thừa: {thua}"
+
+
+def test_thu_tu_pham_vi_hop_ly():
+    """Ba phép so bất biến: lãnh đạo rộng nhất, người ở hiện trường hẹp nhất, và không vai trò nghiệp
+    vụ nào rộng bằng Chủ tịch. Ba câu này đúng bất kể con số thay đổi thế nào."""
+    pv = {v: len(AC.pham_vi_day_du(v)) for v in ROLES}
+    assert pv["chutich"] == pv["tgd"] == pv["bks"], "Chủ tịch, TGĐ và Ban Kiểm soát phải nhìn như nhau"
+    assert pv["xe_hdv"] < pv["nv_dh"] < pv["tp_dh"], "người ở hiện trường phải hẹp hơn văn phòng"
+    for vai in ("nv_kd", "nv_mkt", "hanh_chinh", "nv_visa", "xe_hdv", "gd_doi_xe", "tp_hd"):
+        assert pv[vai] < pv["chutich"], f"{vai} rộng bằng Chủ tịch"

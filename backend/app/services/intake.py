@@ -342,7 +342,7 @@ PHONG_BAN = {"nha_cung_cap": "dieu_hanh", "don_dich_vu": "dieu_hanh", "chuyen_xe
              "dang_kiem": "doi_xe", "chi_phi_ky_doi_xe": "doi_xe", "bang_lai_xe": "doi_xe",
              "chi_marketing_kenh": "marketing", "doanh_so_tu_van_vien": "kd_le",
              "thu_lao_hdv": "huong_dan", "hoa_don_dau_vao": "ketoan",
-             "bao_hiem_ky": "hcns", "bang_luong": "hcns",
+             "bao_hiem_ky": "hcns", "bang_luong": "hcns", "hop_dong_lao_dong": "hcns",
              "tai_san_co_dinh": "ketoan", "cong_cu_dung_cu": "ketoan", "khau_hao_ky": "ketoan"}
 
 
