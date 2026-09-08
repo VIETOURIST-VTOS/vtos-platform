@@ -54,6 +54,33 @@ def settle(db: Session, u: User, s: FinSchedule, done_on: date, bank_ref: str, a
     """Ghi nhận đã thực hiện một dòng lịch (đối chiếu giao dịch ngân hàng) → bút toán + cập nhật dư nợ."""
     if s.status == "da_thuc_hien": raise ValueError("Đã thực hiện")
     c = s.contract; amt = float(amount or s.amount)
+    # V12 – KHOẢN VAY đi qua bảng quy ước hạch toán, không tự dựng cặp tài khoản ở đây.
+    #
+    # Ba lý do, và lý do thứ ba là lý do thật:
+    #   · cặp tài khoản dựng tay ở đây là 341/112, còn quy ước là 3411/1121 – hai chỗ đã lệch sẵn;
+    #   · kế toán sửa quy ước trên màn hình thì bản sửa không tới được chỗ này;
+    #   · và quan trọng nhất: nhánh dưới NUỐT lỗi ghi sổ (bắt ValueError rồi vẫn đánh dấu đã thực
+    #     hiện). Kỳ được đánh dấu xong mà sổ không có bút toán nào – đó chính là cách "dư nợ vay trên
+    #     sổ" và "lịch trả nợ" trở thành hai con số sống riêng.
+    #
+    # Nhánh V12 để lỗi NỔI LÊN. Ghi sổ hỏng thì kỳ KHÔNG được đánh dấu đã thực hiện.
+    if c.kind == "vay" and s.kind in ("tra_goc", "tra_lai", "nhan_vay", "giai_ngan"):
+        from app.services import vay_but_toan as VBT
+        s.amount, s.bank_ref, s.done_on = amt, bank_ref, done_on
+        VBT.ghi_so(db, s, u.username, u.role, done_on)
+        # Chỉ GỐC chạm dư nợ. Trả LÃI không làm dư nợ đổi – lãi là chi phí, không phải khoản vay.
+        # Viết ba nhánh rõ ràng thay vì "if trả gốc … else cộng vào": nhánh else nuốt luôn tra_lai và
+        # cộng tiền lãi vào dư nợ gốc, làm dư nợ phình lên đúng bằng số lãi vừa trả.
+        if s.kind == "tra_goc":
+            c.outstanding = max(0.0, c.outstanding - amt)
+        elif s.kind in ("nhan_vay", "giai_ngan"):
+            c.outstanding += amt
+        if c.outstanding <= 0 and all(x.status == "da_thuc_hien" for x in c.schedule):
+            c.status = "tat_toan"
+        R.audit(db, u.username, u.role, "thuc_hien_lich_tai_chinh", f"fin:{c.code}",
+                after={"loai": s.kind, "so_tien": amt, "du_no": c.outstanding, "qua_quy_uoc": True})
+        db.commit()
+        return s
     acc = KIND_ACCOUNT[c.kind]
     lines = {"tra_goc": [{"account": "341", "debit": amt}, {"account": "112", "credit": amt}],
              "tra_lai": [{"account": "635", "debit": amt}, {"account": "112", "credit": amt}],

@@ -39,9 +39,23 @@ def test_loan_schedule_settle_and_investment_gate():
     res = client.post(f"/api/v1/fin/schedule/{goc['id']}/settle", json={"done_on": str(first), "bank_ref": "FT99"}, headers=kt).json()
     assert "1,100,000,000" in res["message"]
     client.post(f"/api/v1/fin/schedule/{lai['id']}/settle", json={"done_on": str(first), "bank_ref": "FT100"}, headers=kt)
-    js = [e for e in client.get("/api/v1/journal", headers=kt).json() if e["source_ref"] == f"fin:{c['code']}"]
+    # V12 – khoản VAY nay ghi sổ qua BẢNG QUY ƯỚC hạch toán, không dựng cặp tài khoản trong mã.
+    # Hai điều đổi theo, và cả hai là sửa cho đúng chứ không phải đổi cho khác:
+    #   · cặp tài khoản là 3411/1121 (đúng quy ước VAY_TRA_GOC), không phải 341/112 dựng tay;
+    #   · source_ref là "khe_uoc:<mã>:ky<id>" để mỗi kỳ truy được về đúng dòng lịch của nó – bản cũ
+    #     gộp mọi kỳ của một khế ước vào cùng một "fin:<mã>" nên không truy ngược được kỳ nào.
+    js = [e for e in client.get("/api/v1/journal", headers=kt).json()
+          if (e["source_ref"] or "").startswith(f"khe_uoc:{c['code']}:")]
     pairs = {(l["account"], l["debit"], l["credit"]) for e in js for l in e["lines"]}
-    assert ("341", 100_000_000, 0) in pairs and ("635", 9_000_000, 0) in pairs and ("112", 0, 100_000_000) in pairs
+    assert ("3411", 100_000_000, 0) in pairs, pairs
+    assert ("635", 9_000_000, 0) in pairs, pairs
+    assert ("1121", 0, 100_000_000) in pairs, pairs
+    # Trả LÃI không được chạm dư nợ gốc – 1,2 tỷ trả 100 triệu gốc thì còn đúng 1,1 tỷ, dù đã trả
+    # thêm 9 triệu lãi. Bản đầu của V12 để tra_lai rơi vào nhánh "cộng vào dư nợ" và dư nợ phình lên
+    # đúng bằng số lãi vừa trả; phép thử này canh để không lặp lại.
+    con = client.get("/api/v1/fin/contracts", headers=kt).json()
+    ku = [x for x in con if x["code"] == c["code"]][0]
+    assert ku["outstanding"] == 1_100_000_000, ku["outstanding"]
 
 
 def test_forecast_and_weekly():
