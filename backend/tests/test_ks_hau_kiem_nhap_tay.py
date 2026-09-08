@@ -240,3 +240,107 @@ def test_kn11_tong_tien_cong_bang_sql_khong_nap_dong_nao():
         db.close()
     finally:
         NT._doc = goc
+
+
+def _dinh_cua_so(moc, giay=300):
+    """Bản tham chiếu ngây thơ: duyệt mọi cặp. Chậm, nhưng hiển nhiên đúng – dùng để chấm bản nhanh."""
+    ds = sorted(moc); dinh = 0
+    for i in range(len(ds)):
+        j = i
+        while j < len(ds) and (ds[j] - ds[i]).total_seconds() <= giay: j += 1
+        dinh = max(dinh, j - i)
+    return dinh
+
+
+def _chay_ngoai_gio(rows, don_dong):
+    """Gọi thẳng dấu hiệu nhập-dồn với một tập mốc dựng sẵn, không đụng cơ sở dữ liệu."""
+    from app.services import ks_nhap_tay as NT
+    goc = NT._doc
+    NT._doc = lambda db, ng, tu, den, kho=None: (rows if ng["ma"] == NT.NGUON[0]["ma"] else [])
+    try:
+        return NT._ngoai_gio(None, THANG, 0, 24, don_dong, {})   # 0h–24h: tắt phần "ngoài giờ"
+    finally:
+        NT._doc = goc
+
+
+def test_kn12_dinh_cua_so_nam_phut_dung_o_bien():
+    """Cửa sổ là "trong vòng năm phút", tức ĐÚNG 300 giây vẫn tính, 301 giây thì không.
+
+    Sai một giây ở đây không làm sập gì cả – nó chỉ lặng lẽ đếm thừa hoặc thiếu một dòng, và người đọc
+    bảng ngoại lệ không có cách nào biết. Nên chốt bằng phép thử chứ không bằng đọc lại mã.
+    """
+    g = _dau(datetime(2026, 1, 1, 10, 0, 0))
+    # ba mốc cách nhau đúng 150 giây: mốc đầu và mốc cuối cách nhau tròn 300 giây → cả ba cùng một cửa sổ
+    vua_du = [{"nguoi": "ketoan1", "luc": g + timedelta(seconds=s)} for s in (0, 150, 300)]
+    assert _chay_ngoai_gio(vua_du, 3), "đúng 300 giây phải còn nằm trong cửa sổ năm phút"
+    # đẩy mốc cuối thêm một giây → chỉ còn hai mốc trong cửa sổ
+    qua_mot_giay = [{"nguoi": "ketoan1", "luc": g + timedelta(seconds=s)} for s in (0, 150, 301)]
+    assert not _chay_ngoai_gio(qua_mot_giay, 3), "301 giây thì mốc đầu phải rời khỏi cửa sổ"
+    assert _chay_ngoai_gio(qua_mot_giay, 2), "hai mốc còn lại vẫn phải đếm được"
+
+
+def test_kn12b_hai_con_tro_cho_cung_ket_qua_voi_ban_ngay_tho():
+    """Đổi từ hai vòng lồng nhau sang hai con trỏ là đổi cách tính, nên phải chấm lại bằng bản cũ.
+
+    Dựng nhiều hình dạng khác nhau – rời rạc, cụm dày, một cụm dài – vì lỗi hai-con-trỏ thường chỉ hiện
+    ra ở chỗ con trỏ sau phải nhảy qua nhiều mốc một lúc.
+    """
+    import random
+    g = _dau(datetime(2026, 1, 1, 10, 0, 0))
+    random.seed(20260908)
+    for lan in range(30):
+        n = random.randint(1, 60)
+        # trộn khoảng cách bé (dồn cục) và lớn (rời rạc) để có đủ hình dạng
+        moc, t = [], 0
+        for _ in range(n):
+            t += random.choice([0, 1, 7, 60, 150, 299, 300, 301, 900])
+            moc.append(g + timedelta(seconds=t))
+        cho_doi = _dinh_cua_so(moc)
+        rows = [{"nguoi": "ketoan1", "luc": m} for m in moc]
+        # đòi robot báo ở đúng ngưỡng bằng đỉnh, và im ở ngưỡng cao hơn một
+        assert _chay_ngoai_gio(rows, cho_doi), f"lần {lan}: đỉnh phải là {cho_doi}"
+        assert not _chay_ngoai_gio(rows, cho_doi + 1), f"lần {lan}: đỉnh không được vượt {cho_doi}"
+
+
+def test_kn12c_hai_muoi_nghin_moc_trung_gio_van_chay_xong():
+    """Chốt chặn cho đúng lỗi đã xảy ra trên máy chủ ngày 08/9/2026.
+
+    Bản cũ dò lại từ đầu cửa sổ ở mỗi mốc: 25.728 bút toán của một bản nhập hàng loạt rơi vào cùng vài
+    phút thành hơn ba trăm triệu phép trừ thời gian, và cổng trả 502 trước khi hàm chạy xong – nghĩa là
+    dấu hiệu "nhập dồn" TẮT đúng vào lúc có nhập dồn thật. Đó là kiểu hỏng tệ nhất: không báo lỗi, chỉ
+    im lặng bỏ sót.
+
+    Đặt hạn năm giây, không phải để đo máy chạy thử cho chính xác, mà vì bản cũ ở kích thước này mất
+    hàng phút – khoảng cách đủ xa để phép thử không phụ thuộc máy nhanh hay chậm.
+    """
+    import time
+    g = _dau(datetime(2026, 1, 1, 10, 0, 0))
+    rows = [{"nguoi": "ketoan1", "luc": g + timedelta(seconds=i % 120)} for i in range(20_000)]
+    t0 = time.perf_counter()
+    ra = _chay_ngoai_gio(rows, 10)
+    giay = time.perf_counter() - t0
+    assert ra, "hai mươi nghìn dòng trong hai phút thì phải báo nhập dồn"
+    assert giay < 5, f"cửa sổ trượt phải là O(n); đang mất {giay:.1f} giây cho 20.000 mốc"
+
+
+def test_kn13_thong_ke_nguoi_phan_biet_may_do_vao_va_nguoi_go():
+    """Đếm theo người nhập, kèm trải dài thời gian – đây là thứ phân biệt "cả phòng gõ suốt tháng" với
+    "một tài khoản đổ một bản nhập hàng loạt trong mười phút".
+
+    Không có cột này thì con số tổng dẫn thẳng tới kết luận sai, và ngưỡng hậu kiểm đặt trên kết luận
+    sai thì gác nhầm hệ thống.
+    """
+    from app.services import ks_nhap_tay as NT
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    a, b = NT._khoang_thang(THANG)
+    ra = NT.thong_ke_nguoi(db, NT.NGUON[0], a, b)
+    assert isinstance(ra, list)
+    assert all(x["nguoi"].lower() not in NT.BO_QUA_NGUOI for x in ra), \
+        "tài khoản máy đã loại khỏi hậu kiểm thì cũng không được xuất hiện trong thống kê người nhập"
+    # phải xếp giảm dần theo số dòng: người đọc chỉ nhìn vài dòng đầu
+    assert [x["so_dong"] for x in ra] == sorted([x["so_dong"] for x in ra], reverse=True)
+    for x in ra:
+        assert x["so_dong"] >= 1 and "nhanh_nhat" in x and "cham_nhat" in x
+        assert x["trai_dai_phut"] is None or x["trai_dai_phut"] >= 0
+    db.close()

@@ -92,6 +92,41 @@ def _tong_tien(db: Session, ng: dict, tu: datetime, den: datetime) -> float:
     return float(db.execute(q).scalar() or 0)
 
 
+def thong_ke_nguoi(db: Session, ng: dict, tu: datetime, den: datetime, toi_da: int = 12) -> list[dict]:
+    """Ai nhập, bao nhiêu dòng, từ lúc nào tới lúc nào – ĐẾM BẰNG SQL, không nạp dòng nào về bộ nhớ.
+
+    Vì sao cần: con số "25.728 dòng người nhập trong tháng 9" tự nó không nói được điều gì. Hai mươi lăm
+    nghìn dòng có thể là cả phòng Kế toán gõ suốt tháng, cũng có thể là MỘT tài khoản đổ một bản nhập
+    hàng loạt trong mười phút và bị gán nhầm là số nhập tay. Hai chuyện đó dẫn tới hai kết luận trái
+    ngược nhau về hậu kiểm, nên phải phân biệt được TRƯỚC khi đặt ngưỡng – đặt ngưỡng trên dữ liệu chưa
+    hiểu là đặt ngưỡng cho một hệ thống khác.
+
+    Khoảng cách giữa `nhanh_nhat` và `cham_nhat` là chỗ đọc ra câu trả lời: vài phút cho hàng nghìn dòng
+    thì đó là máy đổ vào, không phải người gõ.
+    """
+    t = _bang(ng["bang"])
+    if t is None or ng["nguoi"] not in t.c or ng["luc"] not in t.c: return []
+    n = t.c[ng["nguoi"]]; l = t.c[ng["luc"]]
+    tien = t.c[ng["tien"]] if ng["tien"] and ng["tien"] in t.c else None
+    cot = [n.label("nguoi"), func.count().label("so_dong"),
+           func.min(l).label("dau"), func.max(l).label("cuoi")]
+    if tien is not None: cot.append(func.coalesce(func.sum(tien), 0).label("tong"))
+    q = (select(*cot)
+         .where(l >= tu, l < den, func.lower(func.coalesce(n, "")).notin_(BO_QUA_NGUOI))
+         .group_by(n).order_by(func.count().desc()).limit(toi_da))
+    ra = []
+    for r in db.execute(q).all():
+        dau, cuoi = r.dau, r.cuoi
+        phut = round((cuoi - dau).total_seconds() / 60, 1) if isinstance(dau, datetime) and isinstance(cuoi, datetime) else None
+        ra.append({"nguoi": r.nguoi, "so_dong": int(r.so_dong),
+                   "tong_tien": float(getattr(r, "tong", 0) or 0),
+                   "nhanh_nhat": str(dau), "cham_nhat": str(cuoi), "trai_dai_phut": phut,
+                   # Dòng mỗi phút: người gõ tay hiếm khi vượt vài dòng một phút. Số này lớn thì dòng
+                   # đó là máy đổ vào chứ không phải người nhập, và hậu kiểm nhập tay không áp được.
+                   "dong_moi_phut": round(int(r.so_dong) / phut, 1) if phut else None})
+    return ra
+
+
 def _khoang_thang(thang: str) -> tuple[datetime, datetime]:
     y, m = int(thang[:4]), int(thang[5:7])
     dau = datetime(y, m, 1)
@@ -178,11 +213,16 @@ def _ngoai_gio(db: Session, thang: str, gio_dau: int, gio_cuoi: int, don_dong: i
         for x in rows:
             if isinstance(x["luc"], datetime): theo_nguoi.setdefault(x["nguoi"], []).append(x["luc"])
         for nguoi, ds in theo_nguoi.items():
-            ds.sort(); dinh = 0
-            for i in range(len(ds)):
-                j = i
-                while j < len(ds) and (ds[j] - ds[i]).total_seconds() <= 300: j += 1
-                dinh = max(dinh, j - i)
+            # Cửa sổ trượt bằng HAI CON TRỎ, không phải hai vòng lồng nhau. Bản cũ, với mỗi mốc lại dò
+            # lại từ đầu cửa sổ, là O(n²): một bản nhập hàng loạt 25.728 bút toán cùng rơi vào vài phút
+            # thì thành hơn ba trăm triệu phép trừ thời gian, và trên máy chủ 0,5 CPU cổng trả 502
+            # trước khi hàm chạy xong – tức là dấu hiệu "nhập dồn" TẮT đúng vào lúc có nhập dồn thật.
+            # Danh sách đã sắp tăng dần nên `dau` không bao giờ phải lùi: mỗi mốc vào và ra đúng một
+            # lần, O(n).
+            ds.sort(); dinh = 0; dau = 0
+            for cuoi in range(len(ds)):
+                while (ds[cuoi] - ds[dau]).total_seconds() > 300: dau += 1
+                dinh = max(dinh, cuoi - dau + 1)
             if dinh >= don_dong:
                 ra.append({"loai": "nt_ngoai_gio", "nguon": ng["ma"], "nguoi": nguoi,
                            "tom_tat": f"{ng['ten']}: {nguoi} nhập {dinh} dòng trong vòng 5 phút tháng "

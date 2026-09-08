@@ -82,7 +82,10 @@ def nhap_tay_nguon(thang: str = "", u: User = Depends(require_roles(*XEM)), db: 
         rows = NT._doc(db, ng, a, b, kho)
         ra.append({"nguon": ng["ma"], "ten": ng["ten"], "bang": ng["bang"], "so_dong": len(rows),
                    "tong_tien": sum(x["tien"] for x in rows), "giay": round(_t.perf_counter() - t0, 2),
-                   "cham_tran": len(rows) > NT.TRAN_DONG})
+                   "cham_tran": len(rows) > NT.TRAN_DONG,
+                   # Ai nhập và nhập trong bao lâu. Không có cột này thì "hai mươi lăm nghìn dòng nhập
+                   # tay" và "một bản nhập hàng loạt bị gán nhầm" trông giống hệt nhau.
+                   "theo_nguoi": NT.thong_ke_nguoi(db, ng, a, b)})
     return {"thang": th, "nguon": ra, "tong_giay": round(sum(x["giay"] for x in ra), 2)}
 
 
