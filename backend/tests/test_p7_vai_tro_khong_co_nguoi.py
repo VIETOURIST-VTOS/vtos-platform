@@ -36,10 +36,33 @@ def db_():
 
 
 def test_bao_ra_dung_nhung_vai_tro_chua_co_nguoi():
+    """Đúng những vai trò CỦA NGƯỜI chưa có người – không kể ba vai trò máy.
+
+    Từ 08/9/2026 (P8) có ba vai trò robot. Hỏi "vai trò này đã có ai chưa" với một vai trò máy là hỏi
+    sai câu, và nếu để chúng trong danh sách này thì bộ dò kêu suốt đời về ba dòng không bao giờ xử lý
+    được – cách nhanh nhất dạy người đọc bỏ qua cả danh sách. Việc của vai trò máy được hỏi bằng câu
+    khác, ở _vai_tro_may_chua_co_tai_khoan."""
+    from app.services import access as AC
     db = db_()
     co = {u.role for u in db.execute(select(User).where(User.active == True)).scalars()}   # noqa: E712
     thay = {x["vai_tro"] for x in KS._vai_tro_khong_co_nguoi(db)}
-    assert thay == set(ROLES) - co
+    assert thay == set(ROLES) - co - set(AC.VAI_TRO_MAY)
+    assert not (thay & set(AC.VAI_TRO_MAY)), "vai trò máy lọt vào danh sách vai trò thiếu người"
+    db.close()
+
+
+def test_vai_tro_may_thieu_tai_khoan_thi_hoi_bang_cau_khac():
+    """Vai trò người thiếu người là việc bố trí nhân sự. Vai trò máy thiếu tài khoản nghĩa là robot vẫn
+    chạy dưới tên một con người, và nhật ký vẫn chưa phân biệt được ai làm gì – đúng vấn đề P8 giải."""
+    from app.services import access as AC
+    db = db_()
+    ra = KS._vai_tro_may_chua_co_tai_khoan(db)
+    thay = {x["vai_tro"] for x in ra}
+    co_may = {u.role for u in db.execute(select(User).where(User.active == True)).scalars()   # noqa: E712
+              if AC.la_vai_tro_may(u.role)}
+    assert thay == set(AC.VAI_TRO_MAY) - co_may
+    assert all(x["muc"] == "vang" for x in ra)
+    assert all("nhật ký" in x["tom_tat"] or "không truy được" in x["tom_tat"] for x in ra)
     db.close()
 
 

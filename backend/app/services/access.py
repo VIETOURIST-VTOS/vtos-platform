@@ -138,6 +138,24 @@ RESTRICTED_API_PREFIXES = {
                   "/api/v1/vehicles", "/api/v1/nap-du-lieu", "/api/v1/tep",
                   "/api/v1/doc-chung-tu"),
     "nv_visa": ("/api/v1/auth/", "/api/v1/visa"),
+    # --- Ba vai trò máy (P8, 08/9/2026) ---
+    # Danh sách của mỗi robot hẹp đúng bằng việc nó được giao, và HAI CHỖ TRỐNG dưới đây là chỗ trống
+    # cố ý, mỗi chỗ là một điều cấm trong lệnh giao việc:
+    #
+    #   robot_vpm KHÔNG có /api/v1/ngoai-le → không tự đóng được ngoại lệ do chính mình gây ra. Người
+    #   viết phần mềm mà đóng được việc của mình thì lớp kiểm soát chỉ còn là hình thức: mọi phát hiện
+    #   đều có thể biến mất bằng một lần bấm của chính người bị phát hiện.
+    #
+    #   robot_pq KHÔNG có bất kỳ tiền tố nghiệp vụ nào (/tours, /bookings, /journal, /payment-requests,
+    #   /receipts…) → không ghi được một con số nào vào sổ. Robot cầm chìa khoá quyền mà ghi được số
+    #   tiền thì nó vừa mở cửa vừa đi qua cửa, và không còn ai đứng ngoài để đối chiếu.
+    #
+    # Cả ba đều KHÔNG nằm trong FULL_ACCESS, BASE_VIEW, AUDIT_ROLES. Các cửa GHI của màn hình phân quyền
+    # (đổi vai trò, khoá/mở, gán pháp nhân) liệt kê vai trò đích danh nên robot_pq đọc được mà không ghi
+    # được – hàng rào tiền tố lo phần thô, chữ ký từng đường dẫn lo phần tinh.
+    "robot_ks": ("/api/v1/auth/", "/api/v1/kiem-soat", "/api/v1/ngoai-le", "/api/v1/robot"),
+    "robot_pq": ("/api/v1/auth/", "/api/v1/access", "/api/v1/ai", "/api/v1/kiem-soat"),
+    "robot_vpm": ("/api/v1/auth/", "/api/v1/kiem-soat", "/api/v1/he-thong"),
     # Trưởng phòng Hướng dẫn: phần hướng dẫn, chào chuyến, bảng giá tuyến, tệp đính kèm và bộ nạp dữ
     # liệu của phòng. Không có /bookings, /tours, /payroll, /banks – ông chọn người cho chuyến, không
     # quản khách và không quản tiền công ty.
@@ -474,6 +492,49 @@ RESTRICTED_ROLE_MENUS = {
     "gd_doi_xe": ("/doi-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe", "/xe-hdv",
                   "/nap-du-lieu", "/tep", "/doc-chung-tu", "/doi-mat-khau"),
     "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/doi-mat-khau"),
+    # Ba vai trò máy: danh sách CHO PHÉP, giống bốn vai trò hẹp ở trên. Robot không có menu để bấm,
+    # nhưng khai ở đây thì màn hình tra cứu ngược (P10) nói được nó chạm tới đâu, và bộ quét vai trò
+    # đọc được phạm vi của nó mà không phải suy từ mã.
+    # /doi-mat-khau có mặt ở cả ba vì tài khoản robot cũng được cấp mật khẩu tạm và cũng phải xoay
+    # được mật khẩu của chính nó. Một tài khoản máy không đổi được mật khẩu là một mật khẩu đứng yên
+    # vĩnh viễn trong hệ thống của công ty đại chúng.
+    "robot_ks": ("/kiem-soat", "/ngoai-le", "/doi-mat-khau"),
+    "robot_pq": ("/access", "/ai-roles", "/kiem-soat", "/doi-mat-khau"),
+    "robot_vpm": ("/kiem-soat", "/doi-mat-khau"),
+}
+
+# Vai trò của MÁY, không phải của người. Tách ra thành một khái niệm riêng chứ không chỉ là quy ước đặt
+# tên: nhiều bộ kiểm hỏi "vai trò này đã có ai chưa", "tài khoản này bỏ hoang chưa", "còn mật khẩu tạm
+# không" – ba câu hỏi đúng với người và vô nghĩa với máy. Không tách thì hoặc bộ kiểm kêu suốt đời về ba
+# vai trò không bao giờ có người, hoặc phải nới lỏng chính những bộ kiểm ấy cho cả người lẫn máy.
+VAI_TRO_MAY = ("robot_pq", "robot_ks", "robot_vpm")
+
+
+def la_vai_tro_may(vai_tro: str) -> bool:
+    return vai_tro in VAI_TRO_MAY
+
+
+# Hai điều cấm của P8, viết thành DỮ LIỆU để có thể canh bằng phép thử thay vì bằng trí nhớ.
+# Mỗi dòng: vai trò máy → những tiền tố API nó KHÔNG được chạm, kèm lý do đọc được.
+CAM_CUA_ROBOT: dict[str, dict[str, str]] = {
+    "robot_vpm": {
+        "/api/v1/ngoai-le": "Người viết phần mềm không được đóng ngoại lệ do chính mình gây ra – "
+                            "đóng được thì mọi phát hiện đều biến mất bằng một lần bấm của người bị phát hiện.",
+    },
+    "robot_pq": {
+        "/api/v1/tours": "Robot cầm chìa khoá quyền không được ghi số nghiệp vụ.",
+        "/api/v1/bookings": "Robot cầm chìa khoá quyền không được ghi số nghiệp vụ.",
+        "/api/v1/journal": "Robot cầm chìa khoá quyền không được ghi số nghiệp vụ.",
+        "/api/v1/payment-requests": "Robot cầm chìa khoá quyền không được ghi số nghiệp vụ.",
+        "/api/v1/receipts": "Robot cầm chìa khoá quyền không được ghi số nghiệp vụ.",
+        "/api/v1/payroll-runs": "Robot cầm chìa khoá quyền không được chạm bảng lương.",
+    },
+    "robot_ks": {
+        "/api/v1/tours": "Kiểm soát đọc và mở việc, không sửa số nghiệp vụ – sửa được thì không còn ai đứng ngoài.",
+        "/api/v1/bookings": "Kiểm soát đọc và mở việc, không sửa số nghiệp vụ.",
+        "/api/v1/journal": "Kiểm soát đọc và mở việc, không sửa số nghiệp vụ.",
+        "/api/v1/access": "Kiểm soát không tự sửa quyền của mình – phân quyền là nguồn duy nhất của quyền.",
+    },
 }
 
 

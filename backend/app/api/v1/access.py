@@ -20,7 +20,9 @@ from app.services import rules as R
 router = APIRouter(prefix="/api/v1/access", tags=["phan-quyen"])
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-XEM = ("chutich", "tgd", "cntt", "hcns", "bks")     # mở được màn hình
+# robot_pq ĐỌC được màn hình phân quyền – đó là bàn làm việc của nó. Nó KHÔNG có trong THAO_TAC, nên
+# đổi vai trò, khoá/mở tài khoản, gán pháp nhân vẫn phải do người bấm. Robot đề xuất, người quyết.
+XEM = ("chutich", "tgd", "cntt", "hcns", "bks", "robot_pq")     # mở được màn hình
 THAO_TAC = ("cntt", "hcns")                          # đổi vai trò, khóa/mở, đặt lại mật khẩu
 # Ba vai trò còn phạm vi rộng nhất sau khi siết ma trận: đổi AI SANG một trong ba vai trò này phải do
 # Chủ tịch hoặc TGĐ làm. Quyền nhìn toàn bộ tiền và sổ sách tương đương quyền ký – một người ở HCNS

@@ -150,10 +150,16 @@ def endpoint_phai_doc_ma_nguon(app) -> list[str]:
 
 
 def _vai_tro_trong(db: Session) -> list[dict]:
-    """Vai trò không mở được màn hình nào là vai trò đăng nhập vào và nhìn thấy hệ thống trống."""
+    """Vai trò không mở được màn hình nào là vai trò đăng nhập vào và nhìn thấy hệ thống trống.
+
+    Đếm qua CẢ HAI nguồn khai màn hình, không chỉ ma trận: bảy vai trò hẹp (bốn của người, ba của máy)
+    lấy màn hình từ danh sách CHO PHÉP chứ không từ MENU_ROLES. Chỉ đếm một nguồn thì bộ dò báo đỏ đúng
+    những vai trò đã khai đầy đủ nhất – và một cảnh báo đỏ sai là thứ dạy người đọc bỏ qua cảnh báo đỏ.
+    """
     ra = []
     for vai in ROLES:
-        so = len([m for m, cho in AC.MENU_ROLES.items() if vai in cho])
+        so = len(AC.RESTRICTED_ROLE_MENUS.get(vai) or
+                 [m for m, cho in AC.MENU_ROLES.items() if vai in cho])
         if so == 0:
             ra.append({"ma": f"vai_tro_trong#{vai}", "loai": "vai_tro_trong", "muc": "do",
                        "phong_ban": PHONG_CUA_VAI_TRO.get(vai, ""), "vai_tro": vai, "doi_tuong": vai,
@@ -177,8 +183,8 @@ def _vai_tro_khong_co_nguoi(db: Session) -> list[dict]:
     ra = []
     co_nguoi = {u.role for u in db.execute(select(User).where(User.active == True)).scalars()}   # noqa: E712
     for vai in ROLES:
-        if vai in co_nguoi:
-            continue
+        if vai in co_nguoi or AC.la_vai_tro_may(vai):
+            continue          # vai trò MÁY không bao giờ có "người" – hỏi ở đây là hỏi sai câu
         so_man = len([m for m, cho in AC.MENU_ROLES.items() if vai in cho])
         ra.append({"ma": f"vai_tro_khong_co_nguoi#{vai}", "loai": "vai_tro_khong_co_nguoi", "muc": "vang",
                    "phong_ban": PHONG_CUA_VAI_TRO.get(vai, ""), "vai_tro": vai, "doi_tuong": vai,
@@ -268,7 +274,40 @@ from app.services.ks_ma_tran import _ma_tran_quyen                       # noqa:
 # HỢP của hai nhánh, không phải chọn một: nhánh phân quyền thêm hai bộ kiểm về vai trò, nhánh kiểm
 # soát thêm bộ hậu kiểm số nhập tay. Gộp mà bỏ mất một bên thì bộ kiểm đó im lặng biến mất – và một
 # bộ kiểm biến mất không báo lỗi, nó chỉ ngừng tìm ra vấn đề.
+def _vai_tro_may_chua_co_tai_khoan(db: Session) -> list[dict]:
+    """Vai trò máy đã khai quyền nhưng chưa có tài khoản nào giữ nó.
+
+    Câu hỏi này thay cho "vai trò chưa có người" ở ba vai trò robot, và nó KHÁC hẳn về hướng xử lý:
+    vai trò người thiếu người là việc bố trí nhân sự; vai trò máy thiếu tài khoản nghĩa là robot vẫn
+    đang chạy dưới tên một con người, nên nhật ký vẫn chưa phân biệt được ai làm gì – đúng vấn đề mà
+    P8 sinh ra để giải.
+
+    Cũng báo khi MỘT vai trò máy có nhiều hơn một tài khoản: hai tài khoản cùng một vai trò máy thì
+    lại không truy được lần chạy nào của bên nào.
+    """
+    from app.models.core import User
+    dem: dict[str, list[str]] = {}
+    for u in db.execute(select(User).where(User.active == True)).scalars():   # noqa: E712
+        if AC.la_vai_tro_may(u.role):
+            dem.setdefault(u.role, []).append(u.username)
+    ra = []
+    for vai in AC.VAI_TRO_MAY:
+        ten = dem.get(vai, [])
+        if len(ten) == 1:
+            continue
+        thieu = not ten
+        ra.append({"ma": f"vai_tro_may#{vai}", "loai": "vai_tro_khong_co_nguoi", "muc": "vang",
+                   "phong_ban": "", "vai_tro": vai, "doi_tuong": vai,
+                   "tom_tat": (f"{ROLES[vai]} chưa có tài khoản riêng – robot vẫn chạy dưới tên một "
+                               f"con người, nhật ký chưa phân biệt được ai làm gì" if thieu
+                               else f"{ROLES[vai]} có {len(ten)} tài khoản ({', '.join(ten)}) – "
+                                    f"không truy được lần chạy nào của bên nào"),
+                   "chi_tiet": {"tai_khoan": ten}})
+    return ra
+
+
 BO_KIEM = (_mach_migration, _quyen_lech, _vai_tro_trong, _vai_tro_khong_co_nguoi,
+           _vai_tro_may_chua_co_tai_khoan,
            _quyen_tung_vai_tro, _ngoai_le_ton, _ai_chua_hau_kiem,
            _cot_tien_float, _thieu_khac_khong, _su_kien_ky_thuat, _hau_kiem_nhap_tay,
            _do_dai_du_lieu, _ma_tran_quyen)

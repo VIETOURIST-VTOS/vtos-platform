@@ -14,8 +14,11 @@ from app.services import ks_robot as KS
 
 router = APIRouter(prefix="/api/v1/kiem-soat", tags=["kiem-soat"])
 
-XEM = ("chutich", "tgd", "bks", "cntt")
-CHAY = ("bks", "cntt")            # Chủ tịch và TGĐ vẫn qua được (FULL_ACCESS trong deps)
+# Ba vai trò máy vào đây từ 08/9/2026 (P8). Cả ba ĐỌC được vì bàn này là nơi việc được giao cho từng
+# robot; chỉ robot Kiểm soát CHẠY được quét và chấm điểm – hai robot kia đọc việc của mình chứ không
+# tự chấm điểm cho mình, và đó là toàn bộ lý do vị trí Kiểm soát tách khỏi hai vị trí kia.
+XEM = ("chutich", "tgd", "bks", "cntt", "robot_ks", "robot_pq", "robot_vpm")
+CHAY = ("bks", "cntt", "robot_ks")   # Chủ tịch và TGĐ vẫn qua được (FULL_ACCESS trong deps)
 HAU_KIEM = ("chutich", "tgd")
 
 

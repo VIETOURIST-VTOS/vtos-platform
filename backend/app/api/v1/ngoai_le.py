@@ -15,7 +15,9 @@ from app.services import ngoai_le as NL
 
 router = APIRouter(prefix="/api/v1/ngoai-le", tags=["ngoai-le"])
 
-XEM = ("chutich", "tgd", "bks", "ketoan", "cntt", "tp_dh", "ptgd_doan", "ptgd_mkt")
+# robot_ks chỉ ĐỌC danh sách ngoại lệ (nó mở việc qua vòng quét, không qua API này). KHÔNG có mặt ở
+# GHI và DONG: robot mở việc mà đóng được việc thì lớp kiểm soát chỉ còn là hình thức.
+XEM = ("chutich", "tgd", "bks", "ketoan", "cntt", "tp_dh", "ptgd_doan", "ptgd_mkt", "robot_ks")
 GHI = ("chutich", "tgd", "ketoan", "cntt", "tp_dh", "ptgd_doan", "ptgd_mkt")
 DONG = ("chutich", "tgd")
 
