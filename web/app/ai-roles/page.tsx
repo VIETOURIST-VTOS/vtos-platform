@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { useShell } from "@/components/Shell";
+import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
@@ -11,7 +11,7 @@ import { Tag, errMsg } from "@/components/ui";
 const TABS: [string, string][] = [["bang", "Bảng quyền theo vị trí"], ["nhat_ky", "Nhật ký AI"], ["bao_cao", "Báo cáo"]];
 const MAU: Record<number, string> = { 0: "", 1: "navy", 2: "navy", 3: "warn", 4: "ok" };
 
-export default function AiRolesPage() {
+function AiRolesPage() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const canSua = ["chutich", "tgd", "cntt"].includes(role);
@@ -164,3 +164,7 @@ export default function AiRolesPage() {
     </>}
   </>;
 }
+
+// Bọc trong Shell: không bọc thì trang chạy NGOÀI khung – mất thanh điều hướng, và tệ hơn là
+// useShell() trả user rỗng nên mọi nút theo vai trò lặng lẽ biến mất mà không báo lỗi gì.
+export default function Page() { return <Shell><AiRolesPage /></Shell>; }

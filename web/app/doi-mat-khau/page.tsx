@@ -1,14 +1,14 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useShell } from "@/components/Shell";
+import Shell, { useShell } from "@/components/Shell";
 import { api, getUser, setSession, getToken } from "@/lib/api";
 import { errMsg } from "@/components/ui";
 
 /** Đổi mật khẩu. Bắt buộc với tài khoản còn mật khẩu TẠM do HCNS/CNTT đặt (chỉ đạo 07/9/2026):
  *  mật khẩu mặc định là mã nhân viên, mà mã nhân viên nằm công khai trên bảng lương và danh bạ –
  *  ai biết mã là đăng nhập được người khác, và mọi thao tác sau đó mang tên người bị mượn. */
-export default function DoiMatKhau() {
+function DoiMatKhau() {
   const { user, toast } = useShell();
   const router = useRouter();
   const buoc = !!user?.must_change_password;
@@ -47,3 +47,7 @@ export default function DoiMatKhau() {
     </div>
   </>;
 }
+
+// Bọc trong Shell: không bọc thì trang chạy NGOÀI khung – mất thanh điều hướng, và tệ hơn là
+// useShell() trả user rỗng nên mọi nút theo vai trò lặng lẽ biến mất mà không báo lỗi gì.
+export default function Page() { return <Shell><DoiMatKhau /></Shell>; }

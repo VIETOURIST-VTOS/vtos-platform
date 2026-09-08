@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { useShell } from "@/components/Shell";
+import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
@@ -16,7 +16,7 @@ const TABS: [string, string][] = [
   ["phat_hien", "Việc phát hiện"], ["bao_cao", "Báo cáo gửi Chủ tịch"], ["diem", "Chấm điểm phòng ban"],
 ];
 
-export default function KiemSoatPage() {
+function KiemSoatPage() {
   const { user, toast } = useShell();
   const laLanhDao = ["chutich", "tgd"].includes(user?.role || "");
   const chayDuoc = ["chutich", "tgd", "bks", "cntt"].includes(user?.role || "");
@@ -187,3 +187,7 @@ export default function KiemSoatPage() {
     </main>
   );
 }
+
+// Bọc trong Shell: không bọc thì trang chạy NGOÀI khung – mất thanh điều hướng, và tệ hơn là
+// useShell() trả user rỗng nên mọi nút theo vai trò lặng lẽ biến mất mà không báo lỗi gì.
+export default function Page() { return <Shell><KiemSoatPage /></Shell>; }

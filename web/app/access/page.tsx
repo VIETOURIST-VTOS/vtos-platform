@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { useShell } from "@/components/Shell";
+import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
@@ -28,7 +28,7 @@ const ACT_TEN: Record<string, string> = {
   dang_nhap: "Đăng nhập", xuat_ma_tran_quyen: "Xuất ma trận",
 };
 
-export default function AccessPage() {
+function AccessPage() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const canWrite = ["cntt", "hcns", "chutich", "tgd"].includes(role);
@@ -217,3 +217,7 @@ export default function AccessPage() {
     </>}
   </>;
 }
+
+// Bọc trong Shell: không bọc thì trang chạy NGOÀI khung – mất thanh điều hướng, và tệ hơn là
+// useShell() trả user rỗng nên mọi nút theo vai trò lặng lẽ biến mất mà không báo lỗi gì.
+export default function Page() { return <Shell><AccessPage /></Shell>; }

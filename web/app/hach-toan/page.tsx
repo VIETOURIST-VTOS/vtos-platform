@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { useShell } from "@/components/Shell";
+import Shell, { useShell } from "@/components/Shell";
 import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
@@ -16,7 +16,7 @@ const TABS: [string, string][] = [
   ["quy_tac", "Bảng quy ước"], ["thieu_gia_von", "Đơn bị giữ vì thiếu giá vốn"], ["thu", "Định khoản thử"],
 ];
 
-export default function HachToanPage() {
+function HachToanPage() {
   const { user, toast } = useShell();
   const vai = user?.role || "";
   const laKeToan = ["chutich", "tgd", "ketoan"].includes(vai);
@@ -269,3 +269,7 @@ function DinhKhoanThu({ nguon }: { nguon: Record<string, string> }) {
     </>
   );
 }
+
+// Bọc trong Shell: không bọc thì trang chạy NGOÀI khung – mất thanh điều hướng, và tệ hơn là
+// useShell() trả user rỗng nên mọi nút theo vai trò lặng lẽ biến mất mà không báo lỗi gì.
+export default function Page() { return <Shell><HachToanPage /></Shell>; }

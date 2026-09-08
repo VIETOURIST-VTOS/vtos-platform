@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useShell } from "@/components/Shell";
+import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
@@ -23,7 +23,7 @@ type Row = {
   dong_boi: string; dong_luc: string | null;
 };
 
-export default function NgoaiLePage() {
+function NgoaiLePage() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const laLanhDao = ["chutich", "tgd"].includes(role);
@@ -231,3 +231,7 @@ export default function NgoaiLePage() {
     </main>
   );
 }
+
+// Bọc trong Shell: không bọc thì trang chạy NGOÀI khung – mất thanh điều hướng, và tệ hơn là
+// useShell() trả user rỗng nên mọi nút theo vai trò lặng lẽ biến mất mà không báo lỗi gì.
+export default function Page() { return <Shell><NgoaiLePage /></Shell>; }
