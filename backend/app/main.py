@@ -109,6 +109,11 @@ async def lifespan(app: FastAPI):
         try:
             from app.services import ky_thuat as KT
             KT.nap_nguong(db); KT.ghi_khoi_dong(db)
+            # K1/K2 – quyết định của Chủ tịch ngày 08/9/2026 về xếp loại cột tiền và hướng xử lý
+            # "thiếu ≠ 0". Nạp ở đây để lần triển khai nào cũng có mặt; hàm chỉ điền ô còn trống,
+            # không đè lên quyết định ghi sau đó.
+            from app.services import ks_cot_tien as CT
+            CT.nap_quyet_dinh(db)
         except Exception as e:  # noqa
             print("ghi khoi dong error", e)
     finally:
