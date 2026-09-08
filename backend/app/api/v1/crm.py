@@ -218,6 +218,22 @@ def zalo_uy_quyen_tra_ve(code: str = "", state: str = "", oa_id: str = "", db: S
     return {"message": "Đã nhận quyền Zalo OA. Hộp thư đa kênh bắt đầu nhận tin khách nhắn vào OA.", **kq}
 
 
+# Zalo bắt xác thực quyền sở hữu TIỀN TỐ URL (không chỉ domain) trước khi nhận redirect_uri của luồng cấp
+# quyền OA. Tiền tố ấy là /api/v1/zalo/ – nằm ở máy chủ chứ không ở giao diện, nên tệp xác thực phải do
+# chính máy chủ trả. Chuỗi dưới đây KHÔNG phải bí mật: Zalo cấp công khai cho mỗi ứng dụng để chứng minh
+# quyền sở hữu, và bản sao của nó đã nằm trong web/public từ lần xác thực domain.
+ZALO_VERIFIER = "VyIH6BJWInypriytmjXq6m7usaBjZW0KE3Gs"
+
+
+@router.get("/zalo/zalo_verifier{ma}.html", include_in_schema=False)
+def zalo_verifier(ma: str):
+    """Tệp Zalo tải về để đối chiếu. Trả đúng chuỗi của ứng dụng này, không phải chuỗi trên đường dẫn –
+    trả lại thứ người gọi đưa vào thì bất kỳ ứng dụng nào cũng xác thực được tiền tố URL của công ty."""
+    if ma != ZALO_VERIFIER:
+        raise HTTPException(404, "Không có tệp này")
+    return Response(content=ZALO_VERIFIER, media_type="text/html")
+
+
 @router.get("/zalo/webhook")
 def zalo_webhook_verify():
     return {"ok": True, "service": "VTOS Zalo OA webhook"}
