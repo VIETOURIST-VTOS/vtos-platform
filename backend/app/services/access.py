@@ -164,7 +164,27 @@ RESTRICTED_API_PREFIXES = {
 # cũ – require_roles ở chữ ký từng endpoint, chặn theo bộ nạp, cổng bảng lương. Hàng rào ngoài không
 # thay chúng, nó chỉ đảm bảo một endpoint mới quên khai quyền thì cũng không lọt ra ngoài phạm vi công
 # việc của vai trò.
-API_CHUNG = ("/api/v1/auth", "/api/v1/health", "/api/v1/meta", "/api/v1/alerts", "/api/v1/dashboard")
+# /incident-levels là DANH MỤC, không phải dữ liệu: nó trả về ý nghĩa ba mức sự vụ, các trạng thái, và
+# mô tả quy trình – không có sự vụ của ai trong đó. Sau đợt siết P2, vai trò nào không mở màn hình /ops
+# đều mất quyền đọc nó, và nhân viên kinh doanh mở màn hình sự vụ nhận 403 (phép thử test_hr bắt được).
+#
+# Đưa vào nhóm chung theo đúng lập luận đã ghi sẵn cho /api/v1/incidents ở phần vai trò hẹp: người có
+# thể BỊ ghi nhận một sự vụ phải đọc được mức ấy nghĩa là gì – không đọc được thì không đối chất được.
+# Giấu định nghĩa của chế tài khỏi người chịu chế tài không bảo vệ gì cả.
+#
+# Tiền tố này KHÔNG mở /api/v1/incidents (dữ liệu sự vụ thật): hai chuỗi khác nhau ngay sau chữ
+# "incident", nên phép so tiền tố không trùng. Quyền đọc sự vụ vẫn nguyên như cũ.
+# /incidents cũng vào nhóm chung, và đây là chỗ cần đọc kỹ trước khi ai đó rút nó ra:
+#
+#   - Endpoint TỰ LỌC: nhân viên (nv_kd, nv_dh, xe_hdv) chỉ thấy sự vụ của CHÍNH MÌNH – lọc nằm ngay
+#     trong hàm, không phải lời hứa ở đây.
+#   - Endpoint đã có require_roles riêng ở chữ ký. Vai trò không nằm trong danh sách đó vẫn nhận 403
+#     như trước, kể cả khi tiền tố này mở.
+#   - Hàng rào ngoài sinh ra để "một endpoint QUÊN khai quyền thì cũng không lọt". Endpoint này không
+#     quên: nó khai đủ và lọc đủ. Chặn nó ở vòng ngoài chỉ khóa mất quyền đối chất của người bị ghi
+#     nhận sự vụ – họ không đọc được biên bản về mình, và không gửi được ý kiến hay khiếu nại.
+API_CHUNG = ("/api/v1/auth", "/api/v1/health", "/api/v1/meta", "/api/v1/alerts", "/api/v1/dashboard",
+             "/api/v1/incident-levels", "/api/v1/incidents")
 # Màn hình ai đăng nhập cũng có (giống danh sách phụ trong ALL_MENU_PATHS): trang chủ, đổi mật khẩu,
 # cảnh báo, báo cáo công việc. Bảng lương cá nhân đi qua /payroll và tự lọc về đúng người.
 MAN_HINH_MOI_NGUOI = ("/", "/doi-mat-khau", "/alerts", "/reports", "/payroll")
