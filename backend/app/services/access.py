@@ -131,8 +131,11 @@ RESTRICTED_API_PREFIXES = {
     # GĐ điều hành đội xe: cả phân hệ đội xe và lệnh điều xe, cộng danh mục xe để chọn trong form. Không có
     # /tours, /bookings, /banks, /payroll – phạm vi công việc của ông là chiếc xe, không phải khách hàng và
     # dòng tiền công ty.
+    # /nap-du-lieu và /tep có mặt vì ma trận menu ĐÃ cho vai trò này hai màn hình đó (bộ nạp nhật trình
+    # chuyến xe và kho chứng từ của xe). Thiếu hai prefix này thì menu hiện ra mà bấm vào là 403 – một
+    # cánh cửa vẽ trên tường còn khó chịu hơn không có cửa.
     "gd_doi_xe": ("/api/v1/auth/", "/api/v1/fleet", "/api/v1/xe-hdv/", "/api/v1/dispatch",
-                  "/api/v1/vehicles"),
+                  "/api/v1/vehicles", "/api/v1/nap-du-lieu", "/api/v1/tep"),
     "nv_visa": ("/api/v1/auth/", "/api/v1/visa"),
     # Trưởng phòng Hướng dẫn: phần hướng dẫn, chào chuyến, bảng giá tuyến, tệp đính kèm và bộ nạp dữ
     # liệu của phòng. Không có /bookings, /tours, /payroll, /banks – ông chọn người cho chuyến, không
@@ -280,7 +283,7 @@ RESTRICTED_ROLE_MENUS = {
     "xe_hdv": ("/xe-hdv", "/doi-mat-khau"),
     "nv_visa": ("/visa", "/doi-mat-khau"),
     "gd_doi_xe": ("/doi-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe", "/xe-hdv",
-                  "/doi-mat-khau"),
+                  "/nap-du-lieu", "/tep", "/doi-mat-khau"),
     "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/doi-mat-khau"),
 }
 

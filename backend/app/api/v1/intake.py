@@ -28,7 +28,8 @@ def bo_nap(u: User = Depends(require_roles(*READ))):
     """Khai báo cấu trúc từng loại dữ liệu: cột nào, bắt buộc không, ví dụ, khóa chống trùng.
 
     Đây cũng là thứ một tác vụ AI đọc để biết phải gửi lên những gì – không phải đoán từ màn hình."""
-    return {"bo_nap": IN.danh_sach_bo_nap(), "nguon": IN.NGUON,
+    from app.services.nhap_lieu import CUA, KIEU
+    return {"bo_nap": IN.danh_sach_bo_nap(), "nguon": IN.NGUON, "cua": CUA, "kieu_cot": KIEU,
             "quy_tac": ["Kiểm tra trước, nạp sau: bước kiểm tra không ghi gì vào hệ thống.",
                         "Có dòng lỗi thì mặc định KHÔNG nạp gì cả; bỏ qua dòng lỗi phải là lựa chọn có ý thức.",
                         "Nạp lại cùng tệp không nhân đôi – mỗi bộ nạp có khóa chống trùng riêng.",
@@ -72,6 +73,40 @@ async def kiem_tra_tep(loai: str = Form(...), tep: UploadFile = File(...),
     kq = IN.kiem_tra(db, loai, rows)
     db.rollback()
     return {**kq, "ten_tep": tep.filename, "rows": rows[:1000]}
+
+
+class MotDongIn(BaseModel):
+    loai: str
+    row: dict
+    cua: str = "nhap_tay"        # nhap_tay / doc_anh
+    tac_nhan: str = ""           # tên tác vụ AI, nếu số điền sẵn từ ảnh
+
+
+@router.post("/nhap-mot-dong", status_code=201)
+def nhap_mot_dong(data: MotDongIn, u: User = Depends(require_roles(*WRITE)),
+                  db: Session = Depends(get_db)):
+    """Cửa 1 – nhập tay một bản ghi; cũng là chỗ số đọc từ ảnh đổ về sau khi người bấm xác nhận.
+
+    Cùng bộ kiểm với cửa tải tệp. Không có đường nào ghi thẳng vào bảng mà bỏ qua bộ kiểm này."""
+    if data.loai not in IN.BO_NAP: raise HTTPException(422, f"Không có bộ nạp '{data.loai}'")
+    if not IN.duoc_nap(data.loai, u.role):
+        raise HTTPException(403, f"Vai trò của anh/chị không nhập được '{IN.BO_NAP[data.loai]['ten']}'. "
+                                 "Loại dữ liệu này thuộc phòng khác.")
+    if data.cua not in ("nhap_tay", "doc_anh"): raise HTTPException(422, "Cửa không hợp lệ")
+    if data.cua == "doc_anh" and not data.tac_nhan.strip():
+        raise HTTPException(422, "Số điền sẵn từ ảnh phải ghi tên tác vụ đã đọc – để sau này truy được "
+                                 "con số này do máy nào đọc và ai xác nhận.")
+    try:
+        kq = IN.nhap_mot_dong(db, data.loai, data.row, u.username, data.cua, data.tac_nhan)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    if not kq["da_ghi"]:
+        db.rollback()
+        return kq
+    R.audit(db, u.username, u.role, "nhap_mot_dong", f"bo_nap:{data.loai}",
+            after={"cua": data.cua, "ket_qua": kq.get("ket_qua", "")})
+    db.commit()
+    return kq
 
 
 class NapIn(BaseModel):

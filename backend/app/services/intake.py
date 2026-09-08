@@ -23,7 +23,8 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.intake import IntakeRun
 
-NGUON = {"nguoi_nhap": "Người nhập", "ai": "Tác vụ AI", "he_thong": "Hệ thống khác"}
+NGUON = {"nguoi_nhap": "Người nhập", "nhap_tay": "Nhập tay từng dòng", "nap_tep": "Tải tệp",
+         "doc_anh": "Ảnh – AI đọc, người xác nhận", "ai": "Tác vụ AI", "he_thong": "Hệ thống khác"}
 
 
 # ====================== ĐỌC TỆP ======================
@@ -81,8 +82,13 @@ def _ngay(v):
 
 
 # ====================== KHAI BÁO CÁC BỘ NẠP ======================
-def _c(key, ten, bat_buoc=False, kieu="chu", vi_du="", ghi_chu=""):
-    return {"key": key, "ten": ten, "bat_buoc": bat_buoc, "kieu": kieu, "vi_du": vi_du, "ghi_chu": ghi_chu}
+def _c(key, ten, bat_buoc=False, kieu="chu", vi_du="", ghi_chu="", **thuoc_tinh):
+    """Khai báo một cột. Khai một lần, dùng cho CẢ BA CỬA (nhập tay, tải tệp, ảnh do AI đọc).
+
+    Thuộc tính thêm (V1, lệnh 08/9): min / max cho số, chon={ma: ten} cho danh sách,
+    khoa_ky=True cho cột ngày quyết định kỳ kế toán, khong_tuong_lai=True cho ngày không được ở tương lai."""
+    return {"key": key, "ten": ten, "bat_buoc": bat_buoc, "kieu": kieu, "vi_du": vi_du,
+            "ghi_chu": ghi_chu, **thuoc_tinh}
 
 
 def _ncc_kiem(db, r):
@@ -186,7 +192,7 @@ def _chuyen_nap(db, r, boi):
 
 BO_NAP = {
     "nha_cung_cap": {
-        "ten": "Nhà cung cấp",
+        "ten": "Nhà cung cấp", "bang_dich": "suppliers", "phong_ban": "dieu_hanh",
         "mo_ta": "Danh mục nhà cung cấp. Số tài khoản nạp lần đầu ở đây; đổi về sau phải qua đề nghị có "
                  "người thứ hai xác nhận.",
         "khoa_chong_trung": "Tên nhà cung cấp",
@@ -202,7 +208,7 @@ BO_NAP = {
         "kiem": _ncc_kiem, "nap": _ncc_nap,
     },
     "don_dich_vu": {
-        "ten": "Đơn đặt dịch vụ",
+        "ten": "Đơn đặt dịch vụ", "bang_dich": "service_orders", "phong_ban": "dieu_hanh",
         "mo_ta": "Dịch vụ đã đặt cho từng tour. Bắt buộc có nhà cung cấp (đã tồn tại) và mã tour.",
         "khoa_chong_trung": "Không có – mỗi dòng là một đơn mới, nạp lại sẽ tạo thêm đơn",
         "cot": [_c("nha_cung_cap", "Tên nhà cung cấp", True, ghi_chu="phải trùng tên đã có trong danh mục"),
@@ -216,7 +222,7 @@ BO_NAP = {
         "kiem": _don_kiem, "nap": _don_nap,
     },
     "chuyen_xe": {
-        "ten": "Nhật trình chuyến xe",
+        "ten": "Nhật trình chuyến xe", "bang_dich": "fleet_trips", "phong_ban": "doi_xe",
         "mo_ta": "Phiếu chi phí xe theo từng chuyến. Bốn khoản chi phí do Vietourist tạm ứng.",
         "khoa_chong_trung": "Mã phiếu gốc",
         "cot": [_c("ma_phieu", "Mã phiếu gốc", True, vi_du="VTRIP-CH-100",
@@ -224,7 +230,8 @@ BO_NAP = {
                 _c("bien_so", "Biển số xe", True, vi_du="50F-017.37",
                    ghi_chu="ghi cách nào cũng được: 50F-017.37, 50F 017.37, 50F01737"),
                 _c("ten_tour", "Tour / khách hàng", vi_du="Đà Lạt (lẻ)"),
-                _c("ngay_di", "Ngày đi", True, kieu="ngay", vi_du="01/08/2026"),
+                _c("ngay_di", "Ngày đi", True, kieu="ngay", vi_du="01/08/2026",
+                   khoa_ky=True, khong_tuong_lai=True),
                 _c("ngay_ve", "Ngày về", True, kieu="ngay", vi_du="03/08/2026"),
                 _c("km_dau", "Km đầu", kieu="so", ghi_chu="để trống nghĩa là CHƯA ĐO, không phải 0"),
                 _c("km_cuoi", "Km cuối", kieu="so"),
@@ -272,8 +279,9 @@ PHONG_BAN = {"nha_cung_cap": "dieu_hanh", "don_dich_vu": "dieu_hanh", "chuyen_xe
 
 def danh_sach_bo_nap() -> list[dict]:
     return [{"ma": k, "ten": v["ten"], "mo_ta": v["mo_ta"], "khoa_chong_trung": v["khoa_chong_trung"],
-             "phong_ban": PHONG_BAN.get(k, ""), "vai_tro": list(VAI_TRO.get(k, QUAN_TRI)),
-             "cot": v["cot"]} for k, v in BO_NAP.items()]
+             "phong_ban": v.get("phong_ban") or PHONG_BAN.get(k, ""),
+             "bang_dich": v.get("bang_dich", ""),
+             "vai_tro": list(VAI_TRO.get(k, QUAN_TRI)), "cot": v["cot"]} for k, v in BO_NAP.items()]
 
 
 def mau_csv(loai: str) -> str:
@@ -315,9 +323,11 @@ def kiem_tra(db: Session, loai: str, rows: list[dict]) -> dict:
     ket = []
     for i, r in enumerate(rows, start=2):        # hàng 1 là tiêu đề
         loi, cb, trung = [], [], None
-        for c in bo["cot"]:
-            if c["bat_buoc"] and str(r.get(c["key"]) or "").strip() == "":
-                loi.append(f"Thiếu {c['ten'].lower()}")
+        # Lớp kiểm DÙNG CHUNG cho ba cửa (app/services/nhap_lieu.py). Bắt buộc, kiểu, khoảng hợp lệ,
+        # danh sách chọn và KỲ KHÓA đều kiểm ở đây; hàm kiem riêng của từng bộ nạp chỉ lo phần nghiệp vụ.
+        from app.services.nhap_lieu import kiem_dong
+        l0, c0 = kiem_dong(db, bo, r)
+        loi += l0; cb += c0
         if not loi:
             try:
                 l2, c2, trung = bo["kiem"](db, r)
@@ -333,6 +343,25 @@ def kiem_tra(db: Session, loai: str, rows: list[dict]) -> dict:
             "cot_khong_dung": cot_la, "dong": ket,
             "ghi_chu": ("Đây là bước XEM TRƯỚC – chưa ghi gì vào hệ thống. Có dòng lỗi thì mặc định không "
                         "nạp gì cả; muốn nạp phần hợp lệ phải chọn rõ 'bỏ qua dòng lỗi'.")}
+
+
+def nhap_mot_dong(db: Session, loai: str, row: dict, boi: str, cua: str = "nhap_tay",
+                  tac_nhan: str = "") -> dict:
+    """CỬA 1 – nhập tay một bản ghi. Đi qua ĐÚNG bộ kiểm của cửa tải tệp, không có đường tắt.
+
+    Cũng là chỗ cửa 3 (ảnh do AI đọc) đổ về sau khi người bấm xác nhận: số từ ảnh không có đường riêng
+    vào bảng, nó chỉ điền sẵn vào biểu này. Ai bấm xác nhận là người chịu trách nhiệm về con số, y như
+    người gõ tay – nên nhật ký ghi cửa nào, và nếu là ảnh thì ghi cả tên tác vụ đã đọc."""
+    kq = nap(db, loai, [row], boi, bo_qua_dong_loi=False, ten_tep="", nguon=cua, tac_nhan=tac_nhan)
+    if kq["da_nap"] == 0:
+        d = kq["dong"][0] if kq.get("dong") else {}
+        return {"da_ghi": False, "loi": d.get("loi", []), "canh_bao": d.get("canh_bao", []),
+                "da_co": d.get("da_co"),
+                "message": (f"Đã có trong hệ thống ({d.get('da_co')}) – không ghi thêm bản thứ hai."
+                            if d.get("da_co") else "Chưa ghi được: " + " · ".join(d.get("loi", [])))}
+    return {"da_ghi": True, "ket_qua": kq.get("ket_qua", [{}])[0].get("ket_qua", ""),
+            "canh_bao": kq["dong"][0].get("canh_bao", []), "run_id": kq.get("run_id"),
+            "message": "Đã ghi vào hệ thống."}
 
 
 def nap(db: Session, loai: str, rows: list[dict], boi: str, bo_qua_dong_loi: bool = False,

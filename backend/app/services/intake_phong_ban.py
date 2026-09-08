@@ -324,6 +324,7 @@ def bo_nap(_c) -> dict:
     from app.models.hr import DEPARTMENTS, POSITIONS, OFFICES
     return {
         "nhan_su": {
+            "bang_dich": "employees", "phong_ban": "hcns",
             "ten": "Hồ sơ nhân sự",
             "mo_ta": "Danh sách nhân sự. Nạp chỉ TẠO MỚI: mã đã có thì bỏ qua, không ghi đè lương hay "
                      "phòng ban của người đang làm việc.",
@@ -348,6 +349,7 @@ def bo_nap(_c) -> dict:
             "kiem": _ns_kiem, "nap": _ns_nap,
         },
         "khach_hang": {
+            "bang_dich": "leads", "phong_ban": "kd_le",
             "ten": "Khách hàng / nguồn khách",
             "mo_ta": "Danh sách khách theo kênh và theo tháng. Cùng số điện thoại trong cùng tháng và cùng "
                      "kênh chỉ tính một khách – nạp lại tệp không thổi phồng số lead.",
@@ -362,6 +364,7 @@ def bo_nap(_c) -> dict:
             "kiem": _kh_kiem, "nap": _kh_nap,
         },
         "booking": {
+            "bang_dich": "bookings", "phong_ban": "kd_le",
             "ten": "Booking khách đoàn / khách lẻ",
             "mo_ta": "Booking gắn vào tour đã có. Số đã thu chỉ ghi nhận trên booking, KHÔNG sinh phiếu thu "
                      "và không đối chiếu ngân hàng thay cho kế toán.",
@@ -384,6 +387,7 @@ def bo_nap(_c) -> dict:
             "kiem": _bk_kiem, "nap": _bk_nap,
         },
         "sao_ke_ngan_hang": {
+            "bang_dich": "bank_transactions", "phong_ban": "ketoan",
             "ten": "Sao kê ngân hàng",
             "mo_ta": "Sao kê tải từ ngân hàng. Dòng nạp lên nằm ở trạng thái CHƯA KHỚP – ghép với booking "
                      "là bước riêng có người xác nhận, không tự động theo tệp.",
@@ -401,6 +405,7 @@ def bo_nap(_c) -> dict:
             "kiem": _sk_kiem, "nap": _sk_nap,
         },
         "huong_dan_vien": {
+            "bang_dich": "employees", "phong_ban": "huong_dan",
             "ten": "Hướng dẫn viên cộng tác",
             "mo_ta": "Danh sách HDV. Nạp luôn ghi loại hợp đồng là cộng tác viên – toàn bộ HDV đã chuyển "
                      "sang cộng tác viên từ 07/9/2026. Cố ý KHÔNG có bộ nạp bảng đơn giá tuyến: đơn giá "
@@ -421,6 +426,7 @@ def bo_nap(_c) -> dict:
             "kiem": _hdv_kiem, "nap": _hdv_nap,
         },
         "cham_cong": {
+            "bang_dich": "payroll_runs", "phong_ban": "hcns",
             "ten": "Chấm công cho bảng lương",
             "mo_ta": "Công thực tế theo kỳ để hệ thống TÍNH bảng lương. Cố ý không có bộ nạp 'bảng lương "
                      "thành phẩm': nạp thẳng số lương đã tính là bỏ qua toàn bộ các bước xác nhận và ký. "
