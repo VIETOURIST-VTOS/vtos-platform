@@ -64,7 +64,13 @@ def test_vai_tro_bi_gioi_han_chi_thay_dung_mot_man_hinh():
         assert trang in an, f"tài xế không được thấy {trang}"
     # Từ 07/9/2026 danh sách cho phép có thêm màn hình đổi mật khẩu: tài xế cũng được HCNS đặt mật khẩu tạm,
     # và nếu không có lối đổi thì họ bị khóa ngoài hệ thống chứ không phải bị giới hạn.
-    assert AC.menus_for(type("U", (), {"role": "xe_hdv"})()) == ["/xe-hdv", "/doi-mat-khau"]
+    #
+    # Từ 08/9/2026 thêm màn hình phiếu lương CÁ NHÂN (/phieu-luong, không phải /payroll). Tài xế nằm
+    # trong bảng lương như mọi người khác, nên không xem được lương của chính mình là mất một quyền chứ
+    # không phải bị giới hạn phạm vi. Hai màn hình này khác hẳn nhau và dòng 63 ở trên vẫn giữ nguyên:
+    # /payroll – bảng lương TOÀN CÔNG TY – vẫn phải nằm trong danh sách ẩn của tài xế.
+    assert AC.menus_for(type("U", (), {"role": "xe_hdv"})()) == ["/xe-hdv", "/doi-mat-khau", "/phieu-luong"]
+    assert "/phieu-luong" not in an, "tài xế phải xem được phiếu lương của chính mình"
 
 
 def test_visa_chi_thay_phan_he_visa():

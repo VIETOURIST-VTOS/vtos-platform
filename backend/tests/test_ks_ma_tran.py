@@ -24,7 +24,10 @@ from app.services import ks_ma_tran as MT
 # thử ghi nhận đúng hiện trạng thay vì đỏ mãi mãi – một phép thử đỏ thường trực là phép thử không ai đọc.
 # Sửa xong một dòng thì phép thử đỏ và phải xoá dòng đó khỏi đây: đó là cách nó không bị bỏ quên.
 KHAI_THIEU_MAN_HINH = ["ket-so"]        # menu dẫn tới trang không có
-MAN_HINH_THIEU_QUYEN = ["alerts", "reports"]   # đang mở cho mọi tài khoản đăng nhập
+# Ba màn hình này KHÔNG khai trong MENU_ROLES mà khai qua MAN_HINH_MOI_NGUOI – chúng mở cho mọi tài
+# khoản đăng nhập theo đúng thiết kế, và bộ dò này chỉ đọc MENU_ROLES nên vẫn kể tên chúng ra.
+# phieu-luong vào danh sách ngày 08/9/2026 – màn hình phiếu lương của chính người đăng nhập.
+MAN_HINH_THIEU_QUYEN = ["alerts", "phieu-luong", "reports"]
 
 
 def test_mt1_khai_quyen_cho_man_hinh_khong_ton_tai():
@@ -81,6 +84,13 @@ def test_mt5_moi_ngoai_le_phai_tu_bao_ve_duoc():
     ma = (web / "payroll" / "page.tsx").read_text(encoding="utf-8")
     assert 'location.replace("/hr")' in ma and len(ma) < 400, \
         "payroll không còn là trang chuyển hướng nữa – phải khai quyền cho nó"
+    # Phiếu lương CÁ NHÂN là màn hình khác, đường dẫn khác, và KHÔNG được nằm trong danh sách ngoại lệ:
+    # nó hiển thị dữ liệu thật nên phải khai quyền thật. Đổi nghĩa của /payroll để dùng lại chỗ miễn trừ
+    # của nó là cách lặng lẽ lật lại quyết định 07/9 về việc tài xế không được thấy bảng lương.
+    assert "phieu-luong" not in MT.NGOAI_LE, "màn hình hiển thị dữ liệu thật không được miễn khai quyền"
+    assert AC.MAN_HINH_API.get("/phieu-luong"), "màn hình phiếu lương cá nhân chưa khai nhóm API nào"
+    assert "/phieu-luong" in AC.MAN_HINH_KHONG_DUOC_AN, \
+        "phiếu lương của chính mình mà ẩn được khỏi menu thì người lao động không có lối vào"
 
 
 def test_mt6_da_noi_vao_vong_quet_cua_robot():

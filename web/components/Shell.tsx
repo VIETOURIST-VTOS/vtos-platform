@@ -68,7 +68,11 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Ngoại lệ cần xử lý", "/ngoai-le"], ["Kiểm soát (robot)", "/kiem-soat"],
     ["Quy ước hạch toán", "/hach-toan"],
     ["Nhật ký nghiệp vụ", "/audit"]] },
+  // Nhóm này là của CHÍNH người đăng nhập, không phải của phòng ban nào. Ba mục dưới đây phải có mặt
+  // với mọi vai trò – kể cả tài xế, HDV, chuyên viên visa – vì cả ba đều là việc họ buộc phải làm
+  // được: nộp báo cáo công việc hằng ngày (Điều 12), xem phiếu lương của mình, đổi mật khẩu tạm.
   { key: "taikhoan", label: "0. Tài khoản của tôi", items: [
+    ["Báo cáo công việc của tôi", "/reports"], ["Phiếu lương của tôi", "/phieu-luong"],
     ["Đổi mật khẩu", "/doi-mat-khau"]] },
   { key: "hethong", label: "10. Hệ thống & Tích hợp", items: [
     ["Cấu hình tổ chức", "/companies"], ["Tài khoản & phân quyền", "/access"], ["Vị trí AI & quyền hạn", "/ai-roles"],

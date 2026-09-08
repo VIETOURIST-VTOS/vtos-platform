@@ -95,7 +95,10 @@ def test_nguoi_cua_B_khong_thay_tour_cua_A():
 # ---------------- 2. Chưa xác định: thấy được, có nhãn, không bị cộng vào ----------------
 def test_ho_so_chua_gan_van_thay_duoc_va_co_nhan():
     """Giấu hồ sơ chưa gán đi nghe có vẻ an toàn, nhưng người duy nhất còn có thể gán nó thì không
-    còn nhìn thấy nó để mà gán – và 1.200 tour nhập từ Vietrip đều đang ở trạng thái này."""
+    còn nhìn thấy nó để mà gán.
+
+    Đo trên hệ thống thật ngày 08/9/2026: hiện KHÔNG còn hồ sơ nào chưa gán pháp nhân. Phép thử vẫn
+    giữ – nó canh cho cái ngày có hồ sơ đầu tiên chưa gán, và ngày đó không báo trước."""
     r = client.get("/api/v1/tours?limit=1000", headers=login("pn_a"))
     theo_ma = {t["code"]: t for t in r.json()}
     assert "PN_TOUR_X" in theo_ma, "hồ sơ chưa xác định pháp nhân bị giấu khỏi mọi màn hình"

@@ -92,16 +92,20 @@ def test_vai_tro_hep_noi_ro_la_danh_sach_khai_tay_chu_khong_phai_ma_tran():
         assert "RESTRICTED_ROLE_MENUS" in dong["dong"]
 
 
-def test_vai_tro_hep_van_co_cho_nop_bao_cao_cong_viec_hang_ngay():
-    """Điều 12 bắt MỌI người nộp báo cáo ngày. Trước 08/9/2026 tài xế, HDV và chuyên viên visa không
-    có mục /reports trong menu, trong khi hàng rào API vẫn mở /api/v1/daily-reports cho họ – nộp được
-    nếu biết gõ đường dẫn tay, không nộp được nếu không biết. Siết đúng nguyên tắc, sai hậu quả."""
+def test_vai_tro_hep_van_lam_duoc_hai_viec_cua_chinh_minh():
+    """Hai việc mà một con người có tài khoản buộc phải tự làm được, dù vai trò hẹp tới đâu: đổi mật
+    khẩu tạm do HCNS đặt, và xem phiếu lương của chính mình. Tài xế và HDV đều nằm trong bảng lương.
+
+    Ba màn hình khác – trang chủ, cảnh báo, báo cáo công việc – KHÔNG nằm ở đây, và đó là chủ ý: bộ
+    mẫu báo cáo ngày chỉ có bảy phòng văn phòng, đội xe và visa không phải nộp. Phép thử này từng
+    khẳng định ngược lại và nó đã sai."""
     for vai in ("xe_hdv", "nv_visa"):
         d = tra("cntt", UID[vai])
         thay = {x["path"] for x in d["man_hinh"]}
-        assert "/reports" in thay, f"{vai} không có lối vào chỗ nộp báo cáo công việc hằng ngày"
+        an = set(d["man_hinh_bi_an"])
         assert "/doi-mat-khau" in thay, f"{vai} không đổi được mật khẩu tạm"
-        assert "/reports" not in set(d["man_hinh_bi_an"])
+        assert "/phieu-luong" in thay, f"{vai} không xem được phiếu lương của chính mình"
+        assert "/reports" in an, f"{vai} thấy màn hình báo cáo ngày, trong khi phòng họ không phải nộp"
 
 
 def test_nhom_api_tra_loi_bang_TEN_MAN_HINH_chu_khong_bang_ten_bien():

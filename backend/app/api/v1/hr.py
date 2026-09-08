@@ -866,6 +866,20 @@ def payroll_attendance(period: str, data: ChamCongIn, u: User = Depends(require_
     return {"message": f"Đã nhập công cho {len(data.cong_thuc_te)} người kỳ {period}", "run": run_out(run)}
 
 
+@router.get("/phieu-luong/khoan-treo")
+def khoan_treo_cua_toi(u: User = Depends(loc_theo_nguoi_dung("khoản lương treo của chính người đăng nhập")),
+                       db: Session = Depends(get_db)):
+    """Cùng dữ liệu khoản treo, dưới tiền tố cá nhân /api/v1/phieu-luong.
+
+    Vì sao phải có: đường dẫn cũ nằm dưới /api/v1/payroll, tiền tố chỉ được khai sau màn hình /hr. Người
+    lao động bình thường không có /hr nên hàng rào phạm vi NGOÀI chặn họ ở 403, dù thân hàm đã tự lọc
+    đúng về phần của họ – quyền có, lọc có, chỉ thiếu đường vào. Khoản treo là hoa hồng và thưởng chuyến
+    chưa phát sinh vì chuyến chưa chốt quyết toán; nó không hiện trên phiếu lương nào, nên người không
+    xem được nó là người không có cách nào biết mình đang bị treo bao nhiêu.
+    """
+    return khoan_treo(u, db)
+
+
 @router.get("/payroll/khoan-treo")
 def khoan_treo(u: User = Depends(loc_theo_nguoi_dung("khoản lương treo – ai không xem được bảng lương thì chỉ thấy phần của chính mình")),
                db: Session = Depends(get_db)):
@@ -985,10 +999,63 @@ def nap_doan_vien(data: DoanVienBatch, u: User = Depends(require_roles("hcns", "
             "message": f"Đã ghi nhận {len(danh_sach)} đoàn viên" + (f"; {len(khong_ghep)} tên chưa ghép được" if khong_ghep else "")}
 
 
+@router.get("/phieu-luong/ky-cua-toi")
+def ky_luong_cua_toi(u: User = Depends(loc_theo_nguoi_dung("danh sách kỳ lương của chính người đăng nhập")),
+                     db: Session = Depends(get_db)):
+    """Những kỳ lương CÓ dòng của chính người đăng nhập – để họ mở được phiếu của mình.
+
+    Vì sao phải có endpoint này chứ không để giao diện tự đoán tháng: người lao động không biết kỳ nào
+    đã lập. Bắt họ gõ thử từng tháng rồi đọc lỗi "chưa có bảng lương kỳ 2026-06" là cách chắc chắn để
+    không ai mở phiếu lương của mình lần thứ hai.
+
+    Chỉ trả về kỳ ĐÃ QUA bản nháp – bản nháp là số robot tính chưa ai xác nhận, đưa cho người lao động
+    xem là tạo ra một con số họ nhớ mà công ty không đứng sau. Người xem được bảng lương toàn công ty
+    thì thấy cả bản nháp, vì đó chính là việc của họ.
+    """
+    from app.services import access as AC
+    quan_tri = "payroll" in AC.hr_tabs_for(db, u)
+    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    if not e and u.staff_code:
+        e = db.execute(select(Employee).where(Employee.code == u.staff_code)).scalars().first()
+    ma = e.code if e else ""
+    if not ma:
+        return {"ma_nv": "", "co_ho_so": False, "rows": [],
+                "message": "Tài khoản chưa gắn hồ sơ nhân sự nên chưa có phiếu lương. Báo HCNS ghép mã "
+                           "nhân viên vào tài khoản – không tự sửa được ở màn hình này."}
+    ra = []
+    for run in db.execute(select(PayrollRun).order_by(PayrollRun.period.desc())).scalars():
+        if run.status == "nhap" and not quan_tri: continue
+        dong = next((r for r in (run.rows or []) if r.get("ma") == ma), None)
+        if dong is None: continue
+        ra.append({"period": run.period, "trang_thai": run.status, "da_ky": bool(run.tgd_by),
+                   "thuc_nhan": dong.get("thuc_nhan", 0)})
+    return {"ma_nv": ma, "co_ho_so": True, "ho_ten": e.full_name, "rows": ra,
+            "message": "" if ra else "Chưa có kỳ lương nào đã lập cho mã nhân viên này."}
+
+
+@router.get("/phieu-luong/{period}")
+def phieu_luong_cua_toi(period: str, ma: str = "",
+                        u: User = Depends(loc_theo_nguoi_dung("phiếu lương của chính người đăng nhập")),
+                        db: Session = Depends(get_db)):
+    """Cùng một phiếu lương, nhưng đứng dưới tiền tố RIÊNG /api/v1/phieu-luong.
+
+    Vì sao phải có đường dẫn thứ hai cho cùng một dữ liệu: hàng rào phạm vi ngoài chỉ phân biệt tới mức
+    tiền tố. Tiền tố /api/v1/payroll-runs chứa cả bảng lương TOÀN CÔNG TY, nên mở nó cho mọi vai trò –
+    để tài xế xem được phiếu của mình – là hạ hàng rào ngoài của cả bảng lương công ty, chỉ còn hàng rào
+    trong đỡ. Tiền tố này chỉ chứa endpoint tự lọc về đúng người, nên mở cho mọi người là an toàn ở CẢ
+    HAI lớp. Đường dẫn cũ giữ nguyên cho màn hình Nhân sự của HCNS/Kế toán.
+    """
+    return _phieu_luong(period, ma, u, db)
+
+
 @router.get("/payroll-runs/{period}/phieu-luong")
 def phieu_luong(period: str, ma: str = "",
                 u: User = Depends(loc_theo_nguoi_dung("phiếu lương – phiếu của chính mình ai cũng xem được, phiếu người khác thì phải xem được bảng lương")),
                 db: Session = Depends(get_db)):
+    return _phieu_luong(period, ma, u, db)
+
+
+def _phieu_luong(period: str, ma: str, u: User, db: Session):
     """Phiếu lương của CHÍNH người đăng nhập (hoặc của một mã NV, với Kế toán / HCNS / lãnh đạo).
 
     Người lao động phải tự xem được lương của mình. Phiếu ghi đủ ba khối theo bộ tính lương: thu nhập,

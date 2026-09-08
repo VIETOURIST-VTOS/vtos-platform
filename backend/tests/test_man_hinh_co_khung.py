@@ -15,8 +15,8 @@ WEB = Path(__file__).resolve().parents[2] / "web" / "app"
 
 # Trang được phép đứng ngoài khung, kèm lý do. Thêm tên vào đây phải kèm lý do thật.
 NGOAI_LE = {
-    "login": "màn hình đăng nhập – chưa có phiên thì chưa có khung",
     "payroll": "chỉ chuyển hướng sang /hr, không vẽ gì",
+    "login": "màn hình đăng nhập – chưa có phiên thì chưa có khung",
 }
 
 
