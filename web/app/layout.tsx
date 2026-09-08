@@ -14,6 +14,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi">
       <head>
+        {/* Zalo Platform xác thực quyền sở hữu domain vtos.infinitytours.org (08/9/2026).
+            Thẻ này phải nằm ở HEAD TRANG CHỦ và ở gần đầu trang – Zalo chỉ đọc 512KB đầu tiên.
+            Gỡ thẻ ra là mất xác thực domain, kéo theo mất quyền gọi API Zalo OA của hộp thư đa kênh. */}
+        <meta name="zalo-platform-site-verification" content="VyIH6BJWInypriytmjXq6m7usaBjZW0KE3Gs" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" />
       </head>
       <body>
