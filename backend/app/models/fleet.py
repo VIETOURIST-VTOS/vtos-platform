@@ -18,7 +18,7 @@ Giấy tờ và hàng đợi xác minh nằm ở đây thay vì rải trong bả
 ngày, có nguồn và có mức độ đã xác minh – không phải một ô ngày trên hồ sơ xe.
 """
 from datetime import date, datetime
-from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, ForeignKey, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 
@@ -494,3 +494,59 @@ class DebtPayment(Base):
     note: Mapped[str] = mapped_column(String(300), default="")
     created_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+# Nhóm chi phí kỳ. Cột thứ hai là phạm vi MẶC ĐỊNH: "xe" là chi phí quy được về từng chiếc, "doi" là chi
+# phí của cả đội mà chia về từng xe chỉ là ước lệ. Phân biệt này là cốt lõi của báo cáo lãi lỗ đội xe.
+NHOM_CHI_PHI_KY = {
+    "bao_hiem":    ("Bảo hiểm xe", "xe"),
+    "dang_kiem":   ("Đăng kiểm", "xe"),
+    "bao_duong":   ("Bảo dưỡng, sửa chữa", "xe"),
+    "luong_tai_xe": ("Lương tài xế", "xe"),
+    "wifi_xe":     ("Wifi trên xe", "xe"),
+    "tra_truoc":   ("Phân bổ chi phí trả trước (vỏ xe, ắc quy, thiết bị)", "xe"),
+    "khac_xe":     ("Chi phí khác của xe", "xe"),
+    "bai_xe":      ("Phí bãi xe", "doi"),
+    "dien_nuoc":   ("Điện, nước, wifi tại bãi", "doi"),
+    "quan_ly":     ("Phí dịch vụ quản lý xe, GSHT, camera", "doi"),
+    "lai_vay":     ("Chi phí lãi vay", "doi"),
+    "bhxh":        ("Bảo hiểm nhân viên công ty đóng", "doi"),
+    "khac_doi":    ("Chi phí phát sinh khác của đội", "doi"),
+}
+
+
+class FleetPeriodCost(Base):
+    """Chi phí của một KỲ mà không gắn vào chuyến nào: bảo hiểm, lương tài xế, phí bãi, lãi vay…
+
+    Vì sao phải có bảng riêng thay vì cộng thẳng vào chi phí chuyến:
+
+      Lãi gộp của một chuyến (doanh thu trừ dầu, cầu đường, công tác phí) và kết quả thật của đội xe là
+      hai con số khác nhau, và khoảng cách giữa chúng chính là chỗ đội xe lãi hay lỗ. Tháng 6/2026: cộng
+      lãi gộp 21 chiếc được 938 triệu, nhưng sau bảo hiểm, lương, bãi xe và 327 triệu lãi vay thì còn
+      227 triệu. Ai chỉ nhìn tầng đầu sẽ tưởng đội xe lãi gấp bốn lần thực tế.
+
+    Hai điều bảng này CỐ Ý giữ tách bạch:
+
+      1. PHẠM VI. Chi phí "xe" quy được về từng chiếc và trừ thẳng vào kết quả chiếc đó. Chi phí "đội"
+         thì không: chia lãi vay cho 21 xe theo doanh thu hay theo ngày chạy đều ra những con số khác
+         nhau và đều "có lý" – nên mặc định KHÔNG chia, để riêng một khối như bảng Excel đang làm.
+      2. KHÔNG TỰ SINH. Mỗi dòng là một khoản có người nhập và có chứng từ. Máy không tự ước lượng lương
+         hay lãi vay của kỳ chưa có số – kỳ thiếu dữ liệu phải hiện ra là THIẾU, không phải bằng 0.
+    """
+    __tablename__ = "fleet_period_costs"
+    __table_args__ = (
+        # Cùng kỳ, cùng nhóm, cùng xe, cùng diễn giải chỉ ghi một lần: nhập lại bảng tháng lần thứ hai
+        # là cách nhanh nhất để chi phí nhân đôi mà mỗi dòng vẫn trông đúng.
+        Index("ux_fleet_period_costs", "ky", "nhom", "vehicle_id", "mo_ta", unique=True),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ky: Mapped[str] = mapped_column(String(7), index=True)                 # YYYY-MM
+    pham_vi: Mapped[str] = mapped_column(String(10), default="xe")         # xe / doi
+    vehicle_id: Mapped[int | None] = mapped_column(ForeignKey("vehicles.id"), nullable=True)
+    nhom: Mapped[str] = mapped_column(String(20))
+    mo_ta: Mapped[str] = mapped_column(String(200), default="")
+    so_tien: Mapped[float] = mapped_column(Float, default=0)
+    chung_tu: Mapped[str] = mapped_column(String(200), default="")
+    nguon: Mapped[str] = mapped_column(String(20), default="nhap_tay")     # nhap_tay / nap_tep / ai
+    boi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

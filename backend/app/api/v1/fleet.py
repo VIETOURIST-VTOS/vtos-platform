@@ -649,6 +649,8 @@ from app.models.fleet import (PartnerOwner, SaleCase, Collateral, RepaymentPlan,
                               SALE_STAGES, PLAN_STATUS, SETTLE_STATUS, SETTLE_LINE_KINDS)
 from app.models.finance import FinContract
 from app.services import fleet_settlement as QT
+from app.services import fleet_lai_lo as LL
+from app.models.fleet import FleetPeriodCost, NHOM_CHI_PHI_KY
 
 # Quyết toán và cấn trừ là việc của Kế toán; duyệt nội bộ và đóng kỳ là việc của lãnh đạo.
 QT_WRITE = ("ketoan", "cntt", "gd_doi_xe")   # dựng bảng quyết toán; ĐÓNG kỳ vẫn là QT_DUYET
@@ -1127,6 +1129,123 @@ def goi_y_dieu_xe(date_from: date, date_to: date, so_khach: int = 0, km_du_kien:
                kq, len(kq["phuong_an"]) + len(kq["bi_loai"]), len(kq["bi_loai"]), u.username)
     db.commit()
     return kq
+
+
+# ====================== LÃI LỖ ĐỘI XE ======================
+@router.get("/lai-lo")
+def lai_lo(ky: str, phan_bo: str = "khong", u: User = Depends(require_roles(*READ)),
+           db: Session = Depends(get_db)):
+    """Lãi lỗ đội xe của một kỳ: ba tầng chi phí để riêng, không tầng nào lẫn vào tầng nào.
+
+    Mặc định KHÔNG phân bổ chi phí đội về từng xe. Muốn xem thử thì phải chọn tiêu thức, và kết quả sau
+    phân bổ nằm ở cột riêng có tên nói rõ đó là số phân bổ."""
+    try:
+        QT.ky_range(ky)
+    except Exception:
+        raise HTTPException(422, "Kỳ phải có dạng YYYY-MM")
+    try:
+        return LL.bao_cao(db, ky, phan_bo)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+
+
+@router.get("/lai-lo/theo-chuyen")
+def lai_lo_chuyen(ky: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Quyết toán theo TOUR: mỗi chuyến một dòng kèm lãi gộp và suất tiêu hao của chính chuyến đó."""
+    try:
+        QT.ky_range(ky)
+    except Exception:
+        raise HTTPException(422, "Kỳ phải có dạng YYYY-MM")
+    return LL.theo_chuyen(db, ky)
+
+
+@router.get("/chi-phi-ky")
+def chi_phi_ky(ky: str = "", u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    q = select(FleetPeriodCost).order_by(FleetPeriodCost.ky.desc(), FleetPeriodCost.id.desc())
+    if ky: q = q.where(FleetPeriodCost.ky == ky)
+    xe = {v.id: v.plate for v in db.execute(select(Vehicle)).scalars()}
+    return {"nhom": [{"ma": k, "ten": v[0], "pham_vi": v[1]} for k, v in NHOM_CHI_PHI_KY.items()],
+            "rows": [{"id": r.id, "ky": r.ky, "pham_vi": r.pham_vi, "vehicle_id": r.vehicle_id,
+                      "xe": xe.get(r.vehicle_id, ""), "nhom": r.nhom,
+                      "nhom_ten": NHOM_CHI_PHI_KY.get(r.nhom, (r.nhom,))[0], "mo_ta": r.mo_ta,
+                      "so_tien": r.so_tien, "chung_tu": r.chung_tu, "nguon": r.nguon,
+                      "boi": r.boi, "luc": r.luc}
+                     for r in db.execute(q.limit(500)).scalars()]}
+
+
+class ChiPhiKyIn(BaseModel):
+    ky: str
+    nhom: str
+    so_tien: float
+    vehicle_id: int | None = None
+    mo_ta: str = ""
+    chung_tu: str = ""
+
+
+@router.post("/chi-phi-ky", status_code=201)
+def them_chi_phi_ky(data: ChiPhiKyIn, u: User = Depends(require_roles(*QT_WRITE)),
+                    db: Session = Depends(get_db)):
+    """Ghi một khoản chi phí kỳ (bảo hiểm, lương tài xế, phí bãi, lãi vay…)."""
+    try:
+        QT.ky_range(data.ky)
+    except Exception:
+        raise HTTPException(422, "Kỳ phải có dạng YYYY-MM")
+    if data.nhom not in NHOM_CHI_PHI_KY:
+        raise HTTPException(422, f"Nhóm chi phí không hợp lệ: {data.nhom}")
+    if data.so_tien <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
+    pham_vi = NHOM_CHI_PHI_KY[data.nhom][1]
+    if pham_vi == "xe" and not data.vehicle_id:
+        raise HTTPException(422, f"'{NHOM_CHI_PHI_KY[data.nhom][0]}' là chi phí của một chiếc xe cụ thể "
+                                 "– phải chọn xe. Không chọn xe thì khoản này rơi vào khối chi phí "
+                                 "chung và không còn quy được về chiếc nào.")
+    if pham_vi == "doi" and data.vehicle_id:
+        raise HTTPException(422, f"'{NHOM_CHI_PHI_KY[data.nhom][0]}' là chi phí của cả đội, không gắn "
+                                 "vào một xe. Gắn vào một xe là làm chiếc đó gánh phần của cả đội.")
+    trung = db.execute(select(FleetPeriodCost).where(
+        FleetPeriodCost.ky == data.ky, FleetPeriodCost.nhom == data.nhom,
+        FleetPeriodCost.vehicle_id == data.vehicle_id,
+        FleetPeriodCost.mo_ta == (data.mo_ta or ""))).scalars().first()
+    if trung is not None:
+        raise HTTPException(422, f"Kỳ {data.ky} đã có khoản '{NHOM_CHI_PHI_KY[data.nhom][0]}"
+                                 f"{(' – ' + data.mo_ta) if data.mo_ta else ''}' "
+                                 f"({trung.so_tien:,.0f} đ). Sửa dòng đã có, đừng ghi thêm dòng thứ hai "
+                                 "– nhập lại bảng tháng lần nữa là chi phí nhân đôi.")
+    r = FleetPeriodCost(ky=data.ky, pham_vi=pham_vi, vehicle_id=data.vehicle_id, nhom=data.nhom,
+                        mo_ta=data.mo_ta[:200], so_tien=data.so_tien, chung_tu=data.chung_tu[:200],
+                        boi=u.username)
+    db.add(r); db.flush()
+    R.audit(db, u.username, u.role, "them_chi_phi_ky_doi_xe", f"ky:{data.ky}",
+            after={"nhom": data.nhom, "so_tien": data.so_tien, "xe": data.vehicle_id})
+    db.commit()
+    return {"id": r.id, "message": f"Đã ghi {data.so_tien:,.0f} đ vào kỳ {data.ky}."}
+
+
+@router.put("/chi-phi-ky/{cid}")
+def sua_chi_phi_ky(cid: int, data: ChiPhiKyIn, u: User = Depends(require_roles(*QT_WRITE)),
+                   db: Session = Depends(get_db)):
+    r = db.get(FleetPeriodCost, cid)
+    if r is None: raise HTTPException(404, "Không có khoản này")
+    if data.so_tien <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
+    truoc = {"so_tien": r.so_tien, "mo_ta": r.mo_ta}
+    r.so_tien = data.so_tien; r.mo_ta = data.mo_ta[:200]; r.chung_tu = data.chung_tu[:200]
+    R.audit(db, u.username, u.role, "sua_chi_phi_ky_doi_xe", f"chi_phi_ky:{r.id}", before=truoc,
+            after={"so_tien": r.so_tien, "mo_ta": r.mo_ta})
+    db.commit()
+    return {"message": "Đã cập nhật."}
+
+
+@router.delete("/chi-phi-ky/{cid}")
+def xoa_chi_phi_ky(cid: int, ly_do: str = "", u: User = Depends(require_roles(*QT_WRITE)),
+                   db: Session = Depends(get_db)):
+    """Gỡ một khoản khỏi kỳ. Bắt buộc ghi lý do – một khoản chi phí biến mất khỏi báo cáo mà không ai
+    biết vì sao là cách nhanh nhất làm cho lãi lỗ tháng không đối chiếu được với tháng trước."""
+    if not ly_do.strip(): raise HTTPException(422, "Gỡ một khoản chi phí phải ghi lý do")
+    r = db.get(FleetPeriodCost, cid)
+    if r is None: raise HTTPException(404, "Không có khoản này")
+    R.audit(db, u.username, u.role, "xoa_chi_phi_ky_doi_xe", f"chi_phi_ky:{r.id}",
+            before={"ky": r.ky, "nhom": r.nhom, "so_tien": r.so_tien}, after={"ly_do": ly_do})
+    db.delete(r); db.commit()
+    return {"message": "Đã gỡ khoản này khỏi kỳ."}
 
 
 @router.get("/hieu-qua")

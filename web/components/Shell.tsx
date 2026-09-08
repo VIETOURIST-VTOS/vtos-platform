@@ -43,7 +43,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     // Hồ sơ đội xe theo đặc tả "Quản lý vận hành xe Vietrip" v1.3: mã xe cố định, lịch sử biển, giấy tờ có
     // hạn và điều kiện khai thác. Màn hình /ops?tab=fleet cũ giữ nguyên cho phần bảng giá và lệnh điều xe.
     ["Hồ sơ xe & điều kiện khai thác", "/doi-xe"],
-    ["Đội xe (bảng giá & lệnh)", "/ops?tab=fleet"], ["Phòng Hướng dẫn", "/huong-dan"],
+    ["Đội xe (bảng giá & lệnh)", "/ops?tab=fleet"], ["Phòng Hướng dẫn", "/huong-dan"], ["Lãi lỗ đội xe", "/lai-lo-doi-xe"],
     ["HDV & phân chuyến (cũ)", "/ops?tab=guides"],
     ["Việc của tôi (tài xế & HDV)", "/xe-hdv"],
     // Đợt 4 đội xe: hai mục này trước để trống. Gợi ý điều xe lọc cứng trước, xếp hạng sau, và ghi vết
