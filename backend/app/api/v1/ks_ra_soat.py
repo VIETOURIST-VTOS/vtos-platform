@@ -52,3 +52,29 @@ def quyet_cot_tien(data: QuyetIn, u: User = Depends(require_roles(*QUYET)),
 def su_kien(ngay: int = 7, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
     """Lỗi 5xx, đường dẫn chậm, tác vụ nền hỏng, lần khởi động máy chủ."""
     return KT.bang(db, ngay)
+
+
+@router.get("/nhap-tay/do-nguong")
+def do_nguong(thang: str = "", lan: str = "2,3,5,10",
+              u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """K3 – bảng “ngưỡng này ra bao nhiêu dòng”, chạy trên dữ liệu thật. CHỈ ĐỌC.
+
+    Có bảng này thì người quyết chọn ngưỡng bằng số liệu chứ không bằng cảm giác – và đó là điều kiện
+    để tiêu chí nghiệm thu “danh sách đọc hết trong mười phút” có nghĩa.
+    """
+    from datetime import date
+    from app.services import ks_nhap_tay as NT
+    return NT.do_nguong(db, thang or f"{date.today():%Y-%m}", lan)
+
+
+@router.get("/nhap-tay")
+def nhap_tay(thang: str = "", u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Danh sách dấu hiệu bất thường của một tháng, theo ngưỡng đang hiệu lực."""
+    from datetime import date
+    from app.services import ks_nhap_tay as NT
+    th = thang or f"{date.today():%Y-%m}"
+    ds = NT.quet_thang(db, th)
+    theo = {}
+    for d in ds: theo[d["loai"]] = theo.get(d["loai"], 0) + 1
+    return {"thang": th, "loai": NT.LOAI_TEN, "nguon": {n["ma"]: n["ten"] for n in NT.NGUON},
+            "tong": len(ds), "theo_dau_hieu": theo, "rows": ds}

@@ -167,9 +167,12 @@ def _ai_chua_hau_kiem(db: Session) -> list[dict]:
 # nhìn thấy sức khỏe của chính máy chủ chứ không chỉ số liệu của các phòng ban.
 from app.services.ks_cot_tien import _cot_tien_float, _thieu_khac_khong   # noqa: E402
 from app.services.ky_thuat import _su_kien_ky_thuat                       # noqa: E402
+# K3 – lớp bảo vệ thay cho khâu trưởng phòng duyệt đã bỏ. Chạy trong cùng vòng quét chứ không thành
+# một lịch riêng: một bộ hậu kiểm có lịch riêng là một bộ hậu kiểm sẽ có ngày không ai chạy.
+from app.services.ks_nhap_tay import _hau_kiem_nhap_tay                   # noqa: E402
 
 BO_KIEM = (_mach_migration, _quyen_lech, _vai_tro_trong, _ngoai_le_ton, _ai_chua_hau_kiem,
-           _cot_tien_float, _thieu_khac_khong, _su_kien_ky_thuat)
+           _cot_tien_float, _thieu_khac_khong, _su_kien_ky_thuat, _hau_kiem_nhap_tay)
 
 
 def quet(db: Session, boi: str = "robot_ks") -> dict:
