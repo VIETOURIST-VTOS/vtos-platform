@@ -201,13 +201,34 @@ def test_sao_ke_thieu_ma_giao_dich_thi_tu_choi(_startup):
 
 
 # ---------------------------------------------------------------- Chấm công / bảng lương
-def test_khong_co_bo_nap_bang_luong_thanh_pham(_startup):
-    """Cố ý: nạp thẳng số lương đã tính là bỏ qua các bước Kế toán xác nhận – HCNS lập – TGĐ ký."""
+def test_khong_nap_de_len_bang_luong_da_ky(_startup):
+    """Nguyên tắc giữ nguyên, phạm vi thu hẹp lại đúng chỗ nó thật sự bảo vệ.
+
+    Bản đầu của phép thử này đòi KHÔNG CÓ bộ nạp bảng lương nào cả. Lệnh giao việc 08/9/2026 yêu cầu
+    phải có, vì số bảo hiểm lấy từ bảng lương. Hai điều đó chỉ mâu thuẫn nếu hiểu "nạp bảng lương" là
+    ghi thẳng số đã chốt vào sổ – mà đó chính là thứ vẫn bị cấm ở đây.
+
+    Chỗ cần canh là chữ ký: bộ nạp ghi vào ĐẦU VÀO của kỳ, và kỳ đã có xác nhận của Kế toán trở đi thì
+    từ chối. Nạp đè lên một bảng đã ký là xóa mất căn cứ của chữ ký đó, và không ai biết người ký đã
+    nhìn thấy con số nào."""
     d = client.get("/api/v1/nap-du-lieu/bo-nap", headers=login("hcns")).json()
-    ma = {b["ma"] for b in d["bo_nap"]}
-    assert "bang_luong" not in ma
-    cc = next(b for b in d["bo_nap"] if b["ma"] == "cham_cong")
-    assert "bỏ qua toàn bộ các bước xác nhận" in cc["mo_ta"]
+    bo = {b["ma"]: b for b in d["bo_nap"]}
+    assert "bỏ qua toàn bộ các bước xác nhận" in bo["cham_cong"]["mo_ta"]
+    bl = bo["bang_luong"]
+    assert bl["bang_dich"] == "payroll_runs" and "chưa chốt" in bl["ten"].lower()
+
+    from app.db.session import SessionLocal
+    from app.models.hr import PayrollRun
+    from app.services import intake as IN
+    from sqlalchemy import select
+    with SessionLocal() as db:
+        if db.execute(select(PayrollRun).where(PayrollRun.period == "2026-05")).scalars().first() is None:
+            db.add(PayrollRun(period="2026-05", status="tgd_ky", rows=[], totals={}, inputs={}))
+            db.commit()
+        kq = IN.nap(db, "bang_luong", [{"ky": "2026-05", "ma_nv": "NS0016", "cong_thuc_te": "26"}],
+                    "hcns", ten_tep="", nguon="nap_tep")
+        db.rollback()
+    assert kq["da_nap"] == 0 and "chữ ký" in " ".join(kq["dong"][0]["loi"])
 
 
 def test_cham_cong_nap_vao_dau_vao_cua_ky(_startup):

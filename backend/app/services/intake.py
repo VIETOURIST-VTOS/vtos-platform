@@ -261,6 +261,11 @@ BO_NAP = {
 # Các bộ nạp của phòng ban khai báo ở tệp riêng: thêm loại dữ liệu mới không đụng vào luồng nạp.
 from app.services.intake_phong_ban import bo_nap as _bo_nap_phong_ban   # noqa: E402
 BO_NAP.update(_bo_nap_phong_ban(_c))
+# V4 (08/9/2026) – mười bốn bộ nạp còn thiếu. Tệp thứ hai chứ không viết nối vào tệp trên: hai robot
+# đang sửa cùng một kho mã trong cùng một ngày, và một tệp 900 dòng do hai bên cùng sửa là một lần
+# gộp hỏng chờ sẵn.
+from app.services import intake_phong_ban_2 as _pb2   # noqa: E402
+BO_NAP.update(_pb2.bo_nap(_c))
 
 
 # Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
@@ -279,6 +284,7 @@ VAI_TRO = {
     "huong_dan_vien":   QUAN_TRI + ("tp_hd", "hcns", "tp_dh"),
     "quyet_toan_tour":  QUAN_TRI + ("tp_dh", "nv_dh", "ketoan", "ptgd_doan"),
 }
+VAI_TRO.update(_pb2.vai_tro(QUAN_TRI))
 
 
 # P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.
@@ -296,7 +302,8 @@ VAI_TRO = {
 # dùng ngay", nên nó chỉ áp cho những bộ nạp mà dòng dữ liệu chạm thẳng vào tiền: chi phí nhà cung cấp,
 # chi phí chuyến xe, quyết toán, sao kê, chấm công (đầu vào của bảng lương). Danh mục khách hàng, danh
 # mục nhà cung cấp, danh sách hướng dẫn viên thì không.
-BO_NAP_CHAM_TIEN = ("don_dich_vu", "chuyen_xe", "quyet_toan_tour", "sao_ke_ngan_hang", "cham_cong")
+BO_NAP_CHAM_TIEN = ("don_dich_vu", "chuyen_xe", "quyet_toan_tour", "sao_ke_ngan_hang", "cham_cong"
+                    ) + _pb2.CHAM_TIEN
 NHAN_VIEN = ("nv_dh", "nv_kd", "tn_kd", "nv_mkt", "nv_visa", "xe_hdv", "hanh_chinh")
 # Suy ra từ VAI_TRO chứ không khai tay lần thứ hai: hai bảng khai tay thì sớm muộn cũng lệch, và lúc
 # lệch thì không ai biết bảng nào đúng.
@@ -330,7 +337,13 @@ def duoc_xac_nhan_anh(loai: str, vai_tro: str) -> bool:
 PHONG_BAN = {"nha_cung_cap": "dieu_hanh", "don_dich_vu": "dieu_hanh", "chuyen_xe": "doi_xe",
              "nhan_su": "hcns", "cham_cong": "hcns", "khach_hang": "kd_le", "booking": "kd_le",
              "sao_ke_ngan_hang": "ketoan", "huong_dan_vien": "huong_dan",
-             "quyet_toan_tour": "dieu_hanh"}
+             "quyet_toan_tour": "dieu_hanh",
+             "nhien_lieu": "doi_xe", "phi_cau_duong": "doi_xe", "bao_duong": "doi_xe",
+             "dang_kiem": "doi_xe", "chi_phi_ky_doi_xe": "doi_xe",
+             "chi_marketing_kenh": "marketing", "doanh_so_tu_van_vien": "kd_le",
+             "thu_lao_hdv": "huong_dan", "hoa_don_dau_vao": "ketoan",
+             "bao_hiem_ky": "hcns", "bang_luong": "hcns",
+             "tai_san_co_dinh": "ketoan", "cong_cu_dung_cu": "ketoan", "khau_hao_ky": "ketoan"}
 
 
 def danh_sach_bo_nap() -> list[dict]:
