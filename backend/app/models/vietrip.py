@@ -24,6 +24,8 @@ class VtRecord(Base):
 class TourCostLine(Base):
     """Dòng chi phí dự toán / quyết toán của tour (theo mẫu bảng quyết toán Vietrip): mô tả, loại DV, NCC (MST), đơn giá, SL, hệ số, thực chi, đã thanh toán."""
     __tablename__ = "tour_cost_lines"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
     tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"), index=True)
     line_no: Mapped[int] = mapped_column(Integer, default=0)

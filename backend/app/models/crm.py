@@ -11,6 +11,8 @@ LEAD_STATUS = {"moi": "Mới", "dang_cham_soc": "Đang chăm sóc", "chot": "Đ�
 
 class Lead(Base):
     __tablename__ = "leads"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     __table_args__ = (UniqueConstraint("phone", "lead_month", "channel", name="uq_lead_phone_month_channel"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     phone: Mapped[str] = mapped_column(String(20), index=True)                 # chuẩn hóa 0xxxxxxxxx

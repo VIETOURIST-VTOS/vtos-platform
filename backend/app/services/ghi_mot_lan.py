@@ -1,0 +1,138 @@
+"""V10 – hai việc: người sau biết mình đang đè lên người trước, và bấm hai lần không thành hai lô.
+
+Lệnh Đợt 2, việc V10. Hai việc này đi cùng nhau vì cùng một gốc: quyết định "nhập là dùng luôn" bỏ
+khâu duyệt từng dòng, nên mọi va chạm giữa hai người bây giờ xảy ra thẳng trên dữ liệu thật.
+
+────────────────────────────────────────────────────────────────────────────────
+VIỆC 1 – KIỂM PHIÊN BẢN
+────────────────────────────────────────────────────────────────────────────────
+
+Hai người mở cùng một bản ghi lúc 9h. Người A sửa số tiền lúc 9h05, người B sửa diễn giải lúc 9h07.
+Không kiểm phiên bản thì bản lưu của B mang số tiền CŨ – sửa của A biến mất, và không ai thấy gì bất
+thường: màn hình B hiện đúng cái B vừa gõ.
+
+Cách chặn: mỗi bản ghi mang một số phiên bản, tăng sau mỗi lần sửa. Người gọi gửi kèm số phiên bản
+mình đang cầm; lệch thì máy chủ TỪ CHỐI.
+
+Và từ chối phải kèm NỘI DUNG MỚI. Câu "bản ghi đã đổi, tải lại đi" đẩy việc so sánh về phía người dùng
+đúng lúc họ vừa mất công gõ xong – phần lớn sẽ tải lại rồi gõ đè lên, tức là ta chặn được cái mất dữ
+liệu âm thầm và đổi lấy cái mất dữ liệu cố ý. Trả về nội dung mới thì màn hình chỉ được ra chỗ nào
+khác nhau, và người quyết là người biết việc.
+
+VÌ SAO KHÔNG DÙNG updated_at THAY CHO MỘT CỘT SỐ: hai lần ghi trong cùng một mili-giây thì dấu thời
+gian bằng nhau, và ở đây chuyện đó không hiếm – lô nạp MISA ghi 25.728 bút toán cùng thời điểm. Số
+đếm thì không có chỗ để hòa.
+
+────────────────────────────────────────────────────────────────────────────────
+VIỆC 2 – KHÓA CHỐNG GHI TRÙNG
+────────────────────────────────────────────────────────────────────────────────
+
+Xem chú thích ở app/models/ghi_mot_lan.py. Điều đáng nói ở đây là chỗ ĐẶT khóa: phải nhớ kết quả
+TRƯỚC khi trả về, trong CÙNG một giao dịch với việc ghi. Nhớ sau khi trả về thì đúng khe hở giữa hai
+bước là lúc lần gọi thứ hai đi qua – và đó chính là lúc mạng đang chập, tức là lúc hay xảy ra nhất.
+"""
+import hashlib
+import json
+from datetime import datetime, timedelta
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from app.models.ghi_mot_lan import KhoaGhi
+
+# Cửa sổ suy khóa từ nội dung khi người gọi không gửi khóa riêng. Mười phút: đủ dài cho một lần mạng
+# chập và người dùng bấm lại, đủ ngắn để không cản việc nạp lại thật sự vào hôm sau.
+CUA_SO_SUY_KHOA = timedelta(minutes=10)
+
+# Bảng mang cột phiên bản. VIẾT THẲNG RA từng bảng chứ không thành quy tắc "bảng nào có sửa thì thêm":
+# quy tắc thì bảng thêm sau cũng mang cột này mà không ai cân nhắc bảng đó có thật sự bị hai người sửa
+# cùng lúc không, và mỗi cột thừa là một lần nâng cấp cơ sở dữ liệu.
+#
+# Tiêu chí chọn: bản ghi mà NHIỀU NGƯỜI cùng sửa trong một kỳ, và sửa đè mất thì mất tiền hoặc mất
+# dấu vết. Bảng chỉ một người sửa (tham số hệ thống, danh mục ít đổi) không có trong danh sách.
+BANG_CO_PHIEN_BAN = [
+    "tours",                 # điều hành và kinh doanh cùng sửa một tour
+    "bookings",              # sale sửa khách, kế toán sửa số tiền
+    "tour_settlements",      # quyết toán: điều hành nhập, kế toán chỉnh
+    "tour_cost_lines",       # dòng giá vốn – chỗ lệch một dòng là lệch biên
+    "employees",             # HCNS và kế toán cùng chạm hồ sơ lương
+    "vehicles",              # đội xe và kế toán cùng chạm hồ sơ xe
+    "fleet_trips",           # nhật trình chuyến – tài xế báo, điều hành sửa
+    "dispatch_orders",       # lệnh điều xe
+    "products",              # bảng giá dịch vụ
+    "suppliers",             # số tài khoản nhà cung cấp – sửa đè là chuyển tiền nhầm chỗ
+    "visa_cases",            # hồ sơ visa qua nhiều người
+    "leads",                 # nguồn khách, nhiều sale cùng chạm
+]
+
+
+class LechPhienBan(HTTPException):
+    """409 – bản ghi đã đổi kể từ lúc người này mở nó ra."""
+
+    def __init__(self, ten: str, dang_co: int, gui_len: int, noi_dung_moi):
+        super().__init__(409, {
+            "gate": "LECH_PHIEN_BAN",
+            "message": f"{ten} đã được người khác sửa trong lúc bạn đang mở "
+                       f"(bản trên hệ thống: {dang_co}, bản bạn cầm: {gui_len}). "
+                       "Nội dung mới nằm ở 'noi_dung_moi' – đối chiếu rồi gửi lại.",
+            "dang_co": dang_co, "gui_len": gui_len, "noi_dung_moi": noi_dung_moi,
+        })
+
+
+def kiem_phien_ban(doi_tuong, gui_len, ten: str, noi_dung_moi) -> None:
+    """Gọi TRƯỚC khi gán giá trị mới. gui_len rỗng = người gọi chưa gửi phiên bản.
+
+    Chưa gửi thì CHO QUA, có chủ ý: màn hình cũ chưa kịp sửa vẫn phải dùng được, và bắt lỗi toàn bộ
+    giao diện trong một lần nâng cấp là cách chắc chắn để có một buổi sáng không ai làm việc được.
+    Chỗ này là nơi sẽ siết lại khi mọi màn hình đã gửi phiên bản – ghi ra đây để người sau biết còn nợ.
+    """
+    if gui_len is None or gui_len == "":
+        return
+    dang_co = int(getattr(doi_tuong, "phien_ban", 1) or 1)
+    if int(gui_len) != dang_co:
+        raise LechPhienBan(ten, dang_co, int(gui_len),
+                           noi_dung_moi() if callable(noi_dung_moi) else noi_dung_moi)
+
+
+def tang_phien_ban(doi_tuong) -> int:
+    """Gọi SAU khi gán giá trị mới, trước khi commit."""
+    moi = int(getattr(doi_tuong, "phien_ban", 1) or 1) + 1
+    doi_tuong.phien_ban = moi
+    return moi
+
+
+def suy_khoa(duong_dan: str, boi: str, than) -> str:
+    """Khóa suy từ nội dung, dùng khi người gọi không gửi khóa riêng."""
+    noi_dung = json.dumps(than, ensure_ascii=False, sort_keys=True, default=str)
+    return "suy:" + hashlib.sha256(f"{duong_dan}|{boi}|{noi_dung}".encode("utf-8")).hexdigest()[:60]
+
+
+def da_ghi_roi(db: Session, khoa: str, tu_suy: bool = False):
+    """Trả kết quả lần ghi trước nếu khóa này đã dùng. None nghĩa là chưa ghi lần nào."""
+    if not khoa:
+        return None
+    cu = db.execute(select(KhoaGhi).where(KhoaGhi.khoa == khoa)).scalars().first()
+    if cu is None:
+        return None
+    if tu_suy and (datetime.now() - cu.luc) > CUA_SO_SUY_KHOA:
+        return None                       # ngoài cửa sổ: coi như lần ghi mới, xem chú thích đầu tệp
+    try:
+        ra = json.loads(cu.tra_ve) if cu.tra_ve else {}
+    except ValueError:
+        ra = {}
+    ra = dict(ra) if isinstance(ra, dict) else {"ket_qua": ra}
+    ra["lap_lai"] = True
+    ra["lan_dau_luc"] = cu.luc.isoformat(timespec="seconds")
+    ra["message"] = ("Lô này đã nạp lúc " + cu.luc.strftime("%H:%M %d/%m/%Y")
+                     + " – không nạp lại. Kết quả bên dưới là của lần nạp đó.")
+    return ra
+
+
+def nho_ket_qua(db: Session, khoa: str, duong_dan: str, boi: str, tra_ve: dict,
+                phuong_thuc: str = "POST") -> None:
+    """Ghi nhớ TRONG CÙNG giao dịch với việc ghi dữ liệu – xem chú thích đầu tệp."""
+    if not khoa:
+        return
+    db.add(KhoaGhi(khoa=khoa[:80], duong_dan=duong_dan[:200], phuong_thuc=phuong_thuc,
+                   boi=boi[:50], trang_thai=200,
+                   tra_ve=json.dumps(tra_ve, ensure_ascii=False, default=str)[:200000]))
+    db.flush()

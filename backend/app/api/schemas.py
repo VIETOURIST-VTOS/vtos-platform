@@ -37,6 +37,9 @@ class TourCreate(BaseModel):
 
 
 class TourEdit(BaseModel):
+    # V10 – phiên bản người gọi đang cầm. Để RỖNG = màn hình chưa gửi, máy chủ cho qua (xem
+    # app/services/ghi_mot_lan.kiem_phien_ban). Gửi số lệch = từ chối kèm nội dung mới.
+    phien_ban: int | None = None
     price_per_pax: float = 0
     fixed_cost: float = 0
     var_cost_per_pax: float = 0

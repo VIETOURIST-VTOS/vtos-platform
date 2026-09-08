@@ -2,7 +2,7 @@
 
 Cả ba đường đi qua cùng bộ kiểm tra và cùng nhật ký. Nếu mỗi đường một kiểu kiểm tra thì cái chặt nhất
 trở nên vô nghĩa: người ta chỉ cần đi đường lỏng nhất."""
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import Header, APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -11,7 +11,8 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.core import User
 from app.models.intake import IntakeRun
-from app.services import intake as IN, rules as R
+from app.services import intake as IN
+from app.services import ghi_mot_lan as GML, rules as R
 
 router = APIRouter(prefix="/api/v1/nap-du-lieu", tags=["nap-du-lieu"])
 
@@ -125,9 +126,22 @@ class NapIn(BaseModel):
 
 
 @router.post("/nap", status_code=201)
-def nap(data: NapIn, u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
-    """Nạp thật. Luôn kiểm tra lại ở máy chủ trước khi ghi – không tin kết quả xem trước gửi kèm."""
+def nap(data: NapIn, x_khoa_ghi: str | None = Header(default=None),
+        u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
+    """Nạp thật. Luôn kiểm tra lại ở máy chủ trước khi ghi – không tin kết quả xem trước gửi kèm.
+
+    V10 – khóa chống ghi trùng đặt ở ĐÂY chứ không ở lớp giữa dùng chung: chỉ ở đây mới biết "cùng
+    một lô" nghĩa là gì (cùng bộ nạp, cùng nội dung, cùng người), và mới trả lại được kết quả lần nạp
+    trước dưới đúng hình dạng màn hình đang chờ.
+    """
     if not data.rows: raise HTTPException(422, "Không có dòng nào để nạp")
+    tu_suy = not x_khoa_ghi
+    khoa = x_khoa_ghi or GML.suy_khoa("/nap-du-lieu/nap", u.username,
+                                      {"loai": data.loai, "rows": data.rows,
+                                       "bo_qua_dong_loi": data.bo_qua_dong_loi})
+    cu = GML.da_ghi_roi(db, khoa, tu_suy=tu_suy)
+    if cu is not None:
+        return cu
     if data.loai in IN.BO_NAP and not IN.duoc_nap(data.loai, u.role):
         raise HTTPException(403, f"Vai trò của anh/chị không nạp được '{IN.BO_NAP[data.loai]['ten']}'. "
                                  "Loại dữ liệu này thuộc phòng khác – nhờ họ nạp để nhật ký ghi đúng tên "
@@ -148,6 +162,9 @@ def nap(data: NapIn, u: User = Depends(require_roles(*WRITE)), db: Session = Dep
         return kq
     R.audit(db, u.username, u.role, "nap_du_lieu", f"bo_nap:{data.loai}",
             after={k: kq[k] for k in ("so_dong", "da_nap", "da_co", "dong_loi") if k in kq})
+    # Nhớ kết quả TRONG CÙNG giao dịch với việc ghi dữ liệu: nhớ sau khi commit thì khe hở giữa hai
+    # bước đúng là lúc lần gọi thứ hai đi qua, mà đó là lúc mạng đang chập – lúc hay xảy ra nhất.
+    GML.nho_ket_qua(db, khoa, "/nap-du-lieu/nap", u.username, kq)
     db.commit()
     return kq
 
