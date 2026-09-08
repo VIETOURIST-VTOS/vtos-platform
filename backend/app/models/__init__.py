@@ -23,3 +23,4 @@ from app.models.kiem_soat import *  # noqa
 from app.models.hach_toan import *  # noqa
 from app.models.quyet_toan import *  # noqa
 from app.models.nap_bo_sung import *  # noqa
+from app.models.doc_chung_tu import *  # noqa

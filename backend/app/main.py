@@ -34,6 +34,7 @@ from app.api.v1.intake import router as intake_router
 from app.api.v1.attachments import router as tep_router
 from app.api.v1.huong_dan import router as hd_router
 from app.api.v1.quyet_toan_tour import router as qtt_router
+from app.api.v1.doc_chung_tu import router as dct_router
 from app.api.v1.ngoai_le import router as ngoai_le_router
 from app.api.v1.kiem_soat import router as kiem_soat_router
 from app.api.v1.hach_toan import router as hach_toan_router
@@ -218,6 +219,7 @@ app.include_router(intake_router)
 app.include_router(tep_router)
 app.include_router(hd_router)
 app.include_router(qtt_router)
+app.include_router(dct_router)
 
 
 @app.get("/", include_in_schema=False)
