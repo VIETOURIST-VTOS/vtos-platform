@@ -292,3 +292,63 @@ def test_du_no_theo_lich_chi_tinh_ky_DA_THUC_HIEN():
     _ky(cid, "nhan_vay", 999_000_000)               # để nguyên trạng thái kế hoạch
     with SessionLocal() as db:
         assert VBT.du_no_theo_lich(db) == truoc
+
+def test_loai_hop_dong_KHAC_cung_khong_duoc_nuot_loi_ghi_so():
+    """Sửa 08/9 sau V12, theo chỉ đạo của Chủ tịch.
+
+    V12 chỉ nói về khoản ĐI VAY, nên bản đầu chỉ sửa nhánh khoản vay và ghi rõ trong thông điệp ghi
+    mã rằng các loại hợp đồng khác VẪN nuốt lỗi. Đó là cùng một lỗi: kỳ được đánh dấu đã thực hiện,
+    dư nợ trên hồ sơ giảm, mà sổ không có bút toán nào – và cái duy nhất nói ra điều ấy là một dòng
+    nhật ký không màn hình nào hiển thị.
+
+    Phép thử này canh nhánh CÒN LẠI (ký quỹ), không phải nhánh khoản vay.
+    """
+    from datetime import date as _date
+    from app.db.session import SessionLocal
+    from app.models.finance import FinContract, FinSchedule
+    from app.models.accounting import PeriodLock
+    with SessionLocal() as db:
+        n = db.execute(select(FinContract)).scalars().all()
+        c = FinContract(code=f"KQ-{len(n) + 1:04d}", kind="ky_quy", partner="Ký quỹ thử V12",
+                        principal=50_000_000, outstanding=50_000_000, status="hieu_luc",
+                        approval_ref="NQ thử")
+        db.add(c); db.commit()
+        s = FinSchedule(contract_id=c.id, kind="thu_hoi", amount=50_000_000, due_date=HOM_NAY)
+        db.add(s); db.commit()
+        sid, cid = s.id, c.id
+    ky_khoa = HOM_NAY.strftime("%Y-%m")
+    with SessionLocal() as db:
+        if db.get(PeriodLock, ky_khoa) is None:
+            db.add(PeriodLock(period=ky_khoa, locked_by="thu_v12")); db.commit()
+    try:
+        r = _settle(sid)
+        assert r.status_code != 200, "ghi sổ vào kỳ đã khóa mà vẫn báo thành công"
+        with SessionLocal() as db:
+            k = db.get(FinSchedule, sid)
+            assert k.status != "da_thuc_hien", "loại hợp đồng khác vẫn nuốt lỗi ghi sổ"
+            assert k.entry_id is None
+            # và dư nợ hồ sơ KHÔNG được giảm khi sổ chưa ghi
+            assert db.get(FinContract, cid).outstanding == 50_000_000
+    finally:
+        with SessionLocal() as db:
+            k = db.get(PeriodLock, ky_khoa)
+            if k is not None: db.delete(k); db.commit()
+
+
+def test_loai_hop_dong_khac_van_ghi_so_binh_thuong_khi_ky_mo():
+    """Sửa chỗ nuốt lỗi mà làm hỏng đường đi bình thường thì tệ hơn lỗi cũ."""
+    from app.db.session import SessionLocal
+    from app.models.finance import FinContract, FinSchedule
+    with SessionLocal() as db:
+        n = db.execute(select(FinContract)).scalars().all()
+        c = FinContract(code=f"KQ-OK-{len(n) + 1:04d}", kind="ky_quy", partner="Ký quỹ thử OK",
+                        principal=20_000_000, outstanding=20_000_000, status="hieu_luc",
+                        approval_ref="NQ thử")
+        db.add(c); db.commit()
+        s = FinSchedule(contract_id=c.id, kind="thu_hoi", amount=20_000_000, due_date=HOM_NAY)
+        db.add(s); db.commit()
+        sid = s.id
+    assert _settle(sid).status_code == 200
+    with SessionLocal() as db:
+        k = db.get(FinSchedule, sid)
+        assert k.status == "da_thuc_hien" and k.entry_id is not None

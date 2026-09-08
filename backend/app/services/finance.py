@@ -88,11 +88,28 @@ def settle(db: Session, u: User, s: FinSchedule, done_on: date, bank_ref: str, a
              "giai_ngan": [{"account": acc, "debit": amt}, {"account": "112", "credit": amt}],
              "thu_hoi": [{"account": "112", "debit": amt}, {"account": acc, "credit": amt}]}[s.kind]
     for l in lines: l["partner"] = c.partner
+    # GHI SỔ HỎNG THÌ DỪNG – không đánh dấu đã thực hiện.
+    #
+    # Bản trước bắt ValueError, ghi một dòng nhật ký "ghi_so_that_bai" rồi VẪN chạy tiếp: kỳ được
+    # đánh dấu đã thực hiện, dư nợ trên hồ sơ giảm, mà sổ kế toán không có bút toán nào. Hai con số
+    # bắt đầu sống riêng ngay tại dòng đó, và cái duy nhất nói ra điều ấy là một dòng nhật ký không
+    # màn hình nào hiển thị.
+    #
+    # Nguyên nhân ghi sổ hỏng gần như luôn là KỲ ĐÃ KHÓA hoặc bút toán không cân – hai chuyện người
+    # vận hành sửa được trong một phút nếu biết. Nuốt lỗi là đổi một phút ấy lấy một chênh lệch phải
+    # đi tìm bằng tay sau vài tháng.
+    #
+    # Sửa 08/9/2026 sau V12: khoản VAY đã đi nhánh trên; nhánh này là các loại còn lại (đầu tư liên
+    # kết, hợp tác kinh doanh, ký quỹ, đặt cọc, cho vay, vốn phát hành). Cặp tài khoản của chúng GIỮ
+    # NGUYÊN – chúng chưa có quy ước trong bảng hạch toán, và tự đặt quy ước cho chúng là việc của
+    # Kế toán, không phải của bản sửa này.
     try:
         e = ACC.post_entry(db, u.username, u.role, done_on, f"{c.code} {c.partner}: {s.kind.replace('_', ' ')} {amt:,.0f}" + (f" (GD {bank_ref})" if bank_ref else ""), lines, "tai_chinh", f"fin:{c.code}")
         s.entry_id = e.id
     except ValueError as ex:
         R.audit(db, u.username, u.role, "ghi_so_that_bai", f"fin:{c.code}", after={"ly_do": str(ex)})
+        db.commit()          # giữ lại dấu vết lần thử, rồi mới báo lỗi ra ngoài
+        raise ValueError(f"Không ghi sổ được nên KHÔNG đánh dấu đã thực hiện: {ex}")
     s.status, s.done_on, s.bank_ref, s.amount = "da_thuc_hien", done_on, bank_ref, amt
     if s.kind in ("tra_goc", "thu_hoi"): c.outstanding = max(0.0, c.outstanding - amt)
     if s.kind in ("nhan_vay", "giai_ngan"): c.outstanding += amt
