@@ -112,6 +112,25 @@ def chan_doan() -> dict:
         # Dạng theo BẢNG ĐẶC TẢ (y-m-d) – giữ lại để lần sau ai nghi ngờ thì chạy là thấy nó hỏng
         "4_theo_tai_lieu_ymd": {"from_date": str(b7), "to_date": str(h), "limit": 100},
     }
+    # --- Hai phép đo quyết định, không phép nào đọc nội dung khoá ---
+    k = khoa()
+    ve_khoa = {
+        # Khoá trên trang P.A dài 32 ký tự. Lệch con số này nghĩa là dán thiếu, dán thừa, hoặc dán nhầm ô.
+        "do_dai": len(k),
+        "co_khoang_trang_thua": k != k.strip() or " " in k,
+        "toan_ky_tu_hex": all(c in "0123456789abcdefABCDEF" for c in k) if k else False,
+    }
+    # P.A trả mã gì khi khoá SAI? Nếu cũng là 1003 thì mã 1003 không nói lên điều gì về tham số, và
+    # mọi suy luận từ nó tới giờ đều vô nghĩa. Gửi một khoá bịa để hỏi chính nó.
+    goc_khoa = os.environ.get("PA_TONG_DAI_API_KEY")
+    os.environ["PA_TONG_DAI_API_KEY"] = "0" * 32
+    try:
+        r_sai = _goi_tho(CDR, {"from_date": ngay_pa(b7), "to_date": ngay_pa(h, True), "limit": 10})
+    finally:
+        if goc_khoa is None: os.environ.pop("PA_TONG_DAI_API_KEY", None)
+        else: os.environ["PA_TONG_DAI_API_KEY"] = goc_khoa
+    ve_khoa["khoa_bia_tra_ve"] = "nhan duoc" if r_sai["ok"] else r_sai["loi"]
+
     ra = {}
     for ten, ts in thu.items():
         r = _goi_tho(CDR, ts)
@@ -121,7 +140,11 @@ def chan_doan() -> dict:
                        "truong": sorted((ds[0] or {}).keys()) if isinstance(ds, list) and ds else []}
         else:
             ra[ten] = {"nhan": False, "loi": r["loi"]}
-    return {"tham_so_da_thu": {k: sorted(v.keys()) for k, v in thu.items()}, "ket_qua": ra}
+    return {"ve_khoa": ve_khoa,
+            "doc_ket_qua": "Nếu khoá bịa cũng trả đúng lỗi như khoá thật thì mã 1003 KHÔNG nói gì về "
+                           "tham số – nó chỉ nghĩa là P.A từ chối, và nghi vấn chuyển sang khoá hoặc "
+                           "quyền của tài khoản tổng đài.",
+            "tham_so_da_thu": {k: sorted(v.keys()) for k, v in thu.items()}, "ket_qua": ra}
 
 
 def _giay(v) -> int:
