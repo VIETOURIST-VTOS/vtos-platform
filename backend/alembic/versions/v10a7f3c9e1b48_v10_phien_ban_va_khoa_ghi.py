@@ -25,7 +25,12 @@ revision = "v10a7f3c9e1b48"
 # nhiều hơn một đầu là container KHÔNG khởi động được. Chuỗi V10 → V6 → V12 nối sau bản Zalo chứ
 # không ngược lại, vì bản Zalo đã nằm trên main và có thể đã chạy trên hệ thống thật – đổi cha của
 # một bản đã chạy là đổi thứ tự đã xảy ra rồi.
-down_revision = "za1b2c3d4e5f"
+#
+# NỐI LẠI 09/9/2026 – cùng một lỗi, lần thứ hai. Trong lúc nhánh này chạy, main nhận thêm
+# zb2c3d4e5f6a (nhật ký tổng đài), cũng rẽ từ za1b2c3d4e5f. Đếm đầu mạch trên NHÁNH NÀY vẫn ra một
+# đầu và vẫn xanh – mạch chỉ tách làm hai vào ĐÚNG lúc gộp, tức là lúc không ai còn nhìn nữa và
+# container thì đã dừng. Nên phép đếm đúng là đếm trên origin, không phải trên thư mục đang mở.
+down_revision = "zb2c3d4e5f6a"
 branch_labels = None
 depends_on = None
 
