@@ -36,6 +36,7 @@ LOAI_PHAT_HIEN = {
     "man_hinh_ho_quyen": "Màn hình không khai quyền – ai đăng nhập cũng thấy",
     "nap_lo_lech": "Lô nạp lệch số dòng hoặc lệch tổng tiền",
     "nap_lo_ngoai_so": "Cửa nạp hàng loạt không ghi nhật ký lô – đối chiếu không nhìn thấy",
+    "bang_khong_cua_nhap": "Bảng không có cửa nào để người dùng nhập số liệu vào",
 }
 
 

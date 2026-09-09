@@ -116,3 +116,14 @@ def lo_nap(limit: int = 100, u: User = Depends(require_roles(*XEM)), db: Session
     """
     from app.services import ks_nap_lo as NL
     return NL.bang(db, limit)
+
+
+@router.get("/cua-nhap")
+def cua_nhap(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Mỗi bảng dữ liệu có cửa nào để người dùng đưa số liệu vào: tải tệp, nhập tay, hay máy sinh.
+
+    `khong_cua` là cột phải luôn rỗng. Có tên trong đó nghĩa là hệ thống đang cần một con số mà không
+    có đường nào cho người nhập nó – theo ranh giới 09/9/2026 thì đó là việc còn thiếu.
+    """
+    from app.services import ks_cua_nhap as CN
+    return CN.bang(db)
