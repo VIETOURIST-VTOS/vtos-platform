@@ -30,6 +30,29 @@ function HopDong() {
   }, [toast]);
   useEffect(() => { load(); }, [load]);
 
+  const [dang, setDang] = useState(false);
+
+  // Nối hợp đồng với booking đã tạo. Đây là mắt xích cuối của chuỗi bán hàng, và trước 09/9 nó KHÔNG
+  // có nút nào: màn hình này chỉ đọc, nên chuỗi dừng ở hợp đồng và không ai nối được sang booking.
+  // Bộ kiểm cửa nhập của làn Kiểm soát bắt được chỗ hở này.
+  const noiBooking = async (h: HD) => {
+    const id = window.prompt(`Nối hợp đồng ${h.so_hop_dong} với booking nào?\n` +
+                             "Nhập SỐ ID của booking (xem ở màn hình Booking):");
+    if (!id || !id.trim()) return;
+    const bid = id.trim();
+    if (!/^\d+$/.test(bid)) { toast("ID booking phải là một số", true); return; }
+    setDang(true);
+    try {
+      // Đặt bid ra một biến riêng thay vì gọi id.trim() thẳng trong chuỗi: bộ kiểm cửa nhập đọc mã
+      // bằng biểu thức chính quy, và một lời gọi lồng trong chuỗi làm nó cắt sớm rồi kết luận màn
+      // hình này KHÔNG có cửa ghi. Viết phẳng ra thì cả người lẫn máy đọc đều thấy đúng.
+      const r = await api<any>(`/ban-hang/hop-dong/${h.id}/booking/${bid}`, { method: "POST" });
+      toast(r.message || "Đã nối booking");
+      await load();
+    } catch (e) { toast(errMsg(e), true); }
+    setDang(false);
+  };
+
   const xemChuoi = async (id: number) => {
     if (chuoi[id]) { setChuoi({ ...chuoi, [id]: null }); return; }
     try { setChuoi({ ...chuoi, [id]: await api<any>(`/ban-hang/hop-dong/${id}/chuoi`) }); }
@@ -65,7 +88,12 @@ function HopDong() {
                     <td style={{ textAlign: "right" }}>{vnd(h.dat_coc)}</td>
                     <td>{h.booking_id ? `#${h.booking_id}` : <Tag cls="warn">chưa nối</Tag>}</td>
                     <td>{h.trang_thai}</td>
-                    <td><button className="ghost" onClick={() => xemChuoi(h.id)}>Trọn đường</button></td>
+                    <td className="nut">
+                      {!h.booking_id ? (
+                        <button className="ghost" disabled={dang}
+                                onClick={() => noiBooking(h)}>Nối booking</button>) : null}
+                      <button className="ghost" onClick={() => xemChuoi(h.id)}>Trọn đường</button>
+                    </td>
                   </tr>
                   {chuoi[h.id] ? (
                     <tr key={`${h.id}-chuoi`}><td colSpan={9} className="chitiet">
@@ -112,6 +140,7 @@ function HopDong() {
         .o.thieu { border-style: dashed; color: #92400e; background: #fffbeb; }
         .o .ten { font-size: 12px; color: #64748b; }
         .o .gt { font-weight: 600; font-size: 13px; }
+        .nut { white-space: nowrap; }
         .mono { font-family: ui-monospace, monospace; font-size: 13px; }
         button { padding: 5px 10px; border-radius: 8px; border: 1px solid #cbd5e1;
                  background: #fff; color: #0f172a; cursor: pointer; font-size: 13px; }

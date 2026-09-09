@@ -167,6 +167,23 @@ function BaoGia() {
     setDang(false);
   };
 
+  // Lập hợp đồng từ báo giá khách đã chốt. Cửa này đứng ở ĐÂY chứ không ở màn hình Hợp đồng: giá trị
+  // hợp đồng lấy từ BẢN BÁO GIÁ ĐÃ GỬI, nên chỗ bấm phải là chỗ nhìn thấy bản đã gửi. Đặt ở màn hình
+  // kia thì người lập phải nhớ mã báo giá, và nhớ nhầm thì hợp đồng mang giá trị của một bản khác.
+  const lapHopDong = async (b: BG) => {
+    const so = window.prompt(`Lập hợp đồng cho báo giá ${b.ma} – khách ${b.khach_ten}.\n` +
+                             "Số hợp đồng (để trống thì hệ thống tự sinh):") ?? null;
+    if (so === null) return;               // bấm Huỷ – khác với để trống rồi bấm Đồng ý
+    setDang(true);
+    try {
+      const r = await api<any>(`/ban-hang/bao-gia/${b.id}/hop-dong`, { method: "POST", json: {
+        so_hop_dong: so.trim(), khach_ten: b.khach_ten } });
+      toast(r.message || "Đã lập hợp đồng");
+      await load();
+    } catch (e) { toast(errMsg(e), true); }
+    setDang(false);
+  };
+
   const hanh = async (b: BG, duong: string, xong: string) => {
     setDang(true);
     try { const r = await api<any>(`/ban-hang/bao-gia/${b.id}/${duong}`, { method: "POST", json: {} });
@@ -342,6 +359,9 @@ function BaoGia() {
                         {soan && b.trang_thai === "da_gui" &&
                           <button className="ghost" disabled={dang}
                                   onClick={() => hanh(b, "khach-chot", "Khách đã chốt")}>Khách chốt</button>}
+                        {soan && b.trang_thai === "khach_chot" &&
+                          <button className="ghost" disabled={dang}
+                                  onClick={() => lapHopDong(b)}>Lập hợp đồng</button>}
                       </td>
                     </tr>
                     {mo === b.id ? (

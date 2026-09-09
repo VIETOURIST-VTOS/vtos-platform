@@ -25,6 +25,35 @@ function BangGia() {
   const [ds, setDs] = useState<BG[]>([]);
   const [mang, setMang] = useState("");
   const datGia = ["gd_kd", "tp_kd", "ptgd_mkt", "tgd", "chutich", "cntt"].includes(user?.role || "");
+  // Biểu ĐẶT GIÁ NIÊM YẾT. Trước 09/9 màn hình này chỉ liệt kê – POST /ban-hang/bang-gia đã có mà
+  // không màn hình nào gọi, đúng cùng một chỗ hở với cửa nhập tay một dòng. Bộ kiểm cửa nhập của làn
+  // Kiểm soát bắt được, và bắt đúng: một bảng giá không nhập được ở đâu thì phòng Kinh doanh vẫn
+  // phải giữ giá trong một tệp Excel riêng, tức là hệ thống không phải nơi giữ giá.
+  const RONG_DONG = { hang_khach: "nguoi_lon", mo_ta: "", gia_ban: 0, gia_von: null as number | null,
+                      chiet_khau_toi_da: 0 };
+  const [bieu, setBieu] = useState<any>(null);
+  const [dang, setDang] = useState(false);
+
+  const moBieu = () => setBieu({ ten: "", mang: mang || "kd_le", hieu_luc_tu: "", hieu_luc_den: "",
+                                 ghi_chu: "", dong: [{ ...RONG_DONG }] });
+
+  const luu = async () => {
+    if (!bieu.ten.trim() || !bieu.hieu_luc_tu) { toast("Thiếu tên bảng giá hoặc ngày hiệu lực từ", true); return; }
+    setDang(true);
+    try {
+      const r = await api<any>("/ban-hang/bang-gia", { method: "POST", json: {
+        ten: bieu.ten.trim(), mang: bieu.mang, hieu_luc_tu: bieu.hieu_luc_tu,
+        // Để TRỐNG nghĩa là CÒN hiệu lực. Gửi ngày hôm nay cho "gọn" là tự tắt bảng giá sau một đêm.
+        hieu_luc_den: bieu.hieu_luc_den || null, ghi_chu: bieu.ghi_chu,
+        dong: bieu.dong.filter((d: any) => d.mo_ta || d.gia_ban).map((d: any) => ({
+          hang_khach: d.hang_khach, mo_ta: d.mo_ta,
+          gia_ban: Number(d.gia_ban) || 0,
+          // Giá vốn để trống giữ nguyên là RỖNG suốt đường đi – thiếu giá vốn không phải giá vốn 0.
+          gia_von: d.gia_von === null || d.gia_von === "" ? null : Number(d.gia_von),
+          chiet_khau_toi_da: Number(d.chiet_khau_toi_da) || 0 })) } });
+      toast(r.message || "Đã đặt bảng giá"); setBieu(null); await load();
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
 
   const load = useCallback(async () => {
     try { setDs(await api<BG[]>(`/ban-hang/bang-gia${mang ? `?mang=${mang}` : ""}`)); }
@@ -52,6 +81,76 @@ function BangGia() {
           <button key={k} className={mang === k ? "" : "ghost"} onClick={() => setMang(k)}>{t}</button>
         ))}
       </div>
+
+      {datGia ? (
+        <div className="row">
+          <button onClick={moBieu}>Đặt bảng giá mới</button>
+          {bieu ? <button className="ghost" onClick={() => setBieu(null)}>Đóng biểu</button> : null}
+        </div>
+      ) : null}
+
+      {bieu ? (
+        <div className="card">
+          <h3>Đặt một bảng giá</h3>
+          <p className="muted small">
+            Bảng giá mới KHÔNG xoá bảng cũ. Muốn đổi giá thì đặt bảng mới với ngày hiệu lực sau, và
+            đặt hạn kết thúc cho bảng cũ — có thế thì câu hỏi “ngày ấy giá niêm yết bao nhiêu” mới
+            còn trả lời được.
+          </p>
+          <div className="luoi">
+            <label>Tên bảng giá <span className="do">*</span>
+              <input value={bieu.ten} placeholder="Giá hè 2026 – tuyến miền Trung"
+                     onChange={(e) => setBieu({ ...bieu, ten: e.target.value })} /></label>
+            <label>Mảng
+              <select value={bieu.mang} onChange={(e) => setBieu({ ...bieu, mang: e.target.value })}>
+                <option value="kd_le">Lẻ</option><option value="kd_doan">Đoàn (MICE)</option>
+              </select></label>
+            <label>Hiệu lực từ <span className="do">*</span>
+              <input type="date" value={bieu.hieu_luc_tu}
+                     onChange={(e) => setBieu({ ...bieu, hieu_luc_tu: e.target.value })} /></label>
+            <label>Hiệu lực đến (để trống = còn hiệu lực)
+              <input type="date" value={bieu.hieu_luc_den}
+                     onChange={(e) => setBieu({ ...bieu, hieu_luc_den: e.target.value })} /></label>
+          </div>
+
+          <b>Dòng giá</b>
+          <table className="tbl">
+            <thead><tr><th>Hạng khách</th><th>Diễn giải</th>
+              <th style={{ width: 140 }}>Giá bán</th><th style={{ width: 140 }}>Giá vốn</th>
+              <th style={{ width: 110 }}>Chiết khấu tối đa</th><th></th></tr></thead>
+            <tbody>{bieu.dong.map((d: any, i: number) => {
+              const dat = (k: string, v: any) => setBieu({ ...bieu,
+                dong: bieu.dong.map((x: any, j: number) => j === i ? { ...x, [k]: v } : x) });
+              return (<tr key={i}>
+                <td><select value={d.hang_khach} onChange={(e) => dat("hang_khach", e.target.value)}>
+                  {["nguoi_lon", "tre_em", "em_be", "phu_thu_phong_don"].map((h) =>
+                    <option key={h} value={h}>{h}</option>)}
+                </select></td>
+                <td><input value={d.mo_ta} onChange={(e) => dat("mo_ta", e.target.value)} /></td>
+                <td><input type="number" value={d.gia_ban}
+                           onChange={(e) => dat("gia_ban", e.target.value)} /></td>
+                <td><input type="number" placeholder="chưa có"
+                           value={d.gia_von === null ? "" : d.gia_von}
+                           onChange={(e) => dat("gia_von", e.target.value === "" ? null : e.target.value)} /></td>
+                <td><input type="number" value={d.chiet_khau_toi_da}
+                           onChange={(e) => dat("chiet_khau_toi_da", e.target.value)} /></td>
+                <td><button className="ghost" onClick={() => setBieu({ ...bieu,
+                      dong: bieu.dong.length > 1
+                        ? bieu.dong.filter((_: any, j: number) => j !== i) : bieu.dong })}>Xóa</button></td>
+              </tr>);
+            })}</tbody>
+          </table>
+          <div className="row">
+            <button className="ghost"
+                    onClick={() => setBieu({ ...bieu, dong: [...bieu.dong, { ...RONG_DONG }] })}>Thêm dòng</button>
+            <span className="muted small">Ô giá vốn để trống nghĩa là <b>chưa có giá vốn</b> — không
+              phải bằng 0. Báo giá lấy dòng từ đây sẽ chép nguyên cái trống ấy sang.</span>
+          </div>
+          <div className="row">
+            <button disabled={dang} onClick={luu}>{dang ? "Đang lưu…" : "Đặt bảng giá"}</button>
+          </div>
+        </div>
+      ) : null}
 
       {ds.length === 0 ? <p className="muted">Chưa có bảng giá nào.</p> : ds.map((b) => (
         <div className="card" key={b.id}>
@@ -94,6 +193,11 @@ function BangGia() {
         .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
         .tbl { width: 100%; border-collapse: collapse; }
         .tbl td, .tbl th { border-bottom: 1px solid #f1f5f9; padding: 6px 8px; text-align: left; }
+        .luoi { display: grid; gap: 0 14px; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); }
+        label { display: block; font-size: 12px; color: #64748b; margin-top: 8px; }
+        input, select { width: 100%; padding: 5px 7px; border: 1px solid #cbd5e1; border-radius: 6px;
+                        font-size: 13px; color: #0f172a; background: #fff; }
+        .do { color: #b91c1c; }
         .mono { font-family: ui-monospace, monospace; font-size: 13px; }
         button { padding: 5px 10px; border-radius: 8px; border: 1px solid #0f172a;
                  background: #0f172a; color: #fff; cursor: pointer; font-size: 13px; }
