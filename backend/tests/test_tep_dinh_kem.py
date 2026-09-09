@@ -126,9 +126,20 @@ def test_vai_tro_khac_khong_gan_duoc_tep_vao_ho_so_nhan_su(_startup):
     assert r.status_code == 403 and "Nghị định 13/2023" in r.json()["detail"]
 
 
-def test_cau_hinh_cong_bo_chin_nhom_ho_so_va_thoi_han_luu(_startup):
+def test_cau_hinh_cong_bo_du_nhom_ho_so_va_thoi_han_luu(_startup):
+    """Chín nhóm theo Mô hình quản trị số hóa, cộng nhóm thứ mười thêm 09/9/2026.
+
+    Nhóm "10_Marketing" (lưu 5 năm) sinh ra cùng đợt mở cửa tải tệp cho nội dung marketing: ảnh sắp
+    đăng không phải hồ sơ pháp lý cũng không phải chứng từ ghi sổ, nhét vào một nhóm sẵn có cho tiện
+    là làm hỏng thời hạn lưu của cả nhóm ấy.
+
+    Phép thử này đọc số nhóm THẲNG TỪ khai báo chứ không viết cứng một con số nữa. Viết cứng thì mỗi
+    lần thêm nhóm lại đỏ một lần và người sửa chỉ việc tăng số – tức là phép thử không canh gì cả.
+    Điều đáng canh là: nhóm nào cũng phải có thời hạn lưu, và cấu trúc kho không đổi.
+    """
+    from app.models.attachments import NHOM_HO_SO
     d = client.get("/api/v1/tep/cau-hinh", headers=login("ketoan")).json()
-    assert len(d["nhom_ho_so"]) == 9
+    assert len(d["nhom_ho_so"]) == len(NHOM_HO_SO) >= 9
     assert all(n["thoi_han_luu"] for n in d["nhom_ho_so"])
     assert "Pháp nhân / Năm / Nhóm hồ sơ" in d["cau_truc_kho"]
 

@@ -104,7 +104,18 @@ def test_mo_hinh_va_ban_nang_cap_khong_duoc_lech_nhau():
     for m in (d1, d2):
         assert (m.TIEN.precision, m.TIEN.scale) == (18, 2)
     # Hợp của MỌI bản nâng cấp phải bằng đúng tập cột đã khai kiểu số thập phân trong mô hình.
+    #
+    # Kể cả bản SINH MỚI cột, không chỉ hai bản CHUYỂN KIỂU của V9. Ngày 09/9/2026 làn Kiểm soát thêm
+    # bốn cột tiền cho lô nạp (intake_runs) và khai thẳng kiểu Numeric(18,2) – đúng chuẩn V9, không
+    # phải chuyển kiểu vì sinh ra đã đúng. Phép thử khi ấy đọc là "mô hình đã đổi mà không có bản
+    # nâng cấp", một câu báo động sai.
+    #
+    # Chỗ này lộ ra một điều đáng nhớ hơn cả bản vá: phép thử đỏ từ hôm qua mà không ai thấy, vì cây
+    # làm việc trên máy Chủ tịch thiếu đúng tệp mô hình ấy nên mọi lần chạy đều dùng bản cũ. Một cây
+    # làm việc lùi sau commit thì bộ phép thử vẫn xanh – và cái xanh ấy không nói gì về mã đang chạy.
+    d3 = _mig("zc3d4e5f6a7b_bon_so_tien_cho_lo_nap.py")
     trong_mig = {(b, c) for m in (d1, d2) for b, c, _ in m.COT}
+    trong_mig |= {("intake_runs", c) for c in d3.COT}
     trong_mo_hinh = {(t.name, c.name) for t in Base.metadata.tables.values() for c in t.columns
                      if isinstance(c.type, Numeric) and not isinstance(c.type, Float)}
     assert trong_mig == trong_mo_hinh, {
