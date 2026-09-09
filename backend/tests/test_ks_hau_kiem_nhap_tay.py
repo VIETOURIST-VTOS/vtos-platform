@@ -240,3 +240,181 @@ def test_kn11_tong_tien_cong_bang_sql_khong_nap_dong_nao():
         db.close()
     finally:
         NT._doc = goc
+
+
+def _dinh_cua_so(moc, giay=300):
+    """Bản tham chiếu ngây thơ: duyệt mọi cặp. Chậm, nhưng hiển nhiên đúng – dùng để chấm bản nhanh."""
+    ds = sorted(moc); dinh = 0
+    for i in range(len(ds)):
+        j = i
+        while j < len(ds) and (ds[j] - ds[i]).total_seconds() <= giay: j += 1
+        dinh = max(dinh, j - i)
+    return dinh
+
+
+def _chay_ngoai_gio(rows, don_dong):
+    """Gọi thẳng dấu hiệu nhập-dồn với một tập mốc dựng sẵn, không đụng cơ sở dữ liệu."""
+    from app.services import ks_nhap_tay as NT
+    goc = NT._doc
+    NT._doc = lambda db, ng, tu, den, kho=None: (rows if ng["ma"] == NT.NGUON[0]["ma"] else [])
+    try:
+        return NT._ngoai_gio(None, THANG, 0, 24, don_dong, {})   # 0h–24h: tắt phần "ngoài giờ"
+    finally:
+        NT._doc = goc
+
+
+def test_kn12_dinh_cua_so_nam_phut_dung_o_bien():
+    """Cửa sổ là "trong vòng năm phút", tức ĐÚNG 300 giây vẫn tính, 301 giây thì không.
+
+    Sai một giây ở đây không làm sập gì cả – nó chỉ lặng lẽ đếm thừa hoặc thiếu một dòng, và người đọc
+    bảng ngoại lệ không có cách nào biết. Nên chốt bằng phép thử chứ không bằng đọc lại mã.
+    """
+    g = _dau(datetime(2026, 1, 1, 10, 0, 0))
+    # ba mốc cách nhau đúng 150 giây: mốc đầu và mốc cuối cách nhau tròn 300 giây → cả ba cùng một cửa sổ
+    vua_du = [{"nguoi": "ketoan1", "luc": g + timedelta(seconds=s)} for s in (0, 150, 300)]
+    assert _chay_ngoai_gio(vua_du, 3), "đúng 300 giây phải còn nằm trong cửa sổ năm phút"
+    # đẩy mốc cuối thêm một giây → chỉ còn hai mốc trong cửa sổ
+    qua_mot_giay = [{"nguoi": "ketoan1", "luc": g + timedelta(seconds=s)} for s in (0, 150, 301)]
+    assert not _chay_ngoai_gio(qua_mot_giay, 3), "301 giây thì mốc đầu phải rời khỏi cửa sổ"
+    assert _chay_ngoai_gio(qua_mot_giay, 2), "hai mốc còn lại vẫn phải đếm được"
+
+
+def test_kn12b_hai_con_tro_cho_cung_ket_qua_voi_ban_ngay_tho():
+    """Đổi từ hai vòng lồng nhau sang hai con trỏ là đổi cách tính, nên phải chấm lại bằng bản cũ.
+
+    Dựng nhiều hình dạng khác nhau – rời rạc, cụm dày, một cụm dài – vì lỗi hai-con-trỏ thường chỉ hiện
+    ra ở chỗ con trỏ sau phải nhảy qua nhiều mốc một lúc.
+    """
+    import random
+    g = _dau(datetime(2026, 1, 1, 10, 0, 0))
+    random.seed(20260908)
+    for lan in range(30):
+        n = random.randint(1, 60)
+        # trộn khoảng cách bé (dồn cục) và lớn (rời rạc) để có đủ hình dạng
+        moc, t = [], 0
+        for _ in range(n):
+            t += random.choice([0, 1, 7, 60, 150, 299, 300, 301, 900])
+            moc.append(g + timedelta(seconds=t))
+        cho_doi = _dinh_cua_so(moc)
+        rows = [{"nguoi": "ketoan1", "luc": m} for m in moc]
+        # đòi robot báo ở đúng ngưỡng bằng đỉnh, và im ở ngưỡng cao hơn một
+        assert _chay_ngoai_gio(rows, cho_doi), f"lần {lan}: đỉnh phải là {cho_doi}"
+        assert not _chay_ngoai_gio(rows, cho_doi + 1), f"lần {lan}: đỉnh không được vượt {cho_doi}"
+
+
+def test_kn12c_hai_muoi_nghin_moc_trung_gio_van_chay_xong():
+    """Chốt chặn cho đúng lỗi đã xảy ra trên máy chủ ngày 08/9/2026.
+
+    Bản cũ dò lại từ đầu cửa sổ ở mỗi mốc: 25.728 bút toán của một bản nhập hàng loạt rơi vào cùng vài
+    phút thành hơn ba trăm triệu phép trừ thời gian, và cổng trả 502 trước khi hàm chạy xong – nghĩa là
+    dấu hiệu "nhập dồn" TẮT đúng vào lúc có nhập dồn thật. Đó là kiểu hỏng tệ nhất: không báo lỗi, chỉ
+    im lặng bỏ sót.
+
+    Đặt hạn năm giây, không phải để đo máy chạy thử cho chính xác, mà vì bản cũ ở kích thước này mất
+    hàng phút – khoảng cách đủ xa để phép thử không phụ thuộc máy nhanh hay chậm.
+    """
+    import time
+    g = _dau(datetime(2026, 1, 1, 10, 0, 0))
+    rows = [{"nguoi": "ketoan1", "luc": g + timedelta(seconds=i % 120)} for i in range(20_000)]
+    t0 = time.perf_counter()
+    ra = _chay_ngoai_gio(rows, 10)
+    giay = time.perf_counter() - t0
+    assert ra, "hai mươi nghìn dòng trong hai phút thì phải báo nhập dồn"
+    assert giay < 5, f"cửa sổ trượt phải là O(n); đang mất {giay:.1f} giây cho 20.000 mốc"
+
+
+def test_kn13_thong_ke_nguoi_phan_biet_may_do_vao_va_nguoi_go():
+    """Đếm theo người nhập, kèm trải dài thời gian – đây là thứ phân biệt "cả phòng gõ suốt tháng" với
+    "một tài khoản đổ một bản nhập hàng loạt trong mười phút".
+
+    Không có cột này thì con số tổng dẫn thẳng tới kết luận sai, và ngưỡng hậu kiểm đặt trên kết luận
+    sai thì gác nhầm hệ thống.
+    """
+    from app.services import ks_nhap_tay as NT
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    a, b = NT._khoang_thang(THANG)
+    ra = NT.thong_ke_nguoi(db, NT.NGUON[0], a, b)
+    assert isinstance(ra, list)
+    assert all(x["nguoi"].lower() not in NT.BO_QUA_NGUOI for x in ra), \
+        "tài khoản máy đã loại khỏi hậu kiểm thì cũng không được xuất hiện trong thống kê người nhập"
+    # phải xếp giảm dần theo số dòng: người đọc chỉ nhìn vài dòng đầu
+    assert [x["so_dong"] for x in ra] == sorted([x["so_dong"] for x in ra], reverse=True)
+    for x in ra:
+        assert x["so_dong"] >= 1 and "nhanh_nhat" in x and "cham_nhat" in x
+        assert x["trai_dai_phut"] is None or x["trai_dai_phut"] >= 0
+    db.close()
+
+
+def test_kn14_ban_nap_may_khong_bi_dem_ra_hau_kiem_nhap_tay():
+    """Chốt chặn cho đúng chuyện đã đo trên máy chủ thật ngày 08/9/2026.
+
+    Sổ bút toán tháng đó có 25.728 dòng bị bộ hậu kiểm coi là số nhân viên nhập tay. Số người thật gõ
+    vào sổ đếm trên đầu ngón tay; phần còn lại là bản nạp MISA chạy dưới tên `misa` – một cái tên không
+    có trong danh sách BO_QUA_NGUOI, nên lọt qua toàn bộ.
+
+    Hậu quả không phải là báo thừa vài dòng: ngưỡng hiệu chỉnh trên 25.728 dòng máy nạp là ngưỡng cho
+    một hệ thống không tồn tại, và bảng ngoại lệ chỉ toàn tên `misa` thì người ta đọc vài lần rồi thôi.
+    Nên phép thử này đòi bộ hậu kiểm phân biệt bằng CỘT NGUỒN, không bằng danh sách tên.
+    """
+    from app.services import ks_nhap_tay as NT
+    from app.services import accounting as ACC
+    from app.db.session import SessionLocal
+    from app.models.accounting import JournalEntry
+    from sqlalchemy import select as sel
+
+    db = SessionLocal()
+    a, b = NT._khoang_thang(THANG)
+    ng = [x for x in NT.NGUON if x["ma"] == "but_toan"][0]
+    truoc = len(NT._doc(db, ng, a, b))
+
+    # hai tài khoản tiền: không vướng quy tắc "phải ghi mã đối tượng", nên phép thử đo đúng thứ nó
+    # định đo thay vì đo lại quy tắc hạch toán
+    ln = [{"account": "111", "debit": 5_000_000, "credit": 0},
+          {"account": "112", "debit": 0, "credit": 5_000_000}]
+    # Cùng một người, cùng một ngày: khác nhau ĐÚNG ở cột nguồn – nên nếu bộ hậu kiểm phân biệt được
+    # thì chỉ có thể là nhờ cột đó.
+    tay = ACC.post_entry(db, "ketoan1", "ketoan", date.today(), "Người gõ tay", ln, "thu_cong", "")
+    may = ACC.post_entry(db, "ketoan1", "ketoan", date.today(), "Bản nạp MISA", ln, "misa", "misa:test")
+    db.commit()
+
+    sau = NT._doc(db, ng, a, b)
+    assert len(sau) == truoc + 1, "chỉ dòng người gõ được thêm vào hậu kiểm, dòng máy nạp thì không"
+    ids = {x["id"] for x in sau}
+    assert tay.id in ids, "dòng do người gõ phải nằm trong hậu kiểm"
+    assert may.id not in ids, "dòng do máy nạp (source_type='misa') không được coi là số nhập tay"
+
+    # thống kê người nhập cũng phải cùng một cách nhìn, nếu không thì hai bảng nói hai con số khác nhau
+    tk = {x["nguoi"]: x["so_dong"] for x in NT.thong_ke_nguoi(db, ng, a, b)}
+    assert tk.get("ketoan1", 0) == 1, f"thống kê người nhập phải đếm đúng một dòng, đang đếm {tk.get('ketoan1')}"
+
+    for e in (tay, may): db.delete(e)
+    db.commit(); db.close()
+
+
+def test_kn15_dong_thieu_cot_nguon_van_bi_dem_ra_hau_kiem():
+    """Để trống cột nguồn thì VẪN hậu kiểm. Trong một bộ kiểm soát, im lặng phải do có bằng chứng đây là
+    máy sinh, chứ không do thiếu dữ liệu – nếu không, cách dễ nhất để né hậu kiểm là bỏ trống một cột.
+    """
+    from app.services import ks_nhap_tay as NT
+    from app.db.session import SessionLocal
+    from app.models.accounting import JournalEntry
+    db = SessionLocal()
+    ng = [x for x in NT.NGUON if x["ma"] == "but_toan"][0]
+    t = NT._bang(ng["bang"])
+    dk = NT._chi_nguoi_go(t, ng)
+    assert dk is not None, "sổ bút toán phải có cột phân biệt máy sinh / người gõ"
+    # cột để trống → coalesce về "thu_cong" → điều kiện đúng → dòng vẫn được đem ra hậu kiểm
+    cot, nguoi_go = ng["may_sinh"]
+    from sqlalchemy import select as sel, literal
+    assert db.execute(sel(literal(1)).where(
+        NT.func.coalesce(None, nguoi_go) == nguoi_go)).scalar() == 1
+    # sổ chi phí chuyến xe gọi cột đó bằng tên khác và giá trị khác – cũng phải nhận ra
+    xe = [x for x in NT.NGUON if x["ma"] == "chi_phi_chuyen"][0]
+    assert NT._chi_nguoi_go(NT._bang(xe["bang"]), xe) is not None, \
+        "sổ chi phí chuyến xe có cột nguon, phải dùng nó thay vì coi mọi dòng là nhập tay"
+    # nguồn không có cột đó thì không lọc gì cả, thay vì lọc sạch
+    khac = [x for x in NT.NGUON if x["ma"] == "thu"][0]
+    assert NT._chi_nguoi_go(NT._bang(khac["bang"]), khac) is None, \
+        "nguồn không có cột nguồn thì phải giữ nguyên mọi dòng, không được lọc rỗng"
+    db.close()

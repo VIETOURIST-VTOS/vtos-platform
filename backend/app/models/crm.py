@@ -132,3 +132,37 @@ class ZaloOaToken(Base):
     cap_boi: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class TongDaiSuKien(Base):
+    """Nhật ký NGUYÊN VĂN mọi thứ tổng đài gửi sang. Chưa diễn giải gì cả – và đó là chủ ý.
+
+    Vì sao dựng cái này trước khi dựng phần khớp cuộc gọi vào lead: P.A Việt Nam công bố bốn API tổng đài
+    (lịch sử cuộc gọi, file ghi âm, CallNow, webhook cuộc gọi đến) nhưng KHÔNG công bố đặc tả kỹ thuật. Bài
+    hướng dẫn duy nhất có nội dung (28/08/2021) chỉ nêu bốn cái tên tham số – "số nội bộ, số gọi đi,
+    uniqueid, notecall" – và một URL ví dụ `callback_url.php`. Không địa chỉ, không cách xác thực, không
+    kiểu dữ liệu, không chữ ký.
+
+    Dựng phần khớp lead trên bốn cái tên đó là đoán. Đoán sai thì hỏng LẶNG LẼ: webhook vẫn trả 200, tổng
+    đài vẫn báo thành công, còn VTOS thì ghi rỗng – và không ai biết cho tới lúc cần tra một cuộc gọi mà
+    không có.
+
+    Nên bảng này KHÔNG có cột `so_dien_thoai`, `may_nhanh`, `uniqueid`. Nó chỉ giữ nguyên văn: phương thức,
+    đường dẫn, chuỗi truy vấn, thân yêu cầu, đầu mục HTTP. Khi P.A trỏ webhook vào đây, mình ĐỌC ĐƯỢC dữ
+    liệu thật rồi mới viết phần diễn giải – dựa trên bằng chứng, không dựa trên hình dung.
+
+    `da_doc` đánh dấu dòng đã có người xem và rút ra kết luận; không phải trạng thái nghiệp vụ, vì chưa có
+    nghiệp vụ nào.
+    """
+    __tablename__ = "tong_dai_su_kien"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Nguồn TỰ KHAI (pavietnam / vchat / khac). Không dùng để phân quyền – chỉ để lọc khi đọc.
+    nguon: Mapped[str] = mapped_column(String(20), default="", index=True)
+    phuong_thuc: Mapped[str] = mapped_column(String(10), default="")
+    duong_dan: Mapped[str] = mapped_column(String(300), default="")
+    chuoi_truy_van: Mapped[str] = mapped_column(Text, default="")
+    than: Mapped[str] = mapped_column(Text, default="")
+    dau_muc: Mapped[dict] = mapped_column(JSON, default=dict)
+    ip_goi: Mapped[str] = mapped_column(String(60), default="", index=True)
+    da_doc: Mapped[bool] = mapped_column(Boolean, default=False)
+    nhan_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)

@@ -191,3 +191,54 @@ def test_bang_khong_co_cot_phap_nhan_thi_khong_bi_loc():
     q = select(Company)
     assert PV.loc(q, Company, u) is q, "bảng không có cột company_id mà vẫn bị thêm điều kiện lọc"
     db.close()
+
+
+# ---------------- Cột pháp nhân nào cũng phải được nhìn tới (09/9/2026) ----------------
+def test_quet_du_moi_bang_co_cot_phap_nhan():
+    """Bảng đối chiếu pháp nhân chỉ theo dõi NĂM loại hồ sơ; hệ thống có nhiều bảng mang cột ấy hơn.
+
+    Đây là chỗ một câu báo cáo đúng mà gây hiểu sai: "không còn hồ sơ nào chưa gán pháp nhân" chỉ nói
+    về năm bảng, trong khi phần còn lại không ai nhìn tới. Một cột pháp nhân không ai nhìn tới thì
+    hoặc luôn rỗng, hoặc mang giá trị do mã tự đặt mà không ai kiểm – và cả hai đều dẫn tới cùng một
+    chỗ: đến kỳ hợp nhất, phần dữ liệu ấy không thuộc công ty nào cả.
+
+    Quét từ MÔ HÌNH chứ không từ danh sách viết tay, vì danh sách viết tay lạc hậu ngay lần thêm bảng
+    sau – và lần ấy sẽ không ai nhớ quay lại sửa nó.
+    """
+    from app.services import company_scope as CS
+    bang = {c.__tablename__ for c in PV.bang_co_cot_phap_nhan()}
+    theo_doi = {CS.KINDS[k]["model"].__tablename__ for k in CS.KINDS}
+    assert theo_doi <= bang, "bảng đối chiếu đang theo dõi một bảng không có cột pháp nhân"
+    assert len(bang) > len(theo_doi), (
+        "quét mô hình ra đúng bằng số bảng đang theo dõi – nhiều khả năng hàm quét đang hỏng, vì "
+        "hệ thống có nhiều bảng mang cột company_id hơn năm loại hồ sơ chính")
+
+
+def test_do_phu_kin_tach_ba_nhom_va_khong_gop_thanh_ty_le():
+    """Ba nhóm là ba loại việc khác nhau: xong · còn người phải gán · bảng rỗng chưa kết luận được.
+
+    Cố ý KHÔNG trả về một tỷ lệ phần trăm: một con số 95% làm người đọc yên tâm đúng vào lúc 5% còn
+    lại là toàn bộ một phân hệ.
+    """
+    d = PV.do_phu_kin(_db())
+    assert set(d) >= {"da_gan_het", "con_chua_gan", "rong", "dem"}
+    assert not any("ty_le" in k or "phan_tram" in k for k in d["dem"]), \
+        "gộp thành tỷ lệ là làm mất chỗ đang thiếu"
+    tong = len(d["da_gan_het"]) + len(d["con_chua_gan"]) + len(d["rong"])
+    assert tong == d["dem"]["so_bang"] == len(PV.bang_co_cot_phap_nhan())
+    # mỗi dòng phải nói đủ để đi làm được việc
+    for nhom in ("da_gan_het", "con_chua_gan", "rong"):
+        for x in d[nhom]:
+            assert x["bang"] and x["tong"] == x["da_gan"] + x["chua_gan"]
+
+
+def test_bang_con_thieu_duoc_xep_len_truoc():
+    """Người mở bảng ra là để biết đi làm gì trước. Bảng thiếu nhiều nhất phải nằm trên cùng."""
+    d = PV.do_phu_kin(_db())
+    con = [x["chua_gan"] for x in d["con_chua_gan"]]
+    assert con == sorted(con, reverse=True)
+
+
+def _db():
+    from app.db.session import SessionLocal
+    return SessionLocal()

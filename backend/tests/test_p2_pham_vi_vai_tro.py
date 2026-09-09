@@ -142,17 +142,27 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # Hai lần đổi trên TRỰC GIAO nhau (một bên thêm phân hệ, một bên bỏ dòng thừa) nên con số dưới đây
 # được ĐẾM LẠI TỪ MÃ, không phải cộng trừ tay hai bảng cũ.
 PHAM_VI_DA_CHOT = {
-    "chutich": 98, "tgd": 98, "bks": 98, "cntt": 96,
-    "ketoan": 81, "tp_dh": 78, "ptgd_doan": 58, "nv_dh": 54, "hcns": 52, "gd_kd": 52,
-    "ptgd_mkt": 39, "nv_kd": 40, "tn_kd": 40, "tp_kd": 40, "nv_mkt": 31,
-    "gd_doi_xe": 23, "hanh_chinh": 24, "tp_hd": 21, "xe_hdv": 15, "nv_visa": 16,
+    # +1 cho sáu vai trò ngày 09/9/2026 – nhóm "/api/v1/tong-dai" gắn vào màn hình /kiem-soat: nhật ký
+    # NGUYÊN VĂN sự kiện tổng đài (P.A Việt Nam không công bố đặc tả webhook, nên VTOS nghe trước rồi mới
+    # diễn giải). Cố ý KHÔNG gắn vào /inbox dù cuộc gọi rồi sẽ hiện ở hộp thư: gắn ở đó là mở tiền tố cho
+    # mười ba vai trò trong khi chỉ bốn vai trò gọi được, và phần dôi ra vẫn là quyền đã cấp.
+    # ĐẾM LẠI SAU KHI GỘP 09/9/2026, bằng lệnh chứ không bằng trí nhớ. Hai nhánh đổi bảng này theo hai
+    # hướng ngược nhau nên không bên nào còn đúng: nhánh gop-dot2 THÊM ba màn hình (/tu-dong-hoa,
+    # /bao-cao, và ba màn hình V6 đã có từ trước), main THÊM /api/v1/tong-dai vào /kiem-soat, đồng thời
+    # gop-dot2 BỚT sáu dòng khai tay thừa (bản rà quyền 3b7aaca). Lấy số của bên nào cũng sai, nên đếm
+    # lại từ mã đã hợp nhất.
+    #
+    # Đã kiểm chỗ giảm không phải do gộp làm rơi mất: xe_hdv 17→15, robot_pq 18→17, robot_vpm 17→16,
+    # gd_doi_xe 24→25 – đúng bằng phần sáu dòng thừa mà bản rà quyền đã dọn, không phải mất quyền.
+    "chutich": 101, "tgd": 101, "bks": 101, "cntt": 98,
+    "ketoan": 83, "tp_dh": 80, "ptgd_doan": 59, "nv_dh": 55, "hcns": 54, "gd_kd": 54,
+    "ptgd_mkt": 41, "nv_kd": 40, "tn_kd": 40, "tp_kd": 42, "nv_mkt": 31,
+    "gd_doi_xe": 25, "hanh_chinh": 24, "tp_hd": 23, "xe_hdv": 15, "nv_visa": 17,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    # Con số của robot_ks sẽ còn tăng mỗi lần có phân hệ mới, và đó là ĐÚNG nghĩa của "đọc toàn bộ" –
-    # nhưng vẫn phải đi qua bảng chốt này để mỗi lần tăng có người nhìn thấy.
-    "robot_pq": 17, "robot_ks": 98, "robot_vpm": 16,
+    "robot_pq": 17, "robot_ks": 101, "robot_vpm": 16,
 }
 
 

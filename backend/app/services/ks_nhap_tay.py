@@ -32,10 +32,16 @@ NGUON = (
      "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": ""},
     {"ma": "thu", "ten": "Phiếu thu", "bang": "receipts", "tien": "amount",
      "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": "Kế toán"},
+    # `may_sinh`: (tên cột, giá trị nghĩa là NGƯỜI GÕ). Cột này là thứ phân biệt máy nạp với người gõ
+    # duy nhất đáng tin – xem ghi chú ở _chi_nguoi_go. Nguồn không khai thì không lọc.
     {"ma": "but_toan", "ten": "Bút toán", "bang": "journal_entries", "tien": "",
-     "nguoi": "created_by", "luc": "created_at", "ngay": "entry_date", "phong": "Kế toán"},
+     "nguoi": "created_by", "luc": "created_at", "ngay": "entry_date", "phong": "Kế toán",
+     "may_sinh": ("source_type", "thu_cong")},
+    # Sổ chi phí chuyến xe gọi cột đó là `nguon` và giá trị người-gõ là "nhap_tay" (máy: bao_cao_vietrip
+    # / the_dau / epass / ocr). Khác tên, khác giá trị, cùng một ý – nên khai theo từng nguồn.
     {"ma": "chi_phi_chuyen", "ten": "Chi phí chuyến xe", "bang": "fleet_trip_costs", "tien": "amount",
-     "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": "Đội xe"},
+     "nguoi": "created_by", "luc": "created_at", "ngay": "", "phong": "Đội xe",
+     "may_sinh": ("nguon", "nhap_tay")},
     {"ma": "bao_duong", "ten": "Bảo dưỡng xe", "bang": "fleet_maintenance", "tien": "so_tien",
      "nguoi": "created_by", "luc": "created_at", "ngay": "ngay", "phong": "Đội xe"},
     {"ma": "hoa_don", "ten": "Hóa đơn", "bang": "invoices", "tien": "total",
@@ -44,6 +50,37 @@ NGUON = (
 # Tài khoản máy: robot nạp dữ liệu và các bộ đồng bộ. Không phải "người nhập", nên loại khỏi hậu kiểm –
 # để lại thì mọi dấu hiệu đều chỉ vào chúng và phần của con người chìm nghỉm.
 BO_QUA_NGUOI = ("robot", "", "system", "vietrip", "sepay", "dieuhanhvietrip")
+
+
+def _chi_nguoi_go(t, ng: dict):
+    """Điều kiện SQL giữ lại đúng những dòng do NGƯỜI gõ. Trả None nếu nguồn không có cột phân biệt.
+
+    Vì sao không lọc bằng tên tài khoản: bản đầu tiên chỉ có BO_QUA_NGUOI, một danh sách tên. Đo trên
+    máy chủ thật ngày 08/9/2026 thì tháng 9 có 25.728 "dòng nhập tay" – trong khi số người thật gõ vào
+    sổ bút toán tháng đó đếm trên đầu ngón tay. Toàn bộ phần còn lại là bản nạp MISA, chạy dưới tên
+    `misa`, một cái tên không có trong danh sách.
+
+    Danh sách tên luôn thiếu, vì mỗi lần nối thêm một hệ thống là thêm một cái tên phải nhớ bổ sung –
+    và không ai nhớ. Cột `source_type` thì ngược lại: nó do CHÍNH chỗ ghi sổ đặt, nên một nguồn máy mới
+    tự khai mình là máy mà không cần ai sửa tệp này.
+
+    Cùng ngày, cùng cách đo, sổ chi phí chuyến xe cho ra 87 dòng "nhập tay" – toàn bộ đều mang
+    nguon="bao_cao_vietrip", tức bản nạp từ báo cáo VieTrip. Hai sổ, hai cái tên cột khác nhau, cùng một
+    kiểu nhầm.
+
+    Hậu quả của việc lọc sai không phải là báo thừa vài dòng. Hai mươi lăm nghìn dòng máy nạp đội lốt
+    số nhập tay thì mọi ngưỡng hiệu chỉnh trên đó đều hiệu chỉnh cho một hệ thống không tồn tại, và
+    người đọc bảng ngoại lệ chỉ thấy tên `misa` lặp lại – đọc vài lần rồi thôi đọc. Bộ kiểm soát chết
+    vì bị phớt lờ, không phải vì hỏng.
+
+    Dòng để trống cột này thì VẪN ĐEM RA HẬU KIỂM. Trong một bộ kiểm soát, im lặng phải do có bằng
+    chứng là máy sinh, chứ không do thiếu dữ liệu.
+    """
+    khai = ng.get("may_sinh")
+    if not khai: return None
+    cot, nguoi_go = khai
+    if cot not in t.c: return None
+    return func.coalesce(t.c[cot], nguoi_go) == nguoi_go
 
 
 def _bang(ten: str):
@@ -72,10 +109,11 @@ def _doc(db: Session, ng: dict, tu: datetime, den: datetime, kho: dict | None = 
     cols.append((t.c[ng["ngay"]] if ng["ngay"] and ng["ngay"] in t.c else t.c[ng["luc"]]).label("ngay"))
     # Lọc tài khoản máy NGAY TRONG SQL, không đọc về rồi bỏ: trên hệ thống thật phần lớn dòng là do
     # robot nạp, đọc hết về Python rồi vứt đi là trả giá cho đúng phần không dùng.
-    q = (select(*cols)
-         .where(t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den,
-                func.lower(func.coalesce(t.c[ng["nguoi"]], "")).notin_(BO_QUA_NGUOI))
-         .limit(TRAN_DONG + 1))
+    dk = [t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den,
+          func.lower(func.coalesce(t.c[ng["nguoi"]], "")).notin_(BO_QUA_NGUOI)]
+    loc_may = _chi_nguoi_go(t, ng)
+    if loc_may is not None: dk.append(loc_may)
+    q = select(*cols).where(*dk).limit(TRAN_DONG + 1)
     ra = [{"id": r.id, "nguoi": r.nguoi, "luc": r.luc, "tien": float(r.tien or 0), "ngay": r.ngay}
           for r in db.execute(q).all()]
     if kho is not None: kho[(ng["ma"], tu, den)] = ra
@@ -86,10 +124,47 @@ def _tong_tien(db: Session, ng: dict, tu: datetime, den: datetime) -> float:
     """Tổng tiền của một nguồn trong khoảng – cộng bằng SQL, không nạp dòng nào về bộ nhớ."""
     t = _bang(ng["bang"])
     if t is None or not ng["tien"] or ng["tien"] not in t.c or ng["luc"] not in t.c: return 0.0
-    q = (select(func.coalesce(func.sum(t.c[ng["tien"]]), 0.0))
-         .where(t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den,
-                func.lower(func.coalesce(t.c[ng["nguoi"]], "")).notin_(BO_QUA_NGUOI)))
-    return float(db.execute(q).scalar() or 0)
+    dk = [t.c[ng["luc"]] >= tu, t.c[ng["luc"]] < den,
+          func.lower(func.coalesce(t.c[ng["nguoi"]], "")).notin_(BO_QUA_NGUOI)]
+    loc_may = _chi_nguoi_go(t, ng)
+    if loc_may is not None: dk.append(loc_may)
+    return float(db.execute(select(func.coalesce(func.sum(t.c[ng["tien"]]), 0.0)).where(*dk)).scalar() or 0)
+
+
+def thong_ke_nguoi(db: Session, ng: dict, tu: datetime, den: datetime, toi_da: int = 12) -> list[dict]:
+    """Ai nhập, bao nhiêu dòng, từ lúc nào tới lúc nào – ĐẾM BẰNG SQL, không nạp dòng nào về bộ nhớ.
+
+    Vì sao cần: con số "25.728 dòng người nhập trong tháng 9" tự nó không nói được điều gì. Hai mươi lăm
+    nghìn dòng có thể là cả phòng Kế toán gõ suốt tháng, cũng có thể là MỘT tài khoản đổ một bản nhập
+    hàng loạt trong mười phút và bị gán nhầm là số nhập tay. Hai chuyện đó dẫn tới hai kết luận trái
+    ngược nhau về hậu kiểm, nên phải phân biệt được TRƯỚC khi đặt ngưỡng – đặt ngưỡng trên dữ liệu chưa
+    hiểu là đặt ngưỡng cho một hệ thống khác.
+
+    Khoảng cách giữa `nhanh_nhat` và `cham_nhat` là chỗ đọc ra câu trả lời: vài phút cho hàng nghìn dòng
+    thì đó là máy đổ vào, không phải người gõ.
+    """
+    t = _bang(ng["bang"])
+    if t is None or ng["nguoi"] not in t.c or ng["luc"] not in t.c: return []
+    n = t.c[ng["nguoi"]]; l = t.c[ng["luc"]]
+    tien = t.c[ng["tien"]] if ng["tien"] and ng["tien"] in t.c else None
+    cot = [n.label("nguoi"), func.count().label("so_dong"),
+           func.min(l).label("dau"), func.max(l).label("cuoi")]
+    if tien is not None: cot.append(func.coalesce(func.sum(tien), 0).label("tong"))
+    dk = [l >= tu, l < den, func.lower(func.coalesce(n, "")).notin_(BO_QUA_NGUOI)]
+    loc_may = _chi_nguoi_go(t, ng)
+    if loc_may is not None: dk.append(loc_may)
+    q = select(*cot).where(*dk).group_by(n).order_by(func.count().desc()).limit(toi_da)
+    ra = []
+    for r in db.execute(q).all():
+        dau, cuoi = r.dau, r.cuoi
+        phut = round((cuoi - dau).total_seconds() / 60, 1) if isinstance(dau, datetime) and isinstance(cuoi, datetime) else None
+        ra.append({"nguoi": r.nguoi, "so_dong": int(r.so_dong),
+                   "tong_tien": float(getattr(r, "tong", 0) or 0),
+                   "nhanh_nhat": str(dau), "cham_nhat": str(cuoi), "trai_dai_phut": phut,
+                   # Dòng mỗi phút: người gõ tay hiếm khi vượt vài dòng một phút. Số này lớn thì dòng
+                   # đó là máy đổ vào chứ không phải người nhập, và hậu kiểm nhập tay không áp được.
+                   "dong_moi_phut": round(int(r.so_dong) / phut, 1) if phut else None})
+    return ra
 
 
 def _khoang_thang(thang: str) -> tuple[datetime, datetime]:
@@ -178,11 +253,16 @@ def _ngoai_gio(db: Session, thang: str, gio_dau: int, gio_cuoi: int, don_dong: i
         for x in rows:
             if isinstance(x["luc"], datetime): theo_nguoi.setdefault(x["nguoi"], []).append(x["luc"])
         for nguoi, ds in theo_nguoi.items():
-            ds.sort(); dinh = 0
-            for i in range(len(ds)):
-                j = i
-                while j < len(ds) and (ds[j] - ds[i]).total_seconds() <= 300: j += 1
-                dinh = max(dinh, j - i)
+            # Cửa sổ trượt bằng HAI CON TRỎ, không phải hai vòng lồng nhau. Bản cũ, với mỗi mốc lại dò
+            # lại từ đầu cửa sổ, là O(n²): một bản nhập hàng loạt 25.728 bút toán cùng rơi vào vài phút
+            # thì thành hơn ba trăm triệu phép trừ thời gian, và trên máy chủ 0,5 CPU cổng trả 502
+            # trước khi hàm chạy xong – tức là dấu hiệu "nhập dồn" TẮT đúng vào lúc có nhập dồn thật.
+            # Danh sách đã sắp tăng dần nên `dau` không bao giờ phải lùi: mỗi mốc vào và ra đúng một
+            # lần, O(n).
+            ds.sort(); dinh = 0; dau = 0
+            for cuoi in range(len(ds)):
+                while (ds[cuoi] - ds[dau]).total_seconds() > 300: dau += 1
+                dinh = max(dinh, cuoi - dau + 1)
             if dinh >= don_dong:
                 ra.append({"loai": "nt_ngoai_gio", "nguon": ng["ma"], "nguoi": nguoi,
                            "tom_tat": f"{ng['ten']}: {nguoi} nhập {dinh} dòng trong vòng 5 phút tháng "

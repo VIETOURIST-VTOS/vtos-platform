@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import DinhKem from "@/components/DinhKem";
 
 /** Kết sổ một kỳ – đường vào cho phần đã có ở app/services/ket_so.py.
  *
@@ -120,6 +121,15 @@ function KetSo() {
           </table>
         </div>
       ) : null}
+
+      {/* Hồ sơ của kỳ: biên bản đối chiếu, xác nhận số dư ngân hàng, bảng kê đính kèm. Đặt NGAY DƯỚI
+          bảng tình trạng kỳ, trước các bước ghi sổ – người khóa kỳ nhìn thấy bộ hồ sơ trước khi bấm
+          khóa, chứ không phải đi tìm nó sau khi kỳ đã đóng. Gắn theo MÃ KỲ, không theo bút toán. */}
+      <div className="card">
+        <DinhKem doiTuong="ket_so" doiTuongId={ky} loai="chung_tu"
+                 tieuDe={`Hồ sơ kết sổ kỳ ${ky}`}
+                 chiXem={!!tt?.da_khoa} />
+      </div>
 
       <div className="card">
         <h3>1. Sao kê ngân hàng vào sổ</h3>

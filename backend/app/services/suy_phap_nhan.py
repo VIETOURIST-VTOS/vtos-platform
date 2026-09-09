@@ -52,11 +52,16 @@ PHONG_THEO_PHAP_NHAN = {
 PHAP_NHAN_MAC_DINH = "VTD"     # Vietourist Holdings – mọi phòng còn lại
 
 
-def _theo_quy_tac(db: Session, e) -> tuple[int | None, str]:
-    """Pháp nhân mà QUY TẮC nói, kèm mã. (None, "") khi danh mục chưa có pháp nhân ấy."""
+def _theo_quy_tac(theo_ma: dict, e) -> tuple[int | None, str]:
+    """Pháp nhân mà QUY TẮC nói, kèm mã. (None, mã) khi danh mục chưa có pháp nhân ấy.
+
+    Nhận sẵn bảng tra mã → id thay vì tự truy vấn. Bản đầu gọi một câu lệnh SELECT cho MỖI nhân sự –
+    110 lượt đọc danh mục pháp nhân để lấy đúng hai con số, và xem_truoc() bị gọi hai lần trong một
+    lần bấm nút. Trên máy chủ 0,5 CPU thì đó đúng loại việc đã làm cổng trả 502 hôm 08/9: không sai
+    kết quả, chỉ trả giá nhiều lần cho cùng một câu trả lời.
+    """
     ma = PHONG_THEO_PHAP_NHAN.get(getattr(e, "department", "") or "", PHAP_NHAN_MAC_DINH)
-    c = db.execute(select(Company).where(Company.code == ma)).scalars().first()
-    return (c.id if c else None), ma
+    return theo_ma.get(ma), ma
 
 
 def _ho_so_cua(db: Session) -> tuple[dict, dict]:
@@ -93,7 +98,10 @@ def xem_truoc(db: Session) -> dict:
     Trả về bốn nhóm tách rời, cố ý không gộp thành một con số "tiến độ": ba nhóm sau là ba loại việc
     khác nhau, cần ba người khác nhau xử lý.
     """
-    ten_cty = {c.id: c.code for c in db.execute(select(Company)).scalars()}
+    # Đọc danh mục pháp nhân MỘT lần, dùng cho cả hai chiều tra.
+    cty = list(db.execute(select(Company)).scalars())
+    ten_cty = {c.id: c.code for c in cty}
+    ma_cty = {c.code: c.id for c in cty}
     theo_uid, theo_ma = _ho_so_cua(db)
 
     suy_duoc, khong_suy_duoc, da_co, lech = [], [], [], []
@@ -126,7 +134,7 @@ def xem_truoc(db: Session) -> dict:
         # quy tắc vừa được chốt, còn cột kia là số liệu cũ nhập rải rác từ trước và chưa chắc theo kịp.
         # Hồ sơ vẫn được đọc, nhưng để ĐỐI CHIẾU – chỗ nào lệch thì nêu ra cho HCNS sửa hồ sơ, chứ
         # không im lặng lấy bên nào.
-        qt_id, qt_ma = _theo_quy_tac(db, e)
+        qt_id, qt_ma = _theo_quy_tac(ma_cty, e)
         if qt_id is None:
             dong["ly_do"] = (f"Quy tắc nói pháp nhân {qt_ma} nhưng danh mục pháp nhân chưa có mã này – "
                              f"thêm vào danh mục trước")

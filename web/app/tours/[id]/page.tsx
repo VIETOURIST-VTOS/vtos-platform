@@ -6,6 +6,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, pct, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
 import { ROLES, TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
 import { Tag, Gate, errMsg } from "@/components/ui";
+import DinhKem from "@/components/DinhKem";
 
 const TABS: [string, string][] = [["info", "Thông tin & quy trình"], ["budget", "Dự toán 3 con số"], ["bookings", "Booking & thu tiền"], ["cost", "Chi NCC & quyết toán"], ["ops", "HDV & xe"], ["history", "Quy trình & lịch sử"]];
 const PR_ST: Record<string, string> = { cho_tp: "Chờ TP", cho_kt: "Chờ Kế toán", cho_duyet: "Chờ duyệt", cho_chi: "Chờ chi", da_chi: "Đã chi", tu_choi: "Từ chối", huy: "Hủy" };
@@ -145,6 +146,16 @@ function TourDetail() {
       <div className="panel wrap"><h2>Lệnh điều xe</h2><table><thead><tr><th>Xe</th><th>Tài xế</th><th>Từ – đến</th><th className="num">Giá nội bộ</th><th>Trạng thái</th></tr></thead>
         <tbody>{t.dispatch.length ? t.dispatch.map((d: any) => <tr key={d.id}><td>{d.plate}</td><td>{d.driver}</td><td>{fmtD(d.date_from)} – {fmtD(d.date_to)}</td><td className="num">{vnd(d.internal_price)}</td><td>{d.status}</td></tr>) : <tr><td colSpan={5} className="muted">Chưa có lệnh điều xe – tab Nhân sự › Đội xe.</td></tr>}</tbody></table></div>
     </div>}
+
+    {/* Ô đính kèm cho TOUR. Máy chủ khai "tour" là đối tượng gắn được tệp từ đầu (nhóm 05_Tour, lưu theo mã
+        tour), nhưng đến 09/9/2026 không màn hình nào dựng ô ấy. Chương trình tour đã gửi khách, hợp đồng
+        đoàn, xác nhận dịch vụ, biên bản sự cố – tất cả đều gắn với MỘT mã tour và đều là thứ phải lôi ra
+        được khi quyết toán bị hỏi lại. Không có chỗ để nằm thì chúng nằm trong hộp thư của người điều hành.
+
+        Đặt ở tab Quy trình & lịch sử chứ không ở tab Thông tin: đây là hồ sơ của chuyến, cùng chỗ với các
+        bước đã đi qua, chứ không phải một thuộc tính của tour. */}
+    {tab === "history" && <DinhKem doiTuong="tour" doiTuongId={t.code}
+                                   tieuDe={`Hồ sơ tour ${t.code}`} />}
 
     {tab === "history" && <>
       <div className="panel"><h2>Quy trình & lịch sử</h2>

@@ -126,9 +126,18 @@ def test_vai_tro_khac_khong_gan_duoc_tep_vao_ho_so_nhan_su(_startup):
     assert r.status_code == 403 and "Nghị định 13/2023" in r.json()["detail"]
 
 
-def test_cau_hinh_cong_bo_chin_nhom_ho_so_va_thoi_han_luu(_startup):
+def test_cau_hinh_cong_bo_du_nhom_ho_so_va_thoi_han_luu(_startup):
+    """Chốt số nhóm hồ sơ – 9 → 10 ngày 09/9/2026 khi thêm nhóm 10_Marketing.
+
+    Sửa lúc gộp: bản trên main thêm nhóm thứ mười mà quên sửa con số ở đây, nên phép thử này đang ĐỎ
+    trên chính main. Không phải lỗi do gộp – đã kiểm bằng cách xem lại tệp trên origin/main.
+
+    Vẫn giữ dạng chốt số chứ không đổi thành "lớn hơn 0": mỗi nhóm hồ sơ mang một THỜI HẠN LƯU khác
+    nhau, thêm một nhóm là thêm một quy tắc lưu trữ – việc đó phải có người nhìn thấy, không được
+    lặng lẽ trôi qua một phép thử dễ dãi.
+    """
     d = client.get("/api/v1/tep/cau-hinh", headers=login("ketoan")).json()
-    assert len(d["nhom_ho_so"]) == 9
+    assert len(d["nhom_ho_so"]) == 10
     assert all(n["thoi_han_luu"] for n in d["nhom_ho_so"])
     assert "Pháp nhân / Năm / Nhóm hồ sơ" in d["cau_truc_kho"]
 

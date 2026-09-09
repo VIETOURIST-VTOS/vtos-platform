@@ -32,6 +32,10 @@ NHOM_HO_SO = {
     "07_Hop_dong":       ("Hợp đồng", "10 năm"),
     "08_Kiem_toan":      ("Kiểm toán", "10 năm"),
     "09_HDQT_Co_dong":   ("HĐQT & cổ đông", "Vĩnh viễn"),
+    # Thêm 09/9/2026. Ảnh và tệp nội dung sắp đăng không phải hồ sơ pháp lý hay chứng từ ghi sổ, nên
+    # không nhét vào nhóm nào sẵn có – nhét bừa là làm hỏng thời hạn lưu của cả nhóm đó. Năm năm là đề
+    # xuất của em, Chủ tịch lật được.
+    "10_Marketing":      ("Marketing & nội dung", "5 năm"),
 }
 
 # Đối tượng gắn tệp: mã → (tên hiển thị, phòng ban chủ quản, nhóm hồ sơ, lưu theo đối tượng?).
@@ -56,6 +60,17 @@ DOI_TUONG_DAY_DU = {
     "hoa_don":       ("Hóa đơn", "ketoan", "03_Thue", False),
     "visa":          ("Hồ sơ visa", "visa", "05_Tour", True),
     "van_ban":       ("Văn bản / quyết định", "ban_tgd", "09_HDQT_Co_dong", False),
+    # Thêm 09/9/2026 – bản rà form & cửa tải tệp cho thấy bốn chỗ có nghiệp vụ nhưng không có cửa đưa
+    # bằng chứng vào. Khiếu nại đứng đầu vì nó chạm tiền: hồ sơ bồi thường không có ảnh khách gửi thì
+    # không khép được, mà tiền bồi thường vẫn phải chi.
+    "khieu_nai":     ("Khiếu nại khách hàng", "mkt", "05_Tour", True),
+    "phieu_thu":     ("Phiếu thu / đối soát thu", "ketoan", "02_Ke_toan", False),
+    # Tách bút toán và kết sổ thành HAI đối tượng, dù cùng nhóm hồ sơ: id của chúng khác loại nhau
+    # (số bút toán vs mã kỳ "2026-09"). Dùng chung một đối tượng thì hai không gian id nằm lẫn nhau, và
+    # đó đúng là cách hồ sơ của kỳ này hiện ra trong bút toán của kỳ khác.
+    "but_toan":      ("Chứng từ gốc của bút toán", "ketoan", "02_Ke_toan", False),
+    "ket_so":        ("Hồ sơ kết sổ kỳ", "ketoan", "02_Ke_toan", False),
+    "noi_dung":      ("Nội dung & thương hiệu", "mkt", "10_Marketing", True),
 }
 DOI_TUONG = {k: (v[0], v[1]) for k, v in DOI_TUONG_DAY_DU.items()}
 

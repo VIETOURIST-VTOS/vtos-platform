@@ -33,13 +33,19 @@ assert goi, ("C1 ĐỎ – không trang nào gọi " + DUONG_DAN + ". Cửa nh�
 print(f"C1 XANH – {len(goi)} trang gọi cửa nhập tay: " + ", ".join(str(p.relative_to(WEB)) for p in goi))
 
 # C2 – gọi trong một hàm gửi đi kèm nút bấm, không phải chỉ nằm trong chú thích
+# Xét MỌI lần xuất hiện của đường dẫn, không chỉ lần đầu. Sửa 09/9 sau khi gộp: bản màn hình trên
+# main nhắc đường dẫn trong CHÚ THÍCH ở đầu tệp rồi mới gọi thật ở dưới, nên xét lần đầu tiên là xét
+# đúng chỗ chú thích và kết luận "không có nút" – phép thử đỏ vì chính nó viết hẹp, không phải vì
+# cửa hỏng. Một phép thử báo động giả cũng làm người ta thôi tin nó, y như một cửa hỏng.
 co_nut = False
 for p in goi:
-    s = p.read_text(encoding="utf-8")
-    i = s.find(DUONG_DAN)
-    quanh = s[max(0, i - 600): i + 600]
-    if "method: \"POST\"" in quanh and "<button" in s:
-        co_nut = True
+    noi_dung = p.read_text(encoding="utf-8")
+    if "<button" not in noi_dung:
+        continue
+    vi_tri = [i for i in range(len(noi_dung)) if noi_dung.startswith(DUONG_DAN, i)]
+    for i in vi_tri:
+        if "method: \"POST\"" in noi_dung[max(0, i - 600): i + 600]:
+            co_nut = True
 assert co_nut, ("C2 ĐỎ – có nhắc tới đường dẫn nhưng không thấy lời gọi POST kèm nút bấm. "
                 "Một đường dẫn trong chú thích không phải là một cái cửa.")
 print("C2 XANH – có lời gọi POST và có nút bấm trên màn hình")

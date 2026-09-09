@@ -99,7 +99,10 @@ def nhap_tay_nguon(thang: str = "", u: User = Depends(require_roles(*XEM)), db: 
         rows = NT._doc(db, ng, a, b, kho)
         ra.append({"nguon": ng["ma"], "ten": ng["ten"], "bang": ng["bang"], "so_dong": len(rows),
                    "tong_tien": sum(x["tien"] for x in rows), "giay": round(_t.perf_counter() - t0, 2),
-                   "cham_tran": len(rows) > NT.TRAN_DONG})
+                   "cham_tran": len(rows) > NT.TRAN_DONG,
+                   # Ai nhập và nhập trong bao lâu. Không có cột này thì "hai mươi lăm nghìn dòng nhập
+                   # tay" và "một bản nhập hàng loạt bị gán nhầm" trông giống hệt nhau.
+                   "theo_nguoi": NT.thong_ke_nguoi(db, ng, a, b)})
     return {"thang": th, "nguon": ra, "tong_giay": round(sum(x["giay"] for x in ra), 2)}
 
 
@@ -118,3 +121,26 @@ def nhap_tay(thang: str = "", u: User = Depends(require_roles(*XEM)), db: Sessio
             # Giây của từng dấu hiệu: bộ này chạy trong vòng quét robot trên máy chủ 0,5 CPU, nên
             # "chậm ở đâu" là dữ kiện vận hành chứ không phải chuyện gỡ lỗi tạm thời.
             "giay_moi_dau_hieu": kho.get("_dong_ho", {}), "rows": ds}
+
+
+@router.get("/lo-nap")
+def lo_nap(limit: int = 100, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """K5 – từng lô nạp với bốn con số DÒNG và bốn con số TIỀN, kèm phần bộ đối chiếu KHÔNG che được.
+
+    Cột `cua_khong_ghi_so` là phần quan trọng nhất của bảng này: nó liệt kê những cửa nạp hàng loạt
+    ghi thẳng vào bảng mà không để lại nhật ký lô. Một bộ đối chiếu im lặng về vùng mù của mình khiến
+    người đọc yên tâm sai chỗ.
+    """
+    from app.services import ks_nap_lo as NL
+    return NL.bang(db, limit)
+
+
+@router.get("/cua-nhap")
+def cua_nhap(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Mỗi bảng dữ liệu có cửa nào để người dùng đưa số liệu vào: tải tệp, nhập tay, hay máy sinh.
+
+    `khong_cua` là cột phải luôn rỗng. Có tên trong đó nghĩa là hệ thống đang cần một con số mà không
+    có đường nào cho người nhập nó – theo ranh giới 09/9/2026 thì đó là việc còn thiếu.
+    """
+    from app.services import ks_cua_nhap as CN
+    return CN.bang(db)

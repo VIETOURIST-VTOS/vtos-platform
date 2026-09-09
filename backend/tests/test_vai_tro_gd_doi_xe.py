@@ -142,3 +142,59 @@ def test_danh_sach_cho_phep_khong_bi_bo_ngo(gd):
     assert "gd_doi_xe" in AC.RESTRICTED_API_PREFIXES
     assert "gd_doi_xe" in AC.RESTRICTED_ROLE_MENUS
     assert set(AC.RESTRICTED_ROLE_MENUS["gd_doi_xe"]) >= {"/doi-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe"}
+
+
+# ---------------------------------------------------------------- 3. Có quyền mà không có cửa thì bằng không
+def test_lay_duoc_tour_de_lap_lenh_bang_chinh_tai_khoan_cua_minh(gd):
+    """Ông phải tự lấy được mã tour để điền vào lệnh – không phải hỏi người khác.
+
+    Phép thử lập lệnh ở trên (07/9) mượn token của CNTT để lấy mã tour:
+
+        tours = client.get("/api/v1/tours", headers=login("cntt"))
+
+    Dòng ấy chứng minh endpoint lập lệnh chạy được, nhưng cũng nói ra – mà lúc viết không ai để ý – rằng
+    chính người lập lệnh KHÔNG lấy nổi mã tour bằng tài khoản của mình. Trên máy thử thì mượn một token là
+    xong; ngoài đời thì ông phải nhắn cho Điều hành hỏi mã tour trước mỗi lệnh, và cái phân hệ trông như
+    đang chạy thật ra đang chạy bằng tin nhắn.
+
+    Cách chữa KHÔNG phải mở /api/v1/tours cho ông (phép thử ngoài phạm vi ở trên giữ chỗ đó đóng): tour mang
+    giá bán, dự toán và biên lợi nhuận. Đường /api/v1/fleet/de-lap-lenh trả đúng phần lịch trình.
+    """
+    h = login(gd)
+    tu = HOM_NAY + timedelta(days=400)
+    r = client.get(f"/api/v1/fleet/de-lap-lenh?tu={tu}&den={tu + timedelta(days=1)}", headers=h)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert set(d) >= {"tour", "bang_gia", "nguoi_duoc_lap_lenh", "toi_duoc_lap"}
+    assert d["toi_duoc_lap"] is True, "tham số đang trỏ vào ông mà đường này lại bảo ông không được lập"
+
+
+def test_duong_de_lap_lenh_khong_kem_mot_con_so_tien_nao_cua_tour(gd):
+    """Mở một cửa hẹp thì phải hẹp thật.
+
+    Nếu đường này tiện tay trả nguyên bản ghi tour thì nó vừa chở theo giá bán, dự toán, biên lợi nhuận và
+    giải trình dưới biên – tức là mở /api/v1/tours bằng lối khác, trong khi phép thử ngoài phạm vi ở trên
+    vẫn xanh và không ai biết hàng rào đã thủng.
+    """
+    h = login(gd)
+    tu = HOM_NAY
+    r = client.get(f"/api/v1/fleet/de-lap-lenh?tu={tu}&den={tu + timedelta(days=60)}", headers=h)
+    assert r.status_code == 200, r.text
+    cam = {"price_per_pax", "fixed_cost", "var_cost_per_pax", "below_margin", "justification",
+           "revenue", "profit", "margin", "doanh_thu", "loi_nhuan"}
+    for t in r.json()["tour"]:
+        thua = cam & set(t)
+        assert not thua, f"đường lập lệnh đang chở theo số tiền của tour: {sorted(thua)}"
+        assert set(t) == {"id", "code", "name", "start_date", "end_date", "planned_pax"}, (
+            f"cột lạ trong danh sách tour để lập lệnh: {sorted(set(t))}")
+
+
+def test_nguoi_khac_hoi_duong_nay_thi_duoc_bao_la_khong_duoc_lap(gd):
+    """Đường trả sẵn câu trả lời cho câu hỏi "tôi có được chốt không", để màn hình nói bằng lời thay vì để
+    người dùng bấm nút rồi nhận 403 – lỗi 403 không nói được ai mới là người được bấm."""
+    tu = HOM_NAY
+    r = client.get(f"/api/v1/fleet/de-lap-lenh?tu={tu}&den={tu}", headers=login("cntt"))
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["toi_duoc_lap"] is False
+    assert d["nguoi_duoc_lap_lenh"], "phải nói ra AI được lập, không chỉ nói 'anh thì không'"

@@ -34,6 +34,9 @@ LOAI_PHAT_HIEN = {
     "bat_buoc_de_trong": "Cột bắt buộc nhưng đang để trống",
     "quyen_thua_man_hinh": "Khai quyền cho màn hình không tồn tại",
     "man_hinh_ho_quyen": "Màn hình không khai quyền – ai đăng nhập cũng thấy",
+    "nap_lo_lech": "Lô nạp lệch số dòng hoặc lệch tổng tiền",
+    "nap_lo_ngoai_so": "Cửa nạp hàng loạt không ghi nhật ký lô – đối chiếu không nhìn thấy",
+    "bang_khong_cua_nhap": "Bảng không có cửa nào để người dùng nhập số liệu vào",
 }
 
 

@@ -53,7 +53,6 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const [grates, setGrates] = useState<any[]>([]);
   const [fGrate, setFGrate] = useState<any>({ route: "", days: "", rate_per_day: "", old_rate_per_day: "", effective_from: new Date().toISOString().slice(0, 10) });
   const [incMeta, setIncMeta] = useState<any>(null);
-  const [fDisp, setFDisp] = useState<any>({ tour_id: "", vehicle_id: "", date_from: "", date_to: "", rate_id: "" });
   const [rates, setRates] = useState<any[]>([]);
   const [fRate, setFRate] = useState<any>({ route: "", days: "", internal_price: "", partner_price: "", effective_from: new Date().toISOString().slice(0, 10) });
   const [fInc, setFInc] = useState<any>({ employee_id: "", level: "2", description: "", occurred_on: new Date().toISOString().slice(0, 10) });
@@ -66,7 +65,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     if (tab === "payroll") api(`/payroll-runs/${period}`).then(setRun).catch((e) => toast(errMsg(e), true));
     if (tab === "payroll") { api("/payroll/khoan-treo").then(setTreo).catch(() => {}); api("/payroll/xung-dot-ho-so").then(setXungDot).catch(() => {}); }
     if (tab === "payroll") { api(`/payroll-runs/${period}/phieu-luong`).then(setPhieu).catch(() => setPhieu(null)); api(`/payroll-runs/${period}/theo-phap-nhan`).then(setPhapNhan).catch(() => setPhapNhan(null)); }
-    if (tab === "employees") api("/employees").then(setEmps);
+    if (tab === "employees") { api("/employees").then(setEmps); api("/companies").then(setCos).catch(() => {}); }
     if (tab === "employees") api("/users/khoa").then(setKhoa).catch(() => {});
     if (tab === "visa") api("/visa").then(setVisa);
     if (tab === "guides") { api("/guide-assignments").then(setAsg); api("/guide-rates").then(setGrates); }
@@ -190,8 +189,21 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         <table><thead><tr><th>Tài khoản</th><th>Họ tên</th><th>Mã NV</th><th>Vai trò</th><th></th></tr></thead>
           <tbody>{khoa.map((k) => <tr key={k.id}><td className="mono">{k.username}</td><td>{k.full_name}</td><td className="mono">{k.staff_code}</td><td>{k.role_name}</td>
             <td><button className="act" style={{ margin: 0 }} onClick={() => post(`/users/${k.id}`, { active: true }, "PUT").then(() => api("/users/khoa").then(setKhoa))}>Mở lại</button></td></tr>)}</tbody></table></div>}
-      <div className="panel wrap"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Phòng</th><th>Nhóm</th><th>Chức vụ</th><th>VP</th><th>HĐ</th><th style={{ textAlign: "right" }}>Lương CV</th><th>Công việc chính</th><th>Ngày sinh</th><th>Điện thoại</th><th>Thẻ HDV</th><th>Trạng thái</th>{canHR && <th></th>}</tr></thead>
-        <tbody>{emps.map((e) => <tr key={e.id} style={{ opacity: e.active ? 1 : 0.55 }}><td className="mono">{e.code}</td><td><b>{e.full_name}</b></td><td>{e.department_name}</td><td>{e.sales_group}</td><td>{e.title || e.position_name}</td><td>{e.office_name}</td><td>{e.contract_type === "hdld" ? "HĐLĐ" : e.contract_type === "ctv" ? "CTV" : "Đối tác"}</td><td style={{ textAlign: "right" }}>{e.base_salary ? vnd(e.base_salary) : ""}</td>
+      <div className="panel wrap"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Phòng</th><th>Nhóm</th><th>Chức vụ</th><th>VP</th><th>HĐ</th><th>Pháp nhân</th><th style={{ textAlign: "right" }}>Lương CV</th><th>Công việc chính</th><th>Ngày sinh</th><th>Điện thoại</th><th>Thẻ HDV</th><th>Trạng thái</th>{canHR && <th></th>}</tr></thead>
+        <tbody>{emps.map((e) => <tr key={e.id} style={{ opacity: e.active ? 1 : 0.55 }}><td className="mono">{e.code}</td><td><b>{e.full_name}</b></td><td>{e.department_name}</td><td>{e.sales_group}</td><td>{e.title || e.position_name}</td><td>{e.office_name}</td><td>{e.contract_type === "hdld" ? "HĐLĐ" : e.contract_type === "ctv" ? "CTV" : "Đối tác"}</td>
+          {/* Pháp nhân chủ quản của TỪNG nhân sự. Trước 09/9/2026 ô này chỉ có ở bảng hướng dẫn viên và
+              bảng xe, nên pháp nhân của một tài xế không có cửa nào để HCNS tự sửa – muốn đổi thì phải
+              nhờ người gọi thẳng vào máy chủ. Một con số mà người phụ trách không tự nhập được là một
+              con số sẽ sai và ở yên đó.
+              Pháp nhân này quyết định bút toán lương thuộc công ty nào khi hợp nhất, nên nó phải nằm
+              ngay cạnh hồ sơ chứ không nằm ở một màn hình khác. */}
+          <td>{canHR
+            ? <select value={e.company_id || ""} onChange={(ev) => post(`/employees/${e.id}/company`, { company_id: ev.target.value ? Number(ev.target.value) : null })}>
+                <option value="">– chưa gán –</option>
+                {cos.filter((c) => c.active || c.id === e.company_id).map((c) => <option key={c.id} value={c.id}>{c.code}</option>)}
+              </select>
+            : (cos.find((c) => c.id === e.company_id)?.code || <Tag cls="warn">chưa gán</Tag>)}</td>
+          <td style={{ textAlign: "right" }}>{e.base_salary ? vnd(e.base_salary) : ""}</td>
           <td className="muted" style={{ maxWidth: 340 }}>{e.duties}</td><td>{fmtD(e.birth_date)}</td><td className="mono">{e.phone}</td>
           <td>{e.department === "huong_dan" && <>{e.card_no} <span className="muted">hạn {fmtD(e.card_expiry)}</span> {e.guide_ok ? <Tag cls="ok">Đủ điều kiện</Tag> : <Tag cls="red">Cổng 13</Tag>}</>}</td><td>{e.probation && <Tag cls="warn">Thử việc 85%</Tag>}{e.active ? "" : <Tag cls="red">Nghỉ</Tag>}</td>
           {canHR && <td>{e.active
@@ -258,13 +270,22 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
 
     {tab === "fleet" && <>
       {fleet && <div className="kpis"><div className="kpi"><b>{vnd(fleet.total_revenue)}</b><span>Doanh thu nội bộ Đội xe {period}</span></div>{fleet.rows.map((r: any) => <div className="kpi" key={r.vehicle}><b>{r.days} ngày</b><span>{r.vehicle} · {r.driver} · {r.trips} chuyến · CTP {vnd(r.driver_allowance)}</span></div>)}</div>}
-      {["nv_dh", "tp_dh", "cntt"].includes(role) && <div className="panel"><h2>Lệnh điều xe (Đội xe xác nhận trong 4 giờ)</h2><div className="grid">
-        <label>Tour<select value={fDisp.tour_id} onChange={(e) => setFDisp({ ...fDisp, tour_id: e.target.value })}><option value="">–</option>{tours.map((t) => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}</select></label>
-        <label>Xe<select value={fDisp.vehicle_id} onChange={(e) => setFDisp({ ...fDisp, vehicle_id: e.target.value })}><option value="">–</option>{veh.map((v) => <option key={v.id} value={v.id}>{v.plate} · {v.kind === "hop_tac" ? "xe hợp tác" : v.driver}</option>)}</select></label>
-        <label>Tuyến (bảng giá xe)<select value={fDisp.rate_id} onChange={(e) => setFDisp({ ...fDisp, rate_id: e.target.value })}><option value="">– theo ngày –</option>{rates.filter((r) => r.status === "active").map((r) => <option key={r.id} value={r.id}>{r.route}{r.days ? ` ${r.days}N` : ""} · {vnd(r.internal_price)} / HT {r.partner_price ? vnd(r.partner_price) : "–"}</option>)}</select></label>
-        <label>Từ ngày<input type="date" value={fDisp.date_from} onChange={(e) => setFDisp({ ...fDisp, date_from: e.target.value })} /></label>
-        <label>Đến ngày<input type="date" value={fDisp.date_to} onChange={(e) => setFDisp({ ...fDisp, date_to: e.target.value })} /></label>
-      </div><button className="act" disabled={!fDisp.tour_id || !fDisp.vehicle_id || !fDisp.date_from || !fDisp.date_to} onClick={() => post("/dispatch", { tour_id: Number(fDisp.tour_id), vehicle_id: Number(fDisp.vehicle_id), date_from: fDisp.date_from, date_to: fDisp.date_to, rate_id: fDisp.rate_id ? Number(fDisp.rate_id) : null })}>Lập lệnh</button></div>}
+      {/* Mẫu lập lệnh ĐÃ CHUYỂN sang /lenh-dieu-xe (09/9/2026). Không phải dọn cho gọn – mẫu cũ ở đây
+          không dùng được nữa, và nó hỏng theo kiểu im lặng:
+
+            · Tham số xe_nguoi_lap_lenh chỉ định Giám đốc điều hành đội xe là người DUY NHẤT được chốt
+              lệnh (chỉ đạo Chủ tịch 07/9/2026), nên POST /dispatch trả 403 cho cả ba vai trò từng thấy
+              mẫu này. Một mẫu chỉ để nhận 403 thì tệ hơn là không có mẫu.
+            · Mẫu cũ không gửi so_khach và km_du_kien, nên bộ gợi ý chấm điểm cho một chuyến 0 khách 0 km
+              rồi lấy kết quả ấy quyết định có bắt giải trình hay không.
+            · Mẫu cũ không có ô ly_do_khac_goi_y, nên khi máy chủ trả 422 đòi lý do thì không có chỗ để
+              điền – cụt đường thật, không phải bất tiện.
+
+          Ba vai trò cũ (nv_dh, tp_dh, cntt) đều nhìn thấy /lenh-dieu-xe, nên không ai mất đường. */}
+      <div className="panel"><h2>Lệnh điều xe</h2>
+        <p className="muted">Lập lệnh nay ở màn hình <b>Lệnh điều xe</b> (nhóm Vận tải &amp; Hướng dẫn viên) –
+        nơi có sẵn bảng gợi ý xe, ô số khách và km dự kiến, và ô ghi lý do khi chốt khác gợi ý. Bảng dưới
+        đây vẫn là nơi xác nhận và đóng lệnh.</p></div>
       <div className="panel wrap"><table><thead><tr><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Tuyến</th><th>Thời gian</th><th style={{ textAlign: "right" }}>Giá nội bộ</th><th>Pháp nhân sở hữu xe</th><th>Trạng thái</th><th>Sự cố</th>{["cntt", "tp_dh", "nv_dh", "hcns"].includes(role) && <th></th>}</tr></thead>
         <tbody>{disp.map((d) => <tr key={d.id}><td><b>{d.tour_code}</b></td><td>{d.vehicle}</td><td>{d.driver}</td><td className="muted">{d.route}</td><td>{fmtD(d.date_from)} → {fmtD(d.date_to)} ({d.days} ngày)</td><td style={{ textAlign: "right" }}>{vnd(d.internal_price)}</td>
           <td>{d.company ? <>{d.company_code} {d.noi_bo && <Tag cls="navy">nội bộ</Tag>}</> : <Tag cls="warn">chưa gán</Tag>}</td>

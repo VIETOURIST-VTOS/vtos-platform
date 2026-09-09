@@ -30,7 +30,15 @@ revision = "v10a7f3c9e1b48"
 # zb2c3d4e5f6a (nhật ký tổng đài), cũng rẽ từ za1b2c3d4e5f. Đếm đầu mạch trên NHÁNH NÀY vẫn ra một
 # đầu và vẫn xanh – mạch chỉ tách làm hai vào ĐÚNG lúc gộp, tức là lúc không ai còn nhìn nữa và
 # container thì đã dừng. Nên phép đếm đúng là đếm trên origin, không phải trên thư mục đang mở.
-down_revision = "zb2c3d4e5f6a"
+#
+# NỐI LẠI LẦN BA – lúc GỘP THẬT 09/9/2026. Trong lúc nhánh này chạy, main lại nhận thêm
+# zc3d4e5f6a7b (bốn số tiền cho lô nạp), cũng rẽ từ zb2c3d4e5f6a. Gộp xong đếm ra HAI đầu mạch, đúng
+# như dự đoán khi nối lần hai – và lần này bắt được vì đã đếm NGAY SAU KHI GỘP, trước khi đẩy lên.
+#
+# Ba lần cùng một lỗi trên cùng một mạch, không lần nào do viết sai. Lỗi nằm ở chỗ ĐẾM: đếm trên
+# nhánh của mình thì hai phiên làm song song không bao giờ thấy nhau, và mạch chỉ tách vào đúng lúc
+# gộp. Phép đếm đúng là đếm SAU KHI ĐÃ GỘP, và phải làm trước khi đẩy lên.
+down_revision = "zc3d4e5f6a7b"
 branch_labels = None
 depends_on = None
 

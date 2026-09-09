@@ -250,3 +250,21 @@ def pham_vi_phien(u: User = Depends(current_user), db: Session = Depends(get_db)
             "chua_gan_tong": sum(d["chua_gan"] for d in dong),
             "ghi_chu": "Hồ sơ chưa xác định pháp nhân vẫn hiện trong danh sách và được đánh dấu "
                        "'chua_gan'. Nó không thuộc công ty mẹ – phải do Điều hành/Kế toán gán."}
+
+
+@router.get("/pham-vi/phu-kin")
+def phu_kin_phap_nhan(u: User = Depends(require_roles(*WRITE, "hcns", "bks")),
+                      db: Session = Depends(get_db)):
+    """Mọi bảng có cột pháp nhân: bảng nào đã gán hết, bảng nào còn, bảng nào rỗng.
+
+    Bảng đối chiếu ở màn hình Công ty chỉ theo dõi năm loại hồ sơ chính. Cửa này cho thấy phần còn
+    lại – vì một cột pháp nhân không ai nhìn tới thì đến kỳ hợp nhất, phần dữ liệu ấy không thuộc
+    công ty nào cả.
+
+    Mở cho nhóm ĐI GÁN (Kế toán, CNTT, TGĐ, Chủ tịch, HCNS) và Ban Kiểm soát, không mở cho mọi người:
+    bảng này kể tên mọi bảng dữ liệu và số dòng của chúng – đó là bản đồ kho, không phải số liệu công
+    việc hằng ngày. Tiền tố /api/v1/pham-vi nằm trong nhóm API chung nên hàng rào ngoài cho đi qua;
+    ranh giới thật nằm ở chữ ký này.
+    """
+    from app.services import pham_vi_phap_nhan as PV
+    return PV.do_phu_kin(db)

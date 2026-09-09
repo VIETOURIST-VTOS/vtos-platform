@@ -21,6 +21,11 @@ function NhaCungCap() {
   const [tours, setTours] = useState<any[]>([]);
   const [tab, setTab] = useState<"ncc" | "don" | "tk">("ncc");
   const [tepNcc, setTepNcc] = useState("");   // mã NCC đang xem hồ sơ tệp
+  // Mã đơn đặt dịch vụ đang mở tệp. Máy chủ khai "don_dich_vu" là đối tượng gắn được tệp từ đầu, nhưng đến
+  // 09/9/2026 không màn hình nào dựng ô ấy. Đơn đặt dịch vụ là chỗ chứng minh một khoản chi có thật: xác
+  // nhận đặt phòng của khách sạn, phiếu báo giá, tin nhắn chốt suất ăn. Không có chỗ để nằm thì chúng nằm
+  // trong Zalo của người đặt – và đến lúc cần chứng minh thì người ấy đã nghỉ việc.
+  const [tepDon, setTepDon] = useState("");
   const [form, setForm] = useState<any>(null);       // form hồ sơ NCC
   const [formTk, setFormTk] = useState<any>(null);   // form đề nghị đổi tài khoản
   const [formDon, setFormDon] = useState<any>(null); // form đặt dịch vụ
@@ -208,12 +213,16 @@ function NhaCungCap() {
             <td><Tag cls={d.status === "da_su_dung" ? "ok" : d.status === "huy" ? "red" : "warn"}>{d.status_ten}</Tag>
               {d.xac_nhan_ncc && <div className="muted">{d.xac_nhan_ncc}</div>}</td>
             {canWrite && <td style={{ whiteSpace: "nowrap" }}>
+              <button className="act grey" onClick={() => setTepDon(tepDon === d.code ? "" : d.code)}>
+                {tepDon === d.code ? "Đóng tệp" : "Tệp"}</button>{" "}
               {d.status === "nhap" && <button className="act grey" onClick={() => trangThai(d.id, "da_gui")}>Đã gửi NCC</button>}
               {d.status === "da_gui" && <button className="act grey" onClick={() => trangThai(d.id, "da_xac_nhan")}>NCC xác nhận</button>}
               {d.status === "da_xac_nhan" && <button className="act grey" onClick={() => trangThai(d.id, "da_su_dung")}>Đã sử dụng</button>}
             </td>}
           </tr>) : <tr><td colSpan={canWrite ? 10 : 9} className="muted">Chưa có đơn đặt dịch vụ nào.</td></tr>}</tbody></table>
       </div>
+      {tepDon && <DinhKem doiTuong="don_dich_vu" doiTuongId={tepDon}
+                          tieuDe={`Chứng từ của đơn đặt dịch vụ ${tepDon}`} />}
     </>}
 
     {tab === "ncc" && <div className="panel">

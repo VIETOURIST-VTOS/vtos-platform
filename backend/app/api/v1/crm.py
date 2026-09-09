@@ -246,3 +246,77 @@ async def zalo_webhook(request: Request, db: Session = Depends(get_db), x_zevent
     except ValueError: raise HTTPException(400, "JSON không hợp lệ")
     if not Z.verify_signature(body, x_zevent_signature or "", str(ev.get("timestamp") or "")): raise HTTPException(401, "Sai chữ ký Zalo")
     return Z.on_webhook(db, ev)
+
+
+# ============================ TỔNG ĐÀI – NGHE TRƯỚC, HIỂU SAU ============================
+# P.A Việt Nam có bốn API tổng đài nhưng không công bố đặc tả. Hai đường dẫn dưới đây KHÔNG diễn giải
+# gì cả: một đầu nhận ghi nguyên văn, một đầu đọc để người viết phần diễn giải nhìn thấy dữ liệu thật.
+# Xem ghi chú đầy đủ ở app/services/tong_dai.py.
+@router.api_route("/tong-dai/cuoc-goi/{ma}", methods=["GET", "POST"])
+async def tong_dai_nhan(ma: str, request: Request, nguon: str = "pavietnam",
+                        db: Session = Depends(get_db)):
+    """Đầu nhận công khai – tổng đài không gửi được chuỗi đăng nhập của VTOS, nên khoá nằm ở đường dẫn.
+
+    Trả 200 kể cả khi ghi hỏng: nhà cung cấp thường TẮT webhook sau vài lần nhận mã lỗi, và mất webhook
+    thì mất luôn cơ hội nhìn thấy giao thức. Lỗi ghi thì báo qua nhật ký kỹ thuật, không báo ra ngoài.
+    """
+    from app.services import tong_dai as TD
+    if not TD.kiem_ma(ma):
+        raise HTTPException(404, "Not Found")     # 404 chứ không 403: không xác nhận đường dẫn có tồn tại
+    try:
+        than = (await request.body()).decode("utf-8", "replace")
+    except Exception:
+        than = ""
+    try:
+        TD.ghi(db, nguon=nguon, phuong_thuc=request.method, duong_dan=str(request.url.path),
+               chuoi_truy_van=str(request.url.query), than=than,
+               dau_muc=dict(request.headers), ip=(request.client.host if request.client else ""))
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"ok": True}
+
+
+@router.get("/tong-dai/su-kien")
+def tong_dai_su_kien(limit: int = 50, nguon: str = "",
+                     u: User = Depends(require_roles("cntt", "tgd", "chutich", "bks")),
+                     db: Session = Depends(get_db)):
+    """Tổng đài thật sự gửi gì sang. `khoa_thay` là đặc tả dựng lại từ quan sát – thứ nhà cung cấp không đưa."""
+    from app.services import tong_dai as TD
+    return TD.bang(db, limit, nguon)
+
+
+@router.get("/tong-dai/khoi-luong")
+def tong_dai_khoi_luong(tu: str = "", den: str = "",
+                        u: User = Depends(require_roles("cntt", "tgd", "chutich", "bks")),
+                        db: Session = Depends(get_db)):
+    """Bước 1 của việc nối tổng đài: ĐO trước khi đề xuất.
+
+    Trả về số cuộc, tổng phút, số cuộc có ghi âm của một khoảng ngày, kèm ước chi phí chuyển giọng nói
+    thành văn bản theo đúng số phút đo được. KHÔNG trả về số điện thoại nào – câu hỏi "một tháng gọi
+    bao nhiêu phút" không cần biết số của ai.
+    """
+    from datetime import date, timedelta
+    from app.services import pa_tong_dai as PA
+    if not PA.da_khai():
+        return {"da_khai_khoa": False,
+                "huong_dan": "Khai PA_TONG_DAI_API_KEY trên máy chủ. Khoá lấy ở crm.pavietnam.vn → "
+                             "Người phát triển → Kiểm thử API → API Call Now, ô api_key."}
+    hom_nay = date.today()
+    tu = tu or str(hom_nay - timedelta(days=30))
+    den = den or str(hom_nay)
+    try:
+        d = PA.do_khoi_luong(tu, den)
+    except Exception as ex:
+        raise HTTPException(502, f"Không đọc được lịch sử cuộc gọi: {str(ex)[:200]}")
+    return {"da_khai_khoa": True, **d, "uoc_chi_phi": PA.uoc_chi_phi_chuyen_chu(d["phut_co_ghi_am"])}
+
+
+@router.get("/tong-dai/chan-doan")
+def tong_dai_chan_doan(u: User = Depends(require_roles("cntt", "tgd", "chutich")),
+                       db: Session = Depends(get_db)):
+    """P.A nhận dạng tham số nào – hỏi chính nó thay vì đoán. CHỈ ĐỌC, không đổi gì bên tổng đài."""
+    from app.services import pa_tong_dai as PA
+    if not PA.da_khai():
+        raise HTTPException(400, "Chưa khai PA_TONG_DAI_API_KEY trên máy chủ")
+    return PA.chan_doan()
