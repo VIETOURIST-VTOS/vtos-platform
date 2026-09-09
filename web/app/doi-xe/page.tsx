@@ -458,6 +458,22 @@ function DoiXe() {
       <button className="act grey" onClick={() => setChon(null)}>Đóng</button>
     </div>}
 
+    {/* Ô đính kèm cho HỒ SƠ XE. Máy chủ khai "xe" là đối tượng gắn được tệp từ đầu, nhóm hồ sơ 01_Pháp lý,
+        nhưng đến 09/9/2026 không màn hình nào dựng ô ấy – nên bản chụp đăng kiểm, bảo hiểm, phù hiệu không
+        có chỗ nào để nằm. Điều đó không chỉ bất tiện: tham số xe_chan_khi_thieu_giay chặn phát lệnh khi xe
+        thiếu giấy, mà giấy thì chỉ có dòng khai hạn chứ không có bản chụp – bật cổng ấy lên thành ra tin
+        vào một ô ngày do người gõ, không có gì đối chiếu.
+
+        doiTuongId dùng MÃ XE, không dùng biển số. Biển đổi thì hồ sơ vẫn phải nằm cùng một chỗ – đó đúng
+        là lý do hệ thống có cột mã xe cố định bên cạnh lịch sử biển. */}
+    {tab === "xe" && chon && (chon.code
+      ? <DinhKem doiTuong="xe" doiTuongId={chon.code} loai="hop_dong"
+                 tieuDe={`Giấy tờ xe ${chon.code} · ${chon.plate}`} />
+      : <div className="panel"><h2>Giấy tờ xe</h2>
+          <p className="muted">Xe này <b>chưa có mã xe cố định</b> nên chưa gắn tệp được. Tệp gắn theo mã chứ
+          không theo biển – biển đổi mà hồ sơ đi theo biển thì giấy tờ của một chiếc xe nằm rải ở hai chỗ.
+          Đặt mã cho xe ở bảng trên rồi quay lại.</p></div>)}
+
     {tab === "xe" && <div className="panel wrap"><h2>Hàng đợi xác minh hồ sơ ({xm.filter((x) => x.status !== "xong" && x.status !== "khong_ap_dung").length} còn treo)</h2>
       <p className="muted">Những việc hệ thống không tự quyết được và cần người trả lời. Hệ thống nói ra chỗ nó không chắc, thay vì tự điền cho đủ form.</p>
       <table><thead><tr><th>Đối tượng</th><th>Việc cần xác minh</th><th>Nguồn</th><th>Trạng thái</th><th>Kết luận</th>{canWrite && <th></th>}</tr></thead>
