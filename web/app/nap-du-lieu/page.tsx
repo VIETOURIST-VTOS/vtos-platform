@@ -26,6 +26,11 @@ function NapDuLieu() {
   const [kt, setKt] = useState<any>(null);
   const [ls, setLs] = useState<any[]>([]);
   const [boQua, setBoQua] = useState(false);
+  // Cửa nhập tay một dòng. Gửi TÊN CỘT TIẾNG VIỆT y như tệp, không gửi khóa kỹ thuật: hai cửa đi
+  // chung một đường đọc cột thì không có chuyện cửa này nhận mà cửa kia từ chối cùng một con số.
+  const [cheDo, setCheDo] = useState<"tep" | "tay">("tep");
+  const [tay, setTay] = useState<Record<string, any>>({});
+  const [ketTay, setKetTay] = useState<any>(null);
   const [dang, setDang] = useState(false);
   // Quyền nạp đọc theo TỪNG BỘ NẠP do máy chủ công bố, không chép lại danh sách vai trò ở đây: chép là
   // sớm muộn hai bên lệch nhau, và bên lỏng hơn luôn là bên người dùng nhìn thấy.
@@ -60,6 +65,23 @@ function NapDuLieu() {
       if (!r.ok) throw { status: r.status, message: d?.detail || "Không đọc được tệp" };
       setKt(d); setRows(d.rows || []); setTenTep(d.ten_tep || f.name);
       toast(`Đã đọc ${d.so_dong} dòng – xem kết quả kiểm tra bên dưới`);
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+
+  const nhapMotDong = async () => {
+    setDang(true); setKetTay(null);
+    try {
+      const row: Record<string, any> = {};
+      (chon?.cot || []).forEach((c: any) => {
+        const v = tay[c.key];
+        // Ô để trống thì KHÔNG gửi khóa đó lên. Gửi chuỗi rỗng là bảo hệ thống "số này bằng rỗng",
+        // khác hẳn với "chưa có số" — và chỗ khác nhau đó là chỗ sinh ra giá vốn bằng 0.
+        if (v !== undefined && v !== "" && v !== null) row[c.ten] = v;
+      });
+      const d = await api<any>("/nap-du-lieu/nhap-mot-dong", { method: "POST", json: {
+        loai, row, cua: "nhap_tay" } });
+      setKetTay(d); toast(d.message, !d.da_ghi);
+      if (d.da_ghi) { setTay({}); setLs(await api("/nap-du-lieu/lich-su")); }
     } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
   };
 
@@ -108,12 +130,64 @@ function NapDuLieu() {
     </div>
 
     <div className="panel">
-      <h2>2. Tải tệp lên và kiểm tra</h2>
-      <p className="muted">Bước này <b>chưa ghi gì</b> vào hệ thống. Nhận tệp .csv hoặc .xlsx, hàng đầu là
-        tên cột — tên cột viết hoa hay thường đều được.</p>
-      <input type="file" accept=".csv,.xlsx,.xlsm" disabled={dang}
-             onChange={(e) => { const f = e.target.files?.[0]; if (f) kiemTraTep(f); }} />
-      {tenTep && <p className="muted">Tệp: <b>{tenTep}</b> · {rows.length} dòng</p>}
+      <h2>2. Đưa dữ liệu vào</h2>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button className={cheDo === "tep" ? "act teal" : "act grey"}
+                onClick={() => { setCheDo("tep"); setKetTay(null); }}>Tải tệp Excel / CSV</button>
+        <button className={cheDo === "tay" ? "act teal" : "act grey"}
+                onClick={() => { setCheDo("tay"); setKt(null); setRows([]); }}>Nhập tay một dòng</button>
+      </div>
+
+      {cheDo === "tep" ? <>
+        <p className="muted">Bước này <b>chưa ghi gì</b> vào hệ thống. Nhận tệp .csv hoặc .xlsx, hàng đầu là
+          tên cột — tên cột viết hoa hay thường đều được.</p>
+        <input type="file" accept=".csv,.xlsx,.xlsm" disabled={dang}
+               onChange={(e) => { const f = e.target.files?.[0]; if (f) kiemTraTep(f); }} />
+        {tenTep && <p className="muted">Tệp: <b>{tenTep}</b> · {rows.length} dòng</p>}
+      </> : <>
+        <p className="muted">Sửa một dòng sai mà phải mở tệp, sửa, rồi nạp lại cả lô là cách chắc chắn để
+          người ta thôi không sửa nữa. Cửa này ghi <b>đúng một dòng</b>, qua đúng bộ kiểm và đúng khóa
+          chống trùng của cửa tệp — không có đường tắt nào riêng cho nó.</p>
+        {!canNap && <p className="muted"><Tag cls="warn">chỉ xem</Tag> Loại dữ liệu này thuộc phòng khác
+          nên nút ghi đang khóa.</p>}
+        <div className="grid2">
+          {(chon?.cot || []).map((c: any) => {
+            const dat = (v: any) => setTay((t) => ({ ...t, [c.key]: v }));
+            const v = tay[c.key] ?? "";
+            return (<label key={c.key}>
+              {c.ten}{c.bat_buoc && <span style={{ color: "var(--red)" }}> *</span>}
+              {c.kieu === "chon" && c.chon
+                ? <select value={v} onChange={(e) => dat(e.target.value)}>
+                    <option value="">— chọn —</option>
+                    {Object.entries(c.chon).map(([k, t]: any) => <option key={k} value={k}>{t}</option>)}
+                  </select>
+                : c.kieu === "co_khong"
+                ? <select value={v} onChange={(e) => dat(e.target.value)}>
+                    <option value="">— chưa có —</option><option value="1">Có</option><option value="0">Không</option>
+                  </select>
+                : <input type={c.kieu === "ngay" ? "date" : c.kieu === "thang" ? "month" : "text"}
+                         inputMode={c.kieu === "so" || c.kieu === "tien" ? "numeric" : undefined}
+                         value={v} placeholder={c.vi_du || ""}
+                         onChange={(e) => dat(e.target.value)} />}
+              {c.ghi_chu && <span className="muted" style={{ fontSize: 12 }}>{c.ghi_chu}</span>}
+            </label>);
+          })}
+        </div>
+        <p className="muted" style={{ marginTop: 8 }}>Ô để trống nghĩa là <b>chưa có số</b> — hệ thống để
+          rỗng, không tự hiểu thành 0.</p>
+        <button className="act teal" disabled={dang || !canNap} onClick={nhapMotDong}>
+          {dang ? "Đang ghi…" : "Ghi một dòng vào hệ thống"}</button>
+        <button className="act grey" style={{ marginLeft: 8 }} disabled={dang}
+                onClick={() => { setTay({}); setKetTay(null); }}>Xóa biểu</button>
+
+        {ketTay && <div style={{ marginTop: 12 }}>
+          {ketTay.da_ghi
+            ? <p><Tag cls="ok">đã ghi</Tag> {ketTay.ket_qua ? <b>{ketTay.ket_qua}</b> : null} {ketTay.message}</p>
+            : <p><Tag cls="red">chưa ghi</Tag> {ketTay.message}</p>}
+          {ketTay.loi?.map((l: string, i: number) => <div key={i}><Tag cls="red">{l}</Tag></div>)}
+          {ketTay.canh_bao?.map((c: string, i: number) => <div key={i} className="muted">{c}</div>)}
+        </div>}
+      </>}
     </div>
 
     {kt && <div className="panel">
