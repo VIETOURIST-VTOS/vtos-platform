@@ -239,3 +239,30 @@ def test_kt12_quyet_dinh_08_09_da_duoc_ghi_va_khong_de_len_nguoi_khac():
         r.quyet_k2, r.quyet_k2_boi = "sua", "chutich"; db.commit()
     finally:
         db.close()
+
+
+def test_dem_phan_le_khong_chay_tren_sqlite_va_noi_ro_vi_sao():
+    """Phép đo phần lẻ chỉ có nghĩa trên PostgreSQL.
+
+    SQLite không ép kiểu cột, nên đo ở máy lập trình luôn ra một con số đẹp và con số đó không nói gì
+    về máy chủ thật. Trả "chạy được: không" kèm lý do còn hơn trả 0 – một số 0 giả làm người đọc yên
+    tâm rằng đổi kiểu là an toàn, đúng lúc họ cần cẩn thận nhất.
+    """
+    from app.services import ks_cot_tien as CT
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    kq = CT.dem_phan_le(db)
+    assert kq["chay_duoc"] is False
+    assert kq["tong_dong_se_lam_tron"] is None, "không đo được thì trả None, KHÔNG trả 0"
+    assert "PostgreSQL" in kq["vi_sao"]
+    db.close()
+
+
+def test_sql_dem_phan_le_tu_tim_cot_khong_doc_danh_sach_chep_tay():
+    """Danh sách cột chép tay thì cột thêm sau sẽ lọt – và lọt đúng vào lúc không ai rà lại."""
+    from app.services.ks_cot_tien import SQL_PHAN_LE
+    s = SQL_PHAN_LE.lower()
+    assert "information_schema.columns" in s, "phải tự tìm cột từ siêu dữ liệu"
+    assert "double precision" in s and "real" in s, "phải bắt cả hai kiểu số thực nhị phân"
+    assert "count(*)" in s and "insert" not in s and "update" not in s and "alter" not in s, \
+        "phép đo này CHỈ ĐỌC – chạy lúc hệ thống đang phục vụ"

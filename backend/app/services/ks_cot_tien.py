@@ -314,3 +314,57 @@ def nap_quyet_dinh(db: Session) -> dict:
         n2 += 1
     if n1 or n2: db.commit()
     return {"xep_loai": n1, "quyet_k2": n2}
+
+
+# ============================== ĐẾM PHẦN LẺ TRƯỚC KHI ĐỔI KIỂU ==============================
+#
+# Cửa sổ đo này chỉ mở MỘT LẦN. numeric(18,2) giữ đúng hai chữ số thập phân; giá trị đang có chữ số
+# thứ ba trở đi sẽ bị LÀM TRÒN lúc đổi kiểu, và đó là thay đổi không quay lại được – hạ cấp khôi phục
+# KIỂU, không khôi phục SỐ. Đếm sau khi đã đổi thì luôn ra 0, vì cột mới không giữ nổi chữ số thứ ba,
+# nên nó không chứng minh được gì.
+#
+# Truy vấn tự tìm MỌI cột số thực nhị phân trong cơ sở dữ liệu chứ không đọc từ danh sách chép tay:
+# danh sách chép tay thì cột thêm sau sẽ lọt. Nội dung SQL lấy từ
+# docs/VTOS_V9_dot3_dem_phan_le_truoc_khi_doi_kieu.sql (làn V9 soạn 09/9/2026).
+#
+# CHỈ ĐỌC. Chạy được lúc hệ thống đang phục vụ.
+
+SQL_PHAN_LE = """
+SELECT c.table_name || '.' || c.column_name AS cot,
+       (xpath('/row/c/text()', query_to_xml(
+          format('SELECT COUNT(*) AS c FROM public.%I WHERE %I IS NOT NULL AND %I*100 <> ROUND(%I::numeric*100)',
+                 c.table_name, c.column_name, c.column_name, c.column_name),
+          false, true, '')))[1]::text::bigint AS so_dong_co_le
+FROM information_schema.columns c
+JOIN information_schema.tables t
+  ON t.table_schema = c.table_schema
+ AND t.table_name  = c.table_name
+ AND t.table_type  = 'BASE TABLE'
+WHERE c.table_schema = 'public'
+  AND c.data_type IN ('double precision', 'real')
+ORDER BY 2 DESC, 1
+"""
+
+
+def dem_phan_le(db: Session) -> dict:
+    """Bao nhiêu dòng sẽ bị LÀM TRÒN nếu đổi cột số thực nhị phân sang numeric(18,2)?
+
+    Ra 0 ở mọi cột nghĩa là đổi kiểu là phép biến đổi không mất gì – lúc đó mới nên đổi. Khác 0 thì
+    phải xem từng cột và quyết TRƯỚC, không đổi rồi mới xem.
+    """
+    from sqlalchemy import text
+    if db.bind.dialect.name != "postgresql":
+        return {"chay_duoc": False,
+                "vi_sao": "Phép đo này chỉ chạy trên PostgreSQL. Máy lập trình dùng SQLite – nơi kiểu "
+                          "cột không được ép, nên đo ở đó không nói gì về máy chủ thật.",
+                "cot": [], "tong_dong_se_lam_tron": None}
+    hang = db.execute(text(SQL_PHAN_LE)).all()
+    cot = [{"cot": r[0], "so_dong_co_le": int(r[1] or 0)} for r in hang]
+    return {"chay_duoc": True,
+            "so_cot_so_thuc": len(cot),
+            "cot_co_phan_le": [c for c in cot if c["so_dong_co_le"] > 0],
+            "tong_dong_se_lam_tron": sum(c["so_dong_co_le"] for c in cot),
+            "ket_luan": ("Không dòng nào mất số khi đổi kiểu."
+                         if not any(c["so_dong_co_le"] for c in cot) else
+                         "CÓ dòng sẽ bị làm tròn – phải quyết từng cột TRƯỚC khi đổi."),
+            "cot": cot}

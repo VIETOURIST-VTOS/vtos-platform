@@ -127,3 +127,13 @@ def cua_nhap(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_d
     """
     from app.services import ks_cua_nhap as CN
     return CN.bang(db)
+
+
+@router.get("/cot-tien/phan-le")
+def cot_tien_phan_le(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """K1 – bao nhiêu dòng sẽ bị LÀM TRÒN nếu đổi cột số thực nhị phân sang numeric(18,2)?
+
+    Phải chạy TRƯỚC khi đổi kiểu: đổi rồi thì đếm luôn ra 0, vì cột mới không giữ nổi chữ số thứ ba.
+    Cửa sổ đo này chỉ mở một lần. CHỈ ĐỌC.
+    """
+    return CT.dem_phan_le(db)
