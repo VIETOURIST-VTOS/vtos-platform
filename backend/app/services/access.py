@@ -273,6 +273,10 @@ MAN_HINH_API = {
     # V11 – Lịch tự động hóa. Phạm vi API HẸP: chỉ nhánh /tu-dong. Màn hình này chỉ đọc trạng thái
     # tác vụ; nó không cần chạm vào bất kỳ số liệu nghiệp vụ nào.
     "/tu-dong-hoa": ("/api/v1/tu-dong",),
+    # Báo cáo tự động theo phòng ban. Phạm vi API hẹp: chỉ nhánh /bao-cao. Ai xem được BÁO CÁO NÀO
+    # thì máy chủ quyết theo vai trò (bao_cao_phong.pham_vi_duoc_xem), không quyết ở cửa màn hình –
+    # cửa màn hình chỉ có hai trạng thái mở/đóng, mà ở đây cần "mở đúng phần của mình".
+    "/bao-cao": ("/api/v1/bao-cao",),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
@@ -493,6 +497,17 @@ MENU_ROLES = {
     # thì hẹp, và chỗ chặn đó nằm ở API (tuple KHAI trong api/v1/tu_dong.py), không ở cửa màn hình.
     "/tu-dong-hoa": BASE_VIEW + ("cntt", "ketoan", "hcns", "tp_dh", "nv_dh", "gd_doi_xe",
                                  "tp_hd", "gd_kd", "tp_kd", "ptgd_mkt"),
+    # CHỈ mở cho vai trò CÓ ít nhất một báo cáo. Vai trò không có báo cáo nào thì không thấy mục
+    # menu này luôn – tốt hơn là thấy mục menu rồi bấm vào nhận thông báo "không có gì cho anh/chị",
+    # vì mục menu chết làm người ta bấm lại mỗi tuần để xem đã có chưa.
+    # Danh sách này phải khớp với bao_cao_phong.PHONG[*]["xem"]; lệch thì có vai trò mở được màn hình
+    # mà không có báo cáo nào, hoặc ngược lại – có bộ kiểm canh chỗ đó.
+    # CNTT KHÔNG có trong danh sách này, khác với hầu hết màn hình khác. Báo cáo ở đây là hiệu quả
+    # kinh doanh của từng phòng, không phải tình trạng kỹ thuật; và quyết định của Chủ tịch nói rõ
+    # người xem là trưởng phòng / giám đốc phòng đó và Ban lãnh đạo. Mở thêm cho CNTT "để hỗ trợ" là
+    # cách một danh sách người xem lặng lẽ dài ra cho tới lúc không còn nghĩa gì.
+    "/bao-cao": BASE_VIEW + ("tp_dh", "ptgd_doan", "gd_kd", "tp_kd", "ptgd_mkt", "gd_doi_xe",
+                             "tp_hd", "ketoan", "hcns", "nv_visa"),
     # V6 – chuỗi bán hàng. Bảng giá là CHÍNH SÁCH nên hẹp hơn báo giá: từng sale soạn báo giá
     # được, nhưng đặt giá niêm yết thì không.
     "/bang-gia": BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt", "ketoan", "cntt"),

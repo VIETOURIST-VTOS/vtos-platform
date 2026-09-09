@@ -10,6 +10,10 @@ import { getUser, clearSession, type User } from "@/lib/api";
 export const GROUPS: { key: string; label: string; items: [string, string][] }[] = [
   { key: "holdings", label: "1. Điều hành Holdings", items: [
     ["Tổng quan", "/"], ["Công ty thành viên & liên kết", "/companies"], ["Kết quả từng đơn vị", ""],
+    // Báo cáo tự động theo phòng (09/9/2026) đứng NGAY ĐÂY, ngay dưới Tổng quan: Chủ tịch và TGĐ mở
+    // bản toàn công ty ở đây, trưởng phòng mở bản của phòng mình ở cùng một đường dẫn – máy chủ cắt
+    // theo vai trò. Một đường dẫn cho mọi cấp, không phải mỗi phòng một mục menu.
+    ["Báo cáo tự động", "/bao-cao"],
     ["Báo cáo quản trị", "/robot-reports"],
     // Hai phòng Kinh doanh vào báo cáo qua menu của mình (?mang=le / ?mang=doan). Nếu chỉ có hai lối đó thì
     // không còn đường nào tới con số HỢP NHẤT – nên Điều hành Holdings giữ một lối vào không kèm tham số.
