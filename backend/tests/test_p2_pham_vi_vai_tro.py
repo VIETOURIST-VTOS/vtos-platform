@@ -127,7 +127,12 @@ PHAM_VI_DA_CHOT = {
     # mười ba vai trò trong khi chỉ bốn vai trò gọi được, và phần dôi ra vẫn là quyền đã cấp.
     "chutich": 97, "tgd": 97, "bks": 97, "cntt": 95,
     "ketoan": 81, "tp_dh": 77, "ptgd_doan": 57, "nv_dh": 53, "hcns": 52, "gd_kd": 51,
-    "ptgd_mkt": 38, "nv_kd": 39, "tn_kd": 39, "tp_kd": 39, "nv_mkt": 30,
+    # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
+    # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
+    # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
+    # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
+    # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
+    "ptgd_mkt": 39, "nv_kd": 39, "tn_kd": 39, "tp_kd": 39, "nv_mkt": 30,
     "gd_doi_xe": 24, "hanh_chinh": 24, "tp_hd": 22, "xe_hdv": 17, "nv_visa": 17,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ

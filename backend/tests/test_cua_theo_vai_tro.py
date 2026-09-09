@@ -65,16 +65,17 @@ def test_robot_kiem_soat_khong_ghi_va_khong_doc_ho_so_nhan_su():
 
 # ------------------------------------------------------------------ 2. Được nạp thì phải thấy cửa nạp
 # Vai trò nằm trong danh sách được nạp nhưng KHÔNG thấy màn hình Nạp dữ liệu, kèm lý do thật.
-NAP_KHONG_CO_MAN_HINH = {
-    "ptgd_doan": "Hai danh sách đang nói ngược nhau và chưa ai chốt: quyền cho phép ông nạp booking "
-                 "và quyết toán tour, còn menu thì không có /nap-du-lieu. Một trong hai sai. Nếu Phó "
-                 "TGĐ không phải người gõ số thì bỏ ông khỏi danh sách quyền; nếu có thì mở màn hình. "
-                 "Để nguyên thì cái sai nằm ở chỗ không ai nhìn.",
-    "ptgd_mkt": "Cùng một chỗ lệch, cùng một câu hỏi: quyền cho phép ông nạp nguồn khách và chi phí "
-                "marketing theo kênh, menu thì không có /nap-du-lieu. Hai phân hệ độc lập cùng cấp "
-                "quyền cho hai Phó TGĐ mà cả hai menu cùng thiếu – nên nhiều khả năng menu mới là chỗ "
-                "lạc hậu, nhưng đó là câu Chủ tịch trả lời, không phải câu em tự trả lời.",
-}
+# Vai trò nằm trong danh sách được nạp nhưng KHÔNG thấy màn hình Nạp dữ liệu, kèm lý do thật.
+#
+# Rỗng từ 09/9/2026. Hai dòng đầu tiên của danh sách này là ptgd_doan và ptgd_mkt: quyền cho phép hai
+# ông nạp dữ liệu của phòng mình, menu thì không có màn hình. Câu hỏi đặt cho Chủ tịch là "nếu Phó TGĐ
+# không phải người gõ số thì bỏ khỏi danh sách quyền; nếu có thì mở màn hình", và Chủ tịch trả lời
+# ngay trong ngày: hai Phó TGĐ quản lý phòng của mình. Menu là chỗ lạc hậu – đã mở.
+#
+# Giữ lại cái ô rỗng chứ không xoá, vì chỗ dùng của nó là lần lệch sau. Và ghi lại luôn hình dạng của
+# lần này: hỏi một câu ngắn có hai đường ra rõ ràng thì được trả lời trong ngày; còn đoán hộ rồi tự
+# sửa thì cái sai nằm lại trong mã và không ai biết nó ở đó.
+NAP_KHONG_CO_MAN_HINH = {}
 
 
 def test_duoc_nap_du_lieu_thi_phai_thay_man_hinh_nap():
