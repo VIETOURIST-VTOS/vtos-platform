@@ -11,6 +11,8 @@ khai báo là bản sao, và một cửa bị bỏ quên thường bị bỏ qu�
   C2 trang đó có nút bấm ghi, không phải chỉ nhắc tới đường dẫn trong chú thích
   C3 mọi bộ nạp đều dùng chung cửa này – không bộ nào có đường riêng
   C4 chuỗi bán hàng có cửa SOẠN báo giá, không phải chỉ có cửa xem
+  C5 quy ước hạch toán trình được bản mới từ màn hình, không phải nhờ kỹ thuật
+  C6 khế ước vay gắn được bản gốc
 """
 import os, sys, pathlib, re
 
@@ -56,4 +58,19 @@ soan = [p for p in trang if 'method: "POST"' in p.read_text(encoding="utf-8")
 assert soan, ("C4 ĐỎ – không màn hình nào gửi POST /ban-hang/bao-gia. Xem được báo giá nhưng không "
               "soạn được báo giá mới thì chuỗi bán hàng đứt ở khâu đầu.")
 print("C4 XANH – " + ", ".join(str(p.relative_to(WEB)) for p in soan) + " soạn được báo giá mới")
+
+# C5 – quy ước hạch toán quyết định bút toán vay chạy vào tài khoản nào. Trước 09/9 chỉ đọc được trên
+# màn hình; đổi một dòng phải nhờ kỹ thuật, và việc nhờ kỹ thuật không đi qua đường hai chữ ký.
+c5 = [p for p in trang if "/hach-toan/quy-tac" in p.read_text(encoding="utf-8")
+      or ('"quy-tac"' in p.read_text(encoding="utf-8") and "hach-toan" in p.read_text(encoding="utf-8"))]
+assert c5, "C5 ĐỎ – không màn hình nào trình được quy ước hạch toán mới."
+print("C5 XANH – " + ", ".join(str(p.relative_to(WEB)) for p in c5) + " trình được quy ước mới")
+
+# C6 – khế ước vay: bộ nạp Excel chỉ mang được con số, bản gốc là giấy có chữ ký và dấu.
+from app.models.attachments import DOI_TUONG_DAY_DU
+assert "khe_uoc_vay" in DOI_TUONG_DAY_DU, "C6 ĐỎ – chưa khai đối tượng đính kèm cho khế ước vay"
+c6 = [p for p in trang if '"khe_uoc_vay"' in p.read_text(encoding="utf-8")]
+assert c6, "C6 ĐỎ – khai đối tượng rồi nhưng không màn hình nào gắn được tệp vào khế ước."
+print("C6 XANH – " + ", ".join(str(p.relative_to(WEB)) for p in c6) + " gắn được bản gốc khế ước")
+
 print("TEST CUA NHAP TAY: XANH")

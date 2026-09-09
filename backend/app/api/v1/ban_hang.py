@@ -148,6 +148,29 @@ def _bg_ra(db: Session, bg: BaoGia) -> dict:
             "cong_bien": BH.xem_bien(db, bg)}
 
 
+@router.get("/tour-de-chon")
+def tour_de_chon(u: User = Depends(require_roles(*SOAN)), db: Session = Depends(get_db)):
+    """Danh sách tour để gắn báo giá. CHỈ mã, tên, ngày đi – không kèm con số tiền nào.
+
+    Người soạn báo giá không nằm trong COST_ROLES; mở cơ cấu chi phí tour cho họ là một quyết định về
+    quyền, không phải một tiện ích để lén thêm vào đây."""
+    from app.models.core import Tour
+    q = (select(Tour).where(Tour.status.notin_(["huy"]))
+         .order_by(Tour.start_date.desc()).limit(300))
+    return [{"id": t.id, "code": t.code, "name": t.name, "start_date": t.start_date}
+            for t in db.execute(q).scalars()]
+
+
+@router.get("/tour/{tour_id}/gia-von")
+def gia_von_tour(tour_id: int, so_khach: int = 1, u: User = Depends(require_roles(*SOAN)),
+                 db: Session = Depends(get_db)):
+    """Giá vốn MỘT KHÁCH suy từ dự toán tour – một con số tổng, không có dòng chi tiết.
+
+    Trả về gia_von_moi_khach = null khi tour chưa có dự toán. Rỗng chứ không phải 0: hai cái đó khác
+    nhau, và chỗ khác nhau đó là chỗ cổng biên báo ĐẠT trên một tour chưa ai tính giá vốn."""
+    return BH.gia_von_tu_du_toan(db, tour_id, so_khach)
+
+
 @router.get("/bao-gia")
 def ds_bao_gia(mang: str = "", trang_thai: str = "", limit: int = 200,
                u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):

@@ -48,6 +48,11 @@ DOI_TUONG_DAY_DU = {
     "bang_luong":    ("Bảng lương", "hcns", "06_Nhan_su", False),
     "de_nghi_chi":   ("Đề nghị chi", "ketoan", "02_Ke_toan", False),
     "sao_ke":        ("Sao kê ngân hàng", "ketoan", "04_Ngan_hang_Vay", False),
+    # Khế ước vay: bản gốc là giấy có chữ ký và dấu ngân hàng. Bộ nạp Excel chỉ mang được các CON SỐ
+    # của khế ước; lúc đối chiếu dư nợ với ngân hàng thì thứ phải mở ra là bản gốc, không phải dòng số.
+    # Lưu theo MÃ ĐỐI TƯỢNG (True) chứ không theo tháng: một khế ước sống nhiều năm, xếp theo tháng ký
+    # thì phụ lục gia hạn năm sau nằm ở một thư mục khác với khế ước gốc.
+    "khe_uoc_vay":   ("Khế ước vay & hợp đồng đầu tư", "ketoan", "04_Ngan_hang_Vay", True),
     "hoa_don":       ("Hóa đơn", "ketoan", "03_Thue", False),
     "visa":          ("Hồ sơ visa", "visa", "05_Tour", True),
     "van_ban":       ("Văn bản / quyết định", "ban_tgd", "09_HDQT_Co_dong", False),

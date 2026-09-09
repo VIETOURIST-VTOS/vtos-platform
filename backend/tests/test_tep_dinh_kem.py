@@ -230,3 +230,31 @@ def test_go_tep_hep_hon_gan_tep(_startup):
     aid = r.json()["id"]
     assert client.post(f"/api/v1/tep/{aid}/thu-hoi", headers=login("kd.hoa"),
                        json={"ly_do": "thử gỡ"}).status_code == 403
+
+
+# ------------------------------------------- Khế ước vay (rà soát cửa 09/9)
+def test_khe_uoc_vay_gan_duoc_ban_goc():
+    """Bộ nạp Excel chỉ mang được các CON SỐ của khế ước.
+
+    Lúc đối chiếu dư nợ với ngân hàng, thứ phải mở ra là bản gốc có chữ ký và dấu – không phải một dòng
+    số. Trước 09/9 không có đối tượng nào để gắn nó vào, nên bản gốc nằm ở máy của kế toán.
+    """
+    r = tai("ketoan", "khe_uoc_2026.pdf", b"%PDF-1.4 khe uoc thu", doi_tuong="khe_uoc_vay",
+            dtid="HD-VAY-001", loai="hop_dong", kieu="application/pdf")
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["moi"] is True
+    ds = client.get("/api/v1/tep?doi_tuong=khe_uoc_vay&doi_tuong_id=HD-VAY-001",
+                    headers=login("ketoan")).json()
+    assert len(ds) == 1 and ds[0]["ten_tep"] == "khe_uoc_2026.pdf"
+
+
+def test_khe_uoc_vay_xep_vao_nhom_ngan_hang_va_luu_theo_ma_khe_uoc():
+    """Xếp theo THÁNG KÝ thì phụ lục gia hạn năm sau nằm ở thư mục khác với khế ước gốc – một khế ước
+    sống nhiều năm, hồ sơ của nó phải nằm cùng một chỗ."""
+    d = client.get("/api/v1/tep/cau-hinh", headers=login("ketoan")).json()
+    kv = [x for x in d["doi_tuong"] if x["ma"] == "khe_uoc_vay"]
+    assert kv, "chưa khai đối tượng khe_uoc_vay"
+    assert kv[0]["nhom_ho_so"] == "04_Ngan_hang_Vay"
+    assert kv[0]["luu_theo"] == "đối tượng"
+    assert kv[0]["nhay_cam"] is False, "khế ước vay không phải dữ liệu cá nhân – không gắn nhãn nhạy cảm"

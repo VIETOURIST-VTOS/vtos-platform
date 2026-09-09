@@ -364,3 +364,76 @@ def test_sua_bao_gia_van_xoa_duoc_khoa_khi_NGUOI_GOI_co_y_gui_null():
         "khach_ten": "Khách gỡ khóa", "mang": "kd_le", "lead_id": None, "phien_ban": pb, "dong": []})
     assert r.status_code == 200, r.text
     assert client.get(f"/api/v1/ban-hang/bao-gia/{bid}", headers=h).json()["lead_id"] is None
+
+
+# ====================== 9. NỐI BÁO GIÁ VỚI DỰ TOÁN TOUR ======================
+def _tour_co_du_toan(ma: str, dong: list[dict]) -> int:
+    """Dựng một tour và mấy dòng dự toán. Trả về id tour."""
+    from app.db.session import SessionLocal
+    from app.models.core import Tour, User
+    from app.models.vietrip import TourCostLine
+    with SessionLocal() as db:
+        dh = db.execute(select(User).where(User.role == "nv_dh")).scalars().first()
+        t = Tour(code=ma, name="Tour thử nối dự toán", tour_type="le_noi_dia",
+                 start_date=date.today() + timedelta(days=20),
+                 end_date=date.today() + timedelta(days=23),
+                 operator_id=(dh.id if dh else 1), price_per_pax=0, planned_pax=10,
+                 status="da_duyet")
+        db.add(t); db.flush()
+        for i, d in enumerate(dong):
+            db.add(TourCostLine(tour_id=t.id, line_no=i + 1, description=d.get("mo_ta", f"dòng {i}"),
+                                cost_kind=d.get("kieu", "co_dinh"), unit_price=d.get("don_gia", 0),
+                                qty=d.get("sl", 1), coef=d.get("he_so", 1),
+                                budget=d.get("du_toan", 0), status="hd"))
+        db.commit()
+        return t.id
+
+
+def test_tour_chua_co_du_toan_thi_gia_von_la_RONG_khong_phai_0():
+    """Điều luật học bằng giá đắt, lần này ở cửa mới: thiếu dự toán KHÔNG PHẢI dự toán bằng 0.
+
+    Nếu cửa này trả 0 thì báo giá gắn một tour chưa ai tính giá vốn sẽ cho biên 100% và cổng biên báo
+    ĐẠT – đúng cái mà cổng sinh ra để chặn, bị vô hiệu hóa bằng một tiện ích.
+    """
+    tid = _tour_co_du_toan("V6-DT-TRONG", [])
+    r = client.get(f"/api/v1/ban-hang/tour/{tid}/gia-von?so_khach=10", headers=login("nv_kd"))
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["co_du_toan"] is False
+    assert d["gia_von_moi_khach"] is None, f"phải là RỖNG, đang trả {d['gia_von_moi_khach']!r}"
+
+
+def test_gia_von_moi_khach_chia_dung_co_dinh_va_theo_khach():
+    """Cố định chia cho số khách; theo khách thì KHÔNG nhân số lượng lần nữa (nhân hai lần)."""
+    tid = _tour_co_du_toan("V6-DT-CO", [
+        {"mo_ta": "Thuê xe 45 chỗ", "kieu": "co_dinh", "du_toan": 10_000_000},
+        {"mo_ta": "Ăn trưa", "kieu": "theo_khach", "don_gia": 500_000, "sl": 10, "he_so": 1},
+    ])
+    d = client.get(f"/api/v1/ban-hang/tour/{tid}/gia-von?so_khach=10",
+                   headers=login("nv_kd")).json()
+    assert d["co_du_toan"] is True and d["so_dong"] == 2
+    assert d["co_dinh"] == 10_000_000
+    assert d["theo_khach_moi_khach"] == 500_000, "dòng theo khách bị nhân số lượng lần nữa"
+    assert d["gia_von_moi_khach"] == 1_500_000, d
+
+
+def test_cua_gia_von_tour_KHONG_lo_ten_nha_cung_cap():
+    """Người soạn báo giá không nằm trong COST_ROLES. Cửa này trả một con số tổng, không trả cơ cấu.
+
+    Mở cả cơ cấu chi phí tour cho phòng kinh doanh là một quyết định về QUYỀN – việc của robot Phân
+    quyền. Phép thử này đứng đây để lần sau ai đó thêm 'cho tiện' thì nó đỏ.
+    """
+    tid = _tour_co_du_toan("V6-DT-NCC", [
+        {"mo_ta": "Khách sạn Mường Thanh", "kieu": "co_dinh", "du_toan": 20_000_000}])
+    d = client.get(f"/api/v1/ban-hang/tour/{tid}/gia-von?so_khach=10", headers=login("nv_kd")).json()
+    assert "dong" not in d and "rows" not in d, "cửa này không được trả dòng chi tiết"
+    assert "Mường Thanh" not in str(d.get("dong_chua_co_so_tien", "")), d
+    for khoa in ("supplier_name", "supplier_tax_code", "unit_price"):
+        assert khoa not in str(d), f"lộ trường {khoa}"
+
+
+def test_danh_sach_tour_de_chon_khong_kem_so_tien():
+    d = client.get("/api/v1/ban-hang/tour-de-chon", headers=login("nv_kd")).json()
+    assert isinstance(d, list)
+    if d:
+        assert set(d[0].keys()) == {"id", "code", "name", "start_date"}, d[0]

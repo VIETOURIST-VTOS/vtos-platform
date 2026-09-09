@@ -223,3 +223,52 @@ def chuoi_ban_hang(db: Session, hd: HopDongKhach) -> dict:
         "booking_id": hd.booking_id,
         "day_du": all([bang is not None, bg is not None, ban is not None, hd.booking_id is not None]),
     }
+
+
+# ──────────────────── NỐI BÁO GIÁ VỚI DỰ TOÁN TOUR ────────────────────
+# Việc thứ tư trong bảng rà soát 09/9. Trước đây giá vốn trong báo giá gõ tay, còn dự toán tour nằm ở
+# một chỗ khác – hai nơi cùng giữ một con số thì sớm muộn lệch nhau, và lúc lệch thì biên trên báo giá
+# là con số sai mà không ai biết là sai.
+#
+# Hàm này CHỈ trả về một con số tổng và mấy con số để giải thích nó. KHÔNG trả dòng chi tiết, không
+# trả tên nhà cung cấp: người soạn báo giá không nằm trong COST_ROLES, và mở cả cơ cấu chi phí tour
+# cho họ là một quyết định về quyền – việc của robot Phân quyền, không phải việc lén mở ở đây.
+#
+# Và nó KHÔNG tự điền vào dòng nào. Chia giá vốn cho các hạng khách (người lớn, trẻ em, em bé) là việc
+# có phán đoán; máy chia hộ một con số nhìn rất gọn rồi người ký duyệt tin theo là cách hỏng đắt nhất.
+def gia_von_tu_du_toan(db: Session, tour_id: int, so_khach: int = 1) -> dict:
+    """Giá vốn một khách suy từ dự toán tour. Không có dòng dự toán thì trả RỖNG, không trả 0."""
+    from app.models.vietrip import TourCostLine
+    from app.models.core import Tour
+    t = db.get(Tour, tour_id)
+    if t is None:
+        raise CongBaoGia("KHONG_CO_TOUR", f"Không có tour số {tour_id}")
+    dong = db.execute(select(TourCostLine).where(TourCostLine.tour_id == tour_id,
+                                                 TourCostLine.status == "hd")).scalars().all()
+    if not dong:
+        # Thiếu dự toán KHÔNG PHẢI dự toán bằng 0 (Ý kiến thẩm định 06/9 mục B1).
+        return {"tour": t.code, "co_du_toan": False, "so_dong": 0, "gia_von_moi_khach": None,
+                "co_dinh": None, "theo_khach_moi_khach": None, "so_khach": so_khach,
+                "message": f"Tour {t.code} chưa có dòng dự toán nào – không suy ra được giá vốn."}
+
+    def _tien(l) -> float:
+        # Dự toán trước, thực chi sau: lúc soạn báo giá thì tour chưa chạy nên thực chi thường bằng 0,
+        # và lấy 0 làm giá vốn là đúng cái lỗi đang muốn tránh.
+        if l.budget:
+            return float(l.budget)
+        return float(l.unit_price or 0) * float(l.qty or 0) * float(l.coef or 1)
+
+    co_dinh = sum(_tien(l) for l in dong if l.cost_kind != "theo_khach")
+    # Dòng theo khách: đơn giá đã là của MỘT khách, nhân số lượng vào là nhân hai lần.
+    theo_khach = sum(float(l.unit_price or 0) * float(l.coef or 1)
+                     for l in dong if l.cost_kind == "theo_khach")
+    n = max(int(so_khach or 1), 1)
+    thieu = [l.description for l in dong if _tien(l) == 0 and l.cost_kind != "theo_khach"]
+    return {"tour": t.code, "co_du_toan": True, "so_dong": len(dong), "so_khach": n,
+            "co_dinh": round(co_dinh, 2), "theo_khach_moi_khach": round(theo_khach, 2),
+            "gia_von_moi_khach": round(theo_khach + co_dinh / n, 2),
+            "dong_chua_co_so_tien": thieu,
+            "message": (f"{len(dong)} dòng dự toán · cố định {co_dinh:,.0f}đ chia cho {n} khách, "
+                        f"cộng {theo_khach:,.0f}đ mỗi khách."
+                        + (f" Còn {len(thieu)} dòng chưa có số tiền – con số này đang thiếu phần đó."
+                           if thieu else ""))}

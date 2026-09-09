@@ -40,6 +40,8 @@ function BaoGia() {
   const [mo, setMo] = useState<number | null>(null);
   const [dang, setDang] = useState(false);
   const [bgs, setBgs] = useState<BangGia[]>([]);
+  const [tours, setTours] = useState<any[]>([]);
+  const [gvTour, setGvTour] = useState<any>(null);
   const [soanMo, setSoanMo] = useState(false);
   const [suaId, setSuaId] = useState<number | null>(null);
   const [suaPb, setSuaPb] = useState<number | null>(null);
@@ -47,7 +49,8 @@ function BaoGia() {
   // nghĩa (miễn phí), còn null là chưa biết — và cổng biên phân biệt hai cái đó.
   const [f, setF] = useState<any>({ khach_ten: "", khach_dien_thoai: "", khach_email: "",
                                     so_khach: 1, ngay_khoi_hanh: "", han_hieu_luc: "",
-                                    bang_gia_id: "", dong: [ { ...RONG } ] as Dong[] });
+                                    bang_gia_id: "", tour_id: "",
+                                    dong: [ { ...RONG } ] as Dong[] });
   const soan = ["nv_kd", "tn_kd", "tp_kd", "gd_kd", "ptgd_mkt", "tgd", "chutich", "cntt"]
     .includes(user?.role || "");
 
@@ -61,6 +64,7 @@ function BaoGia() {
     try {
       setDs(await api<BG[]>(`/ban-hang/bao-gia?mang=${mang}`));
       setBgs(await api<BangGia[]>(`/ban-hang/bang-gia?mang=${mang}`));
+      setTours(await api<any[]>("/ban-hang/tour-de-chon"));
     } catch (e) { toast(errMsg(e), true); }
   }, [mang, toast]);
   useEffect(() => { load(); }, [load]);
@@ -71,16 +75,18 @@ function BaoGia() {
 
   const moSoanMoi = () => {
     setSuaId(null); setSuaPb(null); setSoanMo(true);
+    setGvTour(null);
     setF({ khach_ten: "", khach_dien_thoai: "", khach_email: "", so_khach: 1,
-           ngay_khoi_hanh: "", han_hieu_luc: "", bang_gia_id: "", dong: [{ ...RONG }] });
+           ngay_khoi_hanh: "", han_hieu_luc: "", bang_gia_id: "", tour_id: "",
+           dong: [{ ...RONG }] });
   };
 
   const moSua = (b: BG) => {
-    setSuaId(b.id); setSuaPb(b.phien_ban); setSoanMo(true);
+    setSuaId(b.id); setSuaPb(b.phien_ban); setSoanMo(true); setGvTour(null);
     setF({ khach_ten: b.khach_ten, khach_dien_thoai: b.khach_dien_thoai || "",
            khach_email: b.khach_email || "", so_khach: b.so_khach,
            ngay_khoi_hanh: b.ngay_khoi_hanh || "", han_hieu_luc: "",
-           bang_gia_id: b.bang_gia_id ?? "",
+           bang_gia_id: b.bang_gia_id ?? "", tour_id: (b as any).tour_id ?? "",
            dong: b.dong.length ? b.dong.map((d) => ({ ...d })) : [{ ...RONG }] });
   };
 
@@ -95,6 +101,17 @@ function BaoGia() {
     toast(`Đã lấy ${bg.dong.length} dòng từ bảng giá ${bg.ma}`);
   };
 
+  // Hỏi giá vốn một khách từ dự toán tour. CHỈ HIỆN RA, không tự điền vào dòng nào: chia giá vốn cho
+  // người lớn / trẻ em / em bé là việc có phán đoán, và một con số máy chia hộ trông rất gọn rồi
+  // người ký duyệt tin theo là cách hỏng đắt nhất. Nút "dùng số này" nằm ở từng dòng, người bấm.
+  const hoiGiaVon = async (tid: string) => {
+    dat("tour_id", tid); setGvTour(null);
+    if (!tid) return;
+    try {
+      setGvTour(await api<any>(`/ban-hang/tour/${tid}/gia-von?so_khach=${Number(f.so_khach) || 1}`));
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
   const luuNhap = async () => {
     if (!f.khach_ten.trim()) { toast("Chưa có tên khách", true); return; }
     setDang(true);
@@ -103,6 +120,7 @@ function BaoGia() {
         mang, khach_ten: f.khach_ten.trim(), khach_dien_thoai: f.khach_dien_thoai,
         khach_email: f.khach_email,
         bang_gia_id: f.bang_gia_id ? Number(f.bang_gia_id) : null,
+        tour_id: f.tour_id ? Number(f.tour_id) : null,
         so_khach: Number(f.so_khach) || 1,
         ngay_khoi_hanh: f.ngay_khoi_hanh || null,
         han_hieu_luc: f.han_hieu_luc || null,
@@ -206,6 +224,35 @@ function BaoGia() {
                      onChange={(e) => dat("han_hieu_luc", e.target.value)} /></label>
           </div>
 
+          <label className="ca-dong">Gắn với tour (để lấy giá vốn từ dự toán)
+            <select value={f.tour_id} onChange={(e) => hoiGiaVon(e.target.value)}>
+              <option value="">— không gắn tour —</option>
+              {tours.map((t) => (
+                <option key={t.id} value={t.id}>{t.code} · {t.name} · {t.start_date}</option>))}
+            </select></label>
+
+          {gvTour ? (
+            <div className={gvTour.co_du_toan ? "hop" : "hop thieu"}>
+              {gvTour.co_du_toan ? <>
+                <b>Giá vốn một khách theo dự toán tour {gvTour.tour}: {vnd(gvTour.gia_von_moi_khach)}</b>
+                <div className="muted small">{gvTour.message}</div>
+                {gvTour.dong_chua_co_so_tien?.length ? (
+                  <div className="muted small">Dòng dự toán chưa có số tiền: {gvTour.dong_chua_co_so_tien.join(", ")}</div>
+                ) : null}
+                <div className="muted small">
+                  Con số này <b>chưa vào dòng nào</b>. Chia giá vốn cho người lớn / trẻ em / em bé là
+                  việc của người soạn — bấm “dùng số này” ở đúng dòng muốn gán.
+                </div>
+              </> : <>
+                <b>Tour {gvTour.tour} chưa có dự toán.</b>
+                <div className="muted small">
+                  Chưa có dự toán <b>không phải</b> giá vốn bằng 0. Ô giá vốn ở dưới cứ để trống — cổng
+                  biên lúc gửi sẽ báo “chưa đủ cơ sở”, đúng như thực tế.
+                </div>
+              </>}
+            </div>
+          ) : null}
+
           <label className="ca-dong">Lấy dòng từ bảng giá
             <select value={f.bang_gia_id} onChange={(e) => layTuBangGia(e.target.value)}>
               <option value="">— gõ tay, không lấy từ bảng giá —</option>
@@ -239,8 +286,14 @@ function BaoGia() {
                              e.target.value === "" ? null : e.target.value)} /></td>
                 <td><input type="number" value={d.chiet_khau}
                            onChange={(e) => datDong(i, "chiet_khau", e.target.value)} /></td>
-                <td><button className="ghost" onClick={() => dat("dong",
-                      f.dong.length > 1 ? f.dong.filter((_: Dong, j: number) => j !== i) : f.dong)}>Xóa</button></td>
+                <td className="nut">
+                  {gvTour?.gia_von_moi_khach ? (
+                    <button className="ghost"
+                            onClick={() => datDong(i, "gia_von_don_vi", gvTour.gia_von_moi_khach)}>
+                      dùng số này</button>) : null}
+                  <button className="ghost" onClick={() => dat("dong",
+                    f.dong.length > 1 ? f.dong.filter((_: Dong, j: number) => j !== i) : f.dong)}>Xóa</button>
+                </td>
               </tr>))}
             </tbody>
           </table>
@@ -356,6 +409,9 @@ function BaoGia() {
         input, select { width: 100%; padding: 5px 7px; border: 1px solid #cbd5e1; border-radius: 6px;
                         font-size: 13px; color: #0f172a; background: #fff; }
         .do { color: #b91c1c; }
+        .hop { border: 1px solid #bbf7d0; background: #f0fdf4; border-radius: 8px;
+               padding: 8px 10px; margin: 10px 0; font-size: 13px; }
+        .hop.thieu { border-color: #fde68a; background: #fffbeb; }
         .warn { color: #92400e; background: #fffbeb; padding: 8px 10px; border-radius: 8px; }
       `}</style>
     </div>
