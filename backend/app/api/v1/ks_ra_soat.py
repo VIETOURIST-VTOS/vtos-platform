@@ -104,3 +104,15 @@ def nhap_tay(thang: str = "", u: User = Depends(require_roles(*XEM)), db: Sessio
             # Giây của từng dấu hiệu: bộ này chạy trong vòng quét robot trên máy chủ 0,5 CPU, nên
             # "chậm ở đâu" là dữ kiện vận hành chứ không phải chuyện gỡ lỗi tạm thời.
             "giay_moi_dau_hieu": kho.get("_dong_ho", {}), "rows": ds}
+
+
+@router.get("/lo-nap")
+def lo_nap(limit: int = 100, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """K5 – từng lô nạp với bốn con số DÒNG và bốn con số TIỀN, kèm phần bộ đối chiếu KHÔNG che được.
+
+    Cột `cua_khong_ghi_so` là phần quan trọng nhất của bảng này: nó liệt kê những cửa nạp hàng loạt
+    ghi thẳng vào bảng mà không để lại nhật ký lô. Một bộ đối chiếu im lặng về vùng mù của mình khiến
+    người đọc yên tâm sai chỗ.
+    """
+    from app.services import ks_nap_lo as NL
+    return NL.bang(db, limit)

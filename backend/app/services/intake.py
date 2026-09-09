@@ -203,6 +203,32 @@ def _chuyen_nap(db, r, boi):
     return row["ma_phieu"]
 
 
+def cot_tien_cua_bo(loai: str) -> tuple[list[str], list[str]]:
+    """(cột CHẮC CHẮN là tiền, cột số CHƯA RÕ) của một bộ nạp.
+
+    Dùng lại đúng bộ xếp loại của K1/K2 (`ks_cot_tien.xep_theo_ten`) thay vì viết bảng tên cột thứ hai.
+    Hai bảng khai tay thì sớm muộn cũng lệch, và lúc lệch thì không ai biết bảng nào đúng.
+
+    CHỈ cộng những cột xếp loại "tien". Cột "chưa rõ" (so_lit, km_dau, giu_xe…) KHÔNG cộng vào – cộng
+    nhầm số lít vào tổng tiền thì con số đối chiếu vô nghĩa, mà vô nghĩa một cách âm thầm. Danh sách
+    "chưa rõ" trả về để K5 nói thẳng phần nào chưa được che, thay vì im lặng che thiếu.
+    """
+    from app.services.ks_cot_tien import xep_theo_ten
+    bo = BO_NAP.get(loai) or {}
+    tien, chua_ro = [], []
+    for c in bo.get("cot", []):
+        if (c.get("kieu") or "") != "so": continue
+        khoa = c.get("khoa") or c.get("key") or ""
+        if not khoa: continue
+        xep, _ = xep_theo_ten(khoa)
+        (tien if xep == "tien" else chua_ro if xep == "chua_ro" else []).append(khoa)
+    return tien, chua_ro
+
+
+def _tong_tien_dong(row: dict, cot: list[str]) -> float:
+    return round(sum(_so(row.get(k)) for k in cot), 2)
+
+
 BO_NAP = {
     "nha_cung_cap": {
         "ten": "Nhà cung cấp", "bang_dich": "suppliers", "phong_ban": "dieu_hanh",
@@ -450,10 +476,17 @@ def nap(db: Session, loai: str, rows: list[dict], boi: str, bo_qua_dong_loi: boo
         bo = BO_NAP[loai]
         kq = bo["nap_lo"](db, rows, boi, ten_tep, bo_qua_dong_loi)
         noi_dung = json.dumps(rows, ensure_ascii=False, sort_keys=True, default=str)
+        # Bộ nạp theo lô tự lo phần ghi nên KHÔNG trả về kết quả từng dòng. Ghi tổng tiền của TỆP –
+        # cái biết chắc – và để TRỐNG ba ô còn lại thay vì điền 0. Trống nghĩa là "không đo được"; 0
+        # nghĩa là "đo được và bằng không", và K5 phải phân biệt hai thứ đó, nếu không nó báo thiếu
+        # tiền ở mọi lô chạy qua đường này.
+        _ct, _cr = cot_tien_cua_bo(loai)
         run = IntakeRun(loai=loai, ten_tep=ten_tep[:200],
                         nguon=nguon if nguon in NGUON else "nap_tep", tac_nhan=(tac_nhan or boi)[:80],
                         so_dong=kq["so_dong"], da_nap=kq["da_nap"], bo_qua_da_co=kq["da_co"],
                         dong_loi=kq["dong_loi"], bo_qua_dong_loi=bo_qua_dong_loi,
+                        tong_tien_tep=round(sum(_tong_tien_dong(r, _ct) for r in rows), 2),
+                        cot_tien=_ct,
                         dau_vao_hash=hashlib.sha256(noi_dung.encode("utf-8")).hexdigest(),
                         ket_qua=json.dumps({"da_nap": kq["da_nap"]}, ensure_ascii=False), boi=boi)
         db.add(run); db.flush()
@@ -475,10 +508,23 @@ def nap(db: Session, loai: str, rows: list[dict], boi: str, bo_qua_dong_loi: boo
         except Exception as ex:
             k["loi"].append(f"Ghi không thành công: {ex}")
     noi_dung = json.dumps(rows, ensure_ascii=False, sort_keys=True, default=str)
+    # K5 – bốn con số TIỀN soi gương bốn con số DÒNG. Phân bổ SAU vòng ghi, vì dòng ghi hỏng chỉ được
+    # đánh dấu lỗi ở trong vòng đó; phân bổ trước thì tiền của nó nằm nhầm ô "đã nạp".
+    ct, _chua_ro = cot_tien_cua_bo(loai)
+    t_nap = t_bo = t_loi = 0.0
+    for k in kt["dong"]:
+        r = theo_key[k["dong"] - 2] if 0 <= k["dong"] - 2 < len(theo_key) else {}
+        v = _tong_tien_dong(r, ct)
+        if k["loi"]: t_loi += v
+        elif k["da_co"]: t_bo += v
+        else: t_nap += v
     run = IntakeRun(loai=loai, ten_tep=ten_tep[:200], nguon=nguon if nguon in NGUON else "nguoi_nhap",
                     tac_nhan=(tac_nhan or boi)[:80], so_dong=kt["so_dong"], da_nap=da_nap,
                     bo_qua_da_co=kt["da_co"], dong_loi=sum(1 for x in kt["dong"] if x["loi"]),
                     bo_qua_dong_loi=bo_qua_dong_loi,
+                    tong_tien_tep=round(sum(_tong_tien_dong(r, ct) for r in theo_key), 2),
+                    tong_tien_da_nap=round(t_nap, 2), tong_tien_bo_qua=round(t_bo, 2),
+                    tong_tien_loi=round(t_loi, 2), cot_tien=ct,
                     dau_vao_hash=hashlib.sha256(noi_dung.encode("utf-8")).hexdigest(),
                     ket_qua=json.dumps(ket[:200], ensure_ascii=False), boi=boi)
     db.add(run); db.flush()
