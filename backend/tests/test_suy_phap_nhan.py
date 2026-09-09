@@ -335,3 +335,39 @@ def test_khong_phai_ai_cung_tao_duoc_tai_khoan_robot():
     r = client.post("/api/v1/access/accounts/robot", json={"role": "robot_vpm"},
                     headers=login("spn_bks"))
     assert r.status_code == 403, r.text
+
+
+# ---------------- Số lượt đọc, không phải thời gian ----------------
+def test_xem_truoc_doc_danh_muc_phap_nhan_dung_MOT_lan():
+    """Đếm số lượt đọc thật, không đo thời gian: thời gian trên máy chạy thử không nói được gì về máy
+    chủ 0,5 CPU, còn số lượt đọc thì nói.
+
+    Bản đầu tra danh mục pháp nhân một lần cho MỖI nhân sự – 110 lượt đọc để lấy đúng hai con số, và
+    xem_truoc() bị gọi hai lần trong một lần bấm nút. Không sai kết quả, chỉ trả giá nhiều lần cho
+    cùng một câu trả lời – đúng loại việc đã làm cổng trả 502 hôm 08/9 và làm máy chủ vượt bộ nhớ
+    hôm 09/9. Bảng này chỉ có mười dòng nên hôm nay chưa đau; phép thử đứng đây cho ngày tập đoàn có
+    thêm pháp nhân và số nhân sự tăng gấp mấy lần.
+    """
+    from sqlalchemy import event
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    dem = {"companies": 0, "tong": 0}
+
+    def theo_doi(conn, cur, stm, params, ctx, many):
+        dem["tong"] += 1
+        if "companies" in stm.lower():
+            dem["companies"] += 1
+
+    event.listen(db.get_bind(), "before_cursor_execute", theo_doi)
+    try:
+        SPN.xem_truoc(db)
+    finally:
+        event.remove(db.get_bind(), "before_cursor_execute", theo_doi)
+        db.close()
+
+    assert dem["companies"] <= 2, (
+        f"đọc bảng pháp nhân {dem['companies']} lần cho một bảng xem trước – phải đọc một lần rồi "
+        f"dùng lại")
+    assert dem["tong"] <= 10, (
+        f"{dem['tong']} lượt đọc cho một bảng xem trước. Con số này phải KHÔNG tăng theo số nhân sự; "
+        f"tăng theo nghĩa là có một truy vấn nằm trong vòng lặp")
