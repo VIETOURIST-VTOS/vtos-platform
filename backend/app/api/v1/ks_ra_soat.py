@@ -137,3 +137,12 @@ def cot_tien_phan_le(u: User = Depends(require_roles(*XEM)), db: Session = Depen
     Cửa sổ đo này chỉ mở một lần. CHỈ ĐỌC.
     """
     return CT.dem_phan_le(db)
+
+
+@router.get("/cot-tien/so-0")
+def cot_tien_so_0(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """K2 – mỗi cột "mặc định 0, không cho rỗng" đang có bao nhiêu dòng mang số 0.
+
+    Con số để quyết TỪNG cột là sửa hay giữ, thay vì quyết cả 91 cột bằng một cảm giác chung. CHỈ ĐỌC.
+    """
+    return CT.dem_so_0(db)

@@ -388,3 +388,73 @@ def dem_phan_le(db: Session) -> dict:
                          if not any(c["so_dong_co_le"] for c in cot) else
                          "CÓ dòng sẽ bị làm tròn – phải quyết từng cột TRƯỚC khi đổi."),
             "cot": cot}
+
+
+# ============================== K2: ĐẾM SỐ 0 TRƯỚC KHI QUYẾT ==============================
+#
+# K2 nói: cột tiền vừa mặc định 0 vừa không cho rỗng thì "chưa có số" và "bằng 0" là một. Nhưng
+# "không phân biệt được" là một câu ĐỊNH TÍNH – nó không nói cho người quyết biết chuyện này lớn cỡ nào
+# ở từng cột. Một cột có 0/1000 dòng bằng 0 thì gần như không có gì để lo; một cột có 900/1000 dòng
+# bằng 0 thì gần như toàn bộ cột ấy là dấu hỏi.
+#
+# Con số ấy phải có TRƯỚC khi quyết, vì việc quyết là quyết từng cột:
+#   · "sửa"  – cho phép rỗng, và đây là chỗ phải cẩn thận: sau khi cho rỗng thì số 0 ĐANG CÓ vẫn là 0,
+#              không tự thành rỗng. Đổi kiểu không tách được hai nghĩa đã trộn vào nhau; nó chỉ ngăn
+#              chuyện trộn TIẾP TỤC xảy ra.
+#   · "giữ"  – kèm lý do, cho những cột mà 0 đúng là 0 (ví dụ: giảm giá, phụ cấp – không có thì bằng 0).
+#
+# CHỈ ĐỌC, chạy được lúc hệ thống đang phục vụ. Một truy vấn duy nhất cho toàn bộ danh sách: hỏi 91 câu
+# riêng lẻ trên máy chủ 0,5 CPU là tự làm nghẽn chính mình.
+
+SQL_DEM_0 = """
+SELECT c.table_name || '.' || c.column_name AS cot,
+       (xpath('/row/c/text()', query_to_xml(
+          format('SELECT COUNT(*) AS c FROM public.%I', c.table_name),
+          false, true, '')))[1]::text::bigint AS tong_dong,
+       (xpath('/row/c/text()', query_to_xml(
+          format('SELECT COUNT(*) AS c FROM public.%I WHERE %I = 0', c.table_name, c.column_name),
+          false, true, '')))[1]::text::bigint AS so_dong_bang_0
+FROM information_schema.columns c
+JOIN information_schema.tables t
+  ON t.table_schema = c.table_schema
+ AND t.table_name  = c.table_name
+ AND t.table_type  = 'BASE TABLE'
+WHERE c.table_schema = 'public'
+  AND c.table_name || '.' || c.column_name = ANY(:ds)
+"""
+
+
+def dem_so_0(db: Session) -> dict:
+    """Trong những cột K2 chỉ ra, mỗi cột đang có bao nhiêu dòng mang số 0?
+
+    Đây là con số để người quyết chọn "sửa" hay "giữ" cho TỪNG cột, thay vì quyết cả 91 cột bằng một
+    cảm giác chung.
+    """
+    from sqlalchemy import text
+    dong_bo(db)
+    xau = sorted([r for r in _hieu_luc(db)
+                  if r.xep() == "tien" and r.mac_dinh_0 and not r.cho_rong and r.quyet_k2 != "giu"],
+                 key=lambda r: (r.bang, r.cot))
+    ten = [f"{r.bang}.{r.cot}" for r in xau]
+    quyet = {f"{r.bang}.{r.cot}": (r.quyet_k2 or "") for r in xau}
+    if db.bind.dialect.name != "postgresql":
+        return {"chay_duoc": False,
+                "vi_sao": "Chỉ chạy trên PostgreSQL – máy lập trình dùng SQLite, dữ liệu ở đó là dữ "
+                          "liệu nạp mẫu nên đếm ra con số không nói gì về hệ thống thật.",
+                "so_cot": len(ten), "cot": []}
+    hang = db.execute(text(SQL_DEM_0), {"ds": ten}).all()
+    ra = []
+    for c, tong, so0 in hang:
+        tong, so0 = int(tong or 0), int(so0 or 0)
+        ra.append({"cot": c, "tong_dong": tong, "so_dong_bang_0": so0,
+                   "ty_le_0": round(so0 / tong * 100, 1) if tong else None,
+                   "quyet_k2": quyet.get(c, "")})
+    ra.sort(key=lambda x: (-(x["ty_le_0"] or 0), -x["so_dong_bang_0"]))
+    co_du_lieu = [x for x in ra if x["tong_dong"] > 0]
+    return {"chay_duoc": True, "so_cot": len(ra),
+            "so_cot_bang_trong": len(ra) - len(co_du_lieu),
+            "so_cot_toan_bo_bang_0": len([x for x in co_du_lieu if x["ty_le_0"] == 100.0]),
+            "tong_dong_bang_0": sum(x["so_dong_bang_0"] for x in ra),
+            "ghi_chu": "Bảng đang trống thì chưa có gì để lo – nhưng cột vẫn cần quyết trước khi có dữ "
+                       "liệu, vì sau đó thì số 0 đã trộn vào rồi.",
+            "cot": ra}

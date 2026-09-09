@@ -329,3 +329,34 @@ def test_kt13_tinh_lai_xep_may_khong_dung_toi_quyet_dinh_cua_nguoi():
     assert r.xep_may != "chua_ro", "đề xuất của máy thì phải được cập nhật"
 
     r.quyet_nguoi = ""; r.quyet_boi = ""; db.commit(); db.close()
+
+
+def test_kt14_dem_so_0_chi_chay_tren_postgres_va_khong_bia_so():
+    """Trên SQLite trả "chạy được: không" kèm lý do, KHÔNG trả một bảng số 0 giả.
+
+    Dữ liệu ở máy lập trình là dữ liệu nạp mẫu; đếm ở đó ra con số đẹp và con số ấy không nói gì về hệ
+    thống thật – nhưng người đọc thì không biết điều đó nếu bảng vẫn hiện ra như thường.
+    """
+    from app.services import ks_cot_tien as CT
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    kq = CT.dem_so_0(db)
+    assert kq["chay_duoc"] is False
+    assert kq["cot"] == [], "không đo được thì trả bảng RỖNG, không trả số bịa"
+    assert "PostgreSQL" in kq["vi_sao"]
+    assert kq["so_cot"] >= 0, "vẫn phải nói được có bao nhiêu cột trong diện phải quyết"
+    db.close()
+
+
+def test_kt15_sql_dem_so_0_chi_doc_va_khong_ghep_ten_cot_vao_chuoi_truy_van():
+    """Tên bảng/cột đi qua format(%I) của PostgreSQL – nó tự đóng ngoặc kép và tự thoát ký tự.
+
+    Ghép thẳng tên vào chuỗi SQL là mở đúng cái cửa mà một hệ thống kiểm soát không được phép mở, kể
+    cả khi tên cột hôm nay đều lành.
+    """
+    from app.services.ks_cot_tien import SQL_DEM_0
+    s = SQL_DEM_0.lower()
+    assert "%i" in s, "phải dùng format(%I) để PostgreSQL tự thoát tên bảng/cột"
+    assert "= any(:ds)" in s, "danh sách cột phải đi vào bằng THAM SỐ, không nối chuỗi"
+    for cam in ("insert", "update", "delete", "alter", "drop"):
+        assert cam not in s, f"phép đo này chỉ đọc – không được có “{cam}”"
