@@ -1131,6 +1131,50 @@ def goi_y_dieu_xe(date_from: date, date_to: date, so_khach: int = 0, km_du_kien:
     return kq
 
 
+@router.get("/de-lap-lenh")
+def de_lap_lenh(tu: date, den: date, u: User = Depends(require_roles(*READ)),
+                db: Session = Depends(get_db)):
+    """Những thứ CẦN CÓ để chốt một lệnh điều xe, gom vào một đường dưới hàng rào đội xe.
+
+    Vì sao phải có đường riêng thay vì để màn hình gọi /api/v1/tours và /api/v1/vehicle-rates:
+
+      Tham số chính sách xe_nguoi_lap_lenh chỉ định Giám đốc điều hành đội xe là người DUY NHẤT được
+      chốt lệnh (chỉ đạo Chủ tịch 07/9/2026). Nhưng phạm vi API của vai trò gd_doi_xe – đo ngày
+      09/9/2026 – có /api/v1/dispatch và /api/v1/vehicles, KHÔNG có /api/v1/tours và
+      /api/v1/vehicle-rates. Mà POST /dispatch bắt buộc có tour_id. Nghĩa là người duy nhất được lập
+      lệnh không có cách nào biết mã tour để điền vào lệnh.
+
+      Cách chữa dễ nhất là mở /api/v1/tours cho ông. Không làm thế: phân hệ tour mang giá bán, dự
+      toán, biên lợi nhuận và giải trình dưới biên – mở cả cụm để lấy bốn cột lịch trình là nới hàng
+      rào rộng hơn nhiều lần việc cần làm. Đường này trả về ĐÚNG bốn cột ấy: mã, tên, ngày đi, ngày về,
+      số khách dự kiến. Không có một con số tiền nào của tour.
+
+    Trả kèm ai được lập lệnh, để màn hình nói trước bằng lời thay vì để người dùng bấm rồi nhận 403.
+    """
+    if den < tu: raise HTTPException(422, "Ngày kết thúc trước ngày bắt đầu")
+    from app.models.core import Tour as _Tour
+    from app.models.hr import VehicleRate as _Rate
+    # Tour GIAO NHAU với khoảng ngày, không phải tour nằm gọn trong khoảng: một đoàn khởi hành hôm
+    # trước và về hôm sau vẫn là đoàn cần xe trong ngày đang xếp.
+    tours = db.execute(select(_Tour).where(_Tour.start_date <= den, _Tour.end_date >= tu)
+                       .order_by(_Tour.start_date)).scalars().all()
+    rates = db.execute(select(_Rate).where(_Rate.status == "active")
+                       .order_by(_Rate.route)).scalars().all()
+    ai, ly_do = FL.nguoi_duoc_lap_lenh(db)
+    return {
+        "tour": [{"id": t.id, "code": t.code, "name": t.name, "start_date": t.start_date,
+                  "end_date": t.end_date, "planned_pax": t.planned_pax} for t in tours],
+        "bang_gia": [{"id": r.id, "route": r.route, "days": r.days,
+                      "internal_price": r.internal_price, "partner_price": r.partner_price}
+                     for r in rates],
+        "nguoi_duoc_lap_lenh": [{"username": x.username, "full_name": x.full_name} for x in ai],
+        "ly_do_khong_gioi_han": ly_do,
+        "toi_duoc_lap": (not ai) or u.id in {x.id for x in ai},
+        "ghi_chu": ("Danh sách tour ở đây chỉ có lịch trình và số khách – không kèm giá bán hay dự "
+                    "toán. Đội xe cần mã tour để lập lệnh, không cần biết tour lãi bao nhiêu."),
+    }
+
+
 # ====================== LÃI LỖ ĐỘI XE ======================
 @router.get("/lai-lo")
 def lai_lo(ky: str, phan_bo: str = "khong", u: User = Depends(require_roles(*READ)),

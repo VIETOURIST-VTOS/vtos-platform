@@ -1,0 +1,134 @@
+"""Người được phép làm một việc phải có một màn hình để làm việc ấy.
+
+Chỗ hỏng đo được ngày 09/9/2026, và nó hỏng theo kiểu không ai nhìn thấy:
+
+  · Tham số chính sách `xe_nguoi_lap_lenh` chỉ định Giám đốc điều hành đội xe là người DUY NHẤT được
+    tạo và chốt lệnh điều xe (chỉ đạo Chủ tịch 07/9/2026). POST /api/v1/dispatch chặn đúng như thế.
+  · Mẫu lập lệnh duy nhất trong giao diện nằm ở /ops?tab=fleet.
+  · Danh sách màn hình của vai trò gd_doi_xe KHÔNG có /ops.
+
+Ba câu trên, mỗi câu đọc riêng đều đúng và đều hợp lý. Ghép lại thì phân hệ lệnh điều xe đứng hẳn:
+người được phép không thấy mẫu, người thấy mẫu thì máy chủ trả 403. Không có lỗi nào được ghi ra,
+không có cảnh báo nào bật lên – chỉ là bảng "Lệnh đã lập" mãi không dài thêm, và ai nhìn cũng nghĩ
+hôm nay không có chuyến.
+
+Đó là dạng hỏng mà phép thử theo từng tầng không bắt được: phép thử phân quyền hỏi "gd_doi_xe có gọi
+được POST /dispatch không" – có. Phép thử giao diện hỏi "màn hình /ops có mẫu lập lệnh không" – có.
+Phải hỏi bắc qua hai tầng mới thấy: người được phép có màn hình nào chứa mẫu ấy không.
+"""
+import re
+from pathlib import Path
+
+from app.services import access as AC
+
+WEB = Path(__file__).resolve().parents[2] / "web" / "app"
+
+# Nhận diện mẫu lập lệnh trong mã giao diện: một lời gọi GHI tới /dispatch. Bắt cả hai lối viết đang
+# dùng trong dự án – api()/hàm bọc post("/dispatch"...) và fetch("/api/v1/dispatch", {method:"POST"}).
+GOI_LAP_LENH = re.compile(r'(post\(\s*["\`]/dispatch["\`])|(["\`]/api/v1/dispatch["\`][^;]{0,120}?method)', re.S)
+
+
+class _nguoi:
+    """Đủ để menus_for() đọc: nó chỉ cần vai trò và thẻ nhân sự."""
+    def __init__(self, vai): self.role = vai; self.hr_tabs = None; self.id = 0
+
+
+def _man_hinh_co_mau_lap_lenh() -> set:
+    """Tên màn hình (đường dẫn kiểu /lenh-dieu-xe) có mẫu lập lệnh, đọc thẳng từ mã giao diện."""
+    if not WEB.exists():
+        return set()
+    ra = set()
+    # Thành phần dùng chung: màn hình nào nhập nó thì coi như mang theo mẫu bên trong.
+    comp = WEB.parent / "components"
+    mang_mau = {c.stem for c in comp.glob("*.tsx")
+                if GOI_LAP_LENH.search(c.read_text(encoding="utf-8"))} if comp.exists() else set()
+    for p in sorted(WEB.glob("*/page.tsx")):
+        src = p.read_text(encoding="utf-8")
+        nhap = set(re.findall(r'from "@/components/(\w+)"', src))
+        if GOI_LAP_LENH.search(src) or (nhap & mang_mau):
+            ra.add("/" + p.parent.name)
+    return ra
+
+
+def _nguon_cua(ten: str) -> list:
+    """Mã của màn hình, và mã của từng thành phần dùng chung mà nó nhập – trả RIÊNG từng tệp.
+
+    Trả riêng chứ không nối lại thành một chuỗi: nối lại thì một trường nằm ở tệp này có thể che chỗ
+    thiếu ở tệp kia.
+    """
+    ra = []
+    p = WEB / ten.lstrip("/") / "page.tsx"
+    if not p.exists():
+        return ra
+    src = p.read_text(encoding="utf-8")
+    ra.append(src)
+    for m in re.findall(r'from "@/components/(\w+)"', src):
+        q = WEB.parent / "components" / (m + ".tsx")
+        if q.exists():
+            ra.append(q.read_text(encoding="utf-8"))
+    return ra
+
+
+def test_vai_tro_duoc_lap_lenh_phai_co_man_hinh_de_lap():
+    """gd_doi_xe – vai trò mà tham số chính sách chỉ định là người chốt lệnh – phải thấy một mẫu lập lệnh.
+
+    Phép thử này KHÔNG kiểm tra ông có quyền gọi API (chỗ ấy đã đúng từ 07/9). Nó kiểm tra chỗ còn lại:
+    quyền mà không có cửa thì bằng không có quyền.
+    """
+    co_mau = _man_hinh_co_mau_lap_lenh()
+    if not co_mau:
+        return          # chỉ chạy khi có mã giao diện cạnh mã máy chủ
+    thay = set(AC.menus_for(_nguoi("gd_doi_xe")))
+    assert co_mau & thay, (
+        f"Vai trò gd_doi_xe được máy chủ cho phép POST /api/v1/dispatch, nhưng không màn hình nào ông "
+        f"thấy có mẫu lập lệnh. Màn hình có mẫu: {sorted(co_mau)}; màn hình ông thấy: {sorted(thay)}")
+
+
+def test_moi_mau_lap_lenh_deu_gui_du_ba_truong_ghi_vet():
+    """Mẫu lập lệnh phải GỬI ĐI so_khach, km_du_kien và ly_do_khac_goi_y.
+
+    Ba trường này không phải trang trí:
+      · so_khach và km_du_kien là đầu vào của bộ xếp hạng. Không gửi thì mặc định 0, và máy chấm điểm
+        cho một chuyến 0 khách 0 km – tức chấm cho một chuyến không có thật, rồi lấy kết quả ấy để
+        quyết định có bắt người chốt lệnh giải trình hay không.
+      · ly_do_khac_goi_y là trường máy chủ ĐÒI (422) khi xe được chọn điểm thấp hơn nhóm đề xuất. Mẫu
+        không gửi được trường ấy thì người dùng gặp một lỗi 422 không có cách nào giải – cụt đường
+        thật sự, không phải bất tiện.
+
+    Đọc trong KHỐI GỬI ĐI chứ không đọc cả tệp. Bản đầu của phép thử này tìm chữ trong cả tệp và vì
+    thế đã bỏ lọt một đột biến: bỏ ly_do_khac_goi_y khỏi phần gửi đi mà phép thử vẫn xanh, chỉ vì
+    cùng tên ấy còn nằm ở cột hiển thị "Ghi vết gợi ý" phía dưới. Một phép thử đọc cả tệp thì cái nó
+    canh là "tệp có nhắc tới trường này không", chứ không phải "mẫu có gửi trường này đi không".
+    """
+    if not WEB.exists():
+        return
+    thieu = []
+    for ten in sorted(_man_hinh_co_mau_lap_lenh()):
+        for src in _nguon_cua(ten):
+            m = GOI_LAP_LENH.search(src)
+            if not m:
+                continue
+            khoi = src[m.start(): m.start() + 900]     # thân lời gọi ghi, đủ dài để trùm hết phần thân gửi đi
+            van = [t for t in ("so_khach", "km_du_kien", "ly_do_khac_goi_y") if t not in khoi]
+            if van:
+                thieu.append((ten, van))
+    assert not thieu, (
+        "Mẫu lập lệnh không gửi đi: " + "; ".join(f"{t} thiếu {v}" for t, v in thieu) +
+        ". Thiếu so_khach/km_du_kien thì bộ gợi ý chấm điểm cho một chuyến không có thật; thiếu "
+        "ly_do_khac_goi_y thì gặp 422 là cụt đường.")
+
+
+def test_duong_de_lap_lenh_nam_trong_hang_rao_doi_xe():
+    """Đường lấy tour để lập lệnh phải nằm dưới /api/v1/fleet, không phải mở /api/v1/tours cho đội xe.
+
+    Cách chữa dễ nhất cho chỗ hỏng trên là thêm /api/v1/tours vào phạm vi của gd_doi_xe. Không làm thế:
+    phân hệ tour mang giá bán, dự toán, biên lợi nhuận và giải trình dưới biên – mở cả cụm để lấy bốn
+    cột lịch trình là nới hàng rào rộng gấp nhiều lần việc cần làm. Phép thử này canh để lần sau không
+    ai chữa theo lối ấy cho nhanh.
+    """
+    pham_vi = set(AC.pham_vi_day_du("gd_doi_xe"))
+    assert "/api/v1/fleet" in pham_vi
+    assert "/api/v1/tours" not in pham_vi, (
+        "Phạm vi của gd_doi_xe vừa được mở tới cả phân hệ tour. Nếu đó là quyết định thật thì sửa phép "
+        "thử này kèm lý do; nếu chỉ để lấy mã tour cho lệnh điều xe thì dùng "
+        "GET /api/v1/fleet/de-lap-lenh – đường ấy trả lịch trình và số khách, không trả một con số tiền nào.")

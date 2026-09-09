@@ -53,7 +53,6 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const [grates, setGrates] = useState<any[]>([]);
   const [fGrate, setFGrate] = useState<any>({ route: "", days: "", rate_per_day: "", old_rate_per_day: "", effective_from: new Date().toISOString().slice(0, 10) });
   const [incMeta, setIncMeta] = useState<any>(null);
-  const [fDisp, setFDisp] = useState<any>({ tour_id: "", vehicle_id: "", date_from: "", date_to: "", rate_id: "" });
   const [rates, setRates] = useState<any[]>([]);
   const [fRate, setFRate] = useState<any>({ route: "", days: "", internal_price: "", partner_price: "", effective_from: new Date().toISOString().slice(0, 10) });
   const [fInc, setFInc] = useState<any>({ employee_id: "", level: "2", description: "", occurred_on: new Date().toISOString().slice(0, 10) });
@@ -271,13 +270,22 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
 
     {tab === "fleet" && <>
       {fleet && <div className="kpis"><div className="kpi"><b>{vnd(fleet.total_revenue)}</b><span>Doanh thu nội bộ Đội xe {period}</span></div>{fleet.rows.map((r: any) => <div className="kpi" key={r.vehicle}><b>{r.days} ngày</b><span>{r.vehicle} · {r.driver} · {r.trips} chuyến · CTP {vnd(r.driver_allowance)}</span></div>)}</div>}
-      {["nv_dh", "tp_dh", "cntt"].includes(role) && <div className="panel"><h2>Lệnh điều xe (Đội xe xác nhận trong 4 giờ)</h2><div className="grid">
-        <label>Tour<select value={fDisp.tour_id} onChange={(e) => setFDisp({ ...fDisp, tour_id: e.target.value })}><option value="">–</option>{tours.map((t) => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}</select></label>
-        <label>Xe<select value={fDisp.vehicle_id} onChange={(e) => setFDisp({ ...fDisp, vehicle_id: e.target.value })}><option value="">–</option>{veh.map((v) => <option key={v.id} value={v.id}>{v.plate} · {v.kind === "hop_tac" ? "xe hợp tác" : v.driver}</option>)}</select></label>
-        <label>Tuyến (bảng giá xe)<select value={fDisp.rate_id} onChange={(e) => setFDisp({ ...fDisp, rate_id: e.target.value })}><option value="">– theo ngày –</option>{rates.filter((r) => r.status === "active").map((r) => <option key={r.id} value={r.id}>{r.route}{r.days ? ` ${r.days}N` : ""} · {vnd(r.internal_price)} / HT {r.partner_price ? vnd(r.partner_price) : "–"}</option>)}</select></label>
-        <label>Từ ngày<input type="date" value={fDisp.date_from} onChange={(e) => setFDisp({ ...fDisp, date_from: e.target.value })} /></label>
-        <label>Đến ngày<input type="date" value={fDisp.date_to} onChange={(e) => setFDisp({ ...fDisp, date_to: e.target.value })} /></label>
-      </div><button className="act" disabled={!fDisp.tour_id || !fDisp.vehicle_id || !fDisp.date_from || !fDisp.date_to} onClick={() => post("/dispatch", { tour_id: Number(fDisp.tour_id), vehicle_id: Number(fDisp.vehicle_id), date_from: fDisp.date_from, date_to: fDisp.date_to, rate_id: fDisp.rate_id ? Number(fDisp.rate_id) : null })}>Lập lệnh</button></div>}
+      {/* Mẫu lập lệnh ĐÃ CHUYỂN sang /lenh-dieu-xe (09/9/2026). Không phải dọn cho gọn – mẫu cũ ở đây
+          không dùng được nữa, và nó hỏng theo kiểu im lặng:
+
+            · Tham số xe_nguoi_lap_lenh chỉ định Giám đốc điều hành đội xe là người DUY NHẤT được chốt
+              lệnh (chỉ đạo Chủ tịch 07/9/2026), nên POST /dispatch trả 403 cho cả ba vai trò từng thấy
+              mẫu này. Một mẫu chỉ để nhận 403 thì tệ hơn là không có mẫu.
+            · Mẫu cũ không gửi so_khach và km_du_kien, nên bộ gợi ý chấm điểm cho một chuyến 0 khách 0 km
+              rồi lấy kết quả ấy quyết định có bắt giải trình hay không.
+            · Mẫu cũ không có ô ly_do_khac_goi_y, nên khi máy chủ trả 422 đòi lý do thì không có chỗ để
+              điền – cụt đường thật, không phải bất tiện.
+
+          Ba vai trò cũ (nv_dh, tp_dh, cntt) đều nhìn thấy /lenh-dieu-xe, nên không ai mất đường. */}
+      <div className="panel"><h2>Lệnh điều xe</h2>
+        <p className="muted">Lập lệnh nay ở màn hình <b>Lệnh điều xe</b> (nhóm Vận tải &amp; Hướng dẫn viên) –
+        nơi có sẵn bảng gợi ý xe, ô số khách và km dự kiến, và ô ghi lý do khi chốt khác gợi ý. Bảng dưới
+        đây vẫn là nơi xác nhận và đóng lệnh.</p></div>
       <div className="panel wrap"><table><thead><tr><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Tuyến</th><th>Thời gian</th><th style={{ textAlign: "right" }}>Giá nội bộ</th><th>Pháp nhân sở hữu xe</th><th>Trạng thái</th><th>Sự cố</th>{["cntt", "tp_dh", "nv_dh", "hcns"].includes(role) && <th></th>}</tr></thead>
         <tbody>{disp.map((d) => <tr key={d.id}><td><b>{d.tour_code}</b></td><td>{d.vehicle}</td><td>{d.driver}</td><td className="muted">{d.route}</td><td>{fmtD(d.date_from)} → {fmtD(d.date_to)} ({d.days} ngày)</td><td style={{ textAlign: "right" }}>{vnd(d.internal_price)}</td>
           <td>{d.company ? <>{d.company_code} {d.noi_bo && <Tag cls="navy">nội bộ</Tag>}</> : <Tag cls="warn">chưa gán</Tag>}</td>
