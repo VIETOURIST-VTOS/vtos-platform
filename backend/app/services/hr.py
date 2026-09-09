@@ -256,7 +256,7 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         if a.tour_id not in tour_ids or a.guide_id not in emps:
             continue
         e = emps[a.guide_id]; t = db.get(Tour, a.tour_id)
-        gross = a.rate_per_day * a.days * (2 if a.holiday else 1)
+        gross = (a.rate_per_day or 0) * a.days * (2 if a.holiday else 1)
         if not a.report_submitted or not a.advance_settled:
             row(e)["ghi_chu"].append(f"TREO thù lao {t.code}: thiếu báo cáo tour / chưa hoàn ứng"); continue
         add(e, f"Thù lao dẫn {t.code}: {a.days} ngày × {a.rate_per_day:,.0f}{' ×2 lễ' if a.holiday else ''}", gross)

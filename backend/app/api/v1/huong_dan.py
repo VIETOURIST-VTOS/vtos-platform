@@ -113,7 +113,7 @@ def chao_chuyen(u: User = Depends(require_roles(*READ)), db: Session = Depends(g
         out.append({"id": a.id, "tour_code": t.code if t else "", "tour_name": t.name if t else "",
                     "khoi_hanh": t.start_date if t else None, "hdv": ten.get(a.guide_id, ""),
                     "so_ngay": a.days, "don_gia": a.rate_per_day, "le_tet": a.holiday,
-                    "thu_lao": a.rate_per_day * a.days * (2 if a.holiday else 1),
+                    "thu_lao": (a.rate_per_day or 0) * a.days * (2 if a.holiday else 1),
                     "trang_thai": a.status, "chao_luc": a.assigned_at, "nhan_luc": a.confirmed_at,
                     "loi_chao_qua_han": qua_han, "han_tra_loi": a.han_tra_loi, "ly_do": a.ly_do,
                     "da_bao_cao": a.report_submitted,

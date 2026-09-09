@@ -245,7 +245,7 @@ def dung_quyet_toan(db: Session, partner_id: int, ky: str, boi: str) -> Settleme
     st.doi_tac_huong = _q(doanh_thu)
     st.doi_tac_chiu = _q(chi_ho)              # khoản công ty đã chi hộ, đối tác phải hoàn lại
     st.dieu_chinh = _q(dieu_chinh)
-    st.truoc_can_tru = _q(st.doi_tac_huong - st.doi_tac_chiu + (st.dieu_chinh or 0))
+    st.truoc_can_tru = _q((st.doi_tac_huong or 0) - (st.doi_tac_chiu or 0) + (st.dieu_chinh or 0))
     st.can_tru = _q(db.execute(select(func.coalesce(func.sum(OffsetApplication.amount), 0))
                                .where(OffsetApplication.settlement_id == st.id)).scalar() or 0)
     sau = _q((st.truoc_can_tru or 0) - (st.can_tru or 0))

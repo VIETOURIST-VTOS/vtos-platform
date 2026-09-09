@@ -164,7 +164,7 @@ def cong_no_chu_xe(db: Session, p: PartnerOwner, xes: list[Vehicle] | None = Non
             phai_tra += con
         else:
             dang_tinh += _q((st.sau_can_tru or 0))
-        phai_thu += _q(st.chuyen_ky_sau)
+        phai_thu += _q((st.chuyen_ky_sau or 0))
 
     lich = []
     for pl in db.execute(select(RepaymentPlan).where(RepaymentPlan.partner_id == p.id)).scalars():

@@ -101,7 +101,10 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     v["cost_total"] = {"actual": sum((l.actual or 0) for l in lines), "paid": sum((l.paid or 0) for l in lines)}
     v["settlement_edit"] = {"can_edit": ST.can_edit(u, t), "version": t.settlement_version, "service_types": ST.SERVICE_TYPES, "summary": ST.summary(db, t), "checks": ST.checks(db, t)}
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
-    v["guides"] = [{"id": a.id, "guide": emps.get(a.guide_id, ""), "days": a.days, "rate_per_day": a.rate_per_day, "holiday": a.holiday, "status": a.status, "amount": a.rate_per_day * a.days * (2 if a.holiday else 1)}
+    # Như trên: đơn giá hiển thị giữ nguyên rỗng, chỉ thù lao mới xử rỗng thành 0.
+    v["guides"] = [{"id": a.id, "guide": emps.get(a.guide_id, ""), "days": a.days,
+                    "rate_per_day": a.rate_per_day, "holiday": a.holiday, "status": a.status,
+                    "amount": (a.rate_per_day or 0) * a.days * (2 if a.holiday else 1)}
                    for a in db.execute(select(GuideAssignment).where(GuideAssignment.tour_id == t.id)).scalars()]
     veh = {x.id: x.plate for x in db.execute(select(Vehicle)).scalars()}
     v["dispatch"] = [{"id": d.id, "plate": veh.get(d.vehicle_id, ""), "driver": emps.get(d.driver_id, ""), "date_from": d.date_from, "date_to": d.date_to, "internal_price": d.internal_price, "status": d.status}

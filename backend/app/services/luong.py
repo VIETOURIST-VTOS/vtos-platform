@@ -184,7 +184,7 @@ def khoan_treo(db: Session, den_ngay: date | None = None) -> dict:
         rows.append({"tour_code": t.code, "tour_name": t.name, "ket_thuc": t.end_date,
                      "han_quyet_toan": R.settlement_deadline(db, t), "qua_han_ngay": max(0, (hom_nay - R.settlement_deadline(db, t)).days),
                      "vai_tro": "Hướng dẫn viên", "ma": e.code, "ten": e.full_name, "phong": e.department,
-                     "so_tien": round(a.rate_per_day * a.days * (2 if a.holiday else 1)), "doanh_thu": 0.0, "so_booking": 0,
+                     "so_tien": round((a.rate_per_day or 0) * a.days * (2 if a.holiday else 1)), "doanh_thu": 0.0, "so_booking": 0,
                      "trang_thai": "treo", "ly_do": "Thiếu " + " và ".join(thieu)})
     rows.sort(key=lambda r: (-r["qua_han_ngay"], r["ma"]))
     theo_nguoi = {}

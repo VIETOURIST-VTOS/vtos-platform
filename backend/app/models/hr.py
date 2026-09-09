@@ -73,7 +73,7 @@ class GuideAssignment(Base):
     tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"))
     guide_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
     days: Mapped[int] = mapped_column(Integer, default=1)
-    rate_per_day: Mapped[float] = mapped_column(TIEN, default=0)
+    rate_per_day: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     rate_id: Mapped[int | None] = mapped_column(ForeignKey("guide_rates.id"), nullable=True)   # tuyến trong bảng giá HDV
     holiday: Mapped[bool] = mapped_column(Boolean, default=False)
     assigned_by: Mapped[str] = mapped_column(String(50), default="")
@@ -99,7 +99,7 @@ class Vehicle(Base):
     kind: Mapped[str] = mapped_column(String(10), default="noi_bo")            # noi_bo (Vietrip) / hop_tac (xe hợp tác hỗ trợ)
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)   # pháp nhân sở hữu xe
     driver_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
-    internal_rate_per_day: Mapped[float] = mapped_column(TIEN, default=0)   # dùng khi tuyến không có trong bảng giá
+    internal_rate_per_day: Mapped[float | None] = mapped_column(TIEN, nullable=True)   # dùng khi tuyến không có trong bảng giá
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     # --- Đợt 1 đội xe (đặc tả 06/9/2026). Xem app/models/fleet.py để hiểu vì sao tách làm ba trục. ---
     code: Mapped[str] = mapped_column(String(20), default="")                # mã xe cố định suốt vòng đời
@@ -142,8 +142,8 @@ class GuideRate(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     route: Mapped[str] = mapped_column(String(80))
     days: Mapped[float] = mapped_column(Float, default=0)
-    rate_per_day: Mapped[float] = mapped_column(TIEN, default=0)
-    old_rate_per_day: Mapped[float] = mapped_column(TIEN, default=0)
+    rate_per_day: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    old_rate_per_day: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     effective_from: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(20), default="pending")       # pending / active / rejected
     signed_chutich: Mapped[bool] = mapped_column(Boolean, default=False)

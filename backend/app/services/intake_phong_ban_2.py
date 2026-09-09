@@ -370,7 +370,7 @@ def _tl_nap(db: Session, r, boi):
                         report_submitted=_co(r.get("da_nop_bao_cao")), advance_settled=True,
                         status="da_xac_nhan")
     db.add(a); db.flush()
-    thu_lao = a.days * a.rate_per_day * (2 if a.holiday else 1)
+    thu_lao = a.days * (a.rate_per_day or 0) * (2 if a.holiday else 1)
     return f"{t.code} · {g.full_name} · {a.days} ngày · " + (f"{thu_lao:,.0f} đ" if dg else "chưa có đơn giá")
 
 
