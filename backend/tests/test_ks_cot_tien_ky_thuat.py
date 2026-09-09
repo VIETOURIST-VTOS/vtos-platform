@@ -392,3 +392,37 @@ def test_kt15_sql_dem_so_0_chi_doc_va_khong_ghep_ten_cot_vao_chuoi_truy_van():
     assert "= any(:ds)" in s, "danh sách cột phải đi vào bằng THAM SỐ, không nối chuỗi"
     for cam in ("insert", "update", "delete", "alter", "drop"):
         assert cam not in s, f"phép đo này chỉ đọc – không được có “{cam}”"
+
+
+def test_kt13_sau_k2_bang_dem_so_0_phai_goi_dung_ten_con_so_no_dang_dem():
+    """Một con số đúng nhưng gọi sai tên còn nguy hiểm hơn một con số sai, vì không ai đi kiểm nó.
+
+    Ngày 09/9/2026 K2 sửa xong cả 91 cột. Danh sách "cột chờ quyết" về rỗng, và bảng đếm số 0 lập tức
+    hiển thị "0 cột · 0 dòng bằng 0". Đọc lên nghe như "dữ liệu đã sạch". Thật ra nó chỉ có nghĩa
+    "không còn cột nào trong diện chờ quyết" – còn những số 0 CŨ thì vẫn nằm nguyên trong cơ sở dữ
+    liệu, vì bản nâng cấp cố ý không đụng một dòng dữ liệu nào.
+
+    Nếu ai đó đọc bảng ấy rồi kết luận "xong rồi, sạch rồi" thì K2 vừa tạo ra đúng thứ nó sinh ra để
+    xoá: một con số làm người ta yên tâm nhầm.
+
+    Phép thử này canh: khi danh sách chờ đã rỗng, hàm phải CHUYỂN sang đếm mọi cột tiền cho phép rỗng
+    và nói rõ nó đang đếm gì – chứ không được im lặng trả về 0.
+    """
+    from app.services import ks_cot_tien as CT
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    try:
+        d = CT.dem_so_0(db)
+        cho_quyet = [r for r in CT._hieu_luc(db)
+                     if r.xep() == "tien" and r.mac_dinh_0 and not r.cho_rong and r.quyet_k2 != "giu"]
+        assert d.get("xong_k2") is (not cho_quyet), \
+            "cờ xong_k2 phải khớp với việc danh sách chờ quyết còn hay hết"
+        if not cho_quyet:
+            assert d["so_cot"] > 0, (
+                "K2 đã xong mà bảng vẫn đếm trên 0 cột – màn hình sẽ hiện 'không còn số 0 nào', trong "
+                "khi số 0 cũ vẫn còn nguyên. Phải chuyển sang đếm mọi cột tiền cho phép rỗng.")
+            if d.get("chay_duoc"):
+                assert "CŨ" in d["tieu_de"] and "chưa nhập" in d["ghi_chu"], \
+                    "phải nói rõ đây là số 0 CŨ còn lẫn hai nghĩa, không phải 'đã sạch'"
+    finally:
+        db.close()

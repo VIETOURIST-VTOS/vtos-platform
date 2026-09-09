@@ -425,23 +425,41 @@ WHERE c.table_schema = 'public'
 
 
 def dem_so_0(db: Session) -> dict:
-    """Trong những cột K2 chỉ ra, mỗi cột đang có bao nhiêu dòng mang số 0?
+    """Mỗi cột tiền đang có bao nhiêu dòng mang số 0?
 
-    Đây là con số để người quyết chọn "sửa" hay "giữ" cho TỪNG cột, thay vì quyết cả 91 cột bằng một
-    cảm giác chung.
+    Trước khi K2 xong: đếm trên những cột CÒN CHỜ QUYẾT, để người quyết chọn "sửa" hay "giữ" cho TỪNG
+    cột thay vì quyết cả 91 cột bằng một cảm giác chung.
+
+    Sau khi K2 xong (danh sách chờ rỗng): đếm trên MỌI cột tiền đã cho phép rỗng, vì lúc đó câu hỏi
+    đã đổi – không còn là "cột nào cần sửa" mà là "còn bao nhiêu dòng CŨ mang số 0 mà không ai biết
+    đó là 'bằng 0' hay 'chưa nhập'". Trả về `xong_k2` để màn hình gọi đúng tên con số nó đang xem.
     """
     from sqlalchemy import text
     dong_bo(db)
     xau = sorted([r for r in _hieu_luc(db)
                   if r.xep() == "tien" and r.mac_dinh_0 and not r.cho_rong and r.quyet_k2 != "giu"],
                  key=lambda r: (r.bang, r.cot))
+
+    # Ngày 09/9/2026 K2 sửa xong cả 91 cột, và danh sách chờ trên về rỗng. Lúc ấy hàm này trả
+    # "0 cột · 0 dòng bằng 0" – đọc lên nghe như "dữ liệu đã sạch", trong khi nó chỉ có nghĩa "không
+    # còn cột nào trong diện chờ quyết". Hai câu đó khác nhau rất xa, và bảng đang nói câu dễ hiểu
+    # lầm hơn: số 0 CŨ vẫn nằm nguyên trong cơ sở dữ liệu.
+    #
+    # Bản nâng cấp K2 cố ý không đụng một dòng dữ liệu nào – nó chỉ ngăn chuyện trộn TIẾP TỤC xảy ra.
+    # Nên sau K2, con số đáng hỏi đã đổi: không còn là "cột nào cần quyết" mà là "bao nhiêu dòng CŨ
+    # đang mang số 0 mà không ai còn biết đó là 'bằng 0' hay 'chưa nhập'". Đó là phần K2 không chữa
+    # được, và là việc của người – không phải việc của một bản nâng cấp.
+    xong_k2 = not xau
+    if xong_k2:
+        xau = sorted([r for r in _hieu_luc(db) if r.xep() == "tien" and r.cho_rong],
+                     key=lambda r: (r.bang, r.cot))
     ten = [f"{r.bang}.{r.cot}" for r in xau]
     quyet = {f"{r.bang}.{r.cot}": (r.quyet_k2 or "") for r in xau}
     if db.bind.dialect.name != "postgresql":
         return {"chay_duoc": False,
                 "vi_sao": "Chỉ chạy trên PostgreSQL – máy lập trình dùng SQLite, dữ liệu ở đó là dữ "
                           "liệu nạp mẫu nên đếm ra con số không nói gì về hệ thống thật.",
-                "so_cot": len(ten), "cot": []}
+                "so_cot": len(ten), "xong_k2": xong_k2, "cot": []}
     hang = db.execute(text(SQL_DEM_0), {"ds": ten}).all()
     ra = []
     for c, tong, so0 in hang:
@@ -455,6 +473,15 @@ def dem_so_0(db: Session) -> dict:
             "so_cot_bang_trong": len(ra) - len(co_du_lieu),
             "so_cot_toan_bo_bang_0": len([x for x in co_du_lieu if x["ty_le_0"] == 100.0]),
             "tong_dong_bang_0": sum(x["so_dong_bang_0"] for x in ra),
-            "ghi_chu": "Bảng đang trống thì chưa có gì để lo – nhưng cột vẫn cần quyết trước khi có dữ "
-                       "liệu, vì sau đó thì số 0 đã trộn vào rồi.",
+            "xong_k2": xong_k2,
+            "dang_dem": ("so 0 CU con lai" if xong_k2 else "cot cho quyet"),
+            "tieu_de": ("Số 0 CŨ còn lại – nhập trước ngày K2, không còn biết là 'bằng 0' hay 'chưa nhập'"
+                        if xong_k2 else "Cột tiền còn chờ quyết sửa hay giữ"),
+            "ghi_chu": ("Mọi cột tiền đã cho phép rỗng – từ nay ô để trống lưu thành RỖNG. Nhưng bản "
+                        "nâng cấp cố ý không đụng dữ liệu cũ, nên những số 0 dưới đây vẫn còn nguyên và "
+                        "vẫn mang hai nghĩa lẫn nhau. Không có phép nào tách chúng ra được: chỉ người "
+                        "biết việc mới nói được dòng nào là 'đúng bằng 0', dòng nào là 'chưa ai nhập'."
+                        if xong_k2 else
+                        "Bảng đang trống thì chưa có gì để lo – nhưng cột vẫn cần quyết trước khi có dữ "
+                        "liệu, vì sau đó thì số 0 đã trộn vào rồi."),
             "cot": ra}
