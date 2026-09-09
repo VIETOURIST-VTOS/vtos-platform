@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
-import { api, vnd, fmtD, pct } from "@/lib/api";
+import { api, vnd, fmtD, pct, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -49,7 +49,7 @@ function Marketing() {
   const doiKenh = (k: string) => setF({ ...f, channels: f.channels.includes(k) ? f.channels.filter((x: string) => x !== k) : [...f.channels, k] });
   const luu = () => post("/marketing/campaigns", {
     ...f, product_id: f.product_id ? Number(f.product_id) : null, owner_id: f.owner_id ? Number(f.owner_id) : null,
-    budget: Number(f.budget) || 0, target_leads: Number(f.target_leads) || 0,
+    budget: soTien(f.budget), target_leads: Number(f.target_leads) || 0,
     target_bookings: Number(f.target_bookings) || 0, to_date: f.to_date || null,
   }).then((r) => { if (r) { setF({ ...RONG }); setHienForm(false); } });
 
@@ -59,7 +59,7 @@ function Marketing() {
     const lines = Object.entries(fn.lines).filter(([, v]) => Number(v) > 0)
       .map(([hang_muc, v]) => ({ hang_muc, amount: Number(v) }));
     post("/marketing/budgets", { period: fn.period, target_leads: Number(fn.target_leads) || 0,
-      target_revenue: Number(fn.target_revenue) || 0, rationale: fn.rationale, lines,
+      target_revenue: soTien(fn.target_revenue), rationale: fn.rationale, lines,
       nguon_tao: fn.nguon_tao, ai_ghi_chu: fn.ai_ghi_chu })
       .then((r) => { if (r) { setFn({ ...fn, rationale: "", lines: {} }); setHienNs(false); } });
   };

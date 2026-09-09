@@ -324,7 +324,7 @@ class ChuyenIn(BaseModel):
     km_cuoi: int | None = None
     km_gps: int | None = None
     km_nguon: str = "nhap_tay"
-    doanh_thu: float = 0
+    doanh_thu: float | None = None
     note: str = ""
 
 
@@ -548,7 +548,7 @@ class BaoDuongIn(BaseModel):
     km_ky_toi: int | None = None
     noi_dung: str = ""
     garage: str = ""
-    so_tien: float = 0
+    so_tien: float | None = None
     ben_chiu: str | None = None
     chung_tu: str = ""
 
@@ -718,9 +718,9 @@ def gan_xe(data: GanXeIn, u: User = Depends(require_roles(*WRITE, *QT_WRITE)), d
 class LichIn(BaseModel):
     partner_id: int
     ten: str
-    principal: float
+    principal: float | None = None
     so_ky: int = 0
-    moi_ky: float = 0
+    moi_ky: float | None = None
     bat_dau: date | None = None
     creditor_company_id: int | None = None
     sale_case_id: int | None = None
@@ -768,8 +768,8 @@ class HoaDonChungIn(BaseModel):
     nha_cung_cap: str = ""
     company_id: int | None = None
     loai: str = "giu_xe"
-    tong_tien: float = 0
-    vat: float = 0
+    tong_tien: float | None = None
+    vat: float | None = None
     xe: list[dict] = []          # [{vehicle_id, amount?, he_so?}] – lấy từ PHỤ LỤC hóa đơn
 
 
@@ -878,8 +878,8 @@ class BanXeIn(BaseModel):
     partner_id: int | None = None
     seller_company_id: int | None = None
     ngay_ky: date | None = None
-    gia_ban: float = 0
-    da_thu: float = 0
+    gia_ban: float | None = None
+    da_thu: float | None = None
     nguoi_mua: str = ""
     han_thu_du: date | None = None
     nguon: str = ""

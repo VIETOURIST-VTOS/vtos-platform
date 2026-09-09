@@ -70,7 +70,7 @@ class CampaignIn(BaseModel):
     channels: list[str] = []
     from_date: date
     to_date: date | None = None
-    budget: float = 0
+    budget: float | None = None
     target_leads: int = 0
     target_bookings: int = 0
     owner_id: int | None = None
@@ -219,7 +219,7 @@ def chi_tiet_ngan_sach(bid: int, u: User = Depends(require_roles(*XEM)), db: Ses
 
 class DongIn(BaseModel):
     hang_muc: str
-    amount: float
+    amount: float | None = None
     note: str = ""
 
 
@@ -227,7 +227,7 @@ class BudgetIn(BaseModel):
     period: str
     company_id: int | None = None
     target_leads: int = 0
-    target_revenue: float = 0
+    target_revenue: float | None = None
     rationale: str = ""
     lines: list[DongIn] = []
     nguon_tao: str = "nguoi"

@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
-import { api, vnd, fmtD } from "@/lib/api";
+import { api, vnd, fmtD, soTien } from "@/lib/api";
 import { TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
 import { Tag, errMsg } from "@/components/ui";
 
@@ -24,9 +24,9 @@ function Products() {
   const view = async (id: number) => { try { const p = await api(`/products/${id}`); setSel(p); setEditing(false); if (!open.price_adl) setOpen({ ...open, price_adl: String(p.reference_price || "") }); } catch (e) { toast(errMsg(e), true); } };
   const startEdit = (p?: any) => { setEditing(true); setF(p ? { ...p, days: String(p.days), reference_price: String(p.reference_price), deposit_pct: String(p.deposit_pct), days_to_close: String(p.days_to_close) } : EMPTY); };
   const save = async () => {
-    const d = { ...f, days: Number(f.days) || 1, reference_price: Number(f.reference_price) || 0, deposit_pct: Number(f.deposit_pct) || 0, days_to_close: Number(f.days_to_close) || 0,
+    const d = { ...f, days: Number(f.days) || 1, reference_price: soTien(f.reference_price), deposit_pct: Number(f.deposit_pct) || 0, days_to_close: Number(f.days_to_close) || 0,
       cost_structure: Object.fromEntries(Object.entries(f.cost_structure || {}).map(([k, v]) => [k, Number(v) || 0])),
-      cost_lines: (f.cost_lines || []).filter((l: any) => l.mo_ta || l.don_gia).map((l: any) => ({ ...l, don_gia: Number(l.don_gia) || 0, sl: Number(l.sl) || 1, so_tien: Number(l.so_tien) || 0 })) };
+      cost_lines: (f.cost_lines || []).filter((l: any) => l.mo_ta || l.don_gia).map((l: any) => ({ ...l, don_gia: soTien(l.don_gia), sl: Number(l.sl) || 1, so_tien: Number(l.so_tien) || 0 })) };
     try { const p = f.id ? await api(`/products/${f.id}`, { method: "PUT", json: d }) : await api("/products", { method: "POST", json: d }); toast("Đã lưu sản phẩm " + p.code); setEditing(false); load(); view(p.id); } catch (e) { toast(errMsg(e), true); }
   };
   const openTour = async () => {

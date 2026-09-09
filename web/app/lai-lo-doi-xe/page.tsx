@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
-import { api, vnd, fmtD } from "@/lib/api";
+import { api, vnd, fmtD, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 /** Lãi lỗ đội xe: ba tầng chi phí, và khoảng cách giữa chúng.
@@ -42,7 +42,7 @@ function LaiLo() {
     setLuu(true);
     try {
       const r = await api<any>("/fleet/chi-phi-ky", { method: "POST", json: {
-        ky, nhom: f.nhom, so_tien: Number(f.so_tien) || 0,
+        ky, nhom: f.nhom, so_tien: soTien(f.so_tien),
         vehicle_id: f.vehicle_id ? Number(f.vehicle_id) : null,
         mo_ta: f.mo_ta || "", chung_tu: f.chung_tu || "" } });
       toast(r.message); setF(null); await load();

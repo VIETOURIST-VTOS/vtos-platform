@@ -58,7 +58,7 @@ class EmployeeIn(BaseModel):
     position: str = "nv"
     office: str = "hcm"
     contract_type: str = "hdld"
-    base_salary: float = 0
+    base_salary: float | None = None
     user_id: int | None = None
     start_date: date | None = None
     probation: bool = False
@@ -67,7 +67,7 @@ class EmployeeIn(BaseModel):
     card_expiry: date | None = None
     member_org: bool = False
     ctv_contract: bool = False
-    advance_limit: float = 0
+    advance_limit: float | None = None
     title: str | None = None
     duties: str | None = None
     sales_group: str | None = None
@@ -194,7 +194,7 @@ class VisaIn(BaseModel):
     office: str = "hcm"
     alliance: bool = False
     tour_id: int | None = None
-    revenue: float = 0
+    revenue: float | None = None
 
 
 @router.post("/visa", status_code=201)
@@ -345,7 +345,7 @@ class AssignIn(BaseModel):
     tour_id: int
     guide_id: int
     days: int
-    rate_per_day: float
+    rate_per_day: float | None = None
     holiday: bool = False
     rate_id: int | None = None
 
@@ -403,7 +403,7 @@ class VehicleIn(BaseModel):
     seats: int = 45
     kind: str = "noi_bo"
     driver_id: int | None = None
-    internal_rate_per_day: float = 0
+    internal_rate_per_day: float | None = None
 
 
 @router.post("/vehicles", status_code=201)
@@ -462,8 +462,8 @@ def guide_rates(u: User = Depends(current_user), db: Session = Depends(get_db)):
 class GuideRateIn(BaseModel):
     route: str
     days: float = 0
-    rate_per_day: float
-    old_rate_per_day: float = 0
+    rate_per_day: float | None = None
+    old_rate_per_day: float | None = None
     effective_from: date
     note: str = ""
 
@@ -500,8 +500,8 @@ def vehicle_rates(u: User = Depends(current_user), db: Session = Depends(get_db)
 class RateIn(BaseModel):
     route: str
     days: int = 0
-    internal_price: float
-    partner_price: float = 0
+    internal_price: float | None = None
+    partner_price: float | None = None
     effective_from: date
     note: str = ""
 
@@ -560,7 +560,7 @@ class DispatchIn(BaseModel):
     date_from: date
     date_to: date
     rate_id: int | None = None
-    internal_price: float = 0
+    internal_price: float | None = None
     # Đợt 4: chọn xe ngoài top gợi ý thì phải ghi lý do TRƯỚC khi lưu. Đây là dữ liệu duy nhất để sau mỗi quý
     # biết thuật toán gợi ý có tốt lên không – không có nó thì chỉ còn tranh luận bằng cảm nhận.
     ly_do_khac_goi_y: str = ""

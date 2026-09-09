@@ -170,8 +170,8 @@ class DonIn(BaseModel):
     ngay_su_dung: date | None = None
     so_luong: float = 1
     don_vi: str = ""
-    don_gia: float = 0
-    thanh_tien: float = 0
+    don_gia: float | None = None
+    thanh_tien: float | None = None
     note: str = ""
 
 

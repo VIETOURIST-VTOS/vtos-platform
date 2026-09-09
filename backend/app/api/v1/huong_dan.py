@@ -145,7 +145,7 @@ class ChaoIn(BaseModel):
     tour_id: int
     guide_id: int
     days: int
-    rate_per_day: float
+    rate_per_day: float | None = None
     rate_id: int | None = None
     holiday: bool = False
 

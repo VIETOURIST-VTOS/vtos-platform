@@ -44,3 +44,23 @@ export const vnd = (x: number | null | undefined) => Math.round(x || 0).toLocale
 export const pct = (x: number | null | undefined) => ((x || 0) * 100).toFixed(1).replace(".", ",") + "%";
 export const fmtD = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
 export const fmtDT = (s?: string | null) => (s ? fmtD(s) + " " + s.slice(11, 16) : "");
+
+/** Đọc một ô nhập TIỀN: ô trống trả về rỗng, KHÔNG trả về 0.
+ *
+ * `Number("")` bằng 0 chứ không phải NaN – đó là lý do mọi ô tiền để trống trong VTOS xưa nay đều
+ * được ghi xuống thành số 0, và vì sao không ai phân biệt được "chưa nhập" với "bằng 0". Đợt K2 đã
+ * mở đường ở tầng dưới (91 cột tiền nhận rỗng); hàm này là cánh cửa cuối cùng, chỗ người dùng gõ.
+ *
+ * Dùng cho TIỀN và các con số người nhập có quyền để trống. KHÔNG dùng cho số bắt buộc phải có
+ * (số tiền của một phiếu thu chẳng hạn) – ở đó ô trống là lỗi nhập liệu, phải chặn ngay trên biểu
+ * chứ không lặng lẽ hoá rỗng.
+ *
+ * Số 0 do người gõ vẫn là 0. Phân biệt được hai thứ mới là mục đích, không phải cấm số 0.
+ */
+export const soTien = (v: unknown): number | null => {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};

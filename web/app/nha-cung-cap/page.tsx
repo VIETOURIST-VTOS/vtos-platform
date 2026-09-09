@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
-import { api, fmtD, fmtDT } from "@/lib/api";
+import { api, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 /** Nhà cung cấp & đặt dịch vụ.
@@ -188,7 +188,7 @@ function NhaCungCap() {
           <label>Ngày sử dụng<input type="date" value={formDon.ngay_su_dung || ""} onChange={(e) => setFormDon({ ...formDon, ngay_su_dung: e.target.value })} /></label>
           <label>Số lượng<input type="number" value={formDon.so_luong ?? 1} onChange={(e) => setFormDon({ ...formDon, so_luong: Number(e.target.value) })} /></label>
           <label>Đơn vị<input value={formDon.don_vi || ""} onChange={(e) => setFormDon({ ...formDon, don_vi: e.target.value })} placeholder="phòng / suất / vé" /></label>
-          <label>Đơn giá (đ)<input type="number" value={formDon.don_gia ?? 0} onChange={(e) => setFormDon({ ...formDon, don_gia: Number(e.target.value) })} /></label>
+          <label>Đơn giá (đ)<input type="number" value={formDon.don_gia ?? 0} onChange={(e) => setFormDon({ ...formDon, don_gia: soTien(e.target.value) })} /></label>
         </div>
         <label>Nội dung dịch vụ<input value={formDon.noi_dung || ""} onChange={(e) => setFormDon({ ...formDon, noi_dung: e.target.value })} placeholder="20 phòng đôi 2 đêm" /></label>
         <p className="muted">Thành tiền dự tính: <b>{n((formDon.so_luong || 0) * (formDon.don_gia || 0))} đ</b></p>

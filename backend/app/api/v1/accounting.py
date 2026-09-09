@@ -51,8 +51,8 @@ def journal(period: str | None = None, status: str | None = None, limit: int = 3
 
 class LineIn(BaseModel):
     account: str
-    debit: float = 0
-    credit: float = 0
+    debit: float | None = None
+    credit: float | None = None
     partner: str = ""
     partner_code: str = ""
     project_code: str = ""

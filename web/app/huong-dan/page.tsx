@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import DinhKem from "@/components/DinhKem";
-import { api, vnd, fmtD, fmtDT } from "@/lib/api";
+import { api, vnd, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 /** Phòng Hướng dẫn – màn hình của người điều phối, khi toàn bộ HDV là cộng tác viên.
@@ -41,7 +41,7 @@ function HuongDan() {
     try {
       const d = await api<any>("/huong-dan/chao-chuyen", { method: "POST", json: {
         tour_id: Number(form.tour_id), guide_id: Number(form.guide_id), days: Number(form.days) || 1,
-        rate_per_day: Number(form.rate_per_day) || 0, holiday: !!form.holiday } });
+        rate_per_day: soTien(form.rate_per_day), holiday: !!form.holiday } });
       toast(d.message); setForm(null); await load();
     } catch (e) { toast(errMsg(e), true); } finally { setLuu(false); }
   };

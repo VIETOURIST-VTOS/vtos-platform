@@ -42,8 +42,8 @@ class ContractIn(BaseModel):
     partner: str
     contract_no: str = ""
     signed_on: date | None = None
-    principal: float
-    outstanding: float = 0
+    principal: float | None = None
+    outstanding: float | None = None
     interest_rate: float = 0
     maturity: date | None = None
     collateral: str = ""
@@ -150,8 +150,8 @@ class KheUocNapIn(BaseModel):
     partner: str
     entity: str = "Công ty mẹ"
     loan_group: str = "vay_xe_45cho"
-    principal: float
-    outstanding: float = 0
+    principal: float | None = None
+    outstanding: float | None = None
     interest_rate: float = 0
     signed_on: date | None = None
     maturity: date | None = None

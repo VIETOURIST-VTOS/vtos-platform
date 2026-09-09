@@ -83,7 +83,7 @@ def phan_loai(sid: int, data: PhanLoaiIn, u: User = Depends(require_roles(*WRITE
 
 
 class GiaVonIn(BaseModel):
-    gia_von: float
+    gia_von: float | None = None
     ghi_chu: str = ""
 
 
