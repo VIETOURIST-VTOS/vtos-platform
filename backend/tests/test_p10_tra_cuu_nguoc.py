@@ -195,3 +195,54 @@ def test_man_hinh_bi_an_va_man_hinh_thay_khong_giao_nhau():
         thay = {x["path"] for x in d["man_hinh"]}
         an = set(d["man_hinh_bi_an"])
         assert not (thay & an), f"{vai}: {sorted(thay & an)} vừa thấy vừa bị ẩn"
+
+
+# ---------------- Dọn bảng khai tay, 09/9/2026 ----------------
+def test_khong_con_dong_khai_tay_nao_thua():
+    """Dòng khai tay bị một tiền tố khác trong CÙNG phạm vi bao trọn là dòng thừa.
+
+    Hàng rào so bằng startswith, nên "/api/v1/auth/" nằm cạnh "/api/v1/auth" không thêm quyền nào –
+    nó chỉ làm bảng dài ra và làm bộ tra cứu ngược báo "còn dòng khai tay chưa rà", tức là tạo ra một
+    việc giả trong danh sách rà quyền hằng tháng. Việc giả lẫn vào việc thật là cách nhanh nhất làm
+    người rà bỏ qua cả danh sách.
+    """
+    thua = []
+    for vai in ROLES:
+        cho = set(AC.pham_vi_day_du(vai))
+        for t in AC.RESTRICTED_API_PREFIXES.get(vai, ()):
+            if any(t != k and t.startswith(k) for k in cho):
+                thua.append(f"{vai}: {t}")
+    assert not thua, ("Dòng khai tay bị tiền tố khác bao trọn – bỏ đi thì quyền không đổi, giữ lại thì "
+                      f"kỳ rà quyền nào cũng phải hỏi lại một lần: {thua}")
+
+
+def test_khong_gan_nham_nhan_khai_tay_cho_vai_tro_hep():
+    """Bảy vai trò hẹp lấy màn hình từ danh sách CHO PHÉP chứ không từ ma trận menu.
+
+    Bản đầu của bộ tra cứu chỉ duyệt ma trận, nên mọi nhóm API của bảy vai trò ấy đều bị gắn nhãn
+    "khai tay – cần rà rồi bỏ dần". Nhãn ấy sai theo một kiểu nguy hiểm cụ thể: nó MỜI người rà đi xoá
+    đúng những dòng đang giữ quyền. Ngày 09/9 nó suýt làm xoá /api/v1/xe-hdv của Giám đốc đội xe và
+    Trưởng phòng Hướng dẫn – hai người mất cả phân hệ xe & HDV mà bảng vẫn báo "đã dọn sạch".
+    """
+    from app.services.tra_cuu_quyen import _nguon_api
+    for vai in AC.RESTRICTED_ROLE_MENUS:
+        gia = User(id=0, username="x", full_name="x", role=vai, department="", staff_code="",
+                   active=True, password_hash="")
+        for man in AC.RESTRICTED_ROLE_MENUS[vai]:
+            for nhom in AC.MAN_HINH_API.get(man, ()):
+                if nhom not in AC.pham_vi_day_du(vai):
+                    continue
+                ly = _nguon_api(gia, nhom)
+                assert ly["nguon"] != "khai_tay_con_lai", (
+                    f"{vai}: {nhom} bị gắn nhãn khai tay, trong khi màn hình {man} của chính vai trò "
+                    f"này gọi tới nó – xoá theo nhãn ấy là lấy mất quyền đang dùng")
+
+
+def test_moi_vai_tro_van_vao_duoc_cua_doi_mat_khau():
+    """Phép thử canh đúng thứ vừa bị bỏ. "/api/v1/auth/" bị gỡ khỏi bảng khai tay của năm vai trò;
+    nếu "/api/v1/auth" trong API_CHUNG mà cũng biến mất thì cả năm bị khoá ngoài hệ thống, và không
+    phép thử nào khác bắt được."""
+    for vai in ROLES:
+        cho = AC.pham_vi_day_du(vai)
+        for path in ("/api/v1/auth/login", "/api/v1/auth/password", "/api/v1/auth/me"):
+            assert any(path.startswith(p) for p in cho), f"{vai} không vào được {path}"

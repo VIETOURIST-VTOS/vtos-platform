@@ -60,6 +60,14 @@ def _nguon_api(u: User, nhom: str) -> dict:
     for man in AC.MAN_HINH_MOI_NGUOI:
         if nhom in AC.MAN_HINH_API.get(man, ()):
             qua.append(man)
+    # Đọc CẢ HAI nguồn khai màn hình. Bản đầu chỉ duyệt ma trận menu, nên bảy vai trò hẹp – bốn của
+    # người, ba của máy – lấy màn hình từ danh sách CHO PHÉP đều bị gắn nhãn "khai tay, cần rà rồi bỏ
+    # dần". Nhãn ấy sai và nguy hiểm theo một kiểu cụ thể: nó mời người rà đi xoá đúng những dòng đang
+    # giữ quyền cho các vai trò hẹp. Ngày 09/9 nó suýt làm em xoá /api/v1/xe-hdv của Giám đốc đội xe và
+    # Trưởng phòng Hướng dẫn – hai người sẽ mất cả phân hệ xe & HDV mà bảng vẫn báo "đã dọn sạch".
+    for man in AC.RESTRICTED_ROLE_MENUS.get(u.role, ()):
+        if nhom in AC.MAN_HINH_API.get(man, ()):
+            qua.append(man)
     for man, vai_cua_man in AC.MENU_ROLES.items():
         if u.role in vai_cua_man and nhom in AC.MAN_HINH_API.get(man, ()):
             qua.append(man)

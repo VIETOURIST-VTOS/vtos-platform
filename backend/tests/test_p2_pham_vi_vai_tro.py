@@ -127,25 +127,32 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 #   +2  chutich, tgd, bks, cntt      – "/api/v1/ban-hang" (V6: bảng giá, báo giá, hợp đồng khách)
 #                                       và "/api/v1/ra-soat-cot-tien" (bàn K1/K2 tách ra địa chỉ riêng)
 #   +1  chín vai trò kinh doanh và điều hành – chỉ "/api/v1/ban-hang"
-#   +1  ketoan (80 → 81)             – được "/api/v1/ban-hang" và "/api/v1/ra-soat-cot-tien", ĐỒNG THỜI
+#   +1  ketoan                       – được "/api/v1/ban-hang" và "/api/v1/ra-soat-cot-tien", ĐỒNG THỜI
 #                                       MẤT "/api/v1/kiem-soat" theo quyết định của Chủ tịch 08/9.
 #                                       Hai thêm một bớt, không phải một lần nới.
-#   +0  chín vai trò còn lại         – hcns, xe_hdv, gd_doi_xe, tp_hd, nv_visa, hanh_chinh và ba vai
-#                                       trò máy: không ai trong số này liên quan tới bán hàng.
+#   +0  chín vai trò còn lại         – không ai trong số này liên quan tới bán hàng.
+#
+# SIẾT 09/9/2026 – sáu dòng khai tay THỪA bị bỏ, sáu vai trò giảm 1–2 nhóm mà KHÔNG mất quyền nào:
+#   "/api/v1/auth/" ở 5 vai trò – mọi vai trò đã có "/api/v1/auth" qua API_CHUNG
+#   "/api/v1/xe-hdv/" ở xe_hdv   – vai trò này đã suy được tiền tố ấy từ ma trận menu
+# Hàng rào so bằng startswith nên tiền tố có dấu gạch cuối chỉ là bản sao hẹp hơn. Với gd_doi_xe và
+# tp_hd thì dòng "/api/v1/xe-hdv" KHÔNG thừa – hai vai trò ấy lấy màn hình từ danh sách CHO PHÉP nên
+# không suy ra được, bỏ đi là họ mất cả phân hệ xe & HDV.
+#
+# Hai lần đổi trên TRỰC GIAO nhau (một bên thêm phân hệ, một bên bỏ dòng thừa) nên con số dưới đây
+# được ĐẾM LẠI TỪ MÃ, không phải cộng trừ tay hai bảng cũ.
 PHAM_VI_DA_CHOT = {
     "chutich": 98, "tgd": 98, "bks": 98, "cntt": 96,
     "ketoan": 81, "tp_dh": 78, "ptgd_doan": 58, "nv_dh": 54, "hcns": 52, "gd_kd": 52,
     "ptgd_mkt": 39, "nv_kd": 40, "tn_kd": 40, "tp_kd": 40, "nv_mkt": 31,
-    "gd_doi_xe": 24, "hanh_chinh": 24, "tp_hd": 22, "xe_hdv": 17, "nv_visa": 17,
+    "gd_doi_xe": 23, "hanh_chinh": 24, "tp_hd": 21, "xe_hdv": 15, "nv_visa": 16,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    # robot_ks 96 → 98 khi gộp 09/9: Chủ tịch quyết robot Kiểm soát ĐỌC TOÀN BỘ, nên nó nhận mọi tiền
-    # tố – và nhánh Đợt 2 sinh thêm đúng hai tiền tố mới (/api/v1/ban-hang của V6 và
-    # /api/v1/ra-soat-cot-tien). Con số này sẽ còn tăng mỗi lần có phân hệ mới, và đó là ĐÚNG nghĩa
-    # của "đọc toàn bộ" – nhưng vẫn phải đi qua bảng chốt để mỗi lần tăng có người nhìn thấy.
-    "robot_pq": 18, "robot_ks": 98, "robot_vpm": 17,
+    # Con số của robot_ks sẽ còn tăng mỗi lần có phân hệ mới, và đó là ĐÚNG nghĩa của "đọc toàn bộ" –
+    # nhưng vẫn phải đi qua bảng chốt này để mỗi lần tăng có người nhìn thấy.
+    "robot_pq": 17, "robot_ks": 98, "robot_vpm": 16,
 }
 
 

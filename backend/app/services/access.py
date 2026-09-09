@@ -135,17 +135,25 @@ def check_readonly_write(u: User, method: str, path: str) -> None:
 RESTRICTED_API_PREFIXES = {
     # /incidents có mặt vì màn hình sự vụ lọc sẵn về đúng người đăng nhập: người ở hiện trường phải đọc
     # được sự vụ ghi cho CHÍNH MÌNH – bị ghi nhận một sự vụ mà không được xem nó là không đối chất được.
-    "xe_hdv": ("/api/v1/auth/", "/api/v1/xe-hdv/", "/api/v1/incidents"),
+    # 09/9/2026 – dọn hai dòng thừa: "/api/v1/auth/" đã có sẵn cho MỌI vai trò qua API_CHUNG, và
+    # "/api/v1/xe-hdv/" thì vai trò này đã suy được từ ma trận menu. Hàng rào so bằng startswith nên
+    # tiền tố có dấu gạch cuối chỉ là bản sao hẹp hơn của tiền tố không dấu – giữ lại chỉ làm bảng dài
+    # ra và làm bộ tra cứu ngược báo "còn dòng khai tay chưa rà".
+    "xe_hdv": ("/api/v1/incidents",),
     # GĐ điều hành đội xe: cả phân hệ đội xe và lệnh điều xe, cộng danh mục xe để chọn trong form. Không có
     # /tours, /bookings, /banks, /payroll – phạm vi công việc của ông là chiếc xe, không phải khách hàng và
     # dòng tiền công ty.
     # /nap-du-lieu và /tep có mặt vì ma trận menu ĐÃ cho vai trò này hai màn hình đó (bộ nạp nhật trình
     # chuyến xe và kho chứng từ của xe). Thiếu hai prefix này thì menu hiện ra mà bấm vào là 403 – một
     # cánh cửa vẽ trên tường còn khó chịu hơn không có cửa.
-    "gd_doi_xe": ("/api/v1/auth/", "/api/v1/fleet", "/api/v1/xe-hdv/", "/api/v1/dispatch",
+    # "/api/v1/xe-hdv" ở đây KHÔNG thừa và không được bỏ: hai vai trò gd_doi_xe và tp_hd lấy màn hình
+    # /xe-hdv từ danh sách CHO PHÉP chứ không từ ma trận menu, nên không suy ra được tiền tố ấy. Bỏ đi
+    # là họ mất cả phân hệ xe & HDV – đúng kiểu siết đúng nguyên tắc mà sai hậu quả. Chỉ bỏ dấu gạch
+    # cuối cho thống nhất; hàng rào so bằng startswith nên quyền không đổi.
+    "gd_doi_xe": ("/api/v1/fleet", "/api/v1/xe-hdv", "/api/v1/dispatch",
                   "/api/v1/vehicles", "/api/v1/nap-du-lieu", "/api/v1/tep",
                   "/api/v1/doc-chung-tu"),
-    "nv_visa": ("/api/v1/auth/", "/api/v1/visa"),
+    "nv_visa": ("/api/v1/visa",),
     # --- Ba vai trò máy (P8, 08/9/2026) ---
     # Danh sách của mỗi robot hẹp đúng bằng việc nó được giao, và HAI CHỖ TRỐNG dưới đây là chỗ trống
     # cố ý, mỗi chỗ là một điều cấm trong lệnh giao việc:
@@ -161,13 +169,13 @@ RESTRICTED_API_PREFIXES = {
     # Cả ba đều KHÔNG nằm trong FULL_ACCESS, BASE_VIEW, AUDIT_ROLES. Các cửa GHI của màn hình phân quyền
     # (đổi vai trò, khoá/mở, gán pháp nhân) liệt kê vai trò đích danh nên robot_pq đọc được mà không ghi
     # được – hàng rào tiền tố lo phần thô, chữ ký từng đường dẫn lo phần tinh.
-    "robot_pq": ("/api/v1/auth/", "/api/v1/access", "/api/v1/ai", "/api/v1/kiem-soat"),
-    "robot_vpm": ("/api/v1/auth/", "/api/v1/kiem-soat", "/api/v1/he-thong"),
+    "robot_pq": ("/api/v1/access", "/api/v1/ai", "/api/v1/kiem-soat"),
+    "robot_vpm": ("/api/v1/kiem-soat", "/api/v1/he-thong"),
     # Trưởng phòng Hướng dẫn: phần hướng dẫn, chào chuyến, bảng giá tuyến, tệp đính kèm và bộ nạp dữ
     # liệu của phòng. Không có /bookings, /tours, /payroll, /banks – ông chọn người cho chuyến, không
     # quản khách và không quản tiền công ty.
-    "tp_hd": ("/api/v1/auth/", "/api/v1/huong-dan", "/api/v1/guide-assignments", "/api/v1/guide-rates",
-              "/api/v1/incidents", "/api/v1/tep", "/api/v1/nap-du-lieu", "/api/v1/xe-hdv/"),
+    "tp_hd": ("/api/v1/huong-dan", "/api/v1/guide-assignments", "/api/v1/guide-rates",
+              "/api/v1/incidents", "/api/v1/tep", "/api/v1/nap-du-lieu", "/api/v1/xe-hdv"),
 }
 
 
