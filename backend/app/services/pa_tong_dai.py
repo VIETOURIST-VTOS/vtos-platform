@@ -2,7 +2,7 @@
 
 Đặc tả lấy từ chính trang quản trị (Người phát triển → Kiểm thử API), không phải đoán:
 
-  POST /api/getCDRReport.php   api_key, from_date, to_date (y-m-d), limit (≤1000), page,
+  POST /api/getCDRReport.php   api_key, from_date, to_date (DD-MM-YYYY HH:mm), limit (≤1000), page,
                                source, destination, duration_min, duration_max,
                                status = answered | not_answer | busy
       → {"code":"1000","message":"Successful","data":[{date_create, from, to, duration, bill, recording}]}
@@ -29,6 +29,16 @@ CDR = f"{GOC}/getCDRReport.php"
 GHI_AM = f"{GOC}/playRecording.php"
 GOI_NGAY = f"{GOC}/callNow.php"
 
+# ĐỊNH DẠNG NGÀY: "DD-MM-YYYY HH:mm". Bảng đặc tả của P.A ghi "(y-m-d)" – ghi SAI. Gửi y-m-d thì mọi
+# yêu cầu trả 1003 "tham số không hợp lệ", kể cả yêu cầu không kèm ngày.
+#
+# Tìm ra bằng cách mở biểu thử nghiệm của chính P.A: ô ngày nuốt chuỗi "2026-09-01" rồi hiện ra
+# "20-09-2001 00:00" – tức nó đọc theo ngày-tháng-năm. Xác nhận lại trong mã trang: format:
+# "DD-MM-YYYY HH:mm".
+#
+# Ghi cả câu chuyện ra đây vì lần sau ai đó đọc bảng đặc tả của P.A rồi "sửa lại cho đúng tài liệu" là
+# hỏng lại đúng chỗ này, và triệu chứng (1003 ở mọi yêu cầu) không chỉ về phía ngày tháng chút nào.
+DINH_DANG_NGAY = "%d-%m-%Y %H:%M"
 TRAN_MOI_TRANG = 1000        # P.A giới hạn cứng
 TRAN_SO_TRANG = 20           # 20.000 bản ghi cho một lần đo; đủ cho một tháng của hai đầu số
 CHO_GIAY = 25
@@ -95,13 +105,12 @@ def chan_doan() -> dict:
     h = date.today()
     b7, b30 = h - timedelta(days=7), h - timedelta(days=30)
     thu = {
-        "1_chi_ngay_7ngay":        {"from_date": str(b7), "to_date": str(h)},
-        "2_them_limit_100":        {"from_date": str(b7), "to_date": str(h), "limit": 100},
-        "3_limit_va_page":         {"from_date": str(b7), "to_date": str(h), "limit": 100, "page": 1},
-        "4_page_bat_dau_tu_0":     {"from_date": str(b7), "to_date": str(h), "limit": 100, "page": 0},
-        "5_co_gio":                {"from_date": f"{b7} 00:00:00", "to_date": f"{h} 23:59:59", "limit": 100},
-        "6_ba_muoi_ngay":          {"from_date": str(b30), "to_date": str(h), "limit": 100},
-        "7_khong_tham_so_ngay":    {"limit": 100},
+        # Dạng ĐÚNG (d-m-Y H:i) – đọc từ mã biểu thử nghiệm của chính P.A
+        "1_dung_dang_7ngay":   {"from_date": ngay_pa(b7), "to_date": ngay_pa(h, True), "limit": 100},
+        "2_dung_dang_co_page": {"from_date": ngay_pa(b7), "to_date": ngay_pa(h, True), "limit": 100, "page": 1},
+        "3_dung_dang_30ngay":  {"from_date": ngay_pa(b30), "to_date": ngay_pa(h, True), "limit": 100},
+        # Dạng theo BẢNG ĐẶC TẢ (y-m-d) – giữ lại để lần sau ai nghi ngờ thì chạy là thấy nó hỏng
+        "4_theo_tai_lieu_ymd": {"from_date": str(b7), "to_date": str(h), "limit": 100},
     }
     ra = {}
     for ten, ts in thu.items():
@@ -120,9 +129,21 @@ def _giay(v) -> int:
     except Exception: return 0
 
 
+def ngay_pa(d, cuoi_ngay: bool = False) -> str:
+    """Đổi ngày sang đúng định dạng P.A nhận. Nhận date, datetime hoặc chuỗi 'YYYY-MM-DD'."""
+    from datetime import date as _d, datetime as _dt
+    if isinstance(d, str):
+        d = _dt.strptime(d[:10], "%Y-%m-%d")
+    if isinstance(d, _d) and not isinstance(d, _dt):
+        d = _dt(d.year, d.month, d.day)
+    if cuoi_ngay:
+        d = d.replace(hour=23, minute=59)
+    return d.strftime(DINH_DANG_NGAY)
+
+
 def lich_su(tu: str, den: str, trang: int = 1, moi_trang: int = TRAN_MOI_TRANG) -> list[dict]:
     """Một trang lịch sử cuộc gọi. Trả về đúng những gì P.A trả, chưa diễn giải."""
-    j = _goi(CDR, {"from_date": tu, "to_date": den,
+    j = _goi(CDR, {"from_date": ngay_pa(tu), "to_date": ngay_pa(den, cuoi_ngay=True),
                    "limit": min(int(moi_trang), TRAN_MOI_TRANG), "page": int(trang)})
     ds = j.get("data") or []
     return ds if isinstance(ds, list) else []
