@@ -270,6 +270,9 @@ MAN_HINH_API = {
     "/bang-gia": ("/api/v1/ban-hang",),
     "/bao-gia": ("/api/v1/ban-hang",),
     "/hop-dong-khach": ("/api/v1/ban-hang",),
+    # V11 – Lịch tự động hóa. Phạm vi API HẸP: chỉ nhánh /tu-dong. Màn hình này chỉ đọc trạng thái
+    # tác vụ; nó không cần chạm vào bất kỳ số liệu nghiệp vụ nào.
+    "/tu-dong-hoa": ("/api/v1/tu-dong",),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
@@ -485,6 +488,11 @@ MENU_ROLES = {
     # bảng chấm điểm, nhưng vẫn phải có bàn của mình.
     "/kiem-soat": BASE_VIEW + ("cntt",),
     "/ra-soat-cot-tien": BASE_VIEW + ("ketoan", "cntt"),
+    # V11 – "cái gì đang tự chạy" là câu hỏi của cả công ty, không riêng CNTT: một tác vụ im ba ngày
+    # thì người phát hiện sớm nhất thường là phòng đang chờ số liệu đó. Nên XEM rộng. Khai báo tác vụ
+    # thì hẹp, và chỗ chặn đó nằm ở API (tuple KHAI trong api/v1/tu_dong.py), không ở cửa màn hình.
+    "/tu-dong-hoa": BASE_VIEW + ("cntt", "ketoan", "hcns", "tp_dh", "nv_dh", "gd_doi_xe",
+                                 "tp_hd", "gd_kd", "tp_kd", "ptgd_mkt"),
     # V6 – chuỗi bán hàng. Bảng giá là CHÍNH SÁCH nên hẹp hơn báo giá: từng sale soạn báo giá
     # được, nhưng đặt giá niêm yết thì không.
     "/bang-gia": BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt", "ketoan", "cntt"),

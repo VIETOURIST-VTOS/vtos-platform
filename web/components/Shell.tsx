@@ -79,7 +79,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
   { key: "hethong", label: "10. Hệ thống & Tích hợp", items: [
     ["Cấu hình tổ chức", "/companies"], ["Tài khoản & phân quyền", "/access"], ["Vị trí AI & quyền hạn", "/ai-roles"],
     ["Nạp dữ liệu", "/nap-du-lieu"], ["Đọc chứng từ ảnh", "/doc-chung-tu"], ["Tệp & hình ảnh", "/tep"], ["Đồng bộ Vietrip", "/vietrip"], ["Kết nối MISA và các kênh", "/accounting?tab=misa"],
-    ["Lịch tự động hóa", ""], ["Nhật ký kỹ thuật", ""]] },
+    ["Lịch tự động hóa", "/tu-dong-hoa"], ["Nhật ký kỹ thuật", ""]] },
 ];
 
 /** Vai trò được nhìn thấy các mục chưa xây (để theo dõi lộ trình); nhân viên nghiệp vụ chỉ thấy mục dùng được. */

@@ -41,6 +41,7 @@ from app.api.v1.kiem_soat import router as kiem_soat_router
 from app.api.v1.hach_toan import router as hach_toan_router
 from app.api.v1.cskh import router as cskh_router
 from app.api.v1.ban_hang import router as ban_hang_router
+from app.api.v1.tu_dong import router as tu_dong_router
 from app.api.v1.ks_ra_soat import router as ks_ra_soat_router
 from app.api.v1.ks_ra_soat import rst as rst_router
 from app.services import rules as R
@@ -216,6 +217,7 @@ app.include_router(kiem_soat_router)
 app.include_router(hach_toan_router)
 app.include_router(cskh_router)
 app.include_router(ban_hang_router)
+app.include_router(tu_dong_router)
 app.include_router(ks_ra_soat_router)
 app.include_router(rst_router)
 app.include_router(debts_router)
