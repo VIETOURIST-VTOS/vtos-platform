@@ -90,6 +90,7 @@ def _startup():
         # 8. người bấm nút
         tk("spn_cntt", "cntt")
         tk("spn_bks", "bks")
+        tk("spn_hcns", "hcns")
         db.close()
         yield
 
@@ -371,3 +372,43 @@ def test_xem_truoc_doc_danh_muc_phap_nhan_dung_MOT_lan():
     assert dem["tong"] <= 10, (
         f"{dem['tong']} lượt đọc cho một bảng xem trước. Con số này phải KHÔNG tăng theo số nhân sự; "
         f"tăng theo nghĩa là có một truy vấn nằm trong vòng lặp")
+
+
+# ---------------- Mỗi con số phải có một cửa cho NGƯỜI nhập ----------------
+def test_hcns_tu_gan_duoc_phap_nhan_cho_ho_so_nhan_su():
+    """Ranh giới công việc do Chủ tịch đặt 09/9/2026: hệ thống viết cấu trúc và phép tính, còn SỐ LIỆU
+    thì nhân viên các bộ phận tự nhập.
+
+    Phép thử này canh vế thứ hai. Trước 09/9 ô chọn pháp nhân chỉ có ở bảng hướng dẫn viên và bảng xe,
+    nên pháp nhân của một TÀI XẾ không có cửa nào để HCNS tự sửa – muốn đổi thì phải nhờ người gọi
+    thẳng vào máy chủ. Và đó đúng là chuyện đã xảy ra: mười hồ sơ tài xế được sửa bằng tay từ bên
+    ngoài màn hình, vì màn hình không có chỗ để sửa.
+
+    Một con số mà người phụ trách không tự nhập được là một con số sẽ sai và ở yên đó, vì người duy
+    nhất phát hiện ra nó sai lại là người không sửa được.
+    """
+    from app.models.hr import Employee
+    db = _db()
+    e = db.execute(select(Employee).where(Employee.code == "SPN07")).scalars().first()
+    eid, truoc = e.id, e.company_id
+    db.close()
+
+    r = client.put(f"/api/v1/employees/{eid}/company", json={"company_id": ID["B"]},
+                   headers=login("spn_hcns"))
+    assert r.status_code == 200, f"HCNS không tự gán được pháp nhân cho hồ sơ nhân sự: {r.text}"
+    db = _db()
+    assert db.get(Employee, eid).company_id == ID["B"]
+    # trả lại như cũ để các phép thử khác không bị ảnh hưởng
+    db.get(Employee, eid).company_id = truoc; db.commit(); db.close()
+
+
+def test_nguoi_khong_phu_trach_thi_khong_gan_duoc():
+    """Cửa mở cho người phụ trách, không mở cho mọi người – pháp nhân quyết định bút toán lương thuộc
+    công ty nào khi hợp nhất."""
+    from app.models.hr import Employee
+    db = _db()
+    eid = db.execute(select(Employee).where(Employee.code == "SPN07")).scalars().first().id
+    db.close()
+    r = client.put(f"/api/v1/employees/{eid}/company", json={"company_id": ID["A"]},
+                   headers=login("spn_uid"))
+    assert r.status_code == 403, f"nhân viên thường gán được pháp nhân: {r.status_code}"

@@ -66,7 +66,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     if (tab === "payroll") api(`/payroll-runs/${period}`).then(setRun).catch((e) => toast(errMsg(e), true));
     if (tab === "payroll") { api("/payroll/khoan-treo").then(setTreo).catch(() => {}); api("/payroll/xung-dot-ho-so").then(setXungDot).catch(() => {}); }
     if (tab === "payroll") { api(`/payroll-runs/${period}/phieu-luong`).then(setPhieu).catch(() => setPhieu(null)); api(`/payroll-runs/${period}/theo-phap-nhan`).then(setPhapNhan).catch(() => setPhapNhan(null)); }
-    if (tab === "employees") api("/employees").then(setEmps);
+    if (tab === "employees") { api("/employees").then(setEmps); api("/companies").then(setCos).catch(() => {}); }
     if (tab === "employees") api("/users/khoa").then(setKhoa).catch(() => {});
     if (tab === "visa") api("/visa").then(setVisa);
     if (tab === "guides") { api("/guide-assignments").then(setAsg); api("/guide-rates").then(setGrates); }
@@ -190,8 +190,21 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         <table><thead><tr><th>Tài khoản</th><th>Họ tên</th><th>Mã NV</th><th>Vai trò</th><th></th></tr></thead>
           <tbody>{khoa.map((k) => <tr key={k.id}><td className="mono">{k.username}</td><td>{k.full_name}</td><td className="mono">{k.staff_code}</td><td>{k.role_name}</td>
             <td><button className="act" style={{ margin: 0 }} onClick={() => post(`/users/${k.id}`, { active: true }, "PUT").then(() => api("/users/khoa").then(setKhoa))}>Mở lại</button></td></tr>)}</tbody></table></div>}
-      <div className="panel wrap"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Phòng</th><th>Nhóm</th><th>Chức vụ</th><th>VP</th><th>HĐ</th><th style={{ textAlign: "right" }}>Lương CV</th><th>Công việc chính</th><th>Ngày sinh</th><th>Điện thoại</th><th>Thẻ HDV</th><th>Trạng thái</th>{canHR && <th></th>}</tr></thead>
-        <tbody>{emps.map((e) => <tr key={e.id} style={{ opacity: e.active ? 1 : 0.55 }}><td className="mono">{e.code}</td><td><b>{e.full_name}</b></td><td>{e.department_name}</td><td>{e.sales_group}</td><td>{e.title || e.position_name}</td><td>{e.office_name}</td><td>{e.contract_type === "hdld" ? "HĐLĐ" : e.contract_type === "ctv" ? "CTV" : "Đối tác"}</td><td style={{ textAlign: "right" }}>{e.base_salary ? vnd(e.base_salary) : ""}</td>
+      <div className="panel wrap"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Phòng</th><th>Nhóm</th><th>Chức vụ</th><th>VP</th><th>HĐ</th><th>Pháp nhân</th><th style={{ textAlign: "right" }}>Lương CV</th><th>Công việc chính</th><th>Ngày sinh</th><th>Điện thoại</th><th>Thẻ HDV</th><th>Trạng thái</th>{canHR && <th></th>}</tr></thead>
+        <tbody>{emps.map((e) => <tr key={e.id} style={{ opacity: e.active ? 1 : 0.55 }}><td className="mono">{e.code}</td><td><b>{e.full_name}</b></td><td>{e.department_name}</td><td>{e.sales_group}</td><td>{e.title || e.position_name}</td><td>{e.office_name}</td><td>{e.contract_type === "hdld" ? "HĐLĐ" : e.contract_type === "ctv" ? "CTV" : "Đối tác"}</td>
+          {/* Pháp nhân chủ quản của TỪNG nhân sự. Trước 09/9/2026 ô này chỉ có ở bảng hướng dẫn viên và
+              bảng xe, nên pháp nhân của một tài xế không có cửa nào để HCNS tự sửa – muốn đổi thì phải
+              nhờ người gọi thẳng vào máy chủ. Một con số mà người phụ trách không tự nhập được là một
+              con số sẽ sai và ở yên đó.
+              Pháp nhân này quyết định bút toán lương thuộc công ty nào khi hợp nhất, nên nó phải nằm
+              ngay cạnh hồ sơ chứ không nằm ở một màn hình khác. */}
+          <td>{canHR
+            ? <select value={e.company_id || ""} onChange={(ev) => post(`/employees/${e.id}/company`, { company_id: ev.target.value ? Number(ev.target.value) : null })}>
+                <option value="">– chưa gán –</option>
+                {cos.filter((c) => c.active || c.id === e.company_id).map((c) => <option key={c.id} value={c.id}>{c.code}</option>)}
+              </select>
+            : (cos.find((c) => c.id === e.company_id)?.code || <Tag cls="warn">chưa gán</Tag>)}</td>
+          <td style={{ textAlign: "right" }}>{e.base_salary ? vnd(e.base_salary) : ""}</td>
           <td className="muted" style={{ maxWidth: 340 }}>{e.duties}</td><td>{fmtD(e.birth_date)}</td><td className="mono">{e.phone}</td>
           <td>{e.department === "huong_dan" && <>{e.card_no} <span className="muted">hạn {fmtD(e.card_expiry)}</span> {e.guide_ok ? <Tag cls="ok">Đủ điều kiện</Tag> : <Tag cls="red">Cổng 13</Tag>}</>}</td><td>{e.probation && <Tag cls="warn">Thử việc 85%</Tag>}{e.active ? "" : <Tag cls="red">Nghỉ</Tag>}</td>
           {canHR && <td>{e.active
