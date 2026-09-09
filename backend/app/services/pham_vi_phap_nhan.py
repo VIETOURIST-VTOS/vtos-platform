@@ -129,3 +129,63 @@ def mo_ta(db: Session, u: User) -> dict:
         cau = "Tài khoản của bạn chưa được gán pháp nhân nên đang xem toàn bộ dữ liệu."
     return {"company_id": cid, "company_name": ten, "bi_gioi_han": cid is not None,
             "ly_do_khong_gioi_han": ly_do, "cau_hien_thi": cau}
+
+
+def bang_co_cot_phap_nhan() -> list:
+    """MỌI bảng trong hệ thống có cột company_id, đọc thẳng từ mô hình.
+
+    Vì sao phải quét từ mô hình chứ không viết tay một danh sách: bảng đối chiếu pháp nhân
+    (company_scope.KINDS) chỉ kể tên NĂM loại hồ sơ – tour, booking, phiếu thu, đề nghị chi, chứng từ
+    ghi sổ. Đo ngày 09/9/2026 thì hệ thống có HAI MƯƠI bảng mang cột ấy. Nghĩa là câu "không còn hồ sơ
+    nào chưa gán pháp nhân" chỉ đúng cho năm bảng, và mười lăm bảng còn lại không ai nhìn tới.
+
+    Một cột pháp nhân không ai nhìn tới thì hoặc luôn rỗng, hoặc mang giá trị do mã tự đặt mà không ai
+    kiểm – và cả hai đều dẫn tới cùng một chỗ: đến kỳ hợp nhất, phần dữ liệu ấy không thuộc công ty
+    nào cả. Danh sách viết tay sẽ lạc hậu ngay lần thêm bảng sau; quét từ mô hình thì không.
+    """
+    from app.models.core import Base
+    import pkgutil, importlib
+    import app.models as M
+    for _, ten, _ in pkgutil.iter_modules(M.__path__):
+        importlib.import_module(f"app.models.{ten}")
+    ra = []
+    for m in Base.registry.mappers:
+        cls = m.class_
+        if "company_id" in cls.__table__.c:
+            ra.append(cls)
+    return sorted(ra, key=lambda c: c.__tablename__)
+
+
+def do_phu_kin(db: Session) -> dict:
+    """Mỗi bảng có cột pháp nhân: bao nhiêu dòng đã gán, bao nhiêu chưa – ĐO trên dữ liệu thật.
+
+    Trả về ba nhóm tách rời, vì ba nhóm là ba loại việc khác nhau:
+      – da_gan_het   : không còn gì phải làm
+      – con_chua_gan : có người phải đi gán, và bảng nói rõ còn bao nhiêu dòng
+      – rong         : bảng chưa có dòng nào, chưa kết luận được gì
+
+    KHÔNG cộng ba nhóm thành một tỷ lệ phần trăm: một con số 95% làm người đọc yên tâm đúng vào lúc
+    5% còn lại là toàn bộ một phân hệ.
+    """
+    from sqlalchemy import func as F
+    da_gan_het, con_chua_gan, rong = [], [], []
+    for cls in bang_co_cot_phap_nhan():
+        col = cls.__table__.c["company_id"]
+        tong = db.execute(select(F.count()).select_from(cls)).scalar() or 0
+        chua = db.execute(select(F.count()).select_from(cls).where(col.is_(None))).scalar() or 0
+        dong = {"bang": cls.__tablename__, "lop": cls.__name__, "tong": tong, "chua_gan": chua,
+                "da_gan": tong - chua}
+        (rong if tong == 0 else (con_chua_gan if chua else da_gan_het)).append(dong)
+    return {
+        "da_gan_het": da_gan_het,
+        "con_chua_gan": sorted(con_chua_gan, key=lambda d: -d["chua_gan"]),
+        "rong": rong,
+        "dem": {"so_bang": len(da_gan_het) + len(con_chua_gan) + len(rong),
+                "bang_da_xong": len(da_gan_het), "bang_con_viec": len(con_chua_gan),
+                "bang_rong": len(rong),
+                "dong_chua_gan": sum(d["chua_gan"] for d in con_chua_gan)},
+        "ghi_chu": ("Quét từ mô hình nên không lạc hậu khi thêm bảng. Bảng đối chiếu pháp nhân ở màn "
+                    "hình Công ty chỉ theo dõi năm loại hồ sơ chính; danh sách này cho thấy phần còn "
+                    "lại. Dòng chưa gán KHÔNG thuộc công ty mẹ – nó là 'chưa xác định', và đến kỳ hợp "
+                    "nhất thì nó không thuộc công ty nào cả."),
+    }
