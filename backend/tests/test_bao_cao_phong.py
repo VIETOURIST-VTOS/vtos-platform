@@ -247,3 +247,84 @@ def test_mot_phong_hong_khong_lam_chet_bao_cao_toan_cong_ty():
         assert any(x["ma"] == "phong_ketoan" for x in b["chi_tieu"]), "các phòng khác biến mất"
     finally:
         BP.HAM["visa"] = cu
+
+
+# ══════════ B4 – NGOẠI LỆ THEO NGƯỜI (chỉ đạo 09/9: "tất cả báo cáo về TP Điều hành") ══════════
+def _cap_nang_luc(username: str, ma: str, ngay: int = 90):
+    from datetime import date, timedelta
+    from app.db.session import SessionLocal
+    from app.models.core import User, UserGrant
+    with SessionLocal() as db:
+        u = db.execute(select(User).where(User.username == username)).scalars().first()
+        db.add(UserGrant(user_id=u.id, kind="capability", value=ma,
+                         from_date=date.today(), to_date=date.today() + timedelta(days=ngay),
+                         reason="thử", granted_by="test", approved_by="chutich", active=True))
+        db.commit()
+        return u.id
+
+
+def _go_nang_luc(uid: int):
+    from app.db.session import SessionLocal
+    from app.models.core import UserGrant
+    with SessionLocal() as db:
+        for g in db.execute(select(UserGrant).where(UserGrant.user_id == uid)).scalars():
+            db.delete(g)
+        db.commit()
+
+
+def test_nang_luc_theo_nguoi_mo_moi_bao_cao_ma_KHONG_doi_vai_tro():
+    """Chỉ đạo 09/9: tất cả báo cáo về Trưởng phòng Điều hành.
+
+    Cấp bằng NĂNG LỰC THEO NGƯỜI chứ không sửa vai trò tp_dh. Sửa vai trò là mở cho mọi Trưởng phòng
+    Điều hành từ nay về sau, kể cả người kế nhiệm mà chưa ai quyết định gì – đúng kiểu quyền nới ra
+    một lần rồi ở lại vĩnh viễn.
+    """
+    from app.db.session import SessionLocal
+    from app.models.core import User
+    from app.services import bao_cao_phong as B
+    with SessionLocal() as db:
+        u = db.execute(select(User).where(User.role == "tp_dh",
+                                          User.active == True)).scalars().first()
+        if u is None: pytest.skip("dữ liệu mẫu không có tp_dh")
+        ten = u.username
+        # trước khi cấp: chỉ phòng mình
+        assert B.pham_vi_cho_nguoi(db, u) == ["dieu_hanh"]
+
+    uid = _cap_nang_luc(ten, B.NANG_LUC_MOI_PHONG)
+    try:
+        with SessionLocal() as db:
+            u = db.get(User, uid)
+            ds = B.pham_vi_cho_nguoi(db, u)
+            assert B.TOAN_CTY in ds and set(B.PHONG) <= set(ds)
+        # VAI TRÒ không đổi – người kế nhiệm không tự có quyền này
+        assert B.pham_vi_duoc_xem("tp_dh") == ["dieu_hanh"], \
+            "quyền đã rò từ một người sang cả vai trò"
+
+        h = login("tp_dh")
+        for pv in ["toan_cty", "ketoan", "kd_le", "doi_xe"]:
+            r = client.get(f"/api/v1/bao-cao?pham_vi={pv}&kind=ngay", headers=h)
+            assert r.status_code == 200, f"{pv}: {r.status_code} {r.text[:120]}"
+        assert client.get("/api/v1/bao-cao/pham-vi", headers=h).json()["mo_rong_theo_nguoi"] is True
+    finally:
+        _go_nang_luc(uid)
+
+
+def test_go_nang_luc_thi_pham_vi_thu_HEP_LAI_ngay():
+    """Ngoại lệ hết hạn hoặc bị gỡ mà quyền vẫn còn thì cấp quyền có thời hạn thành vô nghĩa."""
+    from app.db.session import SessionLocal
+    from app.models.core import User
+    from app.services import bao_cao_phong as B
+    with SessionLocal() as db:
+        u = db.execute(select(User).where(User.role == "tp_dh",
+                                          User.active == True)).scalars().first()
+        if u is None: pytest.skip("dữ liệu mẫu không có tp_dh")
+        assert B.pham_vi_cho_nguoi(db, u) == ["dieu_hanh"]
+    h = login("tp_dh")
+    assert client.get("/api/v1/bao-cao?pham_vi=toan_cty&kind=ngay", headers=h).status_code == 403
+
+
+def test_nang_luc_moi_phong_da_khai_trong_bang_nang_luc():
+    """Không khai thì màn hình cấp quyền không cấp được, và người cấp phải sửa mã – tức là không cấp."""
+    from app.models.core import CAPABILITIES
+    from app.services import bao_cao_phong as B
+    assert B.NANG_LUC_MOI_PHONG in CAPABILITIES

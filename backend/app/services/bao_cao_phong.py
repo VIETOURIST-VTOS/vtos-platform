@@ -69,11 +69,30 @@ PHONG = {
 XEM_TAT_CA = AC.FULL_VIEW + AC.READ_ALL          # Chủ tịch, TGĐ, Ban Kiểm soát, robot kiểm soát
 
 
+# Năng lực cấp lẻ cho MỘT NGƯỜI, mở mọi báo cáo. Xem chú thích ở models/core.CAPABILITIES.
+NANG_LUC_MOI_PHONG = "bao_cao_moi_phong"
+
+
 def pham_vi_duoc_xem(vai_tro: str) -> list[str]:
-    """Các phạm vi báo cáo một vai trò được mở. Rỗng = không xem báo cáo tự động nào."""
+    """Các phạm vi báo cáo một VAI TRÒ được mở. Rỗng = không xem báo cáo tự động nào.
+
+    Hàm này chỉ xét vai trò. Ngoại lệ cấp cho từng người nằm ở `pham_vi_cho_nguoi` – tách hai hàm
+    có chủ ý, để đọc mã còn thấy được "theo chức danh thì được những gì", tách khỏi "ai đang được
+    cấp thêm". Gộp lại thì ba tháng nữa không ai trả lời được câu hỏi thứ nhất.
+    """
     if vai_tro in XEM_TAT_CA:
         return [TOAN_CTY] + list(PHONG)
     return [p for p, v in PHONG.items() if vai_tro in v["xem"]]
+
+
+def pham_vi_cho_nguoi(db, u) -> list[str]:
+    """Phạm vi thật của một NGƯỜI: theo vai trò, cộng ngoại lệ đã cấp cho riêng người đó."""
+    from app.services import access as AC
+    theo_vai = pham_vi_duoc_xem(u.role)
+    if AC.co_quyen(db, u, NANG_LUC_MOI_PHONG):
+        # Hợp hai danh sách, giữ thứ tự: toàn công ty trước, rồi tới các phòng.
+        return [TOAN_CTY] + list(PHONG)
+    return theo_vai
 
 
 def khoang(kind: str, moc: date | None = None) -> tuple[date, date, str]:

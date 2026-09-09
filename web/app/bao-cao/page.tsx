@@ -56,6 +56,11 @@ function BaoCao() {
     <h1>Báo cáo tự động</h1>
     <p className="muted">Số liệu tính <b>tại thời điểm mở màn hình</b>, không phải bản chốt hôm qua.
       Mỗi dòng đi kèm cách tính và nguồn dữ liệu — bấm vào dòng để xem.</p>
+    {meta.mo_rong_theo_nguoi && <div className="gate">
+      Phạm vi của anh/chị đang <b>rộng hơn chức danh</b>: một ngoại lệ có thời hạn đã được cấp riêng
+      cho tài khoản này, nên anh/chị xem được báo cáo của mọi phòng. Ngoại lệ có ngày hết hạn —
+      xem ở màn hình Ngoại lệ cần xử lý.
+    </div>}
 
     <div className="panel">
       <div className="grid2">

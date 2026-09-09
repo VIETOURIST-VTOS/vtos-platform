@@ -121,6 +121,11 @@ GRANT_KINDS = {"menu": "Màn hình", "capability": "Năng lực"}
 # Năng lực cấp lẻ được cho một người, không đi kèm vai trò.
 CAPABILITIES = {
     "bang_luong": "Xem bảng lương toàn công ty",
+    # Cấp 09/9/2026 theo chỉ đạo "tất cả báo cáo về Trưởng phòng Điều hành". Cấp bằng NĂNG LỰC THEO
+    # NGƯỜI chứ không sửa vai trò tp_dh: sửa vai trò là mở cho mọi Trưởng phòng Điều hành từ nay về
+    # sau, kể cả người kế nhiệm mà chưa ai quyết định gì. Đây là quyền cấp cho MỘT NGƯỜI vì việc của
+    # người đó, nên nó phải hết hạn và phải nhìn thấy được ở màn hình ngoại lệ – y hệt bảng lương.
+    "bao_cao_moi_phong": "Xem báo cáo tự động của MỌI phòng ban và toàn công ty",
 }
 GRANT_MAX_DAYS = 90
 
