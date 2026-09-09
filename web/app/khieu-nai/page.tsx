@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import DinhKem from "@/components/DinhKem";
 
 const RONG = { source: "dien_thoai", customer_name: "", customer_phone: "", booking_id: "", nhom: "chat_luong",
                level: 1, noi_dung: "", de_nghi_khach: "", handler: "", nguon_tao: "nguoi", ai_ghi_chu: "" };
@@ -117,6 +118,12 @@ function KhieuNai() {
           {c.huong_ten?.length > 0 && <p><b>Hướng xử lý:</b> {c.huong_ten.join(" · ")}</p>}
           {c.payment_request_code && <p><b>Chứng từ hoàn tiền:</b> {c.payment_request_code} — {vnd(c.payment_request_amount)}đ ({c.payment_request_status})</p>}
           {c.incident_id && <p className="muted">Đã lập sự vụ nội bộ #{c.incident_id}</p>}
+
+          {/* Ảnh và chứng từ khách gửi. Đặt TRƯỚC khối đóng hồ sơ, không phải sau: người ký đóng cần
+              nhìn thấy bằng chứng ngay trên màn hình đang ký, chứ không phải nhớ là đã xem ở đâu đó. */}
+          <DinhKem doiTuong="khieu_nai" doiTuongId={c.id} loai="hinh_anh"
+                   tieuDe="Ảnh & chứng từ khách gửi"
+                   chiXem={c.status === "da_dong"} />
           <p className="muted">Tiếp nhận {c.received_by} lúc {fmtDT(c.received_at)}{c.handler && ` · Xử lý ${c.handler}`}
             {c.closed_by && ` · Ký đóng ${c.closed_by}`}{c.reopen_reason && ` · Tái mở: ${c.reopen_reason}`}</p>
 

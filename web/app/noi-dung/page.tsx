@@ -9,6 +9,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import DinhKem from "@/components/DinhKem";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const RONG = { title: "", loai: "bai_dang", campaign_id: "", kenh: [] as string[], ngay_du_kien: today(),
@@ -99,6 +100,13 @@ function NoiDung() {
           {n.ai_ghi_chu && <p className="muted"><b>Căn cứ AI:</b> {n.ai_ghi_chu}</p>}
           {n.ly_do_go && <p style={{ color: "var(--red)" }}><b>Lý do gỡ:</b> {n.ly_do_go}</p>}
           <p className="muted">Soạn {n.nguoi_soan}{n.nguoi_duyet && ` · Ký duyệt: ${n.nguoi_duyet}`}</p>
+          {/* Ảnh và tệp của bản nội dung. Đặt TRƯỚC các nút duyệt: người ký duyệt phải xem được đúng
+              tấm ảnh sắp đăng, chứ không phải duyệt một bản thảo bằng chữ rồi ảnh đi đường khác.
+              Đã đăng hoặc đã gỡ thì chỉ xem – nội dung ra ngoài rồi thì kho phải khớp với cái đã ra. */}
+          <DinhKem doiTuong="noi_dung" doiTuongId={n.id} loai="hinh_anh"
+                   tieuDe="Ảnh & tệp nội dung"
+                   chiXem={n.status === "da_dang" || n.status === "go"} />
+
           {n.status === "cho_ky_2" && <p style={{ color: "var(--orange)" }}>Đang chờ <b>chữ ký thứ hai</b> — phải là {(n.vai_tro_ky_2 || []).join(", ")}. Người soạn và người đã ký không ký lại được.</p>}
 
           {n.status === "nhap" && soanDuoc && <button className="act" onClick={() => post(`/noi-dung/${n.id}/chuyen-trang-thai`, { status: "cho_duyet" })}>Trình duyệt</button>}

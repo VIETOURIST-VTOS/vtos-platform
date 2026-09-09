@@ -162,7 +162,16 @@ function Accounting() {
             <td><Tag cls={EST[e.status]?.[1]}>{EST[e.status]?.[0]}</Tag>{e.reversed_by_id && <Tag cls="red">đã đảo</Tag>}</td><td className="muted">{e.posted_by || e.created_by}</td>
             <td onClick={(ev) => ev.stopPropagation()}>{isKT && e.status === "nhap" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/journal/${e.id}/post`)}>Ghi sổ</button>}
               {isKT && e.status === "da_ghi_so" && !e.reversed_by_id && <button className="act grey" style={{ margin: 0 }} onClick={() => { const r = prompt("Lý do đảo bút toán?"); if (r) post(`/journal/${e.id}/reverse`, { reason: r }); }}>Đảo</button>}</td></tr>
-          {open === e.id && <tr key={e.id + "l"}><td colSpan={8}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}><tbody>{e.lines.map((l: any) => <tr key={l.id}><td className="mono">{l.account}</td><td>{accounts.find((a) => a.code === l.account)?.name}</td><td style={{ textAlign: "right" }}>{l.debit ? "Nợ " + vnd(l.debit) : ""}</td><td style={{ textAlign: "right" }}>{l.credit ? "Có " + vnd(l.credit) : ""}</td><td className="muted">{l.partner_code && <code>{l.partner_code}</code>} {l.partner} {l.project_code && <Tag cls="grey">{l.project_code}</Tag>} {l.note}</td></tr>)}</tbody></table></td></tr>}
+          {open === e.id && <tr key={e.id + "l"}><td colSpan={8}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}><tbody>{e.lines.map((l: any) => <tr key={l.id}><td className="mono">{l.account}</td><td>{accounts.find((a) => a.code === l.account)?.name}</td><td style={{ textAlign: "right" }}>{l.debit ? "Nợ " + vnd(l.debit) : ""}</td><td style={{ textAlign: "right" }}>{l.credit ? "Có " + vnd(l.credit) : ""}</td><td className="muted">{l.partner_code && <code>{l.partner_code}</code>} {l.partner} {l.project_code && <Tag cls="grey">{l.project_code}</Tag>} {l.note}</td></tr>)}</tbody></table>
+            {/* Chứng từ gốc của bút toán. Quyết định "nhập là dùng luôn" (08/9/2026) đã bỏ khâu trưởng
+                phòng duyệt từng dòng; tờ chứng từ đính ở đây là thứ còn lại để hậu kiểm truy ngược một
+                con số về nguồn của nó. Bút toán đã ghi sổ thì CHỈ XEM – sổ đã ghi không sửa, và bộ hồ sơ
+                của nó cũng không. */}
+            <div style={{ margin: "0 0 8px 24px" }}>
+              <DinhKem doiTuong="but_toan" doiTuongId={e.id} loai="chung_tu"
+                       tieuDe={`Chứng từ gốc của ${e.code}`}
+                       chiXem={e.status === "da_ghi_so"} />
+            </div></td></tr>}
         </>) : <tr><td colSpan={8} className="muted">Chưa có chứng từ trong kỳ.</td></tr>}</tbody></table></div>
     </>}
 

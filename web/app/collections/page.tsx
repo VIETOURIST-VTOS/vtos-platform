@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import DinhKem from "@/components/DinhKem";
 
 const ST: Record<string, [string, string]> = {
   da_khop: ["Đã khớp", "ok"], cho_ke_toan: ["Chờ Kế toán", "warn"], chua_khop: ["Chưa khớp", ""], bo_qua: ["Bỏ qua", ""],
@@ -18,6 +19,10 @@ function Collections() {
   const [rcs, setRcs] = useState<any[]>([]);
   const [filter, setFilter] = useState("cho_ke_toan");
   const [assign, setAssign] = useState<Record<number, { booking_id: string; note: string }>>({});
+  // Phiếu thu đang mở phần chứng từ đính kèm. Mở TỪNG phiếu chứ không hiện ô đính kèm ở mọi dòng:
+  // bảng phiếu thu có thể dài hàng trăm dòng, dựng ngần ấy ô tải tệp làm màn hình nặng mà chín mươi
+  // phần trăm trong số đó không ai mở.
+  const [tepPT, setTepPT] = useState<number | null>(null);
   const [cash, setCash] = useState({ booking_id: "", amount: "", payer: "", note: "" });
   const [sp, setSp] = useState<any>(null);
   const [pull, setPull] = useState({ from_date: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), to_date: new Date().toISOString().slice(0, 10) });
@@ -66,9 +71,19 @@ function Collections() {
         </div>}</td>}</tr>) : <tr><td colSpan={8} className="muted">Không có giao dịch.</td></tr>}</tbody></table></div>
 
     <h2>Phiếu thu (mẫu 01-TT)</h2>
-    <div className="panel wrap"><table><thead><tr><th>Số PT</th><th>Booking</th><th>Tour</th><th>Người nộp</th><th>Số tiền</th><th>Hình thức</th><th>Trạng thái</th><th>Lập bởi</th><th>Lúc</th>{isKT && <th></th>}</tr></thead>
-      <tbody>{rcs.length ? rcs.map((r) => <tr key={r.id}><td><b>{r.code}</b></td><td>{r.booking_code}<div className="muted">{r.customer_name}</div></td><td>{r.tour_code}</td><td>{r.payer}</td><td style={{ textAlign: "right" }}>{vnd(r.amount)}</td><td>{r.method === "tien_mat" ? "Tiền mặt" : "Chuyển khoản"}</td><td>{S(r.status)}</td><td className="muted">{r.created_by}{r.confirmed_by && ` → ${r.confirmed_by}`}</td><td>{fmtDT(r.created_at)}</td>
-        {isKT && <td>{r.status === "tu_dong" && user?.role === "ketoan" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/receipts/${r.id}/confirm`)}>Xác nhận</button>}</td>}</tr>) : <tr><td colSpan={10} className="muted">Chưa có phiếu thu.</td></tr>}</tbody></table></div>
+    <div className="panel wrap"><table><thead><tr><th>Số PT</th><th>Booking</th><th>Tour</th><th>Người nộp</th><th>Số tiền</th><th>Hình thức</th><th>Trạng thái</th><th>Lập bởi</th><th>Lúc</th>{isKT && <th></th>}<th></th></tr></thead>
+      <tbody>{rcs.length ? rcs.map((r) => [<tr key={r.id}><td><b>{r.code}</b></td><td>{r.booking_code}<div className="muted">{r.customer_name}</div></td><td>{r.tour_code}</td><td>{r.payer}</td><td style={{ textAlign: "right" }}>{vnd(r.amount)}</td><td>{r.method === "tien_mat" ? "Tiền mặt" : "Chuyển khoản"}</td><td>{S(r.status)}</td><td className="muted">{r.created_by}{r.confirmed_by && ` → ${r.confirmed_by}`}</td><td>{fmtDT(r.created_at)}</td>
+        {isKT && <td>{r.status === "tu_dong" && user?.role === "ketoan" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/receipts/${r.id}/confirm`)}>Xác nhận</button>}</td>}
+        <td><button className="act grey" style={{ margin: 0, fontSize: 12 }}
+              onClick={() => setTepPT(tepPT === r.id ? null : r.id)}>{tepPT === r.id ? "Ẩn" : "Chứng từ"}</button></td></tr>,
+        tepPT === r.id && <tr key={r.id + "t"}><td colSpan={isKT ? 11 : 10} style={{ background: "var(--bg2)" }}>
+          {/* Ủy nhiệm chi, biên lai, ảnh chuyển khoản khách gửi. Đối soát thu tiền dựa vào SePay; khoản
+              nào SePay không khớp thì chứng từ gốc ở đây là thứ duy nhất xử được.
+              Phiếu đã xác nhận thì CHỈ XEM: số đã vào sổ thì bộ chứng từ của nó không đổi nữa. */}
+          <DinhKem doiTuong="phieu_thu" doiTuongId={r.id} loai="chung_tu"
+                   tieuDe={`Chứng từ của phiếu thu ${r.code}`}
+                   chiXem={r.status === "da_xac_nhan"} />
+        </td></tr>]) : <tr><td colSpan={10} className="muted">Chưa có phiếu thu.</td></tr>}</tbody></table></div>
 
     {user?.role === "ketoan" && <><h2>Lập phiếu thu tiền mặt</h2>
       <div className="panel"><div className="grid">
