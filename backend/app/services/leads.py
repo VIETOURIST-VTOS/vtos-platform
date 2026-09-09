@@ -149,7 +149,7 @@ def conversion_report(db: Session, target_month: str, lead_months: list[str] | N
         seen.add((l.phone, l.lead_month)); b = min(hit, key=lambda x: x.tour.start_date)
         prior = [x for x in bs if x.tour and x.tour.start_date < b.tour.start_date]
         returning = len(prior) > 0; trips = len({x.tour_id for x in bs if x.tour and x.tour.start_date < d2}); pax = sum(x.pax for x in bs if x.tour and x.tour.start_date < d2)
-        rev = sum(x.amount - x.discount for x in bs if x.tour and x.tour.start_date < d2)
+        rev = sum((x.amount or 0) - (x.discount or 0) for x in bs if x.tour and x.tour.start_date < d2)
         a["converted"] += 1; a["new"] += 0 if returning else 1; a["returning"] += 1 if returning else 0; a["revenue"] += rev
         detail.append({"channel": l.channel, "lead_month": l.lead_month, "phone": l.phone, "name": l.name or b.customer_name, "tour": b.tour.name if b.tour else "", "tour_code": b.tour.code if b.tour else "", "start_date": b.tour.start_date if b.tour else None,
                        "kind": "Khách quay lại" if returning else "Khách mới", "trips": trips, "pax": pax, "revenue": rev, "sales": b.sales.full_name if b.sales else "", "booking": b.code})

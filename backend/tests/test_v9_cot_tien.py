@@ -113,9 +113,16 @@ def test_mo_hinh_va_ban_nang_cap_khong_duoc_lech_nhau():
     # Chỗ này lộ ra một điều đáng nhớ hơn cả bản vá: phép thử đỏ từ hôm qua mà không ai thấy, vì cây
     # làm việc trên máy Chủ tịch thiếu đúng tệp mô hình ấy nên mọi lần chạy đều dùng bản cũ. Một cây
     # làm việc lùi sau commit thì bộ phép thử vẫn xanh – và cái xanh ấy không nói gì về mã đang chạy.
+    #
+    # Ngay 09/9/2026, dot K1 chuyen tiep 47 cot tien con kieu Float sang Numeric(18,2). Phep thu nay lai
+    # do - lan nay DUNG: no dang noi "mo hinh da doi 47 cot ma ban nang cap khong co trong danh sach".
+    # Ban nang cap CO, chi la cho nay chua doc toi. Bai hoc lap lai lan hai: danh sach ban nang cap phai
+    # noi theo moi dot, neu khong phep thu canh cua lai thanh phep thu canh chinh no.
     d3 = _mig("zc3d4e5f6a7b_bon_so_tien_cho_lo_nap.py")
+    d4 = _mig("zd4e5f6a7b8c_doi_kieu_cot_tien.py")
     trong_mig = {(b, c) for m in (d1, d2) for b, c, _ in m.COT}
     trong_mig |= {("intake_runs", c) for c in d3.COT}
+    trong_mig |= {tuple(x) for x in d4.COT}
     trong_mo_hinh = {(t.name, c.name) for t in Base.metadata.tables.values() for c in t.columns
                      if isinstance(c.type, Numeric) and not isinstance(c.type, Float)}
     assert trong_mig == trong_mo_hinh, {

@@ -546,7 +546,7 @@ def dispatch_list(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Sessi
         t = db.get(Tour, d.tour_id)
         rt = db.get(VehicleRate, d.rate_id) if d.rate_id else None
         out.append({"id": d.id, "tour_code": t.code if t else "", "vehicle": veh.get(d.vehicle_id, ""), "driver": emps.get(d.driver_id, ""), "date_from": d.date_from, "date_to": d.date_to, "route": rt.route if rt else "",
-                    "days": (d.date_to - d.date_from).days + 1, "internal_price": d.internal_price, "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at, "incident_note": d.incident_note,
+                    "days": (d.date_to - d.date_from).days + 1, "internal_price": (d.internal_price or 0), "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at, "incident_note": d.incident_note,
                     **_owner(vobj.get(d.vehicle_id), cos)})
     return out
 
@@ -578,7 +578,7 @@ def dispatch_create(data: DispatchIn,
         price = rt.partner_price if v.kind == "hop_tac" else rt.internal_price
         if price <= 0: raise HTTPException(422, f"Tuyến {rt.route} không có giá cho loại xe {v.kind}")
     else:
-        price = data.internal_price or v.internal_rate_per_day * ((data.date_to - data.date_from).days + 1)
+        price = (data.internal_price or 0) or v.internal_rate_per_day * ((data.date_to - data.date_from).days + 1)
     if v.kind != "hop_tac" and not v.driver_id: raise HTTPException(422, "Xe chưa gán tài xế")
     driver_id = v.driver_id
     if not driver_id:   # xe hợp tác: tài xế của đối tác – ghi vào hồ sơ xe khi có; tạm gắn người lập lệnh để theo dõi
@@ -676,7 +676,7 @@ def fleet_summary(period: str, u: User = Depends(require_roles(*HR_READ, "nv_dh"
     for d in db.execute(select(DispatchOrder).where(DispatchOrder.status.in_(["da_xac_nhan", "hoan_thanh"]))).scalars():
         if d.date_to.year == y and d.date_to.month == m:
             r = rows.setdefault(d.vehicle_id, {"vehicle": veh.get(d.vehicle_id, ""), "driver": emps.get(d.driver_id, ""), "trips": 0, "days": 0, "revenue": 0.0})
-            r["trips"] += 1; r["days"] += (d.date_to - d.date_from).days + 1; r["revenue"] += d.internal_price
+            r["trips"] += 1; r["days"] += (d.date_to - d.date_from).days + 1; r["revenue"] += (d.internal_price or 0)
     ctp = R.get_param(db, "tai_xe_cong_tac_phi")
     for r in rows.values(): r["driver_allowance"] = r["days"] * ctp
     return {"period": period, "rows": list(rows.values()), "total_revenue": sum(r["revenue"] for r in rows.values())}

@@ -194,11 +194,11 @@ def tong_hop(db: Session, ky: str = "") -> dict:
     q = select(TourSettlement)
     if ky: q = q.where(TourSettlement.ky == ky)
     ds = list(db.execute(q).scalars())
-    def _s(f): return sum(x.doanh_thu for x in ds if f(x))
+    def _s(f): return sum((x.doanh_thu or 0) for x in ds if f(x))
     cho = [x for x in ds if x.doanh_thu > 0 and x.gia_von is None]
     return {
         "ky": ky, "so_don": len(ds),
-        "doanh_thu": sum(x.doanh_thu for x in ds),
+        "doanh_thu": sum((x.doanh_thu or 0) for x in ds),
         "gia_von": sum(x.gia_von or 0 for x in ds),
         "so_don_du_so": len([x for x in ds if x.gia_von is not None]),
         "hang_doi_thieu_gia_von": {

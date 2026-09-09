@@ -204,7 +204,7 @@ def ds_don(tour_id: int | None = None, supplier_id: int | None = None, status: s
                       "don_gia": d.don_gia, "thanh_tien": d.thanh_tien, "status": d.status,
                       "status_ten": TRANG_THAI_DON.get(d.status, d.status),
                       "xac_nhan_ncc": d.xac_nhan_ncc, "boi": d.created_by} for d in rows],
-            "tong_tien": float(round(sum(d.thanh_tien for d in rows if d.status != "huy")))}
+            "tong_tien": float(round(sum((d.thanh_tien or 0) for d in rows if d.status != "huy")))}
 
 
 class ChuyenTrangThaiIn(BaseModel):

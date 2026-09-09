@@ -25,7 +25,7 @@ def _ra(s: TourSettlement) -> dict:
             "dieu_hanh": s.dieu_hanh, "da_anh_xa": s.operator_id is not None, "sale": s.sale,
             "ngay_kh": s.ngay_kh, "ngay_kt": s.ngay_kt,
             "doanh_thu": s.doanh_thu, "gia_von": s.gia_von, "loi_nhuan": s.loi_nhuan(),
-            "ty_le": (round(s.loi_nhuan() / s.doanh_thu, 4)
+            "ty_le": (round(s.loi_nhuan() / (s.doanh_thu or 0), 4)
                       if s.loi_nhuan() is not None and s.doanh_thu else None),
             "trang_thai_qt": s.trang_thai_qt,
             "trang_thai_ten": TRANG_THAI_QT.get(s.trang_thai_qt, s.trang_thai_qt),

@@ -59,12 +59,12 @@ def xac_dinh_thang_doanh_thu(e: Employee, doanh_thu: float, moc: float, cut: flo
     """
     step = moc * 0.10
     cap = 0 if doanh_thu >= moc else min(10, math.ceil((moc - doanh_thu) / step)) if step else 0
-    muc = max(0.0, e.base_salary - cap * cut) if cap else e.base_salary
+    muc = max(0.0, (e.base_salary or 0) - cap * cut) if cap else (e.base_salary or 0)
     # Doanh thu tính chỉ tiêu chỉ đếm chuyến Kế toán ĐÃ xác nhận quyết toán. Người còn chuyến chưa chốt thì
     # con số 0 ở đây KHÔNG có nghĩa là bán được 0 đồng, mà là chưa đủ cơ sở tính – hai chuyện khác hẳn nhau,
     # và cái sau mà trả ra lương 0 thì là trả sai. Hệ thống nói rõ chỗ nó chưa biết thay vì im lặng.
     chua_du = chuyen_chua_quyet_toan > 0 and doanh_thu <= 0
-    return {"che_do": "thang_doanh_thu", "muc_hop_dong": e.base_salary, "muc_ky": round(muc),
+    return {"che_do": "thang_doanh_thu", "muc_hop_dong": (e.base_salary or 0), "muc_ky": round(muc),
             "cap": cap, "moc": moc, "can_cu": {"doanh_thu_tinh_chi_tieu": round(doanh_thu),
                                                "chuyen_chua_quyet_toan": chuyen_chua_quyet_toan},
             "chua_du_co_so": chua_du,
@@ -95,7 +95,7 @@ def xac_dinh_thang_loi_nhuan(e: Employee, lich_su: list[dict], moc: float, thang
     for i, (nguong, hs) in enumerate(thang):
         if ty_le_moc >= nguong: bac_i, he_so = i, hs
     bac = "Đạt" if he_so >= 1 else f"f{bac_i}"
-    muc = round(e.base_salary * he_so)
+    muc = round((e.base_salary or 0) * he_so)
     return {"che_do": "thang_loi_nhuan", "muc_hop_dong": e.base_salary, "muc_ky": muc, "bac": bac,
             "ty_le": he_so, "moc": moc, "can_cu": {"binh_quan_3_thang": bq["binh_quan"], "so_ky_lay_binh_quan": bq["so_ky"]},
             "lookback_inputs": bq["lookback"], "snapshot_at": datetime.now().isoformat(timespec="seconds"),
@@ -106,17 +106,17 @@ def xac_dinh_thang_loi_nhuan(e: Employee, lich_su: list[dict], moc: float, thang
 def xac_dinh_theo_cong(e: Employee, cong_chuan: float, cong_thuc_te: float | None) -> dict:
     """Kế toán và Nhân sự Hành chính – hai bộ phận duy nhất còn chấm công theo ngày."""
     if cong_thuc_te is None:
-        return {"che_do": "cham_cong", "muc_hop_dong": e.base_salary, "muc_ky": round(e.base_salary),
+        return {"che_do": "cham_cong", "muc_hop_dong": (e.base_salary or 0), "muc_ky": round((e.base_salary or 0)),
                 "can_cu": {"cong_chuan": cong_chuan, "cong_thuc_te": None}, "thieu_du_lieu": True,
                 "giai_thich": f"CHƯA NHẬP CÔNG THỰC TẾ – tạm lấy đủ tháng {e.base_salary:,.0f}, HCNS phải nhập trước khi trình ký"}
-    muc = e.base_salary / cong_chuan * cong_thuc_te if cong_chuan else 0
-    return {"che_do": "cham_cong", "muc_hop_dong": e.base_salary, "muc_ky": round(muc),
+    muc = (e.base_salary or 0) / cong_chuan * cong_thuc_te if cong_chuan else 0
+    return {"che_do": "cham_cong", "muc_hop_dong": (e.base_salary or 0), "muc_ky": round(muc),
             "can_cu": {"cong_chuan": cong_chuan, "cong_thuc_te": cong_thuc_te},
-            "giai_thich": f"{cong_thuc_te}/{cong_chuan} công × {e.base_salary:,.0f}"}
+            "giai_thich": f"{cong_thuc_te}/{cong_chuan} công × {(e.base_salary or 0):,.0f}"}
 
 
 def xac_dinh_co_dinh(e: Employee, ly_do: str = "") -> dict:
-    return {"che_do": "co_dinh", "muc_hop_dong": e.base_salary, "muc_ky": round(e.base_salary),
+    return {"che_do": "co_dinh", "muc_hop_dong": (e.base_salary or 0), "muc_ky": round((e.base_salary or 0)),
             "can_cu": {}, "giai_thich": ly_do or "Lương cơ bản cố định theo hợp đồng"}
 
 
@@ -161,7 +161,7 @@ def khoan_treo(db: Session, den_ngay: date | None = None) -> dict:
             e = emps.get(b.sales_id)
             if e is None: continue
             g = nguoi.setdefault(e.id, {"ma": e.code, "ten": e.full_name, "phong": e.department, "doanh_thu": 0.0, "so_booking": 0})
-            g["doanh_thu"] += b.amount - b.discount; g["so_booking"] += 1
+            g["doanh_thu"] += (b.amount or 0) - (b.discount or 0); g["so_booking"] += 1
         dh = emps.get(t.operator_id)
         for g in nguoi.values():
             rows.append({"tour_code": t.code, "tour_name": t.name, "ket_thuc": t.end_date, "han_quyet_toan": han,

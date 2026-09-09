@@ -87,11 +87,11 @@ def phai_tra_ncc(db: Session) -> dict:
     cho = gom(DANG_CHO_DUYET)
     theo_ncc: dict[str, float] = {}
     for p in no:
-        theo_ncc[p.supplier_name or "(không ghi tên)"] = theo_ncc.get(p.supplier_name or "(không ghi tên)", 0) + p.amount
+        theo_ncc[p.supplier_name or "(không ghi tên)"] = theo_ncc.get(p.supplier_name or "(không ghi tên)", 0) + (p.amount or 0)
     thieu_hd = [p for p in no if not p.has_invoice]
-    return {"tong_phai_tra": _q(sum(p.amount for p in no)), "so_phieu": len(no),
-            "dang_cho_duyet": _q(sum(p.amount for p in cho)), "so_phieu_cho_duyet": len(cho),
-            "thieu_hoa_don_gtgt": _q(sum(p.amount for p in thieu_hd)),
+    return {"tong_phai_tra": _q(sum((p.amount or 0) for p in no)), "so_phieu": len(no),
+            "dang_cho_duyet": _q(sum((p.amount or 0) for p in cho)), "so_phieu_cho_duyet": len(cho),
+            "thieu_hoa_don_gtgt": _q(sum((p.amount or 0) for p in thieu_hd)),
             "theo_nha_cung_cap": [{"ncc": k, "so_tien": _q(v)}
                                   for k, v in sorted(theo_ncc.items(), key=lambda x: -x[1])[:50]],
             "chi_tiet": ra(no)[:300], "cho_duyet": ra(cho)[:100]}

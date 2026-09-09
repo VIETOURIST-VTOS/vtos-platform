@@ -74,4 +74,4 @@ class TourSettlement(Base):
 
     def loi_nhuan(self):
         """Chưa có giá vốn thì KHÔNG có lợi nhuận – trả None, không trả doanh thu."""
-        return None if self.gia_von is None else self.doanh_thu - self.gia_von
+        return None if self.gia_von is None else (self.doanh_thu or 0) - (self.gia_von or 0)

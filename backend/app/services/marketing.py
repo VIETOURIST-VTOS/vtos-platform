@@ -98,14 +98,14 @@ def ket_qua(db: Session, c: Campaign) -> dict:
         .where(Lead.campaign_id == c.id, Booking.cancelled == False)).scalar() or 0)
     return {"so_lead": int(so_lead), "chuyen_doi": int(chuyen_doi),
             "ty_le_chuyen_doi": (chuyen_doi / so_lead) if so_lead else 0,
-            "chi_phi": chi_phi, "chi_phi_treo": treo, "con_lai_ngan_sach": c.budget - chi_phi - treo,
+            "chi_phi": chi_phi, "chi_phi_treo": treo, "con_lai_ngan_sach": (c.budget or 0) - chi_phi - treo,
             "chi_phi_moi_lead": (chi_phi / so_lead) if so_lead else 0,
             "chi_phi_moi_booking": (chi_phi / chuyen_doi) if chuyen_doi else 0,
             "doanh_thu": doanh_thu, "hieu_qua": (doanh_thu / chi_phi) if chi_phi else 0,
             "dat_chi_tieu_lead": (so_lead >= c.target_leads) if c.target_leads else None,
             "dat_chi_tieu_booking": (chuyen_doi >= c.target_bookings) if c.target_bookings else None,
             # Vượt ngân sách nói ra ngay, không đợi tới lúc quyết toán.
-            "vuot_ngan_sach": (chi_phi + treo) > c.budget}
+            "vuot_ngan_sach": (chi_phi + treo) > (c.budget or 0)}
 
 
 def lead_chua_gan(db: Session, thang: str = "") -> dict:
@@ -223,8 +223,8 @@ def bang_ngan_sach(db: Session, b: MarketingBudget) -> dict:
     for l in lines:
         dc = chi["da_chi"].get(l.hang_muc, 0.0); tr = chi["treo"].get(l.hang_muc, 0.0)
         rows.append({"hang_muc": l.hang_muc, "ten": HANG_MUC[l.hang_muc], "du_toan": l.amount,
-                     "da_chi": dc, "dang_treo": tr, "con_lai": l.amount - dc - tr,
-                     "vuot": (dc + tr) > l.amount, "note": l.note})
+                     "da_chi": dc, "dang_treo": tr, "con_lai": (l.amount or 0) - dc - tr,
+                     "vuot": (dc + tr) > (l.amount or 0), "note": l.note})
     # Khoản chi marketing chưa ai gán hạng mục: nêu riêng, KHÔNG chia bừa vào các hạng mục đã có.
     chua = {"da_chi": chi["da_chi"].get("_chua_phan_muc", 0.0), "dang_treo": chi["treo"].get("_chua_phan_muc", 0.0)}
     # Hạng mục có chi nhưng không nằm trong ngân sách kỳ này – cũng phải nêu.
@@ -269,7 +269,7 @@ def con_lai_hang_muc(db: Session, muc: str, company_id: int | None, luc: date | 
                                                      MarketingBudgetLine.hang_muc == muc)).scalars().first()
     if l is None: return 0.0, f"ngân sách kỳ {b.period} không có hạng mục này"
     chi = _chi_theo_muc(db, b.period, b.company_id)
-    con = l.amount - chi["da_chi"].get(muc, 0.0) - chi["treo"].get(muc, 0.0)
+    con = (l.amount or 0) - chi["da_chi"].get(muc, 0.0) - chi["treo"].get(muc, 0.0)
     return con, f"ngân sách kỳ {b.period}"
 
 

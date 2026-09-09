@@ -139,4 +139,4 @@ def chuyen_trang_thai(db: Session, d: ServiceOrder, moi: str, boi: str, xac_nhan
 def tong_hop_theo_tour(db: Session, tour_id: int) -> dict:
     rows = list(db.execute(select(ServiceOrder).where(ServiceOrder.tour_id == tour_id,
                                                       ServiceOrder.status != "huy")).scalars())
-    return {"so_don": len(rows), "tong_tien": float(round(sum(r.thanh_tien for r in rows)))}
+    return {"so_don": len(rows), "tong_tien": float(round(sum((r.thanh_tien or 0) for r in rows)))}

@@ -478,7 +478,7 @@ def export_projects(db: Session, date_from: date | None = None) -> bytes:
     q = select(Tour).where(Tour.tour_type != "non_package").order_by(Tour.start_date)
     for t in db.execute(q).scalars():
         if date_from and t.start_date < date_from: continue
-        ws.append([t.code, t.name[:200], None, None, f"{t.start_date:%d/%m/%Y}", f"{t.end_date:%d/%m/%Y}", t.fixed_cost + t.var_cost_per_pax * t.planned_pax, None, "VTOS"])
+        ws.append([t.code, t.name[:200], None, None, f"{t.start_date:%d/%m/%Y}", f"{t.end_date:%d/%m/%Y}", (t.fixed_cost or 0) + (t.var_cost_per_pax or 0) * t.planned_pax, None, "VTOS"])
     buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
 
 
@@ -496,7 +496,7 @@ def export_general_entries(db: Session, date_from: date, date_to: date, sources:
                     ws.append([e.code, f"{e.entry_date:%d/%m/%Y}", f"{e.entry_date:%d/%m/%Y}", e.description, dl.account_code, cl.account_code, amt, dl.project_code, cl.project_code, dl.partner_code or cl.partner_code])
         else:
             for l in e.lines:
-                ws.append([e.code, f"{e.entry_date:%d/%m/%Y}", f"{e.entry_date:%d/%m/%Y}", e.description, l.account_code if l.debit else "", l.account_code if l.credit else "", l.debit or l.credit, l.project_code if l.debit else "", l.project_code if l.credit else "", l.partner_code])
+                ws.append([e.code, f"{e.entry_date:%d/%m/%Y}", f"{e.entry_date:%d/%m/%Y}", e.description, l.account_code if (l.debit or 0) else "", l.account_code if (l.credit or 0) else "", (l.debit or 0) or (l.credit or 0), l.project_code if (l.debit or 0) else "", l.project_code if (l.credit or 0) else "", l.partner_code])
     buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
 
 

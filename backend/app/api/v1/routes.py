@@ -268,7 +268,7 @@ def req_out(r: ServiceRequest, sla: int = 120, db: Session | None = None) -> dic
             "operator_id": op.id if op else None, "operator_name": op.full_name if op else "",
             "customer_name": r.customer_name, "customer_phone": r.customer_phone, "source": r.source, "care_note": r.care_note, "pax": r.pax,
             "campaign_code": r.campaign_code, "promo_code": r.promo_code, "discount": r.discount, "created_at": r.created_at, "booking_id": r.booking_id,
-            "booking_code": bk.code if bk else "", "amount": max(0.0, (t.price_per_pax * r.pax - r.discount) if t else 0.0),
+            "booking_code": bk.code if bk else "", "amount": max(0.0, ((t.price_per_pax or 0) * r.pax - (r.discount or 0)) if t else 0.0),
             "waited_minutes": waited, "deadline": deadline, "sla_minutes": sla, "sla_state": sla_state, "view": view, "next_step": next_step}
 
 
@@ -279,7 +279,7 @@ def booking_out(b: Booking) -> dict:
             "customer_phone": b.customer_phone, "source": b.source, "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code,
             "sales_name": b.sales.full_name if b.sales else "", "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok,
             "sla_known": bool(b.request_id),
-            "counts_for_target": b.counts_for_target, "created_at": b.created_at, "paid": b.paid, "due": b.amount - b.discount - b.paid,
+            "counts_for_target": b.counts_for_target, "created_at": b.created_at, "paid": (b.paid or 0), "due": (b.amount or 0) - (b.discount or 0) - (b.paid or 0),
             "adl": b.adl, "chd": b.chd, "inf": b.inf, "vietrip_id": b.vietrip_id, "tour_start": b.tour.start_date if b.tour else None,
             "company_id": b.company_id, "chua_gan_phap_nhan": b.company_id is None, **BK.booking_view(b)}
 
@@ -455,7 +455,7 @@ def apply_retention(rid: int, data: S.RetentionApplyIn, u: User = Depends(curren
 @router.post("/retentions/{rid}/refund", tags=["bookings"])
 def refund_retention(rid: int, data: S.RetentionRefundIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
     pr = BK.refund_retention(db, u, _ret(db, rid), data.amount, data.note)
-    return {"message": f"Đã lập đề nghị hoàn tiền {pr.code} ({pr.amount:,.0f} đ) – chờ xác nhận/duyệt/chi", "request": pr.code}
+    return {"message": f"Đã lập đề nghị hoàn tiền {pr.code} ({(pr.amount or 0):,.0f} đ) – chờ xác nhận/duyệt/chi", "request": pr.code}
 
 
 @router.post("/retentions/{rid}/cancel", tags=["bookings"])

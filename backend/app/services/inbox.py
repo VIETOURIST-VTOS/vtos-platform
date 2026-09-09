@@ -225,9 +225,9 @@ def knowledge(db: Session, text: str) -> str:
     lines = []
     for t in chosen[:12]:
         left = max(0, (t.seats_open or t.planned_pax) - R.booked_pax(t))
-        lines.append(f"- {t.name} (mã {t.code}): khởi hành {t.start_date:%d/%m/%Y}, {t.days or ''} ngày, giá người lớn {t.price_per_pax:,.0f} đ" + (f", trẻ em {t.price_chd:,.0f} đ" if t.price_chd else "") + f", còn {left} chỗ")
+        lines.append(f"- {t.name} (mã {t.code}): khởi hành {t.start_date:%d/%m/%Y}, {t.days or ''} ngày, giá người lớn {(t.price_per_pax or 0):,.0f} đ" + (f", trẻ em {(t.price_chd or 0):,.0f} đ" if (t.price_chd or 0) else "") + f", còn {left} chỗ")
     prods = [p for p in db.execute(select(Product).where(Product.status == "active")).scalars() if hit(p.name) or hit(p.code)][:5]
-    for p in prods: lines.append(f"- Sản phẩm {p.name} (mã {p.code}): {p.length_text or ''}, giá tham khảo {p.reference_price:,.0f} đ, cọc {p.deposit_pct:.0f}%, đóng tour trước {p.days_to_close} ngày")
+    for p in prods: lines.append(f"- Sản phẩm {p.name} (mã {p.code}): {p.length_text or ''}, giá tham khảo {(p.reference_price or 0):,.0f} đ, cọc {p.deposit_pct:.0f}%, đóng tour trước {p.days_to_close} ngày")
     pol = f"Chính sách: cọc mặc định {R.get_param(db, 'coc_mac_dinh_pct'):.0f}% khi giữ chỗ, thanh toán đủ trước khởi hành {int(R.get_param(db, 'han_huy_cho_ngay'))} ngày; hủy sau hạn có thể mất phí, phần đã nộp được bảo lưu {int(R.get_param(db, 'bao_luu_han_ngay'))} ngày cho tour sau."
     return ("Tour sắp khởi hành:\n" + "\n".join(lines) if lines else "Hiện chưa có lịch khởi hành phù hợp trong 45 ngày tới.") + "\n" + pol
 

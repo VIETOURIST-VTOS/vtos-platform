@@ -478,7 +478,7 @@ def load_doc_map(db: Session) -> tuple[dict, dict]:
     exact: dict[tuple, str] = {}
     by_doc: dict[str, set] = defaultdict(set)
     for m in db.execute(select(BankDocMap)).scalars():
-        exact[(m.doc_no, round(m.amount, 0), m.side)] = m.bank_code
+        exact[(m.doc_no, round((m.amount or 0), 0), m.side)] = m.bank_code
         by_doc[m.doc_no].add(m.bank_code)
     single = {d: next(iter(v)) for d, v in by_doc.items() if len(v) == 1}
     return exact, single

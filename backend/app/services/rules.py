@@ -308,7 +308,7 @@ def approver_role(tour: Tour) -> str:
 def settlement_summary(db: Session, tour: Tour) -> dict:
     """Số liệu quyết toán và quỹ thưởng theo mục 6.4 (chỉ tính khi đã Kế toán xác nhận)."""
     rev = tour.actual_revenue
-    cost = tour.actual_cost + tour.promo_value  # ĐC Điều 3: giá trị mã KM là một dòng giá vốn nội bộ
+    cost = (tour.actual_cost or 0) + (tour.promo_value or 0)  # ĐC Điều 3: giá trị mã KM là một dòng giá vốn nội bộ
     profit = rev - cost
     margin = profit / rev if rev else 0
     thr = get_param(db, "nguong_bien", tour.end_date)
@@ -394,7 +394,7 @@ def monthly_payroll_draft(db: Session, year: int, month: int) -> list[dict]:
         o["fund_tp"] += s["fund_tp"]
         if is_doan(t):
             for b in t.bookings:
-                doan_profit_by_sales[b.sales_id] = doan_profit_by_sales.get(b.sales_id, 0) + s["profit"] * (b.amount / s["revenue"] if s["revenue"] else 0)
+                doan_profit_by_sales[b.sales_id] = doan_profit_by_sales.get(b.sales_id, 0) + s["profit"] * ((b.amount or 0) / s["revenue"] if s["revenue"] else 0)
     for uid, o in by_op.items():
         rows.append({"nguoi": o["name"], "khoan": "Thưởng chuyến Điều hành (70%)", "so_chuyen": o["chuyen"], "tien": round(o["fund_nv"])})
     tp_total = sum(o["fund_tp"] for o in by_op.values())

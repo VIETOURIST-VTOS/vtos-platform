@@ -121,7 +121,7 @@ def cash_flow(db: Session, period: str) -> dict:
         by_entry.setdefault(e.id, []).append(l)
     buckets = {"thu_khach": 0.0, "chi_ncc": 0.0, "chi_nld": 0.0, "chi_thue": 0.0, "chi_khac": 0.0, "thu_khac": 0.0, "dau_tu": 0.0, "vay": 0.0, "tra_no": 0.0}
     for lines in by_entry.values():
-        cash_net = sum(l.debit - l.credit for l in lines if l.account_code[:3] in CASH)
+        cash_net = sum((l.debit or 0) - (l.credit or 0) for l in lines if l.account_code[:3] in CASH)
         if abs(cash_net) < 1: continue
         others = [l.account_code[:3] for l in lines if l.account_code[:3] not in CASH]
         a = others[0] if others else ""
@@ -189,7 +189,7 @@ def closing_entries_draft(db: Session, u: User, period: str) -> list[JournalEntr
 def vat_return(db: Session, period: str) -> dict:
     """01/GTGT theo tháng: đầu ra từ hóa đơn phát hành, đầu vào từ 133 (đề nghị chi có hóa đơn – nhập bổ sung khi có hóa đơn đầu vào)."""
     invs = [i for i in db.execute(select(Invoice).where(Invoice.status == "da_phat_hanh")).scalars() if i.issue_date and f"{i.issue_date:%Y-%m}" == period]
-    out_pre = sum(i.pre_tax for i in invs); out_vat = sum(i.vat for i in invs)
+    out_pre = sum((i.pre_tax or 0) for i in invs); out_vat = sum((i.vat or 0) for i in invs)
     m = movements(db, period)
     in_vat = m.get("133", {}).get("debit", 0.0) - m.get("133", {}).get("credit", 0.0)
     b_prev = balances(db, prev_period(period))

@@ -79,7 +79,7 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
         if vis is not None: v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") in vis]
     p = db.get(Product, t.product_id) if t.product_id else db.execute(select(Product).where(Product.code == t.product_code)).scalars().first() if t.product_code else None
     v["product"] = AC.mask_product(PS.product_out(p), u) if p else None
-    v["seats"] = {"open": t.seats_open, "promo": t.seats_promo, "booked": R.booked_pax(t), "left": max(0, (t.seats_open or t.planned_pax) - R.booked_pax(t))}
+    v["seats"] = {"open": t.seats_open, "promo": (t.seats_promo or 0), "booked": R.booked_pax(t), "left": max(0, (t.seats_open or t.planned_pax) - R.booked_pax(t))}
     v["prices"] = {"adl": t.price_per_pax, "chd": t.price_chd, "inf": t.price_inf, "promo": t.price_promo}
     # booking + đã thu
     bks = t.bookings
@@ -98,7 +98,7 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     from app.services import settlement as ST
     lines = [l for l in lines if l.status == "hd"]
     v["cost_lines"] = [ST.line_out(l) for l in ST.lines_of(db, t)]
-    v["cost_total"] = {"actual": sum(l.actual for l in lines), "paid": sum(l.paid for l in lines)}
+    v["cost_total"] = {"actual": sum((l.actual or 0) for l in lines), "paid": sum((l.paid or 0) for l in lines)}
     v["settlement_edit"] = {"can_edit": ST.can_edit(u, t), "version": t.settlement_version, "service_types": ST.SERVICE_TYPES, "summary": ST.summary(db, t), "checks": ST.checks(db, t)}
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
     v["guides"] = [{"id": a.id, "guide": emps.get(a.guide_id, ""), "days": a.days, "rate_per_day": a.rate_per_day, "holiday": a.holiday, "status": a.status, "amount": a.rate_per_day * a.days * (2 if a.holiday else 1)}
@@ -112,8 +112,8 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     # đầy đủ của chuyến. Với tour đang bán chưa có dòng quyết toán, số này gần 0 nên "lợi nhuận" xấp xỉ
     # toàn bộ doanh thu – phải ghi rõ là TẠM TÍNH và cảnh báo ngay cạnh chỉ tiêu.
     v["summary"] = {"revenue_booking": sum(b["amount"] - b["discount"] for b in v["bookings"] if not b["cancelled"]), "collected": sum(b["paid"] for b in v["bookings"]),
-                    "cost_actual": v["cost_total"]["actual"] or t.actual_cost, "cost_paid": sum(r.amount for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.status == "da_chi")).scalars())}
-    v["summary"]["profit"] = (t.actual_revenue or v["summary"]["revenue_booking"]) - v["summary"]["cost_actual"]
+                    "cost_actual": v["cost_total"]["actual"] or (t.actual_cost or 0), "cost_paid": sum((r.amount or 0) for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.status == "da_chi")).scalars())}
+    v["summary"]["profit"] = ((t.actual_revenue or 0) or v["summary"]["revenue_booking"]) - v["summary"]["cost_actual"]
     confirmed = t.status in ("kt_xac_nhan", "khoa")
     n_lines = len(lines)
     v["summary"]["cost_lines"] = n_lines

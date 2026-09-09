@@ -192,18 +192,18 @@ def hieu_qua_ky(db: Session, ky: str) -> dict:
         ngay = {t.ngay_di + timedelta(days=i) for i in range((t.ngay_ve - t.ngay_di).days + 1)}
         for r in (x, tx):
             if r is None: continue
-            r["so_chuyen"] += 1; r["doanh_thu"] += t.doanh_thu; r["km"] += km
+            r["so_chuyen"] += 1; r["doanh_thu"] += (t.doanh_thu or 0); r["km"] += km
             r["ngay_khai_thac"] |= ngay
             for c in chi.get(t.id, []):
-                r["chi_phi"] += c.amount
-                if c.kind == "dau": r["tien_dau"] += c.amount; r["lit"] += c.lit
-                if c.kind == "sua_chua": r["sua_chua"] += c.amount
+                r["chi_phi"] += (c.amount or 0)
+                if c.kind == "dau": r["tien_dau"] += (c.amount or 0); r["lit"] += c.lit
+                if c.kind == "sua_chua": r["sua_chua"] += (c.amount or 0)
     # Bảo dưỡng ngoài chuyến vẫn là chi phí của xe trong kỳ.
     for m in db.execute(select(Maintenance).where(Maintenance.ngay >= d1, Maintenance.ngay <= d2)).scalars():
         x = xe_rows.setdefault(m.vehicle_id, _rong({"vehicle_id": m.vehicle_id,
                                                     "xe": veh[m.vehicle_id].plate if m.vehicle_id in veh else "",
                                                     "ma_xe": veh[m.vehicle_id].code if m.vehicle_id in veh else ""}))
-        x["chi_phi"] += m.so_tien; x["sua_chua"] += m.so_tien
+        x["chi_phi"] += (m.so_tien or 0); x["sua_chua"] += (m.so_tien or 0)
 
     def _hoan(r: dict) -> dict:
         ngay = len(r.pop("ngay_khai_thac"))

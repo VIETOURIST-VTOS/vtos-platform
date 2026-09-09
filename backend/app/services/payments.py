@@ -84,9 +84,9 @@ def match_transaction(db: Session, txn: BankTransaction) -> None:
     if not b:
         txn.match_status, txn.match_note = "cho_ke_toan", f"Mã {code} không tồn tại"
         return
-    due = (b.amount - b.discount) - paid_amount(db, b.id)
-    if abs(txn.amount - due) < 1 or (due > 0 and abs(txn.amount - (b.amount - b.discount)) < 1 and paid_amount(db, b.id) == 0):
-        r = _make_receipt(db, b, txn, txn.amount, "robot", "tu_dong", note="Khớp tuyệt đối mã + số tiền")
+    due = ((b.amount or 0) - (b.discount or 0)) - paid_amount(db, b.id)
+    if abs((txn.amount or 0) - due) < 1 or (due > 0 and abs((txn.amount or 0) - ((b.amount or 0) - (b.discount or 0))) < 1 and paid_amount(db, b.id) == 0):
+        r = _make_receipt(db, b, txn, (txn.amount or 0), "robot", "tu_dong", note="Khớp tuyệt đối mã + số tiền")
         txn.match_status, txn.booking_id, txn.match_note = "da_khop", b.id, f"Tự động: {r.code}"
         R.audit(db, "robot", "robot", "sinh_phieu_thu_tu_dong", f"receipt:{r.code}", after={"booking": b.code, "so_tien": txn.amount})
     else:
@@ -110,11 +110,11 @@ def _match_by_tour_code(db: Session, txn: BankTransaction) -> None:
         return
     cands = []
     for b in db.execute(select(Booking).where(Booking.tour_id == t.id, Booking.cancelled == False)).scalars():
-        due = (b.amount - b.discount) - paid_amount(db, b.id)
-        if due > 0 and abs(txn.amount - due) < 1: cands.append(b)
+        due = ((b.amount or 0) - (b.discount or 0)) - paid_amount(db, b.id)
+        if due > 0 and abs((txn.amount or 0) - due) < 1: cands.append(b)
     if len(cands) == 1:
         b = cands[0]
-        r = _make_receipt(db, b, txn, txn.amount, "robot", "tu_dong", note=f"Khớp mã tour {tcode} + đúng số tiền còn phải thu")
+        r = _make_receipt(db, b, txn, (txn.amount or 0), "robot", "tu_dong", note=f"Khớp mã tour {tcode} + đúng số tiền còn phải thu")
         txn.match_status, txn.booking_id, txn.match_note = "da_khop", b.id, f"Tự động theo mã tour: {r.code} ({b.code})"
         R.audit(db, "robot", "robot", "sinh_phieu_thu_tu_dong", f"receipt:{r.code}", after={"booking": b.code, "tour": tcode, "so_tien": txn.amount})
     elif cands:

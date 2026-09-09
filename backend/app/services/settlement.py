@@ -66,10 +66,10 @@ def lines_of(db: Session, t: Tour, active_only: bool = False) -> list[TourCostLi
 
 
 def line_out(l: TourCostLine) -> dict:
-    over = (l.actual - l.budget) / l.budget if l.budget else 0
+    over = ((l.actual or 0) - (l.budget or 0)) / (l.budget or 0) if (l.budget or 0) else 0
     return {"id": l.id, "line_no": l.line_no, "description": l.description, "cost_kind": l.cost_kind, "service_type": l.service_type, "service_name": SERVICE_TYPES.get(l.service_type, l.service_type),
             "supplier_name": l.supplier_name, "supplier_tax_code": l.supplier_tax_code, "unit_price": l.unit_price, "qty": l.qty, "coef": l.coef, "budget": l.budget, "actual": l.actual, "paid": l.paid,
-            "remaining": max(0.0, l.actual - l.paid), "over_pct": over, "note": l.note, "source": l.source, "status": l.status, "version": l.version, "has_doc": bool(l.doc_data), "doc_name": l.doc_name,
+            "remaining": max(0.0, (l.actual or 0) - (l.paid or 0)), "over_pct": over, "note": l.note, "source": l.source, "status": l.status, "version": l.version, "has_doc": bool(l.doc_data), "doc_name": l.doc_name,
             "updated_by": l.updated_by, "updated_at": l.updated_at}
 
 
@@ -122,7 +122,7 @@ def match_paid(db: Session, t: Tour) -> dict:
         cands = [p for p in pool if p["left"] > 0 and ((mst and p["mst"] == mst) or (name and p["name"] == name))]
         paid = 0.0
         for p in cands:
-            take = min(p["left"], max(0.0, l.actual - paid))
+            take = min(p["left"], max(0.0, (l.actual or 0) - paid))
             if take <= 0: break
             p["left"] -= take; paid += take
         if cands:
@@ -137,14 +137,14 @@ def match_paid(db: Session, t: Tour) -> dict:
 
 def summary(db: Session, t: Tour) -> dict:
     ls = lines_of(db, t, active_only=True)
-    actual = sum(l.actual for l in ls); paid = sum(l.paid for l in ls)
-    budget_lines = sum(l.budget for l in ls)
+    actual = sum((l.actual or 0) for l in ls); paid = sum((l.paid or 0) for l in ls)
+    budget_lines = sum((l.budget or 0) for l in ls)
     f, v, src = R.budget_of(db, t)          # dự toán tách hẳn khỏi thực chi (B2), có ghi nguồn
     budget_tour = f + v * R.booked_pax(t)
     budget = budget_lines or budget_tour
     b_src = "dong" if budget_lines else src
-    rev = sum(b.amount - b.discount for b in t.bookings if not b.cancelled)
-    profit = rev - actual - t.promo_value
+    rev = sum((b.amount or 0) - (b.discount or 0) for b in t.bookings if not b.cancelled)
+    profit = rev - actual - (t.promo_value or 0)
     return {"lines": len(ls), "cancelled": sum(1 for l in lines_of(db, t) if l.status != "hd"), "actual": actual, "paid": paid, "remaining": max(0.0, actual - paid),
             "budget": budget, "budget_source": b_src, "budget_source_label": {"dong": "tổng dự toán theo dòng"}.get(b_src, R.BUDGET_SOURCES.get(b_src, b_src)),
             "has_budget": budget > 0 and b_src in ("dong", "du_toan_tour"), "variance": actual - budget, "variance_pct": (actual - budget) / budget if budget else 0,
@@ -156,11 +156,11 @@ def checks(db: Session, t: Tour) -> list[dict]:
     ls = lines_of(db, t, active_only=True); out = []
     thr = R.get_param(db, "nguong_bien", t.end_date) or 0.1
     for l in ls:
-        if l.budget and l.actual > l.budget * (1 + thr) and not l.note.strip():
-            out.append({"level": "block", "line": l.line_no, "msg": f"Dòng {l.line_no} {l.description}: thực chi vượt dự toán {((l.actual - l.budget) / l.budget) * 100:.0f}% – phải ghi lời giải trình ở Ghi chú"})
+        if (l.budget or 0) and (l.actual or 0) > (l.budget or 0) * (1 + thr) and not l.note.strip():
+            out.append({"level": "block", "line": l.line_no, "msg": f"Dòng {l.line_no} {l.description}: thực chi vượt dự toán {(((l.actual or 0) - (l.budget or 0)) / (l.budget or 0)) * 100:.0f}% – phải ghi lời giải trình ở Ghi chú"})
         if not l.supplier_tax_code and l.service_type in ("HOTEL", "RESTAURANT", "VEHICLE", "FLIGHT", "LAND", "INSURANCE") and l.actual >= 5_000_000:
             out.append({"level": "warn", "line": l.line_no, "msg": f"Dòng {l.line_no}: NCC {l.supplier_name} chưa có MST (chi ≥ 5 triệu cần hóa đơn)"})
-        if l.paid > l.actual + 1:
+        if (l.paid or 0) > (l.actual or 0) + 1:
             out.append({"level": "warn", "line": l.line_no, "msg": f"Dòng {l.line_no}: đã thanh toán {l.paid:,.0f} lớn hơn thực chi {l.actual:,.0f}"})
     nodoc = [l.line_no for l in ls if not l.doc_data and l.actual > 0]
     if nodoc:

@@ -177,17 +177,17 @@ def shift_penalties_for_month(db: Session, y: int, m: int) -> dict[int, tuple[fl
 # ====================== ĐỀ NGHỊ CHI – LỆNH CHI (R3) ======================
 def tour_budget(db: Session, t: Tour) -> float:
     pax = max(t.planned_pax, R.booked_pax(t))
-    return t.fixed_cost + t.var_cost_per_pax * pax
+    return (t.fixed_cost or 0) + (t.var_cost_per_pax or 0) * pax
 
 
 def tour_cashflow(db: Session, t: Tour) -> dict:
     """Bảng dòng tiền tour: đã thu, đã chi, còn phải chi, tiền còn lại, lợi nhuận dự kiến; cảnh báo đỏ khi chi vượt thu."""
-    revenue = sum(b.amount - b.discount for b in t.bookings)
-    collected = sum(r.amount for r in db.execute(select(Receipt).join(Booking).where(Booking.tour_id == t.id, Receipt.status != "huy")).scalars())
+    revenue = sum((b.amount or 0) - (b.discount or 0) for b in t.bookings)
+    collected = sum((r.amount or 0) for r in db.execute(select(Receipt).join(Booking).where(Booking.tour_id == t.id, Receipt.status != "huy")).scalars())
     reqs = db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.status != "tu_choi")).scalars().all()
-    paid = sum(r.amount for r in reqs if r.status == "da_chi")
-    committed = sum(r.amount for r in reqs if r.status in ("cho_chi",))
-    pending = sum(r.amount for r in reqs if r.status in ("cho_tp", "cho_kt", "cho_duyet"))
+    paid = sum((r.amount or 0) for r in reqs if r.status == "da_chi")
+    committed = sum((r.amount or 0) for r in reqs if r.status in ("cho_chi",))
+    pending = sum((r.amount or 0) for r in reqs if r.status in ("cho_tp", "cho_kt", "cho_duyet"))
     budget = tour_budget(db, t)
     total_cost = paid + committed + pending
     return {"tour_id": t.id, "code": t.code, "name": t.name, "status": t.status, "revenue": revenue, "collected": collected, "paid": paid, "committed": committed,
@@ -234,7 +234,7 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
             r.over_budget, r.two_signatures = True, True
     if t and cat in ("chi_tour", "tam_ung"):
         cf = tour_cashflow(db, t)
-        if cf["paid"] + cf["committed"] + cf["pending"] + r.amount > cf["budget"] + 1:
+        if cf["paid"] + cf["committed"] + cf["pending"] + (r.amount or 0) > cf["budget"] + 1:
             r.over_budget, r.two_signatures = True, True
     db.add(r); db.flush()
     R.audit(db, u.username, u.role, "lap_de_nghi_chi", f"dc:{r.code}", after={"loai": cat, "tour": t.code if t else "", "ncc": r.supplier_name, "so_tien": r.amount,
@@ -322,7 +322,7 @@ def _post_payment(db: Session, r: PaymentRequest):
 
 def posted_tour_cost(db: Session, tour_id: int) -> float:
     """Chi phí tour đã ghi 154 qua đề nghị chi đã duyệt (để quyết toán chỉ ghi phần chênh lệch vào 335)."""
-    return sum(r.amount for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == tour_id, PaymentRequest.category.in_(["chi_tour", "tam_ung"]),
+    return sum((r.amount or 0) for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == tour_id, PaymentRequest.category.in_(["chi_tour", "tam_ung"]),
                                                                           PaymentRequest.status.in_(["cho_chi", "da_chi"]))).scalars())
 
 
@@ -333,6 +333,6 @@ def match_outgoing(db: Session, content: str, amount: float) -> PaymentRequest |
     if not m: return None
     code = f"DC{m.group(1)}-{m.group(2)}"
     r = db.execute(select(PaymentRequest).where(PaymentRequest.code == code, PaymentRequest.status == "cho_chi")).scalars().first()
-    if r and abs(r.amount - amount) < 1:
+    if r and abs((r.amount or 0) - amount) < 1:
         return r
     return None

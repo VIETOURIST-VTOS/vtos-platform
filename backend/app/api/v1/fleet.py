@@ -341,8 +341,8 @@ def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict) -> dict:
                          "amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu,
                          "ben_chiu_ten": BEN_CHIU.get(c.ben_chiu, c.ben_chiu), "chung_tu": c.chung_tu,
                          "nguon": c.nguon} for c in cps],
-            "tong_chi_vietourist": sum(c.amount for c in cps if c.ben_chiu == "vietourist_tam_ung"),
-            "tong_chi_chu_xe": sum(c.amount for c in cps if c.ben_chiu == "chu_xe")}
+            "tong_chi_vietourist": sum((c.amount or 0) for c in cps if c.ben_chiu == "vietourist_tam_ung"),
+            "tong_chi_chu_xe": sum((c.amount or 0) for c in cps if c.ben_chiu == "chu_xe")}
 
 
 @router.get("/chuyen")
@@ -629,13 +629,13 @@ def ds_giao_dich(source: str = "", chua_khop: bool = False, gom_ban_trung: bool 
                       "vehicle_id": t.vehicle_id, "so_tien": t.so_tien, "lit": t.lit, "khop": t.khop,
                       "co": t.co, "trung": t.trung, "nhom": t.nhom,
                       "khong_phai_chi_phi": t.khong_phai_chi_phi, "ghi_chu": t.ghi_chu} for t in rows],
-            "tong_chi_phi": sum(t.so_tien for t in rows if not t.khong_phai_chi_phi),
-            "tong_dieu_chuyen": sum(t.so_tien for t in rows if t.khong_phai_chi_phi),
-            "tong_chua_quy_ve_xe": sum(t.so_tien for t in rows
+            "tong_chi_phi": sum((t.so_tien or 0) for t in rows if not (t.khong_phai_chi_phi or 0)),
+            "tong_dieu_chuyen": sum((t.so_tien or 0) for t in rows if (t.khong_phai_chi_phi or 0)),
+            "tong_chua_quy_ve_xe": sum((t.so_tien or 0) for t in rows
                                        if not t.khong_phai_chi_phi and t.vehicle_id is None),
             "theo_nhom": [{"nhom": n or "(không ghi nhóm)",
                            "so_khoan": sum(1 for t in rows if (t.nhom or "") == n),
-                           "so_tien": sum(t.so_tien for t in rows if (t.nhom or "") == n)}
+                           "so_tien": sum((t.so_tien or 0) for t in rows if (t.nhom or "") == n)}
                           for n in sorted({(t.nhom or "") for t in rows})],
             "nguon": NGUON_NGOAI,
             "ghi_chu": "Đã loại bản ghi lặp (thêm gom_ban_trung=true để xem cả bản đã loại). Tổng chi phí "
@@ -799,7 +799,7 @@ def them_hoa_don_chung(data: HoaDonChungIn, u: User = Depends(require_roles(*QT_
     db.flush()
     pb = QT.phan_bo_hoa_don_chung(db, inv)
     R.audit(db, u.username, u.role, "hoa_don_dung_chung", f"invoice:{inv.so_hoa_don}",
-            after={"so_xe": len(ids), "tong": data.tong_tien + data.vat})
+            after={"so_xe": len(ids), "tong": (data.tong_tien or 0) + (data.vat or 0)})
     db.commit()
     return {"id": inv.id, "phan_bo": pb, "message": f"Đã ghi hóa đơn {inv.so_hoa_don} và phân bổ cho {len(pb)} xe có tên trên phụ lục"}
 
@@ -1043,7 +1043,7 @@ def can_tru(sid: int, data: CanTruIn, u: User = Depends(require_roles(*QT_WRITE)
         raise HTTPException(422, "Lịch cấn trừ thuộc đối tác khác – không bù nợ của người này vào khoản người kia")
     if pl.creditor_company_id and st.company_id and pl.creditor_company_id != st.company_id:
         raise HTTPException(422, "Lịch cấn trừ thuộc pháp nhân khác với kỳ quyết toán – hai pháp nhân là hai túi tiền")
-    so_tien = data.so_tien if data.so_tien > 0 else max(0.0, st.truoc_can_tru - st.can_tru)
+    so_tien = (data.so_tien or 0) if (data.so_tien or 0) > 0 else max(0.0, (st.truoc_can_tru or 0) - (st.can_tru or 0))
     kq = QT.ap_dung_can_tru(db, pl, so_tien, idem_key=f"qt{st.id}:plan{pl.id}:{round(so_tien)}",
                             boi=u.username, settlement_id=st.id, chung_tu=f"Quyết toán {st.ky}")
     QT.dung_quyet_toan(db, st.partner_id, st.ky, u.username)
@@ -1361,7 +1361,7 @@ def ds_lenh(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_d
         out.append({"id": d.id, "tour": t.code if t else "", "xe": v.plate if v else "",
                     "ma_xe": v.code if v else "", "tai_xe": emps.get(d.driver_id, ""),
                     "date_from": d.date_from, "date_to": d.date_to,
-                    "so_ngay": (d.date_to - d.date_from).days + 1, "internal_price": d.internal_price,
+                    "so_ngay": (d.date_to - d.date_from).days + 1, "internal_price": (d.internal_price or 0),
                     "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at,
                     "theo_goi_y": bool(d.phuong_an_da_chon) and not d.ly_do_khac_goi_y,
                     "phuong_an_da_chon": d.phuong_an_da_chon, "ly_do_khac_goi_y": d.ly_do_khac_goi_y})

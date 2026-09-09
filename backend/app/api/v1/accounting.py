@@ -20,7 +20,7 @@ READ = ("ketoan", "cntt", "tgd", "chutich", "bks", "ptgd_doan", "hcns")
 def entry_out(e: JournalEntry) -> dict:
     return {"id": e.id, "code": e.code, "entry_date": e.entry_date, "period": e.period, "description": e.description, "source_type": e.source_type,
             "source_ref": e.source_ref, "tour_id": e.tour_id, "status": e.status, "created_by": e.created_by, "posted_by": e.posted_by, "posted_at": e.posted_at,
-            "reversed_by_id": e.reversed_by_id, "amount": sum(l.debit for l in e.lines),
+            "reversed_by_id": e.reversed_by_id, "amount": sum((l.debit or 0) for l in e.lines),
             "lines": [{"id": l.id, "account": l.account_code, "debit": l.debit, "credit": l.credit, "partner": l.partner, "partner_code": l.partner_code, "project_code": l.project_code, "item_code": l.item_code, "doc_no": l.doc_no, "booking_id": l.booking_id, "note": l.note} for l in e.lines]}
 
 

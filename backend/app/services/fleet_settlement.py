@@ -106,7 +106,7 @@ def da_ap_dung(db: Session, plan_id: int) -> float:
 
 
 def con_lai(db: Session, plan: RepaymentPlan) -> float:
-    return _q(max(0.0, plan.principal - da_ap_dung(db, plan.id)))
+    return _q(max(0.0, (plan.principal or 0) - da_ap_dung(db, plan.id)))
 
 
 def ap_dung_can_tru(db: Session, plan: RepaymentPlan, so_tien: float, idem_key: str, boi: str,
@@ -136,13 +136,13 @@ def ap_dung_can_tru(db: Session, plan: RepaymentPlan, so_tien: float, idem_key: 
     con = tru
     for k in sorted(tao_ky_cho_lich(db, plan), key=lambda x: x.ky):
         if con <= 0: break
-        chua = k.amount_due - k.amount_applied
+        chua = (k.amount_due or 0) - (k.amount_applied or 0)
         if chua <= 0: continue
-        x = min(chua, con); k.amount_applied += x; con -= x
+        x = min(chua, con); k.amount_applied = (k.amount_applied or 0) + x; con -= x
     if con_lai(db, plan) - tru <= 0:
         pass
     db.flush()
-    if _q(plan.principal - da_ap_dung(db, plan.id)) <= 0:
+    if _q((plan.principal or 0) - da_ap_dung(db, plan.id)) <= 0:
         plan.status = "tat_toan"
     return {"da_tru": tru, "lap_lai": False, "id": a.id,
             "ghi_chu": "" if tru == so_tien else f"Chỉ trừ được {tru:,.0f} đ – số dư còn lại của lịch"}
@@ -164,7 +164,7 @@ def phan_bo_hoa_don_chung(db: Session, inv: SharedInvoice) -> list[dict]:
     if co_san and len(co_san) == len(lines):
         return [{"vehicle_id": l.vehicle_id, "amount": _q(l.amount)} for l in lines]
     tong_he_so = sum(l.he_so or 1 for l in lines)
-    tong = _q(inv.tong_tien + inv.vat)
+    tong = _q((inv.tong_tien or 0) + (inv.vat or 0))
     out, used = [], 0.0
     for l in lines[:-1]:
         a = _q(tong * (l.he_so or 1) / tong_he_so); used += a
@@ -209,14 +209,14 @@ def dung_quyet_toan(db: Session, partner_id: int, ky: str, boi: str) -> Settleme
                 db.add(SettlementLine(settlement_id=st.id, kind="doanh_thu", vehicle_id=t.vehicle_id,
                                       trip_id=t.id, mo_ta=t.ten_tour or f"Chuyến {t.ngay_di:%d/%m}",
                                       amount=_q(t.doanh_thu)))
-                doanh_thu += t.doanh_thu
+                doanh_thu += (t.doanh_thu or 0)
             for c in db.execute(select(TripCost).where(TripCost.trip_id == t.id)).scalars():
                 kind = "chi_ho" if c.ben_chiu == "vietourist_tam_ung" else "chu_xe_chiu"
                 db.add(SettlementLine(settlement_id=st.id, kind=kind, vehicle_id=t.vehicle_id, trip_id=t.id,
                                       mo_ta=COST_KINDS.get(c.kind, c.kind), amount=_q(c.amount),
                                       ben_chiu=c.ben_chiu, chung_tu=c.chung_tu))
-                if c.ben_chiu == "vietourist_tam_ung": chi_ho += c.amount
-                else: chu_xe_chiu += c.amount
+                if c.ben_chiu == "vietourist_tam_ung": chi_ho += (c.amount or 0)
+                else: chu_xe_chiu += (c.amount or 0)
         # Bảo dưỡng, sửa chữa trong kỳ. Chủ tịch chốt lại cuối ngày 07/9/2026: giữ cách đang làm, Vietourist
         # CHI HỘ sửa chữa rồi cấn trừ vào công nợ chủ xe. Bên chịu vẫn đọc từ CỘT trên từng dòng chứ không
         # suy ra ở đây – dòng ghi trước ngày chốt vẫn giữ đúng bên chịu lúc đó, không bị viết lại ngược.
@@ -226,8 +226,8 @@ def dung_quyet_toan(db: Session, partner_id: int, ky: str, boi: str) -> Settleme
             db.add(SettlementLine(settlement_id=st.id, kind=kind, vehicle_id=m.vehicle_id,
                                   mo_ta=f"Bảo dưỡng/sửa chữa {m.ngay:%d/%m}: {m.noi_dung[:120]}",
                                   amount=_q(m.so_tien), ben_chiu=m.ben_chiu, chung_tu=m.chung_tu))
-            if m.ben_chiu == "vietourist_tam_ung": chi_ho += m.so_tien
-            else: chu_xe_chiu += m.so_tien
+            if m.ben_chiu == "vietourist_tam_ung": chi_ho += (m.so_tien or 0)
+            else: chu_xe_chiu += (m.so_tien or 0)
         # Hóa đơn dùng chung: chỉ những xe CÓ TÊN trên chính hóa đơn đó.
         for inv in db.execute(select(SharedInvoice).where(SharedInvoice.ngay >= d1, SharedInvoice.ngay <= d2)).scalars():
             for r in phan_bo_hoa_don_chung(db, inv):
@@ -238,17 +238,17 @@ def dung_quyet_toan(db: Session, partner_id: int, ky: str, boi: str) -> Settleme
                                       chung_tu=inv.so_hoa_don))
                 chi_ho += r["amount"]
 
-    dieu_chinh = sum(l.amount for l in db.execute(
+    dieu_chinh = sum((l.amount or 0) for l in db.execute(
         select(SettlementLine).where(SettlementLine.settlement_id == st.id,
                                      SettlementLine.kind == "dieu_chinh")).scalars())
     st.doanh_thu = _q(doanh_thu)
     st.doi_tac_huong = _q(doanh_thu)
     st.doi_tac_chiu = _q(chi_ho)              # khoản công ty đã chi hộ, đối tác phải hoàn lại
     st.dieu_chinh = _q(dieu_chinh)
-    st.truoc_can_tru = _q(st.doi_tac_huong - st.doi_tac_chiu + st.dieu_chinh)
+    st.truoc_can_tru = _q(st.doi_tac_huong - st.doi_tac_chiu + (st.dieu_chinh or 0))
     st.can_tru = _q(db.execute(select(func.coalesce(func.sum(OffsetApplication.amount), 0))
                                .where(OffsetApplication.settlement_id == st.id)).scalar() or 0)
-    sau = _q(st.truoc_can_tru - st.can_tru)
+    sau = _q((st.truoc_can_tru or 0) - (st.can_tru or 0))
     # Số âm là khoản PHẢI THU, chuyển kỳ sau – không tạo phiếu chi âm.
     st.sau_can_tru = max(0.0, sau)
     st.chuyen_ky_sau = _q(-sau) if sau < 0 else 0.0
@@ -270,7 +270,7 @@ def kiem_dong_ky(db: Session, st: Settlement) -> list[dict]:
             loi.append({"code": "B9_CHUYEN_CO_DO", "level": FL.BLOCK,
                         "msg": f"Chuyến #{t.id} ngày {t.ngay_di:%d/%m} còn cờ đỏ: {t.co_ly_do[:140]}",
                         "huong_xu_ly": "Xử lý cờ đỏ của chuyến rồi dựng lại kỳ"})
-    tong_dong = _q(sum(l.amount for l in db.execute(
+    tong_dong = _q(sum((l.amount or 0) for l in db.execute(
         select(SettlementLine).where(SettlementLine.settlement_id == st.id,
                                      SettlementLine.kind == "doanh_thu")).scalars()))
     if tong_dong != st.doanh_thu:

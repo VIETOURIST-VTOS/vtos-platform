@@ -14,3 +14,6 @@ backend/visa_docs/
 
 web_src.tgz
 _web_src.tgz
+
+# rac do bo phep thu sinh ra khi chay
+backend/test_tep_kho/
