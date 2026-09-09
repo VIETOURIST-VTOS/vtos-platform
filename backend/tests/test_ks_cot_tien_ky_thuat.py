@@ -244,9 +244,21 @@ def test_kt12_quyet_dinh_08_09_da_duoc_ghi_va_khong_de_len_nguoi_khac():
         cho = {f"{r['bang']}.{r['cot']}" for r in d["rows"] if r["xep"] == "chua_ro"}
         assert not (cho & set(CT.QUYET_08_09_2026)), \
             f"cột đã có quyết định 08/9 mà vẫn nằm trong hàng chờ: {cho & set(CT.QUYET_08_09_2026)}"
-        # Quyết "sửa" KHÔNG làm cột biến mất: nó vẫn hỏng cho tới khi mô hình đổi thật. Thứ đo tiến độ
-        # của NGƯỜI là số cột chưa ai quyết.
-        assert d["so_thieu_thanh_0"] > 0, "chưa ai đổi kiểu thì danh sách phải còn nguyên"
+        # Dòng này trước đây đọc `> 0`, kèm ghi chú: quyết "sửa" KHÔNG làm cột biến mất, nó vẫn hỏng
+        # cho tới khi mô hình đổi thật. Đúng ở thời điểm ấy – khi chưa ai đổi mô hình.
+        #
+        # Ngày 09/9/2026 K2 đổi thật: 83 cột ở bước 3, rồi 8 cột nữa ở phần bù sau khi sổ rà soát trên
+        # máy chủ chỉ ra chỗ danh sách bỏ sót. Danh sách "thiếu thành 0" về 0 – và phép thử đỏ vì việc
+        # đã xong. Đảo nó là bắt buộc, nhưng đảo thành `== 0` thôi thì mất luôn cái nó vốn canh.
+        #
+        # Nên canh CẢ HAI CHIỀU: hết danh sách là điều kiện đạt, và nếu sau này lại có cột mọc lên thì
+        # phép thử phải đỏ NGAY, kèm tên cột – vì một cột tiền mới khai `default=0` là lặng lẽ dựng lại
+        # đúng chỗ mù mà cả đợt K2 sinh ra để xoá.
+        con_thieu = [f"{r['bang']}.{r['cot']}" for r in d["rows"] if r["thieu_thanh_0"]]
+        assert not con_thieu, (
+            "có cột tiền vừa mặc định 0 vừa không cho rỗng – 'chưa nhập' lại bị ghi thành 0 ở những cột "
+            f"này. Khai chúng là `Mapped[float | None] = mapped_column(TIEN, nullable=True)` và thêm một "
+            f"bản nâng cấp DROP NOT NULL: {con_thieu}")
         # Cột thêm vào mô hình SAU ngày 08/9 thì KHÔNG bị quyết hộ – đây mới là điều phải giữ. Nếu
         # danh sách viết thành quy tắc thay vì liệt kê từng cột, mọi cột mới sẽ tự động mang chữ ký
         # của Chủ tịch mà ông chưa từng nhìn thấy chúng.
