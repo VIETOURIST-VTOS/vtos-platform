@@ -41,13 +41,25 @@ def _man_hinh_co_mau_lap_lenh() -> set:
     # Thành phần dùng chung: màn hình nào nhập nó thì coi như mang theo mẫu bên trong.
     comp = WEB.parent / "components"
     mang_mau = {c.stem for c in comp.glob("*.tsx")
-                if GOI_LAP_LENH.search(c.read_text(encoding="utf-8"))} if comp.exists() else set()
+                if GOI_LAP_LENH.search(_ma(c.read_text(encoding="utf-8")))} if comp.exists() else set()
     for p in sorted(WEB.glob("*/page.tsx")):
-        src = p.read_text(encoding="utf-8")
+        src = _ma(p.read_text(encoding="utf-8"))
         nhap = set(re.findall(r'from "@/components/(\w+)"', src))
         if GOI_LAP_LENH.search(src) or (nhap & mang_mau):
             ra.add("/" + p.parent.name)
     return ra
+
+
+def _ma(src: str) -> str:
+    """Bỏ chú thích, chỉ giữ mã chạy.
+
+    Phép thử đọc mã giao diện luôn phải bóc chú thích trước. Bài học lấy từ bộ phép thử cửa nhập tay
+    cùng ngày: ở đó hai đột biến lọt qua vì chính đoạn chú thích giải thích chỗ hỏng lại nhắc đúng tên
+    cái đường đã bị gỡ – phép thử hóa ra đang canh "tệp có nhắc tới cửa này không", câu vẫn đúng sau
+    khi cửa đã mất."""
+    src = re.sub(r"/\*.*?\*/", " ", src, flags=re.S)
+    src = re.sub(r"^\s*//.*$", " ", src, flags=re.M)
+    return src
 
 
 def _nguon_cua(ten: str) -> list:
@@ -61,11 +73,11 @@ def _nguon_cua(ten: str) -> list:
     if not p.exists():
         return ra
     src = p.read_text(encoding="utf-8")
-    ra.append(src)
+    ra.append(_ma(src))
     for m in re.findall(r'from "@/components/(\w+)"', src):
         q = WEB.parent / "components" / (m + ".tsx")
         if q.exists():
-            ra.append(q.read_text(encoding="utf-8"))
+            ra.append(_ma(q.read_text(encoding="utf-8")))
     return ra
 
 

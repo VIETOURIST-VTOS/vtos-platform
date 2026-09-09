@@ -27,6 +27,12 @@ function NapDuLieu() {
   const [ls, setLs] = useState<any[]>([]);
   const [boQua, setBoQua] = useState(false);
   const [dang, setDang] = useState(false);
+  // Biểu nhập tay một dòng. Máy chủ đã có POST /nap-du-lieu/nhap-mot-dong từ đầu, nhưng đến 09/9/2026
+  // không màn hình nào gọi nó – nên 26 bộ nạp chỉ có MỘT cửa duy nhất là tải tệp. Muốn ghi một lần đăng
+  // kiểm, một lần bảo dưỡng, một hóa đơn đầu vào, một kỳ bảo hiểm thì phải dựng một tệp Excel. Thực tế
+  // thì người ta không dựng, và ô ấy nằm trống – rồi con số cuối kỳ thiếu mà không ai biết thiếu ở đâu.
+  const [oNhap, setONhap] = useState<Record<string, string>>({});
+  const [ktDong, setKtDong] = useState<any>(null);
   // Quyền nạp đọc theo TỪNG BỘ NẠP do máy chủ công bố, không chép lại danh sách vai trò ở đây: chép là
   // sớm muộn hai bên lệch nhau, và bên lỏng hơn luôn là bên người dùng nhìn thấy.
   const chon0 = bo?.bo_nap?.find((b: any) => b.ma === loai);
@@ -74,10 +80,33 @@ function NapDuLieu() {
     } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
   };
 
+  /** Ghi một dòng. Đi qua ĐÚNG bộ kiểm của cửa tải tệp – máy chủ dùng chung một hàm cho cả hai cửa,
+   *  nên không có đường nào nhập tay mà lỏng hơn nhập tệp. */
+  const ghiMotDong = async () => {
+    setDang(true); setKtDong(null);
+    try {
+      const row: Record<string, any> = {};
+      (chon?.cot || []).forEach((c: any) => { const v = (oNhap[c.key] ?? "").trim(); if (v !== "") row[c.key] = v; });
+      const d = await api<any>("/nap-du-lieu/nhap-mot-dong", { method: "POST", json: { loai, row, cua: "nhap_tay" } });
+      setKtDong(d);
+      if (d.da_ghi) {
+        toast(d.ket_qua ? `Đã ghi: ${d.ket_qua}` : d.message);
+        // Giữ lại các ô NGÀY, xóa phần còn lại. Người nhập mười phiếu dầu của cùng một ngày không phải gõ
+        // lại ngày mười lần; còn giữ cả số tiền thì dòng sau lặng lẽ mang số của dòng trước.
+        const giu: Record<string, string> = {};
+        (chon?.cot || []).forEach((c: any) => { if (c.kieu === "ngay" && oNhap[c.key]) giu[c.key] = oNhap[c.key]; });
+        setONhap(giu);
+        setLs(await api("/nap-du-lieu/lich-su"));
+      }
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+
+  const thieuBatBuoc = (chon?.cot || []).filter((c: any) => c.bat_buoc && !(oNhap[c.key] || "").trim());
+
   if (!bo) return <p className="muted">Đang tải…</p>;
   return (<>
     <h1>Nạp dữ liệu vào VTOS</h1>
-    <p className="muted">Người nhập, tệp tải lên và tác vụ AI đi qua <b>cùng một cửa</b>: cùng bộ kiểm tra,
+    <p className="muted">Gõ tay từng dòng, tải tệp nhiều dòng và tác vụ AI đọc ảnh đi qua <b>cùng một cửa</b>: cùng bộ kiểm tra,
       cùng khóa chống trùng, cùng nhật ký. Nếu mỗi đường một kiểu kiểm tra thì cái chặt nhất trở nên vô
       nghĩa — người ta chỉ cần đi đường lỏng nhất.</p>
 
@@ -107,8 +136,47 @@ function NapDuLieu() {
       </>}
     </div>
 
+    {chon && <div className="panel">
+      <h2>2. Nhập tay một dòng</h2>
+      <p className="muted">Dùng khi chỉ có <b>một bản ghi</b>: một lần đăng kiểm, một phiếu bảo dưỡng, một
+        hóa đơn đầu vào. Bắt dựng tệp Excel cho một dòng là cách chắc chắn nhất để dòng ấy không bao giờ
+        được nhập. Ô nhập đi qua <b>cùng bộ kiểm</b> với cửa tải tệp – không có đường nào nhập tay mà lỏng hơn.</p>
+      {!canNap
+        ? <p className="muted"><Tag cls="warn">chỉ xem</Tag> Loại dữ liệu này thuộc {PHONG[chon.phong_ban] || "phòng khác"} – người nhập phải là người của phòng đó.</p>
+        : <>
+        <div className="grid">
+          {chon.cot.map((c: any) => <div key={c.key}>
+            <label>{c.ten}{c.bat_buoc && <span style={{ color: "var(--red)" }}> *</span>}</label>
+            {c.chon
+              ? <select value={oNhap[c.key] || ""} onChange={(e) => setONhap({ ...oNhap, [c.key]: e.target.value })}>
+                  <option value="">– chọn –</option>
+                  {Object.entries(c.chon).map(([ma, ten]: any) => <option key={ma} value={ma}>{ten}</option>)}
+                </select>
+              : <input type={c.kieu === "ngay" ? "date" : c.kieu === "so" ? "number" : "text"}
+                       value={oNhap[c.key] || ""} placeholder={c.kieu === "ngay" ? "" : c.vi_du}
+                       min={c.min} max={c.max}
+                       onChange={(e) => setONhap({ ...oNhap, [c.key]: e.target.value })} />}
+            {c.ghi_chu && <div className="muted" style={{ fontSize: 12 }}>{c.ghi_chu}</div>}
+          </div>)}
+        </div>
+        <button className="act teal" disabled={dang || thieuBatBuoc.length > 0} onClick={ghiMotDong}>
+          {dang ? "Đang ghi…" : "Kiểm và ghi một dòng"}</button>{" "}
+        <button className="act grey" disabled={dang} onClick={() => { setONhap({}); setKtDong(null); }}>Xóa biểu</button>
+        {thieuBatBuoc.length > 0 && <p className="muted">Còn thiếu ô bắt buộc: <b>{thieuBatBuoc.map((c: any) => c.ten).join(", ")}</b></p>}
+        <p className="muted">Ghi xong, biểu giữ lại các ô NGÀY và xóa phần còn lại – để nhập dòng tiếp theo
+          không phải gõ lại ngày, mà cũng không mang nhầm số tiền của dòng trước.</p>
+        {ktDong && <div style={{ marginTop: 8 }}>
+          {ktDong.da_ghi
+            ? <p><Tag cls="ok">đã ghi</Tag> {ktDong.ket_qua || ktDong.message}</p>
+            : <p><Tag cls={ktDong.da_co ? "warn" : "red"}>chưa ghi</Tag> {ktDong.message}</p>}
+          {ktDong.loi?.map((l: string, i: number) => <div key={i}><Tag cls="red">{l}</Tag></div>)}
+          {ktDong.canh_bao?.map((c: string, i: number) => <div key={i} className="muted">{c}</div>)}
+        </div>}
+      </>}
+    </div>}
+
     <div className="panel">
-      <h2>2. Tải tệp lên và kiểm tra</h2>
+      <h2>3. Tải nhiều dòng bằng tệp</h2>
       <p className="muted">Bước này <b>chưa ghi gì</b> vào hệ thống. Nhận tệp .csv hoặc .xlsx, hàng đầu là
         tên cột — tên cột viết hoa hay thường đều được.</p>
       <input type="file" accept=".csv,.xlsx,.xlsm" disabled={dang}
@@ -117,7 +185,7 @@ function NapDuLieu() {
     </div>
 
     {kt && <div className="panel">
-      <h2>3. Kết quả kiểm tra</h2>
+      <h2>4. Kết quả kiểm tra tệp</h2>
       <div className="kpis">
         <div className="kpi"><b>{kt.so_dong}</b><span>dòng trong tệp</span></div>
         <div className="kpi"><b style={{ color: "var(--ok, green)" }}>{kt.hop_le}</b><span>hợp lệ, sẽ nạp</span></div>
