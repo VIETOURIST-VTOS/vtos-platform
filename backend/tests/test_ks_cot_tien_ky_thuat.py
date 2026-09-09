@@ -273,3 +273,59 @@ def test_sql_dem_phan_le_tu_tim_cot_khong_doc_danh_sach_chep_tay():
     assert "double precision" in s and "real" in s, "phải bắt cả hai kiểu số thực nhị phân"
     assert "count(*)" in s and "insert" not in s and "update" not in s and "alter" not in s, \
         "phép đo này CHỈ ĐỌC – chạy lúc hệ thống đang phục vụ"
+
+
+def test_kt12_xep_loai_cua_may_duoc_tinh_lai_moi_lan_dong_bo():
+    """Vá bộ xếp loại phải có tác dụng lên CẢ những dòng đã ghi vào sổ.
+
+    Bản trước chỉ tính xếp loại một lần, lúc dòng được thêm mới. Ngày 09/9/2026 thêm "_suat" vào danh
+    sách "không phải tiền", đẩy lên máy chủ, và purchase_invoices.thue_suat VẪN hiện là tiền kèm lý do
+    cũ "tên chứa thue" – bản vá không chạm tới dòng nào đang có. Một bộ xếp loại chỉ đúng với cột thêm
+    về sau là một bộ xếp loại chữa được đúng một nửa.
+    """
+    from app.services import ks_cot_tien as CT
+    from app.models.ra_soat_tien import KsCotTien
+    from app.db.session import SessionLocal
+    from sqlalchemy import select as sel
+
+    db = SessionLocal()
+    r = db.execute(sel(KsCotTien).limit(1)).scalars().first()
+    assert r is not None, "sổ rà soát trống thì phép thử này không nói lên điều gì"
+    that_xep, that_ly_do = r.xep_may, r.ly_do_may
+
+    # giả lập bộ xếp loại cũ đã ghi một kết luận khác
+    r.xep_may, r.ly_do_may = "khong_tien", "lý do cũ – phải bị thay"
+    db.commit()
+
+    kq = CT.dong_bo(db)
+    assert kq["may_doi_y"] >= 1, "đồng bộ phải đếm được số dòng máy đổi ý"
+    db.refresh(r)
+    assert (r.xep_may, r.ly_do_may) == (that_xep, that_ly_do), \
+        "xếp loại của máy phải được tính lại theo bộ xếp loại HIỆN TẠI, không giữ kết luận cũ"
+    db.close()
+
+
+def test_kt13_tinh_lai_xep_may_khong_dung_toi_quyet_dinh_cua_nguoi():
+    """Máy đổi ý thì đề xuất đổi; QUYẾT ĐỊNH của người vẫn nguyên và vẫn thắng.
+
+    Nếu tính lại mà đè luôn lên quyết định của người thì mỗi lần vá bộ xếp loại là một lần xoá công
+    người quyết – và không ai quyết lần thứ hai nữa.
+    """
+    from app.services import ks_cot_tien as CT
+    from app.models.ra_soat_tien import KsCotTien
+    from app.db.session import SessionLocal
+    from sqlalchemy import select as sel
+
+    db = SessionLocal()
+    r = db.execute(sel(KsCotTien).limit(1)).scalars().first()
+    r.quyet_nguoi = "khong_tien"; r.quyet_boi = "ketoan_thu_nghiem"
+    r.xep_may, r.ly_do_may = "chua_ro", "lý do cũ"
+    db.commit()
+
+    CT.dong_bo(db)
+    db.refresh(r)
+    assert r.quyet_nguoi == "khong_tien", "quyết định của người bị đè khi máy tính lại"
+    assert r.quyet_boi == "ketoan_thu_nghiem", "mất cả dấu vết ai quyết"
+    assert r.xep_may != "chua_ro", "đề xuất của máy thì phải được cập nhật"
+
+    r.quyet_nguoi = ""; r.quyet_boi = ""; db.commit(); db.close()

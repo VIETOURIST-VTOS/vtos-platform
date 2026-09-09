@@ -93,7 +93,7 @@ def dong_bo(db: Session) -> dict:
     vì quyết định của người về cột đó vẫn là dữ kiện lịch sử đáng giữ."""
     hien = {(x["bang"], x["cot"]): x for x in _cot_so_thuc()}
     cu = {(r.bang, r.cot): r for r in db.execute(select(KsCotTien)).scalars()}
-    now = datetime.now(); them = 0
+    now = datetime.now(); them = doi_y = 0
     for k, x in hien.items():
         r = cu.get(k)
         if r is None:
@@ -106,12 +106,27 @@ def dong_bo(db: Session) -> dict:
             # Kiểu và ràng buộc đọc lại mỗi lần: đó chính là thứ V9 sẽ sửa và K1 phải thấy giảm.
             r.kieu, r.cho_rong, r.mac_dinh_0 = x["kieu"], x["cho_rong"], x["mac_dinh_0"]
             r.lan_cuoi, r.con = now, True
+            # XẾP LOẠI CỦA MÁY CŨNG TÍNH LẠI. Bản trước chỉ tính một lần, lúc dòng được ghi vào sổ –
+            # nên vá bộ xếp loại xong thì mọi dòng đã ghi vẫn mang kết luận cũ, và bản vá coi như
+            # không có tác dụng gì ngoài những cột thêm về sau.
+            #
+            # Tìm ra ngày 09/9/2026: sau khi thêm "_suat" vào danh sách "không phải tiền",
+            # purchase_invoices.thue_suat VẪN hiện là tiền với lý do cũ "tên chứa thue".
+            #
+            # Quyết định của NGƯỜI không bị đụng tới – nó nằm ở quyet_nguoi và luôn thắng. Cái tính lại
+            # ở đây là ĐỀ XUẤT của máy. Máy đổi ý trên một cột người đã quyết thì cũng đáng hiện ra:
+            # đó là lúc nên hỏi lại người quyết, không phải lúc im lặng ghi đè.
+            xep_moi, ly_do_moi = xep_theo_ten(x["cot"])
+            if (r.xep_may, r.ly_do_may) != (xep_moi, ly_do_moi):
+                r.xep_may, r.ly_do_may = xep_moi, ly_do_moi
+                doi_y += 1
     mat = 0
     for k, r in cu.items():
         if k not in hien and r.con:
             r.con = False; mat += 1
     db.commit()
-    return {"tong_cot": len(hien), "them_moi": them, "khong_con": mat}
+    return {"tong_cot": len(hien), "them_moi": them, "khong_con": mat,
+            "may_doi_y": doi_y}
 
 
 def _hieu_luc(db: Session) -> list[KsCotTien]:
