@@ -37,6 +37,8 @@ LOAI_PHAT_HIEN = {
     "nap_lo_lech": "Lô nạp lệch số dòng hoặc lệch tổng tiền",
     "nap_lo_ngoai_so": "Cửa nạp hàng loạt không ghi nhật ký lô – đối chiếu không nhìn thấy",
     "bang_khong_cua_nhap": "Bảng không có cửa nào để người dùng nhập số liệu vào",
+    "tien_vao_thieu_duong": "Một trong hai đường nhận tiền vào chưa được cấu hình",
+    "tien_vao_im_lang": "Lâu không có giao dịch tiền vào nào",
 }
 
 

@@ -272,6 +272,7 @@ from app.services.ks_do_dai import _do_dai_du_lieu                       # noqa:
 from app.services.ks_ma_tran import _ma_tran_quyen                       # noqa: E402
 from app.services.ks_nap_lo import _doi_chieu_lo_nap            # noqa: E402  – K5
 from app.services.ks_cua_nhap import _cua_nhap_du_lieu        # noqa: E402  – mọi số phải có cửa
+from app.services.ks_tien_vao import _hai_duong_tien_vao      # noqa: E402  – hai đường tiền vào
 
 # HỢP của hai nhánh, không phải chọn một: nhánh phân quyền thêm hai bộ kiểm về vai trò, nhánh kiểm
 # soát thêm bộ hậu kiểm số nhập tay. Gộp mà bỏ mất một bên thì bộ kiểm đó im lặng biến mất – và một
@@ -313,7 +314,7 @@ BO_KIEM = (_mach_migration, _quyen_lech, _vai_tro_trong, _vai_tro_khong_co_nguoi
            _quyen_tung_vai_tro, _ngoai_le_ton, _ai_chua_hau_kiem,
            _cot_tien_float, _thieu_khac_khong, _su_kien_ky_thuat, _hau_kiem_nhap_tay,
            _do_dai_du_lieu, _ma_tran_quyen, _doi_chieu_lo_nap,
-           _cua_nhap_du_lieu)
+           _cua_nhap_du_lieu, _hai_duong_tien_vao)
 
 
 def quet(db: Session, boi: str = "robot_ks") -> dict:
