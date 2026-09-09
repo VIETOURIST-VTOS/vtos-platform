@@ -284,3 +284,29 @@ def tong_dai_su_kien(limit: int = 50, nguon: str = "",
     """Tổng đài thật sự gửi gì sang. `khoa_thay` là đặc tả dựng lại từ quan sát – thứ nhà cung cấp không đưa."""
     from app.services import tong_dai as TD
     return TD.bang(db, limit, nguon)
+
+
+@router.get("/tong-dai/khoi-luong")
+def tong_dai_khoi_luong(tu: str = "", den: str = "",
+                        u: User = Depends(require_roles("cntt", "tgd", "chutich", "bks")),
+                        db: Session = Depends(get_db)):
+    """Bước 1 của việc nối tổng đài: ĐO trước khi đề xuất.
+
+    Trả về số cuộc, tổng phút, số cuộc có ghi âm của một khoảng ngày, kèm ước chi phí chuyển giọng nói
+    thành văn bản theo đúng số phút đo được. KHÔNG trả về số điện thoại nào – câu hỏi "một tháng gọi
+    bao nhiêu phút" không cần biết số của ai.
+    """
+    from datetime import date, timedelta
+    from app.services import pa_tong_dai as PA
+    if not PA.da_khai():
+        return {"da_khai_khoa": False,
+                "huong_dan": "Khai PA_TONG_DAI_API_KEY trên máy chủ. Khoá lấy ở crm.pavietnam.vn → "
+                             "Người phát triển → Kiểm thử API → API Call Now, ô api_key."}
+    hom_nay = date.today()
+    tu = tu or str(hom_nay - timedelta(days=30))
+    den = den or str(hom_nay)
+    try:
+        d = PA.do_khoi_luong(tu, den)
+    except Exception as ex:
+        raise HTTPException(502, f"Không đọc được lịch sử cuộc gọi: {str(ex)[:200]}")
+    return {"da_khai_khoa": True, **d, "uoc_chi_phi": PA.uoc_chi_phi_chuyen_chu(d["phut_co_ghi_am"])}
