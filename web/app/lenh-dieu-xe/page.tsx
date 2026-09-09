@@ -34,11 +34,22 @@ function LenhDieuXe() {
   }, [toast]);
   useEffect(() => { load(); }, [load]);
 
+  // Nạp danh sách tour NGAY KHI MỞ TRANG, và mỗi lần đổi khoảng ngày.
+  //
+  // Bản đầu (09/9/2026) chỉ nạp khi bấm "Xem phương án", vì mẫu chốt lệnh dùng chung khoảng ngày với
+  // bảng gợi ý. Soi trên web thật thì thấy hậu quả đúng bằng chỗ hỏng bản này sinh ra để chữa: người
+  // phụ trách mở trang lên, chỉ thấy ô tìm ngày và bảng lệnh cũ, rồi kết luận màn hình này chỉ để xem.
+  // Một cái cửa chỉ hiện ra sau khi người ta đoán đúng phải bấm nút nào thì cũng gần bằng không có cửa.
+  const nenRef = useCallback(async (a: string, b: string) => {
+    try { setNen(await api(`/fleet/de-lap-lenh?tu=${a}&den=${b}`)); }
+    catch (e) { toast(errMsg(e), true); }
+  }, [toast]);
+  useEffect(() => { if (tu && den && den >= tu) nenRef(tu, den); }, [tu, den, nenRef]);
+
   const chay = async () => {
     setBusy(true);
     try {
       setGy(await api(`/fleet/goi-y-dieu-xe?date_from=${tu}&date_to=${den}&so_khach=${khach}&km_du_kien=${km}`));
-      setNen(await api(`/fleet/de-lap-lenh?tu=${tu}&den=${den}`));
       setChon(null); setHoi(null); setLyDo("");
     } catch (e) { toast(errMsg(e), true); }
     setBusy(false);
@@ -76,6 +87,7 @@ function LenhDieuXe() {
 
   return (<>
     <h1>Lệnh điều xe</h1>
+    <p className="muted">Đây là nơi <b>lập và chốt lệnh điều xe</b>: chọn tour bên dưới, đặt khoảng ngày và số khách, xem phương án, rồi bấm <b>Chốt lệnh</b> ngay trên dòng xe đã chọn.</p>
     <p className="muted">Hệ thống <b>lọc cứng trước, xếp hạng sau</b>: xe vi phạm điều kiện không xuất hiện trong gợi ý dù điểm có cao đến đâu. Đây là gợi ý — người chốt lệnh vẫn quyết, và chọn khác gợi ý thì phải ghi lý do.</p>
 
     <div className="panel"><h2>Tìm phương án cho một khoảng ngày</h2>
@@ -110,6 +122,7 @@ function LenhDieuXe() {
           </select></div>
       </div>
       {!nen.tour.length && <p className="muted">Không có tour nào chạy trong khoảng ngày này. Đổi khoảng ngày ở ô trên, hoặc chờ Điều hành lập chuyến.</p>}
+      {tour && !gy && <p className="muted"><Tag cls="warn">còn một bước</Tag> Đã chọn tour. Bấm <b>Xem phương án</b> ở khối trên để hệ thống lọc xe đủ điều kiện — nút Chốt lệnh nằm trên từng dòng xe được đề xuất.</p>}
       {matTour && matTour.planned_pax > 0 && khach === 0 &&
         <p className="muted"><Tag cls="warn">lưu ý</Tag> Tour này dự kiến {matTour.planned_pax} khách nhưng ô "Số khách" đang để 0 – gợi ý đang xếp hạng cho một chuyến không khách. Điền số khách rồi xem lại phương án.</p>}
       <p className="muted">{nen.ghi_chu}</p>

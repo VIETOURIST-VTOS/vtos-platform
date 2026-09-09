@@ -144,3 +144,46 @@ def test_duong_de_lap_lenh_nam_trong_hang_rao_doi_xe():
         "Phạm vi của gd_doi_xe vừa được mở tới cả phân hệ tour. Nếu đó là quyết định thật thì sửa phép "
         "thử này kèm lý do; nếu chỉ để lấy mã tour cho lệnh điều xe thì dùng "
         "GET /api/v1/fleet/de-lap-lenh – đường ấy trả lịch trình và số khách, không trả một con số tiền nào.")
+
+
+def test_mau_lap_lenh_hien_ngay_khi_mo_trang():
+    """Ô chọn tour phải có mặt lúc MỞ trang, không đợi người dùng bấm đúng một nút mới hiện ra.
+
+    Bản đầu ngày 09/9 nạp danh sách tour bên trong hàm "Xem phương án", vì mẫu chốt lệnh dùng chung
+    khoảng ngày với bảng gợi ý. Nghe hợp lý, và soi trên web thật thì hậu quả đúng bằng chỗ hỏng mà cả
+    bản ấy sinh ra để chữa: người phụ trách mở trang lên, chỉ thấy ô tìm ngày và bảng lệnh cũ, rồi kết
+    luận màn hình này chỉ để xem.
+
+    Một cái cửa chỉ hiện ra sau khi người ta đoán đúng phải bấm nút nào thì cũng gần bằng không có cửa
+    – và đó là dạng thiếu KHÔNG phép thử cũ nào bắt được, vì mã có đủ mọi thứ, chỉ sai chỗ đặt.
+
+    Cách canh: đường lấy tour phải nằm trong một hàm được useEffect gọi, chứ không nằm trong thân hàm
+    xử lý nút bấm.
+    """
+    if not WEB.exists():
+        return
+    p = WEB / "lenh-dieu-xe" / "page.tsx"
+    src = _ma(p.read_text(encoding="utf-8"))
+
+    ten = re.findall(r'const\s+(\w+)\s*=\s*useCallback\([^;]{0,400}?de-lap-lenh', src, re.S)
+    assert ten, ("Đường /fleet/de-lap-lenh không nằm trong một useCallback nào – nhiều khả năng nó lại "
+                 "nằm thẳng trong thân hàm của một nút bấm, tức là ô chọn tour chỉ hiện sau khi bấm.")
+
+    goi_trong_effect = any(re.search(r'useEffect\([^;]{0,300}?(?<![\w.])' + re.escape(t) + r'\(', src, re.S)
+                           for t in ten)
+    assert goi_trong_effect, (
+        f"Hàm nạp tour ({ten}) không được useEffect gọi. Ô chọn tour sẽ chỉ hiện sau khi người dùng "
+        "bấm một nút nào đó – và người mở trang lần đầu không biết phải bấm nút nào.")
+
+
+def test_man_hinh_noi_bang_chu_rang_lenh_duoc_chot_o_day():
+    """Nói ra bằng lời, không để người dùng suy ra từ việc có một cái nút.
+
+    Người phụ trách vào màn hình này lần đầu cần đọc được ngay đây là chỗ LẬP lệnh, chứ không phải một
+    bảng tra cứu. Câu ấy rẻ, và nó là thứ phân biệt "màn hình có cửa" với "màn hình trông như chỉ xem".
+    """
+    if not WEB.exists():
+        return
+    src = _ma((WEB / "lenh-dieu-xe" / "page.tsx").read_text(encoding="utf-8"))
+    assert re.search(r"lập và chốt lệnh|nơi lập lệnh|chốt lệnh điều xe", src), (
+        "Màn hình không có câu nào nói rằng lệnh được lập và chốt ở đây.")
