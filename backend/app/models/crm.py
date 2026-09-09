@@ -42,7 +42,7 @@ class LeadChannelStat(Base):
     lead_month: Mapped[str] = mapped_column(String(7), index=True)
     channel: Mapped[str] = mapped_column(String(40))
     leads: Mapped[int] = mapped_column(Integer, default=0)
-    cost: Mapped[float] = mapped_column(TIEN, default=0)                       # chi phí kênh (nếu có) → chi phí/lead
+    cost: Mapped[float | None] = mapped_column(TIEN, default=0)                       # chi phí kênh (nếu có) → chi phí/lead, nullable=True
     updated_by: Mapped[str] = mapped_column(String(50), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 

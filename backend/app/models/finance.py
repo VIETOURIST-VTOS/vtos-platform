@@ -25,8 +25,8 @@ class FinContract(Base):
     partner: Mapped[str] = mapped_column(String(160))                       # ngân hàng / đối tác
     contract_no: Mapped[str] = mapped_column(String(80), default="")
     signed_on: Mapped[date | None] = mapped_column(Date, nullable=True)
-    principal: Mapped[float] = mapped_column(TIEN, default=0)              # giá trị gốc / hạn mức
-    outstanding: Mapped[float] = mapped_column(TIEN, default=0)            # dư nợ / số đã giải ngân còn lại
+    principal: Mapped[float | None] = mapped_column(TIEN, default=0)              # giá trị gốc / hạn mức, nullable=True
+    outstanding: Mapped[float | None] = mapped_column(TIEN, default=0)            # dư nợ / số đã giải ngân còn lại, nullable=True
     interest_rate: Mapped[float] = mapped_column(Float, default=0)          # %/năm
     maturity: Mapped[date | None] = mapped_column(Date, nullable=True)
     collateral: Mapped[str] = mapped_column(String(300), default="")

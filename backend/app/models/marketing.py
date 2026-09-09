@@ -31,7 +31,7 @@ class Campaign(Base):
     channels: Mapped[list] = mapped_column(JSON, default=list)
     from_date: Mapped[date] = mapped_column(Date)
     to_date: Mapped[date | None] = mapped_column(Date, nullable=True)       # rỗng = đang chạy
-    budget: Mapped[float] = mapped_column(TIEN, default=0)
+    budget: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     target_leads: Mapped[int] = mapped_column(Integer, default=0)
     target_bookings: Mapped[int] = mapped_column(Integer, default=0)
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -66,7 +66,7 @@ class MarketingBudget(Base):
     period: Mapped[str] = mapped_column(String(8), index=True)              # 2026-09 hoặc 2026-Q4
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
     target_leads: Mapped[int] = mapped_column(Integer, default=0)
-    target_revenue: Mapped[float] = mapped_column(TIEN, default=0)
+    target_revenue: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     rationale: Mapped[str] = mapped_column(Text, default="")               # căn cứ – bắt buộc
     status: Mapped[str] = mapped_column(String(10), default="nhap")
     nguon_tao: Mapped[str] = mapped_column(String(6), default="nguoi")
@@ -83,7 +83,7 @@ class MarketingBudgetLine(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     budget_id: Mapped[int] = mapped_column(ForeignKey("mkt_budgets.id"), index=True)
     hang_muc: Mapped[str] = mapped_column(String(20))
-    amount: Mapped[float] = mapped_column(TIEN, default=0)
+    amount: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     note: Mapped[str] = mapped_column(String(300), default="")
 
 

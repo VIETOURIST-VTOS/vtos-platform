@@ -61,7 +61,7 @@ class PaymentRequest(Base):
     has_document: Mapped[bool] = mapped_column(Boolean, default=False)    # hợp đồng/hóa đơn/báo giá đính kèm
     document_ref: Mapped[str] = mapped_column(String(120), default="")
     has_invoice: Mapped[bool] = mapped_column(Boolean, default=False)     # có hóa đơn GTGT (không → không được trừ TNDN)
-    over_budget: Mapped[bool] = mapped_column(Boolean, default=False)     # ngoài dự toán → 2 chữ ký (cổng 15)
+    over_budget: Mapped[bool | None] = mapped_column(Boolean, default=False)     # ngoài dự toán → 2 chữ ký (cổng 15, nullable=True)
     two_signatures: Mapped[bool] = mapped_column(Boolean, default=False)  # cần Chủ tịch + TGĐ
     status: Mapped[str] = mapped_column(String(20), default="cho_tp")     # cho_tp / cho_kt / cho_duyet / cho_chi / da_chi / tu_choi
     created_by: Mapped[str] = mapped_column(String(50))

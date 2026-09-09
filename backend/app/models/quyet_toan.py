@@ -58,7 +58,7 @@ class TourSettlement(Base):
     sale: Mapped[str] = mapped_column(String(120), default="")
     ngay_kh: Mapped[date | None] = mapped_column(Date, nullable=True)
     ngay_kt: Mapped[date | None] = mapped_column(Date, nullable=True)
-    doanh_thu: Mapped[float] = mapped_column(TIEN, default=0)
+    doanh_thu: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     # NULL nghĩa là CHƯA CÓ SỐ. Đây là lý do tồn tại của cả bảng này.
     gia_von: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     trang_thai_qt: Mapped[str] = mapped_column(String(20), default="du_toan")

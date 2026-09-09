@@ -143,11 +143,30 @@ def test_kt5_quyet_cua_nguoi_de_len_de_xuat_cua_may():
 
 
 def test_kt6_thieu_khac_0_chi_tinh_cot_tien_va_giu_thi_phai_co_ly_do():
+    """Hai việc: nhóm K2 chỉ gồm cột tiền mặc-định-0-không-cho-rỗng, và "giữ" thì phải nói vì sao.
+
+    Phần thứ hai TỰ DỰNG đối tượng thay vì mượn một dòng trong nhóm K2. Bản trước mượn, và ngày
+    09/9/2026 – khi 86 cột được cho phép rỗng – nhóm ấy gần như rỗng, phép thử đỏ dù quy tắc vẫn đúng
+    nguyên. Đó là lần thứ ba trong ngày một phép thử đòi khuyết tật phải còn tồn tại mới xanh được.
+    Quy tắc "giữ phải có lý do" không phụ thuộc vào việc còn bao nhiêu cột hỏng, nên phép thử của nó
+    cũng không được phụ thuộc.
+    """
     d = so("thieu_thanh_0")
-    assert d["so_thieu_thanh_0"] > 0
     for r in d["rows"]:
-        assert r["xep"] == "tien" and r["mac_dinh_0"] and not r["cho_rong"]
-    i = d["rows"][0]["id"]
+        assert r["xep"] == "tien" and r["mac_dinh_0"] and not r["cho_rong"], \
+            "nhóm K2 lọt một cột không thoả ba điều kiện"
+
+    # đối tượng riêng: lấy một dòng bất kỳ và xoá ghi chú, vì quy tắc chấp nhận lý do đã ghi từ trước
+    from app.models.ra_soat_tien import KsCotTien
+    from app.db.session import SessionLocal
+    from sqlalchemy import select as sel
+    db = SessionLocal()
+    r0 = db.execute(sel(KsCotTien).limit(1)).scalars().first()
+    assert r0 is not None, "sổ rà soát trống thì không kiểm được gì"
+    ghi_cu, k2_cu = r0.ghi_chu, r0.quyet_k2
+    r0.ghi_chu, r0.quyet_k2 = "", ""
+    db.commit(); i = r0.id; db.close()
+
     # giữ nguyên mà không nói vì sao thì lần rà sau không ai biết đã cân nhắc chưa
     assert client.post("/api/v1/kiem-soat/cot-tien/quyet", json={"dong": [{"id": i, "quyet_k2": "giu"}]},
                        headers=login("ketoan")).status_code == 422
@@ -155,8 +174,9 @@ def test_kt6_thieu_khac_0_chi_tinh_cot_tien_va_giu_thi_phai_co_ly_do():
                     json={"dong": [{"id": i, "quyet_k2": "giu", "ghi_chu": "0 ở cột này là chiết khấu bằng 0, là số thật"}]},
                     headers=login("ketoan"))
     assert r.status_code == 200
-    assert so("thieu_thanh_0")["so_thieu_thanh_0"] == d["so_thieu_thanh_0"] - 1
 
+    db = SessionLocal()
+    x = db.get(KsCotTien, i); x.ghi_chu, x.quyet_k2 = ghi_cu, k2_cu; db.commit(); db.close()
 
 def test_kt7_gay_loi_500_thi_robot_phat_hien_trong_vong_quet_ke_tiep():
     assert client.get("/api/v1/_thu_loi_500").status_code == 500

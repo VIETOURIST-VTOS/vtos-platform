@@ -73,8 +73,8 @@ class ThieuGiaVon(Base):
     ma_don: Mapped[str] = mapped_column(String(60), unique=True, index=True)   # mã tour / mã dịch vụ lẻ
     ky: Mapped[str] = mapped_column(String(7), default="", index=True)         # 2026-08
     ten: Mapped[str] = mapped_column(String(300), default="")
-    doanh_thu: Mapped[float] = mapped_column(TIEN, default=0)
-    gia_von: Mapped[float] = mapped_column(TIEN, default=0)
+    doanh_thu: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    gia_von: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     ly_do: Mapped[str] = mapped_column(String(200), default="")   # thieu_gia_von / thieu_dien_giai / gia_von_am
     phong_ban: Mapped[str] = mapped_column(String(40), default="dieu_hanh")
     nguoi_phu_trach: Mapped[str] = mapped_column(String(120), default="")

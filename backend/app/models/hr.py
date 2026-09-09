@@ -23,12 +23,12 @@ class Employee(Base):
     position: Mapped[str] = mapped_column(String(20), default="nv")
     title: Mapped[str] = mapped_column(String(60), default="")             # chức vụ ghi trên bảng lương (NVKD 2, TL Team KD 1, ĐH…)
     duties: Mapped[str] = mapped_column(Text, default="")                 # công việc chính: tuyến/thị trường người này phụ trách
-    bhxh_base: Mapped[float] = mapped_column(TIEN, default=0)            # tiền lương làm căn cứ đóng BHXH bắt buộc (khác lương hợp đồng)
+    bhxh_base: Mapped[float | None] = mapped_column(TIEN, default=0)            # tiền lương làm căn cứ đóng BHXH bắt buộc (khác lương hợp đồng, nullable=True)
     sales_group: Mapped[str] = mapped_column(String(20), default="")      # KD1–KD5, VPCT, VPHN, VPBD, VPHP, DOAN_OB, DOAN_ND
     office: Mapped[str] = mapped_column(String(20), default="hcm")
     contract_type: Mapped[str] = mapped_column(String(10), default="hdld")   # hdld / ctv / doi_tac
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)   # pháp nhân chủ quản (HDV cộng tác viên ghi theo công ty ký hợp đồng)
-    base_salary: Mapped[float] = mapped_column(TIEN, default=0)             # lương công việc (gắn chức vụ)
+    base_salary: Mapped[float | None] = mapped_column(TIEN, default=0)             # lương công việc (gắn chức vụ, nullable=True)
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     phone: Mapped[str] = mapped_column(String(30), default="")
@@ -40,7 +40,7 @@ class Employee(Base):
     card_expiry: Mapped[date | None] = mapped_column(Date, nullable=True)
     member_org: Mapped[bool] = mapped_column(Boolean, default=False)          # hội viên tổ chức XH-NN
     ctv_contract: Mapped[bool] = mapped_column(Boolean, default=False)        # hợp đồng cộng tác đã ký
-    advance_limit: Mapped[float] = mapped_column(TIEN, default=0)
+    advance_limit: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Đội xe Đợt 2: bốn số cuối thẻ dầu gắn với TÀI XẾ, không gắn với xe – đổi tài xế thì đổi luôn
     # ánh xạ, nếu gắn vào xe thì mọi giao dịch thẻ sau ngày bàn giao sẽ gán nhầm chi phí sang người khác.
@@ -60,7 +60,7 @@ class VisaFile(Base):
     office: Mapped[str] = mapped_column(String(20), default="hcm")            # hcm / hanoi
     alliance: Mapped[bool] = mapped_column(Boolean, default=False)            # khách liên minh (+300.000)
     tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True)
-    revenue: Mapped[float] = mapped_column(TIEN, default=0)                  # doanh thu visa
+    revenue: Mapped[float | None] = mapped_column(TIEN, default=0)                  # doanh thu visa, nullable=True
     status: Mapped[str] = mapped_column(String(20), default="dang_lam")       # dang_lam / hoan_thanh / tu_choi
     completed_at: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -125,8 +125,8 @@ class VehicleRate(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     route: Mapped[str] = mapped_column(String(80))
     days: Mapped[int] = mapped_column(Integer, default=0)
-    internal_price: Mapped[float] = mapped_column(TIEN, default=0)          # xe nội bộ Vietrip – VTD
-    partner_price: Mapped[float] = mapped_column(TIEN, default=0)           # xe hợp tác hỗ trợ (0 = không áp dụng)
+    internal_price: Mapped[float | None] = mapped_column(TIEN, default=0)          # xe nội bộ Vietrip – VTD, nullable=True
+    partner_price: Mapped[float | None] = mapped_column(TIEN, default=0)           # xe hợp tác hỗ trợ (0 = không áp dụng, nullable=True)
     effective_from: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(20), default="pending")       # pending / active / rejected
     signed_chutich: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -163,7 +163,7 @@ class DispatchOrder(Base):
     date_from: Mapped[date] = mapped_column(Date)
     date_to: Mapped[date] = mapped_column(Date)
     rate_id: Mapped[int | None] = mapped_column(ForeignKey("vehicle_rates.id"), nullable=True)   # tuyến trong bảng giá
-    internal_price: Mapped[float] = mapped_column(TIEN, default=0)         # giá thuê nội bộ cả chuyến
+    internal_price: Mapped[float | None] = mapped_column(TIEN, default=0)         # giá thuê nội bộ cả chuyến, nullable=True
     created_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

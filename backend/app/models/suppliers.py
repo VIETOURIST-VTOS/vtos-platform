@@ -87,8 +87,8 @@ class ServiceOrder(Base):
     ngay_su_dung: Mapped[date | None] = mapped_column(Date, nullable=True)
     so_luong: Mapped[float] = mapped_column(Float, default=1)
     don_vi: Mapped[str] = mapped_column(String(30), default="")
-    don_gia: Mapped[float] = mapped_column(TIEN, default=0)
-    thanh_tien: Mapped[float] = mapped_column(TIEN, default=0)
+    don_gia: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    thanh_tien: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="nhap")
     xac_nhan_ncc: Mapped[str] = mapped_column(String(200), default="")   # số/ảnh xác nhận của NCC
     payment_request_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

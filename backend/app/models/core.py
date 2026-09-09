@@ -221,7 +221,7 @@ class Product(Base):
     vehicle_type: Mapped[str] = mapped_column(String(40), default="")
     length_text: Mapped[str] = mapped_column(String(20), default="")            # 3N2Đ
     days: Mapped[int] = mapped_column(Integer, default=1)
-    reference_price: Mapped[float] = mapped_column(TIEN, default=0)
+    reference_price: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     deposit_pct: Mapped[float] = mapped_column(Float, default=30)
     days_to_close: Mapped[int] = mapped_column(Integer, default=3)
     requires_confirmation: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -267,9 +267,9 @@ class Tour(Base):
     end_date: Mapped[date] = mapped_column(Date)
     operator_id: Mapped[int] = mapped_column(ForeignKey("users.id"))      # người điều hành duy nhất
     # Dự toán
-    price_per_pax: Mapped[float] = mapped_column(TIEN, default=0)
-    fixed_cost: Mapped[float] = mapped_column(TIEN, default=0)
-    var_cost_per_pax: Mapped[float] = mapped_column(TIEN, default=0)
+    price_per_pax: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    fixed_cost: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    var_cost_per_pax: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     planned_pax: Mapped[int] = mapped_column(Integer, default=0)
     rest_stops: Mapped[str] = mapped_column(Text, default="")             # điểm dừng nghỉ
     strategic: Mapped[bool] = mapped_column(Boolean, default=False)       # tour chiến lược (Chủ tịch công bố)
@@ -284,9 +284,9 @@ class Tour(Base):
     signed_tgd: Mapped[bool] = mapped_column(Boolean, default=False)
     chairman_run_decision: Mapped[str] = mapped_column(String(200), default="")  # quyết định D-7
     # Quyết toán
-    actual_revenue: Mapped[float] = mapped_column(TIEN, default=0)
-    actual_cost: Mapped[float] = mapped_column(TIEN, default=0)
-    promo_value: Mapped[float] = mapped_column(TIEN, default=0)          # giảm giá/mã KM → dòng giá vốn
+    actual_revenue: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    actual_cost: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    promo_value: Mapped[float | None] = mapped_column(TIEN, default=0)          # giảm giá/mã KM → dòng giá vốn, nullable=True
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)  # pháp nhân chủ quản – rỗng là CHƯA XÁC ĐỊNH, không mặc định về công ty mẹ
     kt_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -302,10 +302,10 @@ class Tour(Base):
     transport: Mapped[str] = mapped_column(String(40), default="")
     days: Mapped[int] = mapped_column(Integer, default=0)
     seats_open: Mapped[int] = mapped_column(Integer, default=0)            # số chỗ mở bán
-    seats_promo: Mapped[int] = mapped_column(Integer, default=0)           # số chỗ khuyến mãi
-    price_chd: Mapped[float] = mapped_column(TIEN, default=0)
-    price_inf: Mapped[float] = mapped_column(TIEN, default=0)
-    price_promo: Mapped[float] = mapped_column(TIEN, default=0)
+    seats_promo: Mapped[int | None] = mapped_column(Integer, default=0)           # số chỗ khuyến mãi, nullable=True
+    price_chd: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    price_inf: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    price_promo: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     country: Mapped[str] = mapped_column(String(60), default="")
     settled_vietrip: Mapped[bool] = mapped_column(Boolean, default=False)  # Vietrip: quyết toán / duyệt chi
     imported: Mapped[bool] = mapped_column(Boolean, default=False)         # nhập từ Vietrip – không qua cổng duyệt VTOS
@@ -328,7 +328,7 @@ class ServiceRequest(Base):
     pax: Mapped[int] = mapped_column(Integer, default=1)
     campaign_code: Mapped[str] = mapped_column(String(40), default="")
     promo_code: Mapped[str] = mapped_column(String(40), default="")
-    discount: Mapped[float] = mapped_column(TIEN, default=0)
+    discount: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True)
     tour: Mapped["Tour"] = relationship()
@@ -348,14 +348,14 @@ class Booking(Base):
     source: Mapped[str] = mapped_column(String(60))
     care_note: Mapped[str] = mapped_column(Text, default="")
     pax: Mapped[int] = mapped_column(Integer, default=1)
-    amount: Mapped[float] = mapped_column(TIEN, default=0)
-    discount: Mapped[float] = mapped_column(TIEN, default=0)
+    amount: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    discount: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     promo_code: Mapped[str] = mapped_column(String(40), default="")
     campaign_code: Mapped[str] = mapped_column(String(40), default="")
     counts_for_target: Mapped[bool] = mapped_column(Boolean, default=True)  # cờ tính chỉ tiêu
     sla_minutes: Mapped[int] = mapped_column(Integer, default=0)            # phút từ yêu cầu → booking
     sla_ok: Mapped[bool] = mapped_column(Boolean, default=True)
-    paid: Mapped[float] = mapped_column(TIEN, default=0)
+    paid: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     # Bổ sung theo cấu trúc Vietrip
     vietrip_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
@@ -372,12 +372,12 @@ class Booking(Base):
     lock_reason: Mapped[str] = mapped_column(String(120), default="")
     cancel_reason: Mapped[str] = mapped_column(String(200), default="")
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    cancel_charge: Mapped[float] = mapped_column(TIEN, default=0)          # phí hủy giữ lại làm doanh thu
+    cancel_charge: Mapped[float | None] = mapped_column(TIEN, default=0)          # phí hủy giữ lại làm doanh thu, nullable=True
     service_type: Mapped[str] = mapped_column(String(20), default="")       # non-package: VISA/FLIGHT/HOTEL/VEHICLE/RESTAURANT/LAND/GUIDE/OTHER
     country: Mapped[str] = mapped_column(String(60), default="")
     customer_email: Mapped[str] = mapped_column(String(120), default="")
     service_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    cost_amount: Mapped[float] = mapped_column(TIEN, default=0)            # giá vốn NCC của dịch vụ lẻ
+    cost_amount: Mapped[float | None] = mapped_column(TIEN, default=0)            # giá vốn NCC của dịch vụ lẻ, nullable=True
     supplier_name: Mapped[str] = mapped_column(String(160), default="")
     tour: Mapped["Tour"] = relationship(back_populates="bookings")
     sales: Mapped["User"] = relationship(foreign_keys=[sales_id])

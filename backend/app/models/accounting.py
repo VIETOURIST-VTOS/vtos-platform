@@ -49,8 +49,8 @@ class JournalLine(Base):
     entry_id: Mapped[int] = mapped_column(ForeignKey("journal_entries.id"), index=True)
     account_code: Mapped[str] = mapped_column(ForeignKey("accounts.code"), index=True)
     # V9 đợt 1 – hai cột này là chỗ kiểm toán đối chiếu đầu tiên, nên đổi trước mọi cột khác.
-    debit: Mapped[float] = mapped_column(TIEN, default=0)
-    credit: Mapped[float] = mapped_column(TIEN, default=0)
+    debit: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    credit: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     partner: Mapped[str] = mapped_column(String(160), default="")         # tên đối tượng: khách / NCC
     partner_code: Mapped[str] = mapped_column(String(60), default="", index=True)   # mã đối tượng MISA (MST/CCCD/mã NV/mã ngân hàng)
     project_code: Mapped[str] = mapped_column(String(40), default="", index=True)   # mã công trình MISA = mã tour
@@ -75,10 +75,10 @@ class Invoice(Base):
     customer_tax_code: Mapped[str] = mapped_column(String(20), default="")
     customer_address: Mapped[str] = mapped_column(String(300), default="")
     description: Mapped[str] = mapped_column(String(300), default="")
-    pre_tax: Mapped[float] = mapped_column(TIEN, default=0)
+    pre_tax: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     vat_rate: Mapped[float] = mapped_column(Float, default=0.1)
-    vat: Mapped[float] = mapped_column(TIEN, default=0)
-    total: Mapped[float] = mapped_column(TIEN, default=0)
+    vat: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    total: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="nhap")       # nhap / da_phat_hanh / huy
     provider: Mapped[str] = mapped_column(String(30), default="noi_bo")   # noi_bo / viettel / vnpt / misa…
     provider_ref: Mapped[str] = mapped_column(String(80), default="")     # mã tra cứu / mã CQT
