@@ -310,3 +310,13 @@ def tong_dai_khoi_luong(tu: str = "", den: str = "",
     except Exception as ex:
         raise HTTPException(502, f"Không đọc được lịch sử cuộc gọi: {str(ex)[:200]}")
     return {"da_khai_khoa": True, **d, "uoc_chi_phi": PA.uoc_chi_phi_chuyen_chu(d["phut_co_ghi_am"])}
+
+
+@router.get("/tong-dai/chan-doan")
+def tong_dai_chan_doan(u: User = Depends(require_roles("cntt", "tgd", "chutich")),
+                       db: Session = Depends(get_db)):
+    """P.A nhận dạng tham số nào – hỏi chính nó thay vì đoán. CHỈ ĐỌC, không đổi gì bên tổng đài."""
+    from app.services import pa_tong_dai as PA
+    if not PA.da_khai():
+        raise HTTPException(400, "Chưa khai PA_TONG_DAI_API_KEY trên máy chủ")
+    return PA.chan_doan()

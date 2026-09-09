@@ -72,6 +72,49 @@ def _goi(url: str, tham_so: dict) -> dict:
     return j
 
 
+def _goi_tho(url: str, tham_so: dict) -> dict:
+    """Gọi và TRẢ VỀ NGUYÊN mã lỗi thay vì ném ngoại lệ. Chỉ dùng cho phép chẩn đoán."""
+    try:
+        return {"ok": True, "kq": _goi(url, tham_so)}
+    except Exception as ex:
+        return {"ok": False, "loi": str(ex)[:160]}
+
+
+def chan_doan() -> dict:
+    """P.A nhận dạng tham số nào? Hỏi CHÍNH NÓ thay vì đoán.
+
+    Trang đặc tả của P.A ghi kiểu `datetime` cho from_date/to_date nhưng mô tả lại ghi "(y-m-d)", và
+    biểu thử nghiệm để trống mọi ô nên không học được dạng đúng từ đó. Bản đầu gửi y-m-d kèm
+    limit=1000 và page=1 thì nhận mã 1003 "tham số không hợp lệ" – tức là kết nối và khoá đều đúng,
+    chỉ sai dạng.
+
+    Đoán tiếp là cách đã làm mất một buổi ở Zalo. Nên: gửi vài dạng, đọc câu trả lời của chính P.A,
+    rồi mới viết cứng dạng đúng. Hàm này CHỈ ĐỌC – getCDRReport không đổi gì bên tổng đài.
+    """
+    from datetime import date, timedelta
+    h = date.today()
+    b7, b30 = h - timedelta(days=7), h - timedelta(days=30)
+    thu = {
+        "1_chi_ngay_7ngay":        {"from_date": str(b7), "to_date": str(h)},
+        "2_them_limit_100":        {"from_date": str(b7), "to_date": str(h), "limit": 100},
+        "3_limit_va_page":         {"from_date": str(b7), "to_date": str(h), "limit": 100, "page": 1},
+        "4_page_bat_dau_tu_0":     {"from_date": str(b7), "to_date": str(h), "limit": 100, "page": 0},
+        "5_co_gio":                {"from_date": f"{b7} 00:00:00", "to_date": f"{h} 23:59:59", "limit": 100},
+        "6_ba_muoi_ngay":          {"from_date": str(b30), "to_date": str(h), "limit": 100},
+        "7_khong_tham_so_ngay":    {"limit": 100},
+    }
+    ra = {}
+    for ten, ts in thu.items():
+        r = _goi_tho(CDR, ts)
+        if r["ok"]:
+            ds = r["kq"].get("data") or []
+            ra[ten] = {"nhan": True, "so_ban_ghi": len(ds) if isinstance(ds, list) else 0,
+                       "truong": sorted((ds[0] or {}).keys()) if isinstance(ds, list) and ds else []}
+        else:
+            ra[ten] = {"nhan": False, "loi": r["loi"]}
+    return {"tham_so_da_thu": {k: sorted(v.keys()) for k, v in thu.items()}, "ket_qua": ra}
+
+
 def _giay(v) -> int:
     try: return int(float(v or 0))
     except Exception: return 0
