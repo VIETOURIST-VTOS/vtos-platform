@@ -1,13 +1,13 @@
 """Cửa nhập hoá đơn đầu vào trên dòng chi phí quyết toán
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: 8de308e27b31
 Revises: zf6a7b8c9d0e
 """
 from alembic import op
 import sqlalchemy as sa
 from app.models.kieu_tien import TIEN
 
-revision = "a1b2c3d4e5f6"
+revision = "8de308e27b31"
 down_revision = "zf6a7b8c9d0e"
 branch_labels = None
 depends_on = None

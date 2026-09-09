@@ -125,8 +125,17 @@ PHAM_VI_DA_CHOT = {
     # NGUYÊN VĂN sự kiện tổng đài (P.A Việt Nam không công bố đặc tả webhook, nên VTOS nghe trước rồi mới
     # diễn giải). Cố ý KHÔNG gắn vào /inbox dù cuộc gọi rồi sẽ hiện ở hộp thư: gắn ở đó là mở tiền tố cho
     # mười ba vai trò trong khi chỉ bốn vai trò gọi được, và phần dôi ra vẫn là quyền đã cấp.
-    "chutich": 97, "tgd": 97, "bks": 97, "cntt": 95,
-    "ketoan": 81, "tp_dh": 77, "ptgd_doan": 57, "nv_dh": 53, "hcns": 52, "gd_kd": 51,
+    #
+    # +1 cho CHÍN vai trò ngày 09/9/2026 – nhóm "/api/v1/lai-lo-tour" gắn vào màn hình mới /lai-lo-tour
+    # (bảng lãi lỗ theo tour và theo khách, Chủ tịch duyệt cấu trúc cùng ngày). Chín vai được nới:
+    # chutich, tgd, bks, robot_ks, cntt, ketoan, tp_dh, ptgd_doan, nv_dh.
+    #
+    # Bốn vai Kinh doanh (gd_kd, tp_kd, tn_kd, nv_kd) CỐ Ý không có mặt, và đây là chỗ đáng ghi lại:
+    # lãi lỗ tour là số quản trị, bên trong nó là GIÁ VỐN của chuyến. Sale cần doanh thu và công nợ
+    # của booking mình phụ trách – hai thứ ấy họ đã có ở màn hình bán hàng. Cho thêm giá vốn chuyến là
+    # nới quyền vượt quá việc, và một khi đã nới thì không ai thu lại nữa.
+    "chutich": 98, "tgd": 98, "bks": 98, "cntt": 96,
+    "ketoan": 82, "tp_dh": 78, "ptgd_doan": 58, "nv_dh": 54, "hcns": 52, "gd_kd": 51,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
@@ -138,7 +147,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 97, "robot_vpm": 17,
+    "robot_pq": 18, "robot_ks": 98, "robot_vpm": 17,
 }
 
 
