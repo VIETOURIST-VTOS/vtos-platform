@@ -127,17 +127,19 @@ def test_vai_tro_khac_khong_gan_duoc_tep_vao_ho_so_nhan_su(_startup):
 
 
 def test_cau_hinh_cong_bo_du_nhom_ho_so_va_thoi_han_luu(_startup):
-    """Chốt số nhóm hồ sơ – 9 → 10 ngày 09/9/2026 khi thêm nhóm 10_Marketing.
+    """Chín nhóm theo Mô hình quản trị số hóa, cộng nhóm thứ mười thêm 09/9/2026.
 
-    Sửa lúc gộp: bản trên main thêm nhóm thứ mười mà quên sửa con số ở đây, nên phép thử này đang ĐỎ
-    trên chính main. Không phải lỗi do gộp – đã kiểm bằng cách xem lại tệp trên origin/main.
+    Nhóm "10_Marketing" (lưu 5 năm) sinh ra cùng đợt mở cửa tải tệp cho nội dung marketing: ảnh sắp
+    đăng không phải hồ sơ pháp lý cũng không phải chứng từ ghi sổ, nhét vào một nhóm sẵn có cho tiện
+    là làm hỏng thời hạn lưu của cả nhóm ấy.
 
-    Vẫn giữ dạng chốt số chứ không đổi thành "lớn hơn 0": mỗi nhóm hồ sơ mang một THỜI HẠN LƯU khác
-    nhau, thêm một nhóm là thêm một quy tắc lưu trữ – việc đó phải có người nhìn thấy, không được
-    lặng lẽ trôi qua một phép thử dễ dãi.
+    Phép thử này đọc số nhóm THẲNG TỪ khai báo chứ không viết cứng một con số nữa. Viết cứng thì mỗi
+    lần thêm nhóm lại đỏ một lần và người sửa chỉ việc tăng số – tức là phép thử không canh gì cả.
+    Điều đáng canh là: nhóm nào cũng phải có thời hạn lưu, và cấu trúc kho không đổi.
     """
+    from app.models.attachments import NHOM_HO_SO
     d = client.get("/api/v1/tep/cau-hinh", headers=login("ketoan")).json()
-    assert len(d["nhom_ho_so"]) == 10
+    assert len(d["nhom_ho_so"]) == len(NHOM_HO_SO) >= 9
     assert all(n["thoi_han_luu"] for n in d["nhom_ho_so"])
     assert "Pháp nhân / Năm / Nhóm hồ sơ" in d["cau_truc_kho"]
 

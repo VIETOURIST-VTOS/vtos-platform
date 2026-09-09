@@ -18,8 +18,19 @@ router = APIRouter(prefix="/api/v1/tep", tags=["tep-dinh-kem"])
 
 # Đính kèm chứng từ là việc của gần như mọi vai trò – chỗ chặn nằm ở chỗ khác: xem được hồ sơ nào thì
 # gắn được tệp vào hồ sơ đó. Riêng THU HỒI hẹp hơn: gỡ chứng từ khỏi hồ sơ không phải việc ai cũng làm.
+# "robot_ks" thêm 09/9/2026. Chủ tịch chốt vai trò này là "đọc toàn bộ như BKS, chỉ đọc", và danh sách
+# màn hình của nó đã đúng thế – 46 màn hình, y hệt BKS, trong đó có /tep. Nhưng danh sách vai trò ở đây
+# thì quên, nên mọi lần đọc tệp trả 403: robot đứng trước đúng màn hình nó phải kiểm và không thấy một
+# chứng từ nào. Hàng rào hai lớp là để lớp ngoài rộng, lớp trong hẹp – không phải để hai lớp nói hai điều
+# khác nhau về cùng một vai trò.
+#
+# CỐ Ý KHÔNG thêm vào VAI_TRO_NHAY_CAM (hồ sơ nhóm 06_Nhan_su). BKS là người, có tên, ký vào biên bản
+# kiểm tra; một tác vụ máy đọc hồ sơ nhân sự là việc khác về bản chất, và Nghị định 13/2023 nói về dữ
+# liệu cá nhân chứ không nói về mức tin cậy của người đọc. Chủ tịch mở thêm được – nhưng phải là một
+# câu nói ra, không phải một hệ quả kèm theo của câu "đọc toàn bộ như BKS".
 READ = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "ketoan", "bks", "cntt", "hcns",
-        "gd_doi_xe", "tp_hd", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "nv_visa", "hanh_chinh")
+        "gd_doi_xe", "tp_hd", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "nv_visa", "hanh_chinh",
+        "robot_ks")
 WRITE = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "ketoan", "cntt", "hcns",
          "gd_doi_xe", "tp_hd", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "nv_visa", "hanh_chinh")
 GO = ("chutich", "tgd", "cntt", "ketoan", "hcns", "tp_dh", "gd_doi_xe")

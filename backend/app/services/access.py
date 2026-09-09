@@ -446,8 +446,19 @@ MENU_ROLES = {
     "/nha-cung-cap": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
     # Nạp dữ liệu: màn hình mở cho các phòng có dữ liệu để nạp, còn CHẶN THEO TỪNG BỘ NẠP nằm ở
     # app/services/intake.VAI_TRO – mở được trang không có nghĩa là nạp được sổ của phòng khác.
+    #
+    # Hai Phó TGĐ thêm 09/9/2026, sau khi bản rà cửa nhập chỉ ra một chỗ hai danh sách nói ngược nhau:
+    # intake.VAI_TRO cho phép ptgd_doan nạp booking và quyết toán tour, cho phép ptgd_mkt nạp nguồn
+    # khách và chi phí marketing theo kênh – nhưng menu của cả hai lại không có màn hình này. Hai phân
+    # hệ độc lập cùng cấp quyền cho hai người mà cả hai menu cùng thiếu; Chủ tịch chốt ngày 09/9: hai
+    # Phó TGĐ quản lý phòng của mình, nên menu là chỗ lạc hậu, không phải danh sách quyền.
+    #
+    # Mở màn hình KHÔNG nới quyền nạp: chặn theo từng bộ nạp vẫn nằm ở intake.VAI_TRO, nên mỗi ông chỉ
+    # nạp được đúng những loại dữ liệu của phòng mình, và màn hình nói thẳng "chỉ xem" với loại của
+    # phòng khác.
     "/nap-du-lieu": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ketoan", "hcns", "cntt",
-                                                                              "nv_mkt"),
+                                                                              "nv_mkt", "ptgd_doan",
+                                                                              "ptgd_mkt"),
     # Đọc chứng từ ảnh (cửa 3). Mở cho phòng SỞ HỮU con số, cộng CNTT vì CNTT vận hành mô hình – nhưng
     # CNTT không bấm xác nhận được: chặn đó nằm ở intake.duoc_xac_nhan_anh, không nằm ở danh sách này.
     # KHÔNG mở cho HCNS: bốn loại chứng từ đang mở không có loại nào của HCNS, và bảng lương với bảng

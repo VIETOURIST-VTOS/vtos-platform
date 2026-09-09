@@ -146,17 +146,17 @@ PHAM_VI_DA_CHOT = {
     # NGUYÊN VĂN sự kiện tổng đài (P.A Việt Nam không công bố đặc tả webhook, nên VTOS nghe trước rồi mới
     # diễn giải). Cố ý KHÔNG gắn vào /inbox dù cuộc gọi rồi sẽ hiện ở hộp thư: gắn ở đó là mở tiền tố cho
     # mười ba vai trò trong khi chỉ bốn vai trò gọi được, và phần dôi ra vẫn là quyền đã cấp.
-    # ĐẾM LẠI SAU KHI GỘP 09/9/2026, bằng lệnh chứ không bằng trí nhớ. Hai nhánh đổi bảng này theo hai
-    # hướng ngược nhau nên không bên nào còn đúng: nhánh gop-dot2 THÊM ba màn hình (/tu-dong-hoa,
-    # /bao-cao, và ba màn hình V6 đã có từ trước), main THÊM /api/v1/tong-dai vào /kiem-soat, đồng thời
-    # gop-dot2 BỚT sáu dòng khai tay thừa (bản rà quyền 3b7aaca). Lấy số của bên nào cũng sai, nên đếm
-    # lại từ mã đã hợp nhất.
-    #
-    # Đã kiểm chỗ giảm không phải do gộp làm rơi mất: xe_hdv 17→15, robot_pq 18→17, robot_vpm 17→16,
-    # gd_doi_xe 24→25 – đúng bằng phần sáu dòng thừa mà bản rà quyền đã dọn, không phải mất quyền.
+    # ĐẾM LẠI LẦN HAI khi gộp nhánh Đợt 2 vào (09/9/2026 tối). Nhánh ấy thêm ba màn hình có phạm vi
+    # API riêng – /tu-dong-hoa (Lịch tự động hóa), /bao-cao (Báo cáo tự động theo phòng), và ba màn
+    # hình V6 của chuỗi bán hàng. Bảng này lại được đếm từ mã đã hợp nhất, không cộng trừ tay.
     "chutich": 101, "tgd": 101, "bks": 101, "cntt": 98,
     "ketoan": 83, "tp_dh": 80, "ptgd_doan": 59, "nv_dh": 55, "hcns": 54, "gd_kd": 54,
-    "ptgd_mkt": 41, "nv_kd": 40, "tn_kd": 40, "tp_kd": 42, "nv_mkt": 31,
+    # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
+    # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
+    # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
+    # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
+    # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
+    "ptgd_mkt": 42, "nv_kd": 40, "tn_kd": 40, "tp_kd": 42, "nv_mkt": 31,
     "gd_doi_xe": 25, "hanh_chinh": 24, "tp_hd": 23, "xe_hdv": 15, "nv_visa": 17,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ

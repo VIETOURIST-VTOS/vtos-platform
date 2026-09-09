@@ -92,29 +92,6 @@ def _mig(ten: str):
     return m
 
 
-# Cột SINH RA ĐÃ LÀ KIỂU TIỀN – bảng dựng sau đợt V9, không hề có giai đoạn dùng số thực nhị phân.
-#
-# Vì sao phải khai ra chứ không nới phép thử thành "bỏ qua bảng mới": phép thử này canh đúng một
-# điều – không có cột tiền nào trong mô hình mà không ai chủ ý đặt kiểu cho nó. Nới thành "bỏ qua
-# bảng mới" là bỏ luôn điều đó với mọi bảng dựng từ nay về sau, tức là vô hiệu hóa phép thử bằng
-# cách làm nó luôn xanh. Khai từng cột thì thêm một cột tiền vẫn phải có người ghi vào đây.
-#
-# Ghi nhận 09/9/2026 lúc gộp: phép thử này đang ĐỎ ở CẢ HAI nhánh, mỗi bên vì lý do riêng và không
-# bên nào biết – gop-dot2 dựng bốn bảng V6 (chín cột), main thêm bốn cột tiền cho sổ lô nạp. Gộp lại
-# mới lộ. Đây chính là kiểu hỏng mà bộ kiểm sinh ra để chặn, và nó chặn được – chỉ là muộn hơn nên
-# tốn công đi tìm.
-SINH_RA_DA_LA_TIEN = {
-    # V6 – chuỗi bán hàng (bảng giá → báo giá → hợp đồng khách)
-    ("bang_gia_dong", "gia_ban"), ("bang_gia_dong", "gia_von"),
-    ("bao_gia_dong", "don_gia"), ("bao_gia_dong", "gia_von_don_vi"), ("bao_gia_dong", "chiet_khau"),
-    ("bao_gia_ban", "tong_ban"), ("bao_gia_ban", "tong_von"),
-    ("hop_dong_khach", "gia_tri"), ("hop_dong_khach", "dat_coc"),
-    # Bốn số tiền của một lô nạp (bản zc3d4e5f6a7b)
-    ("intake_runs", "tong_tien_tep"), ("intake_runs", "tong_tien_da_nap"),
-    ("intake_runs", "tong_tien_bo_qua"), ("intake_runs", "tong_tien_loi"),
-}
-
-
 def test_mo_hinh_va_ban_nang_cap_khong_duoc_lech_nhau():
     """Mô hình và bản nâng cấp cùng liệt kê danh sách cột. Lệch nhau là bản nâng cấp đổi một tập, mô
     hình khai một tập khác – và cơ sở dữ liệu THẬT sẽ không giống mô hình mà không ai biết. Đây là
@@ -126,9 +103,29 @@ def test_mo_hinh_va_ban_nang_cap_khong_duoc_lech_nhau():
     assert {(b, c) for b, c, _ in d1.COT} == DOT1
     for m in (d1, d2):
         assert (m.TIEN.precision, m.TIEN.scale) == (18, 2)
-    # Hợp của MỌI bản nâng cấp, CỘNG các cột sinh ra đã là kiểu tiền, phải bằng đúng tập cột đã khai
-    # kiểu số thập phân trong mô hình.
-    trong_mig = {(b, c) for m in (d1, d2) for b, c, _ in m.COT} | SINH_RA_DA_LA_TIEN
+    # Hợp của MỌI bản nâng cấp phải bằng đúng tập cột đã khai kiểu số thập phân trong mô hình.
+    #
+    # Kể cả bản SINH MỚI cột, không chỉ hai bản CHUYỂN KIỂU của V9. Ngày 09/9/2026 làn Kiểm soát thêm
+    # bốn cột tiền cho lô nạp (intake_runs) và khai thẳng kiểu Numeric(18,2) – đúng chuẩn V9, không
+    # phải chuyển kiểu vì sinh ra đã đúng. Phép thử khi ấy đọc là "mô hình đã đổi mà không có bản
+    # nâng cấp", một câu báo động sai.
+    #
+    # Chỗ này lộ ra một điều đáng nhớ hơn cả bản vá: phép thử đỏ từ hôm qua mà không ai thấy, vì cây
+    # làm việc trên máy Chủ tịch thiếu đúng tệp mô hình ấy nên mọi lần chạy đều dùng bản cũ. Một cây
+    # làm việc lùi sau commit thì bộ phép thử vẫn xanh – và cái xanh ấy không nói gì về mã đang chạy.
+    d3 = _mig("zc3d4e5f6a7b_bon_so_tien_cho_lo_nap.py")
+    trong_mig = {(b, c) for m in (d1, d2) for b, c, _ in m.COT}
+    trong_mig |= {("intake_runs", c) for c in d3.COT}
+    # Cùng lý lẽ, cho bốn bảng V6 của chuỗi bán hàng (nhánh Đợt 2): chúng dựng SAU đợt V9 nên sinh ra
+    # đã là kiểu tiền, chưa từng đi qua giai đoạn số thực nhị phân. Khai từng cột chứ không nới phép
+    # thử thành "bỏ qua bảng mới" – nới thế là làm nó luôn xanh, tức là bỏ luôn điều duy nhất nó canh.
+    trong_mig |= {
+        ("bang_gia_dong", "gia_ban"), ("bang_gia_dong", "gia_von"),
+        ("bao_gia_dong", "don_gia"), ("bao_gia_dong", "gia_von_don_vi"),
+        ("bao_gia_dong", "chiet_khau"),
+        ("bao_gia_ban", "tong_ban"), ("bao_gia_ban", "tong_von"),
+        ("hop_dong_khach", "gia_tri"), ("hop_dong_khach", "dat_coc"),
+    }
     trong_mo_hinh = {(t.name, c.name) for t in Base.metadata.tables.values() for c in t.columns
                      if isinstance(c.type, Numeric) and not isinstance(c.type, Float)}
     assert trong_mig == trong_mo_hinh, {
