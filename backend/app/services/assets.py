@@ -68,7 +68,7 @@ def monthly_depreciation(a: FixedAsset) -> float:
     """Mức trích khấu hao một tháng (đường thẳng)."""
     if a.depr_months <= 0:
         return 0.0
-    return round(max(a.cost - a.salvage, 0.0) / a.depr_months, 0)
+    return round(max((a.cost or 0) - (a.salvage or 0), 0.0) / a.depr_months, 0)
 
 
 def asset_prior_accumulated(db: Session, a: FixedAsset, period: str) -> float:
@@ -80,7 +80,7 @@ def asset_prior_accumulated(db: Session, a: FixedAsset, period: str) -> float:
 
 def asset_depreciation_amount(db: Session, a: FixedAsset, period: str) -> float:
     """Mức trích của thẻ tài sản trong kỳ – 0 nếu chưa tới kỳ bắt đầu, đã ngừng trích, đã thanh lý, hoặc hết giá trị."""
-    if a.depr_months <= 0 or a.cost <= 0 or a.status == "ngung_kh":
+    if a.depr_months <= 0 or (a.cost or 0) <= 0 or a.status == "ngung_kh":
         return 0.0
     if period < _period_of(a.start_date):
         return 0.0
@@ -88,7 +88,7 @@ def asset_depreciation_amount(db: Session, a: FixedAsset, period: str) -> float:
         return 0.0                                        # phần này MISA đã trích, không trích lại
     if a.status == "thanh_ly" and a.disposed_date and _period_of(a.disposed_date) <= period:
         return 0.0                                        # thôi trích từ tháng thanh lý
-    depreciable = max(a.cost - a.salvage, 0.0)
+    depreciable = max((a.cost or 0) - (a.salvage or 0), 0.0)
     remaining = round(depreciable - asset_prior_accumulated(db, a, period), 0)
     idx = _months_between(_period_of(a.start_date), period)
     return _straight_line(monthly_depreciation(a), remaining, idx, a.depr_months)
@@ -101,9 +101,9 @@ def depreciation_table(db: Session, period: str) -> dict:
     for a in db.execute(select(FixedAsset).order_by(FixedAsset.code)).scalars():
         p = posted.get(a.id)
         prior = asset_prior_accumulated(db, a, period)
-        amount = p.amount if p else asset_depreciation_amount(db, a, period)
+        amount = (p.amount if p else asset_depreciation_amount(db, a, period)) or 0
         acc = round(prior + amount, 0)
-        depreciable = max(a.cost - a.salvage, 0.0)
+        depreciable = max((a.cost or 0) - (a.salvage or 0), 0.0)
         monthly = monthly_depreciation(a)
         if not p and amount <= 0 and acc <= 0 and a.status != "dang_dung":
             continue                                       # thẻ chưa/không còn liên quan kỳ này
@@ -112,7 +112,7 @@ def depreciation_table(db: Session, period: str) -> dict:
             "group": a.group, "department": a.department, "project_code": a.project_code,
             "start_date": a.start_date, "cost": a.cost, "salvage": a.salvage, "depr_months": a.depr_months,
             "monthly": monthly, "prior_accumulated": prior, "amount": amount, "accumulated": acc,
-            "remaining": round(a.cost - acc, 0),
+            "remaining": round((a.cost or 0) - acc, 0),
             "months_left": (int(round((depreciable - acc) / monthly)) if monthly > 0 else 0),
             "asset_account": a.asset_account, "depr_account": a.depr_account, "expense_account": a.expense_account,
             "status": a.status, "status_name": ASSET_STATUS.get(a.status, a.status),
@@ -132,13 +132,13 @@ def post_depreciation(db: Session, u: User, period: str) -> dict:
     if done:
         raise ValueError(f"Kỳ {period} đã ghi sổ khấu hao – muốn tính lại phải đảo chứng từ cũ")
     tab = depreciation_table(db, period)
-    rows = [r for r in tab["rows"] if r["amount"] > 0]
+    rows = [r for r in tab["rows"] if (r["amount"] or 0) > 0]
     if not rows:
         raise ValueError(f"Kỳ {period} không có tài sản nào phải trích khấu hao")
     groups: dict[tuple, float] = {}
     for r in rows:
         k = (r["expense_account"], r["depr_account"], r["project_code"], r["department"])
-        groups[k] = groups.get(k, 0.0) + r["amount"]
+        groups[k] = groups.get(k, 0.0) + (r["amount"] or 0)
     lines = []
     for (exp, depr, proj, dept), amt in sorted(groups.items()):
         amt = round(amt, 0)
@@ -159,7 +159,7 @@ def post_depreciation(db: Session, u: User, period: str) -> dict:
 def monthly_allocation(p: PrepaidExpense) -> float:
     if p.months <= 0:
         return 0.0
-    return round(max(p.amount, 0.0) / p.months, 0)
+    return round(max((p.amount or 0), 0.0) / p.months, 0)
 
 
 def prepaid_prior_allocated(db: Session, p: PrepaidExpense, period: str) -> float:
@@ -169,13 +169,13 @@ def prepaid_prior_allocated(db: Session, p: PrepaidExpense, period: str) -> floa
 
 
 def prepaid_allocation_amount(db: Session, p: PrepaidExpense, period: str) -> float:
-    if p.months <= 0 or p.amount <= 0 or p.status in ("ngung_pb", "ghi_giam"):
+    if p.months <= 0 or (p.amount or 0) <= 0 or p.status in ("ngung_pb", "ghi_giam"):
         return 0.0
     if period < _period_of(p.start_date):
         return 0.0
     if p.opening_period and period <= p.opening_period:
         return 0.0
-    remaining = round(p.amount - prepaid_prior_allocated(db, p, period), 0)
+    remaining = round((p.amount or 0) - prepaid_prior_allocated(db, p, period), 0)
     idx = _months_between(_period_of(p.start_date), period)
     return _straight_line(monthly_allocation(p), remaining, idx, p.months)
 
@@ -187,7 +187,7 @@ def allocation_table(db: Session, period: str) -> dict:
     for p in db.execute(select(PrepaidExpense).order_by(PrepaidExpense.code)).scalars():
         rec = posted.get(p.id)
         prior = prepaid_prior_allocated(db, p, period)
-        amount = rec.amount if rec else prepaid_allocation_amount(db, p, period)
+        amount = (rec.amount if rec else prepaid_allocation_amount(db, p, period)) or 0
         alloc = round(prior + amount, 0)
         monthly = monthly_allocation(p)
         if not rec and amount <= 0 and p.status != "dang_pb":
@@ -196,8 +196,8 @@ def allocation_table(db: Session, period: str) -> dict:
             "prepaid_id": p.id, "code": p.code, "name": p.name, "kind": p.kind, "kind_name": PREPAID_KINDS.get(p.kind, {}).get("ten", p.kind),
             "department": p.department, "project_code": p.project_code, "start_date": p.start_date,
             "amount_total": p.amount, "months": p.months, "monthly": monthly,
-            "prior_allocated": prior, "amount": amount, "allocated": alloc, "remaining": round(p.amount - alloc, 0),
-            "months_left": (int(round((p.amount - alloc) / monthly)) if monthly > 0 else 0),
+            "prior_allocated": prior, "amount": amount, "allocated": alloc, "remaining": round((p.amount or 0) - alloc, 0),
+            "months_left": (int(round(((p.amount or 0) - alloc) / monthly)) if monthly > 0 else 0),
             "asset_account": p.asset_account, "expense_account": p.expense_account,
             "status": p.status, "status_name": PREPAID_STATUS.get(p.status, p.status),
             "posted": bool(rec and rec.entry_id), "entry_id": rec.entry_id if rec else None,
@@ -214,13 +214,13 @@ def post_allocation(db: Session, u: User, period: str) -> dict:
     if db.execute(select(PrepaidAllocation).where(PrepaidAllocation.period == period, PrepaidAllocation.entry_id.isnot(None))).first():
         raise ValueError(f"Kỳ {period} đã ghi sổ phân bổ – muốn tính lại phải đảo chứng từ cũ")
     tab = allocation_table(db, period)
-    rows = [r for r in tab["rows"] if r["amount"] > 0]
+    rows = [r for r in tab["rows"] if (r["amount"] or 0) > 0]
     if not rows:
         raise ValueError(f"Kỳ {period} không có khoản nào phải phân bổ")
     groups: dict[tuple, float] = {}
     for r in rows:
         k = (r["expense_account"], r["asset_account"], r["project_code"], r["department"])
-        groups[k] = groups.get(k, 0.0) + r["amount"]
+        groups[k] = groups.get(k, 0.0) + (r["amount"] or 0)
     lines = []
     for (exp, src, proj, dept), amt in sorted(groups.items()):
         amt = round(amt, 0)
@@ -231,7 +231,7 @@ def post_allocation(db: Session, u: User, period: str) -> dict:
     for r in rows:
         db.add(PrepaidAllocation(prepaid_id=r["prepaid_id"], period=period, amount=r["amount"],
                                  allocated=r["allocated"], remaining=r["remaining"], entry_id=e.id))
-        if r["remaining"] <= 0:
+        if (r["remaining"] or 0) <= 0:
             p = db.get(PrepaidExpense, r["prepaid_id"])
             if p:
                 p.status = "het"
@@ -257,8 +257,8 @@ def depreciation_xlsx(tab: dict) -> bytes:
         ws.append([i, r["code"], r["name"], r["kind_name"], r["department"], r["project_code"],
                    r["start_date"], r["cost"], r["depr_months"], r["monthly"], r["prior_accumulated"],
                    r["amount"], r["accumulated"], r["remaining"], r["months_left"], r["status_name"]])
-    ws.append(["", "", "TỔNG CỘNG", "", "", "", "", sum(r["cost"] for r in tab["rows"]), "", "", "",
-               tab["total"], "", sum(r["remaining"] for r in tab["rows"]), "", ""])
+    ws.append(["", "", "TỔNG CỘNG", "", "", "", "", sum((r["cost"] or 0) for r in tab["rows"]), "", "", "",
+               (tab["total"] or 0), "", sum((r["remaining"] or 0) for r in tab["rows"]), "", ""])
     for c in ws[ws.max_row]:
         c.font = bold
     for col, w in zip("ABCDEFGHIJKLMNOP", [5, 14, 38, 18, 12, 14, 14, 16, 10, 14, 18, 16, 18, 16, 10, 18]):
@@ -281,7 +281,7 @@ def allocation_xlsx(tab: dict) -> bytes:
                    r["amount_total"], r["months"], r["monthly"], r["prior_allocated"], r["amount"],
                    r["allocated"], r["remaining"], r["months_left"], r["status_name"]])
     ws.append(["", "", "TỔNG CỘNG", "", "", "", "", sum(r["amount_total"] for r in tab["rows"]), "", "", "",
-               tab["total"], "", sum(r["remaining"] for r in tab["rows"]), "", ""])
+               (tab["total"] or 0), "", sum((r["remaining"] or 0) for r in tab["rows"]), "", ""])
     for c in ws[ws.max_row]:
         c.font = bold
     for col, w in zip("ABCDEFGHIJKLMNOP", [5, 14, 38, 18, 12, 14, 14, 16, 8, 14, 16, 16, 18, 16, 10, 18]):
@@ -309,7 +309,7 @@ def create_asset(db: Session, u: User, data: dict) -> FixedAsset:
         note=(data.get("note") or "")[:300], source=data.get("source") or "vtos", created_by=u.username)
     if not a.name:
         raise ValueError("Thiếu tên tài sản")
-    if a.cost <= 0:
+    if (a.cost or 0) <= 0:
         raise ValueError("Nguyên giá phải lớn hơn 0")
     if db.execute(select(FixedAsset).where(FixedAsset.code == a.code)).scalar_one_or_none():
         raise ValueError(f"Mã tài sản {a.code} đã tồn tại")
@@ -346,7 +346,7 @@ def create_prepaid(db: Session, u: User, data: dict) -> PrepaidExpense:
         source=data.get("source") or "vtos", created_by=u.username)
     if not p.name:
         raise ValueError("Thiếu tên khoản mục")
-    if p.amount <= 0:
+    if (p.amount or 0) <= 0:
         raise ValueError("Giá trị phân bổ phải lớn hơn 0")
     if p.months <= 0:
         raise ValueError("Số kỳ phân bổ phải lớn hơn 0")

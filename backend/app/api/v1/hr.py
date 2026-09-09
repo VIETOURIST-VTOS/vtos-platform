@@ -58,7 +58,7 @@ class EmployeeIn(BaseModel):
     position: str = "nv"
     office: str = "hcm"
     contract_type: str = "hdld"
-    base_salary: float = 0
+    base_salary: float | None = None
     user_id: int | None = None
     start_date: date | None = None
     probation: bool = False
@@ -67,7 +67,7 @@ class EmployeeIn(BaseModel):
     card_expiry: date | None = None
     member_org: bool = False
     ctv_contract: bool = False
-    advance_limit: float = 0
+    advance_limit: float | None = None
     title: str | None = None
     duties: str | None = None
     sales_group: str | None = None
@@ -194,7 +194,7 @@ class VisaIn(BaseModel):
     office: str = "hcm"
     alliance: bool = False
     tour_id: int | None = None
-    revenue: float = 0
+    revenue: float | None = None
 
 
 @router.post("/visa", status_code=201)
@@ -256,7 +256,7 @@ def xe_hdv_cua_toi(u: User = Depends(require_roles("xe_hdv", "nv_dh", "tp_dh", "
         t = db.get(Tour, a.tour_id)
         chuyen.append({"id": a.id, "tour_code": t.code if t else "", "tour_name": t.name if t else "",
                        "start_date": t.start_date if t else None, "days": a.days, "holiday": a.holiday,
-                       "amount": a.rate_per_day * a.days * (2 if a.holiday else 1), "status": a.status,
+                       "amount": (a.rate_per_day or 0) * a.days * (2 if a.holiday else 1), "status": a.status,
                        "confirmed_at": a.confirmed_at, "report_submitted": a.report_submitted,
                        "advance_settled": a.advance_settled, "ly_do": a.ly_do,
                        "han_tra_loi": a.han_tra_loi,
@@ -331,7 +331,10 @@ def assignments(u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd")), db
     for a in db.execute(select(GuideAssignment).order_by(desc(GuideAssignment.id))).scalars():
         t = db.get(Tour, a.tour_id)
         out.append({"id": a.id, "tour_id": a.tour_id, "tour_code": t.code if t else "", "tour_name": t.name if t else "", "guide_id": a.guide_id, "guide": emps.get(a.guide_id, ""),
-                    "days": a.days, "rate_per_day": a.rate_per_day, "holiday": a.holiday, "amount": a.rate_per_day * a.days * (2 if a.holiday else 1),
+                    # Đơn giá gửi RA MÀN HÌNH để nguyên, kể cả rỗng: "chưa nhập đơn giá" phải hiện là ô
+                    # trống, không phải số 0. Chỉ phép TÍNH mới xử rỗng thành 0.
+                    "days": a.days, "rate_per_day": a.rate_per_day, "holiday": a.holiday,
+                    "amount": (a.rate_per_day or 0) * a.days * (2 if a.holiday else 1),
                     "assigned_by": a.assigned_by, "assigned_at": a.assigned_at, "confirmed_at": a.confirmed_at, "report_submitted": a.report_submitted,
                     "advance_settled": a.advance_settled, "status": a.status})
     return out
@@ -342,7 +345,7 @@ class AssignIn(BaseModel):
     tour_id: int
     guide_id: int
     days: int
-    rate_per_day: float
+    rate_per_day: float | None = None
     holiday: bool = False
     rate_id: int | None = None
 
@@ -359,7 +362,7 @@ def assign(data: AssignIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "tp
         if not gr or gr.status != "active": raise HTTPException(422, "Tuyến không có trong bảng giá HDV hiệu lực")
         a.rate_per_day = gr.rate_per_day
         if not data.days or data.days <= 0: a.days = max(1, int(round(gr.days)))
-    if a.rate_per_day <= 0: raise HTTPException(422, "Chọn tuyến trong bảng giá HDV hoặc nhập đơn giá/ngày")
+    if (a.rate_per_day or 0) <= 0: raise HTTPException(422, "Chọn tuyến trong bảng giá HDV hoặc nhập đơn giá/ngày")
     db.add(a); db.flush()
     R.audit(db, u.username, u.role, "phan_cong_hdv", f"tour:{t.code}", after={"hdv": e.full_name, "ngay": data.days, "don_gia": data.rate_per_day})
     db.commit()
@@ -400,7 +403,7 @@ class VehicleIn(BaseModel):
     seats: int = 45
     kind: str = "noi_bo"
     driver_id: int | None = None
-    internal_rate_per_day: float = 0
+    internal_rate_per_day: float | None = None
 
 
 @router.post("/vehicles", status_code=201)
@@ -459,8 +462,8 @@ def guide_rates(u: User = Depends(current_user), db: Session = Depends(get_db)):
 class GuideRateIn(BaseModel):
     route: str
     days: float = 0
-    rate_per_day: float
-    old_rate_per_day: float = 0
+    rate_per_day: float | None = None
+    old_rate_per_day: float | None = None
     effective_from: date
     note: str = ""
 
@@ -497,8 +500,8 @@ def vehicle_rates(u: User = Depends(current_user), db: Session = Depends(get_db)
 class RateIn(BaseModel):
     route: str
     days: int = 0
-    internal_price: float
-    partner_price: float = 0
+    internal_price: float | None = None
+    partner_price: float | None = None
     effective_from: date
     note: str = ""
 
@@ -546,7 +549,7 @@ def dispatch_list(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Sessi
         t = db.get(Tour, d.tour_id)
         rt = db.get(VehicleRate, d.rate_id) if d.rate_id else None
         out.append({"id": d.id, "tour_code": t.code if t else "", "vehicle": veh.get(d.vehicle_id, ""), "driver": emps.get(d.driver_id, ""), "date_from": d.date_from, "date_to": d.date_to, "route": rt.route if rt else "",
-                    "days": (d.date_to - d.date_from).days + 1, "internal_price": d.internal_price, "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at, "incident_note": d.incident_note,
+                    "days": (d.date_to - d.date_from).days + 1, "internal_price": (d.internal_price or 0), "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at, "incident_note": d.incident_note,
                     **_owner(vobj.get(d.vehicle_id), cos)})
     return out
 
@@ -557,7 +560,7 @@ class DispatchIn(BaseModel):
     date_from: date
     date_to: date
     rate_id: int | None = None
-    internal_price: float = 0
+    internal_price: float | None = None
     # Đợt 4: chọn xe ngoài top gợi ý thì phải ghi lý do TRƯỚC khi lưu. Đây là dữ liệu duy nhất để sau mỗi quý
     # biết thuật toán gợi ý có tốt lên không – không có nó thì chỉ còn tranh luận bằng cảm nhận.
     ly_do_khac_goi_y: str = ""
@@ -578,7 +581,7 @@ def dispatch_create(data: DispatchIn,
         price = rt.partner_price if v.kind == "hop_tac" else rt.internal_price
         if price <= 0: raise HTTPException(422, f"Tuyến {rt.route} không có giá cho loại xe {v.kind}")
     else:
-        price = data.internal_price or v.internal_rate_per_day * ((data.date_to - data.date_from).days + 1)
+        price = (data.internal_price or 0) or (v.internal_rate_per_day or 0) * ((data.date_to - data.date_from).days + 1)
     if v.kind != "hop_tac" and not v.driver_id: raise HTTPException(422, "Xe chưa gán tài xế")
     driver_id = v.driver_id
     if not driver_id:   # xe hợp tác: tài xế của đối tác – ghi vào hồ sơ xe khi có; tạm gắn người lập lệnh để theo dõi
@@ -676,10 +679,10 @@ def fleet_summary(period: str, u: User = Depends(require_roles(*HR_READ, "nv_dh"
     for d in db.execute(select(DispatchOrder).where(DispatchOrder.status.in_(["da_xac_nhan", "hoan_thanh"]))).scalars():
         if d.date_to.year == y and d.date_to.month == m:
             r = rows.setdefault(d.vehicle_id, {"vehicle": veh.get(d.vehicle_id, ""), "driver": emps.get(d.driver_id, ""), "trips": 0, "days": 0, "revenue": 0.0})
-            r["trips"] += 1; r["days"] += (d.date_to - d.date_from).days + 1; r["revenue"] += d.internal_price
+            r["trips"] += 1; r["days"] += (d.date_to - d.date_from).days + 1; r["revenue"] += (d.internal_price or 0)
     ctp = R.get_param(db, "tai_xe_cong_tac_phi")
     for r in rows.values(): r["driver_allowance"] = r["days"] * ctp
-    return {"period": period, "rows": list(rows.values()), "total_revenue": sum(r["revenue"] for r in rows.values())}
+    return {"period": period, "rows": list(rows.values()), "total_revenue": sum((r["revenue"] or 0) for r in rows.values())}
 
 
 # ---------- Sự vụ ----------

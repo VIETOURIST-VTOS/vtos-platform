@@ -72,8 +72,8 @@ def finance_for_case(db: Session, u: User, c: VisaCase) -> dict:
         raise VisaError("Booking gắn với hồ sơ không còn tồn tại")
 
     receipts = list(db.execute(select(Receipt).where(Receipt.booking_id == b.id)).scalars())
-    da_thu = sum(r.amount for r in receipts if r.status != "huy")
-    da_xac_nhan = sum(r.amount for r in receipts if r.status == "ke_toan_xac_nhan")
+    da_thu = sum((r.amount or 0) for r in receipts if r.status != "huy")
+    da_xac_nhan = sum((r.amount or 0) for r in receipts if r.status == "ke_toan_xac_nhan")
     retentions = list(db.execute(select(Retention).where(Retention.booking_id == b.id)).scalars())
     # Chi: đề nghị chi gắn theo TOUR chứ không theo booking, nên chỉ lấy được với visa theo tour và phải nói rõ
     # đó là chi của cả tour, không phải của riêng hồ sơ này.
@@ -92,7 +92,7 @@ def finance_for_case(db: Session, u: User, c: VisaCase) -> dict:
                     "trang_thai_thanh_toan": b.pmt_status, "so_khach": b.pax},
         "cua_booking": {"doanh_thu": doanh_thu, "gia_von_ncc": gia_von, "da_thu": da_thu,
                         "da_thu_ke_toan_xac_nhan": da_xac_nhan, "con_phai_thu": doanh_thu - da_thu,
-                        "bao_luu": sum(r.remaining for r in retentions if r.status == "hieu_luc")},
+                        "bao_luu": sum((r.remaining or 0) for r in retentions if r.status == "hieu_luc")},
         "phan_bo_cho_ho_so_nay": {
             "so_ho_so_chia_chung": len(kin), "trong_so": c.fee_weight or 1.0,
             "doanh_thu": chia_dt.get(c.id, 0), "gia_von_ncc": chia_gv.get(c.id, 0), "da_thu": chia_thu.get(c.id, 0),

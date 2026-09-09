@@ -104,7 +104,7 @@ def submit(db: Session, u: User, t: Tour, note: str = "") -> str:
     if t.status != "nhap": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     c = R.calc(t, R.get_param(db, "nguong_bien", t.start_date))   # bước trình: dùng đúng số Điều hành nhập, không mượn dự toán sản phẩm
     if not c["complete"]:
-        thieu = [n for n, ok in (("giá bán/khách", t.price_per_pax > 0), ("số khách dự toán", t.planned_pax > 0),
+        thieu = [n for n, ok in (("giá bán/khách", (t.price_per_pax or 0) > 0), ("số khách dự toán", t.planned_pax > 0),
                                  ("chi phí cố định hoặc chi phí theo khách", c["has_cost"]),
                                  ("giá bán phải lớn hơn chi phí theo khách", c["breakeven_pax"] is not None)) if not ok]
         raise Gate("CONG_5", "Dự toán chưa đủ cơ sở tính, thiếu: " + "; ".join(thieu) + ". Không có giá vốn thì không tính được biên – cổng biên không thể ĐẠT")
@@ -176,7 +176,7 @@ def close(db: Session, u: User, t: Tour, data, note: str = "") -> str:
     t.actual_revenue, t.promo_value = data.actual_revenue, data.promo_value
     t.actual_cost = sm["actual"] if sm["lines"] else data.actual_cost   # có bảng dòng NCC → tổng dòng là giá vốn thực tế (không nhập tay)
     t.closed_at, t.status = datetime.now(), "da_dong_so"
-    tag = f"Quyết toán V.{t.settlement_version:02d}: {sm['lines']} dòng NCC, thực chi {t.actual_cost:,.0f} đ, đã trả {sm['paid']:,.0f} đ, dự toán {sm['budget']:,.0f} đ ({sm['variance_pct'] * 100:+.0f}%), {sm['with_doc']}/{sm['lines']} dòng có chứng từ"
+    tag = f"Quyết toán V.{t.settlement_version:02d}: {sm['lines']} dòng NCC, thực chi {(t.actual_cost or 0):,.0f} đ, đã trả {(sm['paid'] or 0):,.0f} đ, dự toán {(sm['budget'] or 0):,.0f} đ ({sm['variance_pct'] * 100:+.0f}%), {sm['with_doc']}/{sm['lines']} dòng có chứng từ"
     EV(db, t, "dong_so", u.username, (note + " | " if note else "") + tag)
     R.audit(db, u.username, u.role, "dong_so_quyet_toan", f"tour:{t.code}", before=before, after=snap(t)); db.commit()
     late = date.today() > R.settlement_deadline(db, t)
@@ -196,8 +196,8 @@ def kt_confirm(db: Session, u: User, t: Tour, note: str = "") -> str:
 def cntt_check(db: Session, u: User, t: Tour, note: str = "") -> str:
     if u.role != "cntt": raise HTTPException(403, "Chỉ CNTT đối chiếu độc lập")
     if t.status != "kt_xac_nhan": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
-    bk = sum(b.amount - b.discount for b in t.bookings)
-    chk = {"doanh_thu_booking": bk, "doanh_thu_quyet_toan": t.actual_revenue, "lech": round(t.actual_revenue - bk)}
+    bk = sum((b.amount or 0) - (b.discount or 0) for b in t.bookings)
+    chk = {"doanh_thu_booking": bk, "doanh_thu_quyet_toan": (t.actual_revenue or 0), "lech": round((t.actual_revenue or 0) - bk)}
     t.status, t.cntt_checked_at = "khoa", datetime.now()
     EV(db, t, "cntt_khoa", u.username, (note + " | " if note else "") + f"Lệch doanh thu booking/quyết toán: {chk['lech']:,.0f} đ")
     R.audit(db, u.username, u.role, "cntt_doi_chieu_khoa", f"tour:{t.code}", after=chk); db.commit()
@@ -237,18 +237,18 @@ def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, st
             db.add(Alert(kind="thieu_du_toan", level="warn", ref=t.code,
                          message=f"{t.code} đang bán nhưng chưa có dự toán ({R.BUDGET_SOURCES['chua_co']}) – không đánh giá được biên, cần Điều hành bổ sung",
                          to_roles="tp_dh,nv_dh,gd_kd,tgd"))
-    if r.discount > 0:
+    if (r.discount or 0) > 0:
         c = cb
-        nr = c["revenue"] - r.discount
-        nm = (nr - c["cost"]) / nr if nr > 0 else 0
+        nr = (c["revenue"] or 0) - (r.discount or 0)
+        nm = (nr - (c["cost"] or 0)) / nr if nr > 0 else 0
         if nm < thr:
-            raise Gate("CONG_3", f"Mã KM/giảm giá {r.discount:,.0f} đ làm biên chuyến tụt còn {nm*100:.1f}% (< {thr*100:.0f}%): treo, cần TGĐ duyệt")
+            raise Gate("CONG_3", f"Mã KM/giảm giá {(r.discount or 0):,.0f} đ làm biên chuyến tụt còn {nm*100:.1f}% (< {thr*100:.0f}%): treo, cần TGĐ duyệt")
     mins = int((datetime.now() - r.created_at).total_seconds() / 60)
     sla = int(R.get_param(db, "sla_booking_phut"))
     n = db.execute(select(func.count()).select_from(Booking)).scalar() + 1
     b = Booking(code=f"BK{date.today():%y%m}{n:04d}", tour_id=t.id, request_id=r.id, sales_id=r.sales_id, created_by=u.id,
                 customer_name=r.customer_name, customer_phone=r.customer_phone, source=r.source, care_note=r.care_note,
-                pax=r.pax, amount=t.price_per_pax * r.pax, discount=r.discount, promo_code=r.promo_code, campaign_code=r.campaign_code,
+                pax=r.pax, amount=(t.price_per_pax or 0) * r.pax, discount=(r.discount or 0), promo_code=r.promo_code, campaign_code=r.campaign_code,
                 counts_for_target=not t.below_margin, sla_minutes=mins, sla_ok=mins <= sla,
                 company_id=t.company_id)      # doanh thu booking thuộc pháp nhân của chuyến
     db.add(b); db.flush(); r.booking_id = b.id

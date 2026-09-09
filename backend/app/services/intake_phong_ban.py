@@ -226,7 +226,7 @@ def _sk_nap(db: Session, r, boi):
                         # nhiệm, không phải hệ quả kèm theo của thao tác tải tệp lên.
                         match_status="chua_khop")
     db.add(t); db.flush()
-    return f"{t.gateway} · {'vào' if vao else 'ra'} {t.amount:,.0f} đ · {t.transaction_date:%d/%m/%Y}"
+    return f"{t.gateway} · {'vào' if vao else 'ra'} {(t.amount or 0):,.0f} đ · {t.transaction_date:%d/%m/%Y}"
 
 
 # ====================== CHẤM CÔNG CHO BẢNG LƯƠNG ======================

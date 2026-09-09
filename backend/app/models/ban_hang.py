@@ -92,7 +92,8 @@ class BangGiaDong(Base):
     bang_gia_id: Mapped[int] = mapped_column(ForeignKey("bang_gia.id"), index=True)
     hang_khach: Mapped[str] = mapped_column(String(20), default="nguoi_lon")  # nguoi_lon / tre_em / em_be / phu_thu_phong_don
     mo_ta: Mapped[str] = mapped_column(String(200), default="")
-    gia_ban: Mapped[float] = mapped_column(TIEN, default=0)
+    # K2 09/9: chưa nhập thì để RỖNG, không phải 0.
+    gia_ban: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     gia_von: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     chiet_khau_toi_da: Mapped[float] = mapped_column(Float, default=0)        # tỷ lệ, 0,05 = 5%
     thu_tu: Mapped[int] = mapped_column(Integer, default=0)
@@ -139,7 +140,8 @@ class BaoGiaDong(Base):
     hang_khach: Mapped[str] = mapped_column(String(20), default="nguoi_lon")
     mo_ta: Mapped[str] = mapped_column(String(200), default="")
     so_luong: Mapped[int] = mapped_column(Integer, default=1)
-    don_gia: Mapped[float] = mapped_column(TIEN, default=0)
+    # K2 09/9: chưa nhập thì để RỖNG, không phải 0.
+    don_gia: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     gia_von_don_vi: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     chiet_khau: Mapped[float] = mapped_column(TIEN, default=0)
     thu_tu: Mapped[int] = mapped_column(Integer, default=0)
@@ -155,7 +157,8 @@ class BaoGiaBan(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     bao_gia_id: Mapped[int] = mapped_column(ForeignKey("bao_gia.id"), index=True)
     lan: Mapped[int] = mapped_column(Integer, default=1)
-    tong_ban: Mapped[float] = mapped_column(TIEN, default=0)
+    # K2 09/9: chưa nhập thì để RỖNG, không phải 0.
+    tong_ban: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     tong_von: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     bien: Mapped[float | None] = mapped_column(Float, nullable=True)
     nguong: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -185,7 +188,8 @@ class HopDongKhach(Base):
     khach_dia_chi: Mapped[str] = mapped_column(String(300), default="")
     ngay_ky: Mapped[date | None] = mapped_column(Date, nullable=True)
     gia_tri: Mapped[float] = mapped_column(TIEN, default=0)
-    dat_coc: Mapped[float] = mapped_column(TIEN, default=0)
+    # K2 09/9: chưa nhập thì để RỖNG, không phải 0.
+    dat_coc: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     han_thanh_toan: Mapped[date | None] = mapped_column(Date, nullable=True)
     trang_thai: Mapped[str] = mapped_column(String(20), default="nhap", index=True)  # nhap / da_ky / thanh_ly / huy
     tep_dinh_kem: Mapped[str] = mapped_column(String(300), default="")

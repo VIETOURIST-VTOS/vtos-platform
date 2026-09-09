@@ -61,10 +61,10 @@ class AssetIn(BaseModel):
     department: str = ""
     purchase_date: date | None = None
     start_date: date
-    cost: float = 0
+    cost: float | None = None
     depr_months: int = 0
-    salvage: float = 0
-    opening_accumulated: float = 0
+    salvage: float | None = None
+    opening_accumulated: float | None = None
     opening_period: str = ""
     quantity: int = 1
     note: str = ""
@@ -138,9 +138,9 @@ class PrepaidIn(BaseModel):
     project_code: str = ""
     department: str = ""
     start_date: date
-    amount: float = 0
+    amount: float | None = None
     months: int = 1
-    opening_allocated: float = 0
+    opening_allocated: float | None = None
     opening_period: str = ""
     quantity: int = 1
     note: str = ""

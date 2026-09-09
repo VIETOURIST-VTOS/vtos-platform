@@ -134,7 +134,7 @@ def post_draft(db: Session, u: User, e: JournalEntry) -> JournalEntry:
     if is_locked(db, e.period):
         raise ValueError(f"Kỳ {e.period} đã khóa")
     e.status, e.posted_by, e.posted_at = "da_ghi_so", u.username, datetime.now()
-    R.audit(db, u.username, u.role, "ghi_so", f"entry:{e.code}", after={"so_tien": sum(l.debit for l in e.lines)})
+    R.audit(db, u.username, u.role, "ghi_so", f"entry:{e.code}", after={"so_tien": sum((l.debit or 0) for l in e.lines)})
     db.commit()
     return e
 
@@ -176,7 +176,7 @@ def on_invoice_issued(db: Session, inv: Invoice) -> JournalEntry:
     """Phát hành hóa đơn → Nợ 131 – Có 511 (doanh thu chưa thuế), Có 3331 (thuế GTGT)."""
     lines = [{"account": "131", "debit": inv.total, "partner": inv.customer_name, "booking_id": inv.booking_id},
              {"account": "511", "credit": inv.pre_tax, "partner": inv.customer_name, "booking_id": inv.booking_id}]
-    if inv.vat > 0:
+    if (inv.vat or 0) > 0:
         lines.append({"account": "3331", "credit": inv.vat, "partner": inv.customer_name})
     return post_entry(db, "robot", "robot", inv.issue_date, f"Hóa đơn {inv.series}-{inv.number:07d} – {inv.customer_name}", lines,
                       "hoa_don", f"invoice:{inv.series}-{inv.number}", inv.tour_id)
@@ -192,20 +192,20 @@ def on_settlement_confirmed(db: Session, t: Tour, actor: str, role: str) -> list
     from app.services.ops import posted_tour_cost
     d = (t.kt_confirmed_at or datetime.now()).date()
     out = []
-    if t.actual_cost > 0:
+    if (t.actual_cost or 0) > 0:
         try:
             from app.models.ops import PaymentRequest
-            adv = sum(r.amount for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.category == "tam_ung", PaymentRequest.status == "da_chi")).scalars())
+            adv = sum((r.amount or 0) for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.category == "tam_ung", PaymentRequest.status == "da_chi")).scalars())
             if adv > 0:   # hoàn ứng: tạm ứng đã chi trở thành chi phí tour
                 out.append(post_entry(db, "robot", "robot", d, f"Hoàn ứng tour {t.code} theo quyết toán",
                                       [{"account": "154", "debit": adv, "tour_id": t.id}, {"account": "141", "credit": adv, "partner": "Tạm ứng tour", "tour_id": t.id}], "quyet_toan", f"tour:{t.code}", t.id))
-            diff = t.actual_cost - posted_tour_cost(db, t.id)
+            diff = (t.actual_cost or 0) - posted_tour_cost(db, t.id)
             if diff > 0:
                 out.append(post_entry(db, "robot", "robot", d, f"Chi phí tour {t.code} chưa có hóa đơn NCC theo quyết toán (trích trước)",
                                       [{"account": "154", "debit": diff, "tour_id": t.id}, {"account": "335", "credit": diff, "partner": "NCC dịch vụ tour", "tour_id": t.id}],
                                       "quyet_toan", f"tour:{t.code}", t.id))
             elif diff < 0:
-                R.audit(db, actor, role, "canh_bao_quyet_toan", f"tour:{t.code}", after={"ly_do": f"Chi phí quyết toán {t.actual_cost:,.0f} nhỏ hơn đề nghị chi đã duyệt {t.actual_cost - diff:,.0f} – Kế toán rà soát"})
+                R.audit(db, actor, role, "canh_bao_quyet_toan", f"tour:{t.code}", after={"ly_do": f"Chi phí quyết toán {(t.actual_cost or 0):,.0f} nhỏ hơn đề nghị chi đã duyệt {(t.actual_cost or 0) - diff:,.0f} – Kế toán rà soát"})
             out.append(post_entry(db, "robot", "robot", d, f"Kết chuyển giá vốn tour {t.code}",
                                   [{"account": "632", "debit": t.actual_cost, "tour_id": t.id}, {"account": "154", "credit": t.actual_cost, "tour_id": t.id}],
                                   "quyet_toan", f"tour:{t.code}", t.id))
@@ -232,7 +232,7 @@ def create_invoice(db: Session, u: User, b: Booking, vat_rate: float | None, tax
     if db.execute(select(Invoice).where(Invoice.booking_id == b.id, Invoice.status != "huy")).scalars().first():
         raise ValueError(f"Booking {b.code} đã có hóa đơn")
     rate = R.get_param(db, "thue_gtgt") if vat_rate is None else float(vat_rate)
-    total = b.amount - b.discount                      # giá bán đã gồm thuế
+    total = (b.amount or 0) - (b.discount or 0)                      # giá bán đã gồm thuế
     pre = round(total / (1 + rate)) if rate > 0 else total
     inv = Invoice(booking_id=b.id, tour_id=b.tour_id, customer_name=b.customer_name, customer_tax_code=tax_code, customer_address=address,
                   description=description or f"Dịch vụ du lịch – {b.tour.name if b.tour else ''} ({b.pax} khách)",
@@ -254,7 +254,7 @@ def issue_invoice(db: Session, u: User, inv: Invoice) -> Invoice:
     db.flush()
     e = on_invoice_issued(db, inv)
     inv.entry_id = e.id
-    R.audit(db, u.username, u.role, "phat_hanh_hoa_don", f"invoice:{inv.series}-{inv.number}", after={"tong": inv.total, "ma_tra_cuu": inv.provider_ref, "chung_tu": e.code})
+    R.audit(db, u.username, u.role, "phat_hanh_hoa_don", f"invoice:{inv.series}-{inv.number}", after={"tong": (inv.total or 0), "ma_tra_cuu": inv.provider_ref, "chung_tu": e.code})
     db.commit(); db.refresh(inv)
     return inv
 
@@ -281,17 +281,17 @@ def ledger(db: Session, account: str, period: str | None) -> dict:
     q = select(JournalLine, JournalEntry).join(JournalEntry).where(JournalLine.account_code == account, JournalEntry.status == "da_ghi_so").order_by(JournalEntry.entry_date, JournalEntry.id)
     rows = db.execute(q).all()
     debit_side = acc.kind in ("TS", "CP")
-    opening = sum((l.debit - l.credit) for l, e in rows if period and e.period < period)
+    opening = sum(((l.debit or 0) - (l.credit or 0)) for l, e in rows if period and e.period < period)
     bal = opening
     out = []
     for l, e in rows:
         if period and e.period != period:
             continue
-        bal += l.debit - l.credit
+        bal += (l.debit or 0) - (l.credit or 0)
         out.append({"date": e.entry_date, "code": e.code, "description": e.description, "partner": l.partner, "debit": l.debit, "credit": l.credit,
                     "balance": bal if debit_side else -bal, "entry_id": e.id})
     return {"account": account, "name": acc.name, "kind": acc.kind, "opening": opening if debit_side else -opening,
-            "total_debit": sum(r["debit"] for r in out), "total_credit": sum(r["credit"] for r in out), "closing": bal if debit_side else -bal, "rows": out}
+            "total_debit": sum((r["debit"] or 0) for r in out), "total_credit": sum((r["credit"] or 0) for r in out), "closing": bal if debit_side else -bal, "rows": out}
 
 
 def trial_balance(db: Session, period: str) -> list[dict]:
@@ -303,14 +303,14 @@ def trial_balance(db: Session, period: str) -> list[dict]:
         r = res.get(l.account_code)
         if not r: continue
         if e.period < period:
-            r["open_debit"] += l.debit; r["open_credit"] += l.credit
+            r["open_debit"] += (l.debit or 0); r["open_credit"] += (l.credit or 0)
         elif e.period == period:
-            r["debit"] += l.debit; r["credit"] += l.credit
+            r["debit"] += (l.debit or 0); r["credit"] += (l.credit or 0)
     out = []
     for r in res.values():
         net_open = r["open_debit"] - r["open_credit"]
         r["open_debit"], r["open_credit"] = (net_open, 0.0) if net_open >= 0 else (0.0, -net_open)
-        net_close = net_open + r["debit"] - r["credit"]
+        net_close = net_open + (r["debit"] or 0) - (r["credit"] or 0)
         r["close_debit"], r["close_credit"] = (net_close, 0.0) if net_close >= 0 else (0.0, -net_close)
         if any(abs(r[k]) > 0 for k in ("open_debit", "open_credit", "debit", "credit")):
             out.append(r)

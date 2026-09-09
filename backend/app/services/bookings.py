@@ -20,14 +20,14 @@ class Gate(HTTPException):
 
 
 # ---------- cọc, trạng thái thanh toán, deadline ----------
-def net(b: Booking) -> float: return max(0.0, b.amount - b.discount)
+def net(b: Booking) -> float: return max(0.0, (b.amount or 0) - (b.discount or 0))
 def deposit_due(b: Booking) -> float: return round(net(b) * (b.deposit_pct or 0) / 100)
 
 
 def pmt_status_of(b: Booking) -> str:
     if b.cancelled: return "CANCEL"
-    if b.paid >= net(b) - 1 and net(b) > 0: return "PAID"
-    if b.paid >= deposit_due(b) and b.paid > 0: return "DEPO"
+    if (b.paid or 0) >= net(b) - 1 and net(b) > 0: return "PAID"
+    if (b.paid or 0) >= deposit_due(b) and (b.paid or 0) > 0: return "DEPO"
     return "UNPAID"
 
 
@@ -111,7 +111,7 @@ def cancel(db: Session, u: User, b: Booking, reason: str, charge: float = 0, ret
     if not (reason or "").strip(): raise Gate("HUY_BOOKING", "Hủy booking phải ghi lý do (hiển thị ở Tiền bảo lưu)")
     if b.tour and b.tour.status in ("da_dong_so", "kt_xac_nhan", "khoa"): raise Gate("TRANG_THAI", "Tour đã đóng số quyết toán – không hủy booking; xử lý qua hoàn tiền")
     b.paid = PAY.paid_amount(db, b.id)
-    charge = max(0.0, min(float(charge or 0), b.paid))
+    charge = max(0.0, min(float(charge or 0), (b.paid or 0)))
     late = bool(b.cancel_deadline and datetime.now() > b.cancel_deadline)
     before = {"amount": b.amount, "paid": b.paid}
     b.cancelled, b.cancelled_at, b.cancel_reason, b.cancel_charge = True, datetime.now(), reason.strip()[:200], charge
@@ -119,7 +119,7 @@ def cancel(db: Session, u: User, b: Booking, reason: str, charge: float = 0, ret
     b.pmt_status = "CANCEL"
     for a in db.execute(select(Alert).where(Alert.ref == f"booking:{b.code}", Alert.resolved == False)).scalars(): a.resolved = True
     out = {"booking": b.code, "paid": b.paid, "charge": charge, "late": late, "retention": None, "refund": None}
-    left = round(b.paid - charge)
+    left = round((b.paid or 0) - charge)
     if left > 0:
         if retain:
             days = expires_days if expires_days is not None else int(R.get_param(db, "bao_luu_han_ngay"))
@@ -152,10 +152,10 @@ def apply_retention(db: Session, u: User, rt: Retention, nb: Booking, amount: fl
     if nb.cancelled: raise Gate("BAO_LUU", "Booking mới đã hủy")
     if nb.id == rt.booking_id: raise Gate("BAO_LUU", "Không dùng bảo lưu cho chính booking gốc")
     nb.paid = PAY.paid_amount(db, nb.id)
-    due = max(0.0, net(nb) - nb.paid)
-    amt = round(min(rt.remaining, due if amount is None else float(amount)))
+    due = max(0.0, net(nb) - (nb.paid or 0))
+    amt = round(min((rt.remaining or 0), due if amount is None else float(amount)))
     if amt <= 0: raise Gate("BAO_LUU", "Số tiền dùng phải > 0 và không vượt số còn lại / số còn phải thu")
-    if amt > rt.remaining + 1: raise Gate("BAO_LUU", f"Vượt số bảo lưu còn lại {rt.remaining:,.0f} đ")
+    if amt > (rt.remaining or 0) + 1: raise Gate("BAO_LUU", f"Vượt số bảo lưu còn lại {(rt.remaining or 0):,.0f} đ")
     if amt > due + 1: raise Gate("BAO_LUU", f"Vượt số còn phải thu của booking {due:,.0f} đ")
     rc = Receipt(code=PAY._next_receipt_code(db), booking_id=nb.id, amount=amt, method="bao_luu", payer=rt.customer_name, note=f"Dùng bảo lưu {rt.code} (booking gốc {rt.tour_code})",
                  status="ke_toan_xac_nhan", created_by=u.username, confirmed_by=u.username, confirmed_at=datetime.now(),
@@ -168,7 +168,7 @@ def apply_retention(db: Session, u: User, rt: Retention, nb: Booking, amount: fl
                         {"account": "131", "credit": amt, "partner": nb.customer_name, "booking_id": nb.id, "note": "ứng trước booking mới"}], "thu_tien", f"receipt:{rc.code}", nb.tour_id)
     except ValueError as ex:
         R.audit(db, "robot", "robot", "ghi_so_that_bai", f"receipt:{rc.code}", after={"ly_do": str(ex)})
-    rt.remaining = round(rt.remaining - amt); rt.applied_booking_id = nb.id
+    rt.remaining = round((rt.remaining or 0) - amt); rt.applied_booking_id = nb.id
     if rt.remaining <= 0: rt.status, rt.resolved_by, rt.resolved_at, rt.resolve_note = "tat_toan", u.username, datetime.now(), f"Dùng hết cho {nb.code}"
     R.audit(db, u.username, u.role, "tat_toan_bao_luu", f"baoluu:{rt.code}", after={"booking_moi": nb.code, "so_tien": amt, "con_lai": rt.remaining})
     db.commit(); db.refresh(rc); return rc
@@ -181,7 +181,7 @@ def refund_retention(db: Session, u: User, rt: Retention, amount: float | None, 
     if rt.refund_request_id:
         pr = db.get(PaymentRequest, rt.refund_request_id)
         if pr and pr.status not in ("tu_choi",): raise Gate("BAO_LUU", f"Đã có đề nghị hoàn {pr.code} ({pr.status})")
-    amt = round(rt.remaining if amount is None else min(float(amount), rt.remaining))
+    amt = round((rt.remaining or 0) if amount is None else min(float(amount), (rt.remaining or 0)))
     if amt <= 0: raise Gate("BAO_LUU", "Số tiền hoàn phải > 0")
     ob = db.get(Booking, rt.booking_id)
     from app.services import ops as OPS
@@ -196,7 +196,7 @@ def on_refund_paid(db: Session, pr: PaymentRequest) -> None:
     """Gọi khi đề nghị chi hoàn tiền đã chi: tất toán khoản bảo lưu tương ứng."""
     rt = db.execute(select(Retention).where(Retention.refund_request_id == pr.id)).scalars().first()
     if not rt or rt.status != "hieu_luc": return
-    rt.remaining = round(max(0.0, rt.remaining - pr.amount))
+    rt.remaining = round(max(0.0, (rt.remaining or 0) - (pr.amount or 0)))
     if rt.remaining <= 0: rt.status, rt.resolved_by, rt.resolved_at, rt.resolve_note = "tat_toan", "robot", datetime.now(), f"Đã hoàn tiền {pr.code}"
 
 
@@ -205,7 +205,7 @@ def cancel_retention(db: Session, u: User, rt: Retention, note: str) -> str:
     if u.role not in ("tp_dh", "gd_kd", "tp_kd", "tgd", "ketoan"): raise HTTPException(403, "Chỉ TP ĐH / GĐ KD / Kế toán / TGĐ hủy bảo lưu")
     if rt.status != "hieu_luc": raise Gate("BAO_LUU", "Khoản bảo lưu không còn hiệu lực")
     if not (note or "").strip(): raise Gate("BAO_LUU", "Hủy bảo lưu phải ghi lý do")
-    amt = round(rt.remaining)
+    amt = round((rt.remaining or 0))
     if amt > 0:
         try:
             ACC.post_entry(db, u.username, u.role, date.today(), f"Hủy bảo lưu {rt.code} – {rt.customer_name}: {note[:80]}",
@@ -221,7 +221,7 @@ def cancel_retention(db: Session, u: User, rt: Retention, note: str) -> str:
 def retention_summary(db: Session) -> dict:
     rows = db.execute(select(Retention.status, func.count(), func.coalesce(func.sum(Retention.remaining), 0), func.coalesce(func.sum(Retention.amount), 0)).group_by(Retention.status)).all()
     d = {s: {"n": n, "remaining": float(r), "amount": float(a)} for s, n, r, a in rows}
-    refunded = sum(pr.amount for pr in db.execute(select(PaymentRequest).where(PaymentRequest.category == "hoan_tien", PaymentRequest.status == "da_chi", PaymentRequest.document_ref.like("baoluu:%"))).scalars())
+    refunded = sum((pr.amount or 0) for pr in db.execute(select(PaymentRequest).where(PaymentRequest.category == "hoan_tien", PaymentRequest.status == "da_chi", PaymentRequest.document_ref.like("baoluu:%"))).scalars())
     return {"hieu_luc": d.get("hieu_luc", {"n": 0, "remaining": 0, "amount": 0}), "tat_toan": d.get("tat_toan", {"n": 0, "remaining": 0, "amount": 0}), "huy": d.get("huy", {"n": 0, "remaining": 0, "amount": 0}), "refunded": refunded}
 
 
@@ -242,12 +242,12 @@ def robot_check(db: Session) -> dict:
         if st == "UNPAID" and (now - b.created_at).total_seconds() / 3600 > han_coc and net(b) > 0:
             add("chua_coc", "warn", ref, f"{b.code} ({b.customer_name}, {b.tour.code}) chưa đặt cọc {deposit_due(b):,.0f} đ sau {han_coc} giờ – sale nhắc khách hoặc Điều hành hủy chỗ", "nv_kd,gd_kd,nv_dh,tp_dh")
         if st != "PAID" and b.cancel_deadline and now > b.cancel_deadline and net(b) > 0:
-            add("qua_deadline_thu", "red", ref, f"{b.code} ({b.customer_name}, {b.tour.code}) quá deadline hủy chỗ {b.cancel_deadline:%d/%m %H:%M} còn thiếu {net(b) - b.paid:,.0f} đ – thu đủ hoặc hủy/bảo lưu", "nv_kd,gd_kd,tp_dh,ketoan")
+            add("qua_deadline_thu", "red", ref, f"{b.code} ({b.customer_name}, {b.tour.code}) quá deadline hủy chỗ {b.cancel_deadline:%d/%m %H:%M} còn thiếu {net(b) - (b.paid or 0):,.0f} đ – thu đủ hoặc hủy/bảo lưu", "nv_kd,gd_kd,tp_dh,ketoan")
         elif st != "PAID" and b.cancel_deadline and 0 <= (b.cancel_deadline - now).total_seconds() <= 48 * 3600 and net(b) > 0:
-            add("sap_deadline_thu", "warn", ref, f"{b.code} ({b.customer_name}, {b.tour.code}) còn thiếu {net(b) - b.paid:,.0f} đ, deadline {b.cancel_deadline:%d/%m %H:%M}", "nv_kd,tp_dh")
+            add("sap_deadline_thu", "warn", ref, f"{b.code} ({b.customer_name}, {b.tour.code}) còn thiếu {net(b) - (b.paid or 0):,.0f} đ, deadline {b.cancel_deadline:%d/%m %H:%M}", "nv_kd,tp_dh")
     for rt in db.execute(select(Retention).where(Retention.status == "hieu_luc", Retention.expires_on != None)).scalars():
         left = (rt.expires_on - today).days
-        if left < 0: add("bao_luu_het_han", "red", f"baoluu:{rt.code}", f"Bảo lưu {rt.code} ({rt.customer_name}, {rt.remaining:,.0f} đ) đã hết hạn {rt.expires_on:%d/%m} – hoàn tiền hoặc hủy bảo lưu", "tp_dh,gd_kd,ketoan")
-        elif left <= 7: add("bao_luu_sap_het_han", "warn", f"baoluu:{rt.code}", f"Bảo lưu {rt.code} ({rt.customer_name}, {rt.remaining:,.0f} đ) hết hạn {rt.expires_on:%d/%m} – liên hệ khách chọn tour", "nv_kd,tp_dh")
+        if left < 0: add("bao_luu_het_han", "red", f"baoluu:{rt.code}", f"Bảo lưu {rt.code} ({rt.customer_name}, {(rt.remaining or 0):,.0f} đ) đã hết hạn {rt.expires_on:%d/%m} – hoàn tiền hoặc hủy bảo lưu", "tp_dh,gd_kd,ketoan")
+        elif left <= 7: add("bao_luu_sap_het_han", "warn", f"baoluu:{rt.code}", f"Bảo lưu {rt.code} ({rt.customer_name}, {(rt.remaining or 0):,.0f} đ) hết hạn {rt.expires_on:%d/%m} – liên hệ khách chọn tour", "nv_kd,tp_dh")
     db.commit()
     return {"locked": locked, "new_alerts": made}

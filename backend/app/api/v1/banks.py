@@ -41,7 +41,7 @@ class BankIn(BaseModel):
     match_prefixes: list[str] = []
     match_keywords: list[str] = []
     sepay_account_number: str = ""
-    opening_balance: float = 0
+    opening_balance: float | None = None
     note: str = ""
 
 

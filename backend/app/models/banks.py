@@ -16,6 +16,7 @@ from datetime import datetime
 from sqlalchemy import String, Integer, Float, DateTime, Boolean, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 CURRENCIES = {"VND": {"ten": "Đồng Việt Nam", "tk_cha": "1121"}, "USD": {"ten": "Đô la Mỹ", "tk_cha": "1122"},
               "EUR": {"ten": "Euro", "tk_cha": "1122"}, "JPY": {"ten": "Yên Nhật", "tk_cha": "1122"}}
@@ -35,7 +36,7 @@ class BankAccount(Base):
     match_prefixes: Mapped[list] = mapped_column(JSON, default=list)             # tiền tố số chứng từ: ["TPB1","TPC1"]
     match_keywords: Mapped[list] = mapped_column(JSON, default=list)             # từ khóa trong diễn giải: ["TPBANK"]
     sepay_account_number: Mapped[str] = mapped_column(String(40), default="")    # để đối chiếu giao dịch SePay
-    opening_balance: Mapped[float] = mapped_column(Float, default=0)
+    opening_balance: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     note: Mapped[str] = mapped_column(String(300), default="")
     created_by: Mapped[str] = mapped_column(String(50), default="")
@@ -58,7 +59,7 @@ class BankDocMap(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     bank_code: Mapped[str] = mapped_column(String(20), index=True)     # = BankAccount.code (số tài khoản)
     doc_no: Mapped[str] = mapped_column(String(60), index=True)        # số chứng từ trên MISA (không có tiền tố MISA-)
-    amount: Mapped[float] = mapped_column(Float, default=0)
+    amount: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     side: Mapped[str] = mapped_column(String(4), default="thu")        # thu (ghi Nợ 112) / chi (ghi Có 112)
     source_file: Mapped[str] = mapped_column(String(120), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

@@ -149,7 +149,7 @@ def conversion_report(db: Session, target_month: str, lead_months: list[str] | N
         seen.add((l.phone, l.lead_month)); b = min(hit, key=lambda x: x.tour.start_date)
         prior = [x for x in bs if x.tour and x.tour.start_date < b.tour.start_date]
         returning = len(prior) > 0; trips = len({x.tour_id for x in bs if x.tour and x.tour.start_date < d2}); pax = sum(x.pax for x in bs if x.tour and x.tour.start_date < d2)
-        rev = sum(x.amount - x.discount for x in bs if x.tour and x.tour.start_date < d2)
+        rev = sum((x.amount or 0) - (x.discount or 0) for x in bs if x.tour and x.tour.start_date < d2)
         a["converted"] += 1; a["new"] += 0 if returning else 1; a["returning"] += 1 if returning else 0; a["revenue"] += rev
         detail.append({"channel": l.channel, "lead_month": l.lead_month, "phone": l.phone, "name": l.name or b.customer_name, "tour": b.tour.name if b.tour else "", "tour_code": b.tour.code if b.tour else "", "start_date": b.tour.start_date if b.tour else None,
                        "kind": "Khách quay lại" if returning else "Khách mới", "trips": trips, "pax": pax, "revenue": rev, "sales": b.sales.full_name if b.sales else "", "booking": b.code})
@@ -157,7 +157,7 @@ def conversion_report(db: Session, target_month: str, lead_months: list[str] | N
     for key in sorted(set(list(stats.keys()) + list(agg.keys()))):
         a = agg.get(key, {"lead_month": key[0], "channel": key[1], "leads": 0, "converted": 0, "new": 0, "returning": 0, "revenue": 0.0})
         a["leads"] = max(stats[key].leads if key in stats else 0, lead_counts.get(key, 0)); a["cost"] = stats[key].cost if key in stats else 0
-        a["rate"] = a["converted"] / a["leads"] if a["leads"] else 0; a["cost_per_lead"] = a["cost"] / a["leads"] if a["leads"] and a["cost"] else 0; rows.append(a)
+        a["rate"] = a["converted"] / a["leads"] if a["leads"] else 0; a["cost_per_lead"] = (a["cost"] or 0) / a["leads"] if a["leads"] and (a["cost"] or 0) else 0; rows.append(a)
     by_month = {}
     for a in rows:
         mm = by_month.setdefault(a["lead_month"], {"lead_month": a["lead_month"], "leads": 0, "converted": 0, "new": 0, "returning": 0, "revenue": 0.0})
@@ -166,7 +166,7 @@ def conversion_report(db: Session, target_month: str, lead_months: list[str] | N
     cur = [a for a in rows if a["lead_month"] == target_month]
     tot = {"leads": sum(a["leads"] for a in cur), "converted": sum(a["converted"] for a in cur)}; tot["rate"] = tot["converted"] / tot["leads"] if tot["leads"] else 0
     return {"target_month": target_month, "lead_months": lead_months, "by_channel_current": cur, "total_current": tot, "by_month": sorted(by_month.values(), key=lambda x: x["lead_month"]),
-            "by_channel_month": rows, "detail": sorted(detail, key=lambda x: (x["channel"], x["lead_month"], -x["revenue"])), "as_of": datetime.now()}
+            "by_channel_month": rows, "detail": sorted(detail, key=lambda x: (x["channel"], x["lead_month"], -(x["revenue"] or 0))), "as_of": datetime.now()}
 
 
 def to_xlsx(rep: dict) -> bytes:
@@ -176,14 +176,14 @@ def to_xlsx(rep: dict) -> bytes:
     def head(ws, cols): ws.append(cols); [setattr(c, "font", Font(bold=True)) or setattr(c, "fill", PatternFill("solid", fgColor="D9E2F3")) for c in ws[ws.max_row]]
     ws.append([f"BÁO CÁO LEAD & CHUYỂN ĐỔI THÁNG {rep['target_month']} (VTOS, {rep['as_of']:%d/%m/%Y %H:%M})"]); ws["A1"].font = Font(bold=True, size=13); ws.append([])
     ws.append([f"1. Lead tháng {rep['target_month']} → tour khởi hành tháng {rep['target_month']} theo kênh"]); head(ws, ["Kênh", "Số leads", "SĐT chốt tour", "Tỷ lệ chốt", "Khách mới", "Khách quay lại", "Doanh thu lũy kế (đ)", "Chi phí/lead"])
-    for a in rep["by_channel_current"]: ws.append([a["channel"], a["leads"], a["converted"], round(a["rate"], 4), a["new"], a["returning"], round(a["revenue"]), round(a["cost_per_lead"])])
+    for a in rep["by_channel_current"]: ws.append([a["channel"], a["leads"], a["converted"], round(a["rate"], 4), a["new"], a["returning"], round((a["revenue"] or 0)), round(a["cost_per_lead"])])
     t = rep["total_current"]; ws.append(["TỔNG", t["leads"], t["converted"], round(t["rate"], 4)]); ws.append([])
     ws.append([f"2. Đối chiếu lead các tháng → tour tháng {rep['target_month']}"]); head(ws, ["Tháng lead", "Tổng leads", "SĐT có tour", "Tỷ lệ chốt", "Khách mới", "Khách quay lại", "Doanh thu lũy kế (đ)"])
-    for mm in rep["by_month"]: ws.append([mm["lead_month"], mm["leads"], mm["converted"], round(mm["rate"], 4), mm["new"], mm["returning"], round(mm["revenue"])])
+    for mm in rep["by_month"]: ws.append([mm["lead_month"], mm["leads"], mm["converted"], round(mm["rate"], 4), mm["new"], mm["returning"], round((mm["revenue"] or 0))])
     ws.append([]); ws.append(["3. Chi tiết kênh × tháng lead"]); head(ws, ["Kênh", "Tháng lead", "Tổng leads", "SĐT có tour", "Tỷ lệ chốt", "Khách mới", "Khách quay lại", "Doanh thu lũy kế (đ)"])
-    for a in rep["by_channel_month"]: ws.append([a["channel"], a["lead_month"], a["leads"], a["converted"], round(a["rate"], 4), a["new"], a["returning"], round(a["revenue"])])
+    for a in rep["by_channel_month"]: ws.append([a["channel"], a["lead_month"], a["leads"], a["converted"], round(a["rate"], 4), a["new"], a["returning"], round((a["revenue"] or 0))])
     ws2 = wb.create_sheet(f"Chi tiet SDT da chot"); head(ws2, ["STT", "Kênh", "Tháng lead", "SĐT", "Tên khách hàng", "Tour", "Mã tour", "Ngày khởi hành", "Phân loại", "Số lần đi (lũy kế)", "Tổng khách (lũy kế)", "Doanh thu lũy kế (đ)", "Sale", "Booking"])
-    for i, d in enumerate(rep["detail"], 1): ws2.append([i, d["channel"], d["lead_month"], d["phone"], d["name"], d["tour"], d["tour_code"], d["start_date"].strftime("%d/%m/%Y") if d["start_date"] else "", d["kind"], d["trips"], d["pax"], round(d["revenue"]), d["sales"], d["booking"]])
+    for i, d in enumerate(rep["detail"], 1): ws2.append([i, d["channel"], d["lead_month"], d["phone"], d["name"], d["tour"], d["tour_code"], d["start_date"].strftime("%d/%m/%Y") if d["start_date"] else "", d["kind"], d["trips"], d["pax"], round((d["revenue"] or 0)), d["sales"], d["booking"]])
     for w in (ws, ws2):
         for col in w.columns:
             width = max((len(str(c.value)) for c in col if c.value is not None), default=8); w.column_dimensions[col[0].column_letter].width = min(max(10, width + 2), 48)

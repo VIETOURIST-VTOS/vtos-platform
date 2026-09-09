@@ -86,19 +86,19 @@ def build(db: Session, u: User) -> dict:
     k = out["kpis"]
     tours_m = _month_tours(db, today.year, today.month)
     sett = [R.settlement_summary(db, t) for t in tours_m]
-    k["doanh_thu_thang"] = sum(s["revenue"] for s in sett); k["loi_nhuan_thang"] = sum(s["profit"] for s in sett); k["so_chuyen_thang"] = len(tours_m)
+    k["doanh_thu_thang"] = sum((s["revenue"] or 0) for s in sett); k["loi_nhuan_thang"] = sum(s["profit"] for s in sett); k["so_chuyen_thang"] = len(tours_m)
     _nguong = R.get_param(db, "nguong_bien")
     k["chuyen_duoi_10"] = sum(1 for s in sett if s["margin"] < _nguong)
     m0 = datetime(today.year, today.month, 1)
-    row = db.execute(select(func.count(), func.coalesce(func.sum(Booking.amount - Booking.discount), 0)).where(Booking.created_at >= m0, Booking.cancelled == False)).one()
+    row = db.execute(select(func.count(), func.coalesce(func.sum(func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0)), 0)).where(Booking.created_at >= m0, Booking.cancelled == False)).one()
     k["booking_thang"] = int(row[0]); k["doanh_thu_booking_thang"] = float(row[1])
     k["canh_bao_do"] = db.execute(select(func.count()).select_from(Alert).where(Alert.resolved == False, Alert.level == "red")).scalar()
     if role in ("chutich", "tgd", "ketoan", "bks", "cntt"):
         b = RP.balances(db, p)
         k["tien"] = sum(b.get(c, 0.0) for c in ("111", "112"))
         from app.models.finance import FinContract
-        k["no_vay"] = sum(c.outstanding for c in db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars())
-        k["phai_thu"] = float(db.execute(select(func.coalesce(func.sum(Booking.amount - Booking.discount - Booking.paid), 0)).where(Booking.cancelled == False, (Booking.amount - Booking.discount - Booking.paid) > 0)).scalar() or 0)
+        k["no_vay"] = sum((c.outstanding or 0) for c in db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars())
+        k["phai_thu"] = float(db.execute(select(func.coalesce(func.sum(func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0)), 0)).where(Booking.cancelled == False, (func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0)) > 0)).scalar() or 0)
         fc = FIN.forecast_13w(db); k["du_bao_canh_bao"] = len(fc["alerts"]); k["so_du_tuan_13"] = fc["closing"]
         pl = RP.income_statement(db, p); k["ln_ke_toan_thang"] = dict((r[0], r[2]) for r in pl["rows"])["50"]
     # --- phần theo phòng ---
@@ -118,12 +118,12 @@ def build(db: Session, u: User) -> dict:
                     if b.cancelled: continue
                     # Chia lợi nhuận theo tỷ trọng doanh thu booking – cùng công thức bảng lương (services/hr.py),
                     # để con số trên trang chủ và con số trả lương không nói khác nhau.
-                    doan[b.sales_id] = doan.get(b.sales_id, 0.0) + s["profit"] * (b.amount / rev if rev else 0)
+                    doan[b.sales_id] = doan.get(b.sales_id, 0.0) + s["profit"] * ((b.amount or 0) / rev if rev else 0)
                 continue
             for b in t.bookings:
-                if b.counts_for_target: le[b.sales_id] = le.get(b.sales_id, 0) + b.amount - b.discount
+                if b.counts_for_target: le[b.sales_id] = le.get(b.sales_id, 0) + (b.amount or 0) - (b.discount or 0)
         users = {x.id: x.full_name for x in db.execute(select(User)).scalars()}
-        sec["kd_le"] = sorted([{"sales": users.get(i, i), "revenue": v, "pct": v / moc if moc else 0} for i, v in le.items()], key=lambda r: -r["revenue"])
+        sec["kd_le"] = sorted([{"sales": users.get(i, i), "revenue": v, "pct": v / moc if moc else 0} for i, v in le.items()], key=lambda r: -(r["revenue"] or 0))
         sec["kd_doan"] = {"so_chuyen": doan_tours,
                           "rows": sorted([{"sales": users.get(i, i), "profit_share": v} for i, v in doan.items()], key=lambda r: -r["profit_share"])}
     if role in ("tp_dh", "nv_dh", "chutich", "tgd"):
@@ -172,7 +172,7 @@ def compose(db: Session, kind: str) -> tuple[str, dict]:
         cho = [t for t in txns if t.match_status == "cho_ke_toan"]
         reqs = [r for r in db.execute(select(ServiceRequest).where(ServiceRequest.booking_id == None)).scalars()]
         fc = FIN.forecast_13w(db)
-        data.update({"alerts_red": sum(1 for a in alerts if a.level == "red"), "alerts": len(alerts), "sepay_in": sum(t.amount for t in txns if t.transfer_type == "in"), "sepay_cho": len(cho),
+        data.update({"alerts_red": sum(1 for a in alerts if a.level == "red"), "alerts": len(alerts), "sepay_in": sum((t.amount or 0) for t in txns if t.transfer_type == "in"), "sepay_cho": len(cho),
                      "yc_cho_booking": len(reqs), "tien": fc["opening"], "canh_bao_dong_tien": fc["alerts"][:3]})
         lines += [f"# Báo cáo ngày {today:%d/%m/%Y} (robot R7)", "",
                   f"- Tiền hiện có: **{_fmt(fc['opening'])} đ**; dự báo 13 tuần: {len(fc['alerts'])} tuần cảnh báo" + (f" – {fc['alerts'][0]}" if fc["alerts"] else ""),
@@ -185,7 +185,7 @@ def compose(db: Session, kind: str) -> tuple[str, dict]:
         qh = [t for t in db.execute(select(Tour).where(Tour.status == "ket_thuc")).scalars() if today > R.settlement_deadline(db, t)]
         bk = [b for b in db.execute(select(Booking)).scalars() if (today - b.created_at.date()).days < 7]
         data.update({"tien": w["cash"], "no_vay": w["total_loans"], "phai_thu": w["receivables_total"], "dau_tu": w["investments_total"], "wip_154": w["wip_154"], "accrued_335": w["accrued_335"],
-                     "han_4_tuan": sum(x["amount"] for x in w["due_4w"]), "d7": [t.code for t in d7], "qua_han_qt": [t.code for t in qh], "booking_tuan": len(bk), "dt_booking_tuan": sum(b.amount - b.discount for b in bk),
+                     "han_4_tuan": sum((x["amount"] or 0) for x in w["due_4w"]), "d7": [t.code for t in d7], "qua_han_qt": [t.code for t in qh], "booking_tuan": len(bk), "dt_booking_tuan": sum((b.amount or 0) - (b.discount or 0) for b in bk),
                      "canh_bao_dong_tien": fc["alerts"][:5], "qua_han_tai_chinh": w["overdue"]})
         lines += [f"# Báo cáo tuần – đến {today:%d/%m/%Y} (robot R7)", "", "## Tài chính (Chủ tịch, TGĐ, KTT, BKS)",
                   f"- Tiền: **{_fmt(w['cash'])} đ** · Dư nợ vay: {_fmt(w['total_loans'])} đ · Phải thu khách: {_fmt(w['receivables_total'])} đ",
@@ -204,7 +204,7 @@ def compose(db: Session, kind: str) -> tuple[str, dict]:
         for t, s in sett:
             o = by_op.setdefault(t.operator.full_name if t.operator else "?", {"chuyen": 0, "ln": 0.0, "dat": 0})
             o["chuyen"] += 1; o["ln"] += s["profit"]; o["dat"] += 1 if s["margin"] >= R.get_param(db, "nguong_bien") else 0
-        data.update({"so_chuyen": len(tours_m), "doanh_thu_qt": sum(s["revenue"] for _, s in sett), "loi_nhuan_qt": sum(s["profit"] for _, s in sett),
+        data.update({"so_chuyen": len(tours_m), "doanh_thu_qt": sum((s["revenue"] or 0) for _, s in sett), "loi_nhuan_qt": sum(s["profit"] for _, s in sett),
                      "chuyen_duoi_10": sum(1 for _, s in sett if s["margin"] < R.get_param(db, "nguong_bien")), "quy_thuong_dh": sum(s["fund"] for _, s in sett),
                      "kqkd": plr, "lai_vay": pl["management"]["interest"], "khau_hao": pl["management"]["depreciation"], "theo_dieu_hanh": by_op,
                      "bang_luong": run.status if run else "chưa lập", "thuc_nhan": run.totals.get("thuc_nhan") if run else 0})

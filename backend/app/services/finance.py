@@ -24,7 +24,7 @@ def add_months(d: date, n: int) -> date:
 
 def build_loan_schedule(c: FinContract, months: int, first_due: date) -> list[FinSchedule]:
     """Trả gốc đều hằng tháng + lãi trên dư nợ giảm dần (tham khảo; ngân hàng cung cấp lịch chính thức thì nhập đè)."""
-    out = []; principal = c.outstanding or c.principal; per = round(principal / months) if months else principal; bal = principal
+    out = []; principal = (c.outstanding or 0) or (c.principal or 0); per = round(principal / months) if months else principal; bal = principal
     for i in range(months):
         d = add_months(first_due, i)
         interest = round(bal * (c.interest_rate / 100) / 12)
@@ -36,7 +36,7 @@ def build_loan_schedule(c: FinContract, months: int, first_due: date) -> list[Fi
 
 def create_contract(db: Session, u: User, data: dict, months: int = 0, first_due: date | None = None) -> FinContract:
     if data["kind"] not in CONTRACT_KINDS: raise ValueError("Loại hợp đồng không hợp lệ")
-    if data["principal"] <= 0: raise ValueError("Giá trị phải > 0")
+    if (data["principal"] or 0) <= 0: raise ValueError("Giá trị phải > 0")
     if data["kind"] != "vay" and not data.get("approval_ref"): raise ValueError("Khoản đầu tư/hợp tác/cho vay/cọc phải có nghị quyết phê duyệt HĐQT")
     c = FinContract(code=next_code(db), created_by=u.username, **data)
     if not c.outstanding: c.outstanding = c.principal
@@ -53,7 +53,7 @@ def create_contract(db: Session, u: User, data: dict, months: int = 0, first_due
 def settle(db: Session, u: User, s: FinSchedule, done_on: date, bank_ref: str, amount: float | None = None) -> FinSchedule:
     """Ghi nhận đã thực hiện một dòng lịch (đối chiếu giao dịch ngân hàng) → bút toán + cập nhật dư nợ."""
     if s.status == "da_thuc_hien": raise ValueError("Đã thực hiện")
-    c = s.contract; amt = float(amount or s.amount)
+    c = s.contract; amt = float(amount or s.amount or 0)
     # V12 – KHOẢN VAY đi qua bảng quy ước hạch toán, không tự dựng cặp tài khoản ở đây.
     #
     # Ba lý do, và lý do thứ ba là lý do thật:
@@ -111,8 +111,8 @@ def settle(db: Session, u: User, s: FinSchedule, done_on: date, bank_ref: str, a
         db.commit()          # giữ lại dấu vết lần thử, rồi mới báo lỗi ra ngoài
         raise ValueError(f"Không ghi sổ được nên KHÔNG đánh dấu đã thực hiện: {ex}")
     s.status, s.done_on, s.bank_ref, s.amount = "da_thuc_hien", done_on, bank_ref, amt
-    if s.kind in ("tra_goc", "thu_hoi"): c.outstanding = max(0.0, c.outstanding - amt)
-    if s.kind in ("nhan_vay", "giai_ngan"): c.outstanding += amt
+    if s.kind in ("tra_goc", "thu_hoi"): c.outstanding = max(0.0, (c.outstanding or 0) - amt)
+    if s.kind in ("nhan_vay", "giai_ngan"): c.outstanding = (c.outstanding or 0) + amt
     if c.outstanding <= 0 and all(x.status == "da_thuc_hien" for x in c.schedule): c.status = "tat_toan"
     R.audit(db, u.username, u.role, "thuc_hien_lich_tai_chinh", f"fin:{c.code}", after={"loai": s.kind, "so_tien": amt, "du_no": c.outstanding})
     db.commit()
@@ -147,7 +147,7 @@ def forecast_13w(db: Session, start: date | None = None) -> dict:
     # Nối bảng và lọc ngay trong SQL, chỉ lấy 3 cột. Bản cũ nạp TOÀN BỘ booking (10.303 dòng trên dữ
     # liệu thật) rồi mỗi dòng lại nạp thêm tour của nó – vừa chậm vừa là một trong những chỗ ngốn hết
     # 512 MB bộ nhớ máy chủ khi mở trang Tổng quan.
-    con_thu = (Booking.amount - Booking.discount - Booking.paid)
+    con_thu = (func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0))
     for start_date, due in db.execute(
             select(Tour.start_date, con_thu)
             .join(Tour, Booking.tour_id == Tour.id)
@@ -156,7 +156,7 @@ def forecast_13w(db: Session, start: date | None = None) -> dict:
         put(max(date.today(), start_date - timedelta(days=7)), "in", "thu_booking", float(due))
     # Chi tour: lệnh chi chờ (tuần này) và đề nghị đang trình (tuần sau); chi dự toán còn lại của tour sắp chạy
     for pr in db.execute(select(PaymentRequest).where(PaymentRequest.status.in_(["cho_chi", "cho_tp", "cho_kt", "cho_duyet"]))).scalars():
-        put(date.today() if pr.status == "cho_chi" else date.today() + timedelta(days=7), "out", "chi_ncc", pr.amount)
+        put(date.today() if pr.status == "cho_chi" else date.today() + timedelta(days=7), "out", "chi_ncc", (pr.amount or 0))
     # Chi dự toán còn lại của tour sắp chạy. Bản cũ gọi tour_cashflow() cho TỪNG tour đã duyệt: mỗi lần
     # là ba chuyến đi–về tới cơ sở dữ liệu ở Singapore cộng một lần nạp lười danh sách booking. Với vài
     # trăm tour đang mở, riêng vòng lặp này đã là hàng nghìn chuyến đi–về, mà kết quả chỉ cần đúng MỘT
@@ -178,19 +178,19 @@ def forecast_13w(db: Session, start: date | None = None) -> dict:
                                  .group_by(Booking.tour_id)).all():
             khach[tid] = int(n)
         for t in tours_dd:
-            budget = t.fixed_cost + t.var_cost_per_pax * max(t.planned_pax, khach.get(t.id, 0))
+            budget = (t.fixed_cost or 0) + (t.var_cost_per_pax or 0) * max(t.planned_pax, khach.get(t.id, 0))
             rest = budget - da_dung.get(t.id, 0.0)
             if rest > 0: put(max(date.today(), t.start_date - timedelta(days=3)), "out", "chi_tour_du_toan", rest)
     # Lịch vay / đầu tư
     for s in db.execute(select(FinSchedule).where(FinSchedule.status.in_(["ke_hoach", "qua_han"]))).scalars():
         key = {"tra_goc": "tra_goc_vay", "tra_lai": "lai_vay", "nhan_vay": "nhan_vay", "giai_ngan": "giai_ngan_dau_tu", "thu_hoi": "thu_hoi_dau_tu"}[s.kind]
-        put(max(date.today(), s.due_date), "in" if s.kind in ("nhan_vay", "thu_hoi") else "out", key, s.amount)
+        put(max(date.today(), s.due_date), "in" if s.kind in ("nhan_vay", "thu_hoi") else "out", key, (s.amount or 0))
     # Kế hoạch thu/chi khác (lương, thuế, thuê văn phòng…) – lặp hằng tháng nếu đánh dấu
     for it in db.execute(select(CashPlanItem)).scalars():
         d = it.due_date
         for k in range(0, 4 if it.recurring_monthly else 1):
             dd = add_months(d, k)
-            if dd >= weeks[0][0]: put(dd, it.direction, it.category, it.amount)
+            if dd >= weeks[0][0]: put(dd, it.direction, it.category, (it.amount or 0))
     # Lương: nếu chưa có kế hoạch lương thì lấy bảng lương gần nhất, chi ngày 10 hằng tháng
     if not any("luong" in r["out"] for r in rows):
         last = db.execute(select(PayrollRun).order_by(PayrollRun.period.desc())).scalars().first()
@@ -220,18 +220,18 @@ def weekly_finance(db: Session) -> dict:
     # tuổi nợ phải thu: booking chưa thu đủ theo tour đã kết thúc
     recv = []
     for bk in db.execute(select(Booking)).scalars():
-        due = (bk.amount - bk.discount) - bk.paid
+        due = ((bk.amount or 0) - (bk.discount or 0)) - (bk.paid or 0)
         if due > 0 and bk.tour:
             age = (today - bk.tour.end_date).days if bk.tour.end_date < today else 0
             recv.append({"booking": bk.code, "customer": bk.customer_name, "tour": bk.tour.code, "due": due, "age_days": age})
     recv.sort(key=lambda r: -r["due"])
     return {"as_of": today, "cash": cash, "loans": [{"code": c.code, "partner": c.partner, "outstanding": c.outstanding, "rate": c.interest_rate, "maturity": c.maturity, "collateral": c.collateral} for c in loans],
-            "total_loans": sum(c.outstanding for c in loans),
+            "total_loans": sum((c.outstanding or 0) for c in loans),
             "due_4w": [{"contract": s.contract.code, "partner": s.contract.partner, "kind": s.kind, "date": s.due_date, "amount": s.amount, "status": s.status} for s in due4],
             "receivables_top10": recv[:10], "receivables_total": sum(r["due"] for r in recv),
             "investments": [{"code": c.code, "kind": CONTRACT_KINDS.get(c.kind, c.kind), "partner": c.partner, "principal": c.principal, "outstanding": c.outstanding, "maturity": c.maturity, "status": c.status,
                              "related_party": c.related_party, "owner": c.owner, "approval_ref": c.approval_ref} for c in invest],
-            "investments_total": sum(c.outstanding for c in invest),
+            "investments_total": sum((c.outstanding or 0) for c in invest),
             "wip_154": b.get("154", 0.0), "accrued_335": -b.get("335", 0.0),
             "overdue": [{"contract": s.contract.code, "partner": s.contract.partner, "kind": s.kind, "date": s.due_date, "amount": s.amount} for s in db.execute(select(FinSchedule).where(FinSchedule.status == "qua_han")).scalars()]}
 
@@ -274,11 +274,11 @@ def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
     for c in loans:
         rows = [t for t in theo_ke_uoc.get(c.id, []) if t.den_ngay is None]
         da_giai = [t for t in theo_ke_uoc.get(c.id, []) if t.den_ngay is not None]
-        lai_thang = round(c.outstanding * (c.interest_rate / 100) / 12) if c.interest_rate else 0
+        lai_thang = round((c.outstanding or 0) * (c.interest_rate / 100) / 12) if c.interest_rate else 0
         con = (c.maturity - today).days if c.maturity else None
         # Dư nợ phân bổ cho từng xe chỉ để tham khảo: ngân hàng nắm CẢ GÓI, giải chấp một xe
         # phải thoả thuận riêng, nên con số này không phải nghĩa vụ riêng của chiếc xe đó.
-        pb = round(c.outstanding / len(rows)) if rows else 0
+        pb = round((c.outstanding or 0) / len(rows)) if rows else 0
         for t in rows:
             gan_xe.setdefault(t.vehicle_id, []).append({"contract_id": c.id, "code": c.code, "contract_no": c.contract_no, "partner": c.partner,
                                                         "du_no": c.outstanding, "so_xe_trong_goi": len(rows), "du_no_phan_bo": pb,
@@ -294,7 +294,7 @@ def vay_xe(db: Session, hom_nay: date | None = None) -> dict:
                        "collateral": c.collateral, "status": c.status})
         if con is not None and con <= 30:
             canh_bao.append({"muc": "gap", "loai": "dao_han", "khe_uoc": c.code,
-                             "noi_dung": f"Khế ước {c.contract_no or c.code} ({c.partner}) dư nợ {c.outstanding:,.0f}đ đáo hạn {c.maturity:%d/%m/%Y}"
+                             "noi_dung": f"Khế ước {c.contract_no or c.code} ({c.partner}) dư nợ {(c.outstanding or 0):,.0f}đ đáo hạn {c.maturity:%d/%m/%Y}"
                                          + (f" – còn {con} ngày" if con >= 0 else f" – ĐÃ QUÁ HẠN {-con} ngày"),
                              "viec": "Chuẩn bị nguồn tất toán hoặc hồ sơ gia hạn"})
         if not c.maturity:
@@ -396,8 +396,8 @@ def doi_chieu_sao_ke(db: Session, dong: list[dict], ngan_hang: str = "", den_nga
             continue
         thay.add(ma)
         sai = []
-        if abs(c.outstanding - sk_du_no) >= 1:
-            sai.append({"truong": "du_no", "he_thong": c.outstanding, "sao_ke": sk_du_no, "chenh": sk_du_no - c.outstanding})
+        if abs((c.outstanding or 0) - sk_du_no) >= 1:
+            sai.append({"truong": "du_no", "he_thong": (c.outstanding or 0), "sao_ke": sk_du_no, "chenh": sk_du_no - (c.outstanding or 0)})
         ls = r.get("lai_suat")
         if ls is not None and abs(float(ls) - c.interest_rate) >= 0.01:
             sai.append({"truong": "lai_suat", "he_thong": c.interest_rate, "sao_ke": float(ls)})

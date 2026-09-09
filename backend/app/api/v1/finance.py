@@ -42,8 +42,8 @@ class ContractIn(BaseModel):
     partner: str
     contract_no: str = ""
     signed_on: date | None = None
-    principal: float
-    outstanding: float = 0
+    principal: float | None = None
+    outstanding: float | None = None
     interest_rate: float = 0
     maturity: date | None = None
     collateral: str = ""
@@ -198,8 +198,8 @@ class KheUocNapIn(BaseModel):
     partner: str
     entity: str = "Công ty mẹ"
     loan_group: str = "vay_xe_45cho"
-    principal: float
-    outstanding: float = 0
+    principal: float | None = None
+    outstanding: float | None = None
     interest_rate: float = 0
     signed_on: date | None = None
     maturity: date | None = None
@@ -320,7 +320,7 @@ def cap_nhat_theo_sao_ke(data: CapNhatSauDoiChieuIn, u: User = Depends(require_r
         c = loans.get(d.ke_uoc.strip())
         if c is None: bo_qua.append(d.ke_uoc); continue
         thay_doi = {}
-        if d.du_no and abs(c.outstanding - d.du_no) >= 1:
+        if d.du_no and abs((c.outstanding or 0) - d.du_no) >= 1:
             thay_doi["du_no"] = [c.outstanding, d.du_no]; c.outstanding = d.du_no
         if d.lai_suat is not None and abs(c.interest_rate - d.lai_suat) >= 0.01:
             thay_doi["lai_suat"] = [c.interest_rate, d.lai_suat]; c.interest_rate = d.lai_suat

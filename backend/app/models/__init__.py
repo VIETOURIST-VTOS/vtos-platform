@@ -26,3 +26,8 @@ from app.models.hach_toan import *  # noqa
 from app.models.quyet_toan import *  # noqa
 from app.models.nap_bo_sung import *  # noqa
 from app.models.doc_chung_tu import *  # noqa
+# Đội xe thiếu ở đây từ đầu. Ứng dụng vẫn chạy vì các dịch vụ nạp thẳng app.models.fleet, nhưng
+# Base.metadata sau `import app.models` thì thiếu 20 bảng – nên mọi phép thử soi metadata đều mù
+# đúng phần đội xe. Phát hiện ngày 09/9/2026 khi phép thử canh cột tiền K2 chỉ nhìn thấy 62 trong
+# 83 cột và vẫn báo xanh.
+from app.models.fleet import *  # noqa

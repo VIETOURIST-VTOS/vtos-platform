@@ -114,7 +114,7 @@ def tao_bang_gia(data: BangGiaIn, u: User = Depends(require_roles(*DAT_GIA)),
     db.add(b); db.flush()
     for i, d in enumerate(data.dong):
         db.add(BangGiaDong(bang_gia_id=b.id, hang_khach=d.get("hang_khach", "nguoi_lon"),
-                           mo_ta=d.get("mo_ta", ""), gia_ban=float(d.get("gia_ban") or 0),
+                           mo_ta=d.get("mo_ta", ""), gia_ban=None if d.get("gia_ban") in (None, "") else float(d["gia_ban"]),
                            gia_von=None if d.get("gia_von") in (None, "") else float(d["gia_von"]),
                            chiet_khau_toi_da=float(d.get("chiet_khau_toi_da") or 0), thu_tu=i))
     db.commit()

@@ -91,7 +91,7 @@ def _gd_nap(db: Session, r, boi, source: str):
                     mo_ta=str(r.get("mo_ta") or "").strip()[:300],
                     imported_by=boi, khop="chua_khop")
     db.add(t); db.flush()
-    return f"{t.ma_gd} · {t.so_tien:,.0f} đ" + (f" · {v.plate}" if v is not None else " · chưa gắn xe")
+    return f"{t.ma_gd} · {(t.so_tien or 0):,.0f} đ" + (f" · {v.plate}" if v is not None else " · chưa gắn xe")
 
 
 def _dau_kiem(db, r): return _gd_kiem(db, r, "the_dau", "Thẻ dầu")
@@ -143,7 +143,7 @@ def _bd_nap(db: Session, r, boi):
                     ben_chiu=str(r.get("ben_chiu") or "chu_xe").strip()[:24],
                     chung_tu=str(r.get("chung_tu") or "").strip()[:200], created_by=boi)
     db.add(m); db.flush()
-    return f"{v.plate} · {d:%d/%m/%Y} · {m.so_tien:,.0f} đ"
+    return f"{v.plate} · {d:%d/%m/%Y} · {(m.so_tien or 0):,.0f} đ"
 
 
 # ====================== ĐỘI XE – ĐĂNG KIỂM ======================
@@ -235,7 +235,7 @@ def _cpk_nap(db: Session, r, boi):
                         mo_ta=str(r.get("mo_ta") or "").strip()[:200], so_tien=_so(r.get("so_tien")),
                         chung_tu=str(r.get("chung_tu") or "").strip()[:200], nguon="nap_tep", boi=boi)
     db.add(c); db.flush()
-    return f"{c.ky} · {ten_nhom} · {c.so_tien:,.0f} đ" + (f" · {v.plate}" if v is not None else "")
+    return f"{c.ky} · {ten_nhom} · {(c.so_tien or 0):,.0f} đ" + (f" · {v.plate}" if v is not None else "")
 
 
 # ====================== MARKETING – CHI THEO KÊNH ======================
@@ -370,7 +370,7 @@ def _tl_nap(db: Session, r, boi):
                         report_submitted=_co(r.get("da_nop_bao_cao")), advance_settled=True,
                         status="da_xac_nhan")
     db.add(a); db.flush()
-    thu_lao = a.days * a.rate_per_day * (2 if a.holiday else 1)
+    thu_lao = a.days * (a.rate_per_day or 0) * (2 if a.holiday else 1)
     return f"{t.code} · {g.full_name} · {a.days} ngày · " + (f"{thu_lao:,.0f} đ" if dg else "chưa có đơn giá")
 
 
@@ -463,7 +463,7 @@ def _bh_kiem(db: Session, r):
     if tt not in ("dang_dong", "bao_giam", "truy_thu"):
         loi.append("Trạng thái phải là dang_dong / bao_giam / truy_thu")
     muc = _so(r.get("muc_dong"))
-    if muc and e.bhxh_base and abs(muc - e.bhxh_base) > 1:
+    if muc and (e.bhxh_base or 0) and abs(muc - (e.bhxh_base or 0)) > 1:
         cb.append(f"Mức đóng {muc:,.0f} khác mức ghi trong hồ sơ ({e.bhxh_base:,.0f}) – "
                   "nạp xong nên xem lại hồ sơ nhân sự hay bảng chốt bên nào đúng")
     ky = str(r.get("ky") or "").strip()
@@ -642,7 +642,7 @@ def _cc_nap(db: Session, r, boi):
                        quantity=int(_so(r.get("so_luong")) or 1),
                        note=str(r.get("ghi_chu") or "").strip()[:300], source="vtos", created_by=boi)
     db.add(p); db.flush()
-    return f"{p.code} · {p.name} · {p.amount:,.0f} đ / {p.months} kỳ"
+    return f"{p.code} · {p.name} · {(p.amount or 0):,.0f} đ / {p.months} kỳ"
 
 
 # ====================== TÀI SẢN – KHẤU HAO KỲ ĐÃ TÍNH Ở HỆ THỐNG CŨ ======================
@@ -658,7 +658,7 @@ def _kh_kiem(db: Session, r):
     st = _so(r.get("khau_hao_ky"))
     if st < 0: loi.append("Khấu hao trong kỳ không được âm")
     lk = _so(r.get("luy_ke"))
-    if lk and lk > a.cost:
+    if lk and lk > (a.cost or 0):
         loi.append(f"Lũy kế {lk:,.0f} lớn hơn nguyên giá {a.cost:,.0f} của thẻ {a.code}")
     # Ngoại lệ có ý thức: chỉ nhận kỳ TRƯỚC kỳ VTOS bắt đầu tự tính cho chính thẻ này.
     if a.start_date and ky and ky >= f"{a.start_date:%Y-%m}":
@@ -678,7 +678,7 @@ def _kh_nap(db: Session, r, boi):
     st = _so(r.get("khau_hao_ky"))
     lk = _so(r.get("luy_ke")) or st
     d = AssetDepreciation(asset_id=a.id, period=str(r.get("ky") or "").strip()[:7],
-                          amount=st, accumulated=lk, remaining=max(a.cost - lk, 0.0))
+                          amount=st, accumulated=lk, remaining=max((a.cost or 0) - lk, 0.0))
     db.add(d); db.flush()
     return f"{a.code} · {d.period} · {st:,.0f} đ (còn lại {d.remaining:,.0f})"
 

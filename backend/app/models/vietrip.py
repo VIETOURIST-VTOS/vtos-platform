@@ -14,7 +14,7 @@ class VtRecord(Base):
     vietrip_id: Mapped[str] = mapped_column(String(40), index=True)
     ref: Mapped[str] = mapped_column(String(60), default="", index=True)   # tourcode / bookingID để tra chéo
     on_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
-    amount: Mapped[float] = mapped_column(Float, default=0)
+    amount: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     raw: Mapped[dict] = mapped_column(JSON, default=dict)
     applied: Mapped[bool] = mapped_column(Boolean, default=False)          # đã ánh xạ sang bảng nghiệp vụ VTOS
     apply_note: Mapped[str] = mapped_column(String(200), default="")
@@ -34,14 +34,14 @@ class TourCostLine(Base):
     service_type: Mapped[str] = mapped_column(String(30), default="")        # GUIDE / HOTEL / LAND / BUS / MEAL / TICKET / VISA / INS…
     supplier_name: Mapped[str] = mapped_column(String(200), default="")
     supplier_tax_code: Mapped[str] = mapped_column(String(20), default="")
-    unit_price: Mapped[float] = mapped_column(TIEN, default=0)
+    unit_price: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     qty: Mapped[float] = mapped_column(Float, default=0)
     coef: Mapped[float] = mapped_column(Float, default=1)
-    actual: Mapped[float] = mapped_column(TIEN, default=0)
-    paid: Mapped[float] = mapped_column(TIEN, default=0)
+    actual: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    paid: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     note: Mapped[str] = mapped_column(String(200), default="")
     source: Mapped[str] = mapped_column(String(20), default="vietrip")
-    budget: Mapped[float] = mapped_column(TIEN, default=0)                 # dự toán của dòng (để so lệch)
+    budget: Mapped[float | None] = mapped_column(TIEN)                 # dự toán của dòng (để so lệch, nullable=True)
     status: Mapped[str] = mapped_column(String(10), default="hd")           # hd (hiệu lực) / huy
     version: Mapped[int] = mapped_column(Integer, default=1)                # phiên bản quyết toán khi tạo/sửa dòng
     doc_name: Mapped[str] = mapped_column(String(160), default="")          # tên tệp chứng từ

@@ -150,3 +150,30 @@ def test_pa7_uoc_chi_phi_theo_so_phut_do_duoc_va_ghi_ro_ngay_bang_gia():
     assert u["ngay_bang_gia"], "không ghi ngày bảng giá thì sang năm không ai biết con số này cũ tới đâu"
     assert u["usd_moi_thang"]["gpt-4o-mini-transcribe"] == 3.0
     assert u["usd_moi_thang"]["whisper-1 / gpt-4o-transcribe"] == 6.0
+
+
+def test_pa8_ngay_gui_di_dung_dang_cua_pa_khong_theo_bang_dac_ta():
+    """Bảng đặc tả của P.A ghi "(y-m-d)" và ghi SAI. Dạng thật là "DD-MM-YYYY HH:mm".
+
+    Gửi y-m-d thì MỌI yêu cầu trả 1003 "tham số không hợp lệ" – kể cả yêu cầu không kèm ngày, nên
+    triệu chứng không chỉ về phía ngày tháng chút nào. Bảy dạng đã thử đều hỏng trước khi tìm ra.
+
+    Chốt bằng phép thử vì đây đúng là chỗ lần sau ai đó đọc tài liệu của P.A rồi "sửa lại cho đúng
+    tài liệu" và hỏng lại y hệt.
+    """
+    from datetime import date
+    from app.services import pa_tong_dai as PA
+    assert PA.ngay_pa("2026-09-01") == "01-09-2026 00:00"
+    assert PA.ngay_pa(date(2026, 9, 9), cuoi_ngay=True) == "09-09-2026 23:59"
+    assert PA.ngay_pa(date(2026, 12, 31)) == "31-12-2026 00:00", "ngày trước tháng, không phải ngược lại"
+
+    # và hàm đọc lịch sử phải THẬT SỰ gửi dạng đó đi
+    ghi = []
+    goc = PA._goi
+    PA._goi = lambda url, ts: (ghi.append(dict(ts)) or {"code": "1000", "data": []})
+    try:
+        PA.lich_su("2026-09-01", "2026-09-09")
+    finally:
+        PA._goi = goc
+    assert ghi and ghi[0]["from_date"] == "01-09-2026 00:00", f"đang gửi: {ghi}"
+    assert ghi[0]["to_date"] == "09-09-2026 23:59", "đến ngày phải lấy hết ngày, không cắt lúc 00:00"

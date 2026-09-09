@@ -83,7 +83,11 @@ def test_b2_du_toan_khong_suy_nguoc_tu_quyet_toan():
     assert client.post("/api/v1/import/vietrip/apply", headers=login("cntt")).status_code == 200
 
     t = next(x for x in client.get("/api/v1/tours?limit=1000", headers=login("cntt")).json() if x["code"] == "KT-B2-VT01")
-    assert t["fixed_cost"] == 0 and t["var_cost_per_pax"] == 0, "không được suy ngược dự toán từ dòng quyết toán"
+    # Trước K2 chỗ này đọc `== 0`. Sau K2, nhập quyết toán mà không lập dự toán thì dự toán là RỖNG,
+    # không phải 0 – và rỗng nói đúng hơn: "chưa ai lập dự toán" chứ không phải "dự toán duyệt bằng 0".
+    # Chấp nhận cả hai vì tour cũ vẫn còn số 0 trong cơ sở dữ liệu; điều bị cấm là ra số dương.
+    assert not t["fixed_cost"] and not t["var_cost_per_pax"], \
+        f"không được suy ngược dự toán từ dòng quyết toán – đang thấy {t['fixed_cost']} / {t['var_cost_per_pax']}"
     det = client.get(f"/api/v1/tours/{t['id']}/detail", headers=login("cntt")).json()
     assert det["settlement_edit"]["summary"]["actual"] == 26_000_000, "thực chi vẫn lấy đủ từ dòng quyết toán"
     assert det["settlement_edit"]["summary"]["has_budget"] is False

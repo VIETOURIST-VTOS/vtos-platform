@@ -55,8 +55,8 @@ class Retention(Base):
     tour_code: Mapped[str] = mapped_column(String(30), default="")
     customer_name: Mapped[str] = mapped_column(String(120), default="")
     customer_phone: Mapped[str] = mapped_column(String(30), default="")
-    amount: Mapped[float] = mapped_column(Float, default=0)
-    remaining: Mapped[float] = mapped_column(Float, default=0)
+    amount: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    remaining: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     note: Mapped[str] = mapped_column(String(300), default="")
     status: Mapped[str] = mapped_column(String(20), default="hieu_luc")          # hieu_luc / tat_toan / huy
     expires_on: Mapped[date | None] = mapped_column(Date, nullable=True)

@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import DinhKem from "@/components/DinhKem";
-import { api, vnd, fmtD } from "@/lib/api";
+import { api, vnd, fmtD, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 /** Hợp đồng lao động — V5 của lệnh giao việc 08/9/2026.
@@ -45,8 +45,8 @@ function HopDong() {
       await api("/labor-contracts", { method: "POST", json: {
         employee_id: Number(f.employee_id), code: f.code, kind: f.kind,
         signed_on: f.signed_on || null, effective_from: f.effective_from,
-        effective_to: f.effective_to || null, salary: Number(f.salary) || 0,
-        si_salary: Number(f.si_salary) || 0, allowance: Number(f.allowance) || 0,
+        effective_to: f.effective_to || null, salary: soTien(f.salary),
+        si_salary: soTien(f.si_salary), allowance: soTien(f.allowance),
         note: f.note || "" } });
       toast("Đã lưu hợp đồng. Nhớ đính kèm bản scan ở dòng của người này.");
       setF(null); await load();

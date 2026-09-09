@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
-import { api, vnd, pct, fmtD, fmtDT, getToken } from "@/lib/api";
+import { api, vnd, pct, fmtD, fmtDT, getToken, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 const PMT: Record<string, [string, string]> = { UNPAID: ["Chưa cọc", "red"], DEPO: ["Đặt cọc", "warn"], PAID: ["Đã thanh toán", "ok"], CANCEL: ["Đã hủy", ""] };
@@ -18,7 +18,7 @@ function NonPackage() {
   const canCreate = ["nv_kd", "gd_kd", "nv_dh", "tp_dh"].includes(role), isDH = ["nv_dh", "tp_dh"].includes(role), canClose = ["ketoan", "tp_dh", "tgd"].includes(role);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); const f = e.target as HTMLFormElement; const d: any = Object.fromEntries(new FormData(f).entries());
-    ["amount", "discount", "cost_amount"].forEach((k) => (d[k] = Number(d[k] || 0))); d.pax = Number(d.pax || 1); if (!d.service_date) delete d.service_date;
+    ["amount", "discount", "cost_amount"].forEach((k) => (d[k] = soTien(d[k]))); d.pax = Number(d.pax || 1); if (!d.service_date) delete d.service_date;
     try { const r = await api("/non-package", { method: "POST", json: d }); toast(r.message); f.reset(); setShowForm(false); load(); } catch (x) { toast(errMsg(x), true); }
   };
   const saveEdit = async (e: React.FormEvent) => {
@@ -27,7 +27,7 @@ function NonPackage() {
     try { await api(`/non-package/${edit.id}`, { method: "PUT", json: d }); toast("Đã lưu dịch vụ"); setEdit(null); load(); } catch (x) { toast(errMsg(x), true); }
   };
   const cancel = async (r: any) => { const reason = prompt(`Lý do hủy ${r.tour_code} – ${r.customer_name}?`); if (!reason) return; const ch = prompt(`Phí hủy giữ lại (đ), đã thu ${vnd(r.paid)} – để 0 nếu không thu phí:`, "0"); if (ch === null) return;
-    try { const x = await api(`/bookings/${r.id}/cancel`, { method: "POST", json: { reason, charge: Number(ch || 0), retain: true } }); toast(x.message); load(); } catch (e) { toast(errMsg(e), true); } };
+    try { const x = await api(`/bookings/${r.id}/cancel`, { method: "POST", json: { reason, charge: soTien(ch), retain: true } }); toast(x.message); load(); } catch (e) { toast(errMsg(e), true); } };
   const printIt = async (r: any) => { try { const res = await fetch(`/api/v1/non-package/${r.id}/print`, { headers: { Authorization: `Bearer ${getToken() || ""}` } }); const html = await res.text(); const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); } } catch { toast("Không in được", true); } };
   const closeMonth = async () => { const m = prompt("Chốt dịch vụ lẻ tháng (YYYY-MM, phải là tháng đã kết thúc):", month); if (!m) return; try { const r = await api("/non-package/close-month", { method: "POST", json: { month: m } }); toast(r.message); load(); } catch (e) { toast(errMsg(e), true); } };
   const K = data.kinds || {}; const S = data.summary || {}; const T = S.total || {};

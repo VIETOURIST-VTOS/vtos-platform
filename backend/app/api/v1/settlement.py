@@ -19,10 +19,10 @@ class LineIn(BaseModel):
     cost_kind: str = "co_dinh"
     supplier_name: str
     supplier_tax_code: str = ""
-    unit_price: float = 0
+    unit_price: float | None = None
     qty: float = 0
     coef: float = 1
-    budget: float = 0
+    budget: float | None = None
     paid: float | None = None
     note: str = ""
 

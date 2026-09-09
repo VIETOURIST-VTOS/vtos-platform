@@ -225,7 +225,7 @@ def run_sync(db: Session, from_date: date, to_date: date, products: bool = True,
         ap = VT.apply_all(db, "robot-vietrip", limit=400); guard += 1
         for k, v in ap.items():
             if k not in ("remaining", "blocked"): total[k] = total.get(k, 0) + v
-        if ap["remaining"] <= 0: break
+        if (ap["remaining"] or 0) <= 0: break
     counts["applied"] = total; counts["blocked"] = ap.get("blocked", 0)
     return counts
 

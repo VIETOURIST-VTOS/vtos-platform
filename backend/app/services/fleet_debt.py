@@ -87,7 +87,7 @@ def ghi_thanh_toan(db: Session, huong: str, so_tien: float, ngay: date, idem_key
         if st.status not in DA_CHOT:
             raise ValueError(f"Kỳ {st.ky} đang ở trạng thái '{st.status}' – con số chưa chốt với đối tác nên "
                              "chưa chi. Duyệt xong bảng rồi mới ghi chi.")
-        con = _q(st.sau_can_tru - da_tra(db, st.id))
+        con = _q((st.sau_can_tru or 0) - da_tra(db, st.id))
         if so_tien > con:
             raise ValueError(f"Chi {so_tien:,.0f} đ vượt số còn phải trả của kỳ {st.ky} ({con:,.0f} đ). "
                              "Nếu đúng là phải trả thêm thì tạo dòng điều chỉnh có người duyệt, "
@@ -98,7 +98,7 @@ def ghi_thanh_toan(db: Session, huong: str, so_tien: float, ngay: date, idem_key
             raise ValueError("Thu tiền bán xe phải gắn với một hồ sơ bán xe")
         sc = db.get(SaleCase, sale_case_id)
         if sc is None: raise ValueError("Không có hồ sơ bán xe này")
-        con = _q(sc.gia_ban - max(sc.da_thu, da_thu_ban_xe(db, sc.id)))
+        con = _q((sc.gia_ban or 0) - max((sc.da_thu or 0), da_thu_ban_xe(db, sc.id)))
         if so_tien > con:
             raise ValueError(f"Thu {so_tien:,.0f} đ vượt số còn phải thu của hồ sơ bán xe ({con:,.0f} đ)")
 
@@ -107,7 +107,7 @@ def ghi_thanh_toan(db: Session, huong: str, so_tien: float, ngay: date, idem_key
                     ngay=ngay, so_tien=_q(so_tien), chung_tu=chung_tu, note=note, created_by=boi)
     db.add(p); db.flush()
     if sc is not None:
-        sc.da_thu = _q(max(sc.da_thu, 0) + so_tien)
+        sc.da_thu = _q(max((sc.da_thu or 0), 0) + so_tien)
     return {"id": p.id, "so_tien": _q(so_tien), "lap_lai": False,
             "message": f"Đã ghi {HUONG_TIEN[huong].lower()}: {so_tien:,.0f} đ"}
 
@@ -134,11 +134,11 @@ def chi_ho_chua_vao_ky(db: Session, xes: list[Vehicle], ky_da_dung: set[str]) ->
                                                    TripCost.ben_chiu == "vietourist_tam_ung")).scalars():
             t = trips.get(c.trip_id)
             if t is None or t.ngay_di is None: continue
-            theo_ky[f"{t.ngay_di:%Y-%m}"] = theo_ky.get(f"{t.ngay_di:%Y-%m}", 0) + c.amount
+            theo_ky[f"{t.ngay_di:%Y-%m}"] = theo_ky.get(f"{t.ngay_di:%Y-%m}", 0) + (c.amount or 0)
     for m in db.execute(select(Maintenance).where(Maintenance.vehicle_id.in_(ids),
                                                   Maintenance.ben_chiu == "vietourist_tam_ung")).scalars():
         if m.ngay is None: continue
-        theo_ky[f"{m.ngay:%Y-%m}"] = theo_ky.get(f"{m.ngay:%Y-%m}", 0) + m.so_tien
+        theo_ky[f"{m.ngay:%Y-%m}"] = theo_ky.get(f"{m.ngay:%Y-%m}", 0) + (m.so_tien or 0)
     return [{"ky": k, "so_tien": _q(v)} for k, v in sorted(theo_ky.items()) if k not in ky_da_dung and _q(v) > 0]
 
 
@@ -153,7 +153,7 @@ def cong_no_chu_xe(db: Session, p: PartnerOwner, xes: list[Vehicle] | None = Non
     for st in sts:
         tra = da_tra(db, st.id)
         chot = st.status in DA_CHOT
-        con = _q(st.sau_can_tru - tra) if chot else 0.0
+        con = _q((st.sau_can_tru or 0) - tra) if chot else 0.0
         cac_ky.append({"settlement_id": st.id, "ky": st.ky, "status": st.status, "da_chot": chot,
                        "doanh_thu": _q(st.doanh_thu), "doi_tac_chiu": _q(st.doi_tac_chiu),
                        "can_tru": _q(st.can_tru), "phai_tra_theo_bang": _q(st.sau_can_tru),
@@ -163,8 +163,8 @@ def cong_no_chu_xe(db: Session, p: PartnerOwner, xes: list[Vehicle] | None = Non
         if chot:
             phai_tra += con
         else:
-            dang_tinh += _q(st.sau_can_tru)
-        phai_thu += _q(st.chuyen_ky_sau)
+            dang_tinh += _q((st.sau_can_tru or 0))
+        phai_thu += _q((st.chuyen_ky_sau or 0))
 
     lich = []
     for pl in db.execute(select(RepaymentPlan).where(RepaymentPlan.partner_id == p.id)).scalars():
@@ -182,7 +182,7 @@ def cong_no_chu_xe(db: Session, p: PartnerOwner, xes: list[Vehicle] | None = Non
         "trong_do_chuyen_ky_sau": _q(phai_thu),
         "trong_do_no_theo_lich": no_mua_xe,
         "chi_ho_chua_vao_ky": treo,
-        "tong_chi_ho_chua_vao_ky": _q(sum(x["so_tien"] for x in treo)),
+        "tong_chi_ho_chua_vao_ky": _q(sum((x["so_tien"] or 0) for x in treo)),
         "cac_ky": cac_ky, "lich_can_tru": lich,
         "tinh_trang": CHUA_CO if not sts else "co_du_lieu",
         "ghi_chu": ("Chủ xe này chưa có bảng quyết toán nào – chưa biết số phải trả, KHÔNG phải bằng 0."
@@ -201,7 +201,7 @@ def so_cong_no(db: Session) -> dict:
     ban_xe = []
     for sc in db.execute(select(SaleCase)).scalars():
         v = db.get(Vehicle, sc.vehicle_id)
-        con = _q(sc.gia_ban - sc.da_thu)
+        con = _q((sc.gia_ban or 0) - (sc.da_thu or 0))
         if con <= 0 and sc.da_sang_ten: continue
         ban_xe.append({"sale_case_id": sc.id, "vehicle_id": sc.vehicle_id,
                        "xe": (v.code or v.plate) if v else "", "plate": v.plate if v else "",

@@ -128,9 +128,9 @@ class ContractIn(BaseModel):
     signed_on: date | None = None
     effective_from: date
     effective_to: date | None = None
-    salary: float = 0
-    si_salary: float = 0
-    allowance: float = 0
+    salary: float | None = None
+    si_salary: float | None = None
+    allowance: float | None = None
     annual_leave_days: float = 12
     note: str = ""
 

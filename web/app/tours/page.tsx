@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
-import { api, pct, fmtD } from "@/lib/api";
+import { api, pct, fmtD, soTien } from "@/lib/api";
 import { TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
 import { Tag, errMsg, MangTag } from "@/components/ui";
 
@@ -18,7 +18,8 @@ function Tours() {
   const canCreate = ["nv_dh", "tp_dh"].includes(user?.role || "");
   async function create(e: React.FormEvent) {
     e.preventDefault(); const f = new FormData(e.target as HTMLFormElement); const d: any = Object.fromEntries(f.entries());
-    ["price_per_pax", "fixed_cost", "var_cost_per_pax", "planned_pax", "operator_id"].forEach((k) => (d[k] = Number(d[k] || 0)));
+    ["price_per_pax", "fixed_cost", "var_cost_per_pax"].forEach((k) => (d[k] = soTien(d[k])));
+    ["planned_pax", "operator_id"].forEach((k) => (d[k] = Number(d[k] || 0)));
     try { const t = await api("/tours", { method: "POST", json: d }); toast("Đã tạo tour – kiểm tra 3 con số rồi trình Trưởng phòng"); location.href = `/tours/${t.id}`; } catch (x) { toast(errMsg(x), true); }
   }
   const today = new Date().toISOString().slice(0, 10);

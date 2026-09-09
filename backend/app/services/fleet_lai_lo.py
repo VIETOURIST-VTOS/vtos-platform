@@ -53,9 +53,9 @@ def theo_chuyen(db: Session, ky: str) -> list[dict]:
         v = veh.get(t.vehicle_id)
         cs = chi.get(t.id, [])
         km = _km(t)
-        tien_dau = sum(c.amount for c in cs if c.kind == "dau")
+        tien_dau = sum((c.amount or 0) for c in cs if c.kind == "dau")
         lit = sum(c.lit or 0 for c in cs if c.kind == "dau")
-        cp = sum(c.amount for c in cs)
+        cp = sum((c.amount or 0) for c in cs)
         did = t.driver_id or (v.driver_id if v else None)
         out.append({
             "trip_id": t.id, "ma_phieu": t.ma_phieu, "xe": v.plate if v else "",
@@ -63,8 +63,8 @@ def theo_chuyen(db: Session, ky: str) -> list[dict]:
             "ngay_di": t.ngay_di, "ngay_ve": t.ngay_ve,
             "so_ngay": (t.ngay_ve - t.ngay_di).days + 1,
             "doanh_thu": t.doanh_thu, "chi_phi_chuyen": cp,
-            "lai_gop": t.doanh_thu - cp,
-            "ty_le": (round((t.doanh_thu - cp) / t.doanh_thu, 4) if t.doanh_thu else None),
+            "lai_gop": (t.doanh_thu or 0) - cp,
+            "ty_le": (round(((t.doanh_thu or 0) - cp) / (t.doanh_thu or 0), 4) if (t.doanh_thu or 0) else None),
             "km": km or None, "tien_dau": tien_dau, "so_lit": lit or None,
             # Suất tiêu hao và giá dầu trên km chỉ tính khi có đủ dữ liệu – thiếu km hay thiếu lít thì
             # trả về trống, không trả 0. Số 0 ở đây đọc ra là "xe không tốn dầu".
@@ -98,7 +98,7 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
         did = t.driver_id or (veh[t.vehicle_id].driver_id if t.vehicle_id in veh else None)
         if did and not r["tai_xe"]: r["tai_xe"] = emps.get(did, "")
         r["so_chuyen"] += 1
-        r["doanh_thu"] += c["doanh_thu"]; r["chi_phi_chuyen"] += c["chi_phi_chuyen"]
+        r["doanh_thu"] += (c["doanh_thu"] or 0); r["chi_phi_chuyen"] += c["chi_phi_chuyen"]
         r["km"] += c["km"] or 0; r["so_lit"] += c["so_lit"] or 0
         r["ngay_khai_thac"] |= {t.ngay_di + timedelta(days=i)
                                 for i in range((t.ngay_ve - t.ngay_di).days + 1)}
@@ -106,34 +106,34 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
     # --- Tầng 2: chi phí của xe trong kỳ ---
     for m in db.execute(select(Maintenance).where(Maintenance.ngay >= d1, Maintenance.ngay <= d2)).scalars():
         r = rows.setdefault(m.vehicle_id, _rong(veh.get(m.vehicle_id), m.vehicle_id))
-        r["chi_phi_xe"] += m.so_tien
-        r["chi_tiet_cp_xe"]["bao_duong"] = r["chi_tiet_cp_xe"].get("bao_duong", 0) + m.so_tien
+        r["chi_phi_xe"] += (m.so_tien or 0)
+        r["chi_tiet_cp_xe"]["bao_duong"] = r["chi_tiet_cp_xe"].get("bao_duong", 0) + (m.so_tien or 0)
 
     cp_doi, chi_tiet_doi = 0.0, {}
     for k in db.execute(select(FleetPeriodCost).where(FleetPeriodCost.ky == ky)).scalars():
         if k.pham_vi == "xe" and k.vehicle_id:
             r = rows.setdefault(k.vehicle_id, _rong(veh.get(k.vehicle_id), k.vehicle_id))
-            r["chi_phi_xe"] += k.so_tien
-            r["chi_tiet_cp_xe"][k.nhom] = r["chi_tiet_cp_xe"].get(k.nhom, 0) + k.so_tien
+            r["chi_phi_xe"] += (k.so_tien or 0)
+            r["chi_tiet_cp_xe"][k.nhom] = r["chi_tiet_cp_xe"].get(k.nhom, 0) + (k.so_tien or 0)
         else:
-            cp_doi += k.so_tien
-            chi_tiet_doi[k.nhom] = chi_tiet_doi.get(k.nhom, 0) + k.so_tien
+            cp_doi += (k.so_tien or 0)
+            chi_tiet_doi[k.nhom] = chi_tiet_doi.get(k.nhom, 0) + (k.so_tien or 0)
 
     # --- Kết quả từng xe ---
     ds = []
     for r in rows.values():
         ngay = len(r["ngay_khai_thac"])
-        lai_gop = r["doanh_thu"] - r["chi_phi_chuyen"]
+        lai_gop = (r["doanh_thu"] or 0) - r["chi_phi_chuyen"]
         ds.append({**{k: v for k, v in r.items() if k != "ngay_khai_thac"},
                    "ngay_khai_thac": ngay,
                    "cong_suat": round(ngay / so_ngay_ky, 4) if so_ngay_ky else None,
                    "lai_gop_chuyen": lai_gop,
                    "ket_qua_xe": lai_gop - r["chi_phi_xe"],
                    "km_moi_lit": (round(r["km"] / r["so_lit"], 2) if r["km"] and r["so_lit"] else None),
-                   "ty_le_lai_gop": (round(lai_gop / r["doanh_thu"], 4) if r["doanh_thu"] else None)})
+                   "ty_le_lai_gop": (round(lai_gop / (r["doanh_thu"] or 0), 4) if (r["doanh_thu"] or 0) else None)})
     ds.sort(key=lambda x: -x["ket_qua_xe"])
 
-    tong_dt = sum(x["doanh_thu"] for x in ds)
+    tong_dt = sum((x["doanh_thu"] or 0) for x in ds)
     tong_cp_chuyen = sum(x["chi_phi_chuyen"] for x in ds)
     tong_cp_xe = sum(x["chi_phi_xe"] for x in ds)
     tong_ngay = sum(x["ngay_khai_thac"] for x in ds)

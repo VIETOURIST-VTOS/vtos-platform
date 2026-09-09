@@ -60,7 +60,7 @@ class TourSettlement(Base):
     sale: Mapped[str] = mapped_column(String(120), default="")
     ngay_kh: Mapped[date | None] = mapped_column(Date, nullable=True)
     ngay_kt: Mapped[date | None] = mapped_column(Date, nullable=True)
-    doanh_thu: Mapped[float] = mapped_column(TIEN, default=0)
+    doanh_thu: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     # NULL nghĩa là CHƯA CÓ SỐ. Đây là lý do tồn tại của cả bảng này.
     gia_von: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     trang_thai_qt: Mapped[str] = mapped_column(String(20), default="du_toan")
@@ -76,4 +76,4 @@ class TourSettlement(Base):
 
     def loi_nhuan(self):
         """Chưa có giá vốn thì KHÔNG có lợi nhuận – trả None, không trả doanh thu."""
-        return None if self.gia_von is None else self.doanh_thu - self.gia_von
+        return None if self.gia_von is None else (self.doanh_thu or 0) - (self.gia_von or 0)

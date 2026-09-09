@@ -79,14 +79,14 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
         if vis is not None: v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") in vis]
     p = db.get(Product, t.product_id) if t.product_id else db.execute(select(Product).where(Product.code == t.product_code)).scalars().first() if t.product_code else None
     v["product"] = AC.mask_product(PS.product_out(p), u) if p else None
-    v["seats"] = {"open": t.seats_open, "promo": t.seats_promo, "booked": R.booked_pax(t), "left": max(0, (t.seats_open or t.planned_pax) - R.booked_pax(t))}
+    v["seats"] = {"open": t.seats_open, "promo": (t.seats_promo or 0), "booked": R.booked_pax(t), "left": max(0, (t.seats_open or t.planned_pax) - R.booked_pax(t))}
     v["prices"] = {"adl": t.price_per_pax, "chd": t.price_chd, "inf": t.price_inf, "promo": t.price_promo}
     # booking + đã thu
     bks = t.bookings
     paid = dict(db.execute(select(Receipt.booking_id, func.coalesce(func.sum(Receipt.amount), 0)).where(Receipt.booking_id.in_([b.id for b in bks] or [0]), Receipt.status != "huy").group_by(Receipt.booking_id)).all())
     for b in v["bookings"]:
         bo = next((x for x in bks if x.id == b["id"]), None)
-        b["paid"] = float(paid.get(b["id"], 0) or 0); b["due"] = max(0.0, b["amount"] - b["discount"] - b["paid"])
+        b["paid"] = float(paid.get(b["id"], 0) or 0); b["due"] = max(0.0, (b["amount"] or 0) - (b["discount"] or 0) - (b["paid"] or 0))
         b["adl"], b["chd"], b["inf"], b["pmt_status"], b["cancelled"], b["cancel_deadline"] = (bo.adl, bo.chd, bo.inf, bo.pmt_status, bo.cancelled, bo.cancel_deadline) if bo else (0, 0, 0, "", False, None)
     v["receipts"] = [{"id": r.id, "code": r.code, "booking_code": next((b.code for b in bks if b.id == r.booking_id), ""), "amount": r.amount, "method": r.method, "payer": r.payer, "status": r.status, "created_at": r.created_at, "confirmed_by": r.confirmed_by}
                      for r in db.execute(select(Receipt).where(Receipt.booking_id.in_([b.id for b in bks] or [0])).order_by(desc(Receipt.created_at))).scalars()]
@@ -98,10 +98,13 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     from app.services import settlement as ST
     lines = [l for l in lines if l.status == "hd"]
     v["cost_lines"] = [ST.line_out(l) for l in ST.lines_of(db, t)]
-    v["cost_total"] = {"actual": sum(l.actual for l in lines), "paid": sum(l.paid for l in lines)}
+    v["cost_total"] = {"actual": sum((l.actual or 0) for l in lines), "paid": sum((l.paid or 0) for l in lines)}
     v["settlement_edit"] = {"can_edit": ST.can_edit(u, t), "version": t.settlement_version, "service_types": ST.SERVICE_TYPES, "summary": ST.summary(db, t), "checks": ST.checks(db, t)}
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
-    v["guides"] = [{"id": a.id, "guide": emps.get(a.guide_id, ""), "days": a.days, "rate_per_day": a.rate_per_day, "holiday": a.holiday, "status": a.status, "amount": a.rate_per_day * a.days * (2 if a.holiday else 1)}
+    # Như trên: đơn giá hiển thị giữ nguyên rỗng, chỉ thù lao mới xử rỗng thành 0.
+    v["guides"] = [{"id": a.id, "guide": emps.get(a.guide_id, ""), "days": a.days,
+                    "rate_per_day": a.rate_per_day, "holiday": a.holiday, "status": a.status,
+                    "amount": (a.rate_per_day or 0) * a.days * (2 if a.holiday else 1)}
                    for a in db.execute(select(GuideAssignment).where(GuideAssignment.tour_id == t.id)).scalars()]
     veh = {x.id: x.plate for x in db.execute(select(Vehicle)).scalars()}
     v["dispatch"] = [{"id": d.id, "plate": veh.get(d.vehicle_id, ""), "driver": emps.get(d.driver_id, ""), "date_from": d.date_from, "date_to": d.date_to, "internal_price": d.internal_price, "status": d.status}
@@ -111,9 +114,9 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     # B3 – Ý kiến thẩm định 06/9/2026: chi phí trên đầu trang là chi phí ĐÃ GHI NHẬN, không phải giá vốn
     # đầy đủ của chuyến. Với tour đang bán chưa có dòng quyết toán, số này gần 0 nên "lợi nhuận" xấp xỉ
     # toàn bộ doanh thu – phải ghi rõ là TẠM TÍNH và cảnh báo ngay cạnh chỉ tiêu.
-    v["summary"] = {"revenue_booking": sum(b["amount"] - b["discount"] for b in v["bookings"] if not b["cancelled"]), "collected": sum(b["paid"] for b in v["bookings"]),
-                    "cost_actual": v["cost_total"]["actual"] or t.actual_cost, "cost_paid": sum(r.amount for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.status == "da_chi")).scalars())}
-    v["summary"]["profit"] = (t.actual_revenue or v["summary"]["revenue_booking"]) - v["summary"]["cost_actual"]
+    v["summary"] = {"revenue_booking": sum((b["amount"] or 0) - (b["discount"] or 0) for b in v["bookings"] if not b["cancelled"]), "collected": sum((b["paid"] or 0) for b in v["bookings"]),
+                    "cost_actual": v["cost_total"]["actual"] or (t.actual_cost or 0), "cost_paid": sum((r.amount or 0) for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.status == "da_chi")).scalars())}
+    v["summary"]["profit"] = ((t.actual_revenue or 0) or v["summary"]["revenue_booking"]) - v["summary"]["cost_actual"]
     confirmed = t.status in ("kt_xac_nhan", "khoa")
     n_lines = len(lines)
     v["summary"]["cost_lines"] = n_lines

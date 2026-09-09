@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
-import { api, vnd, fmtD, fmtDT } from "@/lib/api";
+import { api, vnd, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, errMsg, MangTag } from "@/components/ui";
 
 /** Góc nhìn theo vai trò (Đề xuất 06/9 mục 4). Chỉ mở những góc nhìn mà quy trình hiện có trạng thái tương ứng:
@@ -63,7 +63,7 @@ function Requests() {
     e.preventDefault();
     const f = e.target as HTMLFormElement;
     const d: any = Object.fromEntries(new FormData(f).entries());
-    d.tour_id = Number(d.tour_id); d.pax = Number(d.pax || 1); d.discount = Number(d.discount || 0);
+    d.tour_id = Number(d.tour_id); d.pax = Number(d.pax || 1); d.discount = soTien(d.discount);
     try { const r = await api("/requests", { method: "POST", json: d }); toast(r.message); f.reset(); load(); } catch (x) { toast(errMsg(x), true); }
   }
   async function book(id: number) {

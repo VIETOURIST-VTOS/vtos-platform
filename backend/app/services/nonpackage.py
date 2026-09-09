@@ -82,10 +82,10 @@ def update(db: Session, u: User, b: Booking, d: dict) -> Booking:
         if b.locked: raise Gate("KHOA_BOOKING", "Dịch vụ đã khóa (thu đủ / quá ngày) – mở khóa trước khi đổi giá")
         b.amount = float(d["amount"]); t.price_per_pax = b.amount
     if d.get("cost_amount") is not None:
-        b.cost_amount = max(0.0, float(d["cost_amount"])); t.fixed_cost = b.cost_amount
+        b.cost_amount = max(0.0, float((d["cost_amount"] or 0))); t.fixed_cost = (b.cost_amount or 0)
         l = db.execute(select(TourCostLine).where(TourCostLine.tour_id == t.id, TourCostLine.status == "hd")).scalars().first()
         if l: l.unit_price = l.actual = l.budget = b.cost_amount; l.supplier_name = b.supplier_name or l.supplier_name; l.updated_by = u.username
-        elif b.cost_amount > 0:
+        elif (b.cost_amount or 0) > 0:
             db.add(TourCostLine(tour_id=t.id, line_no=1, description=b.services_note, cost_kind="co_dinh", service_type=b.service_type, supplier_name=b.supplier_name or "NCC", unit_price=b.cost_amount, qty=b.pax, coef=1,
                                 budget=b.cost_amount, actual=b.cost_amount, source="vtos", updated_by=u.username))
     BK.refresh_status(b)
@@ -97,8 +97,8 @@ def row(b: Booking) -> dict:
     t = b.tour
     return {"id": b.id, "code": b.code, "tour_id": t.id, "tour_code": t.code, "tour_status": t.status, "service_type": b.service_type, "service_name": SERVICE_KINDS.get(b.service_type, b.service_type or "–"),
             "description": b.services_note, "country": b.country, "customer_name": b.customer_name, "customer_phone": b.customer_phone, "customer_email": b.customer_email, "source": b.source,
-            "pax": b.pax, "amount": b.amount, "discount": b.discount, "net": max(0.0, b.amount - b.discount), "paid": b.paid, "due": max(0.0, b.amount - b.discount - b.paid), "pmt_status": BK.pmt_status_of(b),
-            "cost_amount": b.cost_amount, "supplier_name": b.supplier_name, "profit": max(0.0, b.amount - b.discount) - b.cost_amount, "service_date": b.service_date, "cancel_deadline": b.cancel_deadline,
+            "pax": b.pax, "amount": (b.amount or 0), "discount": (b.discount or 0), "net": max(0.0, (b.amount or 0) - (b.discount or 0)), "paid": (b.paid or 0), "due": max(0.0, (b.amount or 0) - (b.discount or 0) - (b.paid or 0)), "pmt_status": BK.pmt_status_of(b),
+            "cost_amount": (b.cost_amount or 0), "supplier_name": b.supplier_name, "profit": max(0.0, (b.amount or 0) - (b.discount or 0)) - (b.cost_amount or 0), "service_date": b.service_date, "cancel_deadline": b.cancel_deadline,
             "sales_name": b.sales.full_name if b.sales else "", "created_at": b.created_at, "cancelled": b.cancelled, "cancel_reason": b.cancel_reason, "locked": b.locked, "note": b.care_note, "imported": b.vietrip_id is not None}
 
 
@@ -120,11 +120,11 @@ def summary(rows: list[Booking]) -> dict:
     for b in rows:
         if b.cancelled: continue
         k = b.service_type or "OTHER"; d = by.setdefault(k, {"service_type": k, "service_name": SERVICE_KINDS.get(k, k), "n": 0, "revenue": 0.0, "paid": 0.0, "cost": 0.0})
-        d["n"] += 1; d["revenue"] += b.amount - b.discount; d["paid"] += b.paid; d["cost"] += b.cost_amount
-    out = sorted(by.values(), key=lambda x: -x["revenue"])
-    for d in out: d["profit"] = d["revenue"] - d["cost"]; d["margin"] = d["profit"] / d["revenue"] if d["revenue"] else 0
-    tot = {"n": sum(d["n"] for d in out), "revenue": sum(d["revenue"] for d in out), "paid": sum(d["paid"] for d in out), "cost": sum(d["cost"] for d in out)}
-    tot["profit"] = tot["revenue"] - tot["cost"]; tot["due"] = tot["revenue"] - tot["paid"]; tot["cancelled"] = sum(1 for b in rows if b.cancelled)
+        d["n"] += 1; d["revenue"] += (b.amount or 0) - (b.discount or 0); d["paid"] += (b.paid or 0); d["cost"] += (b.cost_amount or 0)
+    out = sorted(by.values(), key=lambda x: -(x["revenue"] or 0))
+    for d in out: d["profit"] = (d["revenue"] or 0) - (d["cost"] or 0); d["margin"] = d["profit"] / (d["revenue"] or 0) if (d["revenue"] or 0) else 0
+    tot = {"n": sum(d["n"] for d in out), "revenue": sum((d["revenue"] or 0) for d in out), "paid": sum((d["paid"] or 0) for d in out), "cost": sum((d["cost"] or 0) for d in out)}
+    tot["profit"] = (tot["revenue"] or 0) - (tot["cost"] or 0); tot["due"] = (tot["revenue"] or 0) - (tot["paid"] or 0); tot["cancelled"] = sum(1 for b in rows if b.cancelled)
     return {"by_type": out, "total": tot}
 
 
@@ -140,12 +140,12 @@ def close_month(db: Session, u: User, month: str) -> dict:
     done, skipped = [], []
     for t in ts:
         bs = [b for b in t.bookings if not b.cancelled]
-        rev = sum(b.amount - b.discount for b in bs) + sum(b.cancel_charge for b in t.bookings if b.cancelled)
-        paid = sum(b.paid for b in bs)
+        rev = sum((b.amount or 0) - (b.discount or 0) for b in bs) + sum((b.cancel_charge or 0) for b in t.bookings if b.cancelled)
+        paid = sum((b.paid or 0) for b in bs)
         if bs and paid < rev - 1:
             skipped.append({"code": t.code, "due": rev - paid}); continue
         lines = list(db.execute(select(TourCostLine).where(TourCostLine.tour_id == t.id, TourCostLine.status == "hd")).scalars())
-        cost = sum(l.actual for l in lines) if lines else sum(b.cost_amount for b in bs)
+        cost = sum((l.actual or 0) for l in lines) if lines else sum((b.cost_amount or 0) for b in bs)
         t.actual_revenue, t.actual_cost, t.closed_at, t.status, t.kt_confirmed_at = rev, cost, datetime.now(), "kt_xac_nhan", datetime.now()
         EV(db, t, "dong_so", u.username, f"Chốt dịch vụ lẻ tháng {month}: doanh thu {rev:,.0f}, giá vốn {cost:,.0f}", title="Chốt dịch vụ lẻ (Kế toán)")
         EV(db, t, "kt_xac_nhan", u.username, "Xác nhận theo lô dịch vụ lẻ")
@@ -158,8 +158,8 @@ def close_month(db: Session, u: User, month: str) -> dict:
 def print_html(b: Booking, company: str = "CÔNG TY CỔ PHẦN DU LỊCH VIETOURIST") -> str:
     t = b.tour
     rows = [("Mã dịch vụ", t.code), ("Loại dịch vụ", SERVICE_KINDS.get(b.service_type, b.service_type)), ("Nội dung", b.services_note or t.name), ("Quốc gia", b.country or "–"), ("Ngày sử dụng", f"{b.service_date:%d/%m/%Y}" if b.service_date else "–"),
-            ("Khách hàng", f"{b.customer_name} – {b.customer_phone}" + (f" – {b.customer_email}" if b.customer_email else "")), ("Số khách", str(b.pax)), ("Giá dịch vụ", f"{b.amount - b.discount:,.0f} đ"),
-            ("Đã thanh toán", f"{b.paid:,.0f} đ"), ("Còn lại", f"{max(0.0, b.amount - b.discount - b.paid):,.0f} đ"), ("Nhân viên", b.sales.full_name if b.sales else ""), ("Ghi chú", b.care_note or "–")]
+            ("Khách hàng", f"{b.customer_name} – {b.customer_phone}" + (f" – {b.customer_email}" if b.customer_email else "")), ("Số khách", str(b.pax)), ("Giá dịch vụ", f"{(b.amount or 0) - (b.discount or 0):,.0f} đ"),
+            ("Đã thanh toán", f"{(b.paid or 0):,.0f} đ"), ("Còn lại", f"{max(0.0, (b.amount or 0) - (b.discount or 0) - (b.paid or 0)):,.0f} đ"), ("Nhân viên", b.sales.full_name if b.sales else ""), ("Ghi chú", b.care_note or "–")]
     trs = "".join(f"<tr><td style='padding:6px 10px;border:1px solid #999;width:32%'><b>{k}</b></td><td style='padding:6px 10px;border:1px solid #999'>{v}</td></tr>" for k, v in rows)
     return f"""<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Phiếu xác nhận dịch vụ {t.code}</title></head>
 <body style="font-family:'Times New Roman',serif;max-width:720px;margin:24px auto;color:#000">

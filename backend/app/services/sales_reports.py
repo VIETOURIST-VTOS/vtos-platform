@@ -48,12 +48,12 @@ def ban_tour_le(db: Session, d1: date, d2: date, mang: str = "") -> dict:
     for b in rows:
         s = by.setdefault(_sales_name(b) or "(không có sale)", {"sale": _sales_name(b) or "(không có sale)", "bookings": 0, "pax": 0, "revenue": 0.0, "paid": 0.0, "due": 0.0, "cancelled": 0, "du_4_truong": 0, "sla_qua": 0})
         if b.cancelled: s["cancelled"] += 1; continue
-        s["bookings"] += 1; s["pax"] += b.pax; s["revenue"] += b.amount - b.discount; s["paid"] += b.paid; s["due"] += max(0.0, b.amount - b.discount - b.paid)
+        s["bookings"] += 1; s["pax"] += b.pax; s["revenue"] += (b.amount or 0) - (b.discount or 0); s["paid"] += (b.paid or 0); s["due"] += max(0.0, (b.amount or 0) - (b.discount or 0) - (b.paid or 0))
         s["du_4_truong"] += 1 if b.counts_for_target else 0; s["sla_qua"] += 0 if b.sla_ok else 1
-    summary = sorted(by.values(), key=lambda x: -x["revenue"])
+    summary = sorted(by.values(), key=lambda x: -(x["revenue"] or 0))
     detail = [{"created_at": b.created_at, "code": b.code, "tour_code": b.tour.code, "start_date": b.tour.start_date, "customer": b.customer_name, "phone": b.customer_phone, "source": b.source, "pax": b.pax,
-               "revenue": b.amount - b.discount, "paid": b.paid, "due": max(0.0, b.amount - b.discount - b.paid), "status": BK.pmt_status_of(b), "sale": _sales_name(b), "counts": b.counts_for_target, "sla_ok": b.sla_ok, "cancelled": b.cancelled} for b in rows]
-    tot = {"bookings": sum(s["bookings"] for s in summary), "pax": sum(s["pax"] for s in summary), "revenue": sum(s["revenue"] for s in summary), "paid": sum(s["paid"] for s in summary), "due": sum(s["due"] for s in summary), "cancelled": sum(s["cancelled"] for s in summary)}
+               "revenue": (b.amount or 0) - (b.discount or 0), "paid": (b.paid or 0), "due": max(0.0, (b.amount or 0) - (b.discount or 0) - (b.paid or 0)), "status": BK.pmt_status_of(b), "sale": _sales_name(b), "counts": b.counts_for_target, "sla_ok": b.sla_ok, "cancelled": b.cancelled} for b in rows]
+    tot = {"bookings": sum(s["bookings"] for s in summary), "pax": sum(s["pax"] for s in summary), "revenue": sum((s["revenue"] or 0) for s in summary), "paid": sum((s["paid"] or 0) for s in summary), "due": sum(s["due"] for s in summary), "cancelled": sum(s["cancelled"] for s in summary)}
     return {"report": "ban_tour_le", "from": d1, "to": d2, "mang": SEG.valid(mang), "summary": summary, "total": tot, "detail": detail,
             "columns": {"summary": [("sale", "Sale"), ("bookings", "Booking"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn phải thu"), ("cancelled", "Hủy"), ("du_4_truong", "Đủ 4 trường"), ("sla_qua", "Quá SLA 2h")],
                         "detail": [("created_at", "Ngày tạo"), ("code", "Booking"), ("tour_code", "Tour"), ("start_date", "Khởi hành"), ("customer", "Khách"), ("phone", "SĐT"), ("source", "Nguồn"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn lại"), ("status", "TT"), ("sale", "Sale")]}}
@@ -66,11 +66,11 @@ def nhac_thu(db: Session, mang: str = "") -> dict:
     if cond is not None: q = q.where(cond)
     rows = []
     for b in db.execute(q).scalars():
-        due = b.amount - b.discount - b.paid
+        due = (b.amount or 0) - (b.discount or 0) - (b.paid or 0)
         if due <= 1000: continue
         dl = b.cancel_deadline
-        rows.append({"code": b.code, "tour_code": b.tour.code, "start_date": b.tour.start_date, "days_left": (b.tour.start_date - today).days, "customer": b.customer_name, "phone": b.customer_phone, "revenue": b.amount - b.discount,
-                     "deposit_due": BK.deposit_due(b), "paid": b.paid, "due": due, "status": BK.pmt_status_of(b), "deadline": dl, "overdue": bool(dl and now > dl), "sale": _sales_name(b), "locked": b.locked})
+        rows.append({"code": b.code, "tour_code": b.tour.code, "start_date": b.tour.start_date, "days_left": (b.tour.start_date - today).days, "customer": b.customer_name, "phone": b.customer_phone, "revenue": (b.amount or 0) - (b.discount or 0),
+                     "deposit_due": BK.deposit_due(b), "paid": (b.paid or 0), "due": due, "status": BK.pmt_status_of(b), "deadline": dl, "overdue": bool(dl and now > dl), "sale": _sales_name(b), "locked": b.locked})
     rows.sort(key=lambda r: (r["deadline"] or datetime.max, r["start_date"]))
     by: dict[str, dict] = {}
     for r in rows:
@@ -93,10 +93,10 @@ def huy_cho(db: Session, d1: date, d2: date, mang: str = "") -> dict:
     for b in rows:
         rt = rts.get(b.id); late = bool(b.cancel_deadline and b.cancelled_at and b.cancelled_at > b.cancel_deadline)
         detail.append({"cancelled_at": b.cancelled_at, "code": b.code, "tour_code": b.tour.code if b.tour else "", "start_date": b.tour.start_date if b.tour else None, "customer": b.customer_name, "phone": b.customer_phone, "paid": b.paid, "charge": b.cancel_charge,
-                       "retention": rt.code if rt else "", "retention_amt": rt.amount if rt else 0.0, "refund": max(0.0, b.paid - b.cancel_charge) if not rt else 0.0, "reason": b.cancel_reason, "late": late, "sale": _sales_name(b)})
+                       "retention": rt.code if rt else "", "retention_amt": (rt.amount or 0) if rt else 0.0, "refund": max(0.0, (b.paid or 0) - (b.cancel_charge or 0)) if not rt else 0.0, "reason": b.cancel_reason, "late": late, "sale": _sales_name(b)})
         s = by.setdefault(_sales_name(b) or "(không có sale)", {"sale": _sales_name(b) or "(không có sale)", "cancelled": 0, "paid": 0.0, "charge": 0.0, "retained": 0.0, "late": 0})
-        s["cancelled"] += 1; s["paid"] += b.paid; s["charge"] += b.cancel_charge; s["retained"] += rt.amount if rt else 0; s["late"] += 1 if late else 0
-    return {"report": "huy_cho", "from": d1, "to": d2, "mang": SEG.valid(mang), "summary": sorted(by.values(), key=lambda x: -x["cancelled"]), "total": {"cancelled": len(rows), "charge": sum(b.cancel_charge for b in rows), "retained": sum(r.amount for r in rts.values())}, "detail": detail,
+        s["cancelled"] += 1; s["paid"] += (b.paid or 0); s["charge"] += (b.cancel_charge or 0); s["retained"] += (rt.amount or 0) if rt else 0; s["late"] += 1 if late else 0
+    return {"report": "huy_cho", "from": d1, "to": d2, "mang": SEG.valid(mang), "summary": sorted(by.values(), key=lambda x: -x["cancelled"]), "total": {"cancelled": len(rows), "charge": sum((b.cancel_charge or 0) for b in rows), "retained": sum((r.amount or 0) for r in rts.values())}, "detail": detail,
             "columns": {"summary": [("sale", "Sale"), ("cancelled", "Số hủy"), ("paid", "Đã thu trước hủy"), ("charge", "Phí hủy giữ lại"), ("retained", "Bảo lưu"), ("late", "Hủy sau deadline")],
                         "detail": [("cancelled_at", "Ngày hủy"), ("code", "Booking"), ("tour_code", "Tour"), ("start_date", "Khởi hành"), ("customer", "Khách"), ("phone", "SĐT"), ("paid", "Đã thu"), ("charge", "Phí hủy"), ("retention", "Bảo lưu"), ("retention_amt", "Tiền BL"), ("refund", "Hoàn"), ("reason", "Lý do"), ("late", "Sau deadline"), ("sale", "Sale")]}}
 
@@ -113,8 +113,8 @@ def kinh_doanh(db: Session, month: str, mang: str = "") -> dict:
     for b in db.execute(q).scalars():
         e = emps.get(b.sales_id)
         s = by.setdefault(b.sales_id, {"sale": _sales_name(b), "office": e.office if e else "", "department": e.department if e else "", "bookings": 0, "pax": 0, "revenue": 0.0, "revenue_target": 0.0, "paid": 0.0, "moc": HR.moc_of(e, moc_hcm, moc_ct) if e else moc_hcm})
-        s["bookings"] += 1; s["pax"] += b.pax; s["revenue"] += b.amount - b.discount; s["paid"] += b.paid
-        if b.counts_for_target and (not R.is_doan(b.tour)): s["revenue_target"] += b.amount - b.discount
+        s["bookings"] += 1; s["pax"] += b.pax; s["revenue"] += (b.amount or 0) - (b.discount or 0); s["paid"] += (b.paid or 0)
+        if b.counts_for_target and (not R.is_doan(b.tour)): s["revenue_target"] += (b.amount or 0) - (b.discount or 0)
     out = []
     for s in by.values():
         lvl, rate = HR.f_rate(s["revenue_target"], s["moc"], table)
@@ -128,7 +128,7 @@ def kinh_doanh(db: Session, month: str, mang: str = "") -> dict:
     if SEG.valid(mang) == "doan":
         note = ("Mảng Đoàn không hưởng hoa hồng theo bậc thang doanh thu mà theo chia lợi nhuận quyết toán, "
                 "nên hai cột \"DT tính chỉ tiêu\" và \"Hoa hồng ước\" ở đây bằng 0 – xem số chính thức ở bảng lương.")
-    return {"report": "kinh_doanh", "month": month, "mang": SEG.valid(mang), "summary": out, "total": {"bookings": sum(s["bookings"] for s in out), "revenue": sum(s["revenue"] for s in out), "revenue_target": sum(s["revenue_target"] for s in out), "commission_est": sum(s["commission_est"] for s in out)}, "detail": [],
+    return {"report": "kinh_doanh", "month": month, "mang": SEG.valid(mang), "summary": out, "total": {"bookings": sum(s["bookings"] for s in out), "revenue": sum((s["revenue"] or 0) for s in out), "revenue_target": sum(s["revenue_target"] for s in out), "commission_est": sum(s["commission_est"] for s in out)}, "detail": [],
             "note": note,
             "columns": {"summary": [("sale", "Sale"), ("office", "VP"), ("bookings", "Booking"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("revenue_target", "DT tính chỉ tiêu"), ("moc", "Mốc"), ("pct_moc", "% mốc"), ("f", "Bậc"), ("rate", "Hệ số"), ("commission_est", "Hoa hồng ước"), ("paid", "Đã thu")], "detail": []}}
 
@@ -145,11 +145,11 @@ def tour_le(db: Session, d1: date, d2: date, mang: str = "") -> dict:
     ts = list(db.execute(select(Tour).where(Tour.start_date >= d1, Tour.start_date <= d2, cond).order_by(Tour.start_date)).scalars())
     rows = []
     for t in ts:
-        bs = [b for b in t.bookings if not b.cancelled]; rev = sum(b.amount - b.discount for b in bs); paid = sum(b.paid for b in bs)
-        sm = ST.summary(db, t); cost = sm["actual"] if sm["lines"] else (t.actual_cost or (t.fixed_cost + t.var_cost_per_pax * len(bs)))
+        bs = [b for b in t.bookings if not b.cancelled]; rev = sum((b.amount or 0) - (b.discount or 0) for b in bs); paid = sum((b.paid or 0) for b in bs)
+        sm = ST.summary(db, t); cost = (sm["actual"] or 0) if sm["lines"] else ((t.actual_cost or 0) or ((t.fixed_cost or 0) + (t.var_cost_per_pax or 0) * len(bs)))
         rows.append({"tour_code": t.code, "name": t.name, "start_date": t.start_date, "end_date": t.end_date, "seats_open": t.seats_open or t.planned_pax, "pax": sum(b.pax for b in bs), "bookings": len(bs), "revenue": rev, "paid": paid, "due": rev - paid,
                      "cost": cost, "profit": rev - cost, "margin": (rev - cost) / rev if rev else 0, "status": t.status, "operator": t.operator.full_name if t.operator else "", "version": t.settlement_version})
-    tot = {"tours": len(rows), "pax": sum(r["pax"] for r in rows), "revenue": sum(r["revenue"] for r in rows), "paid": sum(r["paid"] for r in rows), "cost": sum(r["cost"] for r in rows)}; tot["profit"] = tot["revenue"] - tot["cost"]
+    tot = {"tours": len(rows), "pax": sum(r["pax"] for r in rows), "revenue": sum((r["revenue"] or 0) for r in rows), "paid": sum((r["paid"] or 0) for r in rows), "cost": sum((r["cost"] or 0) for r in rows)}; tot["profit"] = (tot["revenue"] or 0) - (tot["cost"] or 0)
     return {"report": "tour_le", "from": d1, "to": d2, "mang": SEG.valid(mang), "summary": rows, "total": tot, "detail": [],
             "columns": {"summary": [("tour_code", "Tour"), ("name", "Tên"), ("start_date", "Khởi hành"), ("seats_open", "Mở bán"), ("pax", "Khách"), ("bookings", "Booking"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn lại"), ("cost", "Chi phí"), ("profit", "Lợi nhuận"), ("margin", "Biên"), ("status", "Trạng thái"), ("operator", "Điều hành")], "detail": []}}
 
@@ -213,7 +213,7 @@ def r9_anomalies(db: Session) -> list[dict]:
     q = select(Booking).where(Booking.created_at >= datetime.combine(m0, datetime.min.time()), Booking.cancelled == False)
     miss: dict[str, int] = {}; big = 0
     for b in db.execute(q).scalars():
-        if b.amount and b.discount / b.amount > 0.15: big += 1; add("r9_giam_gia_lon", "warn", f"booking:{b.code}", f"{b.code} giảm giá {b.discount / b.amount * 100:.0f}% ({b.discount:,.0f} đ) – cần mã KM có duyệt")
+        if (b.amount or 0) and (b.discount or 0) / (b.amount or 0) > 0.15: big += 1; add("r9_giam_gia_lon", "warn", f"booking:{b.code}", f"{b.code} giảm giá {(b.discount or 0) / (b.amount or 0) * 100:.0f}% ({(b.discount or 0):,.0f} đ) – cần mã KM có duyệt")
         if not b.counts_for_target: miss[_sales_name(b)] = miss.get(_sales_name(b), 0) + 1
     for s, n in miss.items():
         if n >= 3: add("r9_thieu_4_truong", "warn", f"sale:{s}", f"Sale {s} có {n} booking thiếu 4 trường trong tháng – không tính chỉ tiêu, cần chấn chỉnh")
@@ -227,8 +227,8 @@ def r9_anomalies(db: Session) -> list[dict]:
     for pr in db.execute(select(PaymentRequest).order_by(PaymentRequest.created_at)).scalars():
         key = (pr.supplier_tax_code or pr.supplier_name.strip().upper())
         seen[key] = seen.get(key, 0) + 1
-        if seen[key] == 1 and pr.amount >= 20_000_000 and pr.created_at >= datetime.combine(m0, datetime.min.time()) and pr.status not in ("tu_choi",) and not pr.code.startswith("VTDC"):
-            add("r9_ncc_moi_chi_lon", "warn", f"dc:{pr.code}", f"{pr.code}: NCC mới {pr.supplier_name} ({pr.amount:,.0f} đ) – lần đầu giao dịch, kiểm tra hồ sơ NCC/tài khoản")
+        if seen[key] == 1 and (pr.amount or 0) >= 20_000_000 and pr.created_at >= datetime.combine(m0, datetime.min.time()) and pr.status not in ("tu_choi",) and not pr.code.startswith("VTDC"):
+            add("r9_ncc_moi_chi_lon", "warn", f"dc:{pr.code}", f"{pr.code}: NCC mới {pr.supplier_name} ({(pr.amount or 0):,.0f} đ) – lần đầu giao dịch, kiểm tra hồ sơ NCC/tài khoản")
     # 5. Phiếu thu tiền mặt lớn ≥ 30 triệu trong tháng
     for r in db.execute(select(Receipt).where(Receipt.method == "tien_mat", Receipt.amount >= 30_000_000, Receipt.created_at >= datetime.combine(m0, datetime.min.time()))).scalars():
         add("r9_tien_mat_lon", "warn", f"receipt:{r.code}", f"Phiếu thu tiền mặt {r.code} {r.amount:,.0f} đ – khuyến khích chuyển khoản, Kế toán kiểm biên lai")
@@ -246,9 +246,9 @@ def r9_anomalies(db: Session) -> list[dict]:
         add("r9_huy_bao_luu_lon", "warn", f"baoluu:{rt.code}", f"Hủy bảo lưu {rt.code} {rt.amount:,.0f} đ ({rt.customer_name}) – ghi thu nhập khác, BKS rà lý do: {rt.resolve_note[:80]}")
     # 9. Quyết toán lệch lớn so booking (đã đóng số tháng này)
     for t in db.execute(select(Tour).where(Tour.status.in_(["da_dong_so", "kt_xac_nhan", "khoa"]), Tour.closed_at >= datetime.combine(m0, datetime.min.time()))).scalars():
-        bk = sum(b.amount - b.discount for b in t.bookings if not b.cancelled)
-        if bk and abs(t.actual_revenue - bk) / bk > 0.05:
-            add("r9_lech_doanh_thu", "red", f"tour:{t.code}", f"{t.code}: doanh thu quyết toán {t.actual_revenue:,.0f} lệch {abs(t.actual_revenue - bk) / bk * 100:.0f}% so booking {bk:,.0f}")
+        bk = sum((b.amount or 0) - (b.discount or 0) for b in t.bookings if not b.cancelled)
+        if bk and abs((t.actual_revenue or 0) - bk) / bk > 0.05:
+            add("r9_lech_doanh_thu", "red", f"tour:{t.code}", f"{t.code}: doanh thu quyết toán {(t.actual_revenue or 0):,.0f} lệch {abs((t.actual_revenue or 0) - bk) / bk * 100:.0f}% so booking {bk:,.0f}")
     return out
 
 

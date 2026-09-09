@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import DinhKem from "@/components/DinhKem";
-import { api, vnd, fmtD } from "@/lib/api";
+import { api, vnd, fmtD, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 /** Tài sản cố định & chi phí trả trước — V5 của lệnh 08/9/2026.
@@ -47,9 +47,9 @@ function TaiSan() {
       const la = f.loai === "ts";
       const body: any = { code: f.code, name: f.name, kind: f.kind, department: f.department || "",
         start_date: f.start_date, quantity: Number(f.quantity) || 1, note: f.note || "" };
-      if (la) Object.assign(body, { purchase_date: f.purchase_date || null, cost: Number(f.cost) || 0,
-        depr_months: Number(f.depr_months) || 0, salvage: Number(f.salvage) || 0 });
-      else Object.assign(body, { amount: Number(f.cost) || 0, months: Number(f.depr_months) || 1 });
+      if (la) Object.assign(body, { purchase_date: f.purchase_date || null, cost: soTien(f.cost),
+        depr_months: Number(f.depr_months) || 0, salvage: soTien(f.salvage) });
+      else Object.assign(body, { amount: soTien(f.cost), months: Number(f.depr_months) || 1 });
       await api(la ? "/fixed-assets" : "/prepaid", { method: "POST", json: body });
       toast("Đã ghi. Nhớ đính kèm hóa đơn và biên bản bàn giao."); setF(null); await load();
     } catch (e) { toast(errMsg(e), true); } finally { setLuu(false); }

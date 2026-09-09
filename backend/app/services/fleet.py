@@ -426,7 +426,7 @@ def kiem_chuyen(db: Session, t) -> dict:
     cps = list(db.execute(select(TripCost).where(TripCost.trip_id == t.id)).scalars())
     nguong_ct = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
     for c in cps:
-        if c.amount >= nguong_ct and not (c.chung_tu or "").strip():
+        if (c.amount or 0) >= nguong_ct and not (c.chung_tu or "").strip():
             do(f"{COST_KINDS.get(c.kind, c.kind)} {c.amount:,.0f} đ không có chứng từ gốc (chặn cứng B6)")
     # Tiêu hao nhiên liệu ngoài dải hợp lý – chỉ chấm khi có ĐỦ cả số lít lẫn quãng đường.
     lit = sum(c.lit for c in cps if c.kind == "dau")

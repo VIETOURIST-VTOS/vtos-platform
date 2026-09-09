@@ -55,7 +55,7 @@ def base_salary_le(emp: Employee, rev: float, moc: float, step_amt: float, cut: 
     if rev >= moc:
         return emp.base_salary
     steps = math.ceil((moc - rev) / step_amt)
-    return max(0.0, emp.base_salary - steps * cut)
+    return max(0.0, (emp.base_salary or 0) - steps * cut)
 
 
 def month_tours(db: Session, y: int, m: int) -> list[Tour]:
@@ -129,16 +129,16 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         s = R.settlement_summary(db, t)
         for b in t.bookings:
             if R.is_doan(t):
-                share = s["profit"] * (b.amount / s["revenue"] if s["revenue"] else 0)
+                share = s["profit"] * ((b.amount or 0) / (s["revenue"] or 0) if (s["revenue"] or 0) else 0)
                 doan_profit_by_sales[b.sales_id] = doan_profit_by_sales.get(b.sales_id, 0) + share
                 continue
             if not b.counts_for_target:
                 continue                         # thiếu 4 trường → không chỉ tiêu, không hoa hồng
             if (emp_by_user.get(b.sales_id), t.id) in l3:
                 continue                         # sự vụ mức 3 trên chính booking/đoàn này → không hoa hồng
-            net = b.amount - b.discount           # mã KM: tính theo doanh thu đã giảm
+            net = (b.amount or 0) - (b.discount or 0)           # mã KM: tính theo doanh thu đã giảm
             if t.below_margin and not t.strategic and s["margin"] < thr:
-                share_by_sales[b.sales_id] = share_by_sales.get(b.sales_id, 0) + max(0.0, s["profit"] * (b.amount / s["revenue"] if s["revenue"] else 0)) * 0.10
+                share_by_sales[b.sales_id] = share_by_sales.get(b.sales_id, 0) + max(0.0, s["profit"] * ((b.amount or 0) / (s["revenue"] or 0) if (s["revenue"] or 0) else 0)) * 0.10
             else:
                 rev_by_sales[b.sales_id] = rev_by_sales.get(b.sales_id, 0) + net
         if R.is_doan(t) and s["profit"] > 0:
@@ -209,7 +209,7 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
                 for t in month_tours(db, yy, mm):
                     if R.is_doan(t):
                         s = R.settlement_summary(db, t)
-                        tot += sum(s["profit"] * (b.amount / s["revenue"] if s["revenue"] else 0) for b in t.bookings if b.sales_id == e.user_id)
+                        tot += sum(s["profit"] * ((b.amount or 0) / (s["revenue"] or 0) if (s["revenue"] or 0) else 0) for b in t.bookings if b.sales_id == e.user_id)
                 hist.append({"ky": f"{yy:04d}-{mm:02d}", "loi_nhuan": round(tot)})
             xd = L.xac_dinh_thang_loi_nhuan(e, hist, moc_luong_doan, sorted(DOAN_F))
             row(e)["xac_dinh_luong"] = xd
@@ -256,7 +256,7 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         if a.tour_id not in tour_ids or a.guide_id not in emps:
             continue
         e = emps[a.guide_id]; t = db.get(Tour, a.tour_id)
-        gross = a.rate_per_day * a.days * (2 if a.holiday else 1)
+        gross = (a.rate_per_day or 0) * a.days * (2 if a.holiday else 1)
         if not a.report_submitted or not a.advance_settled:
             row(e)["ghi_chu"].append(f"TREO thù lao {t.code}: thiếu báo cáo tour / chưa hoàn ứng"); continue
         add(e, f"Thù lao dẫn {t.code}: {a.days} ngày × {a.rate_per_day:,.0f}{' ×2 lễ' if a.holiday else ''}", gross)
@@ -288,10 +288,10 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         r = rows[e.id]
         if e.contract_type != "hdld":
             continue          # cộng tác viên (HDV) không thuộc diện đóng BHXH bắt buộc – chỉ khấu trừ TNCN 10%
-        if e.bhxh_base and e.bhxh_base > 0:
-            r["bhxh"] = round(e.bhxh_base * ty_bhxh)
+        if (e.bhxh_base or 0) and (e.bhxh_base or 0) > 0:
+            r["bhxh"] = round((e.bhxh_base or 0) * ty_bhxh)
             r["bhxh_base"] = e.bhxh_base
-            if e.member_org: r["doan_phi"] = round(e.bhxh_base * ty_doan_phi)
+            if e.member_org: r["doan_phi"] = round((e.bhxh_base or 0) * ty_doan_phi)
         else:
             r["thieu_muc_bhxh"] = True
             r["ghi_chu"].append("CHƯA CÓ MỨC ĐÓNG BHXH – chưa trừ bảo hiểm và đoàn phí; HCNS nạp danh sách "

@@ -111,7 +111,7 @@ def cost_lines(tid: int, u: User = Depends(require_roles(*AC.COST_ROLES, mo_ta="
     rows = db.execute(select(TourCostLine).where(TourCostLine.tour_id == tid).order_by(TourCostLine.line_no)).scalars().all()
     return {"tour": t.code, "rows": [{"id": l.id, "line_no": l.line_no, "description": l.description, "cost_kind": l.cost_kind, "service_type": l.service_type, "supplier_name": l.supplier_name,
                                       "supplier_tax_code": l.supplier_tax_code, "unit_price": l.unit_price, "qty": l.qty, "coef": l.coef, "actual": l.actual, "paid": l.paid, "note": l.note, "source": l.source} for l in rows],
-            "total_actual": sum(l.actual for l in rows), "total_paid": sum(l.paid for l in rows)}
+            "total_actual": sum((l.actual or 0) for l in rows), "total_paid": sum((l.paid or 0) for l in rows)}
 
 
 # đặt sau cùng để không nuốt /apply, /status, /records

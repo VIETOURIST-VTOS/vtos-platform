@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
-import { api, vnd, fmtD, fmtDT } from "@/lib/api";
+import { api, vnd, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, Gate, errMsg, MangTag } from "@/components/ui";
 
 const PMT: Record<string, [string, string]> = { UNPAID: ["Chưa cọc", "red"], DEPO: ["Đã cọc", "warn"], PAID: ["Đủ tiền", "ok"], CANCEL: ["Đã hủy", ""] };
@@ -38,7 +38,7 @@ function Bookings() {
   };
   const doCancel = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
-    if (await run(`/bookings/${cancel.id}/cancel`, { reason: d.reason, charge: Number(d.charge || 0), retain: d.mode === "retain", expires_days: d.expires_days ? Number(d.expires_days) : null })) setCancel(null);
+    if (await run(`/bookings/${cancel.id}/cancel`, { reason: d.reason, charge: soTien(d.charge), retain: d.mode === "retain", expires_days: d.expires_days ? Number(d.expires_days) : null })) setCancel(null);
   };
   const doApply = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());

@@ -186,7 +186,7 @@ def dao_han_thieu_chan(db: Session) -> list[dict]:
         if co_tra and co_nhan:
             continue
         thieu = "nhận giải ngân khoản mới" if co_tra else "trả gốc khoản cũ"
-        so = max((sum(l.debit + l.credit for l in e.lines) for e in es), default=0) / 2
+        so = max((sum((l.debit or 0) + (l.credit or 0) for l in e.lines) for e in es), default=0) / 2
         ra.append({"ma": f"dao_han_thieu_chan#{ma}", "loai": "dao_han_thieu_chan", "muc": "do",
                    "luc": min(e.created_at for e in es), "doi_tuong": f"dao_han:{ma}",
                    "nguoi_quyet": "", "ly_do": "",

@@ -184,7 +184,7 @@ def lap_hop_dong(db: Session, bg: BaoGia, boi: str, **data) -> HopDongKhach:
         khach_ten=data.get("khach_ten") or bg.khach_ten,
         khach_dai_dien=data.get("khach_dai_dien", ""), khach_ma_so_thue=data.get("khach_ma_so_thue", ""),
         khach_dia_chi=data.get("khach_dia_chi", ""), ngay_ky=data.get("ngay_ky"),
-        gia_tri=float(ban.tong_ban or 0), dat_coc=float(data.get("dat_coc") or 0),
+        gia_tri=float(ban.tong_ban or 0), dat_coc=None if data.get("dat_coc") in (None, "") else float(data["dat_coc"]),
         han_thanh_toan=data.get("han_thanh_toan"), ghi_chu=data.get("ghi_chu", ""), tao_boi=boi)
     db.add(hd); db.flush()
     return hd

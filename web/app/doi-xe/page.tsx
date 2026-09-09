@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
-import { api, fmtD, fmtDT } from "@/lib/api";
+import { api, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 /** Hồ sơ đội xe Vietrip – Đợt 1.
@@ -69,9 +69,9 @@ function DoiXe() {
           km_dau: form.km_dau, km_cuoi: form.km_cuoi, doanh_thu: form.doanh_thu, note: form.note } });
         // Bốn khoản chi phí ghi thành bốn dòng riêng: mỗi dòng phải trả lời được loại gì, ai chịu, chứng từ đâu.
         for (const k of ["dau", "cau_duong", "cong_tac_phi", "giu_xe"]) {
-          const tien = Number(form[k] || 0);
-          if (tien > 0) await api(`/fleet/chuyen/${r.id}/chi-phi`, { method: "POST", json: {
-            kind: k, amount: tien, lit: k === "dau" ? Number(form.lit || 0) : 0, chung_tu: form.chung_tu || "" } });
+          const tien = soTien(form[k]);
+          if (tien && tien > 0) await api(`/fleet/chuyen/${r.id}/chi-phi`, { method: "POST", json: {
+            kind: k, amount: tien, lit: k === "dau" ? soTien(form.lit) : null, chung_tu: form.chung_tu || "" } });
         }
         toast("Đã ghi phiếu chi phí xe");
       }
@@ -140,20 +140,20 @@ function DoiXe() {
             <input value={form.ten_tour || ""} onChange={(e) => setForm({ ...form, ten_tour: e.target.value })} placeholder="Đà Lạt (lẻ)" /></label>
           <label>Ngày đi<input type="date" value={form.ngay_di || ""} onChange={(e) => setForm({ ...form, ngay_di: e.target.value })} /></label>
           <label>Ngày về<input type="date" value={form.ngay_ve || ""} onChange={(e) => setForm({ ...form, ngay_ve: e.target.value })} /></label>
-          <label>Km đầu<input type="number" value={form.km_dau ?? ""} onChange={(e) => setForm({ ...form, km_dau: e.target.value === "" ? null : Number(e.target.value) })} /></label>
-          <label>Km cuối<input type="number" value={form.km_cuoi ?? ""} onChange={(e) => setForm({ ...form, km_cuoi: e.target.value === "" ? null : Number(e.target.value) })} /></label>
-          <label>Doanh thu (đ)<input type="number" value={form.doanh_thu ?? ""} onChange={(e) => setForm({ ...form, doanh_thu: e.target.value === "" ? null : Number(e.target.value) })} /></label>
+          <label>Km đầu<input type="number" value={form.km_dau ?? ""} onChange={(e) => setForm({ ...form, km_dau: soTien(e.target.value) })} /></label>
+          <label>Km cuối<input type="number" value={form.km_cuoi ?? ""} onChange={(e) => setForm({ ...form, km_cuoi: soTien(e.target.value) })} /></label>
+          <label>Doanh thu (đ)<input type="number" value={form.doanh_thu ?? ""} onChange={(e) => setForm({ ...form, doanh_thu: soTien(e.target.value) })} /></label>
           <label>Ghi chú<input value={form.note || ""} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
         </div>
         {!form.id && <>
           <h3>Chi phí chuyến</h3>
           <p className="muted">Bốn khoản này Vietourist tạm ứng theo quy tắc chốt 07/9/2026. Để trống khoản nào thì không ghi dòng đó.</p>
           <div className="grid2">
-            <label>Tiền dầu (đ)<input type="number" value={form.dau ?? ""} onChange={(e) => setForm({ ...form, dau: Number(e.target.value) })} /></label>
-            <label>Số lít<input type="number" step="0.001" value={form.lit ?? ""} onChange={(e) => setForm({ ...form, lit: Number(e.target.value) })} /></label>
-            <label>Phí cầu đường (đ)<input type="number" value={form.cau_duong ?? ""} onChange={(e) => setForm({ ...form, cau_duong: Number(e.target.value) })} /></label>
-            <label>Công tác phí tài xế (đ)<input type="number" value={form.cong_tac_phi ?? ""} onChange={(e) => setForm({ ...form, cong_tac_phi: Number(e.target.value) })} /></label>
-            <label>Phí gửi xe (đ)<input type="number" value={form.giu_xe ?? ""} onChange={(e) => setForm({ ...form, giu_xe: Number(e.target.value) })} /></label>
+            <label>Tiền dầu (đ)<input type="number" value={form.dau ?? ""} onChange={(e) => setForm({ ...form, dau: soTien(e.target.value) })} /></label>
+            <label>Số lít<input type="number" step="0.001" value={form.lit ?? ""} onChange={(e) => setForm({ ...form, lit: soTien(e.target.value) })} /></label>
+            <label>Phí cầu đường (đ)<input type="number" value={form.cau_duong ?? ""} onChange={(e) => setForm({ ...form, cau_duong: soTien(e.target.value) })} /></label>
+            <label>Công tác phí tài xế (đ)<input type="number" value={form.cong_tac_phi ?? ""} onChange={(e) => setForm({ ...form, cong_tac_phi: soTien(e.target.value) })} /></label>
+            <label>Phí gửi xe (đ)<input type="number" value={form.giu_xe ?? ""} onChange={(e) => setForm({ ...form, giu_xe: soTien(e.target.value) })} /></label>
             <label>Số chứng từ<input value={form.chung_tu || ""} onChange={(e) => setForm({ ...form, chung_tu: e.target.value })} /></label>
           </div>
         </>}
@@ -204,7 +204,7 @@ function DoiXe() {
         ngay thì cuối tháng phải đọc lại từng phiếu để đoán.</p>
       <div className="grid2">
         <label>Ngày đề xuất<input type="date" value={formDX.ngay || ""} onChange={(e) => setFormDX({ ...formDX, ngay: e.target.value })} /></label>
-        <label>Số tiền (đ)<input type="number" value={formDX.so_tien ?? ""} onChange={(e) => setFormDX({ ...formDX, so_tien: Number(e.target.value) })} /></label>
+        <label>Số tiền (đ)<input type="number" value={formDX.so_tien ?? ""} onChange={(e) => setFormDX({ ...formDX, so_tien: soTien(e.target.value) })} /></label>
         <label>Xe (để trống = đề xuất chung)
           <select value={formDX.bien_so || ""} onChange={(e) => setFormDX({ ...formDX, bien_so: e.target.value })}>
             <option value="">— đề xuất chung, không thuộc xe nào —</option>

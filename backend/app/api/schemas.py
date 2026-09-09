@@ -28,9 +28,9 @@ class TourCreate(BaseModel):
     start_date: date
     end_date: date
     operator_id: int
-    price_per_pax: float = 0
-    fixed_cost: float = 0
-    var_cost_per_pax: float = 0
+    price_per_pax: float | None = None
+    fixed_cost: float | None = None
+    var_cost_per_pax: float | None = None
     planned_pax: int = 0
     rest_stops: str = ""
     company_id: int | None = None      # pháp nhân chủ quản; bỏ trống thì tour vào danh sách đối chiếu
@@ -40,18 +40,18 @@ class TourEdit(BaseModel):
     # V10 – phiên bản người gọi đang cầm. Để RỖNG = màn hình chưa gửi, máy chủ cho qua (xem
     # app/services/ghi_mot_lan.kiem_phien_ban). Gửi số lệch = từ chối kèm nội dung mới.
     phien_ban: int | None = None
-    price_per_pax: float = 0
-    fixed_cost: float = 0
-    var_cost_per_pax: float = 0
+    price_per_pax: float | None = None
+    fixed_cost: float | None = None
+    var_cost_per_pax: float | None = None
     planned_pax: int = 0
     rest_stops: str = ""
     justification: str = ""
 
 
 class TourClose(BaseModel):
-    actual_revenue: float
-    actual_cost: float
-    promo_value: float = 0
+    actual_revenue: float | None = None
+    actual_cost: float | None = None
+    promo_value: float | None = None
     note: str = ""
 
 
@@ -71,7 +71,7 @@ class ProductIn(BaseModel):
     vehicle_type: str = ""
     length_text: str = ""
     days: int = 1
-    reference_price: float = 0
+    reference_price: float | None = None
     deposit_pct: float = 30
     days_to_close: int = 3
     requires_confirmation: bool = False
@@ -87,10 +87,10 @@ class OpenTourIn(BaseModel):
     start_date: date
     seats: int = 0
     price_adl: float | None = None
-    price_chd: float = 0
-    price_inf: float = 0
+    price_chd: float | None = None
+    price_inf: float | None = None
     seats_promo: int = 0
-    price_promo: float = 0
+    price_promo: float | None = None
     operator_id: int | None = None
     note: str = ""
     date_to: date | None = None          # có → mở theo lịch lặp
@@ -111,7 +111,7 @@ class RequestCreate(BaseModel):
     pax: int = 1
     campaign_code: str = ""
     promo_code: str = ""
-    discount: float = 0
+    discount: float | None = None
 
 
 class BookingCustomerIn(BaseModel):

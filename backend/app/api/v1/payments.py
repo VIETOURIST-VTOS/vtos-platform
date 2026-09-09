@@ -183,7 +183,7 @@ class CashIn(BaseModel):
 def cash_receipt(data: CashIn, u: User = Depends(require_roles("ketoan",)), db: Session = Depends(get_db)):
     b = db.get(Booking, data.booking_id)
     if not b: raise HTTPException(404, "Không có booking")
-    if data.amount <= 0: raise HTTPException(422, "Số tiền phải > 0")
+    if (data.amount or 0) <= 0: raise HTTPException(422, "Số tiền phải > 0")
     r = P.cash_receipt(db, u, b, data.amount, data.payer, data.note)
     return {"receipt": receipt_out(r, db), "message": f"Đã lập phiếu thu tiền mặt {r.code}"}
 
@@ -196,9 +196,9 @@ def collections_summary(u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: qb = qb.where(Booking.sales_id.in_(vis))
     for b in db.execute(qb).scalars():
-        due = (b.amount - b.discount) - P.paid_amount(db, b.id)
+        due = ((b.amount or 0) - (b.discount or 0)) - P.paid_amount(db, b.id)
         rows.append({"booking_id": b.id, "code": b.code, "tour_code": b.tour.code if b.tour else "", "customer_name": b.customer_name,
-                     "total": b.amount - b.discount, "paid": b.paid, "due": due})
+                     "total": (b.amount or 0) - (b.discount or 0), "paid": (b.paid or 0), "due": due})
     return {"bookings": rows,
             "pending_txns": db.execute(select(BankTransaction).where(BankTransaction.match_status == "cho_ke_toan")).scalars().all().__len__(),
             "pending_receipts": db.execute(select(Receipt).where(Receipt.status == "tu_dong")).scalars().all().__len__()}

@@ -25,7 +25,7 @@ def _ra(s: TourSettlement) -> dict:
             "dieu_hanh": s.dieu_hanh, "da_anh_xa": s.operator_id is not None, "sale": s.sale,
             "ngay_kh": s.ngay_kh, "ngay_kt": s.ngay_kt,
             "doanh_thu": s.doanh_thu, "gia_von": s.gia_von, "loi_nhuan": s.loi_nhuan(),
-            "ty_le": (round(s.loi_nhuan() / s.doanh_thu, 4)
+            "ty_le": (round(s.loi_nhuan() / (s.doanh_thu or 0), 4)
                       if s.loi_nhuan() is not None and s.doanh_thu else None),
             "trang_thai_qt": s.trang_thai_qt,
             "trang_thai_ten": TRANG_THAI_QT.get(s.trang_thai_qt, s.trang_thai_qt),
@@ -83,7 +83,7 @@ def phan_loai(sid: int, data: PhanLoaiIn, u: User = Depends(require_roles(*WRITE
 
 
 class GiaVonIn(BaseModel):
-    gia_von: float
+    gia_von: float | None = None
     ghi_chu: str = ""
 
 
@@ -93,7 +93,7 @@ def nhap_gia_von(sid: int, data: GiaVonIn, u: User = Depends(require_roles(*WRIT
     """Điều hành bổ sung giá vốn cho một đơn đang nằm ở hàng đợi."""
     s = db.get(TourSettlement, sid)
     if s is None: raise HTTPException(404, "Không có dòng quyết toán này")
-    if data.gia_von <= 0:
+    if (data.gia_von or 0) <= 0:
         raise HTTPException(422, "Giá vốn phải lớn hơn 0. Đơn không phát sinh giá vốn thì PHÂN LOẠI, "
                                  "đừng ghi 0 – 0 và 'chưa có số' là hai chuyện khác nhau.")
     truoc = s.gia_von

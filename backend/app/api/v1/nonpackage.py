@@ -22,9 +22,9 @@ class NPIn(BaseModel):
     source: str = ""
     note: str = ""
     pax: int = 1
-    amount: float = 0
-    discount: float = 0
-    cost_amount: float = 0
+    amount: float | None = None
+    discount: float | None = None
+    cost_amount: float | None = None
     supplier_name: str = ""
     service_date: str | None = None
     sales_id: int | None = None

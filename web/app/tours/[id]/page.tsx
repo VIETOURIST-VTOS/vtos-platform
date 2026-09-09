@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
-import { api, pct, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
+import { api, pct, vnd, fmtD, fmtDT, getToken, soTien } from "@/lib/api";
 import { ROLES, TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
 import { Tag, Gate, errMsg } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
@@ -27,12 +27,13 @@ function TourDetail() {
   const run = async (path: string, json?: any) => { try { const r = await api(`/tours/${t.id}/${path}`, { method: "POST", json: { note, ...(json || {}) } }); toast(r.message); setNote(""); load(); } catch (e) { toast(errMsg(e), true); } };
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
-    ["price_per_pax", "fixed_cost", "var_cost_per_pax", "planned_pax"].forEach((k) => (d[k] = Number(d[k] || 0)));
+    ["price_per_pax", "fixed_cost", "var_cost_per_pax"].forEach((k) => (d[k] = soTien(d[k])));
+    d.planned_pax = Number(d.planned_pax || 0);
     try { await api(`/tours/${t.id}`, { method: "PUT", json: d }); toast("Đã lưu dự toán"); load(); } catch (x) { toast(errMsg(x), true); }
   };
   const closeTour = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
-    run("close", { actual_revenue: Number(d.actual_revenue), actual_cost: Number(d.actual_cost), promo_value: Number(d.promo_value || 0) });
+    run("close", { actual_revenue: soTien(d.actual_revenue), actual_cost: soTien(d.actual_cost), promo_value: soTien(d.promo_value) });
   };
   const bookedAmount = sm.revenue_booking || 0;
   const NoteBox = () => <label>Lời giải trình / ghi chú cho bước này (hiển thị ở Quy trình & lịch sử)<input value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: khách ít nên biên thấp, nhờ anh duyệt…" /></label>;
@@ -179,7 +180,8 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
   const calc = (f: any) => Math.round(f.cost_kind === "theo_khach" ? f.unit_price * f.qty * f.coef : f.unit_price * f.coef);
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const body = { ...edit }; ["unit_price", "qty", "coef", "budget"].forEach((k) => (body[k] = Number(body[k] || 0)));
+    const body = { ...edit }; ["unit_price", "budget"].forEach((k) => (body[k] = soTien(body[k])));
+    ["qty", "coef"].forEach((k) => (body[k] = Number(body[k] || 0)));
     try { await api(edit.id ? `${base}/lines/${edit.id}` : `${base}/lines`, { method: edit.id ? "PUT" : "POST", json: body }); toast(edit.id ? "Đã sửa dòng" : "Đã thêm dòng"); setEdit(null); load(); } catch (x) { toast(errMsg(x), true); }
   };
   const cancel = async (l: any) => { const r = prompt(`Lý do hủy dòng ${l.line_no} – ${l.description}?`); if (!r) return; try { await api(`${base}/lines/${l.id}/cancel`, { method: "POST", json: { note: r } }); toast("Đã hủy dòng"); load(); } catch (x) { toast(errMsg(x), true); } };

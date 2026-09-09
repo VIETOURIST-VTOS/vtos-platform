@@ -21,8 +21,13 @@ from app.services import rules as R
 
 # --- Dấu hiệu KHÔNG phải tiền. Xét TRƯỚC, vì nhiều cột chứa cả chữ tiền lẫn chữ tỷ lệ
 #     (fee_weight có "fee", vat_rate có "vat") và trong những trường hợp đó thì phần đuôi mới đúng.
+# "_suat" thêm 09/9/2026: thue_suat và lai_suat là TỶ LỆ, nhưng cả hai đều chứa chữ nằm trong danh
+# sách "là tiền" ("thue", "lai") nên bị xếp nhầm thành tiền. Bắt ở ĐUÔI chứ không ở giữa: cột bắt đầu
+# bằng "suat" (suat_an – tiền ăn ca) vẫn là tiền thật.
+# Tìm ra khi đổi kiểu 48 cột: purchase_invoices.thue_suat lọt vào danh sách đổi, và nó là cột DUY NHẤT
+# trong 48 cột chưa có người xem lại. Bốn cột rate_per_day có người xem thì xếp đúng.
 DUOI_KHONG_TIEN = ("_pct", "_rate", "_ratio", "_days", "_hours", "_hour", "_score", "_weight",
-                   "_qty", "_count", "_km", "_percent")
+                   "_qty", "_count", "_km", "_percent", "_suat")
 CHUA_KHONG_TIEN = ("ty_le", "he_so", "phan_tram", "diem", "score", "coef", "weight", "percent")
 DUNG_KHONG_TIEN = ("days", "lit", "qty", "so_luong", "work", "ot_hours", "so_lan", "so_ngay",
                    "so_gio", "so_khach", "pax", "annual_leave_days")
@@ -88,7 +93,7 @@ def dong_bo(db: Session) -> dict:
     vì quyết định của người về cột đó vẫn là dữ kiện lịch sử đáng giữ."""
     hien = {(x["bang"], x["cot"]): x for x in _cot_so_thuc()}
     cu = {(r.bang, r.cot): r for r in db.execute(select(KsCotTien)).scalars()}
-    now = datetime.now(); them = 0
+    now = datetime.now(); them = doi_y = 0
     for k, x in hien.items():
         r = cu.get(k)
         if r is None:
@@ -101,12 +106,27 @@ def dong_bo(db: Session) -> dict:
             # Kiểu và ràng buộc đọc lại mỗi lần: đó chính là thứ V9 sẽ sửa và K1 phải thấy giảm.
             r.kieu, r.cho_rong, r.mac_dinh_0 = x["kieu"], x["cho_rong"], x["mac_dinh_0"]
             r.lan_cuoi, r.con = now, True
+            # XẾP LOẠI CỦA MÁY CŨNG TÍNH LẠI. Bản trước chỉ tính một lần, lúc dòng được ghi vào sổ –
+            # nên vá bộ xếp loại xong thì mọi dòng đã ghi vẫn mang kết luận cũ, và bản vá coi như
+            # không có tác dụng gì ngoài những cột thêm về sau.
+            #
+            # Tìm ra ngày 09/9/2026: sau khi thêm "_suat" vào danh sách "không phải tiền",
+            # purchase_invoices.thue_suat VẪN hiện là tiền với lý do cũ "tên chứa thue".
+            #
+            # Quyết định của NGƯỜI không bị đụng tới – nó nằm ở quyet_nguoi và luôn thắng. Cái tính lại
+            # ở đây là ĐỀ XUẤT của máy. Máy đổi ý trên một cột người đã quyết thì cũng đáng hiện ra:
+            # đó là lúc nên hỏi lại người quyết, không phải lúc im lặng ghi đè.
+            xep_moi, ly_do_moi = xep_theo_ten(x["cot"])
+            if (r.xep_may, r.ly_do_may) != (xep_moi, ly_do_moi):
+                r.xep_may, r.ly_do_may = xep_moi, ly_do_moi
+                doi_y += 1
     mat = 0
     for k, r in cu.items():
         if k not in hien and r.con:
             r.con = False; mat += 1
     db.commit()
-    return {"tong_cot": len(hien), "them_moi": them, "khong_con": mat}
+    return {"tong_cot": len(hien), "them_moi": them, "khong_con": mat,
+            "may_doi_y": doi_y}
 
 
 def _hieu_luc(db: Session) -> list[KsCotTien]:
@@ -314,3 +334,154 @@ def nap_quyet_dinh(db: Session) -> dict:
         n2 += 1
     if n1 or n2: db.commit()
     return {"xep_loai": n1, "quyet_k2": n2}
+
+
+# ============================== ĐẾM PHẦN LẺ TRƯỚC KHI ĐỔI KIỂU ==============================
+#
+# Cửa sổ đo này chỉ mở MỘT LẦN. numeric(18,2) giữ đúng hai chữ số thập phân; giá trị đang có chữ số
+# thứ ba trở đi sẽ bị LÀM TRÒN lúc đổi kiểu, và đó là thay đổi không quay lại được – hạ cấp khôi phục
+# KIỂU, không khôi phục SỐ. Đếm sau khi đã đổi thì luôn ra 0, vì cột mới không giữ nổi chữ số thứ ba,
+# nên nó không chứng minh được gì.
+#
+# Truy vấn tự tìm MỌI cột số thực nhị phân trong cơ sở dữ liệu chứ không đọc từ danh sách chép tay:
+# danh sách chép tay thì cột thêm sau sẽ lọt. Nội dung SQL lấy từ
+# docs/VTOS_V9_dot3_dem_phan_le_truoc_khi_doi_kieu.sql (làn V9 soạn 09/9/2026).
+#
+# CHỈ ĐỌC. Chạy được lúc hệ thống đang phục vụ.
+
+SQL_PHAN_LE = """
+SELECT c.table_name || '.' || c.column_name AS cot,
+       (xpath('/row/c/text()', query_to_xml(
+          format('SELECT COUNT(*) AS c FROM public.%I WHERE %I IS NOT NULL AND %I*100 <> ROUND(%I::numeric*100)',
+                 c.table_name, c.column_name, c.column_name, c.column_name),
+          false, true, '')))[1]::text::bigint AS so_dong_co_le
+FROM information_schema.columns c
+JOIN information_schema.tables t
+  ON t.table_schema = c.table_schema
+ AND t.table_name  = c.table_name
+ AND t.table_type  = 'BASE TABLE'
+WHERE c.table_schema = 'public'
+  AND c.data_type IN ('double precision', 'real')
+ORDER BY 2 DESC, 1
+"""
+
+
+def dem_phan_le(db: Session) -> dict:
+    """Bao nhiêu dòng sẽ bị LÀM TRÒN nếu đổi cột số thực nhị phân sang numeric(18,2)?
+
+    Ra 0 ở mọi cột nghĩa là đổi kiểu là phép biến đổi không mất gì – lúc đó mới nên đổi. Khác 0 thì
+    phải xem từng cột và quyết TRƯỚC, không đổi rồi mới xem.
+    """
+    from sqlalchemy import text
+    if db.bind.dialect.name != "postgresql":
+        return {"chay_duoc": False,
+                "vi_sao": "Phép đo này chỉ chạy trên PostgreSQL. Máy lập trình dùng SQLite – nơi kiểu "
+                          "cột không được ép, nên đo ở đó không nói gì về máy chủ thật.",
+                "cot": [], "tong_dong_se_lam_tron": None}
+    hang = db.execute(text(SQL_PHAN_LE)).all()
+    cot = [{"cot": r[0], "so_dong_co_le": int(r[1] or 0)} for r in hang]
+    return {"chay_duoc": True,
+            "so_cot_so_thuc": len(cot),
+            "cot_co_phan_le": [c for c in cot if c["so_dong_co_le"] > 0],
+            "tong_dong_se_lam_tron": sum(c["so_dong_co_le"] for c in cot),
+            "ket_luan": ("Không dòng nào mất số khi đổi kiểu."
+                         if not any(c["so_dong_co_le"] for c in cot) else
+                         "CÓ dòng sẽ bị làm tròn – phải quyết từng cột TRƯỚC khi đổi."),
+            "cot": cot}
+
+
+# ============================== K2: ĐẾM SỐ 0 TRƯỚC KHI QUYẾT ==============================
+#
+# K2 nói: cột tiền vừa mặc định 0 vừa không cho rỗng thì "chưa có số" và "bằng 0" là một. Nhưng
+# "không phân biệt được" là một câu ĐỊNH TÍNH – nó không nói cho người quyết biết chuyện này lớn cỡ nào
+# ở từng cột. Một cột có 0/1000 dòng bằng 0 thì gần như không có gì để lo; một cột có 900/1000 dòng
+# bằng 0 thì gần như toàn bộ cột ấy là dấu hỏi.
+#
+# Con số ấy phải có TRƯỚC khi quyết, vì việc quyết là quyết từng cột:
+#   · "sửa"  – cho phép rỗng, và đây là chỗ phải cẩn thận: sau khi cho rỗng thì số 0 ĐANG CÓ vẫn là 0,
+#              không tự thành rỗng. Đổi kiểu không tách được hai nghĩa đã trộn vào nhau; nó chỉ ngăn
+#              chuyện trộn TIẾP TỤC xảy ra.
+#   · "giữ"  – kèm lý do, cho những cột mà 0 đúng là 0 (ví dụ: giảm giá, phụ cấp – không có thì bằng 0).
+#
+# CHỈ ĐỌC, chạy được lúc hệ thống đang phục vụ. Một truy vấn duy nhất cho toàn bộ danh sách: hỏi 91 câu
+# riêng lẻ trên máy chủ 0,5 CPU là tự làm nghẽn chính mình.
+
+SQL_DEM_0 = """
+SELECT c.table_name || '.' || c.column_name AS cot,
+       (xpath('/row/c/text()', query_to_xml(
+          format('SELECT COUNT(*) AS c FROM public.%I', c.table_name),
+          false, true, '')))[1]::text::bigint AS tong_dong,
+       (xpath('/row/c/text()', query_to_xml(
+          format('SELECT COUNT(*) AS c FROM public.%I WHERE %I = 0', c.table_name, c.column_name),
+          false, true, '')))[1]::text::bigint AS so_dong_bang_0
+FROM information_schema.columns c
+JOIN information_schema.tables t
+  ON t.table_schema = c.table_schema
+ AND t.table_name  = c.table_name
+ AND t.table_type  = 'BASE TABLE'
+WHERE c.table_schema = 'public'
+  AND c.table_name || '.' || c.column_name = ANY(:ds)
+"""
+
+
+def dem_so_0(db: Session) -> dict:
+    """Mỗi cột tiền đang có bao nhiêu dòng mang số 0?
+
+    Trước khi K2 xong: đếm trên những cột CÒN CHỜ QUYẾT, để người quyết chọn "sửa" hay "giữ" cho TỪNG
+    cột thay vì quyết cả 91 cột bằng một cảm giác chung.
+
+    Sau khi K2 xong (danh sách chờ rỗng): đếm trên MỌI cột tiền đã cho phép rỗng, vì lúc đó câu hỏi
+    đã đổi – không còn là "cột nào cần sửa" mà là "còn bao nhiêu dòng CŨ mang số 0 mà không ai biết
+    đó là 'bằng 0' hay 'chưa nhập'". Trả về `xong_k2` để màn hình gọi đúng tên con số nó đang xem.
+    """
+    from sqlalchemy import text
+    dong_bo(db)
+    xau = sorted([r for r in _hieu_luc(db)
+                  if r.xep() == "tien" and r.mac_dinh_0 and not r.cho_rong and r.quyet_k2 != "giu"],
+                 key=lambda r: (r.bang, r.cot))
+
+    # Ngày 09/9/2026 K2 sửa xong cả 91 cột, và danh sách chờ trên về rỗng. Lúc ấy hàm này trả
+    # "0 cột · 0 dòng bằng 0" – đọc lên nghe như "dữ liệu đã sạch", trong khi nó chỉ có nghĩa "không
+    # còn cột nào trong diện chờ quyết". Hai câu đó khác nhau rất xa, và bảng đang nói câu dễ hiểu
+    # lầm hơn: số 0 CŨ vẫn nằm nguyên trong cơ sở dữ liệu.
+    #
+    # Bản nâng cấp K2 cố ý không đụng một dòng dữ liệu nào – nó chỉ ngăn chuyện trộn TIẾP TỤC xảy ra.
+    # Nên sau K2, con số đáng hỏi đã đổi: không còn là "cột nào cần quyết" mà là "bao nhiêu dòng CŨ
+    # đang mang số 0 mà không ai còn biết đó là 'bằng 0' hay 'chưa nhập'". Đó là phần K2 không chữa
+    # được, và là việc của người – không phải việc của một bản nâng cấp.
+    xong_k2 = not xau
+    if xong_k2:
+        xau = sorted([r for r in _hieu_luc(db) if r.xep() == "tien" and r.cho_rong],
+                     key=lambda r: (r.bang, r.cot))
+    ten = [f"{r.bang}.{r.cot}" for r in xau]
+    quyet = {f"{r.bang}.{r.cot}": (r.quyet_k2 or "") for r in xau}
+    if db.bind.dialect.name != "postgresql":
+        return {"chay_duoc": False,
+                "vi_sao": "Chỉ chạy trên PostgreSQL – máy lập trình dùng SQLite, dữ liệu ở đó là dữ "
+                          "liệu nạp mẫu nên đếm ra con số không nói gì về hệ thống thật.",
+                "so_cot": len(ten), "xong_k2": xong_k2, "cot": []}
+    hang = db.execute(text(SQL_DEM_0), {"ds": ten}).all()
+    ra = []
+    for c, tong, so0 in hang:
+        tong, so0 = int(tong or 0), int(so0 or 0)
+        ra.append({"cot": c, "tong_dong": tong, "so_dong_bang_0": so0,
+                   "ty_le_0": round(so0 / tong * 100, 1) if tong else None,
+                   "quyet_k2": quyet.get(c, "")})
+    ra.sort(key=lambda x: (-(x["ty_le_0"] or 0), -x["so_dong_bang_0"]))
+    co_du_lieu = [x for x in ra if x["tong_dong"] > 0]
+    return {"chay_duoc": True, "so_cot": len(ra),
+            "so_cot_bang_trong": len(ra) - len(co_du_lieu),
+            "so_cot_toan_bo_bang_0": len([x for x in co_du_lieu if x["ty_le_0"] == 100.0]),
+            "tong_dong_bang_0": sum(x["so_dong_bang_0"] for x in ra),
+            "xong_k2": xong_k2,
+            "dang_dem": ("so 0 CU con lai" if xong_k2 else "cot cho quyet"),
+            "tieu_de": ("Số 0 CŨ còn lại – nhập trước ngày K2, không còn biết là 'bằng 0' hay 'chưa nhập'"
+                        if xong_k2 else "Cột tiền còn chờ quyết sửa hay giữ"),
+            "ghi_chu": ("Mọi cột tiền đã cho phép rỗng – từ nay ô để trống lưu thành RỖNG. Nhưng bản "
+                        "nâng cấp cố ý không đụng dữ liệu cũ, nên những số 0 dưới đây vẫn còn nguyên và "
+                        "vẫn mang hai nghĩa lẫn nhau. Không có phép nào tách chúng ra được: chỉ người "
+                        "biết việc mới nói được dòng nào là 'đúng bằng 0', dòng nào là 'chưa ai nhập'."
+                        if xong_k2 else
+                        "Bảng đang trống thì chưa có gì để lo – nhưng cột vẫn cần quyết trước khi có dữ "
+                        "liệu, vì sau đó thì số 0 đã trộn vào rồi."),
+            "cot": ra}

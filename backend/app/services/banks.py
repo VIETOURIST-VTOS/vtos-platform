@@ -307,7 +307,7 @@ def revert(db: Session, u: User, bank_code: str, since: date, upto: date) -> dic
 
 
 def _balance(db: Session, codes: list[str], upto: date) -> float:
-    q = (select(func.coalesce(func.sum(JournalLine.debit - JournalLine.credit), 0.0))
+    q = (select(func.coalesce(func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)), 0.0))
          .join(JournalEntry, JournalLine.entry_id == JournalEntry.id)
          .where(JournalEntry.status == POSTED, JournalEntry.entry_date <= upto,
                 JournalLine.account_code.in_(codes)))
@@ -478,7 +478,7 @@ def load_doc_map(db: Session) -> tuple[dict, dict]:
     exact: dict[tuple, str] = {}
     by_doc: dict[str, set] = defaultdict(set)
     for m in db.execute(select(BankDocMap)).scalars():
-        exact[(m.doc_no, round(m.amount, 0), m.side)] = m.bank_code
+        exact[(m.doc_no, round((m.amount or 0), 0), m.side)] = m.bank_code
         by_doc[m.doc_no].add(m.bank_code)
     single = {d: next(iter(v)) for d, v in by_doc.items() if len(v) == 1}
     return exact, single

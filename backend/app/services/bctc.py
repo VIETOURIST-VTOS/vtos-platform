@@ -45,10 +45,10 @@ def account_balances(db: Session, upto: date, exclude_kiem_toan: bool = False) -
     out: dict[str, dict] = {}
     for l, d, st, eid, ref, desc in _lines(db, upto, exclude_kiem_toan=exclude_kiem_toan):
         a = out.setdefault(l.account_code, {"net": 0.0, "by_partner": {}})
-        a["net"] += l.debit - l.credit
+        a["net"] += (l.debit or 0) - (l.credit or 0)
         if l.account_code.startswith(BY_PARTNER):
             k = l.partner_code or l.partner or ""
-            a["by_partner"][k] = a["by_partner"].get(k, 0.0) + l.debit - l.credit
+            a["by_partner"][k] = a["by_partner"].get(k, 0.0) + (l.debit or 0) - (l.credit or 0)
     return out
 
 
@@ -105,7 +105,7 @@ def income_statement_tt99(db: Session, since: date, upto: date) -> dict:
         while not code and p and p.parent:
             p = accs.get(p.parent); code = p.pl_code if p else ""
         if not code: continue
-        amt = (l.credit - l.debit) if a.kind == "DT" else (l.debit - l.credit)
+        amt = ((l.credit or 0) - (l.debit or 0)) if a.kind == "DT" else ((l.debit or 0) - (l.credit or 0))
         v[code] = v.get(code, 0.0) + amt
         if l.account_code.startswith("6351"): v["24"] = v.get("24", 0.0) + amt
     for c, f in {m["code"]: m["formula"] for m in MAU["kqkd"] if m["formula"]}.items():
@@ -288,14 +288,14 @@ def loan_bank_detail_341(db: Session, since: date, upto: date) -> dict:
         g = groups.setdefault(key, {"bank": names.get(pcode) or l.partner or "Đối tượng nội bộ chưa phân loại ngân hàng",
                                      "account": l.account_code, "open": 0.0, "debit": 0.0, "credit": 0.0})
         if dt <= end0:
-            g["open"] += l.debit - l.credit
+            g["open"] += (l.debit or 0) - (l.credit or 0)
         elif since <= dt <= upto:
-            g["debit"] += l.debit; g["credit"] += l.credit
+            g["debit"] += (l.debit or 0); g["credit"] += (l.credit or 0)
     rows = []
     for (pcode, acc), g in sorted(groups.items(), key=lambda x: (x[1]["bank"], x[0][1])):
         open_c = -g["open"]                       # dư Có = -(Nợ-Có)
-        close_c = -(g["open"] + g["debit"] - g["credit"])
-        if abs(open_c) < 1 and abs(close_c) < 1 and abs(g["debit"]) < 1 and abs(g["credit"]) < 1: continue
+        close_c = -(g["open"] + (g["debit"] or 0) - (g["credit"] or 0))
+        if abs(open_c) < 1 and abs(close_c) < 1 and abs((g["debit"] or 0)) < 1 and abs((g["credit"] or 0)) < 1: continue
         a = accs.get(acc)
         kind = LOAN_KIND_NAME.get(acc) or (a.name if a else acc) or ("Vay và nợ thuê tài chính dài hạn" if a and a.bs_credit == "339" else "Vay và nợ thuê tài chính ngắn hạn")
         rows.append({"bank": g["bank"], "partner_code": pcode, "account": acc, "kind": kind,

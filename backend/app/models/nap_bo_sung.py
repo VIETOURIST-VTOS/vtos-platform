@@ -17,6 +17,7 @@ from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 
 # ====================== MARKETING – CHI THEO KÊNH ======================
@@ -48,7 +49,7 @@ class MktChannelSpend(Base):
     ky: Mapped[str] = mapped_column(String(7), index=True)                  # YYYY-MM
     kenh: Mapped[str] = mapped_column(String(20))
     chien_dich: Mapped[str] = mapped_column(String(120), default="")        # rỗng = chi chung của kênh
-    so_tien: Mapped[float | None] = mapped_column(Float, nullable=True)
+    so_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     luot_hien_thi: Mapped[int | None] = mapped_column(Integer, nullable=True)
     luot_nhap: Mapped[int | None] = mapped_column(Integer, nullable=True)
     so_lead: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -81,8 +82,8 @@ class SalesByConsultant(Base):
     nhom_kd: Mapped[str] = mapped_column(String(20), default="")
     so_booking: Mapped[int | None] = mapped_column(Integer, nullable=True)
     so_khach: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    doanh_thu: Mapped[float | None] = mapped_column(Float, nullable=True)
-    doanh_thu_da_thu: Mapped[float | None] = mapped_column(Float, nullable=True)
+    doanh_thu: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    doanh_thu_da_thu: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     hoa_hong: Mapped[float | None] = mapped_column(Float, nullable=True)
     ghi_chu: Mapped[str] = mapped_column(String(300), default="")
     nguon: Mapped[str] = mapped_column(String(20), default="nhap_tay")
@@ -115,10 +116,10 @@ class PurchaseInvoice(Base):
     so_hoa_don: Mapped[str] = mapped_column(String(20), default="")
     ngay_hd: Mapped[date | None] = mapped_column(Date, nullable=True)
     noi_dung: Mapped[str] = mapped_column(String(300), default="")
-    tien_truoc_thue: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tien_truoc_thue: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     thue_suat: Mapped[float | None] = mapped_column(Float, nullable=True)   # 0 / 0.05 / 0.08 / 0.1
-    tien_thue: Mapped[float | None] = mapped_column(Float, nullable=True)
-    tong_tien: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tien_thue: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    tong_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     ma_tour: Mapped[str] = mapped_column(String(60), default="")            # gợi ý của người nạp, chưa phải ràng buộc
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True)
     tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True)
