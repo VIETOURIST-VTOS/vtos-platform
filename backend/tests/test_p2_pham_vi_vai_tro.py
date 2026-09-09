@@ -121,15 +121,19 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 #
 # Ba vai trò máy (P8) vào bảng ngay từ lần đầu: chốt sớm thì mọi lần nới sau đều phải giải thích.
 PHAM_VI_DA_CHOT = {
-    "chutich": 96, "tgd": 96, "bks": 96, "cntt": 94,
-    "ketoan": 80, "tp_dh": 77, "ptgd_doan": 57, "nv_dh": 53, "hcns": 52, "gd_kd": 51,
+    # +1 cho sáu vai trò ngày 09/9/2026 – nhóm "/api/v1/tong-dai" gắn vào màn hình /kiem-soat: nhật ký
+    # NGUYÊN VĂN sự kiện tổng đài (P.A Việt Nam không công bố đặc tả webhook, nên VTOS nghe trước rồi mới
+    # diễn giải). Cố ý KHÔNG gắn vào /inbox dù cuộc gọi rồi sẽ hiện ở hộp thư: gắn ở đó là mở tiền tố cho
+    # mười ba vai trò trong khi chỉ bốn vai trò gọi được, và phần dôi ra vẫn là quyền đã cấp.
+    "chutich": 97, "tgd": 97, "bks": 97, "cntt": 95,
+    "ketoan": 81, "tp_dh": 77, "ptgd_doan": 57, "nv_dh": 53, "hcns": 52, "gd_kd": 51,
     "ptgd_mkt": 38, "nv_kd": 39, "tn_kd": 39, "tp_kd": 39, "nv_mkt": 30,
     "gd_doi_xe": 24, "hanh_chinh": 24, "tp_hd": 22, "xe_hdv": 17, "nv_visa": 17,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 96, "robot_vpm": 17,
+    "robot_pq": 18, "robot_ks": 97, "robot_vpm": 17,
 }
 
 

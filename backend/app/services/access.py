@@ -255,7 +255,15 @@ MAN_HINH_API = {
     "/huong-dan": ("/api/v1/huong-dan", "/api/v1/guide-rates", "/api/v1/guide-assignments"),
     "/inbox": ("/api/v1/inbox", "/api/v1/facebook", "/api/v1/zalo"),
     "/khieu-nai": ("/api/v1/khieu-nai", "/api/v1/cskh", "/api/v1/bookings", "/api/v1/payment-requests"),
-    "/kiem-soat": ("/api/v1/kiem-soat",),
+    # Nhật ký NGUYÊN VĂN sự kiện tổng đài về đây chứ không về /inbox, dù cuộc gọi rồi sẽ hiện ở hộp thư.
+    # Lý do: gắn vào /inbox là mở tiền tố cho mười ba vai trò, trong khi chỉ bốn vai trò gọi được đường
+    # dẫn ấy – phần dôi ra không dùng được nhưng vẫn là quyền đã cấp, và quyền đã cấp thì lần sau ai thêm
+    # một đường dẫn cùng tiền tố là mười ba vai trò lặng lẽ có nó. Nhật ký này là bản ghi kỹ thuật thô,
+    # có số điện thoại khách trong đó; đúng chỗ của nó là bàn Kiểm soát, cạnh nhật ký sự kiện kỹ thuật.
+    # Khi phần diễn giải xong và cuộc gọi lên hộp thư thì đó là đường dẫn khác, mở có chủ đích.
+    # Đầu NHẬN (/tong-dai/cuoc-goi/<chuỗi bí mật>) KHÔNG đi qua hàng rào này – tổng đài không có phiên
+    # đăng nhập của VTOS, khoá của nó là chuỗi bí mật trong đường dẫn.
+    "/kiem-soat": ("/api/v1/kiem-soat", "/api/v1/tong-dai"),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
