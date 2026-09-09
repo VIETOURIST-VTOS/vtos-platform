@@ -2,9 +2,9 @@
 
 Vì sao cần một phép thử canh chuyện này thay vì tin vào lần sửa hôm nay:
 
-Bước 1 của K2 cho phép 86 cột tiền nhận giá trị rỗng, vì "0" và "chưa nhập" là hai chuyện khác nhau
-và trước đó phần mềm không phân biệt được. Bước 2 gia cố 228 chỗ đọc để phép tính không vỡ khi gặp
-rỗng. Nhưng chỗ đọc thì mỗi tuần lại thêm, còn cái vỡ thì không kêu: `None - 0` ném lỗi ngay giữa
+Bước 1 của K2 cho phép 83 cột tiền nhận giá trị rỗng, vì "0" và "chưa nhập" là hai chuyện khác nhau
+và trước đó phần mềm không phân biệt được. Bước 2 gia cố 275 chỗ đọc (228 phép tính + 47 phép so
+sánh) để không vỡ khi gặp rỗng. Nhưng chỗ đọc thì mỗi tuần lại thêm, còn cái vỡ thì không kêu: `None - 0` ném lỗi ngay giữa
 một báo cáo, và người dùng chỉ thấy màn hình trắng chứ không thấy dòng nào sai.
 
 Nên phép thử này quét mã nguồn, không quét dữ liệu. Nó đọc danh sách cột tiền TỪ MÔ HÌNH chứ không
@@ -34,8 +34,15 @@ import app.models  # noqa: F401  - nạp đủ mô hình trước khi đọc Bas
 
 GOC = pathlib.Path(__file__).resolve().parents[1] / "app"
 
-# Dấu hiệu "dòng này có phép tính". Cố ý rộng: thà xét thừa một dòng rồi bỏ qua, còn hơn bỏ sót.
-TOAN = re.compile(r"[-+*/]|\bsum\(|\bround\(|\babs\(|\bmax\(|\bmin\(")
+# Dấu hiệu "dòng này có phép tính hoặc phép so sánh". Cố ý rộng: thà xét thừa một dòng rồi bỏ qua,
+# còn hơn bỏ sót.
+#
+# `<` và `>` nằm trong đây vì một lý do phải trả giá mới biết: khi bỏ mặc định 0 ngày 09/9, bảy tệp
+# phép thử đỏ cùng một lỗi `'>=' not supported between NoneType and int`. Bản gia cố đầu tiên chỉ soi
+# PHÉP TÍNH, quên mất rằng `if b.paid >= deposit_due(b)` cũng vỡ y hệt – và vỡ ngay giữa việc xác định
+# trạng thái thanh toán của một booking, không phải ở một báo cáo cuối tháng. So sánh `==` và `!=` thì
+# không cần: chúng chịu được None.
+TOAN = re.compile(r"[-+*/<>]|\bsum\(|\bround\(|\babs\(|\bmax\(|\bmin\(")
 SAU_GAN = re.compile(r"\s*(?:\+=|-=|\*=|/=|=(?!=))")
 SO_SANH_NONE = re.compile(r"\s*(?:is\s+(?:not\s+)?|[=!]=\s*)None\b")
 # Lối thoát có ghi lý do. Không có lý do thì không được miễn.
@@ -122,7 +129,7 @@ def quet() -> list:
 def test_khong_con_cho_doc_cot_tien_chua_chiu_duoc_rong():
     xau = quet()
     assert not xau, (
-        "Có chỗ đọc cột tiền trong phép tính mà chưa chịu được giá trị rỗng. Cột tiền được phép rỗng "
+        "Có chỗ đọc cột tiền trong phép tính hoặc phép so sánh mà chưa chịu được giá trị rỗng. Cột tiền được phép rỗng "
         "từ đợt K2 - rỗng ở đây không phải lỗi dữ liệu mà là 'nhân viên chưa nhập'. Sửa bằng cách bọc "
         "`or 0` quanh chỗ ĐỌC, đừng nới danh sách bỏ qua của phép thử này:\n"
         + "\n".join(f"  {t}:{s}  |  {d}" for t, s, d in xau[:40])
@@ -135,5 +142,28 @@ def test_phep_thu_nay_con_nhin_thay_cot_tien():
     Một phép thử canh cửa mà không còn nhìn thấy cái nó canh thì tệ hơn là không có, vì nó vẫn báo yên.
     """
     ten = ten_cot_tien()
-    assert len(ten) >= 50, f"Chi thay {len(ten)} ten cot tien cho phep rong - dot K2 khai 86 cot (56 ten khac nhau). Cach doc mo hinh hong?"
+    assert len(ten) >= 60, f"Chi thay {len(ten)} ten cot tien cho phep rong - dot K2 khai 83 cot / 64 ten khac nhau. Cach doc mo hinh hong?"
     assert "amount" in ten, "Khong thay ca cot 'amount' - gan nhu chac chan mo hinh chua duoc nap du."
+
+
+# `or 0` đặt sai chỗ không làm vỡ gì cả – nó làm CÂM. Hai lần trong cùng một ngày 09/9/2026, bản chạy
+# tự động bọc `or 0` quanh một giá trị đang được so sánh với None, biến `x is None` thành một biểu thức
+# không bao giờ đúng: một lần ở quyet_toan.loi_nhuan() (chưa có giá vốn thì phải trả None, hoá ra trả
+# số), một lần ở bộ đếm "có doanh thu chưa có giá vốn" (đếm mãi ra 0, tức là cổng chặn giá vốn mở toang
+# mà bảng điều khiển vẫn báo sạch). Không phép thử nào đỏ vì cả hai.
+#
+# Nên chỗ này canh riêng, và canh trên toàn bộ mã nguồn chứ không riêng cột tiền: một chốt kiểm None bị
+# vô hiệu hoá thì cái nó canh biến mất trong im lặng, kiểu hỏng đắt nhất trong các kiểu hỏng.
+CHOT_HONG = re.compile(r"\bor\s+0\s*\)\s*(?:is\s+(?:not\s+)?None|[=!]=\s*None)\b")
+
+
+def test_khong_co_chot_kiem_None_nao_bi_or_0_lam_vo_hieu():
+    xau = []
+    for tep in sorted(GOC.rglob("*.py")):
+        for so, dong in enumerate(tep.read_text(encoding="utf-8").split("\n"), 1):
+            if CHOT_HONG.search(dong):
+                xau.append((str(tep.relative_to(GOC.parent)), so, dong.strip()[:120]))
+    assert not xau, (
+        "`(x or 0) is None` không bao giờ đúng – chốt kiểm 'chưa nhập' ở đây đã bị vô hiệu hoá và sẽ "
+        "hỏng lặng lẽ. Bỏ `or 0` ở vế đang so sánh với None:\n"
+        + "\n".join(f"  {t}:{s}  |  {d}" for t, s, d in xau))

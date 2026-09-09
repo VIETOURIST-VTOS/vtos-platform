@@ -86,7 +86,7 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     paid = dict(db.execute(select(Receipt.booking_id, func.coalesce(func.sum(Receipt.amount), 0)).where(Receipt.booking_id.in_([b.id for b in bks] or [0]), Receipt.status != "huy").group_by(Receipt.booking_id)).all())
     for b in v["bookings"]:
         bo = next((x for x in bks if x.id == b["id"]), None)
-        b["paid"] = float(paid.get(b["id"], 0) or 0); b["due"] = max(0.0, b["amount"] - b["discount"] - b["paid"])
+        b["paid"] = float(paid.get(b["id"], 0) or 0); b["due"] = max(0.0, (b["amount"] or 0) - (b["discount"] or 0) - (b["paid"] or 0))
         b["adl"], b["chd"], b["inf"], b["pmt_status"], b["cancelled"], b["cancel_deadline"] = (bo.adl, bo.chd, bo.inf, bo.pmt_status, bo.cancelled, bo.cancel_deadline) if bo else (0, 0, 0, "", False, None)
     v["receipts"] = [{"id": r.id, "code": r.code, "booking_code": next((b.code for b in bks if b.id == r.booking_id), ""), "amount": r.amount, "method": r.method, "payer": r.payer, "status": r.status, "created_at": r.created_at, "confirmed_by": r.confirmed_by}
                      for r in db.execute(select(Receipt).where(Receipt.booking_id.in_([b.id for b in bks] or [0])).order_by(desc(Receipt.created_at))).scalars()]
@@ -111,7 +111,7 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     # B3 – Ý kiến thẩm định 06/9/2026: chi phí trên đầu trang là chi phí ĐÃ GHI NHẬN, không phải giá vốn
     # đầy đủ của chuyến. Với tour đang bán chưa có dòng quyết toán, số này gần 0 nên "lợi nhuận" xấp xỉ
     # toàn bộ doanh thu – phải ghi rõ là TẠM TÍNH và cảnh báo ngay cạnh chỉ tiêu.
-    v["summary"] = {"revenue_booking": sum(b["amount"] - b["discount"] for b in v["bookings"] if not b["cancelled"]), "collected": sum(b["paid"] for b in v["bookings"]),
+    v["summary"] = {"revenue_booking": sum((b["amount"] or 0) - (b["discount"] or 0) for b in v["bookings"] if not b["cancelled"]), "collected": sum((b["paid"] or 0) for b in v["bookings"]),
                     "cost_actual": v["cost_total"]["actual"] or (t.actual_cost or 0), "cost_paid": sum((r.amount or 0) for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.status == "da_chi")).scalars())}
     v["summary"]["profit"] = ((t.actual_revenue or 0) or v["summary"]["revenue_booking"]) - v["summary"]["cost_actual"]
     confirmed = t.status in ("kt_xac_nhan", "khoa")

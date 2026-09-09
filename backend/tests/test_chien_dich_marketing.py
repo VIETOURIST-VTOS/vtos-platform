@@ -113,7 +113,7 @@ def test_m7_chi_phi_va_doanh_thu_doc_tu_chung_tu_khong_ai_go_tay():
                           amount=10_000_000, description="Quảng cáo", status="da_chi", created_by="cntt"))
     db.add(PaymentRequest(code="DCTEST-02", category="marketing", campaign_id=cid, supplier_name="Zalo",
                           amount=4_000_000, description="Tin nhắn ZNS", status="cho_kt", created_by="cntt"))
-    db.commit(); doanh_thu_bk = bk.amount - bk.discount; db.close()
+    db.commit(); doanh_thu_bk = (bk.amount or 0) - (bk.discount or 0)   # sau K2, chưa nhập giảm giá là RỖNG chứ không phải 0; db.close()
 
     k = client.get(f"/api/v1/marketing/campaigns/{cid}", headers=login("ptgd.mkt")).json()["ket_qua"]
     assert k["so_lead"] == 2 and k["chuyen_doi"] == 1 and k["ty_le_chuyen_doi"] == 0.5

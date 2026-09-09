@@ -215,7 +215,7 @@ def import_opening_balance(db: Session, u: User, tb: bytes, as_of: date, column:
                 missing.append(f"{r['code']}: TK {d - c:,.0f} – đối tượng {sd - sc:,.0f} (lệch {gap:,.0f})")
         else:
             lines.append({"account": r["code"], "debit": d, "credit": c, "note": "Số dư (MISA)"})
-    td = sum(l["debit"] for l in lines); tc = sum(l["credit"] for l in lines)
+    td = sum((l["debit"] or 0) for l in lines); tc = sum((l["credit"] or 0) for l in lines)
     if abs(td - tc) >= 1:
         raise ValueError(f"Bảng cân đối MISA không cân ở tài khoản chi tiết: Nợ {td:,.0f} ≠ Có {tc:,.0f}")
     e = ACC.post_entry(db, u.username, u.role, as_of, f"Số dư đầu kỳ {as_of:%d/%m/%Y} nhập từ MISA ({parsed['period']})", lines, "so_du_dau_ky", ref)
@@ -235,7 +235,7 @@ def _account_net_balances(db: Session, upto: date, exclude_refs: tuple = ()) -> 
     chứng từ có source_ref nằm trong exclude_refs – dùng khi nạp lại mốc chốt kiểm toán để không tính
     trùng lần chốt trước). Vì mọi bút toán đều cân Nợ = Có nên tổng số dư ròng trên TOÀN BỘ tài khoản
     luôn bằng 0 – đây là điều kiện để bút toán điều chỉnh kiểm toán tính theo chênh lệch cũng tự cân."""
-    q = (select(JournalLine.account_code, func.sum(JournalLine.debit - JournalLine.credit))
+    q = (select(JournalLine.account_code, func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)))
          .join(JournalEntry).where(JournalEntry.status == "da_ghi_so", JournalEntry.entry_date <= upto))
     if exclude_refs:
         q = q.where(~JournalEntry.source_ref.in_(exclude_refs))
@@ -298,7 +298,7 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
     partner_accounts = [a["code"] for a in data["tai_khoan"] if a["code"].startswith(BY_PARTNER)]
     cur_by_partner: dict[str, dict[str, float]] = {}
     if partner_accounts:
-        q = (select(JournalLine.account_code, JournalLine.partner_code, func.sum(JournalLine.debit - JournalLine.credit))
+        q = (select(JournalLine.account_code, JournalLine.partner_code, func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)))
              .join(JournalEntry).where(JournalEntry.status == "da_ghi_so", JournalEntry.entry_date <= as_of, JournalLine.account_code.in_(partner_accounts))
              .group_by(JournalLine.account_code, JournalLine.partner_code))
         for code, pcode, net in db.execute(q).all():
@@ -342,7 +342,7 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
     for code, cur in current.items():
         if code[0] in "1234" and abs(cur) >= 1:
             lines.append({"account": code, "debit": max(-cur, 0), "credit": max(cur, 0), "note": "Điều chỉnh về 0 (không có trong bộ số liệu kiểm toán)"})
-    td = sum(l["debit"] for l in lines); tc = sum(l["credit"] for l in lines)
+    td = sum((l["debit"] or 0) for l in lines); tc = sum((l["credit"] or 0) for l in lines)
     if abs(td - tc) >= 1:
         raise ValueError(f"Bút toán điều chỉnh kiểm toán không cân: Nợ {td:,.0f} ≠ Có {tc:,.0f}")
     if not lines:
@@ -390,7 +390,7 @@ def import_journal(db: Session, u: User, data: bytes, date_from: date | None = N
     for (no, d), doc in sorted(docs.items(), key=lambda x: (x[0][1], x[0][0])):
         ref = f"misa:{no}:{d:%Y%m%d}"
         if ref in have: stat["skipped_existing"] += 1; continue
-        td = sum(l["debit"] for l in doc["lines"]); tc = sum(l["credit"] for l in doc["lines"])
+        td = sum((l["debit"] or 0) for l in doc["lines"]); tc = sum((l["credit"] or 0) for l in doc["lines"])
         if td <= 0 or abs(td - tc) >= 1: stat["unbalanced"] += 1; continue
         stat["imported"] += 1; stat["amount"] += td
         stat["from"] = min(stat["from"] or d, d); stat["to"] = max(stat["to"] or d, d)
@@ -492,7 +492,7 @@ def export_general_entries(db: Session, date_from: date, date_to: date, sources:
         if len(debits) == 1 or len(credits) == 1:   # 1 Nợ – nhiều Có hoặc ngược lại
             for dl in debits:
                 for cl in credits:
-                    amt = cl.credit if len(debits) == 1 else dl.debit
+                    amt = (cl.credit if len(debits) == 1 else dl.debit) or 0
                     ws.append([e.code, f"{e.entry_date:%d/%m/%Y}", f"{e.entry_date:%d/%m/%Y}", e.description, dl.account_code, cl.account_code, amt, dl.project_code, cl.project_code, dl.partner_code or cl.partner_code])
         else:
             for l in e.lines:

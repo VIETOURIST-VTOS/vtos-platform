@@ -176,7 +176,7 @@ def on_invoice_issued(db: Session, inv: Invoice) -> JournalEntry:
     """Phát hành hóa đơn → Nợ 131 – Có 511 (doanh thu chưa thuế), Có 3331 (thuế GTGT)."""
     lines = [{"account": "131", "debit": inv.total, "partner": inv.customer_name, "booking_id": inv.booking_id},
              {"account": "511", "credit": inv.pre_tax, "partner": inv.customer_name, "booking_id": inv.booking_id}]
-    if inv.vat > 0:
+    if (inv.vat or 0) > 0:
         lines.append({"account": "3331", "credit": inv.vat, "partner": inv.customer_name})
     return post_entry(db, "robot", "robot", inv.issue_date, f"Hóa đơn {inv.series}-{inv.number:07d} – {inv.customer_name}", lines,
                       "hoa_don", f"invoice:{inv.series}-{inv.number}", inv.tour_id)
@@ -192,7 +192,7 @@ def on_settlement_confirmed(db: Session, t: Tour, actor: str, role: str) -> list
     from app.services.ops import posted_tour_cost
     d = (t.kt_confirmed_at or datetime.now()).date()
     out = []
-    if t.actual_cost > 0:
+    if (t.actual_cost or 0) > 0:
         try:
             from app.models.ops import PaymentRequest
             adv = sum((r.amount or 0) for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.category == "tam_ung", PaymentRequest.status == "da_chi")).scalars())
@@ -291,7 +291,7 @@ def ledger(db: Session, account: str, period: str | None) -> dict:
         out.append({"date": e.entry_date, "code": e.code, "description": e.description, "partner": l.partner, "debit": l.debit, "credit": l.credit,
                     "balance": bal if debit_side else -bal, "entry_id": e.id})
     return {"account": account, "name": acc.name, "kind": acc.kind, "opening": opening if debit_side else -opening,
-            "total_debit": sum(r["debit"] for r in out), "total_credit": sum(r["credit"] for r in out), "closing": bal if debit_side else -bal, "rows": out}
+            "total_debit": sum((r["debit"] or 0) for r in out), "total_credit": sum((r["credit"] or 0) for r in out), "closing": bal if debit_side else -bal, "rows": out}
 
 
 def trial_balance(db: Session, period: str) -> list[dict]:
@@ -310,7 +310,7 @@ def trial_balance(db: Session, period: str) -> list[dict]:
     for r in res.values():
         net_open = r["open_debit"] - r["open_credit"]
         r["open_debit"], r["open_credit"] = (net_open, 0.0) if net_open >= 0 else (0.0, -net_open)
-        net_close = net_open + r["debit"] - r["credit"]
+        net_close = net_open + (r["debit"] or 0) - (r["credit"] or 0)
         r["close_debit"], r["close_credit"] = (net_close, 0.0) if net_close >= 0 else (0.0, -net_close)
         if any(abs(r[k]) > 0 for k in ("open_debit", "open_credit", "debit", "credit")):
             out.append(r)

@@ -117,7 +117,7 @@ def _totals(db: Session, upto: date, since: date | None = None, codes=None, part
 
 def _opening(db: Session, codes, since: date, partner_code: str = "", project_code: str = "") -> float:
     """Số dư đầu kỳ (thuần Nợ − Có) trước ngày bắt đầu – một câu SUM, không nạp dòng nào lên bộ nhớ."""
-    q = _filtered(select(func.coalesce(func.sum(JournalLine.debit - JournalLine.credit), 0.0)),
+    q = _filtered(select(func.coalesce(func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)), 0.0)),
                   since, None, codes, partner_code, project_code)
     # _filtered dùng entry_date <= upto, ở đây cần < since nên siết thêm một điều kiện
     q = q.where(JournalEntry.entry_date < since)
@@ -215,7 +215,7 @@ def journal_book(db: Session, since: date, upto: date, limit: int = PAGE_LIMIT) 
         rows.append(d)
     rep = {"since": since, "upto": upto, "rows": rows,
            "total": {"debit": total["debit"], "credit": total["credit"]},
-           "balanced": abs(total["debit"] - total["credit"]) < 1}
+           "balanced": abs((total["debit"] or 0) - (total["credit"] or 0)) < 1}
     rep.update(_page(raw, total, limit))
     return rep
 
@@ -255,7 +255,7 @@ def account_book(db: Session, account: str, since: date, upto: date, partner_cod
            "since": since, "upto": upto, "partner_code": partner_code, "project_code": project_code,
            "opening": opening, "rows": rows, "detail": detail,
            "total": {"debit": total["debit"], "credit": total["credit"]},
-           "closing": round(opening + total["debit"] - total["credit"], 0)}
+           "closing": round(opening + (total["debit"] or 0) - (total["credit"] or 0), 0)}
     rep.update(_page(raw, total, limit))
     return rep
 
@@ -299,7 +299,7 @@ def cash_book(db: Session, since: date, upto: date, account: str = CASH_ACCOUNT,
     rep = account_book(db, account, since, upto, partner_code=partner_code, limit=limit)
     bal, rows = rep["opening"], []
     for r in rep["rows"]:
-        bal += r["debit"] - r["credit"]
+        bal += (r["debit"] or 0) - (r["credit"] or 0)
         rows.append({"date": r["date"], "code": r["code"], "doc_no": r["doc_no"], "description": r["description"],
                      "contra": r["contra"], "partner": r["partner"], "partner_code": r["partner_code"],
                      "project_code": r["project_code"], "amount_in": r["debit"], "amount_out": r["credit"],
@@ -319,7 +319,7 @@ def cash_book_xlsx(rep: dict) -> bytes:
     for r in rep["rows"]:
         data.append([r["date"], r["code"], r["doc_no"], r["description"], r["contra"],
                      r["amount_in"], r["amount_out"], r["balance"]])
-    total = ["", "", "", "Cộng phát sinh / Tồn cuối kỳ", "", rep["total"]["in"], rep["total"]["out"], rep["closing"]]
+    total = ["", "", "", "Cộng phát sinh / Tồn cuối kỳ", "", (rep["total"] or 0)["in"], (rep["total"] or 0)["out"], rep["closing"]]
     return _book("SO TIEN GUI" if is_bank else "SO QUY TIEN MAT",
                  _head(title, rep["since"], rep["upto"], extra),
                  ["Ngày", "Số chứng từ", "Số CT gốc", "Diễn giải", "TK đối ứng",
@@ -334,7 +334,7 @@ def bank_accounts(db: Session, since: date, upto: date) -> list[dict]:
     codes = account_subtree(db, BANK_ACCOUNT)
     names = dict(db.execute(select(Partner.code, Partner.name)).all())
     q_open = _filtered(select(JournalLine.partner_code,
-                              func.coalesce(func.sum(JournalLine.debit - JournalLine.credit), 0.0)),
+                              func.coalesce(func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)), 0.0)),
                        since, None, codes).where(JournalEntry.entry_date < since).group_by(JournalLine.partner_code)
     opening = {k or "": round(float(v or 0), 0) for k, v in db.execute(q_open).all()}
     q_move = _filtered(select(JournalLine.partner_code,
@@ -368,7 +368,7 @@ def partner_summary(db: Session, account: str, since: date, upto: date, min_amou
     codes = account_subtree(db, account)
     names = dict(db.execute(select(Partner.code, Partner.name)).all())
     q_open = _filtered(select(JournalLine.partner_code,
-                              func.coalesce(func.sum(JournalLine.debit - JournalLine.credit), 0.0)),
+                              func.coalesce(func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)), 0.0)),
                        since, None, codes).where(JournalEntry.entry_date < since).group_by(JournalLine.partner_code)
     opening = {k or "": round(float(v or 0), 0) for k, v in db.execute(q_open).all()}
     q_move = _filtered(select(JournalLine.partner_code,
@@ -387,8 +387,8 @@ def partner_summary(db: Session, account: str, since: date, upto: date, min_amou
     rows.sort(key=lambda x: -abs(x["closing"]))
     return {"account": account, "since": since, "upto": upto, "rows": rows,
             "total": {"opening": round(sum(r["opening"] for r in rows), 0),
-                      "debit": round(sum(r["debit"] for r in rows), 0),
-                      "credit": round(sum(r["credit"] for r in rows), 0),
+                      "debit": round(sum((r["debit"] or 0) for r in rows), 0),
+                      "credit": round(sum((r["credit"] or 0) for r in rows), 0),
                       "closing": round(sum(r["closing"] for r in rows), 0)}}
 
 
@@ -415,7 +415,7 @@ def trial_balance_range(db: Session, since: date, upto: date, level: int = 0, no
     accs = _accounts(db)
     children = _children_map(accs)
     q_open = _filtered(select(JournalLine.account_code,
-                              func.coalesce(func.sum(JournalLine.debit - JournalLine.credit), 0.0)),
+                              func.coalesce(func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)), 0.0)),
                        since, None).where(JournalEntry.entry_date < since).group_by(JournalLine.account_code)
     open_by = {k: float(v or 0) for k, v in db.execute(q_open).all()}
     q_move = _filtered(select(JournalLine.account_code,
@@ -445,7 +445,7 @@ def trial_balance_range(db: Session, since: date, upto: date, level: int = 0, no
     total = {k: round(sum(r[k] for r in tops), 0)
              for k in ("open_debit", "open_credit", "debit", "credit", "close_debit", "close_credit")}
     return {"since": since, "upto": upto, "level": level, "rows": rows, "total": total,
-            "balanced": abs(total["debit"] - total["credit"]) < 1 and abs(total["close_debit"] - total["close_credit"]) < 1}
+            "balanced": abs((total["debit"] or 0) - (total["credit"] or 0)) < 1 and abs(total["close_debit"] - total["close_credit"]) < 1}
 
 
 def trial_balance_xlsx(rep: dict) -> bytes:
@@ -514,8 +514,8 @@ def project_book(db: Session, project_code: str, since: date, upto: date, limit:
         d["account_name"] = names.get(r.account_code, "")
         d["account_kind"] = kinds.get(r.account_code, "")
         rows.append(d)
-    revenue = round(rev["credit"] - rev["debit"], 0)
-    cost_amt = round(cost["debit"] - cost["credit"], 0)
+    revenue = round((rev["credit"] or 0) - (rev["debit"] or 0), 0)
+    cost_amt = round((cost["debit"] or 0) - (cost["credit"] or 0), 0)
     rep = {"project_code": project_code, "since": since, "upto": upto, "rows": rows,
            "revenue": revenue, "cost": cost_amt, "profit": round(revenue - cost_amt, 0)}
     rep.update(_page(raw, total, limit))
@@ -543,15 +543,15 @@ def project_summary(db: Session, since: date, upto: date, min_amount: float = 0)
     collect(cp, "cost")
     rows = []
     for s in agg.values():
-        s["revenue"], s["cost"] = round(s["revenue"], 0), round(s["cost"], 0)
-        s["profit"] = round(s["revenue"] - s["cost"], 0)
-        s["margin"] = round(100 * s["profit"] / s["revenue"], 1) if s["revenue"] else 0.0
-        if abs(s["revenue"]) > min_amount or abs(s["cost"]) > min_amount:
+        s["revenue"], s["cost"] = round((s["revenue"] or 0), 0), round((s["cost"] or 0), 0)
+        s["profit"] = round((s["revenue"] or 0) - (s["cost"] or 0), 0)
+        s["margin"] = round(100 * s["profit"] / (s["revenue"] or 0), 1) if (s["revenue"] or 0) else 0.0
+        if abs((s["revenue"] or 0)) > min_amount or abs((s["cost"] or 0)) > min_amount:
             rows.append(s)
-    rows.sort(key=lambda x: -x["revenue"])
+    rows.sort(key=lambda x: -(x["revenue"] or 0))
     return {"since": since, "upto": upto, "rows": rows,
-            "total": {"revenue": round(sum(r["revenue"] for r in rows), 0),
-                      "cost": round(sum(r["cost"] for r in rows), 0),
+            "total": {"revenue": round(sum((r["revenue"] or 0) for r in rows), 0),
+                      "cost": round(sum((r["cost"] or 0) for r in rows), 0),
                       "profit": round(sum(r["profit"] for r in rows), 0)}}
 
 
@@ -560,7 +560,7 @@ def project_summary_xlsx(rep: dict) -> bytes:
             for i, r in enumerate(rep["rows"], 1)]
     t = rep["total"]
     total = ["", "TỔNG CỘNG", t["revenue"], t["cost"], t["profit"],
-             round(100 * t["profit"] / t["revenue"], 1) if t["revenue"] else 0.0]
+             round(100 * t["profit"] / (t["revenue"] or 0), 1) if (t["revenue"] or 0) else 0.0]
     return _book("TONG HOP THEO CONG TRINH",
                  _head("TỔNG HỢP DOANH THU – CHI PHÍ – LÃI LỖ THEO CÔNG TRÌNH (TOUR)", rep["since"], rep["upto"]),
                  ["STT", "Mã công trình", "Doanh thu", "Chi phí", "Lãi/lỗ", "Tỷ suất %"],

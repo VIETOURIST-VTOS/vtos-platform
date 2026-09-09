@@ -93,7 +93,7 @@ def nhap_gia_von(sid: int, data: GiaVonIn, u: User = Depends(require_roles(*WRIT
     """Điều hành bổ sung giá vốn cho một đơn đang nằm ở hàng đợi."""
     s = db.get(TourSettlement, sid)
     if s is None: raise HTTPException(404, "Không có dòng quyết toán này")
-    if data.gia_von <= 0:
+    if (data.gia_von or 0) <= 0:
         raise HTTPException(422, "Giá vốn phải lớn hơn 0. Đơn không phát sinh giá vốn thì PHÂN LOẠI, "
                                  "đừng ghi 0 – 0 và 'chưa có số' là hai chuyện khác nhau.")
     truoc = s.gia_von

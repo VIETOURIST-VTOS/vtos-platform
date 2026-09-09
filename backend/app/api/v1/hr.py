@@ -679,7 +679,7 @@ def fleet_summary(period: str, u: User = Depends(require_roles(*HR_READ, "nv_dh"
             r["trips"] += 1; r["days"] += (d.date_to - d.date_from).days + 1; r["revenue"] += (d.internal_price or 0)
     ctp = R.get_param(db, "tai_xe_cong_tac_phi")
     for r in rows.values(): r["driver_allowance"] = r["days"] * ctp
-    return {"period": period, "rows": list(rows.values()), "total_revenue": sum(r["revenue"] for r in rows.values())}
+    return {"period": period, "rows": list(rows.values()), "total_revenue": sum((r["revenue"] or 0) for r in rows.values())}
 
 
 # ---------- Sự vụ ----------

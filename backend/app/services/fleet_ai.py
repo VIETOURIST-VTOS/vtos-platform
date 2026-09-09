@@ -207,16 +207,16 @@ def hieu_qua_ky(db: Session, ky: str) -> dict:
 
     def _hoan(r: dict) -> dict:
         ngay = len(r.pop("ngay_khai_thac"))
-        loi = r["doanh_thu"] - r["chi_phi"]
+        loi = (r["doanh_thu"] or 0) - r["chi_phi"]
         out = {**r, "ngay_khai_thac": ngay, "loi_nhuan": round(loi),
-               "doanh_thu": round(r["doanh_thu"]), "chi_phi": round(r["chi_phi"]),
+               "doanh_thu": round((r["doanh_thu"] or 0)), "chi_phi": round(r["chi_phi"]),
                "tien_dau": round(r["tien_dau"]), "sua_chua": round(r["sua_chua"])}
         # Mẫu số 0 hoặc thiếu → "chưa đủ dữ liệu", không phải 0.
         out["loi_nhuan_moi_ngay"] = round(loi / ngay) if ngay else CHUA_DU
         out["dau_dong_tren_km"] = round(r["tien_dau"] / r["km"]) if r["km"] and r["tien_dau"] else CHUA_DU
         out["km_moi_lit"] = round(r["km"] / r["lit"], 2) if r["lit"] and r["km"] else CHUA_DU
         out["sua_chua_tren_km"] = round(r["sua_chua"] / r["km"]) if r["km"] and r["sua_chua"] else CHUA_DU
-        out["bien_loi_nhuan"] = round(loi / r["doanh_thu"], 4) if r["doanh_thu"] else CHUA_DU
+        out["bien_loi_nhuan"] = round(loi / (r["doanh_thu"] or 0), 4) if (r["doanh_thu"] or 0) else CHUA_DU
         return out
 
     xes = sorted((_hoan(r) for r in xe_rows.values()), key=lambda r: -r["loi_nhuan"])

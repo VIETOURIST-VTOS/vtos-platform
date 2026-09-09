@@ -43,7 +43,7 @@ def phai_thu_khach(db: Session, den_ngay: date | None = None) -> dict:
     con_thu, tra_lai, qua_han = [], [], 0.0
     for b in db.execute(select(Booking).where(Booking.cancelled == False)).scalars():
         phai = _q((b.amount or 0) - (b.discount or 0))
-        da = _q(b.paid)
+        da = _q(b.paid or 0)
         t = tours.get(b.tour_id)
         dong = {"booking_id": b.id, "code": b.code, "khach": b.customer_name,
                 "tour": t.code if t else "", "ten_tour": t.name if t else "",

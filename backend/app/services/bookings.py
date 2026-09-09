@@ -27,7 +27,7 @@ def deposit_due(b: Booking) -> float: return round(net(b) * (b.deposit_pct or 0)
 def pmt_status_of(b: Booking) -> str:
     if b.cancelled: return "CANCEL"
     if (b.paid or 0) >= net(b) - 1 and net(b) > 0: return "PAID"
-    if b.paid >= deposit_due(b) and b.paid > 0: return "DEPO"
+    if (b.paid or 0) >= deposit_due(b) and (b.paid or 0) > 0: return "DEPO"
     return "UNPAID"
 
 

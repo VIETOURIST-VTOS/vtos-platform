@@ -121,7 +121,7 @@ def ledger(account: str, period: str | None = None, u: User = Depends(require_ro
 def trial_balance(period: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     rows = ACC.trial_balance(db, period)
     tot = {k: sum(r[k] for r in rows) for k in ("open_debit", "open_credit", "debit", "credit", "close_debit", "close_credit")}
-    return {"period": period, "rows": rows, "total": tot, "balanced": abs(tot["debit"] - tot["credit"]) < 1 and abs(tot["close_debit"] - tot["close_credit"]) < 1}
+    return {"period": period, "rows": rows, "total": tot, "balanced": abs((tot["debit"] or 0) - (tot["credit"] or 0)) < 1 and abs(tot["close_debit"] - tot["close_credit"]) < 1}
 
 
 # ---------- Hóa đơn điện tử ----------

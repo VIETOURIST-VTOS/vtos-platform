@@ -307,7 +307,7 @@ def revert(db: Session, u: User, bank_code: str, since: date, upto: date) -> dic
 
 
 def _balance(db: Session, codes: list[str], upto: date) -> float:
-    q = (select(func.coalesce(func.sum(JournalLine.debit - JournalLine.credit), 0.0))
+    q = (select(func.coalesce(func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)), 0.0))
          .join(JournalEntry, JournalLine.entry_id == JournalEntry.id)
          .where(JournalEntry.status == POSTED, JournalEntry.entry_date <= upto,
                 JournalLine.account_code.in_(codes)))

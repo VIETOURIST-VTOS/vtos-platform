@@ -93,7 +93,7 @@ def ket_qua(db: Session, c: Campaign) -> dict:
                             .where(PaymentRequest.campaign_id == c.id,
                                    PaymentRequest.status.in_(["cho_tp", "cho_kt", "cho_duyet", "cho_chi"]))).scalar() or 0)
     doanh_thu = float(db.execute(
-        select(func.coalesce(func.sum(Booking.amount - Booking.discount), 0.0))
+        select(func.coalesce(func.sum(func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0)), 0.0))
         .join(Lead, Lead.booking_id == Booking.id)
         .where(Lead.campaign_id == c.id, Booking.cancelled == False)).scalar() or 0)
     return {"so_lead": int(so_lead), "chuyen_doi": int(chuyen_doi),
@@ -166,7 +166,7 @@ def tao_ngan_sach(db: Session, u: User, data: dict) -> MarketingBudget:
     for l in dong:
         db.add(MarketingBudgetLine(budget_id=b.id, hang_muc=l["hang_muc"], amount=float(l["amount"]), note=l.get("note", "")))
     R.audit(db, u.username, u.role, "lap_ngan_sach_marketing", f"mkt_budget:{b.id}",
-            after={"ky": period, "so_hang_muc": len(dong), "tong": sum(float(l["amount"]) for l in dong), "nguon": nguon})
+            after={"ky": period, "so_hang_muc": len(dong), "tong": sum(float((l["amount"] or 0)) for l in dong), "nguon": nguon})
     db.commit(); db.refresh(b)
     return b
 

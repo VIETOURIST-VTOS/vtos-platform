@@ -658,7 +658,7 @@ def _kh_kiem(db: Session, r):
     st = _so(r.get("khau_hao_ky"))
     if st < 0: loi.append("Khấu hao trong kỳ không được âm")
     lk = _so(r.get("luy_ke"))
-    if lk and lk > a.cost:
+    if lk and lk > (a.cost or 0):
         loi.append(f"Lũy kế {lk:,.0f} lớn hơn nguyên giá {a.cost:,.0f} của thẻ {a.code}")
     # Ngoại lệ có ý thức: chỉ nhận kỳ TRƯỚC kỳ VTOS bắt đầu tự tính cho chính thẻ này.
     if a.start_date and ky and ky >= f"{a.start_date:%Y-%m}":

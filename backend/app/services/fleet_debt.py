@@ -182,7 +182,7 @@ def cong_no_chu_xe(db: Session, p: PartnerOwner, xes: list[Vehicle] | None = Non
         "trong_do_chuyen_ky_sau": _q(phai_thu),
         "trong_do_no_theo_lich": no_mua_xe,
         "chi_ho_chua_vao_ky": treo,
-        "tong_chi_ho_chua_vao_ky": _q(sum(x["so_tien"] for x in treo)),
+        "tong_chi_ho_chua_vao_ky": _q(sum((x["so_tien"] or 0) for x in treo)),
         "cac_ky": cac_ky, "lich_can_tru": lich,
         "tinh_trang": CHUA_CO if not sts else "co_du_lieu",
         "ghi_chu": ("Chủ xe này chưa có bảng quyết toán nào – chưa biết số phải trả, KHÔNG phải bằng 0."

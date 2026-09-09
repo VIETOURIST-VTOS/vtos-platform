@@ -399,7 +399,7 @@ def them_chi_phi(tid: int, data: ChiPhiIn, u: User = Depends(require_roles(*WRIT
     bc = data.ben_chiu or _mac_dinh_ben_chiu(db, data.kind)
     if bc not in BEN_CHIU: raise HTTPException(422, f"Bên chịu không hợp lệ. Chỉ nhận {', '.join(BEN_CHIU)}")
     nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
-    if data.amount >= nguong and not (data.chung_tu or "").strip():
+    if (data.amount or 0) >= nguong and not (data.chung_tu or "").strip():
         raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc có chứng từ gốc đính kèm (chặn cứng B6)")
     c = TripCost(trip_id=tid, **{**data.model_dump(exclude={"ben_chiu"}), "ben_chiu": bc}, created_by=u.username)
     db.add(c); db.flush()
@@ -499,7 +499,7 @@ def sua_chi_phi(tid: int, cid: int, data: SuaChiPhiIn,
         raise HTTPException(422, f"Bên chịu không hợp lệ. Chỉ nhận {', '.join(BEN_CHIU)}")
     for k, v in d.items(): setattr(c, k, v)
     nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
-    if c.amount >= nguong and not (c.chung_tu or "").strip():
+    if (c.amount or 0) >= nguong and not (c.chung_tu or "").strip():
         raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc có chứng từ gốc đính kèm (chặn cứng B6)")
     db.flush()
     kt = FL.kiem_chuyen(db, t); t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
@@ -629,8 +629,8 @@ def ds_giao_dich(source: str = "", chua_khop: bool = False, gom_ban_trung: bool 
                       "vehicle_id": t.vehicle_id, "so_tien": t.so_tien, "lit": t.lit, "khop": t.khop,
                       "co": t.co, "trung": t.trung, "nhom": t.nhom,
                       "khong_phai_chi_phi": t.khong_phai_chi_phi, "ghi_chu": t.ghi_chu} for t in rows],
-            "tong_chi_phi": sum((t.so_tien or 0) for t in rows if not (t.khong_phai_chi_phi or 0)),
-            "tong_dieu_chuyen": sum((t.so_tien or 0) for t in rows if (t.khong_phai_chi_phi or 0)),
+            "tong_chi_phi": sum((t.so_tien or 0) for t in rows if not t.khong_phai_chi_phi),
+            "tong_dieu_chuyen": sum((t.so_tien or 0) for t in rows if t.khong_phai_chi_phi),
             "tong_chua_quy_ve_xe": sum((t.so_tien or 0) for t in rows
                                        if not t.khong_phai_chi_phi and t.vehicle_id is None),
             "theo_nhom": [{"nhom": n or "(không ghi nhóm)",
@@ -732,7 +732,7 @@ def tao_lich(data: LichIn, u: User = Depends(require_roles(*QT_WRITE)), db: Sess
     """Lịch cấn trừ. Chưa có ngày bắt đầu hợp lệ thì giữ trạng thái nháp và KHÔNG phát cảnh báo quá hạn –
     báo quá hạn cho một lịch chưa ai xác nhận là cách nhanh nhất làm người dùng bỏ qua mọi cảnh báo."""
     if not db.get(PartnerOwner, data.partner_id): raise HTTPException(404, "Không có chủ xe")
-    if data.principal <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
+    if (data.principal or 0) <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
     if not data.so_ky and not data.moi_ky: raise HTTPException(422, "Phải có số kỳ hoặc số tiền mỗi kỳ")
     pl = RepaymentPlan(**data.model_dump(), created_by=u.username)
     pl.status = "hieu_luc" if data.bat_dau else "nhap_chua_xac_nhan"
@@ -1236,7 +1236,7 @@ def them_chi_phi_ky(data: ChiPhiKyIn, u: User = Depends(require_roles(*QT_WRITE)
         raise HTTPException(422, "Kỳ phải có dạng YYYY-MM")
     if data.nhom not in NHOM_CHI_PHI_KY:
         raise HTTPException(422, f"Nhóm chi phí không hợp lệ: {data.nhom}")
-    if data.so_tien <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
+    if (data.so_tien or 0) <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
     pham_vi = NHOM_CHI_PHI_KY[data.nhom][1]
     if pham_vi == "xe" and not data.vehicle_id:
         raise HTTPException(422, f"'{NHOM_CHI_PHI_KY[data.nhom][0]}' là chi phí của một chiếc xe cụ thể "
@@ -1269,7 +1269,7 @@ def sua_chi_phi_ky(cid: int, data: ChiPhiKyIn, u: User = Depends(require_roles(*
                    db: Session = Depends(get_db)):
     r = db.get(FleetPeriodCost, cid)
     if r is None: raise HTTPException(404, "Không có khoản này")
-    if data.so_tien <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
+    if (data.so_tien or 0) <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
     truoc = {"so_tien": r.so_tien, "mo_ta": r.mo_ta}
     r.so_tien = data.so_tien; r.mo_ta = data.mo_ta[:200]; r.chung_tu = data.chung_tu[:200]
     R.audit(db, u.username, u.role, "sua_chi_phi_ky_doi_xe", f"chi_phi_ky:{r.id}", before=truoc,
@@ -1518,13 +1518,13 @@ def tao_de_xuat_chi(data: DeXuatChiIn, u: User = Depends(require_roles(*WRITE, *
         là chi phí. Không phân loại lúc lập thì cuối tháng phải đọc lại từng phiếu để đoán.
       - Số tiền lớn phải có chứng từ, đúng ngưỡng chặn cứng B6 đang áp cho chi phí chuyến.
     """
-    if data.so_tien <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
+    if (data.so_tien or 0) <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
     if not (data.noi_dung or "").strip(): raise HTTPException(422, "Phải ghi nội dung đề xuất")
     if not (data.nhom or "").strip():
         raise HTTPException(422, "Phải chọn nhóm khoản chi – không phân loại lúc lập thì cuối tháng "
                                  "phải đọc lại từng phiếu để đoán khoản nào là chi phí, khoản nào là nạp quỹ")
     nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
-    if data.so_tien >= nguong and not (data.chung_tu or "").strip() and not data.khong_phai_chi_phi:
+    if (data.so_tien or 0) >= nguong and not (data.chung_tu or "").strip() and not data.khong_phai_chi_phi:
         raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc ghi số chứng từ gốc (chặn cứng B6)")
 
     ma = (data.ma_gd or "").strip()

@@ -174,7 +174,7 @@ def closing_entries_draft(db: Session, u: User, period: str) -> list[JournalEntr
     for c in PL_EXPENSE:
         v = m.get(c, {}).get("debit", 0.0) - m.get(c, {}).get("credit", 0.0)
         if v: lines_exp.append({"account": c, "credit": v})
-    tr = sum(l["debit"] for l in lines_rev); te = sum(l["credit"] for l in lines_exp)
+    tr = sum((l["debit"] or 0) for l in lines_rev); te = sum((l["credit"] or 0) for l in lines_exp)
     if tr: out.append(ACC.post_entry(db, u.username, u.role, d, f"Kết chuyển doanh thu kỳ {period} sang 911", lines_rev + [{"account": "911", "credit": tr}], "ket_chuyen", f"period:{period}", post=False))
     if te: out.append(ACC.post_entry(db, u.username, u.role, d, f"Kết chuyển chi phí kỳ {period} sang 911", [{"account": "911", "debit": te}] + lines_exp, "ket_chuyen", f"period:{period}", post=False))
     net = tr - te
@@ -208,7 +208,7 @@ def pit_return(db: Session, period: str) -> dict:
     m = movements(db, period)
     withheld = m.get("333", {}).get("credit", 0.0)  # cấp 1 gộp; tách 3335
     w3335 = float(db.execute(
-        select(func.coalesce(func.sum(JournalLine.credit - JournalLine.debit), 0.0))
+        select(func.coalesce(func.sum(func.coalesce(JournalLine.credit, 0) - func.coalesce(JournalLine.debit, 0)), 0.0))
         .join(JournalEntry, JournalLine.entry_id == JournalEntry.id)
         .where(JournalEntry.status == "da_ghi_so", JournalEntry.period == period,
                JournalLine.account_code == "3335")).scalar() or 0)

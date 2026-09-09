@@ -82,10 +82,10 @@ def update(db: Session, u: User, b: Booking, d: dict) -> Booking:
         if b.locked: raise Gate("KHOA_BOOKING", "Dịch vụ đã khóa (thu đủ / quá ngày) – mở khóa trước khi đổi giá")
         b.amount = float(d["amount"]); t.price_per_pax = b.amount
     if d.get("cost_amount") is not None:
-        b.cost_amount = max(0.0, float(d["cost_amount"])); t.fixed_cost = (b.cost_amount or 0)
+        b.cost_amount = max(0.0, float((d["cost_amount"] or 0))); t.fixed_cost = (b.cost_amount or 0)
         l = db.execute(select(TourCostLine).where(TourCostLine.tour_id == t.id, TourCostLine.status == "hd")).scalars().first()
         if l: l.unit_price = l.actual = l.budget = b.cost_amount; l.supplier_name = b.supplier_name or l.supplier_name; l.updated_by = u.username
-        elif b.cost_amount > 0:
+        elif (b.cost_amount or 0) > 0:
             db.add(TourCostLine(tour_id=t.id, line_no=1, description=b.services_note, cost_kind="co_dinh", service_type=b.service_type, supplier_name=b.supplier_name or "NCC", unit_price=b.cost_amount, qty=b.pax, coef=1,
                                 budget=b.cost_amount, actual=b.cost_amount, source="vtos", updated_by=u.username))
     BK.refresh_status(b)
@@ -121,10 +121,10 @@ def summary(rows: list[Booking]) -> dict:
         if b.cancelled: continue
         k = b.service_type or "OTHER"; d = by.setdefault(k, {"service_type": k, "service_name": SERVICE_KINDS.get(k, k), "n": 0, "revenue": 0.0, "paid": 0.0, "cost": 0.0})
         d["n"] += 1; d["revenue"] += (b.amount or 0) - (b.discount or 0); d["paid"] += (b.paid or 0); d["cost"] += (b.cost_amount or 0)
-    out = sorted(by.values(), key=lambda x: -x["revenue"])
-    for d in out: d["profit"] = d["revenue"] - d["cost"]; d["margin"] = d["profit"] / d["revenue"] if d["revenue"] else 0
-    tot = {"n": sum(d["n"] for d in out), "revenue": sum(d["revenue"] for d in out), "paid": sum(d["paid"] for d in out), "cost": sum(d["cost"] for d in out)}
-    tot["profit"] = tot["revenue"] - tot["cost"]; tot["due"] = tot["revenue"] - tot["paid"]; tot["cancelled"] = sum(1 for b in rows if b.cancelled)
+    out = sorted(by.values(), key=lambda x: -(x["revenue"] or 0))
+    for d in out: d["profit"] = (d["revenue"] or 0) - (d["cost"] or 0); d["margin"] = d["profit"] / (d["revenue"] or 0) if (d["revenue"] or 0) else 0
+    tot = {"n": sum(d["n"] for d in out), "revenue": sum((d["revenue"] or 0) for d in out), "paid": sum((d["paid"] or 0) for d in out), "cost": sum((d["cost"] or 0) for d in out)}
+    tot["profit"] = (tot["revenue"] or 0) - (tot["cost"] or 0); tot["due"] = (tot["revenue"] or 0) - (tot["paid"] or 0); tot["cancelled"] = sum(1 for b in rows if b.cancelled)
     return {"by_type": out, "total": tot}
 
 

@@ -98,7 +98,7 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
         did = t.driver_id or (veh[t.vehicle_id].driver_id if t.vehicle_id in veh else None)
         if did and not r["tai_xe"]: r["tai_xe"] = emps.get(did, "")
         r["so_chuyen"] += 1
-        r["doanh_thu"] += c["doanh_thu"]; r["chi_phi_chuyen"] += c["chi_phi_chuyen"]
+        r["doanh_thu"] += (c["doanh_thu"] or 0); r["chi_phi_chuyen"] += c["chi_phi_chuyen"]
         r["km"] += c["km"] or 0; r["so_lit"] += c["so_lit"] or 0
         r["ngay_khai_thac"] |= {t.ngay_di + timedelta(days=i)
                                 for i in range((t.ngay_ve - t.ngay_di).days + 1)}
@@ -123,17 +123,17 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
     ds = []
     for r in rows.values():
         ngay = len(r["ngay_khai_thac"])
-        lai_gop = r["doanh_thu"] - r["chi_phi_chuyen"]
+        lai_gop = (r["doanh_thu"] or 0) - r["chi_phi_chuyen"]
         ds.append({**{k: v for k, v in r.items() if k != "ngay_khai_thac"},
                    "ngay_khai_thac": ngay,
                    "cong_suat": round(ngay / so_ngay_ky, 4) if so_ngay_ky else None,
                    "lai_gop_chuyen": lai_gop,
                    "ket_qua_xe": lai_gop - r["chi_phi_xe"],
                    "km_moi_lit": (round(r["km"] / r["so_lit"], 2) if r["km"] and r["so_lit"] else None),
-                   "ty_le_lai_gop": (round(lai_gop / r["doanh_thu"], 4) if r["doanh_thu"] else None)})
+                   "ty_le_lai_gop": (round(lai_gop / (r["doanh_thu"] or 0), 4) if (r["doanh_thu"] or 0) else None)})
     ds.sort(key=lambda x: -x["ket_qua_xe"])
 
-    tong_dt = sum(x["doanh_thu"] for x in ds)
+    tong_dt = sum((x["doanh_thu"] or 0) for x in ds)
     tong_cp_chuyen = sum(x["chi_phi_chuyen"] for x in ds)
     tong_cp_xe = sum(x["chi_phi_xe"] for x in ds)
     tong_ngay = sum(x["ngay_khai_thac"] for x in ds)

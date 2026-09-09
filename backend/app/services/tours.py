@@ -168,7 +168,7 @@ def close(db: Session, u: User, t: Tour, data, note: str = "") -> str:
     t.actual_revenue, t.promo_value = data.actual_revenue, data.promo_value
     t.actual_cost = sm["actual"] if sm["lines"] else data.actual_cost   # có bảng dòng NCC → tổng dòng là giá vốn thực tế (không nhập tay)
     t.closed_at, t.status = datetime.now(), "da_dong_so"
-    tag = f"Quyết toán V.{t.settlement_version:02d}: {sm['lines']} dòng NCC, thực chi {(t.actual_cost or 0):,.0f} đ, đã trả {sm['paid']:,.0f} đ, dự toán {sm['budget']:,.0f} đ ({sm['variance_pct'] * 100:+.0f}%), {sm['with_doc']}/{sm['lines']} dòng có chứng từ"
+    tag = f"Quyết toán V.{t.settlement_version:02d}: {sm['lines']} dòng NCC, thực chi {(t.actual_cost or 0):,.0f} đ, đã trả {(sm['paid'] or 0):,.0f} đ, dự toán {(sm['budget'] or 0):,.0f} đ ({sm['variance_pct'] * 100:+.0f}%), {sm['with_doc']}/{sm['lines']} dòng có chứng từ"
     EV(db, t, "dong_so", u.username, (note + " | " if note else "") + tag)
     R.audit(db, u.username, u.role, "dong_so_quyet_toan", f"tour:{t.code}", before=before, after=snap(t)); db.commit()
     late = date.today() > R.settlement_deadline(db, t)
@@ -229,10 +229,10 @@ def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, st
             db.add(Alert(kind="thieu_du_toan", level="warn", ref=t.code,
                          message=f"{t.code} đang bán nhưng chưa có dự toán ({R.BUDGET_SOURCES['chua_co']}) – không đánh giá được biên, cần Điều hành bổ sung",
                          to_roles="tp_dh,nv_dh,gd_kd,tgd"))
-    if r.discount > 0:
+    if (r.discount or 0) > 0:
         c = cb
-        nr = c["revenue"] - (r.discount or 0)
-        nm = (nr - c["cost"]) / nr if nr > 0 else 0
+        nr = (c["revenue"] or 0) - (r.discount or 0)
+        nm = (nr - (c["cost"] or 0)) / nr if nr > 0 else 0
         if nm < thr:
             raise Gate("CONG_3", f"Mã KM/giảm giá {(r.discount or 0):,.0f} đ làm biên chuyến tụt còn {nm*100:.1f}% (< {thr*100:.0f}%): treo, cần TGĐ duyệt")
     mins = int((datetime.now() - r.created_at).total_seconds() / 60)

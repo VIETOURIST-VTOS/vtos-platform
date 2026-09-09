@@ -101,10 +101,10 @@ def bon_so_tien(r: IntakeRun) -> dict | None:
     if r.tong_tien_da_nap is None and r.tong_tien_bo_qua is None and r.tong_tien_loi is None:
         return None
     f = lambda v: float(v or 0)     # noqa: E731
-    tong = f(r.tong_tien_da_nap) + f(r.tong_tien_bo_qua) + f(r.tong_tien_loi)  # k2-doc-an-toan: f tu ep rong thanh 0
+    tong = f((r.tong_tien_da_nap or 0)) + f((r.tong_tien_bo_qua or 0)) + f((r.tong_tien_loi or 0))  # k2-doc-an-toan: f tu ep rong thanh 0
     return {"trong_tep": f(r.tong_tien_tep), "da_nap": f(r.tong_tien_da_nap),
             "bo_qua_da_co": f(r.tong_tien_bo_qua), "dong_loi": f(r.tong_tien_loi),
-            "cong_lai": round(tong, 2), "lech": round(f(r.tong_tien_tep) - tong, 2),  # k2-doc-an-toan: f tu ep rong thanh 0
+            "cong_lai": round(tong, 2), "lech": round(f((r.tong_tien_tep or 0)) - tong, 2),  # k2-doc-an-toan: f tu ep rong thanh 0
             "cot_da_cong": list(r.cot_tien or [])}
 
 

@@ -294,8 +294,8 @@ def loan_bank_detail_341(db: Session, since: date, upto: date) -> dict:
     rows = []
     for (pcode, acc), g in sorted(groups.items(), key=lambda x: (x[1]["bank"], x[0][1])):
         open_c = -g["open"]                       # dư Có = -(Nợ-Có)
-        close_c = -(g["open"] + g["debit"] - g["credit"])
-        if abs(open_c) < 1 and abs(close_c) < 1 and abs(g["debit"]) < 1 and abs(g["credit"]) < 1: continue
+        close_c = -(g["open"] + (g["debit"] or 0) - (g["credit"] or 0))
+        if abs(open_c) < 1 and abs(close_c) < 1 and abs((g["debit"] or 0)) < 1 and abs((g["credit"] or 0)) < 1: continue
         a = accs.get(acc)
         kind = LOAN_KIND_NAME.get(acc) or (a.name if a else acc) or ("Vay và nợ thuê tài chính dài hạn" if a and a.bs_credit == "339" else "Vay và nợ thuê tài chính ngắn hạn")
         rows.append({"bank": g["bank"], "partner_code": pcode, "account": acc, "kind": kind,

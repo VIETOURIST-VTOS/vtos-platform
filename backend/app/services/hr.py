@@ -129,7 +129,7 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         s = R.settlement_summary(db, t)
         for b in t.bookings:
             if R.is_doan(t):
-                share = s["profit"] * ((b.amount or 0) / s["revenue"] if s["revenue"] else 0)
+                share = s["profit"] * ((b.amount or 0) / (s["revenue"] or 0) if (s["revenue"] or 0) else 0)
                 doan_profit_by_sales[b.sales_id] = doan_profit_by_sales.get(b.sales_id, 0) + share
                 continue
             if not b.counts_for_target:
@@ -138,7 +138,7 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
                 continue                         # sự vụ mức 3 trên chính booking/đoàn này → không hoa hồng
             net = (b.amount or 0) - (b.discount or 0)           # mã KM: tính theo doanh thu đã giảm
             if t.below_margin and not t.strategic and s["margin"] < thr:
-                share_by_sales[b.sales_id] = share_by_sales.get(b.sales_id, 0) + max(0.0, s["profit"] * ((b.amount or 0) / s["revenue"] if s["revenue"] else 0)) * 0.10
+                share_by_sales[b.sales_id] = share_by_sales.get(b.sales_id, 0) + max(0.0, s["profit"] * ((b.amount or 0) / (s["revenue"] or 0) if (s["revenue"] or 0) else 0)) * 0.10
             else:
                 rev_by_sales[b.sales_id] = rev_by_sales.get(b.sales_id, 0) + net
         if R.is_doan(t) and s["profit"] > 0:
@@ -209,7 +209,7 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
                 for t in month_tours(db, yy, mm):
                     if R.is_doan(t):
                         s = R.settlement_summary(db, t)
-                        tot += sum(s["profit"] * ((b.amount or 0) / s["revenue"] if s["revenue"] else 0) for b in t.bookings if b.sales_id == e.user_id)
+                        tot += sum(s["profit"] * ((b.amount or 0) / (s["revenue"] or 0) if (s["revenue"] or 0) else 0) for b in t.bookings if b.sales_id == e.user_id)
                 hist.append({"ky": f"{yy:04d}-{mm:02d}", "loi_nhuan": round(tot)})
             xd = L.xac_dinh_thang_loi_nhuan(e, hist, moc_luong_doan, sorted(DOAN_F))
             row(e)["xac_dinh_luong"] = xd
@@ -288,7 +288,7 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         r = rows[e.id]
         if e.contract_type != "hdld":
             continue          # cộng tác viên (HDV) không thuộc diện đóng BHXH bắt buộc – chỉ khấu trừ TNCN 10%
-        if e.bhxh_base and e.bhxh_base > 0:
+        if (e.bhxh_base or 0) and (e.bhxh_base or 0) > 0:
             r["bhxh"] = round((e.bhxh_base or 0) * ty_bhxh)
             r["bhxh_base"] = e.bhxh_base
             if e.member_org: r["doan_phi"] = round((e.bhxh_base or 0) * ty_doan_phi)

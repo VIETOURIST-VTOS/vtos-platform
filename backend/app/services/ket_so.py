@@ -323,7 +323,7 @@ def xem_truoc_sao_ke(db: Session, ky: str, phan_loai: dict | None = None) -> dic
                  "ngan_hang": t.gateway or ""}
         if t.id in da:
             roi.append({**mo_ta, "chung_tu": da[t.id].code}); continue
-        if not t.amount or t.amount <= 0:
+        if not (t.amount or 0) or (t.amount or 0) <= 0:
             chua.append({**mo_ta, "ly_do": "số tiền không dương – dòng này không ghi sổ được"}); continue
         nguon = "tien_vao" if t.transfer_type == "in" else "tien_ra"
         pl = (phan_loai or {}).get(t.id) or (phan_loai or {}).get(str(t.id)) or {}
@@ -349,8 +349,8 @@ def xem_truoc_sao_ke(db: Session, ky: str, phan_loai: dict | None = None) -> dic
     return {
         "ky": ky, "so_dong": len(ds),
         "khop": khop, "chua_nhan_dien": chua, "da_ghi_so": roi,
-        "tong_khop": round(sum(x["so_tien"] for x in khop), 0),
-        "tong_chua_nhan_dien": round(sum(x["so_tien"] for x in chua), 0),
+        "tong_khop": round(sum((x["so_tien"] or 0) for x in khop), 0),
+        "tong_chua_nhan_dien": round(sum((x["so_tien"] or 0) for x in chua), 0),
         "ghi_chu": ("Đây là bản XEM TRƯỚC cả lô – chưa ghi gì. Dòng chưa nhận diện KHÔNG bị đoán tài "
                     "khoản: chúng chờ Kế toán định khoản tay, vì một sổ trông đầy đủ mà sai thì tệ "
                     "hơn một sổ còn thiếu và biết mình thiếu."),
@@ -380,7 +380,7 @@ def ghi_so_sao_ke(db: Session, u: User, ky: str, chi_dinh: list[int] | None = No
             hong.append({"id": x["id"], "so_tien": x["so_tien"], "loi": str(ex)})
     return {"ky": ky, "da_ghi": ra, "hong": hong,
             "con_chua_nhan_dien": len(xt["chua_nhan_dien"]),
-            "tong_da_ghi": round(sum(x["so_tien"] for x in ra), 0),
+            "tong_da_ghi": round(sum((x["so_tien"] or 0) for x in ra), 0),
             "message": (f"Đã ghi sổ {len(ra)} dòng sao kê kỳ {ky}"
                         + (f", {len(hong)} dòng lỗi" if hong else "")
                         + (f". Còn {len(xt['chua_nhan_dien'])} dòng chờ Kế toán định khoản tay."

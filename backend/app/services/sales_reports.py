@@ -50,10 +50,10 @@ def ban_tour_le(db: Session, d1: date, d2: date, mang: str = "") -> dict:
         if b.cancelled: s["cancelled"] += 1; continue
         s["bookings"] += 1; s["pax"] += b.pax; s["revenue"] += (b.amount or 0) - (b.discount or 0); s["paid"] += (b.paid or 0); s["due"] += max(0.0, (b.amount or 0) - (b.discount or 0) - (b.paid or 0))
         s["du_4_truong"] += 1 if b.counts_for_target else 0; s["sla_qua"] += 0 if b.sla_ok else 1
-    summary = sorted(by.values(), key=lambda x: -x["revenue"])
+    summary = sorted(by.values(), key=lambda x: -(x["revenue"] or 0))
     detail = [{"created_at": b.created_at, "code": b.code, "tour_code": b.tour.code, "start_date": b.tour.start_date, "customer": b.customer_name, "phone": b.customer_phone, "source": b.source, "pax": b.pax,
                "revenue": (b.amount or 0) - (b.discount or 0), "paid": (b.paid or 0), "due": max(0.0, (b.amount or 0) - (b.discount or 0) - (b.paid or 0)), "status": BK.pmt_status_of(b), "sale": _sales_name(b), "counts": b.counts_for_target, "sla_ok": b.sla_ok, "cancelled": b.cancelled} for b in rows]
-    tot = {"bookings": sum(s["bookings"] for s in summary), "pax": sum(s["pax"] for s in summary), "revenue": sum(s["revenue"] for s in summary), "paid": sum(s["paid"] for s in summary), "due": sum(s["due"] for s in summary), "cancelled": sum(s["cancelled"] for s in summary)}
+    tot = {"bookings": sum(s["bookings"] for s in summary), "pax": sum(s["pax"] for s in summary), "revenue": sum((s["revenue"] or 0) for s in summary), "paid": sum((s["paid"] or 0) for s in summary), "due": sum(s["due"] for s in summary), "cancelled": sum(s["cancelled"] for s in summary)}
     return {"report": "ban_tour_le", "from": d1, "to": d2, "mang": SEG.valid(mang), "summary": summary, "total": tot, "detail": detail,
             "columns": {"summary": [("sale", "Sale"), ("bookings", "Booking"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn phải thu"), ("cancelled", "Hủy"), ("du_4_truong", "Đủ 4 trường"), ("sla_qua", "Quá SLA 2h")],
                         "detail": [("created_at", "Ngày tạo"), ("code", "Booking"), ("tour_code", "Tour"), ("start_date", "Khởi hành"), ("customer", "Khách"), ("phone", "SĐT"), ("source", "Nguồn"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn lại"), ("status", "TT"), ("sale", "Sale")]}}
@@ -70,7 +70,7 @@ def nhac_thu(db: Session, mang: str = "") -> dict:
         if due <= 1000: continue
         dl = b.cancel_deadline
         rows.append({"code": b.code, "tour_code": b.tour.code, "start_date": b.tour.start_date, "days_left": (b.tour.start_date - today).days, "customer": b.customer_name, "phone": b.customer_phone, "revenue": (b.amount or 0) - (b.discount or 0),
-                     "deposit_due": BK.deposit_due(b), "paid": b.paid, "due": due, "status": BK.pmt_status_of(b), "deadline": dl, "overdue": bool(dl and now > dl), "sale": _sales_name(b), "locked": b.locked})
+                     "deposit_due": BK.deposit_due(b), "paid": (b.paid or 0), "due": due, "status": BK.pmt_status_of(b), "deadline": dl, "overdue": bool(dl and now > dl), "sale": _sales_name(b), "locked": b.locked})
     rows.sort(key=lambda r: (r["deadline"] or datetime.max, r["start_date"]))
     by: dict[str, dict] = {}
     for r in rows:
@@ -128,7 +128,7 @@ def kinh_doanh(db: Session, month: str, mang: str = "") -> dict:
     if SEG.valid(mang) == "doan":
         note = ("Mảng Đoàn không hưởng hoa hồng theo bậc thang doanh thu mà theo chia lợi nhuận quyết toán, "
                 "nên hai cột \"DT tính chỉ tiêu\" và \"Hoa hồng ước\" ở đây bằng 0 – xem số chính thức ở bảng lương.")
-    return {"report": "kinh_doanh", "month": month, "mang": SEG.valid(mang), "summary": out, "total": {"bookings": sum(s["bookings"] for s in out), "revenue": sum(s["revenue"] for s in out), "revenue_target": sum(s["revenue_target"] for s in out), "commission_est": sum(s["commission_est"] for s in out)}, "detail": [],
+    return {"report": "kinh_doanh", "month": month, "mang": SEG.valid(mang), "summary": out, "total": {"bookings": sum(s["bookings"] for s in out), "revenue": sum((s["revenue"] or 0) for s in out), "revenue_target": sum(s["revenue_target"] for s in out), "commission_est": sum(s["commission_est"] for s in out)}, "detail": [],
             "note": note,
             "columns": {"summary": [("sale", "Sale"), ("office", "VP"), ("bookings", "Booking"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("revenue_target", "DT tính chỉ tiêu"), ("moc", "Mốc"), ("pct_moc", "% mốc"), ("f", "Bậc"), ("rate", "Hệ số"), ("commission_est", "Hoa hồng ước"), ("paid", "Đã thu")], "detail": []}}
 
@@ -146,10 +146,10 @@ def tour_le(db: Session, d1: date, d2: date, mang: str = "") -> dict:
     rows = []
     for t in ts:
         bs = [b for b in t.bookings if not b.cancelled]; rev = sum((b.amount or 0) - (b.discount or 0) for b in bs); paid = sum((b.paid or 0) for b in bs)
-        sm = ST.summary(db, t); cost = sm["actual"] if sm["lines"] else ((t.actual_cost or 0) or ((t.fixed_cost or 0) + (t.var_cost_per_pax or 0) * len(bs)))
+        sm = ST.summary(db, t); cost = (sm["actual"] or 0) if sm["lines"] else ((t.actual_cost or 0) or ((t.fixed_cost or 0) + (t.var_cost_per_pax or 0) * len(bs)))
         rows.append({"tour_code": t.code, "name": t.name, "start_date": t.start_date, "end_date": t.end_date, "seats_open": t.seats_open or t.planned_pax, "pax": sum(b.pax for b in bs), "bookings": len(bs), "revenue": rev, "paid": paid, "due": rev - paid,
                      "cost": cost, "profit": rev - cost, "margin": (rev - cost) / rev if rev else 0, "status": t.status, "operator": t.operator.full_name if t.operator else "", "version": t.settlement_version})
-    tot = {"tours": len(rows), "pax": sum(r["pax"] for r in rows), "revenue": sum(r["revenue"] for r in rows), "paid": sum(r["paid"] for r in rows), "cost": sum(r["cost"] for r in rows)}; tot["profit"] = tot["revenue"] - tot["cost"]
+    tot = {"tours": len(rows), "pax": sum(r["pax"] for r in rows), "revenue": sum((r["revenue"] or 0) for r in rows), "paid": sum((r["paid"] or 0) for r in rows), "cost": sum((r["cost"] or 0) for r in rows)}; tot["profit"] = (tot["revenue"] or 0) - (tot["cost"] or 0)
     return {"report": "tour_le", "from": d1, "to": d2, "mang": SEG.valid(mang), "summary": rows, "total": tot, "detail": [],
             "columns": {"summary": [("tour_code", "Tour"), ("name", "Tên"), ("start_date", "Khởi hành"), ("seats_open", "Mở bán"), ("pax", "Khách"), ("bookings", "Booking"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn lại"), ("cost", "Chi phí"), ("profit", "Lợi nhuận"), ("margin", "Biên"), ("status", "Trạng thái"), ("operator", "Điều hành")], "detail": []}}
 
@@ -227,7 +227,7 @@ def r9_anomalies(db: Session) -> list[dict]:
     for pr in db.execute(select(PaymentRequest).order_by(PaymentRequest.created_at)).scalars():
         key = (pr.supplier_tax_code or pr.supplier_name.strip().upper())
         seen[key] = seen.get(key, 0) + 1
-        if seen[key] == 1 and pr.amount >= 20_000_000 and pr.created_at >= datetime.combine(m0, datetime.min.time()) and pr.status not in ("tu_choi",) and not pr.code.startswith("VTDC"):
+        if seen[key] == 1 and (pr.amount or 0) >= 20_000_000 and pr.created_at >= datetime.combine(m0, datetime.min.time()) and pr.status not in ("tu_choi",) and not pr.code.startswith("VTDC"):
             add("r9_ncc_moi_chi_lon", "warn", f"dc:{pr.code}", f"{pr.code}: NCC mới {pr.supplier_name} ({(pr.amount or 0):,.0f} đ) – lần đầu giao dịch, kiểm tra hồ sơ NCC/tài khoản")
     # 5. Phiếu thu tiền mặt lớn ≥ 30 triệu trong tháng
     for r in db.execute(select(Receipt).where(Receipt.method == "tien_mat", Receipt.amount >= 30_000_000, Receipt.created_at >= datetime.combine(m0, datetime.min.time()))).scalars():

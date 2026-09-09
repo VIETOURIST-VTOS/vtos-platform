@@ -69,9 +69,9 @@ class LaborContract(Base):
     signed_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     effective_from: Mapped[date] = mapped_column(Date)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)     # None = không xác định thời hạn
-    salary: Mapped[float | None] = mapped_column(TIEN, default=0)                    # lương chính theo hợp đồng, nullable=True
-    si_salary: Mapped[float | None] = mapped_column(TIEN, default=0)                 # mức lương đóng BHXH, nullable=True
-    allowance: Mapped[float | None] = mapped_column(TIEN, default=0)                 # phụ cấp, nullable=True
+    salary: Mapped[float | None] = mapped_column(TIEN)                    # lương chính theo hợp đồng, nullable=True
+    si_salary: Mapped[float | None] = mapped_column(TIEN)                 # mức lương đóng BHXH, nullable=True
+    allowance: Mapped[float | None] = mapped_column(TIEN)                 # phụ cấp, nullable=True
     annual_leave_days: Mapped[float] = mapped_column(Float, default=12)        # số ngày phép năm theo hợp đồng
     status: Mapped[str] = mapped_column(String(20), default="hieu_luc")
     terminated_on: Mapped[date | None] = mapped_column(Date, nullable=True)

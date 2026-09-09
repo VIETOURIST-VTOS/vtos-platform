@@ -233,7 +233,7 @@ def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptg
     # Hai lý do KHÁC NHAU cùng dẫn tới hai chữ ký, nên nêu cả hai: vượt dự toán là chuyện của ngân sách,
     # còn vượt hạn mức là chuyện của số tiền. Gộp làm một thì người duyệt không biết mình đang duyệt gì.
     if r.over_budget: flags.append("NGOÀI DỰ TOÁN → 2 chữ ký (cổng 15)")
-    if r.category == "marketing" and r.amount >= R.get_param(db, "han_muc_mkt"):
+    if r.category == "marketing" and (r.amount or 0) >= R.get_param(db, "han_muc_mkt"):
         flags.append("≥ hạn mức Marketing → 2 chữ ký (cổng 15)")
     elif r.two_signatures and not r.over_budget: flags.append("≥ hạn mức → 2 chữ ký (cổng 15)")
     return {"request": pr_out(r, db), "message": f"Đã lập {r.code}" + (" – " + "; ".join(flags) if flags else "")}

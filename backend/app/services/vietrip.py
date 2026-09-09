@@ -277,7 +277,7 @@ def repair_derived_budgets(db: Session, actor: str = "cntt") -> dict:
     n = m = 0
     tour_ids = {r[0] for r in db.execute(select(TourCostLine.tour_id).where(TourCostLine.source == "vietrip")).all()}
     for t in db.execute(select(Tour).where(Tour.imported == True)).scalars():
-        if t.id in tour_ids and (t.fixed_cost > 0 or t.var_cost_per_pax > 0):
+        if t.id in tour_ids and ((t.fixed_cost or 0) > 0 or (t.var_cost_per_pax or 0) > 0):
             t.fixed_cost, t.var_cost_per_pax = 0.0, 0.0
             n += 1
         if not t.settled_vietrip and t.id not in tour_ids and (t.actual_cost or t.actual_revenue):

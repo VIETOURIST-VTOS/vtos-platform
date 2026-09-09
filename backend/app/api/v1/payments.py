@@ -183,7 +183,7 @@ class CashIn(BaseModel):
 def cash_receipt(data: CashIn, u: User = Depends(require_roles("ketoan",)), db: Session = Depends(get_db)):
     b = db.get(Booking, data.booking_id)
     if not b: raise HTTPException(404, "Không có booking")
-    if data.amount <= 0: raise HTTPException(422, "Số tiền phải > 0")
+    if (data.amount or 0) <= 0: raise HTTPException(422, "Số tiền phải > 0")
     r = P.cash_receipt(db, u, b, data.amount, data.payer, data.note)
     return {"receipt": receipt_out(r, db), "message": f"Đã lập phiếu thu tiền mặt {r.code}"}
 

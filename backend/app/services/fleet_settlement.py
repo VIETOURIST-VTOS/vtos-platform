@@ -129,7 +129,7 @@ def ap_dung_can_tru(db: Session, plan: RepaymentPlan, so_tien: float, idem_key: 
     if tru <= 0:
         return {"da_tru": 0.0, "lap_lai": False, "ghi_chu": "Lịch đã tất toán hoặc không còn số dư đủ điều kiện"}
     ky = next((k for k in sorted(tao_ky_cho_lich(db, plan), key=lambda x: x.ky)
-               if k.amount_applied < k.amount_due), None)
+               if (k.amount_applied or 0) < (k.amount_due or 0)), None)
     a = OffsetApplication(idem_key=idem_key, plan_id=plan.id, installment_id=ky.id if ky else None,
                           settlement_id=settlement_id, amount=tru, chung_tu=chung_tu, created_by=boi)
     db.add(a)
@@ -236,7 +236,7 @@ def dung_quyet_toan(db: Session, partner_id: int, ky: str, boi: str) -> Settleme
                                       mo_ta=f"Phân bổ hóa đơn {inv.so_hoa_don} ({inv.nha_cung_cap})",
                                       amount=r["amount"], ben_chiu="vietourist_tam_ung",
                                       chung_tu=inv.so_hoa_don))
-                chi_ho += r["amount"]
+                chi_ho += (r["amount"] or 0)
 
     dieu_chinh = sum((l.amount or 0) for l in db.execute(
         select(SettlementLine).where(SettlementLine.settlement_id == st.id,

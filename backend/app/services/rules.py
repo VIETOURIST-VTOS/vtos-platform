@@ -234,9 +234,12 @@ def calc(tour: Tour, threshold: float, fixed: float | None = None, var: float | 
     biên 100% nên cổng biên luôn báo "ĐẠT" – vô hiệu hóa cổng chặn số 1. Nay dự toán thiếu giá vốn
     có complete=False và gate_state="chua_du_co_so"; pass_gate chỉ đúng khi dự toán đủ cơ sở tính.
     """
-    p, n = tour.price_per_pax, tour.planned_pax
-    f = tour.fixed_cost if fixed is None else fixed
-    v = tour.var_cost_per_pax if var is None else var
+    # Gia cố tại chỗ GÁN, không phải chỗ dùng: từ đây trở xuống p/f/v đi vào một chục phép tính, và
+    # máy quét chữ của K2 không lần được qua một biến cục bộ. Rỗng ở đây nghĩa là chưa lập dự toán –
+    # xử như 0 thì `source` ra "chua_co", đúng ý.
+    p, n = tour.price_per_pax or 0, tour.planned_pax
+    f = (tour.fixed_cost if fixed is None else fixed) or 0
+    v = (tour.var_cost_per_pax if var is None else var) or 0
     if source is None:
         source = "du_toan_tour" if (f > 0 or v > 0) else "chua_co"
     revenue = p * n
@@ -270,7 +273,7 @@ def budget_of(db: Session, t: Tour) -> tuple[float, float, str]:
     lập; nếu chuyến chưa có thì lấy cơ cấu chi phí sản phẩm làm dự toán THAM CHIẾU (ghi rõ nguồn);
     không có nữa thì trả về "chưa có dự toán", không suy ra số 0.
     """
-    if t.fixed_cost > 0 or t.var_cost_per_pax > 0:
+    if (t.fixed_cost or 0) > 0 or (t.var_cost_per_pax or 0) > 0:
         return t.fixed_cost, t.var_cost_per_pax, "du_toan_tour"
     from app.models.core import Product
     p = None
@@ -307,7 +310,7 @@ def approver_role(tour: Tour) -> str:
 
 def settlement_summary(db: Session, tour: Tour) -> dict:
     """Số liệu quyết toán và quỹ thưởng theo mục 6.4 (chỉ tính khi đã Kế toán xác nhận)."""
-    rev = tour.actual_revenue
+    rev = tour.actual_revenue or 0
     cost = (tour.actual_cost or 0) + (tour.promo_value or 0)  # ĐC Điều 3: giá trị mã KM là một dòng giá vốn nội bộ
     profit = rev - cost
     margin = profit / rev if rev else 0
@@ -394,7 +397,7 @@ def monthly_payroll_draft(db: Session, year: int, month: int) -> list[dict]:
         o["fund_tp"] += s["fund_tp"]
         if is_doan(t):
             for b in t.bookings:
-                doan_profit_by_sales[b.sales_id] = doan_profit_by_sales.get(b.sales_id, 0) + s["profit"] * ((b.amount or 0) / s["revenue"] if s["revenue"] else 0)
+                doan_profit_by_sales[b.sales_id] = doan_profit_by_sales.get(b.sales_id, 0) + s["profit"] * ((b.amount or 0) / (s["revenue"] or 0) if (s["revenue"] or 0) else 0)
     for uid, o in by_op.items():
         rows.append({"nguoi": o["name"], "khoan": "Thưởng chuyến Điều hành (70%)", "so_chuyen": o["chuyen"], "tien": round(o["fund_nv"])})
     tp_total = sum(o["fund_tp"] for o in by_op.values())

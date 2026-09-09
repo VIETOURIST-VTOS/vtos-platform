@@ -134,10 +134,10 @@ def kiem(db: Session, rows: list[dict]) -> dict:
         "hop_le": sum(1 for k in ket if not k["loi"] and not k["da_co"]),
         "da_co": sum(1 for k in ket if k["da_co"]),
         "dong_loi": sum(1 for k in ket if k["loi"]),
-        "tong_doanh_thu": sum(k["doanh_thu"] for k in ket),
-        "thieu_gia_von_tour": sum(1 for k in ket if k["doanh_thu"] > 0 and k["gia_von"] is None
+        "tong_doanh_thu": sum((k["doanh_thu"] or 0) for k in ket),
+        "thieu_gia_von_tour": sum(1 for k in ket if (k["doanh_thu"] or 0) > 0 and k["gia_von"] is None
                                   and k["loai"] == "tour"),
-        "thieu_gia_von_khach_le": sum(1 for k in ket if k["doanh_thu"] > 0 and k["gia_von"] is None
+        "thieu_gia_von_khach_le": sum(1 for k in ket if (k["doanh_thu"] or 0) > 0 and k["gia_von"] is None
                                       and k["loai"] == "khach_le"),
         "dong": ket,
         "ghi_chu": ("Ô giá vốn bằng 0 trong tệp được đọc là CHƯA CÓ SỐ, không phải 0 đồng. Sheet Tổng "
@@ -164,7 +164,7 @@ def nap(db: Session, rows: list[dict], boi: str, ten_tep: str = "", bo_qua_dong_
             doanh_thu=k["doanh_thu"], gia_von=k["gia_von"], trang_thai_qt=tt,
             # Máy KHÔNG tự đoán dòng nào là bảo lưu. Tour thiếu giá vốn vào hàng đợi; khách lẻ thiếu
             # giá vốn để TRỐNG phân loại và chờ người xếp – hai thứ đó không được lẫn vào nhau.
-            phan_loai=("cho_gia_von" if (k["doanh_thu"] > 0 and k["gia_von"] is None
+            phan_loai=("cho_gia_von" if ((k["doanh_thu"] or 0) > 0 and k["gia_von"] is None
                                          and k["loai"] == "tour") else ""),
             ten_tep=ten_tep[:200], boi=boi)
         db.add(s); da_nap += 1
@@ -195,7 +195,7 @@ def tong_hop(db: Session, ky: str = "") -> dict:
     if ky: q = q.where(TourSettlement.ky == ky)
     ds = list(db.execute(q).scalars())
     def _s(f): return sum((x.doanh_thu or 0) for x in ds if f(x))
-    cho = [x for x in ds if x.doanh_thu > 0 and x.gia_von is None]
+    cho = [x for x in ds if (x.doanh_thu or 0) > 0 and x.gia_von is None]
     return {
         "ky": ky, "so_don": len(ds),
         "doanh_thu": sum((x.doanh_thu or 0) for x in ds),
@@ -203,10 +203,10 @@ def tong_hop(db: Session, ky: str = "") -> dict:
         "so_don_du_so": len([x for x in ds if x.gia_von is not None]),
         "hang_doi_thieu_gia_von": {
             "so_don": len([x for x in cho if x.loai == "tour"]),
-            "doanh_thu": _s(lambda x: x.doanh_thu > 0 and x.gia_von is None and x.loai == "tour")},
+            "doanh_thu": _s(lambda x: (x.doanh_thu or 0) > 0 and x.gia_von is None and x.loai == "tour")},
         "khach_le_cho_phan_loai": {
             "so_don": len([x for x in cho if x.loai == "khach_le" and not x.phan_loai]),
-            "doanh_thu": _s(lambda x: x.doanh_thu > 0 and x.gia_von is None
+            "doanh_thu": _s(lambda x: (x.doanh_thu or 0) > 0 and x.gia_von is None
                             and x.loai == "khach_le" and not x.phan_loai)},
         "chua_anh_xa_dieu_hanh": len([x for x in ds if x.dieu_hanh and x.operator_id is None]),
         "ghi_chu": ("Lợi nhuận chỉ cộng trên những đơn ĐÃ CÓ giá vốn. Đơn chưa có giá vốn không được "

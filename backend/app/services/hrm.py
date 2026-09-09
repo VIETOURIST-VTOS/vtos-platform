@@ -149,7 +149,7 @@ def create_leave(db: Session, u: User, e: Employee, data: dict) -> LeaveRequest:
         raise ValueError("Số ngày nghỉ phải lớn hơn 0")
     if kind == "phep_nam":
         bal = leave_balance(db, e, d1.year)
-        if days > bal["remaining"] - bal["pending"]:
+        if days > (bal["remaining"] or 0) - bal["pending"]:
             raise ValueError(f"Vượt quỹ phép năm {d1.year}: còn {bal['remaining']:.1f} ngày "
                              f"(đang chờ duyệt {bal['pending']:.1f}), xin {days:.1f} ngày")
     r = LeaveRequest(employee_id=e.id, kind=kind, date_from=d1, date_to=d2, days=days,
@@ -169,7 +169,7 @@ def decide_leave(db: Session, u: User, r: LeaveRequest, approve: bool, note: str
     e = db.get(Employee, r.employee_id)
     if approve and r.kind == "phep_nam":
         bal = leave_balance(db, e, r.date_from.year)
-        if r.days > bal["remaining"]:
+        if r.days > (bal["remaining"] or 0):
             raise ValueError(f"Không đủ phép năm: còn {bal['remaining']:.1f} ngày, đơn xin {r.days:.1f} ngày")
     r.status = "duyet" if approve else "tu_choi"
     r.approved_by, r.approved_at, r.decision_note = u.username, datetime.now(), note[:300]

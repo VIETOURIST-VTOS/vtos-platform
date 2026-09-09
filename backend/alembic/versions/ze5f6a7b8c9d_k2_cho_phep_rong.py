@@ -1,4 +1,4 @@
-"""K2 bước 1: 86 cột tiền được PHÉP rỗng (chưa đổi mặc định, chưa đụng dữ liệu)
+"""K2 bước 1: 83 cột tiền được PHÉP rỗng (chưa đổi mặc định, chưa đụng dữ liệu)
 
 Revision ID: ze5f6a7b8c9d
 Revises: zd4e5f6a7b8c
@@ -12,7 +12,7 @@ branch_labels = None
 depends_on = None
 
 # Chủ tịch chốt 09/9/2026: ở những cột này, MỌI số 0 nghĩa là "chưa nhập dữ liệu". Quyết định ấy trả
-# lời câu hỏi K2 cho cả 86 cột một lượt, không phải hỏi từng phòng.
+# lời câu hỏi K2 cho cả 83 cột một lượt, không phải hỏi từng phòng.
 #
 # Nhưng nó KHÔNG thể thi hành trong một bước. Trong mã có 316 dòng làm phép toán trên các cột này, và
 # 242 dòng CHƯA an toàn với giá trị rỗng – kiểu sum(l.debit for l in e.lines). Cho phép rỗng mà đồng
@@ -48,7 +48,6 @@ COT = (
     ("fixed_assets", "opening_accumulated"),
     ("fixed_assets", "salvage"),
     ("fleet_debt_payments", "so_tien"),
-    ("fleet_external_txns", "khong_phai_chi_phi"),
     ("fleet_external_txns", "so_tien"),
     ("fleet_maintenance", "so_tien"),
     ("fleet_offset_applications", "amount"),
@@ -80,7 +79,6 @@ COT = (
     ("lead_channel_stats", "cost"),
     ("mkt_budget_lines", "amount"),
     ("mkt_budgets", "target_revenue"),
-    ("payment_requests", "over_budget"),
     ("prepaid_allocations", "allocated"),
     ("prepaid_allocations", "amount"),
     ("prepaid_allocations", "remaining"),
@@ -107,7 +105,6 @@ COT = (
     ("tours", "price_per_pax"),
     ("tours", "price_promo"),
     ("tours", "promo_value"),
-    ("tours", "seats_promo"),
     ("tours", "var_cost_per_pax"),
     ("vehicle_rates", "internal_price"),
     ("vehicle_rates", "partner_price"),

@@ -208,7 +208,7 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
         raise ValueError("Chi phí tour / hoàn tiền / tạm ứng bắt buộc gắn mã tour (cổng 14)")
     if cat == "tam_ung" and t and t.status in ("da_dong_so", "kt_xac_nhan", "khoa"):
         raise ValueError("Tour đã đóng số quyết toán – không tạm ứng thêm")
-    if data["amount"] <= 0: raise ValueError("Số tiền phải > 0")
+    if (data["amount"] or 0) <= 0: raise ValueError("Số tiền phải > 0")
     if not data.get("supplier_name"): raise ValueError("Thiếu nhà cung cấp / người thụ hưởng")
     r = PaymentRequest(code=_next_code(db), category=cat, tour_id=t.id if t else None, supplier_name=data["supplier_name"], supplier_tax_code=data.get("supplier_tax_code", ""),
                        supplier_bank=data.get("supplier_bank", ""), amount=float(data["amount"]), description=data["description"], has_document=bool(data.get("has_document")),
@@ -218,7 +218,7 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     if cat == "marketing":
         r.marketing_muc = data.get("marketing_muc", "") or ""
         r.campaign_id = data.get("campaign_id")
-        if r.amount >= R.get_param(db, "han_muc_mkt"):
+        if (r.amount or 0) >= R.get_param(db, "han_muc_mkt"):
             r.two_signatures = True
         # Cổng ngân sách marketing: vượt phần còn lại của HẠNG MỤC thì bật cờ ngoài dự toán và cần hai
         # chữ ký – đúng cơ chế đã dùng cho chi phí tour. KHÔNG chặn cứng: có lúc phải chi thật; nhưng
@@ -227,14 +227,14 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
         if r.marketing_muc:
             from app.services import marketing as MK
             con, vi_sao = MK.con_lai_hang_muc(db, r.marketing_muc, r.company_id)
-            if r.amount > con:
+            if (r.amount or 0) > con:
                 r.over_budget, r.two_signatures = True, True
                 r.description = (r.description + f" [ngoài dự toán: còn {con:,.0f}đ theo {vi_sao}]")[:300]
         else:
             r.over_budget, r.two_signatures = True, True
     if t and cat in ("chi_tour", "tam_ung"):
         cf = tour_cashflow(db, t)
-        if cf["paid"] + cf["committed"] + cf["pending"] + (r.amount or 0) > cf["budget"] + 1:
+        if (cf["paid"] or 0) + cf["committed"] + cf["pending"] + (r.amount or 0) > (cf["budget"] or 0) + 1:
             r.over_budget, r.two_signatures = True, True
     db.add(r); db.flush()
     R.audit(db, u.username, u.role, "lap_de_nghi_chi", f"dc:{r.code}", after={"loai": cat, "tour": t.code if t else "", "ncc": r.supplier_name, "so_tien": r.amount,

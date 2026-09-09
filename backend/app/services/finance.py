@@ -36,7 +36,7 @@ def build_loan_schedule(c: FinContract, months: int, first_due: date) -> list[Fi
 
 def create_contract(db: Session, u: User, data: dict, months: int = 0, first_due: date | None = None) -> FinContract:
     if data["kind"] not in CONTRACT_KINDS: raise ValueError("Loại hợp đồng không hợp lệ")
-    if data["principal"] <= 0: raise ValueError("Giá trị phải > 0")
+    if (data["principal"] or 0) <= 0: raise ValueError("Giá trị phải > 0")
     if data["kind"] != "vay" and not data.get("approval_ref"): raise ValueError("Khoản đầu tư/hợp tác/cho vay/cọc phải có nghị quyết phê duyệt HĐQT")
     c = FinContract(code=next_code(db), created_by=u.username, **data)
     if not c.outstanding: c.outstanding = c.principal
@@ -53,7 +53,7 @@ def create_contract(db: Session, u: User, data: dict, months: int = 0, first_due
 def settle(db: Session, u: User, s: FinSchedule, done_on: date, bank_ref: str, amount: float | None = None) -> FinSchedule:
     """Ghi nhận đã thực hiện một dòng lịch (đối chiếu giao dịch ngân hàng) → bút toán + cập nhật dư nợ."""
     if s.status == "da_thuc_hien": raise ValueError("Đã thực hiện")
-    c = s.contract; amt = float(amount or s.amount)
+    c = s.contract; amt = float(amount or s.amount or 0)
     acc = KIND_ACCOUNT[c.kind]
     lines = {"tra_goc": [{"account": "341", "debit": amt}, {"account": "112", "credit": amt}],
              "tra_lai": [{"account": "635", "debit": amt}, {"account": "112", "credit": amt}],
@@ -103,7 +103,7 @@ def forecast_13w(db: Session, start: date | None = None) -> dict:
     # Nối bảng và lọc ngay trong SQL, chỉ lấy 3 cột. Bản cũ nạp TOÀN BỘ booking (10.303 dòng trên dữ
     # liệu thật) rồi mỗi dòng lại nạp thêm tour của nó – vừa chậm vừa là một trong những chỗ ngốn hết
     # 512 MB bộ nhớ máy chủ khi mở trang Tổng quan.
-    con_thu = (Booking.amount - Booking.discount - Booking.paid)
+    con_thu = (func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0))
     for start_date, due in db.execute(
             select(Tour.start_date, con_thu)
             .join(Tour, Booking.tour_id == Tour.id)
@@ -146,7 +146,7 @@ def forecast_13w(db: Session, start: date | None = None) -> dict:
         d = it.due_date
         for k in range(0, 4 if it.recurring_monthly else 1):
             dd = add_months(d, k)
-            if dd >= weeks[0][0]: put(dd, it.direction, it.category, it.amount)
+            if dd >= weeks[0][0]: put(dd, it.direction, it.category, (it.amount or 0))
     # Lương: nếu chưa có kế hoạch lương thì lấy bảng lương gần nhất, chi ngày 10 hằng tháng
     if not any("luong" in r["out"] for r in rows):
         last = db.execute(select(PayrollRun).order_by(PayrollRun.period.desc())).scalars().first()
