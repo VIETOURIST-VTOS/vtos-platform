@@ -101,7 +101,21 @@ def quet() -> list:
                      % "|".join(map(re.escape, sorted(ten, key=len, reverse=True))))
     xau = []
     for tep in sorted(GOC.rglob("*.py")):
+        trong_chuoi_dai = False        # đang ở giữa một chuỗi ba nháy (docstring)
         for so, dong in enumerate(tep.read_text(encoding="utf-8").split("\n"), 1):
+            # Bỏ qua thân docstring. Một công thức VIẾT RA BẰNG CHỮ để giải thích – ví dụ dòng
+            # "doanh thu = tổng (booking.amount - booking.discount)" ở phần mở đầu tệp – không
+            # phải một phép đọc, và bắt nó là dạy người viết đừng ghi chú công thức nữa. Cái giá
+            # ấy quá đắt cho một phép thử canh cửa.
+            #
+            # Đếm dấu ba nháy trên dòng để biết trạng thái SAU dòng đó: số lẻ là vừa mở hoặc vừa
+            # đóng, số chẵn là mở và đóng ngay trên cùng dòng nên trạng thái không đổi.
+            n_nhay = dong.count('"""') + dong.count("'''")
+            dang_mo = trong_chuoi_dai
+            if n_nhay % 2 == 1:
+                trong_chuoi_dai = not trong_chuoi_dai
+            if dang_mo:
+                continue
             if "mapped_column" in dong or not TOAN.search(dong):
                 continue
             mien = MIEN.search(dong)

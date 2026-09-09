@@ -35,7 +35,11 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
   { key: "dieuhanh", label: "5. Điều hành", items: [
     ["Yêu cầu chờ xử lý", "/requests"], ["Chuyến tour & dự toán", "/tours"], ["Nhà cung cấp & đặt dịch vụ", "/nha-cung-cap"],
     ["Hồ sơ visa", "/visa"],
-    ["Sự cố tour", ""], ["Quyết toán tour", "/tours"]] },
+    ["Sự cố tour", ""], ["Quyết toán tour", "/tours"],
+    // Lãi lỗ tour đứng NGAY SAU Quyết toán tour vì đó là thứ tự thật của việc: nhập xong dòng chi phí
+    // quyết toán thì mới có giá vốn, có giá vốn mới có lãi lỗ. Đặt trước thì người dùng gặp bảng lãi lỗ
+    // rỗng trước khi gặp việc phải làm để nó có số.
+    ["Lãi lỗ theo tour", "/lai-lo-tour"]] },
   // Xe và hướng dẫn viên tách khỏi Điều hành thành đơn vị riêng (chỉ đạo 07/9/2026). Xe nội bộ thuộc pháp nhân
   // Công ty TNHH Vận tải Vietrip, còn hướng dẫn viên hưởng lương ở công ty mẹ – gom vào một nhóm menu để
   // người phụ trách có màn hình của mình, thay vì nằm lẫn trong nghiệp vụ tour.

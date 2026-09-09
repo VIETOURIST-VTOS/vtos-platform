@@ -32,6 +32,19 @@ class TourCostLine(Base):
     service_type: Mapped[str] = mapped_column(String(30), default="")        # GUIDE / HOTEL / LAND / BUS / MEAL / TICKET / VISA / INS…
     supplier_name: Mapped[str] = mapped_column(String(200), default="")
     supplier_tax_code: Mapped[str] = mapped_column(String(20), default="")
+    # Hoá đơn đầu vào của nhà cung cấp. Trước 09/9/2026 VTOS chỉ có một ô đúng/sai "có hoá đơn" trên đề
+    # nghị chi và một ô ghi chú tự do – tức là biết CÓ hoá đơn nhưng không tra được hoá đơn NÀO. Không
+    # tra được thì không đối chiếu được với tờ khai thuế, và cũng không trả lời được câu hỏi đơn giản
+    # nhất khi quyết toán: khoản chi này có chứng từ hợp lệ không.
+    #
+    # Ba ô này là CỬA NHẬP cho người làm, không phải chỗ máy tự suy ra. Để rỗng nghĩa là chưa nhập –
+    # theo đúng quy ước K2, không mặc định thành 0 hay chuỗi rỗng giả.
+    so_hoa_don: Mapped[str | None] = mapped_column(String(30), nullable=True)      # số hoá đơn GTGT đầu vào
+    ngay_hoa_don: Mapped[date | None] = mapped_column(Date, nullable=True)
+    vat_hoa_don: Mapped[float | None] = mapped_column(TIEN, nullable=True)         # tiền thuế GTGT được khấu trừ
+    # Nối tới hồ sơ nhà cung cấp để lấy địa chỉ/mã số thuế chuẩn. Để rỗng vẫn ghi được dòng chi phí –
+    # nhiều dòng nhập từ Vietrip chỉ có tên NCC dạng chữ, ép phải chọn danh mục là chặn cả luồng nhập.
+    supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True, index=True)
     unit_price: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     qty: Mapped[float] = mapped_column(Float, default=0)
     coef: Mapped[float] = mapped_column(Float, default=1)

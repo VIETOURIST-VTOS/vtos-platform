@@ -41,6 +41,7 @@ from app.api.v1.kiem_soat import router as kiem_soat_router
 from app.api.v1.hach_toan import router as hach_toan_router
 from app.api.v1.cskh import router as cskh_router
 from app.api.v1.ks_ra_soat import router as ks_ra_soat_router
+from app.api.v1.lai_lo_tour import router as ll_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -222,6 +223,7 @@ app.include_router(hd_router)
 app.include_router(qtt_router)
 app.include_router(dct_router)
 app.include_router(ks_router)
+app.include_router(ll_router)
 
 
 @app.get("/", include_in_schema=False)
