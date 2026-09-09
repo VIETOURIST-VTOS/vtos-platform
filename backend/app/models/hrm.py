@@ -8,6 +8,7 @@ from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 CONTRACT_KINDS = {
     "thu_viec": {"ten": "Hợp đồng thử việc", "bhxh": False},
@@ -68,9 +69,9 @@ class LaborContract(Base):
     signed_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     effective_from: Mapped[date] = mapped_column(Date)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)     # None = không xác định thời hạn
-    salary: Mapped[float] = mapped_column(Float, default=0)                    # lương chính theo hợp đồng
-    si_salary: Mapped[float] = mapped_column(Float, default=0)                 # mức lương đóng BHXH
-    allowance: Mapped[float] = mapped_column(Float, default=0)                 # phụ cấp
+    salary: Mapped[float] = mapped_column(TIEN, default=0)                    # lương chính theo hợp đồng
+    si_salary: Mapped[float] = mapped_column(TIEN, default=0)                 # mức lương đóng BHXH
+    allowance: Mapped[float] = mapped_column(TIEN, default=0)                 # phụ cấp
     annual_leave_days: Mapped[float] = mapped_column(Float, default=12)        # số ngày phép năm theo hợp đồng
     status: Mapped[str] = mapped_column(String(20), default="hieu_luc")
     terminated_on: Mapped[date | None] = mapped_column(Date, nullable=True)

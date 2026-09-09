@@ -51,7 +51,12 @@ def so(loc=""):
 def test_kt1_liet_ke_tung_cot_tien_kieu_float_kem_ten_bang_va_cot():
     d = so("can_doi_kieu")
     assert d["tong_cot"] > 100, "phải quét được toàn bộ mô hình dữ liệu, không chỉ vài bảng"
-    assert d["so_float_tien"] > 0, "còn cột tiền kiểu Float thì bộ kiểm phải nói ra"
+    # KHÔNG đòi so_float_tien > 0. Bản trước đòi, và ngày 09/9/2026 – khi V9 đổi nốt 47 cột tiền cuối
+    # cùng – phép thử này đỏ. Nó đang biến VIỆC SỬA XONG thành lỗi, đúng cái bẫy mà ghi chú bên dưới
+    # cảnh báo, chỉ khác chỗ đặt. Cách nhanh nhất để làm nó xanh lại là hoàn tác V9; nên phải bỏ.
+    #
+    # Thứ đáng gác không phải "còn bao nhiêu cột hỏng" mà là "bộ kiểm có thấy hết những cột còn hỏng
+    # không" – và đó là phép so ở cuối hàm, đúng vẫn đúng khi danh sách rỗng.
     for r in d["rows"][:5]:
         assert r["bang"] and r["cot"] and r["kieu"] == "Float"
     # Và phải chỉ đúng những chỗ nguy hiểm nhất – nhưng CHỈ những chỗ V9 CHƯA sửa.
@@ -103,7 +108,9 @@ def test_kt3_ten_cot_khong_noi_ro_thi_de_chua_ro_cho_nguoi_quyet():
 
 
 def test_kt4_robot_khong_duoc_quyet_xep_loai():
-    d = so("can_doi_kieu"); i = d["rows"][0]["id"]
+    # Lấy từ TOÀN BỘ bảng, không lấy từ nhóm "cần đổi kiểu": nhóm đó rỗng khi V9 đã đổi xong, và phép
+    # thử này gác quyền QUYẾT chứ không gác việc còn hay hết cột hỏng.
+    d = so(); i = d["rows"][0]["id"]
     than = {"dong": [{"id": i, "quyet_nguoi": "tien"}]}
     assert client.post("/api/v1/kiem-soat/cot-tien/quyet", json=than, headers=login("bks")).status_code == 403, \
         "robot vừa xếp loại vừa chốt xếp loại thì con số nó báo lên Chủ tịch là con số nó tự đặt ra"
@@ -113,8 +120,8 @@ def test_kt4_robot_khong_duoc_quyet_xep_loai():
 def test_kt5_quyet_cua_nguoi_de_len_de_xuat_cua_may():
     truoc = so()
     # lấy một cột máy xếp là tiền rồi cho người đổi thành không phải tiền: quyết định của người thắng
-    d = so("can_doi_kieu")
-    chua = [r for r in d["rows"] if not r["quyet_nguoi"]]
+    d = so()
+    chua = [r for r in d["rows"] if not r["quyet_nguoi"] and r["xep_may"] == "tien"]
     assert chua, "không còn cột nào chưa ai quyết thì phép thử này không nói lên điều gì"
     i = chua[0]["id"]; ten = f"{chua[0]['bang']}.{chua[0]['cot']}"
     r = client.post("/api/v1/kiem-soat/cot-tien/quyet",

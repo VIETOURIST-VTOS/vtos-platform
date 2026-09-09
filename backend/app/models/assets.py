@@ -8,6 +8,7 @@ from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 # Loại TSCĐ theo MISA (quyết định TK nguyên giá / hao mòn mặc định)
 ASSET_KINDS = {
@@ -44,10 +45,10 @@ class FixedAsset(Base):
     # Nguyên giá & khấu hao
     purchase_date: Mapped[date | None] = mapped_column(Date, nullable=True)     # ngày mua
     start_date: Mapped[date] = mapped_column(Date)                              # ngày bắt đầu tính khấu hao
-    cost: Mapped[float] = mapped_column(Float, default=0)                       # nguyên giá
+    cost: Mapped[float] = mapped_column(TIEN, default=0)                       # nguyên giá
     depr_months: Mapped[int] = mapped_column(Integer, default=0)                # thời gian sử dụng (tháng); 0 = không trích
-    salvage: Mapped[float] = mapped_column(Float, default=0)                    # giá trị thu hồi ước tính
-    opening_accumulated: Mapped[float] = mapped_column(Float, default=0)        # hao mòn lũy kế khi nạp số dư ban đầu
+    salvage: Mapped[float] = mapped_column(TIEN, default=0)                    # giá trị thu hồi ước tính
+    opening_accumulated: Mapped[float] = mapped_column(TIEN, default=0)        # hao mòn lũy kế khi nạp số dư ban đầu
     opening_period: Mapped[str] = mapped_column(String(7), default="")          # kỳ tương ứng số dư ban đầu (YYYY-MM)
     # Trạng thái
     status: Mapped[str] = mapped_column(String(20), default="dang_dung")
@@ -65,9 +66,9 @@ class AssetDepreciation(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     asset_id: Mapped[int] = mapped_column(ForeignKey("fixed_assets.id"), index=True)
     period: Mapped[str] = mapped_column(String(7), index=True)                  # 2026-09
-    amount: Mapped[float] = mapped_column(Float, default=0)                     # khấu hao trong kỳ
-    accumulated: Mapped[float] = mapped_column(Float, default=0)                # lũy kế đến hết kỳ
-    remaining: Mapped[float] = mapped_column(Float, default=0)                  # giá trị còn lại cuối kỳ
+    amount: Mapped[float] = mapped_column(TIEN, default=0)                     # khấu hao trong kỳ
+    accumulated: Mapped[float] = mapped_column(TIEN, default=0)                # lũy kế đến hết kỳ
+    remaining: Mapped[float] = mapped_column(TIEN, default=0)                  # giá trị còn lại cuối kỳ
     entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)        # chứng từ ghi sổ
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
@@ -85,9 +86,9 @@ class PrepaidExpense(Base):
     project_code: Mapped[str] = mapped_column(String(40), default="")
     department: Mapped[str] = mapped_column(String(20), default="")
     start_date: Mapped[date] = mapped_column(Date)                              # kỳ bắt đầu phân bổ
-    amount: Mapped[float] = mapped_column(Float, default=0)                     # giá trị cần phân bổ
+    amount: Mapped[float] = mapped_column(TIEN, default=0)                     # giá trị cần phân bổ
     months: Mapped[int] = mapped_column(Integer, default=1)                     # số kỳ phân bổ
-    opening_allocated: Mapped[float] = mapped_column(Float, default=0)          # đã phân bổ trước khi lên VTOS
+    opening_allocated: Mapped[float] = mapped_column(TIEN, default=0)          # đã phân bổ trước khi lên VTOS
     opening_period: Mapped[str] = mapped_column(String(7), default="")
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     status: Mapped[str] = mapped_column(String(20), default="dang_pb")
@@ -103,8 +104,8 @@ class PrepaidAllocation(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     prepaid_id: Mapped[int] = mapped_column(ForeignKey("prepaid_expenses.id"), index=True)
     period: Mapped[str] = mapped_column(String(7), index=True)
-    amount: Mapped[float] = mapped_column(Float, default=0)
-    allocated: Mapped[float] = mapped_column(Float, default=0)                  # lũy kế đã phân bổ đến hết kỳ
-    remaining: Mapped[float] = mapped_column(Float, default=0)                  # còn lại cuối kỳ
+    amount: Mapped[float] = mapped_column(TIEN, default=0)
+    allocated: Mapped[float] = mapped_column(TIEN, default=0)                  # lũy kế đã phân bổ đến hết kỳ
+    remaining: Mapped[float] = mapped_column(TIEN, default=0)                  # còn lại cuối kỳ
     entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

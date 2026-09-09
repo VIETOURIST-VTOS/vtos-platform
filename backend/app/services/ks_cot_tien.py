@@ -21,8 +21,13 @@ from app.services import rules as R
 
 # --- Dấu hiệu KHÔNG phải tiền. Xét TRƯỚC, vì nhiều cột chứa cả chữ tiền lẫn chữ tỷ lệ
 #     (fee_weight có "fee", vat_rate có "vat") và trong những trường hợp đó thì phần đuôi mới đúng.
+# "_suat" thêm 09/9/2026: thue_suat và lai_suat là TỶ LỆ, nhưng cả hai đều chứa chữ nằm trong danh
+# sách "là tiền" ("thue", "lai") nên bị xếp nhầm thành tiền. Bắt ở ĐUÔI chứ không ở giữa: cột bắt đầu
+# bằng "suat" (suat_an – tiền ăn ca) vẫn là tiền thật.
+# Tìm ra khi đổi kiểu 48 cột: purchase_invoices.thue_suat lọt vào danh sách đổi, và nó là cột DUY NHẤT
+# trong 48 cột chưa có người xem lại. Bốn cột rate_per_day có người xem thì xếp đúng.
 DUOI_KHONG_TIEN = ("_pct", "_rate", "_ratio", "_days", "_hours", "_hour", "_score", "_weight",
-                   "_qty", "_count", "_km", "_percent")
+                   "_qty", "_count", "_km", "_percent", "_suat")
 CHUA_KHONG_TIEN = ("ty_le", "he_so", "phan_tram", "diem", "score", "coef", "weight", "percent")
 DUNG_KHONG_TIEN = ("days", "lit", "qty", "so_luong", "work", "ot_hours", "so_lan", "so_ngay",
                    "so_gio", "so_khach", "pax", "annual_leave_days")

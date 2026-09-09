@@ -14,7 +14,7 @@ class VtRecord(Base):
     vietrip_id: Mapped[str] = mapped_column(String(40), index=True)
     ref: Mapped[str] = mapped_column(String(60), default="", index=True)   # tourcode / bookingID để tra chéo
     on_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
-    amount: Mapped[float] = mapped_column(Float, default=0)
+    amount: Mapped[float] = mapped_column(TIEN, default=0)
     raw: Mapped[dict] = mapped_column(JSON, default=dict)
     applied: Mapped[bool] = mapped_column(Boolean, default=False)          # đã ánh xạ sang bảng nghiệp vụ VTOS
     apply_note: Mapped[str] = mapped_column(String(200), default="")

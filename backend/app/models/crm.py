@@ -4,6 +4,7 @@ from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 LEAD_CHANNELS = ["Hotline 1", "Hotline 2", "Đặt tour web", "VCHAT", "Tiktok Ads", "Livestream", "Appier", "Zalo OA", "Facebook", "Khách cũ", "Khác"]
 LEAD_STATUS = {"moi": "Mới", "dang_cham_soc": "Đang chăm sóc", "chot": "Đã chốt tour", "mat": "Không chốt"}
@@ -41,7 +42,7 @@ class LeadChannelStat(Base):
     lead_month: Mapped[str] = mapped_column(String(7), index=True)
     channel: Mapped[str] = mapped_column(String(40))
     leads: Mapped[int] = mapped_column(Integer, default=0)
-    cost: Mapped[float] = mapped_column(Float, default=0)                       # chi phí kênh (nếu có) → chi phí/lead
+    cost: Mapped[float] = mapped_column(TIEN, default=0)                       # chi phí kênh (nếu có) → chi phí/lead
     updated_by: Mapped[str] = mapped_column(String(50), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 

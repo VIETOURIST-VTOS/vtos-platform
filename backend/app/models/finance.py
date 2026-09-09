@@ -3,6 +3,7 @@ from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 CONTRACT_KINDS = {"vay": "Khế ước vay ngân hàng", "lien_ket": "Đầu tư công ty liên kết", "hop_tac_kd": "Hợp tác kinh doanh", "ky_quy": "Ký quỹ",
                   "coc": "Đặt cọc mua tài sản", "cho_vay": "Cho vay", "phai_thu_co_phan": "Phải thu bán cổ phần", "von_phat_hanh": "Sử dụng vốn phát hành"}
@@ -24,8 +25,8 @@ class FinContract(Base):
     partner: Mapped[str] = mapped_column(String(160))                       # ngân hàng / đối tác
     contract_no: Mapped[str] = mapped_column(String(80), default="")
     signed_on: Mapped[date | None] = mapped_column(Date, nullable=True)
-    principal: Mapped[float] = mapped_column(Float, default=0)              # giá trị gốc / hạn mức
-    outstanding: Mapped[float] = mapped_column(Float, default=0)            # dư nợ / số đã giải ngân còn lại
+    principal: Mapped[float] = mapped_column(TIEN, default=0)              # giá trị gốc / hạn mức
+    outstanding: Mapped[float] = mapped_column(TIEN, default=0)            # dư nợ / số đã giải ngân còn lại
     interest_rate: Mapped[float] = mapped_column(Float, default=0)          # %/năm
     maturity: Mapped[date | None] = mapped_column(Date, nullable=True)
     collateral: Mapped[str] = mapped_column(String(300), default="")
@@ -47,7 +48,7 @@ class FinSchedule(Base):
     contract_id: Mapped[int] = mapped_column(ForeignKey("fin_contracts.id"), index=True)
     due_date: Mapped[date] = mapped_column(Date, index=True)
     kind: Mapped[str] = mapped_column(String(20))                           # tra_goc / tra_lai / thu_hoi / giai_ngan / nhan_vay
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[float] = mapped_column(TIEN)
     status: Mapped[str] = mapped_column(String(20), default="ke_hoach")     # ke_hoach / da_thuc_hien / qua_han
     done_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     bank_ref: Mapped[str] = mapped_column(String(80), default="")
@@ -63,6 +64,6 @@ class CashPlanItem(Base):
     direction: Mapped[str] = mapped_column(String(5))                       # in / out
     category: Mapped[str] = mapped_column(String(40))                       # luong / thue / thue_van_phong / khac
     description: Mapped[str] = mapped_column(String(200))
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[float] = mapped_column(TIEN)
     recurring_monthly: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[str] = mapped_column(String(50), default="")
