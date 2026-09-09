@@ -10,6 +10,7 @@ khai báo là bản sao, và một cửa bị bỏ quên thường bị bỏ qu�
   C1 có ít nhất một trang giao diện gọi cửa nhập tay một dòng
   C2 trang đó có nút bấm ghi, không phải chỉ nhắc tới đường dẫn trong chú thích
   C3 mọi bộ nạp đều dùng chung cửa này – không bộ nào có đường riêng
+  C4 chuỗi bán hàng có cửa SOẠN báo giá, không phải chỉ có cửa xem
 """
 import os, sys, pathlib, re
 
@@ -48,4 +49,11 @@ thieu_cot = [k for k, v in IN.BO_NAP.items() if not v.get("cot")]
 assert not thieu_cot, ("C3 ĐỎ – bộ nạp không khai cột thì màn hình không dựng được biểu nhập tay: "
                        + ", ".join(thieu_cot))
 print(f"C3 XANH – {len(IN.BO_NAP)} bộ nạp đều khai đủ cột, dùng chung một biểu")
+# C4 – V6 có màn hình xem báo giá từ đầu, nhưng khâu SOẠN thì chưa; chuỗi bán hàng đứt ngay ở khâu
+# đầu tiên. Cùng một loại lỗ hổng với C1: đường đi có, cửa vào thì không.
+soan = [p for p in trang if 'method: "POST"' in p.read_text(encoding="utf-8")
+        and "/ban-hang/bao-gia" in p.read_text(encoding="utf-8")]
+assert soan, ("C4 ĐỎ – không màn hình nào gửi POST /ban-hang/bao-gia. Xem được báo giá nhưng không "
+              "soạn được báo giá mới thì chuỗi bán hàng đứt ở khâu đầu.")
+print("C4 XANH – " + ", ".join(str(p.relative_to(WEB)) for p in soan) + " soạn được báo giá mới")
 print("TEST CUA NHAP TAY: XANH")

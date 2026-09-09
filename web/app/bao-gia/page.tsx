@@ -17,8 +17,17 @@ type Dong = { hang_khach: string; mo_ta: string; so_luong: number; don_gia: numb
               gia_von_don_vi: number | null; chiet_khau: number };
 type BG = { id: number; ma: string; mang: string; khach_ten: string; khach_dien_thoai: string;
             so_khach: number; ngay_khoi_hanh: string | null; trang_thai: string; trang_thai_ten: string;
+            khach_email: string; bang_gia_id: number | null;
             duoi_bien: boolean; giai_trinh: string; bien_luc_gui: number | null; phien_ban: number;
             dong: Dong[]; ban_da_gui: any[]; cong_bien: any };
+
+type BangGia = { id: number; ma: string; ten: string; mang: string; hieu_luc_tu: string;
+                 hieu_luc_den: string | null; con_hieu_luc: boolean;
+                 dong: { hang_khach: string; mo_ta: string; gia_ban: number;
+                         gia_von: number | null; chiet_khau_toi_da: number }[] };
+
+const RONG: Dong = { hang_khach: "nguoi_lon", mo_ta: "", so_luong: 1, don_gia: 0,
+                     gia_von_don_vi: null, chiet_khau: 0 };
 
 const vnd = (n: number) => (n || 0).toLocaleString("vi-VN") + " đ";
 const pct = (n: number | null) => (n === null || n === undefined ? "–" : (n * 100).toFixed(1) + "%");
@@ -30,6 +39,15 @@ function BaoGia() {
   const [meta, setMeta] = useState<any>(null);
   const [mo, setMo] = useState<number | null>(null);
   const [dang, setDang] = useState(false);
+  const [bgs, setBgs] = useState<BangGia[]>([]);
+  const [soanMo, setSoanMo] = useState(false);
+  const [suaId, setSuaId] = useState<number | null>(null);
+  const [suaPb, setSuaPb] = useState<number | null>(null);
+  // Biểu soạn giữ giá vốn là null khi CHƯA CÓ. Không đổi thành 0 ở giao diện: 0 là một con số có
+  // nghĩa (miễn phí), còn null là chưa biết — và cổng biên phân biệt hai cái đó.
+  const [f, setF] = useState<any>({ khach_ten: "", khach_dien_thoai: "", khach_email: "",
+                                    so_khach: 1, ngay_khoi_hanh: "", han_hieu_luc: "",
+                                    bang_gia_id: "", dong: [ { ...RONG } ] as Dong[] });
   const soan = ["nv_kd", "tn_kd", "tp_kd", "gd_kd", "ptgd_mkt", "tgd", "chutich", "cntt"]
     .includes(user?.role || "");
 
@@ -40,10 +58,71 @@ function BaoGia() {
   }, []);
 
   const load = useCallback(async () => {
-    try { setDs(await api<BG[]>(`/ban-hang/bao-gia?mang=${mang}`)); }
-    catch (e) { toast(errMsg(e), true); }
+    try {
+      setDs(await api<BG[]>(`/ban-hang/bao-gia?mang=${mang}`));
+      setBgs(await api<BangGia[]>(`/ban-hang/bang-gia?mang=${mang}`));
+    } catch (e) { toast(errMsg(e), true); }
   }, [mang, toast]);
   useEffect(() => { load(); }, [load]);
+
+  const dat = (k: string, v: any) => setF((x: any) => ({ ...x, [k]: v }));
+  const datDong = (i: number, k: string, v: any) =>
+    setF((x: any) => ({ ...x, dong: x.dong.map((d: Dong, j: number) => j === i ? { ...d, [k]: v } : d) }));
+
+  const moSoanMoi = () => {
+    setSuaId(null); setSuaPb(null); setSoanMo(true);
+    setF({ khach_ten: "", khach_dien_thoai: "", khach_email: "", so_khach: 1,
+           ngay_khoi_hanh: "", han_hieu_luc: "", bang_gia_id: "", dong: [{ ...RONG }] });
+  };
+
+  const moSua = (b: BG) => {
+    setSuaId(b.id); setSuaPb(b.phien_ban); setSoanMo(true);
+    setF({ khach_ten: b.khach_ten, khach_dien_thoai: b.khach_dien_thoai || "",
+           khach_email: b.khach_email || "", so_khach: b.so_khach,
+           ngay_khoi_hanh: b.ngay_khoi_hanh || "", han_hieu_luc: "",
+           bang_gia_id: b.bang_gia_id ?? "",
+           dong: b.dong.length ? b.dong.map((d) => ({ ...d })) : [{ ...RONG }] });
+  };
+
+  // Lấy dòng từ bảng giá hiệu lực. CHÉP giá vốn sang, kể cả khi bảng giá để trống — chép cái trống
+  // đúng như nó là, chứ không lấp bằng 0 để cổng biên đi qua được.
+  const layTuBangGia = (id: string) => {
+    dat("bang_gia_id", id);
+    const bg = bgs.find((x) => String(x.id) === String(id));
+    if (!bg || !bg.dong.length) return;
+    dat("dong", bg.dong.map((d) => ({ hang_khach: d.hang_khach, mo_ta: d.mo_ta, so_luong: 1,
+                                      don_gia: d.gia_ban, gia_von_don_vi: d.gia_von, chiet_khau: 0 })));
+    toast(`Đã lấy ${bg.dong.length} dòng từ bảng giá ${bg.ma}`);
+  };
+
+  const luuNhap = async () => {
+    if (!f.khach_ten.trim()) { toast("Chưa có tên khách", true); return; }
+    setDang(true);
+    try {
+      const than = {
+        mang, khach_ten: f.khach_ten.trim(), khach_dien_thoai: f.khach_dien_thoai,
+        khach_email: f.khach_email,
+        bang_gia_id: f.bang_gia_id ? Number(f.bang_gia_id) : null,
+        so_khach: Number(f.so_khach) || 1,
+        ngay_khoi_hanh: f.ngay_khoi_hanh || null,
+        han_hieu_luc: f.han_hieu_luc || null,
+        phien_ban: suaPb,
+        dong: f.dong.filter((d: Dong) => d.mo_ta || d.don_gia).map((d: Dong) => ({
+          hang_khach: d.hang_khach, mo_ta: d.mo_ta, so_luong: Number(d.so_luong) || 1,
+          don_gia: Number(d.don_gia) || 0,
+          gia_von_don_vi: d.gia_von_don_vi === null || (d.gia_von_don_vi as any) === ""
+                            ? null : Number(d.gia_von_don_vi),
+          chiet_khau: Number(d.chiet_khau) || 0 })),
+      };
+      const r = suaId
+        ? await api<any>(`/ban-hang/bao-gia/${suaId}`, { method: "PUT", json: than })
+        : await api<any>("/ban-hang/bao-gia", { method: "POST", json: than });
+      toast(r.message || `Đã lưu nháp ${r.ma || ""}`);
+      setSoanMo(false); setSuaId(null); setSuaPb(null);
+      await load();
+    } catch (e) { toast(errMsg(e), true); }
+    setDang(false);
+  };
 
   const gui = async (b: BG) => {
     const c = b.cong_bien;
@@ -93,6 +172,91 @@ function BaoGia() {
         {meta ? <span className="muted small">Ngưỡng biên hiện hành: <b>{pct(meta.nguong_bien)}</b></span> : null}
       </div>
 
+      {soan ? (
+        <div className="row">
+          <button onClick={moSoanMoi}>Soạn báo giá mới</button>
+          {soanMo ? <button className="ghost" onClick={() => { setSoanMo(false); setSuaId(null); }}>Đóng biểu</button> : null}
+        </div>
+      ) : null}
+
+      {soanMo ? (
+        <div className="card">
+          <h3>{suaId ? "Sửa báo giá nháp" : "Soạn báo giá mới"}</h3>
+          <p className="muted small">
+            Lưu nháp <b>chưa cam kết gì với khách</b> — nháp là chỗ để thử con số. Biên do máy chủ tính
+            và hiện ở bảng dưới ngay sau khi lưu; màn hình không tự tính lấy một con số biên thứ hai, vì
+            hai chỗ cùng tính một con số thì sớm muộn lệch nhau và người dùng tin chỗ dễ hơn.
+          </p>
+
+          <div className="luoi">
+            <label>Tên khách <span className="do">*</span>
+              <input value={f.khach_ten} onChange={(e) => dat("khach_ten", e.target.value)} /></label>
+            <label>Điện thoại
+              <input value={f.khach_dien_thoai} onChange={(e) => dat("khach_dien_thoai", e.target.value)} /></label>
+            <label>Email
+              <input value={f.khach_email} onChange={(e) => dat("khach_email", e.target.value)} /></label>
+            <label>Số khách
+              <input type="number" min={1} value={f.so_khach}
+                     onChange={(e) => dat("so_khach", e.target.value)} /></label>
+            <label>Ngày khởi hành
+              <input type="date" value={f.ngay_khoi_hanh}
+                     onChange={(e) => dat("ngay_khoi_hanh", e.target.value)} /></label>
+            <label>Báo giá có hiệu lực đến
+              <input type="date" value={f.han_hieu_luc}
+                     onChange={(e) => dat("han_hieu_luc", e.target.value)} /></label>
+          </div>
+
+          <label className="ca-dong">Lấy dòng từ bảng giá
+            <select value={f.bang_gia_id} onChange={(e) => layTuBangGia(e.target.value)}>
+              <option value="">— gõ tay, không lấy từ bảng giá —</option>
+              {bgs.map((b) => (
+                <option key={b.id} value={b.id} disabled={!b.con_hieu_luc}>
+                  {b.ma} · {b.ten} · từ {b.hieu_luc_tu}{b.con_hieu_luc ? "" : " (đã hết hiệu lực)"}
+                </option>))}
+            </select></label>
+          {bgs.length === 0 ? <p className="muted small">Mảng này chưa có bảng giá nào — vẫn soạn tay được,
+            nhưng bảng giá là chỗ giá vốn có sẵn, không phải gõ lại mỗi lần.</p> : null}
+
+          <b>Dòng báo giá</b>
+          <table className="tbl">
+            <thead><tr><th>Hạng khách</th><th>Diễn giải</th><th style={{ width: 70 }}>SL</th>
+              <th style={{ width: 130 }}>Đơn giá</th><th style={{ width: 130 }}>Giá vốn/đơn vị</th>
+              <th style={{ width: 90 }}>Chiết khấu</th><th></th></tr></thead>
+            <tbody>{f.dong.map((d: Dong, i: number) => (
+              <tr key={i}>
+                <td><select value={d.hang_khach} onChange={(e) => datDong(i, "hang_khach", e.target.value)}>
+                  {(meta?.hang_khach || ["nguoi_lon"]).map((h: string) =>
+                    <option key={h} value={h}>{h}</option>)}
+                </select></td>
+                <td><input value={d.mo_ta} onChange={(e) => datDong(i, "mo_ta", e.target.value)} /></td>
+                <td><input type="number" min={1} value={d.so_luong}
+                           onChange={(e) => datDong(i, "so_luong", e.target.value)} /></td>
+                <td><input type="number" value={d.don_gia}
+                           onChange={(e) => datDong(i, "don_gia", e.target.value)} /></td>
+                <td><input type="number" placeholder="chưa có"
+                           value={d.gia_von_don_vi === null ? "" : d.gia_von_don_vi}
+                           onChange={(e) => datDong(i, "gia_von_don_vi",
+                             e.target.value === "" ? null : e.target.value)} /></td>
+                <td><input type="number" value={d.chiet_khau}
+                           onChange={(e) => datDong(i, "chiet_khau", e.target.value)} /></td>
+                <td><button className="ghost" onClick={() => dat("dong",
+                      f.dong.length > 1 ? f.dong.filter((_: Dong, j: number) => j !== i) : f.dong)}>Xóa</button></td>
+              </tr>))}
+            </tbody>
+          </table>
+          <div className="row">
+            <button className="ghost" onClick={() => dat("dong", [...f.dong, { ...RONG }])}>Thêm dòng</button>
+            <span className="muted small">Ô giá vốn để trống nghĩa là <b>chưa có giá vốn</b> — không phải
+              giá vốn bằng 0. Cổng biên lúc gửi sẽ báo “chưa đủ cơ sở”, đúng như thực tế.</span>
+          </div>
+
+          <div className="row">
+            <button disabled={dang} onClick={luuNhap}>{dang ? "Đang lưu…" : "Lưu nháp"}</button>
+            <span className="muted small">Lưu xong, bấm <b>Gửi khách</b> ở bảng dưới — cổng biên đứng ở đó.</span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="card">
         <h3>{ds.length} báo giá</h3>
         {ds.length === 0 ? <p className="muted">Chưa có báo giá nào ở mảng này.</p> : (
@@ -118,6 +282,8 @@ function BaoGia() {
                       </td>
                       <td>{b.trang_thai_ten}</td>
                       <td className="nut">
+                        {soan && b.trang_thai === "nhap" &&
+                          <button className="ghost" disabled={dang} onClick={() => moSua(b)}>Sửa</button>}
                         {soan && ["nhap", "da_gui"].includes(b.trang_thai) &&
                           <button className="ghost" disabled={dang} onClick={() => gui(b)}>Gửi khách</button>}
                         {soan && b.trang_thai === "da_gui" &&
@@ -184,6 +350,12 @@ function BaoGia() {
         button:disabled { opacity: .5; cursor: default; }
         .muted { color: #64748b; }
         .small { font-size: 12px; }
+        .luoi { display: grid; gap: 0 14px; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); }
+        label { display: block; font-size: 12px; color: #64748b; margin-top: 8px; }
+        label.ca-dong { grid-column: 1 / -1; }
+        input, select { width: 100%; padding: 5px 7px; border: 1px solid #cbd5e1; border-radius: 6px;
+                        font-size: 13px; color: #0f172a; background: #fff; }
+        .do { color: #b91c1c; }
         .warn { color: #92400e; background: #fffbeb; padding: 8px 10px; border-radius: 8px; }
       `}</style>
     </div>

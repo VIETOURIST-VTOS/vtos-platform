@@ -314,3 +314,53 @@ def test_bang_gia_het_han_thi_khong_con_hieu_luc():
                        hieu_luc_den=date.today() - timedelta(days=1)))
         db.commit()
         assert BH.bang_gia_hieu_luc(db, 999_998) is None
+
+
+# ====================== 8. SỬA BÁO GIÁ KHÔNG ĐƯỢC XÓA KHÓA LIÊN KẾT ======================
+def test_sua_bao_gia_khong_xoa_lead_id_va_company_id():
+    """Lỗ hổng tìm ra khi dựng màn hình soạn 09/9: PUT gán cả trường người gọi KHÔNG gửi.
+
+    Vòng lặp cũ `setattr(bg, k, getattr(data, k))` chạy trên mọi trường; những trường có mặc định None
+    (lead_id, company_id) bị gán None ngay cả khi màn hình chỉ sửa tên khách. Mất lặng lẽ – không lỗi,
+    không cảnh báo – và chỉ lộ ra lúc đi tìm báo giá này đến từ nguồn khách nào.
+
+    Phép thử này đứng ở chiều nguy hiểm: sửa MỘT trường rồi đòi mọi trường khác còn nguyên.
+    """
+    h = login("nv_kd")
+    r = client.post("/api/v1/ban-hang/bao-gia", headers=h, json={
+        "khach_ten": "Khách giữ khóa", "mang": "kd_le", "lead_id": 1, "company_id": 1,
+        "so_khach": 2, "dong": [{"hang_khach": "nguoi_lon", "mo_ta": "tour", "so_luong": 2,
+                                 "don_gia": 5_000_000, "gia_von_don_vi": 3_000_000}]})
+    assert r.status_code == 201, r.text
+    bid = r.json()["id"]
+
+    truoc = client.get(f"/api/v1/ban-hang/bao-gia/{bid}", headers=h).json()
+    assert truoc["lead_id"] == 1 and truoc["company_id"] == 1, truoc
+
+    # Màn hình soạn chỉ gửi những gì nó có: tên khách, số khách, dòng. Không gửi lead_id/company_id.
+    r = client.put(f"/api/v1/ban-hang/bao-gia/{bid}", headers=h, json={
+        "khach_ten": "Khách giữ khóa (đã sửa tên)", "mang": "kd_le", "so_khach": 3,
+        "phien_ban": truoc["phien_ban"],
+        "dong": [{"hang_khach": "nguoi_lon", "mo_ta": "tour", "so_luong": 3,
+                  "don_gia": 5_000_000, "gia_von_don_vi": 3_000_000}]})
+    assert r.status_code == 200, r.text
+
+    sau = client.get(f"/api/v1/ban-hang/bao-gia/{bid}", headers=h).json()
+    assert sau["khach_ten"] == "Khách giữ khóa (đã sửa tên)"
+    assert sau["so_khach"] == 3
+    assert sau["lead_id"] == 1, "PUT đã xóa lead_id dù người gọi không gửi trường đó"
+    assert sau["company_id"] == 1, "PUT đã xóa company_id dù người gọi không gửi trường đó"
+
+
+def test_sua_bao_gia_van_xoa_duoc_khoa_khi_NGUOI_GOI_co_y_gui_null():
+    """Chiều ngược lại: gửi thẳng null vẫn phải xóa được – nếu không thì gỡ liên kết thành không làm được."""
+    h = login("nv_kd")
+    bid = client.post("/api/v1/ban-hang/bao-gia", headers=h, json={
+        "khach_ten": "Khách gỡ khóa", "mang": "kd_le", "lead_id": 1,
+        "dong": [{"hang_khach": "nguoi_lon", "mo_ta": "x", "so_luong": 1, "don_gia": 1_000_000,
+                  "gia_von_don_vi": 500_000}]}).json()["id"]
+    pb = client.get(f"/api/v1/ban-hang/bao-gia/{bid}", headers=h).json()["phien_ban"]
+    r = client.put(f"/api/v1/ban-hang/bao-gia/{bid}", headers=h, json={
+        "khach_ten": "Khách gỡ khóa", "mang": "kd_le", "lead_id": None, "phien_ban": pb, "dong": []})
+    assert r.status_code == 200, r.text
+    assert client.get(f"/api/v1/ban-hang/bao-gia/{bid}", headers=h).json()["lead_id"] is None

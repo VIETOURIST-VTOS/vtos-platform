@@ -130,6 +130,7 @@ def _bg_ra(db: Session, bg: BaoGia) -> dict:
     return {"id": bg.id, "ma": bg.ma, "mang": bg.mang, "khach_ten": bg.khach_ten,
             "khach_dien_thoai": bg.khach_dien_thoai, "khach_email": bg.khach_email,
             "product_id": bg.product_id, "bang_gia_id": bg.bang_gia_id, "tour_id": bg.tour_id,
+            "lead_id": bg.lead_id, "company_id": bg.company_id,
             "so_khach": bg.so_khach, "ngay_khoi_hanh": bg.ngay_khoi_hanh,
             "han_hieu_luc": bg.han_hieu_luc, "trang_thai": bg.trang_thai,
             "trang_thai_ten": TRANG_THAI_BAO_GIA.get(bg.trang_thai, bg.trang_thai),
@@ -203,9 +204,14 @@ def sua_bao_gia(bid: int, data: BaoGiaIn, u: User = Depends(require_roles(*SOAN)
     if bg.trang_thai in ("khach_chot", "huy"):
         raise HTTPException(422, f"Báo giá đang ở '{bg.trang_thai}', không sửa được")
     GML.kiem_phien_ban(bg, data.phien_ban, f"Báo giá {bg.ma}", lambda: _bg_ra(db, bg))
+    # Chỉ ghi đè những trường người gọi THẬT SỰ gửi lên. Trước đây vòng lặp gán cả những trường có
+    # giá trị mặc định None, nên một màn hình chỉ sửa tên khách cũng xóa mất lead_id và company_id –
+    # mất lặng lẽ, và chỉ lộ ra lúc đi tìm báo giá này thuộc nguồn khách nào.
+    da_gui = data.model_fields_set
     for k in ("khach_ten", "khach_dien_thoai", "khach_email", "product_id", "bang_gia_id",
-              "tour_id", "company_id", "ngay_khoi_hanh", "so_khach", "han_hieu_luc"):
-        setattr(bg, k, getattr(data, k))
+              "tour_id", "lead_id", "company_id", "ngay_khoi_hanh", "so_khach", "han_hieu_luc"):
+        if k in da_gui:
+            setattr(bg, k, getattr(data, k))
     _ghi_dong(db, bg, data.dong)
     GML.tang_phien_ban(bg)
     db.commit()
