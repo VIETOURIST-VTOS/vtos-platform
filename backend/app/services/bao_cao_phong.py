@@ -61,10 +61,19 @@ PHONG = {
     "marketing": {"ten": "Marketing", "xem": ("ptgd_mkt",)},
     "ketoan":    {"ten": "Kế toán", "xem": ("ketoan",)},
     "hcns":      {"ten": "Hành chính & Nhân sự", "xem": ("hcns",)},
-    # Ban Visa chưa có vai trò trưởng bộ phận trong bảng vai trò. Tạm để chuyên viên visa xem báo cáo
-    # của chính ban mình, và ghi ra đây rằng đó là chỗ TẠM: khi có vai trò phụ trách Visa thì sửa dòng
-    # này, đừng để nó trôi thành tiền lệ "nhân viên xem báo cáo phòng".
-    "visa":      {"ten": "Ban Visa", "xem": ("nv_visa",)},
+    # Ban Visa – hai vai trò xem, và cả hai đều là ngoại lệ có lý do, không phải chỗ vá tạm:
+    #
+    #   nv_visa: Chủ tịch chốt 10/9/2026. Một bộ hồ sơ visa đi qua nhiều bước – tiếp nhận, dịch thuật,
+    #     hẹn lãnh sự, nộp, chờ kết quả, ra visa hoặc bị từ chối – và mỗi chuyên viên chỉ phụ trách
+    #     MỘT bước. Không nhìn được bảng cả ban thì người ở bước sau không biết bước trước đang tồn
+    #     bao nhiêu bộ, và hồ sơ nằm chờ ở khe giữa hai bước mà không ai thấy. Đây là NGOẠI LỆ của
+    #     nguyên tắc "nhân viên trong phòng không mặc định xem báo cáo phòng", không phải phản ví dụ.
+    #
+    #   tp_dh: Chủ tịch chốt 10/9/2026 – luồng công việc của Ban Visa đẩy báo cáo về màn hình Trưởng
+    #     phòng Điều hành. Trước dòng này, Ban Visa là phòng DUY NHẤT không vai trò quản lý nào xem
+    #     được báo cáo của nó: người chịu trách nhiệm về con số lại là người duy nhất không nhìn thấy
+    #     con số. Bảy phòng còn lại đều có tp/gd/ptgd trong danh sách "xem".
+    "visa":      {"ten": "Ban Visa", "xem": ("nv_visa", "tp_dh")},
 }
 XEM_TAT_CA = AC.FULL_VIEW + AC.READ_ALL          # Chủ tịch, TGĐ, Ban Kiểm soát, robot kiểm soát
 

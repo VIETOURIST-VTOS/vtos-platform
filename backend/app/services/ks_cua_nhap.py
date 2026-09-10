@@ -45,6 +45,13 @@ CUA_TAY = (
     "projects", "quy_tac_hach_toan", "receipts", "retentions", "service_orders", "service_requests",
     "supplier_bank_changes", "suppliers", "thieu_gia_von", "tour_cost_lines", "tour_events",
     "tac_vu_tu_dong",
+    # V7 Đợt 3 (10/9/2026). Cả năm bảng đều có màn hình nhập tay:
+    #   /su-co-tour        – ghi sự cố, ghi từng bước xử lý
+    #   /ho-so-kiem-toan   – lập hồ sơ, thêm mục danh mục, ghi điều chỉnh kiểm toán đề nghị
+    # KHÔNG khai bảng nào trong nhóm này là "máy sinh": sự cố là lời người ở hiện trường kể lại, và
+    # danh mục kiểm toán là thứ kiểm toán viên hỏi – máy không biết trước cả hai.
+    "su_co_tour", "su_co_tour_xu_ly", "ho_so_kiem_toan", "ho_so_kiem_toan_muc",
+    "ho_so_kiem_toan_dieu_chinh",
     "tours", "user_grants", "users", "vehicle_documents", "vehicle_plates", "vehicle_rates",
     "vehicles", "visa_access_links", "visa_ai_suggestions", "visa_applications",
     "visa_appointments", "visa_cases", "visa_checklist_items", "visa_checklist_templates",

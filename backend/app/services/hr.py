@@ -2,10 +2,11 @@
 theo mục 6.4 Thiết kế v1.7 từ số liệu quyết toán Kế toán đã xác nhận (tháng quyết toán). Robot chỉ lập NHÁP.
 Luồng: nháp → Kế toán xác nhận cơ sở → HCNS lập bảng lương → TGĐ ký lô → bút toán lương.
 """
+import json
 import math
 from datetime import date, datetime
 from sqlalchemy import select, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from app.models.core import Tour, Booking, User
 from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, DispatchOrder, Incident, PayrollRun
 from app.services import rules as R
@@ -59,7 +60,14 @@ def base_salary_le(emp: Employee, rev: float, moc: float, step_amt: float, cut: 
 
 
 def month_tours(db: Session, y: int, m: int) -> list[Tour]:
-    return [t for t in db.execute(select(Tour).where(Tour.status.in_(["kt_xac_nhan", "khoa"]))).scalars()
+    """Chuyến Kế toán đã xác nhận trong tháng (y, m).
+
+    `selectinload` nạp sẵn booking: mọi người gọi hàm này đều duyệt `t.bookings` ngay sau đó, để nạp
+    muộn thì mỗi chuyến một câu truy vấn. Cửa sổ ba tháng của Phòng Đoàn gọi lại hàm này cho từng nhân
+    viên × từng tháng, nên chỗ nạp muộn ấy nhân lên rất nhanh (đo 10/9/2026: bảng lương 52 giây).
+    """
+    return [t for t in db.execute(select(Tour).where(Tour.status.in_(["kt_xac_nhan", "khoa"]))
+                                  .options(selectinload(Tour.bookings))).scalars()
             if t.kt_confirmed_at and t.kt_confirmed_at.year == y and t.kt_confirmed_at.month == m]
 
 
@@ -77,7 +85,23 @@ def level3_tours(db: Session, y: int, m: int) -> set[tuple[int, int]]:
 def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple[list[dict], dict]:
     """Bản nháp thu nhập tháng theo từng người. Mỗi dòng: {ma, ten, phong, khoan[], luong_cb, bien_doi, tncn, thuc_nhan, ghi_chu}."""
     y, m = map(int, period.split("-"))
-    tours = month_tours(db, y, m)
+
+    # Đệm TRONG MỘT LẦN TÍNH. Không phải đệm toàn cục: nó sinh ra ở đây, chết khi hàm trả về, nên không
+    # có chuyện kỳ lương chạy bằng số cũ. Cửa sổ ba tháng của Phòng Đoàn hỏi lại đúng ba tháng ấy cho
+    # từng nhân viên; không đệm thì mỗi lần hỏi là một lần quét lại bảng tours và tính lại quyết toán
+    # của từng chuyến – cùng đầu vào, cùng kết quả, chỉ tốn thêm vòng đi–về (đo 10/9/2026: 52 giây).
+    _thang: dict[tuple[int, int], list[Tour]] = {}
+    _qt: dict[int, dict] = {}
+
+    def thang(yy: int, mm: int) -> list[Tour]:
+        if (yy, mm) not in _thang: _thang[(yy, mm)] = month_tours(db, yy, mm)
+        return _thang[(yy, mm)]
+
+    def qt(t: Tour) -> dict:
+        if t.id not in _qt: _qt[t.id] = R.settlement_summary(db, t)
+        return _qt[t.id]
+
+    tours = thang(y, m)
     emps = {e.id: e for e in db.execute(select(Employee).where(Employee.active == True)).scalars()}
     by_user = {e.user_id: e for e in emps.values() if e.user_id}
     rows: dict[int, dict] = {}
@@ -126,7 +150,7 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
     rev_by_sales: dict[int, float] = {}; share_by_sales: dict[int, float] = {}
     doan_profit_by_sales: dict[int, float] = {}; doan_profit_total = 0.0
     for t in tours:
-        s = R.settlement_summary(db, t)
+        s = qt(t)
         for b in t.bookings:
             if R.is_doan(t):
                 share = s["profit"] * ((b.amount or 0) / (s["revenue"] or 0) if (s["revenue"] or 0) else 0)
@@ -148,7 +172,8 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
     # chuyến này, nên "0 đồng" của người còn chuyến treo là CHƯA BIẾT chứ không phải bán được 0.
     chua_qt: dict[int, int] = {}
     hom_nay = date.today()
-    for t in db.execute(select(Tour).where(Tour.end_date <= hom_nay)).scalars():
+    for t in db.execute(select(Tour).where(Tour.end_date <= hom_nay)
+                        .options(selectinload(Tour.bookings))).scalars():
         if t.status in ("kt_xac_nhan", "khoa"): continue
         for sid in {b.sales_id for b in t.bookings}:
             chua_qt[sid] = chua_qt.get(sid, 0) + 1
@@ -206,9 +231,9 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
                 if e.start_date and date(yy, mm, 1) < date(e.start_date.year, e.start_date.month, 1):
                     continue                      # chưa vào làm: KHÔNG dựng thêm kỳ 0 đồng rồi chia cho ba
                 tot = 0.0
-                for t in month_tours(db, yy, mm):
+                for t in thang(yy, mm):
                     if R.is_doan(t):
-                        s = R.settlement_summary(db, t)
+                        s = qt(t)
                         tot += sum(s["profit"] * ((b.amount or 0) / (s["revenue"] or 0) if (s["revenue"] or 0) else 0) for b in t.bookings if b.sales_id == e.user_id)
                 hist.append({"ky": f"{yy:04d}-{mm:02d}", "loi_nhuan": round(tot)})
             xd = L.xac_dinh_thang_loi_nhuan(e, hist, moc_luong_doan, sorted(DOAN_F))
@@ -227,7 +252,7 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
     # ---------- Điều hành: quỹ 2%/1%/1% chia 70/30 ----------
     fund_by_op: dict[int, float] = {}; fund_tp = 0.0
     for t in tours:
-        s = R.settlement_summary(db, t)
+        s = qt(t)
         fund_by_op[t.operator_id] = fund_by_op.get(t.operator_id, 0) + s["fund_nv"]; fund_tp += s["fund_tp"]
     for e in emps.values():
         if e.department == "dieu_hanh" and e.position == "nv" and fund_by_op.get(e.user_id):
@@ -322,7 +347,40 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
     return out, totals
 
 
+def _dau_van_tay(rows: list[dict], totals: dict) -> str:
+    """Vân tay của một bản nháp, BỎ QUA dấu thời gian.
+
+    `xac_dinh_thang_loi_nhuan` đóng dấu `snapshot_at` bằng giờ chạy, nên hai lần tính cùng số liệu vẫn
+    khác nhau ở đúng trường ấy. So thẳng thì lần nào cũng "đã đổi" và ta lại ghi đè – đúng cái phải
+    tránh. Bỏ dấu thời gian ra thì phần còn lại là TIỀN, và chỉ tiền đổi mới đáng ghi.
+    """
+    import copy
+    sach = copy.deepcopy(rows)
+    for r in sach:
+        xd = r.get("xac_dinh_luong")
+        if isinstance(xd, dict): xd.pop("snapshot_at", None)
+    return json.dumps([sach, totals], sort_keys=True, ensure_ascii=False, default=str)
+
+
 def get_or_draft(db: Session, period: str, refresh: bool = False) -> PayrollRun:
+    """Lấy bảng lương của kỳ; còn ở bước nháp thì tính lại theo số liệu mới nhất.
+
+    Sửa ngày 10/9/2026 – đây vừa là chuyện chậm vừa là chuyện SAI:
+
+    Bản cũ, mỗi lần một người MỞ màn hình bảng lương ở trạng thái nháp, hàm này tính lại toàn bộ rồi
+    `db.commit()` ngay trong một yêu cầu ĐỌC. Hệ quả:
+
+      * hai người cùng mở thì bản ghi bị ghi đè qua lại, ai bấm sau thắng – không ai biết;
+      * dấu thời gian `updated_at` và `snapshot_at` nhảy mỗi lần mở, nên không còn dùng để trả lời
+        "số này chốt lúc nào" – mà đó chính là thứ cần khi giải trình một kỳ lương;
+      * và mỗi lần mở là một lần ghi vào bảng lương, thứ đáng lẽ chỉ đổi khi số liệu đổi.
+
+    Bản mới vẫn tính lại (để số liệu không cũ), nhưng CHỈ GHI khi kết quả thực sự khác bản đang lưu –
+    so bằng vân tay đã bỏ dấu thời gian ở trên. Mở màn hình mười lần mà không ai sửa gì thì bảng lương
+    đứng yên, `updated_at` giữ nguyên, và không có lần ghi nào để đè lên nhau.
+
+    `refresh=True` là yêu cầu tính lại có chủ ý (HCNS nhập công xong) – vẫn ghi như cũ.
+    """
     run = db.execute(select(PayrollRun).where(PayrollRun.period == period)).scalars().first()
     if run and run.status != "nhap" and refresh:
         raise ValueError("Bảng lương đã qua bước xác nhận – không tính lại")
@@ -336,9 +394,11 @@ def get_or_draft(db: Session, period: str, refresh: bool = False) -> PayrollRun:
         rows, totals = compute_draft(db, period, (run.inputs if run else None) or {})
         if run is None:
             run = PayrollRun(period=period, rows=rows, totals=totals); db.add(run)
-        else:
+            db.commit(); db.refresh(run)
+        elif refresh or _dau_van_tay(run.rows or [], run.totals or {}) != _dau_van_tay(rows, totals):
             run.rows, run.totals = rows, totals
-        db.commit(); db.refresh(run)
+            db.commit(); db.refresh(run)
+        # else: số không đổi – không ghi gì, giữ nguyên bản đang lưu và dấu thời gian của nó.
     return run
 
 

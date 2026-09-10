@@ -23,7 +23,7 @@ mà không ai nhìn thấy:
 import math
 from datetime import date, datetime
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from app.models.core import Tour, User
 from app.models.hr import Employee, GuideAssignment, PayrollRun
 from app.services import rules as R
@@ -145,7 +145,11 @@ def khoan_treo(db: Session, den_ngay: date | None = None) -> dict:
     hom_nay = den_ngay or date.today()
     emps = {e.user_id: e for e in db.execute(select(Employee).where(Employee.active == True)).scalars() if e.user_id}
     rows = []
-    for t in db.execute(select(Tour).where(Tour.end_date <= hom_nay)).scalars():
+    # `selectinload` nạp booking của tất cả chuyến trong vài câu truy vấn, thay vì mỗi chuyến một câu khi
+    # chạm `t.bookings`. Đo ngày 10/9/2026: màn hình này duyệt hơn một nghìn chuyến, mỗi chuyến một vòng
+    # đi–về tới Postgres – đó là phần còn lại của 55 giây sau khi đã sửa đệm tham số ở rules.get_param.
+    for t in db.execute(select(Tour).where(Tour.end_date <= hom_nay)
+                        .options(selectinload(Tour.bookings))).scalars():
         if t.status in ("kt_xac_nhan", "khoa"):
             continue                                  # đã chốt – hoa hồng đã hoặc sẽ vào kỳ lương của tháng chốt
         han = R.settlement_deadline(db, t)

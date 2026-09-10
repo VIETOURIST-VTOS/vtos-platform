@@ -19,6 +19,24 @@ def paid_amount(db: Session, booking_id: int) -> float:
     return db.execute(select(func.coalesce(func.sum(Receipt.amount), 0)).where(Receipt.booking_id == booking_id, Receipt.status != "huy")).scalar() or 0.0
 
 
+def paid_amount_map(db: Session, booking_ids: list[int] | None = None) -> dict[int, float]:
+    """Số đã thu của NHIỀU booking trong một câu truy vấn: {booking_id: tiền}.
+
+    Cùng một phép cộng với `paid_amount` ở trên – cùng điều kiện `status != "huy"`, cùng `sum(amount)` –
+    chỉ khác là gom theo booking thay vì hỏi từng cái một. Chỗ nào duyệt một danh sách booking thì dùng
+    hàm này; gọi `paid_amount` trong vòng lặp là mỗi booking một vòng đi–về tới cơ sở dữ liệu, và đó
+    chính là thứ làm màn hình Thu tiền mất 106 giây trên bản chạy thật ngày 10/9/2026.
+
+    Booking chưa có phiếu thu nào thì KHÔNG có khóa trong từ điển. Người gọi dùng `.get(id, 0.0)` –
+    không phiếu thu thì đã thu bằng 0, chuyện này khác với cột tiền bỏ trống của đợt K2.
+    """
+    q = select(Receipt.booking_id, func.coalesce(func.sum(Receipt.amount), 0)).where(Receipt.status != "huy")
+    if booking_ids is not None:
+        if not booking_ids: return {}
+        q = q.where(Receipt.booking_id.in_(booking_ids))
+    return {bid: float(t or 0) for bid, t in db.execute(q.group_by(Receipt.booking_id)) if bid is not None}
+
+
 def _next_receipt_code(db: Session) -> str:
     n = db.execute(select(func.count()).select_from(Receipt)).scalar() + 1
     return f"PT{date.today():%y%m}-{n:04d}"

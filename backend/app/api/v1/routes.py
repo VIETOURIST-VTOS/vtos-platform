@@ -544,10 +544,40 @@ def audit_out(l: AuditLog) -> dict:
 
 
 @router.get("/audit", tags=["audit"])
-def list_audit(limit: int = 300, u: User = Depends(require_roles(*AC.AUDIT_ROLES, mo_ta="nhật ký kiểm toán")), db: Session = Depends(get_db)):
+def list_audit(limit: int = 300, actor: str = "", action: str = "", entity: str = "",
+               tu: str = "", den: str = "",
+               u: User = Depends(require_roles(*AC.AUDIT_ROLES, mo_ta="nhật ký kiểm toán")), db: Session = Depends(get_db)):
+    """Nhật ký nghiệp vụ – CHỈ ĐỌC, và không có endpoint ghi nào ở phân hệ này.
+
+    Bộ lọc thêm 10/9/2026 (V7 Đợt 3). Trước bản này màn hình chỉ đọc được 300 dòng gần nhất, nên câu
+    hỏi thật của một cuộc kiểm toán – "ai đã sửa chứng từ X", "tháng 6 ông A làm những gì" – trả lời
+    bằng cách cuộn tay hoặc không trả lời được. Lọc ở MÁY CHỦ chứ không ở màn hình: lọc trên 300 dòng
+    đã tải về thì bản ghi tháng 6 chưa từng rời khỏi cơ sở dữ liệu.
+
+    `danh_muc` trả về tập giá trị đang có của ba cột lọc, để màn hình dựng ô chọn từ dữ liệu thật thay
+    vì một danh sách chép tay sẽ lạc hậu ngay lần thêm hành động tiếp theo.
+    """
+    q = select(AuditLog)
+    if actor: q = q.where(AuditLog.actor == actor)
+    if action: q = q.where(AuditLog.action == action)
+    # Đối tượng lọc theo TIỀN TỐ: entity ghi dạng "su_co_tour:SC2609-001", nên gõ "su_co_tour" phải ra
+    # cả phân hệ, còn gõ đủ mã thì ra đúng một hồ sơ.
+    if entity: q = q.where(AuditLog.entity.like(f"{entity}%"))
+    for chuoi, dieu_kien in ((tu, True), (den, False)):
+        if not chuoi: continue
+        try:
+            moc = datetime.fromisoformat(chuoi)
+        except ValueError:
+            raise HTTPException(422, "Mốc thời gian phải theo dạng YYYY-MM-DD hoặc YYYY-MM-DDTHH:MM")
+        q = q.where(AuditLog.ts >= moc) if dieu_kien else q.where(AuditLog.ts <= moc)
     ok, n, msg = R.verify_chain(db)
     return {"chain_ok": ok, "records": n, "chain_message": msg,
-            "rows": [audit_out(l) for l in db.execute(select(AuditLog).order_by(desc(AuditLog.id)).limit(limit)).scalars()]}
+            "danh_muc": {
+                "actor": sorted({x for x in db.execute(select(AuditLog.actor).distinct()).scalars() if x}),
+                "action": sorted({x for x in db.execute(select(AuditLog.action).distinct()).scalars() if x}),
+                "entity": sorted({(x or "").split(":")[0] for x in db.execute(select(AuditLog.entity).distinct()).scalars() if x}),
+            },
+            "rows": [audit_out(l) for l in db.execute(q.order_by(desc(AuditLog.id)).limit(limit)).scalars()]}
 
 
 @router.get("/payroll", tags=["payroll"])

@@ -160,20 +160,53 @@ PHAM_VI_DA_CHOT = {
     # ĐẾM LẠI LẦN HAI khi gộp nhánh Đợt 2 vào (09/9/2026 tối). Nhánh ấy thêm ba màn hình có phạm vi
     # API riêng – /tu-dong-hoa (Lịch tự động hóa), /bao-cao (Báo cáo tự động theo phòng), và ba màn
     # hình V6 của chuỗi bán hàng. Bảng này lại được đếm từ mã đã hợp nhất, không cộng trừ tay.
-    "chutich": 102, "tgd": 102, "bks": 102, "cntt": 99,
-    "ketoan": 84, "tp_dh": 81, "ptgd_doan": 60, "nv_dh": 56, "hcns": 54, "gd_kd": 54,
+    # V7 Đợt 3 (10/9/2026) – hai màn hình mới, và mỗi vai chỉ nới đúng nhóm API của màn hình mình mở:
+    #   +2 (/api/v1/su-co-tour và /api/v1/kiem-toan): chutich, tgd, bks, robot_ks, cntt, ketoan,
+    #      tp_dh, ptgd_doan
+    #   +1 chỉ sự cố tour: nv_dh và bốn vai Kinh doanh (sale là người khách gọi đầu tiên khi chuyến
+    #      trục trặc)
+    #   +1 chỉ hồ sơ kiểm toán: hcns và hanh_chinh – hai phòng CÓ MỤC phải nộp cho kiểm toán
+    #   KHÔNG đổi: ptgd_mkt, nv_mkt, xe_hdv, gd_doi_xe, tp_hd, nv_visa, robot_pq, robot_vpm
+    #
+    # Bản đầu của đợt này nới gd_doi_xe 25 → 34 và tp_hd 23 → 29, vì màn hình sự cố tour mở cho hai
+    # vai ấy và kéo theo cả /bookings, /khieu-nai, /suppliers. Chính phép thử này bắt được. Hai chỗ
+    # đã sửa: bỏ hai vai khỏi dòng menu (họ vẫn không thấy mục vì danh sách cho phép không có nó –
+    # tức là nới quyền mà chẳng ai dùng được), và cho danh sách nhà cung cấp đi qua /su-co-tour/meta
+    # dạng mã + tên thay vì gọi thẳng nhóm API nhà cung cấp.
+    "chutich": 104, "tgd": 104, "bks": 104, "cntt": 101,
+    "ketoan": 86, "tp_dh": 83, "ptgd_doan": 62, "nv_dh": 57, "hcns": 55, "gd_kd": 55,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 42, "nv_kd": 40, "tn_kd": 40, "tp_kd": 42, "nv_mkt": 31,
-    "gd_doi_xe": 25, "hanh_chinh": 24, "tp_hd": 23, "xe_hdv": 15, "nv_visa": 17,
+    "ptgd_mkt": 42, "nv_kd": 41, "tn_kd": 41, "tp_kd": 43, "nv_mkt": 31,
+    # nv_visa GIỮ 17 – Chủ tịch chốt lại chiều 10/9/2026, ĐẢO lại lần siết đề xuất buổi sáng.
+    #
+    # Bản sáng cùng ngày định hạ nv_visa 17 → 16 (rời màn hình /bao-cao) theo nguyên tắc chung "nhân
+    # viên trong phòng KHÔNG mặc định xem báo cáo phòng". Ban Visa là NGOẠI LỆ có lý do nghiệp vụ:
+    # một bộ hồ sơ visa đi qua nhiều bước – tiếp nhận, dịch thuật, hẹn lãnh sự, nộp, chờ kết quả, ra
+    # visa hoặc bị từ chối – và mỗi chuyên viên chỉ phụ trách MỘT bước. Không nhìn được bảng của cả
+    # ban thì người ở bước sau không biết bước trước đang tồn bao nhiêu bộ, và hồ sơ nằm chờ ở khe
+    # giữa hai bước mà không ai thấy.
+    #
+    # Lưu ý cho lần sửa sau: bản sáng viết ghi chú SIẾT nhưng KHÔNG sửa access.py, nên suốt thời gian
+    # đó tài liệu nói một đằng phần mềm làm một nẻo. Nay số trong bảng này khớp lại với access.py.
+    #
+    # CÒN TỒN: Ban Visa là phòng DUY NHẤT không vai trò quản lý nào xem được báo cáo của nó (xem
+    # bao_cao_phong.PHONG – bảy phòng còn lại đều có tp/gd/ptgd trong danh sách "xem", riêng visa chỉ
+    # có nv_visa). Nếu Visa thuộc Phòng Điều hành thì tp_dh phải được thêm vào – đó mới là chỗ hở mà
+    # bản sáng nhắm tới nhưng sửa ngược đầu. Chờ Chủ tịch chốt.
+    # gd_doi_xe 25 → 26 và tp_hd 23 → 24 chiều 10/9/2026: anh Tuấn chốt mở màn hình Sự cố tour cho
+    # hai vai này. Nới ĐÚNG MỘT nhóm API mỗi vai (/api/v1/su-co-tour) chứ không phải chín như bản
+    # sáng cùng ngày – vì bốn ô chọn của màn hình đã chuyển vào chính phân hệ ấy, và tên khách chỉ
+    # trả cho vai trò trong su_co_tour.KHACH. Hai vai này không có trong đó.
+    "gd_doi_xe": 26, "hanh_chinh": 25, "tp_hd": 24, "xe_hdv": 15, "nv_visa": 17,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 17, "robot_ks": 102, "robot_vpm": 16,
+    "robot_pq": 17, "robot_ks": 104, "robot_vpm": 16,
 }
 
 

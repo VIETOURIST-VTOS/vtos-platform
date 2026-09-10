@@ -287,8 +287,11 @@ def test_nang_luc_theo_nguoi_mo_moi_bao_cao_ma_KHONG_doi_vai_tro():
                                           User.active == True)).scalars().first()
         if u is None: pytest.skip("dữ liệu mẫu không có tp_dh")
         ten = u.username
-        # trước khi cấp: chỉ phòng mình
-        assert B.pham_vi_cho_nguoi(db, u) == ["dieu_hanh"]
+        # Trước khi cấp: chỉ những phòng THUỘC chức danh. Từ 10/9/2026 Trưởng phòng Điều hành có hai
+        # phạm vi chứ không phải một – Chủ tịch chốt luồng công việc Ban Visa đẩy báo cáo về màn hình
+        # ông (Visa thuộc Phòng Điều hành). Đây là phạm vi THEO VAI TRÒ, không phải ngoại lệ theo
+        # người, nên phép thử dưới đây vẫn đo đúng thứ nó định đo: cấp năng lực thì thêm được gì.
+        assert B.pham_vi_cho_nguoi(db, u) == ["dieu_hanh", "visa"]
 
     uid = _cap_nang_luc(ten, B.NANG_LUC_MOI_PHONG)
     try:
@@ -297,7 +300,7 @@ def test_nang_luc_theo_nguoi_mo_moi_bao_cao_ma_KHONG_doi_vai_tro():
             ds = B.pham_vi_cho_nguoi(db, u)
             assert B.TOAN_CTY in ds and set(B.PHONG) <= set(ds)
         # VAI TRÒ không đổi – người kế nhiệm không tự có quyền này
-        assert B.pham_vi_duoc_xem("tp_dh") == ["dieu_hanh"], \
+        assert B.pham_vi_duoc_xem("tp_dh") == ["dieu_hanh", "visa"], \
             "quyền đã rò từ một người sang cả vai trò"
 
         h = login("tp_dh")
@@ -318,7 +321,7 @@ def test_go_nang_luc_thi_pham_vi_thu_HEP_LAI_ngay():
         u = db.execute(select(User).where(User.role == "tp_dh",
                                           User.active == True)).scalars().first()
         if u is None: pytest.skip("dữ liệu mẫu không có tp_dh")
-        assert B.pham_vi_cho_nguoi(db, u) == ["dieu_hanh"]
+        assert B.pham_vi_cho_nguoi(db, u) == ["dieu_hanh", "visa"]
     h = login("tp_dh")
     assert client.get("/api/v1/bao-cao?pham_vi=toan_cty&kind=ngay", headers=h).status_code == 403
 

@@ -2,12 +2,12 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles
 from app.core.config import settings
-from app.models.core import Booking, User
+from app.models.core import Booking, Tour, User
 from app.models.payments import BankTransaction, Receipt
 from app.services import payments as P
 from app.services import access as AC
@@ -189,16 +189,54 @@ def cash_receipt(data: CashIn, u: User = Depends(require_roles("ketoan",)), db: 
 
 
 @router.get("/collections/summary")
-def collections_summary(u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="tổng quan thu tiền")), db: Session = Depends(get_db)):
-    """Tổng quan thu tiền: booking còn phải thu, giao dịch chờ Kế toán, phiếu thu chờ xác nhận."""
-    rows = []
-    qb = select(Booking).order_by(desc(Booking.created_at))
+def collections_summary(chi_con_no: bool = False,
+                        u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="tổng quan thu tiền")), db: Session = Depends(get_db)):
+    """Tổng quan thu tiền: booking còn phải thu, giao dịch chờ Kế toán, phiếu thu chờ xác nhận.
+
+    Vì sao viết lại ngày 10/9/2026 (đo trên Render: 106.832 ms):
+
+    Bản cũ nạp TOÀN BỘ booking rồi với mỗi booking gọi thêm hai câu truy vấn – một để cộng phiếu thu
+    (`paid_amount`) và một để lấy mã tour (`b.tour` nạp muộn). Trên 10.074 booking là hơn hai mươi nghìn
+    câu, mỗi câu một vòng đi–về tới Postgres. Máy không chậm, cái chậm là số vòng.
+
+    Bản mới gộp phiếu thu thành MỘT câu cộng theo booking và nối bảng tours để lấy mã, nên tổng cộng chỉ
+    còn vài câu bất kể bao nhiêu booking. Từng con số giữ nguyên công thức cũ:
+    `còn phải thu = (amount − discount) − tổng phiếu thu chưa hủy`.
+
+    Hai chỗ khác cố ý sửa hành vi, và lý do:
+
+      * THÊM hàng rào phạm vi pháp nhân `PV.loc`. Mọi đường khác đọc booking đều có nó (xem
+        `_bookings_query` trong routes.py); riêng đường này thiếu từ đầu, nên một Kế toán chỉ được xem
+        một pháp nhân vẫn nhìn thấy công nợ của pháp nhân khác qua màn hình Thu tiền. Đây là lỗ hở
+        quyền, không phải là tính năng – vá lại thì danh sách của một số người sẽ NGẮN ĐI, và ngắn đi
+        mới là đúng.
+      * Cộng sẵn `tong_con_phai_thu` và `so_booking_con_no` ở máy chủ. Giao diện đang tự cộng trên toàn
+        bộ mảng; máy chủ cộng thì con số vẫn thế mà giao diện không phải giữ cả vạn dòng để cộng.
+
+    `chi_con_no=1` chỉ trả những booking còn nợ – dùng cho màn hình công nợ. Mặc định vẫn trả đủ để
+    không làm hỏng ô chọn booking đang có sẵn.
+    """
+    tra = P.paid_amount_map(db)          # {booking_id: đã thu} – một câu cộng cho tất cả
+    qb = (select(Booking, Tour.code).outerjoin(Tour, Tour.id == Booking.tour_id)
+          .order_by(desc(Booking.created_at)))
+    qb = PV.loc(qb, Booking, u)          # P6: phạm vi pháp nhân – thiếu ở đây từ đầu, xem giải thích trên
     vis = AC.sales_ids_visible(db, u)
     if vis is not None: qb = qb.where(Booking.sales_id.in_(vis))
-    for b in db.execute(qb).scalars():
-        due = ((b.amount or 0) - (b.discount or 0)) - P.paid_amount(db, b.id)
-        rows.append({"booking_id": b.id, "code": b.code, "tour_code": b.tour.code if b.tour else "", "customer_name": b.customer_name,
-                     "total": (b.amount or 0) - (b.discount or 0), "paid": (b.paid or 0), "due": due})
+    rows = []
+    tong_no = 0.0
+    so_no = 0
+    for b, ma_tour in db.execute(qb):
+        tong = (b.amount or 0) - (b.discount or 0)
+        due = tong - tra.get(b.id, 0.0)
+        if due > 0:
+            tong_no += due; so_no += 1
+        elif chi_con_no:
+            continue
+        rows.append({"booking_id": b.id, "code": b.code, "tour_code": ma_tour or "", "customer_name": b.customer_name,
+                     "total": tong, "paid": (b.paid or 0), "due": due})
     return {"bookings": rows,
-            "pending_txns": db.execute(select(BankTransaction).where(BankTransaction.match_status == "cho_ke_toan")).scalars().all().__len__(),
-            "pending_receipts": db.execute(select(Receipt).where(Receipt.status == "tu_dong")).scalars().all().__len__()}
+            "tong_con_phai_thu": tong_no, "so_booking_con_no": so_no,
+            "pending_txns": db.execute(select(func.count()).select_from(BankTransaction)
+                                       .where(BankTransaction.match_status == "cho_ke_toan")).scalar() or 0,
+            "pending_receipts": db.execute(select(func.count()).select_from(Receipt)
+                                           .where(Receipt.status == "tu_dong")).scalar() or 0}

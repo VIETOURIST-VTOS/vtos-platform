@@ -126,7 +126,17 @@ DEFAULT_PARAMS = [
 # mỗi chuyến quyết toán gọi 4 lần, mỗi lần là một chuyến đi–về tới PostgreSQL ở Singapore. Tham số
 # là master data đổi vài tháng một lần và mỗi lần đổi đều đi qua đúng một chỗ (ký duyệt tham số),
 # nên đệm được an toàn miễn là chỗ đó xoá đệm. TTL 60 giây để bản ghi do phiên khác ghi cũng vào.
-_PARAM_CACHE: dict[tuple[str, date], tuple[float, float]] = {}
+# Đệm theo KHÓA, không theo (khóa, ngày). Đổi ngày 10/9/2026, lý do:
+#
+# Bản cũ lấy (khóa, ngày hiệu lực) làm khóa đệm. Với `get_param(db, "han_qt_le")` – ngày mặc định là
+# hôm nay – thì đệm ăn. Nhưng những chỗ tính theo TỪNG CHUYẾN đều truyền `on=tour.end_date`, mà mỗi
+# chuyến một ngày kết thúc khác nhau, nên đệm trượt gần như mọi lần: duyệt 1.258 chuyến là 1.258 câu
+# truy vấn cho đúng một tham số không đổi. Đó là phần lớn 55 giây của màn hình Khoản treo.
+#
+# Bản mới nạp TẤT CẢ bản ghi đang hiệu lực của một khóa trong một câu, rồi chọn bản ghi theo ngày
+# ngay trong bộ nhớ. Phép chọn giữ nguyên thứ tự cũ (effective_from giảm dần, id giảm dần, lấy bản
+# ghi đầu tiên có effective_from <= ngày hỏi) nên kết quả trùng khít bản cũ – chỉ khác số câu truy vấn.
+_PARAM_CACHE: dict[str, tuple[list[tuple[date, int, str]], float]] = {}
 PARAM_CACHE_TTL = 60.0
 
 
@@ -135,27 +145,50 @@ def clear_param_cache() -> None:
     _PARAM_CACHE.clear()
 
 
-def get_param(db: Session, key: str, on: date | None = None) -> float:
+def _param_rows(db: Session, key: str) -> list[tuple[date, int, str]]:
+    """Mọi bản ghi đang hiệu lực của một khóa, sắp sẵn theo thứ tự ưu tiên (mới nhất trước)."""
     import time
-    on = on or date.today()
-    ck = (key, on)
-    hit = _PARAM_CACHE.get(ck)
+    hit = _PARAM_CACHE.get(key)
     if hit is not None and time.time() - hit[1] < PARAM_CACHE_TTL:
         return hit[0]
-    row = db.execute(select(Param).where(Param.key == key, Param.status == "active",
-                                          Param.effective_from <= on)
-                     .order_by(desc(Param.effective_from), desc(Param.id))).scalars().first()
-    if row is not None:
-        _PARAM_CACHE[ck] = (float(row.value), time.time())
-    if row is None:
+    rows = [(p.effective_from, p.id, p.value)
+            for p in db.execute(select(Param).where(Param.key == key, Param.status == "active")
+                                .order_by(desc(Param.effective_from), desc(Param.id))).scalars()]
+    _PARAM_CACHE[key] = (rows, time.time())
+    return rows
+
+
+def _param_value(db: Session, key: str, on: date | None) -> str | None:
+    on = on or date.today()
+    for eff, _id, val in _param_rows(db, key):
+        if eff <= on:
+            return val
+    return None
+
+
+def get_param(db: Session, key: str, on: date | None = None) -> float:
+    val = _param_value(db, key, on)
+    if val is None:
         for k, v, *_ in DEFAULT_PARAMS:
             if k == key:
                 return float(v)
         raise KeyError(key)
-    return float(row.value)
+    return float(val)
 
 
 def get_param_text(db: Session, key: str, on: date | None = None) -> str:
+    """Tham số dạng CHỮ – cố ý KHÔNG đệm, khác với `get_param` ở trên.
+
+    Ngày 10/9/2026 đã thử cho hàm này dùng chung đệm với `get_param`, và một phép thử đội xe đỏ ngay:
+    nó sửa thẳng bản ghi Param trong cơ sở dữ liệu (không qua cửa duyệt tham số nên không ai gọi
+    `clear_param_cache`) rồi đọc lại ngay. Với `get_param` thì độ trễ tới 60 giây là điều đã chấp nhận từ
+    trước cho các tham số SỐ – chúng đổi vài tháng một lần. Nhưng tham số chữ ở đây đang giữ những thứ như
+    `xe_nguoi_lap_lenh` (ai được lập lệnh điều xe): sửa xong mà 60 giây sau mới có hiệu lực thì người vừa
+    sửa tưởng mình gõ sai và sửa tiếp.
+
+    Và đệm chỗ này chẳng được gì: mỗi lần tính bảng lương chỉ gọi tới nó một lần. Nên giữ nguyên một câu
+    truy vấn thẳng – đừng "cho nhất quán" mà đệm lại.
+    """
     on = on or date.today()
     row = db.execute(select(Param).where(Param.key == key, Param.status == "active", Param.effective_from <= on)
                      .order_by(desc(Param.effective_from), desc(Param.id))).scalars().first()
