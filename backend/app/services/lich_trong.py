@@ -65,10 +65,31 @@ def _sepay_bu(db: Session) -> tuple[int | None, str]:
 
 
 def _bao_cao(kind: str):
+    """Chụp bản lưu của báo cáo theo lịch – TỪ CHÍNH cấu trúc chỉ tiêu mà màn hình đang đọc.
+
+    Trước 10/9/2026 hàm này gọi `dashboard.run_report` – bản của robot R7, một bài viết dựng từ phép
+    tính riêng. Nghĩa là màn hình và bản lưu là hai phép tính khác nhau cho cùng một câu hỏi: sớm
+    muộn ra hai con số, và lúc lệch thì không ai biết bản nào đúng.
+
+    Bản R7 VẪN được lập, và cố ý giữ lại: nó có phần nhận xét bằng lời mà bảng chỉ tiêu không có.
+    Nhưng nó không còn là bản lưu duy nhất, và nó không còn là chỗ ai đó đi tra con số.
+
+    R7 hỏng thì KHÔNG được kéo theo bản lưu chỉ tiêu – nó gọi ra ngoài (mô hình ngôn ngữ) nên hỏng
+    là chuyện thường, còn bản lưu chỉ tiêu thì đọc thẳng cơ sở dữ liệu. Buộc hai thứ vào nhau là lấy
+    cái hay hỏng làm điều kiện cho cái không hỏng.
+    """
     def chay(db: Session) -> tuple[int | None, str]:
-        from app.services import dashboard as DB_
-        rep = DB_.run_report(db, kind)
-        return None, f"Đã lập báo cáo {kind} kỳ {rep.period} ({len(rep.content)} ký tự)"
+        from app.services import bao_cao_phong as BP
+        kq = BP.luu(db, kind)
+        loi_r7 = ""
+        try:
+            from app.services import dashboard as DB_
+            DB_.run_report(db, kind)
+        except Exception as e:      # noqa
+            loi_r7 = f" · bản nhận xét R7 lỗi: {type(e).__name__}"
+        hong = f" · KHÔNG lưu được: {'; '.join(kq['hong'])}" if kq["hong"] else ""
+        return len(kq["da_luu"]), (f"Lưu báo cáo {kind} kỳ {kq['ky']}: "
+                                   f"{len(kq['da_luu'])} phạm vi{hong}{loi_r7}")
     return chay
 
 
