@@ -72,10 +72,10 @@ def settle(db: Session, u: User, s: FinSchedule, done_on: date, bank_ref: str, a
         # Viết ba nhánh rõ ràng thay vì "if trả gốc … else cộng vào": nhánh else nuốt luôn tra_lai và
         # cộng tiền lãi vào dư nợ gốc, làm dư nợ phình lên đúng bằng số lãi vừa trả.
         if s.kind == "tra_goc":
-            c.outstanding = max(0.0, c.outstanding - amt)
+            c.outstanding = max(0.0, (c.outstanding or 0) - amt)
         elif s.kind in ("nhan_vay", "giai_ngan"):
-            c.outstanding += amt
-        if c.outstanding <= 0 and all(x.status == "da_thuc_hien" for x in c.schedule):
+            c.outstanding = (c.outstanding or 0) + amt
+        if (c.outstanding or 0) <= 0 and all(x.status == "da_thuc_hien" for x in c.schedule):
             c.status = "tat_toan"
         R.audit(db, u.username, u.role, "thuc_hien_lich_tai_chinh", f"fin:{c.code}",
                 after={"loai": s.kind, "so_tien": amt, "du_no": c.outstanding, "qua_quy_uoc": True})

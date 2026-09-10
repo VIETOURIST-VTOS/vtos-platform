@@ -277,7 +277,7 @@ def _marketing(db: Session, tu: date, den: date) -> list[dict]:
     chi = db.execute(select(MktChannelSpend).where(MktChannelSpend.ky == ky)).scalars().all()
     co_so = [x for x in chi if x.so_tien is not None]
     thieu_so = [x for x in chi if x.so_tien is None]
-    tong = sum(x.so_tien for x in co_so) if co_so else None
+    tong = sum(x.so_tien or 0 for x in co_so) if co_so else None
     lead = [l for l in db.execute(select(Lead)).scalars() if tu <= l.received_at.date() <= den]
     theo_kenh: dict[str, int] = {}
     for l in lead:
@@ -313,8 +313,8 @@ def _ketoan(db: Session, tu: date, den: date) -> list[dict]:
     from app.models.accounting import PeriodLock
     gd = [t for t in db.execute(select(BankTransaction)).scalars()
           if tu <= t.transaction_date.date() <= den]
-    vao = sum(t.amount for t in gd if t.transfer_type == "in")
-    ra = sum(t.amount for t in gd if t.transfer_type == "out")
+    vao = sum(t.amount or 0 for t in gd if t.transfer_type == "in")
+    ra = sum(t.amount or 0 for t in gd if t.transfer_type == "out")
     cho = db.execute(select(func.count()).select_from(BankTransaction)
                      .where(BankTransaction.match_status == "cho_ke_toan")).scalar()
     hd = db.execute(select(func.count()).select_from(PurchaseInvoice)
