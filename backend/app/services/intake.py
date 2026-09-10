@@ -292,6 +292,11 @@ BO_NAP.update(_bo_nap_phong_ban(_c))
 # gộp hỏng chờ sẵn.
 from app.services import intake_phong_ban_2 as _pb2   # noqa: E402
 BO_NAP.update(_pb2.bo_nap(_c))
+# Tệp thứ ba (10/9/2026) – quyết toán tour chi tiết theo tệp MỘT chuyến, bốn sheet. Bộ nạp riêng chứ
+# không mở rộng 'quyet_toan_tour': tệp tháng và tệp một chuyến khác nhau về hình dạng, gộp lại thì bộ
+# đọc phải đoán đang cầm loại nào – và đoán sai một lần là nạp tổng tháng vào chỗ của một chuyến.
+from app.services import intake_phong_ban_3 as _pb3   # noqa: E402
+BO_NAP.update(_pb3.bo_nap(_c))
 
 
 # Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
@@ -311,6 +316,7 @@ VAI_TRO = {
     "quyet_toan_tour":  QUAN_TRI + ("tp_dh", "nv_dh", "ketoan", "ptgd_doan"),
 }
 VAI_TRO.update(_pb2.vai_tro(QUAN_TRI))
+VAI_TRO.update(_pb3.vai_tro(QUAN_TRI))
 
 
 # P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.
@@ -329,7 +335,7 @@ VAI_TRO.update(_pb2.vai_tro(QUAN_TRI))
 # chi phí chuyến xe, quyết toán, sao kê, chấm công (đầu vào của bảng lương). Danh mục khách hàng, danh
 # mục nhà cung cấp, danh sách hướng dẫn viên thì không.
 BO_NAP_CHAM_TIEN = ("don_dich_vu", "chuyen_xe", "quyet_toan_tour", "sao_ke_ngan_hang", "cham_cong"
-                    ) + _pb2.CHAM_TIEN
+                    ) + _pb2.CHAM_TIEN + _pb3.CHAM_TIEN
 NHAN_VIEN = ("nv_dh", "nv_kd", "tn_kd", "nv_mkt", "nv_visa", "xe_hdv", "hanh_chinh")
 # Suy ra từ VAI_TRO chứ không khai tay lần thứ hai: hai bảng khai tay thì sớm muộn cũng lệch, và lúc
 # lệch thì không ai biết bảng nào đúng.
@@ -370,6 +376,7 @@ PHONG_BAN = {"nha_cung_cap": "dieu_hanh", "don_dich_vu": "dieu_hanh", "chuyen_xe
              "thu_lao_hdv": "huong_dan", "hoa_don_dau_vao": "ketoan",
              "bao_hiem_ky": "hcns", "bang_luong": "hcns", "hop_dong_lao_dong": "hcns",
              "tai_san_co_dinh": "ketoan", "cong_cu_dung_cu": "ketoan", "khau_hao_ky": "ketoan"}
+PHONG_BAN.update(_pb3.PHONG_BAN)
 
 
 def danh_sach_bo_nap() -> list[dict]:

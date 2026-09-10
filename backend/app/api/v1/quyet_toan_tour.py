@@ -104,3 +104,34 @@ def nhap_gia_von(sid: int, data: GiaVonIn, u: User = Depends(require_roles(*WRIT
             before={"gia_von": truoc}, after={"gia_von": s.gia_von})
     db.commit()
     return _ra(s)
+
+
+@router.get("/{sid}/chi-tiet")
+def chi_tiet(sid: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Lớp 2 – bốn mặt của một bản quyết toán: từng khách, chiết tính, chi của HDV, doanh thu booking.
+
+    Quyền: đúng bằng quyền xem lớp 1. Chủ tịch chốt 10/9/2026 – ai xem được lớp 1 thì xem được lớp 2,
+    không che tên khách.
+
+    Nhưng MỖI LẦN MỞ ĐỀU GHI NHẬT KÝ. Ghi nhật ký không chặn ai và không làm chậm ai; nó chỉ để khi có
+    người hỏi "ai đã đọc danh sách 42 khách của chuyến này" thì có câu trả lời. Danh sách khách kèm số
+    điện thoại là dữ liệu cá nhân theo Nghị định 13/2023, và nghĩa vụ đầu tiên với dữ liệu cá nhân là
+    biết ai đã chạm vào nó – nghĩa vụ ấy không đi cùng với việc siết quyền.
+    """
+    from app.services import lai_lo_tour as LL
+    from app.models.core import Tour
+    from sqlalchemy import select as _select
+
+    s = db.get(TourSettlement, sid)
+    if s is None:
+        raise HTTPException(404, "Không có bản quyết toán này")
+    t = db.execute(_select(Tour).where(Tour.code == s.ma_tour)).scalars().first()
+    if t is None:
+        raise HTTPException(404, f"Chưa có chuyến nào mang mã {s.ma_tour} trong hệ thống tour")
+    ban = LL._ban_quyet_toan(db, t)
+    if ban is None:
+        raise HTTPException(404, "Chuyến này chưa nạp tệp quyết toán chi tiết – lớp 2 chưa có gì")
+    R.audit(db, u.username, u.role, "xem_lop2_quyet_toan", f"tour:{s.ma_tour}",
+            after={"so_dong_khach": ban["so_dong_khach"], "so_booking": len(ban["booking"])})
+    db.commit()
+    return ban

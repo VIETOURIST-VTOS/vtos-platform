@@ -148,6 +148,12 @@ def _mot_dong(t: Tour, bk: dict, cp: dict) -> dict:
     co_bk = bool(bk["so_booking"] or bk["so_huy"])
     return {
         "tour_id": t.id, "ma_tour": t.code, "ten_tour": t.name,
+        # Giá bán NIÊM YẾT của chương trình, không phải doanh thu chia đầu khách. Hai số này khác
+        # nhau và khác một cách có ý nghĩa: chênh giữa chúng là phụ thu, khuyến mãi và charge huỷ.
+        # Rỗng khi tour chưa khai giá – không thay bằng doanh thu/số khách, vì đó là một con số
+        # không có trong bảng giá nào và không ai đối chiếu được.
+        "gia_ban": (float(t.price_per_pax) if getattr(t, "price_per_pax", None) is not None
+                    else None),
         "ngay_khoi_hanh": t.start_date, "ngay_ket_thuc": t.end_date,
         "loai": "dich_vu_le" if t.tour_type == "non_package" else "tour_ghep",
         "trang_thai": t.status,
@@ -191,6 +197,10 @@ def bang(db: Session, u=None, tu: date | None = None, den: date | None = None,
 
     bk, cp = _gom_booking(db, ids), _gom_chi_phi(db, ids)
     rows = [_mot_dong(t, bk.get(t.id, dict(RONG)), cp.get(t.id, dict(RONG_CP))) for t in tours]
+    # Số thứ tự tính TỪ ĐẦU BẢNG chứ không từ đầu trang: trang 3 phải bắt đầu ở 401, không phải ở 1.
+    # Để màn hình tự đánh số thì mỗi trang lại đánh lại từ 1, và người đọc tưởng bảng chỉ có 200 dòng.
+    for i, r in enumerate(rows, start=bo_qua + 1):
+        r["stt"] = i
     return {"rows": rows, "tong": tong, "con_nua": bo_qua + len(rows) < tong,
             "cong": _cong(rows), "canh_bao": _canh_bao(rows)}
 
@@ -306,7 +316,87 @@ def chi_tiet(db: Session, t: Tour) -> dict:
     bk = _gom_booking(db, [t.id]).get(t.id, dict(RONG))
     cp = _gom_chi_phi(db, [t.id]).get(t.id, dict(RONG_CP))
     return {"tong_hop": _mot_dong(t, bk, cp), "khach": khach, "chi_phi": chi_phi,
+            "quyet_toan_dieu_hanh": _ban_quyet_toan(db, t),
             "co_gia_von_theo_khach": le,
             "vi_sao_khong_co_gia_von_theo_khach": None if le else
                 "Chi phí của tour ghép ghi ở mức chuyến (xe, khách sạn, hướng dẫn viên), không tách "
                 "được theo từng khách. Chia đều ra là phép phân bổ, không phải số thật."}
+
+
+# ---------------------------------------------------------------------------------------------
+# Lớp 2, phần đến từ TỆP QUYẾT TOÁN của Điều hành
+# ---------------------------------------------------------------------------------------------
+
+def _ban_quyet_toan(db: Session, t) -> dict | None:
+    """Bốn mặt của bản quyết toán Điều hành, nếu chuyến này đã nạp tệp chi tiết.
+
+    Vì sao gắn vào ĐÂY chứ không dựng màn hình quyết toán riêng: tệp lai_lo_tour.py này sinh ra ngày
+    09/9 vì VTOS lúc ấy có BỐN công thức lãi lỗ tour chạy song song cho ra bốn con số. Dựng thêm một
+    màn hình quyết toán hai lớp nữa là tạo công thức thứ năm, và lần này còn khó thấy hơn vì hai màn
+    hình sẽ trông giống hệt nhau.
+
+    Nên bốn mặt ấy là DỮ LIỆU BỔ SUNG của lớp 2 sẵn có, không phải một lối tính khác. Số tổng của
+    chuyến vẫn do chuẩn phép tính ở đầu tệp này quyết; bản quyết toán chỉ nói thêm "số ấy đến từ đâu"
+    và "chỗ nào trong tệp gốc không khớp nhau".
+
+    Trả None khi chưa nạp tệp – rỗng nghĩa là CHƯA CÓ, khác hẳn với đã nạp mà không có dòng nào.
+    """
+    from app.models.quyet_toan import (TourSettlement, TourSettlementLine, TourSettlementCost,
+                                       TourSettlementCostLine, TourGuideAdvance,
+                                       TourSettlementBooking, TEN_KHOAN)
+    s = db.execute(select(TourSettlement).where(TourSettlement.ma_tour == t.code)).scalars().first()
+    if s is None or s.nguon != "nap_tep_chi_tiet":
+        return None
+
+    dong = db.execute(select(TourSettlementLine)
+                      .where(TourSettlementLine.settlement_id == s.id)
+                      .order_by(TourSettlementLine.stt)).scalars().all()
+    khoan = {}
+    if dong:
+        for k in db.execute(select(TourSettlementCost).where(
+                TourSettlementCost.line_id.in_([x.id for x in dong]))).scalars():
+            khoan.setdefault(k.line_id, []).append(
+                {"ma_khoan": k.ma_khoan, "ten_khoan": TEN_KHOAN.get(k.ma_khoan, k.ma_khoan),
+                 "nhan": k.nhan, "so_tien": float(k.so_tien) if k.so_tien is not None else None})
+    ct = db.execute(select(TourSettlementCostLine)
+                    .where(TourSettlementCostLine.settlement_id == s.id)
+                    .order_by(TourSettlementCostLine.id)).scalars().all()
+    hdv = db.execute(select(TourGuideAdvance)
+                     .where(TourGuideAdvance.settlement_id == s.id)).scalars().all()
+    bkg = db.execute(select(TourSettlementBooking)
+                     .where(TourSettlementBooking.settlement_id == s.id)).scalars().all()
+    f = lambda v: (float(v) if v is not None else None)
+    return {
+        "ma_tour": s.ma_tour, "ten_chuong_trinh": s.ten_chuong_trinh,
+        "so_khach_tep_ghi": s.so_khach, "so_dong_khach": len(dong),
+        "hdv": s.hdv, "bien_so_xe": s.bien_so_xe,
+        "gia_ban": f(s.gia_ban), "nhieu_muc_gia": bool(s.nhieu_muc_gia),
+        # Chênh giữa lớp 1 và tổng lớp 2. Ghi 0 khi đã đối chiếu và khớp – "đã đối chiếu, khớp" khác
+        # với "chưa đối chiếu bao giờ", và một ô rỗng không phân biệt được hai chuyện đó.
+        "chenh_thu": f(s.chenh_thu), "chenh_chi": f(s.chenh_chi),
+        "ten_tep": s.ten_tep, "nap_boi": s.boi, "nap_luc": s.luc,
+        "phat_hien": [x for x in (s.ghi_chu or "").split(" | ") if x],
+        "khach": [{"stt": x.stt, "sales": x.sales, "ten_khach": x.ten_khach,
+                   "gia_ban": f(x.gia_ban), "thu_khac": f(x.thu_khac), "tong_thu": f(x.tong_thu),
+                   "tong_chi": f(x.tong_chi), "loi_nhuan": f(x.loi_nhuan_tep),
+                   "khoan_chi": khoan.get(x.id, []), "co_lech": x.co_lech or None}
+                  for x in dong],
+        "chiet_tinh": [{"ve": x.ve, "nhom": x.nhom, "noi_dung": x.noi_dung, "doi_tac": x.doi_tac,
+                        "don_gia": f(x.don_gia), "so_luong": x.so_luong, "he_so": x.he_so,
+                        "thanh_tien": f(x.thanh_tien), "so_chung_tu": x.so_chung_tu or None,
+                        "mst_ncc": x.mst_ncc or None, "co_lech": x.co_lech or None}
+                       for x in ct],
+        "hdv_chi": [{"noi_dung": x.noi_dung, "don_gia": f(x.don_gia), "so_luong": x.so_luong,
+                     "tong_chi": f(x.tong_chi), "ghi_chu": x.ghi_chu or None,
+                     "tien_ung": f(x.tien_ung), "du": f(x.du), "ctp": f(x.ctp),
+                     "la_dong_tong": bool(x.la_dong_tong)} for x in hdv],
+        "booking": [{"ma_booking_nguon": x.ma_booking_nguon, "booking_id": x.booking_id,
+                     "ten_nguoi_book": x.ten_nguoi_book, "dien_thoai": x.dien_thoai,
+                     "so_khach": x.so_khach, "tong_thu": f(x.tong_thu), "da_dong": f(x.da_dong),
+                     "con_phai_thu": f(x.con_phai_thu()), "nguoi_ban": x.nguoi_ban}
+                    for x in bkg],
+        # Đếm sẵn để màn hình không phải tự cộng – mọi chỗ tự cộng lại là một công thức song song nữa.
+        "so_chung_tu_co_mst": sum(1 for x in ct if x.mst_ncc),
+        "so_dong_chi_co_chung_tu": sum(1 for x in ct if x.ve == "chi" and x.so_chung_tu),
+        "so_dong_chi": sum(1 for x in ct if x.ve == "chi"),
+    }
