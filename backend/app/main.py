@@ -40,7 +40,11 @@ from app.api.v1.ngoai_le import router as ngoai_le_router
 from app.api.v1.kiem_soat import router as kiem_soat_router
 from app.api.v1.hach_toan import router as hach_toan_router
 from app.api.v1.cskh import router as cskh_router
+from app.api.v1.ban_hang import router as ban_hang_router
+from app.api.v1.tu_dong import router as tu_dong_router
+from app.api.v1.bao_cao import router as bao_cao_router
 from app.api.v1.ks_ra_soat import router as ks_ra_soat_router
+from app.api.v1.ks_ra_soat import rst as rst_router
 from app.api.v1.lai_lo_tour import router as ll_router
 from app.services import rules as R
 from app.services import accounting as ACC
@@ -57,6 +61,18 @@ async def robot_loop():
             IB.robot_check(db)                      # R12 mỗi phút: AI trả lời thay khi sale trễ SLA
             from app.services import ky_thuat as KT
             KT.nap_nguong(db)       # ngưỡng "chậm bất thường" nằm ở tham số chính sách, không viết cứng
+            # Lịch theo GIỜ (09/9/2026). Vòng lặp này đếm phút từ lúc khởi động nên không làm đúng
+            # được việc "20:30 mỗi ngày": mỗi lần deploy là bộ đếm về 0, và báo cáo của hôm đó bị bỏ
+            # luôn mà không ai biết. app/services/lich_trong.py khóa theo MÃ KỲ suy từ đồng hồ tường,
+            # nên việc bị lỡ được làm bù và không bao giờ chạy hai lần trong một kỳ.
+            #
+            # Gọi mỗi phút, KHÔNG kèm điều kiện i % n: bản thân mã kỳ đã là điều kiện, và đặt thêm
+            # một điều kiện thứ hai ở đây là dựng hai chỗ quyết định cho cùng một việc.
+            try:
+                from app.services import lich_trong as LT
+                LT.den_luot(db)
+            except Exception as e:  # noqa
+                print("lich trong error", e)
             if i % 10 == 0: R.run_robots(db)         # các robot khác mỗi 10 phút
             if i % 10 == 0:
                 # Sinh phiếu chăm sóc cho tour vừa kết thúc và cảnh báo khiếu nại quá hạn phản hồi.
@@ -105,6 +121,11 @@ async def lifespan(app: FastAPI):
         # vào "không có quy tắc khớp" và kế toán lại định khoản tay – đúng cái việc bảng này thay thế.
         from app.services.hach_toan import nap_mac_dinh as nap_quy_tac
         nap_quy_tac(db)
+        # Các việc chạy theo lịch bên trong VTOS tự khai vào bảng tác vụ V11, để chúng hiện trên màn
+        # hình Lịch tự động hóa cùng chỗ với việc chạy ở hệ thống ngoài – một chỗ nhìn, không phải hai.
+        # Chỉ thêm dòng còn thiếu và cập nhật mô tả; KHÔNG bật lại việc mà người đã tắt.
+        from app.services.lich_trong import dam_bao_khai_bao
+        dam_bao_khai_bao(db)
         if settings.SEED_DEMO:
             seed_all(db)
         # K6 – một dòng mỗi lần máy chủ lên, kèm trạng thái mạch nâng cấp. Đây là dữ kiện duy nhất
@@ -214,7 +235,11 @@ app.include_router(ngoai_le_router)
 app.include_router(kiem_soat_router)
 app.include_router(hach_toan_router)
 app.include_router(cskh_router)
+app.include_router(ban_hang_router)
+app.include_router(tu_dong_router)
+app.include_router(bao_cao_router)
 app.include_router(ks_ra_soat_router)
+app.include_router(rst_router)
 app.include_router(debts_router)
 app.include_router(ncc_router)
 app.include_router(intake_router)

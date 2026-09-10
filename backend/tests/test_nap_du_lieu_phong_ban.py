@@ -35,8 +35,20 @@ def _startup():
         global client; client = c; yield
 
 
+# V10 – mỗi lần gọi hàm này là MỘT lần bấm nút, nên mang một khóa chống ghi trùng riêng.
+#
+# Vì sao phải nói rõ: từ V10, gọi nạp hai lần cùng nội dung trong mười phút được coi là bấm hai lần
+# do mạng chập, và lần hai trả lại kết quả lần đầu mà không ghi gì. Đó đúng là điều ta muốn ngoài đời.
+# Nhưng mấy phép thử dưới đây canh một điều KHÁC và cũng quan trọng: nạp lại cùng một tệp ở một lần
+# bấm khác thì khóa chống trùng THEO DÒNG phải bỏ qua từng dòng đã có. Hai lớp bảo vệ khác nhau, và
+# nếu để lớp ngoài nuốt lời gọi thì lớp trong không còn được canh bởi phép thử nào.
+_lan = [0]
+
+
 def nap(who, loai, rows, **kw):
-    return client.post("/api/v1/nap-du-lieu/nap", headers=login(who),
+    _lan[0] += 1
+    return client.post("/api/v1/nap-du-lieu/nap",
+                       headers={**login(who), "X-Khoa-Ghi": f"thu-nap-{_lan[0]}"},
                        json={"loai": loai, "rows": rows, **kw})
 
 

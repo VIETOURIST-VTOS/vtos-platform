@@ -133,6 +133,8 @@ class Trip(Base):
     `km_dau`/`km_cuoi` để rỗng nghĩa là chưa đo, không phải bằng 0. Dùng 0 làm "chưa có" là cách chắc chắn
     nhất để một ngày nào đó hệ thống báo xe chạy âm mấy trăm nghìn km."""
     __tablename__ = "fleet_trips"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
     driver_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True)

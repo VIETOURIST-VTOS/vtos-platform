@@ -10,6 +10,10 @@ import { getUser, clearSession, type User } from "@/lib/api";
 export const GROUPS: { key: string; label: string; items: [string, string][] }[] = [
   { key: "holdings", label: "1. Điều hành Holdings", items: [
     ["Tổng quan", "/"], ["Công ty thành viên & liên kết", "/companies"], ["Kết quả từng đơn vị", ""],
+    // Báo cáo tự động theo phòng (09/9/2026) đứng NGAY ĐÂY, ngay dưới Tổng quan: Chủ tịch và TGĐ mở
+    // bản toàn công ty ở đây, trưởng phòng mở bản của phòng mình ở cùng một đường dẫn – máy chủ cắt
+    // theo vai trò. Một đường dẫn cho mọi cấp, không phải mỗi phòng một mục menu.
+    ["Báo cáo tự động", "/bao-cao"],
     ["Báo cáo quản trị", "/robot-reports"],
     // Hai phòng Kinh doanh vào báo cáo qua menu của mình (?mang=le / ?mang=doan). Nếu chỉ có hai lối đó thì
     // không còn đường nào tới con số HỢP NHẤT – nên Điều hành Holdings giữ một lối vào không kèm tham số.
@@ -27,11 +31,13 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Khách hàng & cơ hội bán", "/leads?tab=leads"], ["Sản phẩm", "/products"],
     ["Tour lẻ", "/tours?mang=le"], ["Yêu cầu & booking", "/requests?mang=le"],
     ["Booking & bảo lưu", "/bookings?mang=le"], ["Dịch vụ lẻ", "/non-package"],
-    ["Giá & chính sách bán", ""], ["Báo giá", ""], ["Báo cáo bán hàng", "/sales-reports?mang=le"]] },
+    ["Giá & chính sách bán", "/bang-gia"], ["Báo giá", "/bao-gia?mang=kd_le"],
+    ["Báo cáo bán hàng", "/sales-reports?mang=le"]] },
   { key: "kd_doan", label: "4. Kinh doanh Đoàn (MICE)", items: [
     ["Tour đoàn", "/tours?mang=doan"], ["Yêu cầu & booking", "/requests?mang=doan"],
     ["Booking & bảo lưu", "/bookings?mang=doan"],
-    ["Báo giá đoàn", ""], ["Hợp đồng", ""], ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
+    ["Báo giá đoàn", "/bao-gia?mang=kd_doan"], ["Hợp đồng", "/hop-dong-khach"],
+    ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
   { key: "dieuhanh", label: "5. Điều hành", items: [
     ["Yêu cầu chờ xử lý", "/requests"], ["Chuyến tour & dự toán", "/tours"], ["Nhà cung cấp & đặt dịch vụ", "/nha-cung-cap"],
     ["Hồ sơ visa", "/visa"],
@@ -60,7 +66,10 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Báo cáo tài chính", "/accounting?tab=bctc"], ["Hồ sơ kiểm toán", ""],
     // Kết sổ đứng NGAY TRƯỚC Khóa kỳ vì đó là thứ tự thật của việc: đưa sao kê vào sổ, kết chuyển bốn
     // bước, rồi mới khóa. Xếp ngược lại thì người dùng gặp nút khóa trước khi gặp việc phải làm.
-    ["Kết sổ kỳ", "/ket-so"], ["Khóa kỳ", "/accounting?tab=periods"]] },
+    ["Kết sổ kỳ", "/ket-so"], ["Khóa kỳ", "/accounting?tab=periods"],
+    // Bàn quyết cột tiền K1/K2. Ở nhóm Kế toán chứ không ở nhóm Kiểm soát: Chủ tịch quyết 08/9 rằng
+    // Kế toán không xem màn hình Kiểm soát, nhưng vẫn là người quyết một cột có phải tiền hay không.
+    ["Rà soát cột tiền", "/ra-soat-cot-tien"]] },
   { key: "nhansu", label: "8. Hành chính & Nhân sự", items: [
     ["Hồ sơ nhân sự", "/hr?tab=employees"], ["Hợp đồng lao động", "/hop-dong-lao-dong"], ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
     ["Báo cáo công việc", "/reports"], ["Đánh giá & sự vụ", "/hr?tab=incidents"], ["Văn bản", ""], ["Tài sản & mua sắm", "/tai-san"]] },
@@ -78,7 +87,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
   { key: "hethong", label: "10. Hệ thống & Tích hợp", items: [
     ["Cấu hình tổ chức", "/companies"], ["Tài khoản & phân quyền", "/access"], ["Vị trí AI & quyền hạn", "/ai-roles"],
     ["Nạp dữ liệu", "/nap-du-lieu"], ["Đọc chứng từ ảnh", "/doc-chung-tu"], ["Tệp & hình ảnh", "/tep"], ["Đồng bộ Vietrip", "/vietrip"], ["Kết nối MISA và các kênh", "/accounting?tab=misa"],
-    ["Lịch tự động hóa", ""], ["Nhật ký kỹ thuật", ""]] },
+    ["Lịch tự động hóa", "/tu-dong-hoa"], ["Nhật ký kỹ thuật", ""]] },
 ];
 
 /** Vai trò được nhìn thấy các mục chưa xây (để theo dõi lộ trình); nhân viên nghiệp vụ chỉ thấy mục dùng được. */

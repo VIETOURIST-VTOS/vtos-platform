@@ -1,4 +1,5 @@
 "use client";
+import DinhKem from "@/components/DinhKem";
 import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD } from "@/lib/api";
@@ -89,7 +90,13 @@ function Finance() {
             <table style={{ width: "auto" }}><thead><tr><th>Ngày</th><th>Loại</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Trạng thái</th><th>GD ngân hàng</th>{isKT && <th></th>}</tr></thead><tbody>
               {c.schedule.map((s: any) => <tr key={s.id}><td>{fmtD(s.due_date)}</td><td>{SK[s.kind]}</td><td style={{ textAlign: "right" }}>{vnd(s.amount)}</td><td><Tag cls={s.status === "da_thuc_hien" ? "ok" : s.status === "qua_han" ? "red" : "warn"}>{s.status === "da_thuc_hien" ? "Đã thực hiện" : s.status === "qua_han" ? "Quá hạn" : "Kế hoạch"}</Tag></td><td className="muted">{s.bank_ref}{s.done_on && ` · ${fmtD(s.done_on)}`}</td>
                 {isKT && <td>{s.status !== "da_thuc_hien" && <button className="act teal" style={{ margin: 0 }} onClick={() => { const ref = prompt("Mã giao dịch ngân hàng:") || ""; post(`/fin/schedule/${s.id}/settle`, { done_on: today(), bank_ref: ref }); }}>Đã thực hiện</button>}</td>}</tr>)}</tbody></table>
-            {isKT && <button className="act grey" onClick={() => { const d = prompt("Ngày (YYYY-MM-DD):", today()); const k = prompt("Loại: tra_goc / tra_lai / thu_hoi / giai_ngan / nhan_vay:", c.kind === "vay" ? "tra_goc" : "thu_hoi"); const a = prompt("Số tiền:"); if (d && k && a) post(`/fin/contracts/${c.id}/schedule`, { due_date: d, kind: k, amount: Number(a) }); }}>+ dòng lịch</button>}</div></td></tr>}
+            {isKT && <button className="act grey" onClick={() => { const d = prompt("Ngày (YYYY-MM-DD):", today()); const k = prompt("Loại: tra_goc / tra_lai / thu_hoi / giai_ngan / nhan_vay:", c.kind === "vay" ? "tra_goc" : "thu_hoi"); const a = prompt("Số tiền:"); if (d && k && a) post(`/fin/contracts/${c.id}/schedule`, { due_date: d, kind: k, amount: Number(a) }); }}>+ dòng lịch</button>}
+            <DinhKem doiTuong="khe_uoc_vay" doiTuongId={c.code} loai="hop_dong"
+              tieuDe={`Bản gốc khế ước ${c.contract_no || c.code} – ${c.partner}`}
+              goi={"Bản scan khế ước / hợp đồng, phụ lục gia hạn, thông báo lãi suất, giấy nhận nợ từng lần " +
+                   "giải ngân, biên bản đối chiếu dư nợ. Bộ nạp Excel chỉ mang được các con số; lúc đối " +
+                   "chiếu với ngân hàng thì thứ phải mở ra là bản gốc."} />
+            </div></td></tr>}
         </>)}</tbody></table></div>
       <p className="muted">Thực hiện lịch → bút toán tự động: trả gốc Nợ 341/Có 112; lãi Nợ 635/Có 112; nhận vay Nợ 112/Có 341; giải ngân đầu tư Nợ 222/138/244/128/331 – Có 112; thu hồi ngược lại. Khoản quá hạn thu hồi lên báo cáo HĐQT hằng tháng.</p>
     </>}

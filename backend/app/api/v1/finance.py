@@ -70,6 +70,8 @@ class SchedIn(BaseModel):
     due_date: date
     kind: str
     amount: float
+    ky: int | None = None            # V12 – số kỳ trong lịch trả nợ
+    ma_dao_han: str = ""             # V12 – hai chân một lần đảo nợ mang cùng mã này
 
 
 @router.post("/fin/contracts/{cid}/schedule", status_code=201)
@@ -97,6 +99,52 @@ def settle(sid: int, data: SettleIn, u: User = Depends(require_roles(*WRITE)), d
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"message": f"Đã ghi nhận {s.kind} {s.amount:,.0f} đ – dư nợ còn {s.contract.outstanding:,.0f} đ"}
+
+
+class DaoHanIn(BaseModel):
+    tra_goc_id: int
+    nhan_moi_id: int
+    ma: str
+
+
+@router.post("/fin/dao-han")
+def dat_dao_han(data: DaoHanIn, u: User = Depends(require_roles(*WRITE)),
+                db: Session = Depends(get_db)):
+    """V12 – nối hai chân một lần đảo nợ bằng một mã chung, TRƯỚC khi ghi sổ.
+
+    Đảo nợ là trả gốc khoản cũ và nhận giải ngân khoản mới trong cùng một ngày; tiền thực chất không
+    ra khỏi ngân hàng. Ghi hai bút toán rời rạc thì sổ đúng nhưng không ai đọc ra được đó là một lần
+    đảo, và chỉ tiêu "tiền chi trả nợ gốc vay" trên lưu chuyển tiền tệ bị thổi lên bằng đúng số tiền
+    không hề chuyển đi đâu.
+    """
+    from app.services import vay_but_toan as VBT
+    a, b = db.get(FinSchedule, data.tra_goc_id), db.get(FinSchedule, data.nhan_moi_id)
+    if a is None or b is None:
+        raise HTTPException(404, "Không có dòng lịch")
+    if not data.ma.strip():
+        raise HTTPException(422, "Phải có mã đáo hạn – mã rỗng thì hai chân không nối được với nhau")
+    VBT.dat_ma_dao_han(db, a, b, data.ma.strip()[:40])
+    R.audit(db, u.username, u.role, "dat_ma_dao_han", f"dao_han:{data.ma}",
+            after={"tra_goc": a.id, "nhan_moi": b.id})
+    db.commit()
+    return {"message": f"Đã nối hai chân đáo hạn bằng mã '{data.ma.strip()}'"}
+
+
+@router.get("/fin/doi-chieu-vay")
+def doi_chieu_vay(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """V12 nghiệm thu: dư nợ vay TRÊN SỔ có khớp LỊCH TRẢ NỢ không, và lệch vì đâu."""
+    from app.services import vay_but_toan as VBT
+    return VBT.doi_chieu(db)
+
+
+@router.get("/fin/schedule/{sid}/xem-truoc-but-toan")
+def xem_truoc_but_toan(sid: int, u: User = Depends(require_roles(*READ)),
+                       db: Session = Depends(get_db)):
+    """Bút toán SẼ ghi cho một kỳ. Chỉ đọc – xem trước rồi mới bấm ghi."""
+    from app.services import vay_but_toan as VBT
+    s = db.get(FinSchedule, sid)
+    if s is None: raise HTTPException(404, "Không có dòng lịch")
+    return VBT.xem_truoc(db, s)
 
 
 @router.get("/fin/forecast")

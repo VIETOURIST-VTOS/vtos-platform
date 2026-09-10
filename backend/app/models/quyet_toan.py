@@ -42,6 +42,8 @@ PHAN_LOAI = {
 
 class TourSettlement(Base):
     __tablename__ = "tour_settlements"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     __table_args__ = (
         Index("ux_tour_settlements_ma", "ma_tour", unique=True),
         Index("ix_tour_settlements_ky", "ky"),

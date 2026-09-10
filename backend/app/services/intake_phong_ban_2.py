@@ -808,6 +808,107 @@ def _hdld_nap(db: Session, r, boi):
 
 
 # ====================== KHAI BÁO ======================
+# ====================== V12 – KHẾ ƯỚC VAY ======================
+def _ku_kiem(db: Session, r):
+    """Kiểm một dòng khế ước vay trước khi nạp.
+
+    Bộ nạp này khác phần lớn bộ nạp khác ở một chỗ: nó không chỉ ghi một bản ghi, nó còn SINH RA
+    LỊCH TRẢ NỢ bằng công thức. Nên phần kiểm phải chặt hơn – một khế ước sai công thức đẻ ra hàng
+    chục dòng lịch sai, và mỗi dòng sai ấy về sau thành một bút toán sai.
+    """
+    from app.models.finance import FinContract
+    from app.services.lich_tra_no import CONG_THUC, sinh_lich
+    from app.services.intake import _so, _ngay
+    loi, cb = [], []
+    so_hd = str(r.get("so_khe_uoc") or "").strip()
+    if not so_hd:
+        loi.append("Thiếu số khế ước")
+    ngan_hang = str(r.get("ngan_hang") or "").strip()
+    if not ngan_hang:
+        loi.append("Thiếu tên ngân hàng – bên cho vay phải có tên, kể cả khi là cá nhân")
+    goc = _so(r.get("so_tien_vay"))
+    if goc <= 0:
+        loi.append("Số tiền vay phải lớn hơn 0")
+    ls = _so(r.get("lai_suat"))
+    if ls < 0:
+        loi.append("Lãi suất không được âm")
+    elif ls > 30:
+        cb.append(f"Lãi suất {ls}%/năm – cao bất thường, kiểm lại xem có nhập nhầm lãi suất THÁNG không")
+    elif ls == 0:
+        cb.append("Lãi suất bằng 0 – nếu đúng là vay không lãi thì phải có căn cứ, vì đây là giao "
+                  "dịch có thể bị coi là giao dịch liên kết")
+    try:
+        ky_dau = _ngay(r.get("ngay_tra_dau"))
+        _ngay(r.get("ngay_ky"))
+    except ValueError as ex:
+        loi.append(str(ex)); ky_dau = None
+    so_ky = int(_so(r.get("so_ky")) or 0)
+    if so_ky <= 0:
+        loi.append("Số kỳ phải lớn hơn 0")
+    ct = str(r.get("cong_thuc") or "goc_deu").strip() or "goc_deu"
+    if ct not in CONG_THUC:
+        loi.append(f"Công thức '{ct}' không có – chọn: " + " / ".join(CONG_THUC))
+    if not str(r.get("nhom_vay") or "").strip():
+        cb.append("Chưa ghi nhóm khoản vay – sao kê ngân hàng gộp chung vay mua xe, vay bất động sản "
+                  "và vay vốn lưu động, để trống thì màn hình nợ đội xe sẽ hút nhầm khoản khác vào")
+    trung = None
+    if so_hd:
+        trung = db.execute(select(FinContract).where(
+            func.lower(FinContract.contract_no) == so_hd.lower())).scalars().first()
+    # Thử sinh lịch NGAY LÚC KIỂM, không đợi tới lúc nạp: sai công thức thì phải hiện ở bước xem
+    # trước, chứ không phải hiện sau khi đã ghi mấy chục dòng lịch vào cơ sở dữ liệu.
+    if not loi and ky_dau:
+        try:
+            kq = sinh_lich(goc, ls, so_ky, ky_dau, ct)
+            for c in kq["canh_bao"]:
+                loi.append(c)
+            cb.append(f"Lịch sẽ sinh {kq['so_ky']} kỳ, tổng lãi {kq['tong_lai']:,.0f}đ, "
+                      f"tổng phải trả {kq['tong_phai_tra']:,.0f}đ ({kq['cong_thuc_ten']})")
+        except ValueError as ex:
+            loi.append(f"Không dựng được lịch trả nợ: {ex}")
+    return loi, cb, (trung.code if trung is not None else None)
+
+
+def _ku_nap(db: Session, r, boi):
+    """Ghi khế ước và SINH LỊCH TRẢ NỢ từ công thức.
+
+    Gốc và lãi tách thành HAI dòng lịch cho mỗi kỳ, vì chúng là hai bút toán (quyết định 08/9: không
+    bù trừ). Kỳ có gốc bằng 0 – các kỳ đầu của kiểu trả cuối kỳ – thì KHÔNG sinh dòng gốc: một dòng
+    lịch số tiền 0 là một dòng không ai ghi sổ được mà vẫn nằm chờ trong danh sách.
+    """
+    from app.models.finance import FinContract, FinSchedule
+    from app.services.lich_tra_no import sinh_lich
+    from app.services.intake import _so, _ngay
+    goc = _so(r.get("so_tien_vay"))
+    ls = _so(r.get("lai_suat"))
+    so_ky = int(_so(r.get("so_ky")) or 0)
+    ky_dau = _ngay(r.get("ngay_tra_dau"))
+    ct = str(r.get("cong_thuc") or "goc_deu").strip() or "goc_deu"
+    n = db.execute(select(func.count()).select_from(FinContract)).scalar() or 0
+    c = FinContract(
+        code=f"KU{n + 1:05d}", kind="vay",
+        partner=str(r.get("ngan_hang") or "").strip()[:160],
+        contract_no=str(r.get("so_khe_uoc") or "").strip()[:80],
+        signed_on=_ngay(r.get("ngay_ky")), principal=goc, outstanding=goc,
+        interest_rate=ls, maturity=_ngay(r.get("ngay_dao_han")),
+        loan_group=str(r.get("nhom_vay") or "").strip()[:24],
+        collateral=str(r.get("tai_san_bao_dam") or "")[:300],
+        purpose=str(r.get("muc_dich") or "")[:300],
+        note=str(r.get("ghi_chu") or "")[:300], created_by=boi)
+    db.add(c); db.flush()
+    kq = sinh_lich(goc, ls, so_ky, ky_dau, ct)
+    for d in kq["dong"]:
+        if d["goc"] > 0:
+            db.add(FinSchedule(contract_id=c.id, ky=d["ky"], due_date=d["ngay"],
+                               kind="tra_goc", amount=d["goc"]))
+        if d["lai"] > 0:
+            db.add(FinSchedule(contract_id=c.id, ky=d["ky"], due_date=d["ngay"],
+                               kind="tra_lai", amount=d["lai"]))
+    db.flush()
+    return (f"{c.code} – {c.partner}: {kq['so_ky']} kỳ, tổng lãi {kq['tong_lai']:,.0f}đ "
+            f"({kq['cong_thuc_ten']})")
+
+
 def bo_nap(_c) -> dict:
     from app.models.fleet import NHOM_CHI_PHI_KY
     from app.models.nap_bo_sung import KENH_MKT
@@ -1126,6 +1227,45 @@ def bo_nap(_c) -> dict:
                     _c("ghi_chu", "Ghi chú")],
             "kiem": _cc_kiem, "nap": _cc_nap,
         },
+        # ---------- V12: KHẾ ƯỚC VAY ----------
+        "khe_uoc_vay": {
+            "bang_dich": "fin_contracts", "phong_ban": "ketoan",
+            "ten": "Khế ước vay ngân hàng",
+            "mo_ta": "Nạp khế ước và TỰ SINH LỊCH TRẢ NỢ theo công thức. Ba công thức vì ba ngân hàng "
+                     "của công ty dùng ba kiểu: gốc đều (lãi giảm dần) · niên kim (gốc+lãi mỗi kỳ "
+                     "bằng nhau) · trả gốc một lần cuối kỳ. Lịch sinh ra là lịch THAM CHIẾU – lịch "
+                     "chính thức là lịch ngân hàng phát hành; lệch vài nghìn đồng do quy tắc làm "
+                     "tròn là bình thường, lệch lớn nghĩa là chọn sai công thức. Gốc và lãi tách "
+                     "thành hai dòng lịch vì chúng là hai bút toán, không bù trừ.",
+            "khoa_chong_trung": "Số khế ước",
+            "cot": [_c("so_khe_uoc", "Số khế ước", True, vi_du="KU-2026-018",
+                       ghi_chu="số ghi trên hợp đồng tín dụng – khóa chống nạp trùng"),
+                    _c("ngan_hang", "Ngân hàng / bên cho vay", True, vi_du="TPBank – CN Bến Thành",
+                       ghi_chu="cá nhân cho vay cũng phải ghi tên"),
+                    _c("so_tien_vay", "Số tiền vay", True, kieu="tien", min=0, vi_du="1200000000"),
+                    _c("lai_suat", "Lãi suất (%/năm)", True, kieu="so", min=0, vi_du="9.5",
+                       ghi_chu="ghi theo NĂM, không theo tháng"),
+                    _c("so_ky", "Số kỳ trả", True, kieu="so", min=1, vi_du="12",
+                       ghi_chu="số kỳ THÁNG của lịch trả nợ"),
+                    _c("ngay_tra_dau", "Ngày trả kỳ đầu", True, kieu="ngay", vi_du="15/10/2026"),
+                    _c("cong_thuc", "Công thức lịch trả nợ", kieu="chon", vi_du="goc_deu",
+                       chon={"goc_deu": "Gốc đều, lãi trên dư nợ giảm dần",
+                             "nien_kim": "Trả góp đều (niên kim)",
+                             "cuoi_ky": "Gốc trả một lần cuối kỳ"},
+                       ghi_chu="để trống = gốc đều"),
+                    _c("ngay_ky", "Ngày ký khế ước", kieu="ngay", vi_du="10/10/2026",
+                       khong_tuong_lai=True),
+                    _c("ngay_dao_han", "Ngày đáo hạn", kieu="ngay", vi_du="15/09/2027"),
+                    _c("nhom_vay", "Nhóm khoản vay", kieu="chon", vi_du="vay_xe_45cho",
+                       chon={"vay_xe_45cho": "Vay mua xe 45 chỗ", "vay_xe_khac": "Vay mua xe khác",
+                             "von_luu_dong": "Vay vốn lưu động", "bds": "Vay bất động sản",
+                             "khac": "Khác"},
+                       ghi_chu="để trống thì màn hình nợ đội xe sẽ hút nhầm khoản khác vào"),
+                    _c("tai_san_bao_dam", "Tài sản bảo đảm", vi_du="Xe 50F-009.60"),
+                    _c("muc_dich", "Mục đích vay", vi_du="Mua xe 45 chỗ"),
+                    _c("ghi_chu", "Ghi chú")],
+            "kiem": _ku_kiem, "nap": _ku_nap,
+        },
         "khau_hao_ky": {
             "bang_dich": "asset_depreciations", "phong_ban": "ketoan",
             "ten": "Khấu hao kỳ đã tính ở hệ thống cũ",
@@ -1165,6 +1305,7 @@ def vai_tro(QUAN_TRI: tuple) -> dict:
         "hop_dong_lao_dong":    QUAN_TRI + ("hcns",),
         "tai_san_co_dinh":      QUAN_TRI + ("ketoan",),
         "cong_cu_dung_cu":      QUAN_TRI + ("ketoan",),
+        "khe_uoc_vay":          QUAN_TRI + ("ketoan",),
         "khau_hao_ky":          QUAN_TRI + ("ketoan",),
     }
 
@@ -1172,4 +1313,7 @@ def vai_tro(QUAN_TRI: tuple) -> dict:
 # Bộ nạp nào CHẠM THẲNG VÀO TIỀN – nhân viên nhập tay được, tải tệp hàng loạt thì không (quy tắc P4).
 CHAM_TIEN = ("nhien_lieu", "phi_cau_duong", "bao_duong", "chi_phi_ky_doi_xe", "chi_marketing_kenh",
              "doanh_so_tu_van_vien", "thu_lao_hdv", "hoa_don_dau_vao", "bao_hiem_ky", "bang_luong",
-             "hop_dong_lao_dong", "tai_san_co_dinh", "cong_cu_dung_cu", "khau_hao_ky")
+             "hop_dong_lao_dong", "tai_san_co_dinh", "cong_cu_dung_cu", "khau_hao_ky",
+             # V12 – một dòng khế ước sai đẻ ra hàng chục dòng lịch sai, và mỗi dòng lịch sai về sau
+             # thành một bút toán sai. Nhập tay từng cái thì còn nhìn thấy; một tệp thì không.
+             "khe_uoc_vay")

@@ -36,6 +36,13 @@ def test_product_crud_and_open_tour():
     r = client.post("/api/v1/products", json=PROD, headers=h); assert r.status_code == 201, r.text
     p = r.json(); assert p["fixed_cost"] == 10500000 and p["var_cost_per_pax"] == 900000
     start = date.today() + timedelta(days=30)
+    # Phép thử này về sau mở lịch lặp THỨ BẢY từ chính ngày `start`. Nếu `start` rơi đúng thứ Bảy thì
+    # chuyến lặp đầu tiên trùng ngày với chuyến đơn đã mở, hậu tố _2 bị dùng mất, và chuyến trùng thứ
+    # ba nhận _3 – phép thử đỏ dù mã chạy đúng. Ngày 10/9/2026 đúng vào cảnh đó (10/10/2026 là thứ Bảy)
+    # và nó đỏ trên CẢ main. Dời một ngày để phép thử không còn phụ thuộc HÔM NAY là thứ mấy; cửa sổ 28
+    # ngày vẫn chứa đúng 4 thứ Bảy nên phần dưới không đổi.
+    if start.weekday() == 5:
+        start += timedelta(days=1)
     r = client.post(f"/api/v1/products/{p['id']}/open-tour", json={"start_date": str(start), "seats": 40, "note": "Mở theo lịch tuần"}, headers=h); assert r.status_code == 201, r.text
     tid = r.json()["tours"][0]["id"]; code = r.json()["tours"][0]["code"]
     assert code == f"PT001.03{start:%d%m%y}"

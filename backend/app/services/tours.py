@@ -4,6 +4,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.core import Tour, User, ServiceRequest, Booking, Alert, AuditLog, ROLES
 from app.services import rules as R
+from app.services import ghi_mot_lan as GML
 from app.services import accounting as ACC
 from app.services.products import event as EV
 from app.api.deps import Gate
@@ -24,6 +25,7 @@ def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
     days_left = (t.start_date - date.today()).days
     out = {
         "id": t.id, "code": t.code, "name": t.name, "tour_type": t.tour_type, "start_date": t.start_date, "end_date": t.end_date,
+        "phien_ban": getattr(t, "phien_ban", 1),   # V10 – màn hình gửi lại số này khi lưu
         "operator_id": t.operator_id, "operator_name": t.operator.full_name if t.operator else "",
         "price_per_pax": t.price_per_pax, "fixed_cost": t.fixed_cost, "var_cost_per_pax": t.var_cost_per_pax, "planned_pax": t.planned_pax,
         "rest_stops": t.rest_stops, "strategic": t.strategic, "below_margin": t.below_margin, "justification": t.justification,
@@ -84,8 +86,14 @@ def edit(db: Session, u: User, t: Tour, data) -> Tour:
     if not (u.id == t.operator_id or u.role == "tp_dh"):
         raise HTTPException(403, "Chỉ người điều hành chuyến hoặc TP Điều hành sửa dự toán")
     before = snap(t)
+    # V10 – hai người cùng sửa một dự toán thì người sau phải biết. Kiểm TRƯỚC khi gán, và từ chối
+    # kèm nội dung mới để người sửa đối chiếu được thay vì phải đi tra tay.
+    GML.kiem_phien_ban(t, getattr(data, "phien_ban", None), f"Dự toán tour {t.code}",
+                       lambda: {**snap(t), "phien_ban": getattr(t, "phien_ban", 1),
+                                "rest_stops": t.rest_stops, "justification": t.justification})
     t.price_per_pax, t.fixed_cost, t.var_cost_per_pax, t.planned_pax = data.price_per_pax, data.fixed_cost, data.var_cost_per_pax, data.planned_pax
     t.rest_stops, t.justification = data.rest_stops, data.justification
+    GML.tang_phien_ban(t)
     EV(db, t, "sua_du_toan", u.username, "")
     R.audit(db, u.username, u.role, "sua_du_toan", f"tour:{t.code}", before=before, after=snap(t)); db.commit()
     return t

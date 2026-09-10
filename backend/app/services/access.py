@@ -135,17 +135,25 @@ def check_readonly_write(u: User, method: str, path: str) -> None:
 RESTRICTED_API_PREFIXES = {
     # /incidents có mặt vì màn hình sự vụ lọc sẵn về đúng người đăng nhập: người ở hiện trường phải đọc
     # được sự vụ ghi cho CHÍNH MÌNH – bị ghi nhận một sự vụ mà không được xem nó là không đối chất được.
-    "xe_hdv": ("/api/v1/auth/", "/api/v1/xe-hdv/", "/api/v1/incidents"),
+    # 09/9/2026 – dọn hai dòng thừa: "/api/v1/auth/" đã có sẵn cho MỌI vai trò qua API_CHUNG, và
+    # "/api/v1/xe-hdv/" thì vai trò này đã suy được từ ma trận menu. Hàng rào so bằng startswith nên
+    # tiền tố có dấu gạch cuối chỉ là bản sao hẹp hơn của tiền tố không dấu – giữ lại chỉ làm bảng dài
+    # ra và làm bộ tra cứu ngược báo "còn dòng khai tay chưa rà".
+    "xe_hdv": ("/api/v1/incidents",),
     # GĐ điều hành đội xe: cả phân hệ đội xe và lệnh điều xe, cộng danh mục xe để chọn trong form. Không có
     # /tours, /bookings, /banks, /payroll – phạm vi công việc của ông là chiếc xe, không phải khách hàng và
     # dòng tiền công ty.
     # /nap-du-lieu và /tep có mặt vì ma trận menu ĐÃ cho vai trò này hai màn hình đó (bộ nạp nhật trình
     # chuyến xe và kho chứng từ của xe). Thiếu hai prefix này thì menu hiện ra mà bấm vào là 403 – một
     # cánh cửa vẽ trên tường còn khó chịu hơn không có cửa.
-    "gd_doi_xe": ("/api/v1/auth/", "/api/v1/fleet", "/api/v1/xe-hdv/", "/api/v1/dispatch",
+    # "/api/v1/xe-hdv" ở đây KHÔNG thừa và không được bỏ: hai vai trò gd_doi_xe và tp_hd lấy màn hình
+    # /xe-hdv từ danh sách CHO PHÉP chứ không từ ma trận menu, nên không suy ra được tiền tố ấy. Bỏ đi
+    # là họ mất cả phân hệ xe & HDV – đúng kiểu siết đúng nguyên tắc mà sai hậu quả. Chỉ bỏ dấu gạch
+    # cuối cho thống nhất; hàng rào so bằng startswith nên quyền không đổi.
+    "gd_doi_xe": ("/api/v1/fleet", "/api/v1/xe-hdv", "/api/v1/dispatch",
                   "/api/v1/vehicles", "/api/v1/nap-du-lieu", "/api/v1/tep",
                   "/api/v1/doc-chung-tu"),
-    "nv_visa": ("/api/v1/auth/", "/api/v1/visa"),
+    "nv_visa": ("/api/v1/visa",),
     # --- Ba vai trò máy (P8, 08/9/2026) ---
     # Danh sách của mỗi robot hẹp đúng bằng việc nó được giao, và HAI CHỖ TRỐNG dưới đây là chỗ trống
     # cố ý, mỗi chỗ là một điều cấm trong lệnh giao việc:
@@ -161,13 +169,13 @@ RESTRICTED_API_PREFIXES = {
     # Cả ba đều KHÔNG nằm trong FULL_ACCESS, BASE_VIEW, AUDIT_ROLES. Các cửa GHI của màn hình phân quyền
     # (đổi vai trò, khoá/mở, gán pháp nhân) liệt kê vai trò đích danh nên robot_pq đọc được mà không ghi
     # được – hàng rào tiền tố lo phần thô, chữ ký từng đường dẫn lo phần tinh.
-    "robot_pq": ("/api/v1/auth/", "/api/v1/access", "/api/v1/ai", "/api/v1/kiem-soat"),
-    "robot_vpm": ("/api/v1/auth/", "/api/v1/kiem-soat", "/api/v1/he-thong"),
+    "robot_pq": ("/api/v1/access", "/api/v1/ai", "/api/v1/kiem-soat"),
+    "robot_vpm": ("/api/v1/kiem-soat", "/api/v1/he-thong"),
     # Trưởng phòng Hướng dẫn: phần hướng dẫn, chào chuyến, bảng giá tuyến, tệp đính kèm và bộ nạp dữ
     # liệu của phòng. Không có /bookings, /tours, /payroll, /banks – ông chọn người cho chuyến, không
     # quản khách và không quản tiền công ty.
-    "tp_hd": ("/api/v1/auth/", "/api/v1/huong-dan", "/api/v1/guide-assignments", "/api/v1/guide-rates",
-              "/api/v1/incidents", "/api/v1/tep", "/api/v1/nap-du-lieu", "/api/v1/xe-hdv/"),
+    "tp_hd": ("/api/v1/huong-dan", "/api/v1/guide-assignments", "/api/v1/guide-rates",
+              "/api/v1/incidents", "/api/v1/tep", "/api/v1/nap-du-lieu", "/api/v1/xe-hdv"),
 }
 
 
@@ -264,6 +272,19 @@ MAN_HINH_API = {
     # Đầu NHẬN (/tong-dai/cuoc-goi/<chuỗi bí mật>) KHÔNG đi qua hàng rào này – tổng đài không có phiên
     # đăng nhập của VTOS, khoá của nó là chuỗi bí mật trong đường dẫn.
     "/kiem-soat": ("/api/v1/kiem-soat", "/api/v1/tong-dai"),
+    # Bàn quyết cột tiền K1/K2 – phạm vi API HẸP: chỉ nhánh /cot-tien và /the (để giao diện biết vẽ
+    # thẻ nào). KHÔNG gồm kết quả quét, chấm điểm phòng ban hay hậu kiểm số nhập tay.
+    "/ra-soat-cot-tien": ("/api/v1/ra-soat-cot-tien",),
+    "/bang-gia": ("/api/v1/ban-hang",),
+    "/bao-gia": ("/api/v1/ban-hang",),
+    "/hop-dong-khach": ("/api/v1/ban-hang",),
+    # V11 – Lịch tự động hóa. Phạm vi API HẸP: chỉ nhánh /tu-dong. Màn hình này chỉ đọc trạng thái
+    # tác vụ; nó không cần chạm vào bất kỳ số liệu nghiệp vụ nào.
+    "/tu-dong-hoa": ("/api/v1/tu-dong",),
+    # Báo cáo tự động theo phòng ban. Phạm vi API hẹp: chỉ nhánh /bao-cao. Ai xem được BÁO CÁO NÀO
+    # thì máy chủ quyết theo vai trò (bao_cao_phong.pham_vi_duoc_xem), không quyết ở cửa màn hình –
+    # cửa màn hình chỉ có hai trạng thái mở/đóng, mà ở đây cần "mở đúng phần của mình".
+    "/bao-cao": ("/api/v1/bao-cao",),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
@@ -483,7 +504,41 @@ MENU_ROLES = {
     # nên Kế toán mở được màn hình mà KHÔNG đọc được phát hiện, điểm hay báo cáo. Phép thử
     # test_ketoan_ra_soat_duoc_nhung_khong_doc_duoc_giam_sat canh đúng chỗ đó – canh ở lớp API, không
     # canh ở dòng menu này, vì dòng menu không phải chỗ điều đó được bảo đảm.
-    "/kiem-soat": BASE_VIEW + ("ketoan", "cntt"),
+    # Chủ tịch quyết 08/9/2026: KẾ TOÁN KHÔNG XEM MÀN HÌNH KIỂM SOÁT.
+    #
+    # Chặn ở tầng API vẫn giữ nguyên và vẫn là lớp thật (Kế toán gọi /api/v1/kiem-soat nhận 403).
+    # Nhưng để mục menu ở đó rồi chặn từng đường dẫn là vẽ một cánh cửa mở ra chỉ để đóng lại – và
+    # người dùng đọc cái MENU, không đọc bảng phân quyền.
+    #
+    # Kế toán trưởng vẫn là người QUYẾT một cột có phải tiền hay không (ks_ra_soat.QUYET). Việc đó
+    # sang màn hình riêng dưới nhóm Tài chính & Kế toán: người bị chấm điểm không ngồi cùng bàn với
+    # bảng chấm điểm, nhưng vẫn phải có bàn của mình.
+    "/kiem-soat": BASE_VIEW + ("cntt",),
+    "/ra-soat-cot-tien": BASE_VIEW + ("ketoan", "cntt"),
+    # V11 – "cái gì đang tự chạy" là câu hỏi của cả công ty, không riêng CNTT: một tác vụ im ba ngày
+    # thì người phát hiện sớm nhất thường là phòng đang chờ số liệu đó. Nên XEM rộng. Khai báo tác vụ
+    # thì hẹp, và chỗ chặn đó nằm ở API (tuple KHAI trong api/v1/tu_dong.py), không ở cửa màn hình.
+    "/tu-dong-hoa": BASE_VIEW + ("cntt", "ketoan", "hcns", "tp_dh", "nv_dh", "gd_doi_xe",
+                                 "tp_hd", "gd_kd", "tp_kd", "ptgd_mkt"),
+    # CHỈ mở cho vai trò CÓ ít nhất một báo cáo. Vai trò không có báo cáo nào thì không thấy mục
+    # menu này luôn – tốt hơn là thấy mục menu rồi bấm vào nhận thông báo "không có gì cho anh/chị",
+    # vì mục menu chết làm người ta bấm lại mỗi tuần để xem đã có chưa.
+    # Danh sách này phải khớp với bao_cao_phong.PHONG[*]["xem"]; lệch thì có vai trò mở được màn hình
+    # mà không có báo cáo nào, hoặc ngược lại – có bộ kiểm canh chỗ đó.
+    # CNTT KHÔNG có trong danh sách này, khác với hầu hết màn hình khác. Báo cáo ở đây là hiệu quả
+    # kinh doanh của từng phòng, không phải tình trạng kỹ thuật; và quyết định của Chủ tịch nói rõ
+    # người xem là trưởng phòng / giám đốc phòng đó và Ban lãnh đạo. Mở thêm cho CNTT "để hỗ trợ" là
+    # cách một danh sách người xem lặng lẽ dài ra cho tới lúc không còn nghĩa gì.
+    "/bao-cao": BASE_VIEW + ("tp_dh", "ptgd_doan", "gd_kd", "tp_kd", "ptgd_mkt", "gd_doi_xe",
+                             "tp_hd", "ketoan", "hcns", "nv_visa"),
+    # V6 – chuỗi bán hàng. Bảng giá là CHÍNH SÁCH nên hẹp hơn báo giá: từng sale soạn báo giá
+    # được, nhưng đặt giá niêm yết thì không.
+    "/bang-gia": BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt", "ketoan", "cntt"),
+    "/bao-gia": BASE_VIEW + ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "ptgd_mkt", "nv_mkt",
+                             "tp_dh", "nv_dh", "ptgd_doan", "ketoan", "cntt"),
+    # Hợp đồng là căn cứ ghi nhận doanh thu nên Kế toán phải xem được.
+    "/hop-dong-khach": BASE_VIEW + ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "ptgd_mkt",
+                                    "ketoan", "cntt"),
     # Bảng quy ước hạch toán + cổng chặn giá vốn. Điều hành (tp_dh) xem được vì hàng đợi thiếu giá vốn
     # đứng tên phòng họ – bắt một phòng trả lời mà không cho họ nhìn thấy việc là cách chắc chắn để không ai trả lời.
     # Kết sổ một kỳ: sao kê vào sổ hàng loạt, kết chuyển, và trạng thái cả kỳ. Chỉ Kế toán GHI –

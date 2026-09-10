@@ -211,46 +211,59 @@ def test_vi_tri_kiem_soat_khai_dung_bang_quyen_ai():
 
 
 def test_menu_kiem_soat_theo_dung_ma_tran():
-    """Ai mở được tiền tố /kiem-soat, và ai mở được BÀN LÀM VIỆC GIÁM SÁT – hai câu hỏi khác nhau.
+    """Phòng ban không có mặt ở bàn làm việc giám sát.
 
-    Hai nhánh đợt 2 sửa phép thử này theo hai hướng, và cả hai đều đúng một nửa. Gộp lại thì sự thật
-    đầy đủ là: hai thứ khác nhau đang nằm chung một tiền tố đường dẫn.
-
-      · Bàn làm việc giám sát – phát hiện, điểm phòng ban, báo cáo. Nguyên tắc 07/9: phòng ban không
-        đọc kết quả giám sát chính mình. Kế toán KHÔNG có ở đây.
-      · Rà soát kỹ thuật K1/K2 – một cột là tiền hay không, sửa hay giữ. Đây là phán đoán KẾ TOÁN, và
-        chính robot Kiểm soát chỉ định Kế toán trưởng làm người quyết.
-
-    Hàng rào phạm vi chỉ phân biệt tới mức TIỀN TỐ, nên muốn Kế toán làm được việc thứ hai thì buộc
-    phải cho họ chạm tiền tố – tức là phải có mặt trong dòng menu. Ranh giới thật nằm ở chữ ký từng
-    đường dẫn, và phép thử dưới đây canh ở đúng đó chứ không canh ở dòng menu.
+    GỘP 08/9/2026: bản trên nhánh main ghi ngược lại – "Kế toán có mặt trong menu /kiem-soat" – với
+    lý do rằng hàng rào phạm vi chỉ phân biệt tới mức tiền tố nên muốn Kế toán quyết cột tiền thì
+    buộc phải cho họ chạm tiền tố. Lý do ấy ĐÚNG với mã lúc đó, và đã hết đúng: bàn K1/K2 nay có địa
+    chỉ riêng /api/v1/ra-soat-cot-tien, nên hàng rào thô vẫn đủ mà Kế toán không phải vào màn hình
+    Kiểm soát. Chủ tịch quyết 08/9: Kế toán KHÔNG xem màn hình Kiểm soát – bản này theo quyết định đó.
     """
     from app.services.access import MENU_ROLES
     from app.api.v1 import ks_ra_soat as KR
     assert "/kiem-soat" in MENU_ROLES
-    for vai in ("chutich", "tgd", "bks", "cntt", "ketoan"):
-        assert vai in MENU_ROLES["/kiem-soat"]
+    for vai in ("chutich", "tgd", "bks", "cntt"): assert vai in MENU_ROLES["/kiem-soat"]
     for vai in ("nv_kd", "hcns", "tp_dh", "gd_kd", "ptgd_doan", "nv_dh"):
         assert vai not in MENU_ROLES["/kiem-soat"], f"{vai} không được vào bàn làm việc giám sát"
-    # Ban Kiểm soát KHÔNG có trong danh sách quyết: robot không tự chốt xếp loại do chính nó đề xuất.
-    assert "ketoan" in KR.QUYET and "bks" not in KR.QUYET
+    # Chủ tịch quyết 08/9/2026: KẾ TOÁN KHÔNG XEM MÀN HÌNH KIỂM SOÁT.
+    #
+    # Chặn ở API (phép thử dưới) là lớp thật và vẫn giữ nguyên. Nhưng để mục menu ở đó rồi chặn từng
+    # đường dẫn là vẽ một cánh cửa mở ra chỉ để đóng lại – và người dùng đọc cái menu, không đọc bảng
+    # phân quyền. Bàn quyết cột tiền K1/K2 sang màn hình riêng dưới nhóm Tài chính & Kế toán.
+    assert "ketoan" not in MENU_ROLES["/kiem-soat"]
+    assert "ketoan" in MENU_ROLES["/ra-soat-cot-tien"]
+    # Ban Kiểm soát XEM được bàn này – đó là việc của giám sát. Điều bị cấm là QUYẾT, và chỗ cấm nằm
+    # ở chữ ký endpoint chứ không ở dòng menu: robot không tự chốt xếp loại do chính nó đề xuất.
+    assert "bks" in MENU_ROLES["/ra-soat-cot-tien"]
+    assert "bks" not in KR.QUYET and "ketoan" in KR.QUYET
 
 
 def test_ketoan_ra_soat_duoc_nhung_khong_doc_duoc_giam_sat():
-    """Nguyên tắc 07/9 – phòng ban không đọc kết quả giám sát chính mình – được bảo đảm ở lớp API,
-    KHÔNG ở dòng menu.
+    """Nguyên tắc 07/9 – phòng ban không đọc kết quả giám sát chính mình – được bảo đảm ở lớp API.
 
-    Phép thử cũ canh điều này ở dòng menu, tức là canh ở chỗ nó KHÔNG được bảo đảm. Nay canh ở đúng
-    lớp: Kế toán rà soát được cột tiền, và KHÔNG đọc được phát hiện, điểm hay báo cáo.
+    Trước 08/9 hai thứ khác nhau nằm chung một tiền tố: bàn làm việc giám sát (phát hiện, điểm phòng
+    ban, báo cáo) và rà soát K1/K2 (một cột là tiền hay không). Việc thứ hai là phán đoán KẾ TOÁN, nên
+    Kế toán buộc phải chạm tiền tố "/api/v1/kiem-soat" – hàng rào phạm vi chỉ phân biệt tới mức tiền
+    tố, nó không diễn tả được "chạm một nhánh con thôi".
+
+    Chủ tịch quyết ngày 08/9/2026: Kế toán KHÔNG xem màn hình Kiểm soát. Cách làm đúng không phải là
+    siết hàng rào cho tinh vi hơn, mà là cho bàn K1/K2 một ĐỊA CHỈ RIÊNG – "/api/v1/ra-soat-cot-tien".
+    Khi đó hàng rào thô vẫn đủ, và câu quyết của Chủ tịch đọc thẳng ra được từ bảng phạm vi.
     """
     h = login("ketoan")
-    assert client.get("/api/v1/kiem-soat/cot-tien", headers=h).status_code == 200
-    assert client.get("/api/v1/kiem-soat", headers=h).status_code == 403, \
-        "Kế toán đọc được bàn làm việc giám sát – phòng ban đang đọc kết quả giám sát chính mình"
+    assert client.get("/api/v1/ra-soat-cot-tien", headers=h).status_code == 200
+    for duong in ("/api/v1/kiem-soat", "/api/v1/kiem-soat/cot-tien", "/api/v1/kiem-soat/the"):
+        assert client.get(duong, headers=h).status_code == 403, \
+            f"Kế toán còn chạm được {duong} – Chủ tịch đã quyết là không"
     assert client.post("/api/v1/kiem-soat/cham-diem", headers=h).status_code == 403
-    # và giao diện phải biết điều đó để không vẽ thẻ bấm vào là 403
-    r = client.get("/api/v1/kiem-soat/the", headers=h)
-    assert r.status_code == 200 and r.json()["the"] == ["ra_soat"], r.text
+
+
+def test_dia_chi_cu_van_song_cho_lanh_dao_va_robot():
+    """Đổi địa chỉ mà bỏ địa chỉ cũ thì màn hình Kiểm soát của Chủ tịch gãy. Hai địa chỉ cùng trỏ vào
+    một hàm, khác nhau ở chỗ ai đi vào được."""
+    for vai in ("chutich", "cntt", "bks"):
+        assert client.get("/api/v1/kiem-soat/cot-tien", headers=login(vai)).status_code == 200, vai
+        assert client.get("/api/v1/ra-soat-cot-tien", headers=login(vai)).status_code == 200, vai
 
 
 def test_lanh_dao_va_robot_mo_duoc_ca_bon_the():

@@ -133,6 +133,16 @@ def test_mo_hinh_va_ban_nang_cap_khong_duoc_lech_nhau():
     # kiểu báo động sai làm người ta mất tin vào phép thử.
     trong_mig |= {("tour_cost_lines", c) for c, k in d5.COT
                   if isinstance(k, Numeric) and not isinstance(k, Float)}
+    # Cùng lý lẽ, cho bốn bảng V6 của chuỗi bán hàng (nhánh Đợt 2): chúng dựng SAU đợt V9 nên sinh ra
+    # đã là kiểu tiền, chưa từng đi qua giai đoạn số thực nhị phân. Khai từng cột chứ không nới phép
+    # thử thành "bỏ qua bảng mới" – nới thế là làm nó luôn xanh, tức là bỏ luôn điều duy nhất nó canh.
+    trong_mig |= {
+        ("bang_gia_dong", "gia_ban"), ("bang_gia_dong", "gia_von"),
+        ("bao_gia_dong", "don_gia"), ("bao_gia_dong", "gia_von_don_vi"),
+        ("bao_gia_dong", "chiet_khau"),
+        ("bao_gia_ban", "tong_ban"), ("bao_gia_ban", "tong_von"),
+        ("hop_dong_khach", "gia_tri"), ("hop_dong_khach", "dat_coc"),
+    }
     trong_mo_hinh = {(t.name, c.name) for t in Base.metadata.tables.values() for c in t.columns
                      if isinstance(c.type, Numeric) and not isinstance(c.type, Float)}
     assert trong_mig == trong_mo_hinh, {

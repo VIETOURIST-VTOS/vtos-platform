@@ -120,7 +120,30 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 #   +1 nv_kd/tn_kd/tp_kd  /api/v1/visa  – sales phụ trách mở được hồ sơ visa của khách MÌNH (1259841).
 #
 # Ba vai trò máy (P8) vào bảng ngay từ lần đầu: chốt sớm thì mọi lần nới sau đều phải giải thích.
+#
+# ĐO LẠI 08/9/2026 khi gộp main vào nhánh Đợt 2. Ba nhóm thay đổi, mỗi nhóm một lý do, và không vai
+# trò nào đổi mà không thuộc một trong ba nhóm này:
+#
+#   +2  chutich, tgd, bks, cntt      – "/api/v1/ban-hang" (V6: bảng giá, báo giá, hợp đồng khách)
+#                                       và "/api/v1/ra-soat-cot-tien" (bàn K1/K2 tách ra địa chỉ riêng)
+#   +1  chín vai trò kinh doanh và điều hành – chỉ "/api/v1/ban-hang"
+#   +1  ketoan                       – được "/api/v1/ban-hang" và "/api/v1/ra-soat-cot-tien", ĐỒNG THỜI
+#                                       MẤT "/api/v1/kiem-soat" theo quyết định của Chủ tịch 08/9.
+#                                       Hai thêm một bớt, không phải một lần nới.
+#   +0  chín vai trò còn lại         – không ai trong số này liên quan tới bán hàng.
+#
+# SIẾT 09/9/2026 – sáu dòng khai tay THỪA bị bỏ, sáu vai trò giảm 1–2 nhóm mà KHÔNG mất quyền nào:
+#   "/api/v1/auth/" ở 5 vai trò – mọi vai trò đã có "/api/v1/auth" qua API_CHUNG
+#   "/api/v1/xe-hdv/" ở xe_hdv   – vai trò này đã suy được tiền tố ấy từ ma trận menu
+# Hàng rào so bằng startswith nên tiền tố có dấu gạch cuối chỉ là bản sao hẹp hơn. Với gd_doi_xe và
+# tp_hd thì dòng "/api/v1/xe-hdv" KHÔNG thừa – hai vai trò ấy lấy màn hình từ danh sách CHO PHÉP nên
+# không suy ra được, bỏ đi là họ mất cả phân hệ xe & HDV.
+#
+# Hai lần đổi trên TRỰC GIAO nhau (một bên thêm phân hệ, một bên bỏ dòng thừa) nên con số dưới đây
+# được ĐẾM LẠI TỪ MÃ, không phải cộng trừ tay hai bảng cũ.
 PHAM_VI_DA_CHOT = {
+    # ĐẾM LẠI TỪ MÃ ĐÃ HỢP NHẤT 10/9/2026 (gộp Đợt 2 + Lãi lỗ theo tour). Không cộng trừ tay hai bảng:
+    # bảng này là kết quả gọi AC.pham_vi_day_du() trên chính mã trong lần gộp này.
     # +1 cho sáu vai trò ngày 09/9/2026 – nhóm "/api/v1/tong-dai" gắn vào màn hình /kiem-soat: nhật ký
     # NGUYÊN VĂN sự kiện tổng đài (P.A Việt Nam không công bố đặc tả webhook, nên VTOS nghe trước rồi mới
     # diễn giải). Cố ý KHÔNG gắn vào /inbox dù cuộc gọi rồi sẽ hiện ở hộp thư: gắn ở đó là mở tiền tố cho
@@ -134,20 +157,23 @@ PHAM_VI_DA_CHOT = {
     # lãi lỗ tour là số quản trị, bên trong nó là GIÁ VỐN của chuyến. Sale cần doanh thu và công nợ
     # của booking mình phụ trách – hai thứ ấy họ đã có ở màn hình bán hàng. Cho thêm giá vốn chuyến là
     # nới quyền vượt quá việc, và một khi đã nới thì không ai thu lại nữa.
-    "chutich": 98, "tgd": 98, "bks": 98, "cntt": 96,
-    "ketoan": 82, "tp_dh": 78, "ptgd_doan": 58, "nv_dh": 54, "hcns": 52, "gd_kd": 51,
+    # ĐẾM LẠI LẦN HAI khi gộp nhánh Đợt 2 vào (09/9/2026 tối). Nhánh ấy thêm ba màn hình có phạm vi
+    # API riêng – /tu-dong-hoa (Lịch tự động hóa), /bao-cao (Báo cáo tự động theo phòng), và ba màn
+    # hình V6 của chuỗi bán hàng. Bảng này lại được đếm từ mã đã hợp nhất, không cộng trừ tay.
+    "chutich": 102, "tgd": 102, "bks": 102, "cntt": 99,
+    "ketoan": 84, "tp_dh": 81, "ptgd_doan": 60, "nv_dh": 56, "hcns": 54, "gd_kd": 54,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 39, "nv_kd": 39, "tn_kd": 39, "tp_kd": 39, "nv_mkt": 30,
-    "gd_doi_xe": 24, "hanh_chinh": 24, "tp_hd": 22, "xe_hdv": 17, "nv_visa": 17,
+    "ptgd_mkt": 42, "nv_kd": 40, "tn_kd": 40, "tp_kd": 42, "nv_mkt": 31,
+    "gd_doi_xe": 25, "hanh_chinh": 24, "tp_hd": 23, "xe_hdv": 15, "nv_visa": 17,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 98, "robot_vpm": 17,
+    "robot_pq": 17, "robot_ks": 102, "robot_vpm": 16,
 }
 
 

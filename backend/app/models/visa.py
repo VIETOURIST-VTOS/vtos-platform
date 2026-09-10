@@ -97,6 +97,8 @@ class VisaFamilyGroup(Base):
 class VisaCase(Base):
     """Hồ sơ Visa của MỘT đương đơn."""
     __tablename__ = "visa_cases"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
     # Tiền tố HSV để không lẫn với mã "VS…" của bảng visa_files (quỹ visa – phân hệ Nhân sự).
     case_code: Mapped[str] = mapped_column(String(30), unique=True, index=True)   # mã hiển thị, không đổi khi đổi chuyến

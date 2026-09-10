@@ -112,9 +112,9 @@ def test_kt4_robot_khong_duoc_quyet_xep_loai():
     # thử này gác quyền QUYẾT chứ không gác việc còn hay hết cột hỏng.
     d = so(); i = d["rows"][0]["id"]
     than = {"dong": [{"id": i, "quyet_nguoi": "tien"}]}
-    assert client.post("/api/v1/kiem-soat/cot-tien/quyet", json=than, headers=login("bks")).status_code == 403, \
+    assert client.post("/api/v1/ra-soat-cot-tien/quyet", json=than, headers=login("bks")).status_code == 403, \
         "robot vừa xếp loại vừa chốt xếp loại thì con số nó báo lên Chủ tịch là con số nó tự đặt ra"
-    assert client.post("/api/v1/kiem-soat/cot-tien/quyet", json=than, headers=login("ketoan")).status_code == 200
+    assert client.post("/api/v1/ra-soat-cot-tien/quyet", json=than, headers=login("ketoan")).status_code == 200
 
 
 def test_kt5_quyet_cua_nguoi_de_len_de_xuat_cua_may():
@@ -124,7 +124,7 @@ def test_kt5_quyet_cua_nguoi_de_len_de_xuat_cua_may():
     chua = [r for r in d["rows"] if not r["quyet_nguoi"] and r["xep_may"] == "tien"]
     assert chua, "không còn cột nào chưa ai quyết thì phép thử này không nói lên điều gì"
     i = chua[0]["id"]; ten = f"{chua[0]['bang']}.{chua[0]['cot']}"
-    r = client.post("/api/v1/kiem-soat/cot-tien/quyet",
+    r = client.post("/api/v1/ra-soat-cot-tien/quyet",
                     json={"dong": [{"id": i, "quyet_nguoi": "khong_tien", "ghi_chu": "thử: người quyết khác máy"}]},
                     headers=login("ketoan"))
     assert r.status_code == 200 and r.json()["da_xep_loai"] == 1
@@ -134,11 +134,11 @@ def test_kt5_quyet_cua_nguoi_de_len_de_xuat_cua_may():
     con = {f"{x['bang']}.{x['cot']}": x for x in sau["rows"]}
     assert con[ten]["xep_may"] == "tien" and con[ten]["xep"] == "khong_tien"
     # "chưa rõ" là trạng thái CHỜ, không phải một quyết định
-    assert client.post("/api/v1/kiem-soat/cot-tien/quyet",
+    assert client.post("/api/v1/ra-soat-cot-tien/quyet",
                        json={"dong": [{"id": i, "quyet_nguoi": "chua_ro"}]},
                        headers=login("ketoan")).status_code == 422
     # trả lại như cũ để phép thử sau không lệch
-    client.post("/api/v1/kiem-soat/cot-tien/quyet",
+    client.post("/api/v1/ra-soat-cot-tien/quyet",
                 json={"dong": [{"id": i, "quyet_nguoi": "tien", "ghi_chu": ""}]}, headers=login("ketoan"))
 
 
@@ -168,9 +168,9 @@ def test_kt6_thieu_khac_0_chi_tinh_cot_tien_va_giu_thi_phai_co_ly_do():
     db.commit(); i = r0.id; db.close()
 
     # giữ nguyên mà không nói vì sao thì lần rà sau không ai biết đã cân nhắc chưa
-    assert client.post("/api/v1/kiem-soat/cot-tien/quyet", json={"dong": [{"id": i, "quyet_k2": "giu"}]},
+    assert client.post("/api/v1/ra-soat-cot-tien/quyet", json={"dong": [{"id": i, "quyet_k2": "giu"}]},
                        headers=login("ketoan")).status_code == 422
-    r = client.post("/api/v1/kiem-soat/cot-tien/quyet",
+    r = client.post("/api/v1/ra-soat-cot-tien/quyet",
                     json={"dong": [{"id": i, "quyet_k2": "giu", "ghi_chu": "0 ở cột này là chiết khấu bằng 0, là số thật"}]},
                     headers=login("ketoan"))
     assert r.status_code == 200

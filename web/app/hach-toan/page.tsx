@@ -28,6 +28,11 @@ function HachToanPage() {
   const [loi, setLoi] = useState("");
   const [dangChay, setDangChay] = useState("");
   const [trangThai, setTrangThai] = useState("cho");
+  // Trình quy ước mới. KHÔNG có nút "sửa tại chỗ": một dòng định khoản đang chạy mà sửa được thì
+  // bút toán tháng trước và bút toán tháng này cùng mang một mã nhưng khác nội dung, và kiểm toán
+  // không dựng lại được. Sửa ở đây nghĩa là TRÌNH MỘT BẢN MỚI có ngày hiệu lực sau – bản cũ ở lại
+  // nguyên vẹn để giải thích những gì đã ghi bằng nó.
+  const [bieu, setBieu] = useState<any>(null);
 
   const load = useCallback(() => {
     api("/hach-toan").then(setD).catch((e) => setLoi(errMsg(e)));
@@ -43,6 +48,35 @@ function HachToanPage() {
     try {
       const r = await api<any>(`/hach-toan/${path}`, { method: "POST", json });
       toast(r.message || "Xong"); load(); loadQ();
+    } catch (e) { toast(errMsg(e), true); } finally { setDangChay(""); }
+  };
+
+  const RONG = { ma: "", ten: "", nguon: "", tk_no: "", tk_co: "", tk_thue: "", ben_thue: "",
+                 ty_le_thue: 0, doi_tuong: "", can_cong_trinh: false, dien_giai: "", uu_tien: 100,
+                 can_cu: "", ghi_chu: "", effective_from: "", dieu_kien_json: "{}" };
+
+  const moBieu = (r?: any) => setBieu(r
+    ? { ...RONG, ...r, effective_from: "", ty_le_thue: r.ty_le_thue || 0,
+        dieu_kien_json: JSON.stringify(r.dieu_kien || {}, null, 0) }
+    : { ...RONG });
+
+  const trinh = async () => {
+    let dieu_kien: any = {};
+    try { dieu_kien = JSON.parse(bieu.dieu_kien_json || "{}"); }
+    catch { toast("Điều kiện không đúng dạng JSON", true); return; }
+    if (!bieu.ma.trim() || !bieu.tk_no.trim() || !bieu.tk_co.trim() || !bieu.effective_from) {
+      toast("Thiếu mã, tài khoản Nợ/Có, hoặc ngày hiệu lực", true); return;
+    }
+    setDangChay("quy-tac");
+    try {
+      const r = await api<any>("/hach-toan/quy-tac", { method: "POST", json: {
+        ma: bieu.ma.trim(), ten: bieu.ten, nguon: bieu.nguon, dieu_kien,
+        tk_no: bieu.tk_no.trim(), tk_co: bieu.tk_co.trim(), tk_thue: bieu.tk_thue.trim(),
+        ben_thue: bieu.ben_thue, ty_le_thue: Number(bieu.ty_le_thue) || 0,
+        doi_tuong: bieu.doi_tuong, can_cong_trinh: !!bieu.can_cong_trinh,
+        dien_giai: bieu.dien_giai, uu_tien: Number(bieu.uu_tien) || 100,
+        can_cu: bieu.can_cu, ghi_chu: bieu.ghi_chu, effective_from: bieu.effective_from } });
+      toast(r.message || "Đã trình"); setBieu(null); load();
     } catch (e) { toast(errMsg(e), true); } finally { setDangChay(""); }
   };
 
@@ -90,6 +124,82 @@ function HachToanPage() {
       {/* ---------------- Bảng quy ước ---------------- */}
       {tab === "quy_tac" && (
         <>
+          {laKeToan && (
+            <div style={{ margin: "10px 0" }}>
+              <button onClick={() => moBieu()} disabled={!!dangChay}>Trình quy ước mới</button>
+              {bieu && <button className="" style={{ marginLeft: 8 }} onClick={() => setBieu(null)}>Đóng biểu</button>}
+            </div>
+          )}
+
+          {bieu && (
+            <div className="gate" style={{ marginBottom: 12 }}>
+              <h3 style={{ marginTop: 0 }}>Trình một bản quy ước</h3>
+              <p className="muted" style={{ fontSize: 13 }}>
+                Trình xong <b>chưa chạy</b>: phải đủ chữ ký Chủ tịch và TGĐ. Trùng mã với một quy ước
+                đang chạy là <b>bình thường</b> — đó chính là cách sửa: bản mới có ngày hiệu lực sau,
+                bản cũ ở lại nguyên vẹn để giải thích những bút toán đã ghi bằng nó.
+              </p>
+              <div className="grid2">
+                <label>Mã <input value={bieu.ma} onChange={(e) => setBieu({ ...bieu, ma: e.target.value })}
+                                 placeholder="TOUR_DOANH_THU" /></label>
+                <label>Tên / khi nào áp dụng
+                  <input value={bieu.ten} onChange={(e) => setBieu({ ...bieu, ten: e.target.value })} /></label>
+                <label>Nguồn nghiệp vụ
+                  <select value={bieu.nguon} onChange={(e) => setBieu({ ...bieu, nguon: e.target.value })}>
+                    <option value="">— chọn —</option>
+                    {Object.entries(d?.nguon || {}).map(([k, t]: any) => <option key={k} value={k}>{t}</option>)}
+                  </select></label>
+                <label>Tài khoản Nợ
+                  <input value={bieu.tk_no} onChange={(e) => setBieu({ ...bieu, tk_no: e.target.value })} /></label>
+                <label>Tài khoản Có
+                  <input value={bieu.tk_co} onChange={(e) => setBieu({ ...bieu, tk_co: e.target.value })} /></label>
+                <label>Tài khoản thuế
+                  <input value={bieu.tk_thue} onChange={(e) => setBieu({ ...bieu, tk_thue: e.target.value })}
+                         placeholder="để trống nếu không tách thuế" /></label>
+                <label>Thuế ghi bên
+                  <select value={bieu.ben_thue} onChange={(e) => setBieu({ ...bieu, ben_thue: e.target.value })}>
+                    <option value="">—</option><option value="no">Nợ</option><option value="co">Có</option>
+                  </select></label>
+                <label>Tỷ lệ thuế (0.08 = 8%)
+                  <input type="number" step="0.01" value={bieu.ty_le_thue}
+                         onChange={(e) => setBieu({ ...bieu, ty_le_thue: e.target.value })} /></label>
+                <label>Đối tượng
+                  <select value={bieu.doi_tuong} onChange={(e) => setBieu({ ...bieu, doi_tuong: e.target.value })}>
+                    <option value="">—</option>
+                    {Object.entries(d?.doi_tuong || {}).map(([k, t]: any) => <option key={k} value={k}>{t}</option>)}
+                  </select></label>
+                <label>Thứ tự xét (số nhỏ xét trước)
+                  <input type="number" value={bieu.uu_tien}
+                         onChange={(e) => setBieu({ ...bieu, uu_tien: e.target.value })} /></label>
+                <label>Ngày hiệu lực
+                  <input type="date" value={bieu.effective_from}
+                         onChange={(e) => setBieu({ ...bieu, effective_from: e.target.value })} /></label>
+                <label>Căn cứ (điều khoản TT99 / quyết định nội bộ)
+                  <input value={bieu.can_cu} onChange={(e) => setBieu({ ...bieu, can_cu: e.target.value })} /></label>
+                <label>Mẫu diễn giải
+                  <input value={bieu.dien_giai} onChange={(e) => setBieu({ ...bieu, dien_giai: e.target.value })}
+                         placeholder="Doanh thu tour {ma} – {khach}" /></label>
+                <label>Điều kiện (JSON)
+                  <input value={bieu.dieu_kien_json}
+                         onChange={(e) => setBieu({ ...bieu, dieu_kien_json: e.target.value })}
+                         placeholder='{"ma_bat_dau": ["KLE"]}' /></label>
+              </div>
+              <label style={{ marginTop: 8 }}>
+                <input type="checkbox" style={{ width: "auto", marginRight: 6 }}
+                       checked={!!bieu.can_cong_trinh}
+                       onChange={(e) => setBieu({ ...bieu, can_cong_trinh: e.target.checked })} />
+                Bắt buộc có mã đơn / mã tour thì mới ghi được
+              </label>
+              <label>Ghi chú
+                <textarea value={bieu.ghi_chu} rows={2}
+                          onChange={(e) => setBieu({ ...bieu, ghi_chu: e.target.value })} /></label>
+              <div style={{ marginTop: 10 }}>
+                <button disabled={!!dangChay} onClick={trinh}>
+                  {dangChay === "quy-tac" ? "Đang trình…" : "Trình – chờ hai chữ ký"}</button>
+              </div>
+            </div>
+          )}
+
           {kyDuoc && choKy.length > 0 && (
             <div className="gate fail" style={{ marginBottom: 10 }}>
               {choKy.length} quy ước đang chờ chữ ký. Quy ước chưa đủ hai chữ ký thì <b>chưa chạy</b> –
@@ -103,7 +213,7 @@ function HachToanPage() {
                 <table>
                   <thead><tr>
                     <th>Mã</th><th>Khi nào áp dụng</th><th>Nợ</th><th>Có</th><th>Thuế</th>
-                    <th>Đối tượng</th><th>Hiệu lực</th><th>Trạng thái</th>{kyDuoc && <th></th>}
+                    <th>Đối tượng</th><th>Hiệu lực</th><th>Trạng thái</th>{(kyDuoc || laKeToan) && <th></th>}
                   </tr></thead>
                   <tbody>
                     {nhomNguon[k].map((r: any) => (
@@ -124,11 +234,14 @@ function HachToanPage() {
                               {r.signed_chutich ? " (CT ✓)" : ""}{r.signed_tgd ? " (TGĐ ✓)" : ""}</Tag>
                               : <Tag>{r.status}</Tag>}
                         </td>
-                        {kyDuoc && <td>
-                          {r.status === "pending" && r.proposed_by !== user?.username &&
+                        {(kyDuoc || laKeToan) && <td>
+                          {kyDuoc && r.status === "pending" && r.proposed_by !== user?.username &&
                             !(vai === "chutich" ? r.signed_chutich : r.signed_tgd) && (
                             <button disabled={!!dangChay}
                               onClick={() => goi(`quy-tac/${r.id}/ky`)}>Ký</button>
+                          )}
+                          {laKeToan && r.status === "active" && (
+                            <button disabled={!!dangChay} onClick={() => moBieu(r)}>Trình bản mới</button>
                           )}
                         </td>}
                       </tr>

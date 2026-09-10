@@ -44,6 +44,7 @@ CUA_TAY = (
     "params", "partners", "payment_requests", "payroll_runs", "period_locks", "products",
     "projects", "quy_tac_hach_toan", "receipts", "retentions", "service_orders", "service_requests",
     "supplier_bank_changes", "suppliers", "thieu_gia_von", "tour_cost_lines", "tour_events",
+    "tac_vu_tu_dong",
     "tours", "user_grants", "users", "vehicle_documents", "vehicle_plates", "vehicle_rates",
     "vehicles", "visa_access_links", "visa_ai_suggestions", "visa_applications",
     "visa_appointments", "visa_cases", "visa_checklist_items", "visa_checklist_templates",
@@ -65,6 +66,15 @@ MAY_SINH = {
     "ngoai_le_xu_ly": "Ngoại lệ do bộ nạp tự đẩy ra.",
     "prepaid_allocations": "ĐÃ KIỂM LẠI 09/9: bản rà đầu tiên xếp nhầm bảng này vào 'cần cửa'. Thực tế có cửa: màn hình /tai-san, nút ghi sổ phân bổ",
     "su_kien_ky_thuat": "Sự kiện kỹ thuật – hệ thống tự ghi.",
+    # V11 – lịch tự động hóa. Sổ lần chạy do hệ thống chạy tác vụ BÁO VỀ (n8n hoặc chính vòng lặp
+    # trong VTOS), qua POST /tu-dong/bao-cao. Người không gõ tay dòng nào ở đây, và KHÔNG NÊN gõ: một
+    # dòng "đã chạy thành công" nhập tay là bằng chứng giả về một việc có thể chưa hề chạy.
+    #
+    # Ngược lại, bảng KHAI BÁO tác vụ (tac_vu_tu_dong) thì phải do người khai – nằm ở CUA_TAY, màn
+    # hình /tu-dong-hoa. Hai bảng đi cùng nhau nhưng khác hẳn về cửa, và đó chính là thiết kế của
+    # V11: máy tự khai tác vụ thì mất khả năng phát hiện tác vụ đã ngừng chạy.
+    "lan_chay_tac_vu": "Lần chạy do hệ thống chạy tác vụ báo về qua /tu-dong/bao-cao – nhập tay một "
+                       "dòng 'đã chạy thành công' là tạo bằng chứng giả về việc có thể chưa hề chạy.",
     "tong_dai_su_kien": "Nhật ký nguyên văn webhook tổng đài – tổng đài ghi vào, không ai nhập tay.",
 }
 

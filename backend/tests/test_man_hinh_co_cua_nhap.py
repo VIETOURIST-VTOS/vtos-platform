@@ -47,6 +47,11 @@ CHI_XEM = {
     "/phieu-luong": ("Phiếu lương của tôi: kỳ lương do HCNS chốt ở màn hình Lương, thưởng & hoa "
                      "hồng. Người xem phiếu không sửa được phiếu của chính mình.",
                      ("/phieu-luong/ky-cua-toi",)),
+    # Thêm 09/9/2026 cùng đợt gộp nhánh Đợt 2. Ba màn hình bị bộ kiểm này bắt, và CHỈ MỘT trong ba là
+    # chỉ-xem thật – hai cái kia là cửa còn thiếu và đã dựng cửa, không khai vòng cho qua.
+    "/bao-cao": ("Báo cáo tự động theo phòng ban: mọi con số tính TẠI CHỖ từ dữ liệu của các phân hệ "
+                 "khác, không sở hữu con số nào của riêng mình. Cửa nhập nằm ở màn hình của từng "
+                 "phòng. Màn hình này mà ghi được thì nó thôi là báo cáo.", ("/bao-cao",)),
 }
 
 

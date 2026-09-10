@@ -32,6 +32,8 @@ TRANG_THAI_DOI_TK = {"cho_xac_nhan": "Chờ người thứ hai xác nhận", "da
 
 class Supplier(Base):
     __tablename__ = "suppliers"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(30), unique=True)          # NCC0001
     ten: Mapped[str] = mapped_column(String(200))

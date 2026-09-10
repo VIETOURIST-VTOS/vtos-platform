@@ -121,6 +121,11 @@ GRANT_KINDS = {"menu": "Màn hình", "capability": "Năng lực"}
 # Năng lực cấp lẻ được cho một người, không đi kèm vai trò.
 CAPABILITIES = {
     "bang_luong": "Xem bảng lương toàn công ty",
+    # Cấp 09/9/2026 theo chỉ đạo "tất cả báo cáo về Trưởng phòng Điều hành". Cấp bằng NĂNG LỰC THEO
+    # NGƯỜI chứ không sửa vai trò tp_dh: sửa vai trò là mở cho mọi Trưởng phòng Điều hành từ nay về
+    # sau, kể cả người kế nhiệm mà chưa ai quyết định gì. Đây là quyền cấp cho MỘT NGƯỜI vì việc của
+    # người đó, nên nó phải hết hạn và phải nhìn thấy được ở màn hình ngoại lệ – y hệt bảng lương.
+    "bao_cao_moi_phong": "Xem báo cáo tự động của MỌI phòng ban và toàn công ty",
 }
 GRANT_MAX_DAYS = 90
 
@@ -208,6 +213,8 @@ class Product(Base):
     """Sản phẩm tour (tour cha) theo mẫu Vietrip: thông tin cơ bản + cơ cấu chi phí 11 khoản + dòng chi phí theo NCC (cố định / theo khách) + chương trình giá.
     Mở tour (chuyến) từ sản phẩm → dự toán 3 con số tự sinh."""
     __tablename__ = "products"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(30), unique=True)
     name: Mapped[str] = mapped_column(String(200))
@@ -259,6 +266,8 @@ class TourEvent(Base):
 
 class Tour(Base):
     __tablename__ = "tours"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(30), unique=True)
     name: Mapped[str] = mapped_column(String(200))
@@ -337,6 +346,8 @@ class ServiceRequest(Base):
 
 class Booking(Base):
     __tablename__ = "bookings"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(30), unique=True)
     tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"))

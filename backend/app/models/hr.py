@@ -15,6 +15,8 @@ SALES_GROUPS = {"KD1": "Nhóm KD 1", "KD2": "Nhóm KD 2", "KD3": "Nhóm KD 3", "
 
 class Employee(Base):
     __tablename__ = "employees"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(20), unique=True)                 # NS0001
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -93,6 +95,8 @@ class GuideAssignment(Base):
 
 class Vehicle(Base):
     __tablename__ = "vehicles"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
     plate: Mapped[str] = mapped_column(String(20), unique=True)
     seats: Mapped[int] = mapped_column(Integer, default=45)
@@ -156,6 +160,8 @@ class GuideRate(Base):
 class DispatchOrder(Base):
     """Lệnh điều xe theo lịch khởi hành (xác nhận trong 4 giờ); số ngày → công tác phí tài xế; doanh thu nội bộ Đội xe."""
     __tablename__ = "dispatch_orders"
+    # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
     tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"))
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))

@@ -46,6 +46,13 @@ class FinSchedule(Base):
     __tablename__ = "fin_schedules"
     id: Mapped[int] = mapped_column(primary_key=True)
     contract_id: Mapped[int] = mapped_column(ForeignKey("fin_contracts.id"), index=True)
+    # V12 – số KỲ trong lịch trả nợ. Để RỖNG cho dòng không thuộc lịch (giải ngân, thu hồi lẻ).
+    # Có kỳ thì đối chiếu được "dư nợ trên sổ khớp lịch trả nợ" theo từng kỳ, không chỉ theo tổng.
+    ky: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # V12 – mã đáo hạn: hai chân của một lần đảo nợ mang CÙNG một mã, và bút toán sinh ra mang
+    # source_ref "dao_han:<mã>" để cổng đáo hạn (cong_chan.CHAN_DAO_HAN) nhìn thấy cả hai.
+    # Thiếu một chân là ngoại lệ – đó chính là điều cổng ấy canh.
+    ma_dao_han: Mapped[str] = mapped_column(String(40), default="", index=True)
     due_date: Mapped[date] = mapped_column(Date, index=True)
     kind: Mapped[str] = mapped_column(String(20))                           # tra_goc / tra_lai / thu_hoi / giai_ngan / nhan_vay
     amount: Mapped[float] = mapped_column(TIEN)

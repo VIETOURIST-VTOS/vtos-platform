@@ -105,14 +105,24 @@ def test_mt6_da_noi_vao_vong_quet_cua_robot():
 
 
 def test_mt7_kiem_soat_khai_dung_nguoi_quyet_k1_k2():
-    """07/9 nói Kế toán không xem màn hình Kiểm soát; K1/K2 lại đặt Kế toán trưởng làm người quyết một
-    cột là tiền hay không. Để lửng thì bàn làm việc mở ra mà mọi nút bấm đều 403. Đã chốt: Kế toán XEM
-    được, và quyền GHI vẫn nằm ở chữ ký endpoint chứ không ở menu."""
+    """08/9/2026 – Chủ tịch QUYẾT: Kế toán KHÔNG xem màn hình Kiểm soát.
+
+    Bản trước của phép thử này ghi lời thoả hiệp ngược lại ("Kế toán XEM được"), vì lúc đó bàn K1/K2
+    nằm chung tiền tố với bàn làm việc giám sát, mà hàng rào phạm vi chỉ phân biệt tới mức tiền tố –
+    cho Kế toán quyết cột tiền là đồng thời cho Kế toán đọc điểm chấm phòng ban của chính mình.
+
+    Nay bàn K1/K2 có ĐỊA CHỈ RIÊNG nên hai câu không còn phải chọn một: Kế toán quyết được cột tiền ở
+    /ra-soat-cot-tien mà không thấy màn hình Kiểm soát. Điều phép thử canh vẫn là điều cũ – người được
+    quyết phải mở được màn hình chứa nút, không thì bấm đâu cũng 403 – chỉ khác chỗ màn hình.
+    """
     from app.api.v1 import ks_ra_soat as KR
-    assert "/kiem-soat" in AC.MENU_ROLES
-    vai = set(AC.MENU_ROLES["/kiem-soat"])
-    assert "ketoan" in vai and "cntt" in vai
-    assert set(KR.QUYET) <= vai, "người được quyết mà không mở được màn hình thì nút nào cũng 403"
-    assert "bks" not in KR.QUYET, "robot không tự chốt xếp loại của chính mình"
+    assert "/kiem-soat" in AC.MENU_ROLES and "/ra-soat-cot-tien" in AC.MENU_ROLES
+    ks = set(AC.MENU_ROLES["/kiem-soat"])
+    rs = set(AC.MENU_ROLES["/ra-soat-cot-tien"])
+    assert "ketoan" not in ks, "Chủ tịch đã quyết Kế toán không xem màn hình Kiểm soát"
+    assert "cntt" in ks
+    assert set(KR.QUYET) <= rs, "người được quyết mà không mở được màn hình thì nút nào cũng 403"
+    assert "bks" not in KR.QUYET, "robot không tự chốt xếp loại của chính nó"
+    assert "bks" in rs, "Ban Kiểm soát phải XEM được bàn rà soát – cấm là cấm QUYẾT, không cấm nhìn"
     for v in KR.XEM:
-        assert v in vai, f"{v} xem được qua API nhưng không mở được màn hình – hai cửa lệch nhau"
+        assert v in ks or v in rs, f"{v} xem được qua API nhưng không mở được màn hình nào – hai cửa lệch"
