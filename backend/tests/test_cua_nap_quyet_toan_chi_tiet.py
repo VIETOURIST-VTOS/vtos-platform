@@ -49,6 +49,23 @@ def test_doc_tep_tra_ve_MOT_ban_khong_phai_nhieu_dong_phang():
     assert ban["ma_tour"] == "NT001.03100726"
 
 
+def test_moi_cot_da_khai_deu_co_mat_phang_trong_ban_doc_ra():
+    """Khai tám cột thì bản đọc ra phải có đủ tám – bảng xem trước dựng theo đúng danh sách khai.
+
+    Ngày 10/9 chỉ có 'doanh_thu' và 'ma_tour' được để phẳng. Chạy thử trên tệp Nha Trang thật thì
+    bảng xem trước hiện tên tour, ngày đi, ngày về, số khách, HDV, biển số đều RỖNG – trong khi bộ
+    đọc đã đọc đủ cả sáu ô ấy ở đầu sheet QT. Người nạp nhìn bảng trống thì kết luận tệp hỏng và bỏ
+    đi, đúng vào lúc bộ kiểm vừa đọc xong xuôi. Phép thử chức năng cũ không bắt được vì nó soi kết
+    quả GHI VÀO SỔ, mà sổ thì lấy số từ kiem() chứ không lấy từ mấy ô phẳng này.
+    """
+    from tests.test_lop2_quyet_toan_tour import _tep
+    ban = BO["doc_tep"](_tep(), "thu.xlsx")[0]
+    for c in BO["cot"]:
+        assert c["key"] in ban, f"cột đã khai nhưng bản đọc ra không có: {c['key']}"
+    assert ban["ten_chuong_trinh"], "tên chương trình không được rỗng khi tệp có ô ấy"
+    assert ban["so_khach"], "số khách không được rỗng khi tệp có ô ấy"
+
+
 def test_cot_khai_bao_co_doanh_thu_kieu_tien():
     """Cột tiền phải được khai đúng kiểu, vì nhật ký nạp cộng tổng tiền của tệp theo khai báo này."""
     cot_tien = [c for c in BO["cot"] if c["kieu"] == "tien"]

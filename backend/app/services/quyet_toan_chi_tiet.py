@@ -566,9 +566,14 @@ def kiem(doc: dict, ma_khoan_map: dict | None = None) -> dict:
         "ngay_kh": ng_qt or ng_ma or ng_ctt,
         "ngay_kt": _ngay(dau.get("ngay_ve")),
         "so_dong": len(dong),
-        "tong_thu": tong_thu if co_thu else None,
-        "tong_chi": tong_chi if co_chi else None,
-        "loi_nhuan": (tong_thu - tong_chi) if (co_thu and co_chi) else None,
+        # Làm tròn về ĐỒNG trước khi con số rời khỏi bộ đọc. Sheet QT phân bổ giá vốn theo đầu khách
+        # bằng phép chia không hết (1.343.030,3030... × 33 người lớn), nên cộng 42 dòng lại ra
+        # 50.649.999,99999988 trong khi ô TỔNG CỘNG CHI của chính tệp ấy ghi 50.650.000. Ghi số có
+        # đuôi float vào cột tiền thì mọi bản đối chiếu về sau đều lệch 0,00000012đ – không đủ lớn để
+        # ai sửa, nhưng đủ để câu "khớp tuyệt đối" không bao giờ còn đúng.
+        "tong_thu": round(tong_thu, 2) if co_thu else None,
+        "tong_chi": round(tong_chi, 2) if co_chi else None,
+        "loi_nhuan": round(tong_thu - tong_chi, 2) if (co_thu and co_chi) else None,
         "gia_ban": _gia_ban_pho_bien(dong),
         "nhieu_muc_gia": len({d["gia_ban"] for d in dong if d["gia_ban"]}) > 1,
         "so_dong_lech": sum(1 for d in dong if d["co_lech"]),
@@ -733,7 +738,22 @@ def doc_tep_lo(noi_dung: bytes, ten_tep: str = "") -> list[dict]:
     # Doanh thu để phẳng ở gốc để nhật ký nạp ghi được tổng tiền của tệp. Không có ô này thì K5 đọc
     # ra "lô không có cột tiền" và báo thiếu tiền ở mọi lần nạp đi qua đường này.
     d["doanh_thu"] = sum(x["tong_thu"] or 0 for x in d.get("dong", [])) or None
-    d["ma_tour"] = str((d.get("dau") or {}).get("ma_tour") or "").strip()
+
+    # Tám cột đã KHAI ở cửa nạp phải có mặt phẳng ở gốc, vì màn hình xem trước dựng bảng theo đúng
+    # danh sách khai ấy. Ngày 10/9 chỉ có doanh_thu và ma_tour được để phẳng, nên bảng xem trước hiện
+    # tên tour, ngày đi, số khách, HDV và biển số đều RỖNG – trong khi bộ đọc biết đủ cả. Người nạp
+    # nhìn bảng trống thì kết luận tệp đọc hỏng và bỏ đi, đúng lúc bộ kiểm đã đọc xong xuôi.
+    #
+    # Lấy nguyên văn ô đầu sheet QT, KHÔNG sửa theo mã tour: ngày ở đây có thể sai (chuyến Nha Trang
+    # 10/07 ghi 07/07), và chỗ nói ra cái sai ấy là phát hiện đối chiếu, không phải chỗ lặng lẽ vá.
+    dau = d.get("dau") or {}
+    d["ma_tour"] = str(dau.get("ma_tour") or "").strip()
+    d["ten_chuong_trinh"] = str(dau.get("ten_chuong_trinh") or "").strip()
+    d["ngay_di"] = dau.get("ngay_di") or ""
+    d["ngay_ve"] = dau.get("ngay_ve") or ""
+    d["so_khach"] = _so(dau.get("so_khach"))
+    d["hdv"] = str(dau.get("hdv") or "").strip()
+    d["bien_so_xe"] = str(dau.get("bien_so_xe") or "").strip()
     return [d]
 
 

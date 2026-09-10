@@ -257,6 +257,50 @@ def test_bat_chiet_tinh_go_tay_de_len_phep_nhan():
 # Phép thử đột biến: tệp SẠCH thì bộ đối chiếu phải IM
 # ---------------------------------------------------------------------------------------------
 
+def test_tong_tien_khong_mang_duoi_float_khi_gia_von_chia_theo_dau_khach():
+    """Cột tiền phải sạch đuôi float, vì bản đối chiếu sau này so bằng dấu bằng.
+
+    Tệp Nha Trang thật: sheet QT phân bổ LAND theo đầu khách bằng phép chia không hết
+    (1.343.030,3030… × 33 người lớn). Cộng 42 dòng lại được 50.649.999,99999988 trong khi ô
+    TỔNG CỘNG CHI của chính tệp ấy ghi 50.650.000. Chênh 0,00000012đ không đủ lớn để ai đi sửa,
+    nhưng đủ để mọi câu "khớp tuyệt đối" về sau không bao giờ còn đúng.
+    """
+    # Sáu khách, mỗi khách gánh đúng 1/6 của 1.000.000. Cộng sáu số ấy lại bằng float ra
+    # 999.999,9999999999 – cùng một kiểu trôi với tệp Nha Trang thật, chỉ nhỏ hơn cho gọn.
+    # Các ô chi khác để 0 để phép cộng của tệp thử không tự khử mất chỗ trôi cần đo.
+    n, tong_that = 6, 1000000
+    mot_phan = tong_that / n
+    assert sum(mot_phan for _ in range(n)) != float(tong_that), \
+        "tệp thử không còn tái hiện được chỗ trôi float – chọn lại n hoặc tổng"
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+    ws = wb.create_sheet("QT")
+    ws["C4"], ws["D4"] = "Mã tour:", "XX001.03100726"
+    ws["C6"], ws["D6"] = "Ngày đi:", "10/07/2026"
+    for c, v in ((1, "NO"), (3, "TÊN KHÁCH HÀNG"), (4, "THU"), (7, "CHI"), (13, "LỢI NHUẬN")):
+        ws.cell(8, c, v)
+    for c, v in ((4, "GIÁ BÁN"), (5, "THU KHÁC"), (6, "TỔNG THU"), (7, "LAND"), (8, "BH"),
+                 (9, "PHÍ TL"), (10, "NƯỚC SUỐI"), (11, "PHÍ KHÁC"), (12, "TỔNG CHI")):
+        ws.cell(9, c, v)
+    for i in range(n):
+        r = 10 + i
+        ws.cell(r, 1, i + 1); ws.cell(r, 3, f"KHACH {i + 1}")
+        ws.cell(r, 4, 250000); ws.cell(r, 6, 250000)
+        ws.cell(r, 7, mot_phan)
+        for c in (8, 9, 10, 11):
+            ws.cell(r, c, 0)
+        ws.cell(r, 12, mot_phan)
+        ws.cell(r, 13, 250000 - mot_phan)
+    b = io.BytesIO(); wb.save(b)
+
+    kq = QT.kiem(QT.doc_tep(b.getvalue(), "t.xlsx"))
+    assert kq["tong_chi"] == tong_that, f"giá vốn còn đuôi float: {kq['tong_chi']!r}"
+    assert kq["tong_thu"] == 250000 * n, f"doanh thu còn đuôi float: {kq['tong_thu']!r}"
+    assert kq["loi_nhuan"] == 250000 * n - tong_that, \
+        f"lợi nhuận còn đuôi float: {kq['loi_nhuan']!r}"
+
+
 def test_tep_sach_thi_khong_kieu_gi_ca():
     """Một bộ kiểm kêu ở mọi tệp thì sau vài lần không ai đọc nữa – và lúc ấy nó vô dụng hơn là không có.
 

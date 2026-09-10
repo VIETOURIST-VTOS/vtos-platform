@@ -28,13 +28,30 @@ Tất cả cột tiền dùng Numeric(18,2) theo chuẩn V9, và để NULL đư
 hẳn 0 đồng. Đó là quy tắc đã cứu 2,65 tỷ khỏi bị báo lãi 100% ở bảng lớp 1.
 
 Revision ID: w1a2b3c4d5e6
-Revises: v14b6e9c2a7d31
+Revises: v13a4c7e9b1d52
+
+VÌ SAO MÓC VÀO v13a4c7e9b1d52 CHỨ KHÔNG PHẢI v14b6e9c2a7d31
+
+Bản đầu khai down_revision = "v14b6e9c2a7d31" (bản của làn V7 – sự cố tour và hồ sơ kiểm toán),
+vì lúc viết, tệp ấy đang nằm trong cây làm việc. Nhưng nó chưa bao giờ được gộp lên nhánh main:
+nó ở lại nhánh gop-dot2 rồi biến mất khỏi cây. Hậu quả đo được trên máy chủ thật ngày 10/9/2026,
+nhật ký triển khai Render:
+
+    KeyError: 'v14b6e9c2a7d31'
+
+Container thoát ngay ở bước alembic upgrade, Render giữ bản cũ f51c31f đang chạy. VTOS vẫn sống,
+nên nhìn từ ngoài không ai thấy gì hỏng – chỉ có mọi lần triển khai về sau đều hỏng y hệt, kể cả
+lần chỉ thêm một biến môi trường. Đây là kiểu hỏng lặng: hệ thống vẫn phục vụ bằng mã của hôm qua.
+
+Bản nâng cấp này KHÔNG chạm bảng nào của V7 – nó chỉ tạo năm bảng mới và thêm cột vào
+tour_settlements – nên nối thẳng vào đầu thật của main (v13a4c7e9b1d52) là hợp lệ, và mạch trở về
+đúng MỘT đầu. Khi làn V7 gộp lên, v14 móc vào sau bản này.
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "w1a2b3c4d5e6"
-down_revision = "v14b6e9c2a7d31"
+down_revision = "v13a4c7e9b1d52"
 branch_labels = None
 depends_on = None
 
