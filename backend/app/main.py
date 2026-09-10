@@ -45,6 +45,7 @@ from app.api.v1.tu_dong import router as tu_dong_router
 from app.api.v1.bao_cao import router as bao_cao_router
 from app.api.v1.ks_ra_soat import router as ks_ra_soat_router
 from app.api.v1.ks_ra_soat import rst as rst_router
+from app.api.v1.lai_lo_tour import router as ll_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -247,6 +248,7 @@ app.include_router(hd_router)
 app.include_router(qtt_router)
 app.include_router(dct_router)
 app.include_router(ks_router)
+app.include_router(ll_router)
 
 
 @app.get("/", include_in_schema=False)

@@ -120,9 +120,19 @@ def test_mo_hinh_va_ban_nang_cap_khong_duoc_lech_nhau():
     # noi theo moi dot, neu khong phep thu canh cua lai thanh phep thu canh chinh no.
     d3 = _mig("zc3d4e5f6a7b_bon_so_tien_cho_lo_nap.py")
     d4 = _mig("zd4e5f6a7b8c_doi_kieu_cot_tien.py")
+    # Lần thứ BA phép thử này đỏ vì cùng một lý do: thêm cột tiền mà quên nới danh sách bản nâng cấp.
+    # Lần này là `vat_hoa_don` của cửa nhập hoá đơn đầu vào (09/9/2026). Ba lần trong hai ngày là đủ
+    # để kết luận: nhắc nhau "nhớ nới" không có tác dụng. Việc cần làm là để phép thử tự đọc mọi bản
+    # nâng cấp có khai cột tiền, thay vì liệt kê tay từng bản – ghi lại đây làm việc còn tồn.
+    d5 = _mig("8de308e27b31_hoa_don_dau_vao_dong_chi_phi.py")
     trong_mig = {(b, c) for m in (d1, d2) for b, c, _ in m.COT}
     trong_mig |= {("intake_runs", c) for c in d3.COT}
     trong_mig |= {tuple(x) for x in d4.COT}
+    # Bản này khai cả cột chữ (số hoá đơn) và cột ngày, nên phải lọc: chỉ cột kiểu số thập phân mới
+    # thuộc phạm vi phép thử. Lấy cả ba vào là báo "bản nâng cấp đổi cột mà mô hình chưa đổi" – đúng
+    # kiểu báo động sai làm người ta mất tin vào phép thử.
+    trong_mig |= {("tour_cost_lines", c) for c, k in d5.COT
+                  if isinstance(k, Numeric) and not isinstance(k, Float)}
     # Cùng lý lẽ, cho bốn bảng V6 của chuỗi bán hàng (nhánh Đợt 2): chúng dựng SAU đợt V9 nên sinh ra
     # đã là kiểu tiền, chưa từng đi qua giai đoạn số thực nhị phân. Khai từng cột chứ không nới phép
     # thử thành "bỏ qua bảng mới" – nới thế là làm nó luôn xanh, tức là bỏ luôn điều duy nhất nó canh.

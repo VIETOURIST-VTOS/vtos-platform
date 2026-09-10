@@ -38,7 +38,7 @@ revision = "v10a7f3c9e1b48"
 # Ba lần cùng một lỗi trên cùng một mạch, không lần nào do viết sai. Lỗi nằm ở chỗ ĐẾM: đếm trên
 # nhánh của mình thì hai phiên làm song song không bao giờ thấy nhau, và mạch chỉ tách vào đúng lúc
 # gộp. Phép đếm đúng là đếm SAU KHI ĐÃ GỘP, và phải làm trước khi đẩy lên.
-down_revision = "zf6a7b8c9d0e"
+down_revision = "8de308e27b31"
 branch_labels = None
 depends_on = None
 

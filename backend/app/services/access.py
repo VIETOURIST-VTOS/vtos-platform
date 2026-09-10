@@ -313,6 +313,7 @@ MAN_HINH_API = {
     "/phieu-luong": ("/api/v1/phieu-luong",),
     "/requests": ("/api/v1/requests", "/api/v1/bookings", "/api/v1/tours", "/api/v1/meta",
                   "/api/v1/mang"),
+    "/lai-lo-tour": ("/api/v1/lai-lo-tour",),
     "/robot-reports": ("/api/v1/auto-reports",),
     "/sales-reports": ("/api/v1/sales-reports",),
     "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
@@ -398,6 +399,9 @@ MENU_ROLES = {
     "/bookings": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt"),
     "/non-package": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
     "/sales-reports": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "hcns", "cntt"),
+    # Lãi lỗ theo tour: số quản trị. Sale KHÔNG có mặt – họ xem doanh thu và công nợ booking mình
+    # phụ trách ở màn hình bán hàng, còn giá vốn của chuyến thì ngoài phạm vi của họ.
+    "/lai-lo-tour": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
 
     # --- Marketing & CSKH. Kế toán và CNTT KHÔNG có mặt: đây là dữ liệu khách của Marketing. ---
     "/inbox": BASE_VIEW + SALES + OPERATIONS + MARKETING + ("ptgd_mkt", "cntt"),
