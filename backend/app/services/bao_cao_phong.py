@@ -42,7 +42,7 @@ phòng nằm trong tay mọi người là chuyện khác.
 Chủ tịch, TGĐ và Ban Kiểm soát xem tất cả – hai người đầu vì đó là quyết định trên; Ban Kiểm soát vì
 kiểm soát mà chỉ được xem bản tóm tắt do bên bị kiểm soát chọn thì không kiểm được gì.
 """
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.services import access as AC
@@ -61,11 +61,19 @@ PHONG = {
     "marketing": {"ten": "Marketing", "xem": ("ptgd_mkt",)},
     "ketoan":    {"ten": "Kế toán", "xem": ("ketoan",)},
     "hcns":      {"ten": "Hành chính & Nhân sự", "xem": ("hcns",)},
-    # Ban Visa chưa có vai trò trưởng bộ phận trong bảng vai trò. Tạm để chuyên viên visa xem báo cáo
-    # của chính ban mình, và ghi ra đây rằng đó là chỗ TẠM: khi có vai trò phụ trách Visa thì sửa dòng
-    # này, đừng để nó trôi thành tiền lệ "nhân viên xem báo cáo phòng".
-    "visa":      {"ten": "Ban Visa", "xem": ("nv_visa",)},
+    # Bộ phận Visa THUỘC Phòng Điều hành (Chủ tịch chốt 10/9/2026), nên nó KHÔNG phải một phòng
+    # ngang hàng: `thuoc` nói ra điều đó ngay trong bảng, và hai chỗ đọc bảng này xử theo.
+    #
+    # Bản 09/9 tạm để chuyên viên visa (nv_visa) xem báo cáo của chính ban mình. Nay bỏ dòng tạm ấy:
+    # người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành, không phải chuyên viên –
+    # đúng nguyên tắc ở đầu tệp, "nhân viên trong phòng KHÔNG mặc định xem báo cáo phòng". Đây là một
+    # lần SIẾT quyền, ghi rõ ra đây để lần sau ai đọc cũng thấy vì sao nó siết.
+    "visa":      {"ten": "Bộ phận Visa", "xem": ("tp_dh", "ptgd_doan"), "thuoc": "dieu_hanh"},
 }
+
+# Bộ phận trực thuộc một phòng: {mã bộ phận: mã phòng mẹ}. Suy từ PHONG để không phải khai hai chỗ.
+TRUC_THUOC = {ma: cfg["thuoc"] for ma, cfg in PHONG.items() if cfg.get("thuoc")}
+PHONG_GOC = [ma for ma, cfg in PHONG.items() if not cfg.get("thuoc")]
 XEM_TAT_CA = AC.FULL_VIEW + AC.READ_ALL          # Chủ tịch, TGĐ, Ban Kiểm soát, robot kiểm soát
 
 
@@ -132,6 +140,46 @@ def _muc(dieu_kien: bool, muc: str = "vang") -> str:
     return muc if dieu_kien else ""
 
 
+def _bo_phan_truc_thuoc(db: Session, phong: str, tu: date, den: date) -> list[dict]:
+    """Gom các bộ phận TRỰC THUỘC một phòng vào chính báo cáo của phòng ấy.
+
+    Chủ tịch chốt 10/9/2026: bộ phận Visa thuộc Phòng Điều hành, nên báo cáo Visa đẩy về Phòng Điều
+    hành. Câu ấy có hai nửa, và nửa thứ hai mới là phần khó:
+
+      · nửa dễ  – Trưởng phòng Điều hành MỞ được bảng của Visa (xử ở PHONG["visa"]["xem"]);
+      · nửa khó – việc đỏ của Visa phải NỔI LÊN trong bảng của Phòng Điều hành. Không có nửa này thì
+        báo cáo phòng vẫn im lặng trong khi bộ phận trực thuộc đang có việc phải xử, và người phụ
+        trách chỉ biết nếu tự nhớ mà mở thêm một bảng nữa. Một con số phải đi tìm mới thấy thì coi
+        như không có.
+
+    Ở đây ĐỌC LẠI kết quả của bộ phận, không tính lại theo cách khác – cùng lý lẽ với báo cáo toàn
+    công ty: tính lại là cách chắc chắn nhất để hai bảng lệch nhau, và lúc lệch thì không ai biết
+    bảng nào đúng.
+    """
+    ds = []
+    for ma, me in TRUC_THUOC.items():
+        if me != phong:
+            continue
+        cfg = PHONG[ma]
+        try:
+            dong = HAM[ma](db, tu, den)
+        except Exception as e:      # noqa – một bộ phận hỏng không được làm chết báo cáo của phòng
+            ds.append(ct(f"bo_phan_{ma}", f"{cfg['ten']} – KHÔNG lấy được số", None, "",
+                         "Chỉ tiêu của bộ phận trực thuộc lỗi khi tính", f"bao_cao_phong.{ma}",
+                         muc="vang", chi_tiet=[f"{type(e).__name__}: {str(e)[:200]}"]))
+            continue
+        viec_do = [x for x in dong if x["muc"] == "do"]
+        ds.append(ct(f"bo_phan_{ma}", f"{cfg['ten']} (trực thuộc) – việc phải xử lý",
+                     len(viec_do), "việc",
+                     "Đếm chỉ tiêu mức ĐỎ trong báo cáo của bộ phận trực thuộc. KHÔNG tính lại "
+                     "theo cách khác – đọc lại đúng kết quả bảng của bộ phận",
+                     f"báo cáo bộ phận {cfg['ten']}",
+                     muc=_muc(len(viec_do) > 0, "do"),
+                     viec="Mở bảng của bộ phận và xử từng việc đỏ" if viec_do else "",
+                     chi_tiet=[f"{x['ten']}: {x['gia_tri']} {x['don_vi']}" for x in viec_do]))
+    return ds
+
+
 # ═══════════════════════════ CHỈ TIÊU TỪNG PHÒNG ═══════════════════════════
 def _dieu_hanh(db: Session, tu: date, den: date) -> list[dict]:
     from app.models.core import Tour, ServiceRequest
@@ -170,7 +218,7 @@ def _dieu_hanh(db: Session, tu: date, den: date) -> list[dict]:
         ct("yeu_cau_cho", "Yêu cầu dịch vụ chưa tạo booking", cho_bk, "yêu cầu",
            "Đếm yêu cầu dịch vụ chưa gắn booking nào", "service_requests.booking_id rỗng",
            muc=_muc(cho_bk > 0), viec="Tạo booking hoặc đóng yêu cầu kèm lý do"),
-    ]
+    ] + _bo_phan_truc_thuoc(db, "dieu_hanh", tu, den)
 
 
 def _kd_le(db: Session, tu: date, den: date) -> list[dict]:
@@ -426,7 +474,11 @@ def _toan_cty(db: Session, tu: date, den: date) -> list[dict]:
     # Gom việc đỏ của từng phòng. Đây là chỗ báo cáo toàn công ty KHÔNG tự tính lại con số nào: nó
     # đọc lại đúng kết quả của báo cáo phòng. Tính lại theo cách khác là cách chắc chắn để hai bản
     # lệch nhau, và lúc lệch thì không ai biết bản nào đúng.
-    for ma, cfg in PHONG.items():
+    # Chỉ duyệt PHÒNG GỐC. Bộ phận trực thuộc (Visa) đã được gom vào bảng của phòng mẹ rồi – đếm
+    # thêm ở đây là đếm hai lần đúng một việc, và con số "toàn công ty có mấy việc đỏ" sẽ phồng lên
+    # mà không ai giải thích được vì sao.
+    for ma in PHONG_GOC:
+        cfg = PHONG[ma]
         try:
             dong = HAM[ma](db, tu, den)
         except Exception as e:      # noqa – một phòng hỏng không được làm chết báo cáo công ty
@@ -482,3 +534,57 @@ def sang_markdown(b: dict) -> str:
         if x["viec"]:
             d.append(f"  - cần làm: {x['viec']}")
     return "\n".join(d)
+
+
+# ═══════════════════════════ BẢN LƯU THEO LỊCH ═══════════════════════════
+def luu(db: Session, kind: str, moc: date | None = None, boi: str = "lich") -> dict:
+    """Chụp lại TẤT CẢ phạm vi của một kỳ vào bảng `bao_cao_luu`.
+
+    Điều quan trọng nhất của hàm này nằm ở chỗ nó KHÔNG tính gì: nó gọi đúng `bao_cao()` mà màn hình
+    gọi. Trước 10/9/2026 lịch chạy lưu bản của robot R7 – một bài viết dựng từ phép tính riêng – nên
+    số trên màn hình và số trong bản lưu là hai phép tính khác nhau cho cùng một câu hỏi. Hai phép
+    tính như thế sớm muộn ra hai con số, và lúc lệch thì không ai biết bản nào đúng.
+
+    Chạy lại cùng một kỳ thì ĐÈ lên bản cũ, nhờ khoá (kind, ky, pham_vi). Đây cũng là cái làm việc
+    CHẠY BÙ an toàn: lịch lỡ một hôm, hôm sau chạy bù, và kết quả là một bản đúng chứ không phải hai
+    bản chờ người ta chọn.
+
+    Một phạm vi hỏng KHÔNG được làm chết cả mẻ – lưu được phạm vi nào thì lưu, và trả về danh sách
+    phạm vi hỏng để người đọc nhật ký biết chỗ nào còn thiếu. Dừng cả mẻ vì một phòng lỗi là mất
+    luôn bản lưu của những phòng đang ổn, và bản lưu thì không tính lại được về sau.
+    """
+    from app.models.bao_cao_luu import BaoCaoLuu
+    from sqlalchemy import select as _sel
+
+    xong, hong = [], []
+    for pv in [TOAN_CTY] + list(PHONG):
+        try:
+            b = bao_cao(db, kind, pv, moc)
+        except Exception as e:      # noqa
+            hong.append(f"{pv}: {type(e).__name__}: {str(e)[:120]}")
+            continue
+        r = db.execute(_sel(BaoCaoLuu).where(BaoCaoLuu.kind == kind, BaoCaoLuu.ky == b["ky"],
+                                             BaoCaoLuu.pham_vi == pv)).scalars().first()
+        if r is None:
+            r = BaoCaoLuu(kind=kind, ky=b["ky"], pham_vi=pv)
+            db.add(r)
+        r.pham_vi_ten, r.tu, r.den = b["pham_vi_ten"], b["tu"], b["den"]
+        r.chi_tieu, r.markdown = b["chi_tieu"], sang_markdown(b)
+        r.so_viec_do, r.so_can_ra_soat = b["so_viec_do"], b["so_can_ra_soat"]
+        r.so_chua_co_so = b["so_chua_co_so"]
+        r.tao_boi, r.tao_luc = boi, datetime.now()
+        xong.append(pv)
+    db.commit()
+    return {"kind": kind, "ky": khoang(kind, moc)[2], "da_luu": xong, "hong": hong}
+
+
+def ban_luu(db: Session, kind: str, ky: str, pham_vi: str):
+    """Đọc lại một bản lưu. Không có thì trả None – KHÔNG dựng tạm một bản mới.
+
+    Dựng tạm là cách bản lưu mất hết ý nghĩa: người ta hỏi 'cuối tháng trước thế nào' và nhận về số
+    của hôm nay mà không hề biết.
+    """
+    from app.models.bao_cao_luu import BaoCaoLuu
+    from sqlalchemy import select as _sel
+    return db.execute(_sel(BaoCaoLuu).where(BaoCaoLuu.kind == kind, BaoCaoLuu.ky == ky,
+                                            BaoCaoLuu.pham_vi == pham_vi)).scalars().first()

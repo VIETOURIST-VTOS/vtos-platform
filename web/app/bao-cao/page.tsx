@@ -29,6 +29,9 @@ function BaoCao() {
   const [kind, setKind] = useState("ngay");
   const [d, setD] = useState<any>(null);
   const [moTat, setMoTat] = useState<Record<string, boolean>>({});
+  // "" = đang xem số HIỆN TẠI; khác rỗng = đang xem một BẢN CHỤP của kỳ đã qua.
+  const [kyChup, setKyChup] = useState("");
+  const [dsChup, setDsChup] = useState<any[]>([]);
 
   useEffect(() => {
     api<any>("/bao-cao/pham-vi").then((m) => {
@@ -39,10 +42,21 @@ function BaoCao() {
 
   const load = useCallback(async () => {
     if (!pv) return;
-    try { setD(await api(`/bao-cao?pham_vi=${pv}&kind=${kind}`)); }
-    catch (e) { toast(errMsg(e), true); }
-  }, [pv, kind, toast]);
+    try {
+      // Xem bản chụp thì ĐỌC bản chụp, không tính lại. Tính lại là cách người ta hỏi "cuối tháng
+      // trước thế nào" và nhận về số của hôm nay mà không hề biết.
+      setD(kyChup
+        ? await api(`/bao-cao/ban-luu/${kind}/${encodeURIComponent(kyChup)}?pham_vi=${pv}`)
+        : await api(`/bao-cao?pham_vi=${pv}&kind=${kind}`));
+    } catch (e) { toast(errMsg(e), true); }
+  }, [pv, kind, kyChup, toast]);
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!pv) return;
+    api<any>(`/bao-cao/ban-luu?pham_vi=${pv}&kind=${kind}`)
+      .then((r) => setDsChup(r.rows || [])).catch(() => setDsChup([]));
+  }, [pv, kind]);
 
   if (!meta) return <p className="muted">Đang tải…</p>;
   if (!meta.pham_vi.length) return (<>
@@ -54,8 +68,10 @@ function BaoCao() {
 
   return (<>
     <h1>Báo cáo tự động</h1>
-    <p className="muted">Số liệu tính <b>tại thời điểm mở màn hình</b>, không phải bản chốt hôm qua.
-      Mỗi dòng đi kèm cách tính và nguồn dữ liệu — bấm vào dòng để xem.</p>
+    <p className="muted">Mặc định số liệu tính <b>tại thời điểm mở màn hình</b>. Ô <b>Thời điểm</b>
+      cho phép mở lại <b>bản chụp</b> của một kỳ đã qua — số của kỳ ấy không tính lại được, nên bản
+      chụp là cách duy nhất trả lời “cuối kỳ trước thế nào”. Mỗi dòng đi kèm cách tính và nguồn dữ
+      liệu — bấm vào dòng để xem.</p>
     {meta.mo_rong_theo_nguoi && <div className="gate">
       Phạm vi của anh/chị đang <b>rộng hơn chức danh</b>: một ngoại lệ có thời hạn đã được cấp riêng
       cho tài khoản này, nên anh/chị xem được báo cáo của mọi phòng. Ngoại lệ có ngày hết hạn —
@@ -69,13 +85,26 @@ function BaoCao() {
             {meta.pham_vi.map((p: any) => <option key={p.ma} value={p.ma}>{p.ten}</option>)}
           </select></label>
         <label>Kỳ
-          <select value={kind} onChange={(e) => { setKind(e.target.value); setD(null); }}>
+          <select value={kind} onChange={(e) => { setKind(e.target.value); setKyChup(""); setD(null); }}>
             {meta.ky.map((k: any) => <option key={k.ma} value={k.ma}>{k.ten}</option>)}
           </select></label>
+        <label>Thời điểm
+          <select value={kyChup} onChange={(e) => { setKyChup(e.target.value); setD(null); }}>
+            <option value="">Bây giờ (tính tại chỗ)</option>
+            {dsChup.map((r: any) => <option key={r.ky} value={r.ky}>
+              Bản chụp kỳ {r.ky} ({r.tu} → {r.den})</option>)}
+          </select></label>
       </div>
+      {!dsChup.length && <p className="muted">Chưa có bản chụp nào cho phạm vi và kỳ này. Bản chụp
+        do lịch tự động lưu lại mỗi kỳ — xem lịch ở màn hình Lịch tự động hóa.</p>}
     </div>
 
     {!d ? <p className="muted">Đang tính…</p> : <>
+      {d.ban_chup && <div className="gate">
+        Đang xem <b>bản chụp</b> của kỳ {d.ky}, do <b>{d.tao_boi}</b> lưu lúc {String(d.tao_luc).replace("T", " ").slice(0, 16)}.
+        Đây là số <b>tại thời điểm chụp</b>, không phải số hiện tại — dữ liệu từ đó tới nay đã có thể
+        đổi. Chọn “Bây giờ” ở ô Thời điểm để xem số hiện tại.
+      </div>}
       <div className="kpis">
         <div className="kpi"><b style={{ color: d.so_viec_do ? "var(--red)" : undefined }}>{d.so_viec_do}</b>
           <span>việc phải xử lý</span></div>

@@ -76,6 +76,11 @@ MAY_SINH = {
     "lan_chay_tac_vu": "Lần chạy do hệ thống chạy tác vụ báo về qua /tu-dong/bao-cao – nhập tay một "
                        "dòng 'đã chạy thành công' là tạo bằng chứng giả về việc có thể chưa hề chạy.",
     "tong_dai_su_kien": "Nhật ký nguyên văn webhook tổng đài – tổng đài ghi vào, không ai nhập tay.",
+    # Cùng lý lẽ với lan_chay_tac_vu, và ở đây còn gắt hơn: bao_cao_luu là ẢNH CHỤP số liệu tại một
+    # thời điểm đã qua. Cho người nhập tay vào đây là cho phép viết lại quá khứ – đúng thứ mà một bản
+    # chụp sinh ra để chống. Bản chụp chỉ do lịch tự động sinh, từ chính hàm mà màn hình đang gọi.
+    "bao_cao_luu": "Ảnh chụp bảng chỉ tiêu do lịch tự động lưu mỗi kỳ, sinh từ chính hàm màn hình "
+                   "gọi – nhập tay vào đây là viết lại quá khứ, đúng thứ bản chụp sinh ra để chống.",
 }
 
 

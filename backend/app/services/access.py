@@ -529,8 +529,13 @@ MENU_ROLES = {
     # kinh doanh của từng phòng, không phải tình trạng kỹ thuật; và quyết định của Chủ tịch nói rõ
     # người xem là trưởng phòng / giám đốc phòng đó và Ban lãnh đạo. Mở thêm cho CNTT "để hỗ trợ" là
     # cách một danh sách người xem lặng lẽ dài ra cho tới lúc không còn nghĩa gì.
+    #
+    # nv_visa RỜI danh sách ngày 10/9/2026. Bản 09/9 cho chuyên viên visa vào đây vì bộ phận Visa
+    # chưa có người phụ trách – một chỗ vá tạm. Chủ tịch chốt Visa THUỘC Phòng Điều hành, nên người
+    # chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành. Đây là SIẾT quyền: chuyên viên
+    # vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa, chỉ không còn cầm bản tổng hợp cả bộ phận.
     "/bao-cao": BASE_VIEW + ("tp_dh", "ptgd_doan", "gd_kd", "tp_kd", "ptgd_mkt", "gd_doi_xe",
-                             "tp_hd", "ketoan", "hcns", "nv_visa"),
+                             "tp_hd", "ketoan", "hcns"),
     # V6 – chuỗi bán hàng. Bảng giá là CHÍNH SÁCH nên hẹp hơn báo giá: từng sale soạn báo giá
     # được, nhưng đặt giá niêm yết thì không.
     "/bang-gia": BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt", "ketoan", "cntt"),

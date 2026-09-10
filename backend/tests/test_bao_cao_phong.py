@@ -170,13 +170,38 @@ def test_bao_cao_toan_cong_ty_DOC_LAI_ket_qua_bao_cao_phong_khong_tinh_lai():
     with SessionLocal() as db:
         cty = BP.bao_cao(db, "thang", BP.TOAN_CTY)
         theo_ma = {x["ma"]: x for x in cty["chi_tieu"]}
-        for phong in BP.PHONG:
+        for phong in BP.PHONG_GOC:
             dong = theo_ma.get(f"phong_{phong}")
             assert dong is not None, f"báo cáo công ty thiếu dòng của phòng {phong}"
             rieng = BP.bao_cao(db, "thang", phong)
             assert dong["gia_tri"] == rieng["so_viec_do"], (
                 f"phòng {phong}: công ty nói {dong['gia_tri']} việc đỏ, "
                 f"báo cáo phòng nói {rieng['so_viec_do']}")
+
+        # Bộ phận TRỰC THUỘC không có dòng riêng ở bảng công ty – nó đã nằm trong bảng phòng mẹ.
+        # Đếm cả hai chỗ là đếm hai lần đúng một việc.
+        for bo_phan in BP.TRUC_THUOC:
+            assert f"phong_{bo_phan}" not in theo_ma, (
+                f"{bo_phan} là bộ phận trực thuộc mà vẫn có dòng riêng ở bảng công ty – "
+                f"việc đỏ của nó đang được đếm hai lần")
+
+
+def test_bo_phan_truc_thuoc_NOI_LEN_trong_bao_cao_phong_me():
+    """Nửa khó của "báo cáo Visa đẩy về Phòng Điều hành": việc đỏ phải NỔI LÊN ở bảng phòng mẹ.
+
+    Không có dòng này thì bảng Phòng Điều hành vẫn im lặng trong khi bộ phận trực thuộc đang có việc
+    phải xử, và người phụ trách chỉ biết nếu tự nhớ mà mở thêm một bảng nữa.
+    """
+    from app.db.session import SessionLocal
+    with SessionLocal() as db:
+        for bo_phan, me in BP.TRUC_THUOC.items():
+            bang_me = BP.bao_cao(db, "thang", me)
+            dong = next((x for x in bang_me["chi_tieu"] if x["ma"] == f"bo_phan_{bo_phan}"), None)
+            assert dong is not None, f"bảng {me} thiếu dòng gom của bộ phận {bo_phan}"
+            rieng = BP.bao_cao(db, "thang", bo_phan)
+            assert dong["gia_tri"] == rieng["so_viec_do"], (
+                f"{bo_phan}: bảng phòng mẹ nói {dong['gia_tri']} việc đỏ, "
+                f"bảng bộ phận nói {rieng['so_viec_do']}")
 
 
 def test_bao_cao_phong_va_cong_ty_dung_CUNG_mot_khoang_thoi_gian():
@@ -237,14 +262,36 @@ def test_km_doi_xe_chi_cong_chuyen_DA_DO():
 def test_mot_phong_hong_khong_lam_chet_bao_cao_toan_cong_ty():
     """Báo cáo Chủ tịch mà trắng trang vì một phòng lỗi là mất luôn cả những phòng còn ổn."""
     from app.db.session import SessionLocal
+    cu = BP.HAM["huong_dan"]
+    BP.HAM["huong_dan"] = lambda db, tu, den: (_ for _ in ()).throw(RuntimeError("giả vờ hỏng"))
+    try:
+        with SessionLocal() as db:
+            b = BP.bao_cao(db, "thang", BP.TOAN_CTY)
+        dong = next(x for x in b["chi_tieu"] if x["ma"] == "phong_huong_dan")
+        assert dong["gia_tri"] is None and "KHÔNG lấy được số" in dong["ten"]
+        assert any(x["ma"] == "phong_ketoan" for x in b["chi_tieu"]), "các phòng khác biến mất"
+    finally:
+        BP.HAM["huong_dan"] = cu
+
+
+def test_bo_phan_truc_thuoc_hong_khong_lam_chet_bao_cao_phong_me():
+    """Cùng lý lẽ, một tầng thấp hơn: Visa lỗi thì bảng Điều hành vẫn phải còn các chỉ tiêu của nó.
+
+    Tầng này dễ bị bỏ quên hơn tầng trên, vì lỗi ở bộ phận trực thuộc nằm sâu hơn một lớp gọi hàm.
+    """
+    from app.db.session import SessionLocal
     cu = BP.HAM["visa"]
     BP.HAM["visa"] = lambda db, tu, den: (_ for _ in ()).throw(RuntimeError("giả vờ hỏng"))
     try:
         with SessionLocal() as db:
-            b = BP.bao_cao(db, "thang", BP.TOAN_CTY)
-        dong = next(x for x in b["chi_tieu"] if x["ma"] == "phong_visa")
+            b = BP.bao_cao(db, "thang", "dieu_hanh")
+        dong = next(x for x in b["chi_tieu"] if x["ma"] == "bo_phan_visa")
         assert dong["gia_tri"] is None and "KHÔNG lấy được số" in dong["ten"]
-        assert any(x["ma"] == "phong_ketoan" for x in b["chi_tieu"]), "các phòng khác biến mất"
+        assert any(x["ma"] == "khoi_hanh" for x in b["chi_tieu"]), "chỉ tiêu của phòng mẹ biến mất"
+        # Và lỗi ở một bộ phận trực thuộc cũng không được làm chết bảng toàn công ty.
+        with SessionLocal() as db:
+            cty = BP.bao_cao(db, "thang", BP.TOAN_CTY)
+        assert any(x["ma"] == "phong_dieu_hanh" for x in cty["chi_tieu"])
     finally:
         BP.HAM["visa"] = cu
 
@@ -288,7 +335,7 @@ def test_nang_luc_theo_nguoi_mo_moi_bao_cao_ma_KHONG_doi_vai_tro():
         if u is None: pytest.skip("dữ liệu mẫu không có tp_dh")
         ten = u.username
         # trước khi cấp: chỉ phòng mình
-        assert B.pham_vi_cho_nguoi(db, u) == ["dieu_hanh"]
+        assert B.pham_vi_cho_nguoi(db, u) == ["dieu_hanh", "visa"]
 
     uid = _cap_nang_luc(ten, B.NANG_LUC_MOI_PHONG)
     try:
@@ -297,7 +344,8 @@ def test_nang_luc_theo_nguoi_mo_moi_bao_cao_ma_KHONG_doi_vai_tro():
             ds = B.pham_vi_cho_nguoi(db, u)
             assert B.TOAN_CTY in ds and set(B.PHONG) <= set(ds)
         # VAI TRÒ không đổi – người kế nhiệm không tự có quyền này
-        assert B.pham_vi_duoc_xem("tp_dh") == ["dieu_hanh"], \
+        # 10/9: Visa thuộc Phòng Điều hành nên vai trò tp_dh có HAI phạm vi theo chức danh.
+        assert B.pham_vi_duoc_xem("tp_dh") == ["dieu_hanh", "visa"], \
             "quyền đã rò từ một người sang cả vai trò"
 
         h = login("tp_dh")
@@ -318,7 +366,7 @@ def test_go_nang_luc_thi_pham_vi_thu_HEP_LAI_ngay():
         u = db.execute(select(User).where(User.role == "tp_dh",
                                           User.active == True)).scalars().first()
         if u is None: pytest.skip("dữ liệu mẫu không có tp_dh")
-        assert B.pham_vi_cho_nguoi(db, u) == ["dieu_hanh"]
+        assert B.pham_vi_cho_nguoi(db, u) == ["dieu_hanh", "visa"]
     h = login("tp_dh")
     assert client.get("/api/v1/bao-cao?pham_vi=toan_cty&kind=ngay", headers=h).status_code == 403
 
@@ -328,3 +376,115 @@ def test_nang_luc_moi_phong_da_khai_trong_bang_nang_luc():
     from app.models.core import CAPABILITIES
     from app.services import bao_cao_phong as B
     assert B.NANG_LUC_MOI_PHONG in CAPABILITIES
+
+
+# ══════════ B5 – BẢN LƯU THEO LỊCH PHẢI NÓI CÙNG MỘT CHUYỆN VỚI MÀN HÌNH ══════════
+# Đây là lý do cả nhóm B5 tồn tại: trước 10/9/2026 lịch chạy lưu bản của robot R7 – một bài viết
+# dựng từ phép tính RIÊNG – trong khi màn hình đọc bảng chỉ tiêu. Hai phép tính khác nhau cho cùng
+# một câu hỏi thì sớm muộn ra hai con số, và lúc lệch thì không ai biết bản nào đúng.
+def test_ban_luu_TRUNG_KHIT_voi_bang_dang_hien_tren_man_hinh():
+    """Chụp xong đọc lại phải ra ĐÚNG bảng ấy: cùng chỉ tiêu, cùng giá trị, cùng cách tính."""
+    from datetime import date
+    from app.db.session import SessionLocal
+    moc = date(2026, 9, 30)
+    with SessionLocal() as db:
+        kq = BP.luu(db, "thang", moc, boi="phep_thu")
+        assert not kq["hong"], f"có phạm vi không lưu được: {kq['hong']}"
+        assert set(kq["da_luu"]) == {BP.TOAN_CTY} | set(BP.PHONG), "lưu thiếu phạm vi"
+        for pv in kq["da_luu"]:
+            man_hinh = BP.bao_cao(db, "thang", pv, moc)
+            luu = BP.ban_luu(db, "thang", man_hinh["ky"], pv)
+            assert luu is not None, f"{pv}: chụp xong mà đọc lại không thấy"
+            assert luu.chi_tieu == man_hinh["chi_tieu"], (
+                f"{pv}: bản lưu và màn hình khác nhau – đây đúng là thứ nhóm B5 canh")
+            assert (luu.so_viec_do, luu.so_can_ra_soat, luu.so_chua_co_so) == (
+                man_hinh["so_viec_do"], man_hinh["so_can_ra_soat"], man_hinh["so_chua_co_so"])
+
+
+def test_ban_luu_giu_ca_CACH_TINH_chu_khong_chi_giu_con_so():
+    """Ba tháng sau mã đổi, bản lưu vẫn phải nói được con số hồi ấy tính thế nào.
+
+    Lưu mỗi con số thì bản lưu chỉ còn là một dãy số không giải thích được – và một con số không
+    giải thích được thì không ai dám dùng để ra quyết định.
+    """
+    from datetime import date
+    from app.db.session import SessionLocal
+    with SessionLocal() as db:
+        BP.luu(db, "ngay", date(2026, 9, 30), boi="phep_thu")
+        luu = BP.ban_luu(db, "ngay", "2026-09-30", "dieu_hanh")
+        assert luu and luu.chi_tieu
+        for x in luu.chi_tieu:
+            assert x.get("cong_thuc"), f"{x['ma']}: bản lưu mất cách tính"
+            assert x.get("nguon"), f"{x['ma']}: bản lưu mất nguồn dữ liệu"
+
+
+def test_chay_lai_cung_mot_ky_thi_DE_LEN_chu_khong_sinh_ban_thu_hai():
+    """Lịch lỡ một hôm, hôm sau chạy bù – kết quả phải là MỘT bản đúng, không phải hai bản chờ chọn."""
+    from datetime import date
+    from sqlalchemy import func
+    from app.db.session import SessionLocal
+    from app.models.bao_cao_luu import BaoCaoLuu
+    moc = date(2026, 9, 30)
+    with SessionLocal() as db:
+        BP.luu(db, "thang", moc, boi="lan_mot")
+        BP.luu(db, "thang", moc, boi="lan_hai")
+        n = db.execute(select(func.count()).select_from(BaoCaoLuu)
+                       .where(BaoCaoLuu.kind == "thang", BaoCaoLuu.ky == "2026-09",
+                              BaoCaoLuu.pham_vi == "dieu_hanh")).scalar()
+        assert n == 1, f"chạy bù sinh ra {n} bản cho cùng một kỳ"
+        assert BP.ban_luu(db, "thang", "2026-09", "dieu_hanh").tao_boi == "lan_hai"
+
+
+def test_mot_pham_vi_hong_khong_lam_mat_ban_luu_cua_cac_pham_vi_con_lai():
+    """Bản lưu không tính lại được về sau, nên mất một mẻ vì một phòng lỗi là mất vĩnh viễn."""
+    from datetime import date
+    from app.db.session import SessionLocal
+    cu = BP.HAM["huong_dan"]
+    BP.HAM["huong_dan"] = lambda db, tu, den: (_ for _ in ()).throw(RuntimeError("giả vờ hỏng"))
+    try:
+        with SessionLocal() as db:
+            kq = BP.luu(db, "tuan", date(2026, 9, 30), boi="phep_thu")
+        assert any("huong_dan" in x for x in kq["hong"]), "phạm vi hỏng không được ghi ra"
+        assert "ketoan" in kq["da_luu"] and BP.TOAN_CTY in kq["da_luu"], "các phạm vi khác mất theo"
+    finally:
+        BP.HAM["huong_dan"] = cu
+
+
+def test_khong_co_ban_luu_thi_bao_KHONG_CO_chu_khong_tinh_tam_mot_ban_moi():
+    """Tính tạm là cách người ta hỏi 'cuối tháng trước thế nào' và nhận về số của hôm nay."""
+    from app.db.session import SessionLocal
+    with SessionLocal() as db:
+        assert BP.ban_luu(db, "thang", "1999-01", BP.TOAN_CTY) is None
+    h = login("chutich")
+    r = client.get("/api/v1/bao-cao/ban-luu/thang/1999-01?pham_vi=toan_cty", headers=h)
+    assert r.status_code == 404 and "KHÔNG tính tạm" in r.json()["detail"]
+
+
+def test_cua_ban_luu_dung_CUNG_hang_rao_pham_vi_voi_bao_cao_dang_chay():
+    """Bản lưu là cùng những con số ấy, chỉ khác thời điểm – nới hàng rào ở đây là mở cả lịch sử."""
+    h = login("tp_dh")
+    assert client.get("/api/v1/bao-cao/ban-luu?pham_vi=ketoan", headers=h).status_code == 403
+    assert client.get("/api/v1/bao-cao/ban-luu/thang/2026-09?pham_vi=ketoan",
+                      headers=h).status_code == 403
+    # Phạm vi của chính mình thì mở được, kể cả khi chưa có bản nào (danh sách rỗng, không phải lỗi).
+    r = client.get("/api/v1/bao-cao/ban-luu?pham_vi=dieu_hanh", headers=h)
+    assert r.status_code == 200 and isinstance(r.json()["rows"], list)
+
+
+def test_lich_tu_dong_goi_DUNG_ham_luu_ban_chi_tieu():
+    """Nối lịch với cấu trúc chỉ tiêu là toàn bộ mục đích của đợt này – nếu lịch quay lại gọi bản R7
+    thì mọi phép thử trên vẫn xanh mà việc thì chưa xong."""
+    from app.db.session import SessionLocal
+    from app.services import lich_trong as LT
+    dn = next(x for x in LT.LICH if x["ma"] == "vtos_bao_cao_thang")
+    goi = {}
+    cu = BP.luu
+    BP.luu = lambda db, kind, moc=None, boi="lich": (goi.setdefault("kind", kind),
+                                                     {"ky": "x", "da_luu": ["toan_cty"], "hong": []})[1]
+    try:
+        with SessionLocal() as db:
+            n, mo_ta = dn["chay"](db)
+    finally:
+        BP.luu = cu
+    assert goi.get("kind") == "thang", "lịch báo cáo tháng không gọi hàm lưu bản chỉ tiêu"
+    assert n == 1 and "phạm vi" in mo_ta
