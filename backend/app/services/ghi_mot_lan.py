@@ -63,12 +63,66 @@ BANG_CO_PHIEN_BAN = [
     "visa_cases",            # hồ sơ visa qua nhiều người
     "leads",                 # nguồn khách, nhiều sale cùng chạm
 ]
+# Danh sách trên là danh sách của BẢN NÂNG CẤP V10 – đúng những bảng mà bản ấy thêm cột, và phép thử
+# test_v10 canh cho nó khớp với bản nâng cấp. VPM-8 KHÔNG nới nó ra: bốn bảng của chuỗi bán hàng
+# (bao_gia, bang_gia, hop_dong_khach) sinh ra đã mang cột phiên bản từ V6, không đi qua bản nâng cấp
+# V10, nên thêm chúng vào đây sẽ làm hai danh sách lệch nhau vì một lý do không có thật.
+# Bức tranh đầy đủ nằm ở ba bảng khai bên dưới, và test_vpm8 đọc chính chúng.
+
+
+# ────────────────────────────── VPM-8: CỬA SỬA CỦA TỪNG BẢNG ──────────────────────────────
+# Một cột phiên bản không tự chặn ai. Nó chỉ có tác dụng khi CỬA SỬA của bảng ấy thật sự gọi
+# `kiem_phien_ban` trước khi ghi và `tang_phien_ban` sau khi ghi.
+#
+# Ngày 11/9/2026 đo lại: 20 bảng mang cột `phien_ban`, nhưng chỉ 2 cửa sửa gọi `kiem_phien_ban` —
+# dự toán tour và báo giá. Nghĩa là mười tám bảng còn lại mang một cột KHÔNG AI ĐỌC: hai người sửa
+# một hồ sơ xe, một hồ sơ nhân sự, một số tài khoản nhà cung cấp vẫn đè lên nhau lặng lẽ y như
+# trước V10. Cột có mà không có cửa gọi thì tệ hơn không có cột, vì nó làm người đọc mã tin rằng
+# chỗ ấy đã được canh.
+#
+# Bảng dưới đây KHAI cửa sửa của từng bảng, và phép thử test_vpm8_khoa_phien_ban đọc chính nó để
+# hỏi một câu: bảng nào đã khai là có cột phiên bản mà cửa sửa chưa gọi khoá?
+CUA_SUA_CO_KHOA = {
+    "tours":            ("app/services/tours.py",    "edit"),
+    "bookings":         ("app/services/bookings.py", "update_customer"),
+    "products":         ("app/api/v1/products.py",   "edit_product"),
+    "employees":        ("app/api/v1/hr.py",         "update_employee"),
+    "vehicles":         ("app/api/v1/fleet.py",      "cap_nhat_ho_so"),
+    "fleet_trips":      ("app/api/v1/fleet.py",      "sua_chuyen"),
+    "suppliers":        ("app/api/v1/suppliers.py",  "sua_ncc"),
+    "leads":            ("app/api/v1/crm.py",        "patch_lead"),
+    "tour_cost_lines":  ("app/services/settlement.py", "update_line"),
+    "bao_gia":          ("app/api/v1/ban_hang.py",   "sua_bao_gia"),
+    "hop_dong_khach":   ("app/api/v1/ban_hang.py",   "dat_lich"),
+}
+
+# visa_cases KHÔNG nằm ở trên vì nó đã có khoá riêng TỪ TRƯỚC, bằng một cột tên khác: `row_version`
+# (app/models/visa.py), kiểm ngay trong `edit_case` và trả 409. Cùng một ý niệm, hai cái tên — ghi ra
+# đây để người sau không đi gắn thêm một khoá thứ hai lên cùng một bảng, và để biết rằng nếu muốn
+# gộp về một tên thì đó là một việc dọn riêng, có nâng cấp cơ sở dữ liệu, không làm lẫn vào VPM-8.
+KHOA_TEN_KHAC = {"visa_cases": ("row_version", "app/api/v1/visa.py", "edit_case")}
+
+CHUA_CO_CUA_SUA = {
+    "tour_settlements": "sửa qua nhiều đường, chưa có một cửa sửa tờ quyết toán duy nhất",
+    "dispatch_orders": "mới có tạo và huỷ, chưa có sửa",
+    "bang_gia": "sửa qua dòng giá, không sửa thẳng đầu bảng",
+}
 
 
 class LechPhienBan(HTTPException):
     """409 – bản ghi đã đổi kể từ lúc người này mở nó ra."""
 
     def __init__(self, ten: str, dang_co: int, gui_len: int, noi_dung_moi):
+        # VPM-8 – ép về kiểu JSON được TRƯỚC khi dựng câu trả lời. Nội dung mới lấy thẳng từ hàm hiển
+        # thị của từng phân hệ, và các hàm ấy trả về ngày tháng, Decimal, đối tượng ORM. Không ép ở
+        # đây thì mỗi cửa sửa mới gắn khoá sẽ đổ 500 ĐÚNG LÚC có va chạm thật – tức là lỗi chỉ lộ ra
+        # vào đúng ngày hai người sửa cùng lúc, và lộ ra thành "hệ thống sập" chứ không thành "bạn
+        # đang cầm bản cũ". Chỗ ép phải nằm ở đây, một lần, chứ không phải nhắc từng người gọi nhớ.
+        from fastapi.encoders import jsonable_encoder
+        try:
+            noi_dung_moi = jsonable_encoder(noi_dung_moi)
+        except Exception:
+            noi_dung_moi = {"ghi_chu": "không dựng được bản xem trước của nội dung mới – tải lại màn hình"}
         super().__init__(409, {
             "gate": "LECH_PHIEN_BAN",
             "message": f"{ten} đã được người khác sửa trong lúc bạn đang mở "

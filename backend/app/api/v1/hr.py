@@ -53,6 +53,7 @@ def employees(department: str | None = None, u: User = Depends(require_roles(*HR
 class EmployeeIn(BaseModel):
     """Sửa hồ sơ chỉ ghi đè những trường được gửi lên (exclude_unset), nên màn hình cũ gửi thiếu
     trường mới sẽ không xóa mất dữ liệu đã nạp (ngày sinh, điện thoại, pháp nhân, chức danh)."""
+    phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm
     full_name: str
     department: str
     position: str = "nv"
@@ -169,7 +170,11 @@ def update_employee(eid: int, data: EmployeeIn, u: User = Depends(require_roles(
         xe = db.execute(select(Vehicle).where(Vehicle.driver_id == e.id, Vehicle.active == True)).scalars().all()
         if xe: raise HTTPException(422, f"{e.full_name} đang là tài xế của xe {', '.join(v.plate for v in xe)} – giao xe cho người khác trước khi ngưng hồ sơ")
     before = {"luong": e.base_salary, "chuc_vu": e.position, "phong": e.department, "dang_lam": e.active}
+    from app.services import ghi_mot_lan as GML
+    GML.kiem_phien_ban(e, fields.pop("phien_ban", None), f"Hồ sơ nhân sự {e.code}",
+                       lambda: {**before, "phien_ban": e.phien_ban})
     for k, v in fields.items(): setattr(e, k, v)
+    GML.tang_phien_ban(e)
     R.audit(db, u.username, u.role, "sua_ho_so_nhan_su", f"emp:{e.code}", before=before,
             after={"luong": e.base_salary, "chuc_vu": e.position, "phong": e.department, "dang_lam": e.active})
     db.commit()

@@ -319,6 +319,8 @@ class DotLichIn(BaseModel):
 
 
 class LichIn(BaseModel):
+    # VPM-8 – đặt lại lịch là sửa hợp đồng (nó ghi vào `han_thanh_toan`), nên đi qua khoá phiên bản.
+    phien_ban: int | None = None
     dot: list[DotLichIn]
 
 
@@ -347,10 +349,15 @@ def xem_lich(hid: int, u: User = Depends(require_roles(*XEM)), db: Session = Dep
 def dat_lich(hid: int, data: LichIn, u: User = Depends(require_roles(*SOAN, "ketoan")),
              db: Session = Depends(get_db)):
     from app.services import lich_thanh_toan as LTT
+    hd = _hd(db, hid)
+    GML.kiem_phien_ban(hd, data.phien_ban, f"Hợp đồng {hd.so_hop_dong}",
+                       lambda: {**_hd_ra(hd), "lich": LTT.bang(db, hd)})
     try:
-        return LTT.dat_lich(db, u, _hd(db, hid), [d.model_dump() for d in data.dot])
+        kq = LTT.dat_lich(db, u, hd, [d.model_dump() for d in data.dot])
     except ValueError as e:
         raise HTTPException(422, str(e))
+    GML.tang_phien_ban(hd); db.commit()
+    return kq
 
 
 @router.post("/hop-dong/lich-thanh-toan/{did}/doi-han")

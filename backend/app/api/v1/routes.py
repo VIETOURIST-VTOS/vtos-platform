@@ -281,7 +281,11 @@ def booking_out(b: Booking) -> dict:
             "sla_known": bool(b.request_id),
             "counts_for_target": b.counts_for_target, "created_at": b.created_at, "paid": (b.paid or 0), "due": (b.amount or 0) - (b.discount or 0) - (b.paid or 0),
             "adl": b.adl, "chd": b.chd, "inf": b.inf, "vietrip_id": b.vietrip_id, "tour_start": b.tour.start_date if b.tour else None,
-            "company_id": b.company_id, "chua_gan_phap_nhan": b.company_id is None, **BK.booking_view(b)}
+            "company_id": b.company_id, "chua_gan_phap_nhan": b.company_id is None,
+            # VPM-8 – màn hình phải NHẬN được số phiên bản thì mới có cái để gửi lại khi lưu.
+            # Thiếu dòng này thì khoá 409 vĩnh viễn không bao giờ chạm tới, vì không ai gửi số nào.
+            "phien_ban": b.phien_ban,
+            **BK.booking_view(b)}
 
 
 @router.get("/mang", tags=["bookings"])
@@ -511,8 +515,15 @@ def list_params(u: User = Depends(require_roles(*AC.PARAM_ROLES, mo_ta="bảng t
 def propose_param(data: S.ParamPropose, u: User = Depends(require_roles("tp_dh", "gd_kd", "ptgd_doan", "ptgd_mkt", "ketoan", "hcns", "cntt", "tgd", "chutich")), db: Session = Depends(get_db)):
     ref = db.execute(select(Param).where(Param.key == data.key).order_by(desc(Param.id))).scalars().first()
     if not ref: raise Gate("THAM_SO", "Không có tham số này")
-    try: float(data.value)
-    except ValueError: raise Gate("THAM_SO", "Giá trị phải là số")
+    # Tham số ngày đi qua cửa khác: float("2026-12-01") ném lỗi, nên trước 11/9/2026 không có đường
+    # nào nhập được hai mốc vận hành thật. Kiểm định dạng ISO thay cho kiểm số – vẫn là kiểm, không
+    # phải bỏ kiểm: một mốc gõ sai định dạng thì moi_truong_du_lieu đọc ra "chưa chốt" và im lặng.
+    if data.key in getattr(R, "THAM_SO_NGAY", ()):
+        try: date.fromisoformat(str(data.value).strip()[:10])
+        except ValueError: raise Gate("THAM_SO", "Giá trị phải là ngày dạng YYYY-MM-DD")
+    else:
+        try: float(data.value)
+        except ValueError: raise Gate("THAM_SO", "Giá trị phải là số")
     p = Param(key=data.key, value=data.value, label=ref.label, unit=ref.unit, effective_from=data.effective_from,
               source=data.source or ref.source, status="pending", proposed_by=u.username)
     db.add(p); db.flush()

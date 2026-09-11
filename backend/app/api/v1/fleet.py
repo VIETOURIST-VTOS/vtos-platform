@@ -96,6 +96,7 @@ def ho_so_xe(vid: int, u: User = Depends(require_roles(*READ)), db: Session = De
 
 
 class HoSoXeIn(BaseModel):
+    phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm
     code: str | None = None
     vin: str | None = None
     seats: int | None = None
@@ -125,8 +126,12 @@ def cap_nhat_ho_so(vid: int, data: HoSoXeIn, u: User = Depends(require_roles(*WR
     if d.get("code"):
         trung = db.execute(select(Vehicle).where(Vehicle.code == d["code"], Vehicle.id != vid)).scalars().first()
         if trung: raise HTTPException(422, f"Mã xe {d['code']} đã dùng cho xe {trung.plate}")
+    pb = d.pop("phien_ban", None)
     before = {k: getattr(v, k) for k in d}
+    from app.services import ghi_mot_lan as GML
+    GML.kiem_phien_ban(v, pb, f"Hồ sơ xe {v.code or v.plate}", lambda: {**before, "phien_ban": v.phien_ban})
     for k, val in d.items(): setattr(v, k, val)
+    GML.tang_phien_ban(v)
     R.audit(db, u.username, u.role, "sua_ho_so_doi_xe", f"vehicle:{v.code or v.plate}",
             before={k: str(x) for k, x in before.items()}, after=data.model_dump(mode="json", exclude_unset=True))
     db.commit()
@@ -411,6 +416,7 @@ def them_chi_phi(tid: int, data: ChiPhiIn, u: User = Depends(require_roles(*WRIT
 
 
 class SuaChuyenIn(BaseModel):
+    phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm
     ten_tour: str | None = None
     ngay_di: date | None = None
     ngay_ve: date | None = None
@@ -435,7 +441,11 @@ def sua_chuyen(tid: int, data: SuaChuyenIn, u: User = Depends(require_roles(*WRI
     truoc = {"ten_tour": t.ten_tour, "ngay_di": str(t.ngay_di), "ngay_ve": str(t.ngay_ve),
              "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "doanh_thu": t.doanh_thu}
     d = data.model_dump(exclude_none=True)
+    from app.services import ghi_mot_lan as GML
+    GML.kiem_phien_ban(t, d.pop("phien_ban", None), f"Chuyến {t.id}",
+                       lambda: {**truoc, "phien_ban": t.phien_ban})
     for k, v in d.items(): setattr(t, k, v)
+    GML.tang_phien_ban(t)
     if t.ngay_ve < t.ngay_di: raise HTTPException(422, "Ngày về trước ngày đi")
     if t.km_dau is not None and t.km_cuoi is not None and t.km_cuoi < t.km_dau:
         raise HTTPException(422, "Km cuối nhỏ hơn km đầu – kiểm tra lại số đọc trên đồng hồ")

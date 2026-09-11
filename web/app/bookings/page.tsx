@@ -43,7 +43,19 @@ function Bookings() {
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
     ["adl", "chd", "inf"].forEach((k) => (d[k] = d[k] === "" ? null : Number(d[k])));
-    try { await api(`/bookings/${edit.id}`, { method: "PUT", json: d }); toast("Đã cập nhật thông tin khách"); setEdit(null); load(); } catch (x) { toast(errMsg(x), true); }
+    // VPM-8 – gửi kèm bản mình đang cầm. Không gửi thì máy chủ cho qua (màn hình cũ vẫn dùng được),
+    // nhưng cũng mất luôn tác dụng của khoá: người sau vẫn ghi đè lặng lẽ lên người trước.
+    d.phien_ban = edit.phien_ban;
+    try { await api(`/bookings/${edit.id}`, { method: "PUT", json: d }); toast("Đã cập nhật thông tin khách"); setEdit(null); load(); }
+    catch (x: any) {
+      // 409 = người khác vừa sửa. Hiện thẳng nội dung mới thay vì bắt người dùng đi tra tay.
+      const ct = x?.detail || x?.body?.detail;
+      if (ct?.gate === "LECH_PHIEN_BAN") {
+        toast(`${ct.message} Khách trên hệ thống hiện là: ${ct.noi_dung_moi?.khach || "–"} · ${ct.noi_dung_moi?.sdt || "–"}`, true);
+        setEdit(null); load(); return;
+      }
+      toast(errMsg(x), true);
+    }
   };
   const doCancel = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
