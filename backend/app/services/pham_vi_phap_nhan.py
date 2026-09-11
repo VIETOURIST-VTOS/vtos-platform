@@ -189,3 +189,148 @@ def do_phu_kin(db: Session) -> dict:
                     "lại. Dòng chưa gán KHÔNG thuộc công ty mẹ – nó là 'chưa xác định', và đến kỳ hợp "
                     "nhất thì nó không thuộc công ty nào cả."),
     }
+
+
+# =============================================================================================
+# PQ-6 (11/9/2026) · Khai chỗ nào PHẢI lọc, và siết tài khoản chưa gán kể từ ngày vận hành thật
+# =============================================================================================
+# Ba quy tắc ở đầu tệp viết ngày 08/9 vẫn đúng nguyên. Phần này bổ sung hai thứ chúng còn thiếu,
+# và cả hai đều bắt nguồn từ một phép đo ngày 11/9/2026:
+#
+#     22 mô hình mang cột company_id.  PV.loc() được gọi ĐÚNG 5 LẦN trong toàn bộ api/v1.
+#
+# Nghĩa là mười bảy mô hình có cột pháp nhân mà không truy vấn danh sách nào lọc theo phiên. Hàm
+# loc() viết xong từ 08/9 và đúng; nó chỉ không được gọi. Một hàng rào chưa bật thì bằng không có
+# hàng rào, và tệ hơn ở chỗ: nhìn vào mã thấy có hàng rào nên không ai đi dựng cái thứ hai.
+#
+# ĐÍNH CHÍNH con số: bản đầu của khối này ghi "16 mô hình", và 16 là con số SAI. Nó đếm trên một
+# bản sao kho mã chỉ có 6/34 tệp trong app/models – bang_co_cot_phap_nhan() quét mô hình đã nạp,
+# nên tệp không có mặt thì mô hình trong đó vô hình chứ không báo lỗi. Đếm lại trên đủ 34 tệp:
+# 22 mô hình. Sáu mô hình lọt khỏi bản khai đầu tiên – DebtPayment, PartnerOwner, Settlement,
+# SharedInvoice, VisaCase, VisaFamilyGroup – đều thuộc hai phân hệ nặng tiền và nặng định danh
+# nhất (đội xe và visa). Chính phép thử "mỗi mô hình có cột pháp nhân đều phải được khai một lần"
+# đã bắt được chỗ này ngay khi kho mã đủ tệp; đó là lý do phép thử ấy tồn tại.
+
+# Mô hình PHẢI lọc theo phiên, kèm lý do. Việc NỐI loc() vào từng truy vấn là VPM-C2, thuộc làn
+# Viết phần mềm; khai ra chỗ nào phải nối là việc của làn Phân quyền.
+PHAI_LOC = {
+    "Tour":           "chuyến của pháp nhân nào thì doanh thu và giá vốn của pháp nhân ấy",
+    "Booking":        "booking mang tiền khách – nền của mọi báo cáo bán hàng",
+    "Receipt":        "phiếu thu là tiền vào của một pháp nhân cụ thể",
+    "PaymentRequest": "đề nghị chi là tiền ra của một pháp nhân cụ thể",
+    "JournalEntry":   "bút toán ghi sổ – vào thẳng báo cáo tài chính từng pháp nhân",
+    "BaoGia":         "báo giá là cam kết với khách, và cam kết do một pháp nhân đứng tên",
+    "HopDongKhach":   "hợp đồng khách mang giá trị hợp đồng vào báo cáo",
+    "FinContract":    "khế ước vay là nghĩa vụ nợ của đúng một pháp nhân",
+    "Campaign":       "chiến dịch tiêu ngân sách của một pháp nhân",
+    "MarketingBudget": "ngân sách marketing được duyệt theo pháp nhân",
+    "CareTicket":     "phiếu chăm sóc gắn với khách của một pháp nhân",
+    "Complaint":      "khiếu nại có thể dẫn tới tiền bồi thường",
+    "ContentItem":    "nội dung đăng dưới thương hiệu của một pháp nhân",
+    "Vehicle":        "xe thuộc sở hữu của công ty vận tải, không phải của lữ hành",
+
+    # Sáu dòng dưới thêm ngày 11/9/2026 sau khi đếm lại trên đủ 34 tệp mô hình (xem đính chính ở
+    # trên). Cả sáu nằm ở đội xe và visa – hai phân hệ mà lộ chéo pháp nhân là tốn tiền thật hoặc
+    # lộ giấy tờ tùy thân thật, chứ không phải lộ một danh sách xem cho biết.
+    "PartnerOwner":    "chủ xe hợp tác ký với ĐÚNG MỘT pháp nhân; nhìn nhầm danh sách đối tác của "
+                       "pháp nhân khác là bước đầu của một lần cấn trừ sai công ty",
+    "Settlement":      "kỳ quyết toán chủ xe là con số hai bên đã thỏa thuận và đã đóng kỳ – xem "
+                       "được kỳ của pháp nhân khác là xem được giá mua dịch vụ của họ",
+    "DebtPayment":     "một lần tiền đi hoặc tiền về trên công nợ đội xe, có khóa chống trả hai lần; "
+                       "sổ công nợ trộn pháp nhân thì khóa ấy canh nhầm sổ",
+    "SharedInvoice":   "hóa đơn dùng chung chỉ được chia cho xe có tên trên chính hóa đơn đó và "
+                       "tuyệt đối không chia chéo hai pháp nhân – quy tắc sinh từ lỗi tháng 8/2026",
+    "VisaCase":        "hồ sơ visa mang tên thật, ngày sinh và giấy tờ tùy thân của đương đơn; đây "
+                       "là bảng mà lọc sai pháp nhân là lộ dữ liệu cá nhân, không chỉ lộ số liệu",
+    "VisaFamilyGroup": "nhóm gia đình gom nhiều đương đơn và nối tới booking; thấy được nhóm là "
+                       "thấy được cả quan hệ nhân thân của khách pháp nhân khác",
+}
+
+# Mô hình CÓ cột pháp nhân nhưng CỐ Ý không lọc theo phiên. Phải viết ra lý do: "cố ý không lọc" là
+# lối thoát dễ nhất cho một chỗ quên nối, nên không viết được lý do nghĩa là chưa chắc đã cố ý.
+CO_Y_KHONG_LOC = {
+    "User":     "danh sách tài khoản chỉ mở cho quản trị (/access); lọc ở đây là giấu tài khoản "
+                "khỏi đúng người có nhiệm vụ đi gán pháp nhân cho chúng",
+    "Employee": "hồ sơ nhân sự do HCNS quản lý tập trung; HCNS làm việc trên cả tập đoàn",
+}
+
+
+def mo_hinh_thieu_loc(goc_api: str = "") -> list[str]:
+    """Mô hình đã khai PHẢI LỌC mà không truy vấn nào trong api/v1 gọi PV.loc cho nó.
+
+    Đây là phép đo cho bộ kiểm của làn Kiểm soát và cho phép thử: danh sách rỗng nghĩa là đã nối
+    xong; còn tên nào trong đó thì chừng ấy phân hệ đang để lộ dữ liệu chéo pháp nhân.
+    """
+    import pathlib, re
+    goc = pathlib.Path(goc_api) if goc_api else pathlib.Path(__file__).resolve().parents[1] / "api" / "v1"
+    if not goc.exists():
+        return []
+    ma = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in goc.glob("*.py"))
+    da_noi = set(re.findall(r"PV\.loc\(\s*[\w\.]+\s*,\s*(\w+)", ma))
+    return sorted(t for t in PHAI_LOC if t not in da_noi)
+
+
+# ---------------------------------------------------------------------------------------------
+# Siết tài khoản chưa gán pháp nhân, kể từ ngày vận hành thật
+# ---------------------------------------------------------------------------------------------
+# Quy tắc 3 ở đầu tệp – "tài khoản chưa gán vẫn thấy toàn bộ" – đúng cho giai đoạn chạy thử: bật lọc
+# cứng lúc chưa ai kịp gán thì cả công ty đứng lại trong một buổi sáng.
+#
+# Nhưng nó chỉ đúng CHO TỚI ngày vận hành thật. Sau ngày ấy, "chưa gán thì thấy tất" không còn là
+# sự nhường nhịn nữa, nó là một lỗ hổng: mở một tài khoản mới mà quên gán pháp nhân là vô tình trao
+# quyền xem toàn tập đoàn, và không có gì kêu lên.
+#
+# Nên quy tắc 3 có hạn dùng. Từ mốc vận hành thật (tham số ngay_van_hanh_that, hai chữ ký), tài
+# khoản chưa gán KHÔNG còn thấy toàn bộ – nó thấy rỗng, kèm câu nói rõ ai gán được cho mình. Thấy
+# rỗng mà biết vì sao thì người ta đi hỏi; thấy tất mà không biết thì không ai hỏi gì cả.
+SIET_TU_MOC_VAN_HANH_THAT = True
+
+
+def sau_moc_van_hanh_that(db) -> bool:
+    from app.services.moi_truong_du_lieu import che_do, THAT
+    return che_do(db) == THAT
+
+
+def pham_vi_theo_phien(db, u: User) -> dict:
+    """Phạm vi có tính tới mốc vận hành thật. Dùng cho truy vấn danh sách và cho /auth/me.
+
+    Trả `chan_het=True` khi tài khoản chưa gán pháp nhân và đã qua mốc vận hành thật – khi ấy màn
+    hình phải hiện RỖNG kèm lý do, không hiện toàn bộ.
+    """
+    cid = pham_vi(u)
+    ly_do = ly_do_khong_gioi_han(u)
+    chan = bool(SIET_TU_MOC_VAN_HANH_THAT and cid is None
+                and ly_do == "tai_khoan_chua_gan_phap_nhan" and sau_moc_van_hanh_that(db))
+    return {
+        "company_id": cid, "ly_do_khong_gioi_han": ly_do, "chan_het": chan,
+        "cau_hien_thi": ("Tài khoản của bạn chưa được gán pháp nhân nên chưa xem được dữ liệu nào. "
+                         "Hành chính Nhân sự hoặc CNTT gán giúp bạn ở màn hình Tài khoản & phân quyền."
+                         if chan else mo_ta(db, u)["cau_hien_thi"]),
+    }
+
+
+def loc_theo_phien(q, model, u: User, db=None):
+    """Như loc(), nhưng biết tới mốc vận hành thật.
+
+    Không đổi hành vi của loc() cũ – năm chỗ đang gọi nó giữ nguyên. Chỗ nào muốn siết đúng luật
+    mới thì gọi hàm này và truyền db vào; không truyền db thì hệ quả đúng bằng loc().
+    """
+    if db is not None and pham_vi_theo_phien(db, u)["chan_het"]:
+        # Chặn bằng false() của SQLAlchemy chứ không bằng một điều kiện tự mâu thuẫn: điều kiện
+        # kiểu `col IS NULL AND col IS NOT NULL` tuy cũng ra rỗng nhưng đọc như một lỗi gõ nhầm,
+        # và người đọc sau sẽ "sửa" nó.
+        from sqlalchemy import false
+        return q.where(false())
+    return loc(q, model, u)
+
+
+def tai_khoan_chua_gan(db) -> list[dict]:
+    """Tài khoản đang hoạt động, không thuộc vai trò toàn tập đoàn, mà chưa gán pháp nhân.
+
+    Đây là danh sách phải làm cạn TRƯỚC mốc vận hành thật. Sau mốc, mỗi dòng còn lại trong danh
+    sách này là một người sáng ra không mở được màn hình nào.
+    """
+    rows = db.execute(select(User).where(User.active == True)).scalars().all()  # noqa: E712
+    return [{"id": r.id, "username": r.username, "ho_ten": r.full_name, "vai_tro": r.role}
+            for r in rows
+            if getattr(r, "role", "") not in TOAN_TAP_DOAN and getattr(r, "company_id", None) is None]

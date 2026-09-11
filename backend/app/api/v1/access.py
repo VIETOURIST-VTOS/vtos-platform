@@ -16,6 +16,7 @@ from app.models.core import User, ROLES, Company
 from app.services import access as AC
 from app.services import access_admin as AA
 from app.services import rules as R
+from app.services import luong_viec_bao_cao as LVBC   # PQ-2 – trình bày bảng luồng việc
 
 router = APIRouter(prefix="/api/v1/access", tags=["phan-quyen"])
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -42,6 +43,32 @@ def matrix_xlsx(u: User = Depends(require_roles(*XEM)), db: Session = Depends(ge
     R.audit(db, u.username, u.role, "xuat_ma_tran_quyen", "access"); db.commit()
     return Response(content=noi_dung, media_type=XLSX,
                     headers={"Content-Disposition": f'attachment; filename="MA_TRAN_PHAN_QUYEN_{datetime.now():%d%m%y}.xlsx"'})
+
+
+# ---------------------------------------------------------------------------------------------
+# PQ-2 · Luồng công việc – ai được ĐẨY VIỆC sang bước sau
+# ---------------------------------------------------------------------------------------------
+# Ba đường dưới đây trả lời một câu mà ma trận quyền ở trên KHÔNG trả lời được: ma trận nói ai được
+# NHÌN màn hình nào; luồng việc nói ai được đẩy một hồ sơ sang bước tiếp theo. Hai câu khác nhau,
+# và câu thứ hai mới là chuỗi chỉ huy thật của công ty.
+@router.get("/luong-viec")
+def luong_viec(u: User = Depends(require_roles(*XEM))):
+    return LVBC.bao_cao()
+
+
+@router.get("/luong-viec/vai-tro/{vai_tro}")
+def luong_viec_theo_vai_tro(vai_tro: str, u: User = Depends(require_roles(*XEM))):
+    """Tra ngược: người giữ vai trò này đẩy được những bước nào."""
+    return LVBC.tra_cuu_vai_tro(vai_tro)
+
+
+@router.get("/luong-viec.xlsx")
+def luong_viec_xlsx(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Bản Excel để Chủ tịch rà và ký – có sẵn hai ô ký ở cuối."""
+    noi_dung = LVBC.xlsx(db)
+    R.audit(db, u.username, u.role, "xuat_luong_cong_viec", "access"); db.commit()
+    return Response(content=noi_dung, media_type=XLSX,
+                    headers={"Content-Disposition": f'attachment; filename="LUONG_CONG_VIEC_{datetime.now():%d%m%y}.xlsx"'})
 
 
 @router.get("/accounts")
