@@ -1,15 +1,20 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  docDonVi, datDangXem, duyetCay,
+  docDonVi, datDangXem, duyetCay, nhanNgan,
+  TOAN_PHAM_VI, DON_VI, CHUA_XAC_DINH,
   KHOA_YEU_THICH, KHOA_GAN_NHAT,
-  type DonVi, type KetQuaPhamVi,
+  type DonVi, type Kieu, type KetQuaPhamVi,
 } from "@/lib/phamvi";
 
 /** TC-1 · Nút chọn đơn vị trên thanh ngang.
  *
  *  Sáu việc lệnh giao: tìm kiếm · nhóm thu/mở · đơn vị yêu thích · lựa chọn gần nhất · luôn hiện
  *  đơn vị đang chọn · cảnh báo khi còn dữ liệu chưa lưu.
+ *
+ *  BA MỤC CHỌN, không phải hai. Ngoài "Toàn công ty" và từng đơn vị còn có "Chưa xác định pháp
+ *  nhân" – hồ sơ chưa gán công ty. Trước đây chúng lẫn vào mọi danh sách nên không ai đếm được;
+ *  đứng riêng thì đếm được và sửa được. Đây là kiểu `chua_xac_dinh` của máy chủ.
  *
  *  BỐN RÀNG BUỘC, mỗi cái là một chỗ dễ làm sai:
  *
@@ -19,9 +24,9 @@ import {
  *  2. ĐỔI ĐƠN VỊ KHÔNG ĐỔI PHÁP NHÂN CỦA CHỨNG TỪ. Đổi đơn vị là đổi "tôi đang nhìn phần nào";
  *     pháp nhân của một tờ chứng từ là chuyện khác và không ai sửa nó từ đây.
  *
- *  3. "TOÀN CÔNG TY" KHÔNG CỘNG TRÙNG. Nó gửi lên `null` và để MÁY CHỦ gom theo cây parent_id.
- *     Mỗi hồ sơ mang đúng một company_id nên không có đường cộng trùng – miễn là trình duyệt
- *     không tự cộng, và ở đây nó không cộng gì cả.
+ *  3. "TOÀN CÔNG TY" KHÔNG CỘNG TRÙNG. Nó gửi kiểu `toan_pham_vi` và để MÁY CHỦ gom theo cây
+ *     parent_id. Mỗi hồ sơ mang đúng một pháp nhân nên không có đường cộng trùng – miễn là trình
+ *     duyệt không tự cộng, và ở đây nó không cộng gì cả.
  *
  *  4. CÒN DỮ LIỆU CHƯA LƯU THÌ HỎI TRƯỚC. Đổi phạm vi giữa chừng một biểu đang gõ dở là mất việc
  *     người ta vừa làm, mà mất im lặng.
@@ -61,11 +66,13 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
   const phang = useMemo(() => duLieu ? duyetCay(duLieu.duoc_phep) : [], [duLieu]);
   const theoMa = useMemo(() => {
     const m = new Map<string, DonVi>();
-    for (const { dv } of phang) m.set(String(dv.id), dv);
+    for (const { dv } of phang) m.set(String(dv.company_id), dv);
     return m;
   }, [phang]);
 
-  const nhan = duLieu?.dang_xem?.ten ?? "Toàn công ty";
+  const chon_ht = duLieu?.dang_xem ?? null;
+  const dangK = String(chon_ht?.company_id ?? "");
+  const nhan = nhanNgan(chon_ht, theoMa.get(dangK)?.ten);
 
   function luu(khoa: string, v: string[]) {
     try { localStorage.setItem(khoa, JSON.stringify(v)); } catch { /* bỏ qua */ }
@@ -76,7 +83,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
     setYeuThich(moi); luu(KHOA_YEU_THICH, moi);
   }
 
-  async function chon(id: number | "chua_gan" | null, ten: string) {
+  async function chon(kieu: Kieu, ma: number | null, ten: string) {
     // Ràng buộc 4: hỏi TRƯỚC khi đổi, không hỏi sau.
     if (chuaLuu?.()) {
       const ok = window.confirm(
@@ -84,11 +91,11 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
       if (!ok) return;
     }
     setDangDat(true);
-    const r = await datDangXem(id);
+    const r = await datDangXem(kieu, ma);
     setDangDat(false);
     if (!r.ok) { toast?.(r.loi || "Không đổi được đơn vị đang xem", true); return; }
-    if (id !== null) {
-      const khoa = String(id);
+    if (kieu === DON_VI && ma !== null) {
+      const khoa = String(ma);
       const moi = [khoa, ...ganNhat.filter((x) => x !== khoa)].slice(0, 5);
       setGanNhat(moi); luu(KHOA_GAN_NHAT, moi);
     }
@@ -115,7 +122,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
     const an = new Set<string>();
     const di = (ds: DonVi[], duoi: boolean) => {
       for (const dv of ds) {
-        const k = String(dv.id);
+        const k = String(dv.company_id);
         if (duoi) an.add(k);
         if (dv.con?.length) di(dv.con, duoi || thu.has(k));
       }
@@ -123,13 +130,6 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
     di(duLieu.duoc_phep, false);
     return an;
   }, [duLieu, thu, tim]);
-
-  const nut = (
-    <button type="button" onClick={() => setMo((m) => !m)} aria-haspopup="listbox" aria-expanded={mo}
-      title={`Đơn vị đang xem: ${nhan}`} disabled={dangDat}>
-      {nhan} ▾
-    </button>
-  );
 
   if (kq?.tinh_trang === "chua_co_nguon") {
     return (
@@ -144,9 +144,26 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
   }
   if (!kq) return <button type="button" className="soon" disabled>Đang tải đơn vị…</button>;
 
+  // Chỉ một đơn vị trong phạm vi thì nút chọn không đổi được gì – hiện tên, không hiện hộp. Đây là
+  // `co_the_thu_hep` của máy chủ: một ô bấm mở ra rồi đóng lại mà không làm gì là một lời hứa hụt.
+  if (duLieu && !duLieu.co_the_thu_hep) {
+    return <button type="button" className="soon" disabled title={chon_ht?.cau_hien_thi || nhan}>{nhan}</button>;
+  }
+
+  const muc = (nhan_: string, kieu: Kieu, ma: number | null, chuThich: string) => (
+    <button type="button" onClick={() => chon(kieu, ma, nhan_)} title={chuThich}
+      style={{ textAlign: "left", padding: "5px 6px", fontFamily: "inherit", fontSize: 12.5,
+               fontWeight: chon_ht?.kieu === kieu && (chon_ht?.company_id ?? null) === ma ? 700 : 400 }}>
+      {nhan_}
+    </button>
+  );
+
   return (
     <span ref={hop} style={{ position: "relative" }}>
-      {nut}
+      <button type="button" onClick={() => setMo((m) => !m)} aria-haspopup="listbox" aria-expanded={mo}
+        title={chon_ht?.cau_hien_thi || `Đơn vị đang xem: ${nhan}`} disabled={dangDat}>
+        {nhan} ▾
+      </button>
       {mo && (
         <span role="listbox" aria-label="Chọn đơn vị đang xem"
           style={{ position: "absolute", right: 0, top: "100%", zIndex: 50, width: 300, maxHeight: 420,
@@ -159,27 +176,34 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
             </b>
           )}
 
+          {/* Máy chủ vừa BỎ lựa chọn cũ vì nó ra ngoài phạm vi. Nói thẳng, vì im lặng đưa người ta
+              về "Toàn công ty" thì họ tưởng mình vẫn đang xem đơn vị hôm qua. */}
+          {chon_ht?.ve_mac_dinh === "lua_chon_cu_ngoai_pham_vi" && (
+            <b style={{ background: "#fdecec", color: "#8a1f1f", borderRadius: 4, padding: "4px 6px", fontSize: 11.5 }}>
+              Lựa chọn trước đã ra ngoài phạm vi tài khoản của bạn nên đã trở về mặc định.
+            </b>
+          )}
+
           <input value={tim} onChange={(e) => setTim(e.target.value)} placeholder="Tìm đơn vị…"
             aria-label="Tìm đơn vị" style={{ padding: "5px 7px", fontSize: 12.5, fontFamily: "inherit" }} />
 
           {/* Luôn hiện đơn vị đang chọn, ngay cả khi đang tìm chữ khác – lệnh TC-1 đòi vậy, và nó
               đúng: người dùng phải biết mình đang đứng ở đâu trước khi quyết định đi đâu. */}
           <span style={{ fontSize: 11.5, color: "#666", padding: "2px 4px" }}>
-            Đang xem: <b>{nhan}</b>
+            {chon_ht?.cau_hien_thi ? chon_ht.cau_hien_thi : <>Đang xem: <b>{nhan}</b></>}
           </span>
 
-          <button type="button" onClick={() => chon(null, "Toàn công ty")}
-            title="Toàn bộ phạm vi tài khoản được xem, gồm đơn vị trực thuộc – máy chủ gom, không cộng trùng"
-            style={{ textAlign: "left", padding: "5px 6px", fontFamily: "inherit", fontSize: 12.5 }}>
-            Toàn công ty
-          </button>
+          {muc("Toàn công ty", TOAN_PHAM_VI, null,
+               "Toàn bộ phạm vi tài khoản được xem, gồm đơn vị trực thuộc – máy chủ gom, không cộng trùng")}
+          {muc("Chưa xác định pháp nhân", CHUA_XAC_DINH, null,
+               "Hồ sơ chưa gán công ty. Đứng riêng để đếm được và sửa được, thay vì lẫn vào mọi danh sách.")}
 
           {yeuThich.length > 0 && !tim.trim() && (
             <>
               <span style={{ fontSize: 11, color: "#888", padding: "4px 4px 0" }}>YÊU THÍCH</span>
               {yeuThich.filter((k) => theoMa.has(k)).map((k) => {
                 const dv = theoMa.get(k)!;
-                return <button key={"yt" + k} type="button" onClick={() => chon(dv.id, dv.ten)}
+                return <button key={"yt" + k} type="button" onClick={() => chon(DON_VI, dv.company_id, dv.ten)}
                   style={{ textAlign: "left", padding: "4px 6px", fontFamily: "inherit", fontSize: 12.5 }}>★ {dv.ten}</button>;
               })}
             </>
@@ -190,7 +214,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
               <span style={{ fontSize: 11, color: "#888", padding: "4px 4px 0" }}>GẦN NHẤT</span>
               {ganNhat.filter((k) => theoMa.has(k)).map((k) => {
                 const dv = theoMa.get(k)!;
-                return <button key={"gn" + k} type="button" onClick={() => chon(dv.id, dv.ten)}
+                return <button key={"gn" + k} type="button" onClick={() => chon(DON_VI, dv.company_id, dv.ten)}
                   style={{ textAlign: "left", padding: "4px 6px", fontFamily: "inherit", fontSize: 12.5 }}>{dv.ten}</button>;
               })}
             </>
@@ -199,7 +223,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
           <span style={{ fontSize: 11, color: "#888", padding: "4px 4px 0" }}>TẤT CẢ ĐƠN VỊ ĐƯỢC XEM</span>
           {hienThi.length === 0 && <span style={{ fontSize: 12, color: "#888", padding: 4 }}>Không có đơn vị nào khớp.</span>}
           {hienThi.map(({ dv, sau }) => {
-            const k = String(dv.id);
+            const k = String(dv.company_id);
             if (bi_an.has(k)) return null;
             const coCon = !!dv.con?.length && !tim.trim();
             return (
@@ -212,10 +236,14 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
                     {thu.has(k) ? "▸" : "▾"}
                   </button>
                 ) : <span style={{ width: 15 }} />}
-                <button type="button" onClick={() => chon(dv.id, dv.ten)}
+                <button type="button" onClick={() => chon(DON_VI, dv.company_id, dv.ten)}
                   style={{ flex: 1, textAlign: "left", padding: "4px 6px", fontFamily: "inherit", fontSize: 12.5,
-                           fontWeight: String(duLieu?.dang_xem?.id) === k ? 700 : 400 }}>
+                           fontWeight: chon_ht?.kieu === DON_VI && dangK === k ? 700 : 400 }}>
                   {dv.ten}{dv.ma ? <i style={{ color: "#999", fontStyle: "normal" }}> · {dv.ma}</i> : null}
+                  {/* Đơn vị đã ngừng hoạt động VẪN ở trong danh sách – sáu tháng số liệu của nó
+                      không biến mất theo. Nhưng phải có nhãn, kẻo người ta chọn nhầm rồi tưởng
+                      đơn vị đang chạy mà không có doanh thu. */}
+                  {dv.hoat_dong === false ? <i style={{ color: "#a56", fontStyle: "normal" }}> · đã ngừng</i> : null}
                 </button>
                 <button type="button" onClick={() => doiYeuThich(k)}
                   title={yeuThich.includes(k) ? "Bỏ khỏi yêu thích" : "Thêm vào yêu thích"}
@@ -226,6 +254,13 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
               </span>
             );
           })}
+
+          {/* Máy chủ chưa có bảng lưu lựa chọn (KHO_LUU is None). Không hứa "đã ghi nhớ". */}
+          {chon_ht?.luu_tru === "chua_co" && (
+            <span style={{ fontSize: 11, color: "#8a4b00", padding: "6px 4px 0", borderTop: "1px solid #eee", marginTop: 4 }}>
+              Máy chủ chưa lưu lựa chọn này: đăng nhập lại sẽ trở về mặc định.
+            </span>
+          )}
         </span>
       )}
     </span>
