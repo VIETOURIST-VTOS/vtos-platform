@@ -33,8 +33,16 @@ from app.models.quyet_toan import *  # noqa
 from app.models.lop3_tour import *  # noqa
 from app.models.nap_bo_sung import *  # noqa
 from app.models.doc_chung_tu import *  # noqa
+# V7 Đợt 3 (10/9/2026). su_co_tour đứng SAU cskh và hr: nó mang khoá ngoài sang complaints và
+# incidents, nên hai bảng kia phải có mặt trong metadata trước.
+from app.models.su_co_tour import *  # noqa
+from app.models.kiem_toan import *  # noqa
 # Đội xe thiếu ở đây từ đầu. Ứng dụng vẫn chạy vì các dịch vụ nạp thẳng app.models.fleet, nhưng
 # Base.metadata sau `import app.models` thì thiếu 20 bảng – nên mọi phép thử soi metadata đều mù
 # đúng phần đội xe. Phát hiện ngày 09/9/2026 khi phép thử canh cột tiền K2 chỉ nhìn thấy 62 trong
 # 83 cột và vẫn báo xanh.
 from app.models.fleet import *  # noqa
+# V11. Thiếu dòng này thì hai bảng lịch tự động hoá không nằm trong Base.metadata: create_all không
+# tạo, phép thử soi mô hình mù đúng phần ấy, và alembic autogenerate sẽ đòi XOÁ bảng. Bộ kiểm KS-7
+# tìm ra ngày 11/9/2026 – cùng một lỗi đã xảy ra với đội xe (09/9) và VPM-5 (11/9).
+from app.models.tu_dong import *  # noqa

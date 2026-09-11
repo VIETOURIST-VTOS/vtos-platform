@@ -41,7 +41,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
   { key: "dieuhanh", label: "5. Điều hành", items: [
     ["Yêu cầu chờ xử lý", "/requests"], ["Chuyến tour & dự toán", "/tours"], ["Nhà cung cấp & đặt dịch vụ", "/nha-cung-cap"],
     ["Hồ sơ visa", "/visa"],
-    ["Sự cố tour", ""], ["Quyết toán tour", "/tours"],
+    ["Sự cố tour", "/su-co-tour"], ["Quyết toán tour", "/tours"],
     // Lãi lỗ tour đứng NGAY SAU Quyết toán tour vì đó là thứ tự thật của việc: nhập xong dòng chi phí
     // quyết toán thì mới có giá vốn, có giá vốn mới có lãi lỗ. Đặt trước thì người dùng gặp bảng lãi lỗ
     // rỗng trước khi gặp việc phải làm để nó có số.
@@ -63,7 +63,7 @@ export const GROUPS: { key: string; label: string; items: [string, string][] }[]
     ["Thu & đối soát", "/collections"], ["Đề nghị chi & thanh toán", "/expenses"], ["Công nợ", "/cong-no"],
     ["Bảo lưu & hoàn tiền", "/bookings"], ["Dòng tiền", "/finance?tab=forecast"], ["Vay & đầu tư", "/finance?tab=contracts"],
     ["Tài khoản ngân hàng", "/bank-accounts"], ["Sổ kế toán", "/accounting?tab=journal"], ["Hóa đơn & thuế", "/accounting?tab=invoices"],
-    ["Báo cáo tài chính", "/accounting?tab=bctc"], ["Hồ sơ kiểm toán", ""],
+    ["Báo cáo tài chính", "/accounting?tab=bctc"], ["Hồ sơ kiểm toán", "/ho-so-kiem-toan"],
     // Kết sổ đứng NGAY TRƯỚC Khóa kỳ vì đó là thứ tự thật của việc: đưa sao kê vào sổ, kết chuyển bốn
     // bước, rồi mới khóa. Xếp ngược lại thì người dùng gặp nút khóa trước khi gặp việc phải làm.
     ["Kết sổ kỳ", "/ket-so"], ["Khóa kỳ", "/accounting?tab=periods"],

@@ -102,8 +102,28 @@ def test_khong_trung_ten_voi_bo_nap_quyet_toan_thang():
     loại nào, và đoán sai một lần là nạp tổng tháng vào chỗ dành cho một chuyến.
     """
     assert "quyet_toan_tour_chi_tiet" != "quyet_toan_tour"
-    assert set(PB3.bo_nap(_c)) == {"quyet_toan_tour_chi_tiet"}
-    assert PB3.PHONG_BAN["quyet_toan_tour_chi_tiet"] == "dieu_hanh"
+
+    # Tệp này khai NHIỀU HƠN MỘT bộ nạp kể từ 11/9/2026, nên phép thử không còn chốt được bằng một
+    # tên duy nhất. Điều cần giữ vẫn y nguyên: MỖI HÌNH DẠNG TỆP MỘT CỬA RIÊNG, không cửa nào phải
+    # đoán mình đang cầm loại nào.
+    #
+    #   quyet_toan_tour         – tệp CẢ THÁNG, mỗi điều hành viên một sheet (ở tệp nạp khác)
+    #   quyet_toan_tour_chi_tiet – tệp MỘT chuyến, bốn sheet theo mẫu cũ của điều hành
+    #   mau_quyet_toan_tour      – tệp MỘT chuyến theo HAI MẪU CHUẨN Chủ tịch chốt 11/9 (trong nước /
+    #                              nước ngoài); mẫu do máy sinh ra ở /quyet-toan-lop3/mau-trong
+    #
+    # Chốt danh sách ra đây để thêm cửa thứ tư là phải sửa dòng này – tức là phải nghĩ một lần nữa
+    # xem cửa mới có thật sự là một hình dạng tệp khác không, hay chỉ là cửa cũ nhận thêm biến thể.
+    KHAI = set(PB3.bo_nap(_c))
+    assert KHAI == {"quyet_toan_tour_chi_tiet", "mau_quyet_toan_tour"}, \
+        f"Có cửa nạp mới trong intake_phong_ban_3: {KHAI}. Thêm vào danh sách này kèm lý do, và nói rõ nó nhận hình dạng tệp nào."
+    assert "quyet_toan_tour" not in KHAI, "Bộ nạp tệp cả tháng phải ở cửa khác, không gộp vào đây"
+
+    # Mọi cửa trong tệp này đều thuộc Điều hành và đều CHẠM TIỀN – thiếu một trong hai khai báo thì
+    # cửa lọt ra ngoài hàng rào mà không ai thấy.
+    for ten in KHAI:
+        assert PB3.PHONG_BAN[ten] == "dieu_hanh", f"{ten} chưa khai phòng ban"
+        assert ten in PB3.CHAM_TIEN, f"{ten} chạm tiền nhưng chưa khai vào CHAM_TIEN"
 
 
 def test_kiem_lo_khong_nhan_tep_co_nhieu_hon_mot_chuyen():

@@ -94,6 +94,7 @@ CUA_SUA_CO_KHOA = {
     "tour_cost_lines":  ("app/services/settlement.py", "update_line"),
     "bao_gia":          ("app/api/v1/ban_hang.py",   "sua_bao_gia"),
     "hop_dong_khach":   ("app/api/v1/ban_hang.py",   "dat_lich"),
+    "booking_khach":    ("app/api/v1/quyet_toan_lop3.py", "sua_khach"),
 }
 
 # visa_cases KHÔNG nằm ở trên vì nó đã có khoá riêng TỪ TRƯỚC, bằng một cột tên khác: `row_version`
@@ -106,6 +107,13 @@ CHUA_CO_CUA_SUA = {
     "tour_settlements": "sửa qua nhiều đường, chưa có một cửa sửa tờ quyết toán duy nhất",
     "dispatch_orders": "mới có tạo và huỷ, chưa có sửa",
     "bang_gia": "sửa qua dòng giá, không sửa thẳng đầu bảng",
+    # Lớp 3 quyết toán tour. Bốn bảng này mới có cửa THÊM và cửa ĐỌC, chưa có cửa sửa từng dòng: quy
+    # trình hiện tại là xoá dòng sai rồi nhập lại, vì tờ quyết toán còn đang lập thì chưa ai cầm bản
+    # in của nó. Khi nào có cửa sửa thì chuyển lên CUA_SUA_CO_KHOA – cột phien_ban đã sẵn sàng.
+    "khach_chi_phi": "mới có cửa thêm và cửa đọc, chưa có cửa sửa từng dòng chi phí của khách",
+    "tour_doanh_thu_dong": "mới có cửa thêm và cửa đọc, sửa bằng cách xoá dòng rồi nhập lại",
+    "tour_phuong_tien": "mới có cửa thêm và cửa đọc, sửa bằng cách xoá chặng rồi nhập lại",
+    "tour_hdv_chi": "mới có cửa thêm, cửa đọc và cửa duyệt; chưa có cửa sửa số đã ghi",
 }
 
 

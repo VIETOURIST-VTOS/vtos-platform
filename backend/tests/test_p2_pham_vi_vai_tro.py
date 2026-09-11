@@ -172,25 +172,39 @@ PHAM_VI_DA_CHOT = {
     # ĐẾM LẠI LẦN HAI khi gộp nhánh Đợt 2 vào (09/9/2026 tối). Nhánh ấy thêm ba màn hình có phạm vi
     # API riêng – /tu-dong-hoa (Lịch tự động hóa), /bao-cao (Báo cáo tự động theo phòng), và ba màn
     # hình V6 của chuỗi bán hàng. Bảng này lại được đếm từ mã đã hợp nhất, không cộng trừ tay.
-    "chutich": 103, "tgd": 103, "bks": 103, "cntt": 100,
-    "ketoan": 85, "tp_dh": 82, "ptgd_doan": 61, "nv_dh": 57, "hcns": 54, "gd_kd": 55,
+    # ĐẾM LẠI NGÀY 11/9/2026 khi gộp làn V7 Đợt 3 lên nhánh chính. Hai màn hình mới /su-co-tour và
+    # /ho-so-kiem-toan mang theo đúng hai nhóm API (/api/v1/su-co-tour, /api/v1/kiem-toan), và mỗi
+    # vai chỉ nới đúng nhóm của màn hình mình mở được:
+    #   +2  chutich, tgd, bks, robot_ks, cntt, ptgd_doan, tp_dh, ketoan  (mở được CẢ HAI)
+    #   +1  nv_dh và bốn vai Kinh doanh, gd_doi_xe, tp_hd                (chỉ Sự cố tour)
+    #   +1  hcns, hanh_chinh                                             (chỉ Hồ sơ kiểm toán)
+    #   không đổi: ptgd_mkt, nv_mkt, xe_hdv, nv_visa, robot_pq, robot_vpm
+    #
+    # KHÔNG nhóm nào khác dôi ra, và đó là chủ ý: mọi ô chọn của hai màn hình đi qua CHÍNH phân hệ ấy
+    # (/su-co-tour/meta, /su-co-tour/chon/..., /kiem-toan/meta) thay vì gọi thẳng /api/v1/suppliers,
+    # /api/v1/bookings hay /api/v1/companies. Gọi thẳng là nhân danh sách vai trò của phân hệ khác
+    # lên – bài học vòng 1 của Sự cố tour ngày 10/9/2026.
+    #
+    # Bảng này là KẾT QUẢ GỌI AC.pham_vi_day_du() trên chính mã đã gộp, không cộng trừ tay.
+    "chutich": 105, "tgd": 105, "bks": 105, "cntt": 102,
+    "ketoan": 87, "tp_dh": 84, "ptgd_doan": 63, "nv_dh": 58, "hcns": 55, "gd_kd": 56,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 43, "nv_kd": 41, "tn_kd": 41, "tp_kd": 43, "nv_mkt": 31,
+    "ptgd_mkt": 43, "nv_kd": 42, "tn_kd": 42, "tp_kd": 44, "nv_mkt": 31,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
     # chỉ không còn cầm bản tổng hợp cả bộ phận. Đúng nguyên tắc "nhân viên trong phòng KHÔNG mặc
     # định xem báo cáo phòng"; dòng cũ là chỗ vá tạm khi Visa chưa có người phụ trách.
-    "gd_doi_xe": 25, "hanh_chinh": 24, "tp_hd": 23, "xe_hdv": 15, "nv_visa": 16,
+    "gd_doi_xe": 26, "hanh_chinh": 25, "tp_hd": 24, "xe_hdv": 15, "nv_visa": 16,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 17, "robot_ks": 103, "robot_vpm": 16,
+    "robot_pq": 17, "robot_ks": 105, "robot_vpm": 16,
 }
 
 

@@ -71,6 +71,17 @@ DOI_TUONG_DAY_DU = {
     "but_toan":      ("Chứng từ gốc của bút toán", "ketoan", "02_Ke_toan", False),
     "ket_so":        ("Hồ sơ kết sổ kỳ", "ketoan", "02_Ke_toan", False),
     "noi_dung":      ("Nội dung & thương hiệu", "mkt", "10_Marketing", True),
+    # Thêm 10/9/2026 cùng V7 Đợt 3. Nhóm 08_Kiem_toan có trong danh mục hồ sơ từ đầu nhưng CHƯA có
+    # đối tượng nào gắn tệp vào đó – tức là một nhóm hồ sơ rỗng vĩnh viễn. Đây là chỗ nó có người dùng.
+    #
+    # Gắn theo TỪNG MỤC của danh mục chứ không theo cả hồ sơ: kiểm toán hỏi "sổ chi tiết 131 đâu",
+    # không hỏi "hồ sơ kỳ này đâu". Gắn theo cả hồ sơ thì mọi tệp đổ vào một đống và câu hỏi từng mục
+    # lại phải trả lời bằng cách mở từng tệp ra xem.
+    "ho_so_kiem_toan_muc": ("Mục hồ sơ kiểm toán", "ketoan", "08_Kiem_toan", True),
+    # Bằng chứng sự cố: ảnh xe hỏng, thông báo dời chuyến của hãng bay, biên bản với khách sạn. Không
+    # có cửa này thì hồ sơ sự cố chỉ còn là lời kể, và lúc đòi nhà cung cấp bồi hoàn thì không có gì
+    # trong tay.
+    "su_co_tour":    ("Sự cố tour", "dieu_hanh", "05_Tour", True),
 }
 DOI_TUONG = {k: (v[0], v[1]) for k, v in DOI_TUONG_DAY_DU.items()}
 

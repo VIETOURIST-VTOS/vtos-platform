@@ -64,11 +64,15 @@ def test_muc_chua_xay_duoc_danh_dau_khong_phai_link_hong():
     _, block = menu_paths()
     chua_xay = re.findall(r'"([^"]+)",\s*""\]', block)
     # 08/9/2026 – V6 đã dựng chuỗi bán hàng nên "Giá & chính sách bán", "Báo giá", "Báo giá đoàn" và
-    # "Hợp đồng" RỜI khỏi nhóm chưa xây; danh sách kiểm chúng nằm ngay dưới. Còn "Sự cố tour" thì
-    # chưa – nó thuộc V7.
-    for ten in ("Sự cố tour", "Văn bản"):
+    # "Hợp đồng" RỜI khỏi nhóm chưa xây; danh sách kiểm chúng nằm ngay dưới.
+    #
+    # 10/9/2026 – V7 Đợt 3 dựng nốt "Sự cố tour" và "Hồ sơ kiểm toán", nên hai mục ấy cũng rời khỏi
+    # nhóm chưa xây và chuyển xuống danh sách kiểm phía dưới. Sàn hạ từ 5 xuống 4 vì đúng hai mục vừa
+    # được dựng: bốn mục còn lại là Kết quả từng đơn vị, Chỉ đạo & theo dõi thực hiện, Văn bản, và
+    # Nhật ký kỹ thuật.
+    for ten in ("Văn bản", "Nhật ký kỹ thuật"):
         assert ten in chua_xay, f"{ten} phải nằm trong nhóm mục chưa xây"
-    assert len(chua_xay) >= 5
+    assert len(chua_xay) >= 4
     # Đã xây thì phải rời khỏi nhóm "sắp có" và trỏ đúng màn hình – không để cả hai trạng thái cùng lúc.
     for ten, path in (("Công ty thành viên & liên kết", "/companies"), ("Cấu hình tổ chức", "/companies"),
                       ("Tài khoản & phân quyền", "/access"), ("Vị trí AI & quyền hạn", "/ai-roles"),
@@ -76,6 +80,9 @@ def test_muc_chua_xay_duoc_danh_dau_khong_phai_link_hong():
                       ("Nội dung & thương hiệu", "/noi-dung"), ("Chăm sóc sau bán", "/cham-soc"),
                       ("Phản hồi & khiếu nại", "/khieu-nai"),
                       ("Giá & chính sách bán", "/bang-gia"), ("Báo giá", "/bao-gia?mang=kd_le"),
-                      ("Báo giá đoàn", "/bao-gia?mang=kd_doan"), ("Hợp đồng", "/hop-dong-khach")):
+                      ("Báo giá đoàn", "/bao-gia?mang=kd_doan"), ("Hợp đồng", "/hop-dong-khach"),
+                      # V7 Đợt 3 (10/9/2026). Sự cố tour dùng BẢNG RIÊNG su_co_tour, không dùng lại
+                      # bảng incidents – incidents là hồ sơ kỷ luật nhân viên, việc khác hẳn.
+                      ("Sự cố tour", "/su-co-tour"), ("Hồ sơ kiểm toán", "/ho-so-kiem-toan")):
         assert ten not in chua_xay, f"{ten} đã có màn hình, không được để 'sắp có'"
         assert f'["{ten}", "{path}"]' in block

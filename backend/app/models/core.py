@@ -301,6 +301,24 @@ class Tour(Base):
     kt_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cntt_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     settlement_version: Mapped[int] = mapped_column(Integer, default=1)    # V.01, V.02… mỗi lần Kế toán trả lại
+    # trong_nuoc / nuoc_ngoai – Chủ tịch chốt 11/9/2026, hai hình thức quyết toán.
+    #
+    # DÒNG NÀY TỪNG BIẾN MẤT, và đó là lý do nó được ghi chú dài. Bản nâng cấp x1c7d2e9f4a86 có tạo
+    # cột tours.hinh_thuc trong cơ sở dữ liệu, và MƯỜI chỗ trong mã đọc t.hinh_thuc, nhưng dòng khai
+    # cột ở mô hình thì không còn trên nhánh chính – mất trong một lần hai phiên cùng ghi đè
+    # models/core.py. Cột có trong CSDL mà không có trong mô hình thì SQLAlchemy không biết nó tồn
+    # tại: mọi lời gọi t.hinh_thuc ném AttributeError, và cả phân hệ quyết toán lớp 3 chết ngay khi
+    # có người mở – trong khi phép thử nào không chạm tới chuyến thật vẫn xanh.
+    #
+    # KHÁC HẲN cột tour_type ở trên: tour_type phân biệt tour trọn gói với dịch vụ lẻ (package /
+    # non_package). Cột này phân biệt trong nước với nước ngoài – hai trục khác nhau, và một chuyến
+    # mang cả hai giá trị cùng lúc (tour lẻ nước ngoài là package + nuoc_ngoai).
+    #
+    # Hình thức quyết định phép kiểm nào chạy: nước ngoài thì bắt buộc khai tỷ giá và NGÀY tỷ giá cho
+    # mọi khoản ngoại tệ, trong nước thì không; giá trẻ em cũng soát theo tỷ lệ khác nhau. Rỗng nghĩa
+    # là chưa ai xếp – suy từ cột country được, nhưng suy ngầm rồi tính tiền theo cái suy ấy là chỗ
+    # sinh lỗi lặng.
+    hinh_thuc: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     # Bổ sung theo cấu trúc Vietrip (05/9/2026)
     vietrip_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)

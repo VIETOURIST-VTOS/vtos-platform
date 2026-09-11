@@ -31,6 +31,7 @@ from app.models.core import Booking, Tour, User
 from app.models.lop3_tour import (BookingKhach, KhachChiPhi, SuaSauKy, TourDoanhThuDong,
                                   TourHdvChi, TourPhuongTien,
                                   LOAI_PHUONG_TIEN, LOAI_TUOI, NHOM_KHACH, LOAI_DOANH_THU)
+from app.services import ghi_mot_lan as GML
 from app.services import gia_khach as G
 from app.services import khoan_muc_chi as KM
 from app.services import pham_vi_phap_nhan as PV
@@ -172,6 +173,7 @@ class KhachVao(BaseModel):
     so_ho_chieu: str | None = None
     ma_dat_cho: str | None = None
     ly_do_sua: str = ""
+    phien_ban: int | None = None
 
 
 @router.get("/{tid}/khach")
@@ -238,6 +240,11 @@ def sua_khach(tid: int, kid: int, v: KhachVao, u: User = Depends(require_roles(*
     k = db.get(BookingKhach, kid)
     if not k or k.tour_id != tid:
         raise HTTPException(404, "Không có dòng khách này trong chuyến")
+    # VPM-8 – khoá ghi một lần. Bảng mang cột phien_ban từ lúc sinh ra nhưng cửa này chưa đọc nó, nên
+    # hai người cùng mở một dòng khách thì người lưu sau ghi đè lặng lẽ lên người lưu trước. Dòng
+    # khách mang GIÁ BÁN, nên ghi đè lặng là mất tiền chứ không chỉ mất công gõ lại.
+    GML.kiem_phien_ban(k, getattr(v, "phien_ban", None), f"Dòng khách {k.ho_ten or kid}",
+                       lambda: {"id": k.id, "stt": k.stt, "ho_ten": k.ho_ten, "gia_ban": k.gia_ban})
 
     for truong, moi in (("ho_ten", v.ho_ten), ("nhom_khach", v.nhom_khach),
                         ("ngay_sinh", v.ngay_sinh), ("gia_ban", v.gia_ban),
@@ -250,6 +257,7 @@ def sua_khach(tid: int, kid: int, v: KhachVao, u: User = Depends(require_roles(*
             setattr(k, truong, moi)
     k.nguoi_sua, k.sua_luc = u.username, datetime.now()
     G.xac_dinh_khach(db, k, t.start_date, _gia_nguoi_lon(db, tid), t.hinh_thuc)
+    GML.tang_phien_ban(k)
     db.commit(); db.refresh(k)
     return {"id": k.id, "loai_tuoi": k.loai_tuoi, "gia_chuan": k.gia_chuan,
             "lech_chuan": k.lech_chuan()}

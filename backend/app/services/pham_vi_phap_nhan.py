@@ -226,6 +226,14 @@ PHAI_LOC = {
     "MarketingBudget": "ngân sách marketing được duyệt theo pháp nhân",
     "CareTicket":     "phiếu chăm sóc gắn với khách của một pháp nhân",
     "Complaint":      "khiếu nại có thể dẫn tới tiền bồi thường",
+    # V7 Đợt 3, khai khi gộp lên nhánh chính 11/9/2026. Hai bảng này mang cột pháp nhân từ lúc sinh
+    # ra nhưng chưa ai khai, nên hàng rào phạm vi KHÔNG lọc chúng: một người chỉ được xem pháp nhân
+    # mình vẫn đọc được sự cố và hồ sơ kiểm toán của mọi pháp nhân khác trong nhóm.
+    "SuCoTour":       "sự cố của chuyến nào thì thuộc pháp nhân đứng tên chuyến ấy; kết luận sự cố "
+                      "kéo theo đòi bồi hoàn nhà cung cấp hoặc mở Sự vụ với nhân viên",
+    "HoSoKiemToan":   "hồ sơ kiểm toán lập cho ĐÚNG MỘT pháp nhân một kỳ – chỉ mục duy nhất của bảng "
+                      "là (company_id, ky, loai); ý kiến kiểm toán của pháp nhân này không phải việc "
+                      "của người phụ trách pháp nhân khác",
     "ContentItem":    "nội dung đăng dưới thương hiệu của một pháp nhân",
     "Vehicle":        "xe thuộc sở hữu của công ty vận tải, không phải của lữ hành",
 

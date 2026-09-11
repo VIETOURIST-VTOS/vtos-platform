@@ -254,6 +254,25 @@ MAN_HINH_API = {
     "/expenses": ("/api/v1/cashflow", "/api/v1/payment-requests", "/api/v1/tours"),
     "/finance": ("/api/v1/fin", "/api/v1/cashflow"),
     "/hach-toan": ("/api/v1/hach-toan",),
+    # V7 Đợt 3 (10/9/2026). Sự cố tour đọc thêm /tours, /bookings, /suppliers và /payment-requests: màn
+    # hình phải chọn chuyến, chọn nhà cung cấp gây sự cố, và gắn số hiệu đề nghị chi lúc kết luận.
+    # Màn hình này chỉ chạm ĐÚNG HAI nhóm API, và đó là chủ ý.
+    #
+    # Sự cố tour mở cho nhiều vai trò nhất trong các màn hình nghiệp vụ – từ Ban lãnh đạo tới nhân
+    # viên kinh doanh, GĐ Đội xe và TP Hướng dẫn. Mỗi ô chọn gọi thẳng ra một nhóm API là mỗi lần
+    # nhân danh sách vai trò ấy lên cho một phân hệ khác: gọi /api/v1/suppliers là mở cơ cấu chi phí
+    # NCC cho khối Kinh doanh; gọi /api/v1/bookings và /api/v1/khieu-nai là trao danh sách khách cho
+    # Đội xe và Phòng Hướng dẫn. Bản đầu 10/9/2026 làm đúng như thế và bộ kiểm phạm vi P2 bắt được.
+    #
+    # Nên bốn ô chọn đi qua chính phân hệ này, mỗi ô sau hàng rào của riêng nó:
+    #   /su-co-tour/meta            – nhà cung cấp và chuyến, chỉ mã + tên
+    #   /su-co-tour/chon/booking    – booking CỦA MỘT CHUYẾN; tên khách chỉ trả cho vai trò trong KHACH
+    #   /su-co-tour/chon/ket-luan   – chứng từ chi và khiếu nại, sau hàng rào su_co_tour.DONG
+    "/su-co-tour": ("/api/v1/su-co-tour", "/api/v1/tep"),
+    # Hồ sơ kiểm toán đọc /companies (chọn pháp nhân) và /tep (đính kèm tài liệu cho từng mục).
+    # KHÔNG có /journal: màn hình nhận SỐ HIỆU bút toán bằng ô gõ tay chứ không mở danh sách sổ cái để
+    # chọn. Cố ý – gắn ô chọn ở đây là mở sổ kế toán cho mọi vai trò xem được hồ sơ kiểm toán.
+    "/ho-so-kiem-toan": ("/api/v1/kiem-toan", "/api/v1/companies", "/api/v1/tep"),
     "/hieu-qua-doi-xe": ("/api/v1/fleet",),
     "/hop-dong-lao-dong": ("/api/v1/employees", "/api/v1/hrm", "/api/v1/labor-contracts",
                            "/api/v1/dependents", "/api/v1/leaves", "/api/v1/leave-balance"),
@@ -413,6 +432,21 @@ MENU_ROLES = {
     # phụ trách ở màn hình bán hàng, còn giá vốn của chuyến thì ngoài phạm vi của họ.
     "/lai-lo-tour": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
 
+    # V7 Đợt 3 – Sự cố tour. Điều hành cầm việc; Kinh doanh có mặt vì sale thường là người khách gọi
+    # đầu tiên khi chuyến trục trặc; Kế toán đọc để biết khoản chi phát sinh của chuyến từ đâu ra.
+    # GHI và ĐÓNG hẹp hơn hẳn, và chặn đó nằm ở chữ ký từng đường dẫn (su_co_tour.GHI / .DONG).
+    #
+    # GĐ Đội xe và TP Hướng dẫn vào đây theo quyết định của anh Tuấn ngày 10/9/2026 – sự cố xe và sự
+    # cố hướng dẫn viên đúng là việc của họ. Hai vai này dùng DANH SÁCH CHO PHÉP nên còn phải có tên
+    # trong RESTRICTED_ROLE_MENUS bên dưới; thiếu chỗ đó thì dòng này chỉ nới quyền API mà họ vẫn
+    # không thấy mục menu (đúng cái bẫy bản đầu của đợt này mắc phải).
+    #
+    # Mở màn hình KHÔNG mở dữ liệu khách: bản đầu để bốn ô chọn gọi thẳng /bookings, /khieu-nai,
+    # /suppliers, /tours nên nới cho gd_doi_xe thêm chín nhóm API. Nay cả bốn ô đi qua chính phân hệ
+    # này (xem MAN_HINH_API ở trên), và tên khách chỉ trả cho vai trò trong su_co_tour.KHACH – hai
+    # vai này không có trong đó.
+    "/su-co-tour": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ptgd_doan", "ketoan", "cntt"),
+
     # --- Marketing & CSKH. Kế toán và CNTT KHÔNG có mặt: đây là dữ liệu khách của Marketing. ---
     "/inbox": BASE_VIEW + SALES + OPERATIONS + MARKETING + ("ptgd_mkt", "cntt"),
     "/leads": BASE_VIEW + SALES + OPERATIONS + MARKETING + ("ptgd_mkt", "cntt"),
@@ -559,6 +593,17 @@ MENU_ROLES = {
     # Kết sổ một kỳ: sao kê vào sổ hàng loạt, kết chuyển, và trạng thái cả kỳ. Chỉ Kế toán GHI –
     # Chủ tịch, TGĐ và Ban Kiểm soát xem chứ không ghi thay (chặn nằm ở API, không ở menu).
     "/ket-so": BASE_VIEW + ("ketoan", "cntt"),
+    # V7 Đợt 3 – Hồ sơ kiểm toán. Kế toán làm chủ hồ sơ; Ban Kiểm soát đọc theo nghĩa vụ Luật Doanh
+    # nghiệp (đã nằm trong BASE_VIEW). HCNS, Hành chính, Điều hành có mặt vì họ CÓ MỤC phải nộp – hợp
+    # đồng lao động là của HCNS, hồ sơ pháp lý và biên bản HĐQT là của Hành chính. Không mở cho họ thì
+    # Kế toán thành người đưa thư, và mục nào chậm cũng thành lỗi Kế toán.
+    #
+    # GĐ Đội xe KHÔNG có mặt, dù danh mục mẫu có mục "hồ sơ đội xe: đăng kiểm, bảo hiểm, thế chấp".
+    # Lý do giống dòng /su-co-tour ở trên: /ho-so-kiem-toan không nằm trong danh sách cho phép của
+    # vai trò này nên mở cũng không thấy menu. Trong lúc chờ quyết định ấy, mục giấy tờ xe để phòng
+    # ban "gd_doi_xe" và người phụ trách ghi tên – Kế toán vẫn đòi được đúng người, chỉ là đòi qua
+    # kênh ngoài hệ thống.
+    "/ho-so-kiem-toan": BASE_VIEW + ("ketoan", "cntt", "hcns", "hanh_chinh", "tp_dh", "ptgd_doan"),
     "/hach-toan": BASE_VIEW + ("ketoan", "cntt", "tp_dh"),
     # Ngoại lệ cần xử lý: nơi gom mọi lần một quy tắc bị bẻ. Mở cho những vai trò CÓ THỂ trả lời được
     # câu "vì sao lúc đó phải bẻ": Kế toán (tiền), Điều hành (chuyến), hai Phó TGĐ (duyệt), CNTT (tham số
@@ -600,9 +645,12 @@ RESTRICTED_ROLE_MENUS = {
     # viên visa cũng phải đổi được mật khẩu tạm của mình – thiếu dòng này là họ bị khóa ngoài hệ thống.
     "xe_hdv": ("/xe-hdv", "/doi-mat-khau"),
     "nv_visa": ("/visa", "/doi-mat-khau"),
+    # /su-co-tour thêm 10/9/2026 cho cả hai: xe hỏng giữa đèo là việc của GĐ Đội xe, hướng dẫn viên
+    # bỏ đoàn là việc của TP Hướng dẫn – bắt họ nghe lại qua Điều hành là mất đúng mười lăm phút đầu.
+    # Màn hình không mang theo dữ liệu khách: xem ghi chú ở dòng "/su-co-tour" của MENU_ROLES.
     "gd_doi_xe": ("/doi-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe", "/xe-hdv",
-                  "/nap-du-lieu", "/tep", "/doc-chung-tu", "/doi-mat-khau"),
-    "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/doi-mat-khau"),
+                  "/nap-du-lieu", "/tep", "/doc-chung-tu", "/su-co-tour", "/doi-mat-khau"),
+    "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/su-co-tour", "/doi-mat-khau"),
     # Ba vai trò máy: danh sách CHO PHÉP, giống bốn vai trò hẹp ở trên. Robot không có menu để bấm,
     # nhưng khai ở đây thì màn hình tra cứu ngược (P10) nói được nó chạm tới đâu, và bộ quét vai trò
     # đọc được phạm vi của nó mà không phải suy từ mã.

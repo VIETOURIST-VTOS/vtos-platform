@@ -47,6 +47,9 @@ from app.api.v1.ks_ra_soat import router as ks_ra_soat_router
 from app.api.v1.ks_ra_soat import rst as rst_router
 from app.api.v1.lai_lo_tour import router as ll_router
 from app.api.v1.quyet_toan_lop3 import router as qt_lop3_router
+# V7 Đợt 3 (10/9/2026)
+from app.api.v1.su_co_tour import router as su_co_router
+from app.api.v1.kiem_toan import router as kiem_toan_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -251,6 +254,8 @@ app.include_router(dct_router)
 app.include_router(ks_router)
 app.include_router(ll_router)
 app.include_router(qt_lop3_router)
+app.include_router(su_co_router)
+app.include_router(kiem_toan_router)
 
 
 @app.get("/", include_in_schema=False)
