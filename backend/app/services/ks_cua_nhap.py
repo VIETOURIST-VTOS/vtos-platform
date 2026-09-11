@@ -124,6 +124,14 @@ MAY_SINH = {
     # VPM-7 – nhật ký giữ chỗ. Mỗi dòng do MỘT hành động sinh ra: robot trả chỗ về, hoặc người bấm gia
     # hạn / khôi phục ở màn hình /bookings (ở đó lý do là ô người gõ, và đó mới là cửa nhập thật). Cho
     # nhập tay thẳng vào bảng này là cho phép bịa ra một lần gia hạn chưa từng có ai ký.
+    # VPM-11 – sổ nghĩa vụ thanh toán. Đây là LỚP ĐỌC dựng lại từ sáu bảng chứng từ gốc, mỗi bảng đều
+    # đã có cửa nhập riêng ở trên (payment_requests, service_orders, fin_schedules,
+    # lich_thanh_toan_hd, bookings, cash_plan_items). Người nhập ở chứng từ gốc, không nhập ở đây –
+    # và KHÔNG ĐƯỢC nhập ở đây: một dòng nghĩa vụ gõ tay là một khoản nợ không có chứng từ nào đứng
+    # sau, đúng thứ mà việc chống đếm trùng sinh ra để loại.
+    "nghia_vu_thanh_toan": "Sổ nghĩa vụ do phép đồng bộ dựng lại từ sáu bảng chứng từ gốc, mỗi bảng "
+                           "đã có cửa nhập riêng – nhập tay vào đây là tạo một khoản nợ không có "
+                           "chứng từ nào đứng sau.",
     "bao_cao_luu": "Ảnh chụp bảng chỉ tiêu do lịch tự động lưu mỗi kỳ, sinh từ chính hàm màn hình "
                    "gọi – nhập tay vào đây là viết lại quá khứ, đúng thứ bản chụp sinh ra để chống.",
 }

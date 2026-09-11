@@ -114,6 +114,11 @@ CHUA_CO_CUA_SUA = {
     "tour_doanh_thu_dong": "mới có cửa thêm và cửa đọc, sửa bằng cách xoá dòng rồi nhập lại",
     "tour_phuong_tien": "mới có cửa thêm và cửa đọc, sửa bằng cách xoá chặng rồi nhập lại",
     "tour_hdv_chi": "mới có cửa thêm, cửa đọc và cửa duyệt; chưa có cửa sửa số đã ghi",
+    # VPM-11. Sổ nghĩa vụ là LỚP ĐỌC do phép đồng bộ dựng lại từ sáu bảng chứng từ gốc; người sửa ở
+    # chứng từ gốc, không sửa ở đây. Cột `phien_ban` vẫn khai sẵn vì màn hình chi tiết dòng tiền
+    # (VPM-13) sẽ cần một cửa sửa TAY cho đúng hai ô: ngày dự kiến trả và trạng thái tranh chấp.
+    "nghia_vu_thanh_toan": "lớp đọc dựng lại từ chứng từ gốc; cửa sửa tay cho ngày dự kiến trả và "
+                           "trạng thái tranh chấp thuộc VPM-13, chưa dựng",
 }
 
 

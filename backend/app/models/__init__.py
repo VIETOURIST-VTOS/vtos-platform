@@ -14,6 +14,9 @@ from app.models.bao_cao_luu import *  # noqa
 # Base.metadata: phép thử soi mô hình mù đúng bảng ấy, và alembic autogenerate sẽ đòi XOÁ bảng.
 from app.models.phan_bo_tien import *  # noqa
 from app.models.giu_cho import *  # noqa
+# VPM-11 – sổ nghĩa vụ thanh toán. Thiếu dòng này thì bảng không nằm trong Base.metadata:
+# create_all không tạo, phép thử soi mô hình mù đúng bảng ấy, và alembic autogenerate đòi XOÁ nó.
+from app.models.nghia_vu import *  # noqa
 from app.models.vietrip import *  # noqa
 from app.models.crm import *  # noqa
 from app.models.visa import *  # noqa

@@ -9,6 +9,7 @@ from app.api.deps import current_user, require_roles
 from app.models.core import User
 from app.models.finance import FinContract, FinSchedule, CashPlanItem, CONTRACT_KINDS
 from app.services import finance as F
+from app.services import pham_vi_phap_nhan as PV
 from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1", tags=["tai-chinh"])
@@ -332,3 +333,73 @@ def cap_nhat_theo_sao_ke(data: CapNhatSauDoiChieuIn, u: User = Depends(require_r
     db.commit()
     return {"da_cap_nhat": da_sua, "khong_co_trong_he_thong": bo_qua,
             "message": f"Đã cập nhật {len(da_sua)} khế ước theo sao kê {data.ngan_hang}"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VPM-11 – SỔ NGHĨA VỤ THANH TOÁN
+#
+# Đặt trong router NÀY, dưới tiền tố `/fin` đã được cấp, và dùng ĐÚNG danh sách vai trò `READ`/`WRITE`
+# đã khai sẵn ở đầu tệp. Mở một nhóm API mới (`/api/v1/nghia-vu`) là xin thêm quyền cho một loạt vai
+# trò mà chưa ai ký – lane Viết phần mềm không tự khai quyền.
+#
+# `READ` ở đây đang là (ketoan, cntt, tgd, chutich, bks): hai Phó Tổng giám đốc KHÔNG có trong danh
+# sách, đúng yêu cầu SEC-02 của đề xuất 11/9/2026. Đây là trùng hợp có lợi, không phải do bản vá này
+# đặt ra – muốn đổi thì robot Phân quyền đổi ở access.py, không đổi ở đây.
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/fin/nghia-vu")
+def so_nghia_vu(company_id: int | None = None, loai_tien: str = "VND",
+                u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Tổng hợp sổ nghĩa vụ: cộng theo nhóm trên hai cơ sở ngày, kèm ba rổ không được bỏ im lặng."""
+    from app.services import nghia_vu as NV
+    return NV.bang(db, company_id=company_id, loai_tien=loai_tien, vai_tro=u.role)
+
+
+@router.get("/fin/nghia-vu/chi-tiet")
+def nghia_vu_chi_tiet(nhom: str | None = None, co_so_ngay: str = "cam_ket",
+                      tu: date | None = None, den: date | None = None,
+                      company_id: int | None = None, loai_tien: str = "VND",
+                      u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Danh sách chứng từ đứng sau một con số – mục IV.2 của đề xuất: bấm vào số tiền phải ra tờ giấy."""
+    from app.models.nghia_vu import NHOM, TRANG_THAI_DONG, NghiaVuThanhToan
+    from app.services import nghia_vu as NV
+    if nhom is not None and nhom not in NHOM:
+        raise HTTPException(422, f"Không có nhóm nghĩa vụ “{nhom}”")
+    if co_so_ngay not in ("cam_ket", "du_kien"):
+        raise HTTPException(422, "Cơ sở ngày phải là “cam_ket” hoặc “du_kien” – không trộn hai loại")
+    cot = (NghiaVuThanhToan.ngay_cam_ket if co_so_ngay == "cam_ket"
+           else NghiaVuThanhToan.ngay_du_kien_tra)
+    q = select(NghiaVuThanhToan).where(
+        NghiaVuThanhToan.ghi_nho == False,                                   # noqa: E712
+        NghiaVuThanhToan.trang_thai.not_in(TRANG_THAI_DONG),
+        NghiaVuThanhToan.loai_tien == loai_tien)
+    # P6 – phạm vi pháp nhân của PHIÊN ĐĂNG NHẬP. Khác hẳn tham số `company_id` phía dưới: tham số
+    # là người xem TỰ CHỌN xem pháp nhân nào, hàng rào này là điều họ KHÔNG ĐƯỢC chọn. Thiếu nó thì
+    # bỏ tham số đi là thấy cả nhóm — mà bảng dòng tiền là đúng chỗ không được lộ chéo pháp nhân.
+    q = PV.loc(q, NghiaVuThanhToan, u)
+    # Chốt 11/9: Tổng giám đốc CHỈ xem tài chính hoạt động tour và xe. Lọc theo NHÓM đặt ngay ở đây,
+    # cùng một phép lọc mà bảng tổng hợp dùng – không để màn hình tự giấu dòng, vì gọi thẳng đường
+    # dẫn này là thấy lại.
+    from app.models.nghia_vu import nhom_duoc_xem
+    duoc = nhom_duoc_xem(u.role)
+    if nhom is not None and nhom not in duoc:
+        raise HTTPException(403, f"Vai trò “{u.role}” không xem nhóm “{NHOM[nhom][1]}”")
+    q = q.where(NghiaVuThanhToan.nhom.in_(sorted(duoc)))
+    if nhom is not None: q = q.where(NghiaVuThanhToan.nhom == nhom)
+    if company_id is not None: q = q.where(NghiaVuThanhToan.company_id == company_id)
+    if tu is not None: q = q.where(cot.is_not(None), cot >= tu)
+    if den is not None: q = q.where(cot.is_not(None), cot <= den)
+    ds = [nv for nv in db.execute(q).scalars() if nv.con_lai() > 0]
+    ds.sort(key=lambda x: -x.con_lai())
+    return {"so_khoan": len(ds), "tong": round(sum(x.con_lai() for x in ds)),
+            "co_so_ngay": co_so_ngay, "chi_tiet": [NV.dong(x) for x in ds[:500]]}
+
+
+@router.post("/fin/nghia-vu/dong-bo")
+def dong_bo_nghia_vu(u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
+    """Dựng lại sổ từ sáu bảng chứng từ gốc. Chạy lại được – gọi nhiều lần không sinh dòng thừa."""
+    from app.services import nghia_vu as NV
+    kq = NV.dong_bo(db)
+    R.audit(db, u.username, u.role, "dong_bo_so_nghia_vu", "nghia_vu", after=kq)
+    db.commit()
+    return {**kq, "message": f"Đã dựng lại sổ nghĩa vụ – {kq['tong_dong']} dòng"}

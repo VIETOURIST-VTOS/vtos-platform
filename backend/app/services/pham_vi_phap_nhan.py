@@ -235,6 +235,12 @@ PHAI_LOC = {
                       "là (company_id, ky, loai); ý kiến kiểm toán của pháp nhân này không phải việc "
                       "của người phụ trách pháp nhân khác",
     "ContentItem":    "nội dung đăng dưới thương hiệu của một pháp nhân",
+    # VPM-11, 11/9/2026. Sổ nghĩa vụ thanh toán là NỀN của bảng dòng tiền bốn mốc, và đề xuất
+    # 11/9 nói thẳng: "Không mặc định tiền công ty này dùng được cho công ty khác". Không lọc ở
+    # đây thì người phụ trách một pháp nhân mở bảng dòng tiền ra sẽ thấy nghĩa vụ của cả nhóm —
+    # và tệ hơn con số sai, đó là một con số TRÔNG NHƯ ĐÚNG.
+    "NghiaVuThanhToan": "nghĩa vụ phải trả và khoản sắp thu của ĐÚNG MỘT pháp nhân; nền của bảng "
+                        "dòng tiền bốn mốc, nơi lộ chéo pháp nhân thành quyết định điều tiền sai",
     "Vehicle":        "xe thuộc sở hữu của công ty vận tải, không phải của lữ hành",
 
     # Sáu dòng dưới thêm ngày 11/9/2026 sau khi đếm lại trên đủ 34 tệp mô hình (xem đính chính ở
