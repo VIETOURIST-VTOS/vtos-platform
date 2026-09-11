@@ -52,9 +52,16 @@ def test_facebook_webhook_and_ai_fallback():
         "vai_tro": AQ.CHU_QUAN_HOP_THU, "tac_vu": "tin_khach", "muc": 3,
         "han_muc": {"khung_gio": "00:00-23:59", "so_luot_ngay": 50,
                     "loai_noi_dung": "lịch khởi hành, giá công bố", "nguoi_hau_kiem": "ptgd_mkt"}}).status_code == 200
-    res = client.post("/api/v1/inbox/check", headers=login("cntt")).json(); assert res["ai_replied"] == 1 and res["new_alerts"] == 1
+    # 11/9/2026: cửa thứ hai. Máy chạy phép thử KHÔNG có khoá mô hình, nên draft_reply rơi về câu
+    # dựng sẵn theo quy tắc (nguồn "quy_tac"). Mức 3 cấp cho câu của mô hình có ràng buộc
+    # loai_noi_dung, không cấp cho câu cứng trong mã – nên AI SOẠN NHÁP chứ không tự gửi.
+    # Bản trước của phép thử này đòi ai_replied == 1, tức là đòi đúng cái hỏng: càng hỏng càng gửi.
+    res = client.post("/api/v1/inbox/check", headers=login("cntt")).json()
+    assert res["ai_replied"] == 0 and res["ai_soan_nhap"] == 1 and res["new_alerts"] == 1
     d = client.get(f"/api/v1/inbox/{c['id']}", headers=h).json()
-    assert d["messages"][-1]["sender"] == "ai" and "Vietourist" in d["messages"][-1]["text"] and d["ai_replies"] == 1 and d["phone"] == "0903123456" and d["status"] == "ai_da_tra_loi"
+    # Không có tin nào của "ai" đi ra ngoài công ty, và số lượt AI trả lời vẫn là 0. Số điện thoại
+    # khách tự nhắn thì vẫn phải bắt được – phần đọc tin không đổi, chỉ phần GỬI bị chặn.
+    assert d["messages"][-1]["sender"] != "ai" and d["ai_replies"] == 0 and d["phone"] == "0903123456"
     al = client.get("/api/v1/alerts", headers=login("tp.dieuhanh")).json(); assert any(a["kind"] == "sale_tra_loi_cham" for a in al)
     # AI gợi ý trả lời cho sale
     dr = client.post(f"/api/v1/inbox/{c['id']}/ai-draft", headers=login("kd.hoa")).json(); assert dr["source"] == "quy_tac" and dr["text"]
