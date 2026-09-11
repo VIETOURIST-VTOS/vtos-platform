@@ -719,8 +719,8 @@ def nap(db, kq: dict, boi: str, ten_tep: str = "", ky: str = ""):
 
     # Chênh giữa hai lớp: GHI LẠI, không sửa. Bằng 0 cũng ghi 0 – "đã đối chiếu, khớp" khác với
     # "chưa đối chiếu bao giờ", và cột NULL không phân biệt được hai chuyện đó.
-    s.chenh_thu = (s.doanh_thu - cong_thu) if s.doanh_thu is not None else None
-    s.chenh_chi = (s.gia_von - cong_chi) if s.gia_von is not None else None
+    s.chenh_thu = (s.doanh_thu - cong_thu) if s.doanh_thu is not None else None  # k2-doc-an-toan: đã chặn None; cong_thu cộng dồn từ 0.0
+    s.chenh_chi = (s.gia_von - cong_chi) if s.gia_von is not None else None  # k2-doc-an-toan: đã chặn None; cong_chi cộng dồn từ 0.0
     db.flush()
     return s
 
