@@ -163,6 +163,45 @@ def upgrade() -> None:
     ]:
         _them("tour_cost_lines", ten, kieu)
 
+    # ------------------------------------------------------------------- D. dòng khách của booking
+    if not _co("booking_khach"):
+        op.create_table(
+            "booking_khach",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column("booking_id", sa.Integer(),
+                      sa.ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False),
+            # Lặp lại tour_id để hỏi "42 khách của chuyến này" không phải nối qua bookings.
+            sa.Column("tour_id", sa.Integer(), sa.ForeignKey("tours.id"), nullable=True),
+            sa.Column("stt", sa.Integer(), nullable=True),
+            sa.Column("ho_ten", sa.String(200), nullable=True),
+            # AI TRẢ TIỀN: tra_tien / mien_phi / noi_bo / dai_ly
+            sa.Column("nhom_khach", sa.String(20), nullable=True),
+            # TÍNH GIÁ BAO NHIÊU: nguoi_lon / tre_em / em_be
+            sa.Column("loai_tuoi", sa.String(20), nullable=True),
+            # NULL = CHƯA HỎI ngày sinh. Cột quyết định của quy tắc giá theo tuổi, nên NULL phải kêu
+            # lên chứ không lặng lẽ tính thành người lớn: tính nhầm em bé thành người lớn là thu
+            # thừa tiền của khách, và bảng vẫn cân nên không ai phát hiện.
+            sa.Column("ngay_sinh", sa.Date(), nullable=True),
+            sa.Column("tuoi_luc_di", sa.Integer(), nullable=True),
+            sa.Column("gia_chuan", TIEN, nullable=True),
+            sa.Column("gia_ban", TIEN, nullable=True),
+            sa.Column("ly_do_khac_chuan", sa.String(200), nullable=True),
+            # Tour nước ngoài: hộ chiếu và mã đặt chỗ hàng không. Mã đặt chỗ là khoá tra ngược duy
+            # nhất về hãng bay khi cần đối chiếu vé.
+            sa.Column("so_ho_chieu", sa.String(30), nullable=True),
+            sa.Column("ma_dat_cho", sa.String(30), nullable=True),
+            sa.Column("nguoi_sua", sa.String(60), nullable=True),
+            sa.Column("sua_luc", sa.DateTime(), nullable=True),
+            sa.Column("phien_ban", sa.Integer(), nullable=False, server_default="1"),
+        )
+        op.create_index("ix_bk_booking", "booking_khach", ["booking_id"])
+        op.create_index("ix_bk_tour", "booking_khach", ["tour_id"])
+
+    # THỨ TỰ DỰNG BẢNG: booking_khach phải đứng TRƯỚC tour_doanh_thu_dong. Bản trước đặt ngược, và
+    # tour_doanh_thu_dong có khoá ngoại trỏ sang booking_khach – trên máy chủ thật, nơi chưa bảng nào
+    # tồn tại, PostgreSQL từ chối ngay: UndefinedTable "booking_khach". Trên máy lập trình không ai
+    # thấy vì hai bảng đã có sẵn từ lần chạy trước.
+
     # --------------------------------------------------------- C2. dòng doanh thu của chuyến
     # VÌ SAO DOANH THU CŨNG PHẢI THÀNH DÒNG
     #
@@ -209,40 +248,6 @@ def upgrade() -> None:
         )
         op.create_index("ix_tdd_tour", "tour_doanh_thu_dong", ["tour_id"])
         op.create_index("ix_tdd_khach", "tour_doanh_thu_dong", ["khach_id"])
-
-    # ------------------------------------------------------------------- D. dòng khách của booking
-    if not _co("booking_khach"):
-        op.create_table(
-            "booking_khach",
-            sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("booking_id", sa.Integer(),
-                      sa.ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False),
-            # Lặp lại tour_id để hỏi "42 khách của chuyến này" không phải nối qua bookings.
-            sa.Column("tour_id", sa.Integer(), sa.ForeignKey("tours.id"), nullable=True),
-            sa.Column("stt", sa.Integer(), nullable=True),
-            sa.Column("ho_ten", sa.String(200), nullable=True),
-            # AI TRẢ TIỀN: tra_tien / mien_phi / noi_bo / dai_ly
-            sa.Column("nhom_khach", sa.String(20), nullable=True),
-            # TÍNH GIÁ BAO NHIÊU: nguoi_lon / tre_em / em_be
-            sa.Column("loai_tuoi", sa.String(20), nullable=True),
-            # NULL = CHƯA HỎI ngày sinh. Cột quyết định của quy tắc giá theo tuổi, nên NULL phải kêu
-            # lên chứ không lặng lẽ tính thành người lớn: tính nhầm em bé thành người lớn là thu
-            # thừa tiền của khách, và bảng vẫn cân nên không ai phát hiện.
-            sa.Column("ngay_sinh", sa.Date(), nullable=True),
-            sa.Column("tuoi_luc_di", sa.Integer(), nullable=True),
-            sa.Column("gia_chuan", TIEN, nullable=True),
-            sa.Column("gia_ban", TIEN, nullable=True),
-            sa.Column("ly_do_khac_chuan", sa.String(200), nullable=True),
-            # Tour nước ngoài: hộ chiếu và mã đặt chỗ hàng không. Mã đặt chỗ là khoá tra ngược duy
-            # nhất về hãng bay khi cần đối chiếu vé.
-            sa.Column("so_ho_chieu", sa.String(30), nullable=True),
-            sa.Column("ma_dat_cho", sa.String(30), nullable=True),
-            sa.Column("nguoi_sua", sa.String(60), nullable=True),
-            sa.Column("sua_luc", sa.DateTime(), nullable=True),
-            sa.Column("phien_ban", sa.Integer(), nullable=False, server_default="1"),
-        )
-        op.create_index("ix_bk_booking", "booking_khach", ["booking_id"])
-        op.create_index("ix_bk_tour", "booking_khach", ["tour_id"])
 
     # ------------------------------------------------------ E. chi phí ĐÍCH DANH của từng khách
     if not _co("khach_chi_phi"):
