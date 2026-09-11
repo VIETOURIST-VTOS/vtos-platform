@@ -302,6 +302,16 @@ MAN_HINH_API = {
     # Khi phần diễn giải xong và cuộc gọi lên hộp thư thì đó là đường dẫn khác, mở có chủ đích.
     # Đầu NHẬN (/tong-dai/cuoc-goi/<chuỗi bí mật>) KHÔNG đi qua hàng rào này – tổng đài không có phiên
     # đăng nhập của VTOS, khoá của nó là chuỗi bí mật trong đường dẫn.
+    # Robot A · GD-1 (11/9/2026). Khai TẠM do Robot A thêm, Chủ tịch đồng ý 11/9 – theo lệnh giao
+    # việc thì tệp này thuộc Robot B, nhưng nhóm API mồ côi làm ĐỎ CI cho mọi làn, và chính mục F
+    # của lệnh cảnh báo "đỏ mãi thì rồi không ai nhìn CI nữa". Đây là THÊM một khoá mới, không sửa
+    # dòng của ai, nên không va chạm khi Robot B gộp nhánh.
+    # Màn hình /dong-tien ĐÃ DỰNG (bản tạm của Robot A, Robot B thay theo TC-3), nên nó KHÔNG nằm
+    # trong CHUA_CO_TRANG – khai ở đó là khai một màn hình đang chạy là chưa có.
+    # ĐÚNG MỘT nhóm. Danh mục pháp nhân và tài khoản ngân hàng đi qua /dong-tien/meta của chính
+    # phân hệ này, không gọi thẳng /companies hay /bank-accounts – gọi thẳng là nhân danh sách vai
+    # trò của phân hệ khác lên (bài học vòng 1 Sự cố tour, 10/9/2026).
+    "/dong-tien": ("/api/v1/dong-tien",),
     "/kiem-soat": ("/api/v1/kiem-soat", "/api/v1/tong-dai"),
     # Bàn quyết cột tiền K1/K2 – phạm vi API HẸP: chỉ nhánh /cot-tien và /the (để giao diện biết vẽ
     # thẻ nào). KHÔNG gồm kết quả quét, chấm điểm phòng ban hay hậu kiểm số nhập tay.
@@ -569,6 +579,14 @@ MENU_ROLES = {
     # Kế toán trưởng vẫn là người QUYẾT một cột có phải tiền hay không (ks_ra_soat.QUYET). Việc đó
     # sang màn hình riêng dưới nhóm Tài chính & Kế toán: người bị chấm điểm không ngồi cùng bàn với
     # bảng chấm điểm, nhưng vẫn phải có bàn của mình.
+    # Robot A · GD-1. Chủ tịch quyết 11/9/2026 về khối dòng tiền:
+    #   · Chủ tịch, Kế toán, Ban Kiểm soát giữ TOÀN CẢNH – một bên lập số, một bên soát số.
+    #   · Tổng giám đốc CHỈ xem tài chính hoạt động tour và xe; lọc theo TỪNG DÒNG là SEC-02 của làn
+    #     Phân quyền, không phải việc của hàng rào ngoài này.
+    #   · Hai Phó Tổng giám đốc KHÔNG thấy khối – cố ý không có mặt ở đây.
+    #   · robot_ks có mặt theo luật chung đã có: robot Kiểm soát phải xem được MỌI màn hình, nếu
+    #     không thì nó giám sát được mọi phòng trừ đúng phòng giữ tiền.
+    "/dong-tien": ("chutich", "tgd", "ketoan", "bks", "robot_ks", "cntt"),
     "/kiem-soat": BASE_VIEW + ("cntt",),
     "/ra-soat-cot-tien": BASE_VIEW + ("ketoan", "cntt"),
     # V11 – "cái gì đang tự chạy" là câu hỏi của cả công ty, không riêng CNTT: một tác vụ im ba ngày

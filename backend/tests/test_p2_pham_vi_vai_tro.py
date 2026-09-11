@@ -185,9 +185,29 @@ PHAM_VI_DA_CHOT = {
     # /api/v1/bookings hay /api/v1/companies. Gọi thẳng là nhân danh sách vai trò của phân hệ khác
     # lên – bài học vòng 1 của Sự cố tour ngày 10/9/2026.
     #
+    # +1 NGÀY 11/9/2026 – Robot A, GD-1. Màn hình mới /dong-tien mang đúng nhóm "/api/v1/dong-tien"
+    # (tiền khả dụng, bảng bốn mốc, số dư từng ngày, nghĩa vụ tiền). SÁU vai được nới đúng một nhóm:
+    #
+    #   chutich · ketoan · bks   – TOÀN CẢNH. Chủ tịch quyết 11/9: một bên lập số, một bên soát số;
+    #                              không nhìn đủ thì không làm được việc.
+    #   tgd                      – CHỈ tài chính hoạt động tour và xe. Hàng rào ngoài này mở cả nhóm;
+    #                              việc cắt TỪNG DÒNG cho Tổng giám đốc là SEC-02 của làn Phân quyền.
+    #                              Bảng của TGĐ không có ba dòng tiền khả dụng đầu kỳ, số dư dự kiến
+    #                              cuối khoảng và thiếu so với mức dự phòng, và dòng đáy mang tên khác:
+    #                              "Dòng tiền thuần từ hoạt động tour và xe".
+    #   robot_ks                 – luật chung đã có: robot Kiểm soát xem được mọi màn hình, nếu không
+    #                              thì nó giám sát mọi phòng trừ đúng phòng giữ tiền.
+    #   cntt                     – vận hành.
+    #
+    # HAI PHÓ TỔNG GIÁM ĐỐC CỐ Ý KHÔNG CÓ MẶT – giữ nguyên như bản v1.1 của đề xuất giao diện. Nếu
+    # lần đếm sau thấy ptgd_doan hoặc ptgd_mkt nhích lên thì đó là một lần nới nhầm, không phải bản này.
+    #
+    # Màn hình /dong-tien chưa dựng (thuộc Robot B, TC-1→TC-4) nên khai ở CHUA_CO_TRANG của
+    # test_p11 kèm ngày dự kiến 30/9/2026.
+    #
     # Bảng này là KẾT QUẢ GỌI AC.pham_vi_day_du() trên chính mã đã gộp, không cộng trừ tay.
-    "chutich": 105, "tgd": 105, "bks": 105, "cntt": 102,
-    "ketoan": 87, "tp_dh": 84, "ptgd_doan": 63, "nv_dh": 58, "hcns": 55, "gd_kd": 56,
+    "chutich": 106, "tgd": 106, "bks": 106, "cntt": 103,
+    "ketoan": 88, "tp_dh": 84, "ptgd_doan": 63, "nv_dh": 58, "hcns": 55, "gd_kd": 56,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
@@ -204,7 +224,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 17, "robot_ks": 105, "robot_vpm": 16,
+    "robot_pq": 17, "robot_ks": 106, "robot_vpm": 16,
 }
 
 

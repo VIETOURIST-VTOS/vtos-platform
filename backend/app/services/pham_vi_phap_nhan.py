@@ -234,6 +234,12 @@ PHAI_LOC = {
     "HoSoKiemToan":   "hồ sơ kiểm toán lập cho ĐÚNG MỘT pháp nhân một kỳ – chỉ mục duy nhất của bảng "
                       "là (company_id, ky, loai); ý kiến kiểm toán của pháp nhân này không phải việc "
                       "của người phụ trách pháp nhân khác",
+    # Robot A · DT-2, khai ngay khi thêm bảng (11/9/2026). Đây là bảng mà việc lọc theo pháp nhân
+    # KHÔNG phải chuyện riêng tư mà là chuyện ĐÚNG–SAI: luật gốc của cả phân hệ dòng tiền là "không
+    # bù trừ giữa hai pháp nhân". Một bản chốt số dư của pháp nhân A lọt sang truy vấn của người phụ
+    # trách pháp nhân B là tiền của A đi trả nợ cho B ngay trên màn hình.
+    "ChotSoDu":       "bản chốt số dư đã đối soát của ĐÚNG MỘT pháp nhân – nền của hàm tiền khả "
+                      "dụng; lọt sang pháp nhân khác là bù trừ tiền giữa hai pháp nhân",
     "ContentItem":    "nội dung đăng dưới thương hiệu của một pháp nhân",
     # VPM-11, 11/9/2026. Sổ nghĩa vụ thanh toán là NỀN của bảng dòng tiền bốn mốc, và đề xuất
     # 11/9 nói thẳng: "Không mặc định tiền công ty này dùng được cho công ty khác". Không lọc ở

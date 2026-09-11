@@ -26,6 +26,14 @@ from app.services import ks_ma_tran as MT
 # Rỗng từ 08/9/2026: /ket-so là mục cuối cùng trong danh sách này, và màn hình đã dựng (a3e5a16).
 # Danh sách rỗng là trạng thái ĐÚNG, không phải phép thử mất tác dụng: thêm một mục menu trỏ tới trang
 # chưa có thì nó đỏ ngay, và đó là lúc duy nhất bắt được lỗi ấy trước khi người dùng bấm vào.
+# 11/9/2026 – Robot A, GD-1. Máy chủ của khối dòng tiền xong (DT-1→DT-6); MÀN HÌNH thuộc Robot B
+# (TC-1→TC-4), dự kiến 30/9/2026. Đây đúng trạng thái danh sách này sinh ra để ghi: chức năng có
+# thật trên máy chủ mà người dùng chưa có đường vào. Robot B dựng xong trang thì phép thử đỏ, và
+# lúc ấy XOÁ dòng dưới đây – đó là cách nó không bị bỏ quên.
+#
+# Ghi chú cho làn Kiểm soát: cùng một sự thật đang phải khai ở HAI chỗ – `CHUA_CO_TRANG` trong
+# tests/test_p11_khai_quyen_phai_co_man_hinh.py và danh sách này. Hai sổ cho một việc thì sớm muộn
+# lệch nhau, và lúc lệch không ai biết tin sổ nào. Đề nghị gộp – không phải việc của Robot A.
 KHAI_THIEU_MAN_HINH: list[str] = []     # menu dẫn tới trang không có
 # Ba màn hình này KHÔNG khai trong MENU_ROLES mà khai qua MAN_HINH_MOI_NGUOI – chúng mở cho mọi tài
 # khoản đăng nhập theo đúng thiết kế, và bộ dò này chỉ đọc MENU_ROLES nên vẫn kể tên chúng ra.

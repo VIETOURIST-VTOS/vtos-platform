@@ -46,6 +46,7 @@ from app.api.v1.bao_cao import router as bao_cao_router
 from app.api.v1.ks_ra_soat import router as ks_ra_soat_router
 from app.api.v1.ks_ra_soat import rst as rst_router
 from app.api.v1.lai_lo_tour import router as ll_router
+from app.api.v1.dong_tien import router as dong_tien_router
 from app.api.v1.quyet_toan_lop3 import router as qt_lop3_router
 # V7 Đợt 3 (10/9/2026)
 from app.api.v1.su_co_tour import router as su_co_router
@@ -254,6 +255,9 @@ app.include_router(dct_router)
 app.include_router(ks_router)
 app.include_router(ll_router)
 app.include_router(qt_lop3_router)
+# Robot A · GD-1. Ba lần trong tuần này một phân hệ viết xong mà quên dòng đăng ký router:
+# mã có đủ, đường dẫn trả 404, và không phép thử nào kêu vì không ai gọi thử.
+app.include_router(dong_tien_router)
 app.include_router(su_co_router)
 app.include_router(kiem_toan_router)
 

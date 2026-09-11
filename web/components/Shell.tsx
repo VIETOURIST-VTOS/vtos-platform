@@ -104,6 +104,14 @@ export const GROUPS: Group[] = [
     ["Chi & thanh toán", "/expenses"],
     ["Công nợ", "/cong-no"],
     ["Bảo lưu & hoàn tiền", "/bookings"],
+    // Robot A · 11/9/2026. Bảng bốn mốc lũy kế của v1.1 §III (DT-1…DT-4). Đặt NGAY TRÊN mục
+    // "Dòng tiền" cũ vì hai màn hình trả lời hai câu khác nhau và người dùng cần thấy chúng cạnh nhau.
+    //
+    // TÊN "Dòng tiền 4 mốc" LÀ TÊN CHỦ TỊCH CHỐT 11/9/2026, và em cố ý không lấy tên "Dòng tiền" của
+    // mục dưới. v1.1 §III gọi màn hình này là "bảng dòng tiền", nhưng §I.2 đã đặt tên "Dòng tiền" cho
+    // bảng dự báo 13 tuần, và phép thử của lằn TC-2 canh đúng dòng ấy. Hai mục cùng tên mở ra hai màn
+    // hình khác nhau thì tệ hơn một cái tên dài.
+    ["Dòng tiền 4 mốc", "/dong-tien"],
     ["Dòng tiền", "/finance?tab=forecast"],
     ["Vay & đầu tư", "/finance?tab=contracts"],
     ["Tài khoản ngân hàng", "/bank-accounts"],
