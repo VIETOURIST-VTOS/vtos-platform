@@ -17,7 +17,7 @@ ngược cả lần triển khai, và không ai xem được kết quả trướ
 chu_canh_bao.giao_het() – chạy được, xem trước được, chạy lại được.
 
 Revision ID: y2c6e0f4b8d3
-Revises: x1b5d9e3a7c24
+Revises: z3d7f2a5c9e18
 Create Date: 2026-09-11
 """
 import sqlalchemy as sa
@@ -27,7 +27,7 @@ from alembic import op
 # revision cũ hơn. Nối vào cha cũ là tạo thêm một đầu thứ hai, và container khởi động sẽ dừng ở
 # "Multiple head revisions are present" – đúng kiểu hỏng đã làm chết lần triển khai ngày 10/9.
 revision = "y2c6e0f4b8d3"
-down_revision = "x1b5d9e3a7c24"
+down_revision = "z3d7f2a5c9e18"
 branch_labels = None
 depends_on = None
 
