@@ -268,9 +268,26 @@ def test_tong_tien_khong_mang_duoi_float_khi_gia_von_chia_theo_dau_khach():
     # Sáu khách, mỗi khách gánh đúng 1/6 của 1.000.000. Cộng sáu số ấy lại bằng float ra
     # 999.999,9999999999 – cùng một kiểu trôi với tệp Nha Trang thật, chỉ nhỏ hơn cho gọn.
     # Các ô chi khác để 0 để phép cộng của tệp thử không tự khử mất chỗ trôi cần đo.
+    #
+    # CỘNG DỒN BẰNG `+=`, KHÔNG DÙNG `sum()`. Hai lý do, và lý do thứ hai đã làm đỏ CI thật:
+    #
+    #   1. Máy chủ cộng bằng `+=` (quyet_toan_chi_tiet.py: `tong_chi += d["tong_chi"]` trong vòng
+    #      lặp từng dòng khách), và bảng tính Excel cũng cộng dồn từng ô một. Phép tự kiểm phải
+    #      tái hiện đúng cách cộng của chỗ mình đang canh, không phải một cách cộng khác.
+    #
+    #   2. Từ Python 3.12, `sum()` trên số thực cộng có BÙ SAI SỐ (Neumaier), nên
+    #      `sum(1000000/6 for _ in range(6))` ra đúng 1000000.0 – hết trôi. Máy người viết chạy
+    #      3.11 thì dòng này xanh; CI chạy 3.12 thì phép tự kiểm kêu "không còn tái hiện được chỗ
+    #      trôi" và cả bộ đứng lại ở đây (tests/run_all.sh có `set -e`, đỏ một tệp là dừng, mọi
+    #      tệp xếp sau không chạy nữa). Đúng việc phép tự kiểm phải làm – nó từ chối chạy một
+    #      khẳng định đã mất ý nghĩa – nhưng chỗ phải sửa là CÁCH CỘNG ở đây, không phải mã máy
+    #      chủ. `+=` trôi y hệt nhau trên cả 3.11 lẫn 3.12.
     n, tong_that = 6, 1000000
     mot_phan = tong_that / n
-    assert sum(mot_phan for _ in range(n)) != float(tong_that), \
+    cong_don = 0.0
+    for _ in range(n):
+        cong_don += mot_phan
+    assert cong_don != float(tong_that), \
         "tệp thử không còn tái hiện được chỗ trôi float – chọn lại n hoặc tổng"
 
     wb = openpyxl.Workbook()
