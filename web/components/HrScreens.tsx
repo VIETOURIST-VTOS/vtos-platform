@@ -61,7 +61,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const load = useCallback(async () => {
     if (!Object.keys(meta.departments).length) api("/hr/meta").then(setMeta);
     if (!emps.length) api("/employees").then(setEmps).catch(() => {});
-    if (!tours.length) api("/tours").then(setTours).catch(() => {});
+    if (!tours.length) api("/tours").then((r) => setTours(r.rows || [])).catch(() => {});
     if (tab === "payroll") api(`/payroll-runs/${period}`).then(setRun).catch((e) => toast(errMsg(e), true));
     if (tab === "payroll") { api("/payroll/khoan-treo").then(setTreo).catch(() => {}); api("/payroll/xung-dot-ho-so").then(setXungDot).catch(() => {}); }
     if (tab === "payroll") { api(`/payroll-runs/${period}/phieu-luong`).then(setPhieu).catch(() => setPhieu(null)); api(`/payroll-runs/${period}/theo-phap-nhan`).then(setPhapNhan).catch(() => setPhapNhan(null)); }

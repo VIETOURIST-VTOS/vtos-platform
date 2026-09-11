@@ -153,13 +153,21 @@ TU_PHUC_VU: dict[str, str] = {
 
 # Không phải "khai ở chỗ khác" — là KHÔNG CÓ CHẶN. Phép thử để ĐỎ cho tới khi lane chịu trách nhiệm
 # đóng. Kiểm soát mở ngoại lệ, Kiểm soát KHÔNG tự đóng ngoại lệ của mình.
-HO_QUYEN: dict[str, str] = {
+HO_QUYEN: dict[str, str] = {}
+
+# Hở đã đóng — giữ lại lời khai cũ để còn truy được vì sao từng đỏ và cái gì đã đóng nó. Bảng này
+# KHÔNG được bộ kiểm đọc: một chỗ chỉ rời HO_QUYEN khi chặn thật đã nằm ở chữ ký hàm, và lúc ấy
+# chính bộ kiểm Q1 nhìn thấy chặn ấy chứ không cần lời khai nào.
+DA_DONG: dict[str, str] = {
     "POST /api/v1/alerts/{aid}/resolve": (
-        "KHÔNG có chặn nào: bất kỳ tài khoản nào đăng nhập được đều đóng được BẤT KỲ cảnh báo nào, "
-        "kể cả cảnh báo đỏ của phòng khác. Thân hàm chỉ đặt resolved=True rồi ghi nhật ký. "
-        "Đây cũng là chỗ nối thẳng sang KS-4: bảng alerts không có cột ai-đóng và bằng chứng đóng, "
-        "nên sau khi đóng thì không truy lại được ai bấm và dựa vào đâu. "
-        "Chủ: lane Phân quyền (khai vai trò được đóng) + lane Viết phần mềm (cột người đóng)."),
+        "Mở 11/9/2026 bởi KS-2: KHÔNG có chặn nào — bất kỳ tài khoản nào đăng nhập được đều đóng "
+        "được BẤT KỲ cảnh báo nào, kể cả cảnh báo đỏ của phòng khác; thân hàm chỉ đặt resolved=True "
+        "rồi ghi nhật ký, và bảng alerts không có cột ai-đóng nên sau khi đóng thì không truy lại "
+        "được ai bấm và dựa vào đâu. "
+        "ĐÓNG 11/9/2026: chữ ký hàm mang require_roles(*AC.CANH_BAO_ROLES) — 18 vai trò khai ở "
+        "app/services/access.py, máy đọc được từ chữ ký nên Q1 tự nhìn thấy; KS-4 thêm dong_boi_id, "
+        "dong_luc và bang_chung (bắt buộc ≥10 ký tự) nên đóng xong vẫn truy lại được ai bấm, lúc "
+        "nào, dựa vào đâu."),
 }
 
 # Trần cho từng bảng. Quá trần nghĩa là cái được coi là ngoại lệ đã thành quy tắc, và quy tắc thì

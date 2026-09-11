@@ -23,7 +23,7 @@ def _startup():
 
 
 def tour(code):
-    return next(t for t in client.get("/api/v1/tours", headers=login("cntt")).json() if t["code"] == code)
+    return next(t for t in client.get("/api/v1/tours", headers=login("cntt")).json()["rows"] if t["code"] == code)
 
 
 def booking(name, phone, pax=2, discount=0):
@@ -64,5 +64,5 @@ def test_r9_anomalies():
     r = client.post("/api/v1/robot/r9", headers=login("bks")).json(); kinds = {i["kind"] for i in r["items"]}
     assert {"r9_giam_gia_lon", "r9_tien_mat_lon"} <= kinds and r["new_alerts"] >= 2
     assert client.post("/api/v1/robot/r9", headers=login("kd.hoa")).status_code == 403
-    al = client.get("/api/v1/alerts", headers=login("chutich")).json(); assert any(a["kind"] == "r9_giam_gia_lon" and a["ref"] == f"booking:{b['code']}" for a in al)
+    al = client.get("/api/v1/alerts", headers=login("chutich")).json()["rows"]; assert any(a["kind"] == "r9_giam_gia_lon" and a["ref"] == f"booking:{b['code']}" for a in al)
     assert client.get("/api/v1/audit", headers=login("bks")).json()["chain_ok"] is True

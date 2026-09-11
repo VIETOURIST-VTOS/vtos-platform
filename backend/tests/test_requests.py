@@ -27,7 +27,7 @@ def _startup():
 
 
 def tour(code):
-    return next(t for t in client.get("/api/v1/tours", headers=login("cntt")).json() if t["code"] == code)
+    return next(t for t in client.get("/api/v1/tours", headers=login("cntt")).json()["rows"] if t["code"] == code)
 
 
 def test_vai_tro_gui_yeu_cau_du_khoi_kinh_doanh():

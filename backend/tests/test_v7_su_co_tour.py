@@ -56,7 +56,7 @@ def h_dong():
 
 def tour_id():
     if "tour" not in CTX:
-        r = client.get("/api/v1/tours", headers=login("cntt")).json()
+        r = client.get("/api/v1/tours", headers=login("cntt")).json()["rows"]
         rows = r if isinstance(r, list) else r.get("rows", [])
         CTX["tour"] = rows[0]["id"]
     return CTX["tour"]

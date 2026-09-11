@@ -62,7 +62,7 @@ def test_facebook_webhook_and_ai_fallback():
     # Không có tin nào của "ai" đi ra ngoài công ty, và số lượt AI trả lời vẫn là 0. Số điện thoại
     # khách tự nhắn thì vẫn phải bắt được – phần đọc tin không đổi, chỉ phần GỬI bị chặn.
     assert d["messages"][-1]["sender"] != "ai" and d["ai_replies"] == 0 and d["phone"] == "0903123456"
-    al = client.get("/api/v1/alerts", headers=login("tp.dieuhanh")).json(); assert any(a["kind"] == "sale_tra_loi_cham" for a in al)
+    al = client.get("/api/v1/alerts", headers=login("tp.dieuhanh")).json()["rows"]; assert any(a["kind"] == "sale_tra_loi_cham" for a in al)
     # AI gợi ý trả lời cho sale
     dr = client.post(f"/api/v1/inbox/{c['id']}/ai-draft", headers=login("kd.hoa")).json(); assert dr["source"] == "quy_tac" and dr["text"]
     # tắt AI cho hội thoại → quá hạn chỉ cảnh báo, không trả lời

@@ -160,7 +160,20 @@ def _dashboard_payload(db: Session, u: User) -> dict:
 def list_tours(status: str | None = None, q: str = "", month: str = "", limit: int = 300, offset: int = 0, tour_type: str = "", mang: str = "", u: User = Depends(current_user), db: Session = Depends(get_db)):
     """Danh sách tour có phân trang/tìm kiếm (mặc định 300 chuyến mới nhất) – 1.200+ tour nhập từ Vietrip. Mặc định ẩn dịch vụ lẻ (KLE) trừ khi tìm theo mã hoặc chọn tour_type."""
     from sqlalchemy import or_
-    qs = select(Tour).order_by(desc(Tour.start_date))
+    from sqlalchemy.orm import selectinload
+    from app.models.core import Booking as _Bk
+    # KS-5: NẠP SẴN quan hệ, đừng để tour_view đi hỏi từng chuyến một.
+    #
+    # Đo được trước khi sửa: 40 chuyến → 54 lượt truy vấn, 80 chuyến → 91 lượt. Số lượt tăng theo số
+    # dòng nghĩa là có truy vấn nằm trong vòng lặp – ở đây là t.operator, t.bookings và b.sales, mỗi
+    # thuộc tính lười một lượt cho MỖI chuyến. Câu bookings chạy 85 lần trong một lần mở màn hình.
+    #
+    # Trớ trêu là danh sách bookings dựng xong rồi bị `v.pop("bookings")` ném đi ngay dưới kia – màn
+    # hình danh sách không cần nó. Nhưng booked_pax(t) lại đọc t.bookings để đếm khách, nên không bỏ
+    # được, chỉ nạp sẵn được. Ba lượt selectinload thay cho hàng trăm lượt lẻ.
+    qs = (select(Tour).order_by(desc(Tour.start_date))
+          .options(selectinload(Tour.operator),
+                   selectinload(Tour.bookings).selectinload(_Bk.sales)))
     qs = PV.loc(qs, Tour, u)                 # P6: phạm vi pháp nhân của phiên đăng nhập
     from app.services import segments as SEG
     try:
@@ -174,12 +187,23 @@ def list_tours(status: str | None = None, q: str = "", month: str = "", limit: i
     if q: qs = qs.where(or_(Tour.code.ilike(f"%{q}%"), Tour.name.ilike(f"%{q}%"), Tour.product_code.ilike(f"%{q}%")))
     if month:
         y, m = map(int, month.split("-")); qs = qs.where(func.extract("year", Tour.start_date) == y, func.extract("month", Tour.start_date) == m)
+    # KS-5 · T5: CẮT THÌ ĐƯỢC, IM LẶNG THÌ KHÔNG.
+    #
+    # Cửa này vẫn luôn cắt ở 300 chuyến, nhưng trả về một mảng trần nên giao diện không có cách nào
+    # biết là đã cắt – người đọc tin mình đang nhìn toàn bộ và ra quyết định trên phần bị cắt. Với
+    # 1.200+ tour nhập từ Vietrip thì "toàn bộ" ấy thiếu ba phần tư.
+    #
+    # Từ 11/9/2026 phản hồi là một PHONG BÌ: rows · tong · offset · limit · cham_tran. Đây là thay
+    # đổi PHÁ VỠ với mọi bên đang đọc mảng trần, nên web và phép thử sửa cùng một lần với chỗ này.
+    tran = max(1, min(limit, 1000))
+    tong = db.execute(select(func.count()).select_from(qs.order_by(None).subquery())).scalar_one()
     out = []
-    for t in db.execute(qs.offset(offset).limit(min(limit, 1000))).scalars():
+    for t in db.execute(qs.offset(offset).limit(tran)).scalars():
         v = T.tour_view(db, t)
         v.pop("bookings", None)
         out.append(v)
-    return out
+    return {"rows": out, "tong": tong, "offset": offset, "limit": tran,
+            "cham_tran": offset + len(out) < tong}
 
 
 @router.post("/tours", tags=["tours"], status_code=201)
@@ -423,7 +447,7 @@ def xem_giu_cho(bid: int, u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_
 
 
 @router.post("/bookings/{bid}/giu-cho/gia-han", tags=["bookings"])
-def gia_han_giu_cho(bid: int, data: S.GiaHanGiuChoIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def gia_han_giu_cho(bid: int, data: S.GiaHanGiuChoIn, u: User = Depends(require_roles(*AC.GIU_CHO_ROLES, mo_ta="gia hạn giữ chỗ")), db: Session = Depends(get_db)):
     from app.services import giu_cho as GC
     try:
         return GC.gia_han(db, u, _booking(db, bid), data.den, data.ly_do)
@@ -432,7 +456,7 @@ def gia_han_giu_cho(bid: int, data: S.GiaHanGiuChoIn, u: User = Depends(current_
 
 
 @router.post("/bookings/{bid}/giu-cho/khoi-phuc", tags=["bookings"])
-def khoi_phuc_giu_cho(bid: int, data: S.ActionNote, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def khoi_phuc_giu_cho(bid: int, data: S.ActionNote, u: User = Depends(require_roles(*AC.GIU_CHO_ROLES, mo_ta="khôi phục giữ chỗ")), db: Session = Depends(get_db)):
     from app.services import giu_cho as GC
     try:
         return GC.khoi_phuc(db, u, _booking(db, bid), data.note)
@@ -559,27 +583,125 @@ def sign_param(pid: int, u: User = Depends(require_roles("chutich", "tgd")), db:
 
 # ---------- alerts / robots ----------
 def alert_out(a: Alert) -> dict:
-    return {"id": a.id, "kind": a.kind, "level": a.level, "ref": a.ref, "message": a.message, "to_roles": a.to_roles, "created_at": a.created_at, "resolved": a.resolved}
+    from datetime import datetime as _dt
+    han = getattr(a, "han_xu_ly", None)
+    return {"id": a.id, "kind": a.kind, "level": a.level, "ref": a.ref, "message": a.message,
+            "to_roles": a.to_roles, "created_at": a.created_at, "resolved": a.resolved,
+            # KS-4 – vòng đời. `tre` tính ở máy chủ: màn hình không được tự suy hạn, vì mỗi nơi suy
+            # một kiểu là mỗi nơi ra một danh sách "đang trễ" khác nhau.
+            "trang_thai": getattr(a, "trang_thai", "moi"), "han_xu_ly": han,
+            "tre": bool(han and not a.resolved and han < _dt.now()),
+            "nguoi_nhan_id": getattr(a, "nguoi_nhan_id", None), "nhan_luc": getattr(a, "nhan_luc", None),
+            "dong_luc": getattr(a, "dong_luc", None), "dong_boi_id": getattr(a, "dong_boi_id", None),
+            "bang_chung": getattr(a, "bang_chung", ""), "nguon": getattr(a, "nguon", "")}
 
 
 @router.get("/alerts", tags=["alerts"])
-def list_alerts(u: User = Depends(current_user), db: Session = Depends(get_db)):
-    rows = db.execute(select(Alert).order_by(Alert.resolved, desc(Alert.created_at))).scalars()
+def list_alerts(trang_thai: str = "", nguon: str = "", cua_toi: bool = False,
+                limit: int = 200, offset: int = 0,
+                u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Danh sách cảnh báo, CÓ TRẦN và lọc ở máy chủ.
+
+    KS-5 đo 10/9/2026: cửa này đọc TOÀN BỘ bảng alerts – 1.703 dòng đang mở – rồi mới lọc theo vai
+    trò bằng Python. Danh sách không trần nghĩa là số dòng trả về tăng mãi theo dữ liệu: hôm nay
+    1.703, sang năm không ai biết.
+
+    Trần phải đặt SAU bộ lọc vai trò, không phải trước: cắt trước khi lọc thì người chỉ thấy cảnh
+    báo của mình có thể nhận về một trang rỗng trong khi việc của họ nằm ở dòng thứ 400.
+    """
+    qs = select(Alert).order_by(Alert.resolved, desc(Alert.created_at))
+    if trang_thai:
+        qs = qs.where(Alert.trang_thai.in_(trang_thai.split(",")))
+    if nguon:
+        qs = qs.where(Alert.nguon == nguon)
+    if cua_toi:
+        qs = qs.where(Alert.nguoi_nhan_id == u.id)
+    rows = db.execute(qs).scalars()
     # Ai thấy MỌI cảnh báo, ai chỉ thấy cảnh báo gửi tới vai trò mình. Trước 07/9/2026 dùng nhóm "xem tất
     # cả" cũ (bảy vai trò); nay nhóm đó đã giải thể nên liệt kê thẳng: lãnh đạo, Ban Kiểm soát, Kế toán, CNTT –
     # bốn nhóm có trách nhiệm giám sát toàn hệ thống. Cảnh báo là thứ phải có người nhận, không phải thứ
     # ai cũng đọc cho biết.
-    if u.role in AC.BASE_VIEW + ("ketoan", "cntt"): return [alert_out(a) for a in rows]
-    return [alert_out(a) for a in rows if u.role in (a.to_roles or "").split(",")]   # chỉ cảnh báo gửi tới vai trò của mình
+    if u.role in AC.BASE_VIEW + ("ketoan", "cntt"):
+        duoc = list(rows)
+    else:
+        duoc = [a for a in rows if u.role in (a.to_roles or "").split(",")]   # chỉ cảnh báo gửi tới vai trò của mình
+    tran = max(1, min(limit, 500))
+    trang = duoc[offset:offset + tran]
+    # Tên người nhận lấy MỘT lượt cho cả trang. Gắn quan hệ vào Alert thì mỗi dòng một lượt hỏi –
+    # đúng cái N+1 mà KS-5 vừa gỡ ở /tours, không rước lại ở đây.
+    ids = {a.nguoi_nhan_id for a in trang if a.nguoi_nhan_id}
+    ten = dict(db.execute(select(User.id, User.username).where(User.id.in_(ids))).all()) if ids else {}
+    dong = []
+    for a in trang:
+        v = alert_out(a)
+        v["nguoi_nhan"] = ten.get(a.nguoi_nhan_id, "")
+        dong.append(v)
+    # Cùng một khuôn phong bì với GET /tours: rows · tong · offset · limit · cham_tran. Một khuôn
+    # cho mọi danh sách thì giao diện viết MỘT lần; hai khuôn thì chỗ nào cũng phải nhớ khuôn nào.
+    return {"rows": dong, "tong": len(duoc), "offset": offset, "limit": tran,
+            "cham_tran": offset + len(dong) < len(duoc)}
+
+
+@router.post("/alerts/{aid}/nhan", tags=["alerts"])
+def nhan_alert(aid: int, u: User = Depends(require_roles(*AC.CANH_BAO_ROLES, mo_ta="nhận cảnh báo")),
+               db: Session = Depends(get_db)):
+    """Nhận việc. Từ đây dòng này có TÊN MỘT NGƯỜI, không còn là việc của bốn vai trò."""
+    from datetime import datetime as _dt
+    a = db.get(Alert, aid)
+    if not a:
+        raise HTTPException(404, "Không có cảnh báo")
+    if a.trang_thai not in ("moi", "bo_qua"):
+        raise HTTPException(422, f"Cảnh báo đang ở trạng thái '{a.trang_thai}', không nhận lại được")
+    a.trang_thai, a.nguoi_nhan_id, a.nhan_luc = "dang_xu_ly", u.id, _dt.now()
+    R.audit(db, u.username, u.role, "nhan_canh_bao", f"alert:{aid}", after={"kind": a.kind, "ref": a.ref})
+    db.commit()
+    return alert_out(a)
+
+
+class DongCanhBaoIn(BaseModel):
+    bang_chung: str = ""
+    bo_qua: bool = False
 
 
 @router.post("/alerts/{aid}/resolve", tags=["alerts"])
-def resolve_alert(aid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def resolve_alert(aid: int, data: DongCanhBaoIn | None = None,
+                  u: User = Depends(require_roles(*AC.CANH_BAO_ROLES, mo_ta="đóng cảnh báo")),
+                  db: Session = Depends(get_db)):
+    """Đóng một cảnh báo – phải nói dựa vào đâu.
+
+    Trước 11/9/2026 cửa này KHÔNG có chặn nào: bất kỳ tài khoản nào đăng nhập được đều đóng được
+    BẤT KỲ cảnh báo nào, kể cả cảnh báo đỏ của phòng khác. Thân hàm chỉ đặt resolved=True rồi ghi
+    nhật ký, và bảng alerts không có cột ai-đóng nên sau khi đóng thì không truy lại được ai bấm và
+    dựa vào đâu. Bộ kiểm KS-2 tìm ra; KS-4 khai các cột.
+
+    Đóng mà không phải nói dựa vào đâu thì nút đóng là nút giấu việc – nên bằng chứng là BẮT BUỘC,
+    trừ nhánh `bo_qua` dành cho dữ liệu lịch sử, nhánh ấy đòi lý do cũng dài như vậy.
+    """
+    from datetime import datetime as _dt
+    from app.models.core import ALERT_CHUYEN
     a = db.get(Alert, aid)
-    if not a: raise HTTPException(404, "Không có cảnh báo")
-    a.resolved = True
-    R.audit(db, u.username, u.role, "dong_canh_bao", f"alert:{aid}", after={"kind": a.kind, "ref": a.ref}); db.commit()
-    return {"message": "Đã đóng cảnh báo"}
+    if not a:
+        raise HTTPException(404, "Không có cảnh báo")
+    d = data or DongCanhBaoIn()
+    bc = (d.bang_chung or "").strip()
+    if len(bc) < 10:
+        raise HTTPException(422, "Đóng cảnh báo phải ghi bằng chứng: số chứng từ, mã bản ghi, hoặc "
+                                 "lý do viết ra – ít nhất 10 ký tự.")
+    dich = "bo_qua" if d.bo_qua else "dong"
+    hien = a.trang_thai or "moi"
+    # Không cho nhảy thẳng mới → đóng: đóng khi chưa ai nhận là đóng để cho sạch màn hình. Nhận rồi
+    # đóng ngay trong một lần bấm thì vẫn phải đi qua 'dang_xu_ly' – và lúc ấy sổ có tên người nhận.
+    if dich == "dong" and hien == "moi":
+        raise HTTPException(422, "Chưa ai nhận cảnh báo này. Bấm Nhận trước rồi mới đóng được – "
+                                 "đóng khi chưa ai nhận là đóng để cho sạch màn hình.")
+    if dich not in ALERT_CHUYEN.get(hien, ()) and not (dich == "dong" and hien == "da_xu_ly"):
+        raise HTTPException(422, f"Không chuyển được từ '{hien}' sang '{dich}'")
+    a.trang_thai, a.resolved = dich, True
+    a.dong_luc, a.dong_boi_id, a.bang_chung = _dt.now(), u.id, bc
+    R.audit(db, u.username, u.role, "dong_canh_bao", f"alert:{aid}",
+            after={"kind": a.kind, "ref": a.ref, "trang_thai": dich, "bang_chung": bc[:200]})
+    db.commit()
+    return alert_out(a)
 
 
 @router.post("/robots/run", tags=["alerts"])

@@ -12,7 +12,13 @@ function Tours() {
   const [rows, setRows] = useState<any[]>([]); const [ops, setOps] = useState<any[]>([]); const [open, setOpen] = useState(false);
   const [q, setQ] = useState(""); const [month, setMonth] = useState(""); const [st, setSt] = useState("");
   const mang = useSearchParams().get("mang") || "";
-  const load = () => api(`/tours?limit=300&q=${encodeURIComponent(q)}&month=${month}&status=${st}&mang=${mang}`).then(setRows).catch(() => {});
+  const [tong, setTong] = useState(0); const [chamTran, setChamTran] = useState(false);
+  // KS-5 · T5: cửa /tours cắt ở 300 chuyến. Trước 11/9/2026 nó trả về một mảng trần nên màn hình
+  // không biết là đã cắt – với 1.200+ tour nhập từ Vietrip, người đọc tin mình đang nhìn toàn bộ
+  // trong khi đang nhìn một phần tư. Nay phản hồi mang `tong` và `cham_tran`, và dòng chữ dưới đây
+  // nói thẳng ra. Cắt thì được, im lặng thì không.
+  const load = () => api(`/tours?limit=300&q=${encodeURIComponent(q)}&month=${month}&status=${st}&mang=${mang}`)
+    .then((r) => { setRows(r.rows || []); setTong(r.tong || 0); setChamTran(!!r.cham_tran); }).catch(() => {});
   useEffect(() => { load(); }, [q, month, st, mang]); // eslint-disable-line
   useEffect(() => { api("/users?role=nv_dh,tp_dh").then(setOps).catch(() => {}); }, []);
   const canCreate = ["nv_dh", "tp_dh"].includes(user?.role || "");
@@ -25,6 +31,11 @@ function Tours() {
   const today = new Date().toISOString().slice(0, 10);
   return (<>
     <h1>Tour & dự toán</h1>
+    <p className="muted">
+      {chamTran
+        ? `Đang hiện ${rows.length} chuyến mới nhất trong ${tong} chuyến khớp bộ lọc — thu hẹp bằng tìm kiếm, tháng hoặc trạng thái để thấy phần còn lại.`
+        : `${tong} chuyến khớp bộ lọc.`}
+    </p>
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
       <input placeholder="Tìm mã tour / tên / mã sản phẩm…" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 300 }} />
       <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />

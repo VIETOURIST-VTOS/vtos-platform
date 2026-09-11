@@ -171,7 +171,15 @@ class Param(Base):
     __tablename__ = "params"
     id: Mapped[int] = mapped_column(primary_key=True)
     key: Mapped[str] = mapped_column(String(80), index=True)
-    value: Mapped[str] = mapped_column(String(200))
+    # RỖNG LÀ MỘT TRẠNG THÁI HỢP LỆ, không phải dữ liệu thiếu — nên cột khai default="".
+    #
+    # Hai mốc `ngay_van_hanh_that` và `ngay_du_lieu_that_vietrip` cố ý để trống: chúng chờ hai chữ
+    # ký, và điền sẵn một ngày vào đó là ký thay Chủ tịch bằng một dòng mã. Trước 11/9/2026 cột này
+    # không khai mặc định, nên bộ kiểm độ dài (K11) đọc mô hình ra "cột bắt buộc phải có người
+    # điền" và báo hai dòng ấy là dữ liệu thiếu. Hai lane nói ngược nhau vì MÔ HÌNH không nói rõ.
+    # Khai default="" là để mô hình nói đúng điều hệ thống đang làm: chưa chốt thì trống, và trống
+    # đọc ra "chưa chốt" chứ không đọc ra số 0 hay một ngày ai đó đoán hộ.
+    value: Mapped[str] = mapped_column(String(200), default="", server_default="")
     label: Mapped[str] = mapped_column(String(200))
     unit: Mapped[str] = mapped_column(String(30), default="")
     effective_from: Mapped[date] = mapped_column(Date)
@@ -420,6 +428,26 @@ class Booking(Base):
 
 
 # ---------- Cảnh báo (robot) ----------
+# KS-4 · Vòng đời cảnh báo, khai ra cho máy đọc được (bộ kiểm tools/ks4_canh_bao.py đối chiếu).
+ALERT_TRANG_THAI: dict[str, str] = {
+    "moi": "vừa sinh, chưa ai nhận",
+    "dang_xu_ly": "đã có người nhận",
+    "da_xu_ly": "người nhận báo xong, chờ xác nhận",
+    "dong": "đã xác nhận xong",
+    "bo_qua": "quyết định không xử lý — phải có lý do, đây là nhánh cho dữ liệu lịch sử",
+}
+
+# Chuyển trạng thái hợp lệ. KHÔNG cho nhảy thẳng mới → đóng: đóng khi chưa ai nhận là đóng để cho
+# sạch màn hình, đúng cái đang làm 1.703 dòng trở nên vô nghĩa.
+ALERT_CHUYEN: dict[str, tuple[str, ...]] = {
+    "moi": ("dang_xu_ly", "bo_qua"),
+    "dang_xu_ly": ("da_xu_ly", "bo_qua"),
+    "da_xu_ly": ("dong", "dang_xu_ly"),
+    "dong": (),
+    "bo_qua": ("dang_xu_ly",),
+}
+
+
 class Alert(Base):
     __tablename__ = "alerts"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -441,6 +469,35 @@ class Alert(Base):
     # tiền gửi Ban lãnh đạo). Chỗ nguy hiểm không phải là ô trống, mà là ô trống không ai đếm.
     nguoi_phu_trach: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     giao_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # ---------------------------------------------------------------------------------------
+    # KS-4 (11/9/2026) · VÒNG ĐỜI CẢNH BÁO. Chín cột dưới đây trả lời câu hỏi "vì sao 1.703 dòng
+    # đỏ này không ai xử lý". Cột `resolved` đúng/sai ở trên gộp BA trạng thái khác nhau vào một ô:
+    # chưa ai nhận · đang có người làm · đã xong. Hệ quả đo được: hai người cùng làm một việc mà
+    # không ai biết, và "đóng vì đã xử lý" không phân biệt được với "đóng vì là dữ liệu lịch sử".
+    #
+    # `resolved` GIỮ NGUYÊN, không bỏ: mọi màn hình và robot đang đọc nó. Hai cột đi cùng nhau —
+    # trang_thai là sự thật đầy đủ, resolved là hình chiếu đúng/sai của nó cho mã cũ.
+    # ---------------------------------------------------------------------------------------
+    trang_thai: Mapped[str] = mapped_column(String(20), default="moi", server_default="moi", index=True)
+    # Người CỤ THỂ phải làm. to_roles ở trên trả lời "ai được xem", không trả lời "ai phải làm" –
+    # gửi cho bốn vai trò là gửi cho không ai.
+    nguoi_nhan_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    nhan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Mốc phải xong. Không có cột này thì câu "cảnh báo đang trễ" không đo được, và 1.310 dòng đỏ
+    # đứng ngang nhau dù có dòng mở từ tháng trước.
+    han_xu_ly: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    dong_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    dong_boi_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # Đóng mà không phải nói dựa vào đâu thì nút đóng là nút giấu việc.
+    bang_chung: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # 'lich_su' hay 'phat_sinh'. Dữ liệu cũ đổ sang sinh cảnh báo là việc DỌN DỮ LIỆU; vi phạm sau
+    # ngày vận hành thật là việc KỶ LUẬT. Trộn hai thứ vào một danh sách là cách chắc chắn nhất để
+    # không xử lý được thứ nào.
+    nguon: Mapped[str] = mapped_column(String(20), default="", server_default="", index=True)
+    # Khoá gom trùng: cùng một vấn đề sinh lại mỗi lượt quét thì cộng dồn vào một dòng, không đẻ
+    # dòng mới. Trước đây mỗi robot tự dò theo (kind, ref) bằng tay — nơi nào quên là nơi ấy ngập.
+    gom_khoa: Mapped[str] = mapped_column(String(100), default="", server_default="", index=True)
 
 
 # ---------- Nhật ký bất biến ----------

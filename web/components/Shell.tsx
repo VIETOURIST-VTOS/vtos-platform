@@ -123,7 +123,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       localStorage.setItem("vtos_user", JSON.stringify(m)); setUser(m);
       if (m.must_change_password && path !== "/doi-mat-khau") router.replace("/doi-mat-khau");
     }).catch(() => {});
-    fetch("/api/v1/alerts", { headers: h }).then((r) => r.ok ? r.json() : null).then((a) => { if (Array.isArray(a)) setAlerts(a.length); else if (a?.rows) setAlerts(a.rows.length); }).catch(() => {});
+    fetch("/api/v1/alerts", { headers: h }).then((r) => r.ok ? r.json() : null).then((a) => { if (Array.isArray(a)) setAlerts(a.length); else if (a?.rows) setAlerts(a.tong ?? a.rows.length); }).catch(() => {});
   }, [router, path]);
 
   const toast = useCallback((msg: string, err?: boolean) => { setT({ msg, err }); setTimeout(() => setT(null), err ? 6500 : 4000); }, []);

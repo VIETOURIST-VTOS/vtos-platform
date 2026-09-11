@@ -39,7 +39,7 @@ function NhaCungCap() {
       setDs(await api("/ncc"));
       setDon(await api("/ncc/don"));
       setCho(await api("/ncc/doi-tai-khoan/cho-xac-nhan"));
-      try { setTours(await api("/tours")); } catch { setTours([]); }
+      try { setTours((await api("/tours")).rows || []); } catch { setTours([]); }
     } catch (e) { toast(errMsg(e), true); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);

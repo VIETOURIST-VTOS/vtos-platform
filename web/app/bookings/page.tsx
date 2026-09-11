@@ -19,15 +19,11 @@ function Bookings() {
   const PAGE = 300;
   const [ret, setRet] = useState<any>({ summary: {}, rows: [] }); const [rst, setRst] = useState("hieu_luc");
   const [edit, setEdit] = useState<any>(null); const [cancel, setCancel] = useState<any>(null); const [apply, setApply] = useState<any>(null); const [cands, setCands] = useState<any[]>([]);
-  // VPM-7 – giữ chỗ có thời hạn. `gcTong` là số chỗ đang bị giữ mà chưa có đồng nào; đó là con số
-  // người điều hành cần thấy trước khi mở thêm chỗ hay từ chối khách.
-  const [gcTong, setGcTong] = useState<any>(null); const [gc, setGc] = useState<any>(null); const [gcBang, setGcBang] = useState<any>(null);
   const openApply = (r: any) => { setApply(r); api(`/bookings?status=due&limit=50&q=${encodeURIComponent(r.customer_phone || r.customer_name)}`).then((x) => setCands(x.filter((b: any) => b.id !== r.booking_id))).catch(() => setCands([])); };
   const load = useCallback(() => {
     api(`/bookings?limit=${PAGE}&offset=0&q=${encodeURIComponent(q)}&status=${st}&mang=${mang}`).then((x) => { setRows(x); setPage(0); }).catch((e) => toast(errMsg(e), true));
     api(`/bookings/count?q=${encodeURIComponent(q)}&status=${st}&mang=${mang}`).then(setCnt).catch(() => setCnt({ total: null, filtered: null }));
     api(`/retentions?status=${rst}`).then(setRet).catch(() => {});
-    api(`/bookings/giu-cho/tong-hop`).then(setGcTong).catch(() => setGcTong(null));
   }, [q, st, rst, mang, toast]);      // thiếu `mang` ở đây là đổi menu mà danh sách không tải lại
   const more = async () => {
     try { const x = await api(`/bookings?limit=${PAGE}&offset=${(page + 1) * PAGE}&q=${encodeURIComponent(q)}&status=${st}&mang=${mang}`); setRows((r) => [...r, ...x]); setPage((p) => p + 1); } catch (e) { toast(errMsg(e), true); }
@@ -35,46 +31,32 @@ function Bookings() {
   useEffect(() => { load(); }, [load]);
   const isDH = ["nv_dh", "tp_dh"].includes(role), canUnlock = ["tp_dh", "gd_kd", "cntt", "tgd"].includes(role), canRt = ["nv_dh", "tp_dh", "ketoan"].includes(role), canRtCancel = ["tp_dh", "gd_kd", "tgd", "ketoan"].includes(role);
   const canGiuCho = ["nv_dh", "tp_dh", "gd_kd", "tp_kd", "cntt", "tgd"].includes(role);
-  const moGiuCho = async (b: any) => {
-    setGc(b); setGcBang(null);
-    try { setGcBang(await api(`/bookings/${b.id}/giu-cho`)); } catch (e) { toast(errMsg(e), true); }
-  };
   const run = async (path: string, json: any, ok?: string) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || ok || "Xong"); load(); return true; } catch (e) { toast(errMsg(e), true); return false; } };
+  // Gia hạn đòi HẠN MỚI và LÝ DO – máy chủ từ chối nếu thiếu một trong hai, vì một chỗ được giữ thêm
+  // là một chỗ không bán cho khách khác. Hạn mới cũng không được muộn hơn deadline hủy chỗ của tour.
+  const giaHan = (b: any) => {
+    const g = window.prompt(`Gia hạn giữ chỗ ${b.code} (${b.pax} chỗ) đến lúc nào?\nNhập theo dạng 2026-09-20 17:00${b.cancel_deadline ? `\nKhông được muộn hơn deadline hủy chỗ ${fmtDT(b.cancel_deadline)}` : ""}`,
+      (b.giu_cho_den || "").slice(0, 16).replace("T", " "));
+    if (!g) return;
+    const ly_do = (window.prompt("Lý do gia hạn (bắt buộc – một chỗ giữ thêm là một chỗ không bán được):") || "").trim();
+    if (!ly_do) { toast("Phải ghi lý do gia hạn.", true); return; }
+    run(`/bookings/${b.id}/giu-cho/gia-han`, { den: g.trim().replace(" ", "T"), ly_do });
+  };
+  // Khôi phục = xin lại chỗ đã trả về tour. Máy chủ kiểm tour còn chỗ trước khi cho; hết chỗ thì báo
+  // đỏ chứ không im lặng cho qua – cho qua ở đây là bán trùng ghế.
+  const khoiPhuc = (b: any) => {
+    const note = (window.prompt(`Khôi phục giữ chỗ ${b.code} – ${b.pax} chỗ. Lý do:`, "Khách báo đã chuyển tiền") || "").trim();
+    if (!note) return;
+    run(`/bookings/${b.id}/giu-cho/khoi-phuc`, { note });
+  };
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
     ["adl", "chd", "inf"].forEach((k) => (d[k] = d[k] === "" ? null : Number(d[k])));
-    // VPM-8 – gửi kèm bản mình đang cầm. Không gửi thì máy chủ cho qua (màn hình cũ vẫn dùng được),
-    // nhưng cũng mất luôn tác dụng của khoá: người sau vẫn ghi đè lặng lẽ lên người trước.
-    d.phien_ban = edit.phien_ban;
-    try { await api(`/bookings/${edit.id}`, { method: "PUT", json: d }); toast("Đã cập nhật thông tin khách"); setEdit(null); load(); }
-    catch (x: any) {
-      // 409 = người khác vừa sửa. Hiện thẳng nội dung mới thay vì bắt người dùng đi tra tay.
-      const ct = x?.detail || x?.body?.detail;
-      if (ct?.gate === "LECH_PHIEN_BAN") {
-        toast(`${ct.message} Khách trên hệ thống hiện là: ${ct.noi_dung_moi?.khach || "–"} · ${ct.noi_dung_moi?.sdt || "–"}`, true);
-        setEdit(null); load(); return;
-      }
-      toast(errMsg(x), true);
-    }
+    try { await api(`/bookings/${edit.id}`, { method: "PUT", json: d }); toast("Đã cập nhật thông tin khách"); setEdit(null); load(); } catch (x) { toast(errMsg(x), true); }
   };
   const doCancel = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
     if (await run(`/bookings/${cancel.id}/cancel`, { reason: d.reason, charge: soTien(d.charge), retain: d.mode === "retain", expires_days: d.expires_days ? Number(d.expires_days) : null })) setCancel(null);
-  };
-  const doGiaHan = async (e: React.FormEvent) => {
-    e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
-    try {
-      const r = await api(`/bookings/${gc.id}/giu-cho/gia-han`, { method: "POST", json: { den: d.den, ly_do: d.ly_do } });
-      toast(r.message);
-      // Cảnh báo gia hạn nhiều lần hiện RIÊNG, không trộn vào câu báo thành công: người dùng cần thấy
-      // rằng việc đã xong VÀ có một điều đáng lưu ý – hai chuyện khác nhau.
-      if (r.canh_bao) toast(r.canh_bao, true);
-      setGc(null); load();
-    } catch (x) { toast(errMsg(x), true); }
-  };
-  const doKhoiPhuc = async (b: any) => {
-    const n = prompt(`Khôi phục giữ chỗ cho ${b.code}? Ghi lý do (khách trả tiền muộn, Điều hành quyết định…)`);
-    if (n) run(`/bookings/${b.id}/giu-cho/khoi-phuc`, { note: n });
   };
   const doApply = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
@@ -104,41 +86,27 @@ function Bookings() {
           <td className="num">{b.cancelled ? "–" : b.due > 0 ? <Tag cls="warn">{vnd(b.due)}</Tag> : <Tag cls="ok">Đủ</Tag>}</td>
           <td><Tag cls={pc}>{pl}</Tag></td>
           <td style={{ color: b.past_deadline && b.pmt_status !== "PAID" ? "var(--red)" : undefined }}>{fmtDT(b.cancel_deadline)}{b.past_deadline && <div className="muted">đã qua</div>}</td>
-          <td>{b.cancelled ? <span className="muted">–</span>
-            : b.giu_cho_het ? <><Tag cls="red">đã trả chỗ</Tag><div className="muted">hết hạn {fmtDT(b.giu_cho_het_luc)} · booking vẫn còn</div></>
-            : <><span style={{ color: b.qua_han_giu_cho ? "var(--red)" : undefined }}>{fmtDT(b.giu_cho_den)}</span>
-                {b.qua_han_giu_cho && <div className="muted">quá hạn – robot sẽ trả chỗ</div>}
-                {b.gia_han_lan > 0 && <div className="muted">đã gia hạn {b.gia_han_lan} lần</div>}</>}</td>
+          <td style={{ whiteSpace: "nowrap" }}>{b.cancelled ? <span className="muted">–</span>
+            : b.giu_cho_het ? <><Tag cls="red">đã trả chỗ</Tag><div className="muted">{fmtDT(b.giu_cho_het_luc)}</div></>
+            : b.qua_han_giu_cho ? <><Tag cls="warn">quá hạn</Tag><div className="muted">{fmtDT(b.giu_cho_den)}</div></>
+            : b.giu_cho_den ? <span className="muted">đến {fmtDT(b.giu_cho_den)}</span>
+            : <span className="muted">chưa đặt hạn</span>}</td>
           <td>{b.locked ? <Tag cls="navy" >🔒 {b.lock_reason}</Tag> : <span className="muted">mở</span>}</td>
           <td>{b.sales_name}</td>
           <td style={{ whiteSpace: "nowrap" }}>
             {!b.cancelled && !b.locked && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setEdit(b)}>sửa khách</button>}{" "}
             {!b.cancelled && b.locked && canUnlock && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => { const r = prompt(`Lý do mở khóa ${b.code}?`); if (r) run(`/bookings/${b.id}/unlock`, { note: r }); }}>mở khóa</button>}{" "}
             {!b.cancelled && isDH && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setCancel(b)}>hủy</button>}{" "}
-            {!b.cancelled && canGiuCho && !b.giu_cho_het && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => moGiuCho(b)}>gia hạn giữ chỗ</button>}{" "}
-            {!b.cancelled && canGiuCho && b.giu_cho_het && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => doKhoiPhuc(b)}>khôi phục giữ chỗ</button>}
+            {/* VPM-7 · cửa giữ chỗ. Trước 11/9/2026 phân hệ này có đủ robot, đủ nhật ký, đủ cửa ở máy chủ
+                mà màn hình KHÔNG có nút nào – tức là luật chỉ sống trong mã, còn Điều hành thì không dùng
+                được. Gia hạn khi chỗ còn đang giữ; khôi phục khi chỗ đã trả về tour (và chỉ được nếu tour
+                còn chỗ – máy chủ kiểm, không phải màn hình). */}
+            {!b.cancelled && canGiuCho && !b.giu_cho_het &&
+              <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => giaHan(b)}>gia hạn giữ chỗ</button>}
+            {!b.cancelled && canGiuCho && b.giu_cho_het &&
+              <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => khoiPhuc(b)}>khôi phục giữ chỗ</button>}
           </td></tr>; }) : <tr><td colSpan={14} className="muted">Không có booking theo bộ lọc.</td></tr>}</tbody></table>
     </div>
-
-    {gcTong && <p className="muted">Giữ chỗ: <b>{gcTong.cho_dang_giu_chua_thu}</b> chỗ đang giữ mà chưa thu đồng nào ·
-      <b> {gcTong.booking_sap_het_han_12h}</b> booking hết hạn trong 12 giờ tới ·
-      <b> {gcTong.cho_da_tra_ve}</b> chỗ đã trả về tour. Hết hạn giữ chỗ <b>không phải</b> hủy booking – khách trả tiền thì khôi phục nếu còn chỗ.</p>}
-
-    {gc && <form onSubmit={doGiaHan} className="panel"><h2>Gia hạn giữ chỗ – {gc.code} ({gc.tour_code}) · {gc.pax} chỗ</h2>
-      {gcBang && <p className="muted">Hạn hiện tại {fmtDT(gcBang.giu_cho_den)} · đã thu {vnd(gcBang.da_thu)} · đã gia hạn {gcBang.gia_han_lan} lần ·
-        tour còn trống {gcBang.cho_con_trong} chỗ. Không được muộn hơn deadline hủy chỗ {fmtDT(gcBang.cancel_deadline)}.</p>}
-      {gcBang && gcBang.gia_han_lan >= 3 && <Gate ok={false}>Booking này đã gia hạn {gcBang.gia_han_lan} lần – một chỗ giữ mãi dưới danh nghĩa hợp lệ vẫn là một chỗ không bán được.</Gate>}
-      <div className="grid">
-        <div><label>Giữ chỗ tới</label><input name="den" type="datetime-local" required /></div>
-        <div><label>Lý do (bắt buộc)</label><input name="ly_do" required placeholder="Khách hẹn chuyển tiền sáng mai / chờ duyệt ngân sách…" /></div>
-      </div>
-      {gcBang?.nhat_ky?.length ? <table><thead><tr><th>Lúc</th><th>Việc</th><th>Hạn cũ → hạn mới</th><th className="num">Chỗ</th><th>Người</th><th>Lý do</th></tr></thead>
-        <tbody>{gcBang.nhat_ky.map((n: any) => <tr key={n.id}>
-          <td>{fmtDT(n.luc)}</td><td>{({ dat_han: "đặt hạn", gia_han: "gia hạn", het_han: "hết hạn – trả chỗ", khoi_phuc: "khôi phục" } as any)[n.viec] || n.viec}</td>
-          <td className="muted">{fmtDT(n.han_cu)} → {n.han_moi ? fmtDT(n.han_moi) : "–"}</td><td className="num">{n.so_cho}</td><td>{n.boi}</td><td className="muted">{n.ly_do}</td>
-        </tr>)}</tbody></table> : null}
-      <button className="act" type="submit">Gia hạn</button> <button className="act grey" type="button" onClick={() => setGc(null)}>Đóng</button>
-    </form>}
 
     {edit && <form onSubmit={saveEdit} className="panel"><h2>Sửa thông tin khách – {edit.code} ({edit.tour_code})</h2>
       <div className="grid"><div><label>Tên khách</label><input name="customer_name" defaultValue={edit.customer_name} /></div><div><label>SĐT</label><input name="customer_phone" defaultValue={edit.customer_phone} /></div>

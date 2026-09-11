@@ -22,7 +22,7 @@ def _startup():
 
 
 def tour(code):
-    return next(t for t in client.get("/api/v1/tours", headers=login("dh.lan")).json() if t["code"] == code)
+    return next(t for t in client.get("/api/v1/tours", headers=login("dh.lan")).json()["rows"] if t["code"] == code)
 
 
 def pay_request(cat, tid, ncc, mst, amount, desc):

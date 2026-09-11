@@ -76,7 +76,7 @@ def login(un):
 def ma_tour(headers):
     r = client.get("/api/v1/tours?limit=1000", headers=headers)
     assert r.status_code == 200, r.text
-    return {t["code"] for t in r.json()}
+    return {t["code"] for t in r.json()["rows"]}
 
 
 # ---------------- 1. Không thấy hồ sơ của pháp nhân khác ----------------
@@ -100,7 +100,7 @@ def test_ho_so_chua_gan_van_thay_duoc_va_co_nhan():
     Đo trên hệ thống thật ngày 08/9/2026: hiện KHÔNG còn hồ sơ nào chưa gán pháp nhân. Phép thử vẫn
     giữ – nó canh cho cái ngày có hồ sơ đầu tiên chưa gán, và ngày đó không báo trước."""
     r = client.get("/api/v1/tours?limit=1000", headers=login("pn_a"))
-    theo_ma = {t["code"]: t for t in r.json()}
+    theo_ma = {t["code"]: t for t in r.json()["rows"]}
     assert "PN_TOUR_X" in theo_ma, "hồ sơ chưa xác định pháp nhân bị giấu khỏi mọi màn hình"
     assert theo_ma["PN_TOUR_X"]["chua_gan_phap_nhan"] is True
     assert theo_ma["PN_TOUR_A"]["chua_gan_phap_nhan"] is False

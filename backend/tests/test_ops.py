@@ -36,7 +36,7 @@ def _startup():
 
 
 def tour(code):
-    return next(t for t in client.get("/api/v1/tours", headers=login("tp.dieuhanh")).json() if t["code"] == code)
+    return next(t for t in client.get("/api/v1/tours", headers=login("tp.dieuhanh")).json()["rows"] if t["code"] == code)
 
 
 LONG = "Nội dung đủ dài trên hai mươi ký tự để được tính điểm."

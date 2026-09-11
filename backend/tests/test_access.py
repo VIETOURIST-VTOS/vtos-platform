@@ -22,7 +22,7 @@ def _startup():
 
 
 def _tour_id():
-    return client.get("/api/v1/tours?limit=1", headers=login("tgd")).json()[0]["id"]
+    return client.get("/api/v1/tours?limit=1", headers=login("tgd")).json()["rows"][0]["id"]
 
 
 def test_read_matrix_cost_finance_audit():
@@ -68,7 +68,7 @@ def test_sales_sees_only_own():
     for path in ("/api/v1/receipts", "/api/v1/requests", "/api/v1/retentions?status=all"):
         assert client.get(path, headers=hoa).status_code == 200
     # cảnh báo: sale chỉ thấy cảnh báo gửi tới vai trò nv_kd
-    for a in client.get("/api/v1/alerts", headers=hoa).json(): assert "nv_kd" in a["to_roles"].split(",")
+    for a in client.get("/api/v1/alerts", headers=hoa).json()["rows"]: assert "nv_kd" in a["to_roles"].split(",")
 
 
 def test_bks_read_only_and_robot_token():

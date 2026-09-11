@@ -54,6 +54,14 @@ DEFAULT_PARAMS = [
     ("cham_soc_han_ngay", "3", "Hạn liên hệ chăm sóc khách sau khi tour kết thúc", "ngày", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("cham_soc_hai_long_mo_kn", "3", "Điểm hài lòng DƯỚI mức này thì tự mở hồ sơ khiếu nại", "điểm (1–5)", "MKT/CSKH đề xuất 07/9/2026"),
     ("cham_soc_lui_ngay", "30", "Chỉ sinh phiếu chăm sóc cho tour kết thúc trong khoảng lùi này (chặn việc mở phiếu cho toàn bộ lịch sử chuyến đã đóng)", "ngày", "MKT/CSKH Đợt 4"),
+    # KS-4 (11/9/2026) – hai mốc của vòng đời cảnh báo. Chủ tịch chốt 30 ngày / 48 giờ.
+    #
+    # KHÔNG khai `ngay_van_hanh_that` ở đây. Tham số ấy đã có sẵn phía dưới, CỐ Ý để trống chờ hai
+    # chữ ký; thêm một dòng thứ hai điền sẵn "2026-12-01" là ký thay Chủ tịch bằng một dòng mã, và
+    # hai dòng cùng tên thì không ai biết dòng nào đang có hiệu lực. KS-4 ĐỌC mốc ấy qua
+    # moi_truong_du_lieu.moc_van_hanh_that(); chưa ký thì đọc ra None và cảnh báo để nguồn TRỐNG.
+    ("canh_bao_lui_ngay", "30", "Chỉ sinh cảnh báo cho sự kiện trong khoảng lùi này. Không có mốc này thì mỗi lượt quét là một lượt quét lại toàn bộ lịch sử – đúng cơ chế đã đẻ ra 851 dòng quá hạn quyết toán", "ngày", "Chủ tịch chốt 11/9/2026, bằng cham_soc_lui_ngay"),
+    ("canh_bao_han_mac_dinh_gio", "48", "Hạn xử lý mặc định cho loại cảnh báo chưa khai hạn riêng. Không có hạn thì không có gì trễ", "giờ", "Chủ tịch chốt 11/9/2026, bằng han_giu_cho_gio"),
     ("kn_han_muc1_gio", "72", "Hạn phản hồi khách – khiếu nại mức 1 (góp ý)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("kn_han_muc2_gio", "24", "Hạn phản hồi khách – khiếu nại mức 2 (có thiệt hại)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("kn_han_muc3_gio", "4", "Hạn phản hồi khách – khiếu nại mức 3 (nghiêm trọng)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
@@ -390,7 +398,25 @@ def calc_db(db: Session, t: Tour, threshold: float) -> dict:
 
 
 def booked_pax(tour: Tour) -> int:
-    return sum(b.pax for b in tour.bookings if not b.cancelled)
+    """Số chỗ ĐANG BỊ GIỮ trên chuyến – không phải số booking đang tồn tại.
+
+    NỬA CÒN THIẾU CỦA VPM-7 (bù ngày 11/9/2026). Phân hệ giữ chỗ đã dựng xong cả robot hết hạn, cửa
+    gia hạn, cửa khôi phục và nhật ký; giu_cho.con_trong() cũng đã ghi thẳng trong chú thích rằng
+    "booking đã hết hạn giữ chỗ không nằm trong booked_pax nữa". Nhưng hàm này thì vẫn cộng mọi
+    booking chưa huỷ, nên câu ấy KHÔNG đúng: robot tuyên hết hạn, ghi nhật ký, bắn cảnh báo – mà số
+    chỗ còn trống của tour không nhúc nhích một đơn vị. Toàn bộ lý do VPM-7 tồn tại nằm ở một phép
+    cộng thiếu một điều kiện.
+
+    `giu_cho_het = True` nghĩa là: quá hạn giữ mà CHƯA THU ĐỒNG NÀO (luật 1 của giu_cho.py – có tiền
+    vào thì robot không đụng tới), nên chỗ đã trả về tour. Booking VẪN CÒN – luật 2, robot không xoá
+    cam kết với khách – nó chỉ không còn chiếm ghế. Đó cũng là cách đọc đúng ở mọi chỗ gọi hàm này:
+    chỗ còn lại để bán, số khách so với điểm hoà vốn D-7, dự toán theo đầu khách. Một người chưa trả
+    đồng nào và đã mất chỗ thì không phải một khách đang ngồi trên chuyến.
+
+    Khách trả tiền muộn: Điều hành bấm khôi phục, giu_cho.gia_han() kiểm tour còn chỗ rồi đặt
+    giu_cho_het = False, và ghế được tính lại ngay tại đây.
+    """
+    return sum(b.pax for b in tour.bookings if not b.cancelled and not b.giu_cho_het)
 
 
 def settlement_deadline(db: Session, tour: Tour) -> date:
@@ -429,11 +455,35 @@ def run_robots(db: Session) -> int:
     today = date.today()
     created = 0
 
-    def add(kind, level, ref, msg, roles):
+    # KS-4 – mốc thời gian của lượt quét. Đọc một lần ở đây, không đọc lại trong vòng lặp.
+    lui = int(get_param(db, "canh_bao_lui_ngay") or 30)
+    moc_lui = today - timedelta(days=lui)
+    han_gio = float(get_param(db, "canh_bao_han_mac_dinh_gio") or 48)
+    # Mốc vận hành thật đọc qua đúng một chỗ. None nghĩa là CHƯA AI KÝ – và lúc ấy không đoán:
+    # nguồn để TRỐNG chứ không đóng dấu 'phat_sinh' cho mọi thứ. Một ô trống đếm được, còn một ô
+    # điền bừa thì đọc như sự thật.
+    from app.services import moi_truong_du_lieu as MT
+    vhs = MT.moc_van_hanh_that(db)
+
+    def add(kind, level, ref, msg, roles, moc: date | None = None):
+        """Thêm một cảnh báo nếu chưa có dòng CÙNG (kind, ref) đang mở.
+
+        KS-4 gắn luôn ba thứ mà trước đây không ai gắn:
+          · gom_khoa  – khoá gom trùng, để lượt quét sau cộng dồn chứ không đẻ dòng mới
+          · han_xu_ly – không có hạn thì không có gì trễ, và 1.310 dòng đỏ đứng ngang nhau
+          · nguon     – 'lich_su' hay 'phat_sinh'. Sự kiện TRƯỚC ngày vận hành thật là việc dọn dữ
+                        liệu, sau ngày ấy là việc kỷ luật. Trộn hai thứ là cách chắc chắn nhất để
+                        không xử lý được thứ nào. Mốc CHƯA KÝ thì để trống – không đoán.
+        `moc` là ngày SỰ KIỆN xảy ra (không phải hôm nay) – dùng để xếp nguồn.
+        """
         nonlocal created
         exists = db.execute(select(Alert).where(Alert.kind == kind, Alert.ref == ref, Alert.resolved == False)).scalars().first()
         if not exists:
-            db.add(Alert(kind=kind, level=level, ref=ref, message=msg, to_roles=roles))
+            ngay = moc or today
+            db.add(Alert(kind=kind, level=level, ref=ref, message=msg, to_roles=roles,
+                         gom_khoa=f"{kind}:{ref}",
+                         han_xu_ly=datetime.now() + timedelta(hours=han_gio),
+                         nguon="" if vhs is None else ("lich_su" if ngay < vhs else "phat_sinh")))
             created += 1
 
     d7 = int(get_param(db, "moc_d7"))
@@ -451,12 +501,17 @@ def run_robots(db: Session) -> int:
                 "tp_dh,gd_kd,tgd,chutich")
         if t.end_date < today:
             t.status = "ket_thuc"
-    for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.tour_type != "non_package")).scalars():
+    # KS-4 – CHỈ quét chuyến kết thúc trong khoảng lùi. Trước bản này vòng lặp duyệt MỌI chuyến
+    # trạng thái "ket_thuc" từ đầu lịch sử; với dữ liệu đổ từ Vietrip sang nó đẻ ra 851 dòng đỏ
+    # trong một lượt, và 851 dòng đỏ thì không ai đọc dòng nào. Chuyến cũ hơn mốc lùi vẫn quá hạn
+    # thật, nhưng đó là việc DỌN DỮ LIỆU một lần, không phải việc nhắc mỗi lượt quét.
+    for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.tour_type != "non_package",
+                                           Tour.end_date >= moc_lui)).scalars():
         dl = settlement_deadline(db, t)
         if today > dl:
             add("qua_han_qt", "red", t.code,
                 f"{t.code} quá hạn quyết toán (hạn {dl:%d/%m}): xếp nhóm dưới 10% / hoãn thưởng tới khi chốt; người điều hành mất thưởng chuyến",
-                "tp_dh,ketoan,tgd")
+                "tp_dh,ketoan,tgd", moc=t.end_date)
     for t in db.execute(select(Tour).where(Tour.status == "da_dong_so")).scalars():
         if t.closed_at and (today - t.closed_at.date()).days > int(get_param(db, "han_kt_xac_nhan")):
             add("kt_cham", "warn", t.code, f"{t.code}: Kế toán chưa xác nhận sau {get_param(db,'han_kt_xac_nhan'):.0f} ngày làm việc", "ketoan,tgd")

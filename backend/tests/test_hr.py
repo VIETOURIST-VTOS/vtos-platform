@@ -78,7 +78,7 @@ def test_draft_from_seed():
 
 
 def test_gate13_guide_conditions_and_pending_hold():
-    tours = client.get("/api/v1/tours", headers=login("tp.dieuhanh")).json()
+    tours = client.get("/api/v1/tours", headers=login("tp.dieuhanh")).json()["rows"]
     t = next(x for x in tours if x["code"] == "PT-DL-0912")
     emps = {e["code"]: e for e in client.get("/api/v1/employees", headers=login("hcns")).json()}
     bad = client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": emps["NS0012"]["id"], "days": 2, "rate_per_day": 400000}, headers=login("dh.lan"))
@@ -126,7 +126,7 @@ def test_guide_rate_table_and_assignment():
     dl = next(r for r in rates if r["route"] == "Đà Lạt 3N2Đ"); assert dl["rate_per_day"] == 600000 and dl["old_rate_per_day"] == 350000 and str(dl["effective_from"]) == "2026-09-01"
     emps = client.get("/api/v1/employees", headers=login("hcns")).json()
     g = next(e for e in emps if e["department"] == "huong_dan" and e["guide_ok"])
-    t = client.get("/api/v1/tours", headers=login("hcns")).json()[0]
+    t = client.get("/api/v1/tours", headers=login("hcns")).json()["rows"][0]
     r = client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": g["id"], "days": 0, "rate_per_day": 0, "rate_id": dl["id"], "holiday": True}, headers=login("tp.dieuhanh"))
     assert r.status_code == 201, r.text
     a = client.get("/api/v1/guide-assignments", headers=login("hcns")).json()[0]
@@ -173,7 +173,7 @@ def test_vehicle_rate_table_and_dispatch_pricing():
     pt = next(r for r in rates if r["route"] == "Phan Thiết 2 ngày")
     assert pt["internal_price"] == 9_000_000 and pt["partner_price"] == 10_000_000 and pt["status"] == "active" and len(rates) >= 29
     veh = {v["plate"]: v for v in client.get("/api/v1/vehicles", headers=login("dh.lan")).json()}
-    t = next(x for x in client.get("/api/v1/tours", headers=login("dh.lan")).json() if x["code"] == "PT-DL-0912")
+    t = next(x for x in client.get("/api/v1/tours", headers=login("dh.lan")).json()["rows"] if x["code"] == "PT-DL-0912")
     base = {"tour_id": t["id"], "date_from": t["start_date"], "date_to": t["end_date"], "rate_id": pt["id"]}
     # Đợt 4 đội xe: xe này đã có lệnh trước đó nên tài xế của nó đang nhiều ngày công nhất, và bộ gợi ý xếp
     # nó dưới nhóm đề xuất theo tiêu chí cân bằng ngày công. Chọn phương án hệ thống đánh giá thấp hơn thì

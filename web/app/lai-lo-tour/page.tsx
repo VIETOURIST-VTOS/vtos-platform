@@ -15,7 +15,10 @@ import { Tag, errMsg } from "@/components/ui";
  *   2. Tổng ở chân bảng chỉ cộng dòng đã có giá vốn, và phải ghi rõ đã bỏ ra bao nhiêu dòng. */
 
 const NHAN: Record<string, { ten: string; cls: string }> = {
-  quyet_toan_chi_tiet: { ten: "Quyết toán chi tiết", cls: "green" },
+  // globals.css chỉ khai bốn lớp thẻ: ok · warn · red · navy. "green" từng được dùng ở đây và nó
+  // không lỗi, không cảnh báo – chỉ lặng lẽ ra một thẻ trơn không màu, tức là mất đúng cái dấu
+  // hiệu mà cột "nguồn số" sinh ra để nói.
+  quyet_toan_chi_tiet: { ten: "Quyết toán chi tiết", cls: "ok" },
   quyet_toan_tong: { ten: "Quyết toán tổng", cls: "" },
   thieu_gia_von: { ten: "Chưa có giá vốn", cls: "red" },
   chua_co_so: { ten: "Chưa có số", cls: "muted" },
@@ -28,137 +31,6 @@ const pc = (v: any) => (v === null || v === undefined
   ? <span className="muted">—</span>
   : <span className={Number(v) < 0 ? "red" : ""}>{(Number(v) * 100).toFixed(1)}%</span>);
 
-/** Bốn mặt của bản quyết toán Điều hành – lớp 2 phần đến từ TỆP, không phải từ sổ VTOS.
- *
- *  Đặt ở đây, trong màn hình lãi lỗ sẵn có, chứ không dựng màn hình quyết toán riêng. Tệp
- *  lai_lo_tour.py sinh ra ngày 09/9 vì VTOS lúc ấy có bốn công thức lãi lỗ tour chạy song song cho ra
- *  bốn con số; thêm một màn hình quyết toán hai lớp nữa là tạo công thức thứ năm, và lần này còn khó
- *  thấy hơn vì hai màn hình sẽ trông giống hệt nhau.
- *
- *  Số tổng của chuyến vẫn do chuẩn phép tính ở /api/v1/lai-lo-tour quyết. Khối này chỉ nói thêm hai
- *  điều: số ấy đến từ đâu, và chỗ nào trong tệp gốc không khớp nhau. */
-function BanQuyetToan({ q }: { q: any }) {
-  const [mat, setMat] = useState<"khach" | "chiet_tinh" | "hdv" | "booking">("khach");
-  const TAB: [string, string, number][] = [
-    ["khach", "Từng khách", q.khach.length],
-    ["chiet_tinh", "Chiết tính", q.chiet_tinh.length],
-    ["hdv", "Chi trên tour của HDV", q.hdv_chi.length],
-    ["booking", "Doanh thu theo booking", q.booking.length],
-  ];
-  return (<>
-    <h4 style={{ marginTop: 18 }}>Quyết toán của Điều hành — {q.ten_tep || "tệp đã nạp"}</h4>
-
-    {/* Phát hiện đối chiếu hiện TRƯỚC bảng số, không giấu xuống cuối. Ba chỗ vênh đo được trên tệp
-        thật đều thuộc loại đọc lướt sẽ bỏ qua: ngày khởi hành lệch giữa các sheet, số khách lệch,
-        HDV chi nhiều hơn chiết tính. */}
-    {(q.phat_hien || []).length > 0 && <div className="gate fail">
-      <b>Các sheet trong tệp nói khác nhau ở {q.phat_hien.length} chỗ</b>
-      <ul style={{ margin: "6px 0 0 16px", fontSize: 13 }}>
-        {q.phat_hien.map((x: string, i: number) => <li key={i}>{x}</li>)}
-      </ul>
-      <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-        Hệ thống KHÔNG tự chọn nguồn nào đúng — nó giữ nguyên số của từng nguồn để Điều hành sửa tệp
-        gốc. Chọn hộ một lần là sau đó không còn dấu vết nào cho thấy đã từng có hai số.
-      </p>
-    </div>}
-
-    <div className="kpis">
-      <div className="kpi"><b>{q.so_dong_khach}</b><span>dòng khách</span></div>
-      <div className="kpi"><b>{q.so_khach_tep_ghi ?? "—"}</b><span>số khách tệp ghi</span></div>
-      <div className="kpi"><b>{so(q.gia_ban)}</b>
-        <span>giá bán{q.nhieu_muc_gia ? " (nhiều mức)" : ""}</span></div>
-      <div className="kpi"><b>{q.so_dong_chi_co_chung_tu}/{q.so_dong_chi}</b>
-        <span>dòng chi có chứng từ</span></div>
-      <div className="kpi"><b>{q.so_chung_tu_co_mst}</b><span>dòng có MST nhà cung cấp</span></div>
-    </div>
-
-    {/* Chênh giữa lớp 1 và tổng lớp 2. Hiện cả khi bằng 0: "đã đối chiếu, khớp" khác với "chưa đối
-        chiếu bao giờ", và một ô trống không phân biệt được hai chuyện đó. */}
-    <p className="muted" style={{ fontSize: 12 }}>
-      Chênh giữa số tổng và cộng dòng: thu {so(q.chenh_thu)} · chi {so(q.chenh_chi)}
-    </p>
-
-    <div className="row" style={{ gap: 6, margin: "10px 0" }}>
-      {TAB.map(([k, ten, n]) => (
-        <button key={k} className={"act sm" + (mat === k ? "" : " ghost")}
-                onClick={() => setMat(k as any)}>{ten} ({n})</button>))}
-    </div>
-
-    {mat === "khach" && <table><thead><tr>
-      <th className="num">STT</th><th>Sale</th><th>Tên khách</th>
-      <th className="num">Giá bán</th><th className="num">Thu khác</th><th className="num">Tổng thu</th>
-      <th>Các khoản chi</th><th className="num">Tổng chi</th><th className="num">Lợi nhuận</th>
-    </tr></thead><tbody>
-      {q.khach.map((k: any, i: number) => (<tr key={i} style={k.co_lech ? { background: "var(--warnbg)" } : undefined} title={k.co_lech || ""}>
-        <td className="num">{k.stt}</td><td>{k.sales}</td><td>{k.ten_khach}</td>
-        <td className="num">{so(k.gia_ban)}</td><td className="num">{so(k.thu_khac)}</td>
-        <td className="num">{so(k.tong_thu)}</td>
-        <td style={{ fontSize: 12 }}>{k.khoan_chi.map((c: any, j: number) => (
-          <span key={j} title={c.ma_khoan ? c.ten_khoan : "Nhãn chưa được xếp mã — chờ người ánh xạ"}>
-            {c.nhan}: {vnd(c.so_tien)}{c.ma_khoan ? "" : " ⚑"}{j < k.khoan_chi.length - 1 ? " · " : ""}
-          </span>))}</td>
-        <td className="num">{so(k.tong_chi)}</td><td className="num">{so(k.loi_nhuan)}</td>
-      </tr>))}
-    </tbody></table>}
-
-    {mat === "chiet_tinh" && <><table><thead><tr>
-      <th>Vế</th><th>Nhóm</th><th>Nội dung</th><th>Đối tác</th>
-      <th className="num">Đơn giá</th><th className="num">SL</th><th className="num">Hệ số</th>
-      <th className="num">Thành tiền</th><th>Số chứng từ</th><th>MST</th>
-    </tr></thead><tbody>
-      {q.chiet_tinh.map((x: any, i: number) => (<tr key={i} style={x.co_lech ? { background: "var(--warnbg)" } : undefined} title={x.co_lech || ""}>
-        <td>{x.ve === "thu" ? "Thu" : "Chi"}</td><td style={{ fontSize: 12 }}>{x.nhom}</td>
-        <td>{x.noi_dung}</td><td>{x.doi_tac}</td>
-        <td className="num">{so(x.don_gia)}</td><td className="num">{x.so_luong ?? ""}</td>
-        <td className="num">{x.he_so ?? ""}</td><td className="num">{so(x.thanh_tien)}</td>
-        <td>{x.so_chung_tu || <span className="muted">—</span>}</td>
-        <td>{x.mst_ncc || <span className="muted">—</span>}</td>
-      </tr>))}
-    </tbody></table>
-    <p className="muted" style={{ fontSize: 12 }}>
-      Thành tiền phải bằng <b>đơn giá × số lượng × hệ số</b> — cột “DIỄN GIẢI” trong tệp chính là hệ
-      số (số đêm lưu trú, số bữa ăn). Dòng nào lệch được tô cảnh báo: đó là chỗ có người gõ tay đè lên
-      công thức. Cột MST là thứ nối bản quyết toán này với bảng kê thuế GTGT đầu vào.
-    </p></>}
-
-    {mat === "hdv" && <><table><thead><tr>
-      <th>Nội dung</th><th className="num">Đơn giá</th><th className="num">SL</th>
-      <th className="num">Tổng chi</th><th className="num">Tiền ứng</th><th className="num">Dư</th>
-      <th className="num">CTP</th><th>Ghi chú</th>
-    </tr></thead><tbody>
-      {q.hdv_chi.map((x: any, i: number) => (<tr key={i} style={x.la_dong_tong ? { fontWeight: 600 } : undefined}>
-        <td>{x.noi_dung}</td><td className="num">{so(x.don_gia)}</td>
-        <td className="num">{x.so_luong ?? ""}</td><td className="num">{so(x.tong_chi)}</td>
-        <td className="num">{so(x.tien_ung)}</td><td className="num">{so(x.du)}</td>
-        <td className="num">{so(x.ctp)}</td><td>{x.ghi_chu || ""}</td>
-      </tr>))}
-    </tbody></table>
-    <p className="muted" style={{ fontSize: 12 }}>
-      HDV chi theo số khách <b>thực đi</b>, chiết tính lập theo số khách <b>đã đặt</b>. Phần chênh là
-      tiền đã ra khỏi công ty mà chưa vào giá vốn — nó không nằm trong giá vốn, không trong công nợ,
-      cũng không trong hoàn ứng. Không có bảng này thì khoản đó vô hình ở mọi chuyến.
-    </p></>}
-
-    {mat === "booking" && <table><thead><tr>
-      <th>Mã booking</th><th>Người book</th><th>Điện thoại</th><th className="num">Khách</th>
-      <th className="num">Tổng thu</th><th className="num">Đã đóng</th><th className="num">Còn phải thu</th>
-      <th>Người bán</th><th>Nối vào VTOS</th>
-    </tr></thead><tbody>
-      {q.booking.map((b: any, i: number) => (<tr key={i}>
-        <td>{b.ma_booking_nguon}</td><td>{b.ten_nguoi_book}</td><td>{b.dien_thoai}</td>
-        <td className="num">{b.so_khach ?? ""}</td><td className="num">{so(b.tong_thu)}</td>
-        <td className="num">{so(b.da_dong)}</td>
-        <td className={"num " + (b.con_phai_thu ? "red" : "")}>{so(b.con_phai_thu)}</td>
-        <td>{b.nguoi_ban}</td>
-        <td>{b.booking_id
-          ? <Tag cls="ok">đã nối</Tag>
-          : <Tag cls="">chưa tra ra</Tag>}</td>
-      </tr>))}
-    </tbody></table>}
-  </>);
-}
-
-
 function LaiLoTour() {
   const { user, toast } = useShell();
   const [loai, setLoai] = useState<"ghep" | "le" | "tat_ca">("ghep");
@@ -169,6 +41,7 @@ function LaiLoTour() {
   const [busy, setBusy] = useState(false);
   const [mo, setMo] = useState<any>(null);      // tour đang mở lớp 2
   const [hd, setHd] = useState<any>(null);      // dòng chi phí đang nhập hoá đơn
+  const [mat, setMat] = useState("khach");     // mặt đang mở của bản quyết toán Điều hành
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -243,21 +116,14 @@ function LaiLoTour() {
     {c && <p className="muted" style={{ fontSize: 12 }}>{c.ghi_chu}</p>}
 
     {busy ? <p className="muted">Đang tính…</p> : <table><thead><tr>
-      <th className="num">STT</th><th>Mã tour</th><th>Tên tour</th><th>Khởi hành</th><th>Kết thúc</th>
-      <th className="num">Giá bán</th>
+      <th>Mã tour</th><th>Tên tour</th><th>Khởi hành</th><th>Kết thúc</th>
       <th className="num">Khách</th><th className="num">Doanh thu</th><th className="num">Giá vốn</th>
       <th className="num">Lợi nhuận</th><th className="num">Biên</th><th>Nguồn số</th><th></th>
     </tr></thead><tbody>
       {(d?.rows || []).map((r: any) => (<tr key={r.tour_id}>
-        {/* STT do máy chủ đánh, tính từ đầu bảng chứ không từ đầu trang: trang 3 bắt đầu ở 401.
-            Đánh số ở màn hình thì mỗi trang lại từ 1, và người đọc tưởng bảng chỉ có 200 dòng. */}
-        <td className="num muted">{r.stt}</td>
         <td>{r.ma_tour}</td>
         <td title={r.ten_tour}>{r.ten_tour?.slice(0, 42)}</td>
         <td>{fmtD(r.ngay_khoi_hanh)}</td><td>{fmtD(r.ngay_ket_thuc)}</td>
-        {/* Giá bán NIÊM YẾT, không phải doanh thu chia đầu khách. Rỗng khi tour chưa khai giá –
-            không lấp bằng phép chia, vì con số ấy không có trong bảng giá nào. */}
-        <td className="num">{so(r.gia_ban)}</td>
         <td className="num">{r.so_khach || <span className="muted">0</span>}</td>
         <td className="num">{so(r.doanh_thu)}</td>
         <td className="num">{so(r.gia_von)}</td>
@@ -315,11 +181,7 @@ function LaiLoTour() {
             <td><button className="act sm" onClick={() => setHd({ ...l })}>Hoá đơn</button></td>
           </tr>))}
         </tbody></table>
-        {mo.quyet_toan_dieu_hanh && <BanQuyetToan q={mo.quyet_toan_dieu_hanh} />}
-        {!mo.quyet_toan_dieu_hanh && <p className="muted" style={{ fontSize: 12 }}>
-          Chuyến này chưa nạp tệp quyết toán chi tiết của Điều hành. Nạp ở <b>Nạp dữ liệu → Quyết toán
-          tour – chi tiết một chuyến</b> để có thêm bốn mặt: từng khách, chiết tính (kèm số hoá đơn và
-          mã số thuế nhà cung cấp), chi trên tour của HDV, và doanh thu theo booking.</p>}
+        <BanQuyetToan qt={mo.quyet_toan_dieu_hanh} mat={mat} setMat={setMat} />
 
         <div className="row end"><button className="act ghost" onClick={() => setMo(null)}>Đóng</button></div>
       </div>
@@ -345,6 +207,134 @@ function LaiLoTour() {
         </div>
       </div>
     </div>}
+  </>);
+}
+
+/** Bốn mặt của bản quyết toán Điều hành – KHÔNG phải một màn hình quyết toán thứ hai.
+ *
+ *  Bốn mặt vì tệp quyết toán của Điều hành trả lời bốn loại câu hỏi khác nhau, và gộp chúng vào một
+ *  bảng thì mất hết:
+ *    khách      – ai đi, bán bao nhiêu, chi cho người ấy bao nhiêu
+ *    chiết tính – từng khoản mua vào: đối tác, đơn giá, số chứng từ, MÃ SỐ THUẾ (lý do mặt này tồn
+ *                 tại: không có MST thì đối chiếu tờ khai thuế phải mở lại từng tệp Excel gốc)
+ *    HDV        – tiền ứng và chi của hướng dẫn viên, và số dư phải hoàn
+ *    booking    – doanh thu theo booking nguồn, để ghép ngược về hệ bán hàng
+ *
+ *  MỌI SỐ Ở ĐÂY LÀ SỐ TRONG TỆP, không phải số chuẩn của hệ thống. Số chuẩn nằm ở lớp 1 và ở phần
+ *  trên của lớp 2; khối này chỉ nói "tệp gốc ghi gì" và "chỗ nào không khớp". Trộn hai thứ ấy chính
+ *  là cách VTOS từng có bốn công thức lãi lỗ chạy song song.
+ *
+ *  STT lấy từ máy chủ ({r.stt}), không dùng chỉ số vòng lặp: đánh lại số ở màn hình thì đúng ở trang
+ *  đầu và sai ở mọi trang sau, mà kiểu sai ấy chỉ lộ ra ở nhà khách hàng.
+ */
+function BanQuyetToan({ qt, mat, setMat }: { qt: any; mat: string; setMat: (m: string) => void }) {
+  if (!qt) return (<>
+    <h4>Bản quyết toán của Điều hành</h4>
+    <p className="muted" style={{ fontSize: 13 }}>
+      Chuyến này <b>chưa nạp tệp quyết toán chi tiết</b>. Rỗng ở đây nghĩa là chưa có tệp — khác hẳn
+      với đã nạp mà tệp không có dòng nào.
+    </p>
+  </>);
+
+  const MAT: [string, string, number][] = [
+    ["khach", "Khách", qt.khach.length],
+    ["chiet_tinh", "Chiết tính", qt.chiet_tinh.length],
+    ["hdv", "Hướng dẫn viên", qt.hdv_chi.length],
+    ["booking", "Booking nguồn", qt.booking.length],
+  ];
+
+  return (<>
+    <h4>Bản quyết toán của Điều hành — {qt.ten_tep}
+      <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
+        {" "}· nạp bởi {qt.nap_boi} · {fmtD(qt.nap_luc)}</span></h4>
+
+    {/* Chênh lệch giữa số chuẩn và tổng trong tệp. 0 nghĩa là ĐÃ ĐỐI CHIẾU VÀ KHỚP – khác với chưa
+        đối chiếu bao giờ, nên vẫn hiện chứ không ẩn đi. */}
+    <p className="muted" style={{ fontSize: 13 }}>
+      Tệp ghi <b>{qt.so_khach_tep_ghi ?? "—"}</b> khách trên <b>{qt.so_dong_khach}</b> dòng
+      {qt.hdv ? <> · HDV {qt.hdv}</> : null}{qt.bien_so_xe ? <> · xe {qt.bien_so_xe}</> : null}
+      {qt.nhieu_muc_gia ? <> · <b>nhiều mức giá</b></> : null}
+      {" "}· chênh thu {so(qt.chenh_thu)} · chênh chi {so(qt.chenh_chi)}
+    </p>
+
+    {qt.phat_hien?.length ? (
+      <div className="gate fail">
+        <b>{qt.phat_hien.length} chỗ tệp gốc tự mâu thuẫn</b>
+        <ul style={{ margin: "4px 0 0 18px" }}>
+          {qt.phat_hien.map((x: string, i: number) => <li key={i}>{x}</li>)}
+        </ul>
+      </div>) : null}
+
+    <div className="row" style={{ gap: 6, margin: "8px 0" }}>
+      {MAT.map(([k, ten, n]) => (
+        <button key={k} className={"act sm" + (mat === k ? "" : " ghost")}
+                onClick={() => setMat(k)}>{ten} ({n})</button>))}
+    </div>
+
+    {mat === "khach" && (qt.khach.length ? <table><thead><tr>
+      <th className="num">STT</th><th>Sales</th><th>Tên khách</th>
+      <th className="num">Giá bán</th><th className="num">Thu khác</th><th className="num">Tổng thu</th>
+      <th className="num">Tổng chi</th><th className="num">Lợi nhuận</th><th>Khoản chi</th>
+    </tr></thead><tbody>
+      {qt.khach.map((r: any) => (<tr key={r.stt} className={r.co_lech ? "red" : ""}>
+        <td className="num">{r.stt}</td><td>{r.sales}</td><td>{r.ten_khach}</td>
+        <td className="num">{so(r.gia_ban)}</td><td className="num">{so(r.thu_khac)}</td>
+        <td className="num">{so(r.tong_thu)}</td><td className="num">{so(r.tong_chi)}</td>
+        <td className="num">{so(r.loi_nhuan)}</td>
+        <td className="muted" style={{ fontSize: 12 }}>
+          {r.khoan_chi.map((k: any) => `${k.ten_khoan} ${k.so_tien === null ? "—" : vnd(k.so_tien)}`).join(" · ")}
+          {r.co_lech ? <div className="red">{r.co_lech}</div> : null}</td>
+      </tr>))}
+    </tbody></table> : <p className="muted">Tệp không có dòng khách nào.</p>)}
+
+    {mat === "chiet_tinh" && (<>
+      <p className="muted" style={{ fontSize: 12 }}>
+        {qt.so_chung_tu_co_mst}/{qt.chiet_tinh.length} dòng có mã số thuế ·
+        {" "}{qt.so_dong_chi_co_chung_tu}/{qt.so_dong_chi} dòng chi có số chứng từ. Thiếu MST thì lúc
+        đối chiếu tờ khai thuế phải mở lại tệp Excel gốc từng chuyến một.
+      </p>
+      {qt.chiet_tinh.length ? <table><thead><tr>
+        <th>Vế</th><th>Nhóm</th><th>Nội dung</th><th>Đối tác</th><th>MST</th>
+        <th className="num">Đơn giá</th><th className="num">SL</th><th className="num">Hệ số</th>
+        <th className="num">Thành tiền</th><th>Chứng từ</th>
+      </tr></thead><tbody>
+        {qt.chiet_tinh.map((r: any, i: number) => (<tr key={i} className={r.co_lech ? "red" : ""}>
+          <td>{r.ve}</td><td>{r.nhom}</td><td title={r.noi_dung}>{r.noi_dung?.slice(0, 34)}</td>
+          <td>{r.doi_tac || <span className="muted">—</span>}</td>
+          <td>{r.mst_ncc || <span className="muted" title="Chưa có MST – không đối chiếu được tờ khai thuế">—</span>}</td>
+          <td className="num">{so(r.don_gia)}</td><td className="num">{r.so_luong ?? "—"}</td>
+          <td className="num">{r.he_so ?? "—"}</td><td className="num">{so(r.thanh_tien)}</td>
+          <td>{r.so_chung_tu || <span className="muted">—</span>}</td>
+        </tr>))}
+      </tbody></table> : <p className="muted">Tệp không có dòng chiết tính nào.</p>}
+    </>)}
+
+    {mat === "hdv" && (qt.hdv_chi.length ? <table><thead><tr>
+      <th>Nội dung</th><th className="num">Đơn giá</th><th className="num">SL</th>
+      <th className="num">Tổng chi</th><th className="num">Tiền ứng</th><th className="num">Dư</th>
+      <th className="num">CTP</th><th>Ghi chú</th>
+    </tr></thead><tbody>
+      {qt.hdv_chi.map((r: any, i: number) => (<tr key={i} className={r.la_dong_tong ? "" : "muted"}>
+        <td>{r.la_dong_tong ? <b>{r.noi_dung}</b> : r.noi_dung}</td>
+        <td className="num">{so(r.don_gia)}</td><td className="num">{r.so_luong ?? "—"}</td>
+        <td className="num">{so(r.tong_chi)}</td><td className="num">{so(r.tien_ung)}</td>
+        <td className="num">{so(r.du)}</td><td className="num">{so(r.ctp)}</td>
+        <td className="muted" style={{ fontSize: 12 }}>{r.ghi_chu || ""}</td>
+      </tr>))}
+    </tbody></table> : <p className="muted">Tệp không có dòng chi hướng dẫn viên nào.</p>)}
+
+    {mat === "booking" && (qt.booking.length ? <table><thead><tr>
+      <th>Mã booking nguồn</th><th>Người book</th><th>Điện thoại</th><th className="num">Khách</th>
+      <th className="num">Tổng thu</th><th className="num">Đã đóng</th><th className="num">Còn phải thu</th>
+      <th>Người bán</th>
+    </tr></thead><tbody>
+      {qt.booking.map((r: any, i: number) => (<tr key={i}>
+        <td>{r.ma_booking_nguon}{r.booking_id ? null : <div className="muted" style={{ fontSize: 12 }}>chưa ghép vào hệ bán hàng</div>}</td>
+        <td>{r.ten_nguoi_book}</td><td>{r.dien_thoai}</td><td className="num">{r.so_khach ?? "—"}</td>
+        <td className="num">{so(r.tong_thu)}</td><td className="num">{so(r.da_dong)}</td>
+        <td className="num">{so(r.con_phai_thu)}</td><td>{r.nguoi_ban}</td>
+      </tr>))}
+    </tbody></table> : <p className="muted">Tệp không có dòng booking nguồn nào.</p>)}
   </>);
 }
 

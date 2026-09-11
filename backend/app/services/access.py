@@ -67,6 +67,18 @@ PARAM_ROLES = BASE_VIEW + ("ptgd_doan", "ptgd_mkt", "tp_dh", "gd_kd", "ketoan", 
 # Dữ liệu booking (danh sách, phiếu thu, bảo lưu, dịch vụ lẻ). Rộng hơn từng màn hình một vì đây là lớp
 # DỮ LIỆU; màn hình nào ai mở được thì xem ở MENU_ROLES.
 BOOKING_ROLES = BASE_VIEW + OPERATIONS + SALES + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt")
+# VPM-7 – ai gia hạn / khôi phục GIỮ CHỖ được. HẸP HƠN hẳn BOOKING_ROLES ở trên: xem booking là một
+# việc, kéo dài một chỗ đang bị giữ là việc khác — mỗi lần gia hạn là một ghế không bán cho khách
+# khác. Danh sách này từng nằm trong giu_cho.py và chỉ kiểm ở trong thân hàm, nên bộ kiểm KS-2 đọc
+# chữ ký endpoint thì thấy "ai đăng nhập cũng gọi được", và người bị từ chối nhận 422 (sai dữ liệu)
+# chứ không phải 403 (không có quyền). Đưa về đây để một chỗ khai, hai chỗ dùng.
+GIU_CHO_ROLES = ("nv_dh", "tp_dh", "gd_kd", "tp_kd", "cntt", "tgd")
+# KS-4 – ai NHẬN và ĐÓNG cảnh báo được. Trước 11/9/2026 cửa đóng cảnh báo không có chặn nào: bất kỳ
+# tài khoản nào đăng nhập cũng đóng được cảnh báo đỏ của phòng khác. Danh sách này gồm các vai có
+# trách nhiệm xử lý việc, cộng bốn nhóm giám sát toàn hệ thống. KHÔNG có vai chỉ-xem (bks, robot_ks
+# nằm trong BASE_VIEW nhưng bị chặn ghi ở lớp READ_ONLY_ROLES, nên có mặt ở đây là vô hại).
+CANH_BAO_ROLES = BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + (
+    "ketoan", "cntt", "hcns", "ptgd_doan", "ptgd_mkt", "hanh_chinh")
 REQUEST_CREATE_ROLES = OPERATIONS + SALES               # được GỬI yêu cầu đặt dịch vụ: Điều hành + toàn khối Kinh doanh
                                                         # (nguồn duy nhất – máy chủ và giao diện dùng chung, tránh lệch vai trò)
 PAYMENT_REQUEST_ROLES = (BASE_VIEW + OPERATIONS +

@@ -61,7 +61,7 @@ def test_product_crud_and_open_tour():
 
 def test_workflow_events_with_notes():
     h = login("dh.lan")
-    t = next(x for x in client.get("/api/v1/tours?q=PT001", headers=h).json() if x["status"] == "nhap")
+    t = next(x for x in client.get("/api/v1/tours?q=PT001", headers=h).json()["rows"] if x["status"] == "nhap")
     client.put(f"/api/v1/tours/{t['id']}", json={"price_per_pax": 1990000, "fixed_cost": 10500000, "var_cost_per_pax": 900000, "planned_pax": 40, "rest_stops": "Trạm dừng Long Thành", "justification": ""}, headers=h)
     assert client.post(f"/api/v1/tours/{t['id']}/submit", json={"note": "Tour tuần, dự kiến đủ khách"}, headers=h).status_code == 200
     assert client.post(f"/api/v1/tours/{t['id']}/confirm", json={"note": "TP đã kiểm tra NCC"}, headers=login("tp.dieuhanh")).status_code == 200
@@ -69,7 +69,7 @@ def test_workflow_events_with_notes():
     steps = [(e["step"], e["note"]) for e in d["events"]]
     assert ("tp_xac_nhan", "TP đã kiểm tra NCC") in steps and ("trinh_du_toan", "Tour tuần, dự kiến đủ khách") in steps and steps[-1][0] == "khoi_tao"
     # cũ: submit không body vẫn chạy
-    lst = client.get("/api/v1/tours?limit=2", headers=h).json(); assert len(lst) == 2
+    lst = client.get("/api/v1/tours?limit=2", headers=h).json()["rows"]; assert len(lst) == 2
     assert client.get(f"/api/v1/tours?month={date.today() + timedelta(days=30):%Y-%m}", headers=h).status_code == 200
 
 
@@ -84,7 +84,7 @@ def test_vietrip_product_sync_links_tours():
     res = client.post("/api/v1/import/vietrip/apply?limit=50", headers=h).json()["applied"]; assert res["products"] == 1 and res["tours"] == 1
     p = client.get("/api/v1/products?q=AU002", headers=h).json()[0]
     assert p["reference_price"] == 28990000 and p["tour_type"] == "le_nuoc_ngoai" and p["cost_structure"]["ve_may_bay"] == 12000000 and p["cost_lines"][0]["kind"] == "theo_khach" and p["operator_name"].upper() == "NGUYỄN THỊ LAN" and p["n_tours"] == 1
-    t = next(x for x in client.get("/api/v1/tours?q=AU002", headers=h).json())
+    t = next(x for x in client.get("/api/v1/tours?q=AU002", headers=h).json()["rows"])
     d = client.get(f"/api/v1/tours/{t['id']}/detail", headers=h).json(); assert d["product"]["code"] == "AU002"
     # lịch sử quyết toán Vietrip → tour_events nguồn vietrip
     sett = {"tourId": 9001, "tourcode": "AU002.05011026", "tong_thu": 0, "tong_chi": 0, "lines": [], "step": "Bước 5: Lập Quyết toán Tour",

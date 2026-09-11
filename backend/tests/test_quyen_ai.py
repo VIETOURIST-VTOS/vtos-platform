@@ -69,14 +69,17 @@ def test_moi_o_muc_3_deu_phai_duoc_liet_ke_o_day():
     được liệt kê thẳng ở đây, để mỗi lần thêm một ô mức 3 là một lần có người phải sửa phép thử này và
     tự hỏi vì sao. Một ô mức 3 lặng lẽ xuất hiện là cách quyền AI nở ra mà không ai quyết định.
 
-    Năm ô hiện tại:
-      - ptgd_mkt / nv_mkt × tin_khach : Marketing tự trả lời khách trong hạn mức (Phụ lục A)
-      - bks × hoi_dap, vb_noi_bo, cham_diem : vị trí Kiểm soát do AI giữ, chỉ đạo 07/9/2026 –
-        hỏi đáp trên dữ liệu, soạn báo cáo gửi Chủ tịch, chấm điểm phòng ban.
+    BA ô hiện tại, cả ba đều của vị trí Kiểm soát do AI giữ (chỉ đạo 07/9/2026):
+      - bks × hoi_dap, vb_noi_bo, cham_diem : hỏi đáp trên dữ liệu, soạn báo cáo gửi Chủ tịch,
+        chấm điểm phòng ban. Người hậu kiểm là Chủ tịch.
+
+    HAI ô đã RÚT ngày 11/9/2026 – ptgd_mkt × tin_khach và nv_mkt × tin_khach, Marketing tự nhắn cho
+    khách trong hạn mức. Chủ tịch hạ xuống mức 2: AI vẫn soạn nháp, người bấm gửi. Đây là lần thu
+    hẹp quyền AI, không phải nới – và phép thử này ghi lại đúng lần ấy, vì cái nó canh là danh sách
+    KHÔNG tự dài ra. Muốn nâng lại thì sửa dòng dưới, và lúc sửa sẽ phải viết vì sao.
     """
     ba = [(v, c) for v, mucs in AQ.MAC_DINH.items() for c, m in zip(AQ.COT, mucs) if m == 3]
-    assert set(ba) == {("ptgd_mkt", "tin_khach"), ("nv_mkt", "tin_khach"),
-                       ("bks", "hoi_dap"), ("bks", "vb_noi_bo"), ("bks", "cham_diem")}
+    assert set(ba) == {("bks", "hoi_dap"), ("bks", "vb_noi_bo"), ("bks", "cham_diem")}
 
 
 def test_moi_o_muc_3_deu_co_du_han_muc_va_co_ten_nguoi_hau_kiem():

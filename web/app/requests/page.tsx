@@ -35,7 +35,7 @@ function Requests() {
 
   const load = useCallback(() => {
     api(`/requests?mang=${mang}`).then(setReqs).catch((e) => toast(errMsg(e), true));
-    api(`/tours?status=da_duyet&mang=${mang}`).then(setTours).catch(() => {});
+    api(`/tours?status=da_duyet&mang=${mang}`).then((r) => setTours(r.rows || [])).catch(() => {});
     api(`/bookings?limit=50&mang=${mang}`).then(setBookings).catch(() => {});
     api("/meta").then((m) => setSla(m.params.sla_booking_phut)).catch(() => {});
   }, [mang, toast]);      // thiếu `mang` ở đây là đổi menu mà danh sách không tải lại

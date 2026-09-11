@@ -102,8 +102,9 @@ def test_lap_duoc_lenh_dieu_xe_khi_tham_so_tro_dung_vao_minh(gd):
     xe = [x for x in client.get("/api/v1/fleet/xe", headers=h).json() if x.get("driver")]
     if not xe: pytest.skip("dữ liệu mẫu không có xe đã gán tài xế")
     tours = client.get("/api/v1/tours", headers=login("cntt"))
-    if tours.status_code != 200 or not tours.json(): pytest.skip("dữ liệu mẫu không có tour")
-    body = {"vehicle_id": xe[0]["id"], "tour_id": tours.json()[0]["id"],
+    ds = tours.json()["rows"] if tours.status_code == 200 else []
+    if not ds: pytest.skip("dữ liệu mẫu không có tour")
+    body = {"vehicle_id": xe[0]["id"], "tour_id": ds[0]["id"],
             "date_from": str(HOM_NAY + timedelta(days=400)), "date_to": str(HOM_NAY + timedelta(days=401)),
             "internal_price": 1_000_000}
     r = client.post("/api/v1/dispatch", headers=h, json=body)

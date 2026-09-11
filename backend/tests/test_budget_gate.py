@@ -82,7 +82,7 @@ def test_b2_du_toan_khong_suy_nguoc_tu_quyet_toan():
     assert client.post("/api/v1/import/vietrip/settlement", json={"rows": st}, headers=login("cntt")).status_code == 200
     assert client.post("/api/v1/import/vietrip/apply", headers=login("cntt")).status_code == 200
 
-    t = next(x for x in client.get("/api/v1/tours?limit=1000", headers=login("cntt")).json() if x["code"] == "KT-B2-VT01")
+    t = next(x for x in client.get("/api/v1/tours?limit=1000", headers=login("cntt")).json()["rows"] if x["code"] == "KT-B2-VT01")
     # Trước K2 chỗ này đọc `== 0`. Sau K2, nhập quyết toán mà không lập dự toán thì dự toán là RỖNG,
     # không phải 0 – và rỗng nói đúng hơn: "chưa ai lập dự toán" chứ không phải "dự toán duyệt bằng 0".
     # Chấp nhận cả hai vì tour cũ vẫn còn số 0 trong cơ sở dữ liệu; điều bị cấm là ra số dương.
@@ -154,7 +154,7 @@ def test_b3_tong_chi_phi_vietrip_khong_phai_gia_von_khi_chua_quyet_toan():
              "quyetToan": False, "duyetChi": False, "doanhThu": 0, "tongChiPhi": 6500, "baoHiem": 6500, "nuoc": ""}]
     assert client.post("/api/v1/import/vietrip/tour", json={"rows": rows}, headers=login("cntt")).status_code == 200
     assert client.post("/api/v1/import/vietrip/apply", headers=login("cntt")).status_code == 200
-    t = next(x for x in client.get("/api/v1/tours?limit=1000", headers=login("cntt")).json() if x["code"] == "KT-B3-VT02")
+    t = next(x for x in client.get("/api/v1/tours?limit=1000", headers=login("cntt")).json()["rows"] if x["code"] == "KT-B3-VT02")
     assert t["actual_cost"] == 0, "phí bảo hiểm 6.500 không được nhận là giá vốn chuyến"
     det = client.get(f"/api/v1/tours/{t['id']}/detail", headers=login("cntt")).json()
     assert det["summary"]["profit_state"] == "tam_tinh" and det["summary"]["warning"]

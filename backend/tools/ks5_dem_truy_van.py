@@ -62,19 +62,26 @@ def nhom_cau(so: dict) -> dict[str, int]:
 # Đường dẫn đọc danh sách và TRẦN đã khai. None nghĩa là CHƯA CÓ TRẦN — đó là việc còn nợ, không
 # phải lựa chọn thiết kế. Khi thêm trần thì phải kèm cách nói ra lúc chạm trần (xem KHOA_NOI_RA).
 TRAN_DANH_SACH: dict[str, int | None] = {
-    "GET /api/v1/alerts": None,
+    "GET /api/v1/alerts": 200,
     "GET /api/v1/tours": 300,
 }
 
 # Khoá mà phản hồi phải mang khi bị cắt, để giao diện nói cho người đọc biết họ đang nhìn phần cắt.
 KHOA_NOI_RA = ("cham_tran", "con_nua", "tong")
 
-LY_DO_CHUA_CO_TRAN: dict[str, str] = {
+LY_DO_CHUA_CO_TRAN: dict[str, str] = {}
+
+# Trần đã thêm — giữ lại lời khai cũ để còn truy được vì sao từng thiếu và cái gì đã bù. Bảng này
+# KHÔNG được bộ kiểm đọc: một cửa chỉ rời LY_DO_CHUA_CO_TRAN khi TRAN_DANH_SACH có số thật, và số ấy
+# chính bộ kiểm T4/T5 đo lại trên phản hồi chứ không tin lời khai.
+DA_CO_TRAN: dict[str, str] = {
     "GET /api/v1/alerts": (
-        "Đọc TOÀN BỘ bảng alerts rồi lọc theo vai trò bằng Python. Đo 10/9/2026: 1.703 dòng đang mở. "
-        "Không có trần, không có phân trang, và phần lọc nằm sau khi đã nạp hết nên trần thêm vào "
-        "phải đặt SAU bộ lọc chứ không phải trước. Chủ: lane Viết phần mềm, gắn cùng việc KS-4 "
-        "(thêm cột người nhận thì danh sách này lọc theo người chứ không quét cả bảng)."),
+        "Mở 10/9/2026 bởi KS-5: đọc TOÀN BỘ bảng alerts – 1.703 dòng đang mở – rồi mới lọc theo vai "
+        "trò bằng Python; không trần, không phân trang. "
+        "ĐÓNG 11/9/2026: trần 200 dòng một trang (trần cứng 500), có offset, và phản hồi mang `tong` "
+        "nên giao diện biết mình đang nhìn phần cắt. Trần đặt SAU bộ lọc vai trò, không phải trước – "
+        "cắt trước khi lọc thì người chỉ thấy cảnh báo của mình có thể nhận một trang rỗng trong khi "
+        "việc của họ nằm ở dòng thứ 400. Lọc trang_thai/nguon/cua_toi đẩy xuống câu truy vấn (KS-4)."),
 }
 
 # Số lượt truy vấn tối đa cho một lần gọi đọc danh sách. Vượt trần gần như luôn là truy vấn trong

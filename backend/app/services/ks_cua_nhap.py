@@ -55,6 +55,14 @@ CUA_TAY = (
     "projects", "quy_tac_hach_toan", "receipts", "retentions", "service_orders", "service_requests",
     "supplier_bank_changes", "suppliers", "thieu_gia_von", "tour_cost_lines", "tour_events",
     "tac_vu_tu_dong",
+    # Hai bảng dưới đây TỪNG khai nhầm là "máy sinh", và chính lời giải thích đi kèm đã tự nói ra
+    # màn hình nào ghi vào chúng – nghĩa là chúng CÓ cửa, chỉ xếp nhầm ngăn. Bộ kiểm KS-7 bắt được
+    # 11/9/2026. Xếp nhầm ngăn nguy hiểm hơn là để trống: "máy sinh" nghĩa là KHÔNG AI cần dựng cửa,
+    # nên nó đóng luôn câu hỏi thay vì để ngỏ.
+    #   prepaid_allocations – màn hình /tai-san, nút ghi sổ phân bổ chi phí trả trước
+    #   nhat_ky_giu_cho     – màn hình /bookings, nút gia hạn và nút khôi phục giữ chỗ; ô lý do là
+    #                         người gõ, và chính ô ấy làm nó thành dòng do người tạo ra
+    "prepaid_allocations", "nhat_ky_giu_cho",
     # Lớp 3 quyết toán tour (11/9/2026). Năm bảng, cửa API là /api/v1/quyet-toan-lop3
     # (app/api/v1/quyet_toan_lop3.py), gắn vào màn hình "Quyết toán tour" đã có:
     #   POST .../{tid}/khach            – dòng khách, có ngày sinh
@@ -92,7 +100,6 @@ MAY_SINH = {
     "ks_diem": "Điểm chấm tự tính, không nhập tay.",
     "ks_phat_hien": "Phát hiện của robot – tự ghi.",
     "ngoai_le_xu_ly": "Ngoại lệ do bộ nạp tự đẩy ra.",
-    "prepaid_allocations": "ĐÃ KIỂM LẠI 09/9: bản rà đầu tiên xếp nhầm bảng này vào 'cần cửa'. Thực tế có cửa: màn hình /tai-san, nút ghi sổ phân bổ",
     "su_kien_ky_thuat": "Sự kiện kỹ thuật – hệ thống tự ghi.",
     # V11 – lịch tự động hóa. Sổ lần chạy do hệ thống chạy tác vụ BÁO VỀ (n8n hoặc chính vòng lặp
     # trong VTOS), qua POST /tu-dong/bao-cao. Người không gõ tay dòng nào ở đây, và KHÔNG NÊN gõ: một
@@ -117,8 +124,6 @@ MAY_SINH = {
     # VPM-7 – nhật ký giữ chỗ. Mỗi dòng do MỘT hành động sinh ra: robot trả chỗ về, hoặc người bấm gia
     # hạn / khôi phục ở màn hình /bookings (ở đó lý do là ô người gõ, và đó mới là cửa nhập thật). Cho
     # nhập tay thẳng vào bảng này là cho phép bịa ra một lần gia hạn chưa từng có ai ký.
-    "nhat_ky_giu_cho": "Nhật ký giữ chỗ – sinh từ hành động ở /bookings (gia hạn, khôi phục) và từ robot "
-                       "trả chỗ về; lý do là ô người gõ trong hộp thoại, không phải dòng nhập tay.",
     "bao_cao_luu": "Ảnh chụp bảng chỉ tiêu do lịch tự động lưu mỗi kỳ, sinh từ chính hàm màn hình "
                    "gọi – nhập tay vào đây là viết lại quá khứ, đúng thứ bản chụp sinh ra để chống.",
 }

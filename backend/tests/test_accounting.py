@@ -71,7 +71,7 @@ def test_invoice_flow_and_vat_split():
 
 
 def test_settlement_posts_154_331_and_632():
-    t = next(x for x in client.get("/api/v1/tours", headers=login("ketoan")).json() if x["code"] == "DN-HCM-0820")
+    t = next(x for x in client.get("/api/v1/tours", headers=login("ketoan")).json()["rows"] if x["code"] == "DN-HCM-0820")
     client.post(f"/api/v1/tours/{t['id']}/close", json={"actual_revenue": 189000000, "actual_cost": 158000000}, headers=login("dh.lan"))
     assert client.post(f"/api/v1/tours/{t['id']}/kt-confirm", headers=login("ketoan")).status_code == 200
     es = [x for x in journal() if x["source_ref"] == "tour:DN-HCM-0820"]

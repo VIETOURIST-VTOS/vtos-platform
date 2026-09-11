@@ -23,7 +23,7 @@ def _startup():
 
 
 def tour(code):
-    return next(t for t in client.get("/api/v1/tours", headers=login("cntt")).json() if t["code"] == code)
+    return next(t for t in client.get("/api/v1/tours", headers=login("cntt")).json()["rows"] if t["code"] == code)
 
 
 def make_booking(name, phone, pax=2):
@@ -103,9 +103,9 @@ def test_robot_alerts_deposit_and_deadline():
     with SessionLocal() as db:
         x = db.get(Booking, b["id"]); x.created_at = datetime.now() - timedelta(hours=30); x.cancel_deadline = datetime.now() - timedelta(hours=1); db.commit()
     res = client.post("/api/v1/bookings/check", headers=login("ketoan")).json(); assert res["new_alerts"] >= 2
-    al = client.get("/api/v1/alerts", headers=login("tp.dieuhanh")).json()
+    al = client.get("/api/v1/alerts", headers=login("tp.dieuhanh")).json()["rows"]
     kinds = {a["kind"] for a in al if a["ref"] == f"booking:{b['code']}"}; assert {"chua_coc", "qua_deadline_thu"} <= kinds
     g = client.get(f"/api/v1/bookings/{b['id']}", headers=login("dh.lan")).json(); assert g["locked"] is True and g["past_deadline"] is True
     # hủy booking → cảnh báo của booking tự đóng
     assert client.post(f"/api/v1/bookings/{b['id']}/cancel", json={"reason": "Không cọc, hủy chỗ"}, headers=login("tp.dieuhanh")).status_code == 200
-    assert all(a["resolved"] for a in client.get("/api/v1/alerts", headers=login("tp.dieuhanh")).json() if a["ref"] == f"booking:{b['code']}")
+    assert all(a["resolved"] for a in client.get("/api/v1/alerts", headers=login("tp.dieuhanh")).json()["rows"] if a["ref"] == f"booking:{b['code']}")

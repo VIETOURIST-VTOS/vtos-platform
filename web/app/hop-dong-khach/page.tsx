@@ -14,7 +14,7 @@ import { Tag, errMsg } from "@/components/ui";
 type HD = { id: number; so_hop_dong: string; bao_gia_id: number | null; booking_id: number | null;
             khach_ten: string; khach_dai_dien: string; khach_ma_so_thue: string;
             ngay_ky: string | null; gia_tri: number; dat_coc: number;
-            han_thanh_toan: string | null; trang_thai: string };
+            han_thanh_toan: string | null; trang_thai: string; phien_ban: number };
 
 const vnd = (n: number) => (n || 0).toLocaleString("vi-VN") + " đ";
 const pct = (n: number | null) => (n === null || n === undefined ? "–" : (n * 100).toFixed(1) + "%");
@@ -53,57 +53,63 @@ function HopDong() {
     setDang(false);
   };
 
-  // VPM-9 – lịch thanh toán theo tiến độ. Trước bản này một hợp đồng đoàn vài trăm triệu chỉ có MỘT
-  // hạn, nên câu hỏi của người thu công nợ — "đến hôm nay khách phải trả bao nhiêu" — không có chỗ
-  // nào trong phần mềm trả lời được.
+  // VPM-9 · CỬA LỊCH THANH TOÁN.
+  //
+  // Một hợp đồng khách đoàn hiếm khi trả một lần: ký đặt cọc, trả tiếp trước khởi hành, thanh toán nốt
+  // sau tour. Máy chủ đã có đủ – bảng đợt, mốc hạn theo ngày ký / trước – sau khởi hành, phép rải tiền
+  // thu vào từng đợt, cửa dời hạn có lý do. Màn hình thì trước 11/9/2026 KHÔNG có nút nào, nên cả phân
+  // hệ ấy chỉ sống trong mã và Kinh doanh vẫn ghi hạn thanh toán vào một ô văn bản duy nhất.
   const [lich, setLich] = useState<Record<number, any>>({});
-  const [soan, setSoan] = useState<any>(null);
-  const [dongSoan, setDongSoan] = useState<any[]>([]);
+  const [soan, setSoan] = useState<{ hd: HD; dot: any[] } | null>(null);
 
-  const xemLich = async (id: number) => {
-    if (lich[id]) { setLich({ ...lich, [id]: null }); return; }
-    try { setLich({ ...lich, [id]: await api<any>(`/ban-hang/hop-dong/${id}/lich-thanh-toan`) }); }
+  const xemLich = async (h: HD) => {
+    if (lich[h.id]) { setLich({ ...lich, [h.id]: null }); return; }
+    try { setLich({ ...lich, [h.id]: await api<any>(`/ban-hang/hop-dong/${h.id}/lich-thanh-toan`) }); }
     catch (e) { toast(errMsg(e), true); }
   };
 
+  // Mở bảng soạn với lịch đang có; chưa có thì gợi hai đợt theo lối phổ biến nhất – cọc khi ký, nốt
+  // trước khởi hành. Gợi ý chỉ là chỗ bắt đầu: người soạn sửa lại, và MÁY CHỦ mới là chỗ kiểm tổng
+  // các đợt có khớp giá trị hợp đồng hay không.
   const moSoan = (h: HD) => {
-    setSoan(h);
-    const cu = lich[h.id]?.dot || [];
-    setDongSoan(cu.length ? cu.map((d: any) => ({
-      ten: d.ten, so_tien: String(d.so_tien || ""), ty_le: d.ty_le ?? "",
-      moc: d.moc, moc_so_ngay: d.moc_so_ngay ?? "", han: d.han || "", ghi_chu: d.ghi_chu || "",
-    })) : [{ ten: "Đặt cọc khi ký", so_tien: "", ty_le: "", moc: "ngay_ky", moc_so_ngay: 0, han: "", ghi_chu: "" }]);
+    const dang = lich[h.id]?.dot || [];
+    setSoan({ hd: h, dot: dang.length ? dang.map((d: any) => ({
+      ten: d.ten, so_tien: d.so_tien, moc: d.moc, moc_so_ngay: d.moc_so_ngay ?? "", han: d.han || "", ghi_chu: d.ghi_chu || "" })) : [
+      { ten: "Đặt cọc khi ký", so_tien: Math.round((h.dat_coc || h.gia_tri * 0.3)), moc: "ngay_ky", moc_so_ngay: 0, han: "", ghi_chu: "" },
+      { ten: "Thanh toán nốt", so_tien: Math.round(h.gia_tri - (h.dat_coc || h.gia_tri * 0.3)), moc: "truoc_khoi_hanh", moc_so_ngay: 7, han: "", ghi_chu: "" },
+    ] });
   };
 
-  const luuLich = async (e: React.FormEvent) => {
+  const datLich = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!soan) return;
-    const dot = dongSoan.map((d) => ({
-      ten: d.ten, so_tien: Number(d.so_tien || 0),
-      ty_le: d.ty_le === "" ? null : Number(d.ty_le),
-      moc: d.moc, moc_so_ngay: d.moc_so_ngay === "" ? null : Number(d.moc_so_ngay),
-      han: d.moc === "co_dinh" ? (d.han || null) : null, ghi_chu: d.ghi_chu,
+    const dot = soan.dot.map((d, i) => ({
+      ten: d.ten || `Đợt ${i + 1}`, so_tien: Number(d.so_tien) || 0, moc: d.moc,
+      moc_so_ngay: d.moc === "co_dinh" ? null : Number(d.moc_so_ngay || 0),
+      han: d.moc === "co_dinh" ? (d.han || null) : null, ghi_chu: d.ghi_chu || "",
     }));
+    setDang(true);
     try {
-      const r = await api<any>(`/ban-hang/hop-dong/${soan.id}/lich-thanh-toan`, { method: "POST", json: { dot } });
-      toast(r.message);
-      setSoan(null); setLich({ ...lich, [soan.id]: null }); await xemLich(soan.id);
-    } catch (x) { toast(errMsg(x), true); }
+      const r = await api<any>(`/ban-hang/hop-dong/${soan.hd.id}/lich-thanh-toan`,
+        { method: "POST", json: { phien_ban: soan.hd.phien_ban, dot } });
+      toast(r.message || "Đã đặt lịch thanh toán");
+      setSoan(null); setLich({ ...lich, [soan.hd.id]: null }); await load();
+    } catch (e2) { toast(errMsg(e2), true); }
+    setDang(false);
   };
 
+  // Dời hạn một đợt. Hạn GỐC được giữ lại ở máy chủ, nên về sau vẫn đọc được đợt này đã dời mấy lần
+  // và vì sao – đó là điểm khác giữa "dời hạn" và "sửa cho khớp".
   const doiHan = async (hid: number, d: any) => {
-    const ngay = window.prompt(`Dời hạn đợt ${d.dot} (${d.ten}) — hạn hiện tại ${d.han || "chưa có"}.\n` +
-                               "Nhập ngày mới dạng YYYY-MM-DD:");
-    if (!ngay || !ngay.trim()) return;
-    const ly_do = window.prompt("Lý do dời hạn (bắt buộc — hạn này đã nằm trong hợp đồng khách đang cầm):");
-    if (!ly_do || !ly_do.trim()) { toast("Phải ghi lý do dời hạn", true); return; }
-    const han = ngay.trim();
+    const han = (window.prompt(`Dời hạn đợt "${d.ten}" (${vnd(d.so_tien)}) sang ngày nào?\nDạng 2026-10-15`, d.han || "") || "").trim();
+    if (!han) return;
+    const ly_do = (window.prompt("Lý do dời hạn (bắt buộc – sẽ lưu cùng hạn gốc):") || "").trim();
+    if (!ly_do) { toast("Phải ghi lý do dời hạn.", true); return; }
     try {
-      const r = await api<any>(`/ban-hang/hop-dong/lich-thanh-toan/${d.id}/doi-han`,
-                               { method: "POST", json: { han, ly_do } });
-      toast(r.message);
-      setLich({ ...lich, [hid]: null }); await xemLich(hid);
-    } catch (x) { toast(errMsg(x), true); }
+      const r = await api<any>(`/ban-hang/hop-dong/lich-thanh-toan/${d.id}/doi-han`, { method: "POST", json: { han, ly_do } });
+      toast(r.message || "Đã dời hạn");
+      setLich({ ...lich, [hid]: await api<any>(`/ban-hang/hop-dong/${hid}/lich-thanh-toan`) });
+    } catch (e3) { toast(errMsg(e3), true); }
   };
 
   const xemChuoi = async (id: number) => {
@@ -145,48 +151,47 @@ function HopDong() {
                       {!h.booking_id ? (
                         <button className="ghost" disabled={dang}
                                 onClick={() => noiBooking(h)}>Nối booking</button>) : null}
+                      <button className="ghost" onClick={() => xemLich(h)}>Lịch thanh toán</button>
                       <button className="ghost" onClick={() => xemChuoi(h.id)}>Trọn đường</button>
-                      <button className="ghost" onClick={() => xemLich(h.id)}>Lịch thanh toán</button>
                     </td>
                   </tr>
                   {lich[h.id] ? (
                     <tr key={`${h.id}-lich`}><td colSpan={9} className="chitiet">
-                      <p>
-                        <b>Phải trả đến hôm nay: {vnd(lich[h.id].phai_tra_den_hom_nay)}</b>
-                        {" · "}đã đến hạn {vnd(lich[h.id].den_han_hom_nay)}
-                        {" · "}đã thu {vnd(lich[h.id].da_thu)}
-                        {lich[h.id].khop_gia_tri === false ?
-                          <Tag cls="red"> tổng các đợt KHÔNG khớp giá trị hợp đồng</Tag> : null}
-                      </p>
-                      {(lich[h.id].canh_bao || []).map((c: string, i: number) => (
-                        <p className="warn" key={i}>{c}</p>))}
+                      <div className="dong-tieu-de">
+                        <b>Lịch thanh toán – {lich[h.id].dot.length} đợt</b>
+                        <button className="ghost" onClick={() => moSoan(h)}>
+                          {lich[h.id].dot.length ? "Sửa lịch" : "Đặt lịch"}</button>
+                      </div>
+                      {lich[h.id].khop_gia_tri === false ? (
+                        <p className="warn">Tổng các đợt <b>{vnd(lich[h.id].tong_cac_dot)}</b> không khớp
+                          giá trị hợp đồng <b>{vnd(lich[h.id].gia_tri)}</b> — một trong hai con số đang sai,
+                          và cái sai ấy chỉ lộ ra lúc đối chiếu doanh thu.</p>) : null}
                       {lich[h.id].dot.length === 0 ? (
-                        <p className="muted">Chưa có lịch — hợp đồng này đang chỉ có một hạn duy nhất.</p>
-                      ) : (
+                        <p className="muted">Chưa đặt lịch. Hợp đồng không có lịch thì hạn thanh toán chỉ
+                          nằm trong một ô văn bản, và không ai đòi được theo đợt.</p>) : (
                         <table className="tbl">
-                          <thead><tr><th>Đợt</th><th>Tên</th><th>Mốc</th><th>Hạn</th>
+                          <thead><tr><th>Đợt</th><th>Hạn</th>
                             <th style={{ textAlign: "right" }}>Số tiền</th>
                             <th style={{ textAlign: "right" }}>Đã rải</th>
-                            <th style={{ textAlign: "right" }}>Còn thiếu</th><th>Trạng thái</th><th></th></tr></thead>
+                            <th style={{ textAlign: "right" }}>Còn thiếu</th>
+                            <th>Trạng thái</th><th></th></tr></thead>
                           <tbody>{lich[h.id].dot.map((d: any) => (
                             <tr key={d.id}>
-                              <td>{d.dot}</td>
-                              <td>{d.ten}{d.ty_le ? <div className="muted small">{d.ty_le}% giá trị HĐ</div> : null}
-                                {d.ghi_chu ? <div className="muted small">{d.ghi_chu}</div> : null}</td>
-                              <td className="muted small">{d.moc_mo_ta}{d.moc_so_ngay != null ? ` ${d.moc_so_ngay} ngày` : ""}</td>
+                              <td>{d.dot}. {d.ten}<div className="muted small">{d.moc_mo_ta}
+                                {d.moc !== "co_dinh" && d.moc_so_ngay != null ? ` ${d.moc_so_ngay} ngày` : ""}</div></td>
                               <td>{d.han || "–"}{d.da_doi_han ? <div className="muted small">gốc {d.han_goc}</div> : null}</td>
                               <td style={{ textAlign: "right" }}>{vnd(d.so_tien)}</td>
                               <td style={{ textAlign: "right" }}>{vnd(d.da_rai)}</td>
-                              <td style={{ textAlign: "right" }}>{d.con_thieu > 0 ? vnd(d.con_thieu) : "–"}</td>
-                              <td>{d.trang_thai === "da_du" ? <Tag cls="ok">đã đủ</Tag>
-                                : d.qua_han ? <Tag cls="red">quá hạn</Tag> : <Tag cls="warn">chờ đến hạn</Tag>}</td>
-                              <td className="nut"><button className="ghost" onClick={() => doiHan(h.id, d)}>dời hạn</button></td>
+                              <td style={{ textAlign: "right" }}>{d.con_thieu > 0 ? <b>{vnd(d.con_thieu)}</b> : "–"}</td>
+                              <td><Tag cls={d.trang_thai === "da_du" ? "ok" : d.qua_han ? "red" : "warn"}>
+                                {d.trang_thai === "da_du" ? "đã đủ" : d.qua_han ? "quá hạn" : "chờ đến hạn"}</Tag></td>
+                              <td className="nut"><button className="ghost" onClick={() => doiHan(h.id, d)}>Dời hạn</button></td>
                             </tr>))}</tbody>
-                        </table>
-                      )}
+                        </table>)}
                       <p className="muted small">{lich[h.id].ghi_chu_man_hinh}</p>
-                      <button className="ghost" onClick={() => moSoan(h)}>
-                        {lich[h.id].dot.length ? "Sửa lịch" : "Đặt lịch thanh toán"}</button>
+                      {lich[h.id].chua_gan_dot > 0 ? (
+                        <p className="muted small">Còn <b>{vnd(lich[h.id].chua_gan_dot)}</b> đã thu chưa rải
+                          vào đợt nào.</p>) : null}
                     </td></tr>
                   ) : null}
                   {chuoi[h.id] ? (
@@ -223,51 +228,47 @@ function HopDong() {
       </div>
 
       {soan ? (
-        <form className="card" onSubmit={luuLich}>
-          <h3>Lịch thanh toán — {soan.so_hop_dong} · giá trị {vnd(soan.gia_tri)}</h3>
-          <p className="muted">
-            Tổng các đợt phải <b>bằng đúng</b> giá trị hợp đồng, lệch thì hệ thống không ghi gì. Số tiền
-            của đợt được <b>chốt thành tiền</b>; tỷ lệ % chỉ để kể lại con số từ đâu ra, sửa giá trị hợp
-            đồng sau này sẽ không lặng lẽ đổi số tiền đòi khách.
+        <form className="card" onSubmit={datLich}>
+          <h3>Lịch thanh toán – {soan.hd.so_hop_dong} · giá trị {vnd(soan.hd.gia_tri)}</h3>
+          <p className="muted small">
+            Tổng các đợt phải khớp giá trị hợp đồng — máy chủ kiểm và từ chối nếu lệch. Mốc “trước / sau
+            khởi hành” tự tính hạn theo ngày khởi hành của tour, nên đổi ngày khởi hành thì hạn đi theo;
+            chọn “ngày cố định” thì hạn đứng yên dù tour dời.
           </p>
           <table className="tbl">
-            <thead><tr><th>Tên đợt</th><th>Số tiền</th><th>% (ghi chú)</th><th>Mốc hạn</th>
+            <thead><tr><th>Tên đợt</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Mốc</th>
               <th>Số ngày</th><th>Ngày cố định</th><th>Ghi chú</th><th></th></tr></thead>
-            <tbody>{dongSoan.map((d, i) => (
-              <tr key={i}>
-                <td><input value={d.ten} onChange={(e) => { const a = [...dongSoan]; a[i] = { ...d, ten: e.target.value }; setDongSoan(a); }} /></td>
-                <td><input type="number" step={1000} value={d.so_tien} required
-                           onChange={(e) => { const a = [...dongSoan]; a[i] = { ...d, so_tien: e.target.value }; setDongSoan(a); }} /></td>
-                <td><input type="number" step="0.1" value={d.ty_le}
-                           onChange={(e) => { const a = [...dongSoan]; a[i] = { ...d, ty_le: e.target.value }; setDongSoan(a); }} /></td>
-                <td><select value={d.moc} onChange={(e) => { const a = [...dongSoan]; a[i] = { ...d, moc: e.target.value }; setDongSoan(a); }}>
+            <tbody>{soan.dot.map((d, i) => {
+              const sua = (k: string, v: any) => setSoan({ ...soan, dot: soan.dot.map((x, j) => j === i ? { ...x, [k]: v } : x) });
+              return (<tr key={i}>
+                <td><input value={d.ten} onChange={(e) => sua("ten", e.target.value)} placeholder={`Đợt ${i + 1}`} /></td>
+                <td><input type="number" min={0} step={1000} value={d.so_tien} onChange={(e) => sua("so_tien", e.target.value)} style={{ textAlign: "right" }} /></td>
+                <td><select value={d.moc} onChange={(e) => sua("moc", e.target.value)}>
                   <option value="ngay_ky">sau ngày ký hợp đồng</option>
                   <option value="truoc_khoi_hanh">trước ngày khởi hành</option>
                   <option value="sau_khoi_hanh">sau ngày khởi hành</option>
-                  <option value="co_dinh">ngày cố định</option>
+                  <option value="co_dinh">ngày cố định do người nhập</option>
                 </select></td>
-                <td><input type="number" value={d.moc_so_ngay} disabled={d.moc === "co_dinh"}
-                           onChange={(e) => { const a = [...dongSoan]; a[i] = { ...d, moc_so_ngay: e.target.value }; setDongSoan(a); }} /></td>
-                <td><input type="date" value={d.han} disabled={d.moc !== "co_dinh"}
-                           onChange={(e) => { const a = [...dongSoan]; a[i] = { ...d, han: e.target.value }; setDongSoan(a); }} /></td>
-                <td><input value={d.ghi_chu} onChange={(e) => { const a = [...dongSoan]; a[i] = { ...d, ghi_chu: e.target.value }; setDongSoan(a); }} /></td>
+                <td>{d.moc === "co_dinh" ? <span className="muted">–</span>
+                  : <input type="number" min={0} value={d.moc_so_ngay} onChange={(e) => sua("moc_so_ngay", e.target.value)} style={{ width: 70 }} />}</td>
+                <td>{d.moc === "co_dinh"
+                  ? <input type="date" value={d.han} onChange={(e) => sua("han", e.target.value)} />
+                  : <span className="muted">–</span>}</td>
+                <td><input value={d.ghi_chu} onChange={(e) => sua("ghi_chu", e.target.value)} /></td>
                 <td className="nut"><button type="button" className="ghost"
-                    onClick={() => setDongSoan(dongSoan.filter((_, j) => j !== i))}>bỏ</button></td>
-              </tr>))}</tbody>
+                  onClick={() => setSoan({ ...soan, dot: soan.dot.filter((_, j) => j !== i) })}>xoá</button></td>
+              </tr>);
+            })}</tbody>
           </table>
-          <p>
-            Tổng đang soạn: <b>{vnd(dongSoan.reduce((t, d) => t + Number(d.so_tien || 0), 0))}</b>
-            {" / "}{vnd(soan.gia_tri)}
-            {Math.abs(dongSoan.reduce((t, d) => t + Number(d.so_tien || 0), 0) - soan.gia_tri) > 0.5 ?
-              <Tag cls="warn"> chưa khớp</Tag> : <Tag cls="ok"> khớp</Tag>}
+          <p className="muted small">
+            Tổng các đợt đang là <b>{vnd(soan.dot.reduce((t, d) => t + (Number(d.so_tien) || 0), 0))}</b>
+            {" "}/ giá trị hợp đồng <b>{vnd(soan.hd.gia_tri)}</b>.
           </p>
-          <button type="button" className="ghost" onClick={() => setDongSoan([...dongSoan,
-            { ten: `Đợt ${dongSoan.length + 1}`, so_tien: "", ty_le: "", moc: "truoc_khoi_hanh", moc_so_ngay: 7, han: "", ghi_chu: "" }])}>
-            Thêm đợt</button>{" "}
-          <button type="submit">Lưu lịch</button>{" "}
-          <button type="button" className="ghost" onClick={() => setSoan(null)}>Đóng</button>
-        </form>
-      ) : null}
+          <button type="button" className="ghost" onClick={() => setSoan({ ...soan, dot: [...soan.dot,
+            { ten: "", so_tien: 0, moc: "truoc_khoi_hanh", moc_so_ngay: 0, han: "", ghi_chu: "" }] })}>Thêm đợt</button>
+          {" "}<button type="submit" className="ghost" disabled={dang}>Lưu lịch</button>
+          {" "}<button type="button" className="ghost" onClick={() => setSoan(null)}>Đóng</button>
+        </form>) : null}
 
       <style jsx>{`
         .wrap { padding: 16px; max-width: 1250px; }
@@ -282,6 +283,9 @@ function HopDong() {
         .o .ten { font-size: 12px; color: #64748b; }
         .o .gt { font-weight: 600; font-size: 13px; }
         .nut { white-space: nowrap; }
+        .dong-tieu-de { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
+        input, select { padding: 4px 6px; border-radius: 6px; border: 1px solid #cbd5e1;
+                        font-size: 13px; max-width: 100%; }
         .mono { font-family: ui-monospace, monospace; font-size: 13px; }
         button { padding: 5px 10px; border-radius: 8px; border: 1px solid #cbd5e1;
                  background: #fff; color: #0f172a; cursor: pointer; font-size: 13px; }

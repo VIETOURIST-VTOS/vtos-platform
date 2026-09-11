@@ -61,7 +61,7 @@ def _phien():
 
 
 def _tour_mo_ban() -> int:
-    ds = client.get("/api/v1/tours", headers=login(KETOAN)).json()
+    ds = client.get("/api/v1/tours", headers=login(KETOAN)).json()["rows"]
     ds = ds if isinstance(ds, list) else ds.get("items", [])
     for t in ds:
         if t.get("status") == "da_duyet":

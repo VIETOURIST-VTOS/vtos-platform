@@ -48,7 +48,7 @@ def test_ingest_idempotent_and_apply():
     assert st["booking"]["total"] == 2 and st["tour"]["applied"] == 0
     res = client.post("/api/v1/import/vietrip/apply", headers=h).json()["applied"]
     assert res["tours"] == 1 and res["bookings"] == 2 and res["receipts"] == 1 and res["supplier_payments"] == 1 and res["users"] == 1 and res["vehicles"] == 1 and res["settlements"] == 1
-    t = next(x for x in client.get("/api/v1/tours", headers=h).json() if x["code"] == "PT001.03060926")
+    t = next(x for x in client.get("/api/v1/tours", headers=h).json()["rows"] if x["code"] == "PT001.03060926")
     assert t["status"] == "kt_xac_nhan" and t["actual_revenue"] == 27240000 and t["tour_type"] == "le_noi_dia" and t["price_per_pax"] == 1990000
     cl = client.get(f"/api/v1/tours/{t['id']}/cost-lines", headers=h).json()
     assert len(cl["rows"]) == 2 and cl["rows"][1]["supplier_tax_code"] == "3401254663" and cl["rows"][1]["cost_kind"] == "theo_khach" and cl["total_actual"] == 10650000
@@ -75,7 +75,7 @@ def test_booking_without_tour():
     assert client.post("/api/v1/import/vietrip/booking", json={"rows": [b_ok, b_xx]}, headers=h).status_code == 200
     res = client.post("/api/v1/import/vietrip/apply", headers=h).json()["applied"]
     assert res["bookings"] == 1 and res["blocked"] == 0
-    t = next(x for x in client.get("/api/v1/tours", headers=h).json() if x["code"] == "MICEMT5N4D.05090826")
+    t = next(x for x in client.get("/api/v1/tours", headers=h).json()["rows"] if x["code"] == "MICEMT5N4D.05090826")
     assert t["start_date"] == "2026-08-09" and t["end_date"] == "2026-08-13" and t["tour_type"] == "doan_noi_dia" and t["status"] == "ket_thuc"
     bk = {b["code"]: b for b in client.get("/api/v1/bookings", headers=h).json()}
     assert bk["VT130001"]["amount"] == 50000000 and "VT130002" not in bk

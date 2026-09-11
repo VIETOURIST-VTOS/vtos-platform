@@ -27,7 +27,7 @@ def post(u, path, json=None):
 
 
 def tour_by_code(code):
-    return next(t for t in client.get("/api/v1/tours", headers=login("cntt")).json() if t["code"] == code)
+    return next(t for t in client.get("/api/v1/tours", headers=login("cntt")).json()["rows"] if t["code"] == code)
 
 
 @pytest.fixture(scope="module", autouse=True)

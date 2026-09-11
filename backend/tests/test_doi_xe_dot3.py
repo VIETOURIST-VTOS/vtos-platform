@@ -378,7 +378,7 @@ def test_chi_dinh_nguoi_lap_lenh_bang_cau_hinh_khong_viet_ten_vao_ma():
         p.value = "dh.lan"; db.commit()
     finally:
         db.close()
-    t = client.get("/api/v1/tours", headers=login("cntt")).json()[0]
+    t = client.get("/api/v1/tours", headers=login("cntt")).json()["rows"][0]
     v = client.get("/api/v1/fleet/xe", headers=login("cntt")).json()[0]
     body = {"tour_id": t["id"], "vehicle_id": v["id"], "date_from": str(HOM_NAY + timedelta(days=400)),
             "date_to": str(HOM_NAY + timedelta(days=401)), "internal_price": 1_000_000}

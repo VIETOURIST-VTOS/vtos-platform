@@ -117,7 +117,7 @@ def test_bao_cao_va_man_hinh_danh_sach_khong_duoc_noi_khac_nhau():
     """Cùng một mảng, cùng một kỳ: danh sách booking và báo cáo phải kể cùng một câu chuyện."""
     h = login("chutich")
     for mang in ("le", "doan"):
-        tours_ms = {t["code"] for t in client.get(f"/api/v1/tours?mang={mang}&limit=1000", headers=h).json()}
+        tours_ms = {t["code"] for t in client.get(f"/api/v1/tours?mang={mang}&limit=1000", headers=h).json()["rows"]}
         tours_bc = {r["tour_code"] for r in bao_cao("ban_tour_le", mang)["detail"]}
         assert tours_bc <= tours_ms, f"mảng {mang}: báo cáo có tour mà màn hình danh sách không công nhận"
 

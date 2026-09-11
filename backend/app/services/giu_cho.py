@@ -17,7 +17,10 @@ from app.models.core import Alert, Booking, Tour, User
 from app.models.giu_cho import NhatKyGiuCho
 from app.services import rules as R
 
-GIA_HAN_ROLES = ("nv_dh", "tp_dh", "gd_kd", "tp_kd", "cntt", "tgd")
+# Lấy thẳng từ access.py – nguồn quyền duy nhất. Giữ tên cũ để chỗ gọi không phải đổi. Phép kiểm
+# ở dưới VẪN GIỮ dù endpoint đã khai quyền: hàng rào ngoài chặn theo màn hình, hàng rào trong
+# chặn theo việc, và hàm này còn được gọi từ robot trả chỗ chứ không chỉ từ endpoint.
+from app.services.access import GIU_CHO_ROLES as GIA_HAN_ROLES  # noqa: E402
 
 # Gia hạn quá số lần này thì vẫn cho, nhưng kêu lên. Không chặn: có tour khách thật sự cần chờ duyệt
 # ngân sách nhiều vòng. Chặn ở đây chỉ đẩy Điều hành sang huỷ rồi tạo lại booking, và khi ấy hệ thống

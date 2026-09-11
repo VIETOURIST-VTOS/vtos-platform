@@ -32,7 +32,7 @@ def test_import_marketing_file_and_conversion_report():
     st = client.get("/api/v1/leads/stats?month=2026-08", headers=h).json(); assert sum(s["leads"] for s in st) == 2785 and any(s["channel"] == "VCHAT" and s["leads"] == 1062 for s in st)
     lst = client.get("/api/v1/leads?month=2026-08&channel=Hotline%201", headers=h).json(); assert len(lst["rows"]) == 55 and all(len(x["phone"]) == 7 for x in lst["rows"])   # file nguồn chỉ có 7 số cuối cho Hotline 1 T8
     # booking cho 1 lead T8 (khách mới) và 1 lead T6 (đã đi 1 lần trước) → đối chiếu
-    t = next(x for x in client.get("/api/v1/tours", headers=login("cntt")).json() if x["code"] == "PT-DL-0912")
+    t = next(x for x in client.get("/api/v1/tours", headers=login("cntt")).json()["rows"] if x["code"] == "PT-DL-0912")
     lead8 = next(x for x in client.get("/api/v1/leads?month=2026-08&channel=VCHAT", headers=h).json()["rows"] if len(x["phone"]) == 10); lead6 = next(x for x in client.get("/api/v1/leads?month=2026-06&channel=Hotline%201", headers=h).json()["rows"] if len(x["phone"]) == 10)
     for ld in (lead8, lead6):
         rq = client.post("/api/v1/requests", json={"tour_id": t["id"], "customer_name": ld["name"], "customer_phone": ld["phone"], "source": ld["channel"], "care_note": "lead", "pax": 2}, headers=login("kd.hoa")).json()["request"]

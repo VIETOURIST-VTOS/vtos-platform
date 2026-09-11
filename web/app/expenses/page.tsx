@@ -20,7 +20,7 @@ function Expenses() {
   const [tours, setTours] = useState<any[]>([]);
   const [f, setF] = useState<any>({ category: "chi_tour", tour_id: "", supplier_name: "", supplier_tax_code: "", supplier_bank: "", amount: "", description: "", has_document: false, document_ref: "", has_invoice: false });
   const load = useCallback(() => {
-    if (!tours.length) api("/tours").then(setTours).catch(() => {});
+    if (!tours.length) api("/tours").then((r) => setTours(r.rows || [])).catch(() => {});
     if (tab === "requests") api(`/payment-requests${filter ? `?status=${filter}` : ""}`).then(setRows);
     if (tab === "cashflow") api("/cashflow").then(setCf).catch((e) => toast(errMsg(e), true));
   }, [tab, filter]); // eslint-disable-line

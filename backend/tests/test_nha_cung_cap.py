@@ -134,7 +134,7 @@ def test_dat_dich_vu_phai_gan_tour(ncc):
 
 
 def test_tao_don_va_tinh_thanh_tien(ncc):
-    tours = client.get("/api/v1/tours", headers=login("cntt")).json()
+    tours = client.get("/api/v1/tours", headers=login("cntt")).json()["rows"]
     if not tours: pytest.skip("dữ liệu mẫu không có tour")
     tid = tours[0]["id"]
     r = client.post("/api/v1/ncc/don", headers=login("cntt"),

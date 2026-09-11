@@ -108,7 +108,7 @@ def test_journal_import_and_partners_projects():
     ncc = xlsx([["STT", "Tên NCC", "MST", "Tên pháp nhân (người đại diện)", "Địa chỉ"], [1, "RESORT VĨNH HY", "4500485670", "CTY TNHH PHÁT HOÀNG LONG", "Vĩnh Hải"]])
     assert client.post("/api/v1/misa/partners", files={"file": ("DataNCC.xlsx", ncc)}, headers=h).json()["created"] == 1
     ps = client.get("/api/v1/partners?q=4500485670", headers=h).json(); assert ps and ps[0]["trade_name"] == "RESORT VĨNH HY" and ps[0]["is_supplier"]
-    tour_code = client.get("/api/v1/tours?limit=1", headers=h).json()[0]["code"]
+    tour_code = client.get("/api/v1/tours?limit=1", headers=h).json()["rows"][0]["code"]
     ct = xlsx([["DANH SÁCH CÔNG TRÌNH"], ["STT", "Mã công trình", "Tên công trình", "Loại công trình", "Tình trạng", "Ngày bắt đầu", "Ngày kết thúc", "Dự toán", "Chủ đầu tư", "Trạng thái"],
                [1, "0000", "Tour bổ sung", "", "Đang thực hiện", "", "", 0, "", ""], [2, "EU0014.09.170626", "Châu Âu 17/06/2026", "", "Đang thực hiện", "17/06/2026", "25/06/2026", 0, "", ""],
                [3, tour_code, "Tour VTOS", "", "Đang thực hiện", "", "", 0, "", ""]])
@@ -131,7 +131,7 @@ def test_dimension_rules_and_exports():
     assert ws.cell(1, 1).value == "Mã công trình (*)" and ws.max_row > 1
     x = client.get("/api/v1/misa/export/entries.xlsx?date_from=2026-01-01&date_to=2026-12-31", headers=h); assert x.status_code == 200
     # tour mới → công trình cùng mã
-    t = client.get("/api/v1/tours?limit=1", headers=h).json()[0]
+    t = client.get("/api/v1/tours?limit=1", headers=h).json()["rows"][0]
     assert any(p["code"] == t["code"] for p in client.get(f"/api/v1/projects?q={t['code']}", headers=h).json())
     # NV kinh doanh không được nạp
     assert client.post("/api/v1/misa/partners", files={"file": ("a.xlsx", b"x")}, headers=login("kd.hoa")).status_code == 403
