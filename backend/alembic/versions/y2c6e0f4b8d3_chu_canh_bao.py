@@ -17,17 +17,29 @@ ngược cả lần triển khai, và không ai xem được kết quả trướ
 chu_canh_bao.giao_het() – chạy được, xem trước được, chạy lại được.
 
 Revision ID: y2c6e0f4b8d3
-Revises: x1b5d9e3a7c24
+Revises: z3d7f2a5c9e18
 Create Date: 2026-09-11
 """
 import sqlalchemy as sa
 from alembic import op
 
-# Nối vào ĐÚNG đầu đang có của nhánh (x1b5d9e3a7c24 – VPM-5 phân bổ tiền vào), không nối vào một
-# revision cũ hơn. Nối vào cha cũ là tạo thêm một đầu thứ hai, và container khởi động sẽ dừng ở
-# "Multiple head revisions are present" – đúng kiểu hỏng đã làm chết lần triển khai ngày 10/9.
+# Nối vào ĐÚNG đầu đang có của nhánh, không nối vào một revision cũ hơn. Nối vào cha cũ là tạo thêm
+# một đầu thứ hai, và container khởi động sẽ dừng ở "Multiple head revisions are present" – đúng
+# kiểu hỏng đã làm chết lần triển khai ngày 10/9.
+#
+# Sửa lúc 02:00 ngày 11/9: bản đầu nối vào x1b5d9e3a7c24 (VPM-5), đúng tại thời điểm viết. Nhưng
+# trong lúc em viết phần dịch vụ thì làn Viết phần mềm commit VPM-7 và cũng nối vào x1b5d9e3a7c24 –
+# thành hai con nối vào một cha, tức hai đầu. Nối lại vào y2c6e1f4b8d37 (VPM-7) để chuỗi thẳng một
+# hàng. Đây là việc phải ĐO LẠI ngay trước khi commit, không phải đo một lần lúc bắt đầu viết:
+# trong một cây làm việc chung, đầu nhánh đổi trong lúc mình đang gõ.
+#
+# SỬA LẦN HAI lúc 01:40 – lại đúng chuyện ấy. Trong lúc em mở PR thì VPM-9 (lịch thanh toán hợp
+# đồng khách) đã gộp vào main, mang theo z3d7f2a5c9e18 CŨNG nối vào y2c6e1f4b8d37. Hai con một
+# cha, tức hai đầu, tức container dừng ở "Multiple head revisions are present" ngay khi gộp.
+# Đo trước khi gộp nên bắt được; nối lại vào z3d7f2a5c9e18. Không đụng bảng nào của VPM-9 –
+# bản này chỉ thêm hai cột vào alerts.
 revision = "y2c6e0f4b8d3"
-down_revision = "x1b5d9e3a7c24"
+down_revision = "z3d7f2a5c9e18"
 branch_labels = None
 depends_on = None
 
