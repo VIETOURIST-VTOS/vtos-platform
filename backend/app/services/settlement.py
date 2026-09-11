@@ -85,8 +85,13 @@ def add_line(db: Session, u: User, t: Tour, d: dict) -> TourCostLine:
 def update_line(db: Session, u: User, t: Tour, l: TourCostLine, d: dict) -> TourCostLine:
     _assert_edit(u, t)
     if l.status != "hd": raise Gate("QT_NHAP", "Dòng đã hủy – không sửa")
+    from app.services import ghi_mot_lan as GML
+    pb = d.pop("phien_ban", None)
     v = validate(d); before = {"thuc_chi": l.actual, "don_gia": l.unit_price, "sl": l.qty, "hs": l.coef, "da_tt": l.paid}
+    GML.kiem_phien_ban(l, pb, f"Dòng giá vốn {l.line_no} của {t.code}",
+                       lambda: {**before, "phien_ban": l.phien_ban})
     for k, x in v.items(): setattr(l, k, x)
+    GML.tang_phien_ban(l)
     l.version, l.updated_by, l.source = t.settlement_version, u.username, "vtos" if l.source != "vietrip" else "vietrip+vtos"
     R.audit(db, u.username, u.role, "qt_sua_dong", f"tour:{t.code}", before=before, after={"dong": l.line_no, "thuc_chi": l.actual, "da_tt": l.paid, "v": t.settlement_version})
     db.commit(); db.refresh(l); return l

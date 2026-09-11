@@ -40,7 +40,12 @@ CUA_TAY = (
     "fleet_shared_invoices", "fleet_trip_costs", "fleet_trips", "fleet_verifications",
     "guide_assignments", "guide_rates", "hop_dong_khach", "incidents", "intake_runs", "invoices",
     "journal_entries", "journal_lines", "khoa_ghi", "labor_contracts", "lead_channel_stats",
-    "leads", "leave_requests", "messages", "mkt_budget_lines", "mkt_budgets", "page_shifts",
+    "leads", "leave_requests",
+    # VPM-9 – lịch thanh toán theo tiến độ của hợp đồng khách. Cửa nhập tay ở màn hình
+    # /hop-dong-khach: người soạn chia hợp đồng thành các đợt, gõ số tiền và mốc hạn từng đợt.
+    # Máy KHÔNG tự chia được: tiến độ trả tiền là điều hai bên thỏa thuận, không suy ra từ đâu.
+    "lich_thanh_toan_hd",
+    "messages", "mkt_budget_lines", "mkt_budgets", "page_shifts",
     "params", "partners", "payment_requests", "payroll_runs", "period_locks",
     # VPM-5 – kế toán tự tay chia một khoản tiền cho nhiều booking ở màn hình /collections. Đây đúng
     # là CỬA TAY chứ không phải bảng máy sinh: máy không biết khách định trả cho tour nào, chỉ người

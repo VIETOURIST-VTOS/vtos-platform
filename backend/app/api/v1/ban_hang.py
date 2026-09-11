@@ -12,7 +12,7 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.core import User
 from app.models.ban_hang import (BangGia, BangGiaDong, BaoGia, BaoGiaDong, BaoGiaBan,
-                                 HopDongKhach, MANG, TRANG_THAI_BAO_GIA)
+                                 HopDongKhach, LichThanhToanHD, MOC_HAN, MANG, TRANG_THAI_BAO_GIA)
 from app.services import ban_hang as BH
 from app.services import ghi_mot_lan as GML, rules as R
 
@@ -304,6 +304,80 @@ def noi_booking(hid: int, booking_id: int, u: User = Depends(require_roles(*SOAN
     if hd is None: raise HTTPException(404, "Không có hợp đồng")
     BH.noi_booking(db, hd, booking_id); db.commit()
     return {**_hd_ra(hd), "message": "Đã nối hợp đồng với booking"}
+
+
+# ───────────────── VPM-9: lịch thanh toán theo tiến độ ─────────────────
+# Đặt dưới tiền tố "/api/v1/ban-hang" đã được cấp quyền sẵn – không mở tiền tố API mới.
+class DotLichIn(BaseModel):
+    ten: str = ""
+    so_tien: float
+    ty_le: float | None = None
+    moc: str = "co_dinh"          # ngay_ky / truoc_khoi_hanh / sau_khoi_hanh / co_dinh
+    moc_so_ngay: int | None = None
+    han: date | None = None       # chỉ dùng khi moc = "co_dinh"
+    ghi_chu: str = ""
+
+
+class LichIn(BaseModel):
+    # VPM-8 – đặt lại lịch là sửa hợp đồng (nó ghi vào `han_thanh_toan`), nên đi qua khoá phiên bản.
+    phien_ban: int | None = None
+    dot: list[DotLichIn]
+
+
+class DoiHanIn(BaseModel):
+    han: date
+    ly_do: str
+
+
+def _hd(db: Session, hid: int) -> HopDongKhach:
+    hd = db.get(HopDongKhach, hid)
+    if hd is None: raise HTTPException(404, "Không có hợp đồng")
+    return hd
+
+
+@router.get("/hop-dong/{hid}/lich-thanh-toan")
+def xem_lich(hid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    from app.services import lich_thanh_toan as LTT
+    hd = _hd(db, hid)
+    b = LTT.bang(db, hd)
+    b["canh_bao"] = LTT.canh_bao_doi_ngay_khoi_hanh(db, hd)
+    b["moc_han"] = MOC_HAN
+    return b
+
+
+@router.post("/hop-dong/{hid}/lich-thanh-toan")
+def dat_lich(hid: int, data: LichIn, u: User = Depends(require_roles(*SOAN, "ketoan")),
+             db: Session = Depends(get_db)):
+    from app.services import lich_thanh_toan as LTT
+    hd = _hd(db, hid)
+    GML.kiem_phien_ban(hd, data.phien_ban, f"Hợp đồng {hd.so_hop_dong}",
+                       lambda: {**_hd_ra(hd), "lich": LTT.bang(db, hd)})
+    try:
+        kq = LTT.dat_lich(db, u, hd, [d.model_dump() for d in data.dot])
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    GML.tang_phien_ban(hd); db.commit()
+    return kq
+
+
+@router.post("/hop-dong/lich-thanh-toan/{did}/doi-han")
+def doi_han(did: int, data: DoiHanIn, u: User = Depends(require_roles(*SOAN, "ketoan")),
+            db: Session = Depends(get_db)):
+    from app.services import lich_thanh_toan as LTT
+    d = db.get(LichThanhToanHD, did)
+    if d is None: raise HTTPException(404, "Không có đợt thanh toán")
+    try:
+        return LTT.doi_han(db, u, d, data.han, data.ly_do)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@router.get("/hop-dong-qua-han")
+def hop_dong_qua_han(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Mọi đợt đã đến hạn mà chưa thu đủ – danh sách làm việc của người đòi công nợ."""
+    from app.services import lich_thanh_toan as LTT
+    ds = LTT.qua_han(db)
+    return {"so_dot": len(ds), "tong_con_thieu": round(sum(x["con_thieu"] for x in ds), 2), "dong": ds}
 
 
 @router.get("/hop-dong/{hid}/chuoi")

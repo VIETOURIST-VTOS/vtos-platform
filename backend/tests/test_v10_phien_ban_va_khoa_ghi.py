@@ -259,16 +259,25 @@ def test_ket_qua_nho_lai_du_de_man_hinh_ve_duoc():
 
 # ====================== 4. NÓI THẲNG PHẦN CÒN NỢ ======================
 def test_ghi_ro_moi_noi_duoc_MOT_duong_sua_va_con_muoi_mot_bang_chua_noi():
-    """V10 đặt xong cột và cơ chế, nhưng mới nối vào HAI đường sửa: dự toán tour (V10) và báo giá
-    (V6 – bảng bao_gia sinh ra đã mang cột phiên bản). Con số này ở đây để lần sau nối thêm là thấy
-    nó đổi – chứ không phải để ai đó đọc mã rồi tưởng mọi bảng đã được canh."""
+    """Bản gốc (08/9/2026) chốt cứng HAI tệp – dự toán tour và báo giá – kèm câu dặn: "nếu đúng ý thì
+    sửa phép thử này và ghi vì sao". VPM-8 (11/9/2026) chính là lần ấy.
+
+    VÌ SAO ĐỔI: chốt cứng một danh sách tên tệp thì mỗi lần nối thêm một cửa sửa lại phải sửa tay
+    phép thử, và người sửa tay dễ nhất là người đang muốn nó xanh. Nay phép thử đối chiếu với BẢN
+    KHAI `CUA_SUA_CO_KHOA` trong ghi_mot_lan.py: nối thêm cửa mà quên khai thì đỏ, khai mà không nối
+    thì test_vpm8 đỏ. Hai đầu canh nhau, không còn một con số để ai đó chỉnh cho vừa.
+    """
     import pathlib, re
+    from app.services.ghi_mot_lan import CUA_SUA_CO_KHOA
     goc = pathlib.Path(__file__).resolve().parents[1] / "app"
     noi = set()
     for f in goc.rglob("*.py"):
         if re.search(r"GML\.kiem_phien_ban|kiem_phien_ban\(", f.read_text(encoding="utf-8")) \
                 and "ghi_mot_lan" not in f.name:
             noi.add(f.name)
-    assert noi == {"tours.py", "ban_hang.py"}, (
-        f"số đường sửa có kiểm phiên bản đã đổi: {sorted(noi)}. Nếu đúng ý thì sửa phép thử này và "
-        "ghi vì sao trong thông điệp ghi mã – đừng để nó tự trôi.")
+    da_khai = {tep.rsplit("/", 1)[-1] for tep, _ in CUA_SUA_CO_KHOA.values()}
+    assert noi == da_khai, (
+        f"Tệp CÓ gọi kiểm phiên bản: {sorted(noi)}\n"
+        f"Tệp ĐƯỢC KHAI trong CUA_SUA_CO_KHOA: {sorted(da_khai)}\n"
+        "Lệch nghĩa là có cửa sửa gắn khoá mà quên khai (hoặc ngược lại). Khai vào "
+        "app/services/ghi_mot_lan.py::CUA_SUA_CO_KHOA.")
