@@ -138,7 +138,7 @@ class TourSettlementLine(Base):
         """Tổng thu tệp ghi có bằng giá bán cộng thu khác không? None nghĩa là thiếu số để so."""
         if self.tong_thu is None or self.gia_ban is None:
             return None
-        return self.tong_thu - (self.gia_ban + (self.thu_khac or 0))
+        return self.tong_thu - (self.gia_ban + (self.thu_khac or 0))  # k2-doc-an-toan: đã chặn None ngay trên
 
 
 class TourSettlementCost(Base):
@@ -237,7 +237,7 @@ class TourSettlementCostLine(Base):
         """Thành tiền tệp ghi trừ đơn giá × số lượng × hệ số. None khi thiếu số để nhân."""
         if self.thanh_tien is None or self.don_gia is None:
             return None
-        return self.thanh_tien - self.don_gia * (self.so_luong or 1) * (self.he_so or 1)
+        return self.thanh_tien - self.don_gia * (self.so_luong or 1) * (self.he_so or 1)  # k2-doc-an-toan: đã chặn None ngay trên
 
 
 class TourGuideAdvance(Base):
@@ -300,7 +300,7 @@ class TourSettlementBooking(Base):
         """Rỗng khi thiếu một trong hai số – không suy ra 0."""
         if self.tong_thu is None or self.da_dong is None:
             return None
-        return self.tong_thu - self.da_dong
+        return self.tong_thu - self.da_dong  # k2-doc-an-toan: đã chặn None ngay trên
 
 
 VE_CTT = {"thu": "I/ Giá tour (thu)", "chi": "II/ Chi phí"}
