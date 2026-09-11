@@ -196,3 +196,58 @@ class HopDongKhach(Base):
     ghi_chu: Mapped[str] = mapped_column(Text, default="")
     tao_boi: Mapped[str] = mapped_column(String(50), default="")
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+# ────────────────────────────── VPM-9: LỊCH THANH TOÁN THEO TIẾN ĐỘ ──────────────────────────────
+MOC_HAN = {
+    "ngay_ky":         "sau ngày ký hợp đồng",
+    "truoc_khoi_hanh": "trước ngày khởi hành",
+    "sau_khoi_hanh":   "sau ngày khởi hành",
+    "co_dinh":         "ngày cố định do người nhập",
+}
+
+
+class LichThanhToanHD(Base):
+    """Một hợp đồng khách trả làm NHIỀU ĐỢT – mỗi dòng là một đợt, có hạn riêng và số tiền riêng.
+
+    VẤN ĐỀ BẢNG NÀY SINH RA ĐỂ GIẢI
+
+    Trước 11/9/2026 `hop_dong_khach` chỉ có MỘT `han_thanh_toan` và MỘT `dat_coc`. Hợp đồng đoàn vài
+    trăm triệu trong thực tế trả làm ba bốn đợt – ký 30%, trước khởi hành 40%, sau tour phần còn lại –
+    và hệ thống không có chỗ nào nói được điều đó. Hệ quả: không ai trả lời được câu hỏi đơn giản nhất
+    của người thu công nợ – "ĐẾN HÔM NAY khách phải trả bao nhiêu?". Chỉ có tổng giá trị hợp đồng và
+    tổng đã thu; phần đến hạn nằm trong đầu người phụ trách, hoặc trong một tệp Excel riêng.
+
+    BA QUYẾT ĐỊNH ĐÁNG GHI LẠI
+
+    MỘT — SỐ TIỀN CỦA ĐỢT ĐƯỢC CHỐT THÀNH TIỀN, KHÔNG ĐỂ LÀ PHẦN TRĂM. `ty_le` vẫn lưu, nhưng chỉ để
+    kể lại con số từ đâu ra. Lý do: nếu đợt giữ dạng %, thì sửa giá trị hợp đồng sẽ lặng lẽ đổi số
+    tiền đòi khách – trong khi khách đã cầm bản hợp đồng ghi con số cũ. Số đã cam kết phải nằm yên.
+
+    HAI — HẠN ĐÃ BÁO CHO KHÁCH THÌ KHÔNG TỰ DỜI. Hạn tính một lần từ mốc (`moc` + `moc_so_ngay`) rồi
+    lưu thành NGÀY THẬT. Đổi ngày khởi hành thì hệ thống KÊU LÊN để người quyết định có dời hạn hay
+    không, chứ không âm thầm đẩy hạn đi – một cái hạn tự đổi là một lời hứa bị sửa sau lưng cả hai bên.
+
+    BA — KHÔNG LƯU "ĐÃ THU" THEO TỪNG ĐỢT. Tiền vào không mang nhãn ghi nó trả cho đợt nào; lưu một
+    con số đã-thu cho mỗi đợt là tạo ra câu trả lời thứ hai cho "hợp đồng này đã thu bao nhiêu", và
+    hai câu trả lời ấy sẽ lệch nhau. Thay vào đó, tổng đã thu (từ phiếu thu của booking) được RẢI vào
+    các đợt theo thứ tự hạn khi hiển thị. Đó là một phép chia để đọc, và màn hình nói rõ như vậy.
+    """
+    __tablename__ = "lich_thanh_toan_hd"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    hop_dong_id: Mapped[int] = mapped_column(ForeignKey("hop_dong_khach.id"), index=True)
+    dot: Mapped[int] = mapped_column(Integer, default=1)
+    ten: Mapped[str] = mapped_column(String(120), default="")
+
+    ty_le: Mapped[float | None] = mapped_column(Float, nullable=True)   # % tham chiếu – KHÔNG dùng để tính lại
+    so_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)  # K2: rỗng là CHƯA NHẬP, không phải 0
+
+    moc: Mapped[str] = mapped_column(String(20), default="co_dinh")
+    moc_so_ngay: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    han: Mapped[date | None] = mapped_column(Date, nullable=True)
+    han_goc: Mapped[date | None] = mapped_column(Date, nullable=True)   # hạn lần đầu – giữ lại để thấy đã dời bao nhiêu
+
+    ghi_chu: Mapped[str] = mapped_column(String(300), default="")
+    boi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
