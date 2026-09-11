@@ -24,6 +24,10 @@ class BankTransaction(Base):
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True)
     match_note: Mapped[str] = mapped_column(String(200), default="")
     received_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    # Số dư CHƯA PHÂN BỔ của khoản tiền này (xem app/models/phan_bo_tien.py).
+    # RỖNG nghĩa là chưa từng phân bổ dòng nào – khác hẳn 0 (đã phân bổ hết). Giao dịch cũ trước
+    # 11/9/2026 đều rỗng, và đó là câu trả lời đúng cho chúng: không ai từng chia khoản tiền ấy.
+    chua_phan_bo: Mapped[float | None] = mapped_column(TIEN, nullable=True)
 
 
 class Receipt(Base):

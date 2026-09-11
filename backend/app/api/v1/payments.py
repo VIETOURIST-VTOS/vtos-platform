@@ -22,7 +22,18 @@ def txn_out(t: BankTransaction, db: Session) -> dict:
     return {"id": t.id, "sepay_id": t.sepay_id, "gateway": t.gateway, "account_number": t.account_number, "transaction_date": t.transaction_date,
             "transfer_type": t.transfer_type, "amount": t.amount, "content": t.content, "reference_code": t.reference_code,
             "match_status": t.match_status, "match_note": t.match_note, "booking_id": t.booking_id, "booking_code": b.code if b else "",
-            "received_at": t.received_at}
+            "received_at": t.received_at,
+            # VPM-5: số dư chưa phân bổ đi kèm ngay trong danh sách, không bắt màn hình tự trừ.
+            # RỖNG = chưa từng phân bổ dòng nào (giao dịch cũ), khác hẳn 0 = đã phân bổ hết.
+            "chua_phan_bo": t.chua_phan_bo,
+            "so_dong_phan_bo": _dem_phan_bo(db, t.id)}
+
+
+def _dem_phan_bo(db: Session, tid: int) -> int:
+    from app.models.phan_bo_tien import PhanBoTien
+    from sqlalchemy import func as _f
+    return int(db.execute(select(_f.count()).select_from(PhanBoTien)
+                          .where(PhanBoTien.bank_txn_id == tid, PhanBoTien.huy == False)).scalar() or 0)   # noqa: E712
 
 
 def receipt_out(r: Receipt, db: Session) -> dict:
@@ -202,3 +213,58 @@ def collections_summary(u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta
     return {"bookings": rows,
             "pending_txns": db.execute(select(BankTransaction).where(BankTransaction.match_status == "cho_ke_toan")).scalars().all().__len__(),
             "pending_receipts": db.execute(select(Receipt).where(Receipt.status == "tu_dong")).scalars().all().__len__()}
+
+
+# ---------- VPM-5: phân bổ một khoản tiền cho nhiều booking ----------
+class DongPhanBoIn(BaseModel):
+    booking_id: int
+    so_tien: float
+    ghi_chu: str = ""
+
+
+class PhanBoIn(BaseModel):
+    dong: list[DongPhanBoIn]
+
+
+@router.get("/bank-transactions/{tid}/phan-bo")
+def xem_phan_bo(tid: int, u: User = Depends(require_roles(*AC.FINANCE_ROLES, mo_ta="phân bổ tiền vào")),
+                db: Session = Depends(get_db)):
+    """Một khoản tiền đã chia cho ai, còn lại bao nhiêu, và những dòng đã huỷ kèm lý do."""
+    from app.services import phan_bo_tien as PB
+    t = db.get(BankTransaction, tid)
+    if not t: raise HTTPException(404, "Không có giao dịch")
+    return PB.bang(db, t)
+
+
+@router.post("/bank-transactions/{tid}/phan-bo")
+def them_phan_bo(tid: int, data: PhanBoIn, u: User = Depends(require_roles("ketoan", "cntt")),
+                 db: Session = Depends(get_db)):
+    """Chia khoản tiền cho nhiều booking. Cả lô được kiểm TRƯỚC khi ghi dòng đầu tiên."""
+    from app.services import phan_bo_tien as PB
+    t = db.get(BankTransaction, tid)
+    if not t: raise HTTPException(404, "Không có giao dịch")
+    try:
+        return PB.phan_bo(db, u, t, [d.model_dump() for d in data.dong])
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+class HuyPhanBoIn(BaseModel):
+    ly_do: str = ""
+
+
+# Cửa huỷ nằm DƯỚI tiền tố /bank-transactions chứ không ở một tiền tố mới: màn hình Thu tiền đã
+# được cấp tiền tố ấy rồi. Mở "/api/v1/phan-bo-tien" là xin thêm một nhóm API cho mọi vai trò đang
+# xem màn hình này – nới quyền chỉ vì đặt tên đường dẫn cho gọn.
+@router.post("/bank-transactions/phan-bo/{pid}/huy")
+def huy_phan_bo(pid: int, data: HuyPhanBoIn, u: User = Depends(require_roles("ketoan", "cntt")),
+                db: Session = Depends(get_db)):
+    """Huỷ một dòng phân bổ (kèm phiếu thu của nó). Huỷ chứ không xoá, và bắt buộc có lý do."""
+    from app.services import phan_bo_tien as PB
+    from app.models.phan_bo_tien import PhanBoTien
+    pb = db.get(PhanBoTien, pid)
+    if not pb: raise HTTPException(404, "Không có dòng phân bổ")
+    try:
+        return PB.huy_dong(db, u, pb, data.ly_do)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
