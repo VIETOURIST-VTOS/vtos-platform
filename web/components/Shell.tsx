@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState, createContext, useContext, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, createContext, useContext, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getUser, clearSession, type User } from "@/lib/api";
+import ChonDonVi from "@/components/ChonDonVi";
 
 /** Mục v1.1 §I.2 có tên nhưng CHƯA có trang. TC-2 yêu cầu ẩn chức năng "sắp có", nên chúng không vào
  *  menu – nhưng cũng không bị xoá khỏi mã, vì lộ trình còn nợ phải có chỗ đọc được. Phép thử test_menu
@@ -183,7 +184,18 @@ const isOn = (href: string, path: string) => { const b = base(href); return b ==
 const laMuc = (b: Block): b is Item => Array.isArray(b);
 
 type Toast = { msg: string; err?: boolean } | null;
-const Ctx = createContext<{ user: User | null; toast: (m: string, err?: boolean) => void }>({ user: null, toast: () => {} });
+
+/** `datChuaLuu` là sổ ghi "màn hình này còn dữ liệu chưa lưu", dùng cho TC-1: đổi đơn vị đang xem
+ *  giữa chừng một biểu đang gõ dở là mất việc người ta vừa làm, mà mất im lặng.
+ *
+ *  Mỗi màn hình có biểu nhập gọi `datChuaLuu(true)` khi người dùng bắt đầu sửa và `datChuaLuu(false)`
+ *  sau khi lưu xong. Màn hình chưa gọi thì coi như không có gì để mất – đúng với màn hình chỉ đọc,
+ *  và KHÔNG chặn nhầm người dùng ở những chỗ không cần chặn. */
+const Ctx = createContext<{
+  user: User | null;
+  toast: (m: string, err?: boolean) => void;
+  datChuaLuu: (co: boolean) => void;
+}>({ user: null, toast: () => {}, datChuaLuu: () => {} });
 export const useShell = () => useContext(Ctx);
 
 const KHOA_MENU = "vtos_menu_mo";
@@ -225,6 +237,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   }, [router, path]);
 
   const toast = useCallback((msg: string, err?: boolean) => { setT({ msg, err }); setTimeout(() => setT(null), err ? 6500 : 4000); }, []);
+
+  // Dùng ref chứ không dùng state: cờ này chỉ được ĐỌC lúc người dùng bấm đổi đơn vị, không có gì
+  // phải vẽ lại theo nó. Để vào state thì mỗi lần gõ một chữ trong biểu là vẽ lại cả khung.
+  const chuaLuu = useRef(false);
+  const datChuaLuu = useCallback((co: boolean) => { chuaLuu.current = co; }, []);
 
   const doiNhom = useCallback((k: string) => {
     setOpen((o) => {
@@ -281,12 +298,12 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <Ctx.Provider value={{ user, toast }}>
+    <Ctx.Provider value={{ user, toast, datChuaLuu }}>
       <div className="top">
         <button type="button" className="burger" onClick={() => setSide((s) => !s)} aria-label="Menu">☰</button>
         <Link href="/" className="brand">VTOS <small>Vietourist Operating System</small></Link>
         <span className="bar">
-          <select className="soon" disabled title="Chọn công ty / đơn vị – sắp có"><option>Vietourist Holdings</option></select>
+          <ChonDonVi chuaLuu={() => chuaLuu.current} toast={toast} />
           <button type="button" className="soon" title="Sắp có" onClick={() => toast("Tìm kiếm: đang xây dựng")}>Tìm kiếm</button>
           <Link href="/#viec-cua-toi">Việc của tôi</Link>
           <Link href="/#cho-toi-duyet">Chờ tôi duyệt</Link>
