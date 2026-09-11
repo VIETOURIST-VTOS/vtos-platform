@@ -41,7 +41,12 @@ CUA_TAY = (
     "guide_assignments", "guide_rates", "hop_dong_khach", "incidents", "intake_runs", "invoices",
     "journal_entries", "journal_lines", "khoa_ghi", "labor_contracts", "lead_channel_stats",
     "leads", "leave_requests", "messages", "mkt_budget_lines", "mkt_budgets", "page_shifts",
-    "params", "partners", "payment_requests", "payroll_runs", "period_locks", "products",
+    "params", "partners", "payment_requests", "payroll_runs", "period_locks",
+    # VPM-5 – kế toán tự tay chia một khoản tiền cho nhiều booking ở màn hình /collections. Đây đúng
+    # là CỬA TAY chứ không phải bảng máy sinh: máy không biết khách định trả cho tour nào, chỉ người
+    # đọc nội dung chuyển khoản và nói chuyện với khách mới biết.
+    "phan_bo_tien",
+    "products",
     "projects", "quy_tac_hach_toan", "receipts", "retentions", "service_orders", "service_requests",
     "supplier_bank_changes", "suppliers", "thieu_gia_von", "tour_cost_lines", "tour_events",
     "tac_vu_tu_dong",
