@@ -50,8 +50,23 @@ aside.side .sub a.on{color:var(--navy);font-weight:600;border-color:var(--orange
 aside.side .sub .soon{display:block;padding:6px 12px 6px 26px;font-size:12.5px;color:var(--ink2);opacity:.5}
 aside.side .sub .soon i{font-size:10.5px;font-style:normal;background:var(--panel2);border-radius:8px;padding:1px 6px;margin-left:4px}
 .shell main{flex:1;min-width:0;margin:0}
+/* Thu thanh dọc (v1.1 §I.2: rộng 224–240px, thu còn 56–64px). Ở trạng thái thu chỉ còn một cột biểu
+   tượng; nhãn nhóm không mất mà chuyển vào title/aria-label, vì §I.2 đòi biểu tượng phải có chú
+   thích. Mục con ẩn hẳn khi thu: nhét chúng vào một cột 60px là một cột chữ vỡ dòng, không đọc được. */
+aside.side{transition:flex-basis .12s ease,width .12s ease}
+aside.side .thu-nut{display:block;margin:0 8px 4px auto;border:0;background:none;color:var(--ink2);
+  font-family:inherit;font-size:13px;line-height:1;cursor:pointer;padding:4px 6px;border-radius:6px}
+aside.side .thu-nut:hover{background:var(--panel2)}
+aside.side.thu{flex:0 0 60px;width:60px}
+aside.side.thu .thu-nut{margin:0 auto 4px}
+aside.side.thu .grp{text-align:center;padding:10px 0;font-size:18px}
+aside.side.thu .grp .bt{display:block;line-height:1.2}
+aside.side.thu .sub{display:none}
 @media (max-width:900px){.shell{display:block}.burger{display:inline-block}
-  aside.side{position:static;width:auto;flex:none;max-height:none;border-right:0;border-bottom:1px solid var(--line)}
+  aside.side,aside.side.thu{position:static;width:auto;flex:none;max-height:none;border-right:0;border-bottom:1px solid var(--line)}
+  aside.side .thu-nut{display:none}
+  aside.side.thu .grp{text-align:left;padding:9px 12px;font-size:12.5px}
+  aside.side.thu .sub{display:block}
   aside.side.hide{display:none}.shell main{max-width:none}}
 
 /* Lưới hai cột cho các form nhập tay (phiếu chi phí xe, đề xuất chi). Một cột trên điện thoại,

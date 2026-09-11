@@ -68,7 +68,10 @@ def _man_hinh() -> list:
         return []
     blk = _ma(SHELL.read_text(encoding="utf-8"))
     i = blk.index("export const GROUPS")
-    blk = blk[i: blk.index("const ROADMAP_ROLES")]
+    # Mốc kết thúc là MÃ THẬT (`export const CA_NHAN`), không phải chú thích: hàm _ma() ở trên
+    # xoá sạch chú thích trước khi tìm mốc. Trước 11/9/2026 mốc là tên hằng ROADMAP_ROLES; TC-2
+    # bỏ hằng ấy đi và phép thử này vỡ bằng ValueError không nói gì về nguyên nhân.
+    blk = blk[i: blk.index("export const CA_NHAN")]
     ra = []
     for _, href in re.findall(r'\["([^"]*)",\s*"([^"]*)"\]', blk):
         if href:
