@@ -139,13 +139,14 @@ def _trang_thai(con_lai: float, ngay: date | None, hom_nay: date, dong: bool = F
 def _nap_de_nghi_chi(db: Session, dem: list[int], hom_nay: date, cham: set) -> int:
     """payment_requests → trả NCC / hoàn khách / vận hành khác.
 
-    ĐỀ NGHỊ CHI KHÔNG CÓ NGÀY ĐẾN HẠN trong mô hình hiện tại – đã soát, không có cột nào. Nên mọi
-    dòng ở đây vào sổ với `ngay_cam_ket` RỖNG, và rơi vào rổ "Chưa đủ dữ liệu dự báo".
+    NGÀY ĐẾN HẠN lấy từ cột `payment_requests.ngay_den_han` – cửa nhập do VPM-17 dựng, người lập đề
+    nghị hoặc Kế toán gõ vào. Gõ rồi thì khoản ấy rời rổ "Chưa đủ dữ liệu dự báo" và xếp vào đúng cột
+    của bảng bốn mốc.
 
-    Đây KHÔNG phải lỗi của bộ nạp, và cũng không được vá bằng cách đoán một ngày (ví dụ "7 ngày sau
-    ngày duyệt"). Một ngày bịa ra sẽ xếp khoản tiền vào đúng một cột của bảng bốn mốc, trông như một
-    con số đã biết, và không ai còn nhớ nó là số đoán. Thà để nó nằm ở rổ chưa đủ dữ liệu, đếm được,
-    nhìn thấy, và ép người ta đi nhập ngày thật. Cột `ngay_den_han` cho bảng này là việc VPM-17.
+    CHƯA GÕ THÌ VẪN ĐỂ RỖNG, và vẫn KHÔNG đoán một ngày thay người dùng (ví dụ "7 ngày sau ngày
+    duyệt"). Một ngày bịa ra sẽ xếp khoản tiền vào đúng một cột, trông như một con số đã biết, và
+    không ai còn nhớ nó là số đoán. Thà để nó nằm ở rổ chưa đủ dữ liệu — đếm được, nhìn thấy, và có
+    một danh sách việc (`GET /payment-requests/thieu-ngay-den-han`) dẫn người ta tới đúng chỗ phải gõ.
     """
     n = 0
     for pr in db.execute(select(PaymentRequest).where(
@@ -157,8 +158,9 @@ def _nap_de_nghi_chi(db: Session, dem: list[int], hom_nay: date, cham: set) -> i
             "company_id": pr.company_id, "tour_id": pr.tour_id,
             "doi_tuong": pr.supplier_name, "noi_dung": pr.description,
             "tong_nghia_vu": tong, "da_tra": None,
-            "ngay_cam_ket": None, "ngay_du_kien_tra": None,
-            "trang_thai": "da_duyet" if pr.status in PR_DA_DUYET_CHUA_CHUYEN else "du_kien",
+            "ngay_cam_ket": pr.ngay_den_han, "ngay_du_kien_tra": pr.ngay_den_han,
+            "trang_thai": ("da_duyet" if pr.status in PR_DA_DUYET_CHUA_CHUYEN
+                           else _trang_thai(tong, pr.ngay_den_han, hom_nay)),
         }, dem, cham)
         n += 1
     return n
@@ -168,8 +170,11 @@ def _nap_don_dat_dich_vu(db: Session, dem: list[int], hom_nay: date, cham: set) 
     """service_orders → trả NCC, phần CHƯA lập đề nghị chi.
 
     Đề xuất mục III.4 đòi đúng chữ: lịch thanh toán NCC "gồm cả nghĩa vụ chưa lập đề nghị chi". Đây
-    là bộ nạp trả lời câu đó. `ngay_su_dung` KHÔNG phải ngày phải trả – nó là ngày dùng dịch vụ; để
-    nó vào ô ngày cam kết là nói sai. Nên ngày vẫn rỗng, chờ VPM-17.
+    là bộ nạp trả lời câu đó.
+
+    Ngày lấy từ `service_orders.ngay_den_han` (cửa nhập VPM-17), KHÔNG lấy `ngay_su_dung`: ngày dùng
+    dịch vụ là ngày khách lên xe, ngày đến hạn là ngày tiền rời tài khoản – hai ngày có thể cách nhau
+    hàng tháng, và lấy nhầm là xếp sai cột.
     """
     n = 0
     ncc = {s.id: s.ten for s in db.execute(select(Supplier)).scalars()}
@@ -182,8 +187,9 @@ def _nap_don_dat_dich_vu(db: Session, dem: list[int], hom_nay: date, cham: set) 
             "company_id": None, "tour_id": so.tour_id,
             "doi_tuong": ncc.get(so.supplier_id, ""), "noi_dung": so.noi_dung,
             "tong_nghia_vu": float(so.thanh_tien) if so.thanh_tien is not None else None,
-            "da_tra": None, "ngay_cam_ket": None, "ngay_du_kien_tra": None,
-            "trang_thai": "du_kien",
+            "da_tra": None,
+            "ngay_cam_ket": so.ngay_den_han, "ngay_du_kien_tra": so.ngay_den_han,
+            "trang_thai": _trang_thai(float(so.thanh_tien or 0), so.ngay_den_han, hom_nay),
             "ghi_chu": "Nghĩa vụ với nhà cung cấp CHƯA lập đề nghị chi",
         }, dem, cham)
         n += 1

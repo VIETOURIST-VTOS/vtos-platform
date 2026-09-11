@@ -193,7 +193,11 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
             "over_budget": r.over_budget, "two_signatures": r.two_signatures, "status": r.status, "next": nxt, "created_by": r.created_by, "created_at": r.created_at, "tp_by": r.tp_by,
             "kt_by": r.kt_by, "approved_by": r.approved_by, "signed_chutich": r.signed_chutich, "signed_tgd": r.signed_tgd, "approved_at": r.approved_at, "reject_reason": r.reject_reason,
             "paid_at": r.paid_at, "paid_ref": r.paid_ref, "paid_method": r.paid_method, "entry_ids": r.entry_ids,
-            "marketing_muc": r.marketing_muc, "campaign_id": r.campaign_id}
+            "marketing_muc": r.marketing_muc, "campaign_id": r.campaign_id,
+            # VPM-17. Rỗng là CHƯA AI NHẬP – màn hình phải hiện "Chưa có hạn", tuyệt đối không hiện
+            # ngày lập thay vào đó.
+            "ngay_den_han": r.ngay_den_han, "ngay_den_han_boi": r.ngay_den_han_boi,
+            "ngay_den_han_luc": r.ngay_den_han_luc}
 
 
 @router.get("/payment-requests")
@@ -221,6 +225,9 @@ class PRIn(BaseModel):
     # mới biết hạng mục nào sắp vượt, và chiến dịch mới có chi phí thực tế.
     marketing_muc: str = ""
     campaign_id: int | None = None
+    # VPM-17 – ngày đã hẹn trả nhà cung cấp. Để trống được: chưa hẹn được thì đừng đoán, khoản này
+    # sẽ nằm ở danh sách còn thiếu ngày cho tới khi người lập quay lại gõ.
+    ngay_den_han: date | None = None
 
 
 @router.post("/payment-requests", status_code=201)
@@ -267,3 +274,78 @@ def cashflow(tid: int, u: User = Depends(require_roles(*AC.COST_ROLES, mo_ta="d�
 @router.get("/cashflow")
 def cashflow_all(u: User = Depends(require_roles(*MANAGERS, "ketoan", "nv_dh")), db: Session = Depends(get_db)):
     return [O.tour_cashflow(db, t) for t in db.execute(select(Tour).where(Tour.status.in_(["da_duyet", "ket_thuc", "da_dong_so", "kt_xac_nhan"])).order_by(Tour.start_date)).scalars()]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VPM-17 – CỬA NHẬP NGÀY ĐẾN HẠN CHO ĐỀ NGHỊ CHI
+#
+# Hai cửa, và cả hai đều cần thiết:
+#   · cửa SỬA  – ngày hẹn với nhà cung cấp thay đổi là chuyện thường, và hàng nghìn đề nghị chi cũ
+#                lập trước 11/9/2026 không có ngày nào cả; không có cửa sửa thì chúng nằm mãi ở rổ
+#                "Chưa đủ dữ liệu dự báo" và bảng dòng tiền thiếu đúng phần quá khứ.
+#   · cửa ĐẾM  – danh sách khoản CÒN THIẾU ngày. Một con số thiếu mà không ai nhìn thấy thì không ai
+#                đi nhập. Danh sách này là việc của người lập, không phải việc của máy đoán hộ.
+#
+# Vai trò: đúng bảng "Cửa nhập và chủ quản số liệu" mục III.4 của Đề xuất chỉnh sửa giao diện v1.1 —
+# dòng "Trả nhà cung cấp" ghi bộ phận nhập là ĐIỀU HÀNH + KẾ TOÁN. Lấy nguyên danh sách vai trò đã
+# khai cho việc LẬP đề nghị chi, cộng Kế toán. Lane này không tự nghĩ ra vai trò mới.
+# ══════════════════════════════════════════════════════════════════════════════
+
+SUA_NGAY_DEN_HAN = ("nv_dh", "tp_dh", "ptgd_mkt", "hcns", "cntt",
+                    "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "ketoan")
+
+
+class NgayDenHanIn(BaseModel):
+    # Cho phép GỠ ngày (gửi rỗng): nhập nhầm thì phải sửa lại được về "chưa biết", chứ không bị kẹt
+    # với một ngày sai mà không xoá nổi. Gỡ xong khoản ấy quay lại danh sách còn thiếu — đúng chỗ của nó.
+    ngay_den_han: date | None = None
+    ly_do: str = ""
+
+
+@router.put("/payment-requests/{rid}/ngay-den-han")
+def dat_ngay_den_han(rid: int, data: NgayDenHanIn,
+                     u: User = Depends(require_roles(*SUA_NGAY_DEN_HAN, mo_ta="ngày đến hạn đề nghị chi")),
+                     db: Session = Depends(get_db)):
+    """Gõ hoặc sửa ngày phải trả của một đề nghị chi."""
+    r = db.get(PaymentRequest, rid)
+    if not r: raise HTTPException(404, "Không có đề nghị chi")
+    # Đã chi xong thì ngày đến hạn là chuyện của quá khứ; sửa nó chỉ làm sai lại một việc đã xong.
+    if r.status in ("da_chi", "tu_choi"):
+        raise HTTPException(422, f"Đề nghị chi {r.code} đã ở trạng thái “{r.status}” – không đổi ngày đến hạn nữa")
+    truoc = r.ngay_den_han
+    r.ngay_den_han = data.ngay_den_han
+    r.ngay_den_han_boi = u.username if data.ngay_den_han else ""
+    r.ngay_den_han_luc = datetime.now() if data.ngay_den_han else None
+    R.audit(db, u.username, u.role, "dat_ngay_den_han_de_nghi_chi", f"pr:{r.code}",
+            before={"ngay_den_han": str(truoc or "")},
+            after={"ngay_den_han": str(data.ngay_den_han or ""), "ly_do": data.ly_do[:200]})
+    db.commit()
+    if data.ngay_den_han is None:
+        return {"ngay_den_han": None,
+                "message": f"Đã gỡ ngày đến hạn của {r.code} – khoản này quay lại danh sách chưa có hạn"}
+    return {"ngay_den_han": r.ngay_den_han,
+            "message": f"{r.code}: hạn trả {data.ngay_den_han:%d/%m/%Y}"}
+
+
+@router.get("/payment-requests/thieu-ngay-den-han")
+def thieu_ngay_den_han(u: User = Depends(require_roles(*AC.PAYMENT_REQUEST_ROLES,
+                                                       mo_ta="đề nghị chi thiếu ngày đến hạn")),
+                       db: Session = Depends(get_db)):
+    """Danh sách việc: đề nghị chi đang chờ chi mà CHƯA ai gõ ngày phải trả.
+
+    Đây là danh sách khiến con số thiếu hiện ra thay vì im lặng. Mỗi dòng ở đây là một khoản tiền
+    hệ thống biết là phải trả nhưng không biết trả NGÀY NÀO – nên không xếp được vào cột nào của bảng
+    dòng tiền bốn mốc.
+    """
+    q = select(PaymentRequest).where(
+        PaymentRequest.status.in_(("cho_tp", "cho_kt", "cho_duyet", "cho_chi")),
+        PaymentRequest.ngay_den_han.is_(None)).order_by(desc(PaymentRequest.amount))
+    q = PV.loc(q, PaymentRequest, u)          # P6: phạm vi pháp nhân của phiên đăng nhập
+    ds = list(db.execute(q.limit(300)).scalars())
+    return {"so_khoan": len(ds),
+            "tong_tien": float(round(sum((r.amount or 0) for r in ds))),
+            "chi_tiet": [{"id": r.id, "code": r.code, "category": r.category,
+                          "supplier_name": r.supplier_name, "amount": r.amount,
+                          "description": r.description, "status": r.status,
+                          "created_by": r.created_by, "created_at": r.created_at,
+                          "tour_id": r.tour_id} for r in ds]}

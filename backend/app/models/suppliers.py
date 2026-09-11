@@ -101,6 +101,16 @@ class ServiceOrder(Base):
     status: Mapped[str] = mapped_column(String(20), default="nhap")
     xac_nhan_ncc: Mapped[str] = mapped_column(String(200), default="")   # số/ảnh xác nhận của NCC
     payment_request_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # VPM-17 – ngày đến hạn phải trả nhà cung cấp cho đơn này. KHÁC `ngay_su_dung`: ngày dùng dịch vụ
+    # là ngày khách lên xe, ngày đến hạn là ngày tiền phải rời tài khoản. Hai ngày ấy có thể cách nhau
+    # hàng tháng, và lấy ngày dùng thay ngày trả là xếp sai cột trên bảng dòng tiền.
+    #
+    # Đơn đã được NCC xác nhận mà CHƯA lập đề nghị chi vẫn là một nghĩa vụ thật – mục III.4 của đề
+    # xuất đòi bảng dòng tiền phải gồm cả những khoản ấy. Không có ngày ở đây thì chúng nằm mãi trong
+    # rổ "Chưa đủ dữ liệu dự báo". RỖNG = chưa ai nhập, không phải không có hạn.
+    ngay_den_han: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    ngay_den_han_boi: Mapped[str] = mapped_column(String(50), default="")
+    ngay_den_han_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     note: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     created_by: Mapped[str] = mapped_column(String(50), default="")

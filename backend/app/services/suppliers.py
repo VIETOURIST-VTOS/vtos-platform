@@ -121,6 +121,11 @@ def tao_don(db: Session, data: dict, boi: str) -> ServiceOrder:
                      loai=data.get("loai") or s.loai, noi_dung=data["noi_dung"][:300],
                      ngay_su_dung=data.get("ngay_su_dung"), so_luong=sl, don_vi=data.get("don_vi") or "",
                      don_gia=dg, thanh_tien=tt, note=data.get("note") or "", created_by=boi)
+    # VPM-17 – ngày đến hạn trả nếu người đặt đã thoả thuận được. Rỗng thì để rỗng, không lấy
+    # `ngay_su_dung` thay: ngày dùng dịch vụ không phải ngày trả tiền.
+    if data.get("ngay_den_han"):
+        d.ngay_den_han = data["ngay_den_han"]
+        d.ngay_den_han_boi, d.ngay_den_han_luc = boi, datetime.now()
     db.add(d); db.flush()
     return d
 

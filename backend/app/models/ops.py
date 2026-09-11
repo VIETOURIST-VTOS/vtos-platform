@@ -76,5 +76,21 @@ class PaymentRequest(Base):
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     paid_ref: Mapped[str] = mapped_column(String(120), default="")        # mã giao dịch ngân hàng / SePay
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)  # pháp nhân chủ quản – rỗng là CHƯA XÁC ĐỊNH, không mặc định về công ty mẹ
+    # VPM-17 – NGÀY ĐẾN HẠN PHẢI TRẢ. Ngày đã hẹn với nhà cung cấp / người thụ hưởng, KHÔNG phải ngày
+    # lập và cũng không phải ngày duyệt.
+    #
+    # Vì sao cột này sinh ra: bảng dòng tiền bốn mốc xếp mỗi khoản vào một cột theo NGÀY. Đề nghị chi
+    # trước đây không có ngày nào cả, nên mọi khoản chi đang chờ đều rơi vào rổ "Chưa đủ dữ liệu dự
+    # báo" – đếm được, nhưng không xếp được vào cột nào. Sổ nghĩa vụ (VPM-11) CỐ Ý không đoán một ngày
+    # thay người dùng: ngày bịa ra trông y hệt ngày thật trên màn hình lãnh đạo.
+    #
+    # RỖNG nghĩa là CHƯA AI NHẬP – khác hẳn "không có hạn". Không đặt mặc định, không tự suy từ ngày
+    # lập: một khoản chi có hạn 5 ngày và một khoản chưa ai hỏi hạn là hai việc khác nhau, và chỉ
+    # người lập đề nghị mới biết mình đã hẹn nhà cung cấp ngày nào.
+    ngay_den_han: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    # Người gõ ngày và lúc gõ. Ngày đến hạn sửa được sau khi lập (thương lượng lại với NCC là chuyện
+    # thường), nên phải biết ai gõ con số đang nằm đó.
+    ngay_den_han_boi: Mapped[str] = mapped_column(String(50), default="")
+    ngay_den_han_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     paid_method: Mapped[str] = mapped_column(String(20), default="")      # chuyen_khoan / tien_mat
     entry_ids: Mapped[list] = mapped_column(JSON, default=list)

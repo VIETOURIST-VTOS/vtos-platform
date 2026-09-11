@@ -87,6 +87,24 @@ function NhaCungCap() {
     catch (e) { toast(errMsg(e), true); }
   };
 
+  // VPM-17 – gõ hoặc sửa ngày phải trả NCC. Gửi rỗng = gỡ ngày, đơn quay lại danh sách chưa có hạn.
+  const datNgayDon = async (d: any) => {
+    const cu = d.ngay_den_han ? String(d.ngay_den_han).slice(0, 10) : "";
+    const v = prompt(`Ngày phải trả NCC cho đơn ${d.code} (dd/mm/yyyy hoặc yyyy-mm-dd).\nĐể TRỐNG rồi bấm OK = gỡ ngày.`, cu);
+    if (v === null) return;
+    const t = v.trim();
+    let iso: string | null = null;
+    if (t) {
+      const vn = t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+      iso = vn ? `${vn[3]}-${vn[2].padStart(2, "0")}-${vn[1].padStart(2, "0")}` : t;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) { toast("Ngày không hợp lệ – gõ dd/mm/yyyy", true); return; }
+    }
+    try { const r = await api<any>(`/ncc/don/${d.id}/ngay-den-han`, { method: "PUT", json: { ngay_den_han: iso } });
+      toast(r.message); setDon(await api("/ncc/don")); }
+    catch (e) { toast(errMsg(e), true); }
+  };
+
+
   if (!dm) return <p className="muted">Đang tải…</p>;
   return (<>
     <h1>Nhà cung cấp & đặt dịch vụ</h1>
@@ -186,6 +204,9 @@ function NhaCungCap() {
               {tours.map((t: any) => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}
             </select></label>
           <label>Ngày sử dụng<input type="date" value={formDon.ngay_su_dung || ""} onChange={(e) => setFormDon({ ...formDon, ngay_su_dung: e.target.value })} /></label>
+          <label>Ngày phải trả NCC
+            <input type="date" value={formDon.ngay_den_han || ""} onChange={(e) => setFormDon({ ...formDon, ngay_den_han: e.target.value })} />
+            <span className="muted">Khác ngày sử dụng: ngày dùng là lúc khách lên xe, ngày phải trả là lúc tiền rời tài khoản. Chưa thoả thuận được thì để trống — đừng lấy ngày dùng thay.</span></label>
           <label>Số lượng<input type="number" value={formDon.so_luong ?? 1} onChange={(e) => setFormDon({ ...formDon, so_luong: Number(e.target.value) })} /></label>
           <label>Đơn vị<input value={formDon.don_vi || ""} onChange={(e) => setFormDon({ ...formDon, don_vi: e.target.value })} placeholder="phòng / suất / vé" /></label>
           <label>Đơn giá (đ)<input type="number" value={formDon.don_gia ?? 0} onChange={(e) => setFormDon({ ...formDon, don_gia: soTien(e.target.value) })} /></label>
@@ -201,12 +222,15 @@ function NhaCungCap() {
       <div className="panel wrap"><h2>Đơn đặt dịch vụ — tổng {n(don?.tong_tien)} đ</h2>
         {canWrite && !formDon && <button className="act teal" style={{ marginBottom: 10 }}
           onClick={() => setFormDon({ so_luong: 1, don_gia: 0 })}>+ Đặt dịch vụ</button>}
-        <table><thead><tr><th>Mã</th><th>Nhà cung cấp</th><th>Tour</th><th>Nội dung</th><th>Ngày dùng</th>
+        <table><thead><tr><th>Mã</th><th>Nhà cung cấp</th><th>Tour</th><th>Nội dung</th><th>Ngày dùng</th><th>Hạn trả</th>
           <th>SL</th><th>Đơn giá</th><th>Thành tiền</th><th>Trạng thái</th>{canWrite && <th></th>}</tr></thead>
           <tbody>{don?.rows?.length ? don.rows.map((d: any) => <tr key={d.id}>
             <td className="muted">{d.code}</td><td>{d.ncc}</td><td className="muted">{d.tour}</td>
             <td>{d.noi_dung}</td>
             <td className="muted">{d.ngay_su_dung ? fmtD(d.ngay_su_dung) : "—"}</td>
+            <td>{d.ngay_den_han ? <b>{fmtD(d.ngay_den_han)}</b> : <Tag cls="warn">Chưa có hạn</Tag>}
+              {canWrite && d.status !== "huy" && <div><button className="act grey" style={{ margin: 0, padding: "1px 6px", fontSize: 11 }}
+                onClick={() => datNgayDon(d)}>{d.ngay_den_han ? "Sửa" : "Gõ hạn"}</button></div>}</td>
             <td className="num">{d.so_luong} {d.don_vi}</td>
             <td className="num">{n(d.don_gia)}</td>
             <td className="num"><b>{n(d.thanh_tien)}</b></td>

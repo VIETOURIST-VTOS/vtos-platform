@@ -1,8 +1,8 @@
 """Nhà cung cấp & đặt dịch vụ – mục còn trống của nhóm Điều hành."""
-from datetime import date
+from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.db.session import get_db
@@ -173,6 +173,10 @@ class DonIn(BaseModel):
     loai: str = ""
     noi_dung: str
     ngay_su_dung: date | None = None
+    # VPM-17 – ngày tiền phải rời tài khoản. KHÁC `ngay_su_dung` ở trên: ngày dùng dịch vụ là ngày
+    # khách lên xe, hai ngày có thể cách nhau hàng tháng. Để trống được, và trống thì đơn hiện ở
+    # danh sách còn thiếu ngày chứ không bị gán ngày dùng thay thế.
+    ngay_den_han: date | None = None
     so_luong: float = 1
     don_vi: str = ""
     don_gia: float | None = None
@@ -208,7 +212,9 @@ def ds_don(tour_id: int | None = None, supplier_id: int | None = None, status: s
                       "ngay_su_dung": d.ngay_su_dung, "so_luong": d.so_luong, "don_vi": d.don_vi,
                       "don_gia": d.don_gia, "thanh_tien": d.thanh_tien, "status": d.status,
                       "status_ten": TRANG_THAI_DON.get(d.status, d.status),
-                      "xac_nhan_ncc": d.xac_nhan_ncc, "boi": d.created_by} for d in rows],
+                      "xac_nhan_ncc": d.xac_nhan_ncc, "boi": d.created_by,
+                      "ngay_den_han": d.ngay_den_han, "ngay_den_han_boi": d.ngay_den_han_boi}
+                     for d in rows],
             "tong_tien": float(round(sum((d.thanh_tien or 0) for d in rows if d.status != "huy")))}
 
 
@@ -229,3 +235,61 @@ def chuyen_trang_thai(did: int, data: ChuyenTrangThaiIn, u: User = Depends(requi
     R.audit(db, u.username, u.role, "trang_thai_don_dich_vu", f"don:{d.code}", after=data.model_dump(mode="json"))
     db.commit()
     return kq
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VPM-17 – CỬA NHẬP NGÀY ĐẾN HẠN CHO ĐƠN ĐẶT DỊCH VỤ
+#
+# Đơn đã được nhà cung cấp xác nhận mà CHƯA lập đề nghị chi vẫn là nghĩa vụ thật – mục III.4 của đề
+# xuất đòi bảng dòng tiền gồm cả "nghĩa vụ chưa lập đề nghị chi". Không có ngày ở đây thì chúng nằm
+# mãi trong rổ "Chưa đủ dữ liệu dự báo".
+#
+# Vai trò: WRITE của phân hệ này là Điều hành (người đặt dịch vụ), cộng Kế toán — đúng dòng
+# "Trả nhà cung cấp · Điều hành + Kế toán" ở bảng cửa nhập mục III.4. Giống hệt cửa tạo đơn và cửa
+# chuyển trạng thái ngay trên, không mở rộng thêm vai trò nào.
+# ══════════════════════════════════════════════════════════════════════════════
+
+class NgayDenHanDonIn(BaseModel):
+    # Gửi rỗng = gỡ ngày, quay về "chưa biết". Nhập nhầm phải sửa lại được.
+    ngay_den_han: date | None = None
+    ly_do: str = ""
+
+
+@router.put("/don/{did}/ngay-den-han")
+def dat_ngay_den_han_don(did: int, data: NgayDenHanDonIn,
+                         u: User = Depends(require_roles(*WRITE, "ketoan")),
+                         db: Session = Depends(get_db)):
+    """Gõ hoặc sửa ngày phải trả của một đơn đặt dịch vụ."""
+    d = db.get(ServiceOrder, did)
+    if d is None: raise HTTPException(404, "Không có đơn đặt dịch vụ")
+    if d.status == "huy":
+        raise HTTPException(422, f"Đơn {d.code} đã huỷ – không đặt ngày đến hạn")
+    truoc = d.ngay_den_han
+    d.ngay_den_han = data.ngay_den_han
+    d.ngay_den_han_boi = u.username if data.ngay_den_han else ""
+    d.ngay_den_han_luc = datetime.now() if data.ngay_den_han else None
+    R.audit(db, u.username, u.role, "dat_ngay_den_han_don_dich_vu", f"don:{d.code}",
+            before={"ngay_den_han": str(truoc or "")},
+            after={"ngay_den_han": str(data.ngay_den_han or ""), "ly_do": data.ly_do[:200]})
+    db.commit()
+    if data.ngay_den_han is None:
+        return {"ngay_den_han": None,
+                "message": f"Đã gỡ ngày đến hạn của {d.code} – đơn này quay lại danh sách chưa có hạn"}
+    return {"ngay_den_han": d.ngay_den_han,
+            "message": f"{d.code}: hạn trả {data.ngay_den_han:%d/%m/%Y}"}
+
+
+@router.get("/don/thieu-ngay-den-han")
+def don_thieu_ngay_den_han(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Đơn dịch vụ đã thành nghĩa vụ (NCC xác nhận / đã dùng) mà chưa ai gõ ngày phải trả."""
+    ten = {s.id: s.ten for s in db.execute(select(Supplier)).scalars()}
+    tours = {t.id: t.code for t in db.execute(select(Tour)).scalars()}
+    ds = list(db.execute(select(ServiceOrder).where(
+        ServiceOrder.status.in_(("da_xac_nhan", "da_su_dung")),
+        ServiceOrder.ngay_den_han.is_(None)).order_by(desc(ServiceOrder.thanh_tien)).limit(300)).scalars())
+    return {"so_khoan": len(ds),
+            "tong_tien": float(round(sum((d.thanh_tien or 0) for d in ds))),
+            "chi_tiet": [{"id": d.id, "code": d.code, "ncc": ten.get(d.supplier_id, ""),
+                          "tour": tours.get(d.tour_id, ""), "noi_dung": d.noi_dung,
+                          "thanh_tien": d.thanh_tien, "ngay_su_dung": d.ngay_su_dung,
+                          "status": d.status, "boi": d.created_by} for d in ds]}

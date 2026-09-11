@@ -214,6 +214,12 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
                        supplier_bank=data.get("supplier_bank", ""), amount=float(data["amount"]), description=data["description"], has_document=bool(data.get("has_document")),
                        document_ref=data.get("document_ref", ""), has_invoice=bool(data.get("has_invoice")), created_by=u.username,
                        company_id=t.company_id if t else None)
+    # VPM-17 – ngày đến hạn, nếu người lập đã hẹn được với nhà cung cấp. Rỗng thì để rỗng: khoản này
+    # sẽ hiện ở danh sách "đề nghị chi chưa có ngày đến hạn" để người lập quay lại gõ, chứ không bị
+    # gán một ngày đoán.
+    if data.get("ngay_den_han"):
+        r.ngay_den_han = data["ngay_den_han"]
+        r.ngay_den_han_boi, r.ngay_den_han_luc = u.username, datetime.now()
     # R3: xếp cấp duyệt
     if cat == "marketing":
         r.marketing_muc = data.get("marketing_muc", "") or ""
