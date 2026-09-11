@@ -44,12 +44,23 @@ def init_terms(db: Session, b: Booking, t: Tour) -> None:
     b.deposit_pct = pct
     b.cancel_deadline = datetime.combine(t.start_date - timedelta(days=days), time(17, 0))
     refresh_status(b)
+    # VPM-7 – đặt hạn giữ chỗ ngay từ đây. Đặt muộn hơn (để robot lo) nghĩa là trong khoảng thời gian
+    # ấy booking giữ chỗ không có hạn, và không ai nhìn màn hình biết được nó sẽ hết hạn lúc nào.
+    from app.services import giu_cho as GC
+    if b.id:
+        GC.dat_han(db, b, t)
+    else:
+        b.giu_cho_den = GC.han_mac_dinh(db, b, t)
 
 
 def booking_view(b: Booking) -> dict:
     return {"deposit_pct": b.deposit_pct, "deposit_due": deposit_due(b), "pmt_status": pmt_status_of(b), "cancel_deadline": b.cancel_deadline,
             "locked": b.locked, "lock_reason": b.lock_reason, "cancelled": b.cancelled, "cancel_reason": b.cancel_reason, "cancelled_at": b.cancelled_at, "cancel_charge": b.cancel_charge,
-            "past_deadline": bool(b.cancel_deadline and datetime.now() > b.cancel_deadline and not b.cancelled)}
+            "past_deadline": bool(b.cancel_deadline and datetime.now() > b.cancel_deadline and not b.cancelled),
+            # VPM-7 – giữ chỗ có thời hạn. `giu_cho_het` là "chỗ đã trả về tour", KHÔNG phải "booking đã huỷ".
+            "giu_cho_den": b.giu_cho_den, "giu_cho_het": b.giu_cho_het, "giu_cho_het_luc": b.giu_cho_het_luc,
+            "gia_han_lan": b.gia_han_lan,
+            "qua_han_giu_cho": bool(b.giu_cho_den and datetime.now() > b.giu_cho_den and not b.giu_cho_het and not b.cancelled)}
 
 
 # ---------- cập nhật thông tin khách, khóa / mở khóa ----------
@@ -235,6 +246,8 @@ def robot_check(db: Session) -> dict:
             db.add(Alert(kind=kind, level=level, ref=ref, message=msg, to_roles=roles)); made += 1
 
     locked = auto_lock(db)
+    from app.services import giu_cho as GC
+    gc = GC.het_han_giu_cho(db)
     han_coc = int(R.get_param(db, "han_coc_gio"))
     q = select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.cancelled == False, Tour.start_date >= today - timedelta(days=1), Tour.status.in_(["da_duyet", "cho_duyet", "cho_xac_nhan"]))
     for b in db.execute(q).scalars():
@@ -250,4 +263,5 @@ def robot_check(db: Session) -> dict:
         if left < 0: add("bao_luu_het_han", "red", f"baoluu:{rt.code}", f"Bảo lưu {rt.code} ({rt.customer_name}, {(rt.remaining or 0):,.0f} đ) đã hết hạn {rt.expires_on:%d/%m} – hoàn tiền hoặc hủy bảo lưu", "tp_dh,gd_kd,ketoan")
         elif left <= 7: add("bao_luu_sap_het_han", "warn", f"baoluu:{rt.code}", f"Bảo lưu {rt.code} ({rt.customer_name}, {(rt.remaining or 0):,.0f} đ) hết hạn {rt.expires_on:%d/%m} – liên hệ khách chọn tour", "nv_kd,tp_dh")
     db.commit()
-    return {"locked": locked, "new_alerts": made}
+    return {"locked": locked, "new_alerts": made,
+            "giu_cho_dat_han": gc["dat_han"], "giu_cho_het_han": gc["het_han"]}

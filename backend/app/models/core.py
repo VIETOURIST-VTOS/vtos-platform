@@ -390,6 +390,13 @@ class Booking(Base):
     service_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cost_amount: Mapped[float | None] = mapped_column(TIEN)            # giá vốn NCC của dịch vụ lẻ, nullable=True
     supplier_name: Mapped[str] = mapped_column(String(160), default="")
+    # VPM-7 – giữ chỗ có thời hạn. Xem app/models/giu_cho.py để biết vì sao.
+    # `giu_cho_den` rỗng nghĩa là CHƯA ĐẶT HẠN (booking cũ có từ trước 11/9/2026), không phải "hết hạn
+    # ngay". Robot đặt hạn cho chúng ở lần chạy đầu; ở giữa hai thời điểm ấy chúng vẫn giữ chỗ bình thường.
+    giu_cho_den: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    giu_cho_het: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
+    giu_cho_het_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    gia_han_lan: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     tour: Mapped["Tour"] = relationship(back_populates="bookings")
     sales: Mapped["User"] = relationship(foreign_keys=[sales_id])
 

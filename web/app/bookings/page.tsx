@@ -19,17 +19,26 @@ function Bookings() {
   const PAGE = 300;
   const [ret, setRet] = useState<any>({ summary: {}, rows: [] }); const [rst, setRst] = useState("hieu_luc");
   const [edit, setEdit] = useState<any>(null); const [cancel, setCancel] = useState<any>(null); const [apply, setApply] = useState<any>(null); const [cands, setCands] = useState<any[]>([]);
+  // VPM-7 – giữ chỗ có thời hạn. `gcTong` là số chỗ đang bị giữ mà chưa có đồng nào; đó là con số
+  // người điều hành cần thấy trước khi mở thêm chỗ hay từ chối khách.
+  const [gcTong, setGcTong] = useState<any>(null); const [gc, setGc] = useState<any>(null); const [gcBang, setGcBang] = useState<any>(null);
   const openApply = (r: any) => { setApply(r); api(`/bookings?status=due&limit=50&q=${encodeURIComponent(r.customer_phone || r.customer_name)}`).then((x) => setCands(x.filter((b: any) => b.id !== r.booking_id))).catch(() => setCands([])); };
   const load = useCallback(() => {
     api(`/bookings?limit=${PAGE}&offset=0&q=${encodeURIComponent(q)}&status=${st}&mang=${mang}`).then((x) => { setRows(x); setPage(0); }).catch((e) => toast(errMsg(e), true));
     api(`/bookings/count?q=${encodeURIComponent(q)}&status=${st}&mang=${mang}`).then(setCnt).catch(() => setCnt({ total: null, filtered: null }));
     api(`/retentions?status=${rst}`).then(setRet).catch(() => {});
+    api(`/bookings/giu-cho/tong-hop`).then(setGcTong).catch(() => setGcTong(null));
   }, [q, st, rst, mang, toast]);      // thiếu `mang` ở đây là đổi menu mà danh sách không tải lại
   const more = async () => {
     try { const x = await api(`/bookings?limit=${PAGE}&offset=${(page + 1) * PAGE}&q=${encodeURIComponent(q)}&status=${st}&mang=${mang}`); setRows((r) => [...r, ...x]); setPage((p) => p + 1); } catch (e) { toast(errMsg(e), true); }
   };
   useEffect(() => { load(); }, [load]);
   const isDH = ["nv_dh", "tp_dh"].includes(role), canUnlock = ["tp_dh", "gd_kd", "cntt", "tgd"].includes(role), canRt = ["nv_dh", "tp_dh", "ketoan"].includes(role), canRtCancel = ["tp_dh", "gd_kd", "tgd", "ketoan"].includes(role);
+  const canGiuCho = ["nv_dh", "tp_dh", "gd_kd", "tp_kd", "cntt", "tgd"].includes(role);
+  const moGiuCho = async (b: any) => {
+    setGc(b); setGcBang(null);
+    try { setGcBang(await api(`/bookings/${b.id}/giu-cho`)); } catch (e) { toast(errMsg(e), true); }
+  };
   const run = async (path: string, json: any, ok?: string) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || ok || "Xong"); load(); return true; } catch (e) { toast(errMsg(e), true); return false; } };
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
@@ -39,6 +48,21 @@ function Bookings() {
   const doCancel = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
     if (await run(`/bookings/${cancel.id}/cancel`, { reason: d.reason, charge: soTien(d.charge), retain: d.mode === "retain", expires_days: d.expires_days ? Number(d.expires_days) : null })) setCancel(null);
+  };
+  const doGiaHan = async (e: React.FormEvent) => {
+    e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
+    try {
+      const r = await api(`/bookings/${gc.id}/giu-cho/gia-han`, { method: "POST", json: { den: d.den, ly_do: d.ly_do } });
+      toast(r.message);
+      // Cảnh báo gia hạn nhiều lần hiện RIÊNG, không trộn vào câu báo thành công: người dùng cần thấy
+      // rằng việc đã xong VÀ có một điều đáng lưu ý – hai chuyện khác nhau.
+      if (r.canh_bao) toast(r.canh_bao, true);
+      setGc(null); load();
+    } catch (x) { toast(errMsg(x), true); }
+  };
+  const doKhoiPhuc = async (b: any) => {
+    const n = prompt(`Khôi phục giữ chỗ cho ${b.code}? Ghi lý do (khách trả tiền muộn, Điều hành quyết định…)`);
+    if (n) run(`/bookings/${b.id}/giu-cho/khoi-phuc`, { note: n });
   };
   const doApply = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
@@ -58,7 +82,7 @@ function Bookings() {
       </div>
       <h2 style={{ marginTop: 10 }}>Booking – đang xem {rows.length}{cnt.filtered != null && <> / thỏa bộ lọc <b>{cnt.filtered.toLocaleString("vi-VN")}</b> / tổng toàn hệ thống <b>{cnt.total.toLocaleString("vi-VN")}</b></>}</h2>
       {cnt.filtered != null && rows.length < cnt.filtered && <p className="muted">Đang hiển thị {rows.length} dòng mới nhất – <b>không dùng số này làm tổng</b>. <button className="act grey" style={{ margin: 0 }} onClick={more}>Tải thêm {PAGE} dòng</button></p>}
-      <table><thead><tr><th>Mã</th><th>Tour · KH</th><th>Khách</th><th className="num">Pax</th><th className="num">Tiền</th><th className="num">Cọc {""}</th><th className="num">Đã thu</th><th className="num">Còn lại</th><th>Trạng thái</th><th>Deadline hủy chỗ</th><th>Khóa</th><th>Sale</th><th></th></tr></thead>
+      <table><thead><tr><th>Mã</th><th>Tour · KH</th><th>Khách</th><th className="num">Pax</th><th className="num">Tiền</th><th className="num">Cọc {""}</th><th className="num">Đã thu</th><th className="num">Còn lại</th><th>Trạng thái</th><th>Deadline hủy chỗ</th><th>Giữ chỗ</th><th>Khóa</th><th>Sale</th><th></th></tr></thead>
         <tbody>{rows.length ? rows.map((b) => { const [pl, pc] = PMT[b.pmt_status] || [b.pmt_status, ""]; return <tr key={b.id} style={{ opacity: b.cancelled ? 0.55 : 1 }}>
           <td><b>{b.code}</b><div className="muted">{fmtDT(b.created_at)}</div></td>
           <td><Link href={`/tours/${b.tour_id}`}>{b.tour_code}</Link><div className="muted">{fmtD(b.tour_start)}</div></td>
@@ -68,14 +92,41 @@ function Bookings() {
           <td className="num">{b.cancelled ? "–" : b.due > 0 ? <Tag cls="warn">{vnd(b.due)}</Tag> : <Tag cls="ok">Đủ</Tag>}</td>
           <td><Tag cls={pc}>{pl}</Tag></td>
           <td style={{ color: b.past_deadline && b.pmt_status !== "PAID" ? "var(--red)" : undefined }}>{fmtDT(b.cancel_deadline)}{b.past_deadline && <div className="muted">đã qua</div>}</td>
+          <td>{b.cancelled ? <span className="muted">–</span>
+            : b.giu_cho_het ? <><Tag cls="red">đã trả chỗ</Tag><div className="muted">hết hạn {fmtDT(b.giu_cho_het_luc)} · booking vẫn còn</div></>
+            : <><span style={{ color: b.qua_han_giu_cho ? "var(--red)" : undefined }}>{fmtDT(b.giu_cho_den)}</span>
+                {b.qua_han_giu_cho && <div className="muted">quá hạn – robot sẽ trả chỗ</div>}
+                {b.gia_han_lan > 0 && <div className="muted">đã gia hạn {b.gia_han_lan} lần</div>}</>}</td>
           <td>{b.locked ? <Tag cls="navy" >🔒 {b.lock_reason}</Tag> : <span className="muted">mở</span>}</td>
           <td>{b.sales_name}</td>
           <td style={{ whiteSpace: "nowrap" }}>
             {!b.cancelled && !b.locked && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setEdit(b)}>sửa khách</button>}{" "}
             {!b.cancelled && b.locked && canUnlock && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => { const r = prompt(`Lý do mở khóa ${b.code}?`); if (r) run(`/bookings/${b.id}/unlock`, { note: r }); }}>mở khóa</button>}{" "}
-            {!b.cancelled && isDH && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setCancel(b)}>hủy</button>}
-          </td></tr>; }) : <tr><td colSpan={13} className="muted">Không có booking theo bộ lọc.</td></tr>}</tbody></table>
+            {!b.cancelled && isDH && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setCancel(b)}>hủy</button>}{" "}
+            {!b.cancelled && canGiuCho && !b.giu_cho_het && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => moGiuCho(b)}>gia hạn giữ chỗ</button>}{" "}
+            {!b.cancelled && canGiuCho && b.giu_cho_het && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => doKhoiPhuc(b)}>khôi phục giữ chỗ</button>}
+          </td></tr>; }) : <tr><td colSpan={14} className="muted">Không có booking theo bộ lọc.</td></tr>}</tbody></table>
     </div>
+
+    {gcTong && <p className="muted">Giữ chỗ: <b>{gcTong.cho_dang_giu_chua_thu}</b> chỗ đang giữ mà chưa thu đồng nào ·
+      <b> {gcTong.booking_sap_het_han_12h}</b> booking hết hạn trong 12 giờ tới ·
+      <b> {gcTong.cho_da_tra_ve}</b> chỗ đã trả về tour. Hết hạn giữ chỗ <b>không phải</b> hủy booking – khách trả tiền thì khôi phục nếu còn chỗ.</p>}
+
+    {gc && <form onSubmit={doGiaHan} className="panel"><h2>Gia hạn giữ chỗ – {gc.code} ({gc.tour_code}) · {gc.pax} chỗ</h2>
+      {gcBang && <p className="muted">Hạn hiện tại {fmtDT(gcBang.giu_cho_den)} · đã thu {vnd(gcBang.da_thu)} · đã gia hạn {gcBang.gia_han_lan} lần ·
+        tour còn trống {gcBang.cho_con_trong} chỗ. Không được muộn hơn deadline hủy chỗ {fmtDT(gcBang.cancel_deadline)}.</p>}
+      {gcBang && gcBang.gia_han_lan >= 3 && <Gate ok={false}>Booking này đã gia hạn {gcBang.gia_han_lan} lần – một chỗ giữ mãi dưới danh nghĩa hợp lệ vẫn là một chỗ không bán được.</Gate>}
+      <div className="grid">
+        <div><label>Giữ chỗ tới</label><input name="den" type="datetime-local" required /></div>
+        <div><label>Lý do (bắt buộc)</label><input name="ly_do" required placeholder="Khách hẹn chuyển tiền sáng mai / chờ duyệt ngân sách…" /></div>
+      </div>
+      {gcBang?.nhat_ky?.length ? <table><thead><tr><th>Lúc</th><th>Việc</th><th>Hạn cũ → hạn mới</th><th className="num">Chỗ</th><th>Người</th><th>Lý do</th></tr></thead>
+        <tbody>{gcBang.nhat_ky.map((n: any) => <tr key={n.id}>
+          <td>{fmtDT(n.luc)}</td><td>{({ dat_han: "đặt hạn", gia_han: "gia hạn", het_han: "hết hạn – trả chỗ", khoi_phuc: "khôi phục" } as any)[n.viec] || n.viec}</td>
+          <td className="muted">{fmtDT(n.han_cu)} → {n.han_moi ? fmtDT(n.han_moi) : "–"}</td><td className="num">{n.so_cho}</td><td>{n.boi}</td><td className="muted">{n.ly_do}</td>
+        </tr>)}</tbody></table> : null}
+      <button className="act" type="submit">Gia hạn</button> <button className="act grey" type="button" onClick={() => setGc(null)}>Đóng</button>
+    </form>}
 
     {edit && <form onSubmit={saveEdit} className="panel"><h2>Sửa thông tin khách – {edit.code} ({edit.tour_code})</h2>
       <div className="grid"><div><label>Tên khách</label><input name="customer_name" defaultValue={edit.customer_name} /></div><div><label>SĐT</label><input name="customer_phone" defaultValue={edit.customer_phone} /></div>
