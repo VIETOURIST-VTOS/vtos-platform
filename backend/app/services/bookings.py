@@ -69,12 +69,18 @@ def update_customer(db: Session, u: User, b: Booking, d: dict) -> Booking:
     if b.cancelled: raise Gate("TRANG_THAI", "Booking đã hủy")
     if b.locked: raise Gate("KHOA_BOOKING", f"Booking đã khóa ({b.lock_reason}) – TP Điều hành / GĐ KD mở khóa mới sửa được")
     before = {"khach": b.customer_name, "sdt": b.customer_phone, "adl": b.adl, "chd": b.chd, "inf": b.inf}
+    # VPM-8 – đây đúng là trường hợp mà V10 lấy làm ví dụ: "sale sửa khách, kế toán sửa số tiền".
+    # Cột phiên bản có từ V10 nhưng cửa này chưa bao giờ đọc nó, nên hai người vẫn đè lên nhau lặng lẽ.
+    from app.services import ghi_mot_lan as GML
+    GML.kiem_phien_ban(b, d.get("phien_ban"), f"Booking {b.code}",
+                       lambda: {**before, "phien_ban": b.phien_ban, "pax": b.pax})
     for k in ("customer_name", "customer_phone", "care_note", "services_note"):
         if d.get(k) is not None: setattr(b, k, str(d[k]).strip()[:200])
     for k in ("adl", "chd", "inf"):
         if d.get(k) is not None: setattr(b, k, max(0, int(d[k])))
     if any(d.get(k) is not None for k in ("adl", "chd", "inf")) and (b.adl + b.chd + b.inf) > 0:
         b.pax = b.adl + b.chd + b.inf   # số khách theo cơ cấu; tiền không tự tính lại (giữ giá đã chốt)
+    GML.tang_phien_ban(b)
     R.audit(db, u.username, u.role, "sua_thong_tin_khach", f"booking:{b.code}", before=before, after={"khach": b.customer_name, "sdt": b.customer_phone, "adl": b.adl, "chd": b.chd, "inf": b.inf})
     db.commit(); db.refresh(b); return b
 

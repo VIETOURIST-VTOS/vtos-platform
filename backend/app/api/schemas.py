@@ -60,6 +60,7 @@ class ActionNote(BaseModel):
 
 
 class ProductIn(BaseModel):
+    phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm
     code: str
     name: str
     tour_type: str = "le_noi_dia"
@@ -115,6 +116,7 @@ class RequestCreate(BaseModel):
 
 
 class BookingCustomerIn(BaseModel):
+    phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm; rỗng = màn hình cũ, vẫn cho qua
     customer_name: str | None = None
     customer_phone: str | None = None
     care_note: str | None = None

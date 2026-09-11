@@ -50,7 +50,12 @@ def edit_product(pid: int, data: S.ProductIn, u: User = Depends(require_roles("n
     p = db.get(Product, pid)
     if not p: raise HTTPException(404, "Không có sản phẩm")
     d = data.model_dump(); d["code"] = p.code
-    PS.upsert_product(db, d, u); db.commit()
+    from app.services import ghi_mot_lan as GML
+    GML.kiem_phien_ban(p, d.get("phien_ban"), f"Sản phẩm {p.code}",
+                       lambda: {**PS.product_out(p, db), "phien_ban": p.phien_ban})
+    PS.upsert_product(db, d, u)
+    GML.tang_phien_ban(p)
+    db.commit()
     return PS.product_out(p, db)
 
 

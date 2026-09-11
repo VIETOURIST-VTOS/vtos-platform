@@ -32,6 +32,7 @@ class LeadIn(BaseModel):
 
 
 class LeadPatch(BaseModel):
+    phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm
     name: str | None = None
     status: str | None = None
     note: str | None = None
@@ -102,7 +103,11 @@ def patch_lead(lid: int, data: LeadPatch, u: User = Depends(require_roles(*EDIT_
     if vis is not None and l.sales_id not in (None, *vis): raise HTTPException(403, "Lead của sale khác nhóm")
     d = data.model_dump(exclude_none=True)
     if "status" in d and d["status"] not in LEAD_STATUS: raise HTTPException(422, "Trạng thái không hợp lệ")
+    from app.services import ghi_mot_lan as GML
+    GML.kiem_phien_ban(l, d.pop("phien_ban", None), f"Lead {l.phone}",
+                       lambda: {**L.lead_out(l, db), "phien_ban": l.phien_ban})
     for k, v in d.items(): setattr(l, k, v)
+    GML.tang_phien_ban(l)
     if "note" in d or "status" in d: l.last_contact_at = __import__("datetime").datetime.now()
     R.audit(db, u.username, u.role, "cap_nhat_lead", f"lead:{l.phone}", after=d); db.commit()
     return L.lead_out(l, db)
