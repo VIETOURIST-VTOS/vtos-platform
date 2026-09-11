@@ -17,6 +17,37 @@ DEFAULT_PARAMS = [
     # theo giấy tờ khi chưa có giấy tờ nào trong hệ thống thì mọi lệnh điều xe đều dừng.
     ("xe_chan_khi_thieu_giay", "0", "Chặn phát lệnh khi thiếu dữ liệu giấy tờ xe/tài xế", "0 hoặc 1", "Đội xe Vietrip v1.3 §7"),
     ("han_muc_mkt", "5000000", "Hạn mức chi Marketing cần 2 chữ ký", "đồng", "MKT Điều 8"),
+    # Giá theo tuổi – Chủ tịch chốt 10/9/2026, sửa tỷ lệ 11/9/2026. Bốn con số này KHÔNG viết cứng
+    # trong mã vì chúng là chính sách giá, và chính sách giá thì đổi: đổi thì sửa tham số, ký duyệt
+    # theo quy trình tham số đã có, không phải sửa phần mềm rồi triển khai lại.
+    #
+    # Quan trọng hơn: tham số ở đây có hiệu lực THEO NGÀY. Chuyến đã đi giữ nguyên tỷ lệ của ngày nó
+    # khởi hành, nên đổi chính sách hôm nay không làm đổi lợi nhuận của những tờ quyết toán đã ký.
+    #
+    # Tỷ lệ 0,90 đến từ việc đo bốn mẫu quyết toán thật – con số 0,75 chốt hôm 10/9 không mẫu nào
+    # đang theo:
+    #     SIN/MAL   10.340.000 / 11.490.000 = 89,99%
+    #     UK        46.905.000 / 52.900.000 = 88,67%
+    #     Nha Trang  1.500.000 /  1.790.000 = 83,80%
+    ("tuoi_em_be", "2", "Dưới tuổi này là em bé – tính theo tỷ lệ bậc em bé", "tuổi", "Chủ tịch chốt 10/9/2026"),
+    ("tuoi_tre_em", "12", "Dưới tuổi này là trẻ em – tính theo tỷ lệ giá người lớn", "tuổi", "Chủ tịch chốt 10/9/2026"),
+    # TỶ LỆ TÁCH THEO HÌNH THỨC TOUR – Chủ tịch chốt 11/9/2026.
+    #
+    # Một tỷ lệ chung cho cả hai loại là sai về nghiệp vụ, không chỉ sai về con số: tour nước ngoài
+    # có vé máy bay quốc tế, visa và bảo hiểm mà trẻ nhỏ vẫn phải trả gần bằng người lớn, nên hạ sâu
+    # là lỗ ngay. Tour trong nước thì phần lớn chi phí là ghế xe và suất ăn – hạ sâu vẫn còn biên.
+    ("ty_le_tre_em_trong_nuoc", "0.80", "Giá trẻ em (dưới 12) bằng tỷ lệ này của giá người lớn – tour TRONG NƯỚC", "tỷ lệ", "Chủ tịch chốt 11/9/2026"),
+    ("ty_le_tre_em_nuoc_ngoai", "0.90", "Giá trẻ em (dưới 12) bằng tỷ lệ này của giá người lớn – tour NƯỚC NGOÀI", "tỷ lệ", "Chủ tịch chốt 11/9/2026"),
+    # Em bé (dưới 2 tuổi) KHÔNG còn miễn phí. Chủ tịch sửa 11/9/2026: 30% giá người lớn.
+    #
+    # Bản chốt 10/9 ghi "dưới 2 tuổi miễn phí", và mẫu quyết toán Nha Trang cũng làm đúng như vậy –
+    # hai cháu miễn phí thu 0 đồng nhưng vẫn gánh 5.000 đ bảo hiểm mỗi cháu, tức mỗi cháu lỗ 5.000.
+    # Với 30% thì chính hai cháu ấy thu 537.000 đ mỗi cháu.
+    #
+    # Để 0 ở tham số này là quay lại quy tắc miễn phí – đó là một lựa chọn chính sách hợp lệ, không
+    # phải lỗi, nên mã KHÔNG chặn giá trị 0.
+    ("ty_le_em_be_trong_nuoc", "0.10", "Giá em bé (dưới 2) bằng tỷ lệ này của giá người lớn – tour TRONG NƯỚC (0 = miễn phí)", "tỷ lệ", "Chủ tịch chốt 11/9/2026"),
+    ("ty_le_em_be_nuoc_ngoai", "0.30", "Giá em bé (dưới 2) bằng tỷ lệ này của giá người lớn – tour NƯỚC NGOÀI (0 = miễn phí)", "tỷ lệ", "Chủ tịch chốt 11/9/2026"),
     # Marketing & CSKH Đợt 3–5. Bốn con số Ban TGĐ phải chốt (đề xuất 07/9/2026) nằm ở đây chứ KHÔNG viết
     # cứng trong mã: đổi chính sách thì sửa tham số, ký duyệt theo quy trình đã có, không phải sửa phần mềm
     # rồi triển khai lại. Giá trị dưới đây là ĐỀ XUẤT, còn hiệu lực cho tới khi Ban TGĐ ký con số khác.
@@ -28,6 +59,12 @@ DEFAULT_PARAMS = [
     ("kn_han_muc3_gio", "4", "Hạn phản hồi khách – khiếu nại mức 3 (nghiêm trọng)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     # Ngưỡng tiền bồi thường KHÔNG có tham số riêng: hoàn tiền đi qua Đề nghị chi nhóm "hoan_tien" và dùng
     # đúng ngưỡng hai chữ ký hiện hành. Đặt ngưỡng riêng ở đây là tạo đường tiền thứ hai.
+    # V7 Đợt 3 – sự cố tour. Ba con số này đi NGƯỢC chiều với hạn khiếu nại ở trên: mức càng nặng hạn
+    # càng NGẮN, vì khách đang đứng ngoài đường chứ không ngồi nhà chờ thư trả lời. Hạn tính từ LÚC XẢY
+    # RA chứ không phải lúc ghi vào hệ thống – báo muộn ba tiếng không được tự dời hạn thêm ba tiếng.
+    ("sc_han_muc1_gio", "24", "Hạn có người nhận xử lý – sự cố tour mức 1 (xử lý tại chỗ)", "giờ", "Điều hành/V7 đề xuất 10/9/2026 – chờ Ban TGĐ chốt"),
+    ("sc_han_muc2_gio", "8", "Hạn có người nhận xử lý – sự cố tour mức 2 (đổi lịch trình hoặc phát sinh chi phí)", "giờ", "Điều hành/V7 đề xuất 10/9/2026 – chờ Ban TGĐ chốt"),
+    ("sc_han_muc3_gio", "2", "Hạn có người nhận xử lý – sự cố tour mức 3 (mất chuyến, tai nạn, an ninh)", "giờ", "Điều hành/V7 đề xuất 10/9/2026 – chờ Ban TGĐ chốt"),
     # Lệnh Robot Kiểm soát 08/9/2026.
     ("ky_thuat_cham_ms", "5000", "Đường dẫn chạy quá số mili giây này thì ghi sự kiện “chậm bất thường”", "mili giây", "Lệnh Kiểm soát K6"),
     ("han_nhap_lieu_ngay", "5", "Ngày hàng tháng mà số liệu tháng trước coi như đã nhập đủ (mốc đo trễ để chấm điểm phòng ban)", "ngày trong tháng sau", "Chủ tịch chốt 08/9/2026"),
@@ -45,7 +82,6 @@ DEFAULT_PARAMS = [
     ("coc_mac_dinh_pct", "30", "Tỷ lệ cọc mặc định khi sản phẩm không quy định", "%", "Vận hành Vietrip"),
     ("han_coc_gio", "24", "Hạn khách đặt cọc sau khi tạo booking (quá → cảnh báo sale/ĐH)", "giờ", "Vận hành Vietrip"),
     ("han_huy_cho_ngay", "3", "Deadline hủy chỗ / thu đủ trước khởi hành (đóng tour, khóa booking)", "ngày", "Vận hành Vietrip"),
-    ("han_giu_cho_gio", "48", "Giữ chỗ cho booking CHƯA thu đồng nào; quá hạn thì trả chỗ về tour (booking vẫn còn)", "giờ", "VPM-7 11/9/2026"),
     ("bao_luu_han_ngay", "90", "Hạn hiệu lực tiền bảo lưu (cảnh báo trước 7 ngày)", "ngày", "Vận hành Vietrip"),
     ("sla_tra_loi_chat_phut", "5", "Sale phải trả lời tin nhắn khách (Facebook/Zalo/web) trong giờ làm việc; quá → AI trả lời thay", "phút", "MKT/KD – hộp thư đa kênh"),
     ("sla_tra_loi_ngoai_gio_phut", "15", "Ngoài giờ làm việc (trước 8h, sau 21h): AI trả lời thay sau", "phút", "MKT/KD – hộp thư đa kênh"),
@@ -120,14 +156,49 @@ DEFAULT_PARAMS = [
     ("thue_gtgt", "0.10", "Thuế suất GTGT dịch vụ lữ hành (Kế toán chỉnh theo mức giảm thuế hiện hành)", "tỷ lệ", "Luật Thuế GTGT"),
     ("giam_tru_ban_than", "11000000", "Giảm trừ gia cảnh cho bản thân người nộp thuế TNCN (Kế toán chỉnh khi Nhà nước nâng mức)", "đồng/tháng", "NQ 954/2020/UBTVQH14"),
     ("giam_tru_nguoi_phu_thuoc", "4400000", "Giảm trừ gia cảnh cho mỗi người phụ thuộc (Kế toán chỉnh khi Nhà nước nâng mức)", "đồng/tháng/người", "NQ 954/2020/UBTVQH14"),
+    ("han_giu_cho_gio", "48", "Giữ chỗ cho booking CHƯA thu đồng nào; quá hạn thì trả chỗ về tour (booking vẫn còn)", "giờ", "VPM-7 11/9/2026"),
+
+    # ── PQ-4 · Hai mốc chuyển VTOS từ chạy thử sang vận hành thật ────────────────────────────
+    # Thêm 11/9/2026. Trước hôm nay hai khóa này KHÔNG TỒN TẠI, và hệ quả không nhìn thấy được từ
+    # màn hình: propose_param chặn mọi khóa chưa có dòng nào trong bảng, còn ô chọn tham số trên
+    # màn hình Chính sách chỉ liệt kê 81 khóa đang có. Chủ tịch quyết hai mốc ngày 10/9 và tưởng đã
+    # ký xong; đo ngày 11/9 thì trong bảng không có dòng nào. Không phải người quên ký – KHÔNG CÓ
+    # CỬA ĐỂ KÝ. Đây đúng là kiểu thiếu mà quy ước "mỗi con số phải có một cửa nhập" nói tới.
+    #
+    # GIÁ TRỊ ĐỂ TRỐNG, và phải để trống. seed_params tạo dòng mặc định ở trạng thái active kèm hai
+    # chữ ký sẵn – tiện cho bộ chính sách nền, nhưng ở đây mà điền sẵn "01-12-2026" thì hệ thống sẽ
+    # tự đóng dấu VẬN HÀNH THẬT bằng một chữ ký không ai ký. Để trống thì moi_truong_du_lieu đọc ra
+    # None, nghĩa là CHƯA CHỐT, và ngày tháng thật đi vào qua đúng cửa đề xuất – ký hai chữ ký.
+    ("ngay_van_hanh_that", "", "Mốc VTOS chuyển sang vận hành thật – số do người nhập trong VTOS",
+     "ngày (DD-MM-YYYY)", "Chủ tịch quyết 10/9/2026 – đề xuất 01-12-2026, chờ ký"),
+    ("ngay_du_lieu_that_vietrip", "", "Mốc dữ liệu Vietrip đổ về hàng ngày được coi là dữ liệu thật",
+     "ngày (DD-MM-YYYY)", "Chủ tịch quyết 10/9/2026 – đề xuất 01-10-2026, chờ ký"),
 ]
+
+# Tham số mang giá trị NGÀY chứ không phải số. propose_param kiểm giá trị bằng float(), nên nếu
+# không khai ở đây thì một ngày tháng bị trả về "Giá trị phải là số" và không đường nào nhập được.
+#
+# GHÉP LẠI 11/9/2026: khối này từng được commit rồi BIẾN MẤT – một phiên khác lưu đè tệp này bằng
+# bản mở từ trước. Thiếu nó thì routes.py vẫn gọi getattr(R, "THAM_SO_NGAY", ()) và nhận về rỗng,
+# nên cửa nhập ngày im lặng không bao giờ chạy: mã trông đủ, hàng rào thì không có.
+THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip")
 
 
 # Bộ nhớ đệm tham số. get_param bị gọi hàng nghìn lần trong một lần dựng bảng điều khiển –
 # mỗi chuyến quyết toán gọi 4 lần, mỗi lần là một chuyến đi–về tới PostgreSQL ở Singapore. Tham số
 # là master data đổi vài tháng một lần và mỗi lần đổi đều đi qua đúng một chỗ (ký duyệt tham số),
 # nên đệm được an toàn miễn là chỗ đó xoá đệm. TTL 60 giây để bản ghi do phiên khác ghi cũng vào.
-_PARAM_CACHE: dict[tuple[str, date], tuple[float, float]] = {}
+# Đệm theo KHÓA, không theo (khóa, ngày). Đổi ngày 10/9/2026, lý do:
+#
+# Bản cũ lấy (khóa, ngày hiệu lực) làm khóa đệm. Với `get_param(db, "han_qt_le")` – ngày mặc định là
+# hôm nay – thì đệm ăn. Nhưng những chỗ tính theo TỪNG CHUYẾN đều truyền `on=tour.end_date`, mà mỗi
+# chuyến một ngày kết thúc khác nhau, nên đệm trượt gần như mọi lần: duyệt 1.258 chuyến là 1.258 câu
+# truy vấn cho đúng một tham số không đổi. Đó là phần lớn 55 giây của màn hình Khoản treo.
+#
+# Bản mới nạp TẤT CẢ bản ghi đang hiệu lực của một khóa trong một câu, rồi chọn bản ghi theo ngày
+# ngay trong bộ nhớ. Phép chọn giữ nguyên thứ tự cũ (effective_from giảm dần, id giảm dần, lấy bản
+# ghi đầu tiên có effective_from <= ngày hỏi) nên kết quả trùng khít bản cũ – chỉ khác số câu truy vấn.
+_PARAM_CACHE: dict[str, tuple[list[tuple[date, int, str]], float]] = {}
 PARAM_CACHE_TTL = 60.0
 
 
@@ -136,27 +207,50 @@ def clear_param_cache() -> None:
     _PARAM_CACHE.clear()
 
 
-def get_param(db: Session, key: str, on: date | None = None) -> float:
+def _param_rows(db: Session, key: str) -> list[tuple[date, int, str]]:
+    """Mọi bản ghi đang hiệu lực của một khóa, sắp sẵn theo thứ tự ưu tiên (mới nhất trước)."""
     import time
-    on = on or date.today()
-    ck = (key, on)
-    hit = _PARAM_CACHE.get(ck)
+    hit = _PARAM_CACHE.get(key)
     if hit is not None and time.time() - hit[1] < PARAM_CACHE_TTL:
         return hit[0]
-    row = db.execute(select(Param).where(Param.key == key, Param.status == "active",
-                                          Param.effective_from <= on)
-                     .order_by(desc(Param.effective_from), desc(Param.id))).scalars().first()
-    if row is not None:
-        _PARAM_CACHE[ck] = (float(row.value), time.time())
-    if row is None:
+    rows = [(p.effective_from, p.id, p.value)
+            for p in db.execute(select(Param).where(Param.key == key, Param.status == "active")
+                                .order_by(desc(Param.effective_from), desc(Param.id))).scalars()]
+    _PARAM_CACHE[key] = (rows, time.time())
+    return rows
+
+
+def _param_value(db: Session, key: str, on: date | None) -> str | None:
+    on = on or date.today()
+    for eff, _id, val in _param_rows(db, key):
+        if eff <= on:
+            return val
+    return None
+
+
+def get_param(db: Session, key: str, on: date | None = None) -> float:
+    val = _param_value(db, key, on)
+    if val is None:
         for k, v, *_ in DEFAULT_PARAMS:
             if k == key:
                 return float(v)
         raise KeyError(key)
-    return float(row.value)
+    return float(val)
 
 
 def get_param_text(db: Session, key: str, on: date | None = None) -> str:
+    """Tham số dạng CHỮ – cố ý KHÔNG đệm, khác với `get_param` ở trên.
+
+    Ngày 10/9/2026 đã thử cho hàm này dùng chung đệm với `get_param`, và một phép thử đội xe đỏ ngay:
+    nó sửa thẳng bản ghi Param trong cơ sở dữ liệu (không qua cửa duyệt tham số nên không ai gọi
+    `clear_param_cache`) rồi đọc lại ngay. Với `get_param` thì độ trễ tới 60 giây là điều đã chấp nhận từ
+    trước cho các tham số SỐ – chúng đổi vài tháng một lần. Nhưng tham số chữ ở đây đang giữ những thứ như
+    `xe_nguoi_lap_lenh` (ai được lập lệnh điều xe): sửa xong mà 60 giây sau mới có hiệu lực thì người vừa
+    sửa tưởng mình gõ sai và sửa tiếp.
+
+    Và đệm chỗ này chẳng được gì: mỗi lần tính bảng lương chỉ gọi tới nó một lần. Nên giữ nguyên một câu
+    truy vấn thẳng – đừng "cho nhất quán" mà đệm lại.
+    """
     on = on or date.today()
     row = db.execute(select(Param).where(Param.key == key, Param.status == "active", Param.effective_from <= on)
                      .order_by(desc(Param.effective_from), desc(Param.id))).scalars().first()
@@ -296,22 +390,6 @@ def calc_db(db: Session, t: Tour, threshold: float) -> dict:
 
 
 def booked_pax(tour: Tour) -> int:
-    """Số khách ĐANG THỰC SỰ GIỮ CHỖ của tour.
-
-    VPM-7 (11/9/2026) trừ thêm các booking đã HẾT HẠN GIỮ CHỖ. Trước đó hàm này đếm mọi booking chưa
-    huỷ, nên một booking khách gọi giữ rồi im vẫn chiếm chỗ mãi mãi và tour hiện "hết chỗ" trong khi
-    không ai trả đồng nào — số chỗ còn lại sai theo hướng nguy hiểm nhất, vì nó làm công ty từ chối
-    khách thật.
-
-    Booking hết hạn giữ chỗ KHÔNG bị huỷ: nó vẫn nằm trong danh sách, vẫn tra cứu được, khách trả tiền
-    muộn thì khôi phục nếu tour còn chỗ. Cần con số gộp cả chúng (đối chiếu, tra lại lịch sử) thì dùng
-    `booked_pax_gom_het_han` bên dưới — cố ý để thành hai tên khác nhau, vì hai câu hỏi khác nhau.
-    """
-    return sum(b.pax for b in tour.bookings if not b.cancelled and not b.giu_cho_het)
-
-
-def booked_pax_gom_het_han(tour: Tour) -> int:
-    """Đếm cả booking đã hết hạn giữ chỗ – dùng khi cần biết tổng số khách đã từng đăng ký."""
     return sum(b.pax for b in tour.bookings if not b.cancelled)
 
 

@@ -277,11 +277,26 @@ def draft_reply(db: Session, c: Conversation, *, tu_dong: bool = False, boi: str
         nguon = "quy_tac"
     else:
         nguon = "claude"
-    AL.ghi(db, tac_vu="tin_khach" if tu_dong else "tin_khach_nhap", muc=3 if tu_dong else 2,
+    # Cửa thứ hai (11/9/2026): xét NỘI DUNG chứ không chỉ xét vai trò. duoc_tu_gui() đã hỏi "vai trò
+    # chủ quản hộp thư có được tự động không" trước khi vào đây – nhưng nó hỏi lúc chưa biết ai sẽ
+    # thật sự viết ra câu này. Lời gọi mô hình hỏng thì đoạn trên rơi về câu dựng sẵn, và câu dựng
+    # sẵn KHÔNG phải thứ mức 3 cấp phép. Xem ai_quyen.noi_dung_duoc_tu_gui().
+    from app.services import ai_quyen as AQ
+    tu_gui = tu_dong
+    ly_do_ha = ""
+    if tu_dong:
+        tu_gui, ly_do_ha = AQ.noi_dung_duoc_tu_gui("tin_khach", nguon)
+
+    # Vai trò phải được ghi lại. Bản cũ để trống phuc_vu_vai_tro ở mọi lượt tự gửi, nên nhật ký nói
+    # được "AI đã gửi" mà không nói được "nhân danh quyền của ai" – câu thứ hai mới là câu mà người
+    # hậu kiểm và kiểm toán cần.
+    AL.ghi(db, tac_vu="tin_khach" if tu_gui else "tin_khach_nhap", muc=3 if tu_gui else 2,
            dau_vao=prompt, ket_qua=out, nguon=nguon,
            mo_hinh=settings.ANTHROPIC_MODEL if nguon == "claude" else "",
            ref=f"conv:{c.id}", nguoi=boi,
-           trang_thai="cho_hau_kiem" if tu_dong else "khong_can", loi=loi if nguon == "quy_tac" else "")
+           vai_tro=AQ.CHU_QUAN_HOP_THU if tu_dong else "",
+           trang_thai="cho_hau_kiem" if tu_gui else "khong_can",
+           loi=(loi if nguon == "quy_tac" else "") or ly_do_ha)
     return out, nguon
 
 
@@ -360,8 +375,17 @@ def robot_check(db: Session) -> dict:
         if on and not c.ai_off and c.ai_replies < 3 and not stale:
             if tu_gui_duoc:
                 text, src = draft_reply(db, c, tu_dong=True)
-                _send(db, c, text, "ai", "Trợ lý AI Vietourist"); replied += 1
-                c.summary = (c.summary + " | " if c.summary else "") + f"{now:%d/%m %H:%M} AI trả lời thay ({src})"
+                # Cửa thứ hai. Lời gọi mô hình hỏng → draft_reply trả về câu dựng sẵn theo quy tắc,
+                # và câu ấy KHÔNG được tự gửi: mức 3 cấp cho câu trả lời của mô hình, ràng bởi
+                # loai_noi_dung đã khai, chứ không cấp cho một câu cứng trong mã không biết khách
+                # vừa hỏi gì. Bản trước gửi thẳng, nên càng hỏng thì càng gửi.
+                duoc, vi_sao = AQ.noi_dung_duoc_tu_gui("tin_khach", src)
+                if duoc:
+                    _send(db, c, text, "ai", "Trợ lý AI Vietourist"); replied += 1
+                    c.summary = (c.summary + " | " if c.summary else "") + f"{now:%d/%m %H:%M} AI trả lời thay ({src})"
+                else:
+                    drafted += 1
+                    c.summary = (c.summary + " | " if c.summary else "") + f"{now:%d/%m %H:%M} AI soạn nháp – không tự gửi ({vi_sao[:80]})"
                 # số lượt trong ngày đọc từ nhật ký AI, nên phải tính lại sau mỗi lần gửi: nếu không,
                 # một vòng robot có 50 hội thoại sẽ gửi hết 50 dù hạn mức chỉ cho 30.
                 tu_gui_duoc, ly_do = AQ.duoc_tu_gui(db, now)

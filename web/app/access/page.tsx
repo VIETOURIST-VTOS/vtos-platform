@@ -11,8 +11,13 @@ import { Tag, errMsg } from "@/components/ui";
  *  hay khóa, và pháp nhân chủ quản. */
 const TABS: [string, string][] = [
   ["accounts", "Tài khoản"], ["matrix", "Ma trận quyền"],
+  ["luongviec", "Luồng công việc"],
   ["gaps", "Chênh lệch cần xử lý"], ["tracuu", "Tra cứu quyền"], ["audit", "Nhật ký quyền"],
 ];
+/* Vì sao có thẻ "Luồng công việc" (PQ-2, 10/9/2026): thẻ "Ma trận quyền" bên cạnh trả lời câu
+   "ai được NHÌN màn hình nào". Nó KHÔNG trả lời được câu mà kiểm toán hỏi đầu tiên — chuyến này ai
+   trình, ai xác nhận, ai duyệt, ai đóng sổ, và vì sao người khác không làm thay được. Chuỗi bàn giao
+   ấy có thật và rất chặt, nhưng tới trước bản này nó chỉ nằm trong mã dưới dạng chuỗi viết cứng. */
 /* Vì sao có tab này (P10, 08/9/2026): quyền trong VTOS đến từ bốn nguồn không nguồn nào nhìn thấy ba
    nguồn kia. Muốn biết một nhân viên vào được những đâu thì hôm nay phải đọc mã – mà đọc mã thì trong
    kỳ rà quyền hằng tháng sẽ không ai đọc, và không rà thì quyền chỉ nở ra chứ không co lại.
@@ -59,15 +64,17 @@ function AccessPage() {
   const [dangSuy, setDangSuy] = useState(false);
   const [mkRobot, setMkRobot] = useState<any>(null);   // mật khẩu robot – chỉ hiện MỘT lần
   const [tcRole, setTcRole] = useState<any>(null);
+  const [lv, setLv] = useState<any>(null);          // PQ-2 – bảng luồng công việc
 
   const loadAcc = useCallback(() => { api("/access/accounts").then(setAcc).catch((e) => toast(errMsg(e), true)); }, [toast]);
   const loadGaps = useCallback(() => { api("/access/gaps").then(setGaps).catch(() => {}); }, []);
   useEffect(() => { loadAcc(); loadGaps(); api("/access/grants").then(setGrants).catch(() => {}); }, [loadAcc, loadGaps]);
   useEffect(() => {
     if (tab === "matrix" && !mt) api("/access/matrix").then(setMt).catch((e) => toast(errMsg(e), true));
+    if (tab === "luongviec" && !lv) api("/access/luong-viec").then(setLv).catch((e) => toast(errMsg(e), true));
     if (tab === "audit") api("/access/audit").then(setLog).catch(() => {});
     if (tab === "gaps" && !suy) api("/access/phap-nhan/suy-tu-ho-so").then(setSuy).catch(() => {});
-  }, [tab, mt, suy, toast]);
+  }, [tab, mt, suy, lv, toast]);
   useEffect(() => {
     if (tcUid == null) { setTc(null); return; }
     setTc(null); api(`/access/tra-cuu/${tcUid}`).then(setTc).catch((e) => toast(errMsg(e), true));
@@ -119,6 +126,19 @@ function AccessPage() {
       a.download = `MA_TRAN_PHAN_QUYEN_${new Date().toISOString().slice(0, 10)}.xlsx`;
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
       toast("Đã tải bản Excel để ký rà quyền");
+    } catch (e: any) { toast(e?.message || "Không tải được", true); }
+  };
+
+  const taiExcelLuongViec = async () => {
+    try {
+      const res = await fetch("/api/v1/access/luong-viec.xlsx", { headers: { Authorization: `Bearer ${getToken() || ""}` } });
+      if (!res.ok) throw new Error(`Máy chủ trả ${res.status}`);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `LUONG_CONG_VIEC_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+      toast("Đã tải bản Excel luồng công việc để ký");
     } catch (e: any) { toast(e?.message || "Không tải được", true); }
   };
 
@@ -216,6 +236,39 @@ function AccessPage() {
         <td style={{ fontSize: 11 }}>{r.tab_nhan_su.map((t: string) => mt.hr_tabs[t]).join(", ") || "—"}</td>
         {mt.man_hinh.map((p: string) => <td key={p} style={{ textAlign: "center" }}>{r.man_hinh[p] ? "✓" : ""}</td>)}
       </tr>)}</tbody></table></div>
+    </>}
+
+    {tab === "luongviec" && lv && <>
+      <div className="row" style={{ gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <button className="act" style={{ margin: 0 }} onClick={taiExcelLuongViec}>Xuất Excel để Chủ tịch ký</button>
+        <span className="muted">{lv.so_buoc} bước · {lv.so_buoc_mot_cua} bước một cửa · {lv.so_buoc_hai_chu_ky} bước cần hai chữ ký</span>
+      </div>
+      <p className="muted" style={{ margin: "2px 0 12px" }}>{lv.ghi_chu}</p>
+
+      {lv.nhom.map((nv: any) => <div key={nv.ma} style={{ marginBottom: 18 }}>
+        <h3 style={{ marginBottom: 6 }}>{nv.ten} <span className="muted" style={{ fontWeight: 400 }}>· {nv.so_buoc} bước</span></h3>
+        <div className="scroll"><table><thead><tr>
+          <th style={{ minWidth: 180 }}>Bước</th>
+          <th style={{ minWidth: 240 }}>Ai được đẩy việc sang bước sau</th>
+          <th style={{ minWidth: 150 }}>Trạng thái</th>
+          <th style={{ minWidth: 300 }}>Vì sao chặn như vậy</th>
+        </tr></thead><tbody>{nv.buoc.map((b: any) => <tr key={b.ma}
+            style={b.mot_cua ? { background: "var(--warnbg)" } : undefined}>
+          <td><b>{b.ten}</b>{b.chu_ky > 1 && <> <Tag cls="red">{b.chu_ky} chữ ký</Tag></>}</td>
+          <td>{b.ai_duoc}{b.mot_cua && <> <Tag cls="warn">một cửa</Tag></>}</td>
+          <td style={{ fontSize: 11 }}>{b.tu_trang_thai || "—"} → {b.den_trang_thai || "—"}</td>
+          <td style={{ fontSize: 12 }}>{b.vi_sao}
+            <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{b.nguon}</div></td>
+        </tr>)}</tbody></table></div>
+      </div>)}
+
+      <h3 style={{ marginBottom: 6 }}>Người xác nhận đề nghị chi – đổi theo LOẠI CHI</h3>
+      <p className="muted" style={{ margin: "2px 0 8px" }}>Gộp năm loại thành một danh sách phẳng là
+        mở quyền xác nhận cho bốn loại còn lại.</p>
+      <div className="scroll"><table><thead><tr><th>Loại chi</th><th>Người xác nhận bước đầu</th></tr></thead>
+        <tbody>{Object.entries(lv.nguoi_xac_nhan_de_nghi_chi).map(([loai, vs]: any) => <tr key={loai}>
+          <td>{loai}</td><td>{vs.map((v: any) => v.ten).join(", ")}</td>
+        </tr>)}</tbody></table></div>
     </>}
 
     {tab === "gaps" && gaps && <>

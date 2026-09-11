@@ -412,6 +412,17 @@ class Alert(Base):
     to_roles: Mapped[str] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    # PQ-9 (11/9/2026) · MỘT cảnh báo MỘT người. to_roles ở trên là danh sách được BÁO TIN; nó
+    # không phải người chịu trách nhiệm, và trước hôm nay hệ thống không phân biệt hai thứ ấy.
+    #
+    # Đo bản đang chạy: 1.557 trên 1.703 cảnh báo chưa xử lý, 146 cái từng được xử lý. Nhìn vào
+    # to_roles thì hiểu ngay vì sao – một cảnh báo đỏ quá hạn thu tiền gửi cho
+    # "nv_kd,gd_kd,tp_dh,ketoan", tức gửi cho bốn vai trò, tức không gửi cho ai.
+    #
+    # Để trống là hợp lệ và phải đếm được: có loại cảnh báo không suy ra được chủ (cảnh báo dòng
+    # tiền gửi Ban lãnh đạo). Chỗ nguy hiểm không phải là ô trống, mà là ô trống không ai đếm.
+    nguoi_phu_trach: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    giao_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 # ---------- Nhật ký bất biến ----------

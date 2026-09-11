@@ -410,8 +410,12 @@ def cancel_booking(bid: int, data: S.BookingCancelIn, u: User = Depends(current_
 
 
 # ---------- VPM-7: giữ chỗ có thời hạn ----------
-# Đặt dưới tiền tố /bookings đã được cấp quyền sẵn, KHÔNG mở tiền tố API mới: robot viết phần mềm
-# không tự khai quyền cho mình.
+# KHÔI PHỤC 11/9/2026. Khối này đã nằm trong commit VPM-7 (PR #4, đã gộp vào main) rồi BIẾN MẤT khỏi
+# cây làm việc chung – một phiên khác lưu đè tệp này bằng bản mở từ trước khi VPM-7 gộp. Thiếu nó thì
+# màn hình Booking gọi bốn đường dẫn không tồn tại, và commit tiếp theo chạm routes.py sẽ ĐẨY NGƯỢC
+# việc đã gộp ra khỏi main mà không ai đọc thấy trong bản khác biệt.
+#
+# Đặt dưới tiền tố /bookings đã được cấp quyền sẵn, KHÔNG mở tiền tố API mới.
 @router.get("/bookings/{bid}/giu-cho", tags=["bookings"])
 def xem_giu_cho(bid: int, u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="giữ chỗ của booking")), db: Session = Depends(get_db)):
     from app.services import giu_cho as GC
@@ -515,12 +519,16 @@ def list_params(u: User = Depends(require_roles(*AC.PARAM_ROLES, mo_ta="bảng t
 def propose_param(data: S.ParamPropose, u: User = Depends(require_roles("tp_dh", "gd_kd", "ptgd_doan", "ptgd_mkt", "ketoan", "hcns", "cntt", "tgd", "chutich")), db: Session = Depends(get_db)):
     ref = db.execute(select(Param).where(Param.key == data.key).order_by(desc(Param.id))).scalars().first()
     if not ref: raise Gate("THAM_SO", "Không có tham số này")
-    # Tham số ngày đi qua cửa khác: float("2026-12-01") ném lỗi, nên trước 11/9/2026 không có đường
-    # nào nhập được hai mốc vận hành thật. Kiểm định dạng ISO thay cho kiểm số – vẫn là kiểm, không
-    # phải bỏ kiểm: một mốc gõ sai định dạng thì moi_truong_du_lieu đọc ra "chưa chốt" và im lặng.
+    # Tham số ngày đi qua cửa khác: float("01-12-2026") ném lỗi, nên trước 11/9/2026 không có
+    # đường nào nhập được hai mốc vận hành thật. Kiểm định dạng thay cho kiểm số – vẫn là kiểm,
+    # không phải bỏ kiểm: một mốc gõ sai định dạng thì bị đọc ra "chưa chốt" và im lặng.
+    #
+    # Dùng chung đúng một hàm đọc ngày với nơi ĐỌC mốc ra. Nếu cửa nhận rộng hơn chỗ đọc thì có
+    # những giá trị nhập vào được mà đọc ra là None – tức là ký xong mà hệ thống vẫn bảo chưa chốt.
     if data.key in getattr(R, "THAM_SO_NGAY", ()):
-        try: date.fromisoformat(str(data.value).strip()[:10])
-        except ValueError: raise Gate("THAM_SO", "Giá trị phải là ngày dạng YYYY-MM-DD")
+        from app.services import moi_truong_du_lieu as _MT
+        if _MT.doc_ngay(str(data.value)) is None:
+            raise Gate("THAM_SO", f"Giá trị phải là ngày dạng {_MT.DINH_DANG_NGAY}, ví dụ {_MT._VI_DU_NGAY}")
     else:
         try: float(data.value)
         except ValueError: raise Gate("THAM_SO", "Giá trị phải là số")
