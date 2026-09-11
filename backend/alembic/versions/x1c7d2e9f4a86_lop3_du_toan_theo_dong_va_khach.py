@@ -85,6 +85,12 @@ def _co_cot(bang: str, cot: str) -> bool:
 
 
 def _them(bang: str, ten: str, kieu) -> None:
+    # Chưa có bảng thì BỎ QUA, không ALTER. _co_cot trả về False cho HAI chuyện khác nhau: "bảng có,
+    # thiếu cột" và "chưa có bảng". Bản trước gộp hai chuyện ấy làm một, nên gặp bảng chưa dựng là
+    # ALTER thẳng – và lần triển khai 11/9 chết ở đó: UndefinedTable "khach_chi_phi".
+    if not _co(bang):
+        print(f"[x1c7d2e9f4a86] bo qua {bang}.{ten}: chua co bang {bang}")
+        return
     if not _co_cot(bang, ten):
         op.add_column(bang, sa.Column(ten, kieu, nullable=True))
 
@@ -102,7 +108,6 @@ def upgrade() -> None:
     # một khoản có nhiều tên: LAND / LAND MCB / Landtour ADL / Giá land. Chữ tự do thì không cộng được
     # theo khoản mục, nên câu "cả năm công ty chi bao nhiêu tiền khách sạn" không có câu trả lời.
     _them("tour_cost_lines", "ma_khoan_muc", sa.String(40))
-    _them("khach_chi_phi", "ma_khoan_muc", sa.String(40))
 
     # ------------------------------------------------------------- A. hình thức tour
     # KHÁC HẲN cột tour_type sẵn có: tour_type phân biệt tour trọn gói với dịch vụ lẻ (package /
@@ -262,6 +267,11 @@ def upgrade() -> None:
         )
         op.create_index("ix_kcp_khach", "khach_chi_phi", ["khach_id"])
         op.create_index("ix_kcp_tour", "khach_chi_phi", ["tour_id"])
+
+    # Cột mã khoản mục của bảng này phải thêm Ở ĐÂY, sau khi bảng đã dựng – không phải ở khối danh mục
+    # phía trên cùng với tour_cost_lines. khach_chi_phi do CHÍNH bản chuyển này tạo ra, nên trên máy chủ
+    # thật nó chưa tồn tại lúc khối phía trên chạy.
+    _them("khach_chi_phi", "ma_khoan_muc", sa.String(40))
 
     # --------------------------------------------------------------- F. phương tiện từng chặng
     if not _co("tour_phuong_tien"):
