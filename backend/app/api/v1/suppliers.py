@@ -74,6 +74,7 @@ def tao_ncc(data: NccIn, u: User = Depends(require_roles(*WRITE, "ketoan")), db:
 
 class NccSua(BaseModel):
     """KHÔNG có số tài khoản ở đây: đổi tài khoản đi đường riêng, có người thứ hai xác nhận."""
+    phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm
     ten: str | None = None
     loai: str | None = None
     ma_so_thue: str | None = None
@@ -96,7 +97,11 @@ def sua_ncc(sid: int, data: NccSua, u: User = Depends(require_roles(*WRITE, "ket
     if "loai" in d and d["loai"] not in LOAI_NCC:
         raise HTTPException(422, f"Loại không hợp lệ. Chỉ nhận {', '.join(LOAI_NCC)}")
     before = {"ten": s.ten, "active": s.active}
+    from app.services import ghi_mot_lan as GML
+    GML.kiem_phien_ban(s, d.pop("phien_ban", None), f"Nhà cung cấp {s.code}",
+                       lambda: {**before, "phien_ban": s.phien_ban})
     for k, v in d.items(): setattr(s, k, v)
+    GML.tang_phien_ban(s)
     R.audit(db, u.username, u.role, "sua_nha_cung_cap", f"ncc:{s.code}", before=before,
             after=data.model_dump(mode="json", exclude_none=True))
     db.commit()

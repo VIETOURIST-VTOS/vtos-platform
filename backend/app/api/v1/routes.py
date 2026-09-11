@@ -281,7 +281,11 @@ def booking_out(b: Booking) -> dict:
             "sla_known": bool(b.request_id),
             "counts_for_target": b.counts_for_target, "created_at": b.created_at, "paid": (b.paid or 0), "due": (b.amount or 0) - (b.discount or 0) - (b.paid or 0),
             "adl": b.adl, "chd": b.chd, "inf": b.inf, "vietrip_id": b.vietrip_id, "tour_start": b.tour.start_date if b.tour else None,
-            "company_id": b.company_id, "chua_gan_phap_nhan": b.company_id is None, **BK.booking_view(b)}
+            "company_id": b.company_id, "chua_gan_phap_nhan": b.company_id is None,
+            # VPM-8 – màn hình phải NHẬN được số phiên bản thì mới có cái để gửi lại khi lưu.
+            # Thiếu dòng này thì khoá 409 vĩnh viễn không bao giờ chạm tới, vì không ai gửi số nào.
+            "phien_ban": b.phien_ban,
+            **BK.booking_view(b)}
 
 
 @router.get("/mang", tags=["bookings"])
