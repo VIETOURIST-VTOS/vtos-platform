@@ -55,6 +55,17 @@ CUA_TAY = (
     "projects", "quy_tac_hach_toan", "receipts", "retentions", "service_orders", "service_requests",
     "supplier_bank_changes", "suppliers", "thieu_gia_von", "tour_cost_lines", "tour_events",
     "tac_vu_tu_dong",
+    # Lớp 3 quyết toán tour (11/9/2026). Năm bảng, cửa API là /api/v1/quyet-toan-lop3
+    # (app/api/v1/quyet_toan_lop3.py), gắn vào màn hình "Quyết toán tour" đã có:
+    #   POST .../{tid}/khach            – dòng khách, có ngày sinh
+    #   POST .../{tid}/khach-chi-phi    – chi phí đích danh của khách (vé, visa, quà)
+    #   POST .../{tid}/doanh-thu        – dòng doanh thu, kể cả dòng âm theo biên bản thanh lý
+    #   POST .../{tid}/phuong-tien      – từng chặng ô tô / máy bay / tàu
+    #   POST .../{tid}/hdv-chi          – HDV chi trên đường
+    #
+    # Không cửa nào nhận ô "tổng": máy nhân đơn giá × số lượng rồi cộng thuế, và máy cộng các dòng.
+    # Đó là cách chặn đúng lỗi 210.000 đ tìm thấy trên tệp mẫu Nha Trang.
+    "booking_khach", "khach_chi_phi", "tour_doanh_thu_dong", "tour_phuong_tien", "tour_hdv_chi",
     "tours", "user_grants", "users", "vehicle_documents", "vehicle_plates", "vehicle_rates",
     "vehicles", "visa_access_links", "visa_ai_suggestions", "visa_applications",
     "visa_appointments", "visa_cases", "visa_checklist_items", "visa_checklist_templates",
@@ -86,6 +97,13 @@ MAY_SINH = {
     "lan_chay_tac_vu": "Lần chạy do hệ thống chạy tác vụ báo về qua /tu-dong/bao-cao – nhập tay một "
                        "dòng 'đã chạy thành công' là tạo bằng chứng giả về việc có thể chưa hề chạy.",
     "tong_dai_su_kien": "Nhật ký nguyên văn webhook tổng đài – tổng đài ghi vào, không ai nhập tay.",
+    # Lớp 3 quyết toán tour (11/9/2026). Sổ dấu vết sửa sau khi ký: hệ thống ghi khi người bấm sửa
+    # một tờ đã ký, và KHÔNG được có cửa nhập tay. Một sổ dấu vết mà người ta gõ thẳng vào được thì
+    # không còn là dấu vết – ai cũng viết được rằng mình đã sửa vì lý do gì, kể cả khi không sửa.
+    #
+    # Cùng lý lẽ ấy nên cũng không có cửa XOÁ: sửa sai thì sửa tiếp và ghi tiếp.
+    "sua_sau_ky": "Sổ dấu vết sửa tờ quyết toán sau khi ký – hệ thống ghi khi người bấm sửa; có cửa "
+                  "nhập tay thì không còn là dấu vết.",
     # Cùng lý lẽ với lan_chay_tac_vu, và ở đây còn gắt hơn: bao_cao_luu là ẢNH CHỤP số liệu tại một
     # thời điểm đã qua. Cho người nhập tay vào đây là cho phép viết lại quá khứ – đúng thứ mà một bản
     # chụp sinh ra để chống. Bản chụp chỉ do lịch tự động sinh, từ chính hàm mà màn hình đang gọi.
@@ -112,6 +130,11 @@ def cua_tai_tep() -> dict[str, list[str]]:
     for ma, bo in BO_NAP.items():
         b = bo.get("bang_dich")
         if b: ra.setdefault(b, []).append(ma)
+        # Một bộ nạp có thể đổ vào nhiều bảng: tệp quyết toán chi tiết của Điều hành ghi vào năm
+        # bảng từ bốn sheet. bang_dich giữ bảng chính, bang_phu giữ phần còn lại – đọc cả hai, nếu
+        # không thì bốn bảng kia bị báo là không có cửa trong khi chúng đi qua đúng bộ nạp này.
+        for p in (bo.get("bang_phu") or ()):
+            ra.setdefault(p, []).append(ma)
     return ra
 
 

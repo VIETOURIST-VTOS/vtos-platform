@@ -7,8 +7,9 @@ import { api, pct, vnd, fmtD, fmtDT, getToken, soTien } from "@/lib/api";
 import { ROLES, TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
 import { Tag, Gate, errMsg } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
+import QuyetToanForm from "@/components/QuyetToanForm";
 
-const TABS: [string, string][] = [["info", "Thông tin & quy trình"], ["budget", "Dự toán 3 con số"], ["bookings", "Booking & thu tiền"], ["cost", "Chi NCC & quyết toán"], ["ops", "HDV & xe"], ["history", "Quy trình & lịch sử"]];
+const TABS: [string, string][] = [["info", "Thông tin & quy trình"], ["budget", "Dự toán 3 con số"], ["bookings", "Booking & thu tiền"], ["cost", "Chi NCC & quyết toán"], ["qt", "Nhập quyết toán (mẫu chuẩn)"], ["ops", "HDV & xe"], ["history", "Quy trình & lịch sử"]];
 const PR_ST: Record<string, string> = { cho_tp: "Chờ TP", cho_kt: "Chờ Kế toán", cho_duyet: "Chờ duyệt", cho_chi: "Chờ chi", da_chi: "Đã chi", tu_choi: "Từ chối", huy: "Hủy" };
 
 function TourDetail() {
@@ -22,7 +23,10 @@ function TourDetail() {
   if (!t) return <p className="muted">Đang tải…</p>;
   const seeCost = t.calc != null;   // Kinh doanh / HCNS: máy chủ ẩn cơ cấu chi phí → không hiện tab dự toán & chi NCC
   const c = t.calc || {}, s = t.settlement, act: string[] = t.actions || [], sm = t.summary || {};
-  const tabs = TABS.filter(([k]) => seeCost || !["budget", "cost"].includes(k));
+  // Tab nhập quyết toán đi cùng nhóm với dự toán và chi NCC: ai không xem được cơ cấu chi phí thì
+  // cũng không thấy tab này. Hàng rào thật nằm ở máy chủ (danh sách XEM/NHAP của quyet_toan_lop3),
+  // đây chỉ là chuyện không bày ra một tab bấm vào chỉ để nhận lỗi 403.
+  const tabs = TABS.filter(([k]) => seeCost || !["budget", "cost", "qt"].includes(k));
   const can = (a: string) => act.includes(a);
   const run = async (path: string, json?: any) => { try { const r = await api(`/tours/${t.id}/${path}`, { method: "POST", json: { note, ...(json || {}) } }); toast(r.message); setNote(""); load(); } catch (e) { toast(errMsg(e), true); } };
   const saveEdit = async (e: React.FormEvent) => {
@@ -140,6 +144,9 @@ function TourDetail() {
           <tbody>{t.payment_requests.map((r: any) => <tr key={r.id}><td>{r.code}</td><td>{r.supplier_name}</td><td>{r.description}</td><td className="num">{vnd(r.amount)}</td><td><Tag cls={r.status === "da_chi" ? "ok" : "warn"}>{PR_ST[r.status] || r.status}</Tag></td><td>{fmtDT(r.created_at)}</td><td>{fmtDT(r.paid_at)}</td></tr>)}</tbody></table></div>
       <Settlement t={t} note={note} NoteBox={NoteBox} run={run} load={load} toast={toast} />
     </>}
+
+    {tab === "qt" && <QuyetToanForm tourId={t.id} toast={toast} />}
+
 
     {tab === "ops" && <div className="grid">
       <div className="panel wrap"><h2>Phân công HDV</h2><table><thead><tr><th>HDV</th><th>Ngày × đơn giá</th><th className="num">Thù lao</th><th>Trạng thái</th></tr></thead>

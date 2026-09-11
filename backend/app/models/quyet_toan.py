@@ -51,6 +51,13 @@ class TourSettlement(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     ky: Mapped[str] = mapped_column(String(7))                        # kỳ tour KẾT THÚC, YYYY-MM
     ma_tour: Mapped[str] = mapped_column(String(60))
+    # Khoá nối vào chuyến thật trong VTOS. Thêm 10/9/2026 theo chốt của Chủ tịch: bảng này là CỬA
+    # NẠP, không phải nguồn sự thật thứ hai. Trước đó nó khớp với tours bằng CHUỖI ma_tour – chuỗi
+    # thì sai chính tả được, thừa dấu cách được, và không có gì bắt lỗi.
+    #
+    # NULL nghĩa là chưa tra ra chuyến thật, KHÁC HẲN "không có chuyến". Tệp Điều hành vẫn nạp được
+    # khi chưa tra ra; việc tra là một bước riêng, xem app/services/noi_quyet_toan.py.
+    tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True, index=True)
     ten_tour: Mapped[str] = mapped_column(String(300), default="")
     loai: Mapped[str] = mapped_column(String(20), default="tour")
     # Điều hành viên giữ NGUYÊN VĂN tên trong tệp, và operator_id khi tra ra người thật. Không bao giờ

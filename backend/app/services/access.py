@@ -319,7 +319,17 @@ MAN_HINH_API = {
     "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
     "/tep": ("/api/v1/tep",),
     "/tours": ("/api/v1/tours", "/api/v1/users", "/api/v1/products", "/api/v1/mang",
-               "/api/v1/quyet-toan-tour"),
+               "/api/v1/quyet-toan-tour",
+               # Lớp 3 (11/9/2026): dòng khách, doanh thu, phương tiện, HDV chi, sổ dấu vết.
+               #
+               # KHÔNG dựng một màn hình mới cho nó. Menu đã có mục "Quyết toán tour" trỏ vào /tours,
+               # và đây đúng là những cửa của chính màn hình ấy. Thêm một lối vào thứ hai cho cùng
+               # một việc là cách chắc chắn để người dùng không biết nên bấm vào đâu.
+               #
+               # Hệ quả: bốn vai Kinh doanh cũng chạm được tiền tố này, vì họ xem được /tours. Phần
+               # giá vốn thì họ VẪN KHÔNG xem được – hàng rào trong là danh sách XEM của chính
+               # app/api/v1/quyet_toan_lop3.py, và danh sách ấy không có vai Kinh doanh nào.
+               "/api/v1/quyet-toan-lop3"),
     "/vietrip": ("/api/v1/import",),
     "/visa": ("/api/v1/visa",),
     "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents"),

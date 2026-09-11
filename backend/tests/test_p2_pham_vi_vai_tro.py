@@ -142,6 +142,18 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # Hai lần đổi trên TRỰC GIAO nhau (một bên thêm phân hệ, một bên bỏ dòng thừa) nên con số dưới đây
 # được ĐẾM LẠI TỪ MÃ, không phải cộng trừ tay hai bảng cũ.
 PHAM_VI_DA_CHOT = {
+    # LỚP 3 QUYẾT TOÁN TOUR (11/9/2026) – +1 cho MƯỜI BỐN vai trò: nhóm "/api/v1/quyet-toan-lop3"
+    # (dòng khách có ngày sinh, dòng doanh thu, phương tiện từng chặng, HDV chi, sổ dấu vết sửa sau
+    # ký) gắn vào màn hình /tours, tức mục "Quyết toán tour" đã có sẵn trong menu.
+    #
+    # CỐ Ý KHÔNG dựng màn hình mới: menu đã có đúng một mục cho việc này, và thêm lối vào thứ hai cho
+    # cùng một việc là cách chắc chắn để người dùng không biết nên bấm vào đâu. Hệ quả là bốn vai
+    # Kinh doanh cũng được nới, vì họ xem được /tours để tra chuyến của booking mình.
+    #
+    # Phần giá vốn thì họ VẪN KHÔNG xem được: hàng rào trong là danh sách XEM của chính
+    # app/api/v1/quyet_toan_lop3.py, và danh sách ấy không có vai Kinh doanh nào – cùng lý lẽ đã ghi
+    # ở đoạn "/api/v1/lai-lo-tour" bên dưới. Đây đúng là kiểu hai lớp rào mà P2 thiết kế: rào ngoài
+    # theo màn hình, rào trong theo việc.
     # ĐẾM LẠI TỪ MÃ ĐÃ HỢP NHẤT 10/9/2026 (gộp Đợt 2 + Lãi lỗ theo tour). Không cộng trừ tay hai bảng:
     # bảng này là kết quả gọi AC.pham_vi_day_du() trên chính mã trong lần gộp này.
     # +1 cho sáu vai trò ngày 09/9/2026 – nhóm "/api/v1/tong-dai" gắn vào màn hình /kiem-soat: nhật ký
@@ -160,14 +172,14 @@ PHAM_VI_DA_CHOT = {
     # ĐẾM LẠI LẦN HAI khi gộp nhánh Đợt 2 vào (09/9/2026 tối). Nhánh ấy thêm ba màn hình có phạm vi
     # API riêng – /tu-dong-hoa (Lịch tự động hóa), /bao-cao (Báo cáo tự động theo phòng), và ba màn
     # hình V6 của chuỗi bán hàng. Bảng này lại được đếm từ mã đã hợp nhất, không cộng trừ tay.
-    "chutich": 102, "tgd": 102, "bks": 102, "cntt": 99,
-    "ketoan": 84, "tp_dh": 81, "ptgd_doan": 60, "nv_dh": 56, "hcns": 54, "gd_kd": 54,
+    "chutich": 103, "tgd": 103, "bks": 103, "cntt": 100,
+    "ketoan": 85, "tp_dh": 82, "ptgd_doan": 61, "nv_dh": 57, "hcns": 54, "gd_kd": 55,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 42, "nv_kd": 40, "tn_kd": 40, "tp_kd": 42, "nv_mkt": 31,
+    "ptgd_mkt": 43, "nv_kd": 41, "tn_kd": 41, "tp_kd": 43, "nv_mkt": 31,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -178,7 +190,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 17, "robot_ks": 102, "robot_vpm": 16,
+    "robot_pq": 17, "robot_ks": 103, "robot_vpm": 16,
 }
 
 

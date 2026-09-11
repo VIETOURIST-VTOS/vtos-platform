@@ -48,6 +48,26 @@ SO_SANH_NONE = re.compile(r"\s*(?:is\s+(?:not\s+)?|[=!]=\s*)None\b")
 # Lối thoát có ghi lý do. Không có lý do thì không được miễn.
 MIEN = re.compile(r"#\s*k2-doc-an-toan:(.*)$")
 
+# Phép CHẶN RỖNG tường minh: `x.cot is None` / `x.cot is not None`.
+#
+# Bọc `or 0` không phải cách duy nhất chịu được rỗng, và ở nhiều chỗ nó là cách SAI. Hàm
+# `TourSettlement.loi_nhuan()` phải trả None khi chưa có giá vốn – bọc `or 0` ở đó là biến "chưa ai
+# nhập" thành "0 đồng", tức đúng cái lỗi đợt K2 sinh ra để chặn: 76 dòng doanh thu 2.654.940.111 đ
+# báo lãi 100%.
+#
+# Cách đúng thứ hai là chặn trước rồi trả None:
+#
+#     if self.tong_thu is None or self.da_dong is None:
+#         return None
+#     return self.tong_thu - self.da_dong
+#
+# Ngày 11/9/2026 phép thử này báo năm chỗ như trên là "chưa chịu được rỗng" – cả năm đều đã chặn
+# đúng. Báo động sai kiểu ấy nguy hiểm hơn là bỏ sót, vì lời khuyên kèm theo ("bọc `or 0`") sẽ dẫn
+# người sửa đi phá chính chốt kiểm. Nên từ đây phép thử nhận ra phép chặn tường minh, trong PHẠM VI
+# CÙNG MỘT HÀM và phải đúng CÙNG một thuộc tính – `self.a is None` không miễn cho `self.b`.
+CHAN_RONG = re.compile(r"(?<![\w.])([A-Za-z_][\w\.]*?)\.(\w+)\s+is\s+(?:not\s+)?None\b")
+BAT_DAU_HAM = re.compile(r"^\s*(?:async\s+)?def\s")
+
 
 def ten_cot_tien() -> set:
     """Tên các cột tiền ĐƯỢC PHÉP rỗng, đọc thẳng từ mô hình.
@@ -102,6 +122,7 @@ def quet() -> list:
     xau = []
     for tep in sorted(GOC.rglob("*.py")):
         trong_chuoi_dai = False        # đang ở giữa một chuỗi ba nháy (docstring)
+        da_chan: set[tuple[str, str]] = set()   # (đối tượng, cột) đã chặn rỗng trong hàm hiện tại
         for so, dong in enumerate(tep.read_text(encoding="utf-8").split("\n"), 1):
             # Bỏ qua thân docstring. Một công thức VIẾT RA BẰNG CHỮ để giải thích – ví dụ dòng
             # "doanh thu = tổng (booking.amount - booking.discount)" ở phần mở đầu tệp – không
@@ -116,6 +137,13 @@ def quet() -> list:
                 trong_chuoi_dai = not trong_chuoi_dai
             if dang_mo:
                 continue
+            # Mỗi `def` mở một phạm vi mới: phép chặn ở hàm trước không miễn cho hàm sau.
+            if BAT_DAU_HAM.match(dong):
+                da_chan.clear()
+            # Thu phép chặn TRƯỚC khi soi phép đọc, để bắt được cả dạng một dòng:
+            #     s.chenh_thu = (s.doanh_thu - x) if s.doanh_thu is not None else None
+            for c in CHAN_RONG.finditer(dong):
+                da_chan.add((c.group(1), c.group(2)))
             if "mapped_column" in dong or not TOAN.search(dong):
                 continue
             mien = MIEN.search(dong)
@@ -126,7 +154,9 @@ def quet() -> list:
                 dau, cuoi = m.start(), m.end()
                 if m.group(1)[0].isupper():          # cột SQL, không phải giá trị Python
                     continue
-                if dong[cuoi:cuoi + 5] == " or 0":   # đã gia cố
+                if dong[cuoi:cuoi + 5] == " or 0":   # đã gia cố bằng giá trị thay thế
+                    continue
+                if (m.group(1), m.group(2)) in da_chan:   # đã chặn rỗng tường minh ở trên
                     continue
                 if cuoi < len(dong) and dong[cuoi] == "(":
                     continue
@@ -144,8 +174,12 @@ def test_khong_con_cho_doc_cot_tien_chua_chiu_duoc_rong():
     xau = quet()
     assert not xau, (
         "Có chỗ đọc cột tiền trong phép tính hoặc phép so sánh mà chưa chịu được giá trị rỗng. Cột tiền được phép rỗng "
-        "từ đợt K2 - rỗng ở đây không phải lỗi dữ liệu mà là 'nhân viên chưa nhập'. Sửa bằng cách bọc "
-        "`or 0` quanh chỗ ĐỌC, đừng nới danh sách bỏ qua của phép thử này:\n"
+        "từ đợt K2 - rỗng ở đây không phải lỗi dữ liệu mà là 'nhân viên chưa nhập'. Có HAI cách sửa "
+        "đúng, và đừng nới danh sách bỏ qua của phép thử này:\n"
+        "  1. Bọc `or 0` quanh chỗ ĐỌC - khi rỗng thật sự nên tính bằng không.\n"
+        "  2. Chặn trước rồi trả None - khi rỗng nghĩa là CHƯA CÓ SỐ và kết quả cũng phải rỗng:\n"
+        "         if self.a is None or self.b is None: return None\n"
+        "     Bọc `or 0` ở những chỗ này là biến 'chưa ai nhập' thành '0 đồng', đúng cái lỗi K2 chặn.\n"
         + "\n".join(f"  {t}:{s}  |  {d}" for t, s, d in xau[:40])
         + (f"\n  ... và {len(xau) - 40} chỗ nữa" if len(xau) > 40 else ""))
 

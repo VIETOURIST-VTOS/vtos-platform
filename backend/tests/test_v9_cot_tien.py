@@ -118,36 +118,152 @@ def test_mo_hinh_va_ban_nang_cap_khong_duoc_lech_nhau():
     # do - lan nay DUNG: no dang noi "mo hinh da doi 47 cot ma ban nang cap khong co trong danh sach".
     # Ban nang cap CO, chi la cho nay chua doc toi. Bai hoc lap lai lan hai: danh sach ban nang cap phai
     # noi theo moi dot, neu khong phep thu canh cua lai thanh phep thu canh chinh no.
-    d3 = _mig("zc3d4e5f6a7b_bon_so_tien_cho_lo_nap.py")
-    d4 = _mig("zd4e5f6a7b8c_doi_kieu_cot_tien.py")
-    # Lần thứ BA phép thử này đỏ vì cùng một lý do: thêm cột tiền mà quên nới danh sách bản nâng cấp.
-    # Lần này là `vat_hoa_don` của cửa nhập hoá đơn đầu vào (09/9/2026). Ba lần trong hai ngày là đủ
-    # để kết luận: nhắc nhau "nhớ nới" không có tác dụng. Việc cần làm là để phép thử tự đọc mọi bản
-    # nâng cấp có khai cột tiền, thay vì liệt kê tay từng bản – ghi lại đây làm việc còn tồn.
-    d5 = _mig("8de308e27b31_hoa_don_dau_vao_dong_chi_phi.py")
-    trong_mig = {(b, c) for m in (d1, d2) for b, c, _ in m.COT}
-    trong_mig |= {("intake_runs", c) for c in d3.COT}
-    trong_mig |= {tuple(x) for x in d4.COT}
-    # Bản này khai cả cột chữ (số hoá đơn) và cột ngày, nên phải lọc: chỉ cột kiểu số thập phân mới
-    # thuộc phạm vi phép thử. Lấy cả ba vào là báo "bản nâng cấp đổi cột mà mô hình chưa đổi" – đúng
-    # kiểu báo động sai làm người ta mất tin vào phép thử.
-    trong_mig |= {("tour_cost_lines", c) for c, k in d5.COT
-                  if isinstance(k, Numeric) and not isinstance(k, Float)}
-    # Cùng lý lẽ, cho bốn bảng V6 của chuỗi bán hàng (nhánh Đợt 2): chúng dựng SAU đợt V9 nên sinh ra
-    # đã là kiểu tiền, chưa từng đi qua giai đoạn số thực nhị phân. Khai từng cột chứ không nới phép
-    # thử thành "bỏ qua bảng mới" – nới thế là làm nó luôn xanh, tức là bỏ luôn điều duy nhất nó canh.
-    trong_mig |= {
-        ("bang_gia_dong", "gia_ban"), ("bang_gia_dong", "gia_von"),
-        ("bao_gia_dong", "don_gia"), ("bao_gia_dong", "gia_von_don_vi"),
-        ("bao_gia_dong", "chiet_khau"),
-        ("bao_gia_ban", "tong_ban"), ("bao_gia_ban", "tong_von"),
-        ("hop_dong_khach", "gia_tri"), ("hop_dong_khach", "dat_coc"),
-    }
+    # LẦN THỨ TƯ phép thử này đỏ vì cùng một lý do, và lần này sửa theo đúng việc còn tồn đã ghi ở
+    # trên: KHÔNG liệt kê tay từng bản nâng cấp nữa. Hàm `cot_tien_trong_moi_ban_nang_cap()` đọc cả
+    # thư mục versions và tự tìm mọi cột kiểu tiền, nên thêm bảng mới không còn làm phép thử đỏ oan.
+    #
+    # Ba lần trước đều đỏ vì người thêm cột quên nới danh sách. Nhắc nhau "nhớ nới" đã chứng minh là
+    # không có tác dụng – ba lần trong hai ngày. Việc phải làm là bỏ hẳn cái danh sách phải nới.
+    trong_mig = cot_tien_trong_moi_ban_nang_cap()
+    # CHỈ cột TIỀN, tức Numeric(18,2). Cột Numeric khác độ chính xác KHÔNG phải tiền và cố ý như vậy –
+    # tỷ giá là Numeric(18,4) vì bốn chữ số lẻ là độ chính xác ngân hàng công bố. Chính
+    # app/models/kieu_tien.py đã dặn: "Không dùng cho tỷ lệ, hệ số, số lượng, hay số đo". Gộp chúng
+    # vào đây là kéo phép thử canh cột tiền đi canh cả những cột không phải tiền.
     trong_mo_hinh = {(t.name, c.name) for t in Base.metadata.tables.values() for c in t.columns
-                     if isinstance(c.type, Numeric) and not isinstance(c.type, Float)}
-    assert trong_mig == trong_mo_hinh, {
-        "co trong ban nang cap ma mo hinh chua doi": sorted(trong_mig - trong_mo_hinh),
+                     if isinstance(c.type, Numeric) and not isinstance(c.type, Float)
+                     and (c.type.precision, c.type.scale) == (18, 2)}
+    assert trong_mig >= trong_mo_hinh, {
         "mo hinh da doi ma khong co ban nang cap": sorted(trong_mo_hinh - trong_mig)}
+
+
+def cot_tien_trong_moi_ban_nang_cap() -> set[tuple[str, str]]:
+    """Đọc THƯ MỤC versions và trả về mọi (bảng, cột) mang kiểu tiền do bản nâng cấp tạo hoặc đổi.
+
+    Vì sao đọc bằng cây cú pháp chứ không nhập tệp: nhập 80 bản nâng cấp là chạy mã của chúng, và
+    nhiều bản gọi tới `op` vốn chỉ có nghĩa trong ngữ cảnh alembic đang chạy thật.
+
+    Bốn hình dạng khai cột tiền có thật trong kho này, và hàm bắt cả bốn:
+
+        op.create_table("t", sa.Column("c", TIEN), ...)
+        op.add_column("t", sa.Column("c", TIEN))
+        for ten, kieu in DANH_SACH: op.add_column("t", sa.Column(ten, kieu))   <- w1a2b3c4d5e6
+        COT = [("t", "c", ...), ...]                                            <- các bản V9/K1
+
+    Kiểu được coi là TIỀN khi nó viết là `TIEN` hoặc `sa.Numeric(18, 2)` / `Numeric(18, 2)`. Đây là
+    quy ước đã dùng suốt kho, xem app/models/kieu_tien.py.
+    """
+    import ast
+    from pathlib import Path
+
+    thu_muc = Path(__file__).resolve().parent.parent / "alembic" / "versions"
+
+    def la_tien(nut) -> bool:
+        if isinstance(nut, ast.Name):
+            return nut.id == "TIEN"
+        if isinstance(nut, ast.Attribute):
+            return nut.attr == "TIEN"
+        if isinstance(nut, ast.Call):
+            f = nut.func
+            ten = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", "")
+            if ten != "Numeric":
+                return False
+            so = [a.value for a in nut.args if isinstance(a, ast.Constant)]
+            return so[:2] == [18, 2]
+        return False
+
+    def chu(nut):
+        return nut.value if isinstance(nut, ast.Constant) and isinstance(nut.value, str) else None
+
+    kq: set[tuple[str, str]] = set()
+    for tep in thu_muc.glob("*.py"):
+        try:
+            cay = ast.parse(tep.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+
+        # Hằng số cấp mô-đun, để giải được vòng lặp `for ten, kieu in DANH_SACH`.
+        hang: dict[str, ast.AST] = {}
+        for n in cay.body:
+            if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
+                hang[n.targets[0].id] = n.value
+
+        def ten_tu_danh_sach_chuoi(nut):
+            """("a", "b", ...) -> ["a", "b", ...]. Rỗng nếu không phải danh sách chuỗi thuần."""
+            if isinstance(nut, ast.Name):
+                nut = hang.get(nut.id)
+            if not isinstance(nut, (ast.List, ast.Tuple)):
+                return []
+            ten = [chu(x) for x in nut.elts]
+            return ten if ten and all(ten) else []
+
+        def cap_tu_danh_sach(nut):
+            """[(ten, kieu), ...] -> những tên cột mang kiểu tiền."""
+            if isinstance(nut, ast.Name):
+                nut = hang.get(nut.id)
+            if not isinstance(nut, (ast.List, ast.Tuple)):
+                return []
+            ra = []
+            for phan_tu in nut.elts:
+                if isinstance(phan_tu, ast.Tuple) and len(phan_tu.elts) >= 2:
+                    ten = chu(phan_tu.elts[0])
+                    if ten and la_tien(phan_tu.elts[1]):
+                        ra.append(ten)
+            return ra
+
+        for nut in ast.walk(cay):
+            # Hình 1 và 2: gọi thẳng op.create_table / op.add_column với tên bảng là chuỗi.
+            if isinstance(nut, ast.Call) and isinstance(nut.func, ast.Attribute) \
+                    and nut.func.attr in ("create_table", "add_column") and nut.args:
+                bang = chu(nut.args[0])
+                if not bang:
+                    continue
+                for tham_so in nut.args[1:]:
+                    if isinstance(tham_so, ast.Call) and getattr(tham_so.func, "attr", "") == "Column" \
+                            and len(tham_so.args) >= 2:
+                        ten = chu(tham_so.args[0])
+                        if ten and la_tien(tham_so.args[1]):
+                            kq.add((bang, ten))
+
+            # Hình 3: vòng lặp trên một danh sách (ten, kieu), thân gọi add_column với bảng là chuỗi.
+            if isinstance(nut, ast.For):
+                cot = cap_tu_danh_sach(nut.iter)
+                if cot:
+                    for con in ast.walk(nut):
+                        if isinstance(con, ast.Call) and con.args:
+                            bang = chu(con.args[0])
+                            if bang:
+                                kq.update((bang, c) for c in cot)
+                    continue
+
+                # Hình 3b: vòng lặp trên danh sách CHUỖI thuần – tên cột ở danh sách, kiểu nằm trong
+                # thân vòng lặp: `for c in COT: op.add_column("t", sa.Column(c, sa.Numeric(18,2)))`.
+                ten_cot = ten_tu_danh_sach_chuoi(nut.iter)
+                if not ten_cot:
+                    continue
+                for con in ast.walk(nut):
+                    if isinstance(con, ast.Call) and isinstance(con.func, ast.Attribute) \
+                            and con.func.attr in ("create_table", "add_column") and con.args:
+                        bang = chu(con.args[0])
+                        if not bang:
+                            continue
+                        for tham_so in con.args[1:]:
+                            if isinstance(tham_so, ast.Call) \
+                                    and getattr(tham_so.func, "attr", "") == "Column" \
+                                    and len(tham_so.args) >= 2 and la_tien(tham_so.args[1]):
+                                kq.update((bang, c) for c in ten_cot)
+
+        # Hình 4: hằng số COT = [(bang, cot, kieu), ...] của các đợt chuyển kiểu V9/K1.
+        for ten_hang, gia_tri in hang.items():
+            if not ten_hang.startswith("COT"):
+                continue
+            if not isinstance(gia_tri, (ast.List, ast.Tuple)):
+                continue
+            for phan_tu in gia_tri.elts:
+                if isinstance(phan_tu, ast.Tuple) and len(phan_tu.elts) >= 2:
+                    a, b = chu(phan_tu.elts[0]), chu(phan_tu.elts[1])
+                    if a and b:
+                        kq.add((a, b))
+    return kq
 
 
 def test_hai_ban_nang_cap_khong_doi_trung_mot_cot():

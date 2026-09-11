@@ -59,6 +59,10 @@ CUA_NAP = (
     ("misa.import_projects", "app.services.misa", False, "Nạp danh mục công trình từ MISA"),
     ("fleet.nhap_chuyen_hang_loat", "app.services.fleet", False,
      "Nạp nhật trình chuyến xe hàng loạt (báo cáo VieTrip)"),
+    # Lớp 2 quyết toán tour (10/9/2026): nạp cả THƯ MỤC tệp quyết toán của Điều hành, mỗi tệp một
+    # chuyến, bốn sheet mỗi tệp. Có ghi nhật ký lô vì nó đi qua bộ nạp chung.
+    ("quyet_toan_chi_tiet.nap_lo", "app.services.quyet_toan_chi_tiet", True,
+     "Nạp lô tệp quyết toán chi tiết của Phòng Điều hành – bốn mặt của một chuyến"),
     # Năm cửa dưới đây do PHÉP THỬ NL7 soi mã nguồn tìm ra, không phải do đọc mà nhớ ra. Đó đúng là
     # lý do phép thử ấy tồn tại: bảng khai tay nào cũng thiếu, chỉ khác nhau ở chỗ có ai phát hiện không.
     ("banks.import_bank_book", "app.services.banks", False,

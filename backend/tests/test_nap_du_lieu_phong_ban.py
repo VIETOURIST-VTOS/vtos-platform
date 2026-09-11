@@ -77,9 +77,23 @@ def test_du_bo_nap_cho_cac_phong_ban(_startup):
 
 
 def test_moi_bo_nap_deu_co_tep_mau(_startup):
+    """Mỗi bộ nạp phải phát được MẪU – hoặc CSV chung, hoặc mẫu riêng khai trong bộ nạp.
+
+    Bộ nạp nào nhận tệp Excel nhiều sheet (mau_quyet_toan_tour) thì CSV phẳng không phải hình dạng
+    của nó: tải về điền xong nạp lên là bị từ chối ngay dòng đầu vì thiếu sheet. Những bộ ấy khai
+    "mau_rieng" và cửa CSV trả 409 kèm đường dẫn mẫu thật. Phép thử đi theo chính đường dẫn ấy –
+    khai một đường dẫn chết cũng tệ ngang phát một CSV sai hình.
+    """
     d = client.get("/api/v1/nap-du-lieu/bo-nap", headers=login("cntt")).json()
     for b in d["bo_nap"]:
         r = client.get(f"/api/v1/nap-du-lieu/mau/{b['ma']}", headers=login("cntt"))
+        if b.get("mau_rieng"):
+            assert r.status_code == 409, b["ma"]
+            for m in b["mau_rieng"]:
+                rm = client.get(m["duong_dan"], headers=login("cntt"))
+                assert rm.status_code == 200, f"{b['ma']} – mẫu riêng chết: {m['duong_dan']}"
+                assert rm.content[:2] == b"PK", f"{b['ma']} – {m['ten']} không phải tệp .xlsx"
+            continue
         assert r.status_code == 200 and len(r.text.splitlines()) >= 2, b["ma"]
 
 

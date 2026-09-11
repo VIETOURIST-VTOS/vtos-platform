@@ -517,6 +517,43 @@ def kiem(doc: dict, ma_khoan_map: dict | None = None) -> dict:
                              "không phải diễn giải. Đo trên tệp mẫu đúng 20/20 dòng, nên một dòng lệch "
                              "là gõ tay đè lên công thức."})
 
+    # ---- 4b. Ô TỔNG của chiết tính phải bằng tổng các dòng của chính nó ----
+    #
+    # Phép kiểm 4 ở trên soát TỪNG DÒNG: thành tiền có bằng đơn giá × số lượng × hệ số không. Nó
+    # không soát PHÉP CỘNG. Trong Excel, ô tổng là một công thức mà không ai kiểm, và một dải =SUM()
+    # bỏ sót một dòng thì bảng vẫn cân ở mọi tầng phía sau – vì mọi tầng đều lấy lại đúng cái tổng đã
+    # sai ấy.
+    #
+    # Đo trên tệp mẫu "QT TOUR NHA TRANG 10.07.26.xlsx": nhóm "B. TRẺ EM" ghi tổng 3.990.000 đ, cộng
+    # lại năm dòng của chính nhóm ấy được 4.200.000 đ. Thiếu đúng 210.000 đ – dòng Tham quan Tháp Bà
+    # của trẻ em. Con số 3.990.000 sai ấy đi thẳng vào tổng chi 50.650.000, rồi vào cột LAND của cả
+    # 42 dòng quyết toán, rồi vào lợi nhuận 20.515.000. Phép kiểm 4 báo 0/20 dòng lệch, và đúng: mỗi
+    # dòng đều nhân đúng. Cái sai nằm ở chỗ không dòng nào chịu trách nhiệm.
+    #
+    # Đây chính là lý do của nguyên tắc Chủ tịch chốt 10/9/2026: MÁY CHỦ CỘNG, NGƯỜI KHÔNG GÕ TỔNG.
+    # Ở đây máy không sửa được tệp, nên nó làm việc gần nhất: cộng lại và nói ra chỗ lệch.
+    cong_nhom: dict[str, float] = {}
+    for x in ctt_dong:
+        if x["ve"] != "chi" or x["thanh_tien"] is None:
+            continue
+        cong_nhom[x["nhom"] or "(không nhóm)"] = (
+            cong_nhom.get(x["nhom"] or "(không nhóm)", 0.0) + x["thanh_tien"])
+    cong_chi_dong = sum(cong_nhom.values())
+    tong_ghi = ((doc.get("ctt") or {}).get("tong") or {}).get("chi")
+    if tong_ghi is not None and ctt_dong and not _gan(tong_ghi, cong_chi_dong):
+        chenh = cong_chi_dong - tong_ghi
+        dc.append({
+            "muc": "tong_chi_khac_tong_dong", "nang": True,
+            "noi_dung": f"Ô tổng chi ghi {tong_ghi:,.0f} đ, cộng lại các dòng được "
+                        f"{cong_chi_dong:,.0f} đ – lệch {chenh:+,.0f} đ",
+            "nguon": {**{f"cộng lại {k}": round(v) for k, v in cong_nhom.items()},
+                      "cộng lại tất cả": round(cong_chi_dong),
+                      "ô tổng tệp ghi": round(tong_ghi),
+                      "lệch": round(chenh)},
+            "vi_sao": "Ô tổng trong Excel là một công thức mà không ai kiểm. Thiếu một dòng trong dải "
+                      "=SUM() thì bảng vẫn cân ở mọi tầng phía sau, vì mọi tầng đều lấy lại đúng cái "
+                      "tổng đã sai. Lệch ở đây đi thẳng vào giá vốn và vào lợi nhuận của chuyến."})
+
     # ---- 5. Chi phí khác nhau giữa chiết tính và bảng chi thật của HDV ----
     hdv = (doc.get("hdv_chi") or {})
     for h in (hdv.get("dong") or []):

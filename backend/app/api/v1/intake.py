@@ -41,7 +41,13 @@ def bo_nap(u: User = Depends(require_roles(*READ))):
 def tep_mau(loai: str, u: User = Depends(require_roles(*READ))):
     """Tệp CSV mẫu: hàng 1 là tên cột, hàng 2 là một dòng ví dụ."""
     if loai not in IN.BO_NAP: raise HTTPException(404, f"Không có bộ nạp '{loai}'")
-    return PlainTextResponse(IN.mau_csv(loai), media_type="text/csv; charset=utf-8",
+    try:
+        noi_dung = IN.mau_csv(loai)
+    except ValueError as ex:
+        # Bộ nạp có mẫu riêng (Excel nhiều sheet). Nói ra đường dẫn đúng thay vì phát một CSV phẳng
+        # mà nạp lên sẽ bị từ chối – xem giải thích trong intake.mau_csv().
+        raise HTTPException(409, str(ex))
+    return PlainTextResponse(noi_dung, media_type="text/csv; charset=utf-8",
                              headers={"Content-Disposition": f'attachment; filename="mau_{loai}.csv"'})
 
 

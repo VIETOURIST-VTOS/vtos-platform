@@ -1,0 +1,23 @@
+#!/bin/sh
+# KS-1 · cửa chặn mạch nâng cấp, chạy trước mỗi lần đẩy.
+#
+# Cài một lần cho cả kho (git sẽ tìm hook trong thư mục này):
+#     git config core.hooksPath backend/tools
+#
+# Bỏ qua một lần khi thật sự cần (việc này để lại dấu trong lệnh, cố ý):
+#     git push --no-verify
+#
+# Ngày 10/9/2026 nhánh chính được đẩy kèm bản nâng cấp móc vào một bản chưa gộp. Render chết ở
+# 'alembic upgrade head'. Máy chủ giữ bản cũ nên web vẫn chạy và không ai thấy gì bất thường.
+
+GOC=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+[ -f "$GOC/backend/tools/truoc_khi_day.py" ] || exit 0
+
+PY=python3
+command -v "$PY" >/dev/null 2>&1 || PY=python
+command -v "$PY" >/dev/null 2>&1 || {
+    echo "KS-1: không tìm thấy python — không kiểm được mạch nâng cấp. Chặn đẩy." >&2
+    exit 1
+}
+
+"$PY" "$GOC/backend/tools/truoc_khi_day.py"

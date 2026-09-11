@@ -17,7 +17,7 @@ Bốn quy tắc, và mỗi quy tắc ứng một cách nạp dữ liệu làm h�
   4. DỮ LIỆU NẠP LÀ DỮ LIỆU CHƯA ĐỐI CHIẾU. Nó vào hệ thống kèm nguồn và nhật ký, không mặc nhiên thành
      số liệu chính thức – ai đọc cũng phải thấy được nó từ đâu ra.
 """
-import csv, hashlib, io, json
+import csv, hashlib, io, json, re
 from datetime import date, datetime
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -111,8 +111,18 @@ def _ncc_kiem(db, r):
     if not ten: loi.append("Thiếu tên nhà cung cấp")
     loai = str(r.get("loai") or "khac").strip()
     if loai not in LOAI_NCC: loi.append(f"Loại '{loai}' không hợp lệ ({', '.join(LOAI_NCC)})")
-    if not str(r.get("ma_so_thue") or "").strip():
+    mst = str(r.get("ma_so_thue") or "").strip()
+    if not mst:
         cb.append("Chưa có mã số thuế – chi cho đối tác này khó lấy hóa đơn GTGT")
+    elif not re.fullmatch(r"\d{10}(-\d{3})?", mst):
+        # CẢNH BÁO, không phải LỖI: vẫn nạp được, nhưng phải nói ra. Mã số thuế Việt Nam là 10 chữ số,
+        # hoặc 10-3 cho đơn vị phụ thuộc. Đo trên tệp danh mục thật của công ty: 47 trong 280 dòng
+        # không đúng dạng – phần lớn là 11 chữ số hoặc 9 chữ số (dạng cũ). Mã sai dạng thì hoá đơn của
+        # đối tác ấy không kê khai khấu trừ được, và chỉ phát hiện ra vào lúc quyết toán thuế.
+        cb.append(f"Mã số thuế '{mst}' không đúng dạng 10 chữ số (hoặc 10-3 cho đơn vị phụ thuộc) – "
+                  f"kiểm lại trước khi dùng để kê khai")
+    if not str(r.get("ten_phap_nhan") or "").strip():
+        cb.append("Chưa có tên pháp nhân – hoá đơn mang tên pháp nhân, không mang tên giao dịch")
     trung = None
     if ten:
         trung = db.execute(select(Supplier).where(func.lower(Supplier.ten) == ten.lower())).scalars().first()
@@ -235,7 +245,11 @@ BO_NAP = {
         "mo_ta": "Danh mục nhà cung cấp. Số tài khoản nạp lần đầu ở đây; đổi về sau phải qua đề nghị có "
                  "người thứ hai xác nhận.",
         "khoa_chong_trung": "Tên nhà cung cấp",
-        "cot": [_c("ten", "Tên nhà cung cấp", True, vi_du="Khách sạn Mường Thanh Đà Lạt"),
+        "cot": [_c("ten", "Tên nhà cung cấp", True, vi_du="Khách sạn Mường Thanh Đà Lạt",
+                   ghi_chu="Tên GIAO DỊCH – tên mà điều hành gọi hằng ngày"),
+                _c("ten_phap_nhan", "Tên pháp nhân", vi_du="CTY TNHH PHÁT HOÀNG LONG",
+                   ghi_chu="Tên trên HOÁ ĐƠN. Khác tên giao dịch: 'RESORT VĨNH HY' xuất hoá đơn dưới "
+                           "tên 'CTY TNHH PHÁT HOÀNG LONG'. Thiếu tên này thì kê khai thuế không khớp."),
                 _c("loai", "Loại", vi_du="khach_san", ghi_chu="khach_san / nha_hang / van_chuyen / "
                                                               "ve_tham_quan / hdv / hang_khong / tau_thuyen / khac"),
                 _c("ma_so_thue", "Mã số thuế", vi_du="0312345678"),
@@ -385,12 +399,30 @@ def danh_sach_bo_nap() -> list[dict]:
              "bang_dich": v.get("bang_dich", ""),
              "vai_tro": list(VAI_TRO.get(k, QUAN_TRI)),
              "vai_tro_nap_tep": list(VAI_TRO_NAP_TEP.get(k, QUAN_TRI)),
+             # Bộ nạp nào có MẪU RIÊNG thì nói ra ở đây, để màn hình dựng nút tải đúng mẫu ấy thay
+             # cho nút "tải CSV mẫu" chung. Xem giải thích ở mau_csv() ngay dưới.
+             "mau_rieng": list(v.get("mau_rieng", ())),
              "cot": v["cot"]} for k, v in BO_NAP.items()]
 
 
 def mau_csv(loai: str) -> str:
-    """Tệp mẫu: hàng đầu là TÊN CỘT, hàng thứ hai là một dòng ví dụ để người nhập biết định dạng."""
+    """Tệp mẫu: hàng đầu là TÊN CỘT, hàng thứ hai là một dòng ví dụ để người nhập biết định dạng.
+
+    KHÔNG PHẢI BỘ NẠP NÀO CŨNG PHẲNG THÀNH CSV ĐƯỢC
+
+    Bộ nạp 'mau_quyet_toan_tour' nhận một tệp MƯỜI SHEET do chính VTOS phát ra. Khai báo "cot" của nó
+    chỉ là bảng mô tả cho màn hình xem, không phải hình dạng thật của tệp. Dựng CSV từ bảng ấy thì ra
+    một tệp tám cột phẳng – nhân viên tải về, điền vào, nạp lên, và bị từ chối ở dòng đầu vì tệp
+    không có sheet THÔNG TIN. Lỗi nằm ở cái nút họ bấm, không nằm ở việc họ làm.
+
+    Nên chỗ này TỪ CHỐI và chỉ sang mẫu thật, thay vì phát ra một tệp không dùng được.
+    """
     bo = BO_NAP[loai]
+    if bo.get("mau_rieng"):
+        ds = " | ".join(f"{m['ten']}: {m['duong_dan']}" for m in bo["mau_rieng"])
+        raise ValueError(
+            f"'{bo['ten']}' không dùng CSV mẫu – tệp của bộ nạp này là mẫu Excel nhiều sheet do VTOS "
+            f"phát ra. Tải mẫu đúng ở: {ds}")
     tieu_de = [c["ten"] for c in bo["cot"]]
     vi_du = [c["vi_du"] for c in bo["cot"]]
     out = io.StringIO()

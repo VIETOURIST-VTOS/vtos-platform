@@ -30,6 +30,7 @@ from app.models.ngoai_le import *  # noqa
 from app.models.kiem_soat import *  # noqa
 from app.models.hach_toan import *  # noqa
 from app.models.quyet_toan import *  # noqa
+from app.models.lop3_tour import *  # noqa
 from app.models.nap_bo_sung import *  # noqa
 from app.models.doc_chung_tu import *  # noqa
 # Đội xe thiếu ở đây từ đầu. Ứng dụng vẫn chạy vì các dịch vụ nạp thẳng app.models.fleet, nhưng

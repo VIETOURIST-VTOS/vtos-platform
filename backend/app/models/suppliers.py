@@ -37,6 +37,13 @@ class Supplier(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(30), unique=True)          # NCC0001
     ten: Mapped[str] = mapped_column(String(200))
+    # TÊN GIAO DỊCH ở trên, TÊN PHÁP NHÂN ở đây – hai thứ khác nhau và hoá đơn chỉ chấp nhận cái thứ
+    # hai. Đo trên tệp danh mục thật của công ty (280 nhà cung cấp): "RESORT VĨNH HY" là tên người ta
+    # gọi, còn hoá đơn mang tên "CTY TNHH PHÁT HOÀNG LONG"; "NEM NƯỚNG BÀ HÙNG" xuất hoá đơn dưới tên
+    # "HỘ KINH DOANH HOÀNG LỆ GIANG".
+    #
+    # Gộp hai tên vào một cột thì hoặc mất tên để tra, hoặc mất tên để kê khai thuế.
+    ten_phap_nhan: Mapped[str] = mapped_column(String(300), default="")
     loai: Mapped[str] = mapped_column(String(20), default="khac")
     ma_so_thue: Mapped[str] = mapped_column(String(20), default="")
     dia_chi: Mapped[str] = mapped_column(String(300), default="")
