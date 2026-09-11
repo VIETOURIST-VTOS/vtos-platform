@@ -45,6 +45,7 @@ DEFAULT_PARAMS = [
     ("coc_mac_dinh_pct", "30", "Tỷ lệ cọc mặc định khi sản phẩm không quy định", "%", "Vận hành Vietrip"),
     ("han_coc_gio", "24", "Hạn khách đặt cọc sau khi tạo booking (quá → cảnh báo sale/ĐH)", "giờ", "Vận hành Vietrip"),
     ("han_huy_cho_ngay", "3", "Deadline hủy chỗ / thu đủ trước khởi hành (đóng tour, khóa booking)", "ngày", "Vận hành Vietrip"),
+    ("han_giu_cho_gio", "48", "Giữ chỗ cho booking CHƯA thu đồng nào; quá hạn thì trả chỗ về tour (booking vẫn còn)", "giờ", "VPM-7 11/9/2026"),
     ("bao_luu_han_ngay", "90", "Hạn hiệu lực tiền bảo lưu (cảnh báo trước 7 ngày)", "ngày", "Vận hành Vietrip"),
     ("sla_tra_loi_chat_phut", "5", "Sale phải trả lời tin nhắn khách (Facebook/Zalo/web) trong giờ làm việc; quá → AI trả lời thay", "phút", "MKT/KD – hộp thư đa kênh"),
     ("sla_tra_loi_ngoai_gio_phut", "15", "Ngoài giờ làm việc (trước 8h, sau 21h): AI trả lời thay sau", "phút", "MKT/KD – hộp thư đa kênh"),
@@ -295,6 +296,22 @@ def calc_db(db: Session, t: Tour, threshold: float) -> dict:
 
 
 def booked_pax(tour: Tour) -> int:
+    """Số khách ĐANG THỰC SỰ GIỮ CHỖ của tour.
+
+    VPM-7 (11/9/2026) trừ thêm các booking đã HẾT HẠN GIỮ CHỖ. Trước đó hàm này đếm mọi booking chưa
+    huỷ, nên một booking khách gọi giữ rồi im vẫn chiếm chỗ mãi mãi và tour hiện "hết chỗ" trong khi
+    không ai trả đồng nào — số chỗ còn lại sai theo hướng nguy hiểm nhất, vì nó làm công ty từ chối
+    khách thật.
+
+    Booking hết hạn giữ chỗ KHÔNG bị huỷ: nó vẫn nằm trong danh sách, vẫn tra cứu được, khách trả tiền
+    muộn thì khôi phục nếu tour còn chỗ. Cần con số gộp cả chúng (đối chiếu, tra lại lịch sử) thì dùng
+    `booked_pax_gom_het_han` bên dưới — cố ý để thành hai tên khác nhau, vì hai câu hỏi khác nhau.
+    """
+    return sum(b.pax for b in tour.bookings if not b.cancelled and not b.giu_cho_het)
+
+
+def booked_pax_gom_het_han(tour: Tour) -> int:
+    """Đếm cả booking đã hết hạn giữ chỗ – dùng khi cần biết tổng số khách đã từng đăng ký."""
     return sum(b.pax for b in tour.bookings if not b.cancelled)
 
 

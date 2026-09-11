@@ -131,6 +131,12 @@ class BookingCancelIn(BaseModel):
     expires_days: int | None = None
 
 
+class GiaHanGiuChoIn(BaseModel):
+    """VPM-7 – dời hạn giữ chỗ. Lý do là BẮT BUỘC: một chỗ giữ thêm là một chỗ không bán cho khách khác."""
+    den: datetime
+    ly_do: str
+
+
 class RetentionApplyIn(BaseModel):
     booking_id: int
     amount: float | None = None  # mặc định: min(còn lại, còn phải thu)

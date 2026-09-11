@@ -9,7 +9,11 @@ from app.models.ops import *  # noqa
 from app.models.finance import *  # noqa
 from app.models.reports_auto import *  # noqa
 from app.models.bao_cao_luu import *  # noqa
+# VPM-5. Dòng này đã có từ commit VPM-5 rồi BIẾN MẤT trong cây làm việc ngày 11/9/2026 – một phiên
+# khác lưu đè bằng bản mở từ trước khi VPM-5 gộp. Thiếu nó thì `phan_bo_tien` không nằm trong
+# Base.metadata: phép thử soi mô hình mù đúng bảng ấy, và alembic autogenerate sẽ đòi XOÁ bảng.
 from app.models.phan_bo_tien import *  # noqa
+from app.models.giu_cho import *  # noqa
 from app.models.vietrip import *  # noqa
 from app.models.crm import *  # noqa
 from app.models.visa import *  # noqa

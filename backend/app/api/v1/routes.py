@@ -405,6 +405,39 @@ def cancel_booking(bid: int, data: S.BookingCancelIn, u: User = Depends(current_
     return BK.cancel(db, u, _booking(db, bid), data.reason, data.charge, data.retain, data.expires_days)
 
 
+# ---------- VPM-7: giữ chỗ có thời hạn ----------
+# Đặt dưới tiền tố /bookings đã được cấp quyền sẵn, KHÔNG mở tiền tố API mới: robot viết phần mềm
+# không tự khai quyền cho mình.
+@router.get("/bookings/{bid}/giu-cho", tags=["bookings"])
+def xem_giu_cho(bid: int, u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="giữ chỗ của booking")), db: Session = Depends(get_db)):
+    from app.services import giu_cho as GC
+    return GC.bang(db, _booking(db, bid))
+
+
+@router.post("/bookings/{bid}/giu-cho/gia-han", tags=["bookings"])
+def gia_han_giu_cho(bid: int, data: S.GiaHanGiuChoIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    from app.services import giu_cho as GC
+    try:
+        return GC.gia_han(db, u, _booking(db, bid), data.den, data.ly_do)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@router.post("/bookings/{bid}/giu-cho/khoi-phuc", tags=["bookings"])
+def khoi_phuc_giu_cho(bid: int, data: S.ActionNote, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    from app.services import giu_cho as GC
+    try:
+        return GC.khoi_phuc(db, u, _booking(db, bid), data.note)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@router.get("/bookings/giu-cho/tong-hop", tags=["bookings"])
+def tong_hop_giu_cho(u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="tổng hợp giữ chỗ")), db: Session = Depends(get_db)):
+    from app.services import giu_cho as GC
+    return GC.tong_hop(db)
+
+
 @router.post("/bookings/{bid}/unlock", tags=["bookings"])
 def unlock_booking(bid: int, data: S.ActionNote, u: User = Depends(current_user), db: Session = Depends(get_db)):
     return {"message": BK.unlock(db, u, _booking(db, bid), data.note)}
