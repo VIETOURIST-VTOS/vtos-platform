@@ -141,7 +141,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
     // thanh ngang một chữ "Chưa có nguồn". Không có tên thì mới quay về nút cũ.
     if (tenTam) {
       return (
-        <span className="bar-muc o-donvi" title={`${tenTam.ten} · ${tenTam.phu}. Chưa đổi được đơn vị: máy chủ chưa có đường dẫn phạm vi. Bộ phận chịu: ${kq.bo_phan}.`}>
+        <span className="bar-muc o-donvi" title={`${tenTam.day_du} · ${tenTam.phu}. Chưa đổi được đơn vị: máy chủ chưa có đường dẫn phạm vi. Bộ phận chịu: ${kq.bo_phan}.`}>
           <b>{tenTam.ten}</b><small>{tenTam.phu}</small>
         </span>
       );

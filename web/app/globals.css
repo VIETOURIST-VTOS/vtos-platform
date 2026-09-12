@@ -5,7 +5,7 @@ body{font-family:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,Aria
 a{color:var(--navy);font-weight:600}
 /* Thanh ngang – nền tối theo bản vẽ giao diện chốt 12/9/2026. Màu đặt THẲNG, không qua biến
    --panel: thanh này phải giữ nguyên một màu ở cả chế độ sáng lẫn tối, giống thanh dọc. */
-.top{background:#131C25;color:#fff;padding:12px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5;border-bottom:1px solid #223142}
+.top{background:#131C25;color:#fff;padding:12px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid #223142}
 /* Dấu hiệu nhận biết: logo nền trong suốt xếp TRÊN, tên hệ thống xếp DƯỚI (cột dọc). Logo cao cố
    định 24px và để ảnh tự tính bề ngang theo tỉ lệ – khoá cả hai chiều thì ảnh bẹp. Dòng chữ dưới
    giãn chữ .14em cho bằng bề ngang logo, và không bao giờ vỡ dòng. */
@@ -39,7 +39,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* Thanh ngang: phạm vi và việc chung. Thanh dọc: 8 nhóm nghiệp vụ (Đề xuất 06/9/2026). */
 .top .brand{color:#fff;text-decoration:none}
-.top .bar{display:flex;gap:6px;align-items:center;flex:1 1 auto;min-width:0;flex-wrap:wrap;justify-content:flex-end}
+.top .bar{display:flex;gap:6px;align-items:center;flex:1 1 auto;min-width:0;flex-wrap:nowrap;justify-content:flex-end}
 .top .bar a,.top .bar button,.top .bar select{color:#fff;background:rgba(255,255,255,.13);border:0;border-radius:6px;padding:5px 9px;font-size:12px;text-decoration:none;font-family:inherit;cursor:pointer;white-space:nowrap}
 .top .bar a:hover,.top .bar button:hover{background:rgba(255,255,255,.24)}
 .top .bar .soon{opacity:.45;cursor:default}
@@ -59,9 +59,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
    Không phải nút bấm được: chưa có /pham-vi/don-vi thì chưa đổi đơn vị, mà vẽ một mũi tên xổ xuống
    không làm gì là mời người ta bấm vào chỗ trống. Mũi tên mọc cùng lúc với đường dẫn ấy. */
 .top .bar .o-donvi{flex-direction:column;align-items:flex-start;gap:1px;height:auto;padding:4px 10px;
+  flex:0 1 auto;min-width:0;max-width:250px;overflow:hidden;
   cursor:default;border-left:1px solid rgba(255,255,255,.16);border-radius:0;margin-right:2px}
 .top .bar .o-donvi:hover{background:none}
-.top .bar .o-donvi b{font-size:12.5px;font-weight:650;line-height:1.25;white-space:nowrap}
+.top .bar .o-donvi b{font-size:12.5px;font-weight:650;line-height:1.25;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .top .bar .o-donvi small{font-size:9.5px;opacity:.62;line-height:1.2;white-space:nowrap}
 .top .bar .bar-muc.ai{color:#8FB3DE}
 .top .bar .bar-muc.ai:hover{color:#B9D2F0}
@@ -82,7 +84,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   color:#fff;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;
   justify-content:center;letter-spacing:.02em}
 @media (max-width:900px){
-  .top .bar .o-tim{width:auto}
+  .top{flex-wrap:wrap}
+  .top .bar{flex-wrap:wrap}
+  .top .bar .o-tim{flex:1 1 100%}
   .top .bar .o-donvi small{display:none}
   .top .bar .bar-muc span,.top .bar .o-tim span,.top .bar .who-ten{position:absolute;width:1px;
     height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
