@@ -17,6 +17,13 @@ export const THU_TU_MA = [
 
 type CoMa = { code?: string | null };
 
+/** Một dòng trong ô chọn đơn vị, đúng như /dong-tien/meta và /pham-vi/don-vi trả về.
+ *
+ *  Có kiểu này vì gọi `xepDonVi(r.phap_nhan)` với `r` kiểu any thì T rơi về đúng ràng buộc {code}
+ *  và mọi trường khác biến mất — màn hình đọc `ds[0].id` sẽ không biên dịch được.
+ */
+export type DonViChon = { id: number; code?: string | null; name?: string | null };
+
 /** Vị trí của một pháp nhân trong thứ tự trên. Mã lạ trả về một số lớn để rơi xuống cuối. */
 export function viTri(ma?: string | null): number {
   const i = THU_TU_MA.indexOf((ma || "").trim().toUpperCase());

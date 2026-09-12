@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, fmtD, vnd } from "@/lib/api";
 import { useShell } from "@/components/Shell";
-import { xepDonVi } from "@/lib/thu_tu_don_vi";
+import { xepDonVi, type DonViChon } from "@/lib/thu_tu_don_vi";
 
 /** Màn hình 01 · Tổng quan điều hành — khối dòng tiền bốn mốc và bốn ô cảnh báo.
  *
@@ -49,7 +49,9 @@ export default function KhoiDongTien() {
       .then((r: any) => {
         // Xếp theo thứ tự đã chốt (VTD trước) chứ không theo bảng chữ cái của máy chủ: mở màn hình
         // ra mà con số đầu tiên đập vào mắt là của một pháp nhân nhỏ thì đó là con số ít cần nhất.
-        const ds = xepDonVi(r.phap_nhan || []);
+        // Ghi rõ kiểu phần tử: `r` là any nên nếu để suy diễn, T rơi về đúng ràng buộc {code} và
+        // `ds[0].id` không còn tồn tại dưới mắt trình biên dịch (CI/web bắt đỏ lần đầu).
+        const ds = xepDonVi<DonViChon>(r.phap_nhan || []);
         setDsPn(ds);
         if (ds.length) setPn(ds[0].id);
         else setAn(true);
