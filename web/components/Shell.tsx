@@ -415,8 +415,13 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             đọc màn hình đọc tên hai lần. width/height khai đúng tỉ lệ tệp (720×389) để trang không
             bị giật một nhịp khi ảnh tải xong. */}
         <Link href="/" className="brand" aria-label="VIETOURIST Operating System – về bảng điều hành">
+          {/* Dấu VTOS của bộ nhận diện v1.0 (12/9/2026). Bản NỀN TỐI vì thanh ngang là navy đặc
+              #14538D – bản chính dùng cho nền sáng. Dạng SVG nên không vỡ ở mọi cỡ màn hình.
+              Quy tắc 6: logo trong giao diện không nhỏ hơn 22px; ở đây cao 30px.
+              Logo Vietourist (web/public/vietourist.png) GIỮ NGUYÊN trong kho, không xoá – đó là
+              nhận diện công ty, khác với dấu của phần mềm; trang đăng nhập còn dùng. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/vietourist.png" alt="" width={720} height={389} className="brand-logo" />
+          <img src="/thuong-hieu/vtos-logo-nen-toi.svg" alt="" width={708} height={434} className="brand-logo" />
           <small>VIETOURIST OPERATING SYSTEM</small>
         </Link>
         <span className="bar">
