@@ -311,6 +311,12 @@ BO_NAP.update(_pb2.bo_nap(_c))
 # đọc phải đoán đang cầm loại nào – và đoán sai một lần là nạp tổng tháng vào chỗ của một chuyến.
 from app.services import intake_phong_ban_3 as _pb3   # noqa: E402
 BO_NAP.update(_pb3.bo_nap(_c))
+# Tệp thứ tư (11/9/2026) – KHO QUYẾT TOÁN CŨ, 604 tệp Excel TỰ DO tháng 1–6/2026. Bộ nạp riêng chứ
+# không mở rộng 'quyet_toan_tour_chi_tiet': tệp mẫu chuẩn có sheet tên cố định và nhãn cột cố định,
+# kho cũ thì đo được 108 bộ sheet khác nhau. Một bộ đọc phải đoán đang cầm loại nào là một bộ đọc sẽ
+# đoán sai. Xem đầu app/services/intake_kho_cu.py.
+from app.services import intake_kho_cu as _kho   # noqa: E402
+BO_NAP.update(_kho.bo_nap(_c))
 
 
 # Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
@@ -331,6 +337,7 @@ VAI_TRO = {
 }
 VAI_TRO.update(_pb2.vai_tro(QUAN_TRI))
 VAI_TRO.update(_pb3.vai_tro(QUAN_TRI))
+VAI_TRO.update(_kho.vai_tro(QUAN_TRI))
 
 
 # P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.
@@ -349,7 +356,7 @@ VAI_TRO.update(_pb3.vai_tro(QUAN_TRI))
 # chi phí chuyến xe, quyết toán, sao kê, chấm công (đầu vào của bảng lương). Danh mục khách hàng, danh
 # mục nhà cung cấp, danh sách hướng dẫn viên thì không.
 BO_NAP_CHAM_TIEN = ("don_dich_vu", "chuyen_xe", "quyet_toan_tour", "sao_ke_ngan_hang", "cham_cong"
-                    ) + _pb2.CHAM_TIEN + _pb3.CHAM_TIEN
+                    ) + _pb2.CHAM_TIEN + _pb3.CHAM_TIEN + _kho.CHAM_TIEN
 NHAN_VIEN = ("nv_dh", "nv_kd", "tn_kd", "nv_mkt", "nv_visa", "xe_hdv", "hanh_chinh")
 # Suy ra từ VAI_TRO chứ không khai tay lần thứ hai: hai bảng khai tay thì sớm muộn cũng lệch, và lúc
 # lệch thì không ai biết bảng nào đúng.
