@@ -430,14 +430,19 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </button>
           <Link href="/#viec-cua-toi" className="bar-muc"><Bt d="viec" /><span>Công việc</span></Link>
           <Link href="/#cho-toi-duyet" className="bar-muc"><Bt d="duyet" /><span>Chờ duyệt</span></Link>
-          {/* Chuông: số cảnh báo THẬT nằm ở đây, không dời sang "Chờ duyệt" – hệ thống chưa đếm số hồ
-              sơ chờ duyệt trên thanh ngang, dời số qua đó là bịa một con số. */}
-          <Link href="/alerts" className="bar-muc" title="Thông báo & cảnh báo" aria-label={`Thông báo${alerts > 0 ? `: ${alerts}` : ""}`}>
-            <Bt d="chuong" />{alerts > 0 && <b className="so-bao">{alerts}</b>}
-          </Link>
+          {/* THỨ TỰ theo bản vẽ 12/9: … Công việc · Chờ duyệt · Trợ lý AI · chuông · Tài khoản.
+              Chuông đứng sát ô tài khoản vì hai thứ ấy đều là của riêng người đang đăng nhập. */}
           <button type="button" className="bar-muc ai soon" title="Sắp có" onClick={() => toast("Trợ lý AI: đang xây dựng")}>
             <Bt d="ai" /><span>Trợ lý AI</span>
           </button>
+          {/* Con số trên chuông là TỔNG CẢNH BÁO NGHIỆP VỤ, không phải "số thông báo chưa đọc" mà
+              bản vẽ mô tả. Đo 12/9: /alerts/dem và /thong-bao/chua-doc đều trả 404 – hệ thống chưa
+              đếm số chưa đọc ở đâu cả. Đổi nhãn sang "chưa đọc" trong khi con số vẫn là tổng cảnh
+              báo là dán một cái tên sai lên một con số thật, tệ hơn là để nguyên. Khi nào có cửa
+              đếm chưa đọc thì đổi cả số lẫn nhãn một lượt. */}
+          <Link href="/alerts" className="bar-muc" title="Thông báo & cảnh báo nghiệp vụ" aria-label={`Thông báo${alerts > 0 ? `: ${alerts}` : ""}`}>
+            <Bt d="chuong" />{alerts > 0 && <b className="so-bao">{alerts}</b>}
+          </Link>
           {/* Menu cá nhân: ba mục của chính người đăng nhập, rời khỏi menu trái theo TC-2. */}
           <span style={{ position: "relative" }}>
             <button type="button" className="who" aria-haspopup="menu" aria-expanded={menuToi}
