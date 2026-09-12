@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { docTenDonVi, type TenDonVi } from "@/lib/ten_don_vi";
 import {
   docDonVi, datDangXem, duyetCay, nhanNgan,
   TOAN_PHAM_VI, DON_VI, CHUA_XAC_DINH,
   KHOA_YEU_THICH, KHOA_GAN_NHAT,
   type DonVi, type Kieu, type KetQuaPhamVi,
 } from "@/lib/phamvi";
+import { tenNgan } from "@/lib/ten_don_vi";
 
 /** TC-1 · Nút chọn đơn vị trên thanh ngang.
  *
@@ -32,9 +32,9 @@ import {
  *  4. CÒN DỮ LIỆU CHƯA LƯU THÌ HỎI TRƯỚC. Đổi phạm vi giữa chừng một biểu đang gõ dở là mất việc
  *     người ta vừa làm, mà mất im lặng.
  *
- *  Hôm nay hai đường dẫn của hợp đồng chưa có trên máy chủ. Khi ấy nút này hiện "Chưa có nguồn"
- *  kèm tên bộ phận chịu trách nhiệm – theo đúng ranh giới 09/9: chưa có cửa thì nói ra, không hiện
- *  0 và không bịa danh sách. Muốn xem thử giao diện thì thêm ?giaLapDonVi=1 vào đường dẫn.
+ *  Hôm nay hai đường dẫn của hợp đồng chưa có trên máy chủ. Khi ấy thành phần này KHÔNG VẼ GÌ CẢ
+ *  (anh Tuấn chốt 12/9) – không nút chết, không chữ thay thế. Chưa đổi được đơn vị thì thanh ngang
+ *  để trống chỗ ấy; đường dẫn có thật thì ô chọn tự hiện. Xem thử giao diện: ?giaLapDonVi=1.
  */
 export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean; toast?: (m: string, e?: boolean) => void }) {
   const [mo, setMo] = useState(false);
@@ -44,12 +44,9 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
   const [yeuThich, setYeuThich] = useState<string[]>([]);
   const [ganNhat, setGanNhat] = useState<string[]>([]);
   const [dangDat, setDangDat] = useState(false);
-  const [tenTam, setTenTam] = useState<TenDonVi | null>(null);   // cầu tạm, xem lib/ten_don_vi.ts
   const hop = useRef<HTMLSpanElement>(null);
 
   useEffect(() => { docDonVi().then(setKq); }, []);
-  // Cầu tạm: chỉ đi hỏi tên khi đường dẫn phạm vi CHƯA có. Có rồi thì tên lấy từ chính nó.
-  useEffect(() => { if (kq?.tinh_trang === "chua_co_nguon") docTenDonVi().then(setTenTam); }, [kq]);
 
   useEffect(() => {
     try {
@@ -76,7 +73,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
 
   const chon_ht = duLieu?.dang_xem ?? null;
   const dangK = String(chon_ht?.company_id ?? "");
-  const nhan = nhanNgan(chon_ht, theoMa.get(dangK)?.ten);
+  const nhan = tenNgan(nhanNgan(chon_ht, theoMa.get(dangK)?.ten));
 
   function luu(khoa: string, v: string[]) {
     try { localStorage.setItem(khoa, JSON.stringify(v)); } catch { /* bỏ qua */ }
@@ -136,22 +133,16 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
   }, [duLieu, thu, tim]);
 
   if (kq?.tinh_trang === "chua_co_nguon") {
-    // CẦU TẠM 12/9/2026, xem web/lib/ten_don_vi.ts. Chưa có /pham-vi/don-vi thì chưa ĐỔI được đơn
-    // vị – nhưng TÊN đơn vị đang xem thì máy chủ đã nói rồi ở /auth/me, nên không có cớ gì để trên
-    // thanh ngang một chữ "Chưa có nguồn". Không có tên thì mới quay về nút cũ.
-    if (tenTam) {
-      return (
-        <span className="bar-muc o-donvi" title={`${tenTam.day_du} · ${tenTam.phu}. Chưa đổi được đơn vị: máy chủ chưa có đường dẫn phạm vi. Bộ phận chịu: ${kq.bo_phan}.`}>
-          <b>{tenTam.ten}</b><small>{tenTam.phu}</small>
-        </span>
-      );
-    }
-    return (
-      <button type="button" className="soon" disabled
-        title={`Chưa có nguồn – máy chủ chưa có đường dẫn phạm vi đơn vị. Bộ phận chịu: ${kq.bo_phan}.`}>
-        Chưa có nguồn · đơn vị
-      </button>
-    );
+    // KHÔNG VẼ GÌ CẢ (anh Tuấn chốt 12/9: "xoá bỏ chữ Vietourist Holdings").
+    //
+    // Trước đây chỗ này lần lượt là nút "Chưa có nguồn · đơn vị", rồi ô hai dòng ghi tên pháp nhân.
+    // Cả hai đều chiếm một khoảng thanh ngang để nói một điều người dùng KHÔNG cần: họ đang ở
+    // Holdings – thứ mà logo bên trái đã nói rồi.
+    //
+    // Chưa có GET /pham-vi/don-vi thì chưa ĐỔI được đơn vị, mà một ô không bấm được thì không phải
+    // là công cụ, chỉ là chữ. Khi làn Phân quyền dựng xong đường dẫn ấy, nhánh này không chạy nữa
+    // và ô chọn thật ở dưới tự hiện ra – không phải sửa gì thêm ở đây.
+    return null;
   }
   if (kq?.tinh_trang === "loi") {
     return <button type="button" className="soon" disabled title={kq.loi}>Không đọc được đơn vị</button>;

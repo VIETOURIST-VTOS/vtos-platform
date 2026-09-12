@@ -154,13 +154,30 @@ def test_q6_du_lieu_gia_phai_co_co_bat_va_dai_canh_bao():
     assert not xau, f"đơn vị giả thiếu nhãn trong chính tên: {xau}"
 
 
-def test_q6b_chua_co_nguon_thi_noi_ra_kem_bo_phan_chiu_trach_nhiem():
-    """Ranh giới 09/9: chưa có cửa thì ghi "Chưa có nguồn" kèm bộ phận chịu – KHÔNG hiện 0, không đoán."""
+def test_q6b_chua_co_nguon_thi_khong_ve_gi_tren_thanh_ngang():
+    """ĐỔI 12/9/2026 – anh Tuấn chốt: "xoá bỏ chữ Vietourist Holdings".
+
+    BẢN CŨ của phép thử này đòi nút hiện chữ "Chưa có nguồn" kèm tên bộ phận chịu, theo ranh giới
+    09/9 ("chưa có cửa thì nói ra, không hiện 0, không đoán"). Ranh giới ấy KHÔNG BỎ – nó vẫn áp cho
+    mọi CON SỐ trên mọi màn hình, và các phép thử khác vẫn canh.
+
+    Nhưng ô đơn vị trên thanh ngang không phải một con số: nó là một ô để ĐỔI đơn vị. Chưa có
+    /pham-vi/don-vi thì không đổi được gì, nên ô ấy chỉ còn là chữ chiếm chỗ – mà điều nó nói (đang
+    ở Holdings) thì logo bên trái đã nói rồi. Anh Tuấn xem trang thật và yêu cầu bỏ hẳn.
+
+    Nay canh chiều ngược lại: KHÔNG vẽ gì, và không ai dựng lại nút chết ấy.
+    """
     lib, nut = _doc(LIB), _doc(NUT)
     assert "chua_co_nguon" in lib and "chua_co_nguon" in nut, \
-        "phải phân biệt 'máy chủ chưa dựng đường dẫn' với 'lỗi thật'"
-    assert "Chưa có nguồn" in nut, "phải hiện đúng chữ 'Chưa có nguồn' theo ranh giới 09/9"
-    assert "bo_phan" in nut, "phải nêu bộ phận chịu trách nhiệm, không chỉ nói là thiếu"
+        "vẫn phải phân biệt 'máy chủ chưa dựng đường dẫn' với 'lỗi thật' – hai đường xử lý khác nhau"
+    # Bóc chú thích trước: chính đoạn chú thích giải thích việc bỏ nút lại nhắc đúng chữ đang cấm.
+    than = re.sub(r'/\*.*?\*/|//[^\n]*', '', nut, flags=re.S)
+    i = than.index('kq?.tinh_trang === "chua_co_nguon"')
+    nhanh = than[i:than.index('kq?.tinh_trang === "loi"')]
+    assert "return null" in nhanh, "nhánh chưa có nguồn phải KHÔNG vẽ gì lên thanh ngang"
+    assert "Chưa có nguồn" not in nhanh, "không dựng lại nút chết 'Chưa có nguồn · đơn vị'"
+    # Nhánh LỖI THẬT thì vẫn phải nói ra – im lặng khi hỏng là chỗ người dùng tưởng hệ thống ổn.
+    assert "Không đọc được đơn vị" in nut, "lỗi thật vẫn phải hiện, chỉ 'chưa dựng' mới im lặng"
 
 
 def test_q7_nut_chon_da_thay_o_select_bi_khoa_cu():

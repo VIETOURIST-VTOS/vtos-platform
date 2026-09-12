@@ -391,6 +391,46 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     return CA_NHAN.filter(([, h]) => !hid.includes(base(h)));
   }, [user]);
 
+  /** BẢNG XỔ RA của phân hệ đang rê chuột (anh Tuấn chốt 12/9).
+   *
+   *  VÌ SAO PHẢI TÍNH TOẠ ĐỘ BẰNG MÃ chứ không đặt `left:100%` rồi để CSS lo: `aside.side` có
+   *  `overflow-y:auto`, mà một hộp con tràn ngang ra khỏi khung ấy sẽ BỊ CẮT. Nên bảng xổ dùng
+   *  `position:fixed` và nhận toạ độ đo từ chính thanh phân hệ – fixed thoát khỏi mọi khung cắt của
+   *  tổ tiên (aside chỉ `sticky`, không tạo khung chứa cho fixed).
+   *
+   *  Bảng cao quá màn hình thì tự đẩy lên cho vừa: nhóm Kinh doanh và Điều hành mỗi nhóm 15 mục,
+   *  rê vào thanh cuối cùng mà bảng đổ xuống thì nửa dưới nằm ngoài màn hình.
+   */
+  const [bay, setBay] = useState<string | null>(null);
+  const [bayY, setBayY] = useState(0);
+  const [bayX, setBayX] = useState(0);
+  const hetGio = useRef<number | null>(null);
+
+  const moBay = useCallback((khoa: string, el: HTMLElement | null) => {
+    if (hetGio.current) { window.clearTimeout(hetGio.current); hetGio.current = null; }
+    if (!el) return;
+    const o = el.getBoundingClientRect();
+    setBayX(Math.round(o.right));
+    setBayY(Math.round(o.top));
+    setBay(khoa);
+  }, []);
+
+  // Đóng CHẬM một nhịp: chuột đi từ thanh sang bảng phải băng qua mép, đóng ngay là bảng biến mất
+  // giữa đường và người dùng bấm hụt.
+  const dongBay = useCallback(() => {
+    if (hetGio.current) window.clearTimeout(hetGio.current);
+    hetGio.current = window.setTimeout(() => setBay(null), 140);
+  }, []);
+
+  // Cuộn trang hay đổi cỡ cửa sổ thì toạ độ đã đo không còn đúng – đóng thay vì vẽ sai chỗ.
+  useEffect(() => {
+    if (!bay) return;
+    const f = () => setBay(null);
+    window.addEventListener("scroll", f, true);
+    window.addEventListener("resize", f);
+    return () => { window.removeEventListener("scroll", f, true); window.removeEventListener("resize", f); };
+  }, [bay]);
+
   // nhóm chứa trang hiện tại luôn được bung ("mở sẵn nhóm đang dùng" – v1.1 §I.2)
   const auto = groups.find((g) => g.blocks.some((b) =>
     laMuc(b) ? isOn(b[1], path) : b.items.some(([, h]) => isOn(h, path))
@@ -403,6 +443,16 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const lien = (l: string, h: string) => (
     <Link key={l + h} href={h} className={isOn(h, path) ? "on" : ""} onClick={() => setSide(false)}>{l}</Link>
   );
+
+  /** Danh sách mục con của một nhóm. MỘT hàm dùng cho CẢ HAI chỗ – bảng xổ ra khi rê chuột và khối
+   *  ghim mở khi bấm. Viết hai lần thì sớm muộn sửa một chỗ quên chỗ kia, và người dùng gặp hai
+   *  danh sách khác nhau cho cùng một phân hệ. */
+  const khoiMuc = (g: Group) => g.blocks.map((b, i) => laMuc(b) ? lien(b[0], b[1]) : (
+    <div key={b.label + i}>
+      <div className="sub-nhan">{b.label}</div>
+      {b.items.map(([l, h]) => lien(l, h))}
+    </div>
+  ));
 
   return (
     <Ctx.Provider value={{ user, toast, datChuaLuu }}>
@@ -479,25 +529,34 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             {thu ? "»" : "«"}
           </button>
           {groups.map((g) => (
-            <div key={g.key}>
+            <div key={g.key} className="nhom"
+              onMouseEnter={(e) => moBay(g.key, e.currentTarget)}
+              onMouseLeave={dongBay}>
               {/* Khi THU thì chỉ còn biểu tượng, nhưng nhãn nhóm vẫn nằm ở title và aria-label:
                   §I.2 đòi "biểu tượng phải có chú thích". Bấm một biểu tượng lúc đang thu thì BUNG
                   lại rồi mới mở nhóm – nếu không thì người dùng bấm xong không thấy gì xảy ra. */}
               <button type="button" className={"grp" + (opened.has(g.key) ? " on" : "")}
-                title={g.label} aria-label={g.label}
-                onClick={() => { if (thu) doiThu(); doiNhom(g.key); }}>
+                title={g.label} aria-label={g.label} aria-expanded={opened.has(g.key)}
+                onFocus={(e) => moBay(g.key, e.currentTarget.parentElement)}
+                onClick={() => { if (thu) doiThu(); doiNhom(g.key); dongBay(); }}>
                 {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
                      : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label}</span>
                          <span className="grp-mui" aria-hidden="true">{opened.has(g.key) ? "▾" : "▸"}</span></>}
               </button>
-              {!thu && opened.has(g.key) && <div className="sub">
-                {g.blocks.map((b, i) => laMuc(b) ? lien(b[0], b[1]) : (
-                  <div key={b.label + i}>
-                    <div className="muted" style={{ padding: "6px 0 2px", fontSize: ".82em", textTransform: "uppercase", letterSpacing: ".04em" }}>{b.label}</div>
-                    {b.items.map(([l, h]) => lien(l, h))}
-                  </div>
-                ))}
-              </div>}
+
+              {/* BẢNG XỔ RA khi rê chuột hoặc khi nút nhận tiêu điểm bàn phím (anh Tuấn chốt 12/9).
+                  Không vẽ khi nhóm ĐANG GHIM MỞ: hai bản cùng một danh sách chồng lên nhau thì
+                  người dùng không biết bấm bản nào. */}
+              {bay === g.key && !opened.has(g.key) && (
+                <div className="bay" style={{ top: bayY, left: bayX }} role="group" aria-label={g.label}>
+                  <div className="bay-dau">{g.label}</div>
+                  {khoiMuc(g)}
+                </div>
+              )}
+
+              {/* GHIM MỞ TẠI CHỖ khi bấm. Rê chuột chỉ để liếc nhanh; ai làm việc lâu trong một phân
+                  hệ thì bấm một lần, danh sách nằm lại đó, không phải giữ chuột. */}
+              {!thu && opened.has(g.key) && <div className="sub">{khoiMuc(g)}</div>}
             </div>
           ))}
         </aside>

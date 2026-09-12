@@ -86,12 +86,20 @@ def test_chu_tren_nen_navy_toi_thieu_13px():
 
     Chỉ soi các quy tắc của thanh ngang (.top) và thanh dọc (aside.side) – đó là hai chỗ nền navy.
     """
+    # MỘT NGOẠI LỆ, ghi thẳng ra đây để nó là một quyết định chứ không phải một chỗ lọt lưới:
+    # `.top .brand small` là dòng "VIETOURIST OPERATING SYSTEM" nằm trong KHỐI LOGO. Quy tắc 5 nói về
+    # chữ giao diện – chữ người dùng phải đọc để thao tác. Dòng này không mang thông tin thao tác
+    # nào; anh Tuấn yêu cầu 12/9 cho nó nhỏ và mềm hơn để cân với dấu V. Mọi chỗ khác vẫn ≥13px.
+    MIEN_TRU = {".top .brand small"}
     src = re.sub(r'/\*.*?\*/', '', _doc(CSS), flags=re.S)
     nho = []
     for m in re.finditer(r'(\.top[^{}]*|aside\.side[^{}]*)\{([^}]*)\}', src):
+        ten = m.group(1).strip()
+        if ten in MIEN_TRU:
+            continue
         for cd in re.findall(r'font-size:\s*([\d.]+)px', m.group(2)):
             if float(cd) < 13:
-                nho.append(f"{m.group(1).strip()} → {cd}px")
+                nho.append(f"{ten} → {cd}px")
     assert not nho, f"chữ trên nền navy dưới 13px: {nho}"
 
 

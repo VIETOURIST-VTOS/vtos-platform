@@ -256,14 +256,30 @@ def test_moi_nhom_deu_co_bieu_tuong_va_bieu_tuong_phai_co_chu_thich():
 
 
 def test_be_rong_thanh_doc_dung_dac_ta():
-    """§I.2 cho một khoảng, không cho một con số: rộng 224–240px, thu còn 56–64px."""
+    """§I.2 cho một khoảng: rộng 224–256px, thu còn 56–64px.
+
+    KHOẢNG TRÊN NỚI TỪ 240 LÊN 256px NGÀY 12/9/2026, vì đo được chứ không vì thấy chật.
+    Anh Tuấn yêu cầu nhãn phân hệ to hơn (13→14px) và không được cắt chữ. Đo bằng Chromium với
+    đúng phông Be Vietnam Pro 14px/500:
+
+        Nhân sự – Hành chính   140,9px   ← nhãn dài nhất
+        Báo cáo – Phân tích    126,1px
+        Tài chính – Kế toán    121,4px
+
+    Khung quanh chữ trong `aside.side .grp` là 106px (lề 16 + viền 2 + đệm 24 + biểu tượng 20 +
+    hai khoảng hở 20 + mũi tên 12 + thanh cuộn 12). 140,9 + 106 = 247px.
+
+    Nghĩa là 240px – mức trần cũ – THIẾU 7px và "Nhân sự – Hành chính" bị cắt bằng dấu ba chấm.
+    Đặt 252px để còn dư một chút cho phông dự phòng khi Google Fonts chưa về.
+    """
     css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
     m_rong = re.search(r'aside\.side\{flex:0 0 (\d+)px', css)
     m_thu = re.search(r'aside\.side\.thu\{flex:0 0 (\d+)px', css)
     assert m_rong, "không tìm thấy bề rộng thanh dọc trong globals.css"
     assert m_thu, "không tìm thấy bề rộng khi THU trong globals.css"
     rong, thu = int(m_rong.group(1)), int(m_thu.group(1))
-    assert 224 <= rong <= 240, f"bề rộng {rong}px ngoài khoảng 224–240px của §I.2"
+    assert 224 <= rong <= 256, f"bề rộng {rong}px ngoài khoảng 224–256px của §I.2"
+    assert rong >= 247, f"bề rộng {rong}px CẮT nhãn 'Nhân sự – Hành chính' (đo được cần 247px)"
     assert 56 <= thu <= 64, f"bề rộng khi thu {thu}px ngoài khoảng 56–64px của §I.2"
 
 
@@ -308,22 +324,29 @@ def test_thanh_ngang_khong_xuong_hai_dong_o_man_rong():
         assert m, f"không tìm thấy quy tắc {ten}"
         assert "flex-wrap:nowrap" in m.group(0), \
             f"{ten} phải là một hàng ở màn rộng, đang là: {m.group(0)[:130]}"
-    # Ô đơn vị phải CO được, nếu không nó lại lấn chỗ ô tìm kiếm
-    m = re.search(r'\.top \.bar \.o-donvi\{[^}]*\}', css)
-    assert m and "min-width:0" in m.group(0) and "max-width:" in m.group(0), \
-        "ô đơn vị phải co được và có chặn trên, nếu không thanh ngang lại vỡ"
+    # Ô đơn vị đã BỎ HẲN 12/9 (anh Tuấn: "xoá bỏ chữ Vietourist Holdings") – canh để không ai
+    # dựng lại một ô chữ không bấm được ở chỗ ấy.
+    assert "o-donvi" not in css, "ô đơn vị đã bỏ khỏi thanh ngang, không được dựng lại"
 
 
-def test_ten_don_vi_cat_bot_loai_hinh():
-    """Bản vẽ ghi "Vietourist Holdings", sổ đăng ký ghi "Công ty Cổ phần Vietourist Holdings".
+def test_o_don_vi_khong_ve_gi_khi_chua_co_duong_dan():
+    """Anh Tuấn chốt 12/9: bỏ hẳn ô đơn vị khỏi thanh ngang.
 
-    Chip trên thanh ngang lấy bản ngắn; tên đầy đủ phải còn ở title chứ không được mất.
+    Chưa có /pham-vi/don-vi thì KHÔNG vẽ gì – không nút chết, không chữ thay thế. Một ô không bấm
+    được thì không phải công cụ, chỉ là chữ chiếm chỗ.
     """
+    tsx = open(os.path.join(ROOT, "web", "components", "ChonDonVi.tsx"), encoding="utf-8").read()
+    # BÓC CHÚ THÍCH TRƯỚC. Chính đoạn chú thích giải thích "đã bỏ nút Chưa có nguồn" lại chứa đúng
+    # chuỗi mình đang cấm – đọc cả chú thích thì phép thử đỏ vì lời giải thích của chính nó.
+    khong_chu_thich = re.sub(r'/\*.*?\*/|//[^\n]*', '', tsx, flags=re.S)
+    i = khong_chu_thich.index('kq?.tinh_trang === "chua_co_nguon"')
+    nhanh = khong_chu_thich[i:khong_chu_thich.index('kq?.tinh_trang === "loi"')]
+    assert "return null" in nhanh, "nhánh chưa có nguồn phải KHÔNG vẽ gì"
+    assert "Chưa có nguồn · đơn vị" not in nhanh, "không dựng lại nút chết cũ"
+    # Ô chọn THẬT vẫn phải rút gọn tên – thanh ngang chật, chín pháp nhân đều mở đầu "Công ty ..."
+    assert "tenNgan(" in tsx, "ô chọn đơn vị phải rút gọn tên pháp nhân"
     src = open(os.path.join(ROOT, "web", "lib", "ten_don_vi.ts"), encoding="utf-8").read()
     assert "export function tenNgan" in src, "thiếu hàm rút gọn tên pháp nhân"
-    assert "day_du" in src, "phải giữ tên đầy đủ để đưa vào title, không được cắt rồi bỏ luôn"
-    tsx = open(os.path.join(ROOT, "web", "components", "ChonDonVi.tsx"), encoding="utf-8").read()
-    assert "tenTam.day_du" in tsx, "title của chip phải mang tên ĐẦY ĐỦ, không phải tên đã cắt"
 
 
 def test_chieu_cao_thanh_ngang_trong_dac_ta():
@@ -333,6 +356,48 @@ def test_chieu_cao_thanh_ngang_trong_dac_ta():
     assert m, "không tìm thấy --top-h trong globals.css"
     cao = int(m.group(1))
     assert 64 <= cao <= 72, f"thanh ngang {cao}px ngoài khoảng 64–72px của §I.2"
+
+
+def test_bang_xo_ra_mo_duoc_bang_ca_re_chuot_lan_ban_phim():
+    """Anh Tuấn chốt 12/9: rê chuột vào phân hệ thì mục con xổ ra bên cạnh.
+
+    HAI CÁCH MỞ, không phải một. Máy tính bảng và bàn phím không có "rê chuột"; chỉ nghe onMouseEnter
+    là người dùng iPad mất đường vào toàn bộ màn hình con. Nên nút phân hệ mở bảng cả khi nhận tiêu
+    điểm bàn phím, và bấm thì ghim mở tại chỗ.
+    """
+    src = _doc()
+    assert "onMouseEnter" in src, "phải mở bảng khi rê chuột"
+    assert "onFocus" in src, "phải mở bảng cả khi nút nhận tiêu điểm bàn phím – máy bảng không rê được"
+    assert 'className="bay"' in src, "thiếu bảng xổ ra"
+    assert "onMouseLeave" in src, "rời chuột phải đóng bảng"
+
+
+def test_bang_xo_ra_va_khoi_ghim_dung_chung_mot_nguon_muc():
+    """Một hàm dựng danh sách mục con cho CẢ HAI chỗ.
+
+    Viết hai lần thì sớm muộn sửa một chỗ quên chỗ kia, và người dùng gặp hai danh sách khác nhau
+    cho cùng một phân hệ – lỗi ấy không ai nhìn ra cho tới khi bấm nhầm.
+    """
+    src = re.sub(r'/\*.*?\*/|//[^\n]*', '', _doc(), flags=re.S)
+    assert src.count("khoiMuc(g)") == 2, \
+        f"bảng xổ ra và khối ghim mở phải cùng gọi khoiMuc, đang gọi {src.count('khoiMuc(g)')} lần"
+    # Không vẽ cả hai cùng lúc: hai bản chồng nhau thì không biết bấm bản nào
+    assert "!opened.has(g.key)" in src, "nhóm đang ghim mở thì KHÔNG xổ thêm bảng"
+
+
+def test_bang_xo_ra_phai_la_fixed_de_khong_bi_thanh_doc_cat():
+    """aside.side có overflow-y:auto – một hộp absolute tràn ngang ra khỏi nó sẽ BỊ CẮT.
+
+    Đây là chỗ dễ sai nhất của kiểu xổ ngang: đặt left:100% rồi để CSS lo thì bảng cụt mất một nửa,
+    và trên màn rộng lại trông như chạy đúng. Toạ độ do mã đo từ chính thanh phân hệ rồi đặt vào.
+    """
+    css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
+    m = re.search(r'\.bay\{[^}]*\}', css)
+    assert m, "không tìm thấy quy tắc .bay"
+    assert "position:fixed" in m.group(0), f"bảng xổ ra phải là fixed, đang là: {m.group(0)[:110]}"
+    assert "max-height:calc(100vh" in m.group(0), \
+        "bảng của nhóm 15 mục cao hơn màn hình – phải chặn chiều cao và cho cuộn"
+    assert "getBoundingClientRect" in _doc(), "toạ độ bảng phải đo từ thanh phân hệ, không đoán"
 
 
 def test_nho_trang_thai_theo_tung_nguoi_dung():
