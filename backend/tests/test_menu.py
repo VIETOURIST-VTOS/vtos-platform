@@ -308,22 +308,29 @@ def test_thanh_ngang_khong_xuong_hai_dong_o_man_rong():
         assert m, f"không tìm thấy quy tắc {ten}"
         assert "flex-wrap:nowrap" in m.group(0), \
             f"{ten} phải là một hàng ở màn rộng, đang là: {m.group(0)[:130]}"
-    # Ô đơn vị phải CO được, nếu không nó lại lấn chỗ ô tìm kiếm
-    m = re.search(r'\.top \.bar \.o-donvi\{[^}]*\}', css)
-    assert m and "min-width:0" in m.group(0) and "max-width:" in m.group(0), \
-        "ô đơn vị phải co được và có chặn trên, nếu không thanh ngang lại vỡ"
+    # Ô đơn vị đã BỎ HẲN 12/9 (anh Tuấn: "xoá bỏ chữ Vietourist Holdings") – canh để không ai
+    # dựng lại một ô chữ không bấm được ở chỗ ấy.
+    assert "o-donvi" not in css, "ô đơn vị đã bỏ khỏi thanh ngang, không được dựng lại"
 
 
-def test_ten_don_vi_cat_bot_loai_hinh():
-    """Bản vẽ ghi "Vietourist Holdings", sổ đăng ký ghi "Công ty Cổ phần Vietourist Holdings".
+def test_o_don_vi_khong_ve_gi_khi_chua_co_duong_dan():
+    """Anh Tuấn chốt 12/9: bỏ hẳn ô đơn vị khỏi thanh ngang.
 
-    Chip trên thanh ngang lấy bản ngắn; tên đầy đủ phải còn ở title chứ không được mất.
+    Chưa có /pham-vi/don-vi thì KHÔNG vẽ gì – không nút chết, không chữ thay thế. Một ô không bấm
+    được thì không phải công cụ, chỉ là chữ chiếm chỗ.
     """
+    tsx = open(os.path.join(ROOT, "web", "components", "ChonDonVi.tsx"), encoding="utf-8").read()
+    # BÓC CHÚ THÍCH TRƯỚC. Chính đoạn chú thích giải thích "đã bỏ nút Chưa có nguồn" lại chứa đúng
+    # chuỗi mình đang cấm – đọc cả chú thích thì phép thử đỏ vì lời giải thích của chính nó.
+    khong_chu_thich = re.sub(r'/\*.*?\*/|//[^\n]*', '', tsx, flags=re.S)
+    i = khong_chu_thich.index('kq?.tinh_trang === "chua_co_nguon"')
+    nhanh = khong_chu_thich[i:khong_chu_thich.index('kq?.tinh_trang === "loi"')]
+    assert "return null" in nhanh, "nhánh chưa có nguồn phải KHÔNG vẽ gì"
+    assert "Chưa có nguồn · đơn vị" not in nhanh, "không dựng lại nút chết cũ"
+    # Ô chọn THẬT vẫn phải rút gọn tên – thanh ngang chật, chín pháp nhân đều mở đầu "Công ty ..."
+    assert "tenNgan(" in tsx, "ô chọn đơn vị phải rút gọn tên pháp nhân"
     src = open(os.path.join(ROOT, "web", "lib", "ten_don_vi.ts"), encoding="utf-8").read()
     assert "export function tenNgan" in src, "thiếu hàm rút gọn tên pháp nhân"
-    assert "day_du" in src, "phải giữ tên đầy đủ để đưa vào title, không được cắt rồi bỏ luôn"
-    tsx = open(os.path.join(ROOT, "web", "components", "ChonDonVi.tsx"), encoding="utf-8").read()
-    assert "tenTam.day_du" in tsx, "title của chip phải mang tên ĐẦY ĐỦ, không phải tên đã cắt"
 
 
 def test_chieu_cao_thanh_ngang_trong_dac_ta():
