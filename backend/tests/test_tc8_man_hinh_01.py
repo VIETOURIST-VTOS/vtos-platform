@@ -241,3 +241,28 @@ def test_bang_co_cot_cua_nhap():
     """CF-07 trên màn hình: mỗi dòng phải nhìn thấy được ai nhập, không chỉ nằm trong gói JSON."""
     src = _doc("web/components/KhoiDongTien.tsx")
     assert "Cửa nhập" in src
+
+
+# =============================================================================================
+# 7. Thứ tự pháp nhân trong ô chọn đơn vị (chốt 12/9/2026)
+# =============================================================================================
+
+def test_thu_tu_phap_nhan_dat_cong_ty_me_len_dau():
+    """Xếp theo bảng chữ cái thì Buffalotours đứng đầu và Vietourist Holdings nằm gần cuối — con số
+    đầu tiên đập vào mắt người mở màn hình là con số họ ít cần nhất."""
+    src = _doc("web/lib/thu_tu_don_vi.ts")
+    ma = re.findall(r'"([A-Z0-9\-]+)",\s*//', src)
+    assert ma[:4] == ["VTD", "VTRIP-VT", "LANGAU", "HKTN"], f"thứ tự đang là {ma}"
+
+
+def test_ma_la_van_hien_du_chu_khong_bi_bo_qua():
+    """Thêm một pháp nhân mới mà quên sửa tệp thứ tự thì nó vẫn phải xuất hiện, chỉ xếp sau."""
+    src = _doc("web/lib/thu_tu_don_vi.ts")
+    assert "THU_TU_MA.length" in src, "mã lạ phải rơi xuống cuối, không được lọc bỏ"
+    assert "localeCompare" in src, "phần còn lại xếp theo bảng chữ cái"
+
+
+def test_khoi_dong_tien_dung_thu_tu_chung_va_chon_don_vi_dau_tien():
+    src = _doc("web/components/KhoiDongTien.tsx")
+    assert "xepDonVi" in src, "màn hình phải dùng thứ tự dùng chung, không tự xếp"
+    assert "setPn(ds[0].id)" in src, "mặc định chọn pháp nhân đứng đầu thứ tự"
