@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { docTenDonVi, type TenDonVi } from "@/lib/ten_don_vi";
 import {
   docDonVi, datDangXem, duyetCay, nhanNgan,
   TOAN_PHAM_VI, DON_VI, CHUA_XAC_DINH,
@@ -43,9 +44,12 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
   const [yeuThich, setYeuThich] = useState<string[]>([]);
   const [ganNhat, setGanNhat] = useState<string[]>([]);
   const [dangDat, setDangDat] = useState(false);
+  const [tenTam, setTenTam] = useState<TenDonVi | null>(null);   // cầu tạm, xem lib/ten_don_vi.ts
   const hop = useRef<HTMLSpanElement>(null);
 
   useEffect(() => { docDonVi().then(setKq); }, []);
+  // Cầu tạm: chỉ đi hỏi tên khi đường dẫn phạm vi CHƯA có. Có rồi thì tên lấy từ chính nó.
+  useEffect(() => { if (kq?.tinh_trang === "chua_co_nguon") docTenDonVi().then(setTenTam); }, [kq]);
 
   useEffect(() => {
     try {
@@ -132,6 +136,16 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
   }, [duLieu, thu, tim]);
 
   if (kq?.tinh_trang === "chua_co_nguon") {
+    // CẦU TẠM 12/9/2026, xem web/lib/ten_don_vi.ts. Chưa có /pham-vi/don-vi thì chưa ĐỔI được đơn
+    // vị – nhưng TÊN đơn vị đang xem thì máy chủ đã nói rồi ở /auth/me, nên không có cớ gì để trên
+    // thanh ngang một chữ "Chưa có nguồn". Không có tên thì mới quay về nút cũ.
+    if (tenTam) {
+      return (
+        <span className="bar-muc o-donvi" title={`${tenTam.ten} · ${tenTam.phu}. Chưa đổi được đơn vị: máy chủ chưa có đường dẫn phạm vi. Bộ phận chịu: ${kq.bo_phan}.`}>
+          <b>{tenTam.ten}</b><small>{tenTam.phu}</small>
+        </span>
+      );
+    }
     return (
       <button type="button" className="soon" disabled
         title={`Chưa có nguồn – máy chủ chưa có đường dẫn phạm vi đơn vị. Bộ phận chịu: ${kq.bo_phan}.`}>

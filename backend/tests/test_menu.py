@@ -267,6 +267,43 @@ def test_be_rong_thanh_doc_dung_dac_ta():
     assert 56 <= thu <= 64, f"bề rộng khi thu {thu}px ngoài khoảng 56–64px của §I.2"
 
 
+def test_thu_tu_thanh_ngang_theo_ban_ve():
+    """Bản vẽ 12/9: Logo → Đơn vị → Tìm kiếm → Công việc → Chờ duyệt → Trợ lý AI → chuông → Tài khoản.
+
+    Canh bằng VỊ TRÍ TƯƠNG ĐỐI trong mã chứ không bằng toạ độ: thứ tự các thẻ trong JSX chính là
+    thứ tự người dùng nhìn thấy, và đó là thứ đã bị xếp sai một lần rồi (chuông đứng trước Trợ lý AI).
+    """
+    src = _doc()
+    i = src.index('<span className="bar">')
+    bar = src[i:src.index('<div className="shell">', i)]
+    moc = ("<ChonDonVi", 'className="o-tim', ">Công việc<", ">Chờ duyệt<", ">Trợ lý AI<",
+           'd="chuong"', 'className="who"')
+    vi = []
+    for m in moc:
+        assert m in bar, f"thanh ngang thiếu {m}"
+        vi.append(bar.index(m))
+    assert vi == sorted(vi), f"thứ tự thanh ngang sai so với bản vẽ – vị trí đang là {vi}, mốc {moc}"
+
+
+def test_o_tim_kiem_gian_rong_chu_khong_chot_cung():
+    """Bản vẽ cho ô tìm kiếm ăn hết chỗ trống giữa ô đơn vị và cụm nút (flex:1), không chốt 260px."""
+    css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
+    m = re.search(r'\.top \.bar \.o-tim\{[^}]*\}', css)
+    assert m, "không tìm thấy quy tắc .o-tim trong globals.css"
+    luat = m.group(0)
+    assert "flex:1" in luat, f"ô tìm kiếm phải giãn theo bản vẽ, đang là: {luat[:120]}"
+    assert not re.search(r'[;{]width:\d+px', luat), f"ô tìm kiếm còn chốt cứng bề rộng: {luat[:120]}"
+
+
+def test_chieu_cao_thanh_ngang_trong_dac_ta():
+    """§I.2: thanh ngang cao 64–72px. Bản vẽ vẽ 76px – ngoài khoảng, nên lấy biên trên 72px."""
+    css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
+    m = re.search(r'--top-h:(\d+)px', css)
+    assert m, "không tìm thấy --top-h trong globals.css"
+    cao = int(m.group(1))
+    assert 64 <= cao <= 72, f"thanh ngang {cao}px ngoài khoảng 64–72px của §I.2"
+
+
 def test_nho_trang_thai_theo_tung_nguoi_dung():
     """§I.2: nhớ trạng thái mở/thu THEO TỪNG NGƯỜI DÙNG.
 
