@@ -256,14 +256,30 @@ def test_moi_nhom_deu_co_bieu_tuong_va_bieu_tuong_phai_co_chu_thich():
 
 
 def test_be_rong_thanh_doc_dung_dac_ta():
-    """§I.2 cho một khoảng, không cho một con số: rộng 224–240px, thu còn 56–64px."""
+    """§I.2 cho một khoảng: rộng 224–256px, thu còn 56–64px.
+
+    KHOẢNG TRÊN NỚI TỪ 240 LÊN 256px NGÀY 12/9/2026, vì đo được chứ không vì thấy chật.
+    Anh Tuấn yêu cầu nhãn phân hệ to hơn (13→14px) và không được cắt chữ. Đo bằng Chromium với
+    đúng phông Be Vietnam Pro 14px/500:
+
+        Nhân sự – Hành chính   140,9px   ← nhãn dài nhất
+        Báo cáo – Phân tích    126,1px
+        Tài chính – Kế toán    121,4px
+
+    Khung quanh chữ trong `aside.side .grp` là 106px (lề 16 + viền 2 + đệm 24 + biểu tượng 20 +
+    hai khoảng hở 20 + mũi tên 12 + thanh cuộn 12). 140,9 + 106 = 247px.
+
+    Nghĩa là 240px – mức trần cũ – THIẾU 7px và "Nhân sự – Hành chính" bị cắt bằng dấu ba chấm.
+    Đặt 252px để còn dư một chút cho phông dự phòng khi Google Fonts chưa về.
+    """
     css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
     m_rong = re.search(r'aside\.side\{flex:0 0 (\d+)px', css)
     m_thu = re.search(r'aside\.side\.thu\{flex:0 0 (\d+)px', css)
     assert m_rong, "không tìm thấy bề rộng thanh dọc trong globals.css"
     assert m_thu, "không tìm thấy bề rộng khi THU trong globals.css"
     rong, thu = int(m_rong.group(1)), int(m_thu.group(1))
-    assert 224 <= rong <= 240, f"bề rộng {rong}px ngoài khoảng 224–240px của §I.2"
+    assert 224 <= rong <= 256, f"bề rộng {rong}px ngoài khoảng 224–256px của §I.2"
+    assert rong >= 247, f"bề rộng {rong}px CẮT nhãn 'Nhân sự – Hành chính' (đo được cần 247px)"
     assert 56 <= thu <= 64, f"bề rộng khi thu {thu}px ngoài khoảng 56–64px của §I.2"
 
 
