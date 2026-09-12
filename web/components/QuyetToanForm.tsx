@@ -218,6 +218,107 @@ function BangNhap({ tieuDe, giaiThich, cot, dong, nn, them, dangGhi, tong }: {
 // Biểu chính
 // ---------------------------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------------------------
+// TIỀN TIP — Đ-6, Chủ tịch chốt 12/9/2026
+// ---------------------------------------------------------------------------------------------
+//
+//   "tiền tip tour châu Âu chia 1 phần với công ty"
+//   "tỷ lệ chia tiền tip em cài phép toán và form sẵn cho điều hành tự nhập % vào ô đó"
+//
+// BA THỨ Ở ĐÂY LÀ CỐ Ý, không phải cho đẹp:
+//
+//  1. ĐƠN VỊ LÀ Ô BẮT BUỘC, và không có lựa chọn mặc định. Chính tệp châu Âu 6 nước ghi cùng một
+//     khoản 810 € bằng HAI đơn vị: sheet QT ghi 27 €/khách/CHUYẾN, sheet Quyết toán TL ghi
+//     3 €/khách/NGÀY × 9 ngày. Gõ 27 vào ô "mỗi ngày" là ra GẤP CHÍN LẦN, và con số ấy vẫn trông
+//     hợp lệ. Bỏ trống thì phép tính dừng chứ máy không đoán.
+//
+//  2. XEM TRƯỚC RỒI MỚI GHI. Nút "Tính thử" không chạm vào cơ sở dữ liệu. Người nhập nhìn thấy
+//     "đã thu X, công ty Y, trưởng đoàn Z" rồi mới bấm ghi.
+//
+//  3. Ô % LÀ PHẦN TRĂM, KHÔNG CÓ LUẬT NGẦM. Gõ 40 là 40%, gõ 0,4 là 0,4%. Máy chủ nói ra khi thấy
+//     số nhỏ hơn 1 nhưng KHÔNG tự sửa số của người ta.
+function TienTip({ tourId, nn, toast, xong }: {
+  tourId: number; nn: boolean; toast: (m: string, e?: boolean) => void; xong: () => void;
+}) {
+  const [v, setV] = useState<any>({ don_vi: "" });
+  const [kq, setKq] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const o = (k: string) => (e: any) => { setV({ ...v, [k]: e.target.value }); setKq(null); };
+
+  const goi = async (duong: string) => {
+    setBusy(true);
+    try {
+      const r = await api(`/quyet-toan-lop3/${tourId}/tip${duong}`, {
+        method: "POST",
+        json: {
+          don_gia: soTien(v.don_gia), don_vi: v.don_vi || null,
+          so_khach: soTien(v.so_khach), so_ngay: soTien(v.so_ngay),
+          ty_gia: soTien(v.ty_gia), tien_te: v.tien_te || null,
+          ty_le_phan_tram: v.ty_le_phan_tram || null,
+        },
+      });
+      setKq(r);
+      if (duong === "") { toast("Đã ghi phần tiền tip của công ty vào doanh thu"); xong(); }
+    } catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="panel wrap">
+      <h3 style={{ margin: "0 0 4px" }}>Tiền tip – chia với trưởng đoàn</h3>
+      <p className="muted" style={{ fontSize: 12, margin: "0 0 8px" }}>
+        Tiền tip là tiền của KHÁCH trả cho hướng dẫn viên, công ty giữ hộ. Chỉ phần công ty giữ lại
+        sau khi chia mới vào doanh thu; phần của trưởng đoàn là khoản phải trả, đi vào bản chốt công
+        nợ TL.
+      </p>
+      <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <label>Đơn giá<input value={v.don_gia || ""} onChange={o("don_gia")} style={{ width: 110 }} /></label>
+        <label>
+          Đơn vị{" "}
+          <select value={v.don_vi || ""} onChange={o("don_vi")} style={{ width: 210 }}>
+            <option value="">— chọn —</option>
+            <option value="moi_khach_ca_chuyen">mỗi khách CẢ CHUYẾN</option>
+            <option value="moi_khach_moi_ngay">mỗi khách mỗi NGÀY</option>
+          </select>
+        </label>
+        <label>Số khách<input value={v.so_khach || ""} onChange={o("so_khach")} style={{ width: 90 }} /></label>
+        {v.don_vi === "moi_khach_moi_ngay" && (
+          <label>Số ngày<input value={v.so_ngay || ""} onChange={o("so_ngay")} style={{ width: 90 }} /></label>
+        )}
+        {nn && <>
+          <label>Tiền tệ<input value={v.tien_te || ""} onChange={o("tien_te")} style={{ width: 80 }} /></label>
+          <label>Tỷ giá<input value={v.ty_gia || ""} onChange={o("ty_gia")} style={{ width: 110 }} /></label>
+        </>}
+        <label>
+          Phần công ty (%)
+          <input value={v.ty_le_phan_tram || ""} onChange={o("ty_le_phan_tram")} style={{ width: 90 }}
+                 placeholder="vd 40" />
+        </label>
+        <button className="grey" disabled={busy} onClick={() => goi("/xem-truoc")}>Tính thử</button>
+        <button disabled={busy || !kq || !!kq?.chua_chia} onClick={() => goi("")}>Ghi vào doanh thu</button>
+      </div>
+
+      {kq && (kq.chua_chia ? (
+        <div className="gate warn" style={{ marginTop: 8 }}>
+          {kq.tong != null && <><b>Đã thu {vnd(kq.tong)}</b>. </>}{kq.vi_sao}
+        </div>
+      ) : (
+        <div className="gate ok" style={{ marginTop: 8 }}>
+          <b>Đã thu {vnd(kq.tong)}</b> · công ty <b>{vnd(kq.cong_ty)}</b> ({kq.ty_le_phan_tram}%)
+          {" "}· trưởng đoàn <b>{vnd(kq.truong_doan)}</b>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Tỷ lệ lấy từ: {kq.nguon_ty_le === "go_tren_chuyen" ? "ô vừa gõ trên chuyến này"
+              : "tham số công ty đang hiệu lực"}. Ai gõ và gõ lúc nào sẽ vào sổ dấu vết.
+          </div>
+        </div>
+      ))}
+      {kq?.canh_bao?.map((c: string, i: number) => (
+        <div key={i} className="gate warn" style={{ marginTop: 6 }}>{c}</div>
+      ))}
+    </div>
+  );
+}
+
+
 export default function QuyetToanForm({ tourId, toast }: {
   tourId: number; toast: (m: string, err?: boolean) => void;
 }) {
@@ -509,6 +610,8 @@ export default function QuyetToanForm({ tourId, toast }: {
           Im lặng không được tính là đồng ý – tờ quyết toán chưa đóng được khi còn dòng chờ duyệt.
         </div>
       )}
+
+      <TienTip tourId={tourId} nn={nn} toast={toast} xong={nap} />
 
       {/* SỔ DẤU VẾT – CHỈ ĐỌC, KHÔNG CÓ NÚT NÀO.
           Chủ tịch chốt 10/9/2026: sửa tờ đã ký thì phải để lại dấu vết và lý do. Sổ này không có cửa

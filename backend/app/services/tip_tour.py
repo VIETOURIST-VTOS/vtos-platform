@@ -34,21 +34,24 @@ không treo chờ quyết. Hai cách kia cho ra cùng một con số lợi nhu�
 cáo, nên phải chốt một — và đã chốt.
 
 --------------------------------------------------------------------------------------------------
-VÌ SAO TỆP NÀY TỪ CHỐI CHẠY KHI CHƯA CÓ TỶ LỆ
+TỶ LỆ CHIA: Ô CHO ĐIỀU HÀNH NHẬP (Chủ tịch chốt 12/9/2026)
 --------------------------------------------------------------------------------------------------
 
-Chủ tịch nói "chia 1 phần với công ty". Một phần là bao nhiêu thì chưa ai ký.
+    "tỷ lệ chia tiền tip em cài phép toán và form sẵn cho điều hành tự nhập % vào ô đó"
 
-Điền tạm 50% vào mã là tự đặt ra một tỷ lệ chia tiền giữa công ty và người lao động, rồi sáu tháng
-sau không ai trả lời được câu "ai quyết 50/50, từ ngày nào". Điền 0% cũng không trung lập hơn: 0%
-nghĩa là công ty không lấy gì — đó cũng là một chính sách, và cũng chưa ai ký.
+Nên tỷ lệ là một Ô TRÊN TỪNG CHUYẾN, không phải một hằng số của cả công ty. Hợp với thực tế: mỗi
+đoàn một hợp đồng với trưởng đoàn, và đoàn châu Âu chín ngày khác đoàn Nha Trang ba ngày.
 
-Nên `ty_le_cong_ty()` trả về None khi tham số chưa có giá trị, và `tinh()` trả về `chua_ky=True` với
-số tiền tổng ĐÃ TÍNH nhưng hai phần chia để RỖNG. Người dùng thấy "đã thu 24.705.000 đ, chưa chia
-được vì chưa ký tỷ lệ" — một câu đúng — thay vì thấy một con số chia theo tỷ lệ do máy bịa.
+Thứ tự lấy số:  ô người Điều hành gõ  →  tham số công ty (nếu đã ký)  →  RỖNG, phép chia dừng.
 
-Tỷ lệ đi vào qua đúng cửa tham số đang có: đề xuất → hai chữ ký → có hiệu lực từ một ngày cụ thể.
-Và vì tham số có hiệu lực theo ngày, đoàn đã đi giữ nguyên tỷ lệ của ngày nó khởi hành.
+Vẫn giữ tham số ở giữa vì một chuyến bỏ trống ô ấy thì phải có chỗ lùi về, và lùi về một con số ĐÃ
+KÝ tốt hơn lùi về một con số mã tự đoán. Máy KHÔNG BAO GIỜ tự điền: không có cả hai thì hệ thống nói
+"đã thu 24.705.000 đ, chưa chia được vì chưa có tỷ lệ" — một câu đúng — thay vì một con số bịa.
+
+MỘT ĐIỀU PHẢI GHI VÀO SỔ, không phải để cản ai: tỷ lệ này chia tiền giữa công ty và người lao động.
+Khi nó là một ô gõ tay trên từng chuyến thì AI GÕ và GÕ LÚC NÀO phải vào sổ dấu vết — `sua_sau_ky`
+đã có sẵn cơ chế ấy. Một ô đổi được mà không ai biết ai đổi là chỗ mà sáu tháng sau không ai trả lời
+được câu "vì sao đoàn này công ty lấy 40% còn đoàn kia lấy 70%".
 
 --------------------------------------------------------------------------------------------------
 PHẦN CÒN NỢ, ĐÃ GHI RÕ ĐỂ LÀN SAU KHÔNG PHẢI ĐOÁN
@@ -75,30 +78,87 @@ KHOA_TY_LE = "ty_le_tip_cong_ty"
 
 # Lý do trả về khi không chia được. Mỗi lý do là một câu nói được với người dùng, không phải một mã.
 CHUA_CHIA = {
-    "chua_ky_ty_le": "Chưa ký tỷ lệ chia tiền tip giữa công ty và trưởng đoàn – đề xuất tham số "
-                     "ty_le_tip_cong_ty rồi ký đủ hai chữ ký.",
+    "chua_co_ty_le": "Chưa có tỷ lệ chia tiền tip – Điều hành nhập % vào ô «Phần công ty» trên biểu "
+                     "quyết toán, hoặc ký tham số ty_le_tip_cong_ty làm mức mặc định cho mọi chuyến.",
     "chua_co_tip": "Chuyến chưa khai tiền tip.",
 }
 
 
-def ty_le_cong_ty(db: Session, hom_nay: date | None = None) -> float | None:
-    """Tỷ lệ phần tip thuộc công ty, đang hiệu lực tại ngày đưa vào.
-
-    Trả về None khi CHƯA AI KÝ — khác hẳn 0.0 (công ty không lấy gì) và 1.0 (công ty lấy hết). Cả
-    hai đều là chính sách hợp lệ, nên hàm này không được đoán hộ bên nào.
-    """
-    thoi = get_param_text(db, KHOA_TY_LE, hom_nay)
-    if thoi is None or str(thoi).strip() == "":
+def _so(x) -> float | None:
+    if x is None or str(x).strip() == "":
         return None
     try:
-        v = float(thoi)
+        return float(str(x).strip().rstrip("%").replace(",", "."))
     except (TypeError, ValueError):
         return None
-    # Tỷ lệ ngoài [0, 1] là tham số hỏng, không phải chính sách lạ. Trả None để phép chia dừng, thay
-    # vì chia ra một phần âm hoặc một phần lớn hơn cả số tiền có thật.
-    if not (0.0 <= v <= 1.0):
+
+
+def doc_phan_tram(x) -> float | None:
+    """Đọc ô % TRÊN BIỂU NHẬP. Luôn là phần trăm: gõ 40 nghĩa là 40%.
+
+    BẢN NHÁP ĐẦU CỦA HÀM NÀY NHẬN CẢ HAI CÁCH VIẾT — `0.4` và `40` — bằng một luật ngầm "lớn hơn 1
+    thì chia 100". Đó là một cái bẫy tự đặt ra:
+
+        gõ 1    → 100%  hay 1%?
+        gõ 0.4  → 0,4%  hay 40%?
+
+    Cả hai đều đọc xuôi tai, và số tiền chênh nhau HÀNG TRĂM LẦN. Một ngưỡng phép màu đặt giữa hai
+    cách viết là chỗ chắc chắn có ngày chia sai mà không ai biết vì sao.
+
+    Nên bỏ hẳn luật ngầm: ô trên biểu là PHẦN TRĂM, không có ngoại lệ. Tham số hệ thống là SỐ THẬP
+    PHÂN, đọc bằng hàm khác. Hai cách viết, hai cửa, không đoán.
+
+    Ngoài khoảng [0, 100] là số hỏng: trả None để phép chia DỪNG, thay vì chia ra một phần âm hoặc
+    một phần lớn hơn cả số tiền có thật.
+    """
+    v = _so(x)
+    if v is None or v < 0 or v > 100:
+        return None
+    return v / 100.0
+
+
+def doc_ty_le_tham_so(x) -> float | None:
+    """Đọc tham số hệ thống. Luôn là số thập phân: `0.4` nghĩa là 40%."""
+    v = _so(x)
+    if v is None or v < 0 or v > 1:
         return None
     return v
+
+
+def canh_bao_phan_tram(x) -> str:
+    """Người gõ 0,4 vào ô có nhãn % thì hệ thống đọc đúng 0,4% — và rất có thể họ định gõ 40%.
+
+    Không tự sửa số của người ta. Nhưng cũng không im: nói ra để họ nhìn lại.
+    """
+    v = _so(x)
+    if v is not None and 0 < v < 1:
+        return (f"Ô này là PHẦN TRĂM: gõ {v} nghĩa là {v}% – công ty chỉ lấy {v} phần trăm tiền tip. "
+                f"Nếu định {v * 100:g}% thì gõ {v * 100:g}.")
+    return ""
+
+
+def ty_le_cong_ty(db: Session, hom_nay: date | None = None,
+                  ty_le_chuyen=None) -> float | None:
+    """Tỷ lệ phần tip thuộc công ty.
+
+    CHỦ TỊCH CHỐT 12/9/2026: "tỷ lệ chia tiền tip em cài phép toán và form sẵn cho Điều hành tự nhập
+    % vào ô đó." Nên thứ tự là:
+
+        1. Ô người Điều hành gõ trên chính chuyến ấy      ← ưu tiên
+        2. Tham số công ty đang hiệu lực (nếu đã ký)      ← mức dự phòng
+        3. RỖNG – phép chia từ chối chạy
+
+    Vì sao vẫn giữ bước 2 dù Chủ tịch đã cho nhập tay: một chuyến bỏ trống ô ấy thì phải có chỗ lùi
+    về, và lùi về một con số ĐÃ KÝ thì tốt hơn lùi về một con số mã tự đoán. Khi tham số có giá trị,
+    biểu nhập điền sẵn nó vào ô — người Điều hành vẫn sửa được, nhưng mặc định không phải số trống.
+
+    Và vì tỷ lệ nay do người gõ trên từng chuyến, AI GÕ và GÕ LÚC NÀO phải vào sổ dấu vết — đây là
+    một quyết định chia tiền giữa công ty và người lao động, không phải một ô ghi chú.
+    """
+    tren_chuyen = doc_phan_tram(ty_le_chuyen)
+    if tren_chuyen is not None:
+        return tren_chuyen
+    return doc_ty_le_tham_so(get_param_text(db, KHOA_TY_LE, hom_nay))
 
 
 def chia(tong_tip: float | None, ty_le: float | None) -> dict:
@@ -157,21 +217,25 @@ def tien_tip_thu(don_gia: float | None, don_vi: str | None, so_khach: int | None
 
 
 def tinh(db: Session, *, don_gia: float | None, don_vi: str | None, so_khach: int | None,
-         so_ngay: int | None = None, ty_gia: float | None = None,
+         so_ngay: int | None = None, ty_gia: float | None = None, ty_le_chuyen=None,
          hom_nay: date | None = None) -> dict:
     """Bản chia tip của một chuyến.
 
     Luôn trả về con số TỔNG nếu tính được, kể cả khi chưa chia được – vì "đã thu bao nhiêu" là câu
-    trả lời được ngay, còn "chia thế nào" mới là câu đang chờ chữ ký.
+    trả lời được ngay, còn "chia thế nào" mới là câu còn chờ người điền.
     """
     tong = tien_tip_thu(don_gia, don_vi, so_khach, so_ngay, ty_gia)
-    tl = ty_le_cong_ty(db, hom_nay)
+    tl = ty_le_cong_ty(db, hom_nay, ty_le_chuyen)
     kq = chia(tong, tl)
     kq["ty_le_cong_ty"] = tl
+    kq["ty_le_phan_tram"] = None if tl is None else round(tl * 100, 4)
+    kq["nguon_ty_le"] = ("go_tren_chuyen" if doc_phan_tram(ty_le_chuyen) is not None
+                         else ("tham_so" if tl is not None else ""))
+    kq["canh_bao"] = [c for c in (canh_bao_phan_tram(ty_le_chuyen),) if c]
     if tong is None:
         kq["chua_chia"], kq["vi_sao"] = "chua_co_tip", CHUA_CHIA["chua_co_tip"]
     elif tl is None:
-        kq["chua_chia"], kq["vi_sao"] = "chua_ky_ty_le", CHUA_CHIA["chua_ky_ty_le"]
+        kq["chua_chia"], kq["vi_sao"] = "chua_co_ty_le", CHUA_CHIA["chua_co_ty_le"]
     else:
         kq["chua_chia"], kq["vi_sao"] = "", ""
     return kq

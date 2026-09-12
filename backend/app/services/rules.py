@@ -191,6 +191,13 @@ DEFAULT_PARAMS = [
     # của ngày nó khởi hành: đổi thuế suất hôm nay KHÔNG làm đổi lợi nhuận những tờ quyết toán đã ký.
     ("thue_suat_dau_ra", "0.08", "Thuế suất GTGT đầu ra áp cho doanh thu tour", "tỷ lệ",
      "Chủ tịch chốt 12/9/2026"),
+    # Giá bán niêm yết ĐÃ GỒM thuế GTGT hay chưa. Đây là một QUY ƯỚC, không phải phép tính, và hai
+    # quy ước lệch nhau đúng 8% của chính phần chịu thuế – ở mọi chuyến, và không bao giờ tự lộ ra.
+    #
+    # Để 1 (đã gồm) vì đó là quy ước đang dùng trong chính tệp quyết toán của phòng Điều hành: đoàn
+    # Hồ Tràm tính 3.790.000 / 1,08 để ra giá trước thuế.
+    ("gia_ban_gom_thue_gtgt", "1", "Giá bán niêm yết đã gồm thuế GTGT (1) hay chưa gồm (0)", "cờ",
+     "Quy ước đọc từ mẫu quyết toán Điều hành – chờ Kế toán xác nhận"),
     # ---- Đ-6 · Tiền tip. Chủ tịch chốt 12/9/2026: "tiền tip tour châu Âu chia 1 phần với công ty" ----
     #
     # GIÁ TRỊ ĐỂ TRỐNG, và phải để trống — giống hai mốc vận hành thật ở trên. Chủ tịch đã chốt

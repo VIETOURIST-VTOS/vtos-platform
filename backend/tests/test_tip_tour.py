@@ -97,13 +97,68 @@ def test_don_vi_ca_chuyen_thi_so_ngay_KHONG_anh_huong():
 # 2. Tỷ lệ chưa ký thì KHÔNG chia
 # =============================================================================================
 
-def test_chua_ky_ty_le_thi_van_bao_TONG_nhung_khong_chia(db):
-    """"Đã thu bao nhiêu" là câu trả lời được ngay. "Chia thế nào" mới là câu đang chờ chữ ký."""
+def test_chua_co_ty_le_thi_van_bao_TONG_nhung_khong_chia(db):
+    """"Đã thu bao nhiêu" là câu trả lời được ngay. "Chia thế nào" mới là câu còn chờ người điền."""
     kq = TIP.tinh(db, don_gia=27, don_vi="moi_khach_ca_chuyen", so_khach=30, ty_gia=TY_GIA_EUR)
     assert kq["tong"] == pytest.approx(EU_TONG)
     assert kq["cong_ty"] is None and kq["truong_doan"] is None
-    assert kq["chua_chia"] == "chua_ky_ty_le"
-    assert "ty_le_tip_cong_ty" in kq["vi_sao"]
+    assert kq["chua_chia"] == "chua_co_ty_le"
+    assert "Điều hành nhập" in kq["vi_sao"]
+
+
+# =============================================================================================
+# 2b. Ô % TRÊN BIỂU: một ô, một cách đọc — không có luật ngầm
+# =============================================================================================
+
+def test_o_tren_bieu_LUON_la_phan_tram_khong_co_luat_ngam():
+    """Bản nháp đầu nhận cả `0.4` và `40` bằng luật ngầm "lớn hơn 1 thì chia 100".
+
+    Luật ấy là một cái bẫy: gõ 1 là 100% hay 1%? gõ 0.4 là 0,4% hay 40%? Cả hai đều đọc xuôi tai
+    và số tiền chênh nhau HÀNG TRĂM LẦN.
+    """
+    assert TIP.doc_phan_tram("40") == pytest.approx(0.40)
+    assert TIP.doc_phan_tram("1") == pytest.approx(0.01), "1 trong ô '%' là MỘT phần trăm"
+    assert TIP.doc_phan_tram("0.4") == pytest.approx(0.004), "0,4 trong ô '%' là 0,4 phần trăm"
+    assert TIP.doc_phan_tram("100") == pytest.approx(1.0)
+
+
+def test_tham_so_he_thong_LUON_la_so_thap_phan():
+    """Hai cách viết, hai cửa. Tham số viết 0.4; gõ 40 vào tham số là số hỏng, không phải 40%."""
+    assert TIP.doc_ty_le_tham_so("0.4") == pytest.approx(0.4)
+    assert TIP.doc_ty_le_tham_so("40") is None
+
+
+def test_go_so_nho_hon_1_vao_o_phan_tram_thi_NOI_RA_chu_khong_tu_sua():
+    """Không tự sửa số của người ta. Nhưng cũng không im."""
+    c = TIP.canh_bao_phan_tram("0.4")
+    assert "PHẦN TRĂM" in c and "40" in c
+    assert TIP.canh_bao_phan_tram("40") == ""
+
+
+def test_ty_le_ngoai_khoang_bi_TU_CHOI():
+    assert TIP.doc_phan_tram("101") is None
+    assert TIP.doc_phan_tram("-5") is None
+    assert TIP.doc_phan_tram("bốn mươi") is None
+
+
+def test_o_tren_chuyen_DE_LEN_tham_so_va_noi_ro_lay_tu_dau(db):
+    """Chủ tịch chốt 12/9: Điều hành tự nhập % vào ô trên từng chuyến."""
+    _ky_ty_le(db, "0.3")
+    kq = TIP.tinh(db, don_gia=27, don_vi="moi_khach_ca_chuyen", so_khach=30,
+                  ty_gia=TY_GIA_EUR, ty_le_chuyen="65")
+    assert kq["ty_le_cong_ty"] == pytest.approx(0.65)
+    assert kq["ty_le_phan_tram"] == pytest.approx(65)
+    assert kq["nguon_ty_le"] == "go_tren_chuyen"
+    assert kq["cong_ty"] + kq["truong_doan"] == kq["tong"]
+
+
+def test_bo_trong_o_thi_lui_ve_tham_so_DA_KY(db):
+    """Lùi về một con số đã ký tốt hơn lùi về một con số mã tự đoán."""
+    _ky_ty_le(db, "0.3")
+    kq = TIP.tinh(db, don_gia=27, don_vi="moi_khach_ca_chuyen", so_khach=30,
+                  ty_gia=TY_GIA_EUR, ty_le_chuyen="")
+    assert kq["ty_le_cong_ty"] == pytest.approx(0.3)
+    assert kq["nguon_ty_le"] == "tham_so"
 
 
 def test_ty_le_mac_dinh_de_TRONG_chu_khong_phai_0_hay_1(db):

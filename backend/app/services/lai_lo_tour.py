@@ -174,22 +174,36 @@ def ba_tang(lai_gop: float | None, thue: float | None) -> dict:
     }
 
 
+def _gia_von(t: Tour, cp: dict) -> float | None:
+    """Giá vốn của một chuyến — MỘT chỗ duy nhất chọn nguồn.
+
+    Tách riêng khỏi `_mot_dong` vì khối thuế cần biết giá vốn TRƯỚC khi dòng báo cáo được ráp: tour
+    nước ngoài lấy giá vốn làm ranh giới giữa hai dòng hoá đơn. Hai chỗ tính giá vốn theo hai cách
+    là đúng cái bệnh bốn-công-thức mà tệp này sinh ra để chữa.
+
+    Ưu tiên dòng chi phí (nguồn giàu nhất), lùi về giá vốn tổng nếu chưa có dòng nào. KHÔNG lùi về 0
+    – rỗng và 0 là hai chuyện khác nhau, và đó là toàn bộ điều đợt K2 dựng ra để giữ.
+    """
+    khuyen_mai = float(t.promo_value or 0)
+    if cp["so_dong_cp"] > 0:
+        return cp["gia_von_dong"] + khuyen_mai
+    if t.actual_cost is not None and float(t.actual_cost) != 0:
+        return float(t.actual_cost) + khuyen_mai
+    return None
+
+
 def _mot_dong(t: Tour, bk: dict, cp: dict, thue: dict | None = None) -> dict:
     """Ráp một dòng báo cáo theo đúng chuẩn phép tính. Không phép tính nào khác được phép ở nơi khác."""
     doanh_thu = bk["doanh_thu_bk"] + bk["phi_huy"]
     co_dong_cp = cp["so_dong_cp"] > 0
     khuyen_mai = float(t.promo_value or 0)
 
-    # Giá vốn: ưu tiên dòng chi phí (nguồn giàu nhất), lùi về giá vốn tổng nếu chưa có dòng nào.
-    # KHÔNG lùi về 0 - rỗng và 0 là hai chuyện khác nhau, và đó là toàn bộ điều đợt K2 dựng ra để giữ.
+    gia_von = _gia_von(t, cp)
     if co_dong_cp:
-        gia_von = cp["gia_von_dong"] + khuyen_mai
         nguon = "quyet_toan_chi_tiet"
-    elif t.actual_cost is not None and float(t.actual_cost) != 0:
-        gia_von = float(t.actual_cost) + khuyen_mai  # k2-doc-an-toan: dong tren da chan actual_cost is None
+    elif gia_von is not None:
         nguon = "quyet_toan_tong"
     else:
-        gia_von = None
         nguon = "thieu_gia_von" if doanh_thu else "chua_co_so"
 
     loi_nhuan = None if gia_von is None else doanh_thu - gia_von
@@ -223,6 +237,9 @@ def _mot_dong(t: Tour, bk: dict, cp: dict, thue: dict | None = None) -> dict:
         "thue_co_so": (thue or {}).get("co_so", "chua_tinh"),
         "thue_co_so_ten": (thue or {}).get("co_so_ten", "Chưa tính thuế cho chuyến này"),
         "thue_canh_bao": (thue or {}).get("canh_bao", []),
+        # Tour nước ngoài: hai dòng của tờ hoá đơn (phần 0% và phần chịu thuế). Rỗng với tour trong
+        # nước. Màn hình và tệp xuất dùng ĐÚNG số này, không tự chia lại.
+        "hoa_don_hai_dong": (thue or {}).get("hoa_don_hai_dong"),
         "chi_khong_hoa_don": (thue or {}).get("chi_khong_hoa_don", 0.0) or None,
         "ket_qua": ba_tang(loi_nhuan, (thue or {}).get("thue_gtgt")),
         "da_tra_ncc": cp["da_tra"] if co_dong_cp else None,
@@ -257,8 +274,12 @@ def bang(db: Session, u=None, tu: date | None = None, den: date | None = None,
     bk, cp = _gom_booking(db, ids), _gom_chi_phi(db, ids)
     # Thuế GTGT của cả bảng lấy bằng HAI câu truy vấn cho toàn bộ trang, không phải hai câu mỗi dòng.
     # Trang 200 dòng mà hỏi từng dòng là 400 câu truy vấn cho một lần mở màn hình.
+    # Tour nước ngoài cần GIÁ VỐN để tách hai dòng hoá đơn (0% / phần lợi nhuận), nên giá vốn phải
+    # tính xong TRƯỚC khi hỏi thuế. Dùng đúng thứ tự ưu tiên của _mot_dong, không tự nghĩ ra cách
+    # khác — hai chỗ tính giá vốn theo hai cách là đúng cái bệnh tệp này sinh ra để chữa.
     tho = [{"tour_id": t.id, "hinh_thuc": getattr(t, "hinh_thuc", None),
-            "doanh_thu": (bk.get(t.id, RONG)["doanh_thu_bk"] + bk.get(t.id, RONG)["phi_huy"])}
+            "doanh_thu": (bk.get(t.id, RONG)["doanh_thu_bk"] + bk.get(t.id, RONG)["phi_huy"]),
+            "gia_von": _gia_von(t, cp.get(t.id, RONG_CP))}
            for t in tours]
     thue = THUE.nhieu_chuyen(db, tho)
     rows = [_mot_dong(t, bk.get(t.id, dict(RONG)), cp.get(t.id, dict(RONG_CP)), thue.get(t.id))
@@ -398,7 +419,8 @@ def chi_tiet(db: Session, t: Tour) -> dict:
     bk = _gom_booking(db, [t.id]).get(t.id, dict(RONG))
     cp = _gom_chi_phi(db, [t.id]).get(t.id, dict(RONG_CP))
     thue = THUE.nhieu_chuyen(db, [{"tour_id": t.id, "hinh_thuc": getattr(t, "hinh_thuc", None),
-                                   "doanh_thu": bk["doanh_thu_bk"] + bk["phi_huy"]}]).get(t.id)
+                                   "doanh_thu": bk["doanh_thu_bk"] + bk["phi_huy"],
+                                   "gia_von": _gia_von(t, cp)}]).get(t.id)
     return {"tong_hop": _mot_dong(t, bk, cp, thue), "khach": khach, "chi_phi": chi_phi,
             "quyet_toan_dieu_hanh": _ban_quyet_toan(db, t),
             "co_gia_von_theo_khach": le,

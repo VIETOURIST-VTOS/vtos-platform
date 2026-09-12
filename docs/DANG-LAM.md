@@ -50,3 +50,5 @@ tệp; hai làn viết cùng một KHÁI NIỆM vào hai tệp khác tên thì b
 | Robot A | Đ-3 ba phép kiểm hai tổng phải bằng nhau | backend/app/services/soat_can_doi_quyet_toan.py, backend/tests/test_soat_can_doi_quyet_toan.py | 12-09-2026 19:30 | xong |
 | Robot A | Đ-6 tiền tip hai chiều + tham số tỷ lệ chia | backend/app/services/tip_tour.py, backend/app/models/lop3_tour.py, backend/app/services/rules.py, backend/tests/test_tip_tour.py | 12-09-2026 19:30 | xong |
 | Robot A | Đ-1 mở cửa quyết toán lớp 3 | web/app/tours/[id]/page.tsx, backend/tests/test_cua_quyet_toan_lop3.py | 12-09-2026 21:00 | xong |
+| Robot A | Đ-2b thuế tour nước ngoài hai dòng hoá đơn | backend/app/services/thue_gtgt_chuyen.py, backend/app/services/lai_lo_tour.py, backend/app/services/rules.py | 12-09-2026 22:30 | xong |
+| Robot A | Đ-6b ô % chia tip cho Điều hành nhập | backend/app/services/tip_tour.py, backend/app/api/v1/quyet_toan_lop3.py, web/components/QuyetToanForm.tsx | 12-09-2026 22:30 | xong |

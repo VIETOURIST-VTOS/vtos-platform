@@ -168,17 +168,75 @@ def test_chi_khong_hoa_don_KHONG_sinh_thue_dau_vao(db):
     assert vao["vat_vao"] < neu_tinh_ca - 500_000
 
 
-def test_tour_nuoc_ngoai_KHONG_tu_ap_8_phan_tram(db):
-    """Tour trọn gói có dịch vụ tiêu dùng ngoài Việt Nam: giá tính thuế đầu ra không hiển nhiên
-    bằng toàn bộ doanh thu. Chờ Kế toán chốt, không để mã đoán.
+# =============================================================================================
+# 2b. TOUR NƯỚC NGOÀI — HOÁ ĐƠN HAI DÒNG (Chủ tịch chốt 12/9/2026)
+# =============================================================================================
+#
+#   "thuế nước ngoài chia ra 2 loại: 1 là 0%, và khoản lợi nhuận là 8%. Ví dụ giá bán 1 tỷ, giá vốn
+#    900 triệu = lợi nhuận 100 triệu; khi xuất hoá đơn cho khách hàng là 900 triệu 0% VAT, 100 triệu
+#    8% VAT."
 
-    Tệp UK 27/5 có doanh thu 2.479.513.034 đ – áp 8% lên toàn bộ là bịa ra ~183,7 triệu tiền thuế.
-    """
+def test_nuoc_ngoai_tach_dung_hai_dong_theo_vi_du_cua_chu_tich(db):
     kq = T.nhieu_chuyen(db, [{"tour_id": 7, "hinh_thuc": "nuoc_ngoai",
-                              "doanh_thu": 2_479_513_034}])[7]
+                              "doanh_thu": 1_000_000_000, "gia_von": 900_000_000}])[7]
+    assert kq["co_so"] == "nuoc_ngoai_hai_phan"
+    d0, d8 = kq["hoa_don_hai_dong"]
+    assert d0["so_tien"] == pytest.approx(900_000_000) and d0["thue_suat"] == 0.0
+    assert d8["so_tien"] == pytest.approx(100_000_000) and d8["thue_suat"] == pytest.approx(0.08)
+    # Giá bán niêm yết ĐÃ GỒM thuế (quy ước đọc từ chính mẫu Hồ Tràm: 3.790.000 / 1,08).
+    assert d8["tien_thue"] == pytest.approx(100_000_000 - 100_000_000 / 1.08, abs=1)
+    assert kq["vat_ra"] == pytest.approx(7_407_407, abs=2)
+
+
+def test_nuoc_ngoai_KHONG_ap_8_phan_tram_len_toan_bo_doanh_thu(db):
+    """Đây là chỗ sai hàng trăm triệu nếu làm tắt.
+
+    Tệp UK 27/5 doanh thu 2.479.513.034 đ, giá vốn 2.253.432.408 đ. Áp 8% lên TOÀN BỘ doanh thu ra
+    ~183,7 triệu tiền thuế; đúng cách thì chỉ phần chênh 226.080.626 đ chịu thuế.
+    """
+    kq = T.nhieu_chuyen(db, [{"tour_id": 8, "hinh_thuc": "nuoc_ngoai",
+                              "doanh_thu": 2_479_513_034, "gia_von": 2_253_432_408}])[8]
+    dung = kq["vat_ra"]
+    neu_ap_toan_bo = 2_479_513_034 - 2_479_513_034 / 1.08
+    assert dung == pytest.approx(226_080_626 - 226_080_626 / 1.08, abs=2)
+    assert neu_ap_toan_bo - dung > 150_000_000, \
+        "làm tắt ở đây là bịa ra hơn 150 triệu tiền thuế trên MỘT chuyến"
+
+
+def test_nuoc_ngoai_chua_co_gia_von_thi_RONG_chu_khong_doan(db):
+    """Chưa có giá vốn thì chưa biết ranh giới giữa hai dòng hoá đơn nằm ở đâu."""
+    kq = T.nhieu_chuyen(db, [{"tour_id": 9, "hinh_thuc": "nuoc_ngoai",
+                              "doanh_thu": 1_000_000_000, "gia_von": None}])[9]
     assert kq["thue_gtgt"] is None
-    assert kq["co_so"] == "cho_ke_toan_nuoc_ngoai"
-    assert "Kế toán" in kq["vi_sao"]
+    assert kq["co_so"] == "nuoc_ngoai_chua_co_gia_von"
+
+
+def test_nuoc_ngoai_ban_duoi_gia_von_thi_KHONG_co_dong_thue_AM(db):
+    """Hoá đơn không có dòng âm.
+
+    Kẹp ở đây là ĐÚNG và khác hẳn chỗ cấm kẹp ở test_chuyen_am_thue: ở kia số âm là khấu trừ thật bù
+    sang chuyến khác; ở đây chỉ là tờ hoá đơn có một dòng 0% thay vì hai. Lỗ vẫn là lỗ, vẫn hiện ở
+    lãi gộp – nó chỉ không sinh ra thuế đầu ra âm.
+    """
+    kq = T.nhieu_chuyen(db, [{"tour_id": 10, "hinh_thuc": "nuoc_ngoai",
+                              "doanh_thu": 900_000_000, "gia_von": 1_000_000_000}])[10]
+    d0, d8 = kq["hoa_don_hai_dong"]
+    assert d0["so_tien"] == pytest.approx(900_000_000)
+    assert d8["so_tien"] == 0 and d8["tien_thue"] == 0
+    assert kq["vat_ra"] == 0
+    assert any("dưới giá vốn" in c for c in kq["canh_bao"])
+
+
+def test_nuoc_ngoai_van_tru_thue_dau_vao(db):
+    """Chi trong nước của tour nước ngoài (vé bay mua ở VN, bảo hiểm) vẫn có thuế đầu vào."""
+    db.add(TourCostLine(tour_id=11, description="Vé máy bay mua tại VN", actual=500_000_000,
+                        thue_suat=0.08, vat_hoa_don=37_037_037, so_hoa_don="HD 5", status="hd"))
+    db.commit()
+    kq = T.nhieu_chuyen(db, [{"tour_id": 11, "hinh_thuc": "nuoc_ngoai",
+                              "doanh_thu": 1_000_000_000, "gia_von": 900_000_000}])[11]
+    assert kq["vat_vao"] == pytest.approx(37_037_037)
+    assert kq["thue_gtgt"] == pytest.approx(kq["vat_ra"] - 37_037_037)
+    assert kq["thue_gtgt"] < 0, "chuyến này khấu trừ nhiều hơn phải nộp – số âm là thật"
 
 
 def test_chua_co_dong_doanh_thu_thi_SUY_va_noi_ro_la_suy(db):

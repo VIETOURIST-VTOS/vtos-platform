@@ -35,6 +35,7 @@ from app.services import ghi_mot_lan as GML
 from app.services import gia_khach as G
 from app.services import khoan_muc_chi as KM
 from app.services import pham_vi_phap_nhan as PV
+from app.services import tip_tour as TIP
 
 router = APIRouter(prefix="/api/v1/quyet-toan-lop3", tags=["quyet-toan-lop3"])
 
@@ -960,3 +961,81 @@ def dau_vet(tid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depe
         {"id": x.id, "bang": x.bang, "ban_ghi_id": x.ban_ghi_id, "truong": x.truong,
          "gia_tri_cu": x.gia_tri_cu, "gia_tri_moi": x.gia_tri_moi, "ly_do": x.ly_do,
          "nguoi_sua": x.nguoi_sua, "vai_tro": x.vai_tro, "sua_luc": x.sua_luc} for x in ds]}
+
+
+# ---------------------------------------------------------------------------------------------
+# TIỀN TIP — Đ-6, Chủ tịch chốt 12/9/2026
+# ---------------------------------------------------------------------------------------------
+#
+#   "tiền tip tour châu Âu chia 1 phần với công ty"
+#   "tỷ lệ chia tiền tip em cài phép toán và form sẵn cho điều hành tự nhập % vào ô đó"
+#
+# Hai đường: XEM TRƯỚC (không ghi gì) và GHI (tạo một dòng doanh thu loại tip_cong_ty).
+#
+# Tách hai đường vì phép chia này có một cái bẫy đắt: cùng một khoản 810 € viết được bằng hai đơn vị
+# (27 €/khách/chuyến hoặc 3 €/khách/ngày × 9 ngày), và gõ nhầm ô là sai GẤP CHÍN LẦN. Người nhập phải
+# nhìn thấy con số trước khi nó thành một dòng doanh thu.
+
+
+class TipVao(BaseModel):
+    don_gia: float | None = None
+    don_vi: str | None = None            # moi_khach_moi_ngay / moi_khach_ca_chuyen
+    so_khach: int | None = None
+    so_ngay: int | None = None
+    ty_gia: float | None = None
+    tien_te: str | None = None
+    ty_le_phan_tram: str | None = None   # ô % Điều hành gõ; rỗng thì lùi về tham số đã ký
+    ghi_chu: str | None = None
+    ly_do_sua: str = ""
+
+
+def _tip(db: Session, t: Tour, v: TipVao) -> dict:
+    return TIP.tinh(db, don_gia=v.don_gia, don_vi=v.don_vi, so_khach=v.so_khach,
+                    so_ngay=v.so_ngay, ty_gia=v.ty_gia, ty_le_chuyen=v.ty_le_phan_tram,
+                    hom_nay=t.start_date)
+
+
+@router.get("/tip/don-vi")
+def tip_don_vi():
+    """Hai đơn vị của đơn giá tip. Ô này BẮT BUỘC – không khai thì phép tính dừng."""
+    return {"don_vi": TIP.DON_VI_TIP}
+
+
+@router.post("/{tid}/tip/xem-truoc")
+def tip_xem_truoc(tid: int, v: TipVao, u: User = Depends(require_roles(*XEM)),
+                  db: Session = Depends(get_db)):
+    """Tính thử, KHÔNG ghi gì. Người nhập nhìn số rồi mới bấm ghi."""
+    t = _tour(db, tid, u)
+    return _tip(db, t, v)
+
+
+@router.post("/{tid}/tip")
+def ghi_tip(tid: int, v: TipVao, u: User = Depends(require_roles(*NHAP)),
+            db: Session = Depends(get_db)):
+    """Ghi PHẦN CÔNG TY thành một dòng doanh thu loại tip_cong_ty.
+
+    Phần của trưởng đoàn KHÔNG ghi ở đây – nó là khoản phải trả cho trưởng đoàn và đi vào bản chốt
+    công nợ TL. Ghi cả cục vào doanh thu là thổi doanh thu lên bằng tiền của người khác.
+    """
+    t = _tour(db, tid, u)
+    _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
+    kq = _tip(db, t, v)
+    if kq["chua_chia"]:
+        raise HTTPException(422, kq["vi_sao"])
+
+    ghi_chu = (f"Tip {kq['tong']:,.0f} đ – công ty {kq['ty_le_phan_tram']:g}%, "
+               f"trưởng đoàn {kq['truong_doan']:,.0f} đ"
+               + (f". {v.ghi_chu}" if v.ghi_chu else ""))
+    d = TourDoanhThuDong(tour_id=tid, loai="tip_cong_ty",
+                         noi_dung="Phần tiền tip thuộc công ty",
+                         so_luong=1, don_gia_truoc_thue=kq["cong_ty"],
+                         thanh_tien_truoc_thue=kq["cong_ty"], thanh_tien=kq["cong_ty"],
+                         tien_te=v.tien_te, ty_gia=v.ty_gia, ghi_chu=ghi_chu)
+    db.add(d); db.flush()
+    # Tỷ lệ chia tiền giữa công ty và người lao động PHẢI vào sổ dấu vết, kể cả khi tờ chưa ký:
+    # sáu tháng sau phải trả lời được "vì sao đoàn này công ty lấy 40% còn đoàn kia lấy 70%".
+    ghi_dau_vet(db, t, u, "tour_doanh_thu_dong", d.id, "ty_le_tip_cong_ty",
+                None, f"{kq['ty_le_phan_tram']:g}% ({kq['nguon_ty_le']})",
+                v.ly_do_sua or "Điều hành nhập tỷ lệ chia tiền tip")
+    db.commit()
+    return {"id": d.id, **kq}

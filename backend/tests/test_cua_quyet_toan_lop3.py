@@ -93,6 +93,30 @@ def test_bieu_nhap_con_du_sau_khoi():
         f"  Sáu mặt của lớp 3 phải có đủ sáu cửa; năm cửa còn lại vẫn chạy nên mất một cửa không ai kêu.")
 
 
+def test_bieu_nhap_co_du_CUA_TIEN_TIP():
+    """Đ-6 · Chủ tịch chốt 12/9: "form sẵn cho điều hành tự nhập % vào ô đó".
+
+    Ba ô phải còn: đơn giá, ĐƠN VỊ (hai lựa chọn, không có mặc định), và % phần công ty.
+    """
+    src = THANH_PHAN.read_text(encoding="utf-8")
+    assert "TienTip" in src, "biểu nhập mất khối tiền tip"
+    for k in ("moi_khach_ca_chuyen", "moi_khach_moi_ngay", "ty_le_phan_tram"):
+        assert k in src, f"khối tiền tip thiếu ô {k}"
+    # Đơn vị KHÔNG được có lựa chọn mặc định: gõ đơn giá cả-chuyến vào ô mỗi-ngày là sai GẤP CHÍN
+    # LẦN, và một giá trị mặc định là cách chắc chắn để người ta không đọc ô ấy.
+    assert 'value=""' in src and "— chọn —" in src, \
+        "ô đơn vị tip phải mở ở trạng thái CHƯA CHỌN, không được mặc định sẵn một đơn vị"
+
+
+def test_may_chu_co_du_HAI_duong_tip_xem_truoc_va_ghi():
+    """Xem trước KHÔNG chạm cơ sở dữ liệu; người nhập nhìn số rồi mới ghi."""
+    from app.api.v1 import quyet_toan_lop3 as R
+
+    duong = {getattr(r, "path", "") for r in R.router.routes}
+    assert any(p.endswith("/tip/xem-truoc") for p in duong), "thiếu đường xem trước tiền tip"
+    assert any(p.endswith("/tip") for p in duong), "thiếu đường ghi tiền tip"
+
+
 def test_bieu_nhap_KHONG_co_o_nao_cho_go_tong():
     """Nguyên tắc 1 của chính biểu này: máy cộng, người không gõ tổng.
 

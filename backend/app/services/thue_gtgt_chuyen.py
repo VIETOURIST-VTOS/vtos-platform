@@ -70,22 +70,24 @@ from sqlalchemy.orm import Session
 
 from app.models.lop3_tour import TourDoanhThuDong
 from app.models.vietrip import TourCostLine
-from app.services.rules import get_param
+from app.services.rules import get_param, get_param_text
 
 # Khoá tham số thuế suất đầu ra. Chủ tịch chốt 8% ngày 12/9/2026; khai trong rules.DEFAULT_PARAMS.
 KHOA_THUE_SUAT_RA = "thue_suat_dau_ra"
+KHOA_GOM_THUE = "gia_ban_gom_thue_gtgt"
 
 CO_SO = {
     "do_tu_dong_doanh_thu": "Đo được – cộng thuế đầu ra của từng dòng doanh thu",
     "suy_tu_thue_suat": "Suy ra – chưa có dòng doanh thu chi tiết, lấy thuế suất đã khai",
-    "cho_ke_toan_nuoc_ngoai": "Tour nước ngoài – giá tính thuế đầu ra chờ Kế toán chốt",
+    "nuoc_ngoai_hai_phan": "Tour nước ngoài – phần giá vốn 0%, phần lợi nhuận chịu thuế",
+    "nuoc_ngoai_chua_co_gia_von": "Tour nước ngoài – chưa có giá vốn nên chưa tách được hai phần",
     "chua_co_doanh_thu": "Chưa có doanh thu – không có gì để tính thuế",
 }
 
 VI_SAO = {
-    "cho_ke_toan_nuoc_ngoai":
-        "Tour nước ngoài: phần dịch vụ tiêu dùng ngoài Việt Nam làm giá tính thuế đầu ra không hiển "
-        "nhiên bằng toàn bộ doanh thu. Chờ Kế toán chốt cách tính rồi mở khoá bằng tham số.",
+    "nuoc_ngoai_chua_co_gia_von":
+        "Tour nước ngoài xuất hoá đơn hai dòng: phần giá vốn 0%, phần lợi nhuận chịu thuế. Chưa có "
+        "giá vốn thì chưa biết ranh giới giữa hai dòng ấy nằm ở đâu.",
     "chua_co_doanh_thu":
         "Chuyến chưa có doanh thu.",
 }
@@ -95,6 +97,20 @@ def thue_suat_ra(db: Session, hom_nay: date | None = None) -> float:
     """Thuế suất đầu ra đang hiệu lực. Tham số có hiệu lực THEO NGÀY: chuyến đã đi giữ nguyên thuế
     suất của ngày nó khởi hành, nên đổi chính sách hôm nay không làm đổi tờ quyết toán đã ký."""
     return get_param(db, KHOA_THUE_SUAT_RA, hom_nay)
+
+
+def gia_ban_gom_thue(db: Session, hom_nay: date | None = None) -> bool:
+    """Giá bán niêm yết ĐÃ GỒM thuế GTGT hay CHƯA.
+
+    Đây là một quy ước, không phải một phép tính — và hai quy ước lệch nhau đúng 8% của chính phần
+    chịu thuế. Trên một chuyến châu Âu 1 tỷ với 100 triệu lợi nhuận, chênh giữa hai cách là 592.593 đ
+    tiền thuế; không lớn, nhưng nó lệch ở MỌI chuyến và không bao giờ tự lộ ra.
+
+    Mặc định là ĐÃ GỒM, vì đó là quy ước đang dùng trong chính tệp quyết toán của phòng Điều hành:
+    đoàn Hồ Tràm tính `3.790.000 / 1.08` để ra giá trước thuế, tức giá niêm yết cho khách là giá
+    cuối cùng khách trả.
+    """
+    return str(get_param_text(db, KHOA_GOM_THUE, hom_nay) or "1").strip() not in ("0", "", "khong")
 
 
 # ------------------------------------------------------------------------------------------------
@@ -153,34 +169,86 @@ def _rong(co_so: str) -> dict:
             "vi_sao": VI_SAO.get(co_so, ""), "canh_bao": []}
 
 
+def _thue_trong_so(tien: float, ts: float, gom_thue: bool) -> float:
+    """Tiền thuế của một khoản, tuỳ khoản ấy ĐÃ GỒM thuế hay CHƯA.
+
+    Hai cách ra hai con số khác nhau đúng 8% của chính nó, nên không được để mặc định ngầm.
+    """
+    return (tien - tien / (1.0 + ts)) if gom_thue else (tien * ts)
+
+
 def mot_chuyen(db: Session, *, hinh_thuc: str | None, doanh_thu: float | None,
-               ra: dict | None, vao: dict | None, hom_nay: date | None = None) -> dict:
+               ra: dict | None, vao: dict | None, gia_von: float | None = None,
+               hom_nay: date | None = None) -> dict:
     """Thuế GTGT phát sinh của MỘT chuyến.
 
     `ra` / `vao` là phần tử của hai hàm cộng ở trên (None khi chuyến chưa có dòng nào).
     `hinh_thuc` là `trong_nuoc` / `nuoc_ngoai` / None (chưa xếp).
+    `gia_von` CHỈ dùng cho tour nước ngoài – nó là ranh giới giữa hai dòng hoá đơn.
     """
-    if hinh_thuc == "nuoc_ngoai":
-        kq = _rong("cho_ke_toan_nuoc_ngoai")
-        if vao:
-            kq["chi_khong_hoa_don"] = vao["chi_khong_hoa_don"]
-        return kq
     if not doanh_thu:
         return _rong("chua_co_doanh_thu")
 
     ts = thue_suat_ra(db, hom_nay)
+    gom = gia_ban_gom_thue(db, hom_nay)
     v_vao = float(vao["vat_vao"]) if vao else 0.0
     khong_hd = float(vao["chi_khong_hoa_don"]) if vao else 0.0
+    canh_bao = []
 
+    # -------------------------------------------------------------------------------------------
+    # TOUR NƯỚC NGOÀI — HOÁ ĐƠN HAI DÒNG (Chủ tịch chốt 12/9/2026)
+    # -------------------------------------------------------------------------------------------
+    if hinh_thuc == "nuoc_ngoai":
+        if gia_von is None:
+            kq = _rong("nuoc_ngoai_chua_co_gia_von")
+            kq["chi_khong_hoa_don"] = khong_hd
+            return kq
+        phan_0 = min(float(gia_von), float(doanh_thu))
+        phan_chiu_thue = float(doanh_thu) - phan_0
+        v_ra = _thue_trong_so(phan_chiu_thue, ts, gom)
+
+        # KẸP Ở ĐÂY LÀ ĐÚNG, và nó KHÁC HẲN chỗ cấm kẹp ở mục 1 phần đầu tệp.
+        #
+        # Mục 1 cấm kẹp `vat_ra − vat_vao` về 0, vì số âm ở đó là KHẤU TRỪ THẬT, bù sang chuyến khác.
+        # Ở đây kẹp là chuyện khác: một chuyến bán DƯỚI giá vốn thì tờ hoá đơn chỉ có đúng một dòng
+        # 0%, không có dòng thứ hai nào để ghi số âm lên. Hoá đơn không có dòng âm. Phần lỗ vẫn là lỗ
+        # thật và vẫn hiện ở lãi gộp — nó chỉ không sinh ra thuế đầu ra âm.
+        if float(gia_von) > float(doanh_thu):
+            canh_bao.append(
+                f"Bán dưới giá vốn {float(gia_von) - float(doanh_thu):,.0f} đ – cả hoá đơn là một dòng "
+                "0%, không có phần lợi nhuận để chịu thuế. Lỗ vẫn hiện ở lãi gộp.")
+        if vao and vao["so_dong_chua_khai_vat"]:
+            canh_bao.append(
+                f"{vao['so_dong_chua_khai_vat']} dòng chi chưa nhập thuế trên hoá đơn – phần này KHÔNG "
+                "được khấu trừ")
+        return {
+            "co_so": "nuoc_ngoai_hai_phan", "co_so_ten": CO_SO["nuoc_ngoai_hai_phan"],
+            "vat_ra": v_ra, "vat_vao": v_vao,
+            "thue_gtgt": v_ra - v_vao,
+            "chi_khong_hoa_don": khong_hd,
+            "thue_suat_ra": ts,
+            "gia_ban_gom_thue": gom,
+            # Hai dòng của tờ hoá đơn, để màn hình và tệp xuất dùng ĐÚNG số này, không tự chia lại.
+            "hoa_don_hai_dong": [
+                {"noi_dung": "Phần dịch vụ tiêu dùng ngoài Việt Nam", "so_tien": phan_0,
+                 "thue_suat": 0.0, "tien_thue": 0.0},
+                {"noi_dung": "Phần chênh lệch (lợi nhuận)", "so_tien": phan_chiu_thue,
+                 "thue_suat": ts, "tien_thue": v_ra},
+            ],
+            "vi_sao": "",
+            "canh_bao": canh_bao,
+        }
+
+    # -------------------------------------------------------------------------------------------
+    # TOUR TRONG NƯỚC — toàn bộ doanh thu chịu thuế
+    # -------------------------------------------------------------------------------------------
     if ra and ra["so_dong"] > 0:
         co_so = "do_tu_dong_doanh_thu"
         v_ra = float(ra["vat_ra"])
     else:
         co_so = "suy_tu_thue_suat"
-        # Doanh thu đang là số ĐÃ GỒM thuế, nên thuế nằm trong nó: dt − dt/(1+ts).
-        v_ra = float(doanh_thu) - float(doanh_thu) / (1.0 + ts)
+        v_ra = _thue_trong_so(float(doanh_thu), ts, gom)
 
-    canh_bao = []
     if co_so == "do_tu_dong_doanh_thu" and ra and ra["so_dong_chua_khai_thue"]:
         canh_bao.append(
             f"{ra['so_dong_chua_khai_thue']} dòng doanh thu chưa khai thuế suất – thuế đầu ra có thể còn thiếu")
@@ -207,7 +275,8 @@ def mot_chuyen(db: Session, *, hinh_thuc: str | None, doanh_thu: float | None,
 def nhieu_chuyen(db: Session, chuyen: list[dict], hom_nay: date | None = None) -> dict[int, dict]:
     """Tính cho cả bảng bằng HAI câu truy vấn, không phải hai câu cho mỗi chuyến.
 
-    `chuyen` là list `{"tour_id": int, "hinh_thuc": str|None, "doanh_thu": float|None}`.
+    `chuyen` là list `{"tour_id", "hinh_thuc", "doanh_thu", "gia_von"}` – `gia_von` chỉ cần cho tour
+    nước ngoài.
     """
     ids = [c["tour_id"] for c in chuyen]
     ra = vat_dau_ra_do_duoc(db, ids)
@@ -215,6 +284,7 @@ def nhieu_chuyen(db: Session, chuyen: list[dict], hom_nay: date | None = None) -
     return {c["tour_id"]: mot_chuyen(db, hinh_thuc=c.get("hinh_thuc"),
                                      doanh_thu=c.get("doanh_thu"),
                                      ra=ra.get(c["tour_id"]), vao=vao.get(c["tour_id"]),
+                                     gia_von=c.get("gia_von"),
                                      hom_nay=hom_nay)
             for c in chuyen}
 
