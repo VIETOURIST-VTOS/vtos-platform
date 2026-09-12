@@ -28,6 +28,7 @@ from app.db.session import get_db
 from app.models.core import User
 from app.models.dong_tien import NGUON_TIEN, ChotSoDu
 from app.services import dong_tien as DT
+from app.services import khung_dong_tien as KHUNG
 from app.services import pham_vi_phap_nhan as PV
 from app.services import rules as R
 
@@ -124,6 +125,28 @@ def xem_bang(company_id: int, den_ngay: date | None = None,
         return DT.bang_bon_moc(db, company_id, den_ngay)
     except DT.LoiChot as e:
         raise HTTPException(404, str(e))
+
+
+@router.get("/khung/{company_id}")
+def xem_khung(company_id: int, den_ngay: date | None = None,
+              u: User = Depends(require_roles(*XEM, mo_ta="xem khối dòng tiền theo vai")),
+              db: Session = Depends(get_db)):
+    """TC-8 · Màn hình 01 — khung theo VAI đã điền số. MÁY CHỦ CẮT TẬP DÒNG, không phải trình duyệt.
+
+    Vì sao đường dẫn này nằm ở tệp của làn Robot A: hai nửa của màn hình 01 đã có sẵn ở hai làn —
+    `dong_tien_pham_vi` (ai xem dòng nào, ai nhập dòng nào) và `bang_bon_moc` (số của bốn mốc) —
+    nhưng không có chỗ nào ghép chúng, nên màn hình chỉ còn hai lối đi đều sai: hiện toàn cảnh cho
+    mọi vai, hoặc tự lọc ở trình duyệt. Chủ tịch cho phép làn giao diện bắc cầu ngày 12/9/2026.
+    Phép tính của làn A giữ nguyên, tệp này chỉ GỌI `bang_bon_moc` chứ không sửa nó.
+
+    `/bang/{company_id}` ở trên GIỮ NGUYÊN cho màn hình cũ và cho Kế toán đối chiếu toàn cảnh.
+    """
+    try:
+        bang = DT.bang_bon_moc(db, company_id, den_ngay)
+        sdn = DT.so_du_tung_ngay(db, company_id, den_ngay)
+    except DT.LoiChot as e:
+        raise HTTPException(404, str(e))
+    return KHUNG.ghep(u.role, bang, sdn)
 
 
 @router.get("/so-du-tung-ngay/{company_id}")
