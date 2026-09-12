@@ -36,9 +36,10 @@ from app.services import access as AC
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SHELL = os.path.join(ROOT, "web", "components", "Shell.tsx")
 
-# Tên bảy nhóm theo v1.1 §I.2, ĐÚNG THỨ TỰ. Quản trị đặt cuối.
-BAY_NHOM = ("Tổng quan", "Khách hàng & Kinh doanh", "Vận hành", "Tài chính",
-            "Nhân sự & Nội bộ", "Báo cáo", "Quản trị")
+# Tên bảy nhóm ĐÚNG THỨ TỰ, nhóm quản trị đặt cuối. Thứ tự và số nhóm theo v1.1 §I.2; TÊN theo bản
+# vẽ giao diện anh Tuấn chốt 12/9/2026 (v1.1 §I.2 phải đính chính theo). Dấu nối là gạch ngang –.
+BAY_NHOM = ("Tổng quan", "Kinh doanh", "Điều hành", "Tài chính – Kế toán",
+            "Nhân sự – Hành chính", "Báo cáo – Phân tích", "Quản trị hệ thống")
 
 
 def _doc() -> str:
@@ -118,7 +119,7 @@ def test_du_bay_nhom_dung_ten_va_dung_thu_tu():
     ten_nhom = re.findall(r'key:\s*"[a-z_]+",\s*label:\s*"([^"]+)"', block)
     assert tuple(ten_nhom) == BAY_NHOM, \
         f"tên hoặc thứ tự nhóm sai.\n  đang có : {ten_nhom}\n  phải là : {list(BAY_NHOM)}"
-    assert ten_nhom[-1] == "Quản trị", "v1.1 §I.2: nhóm Quản trị phải đặt CUỐI"
+    assert ten_nhom[-1] == "Quản trị hệ thống", "v1.1 §I.2: nhóm quản trị phải đặt CUỐI"
 
 
 def test_bo_so_thu_tu_nhom():

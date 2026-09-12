@@ -25,8 +25,53 @@ type Block = Item | Section;
  *  aria-label chứ không mất. Một hàng biểu tượng không chú thích là một hàng phải đoán. */
 type Group = { key: string; label: string; icon: string; blocks: Block[] };
 
+/** Biểu tượng vẽ bằng NÉT (24×24, stroke 1.7, không tô đặc) thay cho emoji. Ba lý do, không phải
+ *  chuyện thẩm mỹ: emoji mỗi máy vẽ một kiểu – Windows, máy Mac và điện thoại ra ba hình khác nhau
+ *  nên không có một bộ nhận diện chung; emoji không đổi màu theo nền nên trên nền xanh đậm nó vẫn
+ *  là mảng màu sặc sỡ; và emoji không co giãn theo cỡ chữ của người dùng. Nét dùng currentColor nên
+ *  nhận đúng màu của hàng đang chọn.
+ *
+ *  `icon` VẪN LÀ MỘT CHUỖI – đây là khoá tra bảng dưới đây, không phải ký tự để in ra. Phép thử
+ *  test_menu đọc trường này và đòi bảy nhóm đều có, nên khoá nào không có hình sẽ rơi về hình
+ *  mặc định chứ không để trống một ô. */
+const HINH: Record<string, string> = {
+  // Tổng quan – bốn ô bảng điều hành
+  tongquan: "M4 4h7v7H4zM13 4h7v5h-7zM13 11h7v9h-7zM4 13h7v7H4z",
+  // Kinh doanh – hai người
+  khachhang: "M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2.5 20a6.5 6.5 0 0113 0M17 11.5a3 3 0 100-6M18 20a6 6 0 00-2-4.5",
+  // Vận hành – la bàn
+  vanhanh: "M12 21a9 9 0 100-18 9 9 0 000 18zM15.5 8.5l-2 5-5 2 2-5 5-2z",
+  // Tài chính – két tiền
+  taichinh: "M3 7.5A2.5 2.5 0 015.5 5h13A2.5 2.5 0 0121 7.5v9a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 16.5zM16 12h2.5M3 9.5h18",
+  // Nhân sự – Hành chính – thẻ nhân viên
+  nhansu: "M3 5.5h18v13H3zM9 12a2 2 0 100-4 2 2 0 000 4zM6 16a3.2 3.2 0 016 0M14 10h4M14 13.5h4",
+  // Báo cáo – cột biểu đồ
+  baocao: "M4 20V4M4 20h16M8 20v-6M12.5 20V9M17 20v-9",
+  // Quản trị – bánh răng
+  quantri: "M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 14a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1.03 1.56V20a2 2 0 01-4 0v-.1A1.7 1.7 0 009 18.3a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.64 14a1.7 1.7 0 00-1.56-1.03H3a2 2 0 010-4h.1A1.7 1.7 0 004.64 8a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 3.64 1.7 1.7 0 0010.03 2.08V2a2 2 0 014 0v.1A1.7 1.7 0 0015 3.64a1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.36 8v.03A1.7 1.7 0 0020.92 9H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z",
+};
+const MAC_DINH = "M5 5h14v14H5z";
+
+/** aria-hidden: nhãn nhóm đã nằm ở title và aria-label của cái nút bọc ngoài. Nếu hình cũng tự xưng
+ *  tên thì máy đọc màn hình đọc hai lần một mục. */
+function Hinh({ ten }: { ten: string }) {
+  return (
+    <svg className="bt-hinh" viewBox="0 0 24 24" width={20} height={20} aria-hidden="true"
+      fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <path d={HINH[ten] || MAC_DINH} />
+    </svg>
+  );
+}
+
 /** BẢY NHÓM – tên chính thức theo v1.1 §I.2 "Menu trái rút gọn", bản Chủ tịch duyệt 11/9/2026.
  *  Tối đa hai cấp, bỏ số thứ tự, nhóm Quản trị đặt cuối, ẩn mục chưa có trang.
+ *
+ *  12/9/2026 – anh Tuấn chốt ĐỔI TÊN bảy nhóm theo bản vẽ giao diện, giữ nguyên thứ tự, khoá key,
+ *  biểu tượng và mọi đường dẫn. Đổi tên chứ không đổi cấu trúc: Khách hàng & Kinh doanh -> Kinh
+ *  doanh · Vận hành -> Điều hành (bỏ chữ "du lịch" theo yêu cầu) · Tài chính -> Tài chính – Kế
+ *  toán · Nhân sự & Nội bộ -> Nhân sự – Hành chính · Báo cáo -> Báo cáo – Phân tích · Quản trị ->
+ *  Quản trị hệ thống. Dấu nối là gạch ngang – (en dash), không phải gạch nối -, để trùng bản vẽ.
+ *  BAY_NHOM trong test_menu.py sửa cùng vòng này; v1.1 §I.2 phải đính chính theo.
  *
  *  NGUYÊN TẮC XẾP: v1.1 liệt kê mục con theo CHỨC NĂNG NGHIỆP VỤ, không theo đường dẫn. Ở đây chỉ
  *  GOM 53 đường dẫn đang có trong MENU_ROLES vào bảy nhóm ấy – KHÔNG thêm mục mới. Khai một mục trỏ
@@ -47,11 +92,11 @@ type Group = { key: string; label: string; icon: string; blocks: Block[] };
 export const GROUPS: Group[] = [
   // "Việc của tôi" và "Chỉ đạo & giao việc" chưa có trang (xem CHUA_XAY). "Việc của tôi" vẫn tới
   // được bằng neo trên thanh ngang, nên không mất lối đi.
-  { key: "tongquan", label: "Tổng quan", icon: "🏠", blocks: [
+  { key: "tongquan", label: "Tổng quan", icon: "tongquan", blocks: [
     ["Bảng điều hành", "/"],
   ] },
 
-  { key: "khachhang", label: "Khách hàng & Kinh doanh", icon: "🤝", blocks: [
+  { key: "khachhang", label: "Kinh doanh", icon: "khachhang", blocks: [
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
     // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và
@@ -76,7 +121,7 @@ export const GROUPS: Group[] = [
       ["Chăm sóc sau bán", "/cham-soc"], ["Phản hồi & khiếu nại", "/khieu-nai"]] },
   ] },
 
-  { key: "vanhanh", label: "Vận hành", icon: "🧭", blocks: [
+  { key: "vanhanh", label: "Điều hành", icon: "vanhanh", blocks: [
     ["Sản phẩm tour", "/products"],
     ["Yêu cầu chờ xử lý", "/requests"],
     ["Chuyến & quyết toán", "/tours"],
@@ -100,7 +145,7 @@ export const GROUPS: Group[] = [
       ["Phòng Hướng dẫn", "/huong-dan"], ["HDV & phân chuyến (cũ)", "/ops?tab=guides"]] },
   ] },
 
-  { key: "taichinh", label: "Tài chính", icon: "💰", blocks: [
+  { key: "taichinh", label: "Tài chính – Kế toán", icon: "taichinh", blocks: [
     ["Thu & đối soát", "/collections"],
     ["Chi & thanh toán", "/expenses"],
     ["Công nợ", "/cong-no"],
@@ -124,7 +169,7 @@ export const GROUPS: Group[] = [
       ["Quy ước hạch toán", "/hach-toan"], ["Hồ sơ kiểm toán", "/ho-so-kiem-toan"]] },
   ] },
 
-  { key: "nhansu", label: "Nhân sự & Nội bộ", icon: "👥", blocks: [
+  { key: "nhansu", label: "Nhân sự – Hành chính", icon: "nhansu", blocks: [
     ["Hồ sơ nhân sự", "/hr?tab=employees"],
     ["Hợp đồng lao động", "/hop-dong-lao-dong"],
     ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
@@ -140,7 +185,7 @@ export const GROUPS: Group[] = [
   //
   // "Kinh doanh" ở đây KHÔNG kèm ?mang=: hai phòng vào báo cáo của mình qua menu nhóm Khách hàng &
   // Kinh doanh. Nếu chỉ có hai lối đó thì không còn đường nào tới con số HỢP NHẤT.
-  { key: "baocao", label: "Báo cáo", icon: "📊", blocks: [
+  { key: "baocao", label: "Báo cáo – Phân tích", icon: "baocao", blocks: [
     ["Điều hành", "/bao-cao"],
     ["Kinh doanh", "/sales-reports"],
     ["Marketing", "/leads?tab=report"],
@@ -148,8 +193,8 @@ export const GROUPS: Group[] = [
     ["Báo cáo quản trị", "/robot-reports"],
   ] },
 
-  // ĐẶT CUỐI theo v1.1 §I.2.
-  { key: "quantri", label: "Quản trị", icon: "⚙️", blocks: [
+  // ĐẶT CUỐI theo v1.1 §I.2 (tên nhóm đổi theo bản vẽ giao diện 12/9, thứ tự giữ nguyên).
+  { key: "quantri", label: "Quản trị hệ thống", icon: "quantri", blocks: [
     ["Tổ chức & đơn vị", "/companies"],
     { label: "Quyền", items: [
       ["Tài khoản & phân quyền", "/access"], ["Vị trí AI & quyền hạn", "/ai-roles"]] },
@@ -309,7 +354,17 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={{ user, toast, datChuaLuu }}>
       <div className="top">
         <button type="button" className="burger" onClick={() => setSide((s) => !s)} aria-label="Menu">☰</button>
-        <Link href="/" className="brand">VTOS <small>Vietourist Operating System</small></Link>
+        {/* Dấu hiệu nhận biết: logo VIETOURIST nền TRONG SUỐT (tệp gốc anh Tuấn gửi 12/9/2026), dưới
+            là dòng VIETOURIST OPERATING SYSTEM. Không dùng ảnh nền trắng – nền trắng đặt lên thanh
+            xanh đậm sẽ thành một mảng trắng hình chữ nhật quanh chữ.
+            alt để RỖNG và tên hệ thống viết bằng chữ thật bên dưới: nếu alt cũng là tên ấy thì máy
+            đọc màn hình đọc tên hai lần. width/height khai đúng tỉ lệ tệp (720×389) để trang không
+            bị giật một nhịp khi ảnh tải xong. */}
+        <Link href="/" className="brand" aria-label="VIETOURIST Operating System – về bảng điều hành">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/vietourist.png" alt="" width={720} height={389} className="brand-logo" />
+          <small>VIETOURIST OPERATING SYSTEM</small>
+        </Link>
         <span className="bar">
           <ChonDonVi chuaLuu={() => chuaLuu.current} toast={toast} />
           <button type="button" className="soon" title="Sắp có" onClick={() => toast("Tìm kiếm: đang xây dựng")}>Tìm kiếm</button>
@@ -354,8 +409,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               <button type="button" className={"grp" + (opened.has(g.key) ? " on" : "")}
                 title={g.label} aria-label={g.label}
                 onClick={() => { if (thu) doiThu(); doiNhom(g.key); }}>
-                {thu ? <span className="bt">{g.icon}</span>
-                     : <>{opened.has(g.key) ? "▾ " : "▸ "}{g.label}</>}
+                {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
+                     : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label}</span>
+                         <span className="grp-mui" aria-hidden="true">{opened.has(g.key) ? "▾" : "▸"}</span></>}
               </button>
               {!thu && opened.has(g.key) && <div className="sub">
                 {g.blocks.map((b, i) => laMuc(b) ? lien(b[0], b[1]) : (
