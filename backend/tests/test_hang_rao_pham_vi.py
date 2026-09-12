@@ -88,11 +88,36 @@ def test_hr2_van_khong_cham_duoc_endpoint_bang_luong_khac():
 
 
 def test_hr3_duong_tu_loc_doc_tu_dau_hieu_trong_ma_khong_khai_tay():
-    """Khai tay thì thêm endpoint mới là quên, mà quên ở đây nghĩa là khóa người dùng khỏi tiền của họ."""
+    """Khai tay thì thêm endpoint mới là quên, mà quên ở đây nghĩa là khóa người dùng khỏi tiền của họ.
+
+    DANH SÁCH NÀY KHOÁ CỨNG, VÀ ĐÓ LÀ CÓ Ý. Hàm `duong_tu_loc()` tự đọc dấu `loc_theo_nguoi_dung`
+    trong mã nên nó không bao giờ quên; nhưng chính vì thế, gắn thêm một dấu ấy là NỚI hàng rào vai
+    trò cho một đường mới mà không ai phải xin phép. Khoá cứng danh sách bắt người gắn dấu phải sửa
+    phép thử này – và lúc sửa thì phải viết ra vì sao đường ấy được phép tự lọc.
+
+    SÁU ĐƯỜNG, KHÔNG PHẢI BA. Bản đầu của phép thử này (làn Kiểm soát viết) khoá đúng ba đường – đúng
+    tại thời điểm viết. Khi gộp vào `main` ngày 11/9/2026 thì đo được SÁU: làn Viết phần mềm đã thêm
+    màn hình phiếu lương với ba đường `/api/v1/phieu-luong/*`, mỗi đường đều gắn `loc_theo_nguoi_dung`
+    kèm câu giải thích của chính người gắn:
+
+        · /api/v1/phieu-luong/khoan-treo   – "khoản lương treo – ai không xem được bảng lương thì
+                                              chỉ thấy phần của chính mình"
+        · /api/v1/phieu-luong/ky-cua-toi   – "danh sách kỳ lương của chính người đăng nhập"
+        · /api/v1/phieu-luong/{period}     – "phiếu lương – phiếu của chính mình ai cũng xem được,
+                                              phiếu người khác thì phải xem được bảng lương"
+
+    Cả ba đều đúng kiểu tự lọc mà hàm này sinh ra để nhận. Robot A cập nhật con số ba → sáu khi gộp,
+    KHÔNG nới phép thử thành "kiểm tính chất" – nới là bỏ đúng cái giá trị của nó. Làn Kiểm soát xem
+    lại ba đường mới; nếu có đường nào không đáng tự lọc thì sửa ở endpoint, không sửa ở đây.
+    """
     from app.services import access as AC
     ds = AC.duong_tu_loc()
-    assert ds == {"/api/v1/auth/me", "/api/v1/payroll/khoan-treo",
-                  "/api/v1/payroll-runs/{period}/phieu-luong"}, sorted(ds)
+    assert ds == {"/api/v1/auth/me",
+                  "/api/v1/payroll/khoan-treo",
+                  "/api/v1/payroll-runs/{period}/phieu-luong",
+                  "/api/v1/phieu-luong/khoan-treo",
+                  "/api/v1/phieu-luong/ky-cua-toi",
+                  "/api/v1/phieu-luong/{period}"}, sorted(ds)
     # và mỗi đường đó phải THẬT SỰ tự lọc: gọi bằng tài khoản không có quyền bảng lương vẫn phải đi lọt
     assert client.get("/api/v1/auth/me", headers=login("kd.hoa")).status_code == 200
 
