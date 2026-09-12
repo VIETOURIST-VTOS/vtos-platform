@@ -72,3 +72,73 @@ aside.side.thu .sub{display:none}
 /* Lưới hai cột cho các form nhập tay (phiếu chi phí xe, đề xuất chi). Một cột trên điện thoại,
    vì phần lớn người nhập số liệu đội xe làm việc trên điện thoại ngoài bến. */
 .grid2{display:grid;gap:0 14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+
+/* ==========================================================================================
+   TC-4 · UI-03 — BẢN ĐIỆN THOẠI
+   Bốn điều lệnh giao: MỘT ô chọn mốc · thẻ gập được · bốn ô cảnh báo 2x2 · KHÔNG cuộn ngang.
+   Mốc đổi hình: 640px, trùng với ngưỡng đã có ở dòng 31 nên không đẻ thêm một ngưỡng thứ hai
+   (hai ngưỡng gần nhau là chỗ sinh ra khoảng bề rộng mà không bản nào đúng hẳn).
+   ========================================================================================== */
+
+/* Thẻ gập được. Đầu thẻ là một NÚT chiếm hết bề ngang: trên điện thoại vùng bấm phải đủ rộng cho
+   ngón tay, một mũi tên 12px ở góc thì bấm ba lần mới trúng. */
+.the{padding:0}
+.the-dau{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;
+  font-family:inherit;cursor:pointer;padding:12px 16px;color:inherit;min-height:44px}
+.the-dau:hover{background:var(--panel2)}
+.the-dau h2{margin:0;flex:1;min-width:0}
+.the-mui{color:var(--ink2);font-size:12px;line-height:1;width:12px;flex:none}
+.the-phu{font-size:12px;color:var(--ink2);white-space:nowrap}
+.the-than{padding:0 16px 14px}
+
+/* Bốn ô cảnh báo. Màn rộng: một hàng bốn ô. Điện thoại: 2x2 – hai hàng, hai cột, luôn đủ bốn. */
+.bon-o{display:grid;gap:10px;grid-template-columns:repeat(4,1fr);margin-bottom:14px}
+.o-cb{display:block;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ink2);
+  border-radius:8px;padding:12px 14px;text-decoration:none;color:inherit;min-height:64px}
+.o-cb b{display:block;font-size:22px;color:var(--navy);font-variant-numeric:tabular-nums;line-height:1.2}
+.o-cb span{display:block;font-size:12px;color:var(--ink2);margin-top:2px}
+.o-cb.ok{border-left-color:var(--teal)}.o-cb.ok b{color:var(--teal)}
+.o-cb.warn{border-left-color:var(--orange)}.o-cb.warn b{color:var(--orange)}
+.o-cb.red{border-left-color:var(--red)}.o-cb.red b{color:var(--red)}
+a.o-cb:hover{background:var(--panel2)}
+
+/* Một ô chọn mốc. Câu "Đang xem mốc X" KHÔNG phải trang trí: nó là chỗ duy nhất nói tên mốc sau khi
+   người dùng cuộn xuống và ô chọn đã trôi khỏi màn hình. */
+.chon-moc{margin:0 0 10px}
+.chon-moc label{margin-top:0}
+.chon-moc select{max-width:320px}
+.chon-moc .moc-dang{margin:4px 0 0}
+
+/* Bảng đọc-được-trên-điện-thoại. Trên màn rộng đây là một bảng bình thường. */
+table.bang-doc{width:100%}
+
+@media (max-width:640px){
+  /* Bảng: đổi HÌNH, không đổi độ rộng. Mỗi dòng thành một thẻ, mỗi ô mang nhãn cột của chính nó
+     (data-nhan do components/dienthoai.tsx gắn). Đầu bảng ẩn đi vì nhãn đã nằm trong từng ô –
+     nhưng ẩn bằng clip chứ không display:none, để trình đọc màn hình vẫn đọc được cấu trúc. */
+  table.bang-doc thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  table.bang-doc,table.bang-doc tbody,table.bang-doc tr,table.bang-doc td{display:block;width:100%}
+  table.bang-doc tr{border:1px solid var(--line);border-radius:8px;padding:4px 2px;margin-bottom:8px;background:var(--panel)}
+  table.bang-doc td{display:flex;gap:10px;align-items:baseline;border:0;padding:5px 10px;text-align:left}
+  table.bang-doc td::before{content:attr(data-nhan);flex:0 0 40%;font-size:11.5px;color:var(--ink2);
+    text-transform:uppercase;letter-spacing:.04em}
+  table.bang-doc td.num{text-align:left;justify-content:space-between}
+  table.bang-doc td:empty{display:none}
+
+  /* Bốn ô cảnh báo: 2x2. */
+  .bon-o{grid-template-columns:1fr 1fr;gap:8px}
+  .o-cb{padding:10px 12px}.o-cb b{font-size:19px}
+
+  /* Chỉ số cũng hai cột, thay vì một cột dài phải cuộn qua mới tới nội dung. */
+  .kpis{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi{padding:10px 12px}.kpi b{font-size:18px}
+
+  .the-dau{padding:11px 12px}.the-than{padding:0 12px 12px}
+
+  /* Chốt chặn cuối: thân trang không được rộng hơn màn hình. Nếu một bảng cũ (chưa đổi sang
+     BangDoc) còn nằm trong .wrap thì nó tự cuộn trong khung của nó – phần còn lại của trang
+     không bị kéo lệch theo. */
+  html,body{overflow-x:hidden}
+  main,.panel,.the{max-width:100%}
+  .wrap{max-width:100%}
+}
