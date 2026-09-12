@@ -19,7 +19,9 @@ body{font-family:var(--vtos-font-text);font-size:14px;line-height:1.45;color:var
 a{color:var(--navy);font-weight:600}
 /* Thanh ngang – nền tối theo bản vẽ giao diện chốt 12/9/2026. Màu đặt THẲNG, không qua biến
    --panel: thanh này phải giữ nguyên một màu ở cả chế độ sáng lẫn tối, giống thanh dọc. */
-.top{background:var(--vtos-navy);color:#fff;padding:12px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(255,255,255,.16)}
+/* Đệm dọc 8px chứ không phải 12px: khối logo cao lên 55px sau khi mở rộng khung (12/9), 12+55+12
+   là 79px – vượt khoảng 64–72px của §I.2. 8+55+8 = 71px, vừa khít. */
+.top{background:var(--vtos-navy);color:#fff;padding:8px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(255,255,255,.16)}
 /* Dấu hiệu nhận biết: logo nền trong suốt xếp TRÊN, tên hệ thống xếp DƯỚI (cột dọc). Logo cao cố
    định 24px và để ảnh tự tính bề ngang theo tỉ lệ – khoá cả hai chiều thì ảnh bẹp. Dòng chữ dưới
    giãn chữ .14em cho bằng bề ngang logo, và không bao giờ vỡ dòng. */
@@ -34,8 +36,14 @@ a{color:var(--navy);font-weight:600}
    ngang 72px. Đổi bất kỳ số nào trong bốn số ấy thì phải đo lại cả thanh – đúng lỗi đã mắc một lần
    khi ô đơn vị hai dòng đẩy thanh ngang lên 120px. */
 .top .brand{display:inline-flex;flex-direction:column;align-items:center;gap:3px;line-height:1;
-  position:relative;overflow:hidden;flex:0 0 auto;padding:3px 18px;border-radius:var(--vtos-radius-md);
-  background:linear-gradient(112deg,var(--vtos-navy-dark) 0%,var(--vtos-navy) 48%,var(--vtos-sky) 100%)}
+  position:relative;overflow:hidden;flex:0 0 auto;padding:6px 30px;border-radius:var(--vtos-radius-md);
+  background:linear-gradient(112deg,var(--vtos-navy-dark) 0%,var(--vtos-navy) 48%,var(--vtos-sky) 100%);
+  /* NỔI LÊN KHỎI THANH NGANG (anh Tuấn chốt 12/9). Ba lớp, mỗi lớp một việc: viền sáng mảnh tách
+     khối khỏi nền navy; vệt sáng trong lòng viền trên làm mép trên bắt sáng; bóng đổ xuống dưới
+     cho khối có bề dày. Không dùng màu ngoài bộ nhận diện – bóng lấy chính navy-dark pha loãng. */
+  border:1px solid rgba(255,255,255,.20);
+  box-shadow:0 2px 4px rgba(11,37,69,.40),0 11px 24px rgba(11,37,69,.58),
+             inset 0 1px 0 rgba(255,255,255,.34)}
 /* Vệt sáng chéo. aria-hidden theo nghĩa của nó: đây là hình, không mang chữ nào. */
 .top .brand::after{content:"";position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(74deg,transparent 44%,rgba(255,255,255,.28) 50%,transparent 57%)}
