@@ -21,7 +21,21 @@
  */
 import { api } from "@/lib/api";
 
-export type TenDonVi = { ten: string; phu: string };
+export type TenDonVi = { ten: string; phu: string; day_du: string };
+
+/** Bỏ phần loại hình đứng đầu tên pháp nhân để còn lại cái TÊN.
+ *
+ *  Bản vẽ ghi "Vietourist Holdings", còn trong sổ đăng ký thì pháp nhân tên là "Công ty Cổ phần
+ *  Vietourist Holdings". Trên thanh ngang, chín pháp nhân đều mở đầu bằng "Công ty ..." nên phần ấy
+ *  không phân biệt được gì, chỉ chiếm chỗ – đo 12/9: chip dài 249px đẩy cả cụm nút xuống hàng hai.
+ *
+ *  Tên ĐẦY ĐỦ không mất: nó nằm ở thuộc tính title, rê chuột là thấy.
+ */
+export function tenNgan(ten: string): string {
+  const t = (ten || "").trim();
+  const cat = t.replace(/^(công\s+ty\s+(cổ\s+phần|tnhh(\s+mtv)?|hợp\s+danh)?|ctcp|cty)\s+/iu, "").trim();
+  return cat || t;      // cắt xong mà rỗng thì giữ nguyên, thà dài còn hơn trống
+}
 
 /** Đọc tên đơn vị đang xem. Trả null khi không dựng được từ nguồn thật – gọi bên ngoài phải lo
  *  đường rơi, chứ đừng thay bằng một chuỗi mặc định. */
@@ -33,10 +47,10 @@ export async function docTenDonVi(): Promise<TenDonVi | null> {
 
     // Bị giới hạn vào một pháp nhân: máy chủ đã nói tên thì dùng luôn, khỏi gọi thêm.
     if (pv.company_id != null) {
-      if (pv.company_name) return { ten: pv.company_name, phu: "Phạm vi được cấp" };
+      if (pv.company_name) return { ten: tenNgan(pv.company_name), phu: "Phạm vi được cấp", day_du: pv.company_name };
       const ds: any[] = await api("/companies");
       const c = (ds || []).find((x) => x.id === pv.company_id);
-      return c ? { ten: c.name, phu: "Phạm vi được cấp" } : null;
+      return c ? { ten: tenNgan(c.name), phu: "Phạm vi được cấp", day_du: c.name } : null;
     }
 
     // Xem toàn tập đoàn: tên hiện là tên CÔNG TY MẸ, không phải chữ "Toàn tập đoàn" – bản vẽ ghi
@@ -44,7 +58,7 @@ export async function docTenDonVi(): Promise<TenDonVi | null> {
     if (pv.bi_gioi_han === false) {
       const ds: any[] = await api("/companies");
       const me_ = (ds || []).find((x) => x.kind === "me");
-      if (me_) return { ten: me_.name, phu: "Phạm vi báo cáo cấp Holdings" };
+      if (me_) return { ten: tenNgan(me_.name), phu: "Phạm vi báo cáo cấp Holdings", day_du: me_.name };
     }
     return null;
   } catch {

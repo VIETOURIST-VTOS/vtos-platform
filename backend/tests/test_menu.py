@@ -295,6 +295,37 @@ def test_o_tim_kiem_gian_rong_chu_khong_chot_cung():
     assert not re.search(r'[;{]width:\d+px', luat), f"ô tìm kiếm còn chốt cứng bề rộng: {luat[:120]}"
 
 
+def test_thanh_ngang_khong_xuong_hai_dong_o_man_rong():
+    """Đo trên trang thật 12/9 sau TC-11: thanh ngang cao 120px thay vì 72px.
+
+    Nguyên nhân: ô đơn vị hai dòng dài 249px, cộng với logo thì vượt bề ngang, mà .top đang cho phép
+    xuống dòng – cả cụm nút rơi xuống hàng hai. Ở màn rộng thanh ngang phải là MỘT hàng; dưới 900px
+    mới cho xuống dòng, vì ở đó xuống dòng là đúng.
+    """
+    css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
+    for ten, mau in ((".top", r'\.top\{[^}]*\}'), (".top .bar", r'\.top \.bar\{[^}]*\}')):
+        m = re.search(mau, css)
+        assert m, f"không tìm thấy quy tắc {ten}"
+        assert "flex-wrap:nowrap" in m.group(0), \
+            f"{ten} phải là một hàng ở màn rộng, đang là: {m.group(0)[:130]}"
+    # Ô đơn vị phải CO được, nếu không nó lại lấn chỗ ô tìm kiếm
+    m = re.search(r'\.top \.bar \.o-donvi\{[^}]*\}', css)
+    assert m and "min-width:0" in m.group(0) and "max-width:" in m.group(0), \
+        "ô đơn vị phải co được và có chặn trên, nếu không thanh ngang lại vỡ"
+
+
+def test_ten_don_vi_cat_bot_loai_hinh():
+    """Bản vẽ ghi "Vietourist Holdings", sổ đăng ký ghi "Công ty Cổ phần Vietourist Holdings".
+
+    Chip trên thanh ngang lấy bản ngắn; tên đầy đủ phải còn ở title chứ không được mất.
+    """
+    src = open(os.path.join(ROOT, "web", "lib", "ten_don_vi.ts"), encoding="utf-8").read()
+    assert "export function tenNgan" in src, "thiếu hàm rút gọn tên pháp nhân"
+    assert "day_du" in src, "phải giữ tên đầy đủ để đưa vào title, không được cắt rồi bỏ luôn"
+    tsx = open(os.path.join(ROOT, "web", "components", "ChonDonVi.tsx"), encoding="utf-8").read()
+    assert "tenTam.day_du" in tsx, "title của chip phải mang tên ĐẦY ĐỦ, không phải tên đã cắt"
+
+
 def test_chieu_cao_thanh_ngang_trong_dac_ta():
     """§I.2: thanh ngang cao 64–72px. Bản vẽ vẽ 76px – ngoài khoảng, nên lấy biên trên 72px."""
     css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
