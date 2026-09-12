@@ -131,6 +131,34 @@ aside.side .grp .grp-mui{opacity:.55;font-size:13px}
 aside.side .grp:hover{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.26);color:var(--vtos-text-on-navy)}
 aside.side .grp.on{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.34);color:#fff;font-weight:600}
 aside.side .grp.on .bt-hinh{opacity:1;color:#fff}
+/* ==========================================================================================
+   BẢNG XỔ RA KHI RÊ CHUỘT (anh Tuấn chốt 12/9/2026)
+   Rê chuột vào một phân hệ thì mục con xổ ra BÊN CẠNH, không làm thanh dọc dài thêm.
+   Bấm thì ghim mở tại chỗ (khối .sub bên dưới) cho ai làm việc lâu trong một phân hệ.
+
+   position:fixed chứ không phải absolute: aside.side có overflow-y:auto, một hộp absolute tràn
+   ngang ra khỏi nó sẽ bị cắt mất. Toạ độ do Shell.tsx đo từ chính thanh phân hệ rồi đặt vào.
+   ========================================================================================== */
+aside.side .nhom{position:relative}
+.bay{position:fixed;z-index:30;min-width:246px;max-width:300px;max-height:calc(100vh - 24px);
+  overflow-y:auto;margin-left:6px;padding:8px;border-radius:var(--vtos-radius-md);
+  background:var(--vtos-navy);border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 14px 40px rgba(11,37,69,.38)}
+/* Tên phân hệ lặp lại ở đầu bảng: lúc thanh dọc đang THU còn 60px thì thanh chỉ là một biểu tượng,
+   không có tên. Thiếu dòng này là người dùng không biết mình đang mở bảng của nhóm nào. */
+.bay .bay-dau{font-size:13px;font-weight:600;color:#fff;padding:4px 10px 8px;
+  border-bottom:1px solid rgba(255,255,255,.16);margin-bottom:6px;white-space:nowrap}
+.bay a{display:block;padding:7px 10px;font-size:13.5px;color:rgba(255,255,255,.86);font-weight:500;
+  text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bay a:hover{background:rgba(255,255,255,.10);color:var(--vtos-text-on-navy)}
+.bay a.on{background:rgba(255,255,255,.14);color:#fff;font-weight:600}
+/* Nhãn nhóm nhỏ (Lẻ, MICE, Xe & tài xế…) – một cột, giữ nguyên nhãn theo anh Tuấn chọn. */
+.bay .sub-nhan,aside.side .sub .sub-nhan{display:block;font-size:13px;color:rgba(255,255,255,.62);
+  padding:8px 10px 3px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+/* Màn hình nhỏ không có chuột: bảng xổ ra không hợp, ở đó chỉ dùng cách bấm ghim mở. */
+@media (max-width:900px){.bay{display:none}}
+@media (prefers-reduced-motion:no-preference){.bay{animation:bay-vao .12s ease-out}}
+@keyframes bay-vao{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
 aside.side .sub{padding:0 0 8px}
 aside.side .sub a{display:block;margin:0 8px 2px;padding:7px 12px 7px 38px;font-size:13.5px;color:rgba(255,255,255,.68);font-weight:500;text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 aside.side .sub a:hover{background:rgba(255,255,255,.06);color:var(--vtos-text-on-navy)}
