@@ -5,6 +5,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, pct, vnd, fmtD, fmtDT } from "@/lib/api";
 import { ACTION_LABEL } from "@/lib/meta";
 import { Tag, errMsg } from "@/components/ui";
+import KhoiDongTien from "@/components/KhoiDongTien";
 
 function Dash() {
   const { user } = useShell();
@@ -24,7 +25,11 @@ function Dash() {
   const c = d.counts || {};
   const k = d.kpis || {}; const sec = d.sections || {};
   return (<>
-    <h1>Bảng điều khiển · {user?.role_name}</h1>
+    <h1>Tổng quan điều hành · {user?.role_name}</h1>
+    {/* Màn hình 01 theo bản vẽ giao diện 12/9/2026. Khối này đứng TRƯỚC các chỉ số cũ vì đó là thứ
+        tự người đọc cần: còn bao nhiêu tiền và sắp hụt ngày nào, rồi mới tới doanh thu và booking.
+        Khối tự ẩn với vai không được xem khối dòng tiền — không hiện một khung rỗng để dò. */}
+    <KhoiDongTien />
     {d.approvals?.length > 0 && <div id="cho-toi-duyet" className="panel" style={{ borderColor: "var(--orange)" }}><b>Việc chờ tôi xử lý:</b> {d.approvals.map((a: any, i: number) => <Link key={i} href={a.href} className="act orange" style={{ display: "inline-block", textDecoration: "none", margin: "4px 6px 0 0" }}>{a.label}</Link>)}</div>}
     {"tien" in k && <div className="kpis">
       <div className="kpi"><b>{vnd(k.tien)}</b><span>Tiền (111+112)</span></div><div className="kpi"><b>{vnd(k.no_vay)}</b><span>Dư nợ vay</span></div><div className="kpi"><b>{vnd(k.phai_thu)}</b><span>Phải thu khách</span></div>
