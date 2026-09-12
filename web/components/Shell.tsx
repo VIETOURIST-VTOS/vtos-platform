@@ -32,11 +32,13 @@ type Group = { key: string; label: string; icon: string; blocks: Block[] };
  *  nhận đúng màu của hàng đang chọn.
  *
  *  `icon` VẪN LÀ MỘT CHUỖI – đây là khoá tra bảng dưới đây, không phải ký tự để in ra. Phép thử
- *  test_menu đọc trường này và đòi bảy nhóm đều có, nên khoá nào không có hình sẽ rơi về hình
+ *  test_menu đọc trường này và đòi TÁM nhóm đều có, nên khoá nào không có hình sẽ rơi về hình
  *  mặc định chứ không để trống một ô. */
 const HINH: Record<string, string> = {
   // Tổng quan – bốn ô bảng điều hành
   tongquan: "M4 4h7v7H4zM13 4h7v5h-7zM13 11h7v9h-7zM4 13h7v7H4z",
+  // Marketing & PR – loa tay (thêm 12/9/2026 khi menu lên tám nhóm)
+  marketing: "M3.5 9.2 16 5v14L3.5 14.8zM6.2 15.6 7.2 20.5h3l-1-4.9M19.5 8.5 21.5 6.5M20 12h2.5",
   // Kinh doanh – hai người
   khachhang: "M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2.5 20a6.5 6.5 0 0113 0M17 11.5a3 3 0 100-6M18 20a6 6 0 00-2-4.5",
   // Vận hành – la bàn
@@ -63,9 +65,9 @@ function Hinh({ ten }: { ten: string }) {
   );
 }
 
-/** Biểu tượng của THANH NGANG. Tách khỏi bảng HINH ở trên vì bảng ấy là biểu tượng bảy NHÓM MENU và
- *  phép thử test_menu đếm đúng bảy khoá trong đó – thêm hình của thanh ngang vào là làm hỏng phép
- *  đếm. Cùng quy cách nét: 24×24, stroke 1.7, currentColor. */
+/** Biểu tượng của THANH NGANG. Tách khỏi bảng HINH ở trên vì bảng ấy là biểu tượng các NHÓM MENU và
+ *  phép thử test_menu đếm số biểu tượng phải khớp số nhóm – trộn hình của thanh ngang vào là làm
+ *  hỏng phép đếm. Cùng quy cách nét: 24×24, stroke 1.7, currentColor. */
 const HINH_BAR: Record<string, string> = {
   tim: "M11 17.5a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM20 20l-3.6-3.6",
   viec: "M7 4.5h10A1.5 1.5 0 0118.5 6v13A1.5 1.5 0 0117 20.5H7A1.5 1.5 0 015.5 19V6A1.5 1.5 0 017 4.5zM9.5 4.5V3.8a1.3 1.3 0 011.3-1.3h2.4a1.3 1.3 0 011.3 1.3v.7M9 12.5l2 2 4-4",
@@ -92,19 +94,26 @@ function chuDau(ten?: string | null): string {
   return tu.slice(-2).map((t) => t[0]).join("").toUpperCase();
 }
 
-/** BẢY NHÓM – tên chính thức theo v1.1 §I.2 "Menu trái rút gọn", bản Chủ tịch duyệt 11/9/2026.
+/** TÁM NHÓM – tên chính thức theo bản vẽ giao diện navy V1.2, anh Tuấn chốt 12/9/2026.
  *  Tối đa hai cấp, bỏ số thứ tự, nhóm Quản trị đặt cuối, ẩn mục chưa có trang.
  *
- *  12/9/2026 – anh Tuấn chốt ĐỔI TÊN bảy nhóm theo bản vẽ giao diện, giữ nguyên thứ tự, khoá key,
- *  biểu tượng và mọi đường dẫn. Đổi tên chứ không đổi cấu trúc: Khách hàng & Kinh doanh -> Kinh
- *  doanh · Vận hành -> Điều hành (bỏ chữ "du lịch" theo yêu cầu) · Tài chính -> Tài chính – Kế
- *  toán · Nhân sự & Nội bộ -> Nhân sự – Hành chính · Báo cáo -> Báo cáo – Phân tích · Quản trị ->
- *  Quản trị hệ thống. Dấu nối là gạch ngang – (en dash), không phải gạch nối -, để trùng bản vẽ.
- *  BAY_NHOM trong test_menu.py sửa cùng vòng này; v1.1 §I.2 phải đính chính theo.
+ *  LỊCH SỬ HAI LẦN ĐỔI TRONG NGÀY 12/9, ghi cả hai vì tài liệu gửi IT phải đính chính theo:
+ *    · Sáng: ĐỔI TÊN bảy nhóm theo bản vẽ, giữ nguyên thứ tự và mọi đường dẫn. Khách hàng & Kinh
+ *      doanh -> Kinh doanh · Vận hành -> Điều hành (bỏ chữ "du lịch") · Tài chính -> Tài chính – Kế
+ *      toán · Nhân sự & Nội bộ -> Nhân sự – Hành chính · Báo cáo -> Báo cáo – Phân tích · Quản trị
+ *      -> Quản trị hệ thống.
+ *    · Chiều: LÊN TÁM NHÓM. Thêm "Marketing & PR" đứng thứ hai, và Nhân sự – Hành chính đổi lên
+ *      TRƯỚC Tài chính – Kế toán, đúng thứ tự bản vẽ navy V1.2.
+ *
+ *  DẤU NỐI: bản vẽ navy viết "Nhân sự & Hành chính" và "Tài chính & Kế toán" bằng dấu &, nhưng ở đây
+ *  giữ gạch ngang – (en dash) vì đó là dấu anh Tuấn chốt riêng buổi sáng và đã nằm trong tài liệu
+ *  v1.2 gửi IT. Riêng "Marketing & PR" dùng & vì PR là chữ viết tắt, "Marketing – PR" đọc sai nghĩa.
+ *  Đổi lại toàn bộ sang & là một dòng, nhưng phải đính chính tài liệu lần nữa.
  *
  *  NGUYÊN TẮC XẾP: v1.1 liệt kê mục con theo CHỨC NĂNG NGHIỆP VỤ, không theo đường dẫn. Ở đây chỉ
- *  GOM 53 đường dẫn đang có trong MENU_ROLES vào bảy nhóm ấy – KHÔNG thêm mục mới. Khai một mục trỏ
+ *  GOM 53 đường dẫn đang có trong MENU_ROLES vào tám nhóm ấy – KHÔNG thêm mục mới. Khai một mục trỏ
  *  tới trang chưa tồn tại là cổng P11 đỏ ngay, và người dùng thì gặp một đường dẫn hỏng.
+ *  Nhóm Marketing & PR vì thế KHÔNG có mục nào mới: nó nhận lại năm mục vốn nằm trong Kinh doanh.
  *
  *  `blocks` giữ ĐÚNG THỨ TỰ của v1.1: một phần tử là một mục (mảng hai phần) hoặc một mục con có
  *  nhóm nhỏ bên trong (đối tượng có label + items). Nếu tách làm hai trường items và sections thì
@@ -125,6 +134,26 @@ export const GROUPS: Group[] = [
     ["Bảng điều hành", "/"],
   ] },
 
+  // NHÓM THỨ TÁM, thêm 12/9/2026 theo bản vẽ navy V1.2 anh Tuấn chốt. KHÔNG có mục nào mới: năm mục
+  // dưới đây được NHẤC NGUYÊN từ hai mục con "Marketing" và "Chăm sóc & khiếu nại" đang nằm trong
+  // nhóm Kinh doanh. Đường dẫn không đổi một ký tự nào, nên 53 lối vào của MENU_ROLES giữ nguyên và
+  // không ai mất đường đi – chỉ đổi chỗ đứng trong thanh dọc.
+  //
+  // VÌ SAO CHĂM SÓC VÀ KHIẾU NẠI ĐI THEO MARKETING, không ở lại Kinh doanh: đây là chỗ em tự quyết,
+  // ghi ra để anh lật lại được. Hai màn hình ấy làm việc với khách SAU khi đã bán – giữ tiếng và
+  // giữ khách, cùng một việc với Nội dung & thương hiệu. Phiếu chăm sóc VẪN tự giao cho nhân viên
+  // đã bán như chốt 07/9; đổi nhóm menu không đổi người được giao việc.
+  { key: "marketing", label: "Marketing & PR", icon: "marketing", blocks: [
+    ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"],
+    ["Chiến dịch", "/marketing"],
+    ["Nội dung & thương hiệu", "/noi-dung"],
+    { label: "Chăm sóc & khiếu nại", items: [
+      ["Chăm sóc sau bán", "/cham-soc"], ["Phản hồi & khiếu nại", "/khieu-nai"]] },
+  ] },
+
+  // "Hộp thư" Ở LẠI Kinh doanh dù ba kênh (Zalo OA, vChat, tổng đài) do Marketing dựng: người mở
+  // hộp thư mỗi ngày để trả lời khách là nhân viên bán hàng. Phần cấu hình kênh nằm ở Quản trị hệ
+  // thống → Tích hợp, đúng chỗ của nó.
   { key: "khachhang", label: "Kinh doanh", icon: "khachhang", blocks: [
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
@@ -143,11 +172,6 @@ export const GROUPS: Group[] = [
       ["Tour đoàn", "/tours?mang=doan"], ["Yêu cầu & booking", "/requests?mang=doan"],
       ["Booking & bảo lưu", "/bookings?mang=doan"], ["Báo giá đoàn", "/bao-gia?mang=kd_doan"],
       ["Hợp đồng", "/hop-dong-khach"], ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
-    { label: "Marketing", items: [
-      ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"], ["Chiến dịch", "/marketing"],
-      ["Nội dung & thương hiệu", "/noi-dung"]] },
-    { label: "Chăm sóc & khiếu nại", items: [
-      ["Chăm sóc sau bán", "/cham-soc"], ["Phản hồi & khiếu nại", "/khieu-nai"]] },
   ] },
 
   { key: "vanhanh", label: "Điều hành", icon: "vanhanh", blocks: [
@@ -174,6 +198,16 @@ export const GROUPS: Group[] = [
       ["Phòng Hướng dẫn", "/huong-dan"], ["HDV & phân chuyến (cũ)", "/ops?tab=guides"]] },
   ] },
 
+  { key: "nhansu", label: "Nhân sự – Hành chính", icon: "nhansu", blocks: [
+    ["Hồ sơ nhân sự", "/hr?tab=employees"],
+    ["Hợp đồng lao động", "/hop-dong-lao-dong"],
+    ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
+    ["Đánh giá & sự vụ", "/hr?tab=incidents"],
+    ["Báo cáo công việc", "/reports"],
+    ["Chính sách & quy trình", "/params"],
+    ["Tài sản & mua sắm", "/tai-san"],
+  ] },
+
   { key: "taichinh", label: "Tài chính – Kế toán", icon: "taichinh", blocks: [
     ["Thu & đối soát", "/collections"],
     ["Chi & thanh toán", "/expenses"],
@@ -198,15 +232,6 @@ export const GROUPS: Group[] = [
       ["Quy ước hạch toán", "/hach-toan"], ["Hồ sơ kiểm toán", "/ho-so-kiem-toan"]] },
   ] },
 
-  { key: "nhansu", label: "Nhân sự – Hành chính", icon: "nhansu", blocks: [
-    ["Hồ sơ nhân sự", "/hr?tab=employees"],
-    ["Hợp đồng lao động", "/hop-dong-lao-dong"],
-    ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
-    ["Đánh giá & sự vụ", "/hr?tab=incidents"],
-    ["Báo cáo công việc", "/reports"],
-    ["Chính sách & quy trình", "/params"],
-    ["Tài sản & mua sắm", "/tai-san"],
-  ] },
 
   // Báo cáo tự động theo phòng (09/9/2026): Chủ tịch và TGĐ mở bản toàn công ty ở đây, trưởng phòng
   // mở bản của phòng mình ở CÙNG một đường dẫn – máy chủ cắt theo vai trò. Một đường dẫn cho mọi
