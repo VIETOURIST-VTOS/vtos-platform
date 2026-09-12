@@ -1,0 +1,38 @@
+/* VTOS — biến màu giao diện. Phiên bản 1.0 · 09/2026 */
+:root {
+  /* Thương hiệu */
+  --vtos-navy:         #14538D;  /* thanh điều hướng, nút chính */
+  --vtos-navy-dark:    #0B2545;  /* chữ tiêu đề, nền rất tối */
+  --vtos-sky:          #2E7FB8;  /* liên kết, trạng thái chờ */
+  --vtos-navy-light:   #5A9BD4;  /* logo & chữ trên nền tối */
+
+  /* Trạng thái */
+  --vtos-success:      #3B8C43;  /* đã duyệt, thành công */
+  --vtos-danger:       #FC4D7A;  /* từ chối, cảnh báo */
+  --vtos-info:         #2E7FB8;  /* chờ xử lý */
+  --vtos-success-bg:   #E9F3EA;
+  --vtos-danger-bg:    #FDECF0;
+  --vtos-info-bg:      #E7EFF7;
+
+  /* Nền & đường kẻ */
+  --vtos-surface:      #F4F7FA;  /* nền màn hình */
+  --vtos-card:         #FFFFFF;  /* nền thẻ, bảng */
+  --vtos-line:         #E3E9EF;  /* viền bảng, khung nhập */
+
+  /* Chữ */
+  --vtos-text:         #0B2545;
+  --vtos-text-mute:    #64798C;
+  --vtos-text-faint:   #94A5B4;
+  --vtos-text-on-navy: #FFFFFF;
+
+  /* Bo góc */
+  --vtos-radius-sm:    6px;
+  --vtos-radius-md:    9px;
+  --vtos-radius-lg:    16px;
+  --vtos-radius-icon:  23.5%;    /* ô bo góc của logo */
+
+  /* Phông */
+  --vtos-font-display: 'Space Grotesk', Arial, sans-serif;
+  --vtos-font-text:    'Be Vietnam Pro', Calibri, system-ui, sans-serif;
+  --vtos-font-mono:    'JetBrains Mono', Consolas, monospace;
+}

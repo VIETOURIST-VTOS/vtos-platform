@@ -25,12 +25,95 @@ type Block = Item | Section;
  *  aria-label chứ không mất. Một hàng biểu tượng không chú thích là một hàng phải đoán. */
 type Group = { key: string; label: string; icon: string; blocks: Block[] };
 
-/** BẢY NHÓM – tên chính thức theo v1.1 §I.2 "Menu trái rút gọn", bản Chủ tịch duyệt 11/9/2026.
+/** Biểu tượng vẽ bằng NÉT (24×24, stroke 1.7, không tô đặc) thay cho emoji. Ba lý do, không phải
+ *  chuyện thẩm mỹ: emoji mỗi máy vẽ một kiểu – Windows, máy Mac và điện thoại ra ba hình khác nhau
+ *  nên không có một bộ nhận diện chung; emoji không đổi màu theo nền nên trên nền xanh đậm nó vẫn
+ *  là mảng màu sặc sỡ; và emoji không co giãn theo cỡ chữ của người dùng. Nét dùng currentColor nên
+ *  nhận đúng màu của hàng đang chọn.
+ *
+ *  `icon` VẪN LÀ MỘT CHUỖI – đây là khoá tra bảng dưới đây, không phải ký tự để in ra. Phép thử
+ *  test_menu đọc trường này và đòi TÁM nhóm đều có, nên khoá nào không có hình sẽ rơi về hình
+ *  mặc định chứ không để trống một ô. */
+const HINH: Record<string, string> = {
+  // Tổng quan – bốn ô bảng điều hành
+  tongquan: "M4 4h7v7H4zM13 4h7v5h-7zM13 11h7v9h-7zM4 13h7v7H4z",
+  // Marketing & PR – loa tay (thêm 12/9/2026 khi menu lên tám nhóm)
+  marketing: "M3.5 9.2 16 5v14L3.5 14.8zM6.2 15.6 7.2 20.5h3l-1-4.9M19.5 8.5 21.5 6.5M20 12h2.5",
+  // Kinh doanh – hai người
+  khachhang: "M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2.5 20a6.5 6.5 0 0113 0M17 11.5a3 3 0 100-6M18 20a6 6 0 00-2-4.5",
+  // Vận hành – la bàn
+  vanhanh: "M12 21a9 9 0 100-18 9 9 0 000 18zM15.5 8.5l-2 5-5 2 2-5 5-2z",
+  // Tài chính – két tiền
+  taichinh: "M3 7.5A2.5 2.5 0 015.5 5h13A2.5 2.5 0 0121 7.5v9a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 16.5zM16 12h2.5M3 9.5h18",
+  // Nhân sự – Hành chính – thẻ nhân viên
+  nhansu: "M3 5.5h18v13H3zM9 12a2 2 0 100-4 2 2 0 000 4zM6 16a3.2 3.2 0 016 0M14 10h4M14 13.5h4",
+  // Báo cáo – cột biểu đồ
+  baocao: "M4 20V4M4 20h16M8 20v-6M12.5 20V9M17 20v-9",
+  // Quản trị – bánh răng
+  quantri: "M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 14a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1.03 1.56V20a2 2 0 01-4 0v-.1A1.7 1.7 0 009 18.3a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.64 14a1.7 1.7 0 00-1.56-1.03H3a2 2 0 010-4h.1A1.7 1.7 0 004.64 8a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 3.64 1.7 1.7 0 0010.03 2.08V2a2 2 0 014 0v.1A1.7 1.7 0 0015 3.64a1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.36 8v.03A1.7 1.7 0 0020.92 9H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z",
+};
+const MAC_DINH = "M5 5h14v14H5z";
+
+/** aria-hidden: nhãn nhóm đã nằm ở title và aria-label của cái nút bọc ngoài. Nếu hình cũng tự xưng
+ *  tên thì máy đọc màn hình đọc hai lần một mục. */
+function Hinh({ ten }: { ten: string }) {
+  return (
+    <svg className="bt-hinh" viewBox="0 0 24 24" width={20} height={20} aria-hidden="true"
+      fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <path d={HINH[ten] || MAC_DINH} />
+    </svg>
+  );
+}
+
+/** Biểu tượng của THANH NGANG. Tách khỏi bảng HINH ở trên vì bảng ấy là biểu tượng các NHÓM MENU và
+ *  phép thử test_menu đếm số biểu tượng phải khớp số nhóm – trộn hình của thanh ngang vào là làm
+ *  hỏng phép đếm. Cùng quy cách nét: 24×24, stroke 1.7, currentColor. */
+const HINH_BAR: Record<string, string> = {
+  tim: "M11 17.5a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM20 20l-3.6-3.6",
+  viec: "M7 4.5h10A1.5 1.5 0 0118.5 6v13A1.5 1.5 0 0117 20.5H7A1.5 1.5 0 015.5 19V6A1.5 1.5 0 017 4.5zM9.5 4.5V3.8a1.3 1.3 0 011.3-1.3h2.4a1.3 1.3 0 011.3 1.3v.7M9 12.5l2 2 4-4",
+  duyet: "M12 21a9 9 0 100-18 9 9 0 000 18zM8.5 12.2l2.4 2.4 4.6-4.8",
+  chuong: "M18 8.8a6 6 0 10-12 0c0 5.2-2 6.7-2 6.7h16s-2-1.5-2-6.7M13.7 19a2 2 0 01-3.4 0",
+  ai: "M12 3l1.7 4.6L18 9.3l-4.3 1.7L12 15.6l-1.7-4.6L6 9.3l4.3-1.7zM18.5 15l.8 2.1 2.2.8-2.2.8-.8 2.1-.8-2.1-2.2-.8 2.2-.8z",
+};
+
+function Bt({ d }: { d: string }) {
+  return (
+    <svg className="bar-hinh" viewBox="0 0 24 24" width={18} height={18} aria-hidden="true"
+      fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <path d={HINH_BAR[d] || MAC_DINH} />
+    </svg>
+  );
+}
+
+/** Chữ đầu cho ô tròn đại diện. Lấy chữ đầu của HAI từ cuối, vì tên người Việt đọc theo tên chứ
+ *  không theo họ: "Trần Anh Tuấn" ra "AT" chứ không phải "TA". Không có tên thì trả về rỗng và ô
+ *  tròn vẫn giữ chỗ, không nhảy bố cục khi hồ sơ tải xong. */
+function chuDau(ten?: string | null): string {
+  const tu = (ten || "").trim().split(/\s+/).filter(Boolean);
+  if (tu.length === 0) return "";
+  return tu.slice(-2).map((t) => t[0]).join("").toUpperCase();
+}
+
+/** TÁM NHÓM – tên chính thức theo bản vẽ giao diện navy V1.2, anh Tuấn chốt 12/9/2026.
  *  Tối đa hai cấp, bỏ số thứ tự, nhóm Quản trị đặt cuối, ẩn mục chưa có trang.
  *
+ *  LỊCH SỬ HAI LẦN ĐỔI TRONG NGÀY 12/9, ghi cả hai vì tài liệu gửi IT phải đính chính theo:
+ *    · Sáng: ĐỔI TÊN bảy nhóm theo bản vẽ, giữ nguyên thứ tự và mọi đường dẫn. Khách hàng & Kinh
+ *      doanh -> Kinh doanh · Vận hành -> Điều hành (bỏ chữ "du lịch") · Tài chính -> Tài chính – Kế
+ *      toán · Nhân sự & Nội bộ -> Nhân sự – Hành chính · Báo cáo -> Báo cáo – Phân tích · Quản trị
+ *      -> Quản trị hệ thống.
+ *    · Chiều: LÊN TÁM NHÓM. Thêm "Marketing & PR" đứng thứ hai, và Nhân sự – Hành chính đổi lên
+ *      TRƯỚC Tài chính – Kế toán, đúng thứ tự bản vẽ navy V1.2.
+ *
+ *  DẤU NỐI: bản vẽ navy viết "Nhân sự & Hành chính" và "Tài chính & Kế toán" bằng dấu &, nhưng ở đây
+ *  giữ gạch ngang – (en dash) vì đó là dấu anh Tuấn chốt riêng buổi sáng và đã nằm trong tài liệu
+ *  v1.2 gửi IT. Riêng "Marketing & PR" dùng & vì PR là chữ viết tắt, "Marketing – PR" đọc sai nghĩa.
+ *  Đổi lại toàn bộ sang & là một dòng, nhưng phải đính chính tài liệu lần nữa.
+ *
  *  NGUYÊN TẮC XẾP: v1.1 liệt kê mục con theo CHỨC NĂNG NGHIỆP VỤ, không theo đường dẫn. Ở đây chỉ
- *  GOM 53 đường dẫn đang có trong MENU_ROLES vào bảy nhóm ấy – KHÔNG thêm mục mới. Khai một mục trỏ
+ *  GOM 53 đường dẫn đang có trong MENU_ROLES vào tám nhóm ấy – KHÔNG thêm mục mới. Khai một mục trỏ
  *  tới trang chưa tồn tại là cổng P11 đỏ ngay, và người dùng thì gặp một đường dẫn hỏng.
+ *  Nhóm Marketing & PR vì thế KHÔNG có mục nào mới: nó nhận lại năm mục vốn nằm trong Kinh doanh.
  *
  *  `blocks` giữ ĐÚNG THỨ TỰ của v1.1: một phần tử là một mục (mảng hai phần) hoặc một mục con có
  *  nhóm nhỏ bên trong (đối tượng có label + items). Nếu tách làm hai trường items và sections thì
@@ -47,11 +130,31 @@ type Group = { key: string; label: string; icon: string; blocks: Block[] };
 export const GROUPS: Group[] = [
   // "Việc của tôi" và "Chỉ đạo & giao việc" chưa có trang (xem CHUA_XAY). "Việc của tôi" vẫn tới
   // được bằng neo trên thanh ngang, nên không mất lối đi.
-  { key: "tongquan", label: "Tổng quan", icon: "🏠", blocks: [
+  { key: "tongquan", label: "Tổng quan", icon: "tongquan", blocks: [
     ["Bảng điều hành", "/"],
   ] },
 
-  { key: "khachhang", label: "Khách hàng & Kinh doanh", icon: "🤝", blocks: [
+  // NHÓM THỨ TÁM, thêm 12/9/2026 theo bản vẽ navy V1.2 anh Tuấn chốt. KHÔNG có mục nào mới: năm mục
+  // dưới đây được NHẤC NGUYÊN từ hai mục con "Marketing" và "Chăm sóc & khiếu nại" đang nằm trong
+  // nhóm Kinh doanh. Đường dẫn không đổi một ký tự nào, nên 53 lối vào của MENU_ROLES giữ nguyên và
+  // không ai mất đường đi – chỉ đổi chỗ đứng trong thanh dọc.
+  //
+  // VÌ SAO CHĂM SÓC VÀ KHIẾU NẠI ĐI THEO MARKETING, không ở lại Kinh doanh: đây là chỗ em tự quyết,
+  // ghi ra để anh lật lại được. Hai màn hình ấy làm việc với khách SAU khi đã bán – giữ tiếng và
+  // giữ khách, cùng một việc với Nội dung & thương hiệu. Phiếu chăm sóc VẪN tự giao cho nhân viên
+  // đã bán như chốt 07/9; đổi nhóm menu không đổi người được giao việc.
+  { key: "marketing", label: "Marketing & PR", icon: "marketing", blocks: [
+    ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"],
+    ["Chiến dịch", "/marketing"],
+    ["Nội dung & thương hiệu", "/noi-dung"],
+    { label: "Chăm sóc & khiếu nại", items: [
+      ["Chăm sóc sau bán", "/cham-soc"], ["Phản hồi & khiếu nại", "/khieu-nai"]] },
+  ] },
+
+  // "Hộp thư" Ở LẠI Kinh doanh dù ba kênh (Zalo OA, vChat, tổng đài) do Marketing dựng: người mở
+  // hộp thư mỗi ngày để trả lời khách là nhân viên bán hàng. Phần cấu hình kênh nằm ở Quản trị hệ
+  // thống → Tích hợp, đúng chỗ của nó.
+  { key: "khachhang", label: "Kinh doanh", icon: "khachhang", blocks: [
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
     // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và
@@ -69,14 +172,9 @@ export const GROUPS: Group[] = [
       ["Tour đoàn", "/tours?mang=doan"], ["Yêu cầu & booking", "/requests?mang=doan"],
       ["Booking & bảo lưu", "/bookings?mang=doan"], ["Báo giá đoàn", "/bao-gia?mang=kd_doan"],
       ["Hợp đồng", "/hop-dong-khach"], ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
-    { label: "Marketing", items: [
-      ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"], ["Chiến dịch", "/marketing"],
-      ["Nội dung & thương hiệu", "/noi-dung"]] },
-    { label: "Chăm sóc & khiếu nại", items: [
-      ["Chăm sóc sau bán", "/cham-soc"], ["Phản hồi & khiếu nại", "/khieu-nai"]] },
   ] },
 
-  { key: "vanhanh", label: "Vận hành", icon: "🧭", blocks: [
+  { key: "vanhanh", label: "Điều hành", icon: "vanhanh", blocks: [
     ["Sản phẩm tour", "/products"],
     ["Yêu cầu chờ xử lý", "/requests"],
     ["Chuyến & quyết toán", "/tours"],
@@ -100,7 +198,17 @@ export const GROUPS: Group[] = [
       ["Phòng Hướng dẫn", "/huong-dan"], ["HDV & phân chuyến (cũ)", "/ops?tab=guides"]] },
   ] },
 
-  { key: "taichinh", label: "Tài chính", icon: "💰", blocks: [
+  { key: "nhansu", label: "Nhân sự – Hành chính", icon: "nhansu", blocks: [
+    ["Hồ sơ nhân sự", "/hr?tab=employees"],
+    ["Hợp đồng lao động", "/hop-dong-lao-dong"],
+    ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
+    ["Đánh giá & sự vụ", "/hr?tab=incidents"],
+    ["Báo cáo công việc", "/reports"],
+    ["Chính sách & quy trình", "/params"],
+    ["Tài sản & mua sắm", "/tai-san"],
+  ] },
+
+  { key: "taichinh", label: "Tài chính – Kế toán", icon: "taichinh", blocks: [
     ["Thu & đối soát", "/collections"],
     ["Chi & thanh toán", "/expenses"],
     ["Công nợ", "/cong-no"],
@@ -124,15 +232,6 @@ export const GROUPS: Group[] = [
       ["Quy ước hạch toán", "/hach-toan"], ["Hồ sơ kiểm toán", "/ho-so-kiem-toan"]] },
   ] },
 
-  { key: "nhansu", label: "Nhân sự & Nội bộ", icon: "👥", blocks: [
-    ["Hồ sơ nhân sự", "/hr?tab=employees"],
-    ["Hợp đồng lao động", "/hop-dong-lao-dong"],
-    ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
-    ["Đánh giá & sự vụ", "/hr?tab=incidents"],
-    ["Báo cáo công việc", "/reports"],
-    ["Chính sách & quy trình", "/params"],
-    ["Tài sản & mua sắm", "/tai-san"],
-  ] },
 
   // Báo cáo tự động theo phòng (09/9/2026): Chủ tịch và TGĐ mở bản toàn công ty ở đây, trưởng phòng
   // mở bản của phòng mình ở CÙNG một đường dẫn – máy chủ cắt theo vai trò. Một đường dẫn cho mọi
@@ -140,7 +239,7 @@ export const GROUPS: Group[] = [
   //
   // "Kinh doanh" ở đây KHÔNG kèm ?mang=: hai phòng vào báo cáo của mình qua menu nhóm Khách hàng &
   // Kinh doanh. Nếu chỉ có hai lối đó thì không còn đường nào tới con số HỢP NHẤT.
-  { key: "baocao", label: "Báo cáo", icon: "📊", blocks: [
+  { key: "baocao", label: "Báo cáo – Phân tích", icon: "baocao", blocks: [
     ["Điều hành", "/bao-cao"],
     ["Kinh doanh", "/sales-reports"],
     ["Marketing", "/leads?tab=report"],
@@ -148,8 +247,8 @@ export const GROUPS: Group[] = [
     ["Báo cáo quản trị", "/robot-reports"],
   ] },
 
-  // ĐẶT CUỐI theo v1.1 §I.2.
-  { key: "quantri", label: "Quản trị", icon: "⚙️", blocks: [
+  // ĐẶT CUỐI theo v1.1 §I.2 (tên nhóm đổi theo bản vẽ giao diện 12/9, thứ tự giữ nguyên).
+  { key: "quantri", label: "Quản trị hệ thống", icon: "quantri", blocks: [
     ["Tổ chức & đơn vị", "/companies"],
     { label: "Quyền", items: [
       ["Tài khoản & phân quyền", "/access"], ["Vị trí AI & quyền hạn", "/ai-roles"]] },
@@ -309,20 +408,53 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={{ user, toast, datChuaLuu }}>
       <div className="top">
         <button type="button" className="burger" onClick={() => setSide((s) => !s)} aria-label="Menu">☰</button>
-        <Link href="/" className="brand">VTOS <small>Vietourist Operating System</small></Link>
+        {/* Dấu hiệu nhận biết: logo VIETOURIST nền TRONG SUỐT (tệp gốc anh Tuấn gửi 12/9/2026), dưới
+            là dòng VIETOURIST OPERATING SYSTEM. Không dùng ảnh nền trắng – nền trắng đặt lên thanh
+            xanh đậm sẽ thành một mảng trắng hình chữ nhật quanh chữ.
+            alt để RỖNG và tên hệ thống viết bằng chữ thật bên dưới: nếu alt cũng là tên ấy thì máy
+            đọc màn hình đọc tên hai lần. width/height khai đúng tỉ lệ tệp (720×389) để trang không
+            bị giật một nhịp khi ảnh tải xong. */}
+        <Link href="/" className="brand" aria-label="VIETOURIST Operating System – về bảng điều hành">
+          {/* Dấu VTOS của bộ nhận diện v1.0 (12/9/2026). Bản NỀN TỐI vì thanh ngang là navy đặc
+              #14538D – bản chính dùng cho nền sáng. Dạng SVG nên không vỡ ở mọi cỡ màn hình.
+              Quy tắc 6: logo trong giao diện không nhỏ hơn 22px; ở đây cao 30px.
+              Logo Vietourist (web/public/vietourist.png) GIỮ NGUYÊN trong kho, không xoá – đó là
+              nhận diện công ty, khác với dấu của phần mềm; trang đăng nhập còn dùng. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/thuong-hieu/vtos-logo-nen-toi.svg" alt="" width={708} height={434} className="brand-logo" />
+          <small>VIETOURIST OPERATING SYSTEM</small>
+        </Link>
         <span className="bar">
           <ChonDonVi chuaLuu={() => chuaLuu.current} toast={toast} />
-          <button type="button" className="soon" title="Sắp có" onClick={() => toast("Tìm kiếm: đang xây dựng")}>Tìm kiếm</button>
-          <Link href="/#viec-cua-toi">Việc của tôi</Link>
-          <Link href="/#cho-toi-duyet">Chờ tôi duyệt</Link>
-          <Link href="/alerts" title="Thông báo & cảnh báo">🔔{alerts > 0 && <b> {alerts}</b>}</Link>
-          <button type="button" className="soon" title="Sắp có" onClick={() => toast("Trợ lý AI: đang xây dựng")}>Trợ lý AI</button>
+          {/* Ô tìm kiếm vẽ như một Ô NHẬP chứ không phải một nút chữ (bản vẽ giao diện 12/9). Vẫn là
+              chức năng "sắp có" nên dùng thẻ button: một <input> chưa chạy được thì người dùng gõ vào
+              rồi tưởng hệ thống hỏng. */}
+          <button type="button" className="o-tim soon" title="Sắp có"
+            onClick={() => toast("Tìm kiếm: đang xây dựng")}>
+            <Bt d="tim" /><span>Tìm kiếm…</span>
+          </button>
+          <Link href="/#viec-cua-toi" className="bar-muc"><Bt d="viec" /><span>Công việc</span></Link>
+          <Link href="/#cho-toi-duyet" className="bar-muc"><Bt d="duyet" /><span>Chờ duyệt</span></Link>
+          {/* THỨ TỰ theo bản vẽ 12/9: … Công việc · Chờ duyệt · Trợ lý AI · chuông · Tài khoản.
+              Chuông đứng sát ô tài khoản vì hai thứ ấy đều là của riêng người đang đăng nhập. */}
+          <button type="button" className="bar-muc ai soon" title="Sắp có" onClick={() => toast("Trợ lý AI: đang xây dựng")}>
+            <Bt d="ai" /><span>Trợ lý AI</span>
+          </button>
+          {/* Con số trên chuông là TỔNG CẢNH BÁO NGHIỆP VỤ, không phải "số thông báo chưa đọc" mà
+              bản vẽ mô tả. Đo 12/9: /alerts/dem và /thong-bao/chua-doc đều trả 404 – hệ thống chưa
+              đếm số chưa đọc ở đâu cả. Đổi nhãn sang "chưa đọc" trong khi con số vẫn là tổng cảnh
+              báo là dán một cái tên sai lên một con số thật, tệ hơn là để nguyên. Khi nào có cửa
+              đếm chưa đọc thì đổi cả số lẫn nhãn một lượt. */}
+          <Link href="/alerts" className="bar-muc" title="Thông báo & cảnh báo nghiệp vụ" aria-label={`Thông báo${alerts > 0 ? `: ${alerts}` : ""}`}>
+            <Bt d="chuong" />{alerts > 0 && <b className="so-bao">{alerts}</b>}
+          </Link>
           {/* Menu cá nhân: ba mục của chính người đăng nhập, rời khỏi menu trái theo TC-2. */}
           <span style={{ position: "relative" }}>
             <button type="button" className="who" aria-haspopup="menu" aria-expanded={menuToi}
               onClick={() => setMenuToi((m) => !m)}
               style={{ background: "none", border: 0, cursor: "pointer", font: "inherit", color: "inherit" }}>
-              {user?.full_name} · <b>{user?.role_name}</b> ▾
+              <span className="anh-dai-dien" aria-hidden="true">{chuDau(user?.full_name)}</span>
+              <span className="who-ten">{user?.full_name} · <b>{user?.role_name}</b></span> ▾
             </button>
             {menuToi && (
               <span role="menu" onClick={() => setMenuToi(false)}
@@ -354,8 +486,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               <button type="button" className={"grp" + (opened.has(g.key) ? " on" : "")}
                 title={g.label} aria-label={g.label}
                 onClick={() => { if (thu) doiThu(); doiNhom(g.key); }}>
-                {thu ? <span className="bt">{g.icon}</span>
-                     : <>{opened.has(g.key) ? "▾ " : "▸ "}{g.label}</>}
+                {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
+                     : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label}</span>
+                         <span className="grp-mui" aria-hidden="true">{opened.has(g.key) ? "▾" : "▸"}</span></>}
               </button>
               {!thu && opened.has(g.key) && <div className="sub">
                 {g.blocks.map((b, i) => laMuc(b) ? lien(b[0], b[1]) : (

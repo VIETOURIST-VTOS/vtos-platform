@@ -1,71 +1,151 @@
-:root{--navy:#1F3A5F;--navy2:#2B4E7A;--teal:#1B8A7A;--orange:#D9822B;--red:#B84A3A;--ink:#1B2733;--ink2:#5A6B7B;--line:#D9E1EA;--ground:#F5F7FA;--panel:#FFFFFF;--panel2:#EEF3F8;--okbg:#E4F3F0;--warnbg:#FCF1E3;--redbg:#FBEAE7}
-@media (prefers-color-scheme: dark){:root{--navy:#8FB3DE;--navy2:#2B4E7A;--teal:#4FBFAE;--orange:#E9A15A;--red:#E07A6A;--ink:#E6EDF3;--ink2:#9FB0C0;--line:#2A3A4C;--ground:#0F161E;--panel:#17212C;--panel2:#1E2A37;--okbg:#153530;--warnbg:#3A2A14;--redbg:#3B1E1A}}
+@import "./tokens.css";
+
+/* BỘ NHẬN DIỆN VTOS v1.0 (09/2026) – anh Tuấn giao 12/9. Biến gốc nằm ở tokens.css, KHÔNG sửa tệp
+   ấy; ở đây chỉ ÁNH XẠ các biến cũ của VTOS sang biến thương hiệu, để 76 màn hình đang dùng
+   var(--ground), var(--panel)… đổi màu theo mà không phải sửa từng trang.
+
+   MỘT BẢNG MÀU DUY NHẤT, LUÔN SÁNG (anh Tuấn chốt 12/9). Trước đây có thêm một khối
+   @media (prefers-color-scheme: dark) đổi màu theo cài đặt của máy – chính nó làm anh thấy trang
+   nền tối, còn máy khác lại thấy nền sáng. Bộ nhận diện chỉ định nghĩa một bảng màu, nên khối ấy
+   đã gỡ: ai mở VTOS cũng thấy đúng một bộ màu. */
+:root{--top-h:72px;
+  --navy:var(--vtos-navy);--navy2:var(--vtos-sky);
+  --teal:var(--vtos-success);--orange:var(--vtos-info);--red:var(--vtos-danger);
+  --ink:var(--vtos-text);--ink2:var(--vtos-text-mute);--line:var(--vtos-line);
+  --ground:var(--vtos-surface);--panel:var(--vtos-card);--panel2:var(--vtos-info-bg);
+  --okbg:var(--vtos-success-bg);--warnbg:var(--vtos-info-bg);--redbg:var(--vtos-danger-bg)}
 *{box-sizing:border-box}html,body{margin:0}
-body{font-family:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:14px;line-height:1.45;color:var(--ink);background:var(--ground)}
+body{font-family:var(--vtos-font-text);font-size:14px;line-height:1.45;color:var(--ink);background:var(--ground)}
 a{color:var(--navy);font-weight:600}
-.top{background:#1F3A5F;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
-.top .brand{font-weight:700;letter-spacing:.06em}.top .brand small{font-weight:400;opacity:.7;margin-left:8px;letter-spacing:0}
-.top .right{margin-left:auto;font-size:12.5px}.top .right b{color:#ffd9a8}.top .right a{color:#ffd9a8;margin-left:10px}
-nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:48px;z-index:4}
+/* Thanh ngang – nền tối theo bản vẽ giao diện chốt 12/9/2026. Màu đặt THẲNG, không qua biến
+   --panel: thanh này phải giữ nguyên một màu ở cả chế độ sáng lẫn tối, giống thanh dọc. */
+.top{background:var(--vtos-navy);color:#fff;padding:12px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(255,255,255,.16)}
+/* Dấu hiệu nhận biết: logo nền trong suốt xếp TRÊN, tên hệ thống xếp DƯỚI (cột dọc). Logo cao cố
+   định 24px và để ảnh tự tính bề ngang theo tỉ lệ – khoá cả hai chiều thì ảnh bẹp. Dòng chữ dưới
+   giãn chữ .14em cho bằng bề ngang logo, và không bao giờ vỡ dòng. */
+.top .brand{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;line-height:1}
+.top .brand .brand-logo{height:30px;width:auto;display:block}
+.top .brand small{font-weight:400;font-size:13px;letter-spacing:.02em;opacity:.85;white-space:nowrap;
+  font-family:var(--vtos-font-display)}
+.top .right{margin-left:auto;font-size:13px}.top .right b{color:#fff}.top .right a{color:#fff;margin-left:10px}
+nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:var(--top-h);z-index:4}
 nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:13px;color:var(--ink2);text-decoration:none;white-space:nowrap;font-weight:500}
 nav.tabs a.on{color:var(--navy);border-color:var(--orange);font-weight:600}
 main{max-width:1180px;margin:0 auto;padding:16px}
-h1{font-size:19px;margin:4px 0 12px;color:var(--navy)}h2{font-size:14.5px;margin:0 0 10px;color:var(--teal)}h3{font-size:12.5px;color:var(--ink2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+h1{font-size:19px;margin:4px 0 12px;color:var(--navy);font-family:var(--vtos-font-display);letter-spacing:-.01em}h2{font-size:14.5px;margin:0 0 10px;color:var(--vtos-navy-dark);font-family:var(--vtos-font-display)}h3{font-size:12.5px;color:var(--ink2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
 .kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}.kpi b{font-size:24px;color:var(--navy);font-variant-numeric:tabular-nums}.kpi span{display:block;font-size:12px;color:var(--ink2)}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}.kpi b{font-size:24px;color:var(--navy);font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono)}.kpi span{display:block;font-size:12px;color:var(--ink2)}
 table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:7px 8px;font-weight:600;color:var(--ink2);border-bottom:2px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
-td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}.num{text-align:right;font-variant-numeric:tabular-nums}.wrap{overflow-x:auto}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono);font-size:.94em}.wrap{overflow-x:auto}
 .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:var(--panel2);color:var(--ink2);white-space:nowrap}
 .tag.ok{background:var(--okbg);color:var(--teal)}.tag.warn{background:var(--warnbg);color:var(--orange)}.tag.red{background:var(--redbg);color:var(--red)}.tag.navy{background:var(--navy2);color:#fff}
 .gate{border-left:4px solid var(--orange);background:var(--warnbg);padding:8px 12px;border-radius:4px;margin:8px 0;font-size:13px}.gate.pass{border-color:var(--teal);background:var(--okbg)}.gate.fail{border-color:var(--red);background:var(--redbg)}
 .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:92vw;padding:11px 16px;border-radius:8px;font-weight:600;font-size:13.5px;box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:20;background:var(--okbg);color:var(--teal);border:1px solid var(--teal)}
 .toast.err{background:var(--redbg);color:var(--red);border-color:var(--red)}
 label{display:block;font-size:12px;color:var(--ink2);margin-top:8px}
-input,select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:5px;font:inherit;font-size:13.5px;background:var(--panel);color:var(--ink)}textarea{min-height:72px}
-button.act{background:var(--navy2);color:#fff;border:0;border-radius:5px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer;margin:6px 6px 0 0}
+input,select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13.5px;background:var(--panel);color:var(--ink)}textarea{min-height:72px}
+button.act{background:var(--navy2);color:#fff;border:0;border-radius:6px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer;margin:6px 6px 0 0}
 button.act.teal{background:var(--teal)}button.act.orange{background:var(--orange)}button.act.red{background:var(--red)}button.act.grey{background:var(--ink2)}button.act:disabled{opacity:.5;cursor:default}
-.muted{color:var(--ink2);font-size:12.5px}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.muted{color:var(--ink2);font-size:12.5px}.mono{font-family:var(--vtos-font-mono);font-size:12px}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
 @media (max-width:640px){main{padding:10px}td,th{padding:6px 5px}nav.tabs{top:0}.top{position:static}}
 
 /* Thanh ngang: phạm vi và việc chung. Thanh dọc: 8 nhóm nghiệp vụ (Đề xuất 06/9/2026). */
 .top .brand{color:#fff;text-decoration:none}
-.top .bar{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
-.top .bar a,.top .bar button,.top .bar select{color:#fff;background:rgba(255,255,255,.13);border:0;border-radius:6px;padding:5px 9px;font-size:12px;text-decoration:none;font-family:inherit;cursor:pointer;white-space:nowrap}
+.top .bar{display:flex;gap:6px;align-items:center;flex:1 1 auto;min-width:0;flex-wrap:nowrap;justify-content:flex-end}
+.top .bar a,.top .bar button,.top .bar select{color:#fff;background:rgba(255,255,255,.13);border:0;border-radius:6px;padding:5px 9px;font-size:13px;text-decoration:none;font-family:inherit;cursor:pointer;white-space:nowrap}
 .top .bar a:hover,.top .bar button:hover{background:rgba(255,255,255,.24)}
 .top .bar .soon{opacity:.45;cursor:default}
-.top .bar .who{background:none;padding:0 4px;font-size:12.5px}.top .bar .who b{color:#ffd9a8}
+.top .bar .who{background:none;padding:0 4px;font-size:13px}.top .bar .who b{color:#fff}
+
+/* ==========================================================================================
+   THANH NGANG theo bản vẽ giao diện 12/9/2026: mỗi mục là biểu tượng NÉT + chữ, ô tìm kiếm vẽ
+   như một ô nhập, số cảnh báo là một viên tròn vàng, người đăng nhập có ô tròn chữ đầu.
+   ========================================================================================== */
+.top .bar{gap:8px}
+.top .bar .bar-muc{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 10px;
+  background:none;font-size:13px;font-weight:500;color:rgba(255,255,255,.86);border-radius:6px}
+.top .bar .bar-muc:hover{background:rgba(255,255,255,.10);color:#fff}
+.top .bar .bar-muc .bar-hinh{flex:0 0 auto;opacity:.9}
+/* Trợ lý AI xanh nhạt hơn: bản vẽ tách nó khỏi nhóm mục thường vì đây là chức năng mới. */
+/* Ô đơn vị trên thanh ngang: HAI DÒNG theo bản vẽ 12/9 – tên pháp nhân, dưới là phạm vi báo cáo.
+   Không phải nút bấm được: chưa có /pham-vi/don-vi thì chưa đổi đơn vị, mà vẽ một mũi tên xổ xuống
+   không làm gì là mời người ta bấm vào chỗ trống. Mũi tên mọc cùng lúc với đường dẫn ấy. */
+.top .bar .o-donvi{flex-direction:column;align-items:flex-start;gap:1px;height:auto;padding:4px 10px;
+  flex:0 1 auto;min-width:0;max-width:250px;overflow:hidden;
+  cursor:default;border-left:1px solid rgba(255,255,255,.16);border-radius:0;margin-right:2px}
+.top .bar .o-donvi:hover{background:none}
+.top .bar .o-donvi b{font-size:13px;font-weight:600;line-height:1.25;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.top .bar .o-donvi small{font-size:13px;font-weight:400;opacity:.72;line-height:1.2;white-space:nowrap}
+.top .bar .bar-muc.ai{color:var(--vtos-navy-light)}
+.top .bar .bar-muc.ai:hover{color:#fff}
+.top .bar .soon.bar-muc{opacity:.55}
+/* Ô tìm kiếm: nền chìm, viền không, con trỏ chữ – trông như một ô nhập chứ không như một nút. */
+.top .bar .o-tim{display:inline-flex;align-items:center;gap:8px;height:34px;flex:1 1 240px;min-width:150px;max-width:560px;padding:0 12px;
+  background:rgba(255,255,255,.10);border-radius:6px;color:rgba(255,255,255,.62);font-size:13px;font-weight:400;
+  justify-content:flex-start;opacity:1}
+.top .bar .o-tim:hover{background:rgba(255,255,255,.16)}
+/* Viên số cảnh báo. Nền vàng chữ sẫm để đọc được cả khi in đen trắng, không chỉ dựa vào màu. */
+.top .bar .so-bao{min-width:24px;height:22px;padding:0 7px;border-radius:11px;background:var(--vtos-danger);
+  color:#fff;font-size:13px;font-weight:600;display:inline-flex;align-items:center;
+  justify-content:center;margin-left:-2px}
+/* Ô tròn chữ đầu. Tên và vai vẫn hiện bên cạnh trên màn rộng – ô tròn KHÔNG thay cho tên, vì một
+   hệ thống nhiều vai mà chỉ còn hai chữ cái thì không ai biết mình đang đứng ở vai nào. */
+.top .bar .who{display:inline-flex;align-items:center;gap:8px;height:34px}
+.top .bar .anh-dai-dien{width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:rgba(255,255,255,.14);
+  color:#fff;font-size:13px;font-weight:600;display:inline-flex;align-items:center;
+  justify-content:center;letter-spacing:.02em}
+@media (max-width:900px){
+  .top{flex-wrap:wrap}
+  .top .bar{flex-wrap:wrap}
+  .top .bar .o-tim{flex:1 1 100%}
+  .top .bar .o-donvi small{display:none}
+  .top .bar .bar-muc span,.top .bar .o-tim span,.top .bar .who-ten{position:absolute;width:1px;
+    height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
 .burger{display:none;background:rgba(255,255,255,.14);color:#fff;border:0;border-radius:6px;padding:4px 9px;font-size:15px;cursor:pointer;font-family:inherit}
 .shell{display:flex;align-items:flex-start}
-aside.side{flex:0 0 236px;width:236px;background:var(--panel);border-right:1px solid var(--line);position:sticky;top:48px;max-height:calc(100vh - 48px);overflow-y:auto;padding:6px 0}
-aside.side .grp{display:block;width:100%;text-align:left;border:0;background:none;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--navy);padding:9px 12px;cursor:pointer}
-aside.side .grp:hover{background:var(--panel2)}
-aside.side .grp.on{background:var(--panel2)}
+/* THANH PHÂN HỆ – nền xanh đậm theo hình anh Tuấn gửi 12/9/2026. Màu đặt THẲNG chứ không qua biến
+   --panel: biến ấy đảo màu theo chế độ tối của máy, mà thanh này phải giữ nguyên một màu ở cả hai
+   chế độ, nếu không thì nửa sáng nửa tối. Chữ trên nền này dùng màu riêng, không dùng --ink. */
+aside.side{flex:0 0 224px;width:224px;background:var(--vtos-navy);color:rgba(255,255,255,.86);border-right:1px solid rgba(255,255,255,.16);position:sticky;top:var(--top-h);max-height:calc(100vh - var(--top-h));min-height:calc(100vh - var(--top-h));overflow-y:auto;padding:8px 0 14px}
+/* Mục nhóm: viên bo 6px theo bản vẽ 12/9 (bo góc của cả hệ là 8px cho thẻ, 6px cho nút và mục
+   menu). Bỏ vạch màu bên trái – mục đang mở tô nền xanh, đọc rõ hơn một vạch 3px. */
+aside.side .grp{display:flex;align-items:center;gap:10px;width:calc(100% - 16px);margin:0 8px;text-align:left;border:0;background:none;font-family:inherit;font-size:13px;font-weight:500;color:rgba(255,255,255,.68);padding:10px 12px;cursor:pointer;border-radius:6px;white-space:nowrap}
+aside.side .grp .bt-hinh{flex:0 0 auto;opacity:.86}
+/* Nhãn nhóm PHẢI nằm một dòng (anh Tuấn 12/9: "Nhân sự – Hành chính" đang vỡ hai dòng).
+   Dài quá thì cắt bằng dấu ba chấm, không xuống dòng – hai dòng làm lệch chiều cao cả cột. */
+aside.side .grp .grp-ten{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+aside.side .grp .grp-mui{opacity:.55;font-size:13px}
+aside.side .grp:hover{background:rgba(255,255,255,.06);color:var(--vtos-text-on-navy)}
+aside.side .grp.on{background:rgba(255,255,255,.14);color:#fff;font-weight:600}
+aside.side .grp.on .bt-hinh{opacity:1;color:#fff}
 aside.side .sub{padding:0 0 6px}
-aside.side .sub a{display:block;padding:6px 12px 6px 26px;font-size:12.5px;color:var(--ink2);text-decoration:none;border-left:3px solid transparent}
-aside.side .sub a:hover{background:var(--panel2)}
-aside.side .sub a.on{color:var(--navy);font-weight:600;border-color:var(--orange);background:var(--panel2)}
-aside.side .sub .soon{display:block;padding:6px 12px 6px 26px;font-size:12.5px;color:var(--ink2);opacity:.5}
-aside.side .sub .soon i{font-size:10.5px;font-style:normal;background:var(--panel2);border-radius:8px;padding:1px 6px;margin-left:4px}
+aside.side .sub a{display:block;margin:0 8px;padding:6px 12px 6px 37px;font-size:13px;color:rgba(255,255,255,.68);font-weight:500;text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+aside.side .sub a:hover{background:rgba(255,255,255,.06);color:var(--vtos-text-on-navy)}
+aside.side .sub a.on{color:#fff;font-weight:600;background:rgba(32,96,208,.30)}
+aside.side .sub .soon{display:block;margin:0 8px;padding:6px 12px 6px 37px;font-size:13px;color:rgba(255,255,255,.68);opacity:.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+aside.side .sub .soon i{font-size:13px;font-style:normal;background:rgba(255,255,255,.12);border-radius:8px;padding:1px 6px;margin-left:4px}
 .shell main{flex:1;min-width:0;margin:0}
 /* Thu thanh dọc (v1.1 §I.2: rộng 224–240px, thu còn 56–64px). Ở trạng thái thu chỉ còn một cột biểu
    tượng; nhãn nhóm không mất mà chuyển vào title/aria-label, vì §I.2 đòi biểu tượng phải có chú
    thích. Mục con ẩn hẳn khi thu: nhét chúng vào một cột 60px là một cột chữ vỡ dòng, không đọc được. */
 aside.side{transition:flex-basis .12s ease,width .12s ease}
-aside.side .thu-nut{display:block;margin:0 8px 4px auto;border:0;background:none;color:var(--ink2);
+aside.side .thu-nut{display:block;margin:0 8px 4px auto;border:0;background:none;color:rgba(255,255,255,.68);
   font-family:inherit;font-size:13px;line-height:1;cursor:pointer;padding:4px 6px;border-radius:6px}
-aside.side .thu-nut:hover{background:var(--panel2)}
+aside.side .thu-nut:hover{background:rgba(255,255,255,.09);color:var(--vtos-text-on-navy)}
 aside.side.thu{flex:0 0 60px;width:60px}
 aside.side.thu .thu-nut{margin:0 auto 4px}
-aside.side.thu .grp{text-align:center;padding:10px 0;font-size:18px}
-aside.side.thu .grp .bt{display:block;line-height:1.2}
+aside.side.thu .grp{justify-content:center;padding:11px 0;width:calc(100% - 12px);margin:0 6px}
+aside.side.thu .grp .bt{display:flex;line-height:1}
 aside.side.thu .sub{display:none}
 @media (max-width:900px){.shell{display:block}.burger{display:inline-block}
-  aside.side,aside.side.thu{position:static;width:auto;flex:none;max-height:none;border-right:0;border-bottom:1px solid var(--line)}
+  aside.side,aside.side.thu{position:static;width:auto;flex:none;max-height:none;min-height:0;border-right:0;border-bottom:1px solid rgba(255,255,255,.16)}
   aside.side .thu-nut{display:none}
-  aside.side.thu .grp{text-align:left;padding:9px 12px;font-size:12.5px}
+  aside.side.thu .grp{justify-content:flex-start;padding:10px 12px;font-size:13px}
   aside.side.thu .sub{display:block}
   aside.side.hide{display:none}.shell main{max-width:none}}
 
@@ -93,13 +173,17 @@ aside.side.thu .sub{display:none}
 
 /* Bốn ô cảnh báo. Màn rộng: một hàng bốn ô. Điện thoại: 2x2 – hai hàng, hai cột, luôn đủ bốn. */
 .bon-o{display:grid;gap:10px;grid-template-columns:repeat(4,1fr);margin-bottom:14px}
-.o-cb{display:block;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ink2);
+/* Ô cảnh báo theo bản vẽ 12/9: KHÔNG còn vạch màu 4px bên trái. Trạng thái đọc bằng màu của con
+   số và một chấm tròn ở đầu nhãn – vạch bên trái làm bốn ô trông lệch nhau khi đứng cạnh. */
+.o-cb{display:block;background:var(--panel);border:1px solid var(--line);
   border-radius:8px;padding:12px 14px;text-decoration:none;color:inherit;min-height:64px}
-.o-cb b{display:block;font-size:22px;color:var(--navy);font-variant-numeric:tabular-nums;line-height:1.2}
+.o-cb span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:var(--ink2);margin-right:6px;vertical-align:middle}
+.o-cb b{display:block;font-size:22px;color:var(--navy);font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono);line-height:1.2}
 .o-cb span{display:block;font-size:12px;color:var(--ink2);margin-top:2px}
-.o-cb.ok{border-left-color:var(--teal)}.o-cb.ok b{color:var(--teal)}
-.o-cb.warn{border-left-color:var(--orange)}.o-cb.warn b{color:var(--orange)}
-.o-cb.red{border-left-color:var(--red)}.o-cb.red b{color:var(--red)}
+.o-cb.ok span::before{background:var(--teal)}.o-cb.ok b{color:var(--teal)}
+.o-cb.warn span::before{background:var(--orange)}.o-cb.warn b{color:var(--orange)}
+.o-cb.red span::before{background:var(--red)}.o-cb.red b{color:var(--red)}
 a.o-cb:hover{background:var(--panel2)}
 
 /* Một ô chọn mốc. Câu "Đang xem mốc X" KHÔNG phải trang trí: nó là chỗ duy nhất nói tên mốc sau khi
