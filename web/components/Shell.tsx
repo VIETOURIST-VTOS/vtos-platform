@@ -63,6 +63,35 @@ function Hinh({ ten }: { ten: string }) {
   );
 }
 
+/** Biểu tượng của THANH NGANG. Tách khỏi bảng HINH ở trên vì bảng ấy là biểu tượng bảy NHÓM MENU và
+ *  phép thử test_menu đếm đúng bảy khoá trong đó – thêm hình của thanh ngang vào là làm hỏng phép
+ *  đếm. Cùng quy cách nét: 24×24, stroke 1.7, currentColor. */
+const HINH_BAR: Record<string, string> = {
+  tim: "M11 17.5a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM20 20l-3.6-3.6",
+  viec: "M7 4.5h10A1.5 1.5 0 0118.5 6v13A1.5 1.5 0 0117 20.5H7A1.5 1.5 0 015.5 19V6A1.5 1.5 0 017 4.5zM9.5 4.5V3.8a1.3 1.3 0 011.3-1.3h2.4a1.3 1.3 0 011.3 1.3v.7M9 12.5l2 2 4-4",
+  duyet: "M12 21a9 9 0 100-18 9 9 0 000 18zM8.5 12.2l2.4 2.4 4.6-4.8",
+  chuong: "M18 8.8a6 6 0 10-12 0c0 5.2-2 6.7-2 6.7h16s-2-1.5-2-6.7M13.7 19a2 2 0 01-3.4 0",
+  ai: "M12 3l1.7 4.6L18 9.3l-4.3 1.7L12 15.6l-1.7-4.6L6 9.3l4.3-1.7zM18.5 15l.8 2.1 2.2.8-2.2.8-.8 2.1-.8-2.1-2.2-.8 2.2-.8z",
+};
+
+function Bt({ d }: { d: string }) {
+  return (
+    <svg className="bar-hinh" viewBox="0 0 24 24" width={18} height={18} aria-hidden="true"
+      fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <path d={HINH_BAR[d] || MAC_DINH} />
+    </svg>
+  );
+}
+
+/** Chữ đầu cho ô tròn đại diện. Lấy chữ đầu của HAI từ cuối, vì tên người Việt đọc theo tên chứ
+ *  không theo họ: "Trần Anh Tuấn" ra "AT" chứ không phải "TA". Không có tên thì trả về rỗng và ô
+ *  tròn vẫn giữ chỗ, không nhảy bố cục khi hồ sơ tải xong. */
+function chuDau(ten?: string | null): string {
+  const tu = (ten || "").trim().split(/\s+/).filter(Boolean);
+  if (tu.length === 0) return "";
+  return tu.slice(-2).map((t) => t[0]).join("").toUpperCase();
+}
+
 /** BẢY NHÓM – tên chính thức theo v1.1 §I.2 "Menu trái rút gọn", bản Chủ tịch duyệt 11/9/2026.
  *  Tối đa hai cấp, bỏ số thứ tự, nhóm Quản trị đặt cuối, ẩn mục chưa có trang.
  *
@@ -367,17 +396,30 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </Link>
         <span className="bar">
           <ChonDonVi chuaLuu={() => chuaLuu.current} toast={toast} />
-          <button type="button" className="soon" title="Sắp có" onClick={() => toast("Tìm kiếm: đang xây dựng")}>Tìm kiếm</button>
-          <Link href="/#viec-cua-toi">Việc của tôi</Link>
-          <Link href="/#cho-toi-duyet">Chờ tôi duyệt</Link>
-          <Link href="/alerts" title="Thông báo & cảnh báo">🔔{alerts > 0 && <b> {alerts}</b>}</Link>
-          <button type="button" className="soon" title="Sắp có" onClick={() => toast("Trợ lý AI: đang xây dựng")}>Trợ lý AI</button>
+          {/* Ô tìm kiếm vẽ như một Ô NHẬP chứ không phải một nút chữ (bản vẽ giao diện 12/9). Vẫn là
+              chức năng "sắp có" nên dùng thẻ button: một <input> chưa chạy được thì người dùng gõ vào
+              rồi tưởng hệ thống hỏng. */}
+          <button type="button" className="o-tim soon" title="Sắp có"
+            onClick={() => toast("Tìm kiếm: đang xây dựng")}>
+            <Bt d="tim" /><span>Tìm kiếm…</span>
+          </button>
+          <Link href="/#viec-cua-toi" className="bar-muc"><Bt d="viec" /><span>Công việc</span></Link>
+          <Link href="/#cho-toi-duyet" className="bar-muc"><Bt d="duyet" /><span>Chờ duyệt</span></Link>
+          {/* Chuông: số cảnh báo THẬT nằm ở đây, không dời sang "Chờ duyệt" – hệ thống chưa đếm số hồ
+              sơ chờ duyệt trên thanh ngang, dời số qua đó là bịa một con số. */}
+          <Link href="/alerts" className="bar-muc" title="Thông báo & cảnh báo" aria-label={`Thông báo${alerts > 0 ? `: ${alerts}` : ""}`}>
+            <Bt d="chuong" />{alerts > 0 && <b className="so-bao">{alerts}</b>}
+          </Link>
+          <button type="button" className="bar-muc ai soon" title="Sắp có" onClick={() => toast("Trợ lý AI: đang xây dựng")}>
+            <Bt d="ai" /><span>Trợ lý AI</span>
+          </button>
           {/* Menu cá nhân: ba mục của chính người đăng nhập, rời khỏi menu trái theo TC-2. */}
           <span style={{ position: "relative" }}>
             <button type="button" className="who" aria-haspopup="menu" aria-expanded={menuToi}
               onClick={() => setMenuToi((m) => !m)}
               style={{ background: "none", border: 0, cursor: "pointer", font: "inherit", color: "inherit" }}>
-              {user?.full_name} · <b>{user?.role_name}</b> ▾
+              <span className="anh-dai-dien" aria-hidden="true">{chuDau(user?.full_name)}</span>
+              <span className="who-ten">{user?.full_name} · <b>{user?.role_name}</b></span> ▾
             </button>
             {menuToi && (
               <span role="menu" onClick={() => setMenuToi(false)}

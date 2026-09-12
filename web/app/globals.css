@@ -44,6 +44,40 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .top .bar a:hover,.top .bar button:hover{background:rgba(255,255,255,.24)}
 .top .bar .soon{opacity:.45;cursor:default}
 .top .bar .who{background:none;padding:0 4px;font-size:12.5px}.top .bar .who b{color:#ffd9a8}
+
+/* ==========================================================================================
+   THANH NGANG theo bản vẽ giao diện 12/9/2026: mỗi mục là biểu tượng NÉT + chữ, ô tìm kiếm vẽ
+   như một ô nhập, số cảnh báo là một viên tròn vàng, người đăng nhập có ô tròn chữ đầu.
+   ========================================================================================== */
+.top .bar{gap:8px}
+.top .bar .bar-muc{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 10px;
+  background:none;font-size:12.5px;font-weight:500;color:#C4D0DD;border-radius:6px}
+.top .bar .bar-muc:hover{background:rgba(255,255,255,.10);color:#fff}
+.top .bar .bar-muc .bar-hinh{flex:0 0 auto;opacity:.9}
+/* Trợ lý AI xanh nhạt hơn: bản vẽ tách nó khỏi nhóm mục thường vì đây là chức năng mới. */
+.top .bar .bar-muc.ai{color:#8FB3DE}
+.top .bar .bar-muc.ai:hover{color:#B9D2F0}
+.top .bar .soon.bar-muc{opacity:.55}
+/* Ô tìm kiếm: nền chìm, viền không, con trỏ chữ – trông như một ô nhập chứ không như một nút. */
+.top .bar .o-tim{display:inline-flex;align-items:center;gap:8px;height:34px;width:260px;padding:0 12px;
+  background:rgba(255,255,255,.10);border-radius:6px;color:#93A6C4;font-size:12.5px;font-weight:400;
+  justify-content:flex-start;opacity:1}
+.top .bar .o-tim:hover{background:rgba(255,255,255,.16)}
+/* Viên số cảnh báo. Nền vàng chữ sẫm để đọc được cả khi in đen trắng, không chỉ dựa vào màu. */
+.top .bar .so-bao{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#F2B01E;
+  color:#35270A;font-size:11px;font-weight:700;display:inline-flex;align-items:center;
+  justify-content:center;margin-left:-2px}
+/* Ô tròn chữ đầu. Tên và vai vẫn hiện bên cạnh trên màn rộng – ô tròn KHÔNG thay cho tên, vì một
+   hệ thống nhiều vai mà chỉ còn hai chữ cái thì không ai biết mình đang đứng ở vai nào. */
+.top .bar .who{display:inline-flex;align-items:center;gap:8px;height:34px}
+.top .bar .anh-dai-dien{width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:#2060D0;
+  color:#fff;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;
+  justify-content:center;letter-spacing:.02em}
+@media (max-width:900px){
+  .top .bar .o-tim{width:auto}
+  .top .bar .bar-muc span,.top .bar .o-tim span,.top .bar .who-ten{position:absolute;width:1px;
+    height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
 .burger{display:none;background:rgba(255,255,255,.14);color:#fff;border:0;border-radius:6px;padding:4px 9px;font-size:15px;cursor:pointer;font-family:inherit}
 .shell{display:flex;align-items:flex-start}
 /* THANH PHÂN HỆ – nền xanh đậm theo hình anh Tuấn gửi 12/9/2026. Màu đặt THẲNG chứ không qua biến
