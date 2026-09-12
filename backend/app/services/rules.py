@@ -181,6 +181,28 @@ DEFAULT_PARAMS = [
      "ngày (DD-MM-YYYY)", "Chủ tịch quyết 10/9/2026 – đề xuất 01-12-2026, chờ ký"),
     ("ngay_du_lieu_that_vietrip", "", "Mốc dữ liệu Vietrip đổ về hàng ngày được coi là dữ liệu thật",
      "ngày (DD-MM-YYYY)", "Chủ tịch quyết 10/9/2026 – đề xuất 01-10-2026, chờ ký"),
+    # ---- Đ-2 · Thuế GTGT ở mức chuyến. Chủ tịch chốt 12/9/2026 ----
+    #
+    # "VAT đầu vào tương ứng với đầu ra. Nếu đầu vào không đủ thì sẽ phải đóng 8% VAT chênh lệch.
+    #  Nên trừ vào lợi nhuận của tour."
+    #
+    # Để ở tham số chứ không viết cứng 0.08 trong mã vì thuế suất là chính sách NHÀ NƯỚC – nó đã đổi
+    # (10% → 8%) và sẽ còn đổi. Tham số có hiệu lực theo ngày nên chuyến đã đi giữ nguyên thuế suất
+    # của ngày nó khởi hành: đổi thuế suất hôm nay KHÔNG làm đổi lợi nhuận những tờ quyết toán đã ký.
+    ("thue_suat_dau_ra", "0.08", "Thuế suất GTGT đầu ra áp cho doanh thu tour", "tỷ lệ",
+     "Chủ tịch chốt 12/9/2026"),
+    # ---- Đ-6 · Tiền tip. Chủ tịch chốt 12/9/2026: "tiền tip tour châu Âu chia 1 phần với công ty" ----
+    #
+    # GIÁ TRỊ ĐỂ TRỐNG, và phải để trống — giống hai mốc vận hành thật ở trên. Chủ tịch đã chốt
+    # NGUYÊN TẮC (có chia) nhưng chưa cho TỶ LỆ. Điền sẵn một con số vào đây là tự đặt ra tỷ lệ chia
+    # tiền giữa công ty và trưởng đoàn bằng một dòng mã, và về sau không ai trả lời được câu "ai đã
+    # quyết 50/50, từ ngày nào".
+    #
+    # Chưa ký thì tip_tour.ty_le_cong_ty() đọc ra None và phép chia TỪ CHỐI chạy – khác hẳn chia 0%
+    # (công ty không lấy gì) hay chia 100% (công ty lấy hết). Cả hai đều là chính sách hợp lệ, nên
+    # mã không được đoán hộ bên nào.
+    ("ty_le_tip_cong_ty", "", "Phần tiền tip thuộc về công ty (phần còn lại của trưởng đoàn)", "tỷ lệ",
+     "Chủ tịch chốt nguyên tắc 12/9/2026 – TỶ LỆ CHƯA KÝ"),
 ]
 
 # Tham số mang giá trị NGÀY chứ không phải số. propose_param kiểm giá trị bằng float(), nên nếu

@@ -48,6 +48,7 @@ from sqlalchemy.orm import Session
 from app.models.core import Booking, Tour
 from app.models.suppliers import Supplier
 from app.models.vietrip import TourCostLine
+from app.services import thue_gtgt_chuyen as THUE
 
 # Nhãn nguồn số của từng dòng. Bảng không được trình bày như thể mọi dòng đều tin được như nhau.
 NGUON = {
@@ -58,6 +59,31 @@ NGUON = {
 }
 
 RONG = {"doanh_thu_bk": 0.0, "da_thu": 0.0, "khach": 0, "so_booking": 0, "phi_huy": 0.0, "so_huy": 0}
+
+# ------------------------------------------------------------------------------------------------
+# BA TẦNG KẾT QUẢ — Chủ tịch chốt 12/9/2026
+# ------------------------------------------------------------------------------------------------
+# Trước bản này bảng chỉ có MỘT ô tên "Lợi nhuận", và ô ấy là doanh thu trừ giá vốn trực tiếp. Người
+# đọc bảng điều hành hiểu nó là "chuyến này lãi bao nhiêu" — trong khi nó chưa trừ thuế GTGT phát
+# sinh và chưa gánh một đồng chi phí chung nào của công ty.
+#
+# Đo trên đoàn Hồ Tràm: ô ấy ra 15.882.400 đ, còn lãi thật sau thuế là 13.873.067 đ — cao hơn 14,5%.
+#
+# Ba tầng, mỗi tầng MỘT NHÃN PHẠM VI, và tầng nào chưa tính được thì RỖNG chứ không tụt xuống bằng
+# tầng trên. Một ô "sau chi phí chung" mà chưa trừ chi phí chung là ô nói dối đúng vào chỗ nó hứa.
+PHAM_VI = {
+    "lai_gop_chuyen": "Lãi gộp chuyến – doanh thu trừ giá vốn trực tiếp",
+    "sau_thue_gtgt": "Sau thuế GTGT phát sinh của chuyến",
+    "sau_chi_phi_chung": "Sau phân bổ chi phí chung của công ty",
+}
+
+# Vì sao tầng ba luôn rỗng ở bản này: chưa có cơ sở phân bổ chi phí chung nào được ký. Chia chi phí
+# văn phòng về từng chuyến theo doanh thu, theo số khách hay theo số ngày cho ra ba con số khác nhau,
+# và mỗi cách đều "hợp lý" — nên đó là chính sách, không phải phép tính. Để rỗng kèm lý do là nói
+# đúng tình trạng; điền một con số là tự chọn hộ một trong ba.
+LY_DO_CHUA_CO_TANG_BA = ("Chưa có cơ sở phân bổ chi phí chung được ký. "
+                         "Ba cách chia (theo doanh thu / theo số khách / theo số ngày) cho ba con số "
+                         "khác nhau, nên đây là chính sách chờ duyệt chứ không phải phép tính.")
 RONG_CP = {"gia_von_dong": 0.0, "da_tra": 0.0, "so_dong_cp": 0, "thieu_hoa_don": 0}
 
 
@@ -126,7 +152,29 @@ def _gom_chi_phi(db: Session, ids):
             for r in db.execute(q).all()}
 
 
-def _mot_dong(t: Tour, bk: dict, cp: dict) -> dict:
+def ba_tang(lai_gop: float | None, thue: float | None) -> dict:
+    """Ba tầng kết quả của một chuyến, mỗi tầng kèm nhãn phạm vi.
+
+    MỘT CHỖ DUY NHẤT làm phép trừ này, để không màn hình nào tự trừ lại theo cách của mình — đúng
+    lý do tệp này tồn tại (xem phần đầu tệp: bốn công thức lãi lỗ song song).
+    """
+    sau_thue = None if (lai_gop is None or thue is None) else lai_gop - thue
+    return {
+        "lai_gop_chuyen": lai_gop,
+        "sau_thue_gtgt": sau_thue,
+        # Tầng ba CHƯA tính được, và cố ý không tụt xuống bằng tầng hai. Xem LY_DO_CHUA_CO_TANG_BA.
+        "sau_chi_phi_chung": None,
+        "nhan": PHAM_VI,
+        "ly_do_thieu": {
+            "sau_thue_gtgt": "" if sau_thue is not None else
+                             ("Chưa tính được thuế GTGT phát sinh của chuyến" if lai_gop is not None
+                              else "Chưa có giá vốn"),
+            "sau_chi_phi_chung": LY_DO_CHUA_CO_TANG_BA,
+        },
+    }
+
+
+def _mot_dong(t: Tour, bk: dict, cp: dict, thue: dict | None = None) -> dict:
     """Ráp một dòng báo cáo theo đúng chuẩn phép tính. Không phép tính nào khác được phép ở nơi khác."""
     doanh_thu = bk["doanh_thu_bk"] + bk["phi_huy"]
     co_dong_cp = cp["so_dong_cp"] > 0
@@ -166,6 +214,17 @@ def _mot_dong(t: Tour, bk: dict, cp: dict) -> dict:
         "bien": (loi_nhuan / doanh_thu) if (loi_nhuan is not None and doanh_thu) else None,
         "da_thu": bk["da_thu"] if co_bk else None,
         "con_phai_thu": max(0.0, doanh_thu - bk["da_thu"]) if doanh_thu else None,
+        # ---- Đ-2 · thuế GTGT và ba tầng kết quả (Chủ tịch chốt 12/9/2026) ----
+        #
+        # `loi_nhuan` ở trên GIỮ NGUYÊN nghĩa cũ — lãi gộp chuyến. Không đổi nghĩa một cột đang có
+        # người đọc: đổi lặng lẽ thì mọi màn hình và mọi phép thử vẫn chạy, vẫn xanh, và vẫn ra một
+        # con số khác hẳn hôm qua mà không ai biết vì sao. Con số sau thuế nằm ở `ket_qua`, có nhãn.
+        "thue_gtgt": (thue or {}).get("thue_gtgt"),
+        "thue_co_so": (thue or {}).get("co_so", "chua_tinh"),
+        "thue_co_so_ten": (thue or {}).get("co_so_ten", "Chưa tính thuế cho chuyến này"),
+        "thue_canh_bao": (thue or {}).get("canh_bao", []),
+        "chi_khong_hoa_don": (thue or {}).get("chi_khong_hoa_don", 0.0) or None,
+        "ket_qua": ba_tang(loi_nhuan, (thue or {}).get("thue_gtgt")),
         "da_tra_ncc": cp["da_tra"] if co_dong_cp else None,
         "con_phai_tra": max(0.0, cp["gia_von_dong"] - cp["da_tra"]) if co_dong_cp else None,
         "so_dong_chi_phi": cp["so_dong_cp"],
@@ -196,7 +255,14 @@ def bang(db: Session, u=None, tu: date | None = None, den: date | None = None,
         return {"rows": [], "tong": tong, "con_nua": False, "cong": _cong([]), "canh_bao": []}
 
     bk, cp = _gom_booking(db, ids), _gom_chi_phi(db, ids)
-    rows = [_mot_dong(t, bk.get(t.id, dict(RONG)), cp.get(t.id, dict(RONG_CP))) for t in tours]
+    # Thuế GTGT của cả bảng lấy bằng HAI câu truy vấn cho toàn bộ trang, không phải hai câu mỗi dòng.
+    # Trang 200 dòng mà hỏi từng dòng là 400 câu truy vấn cho một lần mở màn hình.
+    tho = [{"tour_id": t.id, "hinh_thuc": getattr(t, "hinh_thuc", None),
+            "doanh_thu": (bk.get(t.id, RONG)["doanh_thu_bk"] + bk.get(t.id, RONG)["phi_huy"])}
+           for t in tours]
+    thue = THUE.nhieu_chuyen(db, tho)
+    rows = [_mot_dong(t, bk.get(t.id, dict(RONG)), cp.get(t.id, dict(RONG_CP)), thue.get(t.id))
+            for t in tours]
     # Số thứ tự tính TỪ ĐẦU BẢNG chứ không từ đầu trang: trang 3 phải bắt đầu ở 401, không phải ở 1.
     # Để màn hình tự đánh số thì mỗi trang lại đánh lại từ 1, và người đọc tưởng bảng chỉ có 200 dòng.
     for i, r in enumerate(rows, start=bo_qua + 1):
@@ -215,9 +281,25 @@ def _cong(rows: list) -> dict:
     du = [r for r in rows if r["loi_nhuan"] is not None]
     dt = sum(r["doanh_thu"] or 0 for r in du)
     gv = sum(r["gia_von"] or 0 for r in du)
+    # Tầng hai cộng trên MỘT TẬP HẸP HƠN: chỉ những dòng đã tính được thuế. Cộng dòng chưa tính được
+    # thuế vào đây là trộn số đã trừ thuế với số chưa trừ, và con số ra không thuộc tầng nào cả.
+    du_thue = [r for r in du if r["ket_qua"]["sau_thue_gtgt"] is not None]
+    dt_t = sum(r["doanh_thu"] or 0 for r in du_thue)
+    sau_thue = sum(r["ket_qua"]["sau_thue_gtgt"] for r in du_thue) if du_thue else None
     return {"so_dong_tinh": len(du), "so_dong_bo_qua": len(rows) - len(du),
             "doanh_thu": dt, "gia_von": gv, "loi_nhuan": dt - gv,
             "bien": (dt - gv) / dt if dt else None,
+            "ket_qua": {
+                "lai_gop_chuyen": dt - gv,
+                "sau_thue_gtgt": sau_thue,
+                "sau_chi_phi_chung": None,
+                "nhan": PHAM_VI,
+                "so_dong_co_thue": len(du_thue),
+                "so_dong_chua_tinh_duoc_thue": len(du) - len(du_thue),
+                "doanh_thu_cua_dong_co_thue": dt_t,
+                "bien_sau_thue": (sau_thue / dt_t) if (sau_thue is not None and dt_t) else None,
+                "ly_do_thieu": {"sau_chi_phi_chung": LY_DO_CHUA_CO_TANG_BA},
+            },
             "ghi_chu": "Tổng chỉ cộng những tour đã có giá vốn. Tour chưa quyết toán không được tính "
                        "vào, vì cộng vào là báo lãi bằng đúng doanh thu."}
 
@@ -315,7 +397,9 @@ def chi_tiet(db: Session, t: Tour) -> dict:
 
     bk = _gom_booking(db, [t.id]).get(t.id, dict(RONG))
     cp = _gom_chi_phi(db, [t.id]).get(t.id, dict(RONG_CP))
-    return {"tong_hop": _mot_dong(t, bk, cp), "khach": khach, "chi_phi": chi_phi,
+    thue = THUE.nhieu_chuyen(db, [{"tour_id": t.id, "hinh_thuc": getattr(t, "hinh_thuc", None),
+                                   "doanh_thu": bk["doanh_thu_bk"] + bk["phi_huy"]}]).get(t.id)
+    return {"tong_hop": _mot_dong(t, bk, cp, thue), "khach": khach, "chi_phi": chi_phi,
             "quyet_toan_dieu_hanh": _ban_quyet_toan(db, t),
             "co_gia_von_theo_khach": le,
             "vi_sao_khong_co_gia_von_theo_khach": None if le else

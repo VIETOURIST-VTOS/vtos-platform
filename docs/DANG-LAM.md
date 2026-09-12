@@ -45,4 +45,8 @@ tệp; hai làn viết cùng một KHÁI NIỆM vào hai tệp khác tên thì b
 | Phân quyền | PQ-10 · SEC-02 · CF-07 · DT-1 · DT-3 · GD-1 | backend/app/services/pham_vi_dang_xem.py, backend/app/services/lam_tron_tien.py, backend/app/services/dong_tien_ky.py, backend/app/services/dong_tien_pham_vi.py, backend/app/services/canh_bao_trinh_bay.py | 11-09-2026 15:30 | xong |
 | Vòng | TC-2 · TC-1 · TC-1b · TC-4 | web/components/Shell.tsx, web/components/ChonDonVi.tsx, web/components/dienthoai.tsx, web/lib/phamvi.ts, web/app/globals.css | 11-09-2026 15:00 | xong |
 | Kiểm soát | hàng rào phạm vi · visa sales | backend/app/services/access.py | 11-09-2026 09:00 | xong |
-| Robot A | Ba cửa kho quyết toán cũ T1–T6/2026 | backend/app/services/intake_kho_cu.py, backend/app/services/intake.py, backend/tests/test_kho_cu_ba_cua.py | 12-09-2026 01:30 | đang làm |
+| Robot A | Ba cửa kho quyết toán cũ T1–T6/2026 | backend/app/services/intake_kho_cu.py, backend/app/services/intake.py, backend/tests/test_kho_cu_ba_cua.py | 12-09-2026 01:30 | xong |
+| Robot A | Đ-2 thuế GTGT ở mức chuyến | backend/app/services/thue_gtgt_chuyen.py, backend/app/services/lai_lo_tour.py, backend/tests/test_thue_gtgt_chuyen.py | 12-09-2026 19:30 | xong |
+| Robot A | Đ-3 ba phép kiểm hai tổng phải bằng nhau | backend/app/services/soat_can_doi_quyet_toan.py, backend/tests/test_soat_can_doi_quyet_toan.py | 12-09-2026 19:30 | xong |
+| Robot A | Đ-6 tiền tip hai chiều + tham số tỷ lệ chia | backend/app/services/tip_tour.py, backend/app/models/lop3_tour.py, backend/app/services/rules.py, backend/tests/test_tip_tour.py | 12-09-2026 19:30 | xong |
+| Robot A | Đ-1 mở cửa quyết toán lớp 3 | web/app/tours/[id]/page.tsx, backend/tests/test_cua_quyet_toan_lop3.py | 12-09-2026 21:00 | xong |

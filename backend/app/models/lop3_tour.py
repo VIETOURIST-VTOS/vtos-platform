@@ -84,6 +84,14 @@ LOAI_DOANH_THU = {
     "thanh_ly": "Điều chỉnh theo biên bản thanh lý – thường là số ÂM",
     "phu_thu": "Phụ thu phát sinh",
     "charge_huy": "Tiền phạt huỷ giữ lại",
+    # Đ-6 · Chủ tịch chốt 12/9/2026: "tiền tip tour châu Âu chia 1 phần với công ty".
+    #
+    # Chỉ PHẦN CÔNG TY GIỮ LẠI SAU KHI CHIA mới là doanh thu. Toàn bộ tiền tip khách trả là tiền của
+    # khách trả cho hướng dẫn viên, công ty giữ hộ; phần của trưởng đoàn đi vào bản chốt công nợ TL,
+    # không đi vào bảng lãi lỗ. Ghi cả cục vào đây là thổi doanh thu lên bằng tiền của người khác.
+    #
+    # Tiền tip hoàn cho đại lý là dòng ÂM loại này, và như mọi dòng âm thì bắt buộc khai `chung_tu`.
+    "tip_cong_ty": "Phần tiền tip thuộc công ty sau khi chia – xem app/services/tip_tour.py",
     "thu_khac": "Thu khác",
 }
 

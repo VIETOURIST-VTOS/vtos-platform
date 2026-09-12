@@ -9,7 +9,17 @@ import { Tag, Gate, errMsg } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
 import QuyetToanForm from "@/components/QuyetToanForm";
 
-const TABS: [string, string][] = [["info", "Thông tin & quy trình"], ["budget", "Dự toán 3 con số"], ["bookings", "Booking & thu tiền"], ["cost", "Chi NCC & quyết toán"], ["qt", "Nhập quyết toán (mẫu chuẩn)"], ["ops", "HDV & xe"], ["history", "Quy trình & lịch sử"]];
+// Đ-1 (12/9/2026) · tab "lop3" là CỬA còn thiếu của cả phân hệ quyết toán lớp 3.
+//
+// Máy chủ đã có 22 đường /api/v1/quyet-toan-lop3 và components/QuyetToanForm.tsx đã viết xong đủ sáu
+// khối nhập – nhưng KHÔNG TRANG NÀO import nó. Tức là có phép tính mà không có cửa, đúng thứ ranh
+// giới Chủ tịch chốt 09/9 gọi là "việc còn thiếu".
+//
+// GẮN VÀO ĐÂY chứ không dựng trang /quyet-toan riêng: access.py đã ghi rõ quyết định 11/9 – menu đã
+// có mục "Quyết toán tour" trỏ vào /tours, và thêm một lối vào thứ hai cho cùng một việc là cách
+// chắc chắn để người dùng không biết nên bấm vào đâu. Nhờ vậy cũng không phải khai thêm dòng nào
+// trong MENU_ROLES hay MAN_HINH_API: tiền tố /api/v1/quyet-toan-lop3 đã nằm sẵn dưới /tours.
+const TABS: [string, string][] = [["info", "Thông tin & quy trình"], ["budget", "Dự toán 3 con số"], ["bookings", "Booking & thu tiền"], ["cost", "Chi NCC & quyết toán"], ["lop3", "Quyết toán chi tiết"], ["ops", "HDV & xe"], ["history", "Quy trình & lịch sử"]];
 const PR_ST: Record<string, string> = { cho_tp: "Chờ TP", cho_kt: "Chờ Kế toán", cho_duyet: "Chờ duyệt", cho_chi: "Chờ chi", da_chi: "Đã chi", tu_choi: "Từ chối", huy: "Hủy" };
 
 function TourDetail() {
@@ -23,10 +33,10 @@ function TourDetail() {
   if (!t) return <p className="muted">Đang tải…</p>;
   const seeCost = t.calc != null;   // Kinh doanh / HCNS: máy chủ ẩn cơ cấu chi phí → không hiện tab dự toán & chi NCC
   const c = t.calc || {}, s = t.settlement, act: string[] = t.actions || [], sm = t.summary || {};
-  // Tab nhập quyết toán đi cùng nhóm với dự toán và chi NCC: ai không xem được cơ cấu chi phí thì
-  // cũng không thấy tab này. Hàng rào thật nằm ở máy chủ (danh sách XEM/NHAP của quyet_toan_lop3),
-  // đây chỉ là chuyện không bày ra một tab bấm vào chỉ để nhận lỗi 403.
-  const tabs = TABS.filter(([k]) => seeCost || !["budget", "cost", "qt"].includes(k));
+  // Lớp 3 đi cùng nhóm với dự toán và chi NCC: ai không xem được cơ cấu chi phí thì cũng không mở
+  // được tab này. Hàng rào THẬT vẫn nằm ở máy chủ (danh sách XEM trong api/v1/quyet_toan_lop3.py);
+  // đây chỉ là chuyện không bày ra một cái tab bấm vào sẽ báo lỗi quyền.
+  const tabs = TABS.filter(([k]) => seeCost || !["budget", "cost", "lop3"].includes(k));
   const can = (a: string) => act.includes(a);
   const run = async (path: string, json?: any) => { try { const r = await api(`/tours/${t.id}/${path}`, { method: "POST", json: { note, ...(json || {}) } }); toast(r.message); setNote(""); load(); } catch (e) { toast(errMsg(e), true); } };
   const saveEdit = async (e: React.FormEvent) => {
@@ -145,8 +155,7 @@ function TourDetail() {
       <Settlement t={t} note={note} NoteBox={NoteBox} run={run} load={load} toast={toast} />
     </>}
 
-    {tab === "qt" && <QuyetToanForm tourId={t.id} toast={toast} />}
-
+    {tab === "lop3" && <QuyetToanForm tourId={t.id} toast={toast} />}
 
     {tab === "ops" && <div className="grid">
       <div className="panel wrap"><h2>Phân công HDV</h2><table><thead><tr><th>HDV</th><th>Ngày × đơn giá</th><th className="num">Thù lao</th><th>Trạng thái</th></tr></thead>
