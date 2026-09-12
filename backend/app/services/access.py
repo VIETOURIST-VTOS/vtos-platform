@@ -409,6 +409,44 @@ def pham_vi_day_du(vai_tro: str) -> tuple[str, ...]:
     return tuple(sorted(set(pham_vi_api(vai_tro)) | set(RESTRICTED_API_PREFIXES.get(vai_tro, ()))))
 
 
+_DUONG_TU_LOC: set[str] | None = None
+
+
+def duong_tu_loc() -> set[str]:
+    """Những endpoint TỰ LỌC dữ liệu theo người đăng nhập, đọc từ dấu hiệu trong mã chứ không khai tay.
+
+    Có hai kiểu endpoint an toàn, và hàng rào ngoài chỉ hiểu một kiểu. Kiểu thứ nhất CHẶN theo vai trò:
+    sai vai trò thì 403. Kiểu thứ hai LỌC theo người: ai gọi cũng được nhưng chỉ nhận phần của chính
+    mình – phiếu lương của mình, khoản lương treo của mình, hồ sơ của mình. Kiểu thứ hai không thuộc
+    màn hình của vai trò nào cả, nên hàng rào suy từ ma trận menu sẽ chặn đúng người mà endpoint sinh ra
+    để phục vụ: một nhân viên kinh doanh không xem được khoản lương treo của chính anh ta.
+
+    Danh sách này KHÔNG khai tay – nó đọc `deps.loc_theo_nguoi_dung` mà endpoint đã tự gắn. Khai tay thì
+    thêm endpoint mới là quên, mà quên ở đây nghĩa là khóa người dùng khỏi tiền của họ.
+    """
+    global _DUONG_TU_LOC
+    if _DUONG_TU_LOC is None:
+        ra: set[str] = set()
+        try:
+            import app.main as _m
+            for r in _m.app.routes:
+                dep = getattr(r, "dependant", None)
+                for d in (getattr(dep, "dependencies", None) or []):
+                    if getattr(getattr(d, "call", None), "loc_theo_nguoi_dung", None):
+                        ra.add(str(getattr(r, "path", "")))
+        except Exception:
+            return set()   # chưa nạp xong ứng dụng thì đừng nới hàng rào
+        _DUONG_TU_LOC = ra
+    return _DUONG_TU_LOC
+
+
+def _khop_duong(path: str, mau: str) -> bool:
+    """So khớp đường thật với đường khai của FastAPI, đoạn {…} khớp đúng một đoạn."""
+    a, b = path.strip("/").split("/"), mau.strip("/").split("/")
+    if len(a) != len(b): return False
+    return all(y.startswith("{") or x == y for x, y in zip(a, b))
+
+
 def check_restricted_scope(u: User, path: str) -> None:
     """Hàng rào ngoài: vai trò chỉ chạm được những nhóm API nằm sau màn hình của mình.
 
@@ -419,9 +457,15 @@ def check_restricted_scope(u: User, path: str) -> None:
     gặp lỗi 403 trên hệ thống thật.
     """
     cho_phep = pham_vi_day_du(u.role)
-    if not any(path.startswith(p) for p in cho_phep):
-        raise HTTPException(403, f"Vai trò {ROLES.get(u.role, u.role)} không có màn hình nào dùng tới "
-                                 f"dữ liệu này ({path})")
+    if any(path.startswith(p) for p in cho_phep):
+        return
+    # Endpoint tự lọc theo người đăng nhập không nằm sau màn hình của vai trò nào – nó phục vụ CHÍNH
+    # người gọi. Chặn nó bằng hàng rào suy từ ma trận menu là khóa người lao động khỏi phiếu lương và
+    # khoản lương treo của chính họ.
+    if any(_khop_duong(path, m) for m in duong_tu_loc()):
+        return
+    raise HTTPException(403, f"Vai trò {ROLES.get(u.role, u.role)} không có màn hình nào dùng tới "
+                             f"dữ liệu này ({path})")
 
 
 # Ma trận công bố cho giao diện / tài liệu (vai trò → nhóm màn hình được xem)
