@@ -1,4 +1,9 @@
-"""Bộ nhận diện VTOS v1.0 (09/2026) – anh Tuấn giao 12/9/2026, tệp docs/VTOS_Bo_giao_dien_IT_README.txt.
+"""Bộ nhận diện VTOS – v1.0 sáng (12/9/2026), v1.1 BẢN TỐI (13/9/2026).
+
+CẬP NHẬT 13/9/2026: anh Tuấn chốt chuyển toàn bộ platform sang NỀN TỐI theo bản vẽ V1.4, và khai
+bảng màu ấy THẲNG vào tokens.css thành bản chính thức của bộ nhận diện (chứ không gõ màu thẳng vào
+globals.css). Các phép thử dưới đây đổi theo giá trị mới. Bộ màu sáng v1.0 còn nguyên trong phần
+chú thích đầu tokens.css.
 
 Tám quy tắc bắt buộc của README nằm ở đây dưới dạng phép thử, vì một quy tắc chỉ ghi trong tệp .txt
 thì ba tháng nữa không ai nhớ. Chúng canh MÃ NGUỒN chứ không canh ảnh chụp: đổi một mã màu là đỏ
@@ -20,17 +25,51 @@ def _doc(p: str) -> str:
     return open(p, encoding="utf-8").read()
 
 
-def test_tokens_css_co_du_va_khong_bi_sua():
-    """tokens.css là bản GỐC của bộ nhận diện – ánh xạ ở globals.css, không sửa tệp này."""
+def test_tokens_css_dung_bang_mau_toi_v11():
+    """tokens.css là bản GỐC của bộ nhận diện – mọi màu phải khai ở đây, không gõ vào globals.css.
+
+    Bốn giá trị KHÁC bản vẽ V1.4 đều vì đo tương phản, không vì thẩm mỹ; lý do từng cái ghi trong
+    phần chú thích đầu tokens.css. Ai muốn kéo chúng về đúng bản vẽ thì phải đo lại trước.
+    """
     src = _doc(TOKENS)
-    for bien, gia_tri in (("--vtos-navy", "#14538D"), ("--vtos-navy-dark", "#0B2545"),
-                          ("--vtos-sky", "#2E7FB8"), ("--vtos-navy-light", "#5A9BD4"),
-                          ("--vtos-success", "#3B8C43"), ("--vtos-danger", "#FC4D7A"),
-                          ("--vtos-info", "#2E7FB8"), ("--vtos-surface", "#F4F7FA"),
-                          ("--vtos-card", "#FFFFFF"), ("--vtos-line", "#E3E9EF"),
-                          ("--vtos-text", "#0B2545")):
+    for bien, gia_tri in (("--vtos-nav-bg", "#10273E"),    # bản vẽ --nav
+                          ("--vtos-surface", "#091624"),   # bản vẽ --bg
+                          ("--vtos-card", "#122C45"),      # bản vẽ --panel
+                          ("--vtos-info-bg", "#183550"),   # bản vẽ --panel2
+                          ("--vtos-text", "#E8F1F8"),      # bản vẽ --text
+                          ("--vtos-text-mute", "#9BB2C6"), # bản vẽ --muted
+                          ("--vtos-success", "#53C49A"),   # bản vẽ --green
+                          ("--vtos-warning", "#F4C36A"),   # bản vẽ --gold
+                          ("--vtos-line", "#2E4E6B"),      # nâng từ #29445D (bản vẽ chỉ 1,41 lần)
+                          ("--vtos-navy", "#6FA8F0"),      # nâng từ #438BEA (chữ 13px chỉ 4,16)
+                          ("--vtos-danger", "#FF6B90"),    # nâng từ #FC4D7A (chỉ 4,40)
+                          ("--vtos-sky", "#1E63C8"),       # nền nút, chữ trắng 5,72
+                          ("--vtos-heading", "#DCE9F4")):
         assert re.search(re.escape(bien) + r":\s*" + gia_tri, src, re.I), \
             f"tokens.css thiếu hoặc sai {bien} = {gia_tri}"
+
+
+def test_bo_mau_sang_v10_van_duoc_ghi_lai():
+    """Bỏ hẳn bảng sáng khỏi tệp là mất luôn bản ghi – ngày nào cần dựng lại thì phải đi tìm."""
+    src = _doc(TOKENS)
+    for cu in ("#14538D", "#F4F7FA", "#0B2545"):
+        assert cu in src, f"chú thích đầu tokens.css phải còn ghi bộ màu sáng v1.0 ({cu})"
+
+
+def test_mot_bien_mot_vai_nen_va_chu_tach_han():
+    """Trên nền tối, nền thanh phải tối còn chữ phải sáng – một biến không gánh được cả hai.
+
+    Đây là lỗi dễ mắc nhất khi đổi sang nền tối: giữ nguyên `--vtos-navy` cho cả hai vai thì hoặc
+    thanh điều hướng sáng loè, hoặc số liệu thành xanh đậm trên nền đậm không ai đọc được.
+    """
+    src = _doc(CSS)
+    for luat in (r'\.top\{[^}]*\}', r'aside\.side\{[^}]*\}'):
+        m = re.search(luat, src)
+        assert m and "background:var(--vtos-nav-bg)" in m.group(0), \
+            f"nền thanh phải dùng --vtos-nav-bg, đang là: {m.group(0)[:110] if m else '(không thấy)'}"
+    m = re.search(r'h2\{[^}]*\}', src)
+    assert m and "color:var(--vtos-heading)" in m.group(0), \
+        "chữ tiêu đề phải dùng --vtos-heading, không dùng --vtos-navy-dark (đó là màu NỀN rất tối)"
 
 
 def test_globals_nap_bo_nhan_dien():
@@ -38,26 +77,22 @@ def test_globals_nap_bo_nhan_dien():
 
 
 def test_mot_bang_mau_duy_nhat_khong_doi_theo_may():
-    """Anh Tuấn chốt 12/9: LUÔN SÁNG theo bộ nhận diện.
+    """Anh Tuấn chốt 13/9: LUÔN TỐI theo bản vẽ V1.4 (12/9 từng chốt luôn sáng).
 
-    Khối @media (prefers-color-scheme: dark) làm mỗi máy thấy một màu khác nhau – máy anh Tuấn để
-    chế độ tối nên thấy nền đen, máy khác thấy nền sáng, và bộ nhận diện thì chỉ có một bảng màu.
+    Điều KHÔNG đổi qua cả hai lần chốt: chỉ có MỘT bảng màu. Khối @media (prefers-color-scheme)
+    làm mỗi máy thấy một màu khác nhau, và bộ nhận diện thì chỉ định nghĩa một bảng.
     """
     src = re.sub(r'/\*.*?\*/', '', _doc(CSS), flags=re.S)      # bỏ chú thích rồi mới tìm
     assert "prefers-color-scheme" not in src, \
         "còn khối đổi màu theo cài đặt máy – bộ nhận diện chỉ có MỘT bảng màu"
 
 
-def test_thanh_dieu_huong_navy_dac_va_muc_chon_phu_trang_14():
-    """Quy tắc 1: thanh điều hướng trái LUÔN nền #14538D đặc; mục đang chọn làm sáng bằng lớp phủ
-    trắng 14%, KHÔNG đổi sang màu khác."""
-    src = _doc(CSS)
-    m = re.search(r'aside\.side\{[^}]*\}', src)
-    assert m and "background:var(--vtos-navy)" in m.group(0), \
-        f"thanh dọc phải là navy đặc của bộ nhận diện, đang là: {m.group(0)[:120] if m else '(không thấy)'}"
-    m = re.search(r'\.top\{[^}]*\}', src)
-    assert m and "background:var(--vtos-navy)" in m.group(0), "thanh ngang cũng phải navy đặc"
-    assert "rgba(255,255,255,.14)" in src, "mục đang chọn phải là lớp phủ trắng 14%"
+def test_muc_dang_chon_van_la_lop_phu_trang_14():
+    """Quy tắc 1: mục đang chọn làm sáng bằng lớp phủ trắng 14%, KHÔNG đổi sang một màu khác.
+
+    Nền của hai thanh do test_mot_bien_mot_vai canh; ở đây chỉ canh cách đánh dấu mục đang chọn.
+    """
+    assert "rgba(255,255,255,.14)" in _doc(CSS), "mục đang chọn phải là lớp phủ trắng 14%"
 
 
 def test_dung_ba_mau_trang_thai_khong_them_mau_thu_tu():
@@ -113,7 +148,7 @@ def test_logo_va_favicon_dung_bo_moi():
     lay = _doc(LAYOUT)
     assert "/favicon/app-icon.svg" in lay and "/favicon/icon-180.png" in lay, \
         "layout.tsx phải khai bộ favicon mới (ô bo góc), không dùng icon-192 trần như trước"
-    assert '"#14538D"' in lay, "themeColor phải là navy thương hiệu"
+    assert '"#10273E"' in lay, "themeColor phải bằng nền thanh ngang, nếu không mép trình duyệt lệch màu"
 
     shell = _doc(os.path.join(ROOT, "web", "components", "Shell.tsx"))
     assert "/thuong-hieu/vtos-logo-nen-toi.svg" in shell, "thanh ngang phải dùng dấu VTOS bản nền tối"

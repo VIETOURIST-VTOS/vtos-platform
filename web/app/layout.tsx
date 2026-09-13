@@ -20,9 +20,14 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "VTOS", statusBarStyle: "default" },
   formatDetection: { telephone: false },
 };
-// Màu thanh trạng thái trình duyệt = navy thương hiệu, để thanh hệ thống của điện thoại liền màu
-// với thanh ngang của trang.
-export const viewport: Viewport = { themeColor: "#14538D", width: "device-width", initialScale: 1 };
+// Màu thanh trạng thái trình duyệt = ĐÚNG MÀU NỀN THANH NGANG, để thanh hệ thống của điện thoại
+// liền màu với thanh ngang của trang. Đổi theo bản tối 13/9/2026: nền thanh nay là --vtos-nav-bg
+// #10273E, để nguyên #14538D thì mép trên màn hình điện thoại sáng hơn thanh ngang một khoảng.
+//
+// CÒN NỢ, KHÔNG THUỘC VÒNG NÀY: manifest.json và bộ ảnh /public/splash vẫn mang màu bản sáng, nên
+// màn hình chờ của app cài trên điện thoại sẽ loé trắng một nhịp rồi mới vào nền tối. Hai thứ ấy
+// là của làn PWA – phải báo họ đổi background_color và sinh lại ảnh chờ, chứ không sửa lén ở đây.
+export const viewport: Viewport = { themeColor: "#10273E", width: "device-width", initialScale: 1 };
 
 /* MÀN HÌNH CHỜ CHO iPHONE/iPAD.
  * Android tự dựng màn hình chờ từ manifest (icon + background_color), không cần khai gì.

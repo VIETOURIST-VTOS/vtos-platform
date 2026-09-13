@@ -172,11 +172,12 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
       {mo && (
         <span role="listbox" aria-label="Chọn đơn vị đang xem"
           style={{ position: "absolute", right: 0, top: "100%", zIndex: 50, width: 300, maxHeight: 420,
-                   overflowY: "auto", display: "flex", flexDirection: "column", gap: 2, background: "#fff",
-                   color: "var(--ink, #222)", border: "1px solid #ddd", borderRadius: 6, padding: 8,
+                   overflowY: "auto", display: "flex", flexDirection: "column", gap: 2,
+                   background: "var(--vtos-card)", color: "var(--vtos-text)",
+                   border: "1px solid var(--vtos-line)", borderRadius: 6, padding: 8,
                    boxShadow: "0 6px 18px rgba(0,0,0,.18)" }}>
           {kq.gia_lap && (
-            <b style={{ background: "#fde9d0", color: "#8a4b00", borderRadius: 4, padding: "4px 6px", fontSize: 11.5 }}>
+            <b style={{ background: "var(--vtos-warning-bg)", color: "var(--vtos-warning)", borderRadius: 4, padding: "4px 6px", fontSize: 11.5 }}>
               DỮ LIỆU GIẢ LẬP — chỉ để xem giao diện. Bỏ ?giaLapDonVi=1 để về bản thật.
             </b>
           )}
@@ -184,7 +185,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
           {/* Máy chủ vừa BỎ lựa chọn cũ vì nó ra ngoài phạm vi. Nói thẳng, vì im lặng đưa người ta
               về "Toàn công ty" thì họ tưởng mình vẫn đang xem đơn vị hôm qua. */}
           {chon_ht?.ve_mac_dinh === "lua_chon_cu_ngoai_pham_vi" && (
-            <b style={{ background: "#fdecec", color: "#8a1f1f", borderRadius: 4, padding: "4px 6px", fontSize: 11.5 }}>
+            <b style={{ background: "var(--vtos-danger-bg)", color: "var(--vtos-danger)", borderRadius: 4, padding: "4px 6px", fontSize: 11.5 }}>
               Lựa chọn trước đã ra ngoài phạm vi tài khoản của bạn nên đã trở về mặc định.
             </b>
           )}
@@ -194,7 +195,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
 
           {/* Luôn hiện đơn vị đang chọn, ngay cả khi đang tìm chữ khác – lệnh TC-1 đòi vậy, và nó
               đúng: người dùng phải biết mình đang đứng ở đâu trước khi quyết định đi đâu. */}
-          <span style={{ fontSize: 11.5, color: "#666", padding: "2px 4px" }}>
+          <span style={{ fontSize: 11.5, color: "var(--vtos-text-mute)", padding: "2px 4px" }}>
             {chon_ht?.cau_hien_thi ? chon_ht.cau_hien_thi : <>Đang xem: <b>{nhan}</b></>}
           </span>
 
@@ -205,7 +206,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
 
           {yeuThich.length > 0 && !tim.trim() && (
             <>
-              <span style={{ fontSize: 11, color: "#888", padding: "4px 4px 0" }}>YÊU THÍCH</span>
+              <span style={{ fontSize: 11, color: "var(--vtos-text-mute)", padding: "4px 4px 0" }}>YÊU THÍCH</span>
               {yeuThich.filter((k) => theoMa.has(k)).map((k) => {
                 const dv = theoMa.get(k)!;
                 return <button key={"yt" + k} type="button" onClick={() => chon(DON_VI, dv.company_id, dv.ten)}
@@ -216,7 +217,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
 
           {ganNhat.length > 0 && !tim.trim() && (
             <>
-              <span style={{ fontSize: 11, color: "#888", padding: "4px 4px 0" }}>GẦN NHẤT</span>
+              <span style={{ fontSize: 11, color: "var(--vtos-text-mute)", padding: "4px 4px 0" }}>GẦN NHẤT</span>
               {ganNhat.filter((k) => theoMa.has(k)).map((k) => {
                 const dv = theoMa.get(k)!;
                 return <button key={"gn" + k} type="button" onClick={() => chon(DON_VI, dv.company_id, dv.ten)}
@@ -225,8 +226,8 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
             </>
           )}
 
-          <span style={{ fontSize: 11, color: "#888", padding: "4px 4px 0" }}>TẤT CẢ ĐƠN VỊ ĐƯỢC XEM</span>
-          {hienThi.length === 0 && <span style={{ fontSize: 12, color: "#888", padding: 4 }}>Không có đơn vị nào khớp.</span>}
+          <span style={{ fontSize: 11, color: "var(--vtos-text-mute)", padding: "4px 4px 0" }}>TẤT CẢ ĐƠN VỊ ĐƯỢC XEM</span>
+          {hienThi.length === 0 && <span style={{ fontSize: 12, color: "var(--vtos-text-mute)", padding: 4 }}>Không có đơn vị nào khớp.</span>}
           {hienThi.map(({ dv, sau }) => {
             const k = String(dv.company_id);
             if (bi_an.has(k)) return null;
@@ -244,11 +245,11 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
                 <button type="button" onClick={() => chon(DON_VI, dv.company_id, dv.ten)}
                   style={{ flex: 1, textAlign: "left", padding: "4px 6px", fontFamily: "inherit", fontSize: 12.5,
                            fontWeight: chon_ht?.kieu === DON_VI && dangK === k ? 700 : 400 }}>
-                  {dv.ten}{dv.ma ? <i style={{ color: "#999", fontStyle: "normal" }}> · {dv.ma}</i> : null}
+                  {dv.ten}{dv.ma ? <i style={{ color: "var(--vtos-text-faint)", fontStyle: "normal" }}> · {dv.ma}</i> : null}
                   {/* Đơn vị đã ngừng hoạt động VẪN ở trong danh sách – sáu tháng số liệu của nó
                       không biến mất theo. Nhưng phải có nhãn, kẻo người ta chọn nhầm rồi tưởng
                       đơn vị đang chạy mà không có doanh thu. */}
-                  {dv.hoat_dong === false ? <i style={{ color: "#a56", fontStyle: "normal" }}> · đã ngừng</i> : null}
+                  {dv.hoat_dong === false ? <i style={{ color: "var(--vtos-danger)", fontStyle: "normal" }}> · đã ngừng</i> : null}
                 </button>
                 <button type="button" onClick={() => doiYeuThich(k)}
                   title={yeuThich.includes(k) ? "Bỏ khỏi yêu thích" : "Thêm vào yêu thích"}
@@ -262,7 +263,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
 
           {/* Máy chủ chưa có bảng lưu lựa chọn (KHO_LUU is None). Không hứa "đã ghi nhớ". */}
           {chon_ht?.luu_tru === "chua_co" && (
-            <span style={{ fontSize: 11, color: "#8a4b00", padding: "6px 4px 0", borderTop: "1px solid #eee", marginTop: 4 }}>
+            <span style={{ fontSize: 11, color: "var(--vtos-warning)", padding: "6px 4px 0", borderTop: "1px solid var(--vtos-line)", marginTop: 4 }}>
               Máy chủ chưa lưu lựa chọn này: đăng nhập lại sẽ trở về mặc định.
             </span>
           )}

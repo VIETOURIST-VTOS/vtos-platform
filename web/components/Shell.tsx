@@ -497,8 +497,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             {menuToi && (
               <span role="menu" onClick={() => setMenuToi(false)}
                 style={{ position: "absolute", right: 0, top: "100%", zIndex: 40, minWidth: 220,
-                         display: "flex", flexDirection: "column", gap: 2, background: "#fff",
-                         border: "1px solid #ddd", borderRadius: 6, padding: 6,
+                         display: "flex", flexDirection: "column", gap: 2,
+                         background: "var(--vtos-card)", color: "var(--vtos-text)",
+                         border: "1px solid var(--vtos-line)", borderRadius: 6, padding: 6,
                          boxShadow: "0 6px 18px rgba(0,0,0,.15)" }}>
                 {caNhan.map(([l, h]) => lien(l, h))}
                 <a href="/login" onClick={() => clearSession()}>Thoát</a>
