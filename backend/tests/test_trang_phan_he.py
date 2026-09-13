@@ -149,3 +149,43 @@ def test_cay_giu_du_muc_cua_ban_ve_v13():
     ma = re.findall(r'ma: "(\d[\d.]*)"', _cay())
     v13 = [m for m in ma if not m.startswith("0")]
     assert len(set(v13)) >= 184, f"cây chỉ còn {len(set(v13))} mục, bản vẽ v1.3 có 184"
+
+
+def test_luat_dien_thoai_moi_khong_duoc_nam_duoi_khoi_tc4():
+    """Cái bẫy đã sập một lần, 13/9/2026 – ghi lại để không sập lần hai.
+
+    test_tc4_dien_thoai đọc bản điện thoại bằng rindex("@media (max-width:640px)"): nó lấy từ lần
+    xuất hiện CUỐI CÙNG tới hết tệp. Thêm một khối 640px xuống cuối globals.css thì bốn phép thử
+    TC-4 đỏ, mà thông báo lỗi lại nói về bảng trên điện thoại chứ không hé một chữ nào về vị trí –
+    mất nửa giờ mới lần ra. Phép thử này nói thẳng nguyên nhân.
+    """
+    css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
+    i = css.rindex("@media (max-width:640px)")
+    cuoi = css[i:]
+    assert "table.bang-doc" in cuoi, (
+        "khối @media (max-width:640px) CUỐI CÙNG của globals.css không còn là khối TC-4 – "
+        "luật điện thoại mới phải đặt TRƯỚC nó, nếu không bốn phép thử TC-4 đỏ vì lý do khác hẳn")
+
+
+def test_trang_phan_he_cat_theo_quyen_cua_nguoi_dang_xem():
+    """Chỉ liệt kê lại màn hình mà chính người ấy được thấy trên menu.
+
+    Liệt kê thêm là bày ra một danh sách bấm vào đâu cũng bị chặn, và là kể cho người ta nghe cấu
+    trúc phần mềm mà vai trò của họ không có phần. Mục CHƯA DỰNG thì giữ – nó chưa thuộc về vai nào.
+    """
+    src = open(TRANG, encoding="utf-8").read()
+    assert "hidden_menus" in src, "trang phân hệ phải lọc theo hidden_menus của phiên"
+    assert "useShell" in src, "phải lấy người dùng từ Shell, không tự gọi máy chủ"
+    # Hàng chuyển nhanh cũng phải lọc: bày tên tám phân hệ cho một vai chỉ vào được một là thừa.
+    assert "CAY_PHAN_HE.filter(" in src, "hàng chuyển nhanh chưa lọc theo quyền"
+
+
+def test_trang_phan_he_da_khai_quyen():
+    """test_ai_log đòi mọi trang trong web/app phải khai quyền hoặc nằm trong danh sách mở.
+
+    Trang này khai ở ALL_MENU_PATHS chứ không ở MENU_ROLES: nó không phải màn hình nghiệp vụ, nó chỉ
+    liệt kê lại những màn hình người dùng vốn đã được thấy.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "backend"))
+    ac = open(os.path.join(ROOT, "backend", "app", "services", "access.py"), encoding="utf-8").read()
+    assert '"/phan-he/[khoa]"' in ac, "trang phân hệ chưa được khai trong ALL_MENU_PATHS"

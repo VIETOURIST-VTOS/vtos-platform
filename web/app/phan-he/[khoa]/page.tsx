@@ -13,7 +13,7 @@
  */
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import Shell from "@/components/Shell";
+import Shell, { useShell } from "@/components/Shell";
 import { CAY_PHAN_HE, timPhanHe, demMuc, laNhan, type MucCay } from "@/lib/cay_phan_he";
 
 /** Một dòng của cây. Mục có đường dẫn thì cả dòng bấm được; mục chưa dựng vẫn hiện đủ mã và tên –
@@ -42,8 +42,33 @@ function Dong({ m, cap }: { m: MucCay; cap: number }) {
   );
 }
 
+/** Cắt cây theo QUYỀN của người đang xem. Trang này chỉ liệt kê lại những màn hình mà chính họ
+ *  được thấy trên menu – liệt kê thêm là bày ra một danh sách bấm vào đâu cũng bị chặn, và là kể
+ *  cho người ta nghe cấu trúc phần mềm mà vai trò của họ không có phần.
+ *
+ *  Mục CHƯA DỰNG thì giữ nguyên: nó chưa thuộc về vai nào cả, và phần còn nợ thì ai cũng nên thấy.
+ *  Nhãn gom nhóm mất hết con thì mất theo – một nhãn không còn gì bên dưới chỉ tổ chiếm dòng. */
+function loc(ds: MucCay[], an: string[]): MucCay[] {
+  const bo = (h?: string) => !!h && an.includes(h.split("?")[0].split("#")[0]);
+  const ra: MucCay[] = [];
+  for (const m of ds) {
+    const con = m.con ? loc(m.con, an) : undefined;
+    if (bo(m.href)) {
+      // Màn hình bị ẩn với vai này. Còn con thấy được thì giữ lại làm nhãn gom nhóm, bỏ đường dẫn.
+      if (con?.length) ra.push({ ...m, href: undefined, tab: undefined, con });
+      continue;
+    }
+    if (m.con && !con?.length && !m.href && !m.tab) continue;
+    ra.push(con ? { ...m, con } : m);
+  }
+  return ra;
+}
+
 function Trang({ khoa }: { khoa: string }) {
-  const ph = timPhanHe(khoa);
+  const { user } = useShell();
+  const an = user?.hidden_menus || [];
+  const goc = timPhanHe(khoa);
+  const ph = goc ? { ...goc, con: loc(goc.con, an) } : undefined;
   if (!ph) return (
     <div className="panel">
       <b>Không có phân hệ này.</b>
@@ -56,7 +81,7 @@ function Trang({ khoa }: { khoa: string }) {
     <>
       {/* Chuyển nhanh sang phân hệ khác mà không phải quay lên menu dọc. */}
       <nav className="cay-chuyen" aria-label="Các phân hệ khác">
-        {CAY_PHAN_HE.map((p) => (
+        {CAY_PHAN_HE.filter((p) => p.khoa === ph.khoa || loc(p.con, an).length > 0).map((p) => (
           <Link key={p.khoa} href={`/phan-he/${p.khoa}`}
             className={"cay-chip" + (p.khoa === ph.khoa ? " on" : "")}>
             <b>{p.ma}</b> {p.ten}

@@ -707,7 +707,13 @@ MATRIX = {
 }
 
 # Mọi trang có trong giao diện – kể cả trang không đặt điều kiện vai trò – để dựng danh sách ẩn cho vai trò bị giới hạn.
-ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/phieu-luong", "/doi-mat-khau")
+# "/phan-he/[khoa]" là TRANG MỤC LỤC của tám phân hệ (13/9/2026) – bấm thanh phân hệ trên menu
+# dọc thì mở nó. Khai ở đây chứ không ở MENU_ROLES vì nó không phải màn hình nghiệp vụ: nó chỉ
+# liệt kê lại những màn hình mà chính người dùng đã được thấy, và tự lọc theo hidden_menus của
+# phiên. Có tên trong danh sách này thì vai trò bị giới hạn (tài xế, HDV, chuyên viên visa)
+# cũng được quyết định có thấy hay không, thay vì mặc nhiên thấy vì chưa ai khai.
+ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/phieu-luong",
+                                      "/doi-mat-khau", "/phan-he/[khoa]")
 
 
 # Vai trò bị giới hạn: chỉ được thấy đúng những trang liệt kê ở đây.
