@@ -688,3 +688,179 @@ class TourTlCongNo(Base):
     ghi_chu: Mapped[str | None] = mapped_column(String(300), nullable=True)
     nguoi_nhap: Mapped[str | None] = mapped_column(String(60), nullable=True)
     nhap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+# Đ-4 (13/9/2026) · NHIỀU BÊN BÁN TRÊN MỘT CHUYẾN  ·  và Đ-6b hoàn tip cho bên bán
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Đo trên tour PHÁP – THỤY SĨ – Ý – ĐỨC khởi hành 27/05/2026 (tệp AU), đầu bảng ghi "Ghép land",
+# "30A+1TL". Ba bên bán cùng ngồi trên một chuyến:
+#
+#       J TRAVEL      3 người lớn
+#       VTOURIST      5 người lớn
+#       VIETOURIST   22 người lớn      -> 3 + 5 + 22 = 30, khớp đầu bảng
+#
+# Mỗi bên có MỘT TỜ QUYẾT TOÁN RIÊNG, cùng đơn giá, khác số lượng. Đã cộng lại và khớp đến từng đồng:
+#
+#       J TRAVEL   tổng 168.955.150,6  −  đã cọc 30.000.000     =  còn 138.955.150,6
+#       VTOURIST   tổng 277.000.584,33 −  đã cọc 177.327.068    =  còn  99.673.516,33
+#
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# BA ĐIỀU TỆP ẤY DẠY, VÀ CẢ BA ĐỀU NGƯỢC VỚI TRỰC GIÁC
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+#
+# 1. SỐ LƯỢNG CỦA DÒNG KHÔNG PHẢI SỐ KHÁCH CỦA BÊN. Tờ J TRAVEL có 3 khách, nhưng dòng "VISA người
+#    lớn 4 pax" ghi số lượng 4, và "Phí điều hành + Dịch thuật" cũng 4. Tờ VTOURIST có 5 khách,
+#    dòng VISA ghi 6. Lý do đơn giản: có khách đã sẵn visa, có người mua visa mà không đi.
+#
+#    Nên hệ thống KHÔNG tự điền số lượng từ số khách. Nó chỉ CẢNH BÁO khi hai con số khác nhau —
+#    tự điền là biến một sự thật nghiệp vụ thành một lỗi lặng lẽ.
+#
+# 2. HAI KIỂU CHIA TIỀN NẰM CẠNH NHAU TRONG CÙNG MỘT TỜ:
+#       · "Chi phí chung HDV" 30.979.080,84 chia theo ĐẦU KHÁCH toàn chuyến:
+#             × 3/30 = 3.097.908,08   (J TRAVEL)
+#             × 5/30 = 5.163.180,14   (VTOURIST)
+#       · "Vé máy bay" 22.425.780,84 là đơn giá MỖI KHÁCH, nhân thẳng:
+#             × 3    = 67.277.342,52
+#    Gộp hai kiểu vào một công thức là sai một trong hai, và sai ở chỗ tổng vẫn cân.
+#
+# 3. DÒNG ÂM LÀ MỘT DÒNG BÌNH THƯỜNG Ở ĐÂY. "TIP HDV hoàn cho JTR −837.000" là Đ-6b: tiền tip công
+#    ty thu của khách đại lý thì phải hoàn về đại lý. Và 837.000 = 27 € × 31.000 — đúng bằng đơn giá
+#    tip cả chuyến của tờ châu Âu (3 €/khách/ngày × 9 ngày). Hai tệp khác nhau, cùng một con số.
+
+
+LOAI_DONG_BEN_BAN = {
+    "phan_bo": "Khoản Vietourist tính cho bên bán – LÀM TĂNG nợ của họ",
+    "hoan_tip": "Hoàn tiền tip về bên bán – số ÂM, làm GIẢM nợ của họ",
+    "giam_tru": "Khoản giảm trừ khác – số ÂM",
+    "thanh_toan": "Bên bán đã trả tiền – làm GIẢM nợ của họ",
+}
+
+# Cách con số của dòng được hình thành. KHÔNG dùng để máy tự tính – dùng để người đọc lại tờ quyết
+# toán biết vì sao dòng này nhân 3 còn dòng kia nhân 3/30.
+CACH_CHIA = {
+    "moi_khach": "Đơn giá MỖI KHÁCH – nhân thẳng với số lượng của dòng",
+    "chia_dau_khach": "Chi phí CHUNG của chuyến – chia theo đầu khách trên tổng khách",
+    "khoan_gon": "Khoán gọn cho bên này – không nhân theo khách",
+}
+
+
+class TourBenBan(Base):
+    """Một BÊN BÁN cùng ngồi trên chuyến – đại lý ghép land, hoặc chính Vietourist.
+
+    Vietourist cũng là MỘT DÒNG ở đây, không phải phần còn lại sau khi trừ các đại lý. Để nó là
+    "phần còn lại" thì lúc số khách lệch, phần thiếu tự chảy vào Vietourist mà không ai thấy.
+    """
+    __tablename__ = "tour_ben_ban"
+    __table_args__ = (Index("ix_tbb_tour", "tour_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"))
+    ten_ben: Mapped[str] = mapped_column(String(200))
+    # 1 = đây là Vietourist (bên nhà). Dùng để báo cáo tách "doanh thu của mình" và "thu hộ ghép".
+    la_vietourist: Mapped[int | None] = mapped_column(Integer, nullable=True, server_default="0")
+    supplier_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    mst: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    so_khach_nguoi_lon: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    so_khach_tre_em: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    so_khach_em_be: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ghi_chu: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    nguoi_nhap: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nhap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class TourBenBanDong(Base):
+    """Một dòng trên tờ quyết toán của MỘT bên bán.
+
+    `thanh_tien` do MÁY nhân đơn giá × số lượng – không có cửa nào cho người gõ nó, và cũng không có
+    ô "tổng của bên". Tổng do máy cộng từ các dòng, đúng nguyên tắc 1 của cả phân hệ.
+    """
+    __tablename__ = "tour_ben_ban_dong"
+    __table_args__ = (Index("ix_tbbd_ben", "ben_ban_id"), Index("ix_tbbd_tour", "tour_id"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"))
+    ben_ban_id: Mapped[int] = mapped_column(ForeignKey("tour_ben_ban.id"))
+    stt: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    noi_dung: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    loai: Mapped[str] = mapped_column(String(20), default="phan_bo",
+                                      server_default="phan_bo", nullable=False)
+    cach_chia: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    don_gia: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    # Số lượng của DÒNG – cố ý tách khỏi số khách của bên. Xem điều 1 ở đầu khối.
+    so_luong: Mapped[float | None] = mapped_column(Float, nullable=True)
+    thanh_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    ngay: Mapped[date | None] = mapped_column(Date, nullable=True)
+    so_chung_tu: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ghi_chu: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    nguoi_nhap: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nhap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+# Đ-12 (13/9/2026) · ĐỀ NGHỊ CHI PHÍ LÃNH SỰ
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Đo trên tệp AU, sheet "PHÍ LSQ": mỗi khách MỘT DÒNG, và dòng mang họ tên, giới tính, ngày sinh,
+# tên sale, ba ô phí, mã số thuế đơn vị thu.
+#
+#       18 khách  ·  phí TLS cơ bản 780.000 × 18            = 14.040.000
+#                 ·  phí LSQ 2.807.000 × 17 + 1.403.500 × 1 = 49.122.500
+#                 ·  tổng thanh toán                        = 63.162.500   (khớp tệp)
+#
+# MỘT KHÁCH TRẢ ĐÚNG MỘT NỬA. NGUYEN CAT MAI ANH sinh 30.10.2015 trả 1.403.500 = 2.807.000 / 2.
+# Nhưng NGUYEN LE NGUYEN sinh 23.09.2013 trả NGUYÊN GIÁ. Tức là mốc tuổi nằm đâu đó giữa 11 và 13,
+# và đó là quy định của LÃNH SỰ QUÁN, thay đổi theo từng thị trường và từng thời kỳ.
+#
+# NÊN HỆ THỐNG KHÔNG CÀI MỐC TUỔI NÀO. Biểu phí sống ở `bang_gia` / `bang_gia_dong` (đã có sẵn, có
+# khoảng hiệu lực và có hạng khách) và do NHÂN VIÊN TEAM VISA khai. Đoán một con số rồi áp cho mọi
+# thị trường là cách chắc chắn để sai ở thị trường thứ hai mà không ai kiểm.
+#
+# Chỗ hệ thống ĐƯỢC PHÉP soi là chuyện khác hẳn và rõ ràng hơn: MỘT NGƯỜI XUẤT HIỆN HAI LẦN trong
+# cùng một đề nghị. Nộp trùng thì chi trùng, và ở mức 2,8 triệu một suất thì một dòng lặp là một
+# khoản tiền thật đi ra khỏi công ty.
+
+
+class DeNghiLanhSu(Base):
+    """Một tờ đề nghị chi phí lãnh sự – gộp nhiều khách, gửi lên duyệt một lần."""
+    __tablename__ = "de_nghi_lanh_su"
+    __table_args__ = (Index("ix_dnls_tour", "tour_id"), Index("ix_dnls_ngay", "ngay"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ma: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # RỖNG là hợp lệ: visa lẻ không thuộc chuyến nào. Ép phải có tour là chặn đúng mảng visa lẻ.
+    tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True)
+    thi_truong: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    ngay: Mapped[date | None] = mapped_column(Date, nullable=True)
+    don_vi_thu: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    mst_don_vi_thu: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    trang_thai: Mapped[str] = mapped_column(String(20), default="nhap",
+                                            server_default="nhap", nullable=False)
+    ghi_chu: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    nguoi_nhap: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nhap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class DeNghiLanhSuDong(Base):
+    """Một khách trên tờ đề nghị. Ba ô phí tách riêng đúng như tệp, và tổng do máy cộng."""
+    __tablename__ = "de_nghi_lanh_su_dong"
+    __table_args__ = (Index("ix_dnlsd_to", "de_nghi_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    de_nghi_id: Mapped[int] = mapped_column(ForeignKey("de_nghi_lanh_su.id"))
+    stt: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ho_ten: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    gioi_tinh: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    ngay_sinh: Mapped[date | None] = mapped_column(Date, nullable=True)
+    sale: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Cột SALE của tệp thật có cả "JTRAVEL" – tức một bên bán, không phải một nhân viên. Nối sang
+    # Đ-4 để khoản phí ấy chảy đúng về tờ công nợ của đại lý thay vì tính vào giá vốn của Vietourist.
+    ben_ban_id: Mapped[int | None] = mapped_column(ForeignKey("tour_ben_ban.id"), nullable=True)
+    khach_id: Mapped[int | None] = mapped_column(ForeignKey("booking_khach.id"), nullable=True)
+    phi_tls_cao_cap: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    phi_tls_co_ban: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    phi_lsq: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    thanh_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    mst: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    ghi_chu: Mapped[str | None] = mapped_column(String(300), nullable=True)

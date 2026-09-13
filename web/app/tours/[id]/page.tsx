@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
 import { api, pct, vnd, fmtD, fmtDT, getToken, soTien } from "@/lib/api";
 import { ROLES, TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
@@ -26,7 +26,14 @@ function TourDetail() {
   const { id } = useParams<{ id: string }>();
   const { user, toast } = useShell();
   const [t, setT] = useState<any>(null);
-  const [tab, setTab] = useState("info");
+  // Đ-5 (13/9/2026) · nhận ?tab=... để màn hình khác trỏ THẲNG vào đúng tab.
+  //
+  // Màn hình /non-package cần đưa người dùng tới ô nhập chi phí của một dịch vụ lẻ. Trước đây nó
+  // chỉ có được một liên kết "chi tiết" mở ra tab Thông tin, rồi người dùng phải tự tìm tiếp — và
+  // trên thực tế họ không tìm, họ quay ra Excel. Đó cũng chính là bệnh Đ-1: có cửa mà không ai
+  // thấy đường vào thì bằng không có cửa.
+  const sp = useSearchParams();
+  const [tab, setTab] = useState(sp.get("tab") || "info");
   const [note, setNote] = useState("");
   const load = useCallback(() => api(`/tours/${id}/detail`).then(setT).catch((e) => toast(errMsg(e), true)), [id, toast]);
   useEffect(() => { load(); }, [load]);

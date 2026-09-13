@@ -28,12 +28,18 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.core import Booking, Tour, User
-from app.models.lop3_tour import (BookingKhach, KhachChiPhi, SuaSauKy, TourDoanhThuDong,
+from app.models.lop3_tour import (BookingKhach, DeNghiLanhSu, DeNghiLanhSuDong,
+                                  KhachChiPhi, SuaSauKy, TourBenBan,
+                                  TourBenBanDong, TourDoanhThuDong,
                                   TourHdvChi, TourPhuongTien, TourTlCongNo, TourVeKhach,
                                   TourVeMa, TourVeThanhToan,
                                   LOAI_PHUONG_TIEN, LOAI_TUOI, NHOM_KHACH, LOAI_DOANH_THU,
-                                  LOAI_CONG_NO_TL, LOAI_VE, TRANG_THAI_MA)
+                                  LOAI_CONG_NO_TL, LOAI_VE, TRANG_THAI_MA,
+                                  LOAI_DONG_BEN_BAN, CACH_CHIA)
+from app.services import ben_ban_tour as BBT
 from app.services import cong_no_truong_doan as TLCN
+from app.services import de_nghi_lanh_su as DNLS
+from app.services import dich_vu_le_thang as DVL
 from app.services import ghi_mot_lan as GML
 from app.services import gia_khach as G
 from app.services import khoan_muc_chi as KM
@@ -1346,3 +1352,220 @@ def ds_tl_cong_no(tid: int, phan_cong_id: int | None = None,
     """Số dư công nợ trưởng đoàn: theo TỪNG đồng tiền, rồi mới gộp về VND."""
     _tour(db, tid, u)
     return TLCN.soat(db, tid, phan_cong_id)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+# Đ-4 · Đ-6b (13/9/2026) · CỬA NHẬP NHIỀU BÊN BÁN, VÀ HOÀN TIP VỀ BÊN BÁN
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+
+class BenBanVao(BaseModel):
+    ten_ben: str
+    la_vietourist: bool = False
+    mst: str | None = None
+    so_khach_nguoi_lon: int | None = None
+    so_khach_tre_em: int | None = None
+    so_khach_em_be: int | None = None
+    ghi_chu: str | None = None
+    ly_do_sua: str = ""
+
+
+class BenBanDongVao(BaseModel):
+    ben_ban_id: int
+    stt: int | None = None
+    noi_dung: str | None = None
+    loai: str | None = None
+    cach_chia: str | None = None
+    don_gia: float | None = None
+    so_luong: float | None = None
+    ngay: date | None = None
+    so_chung_tu: str | None = None
+    ghi_chu: str | None = None
+    ly_do_sua: str = ""
+
+
+class HoanTipVao(BaseModel):
+    don_gia: float | None = None
+    don_vi: str | None = None
+    so_ngay: int | None = None
+    ty_gia: float | None = None
+
+
+@router.get("/ben-ban/danh-muc")
+def ben_ban_danh_muc(u: User = Depends(require_roles(*XEM))):
+    """Loại dòng và cách chia – để biểu nhập không tự bịa danh sách của riêng nó."""
+    return {"loai_dong": LOAI_DONG_BEN_BAN, "cach_chia": CACH_CHIA}
+
+
+@router.post("/{tid}/ben-ban")
+def them_ben_ban(tid: int, v: BenBanVao, u: User = Depends(require_roles(*NHAP)),
+                 db: Session = Depends(get_db)):
+    """Thêm một bên bán. Vietourist cũng là MỘT dòng ở đây, không phải phần còn lại."""
+    t = _tour(db, tid, u)
+    _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
+    if not (v.ten_ben or "").strip():
+        raise HTTPException(422, "Tên bên bán không được để trống.")
+    b = TourBenBan(tour_id=tid, ten_ben=v.ten_ben.strip(),
+                   la_vietourist=1 if v.la_vietourist else 0, mst=v.mst,
+                   so_khach_nguoi_lon=v.so_khach_nguoi_lon, so_khach_tre_em=v.so_khach_tre_em,
+                   so_khach_em_be=v.so_khach_em_be, ghi_chu=v.ghi_chu,
+                   nguoi_nhap=u.username, nhap_luc=datetime.now())
+    db.add(b); db.flush()
+    if _da_ky(t):
+        ghi_dau_vet(db, t, u, "tour_ben_ban", b.id, "(thêm bên bán)", None, v.ten_ben, v.ly_do_sua)
+    db.commit()
+    return {"id": b.id, "ten_ben": b.ten_ben}
+
+
+@router.post("/{tid}/ben-ban/dong")
+def them_ben_ban_dong(tid: int, v: BenBanDongVao, u: User = Depends(require_roles(*NHAP)),
+                      db: Session = Depends(get_db)):
+    """Thêm một dòng vào tờ của một bên bán. KHÔNG có tham số 'thành tiền' – máy nhân.
+
+    Cũng KHÔNG có tham số 'số lượng mặc định': số lượng của dòng cố ý tách khỏi số khách của bên,
+    vì trên tệp thật dòng VISA của một bên 3 khách ghi 4 suất. Xem services/ben_ban_tour.py.
+    """
+    t = _tour(db, tid, u)
+    _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
+    b = db.get(TourBenBan, v.ben_ban_id)
+    if not b or b.tour_id != tid:
+        raise HTTPException(422, "Bên bán không thuộc chuyến này.")
+    loai = v.loai or "phan_bo"
+    if loai not in LOAI_DONG_BEN_BAN:
+        raise HTTPException(422, f"loai phải thuộc {sorted(LOAI_DONG_BEN_BAN)}")
+    if v.cach_chia and v.cach_chia not in CACH_CHIA:
+        raise HTTPException(422, f"cach_chia phải thuộc {sorted(CACH_CHIA)}")
+    tt = BBT.thanh_tien_dong(v.don_gia, v.so_luong)
+    if loai in ("hoan_tip", "giam_tru") and tt is not None and tt > 0:
+        raise HTTPException(422, f"«{LOAI_DONG_BEN_BAN[loai]}» phải mang dấu ÂM – khoản giảm trừ "
+                                 "mang dấu dương thì nợ của bên bán phồng lên thay vì giảm đi.")
+    d = TourBenBanDong(tour_id=tid, ben_ban_id=v.ben_ban_id, stt=v.stt, noi_dung=v.noi_dung,
+                       loai=loai, cach_chia=v.cach_chia, don_gia=v.don_gia, so_luong=v.so_luong,
+                       thanh_tien=tt, ngay=v.ngay, so_chung_tu=v.so_chung_tu, ghi_chu=v.ghi_chu,
+                       nguoi_nhap=u.username, nhap_luc=datetime.now())
+    db.add(d); db.flush()
+    if _da_ky(t):
+        ghi_dau_vet(db, t, u, "tour_ben_ban_dong", d.id, "(thêm dòng)", None, v.noi_dung,
+                    v.ly_do_sua)
+    db.commit()
+    return {"id": d.id, "thanh_tien": tt}
+
+
+@router.get("/{tid}/ben-ban")
+def ds_ben_ban(tid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Tờ quyết toán của TỪNG bên bán, và số dư của từng bên."""
+    _tour(db, tid, u)
+    return BBT.soat(db, tid)
+
+
+@router.post("/{tid}/ben-ban/hoan-tip/xem-truoc")
+def xem_truoc_hoan_tip(tid: int, v: HoanTipVao, u: User = Depends(require_roles(*XEM)),
+                       db: Session = Depends(get_db)):
+    """Tính THỬ tiền tip hoàn về từng bên bán. KHÔNG ghi gì – nhìn số rồi mới bấm ghi."""
+    _tour(db, tid, u)
+    return BBT.xem_truoc_hoan_tip(db, tid, don_gia=v.don_gia, don_vi=v.don_vi,
+                                  so_ngay=v.so_ngay, ty_gia=v.ty_gia)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+# Đ-12 (13/9/2026) · CỬA NHẬP ĐỀ NGHỊ CHI PHÍ LÃNH SỰ
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+
+class DeNghiVao(BaseModel):
+    ma: str | None = None
+    tour_id: int | None = None
+    thi_truong: str | None = None
+    ngay: date | None = None
+    don_vi_thu: str | None = None
+    mst_don_vi_thu: str | None = None
+    ghi_chu: str | None = None
+
+
+class DeNghiDongVao(BaseModel):
+    stt: int | None = None
+    ho_ten: str | None = None
+    gioi_tinh: str | None = None
+    ngay_sinh: date | None = None
+    sale: str | None = None
+    ben_ban_id: int | None = None
+    khach_id: int | None = None
+    phi_tls_cao_cap: float | None = None
+    phi_tls_co_ban: float | None = None
+    phi_lsq: float | None = None
+    mst: str | None = None
+    ghi_chu: str | None = None
+
+
+@router.post("/lanh-su")
+def tao_de_nghi_lanh_su(v: DeNghiVao, u: User = Depends(require_roles(*NHAP)),
+                        db: Session = Depends(get_db)):
+    """Mở một tờ đề nghị chi phí lãnh sự.
+
+    `tour_id` để RỖNG là hợp lệ: visa lẻ không thuộc chuyến nào. Ép phải có tour là chặn đúng mảng
+    visa lẻ, vốn là nơi những tờ này xuất hiện nhiều nhất.
+    """
+    if v.tour_id is not None:
+        _tour(db, v.tour_id, u)
+    t = DeNghiLanhSu(ma=v.ma, tour_id=v.tour_id, thi_truong=v.thi_truong, ngay=v.ngay,
+                     don_vi_thu=v.don_vi_thu, mst_don_vi_thu=v.mst_don_vi_thu,
+                     ghi_chu=v.ghi_chu, nguoi_nhap=u.username, nhap_luc=datetime.now())
+    db.add(t); db.commit()
+    return {"id": t.id, "ma": t.ma}
+
+
+@router.post("/lanh-su/{did}/dong")
+def them_de_nghi_dong(did: int, v: DeNghiDongVao, u: User = Depends(require_roles(*NHAP)),
+                      db: Session = Depends(get_db)):
+    """Thêm một khách vào tờ đề nghị. KHÔNG có tham số 'thành tiền' – máy cộng ba ô phí."""
+    t = db.get(DeNghiLanhSu, did)
+    if t is None:
+        raise HTTPException(404, "Không có tờ đề nghị này")
+    if t.tour_id is not None:
+        _tour(db, t.tour_id, u)
+    d = DeNghiLanhSuDong(de_nghi_id=did, stt=v.stt, ho_ten=v.ho_ten, gioi_tinh=v.gioi_tinh,
+                         ngay_sinh=v.ngay_sinh, sale=v.sale, ben_ban_id=v.ben_ban_id,
+                         khach_id=v.khach_id, phi_tls_cao_cap=v.phi_tls_cao_cap,
+                         phi_tls_co_ban=v.phi_tls_co_ban, phi_lsq=v.phi_lsq,
+                         mst=v.mst, ghi_chu=v.ghi_chu)
+    d.thanh_tien = DNLS.thanh_tien_dong(d)
+    db.add(d); db.flush(); db.commit()
+    return {"id": d.id, "thanh_tien": d.thanh_tien}
+
+
+@router.get("/lanh-su/{did}")
+def xem_de_nghi_lanh_su(did: int, u: User = Depends(require_roles(*XEM)),
+                        db: Session = Depends(get_db)):
+    """Tờ đề nghị KÈM phép soát – trong đó có phép bắt MỘT NGƯỜI ĐỨNG HAI LẦN."""
+    t = db.get(DeNghiLanhSu, did)
+    if t is None:
+        raise HTTPException(404, "Không có tờ đề nghị này")
+    if t.tour_id is not None:
+        _tour(db, t.tour_id, u)
+    return DNLS.soat(db, did)
+
+
+@router.get("/{tid}/lanh-su")
+def ds_de_nghi_theo_tour(tid: int, u: User = Depends(require_roles(*XEM)),
+                         db: Session = Depends(get_db)):
+    """Các tờ đề nghị lãnh sự của một chuyến."""
+    _tour(db, tid, u)
+    ds = list(db.scalars(select(DeNghiLanhSu).where(DeNghiLanhSu.tour_id == tid)
+                         .order_by(DeNghiLanhSu.ngay, DeNghiLanhSu.id)))
+    return {"tour_id": tid, "so_to": len(ds),
+            "to": [DNLS.soat(db, x.id) for x in ds]}
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+# Đ-5 (13/9/2026) · DỊCH VỤ LẺ THEO THÁNG — MỘT CÁCH NHÌN, KHÔNG PHẢI MỘT SỔ MỚI
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Không có cửa GHI nào ở đây, và đó là chủ ý: dữ liệu đã vào hệ thống qua /non-package (booking) và
+# qua màn hình quyết toán của chính chuyến KLE (dòng chi phí). Thêm một cửa ghi thứ hai cho cùng
+# một con số là mở đường cho hai con số. Xem services/dich_vu_le_thang.py.
+
+@router.get("/dich-vu-le/{nam}/{thang}")
+def xem_dich_vu_le_thang(nam: int, thang: int, mang: str | None = None,
+                         u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Tờ dịch vụ lẻ của một tháng, dựng đúng hình tệp Excel của Điều hành — kèm phép soát."""
+    if not (1 <= thang <= 12):
+        raise HTTPException(422, "Tháng phải từ 1 đến 12.")
+    return DVL.soat(db, nam, thang, mang)

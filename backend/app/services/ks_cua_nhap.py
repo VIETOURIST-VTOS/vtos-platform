@@ -86,6 +86,17 @@ CUA_TAY = (
     # cột ma_dat_cho của dòng khách, nhưng hạn xuất vé và số chỗ đã giữ thì không ở đâu suy ra
     # được – chúng là điều đại lý báo qua điện thoại.
     "tour_ve_ma", "tour_ve_khach", "tour_ve_thanh_toan", "tour_tl_cong_no",
+    # Đ-4 · Đ-12 (13/9/2026). Bốn bảng, bốn cửa nhập tay:
+    #   POST .../{tid}/ben-ban            – một bên bán ghép land; Vietourist cũng là một dòng
+    #   POST .../{tid}/ben-ban/dong       – dòng phân bổ / hoàn tip / thanh toán của bên ấy
+    #   POST .../lanh-su                  – mở tờ đề nghị chi phí lãnh sự
+    #   POST .../lanh-su/{did}/dong       – một khách trên tờ đề nghị
+    #
+    # KHÔNG bảng nào ở đây là "máy sinh". Riêng `tour_ben_ban` nghe như thứ máy suy được từ cột
+    # `nhom_khach = "dai_ly"` của dòng khách, nhưng nhãn ấy chỉ nói "khách này của một đại lý nào
+    # đó" – nó KHÔNG nói của đại lý nào, và một chuyến ghép có tới ba bên.
+    "tour_ben_ban", "tour_ben_ban_dong",
+    "de_nghi_lanh_su", "de_nghi_lanh_su_dong",
     # V7 Đợt 3 (10/9/2026). Cả năm bảng đều có màn hình nhập tay:
     #   /su-co-tour        – ghi sự cố, ghi từng bước xử lý
     #   /ho-so-kiem-toan   – lập hồ sơ, thêm mục danh mục, ghi điều chỉnh kiểm toán đề nghị
