@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import require_roles, toan_quyen
 from app.db.session import get_db
 from app.models.core import Booking, Tour, User
 from app.models.lop3_tour import (BookingKhach, DeNghiLanhSu, DeNghiLanhSuDong,
@@ -99,7 +99,7 @@ def _kiem_sua_sau_ky(db: Session, t: Tour, u: User, ly_do: str) -> None:
     """Tờ chưa ký thì sửa tự do. Đã ký thì chỉ hai vai trò, và bắt buộc lý do."""
     if not _da_ky(t):
         return
-    if u.role not in SUA_SAU_KY:
+    if u.role not in SUA_SAU_KY and not toan_quyen(u):
         raise HTTPException(
             403, "Tờ quyết toán đã ký. Chỉ Trưởng phòng Điều hành và Phó TGĐ đoàn sửa được.")
     if len((ly_do or "").strip()) < DAI_NHAT_LY_DO:
@@ -293,7 +293,7 @@ def soat_gia(tid: int, u: User = Depends(require_roles(*XEM)), db: Session = Dep
     # được chuyến). Hai tầng suy riêng thì tầng ngoài hẹp hơn sẽ GIẤU biểu khỏi đúng những người
     # được phép nhập, và không ai hiểu vì sao.
     return {**G.soat_gia(db, tid), "hinh_thuc": t.hinh_thuc, "ma_tour": t.code,
-            "nhap_duoc": u.role in NHAP,
+            "nhap_duoc": u.role in NHAP or toan_quyen(u),
             "goi_y_hinh_thuc": _goi_y_hinh_thuc(t), "nuoc": t.country or ""}
 
 

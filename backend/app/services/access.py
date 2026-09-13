@@ -105,7 +105,8 @@ WRITE_ALLOWED_FOR_READ_ONLY = ("/api/v1/auth/password", "/api/v1/auth/login", "/
 
 
 def require(u: User, roles: tuple, what: str = "dữ liệu này") -> None:
-    if u.role not in roles:
+    from app.api.deps import toan_quyen
+    if u.role not in roles and not toan_quyen(u):
         raise HTTPException(403, f"Vai trò của bạn không được xem {what}")
 
 

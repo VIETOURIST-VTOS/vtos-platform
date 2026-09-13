@@ -21,6 +21,7 @@ from app.services import rules as R
 # ở dưới VẪN GIỮ dù endpoint đã khai quyền: hàng rào ngoài chặn theo màn hình, hàng rào trong
 # chặn theo việc, và hàm này còn được gọi từ robot trả chỗ chứ không chỉ từ endpoint.
 from app.services.access import GIU_CHO_ROLES as GIA_HAN_ROLES  # noqa: E402
+from app.api.deps import toan_quyen   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
 # Gia hạn quá số lần này thì vẫn cho, nhưng kêu lên. Không chặn: có tour khách thật sự cần chờ duyệt
 # ngân sách nhiều vòng. Chặn ở đây chỉ đẩy Điều hành sang huỷ rồi tạo lại booking, và khi ấy hệ thống
@@ -112,7 +113,7 @@ def het_han_giu_cho(db: Session) -> dict:
 
 # ---------- người: gia hạn, khôi phục ----------
 def gia_han(db: Session, u: User, b: Booking, den: datetime, ly_do: str) -> dict:
-    if u.role not in GIA_HAN_ROLES:
+    if u.role not in GIA_HAN_ROLES and not toan_quyen(u):
         raise ValueError("Chỉ Điều hành / Kinh doanh cấp quản lý gia hạn được giữ chỗ")
     if b.cancelled:
         raise ValueError("Booking đã huỷ – gia hạn giữ chỗ không còn nghĩa gì")

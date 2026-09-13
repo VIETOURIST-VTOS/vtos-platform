@@ -10,6 +10,7 @@ from app.models.vietrip import TourCostLine
 from app.services import rules as R
 from app.services import bookings as BK
 from app.services.products import event as EV
+from app.api.deps import toan_quyen   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
 CREATE_ROLES = ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_dh", "tp_dh")
 
@@ -28,7 +29,7 @@ def next_code(db: Session, d: date) -> str:
 
 
 def create(db: Session, u: User, d: dict) -> tuple[Tour, Booking]:
-    if u.role not in CREATE_ROLES: raise HTTPException(403, "Chỉ Kinh doanh / Điều hành tạo dịch vụ lẻ")
+    if u.role not in CREATE_ROLES and not toan_quyen(u): raise HTTPException(403, "Chỉ Kinh doanh / Điều hành tạo dịch vụ lẻ")
     st = (d.get("service_type") or "OTHER").upper()
     if st not in SERVICE_KINDS: raise Gate("NP_NHAP", "Loại dịch vụ không hợp lệ")
     name, phone = (d.get("customer_name") or "").strip(), (d.get("customer_phone") or "").strip()
@@ -68,7 +69,7 @@ def update(db: Session, u: User, b: Booking, d: dict) -> Booking:
     if t.tour_type != "non_package": raise Gate("NP", "Không phải dịch vụ lẻ")
     if b.cancelled: raise Gate("TRANG_THAI", "Dịch vụ đã hủy")
     if t.status not in ("da_duyet", "ket_thuc"): raise Gate("TRANG_THAI", "Dịch vụ đã chốt – không sửa")
-    if u.role not in ("nv_dh", "tp_dh", "gd_kd", "tp_kd", "tn_kd") and u.id != b.sales_id: raise HTTPException(403, "Chỉ sale phụ trách / Điều hành sửa")
+    if u.role not in ("nv_dh", "tp_dh", "gd_kd", "tp_kd", "tn_kd") and u.id != b.sales_id and not toan_quyen(u): raise HTTPException(403, "Chỉ sale phụ trách / Điều hành sửa")
     before = {"gia": b.amount, "gia_von": b.cost_amount, "loai": b.service_type}
     if d.get("service_type"):
         st = d["service_type"].upper()
@@ -131,7 +132,7 @@ def summary(rows: list[Booking]) -> dict:
 def close_month(db: Session, u: User, month: str) -> dict:
     """Kế toán chốt dịch vụ lẻ đã hoàn thành trong tháng: đóng số (doanh thu = booking, giá vốn = dòng NCC) → Kế toán xác nhận → bút toán 154/335/632.
     Chỉ chốt dịch vụ đã thu đủ hoặc đã hủy có phí; dịch vụ còn nợ để lại (báo danh sách)."""
-    if u.role not in ("ketoan", "tp_dh", "tgd"): raise HTTPException(403, "Chỉ Kế toán / TP Điều hành chốt dịch vụ lẻ tháng")
+    if u.role not in ("ketoan", "tp_dh", "tgd") and not toan_quyen(u): raise HTTPException(403, "Chỉ Kế toán / TP Điều hành chốt dịch vụ lẻ tháng")
     from app.services import accounting as ACC
     y, m = [int(x) for x in month.split("-")]
     first = date(y, m, 1); last = (date(y + (m == 12), m % 12 + 1, 1) - timedelta(days=1))

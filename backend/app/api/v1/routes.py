@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select, desc, func, text
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.api.deps import current_user, require_roles, robot_auth, Gate, loc_theo_nguoi_dung
+from app.api.deps import current_user, require_roles, robot_auth, Gate, loc_theo_nguoi_dung, toan_quyen
 from app.api import schemas as S
 from pydantic import BaseModel
 from app.core.security import verify_password, create_token, hash_password
@@ -37,7 +37,7 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 @router.get("/auth/me", tags=["auth"])
 def me(u: User = Depends(loc_theo_nguoi_dung("hồ sơ của chính người đăng nhập")), db: Session = Depends(get_db)):
     return {**user_out(u), "hidden_menus": AC.hidden_menus_for(u, db), "can_see_cost": AC.can_see_cost(u), "read_only": u.role in AC.READ_ONLY_ROLES,
-            "can_create_request": u.role in AC.REQUEST_CREATE_ROLES, "can_create_booking": u.role in AC.OPERATIONS,
+            "can_create_request": u.role in AC.REQUEST_CREATE_ROLES or toan_quyen(u), "can_create_booking": u.role in AC.OPERATIONS or toan_quyen(u),
             "must_change_password": bool(u.must_change_password), "hr_tabs": AC.hr_tabs_for(db, u),
             "company_id": u.company_id, "ngoai_bien_che": bool(u.ngoai_bien_che),
             "pham_vi": PV.mo_ta(db, u)}

@@ -11,6 +11,7 @@ from app.models.ops import DailyReport, PageShift, PaymentRequest
 from app.models.payments import Receipt
 from app.services import rules as R
 from app.services import accounting as ACC
+from app.api.deps import toan_quyen   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
 REPORT_DEADLINE = time(20, 0)
 NO_TIMESHEET_DEPTS = ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt")   # khối bỏ chấm công → báo cáo ngày bắt buộc
@@ -258,7 +259,7 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         msg = f"Đã từ chối {r.code}: {reason}"
     elif action == "confirm":
         if r.status != "cho_tp": raise ValueError("Không ở bước xác nhận bộ phận")
-        if u.role not in CATEGORY_CONFIRMER[r.category] and u.role not in ("tgd",): raise ValueError("Không đúng người phụ trách bộ phận")
+        if u.role not in CATEGORY_CONFIRMER[r.category] and u.role not in ("tgd",) and not toan_quyen(u): raise ValueError("Không đúng người phụ trách bộ phận")
         r.status, r.tp_by = "cho_kt", u.username
         msg = f"{r.code}: bộ phận đã xác nhận, chuyển Kế toán kiểm tra"
     elif action == "check":

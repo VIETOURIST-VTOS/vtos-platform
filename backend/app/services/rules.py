@@ -196,8 +196,16 @@ DEFAULT_PARAMS = [
     #
     # Để 1 (đã gồm) vì đó là quy ước đang dùng trong chính tệp quyết toán của phòng Điều hành: đoàn
     # Hồ Tràm tính 3.790.000 / 1,08 để ra giá trước thuế.
+    #
+    # CHỦ TỊCH XÁC NHẬN 13/9/2026: giá bán niêm yết ĐÃ GỒM thuế GTGT. Giá trị không đổi – vẫn là 1 –
+    # nhưng NGUỒN của nó đổi, và đó mới là điều đáng ghi. Trước hôm nay, số 1 này là máy đọc ngược ra
+    # từ một tệp Excel: thấy phép chia cho 1,08 nên đoán giá đã gồm thuế. Một quy ước thuế suy ra từ
+    # một phép chia trong một tệp mẫu thì đúng cho tệp ấy, không đúng cho công ty – và nếu sai thì
+    # mọi chuyến lệch nhau đúng 8% của phần chịu thuế mà không bao giờ tự lộ ra (xem đoạn trên).
+    # Nay đã có người chịu trách nhiệm chốt, nên nó là quy ước của công ty.
     ("gia_ban_gom_thue_gtgt", "1", "Giá bán niêm yết đã gồm thuế GTGT (1) hay chưa gồm (0)", "cờ",
-     "Quy ước đọc từ mẫu quyết toán Điều hành – chờ Kế toán xác nhận"),
+     "Chủ tịch xác nhận 13/9/2026: giá bán niêm yết ĐÃ GỒM thuế GTGT (trước đó chỉ là quy ước máy "
+     "đọc ngược từ mẫu quyết toán Điều hành)"),
     # Đ-10 · Ngưỡng thực chi THẤP hơn dự toán. Khai riêng khỏi `nguong_bien` (chiều vượt) vì đây là
     # một câu hỏi khác: hụt vài phần trăm là chuyện thường của mọi chuyến (đổi nhà hàng, bớt một
     # suất), còn hụt sâu thì thường là chương trình đã đổi so với thứ đã bán cho khách.

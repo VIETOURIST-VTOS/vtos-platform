@@ -45,6 +45,24 @@ def check_must_change_password(u: User, path: str) -> None:
 FULL_ACCESS = ("chutich",)
 
 
+def toan_quyen(u) -> bool:
+    """Người này có toàn quyền CHỨC NĂNG không (Chủ tịch, quyết định 06/9/2026)?
+
+    ĐẶT RA THÀNH HÀM VÌ MỘT LỖI THẬT, 13/9/2026. Câu trên nói FULL_ACCESS đặt ở "đúng một chỗ" để không
+    endpoint nào bị sót – nhưng nó chỉ đúng với endpoint khai quyền bằng require_roles. Còn 43 chỗ trong
+    kho tự viết `if u.role not in X: raise 403`, và không chỗ nào trong 43 chỗ ấy nhìn thấy FULL_ACCESS.
+
+    Chủ tịch phát hiện ra khi mở tab Quyết toán chi tiết: màn hình báo "Vai trò của anh/chị không khai
+    được hình thức". Cửa ghi thật sự VẪN MỞ cho ông – require_roles(*NHAP) cho qua nhờ FULL_ACCESS –
+    nhưng cái CỜ mà màn hình đọc để vẽ nút lại tự kiểm `u.role in NHAP` bằng tay. Cửa mở, biển đề đóng.
+
+    Một hằng số thì người ta quên nhập; một HÀM có tên thì bộ kiểm đọc được và phép thử canh được. Đó là
+    toàn bộ lý do tệp này có thêm bốn dòng. Danh sách chỗ CỐ Ý không gọi hàm này – tách bạch trách
+    nhiệm, không phải phân quyền – nằm ở app/services/ks_toan_quyen.py, mỗi dòng kèm lý do.
+    """
+    return getattr(u, "role", None) in FULL_ACCESS
+
+
 def require_roles(*roles: str, mo_ta: str = ""):
     """Khai quyền cho MỘT endpoint, ở chữ ký hàm.
 
@@ -61,7 +79,7 @@ def require_roles(*roles: str, mo_ta: str = ""):
     chung chung.
     """
     def dep(u: User = Depends(current_user)) -> User:
-        if roles and u.role not in roles and u.role not in FULL_ACCESS:
+        if roles and u.role not in roles and not toan_quyen(u):
             ten = ROLES.get(u.role, u.role)
             raise HTTPException(status.HTTP_403_FORBIDDEN,
                                 f"Vai trò {ten} không được xem {mo_ta}" if mo_ta

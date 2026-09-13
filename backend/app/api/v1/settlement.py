@@ -4,7 +4,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.api.deps import current_user, require_roles
+from app.api.deps import current_user, require_roles, toan_quyen
 from app.models.core import User, Tour
 from app.models.vietrip import TourCostLine
 from app.services import settlement as ST
@@ -90,7 +90,7 @@ def get_doc(tid: int, lid: int, u: User = Depends(current_user), db: Session = D
 @router.post("/tours/{tid}/settlement/match-paid")
 def match_paid(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
     t = _tour(db, tid)
-    if u.id != t.operator_id and u.role not in ("ketoan", "cntt", "tp_dh"): raise HTTPException(403, "Chỉ Điều hành chuyến / TP ĐH / Kế toán khớp thanh toán")
+    if u.id != t.operator_id and u.role not in ("ketoan", "cntt", "tp_dh") and not toan_quyen(u): raise HTTPException(403, "Chỉ Điều hành chuyến / TP ĐH / Kế toán khớp thanh toán")
     return ST.match_paid(db, t)
 
 

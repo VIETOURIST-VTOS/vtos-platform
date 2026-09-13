@@ -7,7 +7,7 @@ from app.services import rules as R
 from app.services import ghi_mot_lan as GML
 from app.services import accounting as ACC
 from app.services.products import event as EV
-from app.api.deps import Gate
+from app.api.deps import Gate, toan_quyen
 from fastapi import HTTPException
 
 
@@ -63,7 +63,7 @@ def allowed_actions(db: Session, t: Tour, u: User) -> list[str]:
 
 
 def create(db: Session, u: User, data) -> Tour:
-    if u.role not in ("nv_dh", "tp_dh"):
+    if u.role not in ("nv_dh", "tp_dh") and not toan_quyen(u):
         raise HTTPException(403, "Chỉ Phòng Điều hành tạo tour và lập dự toán (ĐH Điều 2)")
     code = data.code.strip().upper()
     if db.execute(select(Tour).where(Tour.code == code)).scalars().first():
@@ -83,7 +83,7 @@ def create(db: Session, u: User, data) -> Tour:
 def edit(db: Session, u: User, t: Tour, data) -> Tour:
     if t.status != "nhap":
         raise Gate("KHOA_DU_TOAN", "Dự toán đã trình, không sửa được (muốn sửa phải rút về nháp, có ghi nhật ký)")
-    if not (u.id == t.operator_id or u.role == "tp_dh"):
+    if not (u.id == t.operator_id or u.role == "tp_dh" or toan_quyen(u)):
         raise HTTPException(403, "Chỉ người điều hành chuyến hoặc TP Điều hành sửa dự toán")
     before = snap(t)
     # V10 – hai người cùng sửa một dự toán thì người sau phải biết. Kiểm TRƯỚC khi gán, và từ chối
@@ -100,7 +100,7 @@ def edit(db: Session, u: User, t: Tour, data) -> Tour:
 
 
 def submit(db: Session, u: User, t: Tour, note: str = "") -> str:
-    if u.role not in ("nv_dh", "tp_dh"): raise HTTPException(403, "Chỉ Điều hành trình dự toán")
+    if u.role not in ("nv_dh", "tp_dh") and not toan_quyen(u): raise HTTPException(403, "Chỉ Điều hành trình dự toán")
     if t.status != "nhap": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     c = R.calc(t, R.get_param(db, "nguong_bien", t.start_date))   # bước trình: dùng đúng số Điều hành nhập, không mượn dự toán sản phẩm
     if not c["complete"]:
@@ -119,7 +119,7 @@ def submit(db: Session, u: User, t: Tour, note: str = "") -> str:
 
 
 def confirm(db: Session, u: User, t: Tour, note: str = "") -> str:
-    if u.role != "tp_dh": raise HTTPException(403, "Chỉ Trưởng phòng Điều hành xác nhận dự toán")
+    if u.role != "tp_dh" and not toan_quyen(u): raise HTTPException(403, "Chỉ Trưởng phòng Điều hành xác nhận dự toán")
     if t.status != "cho_xac_nhan": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     t.status, t.confirmed_by = "cho_duyet", u.username
     EV(db, t, "tp_xac_nhan", u.username, note)
@@ -142,7 +142,7 @@ def approve(db: Session, u: User, t: Tour, note: str = "") -> str:
             return "Đủ 2 chữ ký – chuyến được duyệt với cờ 'dưới biên' (không thưởng lẻ, không tính chỉ tiêu)"
         db.commit(); return f"Đã ký ({ROLES[u.role]}). Chờ chữ ký còn lại"
     need = R.approver_role(t)
-    if u.role != need: raise Gate("PHAN_QUYEN", f"Dự toán này do {ROLES[need]} duyệt (Văn bản đính chính Điều 4)")
+    if u.role != need and not toan_quyen(u): raise Gate("PHAN_QUYEN", f"Dự toán này do {ROLES[need]} duyệt (Văn bản đính chính Điều 4)")
     t.status, t.approved_by = "da_duyet", u.username
     EV(db, t, "duyet", u.username, note)
     R.audit(db, u.username, u.role, "duyet_du_toan", f"tour:{t.code}", after=snap(t)); db.commit()
@@ -207,7 +207,7 @@ def cntt_check(db: Session, u: User, t: Tour, note: str = "") -> str:
 # ---------- yêu cầu & booking ----------
 def create_request(db: Session, u: User, data) -> ServiceRequest:
     from app.services import access as AC
-    if u.role not in AC.REQUEST_CREATE_ROLES: raise HTTPException(403, "Vai trò này không gửi yêu cầu đặt dịch vụ")
+    if u.role not in AC.REQUEST_CREATE_ROLES and not toan_quyen(u): raise HTTPException(403, "Vai trò này không gửi yêu cầu đặt dịch vụ")
     missing = [n for n, v in (("số điện thoại khách", data.customer_phone), ("nguồn khách", data.source), ("ghi chú chăm sóc", data.care_note)) if not v.strip()]
     if missing:
         raise Gate("CONG_4", "Thiếu trường bắt buộc: " + ", ".join(missing) + " (booking sẽ không tính chỉ tiêu, không hoa hồng)")
@@ -222,7 +222,7 @@ def create_request(db: Session, u: User, data) -> ServiceRequest:
 
 
 def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, str]:
-    if u.role not in ("nv_dh", "tp_dh"): raise Gate("CONG_12", "Chỉ Phòng Điều hành tạo booking")
+    if u.role not in ("nv_dh", "tp_dh") and not toan_quyen(u): raise Gate("CONG_12", "Chỉ Phòng Điều hành tạo booking")
     if r.booking_id: raise Gate("TRANG_THAI", "Yêu cầu đã có booking")
     t = db.get(Tour, r.tour_id)
     if t.status != "da_duyet": raise Gate("CONG_1", "Tour chưa được duyệt dự toán, không thể tạo booking")
