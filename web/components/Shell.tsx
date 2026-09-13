@@ -476,13 +476,15 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               báo là dán một cái tên sai lên một con số thật, tệ hơn là để nguyên. Khi nào có cửa
               đếm chưa đọc thì đổi cả số lẫn nhãn một lượt.
 
-              CHẶN TRẦN 99+ (bản vẽ V1.4, sửa 13/9/2026). Bản chạy thật đang hiện 1944 – bốn chữ số
-              trên một cái chuông thì vừa vỡ khung vừa vô nghĩa: không ai đọc 1944 rồi làm gì khác
-              với 999. Bản vẽ chốt tối đa 99+. Chặn trần chỉ đổi cách HIỆN, không đổi con số bên
-              dưới, nên nhãn trợ năng vẫn đọc đúng số thật. */}
+              CHẶN TRẦN 99+ ĐÃ BỊ BÁC (anh Tuấn chốt 13/9/2026). Bản vẽ V1.4 ghi tối đa 99+, và
+              vòng TC-21 đã làm; anh Tuấn xem rồi và quyết GIỮ NGUYÊN SỐ THẬT của VTOS. Lý do đứng
+              được: 1944 là con số nói lên quy mô tồn đọng, còn "99+" thì che mất chính điều ấy –
+              một cái chuông đứng ở 99+ suốt nhiều tuần thì không ai biết nó đang là 120 hay 1900.
+              Chừng nào chuông còn đếm cảnh báo nghiệp vụ chứ chưa đếm thông báo chưa đọc, thì số
+              thật hữu ích hơn số đã chặn trần. Nhãn trợ năng nói rõ đây là cảnh báo nghiệp vụ. */}
           <Link href="/alerts" className="bar-muc" title="Thông báo & cảnh báo nghiệp vụ"
             aria-label={`Cảnh báo nghiệp vụ${alerts > 0 ? `: ${alerts}` : ""}`}>
-            <Bt d="chuong" />{alerts > 0 && <b className="so-bao">{alerts > 99 ? "99+" : alerts}</b>}
+            <Bt d="chuong" />{alerts > 0 && <b className="so-bao">{alerts}</b>}
           </Link>
           {/* Menu cá nhân: ba mục của chính người đăng nhập, rời khỏi menu trái theo TC-2. */}
           <span style={{ position: "relative" }}>

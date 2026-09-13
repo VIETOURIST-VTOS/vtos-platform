@@ -3,13 +3,15 @@
 
 Năm việc sửa được ngay ở lớp giao diện, không cần bảng mới ở máy chủ:
 
-  1. Chuông chặn trần 99+ thay cho con số 1944.
-  2. Ô tài khoản không in chức danh hai lần.
-  3. Khối cảnh báo mang tên "Rủi ro & việc cần theo dõi".
-  4. Mã máy như sale_tra_loi_cham đổi thành câu tiếng Việt; mã lạ giữ nguyên mã.
-  5. Dòng phụ ba thẻ ghi đúng thứ bản vẽ đòi, hoặc ghi rõ chỗ còn thiếu.
+  1. Ô tài khoản không in chức danh hai lần.
+  2. Dòng phụ ba thẻ ghi đúng thứ bản vẽ đòi, hoặc ghi rõ chỗ còn thiếu.
+  3. Đính chính: câu chỉ dẫn phạm vi trên màn hình 01 từng chỉ vào một ô KHÔNG CÓ.
 
-Cộng một việc đính chính: câu chỉ dẫn phạm vi trên màn hình 01 từng chỉ vào một ô KHÔNG CÓ.
+HAI ĐỀ NGHỊ CỦA BẢN VẼ ĐÃ BỊ BÁC (anh Tuấn xem bản đã làm rồi quyết, 13/9/2026). Cả hai đều được
+canh NGƯỢC LẠI ở dưới, để vòng sau không lặng lẽ áp bản vẽ đè lên quyết định:
+
+  · Chuông giữ SỐ THẬT, không chặn trần 99+.
+  · Khối cảnh báo giữ tên "Tồn đọng cần xử lý" và giữ MÃ MÁY, không dịch sang câu tiếng Việt.
 """
 import re
 from pathlib import Path
@@ -34,22 +36,24 @@ def _the(nguon: str, nhan: str) -> str:
 
 # ------------------------------------------------------------------ 1. Chuông
 
-def test_chuong_chan_tran_99_cong():
-    """Bốn chữ số trên một cái chuông thì vừa vỡ khung vừa vô nghĩa (bản vẽ V1.4: tối đa 99+)."""
+def test_chuong_giu_so_that_khong_chan_tran():
+    """QUYẾT ĐỊNH 13/9/2026: giữ số thật của VTOS, bác đề nghị 99+ của bản vẽ V1.4.
+
+    Lý do đứng được: 1944 nói lên quy mô tồn đọng, còn "99+" che mất chính điều ấy – một cái chuông
+    đứng ở 99+ suốt nhiều tuần thì không ai biết nó đang là 120 hay 1900.
+    """
     nguon = _doc(SHELL)
-    assert 'alerts > 99 ? "99+" : alerts' in nguon, (
-        "Chuông phải chặn trần 99+. Bản chạy thật ngày 13/9 đang hiện 1944."
+    # Bỏ chú thích: bản ghi lý do bác đề nghị có nhắc chữ 99+, và đó là chú thích chứ không phải
+    # chữ hiện lên chuông.
+    than = re.sub(r"/\*.*?\*/", "", nguon, flags=re.S)
+    than = re.sub(r"^\s*//.*$", "", than, flags=re.M)
+    assert "99+" not in than, (
+        "Chuông đang bị chặn trần 99+. Anh Tuấn đã xem bản chặn trần và quyết GIỮ SỐ THẬT ngày "
+        "13/9/2026 – đừng áp lại bản vẽ đè lên quyết định ấy."
     )
-
-
-def test_chuong_giu_so_that_cho_trinh_doc_man_hinh():
-    """Chặn trần là đổi cách HIỆN, không được làm mất con số thật khỏi nhãn trợ năng."""
-    nguon = _doc(SHELL)
     i = nguon.find('aria-label={`Cảnh báo nghiệp vụ')
-    assert i > 0, "Nhãn trợ năng của chuông phải nói rõ đây là cảnh báo nghiệp vụ"
-    assert "${alerts}" in nguon[i:i + 200], (
-        "Nhãn trợ năng phải đọc con số THẬT, không đọc chuỗi 99+ đã chặn trần."
-    )
+    assert i > 0, "Nhãn trợ năng của chuông phải nói rõ đây là cảnh báo nghiệp vụ, không phải 'thông báo chưa đọc'"
+    assert "${alerts}" in nguon[i:i + 200], "Nhãn trợ năng phải đọc con số thật"
 
 
 # --------------------------------------------------------------- 2. Tài khoản
@@ -70,41 +74,31 @@ def test_o_tai_khoan_khong_in_chuc_danh_hai_lan():
     )
 
 
-# ------------------------------------------------------------ 3+4. Khối rủi ro
+# -------------------------------------------------------------- 2. Khối cảnh báo
 
-def test_ten_khoi_theo_ban_ve_v14():
+def test_khoi_giu_ten_ton_dong_can_xu_ly():
+    """QUYẾT ĐỊNH 13/9/2026: giữ tên của VTOS, bác đề nghị "Rủi ro & việc cần theo dõi".
+
+    Lý do: thẻ chỉ tiêu ở trên đã tên là "Tồn đọng cần xử lý"; hai chỗ nói về cùng một thứ thì phải
+    gọi cùng một tên, nếu không người đọc tưởng là hai con số khác nhau.
+    """
     nguon = _doc(KHOI)
-    assert "Rủi ro &amp; việc cần theo dõi" in nguon or "Rủi ro & việc cần theo dõi" in nguon, (
-        'Bản vẽ V1.4 chốt tên khối là "Rủi ro & việc cần theo dõi", không phải "Cảnh báo từ robot" '
-        'cũng không phải "Tồn đọng cần xử lý".'
+    assert "<h2>Tồn đọng cần xử lý</h2>" in nguon, (
+        'Khối phải giữ tên "Tồn đọng cần xử lý" cho khớp thẻ chỉ tiêu ở trên (anh Tuấn chốt 13/9).'
     )
 
 
-def test_ma_may_doi_thanh_cau_tieng_viet():
-    """Bản vẽ nêu đích danh sale_tra_loi_cham."""
+def test_giu_ma_may_khong_dich_sang_cau_tieng_viet():
+    """QUYẾT ĐỊNH 13/9/2026: giữ mã máy, bác đề nghị dịch mã của bản vẽ V1.4.
+
+    Lý do: mã là thứ tra ngược được về robot đã phát ra dòng ấy; câu dịch thì mỗi người nhớ một
+    kiểu. Câu ví dụ ngay dưới mỗi dòng đã đủ để người đọc hiểu loại ấy là gì.
+    """
     nguon = _doc(KHOI)
-    assert "const TEN_LOAI" in nguon, "Thiếu bảng dịch mã cảnh báo sang tiếng Việt"
-    for ma in ("sale_tra_loi_cham", "bc_ngay_2", "cham_soc_qua_han", "qua_han_qt"):
-        assert f"{ma}:" in nguon, (
-            f"Thiếu câu tiếng Việt cho mã {ma}. Bốn mã này là toàn bộ mã máy chủ đang phát, "
-            "đọc từ /api/v1/alerts ngày 13/9/2026."
-        )
-    assert "tenLoai(n.kind) || n.kind" in nguon, (
-        "Mã LẠ phải giữ nguyên mã máy. Bịa một câu chung chung kiểu 'Cảnh báo khác' thì phần còn "
-        "thiếu biến mất khỏi tầm mắt và không ai đi khai nữa."
+    assert "TEN_LOAI" not in nguon and "tenLoai" not in nguon, (
+        "Bảng dịch mã cảnh báo đã bị bác ngày 13/9/2026 – đừng đưa lại."
     )
-
-
-def test_bang_dich_khong_gan_bo_phan_va_khong_doi_muc_nang():
-    """Bảng dịch chỉ đổi CÁCH GỌI. Gán bộ phận là tuyên bố nghiệp vụ, phải do máy chủ khai."""
-    nguon = _doc(KHOI)
-    i = nguon.find("const TEN_LOAI")
-    bang = nguon[i:nguon.find("};", i)]
-    for cam in ("Kế toán", "Kinh doanh", "Điều hành", "Marketing", "red", "warn"):
-        assert cam not in bang, (
-            f"Bảng dịch mã đang mang thêm '{cam}'. Nó chỉ được đổi TÊN của loại cảnh báo, không "
-            "gán bộ phận và không đổi mức nặng."
-        )
+    assert "<b>{n.kind}</b>" in nguon, "Dòng gom nhóm phải in thẳng mã máy"
 
 
 # -------------------------------------------------------- 5. Dòng phụ tám thẻ

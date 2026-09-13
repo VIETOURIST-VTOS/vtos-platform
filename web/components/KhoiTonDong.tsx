@@ -22,26 +22,6 @@ import { Tag } from "@/components/ui";
 
 export type CanhBao = { id?: any; kind?: string; level?: string; message?: string };
 
-/** MÃ MÁY → CÂU TIẾNG VIỆT (bản vẽ V1.4 nêu đích danh: "Đổi mã như sale_tra_loi_cham thành câu dễ
- *  hiểu"). Sửa 13/9/2026.
- *
- *  Đây là bảng DỊCH NHÃN, không phải bảng phân loại nghiệp vụ – nó chỉ đổi cách gọi một loại cảnh
- *  báo, không gán bộ phận, không đổi mức nặng, không gộp hai mã làm một. Bốn mã dưới đây là toàn bộ
- *  những mã máy chủ đang phát, đọc từ /api/v1/alerts ngày 13/9/2026.
- *
- *  MÃ LẠ THÌ GIỮ NGUYÊN MÃ. Robot mới thêm một loại mà ở đây chưa khai thì dòng ấy hiện đúng mã máy
- *  – xấu nhưng thật, và nhìn là biết còn thiếu một dòng khai. Bịa một câu chung chung kiểu "Cảnh báo
- *  khác" thì cái thiếu biến mất khỏi tầm mắt, và không ai đi khai nữa. */
-const TEN_LOAI: Record<string, string> = {
-  sale_tra_loi_cham: "Khách nhắn tin chưa được trả lời đúng hạn",
-  bc_ngay_2: "Nhân sự thiếu báo cáo ngày hai ngày liên tiếp",
-  cham_soc_qua_han: "Phiếu chăm sóc sau bán quá hạn liên hệ",
-  qua_han_qt: "Chuyến quá hạn quyết toán",
-};
-
-/** Câu tiếng Việt của một loại; chưa khai thì trả về null để nơi gọi hiện mã máy. */
-export const tenLoai = (ma: string): string | null => TEN_LOAI[ma] ?? null;
-
 /** Xếp hạng mức nặng để chọn mức đại diện cho cả nhóm. Tên mức do máy chủ đặt; mức lạ coi như nhẹ
  *  nhất chứ không bỏ dòng đi – bỏ dòng là giấu việc. */
 const NANG: Record<string, number> = { red: 3, danger: 3, warn: 2, warning: 2, ok: 1, info: 1 };
@@ -76,10 +56,10 @@ export default function KhoiTonDong({ ds, tong }: { ds: CanhBao[]; tong?: number
   return (
     <div className="panel" id="ton-dong">
       <div className="mh01-dau">
-        {/* TÊN KHỐI theo bản vẽ V1.4: "Rủi ro & việc cần theo dõi", không phải "Cảnh báo từ robot"
-            và cũng không phải "Tồn đọng cần xử lý". Người đọc màn hình này cần biết đây là việc
-            phải theo, chứ không cần biết thứ phát ra nó là một con robot. */}
-        <h2>Rủi ro &amp; việc cần theo dõi</h2>
+        {/* TÊN KHỐI GIỮ NGUYÊN CỦA VTOS (anh Tuấn chốt 13/9/2026). Bản vẽ V1.4 đề nghị đổi thành
+            "Rủi ro & việc cần theo dõi"; anh Tuấn giữ "Tồn đọng cần xử lý" cho khớp tên thẻ chỉ
+            tiêu ở trên – hai chỗ nói về cùng một thứ thì phải gọi cùng một tên. */}
+        <h2>Tồn đọng cần xử lý</h2>
         {typeof tong === "number"
           ? <span className="tag">{tong} cảnh báo đang mở</span>
           : <span className="tag">Chưa có tổng số</span>}
@@ -96,10 +76,11 @@ export default function KhoiTonDong({ ds, tong }: { ds: CanhBao[]; tong?: number
                 {nhom.map((n) => (
                   <tr key={n.kind}>
                     <td>
-                      {/* Câu tiếng Việt đứng trước; mã máy vẫn giữ, in nhỏ bên cạnh, để người của
-                          CNTT còn tra được khi đi tìm robot nào phát ra dòng này. */}
-                      <b>{tenLoai(n.kind) || n.kind}</b>
-                      {tenLoai(n.kind) && <span className="td-ma">{n.kind}</span>}
+                      {/* MÃ MÁY GIỮ NGUYÊN (anh Tuấn chốt 13/9/2026). Bản vẽ V1.4 đề nghị đổi mã
+                          thành câu tiếng Việt; anh Tuấn giữ mã của VTOS vì mã là thứ tra được
+                          ngược về robot đã phát ra nó, còn câu dịch thì mỗi người nhớ một kiểu.
+                          Câu ví dụ ngay dưới đã đủ cho người đọc hiểu loại này là gì. */}
+                      <b>{n.kind}</b>
                       <div className="muted td-vd">{n.vi_du}</div>
                     </td>
                     <td className="td-so">{n.so}</td>
@@ -131,9 +112,7 @@ export default function KhoiTonDong({ ds, tong }: { ds: CanhBao[]; tong?: number
                 <tbody>
                   {co.map((a, i) => (
                     <tr key={a.id ?? i}>
-                      <td>{a.level
-                        ? <Tag cls={a.level}>{tenLoai(a.kind || "") || a.kind}</Tag>
-                        : <b>{tenLoai(a.kind || "") || a.kind}</b>}</td>
+                      <td>{a.level ? <Tag cls={a.level}>{a.kind}</Tag> : <b>{a.kind}</b>}</td>
                       <td>{a.message}</td>
                     </tr>
                   ))}
