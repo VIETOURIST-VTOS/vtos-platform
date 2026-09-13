@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.api.deps import current_user, require_roles
+from app.api.deps import current_user, require_roles, toan_quyen_ke_ca_tach_bach
 from app.models.core import User, ROLES, Company
 from app.services import access as AC
 from app.services import access_admin as AA
@@ -176,7 +176,7 @@ def role_change(uid: int, data: DoiVaiTroIn,
     if data.role not in ROLES: raise HTTPException(422, f"Vai trò không hợp lệ: {data.role}")
     if not (data.reason or "").strip(): raise HTTPException(422, "Phải ghi lý do đổi vai trò")
     if t.id == u.id: raise HTTPException(422, "Không tự đổi vai trò của chính mình")
-    if t.role in ("chutich", "tgd") and u.role != "cntt":
+    if t.role in ("chutich", "tgd") and u.role != "cntt" and not toan_quyen_ke_ca_tach_bach(u, db):
         raise HTTPException(403, "Chỉ CNTT thao tác trên tài khoản lãnh đạo")
     if data.role in VAI_TRO_NHAY_CAM and u.role not in ("chutich", "tgd"):
         raise HTTPException(403, f"Đổi sang vai trò {ROLES[data.role]} phải do Chủ tịch hoặc Tổng giám đốc – "

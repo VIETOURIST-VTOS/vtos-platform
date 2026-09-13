@@ -12,6 +12,7 @@ from app.models.crm import Lead
 from app.models.ops import PaymentRequest
 from app.models.marketing import Campaign, CAMPAIGN_STATUS, MUC_TIEU, KENH
 from app.services import rules as R
+from app.api.deps import toan_quyen_ke_ca_tach_bach   # công tắc chu_tich_mo_het_cua
 
 # Chuyển trạng thái hợp lệ. Không cho nhảy cóc: mỗi bước là một quyết định có người chịu trách nhiệm.
 CHUYEN = {"nhap": ("cho_duyet",), "cho_duyet": ("dang_chay", "nhap"),
@@ -344,7 +345,7 @@ def nd_duyet(db: Session, u: User, n: ContentItem) -> tuple[ContentItem, str]:
     if u.username == n.nguoi_soan: raise PermissionError("Người soạn không được tự duyệt nội dung của mình")
     ky = [x for x in (n.nguoi_duyet or "").split(",") if x]
     if u.username in ky: raise ValueError("Bạn đã ký bản này rồi – cần chữ ký của người thứ hai")
-    if n.status == "cho_ky_2" and u.role not in nd_vai_tro_ky_2(db):
+    if n.status == "cho_ky_2" and u.role not in nd_vai_tro_ky_2(db) and not toan_quyen_ke_ca_tach_bach(u, db):
         raise PermissionError("Chữ ký thứ hai cho nội dung có cam kết hoặc số liệu tài chính phải là "
                               f"Ban TGĐ hoặc Pháp chế ({', '.join(nd_vai_tro_ky_2(db))})")
     ky.append(u.username); n.nguoi_duyet = ",".join(ky)

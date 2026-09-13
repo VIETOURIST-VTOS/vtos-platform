@@ -7,7 +7,7 @@ from app.services import rules as R
 from app.services import ghi_mot_lan as GML
 from app.services import accounting as ACC
 from app.services.products import event as EV
-from app.api.deps import Gate, toan_quyen
+from app.api.deps import Gate, toan_quyen, toan_quyen_ke_ca_tach_bach
 from fastapi import HTTPException
 
 
@@ -184,7 +184,7 @@ def close(db: Session, u: User, t: Tour, data, note: str = "") -> str:
 
 
 def kt_confirm(db: Session, u: User, t: Tour, note: str = "") -> str:
-    if u.role != "ketoan": raise HTTPException(403, "Chỉ Kế toán xác nhận quyết toán")
+    if u.role != "ketoan" and not toan_quyen_ke_ca_tach_bach(u, db): raise HTTPException(403, "Chỉ Kế toán xác nhận quyết toán")
     if t.status != "da_dong_so": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     t.status, t.kt_confirmed_at = "kt_xac_nhan", datetime.now()
     EV(db, t, "kt_xac_nhan", u.username, note)
@@ -194,7 +194,7 @@ def kt_confirm(db: Session, u: User, t: Tour, note: str = "") -> str:
 
 
 def cntt_check(db: Session, u: User, t: Tour, note: str = "") -> str:
-    if u.role != "cntt": raise HTTPException(403, "Chỉ CNTT đối chiếu độc lập")
+    if u.role != "cntt" and not toan_quyen_ke_ca_tach_bach(u, db): raise HTTPException(403, "Chỉ CNTT đối chiếu độc lập")
     if t.status != "kt_xac_nhan": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     bk = sum((b.amount or 0) - (b.discount or 0) for b in t.bookings)
     chk = {"doanh_thu_booking": bk, "doanh_thu_quyet_toan": (t.actual_revenue or 0), "lech": round((t.actual_revenue or 0) - bk)}

@@ -63,6 +63,40 @@ def toan_quyen(u) -> bool:
     return getattr(u, "role", None) in FULL_ACCESS
 
 
+# Tên tham số bật/tắt việc Chủ tịch đi qua được cả cửa TÁCH BẠCH TRÁCH NHIỆM. Để ở đây, cạnh
+# FULL_ACCESS, vì hai thứ này phải đọc cùng nhau mới hiểu được.
+KHOA_MO_HET_CUA = "chu_tich_mo_het_cua"
+
+
+def toan_quyen_ke_ca_tach_bach(u, db) -> bool:
+    """Chủ tịch đi qua được cả những cửa vốn đóng với MỌI vai trò?
+
+    Có hai loại cửa, và trộn chúng làm một là cách hỏng âm thầm nhất:
+
+      PHÂN QUYỀN – ai được làm việc gì. `toan_quyen()` ở trên mở hết, đúng quyết định 06/9/2026.
+      TÁCH BẠCH TRÁCH NHIỆM – việc này và việc kia phải do HAI NGƯỜI làm, bất kể hai người ấy to
+      đến đâu. Người ký lệnh chi và người bấm ĐÃ CHI là ví dụ kinh điển: gộp vào một người thì công
+      ty mất lớp chống gian lận, và Ban Kiểm soát mất chỗ đối chiếu.
+
+    Chủ tịch chốt 13/9/2026 MỞ CẢ LOẠI THỨ HAI để chạy thử và trình diễn hệ thống. Đặt sau một THAM
+    SỐ chứ không viết cứng vào sáu chỗ, vì đây là quyết định của giai đoạn chạy thử: đến ngày vận
+    hành thật, đóng lại là đổi một dòng trong bảng tham số, không phải đi sửa lại sáu tệp mã và đẩy
+    một bản nâng cấp. Tham số còn có mặt tốt thứ hai: nó là một con số ĐỌC ĐƯỢC, nên robot Kiểm soát
+    nêu được thành một phát hiện, và Ban Kiểm soát nhìn thấy hệ thống đang ở chế độ nào thay vì phải
+    đi đọc mã nguồn.
+
+    Rỗng/lỗi thì trả False – cửa tách bạch đóng lại. Một công tắc an toàn hỏng phải hỏng về phía
+    ĐÓNG, không phải phía mở.
+    """
+    if not toan_quyen(u):
+        return False
+    try:
+        from app.services.rules import get_param
+        return bool(get_param(db, KHOA_MO_HET_CUA))
+    except Exception:      # noqa – bảng tham số chưa có, hoặc phiên hỏng: đóng, không mở
+        return False
+
+
 def require_roles(*roles: str, mo_ta: str = ""):
     """Khai quyền cho MỘT endpoint, ở chữ ký hàm.
 

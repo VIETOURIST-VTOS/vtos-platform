@@ -10,7 +10,7 @@ from app.models.vietrip import TourCostLine
 from app.models.ops import PaymentRequest
 from app.services import rules as R
 from app.services.vietrip import _strip_accents
-from app.api.deps import toan_quyen   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
+from app.api.deps import toan_quyen, toan_quyen_ke_ca_tach_bach   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
 
 def _norm(s: str) -> str:
@@ -184,7 +184,7 @@ def checks(db: Session, t: Tour) -> list[dict]:
 def kt_return(db: Session, u: User, t: Tour, note: str) -> str:
     """Kế toán trả lại quyết toán để Điều hành sửa: trạng thái về ket_thuc, tăng phiên bản, ghi lịch sử."""
     from app.services.products import event as EV
-    if u.role != "ketoan": raise HTTPException(403, "Chỉ Kế toán trả lại quyết toán")
+    if u.role != "ketoan" and not toan_quyen_ke_ca_tach_bach(u, db): raise HTTPException(403, "Chỉ Kế toán trả lại quyết toán")
     if t.status != "da_dong_so": raise Gate("TRANG_THAI", "Chỉ trả lại quyết toán đang chờ Kế toán xác nhận")
     if not (note or "").strip(): raise Gate("QT_NHAP", "Trả lại phải ghi rõ lý do")
     t.status, t.closed_at, t.settlement_version = "ket_thuc", None, t.settlement_version + 1

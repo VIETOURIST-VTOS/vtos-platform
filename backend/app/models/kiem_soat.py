@@ -39,6 +39,7 @@ LOAI_PHAT_HIEN = {
     "bang_khong_cua_nhap": "Bảng không có cửa nào để người dùng nhập số liệu vào",
     "tien_vao_thieu_duong": "Một trong hai đường nhận tiền vào chưa được cấu hình",
     "tien_vao_im_lang": "Lâu không có giao dịch tiền vào nào",
+    "tach_bach_dang_mo": "Cửa tách bạch trách nhiệm đang mở cho Chủ tịch (chế độ chạy thử)",
 }
 
 

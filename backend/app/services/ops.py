@@ -11,7 +11,7 @@ from app.models.ops import DailyReport, PageShift, PaymentRequest
 from app.models.payments import Receipt
 from app.services import rules as R
 from app.services import accounting as ACC
-from app.api.deps import toan_quyen   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
+from app.api.deps import toan_quyen, toan_quyen_ke_ca_tach_bach   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
 REPORT_DEADLINE = time(20, 0)
 NO_TIMESHEET_DEPTS = ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt")   # khối bỏ chấm công → báo cáo ngày bắt buộc
@@ -264,7 +264,7 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         msg = f"{r.code}: bộ phận đã xác nhận, chuyển Kế toán kiểm tra"
     elif action == "check":
         if r.status != "cho_kt": raise ValueError("Không ở bước Kế toán kiểm tra")
-        if u.role != "ketoan": raise ValueError("Chỉ Kế toán kiểm tra")
+        if u.role != "ketoan" and not toan_quyen_ke_ca_tach_bach(u, db): raise ValueError("Chỉ Kế toán kiểm tra")
         if not r.has_document: raise ValueError("Thiếu chứng từ đính kèm (hợp đồng/hóa đơn/báo giá) – không chuyển duyệt")
         if r.category not in ("hoan_tien", "tam_ung") and not r.supplier_tax_code: raise ValueError("NCC chưa có MST – phải xác nhận trước khi thanh toán")
         r.status, r.kt_by = "cho_duyet", u.username
@@ -283,7 +283,7 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
             msg = f"{r.code}: đã ký {'TGĐ' if r.signed_tgd else 'Chủ tịch'}, chờ chữ ký còn lại"
     elif action == "pay":
         if r.status != "cho_chi": raise ValueError("Chưa có lệnh chi được duyệt")
-        if u.role != "ketoan": raise ValueError("Chỉ Kế toán ghi nhận đã chi")
+        if u.role != "ketoan" and not toan_quyen_ke_ca_tach_bach(u, db): raise ValueError("Chỉ Kế toán ghi nhận đã chi")
         r.status, r.paid_at, r.paid_ref = "da_chi", datetime.now(), reason
         r.paid_method = "tien_mat" if reason.lower().startswith("tm") else "chuyen_khoan"
         _post_payment(db, r)
