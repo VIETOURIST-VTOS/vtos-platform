@@ -192,3 +192,20 @@ def test_moi_o_luoi_deu_co_lai_duoc():
         "Thiếu luật .grid>*{min-width:0}. Ô lưới mặc định là min-width:auto – không bao giờ hẹp "
         "hơn nội dung, nên một bảng dài trong bất kỳ khung nào cũng đẩy cả trang cuộn ngang."
     )
+
+
+def test_bang_dai_tren_man_hinh_01_nam_trong_khung_cuon_rieng():
+    """Vá 13/9/2026 (lần ba). .grid>*{min-width:0} cho KHUNG co lại, nhưng BẢNG bên trong khung thì
+    vẫn rộng hơn khung và thò ra ngoài – đo được: khung Điều hành hết ở 1249px, ô <td> của nó ở
+    1275px, trong khung nhìn 1265px.
+
+    Bảng rộng hơn chỗ chứa nó thì phải tự cuộn trong khung của nó, chứ không kéo cả trang cuộn
+    ngang: đó là quy ước .wrap đã có sẵn trong globals.css.
+    """
+    nguon = TRANG.read_text(encoding="utf-8")
+    assert nguon.count('<div className="wrap"><table>') >= 3, (
+        "Ba bảng dài của màn hình 01 (Kinh doanh Lẻ, Kinh doanh Đoàn, Điều hành 21 ngày tới) phải "
+        "nằm trong <div className=\"wrap\"> để tự cuộn trong khung của chúng."
+    )
+    css = (GOC / "web" / "app" / "globals.css").read_text(encoding="utf-8")
+    assert ".wrap{overflow-x:auto}" in css, "Quy ước .wrap phải còn trong globals.css"
