@@ -6,6 +6,7 @@ import { api, pct, vnd, fmtD, fmtDT } from "@/lib/api";
 import { ACTION_LABEL } from "@/lib/meta";
 import { Tag, errMsg } from "@/components/ui";
 import KhoiDongTien from "@/components/KhoiDongTien";
+import KhoiTonDong from "@/components/KhoiTonDong";
 import {
   DongLoc, KhoiQuyetDinh, TamThe, TieuDe, tien, dem, type The,
 } from "@/components/DauManHinh01";
@@ -53,8 +54,14 @@ function Dash() {
     { nhan: "Marketing & PR", phu: "Khách tiềm năng mới", so: null,
       ai: "Marketing", cua: "/leads?tab=leads",
       duoi: "Đã chuyển Kinh doanh · đã chốt" },
-    { nhan: "Tồn đọng cần xử lý", so: dem(d.alerts?.length ?? 0),
-      duoi: `${k.canh_bao_do ?? 0} cảnh báo đỏ đang mở`, do: (d.alerts?.length ?? 0) > 0 },
+    /* SỬA 13/9/2026 – thẻ này từng in `d.alerts.length`, tức SỐ DÒNG máy chủ gửi kèm trang này
+       (đang cắt ở 60), chứ không phải số tồn đọng thật. Trên bản chạy thật nó ra "60" trong khi
+       dòng phụ ngay dưới ghi "1387 cảnh báo đỏ đang mở": con số nhỏ nằm ở chỗ to nhất màn hình,
+       con số thật nằm ở dòng chữ nhỏ. Nay lấy đúng `k.canh_bao_do`; nếu máy chủ không gửi thì thẻ
+       để trống kèm cửa nhập, không lấy độ dài danh sách thay vào. */
+    { nhan: "Tồn đọng cần xử lý", so: dem(k.canh_bao_do),
+      duoi: `${d.alerts?.length ?? 0} cảnh báo mới nhất đang liệt kê ở bảng bên dưới`,
+      do: (k.canh_bao_do ?? 0) > 0, ai: "Công nghệ thông tin", cua: "/alerts" },
   ];
 
   return (<>
@@ -71,9 +78,10 @@ function Dash() {
         {d.todo.length ? <ul>{d.todo.map((t: any, i: number) => <li key={i}><Link href={`/tours/${t.tour_id}`}>{t.code}</Link> – {t.name}: <b>{ACTION_LABEL[t.action] || t.action}</b></li>)}</ul> : <p className="muted">Không có việc chờ ở vai trò này.</p>}
         {d.pending_params > 0 && ["chutich", "tgd"].includes(user?.role || "") && <p><Link href="/params">{d.pending_params} tham số chính sách chờ ký</Link></p>}
       </div>
-      <div className="panel"><h2>Cảnh báo từ robot</h2>
-        {d.alerts.length ? <table><tbody>{d.alerts.map((a: any) => <tr key={a.id}><td><Tag cls={a.level}>{a.kind}</Tag></td><td>{a.message}</td></tr>)}</tbody></table> : <p className="muted">Không có cảnh báo.</p>}
-      </div>
+      {/* Bảng cảnh báo phẳng cũ đã thay bằng khối gom nhóm: sáu mươi dòng gần giống hệt nhau thì
+          cuộn hết màn hình mà vẫn không cho biết tồn đọng nằm ở đâu. Danh sách từng dòng vẫn còn,
+          nằm trong phần bung ra của khối. */}
+      <KhoiTonDong ds={d.alerts || []} tong={k.canh_bao_do ?? null} />
     </div>
     <div className="grid" style={{ marginTop: 14 }}>
       {sec.kd_le && <div className="panel"><h2>Kinh doanh Lẻ – doanh thu tính chỉ tiêu tháng (quyết toán)</h2><p className="muted"><Link href="/sales-reports?mang=le">Báo cáo bán hàng phòng Lẻ →</Link></p>{sec.kd_le.length ? <table><tbody>{sec.kd_le.map((r: any) => <tr key={r.sales}><td>{r.sales}</td><td style={{ textAlign: "right" }}>{vnd(r.revenue)}</td><td>{Math.round(r.pct * 100)}% mốc {r.pct >= 1 ? <Tag cls="ok">đạt</Tag> : <Tag cls="warn">chưa</Tag>}</td></tr>)}</tbody></table> : <p className="muted">Chưa có chuyến quyết toán trong tháng.</p>}</div>}

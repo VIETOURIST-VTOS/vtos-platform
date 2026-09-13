@@ -322,10 +322,26 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
   border-bottom:1px solid var(--vtos-navy-light)}
 .the-cua:hover{color:var(--vtos-sky)}
 
+/* KHỐI TỒN ĐỌNG (components/KhoiTonDong.tsx). Bảng gom nhóm, không phải bảng dữ liệu dài – nên
+   cột số canh phải và dùng chữ số đều bề ngang để mắt so hàng dọc được. */
+.td-bang{width:100%;border-collapse:collapse}
+.td-bang th{font-size:11.5px;color:var(--vtos-text-mute);text-transform:uppercase;
+  letter-spacing:.04em;font-weight:600;text-align:left}
+.td-bang td.td-so,.td-bang th.td-so{text-align:right;font-variant-numeric:tabular-nums;
+  font-family:var(--vtos-font-mono);white-space:nowrap}
+.td-bang td.td-so{font-weight:700;color:var(--vtos-navy)}
+/* Câu ví dụ chỉ để nhận ra loại cảnh báo, không phải nội dung chính – cắt một dòng, không cho nó
+   đẩy cao cả hàng. */
+.td-vd{font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  max-width:52ch}
+.td-chi-tiet{margin-top:10px}
+
 @media (max-width:640px){
   .mh01-ngay{margin-left:0;width:100%}
   .mh01-ky select{min-width:0;flex:1}
   .the-so{font-size:20px}
+  /* Trên điện thoại câu ví dụ được xuống dòng: ở đây không có chiều ngang để mà cắt gọn. */
+  .td-vd{white-space:normal;max-width:100%}
 }
 
 /* Bảng đọc-được-trên-điện-thoại. Trên màn rộng đây là một bảng bình thường. */
