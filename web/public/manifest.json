@@ -1,13 +1,50 @@
 {
+  "id": "/",
   "name": "VTOS – Vietourist Operating System",
   "short_name": "VTOS",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#F5F7FA",
-  "theme_color": "#1F3A5F",
+  "description": "Hệ thống quản trị nội bộ Vietourist Holdings",
   "lang": "vi",
+  "dir": "ltr",
+  "start_url": "/?nguon=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#14538D",
+  "theme_color": "#14538D",
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/favicon/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Việc chờ tôi duyệt",
+      "short_name": "Chờ duyệt",
+      "url": "/?nguon=pwa#cho-toi-duyet",
+      "icons": [{ "src": "/favicon/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Booking",
+      "short_name": "Booking",
+      "url": "/bookings?nguon=pwa",
+      "icons": [{ "src": "/favicon/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Tổng quan điều hành",
+      "short_name": "Điều hành",
+      "url": "/bao-cao?nguon=pwa",
+      "icons": [{ "src": "/favicon/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Thông báo",
+      "short_name": "Thông báo",
+      "url": "/alerts?nguon=pwa",
+      "icons": [{ "src": "/favicon/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }
