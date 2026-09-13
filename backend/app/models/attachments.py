@@ -46,6 +46,20 @@ DOI_TUONG_DAY_DU = {
     "nha_cung_cap":  ("Nhà cung cấp", "dieu_hanh", "07_Hop_dong", True),
     "don_dich_vu":   ("Đơn đặt dịch vụ", "dieu_hanh", "05_Tour", True),
     "tour":          ("Tour", "dieu_hanh", "05_Tour", True),
+    # Đ-11 (13/9/2026) – CHỨNG TỪ GẮN VÀO TỪNG DÒNG CHI, không phải vào cả chuyến.
+    #
+    # Bản quyết toán thật của Điều hành là MỘT BỘ HỒ SƠ, không phải một tệp: bộ đoàn Hồ Tràm
+    # 2N1Đ gồm một bảng tính cộng BẢY chứng từ (hoá đơn nhà xe, khách sạn, bốn nhà hàng, vé tham
+    # quan, hợp đồng bảo hiểm), và mỗi dòng chi trong bảng tính ghi số hoá đơn tương ứng: HD 739,
+    # HD 1767, HD 7742, HD 00004574, HD 1429, HD 00017197, HD 00082953.
+    #
+    # Trước bản này dòng chi chỉ chứa được MỘT tệp, dạng data URL ghi đè (tour_cost_lines.doc_name /
+    # doc_data). Gắn tệp thứ hai là mất tệp thứ nhất, không cảnh báo. Và kho hồ sơ chung thì gắn
+    # được vào CHUYẾN chứ không gắn được vào DÒNG — nên lúc đối chiếu một khoản chi 32 triệu, người
+    # kế toán phải mở cả xấp tệp của chuyến ra tìm.
+    #
+    # Lưu theo MÃ ĐỐI TƯỢNG (True) vì id của dòng chi sống cùng chuyến, không thuộc về một tháng.
+    "dong_chi_phi":  ("Dòng chi phí quyết toán", "dieu_hanh", "05_Tour", True),
     "booking":       ("Booking", "kd_le", "05_Tour", True),
     "khach_hang":    ("Khách hàng", "kd_le", "05_Tour", True),
     "nhan_su":       ("Hồ sơ nhân sự", "hcns", "06_Nhan_su", True),

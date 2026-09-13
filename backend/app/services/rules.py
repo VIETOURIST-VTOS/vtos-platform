@@ -198,6 +198,14 @@ DEFAULT_PARAMS = [
     # Hồ Tràm tính 3.790.000 / 1,08 để ra giá trước thuế.
     ("gia_ban_gom_thue_gtgt", "1", "Giá bán niêm yết đã gồm thuế GTGT (1) hay chưa gồm (0)", "cờ",
      "Quy ước đọc từ mẫu quyết toán Điều hành – chờ Kế toán xác nhận"),
+    # Đ-10 · Ngưỡng thực chi THẤP hơn dự toán. Khai riêng khỏi `nguong_bien` (chiều vượt) vì đây là
+    # một câu hỏi khác: hụt vài phần trăm là chuyện thường của mọi chuyến (đổi nhà hàng, bớt một
+    # suất), còn hụt sâu thì thường là chương trình đã đổi so với thứ đã bán cho khách.
+    #
+    # Đo trên đoàn Hồ Tràm: ăn tối −11%, vé tham quan −11%, banner −52%. Ngưỡng 15% để hai dòng đầu
+    # đi qua và dòng thứ ba phải có một câu giải thích.
+    ("nguong_hut_du_toan", "0.15", "Thực chi thấp hơn dự toán quá tỷ lệ này thì cần một dòng giải thích",
+     "tỷ lệ", "Đ-10, đo trên mẫu quyết toán Hồ Tràm 12/9/2026"),
     # ---- Đ-6 · Tiền tip. Chủ tịch chốt 12/9/2026: "tiền tip tour châu Âu chia 1 phần với công ty" ----
     #
     # GIÁ TRỊ ĐỂ TRỐNG, và phải để trống — giống hai mốc vận hành thật ở trên. Chủ tịch đã chốt

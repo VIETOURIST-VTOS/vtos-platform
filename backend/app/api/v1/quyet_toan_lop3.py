@@ -29,13 +29,19 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.core import Booking, Tour, User
 from app.models.lop3_tour import (BookingKhach, KhachChiPhi, SuaSauKy, TourDoanhThuDong,
-                                  TourHdvChi, TourPhuongTien,
-                                  LOAI_PHUONG_TIEN, LOAI_TUOI, NHOM_KHACH, LOAI_DOANH_THU)
+                                  TourHdvChi, TourPhuongTien, TourTlCongNo, TourVeKhach,
+                                  TourVeMa, TourVeThanhToan,
+                                  LOAI_PHUONG_TIEN, LOAI_TUOI, NHOM_KHACH, LOAI_DOANH_THU,
+                                  LOAI_CONG_NO_TL, LOAI_VE, TRANG_THAI_MA)
+from app.services import cong_no_truong_doan as TLCN
 from app.services import ghi_mot_lan as GML
 from app.services import gia_khach as G
 from app.services import khoan_muc_chi as KM
 from app.services import pham_vi_phap_nhan as PV
+from app.services import soat_du_chi as SDC
+from app.services import thu_ho_chi_ho as THC
 from app.services import tip_tour as TIP
+from app.services import ve_may_bay as VMB
 
 router = APIRouter(prefix="/api/v1/quyet-toan-lop3", tags=["quyet-toan-lop3"])
 
@@ -468,6 +474,9 @@ class DoanhThuVao(BaseModel):
     so_tien_goc: float | None = None
     ty_gia: float | None = None
     ngay_ty_gia: date | None = None
+    # Đ-7: chỉ có nghĩa với dòng loại `thu_ho`. Rỗng chủ tiền = chưa xác định, và bộ soát CHẶN.
+    chu_tien: str | None = None
+    han_xu_ly: date | None = None
     ghi_chu: str | None = None
     ly_do_sua: str = ""
 
@@ -494,6 +503,7 @@ def them_doanh_thu(tid: int, v: DoanhThuVao, u: User = Depends(require_roles(*NH
                          thanh_tien_truoc_thue=truoc, thue_suat=v.thue_suat, tien_thue=thue,
                          thanh_tien=tong, chung_tu=v.chung_tu, tien_te=v.tien_te,
                          so_tien_goc=v.so_tien_goc, ty_gia=v.ty_gia, ngay_ty_gia=v.ngay_ty_gia,
+                         chu_tien=v.chu_tien, han_xu_ly=v.han_xu_ly,
                          ghi_chu=v.ghi_chu)
     db.add(d); db.flush()
     if _da_ky(t):
@@ -505,20 +515,30 @@ def them_doanh_thu(tid: int, v: DoanhThuVao, u: User = Depends(require_roles(*NH
 
 @router.get("/{tid}/doanh-thu")
 def ds_doanh_thu(tid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
-    """Danh sách dòng doanh thu KÈM tổng do máy cộng. Không ô nào cho người gõ tổng."""
+    """Danh sách dòng doanh thu KÈM tổng do máy cộng. Không ô nào cho người gõ tổng.
+
+    Đ-7 (13/9/2026): dòng loại `thu_ho` KHÔNG vào tổng doanh thu. Nó là tiền của khách đi ngang qua
+    – cộng vào là thổi doanh thu lên bằng tiền của người khác. Nó vẫn hiện trong danh sách và vẫn có
+    tổng riêng, để không ai tưởng nó biến mất.
+    """
     _tour(db, tid, u)
     ds = list(db.scalars(select(TourDoanhThuDong).where(TourDoanhThuDong.tour_id == tid)))
-    co = [d for d in ds if d.thanh_tien is not None]
+    co = [d for d in ds if d.thanh_tien is not None and THC.la_doanh_thu(d.loai)]
+    ho = [d for d in ds if d.thanh_tien is not None and not THC.la_doanh_thu(d.loai)]
     return {
         "so_dong": len(ds),
-        "so_dong_chua_co_so": len(ds) - len(co),
+        "so_dong_chua_co_so": len([d for d in ds if d.thanh_tien is None]),
         "tong_truoc_thue": round(sum(d.thanh_tien_truoc_thue or 0 for d in co), 2) if co else None,
         "tong_thue": round(sum(d.tien_thue or 0 for d in co), 2) if co else None,
         "tong_thu": round(sum(d.thanh_tien for d in co), 2) if co else None,
+        # Tách hẳn, có nhãn riêng: người đọc phải thấy nó tồn tại mà không lẫn vào doanh thu.
+        "tong_thu_ho": round(sum(d.thanh_tien for d in ho), 2) if ho else None,
         "dong": [{"id": d.id, "loai": d.loai, "noi_dung": d.noi_dung, "doi_tuong": d.doi_tuong,
                   "don_gia_truoc_thue": d.don_gia_truoc_thue, "so_luong": d.so_luong,
                   "thanh_tien_truoc_thue": d.thanh_tien_truoc_thue, "thue_suat": d.thue_suat,
                   "tien_thue": d.tien_thue, "thanh_tien": d.thanh_tien, "chung_tu": d.chung_tu,
+                  "la_doanh_thu": THC.la_doanh_thu(d.loai),
+                  "chu_tien": d.chu_tien, "han_xu_ly": d.han_xu_ly,
                   "khach_id": d.khach_id} for d in ds]}
 
 
@@ -1039,3 +1059,290 @@ def ghi_tip(tid: int, v: TipVao, u: User = Depends(require_roles(*NHAP)),
                 v.ly_do_sua or "Điều hành nhập tỷ lệ chia tiền tip")
     db.commit()
     return {"id": d.id, **kq}
+
+
+# ---------------------------------------------------------------------------------------------
+# Đ-10 · DỰ CHI ↔ THỰC CHI, cả hai chiều
+# ---------------------------------------------------------------------------------------------
+
+@router.get("/{tid}/soat-du-chi")
+def soat_du_chi(tid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """So dự chi với thực chi trên TỪNG DÒNG.
+
+    Vượt quá ngưỡng mà không giải trình thì CHẶN; thấp hơn quá ngưỡng thì CẢNH BÁO, không chặn —
+    chặn một chuyến vì nó tiết kiệm được tiền là cách nhanh nhất để người ta thôi ghi dự toán.
+    """
+    t = _tour(db, tid, u)
+    return SDC.soat_dong(db, tid, t.end_date)
+
+
+# ---------------------------------------------------------------------------------------------
+# Đ-7 · THU HỘ – CHI HỘ
+# ---------------------------------------------------------------------------------------------
+
+@router.get("/{tid}/thu-ho")
+def xem_thu_ho(tid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Số dư giữ hộ của chuyến, tách theo CHỦ TIỀN.
+
+    Số dư khác 0 là bình thường (thu hôm nay, trả ngày mai). Chỉ CHẶN khi một khoản thu hộ không
+    biết của ai — không có chủ thì không trả lại được cho ai.
+    """
+    _tour(db, tid, u)
+    return THC.soat(db, tid)
+
+
+# ---------------------------------------------------------------------------------------------
+# Đ-11 · CHỨNG TỪ GẮN VÀO TỪNG DÒNG CHI
+# ---------------------------------------------------------------------------------------------
+#
+# KHÔNG dựng kho tệp thứ hai. Đường này chỉ nói cho màn hình biết PHẢI GỌI kho tệp chung với đối
+# tượng nào — `dong_chi_phi` + id của dòng. Cửa tải và cửa đọc là /api/v1/tep đã có sẵn, kèm toàn bộ
+# phần đã làm ở đó: vân tay chống trùng, thu hồi có lý do, phân quyền theo nhóm hồ sơ.
+#
+# Dựng thêm một cửa tải riêng cho dòng chi là có hai kho tệp, và lần sửa quy tắc lưu trữ đầu tiên sẽ
+# sửa ở một kho rồi quên kho kia.
+
+@router.get("/{tid}/chung-tu-dong-chi")
+def chung_tu_dong_chi(tid: int, u: User = Depends(require_roles(*XEM)),
+                      db: Session = Depends(get_db)):
+    """Mỗi dòng chi cần bao nhiêu chứng từ, và đang có bao nhiêu.
+
+    CẢNH BÁO chứ không chặn khi dòng có số hoá đơn mà chưa có tệp: lúc nhập liệu chưa chắc đã có bản
+    scan, và chặn ở đó là chặn cả luồng làm việc.
+    """
+    from app.models.attachments import Attachment
+    from app.models.vietrip import TourCostLine
+    _tour(db, tid, u)
+    ds = list(db.scalars(select(TourCostLine)
+                         .where(TourCostLine.tour_id == tid, TourCostLine.status == "hd")
+                         .order_by(TourCostLine.line_no, TourCostLine.id)))
+    ids = [str(x.id) for x in ds]
+    dem: dict[str, int] = {}
+    if ids:
+        q = select(Attachment.doi_tuong_id, func.count(Attachment.id)).where(
+            Attachment.doi_tuong == "dong_chi_phi", Attachment.doi_tuong_id.in_(ids),
+            Attachment.thu_hoi == False).group_by(Attachment.doi_tuong_id)   # noqa: E712
+        dem = {k: int(v) for k, v in db.execute(q).all()}
+
+    dong, thieu = [], []
+    for x in ds:
+        so_tep = dem.get(str(x.id), 0)
+        # doc_data là cửa CŨ, một tệp một dòng. Còn dữ liệu ở đó thì vẫn tính là có chứng từ, nhưng
+        # nói rõ nó là bản cũ để người dùng biết chuyển sang kho tệp chung.
+        cu = bool(x.doc_name)
+        d = {"dong_id": x.id, "line_no": x.line_no, "mo_ta": x.description,
+             "so_hoa_don": x.so_hoa_don, "thuc_chi": x.actual,
+             "so_tep": so_tep, "co_tep_ban_cu": cu,
+             "doi_tuong": "dong_chi_phi", "doi_tuong_id": str(x.id)}
+        dong.append(d)
+        if x.so_hoa_don and not so_tep and not cu:
+            thieu.append(d)
+    return {"tour_id": tid, "so_dong": len(ds), "dong": dong,
+            "thieu_chung_tu": thieu, "so_thieu": len(thieu),
+            "muc": "canh_bao",
+            "ghi_chu": ("Dòng có số hoá đơn mà chưa gắn tệp thì CẢNH BÁO, không chặn – lúc nhập "
+                        "liệu chưa chắc đã có bản scan. Tải tệp qua /api/v1/tep với đối tượng "
+                        "«dong_chi_phi» và mã là id của dòng; một dòng gắn được NHIỀU tệp.")}
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+# Đ-8 (13/9/2026) · CỬA NHẬP KHỐI VÉ MÁY BAY
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Ba bảng, ba cửa, và KHÔNG cửa nào nhận một ô tổng:
+#   · mã đặt chỗ      – khối chỗ giữ ở hãng, mang hạn xuất vé
+#   · dòng vé từng khách – SỐ CHỐT; thành tiền do máy cộng bốn ô tiền
+#   · đợt thanh toán   – chỉ trừ dần vào nợ đại lý, không phải bản sao của tổng tiền vé
+
+class VeMaVao(BaseModel):
+    ma_dat_cho: str
+    hang_bay: str | None = None
+    hanh_trinh: str | None = None
+    so_cho_giu: int | None = None
+    han_xuat_ve: date | None = None
+    trang_thai: str | None = None
+    nha_cung_cap: str | None = None
+    ghi_chu: str | None = None
+    ly_do_sua: str = ""
+
+
+class VeKhachVao(BaseModel):
+    ve_ma_id: int | None = None
+    khach_id: int | None = None
+    ho_ten_ve: str | None = None
+    loai: str | None = None
+    gia_ve: float | None = None
+    gia_ve_noi_dia: float | None = None
+    phi_khac: float | None = None
+    phi_nang_hang: float | None = None
+    tien_te: str | None = None
+    ty_gia: float | None = None
+    so_hoa_don: str | None = None
+    ly_do: str | None = None
+    ghi_chu: str | None = None
+    ly_do_sua: str = ""
+
+
+class VeThanhToanVao(BaseModel):
+    ve_ma_id: int | None = None
+    ngay: date | None = None
+    so_tien: float | None = None
+    tien_te: str | None = None
+    ty_gia: float | None = None
+    hinh_thuc: str | None = None
+    so_chung_tu: str | None = None
+    ghi_chu: str | None = None
+    ly_do_sua: str = ""
+
+
+@router.get("/ve/loai")
+def ve_loai(u: User = Depends(require_roles(*XEM))):
+    """Danh mục loại dòng vé và trạng thái mã – để biểu nhập không tự bịa danh sách của riêng nó."""
+    return {"loai_dong": LOAI_VE, "trang_thai_ma": TRANG_THAI_MA}
+
+
+@router.post("/{tid}/ve/ma")
+def them_ve_ma(tid: int, v: VeMaVao, u: User = Depends(require_roles(*NHAP)),
+               db: Session = Depends(get_db)):
+    """Thêm một mã đặt chỗ. Không có ô tiền nào ở đây – tiền nằm ở dòng khách."""
+    t = _tour(db, tid, u)
+    _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
+    if not (v.ma_dat_cho or "").strip():
+        raise HTTPException(422, "Mã đặt chỗ không được để trống.")
+    if v.trang_thai and v.trang_thai not in TRANG_THAI_MA:
+        raise HTTPException(422, f"trang_thai phải thuộc {sorted(TRANG_THAI_MA)}")
+    m = TourVeMa(tour_id=tid, ma_dat_cho=v.ma_dat_cho.strip(), hang_bay=v.hang_bay,
+                 hanh_trinh=v.hanh_trinh, so_cho_giu=v.so_cho_giu, han_xuat_ve=v.han_xuat_ve,
+                 trang_thai=v.trang_thai or "giu_cho", nha_cung_cap=v.nha_cung_cap,
+                 ghi_chu=v.ghi_chu, nguoi_nhap=u.username, nhap_luc=datetime.now())
+    db.add(m); db.flush()
+    if _da_ky(t):
+        ghi_dau_vet(db, t, u, "tour_ve_ma", m.id, "(thêm mã)", None, v.ma_dat_cho, v.ly_do_sua)
+    db.commit()
+    return {"id": m.id, "ma_dat_cho": m.ma_dat_cho}
+
+
+@router.post("/{tid}/ve/khach")
+def them_ve_khach(tid: int, v: VeKhachVao, u: User = Depends(require_roles(*NHAP)),
+                  db: Session = Depends(get_db)):
+    """Thêm một dòng vé của một khách. KHÔNG có tham số 'thành tiền' – máy cộng bốn ô tiền."""
+    t = _tour(db, tid, u)
+    _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
+    loai = v.loai or "ve"
+    if loai not in LOAI_VE:
+        raise HTTPException(422, f"loai phải thuộc {sorted(LOAI_VE)}")
+    if v.ve_ma_id is not None:
+        m = db.get(TourVeMa, v.ve_ma_id)
+        if not m or m.tour_id != tid:
+            raise HTTPException(422, "Mã đặt chỗ không thuộc chuyến này.")
+    # Chặn ngay tại cửa hai chuyện làm con số mất nghĩa. Bộ soát cũng bắt lại, nhưng chặn ở cửa thì
+    # người nhập biết ngay lúc đang gõ chứ không phải lúc đi đóng số.
+    if loai == "hoan_ve" and not (v.ly_do or "").strip():
+        raise HTTPException(422, "Dòng hoàn vé phải ghi LÝ DO hoàn.")
+    d = TourVeKhach(tour_id=tid, ve_ma_id=v.ve_ma_id, khach_id=v.khach_id, ho_ten_ve=v.ho_ten_ve,
+                    loai=loai, gia_ve=v.gia_ve, gia_ve_noi_dia=v.gia_ve_noi_dia,
+                    phi_khac=v.phi_khac, phi_nang_hang=v.phi_nang_hang,
+                    tien_te=v.tien_te, ty_gia=v.ty_gia, so_hoa_don=v.so_hoa_don,
+                    ly_do=v.ly_do, ghi_chu=v.ghi_chu,
+                    nguoi_nhap=u.username, nhap_luc=datetime.now())
+    d.thanh_tien = VMB.thanh_tien_dong(d)
+    db.add(d); db.flush()
+    if _da_ky(t):
+        ghi_dau_vet(db, t, u, "tour_ve_khach", d.id, "(thêm dòng vé)", None, v.ho_ten_ve,
+                    v.ly_do_sua)
+    db.commit()
+    return {"id": d.id, "thanh_tien": d.thanh_tien}
+
+
+@router.post("/{tid}/ve/thanh-toan")
+def them_ve_thanh_toan(tid: int, v: VeThanhToanVao, u: User = Depends(require_roles(*NHAP)),
+                       db: Session = Depends(get_db)):
+    """Ghi một đợt thanh toán cho đại lý vé. Nó TRỪ DẦN vào nợ, không phải bản sao của tổng vé."""
+    t = _tour(db, tid, u)
+    _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
+    x = TourVeThanhToan(tour_id=tid, ve_ma_id=v.ve_ma_id, ngay=v.ngay, so_tien=v.so_tien,
+                        tien_te=v.tien_te, ty_gia=v.ty_gia, hinh_thuc=v.hinh_thuc,
+                        so_chung_tu=v.so_chung_tu, ghi_chu=v.ghi_chu,
+                        nguoi_nhap=u.username, nhap_luc=datetime.now())
+    db.add(x); db.flush()
+    if _da_ky(t):
+        ghi_dau_vet(db, t, u, "tour_ve_thanh_toan", x.id, "(thêm đợt trả)", None,
+                    str(v.so_tien), v.ly_do_sua)
+    db.commit()
+    return {"id": x.id}
+
+
+@router.get("/{tid}/ve")
+def ds_ve(tid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Toàn bộ khối vé: dòng khách, khối theo mã do MÁY CỘNG, và số dư với đại lý."""
+    _tour(db, tid, u)
+    return VMB.soat(db, tid)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+# Đ-9 (13/9/2026) · CỬA NHẬP CÔNG NỢ TRƯỞNG ĐOÀN
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+
+class TlCongNoVao(BaseModel):
+    phan_cong_id: int | None = None
+    ten_truong_doan: str | None = None
+    stt: int | None = None
+    noi_dung: str | None = None
+    loai: str
+    so_tien: float | None = None
+    tien_te: str | None = None
+    ty_gia: float | None = None
+    ngay_ty_gia: date | None = None
+    hdv_chi_id: int | None = None
+    ghi_chu: str | None = None
+    ly_do_sua: str = ""
+
+
+@router.get("/tl-cong-no/loai")
+def tl_loai(u: User = Depends(require_roles(*XEM))):
+    """Danh mục loại khoản KÈM CHIỀU DẤU của từng loại, và câu quy ước để biểu in ngay cạnh ô số."""
+    return {
+        "quy_uoc_dau": TLCN.CAU_QUY_UOC,
+        "loai": [{"ma": k, "chieu": v[0], "ten": v[1],
+                  "dau_dung": ("dương – công ty trả trưởng đoàn" if v[0] > 0
+                               else "âm – trưởng đoàn nộp lại")}
+                 for k, v in LOAI_CONG_NO_TL.items()],
+    }
+
+
+@router.post("/{tid}/tl-cong-no")
+def them_tl_cong_no(tid: int, v: TlCongNoVao, u: User = Depends(require_roles(*NHAP)),
+                    db: Session = Depends(get_db)):
+    """Thêm một dòng công nợ trưởng đoàn.
+
+    Cửa này CHẶN NGAY khi dấu mâu thuẫn với loại khoản, chứ không để dồn tới lúc đóng số. Đó là lỗi
+    duy nhất ở đây có thể làm cả tờ ra kết quả ngược chiều mà mọi tổng vẫn cân – và nó xảy ra đúng
+    lúc người ta đang chép tờ châu Âu, vốn ghi ngược quy ước của chính nó.
+    """
+    t = _tour(db, tid, u)
+    _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
+    chieu = TLCN.chieu_cua_loai(v.loai)
+    if chieu is None:
+        raise HTTPException(422, f"loai phải thuộc {sorted(LOAI_CONG_NO_TL)}")
+    if v.so_tien is not None and v.so_tien != 0 and (v.so_tien > 0) != (chieu > 0):
+        dung = "DƯƠNG" if chieu > 0 else "ÂM"
+        raise HTTPException(422, f"«{LOAI_CONG_NO_TL[v.loai][1]}» phải mang dấu {dung}. "
+                                 f"{TLCN.CAU_QUY_UOC}")
+    d = TourTlCongNo(tour_id=tid, phan_cong_id=v.phan_cong_id,
+                     ten_truong_doan=v.ten_truong_doan, stt=v.stt, noi_dung=v.noi_dung,
+                     loai=v.loai, so_tien=v.so_tien, tien_te=v.tien_te, ty_gia=v.ty_gia,
+                     ngay_ty_gia=v.ngay_ty_gia, hdv_chi_id=v.hdv_chi_id, ghi_chu=v.ghi_chu,
+                     nguoi_nhap=u.username, nhap_luc=datetime.now())
+    db.add(d); db.flush()
+    if _da_ky(t):
+        ghi_dau_vet(db, t, u, "tour_tl_cong_no", d.id, "(thêm dòng)", None, v.noi_dung, v.ly_do_sua)
+    db.commit()
+    return {"id": d.id}
+
+
+@router.get("/{tid}/tl-cong-no")
+def ds_tl_cong_no(tid: int, phan_cong_id: int | None = None,
+                  u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Số dư công nợ trưởng đoàn: theo TỪNG đồng tiền, rồi mới gộp về VND."""
+    _tour(db, tid, u)
+    return TLCN.soat(db, tid, phan_cong_id)

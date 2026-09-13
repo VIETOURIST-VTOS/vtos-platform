@@ -191,6 +191,8 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
   const se = t.settlement_edit || {}; const sm = se.summary || {}; const checks: any[] = se.checks || []; const st: Record<string, string> = se.service_types || {};
   const [edit, setEdit] = useState<any>(null);
   const [showCancelled, setShowCancelled] = useState(false);
+  // Đ-11 (13/9/2026) · dòng chi phí đang mở hồ sơ chứng từ. Xem chú thích ở ô DinhKem bên dưới.
+  const [moHoSo, setMoHoSo] = useState<number | null>(null);
   const base = `/tours/${t.id}/settlement`;
   const lines = (t.cost_lines || []).filter((l: any) => showCancelled || l.status === "hd");
   const calc = (f: any) => Math.round(f.cost_kind === "theo_khach" ? f.unit_price * f.qty * f.coef : f.unit_price * f.coef);
@@ -242,16 +244,36 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
       <button className="act teal" type="submit">Lưu dòng</button> <button type="button" className="act grey" onClick={() => setEdit(null)}>Đóng</button>
     </form>}
     <table style={{ marginTop: 8 }}><thead><tr><th>#</th><th>Mô tả</th><th>Loại DV</th><th>NCC (MST)</th><th className="num">Đơn giá</th><th className="num">SL</th><th className="num">HS</th><th className="num">Dự toán</th><th className="num">Thực chi</th><th className="num">Đã TT</th><th>Chứng từ</th><th>Ghi chú</th><th></th></tr></thead>
-      <tbody>{lines.length ? lines.map((l: any) => <tr key={l.id} style={{ opacity: l.status === "hd" ? 1 : 0.45 }}>
+      <tbody>{lines.length ? lines.flatMap((l: any) => [<tr key={l.id} style={{ opacity: l.status === "hd" ? 1 : 0.45 }}>
         <td>{l.line_no}</td><td>{l.description} <Tag>{l.cost_kind === "theo_khach" ? "theo khách" : "cố định"}</Tag>{l.source === "vietrip" && <Tag>Vietrip</Tag>}</td><td>{l.service_name || l.service_type}</td>
         <td>{l.supplier_name}{l.supplier_tax_code && <span className="muted"> ({l.supplier_tax_code})</span>}</td>
         <td className="num">{vnd(l.unit_price)}</td><td className="num">{l.qty}</td><td className="num">{l.coef}</td><td className="num muted">{l.budget ? vnd(l.budget) : "–"}</td>
         <td className="num"><b style={{ color: l.budget && l.over_pct > 0.1 ? "var(--red)" : undefined }}>{vnd(l.actual)}</b></td>
         <td className="num">{l.remaining > 0 ? <Tag cls="warn">{vnd(l.paid)}</Tag> : <Tag cls="ok">{vnd(l.paid)}</Tag>}</td>
-        <td>{l.has_doc ? <a href="#" onClick={(e) => { e.preventDefault(); viewDoc(l); }}>📎 {l.doc_name || "xem"}</a> : <span className="muted">–</span>} {(se.can_edit || t.status === "da_dong_so") && l.status === "hd" && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => upload(l)}>tải</button>}</td>
+        <td>{l.has_doc ? <a href="#" onClick={(e) => { e.preventDefault(); viewDoc(l); }}>📎 {l.doc_name || "xem"}</a> : <span className="muted">–</span>} {(se.can_edit || t.status === "da_dong_so") && l.status === "hd" && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => upload(l)}>tải</button>}
+          {" "}<button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setMoHoSo(moHoSo === l.id ? null : l.id)}>hồ sơ</button></td>
         <td className="muted">{l.note}</td>
         <td>{se.can_edit && l.status === "hd" && <><button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setEdit({ ...l })}>sửa</button> <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => cancel(l)}>hủy</button></>}</td>
-      </tr>) : <tr><td colSpan={13} className="muted">Chưa có dòng quyết toán – bấm “Thêm dòng chi phí” (cùng bố cục bảng Vietrip) hoặc đồng bộ từ Vietrip.</td></tr>}</tbody>
+      </tr>,
+        /* Đ-11 (13/9/2026) · CỬA của kho chứng từ chung cho từng dòng chi.
+         *
+         * Nút "tải" ngay bên trái là cửa CŨ: một tệp một dòng, ghi thẳng vào cột doc_data. Nó không có
+         * bản thứ hai, không có lý do khi gỡ, không nằm trong thư mục hồ sơ kiểm toán, và không chống
+         * trùng. Một dòng chi thật thường có hai ba tờ – hoá đơn, phiếu thu của nhà cung cấp, ảnh chụp
+         * biên nhận – nên "một tệp" là con số sai ngay từ đầu.
+         *
+         * Ô này gắn vào kho tệp chung (doi_tuong="dong_chi_phi", đã khai trong attachments.py), nơi có
+         * đủ bốn thứ trên. Cửa cũ để nguyên chứ không gỡ: những dòng đã gắn tệp từ trước vẫn phải xem
+         * lại được, và gỡ nó đi là làm mất chứng từ cũ của người ta. */
+        moHoSo === l.id
+          ? <tr key={`${l.id}-hs`}><td colSpan={13}>
+              <div style={{ margin: "0 0 8px 24px" }}>
+                <DinhKem doiTuong="dong_chi_phi" doiTuongId={l.id} loai="chung_tu"
+                         tieuDe={`Chứng từ của dòng ${l.line_no} – ${l.description}`}
+                         chiXem={!se.can_edit && t.status !== "da_dong_so"} />
+              </div></td></tr>
+          : null,
+      ]) : <tr><td colSpan={13} className="muted">Chưa có dòng quyết toán – bấm “Thêm dòng chi phí” (cùng bố cục bảng Vietrip) hoặc đồng bộ từ Vietrip.</td></tr>}</tbody>
       <tfoot><tr><td colSpan={8}><b>TỔNG CỘNG</b></td><td className="num"><b>{vnd(sm.actual)}</b></td><td className="num"><b>{vnd(sm.paid)}</b></td><td colSpan={3}>Còn lại cần thanh toán: <b>{vnd(sm.remaining)}</b></td></tr></tfoot></table>
     <p className="muted">Nguyên tắc: một cửa – chỉ người điều hành chuyến soạn; đóng số lấy tổng dòng làm giá vốn thực tế; vượt dự toán dòng &gt; 10% phải giải trình; Kế toán trả lại → phiên bản mới; sau Kế toán xác nhận không sửa.</p>
   </div>);
