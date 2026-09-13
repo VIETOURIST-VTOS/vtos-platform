@@ -8,6 +8,9 @@ import { Tag, errMsg } from "@/components/ui";
 import KhoiDongTien from "@/components/KhoiDongTien";
 import KhoiTonDong from "@/components/KhoiTonDong";
 import {
+  KhoiHieuQuaXe, KhoiTonDongBoPhan, KhoiPhaiThu, KhoiPhaiTra, KhoiRuiRo, KhoiTienDoBaoCao,
+} from "@/components/KhoiV14";
+import {
   DongLoc, KhoiQuyetDinh, TamThe, TieuDe, tien, dem, type The,
 } from "@/components/DauManHinh01";
 
@@ -100,9 +103,48 @@ function Dash() {
         {sec.kd_doan.rows.length ? <div className="wrap"><table><tbody>{sec.kd_doan.rows.map((r: any) => <tr key={r.sales}><td>{r.sales}</td><td style={{ textAlign: "right" }}>{vnd(r.profit_share)}</td><td>{r.profit_share > 0 ? <Tag cls="ok">có lãi</Tag> : <Tag cls="red">lỗ</Tag>}</td></tr>)}</tbody></table></div>
           : <p className="muted">Chưa có chuyến đoàn quyết toán trong tháng.</p>}
         <p className="muted">{sec.kd_doan.so_chuyen} chuyến đoàn đã quyết toán trong tháng. <Link href="/sales-reports?mang=doan">Báo cáo bán hàng phòng Đoàn →</Link></p></div>}
-      {sec.sap_khoi_hanh && <div className="panel"><h2>Điều hành – chuyến khởi hành 21 ngày tới</h2>{sec.sap_khoi_hanh.length ? <div className="wrap"><table><tbody>{sec.sap_khoi_hanh.map((r: any) => <tr key={r.code}><td>{r.code}</td><td>{fmtD(r.start)} (D-{r.days_left})</td><td>{r.booked}/{r.breakeven} khách {r.below ? <Tag cls="red">dưới hòa vốn</Tag> : <Tag cls="ok">ok</Tag>}</td></tr>)}</tbody></table></div> : <p className="muted">Không có chuyến.</p>}{sec.qua_han_qt?.length > 0 && <p><Tag cls="red">Quá hạn quyết toán</Tag> {sec.qua_han_qt.map((t: any) => t.code).join(", ")}</p>}</div>}
+      {/* KHỐI 04a · ĐIỀU HÀNH. Bản vẽ V1.4 đòi bảy cột: Chuyến · Ngày đi · Số khách · Dịch vụ còn
+          thiếu · Xe · HDV · Phụ trách, và ưu tiên chuyến CÒN THIẾU ĐIỀU KIỆN lên trước.
+
+          Máy chủ hôm nay mới trả ba cột đầu. Bốn cột sau vẫn DỰNG ĐỦ ĐẦU CỘT và ghi "chưa nối" ở
+          từng ô: đầu cột chính là bản mô tả việc còn nợ, giấu đi thì đến lúc dựng phải đi tìm lại
+          bản vẽ. Cũng KHÔNG suy "đã đủ điều kiện" từ việc thiếu dữ liệu – bản vẽ ghi thẳng: không
+          mặc định chuyến đã sẵn sàng.
+
+          Bản vẽ ghi 14 ngày, máy chủ đang tính 21. Chưa đổi vì đó là phép tính ở máy chủ, không
+          phải nhãn ở màn hình; ghi rõ con số thật đang là bao nhiêu. */}
+      {sec.sap_khoi_hanh && <div className="panel" id="dieu-hanh"><h2>Điều hành – chuyến khởi hành 21 ngày tới</h2>
+        <p className="muted">Bản vẽ V1.4 ghi 14 ngày · máy chủ đang tính 21 ngày. Ưu tiên chuyến còn thiếu điều kiện — <b>không</b> mặc định chuyến đã sẵn sàng.</p>
+        {sec.sap_khoi_hanh.length ? <div className="wrap"><table className="v14-bang">
+          <thead><tr><th>Chuyến</th><th>Ngày đi</th><th>Số khách</th><th>Dịch vụ còn thiếu</th><th>Xe</th><th>HDV</th><th>Phụ trách</th></tr></thead>
+          <tbody>{sec.sap_khoi_hanh.map((r: any) => <tr key={r.code}>
+            <td>{r.code}</td>
+            <td>{fmtD(r.start)} (D-{r.days_left})</td>
+            <td>{r.booked}/{r.breakeven} khách {r.below ? <Tag cls="red">dưới hòa vốn</Tag> : <Tag cls="ok">ok</Tag>}</td>
+            <td>{r.dich_vu_thieu ?? <span className="muted">chưa nối</span>}</td>
+            <td>{r.xe ?? <span className="muted">chưa nối</span>}</td>
+            <td>{r.hdv ?? <span className="muted">chưa nối</span>}</td>
+            <td>{r.phu_trach ?? <span className="muted">chưa nối</span>}</td>
+          </tr>)}</tbody></table></div> : <p className="muted">Không có chuyến.</p>}
+        <p className="muted">Bốn cột <b>Dịch vụ còn thiếu · Xe · HDV · Phụ trách</b> máy chủ chưa trả — <b>Điều hành</b> nhập ở <Link className="the-cua" href="/lenh-dieu-xe">Lệnh điều xe →</Link></p>
+        {sec.qua_han_qt?.length > 0 && <p><Tag cls="red">Quá hạn quyết toán</Tag> {sec.qua_han_qt.map((t: any) => t.code).join(", ")}</p>}</div>}
       {sec.bao_cao_ngay && <div className="panel"><h2>Báo cáo ngày (Điều 12) – tháng này</h2><p>{sec.bao_cao_ngay.nhan_su} nhân sự · {sec.bao_cao_ngay.ngay_lam_viec} ngày làm việc · tỷ lệ nộp <b>{Math.round(sec.bao_cao_ngay.ty_le_nop * 100)}%</b> · thiếu 2 ngày liên tiếp: {sec.bao_cao_ngay.thieu_2_ngay}</p><Link href="/reports">Xem tổng hợp</Link></div>}
     </div>
+
+    {/* ══ PHẦN CÒN LẠI CỦA BẢN VẼ V1.4, đúng thứ tự khối 04 → 08 ══
+        04b Hiệu quả đội xe · 04c Tồn đọng theo bộ phận · 05 Phải thu và Phải trả theo hạn ·
+        07 Rủi ro trọng yếu · 08 Tiến độ báo cáo. Khối 06 Dòng tiền đã nằm trên, xem ghi chú cuối
+        components/KhoiV14.tsx về lý do không dựng lại nó ở đây. */}
+    <KhoiHieuQuaXe d={sec.hieu_qua_xe} />
+    <KhoiTonDongBoPhan ds={sec.ton_dong_bo_phan} />
+    {/* Hai khối hạn xếp DỌC, không cạnh nhau. Đặt cạnh nhau thì mỗi khối chỉ còn nửa bề ngang,
+        năm nhóm vỡ thành 2+2+1 và nhóm "Dài hạn" đứng trơ một mình một hàng — đọc thành "bốn nhóm
+        và một cái gì đó". Bản vẽ cũng xếp dọc, năm nhóm một hàng. */}
+    <KhoiPhaiThu ds={sec.phai_thu_theo_han} />
+    <KhoiPhaiTra ds={sec.phai_tra_theo_han} qua_han={sec.phai_tra_qua_han} />
+    <KhoiRuiRo ds={sec.rui_ro_trong_yeu} />
+    <KhoiTienDoBaoCao ds={sec.tien_do_bao_cao} />
+
     <p className="muted">Ngưỡng biên đang áp dụng {pct(d.threshold)} · Robot chạy mỗi 10 phút; CNTT có thể chạy tay ở trang Cảnh báo.</p>
   </>);
 }

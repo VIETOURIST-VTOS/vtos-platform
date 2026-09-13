@@ -203,7 +203,8 @@ def test_bang_dai_tren_man_hinh_01_nam_trong_khung_cuon_rieng():
     ngang: đó là quy ước .wrap đã có sẵn trong globals.css.
     """
     nguon = TRANG.read_text(encoding="utf-8")
-    assert nguon.count('<div className="wrap"><table>') >= 3, (
+    # Đếm '<table' chứ không '<table>': bảng Điều hành nay mang thêm class v14-bang.
+    assert nguon.count('<div className="wrap"><table') >= 3, (
         "Ba bảng dài của màn hình 01 (Kinh doanh Lẻ, Kinh doanh Đoàn, Điều hành 21 ngày tới) phải "
         "nằm trong <div className=\"wrap\"> để tự cuộn trong khung của chúng."
     )

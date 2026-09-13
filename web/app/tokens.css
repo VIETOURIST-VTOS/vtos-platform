@@ -39,6 +39,12 @@
   --vtos-navy-light:   #9BCAFF;  /* chữ rê chuột, chữ nhạt trên nền tối */
   --vtos-nav-bg:       #10273E;  /* NỀN thanh ngang và thanh dọc */
   --vtos-nav-bg-2:     #0C1E30;  /* nền lún của mục trên thanh điều hướng */
+  /* Dải màu của MỤC trên thanh điều hướng — lấy đúng bản vẽ V1.4. Bản sáng phủ trắng 5% lên nền
+     thanh, ra #1C3248; bản vẽ tô đặc và sáng gấp 1,98 lần, đó chính là chỗ làm cả trang trông
+     tối hơn hay sáng hơn. */
+  --vtos-muc-nav:      #24476B;  /* đầu dải, mục thường */
+  --vtos-muc-nav-2:    #1A3858;  /* cuối dải */
+  --vtos-muc-nav-3:    #2A5179;  /* rê chuột */
 
   /* Trạng thái */
   --vtos-success:      #53C49A;  /* đã duyệt, thành công */
