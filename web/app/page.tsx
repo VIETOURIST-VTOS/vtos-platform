@@ -36,12 +36,19 @@ function Dash() {
      tiết – hàng lọc có đường dẫn sang đó. Nhờ vậy tám thẻ không phải mang theo một nhánh "nếu
      chọn quý thì rỗng", và không có chỗ nào lấy số tháng dán nhãn quý. */
   const tam: The[] = [
+    /* Bản vẽ V1.4 chốt dòng phụ của thẻ này là "so với kế hoạch và kỳ trước". Máy chủ chưa có kế
+       hoạch tháng và chưa trả kết quả kỳ trước, nên KHÔNG bịa một tỷ lệ phần trăm: ghi thẳng là
+       chưa có nguồn so sánh và ai phải nhập. Một mũi tên tăng-giảm dựng từ số không có thật thì
+       Chủ tịch đọc là kết quả, chứ không đọc là chỗ trống. */
     { nhan: "Doanh thu tháng", so: tien(k.doanh_thu_thang),
-      duoi: `${k.so_chuyen_thang ?? 0} chuyến đã quyết toán trong tháng` },
+      duoi: `${k.so_chuyen_thang ?? 0} chuyến đã quyết toán · chưa có kế hoạch tháng và kỳ trước để so sánh (Kế toán)` },
     { nhan: "Lợi nhuận trước thuế", so: tien(k.ln_ke_toan_thang),
       duoi: "Lợi nhuận kế toán tháng, cùng phạm vi" },
+    /* Bản vẽ chốt dòng phụ là "Khách đã chốt / chỗ còn". Máy chủ chưa trả sức chứa từng chuyến nên
+       chưa tính được "chỗ còn" – ghi ra chỗ thiếu, không thay bằng con số khác rồi để người đọc
+       tưởng đó là chỗ còn. */
     { nhan: "Tour đang bán", so: dem(c.da_duyet ?? 0),
-      duoi: `${d.n_tours ?? 0} tour trên hệ thống · ${d.pending_requests ?? 0} yêu cầu chưa tạo booking` },
+      duoi: `${d.n_tours ?? 0} tour trên hệ thống · chưa có sức chứa từng chuyến nên chưa tính được chỗ còn (Điều hành)` },
     { nhan: "Tour chờ quyết toán", so: dem((c.ket_thuc || 0) + (c.da_dong_so || 0)),
       duoi: `${sec.qua_han_qt?.length ?? 0} chuyến quá hạn quyết toán`,
       do: (sec.qua_han_qt?.length ?? 0) > 0 },
@@ -59,8 +66,11 @@ function Dash() {
        dòng phụ ngay dưới ghi "1387 cảnh báo đỏ đang mở": con số nhỏ nằm ở chỗ to nhất màn hình,
        con số thật nằm ở dòng chữ nhỏ. Nay lấy đúng `k.canh_bao_do`; nếu máy chủ không gửi thì thẻ
        để trống kèm cửa nhập, không lấy độ dài danh sách thay vào. */
+    /* Bản vẽ chốt ba chỉ số: hồ sơ quá hạn · nghiêm trọng · chưa có người nhận. Máy chủ mới có
+       "nghiêm trọng" (cảnh báo đỏ); chưa gán người nhận cho cảnh báo nên chưa đếm được cái thứ ba,
+       và chưa tách hồ sơ quá hạn ra khỏi cảnh báo đỏ. Nói ra hai cái còn thiếu. */
     { nhan: "Tồn đọng cần xử lý", so: dem(k.canh_bao_do),
-      duoi: `${d.alerts?.length ?? 0} cảnh báo mới nhất đang liệt kê ở bảng bên dưới`,
+      duoi: "cảnh báo mức nghiêm trọng · chưa tách được hồ sơ quá hạn và hồ sơ chưa có người nhận (CNTT)",
       do: (k.canh_bao_do ?? 0) > 0, ai: "Công nghệ thông tin", cua: "/alerts" },
   ];
 

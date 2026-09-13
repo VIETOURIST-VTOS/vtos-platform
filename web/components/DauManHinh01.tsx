@@ -89,7 +89,11 @@ export function DongLoc() {
           chọn bấm vào lại báo "chưa có nguồn". */}
       <Link className="the-cua" href="/phan-he/baocao">Xem theo quý và năm →</Link>
       <span className="tag">Đơn vị tiền: đồng</span>
-      <span className="muted">Phạm vi đang xem: chọn ở ô đơn vị trên thanh ngang</span>
+      {/* SỬA 13/9/2026. Câu cũ ghi "chọn ở ô đơn vị trên thanh ngang" – chỉ vào một ô KHÔNG CÓ:
+          components/ChonDonVi.tsx trả về null khi máy chủ chưa mở GET /pham-vi/don-vi, mà hôm nay
+          thì chưa. Bảo người ta bấm vào chỗ trống là kiểu sai khó chịu nhất, vì họ sẽ đi tìm và cho
+          rằng mình không thấy. Nói thẳng: chưa đổi được đơn vị, và vì sao. */}
+      <span className="muted">Phạm vi do máy chủ áp theo tài khoản · chưa đổi được đơn vị</span>
       {/* Ngày báo cáo là mốc phân nhóm của mọi bảng theo hạn ở dưới – ghi ra để không ai phải đoán. */}
       <span className="muted mh01-ngay">Ngày báo cáo: {homNay || "…"}</span>
     </div>

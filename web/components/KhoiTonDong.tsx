@@ -56,6 +56,9 @@ export default function KhoiTonDong({ ds, tong }: { ds: CanhBao[]; tong?: number
   return (
     <div className="panel" id="ton-dong">
       <div className="mh01-dau">
+        {/* TÊN KHỐI GIỮ NGUYÊN CỦA VTOS (anh Tuấn chốt 13/9/2026). Bản vẽ V1.4 đề nghị đổi thành
+            "Rủi ro & việc cần theo dõi"; anh Tuấn giữ "Tồn đọng cần xử lý" cho khớp tên thẻ chỉ
+            tiêu ở trên – hai chỗ nói về cùng một thứ thì phải gọi cùng một tên. */}
         <h2>Tồn đọng cần xử lý</h2>
         {typeof tong === "number"
           ? <span className="tag">{tong} cảnh báo đang mở</span>
@@ -67,12 +70,16 @@ export default function KhoiTonDong({ ds, tong }: { ds: CanhBao[]; tong?: number
         : <>
             <table className="td-bang">
               <thead>
-                <tr><th>Loại cảnh báo</th><th className="td-so">Số việc</th><th>Mức nặng nhất</th></tr>
+                <tr><th>Việc cần theo dõi</th><th className="td-so">Số việc</th><th>Mức nặng nhất</th></tr>
               </thead>
               <tbody>
                 {nhom.map((n) => (
                   <tr key={n.kind}>
                     <td>
+                      {/* MÃ MÁY GIỮ NGUYÊN (anh Tuấn chốt 13/9/2026). Bản vẽ V1.4 đề nghị đổi mã
+                          thành câu tiếng Việt; anh Tuấn giữ mã của VTOS vì mã là thứ tra được
+                          ngược về robot đã phát ra nó, còn câu dịch thì mỗi người nhớ một kiểu.
+                          Câu ví dụ ngay dưới đã đủ cho người đọc hiểu loại này là gì. */}
                       <b>{n.kind}</b>
                       <div className="muted td-vd">{n.vi_du}</div>
                     </td>
