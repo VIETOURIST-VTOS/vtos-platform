@@ -15,6 +15,14 @@ function NonPackage() {
   const [showForm, setShowForm] = useState(false); const [edit, setEdit] = useState<any>(null);
   const load = useCallback(() => api(`/non-package?month=${month}&service_type=${kind}&paid=${paid}&q=${encodeURIComponent(q)}`).then(setData).catch((e) => toast(errMsg(e), true)), [month, kind, paid, q, toast]);
   useEffect(() => { load(); }, [load]);
+  // Đ-5 (13/9/2026) · phép soát tháng, ĐỌC từ chính booking và dòng chi phí đang có – không có sổ
+  // thứ hai. Nó trả lời một câu mà màn hình này chưa hỏi bao giờ: dịch vụ nào có doanh thu mà
+  // KHÔNG có một dòng giá vốn nào? Lãi của những dòng ấy đang bằng đúng toàn bộ số thu.
+  const [soat, setSoat] = useState<any>(null);
+  useEffect(() => {
+    const [y, m] = month.split("-");
+    api(`/quyet-toan-lop3/dich-vu-le/${y}/${Number(m)}`).then(setSoat).catch(() => setSoat(null));
+  }, [month]);
   const canCreate = ["nv_kd", "gd_kd", "nv_dh", "tp_dh"].includes(role), isDH = ["nv_dh", "tp_dh"].includes(role), canClose = ["ketoan", "tp_dh", "tgd"].includes(role);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); const f = e.target as HTMLFormElement; const d: any = Object.fromEntries(new FormData(f).entries());
@@ -81,11 +89,32 @@ function NonPackage() {
           <td className="num" style={{ color: r.profit < 0 ? "var(--red)" : undefined }}>{vnd(r.profit)}</td><td><Tag cls={pc}>{pl}</Tag>{r.locked && <div className="muted">🔒</div>}</td><td>{fmtDT(r.created_at)}</td>
           <td style={{ whiteSpace: "nowrap" }}>
             <Link href={`/tours/${r.tour_id}`}>chi tiết</Link>{" "}
+            {/* Đ-5 (13/9/2026) · đường THẲNG tới ô nhập bốn khoản chi của dịch vụ này.
+                Ô "Giá vốn NCC" ở biểu sửa bên trên chỉ là MỘT con số gộp – nó không tách được
+                phí lãnh sự / phí dịch vụ visa / phí điều hành / phí dịch thuật, và không mang
+                được ngoại tệ kèm tỷ giá ngày nộp hồ sơ. Bốn thứ ấy nhập ở chiết tính. */}
+            <Link href={`/tours/${r.tour_id}?tab=lop3`} title="Nhập phí LSQ, phí dịch vụ visa, phí điều hành, phí dịch thuật – tách dòng, có ngoại tệ và tỷ giá">chiết tính</Link>{" "}
             <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => printIt(r)}>in phiếu</button>{" "}
             {!r.cancelled && ["da_duyet", "ket_thuc"].includes(r.tour_status) && (isDH || role === "gd_kd" || user?.full_name === r.sales_name) && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setEdit(r)}>sửa</button>}{" "}
             {!r.cancelled && isDH && ["da_duyet", "ket_thuc"].includes(r.tour_status) && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => cancel(r)}>hủy</button>}
           </td></tr>; }) : <tr><td colSpan={12} className="muted">Chưa có dịch vụ lẻ theo bộ lọc.</td></tr>}</tbody></table>
     </div>
+    {(soat?.chan?.length > 0 || soat?.canh_bao?.length > 0) && (
+      <div className="panel wrap">
+        <h2>Soát tháng {month} – {soat.so_chan} chặn · {soat.so_canh_bao} cảnh báo</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Đọc từ chính booking và dòng chi phí của từng dịch vụ – không phải một sổ thứ hai. Bốn cột
+          chi (phí LSQ · phí dịch vụ visa · phí điều hành · phí dịch thuật) lấy theo mã khoản mục;
+          khoản không thuộc bốn mã ấy gom vào «Phí khác» để không con số nào biến mất.
+        </p>
+        {soat.chan.map((c: any, i: number) => (
+          <div key={`c${i}`} className="gate fail"><b>CHẶN – </b>{c.vi_sao} {c.can_lam}</div>
+        ))}
+        {soat.canh_bao.map((c: any, i: number) => (
+          <div key={`w${i}`} className="gate warn">{c.vi_sao} {c.can_lam}</div>
+        ))}
+      </div>
+    )}
     {S.by_type?.length > 0 && <div className="panel wrap"><h2>Tổng hợp theo loại dịch vụ – tháng {month}</h2>
       <table><thead><tr><th>Loại</th><th className="num">Số DV</th><th className="num">Doanh thu</th><th className="num">Đã thu</th><th className="num">Giá vốn</th><th className="num">Lợi nhuận</th><th className="num">Biên</th></tr></thead>
         <tbody>{S.by_type.map((d: any) => <tr key={d.service_type}><td>{d.service_name}</td><td className="num">{d.n}</td><td className="num">{vnd(d.revenue)}</td><td className="num">{vnd(d.paid)}</td><td className="num">{vnd(d.cost)}</td><td className="num"><b>{vnd(d.profit)}</b></td><td className="num">{pct(d.margin)}</td></tr>)}</tbody></table></div>}

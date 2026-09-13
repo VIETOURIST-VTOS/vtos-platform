@@ -215,6 +215,104 @@ function BangNhap({ tieuDe, giaiThich, cot, dong, nn, them, dangGhi, tong }: {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Đ-6b · HOÀN TIỀN TIP VỀ BÊN BÁN
+// ---------------------------------------------------------------------------------------------
+//
+// Cùng ba nguyên tắc với ô tiền tip ở Đ-6, và vì cùng một lý do:
+//
+//  1. ĐƠN VỊ LÀ Ô BẮT BUỘC, KHÔNG CÓ MẶC ĐỊNH. Gõ đơn giá cả-chuyến vào ô mỗi-ngày là ra gấp chín
+//     lần. Tệp thật ghi cùng một khoản 27 €/khách/chuyến ở tờ này và 3 €/khách/ngày × 9 ngày ở tờ
+//     kia — 27 × 31.000 = 837.000, đúng bằng dòng "TIP HDV hoàn cho JTR" của tệp AU.
+//  2. XEM TRƯỚC RỒI MỚI GHI. Nút tính thử không chạm cơ sở dữ liệu.
+//  3. BÊN CỦA VIETOURIST BỊ LOẠI RA — công ty không hoàn tiền cho chính mình.
+function HoanTipBenBan({ tourId, toast, bb, xong }: {
+  tourId: number; toast: (m: string, err?: boolean) => void; bb: any; xong: () => void;
+}) {
+  const [kq, setKq] = useState<any>(null);
+  const [dang, setDang] = useState(false);
+
+  const tinh = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setDang(true);
+    try {
+      setKq(await api(`/quyet-toan-lop3/${tourId}/ben-ban/hoan-tip/xem-truoc`, {
+        method: "POST",
+        json: {
+          don_gia: soTien(f.get("don_gia")), don_vi: String(f.get("don_vi") || "") || null,
+          so_ngay: Number(f.get("so_ngay")) || null, ty_gia: Number(f.get("ty_gia")) || null,
+        },
+      }));
+    } catch (x) { toast(errMsg(x), true); } finally { setDang(false); }
+  };
+
+  return (
+    <div className="panel" style={{ marginBottom: 14 }}>
+      <h3 style={{ margin: "0 0 4px" }}>9c. Hoàn tiền tip về bên bán</h3>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Tiền tip công ty thu của khách đại lý thì phải hoàn về đại lý. Bên của Vietourist bị loại ra
+        — công ty không hoàn tiền cho chính mình. Đây là <b>tính thử</b>, chưa ghi gì.
+      </p>
+      <form onSubmit={tinh}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ minWidth: 150 }}>
+            <label>Đơn giá tip *</label>
+            <input name="don_gia" type="number" required style={{ width: "100%" }} />
+          </div>
+          <div style={{ minWidth: 260 }}>
+            <label>Đơn vị * <span className="muted">ⓘ</span></label>
+            <select name="don_vi" required defaultValue="">
+              <option value="">— chọn —</option>
+              <option value="moi_khach_ca_chuyen">mỗi khách CẢ CHUYẾN – không nhân số ngày</option>
+              <option value="moi_khach_moi_ngay">mỗi khách mỗi NGÀY – nhân với số ngày</option>
+            </select>
+          </div>
+          <div style={{ minWidth: 110 }}>
+            <label>Số ngày</label>
+            <input name="so_ngay" type="number" style={{ width: "100%" }} />
+          </div>
+          <div style={{ minWidth: 130 }}>
+            <label>Tỷ giá</label>
+            <input name="ty_gia" type="number" step="any" style={{ width: "100%" }} />
+          </div>
+          <button className="act grey" disabled={dang} style={{ margin: 0 }}>
+            {dang ? "Đang tính…" : "Tính thử"}
+          </button>
+        </div>
+      </form>
+      {kq && (
+        <div style={{ marginTop: 8 }}>
+          {kq.canh_bao && <div className="gate warn">{kq.canh_bao}</div>}
+          <table>
+            <thead><tr><th>Bên bán</th><th className="num">Số khách</th>
+              <th className="num">Tiền hoàn</th></tr></thead>
+            <tbody>
+              {(kq.theo_ben || []).map((x: any) => (
+                <tr key={x.ten_ben}>
+                  <td>{x.ten_ben}</td>
+                  <td className="num">{x.so_khach}</td>
+                  <td className="num">{vnd(x.so_tien_hoan)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot><tr><td colSpan={2}><b>CỘNG</b></td>
+              <td className="num"><b>{vnd(kq.tong_hoan)}</b></td></tr></tfoot>
+          </table>
+          <p className="muted">
+            Ghi vào tờ của bên bán ở bảng 9b: chọn bên, loại dòng <b>Hoàn tiền tip</b>, đơn giá mang
+            dấu <b>trừ</b>. Máy chặn nếu để dấu dương.
+          </p>
+        </div>
+      )}
+      <p className="muted" style={{ marginBottom: 0 }}>
+        {bb?.so_ben} bên trên chuyến · {kq?.so_ben_bo_qua_vi_la_vietourist ?? 0} bên là Vietourist,
+        đã loại ra khỏi phép chia.
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
 // Biểu chính
 // ---------------------------------------------------------------------------------------------
 
@@ -344,6 +442,10 @@ export default function QuyetToanForm({ tourId, toast }: {
   const [ve, setVe] = useState<any>(null);
   const [tl, setTl] = useState<any>(null);
   const [tlLoai, setTlLoai] = useState<any>(null);
+  // Đ-4 / Đ-12 (13/9/2026) · nhiều bên bán ghép land, và các tờ đề nghị chi phí lãnh sự của chuyến.
+  const [bb, setBb] = useState<any>(null);
+  const [bbDm, setBbDm] = useState<any>(null);
+  const [ls, setLs] = useState<any>(null);
   const [ghi, setGhi] = useState(false);
 
   const nap = useCallback(async () => {
@@ -358,13 +460,17 @@ export default function QuyetToanForm({ tourId, toast }: {
     if (nn) {
       g(`${tourId}/ve`).then(setVe);
       g(`${tourId}/tl-cong-no`).then(setTl);
+      g(`${tourId}/lanh-su`).then(setLs);
     }
+    // Bên bán KHÔNG giới hạn ở tour nước ngoài: ghép đoàn nội địa cũng có đại lý gửi khách.
+    g(`${tourId}/ben-ban`).then(setBb);
     if (s?.hinh_thuc) setHinhThuc(s.hinh_thuc);
   }, [tourId, nn]);
 
   useEffect(() => {
     if (nn && !tlLoai) api("/quyet-toan-lop3/tl-cong-no/loai").then(setTlLoai).catch(() => {});
-  }, [nn, tlLoai]);
+    if (!bbDm) api("/quyet-toan-lop3/ben-ban/danh-muc").then(setBbDm).catch(() => {});
+  }, [nn, tlLoai, bbDm]);
 
   // Khai hình thức. Lần đầu trên tờ trắng thì không hỏi lý do; máy chủ mới là nơi quyết định khi
   // nào cần lý do (tờ đã có dòng), màn hình chỉ chuyển tiếp thông báo của nó.
@@ -626,6 +732,91 @@ export default function QuyetToanForm({ tourId, toast }: {
       )}
 
       <TienTip tourId={tourId} nn={nn} toast={toast} xong={nap} />
+
+      {/* ------------------------------------------------- Đ-4 · NHIỀU BÊN BÁN (GHÉP LAND) */}
+      <BangNhap
+        tieuDe="9a. Bên bán cùng ngồi trên chuyến (ghép land)" nn={nn} dangGhi={ghi}
+        dong={bb?.ben || []}
+        giaiThich="Vietourist cũng là MỘT dòng ở đây, không phải phần còn lại sau khi trừ các đại lý — để nó là phần còn lại thì lúc số khách lệch, phần thiếu tự chảy vào Vietourist mà không ai thấy. Đo trên tour châu Âu 27/05: ba bên, 3 + 5 + 22 = 30 khách."
+        them={(d) => gui("ben-ban", d, "bên bán")}
+        cot={[
+          { khoa: "ten_ben", nhan: "Tên bên bán", batBuoc: true, rong: 200 },
+          { khoa: "la_vietourist", nhan: "Là Vietourist?", kieu: "co", rong: 130,
+            chuThich: "Đánh dấu bên của chính công ty. Phần khách của Vietourist cũng phải có một tờ, không được để nó là phần dư." },
+          { khoa: "mst", nhan: "MST", rong: 140 },
+          { khoa: "so_khach_nguoi_lon", nhan: "Người lớn", kieu: "so", rong: 100 },
+          { khoa: "so_khach_tre_em", nhan: "Trẻ em", kieu: "so", rong: 90 },
+          { khoa: "so_khach_em_be", nhan: "Em bé", kieu: "so", rong: 90 },
+          { khoa: "ghi_chu", nhan: "Ghi chú", rong: 200 },
+          { khoa: "so_khach", nhan: "Tổng khách", chiMay: true },
+          { khoa: "tong_phai_thu", nhan: "Phải thu", kieu: "tien", chiMay: true },
+          { khoa: "da_thanh_toan", nhan: "Đã trả", kieu: "tien", chiMay: true },
+          { khoa: "con_phai_thu", nhan: "Còn phải thu", kieu: "tien", chiMay: true },
+        ]}
+      />
+      <BangNhap
+        tieuDe="9b. Dòng phân bổ cho bên bán" nn={nn} dangGhi={ghi}
+        dong={(bb?.ben || []).flatMap((x: any) =>
+          (x.dong || []).map((d: any) => ({ ...d, ten_ben: x.ten_ben })))}
+        giaiThich="SỐ LƯỢNG CỦA DÒNG KHÔNG PHẢI SỐ KHÁCH CỦA BÊN. Trên tệp thật, bên có 3 khách mà dòng «VISA người lớn» ghi 4 suất — có khách đã sẵn visa, có người mua visa mà không đi. Máy không tự điền; nó chỉ nói ra khi hai con số khác nhau. Dòng HOÀN TIP mang số ÂM."
+        them={(d) => gui("ben-ban/dong", d, "dòng bên bán")}
+        cot={[
+          { khoa: "ben_ban_id", nhan: "Của bên", kieu: "chon", batBuoc: true, rong: 180,
+            chon: (bb?.ben || []).map((x: any) => [String(x.id), x.ten_ben] as [string, string]) },
+          { khoa: "stt", nhan: "STT", kieu: "so", rong: 70 },
+          { khoa: "noi_dung", nhan: "Nội dung", rong: 240 },
+          { khoa: "loai", nhan: "Loại dòng", kieu: "chon", rong: 220,
+            chon: Object.entries(bbDm?.loai_dong || {}).map(([k, v]) => [k, String(v)] as [string, string]) },
+          { khoa: "cach_chia", nhan: "Cách chia", kieu: "chon", rong: 240,
+            chon: Object.entries(bbDm?.cach_chia || {}).map(([k, v]) => [k, String(v)] as [string, string]),
+            chuThich: "Chỉ để người đọc sau biết vì sao dòng này nhân 3 còn dòng kia nhân 3/30. Máy KHÔNG dùng ô này để tự tính." },
+          { khoa: "don_gia", nhan: "Đơn giá", kieu: "tien", rong: 150 },
+          { khoa: "so_luong", nhan: "Số lượng", kieu: "so", rong: 100 },
+          { khoa: "ngay", nhan: "Ngày", kieu: "ngay", rong: 140 },
+          { khoa: "so_chung_tu", nhan: "Số chứng từ", rong: 150 },
+          { khoa: "ghi_chu", nhan: "Ghi chú", rong: 200 },
+          { khoa: "ten_ben", nhan: "Bên", chiMay: true },
+          { khoa: "thanh_tien", nhan: "Thành tiền", kieu: "tien", chiMay: true },
+        ]}
+      />
+      {(bb?.chan?.length > 0 || bb?.canh_bao?.length > 0) && (
+        <div className={bb.chan.length ? "gate fail" : "gate warn"} style={{ marginBottom: 14 }}>
+          {bb.chan.map((c: any, i: number) => <div key={`c${i}`}><b>CHẶN – </b>{c.vi_sao} {c.can_lam}</div>)}
+          {bb.canh_bao.map((c: any, i: number) => <div key={`w${i}`}>{c.vi_sao} {c.can_lam}</div>)}
+        </div>
+      )}
+      {nn && bb?.so_ben > 1 && (
+        <HoanTipBenBan tourId={tourId} toast={toast} bb={bb} xong={nap} />
+      )}
+
+      {/* ------------------------------------------------- Đ-12 · ĐỀ NGHỊ CHI PHÍ LÃNH SỰ */}
+      {nn && ls?.to?.length > 0 && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <h3 style={{ margin: "0 0 4px" }}>10. Đề nghị chi phí lãnh sự — {ls.so_to} tờ</h3>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Biểu phí KHÔNG nằm trong mã nguồn: nó ở bảng giá và do nhân viên team Visa khai, vì mốc
+            tuổi giảm phí là quy định của từng lãnh sự quán. Chỗ máy soi được là chuyện khác —
+            <b> một người đứng hai lần trên cùng một tờ</b>: nộp trùng thì chi trùng.
+          </p>
+          {ls.to.map((t: any) => (
+            <div key={t.de_nghi_id} style={{ marginBottom: 10 }}>
+              <b>{t.ma || `Tờ #${t.de_nghi_id}`}</b> · {t.thi_truong || "—"} · {t.so_dong} khách ·
+              {" "}TLS cơ bản {vnd(t.tong_phi_tls_co_ban)} · LSQ {vnd(t.tong_phi_lsq)} ·
+              {" "}<b>tổng {vnd(t.tong_thanh_toan)}</b>
+              {t.chan?.length > 0 && (
+                <div className="gate fail">
+                  {t.chan.map((c: any, i: number) => <div key={i}><b>CHẶN – </b>{c.vi_sao} {c.can_lam}</div>)}
+                </div>
+              )}
+              {t.canh_bao?.length > 0 && (
+                <div className="gate warn">
+                  {t.canh_bao.map((c: any, i: number) => <div key={i}>{c.vi_sao} {c.can_lam}</div>)}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ------------------------------------------------- Đ-8 · VÉ MÁY BAY THEO MÃ ĐẶT CHỖ */}
       {nn && (<>
