@@ -4,16 +4,20 @@
    ấy; ở đây chỉ ÁNH XẠ các biến cũ của VTOS sang biến thương hiệu, để 76 màn hình đang dùng
    var(--ground), var(--panel)… đổi màu theo mà không phải sửa từng trang.
 
-   MỘT BẢNG MÀU DUY NHẤT, LUÔN SÁNG (anh Tuấn chốt 12/9). Trước đây có thêm một khối
-   @media (prefers-color-scheme: dark) đổi màu theo cài đặt của máy – chính nó làm anh thấy trang
-   nền tối, còn máy khác lại thấy nền sáng. Bộ nhận diện chỉ định nghĩa một bảng màu, nên khối ấy
-   đã gỡ: ai mở VTOS cũng thấy đúng một bộ màu. */
+   MỘT BẢNG MÀU DUY NHẤT, NAY LÀ BẢN TỐI (anh Tuấn chốt 13/9/2026 – trước đó 12/9 chốt bản sáng).
+   Vẫn KHÔNG có khối @media (prefers-color-scheme): màu không được đổi theo cài đặt của máy, vì như
+   thế hai người mở cùng một trang thấy hai màu khác nhau. Bảng màu tối nằm trong tokens.css v1.1,
+   lấy từ bản vẽ V1.4 và đã đo tương phản từng cặp chữ–nền. */
 :root{--top-h:72px;
+  /* --navy là màu CHỮ, --navy2 là màu NỀN của nút. Bản sáng dùng chung một navy cho cả hai;
+     bản tối thì không thể, xem ghi chú "MỘT BIẾN, MỘT VAI" trong tokens.css.
+     --orange nay là VÀNG chú ý của bản vẽ, không còn dùng lại màu xanh của --vtos-info: một thẻ
+     "cần chú ý" cùng màu với liên kết thì màu ấy không nói lên điều gì nữa. */
   --navy:var(--vtos-navy);--navy2:var(--vtos-sky);
-  --teal:var(--vtos-success);--orange:var(--vtos-info);--red:var(--vtos-danger);
+  --teal:var(--vtos-success);--orange:var(--vtos-warning);--red:var(--vtos-danger);
   --ink:var(--vtos-text);--ink2:var(--vtos-text-mute);--line:var(--vtos-line);
   --ground:var(--vtos-surface);--panel:var(--vtos-card);--panel2:var(--vtos-info-bg);
-  --okbg:var(--vtos-success-bg);--warnbg:var(--vtos-info-bg);--redbg:var(--vtos-danger-bg)}
+  --okbg:var(--vtos-success-bg);--warnbg:var(--vtos-warning-bg);--redbg:var(--vtos-danger-bg)}
 *{box-sizing:border-box}html,body{margin:0}
 body{font-family:var(--vtos-font-text);font-size:14px;line-height:1.45;color:var(--ink);background:var(--ground)}
 a{color:var(--navy);font-weight:600}
@@ -21,7 +25,7 @@ a{color:var(--navy);font-weight:600}
    --panel: thanh này phải giữ nguyên một màu ở cả chế độ sáng lẫn tối, giống thanh dọc. */
 /* Đệm dọc 8px chứ không phải 12px: khối logo cao lên 55px sau khi mở rộng khung (12/9), 12+55+12
    là 79px – vượt khoảng 64–72px của §I.2. 8+55+8 = 71px, vừa khít. */
-.top{background:var(--vtos-navy);color:#fff;padding:8px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(255,255,255,.16)}
+.top{background:var(--vtos-nav-bg);color:#fff;padding:8px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(255,255,255,.16)}
 /* Dấu hiệu nhận biết: logo nền trong suốt xếp TRÊN, tên hệ thống xếp DƯỚI (cột dọc). Logo cao cố
    định 24px và để ảnh tự tính bề ngang theo tỉ lệ – khoá cả hai chiều thì ảnh bẹp. Dòng chữ dưới
    giãn chữ .14em cho bằng bề ngang logo, và không bao giờ vỡ dòng. */
@@ -37,7 +41,7 @@ a{color:var(--navy);font-weight:600}
    khi ô đơn vị hai dòng đẩy thanh ngang lên 120px. */
 .top .brand{display:inline-flex;flex-direction:column;align-items:center;gap:3px;line-height:1;
   position:relative;overflow:hidden;flex:0 0 auto;padding:6px 30px;border-radius:var(--vtos-radius-md);
-  background:linear-gradient(112deg,var(--vtos-navy-dark) 0%,var(--vtos-navy) 48%,var(--vtos-sky) 100%);
+  background:linear-gradient(112deg,var(--vtos-navy-dark) 0%,var(--vtos-nav-bg) 48%,var(--vtos-sky) 100%);
   /* NỔI LÊN KHỎI THANH NGANG (anh Tuấn chốt 12/9). Ba lớp, mỗi lớp một việc: viền sáng mảnh tách
      khối khỏi nền navy; vệt sáng trong lòng viền trên làm mép trên bắt sáng; bóng đổ xuống dưới
      cho khối có bề dày. Không dùng màu ngoài bộ nhận diện – bóng lấy chính navy-dark pha loãng. */
@@ -56,7 +60,7 @@ nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bott
 nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:13px;color:var(--ink2);text-decoration:none;white-space:nowrap;font-weight:500}
 nav.tabs a.on{color:var(--navy);border-color:var(--orange);font-weight:600}
 main{max-width:1180px;margin:0 auto;padding:16px}
-h1{font-size:19px;margin:4px 0 12px;color:var(--navy);font-family:var(--vtos-font-display);letter-spacing:-.01em}h2{font-size:14.5px;margin:0 0 10px;color:var(--vtos-navy-dark);font-family:var(--vtos-font-display)}h3{font-size:12.5px;color:var(--ink2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+h1{font-size:19px;margin:4px 0 12px;color:var(--navy);font-family:var(--vtos-font-display);letter-spacing:-.01em}h2{font-size:14.5px;margin:0 0 10px;color:var(--vtos-heading);font-family:var(--vtos-font-display)}h3{font-size:12.5px;color:var(--ink2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
 /* Ô lưới phải CO LẠI ĐƯỢC. Mặc định của lưới là min-width:auto – ô không bao giờ hẹp hơn nội dung
@@ -75,8 +79,18 @@ td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}.num{t
 .toast.err{background:var(--redbg);color:var(--red);border-color:var(--red)}
 label{display:block;font-size:12px;color:var(--ink2);margin-top:8px}
 input,select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13.5px;background:var(--panel);color:var(--ink)}textarea{min-height:72px}
-button.act{background:var(--navy2);color:#fff;border:0;border-radius:6px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer;margin:6px 6px 0 0}
-button.act.teal{background:var(--teal)}button.act.orange{background:var(--orange)}button.act.red{background:var(--red)}button.act.grey{background:var(--ink2)}button.act:disabled{opacity:.5;cursor:default}
+button.act{background:var(--navy2);color:#fff;border:1px solid var(--vtos-navy);border-radius:6px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer;margin:6px 6px 0 0}
+/* CHỮ TỐI TRÊN NÚT MÀU TRẠNG THÁI (sửa 13/9/2026 khi chuyển nền tối). Ở bản sáng, ba màu trạng
+   thái là màu ĐẬM nên chữ trắng đọc được. Bản tối lật ngược: xanh lá #53C49A, vàng #F4C36A và đỏ
+   #FF6B90 đều SÁNG, chữ trắng trên chúng chỉ đạt 1,6–2,7 lần – nhìn qua tưởng ổn vì nút vẫn nổi
+   trên nền tối, nhưng CHỮ trong nút thì gần như không đọc được. Đổi sang chữ màu nền trang:
+   8,45 · 11,17 · 6,74.
+   Nút xám không phải nút màu trạng thái – nó là nút phụ, nên lật hẳn: nền mờ, chữ sáng (11,04). */
+button.act.teal{background:var(--teal);color:var(--vtos-surface);border-color:var(--teal)}
+button.act.orange{background:var(--orange);color:var(--vtos-surface);border-color:var(--orange)}
+button.act.red{background:var(--red);color:var(--vtos-surface);border-color:var(--red)}
+button.act.grey{background:var(--vtos-info-bg);color:var(--vtos-text);border-color:var(--line)}
+button.act:disabled{opacity:.5;cursor:default}
 .muted{color:var(--ink2);font-size:12.5px}.mono{font-family:var(--vtos-font-mono);font-size:12px}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
 @media (max-width:640px){main{padding:10px}td,th{padding:6px 5px}nav.tabs{top:0}.top{position:static}}
@@ -129,7 +143,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* THANH PHÂN HỆ – nền xanh đậm theo hình anh Tuấn gửi 12/9/2026. Màu đặt THẲNG chứ không qua biến
    --panel: biến ấy đảo màu theo chế độ tối của máy, mà thanh này phải giữ nguyên một màu ở cả hai
    chế độ, nếu không thì nửa sáng nửa tối. Chữ trên nền này dùng màu riêng, không dùng --ink. */
-aside.side{flex:0 0 252px;width:252px;background:var(--vtos-navy);color:rgba(255,255,255,.86);border-right:1px solid rgba(255,255,255,.16);position:sticky;top:var(--top-h);max-height:calc(100vh - var(--top-h));min-height:calc(100vh - var(--top-h));overflow-y:auto;padding:8px 0 14px}
+aside.side{flex:0 0 252px;width:252px;background:var(--vtos-nav-bg);color:rgba(255,255,255,.86);border-right:1px solid rgba(255,255,255,.16);position:sticky;top:var(--top-h);max-height:calc(100vh - var(--top-h));min-height:calc(100vh - var(--top-h));overflow-y:auto;padding:8px 0 14px}
 /* Mục nhóm: viên bo 6px theo bản vẽ 12/9 (bo góc của cả hệ là 8px cho thẻ, 6px cho nút và mục
    menu). Bỏ vạch màu bên trái – mục đang mở tô nền xanh, đọc rõ hơn một vạch 3px. */
 aside.side .grp{display:flex;align-items:center;gap:10px;width:calc(100% - 16px);margin:0 8px 6px;text-align:left;
@@ -223,11 +237,11 @@ a.o-cb:hover{background:var(--panel2)}
   border:1px solid var(--vtos-line);border-radius:999px}
 .cay-chip b{font-size:11px;color:var(--vtos-navy-light);font-variant-numeric:tabular-nums}
 .cay-chip:hover{border-color:var(--vtos-navy-light);color:var(--vtos-navy)}
-.cay-chip.on{background:var(--vtos-navy);border-color:var(--vtos-navy);color:#fff}
+.cay-chip.on{background:var(--vtos-sky);border-color:var(--vtos-sky);color:#fff}
 .cay-chip.on b{color:rgba(255,255,255,.72)}
 
 .cay-dau{display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:var(--vtos-radius-lg);
-  background:var(--vtos-navy);color:#fff;margin-bottom:14px}
+  background:var(--vtos-sky);color:#fff;margin-bottom:14px}
 .cay-dau h1{margin:0;font-size:22px;color:#fff}
 .cay-dau-ma{flex:0 0 auto;font-size:20px;font-weight:700;letter-spacing:1px;padding:10px 13px;
   border-radius:var(--vtos-radius-md);background:rgba(255,255,255,.12);color:rgba(255,255,255,.82);
@@ -302,8 +316,8 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
    viết `button.act{...}`, nên một <a class="act"> không nhận màu nào cả và ra một dòng chữ trần.
    Đây đúng là lỗi đã có sẵn ở khối "Việc chờ tôi xử lý" cũ, chỗ ấy phải chữa bằng style nội tuyến. */
 .mh01-qd-nut{display:inline-block;text-decoration:none;margin:0;padding:7px 13px;font-size:13px;
-  font-weight:600;color:#fff;background:var(--vtos-info);border-radius:var(--vtos-radius-sm,6px)}
-.mh01-qd-nut:hover{background:var(--vtos-navy)}
+  font-weight:600;color:#fff;background:var(--vtos-sky);border-radius:var(--vtos-radius-sm,6px)}
+.mh01-qd-nut:hover{background:var(--vtos-sky)}
 
 /* Tám thẻ: để lưới tự xuống dòng theo bề rộng thật. Khoá cứng bốn cột thì ở 1280px nhãn dài như
    "Lợi nhuận trước thuế" bị cắt, mà cắt nhãn của một con số tiền là chuyện không được phép. */
@@ -325,7 +339,7 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
    kèm cửa là việc còn thiếu, không phải một ô trống bình thường. */
 .the-cua{font-size:11.5px;font-weight:600;color:var(--vtos-navy);text-decoration:none;
   border-bottom:1px solid var(--vtos-navy-light)}
-.the-cua:hover{color:var(--vtos-sky)}
+.the-cua:hover{color:var(--vtos-navy-light)}
 
 /* KHỐI TỒN ĐỌNG (components/KhoiTonDong.tsx). Bảng gom nhóm, không phải bảng dữ liệu dài – nên
    cột số canh phải và dùng chữ số đều bề ngang để mắt so hàng dọc được. */

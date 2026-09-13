@@ -1,28 +1,65 @@
-/* VTOS — biến màu giao diện. Phiên bản 1.0 · 09/2026 */
+/* VTOS — biến màu giao diện. Phiên bản 1.1 · BẢN TỐI · 13/09/2026
+ *
+ * ANH TUẤN CHỐT 13/9/2026: toàn bộ platform chuyển sang NỀN TỐI theo bản vẽ
+ * "VTOS · Bảng điều hành Chủ tịch · Navy" V1.4, và bảng màu ấy được KHAI THẲNG vào bộ nhận diện —
+ * không sống ngoài luồng trong globals.css. Nhờ vậy bộ nhận diện vẫn là một nguồn duy nhất.
+ *
+ * BỘ MÀU GỐC CỦA BẢN VẼ V1.4 (đọc thẳng từ :root của tệp HTML, không phải chép tay):
+ *   --bg #091624 · --nav #10273e · --panel #122c45 · --panel2 #183550 · --line #29445d
+ *   --text #e8f1f8 · --muted #9bb2c6 · --blue #438bea · --gold #f4c36a · --green #53c49a
+ *
+ * BỐN CHỖ ĐÃ CHỈNH SO VỚI BẢN VẼ, mỗi chỗ vì một lý do đo được, không phải vì thấy đẹp hơn:
+ *   1. Viền  #29445d → #2E4E6B : bản vẽ chỉ hơn nền thẻ 1,41 lần, đường kẻ bảng gần như biến mất.
+ *   2. Xanh nhấn #438bea → #6FA8F0 : chữ và liên kết cỡ 13px trên nền thẻ chỉ đạt 4,16 (dưới
+ *      ngưỡng 4,5 của WCAG AA). #6FA8F0 đạt 5,80. Bản vẽ chỉ dùng màu ấy cho số CỠ LỚN nên không
+ *      lộ ra.
+ *   3. Đỏ #FC4D7A (của bộ nhận diện v1.0) → #FF6B90 : trên nền tối chỉ đạt 4,40.
+ *   4. Nền nút chính lấy #1E63C8 : chữ trắng đạt 5,72. Bản vẽ không khai riêng màu nút.
+ *
+ * BỘ MÀU SÁNG v1.0 (12/9/2026) GIỮ LẠI Ở ĐÂY LÀM BẢN GHI, phòng khi cần dựng lại bản sáng:
+ *   navy #14538D · navy-dark #0B2545 · sky #2E7FB8 · navy-light #5A9BD4
+ *   success #3B8C43 · danger #FC4D7A · info #2E7FB8
+ *   success-bg #E9F3EA · danger-bg #FDECF0 · info-bg #E7EFF7
+ *   surface #F4F7FA · card #FFFFFF · line #E3E9EF
+ *   text #0B2545 · text-mute #64798C · text-faint #94A5B4
+ *
+ * MỘT BIẾN, MỘT VAI. Ở bản sáng, `--vtos-navy` vừa làm NỀN thanh điều hướng vừa làm MÀU CHỮ của
+ * số và liên kết — một màu navy đậm gánh được cả hai. Trên nền tối thì không: nền thanh phải tối,
+ * chữ phải sáng. Nên bản này tách hẳn:
+ *   --vtos-nav-bg  là NỀN (thanh ngang, thanh dọc)
+ *   --vtos-navy    là CHỮ và SỐ nổi bật
+ *   --vtos-sky     là NỀN của nút và thẻ nhãn đặc (chữ trắng nằm trên)
+ * Trộn ba vai này lại là cách chắc chắn nhất để có một nút xanh chữ xanh không ai đọc được.
+ */
 :root {
   /* Thương hiệu */
-  --vtos-navy:         #14538D;  /* thanh điều hướng, nút chính */
-  --vtos-navy-dark:    #0B2545;  /* chữ tiêu đề, nền rất tối */
-  --vtos-sky:          #2E7FB8;  /* liên kết, trạng thái chờ */
-  --vtos-navy-light:   #5A9BD4;  /* logo & chữ trên nền tối */
+  --vtos-navy:         #6FA8F0;  /* CHỮ và SỐ nổi bật, liên kết */
+  --vtos-navy-dark:    #0B1B2B;  /* nền rất tối, đầu dải chuyển sắc của khối logo */
+  --vtos-sky:          #1E63C8;  /* NỀN nút chính và thẻ nhãn đặc */
+  --vtos-navy-light:   #9BCAFF;  /* chữ rê chuột, chữ nhạt trên nền tối */
+  --vtos-nav-bg:       #10273E;  /* NỀN thanh ngang và thanh dọc */
+  --vtos-nav-bg-2:     #0C1E30;  /* nền lún của mục trên thanh điều hướng */
 
   /* Trạng thái */
-  --vtos-success:      #3B8C43;  /* đã duyệt, thành công */
-  --vtos-danger:       #FC4D7A;  /* từ chối, cảnh báo */
-  --vtos-info:         #2E7FB8;  /* chờ xử lý */
-  --vtos-success-bg:   #E9F3EA;
-  --vtos-danger-bg:    #FDECF0;
-  --vtos-info-bg:      #E7EFF7;
+  --vtos-success:      #53C49A;  /* đã duyệt, thành công */
+  --vtos-danger:       #FF6B90;  /* từ chối, cảnh báo */
+  --vtos-warning:      #F4C36A;  /* cần chú ý */
+  --vtos-info:         #6FA8F0;  /* chờ xử lý */
+  --vtos-success-bg:   #14392F;
+  --vtos-danger-bg:    #3B1B27;
+  --vtos-warning-bg:   #35290F;
+  --vtos-info-bg:      #183550;
 
   /* Nền & đường kẻ */
-  --vtos-surface:      #F4F7FA;  /* nền màn hình */
-  --vtos-card:         #FFFFFF;  /* nền thẻ, bảng */
-  --vtos-line:         #E3E9EF;  /* viền bảng, khung nhập */
+  --vtos-surface:      #091624;  /* nền màn hình */
+  --vtos-card:         #122C45;  /* nền thẻ, bảng */
+  --vtos-line:         #2E4E6B;  /* viền bảng, khung nhập */
 
   /* Chữ */
-  --vtos-text:         #0B2545;
-  --vtos-text-mute:    #64798C;
-  --vtos-text-faint:   #94A5B4;
+  --vtos-text:         #E8F1F8;
+  --vtos-heading:      #DCE9F4;  /* chữ tiêu đề */
+  --vtos-text-mute:    #9BB2C6;
+  --vtos-text-faint:   #7B93A8;
   --vtos-text-on-navy: #FFFFFF;
 
   /* Bo góc */
