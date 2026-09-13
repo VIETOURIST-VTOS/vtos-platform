@@ -10,6 +10,7 @@ from app.models.vietrip import TourCostLine
 from app.models.ops import PaymentRequest
 from app.services import rules as R
 from app.services.vietrip import _strip_accents
+from app.api.deps import toan_quyen   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
 
 def _norm(s: str) -> str:
@@ -107,7 +108,7 @@ def cancel_line(db: Session, u: User, t: Tour, l: TourCostLine, reason: str) -> 
 
 def set_doc(db: Session, u: User, t: Tour, l: TourCostLine, name: str, data: str) -> None:
     """Gắn chứng từ (ảnh/PDF data URL) cho dòng. Sau đóng số vẫn cho bổ sung chứng từ (không đổi số)."""
-    if u.id != t.operator_id and u.role not in ("ketoan", "cntt"): raise Gate("CONG_6", "Chỉ người điều hành chuyến hoặc Kế toán gắn chứng từ")
+    if u.id != t.operator_id and u.role not in ("ketoan", "cntt") and not toan_quyen(u): raise Gate("CONG_6", "Chỉ người điều hành chuyến hoặc Kế toán gắn chứng từ")
     if t.status in ("kt_xac_nhan", "khoa"): raise Gate("TRANG_THAI", "Tour đã xác nhận/khóa – không thay chứng từ")
     if data and not data.startswith(("data:image/", "data:application/pdf")): raise Gate("QT_NHAP", "Chứng từ phải là ảnh hoặc PDF")
     if len(data) > MAX_DOC: raise Gate("QT_NHAP", "Tệp quá lớn (tối đa ~1,5 MB) – vui lòng nén ảnh")

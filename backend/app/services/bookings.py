@@ -10,6 +10,7 @@ from app.models.ops import PaymentRequest
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services import payments as PAY
+from app.api.deps import toan_quyen   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
 UNLOCK_ROLES = ("tp_dh", "gd_kd", "tp_kd", "cntt", "tgd")
 CANCEL_ROLES = ("nv_dh", "tp_dh")
@@ -65,7 +66,7 @@ def booking_view(b: Booking) -> dict:
 
 # ---------- cập nhật thông tin khách, khóa / mở khóa ----------
 def update_customer(db: Session, u: User, b: Booking, d: dict) -> Booking:
-    if u.role not in ("nv_dh", "tp_dh") and u.id != b.sales_id: raise HTTPException(403, "Chỉ Điều hành hoặc sale phụ trách sửa thông tin khách")
+    if u.role not in ("nv_dh", "tp_dh") and u.id != b.sales_id and not toan_quyen(u): raise HTTPException(403, "Chỉ Điều hành hoặc sale phụ trách sửa thông tin khách")
     if b.cancelled: raise Gate("TRANG_THAI", "Booking đã hủy")
     if b.locked: raise Gate("KHOA_BOOKING", f"Booking đã khóa ({b.lock_reason}) – TP Điều hành / GĐ KD mở khóa mới sửa được")
     before = {"khach": b.customer_name, "sdt": b.customer_phone, "adl": b.adl, "chd": b.chd, "inf": b.inf}
@@ -92,7 +93,7 @@ def lock(db: Session, b: Booking, reason: str, actor: str = "robot", audit: bool
 
 
 def unlock(db: Session, u: User, b: Booking, note: str) -> str:
-    if u.role not in UNLOCK_ROLES: raise HTTPException(403, "Chỉ TP Điều hành / GĐ Kinh doanh / CNTT mở khóa booking")
+    if u.role not in UNLOCK_ROLES and not toan_quyen(u): raise HTTPException(403, "Chỉ TP Điều hành / GĐ Kinh doanh / CNTT mở khóa booking")
     if not b.locked: raise Gate("TRANG_THAI", "Booking chưa khóa")
     if not (note or "").strip(): raise Gate("KHOA_BOOKING", "Mở khóa phải ghi lý do")
     b.locked, b.lock_reason = False, ""
@@ -123,7 +124,7 @@ def _next_bl(db: Session) -> str:
 
 def cancel(db: Session, u: User, b: Booking, reason: str, charge: float = 0, retain: bool = True, expires_days: int | None = None) -> dict:
     """Điều hành hủy booking (một cửa). Tiền đã nộp − phí hủy → bảo lưu (mặc định) hoặc đề nghị chi hoàn tiền."""
-    if u.role not in CANCEL_ROLES: raise HTTPException(403, "Chỉ Phòng Điều hành hủy booking (một cửa)")
+    if u.role not in CANCEL_ROLES and not toan_quyen(u): raise HTTPException(403, "Chỉ Phòng Điều hành hủy booking (một cửa)")
     if b.cancelled: raise Gate("TRANG_THAI", "Booking đã hủy")
     if not (reason or "").strip(): raise Gate("HUY_BOOKING", "Hủy booking phải ghi lý do (hiển thị ở Tiền bảo lưu)")
     if b.tour and b.tour.status in ("da_dong_so", "kt_xac_nhan", "khoa"): raise Gate("TRANG_THAI", "Tour đã đóng số quyết toán – không hủy booking; xử lý qua hoàn tiền")
@@ -164,7 +165,7 @@ def retention_out(r: Retention, db: Session | None = None) -> dict:
 
 def apply_retention(db: Session, u: User, rt: Retention, nb: Booking, amount: float | None = None) -> Receipt:
     """Dùng tiền bảo lưu cho booking mới: lập phiếu thu phương thức 'bao_luu' (Kế toán xác nhận ngay), bút toán Nợ 131 booking cũ – Có 131 booking mới."""
-    if u.role not in ("nv_dh", "tp_dh", "ketoan"): raise HTTPException(403, "Chỉ Điều hành / Kế toán tất toán bảo lưu")
+    if u.role not in ("nv_dh", "tp_dh", "ketoan") and not toan_quyen(u): raise HTTPException(403, "Chỉ Điều hành / Kế toán tất toán bảo lưu")
     if rt.status != "hieu_luc": raise Gate("BAO_LUU", "Khoản bảo lưu không còn hiệu lực")
     if nb.cancelled: raise Gate("BAO_LUU", "Booking mới đã hủy")
     if nb.id == rt.booking_id: raise Gate("BAO_LUU", "Không dùng bảo lưu cho chính booking gốc")
@@ -193,7 +194,7 @@ def apply_retention(db: Session, u: User, rt: Retention, nb: Booking, amount: fl
 
 def refund_retention(db: Session, u: User, rt: Retention, amount: float | None, note: str) -> PaymentRequest:
     """Đề xuất hoàn tiền cho khách (đi luồng đề nghị chi hoàn tiền: GĐ KD/TP ĐH xác nhận → Kế toán → TGĐ → chi)."""
-    if u.role not in ("nv_dh", "tp_dh", "nv_kd", "tn_kd", "tp_kd", "gd_kd", "ketoan"): raise HTTPException(403, "Không có quyền đề xuất hoàn tiền")
+    if u.role not in ("nv_dh", "tp_dh", "nv_kd", "tn_kd", "tp_kd", "gd_kd", "ketoan") and not toan_quyen(u): raise HTTPException(403, "Không có quyền đề xuất hoàn tiền")
     if rt.status != "hieu_luc": raise Gate("BAO_LUU", "Khoản bảo lưu không còn hiệu lực")
     if rt.refund_request_id:
         pr = db.get(PaymentRequest, rt.refund_request_id)
@@ -219,7 +220,7 @@ def on_refund_paid(db: Session, pr: PaymentRequest) -> None:
 
 def cancel_retention(db: Session, u: User, rt: Retention, note: str) -> str:
     """Hủy bảo lưu (khách bỏ / hết hạn): số còn lại ghi thu nhập khác (Nợ 131 – Có 711)."""
-    if u.role not in ("tp_dh", "gd_kd", "tp_kd", "tgd", "ketoan"): raise HTTPException(403, "Chỉ TP ĐH / GĐ KD / Kế toán / TGĐ hủy bảo lưu")
+    if u.role not in ("tp_dh", "gd_kd", "tp_kd", "tgd", "ketoan") and not toan_quyen(u): raise HTTPException(403, "Chỉ TP ĐH / GĐ KD / Kế toán / TGĐ hủy bảo lưu")
     if rt.status != "hieu_luc": raise Gate("BAO_LUU", "Khoản bảo lưu không còn hiệu lực")
     if not (note or "").strip(): raise Gate("BAO_LUU", "Hủy bảo lưu phải ghi lý do")
     amt = round((rt.remaining or 0))

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models.core import Product, Tour, TourEvent, User, COST_ITEMS
 from app.services import rules as R
+from app.api.deps import toan_quyen   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
 STEP_TITLES = {"khoi_tao": "Khởi tạo tour / dự toán", "trinh_du_toan": "Đề nghị phê duyệt dự toán", "tp_xac_nhan": "Trưởng phòng Điều hành xác nhận",
                "duyet": "Phê duyệt dự toán", "ky": "Ký duyệt chuyến dưới biên", "d7": "Quyết định mốc D-7", "dong_so": "Đóng số quyết toán",
@@ -58,7 +59,7 @@ def next_tour_code(db: Session, p: Product, start: date) -> str:
 
 def open_tour(db: Session, u: User, p: Product, start: date, seats: int, price_adl: float | None = None, price_chd: float = 0, price_inf: float = 0,
               seats_promo: int = 0, price_promo: float = 0, operator_id: int | None = None, note: str = "") -> Tour:
-    if u.role not in ("nv_dh", "tp_dh", "cntt"): raise HTTPException(403, "Chỉ Phòng Điều hành mở tour từ sản phẩm (ĐH Điều 2)")
+    if u.role not in ("nv_dh", "tp_dh", "cntt") and not toan_quyen(u): raise HTTPException(403, "Chỉ Phòng Điều hành mở tour từ sản phẩm (ĐH Điều 2)")
     days = max(1, p.days or 1)
     t = Tour(code=next_tour_code(db, p, start), name=p.name, tour_type=p.tour_type, start_date=start, end_date=start + timedelta(days=days - 1),
              operator_id=operator_id or p.operator_id or u.id, price_per_pax=float(price_adl if price_adl is not None else p.reference_price),
