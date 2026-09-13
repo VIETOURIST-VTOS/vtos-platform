@@ -236,7 +236,11 @@ API_CHUNG = ("/api/v1/auth", "/api/v1/health", "/api/v1/meta", "/api/v1/alerts",
              "/api/v1/pham-vi")
 # Màn hình ai đăng nhập cũng có (giống danh sách phụ trong ALL_MENU_PATHS): trang chủ, đổi mật khẩu,
 # cảnh báo, báo cáo công việc. Bảng lương cá nhân đi qua /payroll và tự lọc về đúng người.
-MAN_HINH_MOI_NGUOI = ("/", "/doi-mat-khau", "/alerts", "/reports", "/payroll", "/phieu-luong")
+# "/offline" thêm 13/9/2026 cùng đợt đưa VTOS thành app cài được: trang dự phòng service worker
+# bật lên khi MÁY CHỦ KHÔNG VỚI TỚI. Nó không hỏi quyền được – lúc ấy không gọi được máy chủ –
+# nên phải là màn hình mở cho mọi người. Trang không mang một con số nào, chỉ báo mất mạng.
+MAN_HINH_MOI_NGUOI = ("/", "/doi-mat-khau", "/alerts", "/reports", "/payroll", "/phieu-luong",
+                      "/offline")
 
 # Màn hình → nhóm API nó gọi. Đo từ mã giao diện ngày 08/9/2026.
 MAN_HINH_API = {
@@ -336,7 +340,13 @@ MAN_HINH_API = {
     "/ngoai-le": ("/api/v1/ngoai-le",),
     "/nha-cung-cap": ("/api/v1/ncc", "/api/v1/tours"),
     "/noi-dung": ("/api/v1/noi-dung", "/api/v1/marketing"),
-    "/non-package": ("/api/v1/non-package", "/api/v1/bookings", "/api/v1/tours"),
+    # Đ-5 (13/9/2026): thêm tiền tố lớp 3 vì màn hình này gọi phép soát tháng của dịch vụ lẻ
+    # (/quyet-toan-lop3/dich-vu-le/{nam}/{thang} – CHỈ ĐỌC, không có cửa ghi nào).
+    #
+    # Hàng rào trong vẫn nguyên: danh sách XEM của api/v1/quyet_toan_lop3.py không có vai Kinh
+    # doanh nào, nên bốn vai Kinh doanh xem được màn hình này vẫn KHÔNG đọc được phần giá vốn.
+    "/non-package": ("/api/v1/non-package", "/api/v1/bookings", "/api/v1/tours",
+                     "/api/v1/quyet-toan-lop3"),
     # /ops dùng chung thành phần với /hr (HrScreens) nên chạm cùng nhóm API. Quyền chi tiết vẫn tách:
     # tab bảng lương có cổng riêng, nên chạm được nhóm /payroll không có nghĩa là đọc được bảng lương.
     "/ops": ("/api/v1/hr", "/api/v1/employees", "/api/v1/incidents", "/api/v1/incident-levels",
@@ -707,7 +717,13 @@ MATRIX = {
 }
 
 # Mọi trang có trong giao diện – kể cả trang không đặt điều kiện vai trò – để dựng danh sách ẩn cho vai trò bị giới hạn.
-ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/phieu-luong", "/doi-mat-khau")
+# "/phan-he/[khoa]" là TRANG MỤC LỤC của tám phân hệ (13/9/2026) – bấm thanh phân hệ trên menu
+# dọc thì mở nó. Khai ở đây chứ không ở MENU_ROLES vì nó không phải màn hình nghiệp vụ: nó chỉ
+# liệt kê lại những màn hình mà chính người dùng đã được thấy, và tự lọc theo hidden_menus của
+# phiên. Có tên trong danh sách này thì vai trò bị giới hạn (tài xế, HDV, chuyên viên visa)
+# cũng được quyết định có thấy hay không, thay vì mặc nhiên thấy vì chưa ai khai.
+ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/phieu-luong",
+                                      "/doi-mat-khau", "/phan-he/[khoa]", "/offline")
 
 
 # Vai trò bị giới hạn: chỉ được thấy đúng những trang liệt kê ở đây.
@@ -809,7 +825,11 @@ def hr_tabs_for(db, u: User) -> list[str]:
 # nên ẩn /reports khỏi menu của họ là đúng, và ba phép thử vai trò nói vậy là ba phép thử đúng.
 # Bài học ghi lại ở đây vì nó sẽ lặp: thấy một phép thử chặn điều mình cho là quyền lợi, phải đi tìm
 # quyết định đằng sau nó trước, chứ không sửa phép thử cho khớp với suy đoán của mình.
-MAN_HINH_KHONG_DUOC_AN = ("/doi-mat-khau", "/phieu-luong")
+# Trang mục lục phân hệ có mặt ở đây từ 13/9/2026: anh Tuấn chốt AI CŨNG THẤY ĐỦ TÁM PHÂN HỆ,
+# kể cả tài xế, hướng dẫn viên và chuyên viên visa. Mục không có quyền thì KHOÁ lại chứ không
+# giấu – giấu thì người ta không biết hệ thống có gì và không biết phải xin quyền ở đâu.
+# Trang này không mang một con số nghiệp vụ nào, nó chỉ liệt kê TÊN màn hình.
+MAN_HINH_KHONG_DUOC_AN = ("/doi-mat-khau", "/phieu-luong", "/phan-he/[khoa]")
 
 
 def menus_for(u: User, db=None) -> list[str]:

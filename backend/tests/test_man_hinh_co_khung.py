@@ -17,6 +17,10 @@ WEB = Path(__file__).resolve().parents[2] / "web" / "app"
 NGOAI_LE = {
     "payroll": "chỉ chuyển hướng sang /hr, không vẽ gì",
     "login": "màn hình đăng nhập – chưa có phiên thì chưa có khung",
+    # Thêm 13/9/2026 cùng đợt đưa VTOS thành app cài được. Trang này service worker bật lên khi
+    # MÁY CHỦ KHÔNG VỚI TỚI – mà Shell thì gọi /auth/me ngay khi dựng, nên bọc nó vào Shell là cầm
+    # chắc một màn hình trắng đúng lúc người dùng cần đọc dòng "máy đang không có mạng".
+    "offline": "trang dự phòng khi mất mạng – Shell gọi máy chủ nên vô dụng ở đúng lúc này",
 }
 
 

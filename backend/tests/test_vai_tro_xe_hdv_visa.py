@@ -69,7 +69,16 @@ def test_vai_tro_bi_gioi_han_chi_thay_dung_mot_man_hinh():
     # trong bảng lương như mọi người khác, nên không xem được lương của chính mình là mất một quyền chứ
     # không phải bị giới hạn phạm vi. Hai màn hình này khác hẳn nhau và dòng 63 ở trên vẫn giữ nguyên:
     # /payroll – bảng lương TOÀN CÔNG TY – vẫn phải nằm trong danh sách ẩn của tài xế.
-    assert AC.menus_for(type("U", (), {"role": "xe_hdv"})()) == ["/xe-hdv", "/doi-mat-khau", "/phieu-luong"]
+    #
+    # Từ 13/9/2026 thêm "/phan-he/[khoa]" – TRANG MỤC LỤC của tám phân hệ. Anh Tuấn chốt: ai cũng
+    # thấy đủ tám phân hệ, mục không có quyền thì KHOÁ lại chứ không giấu, và luật ấy áp dụng chung
+    # cho cả tài xế, hướng dẫn viên, chuyên viên visa. Lý do: giấu thì người ta không biết hệ thống
+    # có những gì, không biết xin quyền ở đâu, và tưởng phần mềm chưa làm chức năng ấy.
+    # Trang này KHÔNG nới phạm vi của tài xế một chút nào: nó không gọi máy chủ, không hiện một con
+    # số nghiệp vụ nào, chỉ liệt kê TÊN màn hình – và chính những cái tên ấy hiện ra ở trạng thái
+    # khoá. Dòng 63 ở trên vẫn giữ nguyên: mọi màn hình nghiệp vụ vẫn nằm trong danh sách ẩn.
+    assert AC.menus_for(type("U", (), {"role": "xe_hdv"})()) == [
+        "/xe-hdv", "/doi-mat-khau", "/phieu-luong", "/phan-he/[khoa]"]
     assert "/phieu-luong" not in an, "tài xế phải xem được phiếu lương của chính mình"
 
 

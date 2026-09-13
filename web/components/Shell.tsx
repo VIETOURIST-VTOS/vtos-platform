@@ -23,10 +23,12 @@ type Block = Item | Section;
 /** `icon` phục vụ trạng thái THU của menu (v1.1 §I.2: rộng 224–240px, thu còn 56–64px). Khi thu thì
  *  chỉ còn biểu tượng, và §I.2 đòi "biểu tượng phải có chú thích" – nhãn nhóm đi vào title và
  *  aria-label chứ không mất. Một hàng biểu tượng không chú thích là một hàng phải đoán. */
-/** `href` dành cho nhóm KHÔNG CÓ mục con: thanh phân hệ ấy tự nó là một đường dẫn, bấm là đi thẳng.
- *  Thêm 12/9/2026 khi anh Tuấn bỏ mục "Bảng điều hành" khỏi nhóm Tổng quan – nhóm còn rỗng thì thà
- *  cho bấm thẳng còn hơn để một cái mũi tên xổ ra khoảng trắng. */
-type Group = { key: string; label: string; icon: string; blocks: Block[]; href?: string };
+/** `href` – nơi thanh phân hệ dẫn tới khi BẤM (anh Tuấn chốt phương án B, 13/9/2026). Bảy nhóm
+ *  nghiệp vụ dẫn tới TRANG PHÂN HỆ /phan-he/<khoa>: một trang vẽ đủ cây chức năng theo bản vẽ v1.3,
+ *  mục nào đã có trang thì bấm đi được, mục nào còn nợ thì ghi rõ "chưa dựng". Riêng Tổng quan dẫn
+ *  thẳng "/" vì bảng điều hành CHÍNH LÀ màn hình của phân hệ ấy – dựng thêm một trang mục lục cho
+ *  nó chỉ tổ thêm một cú bấm. */
+type Group = { key: string; label: string; icon: string; blocks: Block[]; href: string };
 
 /** Biểu tượng vẽ bằng NÉT (24×24, stroke 1.7, không tô đặc) thay cho emoji. Ba lý do, không phải
  *  chuyện thẩm mỹ: emoji mỗi máy vẽ một kiểu – Windows, máy Mac và điện thoại ra ba hình khác nhau
@@ -147,7 +149,7 @@ export const GROUPS: Group[] = [
   // ghi ra để anh lật lại được. Hai màn hình ấy làm việc với khách SAU khi đã bán – giữ tiếng và
   // giữ khách, cùng một việc với Nội dung & thương hiệu. Phiếu chăm sóc VẪN tự giao cho nhân viên
   // đã bán như chốt 07/9; đổi nhóm menu không đổi người được giao việc.
-  { key: "marketing", label: "Marketing & PR", icon: "marketing", blocks: [
+  { key: "marketing", label: "Marketing & PR", icon: "marketing", href: "/phan-he/marketing", blocks: [
     ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"],
     ["Chiến dịch", "/marketing"],
     ["Nội dung & thương hiệu", "/noi-dung"],
@@ -158,7 +160,7 @@ export const GROUPS: Group[] = [
   // "Hộp thư" Ở LẠI Kinh doanh dù ba kênh (Zalo OA, vChat, tổng đài) do Marketing dựng: người mở
   // hộp thư mỗi ngày để trả lời khách là nhân viên bán hàng. Phần cấu hình kênh nằm ở Quản trị hệ
   // thống → Tích hợp, đúng chỗ của nó.
-  { key: "khachhang", label: "Kinh doanh", icon: "khachhang", blocks: [
+  { key: "khachhang", label: "Kinh doanh", icon: "khachhang", href: "/phan-he/khachhang", blocks: [
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
     // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và
@@ -178,7 +180,7 @@ export const GROUPS: Group[] = [
       ["Hợp đồng", "/hop-dong-khach"], ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
   ] },
 
-  { key: "vanhanh", label: "Điều hành", icon: "vanhanh", blocks: [
+  { key: "vanhanh", label: "Điều hành", icon: "vanhanh", href: "/phan-he/vanhanh", blocks: [
     ["Sản phẩm tour", "/products"],
     ["Yêu cầu chờ xử lý", "/requests"],
     ["Chuyến & quyết toán", "/tours"],
@@ -202,7 +204,7 @@ export const GROUPS: Group[] = [
       ["Phòng Hướng dẫn", "/huong-dan"], ["HDV & phân chuyến (cũ)", "/ops?tab=guides"]] },
   ] },
 
-  { key: "nhansu", label: "Nhân sự – Hành chính", icon: "nhansu", blocks: [
+  { key: "nhansu", label: "Nhân sự – Hành chính", icon: "nhansu", href: "/phan-he/nhansu", blocks: [
     ["Hồ sơ nhân sự", "/hr?tab=employees"],
     ["Hợp đồng lao động", "/hop-dong-lao-dong"],
     ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
@@ -212,7 +214,7 @@ export const GROUPS: Group[] = [
     ["Tài sản & mua sắm", "/tai-san"],
   ] },
 
-  { key: "taichinh", label: "Tài chính – Kế toán", icon: "taichinh", blocks: [
+  { key: "taichinh", label: "Tài chính – Kế toán", icon: "taichinh", href: "/phan-he/taichinh", blocks: [
     ["Thu & đối soát", "/collections"],
     ["Chi & thanh toán", "/expenses"],
     ["Công nợ", "/cong-no"],
@@ -243,7 +245,7 @@ export const GROUPS: Group[] = [
   //
   // "Kinh doanh" ở đây KHÔNG kèm ?mang=: hai phòng vào báo cáo của mình qua menu nhóm Khách hàng &
   // Kinh doanh. Nếu chỉ có hai lối đó thì không còn đường nào tới con số HỢP NHẤT.
-  { key: "baocao", label: "Báo cáo – Phân tích", icon: "baocao", blocks: [
+  { key: "baocao", label: "Báo cáo – Phân tích", icon: "baocao", href: "/phan-he/baocao", blocks: [
     ["Điều hành", "/bao-cao"],
     ["Kinh doanh", "/sales-reports"],
     ["Marketing", "/leads?tab=report"],
@@ -252,7 +254,7 @@ export const GROUPS: Group[] = [
   ] },
 
   // ĐẶT CUỐI theo v1.1 §I.2 (tên nhóm đổi theo bản vẽ giao diện 12/9, thứ tự giữ nguyên).
-  { key: "quantri", label: "Quản trị hệ thống", icon: "quantri", blocks: [
+  { key: "quantri", label: "Quản trị hệ thống", icon: "quantri", href: "/phan-he/quantri", blocks: [
     ["Tổ chức & đơn vị", "/companies"],
     { label: "Quyền", items: [
       ["Tài khoản & phân quyền", "/access"], ["Vị trí AI & quyền hạn", "/ai-roles"]] },
@@ -309,14 +311,14 @@ const Ctx = createContext<{
 }>({ user: null, toast: () => {}, datChuaLuu: () => {} });
 export const useShell = () => useContext(Ctx);
 
-const KHOA_MENU = "vtos_menu_mo";
+// Trạng thái THU/BUNG của thanh dọc, nhớ theo từng người dùng. Khoá "vtos_menu_mo" (nhóm nào đang
+// ghim mở) đã bỏ cùng lối ghim mở, khi bấm thanh phân hệ chuyển thành đi tới trang phân hệ (13/9).
 const KHOA_THU = "vtos_menu_thu";
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
   const [t, setT] = useState<Toast>(null);
-  const [open, setOpen] = useState<string[]>([]);      // nhóm đang bung
   const [side, setSide] = useState(false);             // màn hình nhỏ: mở/đóng thanh dọc
   const [menuToi, setMenuToi] = useState(false);       // menu cá nhân trên thanh ngang
   const [thu, setThu] = useState(false);               // thanh dọc thu còn một cột biểu tượng
@@ -330,11 +332,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     // Tài khoản còn mật khẩu tạm: đưa thẳng tới màn hình đổi mật khẩu. Máy chủ đã chặn mọi đường dẫn
     // khác, nên nếu không chuyển hướng ở đây thì người dùng chỉ thấy một loạt lỗi 403 mà không hiểu.
     if (u.must_change_password && path !== "/doi-mat-khau") { router.replace("/doi-mat-khau"); return; }
-    // Nhớ trạng thái nhóm đang bung THEO NGƯỜI DÙNG. Khoá gắn tên đăng nhập vì một máy dùng chung
+    // Nhớ trạng thái THU/BUNG THEO NGƯỜI DÙNG. Khoá gắn tên đăng nhập vì một máy dùng chung
     // (máy quầy, máy điều hành) thì trạng thái của người trước không được đè lên người sau.
     try {
-      const luu = localStorage.getItem(`${KHOA_MENU}_${u.username}`);
-      if (luu) setOpen(JSON.parse(luu));
       setThu(localStorage.getItem(`${KHOA_THU}_${u.username}`) === "1");
     } catch { /* máy chặn localStorage thì mở mặc định – không phải lỗi */ }
     const h = { Authorization: `Bearer ${localStorage.getItem("vtos_token") || ""}` };
@@ -354,16 +354,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const chuaLuu = useRef(false);
   const datChuaLuu = useCallback((co: boolean) => { chuaLuu.current = co; }, []);
 
-  const doiNhom = useCallback((k: string) => {
-    setOpen((o) => {
-      const moi = o.includes(k) ? o.filter((x) => x !== k) : [...o, k];
-      try { if (user) localStorage.setItem(`${KHOA_MENU}_${user.username}`, JSON.stringify(moi)); } catch { /* bỏ qua */ }
-      return moi;
-    });
-  }, [user]);
-
-  /** Thu / bung thanh dọc. §I.2 đòi nhớ trạng thái THEO TỪNG NGƯỜI DÙNG, nên khoá gắn tên đăng nhập
-   *  y như trạng thái nhóm đang mở. */
+  /** Thu / bung thanh dọc. §I.2 đòi nhớ trạng thái THEO TỪNG NGƯỜI DÙNG, nên khoá gắn tên đăng
+   *  nhập – máy quầy dùng chung thì người trước không đè lên người sau. */
   const doiThu = useCallback(() => {
     setThu((t2) => {
       const moi2 = !t2;
@@ -387,9 +379,13 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         .filter((b): b is Block => b !== null);
       const dem = blocks.reduce((n, b) => n + (laMuc(b) ? 1 : b.items.length), 0);
       return { ...g, blocks, dem };
-      // Nhóm bấm thẳng (`href`) không có mục con nên `dem` bằng 0 – vẫn phải giữ, nhưng vẫn theo
-      // quyền: trang bị ẩn với vai nào thì thanh phân hệ ấy cũng biến mất với vai đó.
-    }).filter((g) => (g.href ? duoc(g.href) : g.dem > 0));
+      // GIỮ ĐỦ TÁM NHÓM CHO MỌI VAI TRÒ (anh Tuấn chốt 13/9/2026). Trước đó nhóm nào vai này không
+      // có màn hình nào thì rụng khỏi menu; bỏ cách ấy vì nó khiến nhân viên không biết hệ thống có
+      // những gì và không biết phải xin quyền ở đâu – cứ tưởng phần mềm chưa làm chức năng ấy.
+      // Quyền vẫn nguyên: bảng xổ ra chỉ liệt kê màn hình họ VÀO ĐƯỢC, và trang phân hệ KHOÁ những
+      // mục không có quyền chứ không giấu. Cái lộ ra là TÊN chức năng, không phải số liệu.
+      // Nhóm Tổng quan dẫn thẳng "/" – màn hình ấy ai đăng nhập cũng có (MAN_HINH_MOI_NGUOI).
+    });
   }, [user]);
 
   const caNhan = useMemo(() => {
@@ -437,18 +433,19 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     return () => { window.removeEventListener("scroll", f, true); window.removeEventListener("resize", f); };
   }, [bay]);
 
-  // nhóm chứa trang hiện tại luôn được bung ("mở sẵn nhóm đang dùng" – v1.1 §I.2)
-  const auto = groups.find((g) => g.blocks.some((b) =>
-    laMuc(b) ? isOn(b[1], path) : b.items.some(([, h]) => isOn(h, path))
-  ))?.key;
-  const opened = new Set(open);
-  if (auto) opened.add(auto);
 
   if (!ready) return <main className="muted">Đang tải…</main>;
 
   const lien = (l: string, h: string) => (
     <Link key={l + h} href={h} className={isOn(h, path) ? "on" : ""} onClick={() => setSide(false)}>{l}</Link>
   );
+
+  /** Thanh phân hệ nào đang SÁNG. Không chỉ so với chính đường dẫn của thanh: người dùng đang ở
+   *  /leads thì thanh Marketing & PR phải sáng, nếu không thanh dọc không cho biết mình đang đứng
+   *  ở đâu trong hệ thống. */
+  const dangO = (g: Group & { dem: number }) =>
+    isOn(g.href, path) || g.blocks.some((b) =>
+      laMuc(b) ? isOn(b[1], path) : b.items.some(([, h]) => isOn(h, path)));
 
   /** Danh sách mục con của một nhóm. MỘT hàm dùng cho CẢ HAI chỗ – bảng xổ ra khi rê chuột và khối
    *  ghim mở khi bấm. Viết hai lần thì sớm muộn sửa một chỗ quên chỗ kia, và người dùng gặp hai
@@ -536,43 +533,36 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </button>
           {groups.map((g) => (
             <div key={g.key} className="nhom"
-              onMouseEnter={(e) => { if (!g.href) moBay(g.key, e.currentTarget); }}
+              onMouseEnter={(e) => moBay(g.key, e.currentTarget)}
               onMouseLeave={dongBay}>
-              {/* NHÓM BẤM THẲNG: không mục con thì không mũi tên, không bảng xổ ra. Một mũi tên mở
-                  ra khoảng trắng là lời hứa suông. */}
-              {g.href ? (
-                <Link href={g.href} className={"grp" + (isOn(g.href, path) ? " on" : "")}
-                  title={g.label} aria-label={g.label} onClick={() => setSide(false)}>
-                  {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
-                       : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label}</span></>}
-                </Link>
-              ) : (<>
-              {/* Khi THU thì chỉ còn biểu tượng, nhưng nhãn nhóm vẫn nằm ở title và aria-label:
-                  §I.2 đòi "biểu tượng phải có chú thích". Bấm một biểu tượng lúc đang thu thì BUNG
-                  lại rồi mới mở nhóm – nếu không thì người dùng bấm xong không thấy gì xảy ra. */}
-              <button type="button" className={"grp" + (opened.has(g.key) ? " on" : "")}
-                title={g.label} aria-label={g.label} aria-expanded={opened.has(g.key)}
+              {/* BẤM LÀ ĐI, KHÔNG PHẢI BUNG (anh Tuấn chốt phương án B, 13/9/2026). Mỗi thanh phân
+                  hệ là một đường dẫn tới TRANG PHÂN HỆ – nơi vẽ đủ cây chức năng theo bản vẽ v1.3,
+                  mục nào đã có trang và mục nào còn nợ. Trước đây bấm thì ghim mở danh sách tại
+                  chỗ; bỏ cách ấy vì một thanh không thể vừa đi vừa bung, và vì cây v1.3 sâu bốn cấp
+                  với hơn một trăm mục chưa dựng – thanh dọc chốt tối đa hai cấp, không chứa nổi.
+                  Khi THU thì chỉ còn biểu tượng, nhãn nhóm đi vào title và aria-label chứ không mất
+                  (§I.2: "biểu tượng phải có chú thích"). */}
+              <Link href={g.href} className={"grp" + (dangO(g) ? " on" : "")}
+                title={g.label} aria-label={g.label}
                 onFocus={(e) => moBay(g.key, e.currentTarget.parentElement)}
-                onClick={() => { if (thu) doiThu(); doiNhom(g.key); dongBay(); }}>
+                onClick={() => setSide(false)}>
                 {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
                      : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label}</span>
-                         <span className="grp-mui" aria-hidden="true">{opened.has(g.key) ? "▾" : "▸"}</span></>}
-              </button>
+                         {g.dem > 0 && <span className="grp-mui" aria-hidden="true">▸</span>}</>}
+              </Link>
 
-              {/* BẢNG XỔ RA khi rê chuột hoặc khi nút nhận tiêu điểm bàn phím (anh Tuấn chốt 12/9).
-                  Không vẽ khi nhóm ĐANG GHIM MỞ: hai bản cùng một danh sách chồng lên nhau thì
-                  người dùng không biết bấm bản nào. */}
-              {bay === g.key && !opened.has(g.key) && (
+              {/* BẢNG XỔ RA khi rê chuột hoặc khi thanh nhận tiêu điểm bàn phím. Đây là LỐI TẮT tới
+                  các màn hình ĐÃ DỰNG của phân hệ – không phải mục lục đầy đủ; mục lục đầy đủ nằm ở
+                  trang phân hệ, và dòng cuối bảng dẫn sang đó. */}
+              {bay === g.key && g.dem > 0 && (
                 <div className="bay" style={{ top: bayY, left: bayX }} role="group" aria-label={g.label}>
                   <div className="bay-dau">{g.label}</div>
                   {khoiMuc(g)}
+                  <Link href={g.href} className="bay-tat-ca" onClick={() => setSide(false)}>
+                    Toàn bộ phân hệ →
+                  </Link>
                 </div>
               )}
-
-              {/* GHIM MỞ TẠI CHỖ khi bấm. Rê chuột chỉ để liếc nhanh; ai làm việc lâu trong một phân
-                  hệ thì bấm một lần, danh sách nằm lại đó, không phải giữ chuột. */}
-              {!thu && opened.has(g.key) && <div className="sub">{khoiMuc(g)}</div>}
-              </>)}
             </div>
           ))}
         </aside>

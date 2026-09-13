@@ -372,17 +372,21 @@ def test_bang_xo_ra_mo_duoc_bang_ca_re_chuot_lan_ban_phim():
     assert "onMouseLeave" in src, "rời chuột phải đóng bảng"
 
 
-def test_bang_xo_ra_va_khoi_ghim_dung_chung_mot_nguon_muc():
-    """Một hàm dựng danh sách mục con cho CẢ HAI chỗ.
+def test_bay_chi_liet_ke_man_hinh_da_dung_va_co_loi_sang_muc_luc_day_du():
+    """Bảng xổ ra là LỐI TẮT, không phải mục lục.
 
-    Viết hai lần thì sớm muộn sửa một chỗ quên chỗ kia, và người dùng gặp hai danh sách khác nhau
-    cho cùng một phân hệ – lỗi ấy không ai nhìn ra cho tới khi bấm nhầm.
+    Nó chỉ liệt kê màn hình đã dựng của phân hệ. Nếu dừng ở đó thì người dùng tưởng phân hệ chỉ có
+    bấy nhiêu, trong khi v1.3 còn hơn một trăm mục chưa dựng. Nên dòng cuối bảng phải dẫn sang trang
+    phân hệ – nơi ghi đủ cả phần còn nợ.
+
+    Lối GHIM MỞ tại chỗ đã bỏ ngày 13/9 (bấm là đi tới trang phân hệ), nên khoiMuc chỉ còn MỘT chỗ
+    gọi; phép thử canh đúng một để không ai lặng lẽ dựng lại khối ghim thứ hai.
     """
     src = re.sub(r'/\*.*?\*/|//[^\n]*', '', _doc(), flags=re.S)
-    assert src.count("khoiMuc(g)") == 2, \
-        f"bảng xổ ra và khối ghim mở phải cùng gọi khoiMuc, đang gọi {src.count('khoiMuc(g)')} lần"
-    # Không vẽ cả hai cùng lúc: hai bản chồng nhau thì không biết bấm bản nào
-    assert "!opened.has(g.key)" in src, "nhóm đang ghim mở thì KHÔNG xổ thêm bảng"
+    assert src.count("khoiMuc(g)") == 1, \
+        f"chỉ bảng xổ ra dùng khoiMuc, đang gọi {src.count('khoiMuc(g)')} lần"
+    assert "bay-tat-ca" in src, "bảng xổ ra thiếu dòng dẫn sang mục lục đầy đủ của phân hệ"
+    assert "opened" not in src, "còn tàn dư của lối ghim mở đã bỏ"
 
 
 def test_bang_xo_ra_phai_la_fixed_de_khong_bi_thanh_doc_cat():
@@ -401,15 +405,19 @@ def test_bang_xo_ra_phai_la_fixed_de_khong_bi_thanh_doc_cat():
 
 
 def test_nho_trang_thai_theo_tung_nguoi_dung():
-    """§I.2: nhớ trạng thái mở/thu THEO TỪNG NGƯỜI DÙNG.
+    """§I.2: nhớ trạng thái THU/BUNG của thanh dọc THEO TỪNG NGƯỜI DÙNG.
 
     Một máy dùng chung (máy quầy, máy điều hành) mà nhớ theo máy thì trạng thái của người trước đè
     lên người sau – và người sau tưởng menu hỏng.
+
+    KHOA_MENU (nhóm nào đang ghim mở) đã bỏ ngày 13/9 cùng với lối ghim mở: bấm thanh phân hệ giờ
+    là ĐI TỚI trang phân hệ, không còn trạng thái mở/đóng nào để nhớ.
     """
     src = _doc()
-    for khoa in ("KHOA_MENU", "KHOA_THU"):
-        assert f"${{{khoa}}}_${{u.username}}" in src or f"${{{khoa}}}_${{user.username}}" in src, \
-            f"{khoa} phải gắn tên đăng nhập vào khoá lưu, không lưu chung cho cả máy"
+    assert "${KHOA_THU}_${u.username}" in src or "${KHOA_THU}_${user.username}" in src, \
+        "KHOA_THU phải gắn tên đăng nhập vào khoá lưu, không lưu chung cho cả máy"
+    assert "KHOA_MENU" not in re.sub(r'/\*.*?\*/|//[^\n]*', '', src, flags=re.S), \
+        "KHOA_MENU là tàn dư của lối ghim mở đã bỏ – còn mã sống thì sớm muộn có người dùng lại"
 
 
 def test_tong_quan_khong_con_muc_con_va_bam_thang_ve_trang_chu():
@@ -426,12 +434,13 @@ def test_tong_quan_khong_con_muc_con_va_bam_thang_ve_trang_chu():
     assert "Bảng điều hành" not in khoi, "mục con 'Bảng điều hành' phải được bỏ khỏi nhóm Tổng quan"
     assert re.search(r'href:\s*"/"', khoi), "nhóm Tổng quan bỏ mục con thì phải có href:\"/\" để bấm thẳng"
     assert re.search(r'blocks:\s*\[\s*\]', khoi), "nhóm Tổng quan phải còn blocks rỗng, không mục con nào"
-    # Bộ lọc quyền phải biết giữ nhóm bấm thẳng, nếu không nó bị loại vì dem == 0.
-    assert re.search(r'filter\(\(g\)\s*=>\s*\(g\.href\s*\?', src), \
-        "bộ lọc nhóm vẫn loại nhóm có dem == 0 – nhóm bấm thẳng sẽ biến mất khỏi menu"
-    # Không mục con thì không được vẽ mũi tên xổ, và không mở bảng xổ ra khi rê chuột.
-    assert re.search(r'if\s*\(!g\.href\)\s*moBay', src), \
-        "nhóm bấm thẳng không có mục con – rê chuột không được mở bảng xổ ra rỗng"
+    # Nhóm Tổng quan không còn mục con nên dem == 0. Từ 13/9 không còn bộ lọc nào loại nhóm theo
+    # dem nữa (tám phân hệ hiện đủ với mọi vai trò), nên chỉ cần canh rằng bộ lọc ấy không quay lại.
+    assert "g.dem > 0 : duoc(g.href)" not in src, \
+        "bộ lọc theo dem đã quay lại – nhóm Tổng quan (dem == 0) sẽ biến mất khỏi menu"
+    # Không mục con thì không vẽ mũi tên xổ – một mũi tên mở ra khoảng trắng là lời hứa suông.
+    assert "g.dem > 0 && <span className=\"grp-mui\"" in src, \
+        "mũi tên xổ phải phụ thuộc nhóm có mục con hay không"
 
 
 def test_khoi_logo_noi_len_khoi_thanh_ngang():
