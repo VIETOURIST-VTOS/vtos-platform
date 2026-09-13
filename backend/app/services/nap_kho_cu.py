@@ -221,9 +221,33 @@ def _la_dong_tong(ws, r: int, het_cot: int) -> bool:
 # ---------------------------------------------------------------------------------------------
 
 def _hang_tieu_de_chi(ws):
-    """Hàng tiêu đề của bảng chi phí: hàng có ÍT NHẤT một nhãn bắt buộc và một nhãn kèm."""
+    """Hàng tiêu đề của bảng chi phí: hàng có ÍT NHẤT một nhãn bắt buộc và một nhãn kèm.
+
+    NHƯNG hàng ấy KHÔNG được đồng thời là tiêu đề của BẢNG KHÁCH – và đó là cả một lớp lỗi, không
+    phải một trường hợp lẻ. Đo trên 604 tệp kho cũ ngày 13/9/2026: **4.113 trong 13.438 dòng chi
+    (30%) có ô "nội dung" chứa một CON SỐ** thay vì chứa chữ, ở 328 tệp.
+
+    Nguyên nhân là một hình dạng bảng rất phổ biến trong kho cũ – BẢNG KHÁCH CÓ CỘT CHI PHÍ. Ví dụ
+    tệp "QT NAM CÁT TIÊN 02.05.2026", sheet NCT:
+
+        TT | SALES | TÊN KHÁCH HÀNG | THU……… | TỔNG THU | CHI PHÍ……………… | TỔNG CHI | LỢI NHUẬN
+                                     GIÁ BÁN|THU KHÁC            CP TREN TOUR|TL|BH|NƯỚC|HH SALE
+
+    Hàng ấy có "CHI PHÍ" (nhãn bắt buộc) và "TỔNG CHI" (nhãn kèm) nên luật cũ nhận là bảng chi. Nó
+    KHÔNG phải: mỗi dòng dưới là MỘT KHÁCH, và cột "CHI PHÍ" là giá vốn phân bổ cho khách ấy. Đọc
+    như bảng chi thì mỗi khách thành một "dòng chi phí" với nội dung = 475142.857.
+
+    Hỏng này im lặng theo đúng cách tệ nhất: vẫn ra một con số, vẫn cộng được, vẫn không có gì đỏ.
+    Mà bảng chi THẬT thì nằm ở sheet khác (ở tệp trên là sheet "CHI PHI", có NGÀY | NỘI DUNG | ĐỐI
+    TÁC | ĐƠN GIÁ | SL | THÀNH TIỀN) – nên vừa đọc nhầm một bảng, vừa che mất bảng đúng.
+
+    Luật thêm vào ngắn và đúng nghĩa: MỘT HÀNG KHÔNG THỂ VỪA LÀ TIÊU ĐỀ BẢNG KHÁCH VỪA LÀ TIÊU ĐỀ
+    BẢNG CHI. Có nhãn tên khách trên hàng ấy thì đây là bảng khách, đi tìm hàng khác.
+    """
     for r in range(1, min(ws.max_row, 30) + 1):
         o = [_hoa(ws.cell(r, c).value) for c in range(1, min(ws.max_column, 20) + 1)]
+        if any(any(x.startswith(n) for n in TD_KHACH) for x in o if x):
+            continue                      # đây là tiêu đề BẢNG KHÁCH, không phải bảng chi
         co_bb = any(any(x == n or x.startswith(n) for n in TD_CHI_BAT_BUOC) for x in o if x)
         co_kem = any(any(x == n or x.startswith(n) for n in TD_CHI_KEM) for x in o if x)
         if co_bb and co_kem:
@@ -452,7 +476,17 @@ def _doc_bang_tien(ws, hang_td: int) -> list[dict]:
         # loạt dòng chi thật – giá vốn tụt từ 105% xuống 69% so với số đã đối chiếu.
         #
         # Nên điều kiện đúng là: KHÔNG CÓ CHỮ Ở BẤT KỲ CỘT MÔ TẢ NÀO thì mới là dòng tổng.
-        co_chu = any(_chu(ws.cell(r, c).value) and _so(ws.cell(r, c).value) is None
+        # VÀ "CÓ CHỮ" PHẢI ĐO BẰNG CHỮ CÁI, KHÔNG ĐO BẰNG "KHÔNG PHẢI SỐ". Bản trước hỏi
+        # `_so(ô) is None` để biết ô có phải chữ không. Nhưng `_so` cố tình bỏ đuôi chữ để đọc được
+        # "1.290.000đ" và "28 khách" – nên nó đọc "XE 45 CHỖ" ra 45, và ô ấy bị xếp là SỐ.
+        #
+        # Hậu quả: mọi dòng chi mà tên có kèm con số đều bị bỏ như thể là dòng tổng không tên –
+        # "XE 45 CHỖ", "Coach 49 chỗ", "BUS 16 CHỖ", "Phòng 2 pax", "Tour 3N2Đ". Trong bảng chi
+        # của tour thì đó lại là nhóm dịch vụ hay gặp nhất: vận chuyển và phòng.
+        #
+        # Câu hỏi thật là "ô này có phải MÔ TẢ không", và mô tả thì có CHỮ CÁI. Hỏi thẳng như vậy.
+        # Dòng tổng không tên vẫn bị loại đúng như cũ, vì nó không có chữ cái nào.
+        co_chu = any(any(k.isalpha() for k in _chu(ws.cell(r, c).value))
                      for c in range(1, min(c_tt, het_cot + 1)))
         if not co_chu:
             continue

@@ -318,6 +318,12 @@ BO_NAP.update(_pb3.bo_nap(_c))
 from app.services import intake_kho_cu as _kho   # noqa: E402
 BO_NAP.update(_kho.bo_nap(_c))
 
+# CỬA TẠO CHUYẾN – chạy TRƯỚC cửa trên. Đo 13/9/2026: 389/436 mã của kho cũ không có chuyến
+# tương ứng trong VTOS, mà cửa nạp quyết toán chặn cứng đúng ở đấy. Tách riêng vì tạo chuyến là
+# ghi lại lịch sử vận hành, không phải hệ quả phụ của việc đọc tệp.
+from app.services import intake_tao_chuyen as _taoc   # noqa: E402
+BO_NAP.update(_taoc.bo_nap(_c))
+
 
 # Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
 # không có nghĩa là nạp được mọi thứ. Kinh doanh nạp danh sách khách của mình, HCNS nạp hồ sơ nhân sự và
@@ -338,6 +344,7 @@ VAI_TRO = {
 VAI_TRO.update(_pb2.vai_tro(QUAN_TRI))
 VAI_TRO.update(_pb3.vai_tro(QUAN_TRI))
 VAI_TRO.update(_kho.vai_tro(QUAN_TRI))
+VAI_TRO.update(_taoc.vai_tro(QUAN_TRI))
 
 
 # P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.
