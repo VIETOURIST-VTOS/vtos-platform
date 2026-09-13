@@ -279,6 +279,11 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 .cay-tt.co{background:var(--vtos-success-bg);color:var(--vtos-success)}
 .cay-tt.chua{background:var(--vtos-surface);color:var(--vtos-text-mute);font-weight:500}
 .cay-tt.nhan{background:transparent;color:var(--vtos-navy-light);font-weight:600}
+/* KHOÁ, KHÔNG GIẤU: mục không có quyền vẫn đọc được tên nhưng nhạt hẳn đi và không bấm được. Dùng
+   nền cảnh báo nhạt chứ không phải nền đỏ – đây là "chưa được mở", không phải "sai". */
+.cay-tt.cam{background:var(--vtos-info-bg);color:var(--vtos-info)}
+.cay-dong.cam{opacity:.6}
+.cay-dong.cam .cay-ten{font-style:italic}
 .cay-tt.tab{background:transparent;color:var(--vtos-text-mute);font-weight:500;
   border:1px solid var(--vtos-line)}
 .cay-co{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--vtos-info-bg);

@@ -167,17 +167,40 @@ def test_luat_dien_thoai_moi_khong_duoc_nam_duoi_khoi_tc4():
         "luật điện thoại mới phải đặt TRƯỚC nó, nếu không bốn phép thử TC-4 đỏ vì lý do khác hẳn")
 
 
-def test_trang_phan_he_cat_theo_quyen_cua_nguoi_dang_xem():
-    """Chỉ liệt kê lại màn hình mà chính người ấy được thấy trên menu.
+def test_khoa_muc_khong_co_quyen_chu_khong_giau_di():
+    """Anh Tuấn chốt 13/9/2026: ai cũng thấy đủ tám phân hệ, mục không có quyền thì KHOÁ lại.
 
-    Liệt kê thêm là bày ra một danh sách bấm vào đâu cũng bị chặn, và là kể cho người ta nghe cấu
-    trúc phần mềm mà vai trò của họ không có phần. Mục CHƯA DỰNG thì giữ – nó chưa thuộc về vai nào.
+    Lần đầu em làm ngược – ẩn hẳn mục không có quyền. Anh Tuấn đổi, và lý do đúng: giấu thì nhân
+    viên không biết hệ thống có những gì, không biết phải xin quyền ở đâu, và tưởng phần mềm chưa
+    làm chức năng ấy. Cái lộ ra chỉ là TÊN chức năng – trang này không gọi máy chủ, không có một
+    con số nghiệp vụ nào (xem phép thử ở trên).
+
+    Luật áp dụng cho MỌI vai trò, kể cả tài xế, hướng dẫn viên và chuyên viên visa.
     """
     src = open(TRANG, encoding="utf-8").read()
-    assert "hidden_menus" in src, "trang phân hệ phải lọc theo hidden_menus của phiên"
+    assert "hidden_menus" in src, "trang phân hệ phải đọc hidden_menus của phiên để biết mục nào khoá"
     assert "useShell" in src, "phải lấy người dùng từ Shell, không tự gọi máy chủ"
-    # Hàng chuyển nhanh cũng phải lọc: bày tên tám phân hệ cho một vai chỉ vào được một là thừa.
-    assert "CAY_PHAN_HE.filter(" in src, "hàng chuyển nhanh chưa lọc theo quyền"
+    assert "Không có quyền" in src, "thiếu nhãn khoá – mục không vào được phải nói ra bằng chữ"
+    assert "Tài khoản & phân quyền" in src, "khoá thì phải chỉ chỗ xin quyền, nếu không người ta bế tắc"
+    # Hàng chuyển nhanh KHÔNG được lọc: đủ tám phân hệ cho mọi vai là chính điều anh Tuấn chốt.
+    assert "CAY_PHAN_HE.filter(" not in src, \
+        "hàng chuyển nhanh đang lọc theo quyền – phải hiện đủ tám phân hệ cho mọi vai trò"
+    ac = open(os.path.join(ROOT, "backend", "app", "services", "access.py"), encoding="utf-8").read()
+    m = re.search(r'MAN_HINH_KHONG_DUOC_AN = \(([^)]*)\)', ac)
+    assert m and "/phan-he/[khoa]" in m.group(1), (
+        "trang phân hệ phải nằm trong MAN_HINH_KHONG_DUOC_AN – nếu không, ba vai bị giới hạn "
+        "(tài xế, HDV, visa) vẫn bị ẩn mất trang mục lục")
+
+
+def test_menu_giu_du_tam_phan_he_cho_moi_vai_tro():
+    """Không nhóm nào rụng khỏi thanh dọc vì vai trò không có màn hình nào trong đó.
+
+    Quyền vẫn nguyên ở hai chỗ khác: bảng xổ ra chỉ liệt kê màn hình vào được, và trang phân hệ
+    khoá mục không có quyền.
+    """
+    src = re.sub(r'/\*.*?\*/|//[^\n]*', '', open(SHELL, encoding="utf-8").read(), flags=re.S)
+    assert "filter((g) =>" not in src, \
+        "bộ lọc nhóm đã quay lại – tám phân hệ phải hiện đủ với mọi vai trò"
 
 
 def test_trang_phan_he_da_khai_quyen():

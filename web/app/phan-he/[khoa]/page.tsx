@@ -16,10 +16,14 @@ import { useParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
 import { CAY_PHAN_HE, timPhanHe, demMuc, laNhan, type MucCay } from "@/lib/cay_phan_he";
 
+/** `khoa` là trạng thái CỦA PHIÊN NÀY, không phải thuộc tính của cây – nên nó sống ở đây chứ không
+ *  vào cay_phan_he.ts. Cùng một mục, người này khoá người kia mở. */
+type MucKhoa = MucCay & { khoa?: boolean; con?: MucKhoa[] };
+
 /** Một dòng của cây. Mục có đường dẫn thì cả dòng bấm được; mục chưa dựng vẫn hiện đủ mã và tên –
  *  đó là phần việc còn nợ, giấu đi thì không ai đòi. */
-function Dong({ m, cap }: { m: MucCay; cap: number }) {
-  const noi = m.tab ? null : m.href;
+function Dong({ m, cap }: { m: MucKhoa; cap: number }) {
+  const noi = m.tab || m.khoa ? null : m.href;
   const than = (
     <>
       <span className="cay-ma">{m.ma}</span>
@@ -27,48 +31,43 @@ function Dong({ m, cap }: { m: MucCay; cap: number }) {
       {m.them && <span className="cay-co them">ngoài v1.3</span>}
       {m.chuyen && <span className="cay-co chuyen">mã v1.3: {m.ma}</span>}
       {m.tab ? <span className="cay-tt tab">Tab trong trang</span>
-        : m.href ? <span className="cay-tt co">Đã có →</span>
-          : laNhan(m) ? <span className="cay-tt nhan">Nhóm chức năng</span>
-            : <span className="cay-tt chua">Chưa dựng</span>}
+        : m.khoa ? <span className="cay-tt cam">Không có quyền</span>
+          : m.href ? <span className="cay-tt co">Đã có →</span>
+            : laNhan(m) ? <span className="cay-tt nhan">Nhóm chức năng</span>
+              : <span className="cay-tt chua">Chưa dựng</span>}
     </>
   );
   return (
     <>
       {noi
         ? <Link href={noi} className={"cay-dong co cap" + cap}>{than}</Link>
-        : <div className={"cay-dong cap" + cap}>{than}</div>}
+        : <div className={"cay-dong cap" + cap + (m.khoa ? " cam" : "")}>{than}</div>}
       {m.con?.map((c) => <Dong key={c.ma} m={c} cap={cap + 1} />)}
     </>
   );
 }
 
-/** Cắt cây theo QUYỀN của người đang xem. Trang này chỉ liệt kê lại những màn hình mà chính họ
- *  được thấy trên menu – liệt kê thêm là bày ra một danh sách bấm vào đâu cũng bị chặn, và là kể
- *  cho người ta nghe cấu trúc phần mềm mà vai trò của họ không có phần.
+/** KHOÁ, KHÔNG GIẤU (anh Tuấn chốt 13/9/2026, áp dụng cho MỌI vai trò kể cả tài xế, hướng dẫn viên
+ *  và chuyên viên visa). Mục nào vai trò này không có quyền thì vẫn hiện đủ mã và tên, nhưng xám và
+ *  không bấm được.
  *
- *  Mục CHƯA DỰNG thì giữ nguyên: nó chưa thuộc về vai nào cả, và phần còn nợ thì ai cũng nên thấy.
- *  Nhãn gom nhóm mất hết con thì mất theo – một nhãn không còn gì bên dưới chỉ tổ chiếm dòng. */
-function loc(ds: MucCay[], an: string[]): MucCay[] {
-  const bo = (h?: string) => !!h && an.includes(h.split("?")[0].split("#")[0]);
-  const ra: MucCay[] = [];
-  for (const m of ds) {
-    const con = m.con ? loc(m.con, an) : undefined;
-    if (bo(m.href)) {
-      // Màn hình bị ẩn với vai này. Còn con thấy được thì giữ lại làm nhãn gom nhóm, bỏ đường dẫn.
-      if (con?.length) ra.push({ ...m, href: undefined, tab: undefined, con });
-      continue;
-    }
-    if (m.con && !con?.length && !m.href && !m.tab) continue;
-    ra.push(con ? { ...m, con } : m);
-  }
-  return ra;
+ *  Vì sao không giấu: giấu thì nhân viên không biết hệ thống có những gì, và khi cần thì không biết
+ *  phải xin quyền ở đâu – họ tưởng phần mềm chưa làm chức năng ấy. Cái lộ ra ở đây là TÊN chức
+ *  năng, không phải số liệu; trang này không gọi máy chủ và không hiện một con số nghiệp vụ nào. */
+function khoaTheoQuyen(ds: MucCay[], an: string[]): MucKhoa[] {
+  const cam = (h?: string) => !!h && an.includes(h.split("?")[0].split("#")[0]);
+  return ds.map((m) => ({
+    ...m,
+    khoa: cam(m.href) || undefined,
+    con: m.con ? khoaTheoQuyen(m.con, an) : undefined,
+  }));
 }
 
 function Trang({ khoa }: { khoa: string }) {
   const { user } = useShell();
   const an = user?.hidden_menus || [];
   const goc = timPhanHe(khoa);
-  const ph = goc ? { ...goc, con: loc(goc.con, an) } : undefined;
+  const ph = goc ? { ...goc, con: khoaTheoQuyen(goc.con, an) } : undefined;
   if (!ph) return (
     <div className="panel">
       <b>Không có phân hệ này.</b>
@@ -81,7 +80,7 @@ function Trang({ khoa }: { khoa: string }) {
     <>
       {/* Chuyển nhanh sang phân hệ khác mà không phải quay lên menu dọc. */}
       <nav className="cay-chuyen" aria-label="Các phân hệ khác">
-        {CAY_PHAN_HE.filter((p) => p.khoa === ph.khoa || loc(p.con, an).length > 0).map((p) => (
+        {CAY_PHAN_HE.map((p) => (
           <Link key={p.khoa} href={`/phan-he/${p.khoa}`}
             className={"cay-chip" + (p.khoa === ph.khoa ? " on" : "")}>
             <b>{p.ma}</b> {p.ten}
@@ -106,6 +105,11 @@ function Trang({ khoa }: { khoa: string }) {
         {" "}bấm vào là mở màn hình thật; mục ghi <b>Chưa dựng</b> là phần còn nợ, chưa có trang trong
         VTOS. Dòng ghi <b>Tab trong trang</b> là tab bên trong một màn hình, và <b>Nhóm chức năng</b>
         {" "}là nhãn gom nhóm – cả hai đều không tính vào số màn hình.
+      </p>
+      <p className="cay-chu">
+        Mục ghi <b>Không có quyền</b> là màn hình đã có, nhưng vai trò của bạn chưa được mở. Xin quyền
+        ở <b>Quản trị hệ thống → Tài khoản & phân quyền</b>; số màn hình đã dựng ở trên đếm cả những
+        mục ấy, vì chúng tồn tại thật.
       </p>
 
       <div className="cay">

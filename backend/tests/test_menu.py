@@ -434,9 +434,10 @@ def test_tong_quan_khong_con_muc_con_va_bam_thang_ve_trang_chu():
     assert "Bảng điều hành" not in khoi, "mục con 'Bảng điều hành' phải được bỏ khỏi nhóm Tổng quan"
     assert re.search(r'href:\s*"/"', khoi), "nhóm Tổng quan bỏ mục con thì phải có href:\"/\" để bấm thẳng"
     assert re.search(r'blocks:\s*\[\s*\]', khoi), "nhóm Tổng quan phải còn blocks rỗng, không mục con nào"
-    # Bộ lọc quyền phải biết giữ nhóm bấm thẳng, nếu không nó bị loại vì dem == 0.
-    assert 'g.href.startsWith("/phan-he/") ? g.dem > 0 : duoc(g.href)' in src, \
-        "bộ lọc nhóm vẫn loại nhóm có dem == 0 – nhóm Tổng quan sẽ biến mất khỏi menu"
+    # Nhóm Tổng quan không còn mục con nên dem == 0. Từ 13/9 không còn bộ lọc nào loại nhóm theo
+    # dem nữa (tám phân hệ hiện đủ với mọi vai trò), nên chỉ cần canh rằng bộ lọc ấy không quay lại.
+    assert "g.dem > 0 : duoc(g.href)" not in src, \
+        "bộ lọc theo dem đã quay lại – nhóm Tổng quan (dem == 0) sẽ biến mất khỏi menu"
     # Không mục con thì không vẽ mũi tên xổ – một mũi tên mở ra khoảng trắng là lời hứa suông.
     assert "g.dem > 0 && <span className=\"grp-mui\"" in src, \
         "mũi tên xổ phải phụ thuộc nhóm có mục con hay không"

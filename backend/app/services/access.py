@@ -815,7 +815,11 @@ def hr_tabs_for(db, u: User) -> list[str]:
 # nên ẩn /reports khỏi menu của họ là đúng, và ba phép thử vai trò nói vậy là ba phép thử đúng.
 # Bài học ghi lại ở đây vì nó sẽ lặp: thấy một phép thử chặn điều mình cho là quyền lợi, phải đi tìm
 # quyết định đằng sau nó trước, chứ không sửa phép thử cho khớp với suy đoán của mình.
-MAN_HINH_KHONG_DUOC_AN = ("/doi-mat-khau", "/phieu-luong")
+# Trang mục lục phân hệ có mặt ở đây từ 13/9/2026: anh Tuấn chốt AI CŨNG THẤY ĐỦ TÁM PHÂN HỆ,
+# kể cả tài xế, hướng dẫn viên và chuyên viên visa. Mục không có quyền thì KHOÁ lại chứ không
+# giấu – giấu thì người ta không biết hệ thống có gì và không biết phải xin quyền ở đâu.
+# Trang này không mang một con số nghiệp vụ nào, nó chỉ liệt kê TÊN màn hình.
+MAN_HINH_KHONG_DUOC_AN = ("/doi-mat-khau", "/phieu-luong", "/phan-he/[khoa]")
 
 
 def menus_for(u: User, db=None) -> list[str]:

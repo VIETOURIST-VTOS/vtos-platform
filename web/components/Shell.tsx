@@ -379,11 +379,13 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         .filter((b): b is Block => b !== null);
       const dem = blocks.reduce((n, b) => n + (laMuc(b) ? 1 : b.items.length), 0);
       return { ...g, blocks, dem };
-      // GIỮ NHÓM NÀO: nhóm dẫn tới trang phân hệ chỉ hiện khi vai này còn ÍT NHẤT MỘT màn hình
-      // trong đó – trang mục lục của một phân hệ mà người ta không được vào màn nào là một trang
-      // trêu người. Nhóm dẫn thẳng tới một màn hình thật (Tổng quan → "/") thì theo quyền của
-      // chính màn hình ấy.
-    }).filter((g) => (g.href.startsWith("/phan-he/") ? g.dem > 0 : duoc(g.href)));
+      // GIỮ ĐỦ TÁM NHÓM CHO MỌI VAI TRÒ (anh Tuấn chốt 13/9/2026). Trước đó nhóm nào vai này không
+      // có màn hình nào thì rụng khỏi menu; bỏ cách ấy vì nó khiến nhân viên không biết hệ thống có
+      // những gì và không biết phải xin quyền ở đâu – cứ tưởng phần mềm chưa làm chức năng ấy.
+      // Quyền vẫn nguyên: bảng xổ ra chỉ liệt kê màn hình họ VÀO ĐƯỢC, và trang phân hệ KHOÁ những
+      // mục không có quyền chứ không giấu. Cái lộ ra là TÊN chức năng, không phải số liệu.
+      // Nhóm Tổng quan dẫn thẳng "/" – màn hình ấy ai đăng nhập cũng có (MAN_HINH_MOI_NGUOI).
+    });
   }, [user]);
 
   const caNhan = useMemo(() => {
