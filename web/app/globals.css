@@ -139,40 +139,10 @@ aside.side .grp .grp-mui{opacity:.55;font-size:13px}
 aside.side .grp:hover{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.26);color:var(--vtos-text-on-navy)}
 aside.side .grp.on{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.34);color:#fff;font-weight:600}
 aside.side .grp.on .bt-hinh{opacity:1;color:#fff}
-/* ==========================================================================================
-   BẢNG XỔ RA KHI RÊ CHUỘT (anh Tuấn chốt 12/9/2026)
-   Rê chuột vào một phân hệ thì mục con xổ ra BÊN CẠNH, không làm thanh dọc dài thêm.
-   Bấm thì ghim mở tại chỗ (khối .sub bên dưới) cho ai làm việc lâu trong một phân hệ.
-
-   position:fixed chứ không phải absolute: aside.side có overflow-y:auto, một hộp absolute tràn
-   ngang ra khỏi nó sẽ bị cắt mất. Toạ độ do Shell.tsx đo từ chính thanh phân hệ rồi đặt vào.
-   ========================================================================================== */
+/* Thanh phân hệ chỉ có MỘT hành vi: bấm là đi (anh Tuấn chốt 13/9/2026, chiều). Bảng xổ ra khi
+   rê chuột đã gỡ cùng toàn bộ luật .bay – mục lục đầy đủ của phân hệ nằm ở trang /phan-he/<khoa>.
+   `position:relative` giữ lại vì .nhom vẫn là khung chứa của thanh phân hệ. */
 aside.side .nhom{position:relative}
-.bay{position:fixed;z-index:30;min-width:246px;max-width:300px;max-height:calc(100vh - 24px);
-  overflow-y:auto;margin-left:6px;padding:8px;border-radius:var(--vtos-radius-md);
-  background:var(--vtos-navy);border:1px solid rgba(255,255,255,.22);
-  box-shadow:0 14px 40px rgba(11,37,69,.38)}
-/* Tên phân hệ lặp lại ở đầu bảng: lúc thanh dọc đang THU còn 60px thì thanh chỉ là một biểu tượng,
-   không có tên. Thiếu dòng này là người dùng không biết mình đang mở bảng của nhóm nào. */
-.bay .bay-dau{font-size:13px;font-weight:600;color:#fff;padding:4px 10px 8px;
-  border-bottom:1px solid rgba(255,255,255,.16);margin-bottom:6px;white-space:nowrap}
-.bay a{display:block;padding:7px 10px;font-size:13.5px;color:rgba(255,255,255,.86);font-weight:500;
-  text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bay a:hover{background:rgba(255,255,255,.10);color:var(--vtos-text-on-navy)}
-.bay a.on{background:rgba(255,255,255,.14);color:#fff;font-weight:600}
-/* Nhãn nhóm nhỏ (Lẻ, MICE, Xe & tài xế…) – một cột, giữ nguyên nhãn theo anh Tuấn chọn. */
-.bay .sub-nhan,aside.side .sub .sub-nhan{display:block;font-size:13px;color:rgba(255,255,255,.62);
-  padding:8px 10px 3px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
-/* Màn hình nhỏ không có chuột: bảng xổ ra không hợp, ở đó chỉ dùng cách bấm ghim mở. */
-@media (max-width:900px){.bay{display:none}}
-@media (prefers-reduced-motion:no-preference){.bay{animation:bay-vao .12s ease-out}}
-@keyframes bay-vao{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
-aside.side .sub{padding:0 0 8px}
-aside.side .sub a{display:block;margin:0 8px 2px;padding:7px 12px 7px 38px;font-size:13.5px;color:rgba(255,255,255,.68);font-weight:500;text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-aside.side .sub a:hover{background:rgba(255,255,255,.06);color:var(--vtos-text-on-navy)}
-aside.side .sub a.on{color:#fff;font-weight:600;background:rgba(255,255,255,.14)}
-aside.side .sub .soon{display:block;margin:0 8px 2px;padding:7px 12px 7px 38px;font-size:13.5px;color:rgba(255,255,255,.68);opacity:.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-aside.side .sub .soon i{font-size:13px;font-style:normal;background:rgba(255,255,255,.12);border-radius:8px;padding:1px 6px;margin-left:4px}
 .shell main{flex:1;min-width:0;margin:0}
 /* Thu thanh dọc (v1.1 §I.2: rộng 224–240px, thu còn 56–64px). Ở trạng thái thu chỉ còn một cột biểu
    tượng; nhãn nhóm không mất mà chuyển vào title/aria-label, vì §I.2 đòi biểu tượng phải có chú
@@ -236,6 +206,143 @@ a.o-cb:hover{background:var(--panel2)}
 .chon-moc label{margin-top:0}
 .chon-moc select{max-width:320px}
 .chon-moc .moc-dang{margin:4px 0 0}
+
+/* ── TRANG PHÂN HỆ (/phan-he/<khoa>) ─────────────────────────────────────────────────────────────
+   Anh Tuấn chốt phương án B 13/9/2026: bấm thanh phân hệ thì mở mục lục đầy đủ của phân hệ ấy.
+   Hình thức bám bản vẽ "Cấu trúc phân hệ V1.3" – nền xám nhạt, thẻ trắng, dải đầu navy, cây thụt
+   dòng có vạch dọc – nhưng MỌI MÀU đều lấy từ bộ nhận diện VTOS, không dùng navy #10283E và hồng
+   #EC5988 của bản vẽ (hai màu ấy ngoài bộ). */
+.cay-chuyen{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.cay-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;font-size:12.5px;
+  text-decoration:none;color:var(--vtos-text-mute);background:var(--vtos-card);
+  border:1px solid var(--vtos-line);border-radius:999px}
+.cay-chip b{font-size:11px;color:var(--vtos-navy-light);font-variant-numeric:tabular-nums}
+.cay-chip:hover{border-color:var(--vtos-navy-light);color:var(--vtos-navy)}
+.cay-chip.on{background:var(--vtos-navy);border-color:var(--vtos-navy);color:#fff}
+.cay-chip.on b{color:rgba(255,255,255,.72)}
+
+.cay-dau{display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:var(--vtos-radius-lg);
+  background:var(--vtos-navy);color:#fff;margin-bottom:14px}
+.cay-dau h1{margin:0;font-size:22px;color:#fff}
+.cay-dau-ma{flex:0 0 auto;font-size:20px;font-weight:700;letter-spacing:1px;padding:10px 13px;
+  border-radius:var(--vtos-radius-md);background:rgba(255,255,255,.12);color:rgba(255,255,255,.82);
+  font-variant-numeric:tabular-nums}
+.cay-tom{margin:5px 0 0;font-size:13px;color:rgba(255,255,255,.76)}
+.cay-dem{margin-left:auto;text-align:right;flex:0 0 auto}
+.cay-dem b{display:block;font-size:21px;font-variant-numeric:tabular-nums}
+.cay-dem span{font-size:11.5px;color:rgba(255,255,255,.72)}
+
+.cay-chu{font-size:12.5px;color:var(--vtos-text-mute);line-height:1.7;margin:0 0 12px}
+.cay-cuoi{font-size:12px;line-height:1.7;margin-top:14px}
+
+.cay{background:var(--vtos-card);border:1px solid var(--vtos-line);
+  border-radius:var(--vtos-radius-lg);padding:6px 10px;overflow-x:auto}
+.cay-dong{display:flex;align-items:center;gap:10px;min-height:40px;padding:7px 10px;
+  border-bottom:1px solid var(--vtos-surface);text-decoration:none;color:var(--vtos-text)}
+.cay-dong:last-child{border-bottom:0}
+/* Thụt dòng theo cấp, kèm vạch dọc để mắt lần được nhánh nào thuộc nhánh nào. */
+.cay-dong.cap1{margin-left:18px;padding-left:14px;border-left:1px solid var(--vtos-line)}
+.cay-dong.cap2{margin-left:36px;padding-left:14px;border-left:1px solid var(--vtos-line)}
+.cay-dong.cap3{margin-left:54px;padding-left:14px;border-left:1px solid var(--vtos-line)}
+.cay-dong.cap0 .cay-ten{font-weight:650;font-size:14.5px;color:var(--vtos-navy)}
+a.cay-dong:hover{background:var(--vtos-info-bg)}
+.cay-ma{flex:0 0 46px;font-size:11px;color:var(--vtos-text-mute);
+  font-family:var(--vtos-font-mono);font-variant-numeric:tabular-nums}
+.cay-ten{font-size:13.5px}
+/* Nhãn trạng thái luôn nằm cuối dòng, một cột thẳng hàng – đọc dọc là thấy ngay còn nợ bao nhiêu. */
+.cay-tt{margin-left:auto;flex:0 0 auto;font-size:10.5px;font-weight:600;padding:3px 9px;
+  border-radius:999px;white-space:nowrap}
+.cay-tt.co{background:var(--vtos-success-bg);color:var(--vtos-success)}
+.cay-tt.chua{background:var(--vtos-surface);color:var(--vtos-text-mute);font-weight:500}
+.cay-tt.nhan{background:transparent;color:var(--vtos-navy-light);font-weight:600}
+/* KHOÁ, KHÔNG GIẤU: mục không có quyền vẫn đọc được tên nhưng nhạt hẳn đi và không bấm được. Dùng
+   nền cảnh báo nhạt chứ không phải nền đỏ – đây là "chưa được mở", không phải "sai". */
+.cay-tt.cam{background:var(--vtos-info-bg);color:var(--vtos-info)}
+.cay-dong.cam{opacity:.6}
+.cay-dong.cam .cay-ten{font-style:italic}
+.cay-tt.tab{background:transparent;color:var(--vtos-text-mute);font-weight:500;
+  border:1px solid var(--vtos-line)}
+.cay-co{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--vtos-info-bg);
+  color:var(--vtos-info);white-space:nowrap}
+
+@media (max-width:640px){
+  .cay-dau{flex-wrap:wrap;gap:10px}
+  .cay-dem{margin-left:0}
+  .cay-dong.cap1{margin-left:8px}.cay-dong.cap2{margin-left:16px}.cay-dong.cap3{margin-left:24px}
+  .cay-ma{flex:0 0 38px}
+}
+
+
+/* CHÚ Ý VỊ TRÍ: mọi luật mới có @media (max-width:640px) phải đặt TRƯỚC đoạn này.
+   test_tc4_dien_thoai đọc bản điện thoại bằng rindex("@media (max-width:640px)") – tức là từ
+   lần xuất hiện CUỐI CÙNG tới hết tệp. Thêm một khối 640px xuống cuối tệp là bốn phép thử
+   TC-4 đỏ ngay, mà thông báo lỗi lại nói về bảng trên điện thoại chứ không nói về vị trí. */
+
+/* ── MÀN HÌNH 01 · phần đầu theo bản vẽ "Bảng điều hành Chủ tịch" V1.2 ──────────────────────────
+   Hàng lọc – tám thẻ chỉ tiêu – khối "Cần quyết định". Màu lấy trọn từ bộ nhận diện VTOS; bản vẽ
+   dùng navy #10283E và hồng #EC5988 nằm ngoài bộ nên không mang sang. */
+.mh01-loc{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 14px;
+  padding:10px 12px;background:var(--vtos-card);border:1px solid var(--vtos-line);
+  border-radius:var(--vtos-radius-md)}
+.mh01-ky{display:inline-flex;align-items:center;gap:8px;margin:0}
+.mh01-ky>span{font-size:12px;color:var(--vtos-text-mute)}
+.mh01-ky select{width:auto;min-width:150px}
+.mh01-ngay{margin-left:auto}
+
+.mh01-qd{border-left:3px solid var(--vtos-info)}
+.mh01-dau{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.mh01-dau h2{margin:0}
+.mh01-qd-ds{display:flex;flex-wrap:wrap;gap:8px}
+/* Nút là một ĐƯỜNG DẪN chứ không phải <button> – bấm giữa chuột mở tab mới được. Nhưng luật cũ
+   viết `button.act{...}`, nên một <a class="act"> không nhận màu nào cả và ra một dòng chữ trần.
+   Đây đúng là lỗi đã có sẵn ở khối "Việc chờ tôi xử lý" cũ, chỗ ấy phải chữa bằng style nội tuyến. */
+.mh01-qd-nut{display:inline-block;text-decoration:none;margin:0;padding:7px 13px;font-size:13px;
+  font-weight:600;color:#fff;background:var(--vtos-info);border-radius:var(--vtos-radius-sm,6px)}
+.mh01-qd-nut:hover{background:var(--vtos-navy)}
+
+/* Tám thẻ: để lưới tự xuống dòng theo bề rộng thật. Khoá cứng bốn cột thì ở 1280px nhãn dài như
+   "Lợi nhuận trước thuế" bị cắt, mà cắt nhãn của một con số tiền là chuyện không được phép. */
+.mh01-the{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));
+  margin-bottom:14px}
+.the-ct{background:var(--vtos-card);border:1px solid var(--vtos-line);
+  border-radius:var(--vtos-radius-md);padding:13px 15px;display:flex;flex-direction:column;gap:3px}
+.the-ct.rong{background:var(--vtos-surface);border-style:dashed}
+.the-nhan{font-size:12.5px;color:var(--vtos-text-mute);font-weight:600}
+.the-phu{font-size:11.5px;color:var(--vtos-text-mute)}
+.the-so{font-size:23px;font-weight:700;color:var(--vtos-navy);line-height:1.2;
+  font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono);margin-top:2px}
+/* Đỏ chỉ nhấn phần quá hạn hoặc thiếu điều kiện – không tô đỏ cả con số tổng (bản vẽ V1.2). */
+.the-so.do{color:var(--vtos-danger)}
+.the-ct.rong .the-so{color:var(--vtos-text-mute);font-weight:500}
+.the-duoi{font-size:11.5px;color:var(--vtos-text-mute);line-height:1.5;margin-top:4px}
+.the-thieu{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:5px;font-size:11.5px}
+/* CỬA NHẬP: ranh giới 09/9 – mỗi con số phải có một cửa cho người dùng đưa số vào. Ô trống không
+   kèm cửa là việc còn thiếu, không phải một ô trống bình thường. */
+.the-cua{font-size:11.5px;font-weight:600;color:var(--vtos-navy);text-decoration:none;
+  border-bottom:1px solid var(--vtos-navy-light)}
+.the-cua:hover{color:var(--vtos-sky)}
+
+/* KHỐI TỒN ĐỌNG (components/KhoiTonDong.tsx). Bảng gom nhóm, không phải bảng dữ liệu dài – nên
+   cột số canh phải và dùng chữ số đều bề ngang để mắt so hàng dọc được. */
+.td-bang{width:100%;border-collapse:collapse}
+.td-bang th{font-size:11.5px;color:var(--vtos-text-mute);text-transform:uppercase;
+  letter-spacing:.04em;font-weight:600;text-align:left}
+.td-bang td.td-so,.td-bang th.td-so{text-align:right;font-variant-numeric:tabular-nums;
+  font-family:var(--vtos-font-mono);white-space:nowrap}
+.td-bang td.td-so{font-weight:700;color:var(--vtos-navy)}
+/* Câu ví dụ chỉ để nhận ra loại cảnh báo, không phải nội dung chính – cắt một dòng, không cho nó
+   đẩy cao cả hàng. */
+.td-vd{font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  max-width:52ch}
+.td-chi-tiet{margin-top:10px}
+
+@media (max-width:640px){
+  .mh01-ngay{margin-left:0;width:100%}
+  .mh01-ky select{min-width:0;flex:1}
+  .the-so{font-size:20px}
+  /* Trên điện thoại câu ví dụ được xuống dòng: ở đây không có chiều ngang để mà cắt gọn. */
+  .td-vd{white-space:normal;max-width:100%}
+}
 
 /* Bảng đọc-được-trên-điện-thoại. Trên màn rộng đây là một bảng bình thường. */
 table.bang-doc{width:100%}

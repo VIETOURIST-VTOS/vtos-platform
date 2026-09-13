@@ -6,6 +6,10 @@ import { api, pct, vnd, fmtD, fmtDT } from "@/lib/api";
 import { ACTION_LABEL } from "@/lib/meta";
 import { Tag, errMsg } from "@/components/ui";
 import KhoiDongTien from "@/components/KhoiDongTien";
+import KhoiTonDong from "@/components/KhoiTonDong";
+import {
+  DongLoc, KhoiQuyetDinh, TamThe, TieuDe, tien, dem, type The,
+} from "@/components/DauManHinh01";
 
 function Dash() {
   const { user } = useShell();
@@ -24,36 +28,60 @@ function Dash() {
   if (!d) return <p className="muted">Đang tải…</p>;
   const c = d.counts || {};
   const k = d.kpis || {}; const sec = d.sections || {};
+
+  /* TÁM THẺ CHỈ TIÊU theo bản vẽ V1.2. Mỗi thẻ chỉ ra đúng một con số chính, một dòng so sánh và
+     một dòng trạng thái dữ liệu – không nhồi ba số vào một ô như hàng KPI cũ.
+
+     KỲ BÁO CÁO: màn hình này CHỈ theo THÁNG (anh Tuấn chốt 13/9). Quý và năm xem ở báo cáo chi
+     tiết – hàng lọc có đường dẫn sang đó. Nhờ vậy tám thẻ không phải mang theo một nhánh "nếu
+     chọn quý thì rỗng", và không có chỗ nào lấy số tháng dán nhãn quý. */
+  const tam: The[] = [
+    { nhan: "Doanh thu tháng", so: tien(k.doanh_thu_thang),
+      duoi: `${k.so_chuyen_thang ?? 0} chuyến đã quyết toán trong tháng` },
+    { nhan: "Lợi nhuận trước thuế", so: tien(k.ln_ke_toan_thang),
+      duoi: "Lợi nhuận kế toán tháng, cùng phạm vi" },
+    { nhan: "Tour đang bán", so: dem(c.da_duyet ?? 0),
+      duoi: `${d.n_tours ?? 0} tour trên hệ thống · ${d.pending_requests ?? 0} yêu cầu chưa tạo booking` },
+    { nhan: "Tour chờ quyết toán", so: dem((c.ket_thuc || 0) + (c.da_dong_so || 0)),
+      duoi: `${sec.qua_han_qt?.length ?? 0} chuyến quá hạn quyết toán`,
+      do: (sec.qua_han_qt?.length ?? 0) > 0 },
+    { nhan: "Tour sắp khởi hành", so: dem(sec.sap_khoi_hanh?.length),
+      duoi: "21 ngày tới (bản vẽ ghi 14 – máy chủ đang tính 21)",
+      ai: "Điều hành", cua: "/tours" },
+    { nhan: "Đội xe hôm nay", so: null,
+      ai: "Đội xe", cua: "/doi-xe",
+      duoi: "Đang chạy / đủ điều kiện · xe trống · bảo dưỡng" },
+    { nhan: "Marketing & PR", phu: "Khách tiềm năng mới", so: null,
+      ai: "Marketing", cua: "/leads?tab=leads",
+      duoi: "Đã chuyển Kinh doanh · đã chốt" },
+    /* SỬA 13/9/2026 – thẻ này từng in `d.alerts.length`, tức SỐ DÒNG máy chủ gửi kèm trang này
+       (đang cắt ở 60), chứ không phải số tồn đọng thật. Trên bản chạy thật nó ra "60" trong khi
+       dòng phụ ngay dưới ghi "1387 cảnh báo đỏ đang mở": con số nhỏ nằm ở chỗ to nhất màn hình,
+       con số thật nằm ở dòng chữ nhỏ. Nay lấy đúng `k.canh_bao_do`; nếu máy chủ không gửi thì thẻ
+       để trống kèm cửa nhập, không lấy độ dài danh sách thay vào. */
+    { nhan: "Tồn đọng cần xử lý", so: dem(k.canh_bao_do),
+      duoi: `${d.alerts?.length ?? 0} cảnh báo mới nhất đang liệt kê ở bảng bên dưới`,
+      do: (k.canh_bao_do ?? 0) > 0, ai: "Công nghệ thông tin", cua: "/alerts" },
+  ];
+
   return (<>
-    <h1>Tổng quan điều hành · {user?.role_name}</h1>
-    {/* Màn hình 01 theo bản vẽ giao diện 12/9/2026. Khối này đứng TRƯỚC các chỉ số cũ vì đó là thứ
-        tự người đọc cần: còn bao nhiêu tiền và sắp hụt ngày nào, rồi mới tới doanh thu và booking.
-        Khối tự ẩn với vai không được xem khối dòng tiền — không hiện một khung rỗng để dò. */}
+    <TieuDe vai={user?.role} ten_vai={user?.role_name} />
+    <DongLoc />
+    <KhoiQuyetDinh ds={d.approvals || []} vai={user?.role} />
+    <TamThe ds={tam} />
+    {/* Khối dòng tiền đứng SAU tám thẻ theo bản vẽ V1.2: thẻ trả lời "kết quả thế nào", dòng tiền
+        trả lời "còn bao nhiêu và sắp hụt ngày nào". Khối tự ẩn với vai không được xem – không vẽ
+        một khung rỗng để người ta dò xem trong đó có gì. */}
     <KhoiDongTien />
-    {d.approvals?.length > 0 && <div id="cho-toi-duyet" className="panel" style={{ borderColor: "var(--orange)" }}><b>Việc chờ tôi xử lý:</b> {d.approvals.map((a: any, i: number) => <Link key={i} href={a.href} className="act orange" style={{ display: "inline-block", textDecoration: "none", margin: "4px 6px 0 0" }}>{a.label}</Link>)}</div>}
-    {"tien" in k && <div className="kpis">
-      <div className="kpi"><b>{vnd(k.tien)}</b><span>Tiền (111+112)</span></div><div className="kpi"><b>{vnd(k.no_vay)}</b><span>Dư nợ vay</span></div><div className="kpi"><b>{vnd(k.phai_thu)}</b><span>Phải thu khách</span></div>
-      <div className="kpi"><b style={{ color: k.du_bao_canh_bao ? "var(--red)" : undefined }}>{k.du_bao_canh_bao}</b><span>Tuần cảnh báo dòng tiền (13 tuần)</span></div><div className="kpi"><b>{vnd(k.ln_ke_toan_thang)}</b><span>LN kế toán tháng (trước thuế)</span></div>
-    </div>}
-    <div className="kpis">
-      <div className="kpi"><b>{vnd(k.doanh_thu_thang)}</b><span>Doanh thu quyết toán tháng ({k.so_chuyen_thang} chuyến KT xác nhận)</span></div><div className="kpi"><b>{vnd(k.loi_nhuan_thang)}</b><span>Lợi nhuận chuyến tháng · {k.chuyen_duoi_10} chuyến dưới 10%</span></div>
-      <div className="kpi"><b>{k.booking_thang}</b><span>Booking tháng · {vnd(k.doanh_thu_booking_thang)} đ</span></div><div className="kpi"><b style={{ color: k.canh_bao_do ? "var(--red)" : undefined }}>{k.canh_bao_do}</b><span>Cảnh báo đỏ đang mở</span></div>
-    </div>
-    <div className="kpis">
-      <div className="kpi"><b>{d.n_tours}</b><span>tour trên hệ thống</span></div>
-      <div className="kpi"><b>{c.da_duyet || 0}</b><span>đang bán (đã duyệt)</span></div>
-      <div className="kpi"><b>{(c.ket_thuc || 0) + (c.da_dong_so || 0)}</b><span>chờ quyết toán / Kế toán</span></div>
-      <div className="kpi"><b>{d.pending_requests}</b><span>yêu cầu chưa tạo booking</span></div>
-      <div className="kpi"><b style={{ color: "var(--red)" }}>{d.alerts.length}</b><span>cảnh báo mở cho vai trò này</span></div>
-    </div>
     <div className="grid" style={{ marginTop: 14 }}>
       <div id="viec-cua-toi" className="panel"><h2>Việc cần xử lý</h2>
         {d.todo.length ? <ul>{d.todo.map((t: any, i: number) => <li key={i}><Link href={`/tours/${t.tour_id}`}>{t.code}</Link> – {t.name}: <b>{ACTION_LABEL[t.action] || t.action}</b></li>)}</ul> : <p className="muted">Không có việc chờ ở vai trò này.</p>}
         {d.pending_params > 0 && ["chutich", "tgd"].includes(user?.role || "") && <p><Link href="/params">{d.pending_params} tham số chính sách chờ ký</Link></p>}
       </div>
-      <div className="panel"><h2>Cảnh báo từ robot</h2>
-        {d.alerts.length ? <table><tbody>{d.alerts.map((a: any) => <tr key={a.id}><td><Tag cls={a.level}>{a.kind}</Tag></td><td>{a.message}</td></tr>)}</tbody></table> : <p className="muted">Không có cảnh báo.</p>}
-      </div>
+      {/* Bảng cảnh báo phẳng cũ đã thay bằng khối gom nhóm: sáu mươi dòng gần giống hệt nhau thì
+          cuộn hết màn hình mà vẫn không cho biết tồn đọng nằm ở đâu. Danh sách từng dòng vẫn còn,
+          nằm trong phần bung ra của khối. */}
+      <KhoiTonDong ds={d.alerts || []} tong={k.canh_bao_do ?? null} />
     </div>
     <div className="grid" style={{ marginTop: 14 }}>
       {sec.kd_le && <div className="panel"><h2>Kinh doanh Lẻ – doanh thu tính chỉ tiêu tháng (quyết toán)</h2><p className="muted"><Link href="/sales-reports?mang=le">Báo cáo bán hàng phòng Lẻ →</Link></p>{sec.kd_le.length ? <table><tbody>{sec.kd_le.map((r: any) => <tr key={r.sales}><td>{r.sales}</td><td style={{ textAlign: "right" }}>{vnd(r.revenue)}</td><td>{Math.round(r.pct * 100)}% mốc {r.pct >= 1 ? <Tag cls="ok">đạt</Tag> : <Tag cls="warn">chưa</Tag>}</td></tr>)}</tbody></table> : <p className="muted">Chưa có chuyến quyết toán trong tháng.</p>}</div>}

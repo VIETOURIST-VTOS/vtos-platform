@@ -38,7 +38,9 @@ KHAI_THIEU_MAN_HINH: list[str] = []     # menu dẫn tới trang không có
 # Ba màn hình này KHÔNG khai trong MENU_ROLES mà khai qua MAN_HINH_MOI_NGUOI – chúng mở cho mọi tài
 # khoản đăng nhập theo đúng thiết kế, và bộ dò này chỉ đọc MENU_ROLES nên vẫn kể tên chúng ra.
 # phieu-luong vào danh sách ngày 08/9/2026 – màn hình phiếu lương của chính người đăng nhập.
-MAN_HINH_THIEU_QUYEN = ["alerts", "phieu-luong", "reports"]
+# offline vào danh sách ngày 13/9/2026 – trang dự phòng khi mất mạng, khai qua MAN_HINH_MOI_NGUOI
+# chứ không qua MENU_ROLES: lúc mất mạng không hỏi quyền được, nên nó phải mở cho mọi người.
+MAN_HINH_THIEU_QUYEN = ["alerts", "offline", "phieu-luong", "reports"]
 
 
 def test_mt1_khai_quyen_cho_man_hinh_khong_ton_tai():

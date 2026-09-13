@@ -358,58 +358,46 @@ def test_chieu_cao_thanh_ngang_trong_dac_ta():
     assert 64 <= cao <= 72, f"thanh ngang {cao}px ngoài khoảng 64–72px của §I.2"
 
 
-def test_bang_xo_ra_mo_duoc_bang_ca_re_chuot_lan_ban_phim():
-    """Anh Tuấn chốt 12/9: rê chuột vào phân hệ thì mục con xổ ra bên cạnh.
+def test_thanh_phan_he_chi_co_mot_hanh_vi_la_bam():
+    """Anh Tuấn chốt 13/9/2026 (chiều): TẮT rê chuột, chỉ để lại bấm.
 
-    HAI CÁCH MỞ, không phải một. Máy tính bảng và bàn phím không có "rê chuột"; chỉ nghe onMouseEnter
-    là người dùng iPad mất đường vào toàn bộ màn hình con. Nên nút phân hệ mở bảng cả khi nhận tiêu
-    điểm bàn phím, và bấm thì ghim mở tại chỗ.
-    """
-    src = _doc()
-    assert "onMouseEnter" in src, "phải mở bảng khi rê chuột"
-    assert "onFocus" in src, "phải mở bảng cả khi nút nhận tiêu điểm bàn phím – máy bảng không rê được"
-    assert 'className="bay"' in src, "thiếu bảng xổ ra"
-    assert "onMouseLeave" in src, "rời chuột phải đóng bảng"
+    Lịch sử của chỗ này, ghi cả ba nước để lần sau không ai đi vòng lại:
+      · 12/9 sáng – bấm thì GHIM MỞ danh sách mục con ngay dưới thanh.
+      · 12/9 chiều – rê chuột thì XỔ RA một bảng bên cạnh; bấm vẫn ghim mở.
+      · 13/9 – bỏ cả hai. Bấm là ĐI TỚI trang phân hệ, hết.
 
+    Vì sao bỏ rê chuột: đưa chuột ngang qua thanh dọc để tới chỗ khác là bảng bật ra chắn đường, và
+    máy bảng thì không có "rê chuột" nên một nửa người dùng chưa từng thấy nó. Mục lục đầy đủ – kể
+    cả phần còn nợ và mục không có quyền – nằm ở trang phân hệ, chỗ đọc kỹ được.
 
-def test_bang_xo_ra_va_khoi_ghim_dung_chung_mot_nguon_muc():
-    """Một hàm dựng danh sách mục con cho CẢ HAI chỗ.
-
-    Viết hai lần thì sớm muộn sửa một chỗ quên chỗ kia, và người dùng gặp hai danh sách khác nhau
-    cho cùng một phân hệ – lỗi ấy không ai nhìn ra cho tới khi bấm nhầm.
+    Phép thử canh phần MÃ ĐÃ GỠ, không chỉ canh phần còn lại: một cái onMouseEnter sót lại là hành
+    vi cũ sống lại lặng lẽ, và không ai nhận ra cho tới khi anh Tuấn nhắc lần nữa.
     """
     src = re.sub(r'/\*.*?\*/|//[^\n]*', '', _doc(), flags=re.S)
-    assert src.count("khoiMuc(g)") == 2, \
-        f"bảng xổ ra và khối ghim mở phải cùng gọi khoiMuc, đang gọi {src.count('khoiMuc(g)')} lần"
-    # Không vẽ cả hai cùng lúc: hai bản chồng nhau thì không biết bấm bản nào
-    assert "!opened.has(g.key)" in src, "nhóm đang ghim mở thì KHÔNG xổ thêm bảng"
-
-
-def test_bang_xo_ra_phai_la_fixed_de_khong_bi_thanh_doc_cat():
-    """aside.side có overflow-y:auto – một hộp absolute tràn ngang ra khỏi nó sẽ BỊ CẮT.
-
-    Đây là chỗ dễ sai nhất của kiểu xổ ngang: đặt left:100% rồi để CSS lo thì bảng cụt mất một nửa,
-    và trên màn rộng lại trông như chạy đúng. Toạ độ do mã đo từ chính thanh phân hệ rồi đặt vào.
-    """
-    css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
-    m = re.search(r'\.bay\{[^}]*\}', css)
-    assert m, "không tìm thấy quy tắc .bay"
-    assert "position:fixed" in m.group(0), f"bảng xổ ra phải là fixed, đang là: {m.group(0)[:110]}"
-    assert "max-height:calc(100vh" in m.group(0), \
-        "bảng của nhóm 15 mục cao hơn màn hình – phải chặn chiều cao và cho cuộn"
-    assert "getBoundingClientRect" in _doc(), "toạ độ bảng phải đo từ thanh phân hệ, không đoán"
+    for tan_du in ("onMouseEnter", "onMouseLeave", "moBay", "dongBay", "khoiMuc",
+                   'className="bay"', "bay-tat-ca", "opened"):
+        assert tan_du not in src, f"còn tàn dư của lối rê chuột/ghim mở đã bỏ: {tan_du}"
+    css = re.sub(r'/\*.*?\*/', '', open(os.path.join(ROOT, "web", "app", "globals.css"),
+                                          encoding="utf-8").read(), flags=re.S)
+    assert ".bay" not in css, "luật CSS của bảng xổ ra còn sống dù không ai vẽ nó nữa"
+    # Thanh phân hệ vẫn phải là một ĐƯỜNG DẪN thật, không phải nút chờ JavaScript.
+    assert '<Link href={g.href}' in _doc(), "thanh phân hệ phải là đường dẫn – bấm giữa chuột, mở tab mới"
 
 
 def test_nho_trang_thai_theo_tung_nguoi_dung():
-    """§I.2: nhớ trạng thái mở/thu THEO TỪNG NGƯỜI DÙNG.
+    """§I.2: nhớ trạng thái THU/BUNG của thanh dọc THEO TỪNG NGƯỜI DÙNG.
 
     Một máy dùng chung (máy quầy, máy điều hành) mà nhớ theo máy thì trạng thái của người trước đè
     lên người sau – và người sau tưởng menu hỏng.
+
+    KHOA_MENU (nhóm nào đang ghim mở) đã bỏ ngày 13/9 cùng với lối ghim mở: bấm thanh phân hệ giờ
+    là ĐI TỚI trang phân hệ, không còn trạng thái mở/đóng nào để nhớ.
     """
     src = _doc()
-    for khoa in ("KHOA_MENU", "KHOA_THU"):
-        assert f"${{{khoa}}}_${{u.username}}" in src or f"${{{khoa}}}_${{user.username}}" in src, \
-            f"{khoa} phải gắn tên đăng nhập vào khoá lưu, không lưu chung cho cả máy"
+    assert "${KHOA_THU}_${u.username}" in src or "${KHOA_THU}_${user.username}" in src, \
+        "KHOA_THU phải gắn tên đăng nhập vào khoá lưu, không lưu chung cho cả máy"
+    assert "KHOA_MENU" not in re.sub(r'/\*.*?\*/|//[^\n]*', '', src, flags=re.S), \
+        "KHOA_MENU là tàn dư của lối ghim mở đã bỏ – còn mã sống thì sớm muộn có người dùng lại"
 
 
 def test_tong_quan_khong_con_muc_con_va_bam_thang_ve_trang_chu():
@@ -426,12 +414,13 @@ def test_tong_quan_khong_con_muc_con_va_bam_thang_ve_trang_chu():
     assert "Bảng điều hành" not in khoi, "mục con 'Bảng điều hành' phải được bỏ khỏi nhóm Tổng quan"
     assert re.search(r'href:\s*"/"', khoi), "nhóm Tổng quan bỏ mục con thì phải có href:\"/\" để bấm thẳng"
     assert re.search(r'blocks:\s*\[\s*\]', khoi), "nhóm Tổng quan phải còn blocks rỗng, không mục con nào"
-    # Bộ lọc quyền phải biết giữ nhóm bấm thẳng, nếu không nó bị loại vì dem == 0.
-    assert re.search(r'filter\(\(g\)\s*=>\s*\(g\.href\s*\?', src), \
-        "bộ lọc nhóm vẫn loại nhóm có dem == 0 – nhóm bấm thẳng sẽ biến mất khỏi menu"
-    # Không mục con thì không được vẽ mũi tên xổ, và không mở bảng xổ ra khi rê chuột.
-    assert re.search(r'if\s*\(!g\.href\)\s*moBay', src), \
-        "nhóm bấm thẳng không có mục con – rê chuột không được mở bảng xổ ra rỗng"
+    # Nhóm Tổng quan không còn mục con nên dem == 0. Từ 13/9 không còn bộ lọc nào loại nhóm theo
+    # dem nữa (tám phân hệ hiện đủ với mọi vai trò), nên chỉ cần canh rằng bộ lọc ấy không quay lại.
+    assert "g.dem > 0 : duoc(g.href)" not in src, \
+        "bộ lọc theo dem đã quay lại – nhóm Tổng quan (dem == 0) sẽ biến mất khỏi menu"
+    # Không mục con thì không vẽ mũi tên xổ – một mũi tên mở ra khoảng trắng là lời hứa suông.
+    assert "g.dem > 0 && <span className=\"grp-mui\"" in src, \
+        "mũi tên xổ phải phụ thuộc nhóm có mục con hay không"
 
 
 def test_khoi_logo_noi_len_khoi_thanh_ngang():
@@ -461,3 +450,24 @@ def test_khoi_logo_noi_len_khoi_thanh_ngang():
     assert cao_thanh <= 72, (
         f"khối logo {cao_khoi}px + đệm {dem.group(1)}px hai đầu = thanh ngang {cao_thanh}px, "
         "vượt khoảng 64–72px của §I.2 – giảm đệm .top hoặc thu khối logo lại")
+
+
+def test_globals_css_can_bang_ngoac():
+    """Một dấu } thừa làm HỎNG IM LẶNG toàn bộ phần CSS phía sau nó.
+
+    Chuyện thật, 13/9/2026: gỡ luật .bay bằng biểu thức chính quy, dòng đầu của một luật nhiều dòng
+    bị xoá còn dòng cuối "…font-weight:600}" ở lại. Dấu } lạc ấy đóng sớm một khối, và MỌI luật viết
+    sau đó – cả khối màn hình 01 vừa thêm – ngừng có tác dụng. Trình duyệt không báo gì, phép thử
+    cũng không, chỉ có trang là trông sai. Đếm ngoặc là phép thử rẻ nhất bắt được đúng chuyện đó.
+    """
+    css = re.sub(r'/\*.*?\*/', '', open(os.path.join(ROOT, "web", "app", "globals.css"),
+                                        encoding="utf-8").read(), flags=re.S)
+    sau = 0
+    for so_dong, dong in enumerate(css.split("\n"), 1):
+        for ch in dong:
+            if ch == "{":
+                sau += 1
+            elif ch == "}":
+                sau -= 1
+                assert sau >= 0, f"globals.css dòng {so_dong}: dấu }} thừa – mọi luật phía sau mất tác dụng"
+    assert sau == 0, f"globals.css còn {sau} dấu {{ chưa đóng – phần cuối tệp không được áp dụng"
