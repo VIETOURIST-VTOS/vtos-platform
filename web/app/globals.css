@@ -324,16 +324,25 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 
 /* KHỐI TỒN ĐỌNG (components/KhoiTonDong.tsx). Bảng gom nhóm, không phải bảng dữ liệu dài – nên
    cột số canh phải và dùng chữ số đều bề ngang để mắt so hàng dọc được. */
-.td-bang{width:100%;border-collapse:collapse}
+/* KHỐI NẰM TRONG .grid nên phải cho phép CO LẠI. Ô lưới mặc định là min-width:auto, tức không bao
+   giờ hẹp hơn nội dung của nó – một câu ví dụ không xuống dòng ở trong là cả cột phình ra ngoài
+   khung và cả trang cuộn ngang. Đo trên bản chạy thật 13/9: trang rộng 1329px trong khung 1265px,
+   đúng bằng phần bảng thò ra. */
+#ton-dong{min-width:0}
+/* table-layout:fixed – cột chia theo bề rộng khai báo, KHÔNG nở theo nội dung. Bảng auto mặc định
+   lấy chuỗi dài nhất làm bề rộng tối thiểu, nên chỉ cần một câu ví dụ dài là bảng đẩy rộng ra. */
+.td-bang{width:100%;border-collapse:collapse;table-layout:fixed}
 .td-bang th{font-size:11.5px;color:var(--vtos-text-mute);text-transform:uppercase;
   letter-spacing:.04em;font-weight:600;text-align:left}
 .td-bang td.td-so,.td-bang th.td-so{text-align:right;font-variant-numeric:tabular-nums;
-  font-family:var(--vtos-font-mono);white-space:nowrap}
+  font-family:var(--vtos-font-mono);white-space:nowrap;width:74px}
 .td-bang td.td-so{font-weight:700;color:var(--vtos-navy)}
+.td-bang th:last-child,.td-bang td:last-child{width:104px}
 /* Câu ví dụ chỉ để nhận ra loại cảnh báo, không phải nội dung chính – cắt một dòng, không cho nó
-   đẩy cao cả hàng. */
+   đẩy cao cả hàng. KHÔNG đặt max-width theo ch: ô lưới hẹp hơn 52ch thì chính con số ấy thành bề
+   rộng tối thiểu và lại đẩy tràn. */
 .td-vd{font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  max-width:52ch}
+  max-width:100%}
 .td-chi-tiet{margin-top:10px}
 
 @media (max-width:640px){

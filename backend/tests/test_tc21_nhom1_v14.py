@@ -158,3 +158,23 @@ def test_css_can_bang_ngoac():
     assert css.count("{") == css.count("}"), (
         f"globals.css lệch ngoặc: {css.count('{')} mở, {css.count('}')} đóng"
     )
+
+
+def test_khoi_ton_dong_khong_the_day_tran_ngang():
+    """Vá 13/9/2026 sau khi đo bản chạy thật: trang rộng 1329px trong khung 1265px.
+
+    Khối nằm trong .grid, mà ô lưới mặc định là min-width:auto – không bao giờ hẹp hơn nội dung.
+    Cộng với bảng auto layout lấy chuỗi dài nhất làm bề rộng tối thiểu, một câu ví dụ không xuống
+    dòng là đủ đẩy cả trang cuộn ngang. Ba luật dưới đây chặn đúng ba nguyên nhân ấy.
+    """
+    css = (GOC / "web" / "app" / "globals.css").read_text(encoding="utf-8")
+    assert "#ton-dong{min-width:0}" in css, (
+        "Khối phải được phép co lại; thiếu min-width:0 thì ô lưới giữ nguyên bề rộng nội dung."
+    )
+    assert "table-layout:fixed" in css, (
+        "Bảng gom nhóm phải dùng table-layout:fixed, nếu không cột nở theo chuỗi dài nhất."
+    )
+    i = css.index(".td-vd{")
+    assert "max-width:52ch" not in css[i:i + 200], (
+        "max-width theo ch làm chính nó thành bề rộng tối thiểu khi ô lưới hẹp hơn – lại tràn."
+    )
