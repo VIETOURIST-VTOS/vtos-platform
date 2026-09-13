@@ -23,7 +23,10 @@ type Block = Item | Section;
 /** `icon` phục vụ trạng thái THU của menu (v1.1 §I.2: rộng 224–240px, thu còn 56–64px). Khi thu thì
  *  chỉ còn biểu tượng, và §I.2 đòi "biểu tượng phải có chú thích" – nhãn nhóm đi vào title và
  *  aria-label chứ không mất. Một hàng biểu tượng không chú thích là một hàng phải đoán. */
-type Group = { key: string; label: string; icon: string; blocks: Block[] };
+/** `href` dành cho nhóm KHÔNG CÓ mục con: thanh phân hệ ấy tự nó là một đường dẫn, bấm là đi thẳng.
+ *  Thêm 12/9/2026 khi anh Tuấn bỏ mục "Bảng điều hành" khỏi nhóm Tổng quan – nhóm còn rỗng thì thà
+ *  cho bấm thẳng còn hơn để một cái mũi tên xổ ra khoảng trắng. */
+type Group = { key: string; label: string; icon: string; blocks: Block[]; href?: string };
 
 /** Biểu tượng vẽ bằng NÉT (24×24, stroke 1.7, không tô đặc) thay cho emoji. Ba lý do, không phải
  *  chuyện thẩm mỹ: emoji mỗi máy vẽ một kiểu – Windows, máy Mac và điện thoại ra ba hình khác nhau
@@ -130,9 +133,10 @@ function chuDau(ten?: string | null): string {
 export const GROUPS: Group[] = [
   // "Việc của tôi" và "Chỉ đạo & giao việc" chưa có trang (xem CHUA_XAY). "Việc của tôi" vẫn tới
   // được bằng neo trên thanh ngang, nên không mất lối đi.
-  { key: "tongquan", label: "Tổng quan", icon: "tongquan", blocks: [
-    ["Bảng điều hành", "/"],
-  ] },
+  // KHÔNG CÓ mục con (anh Tuấn chốt 12/9/2026: "bỏ Bảng điều hành, không hiện lên ở thanh dọc này").
+  // Mục con cũ trỏ đúng trang mà chính thanh "Tổng quan" đang đại diện, nên nó chỉ là một dòng lặp
+  // lại tên nhóm. Đường đi KHÔNG mất: `href` bên dưới cho bấm thẳng vào thanh để về trang này.
+  { key: "tongquan", label: "Tổng quan", icon: "tongquan", href: "/", blocks: [] },
 
   // NHÓM THỨ TÁM, thêm 12/9/2026 theo bản vẽ navy V1.2 anh Tuấn chốt. KHÔNG có mục nào mới: năm mục
   // dưới đây được NHẤC NGUYÊN từ hai mục con "Marketing" và "Chăm sóc & khiếu nại" đang nằm trong
@@ -383,13 +387,55 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         .filter((b): b is Block => b !== null);
       const dem = blocks.reduce((n, b) => n + (laMuc(b) ? 1 : b.items.length), 0);
       return { ...g, blocks, dem };
-    }).filter((g) => g.dem > 0);
+      // Nhóm bấm thẳng (`href`) không có mục con nên `dem` bằng 0 – vẫn phải giữ, nhưng vẫn theo
+      // quyền: trang bị ẩn với vai nào thì thanh phân hệ ấy cũng biến mất với vai đó.
+    }).filter((g) => (g.href ? duoc(g.href) : g.dem > 0));
   }, [user]);
 
   const caNhan = useMemo(() => {
     const hid = user?.hidden_menus || [];
     return CA_NHAN.filter(([, h]) => !hid.includes(base(h)));
   }, [user]);
+
+  /** BẢNG XỔ RA của phân hệ đang rê chuột (anh Tuấn chốt 12/9).
+   *
+   *  VÌ SAO PHẢI TÍNH TOẠ ĐỘ BẰNG MÃ chứ không đặt `left:100%` rồi để CSS lo: `aside.side` có
+   *  `overflow-y:auto`, mà một hộp con tràn ngang ra khỏi khung ấy sẽ BỊ CẮT. Nên bảng xổ dùng
+   *  `position:fixed` và nhận toạ độ đo từ chính thanh phân hệ – fixed thoát khỏi mọi khung cắt của
+   *  tổ tiên (aside chỉ `sticky`, không tạo khung chứa cho fixed).
+   *
+   *  Bảng cao quá màn hình thì tự đẩy lên cho vừa: nhóm Kinh doanh và Điều hành mỗi nhóm 15 mục,
+   *  rê vào thanh cuối cùng mà bảng đổ xuống thì nửa dưới nằm ngoài màn hình.
+   */
+  const [bay, setBay] = useState<string | null>(null);
+  const [bayY, setBayY] = useState(0);
+  const [bayX, setBayX] = useState(0);
+  const hetGio = useRef<number | null>(null);
+
+  const moBay = useCallback((khoa: string, el: HTMLElement | null) => {
+    if (hetGio.current) { window.clearTimeout(hetGio.current); hetGio.current = null; }
+    if (!el) return;
+    const o = el.getBoundingClientRect();
+    setBayX(Math.round(o.right));
+    setBayY(Math.round(o.top));
+    setBay(khoa);
+  }, []);
+
+  // Đóng CHẬM một nhịp: chuột đi từ thanh sang bảng phải băng qua mép, đóng ngay là bảng biến mất
+  // giữa đường và người dùng bấm hụt.
+  const dongBay = useCallback(() => {
+    if (hetGio.current) window.clearTimeout(hetGio.current);
+    hetGio.current = window.setTimeout(() => setBay(null), 140);
+  }, []);
+
+  // Cuộn trang hay đổi cỡ cửa sổ thì toạ độ đã đo không còn đúng – đóng thay vì vẽ sai chỗ.
+  useEffect(() => {
+    if (!bay) return;
+    const f = () => setBay(null);
+    window.addEventListener("scroll", f, true);
+    window.addEventListener("resize", f);
+    return () => { window.removeEventListener("scroll", f, true); window.removeEventListener("resize", f); };
+  }, [bay]);
 
   // nhóm chứa trang hiện tại luôn được bung ("mở sẵn nhóm đang dùng" – v1.1 §I.2)
   const auto = groups.find((g) => g.blocks.some((b) =>
@@ -403,6 +449,16 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const lien = (l: string, h: string) => (
     <Link key={l + h} href={h} className={isOn(h, path) ? "on" : ""} onClick={() => setSide(false)}>{l}</Link>
   );
+
+  /** Danh sách mục con của một nhóm. MỘT hàm dùng cho CẢ HAI chỗ – bảng xổ ra khi rê chuột và khối
+   *  ghim mở khi bấm. Viết hai lần thì sớm muộn sửa một chỗ quên chỗ kia, và người dùng gặp hai
+   *  danh sách khác nhau cho cùng một phân hệ. */
+  const khoiMuc = (g: Group) => g.blocks.map((b, i) => laMuc(b) ? lien(b[0], b[1]) : (
+    <div key={b.label + i}>
+      <div className="sub-nhan">{b.label}</div>
+      {b.items.map(([l, h]) => lien(l, h))}
+    </div>
+  ));
 
   return (
     <Ctx.Provider value={{ user, toast, datChuaLuu }}>
@@ -479,25 +535,44 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             {thu ? "»" : "«"}
           </button>
           {groups.map((g) => (
-            <div key={g.key}>
+            <div key={g.key} className="nhom"
+              onMouseEnter={(e) => { if (!g.href) moBay(g.key, e.currentTarget); }}
+              onMouseLeave={dongBay}>
+              {/* NHÓM BẤM THẲNG: không mục con thì không mũi tên, không bảng xổ ra. Một mũi tên mở
+                  ra khoảng trắng là lời hứa suông. */}
+              {g.href ? (
+                <Link href={g.href} className={"grp" + (isOn(g.href, path) ? " on" : "")}
+                  title={g.label} aria-label={g.label} onClick={() => setSide(false)}>
+                  {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
+                       : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label}</span></>}
+                </Link>
+              ) : (<>
               {/* Khi THU thì chỉ còn biểu tượng, nhưng nhãn nhóm vẫn nằm ở title và aria-label:
                   §I.2 đòi "biểu tượng phải có chú thích". Bấm một biểu tượng lúc đang thu thì BUNG
                   lại rồi mới mở nhóm – nếu không thì người dùng bấm xong không thấy gì xảy ra. */}
               <button type="button" className={"grp" + (opened.has(g.key) ? " on" : "")}
-                title={g.label} aria-label={g.label}
-                onClick={() => { if (thu) doiThu(); doiNhom(g.key); }}>
+                title={g.label} aria-label={g.label} aria-expanded={opened.has(g.key)}
+                onFocus={(e) => moBay(g.key, e.currentTarget.parentElement)}
+                onClick={() => { if (thu) doiThu(); doiNhom(g.key); dongBay(); }}>
                 {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
                      : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label}</span>
                          <span className="grp-mui" aria-hidden="true">{opened.has(g.key) ? "▾" : "▸"}</span></>}
               </button>
-              {!thu && opened.has(g.key) && <div className="sub">
-                {g.blocks.map((b, i) => laMuc(b) ? lien(b[0], b[1]) : (
-                  <div key={b.label + i}>
-                    <div className="muted" style={{ padding: "6px 0 2px", fontSize: ".82em", textTransform: "uppercase", letterSpacing: ".04em" }}>{b.label}</div>
-                    {b.items.map(([l, h]) => lien(l, h))}
-                  </div>
-                ))}
-              </div>}
+
+              {/* BẢNG XỔ RA khi rê chuột hoặc khi nút nhận tiêu điểm bàn phím (anh Tuấn chốt 12/9).
+                  Không vẽ khi nhóm ĐANG GHIM MỞ: hai bản cùng một danh sách chồng lên nhau thì
+                  người dùng không biết bấm bản nào. */}
+              {bay === g.key && !opened.has(g.key) && (
+                <div className="bay" style={{ top: bayY, left: bayX }} role="group" aria-label={g.label}>
+                  <div className="bay-dau">{g.label}</div>
+                  {khoiMuc(g)}
+                </div>
+              )}
+
+              {/* GHIM MỞ TẠI CHỖ khi bấm. Rê chuột chỉ để liếc nhanh; ai làm việc lâu trong một phân
+                  hệ thì bấm một lần, danh sách nằm lại đó, không phải giữ chuột. */}
+              {!thu && opened.has(g.key) && <div className="sub">{khoiMuc(g)}</div>}
+              </>)}
             </div>
           ))}
         </aside>

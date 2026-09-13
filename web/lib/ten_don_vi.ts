@@ -1,23 +1,13 @@
-/** CẦU TẠM: tên đơn vị hiện trên thanh ngang, trong lúc chờ GET /pham-vi/don-vi của làn Phân quyền.
+/** Rút gọn tên pháp nhân cho những chỗ chật – thanh ngang và ô chọn đơn vị.
  *
- *  VÌ SAO CÓ TỆP NÀY. Bản vẽ giao diện 12/9 đòi thanh ngang hiện "Vietourist Holdings" kèm dòng phụ
- *  "Phạm vi báo cáo cấp Holdings". Trang thật hôm nay hiện "Chưa có nguồn · đơn vị" vì đường dẫn
- *  /api/v1/pham-vi/don-vi trả 404 – làn Phân quyền nhận dựng, hạn 20/9/2026 (đo lại 12/9).
+ *  LỊCH SỬ, ghi lại để lần sau không dựng lại cái đã bỏ: tệp này sinh ra 12/9/2026 làm CẦU TẠM cho
+ *  ô đơn vị trên thanh ngang, lúc GET /pham-vi/don-vi còn trả 404. Cùng ngày anh Tuấn chốt BỎ HẲN ô
+ *  ấy khỏi thanh ngang ("xoá bỏ chữ Vietourist Holdings") – logo bên trái đã nói người dùng đang ở
+ *  Holdings rồi, thêm một ô chữ nữa là thừa.
  *
- *  KHÔNG BỊA GÌ. Cái tên ở đây không phải hằng số gõ tay, cũng không phải đoán. Nó lấy từ hai nguồn
- *  máy chủ đã trả về thật:
- *
- *      GET /auth/me   → pham_vi { company_id, company_name, bi_gioi_han, cau_hien_thi }
- *      GET /companies → danh mục pháp nhân, công ty mẹ là bản ghi có kind === "me"
- *
- *  Tài khoản bị giới hạn vào một pháp nhân thì hiện tên pháp nhân ấy. Tài khoản xem toàn tập đoàn
- *  (bi_gioi_han = false) thì hiện tên CÔNG TY MẸ – đúng cái máy chủ vừa nói, không phải cái mình
- *  muốn nó nói. Không đọc được nguồn nào thì trả null và nút quay về "Chưa có nguồn · đơn vị".
- *
- *  KHÔNG DỰNG NÚT ĐỔI ĐƠN VỊ Ở ĐÂY. /companies trả TOÀN BỘ danh mục cho mọi người đăng nhập, nó
- *  không cắt theo phạm vi được phép. Lấy danh sách ấy làm ô chọn là dựng một nút cho người ta bấm
- *  sang pháp nhân họ không được xem – nút sai, rồi lại phải gỡ. Phạm vi ĐƯỢC PHÉP chỉ có
- *  /pham-vi/don-vi mới trả lời được; tới lúc đó nút đổi mới mọc, và tệp này gỡ đi.
+ *  Còn lại đúng phần vẫn dùng: hàm tenNgan(), gọi từ ChonDonVi để ô chọn đơn vị hiện tên gọn.
+ *  docTenDonVi() giữ nguyên cho ngày làn Phân quyền dựng xong /pham-vi/don-vi và ô chọn thật cần
+ *  biết tên pháp nhân đang xem mà không phải gọi thêm một vòng.
  */
 import { api } from "@/lib/api";
 

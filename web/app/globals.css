@@ -19,14 +19,38 @@ body{font-family:var(--vtos-font-text);font-size:14px;line-height:1.45;color:var
 a{color:var(--navy);font-weight:600}
 /* Thanh ngang – nền tối theo bản vẽ giao diện chốt 12/9/2026. Màu đặt THẲNG, không qua biến
    --panel: thanh này phải giữ nguyên một màu ở cả chế độ sáng lẫn tối, giống thanh dọc. */
-.top{background:var(--vtos-navy);color:#fff;padding:12px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(255,255,255,.16)}
+/* Đệm dọc 8px chứ không phải 12px: khối logo cao lên 55px sau khi mở rộng khung (12/9), 12+55+12
+   là 79px – vượt khoảng 64–72px của §I.2. 8+55+8 = 71px, vừa khít. */
+.top{background:var(--vtos-navy);color:#fff;padding:8px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(255,255,255,.16)}
 /* Dấu hiệu nhận biết: logo nền trong suốt xếp TRÊN, tên hệ thống xếp DƯỚI (cột dọc). Logo cao cố
    định 24px và để ảnh tự tính bề ngang theo tỉ lệ – khoá cả hai chiều thì ảnh bẹp. Dòng chữ dưới
    giãn chữ .14em cho bằng bề ngang logo, và không bao giờ vỡ dòng. */
-.top .brand{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;line-height:1}
-.top .brand .brand-logo{height:30px;width:auto;display:block}
-.top .brand small{font-weight:400;font-size:13px;letter-spacing:.02em;opacity:.85;white-space:nowrap;
-  font-family:var(--vtos-font-display)}
+/* KHỐI LOGO có nền riêng (phương án A anh Tuấn chọn 12/9, theo ảnh anh gửi): dải chuyển sắc chéo
+   cộng một vệt sáng, để dấu V và dòng chữ nổi khỏi nền navy đặc của thanh ngang.
+
+   BA MÀU CỦA DẢI ĐỀU LẤY TỪ BỘ NHẬN DIỆN – navy đậm → navy → sky. Ảnh gốc có một sắc xanh sáng hơn
+   (#1E6BB8) không nằm trong bộ; lấy --vtos-sky thay vào, vừa đúng hướng chuyển sắc vừa không đẻ ra
+   màu thứ tư (quy tắc 3).
+
+   CHIỀU CAO: dấu V 24px + hở 4 + dòng chữ 11 + đệm 6 = 45px, nằm gọn trong 48px lòng của thanh
+   ngang 72px. Đổi bất kỳ số nào trong bốn số ấy thì phải đo lại cả thanh – đúng lỗi đã mắc một lần
+   khi ô đơn vị hai dòng đẩy thanh ngang lên 120px. */
+.top .brand{display:inline-flex;flex-direction:column;align-items:center;gap:3px;line-height:1;
+  position:relative;overflow:hidden;flex:0 0 auto;padding:6px 30px;border-radius:var(--vtos-radius-md);
+  background:linear-gradient(112deg,var(--vtos-navy-dark) 0%,var(--vtos-navy) 48%,var(--vtos-sky) 100%);
+  /* NỔI LÊN KHỎI THANH NGANG (anh Tuấn chốt 12/9). Ba lớp, mỗi lớp một việc: viền sáng mảnh tách
+     khối khỏi nền navy; vệt sáng trong lòng viền trên làm mép trên bắt sáng; bóng đổ xuống dưới
+     cho khối có bề dày. Không dùng màu ngoài bộ nhận diện – bóng lấy chính navy-dark pha loãng. */
+  border:1px solid rgba(255,255,255,.20);
+  box-shadow:0 2px 4px rgba(11,37,69,.40),0 11px 24px rgba(11,37,69,.58),
+             inset 0 1px 0 rgba(255,255,255,.34)}
+/* Vệt sáng chéo. aria-hidden theo nghĩa của nó: đây là hình, không mang chữ nào. */
+.top .brand::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(74deg,transparent 44%,rgba(255,255,255,.28) 50%,transparent 57%)}
+.top .brand>*{position:relative;z-index:1}
+.top .brand .brand-logo{height:28px;width:auto;display:block}
+.top .brand small{font-weight:300;font-size:10px;letter-spacing:.11em;opacity:.72;white-space:nowrap;
+  font-family:var(--vtos-font-text)}
 .top .right{margin-left:auto;font-size:13px}.top .right b{color:#fff}.top .right a{color:#fff;margin-left:10px}
 nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:var(--top-h);z-index:4}
 nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:13px;color:var(--ink2);text-decoration:none;white-space:nowrap;font-weight:500}
@@ -70,16 +94,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .top .bar .bar-muc:hover{background:rgba(255,255,255,.10);color:#fff}
 .top .bar .bar-muc .bar-hinh{flex:0 0 auto;opacity:.9}
 /* Trợ lý AI xanh nhạt hơn: bản vẽ tách nó khỏi nhóm mục thường vì đây là chức năng mới. */
-/* Ô đơn vị trên thanh ngang: HAI DÒNG theo bản vẽ 12/9 – tên pháp nhân, dưới là phạm vi báo cáo.
-   Không phải nút bấm được: chưa có /pham-vi/don-vi thì chưa đổi đơn vị, mà vẽ một mũi tên xổ xuống
-   không làm gì là mời người ta bấm vào chỗ trống. Mũi tên mọc cùng lúc với đường dẫn ấy. */
-.top .bar .o-donvi{flex-direction:column;align-items:flex-start;gap:1px;height:auto;padding:4px 10px;
-  flex:0 1 auto;min-width:0;max-width:250px;overflow:hidden;
-  cursor:default;border-left:1px solid rgba(255,255,255,.16);border-radius:0;margin-right:2px}
-.top .bar .o-donvi:hover{background:none}
-.top .bar .o-donvi b{font-size:13px;font-weight:600;line-height:1.25;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.top .bar .o-donvi small{font-size:13px;font-weight:400;opacity:.72;line-height:1.2;white-space:nowrap}
 .top .bar .bar-muc.ai{color:var(--vtos-navy-light)}
 .top .bar .bar-muc.ai:hover{color:#fff}
 .top .bar .soon.bar-muc{opacity:.55}
@@ -102,7 +116,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .top{flex-wrap:wrap}
   .top .bar{flex-wrap:wrap}
   .top .bar .o-tim{flex:1 1 100%}
-  .top .bar .o-donvi small{display:none}
   .top .bar .bar-muc span,.top .bar .o-tim span,.top .bar .who-ten{position:absolute;width:1px;
     height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 }
@@ -111,23 +124,54 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* THANH PHÂN HỆ – nền xanh đậm theo hình anh Tuấn gửi 12/9/2026. Màu đặt THẲNG chứ không qua biến
    --panel: biến ấy đảo màu theo chế độ tối của máy, mà thanh này phải giữ nguyên một màu ở cả hai
    chế độ, nếu không thì nửa sáng nửa tối. Chữ trên nền này dùng màu riêng, không dùng --ink. */
-aside.side{flex:0 0 224px;width:224px;background:var(--vtos-navy);color:rgba(255,255,255,.86);border-right:1px solid rgba(255,255,255,.16);position:sticky;top:var(--top-h);max-height:calc(100vh - var(--top-h));min-height:calc(100vh - var(--top-h));overflow-y:auto;padding:8px 0 14px}
+aside.side{flex:0 0 252px;width:252px;background:var(--vtos-navy);color:rgba(255,255,255,.86);border-right:1px solid rgba(255,255,255,.16);position:sticky;top:var(--top-h);max-height:calc(100vh - var(--top-h));min-height:calc(100vh - var(--top-h));overflow-y:auto;padding:8px 0 14px}
 /* Mục nhóm: viên bo 6px theo bản vẽ 12/9 (bo góc của cả hệ là 8px cho thẻ, 6px cho nút và mục
    menu). Bỏ vạch màu bên trái – mục đang mở tô nền xanh, đọc rõ hơn một vạch 3px. */
-aside.side .grp{display:flex;align-items:center;gap:10px;width:calc(100% - 16px);margin:0 8px;text-align:left;border:0;background:none;font-family:inherit;font-size:13px;font-weight:500;color:rgba(255,255,255,.68);padding:10px 12px;cursor:pointer;border-radius:6px;white-space:nowrap}
+aside.side .grp{display:flex;align-items:center;gap:10px;width:calc(100% - 16px);margin:0 8px 6px;text-align:left;
+  border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);font-family:inherit;font-size:14px;
+  font-weight:500;color:rgba(255,255,255,.88);padding:11px 12px;cursor:pointer;
+  border-radius:var(--vtos-radius-md);white-space:nowrap}
 aside.side .grp .bt-hinh{flex:0 0 auto;opacity:.86}
 /* Nhãn nhóm PHẢI nằm một dòng (anh Tuấn 12/9: "Nhân sự – Hành chính" đang vỡ hai dòng).
    Dài quá thì cắt bằng dấu ba chấm, không xuống dòng – hai dòng làm lệch chiều cao cả cột. */
 aside.side .grp .grp-ten{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 aside.side .grp .grp-mui{opacity:.55;font-size:13px}
-aside.side .grp:hover{background:rgba(255,255,255,.06);color:var(--vtos-text-on-navy)}
-aside.side .grp.on{background:rgba(255,255,255,.14);color:#fff;font-weight:600}
+aside.side .grp:hover{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.26);color:var(--vtos-text-on-navy)}
+aside.side .grp.on{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.34);color:#fff;font-weight:600}
 aside.side .grp.on .bt-hinh{opacity:1;color:#fff}
-aside.side .sub{padding:0 0 6px}
-aside.side .sub a{display:block;margin:0 8px;padding:6px 12px 6px 37px;font-size:13px;color:rgba(255,255,255,.68);font-weight:500;text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ==========================================================================================
+   BẢNG XỔ RA KHI RÊ CHUỘT (anh Tuấn chốt 12/9/2026)
+   Rê chuột vào một phân hệ thì mục con xổ ra BÊN CẠNH, không làm thanh dọc dài thêm.
+   Bấm thì ghim mở tại chỗ (khối .sub bên dưới) cho ai làm việc lâu trong một phân hệ.
+
+   position:fixed chứ không phải absolute: aside.side có overflow-y:auto, một hộp absolute tràn
+   ngang ra khỏi nó sẽ bị cắt mất. Toạ độ do Shell.tsx đo từ chính thanh phân hệ rồi đặt vào.
+   ========================================================================================== */
+aside.side .nhom{position:relative}
+.bay{position:fixed;z-index:30;min-width:246px;max-width:300px;max-height:calc(100vh - 24px);
+  overflow-y:auto;margin-left:6px;padding:8px;border-radius:var(--vtos-radius-md);
+  background:var(--vtos-navy);border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 14px 40px rgba(11,37,69,.38)}
+/* Tên phân hệ lặp lại ở đầu bảng: lúc thanh dọc đang THU còn 60px thì thanh chỉ là một biểu tượng,
+   không có tên. Thiếu dòng này là người dùng không biết mình đang mở bảng của nhóm nào. */
+.bay .bay-dau{font-size:13px;font-weight:600;color:#fff;padding:4px 10px 8px;
+  border-bottom:1px solid rgba(255,255,255,.16);margin-bottom:6px;white-space:nowrap}
+.bay a{display:block;padding:7px 10px;font-size:13.5px;color:rgba(255,255,255,.86);font-weight:500;
+  text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bay a:hover{background:rgba(255,255,255,.10);color:var(--vtos-text-on-navy)}
+.bay a.on{background:rgba(255,255,255,.14);color:#fff;font-weight:600}
+/* Nhãn nhóm nhỏ (Lẻ, MICE, Xe & tài xế…) – một cột, giữ nguyên nhãn theo anh Tuấn chọn. */
+.bay .sub-nhan,aside.side .sub .sub-nhan{display:block;font-size:13px;color:rgba(255,255,255,.62);
+  padding:8px 10px 3px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+/* Màn hình nhỏ không có chuột: bảng xổ ra không hợp, ở đó chỉ dùng cách bấm ghim mở. */
+@media (max-width:900px){.bay{display:none}}
+@media (prefers-reduced-motion:no-preference){.bay{animation:bay-vao .12s ease-out}}
+@keyframes bay-vao{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
+aside.side .sub{padding:0 0 8px}
+aside.side .sub a{display:block;margin:0 8px 2px;padding:7px 12px 7px 38px;font-size:13.5px;color:rgba(255,255,255,.68);font-weight:500;text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 aside.side .sub a:hover{background:rgba(255,255,255,.06);color:var(--vtos-text-on-navy)}
-aside.side .sub a.on{color:#fff;font-weight:600;background:rgba(32,96,208,.30)}
-aside.side .sub .soon{display:block;margin:0 8px;padding:6px 12px 6px 37px;font-size:13px;color:rgba(255,255,255,.68);opacity:.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+aside.side .sub a.on{color:#fff;font-weight:600;background:rgba(255,255,255,.14)}
+aside.side .sub .soon{display:block;margin:0 8px 2px;padding:7px 12px 7px 38px;font-size:13.5px;color:rgba(255,255,255,.68);opacity:.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 aside.side .sub .soon i{font-size:13px;font-style:normal;background:rgba(255,255,255,.12);border-radius:8px;padding:1px 6px;margin-left:4px}
 .shell main{flex:1;min-width:0;margin:0}
 /* Thu thanh dọc (v1.1 §I.2: rộng 224–240px, thu còn 56–64px). Ở trạng thái thu chỉ còn một cột biểu
