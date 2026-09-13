@@ -70,6 +70,7 @@ from sqlalchemy.orm import Session
 
 from app.models.lop3_tour import TourDoanhThuDong
 from app.models.vietrip import TourCostLine
+from app.services import thu_ho_chi_ho as THC
 from app.services.rules import get_param, get_param_text
 
 # Khoá tham số thuế suất đầu ra. Chủ tịch chốt 8% ngày 12/9/2026; khai trong rules.DEFAULT_PARAMS.
@@ -132,7 +133,16 @@ def vat_dau_ra_do_duoc(db: Session, tour_ids: list[int]) -> dict[int, dict]:
         # Dòng chưa khai thuế suất là dòng chưa ai nói nó chịu thuế bao nhiêu. Đếm riêng để nói ra,
         # không lặng lẽ coi bằng 0.
         func.coalesce(func.sum(case((TourDoanhThuDong.thue_suat.is_(None), 1), else_=0)), 0).label("chua_khai"),
-    ).where(TourDoanhThuDong.tour_id.in_(tour_ids)).group_by(TourDoanhThuDong.tour_id)
+    ).where(
+        TourDoanhThuDong.tour_id.in_(tour_ids),
+        # Đ-7: DÒNG THU HỘ KHÔNG PHẢI DOANH THU nên không có mặt ở đây.
+        #
+        # Không phải vì nó mang thuế — nó không mang. Mà vì SỰ CÓ MẶT của nó làm `so_dong > 0`, và
+        # `mot_chuyen()` đọc điều đó thành "chuyến đã có dòng doanh thu chi tiết, thuế đầu ra là số
+        # ĐO ĐƯỢC". Một chuyến chỉ mới ghi mỗi khoản thu hộ sẽ báo thuế đầu ra bằng 0 với nhãn
+        # "đo được" — sai, và sai với cái nhãn đáng tin nhất.
+        TourDoanhThuDong.loai.not_in(THC.LOAI_KHONG_PHAI_DOANH_THU),
+    ).group_by(TourDoanhThuDong.tour_id)
     return {r.tid: {"vat_ra": float(r.vat or 0), "so_dong": int(r.so_dong or 0),
                     "so_dong_chua_khai_thue": int(r.chua_khai or 0)}
             for r in db.execute(q).all()}
