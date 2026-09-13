@@ -393,46 +393,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     return CA_NHAN.filter(([, h]) => !hid.includes(base(h)));
   }, [user]);
 
-  /** BẢNG XỔ RA của phân hệ đang rê chuột (anh Tuấn chốt 12/9).
+  /** KHÔNG CÒN BẢNG XỔ RA KHI RÊ CHUỘT (anh Tuấn chốt 13/9/2026, chiều): thanh phân hệ chỉ làm
+   *  MỘT việc – bấm là đi tới trang phân hệ.
    *
-   *  VÌ SAO PHẢI TÍNH TOẠ ĐỘ BẰNG MÃ chứ không đặt `left:100%` rồi để CSS lo: `aside.side` có
-   *  `overflow-y:auto`, mà một hộp con tràn ngang ra khỏi khung ấy sẽ BỊ CẮT. Nên bảng xổ dùng
-   *  `position:fixed` và nhận toạ độ đo từ chính thanh phân hệ – fixed thoát khỏi mọi khung cắt của
-   *  tổ tiên (aside chỉ `sticky`, không tạo khung chứa cho fixed).
-   *
-   *  Bảng cao quá màn hình thì tự đẩy lên cho vừa: nhóm Kinh doanh và Điều hành mỗi nhóm 15 mục,
-   *  rê vào thanh cuối cùng mà bảng đổ xuống thì nửa dưới nằm ngoài màn hình.
+   *  Vì sao bỏ: rê chuột ngang qua thanh dọc để tới chỗ khác mà bảng cứ bật ra là bật nhầm, và trên
+   *  máy bảng thì không có "rê chuột" nên nửa số người dùng chưa bao giờ thấy nó. Mục lục đầy đủ –
+   *  kể cả phần còn nợ và mục không có quyền – nằm ở trang phân hệ, chỗ ấy đọc kỹ được chứ không
+   *  phải liếc vội. Toàn bộ mã toạ độ, hẹn giờ đóng chậm và bộ nghe cuộn/đổi cỡ đã gỡ theo.
    */
-  const [bay, setBay] = useState<string | null>(null);
-  const [bayY, setBayY] = useState(0);
-  const [bayX, setBayX] = useState(0);
-  const hetGio = useRef<number | null>(null);
-
-  const moBay = useCallback((khoa: string, el: HTMLElement | null) => {
-    if (hetGio.current) { window.clearTimeout(hetGio.current); hetGio.current = null; }
-    if (!el) return;
-    const o = el.getBoundingClientRect();
-    setBayX(Math.round(o.right));
-    setBayY(Math.round(o.top));
-    setBay(khoa);
-  }, []);
-
-  // Đóng CHẬM một nhịp: chuột đi từ thanh sang bảng phải băng qua mép, đóng ngay là bảng biến mất
-  // giữa đường và người dùng bấm hụt.
-  const dongBay = useCallback(() => {
-    if (hetGio.current) window.clearTimeout(hetGio.current);
-    hetGio.current = window.setTimeout(() => setBay(null), 140);
-  }, []);
-
-  // Cuộn trang hay đổi cỡ cửa sổ thì toạ độ đã đo không còn đúng – đóng thay vì vẽ sai chỗ.
-  useEffect(() => {
-    if (!bay) return;
-    const f = () => setBay(null);
-    window.addEventListener("scroll", f, true);
-    window.addEventListener("resize", f);
-    return () => { window.removeEventListener("scroll", f, true); window.removeEventListener("resize", f); };
-  }, [bay]);
-
 
   if (!ready) return <main className="muted">Đang tải…</main>;
 
@@ -447,15 +415,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     isOn(g.href, path) || g.blocks.some((b) =>
       laMuc(b) ? isOn(b[1], path) : b.items.some(([, h]) => isOn(h, path)));
 
-  /** Danh sách mục con của một nhóm. MỘT hàm dùng cho CẢ HAI chỗ – bảng xổ ra khi rê chuột và khối
-   *  ghim mở khi bấm. Viết hai lần thì sớm muộn sửa một chỗ quên chỗ kia, và người dùng gặp hai
-   *  danh sách khác nhau cho cùng một phân hệ. */
-  const khoiMuc = (g: Group) => g.blocks.map((b, i) => laMuc(b) ? lien(b[0], b[1]) : (
-    <div key={b.label + i}>
-      <div className="sub-nhan">{b.label}</div>
-      {b.items.map(([l, h]) => lien(l, h))}
-    </div>
-  ));
 
   return (
     <Ctx.Provider value={{ user, toast, datChuaLuu }}>
@@ -532,9 +491,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             {thu ? "»" : "«"}
           </button>
           {groups.map((g) => (
-            <div key={g.key} className="nhom"
-              onMouseEnter={(e) => moBay(g.key, e.currentTarget)}
-              onMouseLeave={dongBay}>
+            <div key={g.key} className="nhom">
               {/* BẤM LÀ ĐI, KHÔNG PHẢI BUNG (anh Tuấn chốt phương án B, 13/9/2026). Mỗi thanh phân
                   hệ là một đường dẫn tới TRANG PHÂN HỆ – nơi vẽ đủ cây chức năng theo bản vẽ v1.3,
                   mục nào đã có trang và mục nào còn nợ. Trước đây bấm thì ghim mở danh sách tại
@@ -544,25 +501,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   (§I.2: "biểu tượng phải có chú thích"). */}
               <Link href={g.href} className={"grp" + (dangO(g) ? " on" : "")}
                 title={g.label} aria-label={g.label}
-                onFocus={(e) => moBay(g.key, e.currentTarget.parentElement)}
                 onClick={() => setSide(false)}>
                 {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
                      : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label}</span>
                          {g.dem > 0 && <span className="grp-mui" aria-hidden="true">▸</span>}</>}
               </Link>
-
-              {/* BẢNG XỔ RA khi rê chuột hoặc khi thanh nhận tiêu điểm bàn phím. Đây là LỐI TẮT tới
-                  các màn hình ĐÃ DỰNG của phân hệ – không phải mục lục đầy đủ; mục lục đầy đủ nằm ở
-                  trang phân hệ, và dòng cuối bảng dẫn sang đó. */}
-              {bay === g.key && g.dem > 0 && (
-                <div className="bay" style={{ top: bayY, left: bayX }} role="group" aria-label={g.label}>
-                  <div className="bay-dau">{g.label}</div>
-                  {khoiMuc(g)}
-                  <Link href={g.href} className="bay-tat-ca" onClick={() => setSide(false)}>
-                    Toàn bộ phân hệ →
-                  </Link>
-                </div>
-              )}
             </div>
           ))}
         </aside>
