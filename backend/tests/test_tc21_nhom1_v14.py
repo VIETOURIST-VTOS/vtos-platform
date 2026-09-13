@@ -178,3 +178,17 @@ def test_khoi_ton_dong_khong_the_day_tran_ngang():
     assert "max-width:52ch" not in css[i:i + 200], (
         "max-width theo ch làm chính nó thành bề rộng tối thiểu khi ô lưới hẹp hơn – lại tràn."
     )
+
+
+def test_moi_o_luoi_deu_co_lai_duoc():
+    """Vá 13/9/2026 (lần hai). Sau khi chữa riêng khối Tồn đọng, trang vẫn thò 10px – lần này do
+    bảng "Điều hành 21 ngày tới" ở KHUNG BÊN CẠNH.
+
+    Đó là bản chất của lỗi này: thủ phạm nằm ở khung khác chứ không phải khung mình đang sửa, nên
+    chữa từng khung một là chữa mãi không hết. Một luật cho mọi ô lưới thì chặn được cả lớp lỗi.
+    """
+    css = (GOC / "web" / "app" / "globals.css").read_text(encoding="utf-8")
+    assert ".grid>*{min-width:0}" in css, (
+        "Thiếu luật .grid>*{min-width:0}. Ô lưới mặc định là min-width:auto – không bao giờ hẹp "
+        "hơn nội dung, nên một bảng dài trong bất kỳ khung nào cũng đẩy cả trang cuộn ngang."
+    )
