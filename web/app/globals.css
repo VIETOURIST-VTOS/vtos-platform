@@ -161,18 +161,12 @@ aside.side .nhom{position:relative}
 .bay a:hover{background:rgba(255,255,255,.10);color:var(--vtos-text-on-navy)}
 .bay a.on{background:rgba(255,255,255,.14);color:#fff;font-weight:600}
 /* Nhãn nhóm nhỏ (Lẻ, MICE, Xe & tài xế…) – một cột, giữ nguyên nhãn theo anh Tuấn chọn. */
-.bay .sub-nhan,aside.side .sub .sub-nhan{display:block;font-size:13px;color:rgba(255,255,255,.62);
+.bay .sub-nhan{display:block;font-size:13px;color:rgba(255,255,255,.62);
   padding:8px 10px 3px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
 /* Màn hình nhỏ không có chuột: bảng xổ ra không hợp, ở đó chỉ dùng cách bấm ghim mở. */
 @media (max-width:900px){.bay{display:none}}
 @media (prefers-reduced-motion:no-preference){.bay{animation:bay-vao .12s ease-out}}
 @keyframes bay-vao{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
-aside.side .sub{padding:0 0 8px}
-aside.side .sub a{display:block;margin:0 8px 2px;padding:7px 12px 7px 38px;font-size:13.5px;color:rgba(255,255,255,.68);font-weight:500;text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-aside.side .sub a:hover{background:rgba(255,255,255,.06);color:var(--vtos-text-on-navy)}
-aside.side .sub a.on{color:#fff;font-weight:600;background:rgba(255,255,255,.14)}
-aside.side .sub .soon{display:block;margin:0 8px 2px;padding:7px 12px 7px 38px;font-size:13.5px;color:rgba(255,255,255,.68);opacity:.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-aside.side .sub .soon i{font-size:13px;font-style:normal;background:rgba(255,255,255,.12);border-radius:8px;padding:1px 6px;margin-left:4px}
 .shell main{flex:1;min-width:0;margin:0}
 /* Thu thanh dọc (v1.1 §I.2: rộng 224–240px, thu còn 56–64px). Ở trạng thái thu chỉ còn một cột biểu
    tượng; nhãn nhóm không mất mà chuyển vào title/aria-label, vì §I.2 đòi biểu tượng phải có chú
@@ -270,3 +264,69 @@ table.bang-doc{width:100%}
   main,.panel,.the{max-width:100%}
   .wrap{max-width:100%}
 }
+
+/* ── TRANG PHÂN HỆ (/phan-he/<khoa>) ─────────────────────────────────────────────────────────────
+   Anh Tuấn chốt phương án B 13/9/2026: bấm thanh phân hệ thì mở mục lục đầy đủ của phân hệ ấy.
+   Hình thức bám bản vẽ "Cấu trúc phân hệ V1.3" – nền xám nhạt, thẻ trắng, dải đầu navy, cây thụt
+   dòng có vạch dọc – nhưng MỌI MÀU đều lấy từ bộ nhận diện VTOS, không dùng navy #10283E và hồng
+   #EC5988 của bản vẽ (hai màu ấy ngoài bộ). */
+.cay-chuyen{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.cay-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;font-size:12.5px;
+  text-decoration:none;color:var(--vtos-text-mute);background:var(--vtos-card);
+  border:1px solid var(--vtos-line);border-radius:999px}
+.cay-chip b{font-size:11px;color:var(--vtos-navy-light);font-variant-numeric:tabular-nums}
+.cay-chip:hover{border-color:var(--vtos-navy-light);color:var(--vtos-navy)}
+.cay-chip.on{background:var(--vtos-navy);border-color:var(--vtos-navy);color:#fff}
+.cay-chip.on b{color:rgba(255,255,255,.72)}
+
+.cay-dau{display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:var(--vtos-radius-lg);
+  background:var(--vtos-navy);color:#fff;margin-bottom:14px}
+.cay-dau h1{margin:0;font-size:22px;color:#fff}
+.cay-dau-ma{flex:0 0 auto;font-size:20px;font-weight:700;letter-spacing:1px;padding:10px 13px;
+  border-radius:var(--vtos-radius-md);background:rgba(255,255,255,.12);color:rgba(255,255,255,.82);
+  font-variant-numeric:tabular-nums}
+.cay-tom{margin:5px 0 0;font-size:13px;color:rgba(255,255,255,.76)}
+.cay-dem{margin-left:auto;text-align:right;flex:0 0 auto}
+.cay-dem b{display:block;font-size:21px;font-variant-numeric:tabular-nums}
+.cay-dem span{font-size:11.5px;color:rgba(255,255,255,.72)}
+
+.cay-chu{font-size:12.5px;color:var(--vtos-text-mute);line-height:1.7;margin:0 0 12px}
+.cay-cuoi{font-size:12px;line-height:1.7;margin-top:14px}
+
+.cay{background:var(--vtos-card);border:1px solid var(--vtos-line);
+  border-radius:var(--vtos-radius-lg);padding:6px 10px;overflow-x:auto}
+.cay-dong{display:flex;align-items:center;gap:10px;min-height:40px;padding:7px 10px;
+  border-bottom:1px solid var(--vtos-surface);text-decoration:none;color:var(--vtos-text)}
+.cay-dong:last-child{border-bottom:0}
+/* Thụt dòng theo cấp, kèm vạch dọc để mắt lần được nhánh nào thuộc nhánh nào. */
+.cay-dong.cap1{margin-left:18px;padding-left:14px;border-left:1px solid var(--vtos-line)}
+.cay-dong.cap2{margin-left:36px;padding-left:14px;border-left:1px solid var(--vtos-line)}
+.cay-dong.cap3{margin-left:54px;padding-left:14px;border-left:1px solid var(--vtos-line)}
+.cay-dong.cap0 .cay-ten{font-weight:650;font-size:14.5px;color:var(--vtos-navy)}
+a.cay-dong:hover{background:var(--vtos-info-bg)}
+.cay-ma{flex:0 0 46px;font-size:11px;color:var(--vtos-text-mute);
+  font-family:var(--vtos-font-mono);font-variant-numeric:tabular-nums}
+.cay-ten{font-size:13.5px}
+/* Nhãn trạng thái luôn nằm cuối dòng, một cột thẳng hàng – đọc dọc là thấy ngay còn nợ bao nhiêu. */
+.cay-tt{margin-left:auto;flex:0 0 auto;font-size:10.5px;font-weight:600;padding:3px 9px;
+  border-radius:999px;white-space:nowrap}
+.cay-tt.co{background:var(--vtos-success-bg);color:var(--vtos-success)}
+.cay-tt.chua{background:var(--vtos-surface);color:var(--vtos-text-mute);font-weight:500}
+.cay-tt.nhan{background:transparent;color:var(--vtos-navy-light);font-weight:600}
+.cay-tt.tab{background:transparent;color:var(--vtos-text-mute);font-weight:500;
+  border:1px solid var(--vtos-line)}
+.cay-co{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--vtos-info-bg);
+  color:var(--vtos-info);white-space:nowrap}
+
+@media (max-width:640px){
+  .cay-dau{flex-wrap:wrap;gap:10px}
+  .cay-dem{margin-left:0}
+  .cay-dong.cap1{margin-left:8px}.cay-dong.cap2{margin-left:16px}.cay-dong.cap3{margin-left:24px}
+  .cay-ma{flex:0 0 38px}
+}
+
+/* Dòng cuối bảng xổ ra: lối sang mục lục đầy đủ của phân hệ. Bảng xổ chỉ liệt kê màn hình ĐÃ DỰNG
+   nên phải có một cửa dẫn tới phần còn nợ, nếu không người dùng tưởng phân hệ chỉ có bấy nhiêu. */
+.bay .bay-tat-ca{margin-top:6px;border-top:1px solid rgba(255,255,255,.18);padding-top:9px;
+  font-size:12.5px;color:var(--vtos-navy-light);font-weight:600}
+.bay .bay-tat-ca:hover{color:#fff}
