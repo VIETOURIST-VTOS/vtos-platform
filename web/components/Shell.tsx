@@ -99,6 +99,24 @@ function chuDau(ten?: string | null): string {
   return tu.slice(-2).map((t) => t[0]).join("").toUpperCase();
 }
 
+/** Ô tài khoản: TÊN rồi CHỨC DANH, và chức danh chỉ in MỘT LẦN (bản vẽ V1.4 nêu đích danh, sửa
+ *  13/9/2026).
+ *
+ *  Bản chạy thật đang hiện "Chủ tịch HĐQT · Chủ tịch HĐQT". Đây KHÔNG phải lỗi vẽ hai lần: tài
+ *  khoản ấy chưa được đặt họ tên thật, nên `full_name` đang chính là chức danh, và câu
+ *  `{full_name} · {role_name}` in ra hai bản của cùng một chuỗi. Sửa ở máy chủ là đặt tên thật cho
+ *  tài khoản; sửa ở đây là không in trùng khi hai trường bằng nhau – cần cả hai, vì tài khoản chưa
+ *  có tên thật sẽ còn xuất hiện nữa.
+ *
+ *  Không tự đặt tên thay người dùng (bản vẽ ghi rõ). Không có tên thì hiện chức danh, thế thôi. */
+function tenVaChuc(u?: { full_name?: string | null; role_name?: string | null } | null) {
+  const ten = (u?.full_name || "").trim();
+  const chuc = (u?.role_name || "").trim();
+  if (!ten) return <b>{chuc}</b>;
+  if (!chuc || ten.toLowerCase() === chuc.toLowerCase()) return <b>{ten}</b>;
+  return <>{ten} · <b>{chuc}</b></>;
+}
+
 /** TÁM NHÓM – tên chính thức theo bản vẽ giao diện navy V1.2, anh Tuấn chốt 12/9/2026.
  *  Tối đa hai cấp, bỏ số thứ tự, nhóm Quản trị đặt cuối, ẩn mục chưa có trang.
  *
@@ -456,9 +474,15 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               bản vẽ mô tả. Đo 12/9: /alerts/dem và /thong-bao/chua-doc đều trả 404 – hệ thống chưa
               đếm số chưa đọc ở đâu cả. Đổi nhãn sang "chưa đọc" trong khi con số vẫn là tổng cảnh
               báo là dán một cái tên sai lên một con số thật, tệ hơn là để nguyên. Khi nào có cửa
-              đếm chưa đọc thì đổi cả số lẫn nhãn một lượt. */}
-          <Link href="/alerts" className="bar-muc" title="Thông báo & cảnh báo nghiệp vụ" aria-label={`Thông báo${alerts > 0 ? `: ${alerts}` : ""}`}>
-            <Bt d="chuong" />{alerts > 0 && <b className="so-bao">{alerts}</b>}
+              đếm chưa đọc thì đổi cả số lẫn nhãn một lượt.
+
+              CHẶN TRẦN 99+ (bản vẽ V1.4, sửa 13/9/2026). Bản chạy thật đang hiện 1944 – bốn chữ số
+              trên một cái chuông thì vừa vỡ khung vừa vô nghĩa: không ai đọc 1944 rồi làm gì khác
+              với 999. Bản vẽ chốt tối đa 99+. Chặn trần chỉ đổi cách HIỆN, không đổi con số bên
+              dưới, nên nhãn trợ năng vẫn đọc đúng số thật. */}
+          <Link href="/alerts" className="bar-muc" title="Thông báo & cảnh báo nghiệp vụ"
+            aria-label={`Cảnh báo nghiệp vụ${alerts > 0 ? `: ${alerts}` : ""}`}>
+            <Bt d="chuong" />{alerts > 0 && <b className="so-bao">{alerts > 99 ? "99+" : alerts}</b>}
           </Link>
           {/* Menu cá nhân: ba mục của chính người đăng nhập, rời khỏi menu trái theo TC-2. */}
           <span style={{ position: "relative" }}>
@@ -466,7 +490,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               onClick={() => setMenuToi((m) => !m)}
               style={{ background: "none", border: 0, cursor: "pointer", font: "inherit", color: "inherit" }}>
               <span className="anh-dai-dien" aria-hidden="true">{chuDau(user?.full_name)}</span>
-              <span className="who-ten">{user?.full_name} · <b>{user?.role_name}</b></span> ▾
+              <span className="who-ten">{tenVaChuc(user)}</span> ▾
             </button>
             {menuToi && (
               <span role="menu" onClick={() => setMenuToi(false)}
