@@ -36,6 +36,10 @@ THANH_PHAN = GOC / "web" / "components" / "QuyetToanForm.tsx"
 # lẽ — vì năm khối còn lại vẫn chạy.
 SAU_KHOI = ["khach", "doanh-thu", "chi", "khach-chi-phi", "phuong-tien", "hdv-chi"]
 
+# Đ-8 · Đ-9 (13/9/2026). Ba cửa vé và một cửa công nợ trưởng đoàn – cùng một lý do như SAU_KHOI:
+# máy chủ có đường, không có cửa thì đó là việc còn thiếu chứ không phải việc đã xong.
+KHOI_DOT2 = ["ve/ma", "ve/khach", "ve/thanh-toan", "tl-cong-no"]
+
 
 def _co_web() -> bool:
     return WEB_APP.is_dir() and THANH_PHAN.is_file()
@@ -93,6 +97,29 @@ def test_bieu_nhap_con_du_sau_khoi():
         f"  Sáu mặt của lớp 3 phải có đủ sáu cửa; năm cửa còn lại vẫn chạy nên mất một cửa không ai kêu.")
 
 
+def test_bieu_nhap_con_du_bon_cua_dot_2():
+    """Đ-8 vé theo mã đặt chỗ (ba cửa) và Đ-9 công nợ trưởng đoàn (một cửa)."""
+    src = THANH_PHAN.read_text(encoding="utf-8")
+    thieu = [k for k in KHOI_DOT2 if f'"{k}"' not in src]
+    assert not thieu, (
+        f"Biểu nhập thiếu cửa cho: {thieu}.\n"
+        f"  Máy chủ đã có đường /api/v1/quyet-toan-lop3/{{tid}}/… cho từng cái; không có cửa thì "
+        f"điều hành phải nhập ở Excel, đúng chỗ cả đợt này sinh ra để chấm dứt.")
+
+
+def test_bieu_nhap_in_QUY_UOC_DAU_ngay_canh_o_so_cong_no_TL():
+    """Đ-9 · hai tệp mẫu của chính phòng Điều hành dùng hai quy ước dấu NGƯỢC NHAU.
+
+    Quy ước lấy từ máy chủ (`tl-cong-no/loai`), không gõ lại trong tệp giao diện – một quy ước dấu
+    viết ở hai chỗ là một quy ước sẽ có ngày lệch nhau. Nhưng phải có một câu dự phòng ngay trong
+    biểu, để lúc máy chủ chưa trả về thì ô số không nằm đó trần trụi không ai biết dấu nào là dấu nào.
+    """
+    src = THANH_PHAN.read_text(encoding="utf-8")
+    assert "quy_uoc_dau" in src, "biểu không lấy câu quy ước dấu từ máy chủ"
+    assert "NỘP LẠI" in src and "TRẢ trưởng đoàn" in src, \
+        "biểu thiếu câu quy ước dấu dự phòng ngay cạnh ô số"
+
+
 def test_bieu_nhap_co_du_CUA_TIEN_TIP():
     """Đ-6 · Chủ tịch chốt 12/9: "form sẵn cho điều hành tự nhập % vào ô đó".
 
@@ -117,12 +144,45 @@ def test_may_chu_co_du_HAI_duong_tip_xem_truoc_va_ghi():
     assert any(p.endswith("/tip") for p in duong), "thiếu đường ghi tiền tip"
 
 
+def _cac_cot(src: str) -> list[tuple[str, str]]:
+    """Tách từng khai báo cột `{ khoa: "...", … }` thành (tên khoá, phần khai còn lại).
+
+    Đọc tới dấu `}` đầu tiên hoặc tới đầu cột kế tiếp – đủ để biết cột ấy có `chiMay` hay không, mà
+    không phải viết một bộ phân tích cú pháp TypeScript trong một phép thử.
+    """
+    ra = []
+    for m in re.finditer(r'\{\s*khoa:\s*"([a-z_0-9]+)"', src):
+        het = src.find("}", m.end())
+        ke = src.find("{ khoa:", m.end())
+        if ke != -1 and (het == -1 or ke < het):
+            het = ke
+        ra.append((m.group(1), src[m.end():het if het != -1 else m.end() + 400]))
+    return ra
+
+
 def test_bieu_nhap_KHONG_co_o_nao_cho_go_tong():
     """Nguyên tắc 1 của chính biểu này: máy cộng, người không gõ tổng.
 
     Đo trên tệp thật: ô tổng một nhóm chi ghi 3.990.000 trong khi năm dòng của chính nhóm ấy cộng
     lại được 4.200.000. Hễ còn một ô cho gõ tổng thì lỗi ấy còn đường quay lại.
+
+    CỘT `chiMay: true` KHÔNG PHẢI MỘT Ô GÕ – nó là cột chỉ hiện số máy chủ đã cộng, và BangNhap
+    không dựng ô nhập cho nó (`nhap = hien.filter(c => !c.chiMay)`). Phép thử vẫn bắt đúng chuyện
+    cần bắt: một cột tên `tong…` mà THIẾU `chiMay` là một ô cho người gõ tổng.
     """
     src = THANH_PHAN.read_text(encoding="utf-8")
-    xau = re.findall(r'khoa:\s*"(tong[_a-z]*)"', src)
-    assert not xau, f"Biểu nhập có ô cho gõ tổng: {xau}. Tổng phải do máy chủ cộng từ các dòng."
+    xau = [k for k, khai in _cac_cot(src) if k.startswith("tong") and "chiMay" not in khai]
+    assert not xau, (f"Biểu nhập có ô cho gõ tổng: {xau}. Tổng phải do máy chủ cộng từ các dòng – "
+                     f"cột hiển thị tổng phải khai chiMay: true.")
+
+
+def test_phep_thu_go_tong_van_bat_duoc_khi_bo_chiMay():
+    """Canh chính cái nới ở trên: bỏ `chiMay` khỏi một cột tổng thì phép thử phải đỏ lại.
+
+    Một ngoại lệ không có phép thử canh nó là một ngoại lệ sẽ lớn dần.
+    """
+    src = THANH_PHAN.read_text(encoding="utf-8")
+    hong = src.replace('{ khoa: "tong_vnd", nhan: "Tổng của mã", kieu: "tien", chiMay: true }',
+                       '{ khoa: "tong_vnd", nhan: "Tổng của mã", kieu: "tien" }')
+    assert hong != src, "cột tong_vnd đã đổi tên – sửa lại phép thử này cho khớp"
+    assert [k for k, khai in _cac_cot(hong) if k.startswith("tong") and "chiMay" not in khai]

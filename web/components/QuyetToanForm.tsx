@@ -338,6 +338,12 @@ export default function QuyetToanForm({ tourId, toast }: {
   const [ck, setCk] = useState<any>(null);
   const [sg, setSg] = useState<any>(null);
   const [dv, setDv] = useState<any>(null);
+  // Đ-8 / Đ-9 (13/9/2026) · khối vé máy bay và tờ công nợ trưởng đoàn. Chỉ nạp cho tour nước
+  // ngoài: tour trong nước đi máy bay vẫn có vé, nhưng vé nội địa nằm gọn trong dòng chi phí và
+  // không có mã đặt chỗ giữ chỗ theo khối – dựng cả khối ở đó là bắt người ta điền một bảng rỗng.
+  const [ve, setVe] = useState<any>(null);
+  const [tl, setTl] = useState<any>(null);
+  const [tlLoai, setTlLoai] = useState<any>(null);
   const [ghi, setGhi] = useState(false);
 
   const nap = useCallback(async () => {
@@ -349,8 +355,16 @@ export default function QuyetToanForm({ tourId, toast }: {
     ]);
     setKh(a); setDt(b); setChi(c); setPt(d); setHdv(e); setCk(f); setSg(s);
     g(`${tourId}/dau-vet`).then(setDv);
+    if (nn) {
+      g(`${tourId}/ve`).then(setVe);
+      g(`${tourId}/tl-cong-no`).then(setTl);
+    }
     if (s?.hinh_thuc) setHinhThuc(s.hinh_thuc);
   }, [tourId, nn]);
+
+  useEffect(() => {
+    if (nn && !tlLoai) api("/quyet-toan-lop3/tl-cong-no/loai").then(setTlLoai).catch(() => {});
+  }, [nn, tlLoai]);
 
   // Khai hình thức. Lần đầu trên tờ trắng thì không hỏi lý do; máy chủ mới là nơi quyết định khi
   // nào cần lý do (tờ đã có dòng), màn hình chỉ chuyển tiếp thông báo của nó.
@@ -612,6 +626,147 @@ export default function QuyetToanForm({ tourId, toast }: {
       )}
 
       <TienTip tourId={tourId} nn={nn} toast={toast} xong={nap} />
+
+      {/* ------------------------------------------------- Đ-8 · VÉ MÁY BAY THEO MÃ ĐẶT CHỖ */}
+      {nn && (<>
+        <BangNhap
+          tieuDe={`${nn ? "7" : "6"}a. Mã đặt chỗ – khối chỗ giữ ở hãng`} nn={nn} dangGhi={ghi}
+          dong={ve?.theo_ma || []}
+          giaiThich="Không có ô tiền ở đây – tiền nằm ở từng dòng khách bên dưới, và tổng của mỗi mã do máy cộng lại. Ô HẠN XUẤT VÉ là chỗ mất tiền thật khi quên: quá hạn thì hãng huỷ chỗ và giá mua lại là giá hôm huỷ."
+          them={(d) => gui("ve/ma", d, "mã đặt chỗ")}
+          cot={[
+            { khoa: "ma_dat_cho", nhan: "Mã đặt chỗ", batBuoc: true, rong: 130,
+              chuThich: "Không ép định dạng: một tệp thật đang ghi tên tệp PDF ở ô này, và ép sáu ký tự sẽ chặn đúng chỗ điều hành cần ghi lại nhất." },
+            { khoa: "hang_bay", nhan: "Hãng bay", rong: 120 },
+            { khoa: "hanh_trinh", nhan: "Hành trình", rong: 200 },
+            { khoa: "so_cho_giu", nhan: "Số chỗ ĐÃ GIỮ", kieu: "so", rong: 130,
+              chuThich: "Khác với số tên đã điền. Giữ 32 chỗ rồi điền tên dần là cách đặt vé đoàn bình thường; khoảng cách giữa hai con số chính là việc phải làm." },
+            { khoa: "han_xuat_ve", nhan: "Hạn xuất vé", kieu: "ngay", rong: 150 },
+            { khoa: "nha_cung_cap", nhan: "Đại lý vé", rong: 180 },
+            { khoa: "so_ve", nhan: "Đã điền tên", chiMay: true },
+            { khoa: "con_thieu_ten", nhan: "Còn thiếu tên", chiMay: true },
+            { khoa: "tong_vnd", nhan: "Tổng của mã", kieu: "tien", chiMay: true },
+          ]}
+        />
+        <BangNhap
+          tieuDe={`${nn ? "7" : "6"}b. Vé của từng khách – đây là SỐ CHỐT`} nn={nn} dangGhi={ghi}
+          dong={ve?.dong || []}
+          giaiThich="Bốn ô tiền tách riêng vì Kế toán hỏi mỗi kỳ 'phần tăng là do vé hay do nâng hạng'. Thành tiền do máy cộng. HOÀN VÉ là một loại dòng riêng, số ÂM, bắt buộc có lý do – không phải một dòng vé bị xoá hay một dòng vé mang dấu trừ."
+          them={(d) => gui("ve/khach", d, "dòng vé")}
+          tong={[{ nhan: "Tổng tiền vé", gia: ve?.tong_tien_ve_vnd },
+                 { nhan: "Đã trả đại lý", gia: ve?.tong_da_thanh_toan_vnd },
+                 { nhan: "Còn nợ đại lý", gia: ve?.con_no_dai_ly }]}
+          cot={[
+            { khoa: "loai", nhan: "Loại dòng", kieu: "chon", batBuoc: true, rong: 150,
+              chon: [["ve", "Vé xuất cho khách"], ["hoan_ve", "Hoàn vé (số ÂM)"],
+                     ["phi_khac", "Phí khác – không phải vé"]] },
+            { khoa: "ho_ten_ve", nhan: "Họ tên trên vé", rong: 200,
+              chuThich: "Tên theo hộ chiếu, có thể khác tên trong danh sách đoàn. Dòng vé và dòng hoàn vé bắt buộc có tên; dòng phí khác thì không." },
+            { khoa: "khach_id", nhan: "Là khách nào", kieu: "chon", chon: dsKhach, rong: 170 },
+            { khoa: "ve_ma_id", nhan: "Thuộc mã", kieu: "chon", rong: 150,
+              chon: (ve?.theo_ma || []).map((m: any) => [String(m.id), m.ma_dat_cho] as [string, string]) },
+            { khoa: "gia_ve", nhan: "Giá vé", kieu: "tien", rong: 140 },
+            { khoa: "gia_ve_noi_dia", nhan: "Vé nội địa nối chuyến", kieu: "tien", rong: 170 },
+            { khoa: "phi_khac", nhan: "Phí khác", kieu: "tien", rong: 120 },
+            { khoa: "phi_nang_hang", nhan: "Phí nâng hạng", kieu: "tien", rong: 140 },
+            { khoa: "tien_te", nhan: "Tiền tệ", kieu: "chon", rong: 100 },
+            { khoa: "ty_gia", nhan: "Tỷ giá", kieu: "so", rong: 110,
+              chuThich: "Thiếu tỷ giá thì dòng ngoại tệ KHÔNG được cộng vào tổng – 450 USD không được lặng lẽ đếm như 450 đồng." },
+            { khoa: "so_hoa_don", nhan: "Hoá đơn", rong: 130,
+              chuThich: "Ô CHỮ. 'ko VAT' được giữ nguyên: 'không có hoá đơn' là một câu trả lời, 'chưa nhập' là câu khác." },
+            { khoa: "ly_do", nhan: "Lý do (bắt buộc nếu HOÀN)", rong: 200 },
+            { khoa: "thanh_tien", nhan: "Thành tiền", kieu: "tien", chiMay: true },
+          ]}
+        />
+        <BangNhap
+          tieuDe={`${nn ? "7" : "6"}c. Các đợt trả tiền đại lý vé`} nn={nn} dangGhi={ghi}
+          dong={ve?.thanh_toan || []}
+          giaiThich="Các đợt này chỉ TRỪ DẦN vào nợ – chúng không phải một cách ghi khác của tổng tiền vé. Đặt cọc 30% thì hai con số lệch 70%, và đó là tình trạng đúng của gần như mọi chuyến đang làm quyết toán."
+          them={(d) => gui("ve/thanh-toan", d, "đợt thanh toán vé")}
+          cot={[
+            { khoa: "ngay", nhan: "Ngày", kieu: "ngay", rong: 140 },
+            { khoa: "so_tien", nhan: "Số tiền", kieu: "tien", rong: 150 },
+            { khoa: "tien_te", nhan: "Tiền tệ", kieu: "chon", rong: 100 },
+            { khoa: "ty_gia", nhan: "Tỷ giá", kieu: "so", rong: 110 },
+            { khoa: "hinh_thuc", nhan: "Hình thức", rong: 140 },
+            { khoa: "so_chung_tu", nhan: "Số chứng từ", rong: 150 },
+            { khoa: "ghi_chu", nhan: "Ghi chú", rong: 200 },
+            { khoa: "so_tien_vnd", nhan: "Quy VND", kieu: "tien", chiMay: true },
+          ]}
+        />
+        {(ve?.chan?.length > 0 || ve?.canh_bao?.length > 0) && (
+          <div className={ve.chan.length ? "gate fail" : "gate warn"} style={{ marginBottom: 14 }}>
+            {ve.chan.map((c: any, i: number) => <div key={`c${i}`}><b>CHẶN – </b>{c.vi_sao} {c.can_lam}</div>)}
+            {ve.canh_bao.map((c: any, i: number) => <div key={`w${i}`}>{c.vi_sao} {c.can_lam}</div>)}
+          </div>
+        )}
+      </>)}
+
+      {/* ------------------------------------------------- Đ-9 · CÔNG NỢ TRƯỞNG ĐOÀN */}
+      {nn && (<>
+        <BangNhap
+          tieuDe={`${nn ? "8" : "7"}. Công nợ trưởng đoàn`} nn={nn} dangGhi={ghi}
+          dong={tl?.dong || []}
+          giaiThich={tlLoai?.quy_uoc_dau ||
+            "DƯƠNG = công ty còn phải TRẢ trưởng đoàn · ÂM = trưởng đoàn còn phải NỘP LẠI."}
+          them={(d) => gui("tl-cong-no", d, "dòng công nợ trưởng đoàn")}
+          cot={[
+            { khoa: "stt", nhan: "STT", kieu: "so", rong: 70 },
+            { khoa: "loai", nhan: "Loại khoản", kieu: "chon", batBuoc: true, rong: 260,
+              chon: (tlLoai?.loai || []).map((x: any) => [x.ma, `${x.ten} (${x.dau_dung})`] as [string, string]),
+              chuThich: "Mỗi loại khai sẵn chiều dấu của nó. Nhập ngược dấu thì máy chặn ngay tại cửa – đó là lỗi duy nhất ở đây làm cả tờ ra kết quả ngược chiều mà mọi tổng vẫn cân." },
+            { khoa: "noi_dung", nhan: "Nội dung", rong: 240 },
+            { khoa: "ten_truong_doan", nhan: "Trưởng đoàn", rong: 180 },
+            { khoa: "so_tien", nhan: "Số tiền (CÓ DẤU)", kieu: "tien", rong: 160,
+              chuThich: "Tờ quyết toán châu Âu ghi NGƯỢC quy ước này ở dòng cuối. Khi chép vào phải đổi dấu." },
+            { khoa: "tien_te", nhan: "Tiền tệ", kieu: "chon", rong: 100,
+              chuThich: "Mỗi dòng MỘT đồng tiền. Cùng một việc bằng hai đồng tiền thì ghi hai dòng." },
+            { khoa: "ty_gia", nhan: "Tỷ giá", kieu: "so", rong: 110 },
+            { khoa: "ngay_ty_gia", nhan: "Ngày tỷ giá", kieu: "ngay", rong: 150 },
+            { khoa: "ghi_chu", nhan: "Ghi chú", rong: 200 },
+            { khoa: "loai_ten", nhan: "Chiều", chiMay: true },
+          ]}
+        />
+        {tl?.theo_tien_te?.length > 0 && (
+          <div className="panel" style={{ marginBottom: 14 }}>
+            <h3 style={{ margin: "0 0 4px" }}>Số dư theo TỪNG đồng tiền</h3>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Người ta trả cho trưởng đoàn bằng từng đồng tiền một, nên đây mới là số dùng để đi trả.
+              Con số VND gộp chỉ để đưa vào giá vốn – và nó KHÔNG có khi còn đồng tiền thiếu tỷ giá.
+            </p>
+            <table>
+              <thead><tr><th>Đồng tiền</th><th style={{ textAlign: "right" }}>Số dư</th>
+                <th style={{ textAlign: "right" }}>Tỷ giá</th>
+                <th style={{ textAlign: "right" }}>Quy VND</th><th>Ai nợ ai</th></tr></thead>
+              <tbody>
+                {tl.theo_tien_te.map((x: any) => (
+                  <tr key={x.tien_te}>
+                    <td><b>{x.tien_te}</b></td>
+                    <td style={{ textAlign: "right" }}>{x.so_du}</td>
+                    <td style={{ textAlign: "right" }}>{x.ty_gia ?? "—"}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {x.so_du_vnd === null ? <span className="muted">chưa quy được</span> : vnd(x.so_du_vnd)}
+                    </td>
+                    <td>{x.ai_no_ai}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr>
+                <td colSpan={3}><b>CỘNG</b></td>
+                <td style={{ textAlign: "right" }}>
+                  <b>{tl.so_du_vnd === null ? "—" : vnd(tl.so_du_vnd)}</b></td>
+                <td><b>{tl.ai_no_ai ?? "chưa đủ tỷ giá để gộp"}</b></td>
+              </tr></tfoot>
+            </table>
+          </div>
+        )}
+        {(tl?.chan?.length > 0 || tl?.canh_bao?.length > 0) && (
+          <div className={tl.chan.length ? "gate fail" : "gate warn"} style={{ marginBottom: 14 }}>
+            {tl.chan.map((c: any, i: number) => <div key={`c${i}`}><b>CHẶN – </b>{c.vi_sao} {c.can_lam}</div>)}
+            {tl.canh_bao.map((c: any, i: number) => <div key={`w${i}`}>{c.vi_sao} {c.can_lam}</div>)}
+          </div>
+        )}
+      </>)}
 
       {/* SỔ DẤU VẾT – CHỈ ĐỌC, KHÔNG CÓ NÚT NÀO.
           Chủ tịch chốt 10/9/2026: sửa tờ đã ký thì phải để lại dấu vết và lý do. Sổ này không có cửa

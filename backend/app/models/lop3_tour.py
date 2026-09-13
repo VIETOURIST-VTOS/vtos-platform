@@ -92,6 +92,12 @@ LOAI_DOANH_THU = {
     #
     # Tiền tip hoàn cho đại lý là dòng ÂM loại này, và như mọi dòng âm thì bắt buộc khai `chung_tu`.
     "tip_cong_ty": "Phần tiền tip thuộc công ty sau khi chia – xem app/services/tip_tour.py",
+    # Đ-7 · TIỀN ĐI NGANG QUA, KHÔNG PHẢI DOANH THU.
+    #
+    # Nó nằm trong sổ doanh thu vì đó là nơi ghi tiền vào, nhưng MỌI phép cộng doanh thu phải loại
+    # nó ra — xem thu_ho_chi_ho.la_doanh_thu(). Mẫu visa lẻ T5/2026 có hẳn cột "Thu hộ chi hộ"
+    # (821.500 đ, 1.200.000 đ) nằm ngoài cả cột Tổng thu lẫn Tổng chi.
+    "thu_ho": "Thu hộ khách – KHÔNG phải doanh thu, phải trả lại hoặc chi đúng việc",
     "thu_khac": "Thu khác",
 }
 
@@ -264,6 +270,13 @@ class TourDoanhThuDong(Base):
     so_tien_goc: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     ty_gia: Mapped[float | None] = mapped_column(TY_GIA, nullable=True)
     ngay_ty_gia: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # ---- Đ-7 (13/9/2026) · chỉ có nghĩa với dòng loại `thu_ho` ----
+    #
+    # CHỦ TIỀN rỗng = CHƯA AI XÁC ĐỊNH, không phải "của công ty". Một khoản thu hộ không biết của ai
+    # thì không trả lại được cho ai — đó là chỗ DUY NHẤT Đ-7 chặn đóng số.
+    # HẠN XỬ LÝ rỗng = chưa đặt hạn; số dư không có hạn thì nằm đó mãi và không thành việc của ai.
+    chu_tien: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    han_xu_ly: Mapped[date | None] = mapped_column(Date, nullable=True)
     ghi_chu: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
 
@@ -361,6 +374,21 @@ class TourHdvChi(Base):
     # Tiền của KHÁCH, không phải của công ty. Mẫu UK: "TL thu của khách 126 GBP (mua dùm khách vé
     # tham quan)". Khoản ấy không được vào giá vốn, và cũng không được vào doanh thu.
     thu_ho_khach: Mapped[int | None] = mapped_column(Integer, nullable=True, server_default="0")
+    # ---- Đ-7 (13/9/2026) · CỜ NÀY TRƯỚC ĐÂY LÀ CỜ CHẾT ----
+    #
+    # `thu_ho_khach` đã có từ trước và đúng về ý, nhưng KHÔNG chỗ nào cộng trừ nó vào bản chốt – nó
+    # chỉ nằm đó. Tức là hệ thống biết khoản này là tiền của khách mà vẫn không trả lời được câu
+    # "vậy giờ ai đang cầm bao nhiêu tiền của ai".
+    #
+    # Hai cột dưới đây biến nó thành một số dư THẬT, có chủ và có hạn.
+    #
+    # CHỦ TIỀN – rỗng nghĩa là CHƯA AI XÁC ĐỊNH, khác hẳn "của công ty". Một khoản thu hộ mà không
+    # biết của ai thì không trả lại được cho ai; để trống rồi mặc định là tiền công ty là cách biến
+    # tiền của khách thành doanh thu mà không ai bấm nút nào.
+    chu_tien: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # HẠN XỬ LÝ – ngày phải trả lại hoặc nộp về. Số dư giữ hộ không có hạn thì nó nằm đó mãi và
+    # không bao giờ thành việc của ai. Rỗng = chưa đặt hạn, và bộ soát nói ra điều đó.
+    han_xu_ly: Mapped[date | None] = mapped_column(Date, nullable=True)
     # NULL nghĩa là HDV chi một khoản KHÔNG CÓ trong chiết tính – nặng hơn chi vượt, vì không có gì
     # để so. Trường hợp ấy phải duyệt toàn bộ số tiền, không phải phần chênh.
     dong_chiet_tinh_id: Mapped[int | None] = mapped_column(ForeignKey("tour_cost_lines.id"), nullable=True)
@@ -416,3 +444,247 @@ class SuaSauKy(Base):
     nguoi_sua: Mapped[str] = mapped_column(String(60))
     vai_tro: Mapped[str | None] = mapped_column(String(30), nullable=True)
     sua_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+# Đ-8 (13/9/2026) · VÉ MÁY BAY THEO MÃ ĐẶT CHỖ
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Đo trên hai tệp thật:
+#
+#   QuyetToan_27052026_UK, sheet Ve_MB — HAI khối cho cùng một số tiền 952.112.888:
+#       khối trên  : 7 dòng theo MÃ ĐẶT CHỖ (2ZB8A1 · SGN-LGW-SGN · 32 chỗ · 22.435.959 · 717.950.688)
+#       khối dưới  : 44 dòng theo TỪNG KHÁCH có tên, mỗi dòng mang mã đặt chỗ của mình
+#
+#   SM000.05260226 (SIN/MAL), sheet VMB — 4 dòng, trong đó:
+#       "Phí loby  350.000  ko VAT"      -> KHÔNG phải một cái vé
+#       "TVO230.pdf  4.742.047  hoá đơn 82" -> ô "CODE" đang chứa TÊN TỆP
+#
+# BA ĐIỀU BA TỆP ẤY DẠY
+#
+# 1. SỐ CHỐT LÀ DÒNG TỪNG KHÁCH, không phải dòng theo mã. Chủ tịch chốt 12/9/2026: "số chi tiết là
+#    số chốt, tự cộng lại từ dòng". Nên bảng TourVeKhach giữ số; khối theo mã do máy cộng ra và
+#    KHÔNG có cột nào cho người gõ tổng của một mã.
+#
+# 2. NHƯNG MÃ ĐẶT CHỖ VẪN LÀ MỘT BẢN GHI THẬT, không phải một nhãn. Một mã tồn tại TRƯỚC khi có tên
+#    khách: giữ 32 chỗ hôm nay, điền tên dần trong hai tuần, quá hạn xuất vé thì huỷ chỗ. Cột
+#    so_cho_giu KHÔNG phải bản sao của "đếm số dòng khách" – nó là một sự kiện khác (đã giữ bao
+#    nhiêu), và khoảng cách giữa hai con số chính là việc phải làm.
+#
+# 3. HOÀN VÉ LÀ MỘT DÒNG ÂM CÓ TÊN NGƯỜI, không phải một dòng bị xoá. Tệp UK ghi khoản hoàn hai chỗ
+#    khác nhau: khối theo mã ghi thành dòng riêng (−9.210.459 × 2), khối theo khách trừ thẳng vào
+#    cột "Giá vé nội địa" của PHAM DUNG và NGUYEN THI KIM MY. Hai cách ghi cùng ra một tổng, nên
+#    không ai phát hiện. Ở đây chỉ có MỘT cách: một dòng loại `hoan_ve`, mang tên khách, mang mã,
+#    số tiền âm, và bắt buộc có lý do.
+
+
+LOAI_VE = {
+    "ve": "Vé xuất cho khách",
+    "hoan_ve": "Hoàn vé – số tiền ÂM, phải có tên khách và lý do",
+    "phi_khac": "Phí đi kèm không phải vé (phí lobby, phí đổi tên, phí hành lý mua thêm)",
+}
+
+TRANG_THAI_MA = {
+    "giu_cho": "Đang giữ chỗ – chưa xuất vé",
+    "da_xuat": "Đã xuất vé",
+    "huy": "Đã huỷ chỗ",
+}
+
+
+class TourVeMa(Base):
+    """Một MÃ ĐẶT CHỖ của chuyến – khối chỗ giữ ở hãng, chưa chắc đã có tên ai.
+
+    Bảng này KHÔNG giữ tiền. Mọi con số tiền nằm ở TourVeKhach; ở đây chỉ có chỗ giữ và hạn.
+
+    Vì sao vẫn cần bảng riêng dù "số chốt là dòng khách": vì một mã có ba thứ mà dòng khách không
+    có chỗ nào để mang – hãng bay, hành trình chung, và HẠN XUẤT VÉ. Hạn xuất vé là thứ làm mất
+    tiền thật khi quên: quá hạn thì hãng huỷ chỗ và giá mua lại là giá hôm huỷ.
+    """
+    __tablename__ = "tour_ve_ma"
+    __table_args__ = (Index("ix_tvm_tour", "tour_id"), Index("ix_tvm_ma", "ma_dat_cho"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"))
+    # Mã đặt chỗ của hãng (PNR). KHÔNG ép định dạng: mẫu SIN/MAL đang để "TVO230.pdf" ở ô này, và
+    # ép sáu ký tự chữ-số sẽ chặn đúng những chuyến mà điều hành cần ghi lại nhất.
+    ma_dat_cho: Mapped[str] = mapped_column(String(40))
+    hang_bay: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    hanh_trinh: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Số chỗ ĐÃ GIỮ ở hãng. Khác với số dòng khách đã điền tên – xem chú thích đầu khối.
+    so_cho_giu: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    han_xuat_ve: Mapped[date | None] = mapped_column(Date, nullable=True)
+    trang_thai: Mapped[str] = mapped_column(String(20), default="giu_cho",
+                                            server_default="giu_cho", nullable=False)
+    nha_cung_cap: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    ghi_chu: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    nguoi_nhap: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nhap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class TourVeKhach(Base):
+    """Một dòng vé của MỘT khách – đây là số chốt của khối vé.
+
+    Năm ô tiền tách riêng đúng như tệp UK: giá vé quốc tế, giá vé nội địa nối chuyến, phí khác, phí
+    nâng hạng. Gộp làm một ô thì sang tháng không ai trả lời được "phần tăng là do vé hay do nâng
+    hạng", mà đó là câu Kế toán hỏi mỗi kỳ.
+
+    `thanh_tien` do MÁY CHỦ cộng bốn ô ấy – không có cửa nào cho người gõ nó.
+    """
+    __tablename__ = "tour_ve_khach"
+    __table_args__ = (Index("ix_tvk_tour", "tour_id"), Index("ix_tvk_ma", "ve_ma_id"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"))
+    ve_ma_id: Mapped[int | None] = mapped_column(ForeignKey("tour_ve_ma.id"), nullable=True)
+    khach_id: Mapped[int | None] = mapped_column(ForeignKey("booking_khach.id"), nullable=True)
+    # Tên khách trên vé. Vé máy bay quốc tế ghi tên theo hộ chiếu và KHÁC tên trong danh sách đoàn
+    # (dấu, thứ tự họ tên đệm). Nên đây là một ô riêng chứ không lấy từ khach_id.
+    ho_ten_ve: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    loai: Mapped[str] = mapped_column(String(20), default="ve", server_default="ve", nullable=False)
+    gia_ve: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    gia_ve_noi_dia: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    phi_khac: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    phi_nang_hang: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    thanh_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    tien_te: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    ty_gia: Mapped[float | None] = mapped_column(TY_GIA, nullable=True)
+    # Số hoá đơn của đại lý vé. Mẫu SIN/MAL ghi "14 - Việt Việt", "82", và "ko VAT" ở cùng một cột –
+    # nên đây là ô CHỮ, và "ko VAT" được giữ nguyên chứ không đổi thành rỗng: "không có hoá đơn" là
+    # một câu trả lời, "chưa nhập" là một câu khác.
+    so_hoa_don: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Bắt buộc với dòng `hoan_ve`. Dịch vụ chặn khi thiếu.
+    ly_do: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    ghi_chu: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    nguoi_nhap: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nhap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class TourVeThanhToan(Base):
+    """Một ĐỢT THANH TOÁN cho đại lý vé / hãng bay.
+
+    ────────────────────────────────────────────────────────────────────────────────────────────
+    CHỖ BẢN ĐỀ XUẤT SÁNG 12/9 CỦA ROBOT A VIẾT SAI, VÀ LÀN RÀ SOÁT BÁC ĐÚNG
+    ────────────────────────────────────────────────────────────────────────────────────────────
+
+    Bản ấy viết phép kiểm: "Σ giá vé = Σ các đợt thanh toán, lệch là CHẶN".
+
+    Sai. Các đợt thanh toán KHÔNG phải một cách ghi khác của tổng tiền vé – chúng chỉ TRỪ DẦN vào
+    khoản nợ. Đặt cọc 30% hôm nay thì hai con số lệch nhau 70%, và đó là tình trạng đúng của gần như
+    mọi chuyến ở thời điểm đang làm quyết toán. Chặn ở đó là chặn mọi chuyến chưa trả hết tiền vé.
+
+    Quan hệ đúng là một SỐ DƯ, không phải một đẳng thức:
+
+        còn nợ đại lý vé = Σ tiền vé (kể cả dòng hoàn, vốn âm) − Σ đã thanh toán
+
+    Số dư ấy có thể dương (còn nợ), bằng 0 (xong), hoặc âm (đã trả thừa – cũng là chuyện phải biết,
+    vì tiền thừa nằm ở đại lý là tiền của công ty đang nằm ngoài két).
+    """
+    __tablename__ = "tour_ve_thanh_toan"
+    __table_args__ = (Index("ix_tvtt_tour", "tour_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"))
+    ve_ma_id: Mapped[int | None] = mapped_column(ForeignKey("tour_ve_ma.id"), nullable=True)
+    ngay: Mapped[date | None] = mapped_column(Date, nullable=True)
+    so_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    tien_te: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    ty_gia: Mapped[float | None] = mapped_column(TY_GIA, nullable=True)
+    hinh_thuc: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    so_chung_tu: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ghi_chu: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    nguoi_nhap: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nhap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+# Đ-9 (13/9/2026) · CÔNG NỢ TRƯỞNG ĐOÀN
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+#
+# QUY ƯỚC DẤU – Chủ tịch chốt 12/9/2026, và bảng này chỉ có MỘT quy ước:
+#
+#       DƯƠNG  =  CÔNG TY CÒN PHẢI TRẢ TRƯỞNG ĐOÀN
+#       ÂM     =  TRƯỞNG ĐOÀN CÒN PHẢI NỘP LẠI CHO CÔNG TY
+#
+# Phải chốt vì HAI TỆP MẪU DÙNG HAI QUY ƯỚC NGƯỢC NHAU CHO CÙNG MỘT Ý:
+#
+#   QuyetToan_27052026_UK, sheet CongNo_HDV
+#       "Vậy Cty hoàn lại cho TL:  −3.427.560  /  −95,21 (gbp)  —  (TL nộp lại)"
+#       Số âm, chú thích "TL nộp lại". ĐÚNG quy ước trên.
+#
+#   QUYẾT TOÁN TL (tour châu Âu 27/05)
+#       "12 · CTY HOÀN TIỀN CHO TL + CTP   −60   CTY TT"
+#       Số âm, nhãn "CTY HOÀN TIỀN CHO TL". NGƯỢC quy ước trên.
+#
+#   Và số học của chính tờ châu Âu chứng minh nhãn mới là cái đúng, còn dấu thì sai:
+#       CTP HDV 270 + city tax 120 + Riepilogo 480 = 870 €  (công ty nợ TL)
+#       trừ tiền tip nộp công ty 810 €                      (TL nợ công ty)
+#       còn lại  +60 €  -> công ty trả TL 60 €, đúng như nhãn viết, ngược dấu tờ ghi.
+#
+# Nên khi Điều hành chép tờ châu Âu vào hệ thống, dòng cuối phải ĐỔI DẤU. Biểu nhập in quy ước ngay
+# cạnh ô số, và bộ soát chặn khi dấu mâu thuẫn với loại khoản – xem services/cong_no_truong_doan.py.
+#
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+# NHIỀU ĐỒNG TIỀN CHẠY SONG SONG, KHÔNG QUY VỀ MỘT
+# ──────────────────────────────────────────────────────────────────────────────────────────────
+#
+# Tờ UK có ba đồng tiền cùng lúc và KHÔNG cộng chúng lại trước khi ra kết quả:
+#
+#       GBP :  30,79 (TL trả dịch vụ)  −  126 (TL thu của khách)  =  −95,21 GBP  -> TL nộp lại
+#       USD :  450 (công tác phí)                                  =  +450 USD    -> công ty trả TL
+#       quy về VND, mỗi đồng một tỷ giá riêng ghi ngay trên tờ:
+#              −95,21 × 36.000  =  −3.427.560
+#              +450   × 26.500  =  +11.925.000
+#              cộng lại          =  +8.497.440  -> công ty còn phải trả TL 8.497.440 đ
+#
+# Người ta trả cho trưởng đoàn bằng từng đồng tiền một, nên số dư phải giữ theo từng đồng tiền.
+# Cộng gộp sớm là làm mất chính thông tin cần để đi trả tiền.
+
+
+LOAI_CONG_NO_TL = {
+    # Dấu DƯƠNG – công ty nợ trưởng đoàn
+    "tl_chi_ho":       (+1, "Trưởng đoàn ứng tiền túi trả dịch vụ cho đoàn"),
+    "cong_tac_phi":    (+1, "Công tác phí của trưởng đoàn"),
+    "thuong":          (+1, "Thưởng / phụ cấp khác của trưởng đoàn"),
+    # Dấu ÂM – trưởng đoàn nợ công ty
+    "cty_tam_ung":     (-1, "Công ty đã tạm ứng trước cho trưởng đoàn"),
+    "tip_nop_cong_ty": (-1, "Tiền tip phần của công ty, trưởng đoàn thu và phải nộp về"),
+    "tl_thu_ho_khach": (-1, "Trưởng đoàn đang giữ tiền của KHÁCH – không phải tiền công ty"),
+    "cty_da_tra":      (-1, "Công ty đã thanh toán khoản này rồi"),
+}
+
+
+class TourTlCongNo(Base):
+    """Một dòng trên tờ quyết toán trưởng đoàn.
+
+    Mỗi dòng mang MỘT đồng tiền. Muốn ghi cùng một việc bằng hai đồng tiền thì ghi hai dòng – ép
+    một dòng mang hai đồng tiền là chỗ tỷ giá bị nhét vào giữa và không ai lần ra được nữa.
+
+    `so_tien` mang DẤU theo quy ước ở đầu khối. `loai` khai chiều mà khoản ấy đáng lẽ phải có, và bộ
+    soát chặn khi hai thứ mâu thuẫn – đó là cái lưới bắt đúng lỗi đổi dấu khi chép từ tờ châu Âu.
+    """
+    __tablename__ = "tour_tl_cong_no"
+    __table_args__ = (Index("ix_ttcn_tour", "tour_id"), Index("ix_ttcn_pc", "phan_cong_id"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"))
+    phan_cong_id: Mapped[int | None] = mapped_column(ForeignKey("guide_assignments.id"), nullable=True)
+    # Tên trưởng đoàn ghi thẳng, vì tờ quyết toán có thể tới trước khi phân công được nhập.
+    ten_truong_doan: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    stt: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    noi_dung: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    loai: Mapped[str] = mapped_column(String(30))
+    so_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    tien_te: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    # Tỷ giá để quy về VND. RỖNG nghĩa là chưa có tỷ giá, và khi ấy bản quy đổi VND KHÔNG được sinh
+    # ra với số 0 – nó phải không có, và nói ra là vì sao.
+    ty_gia: Mapped[float | None] = mapped_column(TY_GIA, nullable=True)
+    ngay_ty_gia: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Nối sang sổ thu hộ (Đ-7) khi khoản này chính là tiền của khách mà trưởng đoàn đang giữ. Cùng
+    # một khoản 126 GBP xuất hiện ở hai sổ theo hai góc nhìn; nối lại để không ai gõ nó hai lần với
+    # hai con số khác nhau.
+    hdv_chi_id: Mapped[int | None] = mapped_column(ForeignKey("tour_hdv_chi.id"), nullable=True)
+    da_thanh_toan: Mapped[int | None] = mapped_column(Integer, nullable=True, server_default="0")
+    ngay_thanh_toan: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ghi_chu: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    nguoi_nhap: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nhap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

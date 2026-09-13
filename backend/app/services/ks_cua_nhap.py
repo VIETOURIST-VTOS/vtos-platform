@@ -75,6 +75,17 @@ CUA_TAY = (
     # Không cửa nào nhận ô "tổng": máy nhân đơn giá × số lượng rồi cộng thuế, và máy cộng các dòng.
     # Đó là cách chặn đúng lỗi 210.000 đ tìm thấy trên tệp mẫu Nha Trang.
     "booking_khach", "khach_chi_phi", "tour_doanh_thu_dong", "tour_phuong_tien", "tour_hdv_chi",
+    # Đ-8 · Đ-9 (13/9/2026). Bốn bảng của khối vé và tờ công nợ trưởng đoàn, cả bốn đều có cửa
+    # nhập tay trên chính biểu quyết toán (web/components/QuyetToanForm.tsx, khối 7a–7c và 8):
+    #   POST .../{tid}/ve/ma           – mã đặt chỗ; KHÔNG có ô tiền nào ở đây
+    #   POST .../{tid}/ve/khach        – vé của từng khách; máy cộng bốn ô tiền thành thành tiền
+    #   POST .../{tid}/ve/thanh-toan   – các đợt trả tiền đại lý vé; chỉ trừ dần vào nợ
+    #   POST .../{tid}/tl-cong-no      – từng dòng công nợ trưởng đoàn, mỗi dòng một đồng tiền
+    #
+    # KHÔNG bảng nào ở đây là "máy sinh". Đặc biệt tour_ve_ma: nghe như thứ máy có thể suy ra từ
+    # cột ma_dat_cho của dòng khách, nhưng hạn xuất vé và số chỗ đã giữ thì không ở đâu suy ra
+    # được – chúng là điều đại lý báo qua điện thoại.
+    "tour_ve_ma", "tour_ve_khach", "tour_ve_thanh_toan", "tour_tl_cong_no",
     # V7 Đợt 3 (10/9/2026). Cả năm bảng đều có màn hình nhập tay:
     #   /su-co-tour        – ghi sự cố, ghi từng bước xử lý
     #   /ho-so-kiem-toan   – lập hồ sơ, thêm mục danh mục, ghi điều chỉnh kiểm toán đề nghị
