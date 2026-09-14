@@ -10,9 +10,12 @@
  *  vẽ lại đúng những dòng nhận được. Vai nào không được xem khối dòng tiền thì /dong-tien/meta trả
  *  403 và trang nói thẳng là không có quyền, chứ không hiện một bảng rỗng trông như chưa có dữ liệu.
  *
- *  HẠN XỬ LÝ: bản vẽ muốn có cột hạn. Hệ thống hôm nay KHÔNG có chỗ nào ghi hạn khắc phục cho từng
- *  dòng dòng tiền — không có bảng, không có cửa nhập. Nên cột hạn vẫn dựng, và mỗi ô ghi "chưa đặt"
- *  kèm bộ phận. Bịa một hạn ra là hạn ấy trôi qua mà không ai biết mình đã lỡ cái gì.
+ *  HẠN XỬ LÝ (anh Tuấn chốt 14/9/2026 — 24 giờ): hạn do MÁY CHỦ ghi xuống lúc lượt quét phát hiện
+ *  dòng thiếu nguồn, không phải lúc mở trang. Trang này chỉ ĐỌC chuỗi ngày giờ máy chủ gửi sang —
+ *  tự dựng lại định dạng ở đây là cách hai nơi in ra hai kiểu ngày (bài học vòng TC-26).
+ *
+ *  Dòng đang thiếu mà lượt quét chưa chạy tới thì ghi "chờ lượt quét", KHÔNG lấy "bây giờ + 24 giờ"
+ *  cho có: cái hạn ấy lùi lại mỗi lần mở trang, nên không bao giờ quá hạn và chẳng nhắc được ai.
  */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -94,7 +97,9 @@ function Trang() {
         <span className="tag ok">{tt.day_du ?? 0} đầy đủ</span>
         <span className="tag warn">{tt.chua_doi_soat ?? 0} chưa đối soát</span>
         <span className="tag red">{tt.con_thieu ?? 0} còn thiếu</span>
+        {(k.so_qua_han ?? 0) > 0 && <span className="tag red">{k.so_qua_han} quá hạn</span>}
       </div>
+      {k.cau_han && <p className="muted" style={{ margin: "8px 0 0" }}>{k.cau_han}</p>}
       <p className="muted" style={{ marginBottom: 0 }}>{k.cau_pham_vi}</p>
     </div>
 
@@ -123,14 +128,18 @@ function Trang() {
                   {d.nguon || <span className="muted">chưa khai</span>}</td>
                 <td>{d.cua || <span className="muted">chưa khai</span>}
                   {d.cua_do_de_xuat && <> <span className="tag warn">cửa do đề xuất, chờ chốt</span></>}</td>
-                <td><span className="muted">chưa đặt</span></td>
+                <td>{d.han_hien
+                  ? <>{d.han_hien}{d.qua_han && <> <span className="tag red">quá hạn{
+                      d.tre_hien ? " · " + d.tre_hien : ""}</span></>}</>
+                  : <span className="muted">{d.han_chua_quet ? "chờ lượt quét" : "—"}</span>}</td>
               </tr>))}
           </tbody>
         </table>
       </div>
       <p className="muted v14-ghi">
-        Cột <b>Hạn xử lý</b> chưa có nguồn: hệ thống chưa có bảng nào ghi hạn khắc phục cho từng dòng
-        dòng tiền, và cũng chưa có cửa nhập hạn. Đây là việc còn thiếu — không phải ô để trống cho đẹp.
+        Cột <b>Hạn xử lý</b> đếm từ lúc lượt quét phát hiện dòng thiếu nguồn, không phải từ lúc mở
+        trang — nên một dòng treo lâu sẽ quá hạn thật, chứ không được làm mới hạn mỗi lần có người
+        ghé xem. Ô ghi <i>chờ lượt quét</i> là dòng đang thiếu mà lượt quét chưa chạy tới.
       </p>
     </div>
 

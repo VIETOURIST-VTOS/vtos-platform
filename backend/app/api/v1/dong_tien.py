@@ -28,6 +28,7 @@ from app.db.session import get_db
 from app.models.core import User
 from app.models.dong_tien import NGUON_TIEN, ChotSoDu
 from app.services import dong_tien as DT
+from app.services import han_dong_tien as HAN
 from app.services import khung_dong_tien as KHUNG
 from app.services import pham_vi_phap_nhan as PV
 from app.services import rules as R
@@ -147,7 +148,10 @@ def xem_khung(company_id: int, den_ngay: date | None = None,
         sdn = DT.so_du_tung_ngay(db, company_id, den_ngay)
     except DT.LoiChot as e:
         raise HTTPException(404, str(e))
-    return KHUNG.ghep(u.role, bang, sdn)
+    # Hạn xử lý gắn SAU khi đã cắt theo vai: vai nào không nhận dòng ấy thì cũng không nhận hạn của
+    # nó. `gan_han` chỉ ĐỌC — cửa GET không được đẻ cảnh báo, nếu không số cảnh báo tăng theo số lần
+    # người dùng bấm F5.
+    return HAN.gan_han(db, company_id, KHUNG.ghep(u.role, bang, sdn))
 
 
 @router.get("/khung/{company_id}/excel")
@@ -172,7 +176,7 @@ def xuat_khung_excel(company_id: int, den_ngay: date | None = None,
         sdn = DT.so_du_tung_ngay(db, company_id, den_ngay)
     except DT.LoiChot as e:
         raise HTTPException(404, str(e))
-    k = KHUNG.ghep(u.role, bang, sdn)
+    k = HAN.gan_han(db, company_id, KHUNG.ghep(u.role, bang, sdn))
     try:
         noi_dung = XL.dung_tep(k)
     except ValueError as e:

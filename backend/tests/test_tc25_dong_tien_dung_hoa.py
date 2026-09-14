@@ -89,10 +89,21 @@ def test_chi_tiet_khong_bien_mat_ma_chuyen_sang_trang_rieng():
 
 
 def test_han_xu_ly_khong_bia():
-    """Bản vẽ muốn có cột hạn. Hệ thống chưa có chỗ nào ghi hạn — cột dựng nhưng ghi 'chưa đặt'."""
+    """Cột hạn KHÔNG được bịa — lời canh giữ nguyên, cách giữ lời đã đổi ở TC-29.
+
+    Vòng TC-25 (13/9): hệ thống chưa có chỗ nào ghi hạn, nên mọi ô ghi "chưa đặt". Vòng TC-29
+    (14/9): anh Tuấn chốt hạn 24 giờ và `han_dong_tien` ghi hạn xuống lúc LƯỢT QUÉT phát hiện, nên
+    ô ấy nay nói một ngày giờ thật.
+
+    Điều phép thử này canh không đổi một chữ: trang KHÔNG được tự dựng hạn. Chỗ nguy hiểm mới không
+    phải "chưa đặt" nữa mà là "bây giờ + 24 giờ" tính ngay trên trình duyệt — hạn kiểu ấy lùi lại
+    mỗi lần mở trang, không bao giờ quá hạn, và trông y như đã làm xong.
+    """
     ma = _bo_chu_thich_tsx(_doc(NGUON))
     assert "Hạn xử lý" in ma, "Bỏ luôn cột hạn thì việc còn thiếu biến mất khỏi tầm mắt."
-    assert "chưa đặt" in ma, "Cột hạn phải nói rõ là chưa đặt, không để trống cho đẹp."
+    assert "han_hien" in ma, "Cột hạn phải đọc hạn do máy chủ ghi xuống, không tự dựng."
+    for tu in ("Date.now", "new Date(", "setHours", "24 * 60"):
+        assert tu not in ma, f"Trang đang tự tính hạn bằng {tu!r} — hạn sẽ trôi theo người xem."
 
 
 def test_trang_moi_khai_dung_cho():
