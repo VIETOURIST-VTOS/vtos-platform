@@ -222,8 +222,16 @@ def moc_khoang(cot: list[dict]) -> list[dict]:
         m = dict(c)
         if i == 0 or truoc_den is None:
             m["tu_ngay_khoang"] = c.get("tu_ngay")
+            m["tu_hien_khoang"] = c.get("tu_hien")
         else:
-            m["tu_ngay_khoang"] = (truoc_den + timedelta(days=1)).isoformat()
+            d = truoc_den + timedelta(days=1)
+            m["tu_ngay_khoang"] = d.isoformat()
+            # ĐỊNH DẠNG NGÀY LÀM Ở ĐÂY, KHÔNG LÀM Ở TRÌNH DUYỆT, và làm đúng kiểu mà máy chủ đã
+            # dùng cho tu_hien/den_hien (dd-mm-yyyy). Lần đầu vòng này để trình duyệt tự định dạng
+            # ngày đầu khoảng bằng hàm của nó (dd/mm/yyyy) trong khi ngày cuối vẫn lấy den_hien của
+            # máy chủ — ra một ô đọc là "14/09/2026 – 20-09-2026", hai kiểu dấu trong cùng một ô.
+            # Một chỗ định dạng thì không bao giờ lệch với chính nó.
+            m["tu_hien_khoang"] = d.strftime("%d-%m-%Y")
         truoc_den = _ngay(c.get("den_ngay"))
         ra.append(m)
     return ra

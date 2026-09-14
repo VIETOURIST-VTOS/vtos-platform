@@ -172,6 +172,26 @@ def test_rong_khac_khong_khi_tinh_hieu():
     assert " or 0" not in than, "Có chỗ lấy 0 thay cho None trong hàm tính hiệu."
 
 
+def test_hai_dau_ngay_dung_chung_mot_cho_dinh_dang():
+    """ĐÃ THẤY TRÊN TRANG THẬT 14/9: đầu cột đọc ra "14/09/2026 – 20-09-2026" — ngày đầu do trình
+    duyệt định dạng (dấu gạch chéo), ngày cuối lấy chuỗi den_hien của máy chủ (dấu gạch ngang).
+
+    Một ô ngày mà hai đầu hai kiểu dấu thì người đọc dừng lại nhìn, và cái dừng ấy tốn hơn mọi thứ
+    nó mang lại. Nay CẢ HAI ĐẦU lấy chuỗi máy chủ đã định dạng; máy chủ tự sinh tu_hien_khoang theo
+    đúng kiểu nó đã dùng cho tu_hien/den_hien."""
+    s = _doc(DV)
+    assert "tu_hien_khoang" in s, "Máy chủ chưa sinh chuỗi ngày đầu khoảng đã định dạng."
+    assert '%d-%m-%Y' in s, "Ngày đầu khoảng phải định dạng đúng kiểu máy chủ đang dùng."
+    ma = _bo_chu_thich_tsx(_doc(KHOI))
+    assert "c.tu_hien_khoang" in ma and "c.den_hien" in ma, (
+        "Đầu cột phải ưu tiên chuỗi đã định dạng của máy chủ ở CẢ HAI đầu."
+    )
+    assert "fmtD(khoang ?" not in ma, (
+        "Còn chỗ trình duyệt tự định dạng ngày đầu trong khi ngày cuối lấy của máy chủ — hai kiểu "
+        "dấu trong cùng một ô."
+    )
+
+
 def test_ngay_dau_khoang_khong_de_len_ngay_goc():
     """Hai kiểu xem phải nói đúng ngày CỦA MÌNH: luỹ kế cùng bắt đầu từ ngày báo cáo, theo khoảng
     thì cột sau bắt đầu sau cột trước. Ghi đè lên cột gốc là kiểu luỹ kế in sai ngày."""

@@ -141,8 +141,14 @@ export default function KhoiDongTien() {
               <div className="muted" style={{ fontWeight: 400, fontSize: 11 }}>
                 {/* Ngày đầu ĐỔI theo kiểu xem: luỹ kế thì mọi cột cùng bắt đầu từ ngày báo cáo,
                     theo khoảng thì cột sau bắt đầu ngay sau ngày kết thúc của cột trước. In sai
-                    ngày ở đây là người đọc cộng nhầm hai khoảng chồng nhau. */}
-                {fmtD(khoang ? (c.tu_ngay_khoang || c.tu_ngay) : c.tu_ngay)}
+                    ngày ở đây là người đọc cộng nhầm hai khoảng chồng nhau.
+
+                    CẢ HAI ĐẦU LẤY CHUỖI ĐÃ ĐỊNH DẠNG SẴN CỦA MÁY CHỦ (tu_hien · den_hien ·
+                    tu_hien_khoang). fmtD chỉ là lối lui khi máy chủ chưa gửi chuỗi ấy. Trộn hai
+                    nơi định dạng thì ra đúng cái ô đã gặp: "14/09/2026 – 20-09-2026". */}
+                {khoang
+                  ? (c.tu_hien_khoang || fmtD(c.tu_ngay_khoang || c.tu_ngay))
+                  : (c.tu_hien || fmtD(c.tu_ngay))}
                 {" – "}{c.den_hien || fmtD(c.den_ngay)}</div></th>)}
             <th style={{ minWidth: 130 }}>Nguồn số</th>
           </tr></thead>
