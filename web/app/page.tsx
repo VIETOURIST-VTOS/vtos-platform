@@ -86,27 +86,19 @@ function Dash() {
     <DongLoc />
     <KhoiQuyetDinh ds={d.approvals || []} vai={user?.role} />
     <TamThe ds={tam} />
-    {/* Khối dòng tiền đứng SAU tám thẻ theo bản vẽ V1.2: thẻ trả lời "kết quả thế nào", dòng tiền
-        trả lời "còn bao nhiêu và sắp hụt ngày nào". Khối tự ẩn với vai không được xem – không vẽ
-        một khung rỗng để người ta dò xem trong đó có gì. */}
-    <KhoiDongTien />
+
+    {/* ══ THỨ TỰ KHỐI LẤY ĐÚNG BẢN VẼ V1.4 (anh Tuấn gửi lại tệp và đối chiếu 14/9/2026) ══
+        Bản vẽ xếp: Cần quyết định → tám thẻ → Điều hành 14 ngày → Hiệu quả đội xe → Tồn đọng theo
+        bộ phận → Phải thu → Phải trả → Dòng tiền → Rủi ro → Tiến độ báo cáo.
+
+        Trước vòng này VTOS đặt khối Dòng tiền NGAY SAU tám thẻ (theo bản vẽ V1.2 cũ) và chèn năm
+        khối riêng của VTOS vào giữa — nên đọc từ trên xuống ra một thứ tự khác hẳn bản vẽ.
+
+        Năm khối riêng của VTOS (Việc cần xử lý · Tồn đọng cần xử lý · Kinh doanh Lẻ · Kinh doanh
+        Đoàn · Báo cáo ngày) KHÔNG bỏ đi — chúng là việc thật và đang có số thật. Chúng chuyển
+        XUỐNG DƯỚI, sau khối cuối của bản vẽ, dưới một đường ngăn nói rõ đây là phần thêm. */}
+
     <div className="grid" style={{ marginTop: 14 }}>
-      <div id="viec-cua-toi" className="panel"><h2>Việc cần xử lý</h2>
-        {d.todo.length ? <ul>{d.todo.map((t: any, i: number) => <li key={i}><Link href={`/tours/${t.tour_id}`}>{t.code}</Link> – {t.name}: <b>{ACTION_LABEL[t.action] || t.action}</b></li>)}</ul> : <p className="muted">Không có việc chờ ở vai trò này.</p>}
-        {d.pending_params > 0 && ["chutich", "tgd"].includes(user?.role || "") && <p><Link href="/params">{d.pending_params} tham số chính sách chờ ký</Link></p>}
-      </div>
-      {/* Bảng cảnh báo phẳng cũ đã thay bằng khối gom nhóm: sáu mươi dòng gần giống hệt nhau thì
-          cuộn hết màn hình mà vẫn không cho biết tồn đọng nằm ở đâu. Danh sách từng dòng vẫn còn,
-          nằm trong phần bung ra của khối. */}
-      <KhoiTonDong ds={d.alerts || []} tong={k.canh_bao_do ?? null} />
-    </div>
-    <div className="grid" style={{ marginTop: 14 }}>
-      {sec.kd_le && <div className="panel"><h2>Kinh doanh Lẻ – doanh thu tính chỉ tiêu tháng (quyết toán)</h2><p className="muted"><Link href="/sales-reports?mang=le">Báo cáo bán hàng phòng Lẻ →</Link></p>{sec.kd_le.length ? <div className="wrap"><table><tbody>{sec.kd_le.map((r: any) => <tr key={r.sales}><td>{r.sales}</td><td style={{ textAlign: "right" }}>{vnd(r.revenue)}</td><td>{Math.round(r.pct * 100)}% mốc {r.pct >= 1 ? <Tag cls="ok">đạt</Tag> : <Tag cls="warn">chưa</Tag>}</td></tr>)}</tbody></table></div> : <p className="muted">Chưa có chuyến quyết toán trong tháng.</p>}</div>}
-      {sec.kd_doan && <div className="panel"><h2>Kinh doanh Đoàn (MICE) – lợi nhuận chia tháng (quyết toán)</h2>
-        <p className="muted">Phòng Đoàn hưởng theo <b>chia lợi nhuận</b> chuyến đã quyết toán, không theo mốc doanh thu như phòng Lẻ – nên bảng này là lợi nhuận, không phải doanh thu. Số chính thức nằm ở bảng lương.</p>
-        {sec.kd_doan.rows.length ? <div className="wrap"><table><tbody>{sec.kd_doan.rows.map((r: any) => <tr key={r.sales}><td>{r.sales}</td><td style={{ textAlign: "right" }}>{vnd(r.profit_share)}</td><td>{r.profit_share > 0 ? <Tag cls="ok">có lãi</Tag> : <Tag cls="red">lỗ</Tag>}</td></tr>)}</tbody></table></div>
-          : <p className="muted">Chưa có chuyến đoàn quyết toán trong tháng.</p>}
-        <p className="muted">{sec.kd_doan.so_chuyen} chuyến đoàn đã quyết toán trong tháng. <Link href="/sales-reports?mang=doan">Báo cáo bán hàng phòng Đoàn →</Link></p></div>}
       {/* KHỐI 04a · ĐIỀU HÀNH. Bản vẽ V1.4 đòi bảy cột: Chuyến · Ngày đi · Số khách · Dịch vụ còn
           thiếu · Xe · HDV · Phụ trách, và ưu tiên chuyến CÒN THIẾU ĐIỀU KIỆN lên trước.
 
@@ -142,13 +134,12 @@ function Dash() {
           </tr>)}</tbody></table></div> : <p className="muted">Không có chuyến.</p>}
         <p className="muted">Bốn cột <b>Dịch vụ còn thiếu · Xe · HDV · Phụ trách</b> máy chủ chưa trả — <b>Điều hành</b> nhập ở <Link className="the-cua" href="/lenh-dieu-xe">Lệnh điều xe →</Link></p>
         {sec.qua_han_qt?.length > 0 && <p><Tag cls="red">Quá hạn quyết toán</Tag> {sec.qua_han_qt.map((t: any) => t.code).join(", ")}</p>}</div>}
-      {sec.bao_cao_ngay && <div className="panel"><h2>Báo cáo ngày (Điều 12) – tháng này</h2><p>{sec.bao_cao_ngay.nhan_su} nhân sự · {sec.bao_cao_ngay.ngay_lam_viec} ngày làm việc · tỷ lệ nộp <b>{Math.round(sec.bao_cao_ngay.ty_le_nop * 100)}%</b> · thiếu 2 ngày liên tiếp: {sec.bao_cao_ngay.thieu_2_ngay}</p><Link href="/reports">Xem tổng hợp</Link></div>}
     </div>
 
     {/* ══ PHẦN CÒN LẠI CỦA BẢN VẼ V1.4, đúng thứ tự khối 04 → 08 ══
         04b Hiệu quả đội xe · 04c Tồn đọng theo bộ phận · 05 Phải thu và Phải trả theo hạn ·
-        07 Rủi ro trọng yếu · 08 Tiến độ báo cáo. Khối 06 Dòng tiền đã nằm trên, xem ghi chú cuối
-        components/KhoiV14.tsx về lý do không dựng lại nó ở đây. */}
+        07 Rủi ro trọng yếu · 08 Tiến độ báo cáo. Khối 06 Dòng tiền nằm đúng chỗ bản vẽ đặt: sau Phải
+        trả, trước Rủi ro. */}
     <KhoiHieuQuaXe d={sec.hieu_qua_xe} />
     <KhoiTonDongBoPhan ds={sec.ton_dong_bo_phan} />
     {/* Hai khối hạn xếp DỌC, không cạnh nhau. Đặt cạnh nhau thì mỗi khối chỉ còn nửa bề ngang,
@@ -158,8 +149,45 @@ function Dash() {
       vi_sao={sec.phai_thu_vi_sao} />
     <KhoiPhaiTra ds={sec.phai_tra_theo_han} qua_han={sec.phai_tra_qua_han}
       chua_co_han={sec.phai_tra_chua_co_han} vi_sao={sec.phai_tra_vi_sao} />
+    {/* KHỐI 06 · DÒNG TIỀN — bản vẽ đặt SAU hai khối công nợ và TRƯỚC Rủi ro trọng yếu.
+        Bản vẽ vẽ nó thành một thẻ gọn với một câu "chưa đủ dữ liệu"; VTOS dựng thành bảng bốn mốc
+        có trạng thái ba mức — đó là phương án dung hoà anh Tuấn chốt 13/9, giữ nguyên. Chỗ đứng
+        thì lấy theo bản vẽ.
+
+        Bản vẽ xếp Dòng tiền và Rủi ro CẠNH NHAU hai cột. VTOS xếp DỌC, vì thẻ dòng tiền của bản
+        vẽ là một ô rỗng còn bảng của VTOS có bốn cột tiền: ép xuống nửa bề ngang thì bốn cột vỡ
+        — đúng lỗi đã mất ba vòng để chữa ở khối Phải thu/Phải trả. */}
+    <KhoiDongTien />
     <KhoiRuiRo ds={sec.rui_ro_trong_yeu} />
     <KhoiTienDoBaoCao ds={sec.tien_do_bao_cao} />
+
+
+    {/* ══ PHẦN RIÊNG CỦA VTOS, KHÔNG CÓ TRONG BẢN VẼ ══════════════════════════════════════════
+        Bốn khối dưới đây đang có SỐ THẬT và người dùng thật, nên không bỏ. Nhưng bản vẽ không có
+        chúng, và trước vòng này chúng nằm CHEN GIỮA các khối của bản vẽ — đọc từ trên xuống ra
+        một thứ tự khác hẳn. Nay xuống dưới, sau đường ngăn, để phần trên đúng bản vẽ. */}
+    <hr className="mh01-ngan" />
+    <h2 className="mh01-them">Thêm ngoài bản vẽ — khối riêng của VTOS</h2>
+    <div className="grid">
+
+      <div id="viec-cua-toi" className="panel"><h2>Việc cần xử lý</h2>
+        {d.todo.length ? <ul>{d.todo.map((t: any, i: number) => <li key={i}><Link href={`/tours/${t.tour_id}`}>{t.code}</Link> – {t.name}: <b>{ACTION_LABEL[t.action] || t.action}</b></li>)}</ul> : <p className="muted">Không có việc chờ ở vai trò này.</p>}
+        {d.pending_params > 0 && ["chutich", "tgd"].includes(user?.role || "") && <p><Link href="/params">{d.pending_params} tham số chính sách chờ ký</Link></p>}
+      </div>
+      {/* Bảng cảnh báo phẳng cũ đã thay bằng khối gom nhóm: sáu mươi dòng gần giống hệt nhau thì
+          cuộn hết màn hình mà vẫn không cho biết tồn đọng nằm ở đâu. Danh sách từng dòng vẫn còn,
+          nằm trong phần bung ra của khối. */}
+      <KhoiTonDong ds={d.alerts || []} tong={k.canh_bao_do ?? null} />
+    </div>
+    <div className="grid" style={{ marginTop: 14 }}>
+      {sec.kd_le && <div className="panel"><h2>Kinh doanh Lẻ – doanh thu tính chỉ tiêu tháng (quyết toán)</h2><p className="muted"><Link href="/sales-reports?mang=le">Báo cáo bán hàng phòng Lẻ →</Link></p>{sec.kd_le.length ? <div className="wrap"><table><tbody>{sec.kd_le.map((r: any) => <tr key={r.sales}><td>{r.sales}</td><td style={{ textAlign: "right" }}>{vnd(r.revenue)}</td><td>{Math.round(r.pct * 100)}% mốc {r.pct >= 1 ? <Tag cls="ok">đạt</Tag> : <Tag cls="warn">chưa</Tag>}</td></tr>)}</tbody></table></div> : <p className="muted">Chưa có chuyến quyết toán trong tháng.</p>}</div>}
+      {sec.kd_doan && <div className="panel"><h2>Kinh doanh Đoàn (MICE) – lợi nhuận chia tháng (quyết toán)</h2>
+        <p className="muted">Phòng Đoàn hưởng theo <b>chia lợi nhuận</b> chuyến đã quyết toán, không theo mốc doanh thu như phòng Lẻ – nên bảng này là lợi nhuận, không phải doanh thu. Số chính thức nằm ở bảng lương.</p>
+        {sec.kd_doan.rows.length ? <div className="wrap"><table><tbody>{sec.kd_doan.rows.map((r: any) => <tr key={r.sales}><td>{r.sales}</td><td style={{ textAlign: "right" }}>{vnd(r.profit_share)}</td><td>{r.profit_share > 0 ? <Tag cls="ok">có lãi</Tag> : <Tag cls="red">lỗ</Tag>}</td></tr>)}</tbody></table></div>
+          : <p className="muted">Chưa có chuyến đoàn quyết toán trong tháng.</p>}
+        <p className="muted">{sec.kd_doan.so_chuyen} chuyến đoàn đã quyết toán trong tháng. <Link href="/sales-reports?mang=doan">Báo cáo bán hàng phòng Đoàn →</Link></p></div>}
+      {sec.bao_cao_ngay && <div className="panel"><h2>Báo cáo ngày (Điều 12) – tháng này</h2><p>{sec.bao_cao_ngay.nhan_su} nhân sự · {sec.bao_cao_ngay.ngay_lam_viec} ngày làm việc · tỷ lệ nộp <b>{Math.round(sec.bao_cao_ngay.ty_le_nop * 100)}%</b> · thiếu 2 ngày liên tiếp: {sec.bao_cao_ngay.thieu_2_ngay}</p><Link href="/reports">Xem tổng hợp</Link></div>}
+    </div>
 
     <p className="muted">Ngưỡng biên đang áp dụng {pct(d.threshold)} · Robot chạy mỗi 10 phút; CNTT có thể chạy tay ở trang Cảnh báo.</p>
   </>);
