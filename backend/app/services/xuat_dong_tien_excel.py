@@ -30,6 +30,8 @@ BỐN ĐIỀU TỆP NÀY GIỮ
 """
 from __future__ import annotations
 
+import re
+import unicodedata
 from datetime import date
 from io import BytesIO
 
@@ -86,7 +88,9 @@ def _rong_cot(ws, rong: list[int]):
 def _tieu_de_trang(ws, k: dict, ten_phu: str, so_cot: int):
     """Ba dòng đầu của mỗi trang: tên bảng · phạm vi · vai đang xem. Người nhận tệp qua Zalo hay
     email không có màn hình bên cạnh để đối chiếu, nên tệp phải tự nói nó là của ai và của cái gì."""
-    ws.cell(1, 1, f"VTOS · Dòng tiền — {ten_phu}").font = Font(bold=True, size=13, color=NAVY)
+    pn = ten_phap_nhan(k)
+    ws.cell(1, 1, f"VTOS · Dòng tiền — {ten_phu}" + (f" · {pn}" if pn else "")).font = Font(
+        bold=True, size=13, color=NAVY)
     ws.cell(2, 1, k.get("cau_pham_vi") or "").font = Font(size=10, color="FF64798C")
     ws.cell(3, 1, f"Vai đang xem: {k.get('vai_tro') or ''}"
                   f" · Xuất lúc {date.today():%d-%m-%Y}").font = Font(size=10, color="FF64798C")
@@ -225,9 +229,57 @@ def dung_tep(k: dict) -> bytes:
     return b.getvalue()
 
 
-def ten_tep(k: dict, ma_phap_nhan: str = "") -> str:
-    ma = (ma_phap_nhan or k.get("phap_nhan") or "VTOS")
-    return f"VTOS_dong_tien_{ma}_{date.today():%d-%m-%Y}.xlsx"
+def _khong_dau(s: str) -> str:
+    """Bỏ dấu tiếng Việt RỒI mới lọc, chứ không lọc thẳng.
+
+    Lọc thẳng `[^A-Za-z0-9._-]` thì "Một Thành Viên" ra "Mt-Thnh-Vin" — chữ nào có dấu là mất luôn
+    cả chữ cái. Người nhận tệp đọc tên ấy không đoán ra công ty nào. Bỏ dấu trước thì ra
+    "Mot-Thanh-Vien", đọc được. Chữ đ không tự tách dấu theo NFD nên phải thay tay.
+    """
+    s = s.replace("đ", "d").replace("Đ", "D")
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r"[^A-Za-z0-9._-]", "", s.replace(" ", "-"))
+
+
+def ma_phap_nhan(k: dict) -> str:
+    """Mã pháp nhân, ĐỌC ĐÚNG HÌNH DẠNG máy chủ trả về.
+
+    LỖI ĐÃ GẶP TRÊN TRANG THẬT 14/9/2026 — điểm nối Excel trả 500 ngay lần đầu. Tệp này đoán
+    `phap_nhan` là một chuỗi mã, nhưng máy chủ trả một ĐỐI TƯỢNG {id, ma, ten}. Nhét đối tượng ấy
+    vào tên tệp ra chuỗi kiểu
+
+        VTOS_dong_tien_{'id': 8, 'ma': 'BUFFALO', 'ten': 'Công ty Cổ phần Việt Nam Buffalotours'}_...
+
+    — có dấu nháy, dấu ngoặc và chữ có dấu. Chuỗi ấy đi vào tiêu đề Content-Disposition, mà tiêu đề
+    HTTP chỉ nhận latin-1, nên máy chủ ném lỗi và trả 500. Bài học: hình dạng dữ liệu của làn khác
+    phải ĐO, đừng đoán — cùng một lỗi đoán mà cả chuỗi vòng này đã tránh được ở chỗ khác.
+
+    Nhận cả ba hình dạng để không gãy lần nữa nếu làn kia đổi: đối tượng, chuỗi, hay thiếu hẳn.
+    """
+    pn = k.get("phap_nhan")
+    if isinstance(pn, dict):
+        ma = pn.get("ma") or pn.get("code") or pn.get("ten") or ""
+    else:
+        ma = str(pn or "")
+    return _khong_dau(ma) or "VTOS"
+
+
+def ten_phap_nhan(k: dict) -> str:
+    """Tên đầy đủ để in lên đầu trang tính — tệp đi xa khỏi màn hình nên phải tự nói nó của ai."""
+    pn = k.get("phap_nhan")
+    if isinstance(pn, dict):
+        return str(pn.get("ten") or pn.get("ma") or "")
+    return str(pn or "")
+
+
+def ten_tep(k: dict) -> str:
+    """Tên tệp CHỈ gồm chữ cái không dấu, số và ba dấu nối.
+
+    Không phải vì thẩm mỹ: tên tệp này đi thẳng vào tiêu đề Content-Disposition. Một chữ có dấu ở
+    đây là một lỗi 500, và lỗi ấy chỉ lộ ra khi có người bấm nút.
+    """
+    return f"VTOS_dong_tien_{ma_phap_nhan(k)}_{date.today():%d-%m-%Y}.xlsx"
 
 
 # Giữ tham chiếu để người đọc thấy ngay tệp này ăn khớp với đâu; cũng là chốt chặn khi ai đó đổi
