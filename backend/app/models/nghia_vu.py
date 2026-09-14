@@ -100,14 +100,21 @@ NHOM_NGOAI_TAM_TGD = {
     "lai_phi_vay":     "lãi và phí ngân hàng – cùng lý do",
     "thue":            "nghĩa vụ thuế của pháp nhân, không gắn hoạt động tour–xe",
     "ky_quy_lu_hanh":  "ký quỹ giấy phép lữ hành – tiền của pháp nhân bị giữ, không phải dòng tour–xe",
-    # Chốt 11/9 cho Tổng giám đốc phần "lương–bảo hiểm BỘ PHẬN TOUR VÀ ĐỘI XE". Bảng nghĩa vụ hôm nay
-    # KHÔNG CÓ dấu bộ phận nào để tách được phần ấy ra khỏi lương toàn công ty. Cho hiện cả nhóm là
-    # để lộ quỹ lương của mọi phòng; cho hiện "phần tour–xe" bằng một phép đoán là bịa ra một con số.
-    # Nên tạm để ngoài tầm, GHI RÕ LÝ DO, và mở lại khi có cột bộ phận. Đây là việc còn thiếu, không
-    # phải quyết định về quyền.
-    "luong_bh":        "chưa có dấu bộ phận để tách phần tour và đội xe khỏi lương toàn công ty – "
-                       "mở lại khi bảng lương có cột bộ phận",
 }
+# NĂM nhóm, và cả năm đều thuộc MẢNG TÀI CHÍNH – KẾ TOÁN: vay, trả gốc, lãi phí, thuế, ký quỹ.
+#
+# SỬA 13/9/2026 – BỎ `luong_bh` khỏi danh sách này, theo chốt của Chủ tịch: "Lương nằm trong tầm
+# Tổng giám đốc; chỉ mảng TÀI CHÍNH KẾ TOÁN là không."
+#
+# Bản 11/9 xếp lương ra ngoài tầm vì bảng nghĩa vụ không có dấu bộ phận để tách phần tour–xe khỏi
+# lương toàn công ty, và ghi rõ đó là "việc còn thiếu, không phải quyết định về quyền". Nay Chủ tịch
+# quyết đúng phần THẨM QUYỀN ấy: Tổng giám đốc xem cả nhóm lương. Việc còn thiếu vẫn còn – con số
+# gồm cả khối văn phòng tập đoàn, nên bảng trình bày dán một GHI CHÚ nói rõ nó rộng hơn phạm vi
+# tour–xe (xem GHI_CHU_LAN_SANG trong services/dong_tien_pham_vi.py). Quyền xem LƯƠNG TỪNG NGƯỜI
+# vẫn hẹp hơn và KHÔNG mở cho Tổng giám đốc – trục riêng, xem xem_chi_tiet_nhan_vien() ở tệp ấy.
+#
+# Sửa ở ĐÂY chứ không khai đè ở tệp trình bày: hàm dưới đây lọc ngay tại câu truy vấn
+# (services/nghia_vu.py:409), nên mở ở màn hình mà không mở ở đây thì bảng hiện một dòng RỖNG.
 
 
 def nhom_duoc_xem(vai_tro: str) -> set[str]:
