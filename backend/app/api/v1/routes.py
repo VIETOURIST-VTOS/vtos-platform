@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.core.security import verify_password, create_token, hash_password
 from app.models.core import User, Tour, ServiceRequest, Booking, Param, Alert, AuditLog, ROLES, TOUR_TYPES, TOUR_STATUS
 from app.services import rules as R
+from app.services import mat_khau_yeu as MKY
 from app.services import tours as T
 from app.services import bookings as BK
 from app.services import access as AC
@@ -46,10 +47,15 @@ def me(u: User = Depends(loc_theo_nguoi_dung("hồ sơ của chính người đ�
 @router.post("/auth/password", tags=["auth"])
 def change_password(data: S.PasswordChange, u: User = Depends(current_user), db: Session = Depends(get_db)):
     if not verify_password(data.old_password, u.password_hash): raise HTTPException(400, "Mật khẩu cũ không đúng")
-    if len(data.new_password or "") < 6:
-        raise HTTPException(422, "Mật khẩu mới phải từ 6 ký tự")
-    if data.new_password == u.staff_code:
-        raise HTTPException(422, "Không đặt mật khẩu bằng mã nhân viên – mã này nằm công khai trên bảng lương")
+    # Một bộ luật, ở MỘT CHỖ. Trước 14/9/2026 chỗ này kiểm tay hai điều (đủ 6 ký tự, khác mã nhân
+    # viên) và vẫn nhận "12345678" hay chính tên đăng nhập. Nó cũng nói "từ 6 ký tự" trong khi lược
+    # đồ đã chặn ở 8 – hai con số khác nhau cho cùng một luật là chỗ sớm muộn cũng lệch.
+    vi_sao = MKY.vi_sao_khong_dat_duoc(data.new_password, username=u.username,
+                                       ho_ten=u.full_name, ma_nhan_vien=u.staff_code)
+    if vi_sao:
+        raise HTTPException(422, vi_sao)
+    if verify_password(data.new_password, u.password_hash):
+        raise HTTPException(422, "Mật khẩu mới trùng mật khẩu cũ – đổi thành mật khẩu khác.")
     u.password_hash = hash_password(data.new_password)
     u.must_change_password = False
     R.audit(db, u.username, u.role, "doi_mat_khau", "user"); db.commit()

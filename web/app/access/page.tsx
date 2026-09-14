@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
+import MatKhauCongKhai from "@/components/MatKhauCongKhai";
 /** Tài khoản & phân quyền (đặc tả 07/9/2026, phần B).
  *
  *  Màn hình này CÔNG BỐ ma trận quyền chứ không sửa nó: ma trận nằm trong mã nguồn, có phép thử tự động
@@ -159,6 +160,10 @@ function AccessPage() {
       {TABS.map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }}
         onClick={() => setTab(k)}>{l}{k === "gaps" && gaps?.tong ? ` (${gaps.tong})` : ""}</button>)}
     </div>
+
+    {/* Mật khẩu đã công khai: đặt ngay đầu tab Tài khoản vì nó là việc phải xử TRƯỚC, và vì đây
+        đúng là màn hình của người xử nó. Ô tự ẩn khi không còn tài khoản nào dính. */}
+    {tab === "accounts" && <MatKhauCongKhai canWrite={canWrite} />}
 
     {tab === "accounts" && acc && <>
       <div className="row" style={{ gap: 8, flexWrap: "wrap", marginBottom: 8 }}>

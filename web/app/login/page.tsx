@@ -21,7 +21,17 @@ export default function Login() {
           {err && <div className="gate fail">{err}</div>}
           <button className="act teal" disabled={busy} style={{ marginTop: 12 }}>{busy ? "Đang vào…" : "Vào hệ thống"}</button>
         </form>
-        <p className="muted">Bản chạy thử: các tài khoản mẫu (chutich, tgd, ptgd.doan, tp.dieuhanh, dh.lan, dh.minh, kd.hoa, kd.tuan, ketoan, hcns, cntt, bks) dùng mật khẩu <b>123456</b>. Đổi trước khi chạy thật.</p>
+{/* KHÔNG in tên tài khoản và mật khẩu lên trang này.
+            Đến 14/9/2026 chỗ này còn liệt kê mười hai tài khoản mẫu — trong đó có cả tài khoản
+            quản trị cao nhất — dùng chung MỘT mật khẩu, và in luôn mật khẩu ấy ra, trên một trang
+            ai trên internet cũng mở được. Khi hệ chỉ có dữ liệu chạy thử thì chưa mất gì; từ lúc
+            nhận số thật (doanh thu, giá vốn, danh sách khách, doanh số từng người) thì một dòng chữ
+            ở đây là một cánh cửa mở. Mật khẩu tạm đưa cho người dùng bằng đường riêng, không dán
+            lên cửa — và `tests/test_mat_khau_cong_khai.py` đọc thẳng tệp này để canh. */}
+        <p className="muted">
+          Quên mật khẩu thì liên hệ HCNS hoặc phòng CNTT để được đặt lại. Mật khẩu đặt lại là mật
+          khẩu <b>tạm</b> – lần đăng nhập kế tiếp hệ thống buộc đổi trước khi vào được màn hình nào.
+        </p>
       </div>
     </main>
   );
