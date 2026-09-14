@@ -229,7 +229,25 @@ def test_excel_trang_nguon_so_khong_bia_han():
     # Dòng tự cộng KHÔNG có cửa nhập nên không nằm trong danh sách đi đòi nguồn.
     ten = [ws.cell(r, 1).value for r in range(7, 12)]
     assert "TỔNG TIỀN DỰ KIẾN THU" not in ten, "Dòng tự cộng không được nằm ở trang Nguồn số."
-    assert ws.cell(7, 7).value == "chưa đặt", "Cột Hạn xử lý phải ghi 'chưa đặt', không bịa một hạn."
+    # HẠN XỬ LÝ — lời canh giữ nguyên qua hai vòng, cách giữ lời thì đổi.
+    #
+    # TC-27 (14/9 sáng): hệ thống chưa có chỗ nào ghi hạn, nên ô này ghi "chưa đặt".
+    # TC-29 (14/9 chiều): anh Tuấn chốt hạn 24 giờ; `han_dong_tien` ghi hạn xuống lúc LƯỢT QUÉT phát
+    # hiện, và gói đi vào bộ dựng tệp mang theo `han_hien` / `qua_han` / `han_chua_quet`.
+    #
+    # GOI_THU ở đây KHÔNG mang ba trường ấy — đúng như một gói do vai chưa quét tới trả về — nên ô
+    # phải ra "—". Điều phép thử canh vẫn là điều cũ: bộ dựng tệp KHÔNG được tự nghĩ ra một hạn.
+    assert ws.cell(7, 7).value == "—", (
+        "Gói không mang hạn thì ô phải để '—'. Ra một ngày giờ nghĩa là bộ dựng tệp đã tự tính hạn."
+    )
+    # Và khi gói CÓ hạn thì ô phải nói đúng hạn ấy, kèm dấu quá hạn đọc được khi lướt mắt.
+    import io
+    from openpyxl import load_workbook
+    from app.services import xuat_dong_tien_excel as X2
+    goi = {**GOI_THU, "dong": [{**d} for d in GOI_THU["dong"]]}
+    goi["dong"][0].update(han_hien="12-09-2026 09:00", qua_han=True, tre_hien="trễ 2 ngày")
+    o = load_workbook(io.BytesIO(X2.dung_tep(goi)))["Nguồn số"].cell(7, 7).value
+    assert "12-09-2026 09:00" in o and "QUÁ HẠN" in o and "trễ 2 ngày" in o, o
 
 
 def test_cau_nhac_cong_bon_cot_di_theo_kieu_xem_trong_excel():
