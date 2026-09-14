@@ -15,6 +15,7 @@ from app.api.deps import current_user, require_roles, toan_quyen_ke_ca_tach_bach
 from app.models.core import User, ROLES, Company
 from app.services import access as AC
 from app.services import access_admin as AA
+from app.services import mat_khau_yeu as MKY
 from app.services import rules as R
 from app.services import luong_viec_bao_cao as LVBC   # PQ-2 – trình bày bảng luồng việc
 
@@ -386,3 +387,44 @@ def tao_tai_khoan_robot(data: TaoRobotIn,
                        f"màn hình này là nơi duy nhất nó hiện ra.",
             "username": t.username, "mat_khau": mat_khau, "role": t.role,
             "luu_y": "Mật khẩu không lưu ở dạng đọc được. Mất thì đặt lại, không tra lại được."}
+
+
+# =================================================================================================
+# MẬT KHẨU ĐÃ CÔNG KHAI — soát và buộc đổi
+#
+# Ngày 14/9/2026 trang đăng nhập của bản chạy trên internet công cộng in thẳng ra màn hình rằng mười
+# hai tài khoản mẫu — kể cả chutich, tgd, ketoan — dùng mật khẩu "123456". Bộ máy buộc đổi mật khẩu
+# đã có sẵn và chạy đúng; cái thiếu là KHÔNG AI BẬT CỜ cho những tài khoản sinh ra lúc gieo dữ liệu.
+#
+# Hai cửa dưới đây vá đúng chỗ ấy. Chúng KHÔNG đặt mật khẩu cho ai: chỉ so bản băm để biết tài khoản
+# nào còn dùng chuỗi đã bị công bố, rồi bật cờ để chính chủ tài khoản đổi ở lần đăng nhập kế tiếp.
+
+MK_QUAN_TRI = ("chutich", "tgd", "cntt", "hcns")
+
+
+@router.get("/mat-khau/soat-cong-khai")
+def soat_mat_khau_cong_khai(u: User = Depends(require_roles(*MK_QUAN_TRI)),
+                            db: Session = Depends(get_db)):
+    """Còn bao nhiêu tài khoản dùng mật khẩu đã in công khai. KHÔNG đổi gì, KHÔNG lộ mật khẩu nào."""
+    return MKY.soat(db)
+
+
+class BuocDoiVao(BaseModel):
+    xac_nhan: bool = False
+
+
+@router.post("/mat-khau/buoc-doi")
+def buoc_doi_mat_khau_cong_khai(v: BuocDoiVao, u: User = Depends(require_roles(*MK_QUAN_TRI)),
+                                db: Session = Depends(get_db)):
+    """Bật cờ BUỘC ĐỔI cho mọi tài khoản còn dùng mật khẩu đã công khai.
+
+    `xac_nhan` mặc định False nên gọi nhầm không đổi gì. Việc này chạm vào khả năng đăng nhập của
+    người thật nên vào nhật ký mang tên người bấm — kèm danh sách tài khoản bị bật cờ.
+    """
+    kq = MKY.bat_co(db, boi=u.username, xac_nhan=v.xac_nhan)
+    if v.xac_nhan:
+        R.audit(db, u.username, u.role, "buoc_doi_mat_khau_cong_khai", "users",
+                after={"da_bat": kq["da_bat"],
+                       "tai_khoan": [x["username"] for x in kq["danh_sach"]]})
+        db.commit()
+    return kq
