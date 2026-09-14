@@ -247,3 +247,61 @@ def test_ten_tep_mang_phap_nhan_va_ngay():
         "Tên tệp phải nói rõ của pháp nhân nào và tính đến ngày nào — người nhận qua Zalo hay email "
         "không có màn hình bên cạnh để đối chiếu."
     )
+
+
+# ───────────── 4 · LỖI 500 TRÊN TRANG THẬT 14/9/2026 · HÌNH DẠNG PHÁP NHÂN ─────────────
+#
+# Nút Xuất Excel vừa lên trang thật là trả 500 ngay lần bấm đầu. Bộ dựng tệp ĐOÁN `phap_nhan` là
+# một chuỗi mã; máy chủ trả một ĐỐI TƯỢNG {id, ma, ten}. Nhét đối tượng ấy vào tên tệp ra một chuỗi
+# có dấu ngoặc, dấu nháy và chữ có dấu — mà tiêu đề Content-Disposition chỉ nhận latin-1, nên máy
+# chủ ném lỗi. Bốn phép thử dưới đây khoá cả ba hình dạng lại, để lần sau làn kia có đổi thì đỏ ở
+# đây chứ không đỏ ở tay người bấm nút.
+
+PHAP_NHAN_THAT = {"id": 8, "ma": "BUFFALO", "ten": "Công ty Cổ phần Việt Nam Buffalotours"}
+
+
+def _bo_dung():
+    import pytest
+    try:
+        from app.services import xuat_dong_tien_excel as X
+    except ImportError as e:
+        pytest.skip(f"không nạp được bộ dựng tệp: {e}")
+    return X
+
+
+def test_ten_tep_di_duoc_vao_tieu_de_http_khi_phap_nhan_la_doi_tuong():
+    """Phép thử đúng bằng cái đã gãy: dựng tên tệp rồi ép qua latin-1 như tầng HTTP vẫn làm."""
+    X = _bo_dung()
+    ten = X.ten_tep({**GOI_THU, "phap_nhan": PHAP_NHAN_THAT})
+    ten.encode("latin-1")                        # gãy ở đây nghĩa là điểm nối sẽ trả 500
+    assert "BUFFALO" in ten, f"Tên tệp mất mã pháp nhân: {ten}"
+    assert not set(ten) & set("{}'\" ,:"), f"Tên tệp còn ký tự không đi được vào tiêu đề: {ten}"
+
+
+def test_ten_tep_khong_gay_voi_ca_ba_hinh_dang():
+    """Đối tượng · chuỗi · thiếu hẳn. Làn kia đổi hình dạng lúc nào không báo, nên nhận cả ba."""
+    X = _bo_dung()
+    for pn in (PHAP_NHAN_THAT, "VTD", None, {"id": 3}, ""):
+        ten = X.ten_tep({**GOI_THU, "phap_nhan": pn})
+        ten.encode("latin-1")
+        assert ten.endswith(".xlsx") and "VTOS_dong_tien_" in ten, (pn, ten)
+
+
+def test_thieu_phap_nhan_van_ra_ten_doc_duoc():
+    """Thiếu nguồn thì tên tệp lùi về VTOS — KHÔNG ra tên cụt kiểu 'VTOS_dong_tien__14-09-2026'."""
+    X = _bo_dung()
+    assert X.ten_tep({}) == f"VTOS_dong_tien_VTOS_{__import__('datetime').date.today():%d-%m-%Y}.xlsx"
+
+
+def test_dau_trang_in_ten_day_du_cua_phap_nhan():
+    """Tệp đi qua Zalo hay email, không có màn hình bên cạnh — nên phải tự nói nó của công ty nào.
+    Mã 'BUFFALO' hợp cho tên tệp, nhưng người mở tệp cần đọc tên đầy đủ."""
+    import pytest, io
+    X = _bo_dung()
+    try:
+        from openpyxl import load_workbook
+    except ImportError as e:
+        pytest.skip(f"không có openpyxl: {e}")
+    wb = load_workbook(io.BytesIO(X.dung_tep({**GOI_THU, "phap_nhan": PHAP_NHAN_THAT})))
+    dau = wb["Lũy kế"].cell(1, 1).value or ""
+    assert "Công ty Cổ phần Việt Nam Buffalotours" in dau, dau
