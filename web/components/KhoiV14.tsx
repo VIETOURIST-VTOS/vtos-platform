@@ -223,9 +223,10 @@ const PHAI_TRA: NhomHan[] = [
   { nhan: "Dài hạn", mo_ta: "Sau mốc 3 tháng" },
 ];
 
-function KhoiHan({ ten, khung, ds, ai, cua, cua_ten, chan, id }: {
+function KhoiHan({ ten, khung, ds, ai, cua, cua_ten, chan, id, chua_co_han, vi_sao }: {
   ten: string; khung: NhomHan[]; ds?: Record<string, number | null> | null;
   ai: string; cua: string; cua_ten: string; chan?: React.ReactNode; id: string;
+  chua_co_han?: number | null; vi_sao?: string | null;
 }) {
   const s = ds || {};
   return (
@@ -245,8 +246,20 @@ function KhoiHan({ ten, khung, ds, ai, cua, cua_ten, chan, id }: {
           );
         })}
       </div>
+      {/* KHOẢN CHƯA CÓ HẠN — theo dõi riêng, KHÔNG gộp vào Dài hạn. Dòng chú thích bên dưới hứa
+          điều này từ vòng TC-23 nhưng chưa có chỗ hiện; vòng TC-30 thêm chỗ. "Chưa ai điền ngày"
+          và "đến hạn sau ba tháng" là hai việc khác hẳn, và cái thứ nhất là việc phải đi đòi. */}
+      {chua_co_han !== null && chua_co_han !== undefined && chua_co_han > 0 && (
+        <div className="v14-quahan">
+          <b>Chưa có hạn thanh toán:</b>{" "}
+          <span className="the-so v14-qh-so">{chua_co_han.toLocaleString("vi-VN")}</span>
+          <div className="muted">Chưa ai điền ngày cam kết — <b>không</b> xếp vào Dài hạn.</div>
+        </div>)}
       {chan}
-      <p className="v14-ghi"><ChuaNoi ai={ai} cua={cua} cua_ten={cua_ten} /></p>
+      {/* Máy chủ trả rỗng thì phải nói VÌ SAO rỗng, chứ không để năm ô gạch ngang không lời. */}
+      {vi_sao
+        ? <p className="v14-ghi"><Tag>Chưa có nguồn</Tag> {vi_sao}</p>
+        : <p className="v14-ghi"><ChuaNoi ai={ai} cua={cua} cua_ten={cua_ten} /></p>}
       <p className="muted v14-ghi">
         Năm nhóm <b>không lũy kế và không trùng nhau</b>, nên cộng cả năm ra đúng tổng công nợ —
         khác bảng dòng tiền bốn mốc bên trên, ở đó cột sau đã chứa trọn cột trước. Mốc tháng tính
@@ -258,13 +271,17 @@ function KhoiHan({ ten, khung, ds, ai, cua, cua_ten, chan, id }: {
   );
 }
 
-export function KhoiPhaiThu({ ds }: { ds?: Record<string, number | null> | null }) {
+export function KhoiPhaiThu({ ds, chua_co_han, vi_sao }: {
+  ds?: Record<string, number | null> | null; chua_co_han?: number | null; vi_sao?: string | null;
+}) {
   return <KhoiHan id="phai-thu" ten="Phải thu theo hạn thanh toán" khung={PHAI_THU} ds={ds}
+    chua_co_han={chua_co_han} vi_sao={vi_sao}
     ai="Kế toán" cua="/ra-soat-cot-tien" cua_ten="Cửa nhập công nợ phải thu" />;
 }
 
-export function KhoiPhaiTra({ ds, qua_han }: {
+export function KhoiPhaiTra({ ds, qua_han, chua_co_han, vi_sao }: {
   ds?: Record<string, number | null> | null; qua_han?: number | null;
+  chua_co_han?: number | null; vi_sao?: string | null;
 }) {
   /* PHẢI TRẢ QUÁ HẠN THEO DÕI RIÊNG, không cộng vào nhóm 1 tuần (bản vẽ ghi rõ). Gộp vào là một
      khoản đã trễ trông giống một khoản sắp tới hạn – hai việc khác hẳn nhau về mức khẩn. */
@@ -278,6 +295,7 @@ export function KhoiPhaiTra({ ds, qua_han }: {
     </div>
   );
   return <KhoiHan id="phai-tra" ten="Phải trả theo hạn thanh toán" khung={PHAI_TRA} ds={ds}
+    chua_co_han={chua_co_han} vi_sao={vi_sao}
     ai="Kế toán" cua="/nha-cung-cap" cua_ten="Cửa nhập công nợ phải trả" chan={chan} />;
 }
 
