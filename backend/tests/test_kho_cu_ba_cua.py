@@ -276,12 +276,17 @@ def test_c6_khong_co_ma_tour_thi_CHAN_va_bo_qua_canh_bao_cung_khong_cuu_duoc():
 # C7 — chuyến chưa có phiếu đặt: nói ra, không im lặng
 # =============================================================================================
 
-def test_c7_chua_co_phieu_dat_thi_dong_khach_mat_va_phai_NOI_RA():
-    """`booking_khach.booking_id` là cột bắt buộc, nên chuyến chưa có phiếu đặt thì dòng khách không
-    treo vào đâu được.
+def test_c7_chua_co_phieu_dat_thi_CUA_NAP_TU_DUNG_PHIEU_THEO_NGUOI_BAN():
+    """13/9/2026 – phép thử này đổi chiều, và đổi vì một chỗ hỏng thật.
 
-    Bỏ lặng lẽ thì người bấm thấy "nạp xong" trong khi cả danh sách khách của chuyến ấy không vào
-    đâu cả – và họ chỉ phát hiện khi đối chiếu số khách vào tháng sau.
+    Bản cũ chốt hành vi: chuyến chưa có phiếu đặt thì dòng khách KHÔNG treo vào đâu được, nên bỏ, và
+    phải nói ra. "Nói ra" thì đúng, nhưng "bỏ" là sai — và nó sai to hơn vẻ ngoài: mọi chuyến do cửa
+    tạo chuyến sinh ra đều không có phiếu đặt, nên nạp 604 tệp là bỏ TOÀN BỘ doanh thu, giữ lại toàn
+    bộ chi phí. Bảng lãi lỗ khi ấy thấy giá vốn mà không thấy doanh thu: mỗi chuyến thành một khoản
+    lỗ bằng đúng chi phí, và cộng vào lãi gộp toàn công ty.
+
+    Nay cửa nạp tự dựng phiếu từ cột SALES của tệp, mỗi người bán một phiếu. Dòng khách vào đủ, và
+    doanh thu về đúng người bán ra nó.
     """
     tid = _tao_chuyen("KC007.03100726", co_phieu_dat=False)
     rows = KC.doc_tep_lo(_tep(ma_tour="KC007.03100726"), "t7.xlsx")
@@ -290,13 +295,18 @@ def test_c7_chua_co_phieu_dat_thi_dong_khach_mat_va_phai_NOI_RA():
     db.commit()
     db.close()
     assert kq["da_nap"] == 1
-    assert _dem(tid)["khach"] == 0
-    assert "mat_dong_khach_vi_chua_co_phieu_dat" in kq, \
-        "mất hai dòng khách mà kết quả không nói gì – đúng kiểu hỏng im lặng"
-    assert kq["mat_dong_khach_vi_chua_co_phieu_dat"][0]["so_dong_khach"] == 2
-    assert "KHÔNG được ghi" in kq["canh_bao"]
-    # Dòng chi vẫn phải vào: mất dòng khách không phải lý do bỏ cả tệp.
+    assert _dem(tid)["khach"] == 2, \
+        "dòng khách vẫn rơi – cửa nạp chưa dựng phiếu đặt, và cả lô sẽ chỉ có chi phí"
+    assert "mat_dong_khach_vi_chua_co_phieu_dat" not in kq
     assert _dem(tid)["chi"] == 3
+
+    # Phiếu dựng ra phải mang nhãn nguồn của lô, để nút gỡ cả lô gỡ được đúng phần này.
+    from app.models.core import Booking
+    db = _db()
+    ds = db.scalars(select(Booking).where(Booking.tour_id == tid)).all()
+    assert ds and all(b.source == KC.NGUON for b in ds), \
+        "phiếu không mang nhãn nguồn – gỡ lô sẽ để lại doanh thu ma trong báo cáo sales"
+    db.close()
 
 
 # =============================================================================================
@@ -310,7 +320,11 @@ def test_c8_ba_bang_da_co_cua_va_bo_kiem_thay_duoc():
     """
     bo = I.BO_NAP["kho_quyet_toan_cu"]
     assert bo["bang_dich"] == "tour_cost_lines"
-    assert set(bo["bang_phu"]) == {"booking_khach", "tour_hdv_chi"}
+    # 13/9/2026: cửa này ghi thêm hai bảng nữa – `bookings` (phiếu đặt theo người bán, để doanh thu
+    # chạy về báo cáo sales) và `kho_cu_nguoi_ban` (sổ gán tên người bán ↔ tài khoản). Khai thiếu thì
+    # bộ kiểm báo chúng KHÔNG CÓ CỬA trong khi chúng có.
+    assert set(bo["bang_phu"]) == {"booking_khach", "tour_hdv_chi", "bookings",
+                                   "kho_cu_nguoi_ban"}
     assert bo["lo"] is True
     for khoa in ("kiem", "nap", "kiem_lo", "nap_lo", "doc_tep"):
         assert callable(bo[khoa]), f"bộ nạp thiếu khoá {khoa}"

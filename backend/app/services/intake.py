@@ -324,6 +324,12 @@ BO_NAP.update(_kho.bo_nap(_c))
 from app.services import intake_tao_chuyen as _taoc   # noqa: E402
 BO_NAP.update(_taoc.bo_nap(_c))
 
+# CỬA THỨ SÁU (13/9/2026) – BẢN ĐỐI CHIẾU H1. Chạy SAU hai cửa trên. Hai cửa ấy cố ý không ghi tiền
+# mức chuyến vì bộ đọc Excel chỉ rút được 90,7% doanh thu và 71,1% giá vốn; bản đối chiếu Kế toán đã
+# chốt (624 chuyến, khớp MISA) là chỗ duy nhất có số đúng ở mức ấy.
+from app.services import intake_doi_chieu_h1 as _dch1   # noqa: E402
+BO_NAP.update(_dch1.bo_nap(_c))
+
 
 # Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
 # không có nghĩa là nạp được mọi thứ. Kinh doanh nạp danh sách khách của mình, HCNS nạp hồ sơ nhân sự và
@@ -345,6 +351,7 @@ VAI_TRO.update(_pb2.vai_tro(QUAN_TRI))
 VAI_TRO.update(_pb3.vai_tro(QUAN_TRI))
 VAI_TRO.update(_kho.vai_tro(QUAN_TRI))
 VAI_TRO.update(_taoc.vai_tro(QUAN_TRI))
+VAI_TRO.update(_dch1.vai_tro(QUAN_TRI))
 
 
 # P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.
@@ -362,7 +369,8 @@ VAI_TRO.update(_taoc.vai_tro(QUAN_TRI))
 # dùng ngay", nên nó chỉ áp cho những bộ nạp mà dòng dữ liệu chạm thẳng vào tiền: chi phí nhà cung cấp,
 # chi phí chuyến xe, quyết toán, sao kê, chấm công (đầu vào của bảng lương). Danh mục khách hàng, danh
 # mục nhà cung cấp, danh sách hướng dẫn viên thì không.
-BO_NAP_CHAM_TIEN = ("don_dich_vu", "chuyen_xe", "quyet_toan_tour", "sao_ke_ngan_hang", "cham_cong"
+BO_NAP_CHAM_TIEN = ("doi_chieu_h1_2026",
+                    "don_dich_vu", "chuyen_xe", "quyet_toan_tour", "sao_ke_ngan_hang", "cham_cong"
                     ) + _pb2.CHAM_TIEN + _pb3.CHAM_TIEN + _kho.CHAM_TIEN
 NHAN_VIEN = ("nv_dh", "nv_kd", "tn_kd", "nv_mkt", "nv_visa", "xe_hdv", "hanh_chinh")
 # Suy ra từ VAI_TRO chứ không khai tay lần thứ hai: hai bảng khai tay thì sớm muộn cũng lệch, và lúc

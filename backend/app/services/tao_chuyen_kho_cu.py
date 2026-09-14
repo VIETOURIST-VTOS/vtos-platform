@@ -79,6 +79,23 @@ def _khong_dau(s: str) -> str:
                    if unicodedata.category(c) != "Mn").upper()
 
 
+def khoa_tep(ten_tep: str) -> str:
+    """Khoá ghép theo TÊN TỆP: bỏ đuôi, bỏ dấu, bỏ mọi ký tự không phải chữ/số, hạ chữ thường.
+
+    Đây là cầu nối duy nhất sang bản đối chiếu H1 mà Kế toán đã chốt – chỗ duy nhất có tổng thu và
+    tổng chi đúng ở mức chuyến. Bản ấy gọi tên chuyến bằng tên tệp chứ không bằng mã tour: đo ngày
+    13/9/2026 trên 624 dòng, chỉ 10 dòng mang mã tour đúng dạng.
+
+    Phải chuẩn hoá mạnh tay, vì cùng một tệp được gõ ra ba kiểu ở ba chỗ: khoảng trắng thừa, dấu
+    tiếng Việt bị mã hoá thành "#U1ec0" khi giải nén, và đuôi ".xlsx" khi có khi không. Bỏ hết những
+    thứ ấy thì còn lại phần ổn định.
+    """
+    t = re.sub(r"\.(xlsx|xlsm|xls)$", "", (ten_tep or "").strip(), flags=re.I)
+    # Tên giải nén từ tệp nén có thể mang "#U1ec0" thay cho ký tự tiếng Việt – trả lại trước khi bỏ dấu.
+    t = re.sub(r"#U([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), t)
+    return re.sub(r"[^a-z0-9]", "", _khong_dau(t).lower())
+
+
 def phan_loai(ten_tep: str, ma_tour: str = "") -> str:
     """Tệp này là một CHUYẾN, hay là một trong bốn loại không phải chuyến?
 

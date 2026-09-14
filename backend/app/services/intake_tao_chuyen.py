@@ -161,6 +161,25 @@ def _tai_khoan_dieu_hanh(db):
     return db.scalars(select(User).where(User.username == ten)).first(), ten
 
 
+def _ghi_tep_chuyen(db, ten_tep: str, ma_tour: str, tour_id: int) -> None:
+    """Một dòng cho mỗi tệp đã dựng ra chuyến. Ghi lại thì THAY, không đẻ dòng thứ hai."""
+    from sqlalchemy import select
+
+    from app.models.kho_cu import KhoCuTepChuyen
+
+    khoa = TC.khoa_tep(ten_tep or "")
+    if not khoa:
+        return
+    d = db.scalars(select(KhoCuTepChuyen).where(KhoCuTepChuyen.khoa_tep == khoa)).first()
+    if d is None:
+        db.add(KhoCuTepChuyen(khoa_tep=khoa[:200], ten_tep=(ten_tep or "")[:255],
+                              ma_tour=(ma_tour or "")[:30], tour_id=tour_id))
+        return
+    d.ten_tep = (ten_tep or "")[:255]
+    d.ma_tour = (ma_tour or "")[:30]
+    d.tour_id = tour_id
+
+
 def nap_lo(db, rows: list[dict], boi: str, ten_tep: str = "",
            bo_qua_dong_loi: bool = False) -> dict:
     """CỬA GHI. Tạo chuyến cho những dòng xếp là `tao_moi`, không đụng gì khác.
@@ -197,7 +216,7 @@ def nap_lo(db, rows: list[dict], boi: str, ten_tep: str = "",
             bo.append({"tep": h["tep"], "ma": h["ma"], "vi_sao": "mã vừa có người khác tạo"})
             continue
         d = next((r for r in rows if (r.get("ten_tep") or r.get("_tep")) == h["tep"]), {})
-        db.add(Tour(
+        t = Tour(
             code=h["ma"][:30], name=h["ten"][:200],
             tour_type=loai_chuyen(d),
             start_date=h["ngay_di"], end_date=h["ngay_ve"] or h["ngay_di"],
@@ -206,7 +225,13 @@ def nap_lo(db, rows: list[dict], boi: str, ten_tep: str = "",
             status=TRANG_THAI,
             hinh_thuc=None,                    # cố ý – xem quy ước 3 ở đầu tệp
             confirmed_by=NGUON, approved_by=NGUON,
-        ))
+        )
+        db.add(t)
+        db.flush()
+        # GHI LẠI TỆP NÀO ĐẺ RA CHUYẾN NÀY. Không ghi ở đây thì sau này không ai lần ra được, vì mã
+        # tour nằm BÊN TRONG tệp còn bản đối chiếu H1 – chỗ duy nhất có tổng thu/tổng chi đúng ở mức
+        # chuyến – lại gọi tên chuyến bằng TÊN TỆP. Bỏ dòng này là cắt mất cầu nối sang bản đã chốt.
+        _ghi_tep_chuyen(db, h["tep"], h["ma"], t.id)
         da_co.add(h["ma"].upper())
         tao.append(h["ma"])
     db.flush()
@@ -233,6 +258,10 @@ def bo_nap(_c) -> dict:
     return {
         "tao_chuyen_kho_cu": {
             "bang_dich": "tours",
+            # Cửa này còn ghi SỔ TỆP↔CHUYẾN. Khai ở đây không phải cho đẹp: phép kiểm "mọi bảng
+            # phải có một cửa" (ks_cua_nhap) đọc SỐNG từ chỗ này, và thiếu khai thì nó báo bảng ấy
+            # KHÔNG CÓ CỬA trong khi nó có.
+            "bang_phu": ("kho_cu_tep_chuyen",),
             "phong_ban": "dieu_hanh",
             "lo": True,
             "ten": "Tạo CHUYẾN còn thiếu từ kho quyết toán cũ T1–T6/2026",

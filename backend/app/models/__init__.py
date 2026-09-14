@@ -53,3 +53,6 @@ from app.models.tu_dong import *  # noqa
 # sang bank_accounts_cat và companies. Bốn lần cùng một lỗi đã xảy ra ở tệp này – đội xe (09/9),
 # VPM-5, V11 và tu_dong (11/9) – nên thêm bảng mới thì thêm dòng nhập ở đây NGAY, đừng để lần sau.
 from app.models.dong_tien import *  # noqa
+# Robot A · 13/9/2026. Sổ gán người bán cho kho quyết toán cũ. Đứng SAU core: mang khoá ngoài sang
+# users. Lần thứ năm nhắc cùng một điều ở tệp này – thêm bảng thì thêm dòng nhập ở đây NGAY.
+from app.models.kho_cu import *  # noqa

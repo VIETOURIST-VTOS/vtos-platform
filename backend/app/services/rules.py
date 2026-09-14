@@ -191,6 +191,11 @@ DEFAULT_PARAMS = [
     # của ngày nó khởi hành: đổi thuế suất hôm nay KHÔNG làm đổi lợi nhuận những tờ quyết toán đã ký.
     ("thue_suat_dau_ra", "0.08", "Thuế suất GTGT đầu ra áp cho doanh thu tour", "tỷ lệ",
      "Chủ tịch chốt 12/9/2026"),
+    # Dòng "dịch vụ tiêu dùng ngoài Việt Nam" của hoá đơn tour nước ngoài. Chủ tịch chốt 14/9/2026:
+    # tour nước ngoài tính 0%. Nhưng 0% ấy là MỘT CHÍNH SÁCH, nên nó nằm ở đây chứ không nằm trong
+    # mã: chính sách đổi thì Kế toán ký lại tham số, không ai phải sửa và triển khai lại phần mềm.
+    ("thue_suat_ngoai_vn", "0", "Thuế suất GTGT cho phần dịch vụ tiêu dùng ngoài Việt Nam", "tỷ lệ",
+     "Chủ tịch chốt 14/9/2026"),
     # Giá bán niêm yết ĐÃ GỒM thuế GTGT hay chưa. Đây là một QUY ƯỚC, không phải phép tính, và hai
     # quy ước lệch nhau đúng 8% của chính phần chịu thuế – ở mọi chuyến, và không bao giờ tự lộ ra.
     #

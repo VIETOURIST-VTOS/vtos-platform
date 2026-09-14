@@ -41,11 +41,16 @@ from app.services import cong_no_truong_doan as TLCN
 from app.services import de_nghi_lanh_su as DNLS
 from app.services import dich_vu_le_thang as DVL
 from app.services import ghi_mot_lan as GML
+from app.services import go_lo_kho_cu as GLK
+from app.services import khop_nguoi_ban as KNB
+from app.services import phieu_dat_kho_cu as PDK
+from app.services import rules as R
 from app.services import gia_khach as G
 from app.services import khoan_muc_chi as KM
 from app.services import pham_vi_phap_nhan as PV
 from app.services import soat_du_chi as SDC
 from app.services import thu_ho_chi_ho as THC
+from app.services import thue_gtgt_chuyen as THUE
 from app.services import tip_tour as TIP
 from app.services import ve_may_bay as VMB
 
@@ -1569,3 +1574,179 @@ def xem_dich_vu_le_thang(nam: int, thang: int, mang: str | None = None,
     if not (1 <= thang <= 12):
         raise HTTPException(422, "Tháng phải từ 1 đến 12.")
     return DVL.soat(db, nam, thang, mang)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+# KHO QUYẾT TOÁN CŨ T1–T6/2026 (13/9/2026) · GỠ CẢ LÔ — đường đi ngược của hai cửa nạp
+# ═════════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Chủ tịch giao nạp thử tháng 1 trước. Nhưng nạp thử mà không gỡ lại được thì không phải "thử": nó
+# là một chiều, và người ta hoặc không dám bấm, hoặc bấm rồi phải dọn tay mấy trăm dòng.
+#
+# Hai cửa NẠP nằm ở màn hình /tep (khung ba cửa chung: tải → soát → ghi). Nút GỠ đặt ở đây, trong
+# phân hệ quyết toán tour, vì đó là nơi người ta nhìn thấy hậu quả của việc nạp.
+#
+# QUYỀN: đúng bằng cửa tạo chuyến. Hẹp hơn thì có người tạo được mà không gỡ được — và một nút tạo
+# không có nút gỡ tương ứng là nút không ai dám bấm.
+GO_LO = ("chutich", "tgd", "cntt", "tp_dh")
+
+
+@router.get("/kho-cu/xem-go")
+def xem_go_lo_kho_cu(u: User = Depends(require_roles(*GO_LO)), db: Session = Depends(get_db)):
+    """XEM TRƯỚC – không xoá gì. Nói ra đúng thứ nút gỡ sẽ làm."""
+    return GLK.xem(db)
+
+
+class GoLoVao(BaseModel):
+    xac_nhan: bool = False
+
+
+@router.post("/kho-cu/go")
+def go_lo_kho_cu(v: GoLoVao, u: User = Depends(require_roles(*GO_LO)),
+                 db: Session = Depends(get_db)):
+    """GỠ THẬT. `xac_nhan` mặc định False nên gọi nhầm KHÔNG xoá gì.
+
+    Ghi nhật ký kiểm toán TRƯỚC khi commit, và ghi cả con số đã gỡ — để câu "ai gỡ lô kho cũ, lúc
+    nào, mất bao nhiêu dòng" là câu tra được chứ không phải câu phải nhớ.
+    """
+    kq = GLK.go(db, boi=u.username, xac_nhan=v.xac_nhan)
+    if v.xac_nhan:
+        R.audit(db, u.username, u.role, "go_lo_kho_cu_h1_2026", f"nguon:{GLK.NGUON}",
+                after={"da_go_dong": kq["da_go_dong"], "da_xoa_chuyen": kq["da_xoa_chuyen"],
+                       "giu_lai": len(kq.get("giu_lai_khi_go") or [])})
+        db.commit()
+    return kq
+
+
+# =================================================================================================
+# GÁN NGƯỜI BÁN cho kho quyết toán cũ — màn hình cho người giải nốt phần máy không giải được
+#
+# Đo 13/9/2026 trên 604 tệp: 145 tên trong cột SALES, máy khớp chắc chắn được phần lớn, còn lại là
+# hai loại chỉ người mới giải: tên ứng với nhiều người, và tên không có trong danh sách nhân sự
+# (phần lớn là người đã nghỉ trong nửa đầu năm).
+#
+# QUYỀN: rộng hơn cửa gỡ đúng một vai — HCNS. Họ giữ danh sách nhân sự và biết ai đã nghỉ, mà đó
+# đúng là câu hỏi phải trả lời ở màn hình này. Nhưng KHÔNG có nv_kd: để chính người bán tự nhận
+# doanh số về mình là mở một cửa không nên mở.
+GAN_NB = GO_LO + ("hcns",)
+
+
+@router.get("/kho-cu/nguoi-ban")
+def bang_gan_nguoi_ban(u: User = Depends(require_roles(*GAN_NB)), db: Session = Depends(get_db)):
+    """Bảng cho màn hình gán: ai đã khớp, ai còn chờ, mỗi cái tên đáng bao nhiêu dòng khách."""
+    return KNB.bang(db)
+
+
+class GanNguoiBanVao(BaseModel):
+    khoa_ten: str
+    # None nghĩa là "để trống CÓ CHỦ Ý" — người đã nhìn và kết luận đây không phải nhân viên nào
+    # (đại lý ngoài, ghi chú lọt vào ô). Lần nạp sau phải tôn trọng, không tự khớp lại.
+    user_id: int | None = None
+
+
+@router.post("/kho-cu/nguoi-ban/gan")
+def gan_nguoi_ban(v: GanNguoiBanVao, u: User = Depends(require_roles(*GAN_NB)),
+                  db: Session = Depends(get_db)):
+    """Gán một cái tên cho một tài khoản. Vào nhật ký mang tên người gán: đây là việc dịch doanh số
+    sang tên người thật, nên phải tra được ai đã quyết."""
+    try:
+        kq = KNB.gan_tay(db, v.khoa_ten, v.user_id, boi=u.username)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    R.audit(db, u.username, u.role, "gan_nguoi_ban_kho_cu", f"ten:{v.khoa_ten}",
+            after={"user_id": v.user_id, "so_dong": kq["so_dong"]})
+    db.commit()
+    return kq
+
+
+class GanLaiVao(BaseModel):
+    xac_nhan: bool = False
+
+
+@router.get("/kho-cu/gan-lai")
+def xem_gan_lai_phieu(u: User = Depends(require_roles(*GAN_NB)), db: Session = Depends(get_db)):
+    """XEM TRƯỚC: gán tên xong thì bao nhiêu phiếu đặt chuyển về được đúng người, bao nhiêu tiền."""
+    return PDK.gan_lai(db, boi=u.username, xac_nhan=False)
+
+
+@router.post("/kho-cu/gan-lai")
+def gan_lai_phieu(v: GanLaiVao, u: User = Depends(require_roles(*GAN_NB)),
+                  db: Session = Depends(get_db)):
+    """Chuyển phiếu đặt 'chưa gán' về đúng người bán. KHÔNG nạp lại lô — chỉ đổi chủ phiếu."""
+    kq = PDK.gan_lai(db, boi=u.username, xac_nhan=v.xac_nhan)
+    if v.xac_nhan:
+        R.audit(db, u.username, u.role, "gan_lai_phieu_kho_cu", f"nguon:{GLK.NGUON}",
+                after={"da_doi": kq["da_doi"], "tien": kq.get("tien_ve_nguoi_that")})
+        db.commit()
+    return kq
+
+
+# =================================================================================================
+# Đ-2c · HAI Ô THUẾ SUẤT TRÊN CHUYẾN — Chủ tịch chốt 14/9/2026
+#
+#   "Thuế GTGT tour châu Âu là tour nước ngoài nên tính 0%, nhưng em cứ viết cấu trúc và thuật
+#    toán, còn tỷ lệ % để cho Điều hành nhập vào."
+#
+# Nên 0% không phải một con số trong mã, và 8% cũng vậy. Cả hai là ô trên chuyến, rỗng thì lùi về
+# tham số công ty đã ký. Máy không bao giờ tự điền vào ô — điền sẵn thì sáu tháng sau không ai phân
+# biệt được "Điều hành đã cân nhắc và chọn" với "máy để mặc định và không ai nhìn".
+
+class ThueSuatVao(BaseModel):
+    # ĐƠN VỊ LÀ PHẦN TRĂM: gõ 8 nghĩa là 8%. None = xoá ô, lùi về tham số công ty.
+    thue_suat_ra_pt: float | None = None
+    thue_suat_ngoai_vn_pt: float | None = None
+    ly_do: str | None = None
+
+
+@router.get("/{tid}/thue-suat")
+def xem_thue_suat(tid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Hai ô trên chuyến, và MỨC ĐANG THẬT SỰ ÁP DỤNG kèm chỗ nó đến từ đâu.
+
+    Trả cả `dang_ap_dung` chứ không chỉ hai ô: ô rỗng nghĩa là "dùng tham số công ty", và người nhập
+    phải nhìn thấy con số ấy là bao nhiêu. Bày ô rỗng không kèm mức hiện hành là bắt người ta đoán.
+    """
+    t = _tour(db, tid, u)
+    hom_nay = getattr(t, "start_date", None)
+    return {
+        "thue_suat_ra_pt": t.thue_suat_ra_pt,
+        "thue_suat_ngoai_vn_pt": t.thue_suat_ngoai_vn_pt,
+        "dang_ap_dung": {
+            "thue_suat_ra": THUE.thue_suat_ra(db, hom_nay, t.thue_suat_ra_pt),
+            "thue_suat_ngoai_vn": THUE.thue_suat_ngoai_vn(db, hom_nay, t.thue_suat_ngoai_vn_pt),
+            "nguon_ra": ("go_tren_chuyen" if TIP.doc_phan_tram(t.thue_suat_ra_pt) is not None
+                         else "tham_so_cong_ty"),
+            "nguon_ngoai_vn": ("go_tren_chuyen"
+                               if TIP.doc_phan_tram(t.thue_suat_ngoai_vn_pt) is not None
+                               else "tham_so_cong_ty"),
+        },
+        "hinh_thuc": t.hinh_thuc,
+        "nhap_duoc": u.role in NHAP or toan_quyen(u),
+    }
+
+
+@router.put("/{tid}/thue-suat")
+def dat_thue_suat(tid: int, v: ThueSuatVao, u: User = Depends(require_roles(*NHAP)),
+                  db: Session = Depends(get_db)):
+    """Khai thuế suất RIÊNG cho chuyến này. Rỗng thì chuyến dùng tham số công ty.
+
+    Khoảng hợp lệ là [0, 100] vì ô là phần trăm. Ngoài khoảng ấy thì TỪ CHỐI chứ không kẹp: kẹp một
+    con số người ta gõ nhầm về biên là ghi vào sổ một con số không ai chọn.
+    """
+    t = _tour(db, tid, u)
+    for ten, x in (("thue_suat_ra_pt", v.thue_suat_ra_pt),
+                   ("thue_suat_ngoai_vn_pt", v.thue_suat_ngoai_vn_pt)):
+        if x is not None and not (0 <= x <= 100):
+            raise HTTPException(422, f"{ten} là PHẦN TRĂM, phải nằm trong khoảng 0–100 (gõ 8 = 8%)")
+    cu = {"thue_suat_ra_pt": t.thue_suat_ra_pt,
+          "thue_suat_ngoai_vn_pt": t.thue_suat_ngoai_vn_pt}
+    t.thue_suat_ra_pt = v.thue_suat_ra_pt
+    t.thue_suat_ngoai_vn_pt = v.thue_suat_ngoai_vn_pt
+    moi = {"thue_suat_ra_pt": v.thue_suat_ra_pt, "thue_suat_ngoai_vn_pt": v.thue_suat_ngoai_vn_pt}
+    # Thuế suất là con số quyết định tiền thuế của cả chuyến, nên MỌI lần đổi vào sổ dấu vết — kể cả
+    # lần đổi đầu tiên. Sáu tháng sau phải trả lời được "vì sao chuyến này khai 0% còn chuyến kia 8%".
+    R.audit(db, u.username, u.role, "dat_thue_suat_chuyen", f"tour:{t.code}",
+            before=cu, after={**moi, "ly_do": (v.ly_do or "")[:200]})
+    db.commit()
+    return {**moi, "canh_bao": [c for c in (
+        TIP.canh_bao_phan_tram(v.thue_suat_ra_pt),
+        TIP.canh_bao_phan_tram(v.thue_suat_ngoai_vn_pt)) if c]}
