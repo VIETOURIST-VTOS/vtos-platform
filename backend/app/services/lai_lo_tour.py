@@ -277,9 +277,12 @@ def bang(db: Session, u=None, tu: date | None = None, den: date | None = None,
     # Tour nước ngoài cần GIÁ VỐN để tách hai dòng hoá đơn (0% / phần lợi nhuận), nên giá vốn phải
     # tính xong TRƯỚC khi hỏi thuế. Dùng đúng thứ tự ưu tiên của _mot_dong, không tự nghĩ ra cách
     # khác — hai chỗ tính giá vốn theo hai cách là đúng cái bệnh tệp này sinh ra để chữa.
+    # Hai ô % Điều hành gõ trên chuyến đi kèm luôn: thuế suất là của CHUYẾN, không phải của bảng.
     tho = [{"tour_id": t.id, "hinh_thuc": getattr(t, "hinh_thuc", None),
             "doanh_thu": (bk.get(t.id, RONG)["doanh_thu_bk"] + bk.get(t.id, RONG)["phi_huy"]),
-            "gia_von": _gia_von(t, cp.get(t.id, RONG_CP))}
+            "gia_von": _gia_von(t, cp.get(t.id, RONG_CP)),
+            "thue_suat_ra_pt": getattr(t, "thue_suat_ra_pt", None),
+            "thue_suat_ngoai_vn_pt": getattr(t, "thue_suat_ngoai_vn_pt", None)}
            for t in tours]
     thue = THUE.nhieu_chuyen(db, tho)
     rows = [_mot_dong(t, bk.get(t.id, dict(RONG)), cp.get(t.id, dict(RONG_CP)), thue.get(t.id))
@@ -420,7 +423,10 @@ def chi_tiet(db: Session, t: Tour) -> dict:
     cp = _gom_chi_phi(db, [t.id]).get(t.id, dict(RONG_CP))
     thue = THUE.nhieu_chuyen(db, [{"tour_id": t.id, "hinh_thuc": getattr(t, "hinh_thuc", None),
                                    "doanh_thu": bk["doanh_thu_bk"] + bk["phi_huy"],
-                                   "gia_von": _gia_von(t, cp)}]).get(t.id)
+                                   "gia_von": _gia_von(t, cp),
+                                   "thue_suat_ra_pt": getattr(t, "thue_suat_ra_pt", None),
+                                   "thue_suat_ngoai_vn_pt": getattr(
+                                       t, "thue_suat_ngoai_vn_pt", None)}]).get(t.id)
     return {"tong_hop": _mot_dong(t, bk, cp, thue), "khach": khach, "chi_phi": chi_phi,
             "quyet_toan_dieu_hanh": _ban_quyet_toan(db, t),
             "co_gia_von_theo_khach": le,

@@ -6,6 +6,8 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, pct, fmtD, soTien } from "@/lib/api";
 import { TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
 import { Tag, errMsg, MangTag } from "@/components/ui";
+import KhoCuLo from "@/components/KhoCuLo";
+import KhoCuNguoiBan from "@/components/KhoCuNguoiBan";
 
 function Tours() {
   const { user, toast } = useShell();
@@ -31,6 +33,13 @@ function Tours() {
   const today = new Date().toISOString().slice(0, 10);
   return (<>
     <h1>Tour & dự toán</h1>
+    {/* Kho quyết toán cũ T1–T6/2026: nạp và GỠ CẢ LÔ. Đặt ở đây vì đây là chỗ
+        người ta nhìn thấy hậu quả của việc nạp — mấy trăm dòng chuyến mới. Ô tự
+        ẩn với vai trò không có quyền, và mặc định đóng. */}
+    <KhoCuLo onXong={load} />
+    {/* Gán tên người bán trong tệp ↔ tài khoản VTOS. Đặt cạnh ô trên vì hai việc đi liền nhau:
+        nạp xong thì phần máy không khớp được nằm ở đây, và gán xong thì doanh số về đúng người. */}
+    <KhoCuNguoiBan onXong={load} />
     <p className="muted">
       {chamTran
         ? `Đang hiện ${rows.length} chuyến mới nhất trong ${tong} chuyến khớp bộ lọc — thu hẹp bằng tìm kiếm, tháng hoặc trạng thái để thấy phần còn lại.`

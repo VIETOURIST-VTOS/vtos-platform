@@ -305,3 +305,119 @@ def test_thue_suat_lay_tu_tham_so_va_doi_duoc_theo_ngay(db):
     assert T.thue_suat_ra(db, date(2026, 6, 1)) == pytest.approx(0.08), \
         "chuyến đã đi phải giữ nguyên thuế suất của ngày nó khởi hành"
     clear_param_cache()
+
+
+def test_dong_thu_ho_KHONG_lot_vao_phep_do_thue_dau_ra(db):
+    """Đ-7 gặp Đ-2: một chuyến mới chỉ ghi mỗi khoản THU HỘ.
+
+    Dòng thu hộ không mang thuế. Nhưng nếu nó được đếm, `so_dong > 0` và mot_chuyen() đọc thành
+    "chuyến đã có dòng doanh thu chi tiết" → thuế đầu ra báo bằng 0 với nhãn ĐO ĐƯỢC. Sai, và sai
+    với đúng cái nhãn đáng tin nhất.
+    """
+    db.add(TourDoanhThuDong(tour_id=21, loai="thu_ho", noi_dung="Thu hộ mua vé",
+                            thanh_tien=821_500))
+    db.commit()
+    assert 21 not in T.vat_dau_ra_do_duoc(db, [21]), "dòng thu hộ không được có mặt ở vế đo"
+    kq = T.nhieu_chuyen(db, [{"tour_id": 21, "hinh_thuc": "trong_nuoc",
+                              "doanh_thu": 10_800_000}])[21]
+    assert kq["co_so"] == "suy_tu_thue_suat", "chưa có dòng doanh thu THẬT thì phải là suy ra"
+    assert kq["vat_ra"] == pytest.approx(800_000, abs=1)
+
+
+def test_chua_xep_hinh_thuc_thi_KHONG_tinh_thue(db):
+    """Cái bẫy ngủ ba ngày, và cửa nạp bản đối chiếu H1 suýt đánh thức nó.
+
+    Trước 13/9/2026 hàm này chỉ rẽ nhánh khi `hinh_thuc == "nuoc_ngoai"`, còn lại rơi thẳng xuống
+    nhánh TRONG NƯỚC. `hinh_thuc=None` — trạng thái của cả 604 chuyến kho cũ — vì thế bị tính như
+    tour trong nước: toàn bộ doanh thu chịu thuế. Với một tour châu Âu 2,4 tỷ thì đó là hàng trăm
+    triệu tiền thuế không có thật, và màn hình không nói gì về việc con số ấy dựa trên một giả định.
+
+    Bẫy còn ngủ được là vì mọi chuyến kho cũ đều chưa có doanh thu nên dừng ở phép thử trước đó.
+    Cửa nạp bản đối chiếu ghi doanh thu vào 599 chuyến — nên hai việc phải đi cùng một bản.
+    """
+    for ht in (None, "", "chua_biet"):
+        kq = T.mot_chuyen(db, hinh_thuc=ht, doanh_thu=2_400_000_000, ra=None, vao=None,
+                          gia_von=2_200_000_000)
+        assert kq["thue_gtgt"] is None, \
+            f"hinh_thuc={ht!r} vẫn ra một con số thuế – đang rơi xuống nhánh trong nước"
+        assert kq["co_so"] == "chua_xep_hinh_thuc"
+        assert "trong nước" in kq["vi_sao"] and "nước ngoài" in kq["vi_sao"], \
+            "từ chối mà không nói vì sao thì người đọc không biết phải khai ô nào"
+
+    # Và khai rồi thì tính bình thường – phép thử này không được làm chết cả hai nhánh thật.
+    assert T.mot_chuyen(db, hinh_thuc="trong_nuoc", doanh_thu=1_000_000_000, ra=None,
+                        vao=None)["thue_gtgt"] is not None
+
+
+# =================================================================================================
+# Đ-2c · HAI Ô THUẾ SUẤT TRÊN CHUYẾN — Chủ tịch chốt 14/9/2026
+#
+#   "Thuế GTGT tour châu Âu là tour nước ngoài nên tính 0%, nhưng em cứ viết cấu trúc và thuật
+#    toán, còn tỷ lệ % để cho Điều hành nhập vào."
+#
+# Nên phép thử ở đây canh hai điều: (a) con số 0 và con số 8 KHÔNG nằm trong mã, (b) ô Điều hành gõ
+# thắng tham số công ty — nhưng chỉ khi họ thật sự gõ.
+# =================================================================================================
+
+def test_ts1_o_tren_chuyen_thang_tham_so_cong_ty(db):
+    """Ô là PHẦN TRĂM: gõ 10 nghĩa là 10%, không phải 1000%."""
+    kq = T.mot_chuyen(db, hinh_thuc="trong_nuoc", doanh_thu=1_080_000_000, ra=None, vao=None,
+                      ts_ra_pt=10)
+    assert kq["thue_suat_ra"] == 0.10, "ô % trên chuyến không được đọc, hoặc đọc sai đơn vị"
+    assert kq["nguon_thue_suat"] == "go_tren_chuyen"
+
+    # Không gõ thì lùi về tham số công ty — không về một hằng số trong mã.
+    mac_dinh = T.mot_chuyen(db, hinh_thuc="trong_nuoc", doanh_thu=1_080_000_000, ra=None, vao=None)
+    assert mac_dinh["thue_suat_ra"] == T.get_param(db, T.KHOA_THUE_SUAT_RA)
+    assert mac_dinh["nguon_thue_suat"] == "tham_so_cong_ty"
+
+
+def test_ts2_dong_ngoai_VN_doc_tu_THAM_SO_khong_phai_so_0_trong_ma(db):
+    """Tour nước ngoài hôm nay là 0%. Nhưng 0% ấy là một CHÍNH SÁCH, không phải một sự thật của phép
+    tính — ngày nó đổi, người sửa được phải là Kế toán ký lại tham số, không phải người viết mã.
+
+    Phép thử chứng minh bằng cách gõ một số khác 0 vào ô: nếu số 0 đang nằm cứng trong mã thì dòng
+    ngoài Việt Nam vẫn ra 0 đồng thuế dù người ta khai khác.
+    """
+    binh_thuong = T.mot_chuyen(db, hinh_thuc="nuoc_ngoai", doanh_thu=1_000_000_000,
+                               ra=None, vao=None, gia_von=900_000_000)
+    dong0 = binh_thuong["hoa_don_hai_dong"][0]
+    assert dong0["thue_suat"] == 0.0 and dong0["tien_thue"] == 0.0, \
+        "chính sách hiện hành là 0% cho phần tiêu dùng ngoài Việt Nam"
+
+    khai_khac = T.mot_chuyen(db, hinh_thuc="nuoc_ngoai", doanh_thu=1_000_000_000,
+                             ra=None, vao=None, gia_von=900_000_000, ts_ngoai_vn_pt=5)
+    d0 = khai_khac["hoa_don_hai_dong"][0]
+    assert d0["thue_suat"] == 0.05, "số 0 đang viết cứng trong mã – khai khác cũng không đổi được"
+    assert d0["tien_thue"] > 0
+    assert khai_khac["vat_ra"] > binh_thuong["vat_ra"], \
+        "thuế của dòng ngoài Việt Nam không được cộng vào thuế đầu ra"
+    assert khai_khac["nguon_thue_suat_ngoai_vn"] == "go_tren_chuyen"
+
+
+def test_ts3_hai_dong_hoa_don_van_dung_ranh_gioi_gia_von(db):
+    """Ô % không được làm lung lay chỗ chia hai dòng: ranh giới vẫn là GIÁ VỐN."""
+    kq = T.mot_chuyen(db, hinh_thuc="nuoc_ngoai", doanh_thu=1_000_000_000, ra=None, vao=None,
+                      gia_von=900_000_000, ts_ra_pt=8)
+    a, b = kq["hoa_don_hai_dong"]
+    assert a["so_tien"] == 900_000_000 and b["so_tien"] == 100_000_000
+    assert b["thue_suat"] == 0.08
+
+
+def test_ts4_o_ngoai_khoang_thi_BO_QUA_o_do_va_dung_tham_so(db):
+    """Ngoài [0, 100] là số hỏng. Không kẹp về biên — kẹp là ghi vào sổ một con số không ai chọn."""
+    for hong in (-1, 101, 1000, "abc", None):
+        kq = T.mot_chuyen(db, hinh_thuc="trong_nuoc", doanh_thu=1_000_000_000, ra=None, vao=None,
+                          ts_ra_pt=hong)
+        assert kq["thue_suat_ra"] == T.get_param(db, T.KHOA_THUE_SUAT_RA), \
+            f"ô hỏng {hong!r} vẫn được dùng làm thuế suất"
+
+
+def test_ts5_go_so_nho_hon_1_vao_o_phan_tram_thi_MAY_NOI_RA(db):
+    """Người gõ 0,08 vào ô có nhãn % thì máy đọc đúng 0,08% — và rất có thể họ định 8%. Không tự sửa
+    số của họ, nhưng cũng không im: đây đúng là cái bẫy đã phải gỡ ở ô % chia tip ngày 12/9."""
+    kq = T.mot_chuyen(db, hinh_thuc="trong_nuoc", doanh_thu=1_000_000_000, ra=None, vao=None,
+                      ts_ra_pt=0.08)
+    assert kq["thue_suat_ra"] == 0.0008, "máy đã tự sửa số của người nhập"
+    assert any("PHẦN TRĂM" in c for c in kq["canh_bao"]), \
+        "đọc 0,08 thành 0,08% mà không nói gì – người nhập sẽ không bao giờ biết"

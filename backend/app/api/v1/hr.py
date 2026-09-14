@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.api.deps import current_user, require_roles, cong_chan_quyen, loc_theo_nguoi_dung
+from app.api.deps import current_user, require_roles, cong_chan_quyen, loc_theo_nguoi_dung, toan_quyen_ke_ca_tach_bach
 from app.models.core import Tour, User, Company
 from app.models.hr import SALES_GROUPS, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, GuideRate, INCIDENT_LEVELS, INCIDENT_STATUS, DEPARTMENTS, POSITIONS, OFFICES
 from app.services import hr as H
@@ -118,7 +118,7 @@ def update_user(uid: int, data: TaiKhoanIn, u: User = Depends(require_roles(*HR_
     t = db.get(User, uid)
     if not t: raise HTTPException(404, "Không có tài khoản")
     if t.id == u.id: raise HTTPException(422, "Không tự đổi vai trò hoặc tự khóa tài khoản của mình")
-    if t.role in ("chutich", "tgd") and u.role != "cntt": raise HTTPException(403, "Chỉ CNTT thao tác trên tài khoản lãnh đạo")
+    if t.role in ("chutich", "tgd") and u.role != "cntt" and not toan_quyen_ke_ca_tach_bach(u, db): raise HTTPException(403, "Chỉ CNTT thao tác trên tài khoản lãnh đạo")
     if data.role is not None and data.role not in R_: raise HTTPException(422, f"Vai trò không hợp lệ: {data.role}")
     before = {"vai_tro": t.role, "hoat_dong": t.active}
     if data.role is not None and data.role != t.role:
@@ -141,7 +141,7 @@ def reset_password(uid: int, data: ResetPwIn, u: User = Depends(require_roles(*H
     from app.core.security import hash_password
     t = db.get(User, uid)
     if not t: raise HTTPException(404, "Không có tài khoản")
-    if t.role in ("chutich", "tgd") and u.role != "cntt": raise HTTPException(403, "Chỉ CNTT đặt lại mật khẩu lãnh đạo")
+    if t.role in ("chutich", "tgd") and u.role != "cntt" and not toan_quyen_ke_ca_tach_bach(u, db): raise HTTPException(403, "Chỉ CNTT đặt lại mật khẩu lãnh đạo")
     pw = data.new_password.strip() or t.staff_code
     if not pw or len(pw) < 3: raise HTTPException(422, "Chưa có mã NV – nhập mật khẩu mới")
     t.password_hash = hash_password(pw)

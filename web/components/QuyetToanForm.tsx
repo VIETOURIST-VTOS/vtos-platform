@@ -31,6 +31,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, vnd, soTien, fmtDT } from "@/lib/api";
 import { errMsg } from "@/components/ui";
 
+import ThueSuatChuyen from "@/components/ThueSuatChuyen";
 type Kieu = "chu" | "so" | "tien" | "ngay" | "gio" | "chon" | "ncc" | "co";
 
 export type Cot = {
@@ -564,6 +565,11 @@ export default function QuyetToanForm({ tourId, toast }: {
         {" "}Ô tiền để trống nghĩa là <b>chưa nhập</b>, không phải 0 đồng. Không ô nào cho gõ tổng –
         máy chủ cộng lại từ các dòng.
       </p>
+
+      {/* Đ-2c · Chủ tịch chốt 14/9/2026: tỷ lệ % thuế để Điều hành nhập, không viết cứng trong mã.
+          Đặt ngay đầu biểu vì nó quyết định tiền thuế của cả tờ, và người nhập phải thấy mức đang
+          áp dụng TRƯỚC khi gõ dòng đầu tiên. */}
+      <ThueSuatChuyen tourId={tourId} onXong={nap} />
 
       {/* ---------------------------------------------------------------- 1. khách */}
       <BangNhap

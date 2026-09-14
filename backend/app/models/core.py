@@ -327,6 +327,19 @@ class Tour(Base):
     # là chưa ai xếp – suy từ cột country được, nhưng suy ngầm rồi tính tiền theo cái suy ấy là chỗ
     # sinh lỗi lặng.
     hinh_thuc: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Đ-2c · Chủ tịch chốt 14/9/2026: "tour châu Âu là tour nước ngoài nên tính 0%, nhưng em cứ viết
+    # cấu trúc và thuật toán, còn tỷ lệ % để cho Điều hành nhập vào."
+    #
+    # Hai ô này là hai thuế suất CỦA CHÍNH CHUYẾN NÀY, do Điều hành gõ. Rỗng thì lùi về tham số công
+    # ty đang hiệu lực — không bao giờ về một hằng số viết trong mã.
+    #
+    # HẬU TỐ `_pt` LÀ PHẦN CỦA TÊN, KHÔNG PHẢI TRANG TRÍ. Đơn vị là PHẦN TRĂM: 8 nghĩa là 8%. Tham số
+    # công ty thì là số thập phân (0.08). Hai cách viết cùng một thứ, lệch nhau 100 lần, và bài học
+    # ấy đã phải trả giá một lần ở ô % chia tip (12/9) — nên đơn vị nằm ngay trong tên cột.
+    thue_suat_ra_pt: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Dòng "dịch vụ tiêu dùng ngoài Việt Nam" của hoá đơn tour nước ngoài. Mặc định 0%, nhưng là 0%
+    # ĐỌC TỪ THAM SỐ chứ không phải số 0 viết cứng trong mã: chính sách thuế đổi thì đổi tham số.
+    thue_suat_ngoai_vn_pt: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     # Bổ sung theo cấu trúc Vietrip (05/9/2026)
     vietrip_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)

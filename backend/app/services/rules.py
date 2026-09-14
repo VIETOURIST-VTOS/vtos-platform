@@ -191,6 +191,11 @@ DEFAULT_PARAMS = [
     # của ngày nó khởi hành: đổi thuế suất hôm nay KHÔNG làm đổi lợi nhuận những tờ quyết toán đã ký.
     ("thue_suat_dau_ra", "0.08", "Thuế suất GTGT đầu ra áp cho doanh thu tour", "tỷ lệ",
      "Chủ tịch chốt 12/9/2026"),
+    # Dòng "dịch vụ tiêu dùng ngoài Việt Nam" của hoá đơn tour nước ngoài. Chủ tịch chốt 14/9/2026:
+    # tour nước ngoài tính 0%. Nhưng 0% ấy là MỘT CHÍNH SÁCH, nên nó nằm ở đây chứ không nằm trong
+    # mã: chính sách đổi thì Kế toán ký lại tham số, không ai phải sửa và triển khai lại phần mềm.
+    ("thue_suat_ngoai_vn", "0", "Thuế suất GTGT cho phần dịch vụ tiêu dùng ngoài Việt Nam", "tỷ lệ",
+     "Chủ tịch chốt 14/9/2026"),
     # Giá bán niêm yết ĐÃ GỒM thuế GTGT hay chưa. Đây là một QUY ƯỚC, không phải phép tính, và hai
     # quy ước lệch nhau đúng 8% của chính phần chịu thuế – ở mọi chuyến, và không bao giờ tự lộ ra.
     #
@@ -214,6 +219,30 @@ DEFAULT_PARAMS = [
     # đi qua và dòng thứ ba phải có một câu giải thích.
     ("nguong_hut_du_toan", "0.15", "Thực chi thấp hơn dự toán quá tỷ lệ này thì cần một dòng giải thích",
      "tỷ lệ", "Đ-10, đo trên mẫu quyết toán Hồ Tràm 12/9/2026"),
+    # ---- CÔNG TẮC CHẠY THỬ: Chủ tịch đi qua được cả cửa TÁCH BẠCH TRÁCH NHIỆM ----
+    #
+    # Chủ tịch chốt 13/9/2026: mở hết cửa cho Chủ tịch ĐỂ CHẠY THỬ VÀ TRÌNH DIỄN. Sáu cửa được mở là
+    # sáu cửa vốn đóng với mọi vai trò, không riêng Chủ tịch: Kế toán kiểm chứng từ, Kế toán bấm ĐÃ
+    # CHI, Kế toán xác nhận và trả lại quyết toán, CNTT đối chiếu độc lập, CNTT thao tác tài khoản
+    # lãnh đạo, và chữ ký thứ hai của nội dung marketing.
+    #
+    # ĐỂ Ở THAM SỐ chứ không viết cứng vào sáu tệp mã, vì hai lý do:
+    #
+    #   1. Đây là quyết định của GIAI ĐOẠN chạy thử. Đến ngày vận hành thật, đóng lại là đổi một dòng
+    #      ở màn hình tham số — không phải sửa sáu tệp, chạy lại phép thử và đẩy một bản nâng cấp.
+    #      Một việc phải làm mà tốn một bản nâng cấp là một việc sẽ bị hoãn.
+    #   2. Tham số là con số ĐỌC ĐƯỢC. Robot Kiểm soát nêu nó thành phát hiện `tach_bach_dang_mo`,
+    #      nên Ban Kiểm soát nhìn thấy hệ thống đang ở chế độ nào mà không phải đọc mã nguồn. Một
+    #      lớp kiểm soát bị tắt mà không ai nhìn thấy nó đang tắt thì tệ hơn là chưa từng có.
+    #
+    # CÓ MỘT CỬA KHÔNG NẰM TRONG DANH SÁCH NÀY và tham số cũng không mở được: cửa chữ ký hai người
+    # (chu_ky.kiem_tra_nguoi_ky). Ở đó Chủ tịch vốn đã nằm trong danh sách được ký — cửa ấy không
+    # chặn ai vì vai trò. Thứ nó chặn là MỘT NGƯỜI KÝ THAY CẢ HAI VAI, mà mô hình dữ liệu chỉ có hai
+    # ô `signed_chutich` / `signed_tgd`: mở ra thì sổ ghi một chữ ký TGĐ mà TGĐ chưa hề bấm. Đó không
+    # phải nới quyền, đó là ghi sai sổ — và con số sai ấy không ai đọc lại mà biết được.
+    ("chu_tich_mo_het_cua", "1",
+     "Chủ tịch đi qua được cả cửa tách bạch trách nhiệm (1 = mở, dùng khi chạy thử; 0 = đóng)", "cờ",
+     "Chủ tịch chốt 13/9/2026 để chạy thử và trình diễn. ĐẶT LẠI VỀ 0 vào ngày vận hành thật"),
     # ---- Đ-6 · Tiền tip. Chủ tịch chốt 12/9/2026: "tiền tip tour châu Âu chia 1 phần với công ty" ----
     #
     # GIÁ TRỊ ĐỂ TRỐNG, và phải để trống — giống hai mốc vận hành thật ở trên. Chủ tịch đã chốt

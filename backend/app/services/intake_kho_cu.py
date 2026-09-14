@@ -37,6 +37,19 @@ Nên cửa này **KHÔNG ghi doanh thu và giá vốn mức chuyến** từ số
 kho cũ thật sự bổ sung: dòng khách, dòng chi phí, dòng HDV. Ô `actual_revenue` / `actual_cost` của
 chuyến để nguyên. Ghi vào đó bằng một con số kém 29% là làm hỏng đúng thứ người ta định sửa.
 
+PHIẾU ĐẶT THEO NGƯỜI BÁN – THÊM 13/9/2026
+
+Chủ tịch hỏi: "đẩy lên quyết toán thì số có chạy về các phòng ban không, doanh thu cho sales đoàn và
+sales lẻ?" Câu trả lời lúc ấy là KHÔNG, và lý do nằm gọn ở một chỗ: cửa tạo chuyến sinh chuyến mà
+không sinh phiếu đặt, `booking_khach.booking_id` lại là cột bắt buộc – nên cửa này lặng lẽ bỏ TOÀN BỘ
+dòng khách của mọi chuyến mới. Chỉ chi phí vào được, và hậu quả dây chuyền là bảng lãi lỗ thấy giá vốn
+mà không thấy doanh thu: mỗi chuyến thành một khoản lỗ bằng đúng chi phí.
+
+Nay `phieu_dat_kho_cu` dựng phiếu từ chính cột SALES của tệp, **mỗi người bán một phiếu**, và dòng
+khách treo vào đúng phiếu của người đã bán ra khách ấy. Tên chưa khớp được tài khoản thì vào phiếu
+đứng tên tài khoản điều hành khoá với `counts_for_target=False` – doanh thu công ty đúng ngay, mà
+không nhân viên thật nào bị cộng nhầm chỉ tiêu.
+
 VÀ VÌ THIẾU BẢN ĐỐI CHIẾU H1, MỌI TỆP ĐỀU LÀ "CẦN NGƯỜI XÁC NHẬN"
 
 Bản đối chiếu H1 (`VTOS_Kho_quyet_toan_T1-T6-2026.xlsx`) chưa có cửa tải riêng, nên ở đây `ref` luôn
@@ -52,6 +65,8 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.services import chong_trung_quyet_toan as CT
+from app.services import khop_nguoi_ban as KN
+from app.services import phieu_dat_kho_cu as PD
 from app.services import nap_kho_cu as KHO
 
 # Mọi dòng do cửa này ghi mang nguồn riêng. Nạp lại thì XOÁ đúng phần mang nguồn ấy rồi ghi lại –
@@ -172,31 +187,45 @@ def _xoa_phan_cua_nguon(db, tour_id: int) -> None:
     db.query(TourHdvChi).filter(
         TourHdvChi.tour_id == tour_id,
         TourHdvChi.nguoi_nhap == NGUON).delete(synchronize_session=False)
+    # Phiếu đặt do lô này dựng (một phiếu một người bán) – bảng thứ tư, thêm 13/9/2026. Phải xoá ở
+    # ĐÂY chứ không chỉ trong `phieu_dat_kho_cu.sinh`: nạp lại một tệp nay không còn dòng khách nào
+    # thì `sinh` không được gọi, và phiếu cũ ở lại với doanh thu của lần nạp trước.
+    PD.xoa_phieu_cua_lo(db, tour_id)
     db.flush()
 
 
 def _ghi_mot(db, d: dict, tour_id: int, boi: str) -> dict:
     """Ghi một tệp. Trả về những thứ KHÔNG ghi được – để chúng vào báo cáo chứ không biến mất."""
-    from sqlalchemy import select
-
-    from app.models.core import Booking
     from app.models.lop3_tour import BookingKhach, TourHdvChi
     from app.models.vietrip import TourCostLine
 
     _xoa_phan_cua_nguon(db, tour_id)
     bao = {"mat_dong_khach": 0}
 
-    b = db.scalars(select(Booking).where(Booking.tour_id == tour_id)
-                   .order_by(Booking.id)).first()
-    # Không có phiếu đặt thì KHÔNG treo dòng khách vào hư không – `booking_khach.booking_id` là cột
-    # bắt buộc. Nhưng phải NÓI RA: bỏ lặng lẽ thì người bấm thấy "nạp xong" trong khi cả danh sách
-    # khách của chuyến ấy không vào đâu cả.
     khach = d.get("khach") or []
-    if b is None and khach:
-        bao["mat_dong_khach"] = len(khach)
-    else:
+    # PHIẾU ĐẶT THEO NGƯỜI BÁN. Trước 13/9/2026 chỗ này chỉ đi tìm một phiếu có sẵn, và chuyến do
+    # cửa tạo chuyến sinh ra thì KHÔNG có phiếu nào – nên toàn bộ dòng khách rơi, chỉ chi phí vào
+    # được. Hệ quả: bảng lãi lỗ thấy giá vốn mà không thấy doanh thu, mỗi chuyến thành một khoản lỗ
+    # bằng đúng chi phí; và mọi báo cáo doanh số đọc `bookings.sales_id` nên không có gì để đọc.
+    # Nay dựng phiếu từ chính cột SALES của tệp: mỗi người bán một phiếu.
+    theo_ten: dict[str, int] = {}
+    if khach:
+        kq_p = PD.sinh(db, tour_id, khach, boi)
+        if kq_p.get("loi"):
+            bao["mat_dong_khach"] = len(khach)
+            bao["vi_sao_mat"] = kq_p["loi"]
+        else:
+            theo_ten = kq_p["theo_ten_nguoi_ban"]
+            bao["so_phieu_dat"] = kq_p["so_phieu"]
+            bao["chua_gan_nguoi_ban"] = kq_p["chua_gan_dong"]
+
+    if theo_ten:
         for i, x in enumerate(khach, start=1):
-            db.add(BookingKhach(tour_id=tour_id, booking_id=b.id, stt=i,
+            bid = theo_ten.get((x.get("sale") or "").strip())
+            if bid is None:      # không thể xảy ra – phiếu dựng từ chính tập tên này
+                bao["mat_dong_khach"] += 1
+                continue
+            db.add(BookingKhach(tour_id=tour_id, booking_id=bid, stt=i,
                                 ho_ten=(x.get("ho_ten") or "")[:200],
                                 gia_ban=x.get("gia_ban"),
                                 ma_dat_cho=(x.get("ma_dat_cho") or "")[:30] or None,
@@ -247,6 +276,11 @@ def nap_lo(db, rows: list[dict], boi: str, ten_tep: str = "",
     theo_ten = {x["ten_tep"]: x for x in soat["chi_tiet"]}
     da_nap, bo_qua, mat_khach = [], [], []
 
+    # Ghi SỔ GÁN NGƯỜI BÁN trước khi ghi bất cứ dòng nào. Phải trước, vì `phieu_dat_kho_cu` tra sổ
+    # ấy để biết một cái tên trong tệp thuộc tài khoản nào – và vì lựa chọn tay của người đã gán từ
+    # lần trước phải có mặt ở đây thì mới thắng được bộ khớp máy.
+    so_gan = KN.ghi_so(db, PD.dem_nguoi_ban(rows))
+
     for d in rows:
         s = theo_ten.get(d.get("ten_tep")) or {}
         ro = s.get("ro")
@@ -267,6 +301,7 @@ def nap_lo(db, rows: list[dict], boi: str, ten_tep: str = "",
         "da_co": sum(1 for x in bo_qua if x["ro"] == "can_xac_nhan"),
         "dong_loi": sum(1 for x in bo_qua if x["ro"] in ("chan", "khong_thay_chuyen")),
         "nguon": NGUON,
+        "so_gan_nguoi_ban": so_gan,
         "chi_tiet_da_nap": da_nap,
         "chi_tiet_bo_qua": bo_qua,
         "khong_ghi_tien_muc_chuyen": (
@@ -296,7 +331,7 @@ def bo_nap(_c) -> dict:
             # gọi tên được; `bang_phu` là phần còn lại. Khai đủ ở đây không phải cho đẹp: phép kiểm
             # "mọi bảng phải có một cửa" (ks_cua_nhap) đọc sống từ chỗ này.
             "bang_dich": "tour_cost_lines",
-            "bang_phu": ("booking_khach", "tour_hdv_chi"),
+            "bang_phu": ("booking_khach", "tour_hdv_chi", "bookings", "kho_cu_nguoi_ban"),
             "phong_ban": "dieu_hanh",
             "lo": True,          # một tệp = một chuyến, kiểm và nạp cả tệp một lần
             "ten": "Kho quyết toán CŨ T1–T6/2026 (Excel tự do của Điều hành)",
