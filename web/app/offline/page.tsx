@@ -18,8 +18,11 @@ export default function TrangMatMang() {
         gap: 18,
         padding: 24,
         textAlign: "center",
-        background: "var(--vtos-navy, #14538D)",
-        color: "#FFFFFF",
+        /* Trang mất mạng phủ kín màn hình. Nền phải là NỀN thật (--vtos-nav-bg), không phải
+           --vtos-navy — biến ấy nay là màu CHỮ #6FA8F0, tô cả trang bằng nó thì chữ trắng lên
+           trên chỉ đạt 2,0 lần. */
+        background: "var(--vtos-nav-bg, #10273E)",
+        color: "var(--vtos-text-on-navy, #FFFFFF)",
         fontFamily: "var(--vtos-font-text, 'Be Vietnam Pro', system-ui, sans-serif)",
       }}
     >
@@ -49,8 +52,8 @@ export default function TrangMatMang() {
           padding: "12px 26px",
           fontSize: 15,
           fontWeight: 600,
-          color: "var(--vtos-navy, #14538D)",
-          background: "#FFFFFF",
+          color: "var(--vtos-text-on-navy, #FFFFFF)",
+          background: "var(--vtos-sky, #1E63C8)",
           border: "none",
           borderRadius: 9,
           cursor: "pointer",

@@ -203,19 +203,19 @@ function DocChungTu() {
 
       <style jsx>{`
         .wrap { padding: 16px; max-width: 900px; }
-        .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; margin: 14px 0; }
+        .card { border: 1px solid var(--vtos-line); border-radius: 10px; padding: 14px; margin: 14px 0; }
         .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
         .tbl { width: 100%; border-collapse: collapse; }
-        .tbl td, .tbl th { border-bottom: 1px solid #f1f5f9; padding: 6px 8px; text-align: left; }
-        .lbl { width: 190px; color: #475569; }
-        input { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; width: 100%; }
-        input.chua-doc { background: #fffbeb; border-color: #fbbf24; }
-        button { padding: 7px 12px; border-radius: 8px; border: 1px solid #0f172a;
-                 background: #0f172a; color: #fff; cursor: pointer; }
-        button.ghost { background: #fff; color: #0f172a; border-color: #cbd5e1; }
-        .muted { color: #64748b; }
+        .tbl td, .tbl th { border-bottom: 1px solid var(--vtos-line); padding: 6px 8px; text-align: left; }
+        .lbl { width: 190px; color: var(--vtos-text-mute); }
+        input { padding: 6px 8px; border: 1px solid var(--vtos-line); border-radius: 6px; width: 100%; }
+        input.chua-doc { background: var(--vtos-warning-bg); border-color: var(--vtos-warning); }
+        button { padding: 7px 12px; border-radius: 8px; border: 1px solid var(--vtos-sky);
+                 background: var(--vtos-sky); color: var(--vtos-text-on-navy); cursor: pointer; }
+        button.ghost { background: var(--vtos-card); color: var(--vtos-text); border-color: var(--vtos-line); }
+        .muted { color: var(--vtos-text-mute); }
         .small { font-size: 12px; }
-        .warn { color: #92400e; background: #fffbeb; padding: 8px 10px; border-radius: 8px; }
+        .warn { color: var(--vtos-warning); background: var(--vtos-warning-bg); padding: 8px 10px; border-radius: 8px; }
       `}</style>
     </div>
   );

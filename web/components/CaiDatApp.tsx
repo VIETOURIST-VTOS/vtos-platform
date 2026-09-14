@@ -117,8 +117,10 @@ export default function CaiDatApp() {
         zIndex: 9999,
         margin: "0 auto",
         maxWidth: 520,
-        background: "#FFFFFF",
-        color: "var(--vtos-text, #0B2545)",
+        /* Nền tối 13/9: thẻ mời cài app trước đây tô trắng cứng, nên nó là ô giấy duy nhất nổi
+           trên cả nền tối. Lấy nền thẻ của bộ nhận diện. */
+        background: "var(--vtos-card, #122C45)",
+        color: "var(--vtos-text, #E8F1F8)",
         border: "1px solid var(--vtos-line, #E3E9EF)",
         borderRadius: "var(--vtos-radius-lg, 16px)",
         boxShadow: "0 12px 32px rgba(11,37,69,.20)",
@@ -164,8 +166,10 @@ export default function CaiDatApp() {
                 padding: "9px 18px",
                 fontSize: 14,
                 fontWeight: 600,
-                color: "#FFFFFF",
-                background: "var(--vtos-navy, #14538D)",
+                /* --vtos-navy nay là màu CHỮ (#6FA8F0), không còn là màu nền như bản sáng: chữ
+                   trắng trên nó chỉ đạt 2,0 lần. Nền nút là --vtos-sky, chữ trắng đạt 5,72. */
+                color: "var(--vtos-text-on-navy, #FFFFFF)",
+                background: "var(--vtos-sky, #1E63C8)",
                 border: "none",
                 borderRadius: "var(--vtos-radius-md, 9px)",
                 cursor: "pointer",

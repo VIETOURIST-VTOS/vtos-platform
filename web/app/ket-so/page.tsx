@@ -231,23 +231,23 @@ function KetSo() {
 
       <style jsx>{`
         .wrap { padding: 16px; max-width: 1000px; }
-        .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; margin: 14px 0; }
+        .card { border: 1px solid var(--vtos-line); border-radius: 10px; padding: 14px; margin: 14px 0; }
         .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
         .tbl { width: 100%; border-collapse: collapse; margin: 8px 0; }
-        .tbl td, .tbl th { border-bottom: 1px solid #f1f5f9; padding: 6px 8px; text-align: left; }
+        .tbl td, .tbl th { border-bottom: 1px solid var(--vtos-line); padding: 6px 8px; text-align: left; }
         .num { text-align: right; font-variant-numeric: tabular-nums; }
-        .lbl { width: 130px; color: #475569; }
+        .lbl { width: 130px; color: var(--vtos-text-mute); }
         .chip { display: inline-block; margin-right: 10px; }
-        .buoc { padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
-        input, select { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
-        button { padding: 7px 12px; border-radius: 8px; border: 1px solid #0f172a;
-                 background: #0f172a; color: #fff; cursor: pointer; margin-right: 8px; }
-        button.ghost { background: #fff; color: #0f172a; border-color: #cbd5e1; }
+        .buoc { padding: 6px 0; border-bottom: 1px solid var(--vtos-line); }
+        input, select { padding: 6px 8px; border: 1px solid var(--vtos-line); border-radius: 6px; }
+        button { padding: 7px 12px; border-radius: 8px; border: 1px solid var(--vtos-sky);
+                 background: var(--vtos-sky); color: var(--vtos-text-on-navy); cursor: pointer; margin-right: 8px; }
+        button.ghost { background: var(--vtos-card); color: var(--vtos-text); border-color: var(--vtos-line); }
         button:disabled { opacity: .5; cursor: default; }
-        .muted { color: #64748b; }
+        .muted { color: var(--vtos-text-mute); }
         .small { font-size: 12px; }
-        .ok { color: #166534; }
-        .warn { color: #92400e; background: #fffbeb; padding: 8px 10px; border-radius: 8px; }
+        .ok { color: var(--vtos-success); }
+        .warn { color: var(--vtos-warning); background: var(--vtos-warning-bg); padding: 8px 10px; border-radius: 8px; }
       `}</style>
     </div>
   );

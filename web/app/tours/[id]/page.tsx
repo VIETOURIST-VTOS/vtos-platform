@@ -183,7 +183,7 @@ function TourDetail() {
 
     {tab === "history" && <>
       <div className="panel"><h2>Quy trình & lịch sử</h2>
-        {t.events.length ? t.events.map((e: any) => <div key={e.id} style={{ borderLeft: "3px solid " + (e.source === "vietrip" ? "#888" : "var(--teal)"), padding: "4px 10px", marginBottom: 8 }}>
+        {t.events.length ? t.events.map((e: any) => <div key={e.id} style={{ borderLeft: "3px solid " + (e.source === "vietrip" ? "var(--vtos-text-faint)" : "var(--teal)"), padding: "4px 10px", marginBottom: 8 }}>
           <b>{e.title}</b> {e.source === "vietrip" && <Tag>Vietrip</Tag>}<div className="muted">{fmtDT(e.at)} · {e.actor}</div>{e.note && <div style={{ background: "var(--panel2, #f4f6f8)", padding: 6, borderRadius: 6, marginTop: 4 }}>{e.note}</div>}
         </div>) : <p className="muted">Chưa có bước nào được ghi.</p>}
       </div>

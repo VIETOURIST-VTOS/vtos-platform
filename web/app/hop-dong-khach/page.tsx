@@ -272,26 +272,26 @@ function HopDong() {
 
       <style jsx>{`
         .wrap { padding: 16px; max-width: 1250px; }
-        .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; margin: 14px 0; }
+        .card { border: 1px solid var(--vtos-line); border-radius: 10px; padding: 14px; margin: 14px 0; }
         .tbl { width: 100%; border-collapse: collapse; }
-        .tbl td, .tbl th { border-bottom: 1px solid #f1f5f9; padding: 6px 8px; text-align: left;
+        .tbl td, .tbl th { border-bottom: 1px solid var(--vtos-line); padding: 6px 8px; text-align: left;
                            vertical-align: top; }
-        .chitiet { background: #f8fafc; }
+        .chitiet { background: var(--vtos-info-bg); }
         .buoc { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; }
-        .o { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; min-width: 150px; }
-        .o.thieu { border-style: dashed; color: #92400e; background: #fffbeb; }
-        .o .ten { font-size: 12px; color: #64748b; }
+        .o { border: 1px solid var(--vtos-line); border-radius: 8px; padding: 8px 10px; min-width: 150px; }
+        .o.thieu { border-style: dashed; color: var(--vtos-warning); background: var(--vtos-warning-bg); }
+        .o .ten { font-size: 12px; color: var(--vtos-text-mute); }
         .o .gt { font-weight: 600; font-size: 13px; }
         .nut { white-space: nowrap; }
         .dong-tieu-de { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
-        input, select { padding: 4px 6px; border-radius: 6px; border: 1px solid #cbd5e1;
+        input, select { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--vtos-line);
                         font-size: 13px; max-width: 100%; }
         .mono { font-family: ui-monospace, monospace; font-size: 13px; }
-        button { padding: 5px 10px; border-radius: 8px; border: 1px solid #cbd5e1;
-                 background: #fff; color: #0f172a; cursor: pointer; font-size: 13px; }
-        .muted { color: #64748b; }
+        button { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--vtos-line);
+                 background: var(--vtos-card); color: var(--vtos-text); cursor: pointer; font-size: 13px; }
+        .muted { color: var(--vtos-text-mute); }
         .small { font-size: 12px; }
-        .warn { color: #92400e; background: #fffbeb; padding: 8px 10px; border-radius: 8px; }
+        .warn { color: var(--vtos-warning); background: var(--vtos-warning-bg); padding: 8px 10px; border-radius: 8px; }
       `}</style>
     </div>
   );

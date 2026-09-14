@@ -24,9 +24,9 @@ export const metadata: Metadata = {
 // liền màu với thanh ngang của trang. Đổi theo bản tối 13/9/2026: nền thanh nay là --vtos-nav-bg
 // #10273E, để nguyên #14538D thì mép trên màn hình điện thoại sáng hơn thanh ngang một khoảng.
 //
-// CÒN NỢ, KHÔNG THUỘC VÒNG NÀY: manifest.json và bộ ảnh /public/splash vẫn mang màu bản sáng, nên
-// màn hình chờ của app cài trên điện thoại sẽ loé trắng một nhịp rồi mới vào nền tối. Hai thứ ấy
-// là của làn PWA – phải báo họ đổi background_color và sinh lại ảnh chờ, chứ không sửa lén ở đây.
+// ĐÃ TRẢ NỢ 14/9/2026: manifest.json (background_color + theme_color) và cả 16 ảnh ở /public/splash
+// đã đổi sang #10273E. Trước đó ba nơi mang ba màu khác nhau nên app cài trên điện thoại loé một
+// nhịp navy sáng rồi mới vào nền tối. Ba nơi này phải đổi CÙNG NHAU, đổi một nơi là lại loé.
 export const viewport: Viewport = { themeColor: "#10273E", width: "device-width", initialScale: 1 };
 
 /* MÀN HÌNH CHỜ CHO iPHONE/iPAD.
