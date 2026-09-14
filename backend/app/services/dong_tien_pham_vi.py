@@ -1,162 +1,210 @@
 # -*- coding: utf-8 -*-
-"""SEC-02 + CF-07 · Danh mục dòng của khối DÒNG TIỀN: ai xem được dòng nào, và dòng nào có cửa nhập.
+"""SEC-02 + CF-07 · Bảng TRÌNH BÀY của khối Dòng tiền: ai xem dòng nào, và dòng nào có cửa nhập.
 
-TÊN DÒNG VÀ THỨ TỰ lấy nguyên từ bảng ở mục III của đề xuất giao diện v1.1 (11/9/2026). Không đặt
-lại tên cho gọn: bảng ấy là thứ Chủ tịch và Tổng giám đốc đọc, và một dòng đổi tên giữa tài liệu
-với màn hình là một lần hai bên họp về hai thứ khác nhau mà tưởng là một.
+────────────────────────────────────────────────────────────────────────────────────────────────
+MỘT DANH MỤC DÒNG, KHÔNG HAI  (sửa 13/9/2026)
+────────────────────────────────────────────────────────────────────────────────────────────────
+Bản 11/9 của tệp này TỰ KHAI 13 mã dòng, trong khi `models/nghia_vu.py` (VPM-11) đã khai đúng 13
+nhóm ấy để làm khoá dữ liệu. Hai bên trùng việc, và 7 trên 13 mã đặt khác tên nhau.
 
-Chủ tịch chốt ba điều ngày 11/9/2026, cả ba đều là điều mà làm sai thì KHÔNG AI NHÌN RA:
+Nay tệp này KHÔNG khai mã nữa – nó NHẬP `NHOM` từ mô hình. Lý do chọn mã của VPM-11 làm chuẩn
+không phải vì họ làm trước, mà vì mã của họ GẮN VÀO DỮ LIỆU THẬT: đã có bảng, đã có bước chuyển,
+sắp có bản ghi. Mã ở một bảng trình bày thì đổi không tốn gì.
 
-  (1) CHỦ TỊCH xem TẤT CẢ các dòng tài chính.
-  (2) TỔNG GIÁM ĐỐC CHỈ xem tài chính của hoạt động kinh doanh TOUR + XE.
-  (3) CÁCH A: bảng của Tổng giám đốc KHÔNG có "Tiền khả dụng đầu kỳ", KHÔNG có "SỐ DƯ DỰ KIẾN CUỐI
-      KHOẢNG", KHÔNG có "THIẾU SO VỚI MỨC DỰ PHÒNG". Dòng đáy mang tên
-      "Dòng tiền thuần từ hoạt động tour và xe" – KHÔNG BAO GIỜ gọi là "số dư".
+Phần tệp này giữ riêng, vì sổ nghĩa vụ không có và không nên có:
+    · hai dòng TỔNG và ba dòng SỐ DƯ  – chúng là dòng của BẢNG, không phải nghĩa vụ
+    · tên dòng đáy gắn với phạm vi xem
+    · bảng CỬA NHẬP (CF-07)
 
-Vì sao (3) quan trọng hơn nó nghe: một bảng đã bị lọc mất dòng vay, dòng thuế và dòng lãi mà dòng
-đáy vẫn đề chữ "số dư" thì con số ấy KHÔNG SAI THEO KIỂU DỄ THẤY – nó trông như đúng. Người số hai
-của tập đoàn đọc "số dư cuối tháng: 4 tỷ", yên tâm duyệt một khoản chi, trong khi phần bị giấu đi
-có một kỳ trả gốc 6 tỷ. Không dòng nào trên màn hình sai cả; chỉ cái TÊN của dòng đáy nói dối.
+────────────────────────────────────────────────────────────────────────────────────────────────
+MỘT LUẬT QUYỀN, HAI TRỤC  (sửa 13/9/2026 theo phản biện)
+────────────────────────────────────────────────────────────────────────────────────────────────
+VPM-11 khai theo lối LOẠI TRỪ: nhóm mới quên khai thì MẶC ĐỊNH HIỆN. Bản 11/9 của tệp này khai
+ĐÓNG MẶC ĐỊNH: chưa khai thì không thấy. Nhìn qua là mâu thuẫn, nhưng hai bên đang nói về HAI
+TRỤC KHÁC NHAU, nên giữ được cả hai:
 
-Nên ở tệp này, phạm vi xem và TÊN DÒNG ĐÁY đi cùng nhau, do cùng một hàm quyết định. Tách chúng ra
-hai chỗ là mở đường cho một lần sửa giao diện làm gãy đúng chỗ này.
+    Trục NHÓM NGHĨA VỤ   → theo VPM-11. Nhóm mới mà quên khai thì vẫn HIỆN và vẫn được CỘNG.
+                           Lộ một nhóm mới thì có người kêu; giấu một nhóm mới thì không ai biết,
+                           và bảng nhu cầu tiền nhẹ hơn sự thật.
+    Trục VAI TRÒ         → theo bản này. Vai trò chưa khai thì KHÔNG THẤY GÌ. Thêm một vai trò mới
+                           mà tự động cho xem sổ tiền là một lần rò rỉ không ai kêu.
 
-Nguyên tắc ĐÓNG MẶC ĐỊNH: vai trò nào không được khai trong BANG_QUYEN thì KHÔNG thấy gì. Mở mặc
-định rồi liệt kê người bị cấm là kiểu khai mà mỗi lần thêm một vai trò mới là một lần rò rỉ, và
-không có gì kêu lên.
+Phản biện 13/9 tách thêm một tầng nữa, và tầng ấy mới là chỗ đúng nhất: PHÉP TÍNH khác QUYỀN XEM.
+Nhóm chưa phân loại vẫn phải ĐƯỢC ĐẾM (không bỏ sót), nhưng bảng phải TỰ ĐÁNH DẤU là chưa đầy đủ
+(không đoán). Hàm `day_du()` ở cuối tệp làm đúng việc ấy.
 
-CF-07 nằm ở nửa sau tệp: mỗi dòng phải có một CỬA NHẬP hoặc CỬA TẢI và một bộ phận chịu trách
-nhiệm nhập. Dòng ghi "Chưa có" ở cột nguồn là việc phải dựng thêm màn hình – không phải việc bỏ
-trống hoặc điền 0.
+────────────────────────────────────────────────────────────────────────────────────────────────
+RANH GIỚI TẦM NHÌN CỦA TỔNG GIÁM ĐỐC – Chủ tịch chốt 13/9/2026
+────────────────────────────────────────────────────────────────────────────────────────────────
+Nguyên văn: "Lương nằm trong tầm Tổng giám đốc; chỉ mảng TÀI CHÍNH KẾ TOÁN là không."
+
+Nên ranh giới nay vẽ theo MẢNG, không vẽ theo từng dòng một: ngoài tầm đúng NĂM nhóm, và cả năm
+đều là tài chính – kế toán (vay, trả gốc, lãi phí, thuế, ký quỹ). Mọi nhóm còn lại – kể cả lương –
+thuộc tầm Tổng giám đốc.
+
+ĐO ĐƯỢC 13/9, VÀ NÓ LÀM CHỐT NÀY THÀNH BẮT BUỘC CHỨ KHÔNG CHỈ LÀ MỘT LỰA CHỌN
+    `services/hr.py` hàm `advance()` đã có sẵn dây chuyền ký bảng lương:
+        nhap → (kế toán) kt_xac_nhan → (HCNS) hcns_lap → (TỔNG GIÁM ĐỐC) tgd_ky
+    và chính chữ ký của Tổng giám đốc là chỗ gọi `post_payroll_entries()` ghi sổ.
+
+    Tức TRƯỚC chốt hôm nay, người KÝ DUYỆT chi lương lại là người DUY NHẤT không được nhìn dòng
+    lương trên bảng dòng tiền. Ký một khoản mà không thấy nó nằm ở đâu trong nhu cầu tiền của
+    tháng là đúng thứ bảng này sinh ra để chặn. Chốt của Chủ tịch vá lại chỗ lệch ấy.
+
+Chốt này BỎ hai thứ của bản trước:
+  · `luong_bh` ra khỏi `NHOM_NGOAI_TAM_TGD` trong `models/nghia_vu.py` (sửa cùng lần đẩy này).
+    Bản 11/9 xếp nó ra ngoài vì CHƯA TÁCH ĐƯỢC theo bộ phận, và tự ghi rằng đó là "việc còn
+    thiếu, không phải quyết định về quyền". Nay Chủ tịch quyết đúng phần thẩm quyền ấy.
+  · Cách thứ tư ("ô giá trị ghi chưa xác định") KHÔNG còn dòng nào dùng. Bộ máy vẫn giữ – xem
+    `CHUA_TACH_DUOC` bên dưới – vì nó là hàng rào cho mọi dòng ngoài tầm về sau, không phải
+    một chỗ khai riêng cho lương.
+
+SỬA Ở MÔ HÌNH, KHÔNG KHAI ĐÈ Ở ĐÂY
+    `nhom_duoc_xem()` lọc ngay tại CÂU TRUY VẤN (`services/nghia_vu.py` dòng 409), không phải
+    ở màn hình. Mở dòng lương ở bảng trình bày mà không mở ở mô hình thì bảng hiện một dòng
+    RỖNG – tệ hơn cả giấu hẳn, vì nó trông như công ty không phải trả lương.
+
+VIỆC CÒN THIẾU THÌ VẪN CÒN, VÀ PHẢI NÓI RA
+    Quyền đã mở, nhưng con số lương vẫn gồm cả khối văn phòng tập đoàn – nó RỘNG HƠN cái tên
+    "tour và xe" trên đầu bảng. Cùng cảnh với `van_hanh_khac` (lẫn chi phí chung trụ sở). Hai
+    dòng ấy giữ số, giữ phép cộng, và mang `GHI_CHU_LAN_SANG` nói thẳng điều đó.
+
+    Chọn GHI CHÚ chứ không ẩn số, vì ẩn số của một dòng CHI làm dòng đáy CAO LÊN – bảng trông
+    dư tiền hơn sự thật. Để nguyên số thì dòng đáy THẤP HƠN sự thật. Sai về phía thấp thì người
+    đọc đi hỏi; sai về phía cao thì người đọc yên tâm.
+
+    Ngày nào bảng lương có cột bộ phận thì tách được, và ghi chú ấy mới có đường biến mất.
+
+TRỤC RIÊNG KHÔNG ĐỔI THEO CHỐT NÀY
+    Xem SỐ TỔNG HỢP quỹ lương ≠ xem LƯƠNG TỪNG NGƯỜI. Chốt 13/9 mở cái thứ nhất cho Tổng giám
+    đốc; cái thứ hai vẫn chỉ Chủ tịch, Kế toán và Ban Kiểm soát – xem `xem_chi_tiet_nhan_vien()`.
 """
+from app.models.nghia_vu import GHI_NHO as NHOM_GHI_NHO
+from app.models.nghia_vu import NHOM, nhom_duoc_xem
 from app.services.lam_tron_tien import bang_tien, o_tien  # noqa: F401  (dùng ở tầng dựng bảng)
-
-# Mảng hoạt động của một dòng. Đây là thứ quyết định Tổng giám đốc có thấy dòng ấy hay không.
-TOUR_XE = "tour_xe"          # kinh doanh tour và đội xe – phần TGĐ điều hành
-TAI_CHINH = "tai_chinh"      # vay, lãi, thuế, ký quỹ – phần Chủ tịch quyết
-CA_HAI = "ca_hai"            # có phần thuộc tour–xe, có phần không: phải tách theo từng bản ghi
-MOI_VAI = "moi_vai"          # dòng ai mở được khối này cũng thấy (hai dòng TỔNG)
-
-# `tu_tinh` là chuyện KHÁC HẲN với `mang`, và gộp hai thứ ấy làm một là chỗ đã suýt hỏng: "dòng
-# này tính ra được" không nói gì về "ai được xem dòng này". Dòng TỔNG tự tính và ai cũng thấy;
-# dòng SỐ DƯ DỰ KIẾN cũng tự tính nhưng CHỈ Chủ tịch thấy. Một cột không nói được cả hai.
 
 # Phía của dòng trong bảng.
 VAO, RA, GHI_NHO, SO_DU, TONG = "vao", "ra", "ghi_nho", "so_du", "tong"
 
+# Hai mức xem.
+TOAN_CANH = "toan_canh"
+TOUR_XE_THOI = "tour_xe"
+
 
 class Dong:
-    """Một dòng của bảng dòng tiền.
+    """Một dòng của bảng TRÌNH BÀY.
 
-    `ly_do` bắt buộc và phải nói VÌ SAO mảng ấy, không phải chép lại tên dòng. Một dòng khai
-    mang="tai_chinh" mà không nói được vì sao thì rất có thể nó chỉ đang bị xếp nhầm.
+    `tu_tinh` = cộng ra từ dòng khác, nên KHÔNG có cửa nhập. Bắt nó có cửa nhập tức là cho phép gõ
+    đè lên một kết quả tính được – chỗ ấy là chỗ số liệu bắt đầu nói khác sổ.
+
+    `tu_so_nghia_vu` = dòng này lấy số từ sổ nghĩa vụ (mã trùng với NHOM). Dòng không mang cờ này
+    là dòng của riêng bảng.
     """
 
-    def __init__(self, ma: str, ten: str, phia: str, mang: str, ly_do: str,
-                 tu_tinh: bool = False):
-        self.ma, self.ten, self.phia, self.mang, self.ly_do = ma, ten, phia, mang, ly_do
-        # tu_tinh = cộng ra từ dòng khác, nên KHÔNG có cửa nhập. Bắt nó có cửa nhập tức là cho
-        # phép gõ đè lên một kết quả tính được – chỗ ấy là chỗ số liệu bắt đầu nói khác sổ.
-        self.tu_tinh = tu_tinh
+    def __init__(self, ma: str, ten: str, phia: str, tu_tinh: bool = False,
+                 tu_so_nghia_vu: bool = False):
+        self.ma, self.ten, self.phia = ma, ten, phia
+        self.tu_tinh, self.tu_so_nghia_vu = tu_tinh, tu_so_nghia_vu
 
 
 # =============================================================================================
-# Danh mục dòng – NGUYÊN VĂN VÀ ĐÚNG THỨ TỰ bảng mục III của v1.1
+# Danh mục dòng – 13 nhóm NHẬP từ sổ nghĩa vụ + 5 dòng riêng của bảng
 # =============================================================================================
+# Thứ tự lấy nguyên bảng mục III của v1.1: dòng TỔNG đứng TRƯỚC các dòng thành phần của nó.
+def _nv(ma: str, phia: str) -> Dong:
+    """Dựng một dòng từ nhóm nghĩa vụ. TÊN lấy thẳng từ mô hình – không chép lại, không đặt lại."""
+    return Dong(ma, NHOM[ma][1], phia, tu_so_nghia_vu=True)
+
+
 CAC_DONG = [
-    Dong("tien_kha_dung_dau_ky", "Tiền khả dụng đầu kỳ", SO_DU, TAI_CHINH,
-         "gồm cả tiền từ vay và trừ đi phần không phải của mình; đặt con số toàn cảnh ấy lên một "
-         "bảng đã lọc là cho một cái mốc toàn cảnh làm chuẩn cho một bảng không toàn cảnh"),
+    Dong("tien_kha_dung_dau_ky", "Tiền khả dụng đầu kỳ", SO_DU),
 
-    Dong("tong_thu", "TỔNG TIỀN DỰ KIẾN THU", TONG, MOI_VAI,
-         "cộng từ chính tập dòng thu mà vai trò ấy nhìn thấy, không phải cộng toàn cảnh rồi mới "
-         "che bớt – che sau khi cộng thì con số tổng vẫn mang phần đã bị che", tu_tinh=True),
-    Dong("thu_khach", "Thu khách / booking / hợp đồng", VAO, TOUR_XE,
-         "tiền khách nộp cho chuyến và dịch vụ, chính là doanh thu của hoạt động TGĐ điều hành"),
-    Dong("thu_cong_no_khac", "Thu công nợ khác", VAO, TOUR_XE,
-         "công nợ sinh ra từ chuyến đã đi và dịch vụ đã đặt – cùng một hoạt động kinh doanh"),
-    Dong("giai_ngan_vay", "Giải ngân vay đã ký khế ước", VAO, TAI_CHINH,
-         "tiền vay không phải tiền kiếm được; trộn nó vào dòng kinh doanh làm một tháng lỗ trông "
-         "như một tháng có tiền, và đó đúng là lúc người ta duyệt chi"),
+    Dong("tong_thu", "TỔNG TIỀN DỰ KIẾN THU", TONG, tu_tinh=True),
+    _nv("thu_khach", VAO),
+    _nv("thu_cong_no_khac", VAO),
+    _nv("giai_ngan_vay", VAO),
 
-    Dong("tong_chi", "TỔNG TIỀN PHẢI THANH TOÁN", TONG, MOI_VAI,
-         "cộng từ chính tập dòng chi mà vai trò ấy nhìn thấy; cùng lý do với dòng tổng thu",
-         tu_tinh=True),
-    Dong("tra_ncc", "Trả nhà cung cấp", RA, TOUR_XE,
-         "giá vốn của chuyến và của xe, cùng hoạt động với dòng thu của khách"),
-    Dong("hoan_tra_khach", "Hoàn / trả khách hàng", RA, TOUR_XE,
-         "khoản trả ngược cho khách của chính chuyến ấy, phải đứng cạnh dòng thu mới đọc được"),
-    Dong("hoa_hong", "Hoa hồng đại lý và cộng tác viên", RA, TOUR_XE,
-         "chi phí bán hàng của chuyến, biến động theo doanh thu của hoạt động tour"),
-    Dong("tra_goc_vay", "Trả gốc vay ngân hàng", RA, TAI_CHINH,
-         "kỳ trả gốc là nghĩa vụ tài chính, không do hoạt động kinh doanh sinh ra và TGĐ không "
-         "điều tiết được – nhưng nó rút tiền mặt mạnh nhất trong cả bảng"),
-    Dong("lai_phi_ngan_hang", "Lãi và phí ngân hàng", RA, TAI_CHINH,
-         "giá của khoản vay, đi liền với kỳ trả gốc; tách khỏi nó là đọc thiếu một nửa chi phí vốn"),
-    Dong("luong_bhxh", "Lương, bảo hiểm và liên quan", RA, CA_HAI,
-         "TGĐ thấy phần bộ phận tour và đội xe; phần khối văn phòng tập đoàn và ban điều hành "
-         "thuộc phần Chủ tịch quyết – tách theo bộ phận, chưa tách được thì chưa đưa xuống"),
-    Dong("thue_nghia_vu", "Thuế và nghĩa vụ khác", RA, TAI_CHINH,
-         "nghĩa vụ với ngân sách tính trên kết quả của cả pháp nhân, không thuộc một hoạt động"),
-    Dong("van_hanh", "Vận hành và phải trả khác", RA, CA_HAI,
-         "phần của chuyến và của xe thuộc TGĐ; vận hành trụ sở và chi phí chung tập đoàn thì không"),
+    Dong("tong_chi", "TỔNG TIỀN PHẢI THANH TOÁN", TONG, tu_tinh=True),
+    _nv("tra_ncc", RA),
+    _nv("hoan_khach", RA),
+    _nv("hoa_hong", RA),
+    _nv("tra_goc_vay", RA),
+    _nv("lai_phi_vay", RA),
+    _nv("luong_bh", RA),
+    _nv("thue", RA),
+    _nv("van_hanh_khac", RA),
 
-    Dong("so_du_du_kien_cuoi_khoang", "SỐ DƯ DỰ KIẾN CUỐI KHOẢNG", SO_DU, TAI_CHINH,
-         "kết quả của đầu kỳ cộng mọi dòng; thiếu một dòng nào thì con số này sai mà không ai thấy",
-         tu_tinh=True),
-    Dong("thieu_so_voi_muc_du_phong", "THIẾU SO VỚI MỨC DỰ PHÒNG", SO_DU, TAI_CHINH,
-         "ngưỡng dự phòng chốt trên TOÀN CẢNH bằng hai chữ ký; so một phần với một ngưỡng toàn "
-         "cảnh ra một con số không có nghĩa, mà lại trông như một con số có nghĩa", tu_tinh=True),
+    Dong("so_du_du_kien_cuoi_khoang", "SỐ DƯ DỰ KIẾN CUỐI KHOẢNG", SO_DU, tu_tinh=True),
+    Dong("thieu_so_voi_muc_du_phong", "THIẾU SO VỚI MỨC DỰ PHÒNG", SO_DU, tu_tinh=True),
 
-    Dong("ghi_nho_thu_ho", "Ghi nhớ — Tiền thu hộ khách (KHÔNG thuộc tiền khả dụng)", GHI_NHO,
-         TOUR_XE,
-         "nằm trong tài khoản nhưng là tiền của khách; phải nhìn thấy để không tiêu nhầm, và phải "
-         "đứng ngoài phép cộng để không tự cho mình thêm tiền"),
-    Dong("ghi_nho_ky_quy", "Ghi nhớ — Ký quỹ giấy phép lữ hành (KHÔNG thuộc tiền khả dụng)",
-         GHI_NHO, TAI_CHINH,
-         "khoản bị phong toả theo giấy phép lữ hành, là nghĩa vụ pháp lý của từng pháp nhân"),
+    _nv("thu_ho_khach", GHI_NHO),
+    _nv("ky_quy_lu_hanh", GHI_NHO),
 ]
-
 DONG = {d.ma: d for d in CAC_DONG}
 
+# Ba dòng CHỈ Chủ tịch – Cách A, Chủ tịch chốt 11/9. Dòng số dư đứng trên một bảng đã lọc là cho
+# một cái mốc toàn cảnh làm chuẩn cho một bảng không toàn cảnh.
+CHI_TOAN_CANH = ("tien_kha_dung_dau_ky", "so_du_du_kien_cuoi_khoang", "thieu_so_voi_muc_du_phong")
+
 
 # =============================================================================================
-# Bảng quyền – ĐÓNG MẶC ĐỊNH
+# Quyền xem – hai trục
 # =============================================================================================
-TOAN_CANH = "toan_canh"      # thấy mọi dòng
-TOUR_XE_THOI = "tour_xe"     # chỉ phần tour và xe
-
+# Trục VAI TRÒ: đóng mặc định. Vai trò không có ở đây thì KHÔNG mở được khối này.
 BANG_QUYEN = {
     "chutich": TOAN_CANH,
-    "ketoan": TOAN_CANH,      # người lập bảng, và phải đối chiếu được với sổ quỹ
-    "bks": TOAN_CANH,         # kiểm soát mà chỉ xem được một phần thì không kiểm soát gì
+    "ketoan": TOAN_CANH,      # người lập bảng, phải đối chiếu được với sổ quỹ
+    "bks": TOAN_CANH,         # kiểm soát mà chỉ xem một phần thì không kiểm soát gì
+    "cntt": TOAN_CANH,        # theo khai của VPM-11 – giữ cho hai bên nói cùng một thứ
+    "robot_ks": TOAN_CANH,
     "tgd": TOUR_XE_THOI,
 }
-# Hai Phó Tổng giám đốc KHÔNG có trong bảng – nghĩa là không thấy khối này. Khai vắng mặt chứ không
-# khai "cấm": danh sách cấm phải sửa mỗi lần thêm vai trò mới, danh sách cho phép thì không.
+# Hai Phó Tổng giám đốc KHÔNG có trong bảng – khai VẮNG MẶT chứ không khai "cấm". Danh sách cấm
+# phải sửa mỗi lần thêm vai trò mới; danh sách cho phép thì không.
 
-# Tên dòng đáy đi LIỀN với phạm vi. Xem một phần mà dòng đáy đề "số dư" là một con số trông như đúng.
+# Quyền xem CHI TIẾT THEO NHÂN VIÊN, tách khỏi quyền xem số tổng hợp (Chủ tịch chốt 13/9). Đây là
+# trục thứ ba, và nó hẹp hơn hẳn: một người được xem tổng quỹ lương không đương nhiên được xem
+# lương từng người.
+XEM_CHI_TIET_NHAN_VIEN = ("chutich", "ketoan", "bks")
+
+# CÁCH THỨ TƯ – dòng có mặt trên bảng của vai trò xem một phần, nhưng ô giá trị ghi một câu thay
+# cho con số. RỖNG từ 13/9/2026: chốt của Chủ tịch đưa lương vào tầm Tổng giám đốc, và không còn
+# dòng nào vừa ngoài tầm vừa phải hiện.
+#
+# GIỮ LẠI BỘ MÁY dù đang rỗng, và giữ có chủ ý. Nó không phải chỗ khai riêng cho lương – nó là
+# đường duy nhất để một dòng NGOÀI TẦM được phép có mặt trên bảng, và `an_gia_tri()` bảo đảm dòng
+# đi đường ấy thì KHÔNG BAO GIỜ kèm số. Xoá đi thì lần sau ai cần lại phải dựng lại từ đầu, và
+# nhiều khả năng dựng bằng một câu `if` theo tên dòng – tức đúng chỗ đã hỏng.
+CHUA_TACH_DUOC: dict[str, str] = {}
+CAU_CHUA_TACH = "chưa xác định phần thuộc phạm vi quản lý"
+
+# Dòng VẪN HIỆN SỐ và VẪN VÀO PHÉP CỘNG, nhưng con số RỘNG HƠN cái tên bảng. Ghi chú, không phải
+# phép ẩn – xem lý lẽ ở đầu tệp. Ai đọc dòng này phải biết nó đang rộng hơn phạm vi tour–xe.
+#
+# Đây là chỗ giữ lại VIỆC CÒN THIẾU sau khi quyền đã mở: Chủ tịch quyết Tổng giám đốc được XEM
+# lương, nhưng quyết ấy không tạo ra cột bộ phận mà bảng lương đang thiếu.
+GHI_CHU_LAN_SANG = {
+    "luong_bh": "Gồm lương và bảo hiểm của TOÀN CÔNG TY – bảng lương chưa có cột bộ phận để tách "
+                "phần bộ phận tour và đội xe, nên con số này RỘNG HƠN phạm vi tour–xe.",
+    "van_hanh_khac": "Gồm cả chi phí chung của trụ sở – chưa tách được phần của chuyến và của xe, "
+                     "nên con số này RỘNG HƠN phạm vi tour–xe.",
+}
+
 TEN_DONG_DAY = {
     TOAN_CANH: "SỐ DƯ DỰ KIẾN CUỐI KHOẢNG",
     TOUR_XE_THOI: "Dòng tiền thuần từ hoạt động tour và xe",
 }
 
-# Bốn ô cảnh báo trên đầu khối, và ai đọc được ô nào.
 CANH_BAO = {
-    "phai_tra_qua_han": (TOUR_XE_THOI, "Phải trả quá hạn",
-                         "TGĐ thấy phần nhà cung cấp của tour và xe – đó là việc ông ấy xử lý được"),
-    "phai_tra_7_ngay": (TOUR_XE_THOI, "Phải trả trong 7 ngày tới",
-                        "cùng lý do: là lịch phải xoay tiền của chính hoạt động ông ấy điều hành"),
-    "ngay_dau_thieu_tien": (TOAN_CANH, "Ngày đầu tiên dự kiến thiếu tiền",
-                            "tính trên TOÀN CẢNH gồm cả kỳ trả gốc và thuế; tính trên một phần sẽ "
-                            "ra một ngày MUỘN HƠN sự thật – tức là báo yên khi không yên"),
-    "muc_thieu_lon_nhat": (TOAN_CANH, "Mức thiếu lớn nhất",
-                           "cùng lý do, và sai theo cùng một chiều: bao giờ cũng nhẹ hơn thực tế"),
+    "phai_tra_qua_han": (TOUR_XE_THOI, "Phải trả quá hạn"),
+    "phai_tra_7_ngay": (TOUR_XE_THOI, "Phải trả trong 7 ngày tới"),
+    "ngay_dau_thieu_tien": (TOAN_CANH, "Ngày đầu tiên dự kiến thiếu tiền"),
+    "muc_thieu_lon_nhat": (TOAN_CANH, "Mức thiếu lớn nhất"),
 }
 
 
 def muc_xem(vai_tro: str) -> str | None:
-    """Mức xem khối dòng tiền của một vai trò. None = không thấy khối này.
+    """Mức xem khối dòng tiền. None = không mở được khối này.
 
     Đóng mặc định: vai trò lạ trả None. Trả TOUR_XE_THOI cho vai trò chưa khai nghe có vẻ "an toàn
     hơn cấm hẳn", nhưng đó là mở quyền cho một người chưa ai xét.
@@ -170,41 +218,118 @@ def xem_duoc(vai_tro: str, ma_dong: str) -> bool:
         return False
     if m == TOAN_CANH:
         return True
-    return DONG[ma_dong].mang in (TOUR_XE, CA_HAI, MOI_VAI)
+    if ma_dong in CHI_TOAN_CANH:
+        return False
+    d = DONG[ma_dong]
+    if not d.tu_so_nghia_vu:
+        return True                      # hai dòng TỔNG: ai mở được khối cũng thấy
+    if ma_dong in CHUA_TACH_DUOC:
+        return True                      # cách thứ tư: DÒNG có mặt, SỐ thì không (xem an_gia_tri)
+    # Trục NHÓM đi theo khai của sổ nghĩa vụ – nhóm mới chưa khai thì MẶC ĐỊNH HIỆN.
+    return ma_dong in nhom_duoc_xem(vai_tro)
+
+
+def an_gia_tri(vai_tro: str, ma_dong: str) -> bool:
+    """Dòng có mặt nhưng ô giá trị KHÔNG hiện số – hiện "chưa xác định phần thuộc phạm vi quản lý".
+
+    Suy ra từ RÀNG BUỘC, không tra theo tên dòng: một dòng lấy số từ sổ nghĩa vụ, hiện trên bảng
+    của vai trò xem MỘT PHẦN, mà nhóm của nó nằm ngoài `nhom_duoc_xem()` thì BẮT BUỘC không có số.
+    Viết theo lối này để `CHUA_TACH_DUOC` không bao giờ mở thêm được một dòng có số.
+
+    Với người xem toàn cảnh thì dòng ấy vốn là cả dòng, không có gì phải tách.
+    """
+    if muc_xem(vai_tro) != TOUR_XE_THOI:
+        return False
+    d = DONG.get(ma_dong)
+    if d is None or not d.tu_so_nghia_vu:
+        return False
+    if not xem_duoc(vai_tro, ma_dong):
+        return False                     # không hiện thì không có ô nào để ẩn
+    return ma_dong not in nhom_duoc_xem(vai_tro)
+
+
+def xem_chi_tiet_nhan_vien(vai_tro: str) -> bool:
+    """Xem được lương TỪNG NGƯỜI hay không. Hẹp hơn quyền xem số tổng hợp."""
+    return vai_tro in XEM_CHI_TIET_NHAN_VIEN
 
 
 def cac_dong_cho(vai_tro: str) -> list[Dong]:
-    """Danh sách dòng của bảng, đã lọc. Thứ tự giữ nguyên bảng của v1.1 – không xếp lại theo vai."""
+    """Danh sách dòng của bảng, đã lọc. Thứ tự giữ nguyên bảng v1.1 – không xếp lại theo vai."""
     return [d for d in CAC_DONG if xem_duoc(vai_tro, d.ma)]
 
 
 def dong_de_cong(vai_tro: str, phia: str) -> list[str]:
-    """Mã các dòng dùng để cộng ra một dòng TỔNG, theo đúng tập dòng vai trò ấy nhìn thấy.
+    """Mã các dòng dùng để cộng ra dòng TỔNG, theo đúng tập dòng vai trò ấy nhìn thấy.
 
-    Đây là chỗ dễ hỏng nhất của dòng tổng: cộng toàn cảnh rồi mới che bớt thì con số tổng vẫn mang
-    phần đã bị che. Phải cộng TỪ tập đã lọc.
+    Dòng bị ẩn giá trị KHÔNG vào phép cộng: cộng một ô ghi "chưa xác định" là tự bịa ra một số.
     """
-    return [d.ma for d in cac_dong_cho(vai_tro) if d.phia == phia]
+    return [d.ma for d in cac_dong_cho(vai_tro)
+            if d.phia == phia and not an_gia_tri(vai_tro, d.ma)]
 
 
 def ten_dong_day(vai_tro: str) -> str:
-    """Tên dòng đáy. Hàm này và cac_dong_cho() phải luôn được gọi cùng nhau."""
+    """Tên dòng đáy. Hàm này và cac_dong_cho() phải luôn được gọi cùng nhau – một bảng đã lọc mà
+    dòng đáy đề "số dư" thì con số ấy trông như đúng."""
     m = muc_xem(vai_tro)
-    if m is None:
-        return ""
-    return TEN_DONG_DAY[m]
+    return "" if m is None else TEN_DONG_DAY[m]
 
 
 def cac_canh_bao_cho(vai_tro: str) -> list[dict]:
     m = muc_xem(vai_tro)
     if m is None:
         return []
-    return [{"ma": ma, "nhan": nhan} for ma, (can, nhan, _) in CANH_BAO.items()
+    return [{"ma": ma, "nhan": nhan} for ma, (can, nhan) in CANH_BAO.items()
             if m == TOAN_CANH or can == TOUR_XE_THOI]
 
 
-def khung_bang(vai_tro: str) -> dict:
-    """Khung bảng dòng tiền cho một vai trò: dòng nào, dòng đáy tên gì, ô cảnh báo nào.
+def canh_bao_dong_day(vai_tro: str) -> str:
+    """Câu đứng ngay dưới dòng đáy khi bảng còn dòng bị ẩn giá trị.
+
+    Dán nhãn lên từng dòng thôi thì chưa đủ: người ta đọc dòng đáy rồi đi họp, không cuộn lên đọc
+    ghi chú của dòng thứ chín.
+    """
+    an = [d for d in cac_dong_cho(vai_tro) if an_gia_tri(vai_tro, d.ma)]
+    if not an:
+        return ""
+    return ("Con số này CHƯA gồm: " + ", ".join(d.ten for d in an)
+            + f" — {CAU_CHUA_TACH}, nên "
+            + ("dòng ấy" if len(an) == 1 else f"{len(an)} dòng ấy")
+            + " đứng ngoài phép cộng.")
+
+
+def ghi_chu_lan_sang(vai_tro: str) -> str:
+    """Câu cho các dòng CÓ SỐ nhưng số rộng hơn phạm vi bảng. Khác hẳn câu trên: dòng vẫn được cộng.
+
+    Hai câu phải đứng riêng. Gộp chúng lại thì người đọc không phân biệt được "thiếu khoản này"
+    với "khoản này đang tính rộng hơn" – hai lỗi lệch về hai phía ngược nhau.
+    """
+    if muc_xem(vai_tro) != TOUR_XE_THOI:
+        return ""
+    ds = [d for d in cac_dong_cho(vai_tro)
+          if d.ma in GHI_CHU_LAN_SANG and not an_gia_tri(vai_tro, d.ma)]
+    if not ds:
+        return ""
+    return " ".join(f"{d.ten}: {GHI_CHU_LAN_SANG[d.ma]}" for d in ds)
+
+
+def day_du(nhom_chua_phan_loai: list[str] | None = None) -> dict:
+    """Báo cáo có đầy đủ không — TÁCH KHỎI quyền xem.
+
+    Nhóm chưa phân loại vẫn được CỘNG vào tổng (không bỏ sót), nhưng bảng phải tự nói ra rằng nó
+    chưa đầy đủ (không đoán). Đo được ngày 13/9: hạng mục lạ của `cash_plan_items` rơi thầm vào
+    "Vận hành và phải trả khác" mà không có cờ nào – đây là hàm để cờ ấy có chỗ hiện lên.
+    """
+    ds = list(nhom_chua_phan_loai or [])
+    if not ds:
+        return {"day_du": True, "chua_phan_loai": [], "cau": ""}
+    return {"day_du": False, "chua_phan_loai": ds,
+            "cau": (f"Báo cáo CHƯA ĐẦY ĐỦ: {len(ds)} hạng mục chưa được phân loại vào dòng nào "
+                    f"({', '.join(ds)}). Số tiền vẫn được cộng vào tổng, nhưng đang tạm xếp vào "
+                    "'Vận hành và phải trả khác'.")}
+
+
+def khung_bang(vai_tro: str, nhom_chua_phan_loai: list[str] | None = None) -> dict:
+    """Khung bảng cho một vai trò: dòng nào, dòng nào ẩn giá trị, dòng đáy tên gì, ô cảnh báo nào.
 
     KHÔNG có số ở đây – số do tầng dựng bảng điền vào đúng khung này. Trả khung và số từ hai chỗ
     khác nhau là để một hôm nào đó khung thì lọc mà số thì không.
@@ -215,11 +340,21 @@ def khung_bang(vai_tro: str) -> dict:
     return {
         "xem_duoc": True,
         "muc_xem": m,
-        "dong": [{"ma": d.ma, "ten": d.ten, "phia": d.phia} for d in cac_dong_cho(vai_tro)],
+        "dong": [{"ma": d.ma, "ten": d.ten, "phia": d.phia,
+                  "an_gia_tri": an_gia_tri(vai_tro, d.ma),
+                  "hien": CAU_CHUA_TACH if an_gia_tri(vai_tro, d.ma) else None,
+                  "ly_do_an": CHUA_TACH_DUOC.get(d.ma, "") if an_gia_tri(vai_tro, d.ma) else "",
+                  "ghi_chu": ("" if an_gia_tri(vai_tro, d.ma) or m != TOUR_XE_THOI
+                              else GHI_CHU_LAN_SANG.get(d.ma, ""))}
+                 for d in cac_dong_cho(vai_tro)],
         "cong_thu": dong_de_cong(vai_tro, VAO),
         "cong_chi": dong_de_cong(vai_tro, RA),
         "ten_dong_day": ten_dong_day(vai_tro),
         "canh_bao": cac_canh_bao_cho(vai_tro),
+        "canh_bao_dong_day": canh_bao_dong_day(vai_tro),
+        "ghi_chu_lan_sang": ghi_chu_lan_sang(vai_tro),
+        "xem_chi_tiet_nhan_vien": xem_chi_tiet_nhan_vien(vai_tro),
+        "day_du": day_du(nhom_chua_phan_loai),
         "cau_pham_vi": ("Bảng này gồm toàn bộ dòng tiền của pháp nhân đang xem."
                         if m == TOAN_CANH else
                         "Bảng này CHỈ gồm dòng tiền của hoạt động kinh doanh tour và xe. "
@@ -228,17 +363,21 @@ def khung_bang(vai_tro: str) -> dict:
 
 
 # =============================================================================================
-# CF-07 · Cửa nhập và chủ quản số liệu cho từng dòng (bảng mục III.4 của v1.1)
+# CF-07 · Cửa nhập và chủ quản số liệu cho từng dòng
 # =============================================================================================
 # "Chưa có" ở cột nguồn là VIỆC PHẢI DỰNG THÊM MÀN HÌNH, không phải việc bỏ trống hoặc điền 0. Đó
-# cũng là ranh giới đã chốt ngày 09/9: hệ thống viết ra CẤU TRÚC và PHÉP TÍNH, còn SỐ thì bộ phận
-# nghiệp vụ tự nhập hoặc tự tải. Mỗi con số không có cửa là một việc còn thiếu.
+# cũng là ranh giới chốt 09/9: hệ thống viết ra CẤU TRÚC và PHÉP TÍNH, còn SỐ thì bộ phận nghiệp vụ
+# tự nhập hoặc tự tải.
 CHUA_CO = "Chưa có"
 
 
 class Cua:
-    def __init__(self, nguon: str, cua: str, bo_phan: str, tu_de_xuat: bool = False):
-        self.nguon, self.cua, self.bo_phan, self.tu_de_xuat = nguon, cua, bo_phan, tu_de_xuat
+    def __init__(self, nguon: str, cua: str, bo_phan: str, ngoai_bang_III4: bool = False):
+        self.nguon, self.cua, self.bo_phan = nguon, cua, bo_phan
+        # Bảng III.4 của v1.1 có 12 dòng, bảng dòng tiền có 18. Cờ này giữ lại sự thật ấy sau khi
+        # Chủ tịch đã chốt cửa cho hai dòng ghi nhớ ngày 11/9: lần sau ai đối chiếu mã với tài liệu
+        # sẽ thấy ngay vì sao lệch hai dòng, thay vì tưởng có người tự thêm bừa.
+        self.ngoai_bang_III4 = ngoai_bang_III4
 
     def da_co_nguon(self) -> bool:
         return not self.nguon.startswith(CHUA_CO)
@@ -247,65 +386,113 @@ class Cua:
 CUA_NHAP = {
     "tien_kha_dung_dau_ky": Cua(
         "Tài khoản ngân hàng và đối soát SePay",
-        "Màn hình đối soát ngân hàng: chốt số dư theo ngày, có người xác nhận", "Kế toán"),
+        "Màn hình đối soát ngân hàng: chốt số dư theo ngày, ghi DANH SÁCH TÀI KHOẢN và MỐC GIỜ, "
+        "có người xác nhận", "Kế toán"),
     "thu_khach": Cua(
-        "Booking và phiếu thu đã có",
+        "Booking và phiếu thu đã có · sổ nghĩa vụ nạp từ lich_thanh_toan_hd + bookings",
         "Lịch thu theo booking và hợp đồng, có ngày dự kiến thu và mức chắc chắn",
         "Kinh doanh + Kế toán"),
     "thu_cong_no_khac": Cua(
-        CHUA_CO, "Màn hình công nợ phải thu có ngày đến hạn", "Kế toán"),
+        "cash_plan_items hướng vào — kế toán nhập tay",
+        "Màn hình công nợ phải thu có ngày đến hạn, nối tự động vào sổ nghĩa vụ", "Kế toán"),
     "giai_ngan_vay": Cua(
-        "Khế ước vay đã có", "Lịch giải ngân trong hồ sơ khế ước", "Kế toán"),
+        "Khế ước vay · sổ nghĩa vụ nạp từ fin_schedules",
+        "Lịch giải ngân trong hồ sơ khế ước", "Kế toán"),
     "tra_ncc": Cua(
-        "Đặt dịch vụ nhà cung cấp (mới một phần)",
+        "Đặt dịch vụ NCC · sổ nghĩa vụ nạp từ service_orders + payment_requests",
         "Lịch thanh toán theo hợp đồng và đơn đặt dịch vụ, gồm cả nghĩa vụ chưa lập đề nghị chi",
         "Điều hành + Kế toán"),
-    "hoan_tra_khach": Cua(
-        CHUA_CO, "Phiếu hoàn tiền có ngày cam kết hoàn", "Chăm sóc khách hàng + Kế toán"),
+    "hoan_khach": Cua(
+        "payment_requests loại hoàn tiền",
+        "Phiếu hoàn tiền có ngày cam kết hoàn", "Chăm sóc khách hàng + Kế toán"),
     "hoa_hong": Cua(
         CHUA_CO, "Bảng tính hoa hồng theo kỳ, có ngày chi dự kiến", "Kinh doanh + Kế toán"),
     "tra_goc_vay": Cua(
-        "Khế ước vay đã có",
+        "Khế ước vay · fin_schedules loại trả gốc",
         "Lịch trả gốc – lãi – phí trong hồ sơ khế ước; tách phần lãi ước tính", "Kế toán"),
-    "lai_phi_ngan_hang": Cua(
-        "Khế ước vay đã có",
+    "lai_phi_vay": Cua(
+        "Khế ước vay · fin_schedules loại trả lãi",
         "Lịch trả gốc – lãi – phí trong hồ sơ khế ước; tách phần lãi ước tính", "Kế toán"),
-    "luong_bhxh": Cua(
-        CHUA_CO + " — hệ thống hiện chưa có hợp đồng lao động nào",
-        "Màn hình hợp đồng lao động và lịch chi lương, bảo hiểm theo tháng", "Hành chính – Nhân sự"),
-    "thue_nghia_vu": Cua(
-        CHUA_CO, "Lịch nghĩa vụ thuế theo pháp nhân và sắc thuế", "Kế toán"),
-    "van_hanh": Cua(
-        CHUA_CO, "Kế hoạch chi vận hành theo tháng, người phụ trách xác nhận", "Các phòng + Kế toán"),
+    # HAI SỐ CHO CÙNG MỘT KHOẢN TIỀN – đo được 13/9/2026, chưa vá.
+    # Bảng lương `PayrollRun` đã có số thật (`run.totals`), có kỳ, có chữ ký TGĐ và đã ghi sổ kế
+    # toán khi ký. Nhưng `NGUON_DONG_BO` của sổ nghĩa vụ KHÔNG có `payroll_runs` – dòng lương trên
+    # bảng dòng tiền chỉ chảy vào qua `cash_plan_items` do kế toán gõ tay.
+    # Nên hôm nay VTOS giữ HAI con số cho cùng một khoản lương: một số đã ký, một số gõ tay. Chúng
+    # không có gì buộc phải bằng nhau, và lệch thì không ai kêu. Đúng loại lỗi mà sổ nghĩa vụ
+    # ("một nghĩa vụ một dòng") sinh ra để diệt. Việc thuộc làn VPM – đã nêu, chưa nhận.
+    "luong_bh": Cua(
+        "cash_plan_items hạng mục lương — kế toán nhập tay "
+        "(PayrollRun ĐÃ CÓ số đã ký nhưng CHƯA nối vào sổ nghĩa vụ)",
+        "Nối PayrollRun vào sổ nghĩa vụ làm nguồn thứ bảy, và bổ sung CỘT BỘ PHẬN cho bảng lương",
+        "Hành chính – Nhân sự"),
+    "thue": Cua(
+        "cash_plan_items hạng mục thuế — kế toán nhập tay",
+        "Lịch nghĩa vụ thuế theo pháp nhân và sắc thuế", "Kế toán"),
+    "van_hanh_khac": Cua(
+        "payment_requests marketing / hành chính · cash_plan_items (hạng mục lạ rơi vào đây)",
+        "Kế hoạch chi vận hành theo tháng, người phụ trách xác nhận", "Các phòng + Kế toán"),
 
-    # HAI DÒNG DƯỚI KHÔNG CÓ TRONG BẢNG III.4 CỦA v1.1 – bảng ấy có 12 dòng, nhưng bảng dòng tiền ở
-    # mục III có thêm hai dòng ghi nhớ. Một dòng trên bảng mà không ai chịu trách nhiệm nhập thì
-    # đến ngày vận hành thật nó sẽ hiện "Chưa có" mãi mãi và không ai biết phải hỏi ai. Hai dòng
-    # dưới là ĐỀ XUẤT của làn Phân quyền, đánh dấu tu_de_xuat=True, chờ Chủ tịch hoặc TGĐ chốt.
-    "ghi_nho_thu_ho": Cua(
+    # Hai dòng ghi nhớ KHÔNG có trong bảng III.4 của v1.1 (bảng ấy 12 dòng). Làn Phân quyền đề xuất
+    # cửa ngày 11/9 và CHỦ TỊCH ĐÃ CHỐT cùng ngày.
+    "thu_ho_khach": Cua(
         CHUA_CO,
-        "Sổ thu hộ – chi hộ theo khách và theo chuyến, chốt số dư thu hộ tại ngày đối soát",
-        "Kế toán", tu_de_xuat=True),
-    "ghi_nho_ky_quy": Cua(
+        "Sổ thu hộ – chi hộ theo khách và theo chuyến, chốt số dư thu hộ tại ngày đối soát, "
+        "ghi rõ tài khoản nào đang giữ", "Kế toán", ngoai_bang_III4=True),
+    "ky_quy_lu_hanh": Cua(
         CHUA_CO,
-        "Hồ sơ giấy phép lữ hành: số tiền ký quỹ, ngân hàng giữ, ngày phong toả và ngày giải toả",
-        "Hành chính – Pháp chế", tu_de_xuat=True),
+        "Hồ sơ giấy phép lữ hành: số tiền ký quỹ, NGÂN HÀNG VÀ TÀI KHOẢN GIỮ, ngày phong toả và "
+        "ngày giải toả", "Hành chính – Pháp chế", ngoai_bang_III4=True),
 }
 
 
 def dong_chua_co_nguon() -> list[str]:
-    """Dòng đã có cửa được khai nhưng NGUỒN còn 'Chưa có' – tức là màn hình còn phải dựng.
+    """Dòng đã khai cửa nhưng NGUỒN còn 'Chưa có' – màn hình còn phải dựng.
 
-    Đây là danh sách việc, không phải danh sách lỗi. Nó cạn dần khi các cửa nhập được dựng xong.
+    Danh sách VIỆC, không phải danh sách lỗi. Nó cạn dần khi các cửa được dựng xong.
     """
     return [ma for ma, c in CUA_NHAP.items() if not c.da_co_nguon()]
 
 
 def dong_thieu_cua() -> list[str]:
-    """Dòng của bảng mà KHÔNG có dòng nào trong CUA_NHAP nói ai nhập – danh sách này phải RỖNG.
+    """Dòng của bảng mà KHÔNG có ai nhập – danh sách này phải RỖNG.
 
     Dòng tự tính (hai dòng TỔNG, SỐ DƯ DỰ KIẾN, THIẾU SO VỚI DỰ PHÒNG) không cần cửa. "Tiền khả
-    dụng đầu kỳ" thì CÓ cần, dù nó cũng nằm ở phía số dư: nó là số người ta chốt và xác nhận trên
-    màn hình đối soát ngân hàng, không phải số cộng ra được.
+    dụng đầu kỳ" thì CÓ cần, dù cũng nằm ở phía số dư: nó là số người ta chốt và xác nhận trên màn
+    hình đối soát ngân hàng, không phải số cộng ra được.
     """
     return [d.ma for d in CAC_DONG if not d.tu_tinh and d.ma not in CUA_NHAP]
+
+
+def kiem_khop_voi_so_nghia_vu() -> list[str]:
+    """Nhóm có trong sổ nghĩa vụ mà THIẾU trên bảng trình bày. Phải RỖNG.
+
+    Đây là hàng rào chống lặp lại chuyện 11/9: hai bên khai hai danh sách rồi lệch nhau. Nay bảng
+    nhập mã từ sổ, nên lệch chỉ còn xảy ra nếu ai đó thêm nhóm vào sổ mà quên thêm dòng vào bảng –
+    và lúc ấy bảng lãnh đạo sẽ thiếu một dòng mà không ai biết.
+    """
+    return sorted(set(NHOM) - set(DONG))
+
+
+def ghi_nho_khop_voi_so() -> bool:
+    """Hai dòng ghi nhớ trên bảng phải đúng bằng hai nhóm mang cờ ghi nhớ trong sổ."""
+    return {d.ma for d in CAC_DONG if d.phia == GHI_NHO} == set(NHOM_GHI_NHO)
+
+
+def kiem_chua_tach_duoc() -> list[str]:
+    """Mã khai trong CHUA_TACH_DUOC mà KHÔNG nằm ngoài tầm nhóm của vai trò xem một phần. Phải RỖNG.
+
+    Khai một dòng ĐANG TRONG TẦM vào đây thì `xem_duoc()` cho hiện (không đổi gì, nó vốn đã hiện)
+    nhưng `an_gia_tri()` trả False – tức khai xong mà không có tác dụng, và người khai tưởng đã
+    giấu được con số. Câu này bắt đúng cái tưởng ấy.
+    """
+    ngoai_tam = set(NHOM) - nhom_duoc_xem("tgd")
+    return sorted(set(CHUA_TACH_DUOC) - ngoai_tam)
+
+
+def kiem_ghi_chu_lan_sang() -> list[str]:
+    """Mã khai trong GHI_CHU_LAN_SANG mà lại bị ẩn số. Phải RỖNG.
+
+    Hai bảng nói hai việc ngược nhau: một bên "dòng này vẫn có số, số hơi rộng", một bên "dòng này
+    không có số". Một mã nằm cả hai chỗ là một câu tự mâu thuẫn hiện lên màn hình lãnh đạo.
+    """
+    return sorted(ma for ma in GHI_CHU_LAN_SANG if an_gia_tri("tgd", ma))

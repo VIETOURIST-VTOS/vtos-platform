@@ -319,26 +319,55 @@ def tien_kha_dung(db: Session, company_id: int, den_ngay: date | None = None) ->
     # --- Kết luận: PHÉP TÍNH KHÔNG NẰM Ở ĐÂY.
     #
     # Năm thành phần trên là việc của tệp này – mỗi cái đi qua một cửa thật. Cộng trừ chúng lại, và
-    # quyết định "thiếu một thành phần thì ra số hay không", là việc của `dong_tien_ky.tien_kha_dung`.
-    # Luật của hàm ấy: THIẾU MỘT THÀNH PHẦN LÀ KHÔNG RA SỐ, vì thành phần dễ thiếu nhất – lệnh chi đã
-    # duyệt chưa chuyển – là một số TRỪ, bỏ nó đi thì tiền khả dụng LUÔN CAO HƠN sự thật.
+    # quyết định "thiếu một thành phần thì ra số hay không", là việc của `dong_tien_ky`.
     #
     # Số dư ngân hàng vào là RỖNG khi còn tài khoản chưa chốt, không phải tổng của những tài khoản đã
     # chốt: một tổng thiếu một tài khoản trông y hệt một tổng đủ.
+    #
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # SỬA 14/9/2026 – NỐI LẠI CHỖ GÃY (làn R1)
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # Dòng này trước đây gọi `DTK.tien_kha_dung(gia_tri, doi_soat)`. HÀM ẤY KHÔNG CÒN: theo chốt
+    # của Chủ tịch ngày 13/9/2026 nó đã được tách làm hai chỉ tiêu trong `dong_tien_ky.py`
+    #
+    #     A · tien_duoc_phep_su_dung  = số dư đối soát + tiền mặt − các khoản hạn chế
+    #                                   → ĐÂY LÀ SỐ ĐẦU KỲ của bảng dự báo, CHƯA trừ lệnh chi
+    #     B · tien_con_bo_tri_moi     = A − lệnh chi đã duyệt chưa chuyển
+    #                                   → ô chỉ tiêu riêng, mang cờ dung_lam_dau_ky=False
+    #
+    # Từ lúc tách tới lúc sửa này, mọi lần gọi `tien_kha_dung()` đều ném AttributeError – tức cả
+    # màn hình dòng tiền và `bang_bon_moc()` đều hỏng. Người đổi tên không quay lại chỗ gọi.
+    # Phép thử `tests/test_r1_moi_noi_dong_tien.py` nay canh việc ấy: mọi tên `DTK.x` mà tệp này
+    # gọi đều phải tồn tại trong `dong_tien_ky.py`.
+    #
+    # `han_che_nam_trong` khai True cho CẢ HAI khoản. Đây KHÔNG phải phép đoán mới – đó là tiền đề
+    # tệp này đã ghi sẵn từ đầu, ngay trong chú thích của chính nó:
+    #   · ký quỹ giấy phép: "Tiền nằm trong tài khoản phong toả của ngân hàng: nó CÓ trong số dư"
+    #   · thu hộ khách:     "tiền trong tài khoản, không phải tiền của công ty"
+    # Giữ nguyên tiền đề ấy thì con số hôm nay không đổi một đồng. Nếu sau này kế toán xác định
+    # một trong hai khoản nằm ở tài khoản KHÔNG được đếm, đổi True thành False ở đúng đây – và
+    # khi CHƯA BIẾT thì để None, hàm A sẽ trả "Chưa xác minh" chứ không đoán.
     con_thieu_tk = any("tài khoản" in c for c in thieu)
     gia_tri = {
         "so_du_ngan_hang": None if (con_thieu_tk or not tk_da_tung_chot) else ngan_hang,
         "tien_mat": tien_mat,
         "thu_ho_khach": thu_ho,
         "ky_quy_lu_hanh": ky_quy,
-        "lenh_chi_chua_chuyen": da_duyet_chua_chuyen,
     }
+    HAN_CHE_NAM_TRONG_SO_DU = {"thu_ho_khach": True, "ky_quy_lu_hanh": True}
     # Mốc đối soát là ngày CŨ NHẤT trong các bản chốt: số này chỉ đáng tin tới mốc yếu nhất của nó.
     # Lấy ngày mới nhất là nói quá mức tin cậy của chính mình.
     doi_soat = min(moc) if moc else None
-    tinh = DTK.tien_kha_dung(gia_tri, doi_soat)
-    du_dau_vao = tinh["du_du_lieu"] and not thieu
-    so_tien = tinh.get("so") if du_dau_vao else None
+    a = DTK.tien_duoc_phep_su_dung(gia_tri, HAN_CHE_NAM_TRONG_SO_DU, doi_soat,
+                                   tai_khoan_da_dem=[c["tai_khoan"] for c in chi_tiet_nh
+                                                     if c.get("tai_khoan")])
+    b = DTK.tien_con_bo_tri_moi(a, da_duyet_chua_chuyen)
+    tinh = a
+    du_dau_vao = a["du_du_lieu"] and not thieu
+    # Khoá `tien_kha_dung` GIỮ ĐÚNG NGHĨA CŨ = chỉ tiêu B (đã trừ lệnh chi). Đổi nghĩa của một khoá
+    # mà giữ nguyên tên là cách chắc chắn nhất để mọi nơi đọc nó đều sai mà không nơi nào báo lỗi.
+    # Số đầu kỳ của bảng dự báo lấy ở khoá MỚI `tien_duoc_phep_su_dung` – xem `bang_bon_moc()`.
+    so_tien = b.get("so") if (du_dau_vao and b.get("tinh_duoc")) else None
 
     # Hai danh sách thiếu, và chúng KHÁC NHAU, nên giữ cả hai:
     #   · `thieu` của tệp này nói THIẾU Ở CỬA NÀO và phải đi hỏi ai  – "chưa chốt số dư tài khoản …".
@@ -346,8 +375,15 @@ def tien_kha_dung(db: Session, company_id: int, den_ngay: date | None = None) ->
     # Gộp hai cái làm một thì mất một trong hai câu, và câu bị mất luôn là câu chỉ ra người phải làm.
     return {
         "phap_nhan": {"id": ct.id, "ma": ct.code, "ten": ct.name},
+        # Chỉ tiêu B – giữ nguyên tên khoá và nguyên nghĩa cũ cho mọi nơi đang đọc.
         "tien_kha_dung": so_tien,
-        "hien": tinh["hien"] if du_dau_vao else DTK.CHUA_XAC_MINH,
+        # HAI CHỈ TIÊU theo chốt 13/9/2026. Trả cả hai, mỗi cái một tên, không cái nào đội lốt cái
+        # kia. `bang_bon_moc()` lấy A làm đầu kỳ; màn hình hiện B ở ô "còn có thể bố trí mới".
+        "tien_duoc_phep_su_dung": a.get("so") if du_dau_vao else None,
+        "chi_tieu_a": a,
+        "chi_tieu_b": b,
+        "hien": b.get("hien") if (du_dau_vao and b.get("tinh_duoc")) else DTK.CHUA_XAC_MINH,
+        "hien_tien_duoc_phep_su_dung": a["hien"] if du_dau_vao else DTK.CHUA_XAC_MINH,
         "doi_soat_den_ngay": doi_soat if du_dau_vao else None,
         "vi_sao": "" if du_dau_vao else
                   "Chưa đủ đầu vào nên KHÔNG có số – ô này để trống chứ không phải bằng 0. Còn thiếu: "
@@ -510,7 +546,22 @@ def bang_bon_moc(db: Session, company_id: int, hom_nay: date | None = None) -> d
         raise LoiChot("Không có pháp nhân này")
 
     kd = tien_kha_dung(db, company_id, hn)
-    dau_ky = kd["tien_kha_dung"]
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # SỬA 14/9/2026 – ĐẦU KỲ LẤY CHỈ TIÊU A, KHÔNG LẤY B (làn R1)
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # Trước đây dòng này lấy `kd["tien_kha_dung"]` = chỉ tiêu B, tức số ĐÃ TRỪ lệnh chi đã duyệt
+    # chưa chuyển. Nhưng dòng `tra_ncc` của chính bảng này lại cộng ĐÚNG tập lệnh chi ấy một lần
+    # nữa (nguồn "payment_request", lọc status cho_chi). Cùng một khoản tiền bị trừ hai lần:
+    #
+    #     có 100, một lệnh chi 20 đã duyệt chưa chuyển
+    #     B = 80  →  đầu kỳ 80  →  trừ tiếp dòng tra_ncc 20  →  cuối kỳ 60
+    #     Sự thật: sau khi chuyển 20 thì còn 80.
+    #
+    # Đây đúng ví dụ 100→80→60 Chủ tịch chỉ đích danh ngày 13/9/2026 và chốt sửa. Bản sửa đã có ở
+    # `dong_tien_ky.py` từ hôm ấy, nhưng MÀN HÌNH ĐANG CHẠY vẫn đi qua dòng này nên lỗi còn sống.
+    #
+    # Đầu kỳ nay là A – CHƯA trừ lệnh chi. Lệnh chi được trừ đúng MỘT lần, ở dòng chi tương lai.
+    dau_ky = kd["tien_duoc_phep_su_dung"]
 
     # Bốn cột lấy thẳng từ `dong_tien_ky.cac_khoang` – kèm sẵn chuỗi ngày DD-MM-YYYY để màn hình
     # không phải tự định dạng. Mỗi nơi tự định dạng là một nơi có thể quên.
@@ -552,7 +603,14 @@ def bang_bon_moc(db: Session, company_id: int, hom_nay: date | None = None) -> d
         "phap_nhan": kd["phap_nhan"],
         "hom_nay": hn,
         "cot": cot,
+        # TÊN KHOÁ GIỮ NGUYÊN vì nó đồng thời là MÃ DÒNG trong danh mục trình bày
+        # (`dong_tien_pham_vi.DONG` và `khung_dong_tien.DONG_LA_MUC` đều khoá trên chuỗi này).
+        # Nhưng từ 14/9/2026 GIÁ TRỊ của nó là CHỈ TIÊU A – tiền được phép sử dụng, CHƯA trừ lệnh
+        # chi – chứ không còn là "tiền khả dụng" theo nghĩa cũ. Cái tên nay hẹp hơn cái nó chứa.
+        # Đổi mã dòng là việc chạm ba tệp và phải báo trước, nên để lại thành một việc riêng;
+        # trong lúc chờ thì khoá `chi_tieu_dau_ky` dưới đây nói rõ con số này là chỉ tiêu nào.
         "tien_kha_dung_dau_ky": dau_ky,
+        "chi_tieu_dau_ky": "tien_duoc_phep_su_dung",
         "doi_soat_den_ngay": kd["doi_soat_den_ngay"],
         "dong": dong,
         "dong_tien_thuan": thuan,
