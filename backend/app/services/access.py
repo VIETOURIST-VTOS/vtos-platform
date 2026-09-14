@@ -317,6 +317,11 @@ MAN_HINH_API = {
     # phân hệ này, không gọi thẳng /companies hay /bank-accounts – gọi thẳng là nhân danh sách vai
     # trò của phân hệ khác lên (bài học vòng 1 Sự cố tour, 10/9/2026).
     "/dong-tien": ("/api/v1/dong-tien",),
+    # Trang chi tiết nguồn số của khối dòng tiền (TC-25, 14/9/2026). Đọc ĐÚNG hai đường của
+    # chính phân hệ dòng tiền — /meta để lấy danh sách pháp nhân, /khung để lấy khung đã cắt
+    # theo vai. Không gọi thẳng /companies: gọi thẳng là nhân danh sách vai trò của phân hệ
+    # khác lên, đúng bài học vòng 1 Sự cố tour.
+    "/dong-tien/nguon": ("/api/v1/dong-tien",),
     "/kiem-soat": ("/api/v1/kiem-soat", "/api/v1/tong-dai"),
     # Bàn quyết cột tiền K1/K2 – phạm vi API HẸP: chỉ nhánh /cot-tien và /the (để giao diện biết vẽ
     # thẻ nào). KHÔNG gồm kết quả quét, chấm điểm phòng ban hay hậu kiểm số nhập tay.
@@ -642,6 +647,11 @@ MENU_ROLES = {
     #   · robot_ks có mặt theo luật chung đã có: robot Kiểm soát phải xem được MỌI màn hình, nếu
     #     không thì nó giám sát được mọi phòng trừ đúng phòng giữ tiền.
     "/dong-tien": ("chutich", "tgd", "ketoan", "bks", "robot_ks", "cntt"),
+    # Trang chi tiết nguồn số phải có ĐÚNG danh sách vai của khối dòng tiền, không rộng hơn.
+    # Nó bày ra chính những dòng của khối ấy kèm nguyên nhân và bộ phận chịu — mở rộng một vai
+    # ở đây là mở luôn bảng dòng tiền cho vai đó bằng cửa sau. Hai Phó Tổng giám đốc vẫn không
+    # có mặt, đúng như quyết định 11/9 của Chủ tịch.
+    "/dong-tien/nguon": ("chutich", "tgd", "ketoan", "bks", "robot_ks", "cntt"),
     "/kiem-soat": BASE_VIEW + ("cntt",),
     "/ra-soat-cot-tien": BASE_VIEW + ("ketoan", "cntt"),
     # V11 – "cái gì đang tự chạy" là câu hỏi của cả công ty, không riêng CNTT: một tác vụ im ba ngày

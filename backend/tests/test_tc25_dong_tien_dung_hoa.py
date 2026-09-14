@@ -95,6 +95,31 @@ def test_han_xu_ly_khong_bia():
     assert "chưa đặt" in ma, "Cột hạn phải nói rõ là chưa đặt, không để trống cho đẹp."
 
 
+def test_trang_moi_da_khai_quyen_va_khong_rong_hon_khoi_dong_tien():
+    """CI bắt được lỗ này ở lần đẩy đầu (14/9): trang mới không khai quyền thì MỌI vai đăng nhập
+    đều thấy, mà không ai quyết định điều đó.
+
+    Và không chỉ cần "có khai": danh sách vai phải ĐÚNG BẰNG danh sách của /dong-tien. Trang này
+    bày ra chính những dòng của khối dòng tiền kèm nguyên nhân và bộ phận chịu — thêm một vai ở đây
+    là mở bảng dòng tiền cho vai đó bằng cửa sau, trong khi Chủ tịch đã chốt 11/9 rằng hai Phó Tổng
+    giám đốc không thấy khối này.
+    """
+    s = _bo_chu_thich_py(_doc(GOC / "backend" / "app" / "services" / "access.py"))
+    m_khoi = re.search(r'"/dong-tien":\s*\(([^)]*)\)', s)
+    m_moi = re.search(r'"/dong-tien/nguon":\s*\(([^)]*)\)', s)
+    assert m_moi, "/dong-tien/nguon chưa khai quyền trong access.py."
+    # Lấy lần khai VAI TRÒ (bảng thứ hai), phân biệt với bảng đường API ở trên bằng dấu "/api".
+    vai_khoi = [x for x in re.findall(r'"/dong-tien":\s*\(([^)]*)\)', s) if "/api" not in x]
+    vai_moi = [x for x in re.findall(r'"/dong-tien/nguon":\s*\(([^)]*)\)', s) if "/api" not in x]
+    assert vai_khoi and vai_moi, "Không đọc được danh sách vai của một trong hai trang."
+    tach = lambda x: sorted(v.strip().strip('"') for v in x.split(",") if v.strip())
+    assert tach(vai_moi[0]) == tach(vai_khoi[0]), (
+        f"Danh sách vai của /dong-tien/nguon ({tach(vai_moi[0])}) khác của /dong-tien "
+        f"({tach(vai_khoi[0])}) — trang chi tiết không được rộng hơn khối nó chi tiết hoá."
+    )
+    assert m_khoi  # giữ tham chiếu để lời báo lỗi ở trên có nghĩa
+
+
 def test_trang_chi_tiet_khong_tu_loc_theo_vai():
     """SEC-02: cắt dòng ở máy chủ. Trang chi tiết không được nhắc tên vai trò nào."""
     ma = _bo_chu_thich_tsx(_doc(NGUON))
