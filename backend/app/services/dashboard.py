@@ -160,6 +160,27 @@ def build(db: Session, u: User) -> dict:
                              for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.end_date < moc)
                                                  .order_by(desc(Tour.end_date)).limit(300)).scalars()
                              if today > R.settlement_deadline(db, t)][:100]
+    # ── Khối 05 của bản vẽ V1.4: Phải thu / Phải trả theo HẠN THANH TOÁN ──────────────────────
+    #
+    # Giao diện dựng từ vòng TC-23 (13/9) nhưng mọi ô ghi "Chưa kết nối". Anh Tuấn kiểm 14/9: màn
+    # hình Chủ tịch vẫn chưa xong. Rà lại thì nguồn số ĐÃ CÓ — sổ nghĩa vụ VPM-11 — nên đây chỉ là
+    # phép chia nhóm theo hạn, không phải một cửa nhập mới.
+    #
+    # VAI TRÒ TRUYỀN VÀO `theo_han` là hàng rào SEC-02 thật: `nghia_vu._loc()` lọc ngay trong câu
+    # truy vấn theo `nhom_duoc_xem(vai_tro)`, nên Tổng giám đốc không cộng được ba nhóm khoản vay.
+    # Không truyền vai trò là mở toàn sổ cho mọi người xem màn hình này.
+    if role in ("chutich", "tgd", "ketoan", "bks"):
+        from app.services import han_cong_no as HCN
+        thu = HCN.theo_han(db, HCN.THU, vai_tro=role, hom_nay=today)
+        tra = HCN.theo_han(db, HCN.CHI, vai_tro=role, hom_nay=today)
+        sec["phai_thu_theo_han"] = thu["nhom"]
+        sec["phai_thu_chua_co_han"] = thu["chua_co_han"]
+        sec["phai_tra_theo_han"] = tra["nhom"]
+        sec["phai_tra_chua_co_han"] = tra["chua_co_han"]
+        sec["phai_tra_qua_han"] = tra["qua_han"]
+        # Lý do RỖNG đi kèm số rỗng. Ô trống không nói vì sao là ô nằm đó mãi.
+        sec["phai_thu_vi_sao"] = thu["vi_sao"]
+        sec["phai_tra_vi_sao"] = tra["vi_sao"]
     if role in ("hcns", "chutich", "tgd"):
         s = OPS.work_days_in(today.year, today.month, until=today)
         emps = db.execute(select(Employee).where(Employee.active == True, Employee.department.in_(OPS.NO_TIMESHEET_DEPTS), Employee.user_id != None)).scalars().all()

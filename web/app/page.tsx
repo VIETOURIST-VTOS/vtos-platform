@@ -154,8 +154,10 @@ function Dash() {
     {/* Hai khối hạn xếp DỌC, không cạnh nhau. Đặt cạnh nhau thì mỗi khối chỉ còn nửa bề ngang,
         năm nhóm vỡ thành 2+2+1 và nhóm "Dài hạn" đứng trơ một mình một hàng — đọc thành "bốn nhóm
         và một cái gì đó". Bản vẽ cũng xếp dọc, năm nhóm một hàng. */}
-    <KhoiPhaiThu ds={sec.phai_thu_theo_han} />
-    <KhoiPhaiTra ds={sec.phai_tra_theo_han} qua_han={sec.phai_tra_qua_han} />
+    <KhoiPhaiThu ds={sec.phai_thu_theo_han} chua_co_han={sec.phai_thu_chua_co_han}
+      vi_sao={sec.phai_thu_vi_sao} />
+    <KhoiPhaiTra ds={sec.phai_tra_theo_han} qua_han={sec.phai_tra_qua_han}
+      chua_co_han={sec.phai_tra_chua_co_han} vi_sao={sec.phai_tra_vi_sao} />
     <KhoiRuiRo ds={sec.rui_ro_trong_yeu} />
     <KhoiTienDoBaoCao ds={sec.tien_do_bao_cao} />
 
