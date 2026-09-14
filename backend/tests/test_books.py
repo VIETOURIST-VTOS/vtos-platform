@@ -14,7 +14,7 @@ SINCE, UPTO = "2027-03-01", "2027-03-31"
 
 def login(u):
     if u not in TOK:
-        TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"}).json()["access_token"]
+        TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"}).json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
 
 
@@ -142,7 +142,7 @@ def test_danh_muc_so_va_phan_quyen(seeded):
     cat = client.get("/api/v1/books", headers=h).json()
     assert {c["key"] for c in cat} >= {"nhat-ky-chung", "so-cai", "so-quy", "so-tien-gui", "cong-no"}
     # Sổ kế toán không mở cho vai trò kinh doanh
-    kd = client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "123456"})
+    kd = client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "Vtos@Demo#2026"})
     if kd.status_code == 200:
         hk = {"Authorization": f"Bearer {kd.json()['access_token']}"}
         assert client.get(f"/api/v1/books/nhat-ky-chung?since={SINCE}&upto={UPTO}", headers=hk).status_code == 403

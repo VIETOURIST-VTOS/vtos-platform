@@ -29,7 +29,7 @@ BASE = {"title": "Ưu đãi hè 2026 – Nha Trang", "loai": "bai_dang", "kenh":
 
 
 def login(u):
-    if u not in TOK: TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"}).json()["access_token"]
+    if u not in TOK: TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"}).json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
 
 

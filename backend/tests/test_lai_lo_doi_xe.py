@@ -33,7 +33,7 @@ client = TestClient(app); TOK = {}; KY = "2026-06"
 
 def login(u):
     if u not in TOK:
-        r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
+        r = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"})
         assert r.status_code == 200, r.text
         TOK[u] = r.json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}

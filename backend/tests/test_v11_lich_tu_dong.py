@@ -56,7 +56,7 @@ def login(vai: str) -> dict:
         ten = u.username
     r = client.post("/api/v1/auth/login", data={"username": ten, "password": ten})
     if r.status_code != 200:
-        r = client.post("/api/v1/auth/login", data={"username": ten, "password": "123456"})
+        r = client.post("/api/v1/auth/login", data={"username": ten, "password": "Vtos@Demo#2026"})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 

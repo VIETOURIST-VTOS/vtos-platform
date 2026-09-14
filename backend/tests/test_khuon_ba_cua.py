@@ -31,7 +31,7 @@ client = TestClient(app); TOK = {}
 
 def login(u):
     if u not in TOK:
-        r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
+        r = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"})
         assert r.status_code == 200, r.text
         TOK[u] = r.json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
@@ -49,7 +49,7 @@ def _startup():
         with SessionLocal() as db:
             if db.execute(select(User).where(User.username == "gd.doixe")).scalars().first() is None:
                 db.add(User(username="gd.doixe", full_name="GĐ điều hành đội xe", role="gd_doi_xe",
-                            department="Đội xe", password_hash=hash_password("123456")))
+                            department="Đội xe", password_hash=hash_password("Vtos@Demo#2026")))
                 db.commit()
         yield
 

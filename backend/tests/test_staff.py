@@ -10,7 +10,7 @@ from app.main import app
 client = TestClient(app); TOK = {}
 
 
-def login(u, pw="123456"):
+def login(u, pw="Vtos@Demo#2026"):
     k = (u, pw)
     if k not in TOK: TOK[k] = client.post("/api/v1/auth/login", data={"username": u, "password": pw}).json()["access_token"]
     return {"Authorization": f"Bearer {TOK[k]}"}
@@ -29,7 +29,7 @@ def test_import_master_and_group_scope():
     xt = client.post("/api/v1/employees/import-master?dry_run=true", headers=login("hcns")).json()
     assert xt["xem_truoc"] is True and xt["created"] + xt["updated"] >= 105
     assert any("kd.hoa" in x for x in xt["users_closed"]), "tài khoản không có trong bảng lương phải nằm trong danh sách sẽ khóa"
-    assert client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "123456"}).status_code == 200, "xem trước không được đổi gì"
+    assert client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "Vtos@Demo#2026"}).status_code == 200, "xem trước không được đổi gì"
 
     # đặt lại mật khẩu lẻ vẫn chạy trước khi nạp
     hoa_id = client.get("/api/v1/auth/me", headers=login("kd.hoa")).json()["id"]
@@ -68,7 +68,7 @@ def test_import_master_and_group_scope():
     assert client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "abc123"}).status_code == 401
     # nhưng tài khoản hệ thống thì không bị khóa theo bảng lương
     for tk in ("chutich", "tgd", "cntt"):
-        assert client.post("/api/v1/auth/login", data={"username": tk, "password": "123456"}).status_code == 200
+        assert client.post("/api/v1/auth/login", data={"username": tk, "password": "Vtos@Demo#2026"}).status_code == 200
 
     # trưởng nhóm KD1 chỉ thấy booking của sale nhóm KD1, không thấy booking của người khác
     b = client.get("/api/v1/bookings?limit=500", headers=login("nguyenngocthanh", "114")).json()

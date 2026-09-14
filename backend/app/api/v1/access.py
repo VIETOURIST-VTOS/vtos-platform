@@ -396,8 +396,14 @@ def tao_tai_khoan_robot(data: TaoRobotIn,
 # hai tài khoản mẫu — kể cả chutich, tgd, ketoan — dùng mật khẩu "123456". Bộ máy buộc đổi mật khẩu
 # đã có sẵn và chạy đúng; cái thiếu là KHÔNG AI BẬT CỜ cho những tài khoản sinh ra lúc gieo dữ liệu.
 #
-# Hai cửa dưới đây vá đúng chỗ ấy. Chúng KHÔNG đặt mật khẩu cho ai: chỉ so bản băm để biết tài khoản
-# nào còn dùng chuỗi đã bị công bố, rồi bật cờ để chính chủ tài khoản đổi ở lần đăng nhập kế tiếp.
+# Cửa dưới đây vá nửa mà đường đăng nhập không với tới: những tài khoản CHƯA TỪNG ĐĂNG NHẬP, mật
+# khẩu còn nguyên như lúc gieo. Nửa còn lại – người có dùng tài khoản – do chính cửa đăng nhập bắt:
+# lúc ấy máy cầm sẵn mật khẩu họ vừa gõ nên chỉ cần so chuỗi.
+#
+# BẢN 14/9 LÀM SAI CHỖ NÀY và nó lộ ra trên bản thật: cửa GET đi băm lại từng tài khoản một để đoán
+# xem ai còn dùng chuỗi đã công bố, chạy MỖI LẦN có người mở màn hình Tài khoản. bcrypt chậm là cố ý
+# (0,274 giây/lần đo trên máy dựng), 116 tài khoản là hơn hai phút, và màn hình treo. Giờ cửa GET
+# không băm một lần nào.
 
 MK_QUAN_TRI = ("chutich", "tgd", "cntt", "hcns")
 
@@ -405,8 +411,8 @@ MK_QUAN_TRI = ("chutich", "tgd", "cntt", "hcns")
 @router.get("/mat-khau/soat-cong-khai")
 def soat_mat_khau_cong_khai(u: User = Depends(require_roles(*MK_QUAN_TRI)),
                             db: Session = Depends(get_db)):
-    """Còn bao nhiêu tài khoản dùng mật khẩu đã in công khai. KHÔNG đổi gì, KHÔNG lộ mật khẩu nào."""
-    return MKY.soat(db)
+    """Bao nhiêu tài khoản chưa từng đăng nhập. KHÔNG đổi gì, KHÔNG băm, KHÔNG lộ mật khẩu nào."""
+    return MKY.tom_tat(db)
 
 
 class BuocDoiVao(BaseModel):
@@ -416,7 +422,7 @@ class BuocDoiVao(BaseModel):
 @router.post("/mat-khau/buoc-doi")
 def buoc_doi_mat_khau_cong_khai(v: BuocDoiVao, u: User = Depends(require_roles(*MK_QUAN_TRI)),
                                 db: Session = Depends(get_db)):
-    """Bật cờ BUỘC ĐỔI cho mọi tài khoản còn dùng mật khẩu đã công khai.
+    """Bật cờ BUỘC ĐỔI cho mọi tài khoản đang hoạt động mà chưa từng đăng nhập.
 
     `xac_nhan` mặc định False nên gọi nhầm không đổi gì. Việc này chạm vào khả năng đăng nhập của
     người thật nên vào nhật ký mang tên người bấm — kèm danh sách tài khoản bị bật cờ.

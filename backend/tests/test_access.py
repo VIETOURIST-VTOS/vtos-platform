@@ -11,7 +11,7 @@ client = TestClient(app); TOK = {}
 
 
 def login(u):
-    if u not in TOK: TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"}).json()["access_token"]
+    if u not in TOK: TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"}).json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
 
 
@@ -77,7 +77,7 @@ def test_bks_read_only_and_robot_token():
     assert client.get(f"/api/v1/tours/{tid}", headers=h).status_code == 200
     for m, path in (("post", "/api/v1/tours"), ("post", f"/api/v1/tours/{tid}/approve"), ("post", "/api/v1/daily-reports"), ("put", f"/api/v1/tours/{tid}"), ("post", "/api/v1/params")):
         r = getattr(client, m)(path, json={}, headers=h); assert r.status_code == 403 and "chỉ có quyền đọc" in r.text, (m, path, r.text)
-    assert client.post("/api/v1/auth/password", json={"old_password": "123456", "new_password": "123456"}, headers=h).status_code in (200, 422)
+    assert client.post("/api/v1/auth/password", json={"old_password": "Vtos@Demo#2026", "new_password": "Vtos@Demo#2026"}, headers=h).status_code in (200, 422)
     # robot: token rỗng trên máy chủ → mọi lời gọi robot bị chặn, kể cả header rỗng
     assert client.post("/api/v1/robot/run", headers={"X-Robot-Token": ""}).status_code == 401
     assert client.post("/api/v1/robot/run").status_code == 401

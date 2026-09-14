@@ -16,7 +16,7 @@ TOK = {}
 
 def login(u):
     if u not in TOK:
-        r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
+        r = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"})
         assert r.status_code == 200, r.text
         TOK[u] = r.json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
@@ -117,7 +117,7 @@ def test_audit_chain_intact_and_robot_api():
 def test_chu_tich_toan_quyen_moi_phan_he():
     """Chủ tịch HĐQT có toàn quyền (quyết định 06/9/2026) – nhưng các chốt an toàn khác KHÔNG nới theo:
     kỳ đã khóa vẫn không ghi được, và vai trò khác vẫn bị chặn như cũ."""
-    ct = client.post("/api/v1/auth/login", data={"username": "chutich", "password": "123456"})
+    ct = client.post("/api/v1/auth/login", data={"username": "chutich", "password": "Vtos@Demo#2026"})
     assert ct.status_code == 200, ct.text
     h = {"Authorization": f"Bearer {ct.json()['access_token']}"}
 
@@ -137,7 +137,7 @@ def test_chu_tich_toan_quyen_moi_phan_he():
     assert r2.status_code == 422 and "khóa" in str(r2.json()["detail"])
 
     # Vai trò khác vẫn bị chặn như cũ
-    kd = client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "123456"})
+    kd = client.post("/api/v1/auth/login", data={"username": "kd.hoa", "password": "Vtos@Demo#2026"})
     if kd.status_code == 200:
         hk = {"Authorization": f"Bearer {kd.json()['access_token']}"}
         assert client.get("/api/v1/hrm/profile-gaps", headers=hk).status_code == 403

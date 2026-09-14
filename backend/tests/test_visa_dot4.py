@@ -19,7 +19,7 @@ DEP = str(date.today() + timedelta(days=60))
 
 def login(u):
     if u not in TOK:
-        TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"}).json()["access_token"]
+        TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"}).json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
 
 
@@ -222,7 +222,7 @@ def _tao_nv_visa():
     try:
         if not db.execute(sel(User).where(User.username == "visa.chuyenvien")).scalars().first():
             db.add(User(username="visa.chuyenvien", full_name="Chuyên viên Visa (kiểm thử)",
-                        role="nv_visa", department="Visa", password_hash=hash_password("123456")))
+                        role="nv_visa", department="Visa", password_hash=hash_password("Vtos@Demo#2026")))
             db.commit()
         return db.execute(sel(User).where(User.username == "visa.chuyenvien")).scalars().first().id
     finally:

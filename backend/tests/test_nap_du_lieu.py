@@ -20,7 +20,7 @@ client = TestClient(app); TOK = {}
 
 def login(u):
     if u not in TOK:
-        r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
+        r = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"})
         assert r.status_code == 200, r.text
         TOK[u] = r.json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
@@ -164,7 +164,7 @@ def test_nhan_vien_kinh_doanh_khong_nap_du_lieu(_startup):
     from app.core.security import hash_password
     db = SessionLocal()
     db.add(User(username="nvkd.nap.kt", full_name="NV kinh doanh", role="nv_kd", department="kinh_doanh",
-                staff_code="KT920", password_hash=hash_password("123456"), active=True))
+                staff_code="KT920", password_hash=hash_password("Vtos@Demo#2026"), active=True))
     db.commit(); db.close()
     r = client.post("/api/v1/nap-du-lieu/nap", headers=login("nvkd.nap.kt"),
                     json={"loai": "nha_cung_cap", "rows": [{"Tên nhà cung cấp": "X", "Loại": "khac"}]})

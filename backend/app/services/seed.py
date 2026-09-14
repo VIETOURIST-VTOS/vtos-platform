@@ -1,4 +1,16 @@
-"""Dữ liệu mẫu để chạy thử. Mật khẩu mọi tài khoản: 123456 (đổi trước khi chạy thật)."""
+"""Dữ liệu mẫu để chạy thử.
+
+MẬT KHẨU GIEO Ở ĐÂY KHÔNG ĐƯỢC LÀ MỘT CHUỖI AI CŨNG ĐOÁN RA.
+
+Đến 14/9/2026 tệp này gieo "123456" cho mọi tài khoản, và trang đăng nhập của bản chạy trên internet
+công cộng in thẳng danh sách tài khoản kèm chuỗi ấy ra màn hình. Mười hai tài khoản — kể cả Chủ
+tịch, Tổng giám đốc và Kế toán — mở được bằng một dòng chữ ai cũng đọc.
+
+Nay cửa đăng nhập nhận ra mật khẩu đã bị công bố (`services/mat_khau_yeu.DA_CONG_KHAI`) và buộc đổi
+ngay tại chỗ. Nên gieo lại đúng chuỗi ấy là tự khoá mọi tài khoản mẫu ra khỏi hệ thống — và đó là
+điều ĐÚNG, chỉ có điều dữ liệu mẫu thì không cần trả giá ấy. Chuỗi dưới đây chỉ là mật khẩu cho bản
+chạy thử; bản chạy thật không dùng tệp này.
+"""
 from datetime import date, datetime, timedelta
 from app.core.security import hash_password
 from sqlalchemy import select
@@ -36,7 +48,7 @@ def seed_all(db):
                 seed_hr(db, users, [tours.get("PT-DL-0912"), tours.get("TL-BKK-1005"), tours.get("DN-HCM-0820"), tours["DL-0825"]], date.today())
                 db.commit()
         return
-    pw = hash_password("123456")
+    pw = hash_password("Vtos@Demo#2026")
     users = {}
     for un, name, role, dept in USERS:
         u = User(username=un, full_name=name, role=role, department=dept, password_hash=pw)
