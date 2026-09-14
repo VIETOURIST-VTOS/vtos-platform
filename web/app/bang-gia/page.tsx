@@ -187,24 +187,24 @@ function BangGia() {
 
       <style jsx>{`
         .wrap { padding: 16px; max-width: 1150px; }
-        .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; margin: 14px 0; }
+        .card { border: 1px solid var(--vtos-line); border-radius: 10px; padding: 14px; margin: 14px 0; }
         .dau { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
                margin-bottom: 8px; }
         .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
         .tbl { width: 100%; border-collapse: collapse; }
-        .tbl td, .tbl th { border-bottom: 1px solid #f1f5f9; padding: 6px 8px; text-align: left; }
+        .tbl td, .tbl th { border-bottom: 1px solid var(--vtos-line); padding: 6px 8px; text-align: left; }
         .luoi { display: grid; gap: 0 14px; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); }
-        label { display: block; font-size: 12px; color: #64748b; margin-top: 8px; }
-        input, select { width: 100%; padding: 5px 7px; border: 1px solid #cbd5e1; border-radius: 6px;
-                        font-size: 13px; color: #0f172a; background: #fff; }
-        .do { color: #b91c1c; }
+        label { display: block; font-size: 12px; color: var(--vtos-text-mute); margin-top: 8px; }
+        input, select { width: 100%; padding: 5px 7px; border: 1px solid var(--vtos-line); border-radius: 6px;
+                        font-size: 13px; color: var(--vtos-text); background: var(--vtos-card); }
+        .do { color: var(--vtos-danger); }
         .mono { font-family: ui-monospace, monospace; font-size: 13px; }
-        button { padding: 5px 10px; border-radius: 8px; border: 1px solid #0f172a;
-                 background: #0f172a; color: #fff; cursor: pointer; font-size: 13px; }
-        button.ghost { background: #fff; color: #0f172a; border-color: #cbd5e1; }
-        .muted { color: #64748b; }
+        button { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--vtos-sky);
+                 background: var(--vtos-sky); color: var(--vtos-text-on-navy); cursor: pointer; font-size: 13px; }
+        button.ghost { background: var(--vtos-card); color: var(--vtos-text); border-color: var(--vtos-line); }
+        .muted { color: var(--vtos-text-mute); }
         .small { font-size: 12px; }
-        .warn { color: #92400e; background: #fffbeb; padding: 8px 10px; border-radius: 8px; }
+        .warn { color: var(--vtos-warning); background: var(--vtos-warning-bg); padding: 8px 10px; border-radius: 8px; }
       `}</style>
     </div>
   );

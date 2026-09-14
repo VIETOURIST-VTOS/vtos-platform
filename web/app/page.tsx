@@ -120,7 +120,15 @@ function Dash() {
           <tbody>{sec.sap_khoi_hanh.map((r: any) => <tr key={r.code}>
             <td>{r.code}</td>
             <td>{fmtD(r.start)} (D-{r.days_left})</td>
-            <td>{r.booked}/{r.breakeven} khách {r.below ? <Tag cls="red">dưới hòa vốn</Tag> : <Tag cls="ok">ok</Tag>}</td>
+            {/* MỐC HOÀ VỐN BẰNG 0 KHÔNG PHẢI LÀ ĐẠT MỐC. Máy chủ hiện trả breakeven = 0 cho hầu hết
+                chuyến vì chưa ai nhập điểm hoà vốn. Câu cũ `r.below ? đỏ : xanh` đọc số 0 ấy thành
+                "đã vượt mốc" và dán nhãn xanh "ok" lên cả chuyến 0 khách — đúng cái bản vẽ cấm:
+                không mặc định chuyến đã sẵn sàng. Chưa có mốc thì nói chưa có mốc. */}
+            <td>{r.booked}/{r.breakeven || "—"} khách {
+              !r.breakeven
+                ? <Tag>chưa có mốc hoà vốn</Tag>
+                : r.below ? <Tag cls="red">dưới hòa vốn</Tag> : <Tag cls="ok">ok</Tag>
+            }</td>
             <td>{r.dich_vu_thieu ?? <span className="muted">chưa nối</span>}</td>
             <td>{r.xe ?? <span className="muted">chưa nối</span>}</td>
             <td>{r.hdv ?? <span className="muted">chưa nối</span>}</td>
