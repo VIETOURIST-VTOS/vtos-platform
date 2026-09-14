@@ -420,7 +420,18 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 /* Chú giải hai mức của khối Rủi ro. */
 .v14-muc-ds{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px;font-size:12px}
 
+/* ── KHỐI 06 DÒNG TIỀN · nút đổi kiểu xem và dòng tóm tắt nguồn số (14/9/2026) ──────────────────
+   Hai nút dính liền thành một cặp, để đọc ra là MỘT lựa chọn hai bên chứ không phải hai việc rời
+   nhau. Nút đang chọn dùng nền nút chính, nút kia dùng nền mờ — cùng cặp màu đã đo ở TC-22. */
+.dt-kieu{display:inline-flex;border-radius:7px;overflow:hidden;border:1px solid var(--vtos-line)}
+.dt-kieu button.act{border-radius:0;border:0;margin:0;font-size:12.5px;padding:6px 12px}
+.dt-kieu button.act+button.act{border-left:1px solid var(--vtos-line)}
+.dt-tomtat{margin:0 0 10px;font-size:12.5px;display:flex;flex-wrap:wrap;align-items:center;gap:7px}
+
 @media (max-width:640px){
+  /* Cặp nút xuống hàng riêng: để cùng hàng với tiêu đề thì tiêu đề bị bóp còn hai chữ. */
+  .dt-kieu{width:100%}
+  .dt-kieu button.act{flex:1}
   .mh01-ngay{margin-left:0;width:100%}
   .mh01-ky select{min-width:0;flex:1}
   .the-so{font-size:20px}
