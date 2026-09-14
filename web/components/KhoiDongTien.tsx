@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { api, fmtD, vnd } from "@/lib/api";
 import { useShell } from "@/components/Shell";
 import { xepDonVi, type DonViChon } from "@/lib/thu_tu_don_vi";
@@ -16,9 +17,28 @@ import { xepDonVi, type DonViChon } from "@/lib/thu_tu_don_vi";
  *  HAI ĐIỀU KHÔNG LÀM
  *  1. Không hiện "0 đ" thay cho "chưa có số". Ô rỗng ghi "Chưa có nguồn" kèm tên bộ phận phải
  *     nhập — người đọc biết đi hỏi ai, thay vì tin một con số không có thật.
- *  2. Không cộng bốn cột. Bốn cột lũy kế từ cùng một ngày nên chồng lên nhau; cộng lại ra một con
- *     số lớn gấp mấy lần thực tế. Câu nhắc nằm ngay dưới bảng.
+ *  2. Không cộng bốn cột Ở KIỂU LUỸ KẾ. Bốn cột lũy kế từ cùng một ngày nên chồng lên nhau; cộng
+ *     lại ra một con số lớn gấp mấy lần thực tế. Câu nhắc nằm ngay dưới bảng, và nó ĐỔI theo kiểu
+ *     xem đang chọn — ở kiểu "trong từng khoảng" thì bốn cột rời nhau nên cộng lại LẠI ĐÚNG.
+ *
+ *  HAI THỨ THÊM NGÀY 14/9/2026 (phương án dung hoà anh Tuấn chốt 13/9)
+ *
+ *  · CỘT TRẠNG THÁI BA MỨC thay cho cột "Cửa nhập · bộ phận". Bản vẽ V1.4 đòi bỏ hẳn cột cửa nhập
+ *    khỏi trang Chủ tịch; bỏ hẳn thì ngược ranh giới 09/9. Nên trang này chỉ còn MỘT nhãn ba mức,
+ *    còn nguyên nhân · bộ phận · cửa nhập chuyển sang trang /dong-tien/nguon.
+ *
+ *  · NÚT ĐỔI KIỂU XEM luỹ kế ↔ trong từng khoảng. Bản vẽ muốn bốn mốc không luỹ kế. Số trong từng
+ *    khoảng là HIỆU của hai cột luỹ kế liền nhau — máy chủ tính, không tính ở trình duyệt. Ba dòng
+ *    MỨC (tiền đầu kỳ · số dư cuối khoảng · thiếu so với dự phòng) giữ nguyên số ở cả hai kiểu và
+ *    mang cờ la_dong_chay=false, vì chúng là mức tại mốc chứ không phải lượng tiền chảy qua.
  */
+
+/** Nhãn ba mức. Màu lấy từ bộ nhận diện: xanh lá đủ · vàng cần chú ý · đỏ còn thiếu. */
+function ChipTrangThai({ ma, nhan }: { ma?: string; nhan?: string }) {
+  if (!ma || !nhan) return null;
+  const cls = ma === "day_du" ? "ok" : ma === "chua_doi_soat" ? "warn" : "red";
+  return <span className={"tag " + cls}>{nhan}</span>;
+}
 
 const RONG = (vi_sao?: string) => (
   <span className="muted" title={vi_sao || "Chưa có số — khác hẳn với bằng 0"}>Chưa có nguồn</span>
@@ -43,6 +63,9 @@ export default function KhoiDongTien() {
   const [pn, setPn] = useState<number | null>(null);
   const [k, setK] = useState<any>(null);
   const [an, setAn] = useState(false);   // vai này không mở khối dòng tiền → không vẽ gì
+  // Mặc định LUỸ KẾ, không phải kiểu mới. Kiểu luỹ kế là kiểu đã in ra trong tài liệu v1.1 và là
+  // kiểu người đọc đang quen; đổi mặc định là hôm sau có người đọc bảng mới bằng thói quen cũ.
+  const [khoang, setKhoang] = useState(false);
 
   useEffect(() => {
     api("/dong-tien/meta")
@@ -71,11 +94,21 @@ export default function KhoiDongTien() {
 
   const cot = k.cot || [];
   const nCot = cot.length;
+  const tt = k.tom_tat_trang_thai || {};
+
+  /** Số của một dòng ở kiểu xem đang chọn. Dòng MỨC không có số theo khoảng nên luôn lấy `so`. */
+  const soCua = (d: any) => (khoang && d.la_dong_chay ? d.so_khoang : d.so) || {};
 
   return (
     <section style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-        <h2 style={{ margin: 0 }}>Dòng tiền — bốn mốc lũy kế</h2>
+        <h2 style={{ margin: 0 }}>Dòng tiền — bốn mốc {khoang ? "trong từng khoảng" : "lũy kế"}</h2>
+        <div className="dt-kieu" role="group" aria-label="Kiểu xem bốn mốc">
+          <button type="button" className={"act" + (khoang ? " grey" : "")}
+            aria-pressed={!khoang} onClick={() => setKhoang(false)}>Lũy kế</button>
+          <button type="button" className={"act" + (khoang ? "" : " grey")}
+            aria-pressed={khoang} onClick={() => setKhoang(true)}>Trong từng khoảng</button>
+        </div>
         {dsPn.length > 1 && (
           <select value={pn ?? ""} onChange={(e) => setPn(Number(e.target.value))}
             style={{ width: "auto", minWidth: 220 }} aria-label="Pháp nhân đang xem">
@@ -88,6 +121,16 @@ export default function KhoiDongTien() {
 
       <p className="muted" style={{ marginTop: 0 }}>{k.cau_pham_vi}</p>
 
+      {/* DÒNG TÓM TẮT NGUỒN SỐ — phần "một nhãn thay cho cột cửa nhập" của phương án dung hoà.
+          Đếm theo DÒNG CÓ CỬA (bỏ dòng tự cộng), vì dòng tự cộng không ai nhập được. */}
+      <p className="dt-tomtat">
+        <b>Nguồn số:</b>{" "}
+        <span className="tag ok">{tt.day_du ?? 0} đầy đủ</span>{" "}
+        <span className="tag warn">{tt.chua_doi_soat ?? 0} chưa đối soát</span>{" "}
+        <span className="tag red">{tt.con_thieu ?? 0} còn thiếu</span>{" "}
+        <Link className="the-cua" href="/dong-tien/nguon">Nguyên nhân · bộ phận · cửa nhập →</Link>
+      </p>
+
       <div className="bon-o">{(k.canh_bao || []).map((o: any) => <O key={o.ma} o={o} />)}</div>
 
       <div className="panel wrap">
@@ -96,8 +139,12 @@ export default function KhoiDongTien() {
             <th style={{ minWidth: 240 }}>Dòng tiền</th>
             {cot.map((c: any) => <th key={c.ma} className="num">{c.ten}
               <div className="muted" style={{ fontWeight: 400, fontSize: 11 }}>
-                {c.tu_hien || fmtD(c.tu_ngay)} – {c.den_hien || fmtD(c.den_ngay)}</div></th>)}
-            <th style={{ minWidth: 200 }}>Cửa nhập · bộ phận</th>
+                {/* Ngày đầu ĐỔI theo kiểu xem: luỹ kế thì mọi cột cùng bắt đầu từ ngày báo cáo,
+                    theo khoảng thì cột sau bắt đầu ngay sau ngày kết thúc của cột trước. In sai
+                    ngày ở đây là người đọc cộng nhầm hai khoảng chồng nhau. */}
+                {fmtD(khoang ? (c.tu_ngay_khoang || c.tu_ngay) : c.tu_ngay)}
+                {" – "}{c.den_hien || fmtD(c.den_ngay)}</div></th>)}
+            <th style={{ minWidth: 130 }}>Nguồn số</th>
           </tr></thead>
           <tbody>
             {(k.dong || []).map((d: any) => (
@@ -111,32 +158,35 @@ export default function KhoiDongTien() {
                             (một mốc, không theo khoảng)</span></>}
                     </td>
                   : cot.map((c: any) => <td key={c.ma} className="num">
-                      {(d.so || {})[c.ma] === null || (d.so || {})[c.ma] === undefined
+                      {soCua(d)[c.ma] === null || soCua(d)[c.ma] === undefined
                         ? RONG(d.vi_sao_rong || d.bo_phan_chiu_trach_nhiem)
-                        : vnd((d.so || {})[c.ma])}
+                        : vnd(soCua(d)[c.ma])}
                     </td>)}
                 <td style={{ fontSize: 11.5 }}>
                   {d.tu_tinh
-                    ? <span className="muted">Tự cộng — không có cửa nhập</span>
-                    : <>
-                        <div className={d.da_co_nguon ? "" : "muted"}>{d.nguon}</div>
-                        <div className="muted">{d.bo_phan}{d.cua_do_de_xuat ? " · cửa do đề xuất, chờ chốt" : ""}</div>
-                      </>}
+                    ? <span className="muted">Tự cộng</span>
+                    : <ChipTrangThai ma={d.trang_thai} nhan={d.nhan_trang_thai} />}
+                  {khoang && d.la_dong_chay === false && !d.mot_moc &&
+                    <div className="muted" style={{ marginTop: 3 }}>mức tại mốc</div>}
                 </td>
               </tr>))}
             <tr>
               <td><b>{k.ten_dong_thuan}</b></td>
-              {cot.map((c: any) => <td key={c.ma} className="num"><b>
-                {(k.dong_tien_thuan || {})[c.ma] === null || (k.dong_tien_thuan || {})[c.ma] === undefined
-                  ? RONG(k.vi_sao_khong_co_so_cuoi)
-                  : vnd((k.dong_tien_thuan || {})[c.ma])}
-              </b></td>)}
+              {cot.map((c: any) => {
+                const t = ((khoang ? k.dong_tien_thuan_khoang : k.dong_tien_thuan) || {})[c.ma];
+                return <td key={c.ma} className="num"><b>
+                  {t === null || t === undefined ? RONG(k.vi_sao_khong_co_so_cuoi) : vnd(t)}
+                </b></td>;
+              })}
               <td />
             </tr>
           </tbody>
         </table>
 
-        <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>{k.cong_bon_cot_la_sai}</p>
+        {/* CÂU NHẮC ĐỔI THEO KIỂU XEM. Giữ nguyên một câu cho cả hai kiểu là chắc chắn sai một
+            nửa số lần: luỹ kế thì cộng bốn cột là sai, theo khoảng thì cộng bốn cột lại đúng. */}
+        <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
+          {khoang ? k.cong_bon_cot_khi_xem_khoang : k.cong_bon_cot_la_sai}</p>
         {k.vi_sao_khong_co_so_cuoi && <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
           {k.vi_sao_khong_co_so_cuoi}</p>}
         <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>

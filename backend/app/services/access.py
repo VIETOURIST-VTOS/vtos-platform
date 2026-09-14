@@ -723,8 +723,19 @@ MATRIX = {
 # liệt kê lại những màn hình mà chính người dùng đã được thấy, và tự lọc theo hidden_menus của
 # phiên. Có tên trong danh sách này thì vai trò bị giới hạn (tài xế, HDV, chuyên viên visa)
 # cũng được quyết định có thấy hay không, thay vì mặc nhiên thấy vì chưa ai khai.
+# "/dong-tien/nguon" thêm 14/9/2026 (TC-25) – TRANG CHI TIẾT của khối dòng tiền trên màn hình 01,
+# đi tới bằng liên kết chứ không có mục menu. Khai ở đây chứ KHÔNG ở MENU_ROLES, đúng như
+# "/phan-he/[khoa]" ở trên, vì hai lý do:
+#   · MENU_ROLES đòi mỗi mục phải có một lối vào trong menu và một thư mục trang ở cấp một của
+#     web/app; trang con không thoả cả hai, và ba phép thử canh đúng chỗ ấy (mt1, mt4, test_menu).
+#   · Quyền của trang này KHÔNG cần khai riêng: nó chỉ gọi /api/v1/dong-tien, mà nhóm API ấy chỉ
+#     mở cho vai có "/dong-tien" trong MENU_ROLES. Vai không có quyền gọi /dong-tien/meta sẽ nhận
+#     403 và trang nói thẳng là không được xem — hàng rào nằm ở MÁY CHỦ, không nằm ở đường dẫn.
+# Có tên ở đây thì vai trò bị giới hạn (tài xế, HDV, chuyên viên visa) vẫn được quyết định có thấy
+# hay không, thay vì mặc nhiên thấy vì chưa ai khai.
 ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/phieu-luong",
-                                      "/doi-mat-khau", "/phan-he/[khoa]", "/offline")
+                                      "/doi-mat-khau", "/phan-he/[khoa]", "/offline",
+                                      "/dong-tien/nguon")
 
 
 # Vai trò bị giới hạn: chỉ được thấy đúng những trang liệt kê ở đây.
