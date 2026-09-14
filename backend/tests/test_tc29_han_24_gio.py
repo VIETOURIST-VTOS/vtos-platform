@@ -217,3 +217,32 @@ def test_khong_co_ten_vai_tro_trong_trang_nguon():
     ma = _bo_chu_thich_tsx(_doc(NGUON))
     for vai in ("chutich", "tgd", "ketoan", "bks"):
         assert vai not in ma, f"Trang nguồn số nhắc tên vai {vai!r} — việc cắt dòng là của máy chủ."
+
+
+# ─────────────── 6 · CI BẮT ĐÚNG 14/9/2026 — DÒ TRÙNG PHẢI NẰM TRONG CHÍNH HÀM ───────────────
+
+def test_do_trung_nam_trong_chinh_ham_quet_va_la_ma_that():
+    """Phép thử VD-4 của bộ KS-4 bắt vòng này đỏ, và nó bắt đúng.
+
+    Luật: hàm nào dựng `Alert(...)` thì trong CHÍNH hàm ấy phải nhìn thấy câu truy vấn dò dòng đang
+    mở. Bản đầu của `quet()` đẩy phép dò sang hàm phụ `_dang_mo()` — vẫn dò thật, nhưng người đọc
+    `quet()` không thấy, và người sửa sau có thể bỏ lời gọi ấy mà không biết mình vừa mở cửa cho mỗi
+    lượt quét đẻ thêm một lượt dòng. Chữa mã, không xin miễn trừ.
+
+    Phép thử này đi XA HƠN VD-4 một bước: nó BÓC CHÚ THÍCH trước khi tìm. Đây là cái bẫy đã gặp năm
+    lần trong dự án — chính đoạn chú thích giải thích một chuỗi lại chứa đúng chuỗi ấy, nên phép thử
+    xanh nhờ lời giải thích chứ không nhờ mã.
+    """
+    import ast
+    src = _doc(HAN)
+    than = None
+    for nut in ast.parse(src).body:
+        if isinstance(nut, ast.FunctionDef) and nut.name == "quet":
+            than = ast.get_source_segment(src, nut)
+    assert than, "Không tìm thấy hàm quet()."
+    ma = _bo_chu_thich_py(than)
+    assert "Alert(" in ma, "quet() không còn dựng cảnh báo nào?"
+    assert "select(Alert)" in ma, (
+        "quet() dựng Alert mà trong chính hàm ấy không có phép dò dòng đang mở — mỗi lượt quét sẽ "
+        "đẻ thêm một lượt dòng."
+    )

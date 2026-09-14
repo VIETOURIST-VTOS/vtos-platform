@@ -190,7 +190,17 @@ def quet(db: Session) -> int:
         goi = KHUNG.ghep(VAI_QUET, bang, sdn)
         if not goi.get("xem_duoc"):
             continue
-        mo = _dang_mo(db, c.id)
+
+        # DÒ DÒNG ĐANG MỞ — viết THẲNG ở đây chứ không gọi `_dang_mo()`, dù hai chỗ cùng một câu
+        # truy vấn. Phép thử VD-4 của bộ KS-4 đọc MÃ NGUỒN: hàm nào dựng `Alert(...)` thì trong
+        # CHÍNH hàm ấy phải nhìn thấy câu truy vấn dò trùng. Đẩy phép dò sang một hàm phụ thì người đọc
+        # `quet()` không còn thấy nó, và người sửa sau có thể bỏ lời gọi ấy mà không biết mình vừa
+        # mở cửa cho mỗi lượt quét đẻ thêm một lượt dòng — 1.703 thành 3.406. CI bắt đúng chỗ này
+        # ngày 14/9/2026; phép thử ấy đúng, nên chữa mã chứ không xin miễn trừ.
+        dau = f"{c.id}:"
+        mo = {a.ref[len(dau):]: a for a in db.execute(select(Alert).where(
+            Alert.kind == LOAI, Alert.resolved == False,            # noqa: E712
+            Alert.ref.like(dau + "%"))).scalars()}
 
         for o in goi.get("dong") or []:
             ma = o["ma"]
