@@ -62,6 +62,10 @@ DEFAULT_PARAMS = [
     # moi_truong_du_lieu.moc_van_hanh_that(); chưa ký thì đọc ra None và cảnh báo để nguồn TRỐNG.
     ("canh_bao_lui_ngay", "30", "Chỉ sinh cảnh báo cho sự kiện trong khoảng lùi này. Không có mốc này thì mỗi lượt quét là một lượt quét lại toàn bộ lịch sử – đúng cơ chế đã đẻ ra 851 dòng quá hạn quyết toán", "ngày", "Chủ tịch chốt 11/9/2026, bằng cham_soc_lui_ngay"),
     ("canh_bao_han_mac_dinh_gio", "48", "Hạn xử lý mặc định cho loại cảnh báo chưa khai hạn riêng. Không có hạn thì không có gì trễ", "giờ", "Chủ tịch chốt 11/9/2026, bằng han_giu_cho_gio"),
+    # Hạn RIÊNG của dòng tiền, cố ý ngắn hơn hạn mặc định 48 giờ ở trên: một dòng tiền thiếu nguồn
+    # làm sai cả bảng bốn mốc, và bảng ấy là thứ Chủ tịch nhìn để quyết định chi tiền. Hạn đếm từ
+    # lúc LƯỢT QUÉT phát hiện, không phải từ lúc mở trang – xem services/han_dong_tien.py điều 1.
+    ("dong_tien_han_xu_ly_gio", "24", "Hạn xử lý cho dòng dòng tiền chưa đủ nguồn, tính từ lúc lượt quét phát hiện", "giờ", "Chủ tịch chốt 14/9/2026"),
     ("kn_han_muc1_gio", "72", "Hạn phản hồi khách – khiếu nại mức 1 (góp ý)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("kn_han_muc2_gio", "24", "Hạn phản hồi khách – khiếu nại mức 2 (có thiệt hại)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("kn_han_muc3_gio", "4", "Hạn phản hồi khách – khiếu nại mức 3 (nghiêm trọng)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
@@ -596,6 +600,14 @@ def run_robots(db: Session) -> int:
         created += SR.r9_run(db)["new_alerts"]
     except Exception as ex:   # không để lỗi R4 chặn các cảnh báo khác
         audit(db, "robot", "robot", "robot_r4_loi", "robot", after={"ly_do": str(ex)[:200]})
+    # Hạn xử lý dòng tiền (Chủ tịch chốt 14/9/2026 – 24 giờ). Đặt trong try riêng: dòng tiền dựa
+    # trên bảng bốn mốc, pháp nhân nào chưa có nền dữ liệu thì ném lỗi, và một pháp nhân hỏng không
+    # được phép nuốt mất mọi cảnh báo còn lại của lượt quét.
+    try:
+        from app.services import han_dong_tien as HDT
+        created += HDT.quet(db)
+    except Exception as ex:
+        audit(db, "robot", "robot", "robot_han_dong_tien_loi", "robot", after={"ly_do": str(ex)[:200]})
     sla = int(get_param(db, "sla_booking_phut"))
     for r in db.execute(select(ServiceRequest).where(ServiceRequest.booking_id == None)).scalars():
         mins = (datetime.now() - r.created_at).total_seconds() / 60

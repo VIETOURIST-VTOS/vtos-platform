@@ -169,10 +169,26 @@ def _trang_bang(wb: Workbook, k: dict, theo_khoang: bool):
     ws.freeze_panes = ws.cell(h + 1, 2)
 
 
+def _o_han(r: dict) -> str:
+    """Ô Hạn xử lý. BA trạng thái khác nhau, không gộp thành một ô trống.
+
+    Vòng TC-25 ghi "chưa đặt" cho mọi dòng vì hệ thống chưa có chỗ giữ hạn. Anh Tuấn chốt 14/9/2026
+    hạn 24 giờ, và `han_dong_tien` ghi hạn ấy xuống lúc lượt quét phát hiện. Từ nay ô này nói đúng
+    một trong ba điều, và "quá hạn" phải đọc ra được ngay chứ không chỉ là một ngày giờ trong quá
+    khứ mà người đọc phải tự so với hôm nay.
+    """
+    if not r.get("han_hien"):
+        return "chờ lượt quét" if r.get("han_chua_quet") else "—"
+    if r.get("qua_han"):
+        return f"{r['han_hien']} · QUÁ HẠN{(' ' + r['tre_hien']) if r.get('tre_hien') else ''}"
+    return r["han_hien"]
+
+
 def _trang_nguon(wb: Workbook, k: dict):
     """Trang NGUỒN SỐ — bản Excel của trang /dong-tien/nguon."""
     ws = wb.create_sheet("Nguồn số")
     _tieu_de_trang(ws, k, "nguồn số của từng dòng", 7)
+    _han_cua_trang = k.get("cau_han") or ""
 
     tt = k.get("tom_tat_trang_thai") or {}
     o = ws.cell(4, 1, f"{tt.get('day_du', 0)} đầy đủ · {tt.get('chua_doi_soat', 0)} chưa đối soát · "
@@ -192,7 +208,7 @@ def _trang_nguon(wb: Workbook, k: dict):
                r.get("bo_phan") or "chưa gán", r.get("nguon") or "chưa khai",
                (r.get("cua") or "chưa khai") + (" · cửa do đề xuất, chờ chốt"
                                                 if r.get("cua_do_de_xuat") else ""),
-               "chưa đặt"]
+               _o_han(r)]
         for i, v in enumerate(gia, start=1):
             o = ws.cell(d, i, v)
             o.border = _khung
@@ -201,17 +217,22 @@ def _trang_nguon(wb: Workbook, k: dict):
         ws.cell(d, 2).font = Font(size=10, bold=True,
                                   color={"con_thieu": DO, "chua_doi_soat": VANG,
                                          "day_du": XANH}.get(r.get("trang_thai"), "FF64798C"))
+        # Quá hạn phải đọc ra được khi LƯỚT MẮT qua tệp, không phải khi ngồi so từng ngày với hôm nay.
+        if r.get("qua_han"):
+            ws.cell(d, 7).font = Font(size=10, bold=True, color=DO)
         d += 1
 
-    o = ws.cell(d + 1, 1, "Cột “Hạn xử lý” chưa có nguồn: hệ thống chưa có bảng nào ghi hạn khắc "
-                          "phục cho từng dòng dòng tiền, và cũng chưa có cửa nhập hạn. Đây là việc "
-                          "còn thiếu, không phải ô để trống cho đẹp.")
+    o = ws.cell(d + 1, 1, (_han_cua_trang or
+                           "Hạn xử lý đếm từ lúc LƯỢT QUÉT phát hiện dòng thiếu nguồn, không phải "
+                           "từ lúc xuất tệp.")
+                + " Ô ghi “chờ lượt quét” là dòng đang thiếu mà lượt quét chưa chạy tới — không "
+                  "phải dòng không có hạn.")
     o.font = Font(size=9, italic=True, color="FF64798C")
     o.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=d + 1, start_column=1, end_row=d + 3, end_column=7)
 
     ws.row_dimensions[6].height = 28
-    _rong_cot(ws, [30, 14, 42, 20, 40, 46, 12])
+    _rong_cot(ws, [30, 14, 42, 20, 40, 46, 26])
     ws.freeze_panes = ws.cell(7, 2)
 
 

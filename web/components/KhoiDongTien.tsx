@@ -139,6 +139,10 @@ export default function KhoiDongTien() {
         <span className="tag ok">{tt.day_du ?? 0} đầy đủ</span>{" "}
         <span className="tag warn">{tt.chua_doi_soat ?? 0} chưa đối soát</span>{" "}
         <span className="tag red">{tt.con_thieu ?? 0} còn thiếu</span>{" "}
+        {/* Quá hạn tách riêng khỏi ba mức trạng thái: "còn thiếu" nói dòng chưa có số, "quá hạn"
+            nói đã lỡ mốc 24 giờ Chủ tịch chốt. Gộp hai cái vào một nhãn là mất đúng cái khác biệt
+            khiến người ta phải đứng dậy làm ngay. */}
+        {(k.so_qua_han ?? 0) > 0 && <><span className="tag red">{k.so_qua_han} quá hạn</span>{" "}</>}
         <Link className="the-cua" href="/dong-tien/nguon">Nguyên nhân · bộ phận · cửa nhập →</Link>
       </p>
 
