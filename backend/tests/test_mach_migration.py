@@ -63,3 +63,63 @@ def test_moi_ban_deu_co_ham_upgrade_va_downgrade():
         src = open(os.path.join(VERSIONS, f), encoding="utf-8").read()
         if "def upgrade(" not in src or "def downgrade(" not in src: thieu.append(f)
     assert not thieu, f"migration thiếu upgrade/downgrade: {thieu}"
+
+
+# =================================================================================================
+# MẶC ĐỊNH CỦA CỘT BOOLEAN — chỗ SQLite nhận mà PostgreSQL từ chối
+#
+# Ngày 14/9/2026 một bản migration khai `server_default=sa.text("0")` cho một cột Boolean. SQLite
+# nhận, nên toàn bộ bộ thử ở máy xanh — vì phép thử dùng `create_all`, KHÔNG chạy migration. Trên
+# PostgreSQL thì:
+#
+#     column "da_nghi" is of type boolean but default expression is of type integer
+#
+# `alembic upgrade head` dừng ở đấy, mà Dockerfile chạy lệnh ấy lúc khởi động, nên container không
+# lên được. Render giữ bản cũ chạy tiếp — hệ thống KHÔNG sập, nhưng bản mới không bao giờ tới nơi,
+# và nhìn từ ngoài thì y như "deploy chậm". Mất gần hai mươi phút mới nhận ra.
+#
+# Phân biệt quan trọng, và nó là toàn bộ nội dung của phép thử này:
+#
+#     server_default="0"          ->  DEFAULT '0'   chuỗi; PostgreSQL ép sang boolean được. ĐƯỢC.
+#     server_default=sa.text("0") ->  DEFAULT 0     số nguyên thô; PostgreSQL từ chối.   HỎNG.
+#
+# Nên phép thử chỉ soi phần `sa.text(...)`, không cấm dạng chuỗi đang dùng ở hai bản migration cũ.
+# =================================================================================================
+
+# CỐ Ý KHÔNG có "1" và "0" trong danh sách này, dù PostgreSQL nhận chuỗi '0' cho cột boolean.
+# Khác nhau ở chỗ CÓ NHÁY HAY KHÔNG, và `sa.text()` là dạng KHÔNG nháy:
+#
+#     server_default="0"           ->  DEFAULT '0'   chuỗi, ép sang boolean được.   ĐƯỢC
+#     server_default=sa.text("0")  ->  DEFAULT 0     số nguyên thô, bị từ chối.     HỎNG
+#
+# Bản nháp đầu của chính phép thử này có "1" và "0" trong danh sách, nên nó xanh trước đúng cái lỗi
+# nó sinh ra để bắt. Thử phá mới lộ ra — và đó là lý do mỗi chốt đều phải bị thử phá một lần.
+BOOL_HOP_LE = ("true", "false", "t", "f", "yes", "no", "on", "off")
+
+
+def test_cot_boolean_khong_duoc_mac_dinh_bang_so_tho():
+    """Mặc định của cột Boolean viết bằng `sa.text()` thì bên trong phải là chữ boolean.
+
+    Không bắt được ở đây thì chỗ bắt tiếp theo là lúc container khởi động trên máy chủ thật.
+    """
+    xau = []
+    for f in sorted(os.listdir(VERSIONS)):
+        if not f.endswith(".py") or f.startswith("__"):
+            continue
+        src = open(os.path.join(VERSIONS, f), encoding="utf-8").read()
+        for m in re.finditer(r"sa\.Column\((?:[^()]|\([^()]*\))*\)", src, re.S):
+            cot = m.group(0)
+            if "sa.Boolean()" not in cot:
+                continue
+            sd = re.search(r'server_default\s*=\s*sa\.text\(\s*["\']([^"\']*)["\']\s*\)', cot)
+            if sd and sd.group(1).strip().lower() not in BOOL_HOP_LE:
+                ten = re.search(r'sa\.Column\(\s*["\']([^"\']+)', cot)
+                xau.append(f"{f}: cột {ten.group(1) if ten else '?'} "
+                           f"-> server_default=sa.text({sd.group(1)!r})")
+    assert not xau, (
+        "Cột Boolean đặt mặc định bằng một số thô. PostgreSQL từ chối "
+        "(\"is of type boolean but default expression is of type integer\") và `alembic upgrade "
+        "head` dừng ở đấy — container không khởi động được, mà phép thử ở máy KHÔNG thấy vì nó dùng "
+        "create_all chứ không chạy migration.\n"
+        "Sửa thành sa.false() / sa.true(), hoặc sa.text(\"false\") / sa.text(\"true\"):\n  "
+        + "\n  ".join(xau))
