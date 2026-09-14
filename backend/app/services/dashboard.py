@@ -16,6 +16,16 @@ from app.services import finance as FIN
 from app.services import ops as OPS
 from app.core.config import settings
 
+# Khối 04a Điều hành trên màn hình 01 — CỬA SỔ NGÀY KHỞI HÀNH.
+#
+# Anh Tuấn chốt 14/9/2026: lấy theo BẢN VẼ V1.4, tức 14 ngày. Trước đó máy chủ lọc 21 ngày, còn bản
+# vẽ ghi 14 — màn hình phải in cả hai con số ra để không ai đọc nhầm, mà in cả hai thì chẳng ai biết
+# tin con nào. Nay một con số.
+#
+# Để ở đây, KHÔNG rải trong câu truy vấn: số ngày này là một quyết định nghiệp vụ, và chỗ nào cần
+# nó thì đọc từ đây. Màn hình cũng đọc con số này qua `sap_khoi_hanh_so_ngay` chứ không gõ lại.
+SO_NGAY_SAP_KHOI_HANH = 14
+
 
 def _month_tours(db: Session, y: int, m: int) -> list[Tour]:
     """Chuyến Kế toán xác nhận trong THÁNG y-m. Lọc mốc thời gian ngay trong SQL: bản cũ nạp toàn bộ
@@ -130,12 +140,17 @@ def build(db: Session, u: User) -> dict:
         d7 = int(R.get_param(db, "moc_d7")); rows = []
         for t in db.execute(select(Tour).options(selectinload(Tour.bookings))
                             .where(Tour.status == "da_duyet", Tour.start_date >= today,
-                                   Tour.start_date <= today + timedelta(days=21))).scalars():
+                                   Tour.start_date <= today + timedelta(days=SO_NGAY_SAP_KHOI_HANH))).scalars():
             c = R.calc_db(db, t, R.get_param(db, "nguong_bien", t.start_date)); left = (t.start_date - today).days
             pax = R.booked_pax(t)
             rows.append({"code": t.code, "start": t.start_date, "days_left": left, "booked": pax,
                          "breakeven": c["breakeven_pax"], "below": pax < (c["breakeven_pax"] or 0)})
         sec["sap_khoi_hanh"] = sorted(rows, key=lambda r: r["days_left"])
+        # Trả LUÔN số ngày ra cho màn hình, đừng để màn hình gõ lại con số.
+        # Trước 14/9 máy chủ lọc 21 ngày còn tiêu đề trên màn hình ghi "21 ngày tới" bằng chữ
+        # gõ tay. Đổi một nơi là hai nơi nói khác nhau, và người đọc không có cách nào biết
+        # nơi nào đúng. Nay một chỗ khai, một chỗ đọc.
+        sec["sap_khoi_hanh_so_ngay"] = SO_NGAY_SAP_KHOI_HANH
         # Quá hạn quyết toán. Hạn = ngày kết thúc + số ngày theo tham số (đoàn và lẻ khác nhau), nên
         # lọc luôn bằng ngày kết thúc: chuyến kết thúc SAU today − hạn dài nhất thì chắc chắn chưa quá
         # hạn, không cần nạp về. Bản cũ nạp 400 chuyến gần nhất rồi bỏ đi phần lớn.

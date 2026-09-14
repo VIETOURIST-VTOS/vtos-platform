@@ -18,7 +18,7 @@ BA ĐIỀU MỌI CỬA Ở ĐÂY GIỮ
 """
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -31,6 +31,7 @@ from app.services import dong_tien as DT
 from app.services import khung_dong_tien as KHUNG
 from app.services import pham_vi_phap_nhan as PV
 from app.services import rules as R
+from app.services import xuat_dong_tien_excel as XL
 
 router = APIRouter(prefix="/api/v1/dong-tien", tags=["dong-tien"])
 
@@ -147,6 +148,48 @@ def xem_khung(company_id: int, den_ngay: date | None = None,
     except DT.LoiChot as e:
         raise HTTPException(404, str(e))
     return KHUNG.ghep(u.role, bang, sdn)
+
+
+@router.get("/khung/{company_id}/excel")
+def xuat_khung_excel(company_id: int, den_ngay: date | None = None,
+                     u: User = Depends(require_roles(*XEM, mo_ta="xuất Excel khối dòng tiền")),
+                     db: Session = Depends(get_db)):
+    """Xuất khối dòng tiền ra Excel — nút "Xuất Excel" trên màn hình 01 (14/9/2026).
+
+    DÙNG LẠI ĐÚNG ĐƯỜNG CỦA MÀN HÌNH: gọi cùng `bang_bon_moc` + `so_du_tung_ngay` + `KHUNG.ghep`,
+    rồi mới dựng tệp. Nhờ vậy Excel không thể nói khác màn hình — nếu tách ra truy vấn riêng thì
+    hai nơi lấy số ở hai thời điểm, và lệch nhau là chuyện sớm muộn.
+
+    SEC-02 giữ nguyên: `ghep(u.role, ...)` đã cắt tập dòng theo vai, tệp Excel chỉ ghi lại những
+    dòng nhận được. Bộ dựng tệp KHÔNG biết vai là gì và không được biết.
+
+    CÓ NHẬT KÝ (v1.1 §IV.3 đòi "nút xuất Excel có nhật ký"). Một tệp dòng tiền rời khỏi hệ thống là
+    một việc phải trả lời được câu "ai lấy, lúc nào, của pháp nhân nào" — nên ghi một dòng vào sổ
+    nhật ký có xâu chuỗi băm, cùng chỗ với mọi thao tác ghi khác.
+    """
+    try:
+        bang = DT.bang_bon_moc(db, company_id, den_ngay)
+        sdn = DT.so_du_tung_ngay(db, company_id, den_ngay)
+    except DT.LoiChot as e:
+        raise HTTPException(404, str(e))
+    k = KHUNG.ghep(u.role, bang, sdn)
+    try:
+        noi_dung = XL.dung_tep(k)
+    except ValueError as e:
+        raise HTTPException(403, str(e))
+
+    ten = XL.ten_tep(k)
+    R.audit(db, u.username, u.role, "xuat_excel_dong_tien", f"dong_tien:{company_id}",
+            after={"company_id": company_id, "den_ngay": str(den_ngay or ""), "ten_tep": ten,
+                   "so_dong": len(k.get("dong") or []), "muc_xem": k.get("muc_xem")})
+    db.commit()
+    # filename* theo RFC 5987: tên tệp không dấu nên ASCII là đủ, vẫn khai UTF-8 để trình duyệt
+    # nào cũng hiểu một cách.
+    return Response(
+        content=noi_dung,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{ten}"; filename*=UTF-8\'\'{ten}'},
+    )
 
 
 @router.get("/so-du-tung-ngay/{company_id}")

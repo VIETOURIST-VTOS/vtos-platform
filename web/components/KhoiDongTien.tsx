@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, fmtD, vnd } from "@/lib/api";
+import { api, fmtD, taiTep, vnd } from "@/lib/api";
 import { useShell } from "@/components/Shell";
 import { xepDonVi, type DonViChon } from "@/lib/thu_tu_don_vi";
 
@@ -66,6 +66,7 @@ export default function KhoiDongTien() {
   // Mặc định LUỸ KẾ, không phải kiểu mới. Kiểu luỹ kế là kiểu đã in ra trong tài liệu v1.1 và là
   // kiểu người đọc đang quen; đổi mặc định là hôm sau có người đọc bảng mới bằng thói quen cũ.
   const [khoang, setKhoang] = useState(false);
+  const [dangXuat, setDangXuat] = useState(false);
 
   useEffect(() => {
     api("/dong-tien/meta")
@@ -115,8 +116,18 @@ export default function KhoiDongTien() {
             {dsPn.map((c) => <option key={c.id} value={c.id}>{c.code} – {c.name}</option>)}
           </select>)}
         <span style={{ flex: 1 }} />
-        <button type="button" className="act grey"
-          onClick={() => toast("Xuất Excel khối dòng tiền: đang xây dựng")}>Xuất Excel</button>
+        {/* NÚT XUẤT EXCEL THẬT (14/9/2026). Trước đây nó chỉ hiện câu "đang xây dựng" — một nút
+            hứa rồi không làm còn tệ hơn không có nút, vì lần sau người dùng không tin nút nào nữa.
+            Tệp do MÁY CHỦ dựng từ đúng gói mà màn hình này đang đọc, nên Excel không thể nói khác
+            màn hình; và máy chủ ghi một dòng nhật ký cho mỗi lần xuất. */}
+        <button type="button" className="act grey" disabled={dangXuat || !pn}
+          onClick={async () => {
+            if (!pn) return;
+            setDangXuat(true);
+            try { toast("Đã tải " + await taiTep(`/dong-tien/khung/${pn}/excel`)); }
+            catch (e: any) { toast(e?.message || "Không xuất được Excel", true); }
+            finally { setDangXuat(false); }
+          }}>{dangXuat ? "Đang dựng tệp…" : "Xuất Excel"}</button>
       </div>
 
       <p className="muted" style={{ marginTop: 0 }}>{k.cau_pham_vi}</p>

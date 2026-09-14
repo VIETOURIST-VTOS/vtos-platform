@@ -31,6 +31,41 @@ export async function api<T = any>(path: string, init: RequestInit & { json?: an
   return data as T;
 }
 
+/** Tải một tệp từ API về máy người dùng, có kèm thẻ đăng nhập.
+ *
+ *  Vì sao không dùng thẳng thẻ <a href> hay window.open: hai cách ấy KHÔNG gửi được tiêu đề
+ *  Authorization, nên máy chủ trả 401 và người dùng bị đá về trang đăng nhập ngay giữa lúc bấm nút
+ *  tải. Phải gọi bằng fetch để đính thẻ vào, nhận về khối nhị phân rồi mới dựng liên kết tạm.
+ *
+ *  Tên tệp lấy từ tiêu đề Content-Disposition của MÁY CHỦ, không đặt ở đây: máy chủ mới biết tệp
+ *  ấy là của pháp nhân nào và tính đến ngày nào. `mac_dinh` chỉ là lối lui.
+ *
+ *  URL tạm phải thu hồi sau khi dùng; không thu hồi thì mỗi lần bấm nút giữ lại một bản sao của
+ *  tệp trong bộ nhớ trình duyệt cho tới khi đóng tab.
+ */
+export async function taiTep(path: string, mac_dinh = "vtos.xlsx"): Promise<string> {
+  const headers: Record<string, string> = {};
+  const tok = getToken();
+  if (tok) headers["Authorization"] = `Bearer ${tok}`;
+  const r = await fetch(`/api/v1${path}`, { headers });
+  if (r.status === 401) { clearSession(); if (typeof window !== "undefined") location.href = "/login"; }
+  if (!r.ok) {
+    let msg = "Lỗi " + r.status;
+    try { const d = JSON.parse(await r.text())?.detail; if (d) msg = typeof d === "string" ? d : d.message || msg; } catch { }
+    throw { status: r.status, message: msg } as ApiError;
+  }
+  const cd = r.headers.get("Content-Disposition") || "";
+  const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+  const ten = m ? decodeURIComponent(m[1]) : mac_dinh;
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = ten;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  return ten;
+}
+
 export async function login(username: string, password: string) {
   const fd = new URLSearchParams({ username, password });
   const r = await fetch("/api/v1/auth/login", { method: "POST", body: fd, headers: { "Content-Type": "application/x-www-form-urlencoded" } });
