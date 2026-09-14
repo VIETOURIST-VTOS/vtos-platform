@@ -37,7 +37,11 @@ def upgrade():
         sa.Column("cach_khop", sa.String(length=20), nullable=True, server_default=""),
         sa.Column("ung_vien", sa.String(length=400), nullable=True, server_default=""),
         sa.Column("so_dong", sa.Integer(), nullable=True, server_default="0"),
-        sa.Column("da_nghi", sa.Boolean(), nullable=True, server_default=sa.text("0")),
+        # `sa.false()`, KHÔNG phải `sa.text("0")`. PostgreSQL từ chối `DEFAULT 0` cho cột BOOLEAN
+        # ("column is of type boolean but default expression is of type integer") và cả lệnh
+        # `alembic upgrade head` dừng ở đấy — container không khởi động được. SQLite thì nhận, nên
+        # bộ thử ở máy (dùng create_all, không chạy migration) không bao giờ thấy.
+        sa.Column("da_nghi", sa.Boolean(), nullable=True, server_default=sa.false()),
         sa.Column("nguoi_gan", sa.String(length=50), nullable=True, server_default=""),
         sa.Column("gan_luc", sa.DateTime(), nullable=True),
         sa.Column("tao_luc", sa.DateTime(), nullable=True),
