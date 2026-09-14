@@ -31,6 +31,10 @@ function Dash() {
   if (!d) return <p className="muted">Đang tải…</p>;
   const c = d.counts || {};
   const k = d.kpis || {}; const sec = d.sections || {};
+  /* Cửa sổ ngày khởi hành do MÁY CHỦ khai (services/dashboard.py · SO_NGAY_SAP_KHOI_HANH). Màn
+     hình chỉ đọc — gõ lại con số ở đây là mở đường cho hai nơi nói khác nhau, đúng lỗi vừa sửa ở
+     đầu cột bảng dòng tiền. Lối lui 14 chỉ dùng khi máy chủ cũ chưa trả trường này. */
+  const soNgayKH = sec.sap_khoi_hanh_so_ngay ?? 14;
 
   /* TÁM THẺ CHỈ TIÊU theo bản vẽ V1.2. Mỗi thẻ chỉ ra đúng một con số chính, một dòng so sánh và
      một dòng trạng thái dữ liệu – không nhồi ba số vào một ô như hàng KPI cũ.
@@ -56,7 +60,7 @@ function Dash() {
       duoi: `${sec.qua_han_qt?.length ?? 0} chuyến quá hạn quyết toán`,
       do: (sec.qua_han_qt?.length ?? 0) > 0 },
     { nhan: "Tour sắp khởi hành", so: dem(sec.sap_khoi_hanh?.length),
-      duoi: "21 ngày tới (bản vẽ ghi 14 – máy chủ đang tính 21)",
+      duoi: `${soNgayKH} ngày tới`,
       ai: "Điều hành", cua: "/tours" },
     { nhan: "Đội xe hôm nay", so: null,
       ai: "Đội xe", cua: "/doi-xe",
@@ -111,10 +115,12 @@ function Dash() {
           bản vẽ. Cũng KHÔNG suy "đã đủ điều kiện" từ việc thiếu dữ liệu – bản vẽ ghi thẳng: không
           mặc định chuyến đã sẵn sàng.
 
-          Bản vẽ ghi 14 ngày, máy chủ đang tính 21. Chưa đổi vì đó là phép tính ở máy chủ, không
-          phải nhãn ở màn hình; ghi rõ con số thật đang là bao nhiêu. */}
-      {sec.sap_khoi_hanh && <div className="panel" id="dieu-hanh"><h2>Điều hành – chuyến khởi hành 21 ngày tới</h2>
-        <p className="muted">Bản vẽ V1.4 ghi 14 ngày · máy chủ đang tính 21 ngày. Ưu tiên chuyến còn thiếu điều kiện — <b>không</b> mặc định chuyến đã sẵn sàng.</p>
+          SỐ NGÀY: anh Tuấn chốt 14/9/2026 lấy theo BẢN VẼ, tức 14 ngày. Máy chủ đổi từ 21 xuống
+          14 và TRẢ LUÔN con số ấy ra (`sap_khoi_hanh_so_ngay`); màn hình đọc nó chứ không gõ lại.
+          Trước đó hai nơi mang hai con số nên phải in cả hai ra — mà in cả hai thì chẳng ai biết
+          tin con nào. */}
+      {sec.sap_khoi_hanh && <div className="panel" id="dieu-hanh"><h2>Điều hành – chuyến khởi hành {soNgayKH} ngày tới</h2>
+        <p className="muted">Ưu tiên chuyến còn thiếu điều kiện — <b>không</b> mặc định chuyến đã sẵn sàng.</p>
         {sec.sap_khoi_hanh.length ? <div className="wrap"><table className="v14-bang">
           <thead><tr><th>Chuyến</th><th>Ngày đi</th><th>Số khách</th><th>Dịch vụ còn thiếu</th><th>Xe</th><th>HDV</th><th>Phụ trách</th></tr></thead>
           <tbody>{sec.sap_khoi_hanh.map((r: any) => <tr key={r.code}>
