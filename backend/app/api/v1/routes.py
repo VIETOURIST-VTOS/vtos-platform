@@ -30,6 +30,13 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     u = db.execute(select(User).where(User.username == form.username, User.active == True)).scalars().first()
     if not u or not verify_password(form.password, u.password_hash):
         raise HTTPException(401, "Sai tên đăng nhập hoặc mật khẩu")
+    # Ở ĐÚNG CHỖ NÀY máy đang cầm mật khẩu người ta vừa gõ. So nó với danh sách đã bị in công khai
+    # là MỘT PHÉP SO CHUỖI – không tốn gì, và biết chắc chứ không phải thử. Bản 14/9 hỏi cùng câu
+    # hỏi ấy bằng cách băm lại từng tài khoản một ở màn hình quản trị, và trả giá hơn hai phút cho
+    # 116 tài khoản. Cùng một hiệu lực: cờ bật lên, dù bật bằng đường nào, cũng chỉ chặn được từ
+    # lần đăng nhập KẾ TIẾP – mà lần kế tiếp ấy chính là lần này.
+    if MKY.la_mat_khau_da_cong_khai(form.password):
+        u.must_change_password = True
     u.last_login = datetime.now()          # để rà được tài khoản bỏ hoang và người đã nghỉ chưa khóa
     R.audit(db, u.username, u.role, "dang_nhap", "user"); db.commit()
     return {"access_token": create_token(u.username, u.role), "token_type": "bearer", "user": me(u, db)}

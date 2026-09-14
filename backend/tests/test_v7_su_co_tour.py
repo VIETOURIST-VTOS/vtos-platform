@@ -32,7 +32,7 @@ client = TestClient(app); TOK = {}; CTX = {}
 
 def login(u):
     if u not in TOK:
-        r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
+        r = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"})
         assert r.status_code == 200, r.text
         TOK[u] = r.json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
@@ -48,7 +48,7 @@ def h_dong():
     """Tài khoản ĐÓNG được hồ sơ. Cố ý không dùng cntt: cntt ghi được nhưng không kết luận được –
     xem su_co_tour.DONG và phép thử S8."""
     for u in ("tp.dieuhanh", "tgd", "chutich"):
-        r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
+        r = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"})
         if r.status_code == 200:
             return login(u)
     pytest.skip("dữ liệu mẫu không có tài khoản nào đóng được hồ sơ sự cố")
@@ -337,10 +337,10 @@ def _tao_tai_khoan(username, vai, ten):
     with SessionLocal() as db:
         if db.execute(select(User).where(User.username == username)).scalars().first() is None:
             db.add(User(username=username, full_name=ten, role=vai, department="kiem_thu",
-                        staff_code=username.upper()[:10], password_hash=hash_password("123456"),
+                        staff_code=username.upper()[:10], password_hash=hash_password("Vtos@Demo#2026"),
                         active=True))
             db.commit()
-    r = client.post("/api/v1/auth/login", data={"username": username, "password": "123456"})
+    r = client.post("/api/v1/auth/login", data={"username": username, "password": "Vtos@Demo#2026"})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 

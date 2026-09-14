@@ -26,7 +26,7 @@ KY = f"{HOM_NAY:%Y-%m}"
 
 def login(u):
     if u not in TOK:
-        TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"}).json()["access_token"]
+        TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"}).json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
 
 

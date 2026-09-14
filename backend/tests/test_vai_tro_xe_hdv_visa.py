@@ -26,7 +26,7 @@ def _startup():
         global client; client = c; yield
 
 
-def login(u, pw="123456"):
+def login(u, pw="Vtos@Demo#2026"):
     if u not in TOK:
         r = client.post("/api/v1/auth/login", data={"username": u, "password": pw})
         assert r.status_code == 200, r.text
@@ -41,7 +41,7 @@ def tao_tai_khoan(username, role, ten, phong, vi_tri, ma):
     from app.core.security import hash_password
     db = SessionLocal()
     u = User(username=username, full_name=ten, role=role, department=phong, staff_code=ma,
-             password_hash=hash_password("123456"), active=True)
+             password_hash=hash_password("Vtos@Demo#2026"), active=True)
     db.add(u); db.flush()
     e = db.execute(__import__("sqlalchemy").select(Employee).where(Employee.code == ma)).scalars().first()
     if e is None:
@@ -125,7 +125,7 @@ def test_tai_khoan_chua_ghep_ho_so_bao_loi_ro_rang():
     from app.core.security import hash_password
     db = SessionLocal()
     db.add(User(username="taixe.mocoi", full_name="Tài xế chưa ghép", role="xe_hdv", department="doi_xe",
-                password_hash=hash_password("123456"), active=True))
+                password_hash=hash_password("Vtos@Demo#2026"), active=True))
     db.commit(); db.close()
     r = client.get("/api/v1/xe-hdv/cua-toi", headers=login("taixe.mocoi"))
     assert r.status_code == 404 and "HCNS" in r.json()["detail"]
@@ -159,16 +159,16 @@ def test_mo_lai_tai_khoan_bi_khoa():
     from app.core.security import hash_password
     db = SessionLocal()
     db.add(User(username="bks.kt", full_name="Ban Kiểm soát kiểm thử", role="bks", department="bks",
-                password_hash=hash_password("123456"), active=False))
+                password_hash=hash_password("Vtos@Demo#2026"), active=False))
     db.commit(); db.close()
 
     ds = client.get("/api/v1/users/khoa", headers=login("hcns")).json()
     row = next(x for x in ds if x["username"] == "bks.kt")
-    assert client.post("/api/v1/auth/login", data={"username": "bks.kt", "password": "123456"}).status_code == 401
+    assert client.post("/api/v1/auth/login", data={"username": "bks.kt", "password": "Vtos@Demo#2026"}).status_code == 401
 
     r = client.put(f"/api/v1/users/{row['id']}", json={"active": True}, headers=login("hcns"))
     assert r.status_code == 200 and r.json()["user"]["active"] is True, r.text
-    assert client.post("/api/v1/auth/login", data={"username": "bks.kt", "password": "123456"}).status_code == 200
+    assert client.post("/api/v1/auth/login", data={"username": "bks.kt", "password": "Vtos@Demo#2026"}).status_code == 200
 
     # không tự khóa chính mình – tránh tự nhốt ra ngoài hệ thống
     me = client.get("/api/v1/auth/me", headers=login("hcns")).json()

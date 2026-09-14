@@ -20,17 +20,40 @@ BỘ MÁY BUỘC ĐỔI MẬT KHẨU ĐÃ CÓ SẴN, CHỈ THIẾU NGƯỜI BẤ
 khi HCNS đặt lại mật khẩu cho ai đó. **Những tài khoản sinh ra từ lúc gieo dữ liệu mẫu chưa bao giờ
 được bật cờ** — nên không ai bị buộc đổi, và mật khẩu công khai cứ thế sống.
 
-Tệp này là phần còn thiếu: một phép **soát**, và một phép **bật cờ**.
+BẢN ĐẦU CỦA TỆP NÀY ĐI QUÉT — VÀ QUÉT LÀ SAI
+
+Bản 14/9 giải bài bằng cách **quét**: duyệt mọi tài khoản đang hoạt động, mỗi tài khoản gọi
+`verify_password` một lần để xem có trùng chuỗi đã bị công bố không.
+
+Ở bộ thử có năm tài khoản nên nó xanh trong một giây. Trên bản thật có **116 tài khoản**, và nó
+treo. Đo trên máy dựng: `bcrypt.checkpw` **0,274 giây/lần** — bcrypt chậm là CỐ Ý, đó chính là thứ
+làm nó chống dò được. 116 lần là ~32 giây ở máy mạnh, trên máy chủ nhỏ là hơn hai phút. Mà phép
+quét ấy lại chạy **mỗi lần có người mở màn hình Tài khoản**.
+
+CÁCH SỬA KHÔNG PHẢI LÀM CHO QUÉT NHANH HƠN — MÀ LÀ BỎ QUÉT ĐI
+
+Có đúng hai lúc biết được một tài khoản còn dùng mật khẩu đã công bố hay không, và cả hai đều KHÔNG
+cần bcrypt:
+
+  1. LÚC NGƯỜI TA ĐĂNG NHẬP. Máy đang cầm mật khẩu họ vừa gõ. So chuỗi ấy với danh sách đã công bố
+     là một phép so chuỗi — gần như không tốn gì, và biết CHẮC CHẮN chứ không phải đoán. Ai đăng
+     nhập bằng mật khẩu đã công bố thì bị bật cờ ngay tại chỗ, trước khi vào được màn hình nào.
+
+  2. TÀI KHOẢN CHƯA TỪNG ĐĂNG NHẬP (`last_login` rỗng). Chưa ai dùng thì mật khẩu vẫn nguyên như
+     lúc gieo. Không cần thử cũng biết. Bật cờ cả lượt, không một lần bcrypt.
+
+Hai đường ấy phủ kín: ai có dùng tài khoản thì (1) bắt được ở lần đăng nhập kế tiếp, ai không dùng
+thì (2) bắt được ngay. Và phép quét cũ **không nhanh hơn được chút nào về hiệu lực**: cờ bật lên,
+dù bật bằng đường nào, cũng chỉ có tác dụng ở LẦN ĐĂNG NHẬP KẾ TIẾP. Nó tốn hai phút để biết sớm
+một điều không dùng sớm được.
 
 CLAUDE KHÔNG ĐẶT MẬT KHẨU CHO AI
 
-Ở đây chỉ có hai việc: *kiểm* xem một mật khẩu có nằm trong danh sách đã công khai không (bằng cách
-so với bản băm — không đọc, không lưu, không truyền đi đâu), và *bật cờ* buộc người ấy tự đổi ở lần
-đăng nhập kế tiếp. Mật khẩu mới do chính chủ tài khoản gõ.
+Ở đây chỉ có hai việc: *nhận ra* một mật khẩu nằm trong danh sách đã công bố, và *bật cờ* buộc người
+ấy tự đổi ở lần đăng nhập kế tiếp. Mật khẩu mới do chính chủ tài khoản gõ.
 """
 from __future__ import annotations
 
-import re
 import unicodedata
 
 # Mật khẩu ĐÃ IN RA TRANG ĐĂNG NHẬP. Đây không phải "mật khẩu yếu" theo nghĩa đoán được — nó là mật
@@ -70,7 +93,7 @@ def vi_sao_khong_dat_duoc(mk: str, *, username: str = "", ho_ten: str = "",
     m = (mk or "").strip()
     if len(m) < TOI_THIEU:
         return f"Mật khẩu phải từ {TOI_THIEU} ký tự."
-    if m in DA_CONG_KHAI:
+    if la_mat_khau_da_cong_khai(m):
         return ("Mật khẩu này đã từng in công khai trên trang đăng nhập của hệ thống – "
                 "ai cũng biết, nên không dùng lại được.")
     if _khong_dau(m) in QUA_YEU or _lien_tiep(m):
@@ -88,41 +111,58 @@ def vi_sao_khong_dat_duoc(mk: str, *, username: str = "", ho_ten: str = "",
     return ""
 
 
-def dang_dung_mat_khau_cong_khai(password_hash: str) -> bool:
-    """Tài khoản này còn đang dùng một mật khẩu ĐÃ CÔNG KHAI hay không.
+def la_mat_khau_da_cong_khai(mk: str) -> bool:
+    """Chuỗi người dùng vừa gõ có nằm trong danh sách đã bị công bố không.
 
-    So bằng bản băm. Không đọc được mật khẩu thật của ai, và cũng không cần đọc: câu hỏi duy nhất là
-    "có trùng một trong những chuỗi đã bị in ra trang đăng nhập không".
+    SO CHUỖI, KHÔNG BĂM. Đây là phép dùng ở LÚC ĐĂNG NHẬP, khi máy đang cầm sẵn mật khẩu người ta
+    vừa gõ — nên nó không tốn gì, và nó biết chắc chứ không phải thử. Bản trước của tệp này đi băm
+    từng tài khoản một để hỏi cùng câu hỏi đó, và trả giá hơn hai phút cho 116 tài khoản.
+
+    Không ghi lại, không truyền đi đâu: chuỗi vào rồi ra ngay, chỉ còn lại một câu trả lời có/không.
     """
-    from app.core.security import verify_password
-
-    return any(verify_password(x, password_hash or "") for x in DA_CONG_KHAI)
+    return (mk or "").strip() in DA_CONG_KHAI
 
 
-def soat(db) -> dict:
-    """Đếm xem còn bao nhiêu tài khoản đang dùng mật khẩu đã công khai. KHÔNG đổi gì."""
+def co_phai_dang_ngu(u) -> bool:
+    """Tài khoản CHƯA TỪNG ĐĂNG NHẬP — mật khẩu còn nguyên như lúc gieo.
+
+    Không cần thử mật khẩu cũng biết: chưa ai dùng thì chưa ai đổi. Đây là nửa còn lại của bài toán,
+    nửa mà đường đăng nhập không với tới được.
+    """
+    return getattr(u, "last_login", None) is None
+
+
+def tom_tat(db) -> dict:
+    """Ba con số cho màn hình. KHÔNG băm một lần nào, nên mở màn hình không phải chờ.
+
+    Đây là phép chạy lúc TẢI TRANG, nên nó phải rẻ. Bản trước gọi phép quét ở đây và màn hình Tài
+    khoản treo hơn hai phút trên bản thật.
+    """
     from sqlalchemy import select
 
     from app.models.core import User
 
     ds = db.scalars(select(User).where(User.active == True)).all()      # noqa: E712
-    dinh = [u for u in ds if dang_dung_mat_khau_cong_khai(u.password_hash)]
+    ngu = [u for u in ds if co_phai_dang_ngu(u) and not u.must_change_password]
     return {
         "tong_tai_khoan": len(ds),
-        "con_mat_khau_cong_khai": len(dinh),
-        "da_buoc_doi": sum(1 for u in dinh if u.must_change_password),
-        "chua_buoc_doi": sum(1 for u in dinh if not u.must_change_password),
-        "danh_sach": [{"username": u.username, "ho_ten": u.full_name, "role": u.role,
-                       "da_buoc_doi": bool(u.must_change_password)} for u in dinh],
+        "dang_buoc_doi": sum(1 for u in ds if u.must_change_password),
+        "chua_tung_dang_nhap": len(ngu),
+        "danh_sach": [{"username": u.username, "ho_ten": u.full_name, "role": u.role}
+                      for u in ngu],
         "ghi_chu": (
-            f"{len(dinh)}/{len(ds)} tài khoản đang hoạt động còn dùng mật khẩu đã in công khai trên "
-            "trang đăng nhập. Bật cờ thì lần đăng nhập kế tiếp họ buộc phải đổi trước khi vào được "
-            "bất cứ màn hình nào. Không ai bị khoá, và không mật khẩu nào bị đặt hộ."),
+            f"{len(ngu)}/{len(ds)} tài khoản đang hoạt động CHƯA TỪNG ĐĂNG NHẬP — mật khẩu của "
+            "chúng còn nguyên như lúc gieo, trong đó có những tài khoản từng bị in mật khẩu công "
+            "khai trên trang đăng nhập. Bật cờ thì lần đăng nhập đầu tiên họ phải đổi trước khi vào "
+            "được bất cứ màn hình nào. Không ai bị khoá, và không mật khẩu nào bị đặt hộ.\n\n"
+            "Những tài khoản ĐÃ từng đăng nhập không nằm trong danh sách này: nếu ai còn dùng mật "
+            "khẩu đã công bố thì máy nhận ra ngay ở lần đăng nhập kế tiếp của chính họ và bật cờ "
+            "tại chỗ — không cần ai bấm gì."),
     }
 
 
 def bat_co(db, boi: str, xac_nhan: bool = False) -> dict:
-    """Bật cờ BUỘC ĐỔI cho mọi tài khoản còn dùng mật khẩu đã công khai.
+    """Bật cờ BUỘC ĐỔI cho mọi tài khoản đang hoạt động mà CHƯA TỪNG ĐĂNG NHẬP.
 
     Mặc định chỉ XEM TRƯỚC. Việc này chạm vào khả năng đăng nhập của người thật, nên nó phải qua một
     lần bấm và vào nhật ký mang tên người bấm.
@@ -131,19 +171,19 @@ def bat_co(db, boi: str, xac_nhan: bool = False) -> dict:
 
     from app.models.core import User
 
-    kq = soat(db)
+    kq = tom_tat(db)
     if not xac_nhan:
         return {**kq, "da_bat": 0,
                 "message": ("CHƯA ĐỔI GÌ. Đây là bản xem trước. Bấm xác nhận thì mới bật cờ, và lần "
                             "bấm ấy vào nhật ký mang tên người bấm.")}
 
-    ten = [x["username"] for x in kq["danh_sach"] if not x["da_buoc_doi"]]
+    ten = [x["username"] for x in kq["danh_sach"]]
     n = 0
     for u in db.scalars(select(User).where(User.username.in_(ten))).all() if ten else []:
         u.must_change_password = True
         n += 1
     db.flush()
-    return {**kq, "da_bat": n,
-            "message": (f"Đã bật cờ buộc đổi mật khẩu cho {n} tài khoản. Lần đăng nhập kế tiếp họ "
-                        "phải đặt mật khẩu mới trước khi vào được bất cứ màn hình nào. Không tài "
-                        "khoản nào bị khoá, và không mật khẩu nào bị đặt hộ.")}
+    return {**tom_tat(db), "da_bat": n,
+            "message": (f"Đã bật cờ buộc đổi mật khẩu cho {n} tài khoản chưa từng đăng nhập. Lần "
+                        "đăng nhập đầu tiên họ phải đặt mật khẩu mới trước khi vào được bất cứ màn "
+                        "hình nào. Không tài khoản nào bị khoá, và không mật khẩu nào bị đặt hộ.")}

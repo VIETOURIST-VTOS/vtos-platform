@@ -57,7 +57,7 @@ def _startup():
         # lập bảng lương kỳ P để có dòng của tài xế, rồi đưa ra khỏi trạng thái nháp – luồng ba bước
         # (Kế toán xác nhận → HCNS lập → TGĐ ký) đã có phép thử riêng ở test_hr, ở đây chỉ cần một kỳ
         # KHÔNG còn là nháp để phiếu cá nhân mở được.
-        client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("hcns", "123456"))
+        client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("hcns", "Vtos@Demo#2026"))
         from app.db.session import SessionLocal as _SL
         from app.models.hr import PayrollRun as _PR
         _db = _SL()

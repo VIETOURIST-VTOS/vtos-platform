@@ -41,7 +41,7 @@ def tk(role):
 
 def login(role):
     un = tk(role); assert un, f"không có tài khoản vai trò {role}"
-    r = client.post("/api/v1/auth/login", data={"username": un, "password": "123456"})
+    r = client.post("/api/v1/auth/login", data={"username": un, "password": "Vtos@Demo#2026"})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 

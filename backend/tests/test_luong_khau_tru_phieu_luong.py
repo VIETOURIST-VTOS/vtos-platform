@@ -20,7 +20,7 @@ from app.main import app
 client = TestClient(app); TOK = {}
 
 
-def login(u, pw="123456"):
+def login(u, pw="Vtos@Demo#2026"):
     k = (u, pw)
     if k not in TOK: TOK[k] = client.post("/api/v1/auth/login", data={"username": u, "password": pw}).json()["access_token"]
     return {"Authorization": f"Bearer {TOK[k]}"}
@@ -131,7 +131,7 @@ def test_phieu_luong_cua_chinh_minh():
     db = SessionLocal()
     e = db.query(Employee).filter(Employee.active == True, Employee.user_id != None).first()
     u = db.get(User, e.user_id); ten_tk, ma = u.username, e.code
-    u.password_hash = __import__("app.core.security", fromlist=["x"]).hash_password("123456")
+    u.password_hash = __import__("app.core.security", fromlist=["x"]).hash_password("Vtos@Demo#2026")
     db.commit(); db.close()
 
     r = client.get("/api/v1/payroll-runs/2026-09/phieu-luong", headers=login("hcns"))

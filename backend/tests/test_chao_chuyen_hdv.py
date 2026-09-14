@@ -32,7 +32,7 @@ def _chua_co(db, username: str) -> bool:
 
 def login(u):
     if u not in TOK:
-        r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
+        r = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"})
         assert r.status_code == 200, r.text
         TOK[u] = r.json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
@@ -51,7 +51,7 @@ def _startup():
         with SessionLocal() as db:
             if _chua_co(db, "tp.huongdan"):
                 db.add(User(username="tp.huongdan", full_name="Trưởng phòng Hướng dẫn", role="tp_hd",
-                            department="Hướng dẫn", password_hash=hash_password("123456")))
+                            department="Hướng dẫn", password_hash=hash_password("Vtos@Demo#2026")))
             hdv = [e for e in db.execute(select(Employee).where(
                 Employee.department == "huong_dan")).scalars()
                 if H.guide_eligible(e, date.today())[0]]
@@ -60,7 +60,7 @@ def _startup():
             if _chua_co(db, "hdv.mot"):
                 db.add(User(username="hdv.mot", full_name=e.full_name, role="xe_hdv",
                             department="Hướng dẫn", staff_code=e.code,
-                            password_hash=hash_password("123456")))
+                            password_hash=hash_password("Vtos@Demo#2026")))
             ID["hdv"] = e.id
             # Hai tour tương lai để chào – tách khỏi tour demo đã có lệnh phân chuyến sẵn.
             for i, ma in enumerate(("HD-TEST-01", "HD-TEST-02")):
@@ -135,7 +135,7 @@ def test_khong_tra_loi_thay_loi_chao_cua_nguoi_khac(_startup):
     from app.core.security import hash_password
     with SessionLocal() as db:
         db.add(User(username="hdv.hai", full_name="HDV khác", role="xe_hdv", department="Hướng dẫn",
-                    staff_code="KHONG-CO", password_hash=hash_password("123456")))
+                    staff_code="KHONG-CO", password_hash=hash_password("Vtos@Demo#2026")))
         db.commit()
     assert client.post(f"/api/v1/xe-hdv/chao-chuyen/{aid}/nhan",
                        headers=login("hdv.hai")).status_code == 404

@@ -22,7 +22,7 @@ HOM_NAY = date.today()
 
 def login(u):
     if u not in TOK:
-        r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
+        r = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"})
         assert r.status_code == 200, r.text
         TOK[u] = r.json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
@@ -134,7 +134,7 @@ def test_nhan_vien_kinh_doanh_khong_xem_cong_no_toan_cong_ty(_startup):
     db = SessionLocal()
     db.add(User(username="nvkd.congno.kt", full_name="NV kinh doanh kiểm thử", role="nv_kd",
                 department="kinh_doanh", staff_code="KT910",
-                password_hash=hash_password("123456"), active=True))
+                password_hash=hash_password("Vtos@Demo#2026"), active=True))
     db.commit(); db.close()
     r = client.get("/api/v1/cong-no", headers=login("nvkd.congno.kt"))
     assert r.status_code == 403

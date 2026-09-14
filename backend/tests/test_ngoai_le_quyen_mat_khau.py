@@ -29,13 +29,13 @@ def _startup():
         global client; client = c; yield
 
 
-def login(u, pw="123456"):
+def login(u, pw="Vtos@Demo#2026"):
     r = client.post("/api/v1/auth/login", data={"username": u, "password": pw})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
-def tao(username, role, ten="Người kiểm thử", ma="KT999", pw="123456"):
+def tao(username, role, ten="Người kiểm thử", ma="KT999", pw="Vtos@Demo#2026"):
     from app.db.session import SessionLocal
     from app.models.core import User
     from app.core.security import hash_password
@@ -166,7 +166,7 @@ def test_dat_lai_mat_khau_bat_co_buoc_doi_va_chan_vao_he_thong():
 def test_khong_duoc_dat_lai_mat_khau_bang_ma_nhan_vien():
     uid = tao("nv.matkhau2", "nv_kd", "NV mật khẩu 2", "KT996")
     h = login("nv.matkhau2")
-    r = client.post("/api/v1/auth/password", headers=h, json={"old_password": "123456", "new_password": "KT996"})
+    r = client.post("/api/v1/auth/password", headers=h, json={"old_password": "Vtos@Demo#2026", "new_password": "KT996"})
     assert r.status_code == 422, "mã nhân viên nằm công khai trên bảng lương – không dùng làm mật khẩu"
 
 

@@ -34,7 +34,7 @@ def _startup():
 
 def login(u):
     if u not in TOK:
-        r = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"})
+        r = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"})
         assert r.status_code == 200, r.text
         TOK[u] = r.json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
@@ -49,7 +49,7 @@ def gd(_startup):
     from sqlalchemy import select
     db = SessionLocal()
     u = User(username="gd.doixe.kt", full_name="GĐ điều hành đội xe kiểm thử", role="gd_doi_xe",
-             department="doi_xe", staff_code="KT903", password_hash=hash_password("123456"), active=True)
+             department="doi_xe", staff_code="KT903", password_hash=hash_password("Vtos@Demo#2026"), active=True)
     db.add(u)
     p = db.execute(select(Param).where(Param.key == "xe_nguoi_lap_lenh")).scalars().first()
     if p is not None: p.value = "gd.doixe.kt"

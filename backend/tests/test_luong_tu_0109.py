@@ -21,7 +21,7 @@ from app.models.hr import Employee
 client = TestClient(app); TOK = {}
 
 
-def login(u, pw="123456"):
+def login(u, pw="Vtos@Demo#2026"):
     k = (u, pw)
     if k not in TOK: TOK[k] = client.post("/api/v1/auth/login", data={"username": u, "password": pw}).json()["access_token"]
     return {"Authorization": f"Bearer {TOK[k]}"}

@@ -13,7 +13,7 @@ FX = os.path.join(os.path.dirname(__file__), "fixtures_lead_t8.xlsx")
 
 
 def login(u):
-    if u not in TOK: TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "123456"}).json()["access_token"]
+    if u not in TOK: TOK[u] = client.post("/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"}).json()["access_token"]
     return {"Authorization": f"Bearer {TOK[u]}"}
 
 
@@ -24,7 +24,7 @@ def _startup():
 
 
 def test_import_marketing_file_and_conversion_report():
-    h = login("ptgd.mkt") if client.post("/api/v1/auth/login", data={"username": "ptgd.mkt", "password": "123456"}).status_code == 200 else login("gd.kd")
+    h = login("ptgd.mkt") if client.post("/api/v1/auth/login", data={"username": "ptgd.mkt", "password": "Vtos@Demo#2026"}).status_code == 200 else login("gd.kd")
     with open(FX, "rb") as f:
         r = client.post("/api/v1/leads/import", files={"file": ("lead_t8.xlsx", f, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}, headers=h)
     assert r.status_code == 200, r.text

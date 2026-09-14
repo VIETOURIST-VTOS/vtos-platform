@@ -61,7 +61,7 @@ def _startup():
 def login(u: str) -> dict:
     if u not in TOK:
         TOK[u] = {"Authorization": "Bearer " + client.post(
-            "/api/v1/auth/login", data={"username": u, "password": "123456"}).json()["access_token"]}
+            "/api/v1/auth/login", data={"username": u, "password": "Vtos@Demo#2026"}).json()["access_token"]}
     return TOK[u]
 
 
