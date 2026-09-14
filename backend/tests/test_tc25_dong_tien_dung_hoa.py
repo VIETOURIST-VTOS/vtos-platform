@@ -95,29 +95,42 @@ def test_han_xu_ly_khong_bia():
     assert "chưa đặt" in ma, "Cột hạn phải nói rõ là chưa đặt, không để trống cho đẹp."
 
 
-def test_trang_moi_da_khai_quyen_va_khong_rong_hon_khoi_dong_tien():
-    """CI bắt được lỗ này ở lần đẩy đầu (14/9): trang mới không khai quyền thì MỌI vai đăng nhập
-    đều thấy, mà không ai quyết định điều đó.
+def test_trang_moi_khai_dung_cho():
+    """CI bắt hai lượt, mỗi lượt dạy một điều — chép lại đây để vòng sau không đi lại đường vòng.
 
-    Và không chỉ cần "có khai": danh sách vai phải ĐÚNG BẰNG danh sách của /dong-tien. Trang này
-    bày ra chính những dòng của khối dòng tiền kèm nguyên nhân và bộ phận chịu — thêm một vai ở đây
-    là mở bảng dòng tiền cho vai đó bằng cửa sau, trong khi Chủ tịch đã chốt 11/9 rằng hai Phó Tổng
-    giám đốc không thấy khối này.
+    Lượt 1: trang mới KHÔNG khai ở đâu cả → "mọi vai đăng nhập đều thấy mà không ai quyết định điều
+    đó". Đúng là một lỗ thật.
+
+    Lượt 2: khai vào MENU_ROLES thì ba phép thử khác đỏ. MENU_ROLES đòi mỗi mục phải có một lối vào
+    trong MENU và một thư mục trang ở CẤP MỘT của web/app (ks_ma_tran chỉ quét `web/app/*/page.tsx`).
+    Trang con đi tới bằng liên kết không thoả cả hai.
+
+    Chỗ đúng là ALL_MENU_PATHS, theo đúng tiền lệ "/phan-he/[khoa]" — trang mục lục phân hệ cũng
+    không phải màn hình nghiệp vụ và cũng khai ở đó. Quyền thật nằm ở MÁY CHỦ: trang chỉ gọi
+    /api/v1/dong-tien, nhóm API ấy chỉ mở cho vai có "/dong-tien" trong MENU_ROLES, nên vai không
+    có quyền nhận 403 ngay từ /dong-tien/meta.
     """
     s = _bo_chu_thich_py(_doc(GOC / "backend" / "app" / "services" / "access.py"))
-    m_khoi = re.search(r'"/dong-tien":\s*\(([^)]*)\)', s)
-    m_moi = re.search(r'"/dong-tien/nguon":\s*\(([^)]*)\)', s)
-    assert m_moi, "/dong-tien/nguon chưa khai quyền trong access.py."
-    # Lấy lần khai VAI TRÒ (bảng thứ hai), phân biệt với bảng đường API ở trên bằng dấu "/api".
-    vai_khoi = [x for x in re.findall(r'"/dong-tien":\s*\(([^)]*)\)', s) if "/api" not in x]
-    vai_moi = [x for x in re.findall(r'"/dong-tien/nguon":\s*\(([^)]*)\)', s) if "/api" not in x]
-    assert vai_khoi and vai_moi, "Không đọc được danh sách vai của một trong hai trang."
-    tach = lambda x: sorted(v.strip().strip('"') for v in x.split(",") if v.strip())
-    assert tach(vai_moi[0]) == tach(vai_khoi[0]), (
-        f"Danh sách vai của /dong-tien/nguon ({tach(vai_moi[0])}) khác của /dong-tien "
-        f"({tach(vai_khoi[0])}) — trang chi tiết không được rộng hơn khối nó chi tiết hoá."
+    i = s.index("ALL_MENU_PATHS")
+    # Cắt tới hết CÂU LỆNH, không cắt tới dấu ) đầu tiên: dấu ) đầu tiên là của tuple(MENU_ROLES),
+    # cắt ở đó thì khối chỉ còn hai chữ và phép thử đỏ vì cách đọc của chính nó.
+    khoi = s[i:i + s[i:].index("\n\n")]
+    assert '"/dong-tien/nguon"' in khoi, (
+        "/dong-tien/nguon chưa khai trong ALL_MENU_PATHS — vai trò bị giới hạn sẽ thấy nó mà không "
+        "ai quyết định điều đó."
     )
-    assert m_khoi  # giữ tham chiếu để lời báo lỗi ở trên có nghĩa
+    assert '"/dong-tien/nguon":' not in s, (
+        "Đừng khai /dong-tien/nguon trong MENU_ROLES hay MAN_HINH_API: nó là trang con, không có "
+        "mục menu và không nằm ở cấp một của web/app — ba phép thử mt1, mt4 và test_menu sẽ đỏ."
+    )
+
+
+def test_trang_chi_tiet_dua_vao_may_chu_de_chan_quyen():
+    """Trang không tự phán quyền: nó gọi máy chủ, và nếu máy chủ trả 403 thì nói thẳng là không
+    được xem — chứ không hiện một bảng rỗng trông như chưa có dữ liệu."""
+    ma = _bo_chu_thich_tsx(_doc(NGUON))
+    assert "403" in ma, "Trang chi tiết không xử lý 403 — vai không có quyền sẽ thấy màn hình trống."
+    assert "không được xem" in ma, "Thiếu câu nói thẳng cho vai không có quyền."
 
 
 def test_trang_chi_tiet_khong_tu_loc_theo_vai():
