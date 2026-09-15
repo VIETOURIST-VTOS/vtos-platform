@@ -71,6 +71,21 @@ TD_CHI_KEM = ("THÀNH TIỀN", "THANH TIEN", "ĐƠN GIÁ", "DON GIA", "TỔNG CH
 # Con số 14.183 ấy là EUR, không phải đồng – tức là vừa sai nguồn vừa sai đơn vị, mà vẫn là một số
 # nên không có gì đỏ lên.
 SHEET_BO_QUA = ("MẪU", "MAU", "TEMPLATE", "FORM", "HƯỚNG DẪN", "SHEET1", "SHEET2", "SHEET3")
+
+# SHEET DIỄN GIẢI: bảng bóc chi tiết của những khoản ĐÃ NẰM TRONG sheet chi phí.
+#
+# Sheet 'CÔNG NỢ' liệt kê lại khách sạn và các bữa ăn còn nợ nhà cung cấp. Mọi khoản trong đó đã có
+# mặt trong sheet chi phí rồi – nó chỉ tách riêng phần chưa trả tiền để Kế toán theo dõi.
+#
+# Bản trước không nhận ra điều đó: sheet CÔNG NỢ có hàng tiêu đề trông y hệt bảng chi
+# (DỊCH VỤ | ĐƠN GIÁ | SL | ĐÊM | TỔNG TIỀN) nên bộ đọc nhận là một bảng chi thứ hai và cộng thêm.
+#
+# Đo trên 81 tệp tháng 1/2026 ngày 15/9/2026: 19 tệp bị cộng thừa nguyên sheet CÔNG NỢ, 3 tệp bị
+# cộng sheet CHI PHI hai lần – tổng cộng thừa 337.007.448 đồng. Phần thừa khớp ĐÚNG TỪNG ĐỒNG với
+# tổng của sheet bị cộng lặp, nên đây không phải suy đoán.
+#
+# Giữ lại để người xem, nhưng KHÔNG cộng vào giá vốn – cùng nguyên tắc đang áp cho sheet HDV.
+SHEET_DIEN_GIAI = ("CÔNG NỢ", "CONG NO", "CÔNG NƠ", "BẢNG KÊ", "BANG KE", "BGT", "BÀN GIAO")
 # Hàng tiêu đề của BẢNG KHÁCH.
 TD_KHACH = ("TÊN KHÁCH HÀNG", "TEN KHACH HANG", "HỌ VÀ TÊN", "HỌ TÊN", "TÊN KHÁCH", "FULL NAME")
 
@@ -151,6 +166,31 @@ def _ngay(v):
             return date(y, mo, d)
         except ValueError:
             return None
+    return None
+
+
+def _nam_sheet(ws) -> int | None:
+    """Năm mà SHEET NÀY tự khai ở ô 'Ngày đi'/'Khởi hành' của nó.
+
+    Dùng để loại SHEET MA – bản quyết toán của một chuyến năm khác còn sót lại trong tệp.
+
+    Đo trên 81 tệp tháng 1/2026 ngày 15/9/2026: 9 tệp mang sheet đầu tiên tên 'PT14012022', là bản
+    quyết toán tour Phan Thiết 14/01/2022 (20 khách, thu 26.000.000) mà người lập sao chép tệp cũ
+    rồi quên xoá. Bộ đọc lấy sheet khớp ĐẦU TIÊN, nên 9 chuyến ấy vào sổ với doanh thu năm 2022.
+
+    Bắt theo TÊN sheet thì chỉ chữa được đúng 9 tệp này; tháng sau người lập sao chép tệp khác là
+    hỏng lại. Bắt theo NĂM thì chữa được cả lớp: trong một tệp quyết toán của một chuyến, mọi sheet
+    phải nói về cùng một chuyến. Sheet nào tự khai năm CŨ HƠN năm mới nhất tìm được trong tệp thì
+    nó không thuộc chuyến này.
+
+    Sheet không khai năm (bảng phụ, danh sách khách) trả None và KHÔNG bị loại – im lặng không phải
+    là bằng chứng để loại bỏ.
+    """
+    for nhan in (NHAN_NGAY_DI, NHAN_NGAY_VE):
+        v, _, _ = _tim_nhan(ws, nhan)
+        n = _ngay(v)
+        if n is not None:
+            return n.year
     return None
 
 
@@ -287,10 +327,16 @@ def _lay(m: dict, *ten):
 # ---------------------------------------------------------------------------------------------
 
 def _doc_dau(wb) -> dict:
+    return _doc_dau_bo_sheet_ma(wb, [])
+
+
+def _doc_dau_bo_sheet_ma(wb, sheet_ma: list) -> dict:
     """Thông tin chuyến. Quét MỌI sheet – tệp nào cũng có, nhưng không tệp nào ở cùng một chỗ."""
     ra = {"ma_tour": "", "ten_tour": "", "so_khach": None, "hdv": "",
           "ngay_di": None, "ngay_ve": None, "ten_doan": ""}
     for ws in wb.worksheets:
+        if ws.title in sheet_ma:
+            continue
         if not ra["ma_tour"]:
             v, _, _ = _tim_nhan(ws, NHAN_MA_TOUR)
             ra["ma_tour"] = _sach_ma_tour(v)
@@ -402,22 +448,59 @@ def _doc_khach(ws) -> list[dict]:
     return ra
 
 
-def _doc_bang_tien(ws, hang_td: int) -> list[dict]:
-    """Bảng chi/thu theo hàng tiêu đề đã tìm được. Giữ cả tiêu đề NHÓM để biết dòng thuộc mục nào."""
+def _cot_bang_tien(ws, hang_td: int, can_nd: bool = True) -> dict | None:
+    """Vị trí các cột của MỘT hàng tiêu đề bảng tiền. None nếu hàng ấy không đủ làm tiêu đề.
+
+    can_nd=False dùng cho hàng tiêu đề THỨ HAI trong cùng sheet. Hàng thứ hai thường chỉ ghi lại
+    những cột có ĐỔI CHỖ ("ĐƠN GIÁ | SL | LƯỢT TÍNH | THÀNH TIỀN") và để trống ô nhãn của cột nội
+    dung, vì cột ấy vẫn ở nguyên chỗ cũ. Bắt buộc phải có nhãn nội dung ở hàng hai là bỏ sót đúng
+    cái hình dạng cần bắt.
+    """
     m = _map_cot(ws, hang_td)
-    c_nd = _lay(m, "NỘI DUNG", "NOI DUNG", "DỊCH VỤ", "DICH VU", "CHI PHÍ", "DIỄN GIẢI")
-    c_dt = _lay(m, "ĐỐI TÁC", "DOI TAC", "PARTNER", "NHÀ CUNG CẤP", "NCC")
-    c_dg = _lay(m, "ĐƠN GIÁ", "DON GIA", "PRICE", "GIÁ")
-    c_sl = _lay(m, "SL", "SỐ LƯỢNG", "QUANTITY", "QTY")
-    c_he = _lay(m, "DIỄN GIẢI", "LƯỢT TÍNH", "ĐÊM", "NIGHT", "ĐV")
-    c_tt = _lay(m, "THÀNH TIỀN", "THANH TIEN", "TỔNG TIỀN", "TỔNG CHI", "TOTAL", "AMOUNT")
-    c_gc = _lay(m, "GHI CHÚ", "GHI CHU", "NOTE")
-    c_mst = _lay(m, "MST", "MÃ SỐ THUẾ")
-    c_ht = _lay(m, "HTTT", "HÌNH THỨC THANH TOÁN", "HÌNH THỨC TT")
-    c_ngay = _lay(m, "NGÀY", "NGAY", "DATE")
-    if c_nd is None or c_tt is None:
+    c = {
+        "nd": _lay(m, "NỘI DUNG", "NOI DUNG", "DỊCH VỤ", "DICH VU", "CHI PHÍ", "DIỄN GIẢI"),
+        "dt": _lay(m, "ĐỐI TÁC", "DOI TAC", "PARTNER", "NHÀ CUNG CẤP", "NCC"),
+        "dg": _lay(m, "ĐƠN GIÁ", "DON GIA", "PRICE", "GIÁ"),
+        "sl": _lay(m, "SL", "SỐ LƯỢNG", "QUANTITY", "QTY"),
+        "he": _lay(m, "DIỄN GIẢI", "LƯỢT TÍNH", "ĐÊM", "NIGHT", "ĐV"),
+        "tt": _lay(m, "THÀNH TIỀN", "THANH TIEN", "TỔNG TIỀN", "TỔNG CHI", "TOTAL", "AMOUNT"),
+        "gc": _lay(m, "GHI CHÚ", "GHI CHU", "NOTE"),
+        "mst": _lay(m, "MST", "MÃ SỐ THUẾ"),
+        "ht": _lay(m, "HTTT", "HÌNH THỨC THANH TOÁN", "HÌNH THỨC TT"),
+        "ngay": _lay(m, "NGÀY", "NGAY", "DATE"),
+    }
+    if c["tt"] is None or (can_nd and c["nd"] is None):
+        return None
+    c["het"] = max(x for x in m.values())
+    return c
+
+
+def _doc_bang_tien(ws, hang_td: int) -> list[dict]:
+    """Bảng chi/thu theo hàng tiêu đề đã tìm được. Giữ cả tiêu đề NHÓM để biết dòng thuộc mục nào.
+
+    MỘT SHEET CÓ THỂ CÓ HAI HÀNG TIÊU ĐỀ, VÀ CHÚNG XẾP CỘT KHÁC NHAU
+
+    Sheet 'CHI THỰC TẾ' của các tệp đoàn MICE viết hai bảng chồng nhau, mỗi bảng một tiêu đề riêng:
+
+        hàng 6  (phần GIÁ TOUR) : NGÀY | NỘI DUNG | ĐƠN GIÁ | SL | THÀNH TIỀN | VAT | TIỀN THUẾ
+        hàng 12 (phần CHI PHÍ)  : NGÀY | NỘI DUNG | ĐƠN GIÁ | SL | LƯỢT TÍNH  | THÀNH TIỀN | VAT
+
+    Cột 'THÀNH TIỀN' của bảng trên là cột E; của bảng dưới là cột F. Bản trước tìm được hàng 6 rồi
+    dùng cột E cho tới hết sheet – tức là đọc cột 'LƯỢT TÍNH' (toàn số 1) làm tiền chi.
+
+    Đo trên 81 tệp tháng 1/2026 ngày 15/9/2026: 9 tệp MICE, tổng chi thật 548.345.139 đồng, bộ đọc
+    cũ ra đúng 173 ĐỒNG. Không có gì đỏ lên vì 173 vẫn là một con số hợp lệ.
+
+    Nên khi gặp mốc 'II/ CHI PHÍ', hỏi lại xem hàng ấy có phải một hàng tiêu đề MỚI không. Có thì
+    xếp cột lại từ đó. Không thì giữ nguyên như cũ.
+    """
+    cot = _cot_bang_tien(ws, hang_td)
+    if cot is None:
         return []
-    het_cot = max(x for x in m.values())
+    c_nd, c_dt, c_dg = cot["nd"], cot["dt"], cot["dg"]
+    c_sl, c_he, c_tt = cot["sl"], cot["he"], cot["tt"]
+    c_gc, c_mst, c_ht, c_ngay = cot["gc"], cot["mst"], cot["ht"], cot["ngay"]
+    het_cot = cot["het"]
 
     # VẠCH NGĂN THU / CHI: hàng "TỔNG CỘNG THU".
     #
@@ -455,6 +538,21 @@ def _doc_bang_tien(ws, hang_td: int) -> list[dict]:
                 continue
             if any(H.startswith(k) for k in MOC_CHI):
                 phan = "chi"
+                # Hàng mốc này có kiêm luôn tiêu đề của bảng chi không? Có thì xếp lại cột.
+                # Cột nào hàng hai KHÔNG ghi thì giữ nguyên chỗ cũ – hàng hai chỉ nói phần đổi.
+                moi = _cot_bang_tien(ws, r, can_nd=False)
+                if moi is not None and moi["tt"] != c_tt:
+                    c_nd = moi["nd"] or c_nd
+                    c_dt = moi["dt"] or c_dt
+                    c_dg = moi["dg"] or c_dg
+                    c_sl = moi["sl"] or c_sl
+                    c_he = moi["he"] or c_he
+                    c_gc = moi["gc"] or c_gc
+                    c_mst = moi["mst"] or c_mst
+                    c_ht = moi["ht"] or c_ht
+                    c_ngay = moi["ngay"] or c_ngay
+                    c_tt = moi["tt"]
+                    het_cot = max(het_cot, moi["het"])
                 continue
         tt = _so(ws.cell(r, c_tt).value)
         nd = _chu(ws.cell(r, c_nd).value)
@@ -537,15 +635,46 @@ def doc_tep(noi_dung: bytes, ten_tep: str = "") -> dict:
     import openpyxl
     wb = openpyxl.load_workbook(BytesIO(noi_dung), data_only=True)
 
-    d = {"ten_tep": ten_tep, "sheets": list(wb.sheetnames)}
-    d.update(_doc_dau(wb))
+    # SHEET MA phải loại TRƯỚC _doc_dau – nếu không, mã tour và ngày đi của chuyến năm cũ được đọc
+    # trước và cả tệp mang đầu của chuyến khác.
+    # KHÔNG PHẢI CỨ NĂM CŨ LÀ SHEET MA – PHẢI LÀ MỘT BẢN QUYẾT TOÁN HOÀN CHỈNH CỦA CHUYẾN KHÁC.
+    #
+    # Bản đầu của luật này chỉ hỏi "sheet tự khai năm cũ hơn không". Chạy thử nạp cả 81 tệp tháng
+    # 1/2026 ngày 15/9/2026 thì nó bỏ nhầm HAI SHEET CHI PHÍ THẬT của tệp
+    # "QTT ĐOÀN PHAN THIẾT 15.01.2026 - SALE KIM OANH": sheet 'CHI THỰC TẾ' ghi KHỞI HÀNH
+    # "13-14/12/2025" và sheet 'HDV CHI' ghi "15-17/01/2025" – ô ngày chép sót từ tệp trước, trong
+    # khi nội dung bên dưới là chi phí thật của chuyến 15/01/2026.
+    #
+    # Tổng tiền của tệp ấy vẫn đúng (lấy từ hàng tổng bảng khách) nên không có gì đỏ lên – nhưng
+    # toàn bộ DÒNG chi phí bị mất. Đúng kiểu hỏng im lặng mà cả tệp này viết ra để tránh.
+    #
+    # Sheet ma thật là một BẢN QUYẾT TOÁN ĐẦY ĐỦ của chuyến khác: nó có bảng khách riêng, tổng
+    # riêng. Một sheet chi phí chép sót ô ngày thì không có bảng khách. Nên đòi thêm điều kiện ấy:
+    # vừa khai năm cũ, VỪA có bảng khách của chính nó.
+    nam = {ws.title: _nam_sheet(ws) for ws in wb.worksheets}
+    nam_moi = max([v for v in nam.values() if v], default=None)
+    sheet_ma = [ws.title for ws in wb.worksheets
+                if nam.get(ws.title) and nam_moi and nam[ws.title] < nam_moi
+                and _hang_tieu_de_khach(ws) is not None]
+
+    d = {"ten_tep": ten_tep, "sheets": list(wb.sheetnames), "sheet_ma": sheet_ma}
+    d.update(_doc_dau_bo_sheet_ma(wb, sheet_ma))
 
     khach, thu, chi, hdv = [], [], [], {"dong": [], "tien_ung": None, "hoan_ung": None, "ctp": None}
     ngoai_te = []
+    dien_giai = []
     sheet_khach = sheet_chi = sheet_hdv = ""
     for ws in wb.worksheets:
         ten = _hoa(ws.title)
         if any(ten == k or ten.startswith(k) for k in SHEET_BO_QUA):
+            continue
+        if ws.title in sheet_ma:
+            continue
+        # Sheet diễn giải (CÔNG NỢ, bảng kê, bàn giao): các khoản trong đó ĐÃ nằm trong sheet chi.
+        if any(ten == k or ten.startswith(k) for k in SHEET_DIEN_GIAI):
+            h_dg = _hang_tieu_de_chi(ws)
+            dien_giai.append({"sheet": ws.title,
+                              "dong": _doc_bang_tien(ws, h_dg) if h_dg is not None else []})
             continue
         if not khach:
             k = _doc_khach(ws)
@@ -578,11 +707,124 @@ def doc_tep(noi_dung: bytes, ten_tep: str = "") -> dict:
                 thu = t
 
     d.update({"khach": khach, "thu": thu, "chi": chi, "hdv": hdv, "ngoai_te": ngoai_te,
+              "dien_giai": dien_giai,
               "sheet_khach": sheet_khach, "sheet_chi": sheet_chi, "sheet_hdv": sheet_hdv})
-    d["tong_thu"] = tong_thu(d)
-    d["tong_chi"] = tong_chi(d)
+    d["tong_ghi"] = doc_tong_ghi(wb, sheet_ma)
+    d["tong_thu_cong_dong"] = tong_thu(d)
+    d["tong_chi_cong_dong"] = tong_chi(d)
+    d["tong_thu"] = _chot(d["tong_ghi"].get("thu"), d["tong_thu_cong_dong"])
+    d["tong_chi"] = _chot(d["tong_ghi"].get("chi"), d["tong_chi_cong_dong"])
     d["thieu"] = thieu_gi(d)
     return d
+
+
+def _chot(ghi, cong_dong):
+    """Con số chốt: lấy TỔNG TỆP GHI nếu có, không có thì cộng từ dòng."""
+    return ghi if ghi is not None else cong_dong
+
+
+# ---------------------------------------------------------------------------------------------
+# Tổng mà chính tệp đã ghi
+# ---------------------------------------------------------------------------------------------
+
+def doc_tong_ghi(wb, sheet_ma: list | None = None) -> dict:
+    """Con số TỔNG mà chính tệp đã ghi, đọc bằng HAI CÁCH ĐỘC LẬP rồi so nhau.
+
+    VÌ SAO BẢN ĐẦU TỪ CHỐI ĐỌC Ô TỔNG, VÀ VÌ SAO CHỖ ĐÓ CẦN TÁCH LÀM HAI
+
+    Nguyên tắc cũ của tệp này là "tin dòng, không tin tổng", dựng từ một quan sát thật trên tệp Nha
+    Trang: ô tổng của MỘT NHÓM ghi 3.990.000 trong khi năm dòng của chính nhóm ấy cộng lại 4.200.000.
+
+    Quan sát ấy đúng, nhưng nó nói về TỔNG NHÓM giữa bảng. Nó không nói gì về TỔNG CUỐI CÙNG của tệp
+    – con số mà Điều hành ký, Kế toán soát và Tổng giám đốc duyệt.
+
+    Đo trên 81 tệp tháng 1/2026 ngày 15/9/2026: cách "cộng từ dòng" ra giá vốn 4.392.577.191, trong
+    khi tổng tệp tự ghi là 6.664.293.806 – thiếu 2,27 tỷ, tức lãi gộp bị thổi lên 2,76 lần. Ngược
+    lại, tổng tệp tự ghi thì nhất quán với chính nó ở 80/81 tệp (thu − chi = đúng ô LỢI NHUẬN).
+
+    Nên luật đúng không phải "luôn cộng dòng" cũng không phải "luôn tin tổng", mà là ĐỌC CẢ HAI VÀ
+    NÓI RA KHI CHÚNG LỆCH. Tổng tệp ghi làm con số chốt; phần cộng từ dòng thành phép soát; chỗ nào
+    hai con số không gặp nhau thì thieu_gi() nêu tên để Điều hành mở tệp gốc xem.
+
+    HAI CÁCH ĐỌC:
+
+      A. hàng tổng cuối BẢNG KHÁCH  – lấy theo cột 'TỔNG THU' / 'TỔNG CHI' của chính hàng tiêu đề
+      B. nhãn 'TỔNG THU' / 'TỔNG CHI' đứng rời trên SHEET CHI PHÍ, giá trị nằm ở ô bên phải
+
+    Hai cách đi qua hai vùng khác nhau của tệp, do hai người khác nhau lập. Trên 63 tệp có đủ cả
+    hai, chúng khớp tuyệt đối 63/63. Cách nào cũng được; có cả hai thì lấy A và ghi lại B để soát.
+    """
+    bo = set(sheet_ma or [])
+    ra = {"thu": None, "chi": None, "loi_nhuan": None, "sheet": "", "cach": "",
+          "thu_b": None, "chi_b": None, "sheet_b": ""}
+    for ws in wb.worksheets:
+        ten = _hoa(ws.title)
+        if ws.title in bo or any(ten == k or ten.startswith(k) for k in SHEET_BO_QUA):
+            continue
+        if any(ten == k or ten.startswith(k) for k in SHEET_DIEN_GIAI):
+            continue
+        if ra["thu"] is None:
+            a = _tong_hang_cuoi_bang_khach(ws)
+            if a:
+                ra.update({"thu": a["thu"], "chi": a["chi"], "loi_nhuan": a["ln"],
+                           "sheet": ws.title, "cach": "hàng tổng cuối bảng khách"})
+        if ra["thu_b"] is None:
+            b = _tong_theo_nhan(ws)
+            if b:
+                ra.update({"thu_b": b["thu"], "chi_b": b["chi"], "sheet_b": ws.title})
+    if ra["thu"] is None and ra["thu_b"] is not None:
+        ra.update({"thu": ra["thu_b"], "chi": ra["chi_b"], "sheet": ra["sheet_b"],
+                   "cach": "nhãn TỔNG THU/TỔNG CHI trên sheet chi phí"})
+    return ra
+
+
+def _tong_hang_cuoi_bang_khach(ws) -> dict | None:
+    """Cách A: hàng cuối cùng có số ở CẢ cột 'TỔNG THU' lẫn cột 'TỔNG CHI'."""
+    h = _hang_tieu_de_khach(ws)
+    hang = [r for r in range(1, min(ws.max_row, 20) + 1)]
+    c_thu = c_chi = c_ln = None
+    hang_td = None
+    for r in hang:
+        m = _map_cot(ws, r)
+        for k, c in m.items():
+            if k in ("TỔNG THU", "TONG THU") and c_thu is None:
+                c_thu, hang_td = c, r
+            elif k in ("TỔNG CHI", "TONG CHI") and c_chi is None:
+                c_chi = c
+            elif k in ("LỢI NHUẬN", "LOI NHUAN") and c_ln is None:
+                c_ln = c
+    if c_thu is None or c_chi is None or hang_td is None:
+        return None
+    if h is not None and h > hang_td + 2:
+        return None                       # tiêu đề tìm được không thuộc bảng khách này
+    cuoi = None
+    for r in range(hang_td + 1, ws.max_row + 1):
+        t = _so(ws.cell(r, c_thu).value)
+        c = _so(ws.cell(r, c_chi).value)
+        if t is None or c is None:
+            continue
+        cuoi = {"thu": round(t, 2), "chi": round(c, 2),
+                "ln": (round(_so(ws.cell(r, c_ln).value), 2)
+                       if c_ln and _so(ws.cell(r, c_ln).value) is not None else None),
+                "hang": r}
+    return cuoi
+
+
+def _tong_theo_nhan(ws) -> dict | None:
+    """Cách B: nhãn 'TỔNG THU' / 'TỔNG CHI' đứng rời, giá trị ở ô không rỗng bên phải."""
+    thu = chi = None
+    for r in range(1, ws.max_row + 1):
+        for c in range(1, min(ws.max_column, 26) + 1):
+            t = _hoa(ws.cell(r, c).value).rstrip(":").strip()
+            if not t:
+                continue
+            if t in ("TỔNG THU", "TONG THU") and thu is None:
+                thu = _so(_ben_phai(ws, r, c, xa=4))
+            elif t in ("TỔNG CHI", "TONG CHI") and chi is None:
+                chi = _so(_ben_phai(ws, r, c, xa=4))
+    if thu is None or chi is None:
+        return None
+    return {"thu": round(thu, 2), "chi": round(chi, 2)}
 
 
 def tong_thu(d: dict) -> float | None:
@@ -641,6 +883,23 @@ def thieu_gi(d: dict) -> list[str]:
         t.append("không tìm thấy 'Mã tour' ở bất kỳ sheet nào")
     if not d["chi"]:
         t.append("không nhận ra bảng chi phí nào")
+    if d.get("sheet_ma"):
+        t.append("tệp còn sheet của chuyến năm cũ, đã bỏ không đọc: "
+                 + ", ".join(d["sheet_ma"]))
+    # HAI CÁCH ĐỌC TỔNG KHÔNG GẶP NHAU – nêu tên, không tự chọn hộ.
+    g = d.get("tong_ghi") or {}
+    for ten, a, b in (("doanh thu", g.get("thu"), g.get("thu_b")),
+                      ("giá vốn", g.get("chi"), g.get("chi_b"))):
+        if a is not None and b is not None and abs(a - b) > 1:
+            t.append(f"{ten}: hàng tổng bảng khách ghi {a:,.0f} nhưng nhãn TỔNG trên sheet chi phí "
+                     f"ghi {b:,.0f} – lệch {abs(a - b):,.0f}")
+    # TỔNG TỆP GHI ≠ CỘNG TỪ DÒNG. Không phải lúc nào cũng là lỗi (nhiều tệp có khoản chỉ ghi ở
+    # tổng), nhưng lệch lớn thì phải mở tệp gốc xem, nên nêu tên.
+    for ten, ghi, cd in (("Doanh thu", g.get("thu"), d.get("tong_thu_cong_dong")),
+                         ("Giá vốn", g.get("chi"), d.get("tong_chi_cong_dong"))):
+        if ghi is not None and cd is not None and ghi and abs(ghi - cd) > max(1000.0, ghi * 0.02):
+            t.append(f"{ten}: tệp ghi tổng {ghi:,.0f} nhưng cộng lại từ dòng được {cd:,.0f} – "
+                     f"lệch {ghi - cd:+,.0f}. Đang lấy số tệp ghi.")
     if d["tong_thu"] is None:
         t.append("không có doanh thu: tệp không có bảng khách và cũng không có phần I/GIÁ TOUR")
     if not d["khach"]:

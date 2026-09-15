@@ -158,9 +158,13 @@ def kiem_lo(db, rows: list[dict]) -> dict:
             f"XEM TRƯỚC – chưa ghi gì. {dem['nap_duoc']} tệp sạch · "
             f"{dem['can_xac_nhan']} tệp cần người xác nhận · {dem['chan']} tệp bị chặn · "
             f"{dem['khong_thay_chuyen']} tệp không tìm thấy chuyến trong VTOS. "
-            "Doanh thu và giá vốn MỨC CHUYẾN sẽ KHÔNG bị ghi đè – bộ đọc chỉ rút được 90,7% doanh "
-            "thu và 71,1% giá vốn so với bản đối chiếu H1, nên tiền mức chuyến phải lấy theo bản đã "
-            "chốt, không lấy theo tệp."),
+            "Doanh thu và giá vốn MỨC CHUYẾN vẫn KHÔNG bị ghi đè. Hai con số 90,7% doanh thu và "
+            "71,1% giá vốn từng ghi ở đây là đo bằng BỘ ĐỌC CŨ; bộ đọc đã sửa lại ngày 15/9/2026 "
+            "(bốn lỗi: sheet của chuyến năm cũ, sheet hai hàng tiêu đề, sheet CÔNG NỢ bị cộng thêm, "
+            "và việc không lấy ô tổng tệp đã ghi). Trên 81 tệp tháng 1/2026, bản sửa ra đúng số của "
+            "tệp ở 81/81 tệp, giá vốn từ 4,39 tỷ lên 6,66 tỷ. Nhưng chưa chạy lại bản đối chiếu H1 "
+            "bằng bộ đọc mới, nên luật 'không ghi đè tiền mức chuyến' giữ nguyên cho tới khi đối "
+            "chiếu lại xong."),
     }
 
 

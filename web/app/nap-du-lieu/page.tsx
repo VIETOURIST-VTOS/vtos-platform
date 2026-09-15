@@ -33,6 +33,12 @@ function NapDuLieu() {
   // thì người ta không dựng, và ô ấy nằm trống – rồi con số cuối kỳ thiếu mà không ai biết thiếu ở đâu.
   const [oNhap, setONhap] = useState<Record<string, string>>({});
   const [ktDong, setKtDong] = useState<any>(null);
+  // CẢ LÔ NHIỀU TỆP. Kho quyết toán cũ là việc theo lô từ bản chất: tháng 1/2026 có 81 tệp, mỗi tệp
+  // một chuyến, và T1–T6 có 604 tệp. Ô chọn tệp ở mục 3 nhận đúng MỘT tệp, nên nạp tháng 1 là 81
+  // lượt chọn tệp cho cửa "Tạo chuyến" rồi 81 lượt nữa cho cửa "Kho quyết toán cũ" – 162 lượt, và
+  // cả nửa năm là hơn 1.200 lượt. Không ai làm nổi, nên thực tế là không ai nạp.
+  const [lo, setLo] = useState<any[]>([]);
+  const [dangLo, setDangLo] = useState("");
   // Quyền nạp đọc theo TỪNG BỘ NẠP do máy chủ công bố, không chép lại danh sách vai trò ở đây: chép là
   // sớm muộn hai bên lệch nhau, và bên lỏng hơn luôn là bên người dùng nhìn thấy.
   const chon0 = bo?.bo_nap?.find((b: any) => b.ma === loai);
@@ -49,13 +55,13 @@ function NapDuLieu() {
 
   /** Tải MẪU RIÊNG của bộ nạp – tệp .xlsx do chính VTOS sinh ra.
    *
-   *  KHÔNG dùng chung với taiMau() ở dưới: hàm ấy đọc phản hồi bằng .text(), đúng cho CSV nhưng làm
-   *  HỎNG tệp .xlsx – xlsx là tệp nén nhị phân, đọc thành chuỗi rồi gói lại là một tệp Excel mở
-   *  không lên. Hỏng kiểu ấy không có thông báo nào: người dùng tải về, bấm mở, Excel báo tệp lỗi,
-   *  và họ nghĩ hệ thống hỏng chứ không nghĩ cái nút hỏng.
+   * KHÔNG dùng chung với taiMau() ở dưới: hàm ấy đọc phản hồi bằng .text(), đúng cho CSV nhưng làm
+   * HỎNG tệp .xlsx – xlsx là tệp nén nhị phân, đọc thành chuỗi rồi gói lại là một tệp Excel mở
+   * không lên. Hỏng kiểu ấy không có thông báo nào: người dùng tải về, bấm mở, Excel báo tệp lỗi,
+   * và họ nghĩ hệ thống hỏng chứ không nghĩ cái nút hỏng.
    *
-   *  Cũng vì vậy nút "Tải tệp mẫu (.csv)" chung KHÔNG hiện cho bộ nạp có mẫu riêng: bộ nạp mẫu quyết
-   *  toán nhận tệp mười sheet, còn CSV phẳng tải về điền xong nạp lên là bị từ chối ngay dòng đầu. */
+   * Cũng vì vậy nút "Tải tệp mẫu (.csv)" chung KHÔNG hiện cho bộ nạp có mẫu riêng: bộ nạp mẫu quyết
+   * toán nhận tệp mười sheet, còn CSV phẳng tải về điền xong nạp lên là bị từ chối ngay dòng đầu. */
   const taiMauRieng = async (m: { ten: string; duong_dan: string }) => {
     try {
       const h = { Authorization: `Bearer ${localStorage.getItem("vtos_token") || ""}` };
@@ -90,6 +96,79 @@ function NapDuLieu() {
       setKt(d); setRows(d.rows || []); setTenTep(d.ten_tep || f.name);
       toast(`Đã đọc ${d.so_dong} dòng – xem kết quả kiểm tra bên dưới`);
     } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+
+  /** Đọc thử CẢ LÔ. Từng tệp đi qua ĐÚNG cửa `kiem-tra-tep` của mục 3 – cùng bộ kiểm, cùng khóa
+   *  chống trùng. Bước này vẫn CHƯA GHI GÌ, y như nạp một tệp. */
+  const kiemTraCaLo = async (fs: File[]) => {
+    setDang(true); setLo([]); setKt(null);
+    const h = { Authorization: `Bearer ${localStorage.getItem("vtos_token") || ""}` };
+    const ds: any[] = [];
+    for (let i = 0; i < fs.length; i++) {
+      const f = fs[i];
+      setDangLo(`Đang đọc ${i + 1}/${fs.length}: ${f.name}`);
+      try {
+        const fd = new FormData(); fd.append("loai", loai); fd.append("tep", f);
+        const r = await fetch("/api/v1/nap-du-lieu/kiem-tra-tep", { method: "POST", headers: h, body: fd });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d?.detail || "Không đọc được tệp");
+        // ten_tep giữ theo TỪNG TỆP, không gộp. Xem giải thích ở napCaLo().
+        ds.push({ ten_tep: d.ten_tep || f.name, so_dong: d.so_dong, hop_le: d.hop_le,
+                  da_co: d.da_co, dong_loi: d.dong_loi, rows: d.rows || [], trang_thai: "da_doc" });
+      } catch (e: any) {
+        ds.push({ ten_tep: f.name, so_dong: 0, hop_le: 0, da_co: 0, dong_loi: 0,
+                  rows: [], trang_thai: "khong_doc_duoc", loi: e?.message || String(e) });
+      }
+      setLo([...ds]);
+    }
+    setDangLo(""); setDang(false);
+    const hong = ds.filter((x) => x.trang_thai === "khong_doc_duoc").length;
+    toast(hong ? `Đọc xong ${fs.length} tệp – ${hong} tệp không đọc được` : `Đọc xong ${fs.length} tệp`, !!hong);
+  };
+
+  /** Nạp cả lô: MỖI TỆP MỘT LẦN GỌI, mang ĐÚNG TÊN TỆP CỦA NÓ.
+   *
+   *  ĐO TRƯỚC KHI TIN. Bản nháp đầu của chỗ này ghi rằng gộp dòng nhiều tệp làm một lần nạp sẽ cắt
+   *  mất cầu nối tệp↔chuyến sang bản đối chiếu H1. Chạy thử thì KHÔNG PHẢI: mỗi dòng mang sẵn
+   *  `ten_tep` của chính nó, và `nap_lo` ghi sổ `kho_cu_tep_chuyen` bằng tên trong DÒNG chứ không
+   *  bằng tham số của lần gọi – nên gộp lô, cầu nối vẫn đúng từng tệp. Đừng suy lại kết luận cũ ấy.
+   *
+   *  Vẫn gọi theo từng tệp, nhưng vì ba lý do khác và nhỏ hơn:
+   *
+   *    1. NHẬT KÝ NẠP. `intake_runs` ghi một dòng cho mỗi lần gọi, kèm tên tệp và mã băm nội dung.
+   *       Gộp 81 tệp là một dòng nhật ký mang một cái tên bịa cho dữ liệu của 81 tệp – câu "con số
+   *       này ở đâu ra" hết trả lời được, mà đó là lý do cả màn hình Nhật ký nạp tồn tại.
+   *    2. CÔ LẬP LỖI. Ô "bỏ qua dòng lỗi" là một quyết định cho MỘT tệp. Gộp lô thì một tệp hỏng
+   *       kéo theo quyết định ấy áp lên cả 81 tệp.
+   *    3. DỪNG GIỮA CHỪNG. Mất mạng ở tệp thứ 57 mà gộp lô thì không biết gì đã vào, gì chưa. */
+  const napCaLo = async () => {
+    const can = lo.filter((x) => x.trang_thai === "da_doc" && x.hop_le > 0
+                                 && (x.dong_loi === 0 || boQua));
+    if (!can.length) return;
+    if (!confirm(`Nạp ${can.length} tệp vào hệ thống?\n\n`
+      + `Tổng ${can.reduce((s, x) => s + x.hop_le, 0)} dòng hợp lệ.\n`
+      + `Mỗi tệp vào nhật ký thành một dòng riêng mang đúng tên tệp của nó.`)) return;
+    setDang(true);
+    const ds = [...lo];
+    for (let i = 0; i < can.length; i++) {
+      const t = can[i];
+      const vt = ds.indexOf(t);
+      setDangLo(`Đang nạp ${i + 1}/${can.length}: ${t.ten_tep}`);
+      try {
+        const d = await api<any>("/nap-du-lieu/nap", { method: "POST", json: {
+          loai, rows: t.rows, bo_qua_dong_loi: boQua,
+          ten_tep: t.ten_tep,          // TÊN CỦA CHÍNH TỆP NÀY – không phải tên chung của lô
+          nguon: "nguoi_nhap" } });
+        ds[vt] = { ...t, trang_thai: "da_nap", da_nap: d.da_nap, message: d.message };
+      } catch (e) {
+        ds[vt] = { ...t, trang_thai: "nap_hong", loi: errMsg(e) };
+      }
+      setLo([...ds]);
+    }
+    setDangLo(""); setDang(false);
+    setLs(await api("/nap-du-lieu/lich-su"));
+    const hong = ds.filter((x) => x.trang_thai === "nap_hong").length;
+    toast(hong ? `Xong – ${hong} tệp nạp hỏng, xem bảng` : `Đã nạp xong ${can.length} tệp`, !!hong);
   };
 
   const nap = async () => {
@@ -218,6 +297,63 @@ function NapDuLieu() {
              onChange={(e) => { const f = e.target.files?.[0]; if (f) kiemTraTep(f); }} />
       {tenTep && <p className="muted">Tệp: <b>{tenTep}</b> · {rows.length} dòng</p>}
     </div>
+
+    <div className="panel">
+      <h2>3b. Tải CẢ LÔ nhiều tệp một lượt</h2>
+      <p className="muted">Chọn nhiều tệp cùng lúc (giữ <b>Ctrl</b> hoặc bấm <b>Ctrl+A</b> trong hộp thoại).
+        Máy đọc từng tệp qua <b>đúng bộ kiểm của mục 3</b> – không nới một chốt nào – rồi hiện bảng dưới đây.
+        Bước này <b>chưa ghi gì</b>.</p>
+      <p className="muted">Mỗi tệp vào nhật ký thành <b>một dòng riêng mang đúng tên tệp của nó</b> — để
+        sau này còn trả lời được &quot;con số này ở đâu ra&quot;. Một tệp hỏng cũng chỉ dừng ở tệp ấy,
+        không kéo theo cả lô.</p>
+      <input type="file" accept=".csv,.xlsx,.xlsm" multiple disabled={dang}
+             onChange={(e) => { const fs = Array.from(e.target.files || []); if (fs.length) kiemTraCaLo(fs); }} />
+      {dangLo && <p className="muted">{dangLo}</p>}
+    </div>
+
+    {lo.length > 0 && <div className="panel wrap">
+      <h2>3c. Kết quả cả lô — {lo.length} tệp</h2>
+      <div className="kpis">
+        <div className="kpi"><b>{lo.length}</b><span>tệp</span></div>
+        <div className="kpi"><b style={{ color: "var(--ok, green)" }}>{lo.reduce((s, x) => s + (x.hop_le || 0), 0)}</b>
+          <span>dòng hợp lệ</span></div>
+        <div className="kpi"><b className="muted">{lo.reduce((s, x) => s + (x.da_co || 0), 0)}</b>
+          <span>đã có — bỏ qua</span></div>
+        <div className="kpi"><b style={{ color: lo.some((x) => x.dong_loi) ? "var(--red)" : undefined }}>
+          {lo.reduce((s, x) => s + (x.dong_loi || 0), 0)}</b><span>dòng lỗi</span></div>
+        <div className="kpi"><b style={{ color: lo.some((x) => x.trang_thai === "khong_doc_duoc") ? "var(--red)" : undefined }}>
+          {lo.filter((x) => x.trang_thai === "khong_doc_duoc").length}</b><span>tệp không đọc được</span></div>
+      </div>
+      <table><thead><tr><th>Tệp</th><th className="num">Dòng</th><th className="num">Hợp lệ</th>
+        <th className="num">Đã có</th><th className="num">Lỗi</th><th>Trạng thái</th></tr></thead>
+        <tbody>{lo.map((x, i) => <tr key={i}>
+          <td>{x.ten_tep}</td>
+          <td className="num">{x.so_dong}</td>
+          <td className="num">{x.hop_le}</td>
+          <td className="num muted">{x.da_co}</td>
+          <td className="num">{x.dong_loi || 0}</td>
+          <td>{x.trang_thai === "khong_doc_duoc" ? <Tag cls="red">không đọc được: {x.loi}</Tag>
+            : x.trang_thai === "nap_hong" ? <Tag cls="red">nạp hỏng: {x.loi}</Tag>
+            : x.trang_thai === "da_nap" ? <Tag cls="ok">đã nạp {x.da_nap}</Tag>
+            : x.dong_loi > 0 ? <Tag cls="warn">còn dòng lỗi</Tag> : <Tag cls="ok">sẵn sàng</Tag>}</td>
+        </tr>)}</tbody></table>
+
+      {canNap && lo.some((x) => x.trang_thai === "da_doc") && <div style={{ marginTop: 10 }}>
+        {lo.some((x) => x.dong_loi > 0) && <label style={{ display: "block" }}>
+          <input type="checkbox" style={{ width: "auto", marginRight: 6 }} checked={boQua}
+                 onChange={(e) => setBoQua(e.target.checked)} />
+          Bỏ qua các dòng lỗi và chỉ nạp phần hợp lệ
+        </label>}
+        <button className="act teal" disabled={dang} onClick={napCaLo}>
+          {dang ? (dangLo || "Đang nạp…")
+                : `Nạp ${lo.filter((x) => x.trang_thai === "da_doc" && x.hop_le > 0
+                          && (x.dong_loi === 0 || boQua)).length} tệp vào hệ thống`}
+        </button>
+        {lo.some((x) => x.dong_loi > 0) && !boQua && <p className="muted">Những tệp còn dòng lỗi đang bị bỏ
+          ra ngoài. Sửa tệp rồi đọc lại, hoặc tích ô trên — bỏ qua dòng lỗi là một quyết định, không phải
+          một mặc định.</p>}
+      </div>}
+    </div>}
 
     {kt && <div className="panel">
       <h2>4. Kết quả kiểm tra tệp</h2>

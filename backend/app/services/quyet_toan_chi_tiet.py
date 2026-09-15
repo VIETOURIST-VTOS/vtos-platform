@@ -243,11 +243,46 @@ def doc_sheet_ctt(ws) -> dict:
 
     ve, nhom = "", ""
     dong, tong = [], {}
+    # DÒNG CỘNG KHÔNG PHẢI DÒNG CHI.
+    #
+    # Đo trên tệp thật "QUYẾT TOÁN TOUR ĐÀ LẠT 3N3D TỐI 23.01.2026.xlsx" ngày 15/9/2026: sheet CTT có
+    # hai ô cộng giữa bảng – một ô ghi chữ "TỔNG" (30.557.000 đ) và một ô KHÔNG GHI GÌ ở cột A, chỉ
+    # có số ở cột THÀNH TIỀN (2.545.000 đ). Bản trước đọc cả hai thành dòng chi, nên giá vốn của
+    # chuyến ấy vào hệ thống thành 66.204.000 đ trong khi giá vốn thật là 33.102.000 đ – GẤP ĐÚNG
+    # HAI LẦN, vì phần dôi ra chính là hai ô cộng ấy.
+    #
+    # Chuyến đó doanh thu 42.880.000 đ. Giá vốn gấp đôi biến một chuyến LÃI 9,8 triệu thành LỖ 23
+    # triệu, và không có gì kêu lên: bảng vẫn cân, vì nó cân với chính con số đã sai.
+    #
+    # CÁCH NHẬN RA MÀ KHÔNG ĂN NHẦM DÒNG THẬT: một dòng chi phí thật luôn có đơn giá hoặc số lượng.
+    # Dòng chỉ có mỗi thành tiền thì NGỜ là dòng cộng – nhưng ngờ thôi chưa đủ, vì một khoản khoán
+    # trọn gói cũng chỉ có mỗi thành tiền. Nên máy CỘNG THỬ: nếu số ấy đúng bằng tổng những dòng kể
+    # từ ô cộng gần nhất thì nó là ô cộng; không bằng thì nó là một dòng chi thật và được giữ lại.
+    # Luật tự kiểm ấy không bao giờ nuốt mất một khoản tiền thật.
+    cong_don: float = 0.0          # cộng dồn các dòng kể từ ô cộng gần nhất
+    o_cong: list[dict] = []        # những ô cộng đã nhận ra, để phép kiểm 4b soi lại
+
+    def _la_o_cong(nhan: str, dg, sl, tt) -> bool:
+        if tt is None:
+            return False
+        if dg is not None or sl is not None:
+            return False                       # có đơn giá hay số lượng thì là dòng thật
+        if nhan.startswith(("TONG", "CONG")):
+            return True                        # ghi rõ chữ TỔNG/CỘNG
+        return _gan(tt, cong_don, sai_so=1.0)  # không ghi gì: chỉ nhận nếu CỘNG THỬ khớp
+
     for r in range(r0 + 1, ws.max_row + 1):
         nhan_a = _kd(ws.cell(r, 1).value)
-        if nhan_a.startswith("I/"): ve, nhom = "thu", ""; continue
-        if nhan_a.startswith("II/"): ve, nhom = "chi", ""; continue
-        if re.match(r"^[A-Z]\.\s", nhan_a): nhom = str(ws.cell(r, 1).value).strip(); continue
+        if nhan_a.startswith("I/"): ve, nhom, cong_don = "thu", "", 0.0; continue
+        if nhan_a.startswith("II/"): ve, nhom, cong_don = "chi", "", 0.0; continue
+        # Tiêu đề nhóm: "A. VẬN CHUYỂN:", nhưng tệp thật cũng viết "B.CHI PHÍ KHÁC" – KHÔNG có dấu
+        # cách sau dấu chấm. Bản trước đòi dấu cách, nên nhóm B không bao giờ được nhận ra và bốn
+        # dòng của nó (nước, bảo hiểm, HDV, nội bộ) bị xếp nhầm vào nhóm A. Tiền không sai, nhưng
+        # báo cáo chi phí theo nhóm thì sai. Dòng tiêu đề không mang số – đòi thêm điều kiện ấy để
+        # một dòng chi phí bắt đầu bằng "A.Cái gì đó" không bị nuốt thành tiêu đề.
+        if (re.match(r"^[A-Z]\.", nhan_a) and _so(ws.cell(r, c_dg).value) is None
+                and _so(ws.cell(r, c_tt).value) is None):
+            nhom = str(ws.cell(r, 1).value).strip(); cong_don = 0.0; continue
         if nhan_a.startswith("TONG CONG THU"):
             tong["thu"] = _so(ws.cell(r, c_tt).value); continue
         if nhan_a.startswith("TONG CONG CHI"):
@@ -257,6 +292,12 @@ def doc_sheet_ctt(ws) -> dict:
         dg, tt = _so(ws.cell(r, c_dg).value), _so(ws.cell(r, c_tt).value)
         if dg is None and tt is None:
             continue
+        sl = _so(ws.cell(r, c_sl).value) if c_sl else None
+        if _la_o_cong(nhan_a, dg, sl, tt):
+            o_cong.append({"nhom": nhom, "ve": ve or "chi", "ghi": tt, "cong_lai": cong_don})
+            cong_don = 0.0
+            continue
+        cong_don += tt or 0.0
         # Tiêu đề ghi cột A là "NGÀY", nhưng trong tệp thật KHÔNG dòng nào có ngày ở đó – Điều hành
         # dùng cột ấy làm nội dung ("Ăn trưa ngày 1", "LƯU TRÚ", "Tham quan") và đẩy nhà cung cấp
         # sang cột "NỘI DUNG". Đọc theo đúng tên cột thì tên món ăn thành ngày, còn tên nhà cung cấp
@@ -279,7 +320,7 @@ def doc_sheet_ctt(ws) -> dict:
             "doi_tac": dtac,
             "o_phu": oc if oa else "",
             "don_gia": dg,
-            "so_luong": _so(ws.cell(r, c_sl).value) if c_sl else None,
+            "so_luong": sl,
             "he_so": _so(ws.cell(r, c_hs).value) if c_hs else None,
             "thanh_tien": tt,
             "so_chung_tu": str(ws.cell(r, c_gc).value or "").strip() if c_gc else "",
@@ -292,7 +333,7 @@ def doc_sheet_ctt(ws) -> dict:
             if k == "TONG THU" and "thu" not in tong: tong["thu"] = _so(_o_ben_phai(ws, r, c))
             elif k == "TONG CHI" and "chi" not in tong: tong["chi"] = _so(_o_ben_phai(ws, r, c))
             elif k == "LOI NHUAN" and "loi_nhuan" not in tong: tong["loi_nhuan"] = _so(_o_ben_phai(ws, r, c))
-    return {"dau": _doc_dau(ws, r0), "dong": dong, "tong": tong}
+    return {"dau": _doc_dau(ws, r0), "dong": dong, "tong": tong, "o_cong": o_cong}
 
 
 def doc_sheet_hdv(ws) -> dict:
@@ -502,7 +543,13 @@ def kiem(doc: dict, ma_khoan_map: dict | None = None) -> dict:
     for x in ctt_dong:
         if x["thanh_tien"] is None or x["don_gia"] is None:
             continue
-        tinh = x["don_gia"] * (x["so_luong"] or 1) * (x["he_so"] or 1)
+        # `x or 1` biến SỐ KHÔNG thành MỘT. Tệp thật có hai dòng số lượng 0 (phụ thu trẻ em 0 người,
+        # vé tham quan 0 người) và thành tiền 0 – đúng. Bản trước thay 0 bằng 1 rồi kêu "thành tiền 0
+        # khác 140.000", và người nạp phải tích "bỏ qua dòng lỗi" để đi tiếp. Bỏ qua thành thói quen
+        # thì đến dòng lệch thật cũng bị bỏ qua. 0 là một con số khai rõ; RỖNG mới là chưa khai.
+        _sl = 1 if x["so_luong"] is None else x["so_luong"]
+        _hs = 1 if x["he_so"] is None else x["he_so"]
+        tinh = x["don_gia"] * _sl * _hs
         if not _gan(x["thanh_tien"], tinh):
             x["co_lech"] = (f"Thành tiền {x['thanh_tien']:,.0f} khác đơn giá × số lượng × hệ số "
                             f"= {tinh:,.0f}")
