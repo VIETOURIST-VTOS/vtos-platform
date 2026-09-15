@@ -472,3 +472,58 @@ table.bang-doc{width:100%}
   main,.panel,.the{max-width:100%}
   .wrap{max-width:100%}
 }
+
+/* ═══ TC-31 · ĐẦU TRANG MÀN HÌNH 01 THEO BẢN VẼ V1.4 ═══════════════════════════════════════
+   Bản vẽ mở đầu bằng ba thứ mà VTOS chưa có: đường dẫn (breadcrumb), một dòng phụ nói trang
+   này trả lời những câu hỏi nào, và nút In / Lưu PDF. Hai cái đầu là định hướng cho người đọc;
+   cái thứ ba là việc thật — Chủ tịch mang bảng này vào phòng họp. */
+.mh01-duong{display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+  font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--vtos-text-mute);margin:0 0 4px}
+/* TÊN LỚP RIÊNG, KHÔNG DÙNG LẠI .mh01-dau. Lớp .mh01-dau ở trên đã là đầu ĐẦU KHỐI (h2 + thẻ
+   nhãn), dùng ở cả sáu khối V14, khối Tồn đọng và khối Cần quyết định. Đặt lại cùng tên ở đây thì
+   quy tắc sau đè quy tắc trước: mọi đầu khối nhận justify-content:space-between và thẻ nhãn văng
+   sang mép phải. Đầu TRANG và đầu KHỐI là hai việc khác nhau, nên hai tên khác nhau. */
+.mh01-trang{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px}
+.mh01-trang h1{margin:0}
+.mh01-phu{margin:2px 0 0;font-size:13px;color:var(--vtos-text-mute)}
+.mh01-in{flex:0 0 auto}
+
+/* ═══ IN RA GIẤY — bản vẽ có nút "In / Lưu PDF", nên trang phải in ra được tử tế ═════════
+   Giấy là một MÔI TRƯỜNG KHÁC, không phải màn hình thu nhỏ. Bảng màu nền tối in ra giấy trắng
+   thì hoặc tốn cả hộp mực, hoặc trình duyệt bỏ nền đi và còn lại chữ sáng trên trắng — không
+   đọc được chữ nào.
+
+   Nên ở đây ĐỔI GIÁ TRỊ CỦA BIẾN, không gõ màu mới: chữ chính mượn nền thanh điều hướng
+   (#10273E), chữ phụ mượn nền nút chính (#1E63C8), viền mượn màu viền sẵn có. Ba con số tương
+   phản trên giấy trắng đo được là 15,2 · 5,72 · 8,68 — đều qua ngưỡng AA. Không thêm một mã màu
+   nào vào tệp này, đúng luật bộ nhận diện.
+
+   `--vtos-text-mute` (#9BB2C6) CỐ Ý không giữ: trên giấy trắng nó chỉ đạt 2,19. */
+@media print{
+  :root{
+    --vtos-surface:#fff;
+    --vtos-card:#fff;
+    --vtos-text:var(--vtos-nav-bg);
+    --vtos-heading:var(--vtos-navy-dark);
+    --vtos-text-mute:var(--vtos-sky);
+    --vtos-text-faint:var(--vtos-sky);
+    /* Liên kết và số nổi bật đang là xanh nhạt (#6FA8F0) — trên trắng chỉ 2,6. Đổi sang navy. */
+    --vtos-navy:var(--vtos-nav-bg);
+  }
+  /* Thanh điều hướng, nút bấm và lối tắt là thứ BẤM ĐƯỢC; trên giấy chúng chỉ là ô đen vô nghĩa. */
+  .top,aside.side,.mh01-in,button,.cai-dat-app{display:none !important}
+  .shell,.main{display:block;padding:0;margin:0;max-width:none}
+  body{background:#fff}
+  /* Không cắt một khối hay một hàng làm đôi giữa hai trang giấy. */
+  .panel{break-inside:avoid;page-break-inside:avoid;border:1px solid var(--vtos-line);margin:0 0 10px}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  thead{display:table-header-group}
+  .wrap{overflow:visible}
+  @page{margin:12mm}
+}
+
+/* Đường ngăn giữa phần theo bản vẽ và phần riêng của VTOS. Không giấu phần thêm đi, cũng không
+   để nó trông như một khối của bản vẽ — nói thẳng ra là phần thêm, rồi xếp xuống dưới. */
+.mh01-ngan{border:0;border-top:1px solid var(--vtos-line);margin:22px 0 12px}
+.mh01-them{font-size:14px;color:var(--vtos-text-mute);margin:0 0 10px;font-weight:600}

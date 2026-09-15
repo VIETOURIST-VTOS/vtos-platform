@@ -100,8 +100,38 @@ export function DongLoc() {
   );
 }
 
+/** ĐẦU TRANG THEO BẢN VẼ V1.4 — ba thứ bản vẽ mở đầu mà VTOS còn thiếu.
+ *
+ *  1. ĐƯỜNG DẪN. Bản vẽ ghi "VTOS / Không gian lãnh đạo / Thiết kế đề xuất". Chặng cuối của bản
+ *     vẽ là tên CỦA BẢN VẼ, không phải của trang thật — trang thật mang tên trang thật.
+ *
+ *  2. DÒNG PHỤ nói trang này trả lời những câu hỏi nào. Bản vẽ đặt nó ngay dưới tiêu đề, và nó
+ *     làm một việc thật: người mở lần đầu biết cuộn xuống sẽ gặp gì.
+ *
+ *  3. NÚT IN / LƯU PDF. Đây là việc thật, không phải trang trí: Chủ tịch mang bảng này vào phòng
+ *     họp. Kiểu in nằm ở globals.css — giấy là môi trường khác, không phải màn hình thu nhỏ.
+ *
+ *  KHÔNG lấy huy hiệu "Giao diện xanh navy" ở góc phải bản vẽ: đó là nhãn của TÀI LIỆU THIẾT KẾ
+ *  tự mô tả mình, dán lên trang thật thì thành một ô chữ không ai bấm được và không nói gì thêm.
+ */
+const PHU_TRANG = "Kết quả · Phải thu · Phải trả · Dòng tiền · Quyết định";
+
 export function TieuDe({ vai, ten_vai }: { vai?: string; ten_vai?: string }) {
-  return <h1>{TEN_TRANG[vai || ""] || `Bảng điều hành · ${ten_vai || ""}`}</h1>;
+  const ten = TEN_TRANG[vai || ""] || `Bảng điều hành · ${ten_vai || ""}`;
+  return (<>
+    <div className="mh01-duong">
+      <span>VTOS</span><span>/</span><span>Không gian lãnh đạo</span><span>/</span><span>{ten}</span>
+    </div>
+    <div className="mh01-trang">
+      <div>
+        <h1>{ten}</h1>
+        <p className="mh01-phu">{PHU_TRANG}</p>
+      </div>
+      <button type="button" className="act grey mh01-in" onClick={() => window.print()}>
+        In / Lưu PDF
+      </button>
+    </div>
+  </>);
 }
 
 /** Khối 02 – "Cần quyết định". Bản vẽ đặt nó NGAY TRÊN các chỉ tiêu: mở màn hình ra là thấy việc
