@@ -90,6 +90,45 @@ def test_loi1_khong_bo_sheet_khi_moi_sheet_cung_nam():
     assert d["sheet_ma"] == []
 
 
+def test_loi1_sheet_chi_phi_chep_sot_o_NGAY_KHONG_PHAI_sheet_ma():
+    """CHỖ LUẬT NĂM SUÝT NUỐT MẤT TIỀN THẬT — bắt được khi chạy thử nạp cả 81 tệp ngày 15/9/2026.
+
+    Tệp "QTT ĐOÀN PHAN THIẾT 15.01.2026 - SALE KIM OANH" có sheet 'CHI THỰC TẾ' ghi KHỞI HÀNH
+    "13-14/12/2025" và sheet 'HDV CHI' ghi "15-17/01/2025" – ô ngày chép sót từ tệp tháng trước,
+    còn nội dung bên dưới là chi phí THẬT của chuyến 15/01/2026.
+
+    Bản đầu của luật chỉ hỏi "năm có cũ hơn không" nên bỏ cả hai sheet ấy. Tổng tiền của tệp VẪN
+    ĐÚNG vì lấy từ hàng tổng bảng khách – nên không có gì đỏ lên – nhưng toàn bộ DÒNG chi phí biến
+    mất. Đúng kiểu hỏng im lặng mà cả bộ đọc này viết ra để tránh.
+
+    Sheet ma thật là một BẢN QUYẾT TOÁN ĐẦY ĐỦ của chuyến khác: có bảng khách riêng. Sheet chi phí
+    chép sót ô ngày thì không có bảng khách nào.
+    """
+    chi_chep_sot = [
+        ["CHI PHÍ ĐOÀN PHAN THIẾT"],
+        ["MÃ TOUR:", "PT001.04", "SỐ LƯƠNG", 25],
+        ["KHỞI HÀNH:", "13-14/12/2025"],          # ô ngày CHÉP SÓT của tệp tháng trước
+        _o(0),
+        ["NGÀY", "NỘI DUNG ", "ĐỐI TÁC", "ĐƠN GIÁ", "SL", "DIỄN GIẢI", "THÀNH TIỀN"],
+        ["II/ CHI PHÍ:"],
+        [None, "XE 45C", "VIETRIP", 9_000_000, 1, 1, 9_000_000],
+        [None, "LƯU TRÚ", "Sea Links", 700_000, 25, 1, 17_500_000],
+        ["TỔNG CỘNG CHI", None, None, None, None, None, 26_500_000],
+    ]
+    b = _tep({
+        "QUYẾT TOÁN": _sheet_quyet_toan("PT001.04", "15/01/2026", ["K"] * 25,
+                                        1_840_000, 1_060_000),
+        "CHI THỰC TẾ": chi_chep_sot,
+    })
+    d = K.doc_tep(b, "thu.xlsx")
+
+    assert d["sheet_ma"] == [], (
+        f"bỏ nhầm {d['sheet_ma']} – sheet chi phí chép sót ô ngày KHÔNG phải sheet ma, vì nó không "
+        "có bảng khách của riêng nó")
+    assert d["tong_chi_cong_dong"] == 26_500_000, "mất dòng chi phí thật vì luật năm quá tay"
+    assert len(d["chi"]) == 2
+
+
 # =============================================================================================
 # LỖI 2 — MICE: một sheet có HAI hàng tiêu đề, xếp cột khác nhau
 # =============================================================================================

@@ -185,3 +185,26 @@ def test_cl6_man_hinh_nap_theo_tung_tep_chu_khong_gop_dong():
     assert "rows: t.rows" in than, "phải gửi dòng của từng tệp, không gộp"
     for xau in (".flat(", ".flatMap(", "concat("):
         assert xau not in than, f"nạp cả lô đang gộp dòng bằng {xau} – mỗi tệp phải một lần nạp"
+
+
+def test_cl7_them_cua_ca_lo_khong_duoc_xoa_nut_tai_mau_xlsx():
+    """CANH VIỆC CỦA LANE KHÁC TRÊN CÙNG MỘT MÀN HÌNH.
+
+    Chuyện đã xảy ra thật, phát hiện ngày 15/9/2026 khi soi bản so sánh nhánh trước lúc gộp: bản
+    thêm cửa nạp cả lô được viết đè lên một bản `page.tsx` CŨ, nên nó XOÁ MẤT `taiMauRieng` – hàm
+    tải mẫu .xlsx mà lane khác vừa thêm vào `main`.
+
+    Hàm ấy tồn tại vì một lý do cụ thể: `taiMau()` đọc phản hồi bằng `.text()`, đúng cho CSV nhưng
+    làm hỏng .xlsx (tệp nén nhị phân, đọc thành chuỗi rồi gói lại là tệp Excel mở không lên). Gộp
+    nhánh ấy vào là bật lại đúng cái lỗi kia, mà không phép thử nào của kho biết để kêu lên — vì
+    không phép thử nào đứng canh.
+
+    Nhiều làn cùng sửa một tệp màn hình thì mỗi làn phải để lại một chốt canh phần của mình.
+    """
+    src = _trang()
+    assert "taiMauRieng" in src, (
+        "màn hình Nạp dữ liệu mất hàm tải mẫu .xlsx – nhiều khả năng một bản sửa được viết đè lên "
+        "page.tsx cũ. Lấy lại từ main, đừng viết lại từ đầu.")
+    assert "mau_rieng" in src, "mất nhánh hiện nút mẫu riêng cho bộ nạp có mẫu .xlsx"
+    assert ".blob()" in src, (
+        "tải mẫu .xlsx phải đọc bằng .blob(); đọc bằng .text() là tệp Excel mở không lên")

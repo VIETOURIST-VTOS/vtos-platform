@@ -53,6 +53,29 @@ function NapDuLieu() {
 
   const chon = chon0;
 
+  /** Tải MẪU RIÊNG của bộ nạp – tệp .xlsx do chính VTOS sinh ra.
+   *
+   * KHÔNG dùng chung với taiMau() ở dưới: hàm ấy đọc phản hồi bằng .text(), đúng cho CSV nhưng làm
+   * HỎNG tệp .xlsx – xlsx là tệp nén nhị phân, đọc thành chuỗi rồi gói lại là một tệp Excel mở
+   * không lên. Hỏng kiểu ấy không có thông báo nào: người dùng tải về, bấm mở, Excel báo tệp lỗi,
+   * và họ nghĩ hệ thống hỏng chứ không nghĩ cái nút hỏng.
+   *
+   * Cũng vì vậy nút "Tải tệp mẫu (.csv)" chung KHÔNG hiện cho bộ nạp có mẫu riêng: bộ nạp mẫu quyết
+   * toán nhận tệp mười sheet, còn CSV phẳng tải về điền xong nạp lên là bị từ chối ngay dòng đầu. */
+  const taiMauRieng = async (m: { ten: string; duong_dan: string }) => {
+    try {
+      const h = { Authorization: `Bearer ${localStorage.getItem("vtos_token") || ""}` };
+      const r = await fetch(m.duong_dan, { headers: h });
+      if (!r.ok) throw { status: r.status, message: `Không tải được ${m.ten}` };
+      const blob = await r.blob();
+      const cd = r.headers.get("content-disposition") || "";
+      const ten = /filename="?([^"]+)"?/.exec(cd)?.[1] || `${m.ten}.xlsx`;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = ten; a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
   const taiMau = () => {
     const h = { Authorization: `Bearer ${localStorage.getItem("vtos_token") || ""}` };
     fetch(`/api/v1/nap-du-lieu/mau/${loai}`, { headers: h }).then((r) => r.text()).then((t) => {
@@ -211,7 +234,19 @@ function NapDuLieu() {
             <td>{c.bat_buoc ? <Tag cls="red">bắt buộc</Tag> : <span className="muted">không</span>}</td>
             <td className="muted">{c.vi_du}</td><td className="muted">{c.ghi_chu}</td>
           </tr>)}</tbody></table></div>
-        <button className="act grey" style={{ marginTop: 8 }} onClick={taiMau}>Tải tệp mẫu (.csv)</button>
+        {chon.mau_rieng?.length > 0 ? <div style={{ marginTop: 8 }}>
+          <p className="muted" style={{ marginBottom: 4 }}>
+            Bộ nạp này nhận <b>tệp Excel nhiều sheet do chính VTOS phát ra</b>, không nhận CSV phẳng.
+            Mẫu được <b>sinh ra lúc bấm</b> nên danh mục khoản mục trong mẫu luôn khớp danh mục hệ
+            thống – tải về, điền vào ô nền vàng, rồi tải lên ở bước dưới.
+          </p>
+          {chon.mau_rieng.map((m: any) => (
+            <button key={m.duong_dan} type="button" className="act grey"
+                    style={{ marginRight: 6 }} onClick={() => taiMauRieng(m)}>
+              Tải {m.ten}
+            </button>
+          ))}
+        </div> : <button className="act grey" style={{ marginTop: 8 }} onClick={taiMau}>Tải tệp mẫu (.csv)</button>}
       </>}
     </div>
 

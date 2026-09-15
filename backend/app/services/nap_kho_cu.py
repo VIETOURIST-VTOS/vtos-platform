@@ -637,9 +637,25 @@ def doc_tep(noi_dung: bytes, ten_tep: str = "") -> dict:
 
     # SHEET MA phải loại TRƯỚC _doc_dau – nếu không, mã tour và ngày đi của chuyến năm cũ được đọc
     # trước và cả tệp mang đầu của chuyến khác.
+    # KHÔNG PHẢI CỨ NĂM CŨ LÀ SHEET MA – PHẢI LÀ MỘT BẢN QUYẾT TOÁN HOÀN CHỈNH CỦA CHUYẾN KHÁC.
+    #
+    # Bản đầu của luật này chỉ hỏi "sheet tự khai năm cũ hơn không". Chạy thử nạp cả 81 tệp tháng
+    # 1/2026 ngày 15/9/2026 thì nó bỏ nhầm HAI SHEET CHI PHÍ THẬT của tệp
+    # "QTT ĐOÀN PHAN THIẾT 15.01.2026 - SALE KIM OANH": sheet 'CHI THỰC TẾ' ghi KHỞI HÀNH
+    # "13-14/12/2025" và sheet 'HDV CHI' ghi "15-17/01/2025" – ô ngày chép sót từ tệp trước, trong
+    # khi nội dung bên dưới là chi phí thật của chuyến 15/01/2026.
+    #
+    # Tổng tiền của tệp ấy vẫn đúng (lấy từ hàng tổng bảng khách) nên không có gì đỏ lên – nhưng
+    # toàn bộ DÒNG chi phí bị mất. Đúng kiểu hỏng im lặng mà cả tệp này viết ra để tránh.
+    #
+    # Sheet ma thật là một BẢN QUYẾT TOÁN ĐẦY ĐỦ của chuyến khác: nó có bảng khách riêng, tổng
+    # riêng. Một sheet chi phí chép sót ô ngày thì không có bảng khách. Nên đòi thêm điều kiện ấy:
+    # vừa khai năm cũ, VỪA có bảng khách của chính nó.
     nam = {ws.title: _nam_sheet(ws) for ws in wb.worksheets}
     nam_moi = max([v for v in nam.values() if v], default=None)
-    sheet_ma = [t for t, v in nam.items() if v and nam_moi and v < nam_moi]
+    sheet_ma = [ws.title for ws in wb.worksheets
+                if nam.get(ws.title) and nam_moi and nam[ws.title] < nam_moi
+                and _hang_tieu_de_khach(ws) is not None]
 
     d = {"ten_tep": ten_tep, "sheets": list(wb.sheetnames), "sheet_ma": sheet_ma}
     d.update(_doc_dau_bo_sheet_ma(wb, sheet_ma))
