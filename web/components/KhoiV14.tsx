@@ -49,11 +49,25 @@ export type HieuQuaXe = {
  *  cảnh báo vẫn là một hồ sơ, cộng cả ba là thổi phồng con số. Việc chống trùng làm Ở MÁY CHỦ. */
 export type DongTonDong = {
   bo_phan: string;
+  ma_bo_phan?: string;
   ho_so_qua_han?: number | null;
-  ho_so_lau_nhat?: string | null;        // ví dụ "42 ngày" hoặc mã hồ sơ
+  ho_so_lau_nhat?: string | null;        // ví dụ "42 ngày · TOUR-A"
   nguoi_chiu_trach_nhiem?: string | null;
   han_khac_phuc?: string | null;
 };
+
+/** TC-32 · Hai thứ đi KÈM bảng 04c, và không cái nào là trang trí.
+ *
+ *  `chua_ro_bo_phan` – hồ sơ chưa suy ra được bộ phận vì cảnh báo chưa giao cho ai. Đây là một
+ *  DÒNG ĐƯỢC ĐẾM, không phải một ô trống bị bỏ qua: nhét nó vào một phòng là đổ việc cho người
+ *  không gây ra nó; giấu nó đi là làm tổng bảng nhỏ hơn sự thật mà không ai thấy.
+ *
+ *  `da_loai` – những loại cảnh báo CỐ Ý không tính là hồ sơ quá hạn, kèm lý do. Phải hiện ra: khối
+ *  "Tồn đọng cần xử lý" ngay trên trang ghi 1.476, khối này ghi vài chục. Hai con số lệch nhau mà
+ *  không giải thích thì người đọc kết luận một trong hai cái sai — và họ có lý.
+ */
+export type ChuaRoBoPhan = { so: number; vi_sao: string };
+export type LoaiDaLoai = { loai: string; so_ho_so: number; ly_do: string };
 
 /** 05 · Một nhóm hạn thanh toán. `nhan` là tên nhóm, `mo_ta` là định nghĩa khoảng – in ra màn hình
  *  để không ai phải đoán "2 tuần" tính từ đâu. */
@@ -75,10 +89,14 @@ export type RuiRo = {
 /** 08 · Tiến độ báo cáo & kết luận chỉ đạo. Theo dõi hồ sơ chưa chốt và việc làm theo chỉ đạo. */
 export type DongTienDo = {
   ho_so: string;
+  ma_pham_vi?: string;
   don_vi?: string | null;
   han?: string | null;
   tien_do?: string | null;
+  da_nop?: boolean;
   buoc_tiep?: string | null;
+  cua?: string | null;              // cửa đi tới, để "bước tiếp theo" bấm được chứ không chỉ để đọc
+  so_viec_do?: number | null;       // rỗng = chưa nộp nên chưa đếm được, KHÁC 0 = nộp rồi và sạch
 };
 
 /* ────────────────────────── MẢNH DÙNG CHUNG ────────────────────────── */
@@ -168,22 +186,52 @@ export function KhoiHieuQuaXe({ d }: { d?: HieuQuaXe | null }) {
 
 /* ───────────────────────── 04c · TỒN ĐỌNG THEO BỘ PHẬN ───────────────────────── */
 
-export function KhoiTonDongBoPhan({ ds }: { ds?: DongTonDong[] | null }) {
+export function KhoiTonDongBoPhan({ ds, chua_ro, da_loai, vi_sao }: {
+  ds?: DongTonDong[] | null;
+  chua_ro?: ChuaRoBoPhan | null;
+  da_loai?: LoaiDaLoai[] | null;
+  vi_sao?: string | null;
+}) {
   const co = ds || [];
+  const loai = da_loai || [];
   const cot = ["Bộ phận", "Hồ sơ quá hạn", "Hồ sơ lâu nhất", "Người chịu trách nhiệm", "Hạn khắc phục"];
   const ghi = "Mỗi hồ sơ chỉ tính MỘT lần: một hồ sơ phát ba cảnh báo vẫn là một hồ sơ. Việc chống cộng trùng làm ở máy chủ, không làm ở màn hình.";
+  /* Tổng bảng gồm CẢ dòng chưa rõ bộ phận. Ghi tổng mà bỏ dòng ấy ra là ghi một con số nhỏ hơn
+     sự thật – đúng kiểu sai mà không ai kiểm được, vì con số vẫn cộng khớp với các dòng hiện ra.
+
+     RỖNG KHÁC KHÔNG, và luật ấy áp cả cho DÒNG TỔNG. Một dòng chưa có số thì tổng KHÔNG BIẾT
+     ĐƯỢC – coi nó là 0 rồi cộng tiếp ra một con số nhỏ hơn sự thật mà vẫn khớp với các dòng hiện
+     ra, nên không ai kiểm được. Thiếu một dòng thì không ghi tổng, chứ không ghi tổng thiếu. */
+  const thieu_so = co.some((r) => typeof r.ho_so_qua_han !== "number");
+  const tong = thieu_so
+    ? null
+    : co.reduce((s, r) => s + (r.ho_so_qua_han as number), 0) + (chua_ro ? chua_ro.so : 0);
   return (
     <section className="panel" id="ton-dong-bo-phan">
-      <DauKhoi ten="Tồn đọng theo bộ phận" phu="Mỗi hồ sơ chỉ tính một lần" />
-      {co.length === 0
-        ? <BangRong cot={cot} ghi_chu={ghi} ai="Công nghệ thông tin" cua="/alerts" cua_ten="Trang cảnh báo" />
+      <DauKhoi ten="Tồn đọng theo bộ phận" phu={typeof tong === "number" && tong > 0 ? `${tong} hồ sơ` : "Mỗi hồ sơ chỉ tính một lần"} />
+      {co.length === 0 && !chua_ro
+        ? (vi_sao
+            /* Sổ có thật mà rỗng KHÁC sổ chưa nối. Cái đầu là tin tốt và phải nói rõ là tin tốt;
+               cái sau là việc còn nợ. Dùng chung một ô "Chưa kết nối" thì trộn mất hai thứ. */
+            ? <>
+                <div className="wrap">
+                  <table className="v14-bang">
+                    <thead><tr>{cot.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+                    <tbody><tr><td colSpan={cot.length} className="v14-trong">
+                      <Tag>Không có hồ sơ quá hạn</Tag> <span className="muted">{vi_sao}</span>
+                    </td></tr></tbody>
+                  </table>
+                </div>
+                <p className="muted v14-ghi">{ghi}</p>
+              </>
+            : <BangRong cot={cot} ghi_chu={ghi} ai="Công nghệ thông tin" cua="/alerts" cua_ten="Trang cảnh báo" />)
         : <>
             <div className="wrap">
               <table className="v14-bang">
                 <thead><tr>{cot.map((c) => <th key={c}>{c}</th>)}</tr></thead>
                 <tbody>
                   {co.map((r) => (
-                    <tr key={r.bo_phan}>
+                    <tr key={r.ma_bo_phan || r.bo_phan}>
                       <td><b>{r.bo_phan}</b></td>
                       <td className="num">{r.ho_so_qua_han ?? "—"}</td>
                       <td>{r.ho_so_lau_nhat || <span className="muted">—</span>}</td>
@@ -191,11 +239,28 @@ export function KhoiTonDongBoPhan({ ds }: { ds?: DongTonDong[] | null }) {
                       <td>{r.han_khac_phuc || <span className="muted">chưa đặt</span>}</td>
                     </tr>
                   ))}
+                  {chua_ro && (
+                    <tr className="v14-chua-ro">
+                      <td><b>Chưa rõ bộ phận</b></td>
+                      <td className="num">{chua_ro.so}</td>
+                      <td colSpan={3}><span className="muted">{chua_ro.vi_sao}</span></td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
             <p className="muted v14-ghi">{ghi}</p>
           </>}
+      {loai.length > 0 && (
+        <p className="muted v14-ghi">
+          {"Không tính vào bảng này: "}
+          {loai.map((l, i) => (
+            <span key={l.loai}>
+              {i > 0 && " · "}<b>{l.so_ho_so}</b>{" hồ sơ loại "}<code>{l.loai}</code>{" — "}{l.ly_do}
+            </span>
+          ))}
+        </p>
+      )}
     </section>
   );
 }
@@ -347,15 +412,42 @@ export function KhoiRuiRo({ ds }: { ds?: RuiRo[] | null }) {
 
 /* ───────────────────────── 08 · TIẾN ĐỘ BÁO CÁO & KẾT LUẬN CHỈ ĐẠO ───────────────────────── */
 
-export function KhoiTienDoBaoCao({ ds }: { ds?: DongTienDo[] | null }) {
+/** TC-33 · Bản vẽ đặt MỘT khối nhưng hỏi HAI câu khác hẳn nhau, nên màn hình dựng thành hai phần:
+ *
+ *    (A) TIẾN ĐỘ BÁO CÁO   – phòng nào đã nộp bản của kỳ vừa đóng. Trả lời được ngay hôm nay.
+ *    (B) KẾT LUẬN CHỈ ĐẠO  – chưa có bảng nào giữ. Nằm im ở "chưa kết nối", và NÓI RA là chưa có.
+ *
+ *  Gộp hai phần vào một bảng thì khối trông như đã xong trong khi một nửa còn chưa bắt đầu. */
+export function KhoiTienDoBaoCao({ ds, ten_ky, so_da_nop, so_thieu, vi_sao, chi_dao_vi_sao }: {
+  ds?: DongTienDo[] | null;
+  ten_ky?: string | null;
+  so_da_nop?: number | null;
+  so_thieu?: number | null;
+  vi_sao?: string | null;
+  chi_dao_vi_sao?: string | null;
+}) {
   const co = ds || [];
   const cot = ["Hồ sơ / kết luận", "Đơn vị phụ trách", "Hạn", "Tiến độ", "Bước tiếp theo"];
   const ghi = "Theo dõi hồ sơ chưa chốt và công việc thực hiện theo chỉ đạo. Một dòng ở đây là một việc có người chịu và có hạn — không phải một ghi chú.";
+  /* Nhãn đầu khối nói KỲ NÀO đang được đo. Một bảng tiến độ không nói nó đo kỳ nào là một bảng
+     không kiểm được: người đọc không biết "chưa nộp" nghĩa là chưa nộp của tháng nào. */
+  const phu = ten_ky
+    ? (typeof so_thieu === "number" ? `${ten_ky} · còn thiếu ${so_thieu}/${co.length}` : ten_ky)
+    : "Theo trách nhiệm";
   return (
     <section className="panel" id="tien-do-bao-cao">
-      <DauKhoi ten="Tiến độ báo cáo &amp; kết luận chỉ đạo" phu="Theo trách nhiệm" />
+      <DauKhoi ten="Tiến độ báo cáo &amp; kết luận chỉ đạo" phu={phu} />
       {co.length === 0
-        ? <BangRong cot={cot} ghi_chu={ghi} ai="Văn phòng Hội đồng quản trị" cua="/reports" cua_ten="Trang báo cáo" />
+        ? (vi_sao
+            ? <div className="wrap">
+                <table className="v14-bang">
+                  <thead><tr>{cot.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+                  <tbody><tr><td colSpan={cot.length} className="v14-trong">
+                    <span className="muted">{vi_sao}</span>
+                  </td></tr></tbody>
+                </table>
+              </div>
+            : <BangRong cot={cot} ghi_chu={ghi} ai="Văn phòng Hội đồng quản trị" cua="/reports" cua_ten="Trang báo cáo" />)
         : <>
             <div className="wrap">
               <table className="v14-bang">
@@ -366,8 +458,14 @@ export function KhoiTienDoBaoCao({ ds }: { ds?: DongTienDo[] | null }) {
                       <td><b>{r.ho_so}</b></td>
                       <td>{r.don_vi || <span className="muted">—</span>}</td>
                       <td>{r.han || <span className="muted">chưa đặt</span>}</td>
-                      <td>{r.tien_do || <span className="muted">—</span>}</td>
-                      <td>{r.buoc_tiep || <span className="muted">—</span>}</td>
+                      {/* "Chưa nộp" là việc còn nợ, nên nó phải đọc ra được là việc còn nợ — không
+                          nằm chung một màu với dòng đã xong. */}
+                      <td>{r.tien_do
+                        ? (r.da_nop ? r.tien_do : <Tag>{r.tien_do}</Tag>)
+                        : <span className="muted">—</span>}</td>
+                      <td>{r.cua
+                        ? <Link className="the-cua" href={r.cua}>{r.buoc_tiep} →</Link>
+                        : (r.buoc_tiep || <span className="muted">—</span>)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -375,6 +473,13 @@ export function KhoiTienDoBaoCao({ ds }: { ds?: DongTienDo[] | null }) {
             </div>
             <p className="muted v14-ghi">{ghi}</p>
           </>}
+      {/* (B) — phần CHƯA BẮT ĐẦU, tách hẳn khỏi bảng trên. Không mượn số của phần (A) lấp vào. */}
+      {chi_dao_vi_sao && (
+        <div className="v14-chi-dao">
+          <span className="tag">Kết luận chỉ đạo · chưa kết nối</span>
+          <span className="muted"> {chi_dao_vi_sao}</span>
+        </div>
+      )}
     </section>
   );
 }

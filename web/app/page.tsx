@@ -141,7 +141,8 @@ function Dash() {
         07 Rủi ro trọng yếu · 08 Tiến độ báo cáo. Khối 06 Dòng tiền nằm đúng chỗ bản vẽ đặt: sau Phải
         trả, trước Rủi ro. */}
     <KhoiHieuQuaXe d={sec.hieu_qua_xe} />
-    <KhoiTonDongBoPhan ds={sec.ton_dong_bo_phan} />
+    <KhoiTonDongBoPhan ds={sec.ton_dong_bo_phan} chua_ro={sec.ton_dong_chua_ro_bo_phan}
+      da_loai={sec.ton_dong_da_loai} vi_sao={sec.ton_dong_vi_sao} />
     {/* Hai khối hạn xếp DỌC, không cạnh nhau. Đặt cạnh nhau thì mỗi khối chỉ còn nửa bề ngang,
         năm nhóm vỡ thành 2+2+1 và nhóm "Dài hạn" đứng trơ một mình một hàng — đọc thành "bốn nhóm
         và một cái gì đó". Bản vẽ cũng xếp dọc, năm nhóm một hàng. */}
@@ -159,7 +160,9 @@ function Dash() {
         — đúng lỗi đã mất ba vòng để chữa ở khối Phải thu/Phải trả. */}
     <KhoiDongTien />
     <KhoiRuiRo ds={sec.rui_ro_trong_yeu} />
-    <KhoiTienDoBaoCao ds={sec.tien_do_bao_cao} />
+    <KhoiTienDoBaoCao ds={sec.tien_do_bao_cao} ten_ky={sec.tien_do_ten_ky}
+      so_da_nop={sec.tien_do_so_da_nop} so_thieu={sec.tien_do_so_thieu}
+      vi_sao={sec.tien_do_vi_sao} chi_dao_vi_sao={sec.tien_do_chi_dao_vi_sao} />
 
 
     {/* ══ PHẦN RIÊNG CỦA VTOS, KHÔNG CÓ TRONG BẢN VẼ ══════════════════════════════════════════
