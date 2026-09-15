@@ -388,6 +388,11 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 .v14-bang th{white-space:nowrap}
 .v14-trong{text-align:center;padding:18px 8px}
 .v14-ghi{font-size:12px;line-height:1.7;margin:9px 0 0}
+/* TC-33 · Nửa "Kết luận chỉ đạo" của khối 08. Tách hẳn bằng một đường kẻ trên: nó là phần CHƯA
+   BẮT ĐẦU, không phải một dòng nữa của bảng tiến độ ngay trên. Nằm liền mạch thì người đọc tưởng
+   khối đã xong cả hai nửa. */
+.v14-chi-dao{display:flex;flex-wrap:wrap;align-items:baseline;gap:7px;font-size:12px;
+  line-height:1.7;margin:12px 0 0;padding:10px 0 0;border-top:1px solid var(--vtos-line)}
 .v14-chua{display:inline-flex;flex-wrap:wrap;align-items:center;gap:7px;font-size:12px}
 
 /* Hiệu quả đội xe: năm ô ngang, tự xuống dòng theo bề rộng thật. */

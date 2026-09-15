@@ -181,6 +181,43 @@ def build(db: Session, u: User) -> dict:
         # Lý do RỖNG đi kèm số rỗng. Ô trống không nói vì sao là ô nằm đó mãi.
         sec["phai_thu_vi_sao"] = thu["vi_sao"]
         sec["phai_tra_vi_sao"] = tra["vi_sao"]
+
+    # ── TC-32 · khối 04c Tồn đọng theo bộ phận ───────────────────────────────────────────────
+    # KHÔNG thêm cửa nhập nào (ranh giới 09/9): bộ phận suy ra từ chuỗi PQ-9 đã có sẵn
+    # cảnh báo → người phụ trách → users.department.
+    #
+    # HÀNG RÀO SEC-02: `bo_phan_duoc_xem=None` là xem TOÀN BỘ công ty, nên chỉ cấp lãnh đạo và
+    # CNTT (người chạy lượt giao chủ) được None. Mọi vai khác chỉ thấy phòng MÌNH — và vai chưa
+    # khai phòng thì thấy MỘT TẬP RỖNG, không phải toàn bộ. Mặc định "chưa khai = xem hết" là
+    # cách một tài khoản thiếu dữ liệu biến thành một tài khoản thừa quyền.
+    if role in ("chutich", "tgd", "bks", "cntt"):
+        _pham_vi_bp = None
+    else:
+        _pham_vi_bp = {u.department} if getattr(u, "department", "") else set()
+    from app.services import ton_dong_bo_phan as TDBP
+    _td = TDBP.theo_bo_phan(db, bo_phan_duoc_xem=_pham_vi_bp, hom_nay=today)
+    sec["ton_dong_bo_phan"] = _td["dong"]
+    sec["ton_dong_chua_ro_bo_phan"] = _td["chua_ro_bo_phan"]
+    sec["ton_dong_da_loai"] = _td["da_loai"]
+    sec["ton_dong_vi_sao"] = _td["vi_sao"]
+
+    # ── TC-33 · khối 08 Tiến độ báo cáo & kết luận chỉ đạo ───────────────────────────────────
+    # Cũng không thêm bảng nào: danh sách phòng phải nộp đã khai ở `bao_cao_phong.PHONG`, bản đã
+    # nộp nằm ở `bao_cao_luu`. Đối chiếu hai cái là ra.
+    #
+    # Đo KỲ VỪA ĐÓNG, không đo kỳ đang chạy: báo cáo tháng 09 không thể "trễ" vào ngày 15/09, và
+    # tám dòng đỏ vô nghĩa là cách nhanh nhất để người ta thôi tin cả khối.
+    #
+    # HÀNG RÀO SEC-02 dùng lại đúng bảng khai quyền của `bao_cao_phong` — không khai riêng ở đây,
+    # vì hai bản khai cùng một thứ thì sớm muộn lệch nhau.
+    from app.services import tien_do_bao_cao as TDBC
+    _bc = TDBC.tien_do(db, kind="thang", hom_nay=today, vai_tro=role)
+    sec["tien_do_bao_cao"] = _bc["dong"]
+    sec["tien_do_ten_ky"] = _bc["ten_ky"]
+    sec["tien_do_so_da_nop"] = _bc["so_da_nop"]
+    sec["tien_do_so_thieu"] = _bc["so_thieu"]
+    sec["tien_do_vi_sao"] = _bc["vi_sao"]
+    sec["tien_do_chi_dao_vi_sao"] = _bc["chi_dao_vi_sao"]
     if role in ("hcns", "chutich", "tgd"):
         s = OPS.work_days_in(today.year, today.month, until=today)
         emps = db.execute(select(Employee).where(Employee.active == True, Employee.department.in_(OPS.NO_TIMESHEET_DEPTS), Employee.user_id != None)).scalars().all()
