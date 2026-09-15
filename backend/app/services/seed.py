@@ -37,6 +37,39 @@ USERS = [
 ]
 
 
+def neo_tour_mau(today: date) -> date:
+    """Ngày ĐẦU THÁNG của kỳ lương mà tour mẫu DL-0825 thuộc về. Mọi mốc của tour ấy neo vào đây.
+
+    ════════════════════════════════════════════════════════════════════════════════════════════
+    VÌ SAO PHẢI CÓ HÀM NÀY — LỖI ĐO ĐƯỢC NGÀY 15/9/2026
+    ════════════════════════════════════════════════════════════════════════════════════════════
+    Trước đây bảy mốc của tour mẫu rải từ `today-20` (ngày đi) tới `today-13` (CNTT kiểm). Chú
+    thích ngay cạnh ghi "đã khóa THÁNG NÀY" — nhưng một khoảng tám ngày thì BẮC QUA ranh giới
+    tháng, và lúc ấy lời chú thích sai mà không ai thấy.
+
+    Hai chỗ đọc tour này lấy kỳ theo hai mốc KHÁC NHAU:
+
+        bảng lương   `hr.month_tours`   → tháng của `kt_confirmed_at`  (today-14)
+        đội xe       `fleet_summary`    → tháng của `DispatchOrder.date_to` (theo ngày đi, today-18)
+
+    Trùng tháng thì không sao. Lệch tháng thì bảng lương tìm trong tháng này còn chuyến nằm ở
+    tháng trước: `so_chuyen` = 0 và `total_revenue` = 0, trong khi dữ liệu mẫu vẫn đủ.
+
+    ĐO TRÊN LỊCH 2026: khoảng ấy bắc qua ranh giới tháng vào NGÀY 15 ĐẾN 20 mỗi tháng — 72 ngày,
+    tức 20% số ngày trong năm. `test_hr.py::test_draft_from_seed` và `::test_fleet_summary` đỏ
+    đúng những ngày ấy rồi tự xanh lại từ ngày 21.
+
+    Đó là kiểu hỏng nguy hiểm nhất của một bộ kiểm: đỏ theo LỊCH chứ không theo MÃ. Vài lần như
+    thế thì không ai phân biệt được "đỏ thật" với "đỏ tới ngày", và lúc có lỗi thật nó trôi qua.
+
+    CÁCH SỬA: neo cả vòng đời tour vào ĐẦU THÁNG của kỳ lương, chứ không đếm lùi từ hôm nay. Mọi
+    mốc rơi vào ngày 5–12 của tháng ấy, nên không mốc nào bắc sang tháng khác, ngày nào trong năm
+    cũng vậy. `test_hr.py` không phải sửa: kỳ nó tính (`today-14`) đúng bằng tháng neo này.
+    """
+    ky = today - timedelta(days=14)          # mốc Kế toán xác nhận ĐỊNH NGHĨA kỳ lương
+    return date(ky.year, ky.month, 1)
+
+
 def seed_all(db):
     if db.execute(select(User)).scalars().first():
         # CSDL đã có dữ liệu (bản demo trên cloud): chỉ bổ sung phần nhân sự nếu chưa có
@@ -55,6 +88,7 @@ def seed_all(db):
         db.add(u); users[un] = u
     db.flush()
     today = date.today()
+    _neo = neo_tour_mau(today)
     lan, minh = users["dh.lan"], users["dh.minh"]
     tours = [
         # Tour lẻ đạt biên, đang bán, khởi hành 5 ngày nữa nhưng thiếu khách → D-7
@@ -73,15 +107,15 @@ def seed_all(db):
              start_date=today - timedelta(days=12), end_date=today - timedelta(days=10), operator_id=lan.id,
              price_per_pax=4_200_000, fixed_cost=52_000_000, var_cost_per_pax=2_400_000, planned_pax=45,
              rest_stops="Sân bay Đà Nẵng", status="ket_thuc", confirmed_by="tp.dieuhanh", approved_by="ptgd.doan"),
-        # Tour lẻ đã khóa tháng này (để bảng lương nháp có số)
+        # Tour lẻ đã khóa, NẰM GỌN TRONG MỘT THÁNG (xem `neo_tour_mau` ở đầu tệp)
         Tour(code="DL-0825", name="Đà Lạt 3N2Đ", tour_type="le_noi_dia",
-             start_date=today - timedelta(days=20), end_date=today - timedelta(days=18), operator_id=lan.id,
+             start_date=_neo + timedelta(days=4), end_date=_neo + timedelta(days=6), operator_id=lan.id,
              price_per_pax=2_690_000, fixed_cost=21_000_000, var_cost_per_pax=1_050_000, planned_pax=28,
              rest_stops="Bảo Lộc", status="khoa", confirmed_by="tp.dieuhanh", approved_by="tgd",
              actual_revenue=75_320_000, actual_cost=50_400_000, promo_value=1_500_000,
-             closed_at=datetime.combine(today - timedelta(days=16), datetime.min.time()),
-             kt_confirmed_at=datetime.combine(today - timedelta(days=14), datetime.min.time()),
-             cntt_checked_at=datetime.combine(today - timedelta(days=13), datetime.min.time())),
+             closed_at=datetime.combine(_neo + timedelta(days=8), datetime.min.time()),
+             kt_confirmed_at=datetime.combine(_neo + timedelta(days=10), datetime.min.time()),
+             cntt_checked_at=datetime.combine(_neo + timedelta(days=11), datetime.min.time())),
         # Tour nháp mới
         Tour(code="SG-CT-1020", name="Cần Thơ – Sóc Trăng 2N1Đ", tour_type="le_noi_dia",
              start_date=today + timedelta(days=46), end_date=today + timedelta(days=47), operator_id=lan.id,
