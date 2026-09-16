@@ -106,8 +106,10 @@ def test_khong_lay_so_0_thay_cho_chua_co_nguon():
 def test_khong_bia_so_mau_trong_ma():
     """Không có mảng dữ liệu mẫu nào nằm sẵn trong tệp – khối rỗng thì phải rỗng thật."""
     than = _bo_chu_thich(_doc(KHOI))
-    # Các hằng khung (PHAI_THU/PHAI_TRA) chỉ chứa NHÃN và MÔ TẢ khoảng, không được mang số tiền.
-    for ten in ("PHAI_THU", "PHAI_TRA"):
+    # SỬA 16/9/2026 (TC-45): hai khung PHAI_THU / PHAI_TRA gộp thành MỘT — `BAY_NHOM` — vì anh Tuấn
+    # chốt một bộ mốc dùng chung cho cả hai hướng. Luật không đổi một chữ: khung chỉ được khai NHÃN
+    # và MÔ TẢ khoảng, số phải đến từ máy chủ.
+    for ten in ("BAY_NHOM",):
         i = than.find(f"const {ten}")
         assert i > 0, f"Thiếu khung {ten}"
         khung = than[i:than.find("];", i)]
@@ -143,31 +145,63 @@ def test_bang_chua_co_dong_van_dung_du_dau_cot():
 
 # --------------------------------------------- Luật nghiệp vụ của bản vẽ phải được ghi ra
 
-def test_nam_nhom_han_khong_trung_nhau_va_noi_ro_khac_bang_luy_ke():
+def test_nhom_han_khong_trung_nhau_va_noi_ro_khac_bang_luy_ke():
     """Đây là chỗ dễ đọc sai nhất trên cả màn hình.
 
-    Năm nhóm hạn KHÔNG trùng nhau nên cộng cả năm ra đúng tổng công nợ. Bảng dòng tiền bốn mốc ở
+    Bảy nhóm hạn KHÔNG trùng nhau nên cộng cả bảy ra đúng tổng công nợ. Bảng dòng tiền bốn mốc ở
     trên thì LŨY KẾ – cột 14 ngày đã chứa trọn cột 7 ngày, cộng vào là sai gấp mấy lần. Hai bảng
     trông giống nhau nằm trên cùng một màn hình, nên màn hình phải tự nói ra sự khác biệt.
+
+    SỬA 16/9/2026 (TC-45): câu ấy chuyển xuống CHÂN BIỂU ĐỒ (BaKhuBieuDo.tsx), vì bảy ô số vuông
+    đã nhường chỗ cho bảy thanh ngang và câu giải thích phải đứng cạnh hình nó giải thích. Viết ở
+    cả hai chỗ là hai đoạn gần y hệt nhau cách nhau một khối — nên phép thử ĐI THEO câu, không bắt
+    nó ở lại chỗ cũ.
     """
     nguon = _doc(KHOI)
-    assert "không lũy kế và không trùng nhau" in nguon, (
-        "Khối phải nói rõ năm nhóm không lũy kế, và khác bảng dòng tiền bốn mốc ở trên."
+    khu = (GOC / "web" / "components" / "BaKhuBieuDo.tsx").read_text(encoding="utf-8")
+    assert "trùng nhau nên cộng cả bảy" in khu, (
+        "Chân biểu đồ phải nói rõ bảy nhóm không lũy kế, và khác bảng dòng tiền bốn mốc ở trên."
     )
     assert "tháng lịch" in nguon, (
         "Mốc 2 tháng / 3 tháng tính theo THÁNG LỊCH từ ngày báo cáo, không mặc định 60/90 ngày "
         "(bản vẽ ghi rõ) – phải ghi ra màn hình."
     )
-    assert "chưa có hạn" in nguon, (
+    # SỬA 16/9/2026 (TC-45): câu này nay nằm TRONG ô "Chưa có hạn thanh toán", tức chỉ hiện khi
+    # thật sự có khoản như thế. Luật y nguyên — không tự xếp vào Dài hạn — nhưng nó thôi nằm trong
+    # một đoạn chữ chạy suốt kể cả khi không có khoản nào để nói.
+    assert "Chưa có hạn thanh toán" in nguon and "xếp vào Dài hạn" in nguon, (
         "Khoản chưa có hạn thanh toán theo dõi riêng, không tự xếp vào Dài hạn."
     )
 
 
-def test_phai_tra_qua_han_theo_doi_rieng():
-    """Gộp quá hạn vào nhóm 1 tuần là làm một khoản ĐÃ TRỄ trông giống một khoản SẮP tới hạn."""
-    nguon = _doc(KHOI)
-    assert "không cộng" in nguon and "v14-quahan" in nguon, (
-        "Phải trả quá hạn phải đứng riêng và ghi rõ không cộng vào nhóm 1 tuần."
+def test_qua_han_la_mot_nhom_va_chi_nam_dung_mot_cho():
+    """LUẬT NÀY ĐẢO CHIỀU NGÀY 16/9/2026 (TC-45), và đảo vì một lý do đáng ghi.
+
+    Bản cũ để "Phải trả quá hạn" NGOÀI năm nhóm, theo dõi ở một ô riêng, đúng với lập luận "một
+    khoản đã trễ khác hẳn một khoản sắp tới hạn". Lập luận ấy không sai. Nhưng hệ quả của nó là
+    tổng năm nhóm trên màn hình KHÔNG gồm khoản đã trễ — nên ai cộng thử bằng mắt sẽ ra một con số
+    khác con số hệ thống hiểu là tổng công nợ, và không có gì trên màn hình nói ra điều đó.
+
+    Anh Tuấn chốt một bộ mốc dùng chung, trong đó Quá hạn là nhóm ĐẦU TIÊN của cả hai hướng. Mức
+    khẩn vẫn đọc ra ngay — nó mang màu trạng thái trên biểu đồ — nhưng con số chỉ nằm ĐÚNG MỘT chỗ.
+
+    Phép thử vì thế canh điều NGƯỢC LẠI điều nó canh hôm qua: không được có ô "quá hạn" thứ hai.
+    """
+    nguon = _bo_chu_thich(_doc(KHOI))
+    # Bắt ĐÚNG cái ô ấy, không bắt chuỗi "qua_han": khối Tồn đọng theo bộ phận có trường
+    # `ho_so_qua_han` hoàn toàn chính đáng, và một phép soát theo chuỗi sẽ báo oan nó — đúng bài
+    # học TC-41 (cấm MỘT HÀNH VI, không cấm một dãy ký tự).
+    assert "Phải trả quá hạn" not in nguon and "qua_han={" not in nguon, (
+        "Còn ô 'phải trả quá hạn' riêng. Quá hạn nay là một trong bảy nhóm; giữ thêm một ô riêng "
+        "là để cùng một khoản tiền hiện hai chỗ trên một màn hình."
+    )
+    hcn = (GOC / "backend" / "app" / "services" / "han_cong_no.py").read_text(encoding="utf-8")
+    assert '"Quá hạn"' in hcn.split("MOC = ")[1].split("\n")[0], (
+        "Quá hạn phải là một nhãn trong MOC, dùng chung cho cả hai hướng."
+    )
+    khu = (GOC / "web" / "components" / "BaKhuBieuDo.tsx").read_text(encoding="utf-8")
+    assert 'trang_thai: true' in khu.split("KHUNG_HAN")[1][:300], (
+        "Nhóm Quá hạn phải mang cờ trạng thái để đổi màu — mức khẩn vẫn phải đọc ra ngay."
     )
 
 
@@ -212,7 +246,9 @@ def test_bang_moi_deu_nam_trong_khung_cuon():
         f"Có {so_bang} bảng nhưng chỉ {so_wrap} khung cuộn – bảng nào cũng phải nằm trong .wrap."
     )
     css = _doc(CSS)
-    for luat in (".v14-o{", ".v14-han{"):
+    # SỬA 16/9/2026 (TC-45): lớp .v14-han{ đi cùng bảy ô số vuông đã bỏ; hàng thanh ngang
+    # (.bd-th-hang) thay chỗ nó và cũng phải có min-width:0 vì cùng một lý do.
+    for luat in (".v14-o{", ".bd-th-hang{"):
         i = css.find(luat)
         assert i > 0, f"Thiếu luật {luat}"
         assert "min-width:0" in css[i:i + 260], (

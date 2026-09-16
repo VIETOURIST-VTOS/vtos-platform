@@ -54,12 +54,17 @@ def _nap():
 
 # ───────────────── 1 · NĂM NHÓM LIỀN NHAU, KHÔNG HỞ KHÔNG CHỒNG ─────────────────
 
-def test_nam_nhom_lien_nhau_khong_ho_khong_chong():
-    """Cộng năm nhóm phải ra ĐÚNG tổng công nợ. Hở một ngày là một khoản biến mất khỏi bảng;
-    chồng một ngày là một khoản đếm hai lần. Cả hai đều không báo lỗi, chỉ ra số sai."""
+def test_cac_nhom_lien_nhau_khong_ho_khong_chong():
+    """Cộng các nhóm phải ra ĐÚNG tổng công nợ. Hở một ngày là một khoản biến mất khỏi bảng;
+    chồng một ngày là một khoản đếm hai lần. Cả hai đều không báo lỗi, chỉ ra số sai.
+
+    SỬA 16/9/2026 (TC-45): hai hàm `khoang_thu` / `khoang_tra` gộp thành MỘT `khoang` dùng chung
+    cho cả hai hướng — anh Tuấn chốt một bộ bảy mốc. Luật không đổi một chữ, và vì nay chỉ còn một
+    bộ khoảng nên nó chỉ phải đúng ở một chỗ thay vì hai.
+    """
     H = _nap()
     for hom_nay in NGAY_THU:
-        for ten, kh in (("thu", H.khoang_thu(hom_nay)), ("chi", H.khoang_tra(hom_nay))):
+        for ten, kh in (("chung", H.khoang(hom_nay)),):
             truoc = None
             for nhan, tu, den in kh:
                 assert tu <= den, f"{ten}/{nhan} có khoảng ngược: {tu} → {den}"
@@ -75,11 +80,9 @@ def test_nhom_cuoi_khong_co_tran_va_nhom_dau_khong_co_day():
     """Dài hạn phải mở về sau (date.max) và Quá hạn mở về trước (date.min) — không thì khoản rơi
     ngoài hai đầu biến mất lặng lẽ."""
     H = _nap()
-    thu = H.khoang_thu(date(2026, 9, 14))
-    assert thu[0][1] == date.min, "Nhóm Quá hạn phải mở về quá khứ."
-    assert thu[-1][2] == date.max, "Nhóm Dài hạn phải mở về tương lai."
-    tra = H.khoang_tra(date(2026, 9, 14))
-    assert tra[-1][2] == date.max
+    k = H.khoang(date(2026, 9, 14))
+    assert k[0][1] == date.min, "Nhóm Quá hạn phải mở về quá khứ."
+    assert k[-1][2] == date.max, "Nhóm Dài hạn phải mở về tương lai."
 
 
 # ───────────────── 2 · MỐC THÁNG THEO THÁNG LỊCH, KHÔNG PHẢI 30/90 NGÀY ─────────────────
@@ -109,20 +112,31 @@ def test_han_dung_ngay_bao_cao_thuoc_nhom_sap_den_han():
     """Người ta còn cả ngày hôm nay để trả. Xếp vào quá hạn là dán nhãn trễ cho người chưa trễ."""
     H = _nap()
     hn = date(2026, 9, 14)
-    thu = {n: (tu, den) for n, tu, den in H.khoang_thu(hn)}
-    assert thu["Quá hạn"][1] == hn - timedelta(days=1), "Quá hạn phải dừng TRƯỚC ngày báo cáo."
-    assert thu["2 tuần"][0] == hn, "Nhóm sắp đến hạn đầu tiên phải bắt đầu ĐÚNG ngày báo cáo."
-    tra = {n: (tu, den) for n, tu, den in H.khoang_tra(hn)}
-    assert tra["1 tuần"][0] == hn
+    k = {n: (tu, den) for n, tu, den in H.khoang(hn)}
+    assert k["Quá hạn"][1] == hn - timedelta(days=1), "Quá hạn phải dừng TRƯỚC ngày báo cáo."
+    # SỬA 16/9/2026 (TC-45): nhóm sắp đến hạn đầu tiên nay là "1 tuần" cho CẢ HAI hướng — anh Tuấn
+    # thêm mốc ấy vào bộ chung. Luật y nguyên: nhóm ấy bắt đầu ĐÚNG ngày báo cáo.
+    assert k["1 tuần"][0] == hn, "Nhóm sắp đến hạn đầu tiên phải bắt đầu ĐÚNG ngày báo cáo."
 
 
-def test_phai_tra_qua_han_khong_nam_trong_nam_nhom():
-    """Bản vẽ ghi rõ: phải trả quá hạn theo dõi RIÊNG, không cộng vào nhóm 1 tuần. Gộp vào là một
-    khoản đã trễ trông giống một khoản sắp tới hạn — hai việc khác hẳn về mức khẩn."""
+def test_qua_han_nam_trong_cac_nhom_o_ca_hai_huong():
+    """LUẬT NÀY ĐẢO CHIỀU NGÀY 16/9/2026 (TC-45). Ghi lại cả hai vế, vì cả hai đều có lý.
+
+    Bản cũ để "Phải trả quá hạn" NGOÀI năm nhóm: một khoản đã trễ khác hẳn một khoản sắp tới hạn
+    về mức khẩn, nên tách ra là đúng về nghiệp vụ.
+
+    Nhưng hệ quả của nó là tổng các nhóm trên màn hình KHÔNG gồm khoản đã trễ — nên ai cộng thử
+    bằng mắt sẽ ra một con số khác con số hệ thống hiểu là tổng công nợ, và không có gì nói ra điều
+    đó. Phía THU thì quá hạn lại nằm TRONG nhóm, nên hai khối cạnh nhau cộng theo hai luật khác
+    nhau.
+
+    Anh Tuấn chốt một bộ mốc dùng chung, Quá hạn là nhóm ĐẦU TIÊN của cả hai hướng. Mức khẩn vẫn
+    đọc ra ngay — nhóm ấy mang màu trạng thái trên biểu đồ — nhưng con số chỉ nằm đúng một chỗ.
+    """
     H = _nap()
-    nhan = [n for n, _, _ in H.khoang_tra(date(2026, 9, 14))]
-    assert "Quá hạn" not in nhan, nhan
-    assert nhan == list(H.NHAN_TRA)
+    nhan = [n for n, _, _ in H.khoang(date(2026, 9, 14))]
+    assert nhan[0] == "Quá hạn", nhan
+    assert nhan == list(H.MOC)
 
 
 # ───────────────── 4 · NHÃN NHÓM KHỚP TỪNG CHỮ VỚI GIAO DIỆN ─────────────────
@@ -137,11 +151,10 @@ def test_nhan_nhom_khop_giua_may_chu_va_man_hinh():
         blk = tsx[tsx.index(f"const {ten}: NhomHan[]"):]
         return tuple(re.findall(r'nhan: "([^"]+)"', blk[:blk.index("];")]))
 
-    assert nhan_tsx("PHAI_THU") == H.NHAN_THU, (nhan_tsx("PHAI_THU"), H.NHAN_THU)
-    assert nhan_tsx("PHAI_TRA") == H.NHAN_TRA, (nhan_tsx("PHAI_TRA"), H.NHAN_TRA)
-    hn = date(2026, 9, 14)
-    assert tuple(n for n, _, _ in H.khoang_thu(hn)) == H.NHAN_THU
-    assert tuple(n for n, _, _ in H.khoang_tra(hn)) == H.NHAN_TRA
+    # SỬA 16/9/2026 (TC-45): hai khung PHAI_THU / PHAI_TRA gộp thành MỘT `BAY_NHOM`, khớp với
+    # `MOC` của máy chủ. Luật y nguyên — và nay chỉ còn một chỗ để lệch thay vì hai.
+    assert nhan_tsx("BAY_NHOM") == H.MOC, (nhan_tsx("BAY_NHOM"), H.MOC)
+    assert tuple(n for n, _, _ in H.khoang(date(2026, 9, 14))) == H.MOC
 
 
 # ───────────────── 5 · RỖNG KHÁC KHÔNG, VÀ RỖNG PHẢI NÓI VÌ SAO ─────────────────

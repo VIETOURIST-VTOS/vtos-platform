@@ -342,11 +342,37 @@ def test_cau_doc_ho_khong_tu_tinh_chi_tieu_moi():
         assert phep not in _bo_chu_thich_tsx(than), f"Câu đọc hộ đang tự tính: {phep!r}"
 
 
-def test_khoi_van_giu_ti_le_bang_CHU_o_o_so():
-    """Bỏ hình không có nghĩa là bỏ thông tin: tỉ lệ từng nhóm là CHỮ, đọc ngay tại ô số, và nó
-    không trùng với biểu đồ nào cả."""
-    t = _bo_chu_thich_tsx(_doc(V14))
-    assert "v14-han-ty" in t and "cc.ve &&" in t
+def test_bo_hinh_khong_duoc_lam_mat_thong_tin():
+    """BỎ HÌNH KHÔNG CÓ NGHĨA LÀ BỎ THÔNG TIN — luật gốc của TC-38, và nó sống qua ba lần đổi hình.
+
+    TC-38 bỏ thanh cơ cấu khỏi khối, nên tỉ lệ từng nhóm phải hiện thành CHỮ ngay tại ô số
+    (`v14-han-ty`, tính từ `cc.ve`).
+
+    TC-45 (16/9/2026) đi xa hơn: bỏ luôn bảy ô số vuông, vì bảy thanh ngang mang cả con số lẫn tỉ
+    lệ trong MỘT hình — bề dài so với nhau chính là tỉ lệ, không cần in ra phần trăm. Nên con chữ
+    `v14-han-ty` mất đi, nhưng thông tin thì không: phép thử theo THÔNG TIN, không theo tên lớp.
+
+    Ba điều phải còn, và đủ ba mới là không mất gì:
+      · con số từng nhóm hiện ra (nhãn số ở cuối mỗi thanh),
+      · bảy nhóm dùng CHUNG một thước (cùng một `max`), nếu không thì bề dài không so được,
+      · nhóm nào chưa có số hiện thành "chưa có số" chứ không phải thanh dài 0.
+    """
+    bd = _bo_chu_thich_tsx(_doc(GOC / "web" / "components" / "BieuDo.tsx"))
+    than = bd[bd.index("export function BieuDoThanh"): bd.index("export function xepThanh")]
+    assert "bd-th-so" in than and "gonSo(h.gt" in than, (
+        "Mỗi thanh phải in con số của nó — bề dài một mình không cho biết bao nhiêu đồng."
+    )
+    assert "const max = Math.max(...coSo, 0)" in than, (
+        "Bảy thanh phải chia CHUNG một thước. Mỗi thanh một thước thì bề dài không so được với "
+        "nhau, mà nhìn vẫn hoàn toàn bình thường — đúng lỗi đã đo được ở TC-37."
+    )
+    assert "bd-th-khuyet" in than, (
+        "Nhóm chưa có số phải hiện ra là CHƯA CÓ SỐ, không phải một thanh dài 0."
+    )
+    v14 = _bo_chu_thich_tsx(_doc(V14))
+    assert "v14-han-ty" not in v14 and "v14-han-so" not in v14, (
+        "Bảy ô số vuông đã bỏ; giữ lại là hai bức tranh của cùng một hàng số trên một khối."
+    )
 
 
 def test_man_hinh_khong_tu_tinh_con_so_nghiep_vu_nao():

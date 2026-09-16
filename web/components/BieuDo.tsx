@@ -315,7 +315,14 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
 
 /* ─────────────────────────── BIỂU ĐỒ THANH NGANG ─────────────────────────── */
 
-export type Thanh = { ten: string; gt: number | null; nhan_phu?: boolean; ghi?: string };
+export type Thanh = {
+  ten: string; gt: number | null; nhan_phu?: boolean; ghi?: string;
+  /** TC-45 · dòng này là một TRẠNG THÁI chứ không phải một nấc của thang (ví dụ "Quá hạn" giữa các
+   *  mốc hạn còn lại). Mang màu cảnh báo, và KHÔNG bị đẩy xuống cuối như `nhan_phu` — nó vẫn là
+   *  một trong các nhóm, vẫn đứng đúng chỗ của nó trong thứ tự. Cùng nghĩa với `Phan.trang_thai`
+   *  ở biểu đồ cơ cấu, nên phải cùng một màu: một khái niệm hai màu là hai khái niệm. */
+  trang_thai?: boolean;
+};
 
 /** Thanh ngang xếp hạng. Dùng khi nhãn là TÊN (bộ phận, nhân viên, khách hàng) chứ không phải kỳ:
  *  cột dọc thì tên tiếng Việt phải xoay nghiêng hoặc cắt cụt mới vừa.
@@ -329,8 +336,8 @@ export function BieuDoThanh({ ten, phu, ds, dinh_dang = "dem", chan, ai, cua, cu
   ten: string; phu?: string; ds: Thanh[]; dinh_dang?: DinhDang;
   chan?: ReactNode; ai?: string; cua?: string; cua_ten?: string; xep?: boolean;
   /** Chú giải tuỳ chọn, cùng kiểu với hai biểu đồ kia. Thân hàm đã chuyền nó xuống `KhungBieuDo`
-   *  nhưng QUÊN khai ở đây — esbuild không bắt lỗi ấy (nó chỉ dịch, không kiểm kiểu), CI mới bắt,
-   *  mất một vòng dựng. Bài học: bộ soát cục bộ phải có một bước KIỂM KIỂU, không chỉ kiểm cú pháp. */
+   *  từ vòng TC-44 nhưng QUÊN khai ở đây — esbuild không bắt lỗi ấy (nó chỉ dịch, không kiểm
+   *  kiểu), CI mới bắt, mất một vòng dựng. Từ TC-45 có bộ soát kiểu chạy cục bộ. */
   chuGiai?: ReactNode;
 }) {
   const hang = xep ? xepThanh(ds) : ds;
@@ -366,7 +373,8 @@ export function BieuDoThanh({ ten, phu, ds, dinh_dang = "dem", chan, ai, cua, cu
               {h.gt === null
                 ? <span className="bd-th-khuyet">chưa có số</span>
                 : <span
-                    className={"bd-th-thanh" + (h.nhan_phu ? " phu" : "") + (h.gt < 0 ? " am" : "")}
+                    className={"bd-th-thanh" + (h.nhan_phu ? " phu" : "")
+                      + (h.trang_thai ? " tt" : "") + (h.gt < 0 ? " am" : "")}
                     style={h.gt < 0
                       ? { right: `${100 - goc}%`, width: `max(3px, ${(-h.gt / bien) * 100}%)` }
                       : { left: `${goc}%`, width: h.gt === 0 ? 0 : `max(3px, ${(h.gt / bien) * 100}%)` }}

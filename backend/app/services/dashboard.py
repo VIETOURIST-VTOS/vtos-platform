@@ -203,7 +203,9 @@ def build(db: Session, u: User) -> dict:
         sec["phai_thu_chua_co_han"] = thu["chua_co_han"]
         sec["phai_tra_theo_han"] = tra["nhom"]
         sec["phai_tra_chua_co_han"] = tra["chua_co_han"]
-        sec["phai_tra_qua_han"] = tra["qua_han"]
+        # TC-45 (16/9/2026): bỏ `phai_tra_qua_han`. Quá hạn nay là MỘT trong bảy nhóm ở cả hai
+        # hướng, nên giữ thêm một con số riêng cho nó là để cùng một khoản tiền hiện hai chỗ trên
+        # một màn hình — và tổng bảy nhóm sẽ không khớp với con số riêng ấy khi ai đó cộng thử.
         # Lý do RỖNG đi kèm số rỗng. Ô trống không nói vì sao là ô nằm đó mãi.
         sec["phai_thu_vi_sao"] = thu["vi_sao"]
         sec["phai_tra_vi_sao"] = tra["vi_sao"]
