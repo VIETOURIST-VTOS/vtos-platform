@@ -29,7 +29,8 @@ def _lines(db: Session, upto_period: str | None = None, period: str | None = Non
     return rows
 
 
-def _cong_theo_tk(db: Session, upto_period: str | None = None, period: str | None = None):
+def _cong_theo_tk(db: Session, upto_period: str | None = None, period: str | None = None,
+                  company_id: int | None = None):
     """Cộng Nợ/Có theo tài khoản cấp 1 BẰNG SQL, không nạp bút toán vào bộ nhớ.
 
     Bản cũ dùng _lines(): nạp TOÀN BỘ JournalLine + JournalEntry thành đối tượng Python rồi mới lọc kỳ.
@@ -37,6 +38,21 @@ def _cong_theo_tk(db: Session, upto_period: str | None = None, period: str | Non
     tiến trình bị hệ điều hành kết liễu giữa chừng – bảng điều khiển gọi hàm này HAI lần (số dư và
     kết quả kinh doanh), nên mỗi lần ai đó mở trang Tổng quan là một lần cả hệ thống khởi động lại.
     Nay cơ sở dữ liệu cộng sẵn, trả về vài chục dòng.
+
+    TC-47 · `company_id` — PHẠM VI PHÁP NHÂN, MẶC ĐỊNH LÀ CẢ TẬP ĐOÀN NHƯ CŨ.
+
+    Tham số này thêm 16/9/2026 theo chốt của anh Tuấn: màn hình 01 chỉ nói về Vietourist, hợp nhất
+    chỉ ở báo cáo tài chính. Trước đó `income_statement` cộng MỌI bút toán không phân biệt pháp
+    nhân, dù `journal_entries.company_id` đã có và `pham_vi_phap_nhan.PHAI_LOC` đã khai bút toán
+    ghi sổ là loại "vào thẳng báo cáo tài chính từng pháp nhân".
+
+    Để mặc định là None (cả tập đoàn) chứ không đổi hành vi cũ: hàm này còn phục vụ bảng cân đối,
+    lưu chuyển tiền tệ và báo cáo hợp nhất — đổi ngầm phạm vi của chúng là đổi số của những báo cáo
+    không ai yêu cầu đổi. Nơi nào muốn lọc thì nơi ấy truyền vào, và nói ra là mình đang lọc.
+
+    company_id rỗng trên bút toán là CHƯA XÁC ĐỊNH, không phải công ty mẹ (luật
+    `pham_vi_phap_nhan`): lọc theo mẹ thì những dòng ấy nằm NGOÀI, và phải có chỗ hiện chúng ra —
+    xem `chua_gan_phap_nhan` trong services/ket_qua_that.
     """
     q = (select(func.substr(JournalLine.account_code, 1, 3),
                 func.coalesce(func.sum(JournalLine.debit), 0.0),
@@ -45,6 +61,7 @@ def _cong_theo_tk(db: Session, upto_period: str | None = None, period: str | Non
          .where(JournalEntry.status == "da_ghi_so"))
     if period: q = q.where(JournalEntry.period == period)
     elif upto_period: q = q.where(JournalEntry.period <= upto_period)
+    if company_id is not None: q = q.where(JournalEntry.company_id == company_id)
     return db.execute(q.group_by(func.substr(JournalLine.account_code, 1, 3))).all()
 
 
@@ -53,8 +70,9 @@ def balances(db: Session, upto_period: str) -> dict[str, float]:
     return {k: float(d) - float(c) for k, d, c in _cong_theo_tk(db, upto_period=upto_period)}
 
 
-def movements(db: Session, period: str) -> dict[str, dict]:
-    return {k: {"debit": float(d), "credit": float(c)} for k, d, c in _cong_theo_tk(db, period=period)}
+def movements(db: Session, period: str, company_id: int | None = None) -> dict[str, dict]:
+    return {k: {"debit": float(d), "credit": float(c)}
+            for k, d, c in _cong_theo_tk(db, period=period, company_id=company_id)}
 
 
 def balance_sheet(db: Session, period: str) -> dict:
@@ -89,9 +107,13 @@ def balance_sheet(db: Session, period: str) -> dict:
             "balanced": abs(ta - tl - te) < 1, "unposted_pl": pl_open}
 
 
-def income_statement(db: Session, period: str) -> dict:
-    """B02-DN rút gọn theo kỳ (tháng). Lãi vay và khấu hao tách riêng theo yêu cầu BCKQKD tháng (Điều 5 KT-HCNS)."""
-    m = movements(db, period)
+def income_statement(db: Session, period: str, company_id: int | None = None) -> dict:
+    """B02-DN rút gọn theo kỳ (tháng). Lãi vay và khấu hao tách riêng theo yêu cầu BCKQKD tháng (Điều 5 KT-HCNS).
+
+    `company_id` (TC-47): None là cả tập đoàn — giữ nguyên hành vi cũ của mọi nơi đang gọi. Truyền
+    id pháp nhân vào thì bảng này là của RIÊNG pháp nhân ấy; xem chú thích ở `_cong_theo_tk`.
+    """
+    m = movements(db, period, company_id=company_id)
     rev = lambda c: m.get(c, {}).get("credit", 0.0) - m.get(c, {}).get("debit", 0.0)
     exp = lambda c: m.get(c, {}).get("debit", 0.0) - m.get(c, {}).get("credit", 0.0)
     revenue, cogs = rev("511"), exp("632")
@@ -109,6 +131,7 @@ def income_statement(db: Session, period: str) -> dict:
         ("21", "Doanh thu hoạt động tài chính", fin_in), ("22", "Chi phí tài chính (trong đó lãi vay)", fin_exp), ("25", "Chi phí bán hàng", selling),
         ("26", "Chi phí quản lý doanh nghiệp", admin), ("30", "Lợi nhuận thuần từ HĐKD", op), ("40", "Lợi nhuận khác", other),
         ("50", "Tổng lợi nhuận kế toán trước thuế", ebt), ("51", "Chi phí thuế TNDN", tax), ("60", "Lợi nhuận sau thuế", ebt - tax)],
+        "company_id": company_id,
         "management": {"interest": fin_exp, "depreciation": dep, "profit_after_interest_before_dep": ebt + dep,
                        "note": "Lợi nhuận Công ty dùng tính thưởng GĐ KD = sau lãi vay, trước khấu hao (BCKQKD tháng TGĐ duyệt)"}}
 

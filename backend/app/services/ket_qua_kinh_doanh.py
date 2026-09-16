@@ -22,8 +22,13 @@ mười một cột kia cao bao nhiêu.
 ═══════════════════════════════════════════════════════════════════════════════════════════════
 BỐN CON SỐ Ở ĐẦU THẺ, VÀ CHÚNG PHẢI CÙNG MỘT KỲ
 ═══════════════════════════════════════════════════════════════════════════════════════════════
-Thẻ Doanh thu: tổng doanh thu kỳ · mục tiêu kỳ · tỉ lệ đạt.
-Thẻ Lợi nhuận: tổng lợi nhuận kỳ · biên lợi nhuận.
+Hình trên (Doanh thu): tổng doanh thu kỳ · mục tiêu kỳ · tỉ lệ đạt.
+Hình dưới (Lợi nhuận tour · Lợi nhuận trước thuế): tổng lợi nhuận kỳ · biên lợi nhuận.
+
+BIÊN LỢI NHUẬN TÍNH TRÊN LỢI NHUẬN TRƯỚC THUẾ, không trên lợi nhuận tour, và giữ nguyên như vậy
+sau TC-47: "biên" mà người đọc bảng điều hành hỏi là biên của công ty, đã gánh đủ chi phí chung.
+Lấy lãi tour chia doanh thu ra một con số cao hơn hẳn và trông vẫn hợp lý — đó là chỗ dễ nhầm nhất
+khi hình dưới có hai cột.
 
 Cả bốn đều tính trên ĐÚNG kỳ đang chọn, không phải trên cả năm. Trộn một con số của năm vào một
 thẻ đang hiện quý là lỗi không ai nhìn ra — mọi con số đều có thật, chỉ là của hai kỳ khác nhau.
@@ -36,9 +41,14 @@ gây hiểu nhầm.
 KHÔNG CÓ PHÉP TÍNH DOANH THU THỨ HAI Ở ĐÂY
 ═══════════════════════════════════════════════════════════════════════════════════════════════
 Từng tháng gọi đúng hàm mà bảng điều hành và biểu đồ xu hướng đang gọi
-(`xu_huong.doc_that` → `dashboard._month_tours` + `rules.settlement_summary`, `reports.income_statement`).
+(`xu_huong.doc_that` → `ket_qua_that.thang`, `reports.income_statement` có lọc pháp nhân).
 Viết một truy vấn riêng ở đây là để kho có hai công thức cho cùng một câu hỏi, và ngày chúng lệch
 nhau thì không ai biết tin bên nào.
+
+TC-47 (16/9/2026) ĐỔI CHÍNH PHÉP TÍNH ẤY, không đổi khối này: mốc là ngày Điều hành đóng số chứ
+không phải ngày Kế toán xác nhận, phạm vi là Vietourist mẹ chứ không phải cả tập đoàn, và giá vốn
+rỗng không còn đọc thành 0. Lý do từng điều nằm ở đầu services/ket_qua_that.py. Hệ quả nhìn thấy
+được: con số doanh thu và lợi nhuận trên thẻ này ĐỔI so với bản trước — không phải mất số.
 
 MỤC TIÊU KỲ ĐỌC THẲNG Ô KỲ ẤY, KHÔNG CỘNG TỪ THÁNG. Anh Tuấn chốt 16/9: chỉ tiêu năm và quý do
 Hội đồng quản trị nhập riêng. Cộng 12 tháng lại để ra mục tiêu năm là xoá mất một quyết định quản
@@ -55,9 +65,22 @@ from app.services import xu_huong as XH
 # hoạch dùng một mã. Khai cặp ấy ở ĐÚNG MỘT chỗ — hai chỗ thì ngày một bên đổi tên là ngày biểu đồ
 # và mục tiêu nói về hai thứ khác nhau mà vẫn vẽ chồng lên nhau.
 CHI_TIEU = (
-    {"ma": "doanh_thu", "ma_xu_huong": "doanh_thu_thang", "ten": "Doanh thu", "co_ke_hoach": True},
+    {"ma": "doanh_thu", "ma_xu_huong": "doanh_thu_thang", "ten": "Doanh thu",
+     "co_ke_hoach": True, "hinh": "tren"},
+    # TC-47 · HAI CỘT ĐI CÙNG NHAU Ở HÌNH DƯỚI — anh Tuấn 16/9/2026: "1 cột là lợi nhuận tour,
+    # 1 cột là LN trước thuế". Chúng ở CÙNG một hình vì cùng đơn vị tiền và cùng đáng so trực tiếp;
+    # doanh thu ở hình TRÊN vì lớn hơn chúng cả một bậc, vẽ chung thì hai cột lãi bẹp xuống thành
+    # hai vạch không đọc được.
+    #
+    # HAI HÌNH, MỘT TRỤC NGANG — anh chốt "hai hình, chung trục ngang". Mỗi hình có trục tung riêng
+    # của nó, và ĐÓ MỚI LÀ ĐIỂM: luật MỘT TRỤC TUNG cấm vẽ hai thang đo chồng lên nhau trong cùng
+    # một khung, chứ không cấm hai khung xếp dọc. Tháng 9 của hình trên nằm đúng trên tháng 9 của
+    # hình dưới, nên mắt đọc được "doanh thu tháng ấy cao mà lãi thì không" — điều mà một hình hai
+    # trục tung cũng bày ra, nhưng bày kèm một phép so sai giữa hai thang đo.
+    {"ma": "loi_nhuan_tour", "ma_xu_huong": "lai_tour_thang", "ten": "Lợi nhuận tour",
+     "co_ke_hoach": False, "hinh": "duoi"},
     {"ma": "loi_nhuan_truoc_thue", "ma_xu_huong": "ln_ke_toan_thang",
-     "ten": "Lợi nhuận trước thuế", "co_ke_hoach": False},
+     "ten": "Lợi nhuận trước thuế", "co_ke_hoach": False, "hinh": "duoi"},
 )
 
 
@@ -121,6 +144,12 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
     dang_chay = max(trong_ky) >= moc_nay
     de_cong = {t for t in trong_ky if t <= moc_nay} if dang_chay else trong_ky
 
+    # TC-47 · Những gì CÒN THIẾU của từng tháng, đọc một lần cho cả khối. Đây không phải số phụ:
+    # cột chính chỉ gồm chuyến đủ số, nên nếu không nói ra phần thiếu thì người đọc tưởng cột ấy là
+    # toàn bộ tháng. Đọc qua ĐÚNG hàm mà `xu_huong` đang gọi — không truy vấn riêng ở đây.
+    from app.services import ket_qua_that as KQ
+    thieu_thang = {t: KQ.thang(db, t) for t in cac_thang}
+
     ra_ct = []
     so = {}
     for ct in CHI_TIEU:
@@ -134,6 +163,14 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
                 "trong_ky": t in trong_ky}
                for i, (t, g) in enumerate(zip(cac_thang, gt))]
 
+        # TC-47 · KHÚC MỜ: doanh thu của chuyến ĐÃ đóng số mà CHƯA có giá vốn. Chỉ gắn vào cột
+        # doanh thu, vì đúng những chuyến ấy bị bỏ ra khỏi cả doanh thu lẫn lãi (xem chú thích
+        # "vì sao doanh thu cũng phải bỏ chuyến thiếu giá vốn ra" ở đầu services/ket_qua_that.py).
+        # Không có khúc này thì phần doanh thu ấy biến mất khỏi màn hình mà không ai biết.
+        if ct["ma"] == "doanh_thu":
+            for o, t in zip(cot, cac_thang):
+                o["cho"] = float(thieu_thang[t]["dt_thieu_gia_von"])
+
         ke_hoach = None
         if ct["co_ke_hoach"]:
             # VẠCH KẾ HOẠCH CHẠY THEO TỪNG THÁNG, không phải một vạch ngang: chỉ tiêu tháng 1 khác
@@ -141,7 +178,27 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
             kh_thang = [KH.hop_nhat(db, t)[ct["ma"]] for t in cac_thang]
             ke_hoach = [None if not h["du"] else float(h["gia_tri"]) for h in kh_thang]
 
-        ra_ct.append({**{k: ct[k] for k in ("ma", "ten")}, "cot": cot, "ke_hoach": ke_hoach})
+        ra_ct.append({**{k: ct[k] for k in ("ma", "ten", "hinh")},
+                      "cot": cot, "ke_hoach": ke_hoach})
+
+    # PHẦN CÒN THIẾU CỦA ĐÚNG KỲ ĐANG CHỌN — cộng trên `de_cong`, cùng tập tháng với bốn con số ở
+    # đầu thẻ. Cộng trên cả 12 tháng thì dòng chân thẻ nói về một kỳ khác với các con số ngay trên
+    # nó, và đó đúng là loại lỗi "mọi con số đều có thật, chỉ là của hai kỳ khác nhau".
+    #
+    # ĐẶT TRƯỚC dòng đọc mục tiêu là CỐ Ý: sau dòng ấy không được còn phép cộng nào, để không ai
+    # lỡ tay chen một `sum(...)` vào giữa mục tiêu và giá trị trả ra — xem phép thử TC-44
+    # "muc_tieu_ky_khong_bao_gio_cong_tu_thang".
+    trong = [thieu_thang[t] for t in sorted(de_cong)]
+    con_thieu = {
+        "chuyen_thieu_gia_von": sum(x["thieu_gia_von"] for x in trong),
+        "tien_thieu_gia_von": float(sum(x["dt_thieu_gia_von"] for x in trong)),
+        "chuyen_chua_gan_phap_nhan": sum(x["chua_gan_phap_nhan"] for x in trong),
+        "tien_chua_gan_phap_nhan": float(sum(x["dt_chua_gan_phap_nhan"] for x in trong)),
+        # Ai đi nhập, ghi thẳng ở đây: màn hình chỉ bày, không tự đoán tên bộ phận (ranh giới 09/9).
+        "ai_nhap_gia_von": "Điều hành",
+        "ai_gan_phap_nhan": "Hành chính",
+        "co_nguon": all(x["co_nguon"] for x in trong) if trong else False,
+    }
 
     # MỤC TIÊU ĐỌC THẲNG Ô KỲ ẤY — xem chú thích đầu tệp.
     muc_tieu = KH.hop_nhat(db, ky)
@@ -158,7 +215,10 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
         # không có số cho chúng — người đọc thấy một biểu đồ rỗng và tưởng là mất số.
         "ky_hien_tai": ky_mac_dinh(kind, hom_nay),
         "chi_tieu": ra_ct,
-        "tong_ky": {"doanh_thu": dt, "loi_nhuan_truoc_thue": ln},
+        "con_thieu": con_thieu,
+        "tong_ky": {"doanh_thu": dt,
+                    "loi_nhuan_tour": so.get("loi_nhuan_tour"),
+                    "loi_nhuan_truoc_thue": ln},
         "muc_tieu": {
             "gia_tri": mt_doanh_thu["gia_tri"],
             "du": mt_doanh_thu["du"],

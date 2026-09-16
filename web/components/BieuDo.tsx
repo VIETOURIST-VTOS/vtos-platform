@@ -47,6 +47,18 @@ export type Diem = {
      `nhan_so` – có ghi số trên đầu cột này không. Mười hai con số chen nhau thì không đọc được cái
                  nào; bản vẽ chỉ ghi ở cột đầu và cột cuối. */
   mo?: boolean; ke_hoach?: number | null; nhan_so?: boolean;
+  /* TC-47 · hai trường của bản vẽ "hai hình chung một trục ngang" anh Tuấn chốt 16/9/2026.
+
+     `cho` – phần NỐI TIẾP mờ trên chính cây cột này: giá trị ĐÃ BIẾT nhưng CHƯA ĐỦ điều kiện để
+             vào con số chính. Ở khối Kết quả kinh doanh, đó là doanh thu của chuyến đã đóng số mà
+             Điều hành chưa nhập giá vốn — không được cộng vào cột chính (vì cột lãi bên dưới
+             không có chúng, và hai hình phải nói về cùng một tập chuyến), nhưng cũng không được
+             biến mất. Vẽ nối tiếp chứ không vẽ cột riêng: nó là MỘT phần của cùng một tháng.
+
+     `gt2`  – cột thứ hai đứng cạnh, CÙNG một trục tung. Đây KHÔNG phải trục tung thứ hai (luật 4
+             ở đầu tệp vẫn nguyên): hai cột chỉ đứng cạnh nhau khi cùng đơn vị và cùng thang đo,
+             ví dụ lợi nhuận tour và lợi nhuận trước thuế. Khác thang thì tách thành hai hình. */
+  cho?: number | null; gt2?: number | null;
 };
 
 /** Cách đọc con số. Quyết định cả nhãn trục lẫn nhãn trên cột: 1.840.000.000 đồng phải đọc là
@@ -191,10 +203,19 @@ const CAO = 168;   // chiều cao vùng vẽ, px
  *  không phải một trục tung thứ hai — xem luật 4 ở đầu tệp.
  */
 export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, cua, cua_ten,
-                           theo_dau, ten_duong, chuGiai }: {
+                           theo_dau, ten_duong, chuGiai, ten_cot2, ten_cho, an_nhan_x }: {
   ten: string; phu?: string; diem: Diem[]; dinh_dang?: DinhDang;
   moc?: { gt: number; nhan: string } | null;
   chan?: ReactNode; ai?: string; cua?: string; cua_ten?: string;
+  /** TC-47 · tên của cột thứ hai (`Diem.gt2`). Có tên thì mới vẽ — cùng một trục tung. */
+  ten_cot2?: string;
+  /** TC-47 · tên của khúc nối tiếp mờ (`Diem.cho`). Có tên thì mới vẽ, và tên ấy đi thẳng vào câu
+   *  chân: một khúc màu khác mà không nói nó là gì thì người đọc tự đoán, và đoán sai. */
+  ten_cho?: string;
+  /** TC-47 · giấu hàng nhãn trục ngang của hình này. Dùng khi hai hình xếp dọc DÙNG CHUNG một
+   *  trục ngang: hình trên giấu, hình dưới hiện, và nhãn ấy nói cho cả hai. In hai lần thì người
+   *  đọc phải kiểm xem hai hàng có khớp nhau không — một việc thừa trên mọi lần mở màn hình. */
+  an_nhan_x?: boolean;
   /** TC-44 · tô cột theo DẤU: dương xanh lá, âm hồng. Dùng cho lãi/lỗ, nơi dấu chính là điều
    *  người đọc tìm. KHÔNG bật cho doanh thu: doanh thu âm là chuyện khác hẳn, và tô nó cùng màu
    *  với "lỗ" là trộn hai khái niệm. */
@@ -215,8 +236,15 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
   // Đường kế hoạch phải nằm TRONG thang đo: một chỉ tiêu cao hơn mọi cột mà thang không tính nó
   // thì đường bị cắt ở mép trên, và một đường cụt đọc ra là "đã đạt" trong khi sự thật ngược lại.
   const kh = diem.map((d) => d.ke_hoach).filter((x): x is number => typeof x === "number");
-  const thap = Math.min(...gt, ...kh, moc ? moc.gt : 0);
-  const cao = Math.max(...gt, ...kh, moc ? moc.gt : 0);
+  // TC-47 · CỘT THỨ HAI VÀ KHÚC NỐI TIẾP CŨNG PHẢI NẰM TRONG THANG ĐO, vì cùng một trục tung.
+  // Quên chúng thì thang tính theo cột chính, còn cột kia cao hơn sẽ bị cắt ngang ở mép trên —
+  // và một cột cụt vẫn trông như một cột, chỉ là thấp hơn sự thật.
+  const g2 = ten_cot2
+    ? diem.map((d) => d.gt2).filter((x): x is number => typeof x === "number") : [];
+  const dinh_cho = ten_cho
+    ? diem.map((d) => (typeof d.gt === "number" ? d.gt : 0) + (d.cho || 0)) : [];
+  const thap = Math.min(...gt, ...kh, ...g2, ...dinh_cho, moc ? moc.gt : 0);
+  const cao = Math.max(...gt, ...kh, ...g2, ...dinh_cho, moc ? moc.gt : 0);
   const mocs = mocTruc(thap, cao);
   const tMin = mocs[0];
   const tMax = mocs[mocs.length - 1];
@@ -277,16 +305,36 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
               // `nhan_so` chưa khai thì giữ nết cũ: cột nào cũng ghi số. Khai rồi thì chỉ ghi ở
               // những cột được chọn — bản vẽ ghi ở cột đầu và cột cuối.
               const ghiSo = d.nhan_so === undefined ? true : d.nhan_so;
+              // TC-47 · khúc CHỜ nối tiếp: chỉ vẽ cho cột DƯƠNG. Nối một khúc "chưa đủ điều kiện"
+              // lên đầu một cột âm thì không còn đọc ra được nó cộng vào đâu.
+              const cho = ten_cho && !am && d.cho ? Math.abs(y(d.gt + d.cho) - y(d.gt)) : 0;
+              const g2 = ten_cot2 && typeof d.gt2 === "number" ? d.gt2 : null;
+              const h2 = g2 === null ? 0 : Math.max(1, Math.abs(y(g2) - y0));
+              const am2 = g2 !== null && g2 < 0;
               return (
-                <span key={d.nhan} className={"bd-mot" + (d.mo ? " mo" : "")}
+                <span key={d.nhan} className={"bd-mot" + (d.mo ? " mo" : "")
+                      + (ten_cot2 ? " doi" : "")}
                   title={`${d.nhan}: ${daySo(d.gt, dinh_dang)}${d.ghi ? " · " + d.ghi : ""}`}>
                   <span className={"bd-thanh" + (am ? " am" : "")
                         + (theo_dau ? (am ? " lo" : " lai") : "")}
                     style={{ height: h, top: am ? y0 : y0 - h }} />
+                  {cho > 0 && (
+                    <span className="bd-thanh cho" style={{ height: cho, top: y0 - h - cho }}
+                      title={`${d.nhan}: ${daySo(d.cho as number, dinh_dang)} — ${ten_cho}`} />
+                  )}
+                  {g2 !== null && (
+                    <span className={"bd-thanh hai" + (am2 ? " am" : "")
+                          + (theo_dau ? (am2 ? " lo" : " lai") : "")}
+                      style={{ height: h2, top: am2 ? y0 : y0 - h2 }}
+                      title={`${d.nhan}: ${daySo(g2, dinh_dang)} — ${ten_cot2}`} />
+                  )}
                   {/* Nhãn số nằm NGOÀI cột, phía đầu cột — đặt trong lòng cột thì cột thấp không
-                      chứa nổi chữ và chữ tràn ra trông như thuộc cột bên cạnh. */}
-                  {ghiSo && <span className={"bd-so" + (am ? " am" : "")}
-                    style={am ? { top: y0 + h + 2 } : { top: Math.max(0, y0 - h - 15) }}>
+                      chứa nổi chữ và chữ tràn ra trông như thuộc cột bên cạnh.
+                      CÓ CỘT THỨ HAI THÌ KHÔNG GHI SỐ: hai con số trên một tháng rộng hai chục
+                      pixel thì chồng lên nhau, và lúc ấy không đọc được con số nào thuộc cột nào.
+                      Chiều cao hai cột cạnh nhau đã nói đủ điều cần nói ở hình này. */}
+                  {ghiSo && !ten_cot2 && <span className={"bd-so" + (am ? " am" : "")}
+                    style={am ? { top: y0 + h + 2 } : { top: Math.max(0, y0 - h - cho - 15) }}>
                     {gonSo(d.gt, dinh_dang)}
                   </span>}
                 </span>
@@ -295,17 +343,23 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
           </div>
         </div>
         <div className="bd-goc" />
-        <div className="bd-nhanx">
+        {/* TC-47 · hình trên của một cặp dùng chung trục ngang thì giấu hàng nhãn này. Giấu bằng
+            `aria-hidden` + CSS chứ không bỏ hẳn thẻ: bỏ hẳn thì hai hình lệch nhau đúng chiều cao
+            hàng nhãn, và tháng 9 của hình trên không còn nằm trên tháng 9 của hình dưới — mất
+            chính cái mà "chung một trục ngang" sinh ra để có. */}
+        <div className={"bd-nhanx" + (an_nhan_x ? " an" : "")} aria-hidden={an_nhan_x || undefined}>
           {diem.map((d) => <span key={d.nhan} className={d.gt === null ? "muted" : ""}>{d.nhan}</span>)}
         </div>
       </div>
-      {(moc || coAm || ten_duong || diem.some((d) => d.gt === null)) && (
+      {(moc || coAm || ten_duong || ten_cho || diem.some((d) => d.gt === null)) && (
         <p className="muted bd-chu">
           {diem.some((d) => d.gt === null) && <>Ô trống = <b>chưa có số</b>, không phải 0. </>}
           {coAm && <>Vạch đậm là mốc 0; cột dưới vạch là số âm. </>}
           {moc && <>Vạch đứt là <b>{moc.nhan}</b> ({daySo(moc.gt, dinh_dang)}), cùng một trục. </>}
           {ten_duong && <>Đường đứt là <b>{ten_duong}</b>, cùng một trục; đoạn nào đứt là kỳ ấy
             chưa có chỉ tiêu. </>}
+          {ten_cho && diem.some((d) => d.cho) && <>Khúc mờ trên đầu cột là <b>{ten_cho}</b> —
+            đã biết nhưng chưa vào con số chính. </>}
           {diem.some((d) => d.mo) && <>Cột mờ là kỳ NGOÀI kỳ đang chọn. </>}
         </p>
       )}

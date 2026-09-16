@@ -20,6 +20,7 @@ Bốn luật, và mỗi luật sinh ra từ một cách đọc sai cụ thể:
     tháng mà nhãn vẫn ghi "kỳ trước".
 """
 import datetime as dt
+import re
 
 import pytest
 
@@ -162,11 +163,24 @@ def test_giam_thi_bao_giam():
 
 # ───────────────── KHAI BÁO CHỈ TIÊU ─────────────────
 
-def test_dung_bon_chi_tieu_anh_Tuan_chi_dinh():
-    """Tám thẻ mà tám biểu đồ thì không thẻ nào còn nổi bật. Bốn thẻ còn lại là việc phải xử LÚC
-    NÀY (Tour sắp khởi hành · Đội xe · Marketing · Tồn đọng), không phải xu hướng."""
-    assert set(XH.CHI_TIEU) == {"doanh_thu_thang", "ln_ke_toan_thang",
-                                "tour_dang_ban", "tour_cho_quyet_toan"}
+def test_chi_tieu_khai_dung_nhung_gi_anh_Tuan_chi_dinh():
+    """Tám thẻ mà tám biểu đồ thì không thẻ nào còn nổi bật. Bốn thẻ nhỏ (Tour sắp khởi hành · Đội
+    xe · Marketing · Tồn đọng) là việc phải xử LÚC NÀY, không phải xu hướng — chúng KHÔNG được có
+    chỉ tiêu ở đây.
+
+    SỰ THẬT ĐỔI, LUẬT KHÔNG ĐỔI (TC-47, 16/9/2026). Bản cũ chốt cứng "đúng bốn", và con số bốn ấy
+    là HỆ QUẢ của luật chứ không phải luật. Anh Tuấn chốt thêm cột "lợi nhuận tour" đứng cạnh lợi
+    nhuận trước thuế, nên nay là năm. Luật vẫn nguyên: chỉ khai chỉ tiêu cho thứ ĐÁNG NHÌN THEO
+    THỜI GIAN, và bốn thẻ nhỏ vẫn nằm ngoài. Canh đúng luật ấy chứ không canh con số.
+    """
+    phai_co = {"doanh_thu_thang", "lai_tour_thang", "ln_ke_toan_thang",
+               "tour_dang_ban", "tour_cho_quyet_toan"}
+    assert phai_co <= set(XH.CHI_TIEU)
+    cam = {"tour_sap_khoi_hanh", "doi_xe_hom_nay", "xe_dang_di", "marketing", "ton_dong"}
+    assert not (cam & set(XH.CHI_TIEU)), (
+        "Bốn thẻ nhỏ là việc phải xử lúc này, không phải xu hướng — thêm biểu đồ cho chúng là làm "
+        "loãng đúng những hình đáng nhìn."
+    )
 
 
 def test_hai_loai_chi_tieu_khai_dung():
@@ -184,11 +198,28 @@ def test_chi_tieu_chua_khai_thi_bao_loi():
 
 
 def test_khong_tu_viet_cong_thuc_doanh_thu_lan_hai():
-    """`doc_that` phải GỌI hàm mà bảng điều hành đang gọi, không viết công thức riêng. Hai nơi cùng
-    tính một con số là hai nơi sớm muộn ra hai kết quả, và lúc lệch thì không ai biết tin bên nào."""
+    """`doc_that` phải GỌI hàm dùng chung, không viết công thức riêng. Hai nơi cùng tính một con số
+    là hai nơi sớm muộn ra hai kết quả, và lúc lệch thì không ai biết tin bên nào.
+
+    HAI ĐIỀU ĐÃ ĐỔI Ở VÒNG TC-47, cùng một lý do — anh Tuấn chốt mốc là ngày Điều hành đóng số và
+    phạm vi là Vietourist mẹ:
+
+      · Hàm dùng chung nay là `ket_qua_that.thang`, không còn là `_month_tours` +
+        `settlement_summary`. `settlement_summary` vẫn đúng cho việc của nó (quỹ thưởng, căn cứ là
+        số Kế toán đã xác nhận) — chỉ là nó trả lời một câu hỏi KHÁC.
+      · Phép thử này từng CANH CHỮ: nó đòi chuỗi "_month_tours" có mặt trong tệp. Sau khi bỏ lời
+        gọi ấy đi, nó VẪN XANH — vì chuỗi ấy còn nằm trong chính đoạn chú thích giải thích vì sao
+        nó bị bỏ. Đúng bài học TC-41: cấm hay đòi một CHUỖI KÝ TỰ thì phép thử canh lời giải
+        thích chứ không canh việc làm. Nay bỏ chú thích trước khi soát.
+    """
     nguon = open(XH.__file__, encoding="utf-8").read()
-    assert "_month_tours" in nguon and "settlement_summary" in nguon
-    assert "income_statement" in nguon
+    ma = re.sub(r'"""(?:.|\n)*?"""', " ", nguon)
+    ma = re.sub(r"^\s*#.*$", " ", ma, flags=re.M)
+    assert "KQ.thang(db, ky)" in ma, "Doanh thu và lãi tour phải đi qua ket_qua_that."
+    assert "income_statement" in ma
+    assert "_month_tours" not in ma and "settlement_summary" not in ma, (
+        "Phép tính cũ lọc theo ngày Kế toán xác nhận và không lọc pháp nhân — không còn dùng ở đây."
+    )
 
 
 def test_ton_kho_chi_doc_ban_luu_khong_suy_tu_hom_nay():

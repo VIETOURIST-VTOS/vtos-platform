@@ -710,6 +710,47 @@ table.bang-doc{width:100%}
 .bd-thanh.lai{background:var(--vtos-success)}
 .bd-thanh.lo{background:var(--vtos-danger)}
 
+/* ── TC-47 · KHÚC CHỜ, CỘT THỨ HAI, VÀ TRỤC NGANG DÙNG CHUNG ──
+
+   KHÚC CHỜ: phần đã biết nhưng chưa đủ điều kiện vào con số chính (doanh thu chuyến chưa có giá
+   vốn). Cùng màu thân cột nhưng mờ và có sọc, KHÔNG phải một màu riêng: một màu riêng đọc ra là
+   "một loại doanh thu khác", còn sự thật là cùng loại — chỉ chưa đủ giấy tờ. Sọc nghiêng để phân
+   biệt được cả khi in đen trắng và khi người đọc không phân biệt màu.
+   Góc bo chuyển lên khúc này vì nó mới là ĐẦU cột; thân bên dưới thành vuông. */
+.bd-thanh.cho{background:repeating-linear-gradient(45deg,
+    var(--vtos-navy) 0 3px, transparent 3px 6px);
+  opacity:.42;border-radius:3px 3px 0 0}
+.bd-mot:has(.bd-thanh.cho)>.bd-thanh:not(.cho):not(.hai){border-radius:0}
+
+/* CỘT THỨ HAI đứng cạnh, CÙNG một trục tung. Hai cột chia đôi bề ngang ô, chừa 2px ở giữa để mắt
+   đọc ra hai cây chứ không một cây bị chia màu. Màu đậm hơn (navy) cạnh màu lãi (xanh lá) — khác
+   sắc hẳn nhau nên phân biệt được cả với người không phân biệt được đỏ–lục. */
+.bd-mot.doi>.bd-thanh{right:calc(50% + 1px)}
+.bd-mot.doi>.bd-thanh.hai{left:calc(50% + 1px);right:0}
+/* `:not(.lo)` là BẮT BUỘC, không phải cho gọn. Không có nó thì hạng cụ thể (0,3,0) của luật này
+   thắng `.bd-thanh.lo` (0,2,0), và một tháng LỖ của cột thứ hai vẫn tô xanh navy như tháng lãi —
+   tức hình giấu đi đúng điều người đọc mở nó ra để tìm. Tìm ra bằng cách dựng ảnh: tháng 2 có
+   lợi nhuận trước thuế âm mà cột vẫn xanh. Đọc mã thì không thấy. */
+.bd-mot.doi>.bd-thanh.hai:not(.lo){background:var(--vtos-navy)}
+.bd-cg-cham.hai{background:var(--vtos-navy)}
+.bd-cg-cham.cho{background:repeating-linear-gradient(45deg,
+    var(--vtos-navy) 0 3px, transparent 3px 6px);opacity:.55}
+
+/* TRỤC NGANG DÙNG CHUNG: hàng nhãn của hình trên GIỮ CHỖ nhưng không hiện chữ. `visibility` chứ
+   không `display:none` — chiều cao phải còn nguyên, nếu không hai hình lệch nhau đúng chiều cao
+   ấy và cả ý nghĩa "chung trục ngang" mất sạch. */
+.bd-nhanx.an{visibility:hidden}
+
+/* TC-47 · CỘT MẢNH HƠN TRÊN MÀN RỘNG. Mười hai cột chia đều một khung 1800px cho ra những cây cột
+   rộng gần 130px — chúng đọc được, nhưng cái mắt nhìn thấy trước là khối màu chứ không phải hình
+   dáng của chuỗi. Nới khe ra thì cùng một dữ liệu đọc ra thành một ĐƯỜNG VIỀN đi lên đi xuống.
+   Nới KHE chứ không thu hẹp riêng thân cột: ô trống `.bd-khuyet` là chính cái ô lưới, nên thu thân
+   cột lại sẽ để những ô trống rộng nguyên cạnh những cột đã hẹp — hai bề rộng cho cùng một tháng.
+   `.bd-nhanx` phải đổi khe y hệt, nếu không nhãn tháng lệch khỏi tâm cột. */
+@media (min-width:900px){
+  .bd-than.day .bd-cot,.bd-than.day .bd-nhanx{gap:18px}
+}
+
 /* Hình DÀY CỘT trên điện thoại: khe hẹp lại, chữ nhỏ lại, trục thu lại — xem chú thích lớp `day`
    ở components/BieuDo.tsx. Chỉ áp cho hình dày cột: hình sáu cột giữ nguyên khe 10px. */
 @media (max-width:560px){
@@ -823,6 +864,24 @@ table.bang-doc{width:100%}
 .kqkd-dieu{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 14px}
 .kqkd-chon{display:inline-flex;align-items:center;gap:6px;font-size:12px}
 .kqkd-chon select{width:auto;min-width:96px;padding:5px 8px;font-size:12.5px}
+
+/* ═══ TC-47 · HAI HÌNH XẾP DỌC, CHUNG MỘT TRỤC NGANG ════════════════════════════════════════
+   Anh Tuấn chốt 16/9/2026: "hai hình, chung trục ngang". Hình trên giấu hàng nhãn tháng bằng
+   lớp `.bd-nhanx.an` — GIỮ CHỖ chứ không bỏ thẻ, nếu không hai hình lệch nhau đúng chiều cao
+   hàng nhãn và cột tháng 9 của hình trên không còn nằm trên cột tháng 9 của hình dưới.
+   Khe giữa hai tầng hẹp hơn khe thường (10px) để mắt đọc chúng như MỘT hình hai tầng. */
+.kqkd-chong{display:grid;gap:10px;grid-template-columns:1fr}
+.kqkd-chong>*{min-width:0}
+.kqkd-tang{display:grid;grid-template-rows:auto 1fr;align-content:start;min-width:0}
+.kqkd-dau-hinh{margin:0 0 4px}
+/* Hai con số của hình dưới nằm cạnh nhau ở màn rộng, xuống dòng ở điện thoại. `min-width:0` để ô
+   dài không đẩy ô kia tràn khỏi khung. */
+.kqkd-hai-so{display:grid;gap:4px 18px;grid-template-columns:1fr}
+.kqkd-hai-so>*{min-width:0}
+@media (min-width:640px){ .kqkd-hai-so{grid-template-columns:1fr 1fr} }
+/* Dòng "còn thiếu": nằm sát dưới hai hình và mang vạch cảnh báo bên trái để đọc ra ngay là một
+   việc còn tồn, không phải một câu chú thích. */
+.kqkd-thieu{border-left:3px solid var(--vtos-warning);padding-left:10px;margin-top:10px}
 
 .kqkd-doi{display:grid;gap:14px;align-items:start;grid-template-columns:1fr}
 .kqkd-doi>*{min-width:0}

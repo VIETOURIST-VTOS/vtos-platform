@@ -106,7 +106,7 @@ function phanTram(x: number | null | undefined): string | null {
  *  một khung rộng 400px thì không đọc được cái nào; hai con số ở hai đầu cho biết kỳ này bắt đầu
  *  ở đâu và kết thúc ở đâu, phần giữa đã có chiều cao cột nói hộ.
  */
-function diemTu(ct: any): Diem[] {
+function diemTu(ct: any, cot2?: any): Diem[] {
   const cot: any[] = ct?.cot || [];
   const trong = cot
     .map((c, i) => i)
@@ -114,6 +114,10 @@ function diemTu(ct: any): Diem[] {
   const ghi = new Set<number>();
   if (trong.length) { ghi.add(trong[0]); ghi.add(trong[trong.length - 1]); }
   const kh: (number | null)[] | null = ct?.ke_hoach || null;
+  // TC-47 · `cot2` là chỉ tiêu thứ hai của CÙNG hình dưới (lợi nhuận trước thuế đứng cạnh lợi
+  // nhuận tour). Ghép ở đây, theo VỊ TRÍ tháng, chứ không ghép ở máy chủ: máy chủ trả mỗi chỉ tiêu
+  // một dãy độc lập, và dãy nào cũng đủ 12 tháng — nên vị trí i của hai dãy chắc chắn cùng tháng.
+  const c2: any[] = cot2?.cot || [];
   return cot.map((c, i) => ({
     nhan: `T${c.thang}`,
     gt: c.gia_tri === null || c.gia_tri === undefined ? null : Number(c.gia_tri),
@@ -121,6 +125,9 @@ function diemTu(ct: any): Diem[] {
     mo: !c.trong_ky,
     nhan_so: ghi.has(i),
     ke_hoach: kh && kh[i] !== null && kh[i] !== undefined ? Number(kh[i]) : null,
+    cho: c.cho === null || c.cho === undefined ? null : Number(c.cho),
+    gt2: c2[i] && c2[i].gia_tri !== null && c2[i].gia_tri !== undefined
+      ? Number(c2[i].gia_tri) : null,
   }));
 }
 
@@ -234,11 +241,14 @@ export default function KhoiKetQuaKinhDoanh() {
 
   const ct: any[] = d.chi_tieu || [];
   const dt = ct.find((c) => c.ma === "doanh_thu");
+  const lt = ct.find((c) => c.ma === "loi_nhuan_tour");
   const ln = ct.find((c) => c.ma === "loi_nhuan_truoc_thue");
   const tong = d.tong_ky || {};
-  const so_dt = tong.doanh_thu === null || tong.doanh_thu === undefined ? null : Number(tong.doanh_thu);
-  const so_ln = tong.loi_nhuan_truoc_thue === null || tong.loi_nhuan_truoc_thue === undefined
-    ? null : Number(tong.loi_nhuan_truoc_thue);
+  const soTong = (x: any) => (x === null || x === undefined ? null : Number(x));
+  const so_dt = soTong(tong.doanh_thu);
+  const so_lt = soTong(tong.loi_nhuan_tour);
+  const so_ln = soTong(tong.loi_nhuan_truoc_thue);
+  const th = d.con_thieu || {};
 
   // "ĐẾN HÔM NAY" PHẢI ĐI KÈM CON SỐ CỦA KỲ ĐANG CHẠY, không phải một chú thích ở đâu đó. Tổng chín
   // tháng và tổng mười hai tháng nhìn giống hệt nhau nếu không có mấy chữ này.
@@ -282,7 +292,28 @@ export default function KhoiKetQuaKinhDoanh() {
 
   // Cả ba bề rộng dùng CÙNG mười hai cột; chỉ khi kỳ chọn hẹp hơn năm thì mới có phần "tô đậm".
   const diem_dt = diemTu(dt);
-  const diem_ln = diemTu(ln);
+  const diem_lai = diemTu(lt, ln);   // TC-47 · hình dưới: hai cột đứng cạnh, cùng một trục tung
+
+  // CÂU NÓI RA PHẦN CÒN THIẾU. Cột chính chỉ gồm chuyến ĐỦ SỐ, nên nếu không nói thì người đọc
+  // tưởng cột ấy là toàn bộ tháng. Không có gì thiếu thì KHÔNG in dòng này: một dòng "0 chuyến
+  // thiếu" lặp lại mỗi lần mở màn hình sẽ dạy người ta thôi đọc nó, và đúng hôm có số thật thì
+  // mắt lướt qua luôn.
+  const thieu_gv = Number(th.chuyen_thieu_gia_von || 0);
+  const thieu_pn = Number(th.chuyen_chua_gan_phap_nhan || 0);
+  const cau_thieu = thieu_gv || thieu_pn ? (
+    <p className="muted v14-ghi kqkd-thieu">
+      {thieu_gv > 0 && (
+        <>Còn <b>{thieu_gv} chuyến</b> đã đóng số mà chưa có giá vốn
+          ({gonSo(Number(th.tien_thieu_gia_von || 0), "tien")} doanh thu) — chưa vào hai con số
+          trên, hiện thành khúc mờ trên cột. <b>{th.ai_nhap_gia_von}</b> nhập ở cửa đóng số.{" "}</>
+      )}
+      {thieu_pn > 0 && (
+        <>Còn <b>{thieu_pn} chuyến</b> chưa gán pháp nhân
+          ({gonSo(Number(th.tien_chua_gan_phap_nhan || 0), "tien")}) — không cộng vào Vietourist vì
+          chưa biết thuộc công ty nào. <b>{th.ai_gan_phap_nhan}</b> gán.</>
+      )}
+    </p>
+  ) : null;
 
   const phu_hinh = kind === "nam"
     ? `Cả 12 tháng ${nam}`
@@ -298,40 +329,63 @@ export default function KhoiKetQuaKinhDoanh() {
       </div>
       {dieu_khien}
 
-      <div className="kqkd-doi">
-        <div className="kqkd-the">
-          <h3 className="kqkd-ten">Doanh thu</h3>
-          <OSo gt={so_dt} nhan={nhan_ky} phu={cau_ke_hoach} />
+      {/* TC-47 · HAI HÌNH XẾP DỌC, CHUNG MỘT TRỤC NGANG — anh Tuấn chốt "hai hình, chung trục
+          ngang" kèm ảnh mẫu. Hình trên giấu hàng nhãn tháng, hình dưới hiện, và cột tháng 9 của
+          hình trên nằm đúng trên cột tháng 9 của hình dưới. Nhờ vậy đọc được theo CHIỀU DỌC:
+          "tháng ấy doanh thu cao mà lãi thì không" — điều mà hai hình đặt cạnh nhau không cho.
+
+          Vẫn là hai thang đo riêng, và đó là lý do phải xếp dọc chứ không vẽ chung một khung:
+          doanh thu lớn hơn lãi chừng mười lần. Luật MỘT TRỤC TUNG cấm hai thang trong CÙNG một
+          khung, không cấm hai khung. */}
+      <div className="kqkd-chong">
+        <div className="kqkd-tang">
+          <div className="kqkd-dau-hinh">
+            <h3 className="kqkd-ten">Doanh thu</h3>
+            <OSo gt={so_dt} nhan={nhan_ky} phu={cau_ke_hoach} />
+          </div>
           {duVeCot(diem_dt)
             ? <BieuDoCot ten="Doanh thu từng tháng" phu={phu_hinh} diem={diem_dt}
-                ten_duong="kế hoạch tháng"
+                ten_duong="kế hoạch tháng" ten_cho="doanh thu chuyến chưa có giá vốn" an_nhan_x
                 chuGiai={<ChuGiai ds={[
                   { ten: "Thực hiện", lop: "" },
+                  { ten: "Chưa có giá vốn", lop: "cho" },
                   { ten: "Kế hoạch", lop: "duong" },
                 ]} />} />
             : <p className="muted v14-ghi">{CHUA_VE(nam)}</p>}
         </div>
 
-        <div className="kqkd-the">
-          <h3 className="kqkd-ten">Lợi nhuận trước thuế</h3>
-          <OSo gt={so_ln} nhan={nhan_ky} phu={cau_bien} />
+        <div className="kqkd-tang">
+          <div className="kqkd-dau-hinh">
+            <h3 className="kqkd-ten">Lợi nhuận</h3>
+            <div className="kqkd-hai-so">
+              <OSo gt={so_lt} nhan={`Lợi nhuận tour · ${nhan_ky}`}
+                phu="Thu trừ chi của chính những chuyến đã đóng số — chưa gánh chi phí chung." />
+              <OSo gt={so_ln} nhan={`Lợi nhuận trước thuế · ${nhan_ky}`} phu={cau_bien} />
+            </div>
+          </div>
           {/* THEO DẤU, không theo mức: người đọc tìm ở hình này đúng một điều — tháng nào lỗ. Còn
               doanh thu thì KHÔNG bật `theo_dau`: doanh thu âm là chuyện hoàn/huỷ, tô nó cùng màu
               với "lỗ" là trộn hai khái niệm khác hẳn nhau. */}
-          {duVeCot(diem_ln)
-            ? <BieuDoCot ten="Lợi nhuận từng tháng" phu={phu_hinh} diem={diem_ln} theo_dau
+          {duVeCot(diem_lai)
+            ? <BieuDoCot ten="Lợi nhuận từng tháng" phu={phu_hinh} diem={diem_lai} theo_dau
+                ten_cot2="lợi nhuận trước thuế"
                 chuGiai={<ChuGiai ds={[
-                  { ten: "Lãi", lop: "lai" },
+                  { ten: "Lợi nhuận tour", lop: "lai" },
+                  { ten: "LN trước thuế", lop: "hai" },
                   { ten: "Lỗ", lop: "lo" },
                 ]} />} />
             : <p className="muted v14-ghi">{CHUA_VE(nam)}</p>}
         </div>
       </div>
 
+      {cau_thieu}
+
       <p className="muted v14-ghi">
-        Hai biểu đồ cùng một kỳ nhưng <b>thang đo riêng</b>: lợi nhuận nhỏ hơn doanh thu nhiều lần,
-        vẽ chung một thang thì cột lợi nhuận dẹp thành một vạch sát đáy. Đừng so chiều cao cột của
-        hình này với hình kia. Đơn vị đọc ngay trên nhãn trục.{" "}
+        Doanh thu và lợi nhuận lấy <b>thực tế từ chuyến Điều hành đã đóng số</b>, phạm vi{" "}
+        <b>Vietourist</b> — công ty con và liên kết chỉ vào mục hợp nhất của báo cáo tài chính.
+        Hai hình dùng chung trục ngang nên đọc được theo chiều dọc, nhưng <b>thang đo riêng</b>:
+        đừng so chiều cao cột của hình này với hình kia. Khoảng cách giữa hai cột ở hình dưới chính
+        là chi phí chung của công ty. Đơn vị đọc ngay trên nhãn trục.{" "}
         <Link className="the-cua" href={CUA}>Kế hoạch tháng →</Link>
       </p>
     </section>
