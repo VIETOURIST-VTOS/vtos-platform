@@ -194,6 +194,77 @@ def _nam_sheet(ws) -> int | None:
     return None
 
 
+# ---------------------------------------------------------------------------------------------
+# GIỚI HẠN VÙNG QUÉT — MỘT Ô LẠC Ở HÀNG THỨ MỘT TRIỆU LÀM TREO CẢ MÁY CHỦ
+# ---------------------------------------------------------------------------------------------
+#
+# Đo trên bản chạy thật 16/9/2026, khi nạp cửa 1 cho 604 tệp T1–T6: 47 tệp trả về HTTP 502 trong
+# 0 giây. Không phải lỗi mạng, không phải tệp hỏng. Mở tệp "QUYẾT TOÁN VISA MỸ THÁNG 1.xlsx"
+# (30 KB) ra thì thấy:
+#
+#     sheet 'MỸ VISA ONLY'   max_row = 1.048.525      (đúng trần của Excel)
+#     dữ liệu thật           hàng 1 → 40
+#     và ĐÚNG MỘT Ô lạc      (1048525, 5) = 199.500.000
+#
+# Một ô số tiền bị dán nhầm xuống hàng cuối cùng của sheet. Excel ghi kích thước sheet theo ô xa
+# nhất, nên `ws.max_row` thành hơn một triệu. Bộ đọc này duyệt `range(..., ws.max_row + 1)` ở sáu
+# chỗ, mỗi vòng gọi `ws.cell(r, c)` — mà `ws.cell()` TẠO RA ô nếu chưa có. Kết quả: hơn một triệu
+# lượt tạo đối tượng cho mỗi cột, tiến trình treo, cổng web hết giờ chờ và trả 502.
+#
+# Hệ quả nặng hơn con số 47 tệp: một nhân viên Điều hành tải lên đúng một tệp như thế là TREO MỘT
+# TIẾN TRÌNH của máy chủ. Cửa nhập không được phép có chỗ ấy.
+#
+# LUẬT: chỉ quét phần LIỀN MẠCH. Một hàng cách khối dữ liệu quá `KHOANG_TRONG_TOI_DA` hàng thì
+# không còn là phần của bảng ấy nữa.
+#
+# VÀ PHẢI NÓI RA. Ô lạc kia mang 199.500.000 — một con số thật. Cắt vùng quét rồi im lặng là đổi
+# một lỗi treo lấy một lỗi thiếu tiền, mà lỗi thiếu tiền thì không ai thấy. `o_lac()` trả về đúng
+# những ô bị bỏ ngoài vùng, và `doc_tep` đưa chúng vào phần `thieu` để người duyệt nhìn thấy.
+
+KHOANG_TRONG_TOI_DA = 200
+
+
+def _hang_co_gia_tri(ws) -> list:
+    """Các hàng THỰC SỰ có giá trị, đọc thẳng từ sổ ô của openpyxl – không quét theo chỉ số.
+
+    Quan trọng: đọc `_cells` thì KHÔNG tạo ô mới. Quét bằng `ws.cell(r, c)` thì có, và đó chính
+    là cái làm treo.
+    """
+    cells = getattr(ws, "_cells", None)
+    if cells is None:                       # chế độ read_only – không có sổ ô
+        return []
+    return sorted({k[0] for k, o in cells.items() if o.value is not None})
+
+
+def het_hang_that(ws) -> int:
+    """Hàng cuối cùng của khối dữ liệu LIỀN MẠCH. Dùng thay cho `ws.max_row` ở mọi vòng quét."""
+    da = getattr(ws, "_het_hang_cache", None)
+    if da is not None:
+        return da
+    hs = _hang_co_gia_tri(ws)
+    if not hs:
+        ra = min(ws.max_row, KHOANG_TRONG_TOI_DA)
+    else:
+        ra = hs[0]
+        for h in hs[1:]:
+            if h - ra > KHOANG_TRONG_TOI_DA:
+                break
+            ra = h
+    try:
+        ws._het_hang_cache = ra
+    except Exception:
+        pass
+    return ra
+
+
+def o_lac(ws) -> list:
+    """Ô CÓ SỐ LIỆU nằm ngoài khối liền mạch. Không bao giờ được im lặng bỏ qua."""
+    het = het_hang_that(ws)
+    cells = getattr(ws, "_cells", None) or {}
+    return sorted((k[0], k[1], o.value) for k, o in cells.items()
+                  if o.value is not None and k[0] > het)
+
+
 def _ben_phai(ws, r: int, c: int, xa: int = 6):
     """Giá trị của nhãn nằm ở ô KHÔNG RỖNG đầu tiên bên phải.
 
@@ -426,7 +497,7 @@ def _doc_khach(ws) -> list[dict]:
     # Dòng dữ liệu bắt đầu SAU hàng tiêu đề thấp nhất đã dùng.
     dau = max([r for r in (r_ten, r_tong, r_thu) if r] or [h]) + 1
     ra = []
-    for r in range(dau, ws.max_row + 1):
+    for r in range(dau, het_hang_that(ws) + 1):
         ten = _chu(ws.cell(r, c_ten).value)
         if not ten:
             continue
@@ -511,7 +582,7 @@ def _doc_bang_tien(ws, hang_td: int) -> list[dict]:
     #
     # "TỔNG CỘNG THU" thì tệp nào cũng có và đứng đúng chỗ ranh giới, nên lấy nó làm vạch.
     hang_het_thu = None
-    for r in range(hang_td + 1, ws.max_row + 1):
+    for r in range(hang_td + 1, het_hang_that(ws) + 1):
         for c in range(1, min(het_cot, 6) + 1):
             t = _hoa(ws.cell(r, c).value)
             if t.startswith("TỔNG CỘNG THU") or t.startswith("TONG CONG THU") or t.startswith("A. TỔNG THU"):
@@ -523,7 +594,7 @@ def _doc_bang_tien(ws, hang_td: int) -> list[dict]:
     ra = []
     nhom = ""
     phan = ""          # "thu" hoặc "chi"
-    for r in range(hang_td + 1, ws.max_row + 1):
+    for r in range(hang_td + 1, het_hang_that(ws) + 1):
         # Tiêu đề nhóm / mốc phần: một ô chữ, không có số tiền bên cạnh.
         chu_dau = ""
         for c in range(1, min(het_cot, 6) + 1):
@@ -613,7 +684,7 @@ def _doc_hdv(ws) -> dict:
     ra = {"dong": [x for x in dong if x["thanh_tien"] is not None],
           "tien_ung": None, "hoan_ung": None, "ctp": None}
     for nhom, khoa in ((NHAN_UNG, "tien_ung"), (NHAN_HOAN_UNG, "hoan_ung"), (NHAN_CTP, "ctp")):
-        for r in range(1, ws.max_row + 1):
+        for r in range(1, het_hang_that(ws) + 1):
             for c in range(1, min(ws.max_column, 10) + 1):
                 t = _hoa(ws.cell(r, c).value).rstrip(":").strip()
                 if t and any(t == n or t.startswith(n) for n in nhom):
@@ -714,7 +785,18 @@ def doc_tep(noi_dung: bytes, ten_tep: str = "") -> dict:
     d["tong_chi_cong_dong"] = tong_chi(d)
     d["tong_thu"] = _chot(d["tong_ghi"].get("thu"), d["tong_thu_cong_dong"])
     d["tong_chi"] = _chot(d["tong_ghi"].get("chi"), d["tong_chi_cong_dong"])
-    d["thieu"] = thieu_gi(d)
+    # Ô LẠC – phải nói ra, không được im lặng.
+    # Vùng quét bị cắt theo `het_hang_that()` để không treo máy chủ (xem chú thích ở đầu tệp).
+    # Nhưng cái làm treo lại là một Ô CÓ SỐ TIỀN THẬT: 199.500.000 ở hàng 1.048.525. Cắt vùng rồi
+    # im lặng là đổi một lỗi treo lấy một lỗi THIẾU TIỀN, mà lỗi thiếu tiền thì không ai thấy.
+    lac = []
+    for ws in wb.worksheets:
+        for r, c, v in o_lac(ws):
+            lac.append(f"Sheet {ws.title!r}: ô rời ở hàng {r:,} cột {c} mang {v!r} – cách khối dữ "
+                       f"liệu (hết ở hàng {het_hang_that(ws):,}) quá xa nên KHÔNG được đọc. "
+                       f"Người lập cần xoá hoặc đưa nó về đúng bảng.")
+    d["o_lac"] = lac
+    d["thieu"] = thieu_gi(d) + lac
     return d
 
 
@@ -798,7 +880,7 @@ def _tong_hang_cuoi_bang_khach(ws) -> dict | None:
     if h is not None and h > hang_td + 2:
         return None                       # tiêu đề tìm được không thuộc bảng khách này
     cuoi = None
-    for r in range(hang_td + 1, ws.max_row + 1):
+    for r in range(hang_td + 1, het_hang_that(ws) + 1):
         t = _so(ws.cell(r, c_thu).value)
         c = _so(ws.cell(r, c_chi).value)
         if t is None or c is None:
@@ -813,7 +895,7 @@ def _tong_hang_cuoi_bang_khach(ws) -> dict | None:
 def _tong_theo_nhan(ws) -> dict | None:
     """Cách B: nhãn 'TỔNG THU' / 'TỔNG CHI' đứng rời, giá trị ở ô không rỗng bên phải."""
     thu = chi = None
-    for r in range(1, ws.max_row + 1):
+    for r in range(1, het_hang_that(ws) + 1):
         for c in range(1, min(ws.max_column, 26) + 1):
             t = _hoa(ws.cell(r, c).value).rstrip(":").strip()
             if not t:
