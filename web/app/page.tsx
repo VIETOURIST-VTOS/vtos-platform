@@ -136,7 +136,10 @@ function Dash() {
     <KhoiKetQuaKinhDoanh />
 
     <div className="mh01-sau-o">
-      <KhoiDongTien />
+      {/* TC-48 · đáy của dự báo 13 tuần. Máy chủ tính (`kpis.so_du_thap_nhat`), màn hình chỉ bày —
+          ranh giới 09/9. Vai nào không được xem khối dòng tiền thì `kpis` không mang trường này về,
+          nên không có nhánh ẩn/hiện nào ở đây: cắt hàng nằm trong truy vấn, đúng luật SEC-02. */}
+      <KhoiDongTien day={d.kpis?.so_du_thap_nhat} />
       <KhoiPhaiThu ds={sec.phai_thu_theo_han} chua_co_han={sec.phai_thu_chua_co_han}
         vi_sao={sec.phai_thu_vi_sao} bieu_do={bd.phai_thu} />
       {/* TC-45: bỏ `qua_han` — quá hạn nay là nhóm đầu trong bảy nhóm, không còn ô riêng. */}

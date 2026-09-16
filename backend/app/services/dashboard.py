@@ -109,7 +109,12 @@ def build(db: Session, u: User) -> dict:
         from app.models.finance import FinContract
         k["no_vay"] = sum((c.outstanding or 0) for c in db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars())
         k["phai_thu"] = float(db.execute(select(func.coalesce(func.sum(func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0)), 0)).where(Booking.cancelled == False, (func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0)) > 0)).scalar() or 0)
-        fc = FIN.forecast_13w(db); k["du_bao_canh_bao"] = len(fc["alerts"]); k["so_du_tuan_13"] = fc["closing"]
+        # TC-48 · ĐÁY thay cho CUỐI KỲ (anh Tuấn chốt 17/9/2026: "để đáy thấp nhất, bỏ số tuần 13").
+        # `so_du_tuan_13` bỏ hẳn, không giữ song song: hai con số dòng tiền cạnh nhau thì người đọc
+        # phải nhớ con nào là con nào, và con dễ đọc hơn (cuối kỳ, thường dương) sẽ thắng. Vì sao
+        # đáy mới là câu người điều hành hỏi — xem chú thích `day_thap_nhat` ở services/finance.py.
+        fc = FIN.forecast_13w(db); k["du_bao_canh_bao"] = len(fc["alerts"])
+        k["so_du_thap_nhat"] = fc["thap_nhat"]
         pl = RP.income_statement(db, p); k["ln_ke_toan_thang"] = dict((r[0], r[2]) for r in pl["rows"])["50"]
         # TC-41 (16/9/2026) – KẾ HOẠCH THÁNG, cửa nhập vừa mở ở /ke-hoach-thang.
         #

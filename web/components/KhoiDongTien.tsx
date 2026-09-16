@@ -159,7 +159,49 @@ function BieuDoBonMoc({ cot, so, khoang, vi_sao }: {
   );
 }
 
-export default function KhoiDongTien() {
+/** TC-48 · ĐÁY CỦA DỰ BÁO 13 TUẦN — anh Tuấn chốt 17/9/2026: "để đáy thấp nhất, bỏ số tuần 13".
+ *
+ *  ĐÂY LÀ CON SỐ ĐẦU TIÊN CỦA KHỐI, đứng trên bảng bốn mốc. Bốn mốc trả lời "tiền đang ở đâu";
+ *  dòng này trả lời "ba tháng tới có lúc nào hết tiền không" — và câu thứ hai mới là câu bắt người
+ *  đọc phải làm gì đó ngay hôm nay.
+ *
+ *  BA MỨC, KHÔNG PHẢI HAI (xem luật 4 ở `finance.day_thap_nhat`):
+ *    · âm            – không đủ tiền trả, vỡ kế hoạch                    → đỏ
+ *    · dưới ngưỡng   – vẫn trả được nhưng thủng lớp đệm dự phòng         → vàng
+ *    · trên ngưỡng   – đáy vẫn còn trên mức dự phòng                     → xanh
+ *  Gộp hai mức đầu làm một thì một công ty sắp mất khả năng chi trả trông y hệt một công ty mỏng
+ *  đệm — hai tình huống đòi hai hành động khác hẳn nhau.
+ *
+ *  CHƯA CÓ SỐ THÌ KHÔNG VẼ GÌ. Không in "0 đ": 0 đồng trên khối dòng tiền đọc ra là "sắp hết
+ *  tiền", tức bịa ra đúng cái cảnh báo nguy hiểm nhất từ một chỗ trống.
+ */
+function DayDuBao({ d }: { d: any }) {
+  if (!d || d.gia_tri === null || d.gia_tri === undefined) return null;
+  const muc = d.am ? "red" : d.duoi_nguong ? "warn" : "ok";
+  const nhan = d.am ? "ÂM — không đủ tiền trả"
+    : d.duoi_nguong ? "Dưới ngưỡng dự phòng" : "Trên ngưỡng dự phòng";
+  return (
+    <div className={"dt-day " + muc}>
+      <div className="dt-day-so">
+        <b>{vnd(d.gia_tri)}</b>
+        <span className="muted">
+          Số dư thấp nhất dự kiến · tuần {d.tuan} ({fmtD(String(d.tu_ngay))})
+        </span>
+      </div>
+      <div className="dt-day-phu">
+        <span className={"tag " + muc}>{nhan}</span>
+        {d.thieu_so_voi_nguong > 0 && (
+          <span className="muted">Thiếu {vnd(d.thieu_so_voi_nguong)} so với mức dự phòng</span>
+        )}
+        {/* Đường đi tới chỗ sửa: dự báo dựng từ booking, đề nghị chi, lịch vay và bảng kế hoạch
+            thu–chi do Kế toán gõ. Ranh giới 09/9 — màn hình này chỉ bày, cửa nhập nằm ở đó. */}
+        <Link className="the-cua" href="/finance?tab=forecast">Dự báo 13 tuần · cửa nhập →</Link>
+      </div>
+    </div>
+  );
+}
+
+export default function KhoiDongTien({ day }: { day?: any }) {
   const { toast } = useShell();
   const [dsPn, setDsPn] = useState<any[]>([]);
   const [pn, setPn] = useState<number | null>(null);
@@ -204,6 +246,7 @@ export default function KhoiDongTien() {
 
   return (
     <section style={{ marginBottom: 14 }}>
+      <DayDuBao d={day} />
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
         <h2 style={{ margin: 0 }}>Dòng tiền — bốn mốc {khoang ? "trong từng khoảng" : "lũy kế"}</h2>
         <div className="dt-kieu" role="group" aria-label="Kiểu xem bốn mốc">
