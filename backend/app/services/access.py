@@ -341,10 +341,7 @@ MAN_HINH_API = {
     "/marketing": ("/api/v1/marketing", "/api/v1/products", "/api/v1/users"),
     "/doc-chung-tu": ("/api/v1/doc-chung-tu", "/api/v1/nap-du-lieu", "/api/v1/tep"),
 
-    "/nap-du-lieu": ("/api/v1/nap-du-lieu", "/api/v1/quyet-toan-tour",
-                     # Bộ nạp bảng tháng có cột ngoại tệ tra sổ tỷ giá để BÁO THIẾU, không để tự
-                     # quy đổi. Chủ tịch chốt 16/9: tỷ giá do nhân viên tự nhập từng thời điểm.
-                     "/api/v1/ty-gia"),
+    "/nap-du-lieu": ("/api/v1/nap-du-lieu", "/api/v1/quyet-toan-tour"),
     "/ngoai-le": ("/api/v1/ngoai-le",),
     "/nha-cung-cap": ("/api/v1/ncc", "/api/v1/tours"),
     "/noi-dung": ("/api/v1/noi-dung", "/api/v1/marketing"),
@@ -354,9 +351,7 @@ MAN_HINH_API = {
     # Hàng rào trong vẫn nguyên: danh sách XEM của api/v1/quyet_toan_lop3.py không có vai Kinh
     # doanh nào, nên bốn vai Kinh doanh xem được màn hình này vẫn KHÔNG đọc được phần giá vốn.
     "/non-package": ("/api/v1/non-package", "/api/v1/bookings", "/api/v1/tours",
-                     "/api/v1/quyet-toan-lop3",
-                     # Dịch vụ lẻ có khoản ngoại tệ (visa, land, outbound ghép lẻ) – tra sổ tỷ giá.
-                     "/api/v1/ty-gia"),
+                     "/api/v1/quyet-toan-lop3"),
     # /ops dùng chung thành phần với /hr (HrScreens) nên chạm cùng nhóm API. Quyền chi tiết vẫn tách:
     # tab bảng lương có cổng riêng, nên chạm được nhóm /payroll không có nghĩa là đọc được bảng lương.
     "/ops": ("/api/v1/hr", "/api/v1/employees", "/api/v1/incidents", "/api/v1/incident-levels",
@@ -393,10 +388,7 @@ MAN_HINH_API = {
                # Hệ quả: bốn vai Kinh doanh cũng chạm được tiền tố này, vì họ xem được /tours. Phần
                # giá vốn thì họ VẪN KHÔNG xem được – hàng rào trong là danh sách XEM của chính
                # app/api/v1/quyet_toan_lop3.py, và danh sách ấy không có vai Kinh doanh nào.
-               "/api/v1/quyet-toan-lop3",
-               # Robot A · 16/9/2026. Form khoản ngoại tệ của quyết toán tra SỔ TỶ GIÁ để điền
-               # sẵn. CHỈ ĐỌC ở đây: hàng rào trong của api/v1/ty_gia.py (NHAP) vẫn chặn ghi.
-               "/api/v1/ty-gia"),
+               "/api/v1/quyet-toan-lop3"),
     "/vietrip": ("/api/v1/import",),
     "/visa": ("/api/v1/visa",),
     "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents"),
@@ -706,7 +698,7 @@ MENU_ROLES = {
     "/ket-so": BASE_VIEW + ("ketoan", "cntt"),
     # Sổ tỷ giá. Kế toán giữ sổ; Điều hành nhập tỷ giá của chuyến mình chi; Visa nhập tỷ giá phí
     # lãnh sự. Rộng hơn thế thì một con số NHÂN vào tiền có quá nhiều người sửa được.
-    "/ty-gia": BASE_VIEW + OPERATIONS + ("ketoan", "visa", "cntt"),
+    "/ty-gia": BASE_VIEW + OPERATIONS + ("ketoan", "nv_visa", "cntt"),
     # V7 Đợt 3 – Hồ sơ kiểm toán. Kế toán làm chủ hồ sơ; Ban Kiểm soát đọc theo nghĩa vụ Luật Doanh
     # nghiệp (đã nằm trong BASE_VIEW). HCNS, Hành chính, Điều hành có mặt vì họ CÓ MỤC phải nộp – hợp
     # đồng lao động là của HCNS, hồ sơ pháp lý và biên bản HĐQT là của Hành chính. Không mở cho họ thì

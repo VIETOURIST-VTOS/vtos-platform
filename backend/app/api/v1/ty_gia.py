@@ -136,7 +136,9 @@ def them(v: TyGiaVao, u: User = Depends(require_roles(*NHAP)), db: Session = Dep
     if tt == "VND":
         raise HTTPException(422, "Không nhập tỷ giá cho đồng Việt Nam.")
     # Tỷ giá 0 hoặc âm nhân vào tiền ra 0 hoặc số âm, và không ai nhìn lại con số ấy nữa.
-    if not (v.ty_gia and v.ty_gia > 0):
+    # `or 0` quanh chỗ đọc là luật K2: cột tiền được phép rỗng, và rỗng ở đây nghĩa là "chưa nhập"
+    # – rơi đúng vào nhánh từ chối bên dưới, không nổ TypeError khi so với 0.
+    if not ((v.ty_gia or 0) > 0):
         raise HTTPException(422, "Tỷ giá phải lớn hơn 0.")
     if v.ngay > date.today():
         raise HTTPException(422, "Không nhập tỷ giá của ngày chưa tới.")
@@ -188,7 +190,7 @@ def sua(tid: int, v: TyGiaSua, u: User = Depends(require_roles(*NHAP)),
 
     doi = []
     if v.ty_gia is not None:
-        if not v.ty_gia > 0:
+        if not ((v.ty_gia or 0) > 0):
             raise HTTPException(422, "Tỷ giá phải lớn hơn 0.")
         if float(v.ty_gia) != float(x.ty_gia):
             doi.append(f"tỷ giá {float(x.ty_gia):,.4f} → {float(v.ty_gia):,.4f}")

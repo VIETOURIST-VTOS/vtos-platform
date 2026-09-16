@@ -217,8 +217,20 @@ PHAM_VI_DA_CHOT = {
     # Quyền GHI còn hẹp hơn nữa và KHÔNG nằm ở hàng rào này: tuple GHI trong api/v1/ke_hoach.py chỉ
     # có chutich, tgd, ketoan. Ban Kiểm soát đọc được thước đo nhưng không sửa được nó — đúng kiểu
     # hai lớp rào mà P2 thiết kế: rào ngoài theo màn hình, rào trong theo việc.
-    "chutich": 107, "tgd": 107, "bks": 107, "cntt": 104,
-    "ketoan": 89, "tp_dh": 84, "ptgd_doan": 63, "nv_dh": 58, "hcns": 55, "gd_kd": 56,
+    # +1 cho CHÍN vai trò ngày 16/9/2026 – nhóm "/api/v1/ty-gia" gắn vào màn hình mới /ty-gia
+    # (Sổ tỷ giá). Chủ tịch chốt cùng ngày: "tỷ giá để nhân viên tự nhập tại từng thời điểm; tạo
+    # form để nhân viên tự nhập tay và tải tệp/ảnh."
+    #
+    # Chín vai được nới: chutich, tgd, bks, robot_ks, cntt, ketoan, tp_dh, nv_dh, nv_visa.
+    # Kế toán giữ sổ; Điều hành nhập tỷ giá của chuyến mình chi; Visa nhập tỷ giá phí lãnh sự.
+    #
+    # BỐN VAI KINH DOANH CỐ Ý KHÔNG CÓ MẶT, và bản đầu của vá này đã nới nhầm đúng chỗ ấy: nó gắn
+    # "/api/v1/ty-gia" vào cả /tours, /non-package và /nap-du-lieu để form ngoại tệ tra được tỷ giá,
+    # và thế là MƯỜI TÁM vai trò được nới thay vì chín. Tra tỷ giá từ biểu quyết toán là một việc
+    # có thật, nhưng nó phải là một quyết định riêng có người ký, không phải hệ quả phụ của việc
+    # thêm một màn hình. Phép thử này bắt được, và đó đúng là việc của nó.
+    "chutich": 108, "tgd": 108, "bks": 108, "cntt": 105,
+    "ketoan": 90, "tp_dh": 85, "ptgd_doan": 63, "nv_dh": 59, "hcns": 55, "gd_kd": 56,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
@@ -230,12 +242,12 @@ PHAM_VI_DA_CHOT = {
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
     # chỉ không còn cầm bản tổng hợp cả bộ phận. Đúng nguyên tắc "nhân viên trong phòng KHÔNG mặc
     # định xem báo cáo phòng"; dòng cũ là chỗ vá tạm khi Visa chưa có người phụ trách.
-    "gd_doi_xe": 26, "hanh_chinh": 25, "tp_hd": 24, "xe_hdv": 15, "nv_visa": 16,
+    "gd_doi_xe": 26, "hanh_chinh": 25, "tp_hd": 24, "xe_hdv": 15, "nv_visa": 17,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 17, "robot_ks": 107, "robot_vpm": 16,
+    "robot_pq": 17, "robot_ks": 108, "robot_vpm": 16,
 }
 
 

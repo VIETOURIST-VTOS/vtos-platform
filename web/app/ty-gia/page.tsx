@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
+import DinhKem from "@/components/DinhKem";
 import { api, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
@@ -41,7 +42,7 @@ function TyGiaPage() {
   const [f, setF] = useState({ tien_te: "USD", ngay: hnay(), ty_gia: "", nguon: "", loai_gia: "", ghi_chu: "" });
   const [tra, setTra] = useState<any>(null);
   const [sua, setSua] = useState<{ id: number; ty_gia: string; ly_do: string } | null>(null);
-  const [dangTai, setDangTai] = useState<number | null>(null);
+  const [gan, setGan] = useState<number | null>(null);
 
   const load = useCallback(() => {
     const q = new URLSearchParams();
@@ -83,21 +84,10 @@ function TyGiaPage() {
     } catch (e) { setLoi(errMsg(e)); }
   };
 
-  /* Chứng từ đi qua KHO HỒ SƠ CHUNG (doi_tuong = "ty_gia"), không dựng kho ảnh riêng: một kho chung
-   * là một bộ quy tắc chung về kích thước, loại tệp, ai xem được, và thu hồi thay vì xoá. */
-  const dinhKem = async (id: number, tep: File) => {
-    setDangTai(id);
-    try {
-      const fd = new FormData();
-      fd.append("doi_tuong", "ty_gia");
-      fd.append("doi_tuong_id", String(id));
-      fd.append("tep", tep);
-      fd.append("loai", "chung_tu");
-      fd.append("mo_ta", "Chứng từ tỷ giá");
-      const r = await api<any>("/tep", { method: "POST", body: fd });
-      toast(r.message || "Đã lưu tệp");
-    } catch (e) { setLoi(errMsg(e)); } finally { setDangTai(null); }
-  };
+  /* Chứng từ đi qua Ô ĐÍNH KÈM CHUNG (`<DinhKem>`), không tự viết một ô tải tệp riêng ở đây.
+   * Ô chung giữ một bộ quy tắc cho cả hệ: giới hạn dung lượng nói bằng số trước khi người ta chọn
+   * nhầm tệp 40 MB, tải lại đúng tệp cũ thì báo "đã có" chứ không tạo bản thứ hai, và gỡ tệp phải
+   * ghi lý do. Viết riêng một ô ở đây là ba quy tắc ấy không áp cho chứng từ tỷ giá. */
 
   return (
     <main>
@@ -179,7 +169,7 @@ function TyGiaPage() {
           <thead>
             <tr>
               <th>Ngày</th><th>Đồng tiền</th><th style={{ textAlign: "right" }}>Tỷ giá</th>
-              <th>Nguồn</th><th>Loại giá</th><th>Người nhập</th><th>Chứng từ</th><th></th>
+              <th>Nguồn</th><th>Loại giá</th><th>Người nhập</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -195,10 +185,9 @@ function TyGiaPage() {
                   {r.so_lan_sua > 0 && <Tag cls="warn">đã sửa {r.so_lan_sua} lần</Tag>}
                 </td>
                 <td>
-                  <input type="file" disabled={!ghiDuoc || dangTai === r.id}
-                         onChange={(e) => { const t = e.target.files?.[0]; if (t) dinhKem(r.id, t); }} />
-                </td>
-                <td>
+                  <button onClick={() => setGan(gan === r.id ? null : r.id)}>
+                    {gan === r.id ? "Đóng chứng từ" : "Chứng từ"}
+                  </button>
                   {ghiDuoc && (
                     <button onClick={() => setSua({ id: r.id, ty_gia: String(r.ty_gia), ly_do: "" })}>
                       Sửa
@@ -208,10 +197,18 @@ function TyGiaPage() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="muted">Chưa có dòng nào.</td></tr>
+              <tr><td colSpan={7} className="muted">Chưa có dòng nào.</td></tr>
             )}
           </tbody>
         </table>
+
+        {/* Ô đính kèm của ĐÚNG dòng đang mở. Đặt ngay dưới bảng chứ không bắt người dùng sang
+          * màn hình "Tệp & hình ảnh" rồi gõ lại mã hồ sơ – việc ấy sẽ không ai làm, và ảnh bảng tỷ
+          * giá ở lại trong điện thoại. */}
+        {gan !== null && (
+          <DinhKem doiTuong="ty_gia" doiTuongId={gan} loai="chung_tu" chiXem={!ghiDuoc}
+                   tieuDe={`Chứng từ tỷ giá #${gan} – ảnh bảng niêm yết, sao kê, hoặc trang hợp đồng`} />
+        )}
 
         {/* Lịch sử sửa hiện ngay dưới bảng, không giấu sau một nút: số cũ là thứ người đối chiếu
           * cần thấy, và giấu nó đi thì việc giữ lại cũng bằng thừa. */}
