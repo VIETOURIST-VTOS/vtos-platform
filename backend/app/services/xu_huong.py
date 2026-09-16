@@ -80,6 +80,12 @@ class ChiTieu:
 # tám biểu đồ trên tám thẻ thì không thẻ nào còn nổi bật.
 CHI_TIEU: dict[str, ChiTieu] = {
     "doanh_thu_thang": ChiTieu("doanh_thu_thang", "Doanh thu tháng", DONG_CHAY),
+    # TC-47 · LÃI TỪ TOUR — anh Tuấn 16/9/2026: "1 cột là lợi nhuận tour, 1 cột là LN trước thuế".
+    # Hai chỉ tiêu KHÁC NHAU, không phải hai cách gọi của một thứ: lãi tour là thu trừ chi của
+    # chính những chuyến đã đóng số, không gánh chi phí chung (lương văn phòng, thuê nhà, lãi vay);
+    # lợi nhuận trước thuế là con số kế toán sau khi gánh đủ. Cột lãi tour luôn cao hơn, và khoảng
+    # cách giữa hai cột chính là chi phí vận hành công ty — đó là điều đáng nhìn ở hình này.
+    "lai_tour_thang": ChiTieu("lai_tour_thang", "Lợi nhuận tour", DONG_CHAY),
     "ln_ke_toan_thang": ChiTieu("ln_ke_toan_thang", "Lợi nhuận trước thuế", DONG_CHAY),
     "tour_dang_ban": ChiTieu("tour_dang_ban", "Tour đang bán", TON_KHO, dinh_dang="dem"),
     "tour_cho_quyet_toan": ChiTieu("tour_cho_quyet_toan", "Tour chờ quyết toán", TON_KHO,
@@ -304,16 +310,25 @@ def doc_that(db) -> Callable[[str, str], float | None]:
         y, m = _ky_ra_thang(ky)
         try:
             if ct.loai == DONG_CHAY:
-                from app.services import dashboard as DB
-                from app.services import rules as R
-                if ma == "doanh_thu_thang":
-                    tours = DB._month_tours(db, y, m)
-                    if not tours:
-                        return None            # không có chuyến nào ĐÃ XÁC NHẬN trong kỳ → chưa có số
-                    return float(sum((R.settlement_summary(db, t)["revenue"] or 0) for t in tours))
+                # TC-47 · MỘT PHÉP TÍNH CHO CẢ BA CON SỐ TIỀN, và nó nằm ở ket_qua_that.
+                #
+                # Bản trước gọi `dashboard._month_tours` + `rules.settlement_summary`, tức lọc theo
+                # NGÀY KẾ TOÁN XÁC NHẬN, không lọc pháp nhân, và đọc giá vốn rỗng thành 0. Anh Tuấn
+                # chốt 16/9/2026: mốc là ngày Điều hành ĐÓNG SỐ, phạm vi là Vietourist mẹ. Ba lý do
+                # và hệ quả của từng cái ghi ở đầu services/ket_qua_that.py.
+                from app.services import ket_qua_that as KQ
+                if ma in ("doanh_thu_thang", "lai_tour_thang"):
+                    t = KQ.thang(db, ky)
+                    return t["doanh_thu"] if ma == "doanh_thu_thang" else t["lai_tour"]
                 if ma == "ln_ke_toan_thang":
                     from app.services import reports as RP
-                    pl = RP.income_statement(db, ky)
+                    # Lọc pháp nhân NGAY TRONG truy vấn, không cộng cả tập đoàn rồi trừ ra — cùng
+                    # luật SEC-02. Chưa có công ty mẹ trong danh mục thì trả None: một con số của
+                    # cả tập đoàn đứng dưới nhãn "Vietourist" là sai tệ hơn một ô trống.
+                    me = KQ.cong_ty_me(db)
+                    if me is None:
+                        return None
+                    pl = RP.income_statement(db, ky, company_id=me)
                     return float(dict((r[0], r[2]) for r in pl["rows"])["50"])
                 return None
             # TỒN KHO: chỉ đọc bản đã chụp.
