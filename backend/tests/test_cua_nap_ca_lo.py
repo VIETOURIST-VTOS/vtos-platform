@@ -208,3 +208,46 @@ def test_cl7_them_cua_ca_lo_khong_duoc_xoa_nut_tai_mau_xlsx():
     assert "mau_rieng" in src, "mất nhánh hiện nút mẫu riêng cho bộ nạp có mẫu .xlsx"
     assert ".blob()" in src, (
         "tải mẫu .xlsx phải đọc bằng .blob(); đọc bằng .text() là tệp Excel mở không lên")
+
+
+def test_cl8_cua_soat_tra_ve_HAI_hinh_dang_va_man_hinh_phai_doc_ca_hai(db):
+    """CỬA NẠP CẢ LÔ ĐỌC NHẦM KHOÁ NÊN KHÔNG NẠP ĐƯỢC GÌ — đo trên hệ thống thật 16/9/2026.
+
+    `/nap-du-lieu/kiem-tra-tep` trả về HAI hình dạng khác nhau:
+
+        bộ nạp thường  -> _kiem_tra_tung_dong  -> khoá `hop_le`
+        bộ nạp THEO LÔ -> kiem_lo              -> khoá `da_nap`, KHÔNG có `hop_le`
+
+    Hai cửa kho quyết toán cũ – đúng hai cửa mà màn hình nạp cả lô sinh ra để phục vụ – đều là bộ
+    nạp theo lô. Bản đầu của màn hình chỉ đọc `d.hop_le`, nên với chúng nó luôn nhận `undefined`.
+
+    Chạy thật trên vtos.infinitytours.org: chọn cả 81 tệp tháng 1/2026 thì bảng hiện đủ 81 dòng
+    "sẵn sàng", không tệp nào lỗi — nhưng ô đếm ghi "0 dòng hợp lệ" và nút ghi "Nạp 0 TỆP vào hệ
+    thống". Cửa mở ra mà không nạp được gì.
+
+    Phép thử này giữ HAI điều: (a) sự thật về hình dạng phía máy chủ, (b) màn hình đọc cả hai khoá.
+    Mai kia máy chủ đổi tên khoá thì (a) đỏ trước, không phải đợi người dùng phát hiện.
+    """
+    from app.services import intake as IN
+
+    lo = sorted(k for k, v in IN.BO_NAP.items() if v.get("lo"))
+    assert "tao_chuyen_kho_cu" in lo and "kho_quyet_toan_cu" in lo, (
+        f"hai cửa kho quyết toán cũ phải là bộ nạp theo lô; đang có: {lo}")
+    assert len(lo) >= 6, (
+        f"chỉ tìm thấy {len(lo)} bộ nạp theo lô – lỗi đọc nhầm khoá ảnh hưởng TẤT CẢ chúng, "
+        "không riêng hai cửa kho cũ")
+
+    kq = IN.kiem_tra(db, "tao_chuyen_kho_cu", DONG_A)
+    assert "da_nap" in kq, "bộ nạp theo lô phải trả khoá 'da_nap'"
+    assert "hop_le" not in kq, (
+        "bộ nạp theo lô nay đã trả 'hop_le' – nếu đổi thật thì sửa lại chú thích ở kiemTraCaLo, "
+        "đừng bỏ phép thử này")
+
+    src = _trang()
+    i = src.find("const kiemTraCaLo")
+    assert i > 0, "không tìm thấy hàm đọc thử cả lô"
+    than = src[i:i + 2500]
+    assert "d.da_nap" in than, (
+        "màn hình nạp cả lô không đọc khoá 'da_nap' – hai cửa kho quyết toán cũ sẽ luôn hiện "
+        "'Nạp 0 tệp' dù mọi tệp đều sạch")
+    assert "??" in than, "phải dùng ?? chứ không phải || – số 0 là câu trả lời thật, không phải rỗng"
