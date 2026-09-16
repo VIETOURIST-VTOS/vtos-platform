@@ -106,21 +106,44 @@ def test_giu_ma_may_khong_dich_sang_cau_tieng_viet():
 def test_dong_phu_khong_bia_so_so_sanh():
     """Bản vẽ đòi so KẾ HOẠCH và KỲ TRƯỚC. Ghi ra chỗ còn thiếu, không bịa tỷ lệ.
 
-    SỬA 15/9/2026 (TC-36): vế "kỳ trước" NAY ĐÃ CÓ — `services/xu_huong.py` dựng chuỗi các kỳ đã
-    đóng và tính chênh lệch từ số thật, nên thẻ không còn thiếu vế ấy nữa. Vế "kế hoạch tháng" thì
-    vẫn chưa ai nhập, nên câu nhắc THU HẸP lại đúng phần còn thiếu chứ không bỏ đi.
+    SỬA 15/9/2026 (TC-36): vế "kỳ trước" ĐÃ CÓ — `services/xu_huong.py` dựng chuỗi các kỳ đã đóng và
+    tính chênh lệch từ số thật.
 
-    Đây là lý do phép thử đổi chữ: sự thật đổi, không phải luật đổi. Luật vẫn nguyên — thẻ phải nói
-    ra chỗ còn thiếu và ai phải nhập.
+    SỬA 16/9/2026 (TC-41): vế "kế hoạch tháng" NAY CŨNG CÓ — cửa nhập /ke-hoach-thang đã mở, và câu
+    dòng phụ do `docHoKeHoach` dựng ở components/DauManHinh01.tsx chứ không còn là một chuỗi viết
+    thẳng trong trang. Nên phép thử đổi CHỖ NHÌN, và đổi luôn ĐIỀU nhìn:
+
+      · Trang phải GỌI `docHoKeHoach` cho thẻ Doanh thu — tức là dòng phụ lấy từ máy chủ, không phải
+        một câu cố định.
+      · Hàm ấy phải còn đủ BA nhánh: chưa ai nhập · nhập thiếu pháp nhân · đủ. Nhánh giữa là nhánh
+        đáng canh nhất: bỏ nó đi thì phần đã nhập bị cộng lại thành "kế hoạch tháng", và tỉ lệ đạt
+        cao vọt mà không có gì trông giống lỗi.
+      · Trang KHÔNG được tự tính tỉ lệ đạt — phép chia phải nằm ở máy chủ (ranh giới 09/9).
+
+    Ba lần sửa, cùng một luật: thẻ nói đúng sự thật đang có, và nói ra chỗ còn thiếu kèm người phải
+    nhập. Sự thật đổi, luật không đổi.
     """
-    the = _the(_doc(TRANG), "Doanh thu tháng")
-    assert "chưa có kế hoạch tháng" in the, (
-        "Thẻ Doanh thu phải nói rõ còn thiếu nguồn so sánh nào, kèm bộ phận phụ trách.\n" + the
+    trang = _doc(TRANG)
+    the = _the(trang, "Doanh thu tháng")
+    assert "docHoKeHoach" in the, (
+        "Dòng phụ thẻ Doanh thu phải dựng bằng docHoKeHoach, không phải một câu viết cứng.\n" + the
     )
-    assert "Kế toán" in the, "Phải nói AI nhập kế hoạch tháng."
-    assert "%" not in the, (
-        "Không được in tỷ lệ phần trăm khi chưa có kế hoạch và kỳ trước – một mũi tên tăng giảm "
-        "dựng từ số không có thật thì người đọc hiểu là kết quả, không hiểu là chỗ trống."
+
+    dau = _doc(DAU)
+    assert "chưa có kế hoạch tháng" in dau, (
+        "Phải còn nhánh 'chưa ai nhập kế hoạch' – bỏ đi là im lặng khi thiếu nguồn so sánh."
+    )
+    assert "Kế toán" in dau, "Phải nói AI nhập kế hoạch tháng."
+    assert "thieu" in dau and "chưa đủ" in dau, (
+        "Phải còn nhánh 'nhập thiếu pháp nhân' và phải kê tên pháp nhân còn thiếu: cộng phần đã "
+        "nhập lại rồi gọi là kế hoạch tháng là chỗ hỏng nguy hiểm nhất của khối này."
+    )
+
+    # Trang KHÔNG tự chia. Tỉ lệ đạt do services/ke_hoach.ty_le_dat tính và gửi xuống.
+    ma = re.sub(r"/\*.*?\*/", " ", trang, flags=re.S)
+    ma = re.sub(r"^\s*//.*$", " ", ma, flags=re.M)
+    assert "doanh_thu_thang /" not in ma and "/ ke_hoach" not in ma, (
+        "Màn hình không được tự chia thực hiện cho kế hoạch – phép chia ấy nằm ở máy chủ."
     )
 
 

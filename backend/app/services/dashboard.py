@@ -111,6 +111,32 @@ def build(db: Session, u: User) -> dict:
         k["phai_thu"] = float(db.execute(select(func.coalesce(func.sum(func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0)), 0)).where(Booking.cancelled == False, (func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0)) > 0)).scalar() or 0)
         fc = FIN.forecast_13w(db); k["du_bao_canh_bao"] = len(fc["alerts"]); k["so_du_tuan_13"] = fc["closing"]
         pl = RP.income_statement(db, p); k["ln_ke_toan_thang"] = dict((r[0], r[2]) for r in pl["rows"])["50"]
+        # TC-41 (16/9/2026) – KẾ HOẠCH THÁNG, cửa nhập vừa mở ở /ke-hoach-thang.
+        #
+        # Suốt bốn vòng, thẻ "Doanh thu tháng" in câu "chưa có kế hoạch tháng để so sánh (Kế toán)"
+        # vì không có bảng nào giữ chỉ tiêu. Nay có. Ba điều phải giữ đúng ở đây:
+        #
+        #   1. TỈ LỆ ĐẠT TÍNH Ở MÁY CHỦ, không ở màn hình. Ranh giới 09/9: màn hình chỉ bày.
+        #   2. THIẾU MỘT PHÁP NHÂN LÀ CHƯA CÓ KẾ HOẠCH (services/ke_hoach, LUẬT 1). Hàm hợp_nhat trả
+        #      `du=False` kèm tên pháp nhân còn thiếu, và thẻ in đúng câu ấy — không cộng phần đã
+        #      nhập rồi gọi nó là chỉ tiêu tháng.
+        #   3. KẾ HOẠCH BẰNG 0 KHÔNG SINH RA TỈ LỆ. `ty_le_dat` trả None; in "đạt ∞%" hay "đạt 0%"
+        #      đều là trả lời một câu hỏi không có nghĩa.
+        #
+        # Chỉ trả cho nhóm vai trò của nhánh này. Chỉ tiêu cả tập đoàn không phải thứ mọi tài khoản
+        # đăng nhập đều đọc được, và cửa /ke-hoach cũng chặn đúng danh sách ấy.
+        from app.services import ke_hoach as KH
+        kh = KH.hop_nhat(db, KH.ky_cua(today))
+        k["ke_hoach_thang"] = {
+            "ky": kh["ky"],
+            "doanh_thu": kh["doanh_thu"],
+            "loi_nhuan_truoc_thue": kh["loi_nhuan_truoc_thue"],
+            "ty_le_dat_doanh_thu": KH.ty_le_dat(k.get("doanh_thu_thang"),
+                                                kh["doanh_thu"]["gia_tri"]),
+            "ty_le_dat_loi_nhuan": KH.ty_le_dat(k.get("ln_ke_toan_thang"),
+                                                kh["loi_nhuan_truoc_thue"]["gia_tri"]),
+            "cua_nhap": "/ke-hoach-thang",
+        }
     # --- phần theo phòng ---
     sec = out["sections"]
     # Hai phòng Kinh doanh được đo bằng hai thước đo khác nhau, nên màn hình phải hiện hai bảng khác nhau
