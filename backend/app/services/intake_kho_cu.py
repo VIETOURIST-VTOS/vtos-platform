@@ -107,6 +107,43 @@ def _tim_chuyen(db, ma_tour: str):
         select(Tour).where(func.upper(Tour.code) == ma_tour.strip().upper())).first()
 
 
+def _tim_chuyen_theo_tep(db, ten_tep: str):
+    """Tìm chuyến qua SỔ TỆP↔CHUYẾN – chuyến mà cửa tạo chuyến đã dựng TỪ CHÍNH TỆP NÀY.
+
+    VÌ SAO CẦN ĐƯỜNG THỨ HAI
+
+    Hai cửa của kho cũ chạy nối nhau nhưng tra bằng hai khoá khác nhau, và đó là chỗ hở:
+
+        cửa 1 (tạo chuyến)  – không đọc được mã hợp lệ thì tự đặt mã tạm 'KHOCU-…'
+        cửa 2 (kho quyết toán) – đi tìm ĐÚNG chuỗi trong ô 'Mã tour:' của tệp
+
+    Nên mọi tệp bị gõ TÊN TOUR vào ô mã đều rơi vào khe giữa hai cửa: cửa 1 dựng chuyến xong, cửa 2
+    tìm 'BẾN TRE 1 NGÀY' trong bảng mã và không thấy gì.
+
+    Đo trên hệ thống thật ngày 16/9/2026, sau khi nạp xong cửa 1 cho 81 tệp tháng 1/2026: 11 tệp bị
+    chặn với đúng lý do ấy – BẾN TRE 1 NGÀY (2 tệp), SADEC 1 NGÀY (2), HỒ TRÀM 3N2Đ, MIỀN BẮC 3N2Đ,
+    MIỀN BẮC 4N3Đ, MIỀN TÂY 5N4Đ, TÂY NGUYÊN 4N3Đ, VĨNH HY050126, VĨNH HY190126. Cả 11 chuyến ĐỀU
+    ĐÃ CÓ trong VTOS, do chính cửa 1 dựng ra từ chính những tệp ấy vài phút trước.
+
+    Chủ tịch chốt ngày 16/9: LẤY THEO BẢN GỐC – không bắt Điều hành sửa 11 tệp Excel, mà sửa cửa
+    để nó nhận đúng tệp gốc.
+
+    Đường thứ hai này KHÔNG phải đoán mò. Sổ `kho_cu_tep_chuyen` do chính cửa 1 ghi, một dòng cho
+    mỗi tệp, khoá là tên tệp đã chuẩn hoá. "Tệp này đẻ ra chuyến nào" là một sự thật đã ghi, không
+    phải một phép suy. Vẫn giữ nguyên luật cũ: tra mã TRƯỚC; chỉ khi mã không khớp mới hỏi sổ.
+    """
+    from sqlalchemy import select
+
+    from app.models.core import Tour
+    from app.models.kho_cu import KhoCuTepChuyen
+    from app.services.tao_chuyen_kho_cu import khoa_tep
+    k = khoa_tep(ten_tep or "")
+    if not k:
+        return None
+    r = db.scalars(select(KhoCuTepChuyen).where(KhoCuTepChuyen.khoa_tep == k)).first()
+    return db.get(Tour, r.tour_id) if r and r.tour_id else None
+
+
 def _soat_mot(db, d: dict) -> dict:
     """Soát một tệp: tìm chuyến, chạy bộ chống trùng, xếp vào một trong bốn rổ.
 
@@ -117,6 +154,10 @@ def _soat_mot(db, d: dict) -> dict:
       · nap_duoc          – sạch.
     """
     t = _tim_chuyen(db, d.get("ma_tour") or "")
+    qua_so = False
+    if t is None:
+        t = _tim_chuyen_theo_tep(db, d.get("ten_tep") or "")
+        qua_so = t is not None
     kq = CT.kiem_mot(d, None, db=db, tour_id=(t.id if t else None))
     ro = ("khong_thay_chuyen" if t is None
           else "chan" if kq["nang"]
@@ -133,7 +174,14 @@ def _soat_mot(db, d: dict) -> dict:
         "tong_thu_bo_doc": d.get("tong_thu"),
         "tong_chi_bo_doc": d.get("tong_chi"),
         "chan": [x["noi"] for x in kq["nang"]],
-        "can_xac_nhan": [x["noi"] for x in kq["hoi"]],
+        # Tra được chuyến QUA SỔ TỆP chứ không qua mã thì PHẢI nói ra. Ghép đúng nhưng ghép bằng
+        # đường thứ hai là một sự việc người duyệt cần biết, không phải chi tiết máy giữ cho riêng
+        # mình – và nó chỉ ra đúng những tệp mà Điều hành nên sửa lại ô 'Mã tour:' cho lần sau.
+        "can_xac_nhan": [x["noi"] for x in kq["hoi"]] + ([
+            f"Ô 'Mã tour:' trong tệp ghi {d.get('ma_tour')!r} – không có chuyến nào mang mã ấy. "
+            f"Đã ghép qua SỔ TỆP↔CHUYẾN: chuyến {t.code} do chính tệp này dựng ra ở cửa tạo chuyến."
+        ] if qua_so else []),
+        "tim_qua_so": qua_so,
         "doc_thieu": list(d.get("thieu") or []),
     }
 

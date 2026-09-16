@@ -98,6 +98,21 @@ function NapDuLieu() {
     } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
   };
 
+  /** MỘT TỆP SẼ GHI ĐƯỢC BAO NHIÊU DÒNG, VÀ CÓ ĐƯỢC GHI KHÔNG.
+   *
+   * `hop_le` là phần SẠCH – ghi ngay, không cần hỏi ai. `da_co` là phần CÓ CẢNH BÁO: bộ nạp chỉ
+   * ghi khi người duyệt bấm rõ (`bo_qua_dong_loi`).
+   *
+   * Bản trước đòi `hop_le > 0` mới cho nạp, và cửa "Kho quyết toán CŨ" chết đứng ở đấy. Đo trên hệ
+   * thống thật ngày 16/9/2026 với 81 tệp tháng 1: **0 hợp lệ · 70 cần xác nhận · 11 bị chặn**. Con
+   * số 0 không phải hỏng – bản đối chiếu H1 chưa có cửa tải nên MỌI tệp đều mang cảnh báo "không có
+   * số thứ hai để soát", và đó là hàng rào cố ý. Nhưng bộ nạp CÓ đường qua hàng rào ấy, còn màn
+   * hình thì không mở đường ra – nên cửa vĩnh viễn hiện "Nạp 0 tệp".
+   *
+   * Tệp bị CHẶN thì không lối nào ghi được, kể cả khi bấm xác nhận. Đó mới là hàng rào cứng. */
+  const soSeNap = (x: any) => (x.hop_le || 0) + (boQua ? (x.da_co || 0) : 0);
+  const seNap = (x: any) => soSeNap(x) > 0 && (x.dong_loi === 0 || boQua);
+
   /** Đọc thử CẢ LÔ. Từng tệp đi qua ĐÚNG cửa `kiem-tra-tep` của mục 3 – cùng bộ kiểm, cùng khóa
    *  chống trùng. Bước này vẫn CHƯA GHI GÌ, y như nạp một tệp. */
   const kiemTraCaLo = async (fs: File[]) => {
@@ -157,11 +172,10 @@ function NapDuLieu() {
    *       kéo theo quyết định ấy áp lên cả 81 tệp.
    *    3. DỪNG GIỮA CHỪNG. Mất mạng ở tệp thứ 57 mà gộp lô thì không biết gì đã vào, gì chưa. */
   const napCaLo = async () => {
-    const can = lo.filter((x) => x.trang_thai === "da_doc" && x.hop_le > 0
-                                 && (x.dong_loi === 0 || boQua));
+    const can = lo.filter((x) => x.trang_thai === "da_doc" && seNap(x));
     if (!can.length) return;
     if (!confirm(`Nạp ${can.length} tệp vào hệ thống?\n\n`
-      + `Tổng ${can.reduce((s, x) => s + x.hop_le, 0)} dòng hợp lệ.\n`
+      + `Tổng ${can.reduce((s, x) => s + soSeNap(x), 0)} dòng sẽ ghi.\n`
       + `Mỗi tệp vào nhật ký thành một dòng riêng mang đúng tên tệp của nó.`)) return;
     setDang(true);
     const ds = [...lo];
@@ -354,15 +368,18 @@ function NapDuLieu() {
         </tr>)}</tbody></table>
 
       {canNap && lo.some((x) => x.trang_thai === "da_doc") && <div style={{ marginTop: 10 }}>
-        {lo.some((x) => x.dong_loi > 0) && <label style={{ display: "block" }}>
+        {lo.some((x) => x.dong_loi > 0 || x.da_co > 0) && <label style={{ display: "block" }}>
           <input type="checkbox" style={{ width: "auto", marginRight: 6 }} checked={boQua}
                  onChange={(e) => setBoQua(e.target.checked)} />
-          Bỏ qua các dòng lỗi và chỉ nạp phần hợp lệ
+          Nạp cả phần CÓ CẢNH BÁO, và bỏ qua dòng lỗi
         </label>}
+        {lo.some((x) => x.da_co > 0) && !boQua && <p className="muted">
+          <b>{lo.reduce((s, x) => s + (x.da_co || 0), 0)}</b> dòng đang mang cảnh báo nên chưa được
+          nạp. Tích ô trên là bấm rõ &quot;tôi đã xem và vẫn nạp&quot; — đó là một quyết định, không
+          phải một mặc định. Tệp bị <b>chặn</b> thì tích ô này cũng không nạp được.</p>}
         <button className="act teal" disabled={dang} onClick={napCaLo}>
           {dang ? (dangLo || "Đang nạp…")
-                : `Nạp ${lo.filter((x) => x.trang_thai === "da_doc" && x.hop_le > 0
-                          && (x.dong_loi === 0 || boQua)).length} tệp vào hệ thống`}
+                : `Nạp ${lo.filter((x) => x.trang_thai === "da_doc" && seNap(x)).length} tệp vào hệ thống`}
         </button>
         {lo.some((x) => x.dong_loi > 0) && !boQua && <p className="muted">Những tệp còn dòng lỗi đang bị bỏ
           ra ngoài. Sửa tệp rồi đọc lại, hoặc tích ô trên — bỏ qua dòng lỗi là một quyết định, không phải

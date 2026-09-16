@@ -251,3 +251,77 @@ def test_cl8_cua_soat_tra_ve_HAI_hinh_dang_va_man_hinh_phai_doc_ca_hai(db):
         "màn hình nạp cả lô không đọc khoá 'da_nap' – hai cửa kho quyết toán cũ sẽ luôn hiện "
         "'Nạp 0 tệp' dù mọi tệp đều sạch")
     assert "??" in than, "phải dùng ?? chứ không phải || – số 0 là câu trả lời thật, không phải rỗng"
+
+
+def test_cl9_ghep_qua_SO_TEP_khi_o_ma_tour_bi_go_ten_tour(db):
+    """LẤY THEO BẢN GỐC — Chủ tịch chốt 16/9/2026: sửa cửa, không bắt Điều hành sửa 81 tệp Excel.
+
+    Hai cửa kho cũ chạy nối nhau nhưng tra bằng HAI KHOÁ khác nhau:
+
+        cửa 1 (tạo chuyến)     – không đọc được mã hợp lệ thì tự đặt mã tạm 'KHOCU-…'
+        cửa 2 (kho quyết toán) – đi tìm ĐÚNG chuỗi trong ô 'Mã tour:' của tệp
+
+    Nên mọi tệp bị gõ TÊN TOUR vào ô mã rơi vào khe giữa hai cửa. Đo trên hệ thống thật sau khi nạp
+    xong cửa 1 cho 81 tệp tháng 1/2026: **11 tệp bị chặn** với đúng lý do ấy, trong khi cả 11 chuyến
+    đều đã có trong VTOS — do chính cửa 1 dựng ra từ chính những tệp ấy vài phút trước.
+
+    Đường thứ hai không phải đoán mò: sổ `kho_cu_tep_chuyen` do cửa 1 ghi, khoá là tên tệp chuẩn hoá.
+    "Tệp này đẻ ra chuyến nào" là sự thật đã ghi. Mã vẫn được tra TRƯỚC; sổ chỉ dùng khi mã trượt.
+    """
+    from app.models.kho_cu import KhoCuTepChuyen
+    from app.services import intake_kho_cu as IK
+
+    _nap(db, DONG_A, TEP_A)                      # cửa 1 dựng chuyến từ TEP_A
+    tour = db.query(Tour).one()
+    assert db.query(KhoCuTepChuyen).count() == 1, "cửa 1 phải ghi sổ tệp↔chuyến"
+
+    # Tệp quyết toán của CHÍNH tệp ấy, nhưng ô 'Mã tour:' bị gõ TÊN TOUR thay vì mã.
+    dong = {"ten_tep": TEP_A, "ma_tour": "NAM CÁT TIÊN 1 NGÀY",
+            "khach": [], "chi": [], "hdv": {"dong": []}, "thieu": []}
+    kq = IK.kiem_lo(db, [dong])
+    x = kq["chi_tiet"][0]
+
+    assert x["ro"] != "khong_thay_chuyen", (
+        "vẫn bị chặn – cửa 2 chưa hỏi sổ tệp↔chuyến khi mã trượt")
+    assert x["tour_id"] == tour.id, "ghép sai chuyến"
+    assert x["tim_qua_so"] is True
+    assert any("SỔ TỆP" in t for t in x["can_xac_nhan"]), (
+        "ghép qua đường thứ hai mà không NÓI RA thì người duyệt không biết mình đang duyệt cái gì")
+
+
+def test_cl10_ma_tour_dung_thi_KHONG_dung_toi_so_tep(db):
+    """Sổ tệp là đường DỰ PHÒNG. Mã đúng thì phải thắng, không được để sổ ghi đè."""
+    from app.services import intake_kho_cu as IK
+
+    _nap(db, DONG_A, TEP_A)
+    _nap(db, DONG_B, TEP_B)
+    ta = db.query(Tour).filter(Tour.code.like("%NAM%") | (Tour.code != "")).all()
+    assert len(ta) == 2
+
+    # Tên tệp là TEP_A nhưng mã tour ghi rõ mã của chuyến B -> phải theo MÃ, không theo tên tệp.
+    ma_b = next(t.code for t in ta
+                if t.id == db.query(__import__("app.models.kho_cu", fromlist=["x"]).KhoCuTepChuyen)
+                .filter_by(ten_tep=TEP_B).one().tour_id)
+    dong = {"ten_tep": TEP_A, "ma_tour": ma_b,
+            "khach": [], "chi": [], "hdv": {"dong": []}, "thieu": []}
+    x = IK.kiem_lo(db, [dong])["chi_tiet"][0]
+    assert x["tim_qua_so"] is False, "mã đúng mà vẫn đi qua sổ tệp – sai thứ tự ưu tiên"
+
+
+def test_cl11_man_hinh_nap_duoc_phan_CO_CANH_BAO_khi_nguoi_duyet_bam_ro():
+    """Cửa "Kho quyết toán CŨ" chết đứng vì màn hình đòi `hop_le > 0` mới cho nạp.
+
+    Đo thật ngày 16/9/2026 với 81 tệp tháng 1: **0 hợp lệ · 70 cần xác nhận · 11 bị chặn**. Con số 0
+    không phải hỏng – bản đối chiếu H1 chưa có cửa tải nên MỌI tệp mang cảnh báo "không có số thứ
+    hai để soát", và đó là hàng rào cố ý. Nhưng bộ nạp CÓ đường qua hàng rào (`bo_qua_dong_loi`),
+    còn màn hình thì không mở đường ra – nên nút vĩnh viễn hiện "Nạp 0 tệp".
+    """
+    src = _trang()
+    assert "const soSeNap" in src and "const seNap" in src, (
+        "thiếu phép tính 'tệp này sẽ ghi được bao nhiêu dòng' – màn hình lại đi đếm mỗi hop_le")
+    i = src.find("const soSeNap")
+    than = src[i:i + 400]
+    assert "boQua ? (x.da_co || 0) : 0" in than, (
+        "phần CÓ CẢNH BÁO không được cộng vào khi người duyệt đã bấm rõ")
+    assert "x.hop_le > 0" not in src[src.find("const napCaLo"):src.find("const napCaLo") + 1200], (
+        "napCaLo vẫn còn lọc cứng theo hop_le")
