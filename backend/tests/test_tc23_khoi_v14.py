@@ -24,6 +24,7 @@ from pathlib import Path
 GOC = Path(__file__).resolve().parents[2]
 KHOI = GOC / "web" / "components" / "KhoiV14.tsx"
 TRANG = GOC / "web" / "app" / "page.tsx"
+DIEU_HANH = GOC / "web" / "components" / "KhoiDieuHanh.tsx"
 CSS = GOC / "web" / "app" / "globals.css"
 
 
@@ -39,20 +40,39 @@ def _bo_chu_thich(s: str) -> str:
 
 # ------------------------------------------------------- Đủ khối, đúng thứ tự
 
-def test_du_sau_khoi_va_dung_thu_tu_ban_ve():
-    """Bản vẽ xếp 04 → 05 → 06 → 07 → 08; thứ tự ấy là thứ tự đọc, không phải trang trí."""
+def test_ba_khoi_con_lai_giu_dung_thu_tu_ban_ve():
+    """Thứ tự bản vẽ là thứ tự ĐỌC, không phải trang trí — và luật ấy vẫn đúng cho những khối CÒN
+    LẠI trên màn hình.
+
+    TC-40 (15/9/2026): anh Tuấn soát từng khối trên bản chạy thật và chốt danh sách giữ. Ba khối
+    của tệp này còn lại — Hiệu quả đội xe → Phải thu → Phải trả — và chúng phải giữ nguyên thứ tự
+    tương đối của bản vẽ. Ba khối bị gỡ (Tồn đọng theo bộ phận · Rủi ro trọng yếu · Tiến độ báo
+    cáo) được canh riêng ở phép kiểm dưới.
+    """
     nguon = _doc(TRANG)
-    thu_tu = ["<KhoiHieuQuaXe", "<KhoiTonDongBoPhan", "<KhoiPhaiThu", "<KhoiPhaiTra",
-              "<KhoiRuiRo", "<KhoiTienDoBaoCao"]
+    thu_tu = ["<KhoiHieuQuaXe", "<KhoiPhaiThu", "<KhoiPhaiTra"]
     vi_tri = []
     for k in thu_tu:
         i = nguon.find(k)
         assert i > 0, f"Màn hình 01 chưa gọi {k}"
         vi_tri.append(i)
     assert vi_tri == sorted(vi_tri), (
-        "Sáu khối phải đứng đúng thứ tự bản vẽ: Hiệu quả đội xe → Tồn đọng theo bộ phận → "
-        "Phải thu → Phải trả → Rủi ro trọng yếu → Tiến độ báo cáo."
+        "Ba khối còn lại phải đứng đúng thứ tự bản vẽ: Hiệu quả đội xe → Phải thu → Phải trả."
     )
+
+
+def test_ba_khoi_da_go_van_con_MA_du_khong_con_tren_man_hinh():
+    """Gỡ khỏi màn hình KHÔNG phải xoá mã. Các `type` trong tệp khối là HỢP ĐỒNG với máy chủ — bản
+    mô tả những trường máy chủ còn nợ. Xoá đi là mất bản mô tả, và đến lúc dựng màn hình riêng cho
+    từng phòng thì phải đi tìm lại bản vẽ."""
+    trang = _doc(TRANG)
+    khoi = _doc(KHOI)
+    for k in ("KhoiTonDongBoPhan", "KhoiRuiRo", "KhoiTienDoBaoCao"):
+        assert f"<{k}" not in trang, (
+            f"{k} đã được anh Tuấn chốt gỡ khỏi màn hình 01 ngày 15/9/2026. Lắp lại thì phải kèm "
+            f"lý do mới, và sửa phép kiểm này."
+        )
+        assert f"export function {k}" in khoi, f"Mã của {k} bị xoá — hợp đồng dữ liệu mất theo."
 
 
 def test_moi_khoi_deu_co_hop_dong_du_lieu_khai_bang_type():
@@ -165,7 +185,9 @@ def test_ton_dong_bo_phan_noi_ro_chong_cong_trung():
 # ------------------------------------------------------ Khối Điều hành: bốn cột mới
 
 def test_khoi_dieu_hanh_du_bay_cot_ban_ve():
-    nguon = _doc(TRANG)
+    """TC-40: khối Điều hành rời màn hình 01 sang tệp riêng, mang theo nguyên bảy cột của bản vẽ.
+    Luật không đổi, chỉ đổi tệp chứa nó."""
+    nguon = _doc(DIEU_HANH)
     for cot in ("Dịch vụ còn thiếu", "Xe", "HDV", "Phụ trách"):
         assert f"<th>{cot}</th>" in nguon, f"Khối Điều hành thiếu cột '{cot}' của bản vẽ V1.4"
     assert "chưa nối" in nguon, "Bốn cột mới phải ghi rõ ô nào máy chủ chưa trả"

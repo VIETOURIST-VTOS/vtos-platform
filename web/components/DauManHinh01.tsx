@@ -102,15 +102,29 @@ function BieuDoNho({ xh }: { xh: XuHuong }) {
         })}
         <span className="the-xh-truc0" style={{ top: y0 }} />
       </div>
-      {/* MŨI TÊN ĐI KÈM CHỮ, không chỉ có màu: người không phân biệt được đỏ–xanh vẫn phải đọc
+      {/* TC-40 · ĐỌC HỘ THÀNH CÂU, không chỉ một mũi tên và một tỉ lệ.
+          Anh Tuấn chốt 15/9/2026: tám thẻ phải có "biểu đồ và số + phân tích". Bản cũ in
+          "▲ 25.0% 08/2026 so với 07/2026" — đúng nhưng phải tự dịch trong đầu, và khi phần trăm
+          không tính được (kỳ trước bằng 0) thì nó ra "= —", đọc như một lỗi hiển thị.
+
+          Câu ở đây chỉ DIỄN ĐẠT LẠI con số máy chủ đã tính (`so_sanh`), không tính thêm gì —
+          ranh giới 09/9 giữ nguyên. Chênh lệch TUYỆT ĐỐI luôn nói được, kể cả khi phần trăm
+          không tồn tại; nên nó đứng trước, và phần trăm chỉ là phần trong ngoặc.
+
+          MŨI TÊN ĐI KÈM CHỮ, không chỉ có màu: người không phân biệt được đỏ–xanh vẫn phải đọc
           được chiều. Và ghi rõ so với KỲ NÀO — "so với kỳ trước" mà không nói kỳ nào là một câu
           không kiểm được. */}
       {ss && <div className="the-xh-ss">
         <span className={"the-xh-mui" + (ss.tang ? " tang" : ss.giam ? " giam" : "")}>
-          {ss.tang ? "▲" : ss.giam ? "▼" : "="}
-          {ss.phan_tram === null ? " —" : ` ${Math.abs(ss.phan_tram * 100).toFixed(1)}%`}
+          {ss.tang ? "▲ tăng" : ss.giam ? "▼ giảm" : "= không đổi"}
         </span>
-        <span className="muted"> {tenKy(ss.ky)} so với {tenKy(ss.ky_truoc)}</span>
+        {typeof ss.chenh === "number" && ss.chenh !== 0 && (
+          <span className="the-xh-chenh"> {Math.abs(ss.chenh).toLocaleString("vi-VN")}</span>
+        )}
+        {ss.phan_tram !== null && ss.phan_tram !== undefined && (
+          <span className="muted"> ({Math.abs(ss.phan_tram * 100).toFixed(1)}%)</span>
+        )}
+        <span className="muted"> so với {tenKy(ss.ky_truoc)}</span>
       </div>}
     </div>
   );

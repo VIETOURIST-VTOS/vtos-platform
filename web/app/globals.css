@@ -606,33 +606,12 @@ table.bang-doc{width:100%}
    so sánh thì vẫn còn nguyên — giữ phần nói được, bỏ phần không nói được. */
 @media print{.the-xh-cot{display:none}}
 
-/* ─── TC-35 · BIỂU ĐỒ BỐN MỐC. Không dùng thư viện vẽ: bốn cột thì lưới CSS đủ, kéo về một thư
-   viện biểu đồ chỉ để vẽ bốn hình chữ nhật là thêm một thứ phải nâng cấp và vá lỗi mãi về sau.
-   Màu lấy từ biến bộ nhận diện, không gõ mã màu — giữ đúng luật của kho. */
-.dt-bieudo{margin:10px 0 0}
-.dt-bd-cot{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:14px}
-.dt-bd-mot{position:relative}
-.dt-bd-khung{position:relative}
-.dt-bd-thanh{position:absolute;left:0;right:0;border-radius:3px;background:var(--vtos-info);
-  min-height:2px}
-/* Cột ÂM khác màu, không chỉ khác hướng: in đen trắng hay nhìn nhanh thì hướng dễ trượt mắt. */
-.dt-bd-thanh.am{background:var(--vtos-red)}
-.dt-bd-truc0{position:absolute;left:0;right:0;height:1px;background:var(--vtos-line)}
-.dt-bd-nhan{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:14px;margin-top:6px}
-.dt-bd-nhan>div{display:flex;flex-direction:column;gap:1px;font-size:12px}
-.dt-bd-nhan b{font-variant-numeric:tabular-nums}
-.dt-bd-nhan span{font-size:11px}
-.dt-bd-chu{font-size:12px;margin:6px 0 0}
-/* Ô rỗng của biểu đồ: nói còn thiếu mốc nào, không vẽ một đường phẳng ở mức 0. */
-.dt-bieudo-rong{margin:10px 0 0;padding:14px;border:1px dashed var(--vtos-line);border-radius:8px}
-.dt-bieudo-rong p{margin:4px 0 0;font-size:12px}
-@media (max-width:560px){
-  .dt-bd-cot,.dt-bd-nhan{grid-auto-flow:row;grid-auto-columns:auto}
-  .dt-bd-cot{height:auto !important}
-}
-
+/* TC-40 · BIỂU ĐỒ DÒNG TIỀN ĐÃ CHUYỂN SANG BỘ CHUNG (.bd-*, components/BieuDo.tsx).
+   Bản vẽ tay cũ ở đây đúng về hình nhưng là bản chép THỨ TƯ của cùng một phép tính trục, và bốn
+   bản chép thì sớm muộn lệch nhau. Toàn bộ lớp .dt-bd-* / .dt-bieudo* đã dọn đi cùng với nó. */
+/* Hai lớp này bị cắt nhầm khi dọn CSS chết của biểu đồ vẽ tay — phát hiện bằng phép soát "lớp
+   nào TSX dùng mà CSS không có". Trả lại nguyên văn. */
 .dt-nut-chi-tiet{margin:10px 0 0}
-/* Bảng chi tiết gấp sau một nút. In ra giấy thì mở sẵn — <details> đóng in ra là mất cả bảng. */
 .dt-gap{margin:10px 0 0}
 .dt-gap>summary{cursor:pointer;font-size:12px;color:var(--vtos-text-mute)}
 @media print{.dt-gap>summary{display:none}
@@ -738,24 +717,38 @@ table.bang-doc{width:100%}
 .bd-rong-ly,.bd-rong-ai{font-size:11.5px;margin:0;line-height:1.55}
 .bd-rong-ai{margin-top:6px}
 
-/* ── BA KHU BIỂU ĐỒ TRÊN MÀN HÌNH 01 ── */
-.mh01-khu{margin:0 0 14px}
-.mh01-khu-dau{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin:0 0 9px}
-.mh01-khu-dau h3{margin:0;font-size:14px;color:var(--vtos-heading)}
-.mh01-khu-dau p{margin:0;font-size:11.5px}
-/* Hai biểu đồ một hàng trên màn rộng, một cột dưới 900px. Ép hai biểu đồ cột vào nửa bề ngang
-   dưới 900px thì mỗi cột còn chừng 20px và nhãn số trên đầu cột chồng lên nhau. */
-/* align-items:start — mỗi thẻ cao đúng bằng nội dung của nó. Để mặc định (stretch) thì thẻ
-   "Phải trả" chỉ có ba dòng chữ bị kéo cao bằng thẻ biểu đồ bên cạnh, và khoảng trống thừa ấy
-   đọc ra là "còn cái gì đó chưa hiện". */
-.mh01-bd-luoi{display:grid;gap:14px;align-items:start;
-  grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
-.mh01-bd-luoi>*{min-width:0}
+/* ── TC-40 · BỐ CỤC MÀN HÌNH 01 SAU KHI GOM ──
+   Khu biểu đồ riêng đã bỏ (anh Tuấn chốt 15/9/2026): biểu đồ về nằm trong khối của nó, nên các
+   lớp .mh01-khu* không còn ai dùng và đã dọn đi. Giữ lại đúng hai thứ còn dùng. */
+/* Ba khối kinh doanh & nội bộ một hàng; dưới 900px xuống một cột — ép ba khối vào 900px thì mỗi
+   khối còn 280px và thanh ngang trong đó ngắn tới mức mọi người trông dài bằng nhau. */
+.mh01-hang-3{display:grid;gap:14px;align-items:start;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin:0 0 14px}
+.mh01-hang-3>*{min-width:0;margin:0}
+
+/* Nút chọn kỳ (Tháng · Quý · Năm) của khối đội xe. Nằm ở ĐẦU khối vì nó đổi ý nghĩa của mọi con
+   số bên dưới — người đọc phải biết mình đang xem kỳ nào TRƯỚC khi đọc số. */
+.v14-ky{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--vtos-line);
+  border-radius:var(--vtos-radius-sm);background:var(--vtos-surface)}
+.v14-ky-nut{border:0;background:transparent;color:var(--vtos-text-mute);cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:600;padding:4px 12px;
+  border-radius:calc(var(--vtos-radius-sm) - 2px)}
+.v14-ky-nut:hover{color:var(--vtos-text)}
+/* Kỳ đang chọn phải khác hẳn, không chỉ đậm hơn một chút: ba nút gần giống nhau thì người đọc
+   không chắc mình đang xem kỳ nào, và đó là lúc con số bị đọc sai nhãn. */
+.v14-ky-nut.chon{background:var(--vtos-sky);color:var(--vtos-text-on-navy)}
+.v14-ky-nut:focus-visible{outline:2px solid var(--vtos-navy);outline-offset:1px}
+
+/* Con số đáng lo trong một dòng chữ xám — tô lên để nó không chìm. */
+.v14-canh{color:var(--vtos-danger)}
+
+/* Chênh lệch tuyệt đối trên thẻ chỉ tiêu: dóng cột số, vì tám thẻ xếp thành lưới. */
+.the-xh-chenh{font-weight:700;font-variant-numeric:tabular-nums}
 
 @media print{
   /* Giấy: biểu đồ in ra được, nhưng nền thẻ phải mất đi để không tốn mực. Cột giữ nguyên hình
      nhờ print-color-adjust — mất màu cột thì biểu đồ thành một khung trắng vô nghĩa. */
   .bd{break-inside:avoid;background:transparent}
   .bd-thanh,.bd-th-thanh,.bd-cc-o{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .mh01-bd-luoi{grid-template-columns:1fr 1fr}
+  .mh01-hang-3{grid-template-columns:1fr 1fr 1fr}
 }

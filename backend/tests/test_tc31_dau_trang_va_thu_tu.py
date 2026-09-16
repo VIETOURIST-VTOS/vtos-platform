@@ -43,18 +43,36 @@ def _bo_chu_thich_css(s: str) -> str:
 # ───────────────────────── 1 · THỨ TỰ KHỐI ĐÚNG BẢN VẼ ─────────────────────────
 
 # Đúng thứ tự bản vẽ V1.4. Mỗi phần tử là một MỐC NHẬN DẠNG có thật trong mã.
+# TC-40 (15/9/2026) · THỨ TỰ CÒN LẠI SAU KHI ANH TUẤN SOÁT TỪNG KHỐI.
+#
+# Luật KHÔNG đổi: các khối còn trên màn hình phải giữ đúng thứ tự tương đối của bản vẽ V1.4, vì
+# thứ tự ấy là thứ tự đọc. Cái đổi là DANH SÁCH khối — anh Tuấn mở bản chạy thật, chụp ảnh từng
+# khối và chốt bỏ bốn khối chưa có sổ nào phía sau (04a Điều hành · 04c Tồn đọng theo bộ phận ·
+# 07 Rủi ro · 08 Tiến độ báo cáo).
+#
+# Đây là chỗ dễ hiểu nhầm nhất khi đọc lại về sau, nên nói thẳng: màn hình KHÁC bản vẽ ở bốn chỗ,
+# và đó là khác CÓ CHỦ Ý. Bản vẽ là bản vẽ của một hệ thống ĐÃ CÓ SỐ; hôm nay VTOS đang dựng.
 THU_TU_BAN_VE = [
     "<KhoiQuyetDinh",            # 02 · Cần Chủ tịch quyết định
     "<TamThe",                   # 03 · tám thẻ chỉ tiêu
-    'id="dieu-hanh"',            # 04a · Điều hành 14 ngày tới
-    "<KhoiHieuQuaXe",            # 04b · Hiệu quả đội xe trong kỳ
-    "<KhoiTonDongBoPhan",        # 04c · Tồn đọng theo bộ phận
+    "<KhoiHieuQuaXe",            # 04b · Hiệu quả đội xe (thêm chọn tháng / quý / năm)
+    "<KhoiDongTien",             # 06  · Dòng tiền — anh Tuấn: "giữ nguyên"
     "<KhoiPhaiThu",              # 05a · Phải thu theo hạn
     "<KhoiPhaiTra",              # 05b · Phải trả theo hạn
-    "<KhoiDongTien",             # 06  · Dòng tiền
-    "<KhoiRuiRo",                # 07  · Rủi ro trọng yếu
-    "<KhoiTienDoBaoCao",         # 08  · Tiến độ báo cáo
 ]
+
+# Bốn khối đã gỡ. Lắp lại khối nào thì phải có lý do mới và phải sửa phép kiểm này — để việc lắp
+# lại là một quyết định, không phải một lần vô tình.
+DA_GO = ['id="dieu-hanh"', "<KhoiTonDongBoPhan", "<KhoiRuiRo", "<KhoiTienDoBaoCao"]
+
+
+def test_bon_khoi_da_go_khong_quay_lai_man_hinh_01():
+    ma = _bo_chu_thich_tsx(_doc(TRANG))
+    con = [k for k in DA_GO if k in ma]
+    assert not con, (
+        "Khối đã được anh Tuấn chốt gỡ ngày 15/9/2026 lại xuất hiện trên màn hình 01: "
+        + ", ".join(con)
+    )
 
 
 def test_muoi_khoi_xep_dung_thu_tu_ban_ve():
@@ -70,37 +88,41 @@ def test_muoi_khoi_xep_dung_thu_tu_ban_ve():
     )
 
 
-def test_dong_tien_dung_sau_phai_tra_va_truoc_rui_ro():
-    """Chỗ lệch cụ thể anh Tuấn chỉ ra: bản vẽ đặt Dòng tiền ở vị trí 8, VTOS đặt ở vị trí 3."""
+def test_dong_tien_dung_ngay_sau_hieu_qua_doi_xe():
+    """Bản vẽ đặt Dòng tiền SAU hai khối công nợ và TRƯỚC Rủi ro. Rủi ro đã gỡ, và anh Tuấn chốt
+    Dòng tiền "giữ nguyên" — khối quan trọng nhất màn hình nên nó lên ngay sau tám thẻ và đội xe,
+    trước hai khối công nợ. Đọc từ trên xuống là: cần quyết gì → công ty đang ở đâu → tiền ra vào
+    thế nào → ai nợ mình, mình nợ ai."""
     ma = _bo_chu_thich_tsx(_doc(TRANG))
-    assert ma.index("<KhoiPhaiTra") < ma.index("<KhoiDongTien") < ma.index("<KhoiRuiRo"), (
-        "Khối Dòng tiền không nằm giữa Phải trả và Rủi ro như bản vẽ."
+    assert ma.index("<KhoiHieuQuaXe") < ma.index("<KhoiDongTien") < ma.index("<KhoiPhaiThu"), (
+        "Dòng tiền phải đứng sau Hiệu quả đội xe và trước Phải thu."
     )
-    # Và KHÔNG được còn một bản thứ hai nằm ngay sau tám thẻ như trước.
-    assert ma.count("<KhoiDongTien") == 1, "Khối Dòng tiền đang dựng hai lần."
 
+def test_ba_khoi_kinh_doanh_dung_cuoi_va_khong_chen_giua():
+    """TC-40: năm khối riêng của VTOS nay còn BA — Kinh doanh Lẻ · Kinh doanh Đoàn · Báo cáo ngày.
+    Anh Tuấn chốt giữ ba cái ấy và bỏ hai cái kia ("Việc cần xử lý", "Tồn đọng cần xử lý").
 
-def test_khoi_rieng_cua_vtos_xuong_duoi_khoi_cuoi_cua_ban_ve():
-    """Năm khối riêng không bỏ, nhưng không được chen giữa các khối của bản vẽ nữa."""
+    Luật giữ nguyên: khối riêng của VTOS KHÔNG được chen vào giữa các khối của bản vẽ. Chen vào
+    thì đọc từ trên xuống ra một thứ tự khác hẳn bản vẽ dù đủ khối — đúng lỗi đã mất bốn vòng để
+    chữa ở TC-31/TC-35.
+    """
     ma = _bo_chu_thich_tsx(_doc(TRANG))
-    cuoi_ban_ve = ma.index("<KhoiTienDoBaoCao")
-    for moc, ten in (("Việc cần xử lý", "Việc cần xử lý"),
-                     ("<KhoiTonDong ", "Tồn đọng cần xử lý"),
-                     ("Kinh doanh Lẻ", "Kinh doanh Lẻ"),
-                     ("Kinh doanh Đoàn", "Kinh doanh Đoàn"),
-                     ("Báo cáo ngày (Điều 12)", "Báo cáo ngày")):
-        assert moc in ma, f"Khối riêng {ten!r} đã biến mất — không được bỏ, chỉ được chuyển chỗ."
+    cuoi_ban_ve = ma.index("<KhoiPhaiTra")     # khối cuối cùng của bản vẽ còn trên màn hình
+    for moc, ten in (("<KhoiKinhDoanhLe", "Kinh doanh Lẻ"),
+                     ("<KhoiKinhDoanhDoan", "Kinh doanh Đoàn"),
+                     ("<KhoiBaoCaoNgay", "Báo cáo ngày")):
+        assert moc in ma, f"Khối riêng {ten!r} đã biến mất — anh Tuấn chốt GIỮ ba khối này."
         assert ma.index(moc) > cuoi_ban_ve, (
-            f"Khối riêng {ten!r} vẫn chen vào giữa các khối của bản vẽ."
+            f"Khối riêng {ten!r} chen vào giữa các khối của bản vẽ."
         )
 
 
-def test_co_duong_ngan_noi_ro_dau_la_phan_them():
-    """Xuống dưới mà không nói gì thì người đọc tưởng bản vẽ có những khối ấy."""
+def test_hai_khoi_rieng_da_go_khong_quay_lai():
+    """"Việc cần xử lý" và "Tồn đọng cần xử lý" đã gỡ 15/9/2026. Cái sau trùng thẳng với thẻ chỉ
+    tiêu "Tồn đọng cần xử lý" ở tám thẻ — cùng một con số, hai chỗ."""
     ma = _bo_chu_thich_tsx(_doc(TRANG))
-    assert "mh01-ngan" in ma and "mh01-them" in ma, "Thiếu đường ngăn và nhãn phần thêm."
-    css = _bo_chu_thich_css(_doc(CSS))
-    assert ".mh01-ngan" in css and ".mh01-them" in css, "Thiếu kiểu cho đường ngăn."
+    for moc, ten in (('id="viec-cua-toi"', "Việc cần xử lý"), ("<KhoiTonDong ", "Tồn đọng cần xử lý")):
+        assert moc not in ma, f"Khối {ten!r} đã được chốt gỡ khỏi màn hình 01."
 
 
 # ───────────────────────── 2 · ĐẦU TRANG THEO BẢN VẼ ─────────────────────────

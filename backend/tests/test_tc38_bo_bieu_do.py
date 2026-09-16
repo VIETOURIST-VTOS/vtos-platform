@@ -82,8 +82,15 @@ def test_luat2_duoi_hai_diem_thi_khong_ve_va_noi_vi_sao():
     t = _bo_chu_thich_tsx(_doc(BD))
     cot = _than(t, "export function BieuDoCot")
     thanh = _than(t, "export function BieuDoThanh")
-    assert re.search(r"coSo\.length\s*<\s*2", cot), "Biểu đồ cột thiếu chốt chặn hai điểm."
-    assert re.search(r"coSo\.length\s*<\s*2", thanh), "Thanh ngang thiếu chốt chặn hai dòng."
+    # TC-40: điều kiện vẽ tách ra thành hàm thuần `duVeCot` / `duVeThanh`, vì nơi GỌI cũng phải
+    # hỏi được "vẽ nổi không" trước khi quyết bày hay không. Hai bản chép của cùng một điều kiện
+    # thì sớm muộn lệch nhau, nên thành phần vẽ phải GỌI đúng hàm ấy chứ không chép lại.
+    assert "duVeCot(diem)" in cot, "Biểu đồ cột phải gọi duVeCot, không chép lại điều kiện."
+    assert "duVeThanh(hang)" in thanh, "Thanh ngang phải gọi duVeThanh, không chép lại điều kiện."
+    assert re.search(r"filter\(\(d\) => d\.gt !== null\)\.length >= 2",
+                     _bo_chu_thich_tsx(_than(t, "export function duVeCot"))), (
+        "duVeCot phải là đúng luật 'dưới hai điểm có số thì không vẽ'."
+    )
     assert "BieuDoRong" in cot and "BieuDoRong" in thanh, "Không vẽ thì phải nói vì sao."
 
 
@@ -236,42 +243,83 @@ def test_o_rong_luon_noi_vi_sao():
     assert "vi_sao" in t and "bd-rong-ly" in t
 
 
-def test_moi_bieu_do_trong_ba_khu_deu_khai_ai_nap_so():
-    """Ranh giới 09/9: mỗi con số hệ thống cần cần một cửa nhập. Một biểu đồ rỗng không nói ai nạp
-    thì nó nằm đó mãi — ai đọc cũng nghĩ người khác lo."""
-    t = _doc(KHU)
+def test_bieu_do_chua_du_so_thi_tra_null_chu_khong_tra_khung_rong():
+    """TC-40 (anh Tuấn chốt 15/9/2026) · Ô SỐ ĐÃ NÓI RỒI THÌ BIỂU ĐỒ ĐỪNG NÓI LẠI.
+
+    Trước vòng này mỗi biểu đồ chưa đủ số vẫn dựng ra một khung ghi "chưa có số, bộ phận X nạp".
+    Nhưng biểu đồ nằm NGAY TRONG khối của nó, và ô số ngay trên đã ghi đúng câu ấy kèm bộ phận và
+    cửa nhập. Hai khung nói cùng một chuyện, cách nhau 40px.
+
+    Nên `bieuDoCua` trả `null`, và khối chỉ hiện ô số. Ranh giới 09/9 không hề bị nới: chỗ chưa có
+    số VẪN đọc được từ màn hình — nó nằm ở ô số, chỗ đúng của nó."""
+    t = _bo_chu_thich_tsx(_doc(KHU))
     so_bd = len(re.findall(r"<BieuDo(?:Cot|Thanh|CoCau)\b", t))
-    so_ai = len(re.findall(r'\bai="', t))
-    assert so_bd >= 9, f"Ba khu phải đủ biểu đồ, đang đếm {so_bd}"
-    assert so_ai == so_bd, f"{so_bd} biểu đồ nhưng chỉ {so_ai} chỗ khai bộ phận nạp số."
+    so_null = len(re.findall(r"\n\s*: null,", t))
+    assert so_bd >= 7, f"Bộ biểu đồ phải đủ dùng cho các khối, đang đếm {so_bd}"
+    assert so_null == so_bd, (
+        f"{so_bd} biểu đồ nhưng chỉ {so_null} nhánh trả null. Mỗi biểu đồ phải có nhánh 'chưa đủ "
+        f"số thì trả null' — trả một khung rỗng là nói lại điều ô số đã nói."
+    )
+    assert "duVeCoCau(" in t and "duVeCot(" in t and "duVeThanh(" in t, (
+        "Điều kiện vẽ phải hỏi qua ba hàm thuần của bộ biểu đồ, không viết lại tại chỗ."
+    )
 
 
 # ═════════════════ BA KHU TRÊN MÀN HÌNH 01 ═════════════════
 
-def test_du_ba_khu_dung_ten_anh_Tuan_dat():
-    t = _doc(KHU)
-    for so, ten in ((1, "Dòng tiền"), (2, "Doanh thu & Lợi nhuận"), (3, "Nhân sự & Quản trị nội bộ")):
-        assert re.search(rf'<Khu so=\{{{so}\}} ten="{re.escape(ten)}"', t), f"Thiếu khu {so} · {ten}"
+def test_khong_con_khu_bieu_do_rieng_va_khong_danh_so():
+    """Anh Tuấn chốt 15/9/2026: "chỉ dùng biểu đồ cho 1 loại duy nhất, ko dùng biểu đồ 1, biểu đồ
+    2...". Ba khu đánh số đã bỏ; biểu đồ về nằm trong khối của nó."""
+    # Bỏ chú thích trước khi soi: mã NÊN kể lại đường đi ba vòng (TC-37 → TC-38 → TC-40) để vòng
+    # sau không dựng lại khu đánh số với cùng một lý do. Cái không được phép là còn dấu vết trong
+    # THỨ HIỆN RA MÀN HÌNH.
+    t = _bo_chu_thich_tsx(_doc(KHU)) + _bo_chu_thich_tsx(_doc(TRANG))
+    for xau in ("Biểu đồ 1", "Biểu đồ 2", "Biểu đồ 3", "<Khu so=", "khu-bieu-do"):
+        assert xau not in t, f"Còn dấu vết khu biểu đồ đánh số: {xau!r}"
 
 
-def test_ba_khu_dat_SAU_toan_bo_chin_khoi_cua_ban_ve():
-    """Thứ tự chín khối là thứ tự bản vẽ chốt và đã mất bốn vòng mới đúng (TC-35). Chèn ba khu vào
-    giữa là làm hỏng lại đúng cái vừa sửa."""
-    t = _bo_chu_thich_tsx(_doc(TRANG))
-    assert t.index("<KhoiTienDoBaoCao") < t.index("<BaKhuBieuDo"), (
-        "Ba khu biểu đồ phải nằm sau khối 08 — khối cuối của bản vẽ."
-    )
+def test_bieu_do_nam_TRONG_khoi_cua_no():
+    """TC-40 · MỘT CON SỐ — MỘT CHỖ — MỘT HÌNH.
 
-
-def test_khong_ve_cung_mot_bieu_do_hai_lan_tren_mot_trang():
-    """Vòng TC-37 vẽ thanh cơ cấu trong khối 05 và thanh ngang trong khối 04c. Khu 1 và khu 3 vẽ
-    đúng hai thứ ấy. Để cả hai thì một trang vẽ cùng một dữ liệu hai lần, mà hai chỗ vẽ thì sớm
-    muộn hai chỗ lệch nhau."""
-    t = _bo_chu_thich_tsx(_doc(V14))
+    Đường đi ba vòng đáng ghi lại: TC-37 vẽ trong khối → TC-38 gom ra ba khu riêng → TC-40 đưa về.
+    Gom ra khu riêng nghe rất hợp lý ("khu biểu đồ" là thứ bảng điều hành nào cũng có), nhưng trên
+    bản chạy thật nó tách CON SỐ khỏi HÌNH của chính con số ấy, và người đọc phải cuộn qua lại để
+    ghép hai thứ vốn là một. Anh Tuấn nhìn ra ngay: "các mục lặp lại khá nhiều".
+    """
+    trang = _bo_chu_thich_tsx(_doc(TRANG))
+    assert "bieuDoCua(sec)" in trang, "Trang phải dựng bộ biểu đồ một lần rồi giao cho từng khối."
+    for khoi, khoa in (("<KhoiPhaiThu", "bd.phai_thu"), ("<KhoiPhaiTra", "bd.phai_tra"),
+                       ("<KhoiKinhDoanhLe", "bd.kd_le"), ("<KhoiKinhDoanhDoan", "bd.kd_doan"),
+                       ("<KhoiBaoCaoNgay", "bd.bao_cao_ngay")):
+        assert khoi in trang, f"Màn hình 01 thiếu khối {khoi}"
+        assert khoa in trang, f"Khối {khoi} chưa nhận biểu đồ của nó ({khoa})."
+    # Khối V14 không tự vẽ nữa — nó NHẬN hình qua prop. Tự vẽ là bản chép thứ hai của cùng phép tính.
+    v14 = _bo_chu_thich_tsx(_doc(V14))
     for xau in ("ThanhCoCau", "BieuDoBoPhan", "v14-cc-o", "v14-bp-"):
-        assert xau not in t, f"Khối V14 còn tự vẽ biểu đồ: {xau}"
-    # Và khối phải chỉ đường xuống chỗ có hình, chứ không im lặng bỏ hình đi.
-    assert "#khu-bieu-do-1" in _doc(V14) and "#khu-bieu-do-3" in _doc(V14)
+        assert xau not in v14, f"Khối V14 còn tự vẽ biểu đồ: {xau}"
+    assert "bieu_do" in v14, "Khối V14 phải nhận biểu đồ qua prop."
+
+
+def test_khoi_dong_tien_dung_bo_bieu_do_chung():
+    """Anh Tuấn 15/9/2026: "dòng tiền rất quan trọng, cần có số và biểu đồ phân tích".
+
+    Bản vẽ tay cũ trong KhoiDongTien đúng về hình nhưng là bản chép THỨ TƯ của cùng một phép tính
+    trục — và bốn bản chép thì sớm muộn lệch nhau. Nay gọi bộ chung, và thêm một câu đọc hộ nói
+    mốc nào âm sớm nhất, thiếu bao nhiêu."""
+    dt = _bo_chu_thich_tsx(_doc(GOC / "web" / "components" / "KhoiDongTien.tsx"))
+    assert "BieuDoCot" in dt, "Khối dòng tiền phải dùng bộ biểu đồ chung."
+    assert "dt-bd-thanh" not in dt, "Bản vẽ tay cũ còn sót lại."
+    assert "docHoDongTien" in dt, "Thiếu câu đọc hộ cho khối quan trọng nhất màn hình."
+
+
+def test_cau_doc_ho_khong_tu_tinh_chi_tieu_moi():
+    """Câu đọc hộ chỉ ĐỌC LẠI số máy chủ gửi: mốc nào âm, thiếu bao nhiêu. Nó không cộng, không
+    chia, không suy ra một chỉ tiêu nào — ranh giới 09/9 giữ nguyên."""
+    dt = _doc(GOC / "web" / "components" / "KhoiDongTien.tsx")
+    than = dt[dt.index("function docHoDongTien"): dt.index("/** Bốn mốc dòng tiền thuần.")]
+    assert "Math.abs" in than, "Được phép lấy trị tuyệt đối để đọc thành chữ."
+    for phep in (" / ", " * "):
+        assert phep not in _bo_chu_thich_tsx(than), f"Câu đọc hộ đang tự tính: {phep!r}"
 
 
 def test_khoi_van_giu_ti_le_bang_CHU_o_o_so():

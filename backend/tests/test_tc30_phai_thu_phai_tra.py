@@ -170,7 +170,9 @@ def test_khoan_chua_co_han_theo_doi_rieng():
     assert "chua_co_han" in tsx, (
         "Giao diện hứa ở dòng chú thích là khoản chưa có hạn theo dõi riêng, nhưng chưa có chỗ hiện."
     )
-    assert "chua_co_han" in _bo_chu_thich_tsx(_doc(TRANG)), "Trang chủ chưa truyền xuống."
+    # TC-40: khối Phải thu / Phải trả đã rời màn hình 01 (anh Tuấn chốt 15/9/2026 — cùng dữ liệu
+    # ấy nay nằm ở biểu đồ cơ cấu). Nên chỗ truyền `chua_co_han` xuống không còn ở page.tsx nữa;
+    # luật "theo dõi riêng, không gộp vào Dài hạn" vẫn được canh ở máy chủ và ở KhoiV14 bên trên.
 
 
 def test_khong_co_con_so_bia_trong_ma():

@@ -212,13 +212,24 @@ def test_bang_dai_tren_man_hinh_01_nam_trong_khung_cuon_rieng():
     ngang: đó là quy ước .wrap đã có sẵn trong globals.css.
     """
     import re as _re
+    # TC-40 (15/9/2026): màn hình 01 KHÔNG còn bảng nào — ba bảng dài đã chuyển sang khối riêng.
+    # Luật không đổi, chỉ đổi chỗ áp dụng: MỌI bảng dài, ở bất kỳ khối nào, phải nằm trong .wrap.
+    # Kiểm ngay trên trang là cách chắc nhất để luật không rỉ ra khi có ai lắp bảng mới vào đây.
     nguon = TRANG.read_text(encoding="utf-8")
-    # Đếm '<table' chứ không '<table>': bảng Điều hành nay mang thêm class v14-bang.
-    # Và khớp cả lớp PHỤ trên chính thẻ bọc (TC-35 thêm `wrap mh01-cuon` cho bảng Điều hành để nó
-    # cuộn trong khung cao cố định). Bắt đúng chuỗi "wrap" trần là bắt cách viết, không bắt ý định.
-    assert len(_re.findall(r'<div className="wrap[^"]*"><table', nguon)) >= 3, (
-        "Ba bảng dài của màn hình 01 (Kinh doanh Lẻ, Kinh doanh Đoàn, Điều hành 21 ngày tới) phải "
-        "nằm trong <div className=\"wrap\"> để tự cuộn trong khung của chúng."
+    assert "<table" not in nguon, (
+        "Màn hình 01 có bảng trở lại. Nếu là bảng cố ý thì phải bọc trong <div className=\"wrap\">, "
+        "và sửa lại phép kiểm này kèm lý do."
+    )
+    khoi = "".join((GOC / "web" / "components" / t).read_text(encoding="utf-8")
+                   for t in ("KhoiDieuHanh.tsx", "KhoiV14.tsx", "KhoiDongTien.tsx", "KhoiTonDong.tsx"))
+    bang = len(_re.findall(r"<table", khoi))
+    # Cho phép xuống dòng giữa thẻ bọc và <table>, và cho phép "wrap" đứng ở bất kỳ vị trí nào
+    # trong danh sách lớp ("wrap mh01-cuon", "panel wrap"). Bắt đúng một cách viết là bắt CÁCH
+    # VIẾT, không bắt ý định — và cách viết thì đổi, ý định thì không.
+    boc = len(_re.findall(r'<div className="[^"]*\bwrap\b[^"]*">\s*<table', khoi))
+    assert bang > 0 and boc >= 3, (
+        f"Các khối dài phải nằm trong <div className=\"wrap\"> để tự cuộn trong khung của chúng "
+        f"— đang có {bang} bảng, {boc} bảng được bọc."
     )
     css = (GOC / "web" / "app" / "globals.css").read_text(encoding="utf-8")
     assert ".wrap{overflow-x:auto}" in css, "Quy ước .wrap phải còn trong globals.css"
