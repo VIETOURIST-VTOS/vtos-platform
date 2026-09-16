@@ -110,6 +110,17 @@ CUA_TAY = (
     # danh mục kiểm toán là thứ kiểm toán viên hỏi – máy không biết trước cả hai.
     "su_co_tour", "su_co_tour_xu_ly", "ho_so_kiem_toan", "ho_so_kiem_toan_muc",
     "ho_so_kiem_toan_dieu_chinh",
+    # Robot A · 16/9/2026. SỔ TỶ GIÁ. Cửa nhập tay ở màn hình /ty-gia, API /api/v1/ty-gia:
+    #   POST /api/v1/ty-gia        – một đồng tiền, một ngày, một nguồn
+    #   PUT  /api/v1/ty-gia/{id}   – sửa, bắt buộc có lý do, số cũ vào `lich_su`
+    #
+    # KHÔNG khai là "máy sinh", dù nghe như thứ máy lấy được từ trang ngân hàng. Chủ tịch chốt
+    # 16/9/2026: *"tỷ giá để nhân viên tự nhập tại từng thời điểm; tạo form để nhân viên tự nhập tay
+    # và tải tệp/ảnh."* Và có lý do thật: tỷ giá dùng cho một khoản là tỷ giá NGÀY CHI THẬT của
+    # khoản ấy, có khi là giá niêm yết, có khi là giá thực tế đã chuyển khoản, có khi là giá ghi
+    # trong hợp đồng với đối tác – ba con số khác nhau mà chỉ người lập chứng từ biết dùng cái nào.
+    # Máy kéo về một con số rồi nhân vào tiền là chọn hộ cái không được chọn hộ.
+    "ty_gia",
     "tours", "user_grants", "users", "vehicle_documents", "vehicle_plates", "vehicle_rates",
     "vehicles", "visa_access_links", "visa_ai_suggestions", "visa_applications",
     "visa_appointments", "visa_cases", "visa_checklist_items", "visa_checklist_templates",

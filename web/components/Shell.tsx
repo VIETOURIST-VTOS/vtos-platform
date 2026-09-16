@@ -257,7 +257,10 @@ export const GROUPS: Group[] = [
       // Kết sổ đứng NGAY TRƯỚC Khóa kỳ vì đó là thứ tự thật của việc: đưa sao kê vào sổ, kết chuyển
       // bốn bước, rồi mới khóa. Xếp ngược lại thì người dùng gặp nút khóa trước khi gặp việc phải làm.
       ["Kết sổ kỳ", "/ket-so"], ["Khóa kỳ", "/accounting?tab=periods"],
-      ["Quy ước hạch toán", "/hach-toan"], ["Hồ sơ kiểm toán", "/ho-so-kiem-toan"]] },
+      ["Quy ước hạch toán", "/hach-toan"], ["Hồ sơ kiểm toán", "/ho-so-kiem-toan"],
+      // Sổ tỷ giá (16/9/2026). Đứng trong nhóm Sổ & kỳ kế toán chứ không đứng riêng một mục: tỷ giá
+      // là một QUY ƯỚC GHI SỔ – cùng họ với "Quy ước hạch toán" – chứ không phải một nghiệp vụ.
+      ["Sổ tỷ giá", "/ty-gia"]] },
   ] },
 
 
