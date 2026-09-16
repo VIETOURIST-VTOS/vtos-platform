@@ -419,6 +419,12 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
   font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono)}
 .v14-han.rong .v14-han-so{color:var(--vtos-text-mute);font-weight:500}
 .v14-han-mo{font-size:11px;color:var(--vtos-text-faint);line-height:1.5}
+.v14-han-ty{font-size:12px;font-weight:700;color:var(--vtos-text-mute);
+  font-variant-numeric:tabular-nums}
+
+/* TC-38 · Thanh cơ cấu và thanh ngang của hai khối này ĐÃ CHUYỂN sang bộ biểu đồ dùng chung
+   (components/BieuDo.tsx, lớp .bd-*) và hiện ở ba khu biểu đồ cuối trang. Quy tắc màu và các luật
+   vẽ nay nằm ở đó, một chỗ duy nhất. Khối chỉ còn ô số và tỉ lệ — là chữ, không phải hình. */
 /* Phải trả quá hạn: theo dõi RIÊNG, nên tách hẳn bằng một vạch trên chứ không nằm chung lưới. */
 .v14-quahan{margin-top:12px;padding-top:11px;border-top:1px solid var(--vtos-line);font-size:13px}
 .v14-qh-so{font-size:19px;display:inline-block;vertical-align:middle;margin-left:4px}
@@ -637,3 +643,119 @@ table.bang-doc{width:100%}
 
 .mh01-ngan{border:0;border-top:1px solid var(--vtos-line);margin:22px 0 12px}
 .mh01-them{font-size:14px;color:var(--vtos-text-mute);margin:0 0 10px;font-weight:600}
+
+/* ═══ TC-38 · BỘ BIỂU ĐỒ DÙNG CHUNG (components/BieuDo.tsx) ═══════════════════════════════
+   Anh Tuấn 15/9/2026 gửi mấy mẫu bảng điều hành và chốt "đầy đủ: trục, lưới, nhãn số, chú
+   giải". Ba khu biểu đồ trên màn hình 01 đều lấy từ đây; không nơi nào vẽ tay nữa.
+
+   MỘT MÀU CHUỖI DUY NHẤT + NĂM ĐỘ ĐẬM. Không phát sinh màu thứ hai cho "chuỗi thứ hai": bảng
+   màu VTOS có đúng bốn màu trạng thái (xanh lá · vàng · đỏ · xanh dương) và cả bốn đều đã mang
+   nghĩa. Lấy màu trạng thái làm màu chuỗi là làm cho màu đỏ trên màn hình này hết còn nghĩa
+   "đang hỏng". Muốn phân biệt nhiều hơn năm phần thì tách biểu đồ, không đẻ thêm màu. */
+.bd{margin:0;padding:14px 15px 12px;border:1px solid var(--vtos-line);
+  border-radius:var(--vtos-radius-md);background:var(--vtos-card);min-width:0}
+.bd-dau{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin:0 0 12px}
+.bd-dau b{font-size:13px;color:var(--vtos-heading)}
+.bd-phu{font-size:11.5px}
+.bd-chan,.bd-chu{font-size:11.5px;margin:8px 0 0;line-height:1.55}
+
+/* Chú giải: chấm màu + tên. Nhận dạng KHÔNG được chỉ dựa vào màu, nên tên luôn đi kèm chấm. */
+.bd-chugiai{display:flex;flex-wrap:wrap;gap:4px 12px;margin-left:auto;font-size:11px;
+  color:var(--vtos-text-mute)}
+.bd-cg-mot{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.bd-cg-cham{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--vtos-navy)}
+
+/* ── BIỂU ĐỒ CỘT ──
+   Lưới hai hàng hai cột: [nhãn trục | vùng vẽ] và [góc trống | nhãn kỳ]. Nhờ vậy nhãn kỳ dóng
+   thẳng cột của nó mà nhãn trục không bị tính vào bề ngang vùng vẽ. */
+.bd-than{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;
+  column-gap:8px}
+.bd-truc{position:relative;grid-area:1/1/2/2;width:46px}
+.bd-truc-nhan{position:absolute;right:0;transform:translateY(-50%);font-size:10px;
+  color:var(--vtos-text-faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+.bd-o{position:relative;grid-area:1/2/2/3}
+/* Lưới MỜ hơn hẳn cột: lưới là để ước lượng, không phải để đọc. Lưới đậm bằng cột thì mắt đọc
+   cái nền trước cái số. Riêng vạch 0 đậm hơn vì nó là mốc, không phải một nấc như các vạch kia. */
+.bd-luoi{position:absolute;left:0;right:0;height:1px;background:var(--vtos-line);opacity:.45}
+.bd-luoi.khong{opacity:1}
+/* Vạch mốc (kế hoạch tháng…): NÉT ĐỨT để không lẫn với lưới, và nằm trên CÙNG một trục — đây
+   không phải trục tung thứ hai. Xem luật 4 ở đầu components/BieuDo.tsx. */
+.bd-moc{position:absolute;left:0;right:0;height:0;border-top:2px dashed var(--vtos-warning)}
+.bd-cot{position:absolute;inset:0;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:10px}
+.bd-mot{position:relative;display:block;height:100%}
+.bd-thanh{position:absolute;left:0;right:0;border-radius:3px 3px 0 0;background:var(--vtos-navy)}
+.bd-thanh.am{border-radius:0 0 3px 3px;background:var(--vtos-danger)}
+/* Ô trống: khung nét đứt chạy suốt chiều cao, KHÔNG phải cột cao 0. Cột cao 0 đọc ra là "kỳ ấy
+   bằng không", mà sự thật là "kỳ ấy chưa ai nộp số". */
+.bd-khuyet{border:1px dashed var(--vtos-line);border-radius:3px;opacity:.85}
+.bd-so{position:absolute;left:0;right:0;text-align:center;font-size:10.5px;font-weight:700;
+  color:var(--vtos-text-mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.bd-goc{grid-area:2/1/3/2}
+.bd-nhanx{grid-area:2/2/3/3;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:10px;
+  margin-top:5px}
+.bd-nhanx>span{font-size:10.5px;color:var(--vtos-text-mute);text-align:center;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── THANH NGANG ──
+   BA CỘT ĐỀU RỘNG CỐ ĐỊNH. Đây là lỗi đã ĐO ĐƯỢC ở vòng TC-37 trên biểu đồ tồn đọng: để cột tên
+   và cột số co theo nội dung thì dòng có số bốn chữ số bị rãnh hẹp hơn dòng ba chữ số (882,5px
+   so với 891,8px), tức mỗi dòng đo trên một cái thước khác nhau mà nhìn vẫn hoàn toàn bình
+   thường. Câu "chưa có số" vì thế cũng nằm TRONG rãnh, không nằm ở cột số. */
+.bd-th{display:grid;gap:7px}
+.bd-th-hang{display:grid;grid-template-columns:116px minmax(0,1fr) 62px;align-items:center;
+  gap:10px;font-size:12px}
+.bd-th-ten{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-th-rai{position:relative;height:15px;border-radius:3px;background:var(--vtos-surface)}
+.bd-th-thanh{position:absolute;top:0;bottom:0;border-radius:3px;background:var(--vtos-navy)}
+.bd-th-thanh.am{background:var(--vtos-danger)}
+.bd-th-thanh.phu{background:var(--vtos-warning)}
+.bd-th-truc0{position:absolute;top:0;bottom:0;width:1px;background:var(--vtos-line)}
+.bd-th-khuyet{position:absolute;inset:0;border:1px dashed var(--vtos-line);border-radius:3px;
+  display:flex;align-items:center;padding-left:7px;font-size:10px;color:var(--vtos-text-faint)}
+.bd-th-so{font-variant-numeric:tabular-nums;font-weight:700;text-align:right}
+@media (max-width:560px){
+  .bd-th{gap:12px}
+  .bd-th-hang{grid-template-columns:minmax(0,1fr) 62px;row-gap:4px}
+  .bd-th-ten{grid-area:1/1/2/2}
+  .bd-th-so{grid-area:1/2/2/3}
+  .bd-th-rai{grid-area:2/1/3/3}
+}
+
+/* ── THANH CƠ CẤU ── */
+.bd-cc{display:flex;gap:2px;height:16px}
+.bd-cc-o{display:block;min-width:0;border-radius:2px;background:var(--vtos-navy)}
+.bd-mau-1{opacity:1}.bd-mau-2{opacity:.80}.bd-mau-3{opacity:.62}
+.bd-mau-4{opacity:.46}.bd-mau-5{opacity:.32}
+.bd-mau-tt{background:var(--vtos-danger);opacity:1}
+.bd-cc-so{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-size:11.5px}
+.bd-cc-so>span{display:inline-flex;align-items:baseline;gap:5px}
+.bd-cc-so b{font-variant-numeric:tabular-nums}
+
+/* ── Ô RỖNG ──
+   Nét đứt, và BẮT BUỘC có lời. Một khung xám không lời thì người đọc kết luận hệ thống hỏng —
+   mà sự thật thường là chưa ai nhập, tức một việc có chủ. */
+.bd-rong{border-style:dashed;background:transparent}
+.bd-rong-ly,.bd-rong-ai{font-size:11.5px;margin:0;line-height:1.55}
+.bd-rong-ai{margin-top:6px}
+
+/* ── BA KHU BIỂU ĐỒ TRÊN MÀN HÌNH 01 ── */
+.mh01-khu{margin:0 0 14px}
+.mh01-khu-dau{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin:0 0 9px}
+.mh01-khu-dau h3{margin:0;font-size:14px;color:var(--vtos-heading)}
+.mh01-khu-dau p{margin:0;font-size:11.5px}
+/* Hai biểu đồ một hàng trên màn rộng, một cột dưới 900px. Ép hai biểu đồ cột vào nửa bề ngang
+   dưới 900px thì mỗi cột còn chừng 20px và nhãn số trên đầu cột chồng lên nhau. */
+/* align-items:start — mỗi thẻ cao đúng bằng nội dung của nó. Để mặc định (stretch) thì thẻ
+   "Phải trả" chỉ có ba dòng chữ bị kéo cao bằng thẻ biểu đồ bên cạnh, và khoảng trống thừa ấy
+   đọc ra là "còn cái gì đó chưa hiện". */
+.mh01-bd-luoi{display:grid;gap:14px;align-items:start;
+  grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.mh01-bd-luoi>*{min-width:0}
+
+@media print{
+  /* Giấy: biểu đồ in ra được, nhưng nền thẻ phải mất đi để không tốn mực. Cột giữ nguyên hình
+     nhờ print-color-adjust — mất màu cột thì biểu đồ thành một khung trắng vô nghĩa. */
+  .bd{break-inside:avoid;background:transparent}
+  .bd-thanh,.bd-th-thanh,.bd-cc-o{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .mh01-bd-luoi{grid-template-columns:1fr 1fr}
+}
