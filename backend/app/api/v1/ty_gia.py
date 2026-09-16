@@ -160,8 +160,15 @@ def them(v: TyGiaVao, u: User = Depends(require_roles(*NHAP)), db: Session = Dep
     db.add(x)
     db.commit()
     db.refresh(x)
+    # Đọc cột tiền ra một biến TRƯỚC khi dựng câu thông báo, và bọc phép chặn rỗng ngay chỗ đọc.
+    #
+    # Bộ dò K2 coi MỘT DÒNG là "có phép tính" khi thấy dấu cộng, trừ, nhân, chia hay so sánh ở bất
+    # cứ đâu trên dòng ấy — kể cả dấu gạch chéo nằm trong khuôn định dạng ngày. Đọc một cột tiền
+    # lẫn trong câu định dạng ngày là đọc trên một dòng "có phép tính" mà không chịu được rỗng, và
+    # K2 đỏ đúng ở đấy. Tách ra một biến thì câu thông báo không còn đọc cột tiền nữa.
+    so_da_ghi = float(v.ty_gia or 0)
     return {"row": _dong(x),
-            "message": f"Đã ghi tỷ giá {tt} ngày {v.ngay:%d/%m/%Y} = {float(v.ty_gia):,.4f}. "
+            "message": f"Đã ghi tỷ giá {tt} ngày {v.ngay:%d/%m/%Y} = {so_da_ghi:,.4f}. "
                        f"Đính kèm ảnh bảng tỷ giá hoặc sao kê vào hồ sơ 'ty_gia' mã {x.id}."}
 
 

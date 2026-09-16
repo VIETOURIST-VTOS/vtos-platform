@@ -67,4 +67,4 @@ from app.models.ke_hoach import *  # noqa
 # khoá ngoài sang bảng nào nên đứng đâu cũng được, nhưng vẫn phải CÓ MẶT ở đây: lần thứ sáu nhắc
 # cùng một điều ở tệp này – thiếu dòng nhập thì create_all không tạo bảng, phép thử soi mô hình mù
 # đúng phần ấy, và alembic autogenerate sẽ đòi XOÁ bảng.
-from app.models.ty_gia import *  # noqa
+from app.models.ty_gia import *  # noqa  # k2-doc-an-toan: dòng NHẬP MODULE, không đọc cột tiền nào — bộ dò thấy dấu sao của `import *` và tưởng là phép nhân
