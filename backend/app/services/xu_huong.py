@@ -203,14 +203,65 @@ def doc_that(db) -> Callable[[str, str], float | None]:
     return doc
 
 
+# TC-39 · CỬA SỔ CHỤP HỢP LỆ cho chỉ tiêu TỒN KHO, tính bằng ngày sau ngày cuối kỳ.
+#
+# Ba ngày chứ không phải một: lịch tự động lỡ một hôm vì mạng hoặc vì máy chủ khởi động lại là
+# chuyện bình thường, và chạy bù sáng hôm sau vẫn cho một con số đúng trên thực tế — trong hai
+# ngày thì số tour đang bán gần như không đổi. Nhưng chụp bù sau vài tuần thì không: lúc ấy con số
+# ghi vào ô "tháng 8" thực chất là con số của tháng 9.
+HAN_CHUP_NGAY = 3
+
+LY_DO_CHUP_MUON = (
+    "Bản lưu của kỳ này được chụp quá muộn so với ngày cuối kỳ, nên con số tồn kho trong đó là "
+    "con số của lúc chụp chứ không phải của cuối kỳ. Hệ thống bỏ qua, coi như kỳ này chưa có số."
+)
+
+
+def chup_kip_han(den, tao_luc, han_ngay: int = HAN_CHUP_NGAY) -> bool:
+    """Bản lưu này có được chụp ĐÚNG LÚC không?
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    ĐÂY LÀ CHỐT CHẶN QUAN TRỌNG NHẤT CỦA CẢ VÒNG, và nó chặn một lỗi rất dễ xảy ra mà không ai
+    nhìn ra được từ màn hình.
+
+    `bao_cao_phong.luu(db, "thang", moc)` chạy lại cho một kỳ CŨ vẫn chạy trơn tru — nó tính lại
+    mọi chỉ tiêu từ cơ sở dữ liệu HÔM NAY rồi ghi vào ô mang nhãn kỳ cũ. Với chỉ tiêu dòng chảy
+    (doanh thu, lợi nhuận) thì đúng: cộng lại sổ quyết toán tháng 8 hôm nay vẫn ra đúng con số
+    tháng 8. Với chỉ tiêu tồn kho thì SAI HOÀN TOÀN: số tour đang bán hôm nay bị dán nhãn "cuối
+    tháng 8", và biểu đồ xu hướng sẽ vẽ ra một quá khứ chưa từng tồn tại.
+
+    Cái nguy hiểm là nó trông hoàn toàn bình thường — có số, có nhãn kỳ, có cột trên biểu đồ. Nên
+    chốt chặn phải nằm ở chỗ ĐỌC, không phải ở chỗ ghi: chỗ ghi thì ai cũng có thể chạy bù, còn
+    chỗ đọc thì chỉ có một.
+
+    Chụp SỚM cũng bị từ chối: chụp giữa tháng thì con số là số giữa tháng, dán nhãn cuối tháng.
+    """
+    from datetime import datetime as _dt
+    if tao_luc is None or not den:
+        return False
+    if isinstance(den, str):
+        try:
+            den = date.fromisoformat(den)
+        except ValueError:
+            return False
+    if isinstance(tao_luc, _dt):
+        tao_luc = tao_luc.date()
+    cach = (tao_luc - den).days
+    return 0 <= cach <= han_ngay
+
+
 def _doc_ban_luu(db, ma: str, ky: str) -> float | None:
-    """Lấy một chỉ tiêu ra khỏi bản lưu của kỳ. None khi chưa ai lưu kỳ ấy."""
+    """Lấy một chỉ tiêu TỒN KHO ra khỏi bản lưu của kỳ. None khi chưa ai lưu, hoặc lưu quá muộn."""
     from sqlalchemy import select
     from app.models.bao_cao_luu import BaoCaoLuu
     ban = db.execute(select(BaoCaoLuu).where(
         BaoCaoLuu.kind == KY_THANG, BaoCaoLuu.ky == ky,
         BaoCaoLuu.pham_vi == PHAM_VI)).scalars().first()
     if ban is None:
+        return None
+    # Chụp muộn thì thà không có số còn hơn có một con số của tháng khác. Ô trống đọc ra là "chưa
+    # ai chụp kỳ này" — đúng điều đã xảy ra; một con số sai thì không đọc ra được gì cả.
+    if not chup_kip_han(ban.den, ban.tao_luc):
         return None
     khoa = CHI_TIEU[ma].khoa_luu
     for d in (ban.chi_tieu or []):

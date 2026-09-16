@@ -6,7 +6,7 @@ báo cáo của mọi phòng rồi để giao diện lọc thì ai mở công c�
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.api.deps import current_user
+from app.api.deps import current_user, robot_auth
 from app.db.session import get_db
 from app.models.core import User
 from app.services import bao_cao_phong as BP
@@ -102,3 +102,51 @@ def ban_luu_mot_ky(kind: str, ky: str, pham_vi: str = BP.TOAN_CTY,
             "so_viec_do": r.so_viec_do, "so_can_ra_soat": r.so_can_ra_soat,
             "so_chua_co_so": r.so_chua_co_so, "tao_boi": r.tao_boi, "tao_luc": r.tao_luc,
             "ban_chup": True}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# TC-39 · CỬA CHO LỊCH TỰ ĐỘNG CHỤP BẢN LƯU
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# Trước vòng này `bao_cao_phong.luu()` đã có đủ và chạy đúng — NHƯNG KHÔNG CÓ ĐƯỜNG NÀO GỌI TỚI
+# NÓ. Cả bảng `bao_cao_luu` vì thế rỗng từ đầu, và mọi chỉ tiêu "số tại một thời điểm" (tour đang
+# bán, tour chờ quyết toán) không có lấy một kỳ quá khứ nào để vẽ xu hướng.
+#
+# Đây là kiểu việc còn thiếu tệ nhất: không có lỗi nào, không có màn hình nào báo đỏ, chỉ có một
+# cái bảng rỗng mà ai nhìn cũng nghĩ "chắc chưa tới lúc". Và mỗi tháng trôi qua là mất thêm một kỳ
+# KHÔNG BAO GIỜ lấy lại được — khác hẳn doanh thu, vốn cộng lại sổ quyết toán lúc nào cũng ra.
+#
+# XÁC THỰC BẰNG ROBOT_TOKEN, giống mọi đường robot đã có (/robot/inbox/check, /tu-dong/bao-cao).
+# KHÔNG dựng thêm một kiểu xác thực thứ ba cho riêng cửa này: mỗi kiểu xác thực là một chỗ phải
+# canh, và cái yếu nhất quyết định mức an toàn của cả hệ thống.
+@router.post("/chup", dependencies=[Depends(robot_auth)])
+def chup(kind: str = "thang", ngay: str = "", db: Session = Depends(get_db)):
+    """Chụp bản lưu của kỳ ĐANG CHỨA `ngay` (mặc định: hôm nay), cho mọi phạm vi.
+
+    LỊCH GỌI VÀO ĐÂY:
+      · tháng — 00:30 ngày 1 hằng tháng, với ngay = ngày cuối tháng trước
+      · tuần  — 00:30 thứ Hai, với ngay = Chủ nhật vừa rồi
+      · ngày  — 00:30 mỗi ngày, với ngay = hôm qua
+
+    Vì sao lịch phải TRUYỀN NGÀY vào chứ không để mặc định: chạy lúc 00:30 ngày 1 mà không truyền
+    ngày thì `khoang("thang")` trả về THÁNG MỚI — tức là chụp một tháng mới đi được nửa tiếng, rồi
+    ghi đè lên đúng ô đáng ra phải chứa tháng vừa đóng. Một dòng cấu hình lịch sai chỗ này là hỏng
+    vĩnh viễn số liệu của kỳ ấy, nên hàm này để `ngay` ra ngoài cho lịch nói rõ ý định.
+
+    Chạy lại cùng một kỳ thì ĐÈ, nhờ khoá (kind, ky, pham_vi) — nên chạy bù an toàn, và gọi hai
+    lần không sinh hai bản. Nhưng chạy bù MUỘN không cứu được chỉ tiêu tồn kho: xem
+    `services/xu_huong.chup_kip_han`, chỗ đọc sẽ bỏ qua bản chụp muộn thay vì dùng một con số của
+    tháng khác. Cửa này KHÔNG tự chặn chạy muộn, vì bản lưu vẫn có giá trị cho các chỉ tiêu dòng
+    chảy và cho việc đối chiếu — chặn ở đây là vứt luôn cả phần đúng.
+    """
+    if kind not in BP.TEN_KY:
+        raise HTTPException(422, f"Kỳ phải là một trong {list(BP.TEN_KY)}")
+    try:
+        moc = date.fromisoformat(ngay) if ngay else None
+    except ValueError:
+        raise HTTPException(422, f"Ngày '{ngay}' không đúng dạng YYYY-MM-DD")
+    kq = BP.luu(db, kind, moc, boi="lich")
+    # Phạm vi hỏng KHÔNG làm cả mẻ thất bại, nhưng PHẢI hiện ra trong kết quả trả về: lịch tự động
+    # chỉ đọc mã trạng thái, nên một mẻ "thành công" mà thiếu ba phòng thì không ai biết.
+    return {**kq,
+            "message": (f"Đã chụp {len(kq['da_luu'])} phạm vi cho kỳ {kq['ky']}"
+                        + (f"; {len(kq['hong'])} phạm vi lỗi" if kq["hong"] else ""))}
