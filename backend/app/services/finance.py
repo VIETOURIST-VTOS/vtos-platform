@@ -205,7 +205,60 @@ def forecast_13w(db: Session, start: date | None = None) -> dict:
         r["net"] = r["total_in"] - r["total_out"]; bal += r["net"]; r["closing"] = bal
         if bal < 0: alerts.append(f"Tuần {r['week']} ({r['from']:%d/%m}): số dư dự kiến ÂM {bal:,.0f} đ")
         elif bal < min_cash: alerts.append(f"Tuần {r['week']} ({r['from']:%d/%m}): dưới ngưỡng tối thiểu {min_cash:,.0f} đ")
-    return {"start": weeks[0][0], "opening": opening, "min_cash": min_cash, "weeks": rows, "alerts": alerts, "closing": bal}
+    return {"start": weeks[0][0], "opening": opening, "min_cash": min_cash, "weeks": rows,
+            "alerts": alerts, "closing": bal, "thap_nhat": day_thap_nhat(rows, min_cash)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# TC-48 · ĐÁY CỦA DỰ BÁO — anh Tuấn chốt 17/9/2026: "để đáy thấp nhất, bỏ số tuần 13"
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# Bảng điều hành trước vòng này in `so_du_tuan_13 = fc["closing"]`, tức số dư CUỐI tuần thứ 13.
+# Con số ấy có thật, nhưng nó trả lời một câu không ai hỏi.
+#
+# Câu người điều hành hỏi là "ba tháng tới có lúc nào hết tiền không". Dòng tiền tụt xuống âm ở
+# tuần 5 rồi thu về hồi lại, thì cuối tuần 13 vẫn dương đẹp — và màn hình in đúng con số đẹp ấy.
+# Chỗ cần xoay tiền nằm ở tuần 5, bị che sau một con số lớn hơn nó cả tỷ đồng.
+#
+# Hệ thống VẪN BIẾT tuần 5 ấy: `alerts` có một dòng cho nó. Nhưng cảnh báo là chữ, còn con số to
+# nhất trên màn hình là con số che nó đi — và mắt đọc con số trước khi đọc chữ.
+#
+# TÁCH RA MỘT HÀM THUẦN, không chạm cơ sở dữ liệu: phép chọn đáy là chỗ dễ sai lặng lẽ nhất của cả
+# vòng (xem bốn luật dưới), nên nó phải thử được bằng danh sách giả, không cần dựng sổ.
+
+def day_thap_nhat(rows: list[dict], min_cash: float) -> dict | None:
+    """Tuần có số dư dự kiến THẤP NHẤT trong dãy, và tuần ấy có dưới ngưỡng không.
+
+    Bốn luật, mỗi luật vá một chỗ sai không để lại dấu vết:
+
+    1. LẤY ĐÁY, KHÔNG LẤY CUỐI KỲ — lý do ở trên.
+
+    2. HOÀ NHAU THÌ LẤY TUẦN SỚM NHẤT. Hai tuần cùng chạm đáy thì tuần sớm mới là tuần phải xoay
+       tiền; tuần sau chỉ là hệ quả. `min(...)` của Python giữ phần tử đầu khi hoà, nên duyệt theo
+       đúng thứ tự thời gian là đủ — nhưng viết ra đây vì nó là một LỰA CHỌN, không phải tình cờ.
+
+    3. DÃY RỖNG TRẢ None, KHÔNG TRẢ 0. Không có tuần nào thì không có đáy nào. Trả 0 là bịa ra một
+       con số, và 0 đồng trên màn hình dòng tiền đọc ra là "sắp hết tiền" — sai theo hướng nguy
+       hiểm nhất có thể.
+
+    4. "DƯỚI NGƯỠNG" VÀ "ÂM" LÀ HAI VIỆC, không phải hai mức của một việc. Âm nghĩa là KHÔNG ĐỦ
+       tiền trả — vỡ kế hoạch. Dưới ngưỡng nghĩa là vẫn trả được nhưng thủng lớp đệm dự phòng.
+       Gộp thành một cờ thì một công ty sắp mất khả năng chi trả trông y hệt một công ty mỏng đệm.
+    """
+    if not rows:
+        return None
+    day = min(rows, key=lambda r: r["closing"])
+    gt = float(day["closing"])
+    return {
+        "gia_tri": gt,
+        "tuan": day["week"],
+        "tu_ngay": day["from"],
+        "den_ngay": day["to"],
+        "am": gt < 0,
+        "duoi_nguong": gt < min_cash,
+        # Thiếu bao nhiêu so với lớp đệm. Âm thì phần thiếu tính từ 0 lên tới ngưỡng CỘNG phần âm —
+        # `min_cash - gt` làm đúng điều đó mà không cần nhánh riêng.
+        "thieu_so_voi_nguong": max(0.0, float(min_cash) - gt),
+    }
 
 
 # ---------- Báo cáo tài chính tuần cho Chủ tịch/TGĐ/KTT/BKS (mục 6.6) ----------

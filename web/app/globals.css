@@ -438,6 +438,28 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 .dt-kieu button.act+button.act{border-left:1px solid var(--vtos-line)}
 .dt-tomtat{margin:0 0 10px;font-size:12.5px;display:flex;flex-wrap:wrap;align-items:center;gap:7px}
 
+/* ═══ TC-48 · ĐÁY CỦA DỰ BÁO 13 TUẦN ════════════════════════════════════════════════════════
+   Anh Tuấn chốt 17/9/2026: "để đáy thấp nhất, bỏ số tuần 13".
+
+   VẠCH MÀU BÊN TRÁI CHỨ KHÔNG TÔ NỀN CẢ Ô. Nền đỏ kín một khối rộng hết bề ngang thì nó át mọi
+   thứ còn lại trên trang, kể cả những khối đang thật sự đỏ; mà dòng này đỏ khá thường xuyên —
+   một cảnh báo lúc nào cũng kêu là một cảnh báo không ai nghe nữa. Vạch bên trái đủ để mắt bắt
+   được mức, và nhãn chữ ngay cạnh nói rõ mức nào.
+   Ba mức dùng lại đúng ba màu của bộ nhận diện, không khai màu mới. */
+.dt-day{display:grid;gap:4px;padding:10px 0 12px 12px;margin:0 0 12px;
+  border-left:3px solid var(--vtos-line)}
+.dt-day.ok{border-left-color:var(--vtos-success)}
+.dt-day.warn{border-left-color:var(--vtos-warning)}
+.dt-day.red{border-left-color:var(--vtos-danger)}
+/* Con số và câu đọc hộ nằm CÙNG một dòng ở màn rộng, xuống dòng ở điện thoại. `align-items:baseline`
+   để chân chữ số lớn thẳng hàng với chân câu chữ nhỏ — lệch chân đọc ra như hai khối rời nhau. */
+.dt-day-so{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-width:0}
+.dt-day-so>b{font-size:26px;line-height:1.15;font-variant-numeric:tabular-nums;
+  color:var(--vtos-heading)}
+.dt-day.red .dt-day-so>b{color:var(--vtos-danger)}
+.dt-day-so>span{font-size:12.5px}
+.dt-day-phu{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:12px}
+
 @media (max-width:640px){
   /* Cặp nút xuống hàng riêng: để cùng hàng với tiêu đề thì tiêu đề bị bóp còn hai chữ. */
   .dt-kieu{width:100%}
