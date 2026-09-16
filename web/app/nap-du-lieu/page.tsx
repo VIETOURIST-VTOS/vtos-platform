@@ -113,7 +113,22 @@ function NapDuLieu() {
         const d = await r.json();
         if (!r.ok) throw new Error(d?.detail || "Không đọc được tệp");
         // ten_tep giữ theo TỪNG TỆP, không gộp. Xem giải thích ở napCaLo().
-        ds.push({ ten_tep: d.ten_tep || f.name, so_dong: d.so_dong, hop_le: d.hop_le,
+        //
+        // CỬA SOÁT TRẢ VỀ HAI HÌNH DẠNG KHÁC NHAU, VÀ BẢN ĐẦU CHỈ ĐỌC MỘT.
+        //
+        // Bộ nạp thường đi qua `_kiem_tra_tung_dong` và trả khoá `hop_le` (số dòng sạch, sẽ nạp).
+        // Bộ nạp THEO LÔ – gồm đúng hai cửa kho quyết toán cũ mà màn hình này sinh ra để phục vụ –
+        // đi qua `kiem_lo` và trả khoá `da_nap`. Nó KHÔNG có `hop_le`.
+        //
+        // Bản đầu chỉ đọc `d.hop_le`, nên với hai cửa kho cũ nó luôn ra `undefined`. Hậu quả đo
+        // được khi chạy thật trên vtos.infinitytours.org ngày 16/9/2026: chọn cả 81 tệp thì bảng
+        // hiện đủ 81 dòng "sẵn sàng", nhưng ô đếm ghi "0 dòng hợp lệ" và nút ghi "Nạp 0 TỆP vào
+        // hệ thống". Cửa mở ra mà không nạp được gì – hỏng đúng ở chỗ nó sinh ra để làm.
+        //
+        // Đọc cả hai khoá. `??` chứ không phải `||`: số 0 là một câu trả lời thật (không có dòng
+        // nào nạp được), không được rơi sang khoá kia.
+        const hop_le = d.hop_le ?? d.da_nap ?? 0;
+        ds.push({ ten_tep: d.ten_tep || f.name, so_dong: d.so_dong, hop_le,
                   da_co: d.da_co, dong_loi: d.dong_loi, rows: d.rows || [], trang_thai: "da_doc" });
       } catch (e: any) {
         ds.push({ ten_tep: f.name, so_dong: 0, hop_le: 0, da_co: 0, dong_loi: 0,
