@@ -374,6 +374,9 @@ MAN_HINH_API = {
     "/sales-reports": ("/api/v1/sales-reports",),
     "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
     "/tep": ("/api/v1/tep",),
+    # Robot A · 16/9/2026. Sổ tỷ giá. Kèm /api/v1/tep vì chính màn hình này đính ảnh bảng tỷ giá
+    # ngân hàng làm chứng từ – tỷ giá không có chứng từ là con số không ai kiểm được.
+    "/ty-gia": ("/api/v1/ty-gia", "/api/v1/tep"),
     "/tours": ("/api/v1/tours", "/api/v1/users", "/api/v1/products", "/api/v1/mang",
                "/api/v1/quyet-toan-tour",
                # Lớp 3 (11/9/2026): dòng khách, doanh thu, phương tiện, HDV chi, sổ dấu vết.
@@ -693,6 +696,9 @@ MENU_ROLES = {
     # Kết sổ một kỳ: sao kê vào sổ hàng loạt, kết chuyển, và trạng thái cả kỳ. Chỉ Kế toán GHI –
     # Chủ tịch, TGĐ và Ban Kiểm soát xem chứ không ghi thay (chặn nằm ở API, không ở menu).
     "/ket-so": BASE_VIEW + ("ketoan", "cntt"),
+    # Sổ tỷ giá. Kế toán giữ sổ; Điều hành nhập tỷ giá của chuyến mình chi; Visa nhập tỷ giá phí
+    # lãnh sự. Rộng hơn thế thì một con số NHÂN vào tiền có quá nhiều người sửa được.
+    "/ty-gia": BASE_VIEW + OPERATIONS + ("ketoan", "nv_visa", "cntt"),
     # V7 Đợt 3 – Hồ sơ kiểm toán. Kế toán làm chủ hồ sơ; Ban Kiểm soát đọc theo nghĩa vụ Luật Doanh
     # nghiệp (đã nằm trong BASE_VIEW). HCNS, Hành chính, Điều hành có mặt vì họ CÓ MỤC phải nộp – hợp
     # đồng lao động là của HCNS, hồ sơ pháp lý và biên bản HĐQT là của Hành chính. Không mở cho họ thì

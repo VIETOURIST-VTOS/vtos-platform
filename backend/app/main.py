@@ -51,6 +51,7 @@ from app.api.v1.quyet_toan_lop3 import router as qt_lop3_router
 # V7 Đợt 3 (10/9/2026)
 from app.api.v1.su_co_tour import router as su_co_router
 from app.api.v1.kiem_toan import router as kiem_toan_router
+from app.api.v1.ty_gia import router as ty_gia_router
 # TC-41 (16/9/2026) – cửa nhập kế hoạch tháng, anh Tuấn duyệt 15/9.
 from app.api.v1.ke_hoach import router as ke_hoach_router
 from app.services import rules as R
@@ -262,6 +263,8 @@ app.include_router(qt_lop3_router)
 app.include_router(dong_tien_router)
 app.include_router(su_co_router)
 app.include_router(kiem_toan_router)
+# Robot A · 16/9/2026. Cửa tỷ giá – Chủ tịch chốt nhân viên tự nhập tại từng thời điểm.
+app.include_router(ty_gia_router)
 app.include_router(ke_hoach_router)
 
 

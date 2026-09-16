@@ -267,7 +267,10 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "6.5", ten: "Thiết lập kế toán",
         con: [
           { ma: "6.5.1", ten: "Quy tắc hạch toán", href: "/hach-toan" },
-          { ma: "6.5.2", ten: "Kết nối dữ liệu kế toán", href: "/accounting?tab=misa" }
+          { ma: "6.5.2", ten: "Kết nối dữ liệu kế toán", href: "/accounting?tab=misa" },
+          // `them: true` – v1.3 không liệt kê sổ tỷ giá, nhưng màn hình CÓ THẬT từ 16/9/2026.
+          // Xếp vào Thiết lập kế toán vì tỷ giá là một quy ước ghi sổ, cùng họ với 6.5.1.
+          { ma: "6.5.3", ten: "Sổ tỷ giá", href: "/ty-gia", them: true }
         ] },
       { ma: "6.6", ten: "Báo cáo hợp nhất Holdings",
         con: [

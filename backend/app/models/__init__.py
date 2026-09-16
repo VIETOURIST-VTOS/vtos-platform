@@ -62,3 +62,9 @@ from app.models.kho_cu import *  # noqa
 # nhập ở đây thì `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate
 # sẽ đòi XOÁ bảng.
 from app.models.ke_hoach import *  # noqa
+
+# Robot A · 16/9/2026. Sổ tỷ giá – Chủ tịch chốt "nhân viên tự nhập tại từng thời điểm". Không mang
+# khoá ngoài sang bảng nào nên đứng đâu cũng được, nhưng vẫn phải CÓ MẶT ở đây: lần thứ sáu nhắc
+# cùng một điều ở tệp này – thiếu dòng nhập thì create_all không tạo bảng, phép thử soi mô hình mù
+# đúng phần ấy, và alembic autogenerate sẽ đòi XOÁ bảng.
+from app.models.ty_gia import *  # noqa  # k2-doc-an-toan: dòng NHẬP MODULE, không đọc cột tiền nào — bộ dò thấy dấu sao của `import *` và tưởng là phép nhân

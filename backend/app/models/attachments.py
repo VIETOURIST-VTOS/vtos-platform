@@ -96,6 +96,14 @@ DOI_TUONG_DAY_DU = {
     # có cửa này thì hồ sơ sự cố chỉ còn là lời kể, và lúc đòi nhà cung cấp bồi hoàn thì không có gì
     # trong tay.
     "su_co_tour":    ("Sự cố tour", "dieu_hanh", "05_Tour", True),
+    # Thêm 16/9/2026. Chứng từ của một dòng tỷ giá: ảnh chụp bảng tỷ giá ngân hàng, sao kê có số
+    # quy đổi thật, hoặc trang hợp đồng ghi tỷ giá đã thoả thuận. Không có cửa này thì tỷ giá là
+    # một con số người gõ vào mà không ai kiểm được – mà nó là con số NHÂN vào tiền.
+    #
+    # Lưu theo THÁNG (False) chứ không theo mã đối tượng: một tỷ giá thuộc về một NGÀY, và ảnh bảng
+    # tỷ giá ngân hàng ngày 04/04 nằm đúng chỗ khi xếp vào thư mục tháng 4. Xếp theo id dòng thì
+    # mỗi ngày một thư mục, và không ai tìm ra ảnh của cả tháng để đối chiếu một lượt.
+    "ty_gia":        ("Tỷ giá ngoại tệ", "ketoan", "02_Ke_toan", False),
 }
 DOI_TUONG = {k: (v[0], v[1]) for k, v in DOI_TUONG_DAY_DU.items()}
 
