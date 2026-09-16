@@ -55,9 +55,12 @@ def test_sau_o_lon_va_nam_the_nho():
     s = _ma(TRANG)
     khoi = s[s.index("const the: The[] = ["): s.index("];", s.index("const the: The[] = ["))]
     nhan = re.findall(r'nhan: "([^"]+)"', khoi)
-    assert len(nhan) == 5, f"hàng thẻ nhỏ phải đúng NĂM mục, đang có {len(nhan)}: {nhan}"
-    for can in ("Tour đang bán", "Tour chờ quyết toán", "Tour sắp khởi hành",
-                "Đội xe hôm nay", "Marketing & PR"):
+    # SỬA 16/9/2026 lần hai (TC-46): anh Tuấn chốt SÁU thẻ theo bản vẽ v3.0 — thêm "Tour đang
+    # chạy" và đổi "Đội xe hôm nay" thành "Xe đang đi". Luật không đổi một chữ: hàng thẻ là những
+    # con số để LIẾC, nên không thẻ nào được mang biểu đồ.
+    assert len(nhan) == 6, f"hàng thẻ nhỏ phải đúng SÁU mục, đang có {len(nhan)}: {nhan}"
+    for can in ("Tour đang bán", "Tour đang chạy", "Tour chờ quyết toán", "Tour sắp khởi hành",
+                "Xe đang đi", "Khách tiềm năng mới"):
         assert can in nhan, f"thiếu thẻ “{can}” trong hàng thẻ nhỏ"
     assert "xu_huong:" not in khoi, (
         "Năm thẻ nhỏ KHÔNG được mang biểu đồ — chúng là con số để liếc, và hình trên chúng kéo "

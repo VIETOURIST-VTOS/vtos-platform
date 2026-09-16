@@ -49,26 +49,54 @@ function Dash() {
      vào chỗ nó không thuộc về. Muốn có lại thì máy chủ phải đếm chuyến THEO KỲ — ghi ra đây để
      việc còn thiếu nằm trong mã, không nằm trong trí nhớ. */
 
-  /* NĂM THẺ SỐ NHỎ — anh Tuấn chốt 16/9/2026: "các phần tour đang bán, tour chờ quyết toán, tour
-     sắp khởi hành, đội xe hôm nay, marketing đưa xuống vị trí dưới".
+  /* SÁU THẺ SỐ NHỎ — anh Tuấn chốt 16/9/2026 theo bản vẽ v3.0 (trước đó là năm).
 
-     KHÔNG có biểu đồ trên năm thẻ này, và đó là lựa chọn chứ không phải thiếu sót. Đây là những
-     con số chỉ để LIẾC: 349 tour đang bán, 93 tour sắp khởi hành — đọc xong là xong, không phải
-     đặt cạnh kỳ trước hay cạnh kế hoạch mới hiểu. Thêm hình vào chúng là kéo mắt khỏi sáu ô lớn
-     phía trên, nơi có những con số thật sự cần nghĩ. */
+     KHÔNG có biểu đồ trên sáu thẻ này, và đó là lựa chọn chứ không phải thiếu sót. Đây là những
+     con số chỉ để LIẾC — đọc xong là xong, không phải đặt cạnh kỳ trước hay cạnh kế hoạch mới
+     hiểu. Thêm hình vào chúng là kéo mắt khỏi những con số thật sự cần nghĩ ở phía trên.
+
+     "ĐANG BÁN" VÀ "ĐANG CHẠY" LÀ HAI CÂU HỎI KHÁC NHAU, và tách chúng ra làm lộ một điều: hệ
+     thống KHÔNG có trạng thái "đang chạy" — một chuyến giữ trạng thái `da_duyet` suốt từ lúc mở
+     bán qua cả hành trình. Nên phép chia là theo NGÀY, làm ở máy chủ
+     (`services/dem_tour.theo_giai_doan`), và hệ quả phải nói trước: con số "Tour đang bán" NHỎ ĐI
+     so với bản hôm qua, vì những đoàn đang trên đường đã tách sang thẻ bên cạnh.
+
+     NHÓM THỨ BA — chuyến đã qua ngày về mà trạng thái vẫn là "đã duyệt" — không có thẻ riêng,
+     nhưng CÓ CHỖ HIỆN: nó là dòng phụ của thẻ Chờ quyết toán, vì đó chính là việc còn thiếu (Điều
+     hành chưa bấm kết thúc thì tiền của chuyến ấy chưa vào hàng đợi quyết toán). Bỏ nó đi thì hai
+     con số đầu cộng lại không bằng tổng đã duyệt, và chỗ chênh biến mất lặng lẽ. */
+  const gd = sec.tour_giai_doan || {};
+  const xe = sec.xe_hom_nay || {};
+  const chuaDongSo = gd.da_ve_chua_dong_so;
+
   const the: The[] = [
-    { nhan: "Tour đang bán", so: dem(c.da_duyet ?? 0),
-      duoi: `${d.n_tours ?? 0} tour trên hệ thống · chưa có sức chứa từng chuyến nên chưa tính được chỗ còn (Điều hành)` },
-    { nhan: "Tour chờ quyết toán", so: dem((c.ket_thuc || 0) + (c.da_dong_so || 0)),
-      duoi: `${sec.qua_han_qt?.length ?? 0} chuyến quá hạn quyết toán`,
-      do: (sec.qua_han_qt?.length ?? 0) > 0 },
+    { nhan: "Tour đang bán", so: dem(gd.dang_ban),
+      duoi: "Đã duyệt, chưa tới ngày khởi hành · chưa có sức chứa từng chuyến nên chưa tính được chỗ còn (Điều hành)",
+      ai: "Điều hành", cua: "/tours" },
+    { nhan: "Tour đang chạy", so: dem(gd.dang_chay),
+      duoi: "Đang trong hành trình hôm nay · chưa có sổ sự cố chuyến nên chưa đếm được chuyến cần xử lý (Điều hành)",
+      ai: "Điều hành", cua: "/tours" },
     { nhan: "Tour sắp khởi hành", so: dem(sec.sap_khoi_hanh?.length),
       duoi: `${soNgayKH} ngày tới`, ai: "Điều hành", cua: "/tours" },
-    { nhan: "Đội xe hôm nay", so: null, ai: "Đội xe", cua: "/doi-xe",
-      duoi: "Đang chạy / đủ điều kiện · xe trống · bảo dưỡng" },
-    { nhan: "Marketing & PR", phu: "Khách tiềm năng mới", so: null,
+    { nhan: "Tour chờ quyết toán", so: dem((c.ket_thuc || 0) + (c.da_dong_so || 0)),
+      duoi: `${sec.qua_han_qt?.length ?? 0} chuyến quá hạn quyết toán`
+        + (typeof chuaDongSo === "number" && chuaDongSo > 0
+           ? ` · ${chuaDongSo} chuyến đã qua ngày về mà chưa đóng sổ (Điều hành)` : ""),
+      do: (sec.qua_han_qt?.length ?? 0) > 0 || (chuaDongSo ?? 0) > 0 },
+    /* XE ĐANG ĐI — cùng luật với tour: lịch hôm nay trùng lịch điều xe. `co_nguon` phân biệt
+       "hôm nay không điều xe nào" (số THẬT, bằng 0) với "chưa ai nhập bảng xe" (chưa có nguồn);
+       không có nó thì hai việc khác hẳn nhau hiện ra y hệt một con số 0. */
+    { nhan: "Xe đang đi", so: xe.co_nguon ? dem(xe.dang_chay) : null,
+      ai: "Đội xe", cua: "/doi-xe",
+      duoi: xe.co_nguon
+        ? `${xe.o_bai} xe nằm bãi trên ${xe.dieu_duoc} xe điều được`
+          + (xe.bat_thuong > 0 ? ` · ${xe.bat_thuong} xe có bất thường` : "")
+          + (xe.lech > 0 ? ` · ${xe.lech} lệnh điều xe trỏ tới xe không còn điều được (Đội xe)` : "")
+        : "Xe đang chạy hôm nay · xe nằm bãi · xe có bất thường",
+      do: (xe.bat_thuong ?? 0) > 0 || (xe.lech ?? 0) > 0 },
+    { nhan: "Khách tiềm năng mới", so: null,
       ai: "Marketing", cua: "/leads?tab=leads",
-      duoi: "Đã chuyển Kinh doanh · đã chốt" },
+      duoi: "Chưa bàn giao Kinh doanh · quá hạn bàn giao" },
   ];
 
   /* Biểu đồ dựng một lần, giao cho từng khối tự bày. Khối nào chưa đủ số thì nhận `null` và chỉ
