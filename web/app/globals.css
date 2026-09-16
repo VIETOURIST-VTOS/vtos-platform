@@ -492,7 +492,9 @@ table.bang-doc{width:100%}
 .mh01-trang{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px}
 .mh01-trang h1{margin:0}
 .mh01-phu{margin:2px 0 0;font-size:13px;color:var(--vtos-text-mute)}
-.mh01-in{flex:0 0 auto}
+/* Nút In nay nằm cuối HÀNG LỌC (TC-35), nên đẩy nó sang mép phải đúng như bản vẽ. `.mh01-ngay`
+   ở trước nó đã có `margin-left:auto`, nên chỉ cần không cho nút co lại. */
+.mh01-in{flex:0 0 auto;margin-left:8px}
 
 /* ═══ IN RA GIẤY — bản vẽ có nút "In / Lưu PDF", nên trang phải in ra được tử tế ═════════
    Giấy là một MÔI TRƯỜNG KHÁC, không phải màn hình thu nhỏ. Bảng màu nền tối in ra giấy trắng
@@ -530,5 +532,108 @@ table.bang-doc{width:100%}
 
 /* Đường ngăn giữa phần theo bản vẽ và phần riêng của VTOS. Không giấu phần thêm đi, cũng không
    để nó trông như một khối của bản vẽ — nói thẳng ra là phần thêm, rồi xếp xuống dưới. */
+/* ═══ TC-35 · SỬA VỊ TRÍ CHO ĐÚNG BẢN VẼ V1.4 ═══════════════════════════════════════════════
+   Vòng TC-31 sửa THỨ TỰ DỌC chín khối và dừng ở đó, rồi tuyên bố "đúng bản vẽ". Thứ tự đúng
+   thật, nhưng VỊ TRÍ thì sai — và không ai đo nên không ai thấy. Anh Tuấn nhìn ra ngay.
+
+   Đo hai bên ở bề rộng 1440px (15/9/2026):
+
+                         BẢN VẼ                 TRANG THẬT (trước vòng này)
+     Dòng tiền     trên 2189 · rộng 616      trên 5778 · rộng 1121
+     Rủi ro        trên 2189 · rộng 440      trên 6629 · rộng 1121
+     Nút In        trong hàng lọc            cạnh tiêu đề, cao hơn 87px
+     Khối Điều hành cao 158                  cao 3.693
+     Cả trang cao  2.791                     8.192   (gấp 2,9 lần)
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* Dòng tiền và Rủi ro CÙNG MỘT HÀNG, tỉ lệ 1,4 : 1 đúng bản vẽ (616 : 440).
+   `minmax(0,…)` chứ không phải `1.4fr` trần: ô lưới mặc định không co nhỏ hơn nội dung, nên nếu
+   thiếu nó thì bảng dòng tiền tự nong cột ra và đẩy vỡ cả hàng thay vì cuộn trong khung mình. */
+/* Hai khối CAO BẰNG NHAU (bản vẽ đo được cả hai đúng 319px) — mặc định `stretch` của lưới lo
+   việc ấy, nên KHÔNG đặt align-items:start. Để so le thì mép dưới lệch nhau và hàng trông như
+   hai khối rơi vào nhau chứ không phải một hàng. */
+.mh01-hang-2{display:grid;gap:16px;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);
+  margin:0 0 12px}
+.mh01-hang-2>*{margin:0;min-width:0}
+/* Dưới 1180px thì xuống một cột. Bảng dòng tiền cần tối thiểu 637px; giữ hai cột trên màn hẹp
+   mới đúng là chỗ nó vỡ thật. */
+@media (max-width:1180px){.mh01-hang-2{grid-template-columns:1fr}}
+
+/* Bảng dài cuộn TRONG khung, không cắt dòng. 92 chuyến là 92 việc có thật — giấu dòng nào là
+   giấu đúng việc ấy. Đầu bảng dính lại để cuộn giữa chừng vẫn còn tên cột. */
+.mh01-cuon{max-height:420px;overflow-y:auto}
+.mh01-cuon thead th{position:sticky;top:0;z-index:1;background:var(--vtos-card)}
+/* In ra giấy thì BỎ khung cuộn: giấy không cuộn được, còn lại 420px là mất 78 chuyến. */
+@media print{.mh01-cuon{max-height:none;overflow:visible}}
+
+/* Danh sách dài gấp lại. In ra giấy thì mở sẵn, vì <details> đóng in ra là mất chữ. */
+.mh01-gap{margin:8px 0 0}
+.mh01-gap>summary{cursor:pointer;font-size:12px}
+.mh01-gap>p{margin:6px 0 0;font-size:12px;line-height:1.7;word-break:break-word}
+@media print{.mh01-gap>p{display:block !important}}
+
+/* ─── TC-36 · BIỂU ĐỒ NHỎ TRÊN THẺ CHỈ TIÊU ────────────────────────────────────────────────
+   Cột nhỏ, không phải đường: chuỗi này có ô trống THẬT (kỳ chưa ai lưu báo cáo). Đường gấp khúc
+   thì hoặc nối liền qua chỗ trống — bịa ra một đoạn dữ liệu — hoặc đứt quãng trông như lỗi vẽ.
+   Ô trống của cột thì đọc ra ngay là "kỳ ấy chưa có số".
+
+   `align-items:end` KHÔNG dùng: cột định vị theo mốc 0 tính trong mã, để một kỳ LỖ đi xuống dưới
+   vạch thay vì thành một cột ngắn trông như lãi ít. */
+.the-xh{margin-top:8px}
+.the-xh-cot{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px}
+/* MỖI KỲ MỘT Ô, và ô ấy là mốc định vị của thanh. Thiếu lớp này thì thanh định vị theo cả khung
+   và sáu thanh chồng lên nhau thành một vệt dài — lỗi đã mắc, chỉ lộ ra khi dựng thành ảnh. */
+.the-xh-o{position:relative;display:block;height:100%}
+.the-xh-thanh{position:absolute;left:0;right:0;border-radius:2px;background:var(--vtos-sky)}
+/* Cột ÂM đổi cả MÀU lẫn HƯỚNG. Chỉ đổi hướng thì liếc nhanh dễ trượt; chỉ đổi màu thì in đen
+   trắng là mất. Hai dấu hiệu cho một ý nghĩa. */
+.the-xh-thanh.am{background:var(--vtos-danger)}
+/* Kỳ chưa có số: ô vẫn chừa chỗ nhưng KHÔNG vẽ gì bên trong. Không tô xám — một cột xám vẫn là
+   một cột, và người đọc sẽ ước lượng chiều cao của nó. */
+.the-xh-truc0{position:absolute;left:0;right:0;height:1px;background:var(--vtos-line)}
+.the-xh-ss{margin-top:5px;font-size:11px}
+.the-xh-mui{font-weight:700;font-variant-numeric:tabular-nums}
+.the-xh-mui.tang{color:var(--vtos-success)}
+.the-xh-mui.giam{color:var(--vtos-danger)}
+.the-xh-rong{margin-top:8px;font-size:11px;line-height:1.6}
+/* In ra giấy: biểu đồ nhỏ bỏ đi. Cột 30px in ra là bốn vệt mực không đọc được, mà con số và dòng
+   so sánh thì vẫn còn nguyên — giữ phần nói được, bỏ phần không nói được. */
+@media print{.the-xh-cot{display:none}}
+
+/* ─── TC-35 · BIỂU ĐỒ BỐN MỐC. Không dùng thư viện vẽ: bốn cột thì lưới CSS đủ, kéo về một thư
+   viện biểu đồ chỉ để vẽ bốn hình chữ nhật là thêm một thứ phải nâng cấp và vá lỗi mãi về sau.
+   Màu lấy từ biến bộ nhận diện, không gõ mã màu — giữ đúng luật của kho. */
+.dt-bieudo{margin:10px 0 0}
+.dt-bd-cot{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:14px}
+.dt-bd-mot{position:relative}
+.dt-bd-khung{position:relative}
+.dt-bd-thanh{position:absolute;left:0;right:0;border-radius:3px;background:var(--vtos-info);
+  min-height:2px}
+/* Cột ÂM khác màu, không chỉ khác hướng: in đen trắng hay nhìn nhanh thì hướng dễ trượt mắt. */
+.dt-bd-thanh.am{background:var(--vtos-red)}
+.dt-bd-truc0{position:absolute;left:0;right:0;height:1px;background:var(--vtos-line)}
+.dt-bd-nhan{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:14px;margin-top:6px}
+.dt-bd-nhan>div{display:flex;flex-direction:column;gap:1px;font-size:12px}
+.dt-bd-nhan b{font-variant-numeric:tabular-nums}
+.dt-bd-nhan span{font-size:11px}
+.dt-bd-chu{font-size:12px;margin:6px 0 0}
+/* Ô rỗng của biểu đồ: nói còn thiếu mốc nào, không vẽ một đường phẳng ở mức 0. */
+.dt-bieudo-rong{margin:10px 0 0;padding:14px;border:1px dashed var(--vtos-line);border-radius:8px}
+.dt-bieudo-rong p{margin:4px 0 0;font-size:12px}
+@media (max-width:560px){
+  .dt-bd-cot,.dt-bd-nhan{grid-auto-flow:row;grid-auto-columns:auto}
+  .dt-bd-cot{height:auto !important}
+}
+
+.dt-nut-chi-tiet{margin:10px 0 0}
+/* Bảng chi tiết gấp sau một nút. In ra giấy thì mở sẵn — <details> đóng in ra là mất cả bảng. */
+.dt-gap{margin:10px 0 0}
+.dt-gap>summary{cursor:pointer;font-size:12px;color:var(--vtos-text-mute)}
+@media print{.dt-gap>summary{display:none}
+  /* Nội dung bên trong <details> đóng bị trình duyệt ẩn; ép hiện khi in, không thì bản in mất
+     nguyên bảng bốn mốc — đúng thứ Chủ tịch mang vào phòng họp. */
+  .dt-gap>*:not(summary){display:block !important}
+  .mh01-gap>*:not(summary){display:block !important}}
+
 .mh01-ngan{border:0;border-top:1px solid var(--vtos-line);margin:22px 0 12px}
 .mh01-them{font-size:14px;color:var(--vtos-text-mute);margin:0 0 10px;font-weight:600}

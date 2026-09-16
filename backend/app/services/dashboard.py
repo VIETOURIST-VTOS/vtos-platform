@@ -201,6 +201,20 @@ def build(db: Session, u: User) -> dict:
     sec["ton_dong_da_loai"] = _td["da_loai"]
     sec["ton_dong_vi_sao"] = _td["vi_sao"]
 
+    # ── TC-36 · xu hướng bốn chỉ tiêu (biểu đồ nhỏ trên thẻ) ─────────────────────────────────
+    # Anh Tuấn chốt 15/9: thẻ vừa hiện số vừa hiện xu hướng so kỳ trước. Phép tính nằm trọn ở
+    # `xu_huong.py`; ở đây chỉ gọi. KHÔNG tính lại doanh thu/lợi nhuận bằng công thức riêng —
+    # `xu_huong.doc_that` gọi đúng những hàm bảng này đang gọi, nên biểu đồ không thể nói khác thẻ.
+    #
+    # Bọc try riêng: xu hướng là phần TRANG TRÍ THÔNG TIN, hỏng thì thẻ vẫn phải hiện con số. Một
+    # lỗi ở chuỗi lịch sử không được kéo sập cả bảng điều hành.
+    try:
+        from app.services import xu_huong as XH
+        sec["xu_huong"] = XH.cho_man_hinh(db, so_ky=6, hom_nay=today)
+    except Exception as ex:
+        sec["xu_huong"] = {}
+        R.audit(db, "robot", "robot", "xu_huong_loi", "dashboard", after={"ly_do": str(ex)[:200]})
+
     # ── TC-33 · khối 08 Tiến độ báo cáo & kết luận chỉ đạo ───────────────────────────────────
     # Cũng không thêm bảng nào: danh sách phòng phải nộp đã khai ở `bao_cao_phong.PHONG`, bản đã
     # nộp nằm ở `bao_cao_luu`. Đối chiếu hai cái là ra.

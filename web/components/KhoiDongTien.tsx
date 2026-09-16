@@ -57,6 +57,77 @@ function O({ o }: { o: any }) {
   );
 }
 
+/** TC-35 · BIỂU ĐỒ DÒNG TIỀN THUẦN QUA BỐN MỐC.
+ *
+ *  Bản vẽ V1.4 đặt đúng chỗ này một biểu đồ, kèm câu quy định cách cư xử khi thiếu số:
+ *
+ *      "Dự báo chưa đủ dữ liệu. Biểu đồ số dư và ngưỡng dự phòng sẽ hiển thị khi có số dư đã đối
+ *       soát cùng lịch thu–chi đầy đủ. KHÔNG QUY ĐỔI DỮ LIỆU THIẾU THÀNH SỐ 0."
+ *
+ *  Câu cuối là luật, không phải lời khuyên. Một đường phẳng ở mức 0 trên biểu đồ dòng tiền đọc ra
+ *  là "không có tiền vào ra" — khác hẳn "chưa ai nạp số". Nên THIẾU MỘT MỐC LÀ KHÔNG VẼ, và ghi ra
+ *  còn thiếu mốc nào.
+ *
+ *  NGUỒN SỐ: `k.dong_tien_thuan` / `k.dong_tien_thuan_khoang` — đúng hai trường mà dòng đáy của
+ *  bảng đang đọc, nên biểu đồ không thể nói khác bảng ngay dưới nó. Cố ý KHÔNG tự dò dòng "số dư
+ *  cuối khoảng" theo tên tiếng Việt: tên đổi một chữ là biểu đồ âm thầm vẽ sang dòng khác.
+ *
+ *  Biểu đồ đổi theo KIỂU XEM cùng với bảng. Ở kiểu luỹ kế bốn cột chồng nhau nên đây là đường đi
+ *  lên của cùng một dòng tiền; ở kiểu từng khoảng bốn cột rời nhau nên đây là bốn lượng độc lập —
+ *  chú thích dưới biểu đồ nói rõ đang là kiểu nào.
+ */
+function BieuDoBonMoc({ cot, so, khoang, vi_sao }: {
+  cot: any[]; so: Record<string, number | null | undefined>; khoang: boolean; vi_sao?: string;
+}) {
+  const gt = cot.map((c: any) => so?.[c.ma]);
+  const thieu = cot.filter((c: any, i: number) => gt[i] === null || gt[i] === undefined);
+  if (thieu.length) {
+    return (
+      <div className="dt-bieudo-rong">
+        <b>Chưa đủ dữ liệu để vẽ biểu đồ</b>
+        <p className="muted">
+          Còn thiếu {thieu.length}/{cot.length} mốc: {thieu.map((c: any) => c.ten).join(" · ")}.
+          {vi_sao ? " " + vi_sao : ""}
+        </p>
+        <p className="muted">Không quy đổi dữ liệu thiếu thành số 0.</p>
+      </div>
+    );
+  }
+  const v = gt as number[];
+  const max = Math.max(...v, 0), min = Math.min(...v, 0);
+  const bien = max - min || 1;
+  // Trục 0 nằm đúng chỗ của nó: cột âm đi xuống, cột dương đi lên. Vẽ mọi cột từ đáy khung là
+  // biến một tháng âm thành một cột ngắn trông như tháng dương ít tiền.
+  const H = 120, y0 = Math.round(H * (max / bien));
+  return (
+    <div className="dt-bieudo">
+      <div className="dt-bd-cot" style={{ height: H }}>
+        {v.map((x, i) => {
+          const cao = Math.round((Math.abs(x) / bien) * H);
+          return (
+            <div key={cot[i].ma} className="dt-bd-mot" title={`${cot[i].ten}: ${vnd(x)}`}>
+              <div className="dt-bd-khung" style={{ height: H }}>
+                <div className={"dt-bd-thanh" + (x < 0 ? " am" : "")}
+                  style={{ height: cao, top: x < 0 ? y0 : y0 - cao }} />
+              </div>
+            </div>
+          );
+        })}
+        <div className="dt-bd-truc0" style={{ top: y0 }} />
+      </div>
+      <div className="dt-bd-nhan">
+        {cot.map((c: any, i: number) => (
+          <div key={c.ma}><b>{vnd(v[i])}</b><span className="muted">{c.ten}</span></div>
+        ))}
+      </div>
+      <p className="muted dt-bd-chu">
+        Dòng tiền thuần {khoang ? "trong từng khoảng — bốn cột rời nhau" : "luỹ kế — bốn cột chồng lên nhau"}.
+        Vạch ngang là mốc 0.
+      </p>
+    </div>
+  );
+}
+
 export default function KhoiDongTien() {
   const { toast } = useShell();
   const [dsPn, setDsPn] = useState<any[]>([]);
@@ -148,6 +219,29 @@ export default function KhoiDongTien() {
 
       <div className="bon-o">{(k.canh_bao || []).map((o: any) => <O key={o.ma} o={o} />)}</div>
 
+      {/* ═══ TC-35 · BIỂU ĐỒ TRƯỚC, BẢNG SAU NÚT ═══════════════════════════════════════════════
+          Anh Tuấn chỉ ra 15/9/2026: bảng 14 dòng × 4 mốc "không cần chi tiết ra màn hình, đưa vào
+          nút click, ở ngoài để con số báo cáo tổng". Đối chiếu lại thì BẢN VẼ V1.4 vốn đã làm đúng
+          như thế: khối này trong bản vẽ chỉ có bốn ô tổng, một biểu đồ, và một nút "Cấu trúc chi
+          tiết dòng tiền →". Không có bảng nào trên màn hình.
+
+          Đo hậu quả của cách cũ: khối dòng tiền đổ cả bảng ra làm trang Chủ tịch cao 8.192px so với
+          2.791px của bản vẽ. Người mở trang phải cuộn qua bảng mới thấy khối kế tiếp.
+
+          VÌ SAO GẤP TẠI CHỖ chứ không dời hẳn sang /dong-tien: màn hình ấy CÓ "Bảng bốn mốc" nhưng
+          KHÔNG có nút đổi kiểu xem (luỹ kế ↔ từng khoảng) và KHÔNG có nút Xuất Excel. Dời đi là âm
+          thầm bỏ mất hai tính năng — trong đó nút Excel vừa sửa xong ở vòng TC-28. Gấp lại thì giữ
+          đủ, mà khối vẫn co về đúng chiều cao bản vẽ. Nút sang màn hình chi tiết vẫn có, đúng bản vẽ. */}
+      <BieuDoBonMoc cot={cot}
+        so={(khoang ? k.dong_tien_thuan_khoang : k.dong_tien_thuan) || {}}
+        khoang={khoang} vi_sao={k.vi_sao_khong_co_so_cuoi} />
+
+      <p className="dt-nut-chi-tiet">
+        <Link className="the-cua" href="/dong-tien">Cấu trúc chi tiết dòng tiền →</Link>
+      </p>
+
+      <details className="dt-gap">
+        <summary>Bảng bốn mốc — {(k.dong || []).length} dòng · {nCot} mốc</summary>
       <div className="panel wrap">
         <table>
           <thead><tr>
@@ -216,6 +310,7 @@ export default function KhoiDongTien() {
           {k.doi_soat_den_ngay ? ` Đối soát đến ${fmtD(String(k.doi_soat_den_ngay))}.` : ""}
         </p>
       </div>
+      </details>
     </section>
   );
 }
