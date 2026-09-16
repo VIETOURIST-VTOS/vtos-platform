@@ -70,8 +70,13 @@ export type ChuaRoBoPhan = { so: number; vi_sao: string };
 export type LoaiDaLoai = { loai: string; so_ho_so: number; ly_do: string };
 
 /** 05 · Một nhóm hạn thanh toán. `nhan` là tên nhóm, `mo_ta` là định nghĩa khoảng – in ra màn hình
- *  để không ai phải đoán "2 tuần" tính từ đâu. */
-export type NhomHan = { nhan: string; mo_ta: string; so?: number | null };
+ *  để không ai phải đoán "2 tuần" tính từ đâu.
+ *
+ *  `do` = nhóm này là một TRẠNG THÁI, không phải một quãng hạn còn lại. "Quá hạn" của Phải thu là
+ *  tiền ĐÃ trễ; bốn nhóm kia là tiền chưa đến hạn. Nên nó mang màu cảnh báo, còn bốn nhóm kia mang
+ *  một dải xanh nhạt dần theo hạn xa dần. Tô cả năm cùng một dải là để nhóm đã trễ trông như đầu
+ *  một hàng đợi bình thường. */
+export type NhomHan = { nhan: string; mo_ta: string; so?: number | null; do?: boolean };
 
 /** 07 · Rủi ro trọng yếu. Hai mức: cần quyết định (thuộc thẩm quyền Chủ tịch) và cần theo dõi.
  *  Nghiệp vụ thường ngày KHÔNG lên đây – bản vẽ ghi rõ, và đó cũng là lý do khối này khác khối
@@ -186,6 +191,76 @@ export function KhoiHieuQuaXe({ d }: { d?: HieuQuaXe | null }) {
 
 /* ───────────────────────── 04c · TỒN ĐỌNG THEO BỘ PHẬN ───────────────────────── */
 
+/** TC-37 · THANH NGANG tồn đọng theo bộ phận.
+ *  ═════════════════════════════════════════════════════════════════════════════════════════════
+ *  THANH NGANG CHỨ KHÔNG PHẢI CỘT DỌC: nhãn ở đây là tên phòng tiếng Việt ("Công nghệ thông tin",
+ *  "Kinh doanh Đoàn"), không phải tên tháng. Cột dọc thì nhãn phải xoay nghiêng hoặc cắt cụt mới
+ *  vừa; thanh ngang để tên nằm thẳng, đọc bình thường.
+ *
+ *  XẾP NHIỀU TRƯỚC, và đó là lý do chính có biểu đồ này: bảng bên dưới đọc từ trên xuống mới biết
+ *  phòng nào nặng nhất, còn thanh ngang thì thanh dài nhất đập vào mắt ngay.
+ *
+ *  BA LUẬT:
+ *   1. DƯỚI HAI DÒNG THÌ KHÔNG VẼ. Một thanh dài hết khung không so sánh với cái gì cả — nó chỉ
+ *      làm người đọc tưởng phòng ấy đã chạm một ngưỡng nào đó. Có đúng một dòng thì bảng là đủ.
+ *   2. CHƯA CÓ SỐ THÌ KHÔNG VẼ THANH, vẽ một khung nét đứt. Thanh dài 0 đọc ra là "phòng này sạch",
+ *      mà sự thật là "chưa ai đếm".
+ *   3. BẰNG 0 THÌ RỘNG ĐÚNG 0. Không kéo lên vài pixel cho dễ nhìn — 0 hồ sơ quá hạn là tin tốt và
+ *      phải trông đúng như tin tốt.
+ *
+ *  "CHƯA RÕ BỘ PHẬN" MANG MÀU KHÁC và luôn đứng cuối: nó KHÔNG phải một phòng. Tô cùng màu với các
+ *  phòng là xếp một chỗ chưa ai nhận ngang hàng với một phòng có người chịu trách nhiệm. */
+export function xepBoPhan(ds: DongTonDong[], chua_ro?: ChuaRoBoPhan | null) {
+  const hang = ds
+    .map((r) => ({ ten: r.bo_phan, so: r.ho_so_qua_han ?? null, chua_ro: false }))
+    /* Dòng có số xếp nhiều trước; dòng chưa có số dồn xuống cuối — chúng không có chỗ nào trong
+       một thứ tự theo độ lớn, và nhét chúng vào đầu hay cuối theo số 0 là gán cho chúng một giá
+       trị mà chúng không có. */
+    .sort((a, b) => {
+      if (a.so === null && b.so === null) return 0;
+      if (a.so === null) return 1;
+      if (b.so === null) return -1;
+      return b.so - a.so;
+    });
+  if (chua_ro) hang.push({ ten: "Chưa rõ bộ phận", so: chua_ro.so, chua_ro: true });
+  return hang;
+}
+
+function BieuDoBoPhan({ ds, chua_ro }: { ds: DongTonDong[]; chua_ro?: ChuaRoBoPhan | null }) {
+  const hang = xepBoPhan(ds, chua_ro);
+  const coSo = hang.filter((h) => typeof h.so === "number").map((h) => h.so as number);
+  if (hang.length < 2 || coSo.length < 2) return null;   // luật 1
+  const max = Math.max(...coSo);
+  if (max <= 0) return null;                              // mọi dòng đều 0 — bảng nói rõ hơn
+  /* Câu chú nằm TRONG hàm này, không đặt ở nơi gọi. Đặt ngoài thì điều kiện "có vẽ hay không"
+     phải viết lại lần thứ hai, và hai bản chép ấy sớm muộn lệch nhau — lúc ấy màn hình có câu
+     chú giải cho một biểu đồ không tồn tại, hoặc ngược lại. */
+  return (<>
+    <div className="v14-bp-bd" role="img"
+      aria-label={"Hồ sơ quá hạn theo bộ phận: " +
+        hang.map((h) => `${h.ten} ${h.so === null ? "chưa có số" : h.so}`).join(" · ")}>
+      {hang.map((h) => (
+        <div key={h.ten} className="v14-bp-hang">
+          <span className="v14-bp-ten" title={h.ten}>{h.ten}</span>
+          <span className="v14-bp-rai">
+            {/* "chưa có số" nằm TRONG rãnh chứ không ở cột số bên phải. Lý do là một phép đo:
+                cột số rộng theo nội dung, nên một dòng ghi "chưa có số" đẩy rãnh của CHÍNH dòng
+                ấy hẹp lại — và thanh của các dòng khác thì không. Lúc ấy mỗi dòng đo trên một
+                thước khác nhau mà nhìn vẫn bình thường. Cột số nay rộng cố định, chữ vào rãnh. */}
+            {h.so === null
+              ? <span className="v14-bp-khuyet">chưa có số</span>
+              : <span className={"v14-bp-thanh" + (h.chua_ro ? " chua-ro" : "")}
+                  style={{ width: h.so === 0 ? 0 : `max(3px, ${(h.so / max) * 100}%)` }} />}
+          </span>
+          <span className="v14-bp-so">{h.so === null ? "" : h.so.toLocaleString("vi-VN")}</span>
+        </div>
+      ))}
+    </div>
+    <p className="muted v14-bp-chu">Hồ sơ quá hạn, xếp nhiều trước. Thanh dài nhất là bộ phận đang
+      tồn nhiều nhất, <b>không</b> phải bộ phận vượt ngưỡng nào — chưa có ngưỡng nào được khai.</p>
+  </>);
+}
+
 export function KhoiTonDongBoPhan({ ds, chua_ro, da_loai, vi_sao }: {
   ds?: DongTonDong[] | null;
   chua_ro?: ChuaRoBoPhan | null;
@@ -226,6 +301,10 @@ export function KhoiTonDongBoPhan({ ds, chua_ro, da_loai, vi_sao }: {
               </>
             : <BangRong cot={cot} ghi_chu={ghi} ai="Công nghệ thông tin" cua="/alerts" cua_ten="Trang cảnh báo" />)
         : <>
+            {/* Biểu đồ TRƯỚC bảng: nhìn hình là biết phòng nào nặng nhất, rồi mới đọc bảng để biết
+                hồ sơ nào, ai chịu, hạn nào. Bảng trước biểu đồ thì phải đọc hết bảng mới ra được
+                cái mà biểu đồ nói trong một giây. */}
+            <BieuDoBoPhan ds={co} chua_ro={chua_ro} />
             <div className="wrap">
               <table className="v14-bang">
                 <thead><tr>{cot.map((c) => <th key={c}>{c}</th>)}</tr></thead>
@@ -274,7 +353,7 @@ export function KhoiTonDongBoPhan({ ds, chua_ro, da_loai, vi_sao }: {
  *  Hai tháng và ba tháng tính theo THÁNG LỊCH từ ngày báo cáo, không mặc định 60/90 ngày (bản vẽ
  *  ghi rõ). Hạn rơi ĐÚNG ngày báo cáo thuộc nhóm sắp đến hạn đầu tiên, không thuộc nhóm quá hạn. */
 const PHAI_THU: NhomHan[] = [
-  { nhan: "Quá hạn", mo_ta: "Hạn thanh toán trước ngày báo cáo" },
+  { nhan: "Quá hạn", mo_ta: "Hạn thanh toán trước ngày báo cáo", do: true },
   { nhan: "2 tuần", mo_ta: "Từ ngày báo cáo đến hết ngày +14" },
   { nhan: "4 tuần", mo_ta: "Sau 2 tuần đến hết ngày +28" },
   { nhan: "2 tháng", mo_ta: "Sau 4 tuần đến hết mốc +2 tháng lịch" },
@@ -288,29 +367,119 @@ const PHAI_TRA: NhomHan[] = [
   { nhan: "Dài hạn", mo_ta: "Sau mốc 3 tháng" },
 ];
 
+/** TC-37 · THANH CƠ CẤU cho năm nhóm hạn.
+ *  ═════════════════════════════════════════════════════════════════════════════════════════════
+ *  VÌ SAO LÀ MỘT THANH CHIA KHÚC, KHÔNG PHẢI NĂM CỘT RỜI: năm nhóm này KHÔNG trùng nhau nên cộng
+ *  lại đúng bằng tổng công nợ — tức chúng là năm PHẦN của một cái. Cái Chủ tịch cần đọc trong một
+ *  giây không phải "nhóm 2 tuần là bao nhiêu đồng" (con số ấy đã nằm ngay trên ô rồi), mà "bao
+ *  nhiêu phần trăm tiền của tôi đã quá hạn". Thanh chia khúc trả lời đúng câu ấy; năm cột rời thì
+ *  phải tự cộng nhẩm trong đầu mới ra.
+ *
+ *  Đây cũng là chỗ khác hẳn bảng bốn mốc ở khối 06: bốn mốc kia LŨY KẾ, cột sau đã chứa trọn cột
+ *  trước, nên tuyệt đối KHÔNG được vẽ thành một thanh chia khúc — làm thế là cộng một khoản tiền
+ *  vào chính nó bốn lần.
+ *
+ *  BỐN ĐIỀU KIỆN MỚI VẼ, và mỗi điều kiện sinh ra từ một cách đọc sai cụ thể:
+ *   1. ĐỦ CẢ NĂM NHÓM. Thiếu một nhóm thì tổng đã sai, mà tỉ lệ nào cũng tính trên tổng ấy — bốn
+ *      khúc còn lại sẽ cùng phình to lên và trông vẫn rất hợp lý. Sai kiểu không ai kiểm được.
+ *   2. KHÔNG NHÓM NÀO ÂM. Một phần âm của một tổng thì không có bề dài nào biểu diễn được.
+ *   3. TỔNG KHÁC 0. Tổng bằng 0 là số THẬT (không còn công nợ) chứ không phải chỗ trống — nhưng
+ *      0/0 không ra tỉ lệ, nên nói thành câu thay vì vẽ một thanh rỗng.
+ *   4. KHÚC 0 THÌ RỘNG ĐÚNG 0. Không kéo khúc nhỏ lên "cho nhìn thấy": một nhóm bằng 0 mà hiện ra
+ *      một vạch là nói có tiền ở đó.
+ *
+ *  BỀ RỘNG ĐẶT BẰNG flex-grow CHỨ KHÔNG PHẢI width PHẦN TRĂM: năm khúc cách nhau 2px, mà năm bề
+ *  rộng phần trăm cộng đúng 100% thì tổng cả gap vượt khung và khúc cuối bị cắt cụt — tức nhóm
+ *  "Dài hạn" luôn trông nhỏ hơn sự thật. flex chia phần CÒN LẠI sau khi trừ gap, nên tỉ lệ đúng. */
+type CoCau =
+  | { ve: true; tong: number; gt: number[] }
+  | { ve: false; ly_do: string };
+
+export function coCau(khung: NhomHan[], s: Record<string, number | null | undefined>): CoCau {
+  const gt = khung.map((n) => s[n.nhan]);
+  const thieu = khung.filter((_, i) => gt[i] === null || gt[i] === undefined);
+  if (thieu.length) {
+    return { ve: false, ly_do:
+      `Còn thiếu ${thieu.length}/${khung.length} nhóm: ${thieu.map((n) => n.nhan).join(" · ")}. ` +
+      "Tỉ lệ nào cũng tính trên tổng năm nhóm, nên thiếu một nhóm là mọi tỉ lệ đều sai. " +
+      "Hệ thống không quy đổi nhóm thiếu thành 0." };
+  }
+  const v = gt as number[];
+  if (v.some((x) => x < 0)) {
+    return { ve: false, ly_do:
+      "Có nhóm mang số âm. Một phần âm của một tổng thì không có bề dài nào biểu diễn đúng được — " +
+      "nhờ Kế toán soát lại dấu của khoản ấy." };
+  }
+  const tong = v.reduce((a, b) => a + b, 0);
+  if (tong === 0) {
+    return { ve: false, ly_do:
+      "Tổng năm nhóm bằng 0 — không còn công nợ nào để chia tỉ lệ. Đây là số THẬT, khác hẳn chưa " +
+      "có nguồn số." };
+  }
+  return { ve: true, tong, gt: v };
+}
+
+function ThanhCoCau({ khung, cc }: { khung: NhomHan[]; cc: Extract<CoCau, { ve: true }> }) {
+  const ten = khung
+    .map((n, i) => `${n.nhan} ${Math.round((cc.gt[i] / cc.tong) * 100)}%`)
+    .join(" · ");
+  return (
+    <div className="v14-cc" role="img" aria-label={`Cơ cấu theo hạn: ${ten}`}>
+      {khung.map((n, i) => (
+        <span key={n.nhan}
+          className={"v14-cc-o " + (n.do ? "v14-mau-do" : `v14-mau-${i + 1}`)}
+          style={{ flexGrow: cc.gt[i], flexBasis: 0 }}
+          title={`${n.nhan}: ${cc.gt[i].toLocaleString("vi-VN")} · ${Math.round((cc.gt[i] / cc.tong) * 100)}%`} />
+      ))}
+    </div>
+  );
+}
+
 function KhoiHan({ ten, khung, ds, ai, cua, cua_ten, chan, id, chua_co_han, vi_sao }: {
   ten: string; khung: NhomHan[]; ds?: Record<string, number | null> | null;
   ai: string; cua: string; cua_ten: string; chan?: React.ReactNode; id: string;
   chua_co_han?: number | null; vi_sao?: string | null;
 }) {
   const s = ds || {};
+  const cc = coCau(khung, s);
   return (
     <section className="panel" id={id}>
       <DauKhoi ten={ten} phu="5 nhóm không trùng nhau" />
       <div className="v14-han-ds">
-        {khung.map((n) => {
+        {khung.map((n, i) => {
           const gt = s[n.nhan];
           const rong = gt === null || gt === undefined;
           return (
             <div key={n.nhan} className={"v14-han" + (rong ? " rong" : "")}>
-              <div className="v14-han-nhan">{n.nhan}</div>
+              {/* Chấm màu nối ô này với đúng khúc của nó trên thanh cơ cấu ngay dưới. Không có nó
+                  thì phải đếm từ trái sang mới biết khúc nào là nhóm nào — và đếm sai một nhịp là
+                  đọc nhầm hẳn một nhóm. */}
+              <div className="v14-han-nhan">
+                {cc.ve && <i className={"v14-cham " + (n.do ? "v14-mau-do" : `v14-mau-${i + 1}`)} aria-hidden="true" />}
+                {n.nhan}
+              </div>
               <div className="v14-han-so">{rong ? "—" : gt.toLocaleString("vi-VN")}</div>
               {rong && <span className="tag">Chưa kết nối</span>}
+              {/* Tỉ lệ CHỈ hiện khi vẽ được thanh cơ cấu, vì cùng một mẫu số. Hiện tỉ lệ trong khi
+                  còn nhóm thiếu là in ra một phần trăm tính trên cái tổng chưa đủ. */}
+              {cc.ve && <div className="v14-han-ty">{Math.round(((s[n.nhan] as number) / cc.tong) * 100)}%</div>}
               <div className="v14-han-mo">{n.mo_ta}</div>
             </div>
           );
         })}
       </div>
+      {cc.ve
+        ? <>
+            <ThanhCoCau khung={khung} cc={cc} />
+            <p className="muted v14-cc-chu">
+              Một thanh = <b>tổng {cc.tong.toLocaleString("vi-VN")}</b>, chia theo hạn. Năm khúc
+              không trùng nhau nên cộng đủ 100%.
+            </p>
+          </>
+        : <div className="dt-bieudo-rong">
+            <b>Chưa vẽ được thanh cơ cấu</b>
+            <p className="muted">{cc.ly_do}</p>
+          </div>}
       {/* KHOẢN CHƯA CÓ HẠN — theo dõi riêng, KHÔNG gộp vào Dài hạn. Dòng chú thích bên dưới hứa
           điều này từ vòng TC-23 nhưng chưa có chỗ hiện; vòng TC-30 thêm chỗ. "Chưa ai điền ngày"
           và "đến hạn sau ba tháng" là hai việc khác hẳn, và cái thứ nhất là việc phải đi đòi. */}

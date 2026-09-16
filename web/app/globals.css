@@ -419,6 +419,68 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
   font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono)}
 .v14-han.rong .v14-han-so{color:var(--vtos-text-mute);font-weight:500}
 .v14-han-mo{font-size:11px;color:var(--vtos-text-faint);line-height:1.5}
+.v14-han-ty{font-size:12px;font-weight:700;color:var(--vtos-text-mute);
+  font-variant-numeric:tabular-nums}
+
+/* TC-37 · THANH CƠ CẤU năm nhóm hạn + chấm màu nối ô với khúc.
+   ─────────────────────────────────────────────────────────────────────────────────────────────
+   MỘT MÀU, NĂM ĐỘ ĐẬM — không phải năm màu khác nhau. Năm nhóm này là năm nấc của CÙNG một thứ
+   (hạn còn lại, gần → xa), nên chúng phải trông như một dải liên tục; tô năm màu rời là nói đây
+   là năm loại khác nhau, và mắt sẽ đi tìm ý nghĩa của từng màu.
+
+   Riêng khúc "Quá hạn" mang màu cảnh báo, vì nó là một TRẠNG THÁI chứ không phải một nấc hạn —
+   tiền đã trễ không nằm trên cùng cái thước với tiền chưa đến hạn.
+
+   ĐỘ ĐẬM GIẢM DẦN THEO HẠN XA DẦN: tiền sắp phải thu/trả là tiền phải lo trước, nên nó đậm nhất.
+   Chuyển thang ngược lại là làm khoản xa nhất nổi bật nhất.
+
+   flex-basis:0 + flex-grow = giá trị: xem ghi chú "BỀ RỘNG ĐẶT BẰNG flex-grow" ở KhoiV14.tsx. */
+.v14-cc{display:flex;gap:2px;height:14px;margin:14px 0 0}
+.v14-cc-o{display:block;min-width:0;border-radius:2px;background:var(--vtos-navy)}
+.v14-mau-1{opacity:1}
+.v14-mau-2{opacity:.80}
+.v14-mau-3{opacity:.62}
+.v14-mau-4{opacity:.46}
+.v14-mau-5{opacity:.32}
+.v14-mau-do{background:var(--vtos-danger);opacity:1}
+.v14-cc-chu{font-size:12px;margin:6px 0 0}
+.v14-cham{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;
+  background:var(--vtos-navy)}
+
+/* TC-37 · THANH NGANG tồn đọng theo bộ phận. Ba cột: tên — rãnh — số. Rãnh là nền của thanh, nên
+   khung rỗng và thanh dài 0 trông khác nhau rõ ràng. */
+   BA CỘT ĐỀU RỘNG CỐ ĐỊNH, và đây là một lỗi đã ĐO ĐƯỢC chứ không phải đề phòng suông. Bản đầu
+   để cột tên `minmax(90px,168px)` và cột số `auto`, tức hai cột ấy co giãn theo nội dung TỪNG
+   DÒNG. Đo trên bản dựng: rãnh của dòng "Chưa rõ bộ phận" (số 1.750, bốn chữ số) rộng 882,5px
+   trong khi rãnh dòng "Kinh doanh Đoàn" (số 412) rộng 891,8px. Mỗi dòng một thước đo, mà nhìn
+   thì hoàn toàn bình thường — đúng loại sai không ai kiểm được. Dòng ghi "chưa có số" còn lệch
+   xa hơn nữa, nên câu ấy chuyển hẳn vào trong rãnh. */
+.v14-bp-bd{display:grid;gap:6px;margin:0 0 8px}
+.v14-bp-hang{display:grid;grid-template-columns:150px minmax(0,1fr) 72px;
+  align-items:center;gap:10px;font-size:12px}
+.v14-bp-ten{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v14-bp-rai{position:relative;height:14px;border-radius:3px;background:var(--vtos-surface)}
+.v14-bp-thanh{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--vtos-navy)}
+/* "Chưa rõ bộ phận" KHÔNG phải một phòng — màu khác để không đọc nhầm thành phòng thứ n. */
+.v14-bp-thanh.chua-ro{background:var(--vtos-warning)}
+.v14-bp-khuyet{position:absolute;inset:0;border:1px dashed var(--vtos-line);border-radius:3px;
+  display:flex;align-items:center;padding-left:7px;font-size:10px;color:var(--vtos-text-faint)}
+.v14-bp-so{font-variant-numeric:tabular-nums;font-weight:700;text-align:right}
+/* Khoảng hở đặt bằng padding chứ không bằng lề: lề dưới của khung biểu đồ đo trên bản dựng ra
+   0px (bị gộp mất), nên câu chú dính sát thanh cuối. Padding thì không gộp với lề của ai cả. */
+.v14-bp-chu{font-size:12px;margin:0 0 14px;padding-top:7px}
+/* Màn hẹp: TÊN và SỐ chung dòng trên, thanh chiếm trọn dòng dưới — ép ba cột vào 360px thì rãnh
+   còn chừng 80px và mọi thanh trông dài gần bằng nhau, tức biểu đồ hết nói lên điều gì.
+   Đặt ô bằng grid-area chứ không để grid tự xếp: thứ tự trong mã là tên → rãnh → số, tự xếp thì
+   con số rơi xuống DƯỚI thanh, tức nằm ngay trên tên bộ phận kế tiếp và đọc ra là số của phòng
+   kia. Hai cột vẫn cố định để mọi dòng giữ chung một thước. */
+@media (max-width:560px){
+  .v14-bp-bd{gap:12px}
+  .v14-bp-hang{grid-template-columns:minmax(0,1fr) 72px;row-gap:4px}
+  .v14-bp-ten{grid-area:1/1/2/2}
+  .v14-bp-so{grid-area:1/2/2/3}
+  .v14-bp-rai{grid-area:2/1/3/3}
+}
 /* Phải trả quá hạn: theo dõi RIÊNG, nên tách hẳn bằng một vạch trên chứ không nằm chung lưới. */
 .v14-quahan{margin-top:12px;padding-top:11px;border-top:1px solid var(--vtos-line);font-size:13px}
 .v14-qh-so{font-size:19px;display:inline-block;vertical-align:middle;margin-left:4px}
