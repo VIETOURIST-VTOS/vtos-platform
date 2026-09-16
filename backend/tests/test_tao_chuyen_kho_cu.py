@@ -168,3 +168,78 @@ def test_tc9_bo_nay_khong_ghi_gi():
     assert not thay, f"bộ ĐỀ XUẤT đang gọi lệnh ghi cơ sở dữ liệu: {thay}"
     assert "Session" not in open(TC.__file__, encoding="utf-8").read(), \
         "bộ đề xuất không được nhận phiên cơ sở dữ liệu"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TC10–TC11 thêm ngày 16/9/2026, sau khi nạp xong 604 tệp lên bản chạy thật.
+#
+# Vòng nạp báo 54 tệp "không thấy chuyến". Đo lại từng tệp thì 49 trong số ấy đúng là không phải
+# chuyến (bảng visa theo tháng, ghép lẻ theo tháng, dịch vụ lẻ theo tháng, bảng tháng của đối tác
+# land) — để chúng ra ngoài là đúng. Nhưng 4 tệp thì KHÔNG: chúng có đủ mã, ngày, khách và dòng chi
+# của chính đoàn mình, chỉ rơi qua khe giữa hai luật. 312,2 triệu doanh thu nằm ngoài hệ vì thế.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_tc10_land_mot_doan_co_ngay_KHONG_phai_bang_thang_cua_doi_tac():
+    """Chữ LAND trong tên không đủ để kết luận "không phải chuyến".
+
+    Đo 16/9/2026 trên 13 tệp LAND: 11 là bảng THÁNG của đối tác, 2 là quyết toán MỘT ĐOÀN có mã
+    thật, có ngày, có dòng chi phí riêng. Gộp cả 13 vào một rổ là bỏ rơi 49,7 triệu chi phí có
+    chứng từ — mà bỏ rơi im lặng, vì rổ 'bỏ qua' không ai đi soát lại.
+    """
+    thang = [
+        _t("LAND TOUR MIỀN BẮC THÁNG 5.2026.xlsx"),
+        _t("QUYẾT TOÁN LAND PHU QUOC THANG 01.2026.xlsx", "PHUQUOC012026"),
+        _t("QUYẾT TOÁN LAND ĐÀ NẴNG - HUẾ THÁNG 02.2026.xlsx", "MT022026"),
+    ]
+    for d in thang:
+        assert TC.phan_loai(d["ten_tep"]) == "land_doi_tac", \
+            f"bảng tháng của đối tác {d['ten_tep']!r} phải nằm ngoài, không được tạo chuyến"
+
+    doan = [
+        _t("QTT LAND VĨNH HY 03.03.2026 - SALE DIỆU TRINH VTD).xlsx", "DOANVH030326"),
+        _t("QTT ĐOÀN LAND PT 04.06.2026 - SALE KIM OANH (VAT VTD).xlsx", "DOANPT040626"),
+    ]
+    for d in doan:
+        assert TC.phan_loai(d["ten_tep"]) == "mot_chuyen", \
+            f"{d['ten_tep']!r} là quyết toán MỘT ĐOÀN – có mã, có ngày, có dòng chi"
+
+    b = TC.bang(thang + doan, set())
+    assert b["bo_qua"] == 3 and b["tao_moi"] == 2, \
+        f"phải để riêng 3 bảng tháng và tạo 2 chuyến, đang bỏ qua {b['bo_qua']} tạo {b['tao_moi']}"
+    # Mã của hai đoàn là mã THẬT, không được thay bằng mã máy đặt.
+    ma = {h["tep"]: h for h in b["hang"] if h["viec"] == "tao_moi"}
+    for h in ma.values():
+        assert h["ma_la_may_dat"] is False, f"{h['tep']!r} có mã thật {h['ma']!r}, đừng đặt mã tạm"
+
+
+def test_tc11_ngay_nam_o_duoi_TEN_TEP_khi_o_ma_tour_cam():
+    """Khe thứ tư: sáu số cuối nằm trên TÊN TỆP chứ không nằm trong ô 'Mã tour'.
+
+    `ngay_tu_ten_tep` đòi ngày có dấu ngăn; `ngay_tu_ma` đọc sáu số cuối nhưng đọc ở ô mã. Tệp đặt
+    tên bằng chính mã rồi bỏ trống ô ấy thì cả hai đều câm, dù ngày nằm ngay trên tên.
+
+    Đo 16/9/2026: đúng 2 tệp rơi vào khe này — SM001.04090126.xlsx (40 khách, 160,3 tr) và
+    SMI.05090126.xlsx (20 khách, 101,9 tr). Cả hai ghi 'Mã tour' là '3VSV', bốn ký tự, không qua
+    nổi `la_ma_that`, nên trước đây bị xếp 'thiếu ngày' và bỏ hẳn.
+    """
+    assert TC.ngay_tu_duoi_ten_tep("SM001.04090126.xlsx") == date(2026, 1, 9)
+    assert TC.ngay_tu_duoi_ten_tep("SMI.05090126.xlsx") == date(2026, 1, 9)
+    assert TC.ngay_tu_duoi_ten_tep("THÁNG 1.2026.xlsx") is None, \
+        "bảng tháng không có ngày – không được bịa ra một ngày cho nó"
+
+    ds = [_t("SM001.04090126.xlsx", "3VSV", None), _t("SMI.05090126.xlsx", "3VSV", None)]
+    b = TC.bang(ds, set())
+    assert b["thieu_ngay"] == 0 and b["tao_moi"] == 2, \
+        f"hai tệp này phải tạo được chuyến, đang thiếu ngày {b['thieu_ngay']}"
+    h = {x["tep"]: x for x in b["hang"]}
+    for x in h.values():
+        assert x["ngay_di"] == date(2026, 1, 9)
+        assert x["ma_la_may_dat"] is True, "'3VSV' là bốn ký tự – không phải mã, phải đặt mã tạm"
+    assert h["SM001.04090126.xlsx"]["ma"] != h["SMI.05090126.xlsx"]["ma"], \
+        "hai tệp khác nhau cùng ngày mà cùng mã thì cửa ghi gộp hai chuyến làm một"
+
+    # ĐƯỜNG LUI CUỐI, không được vượt mặt ba nguồn trên. Tên tệp có đủ cả hai kiểu ngày thì kiểu
+    # có dấu ngăn phải thắng.
+    x = TC.de_xuat(_t("QT ABC 20.02.2026 - SM000.05120326.xlsx", "", None), set())
+    assert x["ngay_di"] == date(2026, 2, 20), "ngày có dấu ngăn trên tên tệp phải thắng sáu số cuối"

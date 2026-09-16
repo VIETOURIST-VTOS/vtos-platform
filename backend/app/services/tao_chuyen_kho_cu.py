@@ -103,8 +103,23 @@ def phan_loai(ten_tep: str, ma_tour: str = "") -> str:
     bảng gom nhiều việc lẻ trong một tháng, nên bên trong chúng trông y hệt một bảng chi bình
     thường. Thứ phân biệt được chúng là cái tên mà người lập đặt — 'QUYẾT TOÁN VISA MỸ THÁNG 4',
     'QT OUTBOUND GHÉP LẺ T01.26'. Đo trên 604 tệp: cách này xếp đúng 34/37 tệp không có mã tour.
+
+    NGOẠI LỆ CỦA LAND — đo lại ngày 16/9/2026 trên 13 tệp LAND trong kho:
+
+        11 tệp là BẢNG THÁNG của đối tác  – 'LAND PHU QUOC THANG 01.2026', 'LAND TOUR MIỀN BẮC
+                                            THÁNG 5.2026'. Đúng là không phải chuyến.
+         2 tệp là QUYẾT TOÁN MỘT ĐOÀN     – 'QTT LAND VĨNH HY 03.03.2026' (mã DOANVH030326, 1 khách,
+                                            7 dòng chi), 'QTT ĐOÀN LAND PT 04.06.2026'
+                                            (mã DOANPT040626, 3 khách, 17 dòng chi).
+
+    Hai tệp sau có ĐỦ ba thứ mà một chuyến cần: mã thật, ngày đi, và dòng chi phí của chính đoàn ấy.
+    Xếp chúng vào 'không phải chuyến' chỉ vì chữ LAND trong tên là bỏ rơi 49,7 triệu chi phí có
+    chứng từ. Phân biệt bằng thứ đo được: tên có THÁNG / T<số> là bảng tháng; tên có NGÀY đầy đủ
+    (dd.mm.yyyy) là một đoàn. Luật này tách đúng 11/2 trên cả 13 tệp, không sót và không bắt oan.
     """
     T = _khong_dau(ten_tep)
+    if "LAND" in T and not re.search(r"THANG|\bT\d", T) and ngay_tu_ten_tep(ten_tep):
+        return "mot_chuyen"
     if "VISA" in T:
         return "visa_thang"
     if re.search(r"(OUTBOUND|\bOB\b).{0,6}GHEP\s*LE", T) or "GHEP LE" in T:
@@ -161,6 +176,27 @@ def ngay_tu_ma(ma: str) -> date | None:
         return date(2000 + int(s[4:6]), int(s[2:4]), int(s[0:2]))
     except ValueError:
         return None
+
+
+def ngay_tu_duoi_ten_tep(ten_tep: str) -> date | None:
+    """Ngày đọc từ SÁU CHỮ SỐ CUỐI CỦA TÊN TỆP – cùng quy ước DDMMYY của công ty, chỗ khác.
+
+    VÌ SAO CẦN THÊM ĐƯỜNG NÀY
+
+    `ngay_tu_ten_tep` đòi ngày có dấu ngăn ('03.03.2026'). `ngay_tu_ma` đọc sáu chữ số cuối, nhưng
+    đọc ở Ô 'Mã tour' – mà có tệp đặt TÊN bằng chính mã và bỏ trống ô ấy. Hai đường cùng câm, dù
+    ngày nằm ngay trên tên tệp.
+
+    Đo ngày 16/9/2026 trên 604 tệp: đúng 2 tệp rơi vào khe này – 'SM001.04090126.xlsx' (40 khách,
+    160,3 triệu) và 'SMI.05090126.xlsx' (20 khách, 101,9 triệu). Cả hai ghi 'Mã tour' là '3VSV' –
+    bốn ký tự, không qua nổi `la_ma_that` – nên trước đây bị xếp 'thiếu ngày' và bỏ hẳn ra ngoài.
+    262,2 triệu doanh thu của khách có tên tuổi nằm ngoài hệ vì một dấu chấm thiếu trong tên tệp.
+
+    Vẫn là ĐƯỜNG LUI CUỐI, sau cả ngày trong tệp, ngày trên tên tệp và ngày trong mã: quy ước DDMMYY
+    đo được 94% khớp, tức 6% lệch, nên nó chỉ được dùng khi mọi nguồn đáng tin hơn đều câm.
+    """
+    t = re.sub(r"\.(xlsx|xlsm|xls)$", "", (ten_tep or "").strip(), flags=re.I)
+    return ngay_tu_ma(t)
 
 
 # Lệch quá ngần này thì phần đầu tệp là VỎ MẪU CŨ, không phải thông tin của chuyến này.
@@ -273,7 +309,7 @@ def de_xuat(d: dict, ma_da_co: set[str], ma_vo_cu: set[str] | None = None) -> di
         except ValueError:
             ngay = None
     if not isinstance(ngay, date):
-        ngay = ngay_tu_ten_tep(tep) or ngay_tu_ma(ma_goc)
+        ngay = ngay_tu_ten_tep(tep) or ngay_tu_ma(ma_goc) or ngay_tu_duoi_ten_tep(tep)
 
     if vo_cu:
         ra["ma"] = _ma_tam(tep, ngay)
