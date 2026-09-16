@@ -502,8 +502,14 @@ def bo_nap(_c) -> dict:
                    ghi_chu="TÊN NGƯỜI, không phải mã. Chưa gán được tài khoản thì doanh thu KHÔNG "
                            "vào chỉ tiêu của ai – gán ở màn hình người bán"),
                 _c("doi_tac", "Đối tác / nhà cung cấp"),
-                _c("tong_thu", "Tổng thu", kieu="so", vi_du="6790000",
-                   ghi_chu="lấy ô 'Tổng thu' khi bảng có; không có thì CỘNG các cột thu"),
+                # CỘT BẮT BUỘC DUY NHẤT, và bắt buộc ở mức MỘT DÒNG chứ không ở mức một ô: dòng
+                # không có tiền thu thì không phải một khách, nó là dòng trắng ngăn giữa hai nhóm —
+                # và cửa này bỏ đúng những dòng ấy (xem `_khach_cho_phieu`). Ngược lại, dòng CÓ
+                # tiền mà tệp quên ghi tên khách thì VẪN GIỮ: bỏ nó là mất doanh thu công ty thu
+                # thật, và mất lặng vì mọi tổng vẫn cân trên phần còn lại.
+                _c("tong_thu", "Tổng thu", True, kieu="so", vi_du="6790000",
+                   ghi_chu="lấy ô 'Tổng thu' khi bảng có; không có thì CỘNG các cột thu. Dòng "
+                           "không có tiền thu là dòng trắng, không phải một khách"),
                 _c("tong_chi", "Tổng chi", kieu="so",
                    ghi_chu="luôn CỘNG TỪ CÁC CỘT CHI. Ô tổng của tệp chỉ dùng để đối chiếu"),
                 _c("ty_gia", "Tỷ giá", kieu="so",

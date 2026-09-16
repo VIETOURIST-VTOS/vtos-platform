@@ -137,6 +137,13 @@ def test_btn1_cua_co_mat_trong_khung_nap_va_khong_noi_quyen():
     # Bảng phụ phải khai đủ: phép kiểm "mọi bảng phải có một cửa" đọc SỐNG từ chỗ này.
     assert set(b["bang_phu"]) == {"tours", "booking_khach", "tour_cost_lines"}
     assert I.VAI_TRO["bang_thang_dich_vu_le"] == ("chutich", "tgd", "cntt", "tp_dh", "ketoan")
+    # PHẢI CÓ ÍT NHẤT MỘT CỘT BẮT BUỘC. Hàng rào chung của khung nạp
+    # (`test_nap_du_lieu_phong_ban.test_du_bo_nap_cho_cac_phong_ban`) đọc điều này, và vòng CI đầu
+    # của vá 10b ĐỎ đúng ở đây — vì phép thử ấy không nằm trong danh sách chạy tại máy. Chốt lại ở
+    # đây để lần sau bắt được tại chỗ, không phải sau 24 phút chờ CI.
+    assert any(c["bat_buoc"] for c in b["cot"]), "bộ nạp phải có ít nhất một cột bắt buộc"
+    assert [c["key"] for c in b["cot"] if c["bat_buoc"]] == ["tong_thu"], \
+        "cột bắt buộc là TỔNG THU: dòng không có tiền thu là dòng trắng, không phải một khách"
     for xau in ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_dh"):
         assert xau not in I.VAI_TRO["bang_thang_dich_vu_le"], \
             f"{xau} không được nạp lô này — doanh số của chính họ nằm trong đây"
