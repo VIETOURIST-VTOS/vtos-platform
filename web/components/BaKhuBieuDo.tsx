@@ -30,23 +30,17 @@
  *  khung xám ghi lại đúng điều ấy là nói hai lần cùng một chuyện, và đó là cái anh Tuấn bảo bỏ.
  */
 import {
-  BieuDoCot, BieuDoThanh, BieuDoCoCau, duVeCot, duVeThanh, duVeCoCau,
-  type Diem, type Thanh, type Phan,
+  BieuDoThanh, BieuDoCoCau, duVeThanh, duVeCoCau,
+  type Thanh, type Phan,
 } from "@/components/BieuDo";
 
 /* ─────────────────────────── ĐỌC DỮ LIỆU MÁY CHỦ ─────────────────────────── */
 
-const tenKy = (ky: string) => { const [y, m] = String(ky).split("-"); return `${m}/${y}`; };
-
-/** Một chuỗi xu hướng của máy chủ → dãy điểm của biểu đồ.
- *  `gia_tri === null` giữ nguyên là null: đó là kỳ CHƯA CÓ SỐ, và bộ biểu đồ vẽ nó thành ô trống
- *  đúng vị trí. Quy nó thành 0 ở đây là phá luật ngay tại cửa vào. */
-function diemTu(xh: any): Diem[] {
-  return (xh?.diem || []).map((d: any) => ({
-    nhan: tenKy(d.ky),
-    gt: d.gia_tri === null || d.gia_tri === undefined ? null : Number(d.gia_tri),
-  }));
-}
+/* TC-42 (16/9/2026) – hai biểu đồ CỘT theo kỳ (doanh thu, lợi nhuận) RỜI khỏi tệp này.
+   Chúng thành hai Ô LỚN có ô chọn Tháng / Quý / Năm, dựng ở components/KhoiSauO.tsx. Hàm đổi chuỗi
+   xu hướng thành dãy điểm đi theo chúng sang đó — giữ lại một bản ở đây là để hai bản cùng đọc một
+   cấu trúc dữ liệu, và ngày một bản sửa mà bản kia quên là ngày hai biểu đồ nói khác nhau.
+   Tệp này nay chỉ còn các biểu đồ CƠ CẤU và XẾP HẠNG. */
 
 /** Năm nhóm hạn của máy chủ → các phần của một tổng. Thứ tự lấy theo KHUNG, không theo thứ tự
  *  máy chủ trả về: khung là thứ tự hạn gần → xa, còn đối tượng JSON thì không hứa thứ tự nào. */
@@ -75,19 +69,13 @@ const KHUNG_TRA = [
  *  Nơi gọi chỉ việc `{bd.phai_thu}` — không phải chép lại điều kiện vẽ lần thứ hai. */
 export type BoBieuDo = {
   phai_thu: any; phai_tra: any;
-  doanh_thu: any; loi_nhuan: any;
   kd_le: any; kd_doan: any;
   bao_cao_ngay: any;
 };
 
 export function bieuDoCua(sec: any): BoBieuDo {
-  const xh = sec?.xu_huong || {};
-
   const thu = phanTu(KHUNG_THU, sec?.phai_thu_theo_han);
   const tra = phanTu(KHUNG_TRA, sec?.phai_tra_theo_han);
-  const dtThang = diemTu(xh.doanh_thu_thang);
-  const lnThang = diemTu(xh.ln_ke_toan_thang);
-
   const le: Thanh[] = (sec?.kd_le || []).map((r: any) => ({
     ten: r.sales, gt: r.revenue === null || r.revenue === undefined ? null : Number(r.revenue),
   }));
@@ -112,14 +100,6 @@ export function bieuDoCua(sec: any): BoBieuDo {
     phai_tra: duVeCoCau(tra)
       ? <BieuDoCoCau ten="Cơ cấu theo hạn" ds={tra}
           chan="Phải trả quá hạn theo dõi riêng ở dưới, KHÔNG nằm trong năm nhóm này — gộp vào là đếm hai lần." />
-      : null,
-    doanh_thu: duVeCot(dtThang)
-      ? <BieuDoCot ten="Doanh thu theo tháng" phu="6 tháng đã đóng gần nhất" diem={dtThang}
-          chan="Tháng đang chạy KHÔNG nằm trong biểu đồ: đặt một tháng mới đi nửa đường cạnh các tháng đủ ngày thì cột cuối luôn thấp và đường xu hướng luôn trông như đang lao dốc." />
-      : null,
-    loi_nhuan: duVeCot(lnThang)
-      ? <BieuDoCot ten="Lợi nhuận trước thuế theo tháng" phu="6 tháng đã đóng gần nhất" diem={lnThang}
-          chan="Cột dưới vạch 0 là tháng lỗ. Lỗ ít đi so với tháng trước vẫn tính là TĂNG — so sánh chia cho trị tuyệt đối." />
       : null,
     kd_le: duVeThanh(le)
       ? <BieuDoThanh ten="Xếp hạng theo nhân viên" ds={le} dinh_dang="tien" />

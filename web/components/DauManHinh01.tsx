@@ -53,38 +53,12 @@ export type XuHuong = {
 /** Tên kỳ "2026-08" → "08/2026". Đọc "2026-08" trên nhãn cột thì phải dịch trong đầu mỗi lần. */
 const tenKy = (ky: string) => { const [y, m] = ky.split("-"); return `${m}/${y}`; };
 
-/** TC-41 · DÒNG PHỤ "SO VỚI KẾ HOẠCH" của thẻ Doanh thu và thẻ Lợi nhuận trước thuế.
- *
- *  Bản vẽ V1.4 chốt dòng phụ ấy từ lâu, nhưng suốt bốn vòng thẻ chỉ in được một câu thú nhận vì
- *  chưa có bảng kế hoạch. Cửa nhập /ke-hoach-thang mở ngày 16/9/2026, nên câu ấy nay viết được.
- *
- *  HÀM NÀY KHÔNG TÍNH GÌ. Tỉ lệ đạt do máy chủ tính (services/ke_hoach.ty_le_dat) và gửi xuống ở
- *  `ty_le`; ở đây chỉ nhân 100 để đổi sang phần trăm khi in — đúng như mọi chỗ khác trên màn hình.
- *
- *  BA TRẠNG THÁI, BA CÂU KHÁC HẲN NHAU, và nhập nhằng giữa chúng là chỗ hỏng:
- *    · chưa nhập gì cả        → nói chưa có, và nói ai nhập ở đâu
- *    · nhập thiếu pháp nhân   → nói THIẾU AI, vì phần đã nhập KHÔNG phải kế hoạch nhỏ hơn
- *    · đủ                     → in chỉ tiêu và tỉ lệ đạt
- */
-export function docHoKeHoach(kh: any, don_vi: "doanh_thu" | "loi_nhuan_truoc_thue",
-                             ty_le: number | null | undefined): string {
-  const o = kh?.[don_vi];
-  if (!o) return "chưa có kế hoạch tháng để so sánh (Kế toán nhập ở Kế hoạch tháng)";
-  if (!o.du) {
-    const thieu: string[] = o.thieu || [];
-    if (thieu.length === 0) {
-      return "chưa có kế hoạch tháng để so sánh (Kế toán nhập ở Kế hoạch tháng)";
-    }
-    // Kê đích danh, tối đa hai tên rồi mới đếm phần còn lại: "thiếu 4 pháp nhân" không giúp ai đi
-    // đòi, còn một danh sách bảy tên thì không đọc hết trên một dòng phụ.
-    const ten = thieu.slice(0, 2).join(", ")
-      + (thieu.length > 2 ? ` và ${thieu.length - 2} pháp nhân nữa` : "");
-    return `kế hoạch tháng chưa đủ — còn thiếu ${ten} (Kế toán nhập ở Kế hoạch tháng)`;
-  }
-  const chi_tieu = `kế hoạch ${vnd(o.gia_tri)}`;
-  if (ty_le === null || ty_le === undefined) return `${chi_tieu} · chưa tính được tỉ lệ đạt`;
-  return `${chi_tieu} · đạt ${Math.round(ty_le * 100)}%`;
-}
+/* TC-42 (16/9/2026) – câu đọc hộ phần kế hoạch RỜI khỏi tệp này.
+   Nó theo hai ô lớn Doanh thu và Lợi nhuận sang components/KhoiSauO.tsx, nơi nó thành
+   `docHoKeHoachKy` và biết thêm một việc mà bản cũ không biết: kế hoạch CHỈ có cho kỳ tháng, nên
+   bấm sang Quý thì phải nói ra điều đó thay vì im lặng vẽ một vạch mốc dựng từ kế hoạch tháng.
+   Giữ lại một bản ở đây là để hai bản cùng nói về một con số, và ngày chúng lệch nhau thì màn
+   hình có hai câu trả lời cho cùng một câu hỏi. */
 
 /** BIỂU ĐỒ NHỎ TRÊN THẺ — cột, không phải đường.
  *
@@ -296,7 +270,14 @@ export function KhoiQuyetDinh({ ds, vai }: { ds: any[]; vai?: string }) {
 
 /** Khối 03 – tám thẻ. Bản vẽ xếp hai hàng bốn thẻ trên màn rộng; ở đây để lưới tự xuống dòng theo
  *  bề rộng thật, vì khoá cứng bốn cột thì trên màn 1280px chữ bị cắt. */
-export function TamThe({ ds }: { ds: The[] }) {
+/** HÀNG THẺ SỐ — đổi tên từ `TamThe` ngày 16/9/2026 (TC-42), và đổi tên là có lý do.
+ *
+ *  Anh Tuấn chuyển sáu trong tám thẻ thành sáu Ô LỚN có biểu đồ, năm mục còn lại xuống một hàng
+ *  thẻ nhỏ. Một hàm tên `TamThe` mà bày năm thẻ là một lời nói dối nhỏ nằm ngay trong mã: người
+ *  đọc mã ba tháng sau sẽ đếm tám và đi tìm ba thẻ không tồn tại. Số lượng thẻ nay là việc của nơi
+ *  gọi, nên tên hàm không được nhắc tới nó nữa.
+ */
+export function HangThe({ ds }: { ds: The[] }) {
   return <div className="mh01-the">{ds.map((t) => <TheChiTieu key={t.nhan + (t.phu || "")} t={t} />)}</div>;
 }
 

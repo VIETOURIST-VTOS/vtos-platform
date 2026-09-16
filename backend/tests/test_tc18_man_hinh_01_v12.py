@@ -33,21 +33,39 @@ def _ma(p):
 def test_viec_can_quyet_dinh_dung_truoc_cac_con_so():
     """Thứ tự bản vẽ: tiêu đề → hàng lọc → Cần quyết định → tám thẻ → dòng tiền."""
     s = _ma(TRANG)
-    vt = {t: s.index(t) for t in ("<TieuDe", "<DongLoc", "<KhoiQuyetDinh", "<TamThe", "<KhoiDongTien")}
+    # TC-42: `<TamThe` → `<HangThe`, và hàng thẻ nhỏ nay đứng SAU sáu ô lớn. Luật giữ nguyên —
+    # tiêu đề, hàng lọc và khối "Cần quyết định" vẫn phải đứng trước mọi con số.
+    vt = {t: s.index(t) for t in ("<TieuDe", "<DongLoc", "<KhoiQuyetDinh", "<KhoiDongTien", "<HangThe")}
     thu_tu = sorted(vt, key=lambda t: vt[t])
-    assert thu_tu == ["<TieuDe", "<DongLoc", "<KhoiQuyetDinh", "<TamThe", "<KhoiDongTien"], \
+    assert thu_tu == ["<TieuDe", "<DongLoc", "<KhoiQuyetDinh", "<KhoiDongTien", "<HangThe"], \
         f"thứ tự khối trên màn hình 01 lệch bản vẽ V1.2: {thu_tu}"
 
 
-def test_dung_tam_the_chi_tieu():
-    """Tám thẻ, đúng tám – bản vẽ xếp hai hàng bốn thẻ."""
+def test_sau_o_lon_va_nam_the_nho():
+    """TÁM THẺ → SÁU Ô LỚN + NĂM THẺ NHỎ (anh Tuấn chốt 16/9/2026, TC-42).
+
+    Bản V1.2 chốt tám thẻ ngang hàng nhau. Trên bản chạy thật, tám thẻ ngang hàng hoá ra là tám
+    con số ngang hàng — mà chúng không ngang hàng: "doanh thu 4,3 tỷ" chỉ có nghĩa khi đặt cạnh kế
+    hoạch và kỳ trước, còn "93 tour sắp khởi hành" thì đọc xong là xong.
+
+    Nên phép thử này canh HAI nhóm, và canh rằng chúng không lẫn vào nhau. Sáu mục phải nghĩ thì
+    phải có biểu đồ; năm mục chỉ để liếc thì KHÔNG được có, vì hình trên chúng kéo mắt khỏi sáu ô
+    trên — đúng điều anh Tuấn chốt khi chọn "thẻ số nhỏ, một hàng, không biểu đồ".
+    """
     s = _ma(TRANG)
-    khoi = s[s.index("const tam: The[] = ["): s.index("];", s.index("const tam: The[] = ["))]
+    khoi = s[s.index("const the: The[] = ["): s.index("];", s.index("const the: The[] = ["))]
     nhan = re.findall(r'nhan: "([^"]+)"', khoi)
-    assert len(nhan) == 8, f"bản vẽ chốt TÁM thẻ, đang có {len(nhan)}: {nhan}"
-    for can in ("Doanh thu tháng", "Lợi nhuận trước thuế", "Tour đang bán", "Tour chờ quyết toán",
-                "Tour sắp khởi hành", "Đội xe hôm nay", "Marketing & PR", "Tồn đọng cần xử lý"):
-        assert can in nhan, f"thiếu thẻ “{can}” của bản vẽ V1.2"
+    assert len(nhan) == 5, f"hàng thẻ nhỏ phải đúng NĂM mục, đang có {len(nhan)}: {nhan}"
+    for can in ("Tour đang bán", "Tour chờ quyết toán", "Tour sắp khởi hành",
+                "Đội xe hôm nay", "Marketing & PR"):
+        assert can in nhan, f"thiếu thẻ “{can}” trong hàng thẻ nhỏ"
+    assert "xu_huong:" not in khoi, (
+        "Năm thẻ nhỏ KHÔNG được mang biểu đồ — chúng là con số để liếc, và hình trên chúng kéo "
+        "mắt khỏi sáu ô lớn phía trên."
+    )
+    for o in ("<KhoiDoanhThu", "<KhoiLoiNhuan", "<KhoiDongTien",
+              "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiTonDongMuc"):
+        assert o in s, f"thiếu ô lớn {o} — anh Tuấn chốt đúng sáu ô."
 
 
 def test_the_chua_co_nguon_phai_co_cua_nhap():
@@ -57,7 +75,7 @@ def test_the_chua_co_nguon_phai_co_cua_nhap():
     ghi ra thì không ai biết phải đi hỏi bộ phận nào.
     """
     s = _ma(TRANG)
-    khoi = s[s.index("const tam: The[] = ["): s.index("];", s.index("const tam: The[] = ["))]
+    khoi = s[s.index("const the: The[] = ["): s.index("];", s.index("const the: The[] = ["))]
     for the in re.findall(r'\{ nhan: "[^"]+".*?\},\n', khoi, re.S):
         if re.search(r'so: null', the):
             assert "cua:" in the and "ai:" in the, \
@@ -65,18 +83,34 @@ def test_the_chua_co_nguon_phai_co_cua_nhap():
     assert "the-cua" in _ma(DAU), "thẻ rỗng phải vẽ được đường dẫn cửa nhập"
 
 
-def test_man_hinh_01_chi_theo_thang_va_chi_duong_xem_quy_nam():
-    """Anh Tuấn chốt 13/9: màn hình 01 chỉ hiển thị THÁNG; quý và năm xem ở báo cáo chi tiết.
+def test_o_chon_ky_chi_mo_khi_co_so_that_dang_sau():
+    """SỬA 16/9/2026 (TC-42) — QUYẾT ĐỊNH 13/9 BỊ THAY, VÀ ĐÂY LÀ LÝ DO.
 
-    Không để một ô chọn có sẵn "Quý"/"Năm" mà bấm vào lại báo "chưa có nguồn" – đó là một lời hứa
-    suông ngay trên màn hình đầu tiên. Thay bằng đường dẫn tới chỗ xem được thật.
+    Bản 13/9 cấm ô chọn Tháng/Quý/Năm trên màn hình 01, vì lúc ấy máy chủ mới tính theo tháng: một
+    ô chọn ba kỳ mà bấm vào lại báo "chưa có nguồn" là lời hứa suông ngay trên màn hình đầu tiên.
+    Cái bị cấm là LỜI HỨA SUÔNG, không phải ô chọn.
+
+    Nay `services/xu_huong.doc_theo_ky` cộng được quý và năm từ chính các tháng, nên đằng sau ô
+    chọn có số thật — và anh Tuấn chốt 16/9 là "doanh thu và lợi nhuận phân ra theo tháng, quý,
+    năm". Luật giữ nguyên, chỉ sự thật đổi.
+
+    Phép thử nay canh đúng cái luật ấy: có ô chọn thì phải có nguồn, và hàng lọc vẫn phải chỉ ra
+    chỗ xem báo cáo đầy đủ.
     """
-    dau, trang = _ma(DAU), _ma(TRANG)
+    dau = _ma(DAU)
     assert "tenThang" in dau, "hàng lọc phải in tháng báo cáo lấy từ lịch máy"
     assert 'href="/phan-he/baocao"' in dau, "thiếu đường dẫn sang chỗ xem theo quý và năm"
-    for cam in ("theoQuy", 'value="quy"', "type Ky"):
-        assert cam not in trang and cam not in dau, \
-            f"còn tàn dư của ô chọn kỳ nhiều mức: {cam}"
+
+    import pathlib
+    goc = pathlib.Path(ROOT)
+    sau_o = (goc / "web" / "components" / "KhoiSauO.tsx").read_text(encoding="utf-8")
+    assert '{ ma: "quy", ten: "Quý" }' in sau_o, "ô chọn ba kỳ phải nằm ở khối sáu ô"
+    assert "ba_ky?.[ky]" in sau_o, (
+        "Mỗi kỳ phải đọc chuỗi RIÊNG của kỳ ấy. Lấy chuỗi tháng làm lối lui cho quý là nói dối "
+        "bằng giao diện — người đọc kết luận quý bằng tháng, chứ không kết luận là chưa có số."
+    )
+    xh = (goc / "backend" / "app" / "services" / "xu_huong.py").read_text(encoding="utf-8")
+    assert "def doc_theo_ky" in xh, "nguồn số của quý và năm phải có thật ở máy chủ"
 
 
 def test_ngay_bao_cao_lay_theo_lich_may_va_khong_vo_hydration():

@@ -52,13 +52,27 @@ def _bo_chu_thich_css(s: str) -> str:
 #
 # Đây là chỗ dễ hiểu nhầm nhất khi đọc lại về sau, nên nói thẳng: màn hình KHÁC bản vẽ ở bốn chỗ,
 # và đó là khác CÓ CHỦ Ý. Bản vẽ là bản vẽ của một hệ thống ĐÃ CÓ SỐ; hôm nay VTOS đang dựng.
+# TC-42 (16/9/2026) · THỨ TỰ DỰNG LẠI THEO CÁCH ĐỌC, KHÔNG THEO SỐ HIỆU BẢN VẼ.
+#
+# Anh Tuấn mở bản chạy thật lần nữa và chốt: sáu mục phải NGHĨ mới hiểu (doanh thu · lợi nhuận ·
+# dòng tiền · phải thu · phải trả · tồn đọng) thành sáu Ô LỚN có biểu đồ, đứng trên cùng; năm mục
+# chỉ để LIẾC (tour đang bán · chờ quyết toán · sắp khởi hành · đội xe · marketing) xuống một hàng
+# thẻ nhỏ phía dưới.
+#
+# Vì thế thứ tự ở đây KHÔNG còn là thứ tự số hiệu của bản vẽ V1.4, và nói thẳng ra để vòng sau
+# không "sửa lại cho đúng bản vẽ": bản vẽ xếp theo NHÓM NGHIỆP VỤ (04 vận hành, 05 công nợ, 06
+# dòng tiền); màn hình nay xếp theo CÁCH ĐỌC. Ba khối Dòng tiền, Phải thu, Phải trả chuyển hẳn lên
+# nhóm sáu ô — không để lại bản sao ở dưới, đúng luật "một con số, một chỗ, một hình" của TC-40.
 THU_TU_BAN_VE = [
-    "<KhoiQuyetDinh",            # 02 · Cần Chủ tịch quyết định
-    "<TamThe",                   # 03 · tám thẻ chỉ tiêu
-    "<KhoiHieuQuaXe",            # 04b · Hiệu quả đội xe (thêm chọn tháng / quý / năm)
-    "<KhoiDongTien",             # 06  · Dòng tiền — anh Tuấn: "giữ nguyên"
-    "<KhoiPhaiThu",              # 05a · Phải thu theo hạn
-    "<KhoiPhaiTra",              # 05b · Phải trả theo hạn
+    "<KhoiQuyetDinh",            # 02  · Cần Chủ tịch quyết định
+    "<KhoiDoanhThu",             # Ô 1 · Doanh thu (tháng / quý / năm)
+    "<KhoiLoiNhuan",             # Ô 2 · Lợi nhuận trước thuế (tháng / quý / năm)
+    "<KhoiDongTien",             # Ô 3 · Dòng tiền — anh Tuấn: "giữ nguyên"
+    "<KhoiPhaiThu",              # Ô 4 · Phải thu theo hạn
+    "<KhoiPhaiTra",              # Ô 5 · Phải trả theo hạn
+    "<KhoiTonDongMuc",           # Ô 6 · Tồn đọng theo mức độ
+    "<HangThe",                  # hàng năm thẻ số nhỏ
+    "<KhoiHieuQuaXe",            # 04b · Hiệu quả đội xe
 ]
 
 # Bốn khối đã gỡ. Lắp lại khối nào thì phải có lý do mới và phải sửa phép kiểm này — để việc lắp
@@ -88,14 +102,23 @@ def test_muoi_khoi_xep_dung_thu_tu_ban_ve():
     )
 
 
-def test_dong_tien_dung_ngay_sau_hieu_qua_doi_xe():
-    """Bản vẽ đặt Dòng tiền SAU hai khối công nợ và TRƯỚC Rủi ro. Rủi ro đã gỡ, và anh Tuấn chốt
-    Dòng tiền "giữ nguyên" — khối quan trọng nhất màn hình nên nó lên ngay sau tám thẻ và đội xe,
-    trước hai khối công nợ. Đọc từ trên xuống là: cần quyết gì → công ty đang ở đâu → tiền ra vào
-    thế nào → ai nợ mình, mình nợ ai."""
+def test_dong_tien_dung_giua_nhom_sau_o_va_truoc_hai_khoi_cong_no():
+    """SỬA 16/9/2026 (TC-42) — LUẬT GIỮ NGUYÊN, VỊ TRÍ ĐỔI VÌ MÀN HÌNH ĐỔI.
+
+    Luật là MẠCH ĐỌC: cần quyết gì → công ty đang ở đâu → tiền ra vào thế nào → ai nợ mình, mình
+    nợ ai. Trước TC-42, "công ty đang ở đâu" là tám thẻ chỉ tiêu cộng khối Hiệu quả đội xe, nên
+    Dòng tiền đứng sau đội xe.
+
+    Nay hai ô Doanh thu và Lợi nhuận GÁNH vế "công ty đang ở đâu" — chúng có cả số, cả biểu đồ ba
+    kỳ, cả so với kế hoạch. Hiệu quả đội xe thành số liệu của một bộ phận và xuống dưới hàng thẻ.
+    Mạch đọc không đổi; thứ đứng ở vế thứ hai thì đổi.
+    """
     ma = _bo_chu_thich_tsx(_doc(TRANG))
-    assert ma.index("<KhoiHieuQuaXe") < ma.index("<KhoiDongTien") < ma.index("<KhoiPhaiThu"), (
-        "Dòng tiền phải đứng sau Hiệu quả đội xe và trước Phải thu."
+    assert ma.index("<KhoiDoanhThu") < ma.index("<KhoiLoiNhuan") < ma.index("<KhoiDongTien"), (
+        "Dòng tiền phải đứng sau hai ô kết quả kinh doanh."
+    )
+    assert ma.index("<KhoiDongTien") < ma.index("<KhoiPhaiThu") < ma.index("<KhoiPhaiTra"), (
+        "Dòng tiền phải đứng trước hai khối công nợ: tiền ra vào trước, ai nợ ai sau."
     )
 
 def test_ba_khoi_kinh_doanh_dung_cuoi_va_khong_chen_giua():

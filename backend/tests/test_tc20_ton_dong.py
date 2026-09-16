@@ -15,6 +15,9 @@ from pathlib import Path
 GOC = Path(__file__).resolve().parents[2]
 TRANG = GOC / "web" / "app" / "page.tsx"
 KHOI = GOC / "web" / "components" / "KhoiTonDong.tsx"
+# TC-42 (16/9/2026): "Tồn đọng cần xử lý" từ một THẺ SỐ trong mảng tám thẻ thành một Ô LỚN có biểu
+# đồ cơ cấu ba mức độ. Con số to nay nằm ở components/KhoiSauO.tsx.
+SAU_O = GOC / "web" / "components" / "KhoiSauO.tsx"
 CSS = GOC / "web" / "app" / "globals.css"
 
 
@@ -23,34 +26,46 @@ def _doc(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
 
-def _the_ton_dong(nguon: str) -> str:
-    """Cắt đúng khai báo thẻ "Tồn đọng cần xử lý" trong mảng tám thẻ."""
-    i = nguon.find('nhan: "Tồn đọng cần xử lý"')
-    assert i > 0, 'Không tìm thấy thẻ "Tồn đọng cần xử lý" trong màn hình 01'
-    return nguon[i:nguon.find("},", i) + 2]
+def _khoi_ton_dong(nguon: str) -> str:
+    """Cắt đúng thân khối Tồn đọng — nay là một Ô LỚN, không còn là một phần tử mảng thẻ."""
+    i = nguon.find("export function KhoiTonDongMuc")
+    assert i > 0, "Không tìm thấy khối Tồn đọng cần xử lý (KhoiTonDongMuc)"
+    return nguon[i:]
 
 
-def test_the_ton_dong_lay_tong_that_khong_lay_do_dai_danh_sach():
-    """Con số to của thẻ phải là tổng thật của máy chủ, không phải len() của danh sách gửi kèm."""
-    the = _the_ton_dong(_doc(TRANG))
-    assert "so: dem(k.canh_bao_do)" in the, (
-        "Thẻ Tồn đọng phải lấy `k.canh_bao_do` (tổng thật) làm con số chính.\n"
-        f"Đang là:\n{the}"
+def test_khoi_ton_dong_lay_tong_that_khong_lay_do_dai_danh_sach():
+    """Con số to phải là tổng THẬT của máy chủ, không phải len() của danh sách gửi kèm.
+
+    SỬA 16/9/2026 (TC-42): luật không đổi một chữ, chỉ chỗ nhìn đổi. Trước đây con số ấy là
+    `k.canh_bao_do` trên một thẻ; nay là `d.tong` trong ô lớn — tổng do services/canh_bao_muc gom,
+    và nó gồm CẢ những mức lạ chưa khai, đúng để tổng trên màn hình không nhỏ hơn số việc thật.
+
+    Lỗi gốc mà phép thử này sinh ra để chặn vẫn nguyên đó: ngày 13/9 màn hình in 60 (số dòng gửi
+    kèm) trong khi số thật là 1387. Cả hai đều có thật, đều do máy chủ trả về — chỉ là lấy nhầm cái.
+    """
+    khoi = _khoi_ton_dong(_doc(SAU_O))
+    assert "d.tong" in khoi, (
+        "Ô Tồn đọng phải lấy tổng THẬT của máy chủ (`d.tong`) làm con số chính.\n"
+        f"Đang là:\n{khoi[:400]}"
     )
-    assert not re.search(r"so:\s*dem\(\s*d\.alerts", the), (
+    assert not re.search(r"\bd\.alerts\b|\.length\b", khoi.split("</section>")[0]), (
         "Thẻ Tồn đọng đang lấy độ dài danh sách `d.alerts` làm con số chính. Đó là số dòng máy chủ "
         "gửi kèm trang này (đang cắt), không phải số tồn đọng – đúng lỗi đã lên bản chạy thật "
         "ngày 13/9 (in 60 trong khi thực tế 1387)."
     )
 
 
-def test_the_ton_dong_van_co_cua_nhap_khi_rong():
-    """Ranh giới 09/9: thẻ nào có thể rỗng thì phải chỉ ra bộ phận và cửa xem/nhập."""
-    the = _the_ton_dong(_doc(TRANG))
-    assert "cua:" in the and "ai:" in the, (
-        "`k.canh_bao_do` có thể không được máy chủ gửi; khi ấy thẻ rỗng và bắt buộc phải kèm "
-        "`cua:` (đường dẫn) và `ai:` (bộ phận phụ trách).\n" + the
-    )
+def test_khoi_ton_dong_van_co_cua_xem_khi_rong():
+    """Ranh giới 09/9: chỗ nào có thể rỗng thì phải chỉ ra bộ phận và cửa xem/nhập.
+
+    SỬA 16/9/2026 (TC-42): trước đây là hai trường `cua:` và `ai:` của một thẻ; nay ô lớn tự vẽ
+    nhánh rỗng của nó. Luật giữ nguyên — máy chủ không gửi thì màn hình phải nói ra ai phụ trách
+    và bấm vào đâu, chứ không để một khoảng trắng.
+    """
+    khoi = _khoi_ton_dong(_doc(SAU_O))
+    assert "Chưa kết nối" in khoi, "Máy chủ chưa trả thì phải nói ra, không để trống."
+    assert 'href="/alerts"' in khoi, "Phải có đường dẫn sang trang Cảnh báo."
+    assert "(CNTT)" in khoi, "Phải nói rõ bộ phận phụ trách."
 
 
 def test_khong_con_bang_canh_bao_phang_tren_man_hinh_01():
@@ -66,6 +81,9 @@ def test_khong_con_bang_canh_bao_phang_tren_man_hinh_01():
     assert "d.alerts.map" not in nguon, (
         "Màn hình 01 đổ thẳng `d.alerts.map` ra một bảng phẳng — đúng cái đã bỏ từ vòng TC-20."
     )
+    # `KhoiTonDongMuc` là Ô LỚN của TC-42, KHÔNG phải khối gom nhóm cũ — nên loại nó ra trước khi
+    # soát. Cấm theo chuỗi ký tự thì lần nào có tên mới bắt đầu bằng tên cũ là một lần báo oan.
+    nguon = nguon.replace("<KhoiTonDongMuc", "")
     assert "<KhoiTonDong" not in nguon, (
         "Khối gom nhóm đã chuyển khỏi màn hình 01 (anh Tuấn chốt 15/9/2026). Lắp lại là bày cùng "
         "một dữ liệu ở ba chỗ trên một trang."

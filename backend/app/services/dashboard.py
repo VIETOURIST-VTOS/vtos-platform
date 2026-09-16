@@ -237,9 +237,33 @@ def build(db: Session, u: User) -> dict:
     try:
         from app.services import xu_huong as XH
         sec["xu_huong"] = XH.cho_man_hinh(db, so_ky=6, hom_nay=today)
+        # TC-42 (16/9/2026) · anh Tuấn chốt sáu ô lớn, hai ô đầu có ô chọn THÁNG / QUÝ / NĂM.
+        #
+        # Ba chuỗi dựng ĐỘC LẬP (xu_huong.bo_ba_ky), không lấy chuỗi tháng làm lối lui cho quý và
+        # năm. Bài học đã phải trả giá ở khối Hiệu quả đội xe (TC-40): ba nút mà bấm sang kỳ nào
+        # cũng ra cùng một bộ số là nói dối bằng giao diện — người đọc kết luận quý bằng tháng, chứ
+        # không kết luận là chưa có số.
+        #
+        # Quý và năm là TỔNG CỦA CÁC THÁNG, không phải một truy vấn thứ hai cho cùng một câu hỏi.
+        sec["ba_ky"] = XH.ba_ky_cho_man_hinh(db, hom_nay=today)
     except Exception as ex:
         sec["xu_huong"] = {}
+        sec["ba_ky"] = {}
         R.audit(db, "robot", "robot", "xu_huong_loi", "dashboard", after={"ly_do": str(ex)[:200]})
+
+    # ── TC-42 · Tồn đọng cần xử lý, tách theo ba mức độ ──────────────────────────────────────
+    # Trước vòng này màn hình có đúng MỘT con số (1483 cảnh báo đỏ), và một con số nằm một mình
+    # thì không nói được điều gì để hành động. `Alert.level` đã có sẵn trong sổ nên chiều "mức độ"
+    # vẽ được NGAY, không phải chờ bản lưu kỳ nào tích luỹ — đó là lý do chọn chiều này trước.
+    #
+    # Bọc try riêng cùng lý lẽ với xu hướng: một ô hỏng không được kéo sập cả bảng điều hành.
+    try:
+        from app.services import canh_bao_muc as CBM
+        sec["ton_dong_theo_muc"] = CBM.theo_muc(db)
+    except Exception as ex:
+        sec["ton_dong_theo_muc"] = None
+        R.audit(db, "robot", "robot", "ton_dong_muc_loi", "dashboard",
+                after={"ly_do": str(ex)[:200]})
 
     # ── TC-33 · khối 08 Tiến độ báo cáo & kết luận chỉ đạo ───────────────────────────────────
     # Cũng không thêm bảng nào: danh sách phòng phải nộp đã khai ở `bao_cao_phong.PHONG`, bản đã

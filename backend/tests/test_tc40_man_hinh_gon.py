@@ -55,7 +55,12 @@ def _bo_chu_thich_css(s: str) -> str:
 
 # ═════════════════ DANH SÁCH GIỮ / BỎ ═════════════════
 
-GIU = ["<KhoiQuyetDinh", "<TamThe", "<KhoiHieuQuaXe", "<KhoiDongTien",
+# SỬA 16/9/2026 (TC-42): `<TamThe` đổi tên thành `<HangThe`, và hai khối mới `<KhoiDoanhThu`,
+# `<KhoiLoiNhuan`, `<KhoiTonDongMuc` vào danh sách GIỮ. Đổi tên vì hàm nay bày NĂM thẻ chứ không
+# tám — một hàm tên "TamThe" bày năm thẻ là một lời nói dối nhỏ nằm ngay trong mã.
+# Danh sách BỎ không đổi một dòng: không khối nào anh Tuấn chốt gỡ được lắp lại.
+GIU = ["<KhoiQuyetDinh", "<HangThe", "<KhoiHieuQuaXe", "<KhoiDongTien",
+       "<KhoiDoanhThu", "<KhoiLoiNhuan", "<KhoiTonDongMuc",
        "<KhoiPhaiThu", "<KhoiPhaiTra",
        "<KhoiKinhDoanhLe", "<KhoiKinhDoanhDoan", "<KhoiBaoCaoNgay"]
 

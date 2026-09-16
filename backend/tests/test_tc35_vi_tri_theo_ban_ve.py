@@ -174,11 +174,16 @@ def test_khong_them_ma_mau_go_thang():
 
 
 def test_thu_tu_doc_chin_khoi_van_giu_nguyen():
-    """Vòng này sửa VỊ TRÍ, không được làm hỏng THỨ TỰ mà TC-31 đã chỉnh đúng."""
+    """Vòng này sửa VỊ TRÍ, không được làm hỏng THỨ TỰ mà TC-31 đã chỉnh đúng.
+
+    SỬA 16/9/2026 (TC-42): danh sách và thứ tự đổi theo bố cục sáu ô lớn anh Tuấn chốt — xem
+    THU_TU_BAN_VE ở test_tc31, nơi ghi lý do đầy đủ. Luật thì không đổi một chữ: các khối còn trên
+    màn hình phải giữ đúng thứ tự dọc đã chốt, vì thứ tự ấy là thứ tự đọc.
+    """
     ma = _bo_chu_thich_tsx(_doc(TRANG))
-    # TC-40: bốn khối đã gỡ khỏi màn hình (xem test_tc31). Luật thứ tự vẫn áp cho phần còn lại.
-    thu_tu = ["<KhoiQuyetDinh", "<TamThe", "<KhoiHieuQuaXe", "<KhoiDongTien",
-              "<KhoiPhaiThu", "<KhoiPhaiTra"]
+    thu_tu = ["<KhoiQuyetDinh", "<KhoiDoanhThu", "<KhoiLoiNhuan", "<KhoiDongTien",
+              "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiTonDongMuc", "<HangThe",
+              "<KhoiHieuQuaXe"]
     vi = [(m, ma.index(m)) for m in thu_tu if m in ma]
     assert len(vi) == len(thu_tu), f"Thiếu khối: {set(thu_tu) - {m for m, _ in vi}}"
     sai = [(a[0], b[0]) for a, b in zip(vi, vi[1:]) if a[1] > b[1]]

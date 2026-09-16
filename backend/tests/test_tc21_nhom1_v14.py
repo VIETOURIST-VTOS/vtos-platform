@@ -109,12 +109,11 @@ def test_dong_phu_khong_bia_so_so_sanh():
     SỬA 15/9/2026 (TC-36): vế "kỳ trước" ĐÃ CÓ — `services/xu_huong.py` dựng chuỗi các kỳ đã đóng và
     tính chênh lệch từ số thật.
 
-    SỬA 16/9/2026 (TC-41): vế "kế hoạch tháng" NAY CŨNG CÓ — cửa nhập /ke-hoach-thang đã mở, và câu
-    dòng phụ do `docHoKeHoach` dựng ở components/DauManHinh01.tsx chứ không còn là một chuỗi viết
-    thẳng trong trang. Nên phép thử đổi CHỖ NHÌN, và đổi luôn ĐIỀU nhìn:
+    SỬA 16/9/2026 (TC-41 rồi TC-42): vế "kế hoạch tháng" NAY CŨNG CÓ — cửa nhập /ke-hoach-thang đã
+    mở. Câu dòng phụ do `docHoKeHoachKy` dựng ở components/KhoiSauO.tsx, cùng chỗ với hai Ô LỚN
+    Doanh thu và Lợi nhuận mà nó phục vụ. Nên phép thử đổi CHỖ NHÌN, và đổi luôn ĐIỀU nhìn:
 
-      · Trang phải GỌI `docHoKeHoach` cho thẻ Doanh thu — tức là dòng phụ lấy từ máy chủ, không phải
-        một câu cố định.
+      · Câu ấy phải là một HÀM, không phải chuỗi viết cứng — tức nó đọc số máy chủ gửi xuống.
       · Hàm ấy phải còn đủ BA nhánh: chưa ai nhập · nhập thiếu pháp nhân · đủ. Nhánh giữa là nhánh
         đáng canh nhất: bỏ nó đi thì phần đã nhập bị cộng lại thành "kế hoạch tháng", và tỉ lệ đạt
         cao vọt mà không có gì trông giống lỗi.
@@ -123,24 +122,21 @@ def test_dong_phu_khong_bia_so_so_sanh():
     Ba lần sửa, cùng một luật: thẻ nói đúng sự thật đang có, và nói ra chỗ còn thiếu kèm người phải
     nhập. Sự thật đổi, luật không đổi.
     """
-    trang = _doc(TRANG)
-    the = _the(trang, "Doanh thu tháng")
-    assert "docHoKeHoach" in the, (
-        "Dòng phụ thẻ Doanh thu phải dựng bằng docHoKeHoach, không phải một câu viết cứng.\n" + the
+    sau_o = (GOC / "web" / "components" / "KhoiSauO.tsx").read_text(encoding="utf-8")
+    assert "docHoKeHoachKy" in sau_o, (
+        "Dòng phụ phải dựng bằng docHoKeHoachKy, không phải một câu viết cứng."
     )
-
-    dau = _doc(DAU)
-    assert "chưa có kế hoạch tháng" in dau, (
+    assert "Chưa có kế hoạch tháng" in sau_o, (
         "Phải còn nhánh 'chưa ai nhập kế hoạch' – bỏ đi là im lặng khi thiếu nguồn so sánh."
     )
-    assert "Kế toán" in dau, "Phải nói AI nhập kế hoạch tháng."
-    assert "thieu" in dau and "chưa đủ" in dau, (
+    assert "Kế toán" in sau_o, "Phải nói AI nhập kế hoạch tháng."
+    assert "thieu" in sau_o and "chưa đủ" in sau_o, (
         "Phải còn nhánh 'nhập thiếu pháp nhân' và phải kê tên pháp nhân còn thiếu: cộng phần đã "
         "nhập lại rồi gọi là kế hoạch tháng là chỗ hỏng nguy hiểm nhất của khối này."
     )
 
-    # Trang KHÔNG tự chia. Tỉ lệ đạt do services/ke_hoach.ty_le_dat tính và gửi xuống.
-    ma = re.sub(r"/\*.*?\*/", " ", trang, flags=re.S)
+    # Màn hình KHÔNG tự chia. Tỉ lệ đạt do services/ke_hoach.ty_le_dat tính và gửi xuống.
+    ma = re.sub(r"/\*.*?\*/", " ", _doc(TRANG) + sau_o, flags=re.S)
     ma = re.sub(r"^\s*//.*$", " ", ma, flags=re.M)
     assert "doanh_thu_thang /" not in ma and "/ ke_hoach" not in ma, (
         "Màn hình không được tự chia thực hiện cho kế hoạch – phép chia ấy nằm ở máy chủ."
@@ -155,11 +151,16 @@ def test_the_tour_dang_ban_noi_ro_chua_tinh_duoc_cho_con():
     )
 
 
-def test_the_ton_dong_noi_ro_hai_chi_so_con_thieu():
-    the = _the(_doc(TRANG), "Tồn đọng cần xử lý")
-    assert "chưa tách được hồ sơ quá hạn" in the and "chưa có người nhận" in the, (
+def test_khoi_ton_dong_noi_ro_hai_chi_so_con_thieu():
+    """SỬA 16/9/2026 (TC-42): "Tồn đọng cần xử lý" từ một THẺ SỐ thành một Ô LỚN có biểu đồ cơ cấu
+    theo ba mức độ (components/KhoiSauO.tsx). Luật không đổi một chữ — bản vẽ chốt BA chỉ số và máy
+    chủ mới đếm được một, nên hai chỉ số còn thiếu vẫn phải được nói ra chứ không im lặng.
+    """
+    sau_o = (GOC / "web" / "components" / "KhoiSauO.tsx").read_text(encoding="utf-8")
+    thap = sau_o.lower()
+    assert "chưa tách được hồ sơ quá hạn" in thap and "chưa có người nhận" in thap, (
         "Bản vẽ chốt ba chỉ số: hồ sơ quá hạn · nghiêm trọng · chưa có người nhận. Máy chủ mới có "
-        "cái giữa – hai cái còn lại phải được nói ra.\n" + the
+        "cái giữa – hai cái còn lại phải được nói ra."
     )
 
 

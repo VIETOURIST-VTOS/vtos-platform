@@ -48,9 +48,14 @@ def test_ba_khoi_con_lai_giu_dung_thu_tu_ban_ve():
     của tệp này còn lại — Hiệu quả đội xe → Phải thu → Phải trả — và chúng phải giữ nguyên thứ tự
     tương đối của bản vẽ. Ba khối bị gỡ (Tồn đọng theo bộ phận · Rủi ro trọng yếu · Tiến độ báo
     cáo) được canh riêng ở phép kiểm dưới.
+
+    SỬA 16/9/2026 (TC-42): Phải thu và Phải trả lên nhóm SÁU Ô LỚN, còn Hiệu quả đội xe xuống dưới
+    hàng thẻ nhỏ — nó là số liệu của MỘT bộ phận, không phải một trong sáu con số Chủ tịch đọc đầu
+    tiên. Luật giữ nguyên: hai khối công nợ phải đứng cạnh nhau và đúng thứ tự thu trước trả sau,
+    vì đó là thứ tự đọc "ai nợ mình → mình nợ ai".
     """
     nguon = _doc(TRANG)
-    thu_tu = ["<KhoiHieuQuaXe", "<KhoiPhaiThu", "<KhoiPhaiTra"]
+    thu_tu = ["<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiHieuQuaXe"]
     vi_tri = []
     for k in thu_tu:
         i = nguon.find(k)
