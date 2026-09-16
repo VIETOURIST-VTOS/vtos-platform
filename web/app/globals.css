@@ -340,6 +340,11 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
    "Lợi nhuận trước thuế" bị cắt, mà cắt nhãn của một con số tiền là chuyện không được phép. */
 .mh01-the{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));
   margin-bottom:14px}
+/* TC-46 · BA CỘT TRÊN MÀN RỘNG, vì hàng thẻ nay có SÁU thẻ (anh Tuấn chốt 16/9/2026).
+   Để `auto-fit` tự chia thì ở bề ngang 1280px nó ra năm cột — tức năm thẻ một hàng rồi một thẻ
+   lẻ loi ở hàng dưới, và cái thẻ lẻ ấy đọc ra như một mục phụ chứ không phải một trong sáu. Ba
+   cột cho hai hàng bằng nhau, và sáu thẻ vẫn đọc ra là một nhóm. */
+@media (min-width:900px){ .mh01-the{grid-template-columns:repeat(3,1fr)} }
 .the-ct{background:var(--vtos-card);border:1px solid var(--vtos-line);
   border-radius:var(--vtos-radius-md);padding:13px 15px;display:flex;flex-direction:column;gap:3px}
 .the-ct.rong{background:var(--vtos-surface);border-style:dashed}

@@ -177,6 +177,17 @@ def build(db: Session, u: User) -> dict:
         # gõ tay. Đổi một nơi là hai nơi nói khác nhau, và người đọc không có cách nào biết
         # nơi nào đúng. Nay một chỗ khai, một chỗ đọc.
         sec["sap_khoi_hanh_so_ngay"] = SO_NGAY_SAP_KHOI_HANH
+        # TC-46 · BA GIAI ĐOẠN CỦA CHUYẾN ĐÃ DUYỆT (anh Tuấn chốt 16/9/2026, theo bản vẽ v3.0).
+        # `counts` do routes.py dựng chỉ đếm theo TRẠNG THÁI, mà trạng thái không phân biệt được
+        # chuyến chưa đi với chuyến đang trên đường. Phép chia theo NGÀY nằm ở dem_tour, khai một
+        # lần — xem chú thích TC-46 ở đó.
+        from app.services import dem_tour as DT
+        sec["tour_giai_doan"] = DT.theo_giai_doan(db, hom_nay=today)
+        # XE HÔM NAY — cùng MỘT luật với tour, áp cho xe: lịch hôm nay trùng lịch điều xe thì xe ấy
+        # đang chạy, còn lại là nằm bãi (anh Tuấn 16/9/2026). Nguồn là LỆNH ĐIỀU XE, không phải
+        # nhật trình chuyến — xem chú thích đầu services/xe_hom_nay.py để biết vì sao khác nhau.
+        from app.services import xe_hom_nay as XE
+        sec["xe_hom_nay"] = XE.dem(db, hom_nay=today)
         # Quá hạn quyết toán. Hạn = ngày kết thúc + số ngày theo tham số (đoàn và lẻ khác nhau), nên
         # lọc luôn bằng ngày kết thúc: chuyến kết thúc SAU today − hạn dài nhất thì chắc chắn chưa quá
         # hạn, không cần nạp về. Bản cũ nạp 400 chuyến gần nhất rồi bỏ đi phần lớn.
