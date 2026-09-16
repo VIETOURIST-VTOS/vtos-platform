@@ -364,7 +364,15 @@ function NapDuLieu() {
           <td>{x.trang_thai === "khong_doc_duoc" ? <Tag cls="red">không đọc được: {x.loi}</Tag>
             : x.trang_thai === "nap_hong" ? <Tag cls="red">nạp hỏng: {x.loi}</Tag>
             : x.trang_thai === "da_nap" ? <Tag cls="ok">đã nạp {x.da_nap}</Tag>
-            : x.dong_loi > 0 ? <Tag cls="warn">còn dòng lỗi</Tag> : <Tag cls="ok">sẵn sàng</Tag>}</td>
+            : x.dong_loi > 0 ? <Tag cls="warn">còn dòng lỗi</Tag>
+            /* "Sẵn sàng" TỪNG CHỈ NGHĨA LÀ "không có dòng lỗi" – và đó là một lời nói dối.
+             * Tệp có hop_le=0, da_co=1, dong_loi=0 hiện "sẵn sàng" trong khi nút nạp không hề
+             * đếm nó: cả 81 tệp tháng 1 nằm đúng vào ô ấy, bảng nói sẵn sàng còn nút nói
+             * "Nạp 0 tệp". Nhãn phải nói đúng thứ nút sẽ làm. */
+            : (x.hop_le || 0) === 0 && (x.da_co || 0) > 0
+              ? <Tag cls="warn">chờ xác nhận{boQua ? " — sẽ nạp" : " — nút chưa đếm"}</Tag>
+            : (x.hop_le || 0) === 0 ? <Tag cls="warn">không có dòng nào để nạp</Tag>
+            : <Tag cls="ok">sẵn sàng</Tag>}</td>
         </tr>)}</tbody></table>
 
       {canNap && lo.some((x) => x.trang_thai === "da_doc") && <div style={{ marginTop: 10 }}>
@@ -391,21 +399,44 @@ function NapDuLieu() {
       <h2>4. Kết quả kiểm tra tệp</h2>
       <div className="kpis">
         <div className="kpi"><b>{kt.so_dong}</b><span>dòng trong tệp</span></div>
-        <div className="kpi"><b style={{ color: "var(--ok, green)" }}>{kt.hop_le}</b><span>hợp lệ, sẽ nạp</span></div>
+        {/* Bộ nạp theo lô trả `da_nap` chứ không trả `hop_le` – xem soSeNap() ở trên. */}
+        <div className="kpi"><b style={{ color: "var(--ok, green)" }}>{kt.hop_le ?? kt.da_nap ?? 0}</b><span>hợp lệ, sẽ nạp</span></div>
         <div className="kpi"><b className="muted">{kt.da_co}</b><span>đã có trong hệ thống — bỏ qua</span></div>
         <div className="kpi"><b style={{ color: kt.dong_loi ? "var(--red)" : undefined }}>{kt.dong_loi}</b><span>dòng lỗi</span></div>
       </div>
       {kt.cot_khong_dung?.length > 0 && <p className="muted">Cột không dùng đến:
         <b> {kt.cot_khong_dung.join(", ")}</b> — kiểm tra lại xem có nạp nhầm tệp không.</p>}
-      <div className="wrap"><table>
+      {/* HAI HÌNH DẠNG KẾT QUẢ, VÀ BẢNG NÀY TỪNG CHỈ BIẾT MỘT.
+        *
+        * Bộ nạp thường trả `dong` – một dòng cho mỗi DÒNG trong tệp. Bộ nạp THEO LÔ trả `chi_tiet`
+        * – một dòng cho mỗi TỆP, và KHÔNG có `dong`.
+        *
+        * Bản trước gọi thẳng `kt.dong.slice(...)`. Với sáu bộ nạp theo lô thì `kt.dong` là undefined
+        * và cả trang NỔ: "TypeError: Cannot read properties of undefined (reading 'slice')" –
+        * màn hình trắng, người dùng mất luôn kết quả vừa đọc. Bắt được trên chính bản chạy thật
+        * ngày 16/9/2026 khi tải một tệp kho quyết toán cũ qua mục 3. */}
+      {kt.chi_tiet ? <div className="wrap"><table>
+        <thead><tr><th>Tệp</th><th>Chuyến</th><th>Kết quả</th></tr></thead>
+        <tbody>{kt.chi_tiet.slice(0, 200).map((x: any, i: number) => <tr key={i}>
+          <td>{x.ten_tep}</td>
+          <td className="muted">{x.ma_tour || "—"}</td>
+          <td>{(x.chan || []).map((l: string, j: number) => <div key={j}><Tag cls="red">{l}</Tag></div>)}
+            {x.ro === "khong_thay_chuyen" && <Tag cls="red">không tìm thấy chuyến trong VTOS</Tag>}
+            {x.ro === "nap_duoc" && <Tag cls="ok">sạch</Tag>}
+            {(x.can_xac_nhan || []).map((c: string, j: number) =>
+              <div key={j} className="muted">{c}</div>)}
+            {(x.doc_thieu || []).map((c: string, j: number) =>
+              <div key={j} className="muted">{c}</div>)}</td>
+        </tr>)}</tbody></table></div>
+      : <div className="wrap"><table>
         <thead><tr><th>Dòng</th><th>Nội dung</th><th>Kết quả</th></tr></thead>
-        <tbody>{kt.dong.slice(0, 200).map((d: any) => <tr key={d.dong}>
+        <tbody>{(kt.dong || []).slice(0, 200).map((d: any) => <tr key={d.dong}>
           <td className="muted">{d.dong}</td>
           <td>{d.tom_tat}</td>
           <td>{d.loi.length ? d.loi.map((l: string, i: number) => <div key={i}><Tag cls="red">{l}</Tag></div>)
             : d.da_co ? <Tag cls="warn">đã có ({d.da_co})</Tag> : <Tag cls="ok">hợp lệ</Tag>}
             {d.canh_bao?.map((c: string, i: number) => <div key={i} className="muted">{c}</div>)}</td>
-        </tr>)}</tbody></table></div>
+        </tr>)}</tbody></table></div>}
       {kt.da_nap === undefined && canNap && <div style={{ marginTop: 10 }}>
         {kt.dong_loi > 0 && <label style={{ display: "block" }}>
           <input type="checkbox" style={{ width: "auto", marginRight: 6 }} checked={boQua}
@@ -418,7 +449,14 @@ function NapDuLieu() {
           kiểm tra lại, hoặc tích ô trên để nạp phần hợp lệ — bỏ qua dòng lỗi là một quyết định, không phải
           một mặc định.</p>}
       </div>}
-      {kt.da_nap !== undefined && <p><b>{kt.message}</b></p>}
+      {/* Bộ nạp theo lô đi qua mục 3 chỉ XEM TRƯỚC, không có nút nạp ở đây (nút nạp nằm ở mục 3c).
+        * Trước đây chỗ này in `kt.message` – với bản xem trước thì message rỗng, nên người dùng thấy
+        * một khoảng trắng và không hiểu vì sao không có nút nạp. Nói thẳng ra. */}
+      {kt.da_nap !== undefined && <p>{kt.message ? <b>{kt.message}</b> : <>
+        <b>{kt.ghi_chu || "Đây là bước XEM TRƯỚC – chưa ghi gì vào hệ thống."}</b><br />
+        <span className="muted">Loại dữ liệu này nạp theo LÔ. Muốn nạp thật thì kéo chính tệp này
+          (một tệp cũng được) vào <b>mục 3b</b> ở trên, xem bảng ở mục 3c rồi bấm nút nạp ở đó.</span>
+      </>}</p>}
     </div>}
 
     <div className="panel wrap">

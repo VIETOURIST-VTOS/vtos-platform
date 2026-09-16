@@ -325,3 +325,99 @@ def test_cl11_man_hinh_nap_duoc_phan_CO_CANH_BAO_khi_nguoi_duyet_bam_ro():
         "phần CÓ CẢNH BÁO không được cộng vào khi người duyệt đã bấm rõ")
     assert "x.hop_le > 0" not in src[src.find("const napCaLo"):src.find("const napCaLo") + 1200], (
         "napCaLo vẫn còn lọc cứng theo hop_le")
+
+
+def test_cl12_bang_ket_qua_mot_tep_KHONG_duoc_no_voi_bo_nap_theo_lo():
+    """CẢ TRANG NỔ KHI TẢI MỘT TỆP KHO CŨ QUA MỤC 3 — bắt trên bản chạy thật 16/9/2026.
+
+        TypeError: Cannot read properties of undefined (reading 'slice')
+
+    Cửa soát trả về hai hình dạng kết quả:
+
+        bộ nạp thường  -> `dong`     : một dòng cho mỗi DÒNG trong tệp
+        bộ nạp THEO LÔ -> `chi_tiet` : một dòng cho mỗi TỆP, và KHÔNG có `dong`
+
+    Bảng "4. Kết quả kiểm tra tệp" gọi thẳng `kt.dong.slice(...)`. Với sáu bộ nạp theo lô thì
+    `kt.dong` là undefined, React nổ giữa lúc dựng, và người dùng nhận MÀN HÌNH TRẮNG — mất luôn
+    kết quả vừa đọc xong.
+
+    Đây là mặt thứ ba của cùng một gốc: màn hình được viết cho một hình dạng dữ liệu, rồi dùng cho
+    hai. CL8 canh ô đếm, CL11 canh nút nạp, CL12 canh bảng.
+    """
+    from app.services import intake as IN
+
+    # Sự thật phía máy chủ: bộ nạp theo lô KHÔNG trả khoá `dong`.
+    lo = [k for k, v in IN.BO_NAP.items() if v.get("lo")]
+    assert lo, "không còn bộ nạp theo lô nào"
+
+    src = _trang()
+    i = src.find("4. Kết quả kiểm tra tệp")
+    assert i > 0, "không tìm thấy bảng kết quả kiểm tra tệp"
+    than = src[i:i + 2600]
+    # Soi MÃ chứ không soi chữ: chuỗi "kt.dong.slice(" cũng nằm trong chú thích giải thích lỗi này,
+    # nên phải bắt đúng dạng gọi trong JSX ("}{kt.dong.slice(" sau <tbody>), không bắt chữ trần.
+    assert ">{kt.dong.slice(" not in than, (
+        "bảng vẫn gọi thẳng kt.dong.slice() – bộ nạp theo lô không có khoá 'dong', cả trang sẽ nổ")
+    assert "kt.chi_tiet ?" in than, (
+        "bảng chưa tách hai hình dạng: bộ nạp theo lô phải hiện MỘT DÒNG MỖI TỆP từ chi_tiet")
+    assert "(kt.dong || [])" in than, "nhánh dòng vẫn chưa chịu được kt.dong rỗng"
+
+
+def test_cl13_bo_nap_theo_lo_qua_muc_3_phai_chi_duong_sang_muc_3b():
+    """NGÕ CỤT IM LẶNG — hết nổ thì đến lượt không nói gì.
+
+    Vá xong CL12, tải một tệp kho cũ qua mục 3 không còn trắng màn hình nữa: bảng hiện đúng một
+    dòng cho tệp ấy. Nhưng nút nạp thì KHÔNG hiện — đúng như thiết kế, vì bộ nạp theo lô nạp ở mục
+    3c — và chỗ lẽ ra giải thích điều đó lại in `kt.message`, thứ mà bản XEM TRƯỚC không hề trả về.
+
+    Kết quả: người dùng đọc tệp xong, thấy một khoảng trắng, và không có cách nào biết phải làm gì
+    tiếp. Cửa còn đó nhưng người không tìm ra cửa thì cũng như không có cửa.
+
+    Phía máy chủ đã nói sẵn câu cần nói trong `ghi_chu`; màn hình chỉ việc in ra, kèm đường đi.
+    """
+    from app.services import intake as IN
+
+    lo = [k for k, v in IN.BO_NAP.items() if v.get("lo")]
+    assert lo, "không còn bộ nạp theo lô nào"
+
+    src = _trang()
+    i = src.find("kt.da_nap !== undefined")
+    assert i > 0, "không tìm thấy nhánh hiện thông báo cho bộ nạp theo lô"
+    than = src[i:i + 700]
+    assert "kt.ghi_chu" in than, (
+        "bản xem trước theo lô không trả `message`; màn hình phải in `ghi_chu` của máy chủ, "
+        "không thì người dùng nhận một khoảng trắng")
+    assert "3b" in than, (
+        "phải chỉ rõ nút nạp thật nằm ở mục 3b/3c – không thì cửa có mà người không tìm ra")
+
+
+def test_cl14_nhan_trang_thai_phai_noi_dung_thu_nut_se_lam():
+    """BẢNG NÓI "SẴN SÀNG", NÚT NÓI "NẠP 0 TỆP" — đo trên bản chạy thật 16/9/2026.
+
+    Kéo cả 81 tệp tháng 1 vào cửa nạp cả lô, máy chủ trả về:
+
+        81 tệp · 0 dòng hợp lệ · 70 "đã có — bỏ qua" · 11 dòng lỗi
+
+    70 tệp kia hiện nhãn "sẵn sàng" trong cột Trạng thái, vì nhãn chỉ đọc mỗi `dong_loi`:
+
+        x.dong_loi > 0 ? "còn dòng lỗi" : "sẵn sàng"
+
+    Nhưng nút nạp đếm theo `hop_le` (+ `da_co` khi đã tích ô), nên nó đếm 0. Người dùng đọc một
+    bảng toàn chữ "sẵn sàng" rồi bấm một cái nút ghi "Nạp 0 tệp" — và không có gì sai để sửa,
+    vì bảng đã nói sai.
+
+    Nhãn trạng thái phải nói đúng thứ NÚT sẽ làm với dòng ấy, không nói một điều kiện khác.
+    """
+    src = _trang()
+    i = src.find("3c. Kết quả cả lô")
+    assert i > 0, "không tìm thấy bảng kết quả cả lô"
+    than = src[i:i + 3000]
+
+    assert 'cls="ok">sẵn sàng' in than, "mất nhãn sẵn sàng"
+    j = than.find('cls="ok">sẵn sàng')
+    truoc = than[:j]
+    assert "x.hop_le" in truoc, (
+        "nhãn trạng thái vẫn chỉ đọc dong_loi; tệp hop_le=0 sẽ hiện 'sẵn sàng' trong khi nút "
+        "nạp không đếm nó – đúng cảnh cả 81 tệp tháng 1")
+    assert "chờ xác nhận" in truoc, (
+        "phải có nhãn riêng cho rổ cần người xác nhận, để nó không đội lốt 'sẵn sàng'")
