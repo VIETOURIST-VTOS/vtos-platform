@@ -56,3 +56,9 @@ from app.models.dong_tien import *  # noqa
 # Robot A · 13/9/2026. Sổ gán người bán cho kho quyết toán cũ. Đứng SAU core: mang khoá ngoài sang
 # users. Lần thứ năm nhắc cùng một điều ở tệp này – thêm bảng thì thêm dòng nhập ở đây NGAY.
 from app.models.kho_cu import *  # noqa
+# TC-41 (16/9/2026) – kế hoạch tháng. Đứng SAU core: nó mang khoá ngoài sang companies. Lần thứ SÁU
+# nhắc cùng một điều ở tệp này – đội xe (09/9), VPM-5, V11, tu_dong (11/9), kho_cu (13/9) – và lần
+# này chính bộ kiểm KS-7 bắt được ngay trong vòng đầu: bảng khai dưới app/models mà không có dòng
+# nhập ở đây thì `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate
+# sẽ đòi XOÁ bảng.
+from app.models.ke_hoach import *  # noqa

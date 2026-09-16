@@ -40,7 +40,13 @@ CUA_TAY = (
     "fleet_sale_cases", "fleet_settlement_lines", "fleet_settlements", "fleet_shared_invoice_lines",
     "fleet_shared_invoices", "fleet_trip_costs", "fleet_trips", "fleet_verifications",
     "guide_assignments", "guide_rates", "hop_dong_khach", "incidents", "intake_runs", "invoices",
-    "journal_entries", "journal_lines", "khoa_ghi", "labor_contracts", "lead_channel_stats",
+    "journal_entries",
+    # TC-41 – chỉ tiêu doanh thu và lợi nhuận trước thuế theo tháng × pháp nhân. Cửa nhập tay ở màn
+    # hình /ke-hoach-thang. Máy KHÔNG sinh được bảng này và cũng không được phép: kế hoạch là điều
+    # người ta QUYẾT ĐỊNH, không phải điều hệ thống đo được. Suy nó từ thực hiện kỳ trước là biến
+    # thước đo thành cái bóng của chính số bị đo.
+    "ke_hoach_thang",
+    "journal_lines", "khoa_ghi", "labor_contracts", "lead_channel_stats",
     "leads", "leave_requests",
     # VPM-9 – lịch thanh toán theo tiến độ của hợp đồng khách. Cửa nhập tay ở màn hình
     # /hop-dong-khach: người soạn chia hợp đồng thành các đợt, gõ số tiền và mốc hạn từng đợt.

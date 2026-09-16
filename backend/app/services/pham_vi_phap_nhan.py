@@ -264,6 +264,8 @@ PHAI_LOC = {
                        "là bảng mà lọc sai pháp nhân là lộ dữ liệu cá nhân, không chỉ lộ số liệu",
     "VisaFamilyGroup": "nhóm gia đình gom nhiều đương đơn và nối tới booking; thấy được nhóm là "
                        "thấy được cả quan hệ nhân thân của khách pháp nhân khác",
+    "KeHoachThang":   "chỉ tiêu doanh thu và lợi nhuận tháng của MỘT pháp nhân; thấy được chỉ tiêu "
+                      "của pháp nhân khác là biết trước họ cam kết gì với Hội đồng quản trị",
 }
 
 # Mô hình CÓ cột pháp nhân nhưng CỐ Ý không lọc theo phiên. Phải viết ra lý do: "cố ý không lọc" là
@@ -276,16 +278,31 @@ CO_Y_KHONG_LOC = {
 
 
 def mo_hinh_thieu_loc(goc_api: str = "") -> list[str]:
-    """Mô hình đã khai PHẢI LỌC mà không truy vấn nào trong api/v1 gọi PV.loc cho nó.
+    """Mô hình đã khai PHẢI LỌC mà KHÔNG chỗ nào ở máy chủ gọi PV.loc cho nó.
 
     Đây là phép đo cho bộ kiểm của làn Kiểm soát và cho phép thử: danh sách rỗng nghĩa là đã nối
     xong; còn tên nào trong đó thì chừng ấy phân hệ đang để lộ dữ liệu chéo pháp nhân.
+
+    SỬA 16/9/2026 (TC-41): quét CẢ `api/v1` LẪN `services`, chứ không chỉ `api/v1`.
+
+    Bản cũ chỉ nhìn vào thư mục cửa HTTP, nên một phân hệ đặt truy vấn ở lớp dịch vụ — đúng chỗ của
+    nó — bị đếm là "chưa nối" dù nó lọc đầy đủ. Đó là một BÁO SAI, và báo sai theo hướng nguy hiểm
+    nhất: người đọc bảng đo sẽ đi "sửa" bằng cách nhân bản phép lọc lên tầng cửa, và từ đó có hai
+    chỗ cùng quyết một hàng rào. SEC-02 đòi phép cắt dòng nằm TRONG TRUY VẤN Ở MÁY CHỦ; nó không
+    đòi truy vấn ấy phải nằm trong tệp nào.
+
+    Vẫn không quét cả kho: chỉ hai thư mục ấy mới có truy vấn phục vụ một phiên đăng nhập.
     """
     import pathlib, re
-    goc = pathlib.Path(goc_api) if goc_api else pathlib.Path(__file__).resolve().parents[1] / "api" / "v1"
-    if not goc.exists():
+    if goc_api:
+        thu_muc = [pathlib.Path(goc_api)]
+    else:
+        nen = pathlib.Path(__file__).resolve().parents[1]
+        thu_muc = [nen / "api" / "v1", nen / "services"]
+    tep = [p for d in thu_muc if d.exists() for p in d.glob("*.py")]
+    if not tep:
         return []
-    ma = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in goc.glob("*.py"))
+    ma = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in tep)
     da_noi = set(re.findall(r"PV\.loc\(\s*[\w\.]+\s*,\s*(\w+)", ma))
     return sorted(t for t in PHAI_LOC if t not in da_noi)
 

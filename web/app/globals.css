@@ -745,6 +745,62 @@ table.bang-doc{width:100%}
 /* Chênh lệch tuyệt đối trên thẻ chỉ tiêu: dóng cột số, vì tám thẻ xếp thành lưới. */
 .the-xh-chenh{font-weight:700;font-variant-numeric:tabular-nums}
 
+/* ═══ TC-41 · CỬA NHẬP KẾ HOẠCH THÁNG ════════════════════════════════════════════════════════
+   Một hàng điều khiển dùng chung cho cả thanh chọn năm lẫn hàng nút Lưu: cùng một hình dạng cho
+   cùng một loại việc, nên người dùng không phải học hai bố cục trên cùng một màn hình. */
+.kh-hang{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.kh-nam{font-size:18px;font-variant-numeric:tabular-nums;min-width:64px;text-align:center}
+.kh-pv{margin-left:auto}
+
+/* Ô NHẬP TIỀN. Dóng phải và dùng chữ số đều bề ngang: 12 tháng × nhiều pháp nhân xếp thành cột,
+   và cột số mà không dóng thì sai một chữ số cũng không ai nhìn ra.
+   Ô RỖNG PHẢI TRÔNG RA RỖNG, không giống ô đang chứa số 0 — viền nhạt hơn là chưa đủ, nên thêm
+   chữ gợi ý mờ ở thuộc tính placeholder của chính ô (xem page.tsx). */
+.kh-o{width:100%;min-width:96px;text-align:right;font-variant-numeric:tabular-nums;
+  font-family:inherit;font-size:13px;padding:5px 7px;
+  border:1px solid var(--vtos-line);border-radius:var(--vtos-radius-sm);
+  background:var(--vtos-surface);color:var(--vtos-text)}
+.kh-o:focus-visible{outline:2px solid var(--vtos-navy);outline-offset:1px}
+.kh-o:disabled{background:transparent;color:var(--vtos-text-mute);cursor:not-allowed}
+
+/* Tiêu đề hai tầng: tầng trên là pháp nhân (gộp cột), tầng dưới là chỉ tiêu. Vạch dọc bên trái mỗi
+   nhóm pháp nhân để mắt biết cột nào thuộc công ty nào — không có vạch thì bốn cột số trông như
+   một dãy liền, và người nhập gõ nhầm sang công ty bên cạnh. */
+.kh-pn{text-align:center;border-left:1px solid var(--vtos-line)}
+/* Nhãn chỉ tiêu KHÔNG dùng lớp .num, dù nó cũng dóng phải.
+   Lý do tìm ra bằng cách dựng ảnh chứ không bằng cách đọc mã: .num đổi sang phông chữ đơn cách,
+   mà phông ấy không có chữ "Ế" — nên "LỢI NHUẬN TRƯỚC THUẾ" in ra thành "THUÊ´", dấu sắc rơi ra
+   thành một ký tự riêng. Bỏ luôn text-transform vì chữ hoa toàn phần làm dấu tiếng Việt khó đọc. */
+.kh-ct{text-align:right;text-transform:none;font-size:12px}
+.kh-thang{white-space:nowrap}
+/* Lý do sửa gần nhất hiện ngay trên dòng, nhưng CẮT BỚT khi dài: một lý do ba dòng sẽ kéo cả bảng
+   rộng ra và đẩy các cột số ra ngoài tầm mắt. Bản đầy đủ nằm ở title và ở nhật ký. */
+.kh-ly{display:inline-block;max-width:280px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;vertical-align:bottom}
+/* Cột "Sửa muộn" và cột nút: dóng trái và CÓ KHOẢNG THỞ bên trái. Cột số dóng phải chạm sát mép ô,
+   nên không chừa khoảng thì nhãn cột này dính liền vào nhãn cột số trước nó. */
+.kh-sua{padding-left:18px;white-space:nowrap}
+.kh-bo{margin-left:6px}
+/* Ổ khoá của tháng đã khép. Nhỏ, đứng sau tên tháng, không chiếm một cột riêng. */
+.kh-khoa{margin-left:6px;font-size:11px;opacity:.75}
+/* Dòng có ô vừa sửa mà chưa lưu: tô nền mờ. Mất điện giữa chừng thì người dùng phải nhìn ra ngay
+   mình còn đang nợ nút Lưu ở những dòng nào. */
+.kh-dang-sua>td{background:color-mix(in srgb,var(--vtos-sky) 12%,transparent)}
+
+/* Ô lý do chỉ hiện khi tháng đã khép VÀ có ô vừa sửa. Viền cảnh báo vì nó là một hàng rào, không
+   phải một ghi chú tuỳ chọn: chưa điền thì không lưu được. */
+.kh-lydo{margin-top:10px;padding:10px;border:1px solid var(--vtos-danger);
+  border-radius:var(--vtos-radius-sm)}
+.kh-lydo label{display:block;font-size:12px;margin-bottom:6px}
+.kh-lydo-o{width:100%;font-family:inherit;font-size:13px;padding:6px 8px;
+  border:1px solid var(--vtos-line);border-radius:var(--vtos-radius-sm);
+  background:var(--vtos-surface);color:var(--vtos-text)}
+.kh-lydo-o:focus-visible{outline:2px solid var(--vtos-navy);outline-offset:1px}
+
+/* Điện thoại: ô hẹp lại vừa đủ để hai chỉ tiêu còn nằm cạnh nhau. Việc cuộn ngang do khung .wrap
+   quanh bảng lo — bảng cuộn trong khung của nó, cả trang không trượt theo. */
+@media (max-width:760px){ .kh-o{min-width:84px} }
+
 @media print{
   /* Giấy: biểu đồ in ra được, nhưng nền thẻ phải mất đi để không tốn mực. Cột giữ nguyên hình
      nhờ print-color-adjust — mất màu cột thì biểu đồ thành một khung trắng vô nghĩa. */

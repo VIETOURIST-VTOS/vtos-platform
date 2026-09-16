@@ -331,6 +331,10 @@ MAN_HINH_API = {
     # thì máy chủ quyết theo vai trò (bao_cao_phong.pham_vi_duoc_xem), không quyết ở cửa màn hình –
     # cửa màn hình chỉ có hai trạng thái mở/đóng, mà ở đây cần "mở đúng phần của mình".
     "/bao-cao": ("/api/v1/bao-cao",),
+    # TC-41 – Kế hoạch tháng. Phạm vi API HẸP: chỉ nhánh /ke-hoach. Màn hình này KHÔNG đọc doanh thu
+    # thực hiện: so kế hoạch với thực hiện là việc của màn hình 01, và mở thêm /dashboard ở đây là
+    # cấp cho Kế toán một đường vòng vào bảng điều hành của Chủ tịch.
+    "/ke-hoach-thang": ("/api/v1/ke-hoach",),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
@@ -497,6 +501,11 @@ MENU_ROLES = {
     # Mỗi dòng = BASE_VIEW (Chủ tịch, TGĐ, Ban Kiểm soát) + đúng những vai trò có việc trên màn hình đó.
     # Viết thẳng tên vai trò thay vì cộng các nhóm lớn: nhóm lớn là thứ đã làm bảy vai trò tự động nhìn
     # thấy mọi màn hình mới mà không ai quyết định. Dài hơn, nhưng đọc là biết ai xem được gì.
+
+    # TC-41 – Kế hoạch tháng. Cùng danh sách với cửa màn hình ở MAN_HINH_API phía trên; lệch hai chỗ
+    # này là có vai trò thấy mục menu rồi bấm vào nhận 403, hoặc mở được màn hình mà không có mục menu
+    # để tới nó.
+    "/ke-hoach-thang": BASE_VIEW + ("ketoan", "cntt"),
 
     # --- Kinh doanh & sản phẩm ---
     "/products": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt"),
@@ -665,6 +674,12 @@ MENU_ROLES = {
     # vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa, chỉ không còn cầm bản tổng hợp cả bộ phận.
     "/bao-cao": BASE_VIEW + ("tp_dh", "ptgd_doan", "gd_kd", "tp_kd", "ptgd_mkt", "gd_doi_xe",
                              "tp_hd", "ketoan", "hcns"),
+    # TC-41 – Kế hoạch tháng. HẸP có chủ ý, và đây là chỗ dễ bị đòi nới nhất nên ghi lý do sẵn:
+    # chỉ tiêu tháng là thước đo mà mọi phòng sẽ bị đo bằng nó. Trưởng phòng đọc được chỉ tiêu của
+    # phòng mình ở báo cáo phòng; còn BẢNG CHỈ TIÊU CẢ NĂM của cả tập đoàn thì không phải thứ để mở
+    # rộng "cho tiện". Ghi thì còn hẹp hơn nữa – chặn ở API (tuple GHI trong api/v1/ke_hoach.py),
+    # không ở cửa màn hình, vì cửa màn hình chỉ có hai trạng thái mở/đóng.
+    "/ke-hoach-thang": BASE_VIEW + ("ketoan", "cntt"),
     # V6 – chuỗi bán hàng. Bảng giá là CHÍNH SÁCH nên hẹp hơn báo giá: từng sale soạn báo giá
     # được, nhưng đặt giá niêm yết thì không.
     "/bang-gia": BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt", "ketoan", "cntt"),

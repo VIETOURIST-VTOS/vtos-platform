@@ -113,7 +113,17 @@ def test_khong_gioi_han_so_ho_so_can_quyet_dinh():
     """Anh Tuấn chốt 13/9: KHÔNG giới hạn hồ sơ. Bản vẽ V1.2 ghi "tối đa 5", nhưng cắt ở năm nghĩa
     là hồ sơ thứ sáu nằm ngoài tầm mắt đúng người được quyền quyết nó – mà máy chủ chưa xếp thứ tự
     ưu tiên, nên "năm cái đầu" chỉ là năm cái ngẫu nhiên.
+
+    SỬA 16/9/2026 (TC-41) — LUẬT GIỮ NGUYÊN, PHÉP SOÁT THU HẸP LẠI ĐÚNG CHỖ NÓ CANH.
+    Bản cũ cấm chuỗi "slice(" trong TOÀN BỘ tệp DauManHinh01.tsx. Tệp ấy nay còn chứa
+    `docHoKeHoach`, nơi kê tên hai pháp nhân đầu rồi đếm phần còn lại — một phép cắt hoàn toàn
+    chính đáng trên một DÒNG CHỮ, không phải trên danh sách hồ sơ chờ quyết.
+
+    Đây đúng kiểu phép soát tự bắt oan mình: nó cấm một chuỗi ký tự thay vì cấm một hành vi, nên
+    lần đầu có người viết `slice` cho việc khác là nó báo đỏ. Nay chỉ soi THÂN HÀM KhoiQuyetDinh.
     """
     s = _ma(DAU)
-    assert "slice(" not in s, "khối Cần quyết định không được cắt bớt hồ sơ"
+    i = s.index("export function KhoiQuyetDinh")
+    than = s[i: s.index("export function", i + 10)]
+    assert "slice(" not in than, "khối Cần quyết định không được cắt bớt hồ sơ"
     assert "{co.length} hồ sơ đang chờ" in s, "phải đếm ra số hồ sơ đang chờ"
