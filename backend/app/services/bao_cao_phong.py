@@ -471,6 +471,29 @@ def _toan_cty(db: Session, tu: date, den: date) -> list[dict]:
            chi_tiet=[a.message for a in do[:10]]),
     ]
 
+    # TC-39 · HAI CHỈ TIÊU "SỐ TẠI MỘT THỜI ĐIỂM", thêm vào để bản lưu có cái mà chụp.
+    # ═════════════════════════════════════════════════════════════════════════════════════════
+    # Chúng KHÁC HẲN mọi chỉ tiêu khác trong bản báo cáo này: những chỉ tiêu kia đo việc xảy ra
+    # TRONG KỲ [tu, den] và hôm nay cộng lại vẫn ra đúng con số ấy. Hai cái này đo trạng thái TẠI
+    # LÚC ĐỌC, và `Tour.status` không giữ lịch sử — nên "cuối tháng 8 có bao nhiêu tour đang bán"
+    # là câu hỏi mà sang tháng 10 không ai trả lời được nữa, kể cả với toàn bộ cơ sở dữ liệu.
+    #
+    # Đó chính là lý do chúng phải nằm trong bản lưu: bản lưu là chỗ DUY NHẤT giữ được câu trả
+    # lời ấy, và mỗi kỳ không chụp là một câu hỏi vĩnh viễn không có đáp án.
+    #
+    # Câu "tại thời điểm chụp" viết thẳng vào phần CÔNG THỨC, không để trong chú thích mã: ba
+    # tháng nữa người đọc bản lưu chỉ thấy JSON, không thấy tệp này.
+    from app.services import dem_tour as DT
+    _dem = DT.theo_trang_thai(db)
+    ds += [
+        ct("tour_dang_ban", "Tour đang bán", DT.dang_ban(db, _dem), "tour",
+           "Đếm tour ở trạng thái đã duyệt TẠI THỜI ĐIỂM CHỤP — không phải trong kỳ. Số này "
+           "không tính lại được cho kỳ đã qua.", "tours.status"),
+        ct("tour_cho_quyet_toan", "Tour chờ quyết toán", DT.cho_quyet_toan(db, _dem), "tour",
+           "Đếm tour đã kết thúc hoặc đã đóng sổ mà chưa xác nhận, TẠI THỜI ĐIỂM CHỤP — không "
+           "phải trong kỳ. Số này không tính lại được cho kỳ đã qua.", "tours.status"),
+    ]
+
     # Gom việc đỏ của từng phòng. Đây là chỗ báo cáo toàn công ty KHÔNG tự tính lại con số nào: nó
     # đọc lại đúng kết quả của báo cáo phòng. Tính lại theo cách khác là cách chắc chắn để hai bản
     # lệch nhau, và lúc lệch thì không ai biết bản nào đúng.
