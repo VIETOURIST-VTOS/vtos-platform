@@ -13,6 +13,7 @@ import {
 import {
   DongLoc, KhoiQuyetDinh, TamThe, TieuDe, tien, dem, type The,
 } from "@/components/DauManHinh01";
+import BaKhuBieuDo from "@/components/BaKhuBieuDo";
 
 function Dash() {
   const { user } = useShell();
@@ -192,6 +193,18 @@ function Dash() {
       so_da_nop={sec.tien_do_so_da_nop} so_thieu={sec.tien_do_so_thieu}
       vi_sao={sec.tien_do_vi_sao} chi_dao_vi_sao={sec.tien_do_chi_dao_vi_sao} />
 
+
+    {/* TC-38 · BA KHU BIỂU ĐỒ (anh Tuấn giao 15/9/2026: "phân ra 3 loại biểu đồ — 1 dòng tiền,
+        2 doanh thu + lợi nhuận, 3 nhân viên quản trị nội bộ").
+
+        ĐẶT SAU TOÀN BỘ CHÍN KHỐI CỦA BẢN VẼ, không chen vào giữa. Thứ tự chín khối là thứ tự bản
+        vẽ chốt và đã mất bốn vòng mới đúng (xem TC-35); chèn ba khu vào giữa là làm hỏng lại đúng
+        cái vừa sửa. Biểu đồ là phần anh Tuấn giao THÊM, nên nó đứng sau, dưới một đường ngăn.
+
+        MỖI BIỂU ĐỒ CHỈ VẼ MỘT LẦN TRÊN TRANG. Vòng TC-37 vẽ thanh cơ cấu trong khối 05 và thanh
+        ngang trong khối 04c; nay hai hình ấy nằm ở khu 1 và khu 3, và hai khối kia chỉ còn số
+        cùng một đường dẫn xuống đây. Hai chỗ vẽ cùng một dữ liệu là hai chỗ sớm muộn lệch nhau. */}
+    <BaKhuBieuDo sec={sec} approvals={d.approvals} />
 
     {/* ══ PHẦN RIÊNG CỦA VTOS, KHÔNG CÓ TRONG BẢN VẼ ══════════════════════════════════════════
         Bốn khối dưới đây đang có SỐ THẬT và người dùng thật, nên không bỏ. Nhưng bản vẽ không có
