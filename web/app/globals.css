@@ -667,8 +667,13 @@ table.bang-doc{width:100%}
 /* Ô trống: khung nét đứt chạy suốt chiều cao, KHÔNG phải cột cao 0. Cột cao 0 đọc ra là "kỳ ấy
    bằng không", mà sự thật là "kỳ ấy chưa ai nộp số". */
 .bd-khuyet{border:1px dashed var(--vtos-line);border-radius:3px;opacity:.85}
+/* Nhãn số trên đầu cột. `position:relative` + z-index để nó nằm TRÊN vạch mốc: khi kế hoạch rơi
+   đúng tầm một cột, vạch nét đứt cắt ngang giữa chữ số và con số thành ra bị gạch bỏ — tìm ra
+   bằng cách dựng ảnh ở TC-42, đọc mã thì không thấy. Không dùng nền đục để lấp vạch: nền đục làm
+   thủng vạch mốc ở đúng chỗ người ta cần thấy nó liền mạch. */
 .bd-so{position:absolute;left:0;right:0;text-align:center;font-size:10.5px;font-weight:700;
-  color:var(--vtos-text-mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+  color:var(--vtos-text-mute);font-variant-numeric:tabular-nums;white-space:nowrap;z-index:2;
+  text-shadow:0 0 3px var(--vtos-card),0 0 3px var(--vtos-card),0 0 3px var(--vtos-card)}
 .bd-goc{grid-area:2/1/3/2}
 .bd-nhanx{grid-area:2/2/3/3;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:10px;
   margin-top:5px}
@@ -744,6 +749,26 @@ table.bang-doc{width:100%}
 
 /* Chênh lệch tuyệt đối trên thẻ chỉ tiêu: dóng cột số, vì tám thẻ xếp thành lưới. */
 .the-xh-chenh{font-weight:700;font-variant-numeric:tabular-nums}
+
+/* ═══ TC-42 · SÁU Ô LỚN CỦA MÀN HÌNH CHỦ TỊCH ═══════════════════════════════════════════════
+   Hai cột trên màn rộng chứ không phải ba: mỗi ô mang một biểu đồ có trục và nhãn số, và ba cột
+   thì mỗi biểu đồ chỉ còn hơn 300px — cột chồng nhãn, nhãn cắt cụt. Thà cuộn thêm một nhịp còn
+   hơn sáu hình không đọc được. Dưới 900px thì một cột.
+   `align-items:start` để ô ngắn không bị kéo cao bằng ô dài: khoảng trắng dưới một khối trông
+   giống dữ liệu còn thiếu. */
+.mh01-sau-o{display:grid;gap:14px;align-items:start;grid-template-columns:1fr}
+.mh01-sau-o>*{min-width:0;margin:0}
+@media (min-width:900px){ .mh01-sau-o{grid-template-columns:1fr 1fr} }
+
+/* Con số lớn của ô: kỳ ĐANG CHẠY. Nó đứng trên biểu đồ vì đó là thứ đọc trước; biểu đồ các kỳ đã
+   đóng là thứ đọc sau để biết con số ấy đang đi lên hay xuống. */
+.o6-so{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:2px 0 12px}
+.o6-lon{font-size:30px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;
+  color:var(--vtos-text)}
+/* Rỗng KHÁC 0: chữ mờ và nhỏ hơn, để một ô chưa có số không bị đọc thành một ô giá trị thấp. */
+.o6-lon.rong{color:var(--vtos-text-mute);font-weight:500;font-size:26px}
+.o6-lon.do{color:var(--vtos-danger)}
+.o6-nhan{font-size:12px}
 
 /* ═══ TC-41 · CỬA NHẬP KẾ HOẠCH THÁNG ════════════════════════════════════════════════════════
    Một hàng điều khiển dùng chung cho cả thanh chọn năm lẫn hàng nút Lưu: cùng một hình dạng cho

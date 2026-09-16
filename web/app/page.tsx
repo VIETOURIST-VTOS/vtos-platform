@@ -9,8 +9,11 @@ import {
   KhoiKinhDoanhLe, KhoiKinhDoanhDoan, KhoiBaoCaoNgay,
 } from "@/components/KhoiKinhDoanh";
 import {
-  DongLoc, KhoiQuyetDinh, TamThe, TieuDe, tien, dem, docHoKeHoach, type The,
+  DongLoc, KhoiQuyetDinh, HangThe, TieuDe, dem, type The,
 } from "@/components/DauManHinh01";
+import {
+  KhoiDoanhThu, KhoiLoiNhuan, KhoiTonDongMuc,
+} from "@/components/KhoiSauO";
 import { bieuDoCua } from "@/components/BaKhuBieuDo";
 
 function Dash() {
@@ -35,62 +38,35 @@ function Dash() {
      đầu cột bảng dòng tiền. Lối lui 14 chỉ dùng khi máy chủ cũ chưa trả trường này. */
   const soNgayKH = sec.sap_khoi_hanh_so_ngay ?? 14;
 
-  /* TÁM THẺ CHỈ TIÊU theo bản vẽ V1.2. Mỗi thẻ chỉ ra đúng một con số chính, một dòng so sánh và
-     một dòng trạng thái dữ liệu – không nhồi ba số vào một ô như hàng KPI cũ.
-
-     KỲ BÁO CÁO: màn hình này CHỈ theo THÁNG (anh Tuấn chốt 13/9). Quý và năm xem ở báo cáo chi
-     tiết – hàng lọc có đường dẫn sang đó. Nhờ vậy tám thẻ không phải mang theo một nhánh "nếu
-     chọn quý thì rỗng", và không có chỗ nào lấy số tháng dán nhãn quý. */
-  /* TC-36 · Xu hướng do MÁY CHỦ quyết: lấy kỳ nào, kỳ nào rỗng, đủ điểm để vẽ chưa. Màn hình chỉ
-     gắn đúng chuỗi vào đúng thẻ. Thẻ nào máy chủ chưa trả xu hướng thì không vẽ gì — không dựng
-     một dãy cột rỗng cho "đỡ trống". */
-  const xh = sec.xu_huong || {};
-  /* TC-41 · KẾ HOẠCH THÁNG — cửa nhập mở ngày 16/9/2026 ở /ke-hoach-thang.
-     Bản vẽ V1.4 chốt dòng phụ của thẻ Doanh thu là "so với kế hoạch và kỳ trước". Suốt bốn vòng
-     dòng ấy chỉ in được một câu thú nhận, vì trong hệ thống không có bảng nào giữ chỉ tiêu.
-     Nay có. Nhưng ba trạng thái phải giữ nguyên vẹn khác nhau, và `docHoKeHoach` giữ chúng:
-     chưa ai nhập · nhập thiếu pháp nhân · đủ. Trạng thái giữa là trạng thái nguy hiểm — cộng phần
-     đã nhập lại sẽ ra một chỉ tiêu thấp hơn thật, và tỉ lệ đạt cao vọt mà không có gì trông giống
-     lỗi cả. Máy chủ quyết đủ hay chưa (cờ `du`), màn hình chỉ đọc cờ ấy. */
+  /* KỲ BÁO CÁO — SỬA 16/9/2026 (TC-42), và sửa ngược lại quyết định 13/9.
+     Bản 13/9 chốt "màn hình 01 chỉ theo THÁNG, quý và năm xem ở báo cáo chi tiết", vì lúc ấy máy
+     chủ mới tính theo tháng và một ô chọn ba kỳ sẽ là lời hứa suông. Nay máy chủ cộng được quý và
+     năm từ chính các tháng (`services/xu_huong.doc_theo_ky`), nên ô chọn ấy có số thật đằng sau —
+     và anh Tuấn chốt 16/9 là "doanh thu và lợi nhuận phân ra theo tháng, quý, năm".
+     Chỉ HAI ô lớn ấy có ba kỳ: tồn kho cộng không được, và bốn ô chọn kỳ trên cùng một màn hình
+     thì không ô nào còn đáng bấm. */
   const kh = k.ke_hoach_thang;
-  const tam: The[] = [
-    { nhan: "Doanh thu tháng", so: tien(k.doanh_thu_thang),
-      duoi: `${k.so_chuyen_thang ?? 0} chuyến đã quyết toán · `
-            + docHoKeHoach(kh, "doanh_thu", kh?.ty_le_dat_doanh_thu),
-      xu_huong: xh.doanh_thu_thang },
-    { nhan: "Lợi nhuận trước thuế", so: tien(k.ln_ke_toan_thang),
-      duoi: `Lợi nhuận kế toán tháng, cùng phạm vi · `
-            + docHoKeHoach(kh, "loi_nhuan_truoc_thue", kh?.ty_le_dat_loi_nhuan),
-      xu_huong: xh.ln_ke_toan_thang },
-    /* Bản vẽ chốt dòng phụ là "Khách đã chốt / chỗ còn". Máy chủ chưa trả sức chứa từng chuyến nên
-       chưa tính được "chỗ còn" – ghi ra chỗ thiếu, không thay bằng con số khác rồi để người đọc
-       tưởng đó là chỗ còn. */
+
+  /* NĂM THẺ SỐ NHỎ — anh Tuấn chốt 16/9/2026: "các phần tour đang bán, tour chờ quyết toán, tour
+     sắp khởi hành, đội xe hôm nay, marketing đưa xuống vị trí dưới".
+
+     KHÔNG có biểu đồ trên năm thẻ này, và đó là lựa chọn chứ không phải thiếu sót. Đây là những
+     con số chỉ để LIẾC: 349 tour đang bán, 93 tour sắp khởi hành — đọc xong là xong, không phải
+     đặt cạnh kỳ trước hay cạnh kế hoạch mới hiểu. Thêm hình vào chúng là kéo mắt khỏi sáu ô lớn
+     phía trên, nơi có những con số thật sự cần nghĩ. */
+  const the: The[] = [
     { nhan: "Tour đang bán", so: dem(c.da_duyet ?? 0),
-      duoi: `${d.n_tours ?? 0} tour trên hệ thống · chưa có sức chứa từng chuyến nên chưa tính được chỗ còn (Điều hành)`,
-      xu_huong: xh.tour_dang_ban },
+      duoi: `${d.n_tours ?? 0} tour trên hệ thống · chưa có sức chứa từng chuyến nên chưa tính được chỗ còn (Điều hành)` },
     { nhan: "Tour chờ quyết toán", so: dem((c.ket_thuc || 0) + (c.da_dong_so || 0)),
       duoi: `${sec.qua_han_qt?.length ?? 0} chuyến quá hạn quyết toán`,
-      do: (sec.qua_han_qt?.length ?? 0) > 0, xu_huong: xh.tour_cho_quyet_toan },
+      do: (sec.qua_han_qt?.length ?? 0) > 0 },
     { nhan: "Tour sắp khởi hành", so: dem(sec.sap_khoi_hanh?.length),
-      duoi: `${soNgayKH} ngày tới`,
-      ai: "Điều hành", cua: "/tours" },
-    { nhan: "Đội xe hôm nay", so: null,
-      ai: "Đội xe", cua: "/doi-xe",
+      duoi: `${soNgayKH} ngày tới`, ai: "Điều hành", cua: "/tours" },
+    { nhan: "Đội xe hôm nay", so: null, ai: "Đội xe", cua: "/doi-xe",
       duoi: "Đang chạy / đủ điều kiện · xe trống · bảo dưỡng" },
     { nhan: "Marketing & PR", phu: "Khách tiềm năng mới", so: null,
       ai: "Marketing", cua: "/leads?tab=leads",
       duoi: "Đã chuyển Kinh doanh · đã chốt" },
-    /* SỬA 13/9/2026 – thẻ này từng in `d.alerts.length`, tức SỐ DÒNG máy chủ gửi kèm trang này
-       (đang cắt ở 60), chứ không phải số tồn đọng thật. Trên bản chạy thật nó ra "60" trong khi
-       dòng phụ ngay dưới ghi "1387 cảnh báo đỏ đang mở": con số nhỏ nằm ở chỗ to nhất màn hình,
-       con số thật nằm ở dòng chữ nhỏ. Nay lấy đúng `k.canh_bao_do`; nếu máy chủ không gửi thì thẻ
-       để trống kèm cửa nhập, không lấy độ dài danh sách thay vào. */
-    /* Bản vẽ chốt ba chỉ số: hồ sơ quá hạn · nghiêm trọng · chưa có người nhận. Máy chủ mới có
-       "nghiêm trọng" (cảnh báo đỏ); chưa gán người nhận cho cảnh báo nên chưa đếm được cái thứ ba,
-       và chưa tách hồ sơ quá hạn ra khỏi cảnh báo đỏ. Nói ra hai cái còn thiếu. */
-    { nhan: "Tồn đọng cần xử lý", so: dem(k.canh_bao_do),
-      duoi: "cảnh báo mức nghiêm trọng · chưa tách được hồ sơ quá hạn và hồ sơ chưa có người nhận (CNTT)",
-      do: (k.canh_bao_do ?? 0) > 0, ai: "Công nghệ thông tin", cua: "/alerts" },
   ];
 
   /* Biểu đồ dựng một lần, giao cho từng khối tự bày. Khối nào chưa đủ số thì nhận `null` và chỉ
@@ -101,50 +77,39 @@ function Dash() {
     <TieuDe vai={user?.role} ten_vai={user?.role_name} />
     <DongLoc />
 
-    {/* ══ TC-40 · MÀN HÌNH CHỦ TỊCH SAU KHI ANH TUẤN SOÁT TỪNG KHỐI (15/9/2026) ═══════════════
-        Anh Tuấn mở bản chạy thật, chụp ảnh từng khối, và chốt danh sách GIỮ:
-          · Tám thẻ chỉ tiêu          · Hiệu quả đội xe (thêm chọn tháng / quý / năm)
-          · Phải thu theo hạn          · Phải trả theo hạn
-          · Kinh doanh Lẻ · Đoàn · Báo cáo ngày
-          · Dòng tiền — "số 6 dòng tiền em giữ nguyên", tức giữ NGUYÊN VẸN, cả bốn ô cảnh báo
-        Cộng thêm một khối ông ấy không đụng tới: Cần quyết định — việc chờ chữ ký của chính ông
-        ấy, không ai làm thay được.
+    {/* ══ TC-42 · SÁU Ô LỚN, RỒI MỚI ĐẾN NHỮNG CON SỐ ĐỂ LIẾC (anh Tuấn chốt 16/9/2026) ═══════
+        "8 ô này anh muốn thay đổi vị trí — doanh thu, lợi nhuận trước thuế, dòng tiền, phải thu,
+         phải trả, tồn đọng cần xử lý: 6 ô này làm biểu đồ lớn lên, chia ra các chart khác nhau
+         theo cấu trúc; phần doanh thu và lợi nhuận phân ra theo tháng, quý, năm. Giảm từ 8 ô
+         xuống còn 6 ô. Các phần tour đang bán, tour chờ quyết toán, tour sắp khởi hành, đội xe
+         hôm nay, marketing đưa xuống vị trí dưới."
 
-        BỎ: Điều hành 14 ngày · Tồn đọng theo bộ phận · Tiến độ báo cáo · Rủi ro trọng yếu · Việc
-        cần xử lý · Tồn đọng cần xử lý · và khu biểu đồ riêng có đánh số.
+        RANH GIỚI GIỮA HAI NHÓM KHÔNG PHẢI LÀ ĐỘ QUAN TRỌNG, MÀ LÀ CÁCH ĐỌC:
+          · Sáu ô trên là con số phải NGHĨ mới hiểu — chỉ có nghĩa khi đặt cạnh kỳ trước, cạnh kế
+            hoạch, hoặc chia theo cơ cấu. "Doanh thu 4,3 tỷ" một mình thì không ai nói được là tốt
+            hay xấu.
+          · Năm thẻ dưới là con số chỉ để LIẾC. Đọc xong là xong.
 
-        HAI LUẬT RÚT RA, cả hai kiểm được bằng máy:
-
-        1. MỘT CON SỐ — MỘT CHỖ — MỘT HÌNH. Trước vòng này cảnh báo tồn đọng nằm ở BỐN chỗ và
-           doanh thu nhân viên nằm ở HAI chỗ. Bốn chỗ cùng nói một chuyện thì không chỗ nào còn
-           đáng đọc, và đến lúc bốn chỗ ra bốn con số thì không ai biết tin chỗ nào.
-
-        2. BIỂU ĐỒ Ở CẠNH CON SỐ NÓ VẼ. Vòng TC-38 gom biểu đồ ra ba khu riêng — nghe rất hợp lý,
-           vì "khu biểu đồ" là thứ bảng điều hành nào cũng có. Nhưng trên bản chạy thật nó tách
-           con số khỏi hình của chính con số ấy, và người đọc phải cuộn qua lại để ghép hai thứ
-           vốn là một. Nay hình về nằm trong khối.
-
-        BỎ KHỎI MÀN HÌNH KHÔNG PHẢI BỎ SỐ — chỗ dễ hiểu nhầm nhất, nên nói rõ. Mỗi khối gỡ đi đều
-        còn nguyên ở chỗ của nó: Điều hành ở /tours và /lenh-dieu-xe (mã giữ trong
-        components/KhoiDieuHanh.tsx), tồn đọng ở /alerts, tiến độ báo cáo ở /reports. Bảng điều
-        hành Chủ tịch trả lời câu "có gì cần tôi quyết"; nó không phải chỗ chứa mọi bảng của công
-        ty.
-
-        KHÁC BẢN VẼ V1.4, VÀ LÀ KHÁC CÓ CHỦ Ý. Ghi ra để vòng sau không ai "sửa lại cho đúng bản
-        vẽ" mà không biết vì sao: bản vẽ là bản vẽ của một hệ thống ĐÃ CÓ SỐ; hôm nay VTOS đang
-        dựng, và những khối bị gỡ chưa có sổ nào phía sau. */}
+        BA KHỐI CHUYỂN LÊN, KHÔNG NHÂN BẢN. Dòng tiền · Phải thu · Phải trả trước đây nằm rời phía
+        dưới; nay chúng LÀ ba trong sáu ô. Giữ cả hai chỗ là để một con số nằm hai nơi — đúng cái
+        anh Tuấn bảo bỏ ở vòng TC-40 ("các mục lặp lại thì bỏ hết"). */}
 
     <KhoiQuyetDinh ds={d.approvals || []} vai={user?.role} />
-    <TamThe ds={tam} />
+
+    <div className="mh01-sau-o">
+      <KhoiDoanhThu ba_ky={sec.ba_ky} ke_hoach={kh} so_chuyen={k.so_chuyen_thang} />
+      <KhoiLoiNhuan ba_ky={sec.ba_ky} ke_hoach={kh} />
+      <KhoiDongTien />
+      <KhoiPhaiThu ds={sec.phai_thu_theo_han} chua_co_han={sec.phai_thu_chua_co_han}
+        vi_sao={sec.phai_thu_vi_sao} bieu_do={bd.phai_thu} />
+      <KhoiPhaiTra ds={sec.phai_tra_theo_han} qua_han={sec.phai_tra_qua_han}
+        chua_co_han={sec.phai_tra_chua_co_han} vi_sao={sec.phai_tra_vi_sao} bieu_do={bd.phai_tra} />
+      <KhoiTonDongMuc d={sec.ton_dong_theo_muc} />
+    </div>
+
+    <HangThe ds={the} />
 
     <KhoiHieuQuaXe d={sec.hieu_qua_xe} theo_ky={sec.hieu_qua_xe_theo_ky} />
-
-    <KhoiDongTien />
-
-    <KhoiPhaiThu ds={sec.phai_thu_theo_han} chua_co_han={sec.phai_thu_chua_co_han}
-      vi_sao={sec.phai_thu_vi_sao} bieu_do={bd.phai_thu} />
-    <KhoiPhaiTra ds={sec.phai_tra_theo_han} qua_han={sec.phai_tra_qua_han}
-      chua_co_han={sec.phai_tra_chua_co_han} vi_sao={sec.phai_tra_vi_sao} bieu_do={bd.phai_tra} />
 
     {/* Ba khối kinh doanh & nội bộ xếp một hàng: cả ba đều ngắn sau khi bỏ bảng, và đọc cạnh nhau
         thì thấy được bức tranh "bán hàng · lợi nhuận · kỷ luật nội bộ" trong một cái nhìn. */}

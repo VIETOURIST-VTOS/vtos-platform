@@ -97,15 +97,84 @@ def _lui_thang(y: int, m: int, n: int) -> tuple[int, int]:
     return t // 12, t % 12 + 1
 
 
-def cac_ky(hom_nay: date, so_ky: int) -> list[str]:
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# TC-42 · BA BỀ RỘNG KỲ: THÁNG · QUÝ · NĂM
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# Anh Tuấn 16/9/2026: "phần doanh thu và lợi nhuận phân ra theo tháng, quý, năm".
+#
+# BỐN LUẬT Ở ĐẦU TỆP KHÔNG ĐỔI MỘT CHỮ — chúng vốn không nói gì về bề rộng của kỳ. Luật 1 "chỉ lấy
+# kỳ đã đóng" nay áp cho quý và năm y hệt: quý đang chạy có thể mới đi được hai tuần, và đặt nó
+# cạnh các quý đủ ba tháng thì cột cuối luôn thấp — đúng cái bẫy mà luật 1 sinh ra để tránh.
+#
+# QUÝ VÀ NĂM LÀ TỔNG CỦA CÁC THÁNG, KHÔNG PHẢI MỘT PHÉP TÍNH THỨ HAI. Đây là chỗ dễ sai nhất: viết
+# một truy vấn riêng "doanh thu quý" thì kho có HAI công thức cho cùng một câu hỏi, và ngày chúng
+# lệch nhau thì không ai biết tin bên nào. Nên `doc` của quý gọi đúng `doc` của từng tháng rồi cộng.
+#
+# THIẾU MỘT THÁNG THÌ CẢ KỲ CHƯA CÓ SỐ — cùng luật với kế hoạch hợp nhất (services/ke_hoach, LUẬT
+# 1), và cùng lý do: cộng hai tháng có số rồi gọi đó là "doanh thu quý" cho ra một con số NHỎ HƠN
+# thật mà nhìn không khác gì một con số đầy đủ. Ô trống thì người đọc đi hỏi; con số thiếu một
+# tháng thì không ai hỏi gì cả. `vi_sao` nói rõ thiếu tháng nào.
+
+KY_THANG = "thang"
+KY_QUY = "quy"
+KY_NAM = "nam"
+TEN_KY = {KY_THANG: "Tháng", KY_QUY: "Quý", KY_NAM: "Năm"}
+
+# Số kỳ mặc định cho từng bề rộng. Sáu tháng · bốn quý · ba năm — đều xấp xỉ một màn hình biểu đồ,
+# và đều đủ để nhìn ra chiều đi lên hay xuống mà không phải nheo mắt.
+SO_KY_MAC_DINH = {KY_THANG: 6, KY_QUY: 4, KY_NAM: 3}
+
+
+def _lui_quy(y: int, q: int, n: int) -> tuple[int, int]:
+    t = (y * 4 + (q - 1)) - n
+    return t // 4, t % 4 + 1
+
+
+def kieu_ky(ky: str) -> str:
+    """Đọc bề rộng từ chính mã kỳ: '2026-08' → tháng · '2026-Q3' → quý · '2026' → năm."""
+    s = str(ky)
+    if "-Q" in s:
+        return KY_QUY
+    if "-" in s:
+        return KY_THANG
+    return KY_NAM
+
+
+def thang_cua_ky(ky: str) -> list[str]:
+    """Các mã THÁNG nằm trong một kỳ. Tháng trả về chính nó — nhờ vậy nơi gọi không phải rẽ nhánh."""
+    loai = kieu_ky(ky)
+    if loai == KY_THANG:
+        return [ky]
+    if loai == KY_QUY:
+        y, q = str(ky).split("-Q")
+        y, q = int(y), int(q)
+        if not 1 <= q <= 4:
+            raise ValueError(f"quý không hợp lệ: {ky!r}")
+        return [f"{y}-{m:02d}" for m in range((q - 1) * 3 + 1, (q - 1) * 3 + 4)]
+    y = int(ky)
+    return [f"{y}-{m:02d}" for m in range(1, 13)]
+
+
+def cac_ky(hom_nay: date, so_ky: int, kind: str = KY_THANG) -> list[str]:
     """`so_ky` kỳ ĐÃ ĐÓNG gần nhất, xếp cũ → mới. Kỳ đang chạy KHÔNG nằm trong đây (luật 1)."""
     if so_ky < 1:
         raise ValueError("so_ky phải ≥ 1")
-    y, m = _lui_thang(hom_nay.year, hom_nay.month, 1)      # tháng vừa đóng
+    if kind not in TEN_KY:
+        raise ValueError(f"bề rộng kỳ chưa khai: {kind!r}")
     ra = []
-    for i in range(so_ky):
-        yy, mm = _lui_thang(y, m, i)
-        ra.append(f"{yy}-{mm:02d}")
+    if kind == KY_THANG:
+        y, m = _lui_thang(hom_nay.year, hom_nay.month, 1)      # tháng vừa đóng
+        for i in range(so_ky):
+            yy, mm = _lui_thang(y, m, i)
+            ra.append(f"{yy}-{mm:02d}")
+    elif kind == KY_QUY:
+        y, q = _lui_quy(hom_nay.year, (hom_nay.month - 1) // 3 + 1, 1)   # quý vừa đóng
+        for i in range(so_ky):
+            yy, qq = _lui_quy(y, q, i)
+            ra.append(f"{yy}-Q{qq}")
+    else:
+        for i in range(so_ky):
+            ra.append(str(hom_nay.year - 1 - i))               # năm vừa đóng trở về trước
     return list(reversed(ra))
 
 
@@ -128,8 +197,9 @@ def so_sanh(diem: list[dict]) -> dict | None:
 
 
 def chuoi(ma: str, doc: Callable[[str, str], float | None], *,
-          so_ky: int = 6, hom_nay: date | None = None) -> dict:
-    """Chuỗi xu hướng của một chỉ tiêu.
+          so_ky: int | None = None, hom_nay: date | None = None,
+          kind: str = KY_THANG) -> dict:
+    """Chuỗi xu hướng của một chỉ tiêu, ở một bề rộng kỳ (tháng · quý · năm).
 
     `doc(ma, ky)` trả số của chỉ tiêu ở kỳ ấy, hoặc None nếu kỳ ấy chưa có số. Tách ra ngoài để
     phép tính kiểm được bằng sổ giả — xem chú thích đầu tệp.
@@ -137,8 +207,11 @@ def chuoi(ma: str, doc: Callable[[str, str], float | None], *,
     ct = CHI_TIEU.get(ma)
     if ct is None:
         raise ValueError(f"chỉ tiêu chưa khai: {ma!r}")
+    if kind not in TEN_KY:
+        raise ValueError(f"bề rộng kỳ chưa khai: {kind!r}")
     hom_nay = hom_nay or date.today()
-    diem = [{"ky": ky, "gia_tri": doc(ma, ky)} for ky in cac_ky(hom_nay, so_ky)]
+    so_ky = SO_KY_MAC_DINH[kind] if so_ky is None else so_ky
+    diem = [{"ky": ky, "gia_tri": doc(ma, ky)} for ky in cac_ky(hom_nay, so_ky, kind)]
     co_so = [d for d in diem if d["gia_tri"] is not None]
 
     # Luật 3: dưới hai điểm thật thì KHÔNG vẽ, và nói vì sao. Một cột đơn độc kèm mũi tên đọc ra
@@ -152,12 +225,61 @@ def chuoi(ma: str, doc: Callable[[str, str], float | None], *,
 
     return {
         "ma": ma, "ten": ct.ten, "loai": ct.loai, "dinh_dang": ct.dinh_dang,
+        "kind": kind, "kind_ten": TEN_KY[kind],
         "diem": diem,
         "so_ky_co_so": len(co_so),
         "du_ve": du_ve,
         "vi_sao": vi_sao,
         "so_sanh": so_sanh(diem) if du_ve else None,
     }
+
+
+def ky_dang_chay(hom_nay: date, kind: str) -> tuple[str, list[str]]:
+    """Kỳ ĐANG CHẠY và các tháng đã trôi qua trong nó, kể cả tháng hiện tại.
+
+    Kỳ đang chạy tuyệt đối KHÔNG được vào biểu đồ (luật 1) — nó chỉ là CON SỐ LỚN trên đầu khối,
+    và luôn đi kèm chữ "đến hôm nay". Một kỳ mới đi được nửa đường đứng cạnh các kỳ đủ ngày thì cột
+    cuối luôn thấp và đường xu hướng luôn trông như đang lao dốc; nhưng cùng con số ấy, đặt riêng
+    ra và nói rõ là "đến hôm nay", thì lại chính là thứ người đọc bảng điều hành cần nhất.
+    """
+    if kind == KY_THANG:
+        ky = f"{hom_nay.year}-{hom_nay.month:02d}"
+    elif kind == KY_QUY:
+        ky = f"{hom_nay.year}-Q{(hom_nay.month - 1) // 3 + 1}"
+    elif kind == KY_NAM:
+        ky = str(hom_nay.year)
+    else:
+        raise ValueError(f"bề rộng kỳ chưa khai: {kind!r}")
+    da_troi = [t for t in thang_cua_ky(ky) if t <= f"{hom_nay.year}-{hom_nay.month:02d}"]
+    return ky, da_troi
+
+
+def bo_ba_ky(ma: str, doc: Callable[[str, str], float | None], *,
+             hom_nay: date | None = None) -> dict:
+    """Cùng một chỉ tiêu ở CẢ BA bề rộng: {"thang": …, "quy": …, "nam": …}.
+
+    Ba chuỗi dựng ĐỘC LẬP, và đó là điều phải giữ: màn hình có ba nút, và bấm sang Quý mà thấy y
+    hệt bộ số của Tháng là nói dối bằng giao diện — người đọc sẽ kết luận quý bằng tháng, chứ không
+    kết luận là chưa có số. Cùng một bài học đã phải trả giá ở khối Hiệu quả đội xe (TC-40).
+
+    Mỗi bề rộng kèm `dang_chay`: con số của kỳ ĐANG CHẠY tính đến hôm nay. Nó KHÔNG nằm trong
+    `diem` — xem `ky_dang_chay()`.
+    """
+    hom_nay = hom_nay or date.today()
+    ra = {}
+    for k in TEN_KY:
+        c = chuoi(ma, doc, hom_nay=hom_nay, kind=k)
+        ky, da_troi = ky_dang_chay(hom_nay, k)
+        phan = [doc(ma, t) for t in da_troi]
+        c["dang_chay"] = {
+            "ky": ky,
+            "so_thang_da_troi": len(da_troi),
+            # Thiếu một tháng đã trôi thì cả kỳ chưa có số — cùng luật với kỳ đã đóng. Cộng phần có
+            # rồi gọi đó là "quý này đến hôm nay" là một con số thấp hơn thật mà trông bình thường.
+            "gia_tri": None if any(p is None for p in phan) else float(sum(phan)),
+        }
+        ra[k] = c
+    return ra
 
 
 # ───────────────────────────── NỐI VÀO SỔ THẬT ─────────────────────────────
@@ -200,6 +322,38 @@ def doc_that(db) -> Callable[[str, str], float | None]:
             # Một kỳ hỏng không được làm sập cả bảng điều hành: kỳ ấy thành ô trống, các kỳ khác
             # vẫn vẽ. Ô trống đọc ra là "chưa có số" — đúng điều đang xảy ra với kỳ ấy.
             return None
+    return doc_theo_ky(doc)
+
+
+def doc_theo_ky(doc_thang: Callable[[str, str], float | None]
+                ) -> Callable[[str, str], float | None]:
+    """Bọc một hàm đọc THEO THÁNG thành hàm đọc được MỌI bề rộng kỳ (TC-42).
+
+    Tách ra khỏi `doc_that` để luật cộng kỳ kiểm được bằng sổ giả, đúng như `chuoi()` — cả tệp này
+    dựng theo lối ấy: phép tính ở trên và kiểm được, phần chạm cơ sở dữ liệu mỏng nhất có thể.
+
+    HAI LUẬT, VÀ CHÚNG NGƯỢC NHAU — nên phải viết ra:
+
+      · DÒNG CHẢY CỘNG ĐƯỢC. Doanh thu quý 3 là tổng ba tháng. Thiếu một tháng thì cả quý CHƯA CÓ
+        SỐ, không phải tổng của hai tháng còn lại: con số thiếu một tháng nhìn không khác gì con
+        số đầy đủ, và không ai đi hỏi một con số trông bình thường.
+
+      · TỒN KHO KHÔNG CỘNG ĐƯỢC. "Tour đang bán" của quý 3 KHÔNG phải tổng ba tháng — một chuyến
+        còn đang bán suốt cả quý thì bị đếm ba lần. Con số đúng của quý là số đếm tại NGÀY CUỐI
+        QUÝ, tức bản lưu của tháng cuối quý. Cộng tồn kho là lỗi kinh điển của bảng điều hành, và
+        nó ra một con số to gấp ba mà vẫn trông hợp lý.
+    """
+    def doc(ma: str, ky: str) -> float | None:
+        if kieu_ky(ky) == KY_THANG:
+            return doc_thang(ma, ky)
+        ct = CHI_TIEU.get(ma)
+        thang = thang_cua_ky(ky)
+        if ct is not None and ct.loai == TON_KHO:
+            return doc_thang(ma, thang[-1])
+        phan = [doc_thang(ma, t) for t in thang]
+        if any(p is None for p in phan):
+            return None
+        return float(sum(phan))
     return doc
 
 
@@ -275,3 +429,14 @@ def cho_man_hinh(db, *, so_ky: int = 6, hom_nay: date | None = None) -> dict:
     """Gói xu hướng của cả bốn chỉ tiêu, dạng bảng điều hành đọc thẳng."""
     d = doc_that(db)
     return {ma: chuoi(ma, d, so_ky=so_ky, hom_nay=hom_nay) for ma in CHI_TIEU}
+
+
+# Hai chỉ tiêu có ô chọn ba kỳ trên màn hình Chủ tịch (TC-42). CỐ Ý chỉ hai: tồn kho cộng không
+# được, và bốn ô chọn ba kỳ trên cùng một màn hình thì không ô nào còn đáng bấm.
+CHI_TIEU_BA_KY = ("doanh_thu_thang", "ln_ke_toan_thang")
+
+
+def ba_ky_cho_man_hinh(db, *, hom_nay: date | None = None) -> dict:
+    """{chỉ tiêu: {thang, quy, nam}} cho hai ô lớn Doanh thu và Lợi nhuận trước thuế."""
+    d = doc_that(db)
+    return {ma: bo_ba_ky(ma, d, hom_nay=hom_nay) for ma in CHI_TIEU_BA_KY}

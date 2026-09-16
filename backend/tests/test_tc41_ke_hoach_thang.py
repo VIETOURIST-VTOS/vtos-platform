@@ -43,6 +43,9 @@ MAN_HINH = GOC / "web" / "app" / "ke-hoach-thang" / "page.tsx"
 SHELL = GOC / "web" / "components" / "Shell.tsx"
 DAU = GOC / "web" / "components" / "DauManHinh01.tsx"
 TRANG = GOC / "web" / "app" / "page.tsx"
+# TC-42 (16/9/2026): câu đọc hộ kế hoạch chuyển từ DauManHinh01 sang KhoiSauO, đi theo hai ô lớn
+# Doanh thu và Lợi nhuận. Phép thử đổi CHỖ NHÌN, luật không đổi.
+SAU_O = GOC / "web" / "components" / "KhoiSauO.tsx"
 
 
 def _doc(p: Path) -> str:
@@ -347,22 +350,31 @@ def test_hop_nhat_tra_ve_danh_sach_thieu_chu_khong_tra_ve_tong_mot_phan():
 
 
 def test_man_hinh_01_giu_du_ba_trang_thai_cua_ke_hoach():
-    """Chưa ai nhập · nhập thiếu pháp nhân · đủ. Ba câu khác hẳn nhau."""
-    dau = _doc(DAU)
-    assert "docHoKeHoach" in dau, "Câu đọc hộ kế hoạch phải là một hàm riêng, kiểm được."
-    assert "chưa có kế hoạch tháng" in dau, "Thiếu nhánh 'chưa ai nhập'."
-    assert "chưa đủ" in dau and "còn thiếu" in dau, "Thiếu nhánh 'nhập thiếu pháp nhân'."
-    assert "đạt" in dau, "Thiếu nhánh 'đủ' — nơi in chỉ tiêu và tỉ lệ đạt."
-    # Trang gọi hàm ấy cho CẢ HAI thẻ, không chỉ thẻ Doanh thu.
-    trang = _doc(TRANG)
-    assert trang.count("docHoKeHoach") >= 2, (
-        "Cả thẻ Doanh thu lẫn thẻ Lợi nhuận trước thuế đều phải so với kế hoạch."
+    """Chưa ai nhập · nhập thiếu pháp nhân · đủ. Ba câu khác hẳn nhau.
+
+    SỬA 16/9/2026 (TC-42): hàm đổi tên thành `docHoKeHoachKy` và sang KhoiSauO.tsx cùng hai ô lớn.
+    Nó biết thêm một việc bản cũ không biết — kế hoạch CHỈ có cho kỳ tháng — nên phép thử canh
+    thêm nhánh thứ tư ấy.
+    """
+    sau_o = _doc(SAU_O)
+    assert "docHoKeHoachKy" in sau_o, "Câu đọc hộ kế hoạch phải là một hàm riêng, kiểm được."
+    assert "Chưa có kế hoạch tháng" in sau_o, "Thiếu nhánh 'chưa ai nhập'."
+    assert "chưa đủ" in sau_o and "còn thiếu" in sau_o, "Thiếu nhánh 'nhập thiếu pháp nhân'."
+    assert "đạt" in sau_o, "Thiếu nhánh 'đủ' — nơi in chỉ tiêu và tỉ lệ đạt."
+    assert 'if (ky !== "thang")' in _ma(sau_o), (
+        "Bấm sang Quý mà vẫn vẽ vạch mốc dựng từ KẾ HOẠCH THÁNG là bịa ra một chỉ tiêu chưa ai "
+        "duyệt: chỉ tiêu quý và năm là quyết định riêng của Hội đồng quản trị, không phải tổng "
+        "ba tháng."
+    )
+    # Cả HAI ô lớn đều so với kế hoạch, không chỉ ô Doanh thu.
+    assert sau_o.count("docHoKeHoachKy(ky") >= 2, (
+        "Cả ô Doanh thu lẫn ô Lợi nhuận trước thuế đều phải so với kế hoạch."
     )
 
 
 def test_man_hinh_khong_tu_tinh_ty_le_dat():
     """Ranh giới 09/9: phép chia nằm ở máy chủ. Màn hình chỉ nhân 100 để in phần trăm."""
-    for tep in (DAU, MAN_HINH, TRANG):
+    for tep in (DAU, MAN_HINH, TRANG, SAU_O):
         ma = _ma(_doc(tep))
         assert "/ ke_hoach" not in ma and "/ o.gia_tri" not in ma, (
             f"{tep.name} đang tự chia thực hiện cho kế hoạch — phép ấy thuộc về máy chủ."

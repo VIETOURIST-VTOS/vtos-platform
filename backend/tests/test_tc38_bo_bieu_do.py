@@ -255,13 +255,24 @@ def test_bieu_do_chua_du_so_thi_tra_null_chu_khong_tra_khung_rong():
     t = _bo_chu_thich_tsx(_doc(KHU))
     so_bd = len(re.findall(r"<BieuDo(?:Cot|Thanh|CoCau)\b", t))
     so_null = len(re.findall(r"\n\s*: null,", t))
-    assert so_bd >= 7, f"Bộ biểu đồ phải đủ dùng cho các khối, đang đếm {so_bd}"
+    # SỬA 16/9/2026 (TC-42): hai biểu đồ CỘT theo kỳ (doanh thu, lợi nhuận) rời tệp này sang
+    # components/KhoiSauO.tsx cùng hai Ô LỚN của chúng — nên bộ này còn NĂM. Luật thì không đổi
+    # một chữ, và nó nằm ở phép so bên dưới: mỗi biểu đồ phải có đúng một nhánh trả `null`.
+    assert so_bd >= 5, f"Bộ biểu đồ phải đủ dùng cho các khối, đang đếm {so_bd}"
     assert so_null == so_bd, (
         f"{so_bd} biểu đồ nhưng chỉ {so_null} nhánh trả null. Mỗi biểu đồ phải có nhánh 'chưa đủ "
         f"số thì trả null' — trả một khung rỗng là nói lại điều ô số đã nói."
     )
-    assert "duVeCoCau(" in t and "duVeCot(" in t and "duVeThanh(" in t, (
-        "Điều kiện vẽ phải hỏi qua ba hàm thuần của bộ biểu đồ, không viết lại tại chỗ."
+    # TC-42: `duVeCot` theo hai biểu đồ cột sang KhoiSauO.tsx, nên tệp này chỉ còn hai hàm hỏi.
+    # Luật là "hỏi qua hàm thuần, không viết lại điều kiện tại chỗ" — nên canh CẢ HAI tệp, thay vì
+    # nới lỏng cho tệp này.
+    assert "duVeCoCau(" in t and "duVeThanh(" in t, (
+        "Điều kiện vẽ phải hỏi qua hàm thuần của bộ biểu đồ, không viết lại tại chỗ."
+    )
+    sau_o = _bo_chu_thich_tsx(
+        (GOC / "web" / "components" / "KhoiSauO.tsx").read_text(encoding="utf-8"))
+    assert "duVeCot(" in sau_o and "duVeCoCau(" in sau_o, (
+        "Hai Ô LỚN theo kỳ và ô Tồn đọng cũng phải hỏi qua hàm thuần, không tự xét điều kiện vẽ."
     )
 
 
