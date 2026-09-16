@@ -54,13 +54,24 @@ def test_the_ton_dong_van_co_cua_nhap_khi_rong():
 
 
 def test_khong_con_bang_canh_bao_phang_tren_man_hinh_01():
-    """Bảng phẳng cũ đổ sáu mươi dòng gần giống hệt nhau – đã thay bằng khối gom nhóm."""
+    """Bảng phẳng cũ đổ sáu mươi dòng gần giống hệt nhau – đã thay bằng khối gom nhóm.
+
+    SỰ THẬT ĐỔI, LUẬT KHÔNG ĐỔI (15/9/2026). Luật vẫn là: KHÔNG đổ danh sách cảnh báo phẳng ra màn
+    hình Chủ tịch. Trước đây luật ấy được giữ bằng cách thay bảng phẳng bằng khối gom nhóm; nay anh
+    Tuấn chốt bỏ luôn cả khối gom nhóm khỏi màn hình 01, vì cùng dữ liệu ấy đã có ở thẻ chỉ tiêu
+    "Tồn đọng cần xử lý" và ở biểu đồ theo bộ phận — ba chỗ nói một chuyện thì không chỗ nào còn
+    đáng đọc. Khối vẫn còn nguyên trong KhoiTonDong.tsx và ở trang /alerts.
+    """
     nguon = _doc(TRANG)
-    assert "<KhoiTonDong" in nguon, "Màn hình 01 chưa gọi khối KhoiTonDong"
     assert "d.alerts.map" not in nguon, (
-        "Màn hình 01 vẫn còn đổ thẳng `d.alerts.map` ra một bảng phẳng. Danh sách từng dòng nay "
-        "nằm trong phần bung ra của KhoiTonDong."
+        "Màn hình 01 đổ thẳng `d.alerts.map` ra một bảng phẳng — đúng cái đã bỏ từ vòng TC-20."
     )
+    assert "<KhoiTonDong" not in nguon, (
+        "Khối gom nhóm đã chuyển khỏi màn hình 01 (anh Tuấn chốt 15/9/2026). Lắp lại là bày cùng "
+        "một dữ liệu ở ba chỗ trên một trang."
+    )
+    # Khối KHÔNG bị xoá: mã còn nguyên để lắp vào trang Cảnh báo.
+    assert KHOI.exists() and "gomTheoLoai" in _doc(KHOI)
 
 
 def test_khoi_ton_dong_khong_tu_doan_bo_phan():

@@ -25,6 +25,8 @@ from pathlib import Path
 
 GOC = Path(__file__).resolve().parents[2]
 TRANG = GOC / "web" / "app" / "page.tsx"
+# TC-40: khối Điều hành rời màn hình 01 sang tệp riêng, mang theo nguyên các luật bên dưới.
+DIEU_HANH = GOC / "web" / "components" / "KhoiDieuHanh.tsx"
 DAU = GOC / "web" / "components" / "DauManHinh01.tsx"
 CSS = GOC / "web" / "app" / "globals.css"
 
@@ -46,17 +48,19 @@ def _bo_chu_thich_css(s: str) -> str:
 
 # ─────────────── 1 · DÒNG TIỀN VÀ RỦI RO CÙNG MỘT HÀNG ───────────────
 
-def test_dong_tien_va_rui_ro_nam_chung_mot_hang():
-    """Bản vẽ đặt hai khối này CẠNH NHAU. Xếp dọc thì Rủi ro tụt xuống dưới 851px."""
+def test_dong_tien_dung_mot_minh_mot_hang():
+    """TC-40: khối Rủi ro đã gỡ (anh Tuấn chốt 15/9/2026), nên hàng hai cột không còn lý do tồn
+    tại — và để Dòng tiền một mình trong lưới hai cột thì nó co còn nửa bề ngang, dưới bề rộng tối
+    thiểu 637px của bảng bốn mốc. Đúng cái lỗi TC-35 đã đo và chữa, chỉ theo chiều ngược lại.
+
+    Luật giữ nguyên: bảng bốn mốc cần tối thiểu 637px, và bố cục không được ép nó xuống dưới mức
+    ấy."""
     ma = _bo_chu_thich_tsx(_doc(TRANG))
+    assert "<KhoiRuiRo" not in ma, "Khối Rủi ro đã được chốt gỡ khỏi màn hình 01."
     m = re.search(r'<div className="mh01-hang-2">(.*?)</div>', ma, re.S)
-    assert m, "Thiếu hàng hai cột `mh01-hang-2` cho Dòng tiền + Rủi ro."
-    trong = m.group(1)
-    assert "<KhoiDongTien" in trong and "<KhoiRuiRo" in trong, (
-        "Hàng hai cột phải chứa ĐÚNG hai khối Dòng tiền và Rủi ro."
-    )
-    assert trong.index("<KhoiDongTien") < trong.index("<KhoiRuiRo"), (
-        "Bản vẽ đặt Dòng tiền BÊN TRÁI (rộng 616), Rủi ro bên phải (rộng 440)."
+    assert not m, (
+        "Hàng hai cột `mh01-hang-2` còn sót lại mà chỉ chứa một khối — khối ấy sẽ co còn nửa bề "
+        "ngang."
     )
 
 
@@ -115,8 +119,11 @@ def test_chi_co_mot_nut_in_tren_man_hinh():
 # ─────────────── 3 · KHỐI DÀI CUỘN TRONG KHUNG, KHÔNG CẮT DÒNG ───────────────
 
 def test_bang_dieu_hanh_cuon_trong_khung():
-    """Khối Điều hành đo được cao 3.693px — 45% cả trang — vì 92 chuyến đổ hết ra một mạch."""
-    ma = _bo_chu_thich_tsx(_doc(TRANG))
+    """Khối Điều hành đo được cao 3.693px — 45% cả trang — vì 92 chuyến đổ hết ra một mạch.
+
+    TC-40: khối này đã rời màn hình 01 sang tệp riêng (anh Tuấn chốt bỏ). Luật không đổi và vẫn
+    được canh ở đó — bảng dài phải cuộn trong khung, không kéo cả trang."""
+    ma = _bo_chu_thich_tsx(_doc(DIEU_HANH))
     assert "mh01-cuon" in ma, "Bảng chuyến chưa có khung cuộn."
     css = _bo_chu_thich_css(_doc(CSS))
     m = re.search(r"\.mh01-cuon\s*\{([^}]*)\}", css)
@@ -136,7 +143,7 @@ def test_dau_bang_dinh_lai_khi_cuon():
 def test_khong_cat_bot_dong_nao():
     """92 chuyến là 92 việc có thật trong 14 ngày tới. Cắt dòng là giấu đúng việc ấy — nên chỉ
     được CUỘN, không được `.slice(`."""
-    ma = _bo_chu_thich_tsx(_doc(TRANG))
+    ma = _bo_chu_thich_tsx(_doc(DIEU_HANH))
     m = re.search(r"sec\.sap_khoi_hanh[^\n]*\.slice\(", ma)
     assert not m, "Bảng chuyến đang cắt bớt dòng thay vì cuộn."
 
@@ -153,7 +160,7 @@ def test_in_ra_giay_thi_bo_khung_cuon():
 
 def test_danh_sach_dai_gap_lai_nhung_in_van_mo():
     """Danh sách 100 mã quá hạn gấp lại cho gọn, nhưng <details> đóng thì in ra mất chữ."""
-    ma = _bo_chu_thich_tsx(_doc(TRANG))
+    ma = _bo_chu_thich_tsx(_doc(DIEU_HANH))
     assert "mh01-gap" in ma and "<summary>" in ma, "Danh sách dài chưa gấp lại."
     assert "qua_han_qt.length" in ma, "Gấp lại thì phải ghi SỐ chuyến ra ngoài, không thì gấp mất tin."
 
@@ -169,9 +176,9 @@ def test_khong_them_ma_mau_go_thang():
 def test_thu_tu_doc_chin_khoi_van_giu_nguyen():
     """Vòng này sửa VỊ TRÍ, không được làm hỏng THỨ TỰ mà TC-31 đã chỉnh đúng."""
     ma = _bo_chu_thich_tsx(_doc(TRANG))
-    thu_tu = ["<KhoiQuyetDinh", "<TamThe", 'id="dieu-hanh"', "<KhoiHieuQuaXe",
-              "<KhoiTonDongBoPhan", "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiDongTien",
-              "<KhoiRuiRo", "<KhoiTienDoBaoCao"]
+    # TC-40: bốn khối đã gỡ khỏi màn hình (xem test_tc31). Luật thứ tự vẫn áp cho phần còn lại.
+    thu_tu = ["<KhoiQuyetDinh", "<TamThe", "<KhoiHieuQuaXe", "<KhoiDongTien",
+              "<KhoiPhaiThu", "<KhoiPhaiTra"]
     vi = [(m, ma.index(m)) for m in thu_tu if m in ma]
     assert len(vi) == len(thu_tu), f"Thiếu khối: {set(thu_tu) - {m for m, _ in vi}}"
     sai = [(a[0], b[0]) for a, b in zip(vi, vi[1:]) if a[1] > b[1]]

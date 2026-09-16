@@ -20,7 +20,10 @@ import re
 from pathlib import Path
 
 GOC = Path(__file__).resolve().parents[2]
-TRANG = GOC / "web" / "app" / "page.tsx"
+# TC-40 (15/9/2026): khối Điều hành đã rời màn hình 01 — anh Tuấn chốt bỏ, vì nó cao 3.693px để
+# trình 92 chuyến mà bốn trên bảy cột ghi "chưa nối". Mã KHÔNG xoá: nó tách ra thành khối riêng và
+# mang theo nguyên bốn luật mà bộ kiểm này canh. Luật không đổi, chỉ đổi tệp chứa nó.
+TRANG = GOC / "web" / "components" / "KhoiDieuHanh.tsx"
 
 
 def _bo_chu_thich(s: str) -> str:

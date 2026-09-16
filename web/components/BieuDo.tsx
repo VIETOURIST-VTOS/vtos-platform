@@ -86,6 +86,37 @@ export function mocTruc(min: number, max: number, soMoc = 4): number[] {
   return ds;
 }
 
+/* ─────────────────────────── ĐỦ ĐIỀU KIỆN VẼ CHƯA? ───────────────────────────
+   Ba hàm thuần dưới đây là ĐÚNG những điều kiện mà ba thành phần vẽ dùng — và chúng phải là MỘT
+   bản duy nhất, không phải hai bản giống nhau.
+
+   Vì sao cần chúng đứng riêng: từ vòng TC-40, màn hình Chủ tịch KHÔNG bày biểu đồ rỗng nữa. Anh
+   Tuấn chụp màn hình bản chạy thật và chốt 15/9/2026 — trên đó tám trong mười một biểu đồ là ô
+   rỗng, và tám khung chữ "chưa có số" chiếm gần trọn màn hình của một người mở bảng ra để quyết
+   việc. Nên nơi gọi phải HỎI TRƯỚC khi vẽ, để gom mọi chỗ rỗng vào đúng một dòng ở cuối.
+
+   Nhưng "không bày" KHÔNG phải "giấu đi": dòng gom ấy nêu đích danh từng biểu đồ còn thiếu, bộ
+   phận phải nạp và cửa nhập. Ranh giới 09/9 giữ nguyên — mỗi con số vẫn phải có một cửa, và chỗ
+   chưa có cửa vẫn phải đọc được từ màn hình này. */
+
+export function duVeCot(diem: Diem[]): boolean {
+  return diem.filter((d) => d.gt !== null).length >= 2;
+}
+
+export function duVeThanh(ds: Thanh[]): boolean {
+  const v = ds.filter((h) => typeof h.gt === "number").map((h) => h.gt as number);
+  if (v.length < 2) return false;
+  // Mọi dòng đều 0 thì không có gì để so — đây là số THẬT, nhưng một biểu đồ toàn thanh dài 0 thì
+  // không nói thêm được điều gì mà bảng chưa nói.
+  return !(Math.max(...v, 0) === 0 && Math.min(...v, 0) === 0);
+}
+
+export function duVeCoCau(ds: Phan[]): boolean {
+  if (ds.some((p) => p.gt === null || p.gt === undefined)) return false;
+  const v = ds.map((p) => p.gt as number);
+  return !v.some((x) => x < 0) && v.reduce((a, b) => a + b, 0) !== 0;
+}
+
 /* ─────────────────────────── KHUNG & Ô RỖNG ─────────────────────────── */
 
 export function KhungBieuDo({ ten, phu, chan, chuGiai, children }: {
@@ -155,7 +186,7 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
   chan?: ReactNode; ai?: string; cua?: string; cua_ten?: string;
 }) {
   const coSo = diem.filter((d) => d.gt !== null) as { nhan: string; gt: number }[];
-  if (coSo.length < 2) {
+  if (!duVeCot(diem)) {
     return <BieuDoRong ten={ten} ai={ai} cua={cua} cua_ten={cua_ten}
       vi_sao={coSo.length === 0
         ? `Chưa có kỳ nào có số trong ${diem.length} kỳ gần nhất, nên chưa vẽ được.`
@@ -247,7 +278,7 @@ export function BieuDoThanh({ ten, phu, ds, dinh_dang = "dem", chan, ai, cua, cu
 }) {
   const hang = xep ? xepThanh(ds) : ds;
   const coSo = hang.filter((h) => typeof h.gt === "number").map((h) => h.gt as number);
-  if (coSo.length < 2) {
+  if (!duVeThanh(hang)) {
     return <BieuDoRong ten={ten} ai={ai} cua={cua} cua_ten={cua_ten}
       vi_sao={coSo.length === 0
         ? "Chưa dòng nào có số, nên chưa vẽ được."

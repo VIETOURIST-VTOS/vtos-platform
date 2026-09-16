@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, fmtD, taiTep, vnd } from "@/lib/api";
+import { BieuDoCot, type Diem } from "@/components/BieuDo";
 import { useShell } from "@/components/Shell";
 import { xepDonVi, type DonViChon } from "@/lib/thu_tu_don_vi";
 
@@ -76,55 +77,85 @@ function O({ o }: { o: any }) {
  *  lên của cùng một dòng tiền; ở kiểu từng khoảng bốn cột rời nhau nên đây là bốn lượng độc lập —
  *  chú thích dưới biểu đồ nói rõ đang là kiểu nào.
  */
+/** TC-40 · DÙNG BỘ BIỂU ĐỒ CHUNG, và thêm một câu ĐỌC HỘ.
+ *
+ *  Anh Tuấn chốt 15/9/2026: "dòng tiền rất quan trọng, cần có số và biểu đồ phân tích". Hai việc:
+ *
+ *   1. Biểu đồ bỏ bản vẽ tay ở đây, gọi `BieuDoCot` của components/BieuDo.tsx. Bản vẽ tay cũ đúng
+ *      về hình nhưng là bản chép thứ tư của cùng một phép tính trục — và bốn bản chép thì sớm
+ *      muộn lệch nhau. Bộ chung còn có thứ bản vẽ tay không có: trục tung ghi mốc, lưới mờ, nhãn
+ *      số trên từng cột.
+ *   2. Thêm một câu đọc hộ. Đây là khối quan trọng nhất màn hình, mà bốn con số bốn mốc thì phải
+ *      tự so trong đầu mới ra được điều đáng lo. Câu ấy chỉ ĐỌC LẠI số máy chủ gửi — nó nói mốc
+ *      nào âm sớm nhất và thiếu bao nhiêu, không tính ra chỉ tiêu mới nào.
+ */
+function docHoDongTien(cot: any[], v: (number | null | undefined)[], khoang: boolean): string {
+  const co = cot.map((c, i) => ({ ten: c.ten, gt: v[i] }))
+    .filter((x) => typeof x.gt === "number") as { ten: string; gt: number }[];
+  if (co.length === 0) return "";
+  const am = co.filter((x) => x.gt < 0);
+  if (am.length === 0) {
+    return khoang
+      ? `Cả ${co.length} khoảng đều dương — không khoảng nào thu không đủ bù chi.`
+      : `Dòng tiền luỹ kế dương ở cả ${co.length} mốc.`;
+  }
+  // Mốc ÂM SỚM NHẤT là điều đáng lo nhất, vì nó là hạn phải xoay tiền. Cột thứ tự trong `cot` đã
+  // là thứ tự thời gian, nên phần tử âm đầu tiên chính là mốc sớm nhất — không cần sắp lại.
+  const dau = am[0];
+  const sau = am.length > 1 ? ` (${am.length}/${co.length} mốc âm)` : "";
+  return khoang
+    ? `Thu không đủ bù chi từ khoảng ${dau.ten}, thiếu ${vnd(Math.abs(dau.gt))}${sau}.`
+    : `Dòng tiền luỹ kế âm từ mốc ${dau.ten}, thiếu ${vnd(Math.abs(dau.gt))}${sau}.`;
+}
+
+/** Bốn mốc dòng tiền thuần.
+ *
+ *  Bản vẽ V1.4 đặt đúng chỗ này một biểu đồ, kèm câu quy định cách cư xử khi thiếu số:
+ *
+ *      "Dự báo chưa đủ dữ liệu. Biểu đồ số dư và ngưỡng dự phòng sẽ hiển thị khi có số dư đã đối
+ *       soát cùng lịch thu–chi đầy đủ. KHÔNG QUY ĐỔI DỮ LIỆU THIẾU THÀNH SỐ 0."
+ *
+ *  Câu cuối là luật, không phải lời khuyên. Một đường phẳng ở mức 0 trên biểu đồ dòng tiền đọc ra
+ *  là "không có tiền vào ra" — khác hẳn "chưa ai nạp số". Bộ biểu đồ chung giữ đúng luật ấy: mốc
+ *  thiếu là một ô trống có khung nét đứt, không phải một cột cao 0.
+ *
+ *  NGUỒN SỐ: `k.dong_tien_thuan` / `k.dong_tien_thuan_khoang` — đúng hai trường mà dòng đáy của
+ *  bảng đang đọc, nên biểu đồ không thể nói khác bảng ngay dưới nó. Cố ý KHÔNG tự dò dòng "số dư
+ *  cuối khoảng" theo tên tiếng Việt: tên đổi một chữ là biểu đồ âm thầm vẽ sang dòng khác.
+ *
+ *  Biểu đồ đổi theo KIỂU XEM cùng với bảng. Ở kiểu luỹ kế bốn cột chồng nhau nên đây là đường đi
+ *  lên của cùng một dòng tiền; ở kiểu từng khoảng bốn cột rời nhau nên đây là bốn lượng độc lập —
+ *  chú thích dưới biểu đồ nói rõ đang là kiểu nào.
+ */
 function BieuDoBonMoc({ cot, so, khoang, vi_sao }: {
   cot: any[]; so: Record<string, number | null | undefined>; khoang: boolean; vi_sao?: string;
 }) {
   const gt = cot.map((c: any) => so?.[c.ma]);
+  const diem: Diem[] = cot.map((c: any, i: number) => ({
+    nhan: c.ten,
+    gt: gt[i] === null || gt[i] === undefined ? null : Number(gt[i]),
+  }));
   const thieu = cot.filter((c: any, i: number) => gt[i] === null || gt[i] === undefined);
-  if (thieu.length) {
-    return (
-      <div className="dt-bieudo-rong">
-        <b>Chưa đủ dữ liệu để vẽ biểu đồ</b>
-        <p className="muted">
-          Còn thiếu {thieu.length}/{cot.length} mốc: {thieu.map((c: any) => c.ten).join(" · ")}.
-          {vi_sao ? " " + vi_sao : ""}
-        </p>
-        <p className="muted">Không quy đổi dữ liệu thiếu thành số 0.</p>
-      </div>
-    );
-  }
-  const v = gt as number[];
-  const max = Math.max(...v, 0), min = Math.min(...v, 0);
-  const bien = max - min || 1;
-  // Trục 0 nằm đúng chỗ của nó: cột âm đi xuống, cột dương đi lên. Vẽ mọi cột từ đáy khung là
-  // biến một tháng âm thành một cột ngắn trông như tháng dương ít tiền.
-  const H = 120, y0 = Math.round(H * (max / bien));
+  const doc = docHoDongTien(cot, gt as any, khoang);
   return (
-    <div className="dt-bieudo">
-      <div className="dt-bd-cot" style={{ height: H }}>
-        {v.map((x, i) => {
-          const cao = Math.round((Math.abs(x) / bien) * H);
-          return (
-            <div key={cot[i].ma} className="dt-bd-mot" title={`${cot[i].ten}: ${vnd(x)}`}>
-              <div className="dt-bd-khung" style={{ height: H }}>
-                <div className={"dt-bd-thanh" + (x < 0 ? " am" : "")}
-                  style={{ height: cao, top: x < 0 ? y0 : y0 - cao }} />
-              </div>
-            </div>
-          );
-        })}
-        <div className="dt-bd-truc0" style={{ top: y0 }} />
-      </div>
-      <div className="dt-bd-nhan">
-        {cot.map((c: any, i: number) => (
-          <div key={c.ma}><b>{vnd(v[i])}</b><span className="muted">{c.ten}</span></div>
-        ))}
-      </div>
-      <p className="muted dt-bd-chu">
-        Dòng tiền thuần {khoang ? "trong từng khoảng — bốn cột rời nhau" : "luỹ kế — bốn cột chồng lên nhau"}.
-        Vạch ngang là mốc 0.
-      </p>
-    </div>
+    <>
+      <BieuDoCot
+        ten={`Dòng tiền thuần qua bốn mốc`}
+        phu={khoang ? "trong từng khoảng — bốn cột rời nhau" : "luỹ kế — bốn cột chồng lên nhau"}
+        diem={diem}
+        ai="Kế toán" cua="/dong-tien/nguon" cua_ten="Nguyên nhân · bộ phận · cửa nhập"
+        chan={<>
+          {/* CÂU ĐỌC HỘ ĐỨNG TRƯỚC mọi chú thích khác: nó là điều người đọc cần biết, còn phần
+              còn lại là cách đọc hình. */}
+          {doc && <><b>{doc}</b>{" "}</>}
+          {thieu.length > 0 && <>
+            Còn thiếu {thieu.length}/{cot.length} mốc: {thieu.map((c: any) => c.ten).join(" · ")}.
+            {vi_sao ? " " + vi_sao : ""} Không quy đổi dữ liệu thiếu thành số 0.
+          </>}
+          {/* KHÔNG nhắc lại "vạch đậm là mốc 0": `BieuDoCot` tự in câu ấy khi có cột âm. Trên ảnh
+              dựng ra hai câu gần y hệt nhau đứng liền nhau. */}
+        </>} />
+    </>
   );
 }
 
@@ -217,6 +248,10 @@ export default function KhoiDongTien() {
         <Link className="the-cua" href="/dong-tien/nguon">Nguyên nhân · bộ phận · cửa nhập →</Link>
       </p>
 
+      {/* TC-40 · BỐN Ô CẢNH BÁO GIỮ NGUYÊN — anh Tuấn chốt 15/9/2026: "số 6 dòng tiền em giữ
+          nguyên". Em có đề xuất gỡ bốn ô này (chúng đang ghi "Chưa có nguồn" và lặp lại dòng tóm
+          tắt ngay trên), anh Tuấn không đồng ý và khối 06 giữ đúng như cũ. Ghi lại để vòng sau
+          không ai gỡ chúng đi lần nữa với cùng một lý do. */}
       <div className="bon-o">{(k.canh_bao || []).map((o: any) => <O key={o.ma} o={o} />)}</div>
 
       {/* ═══ TC-35 · BIỂU ĐỒ TRƯỚC, BẢNG SAU NÚT ═══════════════════════════════════════════════

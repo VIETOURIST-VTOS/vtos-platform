@@ -4,6 +4,19 @@
  *  Bản vẽ xếp tám khối; VTOS đã có 01 phạm vi/kỳ, 02 cần quyết định, 03 tám thẻ, và 06 dòng tiền
  *  (dựng theo hình khác, xem ghi chú cuối tệp). Tệp này dựng phần còn lại:
  *
+ *  TC-40 (15/9/2026) — BA TRONG SÁU KHỐI NÀY ĐÃ GỠ KHỎI MÀN HÌNH 01.
+ *  Anh Tuấn soát từng khối trên bản chạy thật và chốt danh sách GIỮ: 04b Hiệu quả đội xe, 05a
+ *  Phải thu, 05b Phải trả. Ba khối bị gỡ: 04c Tồn đọng theo bộ phận, 07 Rủi ro trọng yếu, 08
+ *  Tiến độ báo cáo.
+ *
+ *  Lý do gỡ không phải "làm thiếu" mà là TRÙNG hoặc RỖNG-KHÔNG-AI-DÙNG: 04c nói đúng con số mà
+ *  thẻ "Tồn đọng cần xử lý" đã nói; 07 và 08 là hai bảng chưa có sổ nào phía sau, mỗi bảng chiếm
+ *  gần một màn hình để ghi "Chưa kết nối".
+ *
+ *  Mã của chúng GIỮ NGUYÊN ở đây, không xoá, vì hai lẽ: các `type` bên dưới là HỢP ĐỒNG với máy
+ *  chủ — bản mô tả những trường máy chủ còn nợ, xoá đi là mất bản mô tả; và khi nào có màn hình
+ *  riêng cho từng phòng thì ba khối ấy lắp vào đó là dùng được ngay.
+ *
  *    04b  Hiệu quả đội xe trong kỳ
  *    04c  Tồn đọng theo bộ phận
  *    05a  Phải thu theo hạn thanh toán   – 5 nhóm KHÔNG trùng nhau
@@ -29,6 +42,7 @@
  *  ấy trong /api/v1/dashboard; khối nào chưa có thì để thiếu, màn hình tự hiện "Chưa kết nối" chứ
  *  không vỡ.
  */
+import { useState } from "react";
 import Link from "next/link";
 import { Tag } from "@/components/ui";
 
@@ -151,8 +165,37 @@ function BangRong({ cot, ghi_chu, ai, cua, cua_ten }:
 
 /* ───────────────────────── 04b · HIỆU QUẢ ĐỘI XE ───────────────────────── */
 
-export function KhoiHieuQuaXe({ d }: { d?: HieuQuaXe | null }) {
-  const o = d || {};
+/** TC-40 · BA KỲ XEM: THÁNG · QUÝ · NĂM (anh Tuấn chốt 15/9/2026 — "kết quả đội xe sẽ update
+ *  hàng ngày theo tháng, quý, năm").
+ *
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════
+ *  NÚT CÓ, SỐ CHƯA CÓ — VÀ MÀN HÌNH PHẢI NÓI RA ĐIỀU ĐÓ
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════
+ *  Máy chủ hôm nay trả đúng MỘT bộ bốn chỉ số, không phân theo kỳ: `/dashboard` chưa nhận tham số
+ *  kỳ cho khối đội xe, và sổ đội xe cũng chưa có (cả bốn ô đang "Chưa kết nối").
+ *
+ *  Nên nút chọn kỳ ở đây là CẤU TRÚC dựng sẵn, chưa phải một nút chạy được. Và đây là chỗ rất dễ
+ *  làm sai: dựng ba nút rồi để cả ba hiện CÙNG một bộ số là nói dối bằng giao diện — người đọc bấm
+ *  "Quý" thấy số không đổi sẽ kết luận quý bằng tháng, chứ không kết luận là chưa có số.
+ *
+ *  Nên: bấm sang kỳ nào chưa có nguồn thì ô số nói thẳng kỳ ấy chưa có, kèm bộ phận và cửa nhập.
+ *  Khi máy chủ trả `hieu_qua_xe_theo_ky`, chỗ này chỉ việc đọc đúng khoá kỳ — không phải dựng lại.
+ */
+const KY_XE: { ma: "thang" | "quy" | "nam"; ten: string }[] = [
+  { ma: "thang", ten: "Tháng" }, { ma: "quy", ten: "Quý" }, { ma: "nam", ten: "Năm" },
+];
+
+export function KhoiHieuQuaXe({ d, theo_ky }: {
+  d?: HieuQuaXe | null;
+  /** Khi máy chủ trả số theo từng kỳ thì truyền vào đây: { thang: {...}, quy: {...}, nam: {...} } */
+  theo_ky?: Partial<Record<"thang" | "quy" | "nam", HieuQuaXe>> | null;
+}) {
+  const [ky, setKy] = useState<"thang" | "quy" | "nam">("thang");
+  /* Kỳ THÁNG lấy `d` làm lối lui, vì đó là bộ số máy chủ đang trả hôm nay. Quý và năm KHÔNG lấy
+     lối lui ấy — lấy là bày số tháng dưới nhãn quý. */
+  const o: HieuQuaXe = (theo_ky?.[ky]) || (ky === "thang" ? (d || {}) : {});
+  const coNguonKy = !!theo_ky?.[ky] || (ky === "thang" && !!d);
+
   const so = (x: any, duoi = "") =>
     x === null || x === undefined || x === "" ? null : `${x}${duoi}`;
   const cot: [string, string | null][] = [
@@ -163,7 +206,18 @@ export function KhoiHieuQuaXe({ d }: { d?: HieuQuaXe | null }) {
   ];
   return (
     <section className="panel" id="hieu-qua-doi-xe">
-      <DauKhoi ten="Hiệu quả đội xe trong kỳ" phu="Theo kỳ đang chọn" />
+      <div className="mh01-dau">
+        <h2>Hiệu quả đội xe</h2>
+        {/* Nút chọn kỳ nằm ngay đầu khối, cạnh tên — không giấu dưới đáy: nó đổi ý nghĩa của MỌI
+            con số trong khối, nên người đọc phải thấy mình đang xem kỳ nào trước khi đọc số. */}
+        <div className="v14-ky" role="group" aria-label="Kỳ xem của khối đội xe">
+          {KY_XE.map((k) => (
+            <button key={k.ma} type="button"
+              className={"v14-ky-nut" + (ky === k.ma ? " chon" : "")}
+              aria-pressed={ky === k.ma} onClick={() => setKy(k.ma)}>{k.ten}</button>
+          ))}
+        </div>
+      </div>
       <div className="v14-o-ds">
         {cot.map(([nhan, gt]) => (
           <div key={nhan} className={"v14-o" + (gt === null ? " rong" : "")}>
@@ -178,12 +232,20 @@ export function KhoiHieuQuaXe({ d }: { d?: HieuQuaXe | null }) {
           <div className="v14-o-so v14-o-chu">{o.da_chot ? "Đã chốt" : "Chưa chốt"}</div>
         </div>
       </div>
-      {cot.every(([, g]) => g === null) &&
+      {!coNguonKy && (
+        <p className="v14-ghi">
+          <span className="tag">Chưa có số cho kỳ {KY_XE.find((k) => k.ma === ky)!.ten.toLowerCase()}</span>{" "}
+          <span className="muted">· Đội xe nhập</span>
+          <Link className="the-cua" href="/doi-xe">Cửa nhập đội xe →</Link>
+        </p>
+      )}
+      {coNguonKy && cot.every(([, g]) => g === null) &&
         <p className="v14-ghi"><ChuaNoi ai="Đội xe" cua="/doi-xe" cua_ten="Cửa nhập đội xe" /></p>}
       {/* Hai câu cảnh báo nghiệp vụ của bản vẽ. Giữ nguyên vì cả hai đều là chỗ dễ đọc sai con số. */}
       <p className="muted v14-ghi">
-        Xe không có lệnh <b>chưa chắc</b> sẵn sàng; công suất tính trên thời gian xe <b>có thể</b>
-        {" "}khai thác, không phải trên số ngày trong kỳ. Hướng dẫn viên vẫn được quản lý riêng.
+        Cập nhật hằng ngày. Xe không có lệnh <b>chưa chắc</b> sẵn sàng; công suất tính trên thời
+        gian xe <b>có thể</b> khai thác, không phải trên số ngày trong kỳ. Hướng dẫn viên vẫn được
+        quản lý riêng.
       </p>
     </section>
   );
@@ -234,7 +296,7 @@ export function KhoiTonDongBoPhan({ ds, chua_ro, da_loai, vi_sao }: {
             {/* TC-38 · Thanh ngang đã chuyển sang khu Biểu đồ 3, cùng lý do với thanh cơ cấu ở
                 khối 05: một trang không vẽ cùng một biểu đồ hai lần. */}
             <p className="muted v14-ghi">
-              <a className="the-cua" href="#khu-bieu-do-3">Biểu đồ 3 · Nhân sự &amp; Quản trị nội bộ →</a>
+              <a className="the-cua" href="#khu-bieu-do">Xem biểu đồ theo bộ phận →</a>
             </p>
             <div className="wrap">
               <table className="v14-bang">
@@ -350,10 +412,10 @@ export function coCau(khung: NhomHan[], s: Record<string, number | null | undefi
   return { ve: true, tong, gt: v };
 }
 
-function KhoiHan({ ten, khung, ds, ai, cua, cua_ten, chan, id, chua_co_han, vi_sao }: {
+function KhoiHan({ ten, khung, ds, ai, cua, cua_ten, chan, id, chua_co_han, vi_sao, bieu_do }: {
   ten: string; khung: NhomHan[]; ds?: Record<string, number | null> | null;
   ai: string; cua: string; cua_ten: string; chan?: React.ReactNode; id: string;
-  chua_co_han?: number | null; vi_sao?: string | null;
+  chua_co_han?: number | null; vi_sao?: string | null; bieu_do?: React.ReactNode;
 }) {
   const s = ds || {};
   const cc = coCau(khung, s);
@@ -377,18 +439,19 @@ function KhoiHan({ ten, khung, ds, ai, cua, cua_ten, chan, id, chua_co_han, vi_s
           );
         })}
       </div>
-      {/* TC-38 · THANH CƠ CẤU ĐÃ CHUYỂN SANG KHU BIỂU ĐỒ 1.
-          Vòng TC-37 vẽ thanh ấy ngay trong khối này. Nhưng anh Tuấn chốt 15/9 gom biểu đồ thành
-          ba khu riêng, và khu 1 cũng vẽ đúng cơ cấu này — để cả hai thì một trang vẽ cùng một
-          biểu đồ hai lần, mà hai chỗ vẽ thì sớm muộn hai chỗ lệch nhau.
-          Khối giữ Ô SỐ và TỈ LỆ (là chữ, không phải hình); hình nằm ở khu biểu đồ. */}
-      {cc.ve && (
-        <p className="muted v14-ghi">
-          Tổng năm nhóm <b>{cc.tong.toLocaleString("vi-VN")}</b> — năm nhóm không trùng nhau nên
-          cộng đủ 100%. Biểu đồ cơ cấu ở{" "}
-          <a className="the-cua" href="#khu-bieu-do-1">Biểu đồ 1 · Dòng tiền →</a>
-        </p>
-      )}
+      {/* TC-40 · BIỂU ĐỒ NẰM NGAY ĐÂY, cạnh năm ô số nó vẽ.
+          Đường đi ba vòng: TC-37 vẽ ở đây → TC-38 dời sang một khu biểu đồ riêng → TC-40 đưa về.
+          Bài học đáng ghi: gom biểu đồ ra khu riêng nghe rất hợp lý ("khu biểu đồ" là thứ bảng
+          điều hành nào cũng có), nhưng trên bản chạy thật nó tách CON SỐ khỏi HÌNH của chính con
+          số ấy, và người đọc phải cuộn qua lại để ghép hai thứ vốn là một.
+
+          `bieu_do` là `null` khi chưa đủ số. Lúc ấy KHÔNG bày gì thêm, vì năm ô trên đã ghi "Chưa
+          kết nối" kèm bộ phận và cửa nhập — thêm một khung xám nhắc lại đúng điều ấy là nói hai
+          lần cùng một chuyện, đúng thứ anh Tuấn bảo bỏ. */}
+      {/* Dòng "Tổng ... cộng đủ 100%" KHÔNG viết lại ở đây: thanh cơ cấu đã in đúng câu ấy ở chân
+          nó. Bản đầu in cả hai và trên ảnh dựng ra hai dòng y hệt nhau cách nhau 40px — đúng kiểu
+          lặp mà anh Tuấn bảo bỏ, chỉ ở quy mô nhỏ. */}
+      {bieu_do}
       {/* KHOẢN CHƯA CÓ HẠN — theo dõi riêng, KHÔNG gộp vào Dài hạn. Dòng chú thích bên dưới hứa
           điều này từ vòng TC-23 nhưng chưa có chỗ hiện; vòng TC-30 thêm chỗ. "Chưa ai điền ngày"
           và "đến hạn sau ba tháng" là hai việc khác hẳn, và cái thứ nhất là việc phải đi đòi. */}
@@ -414,17 +477,18 @@ function KhoiHan({ ten, khung, ds, ai, cua, cua_ten, chan, id, chua_co_han, vi_s
   );
 }
 
-export function KhoiPhaiThu({ ds, chua_co_han, vi_sao }: {
+export function KhoiPhaiThu({ ds, chua_co_han, vi_sao, bieu_do }: {
   ds?: Record<string, number | null> | null; chua_co_han?: number | null; vi_sao?: string | null;
+  bieu_do?: React.ReactNode;
 }) {
   return <KhoiHan id="phai-thu" ten="Phải thu theo hạn thanh toán" khung={PHAI_THU} ds={ds}
-    chua_co_han={chua_co_han} vi_sao={vi_sao}
+    chua_co_han={chua_co_han} vi_sao={vi_sao} bieu_do={bieu_do}
     ai="Kế toán" cua="/ra-soat-cot-tien" cua_ten="Cửa nhập công nợ phải thu" />;
 }
 
-export function KhoiPhaiTra({ ds, qua_han, chua_co_han, vi_sao }: {
+export function KhoiPhaiTra({ ds, qua_han, chua_co_han, vi_sao, bieu_do }: {
   ds?: Record<string, number | null> | null; qua_han?: number | null;
-  chua_co_han?: number | null; vi_sao?: string | null;
+  chua_co_han?: number | null; vi_sao?: string | null; bieu_do?: React.ReactNode;
 }) {
   /* PHẢI TRẢ QUÁ HẠN THEO DÕI RIÊNG, không cộng vào nhóm 1 tuần (bản vẽ ghi rõ). Gộp vào là một
      khoản đã trễ trông giống một khoản sắp tới hạn – hai việc khác hẳn nhau về mức khẩn. */
@@ -438,7 +502,7 @@ export function KhoiPhaiTra({ ds, qua_han, chua_co_han, vi_sao }: {
     </div>
   );
   return <KhoiHan id="phai-tra" ten="Phải trả theo hạn thanh toán" khung={PHAI_TRA} ds={ds}
-    chua_co_han={chua_co_han} vi_sao={vi_sao}
+    chua_co_han={chua_co_han} vi_sao={vi_sao} bieu_do={bieu_do}
     ai="Kế toán" cua="/nha-cung-cap" cua_ten="Cửa nhập công nợ phải trả" chan={chan} />;
 }
 
