@@ -196,10 +196,45 @@ def da_ghi_roi(db: Session, khoa: str, tu_suy: bool = False):
 
 def nho_ket_qua(db: Session, khoa: str, duong_dan: str, boi: str, tra_ve: dict,
                 phuong_thuc: str = "POST") -> None:
-    """Ghi nhớ TRONG CÙNG giao dịch với việc ghi dữ liệu – xem chú thích đầu tệp."""
+    """Ghi nhớ TRONG CÙNG giao dịch với việc ghi dữ liệu – xem chú thích đầu tệp.
+
+    PHẢI GHI ĐÈ, KHÔNG ĐƯỢC THÊM DÒNG MỚI – cánh cửa 10 phút mở ra một bức tường.
+
+    Đo trên bản chạy thật 16/9/2026: nạp lại 67 tệp kho cũ T1 (đã nạp buổi sáng) thì bước kiểm
+    tra trả 200 bình thường, còn bước ghi trả 500 Internal Server Error. Dựng lại được:
+
+        suy_khoa()   = băm THUẦN của (đường dẫn | người | {loại, rows, cờ bỏ dòng lỗi})
+                       -> cùng tệp, cùng người, cùng cờ thì RA CÙNG MỘT KHÓA, mãi mãi
+        da_ghi_roi() sau CUA_SO_SUY_KHOA (10 phút) cố ý trả None – "coi như lần ghi mới",
+                       đúng như chú thích đầu tệp: "đủ ngắn để không cản việc nạp lại thật sự
+                       vào hôm sau"
+        nho_ket_qua() rồi THÊM lại đúng khóa ấy -> `khoa_ghi.khoa` là cột unique
+                       -> IntegrityError -> 500
+
+    Tức là chính cái trường hợp mà cửa sổ 10 phút sinh ra để cho phép — nạp lại vào hôm sau —
+    lại là trường hợp làm nổ. Trong 10 phút thì không nổ, vì `da_ghi_roi` trả kết quả cũ và
+    không bao giờ tới đây. Đó cũng là lý do chạy thử tại máy không thấy: hai lần nạp cách nhau
+    vài giây.
+
+    Và lỗi này KHÔNG RIÊNG kho cũ: mọi bộ nạp, hễ nạp lại đúng một nội dung sau 10 phút, đều nổ.
+
+    Sửa: có dòng rồi thì cập nhật chính dòng ấy (kèm mốc thời gian mới) chứ không thêm dòng thứ
+    hai. Giữ nguyên cả hai hành vi đang đúng — trong cửa sổ thì trả kết quả cũ, ngoài cửa sổ thì
+    nạp thật.
+    """
     if not khoa:
         return
-    db.add(KhoaGhi(khoa=khoa[:80], duong_dan=duong_dan[:200], phuong_thuc=phuong_thuc,
-                   boi=boi[:50], trang_thai=200,
-                   tra_ve=json.dumps(tra_ve, ensure_ascii=False, default=str)[:200000]))
+    k = khoa[:80]
+    tv = json.dumps(tra_ve, ensure_ascii=False, default=str)[:200000]
+    cu = db.execute(select(KhoaGhi).where(KhoaGhi.khoa == k)).scalars().first()
+    if cu is not None:
+        cu.duong_dan = duong_dan[:200]
+        cu.phuong_thuc = phuong_thuc
+        cu.boi = boi[:50]
+        cu.trang_thai = 200
+        cu.tra_ve = tv
+        cu.luc = datetime.now()          # mốc mới: cửa sổ 10 phút tính từ lần nạp NÀY
+    else:
+        db.add(KhoaGhi(khoa=k, duong_dan=duong_dan[:200], phuong_thuc=phuong_thuc,
+                       boi=boi[:50], trang_thai=200, tra_ve=tv))
     db.flush()
