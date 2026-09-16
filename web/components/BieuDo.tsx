@@ -37,7 +37,17 @@ import { ReactNode } from "react";
 /* ─────────────────────────── KIỂU DỮ LIỆU ─────────────────────────── */
 
 /** Một điểm trên biểu đồ. `gt === null` nghĩa là CHƯA CÓ SỐ — không phải 0. */
-export type Diem = { nhan: string; gt: number | null; ghi?: string };
+export type Diem = {
+  nhan: string; gt: number | null; ghi?: string;
+  /* TC-44 · ba trường của bản vẽ "Kết quả kinh doanh" anh Tuấn gửi 16/9/2026.
+     `mo`      – cột NGOÀI kỳ đang chọn: vẫn vẽ, nhưng mờ đi. Bỏ hẳn nó thì tháng 9 mất chỗ đứng
+                 trong cả năm, và đó chính là thứ một hình 12 cột cho được mà ba hình riêng không.
+     `ke_hoach`– chỉ tiêu của ĐÚNG kỳ ấy, để vẽ đường kế hoạch chạy theo từng cột. Một vạch ngang
+                 duy nhất là nói dối về mười một tháng còn lại: chỉ tiêu tháng 1 khác tháng 12.
+     `nhan_so` – có ghi số trên đầu cột này không. Mười hai con số chen nhau thì không đọc được cái
+                 nào; bản vẽ chỉ ghi ở cột đầu và cột cuối. */
+  mo?: boolean; ke_hoach?: number | null; nhan_so?: boolean;
+};
 
 /** Cách đọc con số. Quyết định cả nhãn trục lẫn nhãn trên cột: 1.840.000.000 đồng phải đọc là
  *  "1,8 tỷ" trên trục, còn 412 hồ sơ thì tuyệt đối không được gọi là "0,4 ng". */
@@ -155,7 +165,7 @@ export function BieuDoRong({ ten, vi_sao, ai, cua, cua_ten }: {
   );
 }
 
-function ChuGiai({ ds }: { ds: { ten: string; lop: string }[] }) {
+export function ChuGiai({ ds }: { ds: { ten: string; lop: string }[] }) {
   return (
     <span className="bd-chugiai">
       {ds.map((c) => (
@@ -180,10 +190,18 @@ const CAO = 168;   // chiều cao vùng vẽ, px
  *  `moc` là một vạch mốc nằm ngang (kế hoạch tháng chẳng hạn). Nó là MỘT VẠCH trên CÙNG một trục,
  *  không phải một trục tung thứ hai — xem luật 4 ở đầu tệp.
  */
-export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, cua, cua_ten }: {
+export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, cua, cua_ten,
+                           theo_dau, ten_duong, chuGiai }: {
   ten: string; phu?: string; diem: Diem[]; dinh_dang?: DinhDang;
   moc?: { gt: number; nhan: string } | null;
   chan?: ReactNode; ai?: string; cua?: string; cua_ten?: string;
+  /** TC-44 · tô cột theo DẤU: dương xanh lá, âm hồng. Dùng cho lãi/lỗ, nơi dấu chính là điều
+   *  người đọc tìm. KHÔNG bật cho doanh thu: doanh thu âm là chuyện khác hẳn, và tô nó cùng màu
+   *  với "lỗ" là trộn hai khái niệm. */
+  theo_dau?: boolean;
+  /** Tên của đường kế hoạch, hiện ở chú giải và ở câu chân. Có tên thì mới vẽ đường. */
+  ten_duong?: string;
+  chuGiai?: ReactNode;
 }) {
   const coSo = diem.filter((d) => d.gt !== null) as { nhan: string; gt: number }[];
   if (!duVeCot(diem)) {
@@ -194,8 +212,11 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
   }
 
   const gt = coSo.map((d) => d.gt);
-  const thap = Math.min(...gt, moc ? moc.gt : 0);
-  const cao = Math.max(...gt, moc ? moc.gt : 0);
+  // Đường kế hoạch phải nằm TRONG thang đo: một chỉ tiêu cao hơn mọi cột mà thang không tính nó
+  // thì đường bị cắt ở mép trên, và một đường cụt đọc ra là "đã đạt" trong khi sự thật ngược lại.
+  const kh = diem.map((d) => d.ke_hoach).filter((x): x is number => typeof x === "number");
+  const thap = Math.min(...gt, ...kh, moc ? moc.gt : 0);
+  const cao = Math.max(...gt, ...kh, moc ? moc.gt : 0);
   const mocs = mocTruc(thap, cao);
   const tMin = mocs[0];
   const tMax = mocs[mocs.length - 1];
@@ -205,8 +226,13 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
   const coAm = gt.some((v) => v < 0);
 
   return (
-    <KhungBieuDo ten={ten} phu={phu} chan={chan}>
-      <div className="bd-than">
+    <KhungBieuDo ten={ten} phu={phu} chan={chan} chuGiai={chuGiai}>
+      {/* `day` = biểu đồ DÀY CỘT (trên tám cột). Mười hai cột tháng ở bề ngang điện thoại chỉ còn
+          chừng hai chục pixel mỗi cột, và nhãn "T10" bị cắt thành "T.." — tìm ra bằng cách dựng ảnh
+          ở bề ngang 390px, đọc mã thì không thấy. Nhãn cắt cụt còn tệ hơn không có nhãn: người đọc
+          tưởng mình đọc được. Lớp này để CSS thu hẹp khe và cỡ chữ ĐÚNG những hình dày cột, không
+          động tới các hình sáu cột vốn đang vừa vặn. */}
+      <div className={"bd-than" + (diem.length > 8 ? " day" : "")}>
         <div className="bd-truc" style={{ height: CAO }}>
           {mocs.map((m) => (
             <span key={m} className="bd-truc-nhan" style={{ top: y(m) }}>{gonSo(m, dinh_dang)}</span>
@@ -221,25 +247,48 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
             <i className="bd-moc" style={{ top: y(moc.gt) }}
               title={`${moc.nhan}: ${daySo(moc.gt, dinh_dang)}`} aria-hidden="true" />
           )}
+          {/* ĐƯỜNG KẾ HOẠCH — vẽ bằng SVG phủ lên vùng cột, KHÔNG phải một vạch ngang.
+              `preserveAspectRatio="none"` để toạ độ x chạy theo phần trăm bề ngang: nhờ vậy đường
+              luôn khớp tâm cột dù khung rộng hay hẹp, không phải đo lại bằng JavaScript.
+              Đoạn nào thiếu chỉ tiêu thì ĐỨT — nối liền qua chỗ trống là bịa ra một chỉ tiêu. */}
+          {ten_duong && (
+            <svg className="bd-duong" viewBox={`0 0 100 ${CAO}`} preserveAspectRatio="none"
+                 aria-hidden="true">
+              {diem.map((d, i) => {
+                const k = d.ke_hoach, k2 = diem[i + 1]?.ke_hoach;
+                if (typeof k !== "number" || typeof k2 !== "number") return null;
+                const b = 100 / diem.length;
+                return <line key={d.nhan} x1={b * (i + 0.5)} y1={y(k)}
+                  x2={b * (i + 1.5)} y2={y(k2)} />;
+              })}
+            </svg>
+          )}
           <div className="bd-cot">
             {diem.map((d) => {
               if (d.gt === null) {
-                return <span key={d.nhan} className="bd-mot bd-khuyet"
+                // `mo` phải theo cả ô TRỐNG, không riêng cột có số: ở kỳ Quý, tháng 11 vừa ngoài
+                // kỳ vừa chưa có số, mà bỏ `mo` đi thì nó nhìn hệt tháng trống NẰM TRONG kỳ — hai
+                // việc khác hẳn nhau (một cái chưa xảy ra, một cái chưa ai nộp sổ).
+                return <span key={d.nhan} className={"bd-mot bd-khuyet" + (d.mo ? " mo" : "")}
                   title={`${d.nhan}: chưa có số`} />;
               }
               const h = Math.max(1, Math.abs(y(d.gt) - y0));
               const am = d.gt < 0;
+              // `nhan_so` chưa khai thì giữ nết cũ: cột nào cũng ghi số. Khai rồi thì chỉ ghi ở
+              // những cột được chọn — bản vẽ ghi ở cột đầu và cột cuối.
+              const ghiSo = d.nhan_so === undefined ? true : d.nhan_so;
               return (
-                <span key={d.nhan} className="bd-mot"
+                <span key={d.nhan} className={"bd-mot" + (d.mo ? " mo" : "")}
                   title={`${d.nhan}: ${daySo(d.gt, dinh_dang)}${d.ghi ? " · " + d.ghi : ""}`}>
-                  <span className={"bd-thanh" + (am ? " am" : "")}
+                  <span className={"bd-thanh" + (am ? " am" : "")
+                        + (theo_dau ? (am ? " lo" : " lai") : "")}
                     style={{ height: h, top: am ? y0 : y0 - h }} />
                   {/* Nhãn số nằm NGOÀI cột, phía đầu cột — đặt trong lòng cột thì cột thấp không
                       chứa nổi chữ và chữ tràn ra trông như thuộc cột bên cạnh. */}
-                  <span className={"bd-so" + (am ? " am" : "")}
+                  {ghiSo && <span className={"bd-so" + (am ? " am" : "")}
                     style={am ? { top: y0 + h + 2 } : { top: Math.max(0, y0 - h - 15) }}>
                     {gonSo(d.gt, dinh_dang)}
-                  </span>
+                  </span>}
                 </span>
               );
             })}
@@ -250,11 +299,14 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
           {diem.map((d) => <span key={d.nhan} className={d.gt === null ? "muted" : ""}>{d.nhan}</span>)}
         </div>
       </div>
-      {(moc || coAm || diem.some((d) => d.gt === null)) && (
+      {(moc || coAm || ten_duong || diem.some((d) => d.gt === null)) && (
         <p className="muted bd-chu">
           {diem.some((d) => d.gt === null) && <>Ô trống = <b>chưa có số</b>, không phải 0. </>}
           {coAm && <>Vạch đậm là mốc 0; cột dưới vạch là số âm. </>}
           {moc && <>Vạch đứt là <b>{moc.nhan}</b> ({daySo(moc.gt, dinh_dang)}), cùng một trục. </>}
+          {ten_duong && <>Đường đứt là <b>{ten_duong}</b>, cùng một trục; đoạn nào đứt là kỳ ấy
+            chưa có chỉ tiêu. </>}
+          {diem.some((d) => d.mo) && <>Cột mờ là kỳ NGOÀI kỳ đang chọn. </>}
         </p>
       )}
     </KhungBieuDo>
@@ -272,9 +324,14 @@ export type Thanh = { ten: string; gt: number | null; nhan_phu?: boolean; ghi?: 
  *  phòng). Nó mang màu khác và luôn đứng cuối — tô cùng màu là xếp một chỗ chưa ai nhận ngang
  *  hàng với một phòng có người chịu trách nhiệm.
  */
-export function BieuDoThanh({ ten, phu, ds, dinh_dang = "dem", chan, ai, cua, cua_ten, xep = true }: {
+export function BieuDoThanh({ ten, phu, ds, dinh_dang = "dem", chan, ai, cua, cua_ten, xep = true,
+                             chuGiai }: {
   ten: string; phu?: string; ds: Thanh[]; dinh_dang?: DinhDang;
   chan?: ReactNode; ai?: string; cua?: string; cua_ten?: string; xep?: boolean;
+  /** Chú giải tuỳ chọn, cùng kiểu với hai biểu đồ kia. Thân hàm đã chuyền nó xuống `KhungBieuDo`
+   *  nhưng QUÊN khai ở đây — esbuild không bắt lỗi ấy (nó chỉ dịch, không kiểm kiểu), CI mới bắt,
+   *  mất một vòng dựng. Bài học: bộ soát cục bộ phải có một bước KIỂM KIỂU, không chỉ kiểm cú pháp. */
+  chuGiai?: ReactNode;
 }) {
   const hang = xep ? xepThanh(ds) : ds;
   const coSo = hang.filter((h) => typeof h.gt === "number").map((h) => h.gt as number);
@@ -297,7 +354,7 @@ export function BieuDoThanh({ ten, phu, ds, dinh_dang = "dem", chan, ai, cua, cu
   const goc = (-Math.min(0, min) / bien) * 100;   // vị trí mốc 0, tính bằng % bề ngang
 
   return (
-    <KhungBieuDo ten={ten} phu={phu} chan={chan}>
+    <KhungBieuDo ten={ten} phu={phu} chan={chan} chuGiai={chuGiai}>
       <div className="bd-th" role="img"
         aria-label={`${ten}: ` + hang.map((h) =>
           `${h.ten} ${h.gt === null ? "chưa có số" : daySo(h.gt, dinh_dang)}`).join(" · ")}>

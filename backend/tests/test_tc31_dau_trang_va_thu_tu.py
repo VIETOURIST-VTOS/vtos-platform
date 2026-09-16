@@ -63,10 +63,13 @@ def _bo_chu_thich_css(s: str) -> str:
 # không "sửa lại cho đúng bản vẽ": bản vẽ xếp theo NHÓM NGHIỆP VỤ (04 vận hành, 05 công nợ, 06
 # dòng tiền); màn hình nay xếp theo CÁCH ĐỌC. Ba khối Dòng tiền, Phải thu, Phải trả chuyển hẳn lên
 # nhóm sáu ô — không để lại bản sao ở dưới, đúng luật "một con số, một chỗ, một hình" của TC-40.
+# SỬA 16/9/2026 (TC-44): `<KhoiDoanhThu` và `<KhoiLoiNhuan` gộp thành MỘT khối
+# `<KhoiKetQuaKinhDoanh` dùng chung một bộ chọn kỳ — bản vẽ anh Tuấn gửi chiều cùng ngày.
+# Hai ô cũ đã XOÁ khỏi KhoiSauO.tsx, không để lại bản sao. Luật không đổi một chữ: các khối
+# còn trên màn hình phải đủ và đúng thứ tự dọc, vì thứ tự ấy là thứ tự đọc.
 THU_TU_BAN_VE = [
     "<KhoiQuyetDinh",            # 02  · Cần Chủ tịch quyết định
-    "<KhoiDoanhThu",             # Ô 1 · Doanh thu (tháng / quý / năm)
-    "<KhoiLoiNhuan",             # Ô 2 · Lợi nhuận trước thuế (tháng / quý / năm)
+    "<KhoiKetQuaKinhDoanh",      # Ô 1+2 · Doanh thu & Lợi nhuận trước thuế, một bộ chọn kỳ
     "<KhoiDongTien",             # Ô 3 · Dòng tiền — anh Tuấn: "giữ nguyên"
     "<KhoiPhaiThu",              # Ô 4 · Phải thu theo hạn
     "<KhoiPhaiTra",              # Ô 5 · Phải trả theo hạn
@@ -114,8 +117,8 @@ def test_dong_tien_dung_giua_nhom_sau_o_va_truoc_hai_khoi_cong_no():
     Mạch đọc không đổi; thứ đứng ở vế thứ hai thì đổi.
     """
     ma = _bo_chu_thich_tsx(_doc(TRANG))
-    assert ma.index("<KhoiDoanhThu") < ma.index("<KhoiLoiNhuan") < ma.index("<KhoiDongTien"), (
-        "Dòng tiền phải đứng sau hai ô kết quả kinh doanh."
+    assert ma.index("<KhoiKetQuaKinhDoanh") < ma.index("<KhoiDongTien"), (
+        "Dòng tiền phải đứng sau khối kết quả kinh doanh."
     )
     assert ma.index("<KhoiDongTien") < ma.index("<KhoiPhaiThu") < ma.index("<KhoiPhaiTra"), (
         "Dòng tiền phải đứng trước hai khối công nợ: tiền ra vào trước, ai nợ ai sau."

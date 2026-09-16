@@ -68,7 +68,7 @@ KIND_HOP_NHAT = ("me", "con", "chi_nhanh")
 # thì trong vòng một tháng mọi lý do trong bảng đều là "ok", và cột lý do thành cột trang trí.
 DAI_TOI_THIEU_LY_DO = 10
 
-LY_DO_THIEU = (f"Tháng này đã khép. Sửa kế hoạch của một tháng đã qua phải kèm lý do ít nhất "
+LY_DO_THIEU = (f"Kỳ này đã khép. Sửa kế hoạch của một kỳ đã qua phải kèm lý do ít nhất "
                f"{DAI_TOI_THIEU_LY_DO} ký tự – lý do được lưu ngay trên dòng và vào nhật ký.")
 
 
@@ -83,17 +83,82 @@ def hop_le_ky(ky: str) -> bool:
     Kiểm ở đây chứ không để cơ sở dữ liệu tự chịu: cột là chuỗi, nên '2026-13' hay 'thang sau' lưu
     được hết, và một dòng như thế thì mọi phép so sánh kỳ sau đó âm thầm trả về sai.
     """
-    phan = str(ky).split("-")
-    if len(phan) != 2 or len(phan[0]) != 4 or len(phan[1]) != 2:
-        return False
-    if not phan[0].isdigit() or not phan[1].isdigit():
-        return False
-    return 1 <= int(phan[1]) <= 12
+    return be_rong(ky) is not None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# TC-44 · KẾ HOẠCH CÓ BA BỀ RỘNG: THÁNG · QUÝ · NĂM
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# Anh Tuấn chốt 16/9/2026, khi chọn giữa hai cách lấy mục tiêu năm:
+#
+#     "HĐQT nhập riêng một ô mục tiêu năm và quý."
+#
+# Đây là lần BÁC một đề xuất của em, và bác đúng — nên ghi lại cả hai vế để vòng sau không lặng lẽ
+# đổi lại. Em đề xuất cộng 12 tháng kế hoạch thành mục tiêu năm, vì như thế Kế toán chỉ nhập một
+# chỗ. Nhưng chỉ tiêu năm là điều HỘI ĐỒNG QUẢN TRỊ quyết, và nó KHÔNG nhất thiết bằng tổng 12
+# tháng: hội đồng có thể đặt 230 tỷ trong khi phân bổ tháng cộng lại ra 226 — phần chênh là dư địa
+# cố ý. Cộng ngược lại là xoá mất một quyết định quản trị và thay bằng một phép cộng.
+#
+# HỆ QUẢ PHẢI CHỊU, và phải nói ra: Kế toán nay nhập ở BA chỗ (12 tháng + 4 quý + 1 năm cho mỗi
+# pháp nhân, mỗi chỉ tiêu). Ba chỗ thì sớm muộn lệch nhau — tổng 12 tháng không bằng ô năm. Hệ
+# thống KHÔNG tự sửa chỗ lệch ấy: nó HIỆN RA (xem `doi_chieu_be_rong`), vì chênh lệch giữa chỉ
+# tiêu hội đồng giao và phân bổ tháng của Kế toán là một câu hỏi quản trị, không phải một lỗi nhập.
+#
+# Mã kỳ dùng ĐÚNG quy ước của services/xu_huong: "2026-09" · "2026-Q3" · "2026". Một quy ước cho
+# cả kho — hai quy ước là hai chỗ phải nhớ, và chỗ nối giữa chúng là chỗ sinh lỗi.
+
+BE_RONG_THANG = "thang"
+BE_RONG_QUY = "quy"
+BE_RONG_NAM = "nam"
+TEN_BE_RONG = {BE_RONG_THANG: "Tháng", BE_RONG_QUY: "Quý", BE_RONG_NAM: "Năm"}
+
+# VTOS không có sổ trước 2026. Một ô chọn bày ra năm 2025 chỉ để ai bấm vào cũng gặp một hình rỗng.
+NAM_DAU = 2026
+
+
+def be_rong(ky: str) -> str | None:
+    """Bề rộng của một mã kỳ, hoặc None nếu mã sai dạng.
+
+    Kiểm ở đây chứ không để cơ sở dữ liệu tự chịu: cột `ky` là chuỗi, nên '2026-13' hay 'thang sau'
+    lưu được hết, và một dòng như thế thì mọi phép so sánh kỳ sau đó âm thầm trả về sai.
+    """
+    s = str(ky)
+    if "-Q" in s:
+        y, q = s.split("-Q", 1)
+        return BE_RONG_QUY if (len(y) == 4 and y.isdigit() and q.isdigit()
+                               and 1 <= int(q) <= 4) else None
+    if "-" in s:
+        phan = s.split("-")
+        if len(phan) != 2 or len(phan[0]) != 4 or len(phan[1]) != 2:
+            return None
+        if not phan[0].isdigit() or not phan[1].isdigit():
+            return None
+        return BE_RONG_THANG if 1 <= int(phan[1]) <= 12 else None
+    return BE_RONG_NAM if (len(s) == 4 and s.isdigit()) else None
+
+
+def _cuoi_ky(ky: str) -> tuple[int, int]:
+    """(năm, tháng) của tháng CUỐI trong kỳ — dùng để biết kỳ đã khép chưa."""
+    loai = be_rong(ky)
+    if loai == BE_RONG_THANG:
+        y, m = str(ky).split("-")
+        return int(y), int(m)
+    if loai == BE_RONG_QUY:
+        y, q = str(ky).split("-Q")
+        return int(y), int(q) * 3
+    return int(ky), 12
 
 
 def da_khep(ky: str, hom_nay: date | None = None) -> bool:
-    """Kỳ này đã qua chưa. Xem LUẬT 2 ở đầu tệp về việc vì sao dùng mốc lịch."""
-    return ky < ky_cua(hom_nay or date.today())
+    """Kỳ này đã qua chưa. Xem LUẬT 2 ở đầu tệp về việc vì sao dùng mốc lịch.
+
+    So bằng THÁNG CUỐI của kỳ, không so chuỗi: '2026' < '2026-09' theo phép so chuỗi, nên so chuỗi
+    sẽ kết luận cả năm 2026 đã khép ngay từ tháng 1 — và Kế toán không sửa được chỉ tiêu năm của
+    chính năm đang chạy mà không phải viết lý do.
+    """
+    hom_nay = hom_nay or date.today()
+    y, m = _cuoi_ky(ky)
+    return (y, m) < (hom_nay.year, hom_nay.month)
 
 
 def phap_nhan_hop_nhat(db: Session) -> list[Company]:
@@ -125,15 +190,17 @@ def doc_nam(db: Session, nam: int, u: User) -> dict:
     if cid is not None:
         cty = [c for c in cty if c.id == cid]
 
-    q = select(KeHoachThang).where(KeHoachThang.ky.startswith(f"{nam:04d}-"))
+    # startswith("2026") bắt CẢ ba bề rộng: "2026-09", "2026-Q3" và "2026". Bản TC-41 dùng
+    # startswith("2026-") nên ô NĂM (mã đúng bốn chữ số, không có gạch) lọt ra ngoài — một dòng có
+    # thật trong sổ mà bảng không hiện, và người nhập sẽ gõ lại rồi tưởng mình chưa nhập.
+    q = select(KeHoachThang).where(KeHoachThang.ky.startswith(f"{nam:04d}"))
     q = PV.loc(q, KeHoachThang, u)
     rows = list(db.execute(q).scalars())
     tra = {(r.ky, r.company_id, r.chi_tieu): r for r in rows}
 
     hom_nay = date.today()
-    thang = []
-    for m in range(1, 13):
-        ky = f"{nam:04d}-{m:02d}"
+
+    def _dong_ky(ky: str, ten: str) -> dict:
         o = []
         for c in cty:
             for ma in CHI_TIEU:
@@ -148,16 +215,74 @@ def doc_nam(db: Session, nam: int, u: User) -> dict:
                     "sua_luc": None if r is None else r.sua_luc,
                     "so_lan_sua_muon": 0 if r is None else r.so_lan_sua_muon,
                 })
-        thang.append({"ky": ky, "da_khep": da_khep(ky, hom_nay), "o": o})
+        return {"ky": ky, "ten": ten, "be_rong": be_rong(ky),
+                "da_khep": da_khep(ky, hom_nay), "o": o}
+
+    # THỨ TỰ BÀY: năm → bốn quý → mười hai tháng. Rộng trước hẹp sau, vì đó là thứ tự lập kế
+    # hoạch thật: Hội đồng giao chỉ tiêu năm, rồi Kế toán phân bổ xuống quý và tháng. Bày ngược
+    # lại thì người nhập gõ 12 ô tháng xong mới gặp ô năm và phải cộng lại bằng tay.
+    ky_nam = f"{nam:04d}"
+    ds = [_dong_ky(ky_nam, f"Năm {nam}")]
+    ds += [_dong_ky(f"{nam:04d}-Q{q}", f"Quý {q}") for q in range(1, 5)]
+    ds += [_dong_ky(f"{nam:04d}-{m:02d}", f"Tháng {m}") for m in range(1, 13)]
 
     return {
         "nam": nam,
         "chi_tieu": [{"ma": k, "ten": v} for k, v in CHI_TIEU.items()],
         "phap_nhan": [{"id": c.id, "ma": c.code, "ten": c.name} for c in cty],
-        "thang": thang,
+        "ky": ds,
+        # Giữ khoá `thang` cho đúng hợp đồng cũ với màn hình: chỉ 12 dòng tháng.
+        "thang": [d for d in ds if d["be_rong"] == BE_RONG_THANG],
+        "doi_chieu": doi_chieu_be_rong(db, nam, u),
         "pham_vi": PV.mo_ta(db, u),
         "dai_toi_thieu_ly_do": DAI_TOI_THIEU_LY_DO,
+        "nam_chon_duoc": cac_nam(hom_nay),
     }
+
+
+def cac_nam(hom_nay: date | None = None) -> list[int]:
+    """Các năm ô chọn bày ra: từ NAM_DAU tới năm hiện tại.
+
+    Anh Tuấn chốt 16/9/2026: "từ 2026 đến năm hiện tại". VTOS không có sổ trước 2026, nên bày năm
+    2025 ra chỉ để ai bấm vào cũng gặp một hình rỗng — và một ô chọn dẫn tới chỗ trống thì lần sau
+    người ta thôi bấm.
+    """
+    nay = (hom_nay or date.today()).year
+    return list(range(NAM_DAU, max(NAM_DAU, nay) + 1))
+
+
+def doi_chieu_be_rong(db: Session, nam: int, u: User) -> list[dict]:
+    """Chỉ tiêu NĂM so với TỔNG 12 THÁNG, và mỗi QUÝ so với ba tháng của nó.
+
+    KHÔNG TỰ SỬA CHỖ LỆCH — chỉ hiện ra. Hội đồng giao 230 tỷ trong khi Kế toán phân bổ tháng cộng
+    lại ra 226 thì phần chênh 4 tỷ là dư địa CỐ Ý, không phải lỗi nhập. Tự cộng ngược hay tự chia
+    đều là xoá mất một quyết định quản trị và thay bằng một phép tính.
+
+    Nhưng lệch mà KHÔNG AI THẤY thì mới là chỗ hỏng: sáu tháng sau không ai nhớ 4 tỷ ấy là dư địa
+    hay là một ô gõ thiếu số 0. Nên dòng đối chiếu đứng ngay trên bảng nhập.
+
+    Bỏ qua phần chưa đủ: thiếu một tháng thì tổng 12 tháng chưa tồn tại (LUẬT 1), và so một con số
+    với một con số chưa tồn tại là so với chỗ trống.
+    """
+    ra = []
+    for ma, ten in CHI_TIEU.items():
+        for ky_rong, cac_hep, nhan in (
+            (f"{nam:04d}", [f"{nam:04d}-{m:02d}" for m in range(1, 13)], "12 tháng"),
+            *[(f"{nam:04d}-Q{q}",
+               [f"{nam:04d}-{m:02d}" for m in range((q - 1) * 3 + 1, (q - 1) * 3 + 4)],
+               "3 tháng") for q in range(1, 5)],
+        ):
+            rong = hop_nhat(db, ky_rong)[ma]
+            hep = [hop_nhat(db, k)[ma] for k in cac_hep]
+            if not rong["du"] or any(not h["du"] for h in hep):
+                continue
+            tong = sum(float(h["gia_tri"]) for h in hep)
+            chenh = float(rong["gia_tri"]) - tong
+            if chenh:
+                ra.append({"ky": ky_rong, "chi_tieu": ma, "chi_tieu_ten": ten,
+                           "chi_tieu_giao": float(rong["gia_tri"]), "tong_hep": tong,
+                           "chenh": chenh, "nhan_hep": nhan})
+    return ra
 
 
 def ghi(db: Session, ky: str, company_id: int, chi_tieu: str, gia_tri: float | None,

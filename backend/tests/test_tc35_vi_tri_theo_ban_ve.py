@@ -181,7 +181,8 @@ def test_thu_tu_doc_chin_khoi_van_giu_nguyen():
     màn hình phải giữ đúng thứ tự dọc đã chốt, vì thứ tự ấy là thứ tự đọc.
     """
     ma = _bo_chu_thich_tsx(_doc(TRANG))
-    thu_tu = ["<KhoiQuyetDinh", "<KhoiDoanhThu", "<KhoiLoiNhuan", "<KhoiDongTien",
+    # SỬA 16/9/2026 (TC-44): hai ô Doanh thu · Lợi nhuận gộp thành <KhoiKetQuaKinhDoanh.
+    thu_tu = ["<KhoiQuyetDinh", "<KhoiKetQuaKinhDoanh", "<KhoiDongTien",
               "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiTonDongMuc", "<HangThe",
               "<KhoiHieuQuaXe"]
     vi = [(m, ma.index(m)) for m in thu_tu if m in ma]

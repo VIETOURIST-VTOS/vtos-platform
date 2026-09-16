@@ -269,10 +269,19 @@ def test_bieu_do_chua_du_so_thi_tra_null_chu_khong_tra_khung_rong():
     assert "duVeCoCau(" in t and "duVeThanh(" in t, (
         "Điều kiện vẽ phải hỏi qua hàm thuần của bộ biểu đồ, không viết lại tại chỗ."
     )
+    # SỬA 16/9/2026 (TC-44): hai Ô LỚN theo kỳ rời KhoiSauO.tsx sang KhoiKetQuaKinhDoanh.tsx; ô
+    # Tồn đọng ở lại. Luật không đổi một chữ — nơi nào QUYẾT ĐỊNH vẽ hay không thì nơi ấy phải hỏi
+    # qua hàm thuần — nên phép thử theo hai ô kia sang tệp mới, thay vì nới lỏng cho tệp cũ.
     sau_o = _bo_chu_thich_tsx(
         (GOC / "web" / "components" / "KhoiSauO.tsx").read_text(encoding="utf-8"))
-    assert "duVeCot(" in sau_o and "duVeCoCau(" in sau_o, (
-        "Hai Ô LỚN theo kỳ và ô Tồn đọng cũng phải hỏi qua hàm thuần, không tự xét điều kiện vẽ."
+    assert "duVeCoCau(" in sau_o, (
+        "Ô Tồn đọng phải hỏi qua hàm thuần, không tự xét điều kiện vẽ."
+    )
+    kq = _bo_chu_thich_tsx(
+        (GOC / "web" / "components" / "KhoiKetQuaKinhDoanh.tsx").read_text(encoding="utf-8"))
+    assert kq.count("duVeCot(") == 2, (
+        "Cả hai biểu đồ của khối Kết quả kinh doanh phải HỎI TRƯỚC KHI VẼ. Để bộ biểu đồ tự dựng "
+        "khung rỗng của nó là nói lại điều ô số ngay trên đã nói, cách đó bốn chục pixel."
     )
 
 

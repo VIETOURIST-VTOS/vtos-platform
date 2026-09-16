@@ -119,18 +119,24 @@ def test_dong_phu_khong_bia_so_so_sanh():
         cao vọt mà không có gì trông giống lỗi.
       · Trang KHÔNG được tự tính tỉ lệ đạt — phép chia phải nằm ở máy chủ (ranh giới 09/9).
 
-    Ba lần sửa, cùng một luật: thẻ nói đúng sự thật đang có, và nói ra chỗ còn thiếu kèm người phải
+    SỬA 16/9/2026 lần hai (TC-44): hai Ô LỚN ấy gộp thành khối `KhoiKetQuaKinhDoanh`, và câu dòng
+    phụ dựng ngay trong khối ấy từ `muc_tieu` máy chủ gửi xuống. `docHoKeHoachKy` không còn — cùng
+    với nó, nhánh "kế hoạch chỉ có cho kỳ tháng" cũng không còn CHỖ để sai: bản mới đọc thẳng ô chỉ
+    tiêu của đúng kỳ ấy (`ke_hoach.hop_nhat(db, ky)`), không suy chỉ tiêu quý từ kế hoạch tháng.
+
+    Bốn lần sửa, cùng một luật: thẻ nói đúng sự thật đang có, và nói ra chỗ còn thiếu kèm người phải
     nhập. Sự thật đổi, luật không đổi.
     """
-    sau_o = (GOC / "web" / "components" / "KhoiSauO.tsx").read_text(encoding="utf-8")
-    assert "docHoKeHoachKy" in sau_o, (
-        "Dòng phụ phải dựng bằng docHoKeHoachKy, không phải một câu viết cứng."
+    khoi = (GOC / "web" / "components" / "KhoiKetQuaKinhDoanh.tsx").read_text(encoding="utf-8")
+    assert "cau_ke_hoach" in khoi, (
+        "Dòng phụ phải dựng bằng một biểu thức đọc số máy chủ, không phải một câu viết cứng."
     )
-    assert "Chưa có kế hoạch tháng" in sau_o, (
-        "Phải còn nhánh 'chưa ai nhập kế hoạch' – bỏ đi là im lặng khi thiếu nguồn so sánh."
+    assert "Chưa có mục tiêu" in khoi, (
+        "Phải còn nhánh 'chưa ai nhập chỉ tiêu' – bỏ đi là im lặng khi thiếu nguồn so sánh."
     )
-    assert "Kế toán" in sau_o, "Phải nói AI nhập kế hoạch tháng."
-    assert "thieu" in sau_o and "chưa đủ" in sau_o, (
+    assert "Kế hoạch tháng" in khoi, "Phải chỉ ra CỬA NHẬP chỉ tiêu."
+    sau_o = khoi
+    assert "thieu" in sau_o and "còn thiếu" in sau_o, (
         "Phải còn nhánh 'nhập thiếu pháp nhân' và phải kê tên pháp nhân còn thiếu: cộng phần đã "
         "nhập lại rồi gọi là kế hoạch tháng là chỗ hỏng nguy hiểm nhất của khối này."
     )
