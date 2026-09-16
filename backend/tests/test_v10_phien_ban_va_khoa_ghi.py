@@ -281,3 +281,74 @@ def test_ghi_ro_moi_noi_duoc_MOT_duong_sua_va_con_muoi_mot_bang_chua_noi():
         f"Tệp ĐƯỢC KHAI trong CUA_SUA_CO_KHOA: {sorted(da_khai)}\n"
         "Lệch nghĩa là có cửa sửa gắn khoá mà quên khai (hoặc ngược lại). Khai vào "
         "app/services/ghi_mot_lan.py::CUA_SUA_CO_KHOA.")
+
+
+def test_ngoai_cua_so_thi_NAP_LAI_THAT_chu_khong_phai_500():
+    """CÁNH CỬA 10 PHÚT MỞ RA MỘT BỨC TƯỜNG — đo trên bản chạy thật 16/9/2026.
+
+    Nạp lại 67 tệp kho cũ T1 (đã nạp buổi sáng) thì bước kiểm tra trả 200 bình thường, còn bước
+    ghi trả **500 Internal Server Error**. Lần theo thì ra ba mảnh khớp nhau:
+
+        suy_khoa()    băm THUẦN của (đường dẫn | người | nội dung) – cùng tệp, cùng người,
+                      cùng cờ thì ra CÙNG MỘT KHÓA, mãi mãi
+        da_ghi_roi()  ngoài cửa sổ 10 phút thì cố ý trả None – "coi như lần ghi mới"
+        nho_ket_qua() rồi THÊM lại đúng khóa ấy, mà `khoa_ghi.khoa` là cột unique
+                      -> IntegrityError -> 500
+
+    Tức là chính trường hợp mà cửa sổ 10 phút sinh ra để CHO PHÉP — chú thích đầu tệp viết rõ
+    "đủ ngắn để không cản việc nạp lại thật sự vào hôm sau" — lại là trường hợp làm nổ.
+
+    VÌ SAO BỘ TEST NÀY TỪNG BỎ LỌT. `test_khoa_suy_HET_HAN_ngoai_cua_so_thi_nap_lai_duoc` dừng
+    đúng ở ngưỡng cửa: nó chứng minh `da_ghi_roi` trả None, rồi thôi. Không ai bước qua cửa ấy để
+    xem bên kia có sàn không. Phép thử này đi hết đường: gọi THẬT lần thứ hai qua cửa HTTP.
+
+    Và lỗi này KHÔNG RIÊNG kho cũ: mọi bộ nạp, hễ nạp lại đúng một nội dung sau 10 phút, đều nổ.
+    """
+    from datetime import datetime, timedelta
+    from sqlalchemy import select
+    from app.db.session import SessionLocal
+    from app.models.ghi_mot_lan import KhoaGhi
+
+    h = login("cntt")
+    than = {"loai": "nha_cung_cap", "rows": _lo_ncc("NCC thử – nạp lại hôm sau"),
+            "ten_tep": "hom-sau.csv", "nguon": "nguoi_nhap"}
+
+    a = client.post("/api/v1/nap-du-lieu/nap", json=than, headers=h)
+    assert a.status_code == 201, a.text
+    assert not a.json().get("lap_lai")
+
+    # Đẩy mốc thời gian lùi ra NGOÀI cửa sổ – đúng cảnh "nạp lại vào hôm sau".
+    with SessionLocal() as db:
+        r = db.execute(select(KhoaGhi).order_by(KhoaGhi.id.desc())).scalars().first()
+        r.luc = datetime.now() - GML_CUA_SO() - timedelta(minutes=1)
+        db.commit()
+
+    b = client.post("/api/v1/nap-du-lieu/nap", json=than, headers=h)
+    assert b.status_code != 500, (
+        "nạp lại sau cửa sổ 10 phút trả 500 – khóa chống ghi trùng tự đâm vào cột unique "
+        "của chính nó. Đây là 67 tệp kho cũ T1 không nạp lại được trên bản chạy thật 16/9/2026.")
+    assert b.status_code == 201, b.text
+    assert not b.json().get("lap_lai"), "ngoài cửa sổ thì phải nạp THẬT, không trả kết quả cũ"
+
+    # Và chỉ còn ĐÚNG MỘT dòng khóa cho nội dung ấy – ghi đè, không đẻ dòng thứ hai.
+    with SessionLocal() as db:
+        from app.services import ghi_mot_lan as GML
+        khoa = GML.suy_khoa("/nap-du-lieu/nap", _ten_dang_nhap("cntt"),
+                            {"loai": than["loai"], "rows": than["rows"],
+                             "bo_qua_dong_loi": False})
+        so = len(db.execute(select(KhoaGhi).where(KhoaGhi.khoa == khoa)).scalars().all())
+    assert so == 1, f"có {so} dòng khóa cho cùng một nội dung – phải ghi đè, không thêm dòng"
+
+
+def GML_CUA_SO():
+    from app.services import ghi_mot_lan as GML
+    return GML.CUA_SO_SUY_KHOA
+
+
+def _ten_dang_nhap(vai: str) -> str:
+    from sqlalchemy import select
+    from app.db.session import SessionLocal
+    from app.models.core import User
+    with SessionLocal() as s:
+        u = s.execute(select(User).where(User.role == vai, User.active == True)).scalars().first()
+        return u.username
