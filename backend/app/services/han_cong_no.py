@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""KHỐI 05 CỦA BẢN VẼ V1.4 — Phải thu và Phải trả theo HẠN THANH TOÁN, năm nhóm không trùng nhau.
+"""KHỐI 05 CỦA BẢN VẼ V1.4 — Phải thu và Phải trả theo HẠN THANH TOÁN, bảy nhóm không trùng nhau.
 
 Vòng TC-23 (13/9/2026) dựng xong GIAO DIỆN hai khối này rồi để mỗi ô ghi "Chưa kết nối", vì lúc ấy
 chưa rà ra nguồn số. Anh Tuấn kiểm lại 14/9 và nói thẳng: màn hình Chủ tịch vẫn chưa xong.
@@ -13,8 +13,8 @@ phần việc "viết cấu trúc và phép tính", không cần thêm một c�
 NĂM ĐIỀU TỆP NÀY GIỮ
 ═══════════════════════════════════════════════════════════════════════════════════════════════
 
-1. NĂM NHÓM KHÔNG TRÙNG NHAU, khác hẳn bảng dòng tiền bốn mốc LŨY KẾ ở khối 06. Ở đây một khoản
-   rơi vào ĐÚNG MỘT nhóm, nên cộng năm nhóm ra đúng tổng công nợ; ở khối 06 cột 14 ngày đã chứa
+1. BẢY NHÓM KHÔNG TRÙNG NHAU, khác hẳn bảng dòng tiền bốn mốc LŨY KẾ ở khối 06. Ở đây một khoản
+   rơi vào ĐÚNG MỘT nhóm, nên cộng bảy nhóm ra đúng tổng công nợ; ở khối 06 cột 14 ngày đã chứa
    trọn cột 7 ngày, cộng lại là sai. Hai khối cạnh nhau trên cùng màn hình mà cộng theo hai luật
    khác nhau — nên luật phải viết ra, không để người đọc tự đoán.
 
@@ -48,10 +48,30 @@ from app.services import nghia_vu as NV
 
 THU, CHI = "thu", "chi"
 
-# Nhãn nhóm PHẢI KHỚP TỪNG CHỮ với PHAI_THU / PHAI_TRA trong web/components/KhoiV14.tsx: màn hình
-# tra số theo đúng chuỗi này. Lệch một dấu là ô hiện "Chưa kết nối" trong khi máy chủ có số.
-NHAN_THU = ("Quá hạn", "2 tuần", "4 tuần", "2 tháng", "Dài hạn")
-NHAN_TRA = ("1 tuần", "2 tuần", "4 tuần", "3 tháng", "Dài hạn")
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# BẢY NHÓM, MỘT BỘ MỐC CHO CẢ THU LẪN TRẢ — anh Tuấn chốt 16/9/2026
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# Trước vòng này Phải thu và Phải trả dùng HAI bộ mốc khác nhau: thu có "Quá hạn" trong nhóm còn
+# trả thì "1 tuần" rồi để quá hạn theo dõi riêng; thu mốc dài là 2 tháng còn trả là 3 tháng. Hai
+# khối ấy nằm CẠNH NHAU trên cùng một màn hình, nên mắt sẽ dóng "4 tuần" bên này với "4 tuần" bên
+# kia — mà mép sau của chúng khác nhau. Không con số nào sai; cái sai là phép so người đọc tự làm.
+#
+# Nay MỘT bộ bảy mốc cho cả hai, khai đúng một chỗ:
+#
+#     Quá hạn · 1 tuần · 2 tuần · 4 tuần · 2 tháng · 3 tháng · Dài hạn
+#
+# BẢY CHỨ KHÔNG PHẢI SÁU, và mốc thứ bảy là "1 tuần". Bản chốt đầu của anh Tuấn có sáu; em nêu ra
+# rằng bỏ "1 tuần" là bỏ mất câu "tuần này phải chi bao nhiêu" — câu Kế toán hỏi mỗi sáng — và anh
+# quyết thêm nó lại cho cả hai phía. Nhờ vậy phía THU cũng có mốc một tuần, thứ bản cũ không có.
+#
+# QUÁ HẠN NAY NẰM TRONG BẢY NHÓM CẢ HAI PHÍA. Trước đây phía chi để nó riêng, không cộng vào tổng;
+# nghĩa là tổng phải trả trên màn hình KHÔNG gồm khoản đã trễ — đúng thứ dễ đọc nhầm nhất. Nay cộng
+# bảy nhóm là ra đúng tổng công nợ, ở cả hai phía, cùng một luật.
+#
+# Nhãn PHẢI KHỚP TỪNG CHỮ với KHUNG_HAN trong web/components/BaKhuBieuDo.tsx và SAU_NHOM trong
+# web/components/KhoiV14.tsx: màn hình tra số theo đúng chuỗi này. Lệch một dấu là dòng hiện "chưa
+# có số" trong khi máy chủ có số.
+MOC = ("Quá hạn", "1 tuần", "2 tuần", "4 tuần", "2 tháng", "3 tháng", "Dài hạn")
 
 LY_DO_SO_RONG = ("Sổ nghĩa vụ thanh toán chưa có khoản nào — phép đồng bộ VPM-11 chưa chạy hoặc "
                  "chưa bộ phận nào nạp chứng từ.")
@@ -69,27 +89,22 @@ def cong_thang(d: date, n: int) -> date:
     return date(nam, thang, min(d.day, calendar.monthrange(nam, thang)[1]))
 
 
-def khoang_thu(hom_nay: date) -> list[tuple[str, date, date]]:
-    """Năm khoảng của PHẢI THU. Liền nhau, không hở, không chồng."""
+def khoang(hom_nay: date) -> list[tuple[str, date, date]]:
+    """Bảy khoảng, dùng CHO CẢ hai hướng. Liền nhau, không hở, không chồng.
+
+    Liền nhau là điều phải giữ bằng mắt mỗi lần sửa: mép sau của khoảng trước cộng một ngày phải
+    đúng bằng mép trước của khoảng sau. Hở một ngày thì một khoản rơi vào khe và biến mất khỏi mọi
+    nhóm mà tổng vẫn trông hợp lý; chồng một ngày thì nó bị đếm hai lần. Phép thử tc45 canh cả hai.
+    """
     m2 = cong_thang(hom_nay, 2)
-    return [
-        ("Quá hạn", date.min, hom_nay - timedelta(days=1)),
-        ("2 tuần", hom_nay, hom_nay + timedelta(days=14)),
-        ("4 tuần", hom_nay + timedelta(days=15), hom_nay + timedelta(days=28)),
-        ("2 tháng", hom_nay + timedelta(days=29), m2),
-        ("Dài hạn", m2 + timedelta(days=1), date.max),
-    ]
-
-
-def khoang_tra(hom_nay: date) -> list[tuple[str, date, date]]:
-    """Năm khoảng của PHẢI TRẢ. Quá hạn KHÔNG nằm trong năm nhóm này — nó theo dõi riêng ở
-    `qua_han`, vì một khoản đã trễ và một khoản sắp tới hạn khác hẳn nhau về mức khẩn."""
     m3 = cong_thang(hom_nay, 3)
     return [
+        ("Quá hạn", date.min, hom_nay - timedelta(days=1)),
         ("1 tuần", hom_nay, hom_nay + timedelta(days=7)),
         ("2 tuần", hom_nay + timedelta(days=8), hom_nay + timedelta(days=14)),
         ("4 tuần", hom_nay + timedelta(days=15), hom_nay + timedelta(days=28)),
-        ("3 tháng", hom_nay + timedelta(days=29), m3),
+        ("2 tháng", hom_nay + timedelta(days=29), m2),
+        ("3 tháng", m2 + timedelta(days=1), m3),
         ("Dài hạn", m3 + timedelta(days=1), date.max),
     ]
 
@@ -148,19 +163,18 @@ def theo_han(db: Session, huong: str, *, vai_tro: str | None = None,
              hom_nay: date | None = None, loai_tien: str = "VND") -> dict:
     """Khối 05a (huong="thu") hoặc 05b (huong="chi").
 
-    Trả về `{"nhom": {nhãn: số|None}, "chua_co_han": số|None, "qua_han": số|None, "vi_sao": str}`.
-    `qua_han` chỉ có nghĩa ở phía CHI — phía THU đã có nhóm "Quá hạn" trong năm nhóm.
+    Trả về `{"nhom": {nhãn: số|None}, "chua_co_han": số|None, "vi_sao": str}`.
+
+    TC-45 bỏ trường `qua_han` riêng: quá hạn nay là MỘT trong bảy nhóm ở cả hai hướng, nên giữ
+    thêm một con số riêng cho nó là để cùng một khoản tiền xuất hiện hai chỗ trên một màn hình.
     """
     hom_nay = hom_nay or date.today()
-    khoang = khoang_thu(hom_nay) if huong == THU else khoang_tra(hom_nay)
+    cac_khoang = khoang(hom_nay)
 
     if not _co_khoan_nao(db, huong, vai_tro, loai_tien):
         # Sổ rỗng: trả RỖNG kèm lý do, không trả một hàng số 0 — xem điều 4 ở đầu tệp.
-        return {"nhom": {nhan: None for nhan, _, _ in khoang},
-                "chua_co_han": None, "qua_han": None, "vi_sao": LY_DO_SO_RONG}
+        return {"nhom": {nhan: None for nhan, _, _ in cac_khoang},
+                "chua_co_han": None, "vi_sao": LY_DO_SO_RONG}
 
-    ra = {nhan: _tong(db, tu, den, huong, vai_tro, loai_tien) for nhan, tu, den in khoang}
-    qh = (None if huong == THU
-          else _tong(db, date.min, hom_nay - timedelta(days=1), huong, vai_tro, loai_tien))
-    return {"nhom": ra, "chua_co_han": _chua_co_han(db, huong, vai_tro, loai_tien),
-            "qua_han": qh, "vi_sao": ""}
+    ra = {nhan: _tong(db, tu, den, huong, vai_tro, loai_tien) for nhan, tu, den in cac_khoang}
+    return {"nhom": ra, "chua_co_han": _chua_co_han(db, huong, vai_tro, loai_tien), "vi_sao": ""}

@@ -111,7 +111,8 @@ function Dash() {
       <KhoiDongTien />
       <KhoiPhaiThu ds={sec.phai_thu_theo_han} chua_co_han={sec.phai_thu_chua_co_han}
         vi_sao={sec.phai_thu_vi_sao} bieu_do={bd.phai_thu} />
-      <KhoiPhaiTra ds={sec.phai_tra_theo_han} qua_han={sec.phai_tra_qua_han}
+      {/* TC-45: bỏ `qua_han` — quá hạn nay là nhóm đầu trong bảy nhóm, không còn ô riêng. */}
+      <KhoiPhaiTra ds={sec.phai_tra_theo_han}
         chua_co_han={sec.phai_tra_chua_co_han} vi_sao={sec.phai_tra_vi_sao} bieu_do={bd.phai_tra} />
       <KhoiTonDongMuc d={sec.ton_dong_theo_muc} />
     </div>
