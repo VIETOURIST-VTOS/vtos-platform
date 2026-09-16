@@ -213,7 +213,13 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
   { khoa: "taichinh", ma: "06", ten: "Tài chính – Kế toán",
     tom_tat: "Thu–chi · Ngân quỹ · Kế toán · Hợp nhất",
     con: [
-      { ma: "6.1", ten: "Tổng quan tài chính" },
+      { ma: "6.1", ten: "Tổng quan tài chính",
+        con: [
+          // TC-41 (16/9/2026) – cửa nhập chỉ tiêu tháng. Đứng ở 6.1 chứ không ở 6.2 "Thu – Chi":
+          // kế hoạch là thứ đặt ra TRƯỚC khi có đồng thu đầu tiên, và xếp nó lẫn vào các nghiệp vụ
+          // hằng ngày thì người đi tìm "chỉ tiêu năm nay đặt bao nhiêu" không nghĩ ra chỗ mà tìm.
+          { ma: "6.1.1", ten: "Kế hoạch tháng", href: "/ke-hoach-thang" }
+        ] },
       { ma: "6.2", ten: "Thu – Chi & Công nợ",
         con: [
           { ma: "6.2.1", ten: "Thu tiền", href: "/collections" },

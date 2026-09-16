@@ -206,8 +206,19 @@ PHAM_VI_DA_CHOT = {
     # test_p11 kèm ngày dự kiến 30/9/2026.
     #
     # Bảng này là KẾT QUẢ GỌI AC.pham_vi_day_du() trên chính mã đã gộp, không cộng trừ tay.
-    "chutich": 106, "tgd": 106, "bks": 106, "cntt": 103,
-    "ketoan": 88, "tp_dh": 84, "ptgd_doan": 63, "nv_dh": 58, "hcns": 55, "gd_kd": 56,
+    #
+    # +1 NGÀY 16/9/2026 – TC-41. Màn hình mới /ke-hoach-thang mang đúng nhóm "/api/v1/ke-hoach"
+    # (bảng chỉ tiêu một năm, ghi từng ô, số hợp nhất một tháng). SÁU vai được nới đúng một nhóm:
+    #   chutich · tgd · bks · robot_ks · cntt · ketoan
+    # Hẹp có chủ ý, và đây là chỗ dễ bị đòi nới nhất nên ghi lý do sẵn: chỉ tiêu tháng là thước đo
+    # mà mọi phòng sẽ bị đo bằng nó. Trưởng phòng đọc chỉ tiêu của phòng mình ở báo cáo phòng; còn
+    # BẢNG CHỈ TIÊU CẢ NĂM của cả tập đoàn thì không phải thứ mở rộng "cho tiện".
+    #
+    # Quyền GHI còn hẹp hơn nữa và KHÔNG nằm ở hàng rào này: tuple GHI trong api/v1/ke_hoach.py chỉ
+    # có chutich, tgd, ketoan. Ban Kiểm soát đọc được thước đo nhưng không sửa được nó — đúng kiểu
+    # hai lớp rào mà P2 thiết kế: rào ngoài theo màn hình, rào trong theo việc.
+    "chutich": 107, "tgd": 107, "bks": 107, "cntt": 104,
+    "ketoan": 89, "tp_dh": 84, "ptgd_doan": 63, "nv_dh": 58, "hcns": 55, "gd_kd": 56,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
@@ -224,7 +235,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 17, "robot_ks": 106, "robot_vpm": 16,
+    "robot_pq": 17, "robot_ks": 107, "robot_vpm": 16,
 }
 
 

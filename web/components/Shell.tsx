@@ -233,6 +233,10 @@ export const GROUPS: Group[] = [
   ] },
 
   { key: "taichinh", label: "Tài chính – Kế toán", icon: "taichinh", href: "/phan-he/taichinh", blocks: [
+    // TC-41 (16/9/2026) – ĐẶT ĐẦU NHÓM, trên cả Thu và Chi, vì đó là thứ tự thật của việc: đặt chỉ
+    // tiêu trước, rồi mới thu và chi để đạt nó. Xếp xuống cuối nhóm thì mục này nằm sau sáu mục
+    // nghiệp vụ hằng ngày, và một việc làm mỗi năm một lần mà nằm cuối danh sách thì không ai thấy.
+    ["Kế hoạch tháng", "/ke-hoach-thang"],
     ["Thu & đối soát", "/collections"],
     ["Chi & thanh toán", "/expenses"],
     ["Công nợ", "/cong-no"],

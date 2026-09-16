@@ -9,7 +9,7 @@ import {
   KhoiKinhDoanhLe, KhoiKinhDoanhDoan, KhoiBaoCaoNgay,
 } from "@/components/KhoiKinhDoanh";
 import {
-  DongLoc, KhoiQuyetDinh, TamThe, TieuDe, tien, dem, type The,
+  DongLoc, KhoiQuyetDinh, TamThe, TieuDe, tien, dem, docHoKeHoach, type The,
 } from "@/components/DauManHinh01";
 import { bieuDoCua } from "@/components/BaKhuBieuDo";
 
@@ -45,16 +45,23 @@ function Dash() {
      gắn đúng chuỗi vào đúng thẻ. Thẻ nào máy chủ chưa trả xu hướng thì không vẽ gì — không dựng
      một dãy cột rỗng cho "đỡ trống". */
   const xh = sec.xu_huong || {};
+  /* TC-41 · KẾ HOẠCH THÁNG — cửa nhập mở ngày 16/9/2026 ở /ke-hoach-thang.
+     Bản vẽ V1.4 chốt dòng phụ của thẻ Doanh thu là "so với kế hoạch và kỳ trước". Suốt bốn vòng
+     dòng ấy chỉ in được một câu thú nhận, vì trong hệ thống không có bảng nào giữ chỉ tiêu.
+     Nay có. Nhưng ba trạng thái phải giữ nguyên vẹn khác nhau, và `docHoKeHoach` giữ chúng:
+     chưa ai nhập · nhập thiếu pháp nhân · đủ. Trạng thái giữa là trạng thái nguy hiểm — cộng phần
+     đã nhập lại sẽ ra một chỉ tiêu thấp hơn thật, và tỉ lệ đạt cao vọt mà không có gì trông giống
+     lỗi cả. Máy chủ quyết đủ hay chưa (cờ `du`), màn hình chỉ đọc cờ ấy. */
+  const kh = k.ke_hoach_thang;
   const tam: The[] = [
-    /* Bản vẽ V1.4 chốt dòng phụ của thẻ này là "so với kế hoạch và kỳ trước". Máy chủ chưa có kế
-       hoạch tháng và chưa trả kết quả kỳ trước, nên KHÔNG bịa một tỷ lệ phần trăm: ghi thẳng là
-       chưa có nguồn so sánh và ai phải nhập. Một mũi tên tăng-giảm dựng từ số không có thật thì
-       Chủ tịch đọc là kết quả, chứ không đọc là chỗ trống. */
     { nhan: "Doanh thu tháng", so: tien(k.doanh_thu_thang),
-      duoi: `${k.so_chuyen_thang ?? 0} chuyến đã quyết toán · chưa có kế hoạch tháng để so sánh (Kế toán)`,
+      duoi: `${k.so_chuyen_thang ?? 0} chuyến đã quyết toán · `
+            + docHoKeHoach(kh, "doanh_thu", kh?.ty_le_dat_doanh_thu),
       xu_huong: xh.doanh_thu_thang },
     { nhan: "Lợi nhuận trước thuế", so: tien(k.ln_ke_toan_thang),
-      duoi: "Lợi nhuận kế toán tháng, cùng phạm vi", xu_huong: xh.ln_ke_toan_thang },
+      duoi: `Lợi nhuận kế toán tháng, cùng phạm vi · `
+            + docHoKeHoach(kh, "loi_nhuan_truoc_thue", kh?.ty_le_dat_loi_nhuan),
+      xu_huong: xh.ln_ke_toan_thang },
     /* Bản vẽ chốt dòng phụ là "Khách đã chốt / chỗ còn". Máy chủ chưa trả sức chứa từng chuyến nên
        chưa tính được "chỗ còn" – ghi ra chỗ thiếu, không thay bằng con số khác rồi để người đọc
        tưởng đó là chỗ còn. */
