@@ -1,0 +1,172 @@
+# -*- coding: utf-8 -*-
+"""TC-44 · KẾT QUẢ KINH DOANH — hai biểu đồ cùng kỳ, theo bản vẽ anh Tuấn gửi 16/9/2026.
+
+Anh Tuấn gửi bản vẽ hai thẻ cạnh nhau (Doanh thu · Lợi nhuận trước thuế), một bộ chọn kỳ dùng
+chung, và chốt ba điều:
+
+  · chọn "Năm" thì biểu đồ chia thành 12 tháng của năm ấy;
+  · chọn "Tháng" hay "Quý" thì VẪN mười hai cột ấy, chỉ TÔ ĐẬM phần đang chọn;
+  · ô chọn năm liệt kê từ 2026 tới năm hiện tại.
+
+═══════════════════════════════════════════════════════════════════════════════════════════════
+MỘT HÌNH CHO CẢ BA KỲ — VÌ SAO ĐÓ LÀ LỰA CHỌN ĐÚNG, KHÔNG PHẢI LỰA CHỌN LƯỜI
+═══════════════════════════════════════════════════════════════════════════════════════════════
+Cách hiển nhiên là mỗi bề rộng một hình: Tháng vẽ các ngày, Quý vẽ ba tháng, Năm vẽ mười hai
+tháng. Ba nút ra ba hình khác nhau, và người đọc phải học ba cách đọc trên cùng một màn hình.
+
+Bản này giữ MỘT hình mười hai cột cho cả ba, và chỉ đổi phần được tô đậm. Cái được là điều mà ba
+hình riêng không cho: tháng 9 luôn nằm đúng chỗ của nó trong cả năm, nên nhìn một cái là thấy
+tháng ấy so với mười một tháng còn lại — chứ không phải nhìn một cột đứng một mình rồi tự nhớ
+mười một cột kia cao bao nhiêu.
+
+═══════════════════════════════════════════════════════════════════════════════════════════════
+BỐN CON SỐ Ở ĐẦU THẺ, VÀ CHÚNG PHẢI CÙNG MỘT KỲ
+═══════════════════════════════════════════════════════════════════════════════════════════════
+Thẻ Doanh thu: tổng doanh thu kỳ · mục tiêu kỳ · tỉ lệ đạt.
+Thẻ Lợi nhuận: tổng lợi nhuận kỳ · biên lợi nhuận.
+
+Cả bốn đều tính trên ĐÚNG kỳ đang chọn, không phải trên cả năm. Trộn một con số của năm vào một
+thẻ đang hiện quý là lỗi không ai nhìn ra — mọi con số đều có thật, chỉ là của hai kỳ khác nhau.
+
+BIÊN LỢI NHUẬN = LỢI NHUẬN ÷ DOANH THU, CỦA CÙNG KỲ, và trả None khi doanh thu chưa có hoặc bằng
+0. "Biên lợi nhuận trên doanh thu 0" là một câu không có nghĩa, và mọi con số trả ra cho nó đều
+gây hiểu nhầm.
+
+═══════════════════════════════════════════════════════════════════════════════════════════════
+KHÔNG CÓ PHÉP TÍNH DOANH THU THỨ HAI Ở ĐÂY
+═══════════════════════════════════════════════════════════════════════════════════════════════
+Từng tháng gọi đúng hàm mà bảng điều hành và biểu đồ xu hướng đang gọi
+(`xu_huong.doc_that` → `dashboard._month_tours` + `rules.settlement_summary`, `reports.income_statement`).
+Viết một truy vấn riêng ở đây là để kho có hai công thức cho cùng một câu hỏi, và ngày chúng lệch
+nhau thì không ai biết tin bên nào.
+
+MỤC TIÊU KỲ ĐỌC THẲNG Ô KỲ ẤY, KHÔNG CỘNG TỪ THÁNG. Anh Tuấn chốt 16/9: chỉ tiêu năm và quý do
+Hội đồng quản trị nhập riêng. Cộng 12 tháng lại để ra mục tiêu năm là xoá mất một quyết định quản
+trị và thay bằng một phép cộng — xem chú thích TC-44 trong services/ke_hoach.py.
+"""
+from datetime import date
+
+from sqlalchemy.orm import Session
+
+from app.services import ke_hoach as KH
+from app.services import xu_huong as XH
+
+# Hai chỉ tiêu của khối, và cặp khoá nối chúng lại: chuỗi xu hướng ở xu_huong dùng một mã, bảng kế
+# hoạch dùng một mã. Khai cặp ấy ở ĐÚNG MỘT chỗ — hai chỗ thì ngày một bên đổi tên là ngày biểu đồ
+# và mục tiêu nói về hai thứ khác nhau mà vẫn vẽ chồng lên nhau.
+CHI_TIEU = (
+    {"ma": "doanh_thu", "ma_xu_huong": "doanh_thu_thang", "ten": "Doanh thu", "co_ke_hoach": True},
+    {"ma": "loi_nhuan_truoc_thue", "ma_xu_huong": "ln_ke_toan_thang",
+     "ten": "Lợi nhuận trước thuế", "co_ke_hoach": False},
+)
+
+
+def ky_mac_dinh(kind: str, hom_nay: date | None = None) -> str:
+    """Kỳ mở sẵn khi vào màn hình: kỳ ĐANG CHẠY của bề rộng ấy.
+
+    Không mở sẵn kỳ đã đóng gần nhất: người mở bảng điều hành hỏi "công ty đang thế nào", không
+    hỏi "tháng trước thế nào".
+    """
+    d = hom_nay or date.today()
+    if kind == XH.KY_THANG:
+        return f"{d.year:04d}-{d.month:02d}"
+    if kind == XH.KY_QUY:
+        return f"{d.year:04d}-Q{(d.month - 1) // 3 + 1}"
+    return f"{d.year:04d}"
+
+
+def bien_loi_nhuan(loi_nhuan: float | None, doanh_thu: float | None) -> float | None:
+    """Lợi nhuận ÷ doanh thu của CÙNG kỳ. None khi thiếu một vế hoặc doanh thu bằng 0."""
+    if loi_nhuan is None or doanh_thu is None or doanh_thu == 0:
+        return None
+    return loi_nhuan / doanh_thu
+
+
+def _tong(phan: list[float | None]) -> float | None:
+    """Tổng của một dãy tháng — None nếu THIẾU một tháng.
+
+    Cùng luật với `xu_huong.doc_theo_ky` và với kế hoạch hợp nhất: cộng phần đã có rồi gọi đó là
+    tổng kỳ cho ra một con số nhỏ hơn thật mà nhìn không khác gì con số đầy đủ.
+    """
+    if any(p is None for p in phan):
+        return None
+    return float(sum(phan))
+
+
+def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
+         hom_nay: date | None = None) -> dict:
+    """Số liệu cho cả khối Kết quả kinh doanh: 12 cột tháng + bốn con số của kỳ đang chọn."""
+    hom_nay = hom_nay or date.today()
+    if kind not in XH.TEN_KY:
+        raise ValueError(f"bề rộng kỳ chưa khai: {kind!r}")
+    ky = ky or ky_mac_dinh(kind, hom_nay)
+    if KH.be_rong(ky) != kind:
+        raise ValueError(f"mã kỳ {ky!r} không phải bề rộng {kind!r}")
+
+    nam = int(str(ky)[:4])
+    cac_thang = [f"{nam:04d}-{m:02d}" for m in range(1, 13)]
+    trong_ky = set(XH.thang_cua_ky(ky))
+    doc = XH.doc_that(db)
+
+    # KỲ ĐANG CHẠY: chỉ cộng những tháng ĐÃ TRÔI, và nói rõ "đến hôm nay".
+    #
+    # Không có nhánh này thì cả năm 2026 hiện "—" cho tới hết tháng 12, vì tháng 10–11–12 chưa có
+    # số và luật "thiếu một tháng thì cả kỳ chưa có số" bắt trả None. Luật ấy đúng cho kỳ ĐÃ ĐÓNG —
+    # ở đó một tháng trống nghĩa là ai đó chưa nộp sổ. Với kỳ ĐANG CHẠY thì tháng 12 trống không
+    # phải chỗ thiếu, nó là tháng chưa xảy ra; đòi nó có số là đòi một điều vô lý.
+    #
+    # Cùng cách đặt vấn đề đã dùng ở TC-42 (`xu_huong.ky_dang_chay`): con số vẫn hiện, nhưng đi kèm
+    # chữ "đến hôm nay" và KHÔNG bao giờ đứng cạnh một kỳ đủ ngày mà không có nhãn ấy.
+    moc_nay = f"{hom_nay.year:04d}-{hom_nay.month:02d}"
+    dang_chay = max(trong_ky) >= moc_nay
+    de_cong = {t for t in trong_ky if t <= moc_nay} if dang_chay else trong_ky
+
+    ra_ct = []
+    so = {}
+    for ct in CHI_TIEU:
+        # Từng tháng đọc qua ĐÚNG hàm mà biểu đồ xu hướng dùng. `None` giữ nguyên là None: tháng
+        # chưa có số là ô trống đúng vị trí, không phải cột cao 0.
+        gt = [doc(ct["ma_xu_huong"], t) for t in cac_thang]
+        so[ct["ma"]] = _tong([g for t, g in zip(cac_thang, gt) if t in de_cong])
+
+        cot = [{"ky": t, "thang": i + 1,
+                "gia_tri": None if g is None else float(g),
+                "trong_ky": t in trong_ky}
+               for i, (t, g) in enumerate(zip(cac_thang, gt))]
+
+        ke_hoach = None
+        if ct["co_ke_hoach"]:
+            # VẠCH KẾ HOẠCH CHẠY THEO TỪNG THÁNG, không phải một vạch ngang: chỉ tiêu tháng 1 khác
+            # tháng 12, và một vạch ngang duy nhất là nói dối về cả mười một tháng còn lại.
+            kh_thang = [KH.hop_nhat(db, t)[ct["ma"]] for t in cac_thang]
+            ke_hoach = [None if not h["du"] else float(h["gia_tri"]) for h in kh_thang]
+
+        ra_ct.append({**{k: ct[k] for k in ("ma", "ten")}, "cot": cot, "ke_hoach": ke_hoach})
+
+    # MỤC TIÊU ĐỌC THẲNG Ô KỲ ẤY — xem chú thích đầu tệp.
+    muc_tieu = KH.hop_nhat(db, ky)
+    mt_doanh_thu = muc_tieu["doanh_thu"]
+    dt = so.get("doanh_thu")
+    ln = so.get("loi_nhuan_truoc_thue")
+
+    return {
+        "kind": kind, "kind_ten": XH.TEN_KY[kind], "ky": ky, "nam": nam,
+        "nam_chon_duoc": KH.cac_nam(hom_nay),
+        # KỲ ĐANG CHẠY CỦA BỀ RỘNG NÀY, để màn hình biết đâu là mốc "hôm nay" mà KHÔNG phải tự đọc
+        # đồng hồ của máy người dùng. Máy người dùng có thể sai ngày, sai múi giờ, hoặc đơn giản là
+        # đang ở nửa kia quả đất; lúc ấy ô chọn kỳ bày ra những tháng chưa xảy ra còn máy chủ thì
+        # không có số cho chúng — người đọc thấy một biểu đồ rỗng và tưởng là mất số.
+        "ky_hien_tai": ky_mac_dinh(kind, hom_nay),
+        "chi_tieu": ra_ct,
+        "tong_ky": {"doanh_thu": dt, "loi_nhuan_truoc_thue": ln},
+        "muc_tieu": {
+            "gia_tri": mt_doanh_thu["gia_tri"],
+            "du": mt_doanh_thu["du"],
+            "thieu": mt_doanh_thu["thieu"],
+        },
+        "ty_le_dat": KH.ty_le_dat(dt, mt_doanh_thu["gia_tri"]),
+        "bien_loi_nhuan": bien_loi_nhuan(ln, dt),
+        "so_thang_trong_ky": len(trong_ky),
+        "dang_chay": dang_chay,
+        "so_thang_da_troi": len(de_cong),
+    }

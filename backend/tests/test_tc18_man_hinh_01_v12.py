@@ -63,7 +63,8 @@ def test_sau_o_lon_va_nam_the_nho():
         "Năm thẻ nhỏ KHÔNG được mang biểu đồ — chúng là con số để liếc, và hình trên chúng kéo "
         "mắt khỏi sáu ô lớn phía trên."
     )
-    for o in ("<KhoiDoanhThu", "<KhoiLoiNhuan", "<KhoiDongTien",
+    # SỬA 16/9/2026 (TC-44): hai ô đầu gộp vào <KhoiKetQuaKinhDoanh — vẫn sáu con số.
+    for o in ("<KhoiKetQuaKinhDoanh", "<KhoiDongTien",
               "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiTonDongMuc"):
         assert o in s, f"thiếu ô lớn {o} — anh Tuấn chốt đúng sáu ô."
 
@@ -101,14 +102,20 @@ def test_o_chon_ky_chi_mo_khi_co_so_that_dang_sau():
     assert "tenThang" in dau, "hàng lọc phải in tháng báo cáo lấy từ lịch máy"
     assert 'href="/phan-he/baocao"' in dau, "thiếu đường dẫn sang chỗ xem theo quý và năm"
 
+    # SỬA 16/9/2026 lần hai (TC-44): ô chọn ba kỳ chuyển sang khối Kết quả kinh doanh, và cách nó
+    # lấy số đổi hẳn — không còn chọn nhánh trong một gói `ba_ky` dựng sẵn, mà HỎI máy chủ đúng kỳ
+    # đang chọn. Nhờ vậy lối lui về bộ số của tháng không còn chỗ tồn tại: gửi sai bề rộng thì máy
+    # chủ từ chối bằng 422 chứ không trả bừa. Luật y nguyên, chỗ canh đi theo nó.
     import pathlib
     goc = pathlib.Path(ROOT)
-    sau_o = (goc / "web" / "components" / "KhoiSauO.tsx").read_text(encoding="utf-8")
-    assert '{ ma: "quy", ten: "Quý" }' in sau_o, "ô chọn ba kỳ phải nằm ở khối sáu ô"
-    assert "ba_ky?.[ky]" in sau_o, (
-        "Mỗi kỳ phải đọc chuỗi RIÊNG của kỳ ấy. Lấy chuỗi tháng làm lối lui cho quý là nói dối "
-        "bằng giao diện — người đọc kết luận quý bằng tháng, chứ không kết luận là chưa có số."
+    khoi = (goc / "web" / "components" / "KhoiKetQuaKinhDoanh.tsx").read_text(encoding="utf-8")
+    assert '{ ma: "quy", ten: "Quý" }' in khoi, "ô chọn ba kỳ phải nằm ở khối Kết quả kinh doanh"
+    assert "ket-qua-kinh-doanh?kind=" in khoi, (
+        "Mỗi kỳ phải HỎI máy chủ đúng kỳ ấy. Lấy chuỗi tháng làm lối lui cho quý là nói dối bằng "
+        "giao diện — người đọc kết luận quý bằng tháng, chứ không kết luận là chưa có số."
     )
+    kq = (goc / "backend" / "app" / "services" / "ket_qua_kinh_doanh.py").read_text(encoding="utf-8")
+    assert "không phải bề rộng" in kq, "máy chủ phải TỪ CHỐI mã kỳ sai bề rộng, không đoán hộ"
     xh = (goc / "backend" / "app" / "services" / "xu_huong.py").read_text(encoding="utf-8")
     assert "def doc_theo_ky" in xh, "nguồn số của quý và năm phải có thật ở máy chủ"
 

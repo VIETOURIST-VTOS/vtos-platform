@@ -6,10 +6,12 @@ báo cáo của mọi phòng rồi để giao diện lọc thì ai mở công c�
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.api.deps import current_user, robot_auth
+from app.api.deps import current_user, require_roles, robot_auth
 from app.db.session import get_db
 from app.models.core import User
 from app.services import bao_cao_phong as BP
+# Cùng danh sách XEM với cửa kế hoạch: hai cửa nói về cùng một con số chỉ tiêu.
+from app.api.v1.ke_hoach import XEM as KQ_XEM
 
 router = APIRouter(prefix="/api/v1/bao-cao", tags=["bao-cao-tu-dong"])
 
@@ -193,3 +195,26 @@ def chup_hom_nay(db: Session = Depends(get_db)):
             "vi_sao": LC.mo_ta(),
             "message": (f"Đã chụp {len(ra)} kỳ"
                         + (f"; {len(hong)} kỳ lỗi" if hong else ""))}
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# TC-44 · KẾT QUẢ KINH DOANH — cửa riêng cho khối hai biểu đồ của màn hình Chủ tịch
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# CỬA RIÊNG chứ không nhét vào /dashboard, và đó là điều đáng nói: khối này có ô chọn kỳ, nên mỗi
+# lần anh Tuấn bấm sang Quý là màn hình phải đi lấy số mới. Nếu số nằm trong /dashboard thì mỗi lần
+# bấm là tải lại TOÀN BỘ bảng điều hành — hàng chục truy vấn cho một khối đổi kỳ.
+#
+# Danh sách vai trò lấy ĐÚNG danh sách của /ke-hoach (XEM): hai chỗ nói về cùng một con số chỉ tiêu,
+# và mở rộng một chỗ mà quên chỗ kia là để lộ chỉ tiêu qua đường vòng.
+@router.get("/ket-qua-kinh-doanh",
+            dependencies=[Depends(require_roles(*KQ_XEM, mo_ta="kết quả kinh doanh"))])
+def ket_qua_kinh_doanh(kind: str = "nam", ky: str = "", db: Session = Depends(get_db)):
+    """12 cột tháng của một năm, cộng bốn con số của kỳ đang chọn.
+
+    `kind` là bề rộng (thang · quy · nam); `ky` là mã kỳ. Bỏ trống `ky` thì lấy kỳ ĐANG CHẠY của
+    bề rộng ấy — người mở bảng điều hành hỏi "công ty đang thế nào", không hỏi "tháng trước".
+    """
+    from app.services import ket_qua_kinh_doanh as KQ
+    try:
+        return KQ.bang(db, kind=kind, ky=ky)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))

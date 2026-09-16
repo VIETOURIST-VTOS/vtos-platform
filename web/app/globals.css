@@ -680,6 +680,46 @@ table.bang-doc{width:100%}
 .bd-nhanx>span{font-size:10.5px;color:var(--vtos-text-mute);text-align:center;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+/* ── TC-44 · ĐƯỜNG KẾ HOẠCH, CỘT MỜ, CỘT THEO DẤU ──
+   Bốn màu dưới đây lấy thẳng từ tokens.css, không gõ mã màu mới: cột thực hiện --vtos-navy,
+   đường kế hoạch --vtos-warning (cùng màu với vạch mốc .bd-moc — cùng nghĩa "chỉ tiêu" thì cùng
+   màu), lãi --vtos-success, lỗ --vtos-danger. */
+
+/* Chấm chú giải cho ba vai mới. Đường kế hoạch không phải một KHỐI màu nên chấm của nó cũng
+   không phải chấm: nó là một đoạn nét đứt, đúng thứ người đọc sẽ tìm trên hình. */
+.bd-cg-cham.duong{height:0;width:14px;border-radius:0;background:none;
+  border-top:2px dashed var(--vtos-warning)}
+.bd-cg-cham.lai{background:var(--vtos-success)}
+.bd-cg-cham.lo{background:var(--vtos-danger)}
+
+/* Đường kế hoạch. `z-index:1` để đường nằm TRÊN cột — bản vẽ của anh Tuấn cho đường chạy vắt qua
+   các cột, và một đường bị cột che mất nửa đoạn thì không so được cao thấp. Nhãn số .bd-so mang
+   z-index:2 nên vẫn nằm trên đường (xem chú thích .bd-so ở trên).
+   `vector-effect:non-scaling-stroke` là bắt buộc: viewBox bị kéo giãn theo chiều ngang bằng
+   `preserveAspectRatio="none"`, không có nó thì nét đứt bị kéo dẹt thành nét liền ở khung rộng. */
+.bd-duong{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:1;
+  pointer-events:none}
+.bd-duong line{stroke:var(--vtos-warning);stroke-width:2;stroke-dasharray:5 4;
+  stroke-linecap:round;vector-effect:non-scaling-stroke}
+
+/* Cột NGOÀI kỳ đang chọn: mờ đi chứ KHÔNG bỏ đi. Bỏ đi thì chọn "Tháng 9" ra một cột đứng một
+   mình, mất đúng cái mà bản vẽ muốn — thấy tháng ấy so với mười một tháng còn lại. */
+.bd-mot.mo{opacity:.38}
+
+/* Tô theo DẤU. Đặt sau .bd-thanh.am nên thắng về thứ tự, và cùng hạng cụ thể (0,2,0) với .am —
+   cột âm mang cả hai lớp vẫn ra màu lỗ, đúng nghĩa. Bán kính góc do .am quyết, không đụng tới. */
+.bd-thanh.lai{background:var(--vtos-success)}
+.bd-thanh.lo{background:var(--vtos-danger)}
+
+/* Hình DÀY CỘT trên điện thoại: khe hẹp lại, chữ nhỏ lại, trục thu lại — xem chú thích lớp `day`
+   ở components/BieuDo.tsx. Chỉ áp cho hình dày cột: hình sáu cột giữ nguyên khe 10px. */
+@media (max-width:560px){
+  .bd-than.day .bd-cot,.bd-than.day .bd-nhanx{gap:3px}
+  .bd-than.day .bd-nhanx>span{font-size:9px;letter-spacing:-.2px}
+  .bd-than.day .bd-truc{width:34px}
+  .bd-than.day .bd-truc-nhan{font-size:9px}
+}
+
 /* ── THANH NGANG ──
    BA CỘT ĐỀU RỘNG CỐ ĐỊNH. Đây là lỗi đã ĐO ĐƯỢC ở vòng TC-37 trên biểu đồ tồn đọng: để cột tên
    và cột số co theo nội dung thì dòng có số bốn chữ số bị rãnh hẹp hơn dòng ba chữ số (882,5px
@@ -770,6 +810,35 @@ table.bang-doc{width:100%}
 .o6-lon.do{color:var(--vtos-danger)}
 .o6-nhan{font-size:12px}
 
+/* ═══ TC-44 · KẾT QUẢ KINH DOANH — HAI THẺ, MỘT BỘ CHỌN KỲ ══════════════════════════════════
+   Bản vẽ anh Tuấn gửi 16/9/2026: một khối chiếm hết bề ngang, bên trong hai thẻ cạnh nhau. Khối
+   này KHÔNG nằm trong lưới sáu ô — nó rộng gấp đôi, và ép nó vào một nửa lưới thì mười hai cột
+   của mỗi hình chỉ còn hơn hai chục pixel mỗi cột. */
+
+/* Bộ chọn kỳ đứng RIÊNG một dòng dưới tên khối, không nhét vào .mh01-dau: nó có ba nút và hai ô
+   chọn, và trên điện thoại chúng xuống dòng thành một mớ lẫn với tên khối. */
+.kqkd-dieu{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 14px}
+.kqkd-chon{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.kqkd-chon select{width:auto;min-width:96px;padding:5px 8px;font-size:12.5px}
+
+.kqkd-doi{display:grid;gap:14px;align-items:start;grid-template-columns:1fr}
+.kqkd-doi>*{min-width:0}
+@media (min-width:900px){ .kqkd-doi{grid-template-columns:1fr 1fr} }
+.kqkd-the{display:grid;grid-template-rows:auto auto 1fr;align-content:start;min-width:0}
+/* HAI HÌNH PHẢI BẮT ĐẦU Ở CÙNG MỘT ĐỘ CAO. Câu đọc hộ bên Doanh thu có thể dài thành hai dòng
+   ("chưa có mục tiêu… còn thiếu hai pháp nhân") trong khi bên Lợi nhuận chỉ một dòng — lúc ấy hai
+   biểu đồ lệch nhau một dòng chữ, và mắt so hai đường kế hoạch với nhau sẽ lệch theo. `subgrid`
+   cho hai thẻ dùng CHUNG ba hàng của lưới cha, nên ba phần luôn dóng thẳng. Trình duyệt chưa hiểu
+   subgrid thì rơi về luật trên: mỗi thẻ tự xếp ba hàng của nó, vẫn đọc được, chỉ không dóng. */
+@supports (grid-template-rows: subgrid){
+  .kqkd-doi{grid-template-rows:auto auto 1fr}
+  .kqkd-the{grid-row:span 3;grid-template-rows:subgrid}
+}
+.kqkd-ten{font-size:14px;margin:0 0 2px;color:var(--vtos-heading)}
+/* Câu đọc hộ ("Đạt 102,2% kế hoạch…") xuống DÒNG RIÊNG chứ không nối đuôi nhãn kỳ: nó dài, và nối
+   đuôi thì ở bề ngang hẹp nó ngắt giữa chừng thành hai mẩu không ai ghép lại được. */
+.kqkd-phu{flex-basis:100%;font-size:12px;line-height:1.5}
+
 /* ═══ TC-41 · CỬA NHẬP KẾ HOẠCH THÁNG ════════════════════════════════════════════════════════
    Một hàng điều khiển dùng chung cho cả thanh chọn năm lẫn hàng nút Lưu: cùng một hình dạng cho
    cùng một loại việc, nên người dùng không phải học hai bố cục trên cùng một màn hình. */
@@ -825,6 +894,17 @@ table.bang-doc{width:100%}
 /* Điện thoại: ô hẹp lại vừa đủ để hai chỉ tiêu còn nằm cạnh nhau. Việc cuộn ngang do khung .wrap
    quanh bảng lo — bảng cuộn trong khung của nó, cả trang không trượt theo. */
 @media (max-width:760px){ .kh-o{min-width:84px} }
+
+/* TC-44 · Dòng NĂM và dòng QUÝ trong bảng kế hoạch: nền lún nhẹ để tách khỏi mười hai dòng tháng.
+   Không tô màu thương hiệu — chúng không phải cảnh báo, chỉ là một bề rộng khác. */
+.kh-rong-hon>td{background:color-mix(in srgb,var(--vtos-text) 5%,transparent)}
+.kh-rong-hon>td:first-child{font-variant-caps:all-small-caps;letter-spacing:.03em}
+
+/* Bảng đối chiếu chỉ tiêu giao với tổng phân bổ. Viền cảnh báo vì nó là câu hỏi cần trả lời, nhưng
+   KHÔNG phải lỗi — nên không dùng nền đỏ đặc như khối cảnh báo thật. */
+.kh-doi-chieu{border-color:var(--vtos-warning)}
+.kh-dc-ds{margin:0;padding-left:18px;font-size:13px;line-height:1.7}
+.kh-dc-ds li{margin:0}
 
 @media print{
   /* Giấy: biểu đồ in ra được, nhưng nền thẻ phải mất đi để không tốn mực. Cột giữ nguyên hình
