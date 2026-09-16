@@ -330,6 +330,14 @@ BO_NAP.update(_taoc.bo_nap(_c))
 from app.services import intake_doi_chieu_h1 as _dch1   # noqa: E402
 BO_NAP.update(_dch1.bo_nap(_c))
 
+# CỬA THỨ BẢY (16/9/2026) – BẢNG THÁNG DỊCH VỤ LẺ. 49 tệp mà cửa tạo chuyến cố ý để ra ngoài vì
+# chúng KHÔNG phải một chuyến: visa lẻ, land lẻ, vé, combo bán theo tháng. Đúng là không phải một
+# chuyến – nhưng đo ngày 16/9 trên đúng 49 tệp ấy: 672 dòng khách, thu 10,29 tỷ, chi 8,01 tỷ. Ngần
+# ấy tiền đứng ngoài hệ vì thiếu một cái cửa, không vì thiếu số liệu. Bộ nạp riêng: mỗi tệp thành
+# MỘT SỔ DỊCH VỤ LẺ CỦA MỘT THÁNG (non_package, mã DVL-…), không thành một chuyến ma.
+from app.services import intake_bang_thang as _bth   # noqa: E402
+BO_NAP.update(_bth.bo_nap(_c))
+
 
 # Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
 # không có nghĩa là nạp được mọi thứ. Kinh doanh nạp danh sách khách của mình, HCNS nạp hồ sơ nhân sự và
@@ -352,6 +360,7 @@ VAI_TRO.update(_pb3.vai_tro(QUAN_TRI))
 VAI_TRO.update(_kho.vai_tro(QUAN_TRI))
 VAI_TRO.update(_taoc.vai_tro(QUAN_TRI))
 VAI_TRO.update(_dch1.vai_tro(QUAN_TRI))
+VAI_TRO.update(_bth.vai_tro(QUAN_TRI))
 
 
 # P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.

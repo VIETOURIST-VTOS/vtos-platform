@@ -217,7 +217,12 @@ def doc_cot(ws, gop, hang_td: int, hang_bd: int | None = None) -> dict[int, tupl
         if not tt:
             tt = (_RE_TIEN_TE.search(_kd(tren)) or _RE_TIEN_TE.search(_kd(duoi)) or [None, ""])[1] \
                 if (_RE_TIEN_TE.search(_kd(tren)) or _RE_TIEN_TE.search(_kd(duoi))) else ""
-        ra[c] = (vt, tt, re.sub(r"\s+", " ", (tren + " " + duoi).strip())[:60])
+        # Ô TIÊU ĐỀ GỘP TRÊN CẢ HAI HÀNG trả về cùng một chữ ở `tren` và `duoi`, và nối thẳng lại
+        # thì nhãn thành "VP VFS VP VFS". Nhãn này đi vào câu báo cho người đọc ("cột 'VP VFS' có
+        # tiền nhưng bộ đọc không biết THU hay CHI"), nên một nhãn lặp là một câu khó hiểu đúng lúc
+        # người ta đang cần hiểu. Đo trên tệp thật ngày 16/9: 2 trong 3 nhãn lạ bị lặp kiểu này.
+        ghep = tren if _kd(tren) == _kd(duoi) else (tren + " " + duoi)
+        ra[c] = (vt, tt, re.sub(r"\s+", " ", ghep.strip())[:60])
     return ra
 
 
