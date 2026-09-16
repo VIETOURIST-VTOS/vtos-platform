@@ -104,11 +104,20 @@ def test_giu_ma_may_khong_dich_sang_cau_tieng_viet():
 # -------------------------------------------------------- 5. Dòng phụ tám thẻ
 
 def test_dong_phu_khong_bia_so_so_sanh():
-    """Bản vẽ đòi so kế hoạch và kỳ trước; máy chủ chưa có. Ghi ra chỗ thiếu, không bịa tỷ lệ."""
+    """Bản vẽ đòi so KẾ HOẠCH và KỲ TRƯỚC. Ghi ra chỗ còn thiếu, không bịa tỷ lệ.
+
+    SỬA 15/9/2026 (TC-36): vế "kỳ trước" NAY ĐÃ CÓ — `services/xu_huong.py` dựng chuỗi các kỳ đã
+    đóng và tính chênh lệch từ số thật, nên thẻ không còn thiếu vế ấy nữa. Vế "kế hoạch tháng" thì
+    vẫn chưa ai nhập, nên câu nhắc THU HẸP lại đúng phần còn thiếu chứ không bỏ đi.
+
+    Đây là lý do phép thử đổi chữ: sự thật đổi, không phải luật đổi. Luật vẫn nguyên — thẻ phải nói
+    ra chỗ còn thiếu và ai phải nhập.
+    """
     the = _the(_doc(TRANG), "Doanh thu tháng")
-    assert "chưa có kế hoạch tháng và kỳ trước" in the, (
-        "Thẻ Doanh thu phải nói rõ chưa có nguồn so sánh, kèm bộ phận phụ trách.\n" + the
+    assert "chưa có kế hoạch tháng" in the, (
+        "Thẻ Doanh thu phải nói rõ còn thiếu nguồn so sánh nào, kèm bộ phận phụ trách.\n" + the
     )
+    assert "Kế toán" in the, "Phải nói AI nhập kế hoạch tháng."
     assert "%" not in the, (
         "Không được in tỷ lệ phần trăm khi chưa có kế hoạch và kỳ trước – một mũi tên tăng giảm "
         "dựng từ số không có thật thì người đọc hiểu là kết quả, không hiểu là chỗ trống."
@@ -202,9 +211,12 @@ def test_bang_dai_tren_man_hinh_01_nam_trong_khung_cuon_rieng():
     Bảng rộng hơn chỗ chứa nó thì phải tự cuộn trong khung của nó, chứ không kéo cả trang cuộn
     ngang: đó là quy ước .wrap đã có sẵn trong globals.css.
     """
+    import re as _re
     nguon = TRANG.read_text(encoding="utf-8")
     # Đếm '<table' chứ không '<table>': bảng Điều hành nay mang thêm class v14-bang.
-    assert nguon.count('<div className="wrap"><table') >= 3, (
+    # Và khớp cả lớp PHỤ trên chính thẻ bọc (TC-35 thêm `wrap mh01-cuon` cho bảng Điều hành để nó
+    # cuộn trong khung cao cố định). Bắt đúng chuỗi "wrap" trần là bắt cách viết, không bắt ý định.
+    assert len(_re.findall(r'<div className="wrap[^"]*"><table', nguon)) >= 3, (
         "Ba bảng dài của màn hình 01 (Kinh doanh Lẻ, Kinh doanh Đoàn, Điều hành 21 ngày tới) phải "
         "nằm trong <div className=\"wrap\"> để tự cuộn trong khung của chúng."
     )

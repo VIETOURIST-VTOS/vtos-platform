@@ -42,23 +42,29 @@ function Dash() {
      KỲ BÁO CÁO: màn hình này CHỈ theo THÁNG (anh Tuấn chốt 13/9). Quý và năm xem ở báo cáo chi
      tiết – hàng lọc có đường dẫn sang đó. Nhờ vậy tám thẻ không phải mang theo một nhánh "nếu
      chọn quý thì rỗng", và không có chỗ nào lấy số tháng dán nhãn quý. */
+  /* TC-36 · Xu hướng do MÁY CHỦ quyết: lấy kỳ nào, kỳ nào rỗng, đủ điểm để vẽ chưa. Màn hình chỉ
+     gắn đúng chuỗi vào đúng thẻ. Thẻ nào máy chủ chưa trả xu hướng thì không vẽ gì — không dựng
+     một dãy cột rỗng cho "đỡ trống". */
+  const xh = sec.xu_huong || {};
   const tam: The[] = [
     /* Bản vẽ V1.4 chốt dòng phụ của thẻ này là "so với kế hoạch và kỳ trước". Máy chủ chưa có kế
        hoạch tháng và chưa trả kết quả kỳ trước, nên KHÔNG bịa một tỷ lệ phần trăm: ghi thẳng là
        chưa có nguồn so sánh và ai phải nhập. Một mũi tên tăng-giảm dựng từ số không có thật thì
        Chủ tịch đọc là kết quả, chứ không đọc là chỗ trống. */
     { nhan: "Doanh thu tháng", so: tien(k.doanh_thu_thang),
-      duoi: `${k.so_chuyen_thang ?? 0} chuyến đã quyết toán · chưa có kế hoạch tháng và kỳ trước để so sánh (Kế toán)` },
+      duoi: `${k.so_chuyen_thang ?? 0} chuyến đã quyết toán · chưa có kế hoạch tháng để so sánh (Kế toán)`,
+      xu_huong: xh.doanh_thu_thang },
     { nhan: "Lợi nhuận trước thuế", so: tien(k.ln_ke_toan_thang),
-      duoi: "Lợi nhuận kế toán tháng, cùng phạm vi" },
+      duoi: "Lợi nhuận kế toán tháng, cùng phạm vi", xu_huong: xh.ln_ke_toan_thang },
     /* Bản vẽ chốt dòng phụ là "Khách đã chốt / chỗ còn". Máy chủ chưa trả sức chứa từng chuyến nên
        chưa tính được "chỗ còn" – ghi ra chỗ thiếu, không thay bằng con số khác rồi để người đọc
        tưởng đó là chỗ còn. */
     { nhan: "Tour đang bán", so: dem(c.da_duyet ?? 0),
-      duoi: `${d.n_tours ?? 0} tour trên hệ thống · chưa có sức chứa từng chuyến nên chưa tính được chỗ còn (Điều hành)` },
+      duoi: `${d.n_tours ?? 0} tour trên hệ thống · chưa có sức chứa từng chuyến nên chưa tính được chỗ còn (Điều hành)`,
+      xu_huong: xh.tour_dang_ban },
     { nhan: "Tour chờ quyết toán", so: dem((c.ket_thuc || 0) + (c.da_dong_so || 0)),
       duoi: `${sec.qua_han_qt?.length ?? 0} chuyến quá hạn quyết toán`,
-      do: (sec.qua_han_qt?.length ?? 0) > 0 },
+      do: (sec.qua_han_qt?.length ?? 0) > 0, xu_huong: xh.tour_cho_quyet_toan },
     { nhan: "Tour sắp khởi hành", so: dem(sec.sap_khoi_hanh?.length),
       duoi: `${soNgayKH} ngày tới`,
       ai: "Điều hành", cua: "/tours" },
@@ -113,7 +119,15 @@ function Dash() {
           tin con nào. */}
       {sec.sap_khoi_hanh && <div className="panel" id="dieu-hanh"><h2>Điều hành – chuyến khởi hành {soNgayKH} ngày tới</h2>
         <p className="muted">Ưu tiên chuyến còn thiếu điều kiện — <b>không</b> mặc định chuyến đã sẵn sàng.</p>
-        {sec.sap_khoi_hanh.length ? <div className="wrap"><table className="v14-bang">
+        {/* TC-35 · KHUNG CUỘN, KHÔNG CẮT DÒNG. Đo trên bản chạy thật 15/9: khối này cao 3.693px —
+            45% chiều cao toàn trang — vì 92 chuyến đổ hết ra một mạch, trong khi bản vẽ để khối
+            cao 158px. Hệ quả: mở trang phải cuộn gần bốn nghìn pixel mới tới khối kế tiếp, nên
+            đọc từ trên xuống ra một trang khác hẳn bản vẽ dù đủ khối.
+
+            Cách chữa là CUỘN TRONG KHUNG, không phải cắt bớt dòng rồi ghi "xem thêm": 92 chuyến
+            này là 92 việc có thật trong 14 ngày tới, giấu đi dòng nào là giấu đúng dòng ấy. Đầu
+            bảng dính lại khi cuộn để không mất tên cột. */}
+        {sec.sap_khoi_hanh.length ? <div className="wrap mh01-cuon"><table className="v14-bang">
           <thead><tr><th>Chuyến</th><th>Ngày đi</th><th>Số khách</th><th>Dịch vụ còn thiếu</th><th>Xe</th><th>HDV</th><th>Phụ trách</th></tr></thead>
           <tbody>{sec.sap_khoi_hanh.map((r: any) => <tr key={r.code}>
             <td>{r.code}</td>
@@ -133,7 +147,13 @@ function Dash() {
             <td>{r.phu_trach ?? <span className="muted">chưa nối</span>}</td>
           </tr>)}</tbody></table></div> : <p className="muted">Không có chuyến.</p>}
         <p className="muted">Bốn cột <b>Dịch vụ còn thiếu · Xe · HDV · Phụ trách</b> máy chủ chưa trả — <b>Điều hành</b> nhập ở <Link className="the-cua" href="/lenh-dieu-xe">Lệnh điều xe →</Link></p>
-        {sec.qua_han_qt?.length > 0 && <p><Tag cls="red">Quá hạn quyết toán</Tag> {sec.qua_han_qt.map((t: any) => t.code).join(", ")}</p>}</div>}
+        {/* Danh sách 100 mã quá hạn quyết toán: gấp lại. Trải thẳng ra thì nó là một đoạn chữ
+            dài bằng cả một khối, mà không ai đọc một trăm mã liền nhau — đếm được số thì đủ để
+            quyết có mở ra hay không. Vẫn là thẻ <details> nên in ra giấy và tìm chữ vẫn thấy. */}
+        {sec.qua_han_qt?.length > 0 && <details className="mh01-gap">
+          <summary><Tag cls="red">Quá hạn quyết toán</Tag> {sec.qua_han_qt.length} chuyến</summary>
+          <p className="muted">{sec.qua_han_qt.map((t: any) => t.code).join(", ")}</p>
+        </details>}</div>}
     </div>
 
     {/* ══ PHẦN CÒN LẠI CỦA BẢN VẼ V1.4, đúng thứ tự khối 04 → 08 ══
@@ -150,16 +170,24 @@ function Dash() {
       vi_sao={sec.phai_thu_vi_sao} />
     <KhoiPhaiTra ds={sec.phai_tra_theo_han} qua_han={sec.phai_tra_qua_han}
       chua_co_han={sec.phai_tra_chua_co_han} vi_sao={sec.phai_tra_vi_sao} />
-    {/* KHỐI 06 · DÒNG TIỀN — bản vẽ đặt SAU hai khối công nợ và TRƯỚC Rủi ro trọng yếu.
-        Bản vẽ vẽ nó thành một thẻ gọn với một câu "chưa đủ dữ liệu"; VTOS dựng thành bảng bốn mốc
-        có trạng thái ba mức — đó là phương án dung hoà anh Tuấn chốt 13/9, giữ nguyên. Chỗ đứng
-        thì lấy theo bản vẽ.
+    {/* KHỐI 06 DÒNG TIỀN + KHỐI 07 RỦI RO — MỘT HÀNG HAI CỘT, đúng bản vẽ.
+        ═══════════════════════════════════════════════════════════════════════════════════════
+        SỬA CỦA TC-35. Vòng TC-31 xếp hai khối này DỌC và tự biện hộ bằng một câu nghe có lý:
+        "bảng dòng tiền bốn mốc ép xuống nửa bề ngang thì vỡ cột". Câu ấy KHÔNG ĐƯỢC ĐO.
 
-        Bản vẽ xếp Dòng tiền và Rủi ro CẠNH NHAU hai cột. VTOS xếp DỌC, vì thẻ dòng tiền của bản
-        vẽ là một ô rỗng còn bảng của VTOS có bốn cột tiền: ép xuống nửa bề ngang thì bốn cột vỡ
-        — đúng lỗi đã mất ba vòng để chữa ở khối Phải thu/Phải trả. */}
-    <KhoiDongTien />
-    <KhoiRuiRo ds={sec.rui_ro_trong_yeu} />
+        Đo lại 15/9: bản vẽ cho Dòng tiền rộng 616px (Rủi ro 440px, cùng hàng, tỉ lệ 1,4:1), còn
+        bề rộng TỐI THIỂU thật của bảng bốn mốc là 637px — hụt 21px, không vỡ. Và `.wrap` quanh
+        bảng vốn đã có `overflow-x:auto`, nên chỗ hụt ấy thành một thanh cuộn ngang nhỏ, không
+        phải một bảng gãy.
+
+        Bài học ghi ra để lần sau không lặp: một lý do nghe hợp lý mà không kèm số đo thì vẫn chỉ
+        là phỏng đoán — và ở đây nó làm sai bố cục suốt bốn vòng.
+
+        Dưới 1180px thì tự xuống một cột: hai khối cạnh nhau trên màn hẹp mới là chỗ thật sự vỡ. */}
+    <div className="mh01-hang-2">
+      <KhoiDongTien />
+      <KhoiRuiRo ds={sec.rui_ro_trong_yeu} />
+    </div>
     <KhoiTienDoBaoCao ds={sec.tien_do_bao_cao} ten_ky={sec.tien_do_ten_ky}
       so_da_nop={sec.tien_do_so_da_nop} so_thieu={sec.tien_do_so_thieu}
       vi_sao={sec.tien_do_vi_sao} chi_dao_vi_sao={sec.tien_do_chi_dao_vi_sao} />
