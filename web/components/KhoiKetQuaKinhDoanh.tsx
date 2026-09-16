@@ -1,0 +1,339 @@
+"use client";
+/** KẾT QUẢ KINH DOANH — hai thẻ cạnh nhau, một bộ chọn kỳ dùng chung.
+ *
+ *  Dựng theo bản vẽ anh Tuấn gửi 16/9/2026: *"em điều chỉnh chart doanh thu và lợi nhuận trước
+ *  thuế như bản vẽ và chọn đúng tông màu của VTOS, và áp dụng từ năm 2026 về sau"*.
+ *
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════
+ *  MỘT BỘ CHỌN KỲ CHO CẢ HAI THẺ — ĐÂY LÀ ĐIỀU QUAN TRỌNG NHẤT CỦA BẢN VẼ
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════
+ *  Bản cũ (TC-42) cho mỗi ô một bộ nút Tháng/Quý/Năm riêng. Nó chạy được, nhưng nó cho phép một
+ *  trạng thái không ai muốn: doanh thu đang xem QUÝ còn lợi nhuận đang xem THÁNG, hai con số nằm
+ *  cạnh nhau như thể so được với nhau. Không con số nào sai; cái sai là phép trừ mà người đọc tự
+ *  làm trong đầu giữa chúng. Gộp thành MỘT bộ chọn là bỏ hẳn trạng thái ấy đi, chứ không phải dặn
+ *  người dùng đừng rơi vào nó.
+ *
+ *  Vì cùng một kỳ, hai thẻ mới chia được với nhau con số thứ ba: BIÊN LỢI NHUẬN = lợi nhuận ÷
+ *  doanh thu. Phép chia ấy chỉ có nghĩa khi tử và mẫu cùng kỳ — nên nó nằm được ở đây mà không
+ *  nằm được ở bản cũ.
+ *
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════
+ *  HAI THANG ĐO RIÊNG, KHÔNG PHẢI HAI TRỤC TRÊN MỘT HÌNH
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════
+ *  Lợi nhuận nhỏ hơn doanh thu chừng mười lần. Vẽ chung một hình thì cột lợi nhuận dẹp thành một
+ *  vạch sát đáy; vẽ chung một hình với hai trục tung thì chỗ hai đường cắt nhau là do người vẽ
+ *  chọn thang chứ không do số liệu (luật 4 ở đầu components/BieuDo.tsx). Nên: HAI hình, mỗi hình
+ *  một thang, và nói thẳng điều đó ở câu chân — chứ không để người đọc so chiều cao cột của hình
+ *  này với hình kia.
+ *
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════
+ *  ĐƠN VỊ KHÔNG ĐỨNG MỘT CHỖ TRÊN ĐẦU TRỤC
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════
+ *  Bản vẽ ghi "Đơn vị: tỷ đồng" ở chân. Bộ biểu đồ VTOS đi xa hơn một bước: mỗi nhãn trục TỰ mang
+ *  đơn vị của nó ("1,8 tỷ", "600 tr"), nên một chuỗi vắt qua hai bậc đơn vị vẫn đọc đúng — thứ mà
+ *  một dòng "Đơn vị: tỷ đồng" cố định làm sai. Vì vậy không thêm nhãn đơn vị trên đầu trục: thêm
+ *  vào là in đơn vị hai lần, và lần cố định ấy sẽ có ngày nói khác nhãn bên cạnh nó.
+ *
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════
+ *  TỆP NÀY KHÔNG TÍNH GÌ CẢ (ranh giới 09/9 giữ nguyên)
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════
+ *  Tổng kỳ, tỉ lệ đạt, biên lợi nhuận, đường kế hoạch, kỳ đang chạy: tất cả do
+ *  `services/ket_qua_kinh_doanh.bang()` trả về. Ở đây chỉ chọn trường nào vào hình nào và diễn đạt
+ *  lại thành câu. Kể cả NGÀY HÔM NAY cũng lấy từ máy chủ (`ky_hien_tai`), không đọc đồng hồ máy
+ *  người dùng.
+ */
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { api } from "@/lib/api";
+import { errMsg } from "@/components/ui";
+import { BieuDoCot, ChuGiai, duVeCot, gonSo, type Diem } from "@/components/BieuDo";
+
+type Ky = "thang" | "quy" | "nam";
+const BA_KY: { ma: Ky; ten: string }[] = [
+  { ma: "thang", ten: "Tháng" }, { ma: "quy", ten: "Quý" }, { ma: "nam", ten: "Năm" },
+];
+
+const CUA = "/ke-hoach-thang";
+
+/** "2026-08" → "Tháng 8/2026" · "2026-Q3" → "Quý 3/2026" · "2026" → "Năm 2026". */
+function tenKyDai(ky: string): string {
+  const s = String(ky);
+  if (s.includes("-Q")) { const [y, q] = s.split("-Q"); return `Quý ${q}/${y}`; }
+  if (s.includes("-")) { const [y, m] = s.split("-"); return `Tháng ${Number(m)}/${y}`; }
+  return `Năm ${s}`;
+}
+
+/** Số thứ tự của kỳ trong năm: tháng 1–12, quý 1–4, năm thì 1. */
+function soTrongNam(ky: string): number {
+  const s = String(ky);
+  if (s.includes("-Q")) return Number(s.split("-Q")[1]);
+  if (s.includes("-")) return Number(s.split("-")[1]);
+  return 1;
+}
+
+/** Ghép lại mã kỳ từ ba mảnh. Định dạng phải KHỚP máy chủ ("2026-09", "2026-Q3", "2026") — máy
+ *  chủ từ chối mã sai bề rộng bằng lỗi 422 chứ không đoán hộ, nên chỗ ghép là chỗ duy nhất. */
+function ghepKy(kind: Ky, nam: number, so: number): string {
+  if (kind === "nam") return String(nam);
+  if (kind === "quy") return `${nam}-Q${so}`;
+  return `${nam}-${String(so).padStart(2, "0")}`;
+}
+
+/** Số kỳ con mà năm ấy ĐÃ CÓ: năm đã qua thì đủ 12 tháng / 4 quý, năm đang chạy thì chỉ tới kỳ
+ *  hiện tại. Bày ra tháng 11 khi đang là tháng 9 là dẫn người ta tới một hình rỗng. */
+function soKyCua(kind: Ky, nam: number, ky_hien_tai: string): number {
+  const day = kind === "quy" ? 4 : 12;
+  const nam_nay = Number(String(ky_hien_tai).slice(0, 4));
+  if (nam < nam_nay) return day;
+  if (nam > nam_nay) return 1;
+  return soTrongNam(ky_hien_tai);
+}
+
+function tenKyCon(kind: Ky, so: number): string {
+  return kind === "quy" ? `Quý ${so}` : `Tháng ${so}`;
+}
+
+/** Phần trăm đọc được: 1,0217 → "102,2%". Một chữ số lẻ, vì chữ số thứ hai không đổi được quyết
+ *  định nào mà lại làm con số dài thêm. */
+function phanTram(x: number | null | undefined): string | null {
+  if (x === null || x === undefined) return null;
+  return `${(x * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`;
+}
+
+/** Mười hai cột của một chỉ tiêu.
+ *
+ *  GHI SỐ Ở ĐÚNG HAI CỘT — cột đầu và cột cuối CỦA KỲ ĐANG CHỌN. Mười hai con số chen nhau trên
+ *  một khung rộng 400px thì không đọc được cái nào; hai con số ở hai đầu cho biết kỳ này bắt đầu
+ *  ở đâu và kết thúc ở đâu, phần giữa đã có chiều cao cột nói hộ.
+ */
+function diemTu(ct: any): Diem[] {
+  const cot: any[] = ct?.cot || [];
+  const trong = cot
+    .map((c, i) => i)
+    .filter((i) => cot[i].trong_ky && cot[i].gia_tri !== null && cot[i].gia_tri !== undefined);
+  const ghi = new Set<number>();
+  if (trong.length) { ghi.add(trong[0]); ghi.add(trong[trong.length - 1]); }
+  const kh: (number | null)[] | null = ct?.ke_hoach || null;
+  return cot.map((c, i) => ({
+    nhan: `T${c.thang}`,
+    gt: c.gia_tri === null || c.gia_tri === undefined ? null : Number(c.gia_tri),
+    ghi: `Tháng ${c.thang}`,
+    mo: !c.trong_ky,
+    nhan_so: ghi.has(i),
+    ke_hoach: kh && kh[i] !== null && kh[i] !== undefined ? Number(kh[i]) : null,
+  }));
+}
+
+/** Câu thay cho hình khi chưa đủ hai tháng có số.
+ *
+ *  HỎI TRƯỚC KHI VẼ, chứ không để bộ biểu đồ dựng khung rỗng của nó — luật TC-40: ô số ngay trên
+ *  đã ghi "—" kèm bộ phận và cửa nhập rồi, một khung rỗng nói lại điều ấy cách đó bốn chục pixel
+ *  là hai khung nói cùng một chuyện. Ranh giới 09/9 không hề bị nới: chỗ chưa có số VẪN đọc được
+ *  từ màn hình — nó nằm ở ô số, chỗ đúng của nó.
+ */
+const CHUA_VE = (nam: number) =>
+  `Chưa đủ hai tháng có số trong năm ${nam} để vẽ — một cột đứng một mình không so được với gì. `
+  + "Kế toán nạp sổ quyết toán và sổ kế toán từng tháng.";
+
+/** Con số lớn của một thẻ + câu đọc hộ bên dưới. */
+function OSo({ gt, nhan, phu }: { gt: number | null; nhan: string; phu: string }) {
+  return (
+    <div className="o6-so">
+      <b className={"o6-lon" + (gt === null ? " rong" : "")}>
+        {gt === null ? "—" : gonSo(gt, "tien")}
+      </b>
+      <span className="muted o6-nhan">{nhan}</span>
+      <span className="muted kqkd-phu">{phu}</span>
+    </div>
+  );
+}
+
+export default function KhoiKetQuaKinhDoanh() {
+  const [kind, setKind] = useState<Ky>("nam");
+  // `ky === ""` nghĩa là "để máy chủ chọn kỳ đang chạy". Không tự dựng mã kỳ từ đồng hồ máy người
+  // dùng: máy ấy có thể sai ngày, và một màn hình điều hành lệch một tháng thì không ai phát hiện.
+  const [ky, setKy] = useState<string>("");
+  const [d, setD] = useState<any>(null);
+  const [loi, setLoi] = useState<string>("");
+
+  useEffect(() => {
+    let bo = false;
+    setLoi("");
+    api(`/bao-cao/ket-qua-kinh-doanh?kind=${kind}${ky ? `&ky=${encodeURIComponent(ky)}` : ""}`)
+      // KHÔNG chép `r.ky` ngược vào ô trạng thái: `ky` là câu HỎI gửi đi, `d.ky` là câu TRẢ LỜI
+      // nhận về. Chép ngược lại thì mỗi lần đổi bề rộng phải gọi máy chủ hai lượt — lượt hai chỉ để
+      // hỏi lại đúng điều vừa được trả lời.
+      .then((r) => { if (!bo) setD(r); })
+      .catch((e) => { if (!bo) setLoi(errMsg(e) || "Không tải được kết quả kinh doanh"); });
+    return () => { bo = true; };
+  }, [kind, ky]);
+
+  // ĐỔI BỀ RỘNG THÌ TRẢ KỲ VỀ CHO MÁY CHỦ CHỌN LẠI. Giữ nguyên năm rồi tự suy ra quý tương ứng là
+  // việc đoán: bấm từ "Tháng 9" sang "Quý" thì Quý 3 hay quý gần nhất đã đóng? Máy chủ có đúng một
+  // câu trả lời cho câu ấy (`ky_mac_dinh`), và để nó trả lời thì cả hệ thống chỉ có một luật.
+  const doiKind = (k: Ky) => { setKind(k); setKy(""); };
+
+  const nam = d?.nam;
+  const ky_ht: string = d?.ky_hien_tai || "";
+  const so_nay = d ? soTrongNam(d.ky) : 1;
+  const so_toi_da = d && nam ? soKyCua(kind, nam, ky_ht) : 1;
+
+  const doiNam = (n: number) => setKy(ghepKy(kind, n, Math.min(so_nay, soKyCua(kind, n, ky_ht))));
+  const doiSo = (s: number) => setKy(ghepKy(kind, nam, s));
+
+  const dieu_khien = (
+    <div className="kqkd-dieu">
+      <div className="v14-ky" role="group" aria-label="Bề rộng kỳ của khối Kết quả kinh doanh">
+        {BA_KY.map((k) => (
+          <button key={k.ma} type="button"
+            className={"v14-ky-nut" + (kind === k.ma ? " chon" : "")}
+            aria-pressed={kind === k.ma} onClick={() => doiKind(k.ma)}>{k.ten}</button>
+        ))}
+      </div>
+      {d && (
+        <>
+          <label className="kqkd-chon">
+            <span className="muted">Năm</span>
+            <select value={nam} onChange={(e) => doiNam(Number(e.target.value))}>
+              {(d.nam_chon_duoc || [nam]).map((n: number) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+          {/* Ô chọn kỳ con KHÔNG có nhãn hiện ra, chỉ có aria-label: từng lựa chọn đã mang sẵn chữ
+              "Quý 3" / "Tháng 9", nên một nhãn "Quý" đứng cạnh đọc thành "Quý Quý 3". */}
+          {kind !== "nam" && (
+            <label className="kqkd-chon">
+              <select value={so_nay} aria-label={kind === "quy" ? "Quý" : "Tháng"}
+                onChange={(e) => doiSo(Number(e.target.value))}>
+                {Array.from({ length: so_toi_da }, (_, i) => i + 1).map((s) => (
+                  <option key={s} value={s}>{tenKyCon(kind, s)}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  if (loi || !d) {
+    return (
+      <section className="panel" id="ket-qua-kinh-doanh">
+        <div className="mh01-dau"><h2>Kết quả kinh doanh</h2></div>
+        {dieu_khien}
+        {loi
+          ? <p className="muted">
+              <span className="tag">Chưa kết nối</span> {loi}{" "}
+              <Link className="the-cua" href={CUA}>Kế hoạch tháng →</Link>
+            </p>
+          : <p className="muted">Đang tải…</p>}
+      </section>
+    );
+  }
+
+  const ct: any[] = d.chi_tieu || [];
+  const dt = ct.find((c) => c.ma === "doanh_thu");
+  const ln = ct.find((c) => c.ma === "loi_nhuan_truoc_thue");
+  const tong = d.tong_ky || {};
+  const so_dt = tong.doanh_thu === null || tong.doanh_thu === undefined ? null : Number(tong.doanh_thu);
+  const so_ln = tong.loi_nhuan_truoc_thue === null || tong.loi_nhuan_truoc_thue === undefined
+    ? null : Number(tong.loi_nhuan_truoc_thue);
+
+  // "ĐẾN HÔM NAY" PHẢI ĐI KÈM CON SỐ CỦA KỲ ĐANG CHẠY, không phải một chú thích ở đâu đó. Tổng chín
+  // tháng và tổng mười hai tháng nhìn giống hệt nhau nếu không có mấy chữ này.
+  const con_lai = Number(d.so_thang_trong_ky || 0) - Number(d.so_thang_da_troi || 0);
+
+  // "(3/3 tháng)" là câu nói dối tinh vi ở kỳ QUÝ ĐANG CHẠY: quý 3 xem ngày 16/9 có đủ ba tháng
+  // trong danh sách, nhưng tháng 9 mới đi được nửa. Kê phân số ấy ra thì người đọc hiểu là quý đã
+  // đủ ngày. Nên chỉ kê khi CÒN tháng chưa trôi; còn lại thì mấy chữ "đến hôm nay" nói đủ.
+  const nhan_ky = !d.dang_chay
+    ? tenKyDai(d.ky)
+    : con_lai > 0
+      ? `${tenKyDai(d.ky)} · đến hôm nay (${d.so_thang_da_troi}/${d.so_thang_trong_ky} tháng)`
+      : `${tenKyDai(d.ky)} · đến hôm nay`;
+
+  const mt = d.muc_tieu || {};
+  const ty_le = phanTram(d.ty_le_dat);
+  // "ĐẠT" VÀ "ĐI ĐƯỢC" LÀ HAI CÂU KHÁC NHAU, và đây là chỗ dễ nói sai nhất của cả khối.
+  //
+  // Tỉ lệ luôn là (thực hiện đến nay) ÷ (mục tiêu CẢ KỲ) — máy chủ không chia mục tiêu năm cho 12
+  // rồi nhân 9, vì không ai duyệt một mục tiêu chín tháng. Con số ấy đúng. Nhưng gọi nó là "đạt"
+  // khi kỳ mới đi hai phần ba đường là để người đọc so nó với 100% và kết luận là đang hụt —
+  // trong khi 75% sau chín tháng có thể là đúng tiến độ.
+  //
+  // Nên: kỳ ĐÃ ĐÓNG mới nói "đạt"; kỳ ĐANG CHẠY nói "đi được", kèm số tháng còn lại để người đọc
+  // tự đặt con số vào đúng chỗ của nó.
+  const cau_ke_hoach = !mt.du
+    ? `Chưa có mục tiêu ${tenKyDai(d.ky).toLowerCase()} — Hội đồng quản trị nhập ở Kế hoạch tháng`
+      + ((mt.thieu || []).length ? `; còn thiếu ${(mt.thieu || []).slice(0, 2).join(", ")}` : "")
+      + "."
+    : !ty_le
+      ? `Mục tiêu ${gonSo(Number(mt.gia_tri), "tien")} · chưa tính được tỉ lệ đạt.`
+      : d.dang_chay
+        ? `Đi được ${ty_le} mục tiêu ${gonSo(Number(mt.gia_tri), "tien")}`
+          + (con_lai > 0 ? ` · còn ${con_lai} tháng` : "")
+        : `Đạt ${ty_le} kế hoạch · Mục tiêu ${gonSo(Number(mt.gia_tri), "tien")}`;
+
+  const bien = phanTram(d.bien_loi_nhuan);
+  const cau_bien = bien
+    ? `Biên lợi nhuận ${bien}`
+    : "Chưa tính được biên lợi nhuận — cần cả doanh thu và lợi nhuận của cùng kỳ này.";
+
+  // Cả ba bề rộng dùng CÙNG mười hai cột; chỉ khi kỳ chọn hẹp hơn năm thì mới có phần "tô đậm".
+  const diem_dt = diemTu(dt);
+  const diem_ln = diemTu(ln);
+
+  const phu_hinh = kind === "nam"
+    ? `Cả 12 tháng ${nam}`
+    : `12 tháng ${nam} · tô đậm ${tenKyDai(d.ky).toLowerCase()}`;
+
+  return (
+    <section className="panel" id="ket-qua-kinh-doanh">
+      {/* KHÔNG gắn thẻ "Năm/Quý/Tháng" cạnh tên khối: nút đang bật ở ngay dòng dưới đã nói điều
+          ấy, và một màn hình nói cùng một việc hai lần thì lần thứ hai chỉ tổ làm người đọc dừng
+          lại kiểm xem hai chỗ có khớp nhau không. */}
+      <div className="mh01-dau">
+        <h2>Kết quả kinh doanh</h2>
+      </div>
+      {dieu_khien}
+
+      <div className="kqkd-doi">
+        <div className="kqkd-the">
+          <h3 className="kqkd-ten">Doanh thu</h3>
+          <OSo gt={so_dt} nhan={nhan_ky} phu={cau_ke_hoach} />
+          {duVeCot(diem_dt)
+            ? <BieuDoCot ten="Doanh thu từng tháng" phu={phu_hinh} diem={diem_dt}
+                ten_duong="kế hoạch tháng"
+                chuGiai={<ChuGiai ds={[
+                  { ten: "Thực hiện", lop: "" },
+                  { ten: "Kế hoạch", lop: "duong" },
+                ]} />} />
+            : <p className="muted v14-ghi">{CHUA_VE(nam)}</p>}
+        </div>
+
+        <div className="kqkd-the">
+          <h3 className="kqkd-ten">Lợi nhuận trước thuế</h3>
+          <OSo gt={so_ln} nhan={nhan_ky} phu={cau_bien} />
+          {/* THEO DẤU, không theo mức: người đọc tìm ở hình này đúng một điều — tháng nào lỗ. Còn
+              doanh thu thì KHÔNG bật `theo_dau`: doanh thu âm là chuyện hoàn/huỷ, tô nó cùng màu
+              với "lỗ" là trộn hai khái niệm khác hẳn nhau. */}
+          {duVeCot(diem_ln)
+            ? <BieuDoCot ten="Lợi nhuận từng tháng" phu={phu_hinh} diem={diem_ln} theo_dau
+                chuGiai={<ChuGiai ds={[
+                  { ten: "Lãi", lop: "lai" },
+                  { ten: "Lỗ", lop: "lo" },
+                ]} />} />
+            : <p className="muted v14-ghi">{CHUA_VE(nam)}</p>}
+        </div>
+      </div>
+
+      <p className="muted v14-ghi">
+        Hai biểu đồ cùng một kỳ nhưng <b>thang đo riêng</b>: lợi nhuận nhỏ hơn doanh thu nhiều lần,
+        vẽ chung một thang thì cột lợi nhuận dẹp thành một vạch sát đáy. Đừng so chiều cao cột của
+        hình này với hình kia. Đơn vị đọc ngay trên nhãn trục.{" "}
+        <Link className="the-cua" href={CUA}>Kế hoạch tháng →</Link>
+      </p>
+    </section>
+  );
+}

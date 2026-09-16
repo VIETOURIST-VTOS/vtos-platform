@@ -46,6 +46,7 @@ TRANG = GOC / "web" / "app" / "page.tsx"
 # TC-42 (16/9/2026): câu đọc hộ kế hoạch chuyển từ DauManHinh01 sang KhoiSauO, đi theo hai ô lớn
 # Doanh thu và Lợi nhuận. Phép thử đổi CHỖ NHÌN, luật không đổi.
 SAU_O = GOC / "web" / "components" / "KhoiSauO.tsx"
+KHOI_KQ = GOC / "web" / "components" / "KhoiKetQuaKinhDoanh.tsx"
 
 
 def _doc(p: Path) -> str:
@@ -353,22 +354,26 @@ def test_man_hinh_01_giu_du_ba_trang_thai_cua_ke_hoach():
     """Chưa ai nhập · nhập thiếu pháp nhân · đủ. Ba câu khác hẳn nhau.
 
     SỬA 16/9/2026 (TC-42): hàm đổi tên thành `docHoKeHoachKy` và sang KhoiSauO.tsx cùng hai ô lớn.
-    Nó biết thêm một việc bản cũ không biết — kế hoạch CHỈ có cho kỳ tháng — nên phép thử canh
-    thêm nhánh thứ tư ấy.
+
+    SỬA 16/9/2026 lần hai (TC-44): hai ô lớn gộp thành `KhoiKetQuaKinhDoanh`, và ba trạng thái ấy
+    nay dựng từ `muc_tieu` của máy chủ. Nhánh thứ tư của bản TC-42 — "kế hoạch chỉ có cho kỳ tháng"
+    — BIẾN MẤT, và đó là tiến bộ chứ không phải mất mát: bản cũ phải tự canh vì nó dựng vạch mốc từ
+    kế hoạch THÁNG; bản mới đọc thẳng ô chỉ tiêu của ĐÚNG kỳ đang xem, nên không còn chỗ nào để suy
+    ra một chỉ tiêu chưa ai duyệt. Luật chuyển xuống máy chủ, phép thử theo nó xuống đó.
     """
-    sau_o = _doc(SAU_O)
-    assert "docHoKeHoachKy" in sau_o, "Câu đọc hộ kế hoạch phải là một hàm riêng, kiểm được."
-    assert "Chưa có kế hoạch tháng" in sau_o, "Thiếu nhánh 'chưa ai nhập'."
-    assert "chưa đủ" in sau_o and "còn thiếu" in sau_o, "Thiếu nhánh 'nhập thiếu pháp nhân'."
-    assert "đạt" in sau_o, "Thiếu nhánh 'đủ' — nơi in chỉ tiêu và tỉ lệ đạt."
-    assert 'if (ky !== "thang")' in _ma(sau_o), (
-        "Bấm sang Quý mà vẫn vẽ vạch mốc dựng từ KẾ HOẠCH THÁNG là bịa ra một chỉ tiêu chưa ai "
-        "duyệt: chỉ tiêu quý và năm là quyết định riêng của Hội đồng quản trị, không phải tổng "
-        "ba tháng."
+    khoi = _doc(KHOI_KQ)
+    assert "Chưa có mục tiêu" in khoi, "Thiếu nhánh 'chưa ai nhập'."
+    assert "còn thiếu" in khoi, "Thiếu nhánh 'nhập thiếu pháp nhân'."
+    assert "Đạt" in khoi and "Đi được" in khoi, (
+        "Thiếu nhánh 'đủ' — nơi in chỉ tiêu và tỉ lệ. Kỳ đã đóng nói 'đạt', kỳ đang chạy nói 'đi "
+        "được': gọi là 'đạt' khi kỳ mới đi hai phần ba đường là để người đọc so với 100% rồi kết "
+        "luận đang hụt."
     )
-    # Cả HAI ô lớn đều so với kế hoạch, không chỉ ô Doanh thu.
-    assert sau_o.count("docHoKeHoachKy(ky") >= 2, (
-        "Cả ô Doanh thu lẫn ô Lợi nhuận trước thuế đều phải so với kế hoạch."
+    dich_vu = _ma((GOC / "backend" / "app" / "services" / "ket_qua_kinh_doanh.py")
+                  .read_text(encoding="utf-8"))
+    assert "muc_tieu = KH.hop_nhat(db, ky)" in dich_vu, (
+        "Chỉ tiêu quý và năm là quyết định riêng của Hội đồng quản trị, không phải tổng ba tháng — "
+        "máy chủ phải đọc thẳng ô của kỳ ấy."
     )
 
 

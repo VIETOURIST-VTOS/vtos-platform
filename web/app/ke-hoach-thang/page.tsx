@@ -42,18 +42,27 @@ type O = {
   gia_tri: number | null; ly_do_sua: string; nguoi_nhap: string;
   sua_luc: string | null; so_lan_sua_muon: number;
 };
-type Thang = { ky: string; da_khep: boolean; o: O[] };
+type Thang = { ky: string; ten: string; be_rong: "thang" | "quy" | "nam"; da_khep: boolean; o: O[] };
+type DoiChieu = {
+  ky: string; chi_tieu_ten: string; chi_tieu_giao: number; tong_hep: number;
+  chenh: number; nhan_hep: string;
+};
 type Bang = {
   nam: number;
   chi_tieu: { ma: string; ten: string }[];
   phap_nhan: { id: number; ma: string; ten: string }[];
-  thang: Thang[];
+  ky: Thang[];
+  doi_chieu?: DoiChieu[];
+  nam_chon_duoc?: number[];
   pham_vi?: { cau_hien_thi?: string };
   dai_toi_thieu_ly_do: number;
 };
 
 const khoaO = (ky: string, cid: number, ct: string) => `${ky}|${cid}|${ct}`;
-const tenThang = (ky: string) => `Tháng ${Number(ky.split("-")[1])}`;
+/* TC-44 · Tên kỳ do MÁY CHỦ đặt và gửi xuống (`ten`). Trước đây màn hình tự dựng "Tháng N" từ mã
+   kỳ — được, khi mọi dòng đều là tháng. Nay bảng có cả dòng Năm và bốn dòng Quý, và một hàm tên
+   `tenThang` dựng tên cho dòng "Năm 2027" là chỗ sai chỉ chờ ngày lộ ra. */
+const tenKy = (t: { ten?: string; ky: string }) => t.ten || t.ky;
 
 /** Chuỗi người gõ → số, hoặc `null` khi ô để trống.
  *  Trả `undefined` nghĩa là GÕ SAI (chữ, dấu lạ) — khác hẳn để trống, nên nút Lưu phải chặn chứ
@@ -140,7 +149,7 @@ function KeHoachThang() {
                   gia_tri: docSo(nhap[k]), ly_do: lyDo[t.ky] || "" },
         });
       }
-      toast(`Đã lưu kế hoạch ${tenThang(t.ky)}/${b!.nam}.`);
+      toast(`Đã lưu kế hoạch ${tenKy(t)} · ${b!.nam}.`);
       await tai();
     } catch (e) { toast(errMsg(e), true); }
     finally { setDangLuu(""); }
@@ -178,6 +187,37 @@ function KeHoachThang() {
       </p>}
     </div>
 
+    {/* ĐỐI CHIẾU BA BỀ RỘNG — HIỆN RA, KHÔNG TỰ SỬA.
+        Anh Tuấn chốt 16/9/2026 rằng chỉ tiêu năm và quý do HĐQT nhập riêng, không cộng từ 12
+        tháng. Hệ quả là ba chỗ nhập, và ba chỗ thì sớm muộn lệch nhau.
+
+        Lệch KHÔNG phải lỗi: hội đồng giao 230 tỷ trong khi Kế toán phân bổ tháng cộng lại ra 226
+        thì 4 tỷ ấy là dư địa cố ý. Tự cộng ngược hay tự chia đều là xoá một quyết định quản trị và
+        thay bằng một phép tính.
+        Nhưng lệch mà KHÔNG AI THẤY mới là chỗ hỏng — sáu tháng sau không ai nhớ 4 tỷ ấy là dư địa
+        hay một ô gõ thiếu số 0. Nên dòng này đứng ngay trên bảng nhập, và nó chỉ NÓI. */}
+    {(b.doi_chieu || []).length > 0 && <div className="panel kh-doi-chieu">
+      <div className="mh01-dau"><h2>Chỉ tiêu giao khác tổng phân bổ</h2>
+        <span className="tag">{b.doi_chieu!.length} chỗ</span></div>
+      <ul className="kh-dc-ds">
+        {b.doi_chieu!.map((d) => (
+          <li key={d.ky + d.chi_tieu_ten}>
+            <b>{d.ky}</b> · {d.chi_tieu_ten}: giao{" "}
+            <b>{Math.round(d.chi_tieu_giao).toLocaleString("vi-VN")}</b>, {d.nhan_hep} cộng lại{" "}
+            <b>{Math.round(d.tong_hep).toLocaleString("vi-VN")}</b> —{" "}
+            <b className="v14-canh">
+              {d.chenh > 0 ? "còn thiếu " : "vượt "}
+              {Math.abs(Math.round(d.chenh)).toLocaleString("vi-VN")}
+            </b>
+          </li>
+        ))}
+      </ul>
+      <p className="muted v14-ghi">
+        Hệ thống KHÔNG tự cộng ngược hay chia đều — chênh lệch giữa chỉ tiêu Hội đồng giao và phân
+        bổ của Kế toán có thể là dư địa cố ý. Dòng này chỉ nói ra để anh/chị quyết.
+      </p>
+    </div>}
+
     {/* BIỂU ĐỒ ĐẶT TRƯỚC BẢNG NHẬP: người mở màn hình này thường mở để xem "năm nay đã đặt chỉ tiêu
         tới đâu", và câu trả lời ấy là một cái nhìn chứ không phải một bảng 24 ô. */}
     {duVeCot(diem) && <div className="panel">
@@ -199,6 +239,7 @@ function KeHoachThang() {
       <div className="mh01-dau">
         <h2>Bảng chỉ tiêu {b.nam}</h2>
         <span className="tag">{b.phap_nhan.length} pháp nhân · {b.chi_tieu.length} chỉ tiêu</span>
+        <span className="tag">1 năm · 4 quý · 12 tháng</span>
       </div>
       <div className="wrap">
         <table className="tbl">
@@ -220,16 +261,18 @@ function KeHoachThang() {
             </tr>
           </thead>
           <tbody>
-            {b.thang.map((t) => {
+            {(b.ky || []).map((t) => {
               const doi = thangDoi(t);
               const canLyDo = t.da_khep && doi.length > 0;
               const soSua = Math.max(...t.o.map((x) => x.so_lan_sua_muon), 0);
               const lyDoCu = (t.o.find((x) => x.ly_do_sua) || {} as O).ly_do_sua || "";
               return (
                 <Fragment key={t.ky}>
-                  <tr className={doi.length > 0 ? "kh-dang-sua" : undefined}>
+                  <tr className={[doi.length > 0 ? "kh-dang-sua" : "",
+                                  t.be_rong !== "thang" ? "kh-rong-hon" : ""].join(" ").trim()
+                                  || undefined}>
                     <td className="kh-thang">
-                      <b>{tenThang(t.ky)}</b>
+                      <b>{tenKy(t)}</b>
                       {/* Ổ KHOÁ chứ không phải chữ "đã khép": mười hai dòng mà dòng nào cũng mang
                           một chữ thì chữ ấy thành nhiễu. Biểu tượng đọc được bằng cách liếc, và
                           title kèm câu đầy đủ cho người rê chuột lẫn trình đọc màn hình. */}
@@ -238,7 +281,7 @@ function KeHoachThang() {
                     {b.phap_nhan.map((p) => b.chi_tieu.map((c) => (
                       <td key={`${p.id}-${c.ma}`} className="num">
                         <input className="kh-o" inputMode="numeric"
-                          aria-label={`${c.ten} ${tenThang(t.ky)} ${p.ten}`}
+                          aria-label={`${c.ten} ${tenKy(t)} ${p.ten}`}
                           disabled={!ghiDuoc}
                           value={giaTriHienTai(t, p.id, c.ma)}
                           onChange={(e) => setNhap({ ...nhap, [khoaO(t.ky, p.id, c.ma)]: e.target.value })} />
@@ -269,7 +312,7 @@ function KeHoachThang() {
                     <td colSpan={2 + b.phap_nhan.length * b.chi_tieu.length + (ghiDuoc ? 1 : 0)}>
                       <div className="kh-lydo">
                         <label htmlFor={`lydo-${t.ky}`}>
-                          Lý do sửa {tenThang(t.ky)} — tháng đã khép <span className="muted">
+                          Lý do sửa {tenKy(t)} — kỳ đã khép <span className="muted">
                             (ít nhất {b.dai_toi_thieu_ly_do} ký tự, lưu ngay trên dòng và vào nhật ký)</span>
                         </label>
                         <input id={`lydo-${t.ky}`} className="kh-lydo-o" value={lyDo[t.ky] || ""}

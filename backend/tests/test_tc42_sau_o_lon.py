@@ -52,6 +52,7 @@ from app.services import xu_huong as XH
 GOC = Path(__file__).resolve().parents[2]
 TRANG = GOC / "web" / "app" / "page.tsx"
 SAU_O = GOC / "web" / "components" / "KhoiSauO.tsx"
+KHOI_KQ = GOC / "web" / "components" / "KhoiKetQuaKinhDoanh.tsx"
 DAU = GOC / "web" / "components" / "DauManHinh01.tsx"
 CSS = GOC / "web" / "app" / "globals.css"
 BANG_DIEU_KHIEN = GOC / "backend" / "app" / "services" / "dashboard.py"
@@ -257,7 +258,10 @@ def test_khong_co_viec_nao_thi_ba_muc_deu_bang_khong(db):
 
 # ═════════════════ 5 · MÀN HÌNH: SÁU Ô LỚN VÀ NĂM THẺ NHỎ ═════════════════
 
-SAU_O_KHOI = ["<KhoiDoanhThu", "<KhoiLoiNhuan", "<KhoiDongTien",
+# SỬA 16/9/2026 (TC-44): sáu Ô vẫn là sáu CON SỐ, nhưng hai con số đầu nay nằm chung MỘT khối
+# `<KhoiKetQuaKinhDoanh` với một bộ chọn kỳ dùng chung (bản vẽ anh Tuấn gửi chiều cùng ngày).
+# Đổi CÁCH BÀY, không đổi danh sách — nên phép thử vẫn canh đúng điều cũ: đủ mặt và đúng thứ tự.
+SAU_O_KHOI = ["<KhoiKetQuaKinhDoanh", "<KhoiDongTien",
               "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiTonDongMuc"]
 
 
@@ -292,10 +296,15 @@ def test_nam_the_nho_khong_mang_bieu_do():
 
 
 def test_o_lon_khong_lay_bo_so_cua_thang_lam_loi_lui_cho_quy():
-    """Chỗ RẤT dễ làm sai, và đã sai một lần ở khối Hiệu quả đội xe (TC-40)."""
-    ma = _ma(_doc(SAU_O))
-    assert "ba_ky?.[ky]" in ma, "Mỗi kỳ phải đọc chuỗi RIÊNG của kỳ ấy."
-    for cam in ("|| ba_ky?.thang", '?? ba_ky?.thang', 'ky === "thang" ?'):
+    """Chỗ RẤT dễ làm sai, và đã sai một lần ở khối Hiệu quả đội xe (TC-40).
+
+    SỬA 16/9/2026 (TC-44): hai ô lớn sang KhoiKetQuaKinhDoanh và đổi cách lấy số — hỏi thẳng máy
+    chủ đúng kỳ đang chọn thay vì chọn nhánh trong một gói dựng sẵn. Lối lui về bộ số của tháng vì
+    thế không còn chỗ tồn tại, nhưng phép thử vẫn phải đứng đây: cách làm đổi, cám dỗ thì không.
+    """
+    ma = _ma(_doc(KHOI_KQ))
+    assert "ket-qua-kinh-doanh?kind=" in ma, "Mỗi kỳ phải hỏi máy chủ đúng kỳ ấy."
+    for cam in ("|| ba_ky?.thang", '?? ba_ky?.thang', 'kind === "thang" ? '):
         assert cam not in ma, (
             f"Có lối lui về bộ số của tháng ({cam}). Bấm sang Quý mà thấy y hệt bộ số của Tháng là "
             f"nói dối bằng giao diện — người đọc kết luận quý bằng tháng, chứ không kết luận là "
@@ -310,7 +319,9 @@ def test_o_lon_khong_tu_tinh_con_so_nghiep_vu_nao():
     một phép soát cấm chuỗi "slice(" trong cả tệp đã báo oan một phép cắt hoàn toàn chính đáng.
     Nên ở đây: bỏ chuỗi ký tự và đường dẫn trước, rồi mới tìm phép chia thật (` / ` giữa hai vế).
     """
-    ma = _ma(_doc(SAU_O))
+    # SỬA 16/9/2026 (TC-44): soát cả khối Kết quả kinh doanh — nơi hai ô lớn chuyển sang, và là
+    # nơi có nhiều con số dễ bị tính tại chỗ nhất (tỉ lệ đạt, biên lợi nhuận).
+    ma = _ma(_doc(SAU_O) + "\n" + _doc(KHOI_KQ))
     ma = re.sub(r'"[^"\n]*"|\'[^\'\n]*\'|`[^`]*`', '""', ma)   # bỏ mọi chuỗi ký tự
     for dong in ma.splitlines():
         assert "reduce(" not in dong, f"Có phép gộp trên màn hình: {dong.strip()}"
@@ -321,13 +332,24 @@ def test_o_lon_khong_tu_tinh_con_so_nghiep_vu_nao():
             )
 
 
-def test_nhan_truc_kem_nam_khi_chuoi_vat_qua_hai_nam():
+def test_nhan_truc_khong_bao_gio_mo_ho_ve_nam():
     """Bốn quý gần nhất thường là "Q3 Q4 Q1 Q2" — đọc dãy ấy thì không ai biết Q3 thuộc năm nào,
     và cùng màn hình còn có quý ĐANG CHẠY cũng tên Q3. Tìm ra bằng cách dựng ảnh, không phải bằng
-    cách đọc mã."""
-    ma = _ma(_doc(SAU_O))
-    assert "kem_nam" in ma, "Nhãn trục phải biết chuỗi có vắt qua hai năm hay không."
-    assert "new Set(ds.map" in ma, "Phải ĐO số năm trong chuỗi, không đoán theo bề rộng kỳ."
+    cách đọc mã.
+
+    SỬA 16/9/2026 (TC-44): bản TC-42 chữa bằng cách THÊM năm vào nhãn khi chuỗi vắt qua hai năm
+    (`kem_nam`). Bản vẽ chiều 16/9 chữa tận gốc: trục LUÔN là mười hai tháng của ĐÚNG MỘT năm, và
+    năm ấy in ở phụ đề. Không còn chuỗi nào vắt qua hai năm thì cũng không còn nhãn nào mơ hồ.
+    Luật không đổi — nhãn trục không được để người đọc phải đoán năm; cách giữ luật thì đổi.
+    """
+    ma = _ma(_doc(KHOI_KQ))
+    assert 'nhan: `T${c.thang}`' in ma, "Trục phải là mười hai tháng, đánh số 1–12."
+    assert "12 tháng ${nam}" in ma, "Phụ đề phải in NĂM của mười hai cột ấy."
+    assert "cac_thang = [f\"{nam:04d}" in _doc(
+        GOC / "backend" / "app" / "services" / "ket_qua_kinh_doanh.py"), (
+        "Mười hai cột phải dựng từ MỘT năm ở máy chủ — trộn tháng của hai năm vào một trục là đúng "
+        "cái mơ hồ mà phép thử này sinh ra để chặn."
+    )
 
 
 def test_luoi_sau_o_hai_cot_tren_man_rong_va_mot_cot_tren_dien_thoai():

@@ -11,9 +11,8 @@ import {
 import {
   DongLoc, KhoiQuyetDinh, HangThe, TieuDe, dem, type The,
 } from "@/components/DauManHinh01";
-import {
-  KhoiDoanhThu, KhoiLoiNhuan, KhoiTonDongMuc,
-} from "@/components/KhoiSauO";
+import { KhoiTonDongMuc } from "@/components/KhoiSauO";
+import KhoiKetQuaKinhDoanh from "@/components/KhoiKetQuaKinhDoanh";
 import { bieuDoCua } from "@/components/BaKhuBieuDo";
 
 function Dash() {
@@ -32,20 +31,23 @@ function Dash() {
   </div>;
   if (!d) return <p className="muted">Đang tải…</p>;
   const c = d.counts || {};
-  const k = d.kpis || {}; const sec = d.sections || {};
+  const sec = d.sections || {};   // `d.kpis` không còn ai đọc từ TC-44 — xem ghi chú bên dưới.
   /* Cửa sổ ngày khởi hành do MÁY CHỦ khai (services/dashboard.py · SO_NGAY_SAP_KHOI_HANH). Màn
      hình chỉ đọc — gõ lại con số ở đây là mở đường cho hai nơi nói khác nhau, đúng lỗi vừa sửa ở
      đầu cột bảng dòng tiền. Lối lui 14 chỉ dùng khi máy chủ cũ chưa trả trường này. */
   const soNgayKH = sec.sap_khoi_hanh_so_ngay ?? 14;
 
-  /* KỲ BÁO CÁO — SỬA 16/9/2026 (TC-42), và sửa ngược lại quyết định 13/9.
-     Bản 13/9 chốt "màn hình 01 chỉ theo THÁNG, quý và năm xem ở báo cáo chi tiết", vì lúc ấy máy
-     chủ mới tính theo tháng và một ô chọn ba kỳ sẽ là lời hứa suông. Nay máy chủ cộng được quý và
-     năm từ chính các tháng (`services/xu_huong.doc_theo_ky`), nên ô chọn ấy có số thật đằng sau —
-     và anh Tuấn chốt 16/9 là "doanh thu và lợi nhuận phân ra theo tháng, quý, năm".
-     Chỉ HAI ô lớn ấy có ba kỳ: tồn kho cộng không được, và bốn ô chọn kỳ trên cùng một màn hình
-     thì không ô nào còn đáng bấm. */
-  const kh = k.ke_hoach_thang;
+  /* KỲ BÁO CÁO — SỬA 16/9/2026 (TC-42), rồi sửa lần nữa cùng ngày (TC-44).
+     Bản 13/9 chốt "màn hình 01 chỉ theo THÁNG". TC-42 mở ra ba kỳ vì máy chủ đã cộng được quý và
+     năm. TC-44 đưa hẳn hai ô ấy sang khối Kết quả kinh doanh, nơi chúng dùng CHUNG một bộ chọn kỳ
+     và tự gọi `/bao-cao/ket-qua-kinh-doanh` — nên ở đây không còn phải chuyền `ke_hoach_thang`
+     xuống nữa; kế hoạch đi thẳng từ máy chủ vào khối ấy.
+
+     MỘT CÂU MẤT ĐI, VÀ ĐÓ LÀ CHỦ Ý: dòng "N chuyến đã quyết toán trong tháng" (`k.so_chuyen_thang`)
+     không theo sang khối mới được, vì con số ấy là của THÁNG HIỆN TẠI còn khối mới xem được bất kỳ
+     tháng nào của bất kỳ năm nào. Đặt nó dưới biểu đồ tháng 3/2026 là dán một con số của tháng 9
+     vào chỗ nó không thuộc về. Muốn có lại thì máy chủ phải đếm chuyến THEO KỲ — ghi ra đây để
+     việc còn thiếu nằm trong mã, không nằm trong trí nhớ. */
 
   /* NĂM THẺ SỐ NHỎ — anh Tuấn chốt 16/9/2026: "các phần tour đang bán, tour chờ quyết toán, tour
      sắp khởi hành, đội xe hôm nay, marketing đưa xuống vị trí dưới".
@@ -96,9 +98,16 @@ function Dash() {
 
     <KhoiQuyetDinh ds={d.approvals || []} vai={user?.role} />
 
+    {/* TC-44 · Doanh thu và Lợi nhuận trước thuế GỘP thành MỘT khối rộng hết bề ngang, theo bản
+        vẽ anh Tuấn gửi 16/9/2026. Hai ô ấy rời khỏi lưới sáu ô vì hai lẽ: chúng dùng CHUNG một bộ
+        chọn kỳ (để không bao giờ xảy ra cảnh doanh thu đang xem quý còn lợi nhuận đang xem tháng),
+        và mười hai cột mỗi hình cần bề ngang gấp đôi một ô lưới.
+
+        Sáu con số của anh Tuấn KHÔNG mất đi: hai con số đầu nằm trong khối này, bốn con số còn lại
+        ở lưới ngay dưới. Đổi CÁCH BÀY, không đổi danh sách. */}
+    <KhoiKetQuaKinhDoanh />
+
     <div className="mh01-sau-o">
-      <KhoiDoanhThu ba_ky={sec.ba_ky} ke_hoach={kh} so_chuyen={k.so_chuyen_thang} />
-      <KhoiLoiNhuan ba_ky={sec.ba_ky} ke_hoach={kh} />
       <KhoiDongTien />
       <KhoiPhaiThu ds={sec.phai_thu_theo_han} chua_co_han={sec.phai_thu_chua_co_han}
         vi_sao={sec.phai_thu_vi_sao} bieu_do={bd.phai_thu} />
