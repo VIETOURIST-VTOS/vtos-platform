@@ -42,10 +42,23 @@ import {
    cấu trúc dữ liệu, và ngày một bản sửa mà bản kia quên là ngày hai biểu đồ nói khác nhau.
    Tệp này nay chỉ còn các biểu đồ CƠ CẤU và XẾP HẠNG. */
 
-/** Năm nhóm hạn của máy chủ → các phần của một tổng. Thứ tự lấy theo KHUNG, không theo thứ tự
- *  máy chủ trả về: khung là thứ tự hạn gần → xa, còn đối tượng JSON thì không hứa thứ tự nào. */
-function phanTu(khung: { nhan: string; trang_thai?: boolean }[],
-                ds: Record<string, number | null> | null | undefined): Phan[] {
+/** Bảy nhóm hạn của máy chủ → bảy thanh ngang. Thứ tự lấy theo KHUNG, không theo thứ tự máy chủ
+ *  trả về: khung là thứ tự hạn gần → xa, còn đối tượng JSON thì không hứa thứ tự nào.
+ *
+ *  TC-45 · THANH NGANG THAY CHO THANH CƠ CẤU MỘT VẠCH, và cũng thay luôn bảy ô số vuông.
+ *  ═════════════════════════════════════════════════════════════════════════════════════════════
+ *  Bản cũ bày CẢ HAI: năm ô số vuông ở trên, rồi một thanh chia khúc ở dưới — hai bức tranh của
+ *  cùng một hàng số, đúng thứ luật "MỘT CON SỐ · MỘT CHỖ · MỘT HÌNH" (TC-40) cấm. Thanh chia khúc
+ *  trả lời "bao nhiêu phần trăm tiền đã quá hạn"; ô số vuông trả lời "nhóm ấy bao nhiêu đồng". Bảy
+ *  thanh ngang trả lời CẢ HAI trong một hình: con số nằm cuối mỗi thanh, còn bề dài so với nhau
+ *  cho ngay tỉ lệ — mà không bắt mắt nhảy bảy lần rồi tự cộng nhẩm.
+ *
+ *  `xep={false}` là bắt buộc và là chỗ dễ quên nhất: bảy nhóm này xếp theo THỜI GIAN (quá hạn →
+ *  dài hạn), không theo độ lớn. Để bộ biểu đồ tự xếp nhiều-trước thì trục thời gian biến mất, và
+ *  "quá hạn" có thể rơi xuống giữa bảng — lúc ấy không ai đọc ra được nợ đang dồn về phía nào.
+ */
+function thanhTu(khung: { nhan: string; trang_thai?: boolean }[],
+                 ds: Record<string, number | null> | null | undefined): Thanh[] {
   const s = ds || {};
   return khung.map((k) => ({
     ten: k.nhan,
@@ -54,14 +67,18 @@ function phanTu(khung: { nhan: string; trang_thai?: boolean }[],
   }));
 }
 
-const KHUNG_THU = [
-  { nhan: "Quá hạn", trang_thai: true }, { nhan: "2 tuần" }, { nhan: "4 tuần" },
-  { nhan: "2 tháng" }, { nhan: "Dài hạn" },
+/* MỘT khung cho cả hai hướng — anh Tuấn chốt 16/9/2026. Nhãn phải khớp TỪNG CHỮ với `MOC` ở
+   backend/app/services/han_cong_no.py. */
+const KHUNG_HAN = [
+  { nhan: "Quá hạn", trang_thai: true }, { nhan: "1 tuần" }, { nhan: "2 tuần" },
+  { nhan: "4 tuần" }, { nhan: "2 tháng" }, { nhan: "3 tháng" }, { nhan: "Dài hạn" },
 ];
-const KHUNG_TRA = [
-  { nhan: "1 tuần" }, { nhan: "2 tuần" }, { nhan: "4 tuần" },
-  { nhan: "3 tháng" }, { nhan: "Dài hạn" },
-];
+
+/* Câu chân dùng chung cho cả hai khối công nợ: một câu, hai chỗ gọi. Viết riêng hai bản là để
+   ngày luật đổi thì một bản được sửa còn bản kia nói điều cũ. */
+const CHAN_HAN = "Bảy nhóm KHÔNG trùng nhau nên cộng cả bảy ra đúng tổng công nợ — khác bảng dòng "
+  + "tiền bốn mốc, ở đó cột sau đã chứa trọn cột trước. Nhóm Quá hạn mang màu cảnh báo vì nó là "
+  + "TRẠNG THÁI: tiền đã trễ, không phải nấc gần nhất của thang hạn còn lại.";
 
 /* ─────────────────────────── DỰNG BIỂU ĐỒ CHO TỪNG KHỐI ─────────────────────────── */
 
@@ -74,8 +91,8 @@ export type BoBieuDo = {
 };
 
 export function bieuDoCua(sec: any): BoBieuDo {
-  const thu = phanTu(KHUNG_THU, sec?.phai_thu_theo_han);
-  const tra = phanTu(KHUNG_TRA, sec?.phai_tra_theo_han);
+  const thu = thanhTu(KHUNG_HAN, sec?.phai_thu_theo_han);
+  const tra = thanhTu(KHUNG_HAN, sec?.phai_tra_theo_han);
   const le: Thanh[] = (sec?.kd_le || []).map((r: any) => ({
     ten: r.sales, gt: r.revenue === null || r.revenue === undefined ? null : Number(r.revenue),
   }));
@@ -93,13 +110,13 @@ export function bieuDoCua(sec: any): BoBieuDo {
     : [{ ten: "Đã nộp", gt: null }, { ten: "Chưa nộp", gt: null }];
 
   return {
-    phai_thu: duVeCoCau(thu)
-      ? <BieuDoCoCau ten="Cơ cấu theo hạn" ds={thu}
-          chan="Nhóm Quá hạn mang màu cảnh báo vì nó là TRẠNG THÁI — tiền đã trễ, không phải nấc gần nhất của thang hạn còn lại." />
+    phai_thu: duVeThanh(thu)
+      ? <BieuDoThanh ten="Bảy nhóm hạn" phu="gần → xa" ds={thu} dinh_dang="tien" xep={false}
+          chan={CHAN_HAN} ai="Kế toán" cua="/ra-soat-cot-tien" cua_ten="Cửa nhập công nợ phải thu" />
       : null,
-    phai_tra: duVeCoCau(tra)
-      ? <BieuDoCoCau ten="Cơ cấu theo hạn" ds={tra}
-          chan="Phải trả quá hạn theo dõi riêng ở dưới, KHÔNG nằm trong năm nhóm này — gộp vào là đếm hai lần." />
+    phai_tra: duVeThanh(tra)
+      ? <BieuDoThanh ten="Bảy nhóm hạn" phu="gần → xa" ds={tra} dinh_dang="tien" xep={false}
+          chan={CHAN_HAN} ai="Kế toán" cua="/nha-cung-cap" cua_ten="Cửa nhập công nợ phải trả" />
       : null,
     kd_le: duVeThanh(le)
       ? <BieuDoThanh ten="Xếp hạng theo nhân viên" ds={le} dinh_dang="tien" />

@@ -406,21 +406,15 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 .v14-o.rong .v14-o-so{color:var(--vtos-text-mute);font-weight:500;font-size:16px}
 .v14-o-chu{font-family:var(--vtos-font-text);font-size:15px}
 
-/* Phải thu / Phải trả: năm nhóm hạn. KHÔNG dùng lưới bốn cột cứng — nhãn "Quá hạn" và mô tả
-   "Sau 4 tuần đến hết mốc +2 tháng lịch" dài ngắn rất khác nhau, khoá cứng là chữ bị cắt. */
-.v14-han-ds{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr))}
-.v14-han{background:var(--vtos-info-bg);border:1px solid var(--vtos-line);
-  border-radius:var(--vtos-radius-md);padding:11px 13px;min-width:0;
-  display:flex;flex-direction:column;gap:3px;align-items:flex-start}
-.v14-han.rong{background:transparent;border-style:dashed}
-.v14-han-nhan{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
-  color:var(--vtos-text-mute)}
-.v14-han-so{font-size:19px;font-weight:700;color:var(--vtos-navy);
-  font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono)}
-.v14-han.rong .v14-han-so{color:var(--vtos-text-mute);font-weight:500}
-.v14-han-mo{font-size:11px;color:var(--vtos-text-faint);line-height:1.5}
-.v14-han-ty{font-size:12px;font-weight:700;color:var(--vtos-text-mute);
-  font-variant-numeric:tabular-nums}
+/* TC-45 · BẢY Ô SỐ VUÔNG CỦA PHẢI THU / PHẢI TRẢ ĐÃ ĐI, cùng với lớp .v14-han*.
+   Hai khối ấy nay bày số bằng bảy thanh ngang của bộ biểu đồ dùng chung (.bd-th-*), nên giữ lại
+   bộ lớp cũ "phòng khi cần" là để kho có hai cách bày cùng một hàng số — và ngày ai đó sửa màu ở
+   một bộ là ngày hai khối cạnh nhau không còn giống nhau. Bản cũ nằm trong lịch sử git. */
+
+/* Dòng "Mốc tính từ ngày báo cáo: Quá hạn ... · Dài hạn ..." — một câu dài liệt kê bảy mốc, thay
+   cho bảy câu rải dưới bảy ô. Cho nó giãn dòng rộng hơn chữ thường vì nó là câu để TRA, không phải
+   câu để đọc trôi. */
+.v14-moc{line-height:1.7}
 
 /* TC-38 · Thanh cơ cấu và thanh ngang của hai khối này ĐÃ CHUYỂN sang bộ biểu đồ dùng chung
    (components/BieuDo.tsx, lớp .bd-*) và hiện ở ba khu biểu đồ cuối trang. Quy tắc màu và các luật
@@ -727,12 +721,16 @@ table.bang-doc{width:100%}
    thường. Câu "chưa có số" vì thế cũng nằm TRONG rãnh, không nằm ở cột số. */
 .bd-th{display:grid;gap:7px}
 .bd-th-hang{display:grid;grid-template-columns:116px minmax(0,1fr) 62px;align-items:center;
-  gap:10px;font-size:12px}
+  gap:10px;font-size:12px;min-width:0}
 .bd-th-ten{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bd-th-rai{position:relative;height:15px;border-radius:3px;background:var(--vtos-surface)}
 .bd-th-thanh{position:absolute;top:0;bottom:0;border-radius:3px;background:var(--vtos-navy)}
 .bd-th-thanh.am{background:var(--vtos-danger)}
 .bd-th-thanh.phu{background:var(--vtos-warning)}
+/* TC-45 · dòng TRẠNG THÁI ("Quá hạn"): cùng màu với khúc trạng thái của biểu đồ cơ cấu
+   (.bd-mau-tt). Đặt SAU .am nên một dòng vừa âm vừa là trạng thái vẫn ra màu ấy — cùng màu, nên
+   không có chỗ nào để lệch. */
+.bd-th-thanh.tt{background:var(--vtos-danger)}
 .bd-th-truc0{position:absolute;top:0;bottom:0;width:1px;background:var(--vtos-line)}
 .bd-th-khuyet{position:absolute;inset:0;border:1px dashed var(--vtos-line);border-radius:3px;
   display:flex;align-items:center;padding-left:7px;font-size:10px;color:var(--vtos-text-faint)}
