@@ -150,3 +150,46 @@ def chup(kind: str = "thang", ngay: str = "", db: Session = Depends(get_db)):
     return {**kq,
             "message": (f"Đã chụp {len(kq['da_luu'])} phạm vi cho kỳ {kq['ky']}"
                         + (f"; {len(kq['hong'])} phạm vi lỗi" if kq["hong"] else ""))}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# TC-43 · MỘT LỊCH DUY NHẤT — CỬA CHO LỊCH TỰ ĐỘNG GỌI MỖI NGÀY MỘT LẦN
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# Cửa /chup ở trên đòi lịch tự truyền `kind` và `ngay`, và chú thích của chính nó cảnh báo rằng gõ
+# sai ô ngày là hỏng vĩnh viễn số liệu của kỳ ấy. Cảnh báo đúng — nhưng nó đặt phần DỄ SAI NHẤT
+# vào một ô cấu hình nằm ngoài kho mã, nơi không bộ kiểm nào canh và sai thì im lặng. Ba lịch là
+# ba ô như thế.
+#
+# Cửa này đảo lại: lịch chỉ còn phải biết MỘT việc — gọi mỗi ngày một lần, không tham số. Việc
+# "hôm nay là kỳ gì, mốc ngày nào" chuyển vào services/lich_chup.ky_den_han, nơi test_tc43 canh
+# từng trường hợp biên: mùng 1, thứ Hai, mùng 1 rơi đúng thứ Hai, và mốc qua đầu năm.
+#
+# /chup CŨ GIỮ NGUYÊN, không bỏ: nó là cửa CHẠY BÙ THỦ CÔNG cho một kỳ cũ, và việc ấy phải nói rõ
+# kỳ nào — đúng chỗ để người gọi tự truyền ngày.
+@router.post("/chup-hom-nay", dependencies=[Depends(robot_auth)])
+def chup_hom_nay(db: Session = Depends(get_db)):
+    """Chụp mọi kỳ ĐẾN HẠN hôm nay. Lịch gọi 00:30 mỗi ngày, không truyền gì cả.
+
+    MỘT KỲ HỎNG KHÔNG ĐƯỢC LÀM CHẾT NHỮNG KỲ CÒN LẠI. Ngày 1 rơi đúng thứ Hai thì có ba kỳ phải
+    chụp, và ba kỳ ấy là ba câu hỏi khác nhau về cùng một ngày cuối — mất kỳ nào là mất vĩnh viễn
+    kỳ ấy, vì chỉ tiêu tồn kho không tính lại được. Nên mỗi kỳ bọc try riêng, và kỳ hỏng hiện ra ở
+    `hong` chứ không ném lỗi ra ngoài.
+
+    Mã trạng thái vẫn 200 kể cả khi có kỳ hỏng — nhưng `so_ky_hong` > 0 nói rõ, và lịch tự động nên
+    đọc trường ấy. Trả 500 thì n8n báo đỏ và người ta chạy lại cả mẻ, ghi đè lên những kỳ VỪA chụp
+    xong đúng — tức là lấy một kỳ hỏng đổi lấy ba kỳ hỏng.
+    """
+    from app.services import lich_chup as LC
+    ra, hong = [], []
+    for kind, moc in LC.ky_den_han():
+        try:
+            kq = BP.luu(db, kind, moc, boi="lich")
+            ra.append({"kind": kind, "moc": moc.isoformat(), "ky": kq["ky"],
+                       "so_pham_vi": len(kq["da_luu"]), "pham_vi_hong": kq["hong"]})
+        except Exception as ex:      # noqa – xem chú thích trên: một kỳ hỏng không kéo theo kỳ khác
+            hong.append({"kind": kind, "moc": moc.isoformat(), "ly_do": str(ex)[:300]})
+    return {"da_chup": ra, "hong": hong,
+            "so_ky_hong": len(hong),
+            "vi_sao": LC.mo_ta(),
+            "message": (f"Đã chụp {len(ra)} kỳ"
+                        + (f"; {len(hong)} kỳ lỗi" if hong else ""))}
