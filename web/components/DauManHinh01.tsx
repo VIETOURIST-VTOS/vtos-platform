@@ -190,11 +190,20 @@ export function DongLoc() {
           chọn bấm vào lại báo "chưa có nguồn". */}
       <Link className="the-cua" href="/phan-he/baocao">Xem theo quý và năm →</Link>
       <span className="tag">Đơn vị tiền: đồng</span>
-      {/* SỬA 13/9/2026. Câu cũ ghi "chọn ở ô đơn vị trên thanh ngang" – chỉ vào một ô KHÔNG CÓ:
-          components/ChonDonVi.tsx trả về null khi máy chủ chưa mở GET /pham-vi/don-vi, mà hôm nay
-          thì chưa. Bảo người ta bấm vào chỗ trống là kiểu sai khó chịu nhất, vì họ sẽ đi tìm và cho
-          rằng mình không thấy. Nói thẳng: chưa đổi được đơn vị, và vì sao. */}
-      <span className="muted">Phạm vi do máy chủ áp theo tài khoản · chưa đổi được đơn vị</span>
+      {/* TC-55 · PHẠM VI LÀ MỘT CÂU TRẢ LỜI, KHÔNG PHẢI MỘT Ô CHỌN — anh Tuấn chốt 17/9/2026:
+          "bỏ hết pháp nhân, chỉ chọn Vietourist; khi nào cần xem pháp nhân thì vào Báo cáo tài
+          chính tổng hợp."
+
+          Nên ghi thẳng ra đây màn hình đang nói về công ty nào. Hai người mở cùng một trang mà mỗi
+          người đang xem một pháp nhân khác nhau, rồi cùng bàn về "con số đó", là kiểu sai không ai
+          phát hiện ra trong phòng họp.
+
+          KHÔNG dẫn sang Báo cáo tài chính hợp nhất, dù anh Tuấn nhắc tới nó: màn hình ấy CHƯA
+          DỰNG (hợp nhất hai pháp nhân và công ty liên kết nằm ở giai đoạn 4 — xem app/accounting).
+          Bài học 13/9 ngay trong tệp này: câu cũ chỉ người dùng "chọn ở ô đơn vị trên thanh ngang"
+          — một ô không tồn tại — và họ đi tìm rồi tưởng mình không thấy. Chỉ vào chỗ trống là kiểu
+          sai khó chịu nhất. Khi nào màn hình hợp nhất có thật thì thêm đường dẫn ở đây. */}
+      <span className="muted">Phạm vi: <b>Vietourist</b> — công ty mẹ</span>
       {/* Ngày báo cáo là mốc phân nhóm của mọi bảng theo hạn ở dưới – ghi ra để không ai phải đoán. */}
       <span className="muted mh01-ngay">Ngày báo cáo: {homNay || "…"}</span>
       {/* TC-35 · Nút In về ĐÚNG CHỖ bản vẽ đặt: cuối hàng lọc, mép phải. Nó là một THAO TÁC TRÊN

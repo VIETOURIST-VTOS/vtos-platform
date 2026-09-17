@@ -201,9 +201,24 @@ function DayDuBao({ d }: { d: any }) {
   );
 }
 
+/** Pháp nhân của MÀN HÌNH 01: luôn là Vietourist mẹ (VTD) — anh Tuấn chốt 17/9/2026.
+ *
+ *  "Em bỏ hết pháp nhân, chỉ chọn Vietourist; khi nào cần xem pháp nhân thì vào Báo cáo tài chính
+ *   tổng hợp."
+ *
+ *  Tìm theo MÃ chứ không lấy `ds[0]`: `xepDonVi` xếp VTD lên đầu, nhưng dựa vào một hàm xếp để
+ *  quyết định màn hình Chủ tịch đang nói về công ty nào là đặt một con số tiền lên một quy ước
+ *  sắp xếp. Đổi thứ tự trong THU_TU_MA là đổi luôn công ty — mà không có lỗi nào báo.
+ *
+ *  Vẫn giữ `xepDonVi` cho lối lui: vai nào không được xem VTD thì nhận pháp nhân đầu tiên theo
+ *  đúng thứ tự đã chốt, thay vì nhận bừa phần tử đầu mảng máy chủ trả về.
+ */
+function vietouristMe(ds: DonViChon[]): DonViChon | null {
+  return ds.find((c) => (c.code || "").trim().toUpperCase() === "VTD") || ds[0] || null;
+}
+
 export default function KhoiDongTien({ day }: { day?: any }) {
   const { toast } = useShell();
-  const [dsPn, setDsPn] = useState<any[]>([]);
   const [pn, setPn] = useState<number | null>(null);
   const [k, setK] = useState<any>(null);
   const [an, setAn] = useState(false);   // vai này không mở khối dòng tiền → không vẽ gì
@@ -215,13 +230,10 @@ export default function KhoiDongTien({ day }: { day?: any }) {
   useEffect(() => {
     api("/dong-tien/meta")
       .then((r: any) => {
-        // Xếp theo thứ tự đã chốt (VTD trước) chứ không theo bảng chữ cái của máy chủ: mở màn hình
-        // ra mà con số đầu tiên đập vào mắt là của một pháp nhân nhỏ thì đó là con số ít cần nhất.
         // Ghi rõ kiểu phần tử: `r` là any nên nếu để suy diễn, T rơi về đúng ràng buộc {code} và
-        // `ds[0].id` không còn tồn tại dưới mắt trình biên dịch (CI/web bắt đỏ lần đầu).
-        const ds = xepDonVi<DonViChon>(r.phap_nhan || []);
-        setDsPn(ds);
-        if (ds.length) setPn(ds[0].id);
+        // `.id` không còn tồn tại dưới mắt trình biên dịch (CI/web bắt đỏ lần đầu).
+        const c = vietouristMe(xepDonVi<DonViChon>(r.phap_nhan || []));
+        if (c) setPn(c.id);
         else setAn(true);
       })
       .catch(() => setAn(true));   // 403: vai này không xem khối dòng tiền – im lặng, không báo lỗi
@@ -255,11 +267,15 @@ export default function KhoiDongTien({ day }: { day?: any }) {
           <button type="button" className={"act" + (khoang ? "" : " grey")}
             aria-pressed={khoang} onClick={() => setKhoang(true)}>Trong từng khoảng</button>
         </div>
-        {dsPn.length > 1 && (
-          <select value={pn ?? ""} onChange={(e) => setPn(Number(e.target.value))}
-            style={{ width: "auto", minWidth: 220 }} aria-label="Pháp nhân đang xem">
-            {dsPn.map((c) => <option key={c.id} value={c.id}>{c.code} – {c.name}</option>)}
-          </select>)}
+        {/* TC-55 · Ô CHỌN PHÁP NHÂN ĐÃ GỠ — anh Tuấn chốt 17/9/2026: "bỏ hết pháp nhân, chỉ chọn
+            Vietourist; khi nào cần xem pháp nhân thì vào Báo cáo tài chính tổng hợp."
+
+            Một ô chọn trên màn hình Chủ tịch là một câu hỏi phải trả lời trước khi đọc được con
+            số — và tệ hơn, nó khiến hai người mở cùng một trang có thể đang nhìn hai công ty khác
+            nhau mà tưởng đang nói cùng một chuyện. Màn hình 01 nay chỉ nói về Vietourist mẹ, và
+            phạm vi ấy được ghi ra bằng chữ ở dòng ngay dưới (`cau_pham_vi`) chứ không nằm trong
+            một ô người ta phải để ý mới thấy. Xem theo pháp nhân là việc của Báo cáo tài chính
+            tổng hợp. */}
         <span style={{ flex: 1 }} />
         {/* NÚT XUẤT EXCEL THẬT (14/9/2026). Trước đây nó chỉ hiện câu "đang xây dựng" — một nút
             hứa rồi không làm còn tệ hơn không có nút, vì lần sau người dùng không tin nút nào nữa.
