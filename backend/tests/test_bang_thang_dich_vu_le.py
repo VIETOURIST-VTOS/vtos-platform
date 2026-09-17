@@ -296,3 +296,29 @@ def test_bt10_bo_doc_nay_khong_ghi_mot_dong_nao():
     assert not thay, f"bộ ĐỌC đang gọi lệnh ghi cơ sở dữ liệu: {thay}"
     assert "Session" not in open(BT.__file__, encoding="utf-8").read(), \
         "bộ đọc không được nhận phiên cơ sở dữ liệu"
+
+
+# =============================================================================================
+# BT11 · Ô TIÊU ĐỀ GỘP TRÊN CẢ HAI HÀNG KHÔNG ĐƯỢC SINH NHÃN LẶP
+# =============================================================================================
+def test_bt11_o_tieu_de_gop_ca_hai_hang_khong_sinh_nhan_lap():
+    """Nhãn cột đi thẳng vào câu báo cho người đọc: "cột 'VP VFS' có tiền nhưng bộ đọc không biết
+    THU hay CHI". Ô gộp trên cả hai hàng tiêu đề trả cùng một chữ ở hàng trên và hàng dưới, nối
+    thẳng lại thì câu ấy thành "cột 'VP VFS VP VFS'…" — khó hiểu đúng lúc người ta đang cần hiểu.
+
+    Bắt được khi chạy cửa nạp trên tệp thật ngày 16/9/2026: 2 trong 3 nhãn lạ bị lặp kiểu này.
+    """
+    tep = _tep(
+        [(5, ["STT", "TÊN KHÁCH", "GIÁ BÁN", "VP VFS"]),
+         (6, [None, None, None, None]),
+         (7, [1, "NGUYỄN VĂN A", 6_000_000, 250_000]),
+         (8, [2, "TRẦN THỊ B", 4_000_000, 150_000]),
+         (9, ["TỔNG CỘNG", None, 10_000_000, 400_000])],
+        gop=("A5:A6", "B5:B6", "C5:C6", "D5:D6"))
+    d = BT.doc_tep(tep, "QUYẾT TOÁN VISA LẺ T3.2026.xlsx")
+    assert d["hang_tieu_de"] is not None
+    assert "VP VFS" in d["cot_khong_nhan_ra"], "cột có tiền mà không rõ THU/CHI phải được nêu ra"
+    assert "VP VFS VP VFS" not in d["cot_khong_nhan_ra"], "nhãn của ô gộp bị lặp hai lần"
+    for c in d["cot_khong_nhan_ra"]:
+        n = c.split()
+        assert n != n[:len(n) // 2] * 2 or len(n) < 2, f"nhãn {c!r} lặp chính nó"
