@@ -325,6 +325,29 @@ export default function KhoiKetQuaKinhDoanh() {
     </p>
   ) : null;
 
+  // 17/9/2026 · SỐ VÀO BẰNG CỬA ĐÓNG SỐ BÙ. Chủ tịch chốt "vì đây là nhập dữ liệu cũ lên hệ thống
+  // nên em để Chủ tịch ký thay toàn bộ các phòng ban luôn, khi nào vào vận hành chính thức thì
+  // phòng nào ký phòng đó". Đây KHÔNG phải phần còn thiếu — số đã đủ — nên nó là một câu riêng,
+  // không nhét vào dòng "còn thiếu" ở trên.
+  //
+  // Vì sao vẫn phải in ra: 456 chuyến T1–T5 vào hệ bằng cách nhập lại tệp Excel của Điều hành rồi
+  // Chủ tịch ký thay, chưa đi qua vòng duyệt của Điều hành và Kế toán. Nhìn trên biểu đồ thì cột
+  // tháng 3 của số bù và cột tháng 8 của số vận hành thật giống hệt nhau, mà mức tin vào hai cột
+  // ấy khác nhau. Không in thì người đọc không có cách nào biết.
+  //
+  // KHÔNG in khi bằng 0, cùng lý do với dòng "còn thiếu": một dòng lặp lại mỗi lần mở màn hình sẽ
+  // dạy người ta thôi đọc nó.
+  const bu = d.ky_bu || {};
+  const so_bu = Number(bu.so_chuyen || 0);
+  const cau_bu = so_bu > 0 ? (
+    <p className="muted v14-ghi kqkd-thieu">
+      Trong đó <b>{so_bu}/{Number(bu.tren_tong_du_so || 0)} chuyến</b> vào bằng <b>cửa đóng số
+      bù</b> của kho quyết toán cũ — nhập lại từ tệp Excel của Điều hành, <b>{bu.ai_ky}</b>, mốc kỳ
+      lấy theo ngày kết thúc chuyến. Chưa qua vòng duyệt của Điều hành và Kế toán như chuyến vận
+      hành.
+    </p>
+  ) : null;
+
   const phu_hinh = kind === "nam"
     ? `Cả 12 tháng ${nam}`
     : `12 tháng ${nam} · tô đậm ${tenKyDai(d.ky).toLowerCase()}`;
@@ -390,6 +413,7 @@ export default function KhoiKetQuaKinhDoanh() {
       </div>
 
       {cau_thieu}
+      {cau_bu}
 
       <p className="muted v14-ghi">
         Doanh thu và lợi nhuận lấy <b>thực tế từ chuyến Điều hành đã đóng số</b>, phạm vi{" "}

@@ -40,6 +40,7 @@ from app.services import ben_ban_tour as BBT
 from app.services import cong_no_truong_doan as TLCN
 from app.services import de_nghi_lanh_su as DNLS
 from app.services import dich_vu_le_thang as DVL
+from app.services import dong_so_kho_cu as DSK
 from app.services import ghi_mot_lan as GML
 from app.services import go_lo_kho_cu as GLK
 from app.services import khop_nguoi_ban as KNB
@@ -1677,6 +1678,77 @@ def gan_lai_phieu(v: GanLaiVao, u: User = Depends(require_roles(*GAN_NB)),
     if v.xac_nhan:
         R.audit(db, u.username, u.role, "gan_lai_phieu_kho_cu", f"nguon:{GLK.NGUON}",
                 after={"da_doi": kq["da_doi"], "tien": kq.get("tien_ve_nguoi_that")})
+        db.commit()
+    return kq
+
+
+# =================================================================================================
+# ĐÓNG SỐ BÙ cho kho quyết toán cũ — Chủ tịch ký thay các phòng ban (chốt 17/9/2026)
+#
+#   "Vì đây là nhập dữ liệu cũ lên hệ thống nên em để Chủ tịch ký thay toàn bộ các phòng ban luôn.
+#    Khi nào vào vận hành chính thức thì phòng nào ký phòng đó, đúng vai trò thiết lập."
+#
+# Cửa nạp kho cũ ghi dòng khách và dòng chi nhưng CỐ Ý không đóng số — nên màn hình Chủ tịch rỗng
+# T1–T5 trong khi ≈36 tỷ đã nằm trong hệ. Cửa này gỡ đúng chỗ tắc ấy, cho đúng một lô.
+#
+# QUYỀN KÝ: chỉ `chutich`. HẸP HƠN mọi cửa kho cũ khác ở trên, và đó là chủ ý — ba cửa kia sắp xếp
+# lại dữ liệu, cửa này GHI TIỀN VÀO BÁO CÁO KẾT QUẢ KINH DOANH thay cho chữ ký của Điều hành và Kế
+# toán. Lời chốt ở trên nêu đích danh một người; mở rộng ra "tgd, cntt, tp_dh" cho tiện là tự ý nới
+# một chữ ký, và CNTT thì không có việc gì phải ký một con số lãi lỗ.
+KY_DONG_BU = ("chutich",)
+
+# Cửa XEM mở rộng hơn cửa ký: Điều hành và Kế toán phải soi được lô này trước và sau khi Chủ tịch
+# ký — họ là người sẽ phải sống với con số — nhưng không ai trong số họ bấm được nút.
+XEM_DONG_BU = KY_DONG_BU + ("tgd", "tp_dh", "ketoan", "cntt")
+
+
+@router.get("/kho-cu/dong-so-bu/xem")
+def xem_dong_so_bu(u: User = Depends(require_roles(*XEM_DONG_BU)), db: Session = Depends(get_db)):
+    """XEM TRƯỚC – không ghi một dòng nào.
+
+    Trả về đủ ba thứ người ký cần biết TRƯỚC khi ký: đóng bao nhiêu chuyến, tiền rơi vào THÁNG NÀO
+    (`theo_ky`), và những chuyến không đóng được thì vì sao (`vi_sao_khong_dong`).
+    """
+    return DSK.xem(db)
+
+
+class DongSoBuVao(BaseModel):
+    xac_nhan: bool = False
+
+
+@router.post("/kho-cu/dong-so-bu")
+def chay_dong_so_bu(v: DongSoBuVao, u: User = Depends(require_roles(*KY_DONG_BU)),
+                    db: Session = Depends(get_db)):
+    """ĐÓNG SỐ THẬT. `xac_nhan` mặc định False nên gọi nhầm KHÔNG ghi gì.
+
+    Nhật ký ghi TRƯỚC khi commit, và ghi cả số tiền theo từng kỳ — vì câu sẽ phải trả lời sau này
+    không phải "ai bấm nút" mà là "ai đã ký cho 36 tỷ rơi vào những tháng nào".
+    """
+    kq = DSK.chay(db, boi=u.username, xac_nhan=v.xac_nhan)
+    if v.xac_nhan:
+        R.audit(db, u.username, u.role, "dong_so_bu_kho_cu_h1_2026", f"nguon:{DSK.NGUON}",
+                after={"da_dong": kq["da_dong"],
+                       "tong_doanh_thu": kq.get("tong_doanh_thu"),
+                       "tong_gia_von": kq.get("tong_gia_von"),
+                       "theo_ky": kq.get("theo_ky_da_dong"),
+                       "khong_dong_duoc": kq.get("khong_dong_duoc"),
+                       "ky_thay": "toàn bộ các phòng ban – Chủ tịch chốt 17/9/2026"})
+        db.commit()
+    return kq
+
+
+@router.post("/kho-cu/dong-so-bu/go")
+def go_dong_so_bu(v: DongSoBuVao, u: User = Depends(require_roles(*KY_DONG_BU)),
+                  db: Session = Depends(get_db)):
+    """GỠ lại phần CHÍNH CỬA NÀY đã đóng. Không đụng chuyến Điều hành đã đóng số thật.
+
+    Cùng quyền với cửa ký: không được phép gỡ một chữ ký mà mình không đủ quyền đặt xuống.
+    """
+    kq = DSK.go(db, boi=u.username, xac_nhan=v.xac_nhan)
+    if v.xac_nhan:
+        R.audit(db, u.username, u.role, "go_dong_so_bu_kho_cu", f"nguon:{DSK.NGUON}",
+                after={"da_go": kq["da_go"],
+                       "giu_lai_do_dong_that": kq.get("giu_lai_do_dong_that")})
         db.commit()
     return kq
 
