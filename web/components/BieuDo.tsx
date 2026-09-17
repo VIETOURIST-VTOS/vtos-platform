@@ -423,6 +423,192 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
   );
 }
 
+/* ─────────────────────────── BIỂU ĐỒ ĐƯỜNG (NHIỀU CHUỖI) ───────────────────────────
+   TC-59 · 17/9/2026. Anh Tuấn gửi một bản mẫu "BIẾN ĐỘNG DÒNG TIỀN" — ba đường THU · CHI · TỒN
+   trên cùng một khung — và bảo dựng lại biểu đồ dòng tiền giống nó.
+
+   VÌ SAO ĐƯỜNG Ở ĐÂY, TRONG KHI LUẬT CỦA TỆP NÀY NGHIÊNG VỀ CỘT
+   `BieuDoCot` chọn cột vì dữ liệu VTOS có lỗ hổng: tháng nào chưa ai nộp báo cáo thì tháng ấy
+   trống, và một đường nối liền qua chỗ trống là vẽ ra một giá trị không tồn tại. Lý lẽ ấy vẫn
+   đúng — nên hàm này KHÔNG nối qua chỗ trống: gặp `null` là đường ĐỨT, và điểm ấy không có chấm.
+   Ba chuỗi cùng một khung thì cột không dùng được (ba cột cạnh nhau ở mười ba tuần là ba mươi
+   chín cột, không đọc nổi), còn đường thì so được ngay chuỗi nào đang vượt chuỗi nào.
+
+   NĂM LUẬT Ở ĐẦU TỆP GIỮ NGUYÊN HẾT, và luật 4 (MỘT TRỤC TUNG) là luật khó nhất ở đây: ba chuỗi
+   phải CÙNG ĐƠN VỊ. Bản mẫu của anh Tuấn có số ở cả mép trái lẫn mép phải — `doi_xung` vẽ lại
+   đúng vậy, nhưng hai mép đọc từ CÙNG một mảng `moc`, nên đó là một thang đo in hai lần chứ không
+   phải hai thang đo. Khác thang thì vẫn phải tách làm hai hình.
+
+   MÀU — ĐÃ CHẠY BỘ KIỂM MÙ MÀU, KHÔNG CHỌN BẰNG MẮT
+   Bản mẫu dùng cam (THU) · xanh dương (CHI) · xanh lá (TỒN). Chạy bộ kiểm tách màu trên đúng ba
+   biến của bộ nhận diện VTOS: cặp xanh lá `--vtos-success` và hồng `--vtos-danger` chỉ cách nhau
+   ΔE 2,1 với mắt mù màu lục (deutan) — người ấy KHÔNG phân biệt được đường thu với đường chi, mà
+   đó là hai đường quan trọng nhất hình. Nên bộ ba chốt lại là:
+
+       TỒN  → --vtos-navy      (chuỗi chính, cùng màu với cột của hình cũ)
+       CHI  → --vtos-danger    (tiền rời khỏi tài khoản)
+       THU  → --vtos-warning   (KHÔNG phải vì "cần chú ý" — mà vì xanh lá trượt phép kiểm trên)
+
+   Ba cặp bất kỳ nay cách nhau ít nhất ΔE 14,7 với mọi kiểu mù màu. Ngoài màu, mỗi chuỗi còn có
+   hình chấm riêng và nhãn số ở hai đầu, nên danh tính KHÔNG bao giờ chỉ nằm ở màu.
+
+   VẠCH NGƯỠNG đổi sang màu chữ mờ, nét đứt — khác với `.bd-moc` của biểu đồ cột (vàng). Lý do
+   hẹp và cụ thể: vàng ở hình này đã là đường THU rồi. Một vạch cùng màu với một chuỗi là chỗ
+   người đọc nhìn nhầm vạch thành số. */
+
+export type Duong = {
+  ten: string;
+  /** Lớp màu: "d1" | "d2" | "d3" — khai ở globals.css, lấy từ biến bộ nhận diện. */
+  lop: string;
+  diem: Diem[];
+};
+
+/** Đủ điều kiện vẽ: ÍT NHẤT MỘT chuỗi có từ hai điểm có số (luật 2). */
+export function duVeDuong(ds: Duong[]): boolean {
+  return ds.some((d) => d.diem.filter((p) => p.gt !== null && p.gt !== undefined).length >= 2);
+}
+
+/** Cắt một chuỗi thành các ĐOẠN LIỀN: mỗi đoạn là một dãy điểm liên tiếp CÓ SỐ.
+ *
+ *  Đây là chỗ luật 1 (rỗng khác không) sống trong hình này. Nối hai điểm hai bên một lỗ hổng là
+ *  vẽ ra giá trị của tuần ở giữa — một con số không ai nhập và không ai kiểm được. */
+export function doanLien(diem: Diem[]): { i: number; gt: number }[][] {
+  const ra: { i: number; gt: number }[][] = [];
+  let cur: { i: number; gt: number }[] = [];
+  diem.forEach((p, i) => {
+    if (p.gt === null || p.gt === undefined) { if (cur.length) { ra.push(cur); cur = []; } return; }
+    cur.push({ i, gt: p.gt });
+  });
+  if (cur.length) ra.push(cur);
+  return ra;
+}
+
+export function BieuDoDuong({ ten, phu, ds, nhan, dinh_dang = "tien", moc, chan, ai, cua, cua_ten,
+                             doi_xung = false }: {
+  ten: string; phu?: string; ds: Duong[]; nhan: string[]; dinh_dang?: DinhDang;
+  /** Vạch mốc nằm ngang trên CÙNG một trục (ngưỡng dự phòng chẳng hạn). */
+  moc?: { gt: number; nhan: string } | null;
+  chan?: ReactNode; ai?: string; cua?: string; cua_ten?: string;
+  /** In lại mốc trục ở mép PHẢI. Cùng một mảng `moc`, nên là một thang in hai lần. */
+  doi_xung?: boolean;
+}) {
+  if (!duVeDuong(ds)) {
+    return <BieuDoRong ten={ten} phu={phu} nhan={nhan} ai={ai} cua={cua} cua_ten={cua_ten}
+      vi_sao="Cần ít nhất hai kỳ có số thì mới vẽ được đường — một điểm đứng một mình không so với kỳ nào." />;
+  }
+
+  const giaTri = ds.flatMap((d) => d.diem.map((p) => p.gt)).filter((v): v is number => typeof v === "number");
+  const canMoc = typeof moc?.gt === "number" ? [moc.gt] : [];
+  const mocs = mocTruc(Math.min(...giaTri, ...canMoc, 0), Math.max(...giaTri, ...canMoc, 0));
+  const day = mocs[0];
+  const dinh = mocs[mocs.length - 1];
+  const khoang = dinh - day || 1;
+  /** Đổi một giá trị thành % tính từ ĐÁY khung. */
+  const pct = (v: number) => ((v - day) / khoang) * 100;
+  /** Vị trí ngang của điểm thứ i, tính bằng %. Một điểm duy nhất thì đặt giữa. */
+  const n = nhan.length;
+  const x = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100);
+
+  return (
+    <KhungBieuDo ten={ten} phu={phu} chan={chan}
+      chuGiai={<ChuGiai ds={ds.map((d) => ({ ten: d.ten, lop: d.lop }))} />}>
+      <div className="bd-duong-vung">
+        {/* Cột mốc trục bên TRÁI. Mỗi nhãn đặt TUYỆT ĐỐI ở đúng chiều cao của vạch lưới nó
+            nói về — không xếp đều bằng flex. Xếp đều chỉ trùng khi các mốc cách đều nhau, mà
+            `mocTruc` có thể trả về mốc đầu lệch (khi có giá trị âm); lúc ấy nhãn và vạch lệch
+            nhau, và người đọc tin nhãn. */}
+        <div className="bd-duong-truc" aria-hidden="true">
+          {mocs.map((m) => (
+            <span key={m} className="bd-truc-nhan" style={{ bottom: `${pct(m)}%` }}>
+              {gonSo(m, dinh_dang)}
+            </span>
+          ))}
+        </div>
+
+        <div className="bd-duong-khung">
+          {/* Lưới ngang — một vạch cho mỗi mốc, kể cả vạch 0. */}
+          {mocs.map((m) => (
+            <div key={m} className="bd-luoi" style={{ bottom: `${pct(m)}%` }} />
+          ))}
+          {/* Vạch ngưỡng: CÙNG trục với ba đường, không phải trục thứ hai. */}
+          {/* KHÔNG in nhãn ngay trên vạch: ngưỡng thường nằm sát đáy, đúng chỗ nhãn số của điểm
+              đầu và điểm cuối các chuỗi đứng, và ba mẩu chữ chồng lên nhau ở góc trái. Tên và giá
+              trị của vạch nói ở câu chân hình — cùng lối `BieuDoCot` đã dùng. */}
+          {/* TC-60 · GIÁ TRỊ CỦA VẠCH NẰM Ở NHÃN RÊ CHUỘT, không ở một mẩu chữ trên hình.
+              Câu chân hình đã bỏ theo chốt 17/9, nên nếu vạch cũng không mang số thì trên cả màn
+              hình không còn chỗ nào nói ngưỡng dự phòng là bao nhiêu — mất một con số khác hẳn
+              với gọn một câu chữ. */}
+          {typeof moc?.gt === "number" && moc.gt >= day && moc.gt <= dinh && (
+            <div className="bd-nguong" style={{ bottom: `${pct(moc.gt)}%` }}
+              title={`${moc.nhan}: ${daySo(moc.gt, dinh_dang)}`} />
+          )}
+
+          {/* Các đường. SVG kéo giãn theo khung (preserveAspectRatio none) nên nét vẽ dùng
+              vector-effect để bề dày không bị méo theo. */}
+          <svg className="bd-duong-svg" viewBox="0 0 100 100" preserveAspectRatio="none"
+               aria-hidden="true">
+            {ds.map((d) => doanLien(d.diem).map((doan, k) => (
+              doan.length < 2 ? null : (
+                <polyline key={d.ten + "-" + k} className={"bd-net " + d.lop}
+                  points={doan.map((p) => `${x(p.i)},${100 - pct(p.gt)}`).join(" ")}
+                  vectorEffect="non-scaling-stroke" />
+              )
+            )))}
+          </svg>
+
+          {/* Chấm: div tuyệt đối chứ không phải hình trong SVG — SVG bị kéo giãn nên hình tròn
+              trong đó sẽ thành bầu dục. */}
+          {ds.map((d) => d.diem.map((p, i) => (
+            p.gt === null || p.gt === undefined ? null : (
+              <span key={d.ten + "-" + i} className={"bd-cham " + d.lop}
+                style={{ left: `${x(i)}%`, bottom: `${pct(p.gt)}%` }}
+                title={`${d.ten} · ${nhan[i]}: ${daySo(p.gt, dinh_dang)}`} />
+            )
+          )))}
+
+          {/* NHÃN SỐ CÓ CHỌN LỌC: chỉ đầu và cuối mỗi chuỗi. Ghi số lên cả ba mươi chín điểm thì
+              không đọc được điểm nào — và người đọc cần biết "bắt đầu từ đâu, kết thúc ở đâu",
+              phần giữa là việc của hình. */}
+          {ds.map((d) => {
+            const co = d.diem.map((p, i) => ({ p, i })).filter((o) => o.p.gt !== null && o.p.gt !== undefined);
+            if (!co.length) return null;
+            const canhan = co.length === 1 ? [{ o: co[0], cuoi: false }]
+              : [{ o: co[0], cuoi: false }, { o: co[co.length - 1], cuoi: true }];
+            /* Nhãn đầu MỞ SANG PHẢI, nhãn cuối MỞ SANG TRÁI — không căn giữa điểm. Căn giữa thì
+               nhãn của điểm đầu thò ra ngoài mép trái khung, và nhãn của điểm cuối đè lên cột mốc
+               trục bên phải. Cả hai chỉ lộ ra khi dựng ảnh. */
+            return canhan.map(({ o, cuoi }) => (
+              <span key={d.ten + "-nhan-" + o.i}
+                className={"bd-duong-nhan " + d.lop + (cuoi ? " cuoi" : "")}
+                style={{ left: `${x(o.i)}%`, bottom: `${pct(o.p.gt as number)}%` }}>
+                {gonSo(o.p.gt as number, dinh_dang)}
+              </span>
+            ));
+          })}
+        </div>
+
+        {/* Cột mốc trục bên PHẢI — cùng mảng `mocs`, nên cùng một thang đo. */}
+        {doi_xung && (
+          <div className="bd-duong-truc bd-truc-phai" aria-hidden="true">
+            {mocs.map((m) => (
+              <span key={m} className="bd-truc-nhan" style={{ bottom: `${pct(m)}%` }}>
+                {gonSo(m, dinh_dang)}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Hàng nhãn trục ngang nằm TRONG cùng lưới, ở đúng cột của vùng vẽ — không phải một
+            hàng riêng chạy hết bề ngang hình. Chạy hết bề ngang thì nhãn lệch sang trái đúng
+            bằng bề rộng cột mốc trục, và mười ba nhãn đều lệch khỏi mười ba điểm của chúng. */}
+        <div className="bd-duong-nhanx" style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}>
+          {nhan.map((t, i) => <span key={t + i}>{t}</span>)}
+        </div>
+      </div>
+    </KhungBieuDo>
+  );
+}
+
 /* ─────────────────────────── BIỂU ĐỒ THANH NGANG ─────────────────────────── */
 
 export type Thanh = {

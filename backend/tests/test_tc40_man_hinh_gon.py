@@ -200,7 +200,13 @@ def test_khoi_06_dong_tien_nay_la_bieu_do_khong_con_bon_o_canh_bao():
         "Xoá luôn hàm dựng ô ấy: một thành phần không ai gọi vẫn qua được mọi phép kiểm, và vòng "
         "sau có người dựng lại bốn ô chỉ vì thấy hàm còn nằm đó."
     )
-    assert "function DuBao13Tuan" in t, "Phải có cái THAY THẾ — biểu đồ 13 tuần, không phải khoảng trống."
+    # TC-59 (chiều cùng ngày) tách `DuBao13Tuan` làm hai — `Hinh13Tuan` (ba đường THU · CHI · TỒN)
+    # và `BonMocDuBao` (bốn con số) — để gộp dải chú thích vào GIỮA chúng, trong cùng một khung.
+    # Phép thử canh CÁI THAY THẾ CÓ THẬT, nên nó đi theo tên mới chứ không giữ tên cũ: giữ tên cũ
+    # là canh một cái tên, còn điều phải canh là "chỗ này không được thành khoảng trống".
+    assert "function Hinh13Tuan" in t and "function BonMocDuBao" in t, (
+        "Phải có cái THAY THẾ — biểu đồ 13 tuần và bốn con số, không phải khoảng trống."
+    )
     assert 'className="dt-moc"' in t, "Bốn con số của phép cân (đầu kỳ · thu · chi · cuối tuần 13)."
 
 
