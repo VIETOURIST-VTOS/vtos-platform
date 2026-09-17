@@ -115,6 +115,30 @@ def build(db: Session, u: User) -> dict:
         # đáy mới là câu người điều hành hỏi — xem chú thích `day_thap_nhat` ở services/finance.py.
         fc = FIN.forecast_13w(db); k["du_bao_canh_bao"] = len(fc["alerts"])
         k["so_du_thap_nhat"] = fc["thap_nhat"]
+        # TC-57 · DÒNG TIỀN NAY LÀ MỘT BIỂU ĐỒ, KHÔNG PHẢI BỐN Ô "CHƯA CÓ NGUỒN".
+        #
+        #   "em xoa bo cai nay khoi man hinh chu tich, thay vao do la bieu do va so lieu phan tich
+        #    dong tien ngang o duoi PHAI THU VA PHAI TRA"      — anh Tuấn, 17/9/2026
+        #
+        # Máy chủ dọn sẵn đúng những gì màn hình vẽ, KHÔNG gửi cả `fc` sang: gói đầy đủ có 13 tuần
+        # × mọi khoản thu chi theo mã, nặng hơn cần thiết nhiều lần và mở đường cho màn hình tự
+        # cộng lại một con số máy chủ đã cộng rồi — đúng cái ranh giới 09/9 cấm.
+        #
+        # `tong_thu` và `tong_chi` cộng ở ĐÂY chứ không để màn hình cộng, vì lý do trên. Bốn con số
+        # (đầu kỳ · dự kiến thu · dự kiến chi · cuối tuần 13) là bốn con số của cùng MỘT phép cân:
+        # đầu kỳ + thu − chi = cuối kỳ. Để màn hình tự cộng là mở đường cho bốn con số không còn
+        # cân nhau mà chẳng ai biết.
+        # `out["sections"]` chứ không phải `sec`: bí danh `sec` chỉ được đặt ở phần "theo phòng" bên
+        # dưới, còn khối này nằm trong nhánh vai tài chính ở trên. Cùng một cuốn sổ, khác cái tên.
+        out["sections"]["du_bao_13_tuan"] = {
+            "dau_ky": fc["opening"],
+            "tong_thu": sum(float(w.get("total_in") or 0) for w in fc["weeks"]),
+            "tong_chi": sum(float(w.get("total_out") or 0) for w in fc["weeks"]),
+            "cuoi_ky": fc["closing"],
+            "nguong": fc["min_cash"],
+            "tuan": [{"tuan": w["week"], "tu": w["from"], "den": w["to"], "so_du": w["closing"]}
+                     for w in fc["weeks"]],
+        }
         pl = RP.income_statement(db, p); k["ln_ke_toan_thang"] = dict((r[0], r[2]) for r in pl["rows"])["50"]
         # TC-41 (16/9/2026) – KẾ HOẠCH THÁNG, cửa nhập vừa mở ở /ke-hoach-thang.
         #

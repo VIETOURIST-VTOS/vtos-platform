@@ -261,8 +261,10 @@ def test_khong_co_viec_nao_thi_ba_muc_deu_bang_khong(db):
 # SỬA 16/9/2026 (TC-44): sáu Ô vẫn là sáu CON SỐ, nhưng hai con số đầu nay nằm chung MỘT khối
 # `<KhoiKetQuaKinhDoanh` với một bộ chọn kỳ dùng chung (bản vẽ anh Tuấn gửi chiều cùng ngày).
 # Đổi CÁCH BÀY, không đổi danh sách — nên phép thử vẫn canh đúng điều cũ: đủ mặt và đúng thứ tự.
-SAU_O_KHOI = ["<KhoiKetQuaKinhDoanh", "<KhoiDongTien",
-              "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiTonDongMuc"]
+# SỬA 17/9/2026 (TC-57): Dòng tiền xuống SAU hai khối công nợ và nằm ngang hết bề ngang — anh Tuấn
+# chốt. Danh sách vẫn đủ sáu con số, chỉ đổi thứ tự; xem THU_TU_BAN_VE ở test_tc31 cho cả hai vế.
+SAU_O_KHOI = ["<KhoiKetQuaKinhDoanh",
+              "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiDongTien", "<KhoiTonDongMuc"]
 
 
 def test_du_sau_o_lon_va_dung_thu_tu_anh_Tuan_ke():

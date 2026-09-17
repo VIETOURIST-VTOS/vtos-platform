@@ -151,18 +151,26 @@ function Dash() {
         theo mức độ, đọc ngang, không có trục nào để so với hai bảng hạn. Nhét nó vào ô thứ tư chỉ
         để lưới cho chẵn là lấy hình dáng quyết định nội dung. */}
     <div className="mh01-sau-o">
-      {/* TC-48 · đáy của dự báo 13 tuần. Máy chủ tính (`kpis.so_du_thap_nhat`), màn hình chỉ bày —
-          ranh giới 09/9. Vai nào không được xem khối dòng tiền thì `kpis` không mang trường này về,
-          nên không có nhánh ẩn/hiện nào ở đây: cắt hàng nằm trong truy vấn, đúng luật SEC-02.
-          Khối này đứng ĐẦU và lớp CSS trỏ tới nó bằng `:first-child` — đổi thứ tự ba khối dưới đây
-          là đổi luôn bố cục, nên thứ tự ở đây là một phần của thiết kế, không phải ngẫu nhiên. */}
-      <KhoiDongTien day={d.kpis?.so_du_thap_nhat} />
       <KhoiPhaiThu ds={sec.phai_thu_theo_han} chua_co_han={sec.phai_thu_chua_co_han}
         vi_sao={sec.phai_thu_vi_sao} bieu_do={bd.phai_thu} />
       {/* TC-45: bỏ `qua_han` — quá hạn nay là nhóm đầu trong bảy nhóm, không còn ô riêng. */}
       <KhoiPhaiTra ds={sec.phai_tra_theo_han}
         chua_co_han={sec.phai_tra_chua_co_han} vi_sao={sec.phai_tra_vi_sao} bieu_do={bd.phai_tra} />
     </div>
+
+    {/* ══ TC-57 · DÒNG TIỀN XUỐNG DƯỚI, NẰM NGANG, VÀ LÀ MỘT BIỂU ĐỒ ═══════════════════════════
+        "em xoa bo cai nay khoi man hinh chu tich, thay vao do la bieu do va so lieu phan tich
+         dong tien ngang o duoi PHAI THU VA PHAI TRA"          — anh Tuấn, 17/9/2026
+
+        Khối này trước đứng ĐẦU hàng ba khối tiền. Nay xuống dưới và rộng hết bề ngang, vì hai lẽ:
+        biểu đồ 13 tuần cần chỗ (13 cột trong một phần ba bề ngang là mười ba vạch không đọc nổi),
+        và Phải thu · Phải trả đứng riêng một hàng thì so hàng ngang với nhau dễ hơn — chúng dùng
+        chung một bộ bảy mốc hạn, còn dòng tiền thì không chung trục với chúng.
+
+        `d.kpis?.so_du_thap_nhat` và `sec.du_bao_13_tuan` đều do MÁY CHỦ tính sẵn — ranh giới 09/9,
+        màn hình chỉ bày. Vai nào không được xem khối dòng tiền thì máy chủ không gửi hai trường
+        này, nên không có nhánh ẩn/hiện nào ở đây: cắt hàng nằm trong truy vấn (SEC-02). */}
+    <KhoiDongTien day={d.kpis?.so_du_thap_nhat} du_bao={sec.du_bao_13_tuan} />
 
     <KhoiTonDongMuc d={sec.ton_dong_theo_muc} />
 

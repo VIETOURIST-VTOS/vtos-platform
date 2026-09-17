@@ -45,18 +45,9 @@ const RONG = (vi_sao?: string) => (
   <span className="muted" title={vi_sao || "Chưa có số — khác hẳn với bằng 0"}>Chưa có nguồn</span>
 );
 
-function O({ o }: { o: any }) {
-  const co = o.gia_tri !== null && o.gia_tri !== undefined && o.gia_tri !== "";
-  const hien = !co ? null : o.kieu === "ngay" ? fmtD(String(o.gia_tri)) : vnd(o.gia_tri);
-  return (
-    <div className={"o-cb" + (co ? " red" : "")}>
-      <b>{co ? hien : <span className="muted" style={{ fontSize: 15 }}>Chưa có nguồn</span>}</b>
-      <span>{o.nhan}</span>
-      {o.vi_sao && <span className="muted" style={{ fontSize: 11 }}>{o.vi_sao}</span>}
-      {o.bo_phan && <span className="muted" style={{ fontSize: 11 }}>Bộ phận nối nguồn: {o.bo_phan}</span>}
-    </div>
-  );
-}
+/* TC-57 · Ô CẢNH BÁO `O` ĐÃ GỠ cùng với bốn ô dùng nó (anh Tuấn chốt 17/9/2026 — xem chú thích
+   tại chỗ gỡ, trong thân khối). Xoá luôn hàm thay vì để lại: một thành phần không ai gọi vẫn qua
+   được mọi phép kiểm, và vòng sau có người dựng lại bốn ô ấy chỉ vì thấy hàm còn nằm đó. */
 
 /** TC-35 · BIỂU ĐỒ DÒNG TIỀN THUẦN QUA BỐN MỐC.
  *
@@ -217,7 +208,56 @@ function vietouristMe(ds: DonViChon[]): DonViChon | null {
   return ds.find((c) => (c.code || "").trim().toUpperCase() === "VTD") || ds[0] || null;
 }
 
-export default function KhoiDongTien({ day }: { day?: any }) {
+/** TC-57 · BIỂU ĐỒ 13 TUẦN + BỐN CON SỐ CỦA CÙNG MỘT PHÉP CÂN.
+ *
+ *  Thay cho bốn ô "Chưa có nguồn" mà anh Tuấn bảo bỏ ngày 17/9/2026.
+ *
+ *  BỐN CON SỐ NÀY LÀ MỘT PHÉP CÂN, KHÔNG PHẢI BỐN Ô RỜI: đầu kỳ + dự kiến thu − dự kiến chi =
+ *  cuối tuần 13. Máy chủ cộng cả bốn (`sections.du_bao_13_tuan`) chứ không để màn hình cộng — để
+ *  màn hình tự cộng là mở đường cho bốn con số không còn cân nhau mà chẳng ai biết. Đó cũng là
+ *  ranh giới 09/9: máy chủ tính, màn hình bày.
+ *
+ *  RỖNG KHÁC KHÔNG, ở đây cũng vậy: chưa có dự báo thì trả `null` — không vẽ một khung 13 cột
+ *  bằng 0, vì một hàng cột dí sát đáy đọc ra là "sắp hết tiền" chứ không phải "chưa có số".
+ */
+function DuBao13Tuan({ d }: { d?: any }) {
+  const tuan: any[] = d?.tuan || [];
+  if (!tuan.length) return null;
+  const diem: Diem[] = tuan.map((w) => ({
+    nhan: `T${w.tuan}`,
+    gt: w.so_du === null || w.so_du === undefined ? null : Number(w.so_du),
+  }));
+  const o = (ten: string, gt: any, dau = "") => (
+    <div className="dt-moc-o">
+      <b>{gt === null || gt === undefined ? "—" : dau + vnd(Math.abs(Number(gt)))}</b>
+      <small>{ten}</small>
+    </div>
+  );
+  return (
+    <div className="dt-dubao">
+      {/* Ngưỡng dự phòng là một ĐƯỜNG trên cùng trục, không phải một con số ghi bên cạnh: mắt đọc
+          "tuần nào chạm ngưỡng" bằng cách nhìn cột nào thấp hơn đường, không bằng cách so từng con
+          số với một con số nhớ trong đầu. `moc` chỉ vẽ khi máy chủ có ngưỡng — không bịa. */}
+      <BieuDoCot ten="Số dư cuối tuần" phu="dự báo 13 tuần" diem={diem} dinh_dang="tien"
+        moc={typeof d?.nguong === "number" ? { gt: d.nguong, nhan: "ngưỡng dự phòng" } : null}
+        ai="Kế toán" cua="/finance?tab=forecast" cua_ten="Cửa nhập dự báo 13 tuần" />
+      {/* Bốn mốc đứng SAU biểu đồ: hình trả lời "có tuần nào hụt không", bốn số trả lời "vì sao".
+          Đảo thứ tự là bắt người đọc cộng trừ trước khi biết mình có cần cộng trừ hay không. */}
+      <div className="dt-moc">
+        {o("Tiền đầu kỳ", d?.dau_ky)}
+        {o("Dự kiến thu", d?.tong_thu, "+")}
+        {o("Dự kiến chi", d?.tong_chi, "−")}
+        {o("Cuối tuần 13", d?.cuoi_ky)}
+      </div>
+      <p className="dt-dubao-chan">
+        Bốn con số là một phép cân: <b>đầu kỳ + thu − chi = cuối tuần 13</b>. Dựng từ booking còn
+        phải thu, đề nghị chi, lịch vay và bảng kế hoạch thu–chi do <b>Kế toán</b> nhập.
+      </p>
+    </div>
+  );
+}
+
+export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any }) {
   const { toast } = useShell();
   const [pn, setPn] = useState<number | null>(null);
   const [k, setK] = useState<any>(null);
@@ -307,11 +347,22 @@ export default function KhoiDongTien({ day }: { day?: any }) {
         <Link className="the-cua" href="/dong-tien/nguon">Nguyên nhân · bộ phận · cửa nhập →</Link>
       </p>
 
-      {/* TC-40 · BỐN Ô CẢNH BÁO GIỮ NGUYÊN — anh Tuấn chốt 15/9/2026: "số 6 dòng tiền em giữ
-          nguyên". Em có đề xuất gỡ bốn ô này (chúng đang ghi "Chưa có nguồn" và lặp lại dòng tóm
-          tắt ngay trên), anh Tuấn không đồng ý và khối 06 giữ đúng như cũ. Ghi lại để vòng sau
-          không ai gỡ chúng đi lần nữa với cùng một lý do. */}
-      <div className="bon-o">{(k.canh_bao || []).map((o: any) => <O key={o.ma} o={o} />)}</div>
+      {/* ═══ TC-57 · BỐN Ô CẢNH BÁO ĐÃ GỠ, THAY BẰNG BIỂU ĐỒ 13 TUẦN ═══════════════════════════
+          "em xoa bo cai nay khoi man hinh chu tich, thay vao do la bieu do va so lieu phan tich
+           dong tien ngang o duoi PHAI THU VA PHAI TRA"        — anh Tuấn, 17/9/2026
+
+          LUẬT TC-40 BỊ ĐẢO, VÀ GHI LẠI CẢ HAI VẾ. Ngày 15/9/2026 em đề xuất gỡ đúng bốn ô này —
+          chúng đều ghi "Chưa có nguồn" và lặp lại dòng tóm tắt ngay trên — và anh Tuấn KHÔNG đồng
+          ý: "số 6 dòng tiền em giữ nguyên". Em đã ghi vào đây để vòng sau không ai gỡ chúng.
+
+          Hai ngày sau anh Tuấn mở trang, chụp đúng chỗ ấy và bảo bỏ. Điều đổi giữa hai lần không
+          phải ý thích: lần trước bốn ô ấy là thứ DUY NHẤT nói về dòng tiền ngoài một dòng tóm tắt,
+          nên gỡ đi là còn lại một khoảng trống. Lần này chúng được THAY bằng một biểu đồ 13 tuần
+          và bốn con số của cùng một phép cân — có cái thay thế thì mới gỡ được.
+
+          Ghi lại cả hai vế thay vì xoá chú thích cũ: một luật bị đảo mà không để dấu vết thì vòng
+          sau có người khôi phục nó, tưởng đang vá một thiếu sót. */}
+      <DuBao13Tuan d={du_bao} />
 
       {/* ═══ TC-35 · BIỂU ĐỒ TRƯỚC, BẢNG SAU NÚT ═══════════════════════════════════════════════
           Anh Tuấn chỉ ra 15/9/2026: bảng 14 dòng × 4 mốc "không cần chi tiết ra màn hình, đưa vào
