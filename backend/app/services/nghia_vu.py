@@ -141,26 +141,51 @@ def _nap_de_nghi_chi(db: Session, dem: list[int], hom_nay: date, cham: set) -> i
 
     NGÀY ĐẾN HẠN lấy từ cột `payment_requests.ngay_den_han` – cửa nhập do VPM-17 dựng, người lập đề
     nghị hoặc Kế toán gõ vào. Gõ rồi thì khoản ấy rời rổ "Chưa đủ dữ liệu dự báo" và xếp vào đúng cột
-    của bảng bốn mốc.
+    của bảng bốn mốc. Cột ấy là NGÀY CAM KẾT: một người đã ký vào nó.
 
-    CHƯA GÕ THÌ VẪN ĐỂ RỖNG, và vẫn KHÔNG đoán một ngày thay người dùng (ví dụ "7 ngày sau ngày
-    duyệt"). Một ngày bịa ra sẽ xếp khoản tiền vào đúng một cột, trông như một con số đã biết, và
-    không ai còn nhớ nó là số đoán. Thà để nó nằm ở rổ chưa đủ dữ liệu — đếm được, nhìn thấy, và có
-    một danh sách việc (`GET /payment-requests/thieu-ngay-den-han`) dẫn người ta tới đúng chỗ phải gõ.
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    TC-58 (17/9/2026) · MỐC SUY RA CHO CHỨNG TỪ VIETRIP — VÀ VÌ SAO NÓ KHÔNG PHẢI NGÀY CAM KẾT
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    Vietrip KHÔNG có ô ngày đến hạn cho đề nghị chi NCC. 4.815 chứng từ chi chảy từ Vietrip về đều
+    mang `ngay_den_han` rỗng, nên trước vòng này toàn bộ khối Phải trả rơi vào ô "Chưa có hạn" và
+    bảy ô hạn đứng trống — màn hình Chủ tịch không đọc ra được câu "tuần này phải trả bao nhiêu".
+
+    Anh Tuấn chốt 17/9/2026: "sau khi tour về gọi là quá hạn, và trước khi đi tour cũng theo mốc
+    thời gian set của VTOS". Nên mốc suy ra là NGÀY KẾT THÚC TOUR: tour đã về mà chưa trả NCC thì
+    đó là quá hạn, đúng chữ anh dùng.
+
+    VÀ NÓ ĐI VÀO `ngay_du_kien_tra`, KHÔNG vào `ngay_cam_ket`. Lý lẽ cũ của tệp này — "không đoán
+    một ngày thay người dùng" — vẫn đứng nguyên ở chỗ nó sinh ra để đứng: cột cam kết là nơi ghi
+    ngày ĐÃ CÓ NGƯỜI KÝ, và không ai ký ngày kết thúc tour với nhà cung cấp cả. Ghi mốc suy ra vào
+    cột ấy là lặng lẽ xoá mất khả năng trả lời "khoản này quá hạn theo cam kết hay theo suy đoán".
+    Hai cột tách ra từ đầu chính là để có chỗ cho một mốc như thế này mà không nói dối.
+
+    Chứng từ nào Kế toán đã gõ ngày thật thì ngày gõ THẮNG mốc suy ra, ở cả hai cột.
     """
     n = 0
+    tours = {t.id: t for t in db.execute(select(Tour)).scalars()}
+    n_suy_ra = 0
     for pr in db.execute(select(PaymentRequest).where(
             PaymentRequest.status.in_(PR_CHUA_CHI))).scalars():
         nhom = NHOM_THEO_PR.get(pr.category, "van_hanh_khac")
         tong = float(pr.amount or 0)
+        t = tours.get(pr.tour_id) if pr.tour_id else None
+        du_kien = pr.ngay_den_han
+        ghi_chu = ""
+        if du_kien is None and t is not None and t.end_date:
+            du_kien = t.end_date
+            ghi_chu = ("Mốc SUY RA theo ngày kết thúc tour (chốt 17/9/2026) — Vietrip không có ô "
+                       "ngày đến hạn. Kế toán gõ ngày thật vào thì ngày gõ thay mốc này.")
+            n_suy_ra += 1
         _dat(db, {
             "nhom": nhom, "nguon_bang": "payment_requests", "nguon_id": pr.id, "nguon_ma": pr.code,
             "company_id": pr.company_id, "tour_id": pr.tour_id,
             "doi_tuong": pr.supplier_name, "noi_dung": pr.description,
             "tong_nghia_vu": tong, "da_tra": None,
-            "ngay_cam_ket": pr.ngay_den_han, "ngay_du_kien_tra": pr.ngay_den_han,
+            "ngay_cam_ket": pr.ngay_den_han, "ngay_du_kien_tra": du_kien,
             "trang_thai": ("da_duyet" if pr.status in PR_DA_DUYET_CHUA_CHUYEN
-                           else _trang_thai(tong, pr.ngay_den_han, hom_nay)),
+                           else _trang_thai(tong, du_kien, hom_nay)),
+            "ghi_chu": ghi_chu,
         }, dem, cham)
         n += 1
     return n
@@ -261,6 +286,24 @@ def _nap_booking(db: Session, dem: list[int], hom_nay: date, bo_qua: set[int], c
     Ngày ở đây là ƯỚC, không phải cam kết – nên chỉ điền `ngay_du_kien_tra`, để `ngay_cam_ket` rỗng.
     Tab "Nghĩa vụ đến hạn" (dùng ngày cam kết) sẽ không thấy những khoản này, và đúng ra là không nên
     thấy: không ai ký một ngày nào cho chúng cả.
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    TC-58 (17/9/2026) · BỎ PHÉP KÉO NGÀY QUÁ KHỨ VỀ HÔM NAY — GHI LẠI CẢ HAI VẾ
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    Vế cũ: `uoc = max(hom_nay, khởi_hành − 7)`. Lý lẽ: ngày Kế toán ĐỊNH THU THẬT không thể nằm
+    trong quá khứ, nên kéo về hôm nay cho bảng dự báo khỏi có cột âm thời gian.
+
+    Cái giá của phép kéo ấy chỉ lộ ra khi sổ có số thật: một khách đã đi tour tháng 6 mà còn nợ thì
+    D-7 của nó là tháng 6, bị kéo về hôm nay, và khoản ấy nằm ở ô "1 tuần" — đọc ra là "sắp tới hạn"
+    trong khi sự thật là "đi tour xong hai tháng rồi vẫn chưa trả". Ô "Quá hạn" phía Phải thu vì thế
+    KHÔNG BAO GIỜ có số, dù đó là ô cần gọi điện nhất.
+
+    Anh Tuấn 17/9 gửi bản hướng dẫn tự viết, định nghĩa nhóm 1 nguyên văn: "Quá hạn — đã qua hoặc
+    hôm nay — Gọi ngay, khách đi tour mà chưa trả đủ". Nên ngày giữ NGUYÊN giá trị thật của nó.
+
+    Bảng dự báo không mất gì: `ba_ro()` đã có sẵn rổ "qua_han" dựng ra đúng để hiện các khoản ngày
+    quá khứ RIÊNG mà vẫn cộng vào nhu cầu tiền ("Không tự ẩn" — ghi ở chính hàm ấy). Phép kéo cũ
+    thực ra đang VÔ HIỆU HOÁ cái rổ đó.
     """
     n = 0
     tours = {t.id: t for t in db.execute(select(Tour)).scalars()}
@@ -273,7 +316,7 @@ def _nap_booking(db: Session, dem: list[int], hom_nay: date, bo_qua: set[int], c
         t = tours.get(b.tour_id)
         if t is not None and t.status in ("huy", "khoa", "kt_xac_nhan", "da_dong_so"):
             continue
-        uoc = (max(hom_nay, t.start_date - timedelta(days=D_TRUOC_KHOI_HANH))
+        uoc = (t.start_date - timedelta(days=D_TRUOC_KHOI_HANH)
                if t is not None and t.start_date else None)
         _dat(db, {
             "nhom": "thu_khach", "nguon_bang": "bookings", "nguon_id": b.id, "nguon_ma": b.code,
@@ -281,7 +324,11 @@ def _nap_booking(db: Session, dem: list[int], hom_nay: date, bo_qua: set[int], c
             "doi_tuong": b.customer_name, "noi_dung": t.name if t else "",
             "tong_nghia_vu": float((b.amount or 0) - (b.discount or 0)), "da_tra": float(b.paid or 0),
             "ngay_cam_ket": None, "ngay_du_kien_tra": uoc,
-            "trang_thai": "du_kien",
+            # TC-58: trạng thái tính bằng CHÍNH hàm mọi bộ nạp khác dùng, thay cho chuỗi "du_kien"
+            # gõ cứng. Gõ cứng nghĩa là một khoản khách đã đi tour từ tháng 6 mà chưa trả vẫn mang
+            # nhãn "Dự kiến" suốt đời — và nhãn ấy là thứ người đọc tin trước cả con số.
+            "trang_thai": _trang_thai(
+                float((b.amount or 0) - (b.discount or 0) - (b.paid or 0)), uoc, hom_nay),
             "ghi_chu": "Ngày là ƯỚC theo D-7 trước khởi hành, chưa có lịch thu ký với khách",
         }, dem, cham)
         n += 1
@@ -410,19 +457,43 @@ def _loc(q, company_id: int | None, loai_tien: str, vai_tro: str | None = None):
     return q.where(NghiaVuThanhToan.loai_tien == loai_tien)
 
 
+def cot_ngay(co_so_ngay: str):
+    """Cột ngày ứng với một cơ sở. BA cơ sở, và cái thứ ba là của TC-58.
+
+      · "cam_ket"  – ngày đã có người ký. Tab Nghĩa vụ đến hạn.
+      · "du_kien"  – ngày kế toán định trả thật. Tab Kế hoạch thực thu–chi.
+      · "han"      – cam kết NẾU CÓ, không thì dự kiến. Khối Phải thu · Phải trả của màn hình 01.
+
+    Vì sao cơ sở thứ ba tồn tại: hai khối công nợ trên màn hình Chủ tịch hỏi một câu khác hai tab
+    kia. Chúng không hỏi "ai đã ký ngày nào" mà hỏi "tiền này tới hạn lúc nào, theo chỗ tốt nhất
+    mình biết". Ép chúng dùng riêng cột cam kết thì 12.198 phiếu đặt Vietrip và 4.815 chứng từ chi
+    — không cái nào có ngày ký — dồn hết vào một ô "Chưa có hạn", và bảy ô hạn đứng trống trong khi
+    hệ thống THỪA BIẾT tour nào đi ngày nào.
+
+    Cái phải giữ là không để cơ sở này lẫn sang hai tab kia: trộn vào tab cam kết là xoá mất câu
+    "quá hạn theo cam kết", đúng điều mục IV.4 của đề xuất cấm. Nên đây là một cơ sở THỨ BA, gọi
+    tên riêng, chứ không phải nới lỏng cơ sở cũ.
+    """
+    if co_so_ngay == "cam_ket":
+        return NghiaVuThanhToan.ngay_cam_ket
+    if co_so_ngay == "han":
+        return func.coalesce(NghiaVuThanhToan.ngay_cam_ket, NghiaVuThanhToan.ngay_du_kien_tra)
+    return NghiaVuThanhToan.ngay_du_kien_tra
+
+
 def cong(db: Session, tu: date, den: date, *, co_so_ngay: str = "cam_ket",
          company_id: int | None = None, loai_tien: str = "VND",
          vai_tro: str | None = None) -> dict:
     """Cộng phần CÒN LẠI theo nhóm, trong khoảng [tu, den] BAO GỒM CẢ HAI ĐẦU.
 
-    `co_so_ngay`: "cam_ket" cho tab Nghĩa vụ đến hạn, "du_kien" cho tab Kế hoạch thực thu–chi. Hai tab
-    KHÔNG được trộn – đó là lý do tham số này bắt buộc phải chọn, không có giá trị "cả hai".
+    `co_so_ngay`: "cam_ket" cho tab Nghĩa vụ đến hạn, "du_kien" cho tab Kế hoạch thực thu–chi, "han"
+    cho hai khối công nợ của màn hình 01 — xem `cot_ngay()`. Ba cơ sở KHÔNG được trộn; đó là lý do
+    tham số này bắt buộc phải chọn, không có giá trị "cả ba".
 
     Mỗi nghĩa vụ là MỘT DÒNG nên phép cộng này không thể đếm trùng: không có chỗ nào để một khoản tiền
     xuất hiện hai lần. Đó là toàn bộ lý do bảng nghĩa vụ tồn tại.
     """
-    cot = (NghiaVuThanhToan.ngay_cam_ket if co_so_ngay == "cam_ket"
-           else NghiaVuThanhToan.ngay_du_kien_tra)
+    cot = cot_ngay(co_so_ngay)
     q = _loc(select(NghiaVuThanhToan).where(
         NghiaVuThanhToan.ghi_nho == False,                                  # noqa: E712
         NghiaVuThanhToan.trang_thai.not_in(TRANG_THAI_DONG),
@@ -447,8 +518,7 @@ def ba_ro(db: Session, den: date, *, co_so_ngay: str = "cam_ket",
     vì thế trông gọn hơn sự thật. Hàm này trả cả ba ra để màn hình BUỘC phải hiển thị chúng.
     """
     hom_nay = hom_nay or date.today()
-    cot = (NghiaVuThanhToan.ngay_cam_ket if co_so_ngay == "cam_ket"
-           else NghiaVuThanhToan.ngay_du_kien_tra)
+    cot = cot_ngay(co_so_ngay)
     nen = _loc(select(NghiaVuThanhToan).where(
         NghiaVuThanhToan.ghi_nho == False,                                  # noqa: E712
         NghiaVuThanhToan.trang_thai.not_in(TRANG_THAI_DONG)), company_id, loai_tien, vai_tro)

@@ -49,6 +49,24 @@ from app.services import nghia_vu as NV
 THU, CHI = "thu", "chi"
 
 # ═══════════════════════════════════════════════════════════════════════════════════════════════
+# TC-58 (17/9/2026) · CƠ SỞ NGÀY CỦA HAI KHỐI NÀY — VÀ VÌ SAO NÓ ĐỔI
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# Vế cũ: cả bảy ô cộng theo NGÀY CAM KẾT. Lý lẽ đúng cho một sổ do người Việt Nam nhập tay, nơi mọi
+# nghĩa vụ đều có một tờ giấy ai đó đã ký.
+#
+# Vế ấy sập khi sổ được nạp từ Vietrip. Đếm 17/9/2026: 12.198 phiếu đặt và 4.815 chứng từ chi NCC
+# chảy về, và KHÔNG MỘT cái nào mang ngày cam kết — Vietrip không có ô ấy. Bảy ô hạn của cả hai khối
+# vì thế đứng trống, trong khi hệ thống thừa biết tour nào khởi hành ngày nào và kết thúc ngày nào.
+#
+# Nay cộng theo HẠN = cam kết nếu có, không thì dự kiến (`NV.cot_ngay("han")`). Ngày ký vẫn THẮNG
+# mốc suy ra ở mọi dòng có nó, nên không khoản nào bị một con số đoán che mất ngày thật của nó.
+#
+# CÁI GIÁ, và nó phải nói ra: một khoản xếp vào "Quá hạn" ở đây có thể là quá hạn theo MỐC SUY RA
+# chứ không theo cam kết. Hai tab của khối dòng tiền (`co_so_ngay="cam_ket"` / `"du_kien"`) KHÔNG
+# đổi và vẫn là chỗ trả lời câu "quá hạn theo cam kết" cho đúng nghĩa.
+CO_SO_NGAY = "han"
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
 # BẢY NHÓM, MỘT BỘ MỐC CHO CẢ THU LẪN TRẢ — anh Tuấn chốt 16/9/2026
 # ═══════════════════════════════════════════════════════════════════════════════════════════════
 # Trước vòng này Phải thu và Phải trả dùng HAI bộ mốc khác nhau: thu có "Quá hạn" trong nhóm còn
@@ -74,7 +92,8 @@ THU, CHI = "thu", "chi"
 MOC = ("Quá hạn", "1 tuần", "2 tuần", "4 tuần", "2 tháng", "3 tháng", "Dài hạn")
 
 LY_DO_SO_RONG = ("Sổ nghĩa vụ thanh toán chưa có khoản nào — phép đồng bộ VPM-11 chưa chạy hoặc "
-                 "chưa bộ phận nào nạp chứng từ.")
+                 "chưa bộ phận nào nạp chứng từ. Kế toán hoặc CNTT bấm dựng lại sổ tại "
+                 "POST /api/v1/dong-tien/nghia-vu/dong-bo.")
 
 
 def cong_thang(d: date, n: int) -> date:
@@ -141,7 +160,13 @@ def _co_khoan_nao(db: Session, huong: str, vai_tro: str | None, loai_tien: str) 
 
 
 def _chua_co_han(db: Session, huong: str, vai_tro: str | None, loai_tien: str) -> float:
-    """Tổng khoản CHƯA CÓ NGÀY CAM KẾT. Không xếp vào Dài hạn — xem điều 5 ở đầu tệp."""
+    """Tổng khoản CHƯA CÓ HẠN NÀO CẢ. Không xếp vào Dài hạn — xem điều 5 ở đầu tệp.
+
+    TC-58 siết lại định nghĩa: "chưa có hạn" nay là RỖNG CẢ HAI CỘT ngày, không còn là "rỗng cột
+    cam kết". Vế cũ đọc sai theo hướng nguy hiểm: một khoản Kế toán đã ghi ngày dự kiến trả vẫn bị
+    đếm là chưa có hạn, nên ô ấy phồng lên và bảy ô hạn hụt đi đúng phần chênh — mà tổng tám ô vẫn
+    khớp tổng công nợ, nên không có cách nào phát hiện bằng phép cộng.
+    """
     nhom = [k for k in nhom_duoc_xem(vai_tro) if _huong_cua(k) == huong] if vai_tro else \
            [k for k in NHOM if _huong_cua(k) == huong]
     q = select(NghiaVuThanhToan).where(
@@ -149,13 +174,14 @@ def _chua_co_han(db: Session, huong: str, vai_tro: str | None, loai_tien: str) -
         NghiaVuThanhToan.trang_thai.not_in(TRANG_THAI_DONG),
         NghiaVuThanhToan.loai_tien == loai_tien,
         NghiaVuThanhToan.ngay_cam_ket.is_(None),
+        NghiaVuThanhToan.ngay_du_kien_tra.is_(None),
         NghiaVuThanhToan.nhom.in_(sorted(nhom)))
     return round(sum(max(nv.con_lai(), 0) for nv in db.execute(q).scalars()))
 
 
 def _tong(db: Session, tu: date, den: date, huong: str, vai_tro: str | None, loai_tien: str) -> float:
     """Tổng một khoảng, theo hướng. `NV.cong()` trả theo NHÓM nên chỉ việc gộp các nhóm cùng hướng."""
-    theo_nhom = NV.cong(db, tu, den, co_so_ngay="cam_ket", loai_tien=loai_tien, vai_tro=vai_tro)
+    theo_nhom = NV.cong(db, tu, den, co_so_ngay=CO_SO_NGAY, loai_tien=loai_tien, vai_tro=vai_tro)
     return round(sum(v for k, v in theo_nhom.items() if _huong_cua(k) == huong))
 
 

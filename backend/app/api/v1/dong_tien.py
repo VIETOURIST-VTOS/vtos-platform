@@ -247,3 +247,50 @@ def meta(u: User = Depends(require_roles(*XEM, mo_ta="danh mục cho màn hình 
             "ghi_chu": ("Danh mục tài khoản ngân hàng CHƯA có cột pháp nhân (đo 11/9/2026), nên danh "
                         "sách này chưa lọc được theo pháp nhân – việc của làn Kế toán, đã ghi trong "
                         "bản bàn giao.")}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# TC-58 (17/9/2026) · CỬA DỰNG LẠI SỔ NGHĨA VỤ THANH TOÁN
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# Anh Tuấn 17/9: "em đọc hướng dẫn này vào Vietrip cập nhật nợ phải thu - phải trả".
+#
+# Đi soát thì số Vietrip ĐÃ về đủ: 12.198 phiếu đặt nằm trong `bookings`, 4.815 chứng từ chi NCC nằm
+# trong `payment_requests`. Hàm dựng sổ nghĩa vụ từ hai bảng ấy cũng đã có sẵn và chạy-lại-được
+# (`services/nghia_vu.dong_bo`). Thứ DUY NHẤT thiếu là một cửa để bấm chạy nó — nên hai khối Phải thu
+# · Phải trả của màn hình Chủ tịch đọc một cuốn sổ chưa ai dựng, và trả rỗng kèm đúng lý do.
+#
+# Đây chính là cái mà ranh giới công việc 09/9/2026 gọi là VIỆC CÒN THIẾU: "mỗi con số hệ thống cần
+# phải có một cửa nhập hoặc cửa tải cho người dùng; không có cửa thì đó là việc còn thiếu". Vòng này
+# mở cửa ấy, không nhập hộ một con số nào.
+#
+# VÌ SAO KHÔNG TỰ CHẠY THEO LỊCH Ở VÒNG NÀY: dựng lại sổ là một phép quét toàn bộ sáu nguồn, và việc
+# chạy nền bị cắt giữa chừng ĐÃ xảy ra với robot Vietrip hôm 17/9 — nhưng CHƯA AI BIẾT VÌ SAO.
+#
+# Bản viết đầu của chú thích này ghi nguyên nhân là "gói Render miễn phí ngủ sau 15 phút". Đo lại
+# cùng ngày trên chính bảng Render: vtos-api đang ở gói TRẢ TIỀN 0,5 CPU / 512 MB (7 USD/tháng), và
+# máy trả tiền thì KHÔNG ngủ. Câu ấy sai, nên gỡ — một nguyên nhân đoán mà ghi vào mã thì vòng sau
+# sẽ đi sửa nhầm chỗ, và không có lỗi nào báo.
+#
+# Nghi vấn còn lại, chưa đo: 512 MB bộ nhớ cho một lượt quét 12.198 phiếu đặt. Phải ĐẾM trước khi
+# kết luận. Cửa bấm tay chạy đồng bộ và thấy kết quả ngay, nên đặt lịch chờ được tới lúc biết thật.
+DUNG_SO = ("ketoan", "cntt")
+
+
+@router.post("/nghia-vu/dong-bo")
+def dong_bo_nghia_vu(u: User = Depends(require_roles(*DUNG_SO, mo_ta="dựng lại sổ nghĩa vụ thanh toán")),
+                     db: Session = Depends(get_db)):
+    """Dựng lại sổ nghĩa vụ từ sáu nguồn chứng từ. Bấm bao nhiêu lần cũng ra cùng một sổ.
+
+    Trả về số dòng mỗi nguồn sinh ra, để người bấm ĐỐI CHIẾU ĐƯỢC chứ không phải tin lời: `bookings`
+    phải xấp xỉ số phiếu đặt còn nợ, `payment_requests` phải xấp xỉ số chứng từ chi chưa trả. Lệch
+    nhiều là dấu hiệu một lô Vietrip chưa ánh xạ xong — bấm `POST /import/vietrip/apply` trước.
+    """
+    from app.services import nghia_vu as NV
+    try:
+        ra = NV.dong_bo(db)
+    except Exception as e:      # noqa: BLE001 — trả lỗi có nội dung để CNTT chẩn đoán
+        db.rollback()
+        raise HTTPException(500, f"Dựng sổ lỗi: {type(e).__name__}: {str(e)[:600]}")
+    R.audit(db, u.username, u.role, "dong_bo_nghia_vu", "nghia_vu_thanh_toan", after=ra)
+    db.commit()
+    return {**ra, "message": f"Đã dựng lại sổ nghĩa vụ — {ra['tong_dong']} dòng"}
