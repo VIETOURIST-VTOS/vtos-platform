@@ -867,7 +867,11 @@ table.bang-doc{width:100%}
    lớp .mh01-khu* không còn ai dùng và đã dọn đi. Giữ lại đúng hai thứ còn dùng. */
 /* Ba khối kinh doanh & nội bộ một hàng; dưới 900px xuống một cột — ép ba khối vào 900px thì mỗi
    khối còn 280px và thanh ngang trong đó ngắn tới mức mọi người trông dài bằng nhau. */
-.mh01-hang-3{display:grid;gap:14px;align-items:start;
+/* TC-54 · `align-items:stretch` thay cho `start` — cùng lý do với .mh01-sau-o ở dưới: ba khối
+   cao thấp so le làm cả hàng cuối trang trông như chưa dựng xong ("các ô ở dưới cùng chưa cân
+   xứng", anh Tuấn 17/9/2026). Ba khối này còn lệch mạnh hơn, vì Kinh doanh Lẻ thường chỉ có một
+   câu trong khi Kinh doanh Đoàn có sáu dòng giải thích cách chia lợi nhuận. */
+.mh01-hang-3{display:grid;gap:14px;align-items:stretch;
   grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin:0 0 14px}
 .mh01-hang-3>*{min-width:0;margin:0}
 
@@ -890,15 +894,36 @@ table.bang-doc{width:100%}
 /* Chênh lệch tuyệt đối trên thẻ chỉ tiêu: dóng cột số, vì tám thẻ xếp thành lưới. */
 .the-xh-chenh{font-weight:700;font-variant-numeric:tabular-nums}
 
-/* ═══ TC-42 · SÁU Ô LỚN CỦA MÀN HÌNH CHỦ TỊCH ═══════════════════════════════════════════════
-   Hai cột trên màn rộng chứ không phải ba: mỗi ô mang một biểu đồ có trục và nhãn số, và ba cột
-   thì mỗi biểu đồ chỉ còn hơn 300px — cột chồng nhãn, nhãn cắt cụt. Thà cuộn thêm một nhịp còn
-   hơn sáu hình không đọc được. Dưới 900px thì một cột.
-   `align-items:start` để ô ngắn không bị kéo cao bằng ô dài: khoảng trắng dưới một khối trông
-   giống dữ liệu còn thiếu. */
-.mh01-sau-o{display:grid;gap:14px;align-items:start;grid-template-columns:1fr}
+/* ═══ TC-54 · BA KHỐI TIỀN MỘT HÀNG (thay bố cục bốn-ô-hai-cột của TC-42) ══════════════════
+   "phai thu - phai tra song song nhau, va cac ô o dưới cung chưa cân xứng"
+                                                             — anh Tuấn, 17/9/2026
+
+   TC-42 xếp BỐN khối vào lưới hai cột, nên Phải thu rơi xuống ô 2 còn Phải trả lên ô 3 — hai
+   khối nằm CHÉO nhau. Chúng dùng chung một bộ bảy mốc hạn (TC-45), nên cái lợi lớn nhất của
+   chúng là đọc SO HÀNG NGANG; nằm chéo là vứt bỏ đúng cái lợi ấy.
+
+   Nay chỉ còn BA khối trong lưới (Tồn đọng ra hàng riêng, xem page.tsx), và luật là:
+     · ≥1280px  → ba cột, Dòng tiền rộng hơn vì biểu đồ 13 tuần cần chỗ.
+     · 900–1279 → hai cột, Dòng tiền chiếm TRỌN hàng trên, để Phải thu và Phải trả vẫn song song.
+       Đây là chỗ dễ làm ẩu nhất: để lưới tự chia hai cột thì ở bề ngang này chúng lại nằm chéo,
+       đúng lỗi vừa sửa, mà chỉ lộ ra ở một khoảng bề ngang nên dễ lọt.
+     · <900px   → một cột.
+
+   BỎ `align-items:start` CỦA TC-42, và nói rõ vì sao đảo: lý lẽ cũ là "khoảng trắng dưới một
+   khối trông giống dữ liệu còn thiếu". Trên bản chạy thật điều ngược lại xảy ra — ba khối cao
+   thấp so le làm cả hàng trông như chưa dựng xong, và anh Tuấn gọi đúng tên: "chưa cân xứng".
+   Khoảng trắng bên trong một khung có viền đọc ra là khoảng thở; ba đáy khung lệch nhau thì
+   không đọc ra gì cả. */
+.mh01-sau-o{display:grid;gap:14px;align-items:stretch;grid-template-columns:1fr}
 .mh01-sau-o>*{min-width:0;margin:0}
-@media (min-width:900px){ .mh01-sau-o{grid-template-columns:1fr 1fr} }
+@media (min-width:900px){
+  .mh01-sau-o{grid-template-columns:1fr 1fr}
+  .mh01-sau-o>:first-child{grid-column:1 / -1}
+}
+@media (min-width:1280px){
+  .mh01-sau-o{grid-template-columns:1.25fr 1fr 1fr}
+  .mh01-sau-o>:first-child{grid-column:auto}
+}
 
 /* Con số lớn của ô: kỳ ĐANG CHẠY. Nó đứng trên biểu đồ vì đó là thứ đọc trước; biểu đồ các kỳ đã
    đóng là thứ đọc sau để biết con số ấy đang đi lên hay xuống. */
