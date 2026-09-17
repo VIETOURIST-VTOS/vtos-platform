@@ -187,8 +187,19 @@ def test_khong_chi_nguoi_dung_bam_vao_o_khong_ton_tai():
         "Màn hình 01 vẫn đang chỉ người dùng sang 'ô đơn vị trên thanh ngang', trong khi ô ấy chưa "
         "được vẽ vì máy chủ chưa mở đường phạm vi."
     )
-    assert "chưa đổi được đơn vị" in nguon, (
-        "Phải nói thẳng là chưa đổi được đơn vị, thay cho một chỉ dẫn trỏ vào chỗ trống."
+    # TC-55 (17/9/2026) · VẾ SAU CỦA PHÉP THỬ ĐỔI, LUẬT THÌ KHÔNG.
+    # Bản cũ đòi câu "chưa đổi được đơn vị". Anh Tuấn chốt bỏ hẳn pháp nhân khỏi màn hình 01 —
+    # "chỉ chọn Vietourist" — nên nay không còn cái đơn vị nào để mà đổi, và một câu than phiền về
+    # chuyện không đổi được đọc ra như một hạn chế chứ không phải một quyết định. Luật giữ nguyên:
+    # KHÔNG chỉ người dùng tới một chỗ không có. Vế mới: phải nói thẳng màn hình đang nói về công
+    # ty nào.
+    assert "Phạm vi:" in than and "Vietourist" in than, (
+        "Phải ghi rõ phạm vi là Vietourist — công ty mẹ, thay cho một câu nói về việc không đổi "
+        "được đơn vị."
+    )
+    assert "Báo cáo tài chính hợp nhất" not in than, (
+        "Chưa được dẫn sang màn hình hợp nhất: nó CHƯA DỰNG (giai đoạn 4). Đặt đường dẫn tới đó là "
+        "lặp lại đúng lỗi mà phép thử này sinh ra để canh."
     )
 
 

@@ -262,7 +262,48 @@ def test_ma_la_van_hien_du_chu_khong_bi_bo_qua():
     assert "localeCompare" in src, "phần còn lại xếp theo bảng chữ cái"
 
 
-def test_khoi_dong_tien_dung_thu_tu_chung_va_chon_don_vi_dau_tien():
+def test_khoi_dong_tien_luon_la_vietourist_me_va_khong_con_o_chon_phap_nhan():
+    """TC-55 · anh Tuấn chốt 17/9/2026: màn hình 01 CHỈ nói về Vietourist.
+
+        "Em bỏ hết pháp nhân, chỉ chọn Vietourist; khi nào cần xem pháp nhân thì vào Báo cáo tài
+         chính tổng hợp."
+
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    LUẬT CŨ BỊ ĐẢO — GHI LẠI CẢ HAI VẾ
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    Phép thử này trước đây canh `setPn(ds[0].id)`: có một ô chọn pháp nhân, và mặc định là pháp
+    nhân đứng đầu thứ tự dùng chung. Nay ô chọn bị gỡ hẳn.
+
+    Vì sao gỡ: một ô chọn trên màn hình Chủ tịch khiến hai người mở cùng một trang có thể đang
+    nhìn hai công ty khác nhau mà tưởng đang nói cùng một chuyện — kiểu sai không ai phát hiện ra
+    trong phòng họp.
+
+    Vì sao tìm theo MÃ chứ không giữ `ds[0]`: `xepDonVi` xếp VTD lên đầu, nhưng dựa vào một hàm
+    xếp để quyết định màn hình đang nói về công ty nào là đặt một con số tiền lên một quy ước sắp
+    xếp — đổi thứ tự trong THU_TU_MA là đổi luôn công ty, mà không có lỗi nào báo. `xepDonVi` vẫn
+    còn, làm LỐI LUI cho vai không được xem VTD.
+    """
     src = _doc("web/components/KhoiDongTien.tsx")
-    assert "xepDonVi" in src, "màn hình phải dùng thứ tự dùng chung, không tự xếp"
-    assert "setPn(ds[0].id)" in src, "mặc định chọn pháp nhân đứng đầu thứ tự"
+    assert "xepDonVi" in src, "lối lui vẫn phải theo thứ tự dùng chung, không tự xếp"
+    assert 'code || "").trim().toUpperCase() === "VTD"' in src, (
+        "Phải tìm công ty mẹ theo MÃ, không lấy phần tử đầu mảng."
+    )
+    assert "setPn(ds[0].id)" not in src, "Không còn chọn theo vị trí trong mảng."
+    assert "Pháp nhân đang xem" not in src, (
+        "Ô chọn pháp nhân đã gỡ khỏi màn hình 01 (anh Tuấn chốt 17/9/2026) — xem theo pháp nhân "
+        "là việc của Báo cáo tài chính hợp nhất."
+    )
+
+
+def test_dong_loc_ghi_ro_pham_vi_la_vietourist_va_khong_dan_toi_man_hinh_chua_dung():
+    """Phạm vi phải là một câu trả lời, và không được chỉ vào chỗ trống.
+
+    Bài học 13/9 ngay trong DauManHinh01.tsx: câu cũ bảo người dùng "chọn ở ô đơn vị trên thanh
+    ngang" — một ô không tồn tại. Màn hình Báo cáo tài chính hợp nhất cũng CHƯA DỰNG (hợp nhất
+    nằm ở giai đoạn 4), nên không được đặt đường dẫn sang đó.
+    """
+    src = _doc("web/components/DauManHinh01.tsx")
+    assert "Phạm vi:" in src and "Vietourist" in src, "Phải ghi rõ màn hình đang nói về công ty nào."
+    assert "chưa đổi được đơn vị" not in src, (
+        "Câu cũ đọc ra như một hạn chế; nay đó là một quyết định, phải nói như một quyết định."
+    )
