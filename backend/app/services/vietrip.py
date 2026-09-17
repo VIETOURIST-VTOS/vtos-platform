@@ -191,8 +191,58 @@ def apply_vehicles(db: Session, limit: int = 400) -> int:
     return n
 
 
+def phap_nhan_mac_dinh(db: Session) -> int | None:
+    """Pháp nhân gắn cho chuyến nhập từ Vietrip: CÔNG TY MẸ (anh Tuấn chốt 17/9/2026).
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    VÌ SAO PHẢI CÓ HÀM NÀY — VÀ VÌ SAO NÓ CHỈ ÁP CHO TOUR VIETRIP
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    `tours.company_id` để rỗng nghĩa là CHƯA XÁC ĐỊNH, và luật chung là không mặc định về công ty
+    mẹ — đoán sai pháp nhân thì mọi con số tiền trên màn hình là của một công ty khác, mà nhìn
+    thì không khác gì số đúng.
+
+    Nhưng chuyến nhập từ Vietrip là trường hợp KHÔNG PHẢI ĐOÁN: Vietrip là app điều hành của công
+    ty mẹ, chuyến nào chạy trên đó là chuyến của mẹ. Anh Tuấn chốt như vậy ngày 17/9/2026, sau khi
+    mở màn hình chủ tịch và thấy Doanh thu hiện "—" trong khi VTOS đang giữ 1.244 chuyến và 10.303
+    booking nhập từ Vietrip: `ket_qua_that.thang()` lọc theo pháp nhân mẹ, mà 1.743 chuyến đều
+    `company_id = NULL`, nên phép lọc trả về rỗng.
+
+    Ba ranh giới của luật này, mỗi cái là một phép thử:
+      1. CHỈ chuyến `imported = True` (nguồn Vietrip). Chuyến dựng tay trong VTOS vẫn phải do người
+         chọn pháp nhân — luật cũ giữ nguyên cho chúng.
+      2. KHÔNG ghi đè. `company_id` đã có giá trị thì để yên, kể cả khi giá trị ấy khác công ty mẹ:
+         ai đó đã gắn tay là đã có chủ ý, robot không được cãi.
+      3. KHÔNG bịa. Danh mục công ty chưa có dòng `kind='me'` thì trả None và không gắn gì cả —
+         thà để rỗng còn hơn gắn nhầm vào công ty đầu tiên trong bảng.
+    """
+    from app.services.ket_qua_that import cong_ty_me
+    return cong_ty_me(db)
+
+
+def gan_phap_nhan_vietrip(db: Session, boi: str = "robot-vietrip") -> dict:
+    """Vá MỘT LẦN cho chuyến Vietrip đã nhập trước ngày có luật: gắn pháp nhân mẹ vào chỗ còn rỗng.
+
+    Cần một cửa riêng vì `apply_tours` chỉ chạm tới bản ghi thô CHƯA ánh xạ; 1.743 chuyến nhập từ
+    05/9/2026 trở về trước đã `applied = True` nên vòng đồng bộ kế tiếp không đi qua chúng nữa.
+    Chạy lại nhiều lần vô hại: lần hai không còn chuyến nào rỗng để gắn.
+    """
+    me = phap_nhan_mac_dinh(db)
+    if me is None:
+        return {"da_gan": 0, "con_rong": None, "cong_ty_me": None,
+                "message": "Danh mục công ty chưa có pháp nhân mẹ (kind='me') — không gắn gì cả"}
+    rows = db.execute(select(Tour).where(Tour.imported.is_(True), Tour.company_id.is_(None))).scalars().all()
+    for t in rows:
+        t.company_id = me
+    R.audit(db, boi, "robot", "gan_phap_nhan_vietrip", "tours", after={"so_chuyen": len(rows), "company_id": me})
+    db.commit()
+    con_rong = db.execute(select(func.count(Tour.id)).where(Tour.imported.is_(True), Tour.company_id.is_(None))).scalars().first()
+    return {"da_gan": len(rows), "con_rong": int(con_rong or 0), "cong_ty_me": me,
+            "message": f"Đã gắn pháp nhân mẹ cho {len(rows)} chuyến nhập từ Vietrip"}
+
+
 def apply_tours(db: Session, only_from: date | None = None, limit: int = 400) -> int:
     n = 0; cache = {}
+    me = phap_nhan_mac_dinh(db)   # tra MỘT lần cho cả lô, không phải mỗi chuyến một câu truy vấn
     for r in db.execute(select(VtRecord).where(VtRecord.entity == "tour", VtRecord.applied == False).order_by(VtRecord.apply_note, VtRecord.id).limit(limit)).scalars():
         raw = r.raw; code = raw.get("tourcode") or ""
         start, end = _d(raw.get("ngayKhoiHanh")), _d(raw.get("ngayKetThuc"))
@@ -212,6 +262,11 @@ def apply_tours(db: Session, only_from: date | None = None, limit: int = 400) ->
             if pr: t.product_id = pr.id
         t.vehicle_type = raw.get("loaiXe") or ""; t.departure_point = raw.get("diemKhoiHanh") or ""; t.transport = raw.get("phuongTien") or ""
         t.days = int(raw.get("soNgay") or 0); t.country = raw.get("nuoc") or ""; t.vietrip_id = int(raw["recID"]); t.imported = True
+        # Gắn pháp nhân mẹ khi chỗ ấy còn rỗng — xem phap_nhan_mac_dinh() cho luật và ba ranh giới.
+        # `is None` chứ không phải `not t.company_id`: id công ty không bao giờ là 0, nhưng viết
+        # `not` thì ngày nào đó có id 0 là robot ghi đè mất pháp nhân người ta gắn tay.
+        if t.company_id is None and me is not None:
+            t.company_id = me
         t.settled_vietrip = bool(raw.get("quyetToan")) or bool(raw.get("duyetChi"))
         # Với tour CHƯA quyết toán, trường tongChiPhi của Vietrip chỉ là các khoản phí nhập sẵn theo khách
         # (bảo hiểm, vé máy bay, land, quà tặng, phí LSQ) chứ không phải giá vốn chuyến – tour DL001.03130926

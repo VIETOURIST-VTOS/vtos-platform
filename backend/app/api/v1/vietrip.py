@@ -70,6 +70,16 @@ def repair_budget(u: User = Depends(require_roles(*SYNC_ROLES)), db: Session = D
     return VT.repair_derived_budgets(db, u.username)
 
 
+@router.post("/import/vietrip/repair-phap-nhan")
+def repair_phap_nhan(u: User = Depends(require_roles(*SYNC_ROLES)), db: Session = Depends(get_db)):
+    """Gắn pháp nhân MẸ cho các chuyến nhập từ Vietrip còn để rỗng (anh Tuấn chốt 17/9/2026).
+
+    Chạy một lần sau khi triển khai TC-51: chuyến nhập trước ngày có luật đã `applied = True` nên
+    vòng đồng bộ kế tiếp không đi qua chúng. Bấm lại lần hai vô hại — không còn chuyến nào rỗng.
+    """
+    return VT.gan_phap_nhan_vietrip(db, u.username)
+
+
 @router.post("/import/vietrip/sync")
 def vietrip_sync(data: SyncIn, u: User = Depends(require_roles("cntt", "ketoan")), db: Session = Depends(get_db)):
     from app.services import vietrip_client as VC
