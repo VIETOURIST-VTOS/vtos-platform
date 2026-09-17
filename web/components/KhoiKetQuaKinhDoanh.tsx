@@ -152,15 +152,31 @@ function diemTu(ct: any, cot2?: any): Diem[] {
  * bịa; nó chỉ giữ chỗ và nói ai nạp, cửa nào.
  */
 
-/** Con số lớn của một thẻ + câu đọc hộ bên dưới. */
-function OSo({ gt, nhan, phu }: { gt: number | null; nhan: string; phu: string }) {
+/** Con số lớn của một thẻ, kèm kỳ của nó.
+ *
+ *  ══════════════════════════════════════════════════════════════════════════════════════════════
+ *  TC-62 · BA CÂU ĐỌC HỘ XUỐNG CHỖ RÊ CHUỘT — anh Tuấn chốt 18/9/2026
+ *  ══════════════════════════════════════════════════════════════════════════════════════════════
+ *  "bỏ bớt chú thích không quan trọng … chỉ giữ lại chữ kế hoạch tháng và mũi tên để cho CHỦ TỊCH
+ *  nhập vào."
+ *
+ *  Trước vòng này mỗi con số kéo theo một câu dài bên dưới ("Đi được 87% mục tiêu 52 tỷ · còn 3
+ *  tháng", "Biên lợi nhuận 20%", "Thu trừ chi của chính những chuyến đã đóng số…"). Ba câu ấy cộng
+ *  lại dài hơn cả ba con số chúng chú thích, và chúng đứng đúng giữa con số và cái hình — tức là
+ *  chen vào giữa hai thứ người ta mở màn hình ra để xem.
+ *
+ *  KHÔNG XOÁ NỘI DUNG, CHỈ ĐỔI CHỖ ĐỨNG. Mục tiêu kỳ, tỉ lệ đạt, biên lợi nhuận đều là SỐ THẬT do
+ *  máy chủ trả về; xoá hẳn là bỏ mất một câu trả lời, đúng cái mà luật "rỗng khác không" chặn. Nên
+ *  chúng thành `title` trên chính con số: rê chuột lên "45,06 tỷ" là đọc được kỳ ấy so với kế
+ *  hoạch thế nào, còn màn hình thì chỉ còn con số và cái hình.
+ */
+function OSo({ gt, nhan, chu }: { gt: number | null; nhan: string; chu: string }) {
   return (
-    <div className="o6-so">
+    <div className="o6-so" title={chu}>
       <b className={"o6-lon" + (gt === null ? " rong" : "")}>
         {gt === null ? "—" : gonSo(gt, "tien")}
       </b>
       <span className="muted o6-nhan">{nhan}</span>
-      <span className="muted kqkd-phu">{phu}</span>
     </div>
   );
 }
@@ -237,7 +253,9 @@ export default function KhoiKetQuaKinhDoanh() {
   if (loi || !d) {
     return (
       <section className="panel" id="ket-qua-kinh-doanh">
-        <div className="mh01-dau"><h2>Kết quả kinh doanh</h2></div>
+        {/* MỘT KHUNG khi chưa có gì để bày, HAI KHUNG khi đã có — vì lúc chưa tải được thì hai
+            khung rỗng cạnh nhau chỉ nói lại cùng một câu "đang tải" hai lần. */}
+        <div className="mh01-dau"><h2>Doanh thu và lợi nhuận</h2></div>
         {dieu_khien}
         {loi
           ? <p className="muted">
@@ -325,104 +343,94 @@ export default function KhoiKetQuaKinhDoanh() {
     </p>
   ) : null;
 
-  // 17/9/2026 · SỐ VÀO BẰNG CỬA ĐÓNG SỐ BÙ. Chủ tịch chốt "vì đây là nhập dữ liệu cũ lên hệ thống
-  // nên em để Chủ tịch ký thay toàn bộ các phòng ban luôn, khi nào vào vận hành chính thức thì
-  // phòng nào ký phòng đó". Đây KHÔNG phải phần còn thiếu — số đã đủ — nên nó là một câu riêng,
-  // không nhét vào dòng "còn thiếu" ở trên.
-  //
-  // Vì sao vẫn phải in ra: 456 chuyến T1–T5 vào hệ bằng cách nhập lại tệp Excel của Điều hành rồi
-  // Chủ tịch ký thay, chưa đi qua vòng duyệt của Điều hành và Kế toán. Nhìn trên biểu đồ thì cột
-  // tháng 3 của số bù và cột tháng 8 của số vận hành thật giống hệt nhau, mà mức tin vào hai cột
-  // ấy khác nhau. Không in thì người đọc không có cách nào biết.
-  //
-  // KHÔNG in khi bằng 0, cùng lý do với dòng "còn thiếu": một dòng lặp lại mỗi lần mở màn hình sẽ
-  // dạy người ta thôi đọc nó.
-  const bu = d.ky_bu || {};
-  const so_bu = Number(bu.so_chuyen || 0);
-  const cau_bu = so_bu > 0 ? (
-    <p className="muted v14-ghi kqkd-thieu">
-      Trong đó <b>{so_bu}/{Number(bu.tren_tong_du_so || 0)} chuyến</b> vào bằng <b>cửa đóng số
-      bù</b> của kho quyết toán cũ — nhập lại từ tệp Excel của Điều hành, <b>{bu.ai_ky}</b>, mốc kỳ
-      lấy theo ngày kết thúc chuyến. Chưa qua vòng duyệt của Điều hành và Kế toán như chuyến vận
-      hành.
-    </p>
-  ) : null;
-
   const phu_hinh = kind === "nam"
     ? `Cả 12 tháng ${nam}`
     : `12 tháng ${nam} · tô đậm ${tenKyDai(d.ky).toLowerCase()}`;
 
-  return (
+  /* ════════════════════════════════════════════════════════════════════════════════════════════
+   * TC-62 · MỘT KHỐI CHUNG TÁCH THÀNH HAI KHUNG — VÀ MỘT LUẬT CỦA TC-47 BỊ ĐẢO CHIỀU
+   * ════════════════════════════════════════════════════════════════════════════════════════════
+   * Anh Tuấn chốt 17/9/2026: "hình 2 tách biểu đồ doanh thu và lợi nhuận ra riêng cho đẹp", rồi
+   * duyệt bản vẽ thử ngày 18/9 ("khung em vừa vẽ ok").
+   *
+   * MẶT CŨ (TC-47, 16/9/2026) — ghi lại nguyên văn vì nó đúng vào lúc ấy: hai hình XẾP DỌC và DÙNG
+   * CHUNG TRỤC NGANG. Hình trên bật `an_nhan_x` để giấu hàng nhãn tháng, hình dưới hiện, nên cột
+   * tháng 9 của hình trên nằm đúng trên cột tháng 9 của hình dưới và đọc được theo CHIỀU DỌC:
+   * "tháng ấy doanh thu cao mà lãi thì không".
+   *
+   * MẶT MỚI: hai KHUNG riêng, mỗi khung một trục ngang đầy đủ. Cái mất là lối đọc dọc ấy. Cái được
+   * là ba thứ, và cộng lại chúng lớn hơn:
+   *   · Hai khung riêng thì KHÔNG CÒN CÁM DỖ so chiều cao cột của hình này với hình kia — điều mà
+   *     bản cũ phải dặn bằng một câu chữ ở chân khối ("thang đo riêng: đừng so chiều cao"). Một bố
+   *     cục tự chặn được cái sai thì hơn một câu dặn đừng sai.
+   *   · Mỗi khung mang đủ nhãn tháng của nó, nên in ra hai trang giấy vẫn đọc được từng trang.
+   *   · Doanh thu và Lợi nhuận là hai trong SÁU Ô LỚN của bản vẽ V1.4; gộp chúng vào một khung là
+   *     sáu ô ấy trên màn hình chỉ còn năm khung.
+   *
+   * KỲ VẪN LÀ MỘT — ĐÂY LÀ ĐIỀU KHÔNG ĐƯỢC LÀM HỎNG. Bộ chọn Tháng/Quý/Năm vẫn nằm ở MỘT chỗ và
+   * vẫn chi phối cả hai khung, vì cả hai khung do cùng thành phần này dựng ra từ cùng một trạng
+   * thái. Tách thành hai thành phần có trạng thái riêng là dựng lại đúng trạng thái mà TC-44 sinh
+   * ra để bỏ: doanh thu đang xem QUÝ còn lợi nhuận đang xem THÁNG. Và biên lợi nhuận — phép chia
+   * chỉ có nghĩa khi tử và mẫu cùng kỳ — cũng mất theo.
+   *
+   * Người đọc vẫn thấy hai khung cùng kỳ mà không cần một câu chú thích nào: kỳ được in ngay cạnh
+   * mỗi con số ("Năm 2026 · đến hôm nay").
+   */
+  const kq_dt = (
     <section className="panel" id="ket-qua-kinh-doanh">
       {/* KHÔNG gắn thẻ "Năm/Quý/Tháng" cạnh tên khối: nút đang bật ở ngay dòng dưới đã nói điều
           ấy, và một màn hình nói cùng một việc hai lần thì lần thứ hai chỉ tổ làm người đọc dừng
           lại kiểm xem hai chỗ có khớp nhau không. */}
-      <div className="mh01-dau">
-        <h2>Kết quả kinh doanh</h2>
-      </div>
+      <div className="mh01-dau"><h2>Doanh thu</h2></div>
       {dieu_khien}
+      <div className="kqkd-dau-hinh">
+        <OSo gt={so_dt} nhan={nhan_ky} chu={cau_ke_hoach} />
+      </div>
+      {/* TC-49 · KHÔNG còn nhánh thay hình bằng một đoạn chữ. `BieuDoCot` tự quyết đủ số hay
+          chưa và tự vẽ khung rỗng mang đủ mười hai nhãn tháng — nhờ vậy khối giữ đúng hình
+          dáng lúc chưa có số, và ngày số về thì nó tự đầy lên chứ không phải đổi bố cục. */}
+      <BieuDoCot ten="Doanh thu từng tháng" phu={phu_hinh} diem={diem_dt}
+        ai="Điều hành" cua="/tours" cua_ten="Cửa đóng số quyết toán"
+        ten_duong="kế hoạch tháng" ten_cho="doanh thu chuyến chưa có giá vốn"
+        chuGiai={<ChuGiai ds={[
+          { ten: "Thực hiện", lop: "" },
+          { ten: "Chưa có giá vốn", lop: "cho" },
+          { ten: "Kế hoạch", lop: "duong" },
+        ]} />} />
+      {cau_thieu}
+    </section>
+  );
 
-      {/* TC-47 · HAI HÌNH XẾP DỌC, CHUNG MỘT TRỤC NGANG — anh Tuấn chốt "hai hình, chung trục
-          ngang" kèm ảnh mẫu. Hình trên giấu hàng nhãn tháng, hình dưới hiện, và cột tháng 9 của
-          hình trên nằm đúng trên cột tháng 9 của hình dưới. Nhờ vậy đọc được theo CHIỀU DỌC:
-          "tháng ấy doanh thu cao mà lãi thì không" — điều mà hai hình đặt cạnh nhau không cho.
-
-          Vẫn là hai thang đo riêng, và đó là lý do phải xếp dọc chứ không vẽ chung một khung:
-          doanh thu lớn hơn lãi chừng mười lần. Luật MỘT TRỤC TUNG cấm hai thang trong CÙNG một
-          khung, không cấm hai khung. */}
-      <div className="kqkd-chong">
-        <div className="kqkd-tang">
-          <div className="kqkd-dau-hinh">
-            <h3 className="kqkd-ten">Doanh thu</h3>
-            <OSo gt={so_dt} nhan={nhan_ky} phu={cau_ke_hoach} />
-          </div>
-          {/* TC-49 · KHÔNG còn nhánh thay hình bằng một đoạn chữ. `BieuDoCot` tự quyết đủ số hay
-              chưa và tự vẽ khung rỗng mang đủ mười hai nhãn tháng — nhờ vậy khối giữ đúng hình
-              dáng lúc chưa có số, và ngày số về thì nó tự đầy lên chứ không phải đổi bố cục. */}
-          <BieuDoCot ten="Doanh thu từng tháng" phu={phu_hinh} diem={diem_dt}
-            ai="Điều hành" cua="/tours" cua_ten="Cửa đóng số quyết toán"
-            ten_duong="kế hoạch tháng" ten_cho="doanh thu chuyến chưa có giá vốn" an_nhan_x
-            chuGiai={<ChuGiai ds={[
-              { ten: "Thực hiện", lop: "" },
-              { ten: "Chưa có giá vốn", lop: "cho" },
-              { ten: "Kế hoạch", lop: "duong" },
-            ]} />} />
-        </div>
-
-        <div className="kqkd-tang">
-          <div className="kqkd-dau-hinh">
-            <h3 className="kqkd-ten">Lợi nhuận</h3>
-            <div className="kqkd-hai-so">
-              <OSo gt={so_lt} nhan={`Lợi nhuận tour · ${nhan_ky}`}
-                phu="Thu trừ chi của chính những chuyến đã đóng số — chưa gánh chi phí chung." />
-              <OSo gt={so_ln} nhan={`Lợi nhuận trước thuế · ${nhan_ky}`} phu={cau_bien} />
-            </div>
-          </div>
-          {/* THEO DẤU, không theo mức: người đọc tìm ở hình này đúng một điều — tháng nào lỗ. Còn
-              doanh thu thì KHÔNG bật `theo_dau`: doanh thu âm là chuyện hoàn/huỷ, tô nó cùng màu
-              với "lỗ" là trộn hai khái niệm khác hẳn nhau. */}
-          <BieuDoCot ten="Lợi nhuận từng tháng" phu={phu_hinh} diem={diem_lai} theo_dau
-            ai="Điều hành và Kế toán" cua="/tours" cua_ten="Cửa đóng số quyết toán"
-            ten_cot2="lợi nhuận trước thuế"
-            chuGiai={<ChuGiai ds={[
-              { ten: "Lợi nhuận tour", lop: "lai" },
-              { ten: "LN trước thuế", lop: "hai" },
-              { ten: "Lỗ", lop: "lo" },
-            ]} />} />
+  const kq_ln = (
+    <section className="panel" id="loi-nhuan">
+      <div className="mh01-dau"><h2>Lợi nhuận</h2></div>
+      <div className="kqkd-dau-hinh">
+        <div className="kqkd-hai-so">
+          <OSo gt={so_lt} nhan={`Lợi nhuận tour · ${nhan_ky}`}
+            chu="Thu trừ chi của chính những chuyến đã đóng số — chưa gánh chi phí chung." />
+          <OSo gt={so_ln} nhan={`Lợi nhuận trước thuế · ${nhan_ky}`} chu={cau_bien} />
         </div>
       </div>
-
-      {cau_thieu}
-      {cau_bu}
-
-      <p className="muted v14-ghi">
-        Doanh thu và lợi nhuận lấy <b>thực tế từ chuyến Điều hành đã đóng số</b>, phạm vi{" "}
-        <b>Vietourist</b> — công ty con và liên kết chỉ vào mục hợp nhất của báo cáo tài chính.
-        Hai hình dùng chung trục ngang nên đọc được theo chiều dọc, nhưng <b>thang đo riêng</b>:
-        đừng so chiều cao cột của hình này với hình kia. Khoảng cách giữa hai cột ở hình dưới chính
-        là chi phí chung của công ty. Đơn vị đọc ngay trên nhãn trục.{" "}
+      {/* THEO DẤU, không theo mức: người đọc tìm ở hình này đúng một điều — tháng nào lỗ. Còn
+          doanh thu thì KHÔNG bật `theo_dau`: doanh thu âm là chuyện hoàn/huỷ, tô nó cùng màu
+          với "lỗ" là trộn hai khái niệm khác hẳn nhau. */}
+      <BieuDoCot ten="Lợi nhuận từng tháng" phu={phu_hinh} diem={diem_lai} theo_dau
+        ai="Điều hành và Kế toán" cua="/tours" cua_ten="Cửa đóng số quyết toán"
+        ten_cot2="lợi nhuận trước thuế"
+        chuGiai={<ChuGiai ds={[
+          { ten: "Lợi nhuận tour", lop: "lai" },
+          { ten: "LN trước thuế", lop: "hai" },
+          { ten: "Lỗ", lop: "lo" },
+        ]} />} />
+      {/* CỬA NHẬP CỦA CHỦ TỊCH — thứ DUY NHẤT còn lại ở chân khối (anh Tuấn 18/9/2026: "chỉ giữ
+          lại chữ kế hoạch tháng và mũi tên để cho CHỦ TỊCH nhập vào"). Đoạn văn cũ ở đây nói ba
+          việc, và cả ba nay đã có chỗ nói đúng hơn: phạm vi Vietourist ghi trên thanh đầu trang,
+          "thang đo riêng" do chính hai khung riêng nói hộ, đơn vị đọc ngay trên nhãn trục. */}
+      <p className="muted v14-ghi kqkd-cua">
         <Link className="the-cua" href={CUA}>Kế hoạch tháng →</Link>
       </p>
     </section>
   );
+
+  return (<>{kq_dt}{kq_ln}</>);
 }

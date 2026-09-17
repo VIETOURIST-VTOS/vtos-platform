@@ -193,7 +193,9 @@ def test_khong_chi_nguoi_dung_bam_vao_o_khong_ton_tai():
     # chuyện không đổi được đọc ra như một hạn chế chứ không phải một quyết định. Luật giữ nguyên:
     # KHÔNG chỉ người dùng tới một chỗ không có. Vế mới: phải nói thẳng màn hình đang nói về công
     # ty nào.
-    assert "Phạm vi:" in than and "Vietourist" in than, (
+    # TC-62 (18/9/2026) · VẾ SAU ĐỔI LẦN HAI, LUẬT VẪN KHÔNG ĐỔI. Ba tầng đầu trang gộp thành một
+    # thanh ngang, nên nhãn chữ "Phạm vi:" xuống `title="Phạm vi"`. Câu TRẢ LỜI thì vẫn hiện ra.
+    assert 'title="Phạm vi"' in than and "Vietourist — công ty mẹ" in than, (
         "Phải ghi rõ phạm vi là Vietourist — công ty mẹ, thay cho một câu nói về việc không đổi "
         "được đơn vị."
     )

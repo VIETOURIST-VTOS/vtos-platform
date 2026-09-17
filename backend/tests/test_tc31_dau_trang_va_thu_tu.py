@@ -171,14 +171,33 @@ def test_hai_khoi_rieng_da_go_khong_quay_lai():
 
 # ───────────────────────── 2 · ĐẦU TRANG THEO BẢN VẼ ─────────────────────────
 
-def test_co_duong_dan_va_dong_phu():
+def test_dau_trang_la_mot_thanh_ngang_khong_con_duong_dan_va_dong_phu():
+    """LUẬT BỊ ĐẢO CHIỀU — ghi cả hai mặt để vòng sau biết đây là một quyết định, không phải sót.
+
+    MẶT CŨ (TC-31, 15/9/2026): bản vẽ V1.4 mở đầu bằng đường dẫn "VTOS / Không gian lãnh đạo / …"
+    và một dòng phụ "Kết quả · Phải thu · Phải trả · Dòng tiền · Quyết định". Cả hai là định hướng
+    cho người mở trang lần đầu, và phép thử này canh chúng còn đủ.
+
+    MẶT MỚI (TC-62, 18/9/2026): anh Tuấn chốt "gộp thành 1 thanh ngang, bỏ bớt chú thích không
+    quan trọng". Đo lại trên bản chạy thật thì ba tầng chữ ấy cao gần bằng một khối số, mà không
+    tầng nào mang một con số nào — và cả hai đều nói lại thứ đã có ngay bên dưới: chặng cuối của
+    đường dẫn chính là tên trang ở dòng kế tiếp, còn dòng phụ liệt kê đúng các khối mà cuộn xuống
+    là thấy.
+
+    Phép thử canh chiều NGƯỢC LẠI, vì không canh gì cả thì một vòng sau người ta dựng lại đường dẫn
+    "cho giống bản vẽ" mà không biết nó đã bị bỏ có lý do.
+    """
     ma = _bo_chu_thich_tsx(_doc(DAU))
-    assert "mh01-duong" in ma, "Thiếu đường dẫn (breadcrumb) ở đầu trang."
-    assert "Không gian lãnh đạo" in ma, "Đường dẫn chưa đúng bản vẽ."
-    assert "Kết quả · Phải thu · Phải trả · Dòng tiền · Quyết định" in ma, "Thiếu dòng phụ."
+    assert "mh01-duong" not in ma, "Đường dẫn (breadcrumb) sống lại ở đầu trang."
+    assert "Kết quả · Phải thu · Phải trả · Dòng tiền · Quyết định" not in ma, "Dòng phụ sống lại."
+    assert "mh01-thanh" in ma, "Đầu trang phải là MỘT thanh ngang `.mh01-thanh`."
     css = _bo_chu_thich_css(_doc(CSS))
+    assert ".mh01-thanh{" in css, "Thiếu kiểu `.mh01-thanh`."
     for lop in (".mh01-duong", ".mh01-trang", ".mh01-phu"):
-        assert lop in css, f"Thiếu kiểu {lop}."
+        assert lop not in css, (
+            f"Kiểu {lop} còn trong globals.css nhưng không ai dùng — lớp mồ côi là cách vòng sau "
+            f"dựng lại bố cục cũ mà không đọc lý do (bài học TC-60)."
+        )
 
 
 def test_dau_trang_khong_dung_lai_ten_lop_cua_dau_khoi():
@@ -195,10 +214,13 @@ def test_dau_trang_khong_dung_lai_ten_lop_cua_dau_khoi():
     dau = _bo_chu_thich_tsx(_doc(DAU))
     khoi_dau_trang = dau[dau.index("export function TieuDe"):]
     khoi_dau_trang = khoi_dau_trang[:khoi_dau_trang.index("export function", 1)]
+    # SỬA 18/9/2026 (TC-62): tên lớp riêng của đầu trang đổi từ `.mh01-trang` sang `.mh01-thanh`
+    # khi ba tầng gộp thành một thanh ngang. LUẬT thì không đổi một chữ — vẫn là "đầu TRANG phải
+    # mang tên riêng, không được mượn `.mh01-dau` của đầu KHỐI" — và lý do dưới đây vẫn nguyên.
     assert "mh01-dau" not in khoi_dau_trang, (
         "Đầu trang đang dùng lại lớp .mh01-dau của đầu khối — đè kiểu lên mọi đầu khối khác."
     )
-    assert "mh01-trang" in khoi_dau_trang, "Đầu trang phải mang lớp riêng .mh01-trang."
+    assert "mh01-thanh" in khoi_dau_trang, "Đầu trang phải mang lớp riêng .mh01-thanh."
 
     # Và trong CSS, .mh01-dau chỉ được khai MỘT LẦN (không kể quy tắc con "…-dau h2").
     css = _bo_chu_thich_css(_doc(CSS))

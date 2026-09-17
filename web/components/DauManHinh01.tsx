@@ -176,78 +176,68 @@ export function tenThang(): string {
   return `Tháng ${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
-/** KHÔNG in nhãn phạm vi ở đây. Phạm vi đang xem do ô đơn vị TRÊN THANH NGANG giữ, và người dùng
- *  đổi được bất cứ lúc nào; in thêm một nhãn thứ hai ở đây là hai chỗ nói về cùng một thứ, mà chỗ
- *  này thì không biết chỗ kia vừa đổi. Một dòng nhắc là đủ. */
-export function DongLoc() {
+/* TC-62 · `DongLoc` ĐÃ XOÁ — anh Tuấn chốt 18/9/2026: "gộp thành 1 thanh ngang, bỏ bớt chú
+   thích không quan trọng".
+
+   Trước vòng này đầu trang là BA tầng: dòng đường dẫn (VTOS / Không gian lãnh đạo / …), tầng tiêu
+   đề kèm câu phụ "Kết quả · Phải thu · Phải trả · Dòng tiền · Quyết định", rồi hàng lọc. Ba tầng
+   ấy cao gần bằng một khối số thật, mà không tầng nào mang một con số nào.
+
+   Nay cả ba gộp vào `TieuDe` thành MỘT thanh. Thứ bỏ hẳn: dòng đường dẫn (tên trang lặp lại ngay
+   dòng dưới), câu phụ liệt kê các khối (cuộn xuống là thấy chúng), và nhãn "Đơn vị tiền: đồng"
+   (mọi con số trên màn hình đều là đồng và đã định dạng sẵn).
+
+   XOÁ chứ không để lại hàm không ai gọi — cùng bài học với `O` ở TC-57 và bốn lớp CSS mồ côi ở
+   TC-60: một thành phần không ai gọi vẫn qua mọi phép kiểm, và vòng sau có người dựng lại nó. */
+
+/** ĐẦU TRANG — MỘT THANH NGANG DUY NHẤT (TC-62).
+ *
+ *  Thanh này mang đúng bốn thứ, và mỗi thứ phải trả lời được câu "bỏ đi thì ai mất gì":
+ *
+ *  1. TÊN TRANG — người mở lần đầu biết mình đang ở đâu.
+ *  2. KỲ BÁO CÁO + cửa "Quý và năm →". Mọi con số bên dưới thuộc về kỳ ghi ở đây; không ghi ra
+ *     thì hai người cùng nhìn một màn hình mà hiểu hai kỳ khác nhau.
+ *  3. PHẠM VI + NGÀY BÁO CÁO. Ngày báo cáo là mốc phân nhóm của mọi bảng theo hạn ở dưới.
+ *  4. NÚT IN / LƯU PDF — việc thật, không phải trang trí: Chủ tịch mang bảng này vào phòng họp.
+ *     Kiểu in nằm ở globals.css; giấy là môi trường khác, không phải màn hình thu nhỏ.
+ *
+ *  BA NHÃN CHỮ ĐÃ XUỐNG CHỖ RÊ CHUỘT ("Kỳ báo cáo · Phạm vi · Ngày báo cáo"): chúng dài gần bằng
+ *  chính ba giá trị chúng giới thiệu.
+ *
+ *  KHÔNG lấy huy hiệu "Giao diện xanh navy" ở góc phải bản vẽ: đó là nhãn của TÀI LIỆU THIẾT KẾ
+ *  tự mô tả mình, dán lên trang thật thì thành một ô chữ không ai bấm được và không nói gì thêm.
+ */
+export function TieuDe({ vai, ten_vai }: { vai?: string; ten_vai?: string }) {
+  const ten = TEN_TRANG[vai || ""] || `Bảng điều hành · ${ten_vai || ""}`;
   const homNay = useHomNay();
   const [thang, setThang] = useState("");
   useEffect(() => setThang(tenThang()), []);
   return (
-    <div className="mh01-loc">
-      <span className="mh01-ky"><span>Kỳ báo cáo</span><b>{thang || "…"}</b></span>
+    <div className="mh01-thanh">
+      <span className="mh01-thanh-ten">{ten}</span>
+      {/* NHÃN NẰM Ở CHỖ RÊ CHUỘT, KHÔNG NẰM TRÊN THANH. Ba chữ "Kỳ báo cáo · Phạm vi · Ngày báo
+          cáo" dài gần bằng chính ba giá trị chúng giới thiệu; bỏ đi thì thanh còn một hàng, mà ai
+          chưa quen vẫn tra được bằng cách rê chuột. */}
+      <b title="Kỳ báo cáo">{thang || "…"}</b>
       {/* Quý và năm KHÔNG nằm trên màn hình này. Dẫn thẳng sang chỗ xem được, chứ không để một ô
           chọn bấm vào lại báo "chưa có nguồn". */}
-      <Link className="the-cua" href="/phan-he/baocao">Xem theo quý và năm →</Link>
-      <span className="tag">Đơn vị tiền: đồng</span>
+      <Link className="the-cua" href="/phan-he/baocao">Quý và năm →</Link>
       {/* TC-55 · PHẠM VI LÀ MỘT CÂU TRẢ LỜI, KHÔNG PHẢI MỘT Ô CHỌN — anh Tuấn chốt 17/9/2026:
-          "bỏ hết pháp nhân, chỉ chọn Vietourist; khi nào cần xem pháp nhân thì vào Báo cáo tài
-          chính tổng hợp."
-
-          Nên ghi thẳng ra đây màn hình đang nói về công ty nào. Hai người mở cùng một trang mà mỗi
-          người đang xem một pháp nhân khác nhau, rồi cùng bàn về "con số đó", là kiểu sai không ai
-          phát hiện ra trong phòng họp.
-
-          KHÔNG dẫn sang Báo cáo tài chính hợp nhất, dù anh Tuấn nhắc tới nó: màn hình ấy CHƯA
-          DỰNG (hợp nhất hai pháp nhân và công ty liên kết nằm ở giai đoạn 4 — xem app/accounting).
-          Bài học 13/9 ngay trong tệp này: câu cũ chỉ người dùng "chọn ở ô đơn vị trên thanh ngang"
-          — một ô không tồn tại — và họ đi tìm rồi tưởng mình không thấy. Chỉ vào chỗ trống là kiểu
-          sai khó chịu nhất. Khi nào màn hình hợp nhất có thật thì thêm đường dẫn ở đây. */}
-      <span className="muted">Phạm vi: <b>Vietourist</b> — công ty mẹ</span>
+          "bỏ hết pháp nhân, chỉ chọn Vietourist". Hai người mở cùng một trang mà mỗi người đang
+          xem một pháp nhân khác nhau, rồi cùng bàn về "con số đó", là kiểu sai không ai phát hiện
+          ra trong phòng họp. KHÔNG dẫn sang Báo cáo tài chính hợp nhất: màn hình ấy CHƯA DỰNG, và
+          chỉ vào chỗ trống là kiểu sai khó chịu nhất (bài học 13/9 ngay trong tệp này). */}
+      <b title="Phạm vi">Vietourist — công ty mẹ</b>
       {/* Ngày báo cáo là mốc phân nhóm của mọi bảng theo hạn ở dưới – ghi ra để không ai phải đoán. */}
-      <span className="muted mh01-ngay">Ngày báo cáo: {homNay || "…"}</span>
-      {/* TC-35 · Nút In về ĐÚNG CHỖ bản vẽ đặt: cuối hàng lọc, mép phải. Nó là một THAO TÁC TRÊN
-          KỲ ĐANG CHỌN — in đúng cái kỳ ghi ngay bên trái — nên đứng cùng hàng với kỳ thì đọc ra
-          quan hệ ấy; đứng cạnh tiêu đề thì nó chỉ là một nút trôi nổi. */}
+      <b className="mh01-thanh-ngay" title="Ngày báo cáo">{homNay || "…"}</b>
+      <span className="mh01-thanh-day" />
+      {/* TC-35 · Nút In là một THAO TÁC TRÊN KỲ ĐANG CHỌN — in đúng cái kỳ ghi bên trái — nên nó
+          đứng cùng thanh với kỳ; đứng riêng cạnh tiêu đề thì nó chỉ là một nút trôi nổi. */}
       <button type="button" className="act grey mh01-in" onClick={() => window.print()}>
         In / Lưu PDF
       </button>
     </div>
   );
-}
-
-/** ĐẦU TRANG THEO BẢN VẼ V1.4 — ba thứ bản vẽ mở đầu mà VTOS còn thiếu.
- *
- *  1. ĐƯỜNG DẪN. Bản vẽ ghi "VTOS / Không gian lãnh đạo / Thiết kế đề xuất". Chặng cuối của bản
- *     vẽ là tên CỦA BẢN VẼ, không phải của trang thật — trang thật mang tên trang thật.
- *
- *  2. DÒNG PHỤ nói trang này trả lời những câu hỏi nào. Bản vẽ đặt nó ngay dưới tiêu đề, và nó
- *     làm một việc thật: người mở lần đầu biết cuộn xuống sẽ gặp gì.
- *
- *  3. NÚT IN / LƯU PDF. Đây là việc thật, không phải trang trí: Chủ tịch mang bảng này vào phòng
- *     họp. Kiểu in nằm ở globals.css — giấy là môi trường khác, không phải màn hình thu nhỏ.
- *
- *  KHÔNG lấy huy hiệu "Giao diện xanh navy" ở góc phải bản vẽ: đó là nhãn của TÀI LIỆU THIẾT KẾ
- *  tự mô tả mình, dán lên trang thật thì thành một ô chữ không ai bấm được và không nói gì thêm.
- */
-const PHU_TRANG = "Kết quả · Phải thu · Phải trả · Dòng tiền · Quyết định";
-
-export function TieuDe({ vai, ten_vai }: { vai?: string; ten_vai?: string }) {
-  const ten = TEN_TRANG[vai || ""] || `Bảng điều hành · ${ten_vai || ""}`;
-  return (<>
-    <div className="mh01-duong">
-      <span>VTOS</span><span>/</span><span>Không gian lãnh đạo</span><span>/</span><span>{ten}</span>
-    </div>
-    {/* TC-35 · Nút In / Lưu PDF KHÔNG nằm ở đây. Bản vẽ đặt nó trong HÀNG LỌC, mép phải, ngang
-        với "Kỳ báo cáo" — xem `DongLoc`. Vòng TC-31 đặt nhầm lên cạnh tiêu đề: đúng nút, sai chỗ.
-        Đo trên bản vẽ: nút nằm trong `.filters`, trang thật để ở đầu trang cao hơn 87px. */}
-    <div className="mh01-trang">
-      <div>
-        <h1>{ten}</h1>
-        <p className="mh01-phu">{PHU_TRANG}</p>
-      </div>
-    </div>
-  </>);
 }
 
 /** Khối 02 – "Cần quyết định". Bản vẽ đặt nó NGAY TRÊN các chỉ tiêu: mở màn hình ra là thấy việc
