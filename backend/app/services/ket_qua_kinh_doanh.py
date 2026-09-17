@@ -200,6 +200,23 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
         "co_nguon": all(x["co_nguon"] for x in trong) if trong else False,
     }
 
+    # 17/9/2026 · SỐ VÀO BẰNG CỬA ĐÓNG SỐ BÙ (Chủ tịch ký thay các phòng ban cho lô kho quyết toán
+    # cũ T1–T6/2026). Không phải "còn thiếu" nên KHÔNG nằm trong `con_thieu`: số đã đủ, chỉ là nó
+    # vào hệ bằng một chữ ký khác chữ ký vận hành. Nhưng người đọc bảng phải biết — một tháng mà
+    # gần như toàn bộ là số bù thì nó là số nhập lại từ Excel, chưa qua vòng duyệt của Điều hành và
+    # Kế toán, và mức tin vào nó khác hẳn tháng vận hành thật.
+    so_bu = sum(x.get("dong_so_bu", 0) for x in trong)
+    du_so = sum(x["du_so"] for x in trong)
+    ky_bu = {
+        "so_chuyen": so_bu,
+        "tren_tong_du_so": du_so,
+        "ty_le": round(so_bu / du_so, 4) if du_so else None,
+        "ai_ky": "Chủ tịch ký thay các phòng ban (chốt 17/9/2026)",
+        "ghi_chu": ("Số của lô kho quyết toán cũ được nhập lại từ tệp Excel của Điều hành và đóng "
+                    "số bù; mốc kỳ lấy theo ngày kết thúc chuyến. Khi vào vận hành chính thức, "
+                    "phòng nào ký phòng đó theo đúng vai trò thiết lập."),
+    }
+
     # MỤC TIÊU ĐỌC THẲNG Ô KỲ ẤY — xem chú thích đầu tệp.
     muc_tieu = KH.hop_nhat(db, ky)
     mt_doanh_thu = muc_tieu["doanh_thu"]
@@ -216,6 +233,7 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
         "ky_hien_tai": ky_mac_dinh(kind, hom_nay),
         "chi_tieu": ra_ct,
         "con_thieu": con_thieu,
+        "ky_bu": ky_bu,
         "tong_ky": {"doanh_thu": dt,
                     "loi_nhuan_tour": so.get("loi_nhuan_tour"),
                     "loi_nhuan_truoc_thue": ln},
