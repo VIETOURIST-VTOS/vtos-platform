@@ -90,6 +90,45 @@ def dong_so_theo_buoc(u: User = Depends(require_roles(*SYNC_ROLES)), db: Session
     return VT.dong_so_theo_buoc_vietrip(db, u.username)
 
 
+class NapBuIn(BaseModel):
+    """Khoảng NGÀY KẾT THÚC của chuyến, không phải ngày khởi hành."""
+    tu: str = "2026-01-01"
+    den: str | None = None      # mặc định hôm nay
+    gioi_han: int = 6           # số bảng quyết toán mỗi lô
+
+
+def _khoang(data: "NapBuIn"):
+    from datetime import date as _d
+    t = _d.fromisoformat(data.den) if data.den else _d.today()
+    return _d.fromisoformat(data.tu), t
+
+
+@router.post("/import/vietrip/nap-bu/tour")
+def nap_bu_tour(data: NapBuIn, u: User = Depends(require_roles("cntt", "ketoan")), db: Session = Depends(get_db)):
+    """Kéo DANH SÁCH TOUR kết thúc trong khoảng ngày (TC-53). Không đụng booking/phiếu thu.
+
+    Dùng để nạp bù giai đoạn chưa bao giờ kéo về: lần đồng bộ đầu 05/9/2026 đặt mốc từ 01/6 nên
+    VTOS không có chuyến nào kết thúc trước tháng 6.
+    """
+    from app.services import vietrip_client as VC
+    f, t = _khoang(data)
+    ra = VC.nap_tour_theo_khoang(db, f, t)
+    R.audit(db, u.username, u.role, "nap_bu_tour_vietrip", "vietrip", after=ra); db.commit()
+    return ra
+
+
+@router.post("/import/vietrip/nap-bu/quyet-toan")
+def nap_bu_quyet_toan(data: NapBuIn, u: User = Depends(require_roles("cntt", "ketoan")), db: Session = Depends(get_db)):
+    """Tải bảng quyết toán CÒN THIẾU — MỖI LẦN MỘT LÔ NHỎ, gọi lặp tới khi `con_lai` = 0 (TC-53).
+
+    Mỗi trang quyết toán mất ~10 giây và Render gói miễn phí ngủ sau 15 phút, nên một lần chạy dài
+    không bao giờ xong. Lô nhỏ có đáy thì ngủ giữa chừng cũng chỉ mất đúng lô đang dở.
+    """
+    from app.services import vietrip_client as VC
+    f, t = _khoang(data)
+    return VC.nap_quyet_toan_thieu(db, f, t, data.gioi_han)
+
+
 @router.post("/import/vietrip/sync")
 def vietrip_sync(data: SyncIn, u: User = Depends(require_roles("cntt", "ketoan")), db: Session = Depends(get_db)):
     from app.services import vietrip_client as VC
