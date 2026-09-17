@@ -212,7 +212,23 @@ def test_nut_ky_dang_chon_khac_han_hai_nut_kia():
 
 def test_ba_khoi_kinh_doanh_mot_hang_va_xuong_cot_tren_man_hep():
     """Ép ba khối vào 900px thì mỗi khối còn 280px và thanh ngang trong đó ngắn tới mức mọi người
-    trông dài bằng nhau — tức biểu đồ hết nói lên điều gì."""
+    trông dài bằng nhau — tức biểu đồ hết nói lên điều gì.
+
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    LUẬT CHIỀU CAO BỊ ĐẢO NGÀY 17/9/2026 — GHI LẠI CẢ HAI VẾ
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    TC-40 khai `align-items:start` và phép thử này canh nó, với lý lẽ: "khối ngắn bị kéo dài ra
+    thành một vùng trống, và vùng trống ấy đọc ra là 'còn cái gì đó chưa hiện'".
+
+    Trên bản chạy thật, điều ngược lại xảy ra. Ba khối cao thấp so le — Kinh doanh Lẻ thường chỉ
+    có một câu, Kinh doanh Đoàn có sáu dòng giải thích cách chia lợi nhuận — làm cả hàng cuối
+    trang trông như chưa dựng xong. Anh Tuấn mở trang ngày 17/9 và gọi đúng tên: "các ô ở dưới
+    cùng chưa cân xứng".
+
+    Nên luật nay là `stretch`. Khoảng trắng BÊN TRONG một khung có viền đọc ra là khoảng thở; ba
+    đáy khung lệch nhau thì không đọc ra gì cả. Phép thử giữ nguyên tên và đổi vế, chứ không bị
+    xoá — để vòng sau có người định khôi phục `start` thì đọc được vì sao nó đã bị bỏ.
+    """
     assert 'className="mh01-hang-3"' in _doc(TRANG)
     c = _bo_chu_thich_css(_doc(CSS))
     m = re.search(r"\.mh01-hang-3\{([^}]*)\}", c)
@@ -221,9 +237,9 @@ def test_ba_khoi_kinh_doanh_mot_hang_va_xuong_cot_tren_man_hep():
     assert "auto-fit" in than and "minmax(300px" in than, (
         "Ba khối phải tự xuống cột khi mỗi khối hẹp hơn 300px."
     )
-    assert "align-items:start" in than, (
-        "Không kéo ba khối cao bằng nhau: khối ngắn bị kéo dài ra thành một vùng trống, và vùng "
-        "trống ấy đọc ra là 'còn cái gì đó chưa hiện'."
+    assert "align-items:stretch" in than, (
+        "Ba khối phải cao bằng nhau (anh Tuấn chốt 17/9/2026 — xem chuỗi tài liệu của phép thử "
+        "này). Đáy ba khung lệch nhau làm cả hàng trông như chưa dựng xong."
     )
 
 

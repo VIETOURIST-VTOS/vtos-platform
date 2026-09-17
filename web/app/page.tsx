@@ -135,18 +135,36 @@ function Dash() {
         ở lưới ngay dưới. Đổi CÁCH BÀY, không đổi danh sách. */}
     <KhoiKetQuaKinhDoanh />
 
+    {/* ══ TC-54 · BA KHỐI TIỀN MỘT HÀNG, PHẢI THU ĐỨNG SONG SONG PHẢI TRẢ ═══════════════════════
+        "phai thu - phai tra song song nhau, va cac ô o dưới cung chưa cân xứng"
+                                                                    — anh Tuấn, 17/9/2026
+
+        Bản cũ xếp BỐN khối vào một lưới hai cột, nên chúng rơi thành:
+              Dòng tiền  │  Phải thu
+              Phải trả   │  Tồn đọng
+        Phải thu và Phải trả nằm CHÉO nhau. Mà hai khối ấy dùng CHUNG một bộ bảy mốc hạn (TC-45),
+        nên giá trị lớn nhất của chúng là được đặt cạnh nhau để so từng hàng: "quá hạn phải thu
+        12,1 tỷ, quá hạn phải trả 5,3 tỷ" chỉ đọc ra khi hai hàng ấy ngang tầm mắt. Xếp chéo là
+        vứt bỏ đúng cái lợi ấy — và đúng chỗ này bản thử anh Tuấn duyệt đặt cả ba khối một hàng.
+
+        TỒN ĐỌNG RỜI KHỎI LƯỚI, không phải vì nó kém quan trọng mà vì nó là loại khác: ba dòng
+        theo mức độ, đọc ngang, không có trục nào để so với hai bảng hạn. Nhét nó vào ô thứ tư chỉ
+        để lưới cho chẵn là lấy hình dáng quyết định nội dung. */}
     <div className="mh01-sau-o">
       {/* TC-48 · đáy của dự báo 13 tuần. Máy chủ tính (`kpis.so_du_thap_nhat`), màn hình chỉ bày —
           ranh giới 09/9. Vai nào không được xem khối dòng tiền thì `kpis` không mang trường này về,
-          nên không có nhánh ẩn/hiện nào ở đây: cắt hàng nằm trong truy vấn, đúng luật SEC-02. */}
+          nên không có nhánh ẩn/hiện nào ở đây: cắt hàng nằm trong truy vấn, đúng luật SEC-02.
+          Khối này đứng ĐẦU và lớp CSS trỏ tới nó bằng `:first-child` — đổi thứ tự ba khối dưới đây
+          là đổi luôn bố cục, nên thứ tự ở đây là một phần của thiết kế, không phải ngẫu nhiên. */}
       <KhoiDongTien day={d.kpis?.so_du_thap_nhat} />
       <KhoiPhaiThu ds={sec.phai_thu_theo_han} chua_co_han={sec.phai_thu_chua_co_han}
         vi_sao={sec.phai_thu_vi_sao} bieu_do={bd.phai_thu} />
       {/* TC-45: bỏ `qua_han` — quá hạn nay là nhóm đầu trong bảy nhóm, không còn ô riêng. */}
       <KhoiPhaiTra ds={sec.phai_tra_theo_han}
         chua_co_han={sec.phai_tra_chua_co_han} vi_sao={sec.phai_tra_vi_sao} bieu_do={bd.phai_tra} />
-      <KhoiTonDongMuc d={sec.ton_dong_theo_muc} />
     </div>
+
+    <KhoiTonDongMuc d={sec.ton_dong_theo_muc} />
 
     <HangThe ds={the} />
 
