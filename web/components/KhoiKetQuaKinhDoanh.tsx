@@ -46,7 +46,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { errMsg } from "@/components/ui";
-import { BieuDoCot, ChuGiai, duVeCot, gonSo, type Diem } from "@/components/BieuDo";
+import { BieuDoCot, ChuGiai, gonSo, type Diem } from "@/components/BieuDo";
 
 type Ky = "thang" | "quy" | "nam";
 const BA_KY: { ma: Ky; ten: string }[] = [
@@ -131,16 +131,26 @@ function diemTu(ct: any, cot2?: any): Diem[] {
   }));
 }
 
-/** Câu thay cho hình khi chưa đủ hai tháng có số.
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+ * TC-49 · MỘT LUẬT BỊ ĐẢO CHIỀU — GHI RA ĐÂY ĐỂ VÒNG SAU KHÔNG LẶNG LẼ ĐẢO NGƯỢC LẠI
+ * ══════════════════════════════════════════════════════════════════════════════════════════════
+ * Chỗ này từng có hằng `CHUA_VE` và hai nhánh `duVeCot(...) ? <BieuDoCot/> : <p>{CHUA_VE}</p>`,
+ * kèm lý do của luật TC-40: "HỎI TRƯỚC KHI VẼ, chứ không để bộ biểu đồ dựng khung rỗng của nó —
+ * ô số ngay trên đã ghi '—' kèm bộ phận và cửa nhập rồi, một khung rỗng nói lại điều ấy cách đó
+ * bốn chục pixel là hai khung nói cùng một chuyện."
  *
- *  HỎI TRƯỚC KHI VẼ, chứ không để bộ biểu đồ dựng khung rỗng của nó — luật TC-40: ô số ngay trên
- *  đã ghi "—" kèm bộ phận và cửa nhập rồi, một khung rỗng nói lại điều ấy cách đó bốn chục pixel
- *  là hai khung nói cùng một chuyện. Ranh giới 09/9 không hề bị nới: chỗ chưa có số VẪN đọc được
- *  từ màn hình — nó nằm ở ô số, chỗ đúng của nó.
+ * Lý do ấy ĐÚNG khi chỉ MỘT khối chưa có số: lúc ấy khung rỗng đúng là thừa.
+ * Nó SAI khi CẢ MÀN HÌNH chưa có số — và đó mới là tình trạng thật của VTOS hôm nay.
+ *
+ * Anh Tuấn mở trang thật ngày 17/9/2026: "trên màn hình chưa có biểu đồ, và giao diện chưa giống
+ * file ảnh anh gửi". Cả hai vế đều từ luật cũ mà ra: mọi khối cùng lúc co lại thành văn xuôi, và
+ * bảng điều hành không còn ra hình dáng một bảng điều hành. Anh duyệt bản thử giao diện rồi chốt
+ * "đưa lên web đúng y chang vậy".
+ *
+ * NÊN: luôn vẽ hình. Chưa có số thì `BieuDoCot` tự trả khung rỗng mang đủ mười hai nhãn tháng.
+ * Ranh giới 09/9 KHÔNG hề bị nới — khung rỗng không có cột nào cao lên, không con số nào được
+ * bịa; nó chỉ giữ chỗ và nói ai nạp, cửa nào.
  */
-const CHUA_VE = (nam: number) =>
-  `Chưa đủ hai tháng có số trong năm ${nam} để vẽ — một cột đứng một mình không so được với gì. `
-  + "Kế toán nạp sổ quyết toán và sổ kế toán từng tháng.";
 
 /** Con số lớn của một thẻ + câu đọc hộ bên dưới. */
 function OSo({ gt, nhan, phu }: { gt: number | null; nhan: string; phu: string }) {
@@ -343,15 +353,17 @@ export default function KhoiKetQuaKinhDoanh() {
             <h3 className="kqkd-ten">Doanh thu</h3>
             <OSo gt={so_dt} nhan={nhan_ky} phu={cau_ke_hoach} />
           </div>
-          {duVeCot(diem_dt)
-            ? <BieuDoCot ten="Doanh thu từng tháng" phu={phu_hinh} diem={diem_dt}
-                ten_duong="kế hoạch tháng" ten_cho="doanh thu chuyến chưa có giá vốn" an_nhan_x
-                chuGiai={<ChuGiai ds={[
-                  { ten: "Thực hiện", lop: "" },
-                  { ten: "Chưa có giá vốn", lop: "cho" },
-                  { ten: "Kế hoạch", lop: "duong" },
-                ]} />} />
-            : <p className="muted v14-ghi">{CHUA_VE(nam)}</p>}
+          {/* TC-49 · KHÔNG còn nhánh thay hình bằng một đoạn chữ. `BieuDoCot` tự quyết đủ số hay
+              chưa và tự vẽ khung rỗng mang đủ mười hai nhãn tháng — nhờ vậy khối giữ đúng hình
+              dáng lúc chưa có số, và ngày số về thì nó tự đầy lên chứ không phải đổi bố cục. */}
+          <BieuDoCot ten="Doanh thu từng tháng" phu={phu_hinh} diem={diem_dt}
+            ai="Điều hành" cua="/tours" cua_ten="Cửa đóng số quyết toán"
+            ten_duong="kế hoạch tháng" ten_cho="doanh thu chuyến chưa có giá vốn" an_nhan_x
+            chuGiai={<ChuGiai ds={[
+              { ten: "Thực hiện", lop: "" },
+              { ten: "Chưa có giá vốn", lop: "cho" },
+              { ten: "Kế hoạch", lop: "duong" },
+            ]} />} />
         </div>
 
         <div className="kqkd-tang">
@@ -366,15 +378,14 @@ export default function KhoiKetQuaKinhDoanh() {
           {/* THEO DẤU, không theo mức: người đọc tìm ở hình này đúng một điều — tháng nào lỗ. Còn
               doanh thu thì KHÔNG bật `theo_dau`: doanh thu âm là chuyện hoàn/huỷ, tô nó cùng màu
               với "lỗ" là trộn hai khái niệm khác hẳn nhau. */}
-          {duVeCot(diem_lai)
-            ? <BieuDoCot ten="Lợi nhuận từng tháng" phu={phu_hinh} diem={diem_lai} theo_dau
-                ten_cot2="lợi nhuận trước thuế"
-                chuGiai={<ChuGiai ds={[
-                  { ten: "Lợi nhuận tour", lop: "lai" },
-                  { ten: "LN trước thuế", lop: "hai" },
-                  { ten: "Lỗ", lop: "lo" },
-                ]} />} />
-            : <p className="muted v14-ghi">{CHUA_VE(nam)}</p>}
+          <BieuDoCot ten="Lợi nhuận từng tháng" phu={phu_hinh} diem={diem_lai} theo_dau
+            ai="Điều hành và Kế toán" cua="/tours" cua_ten="Cửa đóng số quyết toán"
+            ten_cot2="lợi nhuận trước thuế"
+            chuGiai={<ChuGiai ds={[
+              { ten: "Lợi nhuận tour", lop: "lai" },
+              { ten: "LN trước thuế", lop: "hai" },
+              { ten: "Lỗ", lop: "lo" },
+            ]} />} />
         </div>
       </div>
 
