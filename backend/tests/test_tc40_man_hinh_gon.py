@@ -167,13 +167,41 @@ def test_khoi_dong_tien_co_so_hinh_va_cau_doc_ho():
     assert "am[0]" in than, "Câu đọc hộ phải chỉ ra mốc âm SỚM NHẤT, không phải mốc âm nặng nhất."
 
 
-def test_khoi_06_dong_tien_giu_nguyen_bon_o_canh_bao():
-    """Anh Tuấn chốt "số 6 dòng tiền em giữ nguyên". Em có đề xuất gỡ bốn ô ấy (chúng lặp lại dòng
-    tóm tắt ngay trên) và anh Tuấn không đồng ý. Ghi vào bộ kiểm để vòng sau không ai gỡ lần nữa
-    với cùng một lý do."""
+def test_khoi_06_dong_tien_nay_la_bieu_do_khong_con_bon_o_canh_bao():
+    """TC-57 (17/9/2026) · LUẬT NÀY BỊ ĐẢO — GHI LẠI CẢ HAI VẾ.
+
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    VẾ CŨ (TC-40, 15/9/2026)
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    Anh Tuấn chốt "số 6 dòng tiền em giữ nguyên". Em có đề xuất gỡ bốn ô cảnh báo ấy — chúng đều
+    ghi "Chưa có nguồn" và lặp lại dòng tóm tắt ngay trên — và anh Tuấn KHÔNG đồng ý. Phép thử này
+    sinh ra để vòng sau không ai gỡ chúng lần nữa với cùng một lý do.
+
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    VẾ MỚI (TC-57, 17/9/2026)
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    Anh Tuấn mở trang, chụp đúng bốn ô ấy và bảo: "xoá bỏ cái này khỏi màn hình chủ tịch, thay vào
+    đó là biểu đồ và số liệu phân tích dòng tiền ngang ở dưới PHẢI THU VÀ PHẢI TRẢ."
+
+    Điều đổi giữa hai lần KHÔNG phải ý thích. Lần trước, bốn ô ấy là thứ duy nhất nói về dòng tiền
+    ngoài một dòng tóm tắt — gỡ đi thì còn lại một khoảng trống, và đó là lý do anh Tuấn giữ. Lần
+    này chúng được THAY bằng một biểu đồ 13 tuần cùng bốn con số của một phép cân. Có cái thay thế
+    thì mới gỡ được; đó là khác biệt thật giữa hai quyết định, không phải đổi ý.
+
+    Nên phép thử giữ nguyên chỗ đứng và ĐỔI VẾ: nay nó canh rằng bốn ô KHÔNG quay lại, và cái thay
+    chúng phải có thật.
+    """
     t = _doc(DT)
-    assert '<div className="bon-o">' in t, "Bốn ô cảnh báo của khối 06 phải giữ nguyên."
-    assert "function O({ o }" in t
+    assert '<div className="bon-o">' not in t, (
+        "Bốn ô cảnh báo đã gỡ khỏi khối dòng tiền (anh Tuấn chốt 17/9/2026) — xem chuỗi tài liệu "
+        "của phép thử này để đọc cả hai vế trước khi lắp lại."
+    )
+    assert "function O({ o }" not in t, (
+        "Xoá luôn hàm dựng ô ấy: một thành phần không ai gọi vẫn qua được mọi phép kiểm, và vòng "
+        "sau có người dựng lại bốn ô chỉ vì thấy hàm còn nằm đó."
+    )
+    assert "function DuBao13Tuan" in t, "Phải có cái THAY THẾ — biểu đồ 13 tuần, không phải khoảng trống."
+    assert 'className="dt-moc"' in t, "Bốn con số của phép cân (đầu kỳ · thu · chi · cuối tuần 13)."
 
 
 # ═════════════════ ĐỘI XE: THÁNG · QUÝ · NĂM ═════════════════

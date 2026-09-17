@@ -182,9 +182,11 @@ def test_thu_tu_doc_chin_khoi_van_giu_nguyen():
     """
     ma = _bo_chu_thich_tsx(_doc(TRANG))
     # SỬA 16/9/2026 (TC-44): hai ô Doanh thu · Lợi nhuận gộp thành <KhoiKetQuaKinhDoanh.
-    thu_tu = ["<KhoiQuyetDinh", "<KhoiKetQuaKinhDoanh", "<KhoiDongTien",
-              "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiTonDongMuc", "<HangThe",
-              "<KhoiHieuQuaXe"]
+    # SỬA 17/9/2026 (TC-57): Dòng tiền xuống SAU hai khối công nợ — xem THU_TU_BAN_VE ở test_tc31,
+    # nơi ghi cả hai vế và lý do đảo.
+    thu_tu = ["<KhoiQuyetDinh", "<KhoiKetQuaKinhDoanh",
+              "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiDongTien",
+              "<KhoiTonDongMuc", "<HangThe", "<KhoiHieuQuaXe"]
     vi = [(m, ma.index(m)) for m in thu_tu if m in ma]
     assert len(vi) == len(thu_tu), f"Thiếu khối: {set(thu_tu) - {m for m, _ in vi}}"
     sai = [(a[0], b[0]) for a, b in zip(vi, vi[1:]) if a[1] > b[1]]

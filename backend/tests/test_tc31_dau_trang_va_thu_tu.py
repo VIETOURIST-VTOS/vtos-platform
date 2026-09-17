@@ -70,9 +70,13 @@ def _bo_chu_thich_css(s: str) -> str:
 THU_TU_BAN_VE = [
     "<KhoiQuyetDinh",            # 02  · Cần Chủ tịch quyết định
     "<KhoiKetQuaKinhDoanh",      # Ô 1+2 · Doanh thu & Lợi nhuận trước thuế, một bộ chọn kỳ
-    "<KhoiDongTien",             # Ô 3 · Dòng tiền — anh Tuấn: "giữ nguyên"
-    "<KhoiPhaiThu",              # Ô 4 · Phải thu theo hạn
-    "<KhoiPhaiTra",              # Ô 5 · Phải trả theo hạn
+    # SỬA 17/9/2026 (TC-57) — DÒNG TIỀN XUỐNG SAU HAI KHỐI CÔNG NỢ. Anh Tuấn mở trang, chụp đúng
+    # khối Dòng tiền và bảo: "xoá bỏ cái này khỏi màn hình chủ tịch, thay vào đó là biểu đồ và số
+    # liệu phân tích dòng tiền NGANG Ở DƯỚI PHẢI THU VÀ PHẢI TRẢ". Vế cũ (dòng tiền đứng trước hai
+    # khối công nợ, "tiền ra vào trước, ai nợ ai sau") ghi ở test_dong_tien_nam_duoi_hai_khoi_cong_no.
+    "<KhoiPhaiThu",              # Ô 4 · Phải thu theo hạn  — hai khối này dùng CHUNG bảy mốc hạn,
+    "<KhoiPhaiTra",              # Ô 5 · Phải trả theo hạn  — nên đứng cạnh nhau để so hàng ngang
+    "<KhoiDongTien",             # Ô 3 · Dòng tiền — nay nằm ngang hết bề ngang, mang biểu đồ 13 tuần
     "<KhoiTonDongMuc",           # Ô 6 · Tồn đọng theo mức độ
     "<HangThe",                  # hàng năm thẻ số nhỏ
     "<KhoiHieuQuaXe",            # 04b · Hiệu quả đội xe
@@ -105,7 +109,7 @@ def test_muoi_khoi_xep_dung_thu_tu_ban_ve():
     )
 
 
-def test_dong_tien_dung_giua_nhom_sau_o_va_truoc_hai_khoi_cong_no():
+def test_dong_tien_nam_duoi_hai_khoi_cong_no():
     """SỬA 16/9/2026 (TC-42) — LUẬT GIỮ NGUYÊN, VỊ TRÍ ĐỔI VÌ MÀN HÌNH ĐỔI.
 
     Luật là MẠCH ĐỌC: cần quyết gì → công ty đang ở đâu → tiền ra vào thế nào → ai nợ mình, mình
@@ -120,8 +124,22 @@ def test_dong_tien_dung_giua_nhom_sau_o_va_truoc_hai_khoi_cong_no():
     assert ma.index("<KhoiKetQuaKinhDoanh") < ma.index("<KhoiDongTien"), (
         "Dòng tiền phải đứng sau khối kết quả kinh doanh."
     )
-    assert ma.index("<KhoiDongTien") < ma.index("<KhoiPhaiThu") < ma.index("<KhoiPhaiTra"), (
-        "Dòng tiền phải đứng trước hai khối công nợ: tiền ra vào trước, ai nợ ai sau."
+    # ══════════════════════════════════════════════════════════════════════════════════════
+    # SỬA 17/9/2026 (TC-57) · VẾ NÀY ĐẢO, GHI LẠI CẢ HAI
+    # ══════════════════════════════════════════════════════════════════════════════════════
+    # Vế cũ: "Dòng tiền phải đứng TRƯỚC hai khối công nợ: tiền ra vào trước, ai nợ ai sau."
+    #
+    # Anh Tuấn mở trang ngày 17/9, chụp đúng khối Dòng tiền và bảo: "xoá bỏ cái này khỏi màn hình
+    # chủ tịch, thay vào đó là biểu đồ và số liệu phân tích dòng tiền NGANG Ở DƯỚI PHẢI THU VÀ
+    # PHẢI TRẢ."
+    #
+    # Mạch đọc cũ không sai, nhưng nó bỏ qua một điều mạnh hơn: Phải thu và Phải trả dùng CHUNG
+    # một bộ bảy mốc hạn (TC-45), nên cái lợi lớn nhất của chúng là đọc SO HÀNG NGANG với nhau.
+    # Chen Dòng tiền vào giữa là tách đúng cặp cần đứng cạnh. Còn Dòng tiền thì không chung trục
+    # với chúng, và biểu đồ 13 tuần của nó cần cả bề ngang — nên nó nằm riêng một hàng bên dưới.
+    assert ma.index("<KhoiPhaiThu") < ma.index("<KhoiPhaiTra") < ma.index("<KhoiDongTien"), (
+        "Phải thu và Phải trả đứng cạnh nhau (chung bảy mốc hạn), Dòng tiền nằm hàng riêng bên "
+        "dưới vì biểu đồ 13 tuần cần cả bề ngang."
     )
 
 def test_ba_khoi_kinh_doanh_dung_cuoi_va_khong_chen_giua():

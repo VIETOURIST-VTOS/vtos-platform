@@ -79,31 +79,45 @@ def test_ton_dong_khong_con_nam_trong_luoi_ba_khoi_tien():
     )
 
 
-def test_luoi_chi_con_dung_ba_khoi_tien_dung_thu_tu():
-    """Chỗ hỏng số 4: lớp CSS trỏ tới Dòng tiền bằng `:first-child`."""
+def test_luoi_chi_con_hai_khoi_cong_no_dung_thu_tu():
+    """TC-57 (cùng ngày) rút lưới xuống còn HAI khối — Dòng tiền ra hàng riêng bên dưới.
+
+    Vế cũ của phép thử này đòi ba khối theo thứ tự Dòng tiền → Phải thu → Phải trả, vì lớp CSS
+    chiếm-trọn-hàng trỏ tới khối đầu bằng `:first-child`. Anh Tuấn chốt 17/9/2026: "biểu đồ và số
+    liệu phân tích dòng tiền ngang ở dưới PHẢI THU VÀ PHẢI TRẢ". Không còn khối nào phải chiếm
+    trọn hàng, nên hai dòng `:first-child` ấy cũng đi theo — xem phép thử bề ngang bên dưới.
+    """
     khoi = _khoi_luoi(_ma_tsx(_doc(TRANG)))
-    thu_tu = [t for t in ("KhoiDongTien", "KhoiPhaiThu", "KhoiPhaiTra") if t in khoi]
-    assert thu_tu == ["KhoiDongTien", "KhoiPhaiThu", "KhoiPhaiTra"], (
-        "Ba khối phải đúng thứ tự Dòng tiền → Phải thu → Phải trả. CSS chiếm-trọn-hàng trỏ tới "
-        "khối đầu bằng `:first-child`; đảo thứ tự là đổi bố cục mà không có lỗi biên dịch nào báo."
+    assert "KhoiDongTien" not in khoi, (
+        "Dòng tiền đã ra hàng riêng bên dưới: biểu đồ 13 tuần cần cả bề ngang, và Phải thu · Phải "
+        "trả cần đứng cạnh nhau vì chung bảy mốc hạn."
     )
+    assert "KhoiPhaiThu" in khoi and "KhoiPhaiTra" in khoi
     assert khoi.index("KhoiPhaiThu") < khoi.index("KhoiPhaiTra"), "Phải thu đứng trước Phải trả."
 
 
 # ═════════════════ 2 · BỀ NGANG TRUNG GIAN ═════════════════
 
-def test_be_ngang_trung_gian_dong_tien_chiem_tron_hang_de_hai_khoi_kia_song_song():
-    """Chỗ hỏng số 2 — chỗ chỉ lộ ra ở một khoảng bề ngang nên dễ lọt qua mắt."""
+def test_luoi_hai_cot_va_khong_con_lop_chiem_tron_hang_mo_coi():
+    """Chỗ hỏng số 2, ở hình dạng mới sau TC-57.
+
+    Lưới chỉ còn hai khối nên nó là hai cột ở mọi bề ngang từ 900px — không còn khoảng trung gian
+    nào để chúng nằm chéo.
+
+    Nhưng sinh ra một chỗ hỏng MỚI, và phép thử này canh đúng nó: hai dòng `:first-child` của
+    TC-54 phải bị gỡ. Chúng sinh ra để đẩy DÒNG TIỀN chiếm trọn hàng khi lưới còn ba khối. Không
+    còn khối ấy trong lưới mà giữ lại thì chúng đẩy PHẢI THU chiếm trọn hàng — một lớp CSS mồ côi
+    vẫn chạy, và chạy sai: Phải trả tụt xuống một mình, đúng cái lệch anh Tuấn vừa bảo sửa.
+    """
     css = _ma_css(_doc(CSS))
     i = css.index(".mh01-sau-o{")
     khoi = css[i:i + 1200]
-    assert re.search(r"\.mh01-sau-o>:first-child\{grid-column:1\s*/\s*-1\}", khoi), (
-        "Ở 900–1279px lưới còn hai cột. Không cho Dòng tiền chiếm trọn hàng trên thì Phải thu ô 2, "
-        "Phải trả tụt xuống ô 3 — chéo nhau đúng như lỗi vừa sửa."
+    assert "grid-template-columns:1fr 1fr" in khoi, "Từ 900px trở lên phải là hai cột."
+    assert ".mh01-sau-o>:first-child" not in khoi, (
+        "Lớp chiếm-trọn-hàng đã mồ côi từ TC-57 — giữ lại là đẩy Phải thu chiếm trọn hàng và Phải "
+        "trả tụt xuống một mình."
     )
-    assert "grid-template-columns:1.25fr 1fr 1fr" in khoi, (
-        "Màn rộng phải là BA cột, Dòng tiền rộng hơn vì biểu đồ 13 tuần cần chỗ."
-    )
+    assert "1.25fr" not in khoi, "Không còn cột Dòng tiền trong lưới này."
 
 
 # ═════════════════ 3 · KHÔNG CÒN align-items:start ═════════════════

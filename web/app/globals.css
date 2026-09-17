@@ -902,12 +902,15 @@ table.bang-doc{width:100%}
    khối nằm CHÉO nhau. Chúng dùng chung một bộ bảy mốc hạn (TC-45), nên cái lợi lớn nhất của
    chúng là đọc SO HÀNG NGANG; nằm chéo là vứt bỏ đúng cái lợi ấy.
 
-   Nay chỉ còn BA khối trong lưới (Tồn đọng ra hàng riêng, xem page.tsx), và luật là:
-     · ≥1280px  → ba cột, Dòng tiền rộng hơn vì biểu đồ 13 tuần cần chỗ.
-     · 900–1279 → hai cột, Dòng tiền chiếm TRỌN hàng trên, để Phải thu và Phải trả vẫn song song.
-       Đây là chỗ dễ làm ẩu nhất: để lưới tự chia hai cột thì ở bề ngang này chúng lại nằm chéo,
-       đúng lỗi vừa sửa, mà chỉ lộ ra ở một khoảng bề ngang nên dễ lọt.
-     · <900px   → một cột.
+   TC-57 (cùng ngày) rút tiếp xuống còn HAI khối: Dòng tiền xuống hàng riêng bên dưới, nằm ngang
+   hết bề ngang, vì biểu đồ 13 tuần cần chỗ (anh Tuấn chốt 17/9/2026). Lưới này nay chỉ còn Phải
+   thu và Phải trả — hai khối dùng chung một bộ bảy mốc hạn, và đó chính là cặp phải so hàng ngang.
+   Luật:
+     · ≥900px → hai cột, Phải thu và Phải trả song song.
+     · <900px → một cột.
+   Hai dòng `:first-child` của TC-54 đã bỏ: chúng sinh ra để đẩy Dòng tiền chiếm trọn hàng trên khi
+   lưới còn ba khối. Không còn khối ấy trong lưới thì giữ lại là đẩy PHẢI THU chiếm trọn hàng —
+   một lớp CSS mồ côi vẫn chạy, và chạy sai.
 
    BỎ `align-items:start` CỦA TC-42, và nói rõ vì sao đảo: lý lẽ cũ là "khoảng trắng dưới một
    khối trông giống dữ liệu còn thiếu". Trên bản chạy thật điều ngược lại xảy ra — ba khối cao
@@ -916,14 +919,7 @@ table.bang-doc{width:100%}
    không đọc ra gì cả. */
 .mh01-sau-o{display:grid;gap:14px;align-items:stretch;grid-template-columns:1fr}
 .mh01-sau-o>*{min-width:0;margin:0}
-@media (min-width:900px){
-  .mh01-sau-o{grid-template-columns:1fr 1fr}
-  .mh01-sau-o>:first-child{grid-column:1 / -1}
-}
-@media (min-width:1280px){
-  .mh01-sau-o{grid-template-columns:1.25fr 1fr 1fr}
-  .mh01-sau-o>:first-child{grid-column:auto}
-}
+@media (min-width:900px){ .mh01-sau-o{grid-template-columns:1fr 1fr} }
 
 /* Con số lớn của ô: kỳ ĐANG CHẠY. Nó đứng trên biểu đồ vì đó là thứ đọc trước; biểu đồ các kỳ đã
    đóng là thứ đọc sau để biết con số ấy đang đi lên hay xuống. */
@@ -1056,3 +1052,19 @@ table.bang-doc{width:100%}
   .bd-thanh,.bd-th-thanh,.bd-cc-o{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .mh01-hang-3{grid-template-columns:1fr 1fr 1fr}
 }
+
+/* ═══ TC-57 · DÒNG TIỀN: BIỂU ĐỒ 13 TUẦN + BỐN MỐC ═════════════════════════════════════════
+   "em xoa bo cai nay khoi man hinh chu tich, thay vao do la bieu do va so lieu phan tich dong
+    tien ngang o duoi PHAI THU VA PHAI TRA"              — anh Tuấn, 17/9/2026
+   Bốn ô cảnh báo (.bon-o) đã gỡ khỏi khối này; lớp .bon-o vẫn còn vì màn hình khác dùng. */
+.dt-dubao{margin:10px 0 14px}
+/* Bốn mốc: 2×2 trên điện thoại, một hàng bốn ô từ 560px. Cùng luật với bản thử anh Tuấn duyệt.
+   `align-items:stretch` (mặc định của lưới) giữ bốn ô cao bằng nhau — bài học TC-54. */
+.dt-moc{display:grid;gap:10px;grid-template-columns:repeat(2,1fr);margin-top:12px}
+@media (min-width:560px){ .dt-moc{grid-template-columns:repeat(4,1fr)} }
+.dt-moc-o{background:var(--vtos-surface);border:1px solid var(--vtos-line);
+  border-radius:var(--vtos-radius-md);padding:10px 12px;min-width:0}
+.dt-moc-o b{display:block;font-size:17px;font-weight:700;line-height:1.25;
+  font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono)}
+.dt-moc-o small{display:block;font-size:11.5px;color:var(--vtos-text-mute);margin-top:3px}
+.dt-dubao-chan{font-size:11.5px;color:var(--vtos-text-mute);line-height:1.6;margin:10px 0 0}
