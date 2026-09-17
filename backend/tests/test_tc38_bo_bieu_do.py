@@ -243,45 +243,81 @@ def test_o_rong_luon_noi_vi_sao():
     assert "vi_sao" in t and "bd-rong-ly" in t
 
 
-def test_bieu_do_chua_du_so_thi_tra_null_chu_khong_tra_khung_rong():
-    """TC-40 (anh Tuấn chốt 15/9/2026) · Ô SỐ ĐÃ NÓI RỒI THÌ BIỂU ĐỒ ĐỪNG NÓI LẠI.
+def test_chua_du_so_thi_ve_khung_rong_giu_cho_chu_khong_bo_hinh():
+    """TC-49 (anh Tuấn chốt 17/9/2026) · LUẬT TC-40 BỊ ĐẢO CHIỀU — GHI CẢ HAI VẾ.
 
-    Trước vòng này mỗi biểu đồ chưa đủ số vẫn dựng ra một khung ghi "chưa có số, bộ phận X nạp".
-    Nhưng biểu đồ nằm NGAY TRONG khối của nó, và ô số ngay trên đã ghi đúng câu ấy kèm bộ phận và
-    cửa nhập. Hai khung nói cùng một chuyện, cách nhau 40px.
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    LUẬT CŨ (TC-40, anh Tuấn chốt 15/9/2026) và vì sao nó ĐÚNG lúc ấy
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    "Ô số đã nói rồi thì biểu đồ đừng nói lại." Biểu đồ nằm NGAY TRONG khối của nó, và ô số ngay
+    trên đã ghi "—" kèm bộ phận và cửa nhập. Hai khung nói cùng một chuyện, cách nhau 40px. Nên
+    `bieuDoCua` trả `null` và khối chỉ hiện ô số.
 
-    Nên `bieuDoCua` trả `null`, và khối chỉ hiện ô số. Ranh giới 09/9 không hề bị nới: chỗ chưa có
-    số VẪN đọc được từ màn hình — nó nằm ở ô số, chỗ đúng của nó."""
+    Lý do ấy đúng khi MỘT khối chưa có số. Nó SAI khi CẢ MÀN HÌNH chưa có số — và đó mới là tình
+    trạng thật của VTOS hôm nay.
+
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    VÌ SAO ĐẢO
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    Anh Tuấn mở trang thật ngày 17/9/2026: "trên màn hình chưa có biểu đồ, và giao diện chưa
+    giống file ảnh anh gửi". Cả hai vế đều từ luật cũ: mọi khối cùng lúc co lại thành văn xuôi,
+    và bảng điều hành không còn ra hình dáng một bảng điều hành. Anh duyệt bản thử giao diện rồi
+    chốt "đưa lên web đúng y chang vậy".
+
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    LUẬT MỚI, VÀ PHẦN KHÔNG ĐƯỢC NỚI
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    Luôn vẽ hình; chưa đủ số thì bộ biểu đồ tự trả `BieuDoRong` mang đủ nhãn thật.
+
+    NHƯNG RANH GIỚI 09/9 KHÔNG HỀ BỊ NỚI, và đó là phần phép thử này canh gắt nhất: khung rỗng
+    KHÔNG được có cột nào cao lên. Một cột giả có chiều cao là một con số bịa, và bịa trên bảng
+    điều hành Chủ tịch là chỗ nguy hiểm nhất của cả hệ thống.
+    """
     t = _bo_chu_thich_tsx(_doc(KHU))
     so_bd = len(re.findall(r"<BieuDo(?:Cot|Thanh|CoCau)\b", t))
-    so_null = len(re.findall(r"\n\s*: null,", t))
-    # SỬA 16/9/2026 (TC-42): hai biểu đồ CỘT theo kỳ (doanh thu, lợi nhuận) rời tệp này sang
-    # components/KhoiSauO.tsx cùng hai Ô LỚN của chúng — nên bộ này còn NĂM. Luật thì không đổi
-    # một chữ, và nó nằm ở phép so bên dưới: mỗi biểu đồ phải có đúng một nhánh trả `null`.
     assert so_bd >= 5, f"Bộ biểu đồ phải đủ dùng cho các khối, đang đếm {so_bd}"
-    assert so_null == so_bd, (
-        f"{so_bd} biểu đồ nhưng chỉ {so_null} nhánh trả null. Mỗi biểu đồ phải có nhánh 'chưa đủ "
-        f"số thì trả null' — trả một khung rỗng là nói lại điều ô số đã nói."
+
+    # Bốn biểu đồ THANH của bộ này không còn nhánh trả null — chúng luôn được dựng, và chính bộ
+    # biểu đồ quyết vẽ đầy hay vẽ rỗng. Cơ cấu (Tỉ lệ nộp) giữ nhánh cũ: nó là hình TRÒN, khung
+    # rỗng của nó không nói thêm được gì ngoài chính câu ô số đã nói.
+    so_null = len(re.findall(r"\n\s*: null,", t))
+    assert so_null <= 1, (
+        f"Còn {so_null} nhánh trả null. Từ TC-49 các biểu đồ THANH luôn được dựng; chưa đủ số thì "
+        f"bộ biểu đồ tự trả khung rỗng giữ đúng hình dáng."
     )
-    # TC-42: `duVeCot` theo hai biểu đồ cột sang KhoiSauO.tsx, nên tệp này chỉ còn hai hàm hỏi.
-    # Luật là "hỏi qua hàm thuần, không viết lại điều kiện tại chỗ" — nên canh CẢ HAI tệp, thay vì
-    # nới lỏng cho tệp này.
-    assert "duVeCoCau(" in t and "duVeThanh(" in t, (
-        "Điều kiện vẽ phải hỏi qua hàm thuần của bộ biểu đồ, không viết lại tại chỗ."
+
+    # MỘT CHỖ QUYẾT ĐỊNH, KHÔNG PHẢI HAI. Luật "hỏi qua hàm thuần, không viết lại điều kiện tại
+    # chỗ" giữ nguyên — chỉ khác là nay nơi hỏi nằm TRONG bộ biểu đồ.
+    bd = _bo_chu_thich_tsx((GOC / "web" / "components" / "BieuDo.tsx").read_text(encoding="utf-8"))
+    assert "if (!duVeCot(diem))" in bd and "if (!duVeThanh(hang))" in bd, (
+        "Điều kiện vẽ phải hỏi qua hàm thuần, và hỏi ở trong bộ biểu đồ."
     )
-    # SỬA 16/9/2026 (TC-44): hai Ô LỚN theo kỳ rời KhoiSauO.tsx sang KhoiKetQuaKinhDoanh.tsx; ô
-    # Tồn đọng ở lại. Luật không đổi một chữ — nơi nào QUYẾT ĐỊNH vẽ hay không thì nơi ấy phải hỏi
-    # qua hàm thuần — nên phép thử theo hai ô kia sang tệp mới, thay vì nới lỏng cho tệp cũ.
-    sau_o = _bo_chu_thich_tsx(
-        (GOC / "web" / "components" / "KhoiSauO.tsx").read_text(encoding="utf-8"))
-    assert "duVeCoCau(" in sau_o, (
-        "Ô Tồn đọng phải hỏi qua hàm thuần, không tự xét điều kiện vẽ."
-    )
+
+    # KHỐI KẾT QUẢ KINH DOANH không còn tự hỏi trước khi vẽ nữa — nó giao việc ấy cho bộ biểu đồ.
     kq = _bo_chu_thich_tsx(
         (GOC / "web" / "components" / "KhoiKetQuaKinhDoanh.tsx").read_text(encoding="utf-8"))
-    assert kq.count("duVeCot(") == 2, (
-        "Cả hai biểu đồ của khối Kết quả kinh doanh phải HỎI TRƯỚC KHI VẼ. Để bộ biểu đồ tự dựng "
-        "khung rỗng của nó là nói lại điều ô số ngay trên đã nói, cách đó bốn chục pixel."
+    assert "duVeCot(" not in kq, (
+        "Khối không tự xét điều kiện vẽ nữa; để bộ biểu đồ quyết, nhờ vậy khung rỗng giữ đúng "
+        "hình dáng của hình thật."
+    )
+
+
+def test_khung_rong_khong_duoc_co_cot_nao_cao_len():
+    """Phần KHÔNG ĐƯỢC NỚI của luật mới — canh riêng vì đây là chỗ nguy hiểm nhất.
+
+    Khung rỗng giữ chỗ bằng ô NÉT ĐỨT, không có phần tô. Ngày nào có người thấy khung trống trải
+    quá rồi cho mỗi ô một chiều cao "cho đẹp", ngày ấy bảng điều hành Chủ tịch có cột bịa.
+    """
+    css = _doc(GOC / "web" / "app" / "globals.css")
+    khoi = css.split(".bd-rong-mot{")[1].split("}")[0]
+    assert "dashed" in khoi, "Ô giữ chỗ phải là nét đứt."
+    assert "background" not in khoi, (
+        "Ô giữ chỗ KHÔNG được có phần tô — tô vào là vẽ ra một cột không có số đằng sau."
+    )
+    bd = _bo_chu_thich_tsx((GOC / "web" / "components" / "BieuDo.tsx").read_text(encoding="utf-8"))
+    rong = bd.split("export function BieuDoRong")[1].split("export function ChuGiai")[0]
+    assert "height" not in rong, (
+        "BieuDoRong không được tính chiều cao cho ô nào — chiều cao là con số, và ở đây chưa có số."
     )
 
 

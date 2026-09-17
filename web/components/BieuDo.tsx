@@ -160,12 +160,66 @@ export function KhungBieuDo({ ten, phu, chan, chuGiai, children }: {
 /** Ô rỗng CHUẨN: nói chưa vẽ được, nói VÌ SAO, và nếu biết thì nói AI phải nạp số.
  *  Một khung xám không lời thì người đọc kết luận hệ thống hỏng — mà sự thật thường là chưa ai
  *  nhập, tức là một việc có chủ. */
-export function BieuDoRong({ ten, vi_sao, ai, cua, cua_ten }: {
-  ten: string; vi_sao: string; ai?: string; cua?: string; cua_ten?: string;
+/** Biểu đồ CHƯA CÓ SỐ.
+ *
+ *  TC-49 · KHUNG RỖNG PHẢI GIỮ ĐÚNG HÌNH DÁNG CỦA BIỂU ĐỒ THẬT (anh Tuấn duyệt bản thử giao diện
+ *  17/9/2026 rồi chốt "đưa lên web đúng y chang vậy").
+ *
+ *  Bản cũ chỉ in một dòng chữ. Chạy được, và đúng về nội dung — nhưng khi CẢ màn hình chưa có
+ *  nguồn thì mọi khối co lại thành mấy đoạn văn xuôi, và bảng điều hành không còn ra hình dáng một
+ *  bảng điều hành nữa. Anh Tuấn mở trang thật ngày 17/9 và nói đúng một câu: "trên màn hình chưa
+ *  có biểu đồ, và giao diện chưa giống file ảnh anh gửi". Cả hai vế đều từ chỗ này mà ra.
+ *
+ *  BA ĐIỀU KHUNG RỖNG PHẢI LÀM, VÀ MỘT ĐIỀU TUYỆT ĐỐI KHÔNG:
+ *    · giữ đúng chiều cao và bề ngang của hình thật, để bố cục không nhảy khi số về;
+ *    · vẽ trục và NHÃN THẬT (T1…T12, bảy nhóm hạn) — người đọc thấy trước hình này sẽ nói gì;
+ *    · nói rõ vì sao rỗng, ai nạp, cửa nào.
+ *    · KHÔNG vẽ một cột nào có chiều cao. Ô trống là ô trống; một cột giả cao lên trong khung
+ *      rỗng là con số bịa, và bịa trên bảng điều hành Chủ tịch là chỗ nguy hiểm nhất của cả hệ
+ *      thống. Nên chỗ giữ chỗ chỉ là khung nét đứt, không có phần tô.
+ */
+export function BieuDoRong({ ten, phu, vi_sao, ai, cua, cua_ten, nhan, ngang }: {
+  ten: string; phu?: string; vi_sao: string; ai?: string; cua?: string; cua_ten?: string;
+  /** Nhãn của các ô sẽ có khi có số: "T1"…"T12", hoặc bảy nhóm hạn. Có nhãn thì vẽ khung. */
+  nhan?: string[];
+  /** Thanh NGANG (nhãn là tên) thay vì cột dọc (nhãn là kỳ). */
+  ngang?: boolean;
 }) {
+  const ds = nhan || [];
   return (
     <figure className="bd bd-rong">
-      <figcaption className="bd-dau"><b>{ten}</b></figcaption>
+      <figcaption className="bd-dau">
+        <b>{ten}</b>{phu && <span className="muted bd-phu"> {phu}</span>}
+      </figcaption>
+
+      {ds.length > 0 && (ngang ? (
+        <div className="bd-rong-ngang" aria-hidden="true">
+          {ds.map((n) => (
+            <div key={n} className="bd-rong-hang">
+              <span className="bd-rong-ten">{n}</span>
+              <span className="bd-rong-ray" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className={"bd-rong-khung" + (ds.length > 8 ? " day" : "")} aria-hidden="true">
+          <div className="bd-rong-o">
+            {/* Ba vạch lưới mờ: đủ để mắt đọc ra "đây là một khung biểu đồ", không nhiều tới mức
+                trông như một hình đã có số. Không ghi nhãn trục tung — chưa có số thì chưa có
+                thang đo, và in một thang đo bịa còn tệ hơn không in. */}
+            <i className="bd-rong-luoi" style={{ top: "0%" }} />
+            <i className="bd-rong-luoi" style={{ top: "50%" }} />
+            <i className="bd-rong-luoi khong" style={{ top: "100%" }} />
+            <div className="bd-rong-cot">
+              {ds.map((n) => <span key={n} className="bd-rong-mot" />)}
+            </div>
+          </div>
+          <div className="bd-nhanx">
+            {ds.map((n) => <span key={n} className="muted">{n}</span>)}
+          </div>
+        </div>
+      ))}
+
       <p className="muted bd-rong-ly">{vi_sao}</p>
       {ai && (
         <p className="muted bd-rong-ai">
@@ -226,7 +280,9 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
 }) {
   const coSo = diem.filter((d) => d.gt !== null) as { nhan: string; gt: number }[];
   if (!duVeCot(diem)) {
-    return <BieuDoRong ten={ten} ai={ai} cua={cua} cua_ten={cua_ten}
+    // TC-49 · truyền NHÃN THẬT xuống khung rỗng, để hình rỗng giữ đúng hình dáng hình thật.
+    return <BieuDoRong ten={ten} phu={phu} ai={ai} cua={cua} cua_ten={cua_ten}
+      nhan={diem.map((d) => d.nhan)}
       vi_sao={coSo.length === 0
         ? `Chưa có kỳ nào có số trong ${diem.length} kỳ gần nhất, nên chưa vẽ được.`
         : `Mới có 1/${diem.length} kỳ có số. Một cột đứng một mình không so được với gì — cần ít nhất hai kỳ.`} />;
@@ -397,7 +453,11 @@ export function BieuDoThanh({ ten, phu, ds, dinh_dang = "dem", chan, ai, cua, cu
   const hang = xep ? xepThanh(ds) : ds;
   const coSo = hang.filter((h) => typeof h.gt === "number").map((h) => h.gt as number);
   if (!duVeThanh(hang)) {
-    return <BieuDoRong ten={ten} ai={ai} cua={cua} cua_ten={cua_ten}
+    // TC-49 · bảy nhóm hạn vẫn hiện ĐỦ BẢY TÊN dù chưa có số. Người đọc thấy trước hình này sẽ
+    // trả lời câu gì, và thấy luôn rằng nó có bảy nhóm chứ không phải năm — điều mà một đoạn chữ
+    // "chưa có nguồn" không nói được.
+    return <BieuDoRong ten={ten} phu={phu} ai={ai} cua={cua} cua_ten={cua_ten}
+      ngang nhan={hang.map((h) => h.ten)}
       vi_sao={coSo.length === 0
         ? "Chưa dòng nào có số, nên chưa vẽ được."
         : "Mới có 1 dòng có số. Một thanh dài hết khung không so với gì cả — cần ít nhất hai dòng."} />;

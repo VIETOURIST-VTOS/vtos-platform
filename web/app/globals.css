@@ -828,6 +828,40 @@ table.bang-doc{width:100%}
 .bd-rong-ly,.bd-rong-ai{font-size:11.5px;margin:0;line-height:1.55}
 .bd-rong-ai{margin-top:6px}
 
+/* ═══ TC-49 · KHUNG RỖNG GIỮ ĐÚNG HÌNH DÁNG CỦA HÌNH THẬT ═══════════════════════════════════
+   Anh Tuấn duyệt bản thử giao diện 17/9/2026 rồi chốt "đưa lên web đúng y chang vậy". Trước đó
+   anh mở trang thật và nói: "trên màn hình chưa có biểu đồ, giao diện chưa giống file ảnh".
+
+   Cả hai vế đều từ một chỗ: chưa có số thì khối in một đoạn chữ thay cho hình, nên khi CẢ màn
+   hình chưa có nguồn thì bảng điều hành co lại thành mấy đoạn văn xuôi.
+
+   KHUNG RỖNG KHÔNG ĐƯỢC CÓ CỘT NÀO CAO LÊN. Chỗ giữ chỗ chỉ là ô nét đứt, không phần tô — một
+   cột giả có chiều cao là một con số bịa, và bịa trên bảng điều hành Chủ tịch là chỗ nguy hiểm
+   nhất của cả hệ thống. Chiều cao khung lấy đúng 168px của hình thật để bố cục không nhảy khi
+   số về. */
+.bd-rong-khung{display:grid;grid-template-columns:1fr;gap:0;margin:10px 0 12px}
+.bd-rong-o{position:relative;height:148px}
+.bd-rong-luoi{position:absolute;left:0;right:0;height:1px;background:var(--vtos-line);opacity:.4}
+.bd-rong-luoi.khong{opacity:.85}
+.bd-rong-cot{position:absolute;inset:0;display:grid;grid-auto-flow:column;
+  grid-auto-columns:1fr;gap:10px}
+.bd-rong-mot{border:1px dashed var(--vtos-line);border-radius:3px;opacity:.55}
+.bd-rong-khung .bd-nhanx{grid-area:auto;margin-top:5px}
+@media (min-width:900px){ .bd-rong-khung.day .bd-rong-cot,
+  .bd-rong-khung.day .bd-nhanx{gap:18px} }
+@media (max-width:560px){
+  .bd-rong-khung.day .bd-rong-cot,.bd-rong-khung.day .bd-nhanx{gap:3px}
+  .bd-rong-khung.day .bd-nhanx>span{font-size:9px;letter-spacing:-.2px}
+}
+
+/* Thanh NGANG rỗng: giữ đủ TÊN các nhóm. Bảy nhóm hạn hiện đủ bảy tên dù chưa có số — người đọc
+   thấy luôn hình này có bảy nhóm chứ không phải năm, điều một dòng chữ không nói được. */
+.bd-rong-ngang{display:grid;gap:9px;margin:10px 0 12px}
+.bd-rong-hang{display:grid;grid-template-columns:96px 1fr;align-items:center;gap:10px}
+.bd-rong-ten{font-size:11px;color:var(--vtos-text-mute);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.bd-rong-ray{height:11px;border:1px dashed var(--vtos-line);border-radius:4px;opacity:.55}
+
 /* ── TC-40 · BỐ CỤC MÀN HÌNH 01 SAU KHI GOM ──
    Khu biểu đồ riêng đã bỏ (anh Tuấn chốt 15/9/2026): biểu đồ về nằm trong khối của nó, nên các
    lớp .mh01-khu* không còn ai dùng và đã dọn đi. Giữ lại đúng hai thứ còn dùng. */

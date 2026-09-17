@@ -30,7 +30,7 @@
  *  khung xám ghi lại đúng điều ấy là nói hai lần cùng một chuyện, và đó là cái anh Tuấn bảo bỏ.
  */
 import {
-  BieuDoThanh, BieuDoCoCau, duVeThanh, duVeCoCau,
+  BieuDoThanh, BieuDoCoCau, duVeCoCau,
   type Thanh, type Phan,
 } from "@/components/BieuDo";
 
@@ -109,21 +109,27 @@ export function bieuDoCua(sec: any): BoBieuDo {
     ? [{ ten: "Đã nộp", gt: tyLe }, { ten: "Chưa nộp", gt: 1 - tyLe, trang_thai: true }]
     : [{ ten: "Đã nộp", gt: null }, { ten: "Chưa nộp", gt: null }];
 
+  /* TC-49 · KHÔNG CÒN CỔNG `duVe… ? … : null` Ở ĐÂY.
+   *
+   *  Bản cũ: chưa đủ số thì trả `null`, khối bên ngoài không vẽ gì, và cả màn hình co lại thành
+   *  mấy đoạn văn xuôi. Anh Tuấn mở trang thật ngày 17/9: "trên màn hình chưa có biểu đồ".
+   *
+   *  Phép quyết "đủ số hay chưa" KHÔNG bị bỏ — nó chuyển vào trong chính bộ biểu đồ, nơi nó vốn
+   *  thuộc về (`BieuDoThanh`/`BieuDoCot` tự gọi `duVeThanh`/`duVeCot` rồi trả `BieuDoRong`). Nhờ
+   *  vậy chỉ còn MỘT chỗ quyết, và khung rỗng giữ đúng hình dáng của hình thật.
+   *
+   *  Hệ quả phải nói ra: nơi gọi không còn phân biệt được "có hình" với "không có hình" bằng cách
+   *  kiểm `null`. Đó là chủ ý — luôn luôn có hình, chỉ là hình rỗng hay hình đầy.
+   */
   return {
-    phai_thu: duVeThanh(thu)
-      ? <BieuDoThanh ten="Bảy nhóm hạn" phu="gần → xa" ds={thu} dinh_dang="tien" xep={false}
-          chan={CHAN_HAN} ai="Kế toán" cua="/ra-soat-cot-tien" cua_ten="Cửa nhập công nợ phải thu" />
-      : null,
-    phai_tra: duVeThanh(tra)
-      ? <BieuDoThanh ten="Bảy nhóm hạn" phu="gần → xa" ds={tra} dinh_dang="tien" xep={false}
-          chan={CHAN_HAN} ai="Kế toán" cua="/nha-cung-cap" cua_ten="Cửa nhập công nợ phải trả" />
-      : null,
-    kd_le: duVeThanh(le)
-      ? <BieuDoThanh ten="Xếp hạng theo nhân viên" ds={le} dinh_dang="tien" />
-      : null,
-    kd_doan: duVeThanh(doan)
-      ? <BieuDoThanh ten="Xếp hạng theo nhân viên" ds={doan} dinh_dang="tien" />
-      : null,
+    phai_thu: <BieuDoThanh ten="Bảy nhóm hạn" phu="gần → xa" ds={thu} dinh_dang="tien" xep={false}
+      chan={CHAN_HAN} ai="Kế toán" cua="/ra-soat-cot-tien" cua_ten="Cửa nhập công nợ phải thu" />,
+    phai_tra: <BieuDoThanh ten="Bảy nhóm hạn" phu="gần → xa" ds={tra} dinh_dang="tien" xep={false}
+      chan={CHAN_HAN} ai="Kế toán" cua="/nha-cung-cap" cua_ten="Cửa nhập công nợ phải trả" />,
+    kd_le: <BieuDoThanh ten="Xếp hạng theo nhân viên" ds={le} dinh_dang="tien"
+      ai="Kinh doanh" cua="/bookings" cua_ten="Cửa nhập booking" />,
+    kd_doan: <BieuDoThanh ten="Xếp hạng theo nhân viên" ds={doan} dinh_dang="tien"
+      ai="Kinh doanh" cua="/bookings" cua_ten="Cửa nhập booking" />,
     bao_cao_ngay: duVeCoCau(bcNgay)
       ? <BieuDoCoCau ten="Tỉ lệ nộp" ds={bcNgay} dinh_dang="phan_tram" />
       : null,
