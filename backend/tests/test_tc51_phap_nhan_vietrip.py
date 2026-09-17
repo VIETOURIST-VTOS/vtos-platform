@@ -11,14 +11,16 @@ Lý do: `ket_qua_that.thang()` lọc theo pháp nhân mẹ (TC-47, anh Tuấn ch
 đúng khi đứng một mình; đặt cạnh nhau thì chúng triệt tiêu nhau và không ai thấy vì màn hình chỉ
 hiện một dấu gạch.
 
-Anh Tuấn chốt 17/9/2026: **tất cả tour Vietrip → Vietourist mẹ**.
+Anh Tuấn chốt 17/9/2026 (sáng): **tất cả tour Vietrip → Vietourist mẹ**.
+Anh Tuấn chốt 17/9/2026 (chiều, TC-56): **"1 gán hết cho Vietourist Holdings, ok"** — sau khi kho
+cũ nạp về và lộ ra 477/765 chuyến H1 không có pháp nhân, rơi khỏi màn hình mà không ai thấy.
 
 ══════════════════════════════════════════════════════════════════════════════════════════════
 NĂM CHỖ DỄ HỎNG — MỖI PHÉP THỬ CANH ĐÚNG MỘT CHỖ
 ══════════════════════════════════════════════════════════════════════════════════════════════
-1. GẮN LAN SANG CHUYẾN DỰNG TAY. Luật chung của `tours.company_id` vẫn là "rỗng nghĩa là CHƯA XÁC
-   ĐỊNH, không mặc định về mẹ". Vòng này chỉ mở ngoại lệ cho chuyến NGUỒN VIETRIP. Gắn luôn cả
-   chuyến người ta dựng tay trong VTOS là lặng lẽ xoá mất câu hỏi "chuyến này của ai".
+1. CHUYẾN KHÔNG RÕ NGUỒN BỊ BỎ LẠI. (Vế cũ của chỗ này là ngược lại — xem chuỗi tài liệu của phép
+   thử số 1 để đọc cả hai vế và vì sao đảo.) Kho cũ không phải Vietrip, cũng không phải ai dựng
+   tay; để rỗng là để nó rơi khỏi màn hình Chủ tịch mà không ai biết.
 2. GHI ĐÈ PHÁP NHÂN NGƯỜI TA GẮN TAY. Ai đó gán một chuyến Vietrip cho công ty con là đã có chủ ý.
    Robot chạy đêm ghi đè về mẹ thì sáng ra số đã đổi mà không ai biết — và lần sau lại đổi tiếp.
 3. BỊA PHÁP NHÂN KHI DANH MỤC CHƯA CÓ MẸ. Lùi về "công ty đầu tiên trong bảng" là gắn 1.743 chuyến
@@ -90,17 +92,30 @@ def _so_gia(co_me: bool = True):
     return db, (me.id if co_me else None), con.id
 
 
-# ═════════════════ 1 · CHỈ CHUYẾN NGUỒN VIETRIP ═════════════════
+# ═════════════════ 1 · GẮN HẾT, KHÔNG PHÂN BIỆT NGUỒN (TC-56 đảo luật TC-51) ═════════════════
 
-def test_chi_gan_chuyen_nhap_tu_vietrip_khong_dung_den_chuyen_dung_tay():
-    """Chỗ hỏng số 1."""
+def test_gan_het_chuyen_con_rong_ve_cong_ty_me_du_nguon_nao():
+    """TC-56 · anh Tuấn chốt 17/9/2026: "1 gán hết cho Vietourist Holdings, ok".
+
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    LUẬT TC-51 BỊ ĐẢO — GHI LẠI CẢ HAI VẾ
+    ══════════════════════════════════════════════════════════════════════════════════════════
+    TC-51 (sáng cùng ngày) cố ý chỉ gắn cho chuyến `imported = True`, lý lẽ: chuyến dựng tay trong
+    VTOS phải do NGƯỜI chọn pháp nhân, gắn thay là lặng lẽ xoá mất câu hỏi "chuyến này của ai".
+
+    Lý lẽ ấy bỏ sót trường hợp thứ ba, và nó lộ ra ngay chiều hôm đó: **kho cũ**. Chuyến nạp từ kho
+    lịch sử không phải nguồn Vietrip, cũng không phải ai dựng tay — rơi đúng vào khe giữa hai
+    nhánh. Đếm 17/9: 477/765 chuyến H1 không có pháp nhân, và màn hình Chủ tịch lọc theo Vietourist
+    mẹ nên chúng bị lọc ra sạch, dù đã đóng số hay chưa.
+
+    Hai ranh giới còn lại (không ghi đè · không bịa) giữ nguyên — và chúng mới là chỗ bảo vệ thật.
+    """
     db, me, _ = _so_gia()
-    VT.gan_phap_nhan_vietrip(db)
+    VT.gan_phap_nhan_con_rong(db)
     assert db.query(Tour).filter_by(code="VT-RONG").one().company_id == me
-    assert db.query(Tour).filter_by(code="TAY-RONG").one().company_id is None, (
-        "Chuyến dựng tay trong VTOS vẫn phải do NGƯỜI chọn pháp nhân. Luật 'tất cả tour Vietrip → "
-        "mẹ' chỉ áp cho chuyến nguồn Vietrip; gắn lan sang chuyến dựng tay là lặng lẽ xoá mất câu "
-        "hỏi 'chuyến này của ai'."
+    assert db.query(Tour).filter_by(code="TAY-RONG").one().company_id == me, (
+        "Chuyến không rõ nguồn cũng phải về công ty mẹ. Để rỗng là để nó rơi khỏi màn hình Chủ "
+        "tịch mà không ai biết — đúng chỗ 477 chuyến H1 đã rơi."
     )
 
 
@@ -109,7 +124,7 @@ def test_chi_gan_chuyen_nhap_tu_vietrip_khong_dung_den_chuyen_dung_tay():
 def test_khong_ghi_de_phap_nhan_ai_da_gan_tay_du_khac_cong_ty_me():
     """Chỗ hỏng số 2."""
     db, me, con = _so_gia()
-    VT.gan_phap_nhan_vietrip(db)
+    VT.gan_phap_nhan_con_rong(db)
     assert db.query(Tour).filter_by(code="VT-DA-GAN").one().company_id == con, (
         "Chuyến Vietrip đã được gắn tay cho công ty con phải GIỮ NGUYÊN. Robot ghi đè về mẹ thì "
         "sáng ra số đã đổi mà không ai biết, và đêm sau lại đổi tiếp."
@@ -139,7 +154,7 @@ def test_danh_muc_chua_co_phap_nhan_me_thi_khong_gan_gi_ca():
     db, me, _ = _so_gia(co_me=False)
     assert me is None
     assert VT.phap_nhan_mac_dinh(db) is None
-    kq = VT.gan_phap_nhan_vietrip(db)
+    kq = VT.gan_phap_nhan_con_rong(db)
     assert kq["da_gan"] == 0 and kq["cong_ty_me"] is None
     assert db.query(Tour).filter_by(code="VT-RONG").one().company_id is None, (
         "Không có dòng kind='me' thì để rỗng. Lùi về 'công ty đầu tiên trong bảng' là gắn cả nghìn "
@@ -152,10 +167,13 @@ def test_danh_muc_chua_co_phap_nhan_me_thi_khong_gan_gi_ca():
 def test_bam_cua_va_lan_hai_khong_gan_them_gi():
     """Chỗ hỏng số 4."""
     db, me, _ = _so_gia()
-    lan1 = VT.gan_phap_nhan_vietrip(db)
-    lan2 = VT.gan_phap_nhan_vietrip(db)
-    assert lan1["da_gan"] == 1 and lan2["da_gan"] == 0
+    lan1 = VT.gan_phap_nhan_con_rong(db)
+    lan2 = VT.gan_phap_nhan_con_rong(db)
+    assert lan1["da_gan"] == 2 and lan2["da_gan"] == 0   # VT-RONG + TAY-RONG
     assert lan1["con_rong"] == 0 and lan2["con_rong"] == 0
+    # Đếm riêng theo nguồn: gắn hết KHÔNG có nghĩa là thôi không biết chuyến nào từ đâu. Con số
+    # "nguồn khác" chính là thứ cho thấy kho cũ đã vào — bỏ nó đi là mất dấu vết của cả vòng này.
+    assert lan1["tu_vietrip"] == 1 and lan1["nguon_khac"] == 1
 
 
 def test_cua_va_co_that_trong_api_va_chi_mo_cho_vai_tro_dong_bo():
@@ -189,10 +207,12 @@ def test_gan_phap_nhan_xong_thi_man_hinh_chu_tich_dem_duoc_chuyen_ay():
         "số 2: không gộp im lặng, cũng không giấu."
     )
 
-    VT.gan_phap_nhan_vietrip(db)
+    VT.gan_phap_nhan_con_rong(db)
 
     sau = KQ.thang(db, "2026-08")
-    assert sau["doanh_thu"] == 100.0, (
+    # 200 chứ không phải 100: từ TC-56 cả VT-RONG (nguồn Vietrip) lẫn TAY-RONG (nguồn khác) đều
+    # được gắn về mẹ, nên cả hai cùng lên màn hình. Chính con số này là thứ TC-56 sinh ra để có.
+    assert sau["doanh_thu"] == 200.0, (
         "Vá xong mà màn hình Chủ tịch vẫn trống thì cả vòng này vô nghĩa."
     )
-    assert sau["lai_tour"] == 40.0
+    assert sau["lai_tour"] == 80.0

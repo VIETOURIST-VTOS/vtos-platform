@@ -72,12 +72,17 @@ def repair_budget(u: User = Depends(require_roles(*SYNC_ROLES)), db: Session = D
 
 @router.post("/import/vietrip/repair-phap-nhan")
 def repair_phap_nhan(u: User = Depends(require_roles(*SYNC_ROLES)), db: Session = Depends(get_db)):
-    """Gắn pháp nhân MẸ cho các chuyến nhập từ Vietrip còn để rỗng (anh Tuấn chốt 17/9/2026).
+    """Gắn pháp nhân MẸ cho MỌI chuyến còn để rỗng — anh Tuấn chốt 17/9/2026: "gán hết cho
+    Vietourist Holdings".
 
-    Chạy một lần sau khi triển khai TC-51: chuyến nhập trước ngày có luật đã `applied = True` nên
-    vòng đồng bộ kế tiếp không đi qua chúng. Bấm lại lần hai vô hại — không còn chuyến nào rỗng.
+    TC-51 chỉ gắn cho chuyến nhập từ Vietrip; TC-56 mở ra cho mọi nguồn, vì KHO CŨ rơi đúng vào
+    khe giữa "nhập từ Vietrip" và "ai đó dựng tay" — 477/765 chuyến H1 không có pháp nhân nên bị
+    lọc khỏi màn hình Chủ tịch mà không ai thấy.
+
+    Không ghi đè pháp nhân ai đã gắn tay, và không bịa khi danh mục chưa có công ty mẹ. Bấm lại
+    lần hai vô hại. Kết quả đếm riêng `tu_vietrip` / `nguon_khac` để còn thấy kho cũ đã vào.
     """
-    return VT.gan_phap_nhan_vietrip(db, u.username)
+    return VT.gan_phap_nhan_con_rong(db, u.username)
 
 
 @router.post("/import/vietrip/dong-so-theo-buoc")
