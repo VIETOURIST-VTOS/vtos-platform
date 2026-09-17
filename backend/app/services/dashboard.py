@@ -136,7 +136,16 @@ def build(db: Session, u: User) -> dict:
             "tong_chi": sum(float(w.get("total_out") or 0) for w in fc["weeks"]),
             "cuoi_ky": fc["closing"],
             "nguong": fc["min_cash"],
-            "tuan": [{"tuan": w["week"], "tu": w["from"], "den": w["to"], "so_du": w["closing"]}
+            # TC-59 (17/9/2026) · THÊM `thu` và `chi` TỪNG TUẦN, để biểu đồ vẽ được BA ĐƯỜNG như
+            # bản mẫu anh Tuấn gửi: THU · CHI · TỒN. Trước đây chỉ gửi `so_du`, nên hình chỉ nói
+            # được "còn bao nhiêu" mà không nói được "vì sao còn bấy nhiêu".
+            #
+            # BA CON SỐ NÀY RÀNG BUỘC NHAU TỪNG TUẦN: số dư tuần n = số dư tuần n−1 + thu − chi.
+            # Chúng lấy từ CÙNG một `fc["weeks"]` đã dùng để cộng `tong_thu` / `tong_chi` ở trên,
+            # nên tổng mười ba tuần của đường THU đúng bằng ô "Dự kiến thu" — hai chỗ không thể
+            # nói khác nhau, vì chỉ có một phép cộng.
+            "tuan": [{"tuan": w["week"], "tu": w["from"], "den": w["to"], "so_du": w["closing"],
+                      "thu": w.get("total_in"), "chi": w.get("total_out")}
                      for w in fc["weeks"]],
         }
         pl = RP.income_statement(db, p); k["ln_ke_toan_thang"] = dict((r[0], r[2]) for r in pl["rows"])["50"]

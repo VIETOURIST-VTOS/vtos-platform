@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, fmtD, taiTep, vnd } from "@/lib/api";
-import { BieuDoCot, type Diem } from "@/components/BieuDo";
+import { BieuDoCot, BieuDoDuong, type Diem } from "@/components/BieuDo";
 import { useShell } from "@/components/Shell";
 import { xepDonVi, type DonViChon } from "@/lib/thu_tu_don_vi";
 
@@ -171,23 +171,24 @@ function DayDuBao({ d }: { d: any }) {
   const muc = d.am ? "red" : d.duoi_nguong ? "warn" : "ok";
   const nhan = d.am ? "ÂM — không đủ tiền trả"
     : d.duoi_nguong ? "Dưới ngưỡng dự phòng" : "Trên ngưỡng dự phòng";
+  /* TC-60 (17/9/2026) · MỘT HÀNG, KHÔNG CÒN MỘT KHỐI RIÊNG.
+     Anh Tuấn: "gom lại thành 2 hàng ở dưới biểu đồ cho gọn". Con số này là HÀNG THỨ NHẤT của dải
+     chú thích — nó vẫn giữ vạch màu bên trái (ba mức: đỏ · vàng · xanh), vì mức độ phải đọc được
+     trước cả con số; thứ bỏ đi là khoảng đệm trên dưới và cái xuống dòng của nhãn trạng thái. */
   return (
-    <div className={"dt-day " + muc}>
-      <div className="dt-day-so">
-        <b>{vnd(d.gia_tri)}</b>
-        <span className="muted">
-          Số dư thấp nhất dự kiến · tuần {d.tuan} ({fmtD(String(d.tu_ngay))})
-        </span>
-      </div>
-      <div className="dt-day-phu">
-        <span className={"tag " + muc}>{nhan}</span>
-        {d.thieu_so_voi_nguong > 0 && (
-          <span className="muted">Thiếu {vnd(d.thieu_so_voi_nguong)} so với mức dự phòng</span>
-        )}
-        {/* Đường đi tới chỗ sửa: dự báo dựng từ booking, đề nghị chi, lịch vay và bảng kế hoạch
-            thu–chi do Kế toán gõ. Ranh giới 09/9 — màn hình này chỉ bày, cửa nhập nằm ở đó. */}
-        <Link className="the-cua" href="/finance?tab=forecast">Dự báo 13 tuần · cửa nhập →</Link>
-      </div>
+    <div className={"dt-hang dt-day " + muc}>
+      <b className="dt-day-so">{vnd(d.gia_tri)}</b>
+      <span className="muted dt-day-nhan">
+        Số dư thấp nhất · tuần {d.tuan} ({fmtD(String(d.tu_ngay))})
+      </span>
+      <span className={"tag " + muc}>{nhan}</span>
+      {d.thieu_so_voi_nguong > 0 && (
+        <span className="muted">Thiếu {vnd(d.thieu_so_voi_nguong)} so với mức dự phòng</span>
+      )}
+      <span className="dt-day-day" />
+      {/* Đường đi tới chỗ sửa: dự báo dựng từ booking, đề nghị chi, lịch vay và bảng kế hoạch
+          thu–chi do Kế toán gõ. Ranh giới 09/9 — màn hình này chỉ bày, cửa nhập nằm ở đó. */}
+      <Link className="the-cua" href="/finance?tab=forecast">Dự báo 13 tuần · cửa nhập →</Link>
     </div>
   );
 }
@@ -208,51 +209,84 @@ function vietouristMe(ds: DonViChon[]): DonViChon | null {
   return ds.find((c) => (c.code || "").trim().toUpperCase() === "VTD") || ds[0] || null;
 }
 
-/** TC-57 · BIỂU ĐỒ 13 TUẦN + BỐN CON SỐ CỦA CÙNG MỘT PHÉP CÂN.
+/** TC-59 · BIỂU ĐỒ BA ĐƯỜNG — THU · CHI · TỒN, theo bản mẫu anh Tuấn gửi 17/9/2026.
  *
- *  Thay cho bốn ô "Chưa có nguồn" mà anh Tuấn bảo bỏ ngày 17/9/2026.
+ *  TC-57 (sáng cùng ngày) dựng chỗ này thành một hình CỘT chỉ vẽ số dư cuối tuần. Hình ấy trả lời
+ *  được "tuần nào thấp nhất", nhưng không trả lời được "vì sao thấp" — mà đó mới là câu người
+ *  đọc phải trả lời trước khi làm gì. Ba đường cùng khung thì đọc ra ngay: tuần nào chi vượt thu,
+ *  đường tồn tụt theo đúng tuần ấy.
  *
- *  BỐN CON SỐ NÀY LÀ MỘT PHÉP CÂN, KHÔNG PHẢI BỐN Ô RỜI: đầu kỳ + dự kiến thu − dự kiến chi =
- *  cuối tuần 13. Máy chủ cộng cả bốn (`sections.du_bao_13_tuan`) chứ không để màn hình cộng — để
- *  màn hình tự cộng là mở đường cho bốn con số không còn cân nhau mà chẳng ai biết. Đó cũng là
- *  ranh giới 09/9: máy chủ tính, màn hình bày.
+ *  LUẬT TC-57 BỊ ĐẢO, GHI LẠI CẢ HAI VẾ. TC-57 chọn cột với lý lẽ của `BieuDoCot`: dữ liệu VTOS
+ *  có lỗ hổng, và đường nối liền qua chỗ trống là vẽ ra một giá trị không tồn tại. Lý lẽ ấy vẫn
+ *  đúng và KHÔNG bị bỏ — `BieuDoDuong` không nối qua chỗ trống, gặp `null` là đường đứt. Thứ đổi
+ *  là số chuỗi: ba chuỗi × mười ba tuần là ba mươi chín cột cạnh nhau, không đọc nổi cái nào.
  *
- *  RỖNG KHÁC KHÔNG, ở đây cũng vậy: chưa có dự báo thì trả `null` — không vẽ một khung 13 cột
- *  bằng 0, vì một hàng cột dí sát đáy đọc ra là "sắp hết tiền" chứ không phải "chưa có số".
+ *  RỖNG KHÁC KHÔNG, ở đây cũng vậy: chưa có dự báo thì không vẽ gì — không vẽ một khung 13 tuần
+ *  dí sát đáy, vì một đường phẳng ở 0 đọc ra là "sắp hết tiền" chứ không phải "chưa có số".
+ *
+ *  MÁY CHỦ BẢN CŨ chưa gửi `thu` / `chi` từng tuần thì hai đường ấy không đủ hai điểm và không
+ *  được vẽ, còn đường TỒN vẫn vẽ bình thường. Không suy `thu` từ hiệu hai số dư liền nhau: hiệu
+ *  ấy là thu TRỪ chi, gọi nó là "thu" thì con số sai mà hình vẫn trông đúng.
  */
-function DuBao13Tuan({ d }: { d?: any }) {
+function Hinh13Tuan({ d }: { d?: any }) {
   const tuan: any[] = d?.tuan || [];
   if (!tuan.length) return null;
-  const diem: Diem[] = tuan.map((w) => ({
-    nhan: `T${w.tuan}`,
-    gt: w.so_du === null || w.so_du === undefined ? null : Number(w.so_du),
+  const nhan = tuan.map((w) => `T${w.tuan}`);
+  /** Một cột của `tuan[]` thành chuỗi điểm. Thiếu trường (máy chủ bản cũ) → `null`, không → 0. */
+  const chuoi = (khoa: string): Diem[] => tuan.map((w, i) => ({
+    nhan: nhan[i],
+    gt: w[khoa] === null || w[khoa] === undefined ? null : Number(w[khoa]),
   }));
+  return (
+    <BieuDoDuong
+      ten="Biến động dòng tiền" phu="dự báo 13 tuần"
+      nhan={nhan} dinh_dang="tien" doi_xung
+      ds={[
+        { ten: "THU", lop: "d1", diem: chuoi("thu") },
+        { ten: "CHI", lop: "d2", diem: chuoi("chi") },
+        { ten: "TỒN", lop: "d3", diem: chuoi("so_du") },
+      ]}
+      /* Ngưỡng dự phòng là một ĐƯỜNG trên cùng trục, không phải một con số ghi bên cạnh: mắt đọc
+         "tuần nào chạm ngưỡng" bằng cách nhìn đường TỒN cắt xuống dưới vạch, không bằng cách so
+         từng con số với một con số nhớ trong đầu. Chỉ vẽ khi máy chủ có ngưỡng — không bịa. */
+      moc={typeof d?.nguong === "number" ? { gt: d.nguong, nhan: "ngưỡng dự phòng" } : null}
+      /* TC-60 · KHÔNG CÒN CÂU CHÂN. Anh Tuấn chụp đúng ba câu chú thích của khối này và bảo xoá
+         (17/9/2026). Ba câu ấy đúng nhưng chúng giải thích cách ĐỌC hình cho người đọc lần đầu,
+         mà người đọc màn hình này mở nó mỗi ngày. Chú giải THU · CHI · TỒN ở đầu hình vẫn còn,
+         nên danh tính ba đường không mất.
+         Con số ngưỡng thì KHÔNG được mất theo: nó chuyển vào nhãn rê chuột của chính vạch ấy
+         (`BieuDoDuong` dựng từ `moc.nhan` + giá trị), chứ không biến khỏi màn hình. */
+      ai="Kế toán" cua="/finance?tab=forecast" cua_ten="Cửa nhập dự báo 13 tuần" />
+  );
+}
+
+/** Bốn con số của CÙNG MỘT PHÉP CÂN: đầu kỳ + dự kiến thu − dự kiến chi = cuối tuần 13.
+ *
+ *  Máy chủ cộng cả bốn (`sections.du_bao_13_tuan`) chứ không để màn hình cộng — để màn hình tự
+ *  cộng là mở đường cho bốn con số không còn cân nhau mà chẳng ai biết. Ranh giới 09/9: máy chủ
+ *  tính, màn hình bày.
+ *
+ *  Bốn ô đứng SAU biểu đồ: hình trả lời "có tuần nào hụt không", bốn số trả lời "vì sao". Đảo thứ
+ *  tự là bắt người đọc cộng trừ trước khi biết mình có cần cộng trừ hay không.
+ */
+function BonMocDuBao({ d }: { d?: any }) {
+  if (!d) return null;
   const o = (ten: string, gt: any, dau = "") => (
     <div className="dt-moc-o">
       <b>{gt === null || gt === undefined ? "—" : dau + vnd(Math.abs(Number(gt)))}</b>
       <small>{ten}</small>
     </div>
   );
+  /* TC-60 · CÂU "PHÉP CÂN" ĐÃ XOÁ theo chốt 17/9. Phép cân vẫn còn — nó nằm ở dấu + và − in
+     ngay trước hai con số giữa, và ở thứ tự bốn ô đọc từ trái sang. Câu chữ chỉ nói lại điều bốn
+     cái nhãn đã nói. Ràng buộc "tổng mười ba tuần của hai đường = hai ô giữa" chuyển hẳn về phép
+     thử canh (test_tc59) — chỗ nó không thể bị ai đọc lướt qua. */
   return (
-    <div className="dt-dubao">
-      {/* Ngưỡng dự phòng là một ĐƯỜNG trên cùng trục, không phải một con số ghi bên cạnh: mắt đọc
-          "tuần nào chạm ngưỡng" bằng cách nhìn cột nào thấp hơn đường, không bằng cách so từng con
-          số với một con số nhớ trong đầu. `moc` chỉ vẽ khi máy chủ có ngưỡng — không bịa. */}
-      <BieuDoCot ten="Số dư cuối tuần" phu="dự báo 13 tuần" diem={diem} dinh_dang="tien"
-        moc={typeof d?.nguong === "number" ? { gt: d.nguong, nhan: "ngưỡng dự phòng" } : null}
-        ai="Kế toán" cua="/finance?tab=forecast" cua_ten="Cửa nhập dự báo 13 tuần" />
-      {/* Bốn mốc đứng SAU biểu đồ: hình trả lời "có tuần nào hụt không", bốn số trả lời "vì sao".
-          Đảo thứ tự là bắt người đọc cộng trừ trước khi biết mình có cần cộng trừ hay không. */}
-      <div className="dt-moc">
-        {o("Tiền đầu kỳ", d?.dau_ky)}
-        {o("Dự kiến thu", d?.tong_thu, "+")}
-        {o("Dự kiến chi", d?.tong_chi, "−")}
-        {o("Cuối tuần 13", d?.cuoi_ky)}
-      </div>
-      <p className="dt-dubao-chan">
-        Bốn con số là một phép cân: <b>đầu kỳ + thu − chi = cuối tuần 13</b>. Dựng từ booking còn
-        phải thu, đề nghị chi, lịch vay và bảng kế hoạch thu–chi do <b>Kế toán</b> nhập.
-      </p>
+    <div className="dt-moc">
+      {o("Tiền đầu kỳ", d?.dau_ky)}
+      {o("Dự kiến thu", d?.tong_thu, "+")}
+      {o("Dự kiến chi", d?.tong_chi, "−")}
+      {o("Cuối tuần 13", d?.cuoi_ky)}
     </div>
   );
 }
@@ -298,71 +332,81 @@ export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any 
 
   return (
     <section style={{ marginBottom: 14 }}>
-      <DayDuBao d={day} />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-        <h2 style={{ margin: 0 }}>Dòng tiền — bốn mốc {khoang ? "trong từng khoảng" : "lũy kế"}</h2>
-        <div className="dt-kieu" role="group" aria-label="Kiểu xem bốn mốc">
-          <button type="button" className={"act" + (khoang ? " grey" : "")}
-            aria-pressed={!khoang} onClick={() => setKhoang(false)}>Lũy kế</button>
-          <button type="button" className={"act" + (khoang ? "" : " grey")}
-            aria-pressed={khoang} onClick={() => setKhoang(true)}>Trong từng khoảng</button>
-        </div>
-        {/* TC-55 · Ô CHỌN PHÁP NHÂN ĐÃ GỠ — anh Tuấn chốt 17/9/2026: "bỏ hết pháp nhân, chỉ chọn
-            Vietourist; khi nào cần xem pháp nhân thì vào Báo cáo tài chính tổng hợp."
+      {/* ═══ TC-59 · MỘT KHUNG DUY NHẤT: HÌNH · CHÚ THÍCH · BỐN MỐC ════════════════════════════
+          "em thiet ke lai cho anh biểu đồ giống nhu hình mẫu 1, và gòm hinh 2 lai cho gọn nằm
+           trong khung cua biểu đồ dòng tiền o phan chú thich bên dưới biểu đồ ... nối liền với
+           biều đồ hình 4"                                       — anh Tuấn, 17/9/2026
 
-            Một ô chọn trên màn hình Chủ tịch là một câu hỏi phải trả lời trước khi đọc được con
-            số — và tệ hơn, nó khiến hai người mở cùng một trang có thể đang nhìn hai công ty khác
-            nhau mà tưởng đang nói cùng một chuyện. Màn hình 01 nay chỉ nói về Vietourist mẹ, và
-            phạm vi ấy được ghi ra bằng chữ ở dòng ngay dưới (`cau_pham_vi`) chứ không nằm trong
-            một ô người ta phải để ý mới thấy. Xem theo pháp nhân là việc của Báo cáo tài chính
-            tổng hợp. */}
-        <span style={{ flex: 1 }} />
-        {/* NÚT XUẤT EXCEL THẬT (14/9/2026). Trước đây nó chỉ hiện câu "đang xây dựng" — một nút
-            hứa rồi không làm còn tệ hơn không có nút, vì lần sau người dùng không tin nút nào nữa.
-            Tệp do MÁY CHỦ dựng từ đúng gói mà màn hình này đang đọc, nên Excel không thể nói khác
-            màn hình; và máy chủ ghi một dòng nhật ký cho mỗi lần xuất. */}
-        <button type="button" className="act grey" disabled={dangXuat || !pn}
-          onClick={async () => {
-            if (!pn) return;
-            setDangXuat(true);
-            try { toast("Đã tải " + await taiTep(`/dong-tien/khung/${pn}/excel`)); }
-            catch (e: any) { toast(e?.message || "Không xuất được Excel", true); }
-            finally { setDangXuat(false); }
-          }}>{dangXuat ? "Đang dựng tệp…" : "Xuất Excel"}</button>
+          TRƯỚC VÒNG NÀY chỗ này là BA mảnh rời có khe hở giữa: con số đáy dự báo đứng riêng trên
+          cùng, rồi tiêu đề + nút đổi kiểu + Xuất Excel + dòng "Nguồn số", rồi mới tới biểu đồ và
+          bốn ô. Ba khe hở ấy đọc ra là ba khối khác nhau — trong khi cả ba nói về đúng một dòng
+          tiền, và con số đáy chính là điểm thấp nhất của cái đường đang vẽ ngay dưới nó.
+
+          NAY MỘT VIỀN, và thứ tự đảo lại: HÌNH TRƯỚC, CHỮ SAU. Hình trả lời "ba tháng tới tiền
+          đi thế nào"; phần chữ bên dưới nói con số đáy là bao nhiêu, số liệu lấy từ đâu, còn
+          thiếu nguồn nào. Đặt chữ lên trước là bắt người đọc đọc chú thích của một hình họ chưa
+          nhìn thấy. */}
+      <div className="dt-gop">
+        <Hinh13Tuan d={du_bao} />
+
+        {/* ═══ TC-60 · ĐÚNG HAI HÀNG, KHÔNG HƠN ════════════════════════════════════════════
+            "em xoa nhung chú thich này, va gom lại thành 2 hàng ở dưới biểu đồ cho gọn"
+                                                                    — anh Tuấn, 17/9/2026
+
+            Hàng 1 là CON SỐ: đáy dự báo, tuần nào, mức so với ngưỡng, và cửa nhập dự báo.
+            Hàng 2 là THAO TÁC: kiểu xem bốn mốc, tình trạng nguồn số, và nút xuất.
+
+            Chia theo "số / thao tác" chứ không theo thứ tự cũ: mắt đọc con số trước, và tay chỉ
+            chạm tới hàng dưới khi đã quyết định làm gì. Trộn hai loại vào một hàng là bắt người
+            đọc lướt qua mấy cái nút trước khi tới được con số. */}
+        <div className="dt-chan">
+          <DayDuBao d={day} />
+
+          <div className="dt-hang">
+            <span className="dt-nhan-nho">Bốn mốc</span>
+            <div className="dt-kieu" role="group" aria-label="Kiểu xem bốn mốc">
+              <button type="button" className={"act" + (khoang ? " grey" : "")}
+                aria-pressed={!khoang} onClick={() => setKhoang(false)}>Lũy kế</button>
+              <button type="button" className={"act" + (khoang ? "" : " grey")}
+                aria-pressed={khoang} onClick={() => setKhoang(true)}>Trong từng khoảng</button>
+            </div>
+            {/* TÓM TẮT NGUỒN SỐ — phần "một nhãn thay cho cột cửa nhập" của phương án dung hoà.
+                Đếm theo DÒNG CÓ CỬA (bỏ dòng tự cộng), vì dòng tự cộng không ai nhập được. */}
+            <span className="muted dt-nhan-nho-mo">Nguồn số</span>
+            <span className="tag ok">{tt.day_du ?? 0} đầy đủ</span>
+            <span className="tag warn">{tt.chua_doi_soat ?? 0} chưa đối soát</span>
+            <span className="tag red">{tt.con_thieu ?? 0} còn thiếu</span>
+            {/* Quá hạn tách riêng khỏi ba mức trạng thái: "còn thiếu" nói dòng chưa có số, "quá
+                hạn" nói đã lỡ mốc 24 giờ Chủ tịch chốt. Gộp hai cái vào một nhãn là mất đúng cái
+                khác biệt khiến người ta phải đứng dậy làm ngay. */}
+            {(k.so_qua_han ?? 0) > 0 && <span className="tag red">{k.so_qua_han} quá hạn</span>}
+            <Link className="the-cua" href="/dong-tien/nguon">Nguyên nhân · cửa nhập →</Link>
+            {/* TC-55 · Ô CHỌN PHÁP NHÂN ĐÃ GỠ, và TC-60 gỡ luôn câu `k.cau_pham_vi` từng đứng
+                dưới nó: câu ấy nói "bảng này gồm toàn bộ dòng tiền của pháp nhân đang xem", mà
+                đầu màn hình đã ghi "Phạm vi: Vietourist — công ty mẹ". Hai câu cùng nói một điều
+                thì câu thứ hai chỉ làm khối dài thêm. */}
+            <span className="dt-day-day" />
+            {/* NÚT XUẤT EXCEL THẬT (14/9/2026). Trước đây nó chỉ hiện câu "đang xây dựng" — một
+                nút hứa rồi không làm còn tệ hơn không có nút, vì lần sau người dùng không tin nút
+                nào nữa. Tệp do MÁY CHỦ dựng từ đúng gói mà màn hình này đang đọc, nên Excel không
+                thể nói khác màn hình; và máy chủ ghi một dòng nhật ký cho mỗi lần xuất. */}
+            <button type="button" className="act grey" disabled={dangXuat || !pn}
+              onClick={async () => {
+                if (!pn) return;
+                setDangXuat(true);
+                try { toast("Đã tải " + await taiTep(`/dong-tien/khung/${pn}/excel`)); }
+                catch (e: any) { toast(e?.message || "Không xuất được Excel", true); }
+                finally { setDangXuat(false); }
+              }}>{dangXuat ? "Đang dựng tệp…" : "Xuất Excel"}</button>
+          </div>
+        </div>
+
+        {/* NỐI LIỀN, KHÔNG CÁCH: bốn mốc nằm trong cùng viền với hình và dải chú thích — chúng là
+            tổng mười ba tuần của chính hai đường THU và CHI ở trên. Tách ra thành khung riêng là
+            mời người đọc coi chúng như hai bộ số không liên quan. */}
+        <BonMocDuBao d={du_bao} />
       </div>
 
-      <p className="muted" style={{ marginTop: 0 }}>{k.cau_pham_vi}</p>
-
-      {/* DÒNG TÓM TẮT NGUỒN SỐ — phần "một nhãn thay cho cột cửa nhập" của phương án dung hoà.
-          Đếm theo DÒNG CÓ CỬA (bỏ dòng tự cộng), vì dòng tự cộng không ai nhập được. */}
-      <p className="dt-tomtat">
-        <b>Nguồn số:</b>{" "}
-        <span className="tag ok">{tt.day_du ?? 0} đầy đủ</span>{" "}
-        <span className="tag warn">{tt.chua_doi_soat ?? 0} chưa đối soát</span>{" "}
-        <span className="tag red">{tt.con_thieu ?? 0} còn thiếu</span>{" "}
-        {/* Quá hạn tách riêng khỏi ba mức trạng thái: "còn thiếu" nói dòng chưa có số, "quá hạn"
-            nói đã lỡ mốc 24 giờ Chủ tịch chốt. Gộp hai cái vào một nhãn là mất đúng cái khác biệt
-            khiến người ta phải đứng dậy làm ngay. */}
-        {(k.so_qua_han ?? 0) > 0 && <><span className="tag red">{k.so_qua_han} quá hạn</span>{" "}</>}
-        <Link className="the-cua" href="/dong-tien/nguon">Nguyên nhân · bộ phận · cửa nhập →</Link>
-      </p>
-
-      {/* ═══ TC-57 · BỐN Ô CẢNH BÁO ĐÃ GỠ, THAY BẰNG BIỂU ĐỒ 13 TUẦN ═══════════════════════════
-          "em xoa bo cai nay khoi man hinh chu tich, thay vao do la bieu do va so lieu phan tich
-           dong tien ngang o duoi PHAI THU VA PHAI TRA"        — anh Tuấn, 17/9/2026
-
-          LUẬT TC-40 BỊ ĐẢO, VÀ GHI LẠI CẢ HAI VẾ. Ngày 15/9/2026 em đề xuất gỡ đúng bốn ô này —
-          chúng đều ghi "Chưa có nguồn" và lặp lại dòng tóm tắt ngay trên — và anh Tuấn KHÔNG đồng
-          ý: "số 6 dòng tiền em giữ nguyên". Em đã ghi vào đây để vòng sau không ai gỡ chúng.
-
-          Hai ngày sau anh Tuấn mở trang, chụp đúng chỗ ấy và bảo bỏ. Điều đổi giữa hai lần không
-          phải ý thích: lần trước bốn ô ấy là thứ DUY NHẤT nói về dòng tiền ngoài một dòng tóm tắt,
-          nên gỡ đi là còn lại một khoảng trống. Lần này chúng được THAY bằng một biểu đồ 13 tuần
-          và bốn con số của cùng một phép cân — có cái thay thế thì mới gỡ được.
-
-          Ghi lại cả hai vế thay vì xoá chú thích cũ: một luật bị đảo mà không để dấu vết thì vòng
-          sau có người khôi phục nó, tưởng đang vá một thiếu sót. */}
-      <DuBao13Tuan d={du_bao} />
 
       {/* ═══ TC-35 · BIỂU ĐỒ TRƯỚC, BẢNG SAU NÚT ═══════════════════════════════════════════════
           Anh Tuấn chỉ ra 15/9/2026: bảng 14 dòng × 4 mốc "không cần chi tiết ra màn hình, đưa vào

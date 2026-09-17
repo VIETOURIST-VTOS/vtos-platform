@@ -181,9 +181,18 @@ def test_khoi_chi_ra_cua_nhap_chu_khong_tu_nhap():
 
 
 def test_css_khong_go_ma_mau_moi():
-    """Ba mức dùng lại đúng ba màu của bộ nhận diện — không khai màu mới cho riêng khối này."""
-    css = _doc(CSS)
-    khoi = css.split(".dt-day{")[1].split("\n.dt-day-phu")[0]
+    """Ba mức dùng lại đúng ba màu của bộ nhận diện — không khai màu mới cho riêng khối này.
+
+    TC-60 (17/9/2026) sửa CÁCH CẮT, không sửa điều phải canh. Bản cũ cắt từ `.dt-day{` tới
+    `.dt-day-phu` — mà `.dt-day-phu` đã xoá cùng với khối hai dòng nó tạo kiểu, nên lát cắt chạy
+    tuột qua nửa tệp và bắt phải một mã màu nằm trong MỘT CHÚ THÍCH ở tận đâu.
+
+    Nay cắt tới đúng dòng `.dt-day.red…` cuối cùng của nhóm, và bỏ chú thích trước khi dò: luật
+    của dự án là không gõ mã màu TRONG MÃ CHẠY, còn chú thích thì được phép nhắc tên màu.
+    """
+    css = re.sub(r"/\*(?:.|\n)*?\*/", " ", _doc(CSS))
+    i = css.index(".dt-day{")
+    khoi = css[i:css.index(".dt-day-so{", i)]
     assert not re.search(r"#[0-9a-fA-F]{3,6}", khoi), "Phải dùng biến --vtos-*, không gõ mã màu."
     for bien in ("--vtos-success", "--vtos-warning", "--vtos-danger"):
-        assert bien in khoi
+        assert bien in khoi, f"Thiếu {bien} trong nhóm ba mức của khối đáy dự báo."
