@@ -421,16 +421,34 @@ export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any 
           KHÔNG có nút đổi kiểu xem (luỹ kế ↔ từng khoảng) và KHÔNG có nút Xuất Excel. Dời đi là âm
           thầm bỏ mất hai tính năng — trong đó nút Excel vừa sửa xong ở vòng TC-28. Gấp lại thì giữ
           đủ, mà khối vẫn co về đúng chiều cao bản vẽ. Nút sang màn hình chi tiết vẫn có, đúng bản vẽ. */}
-      <BieuDoBonMoc cot={cot}
-        so={(khoang ? k.dong_tien_thuan_khoang : k.dong_tien_thuan) || {}}
-        khoang={khoang} vi_sao={k.vi_sao_khong_co_so_cuoi} />
+      {/* ═══ TC-61 · HÌNH BỐN MỐC RỜI KHỎI MÀN HÌNH CHỦ TỊCH ═══════════════════════════════════
+          "BỎ khỏi màn hình chủ tịch, và thiết kế lại cho đẹp giống bản thử 01"
+                                                                    — anh Tuấn, 17/9/2026
 
+          Anh Tuấn chụp đúng chỗ này: một khung biểu đồ rỗng kèm câu "Chưa có kỳ nào có số trong 4
+          kỳ gần nhất". Từ TC-59, câu hỏi "ba tháng tới tiền đi thế nào" đã có hình 13 tuần trả lời
+          ở đầu khối — nên hình bốn mốc ở đây vừa rỗng vừa nói lại một việc đã có người nói.
+
+          CHUYỂN XUỐNG chứ KHÔNG XOÁ, và đây là chỗ phải cân nhắc thật: `/dong-tien` KHÔNG có hình
+          nào vẽ bốn mốc (đã soát). Xoá hẳn là bỏ mất bản vẽ duy nhất của một con số mà Kế toán sẽ
+          nạp — mất một năng lực vì hôm nay nó chưa có số. Nên nó xuống nằm cạnh CHÍNH cái bảng nó
+          mô tả, trong nếp gấp "Bảng bốn mốc": màn hình lúc mở ra không còn thấy nó, ai cần thì bung
+          nếp gấp là có cả hình lẫn bảng.
+
+          Nếu anh Tuấn muốn xoá hẳn thì xoá ở đây, và phải gỡ luôn `BieuDoBonMoc` + `docHoDongTien`
+          cùng hai phép thử canh chúng — để lại một thành phần không ai gọi là cách vòng sau dựng
+          lại nó mà không biết vì sao nó từng bị bỏ. */}
       <p className="dt-nut-chi-tiet">
         <Link className="the-cua" href="/dong-tien">Cấu trúc chi tiết dòng tiền →</Link>
       </p>
 
       <details className="dt-gap">
         <summary>Bảng bốn mốc — {(k.dong || []).length} dòng · {nCot} mốc</summary>
+      {/* Hình đứng TRƯỚC bảng, trong cùng nếp gấp: hình trả lời "bốn mốc đi lên hay đi xuống",
+          bảng trả lời "dòng nào làm nên điều đó". Ai bung nếp gấp là muốn cả hai. */}
+      <BieuDoBonMoc cot={cot}
+        so={(khoang ? k.dong_tien_thuan_khoang : k.dong_tien_thuan) || {}}
+        khoang={khoang} vi_sao={k.vi_sao_khong_co_so_cuoi} />
       <div className="panel wrap">
         <table>
           <thead><tr>
