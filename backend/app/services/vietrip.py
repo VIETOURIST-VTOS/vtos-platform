@@ -191,6 +191,48 @@ def apply_vehicles(db: Session, limit: int = 400) -> int:
     return n
 
 
+"""TC-52 · DẤU "ĐÃ ĐÓNG SỐ" LẤY TỪ BƯỚC QUY TRÌNH CỦA VIETRIP, KHÔNG LẤY TỪ HAI CỜ CHẾT."""
+
+# Trạng thái VTOS coi là đã đóng số. Giống hệt `ket_qua_that.DA_DONG_SO` — chép sang đây thay vì
+# nhập khẩu để tránh vòng tròn, và có phép thử canh hai bản không được lệch nhau.
+DA_DONG_SO = ("da_dong_so", "kt_xac_nhan", "khoa")
+
+# Bước quy trình Vietrip tính là ĐÃ QUYẾT TOÁN. Anh Tuấn chốt 17/9/2026: từ Bước 5 trở lên.
+#
+#   1 Lập dự toán · 2 KSNB dự toán · 3 Phê duyệt dự toán  → DỰ TOÁN, không phải số thực
+#   5 Lập quyết toán · 6 KSNB quyết toán · 7 Phê duyệt quyết toán · 8 Thanh toán, đối chiếu · 9 Báo cáo
+#
+# Vì sao không dùng `quyetToan`/`duyetChi` như apply_tours: hai cờ ấy false ở CẢ 1.363 bản ghi tour
+# Vietrip gửi sang (đếm ngày 17/9/2026, không sót một chuyến). Luật dựa trên chúng không bao giờ ra
+# một con số nào — màn hình Chủ tịch đứng ở một dấu gạch suốt, mà không ai biết vì sao.
+#
+# Vì sao không lấy cả Bước 1–3, dù chúng cũng có cột thực chi và cộng lại ra 2,89 tỷ "lãi": ở những
+# bước ấy bảng còn là DỰ TOÁN. Lấy dự toán làm giá vốn thì biên kế hoạch bằng biên thực tế và cảnh
+# báo vượt dự toán không bao giờ kích hoạt — đúng cái bẫy Ý kiến thẩm định 06/9/2026 (B2, B3) đã
+# chỉ ra và vòng này không được bước lại vào.
+BUOC_DA_QUYET_TOAN = 5
+
+
+def buoc_vietrip(step: str | None) -> int | None:
+    """Số thứ tự bước trong chuỗi "Bước 7: Phê duyệt Quyết toán". None khi không đọc được.
+
+    Trang quyết toán Vietrip chỉ hiện MỘT dòng "Bước N" — bước hiện tại, không phải thanh tiến độ
+    liệt kê cả chín bước (đã mở trang thật kiểm ngày 17/9/2026). Nên lấy chuỗi đầu tiên là đúng.
+    """
+    m = re.search(r"Bước\s*(\d+)", step or "")
+    return int(m.group(1)) if m else None
+
+
+def da_quyet_toan_tren_vietrip(raw: dict) -> bool:
+    """Bảng quyết toán này đã tới bước được coi là đã đóng số chưa.
+
+    Không đọc được bước thì trả False. Đoán "chắc là xong rồi" ở đây là đưa một chuyến chưa quyết
+    toán vào kết quả kinh doanh của Chủ tịch — rỗng thì còn nhìn ra, đoán sai thì không.
+    """
+    b = buoc_vietrip(raw.get("step"))
+    return b is not None and b >= BUOC_DA_QUYET_TOAN
+
+
 def phap_nhan_mac_dinh(db: Session) -> int | None:
     """Pháp nhân gắn cho chuyến nhập từ Vietrip: CÔNG TY MẸ (anh Tuấn chốt 17/9/2026).
 
@@ -240,6 +282,43 @@ def gan_phap_nhan_vietrip(db: Session, boi: str = "robot-vietrip") -> dict:
             "message": f"Đã gắn pháp nhân mẹ cho {len(rows)} chuyến nhập từ Vietrip"}
 
 
+def dong_so_theo_buoc_vietrip(db: Session, boi: str = "robot-vietrip") -> dict:
+    """Vá MỘT LẦN: đóng số cho chuyến có bảng quyết toán đã tới Bước 5 trở lên (TC-52).
+
+    Cần cửa riêng vì 837 bảng quyết toán đã nhập đều `applied = True`; `apply_settlements` chỉ chạm
+    tới bản ghi CHƯA ánh xạ, nên luật mới một mình nó chỉ áp cho bảng về từ mai trở đi.
+
+    Bấm lại lần hai vô hại: chuyến đã `da_dong_so` không thoả điều kiện nữa. Trả về cả phần KHÔNG
+    đóng được kèm lý do — con số bị bỏ lại phải nhìn thấy được, không được im lặng biến mất.
+    """
+    ra = {"da_dong_so": 0, "bo_qua_chua_du_buoc": 0, "bo_qua_da_dong_roi": 0,
+          "bo_qua_chua_ket_thuc": 0, "bo_qua_khong_thay_tour": 0,
+          "doanh_thu": 0.0, "gia_von": 0.0, "thieu_gia_von": 0}
+    hom_nay = date.today()
+    for r in db.execute(select(VtRecord).where(VtRecord.entity == "settlement")).scalars():
+        raw = r.raw or {}
+        if not da_quyet_toan_tren_vietrip(raw):
+            ra["bo_qua_chua_du_buoc"] += 1; continue
+        t = db.execute(select(Tour).where(Tour.code == raw.get("tourcode"))).scalars().first()
+        if not t:
+            ra["bo_qua_khong_thay_tour"] += 1; continue
+        if t.status in DA_DONG_SO:
+            ra["bo_qua_da_dong_roi"] += 1; continue
+        if not t.end_date or t.end_date > hom_nay:
+            ra["bo_qua_chua_ket_thuc"] += 1; continue
+        t.status = "da_dong_so"
+        t.closed_at = t.closed_at or datetime.combine(t.end_date, datetime.min.time())
+        ra["da_dong_so"] += 1
+        ra["doanh_thu"] += float(t.actual_revenue or 0)
+        if t.actual_cost is None: ra["thieu_gia_von"] += 1
+        else: ra["gia_von"] += float(t.actual_cost)
+    R.audit(db, boi, "robot", "dong_so_theo_buoc_vietrip", "tours", after=ra)
+    db.commit()
+    ra["message"] = (f"Đã đóng số {ra['da_dong_so']} chuyến theo bước quyết toán Vietrip "
+                     f"(từ Bước {BUOC_DA_QUYET_TOAN})")
+    return ra
+
+
 def apply_tours(db: Session, only_from: date | None = None, limit: int = 400) -> int:
     n = 0; cache = {}
     me = phap_nhan_mac_dinh(db)   # tra MỘT lần cho cả lô, không phải mỗi chuyến một câu truy vấn
@@ -274,12 +353,20 @@ def apply_tours(db: Session, only_from: date | None = None, limit: int = 400) ->
         # doanh thu (Ý kiến thẩm định 06/9/2026, B3). Chỉ nhận doanh thu/giá vốn khi Vietrip đã quyết toán.
         if t.settled_vietrip:
             t.actual_revenue = float(raw.get("doanhThu") or 0); t.actual_cost = float(raw.get("tongChiPhi") or 0)
-        else:
+        elif t.status not in DA_DONG_SO:
             t.actual_revenue = t.actual_cost = 0.0
+        # TC-52 · `elif t.status not in DA_DONG_SO` thay cho `else` trơn — CHỖ RÒ RỈ LẶNG LẼ NHẤT.
+        #
+        # `quyetToan`/`duyetChi` của Vietrip LUÔN false (đã soi cả 1.363 bản ghi ngày 17/9/2026 —
+        # không sót một chuyến nào), nên nhánh `else` này chạy cho MỌI chuyến, mọi lần đồng bộ. Mà
+        # `apply_settlements` mới là chỗ ghi doanh thu/giá vốn thật từ bảng quyết toán. Hai hàm ấy
+        # đọc hai loại bản ghi khác nhau: tour được nạp lại thì tour chạy một mình, và nó xoá trắng
+        # số quyết toán đã ghi — không báo lỗi, không audit, chỉ là hai cột tiền về 0 sau mỗi đêm.
         t.confirmed_by, t.approved_by = "vietrip", "vietrip"
         today = date.today()
         if raw.get("duyetChi"): t.status = "khoa"; t.closed_at = t.closed_at or _dt(raw.get("ngayDuyetChi")) or datetime.combine(t.end_date, datetime.min.time()); t.kt_confirmed_at = t.kt_confirmed_at or _dt(raw.get("ngayDuyetChi")); t.cntt_checked_at = t.cntt_checked_at or _dt(raw.get("ngayDuyetChi"))
         elif raw.get("quyetToan"): t.status = "kt_xac_nhan"; t.closed_at = t.closed_at or datetime.combine(t.end_date, datetime.min.time()); t.kt_confirmed_at = t.kt_confirmed_at or datetime.combine(t.end_date, datetime.min.time())
+        elif t.status in DA_DONG_SO: pass   # TC-52: đã đóng số rồi thì KHÔNG hạ cấp ngược về "kết thúc"
         elif t.end_date < today: t.status = "ket_thuc"
         else: t.status = "da_duyet"
         r.applied, r.apply_note = True, f"tour:{code}"; n += 1
@@ -309,6 +396,24 @@ def apply_settlements(db: Session, limit: int = 400) -> int:
         total_lines = sum(float(l.get("thuc_chi") or 0) for l in (raw.get("lines") or []))
         if raw.get("tong_chi"): t.actual_cost = float(raw["tong_chi"])
         elif total_lines: t.actual_cost = total_lines
+        # TC-52 · ĐÓNG SỐ theo bước quy trình Vietrip (anh Tuấn chốt 17/9/2026: từ Bước 5).
+        #
+        # Đây là chỗ duy nhất trong cả hệ biết chuyến này đã quyết toán hay chưa, vì bảng quyết toán
+        # là thứ mang cái bước ấy. Trước vòng này, 1.743 chuyến nằm ở "kết thúc" với doanh thu và giá
+        # vốn ĐÃ GHI ĐỦ ngay bên cạnh (đếm 17/9: 558 bảng có thực chi, 57,9 tỷ) — thiếu đúng hai
+        # trường `status` và `closed_at` nên màn hình Chủ tịch bỏ qua sạch.
+        #
+        # Ba ranh giới, mỗi cái một phép thử:
+        #   1. CHỈ NÂNG, KHÔNG HẠ. Chuyến đã `kt_xac_nhan`/`khoa` là đã qua tay Kế toán — kéo ngược
+        #      về `da_dong_so` là xoá một chữ ký.
+        #   2. KHÔNG ĐÓNG SỐ CHUYẾN CHƯA CHẠY XONG. Bảng quyết toán có thể lập sớm; chuyến chưa tới
+        #      ngày kết thúc mà đã tính vào kết quả tháng là ghi nhận doanh thu trước khi có.
+        #   3. MỐC LÀ NGÀY CHUYẾN KẾT THÚC, không phải ngày robot chạy. Lấy ngày robot thì doanh thu
+        #      tháng 6 rơi vào tháng 9 chỉ vì hôm nay mới đồng bộ — bài học TC-47 số 4.
+        if (da_quyet_toan_tren_vietrip(raw) and t.status not in DA_DONG_SO
+                and t.end_date and t.end_date <= date.today()):
+            t.status = "da_dong_so"
+            t.closed_at = t.closed_at or datetime.combine(t.end_date, datetime.min.time())
         # lịch sử quy trình Vietrip → tour_events (nguồn vietrip), không nhân bản
         hist = raw.get("history") or []
         if hist:
