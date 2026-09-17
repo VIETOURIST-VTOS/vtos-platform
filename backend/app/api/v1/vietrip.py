@@ -80,6 +80,16 @@ def repair_phap_nhan(u: User = Depends(require_roles(*SYNC_ROLES)), db: Session 
     return VT.gan_phap_nhan_vietrip(db, u.username)
 
 
+@router.post("/import/vietrip/dong-so-theo-buoc")
+def dong_so_theo_buoc(u: User = Depends(require_roles(*SYNC_ROLES)), db: Session = Depends(get_db)):
+    """Đóng số cho chuyến có bảng quyết toán Vietrip đã tới Bước 5 trở lên (anh Tuấn chốt 17/9/2026).
+
+    Chạy một lần sau khi triển khai TC-52: 837 bảng quyết toán đã nhập đều `applied = True` nên
+    `apply_settlements` không đi qua chúng nữa. Bấm lại lần hai vô hại.
+    """
+    return VT.dong_so_theo_buoc_vietrip(db, u.username)
+
+
 @router.post("/import/vietrip/sync")
 def vietrip_sync(data: SyncIn, u: User = Depends(require_roles("cntt", "ketoan")), db: Session = Depends(get_db)):
     from app.services import vietrip_client as VC
