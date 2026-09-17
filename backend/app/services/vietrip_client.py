@@ -230,6 +230,112 @@ def run_sync(db: Session, from_date: date, to_date: date, products: bool = True,
     return counts
 
 
+"""TC-53 · NẠP BÙ THEO LÔ — hai cửa nhỏ thay cho một lần chạy dài không bao giờ xong.
+
+═══════════════════════════════════════════════════════════════════════════════════════════════
+VÌ SAO KHÔNG DÙNG `run_sync` ĐỂ NẠP BÙ TỪ THÁNG 1
+═══════════════════════════════════════════════════════════════════════════════════════════════
+Đếm ngày 17/9/2026: VTOS không có chuyến nào KẾT THÚC trước tháng 6 — T6 297, T7 289, T8 220,
+T9 119, còn T1–T5 trống trơn. Không phải mất dữ liệu: lần đồng bộ đầu (05/9) đặt mốc từ 01/6 nên
+Vietrip chỉ trả về tour từ tháng 6. Anh Tuấn yêu cầu 17/9: cập nhật từ tháng 1.
+
+Gọi `run_sync(from_date=2026-01-01)` KHÔNG làm được việc ấy, vì hai chỗ:
+  · Nó quét TỪNG BOOKING một để lấy phiếu thu (`/api/bookings/{id}/payments`). Từ tháng 1 là hơn
+    12.000 lượt gọi — đây mới là chỗ giết job, không phải bảng quyết toán.
+  · Nó chọn bảng quyết toán theo `settlements_days` đếm lùi từ HÔM NAY, nên muốn với tới tháng 1
+    phải đặt ~260 ngày, kéo về hơn nghìn trang, mỗi trang ~10 giây — hơn ba tiếng.
+Mà Render gói miễn phí ngủ sau 15 phút không có ai gọi, và robot chạy nền nằm trong chính tiến
+trình ấy. Job dài hơn 15 phút chết giữa đường — đã xảy ra đúng như vậy sáng 17/9.
+
+Nên hai cửa dưới đây CHẠY ĐỒNG BỘ VÀ CÓ ĐÁY: mỗi lần gọi làm một lô nhỏ rồi trả về `con_lai`.
+Ngủ giữa chừng thì gọi tiếp — không mất gì, không nạp trùng (khoá theo `vietrip_id`). Cả hai
+KHÔNG đụng tới booking và phiếu thu.
+"""
+
+
+def _dang_nhap() -> "Client":
+    if not settings.VIETRIP_PHONE or not settings.VIETRIP_PASSWORD:
+        raise VietripError("Chưa cấu hình VIETRIP_PHONE / VIETRIP_PASSWORD (Render → Environment) cho tài khoản robot")
+    c = Client(settings.VIETRIP_PHONE, settings.VIETRIP_PASSWORD)
+    c.login()
+    return c
+
+
+def _ngay(s) -> str:
+    return (s or "")[:10]
+
+
+def nap_tour_theo_khoang(db: Session, tu: date, den: date) -> dict:
+    """Kéo DANH SÁCH TOUR kết thúc trong [tu, den] rồi ánh xạ. Không đụng booking/phiếu thu.
+
+    Vietrip chỉ nhận `fromDate` (mốc khởi hành) chứ không nhận mốc kết thúc, nên lấy rộng rồi lọc
+    tại chỗ theo `ngayKetThuc`. Lọc ở đây chứ không ở Vietrip là chủ ý: một chuyến khởi hành cuối
+    tháng 12/2025 mà kết thúc đầu tháng 1/2026 vẫn phải vào kỳ tháng 1.
+    """
+    c = _dang_nhap()
+    tours, page = [], 1
+    lay_tu = tu - timedelta(days=60)   # chuyến dài ngày khởi hành trước mốc vẫn kết thúc trong kỳ
+    while True:
+        j = c.post_json("/operations/OperationsTour/GetToursData",
+                        {"tourType": "All", "fromDate": str(lay_tu), "searchKeyword": "",
+                         "selectedServices": [], "page": page, "pageSize": 500})
+        lo = j.get("data") or []
+        tours += lo
+        if not lo or len(lo) < 500 or page >= (j.get("totalPages") or 1): break
+        page += 1
+    trong_ky = [t for t in tours if str(tu) <= _ngay(t.get("ngayKetThuc")) <= str(den)]
+    VT.upsert(db, "tour", trong_ky)
+    da_anh_xa, vong = 0, 0
+    while vong < 40:                       # 40 × 400 = 16.000 chuyến, thừa sức cho một năm
+        n = VT.apply_tours(db, limit=400)
+        da_anh_xa += n; vong += 1
+        if n == 0: break
+    return {"tu": str(tu), "den": str(den), "vietrip_tra_ve": len(tours),
+            "trong_ky": len(trong_ky), "da_anh_xa": da_anh_xa}
+
+
+def nap_quyet_toan_thieu(db: Session, tu: date, den: date, gioi_han: int = 6) -> dict:
+    """Tải bảng quyết toán CÒN THIẾU cho chuyến kết thúc trong [tu, den] — mỗi lần một lô nhỏ.
+
+    Danh sách chuyến đọc từ `vt_records` đã nạp, KHÔNG gọi lại Vietrip: danh sách tour vừa nặng
+    vừa không đổi giữa hai lô, và mỗi lần gọi lại là một lần nữa có thể hỏng giữa chừng.
+
+    Trả về `con_lai` để nơi gọi lặp tới khi bằng 0. `gioi_han` mặc định nhỏ vì mỗi trang quyết toán
+    mất khoảng 10 giây: một lô phải xong gọn trong thời gian một lượt gọi HTTP, thà gọi nhiều lần
+    còn hơn một lần gọi chết giữa đường và không biết đã làm tới đâu.
+    """
+    from sqlalchemy import select
+    from app.models.vietrip import VtRecord
+
+    da_co = {r.raw.get("tourcode") for r in db.execute(
+        select(VtRecord).where(VtRecord.entity == "settlement")).scalars() if r.raw}
+    thieu = []
+    for r in db.execute(select(VtRecord).where(VtRecord.entity == "tour")).scalars():
+        w = r.raw or {}
+        if not (str(tu) <= _ngay(w.get("ngayKetThuc")) <= str(den)): continue
+        if w.get("tourcode") in da_co: continue
+        if not w.get("recID"): continue
+        thieu.append(w)
+    thieu.sort(key=lambda w: _ngay(w.get("ngayKetThuc")))
+
+    lo = thieu[:max(1, min(gioi_han, 20))]
+    if not lo:
+        return {"da_nap": 0, "con_lai": 0, "loi": [], "message": "Không còn bảng quyết toán nào thiếu"}
+
+    c = _dang_nhap()
+    duoc, loi = [], []
+    for w in lo:
+        try:
+            duoc.append(parse_settlement(c.get(f"/tour-settlement/spreadsheet/{w['recID']}", timeout=60), w))
+        except Exception as e:                      # một trang hỏng KHÔNG được làm chết cả lô
+            loi.append(f"{w.get('tourcode')}: {type(e).__name__}")
+    if duoc:
+        VT.upsert(db, "settlement", duoc)
+        VT.apply_settlements(db, limit=400)
+    return {"da_nap": len(duoc), "con_lai": len(thieu) - len(lo), "loi": loi,
+            "message": f"Đã nạp {len(duoc)} bảng, còn {len(thieu) - len(lo)}"}
+
+
 def start_background(from_date: date, to_date: date, products: bool, settlements_days: int) -> bool:
     if STATE["running"]: return False
     STATE.update({"running": True, "log": [], "started": datetime.now(), "finished": None, "result": None, "error": ""})
