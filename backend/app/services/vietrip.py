@@ -261,25 +261,45 @@ def phap_nhan_mac_dinh(db: Session) -> int | None:
     return cong_ty_me(db)
 
 
-def gan_phap_nhan_vietrip(db: Session, boi: str = "robot-vietrip") -> dict:
-    """Vá MỘT LẦN cho chuyến Vietrip đã nhập trước ngày có luật: gắn pháp nhân mẹ vào chỗ còn rỗng.
+def gan_phap_nhan_con_rong(db: Session, boi: str = "robot-vietrip") -> dict:
+    """Gắn pháp nhân MẸ cho MỌI chuyến còn để rỗng — anh Tuấn chốt 17/9/2026: "gán hết cho
+    Vietourist Holdings".
 
-    Cần một cửa riêng vì `apply_tours` chỉ chạm tới bản ghi thô CHƯA ánh xạ; 1.743 chuyến nhập từ
-    05/9/2026 trở về trước đã `applied = True` nên vòng đồng bộ kế tiếp không đi qua chúng nữa.
-    Chạy lại nhiều lần vô hại: lần hai không còn chuyến nào rỗng để gắn.
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    TC-56 · RANH GIỚI "CHỈ CHUYẾN NGUỒN VIETRIP" CỦA TC-51 ĐÃ BỎ — GHI LẠI CẢ HAI VẾ
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    TC-51 cố ý chỉ gắn cho chuyến `imported = True`, với lý lẽ: chuyến dựng tay trong VTOS phải do
+    NGƯỜI chọn pháp nhân, gắn thay là lặng lẽ xoá mất câu hỏi "chuyến này của ai".
+
+    Lý lẽ ấy bỏ sót một trường hợp thứ ba, và nó lộ ra ngay hôm sau: **kho cũ**. Chuyến nạp từ kho
+    lịch sử không phải nguồn Vietrip, cũng không phải ai dựng tay — nên nó rơi đúng vào khe giữa
+    hai nhánh. Đếm ngày 17/9: 477/765 chuyến H1 không có pháp nhân, và màn hình Chủ tịch lọc theo
+    Vietourist mẹ nên chúng bị lọc ra sạch, dù đã đóng số hay chưa.
+
+    Anh Tuấn chốt gắn hết. Điều đó đúng với thực tế VTOS hôm nay: đây là hệ điều hành của
+    Vietourist, pháp nhân khác là ngoại lệ và được gắn tay khi cần.
+
+    HAI RANH GIỚI CÒN LẠI GIỮ NGUYÊN, và chúng mới là chỗ bảo vệ thật:
+      · KHÔNG GHI ĐÈ. `company_id` đã có giá trị thì để yên, kể cả khác công ty mẹ — ai gắn tay là
+        đã có chủ ý, và ngoại lệ chỉ sống được nếu robot không cãi lại nó.
+      · KHÔNG BỊA. Danh mục chưa có dòng `kind='me'` thì trả None và không gắn gì cả.
     """
     me = phap_nhan_mac_dinh(db)
     if me is None:
         return {"da_gan": 0, "con_rong": None, "cong_ty_me": None,
                 "message": "Danh mục công ty chưa có pháp nhân mẹ (kind='me') — không gắn gì cả"}
-    rows = db.execute(select(Tour).where(Tour.imported.is_(True), Tour.company_id.is_(None))).scalars().all()
+    rows = db.execute(select(Tour).where(Tour.company_id.is_(None))).scalars().all()
+    tu_vietrip = sum(1 for t in rows if t.imported)
     for t in rows:
         t.company_id = me
-    R.audit(db, boi, "robot", "gan_phap_nhan_vietrip", "tours", after={"so_chuyen": len(rows), "company_id": me})
+    R.audit(db, boi, "robot", "gan_phap_nhan_con_rong", "tours",
+            after={"so_chuyen": len(rows), "tu_vietrip": tu_vietrip,
+                   "nguon_khac": len(rows) - tu_vietrip, "company_id": me})
     db.commit()
-    con_rong = db.execute(select(func.count(Tour.id)).where(Tour.imported.is_(True), Tour.company_id.is_(None))).scalars().first()
-    return {"da_gan": len(rows), "con_rong": int(con_rong or 0), "cong_ty_me": me,
-            "message": f"Đã gắn pháp nhân mẹ cho {len(rows)} chuyến nhập từ Vietrip"}
+    con_rong = db.execute(select(func.count(Tour.id)).where(Tour.company_id.is_(None))).scalars().first()
+    return {"da_gan": len(rows), "tu_vietrip": tu_vietrip, "nguon_khac": len(rows) - tu_vietrip,
+            "con_rong": int(con_rong or 0), "cong_ty_me": me,
+            "message": f"Đã gắn pháp nhân mẹ cho {len(rows)} chuyến còn rỗng"}
 
 
 def dong_so_theo_buoc_vietrip(db: Session, boi: str = "robot-vietrip") -> dict:
