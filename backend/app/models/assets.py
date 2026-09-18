@@ -25,6 +25,42 @@ PREPAID_KINDS = {
 }
 PREPAID_STATUS = {"dang_pb": "Đang phân bổ", "ngung_pb": "Ngừng phân bổ", "het": "Đã phân bổ hết", "ghi_giam": "Đã ghi giảm"}
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# SỔ TÀI SẢN THƯƠNG HIỆU — Chủ tịch chốt 18/9/2026: DÙNG CHUNG bảng này, không dựng bảng riêng
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# VÌ SAO DÙNG CHUNG LÀ ĐÚNG, chứ không phải mượn tạm: bảng này đã có sẵn loại `vo_hinh` (TSCĐ vô
+# hình, TK 213/2143). Một bộ nhận diện MUA NGOÀI có hoá đơn đúng là TSCĐ vô hình — nó vốn thuộc về
+# đây. Dựng một bảng thứ hai cho nó là để hai sổ cùng nói về một tài sản.
+#
+# CHỖ KHÔNG VỪA, và cách giải:
+#
+#  1. Nhãn hiệu do NỘI BỘ TỰ TẠO thì kế toán không được ghi nhận là tài sản (VAS 04). Logo team tự
+#     vẽ, bộ màu, mẫu ấn phẩm — có thật, Marketing phải quản, nhưng không phải một thẻ TSCĐ có giá
+#     trị trên sổ. Chúng vào đây với nguyên giá ĐỂ RỖNG.
+#
+#     Chủ tịch chốt 18/9: *"chỉ hiện dòng có hoá đơn"*. Bảng này không có cột hoá đơn, nó có nguyên
+#     giá — nên luật viết ra là: dòng thương hiệu chỉ vào danh sách và báo cáo TSCĐ của Kế toán KHI
+#     NGUYÊN GIÁ ĐÃ ĐƯỢC KHAI. Nguyên giá rỗng = nội bộ tự tạo = chỉ Marketing thấy. Luật ấy nằm ở
+#     `services/tai_san_thuong_hieu.hien_o_so_ke_toan`, viết MỘT chỗ và mọi nơi đọc đều gọi nó.
+#
+#  2. Bảng này không có cột để quản nhận diện: phiên bản, hiệu lực từ–đến, bản nào thay bản nào,
+#     đang dán ở đâu, ai duyệt. Tám cột dưới đây là chỗ ấy. Chúng CHỈ có nghĩa khi `th_so` bật;
+#     thẻ TSCĐ thường của Kế toán không bao giờ chạm tới chúng.
+#
+#  3. `kind` KHÔNG dùng để đánh dấu thương hiệu, và đây là chỗ dễ làm sai nhất. `kind` quyết định
+#     TK nguyên giá và TK hao mòn — đổi nó là đổi định khoản. Một logo mua ngoài vẫn phải là
+#     `vo_hinh` (TK 213) cho đúng sổ; dấu "thuộc sổ thương hiệu" là một cột RIÊNG.
+TH_LOAI = {
+    "logo": "Logo & dấu hiệu nhận diện", "phong_chu": "Bộ phông chữ", "bo_mau": "Bộ màu",
+    "an_pham": "Mẫu ấn phẩm (brochure, standee, name card)", "dong_phuc": "Đồng phục",
+    "bien_hieu": "Biển hiệu & bảng quảng cáo", "video": "Video & nhạc hiệu", "khac": "Khác",
+}
+# `nhap` → chưa đủ hai chữ ký. `dang_dung` → bản đang có hiệu lực. `da_thay` → đã có bản mới thay.
+# KHÔNG có trạng thái "đã duyệt" tách khỏi "đang dùng": duyệt xong mà chưa có ngày hiệu lực thì
+# chưa ai biết từ hôm nào phải in theo bản mới, và đó đúng là chỗ hay cãi nhau nhất khi đổi logo.
+TH_TRANG_THAI = {"nhap": "Nháp – chưa đủ chữ ký", "dang_dung": "Đang dùng", "da_thay": "Đã có bản thay"}
+
 
 class FixedAsset(Base):
     """Thẻ tài sản cố định (MISA: Tài sản cố định ▸ Ghi tăng). Khấu hao đường thẳng theo tháng."""
@@ -58,6 +94,21 @@ class FixedAsset(Base):
     source: Mapped[str] = mapped_column(String(20), default="vtos")             # vtos / misa
     created_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    # ---- Sổ tài sản thương hiệu (18/9/2026) – xem ghi chú TH_LOAI ở đầu tệp ----
+    # `th_so` là DẤU DUY NHẤT phân biệt hai loại thẻ. Không suy từ `group`, không suy từ tên: suy
+    # từ một chuỗi người gõ là sớm muộn có thẻ máy photocopy tên "Logo hội nghị" rơi vào sổ nhận diện.
+    th_so: Mapped[bool] = mapped_column(Boolean, default=False)
+    th_loai: Mapped[str] = mapped_column(String(20), default="")
+    th_phien_ban: Mapped[str] = mapped_column(String(30), default="")
+    th_hieu_luc_tu: Mapped[date | None] = mapped_column(Date, nullable=True)
+    th_hieu_luc_den: Mapped[date | None] = mapped_column(Date, nullable=True)
+    th_trang_thai: Mapped[str] = mapped_column(String(20), default="")
+    th_noi_su_dung: Mapped[str] = mapped_column(String(200), default="")
+    # HAI CHỮ KÝ, đúng khuôn `vehicle_rates` / `guide_rates` đã có trong kho (Chủ tịch + TGĐ ở đó).
+    # Ở đây là Chủ tịch + P.TGĐ Marketing, theo chốt 18/9/2026. Hai ô riêng chứ không một ô
+    # "đã duyệt": một ô thì sổ không trả lời được câu "ai đã ký, còn thiếu ai".
+    th_ky_chutich: Mapped[bool] = mapped_column(Boolean, default=False)
+    th_ky_ptgd_mkt: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class AssetDepreciation(Base):

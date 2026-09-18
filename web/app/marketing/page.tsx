@@ -109,6 +109,10 @@ function Marketing() {
   const [sThang, setSThang] = useState(thang0());
   const [sMoi, setSMoi] = useState<any>({ channel: "", leads: "", cost: "" });
 
+  // ── thương hiệu ──
+  const [th, setTh] = useState<any>({ rows: [], dem: {}, loai: {}, trang_thai_ds: {} });
+  const [thLoai, setThLoai] = useState("");
+
   // ── nội dung ──
   const [nd, setNd] = useState<any[]>([]);
 
@@ -157,6 +161,24 @@ function Marketing() {
     api(`/leads?month=${thang}&channel=${encodeURIComponent(kenh)}&status=${tt}&q=${encodeURIComponent(q)}`)
       .then(setLeads).catch((e) => { if (tab === "khach") toast(errMsg(e), true); });
   }, [tab, thang, kenh, tt, q, xemLead, toast]);
+  /** Ký một bộ nhận diện. Nút CHỈ hiện cho vai còn thiếu chữ ký – gương của hàng rào thật ở
+   *  máy chủ (tham số `thuong_hieu_vai_ky`), không thay cho nó. Và cố ý KHÔNG hiện nút cho vai đã
+   *  ký rồi: hai chữ ký phải là hai người bấm, không phải một người bấm hai lần. */
+  const kyTh = async (id: number) => {
+    try {
+      const r = await api(`/marketing/thuong-hieu/${id}/ky`, { method: "POST" });
+      toast(r.message);
+      setTh(await api(`/marketing/thuong-hieu?loai=${encodeURIComponent(thLoai)}`));
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
+  // Sổ nhận diện. Chỉ nạp khi mở tab – sổ này đọc từ bảng tài sản, không phải thứ cần sẵn ở
+  // mọi màn hình.
+  useEffect(() => {
+    if (tab !== "thuonghieu") return;
+    api(`/marketing/thuong-hieu?loai=${encodeURIComponent(thLoai)}`).then(setTh)
+      .catch((e) => toast(errMsg(e), true));
+  }, [tab, thLoai, toast]);
   useEffect(() => {
     if (tab !== "doisoat") return;
     api(`/leads/stats?month=${sThang}`).then((r) => setStats(Array.isArray(r) ? r : [])).catch(() => {});
@@ -582,32 +604,73 @@ function Marketing() {
 
     {/* ═══════════════ 7 · THƯƠNG HIỆU & PR ═══════════════ */}
     {tab === "thuonghieu" && <>
-      <div className="panel" style={{ borderColor: "var(--vtos-warning)" }}>
-        <h2>Màn hình này chưa có sổ — đây là bản kê việc còn thiếu</h2>
-        <p className="muted">Đo ngày 18/9/2026 trên kho mã: <b>không có bảng dữ liệu và không có đường
-          API nào</b> cho tài sản thương hiệu hay hoạt động PR. Theo ranh giới 09/9, chỗ không có cửa
-          nhập là việc còn thiếu — không phải chỗ để dựng một bảng trống rồi đổ số mẫu vào cho đủ
-          bảy màn hình.</p>
+      <div className="panel">
+        <h2>Sổ tài sản thương hiệu</h2>
+        <p className="muted">Chủ tịch chốt 18/9/2026: sổ này <b>dùng chung bảng tài sản cố định</b> của
+          Kế toán chứ không dựng bảng riêng — một bộ nhận diện mua ngoài có hoá đơn đúng là TSCĐ vô
+          hình, nó vốn thuộc về đó. Thẻ <b>đã khai nguyên giá</b> thì đồng thời nằm trong danh sách
+          TSCĐ của Kế toán; thẻ chưa khai là nhận diện nội bộ tự tạo, chỉ Marketing thấy.</p>
+        <p className="muted">Một bản mới chỉ có hiệu lực khi đủ <b>hai chữ ký: Chủ tịch và P.TGĐ
+          Marketing</b>. Cửa nhập nằm ở màn hình Nạp dữ liệu — mục “Tài sản thương hiệu”.</p>
       </div>
       <div className="mh01-the">
-        <The rong nhan="Kho tài sản nhận diện" so="chưa có"
-             nguon="Cần: một bảng tài sản (logo, phông, bộ màu, mẫu ấn phẩm) có phiên bản và ngày hết hiệu lực. Kho tệp dùng chung `attachments` đã có sẵn để đính bản gốc." />
-        <The rong nhan="Hoạt động PR & báo chí" so="chưa có"
-             nguon="Cần: một sổ hoạt động (bài đăng báo, sự kiện, phát ngôn) gắn với chiến dịch và với người phát ngôn được uỷ quyền." />
-        <The rong nhan="Theo dõi nhắc tên thương hiệu" so="chưa có"
-             nguon="Cần: một cửa nhập hoặc một mối nối với dịch vụ đo bên ngoài. Không có cửa thì con số này không thể có, kể cả ước lượng." />
-        <The rong nhan="Khủng hoảng truyền thông" so="chưa có"
-             nguon="Cần: quy trình và sổ ghi — ai được phát ngôn, trong bao lâu, và ai duyệt. Việc này cần chữ ký trước khi viết mã." />
+        <The nhan="Bản đang dùng" so={th.dem?.dang_dung ?? 0} nguon="đủ hai chữ ký và đã tới ngày hiệu lực" />
+        <The nhan="Đang chờ chữ ký" so={th.dem?.cho_chu_ky ?? 0} canhBao={(th.dem?.cho_chu_ky ?? 0) > 0}
+             nguon="thiếu chữ ký của Chủ tịch hoặc P.TGĐ Marketing – chưa bản nào trong số này có hiệu lực" />
+        <The nhan="Có trong sổ Kế toán" so={th.dem?.vao_so_ke_toan ?? 0}
+             nguon="đã khai nguyên giá nên hiện trong danh sách TSCĐ như TSCĐ vô hình" />
+        <The nhan="Tổng số thẻ nhận diện" so={th.dem?.tong ?? 0} nguon="cả sổ, mọi trạng thái" />
       </div>
       <div className="panel">
-        <h2>Hai chỗ cần anh quyết trước khi dựng</h2>
-        <ol>
-          <li><b>Sổ tài sản thương hiệu nằm ở đâu</b> — dựng bảng riêng cho Marketing, hay dùng chung
-            bảng tài sản đã có của Hành chính? Dùng chung thì tiết kiệm, nhưng vòng đời một bộ nhận
-            diện khác hẳn vòng đời một cái máy tính.</li>
-          <li><b>Ai được phát ngôn</b> — chưa có danh sách này thì sổ PR không có cột “người chịu
-            trách nhiệm”, mà một sổ PR không có cột ấy thì không dùng được lúc cần.</li>
-        </ol>
+        <div className="hang">
+          <label>Loại</label>
+          <select value={thLoai} onChange={(e) => setThLoai(e.target.value)}>
+            <option value="">– tất cả –</option>
+            {Object.entries(th.loai || {}).map(([ma, ten]: any) => <option key={ma} value={ma}>{ten}</option>)}
+          </select>
+        </div>
+        {(th.rows || []).length === 0
+          ? <p className="muted">Sổ chưa có dòng nào. Nhập ở màn hình <b>Nạp dữ liệu</b> — mục “Tài sản
+              thương hiệu”. Màn hình này KHÔNG tự sinh dòng mẫu: một sổ nhận diện có sẵn mấy dòng
+              không ai nhập là một sổ không ai tin.</p>
+          : <table className="bang">
+            <thead><tr>
+              <th>Mã</th><th>Loại</th><th>Tên</th><th>Phiên bản</th><th>Hiệu lực</th>
+              <th>Đang dùng ở đâu</th><th>Chữ ký</th><th>Sổ Kế toán</th><th></th>
+            </tr></thead>
+            <tbody>
+              {th.rows.map((r: any) => <tr key={r.id}>
+                <td>{r.ma}</td>
+                <td>{r.loai_ten}</td>
+                <td>{r.ten}</td>
+                <td>{r.phien_ban || <span className="muted">chưa ghi</span>}</td>
+                <td>{r.hieu_luc_tu ? fmtD(r.hieu_luc_tu) : <span className="muted">chưa có</span>}
+                    {r.hieu_luc_den ? ` → ${fmtD(r.hieu_luc_den)}` : ""}</td>
+                <td>{r.noi_su_dung || <span className="muted">chưa ghi</span>}</td>
+                <td>{r.con_thieu_chu_ky.length === 0
+                      ? <Tag cls="ok">đủ hai chữ ký</Tag>
+                      : <Tag cls="warn">còn thiếu: {r.con_thieu_chu_ky.join(", ")}</Tag>}</td>
+                <td>{r.vao_so_ke_toan
+                      ? <>{vnd(r.nguyen_gia)} <span className="muted">· có trong sổ</span></>
+                      : <span className="muted">{r.vi_sao}</span>}</td>
+                <td>{r.con_thieu_chu_ky.includes(role) &&
+                      <button className="act teal" onClick={() => kyTh(r.id)}>Ký</button>}</td>
+              </tr>)}
+            </tbody>
+          </table>}
+      </div>
+      <div className="panel" style={{ borderColor: "var(--vtos-warning)" }}>
+        <h2>Phần PR còn thiếu — đã có chữ ký, chưa có sổ</h2>
+        <p className="muted">Hai điều Chủ tịch chốt 18/9/2026 và hệ thống CHƯA dựng: người phát ngôn
+          là <b>P.TGĐ Marketing</b>, và <b>hạn phản hồi khủng hoảng truyền thông là 2 giờ</b> kể từ
+          lúc việc được ghi vào sổ. Chưa có bảng hoạt động PR thì hai con số ấy chưa có chỗ để
+          sống — nên màn hình này nói ra chứ không hiện một ô “quá hạn” rỗng.</p>
+        <div className="mh01-the">
+          <The rong nhan="Hoạt động PR &amp; báo chí" so="chưa có"
+               nguon="Cần: một sổ hoạt động (bài đăng, sự kiện, phát ngôn) gắn với chiến dịch và với người phát ngôn." />
+          <The rong nhan="Theo dõi nhắc tên thương hiệu" so="chưa có"
+               nguon="Cần một cửa nhập hoặc một mối nối với dịch vụ đo bên ngoài. Không có cửa thì con số này không thể có, kể cả ước lượng." />
+        </div>
       </div>
     </>}
   </>);

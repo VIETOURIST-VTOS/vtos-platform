@@ -98,7 +98,12 @@ def depreciation_table(db: Session, period: str) -> dict:
     """Bảng tính khấu hao TSCĐ của kỳ (MISA: Tài sản cố định ▸ Tính khấu hao). Chưa ghi sổ thì tính lại mỗi lần gọi."""
     posted = {r.asset_id: r for r in db.execute(select(AssetDepreciation).where(AssetDepreciation.period == period)).scalars()}
     rows, total = [], 0.0
-    for a in db.execute(select(FixedAsset).order_by(FixedAsset.code)).scalars():
+    # HÀNG RÀO SỔ THƯƠNG HIỆU (18/9/2026). Thẻ nhận diện nội bộ tự tạo (nguyên giá rỗng) KHÔNG vào
+    # bảng tính khấu hao. Về số thì nó vô hại – nguyên giá rỗng nên không có gì để trích – nhưng
+    # bảng tính khấu hao là thứ Kế toán in ra và ký, và một bảng ký tên có mấy chục dòng logo là
+    # một bảng sai. Luật nằm ở services/tai_san_thuong_hieu, KHÔNG viết lại điều kiện ở đây.
+    from app.services.tai_san_thuong_hieu import loc_so_ke_toan
+    for a in db.execute(loc_so_ke_toan(select(FixedAsset)).order_by(FixedAsset.code)).scalars():
         p = posted.get(a.id)
         prior = asset_prior_accumulated(db, a, period)
         amount = (p.amount if p else asset_depreciation_amount(db, a, period)) or 0
