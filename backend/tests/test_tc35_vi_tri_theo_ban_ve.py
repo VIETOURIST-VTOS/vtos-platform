@@ -203,7 +203,9 @@ def test_thu_tu_doc_chin_khoi_van_giu_nguyen():
     # SỬA 16/9/2026 (TC-44): hai ô Doanh thu · Lợi nhuận gộp thành <KhoiKetQuaKinhDoanh.
     # SỬA 17/9/2026 (TC-57): Dòng tiền xuống SAU hai khối công nợ — xem THU_TU_BAN_VE ở test_tc31,
     # nơi ghi cả hai vế và lý do đảo.
-    thu_tu = ["<KhoiQuyetDinh", "<KhoiKetQuaKinhDoanh",
+    # SỬA 18/9/2026 (TC-65): `<KhoiQuyetDinh` rời danh sách — hàng nút chờ quyết nhập vào thanh
+    # ngang đầu trang. Xem THU_TU_BAN_VE ở test_tc31, nơi ghi lý do đầy đủ.
+    thu_tu = ["<KhoiKetQuaKinhDoanh",
               "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiDongTien",
               "<KhoiTonDongMuc", "<HangThe", "<KhoiHieuQuaXe"]
     vi = [(m, ma.index(m)) for m in thu_tu if m in ma]

@@ -58,12 +58,19 @@ def test_thanh_ngang_mang_du_bon_thu_cua_dau_trang():
     ma = _ma(DAU)
     than = ma[ma.index("export function TieuDe"):]
     than = than[:than.index("export function", 1)]
+    # TC-65 (18/9/2026) · DANH SÁCH DÀI RA MỘT MỤC, VÀ MỘT MỤC ĐỔI CHỖ BÁM.
+    #   · Phạm vi: anh Tuấn chốt "bỏ Vietourist công ty mẹ" khỏi thanh, nên nhãn rê chuột chuyển
+    #     sang bám vào TÊN TRANG. Câu trả lời không mất khỏi hệ thống, chỉ đổi chỗ.
+    #   · Việc chờ quyết: khối riêng "Cần Chủ tịch quyết định" nhập vào thanh, nên thanh phải
+    #     BÀY ĐƯỢC danh sách ấy. Thiếu chỗ này thì việc chờ Chủ tịch biến mất mà không lỗi nào báo.
+    # Luật của phép thử không đổi: thanh gộp lại là để BỚT CHỮ, không phải để bớt câu trả lời.
     for can, vi in (
         ("mh01-thanh-ten", "tên trang"),
         ('title="Kỳ báo cáo"', "kỳ báo cáo"),
         ("Quý và năm →", "cửa sang quý và năm"),
-        ('title="Phạm vi"', "phạm vi"),
+        ('title="Phạm vi: Vietourist — công ty mẹ"', "phạm vi"),
         ('title="Ngày báo cáo"', "ngày báo cáo"),
+        ("cho.map(", "hàng nút việc chờ quyết"),
     ):
         assert can in than, f"Thanh ngang thiếu {vi}."
 

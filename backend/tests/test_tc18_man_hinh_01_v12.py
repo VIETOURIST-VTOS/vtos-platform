@@ -40,10 +40,23 @@ def test_viec_can_quyet_dinh_dung_truoc_cac_con_so():
     # "gộp thành 1 thanh ngang", hàng lọc nhập vào `<TieuDe`. Luật vẫn nguyên một chữ: đầu trang
     # → việc cần quyết định → rồi mới tới con số. Mặt cũ của luật (hàng lọc là một khối riêng
     # đứng giữa `<TieuDe` và `<KhoiQuyetDinh`) được canh ngược lại ngay dưới đây.
-    vt = {t: s.index(t) for t in ("<TieuDe", "<KhoiQuyetDinh", "<KhoiDongTien", "<HangThe")}
+    #
+    # TC-65 (18/9/2026): `<KhoiQuyetDinh` cũng rời danh sách — anh Tuấn chốt "gom lại thành 1 thanh
+    # ngang", hàng nút chờ quyết nhập thẳng vào `<TieuDe`. LUẬT VẪN NGUYÊN MỘT CHỮ: việc chờ mình
+    # quyết phải đứng TRƯỚC mọi con số. Nay nó đứng trước theo nghĩa mạnh hơn — nó nằm trong chính
+    # dòng đầu tiên của trang. Vế canh ngược ("không dựng lại khối riêng") ở ngay dưới.
+    vt = {t: s.index(t) for t in ("<TieuDe", "<KhoiDongTien", "<HangThe")}
     thu_tu = sorted(vt, key=lambda t: vt[t])
-    assert thu_tu == ["<TieuDe", "<KhoiQuyetDinh", "<KhoiDongTien", "<HangThe"], \
+    assert thu_tu == ["<TieuDe", "<KhoiDongTien", "<HangThe"], \
         f"thứ tự khối trên màn hình 01 lệch bản vẽ V1.2: {thu_tu}"
+    assert "<KhoiQuyetDinh" not in s, (
+        "`<KhoiQuyetDinh` sống lại thành khối riêng — hàng nút chờ quyết phải nằm trên thanh "
+        "ngang đầu trang (TC-65)."
+    )
+    assert "quyet_dinh={d.approvals" in s, (
+        "Thanh ngang không còn nhận danh sách hồ sơ chờ quyết — việc chờ Chủ tịch biến mất khỏi "
+        "màn hình mà không lỗi nào báo."
+    )
     assert "<DongLoc" not in s, (
         "`<DongLoc />` sống lại trên trang — đầu trang phải là MỘT thanh ngang (TC-62)."
     )
@@ -174,8 +187,15 @@ def test_khong_gioi_han_so_ho_so_can_quyet_dinh():
     Đây đúng kiểu phép soát tự bắt oan mình: nó cấm một chuỗi ký tự thay vì cấm một hành vi, nên
     lần đầu có người viết `slice` cho việc khác là nó báo đỏ. Nay chỉ soi THÂN HÀM KhoiQuyetDinh.
     """
+    # TC-65 (18/9/2026) · CHỖ SOÁT ĐỔI, LUẬT KHÔNG ĐỔI. Hàng nút chờ quyết nhập vào `TieuDe`, nên
+    # thân hàm phải soi là `TieuDe`. Và thẻ nhãn "{co.length} hồ sơ đang chờ" đã bỏ theo chốt của
+    # anh Tuấn ("bỏ chữ chờ chủ tịch quyết") — nó đếm đúng số nút đứng ngay cạnh nó, tức nói lại
+    # một điều mắt đã thấy. Luật CÒN NGUYÊN và là luật quan trọng hơn: KHÔNG CẮT BỚT hồ sơ.
     s = _ma(DAU)
-    i = s.index("export function KhoiQuyetDinh")
+    i = s.index("export function TieuDe")
     than = s[i: s.index("export function", i + 10)]
-    assert "slice(" not in than, "khối Cần quyết định không được cắt bớt hồ sơ"
-    assert "{co.length} hồ sơ đang chờ" in s, "phải đếm ra số hồ sơ đang chờ"
+    assert "slice(" not in than, "hàng nút Cần quyết định không được cắt bớt hồ sơ"
+    assert "cho.map(" in than, "phải bày TOÀN BỘ danh sách hồ sơ chờ quyết, không cắt"
+    assert "hồ sơ đang chờ" not in s, (
+        "Thẻ nhãn đếm hồ sơ sống lại — nó đếm đúng số nút đứng ngay cạnh (TC-65)."
+    )

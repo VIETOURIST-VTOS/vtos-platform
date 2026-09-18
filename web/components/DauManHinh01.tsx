@@ -207,14 +207,25 @@ export function tenThang(): string {
  *  KHÔNG lấy huy hiệu "Giao diện xanh navy" ở góc phải bản vẽ: đó là nhãn của TÀI LIỆU THIẾT KẾ
  *  tự mô tả mình, dán lên trang thật thì thành một ô chữ không ai bấm được và không nói gì thêm.
  */
-export function TieuDe({ vai, ten_vai }: { vai?: string; ten_vai?: string }) {
+export function TieuDe({ vai, ten_vai, quyet_dinh }: {
+  vai?: string; ten_vai?: string;
+  /** TC-65 · Hồ sơ đang chờ chính người đang xem quyết. Xem chú thích dài ngay trên. */
+  quyet_dinh?: { href: string; label: string }[];
+}) {
   const ten = TEN_TRANG[vai || ""] || `Bảng điều hành · ${ten_vai || ""}`;
+  const cho = quyet_dinh || [];
   const homNay = useHomNay();
   const [thang, setThang] = useState("");
   useEffect(() => setThang(tenThang()), []);
   return (
     <div className="mh01-thanh">
-      <span className="mh01-thanh-ten">{ten}</span>
+      {/* TC-65 · PHẠM VI XUỐNG CHỖ RÊ CHUỘT — anh Tuấn: "bỏ Vietourist công ty mẹ".
+          Câu trả lời KHÔNG mất, nó đi theo tên trang: rê chuột lên "Bảng điều hành Chủ tịch" là
+          đọc được màn hình này đang nói về công ty nào. TC-55 đặt ra luật "phạm vi là một câu trả
+          lời, không phải một ô chọn" — luật ấy còn nguyên, chỉ chỗ đứng đổi. KHÔNG dẫn sang Báo
+          cáo tài chính hợp nhất: màn hình ấy CHƯA DỰNG, và chỉ vào chỗ trống là kiểu sai khó chịu
+          nhất (bài học 13/9 ngay trong tệp này). */}
+      <span className="mh01-thanh-ten" title="Phạm vi: Vietourist — công ty mẹ">{ten}</span>
       {/* NHÃN NẰM Ở CHỖ RÊ CHUỘT, KHÔNG NẰM TRÊN THANH. Ba chữ "Kỳ báo cáo · Phạm vi · Ngày báo
           cáo" dài gần bằng chính ba giá trị chúng giới thiệu; bỏ đi thì thanh còn một hàng, mà ai
           chưa quen vẫn tra được bằng cách rê chuột. */}
@@ -222,15 +233,24 @@ export function TieuDe({ vai, ten_vai }: { vai?: string; ten_vai?: string }) {
       {/* Quý và năm KHÔNG nằm trên màn hình này. Dẫn thẳng sang chỗ xem được, chứ không để một ô
           chọn bấm vào lại báo "chưa có nguồn". */}
       <Link className="the-cua" href="/phan-he/baocao">Quý và năm →</Link>
-      {/* TC-55 · PHẠM VI LÀ MỘT CÂU TRẢ LỜI, KHÔNG PHẢI MỘT Ô CHỌN — anh Tuấn chốt 17/9/2026:
-          "bỏ hết pháp nhân, chỉ chọn Vietourist". Hai người mở cùng một trang mà mỗi người đang
-          xem một pháp nhân khác nhau, rồi cùng bàn về "con số đó", là kiểu sai không ai phát hiện
-          ra trong phòng họp. KHÔNG dẫn sang Báo cáo tài chính hợp nhất: màn hình ấy CHƯA DỰNG, và
-          chỉ vào chỗ trống là kiểu sai khó chịu nhất (bài học 13/9 ngay trong tệp này). */}
-      <b title="Phạm vi">Vietourist — công ty mẹ</b>
       {/* Ngày báo cáo là mốc phân nhóm của mọi bảng theo hạn ở dưới – ghi ra để không ai phải đoán. */}
       <b className="mh01-thanh-ngay" title="Ngày báo cáo">{homNay || "…"}</b>
       <span className="mh01-thanh-day" />
+
+      {/* ═══ TC-65 · VIỆC CHỜ QUYẾT NẰM NGAY TRÊN THANH ══════════════════════════════════════
+          "gom lại thành 1 thanh ngang, bỏ chữ chờ chủ tịch quyết"      — anh Tuấn, 18/9/2026
+
+          Trước vòng này đây là một `.panel` riêng mang tiêu đề "Cần Chủ tịch quyết định" và một
+          thẻ nhãn "N hồ sơ đang chờ" — ba dòng chữ để giới thiệu một hàng nút. Chính mấy cái nút
+          đã nói đủ ("1 dự toán tour chờ duyệt"), nên chữ giới thiệu chúng là chữ thừa.
+
+          KHÔNG CÓ HỒ SƠ THÌ KHÔNG VẼ GÌ, và đây là chỗ phải nói rõ vì nó trông giống "rỗng khác
+          không" nhưng không phải: đây KHÔNG phải một con số bị bỏ trống, nó là một DANH SÁCH
+          VIỆC. Danh sách việc rỗng thì đúng nghĩa là không có việc — in thêm câu "không có hồ sơ
+          nào đang chờ" mỗi ngày chỉ dạy người ta thôi đọc chỗ này. */}
+      {cho.map((a, i) => (
+        <Link key={i} href={a.href} className="mh01-qd-nut">{a.label}</Link>
+      ))}
       {/* TC-35 · Nút In là một THAO TÁC TRÊN KỲ ĐANG CHỌN — in đúng cái kỳ ghi bên trái — nên nó
           đứng cùng thanh với kỳ; đứng riêng cạnh tiêu đề thì nó chỉ là một nút trôi nổi. */}
       <button type="button" className="act grey mh01-in" onClick={() => window.print()}>
@@ -240,32 +260,20 @@ export function TieuDe({ vai, ten_vai }: { vai?: string; ten_vai?: string }) {
   );
 }
 
-/** Khối 02 – "Cần quyết định". Bản vẽ đặt nó NGAY TRÊN các chỉ tiêu: mở màn hình ra là thấy việc
- *  chờ mình, rồi mới tới số.
- *
- *  KHÔNG GIỚI HẠN SỐ HỒ SƠ (anh Tuấn chốt 13/9/2026). Bản vẽ V1.2 ghi "tối đa 5 hồ sơ ưu tiên",
- *  nhưng cắt ở năm nghĩa là hồ sơ thứ sáu nằm ngoài tầm mắt người duy nhất được quyết nó – mà thứ
- *  tự ưu tiên thì máy chủ chưa xếp, nên "năm cái đầu" chỉ là năm cái ngẫu nhiên. Hiện đủ, và
- *  đếm ra số. */
-export function KhoiQuyetDinh({ ds, vai }: { ds: any[]; vai?: string }) {
-  const co = ds || [];
-  const ten = vai === "tgd" ? "Cần Tổng giám đốc quyết định" : "Cần Chủ tịch quyết định";
-  return (
-    <section className="panel mh01-qd" id="cho-toi-duyet">
-      <div className="mh01-dau">
-        <h2>{ten}</h2>
-        <span className="tag">{co.length} hồ sơ đang chờ</span>
-      </div>
-      {co.length === 0
-        ? <p className="muted">Không có hồ sơ nào đang chờ ở vai trò này.</p>
-        : <div className="mh01-qd-ds">
-            {co.map((a: any, i: number) => (
-              <Link key={i} href={a.href} className="mh01-qd-nut">{a.label}</Link>
-            ))}
-          </div>}
-    </section>
-  );
-}
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   TC-65 · `KhoiQuyetDinh` ĐÃ XOÁ — hàng nút chờ quyết nhập vào `TieuDe` (anh Tuấn 18/9/2026:
+   "gom lại thành 1 thanh ngang, bỏ chữ chờ chủ tịch quyết").
+
+   LUẬT CŨ GIỮ NGUYÊN MỘT CHỮ, và phải giữ: KHÔNG GIỚI HẠN SỐ HỒ SƠ (anh Tuấn chốt 13/9/2026).
+   Bản vẽ V1.2 ghi "tối đa 5 hồ sơ ưu tiên", nhưng cắt ở năm nghĩa là hồ sơ thứ sáu nằm ngoài tầm
+   mắt người duy nhất được quyết nó — mà thứ tự ưu tiên thì máy chủ chưa xếp, nên "năm cái đầu"
+   chỉ là năm cái ngẫu nhiên. `TieuDe` vì thế `map` toàn bộ danh sách, không `slice`.
+
+   Thứ bỏ đi là BA dòng chữ giới thiệu: tiêu đề "Cần Chủ tịch quyết định", thẻ nhãn "N hồ sơ đang
+   chờ", và câu "không có hồ sơ nào đang chờ ở vai trò này". Cái đầu lặp lại điều tên trang đã nói;
+   cái thứ hai đếm đúng số nút đứng ngay cạnh nó; cái thứ ba in một câu "không có việc" mỗi ngày.
+
+   XOÁ chứ không để lại hàm không ai gọi — cùng bài học với `O` ở TC-57 và `DongLoc` ở TC-62. */
 
 /** Khối 03 – tám thẻ. Bản vẽ xếp hai hàng bốn thẻ trên màn rộng; ở đây để lưới tự xuống dòng theo
  *  bề rộng thật, vì khoá cứng bốn cột thì trên màn 1280px chữ bị cắt. */

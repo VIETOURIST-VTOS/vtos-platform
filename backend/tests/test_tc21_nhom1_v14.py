@@ -195,7 +195,10 @@ def test_khong_chi_nguoi_dung_bam_vao_o_khong_ton_tai():
     # ty nào.
     # TC-62 (18/9/2026) · VẾ SAU ĐỔI LẦN HAI, LUẬT VẪN KHÔNG ĐỔI. Ba tầng đầu trang gộp thành một
     # thanh ngang, nên nhãn chữ "Phạm vi:" xuống `title="Phạm vi"`. Câu TRẢ LỜI thì vẫn hiện ra.
-    assert 'title="Phạm vi"' in than and "Vietourist — công ty mẹ" in than, (
+    # TC-65 (18/9/2026) · VẾ SAU ĐỔI LẦN BA, LUẬT VẪN KHÔNG ĐỔI. Anh Tuấn: "bỏ Vietourist công ty
+    # mẹ" khỏi thanh. Nhãn rê chuột nay gắn vào TÊN TRANG, nên chuỗi cần tìm là
+    # `title="Phạm vi: Vietourist — công ty mẹ"`. Câu TRẢ LỜI vẫn còn trong hệ thống.
+    assert 'title="Phạm vi: Vietourist — công ty mẹ"' in than, (
         "Phải ghi rõ phạm vi là Vietourist — công ty mẹ, thay cho một câu nói về việc không đổi "
         "được đơn vị."
     )

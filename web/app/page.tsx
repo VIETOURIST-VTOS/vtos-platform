@@ -9,7 +9,7 @@ import {
   KhoiKinhDoanhLe, KhoiKinhDoanhDoan, KhoiBaoCaoNgay,
 } from "@/components/KhoiKinhDoanh";
 import {
-  KhoiQuyetDinh, HangThe, TieuDe, dem, type The,
+  HangThe, TieuDe, dem, type The,
 } from "@/components/DauManHinh01";
 import { KhoiTonDongMuc } from "@/components/KhoiSauO";
 import KhoiKetQuaKinhDoanh from "@/components/KhoiKetQuaKinhDoanh";
@@ -104,7 +104,7 @@ function Dash() {
   const bd = bieuDoCua(sec);
 
   return (<>
-    <TieuDe vai={user?.role} ten_vai={user?.role_name} />
+    <TieuDe vai={user?.role} ten_vai={user?.role_name} quyet_dinh={d.approvals || []} />
 
     {/* ══ TC-42 · SÁU Ô LỚN, RỒI MỚI ĐẾN NHỮNG CON SỐ ĐỂ LIẾC (anh Tuấn chốt 16/9/2026) ═══════
         "8 ô này anh muốn thay đổi vị trí — doanh thu, lợi nhuận trước thuế, dòng tiền, phải thu,
@@ -123,7 +123,10 @@ function Dash() {
         dưới; nay chúng LÀ ba trong sáu ô. Giữ cả hai chỗ là để một con số nằm hai nơi — đúng cái
         anh Tuấn bảo bỏ ở vòng TC-40 ("các mục lặp lại thì bỏ hết"). */}
 
-    <KhoiQuyetDinh ds={d.approvals || []} vai={user?.role} />
+    {/* TC-65 · KHỐI "CẦN CHỦ TỊCH QUYẾT ĐỊNH" ĐÃ NHẬP VÀO THANH NGANG ở đầu trang
+        (anh Tuấn 18/9/2026: "gom lại thành 1 thanh ngang, bỏ chữ chờ chủ tịch quyết").
+        Danh sách vẫn là `d.approvals`, vẫn đi đủ không cắt bớt — chỉ ba dòng chữ giới thiệu nó
+        là biến mất. Lý do đầy đủ ghi ở components/DauManHinh01.tsx. */}
 
     {/* TC-44 · Doanh thu và Lợi nhuận trước thuế GỘP thành MỘT khối rộng hết bề ngang, theo bản
         vẽ anh Tuấn gửi 16/9/2026. Hai ô ấy rời khỏi lưới sáu ô vì hai lẽ: chúng dùng CHUNG một bộ

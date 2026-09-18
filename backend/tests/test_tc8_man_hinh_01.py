@@ -306,8 +306,11 @@ def test_dong_loc_ghi_ro_pham_vi_la_vietourist_va_khong_dan_toi_man_hinh_chua_du
     # tầng đầu trang gộp thành một thanh ngang — nhãn dài gần bằng chính giá trị nó giới thiệu.
     # LUẬT KHÔNG ĐỔI: câu trả lời "Vietourist — công ty mẹ" vẫn phải HIỆN RA trên màn hình.
     src = _doc("web/components/DauManHinh01.tsx")
-    assert 'title="Phạm vi"' in src, "Mất nhãn Phạm vi (nay nằm ở thuộc tính title)."
-    assert "Vietourist — công ty mẹ" in src, "Phải ghi rõ màn hình đang nói về công ty nào."
+    # TC-65 (18/9/2026): nhãn rê chuột chuyển sang gắn vào TÊN TRANG khi anh Tuấn chốt bỏ chữ
+    # "Vietourist — công ty mẹ" khỏi thanh. Câu trả lời vẫn còn, chỉ đổi chỗ bám.
+    assert 'title="Phạm vi: Vietourist — công ty mẹ"' in src, (
+        "Mất nhãn Phạm vi — nay nằm ở thuộc tính title của tên trang."
+    )
     assert "chưa đổi được đơn vị" not in src, (
         "Câu cũ đọc ra như một hạn chế; nay đó là một quyết định, phải nói như một quyết định."
     )

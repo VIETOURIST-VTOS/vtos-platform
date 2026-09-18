@@ -141,14 +141,24 @@ export function duVeCoCau(ds: Phan[]): boolean {
 
 /* ─────────────────────────── KHUNG & Ô RỖNG ─────────────────────────── */
 
-export function KhungBieuDo({ ten, phu, chan, chuGiai, children }: {
-  ten: string; phu?: string; chan?: ReactNode; chuGiai?: ReactNode; children: ReactNode;
+export function KhungBieuDo({ ten, phu, chan, chuGiai, ben_ten, children }: {
+  ten: string; phu?: string; chan?: ReactNode; chuGiai?: ReactNode;
+  /** TC-65 · Một cửa đứng NGAY CẠNH tên hình, trước chú giải.
+   *
+   *  Chỗ này dành cho đường dẫn tới màn hình mà chính hình đang tóm tắt — anh Tuấn 18/9/2026:
+   *  "đưa chữ cấu trúc chi tiết dòng tiền lên kề bên chữ dự báo dòng tiền 13 tuần". Đặt cạnh tên
+   *  hình thì đọc ra ngay nó dẫn đi đâu; để nó nằm một mình dưới đáy khối thì nó thành một dòng
+   *  chữ trôi nổi giữa một dải trống. KHÔNG dùng chỗ này cho chú giải: chú giải có `chuGiai`, và
+   *  nó phải bị đẩy sang mép phải để không chen vào giữa tên hình và cửa. */
+  ben_ten?: ReactNode;
+  children: ReactNode;
 }) {
   return (
     <figure className="bd">
       <figcaption className="bd-dau">
         <b>{ten}</b>
         {phu && <span className="muted bd-phu">{phu}</span>}
+        {ben_ten}
         {chuGiai}
       </figcaption>
       {children}
@@ -480,8 +490,10 @@ export function doanLien(diem: Diem[]): { i: number; gt: number }[][] {
 }
 
 export function BieuDoDuong({ ten, phu, ds, nhan, dinh_dang = "tien", moc, chan, ai, cua, cua_ten,
-                             doi_xung = false }: {
+                             ben_ten, doi_xung = false }: {
   ten: string; phu?: string; ds: Duong[]; nhan: string[]; dinh_dang?: DinhDang;
+  /** TC-65 · Cửa đứng cạnh tên hình — xem chú thích ở `KhungBieuDo`. */
+  ben_ten?: ReactNode;
   /** Vạch mốc nằm ngang trên CÙNG một trục (ngưỡng dự phòng chẳng hạn). */
   moc?: { gt: number; nhan: string } | null;
   chan?: ReactNode; ai?: string; cua?: string; cua_ten?: string;
@@ -506,7 +518,7 @@ export function BieuDoDuong({ ten, phu, ds, nhan, dinh_dang = "tien", moc, chan,
   const x = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100);
 
   return (
-    <KhungBieuDo ten={ten} phu={phu} chan={chan}
+    <KhungBieuDo ten={ten} phu={phu} chan={chan} ben_ten={ben_ten}
       chuGiai={<ChuGiai ds={ds.map((d) => ({ ten: d.ten, lop: d.lop }))} />}>
       <div className="bd-duong-vung">
         {/* Cột mốc trục bên TRÁI. Mỗi nhãn đặt TUYỆT ĐỐI ở đúng chiều cao của vạch lưới nó
