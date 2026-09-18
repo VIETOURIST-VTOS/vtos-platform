@@ -358,8 +358,12 @@ def ghi(db: Session, ky: str, company_id: int, chi_tieu: str, gia_tri: float | N
             "chi_tieu": chi_tieu, "gia_tri": gia_tri, "thang_da_khep": khep}
 
 
-def hop_nhat(db: Session, ky: str) -> dict:
+def hop_nhat(db: Session, ky: str, nho: dict | None = None) -> dict:
     """Kế hoạch HỢP NHẤT của một tháng – hoặc `None` kèm danh sách pháp nhân còn thiếu.
+
+    TC-64 · `nho` là chỗ nhớ của MỘT lần dựng bảng (xem `ket_qua_kinh_doanh.bang`). Bảng Kết quả
+    kinh doanh hỏi lại cùng một tháng cho từng chỉ tiêu có kế hoạch; có `nho` thì hỏi một lần.
+    Không truyền `nho` thì hàm chạy y như trước.
 
     Đây là hàm màn hình Chủ tịch gọi. Xem LUẬT 1 ở đầu tệp: thiếu một pháp nhân là chưa có kế hoạch,
     không phải là kế hoạch nhỏ hơn.
@@ -368,6 +372,9 @@ def hop_nhat(db: Session, ky: str) -> dict:
     gọi đã chặn theo vai trò rồi (màn hình 01 chỉ mở cho Ban lãnh đạo). Cắt phạm vi ở đây sẽ cho ra
     một "số hợp nhất" chỉ gồm một pháp nhân, đúng cái bẫy mà LUẬT 1 đang chặn.
     """
+    khoa = ("kh.hop_nhat", ky)
+    if nho is not None and khoa in nho:
+        return nho[khoa]
     cty = phap_nhan_hop_nhat(db)
     ra: dict = {"ky": ky, "so_phap_nhan": len(cty)}
     for ma in CHI_TIEU:
@@ -380,6 +387,8 @@ def hop_nhat(db: Session, ky: str) -> dict:
                 tong += float(r.gia_tri)
         du = len(cty) > 0 and not thieu
         ra[ma] = {"gia_tri": tong if du else None, "du": du, "thieu": thieu}
+    if nho is not None:
+        nho[khoa] = ra
     return ra
 
 

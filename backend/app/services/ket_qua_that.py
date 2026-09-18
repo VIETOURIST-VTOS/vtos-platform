@@ -137,8 +137,13 @@ def _dem_dong_bu(ds: list[Tour]) -> int:
     return sum(1 for t in ds if t.confirmed_by == N_BU and _do_cua_nay(t))
 
 
-def thang(db: Session, ky: str) -> dict:
+def thang(db: Session, ky: str, nho: dict | None = None) -> dict:
     """Doanh thu và lãi tour của MỘT tháng, phạm vi Vietourist mẹ.
+
+    TC-64 · `nho` là chỗ nhớ của MỘT lần dựng bảng, do chỗ gọi tạo ra và truyền vào (xem chú thích
+    dài ở `ket_qua_kinh_doanh.bang`). Bảng Kết quả kinh doanh hỏi ba lần về cùng một tháng; có
+    `nho` thì lượt thứ hai và thứ ba lấy lại kết quả lượt đầu thay vì xuống cơ sở dữ liệu.
+    KHÔNG truyền `nho` thì hàm chạy y như trước — mọi chỗ gọi khác không phải đổi một chữ.
 
     `ky` dạng "2026-09" — đúng quy ước dùng chung cả kho (`services/xu_huong`).
 
@@ -157,6 +162,10 @@ def thang(db: Session, ky: str) -> dict:
                                đây bằng CỬA ĐÓNG SỐ BÙ (Chủ tịch ký thay, lô kho cũ) chứ không do
                                Điều hành đóng số thật. Xem khối 17/9 ở đầu tệp.
     """
+    khoa = ("kqt.thang", ky)
+    if nho is not None and khoa in nho:
+        return nho[khoa]
+
     y, m = int(ky[:4]), int(ky[5:7])
     dau, cuoi = _khoang_thang(y, m)
     me = cong_ty_me(db)
@@ -171,7 +180,7 @@ def thang(db: Session, ky: str) -> dict:
     du = [t for t in cua_me if _lai(t) is not None]
     thieu = [t for t in cua_me if _lai(t) is None]
 
-    return {
+    ra = {
         "ky": ky,
         "doanh_thu": float(sum(float(t.actual_revenue or 0) for t in du)) if du else None,
         "lai_tour": float(sum(_lai(t) or 0 for t in du)) if du else None,
@@ -186,3 +195,6 @@ def thang(db: Session, ky: str) -> dict:
         "co_nguon": me is not None,
         "dong_so_bu": _dem_dong_bu(cua_me),
     }
+    if nho is not None:
+        nho[khoa] = ra
+    return ra

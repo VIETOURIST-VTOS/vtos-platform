@@ -30,6 +30,7 @@ from app.models.dong_tien import NGUON_TIEN, ChotSoDu
 from app.services import dong_tien as DT
 from app.services import han_dong_tien as HAN
 from app.services import khung_dong_tien as KHUNG
+from app.services import nho_tam as NHO
 from app.services import pham_vi_phap_nhan as PV
 from app.services import rules as R
 from app.services import xuat_dong_tien_excel as XL
@@ -104,6 +105,10 @@ def chot_so_du(data: ChotIn,
             after={"company_id": b.company_id, "nguon": b.nguon, "den_ngay": str(b.den_ngay),
                    "so_du": float(b.so_du), "lech": None if b.lech is None else float(b.lech)})
     db.commit()
+    # TC-64 · XOÁ CHỖ NHỚ CỦA ĐÚNG PHÁP NHÂN VỪA CHỐT. Không xoá thì người vừa nhập số nhìn màn
+    # hình vẫn thấy số cũ tới năm phút — và họ sẽ chốt lại lần nữa, đó mới là cái sai thật.
+    # Xoá theo mã pháp nhân chứ không theo vai: chốt xong thì MỌI vai phải thấy số mới.
+    KHO_KHUNG.xoa(lambda k: k[1] == b.company_id)
     return {**_ra(b), "message": f"Đã chốt số dư đến hết {b.den_ngay:%d/%m/%Y}"}
 
 
@@ -129,8 +134,13 @@ def xem_bang(company_id: int, den_ngay: date | None = None,
         raise HTTPException(404, str(e))
 
 
+# Kho nhớ của khối bốn mốc. Khai ở đây, cạnh cửa dùng nó — một kho nằm xa cửa của nó là một kho
+# mà vòng sau quên xoá khi thêm một cửa ghi mới.
+KHO_KHUNG = NHO.Kho("dong_tien.khung")
+
+
 @router.get("/khung/{company_id}")
-def xem_khung(company_id: int, den_ngay: date | None = None,
+def xem_khung(company_id: int, den_ngay: date | None = None, refresh: bool = False,
               u: User = Depends(require_roles(*XEM, mo_ta="xem khối dòng tiền theo vai")),
               db: Session = Depends(get_db)):
     """TC-8 · Màn hình 01 — khung theo VAI đã điền số. MÁY CHỦ CẮT TẬP DÒNG, không phải trình duyệt.
@@ -143,6 +153,16 @@ def xem_khung(company_id: int, den_ngay: date | None = None,
 
     `/bang/{company_id}` ở trên GIỮ NGUYÊN cho màn hình cũ và cho Kế toán đối chiếu toàn cảnh.
     """
+    # TC-64 · CHỖ NHỚ NĂM PHÚT (anh Tuấn 18/9/2026: "kiểm tra lý do load rất chậm"). Đo thật:
+    # 0,87–2,60 giây mỗi lần. KHOÁ MANG VAI — đây là cửa cắt tập dòng theo vai (SEC-02), nên một
+    # chỗ nhớ quên vai sẽ trả gói của Chủ tịch cho Tổng giám đốc. Xem luật 1 ở services/nho_tam.py.
+    # Cửa GHI "chốt số dư" và "dựng lại sổ nghĩa vụ" tự xoá kho này, nên người vừa nhập số thấy
+    # ngay số mới chứ không phải đợi hết năm phút.
+    khoa = NHO.khoa_vai(u.role, company_id, str(den_ngay or ""))
+    if not refresh:
+        cu = KHO_KHUNG.lay(khoa)
+        if cu is not None:
+            return {**cu, "nho_tam": True}
     try:
         bang = DT.bang_bon_moc(db, company_id, den_ngay)
         sdn = DT.so_du_tung_ngay(db, company_id, den_ngay)
@@ -151,7 +171,7 @@ def xem_khung(company_id: int, den_ngay: date | None = None,
     # Hạn xử lý gắn SAU khi đã cắt theo vai: vai nào không nhận dòng ấy thì cũng không nhận hạn của
     # nó. `gan_han` chỉ ĐỌC — cửa GET không được đẻ cảnh báo, nếu không số cảnh báo tăng theo số lần
     # người dùng bấm F5.
-    return HAN.gan_han(db, company_id, KHUNG.ghep(u.role, bang, sdn))
+    return KHO_KHUNG.dat(khoa, HAN.gan_han(db, company_id, KHUNG.ghep(u.role, bang, sdn)))
 
 
 @router.get("/khung/{company_id}/excel")
@@ -293,4 +313,6 @@ def dong_bo_nghia_vu(u: User = Depends(require_roles(*DUNG_SO, mo_ta="dựng l�
         raise HTTPException(500, f"Dựng sổ lỗi: {type(e).__name__}: {str(e)[:600]}")
     R.audit(db, u.username, u.role, "dong_bo_nghia_vu", "nghia_vu_thanh_toan", after=ra)
     db.commit()
+    # Dựng lại sổ nghĩa vụ đổi số của MỌI pháp nhân, nên xoá sạch kho chứ không lọc.
+    KHO_KHUNG.xoa()
     return {**ra, "message": f"Đã dựng lại sổ nghĩa vụ — {ra['tong_dong']} dòng"}

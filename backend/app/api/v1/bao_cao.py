@@ -10,6 +10,7 @@ from app.api.deps import current_user, require_roles, robot_auth
 from app.db.session import get_db
 from app.models.core import User
 from app.services import bao_cao_phong as BP
+from app.services import nho_tam as NHO
 # Cùng danh sách XEM với cửa kế hoạch: hai cửa nói về cùng một con số chỉ tiêu.
 from app.api.v1.ke_hoach import XEM as KQ_XEM
 
@@ -205,16 +206,43 @@ def chup_hom_nay(db: Session = Depends(get_db)):
 #
 # Danh sách vai trò lấy ĐÚNG danh sách của /ke-hoach (XEM): hai chỗ nói về cùng một con số chỉ tiêu,
 # và mở rộng một chỗ mà quên chỗ kia là để lộ chỉ tiêu qua đường vòng.
-@router.get("/ket-qua-kinh-doanh",
-            dependencies=[Depends(require_roles(*KQ_XEM, mo_ta="kết quả kinh doanh"))])
-def ket_qua_kinh_doanh(kind: str = "nam", ky: str = "", db: Session = Depends(get_db)):
+# TC-64 · CHỖ NHỚ NĂM PHÚT — anh Tuấn 18/9/2026: "kiểm tra lý do load rất chậm".
+#
+# Đo trên bản chạy thật: cửa này mất 1,7–2,3 giây MỖI lần, không lần nào nhanh hơn, vì nó dựng lại
+# cả mười hai tháng từ đầu. Trên máy chủ nửa lõi CPU, hai giây ấy làm những cửa khác của cùng một
+# lần mở màn hình phải xếp hàng — `/dashboard` vốn 0,25 giây bị đẩy lên 8 giây.
+#
+# BA LÝ DO ĐỂ NHỚ ĐƯỢC Ở ĐÂY:
+#   · Con số này KHÔNG đổi theo vai. Hàm `bang()` không nhận `u`; nó trả kết quả hợp nhất của
+#     Vietourist mẹ, và cửa đã chặn theo vai bằng `require_roles` trước khi vào tới đây. Dù vậy
+#     khoá vẫn mang vai — xem luật 1 ở services/nho_tam.py: quên vai là cách lộ dữ liệu, và một
+#     ngày nào đó `bang()` có thể nhận `u`.
+#   · Nguồn của nó đổi CHẬM: một chuyến được đóng số, một bút toán được ghi. Năm phút chậm trên
+#     một bảng điều hành là mức `/dashboard` đã chấp nhận từ trước, không phải mức mới.
+#   · Có cửa làm mới: `?refresh=true`, đúng như `/dashboard`.
+KHO_KQKD = NHO.Kho("bao_cao.ket_qua_kinh_doanh")
+
+
+@router.get("/ket-qua-kinh-doanh")
+def ket_qua_kinh_doanh(kind: str = "nam", ky: str = "", refresh: bool = False,
+                       u: User = Depends(require_roles(*KQ_XEM, mo_ta="kết quả kinh doanh")),
+                       db: Session = Depends(get_db)):
     """12 cột tháng của một năm, cộng bốn con số của kỳ đang chọn.
 
     `kind` là bề rộng (thang · quy · nam); `ky` là mã kỳ. Bỏ trống `ky` thì lấy kỳ ĐANG CHẠY của
     bề rộng ấy — người mở bảng điều hành hỏi "công ty đang thế nào", không hỏi "tháng trước".
+
+    `refresh=true` bỏ qua chỗ nhớ và dựng lại — dành cho người vừa đóng số một chuyến.
     """
     from app.services import ket_qua_kinh_doanh as KQ
+    khoa = NHO.khoa_vai(u.role, kind, ky)
+    if not refresh:
+        cu = KHO_KQKD.lay(khoa)
+        if cu is not None:
+            return {**cu, "nho_tam": True}
     try:
-        return KQ.bang(db, kind=kind, ky=ky)
+        return KHO_KQKD.dat(khoa, KQ.bang(db, kind=kind, ky=ky))
     except ValueError as ex:
+        # KHÔNG ghi lỗi vào chỗ nhớ (luật 3 ở services/nho_tam.py): nhớ một lỗi năm phút là biến
+        # một mã kỳ gõ sai thành năm phút hỏng cho mọi người cùng vai.
         raise HTTPException(422, str(ex))

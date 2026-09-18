@@ -129,7 +129,25 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
     nam = int(str(ky)[:4])
     cac_thang = [f"{nam:04d}-{m:02d}" for m in range(1, 13)]
     trong_ky = set(XH.thang_cua_ky(ky))
-    doc = XH.doc_that(db)
+
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # TC-64 · HỎI MỘT LẦN CHO MỘT THÁNG, KHÔNG PHẢI BA LẦN — anh Tuấn 18/9/2026: "kiểm tra lý do
+    # load rất chậm".
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # Đo trên bản chạy thật: cửa này mất 1,7–2,3 giây MỖI LẦN gọi, không có lần nào nhanh hơn.
+    # Đếm ra thì với mỗi tháng trong mười hai tháng, `ket_qua_that.thang()` bị gọi BA lượt riêng
+    # biệt — một lượt cho `thieu_thang` ở dưới, một cho chỉ tiêu doanh thu, một cho lợi nhuận tour
+    # — và cả ba hỏi CÙNG một câu về CÙNG một tháng. `ke_hoach.hop_nhat()` cũng bị gọi lại cho
+    # từng chỉ tiêu có kế hoạch.
+    #
+    # `nho` là chỗ nhớ của ĐÚNG MỘT LẦN GỌI hàm này, không phải chỗ nhớ sống qua nhiều lần: nó
+    # sinh ra ở đây và chết khi hàm trả về. Nhờ vậy nó không thể trả số cũ cho lần bấm sau — thứ
+    # duy nhất nó bỏ đi là những lượt hỏi TRÙNG bên trong một lần dựng bảng.
+    #
+    # Truyền tường minh chứ KHÔNG gắn ngầm vào phiên `db`: một chỗ nhớ nấp trong đối tượng phiên
+    # là thứ sẽ trả số cũ cho một cửa GHI nào đó trong tương lai mà không ai ngờ tới.
+    nho: dict = {}
+    doc = XH.doc_that(db, nho=nho)
 
     # KỲ ĐANG CHẠY: chỉ cộng những tháng ĐÃ TRÔI, và nói rõ "đến hôm nay".
     #
@@ -148,7 +166,7 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
     # cột chính chỉ gồm chuyến đủ số, nên nếu không nói ra phần thiếu thì người đọc tưởng cột ấy là
     # toàn bộ tháng. Đọc qua ĐÚNG hàm mà `xu_huong` đang gọi — không truy vấn riêng ở đây.
     from app.services import ket_qua_that as KQ
-    thieu_thang = {t: KQ.thang(db, t) for t in cac_thang}
+    thieu_thang = {t: KQ.thang(db, t, nho=nho) for t in cac_thang}
 
     ra_ct = []
     so = {}
@@ -175,7 +193,7 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
         if ct["co_ke_hoach"]:
             # VẠCH KẾ HOẠCH CHẠY THEO TỪNG THÁNG, không phải một vạch ngang: chỉ tiêu tháng 1 khác
             # tháng 12, và một vạch ngang duy nhất là nói dối về cả mười một tháng còn lại.
-            kh_thang = [KH.hop_nhat(db, t)[ct["ma"]] for t in cac_thang]
+            kh_thang = [KH.hop_nhat(db, t, nho=nho)[ct["ma"]] for t in cac_thang]
             ke_hoach = [None if not h["du"] else float(h["gia_tri"]) for h in kh_thang]
 
         ra_ct.append({**{k: ct[k] for k in ("ma", "ten", "hinh")},
