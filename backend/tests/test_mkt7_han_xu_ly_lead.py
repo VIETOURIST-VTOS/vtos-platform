@@ -12,7 +12,7 @@ BỐN ĐIỀU TỆP NÀY CANH, và cả bốn đều là chỗ đã từng hỏn
   4. CHỖ ĐẾM VÀ CHỖ ĐÁNH DẤU TỪNG DÒNG DÙNG CHUNG MỘT ĐỊNH NGHĨA. Đếm bằng SQL còn đánh dấu bằng
      Python là hai đầu, và hai đầu thì sớm muộn lệch nhau.
 """
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 import sqlalchemy as sa
@@ -84,7 +84,7 @@ def test_khong_viet_cung_so_24_trong_ma_nghiep_vu():
 def test_han_dem_tu_luc_lead_VAO_SO(db):
     vao_so = datetime(2026, 9, 18, 8, 0, 0)
     l = _lead(db, received_at=vao_so)
-    assert L.han_xu_ly(l, 24.0) == vao_so + timedelta(hours=24), (
+    assert L.han_theo_quy_tac(l, 24.0) == vao_so + timedelta(hours=24), (
         "Hạn phải đếm từ received_at. Đếm từ lúc mở màn hình thì mỗi lần xem là một hạn mới, và "
         "không lead nào quá hạn bao giờ.")
 
@@ -105,7 +105,7 @@ def test_KHONG_BIET_LEAD_VAO_SO_LUC_NAO_THI_KHONG_KET_LUAN_QUA_HAN(db):
     người ta một lần chậm trễ mà sổ không chứng minh được."""
     l = _lead(db)
     l.received_at = None
-    assert L.han_xu_ly(l, 24.0) is None
+    assert L.han_theo_quy_tac(l, 24.0) is None
     assert L.qua_han(l, 24.0, BAY_GIO) is False
 
 
@@ -185,3 +185,64 @@ def test_goi_lead_out_khong_kem_db_thi_KHONG_DOAN_bang_mot_so_viet_cung(db):
     ra = L.lead_out(l)
     assert ra["han_xu_ly"] is None and ra["qua_han"] is None, (
         "Không đọc được tham số đã ký thì trả None, không được lấy 24 làm mặc định trong mã.")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# 5 · LỜI HẸN THẮNG LUẬT (thêm 18/9/2026, khi gói R3 mang cột `han_xu_ly` vào)
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Từ 18/9 có HAI thứ cùng nói về hạn, và chúng không cùng nghĩa:
+#     CỘT  Lead.han_xu_ly      – hạn ĐÃ HẸN, do người nhập ghi (cửa nhập trong intake_marketing)
+#     HÀM  han_theo_quy_tac()  – hạn THEO LUẬT 24 giờ P.TGĐ ký
+# Sales đã hẹn với khách ngày cụ thể thì đó là lời hứa có thật; chấm họ theo luật chung trong khi
+# họ đã hẹn khác là chấm sai. Nên lời hẹn thắng, và màn hình phải nói ra đang theo cái nào.
+
+def test_co_han_da_hen_thi_lay_han_ay_chu_khong_lay_luat_chung(db):
+    l = _lead(db, received_at=BAY_GIO - timedelta(hours=48),
+              han_xu_ly=date(2026, 9, 25))
+    han, nguon = L.han_hieu_luc(l, 24.0)
+    assert nguon == "da_hen"
+    assert han.date() == date(2026, 9, 25)
+    assert L.qua_han(l, 24.0, BAY_GIO) is False, (
+        "Lead vào sổ 48 giờ trước nhưng ĐÃ HẸN ngày 25 — chưa tới hẹn thì chưa trễ.")
+
+
+def test_han_da_hen_la_HET_NGAY_moi_tre_chu_khong_phai_0_gio_sang(db):
+    """Hẹn 'ngày 18' nghĩa là hết ngày 18 mới trễ. Lấy 0 giờ sáng 18 làm mốc là biến cả ngày làm
+    việc hôm ấy thành quá hạn."""
+    l = _lead(db, received_at=BAY_GIO - timedelta(days=5), han_xu_ly=date(2026, 9, 18))
+    assert L.qua_han(l, 24.0, BAY_GIO) is False            # BAY_GIO = 12:00 ngày 18
+    assert L.qua_han(l, 24.0, datetime(2026, 9, 19, 0, 30)) is True
+
+
+def test_khong_hen_gi_thi_van_theo_luat_24_gio(db):
+    l = _lead(db, received_at=BAY_GIO - timedelta(hours=30), han_xu_ly=None)
+    han, nguon = L.han_hieu_luc(l, 24.0)
+    assert nguon == "theo_quy_tac"
+    assert L.qua_han(l, 24.0, BAY_GIO) is True
+
+
+def test_SQL_va_Python_van_khop_khi_co_ca_han_hen_lan_han_luat(db):
+    """Cùng một phép thử hai đầu như phần 4, nhưng lần này bộ dữ liệu có CẢ hai loại hạn. Đây là
+    chỗ dễ lệch nhất: nhánh Python viết bằng if, nhánh SQL viết bằng CASE."""
+    _lead(db, received_at=BAY_GIO - timedelta(hours=30))                                   # quá hạn theo luật
+    _lead(db, received_at=BAY_GIO - timedelta(days=5), han_xu_ly=date(2026, 9, 17))        # quá hạn đã hẹn
+    _lead(db, received_at=BAY_GIO - timedelta(days=5), han_xu_ly=date(2026, 9, 25))        # đã hẹn, chưa tới
+    _lead(db, received_at=BAY_GIO - timedelta(hours=30), han_xu_ly=date(2026, 9, 30))      # hẹn cứu lead trễ luật
+    _lead(db, received_at=BAY_GIO - timedelta(hours=1))                                     # chưa tới hạn luật
+
+    rows = list(db.execute(select(Lead)).scalars())
+    theo_python = sum(1 for l in rows if L.qua_han(l, 24.0, BAY_GIO))
+    theo_sql = L.dem_qua_han(db, select(Lead), 24.0, BAY_GIO)
+    assert theo_python == 2, f"Python đánh dấu {theo_python}, đáng ra 2"
+    assert theo_sql == theo_python, (
+        f"SQL đếm {theo_sql} nhưng Python đánh dấu {theo_python}. Nhánh CASE bên SQL đã lệch khỏi "
+        f"nhánh if bên Python — hai đầu của cùng một định nghĩa.")
+
+
+def test_cua_nhap_tra_ve_ca_han_lan_NGUON_cua_han(db):
+    l = _lead(db, received_at=BAY_GIO - timedelta(days=5), han_xu_ly=date(2026, 9, 25))
+    ra = L.lead_out(l, db)
+    assert ra["nguon_han"] == "da_hen", (
+        "Màn hình phải biết con số đang theo lời hẹn hay theo luật — cùng một lẽ với `nguon_mau_so` "
+        "của báo cáo chuyển đổi: con số nào cũng phải nói được nó ra từ đâu.")
