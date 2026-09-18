@@ -215,7 +215,10 @@ def test_khong_tu_viet_cong_thuc_doanh_thu_lan_hai():
     nguon = open(XH.__file__, encoding="utf-8").read()
     ma = re.sub(r'"""(?:.|\n)*?"""', " ", nguon)
     ma = re.sub(r"^\s*#.*$", " ", ma, flags=re.M)
-    assert "KQ.thang(db, ky)" in ma, "Doanh thu và lãi tour phải đi qua ket_qua_that."
+    # TC-64 (18/9/2026): thêm tham số `nho` — chỗ nhớ của MỘT lần dựng bảng, để một tháng không bị
+    # hỏi ba lần (xem `ket_qua_kinh_doanh.bang`). Luật canh ở đây KHÔNG đổi: phải đi qua
+    # `ket_qua_that`, không được tự viết truy vấn lần hai. Nên canh tiền tố của lời gọi.
+    assert "KQ.thang(db, ky" in ma, "Doanh thu và lãi tour phải đi qua ket_qua_that."
     assert "income_statement" in ma
     assert "_month_tours" not in ma and "settlement_summary" not in ma, (
         "Phép tính cũ lọc theo ngày Kế toán xác nhận và không lọc pháp nhân — không còn dùng ở đây."

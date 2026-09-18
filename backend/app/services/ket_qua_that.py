@@ -61,24 +61,6 @@ khúc mờ nối tiếp trên chính cây cột doanh thu, có tên và có bộ
 
 RANH GIỚI 09/9 GIỮ NGUYÊN: tệp này không nhập số nào. Giá vốn thiếu thì Điều hành nhập ở cửa đóng
 số; pháp nhân thiếu thì Hành chính gán. Hệ thống chỉ nói ra là còn thiếu bao nhiêu và ai nhập.
-
-═══════════════════════════════════════════════════════════════════════════════════════════════
-17/9/2026 · `closed_at` TỪ NAY MANG HAI NGHĨA — ĐỌC KỸ TRƯỚC KHI SỬA PHÉP LỌC Ở DƯỚI
-═══════════════════════════════════════════════════════════════════════════════════════════════
-Chủ tịch chốt: *"vì đây là nhập dữ liệu cũ lên hệ thống nên em để Chủ tịch ký thay toàn bộ các
-phòng ban luôn, khi nào vào vận hành chính thức thì phòng nào ký phòng đó"*. Từ đó có cửa
-`services/dong_so_kho_cu` đóng số bù cho 456 chuyến T1–T5/2026 của kho quyết toán cũ.
-
-Cửa ấy KHÔNG ghi `closed_at = now()` như cửa thật, mà ghi **cuối ngày kết thúc của chính chuyến**.
-Nếu ghi `now()` thì cả ≈36 tỷ của năm tháng đầu năm nhảy hết vào tháng bấm nút: cột tháng 9 phình
-lên nhìn y hệt một tháng bán tốt, còn T1–T5 vẫn rỗng. Sai kiểu ấy tệ hơn rỗng, vì rỗng thì người
-đọc biết là thiếu.
-
-NÊN Ở ĐÂY: với lô kho cũ, `closed_at` là **KỲ CỦA CHUYẾN**, không phải "lúc người ta bấm đóng số".
-Ngày bấm thật và người ký nằm ở nhật ký kiểm toán (`dong_so_bu_kho_cu_h1_2026`) và ở dòng sự kiện
-của chuyến. Luật 1 ở trên — "mốc là ngày đóng số" — vẫn đúng cho mọi chuyến vận hành; lô bù là
-ngoại lệ có chữ ký, đếm riêng ở `dong_so_bu` trong bản trả về, để một tháng gồm phần lớn là số bù
-thì người đọc thấy ngay chứ không phải đi tra.
 """
 from __future__ import annotations
 
@@ -125,20 +107,13 @@ def _lai(t: Tour) -> float | None:
     return float(t.actual_revenue) - (float(t.actual_cost) + float(t.promo_value or 0))
 
 
-def _dem_dong_bu(ds: list[Tour]) -> int:
-    """Bao nhiêu chuyến trong danh sách này vào tháng bằng CỬA ĐÓNG SỐ BÙ của kho cũ.
-
-    Dấu nhận đúng bằng dấu mà cửa gỡ dùng (`dong_so_kho_cu._do_cua_nay`): nguồn là kho cũ và
-    `closed_at` rơi trúng mốc kỳ. Gọi lại hàm bên ấy chứ không chép luật sang đây — hai bản sao của
-    cùng một luật là hai bản sẽ lệch nhau vào ngày không ai để ý.
-    """
-    from app.services.dong_so_kho_cu import NGUON as N_BU, _do_cua_nay
-
-    return sum(1 for t in ds if t.confirmed_by == N_BU and _do_cua_nay(t))
-
-
-def thang(db: Session, ky: str) -> dict:
+def thang(db: Session, ky: str, nho: dict | None = None) -> dict:
     """Doanh thu và lãi tour của MỘT tháng, phạm vi Vietourist mẹ.
+
+    TC-64 · `nho` là chỗ nhớ của MỘT lần dựng bảng, do chỗ gọi tạo ra và truyền vào (xem chú thích
+    dài ở `ket_qua_kinh_doanh.bang`). Bảng Kết quả kinh doanh hỏi ba lần về cùng một tháng; có
+    `nho` thì lượt thứ hai và thứ ba lấy lại kết quả lượt đầu thay vì xuống cơ sở dữ liệu.
+    KHÔNG truyền `nho` thì hàm chạy y như trước — mọi chỗ gọi khác không phải đổi một chữ.
 
     `ky` dạng "2026-09" — đúng quy ước dùng chung cả kho (`services/xu_huong`).
 
@@ -153,10 +128,11 @@ def thang(db: Session, ky: str) -> dict:
                                KHÔNG cộng vào Vietourist — xem luật 2.
       da_khoa                – tháng này còn chuyến Kế toán trả lại được hay không.
       co_nguon               – danh mục pháp nhân đã có công ty mẹ chưa.
-      dong_so_bu             – trong số chuyến của Vietourist mẹ tháng này, bao nhiêu chuyến vào
-                               đây bằng CỬA ĐÓNG SỐ BÙ (Chủ tịch ký thay, lô kho cũ) chứ không do
-                               Điều hành đóng số thật. Xem khối 17/9 ở đầu tệp.
     """
+    khoa = ("kqt.thang", ky)
+    if nho is not None and khoa in nho:
+        return nho[khoa]
+
     y, m = int(ky[:4]), int(ky[5:7])
     dau, cuoi = _khoang_thang(y, m)
     me = cong_ty_me(db)
@@ -171,7 +147,7 @@ def thang(db: Session, ky: str) -> dict:
     du = [t for t in cua_me if _lai(t) is not None]
     thieu = [t for t in cua_me if _lai(t) is None]
 
-    return {
+    ra = {
         "ky": ky,
         "doanh_thu": float(sum(float(t.actual_revenue or 0) for t in du)) if du else None,
         "lai_tour": float(sum(_lai(t) or 0 for t in du)) if du else None,
@@ -184,5 +160,8 @@ def thang(db: Session, ky: str) -> dict:
         "dt_chua_gan_phap_nhan": float(sum(float(t.actual_revenue or 0) for t in chua_gan)),
         "da_khoa": bool(cua_me) and all(t.status in KHONG_TRA_LAI_DUOC for t in cua_me),
         "co_nguon": me is not None,
-        "dong_so_bu": _dem_dong_bu(cua_me),
     }
+    if nho is not None:
+        nho[khoa] = ra
+    return ra
+
