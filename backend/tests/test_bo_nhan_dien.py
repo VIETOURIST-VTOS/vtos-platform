@@ -85,15 +85,40 @@ def test_globals_nap_bo_nhan_dien():
     assert '@import "./tokens.css"' in _doc(CSS), "globals.css phải nạp tokens.css ngay đầu tệp"
 
 
-def test_mot_bang_mau_duy_nhat_khong_doi_theo_may():
-    """Anh Tuấn chốt 13/9: LUÔN TỐI theo bản vẽ V1.4 (12/9 từng chốt luôn sáng).
+def test_mau_khong_tu_doi_theo_may_khi_nguoi_dung_chua_chon():
+    """LUẬT NÀY ĐÃ BỊ ĐẢO MỘT NỬA NGÀY 18/9/2026. Ghi cả hai bên, vì cả hai đều đúng vào thời của nó.
 
-    Điều KHÔNG đổi qua cả hai lần chốt: chỉ có MỘT bảng màu. Khối @media (prefers-color-scheme)
-    làm mỗi máy thấy một màu khác nhau, và bộ nhận diện thì chỉ định nghĩa một bảng.
+    ══ BÊN CŨ · 13/9/2026 ════════════════════════════════════════════════════════════════════
+    Tên cũ của phép thử: `test_mot_bang_mau_duy_nhat_khong_doi_theo_may`.
+    globals.css chép nguyên văn: *"Vẫn KHÔNG có khối @media (prefers-color-scheme): màu không được
+    đổi theo cài đặt của máy, vì như thế hai người mở cùng một trang thấy hai màu khác nhau."*
+    Lúc ấy hệ thống chỉ có MỘT bảng màu, và người dùng không có cách nào chọn.
+
+    ══ BÊN MỚI · 18/9/2026 ═══════════════════════════════════════════════════════════════════
+    Anh Tuấn giao mục "Theo hệ thống" trong bảng chọn giao diện. Nay có HAI bảng màu, và người
+    dùng chọn lấy một. Lý do cũ yếu đi thật: hồi 13/9 màu đổi là do CÀI ĐẶT MÁY TỰ NHẢY, không ai
+    chọn; nay là NGƯỜI DÙNG TỰ CHỌN và biết mình đang chọn gì.
+    Cái giá thì vẫn còn và vẫn thật, ghi lại để đừng ai quên: chụp màn hình gửi cho người khác thì
+    người mở ở nền kia thấy màu khác, và hai bên bàn với nhau về "ô màu đỏ đó" sẽ lệch nhau.
+
+    ══ PHẦN KHÔNG ĐẢO, VÀ VÌ SAO PHÉP THỬ NÀY CÒN SỐNG ═══════════════════════════════════════
+    Khẳng định giữ nguyên: globals.css và tokens.css KHÔNG được chứa @media (prefers-color-scheme).
+    Nhưng lý do đã khác. Một khối như thế trong CSS áp cho MỌI người, kể cả người chưa chọn gì và
+    người đã cố ý chọn "Navy tối" – tức nó cướp mất chính cái lựa chọn mà vòng TC-67 vừa dựng.
+    Nền "Theo máy" được giải quyết trong JavaScript (`matchMedia` ở ChonGiaoDien.tsx và ở kịch bản
+    đầu layout.tsx), và CHỈ chạy cho người đã chọn "may". Đó là khác biệt giữa "máy quyết" và
+    "người chọn để máy quyết".
     """
-    src = re.sub(r'/\*.*?\*/', '', _doc(CSS), flags=re.S)      # bỏ chú thích rồi mới tìm
-    assert "prefers-color-scheme" not in src, \
-        "còn khối đổi màu theo cài đặt máy – bộ nhận diện chỉ có MỘT bảng màu"
+    for tep, ten in ((CSS, "globals.css"), (TOKENS, "tokens.css")):
+        src = re.sub(r'/\*.*?\*/', '', _doc(tep), flags=re.S)      # bỏ chú thích rồi mới tìm
+        assert "prefers-color-scheme" not in src, (
+            f"{ten} còn khối đổi màu theo cài đặt máy – nó áp cho cả người đã cố ý chọn Navy tối. "
+            'Nền "Theo máy" phải giải quyết bằng matchMedia trong JavaScript, chỉ cho người đã chọn.')
+
+    # Và bên kia của luật: hai bảng màu PHẢI cùng tồn tại, cùng khoá trên `data-nen`.
+    tok = _doc(TOKENS)
+    assert ':root[data-nen="sang"]' in tok, "thiếu bảng màu sáng – mục 2 của yêu cầu 18/9 chưa có"
+    assert re.search(r'^:root\s*\{', tok, re.M), "thiếu bảng màu tối ở :root – bản tối vẫn là mặc định"
 
 
 def test_muc_dang_chon_van_la_lop_phu_trang_14():
@@ -129,6 +154,19 @@ def test_chu_tren_nen_navy_toi_thieu_13px():
     """Quy tắc 5: chữ trên nền navy tối thiểu 13px, độ đậm từ 400 trở lên.
 
     Chỉ soi các quy tắc của thanh ngang (.top) và thanh dọc (aside.side) – đó là hai chỗ nền navy.
+
+    ══ ĐƠN VỊ ĐỔI 18/9/2026 (TC-67), NGƯỠNG KHÔNG ĐỔI ═════════════════════════════════════════
+    TRƯỚC:  globals.css viết `font-size:13px`; phép thử đọc thẳng con số 13.
+    TỪ NAY: viết `font-size:calc(13/14*1rem)`, để cỡ chữ đi theo lựa chọn của người dùng.
+
+    Chia cho 14 vì thân bài TRƯỚC TC-67 là 14px: khi người dùng để núm ở 14 thì `13/14*1rem` ra
+    đúng 13px, y hệt bản cũ. Tử số vì thế vẫn đúng nghĩa "13px ở cỡ gốc", và phép thử đọc tử số.
+    Ngưỡng 13 của Quy tắc 5 giữ nguyên từng chữ.
+
+    CÂU HỎI THẬT LÀ: kéo núm xuống thì có tụt dưới 13px không? KHÔNG – núm dừng ở 14, mà 14 chính
+    là cỡ gốc, nên cỡ nhỏ nhất người dùng chọn được cũng vừa đúng bằng hôm nay. Đây là lý do dải
+    cỡ chữ bắt đầu từ 14 chứ không từ 12: một dải rộng hơn trông thì rộng rãi, nhưng nó phá đúng
+    quy tắc này mà không màn hình nào báo.
     """
     # MỘT NGOẠI LỆ, ghi thẳng ra đây để nó là một quyết định chứ không phải một chỗ lọt lưới:
     # `.top .brand small` là dòng "VIETOURIST OPERATING SYSTEM" nằm trong KHỐI LOGO. Quy tắc 5 nói về
@@ -141,10 +179,53 @@ def test_chu_tren_nen_navy_toi_thieu_13px():
         ten = m.group(1).strip()
         if ten in MIEN_TRU:
             continue
-        for cd in re.findall(r'font-size:\s*([\d.]+)px', m.group(2)):
-            if float(cd) < 13:
-                nho.append(f"{ten} → {cd}px")
+        # Nhận CẢ HAI cách viết: `13px` (bản trước TC-67) và `calc(13/14*1rem)` (từ TC-67).
+        # Giữ lại nhánh đọc `px` chứ không xoá: nó vẫn phải bắt được, phòng khi ai đó gõ lại một
+        # con số px cứng vào thanh navy – lúc ấy chữ không co giãn theo người dùng nữa, và đó là
+        # một lỗi khác cũng cần bị chặn.
+        for cd in re.findall(r'font-size:\s*(?:calc\(\s*([\d.]+)\s*/\s*14\s*\*\s*1rem\s*\)|([\d.]+)px)',
+                             m.group(2)):
+            so = float(cd[0] or cd[1])
+            if so < 13:
+                nho.append(f"{ten} → {so}px ở cỡ gốc")
     assert not nho, f"chữ trên nền navy dưới 13px: {nho}"
+
+
+def test_moi_co_chu_deu_co_gian_theo_nguoi_dung():
+    """TC-67 · KHÔNG CÒN MỘT CỠ CHỮ NÀO KHOÁ CỨNG BẰNG px trong globals.css.
+
+    Anh Tuấn 18/9/2026 mục 4: "áp dụng cho toàn hệ thống … tiêu đề, nhãn giãn theo tỉ lệ".
+    Sót MỘT khai báo px là một chỗ trên màn hình không giãn theo, và nó lọt lưới đúng kiểu khó
+    thấy nhất: người dùng kéo cỡ chữ lên 20, cả trang to lên, riêng một cái nhãn đứng nguyên – ai
+    cũng thấy là lạ mà không ai chỉ ra được chỗ nào.
+
+    Canh Ở ĐÂY chứ không canh trong vòng TC-67 rồi thôi: luật này phải sống lâu hơn cái vòng đẻ ra
+    nó. Người viết màn hình mới sáu tháng nữa sẽ gõ `font-size:12px` theo thói quen, và phải có
+    cái gì đó chặn lại ngay lúc ấy.
+    """
+    src = re.sub(r'/\*.*?\*/', '', _doc(CSS), flags=re.S)
+    sot = re.findall(r'font-size:\s*[\d.]+px', src)
+    assert not sot, (
+        f"còn {len(sot)} cỡ chữ khoá cứng bằng px: {sot[:6]} – "
+        "viết `calc(N/14*1rem)` để chữ đi theo lựa chọn cỡ chữ của người dùng")
+
+
+def test_hai_bang_mau_cung_du_bon_nac_chu():
+    """TC-67 · Bản sáng phải khai ĐỦ bốn nấc chữ, không được thiếu nấc nào.
+
+    Thiếu một nấc thì nấc ấy rơi về giá trị của BẢN TỐI – tức một màu chữ sáng nằm trên nền trắng,
+    gần như vô hình. Kiểu hỏng này không làm trang vỡ, không có lỗi nào trong bảng điều khiển, chỉ
+    có một dòng chữ mà người dùng phải nghiêng màn hình mới đọc được.
+
+    Bốn nấc chứ không phải "có khai là được": bản tối cố ý giữ bốn nấc để phân biệt chữ chính với
+    chữ phụ; bản sáng gộp bớt là mọi màn hình đọc ra thành một khối chữ phẳng.
+    """
+    khoi = re.search(r':root\[data-nen="sang"\]\s*\{(.*?)\}', _doc(TOKENS), re.S)
+    assert khoi, 'tokens.css chưa có khối :root[data-nen="sang"] – bản sáng chưa tồn tại'
+    than = khoi.group(1)
+    for bien in ("--vtos-text", "--vtos-heading", "--vtos-text-mute", "--vtos-text-faint",
+                 "--vtos-surface", "--vtos-card", "--vtos-line"):
+        assert re.search(rf'{bien}\s*:', than), f"bản sáng thiếu {bien} – nấc này sẽ rơi về màu của bản tối"
 
 
 def test_logo_va_favicon_dung_bo_moi():

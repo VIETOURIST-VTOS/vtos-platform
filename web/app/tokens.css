@@ -96,3 +96,66 @@
   --vtos-font-text:    'Be Vietnam Pro', Calibri, system-ui, sans-serif;
   --vtos-font-mono:    'JetBrains Mono', Consolas, monospace;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+ * TC-67 · BẢN SÁNG · 18/09/2026 — anh Tuấn: "Nền mặc định navy … thêm chế độ Trắng sáng và Theo máy"
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * BẢN TỐI Ở TRÊN VẪN LÀ MẶC ĐỊNH. Khối này chỉ có hiệu lực khi thẻ <html> mang
+ * `data-nen="sang"`, tức khi chính người dùng đã chọn. Không chọn thì không có gì đổi.
+ *
+ * MỘT LUẬT CŨ BỊ ĐẢO, GHI LẠI CẢ HAI BÊN:
+ *   13/9/2026 globals.css chép: "Vẫn KHÔNG có khối @media (prefers-color-scheme): màu không được
+ *   đổi theo cài đặt của máy, vì như thế hai người mở cùng một trang thấy hai màu khác nhau."
+ *   18/9/2026 anh Tuấn đảo luật ấy khi giao mục "Theo máy". Lý do cũ nay yếu đi thật: hồi 13/9 màu
+ *   đổi là do CÀI ĐẶT MÁY TỰ NHẢY, không ai chọn; nay là NGƯỜI DÙNG TỰ CHỌN và biết mình chọn gì.
+ *   Cái giá vẫn còn và vẫn thật: ảnh chụp màn hình gửi cho người khác thì màu hai bên khác nhau.
+ *   Phép thử canh luật cũ KHÔNG bị xoá — nó được lật chiều khẳng định, ghi trong
+ *   test_tc67_giao_dien_nen_va_co_chu.py.
+ *
+ * KHÔNG CHÉP BỘ MÀU SÁNG v1.0 GHI Ở ĐẦU TỆP. Đo lại mới thấy hai nấc chữ của bộ ấy KHÔNG ĐẠT:
+ *     --vtos-text-mute  #64798C  chỉ 3,89 trên nền thông tin  (ngưỡng WCAG AA là 4,5)
+ *     --vtos-text-faint #94A5B4  chỉ 2,43 trên nền thông tin
+ * Đúng là lỗi mà TC-64 vừa sửa ở bản tối. Chép lại là rước lỗi ấy sang bản sáng, nên hai nấc này
+ * đậm hơn bản ghi cũ. Bản ghi v1.0 GIỮ NGUYÊN ở đầu tệp làm sử liệu — không sửa nó, vì nó ghi cái
+ * ĐÃ CHỐT ngày 12/9, không phải cái đang chạy.
+ *
+ * SỐ KÈM MỖI DÒNG là tỉ lệ tương phản đo trên nền KHÓ NHẤT trong ba nền của bản sáng
+ * (thẻ #FFFFFF · màn hình #F4F7FA · nền thông tin #E7EFF7).
+ *
+ * THANH NGANG VÀ THANH DỌC KHÔNG ĐỔI MÀU — `--vtos-nav-bg`, `--vtos-nav-bg-2` và ba màu
+ * `--vtos-muc-nav*` cố ý KHÔNG khai lại ở đây. Ba lý do:
+ *   1. Bản vẽ V1.4 vẽ thanh navy. Đó là nhận diện, không phải nền để đọc chữ.
+ *   2. Toàn bộ luật của thanh viết bằng rgba(255,255,255,…) — chữ trắng, viền trắng mờ. Đổi thanh
+ *      sang nền sáng là phải viết lại từng dòng ấy, và sót dòng nào là chữ trắng trên trắng dòng ấy.
+ *   3. "Nền sáng" là để dễ đọc VÙNG LÀM VIỆC. Thanh điều hướng không phải chỗ đọc.
+ * Muốn thanh sáng theo thì đó là một vòng riêng, và phải đo lại cả thanh.
+ */
+:root[data-nen="sang"] {
+  --vtos-navy:         #14538D;  /* 7,92 — chữ, số nổi bật, liên kết, và MÀU TÔ cột biểu đồ */
+  --vtos-navy-dark:    #071A33;
+  --vtos-sky:          #14538D;  /* 7,92 với chữ trắng — nền nút chính và thẻ nhãn đặc */
+  --vtos-navy-light:   #0F4C84;  /* 8,18 */
+
+  --vtos-success:      #1E7A4E;  /* 5,32 */
+  --vtos-danger:       #A8145C;  /* 6,79 */
+  --vtos-warning:      #8A5A00;  /* 5,93 */
+  --vtos-info:         #14538D;  /* 7,92 */
+  --vtos-success-bg:   #E6F4EC;
+  --vtos-danger-bg:    #FBE9F0;
+  --vtos-warning-bg:   #FBF1DC;
+  --vtos-info-bg:      #E7EFF7;
+
+  --vtos-surface:      #F4F7FA;  /* nền màn hình */
+  --vtos-card:         #FFFFFF;  /* nền thẻ — SÁNG HƠN nền màn hình, đúng yêu cầu 18/9 mục 1 */
+  --vtos-line:         #D3DEE9;  /* 1,36 so với nền thẻ: thấy được mà không thành khung đen */
+
+  /* BỐN NẤC CHỮ GIỮ ĐÚNG BỐN NẤC như bản tối — sáng đều tất cả lên đen thì không còn phân biệt
+     được chữ chính với chữ phụ. Khoảng cách nấc 1 ↔ nấc 4 ở đây là 15,39 ↔ 4,88, tương đương
+     khoảng cách 13,46 ↔ 7,36 của bản tối tính theo số nấc. */
+  --vtos-text:         #0B2545;  /* 15,39 */
+  --vtos-heading:      #071A33;  /* 17,43 — tiêu đề đậm hơn thân bài, giữ đúng thứ bậc */
+  --vtos-text-mute:    #4A6076;  /*  5,61 (bản ghi v1.0 #64798C chỉ 3,89 — dưới AA) */
+  --vtos-text-faint:   #56697C;  /*  4,88 (bản ghi v1.0 #94A5B4 chỉ 2,43 — dưới AA) */
+  --vtos-text-on-navy: #FFFFFF;
+}

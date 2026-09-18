@@ -271,13 +271,27 @@ def test_be_rong_thanh_doc_dung_dac_ta():
 
     Nghĩa là 240px – mức trần cũ – THIẾU 7px và "Nhân sự – Hành chính" bị cắt bằng dấu ba chấm.
     Đặt 252px để còn dư một chút cho phông dự phòng khi Google Fonts chưa về.
+
+    ══ ĐƠN VỊ ĐỔI 18/9/2026 (TC-67), KHOẢNG KHÔNG ĐỔI ═════════════════════════════════════════
+    TRƯỚC:  `aside.side{flex:0 0 252px}` – con số cứng.
+    TỪ NAY: `calc(252/14*1rem)` – rộng 252px ở cỡ chữ gốc, NỞ RA khi người dùng tăng cỡ chữ.
+
+    Vì sao buộc phải nở: cả phép tính 247px trong tài liệu này dựa trên nhãn "Nhân sự – Hành chính"
+    đo ở phông 14px. Người dùng kéo cỡ chữ lên 20 thì nhãn ấy rộng 201px, cần 307px – thanh dọc
+    đứng nguyên 252px là nhãn bị cắt bằng dấu ba chấm, đúng cái mức trần 240px cũ từng gây ra.
+    Đơn vị co giãn giữ nguyên TỈ LỆ ấy ở mọi cỡ, nên phép tính trên đúng cho cả ba cỡ.
+
+    BỀ RỘNG KHI THU THÌ VẪN LÀ px, và đó là một quyết định chứ không phải chỗ bỏ sót: lúc thu,
+    thanh dọc chỉ còn BIỂU TƯỢNG — các hình SVG 24×24 cố định, không có chữ nào. Cho nó nở theo cỡ
+    chữ là chừa chỗ trống cho một thứ không tồn tại.
     """
     css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
-    m_rong = re.search(r'aside\.side\{flex:0 0 (\d+)px', css)
+    # Nhận cả hai cách viết; nhánh `px` giữ lại để bắt được nếu ai đó gõ ngược lại số cứng.
+    m_rong = re.search(r'aside\.side\{flex:0 0 (?:calc\((\d+)/14\*1rem\)|(\d+)px)', css)
     m_thu = re.search(r'aside\.side\.thu\{flex:0 0 (\d+)px', css)
     assert m_rong, "không tìm thấy bề rộng thanh dọc trong globals.css"
     assert m_thu, "không tìm thấy bề rộng khi THU trong globals.css"
-    rong, thu = int(m_rong.group(1)), int(m_thu.group(1))
+    rong, thu = int(m_rong.group(1) or m_rong.group(2)), int(m_thu.group(1))
     assert 224 <= rong <= 256, f"bề rộng {rong}px ngoài khoảng 224–256px của §I.2"
     assert rong >= 247, f"bề rộng {rong}px CẮT nhãn 'Nhân sự – Hành chính' (đo được cần 247px)"
     assert 56 <= thu <= 64, f"bề rộng khi thu {thu}px ngoài khoảng 56–64px của §I.2"
@@ -350,12 +364,27 @@ def test_o_don_vi_khong_ve_gi_khi_chua_co_duong_dan():
 
 
 def test_chieu_cao_thanh_ngang_trong_dac_ta():
-    """§I.2: thanh ngang cao 64–72px. Bản vẽ vẽ 76px – ngoài khoảng, nên lấy biên trên 72px."""
+    """§I.2: thanh ngang cao 64–72px. Bản vẽ vẽ 76px – ngoài khoảng, nên lấy biên trên 72px.
+
+    ══ ĐƠN VỊ ĐỔI 18/9/2026 (TC-67), KHOẢNG KHÔNG ĐỔI ═════════════════════════════════════════
+    TRƯỚC:  `--top-h:72px` – một con số cứng.
+    TỪ NAY: `--top-h:calc(72/14*1rem)` – cao 72px ở cỡ chữ gốc, và NỞ RA khi người dùng tăng cỡ.
+
+    Vì sao buộc phải nở: thanh ngang đựng chữ. Chữ to lên mà cái thanh đứng nguyên 72px thì chữ bị
+    cắt ngang – đúng yêu cầu mục 5 của anh Tuấn ("không được cắt chữ, không mất nút"). Đo thật ở
+    TC-67: thanh cao 72 → 82 → 103px theo ba cỡ 14/16/20, không cắt chữ ở khổ nào.
+
+    §I.2 NÓI VỀ CỠ GỐC, và phép thử đọc đúng tử số ấy. Ở cỡ 20 thanh cao 103px, vượt khoảng 64–72
+    – và đó KHÔNG phải vi phạm: khoảng ấy đặt ra cho bố cục mặc định, còn 103px là kết quả của
+    việc người dùng cố ý xin chữ to hơn. Ràng một người cần chữ lớn vào một cái thanh 72px là
+    chọn con số trong đặc tả thay vì chọn người đọc được màn hình.
+    """
     css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
-    m = re.search(r'--top-h:(\d+)px', css)
+    # Nhận cả hai cách viết; nhánh `px` giữ lại để bắt được nếu ai đó gõ ngược trở lại số cứng.
+    m = re.search(r'--top-h:\s*(?:calc\(\s*(\d+)\s*/\s*14\s*\*\s*1rem\s*\)|(\d+)px)', css)
     assert m, "không tìm thấy --top-h trong globals.css"
-    cao = int(m.group(1))
-    assert 64 <= cao <= 72, f"thanh ngang {cao}px ngoài khoảng 64–72px của §I.2"
+    cao = int(m.group(1) or m.group(2))
+    assert 64 <= cao <= 72, f"thanh ngang {cao}px (ở cỡ chữ gốc) ngoài khoảng 64–72px của §I.2"
 
 
 def test_thanh_phan_he_chi_co_mot_hanh_vi_la_bam():

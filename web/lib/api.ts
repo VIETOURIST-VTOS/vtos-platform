@@ -5,7 +5,12 @@ export type ApiError = { status: number; gate?: string; message: string };
 const TOKEN_KEY = "vtos_token";
 const USER_KEY = "vtos_user";
 
-export type User = { id: number; username: string; full_name: string; role: string; role_name: string; department: string; hidden_menus?: string[]; can_see_cost?: boolean; read_only?: boolean; can_create_request?: boolean; can_create_booking?: boolean; must_change_password?: boolean; hr_tabs?: string[]; company_id?: number | null; ngoai_bien_che?: boolean };
+export type User = { id: number; username: string; full_name: string; role: string; role_name: string; department: string; hidden_menus?: string[]; can_see_cost?: boolean; read_only?: boolean; can_create_request?: boolean; can_create_booking?: boolean; must_change_password?: boolean; hr_tabs?: string[]; company_id?: number | null; ngoai_bien_che?: boolean;
+  /* TC-67 · giao diện của chính người này. `null` ở một trường nghĩa là CHƯA CHỌN, khác hẳn với
+     "đã chọn đúng giá trị mặc định" – xem models/core.py. `giao_dien_mac_dinh` do máy chủ gửi
+     xuống để màn hình không chép cứng hai con số ấy vào mã. */
+  giao_dien?: { nen: string | null; co_chu: number | null };
+  giao_dien_mac_dinh?: { nen: string; co_chu: number } };
 
 export function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
 export function getUser(): User | null { try { const s = localStorage.getItem(USER_KEY); return s ? JSON.parse(s) : null; } catch { return null; } }

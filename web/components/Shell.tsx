@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getUser, clearSession, type User } from "@/lib/api";
 import ChonDonVi from "@/components/ChonDonVi";
+import ChonGiaoDien from "@/components/ChonGiaoDien";
 
 /** Mục v1.1 §I.2 có tên nhưng CHƯA có trang. TC-2 yêu cầu ẩn chức năng "sắp có", nên chúng không vào
  *  menu – nhưng cũng không bị xoá khỏi mã, vì lộ trình còn nợ phải có chỗ đọc được. Phép thử test_menu
@@ -493,6 +494,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             aria-label={`Cảnh báo nghiệp vụ${alerts > 0 ? `: ${alerts}` : ""}`}>
             <Bt d="chuong" />{alerts > 0 && <b className="so-bao">{alerts}</b>}
           </Link>
+          {/* TC-67 · Nút "Giao diện" đứng NGAY TRƯỚC ô tài khoản, cùng cụm với chuông: chuông, giao
+              diện và ô tài khoản đều là thứ của RIÊNG người đang đăng nhập, khác với Công việc /
+              Chờ duyệt là việc chung. Bảng chọn thì gắn thẳng vào <body> chứ không nằm trong thanh
+              này – lý do ghi trong ChonGiaoDien.tsx, và đó là lỗi đã mắc thật một lần. */}
+          <ChonGiaoDien user={user} />
           {/* Menu cá nhân: ba mục của chính người đăng nhập, rời khỏi menu trái theo TC-2. */}
           <span style={{ position: "relative" }}>
             <button type="button" className="who" aria-haspopup="menu" aria-expanded={menuToi}

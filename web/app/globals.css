@@ -8,7 +8,7 @@
    Vẫn KHÔNG có khối @media (prefers-color-scheme): màu không được đổi theo cài đặt của máy, vì như
    thế hai người mở cùng một trang thấy hai màu khác nhau. Bảng màu tối nằm trong tokens.css v1.1,
    lấy từ bản vẽ V1.4 và đã đo tương phản từng cặp chữ–nền. */
-:root{--top-h:72px;
+:root{--top-h:calc(72/14*1rem);
   /* --navy là màu CHỮ, --navy2 là màu NỀN của nút. Bản sáng dùng chung một navy cho cả hai;
      bản tối thì không thể, xem ghi chú "MỘT BIẾN, MỘT VAI" trong tokens.css.
      --orange nay là VÀNG chú ý của bản vẽ, không còn dùng lại màu xanh của --vtos-info: một thẻ
@@ -19,7 +19,7 @@
   --ground:var(--vtos-surface);--panel:var(--vtos-card);--panel2:var(--vtos-info-bg);
   --okbg:var(--vtos-success-bg);--warnbg:var(--vtos-warning-bg);--redbg:var(--vtos-danger-bg)}
 *{box-sizing:border-box}html,body{margin:0}
-body{font-family:var(--vtos-font-text);font-size:14px;line-height:1.45;color:var(--ink);background:var(--ground)}
+body{font-family:var(--vtos-font-text);font-size:calc(14/14*1rem);line-height:1.45;color:var(--ink);background:var(--ground)}
 a{color:var(--navy);font-weight:600}
 /* Thanh ngang – nền tối theo bản vẽ giao diện chốt 12/9/2026. Màu đặt THẲNG, không qua biến
    --panel: thanh này phải giữ nguyên một màu ở cả chế độ sáng lẫn tối, giống thanh dọc. */
@@ -53,14 +53,14 @@ a{color:var(--navy);font-weight:600}
   background:linear-gradient(74deg,transparent 44%,rgba(255,255,255,.28) 50%,transparent 57%)}
 .top .brand>*{position:relative;z-index:1}
 .top .brand .brand-logo{height:28px;width:auto;display:block}
-.top .brand small{font-weight:300;font-size:10px;letter-spacing:.11em;opacity:.72;white-space:nowrap;
+.top .brand small{font-weight:300;font-size:calc(10/14*1rem);letter-spacing:.11em;opacity:.72;white-space:nowrap;
   font-family:var(--vtos-font-text)}
-.top .right{margin-left:auto;font-size:13px}.top .right b{color:#fff}.top .right a{color:#fff;margin-left:10px}
+.top .right{margin-left:auto;font-size:calc(13/14*1rem)}.top .right b{color:#fff}.top .right a{color:#fff;margin-left:10px}
 nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:var(--top-h);z-index:4}
-nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:13px;color:var(--ink2);text-decoration:none;white-space:nowrap;font-weight:500}
+nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:calc(13/14*1rem);color:var(--ink2);text-decoration:none;white-space:nowrap;font-weight:500}
 nav.tabs a.on{color:var(--navy);border-color:var(--orange);font-weight:600}
 main{max-width:1180px;margin:0 auto;padding:16px}
-h1{font-size:19px;margin:4px 0 12px;color:var(--navy);font-family:var(--vtos-font-display);letter-spacing:-.01em}h2{font-size:14.5px;margin:0 0 10px;color:var(--vtos-heading);font-family:var(--vtos-font-display)}h3{font-size:12.5px;color:var(--ink2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+h1{font-size:calc(19/14*1rem);margin:4px 0 12px;color:var(--navy);font-family:var(--vtos-font-display);letter-spacing:-.01em}h2{font-size:calc(14.5/14*1rem);margin:0 0 10px;color:var(--vtos-heading);font-family:var(--vtos-font-display)}h3{font-size:calc(12.5/14*1rem);color:var(--ink2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
 /* TC-62 · KHUNG NỔI HƠN HÌNH NỀN (anh Tuấn 18/9/2026: "các khung phân hệ nổi hơn so với hình nền").
    Nền trang là một dải chuyển sắc navy, nên chỉ một đường viền 1px thì khung chìm vào nền ở đúng
    khúc nền sáng. Chọn NỔI NHẸ (phương án B trong ba bản thử) chứ không tô nền khung sáng lên một
@@ -75,17 +75,17 @@ h1{font-size:19px;margin:4px 0 12px;color:var(--navy);font-family:var(--vtos-fon
    ngày tới" đẩy trang ra 1275px trong khung 1265px. Một luật ở đây chặn cho mọi khung. */
 .grid>*{min-width:0}
 .kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}.kpi b{font-size:24px;color:var(--navy);font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono)}.kpi span{display:block;font-size:12px;color:var(--ink2)}
-table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:7px 8px;font-weight:600;color:var(--ink2);border-bottom:2px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}.kpi b{font-size:calc(24/14*1rem);color:var(--navy);font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono)}.kpi span{display:block;font-size:calc(12/14*1rem);color:var(--ink2)}
+table{width:100%;border-collapse:collapse;font-size:calc(13/14*1rem)}th{text-align:left;padding:7px 8px;font-weight:600;color:var(--ink2);border-bottom:2px solid var(--line);font-size:calc(12/14*1rem);text-transform:uppercase;letter-spacing:.04em}
 td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono);font-size:.94em}.wrap{overflow-x:auto}
-.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:var(--panel2);color:var(--ink2);white-space:nowrap}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:calc(11/14*1rem);font-weight:600;background:var(--panel2);color:var(--ink2);white-space:nowrap}
 .tag.ok{background:var(--okbg);color:var(--teal)}.tag.warn{background:var(--warnbg);color:var(--orange)}.tag.red{background:var(--redbg);color:var(--red)}.tag.navy{background:var(--navy2);color:#fff}
-.gate{border-left:4px solid var(--orange);background:var(--warnbg);padding:8px 12px;border-radius:4px;margin:8px 0;font-size:13px}.gate.pass{border-color:var(--teal);background:var(--okbg)}.gate.fail{border-color:var(--red);background:var(--redbg)}
-.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:92vw;padding:11px 16px;border-radius:8px;font-weight:600;font-size:13.5px;box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:20;background:var(--okbg);color:var(--teal);border:1px solid var(--teal)}
+.gate{border-left:4px solid var(--orange);background:var(--warnbg);padding:8px 12px;border-radius:4px;margin:8px 0;font-size:calc(13/14*1rem)}.gate.pass{border-color:var(--teal);background:var(--okbg)}.gate.fail{border-color:var(--red);background:var(--redbg)}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:92vw;padding:11px 16px;border-radius:8px;font-weight:600;font-size:calc(13.5/14*1rem);box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:20;background:var(--okbg);color:var(--teal);border:1px solid var(--teal)}
 .toast.err{background:var(--redbg);color:var(--red);border-color:var(--red)}
-label{display:block;font-size:12px;color:var(--ink2);margin-top:8px}
-input,select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13.5px;background:var(--panel);color:var(--ink)}textarea{min-height:72px}
-button.act{background:var(--navy2);color:#fff;border:1px solid var(--vtos-navy);border-radius:6px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer;margin:6px 6px 0 0}
+label{display:block;font-size:calc(12/14*1rem);color:var(--ink2);margin-top:8px}
+input,select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:calc(13.5/14*1rem);background:var(--panel);color:var(--ink)}textarea{min-height:72px}
+button.act{background:var(--navy2);color:#fff;border:1px solid var(--vtos-navy);border-radius:6px;padding:7px 13px;font:inherit;font-size:calc(13/14*1rem);cursor:pointer;margin:6px 6px 0 0}
 /* CHỮ TỐI TRÊN NÚT MÀU TRẠNG THÁI (sửa 13/9/2026 khi chuyển nền tối). Ở bản sáng, ba màu trạng
    thái là màu ĐẬM nên chữ trắng đọc được. Bản tối lật ngược: xanh lá #53C49A, vàng #F4C36A và đỏ
    #FF6B90 đều SÁNG, chữ trắng trên chúng chỉ đạt 1,6–2,7 lần – nhìn qua tưởng ổn vì nút vẫn nổi
@@ -97,17 +97,17 @@ button.act.orange{background:var(--orange);color:var(--vtos-surface);border-colo
 button.act.red{background:var(--red);color:var(--vtos-surface);border-color:var(--red)}
 button.act.grey{background:var(--vtos-info-bg);color:var(--vtos-text);border-color:var(--line)}
 button.act:disabled{opacity:.5;cursor:default}
-.muted{color:var(--ink2);font-size:12.5px}.mono{font-family:var(--vtos-font-mono);font-size:12px}
+.muted{color:var(--ink2);font-size:calc(12.5/14*1rem)}.mono{font-family:var(--vtos-font-mono);font-size:calc(12/14*1rem)}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
 @media (max-width:640px){main{padding:10px}td,th{padding:6px 5px}nav.tabs{top:0}.top{position:static}}
 
 /* Thanh ngang: phạm vi và việc chung. Thanh dọc: 8 nhóm nghiệp vụ (Đề xuất 06/9/2026). */
 .top .brand{color:#fff;text-decoration:none}
 .top .bar{display:flex;gap:6px;align-items:center;flex:1 1 auto;min-width:0;flex-wrap:nowrap;justify-content:flex-end}
-.top .bar a,.top .bar button,.top .bar select{color:#fff;background:rgba(255,255,255,.13);border:0;border-radius:6px;padding:5px 9px;font-size:13px;text-decoration:none;font-family:inherit;cursor:pointer;white-space:nowrap}
+.top .bar a,.top .bar button,.top .bar select{color:#fff;background:rgba(255,255,255,.13);border:0;border-radius:6px;padding:5px 9px;font-size:calc(13/14*1rem);text-decoration:none;font-family:inherit;cursor:pointer;white-space:nowrap}
 .top .bar a:hover,.top .bar button:hover{background:rgba(255,255,255,.24)}
 .top .bar .soon{opacity:.45;cursor:default}
-.top .bar .who{background:none;padding:0 4px;font-size:13px}.top .bar .who b{color:#fff}
+.top .bar .who{background:none;padding:0 4px;font-size:calc(13/14*1rem)}.top .bar .who b{color:#fff}
 
 /* ==========================================================================================
    THANH NGANG theo bản vẽ giao diện 12/9/2026: mỗi mục là biểu tượng NÉT + chữ, ô tìm kiếm vẽ
@@ -115,7 +115,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
    ========================================================================================== */
 .top .bar{gap:8px}
 .top .bar .bar-muc{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 10px;
-  background:none;font-size:13px;font-weight:500;color:rgba(255,255,255,.86);border-radius:6px}
+  background:none;font-size:calc(13/14*1rem);font-weight:500;color:rgba(255,255,255,.86);border-radius:6px}
 .top .bar .bar-muc:hover{background:rgba(255,255,255,.10);color:#fff}
 .top .bar .bar-muc .bar-hinh{flex:0 0 auto;opacity:.9}
 /* Trợ lý AI xanh nhạt hơn: bản vẽ tách nó khỏi nhóm mục thường vì đây là chức năng mới. */
@@ -124,18 +124,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .top .bar .soon.bar-muc{opacity:.55}
 /* Ô tìm kiếm: nền chìm, viền không, con trỏ chữ – trông như một ô nhập chứ không như một nút. */
 .top .bar .o-tim{display:inline-flex;align-items:center;gap:8px;height:34px;flex:1 1 240px;min-width:150px;max-width:560px;padding:0 12px;
-  background:rgba(255,255,255,.10);border-radius:6px;color:rgba(255,255,255,.62);font-size:13px;font-weight:400;
+  background:rgba(255,255,255,.10);border-radius:6px;color:rgba(255,255,255,.62);font-size:calc(13/14*1rem);font-weight:400;
   justify-content:flex-start;opacity:1}
 .top .bar .o-tim:hover{background:rgba(255,255,255,.16)}
 /* Viên số cảnh báo. Nền vàng chữ sẫm để đọc được cả khi in đen trắng, không chỉ dựa vào màu. */
 .top .bar .so-bao{min-width:24px;height:22px;padding:0 7px;border-radius:11px;background:var(--vtos-danger);
-  color:#fff;font-size:13px;font-weight:600;display:inline-flex;align-items:center;
+  color:#fff;font-size:calc(13/14*1rem);font-weight:600;display:inline-flex;align-items:center;
   justify-content:center;margin-left:-2px}
 /* Ô tròn chữ đầu. Tên và vai vẫn hiện bên cạnh trên màn rộng – ô tròn KHÔNG thay cho tên, vì một
    hệ thống nhiều vai mà chỉ còn hai chữ cái thì không ai biết mình đang đứng ở vai nào. */
 .top .bar .who{display:inline-flex;align-items:center;gap:8px;height:34px}
 .top .bar .anh-dai-dien{width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:rgba(255,255,255,.14);
-  color:#fff;font-size:13px;font-weight:600;display:inline-flex;align-items:center;
+  color:#fff;font-size:calc(13/14*1rem);font-weight:600;display:inline-flex;align-items:center;
   justify-content:center;letter-spacing:.02em}
 @media (max-width:900px){
   .top{flex-wrap:wrap}
@@ -144,12 +144,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .top .bar .bar-muc span,.top .bar .o-tim span,.top .bar .who-ten{position:absolute;width:1px;
     height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 }
-.burger{display:none;background:rgba(255,255,255,.14);color:#fff;border:0;border-radius:6px;padding:4px 9px;font-size:15px;cursor:pointer;font-family:inherit}
+.burger{display:none;background:rgba(255,255,255,.14);color:#fff;border:0;border-radius:6px;padding:4px 9px;font-size:calc(15/14*1rem);cursor:pointer;font-family:inherit}
 .shell{display:flex;align-items:flex-start}
 /* THANH PHÂN HỆ – nền xanh đậm theo hình anh Tuấn gửi 12/9/2026. Màu đặt THẲNG chứ không qua biến
    --panel: biến ấy đảo màu theo chế độ tối của máy, mà thanh này phải giữ nguyên một màu ở cả hai
    chế độ, nếu không thì nửa sáng nửa tối. Chữ trên nền này dùng màu riêng, không dùng --ink. */
-aside.side{flex:0 0 252px;width:252px;background:var(--vtos-nav-bg);color:rgba(255,255,255,.86);border-right:1px solid rgba(255,255,255,.16);position:sticky;top:var(--top-h);max-height:calc(100vh - var(--top-h));min-height:calc(100vh - var(--top-h));overflow-y:auto;padding:8px 0 14px}
+aside.side{flex:0 0 calc(252/14*1rem);width:calc(252/14*1rem);background:var(--vtos-nav-bg);color:rgba(255,255,255,.86);border-right:1px solid rgba(255,255,255,.16);position:sticky;top:var(--top-h);max-height:calc(100vh - var(--top-h));min-height:calc(100vh - var(--top-h));overflow-y:auto;padding:8px 0 14px}
 /* Mục nhóm: viên bo 6px theo bản vẽ 12/9 (bo góc của cả hệ là 8px cho thẻ, 6px cho nút và mục
    menu). Bỏ vạch màu bên trái – mục đang mở tô nền xanh, đọc rõ hơn một vạch 3px. */
 /* DẢI MÀU ĐẶC THEO BẢN VẼ V1.4 (sửa 13/9/2026, sau khi anh Tuấn nhận xét bản của Claude tối hơn).
@@ -163,7 +163,7 @@ aside.side{flex:0 0 252px;width:252px;background:var(--vtos-nav-bg);color:rgba(2
 aside.side .grp{display:flex;align-items:center;gap:10px;width:calc(100% - 16px);margin:0 8px 8px;text-align:left;
   border:1px solid rgba(255,255,255,.10);
   background:linear-gradient(180deg,var(--vtos-muc-nav) 0%,var(--vtos-muc-nav-2) 100%);
-  font-family:inherit;font-size:14px;
+  font-family:inherit;font-size:calc(14/14*1rem);
   font-weight:500;color:rgba(255,255,255,.92);padding:15px 12px;cursor:pointer;
   border-radius:10px;white-space:nowrap;
   box-shadow:0 4px 8px rgba(2,11,24,.20),inset 0 1px 0 rgba(255,255,255,.10)}
@@ -171,7 +171,7 @@ aside.side .grp .bt-hinh{flex:0 0 auto;opacity:.86}
 /* Nhãn nhóm PHẢI nằm một dòng (anh Tuấn 12/9: "Nhân sự – Hành chính" đang vỡ hai dòng).
    Dài quá thì cắt bằng dấu ba chấm, không xuống dòng – hai dòng làm lệch chiều cao cả cột. */
 aside.side .grp .grp-ten{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-aside.side .grp .grp-mui{opacity:.55;font-size:13px}
+aside.side .grp .grp-mui{opacity:.55;font-size:calc(13/14*1rem)}
 aside.side .grp:hover{background:linear-gradient(180deg,var(--vtos-muc-nav-3) 0%,var(--vtos-muc-nav) 100%);
   border-color:rgba(255,255,255,.22);color:var(--vtos-text-on-navy)}
 /* MỤC ĐANG CHỌN GIỮ LỚP PHỦ TRẮNG 14% – quy tắc 1 của bộ nhận diện, anh Tuấn chốt 12/9: "mục đang
@@ -191,7 +191,7 @@ aside.side .nhom{position:relative}
    thích. Mục con ẩn hẳn khi thu: nhét chúng vào một cột 60px là một cột chữ vỡ dòng, không đọc được. */
 aside.side{transition:flex-basis .12s ease,width .12s ease}
 aside.side .thu-nut{display:block;margin:0 8px 4px auto;border:0;background:none;color:rgba(255,255,255,.68);
-  font-family:inherit;font-size:13px;line-height:1;cursor:pointer;padding:4px 6px;border-radius:6px}
+  font-family:inherit;font-size:calc(13/14*1rem);line-height:1;cursor:pointer;padding:4px 6px;border-radius:6px}
 aside.side .thu-nut:hover{background:rgba(255,255,255,.09);color:var(--vtos-text-on-navy)}
 aside.side.thu{flex:0 0 60px;width:60px}
 aside.side.thu .thu-nut{margin:0 auto 4px}
@@ -201,7 +201,7 @@ aside.side.thu .sub{display:none}
 @media (max-width:900px){.shell{display:block}.burger{display:inline-block}
   aside.side,aside.side.thu{position:static;width:auto;flex:none;max-height:none;min-height:0;border-right:0;border-bottom:1px solid rgba(255,255,255,.16)}
   aside.side .thu-nut{display:none}
-  aside.side.thu .grp{justify-content:flex-start;padding:10px 12px;font-size:13px}
+  aside.side.thu .grp{justify-content:flex-start;padding:10px 12px;font-size:calc(13/14*1rem)}
   aside.side.thu .sub{display:block}
   aside.side.hide{display:none}.shell main{max-width:none}}
 
@@ -223,8 +223,8 @@ aside.side.thu .sub{display:none}
   font-family:inherit;cursor:pointer;padding:12px 16px;color:inherit;min-height:44px}
 .the-dau:hover{background:var(--panel2)}
 .the-dau h2{margin:0;flex:1;min-width:0}
-.the-mui{color:var(--ink2);font-size:12px;line-height:1;width:12px;flex:none}
-.the-phu{font-size:12px;color:var(--ink2);white-space:nowrap}
+.the-mui{color:var(--ink2);font-size:calc(12/14*1rem);line-height:1;width:12px;flex:none}
+.the-phu{font-size:calc(12/14*1rem);color:var(--ink2);white-space:nowrap}
 .the-than{padding:0 16px 14px}
 
 /* Bốn ô cảnh báo. Màn rộng: một hàng bốn ô. Điện thoại: 2x2 – hai hàng, hai cột, luôn đủ bốn. */
@@ -235,8 +235,8 @@ aside.side.thu .sub{display:none}
   border-radius:8px;padding:12px 14px;text-decoration:none;color:inherit;min-height:64px}
 .o-cb span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;
   background:var(--ink2);margin-right:6px;vertical-align:middle}
-.o-cb b{display:block;font-size:22px;color:var(--navy);font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono);line-height:1.2}
-.o-cb span{display:block;font-size:12px;color:var(--ink2);margin-top:2px}
+.o-cb b{display:block;font-size:calc(22/14*1rem);color:var(--navy);font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono);line-height:1.2}
+.o-cb span{display:block;font-size:calc(12/14*1rem);color:var(--ink2);margin-top:2px}
 .o-cb.ok span::before{background:var(--teal)}.o-cb.ok b{color:var(--teal)}
 .o-cb.warn span::before{background:var(--orange)}.o-cb.warn b{color:var(--orange)}
 .o-cb.red span::before{background:var(--red)}.o-cb.red b{color:var(--red)}
@@ -255,27 +255,27 @@ a.o-cb:hover{background:var(--panel2)}
    dòng có vạch dọc – nhưng MỌI MÀU đều lấy từ bộ nhận diện VTOS, không dùng navy #10283E và hồng
    #EC5988 của bản vẽ (hai màu ấy ngoài bộ). */
 .cay-chuyen{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
-.cay-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;font-size:12.5px;
+.cay-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;font-size:calc(12.5/14*1rem);
   text-decoration:none;color:var(--vtos-text-mute);background:var(--vtos-card);
   border:1px solid var(--vtos-line);border-radius:999px}
-.cay-chip b{font-size:11px;color:var(--vtos-navy-light);font-variant-numeric:tabular-nums}
+.cay-chip b{font-size:calc(11/14*1rem);color:var(--vtos-navy-light);font-variant-numeric:tabular-nums}
 .cay-chip:hover{border-color:var(--vtos-navy-light);color:var(--vtos-navy)}
 .cay-chip.on{background:var(--vtos-sky);border-color:var(--vtos-sky);color:#fff}
 .cay-chip.on b{color:rgba(255,255,255,.72)}
 
 .cay-dau{display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:var(--vtos-radius-lg);
   background:var(--vtos-sky);color:#fff;margin-bottom:14px}
-.cay-dau h1{margin:0;font-size:22px;color:#fff}
-.cay-dau-ma{flex:0 0 auto;font-size:20px;font-weight:700;letter-spacing:1px;padding:10px 13px;
+.cay-dau h1{margin:0;font-size:calc(22/14*1rem);color:#fff}
+.cay-dau-ma{flex:0 0 auto;font-size:calc(20/14*1rem);font-weight:700;letter-spacing:1px;padding:10px 13px;
   border-radius:var(--vtos-radius-md);background:rgba(255,255,255,.12);color:rgba(255,255,255,.82);
   font-variant-numeric:tabular-nums}
-.cay-tom{margin:5px 0 0;font-size:13px;color:rgba(255,255,255,.76)}
+.cay-tom{margin:5px 0 0;font-size:calc(13/14*1rem);color:rgba(255,255,255,.76)}
 .cay-dem{margin-left:auto;text-align:right;flex:0 0 auto}
-.cay-dem b{display:block;font-size:21px;font-variant-numeric:tabular-nums}
-.cay-dem span{font-size:11.5px;color:rgba(255,255,255,.72)}
+.cay-dem b{display:block;font-size:calc(21/14*1rem);font-variant-numeric:tabular-nums}
+.cay-dem span{font-size:calc(11.5/14*1rem);color:rgba(255,255,255,.72)}
 
-.cay-chu{font-size:12.5px;color:var(--vtos-text-mute);line-height:1.7;margin:0 0 12px}
-.cay-cuoi{font-size:12px;line-height:1.7;margin-top:14px}
+.cay-chu{font-size:calc(12.5/14*1rem);color:var(--vtos-text-mute);line-height:1.7;margin:0 0 12px}
+.cay-cuoi{font-size:calc(12/14*1rem);line-height:1.7;margin-top:14px}
 
 .cay{background:var(--vtos-card);border:1px solid var(--vtos-line);
   border-radius:var(--vtos-radius-lg);padding:6px 10px;overflow-x:auto}
@@ -286,13 +286,13 @@ a.o-cb:hover{background:var(--panel2)}
 .cay-dong.cap1{margin-left:18px;padding-left:14px;border-left:1px solid var(--vtos-line)}
 .cay-dong.cap2{margin-left:36px;padding-left:14px;border-left:1px solid var(--vtos-line)}
 .cay-dong.cap3{margin-left:54px;padding-left:14px;border-left:1px solid var(--vtos-line)}
-.cay-dong.cap0 .cay-ten{font-weight:650;font-size:14.5px;color:var(--vtos-navy)}
+.cay-dong.cap0 .cay-ten{font-weight:650;font-size:calc(14.5/14*1rem);color:var(--vtos-navy)}
 a.cay-dong:hover{background:var(--vtos-info-bg)}
-.cay-ma{flex:0 0 46px;font-size:11px;color:var(--vtos-text-mute);
+.cay-ma{flex:0 0 46px;font-size:calc(11/14*1rem);color:var(--vtos-text-mute);
   font-family:var(--vtos-font-mono);font-variant-numeric:tabular-nums}
-.cay-ten{font-size:13.5px}
+.cay-ten{font-size:calc(13.5/14*1rem)}
 /* Nhãn trạng thái luôn nằm cuối dòng, một cột thẳng hàng – đọc dọc là thấy ngay còn nợ bao nhiêu. */
-.cay-tt{margin-left:auto;flex:0 0 auto;font-size:10.5px;font-weight:600;padding:3px 9px;
+.cay-tt{margin-left:auto;flex:0 0 auto;font-size:calc(10.5/14*1rem);font-weight:600;padding:3px 9px;
   border-radius:999px;white-space:nowrap}
 .cay-tt.co{background:var(--vtos-success-bg);color:var(--vtos-success)}
 .cay-tt.chua{background:var(--vtos-surface);color:var(--vtos-text-mute);font-weight:500}
@@ -304,7 +304,7 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 .cay-dong.cam .cay-ten{font-style:italic}
 .cay-tt.tab{background:transparent;color:var(--vtos-text-mute);font-weight:500;
   border:1px solid var(--vtos-line)}
-.cay-co{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--vtos-info-bg);
+.cay-co{font-size:calc(10/14*1rem);padding:2px 7px;border-radius:999px;background:var(--vtos-info-bg);
   color:var(--vtos-info);white-space:nowrap}
 
 @media (max-width:640px){
@@ -332,8 +332,8 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
    dưới. Nền card + một viền mảnh là đủ để nó tách khỏi hình nền mà không tranh chỗ. */
 .mh01-thanh{display:flex;flex-wrap:wrap;align-items:center;gap:0 14px;margin:0 0 14px;
   padding:9px 14px;background:var(--vtos-card);border:1px solid var(--vtos-line);
-  border-radius:var(--vtos-radius-md);font-size:13px}
-.mh01-thanh-ten{font-family:var(--vtos-font-display);font-size:16px;font-weight:700;
+  border-radius:var(--vtos-radius-md);font-size:calc(13/14*1rem)}
+.mh01-thanh-ten{font-family:var(--vtos-font-display);font-size:calc(16/14*1rem);font-weight:700;
   color:var(--vtos-navy);letter-spacing:-.01em;margin-right:2px}
 /* Vạch ngăn thay cho ba nhãn chữ đã bỏ: mắt vẫn thấy đây là bốn mẩu tin rời, mà không tốn chữ. */
 .mh01-thanh>b,.mh01-thanh>.the-cua{padding-left:14px;border-left:1px solid var(--vtos-line);
@@ -355,7 +355,7 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
    CỠ THU LẠI CHO VỪA THANH (TC-65): nút cũ cao 7px đệm trên dưới, đứng trong một khung riêng thì
    vừa; đứng chung một thanh với chữ cỡ 13px thì nó đội thanh cao lên gần gấp rưỡi. Giảm đệm và
    cỡ chữ để thanh giữ đúng một hàng. */
-.mh01-qd-nut{display:inline-block;text-decoration:none;margin:0;padding:4px 11px;font-size:12.5px;
+.mh01-qd-nut{display:inline-block;text-decoration:none;margin:0;padding:4px 11px;font-size:calc(12.5/14*1rem);
   font-weight:600;color:#fff;background:var(--vtos-sky);border-radius:var(--vtos-radius-sm,6px);
   white-space:nowrap;line-height:1.5}
 .mh01-qd-nut:hover{background:var(--vtos-sky)}
@@ -372,18 +372,18 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 .the-ct{background:var(--vtos-card);border:1px solid var(--vtos-line);
   border-radius:var(--vtos-radius-md);padding:13px 15px;display:flex;flex-direction:column;gap:3px}
 .the-ct.rong{background:var(--vtos-surface);border-style:dashed}
-.the-nhan{font-size:12.5px;color:var(--vtos-text-mute);font-weight:600}
-.the-phu{font-size:11.5px;color:var(--vtos-text-mute)}
-.the-so{font-size:23px;font-weight:700;color:var(--vtos-navy);line-height:1.2;
+.the-nhan{font-size:calc(12.5/14*1rem);color:var(--vtos-text-mute);font-weight:600}
+.the-phu{font-size:calc(11.5/14*1rem);color:var(--vtos-text-mute)}
+.the-so{font-size:calc(23/14*1rem);font-weight:700;color:var(--vtos-navy);line-height:1.2;
   font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono);margin-top:2px}
 /* Đỏ chỉ nhấn phần quá hạn hoặc thiếu điều kiện – không tô đỏ cả con số tổng (bản vẽ V1.2). */
 .the-so.do{color:var(--vtos-danger)}
 .the-ct.rong .the-so{color:var(--vtos-text-mute);font-weight:500}
-.the-duoi{font-size:11.5px;color:var(--vtos-text-mute);line-height:1.5;margin-top:4px}
-.the-thieu{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:5px;font-size:11.5px}
+.the-duoi{font-size:calc(11.5/14*1rem);color:var(--vtos-text-mute);line-height:1.5;margin-top:4px}
+.the-thieu{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:5px;font-size:calc(11.5/14*1rem)}
 /* CỬA NHẬP: ranh giới 09/9 – mỗi con số phải có một cửa cho người dùng đưa số vào. Ô trống không
    kèm cửa là việc còn thiếu, không phải một ô trống bình thường. */
-.the-cua{font-size:11.5px;font-weight:600;color:var(--vtos-navy);text-decoration:none;
+.the-cua{font-size:calc(11.5/14*1rem);font-weight:600;color:var(--vtos-navy);text-decoration:none;
   border-bottom:1px solid var(--vtos-navy-light)}
 .the-cua:hover{color:var(--vtos-navy-light)}
 
@@ -397,7 +397,7 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 /* table-layout:fixed – cột chia theo bề rộng khai báo, KHÔNG nở theo nội dung. Bảng auto mặc định
    lấy chuỗi dài nhất làm bề rộng tối thiểu, nên chỉ cần một câu ví dụ dài là bảng đẩy rộng ra. */
 .td-bang{width:100%;border-collapse:collapse;table-layout:fixed}
-.td-bang th{font-size:11.5px;color:var(--vtos-text-mute);text-transform:uppercase;
+.td-bang th{font-size:calc(11.5/14*1rem);color:var(--vtos-text-mute);text-transform:uppercase;
   letter-spacing:.04em;font-weight:600;text-align:left}
 .td-bang td.td-so,.td-bang th.td-so{text-align:right;font-variant-numeric:tabular-nums;
   font-family:var(--vtos-font-mono);white-space:nowrap;width:74px}
@@ -406,7 +406,7 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 /* Câu ví dụ chỉ để nhận ra loại cảnh báo, không phải nội dung chính – cắt một dòng, không cho nó
    đẩy cao cả hàng. KHÔNG đặt max-width theo ch: ô lưới hẹp hơn 52ch thì chính con số ấy thành bề
    rộng tối thiểu và lại đẩy tràn. */
-.td-vd{font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+.td-vd{font-size:calc(11.5/14*1rem);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   max-width:100%}
 .td-chi-tiet{margin-top:10px}
 
@@ -416,24 +416,24 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 .v14-bang{width:100%;border-collapse:collapse}
 .v14-bang th{white-space:nowrap}
 .v14-trong{text-align:center;padding:18px 8px}
-.v14-ghi{font-size:12px;line-height:1.7;margin:9px 0 0}
+.v14-ghi{font-size:calc(12/14*1rem);line-height:1.7;margin:9px 0 0}
 /* TC-33 · Nửa "Kết luận chỉ đạo" của khối 08. Tách hẳn bằng một đường kẻ trên: nó là phần CHƯA
    BẮT ĐẦU, không phải một dòng nữa của bảng tiến độ ngay trên. Nằm liền mạch thì người đọc tưởng
    khối đã xong cả hai nửa. */
-.v14-chi-dao{display:flex;flex-wrap:wrap;align-items:baseline;gap:7px;font-size:12px;
+.v14-chi-dao{display:flex;flex-wrap:wrap;align-items:baseline;gap:7px;font-size:calc(12/14*1rem);
   line-height:1.7;margin:12px 0 0;padding:10px 0 0;border-top:1px solid var(--vtos-line)}
-.v14-chua{display:inline-flex;flex-wrap:wrap;align-items:center;gap:7px;font-size:12px}
+.v14-chua{display:inline-flex;flex-wrap:wrap;align-items:center;gap:7px;font-size:calc(12/14*1rem)}
 
 /* Hiệu quả đội xe: năm ô ngang, tự xuống dòng theo bề rộng thật. */
 .v14-o-ds{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .v14-o{background:var(--vtos-info-bg);border:1px solid var(--vtos-line);
   border-radius:var(--vtos-radius-md);padding:11px 13px;min-width:0}
 .v14-o.rong{background:transparent;border-style:dashed}
-.v14-o-nhan{font-size:11.5px;color:var(--vtos-text-mute);font-weight:600;line-height:1.4}
-.v14-o-so{font-size:19px;font-weight:700;color:var(--vtos-navy);margin-top:3px;
+.v14-o-nhan{font-size:calc(11.5/14*1rem);color:var(--vtos-text-mute);font-weight:600;line-height:1.4}
+.v14-o-so{font-size:calc(19/14*1rem);font-weight:700;color:var(--vtos-navy);margin-top:3px;
   font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono)}
-.v14-o.rong .v14-o-so{color:var(--vtos-text-mute);font-weight:500;font-size:16px}
-.v14-o-chu{font-family:var(--vtos-font-text);font-size:15px}
+.v14-o.rong .v14-o-so{color:var(--vtos-text-mute);font-weight:500;font-size:calc(16/14*1rem)}
+.v14-o-chu{font-family:var(--vtos-font-text);font-size:calc(15/14*1rem)}
 
 /* TC-45 · BẢY Ô SỐ VUÔNG CỦA PHẢI THU / PHẢI TRẢ ĐÃ ĐI, cùng với lớp .v14-han*.
    Hai khối ấy nay bày số bằng bảy thanh ngang của bộ biểu đồ dùng chung (.bd-th-*), nên giữ lại
@@ -449,16 +449,16 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
    (components/BieuDo.tsx, lớp .bd-*) và hiện ở ba khu biểu đồ cuối trang. Quy tắc màu và các luật
    vẽ nay nằm ở đó, một chỗ duy nhất. Khối chỉ còn ô số và tỉ lệ — là chữ, không phải hình. */
 /* Phải trả quá hạn: theo dõi RIÊNG, nên tách hẳn bằng một vạch trên chứ không nằm chung lưới. */
-.v14-quahan{margin-top:12px;padding-top:11px;border-top:1px solid var(--vtos-line);font-size:13px}
-.v14-qh-so{font-size:19px;display:inline-block;vertical-align:middle;margin-left:4px}
+.v14-quahan{margin-top:12px;padding-top:11px;border-top:1px solid var(--vtos-line);font-size:calc(13/14*1rem)}
+.v14-qh-so{font-size:calc(19/14*1rem);display:inline-block;vertical-align:middle;margin-left:4px}
 /* Chú giải hai mức của khối Rủi ro. */
-.v14-muc-ds{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px;font-size:12px}
+.v14-muc-ds{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px;font-size:calc(12/14*1rem)}
 
 /* ── KHỐI 06 DÒNG TIỀN · nút đổi kiểu xem và dòng tóm tắt nguồn số (14/9/2026) ──────────────────
    Hai nút dính liền thành một cặp, để đọc ra là MỘT lựa chọn hai bên chứ không phải hai việc rời
    nhau. Nút đang chọn dùng nền nút chính, nút kia dùng nền mờ — cùng cặp màu đã đo ở TC-22. */
 .dt-kieu{display:inline-flex;border-radius:7px;overflow:hidden;border:1px solid var(--vtos-line)}
-.dt-kieu button.act{border-radius:0;border:0;margin:0;font-size:12.5px;padding:6px 12px}
+.dt-kieu button.act{border-radius:0;border:0;margin:0;font-size:calc(12.5/14*1rem);padding:6px 12px}
 .dt-kieu button.act+button.act{border-left:1px solid var(--vtos-line)}
 /* TC-60 · .dt-day-phu · .dt-dubao · .dt-dubao-chan · .dt-tomtat ĐÃ XOÁ cùng với ba câu chú thích
    và khối đáy dự báo mà chúng tạo kiểu. Giữ lại một lớp không ai gọi thì nó vẫn qua mọi phép
@@ -476,13 +476,13 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 /* TC-60 · từ MỘT KHỐI thành MỘT HÀNG: bỏ lưới hai dòng, bỏ đệm trên dưới và lề đáy. Vạch màu
    bên trái GIỮ NGUYÊN — ba mức (đỏ · vàng · xanh) phải đọc được trước cả con số. */
 .dt-day{padding:2px 0 2px 10px;margin:0;border-left:3px solid var(--vtos-line)}
-.dt-day-nhan{font-size:12.5px}
+.dt-day-nhan{font-size:calc(12.5/14*1rem)}
 .dt-day.ok{border-left-color:var(--vtos-success)}
 .dt-day.warn{border-left-color:var(--vtos-warning)}
 .dt-day.red{border-left-color:var(--vtos-danger)}
 /* Con số và câu đọc hộ nằm CÙNG một dòng ở màn rộng, xuống dòng ở điện thoại. `align-items:baseline`
    để chân chữ số lớn thẳng hàng với chân câu chữ nhỏ — lệch chân đọc ra như hai khối rời nhau. */
-.dt-day-so{font-size:19px;line-height:1.15;font-variant-numeric:tabular-nums;
+.dt-day-so{font-size:calc(19/14*1rem);line-height:1.15;font-variant-numeric:tabular-nums;
   font-family:var(--vtos-font-mono);color:var(--vtos-heading)}
 .dt-day.red .dt-day-so{color:var(--vtos-danger)}
 
@@ -492,7 +492,7 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
   .dt-kieu button.act{flex:1}
   .mh01-ngay{margin-left:0;width:100%}
   .mh01-ky select{min-width:0;flex:1}
-  .the-so{font-size:20px}
+  .the-so{font-size:calc(20/14*1rem)}
   /* Trên điện thoại câu ví dụ được xuống dòng: ở đây không có chiều ngang để mà cắt gọn. */
   .td-vd{white-space:normal;max-width:100%}
 }
@@ -508,18 +508,18 @@ table.bang-doc{width:100%}
   table.bang-doc,table.bang-doc tbody,table.bang-doc tr,table.bang-doc td{display:block;width:100%}
   table.bang-doc tr{border:1px solid var(--line);border-radius:8px;padding:4px 2px;margin-bottom:8px;background:var(--panel)}
   table.bang-doc td{display:flex;gap:10px;align-items:baseline;border:0;padding:5px 10px;text-align:left}
-  table.bang-doc td::before{content:attr(data-nhan);flex:0 0 40%;font-size:11.5px;color:var(--ink2);
+  table.bang-doc td::before{content:attr(data-nhan);flex:0 0 40%;font-size:calc(11.5/14*1rem);color:var(--ink2);
     text-transform:uppercase;letter-spacing:.04em}
   table.bang-doc td.num{text-align:left;justify-content:space-between}
   table.bang-doc td:empty{display:none}
 
   /* Bốn ô cảnh báo: 2x2. */
   .bon-o{grid-template-columns:1fr 1fr;gap:8px}
-  .o-cb{padding:10px 12px}.o-cb b{font-size:19px}
+  .o-cb{padding:10px 12px}.o-cb b{font-size:calc(19/14*1rem)}
 
   /* Chỉ số cũng hai cột, thay vì một cột dài phải cuộn qua mới tới nội dung. */
   .kpis{grid-template-columns:1fr 1fr;gap:8px}
-  .kpi{padding:10px 12px}.kpi b{font-size:18px}
+  .kpi{padding:10px 12px}.kpi b{font-size:calc(18/14*1rem)}
 
   .the-dau{padding:11px 12px}.the-than{padding:0 12px 12px}
 
@@ -556,7 +556,9 @@ table.bang-doc{width:100%}
 
    `--vtos-text-mute` (#9BB2C6) CỐ Ý không giữ: trên giấy trắng nó chỉ đạt 2,19. */
 @media print{
-  :root{
+  /* TC-67: phải thắng cả `:root[data-nen="sang"]` của tokens.css, nếu không thì người
+     đang để nền sáng in ra giấy bằng bảng màu màn hình chứ không bằng bảng màu giấy. */
+  :root,:root[data-nen]{
     --vtos-surface:#fff;
     --vtos-card:#fff;
     --vtos-text:var(--vtos-nav-bg);
@@ -611,15 +613,15 @@ table.bang-doc{width:100%}
 
 /* Bảng dài cuộn TRONG khung, không cắt dòng. 92 chuyến là 92 việc có thật — giấu dòng nào là
    giấu đúng việc ấy. Đầu bảng dính lại để cuộn giữa chừng vẫn còn tên cột. */
-.mh01-cuon{max-height:420px;overflow-y:auto}
+.mh01-cuon{max-height:calc(420/14*1rem);overflow-y:auto}
 .mh01-cuon thead th{position:sticky;top:0;z-index:1;background:var(--vtos-card)}
 /* In ra giấy thì BỎ khung cuộn: giấy không cuộn được, còn lại 420px là mất 78 chuyến. */
 @media print{.mh01-cuon{max-height:none;overflow:visible}}
 
 /* Danh sách dài gấp lại. In ra giấy thì mở sẵn, vì <details> đóng in ra là mất chữ. */
 .mh01-gap{margin:8px 0 0}
-.mh01-gap>summary{cursor:pointer;font-size:12px}
-.mh01-gap>p{margin:6px 0 0;font-size:12px;line-height:1.7;word-break:break-word}
+.mh01-gap>summary{cursor:pointer;font-size:calc(12/14*1rem)}
+.mh01-gap>p{margin:6px 0 0;font-size:calc(12/14*1rem);line-height:1.7;word-break:break-word}
 @media print{.mh01-gap>p{display:block !important}}
 
 /* ─── TC-36 · BIỂU ĐỒ NHỎ TRÊN THẺ CHỈ TIÊU ────────────────────────────────────────────────
@@ -641,11 +643,11 @@ table.bang-doc{width:100%}
 /* Kỳ chưa có số: ô vẫn chừa chỗ nhưng KHÔNG vẽ gì bên trong. Không tô xám — một cột xám vẫn là
    một cột, và người đọc sẽ ước lượng chiều cao của nó. */
 .the-xh-truc0{position:absolute;left:0;right:0;height:1px;background:var(--vtos-line)}
-.the-xh-ss{margin-top:5px;font-size:11px}
+.the-xh-ss{margin-top:5px;font-size:calc(11/14*1rem)}
 .the-xh-mui{font-weight:700;font-variant-numeric:tabular-nums}
 .the-xh-mui.tang{color:var(--vtos-success)}
 .the-xh-mui.giam{color:var(--vtos-danger)}
-.the-xh-rong{margin-top:8px;font-size:11px;line-height:1.6}
+.the-xh-rong{margin-top:8px;font-size:calc(11/14*1rem);line-height:1.6}
 /* In ra giấy: biểu đồ nhỏ bỏ đi. Cột 30px in ra là bốn vệt mực không đọc được, mà con số và dòng
    so sánh thì vẫn còn nguyên — giữ phần nói được, bỏ phần không nói được. */
 @media print{.the-xh-cot{display:none}}
@@ -665,7 +667,7 @@ table.bang-doc{width:100%}
   .mh01-gap>*:not(summary){display:block !important}}
 
 .mh01-ngan{border:0;border-top:1px solid var(--vtos-line);margin:22px 0 12px}
-.mh01-them{font-size:14px;color:var(--vtos-text-mute);margin:0 0 10px;font-weight:600}
+.mh01-them{font-size:calc(14/14*1rem);color:var(--vtos-text-mute);margin:0 0 10px;font-weight:600}
 
 /* ═══ TC-38 · BỘ BIỂU ĐỒ DÙNG CHUNG (components/BieuDo.tsx) ═══════════════════════════════
    Anh Tuấn 15/9/2026 gửi mấy mẫu bảng điều hành và chốt "đầy đủ: trục, lưới, nhãn số, chú
@@ -678,12 +680,12 @@ table.bang-doc{width:100%}
 .bd{margin:0;padding:14px 15px 12px;border:1px solid var(--vtos-line);
   border-radius:var(--vtos-radius-md);background:var(--vtos-card);min-width:0}
 .bd-dau{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin:0 0 12px}
-.bd-dau b{font-size:13px;color:var(--vtos-heading)}
-.bd-phu{font-size:11.5px}
-.bd-chan,.bd-chu{font-size:11.5px;margin:8px 0 0;line-height:1.55}
+.bd-dau b{font-size:calc(13/14*1rem);color:var(--vtos-heading)}
+.bd-phu{font-size:calc(11.5/14*1rem)}
+.bd-chan,.bd-chu{font-size:calc(11.5/14*1rem);margin:8px 0 0;line-height:1.55}
 
 /* Chú giải: chấm màu + tên. Nhận dạng KHÔNG được chỉ dựa vào màu, nên tên luôn đi kèm chấm. */
-.bd-chugiai{display:flex;flex-wrap:wrap;gap:4px 12px;margin-left:auto;font-size:11px;
+.bd-chugiai{display:flex;flex-wrap:wrap;gap:4px 12px;margin-left:auto;font-size:calc(11/14*1rem);
   color:var(--vtos-text-mute)}
 .bd-cg-mot{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .bd-cg-cham{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--vtos-navy)}
@@ -694,7 +696,7 @@ table.bang-doc{width:100%}
 .bd-than{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;
   column-gap:8px}
 .bd-truc{position:relative;grid-area:1/1/2/2;width:46px}
-.bd-truc-nhan{position:absolute;right:0;transform:translateY(-50%);font-size:10px;
+.bd-truc-nhan{position:absolute;right:0;transform:translateY(-50%);font-size:calc(10/14*1rem);
   color:var(--vtos-text-faint);font-variant-numeric:tabular-nums;white-space:nowrap}
 .bd-o{position:relative;grid-area:1/2/2/3}
 /* Lưới MỜ hơn hẳn cột: lưới là để ước lượng, không phải để đọc. Lưới đậm bằng cột thì mắt đọc
@@ -736,13 +738,13 @@ table.bang-doc{width:100%}
    đúng tầm một cột, vạch nét đứt cắt ngang giữa chữ số và con số thành ra bị gạch bỏ — tìm ra
    bằng cách dựng ảnh ở TC-42, đọc mã thì không thấy. Không dùng nền đục để lấp vạch: nền đục làm
    thủng vạch mốc ở đúng chỗ người ta cần thấy nó liền mạch. */
-.bd-so{position:absolute;left:0;right:0;text-align:center;font-size:10.5px;font-weight:700;
+.bd-so{position:absolute;left:0;right:0;text-align:center;font-size:calc(10.5/14*1rem);font-weight:700;
   color:var(--vtos-text-mute);font-variant-numeric:tabular-nums;white-space:nowrap;z-index:2;
   text-shadow:0 0 3px var(--vtos-card),0 0 3px var(--vtos-card),0 0 3px var(--vtos-card)}
 .bd-goc{grid-area:2/1/3/2}
 .bd-nhanx{grid-area:2/2/3/3;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:10px;
   margin-top:5px}
-.bd-nhanx>span{font-size:10.5px;color:var(--vtos-text-mute);text-align:center;
+.bd-nhanx>span{font-size:calc(10.5/14*1rem);color:var(--vtos-text-mute);text-align:center;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ── TC-44 · ĐƯỜNG KẾ HOẠCH, CỘT MỜ, CỘT THEO DẤU ──
@@ -822,9 +824,9 @@ table.bang-doc{width:100%}
    ở components/BieuDo.tsx. Chỉ áp cho hình dày cột: hình sáu cột giữ nguyên khe 10px. */
 @media (max-width:560px){
   .bd-than.day .bd-cot,.bd-than.day .bd-nhanx{gap:3px}
-  .bd-than.day .bd-nhanx>span{font-size:9px;letter-spacing:-.2px}
+  .bd-than.day .bd-nhanx>span{font-size:calc(9/14*1rem);letter-spacing:-.2px}
   .bd-than.day .bd-truc{width:34px}
-  .bd-than.day .bd-truc-nhan{font-size:9px}
+  .bd-than.day .bd-truc-nhan{font-size:calc(9/14*1rem)}
 }
 
 /* ── THANH NGANG ──
@@ -834,7 +836,7 @@ table.bang-doc{width:100%}
    thường. Câu "chưa có số" vì thế cũng nằm TRONG rãnh, không nằm ở cột số. */
 .bd-th{display:grid;gap:7px}
 .bd-th-hang{display:grid;grid-template-columns:116px minmax(0,1fr) 62px;align-items:center;
-  gap:10px;font-size:12px;min-width:0}
+  gap:10px;font-size:calc(12/14*1rem);min-width:0}
 .bd-th-ten{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bd-th-rai{position:relative;height:15px;border-radius:3px;background:var(--vtos-surface)}
 .bd-th-thanh{position:absolute;top:0;bottom:0;border-radius:3px;background:var(--vtos-navy)}
@@ -846,7 +848,7 @@ table.bang-doc{width:100%}
 .bd-th-thanh.tt{background:var(--vtos-danger)}
 .bd-th-truc0{position:absolute;top:0;bottom:0;width:1px;background:var(--vtos-line)}
 .bd-th-khuyet{position:absolute;inset:0;border:1px dashed var(--vtos-line);border-radius:3px;
-  display:flex;align-items:center;padding-left:7px;font-size:10px;color:var(--vtos-text-faint)}
+  display:flex;align-items:center;padding-left:7px;font-size:calc(10/14*1rem);color:var(--vtos-text-faint)}
 .bd-th-so{font-variant-numeric:tabular-nums;font-weight:700;text-align:right}
 @media (max-width:560px){
   .bd-th{gap:12px}
@@ -862,7 +864,7 @@ table.bang-doc{width:100%}
 .bd-mau-1{opacity:1}.bd-mau-2{opacity:.80}.bd-mau-3{opacity:.62}
 .bd-mau-4{opacity:.46}.bd-mau-5{opacity:.32}
 .bd-mau-tt{background:var(--vtos-danger);opacity:1}
-.bd-cc-so{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-size:11.5px}
+.bd-cc-so{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-size:calc(11.5/14*1rem)}
 .bd-cc-so>span{display:inline-flex;align-items:baseline;gap:5px}
 .bd-cc-so b{font-variant-numeric:tabular-nums}
 
@@ -870,7 +872,7 @@ table.bang-doc{width:100%}
    Nét đứt, và BẮT BUỘC có lời. Một khung xám không lời thì người đọc kết luận hệ thống hỏng —
    mà sự thật thường là chưa ai nhập, tức một việc có chủ. */
 .bd-rong{border-style:dashed;background:transparent}
-.bd-rong-ly,.bd-rong-ai{font-size:11.5px;margin:0;line-height:1.55}
+.bd-rong-ly,.bd-rong-ai{font-size:calc(11.5/14*1rem);margin:0;line-height:1.55}
 .bd-rong-ai{margin-top:6px}
 
 /* ═══ TC-49 · KHUNG RỖNG GIỮ ĐÚNG HÌNH DÁNG CỦA HÌNH THẬT ═══════════════════════════════════
@@ -896,14 +898,14 @@ table.bang-doc{width:100%}
   .bd-rong-khung.day .bd-nhanx{gap:18px} }
 @media (max-width:560px){
   .bd-rong-khung.day .bd-rong-cot,.bd-rong-khung.day .bd-nhanx{gap:3px}
-  .bd-rong-khung.day .bd-nhanx>span{font-size:9px;letter-spacing:-.2px}
+  .bd-rong-khung.day .bd-nhanx>span{font-size:calc(9/14*1rem);letter-spacing:-.2px}
 }
 
 /* Thanh NGANG rỗng: giữ đủ TÊN các nhóm. Bảy nhóm hạn hiện đủ bảy tên dù chưa có số — người đọc
    thấy luôn hình này có bảy nhóm chứ không phải năm, điều một dòng chữ không nói được. */
 .bd-rong-ngang{display:grid;gap:9px;margin:10px 0 12px}
 .bd-rong-hang{display:grid;grid-template-columns:96px 1fr;align-items:center;gap:10px}
-.bd-rong-ten{font-size:11px;color:var(--vtos-text-mute);overflow:hidden;
+.bd-rong-ten{font-size:calc(11/14*1rem);color:var(--vtos-text-mute);overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .bd-rong-ray{height:11px;border:1px dashed var(--vtos-line);border-radius:4px;opacity:.55}
 
@@ -925,7 +927,7 @@ table.bang-doc{width:100%}
 .v14-ky{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--vtos-line);
   border-radius:var(--vtos-radius-sm);background:var(--vtos-surface)}
 .v14-ky-nut{border:0;background:transparent;color:var(--vtos-text-mute);cursor:pointer;
-  font-family:inherit;font-size:12px;font-weight:600;padding:4px 12px;
+  font-family:inherit;font-size:calc(12/14*1rem);font-weight:600;padding:4px 12px;
   border-radius:calc(var(--vtos-radius-sm) - 2px)}
 .v14-ky-nut:hover{color:var(--vtos-text)}
 /* Kỳ đang chọn phải khác hẳn, không chỉ đậm hơn một chút: ba nút gần giống nhau thì người đọc
@@ -969,12 +971,12 @@ table.bang-doc{width:100%}
 /* Con số lớn của ô: kỳ ĐANG CHẠY. Nó đứng trên biểu đồ vì đó là thứ đọc trước; biểu đồ các kỳ đã
    đóng là thứ đọc sau để biết con số ấy đang đi lên hay xuống. */
 .o6-so{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:2px 0 12px}
-.o6-lon{font-size:30px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;
+.o6-lon{font-size:calc(30/14*1rem);font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;
   color:var(--vtos-text)}
 /* Rỗng KHÁC 0: chữ mờ và nhỏ hơn, để một ô chưa có số không bị đọc thành một ô giá trị thấp. */
-.o6-lon.rong{color:var(--vtos-text-mute);font-weight:500;font-size:26px}
+.o6-lon.rong{color:var(--vtos-text-mute);font-weight:500;font-size:calc(26/14*1rem)}
 .o6-lon.do{color:var(--vtos-danger)}
-.o6-nhan{font-size:12px}
+.o6-nhan{font-size:calc(12/14*1rem)}
 
 /* ═══ TC-44 · KẾT QUẢ KINH DOANH — HAI THẺ, MỘT BỘ CHỌN KỲ ══════════════════════════════════
    Bản vẽ anh Tuấn gửi 16/9/2026: một khối chiếm hết bề ngang, bên trong hai thẻ cạnh nhau. Khối
@@ -984,8 +986,8 @@ table.bang-doc{width:100%}
 /* Bộ chọn kỳ đứng RIÊNG một dòng dưới tên khối, không nhét vào .mh01-dau: nó có ba nút và hai ô
    chọn, và trên điện thoại chúng xuống dòng thành một mớ lẫn với tên khối. */
 .kqkd-dieu{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 14px}
-.kqkd-chon{display:inline-flex;align-items:center;gap:6px;font-size:12px}
-.kqkd-chon select{width:auto;min-width:96px;padding:5px 8px;font-size:12.5px}
+.kqkd-chon{display:inline-flex;align-items:center;gap:6px;font-size:calc(12/14*1rem)}
+.kqkd-chon select{width:auto;min-width:96px;padding:5px 8px;font-size:calc(12.5/14*1rem)}
 
 /* ═══ TC-62 · HAI KHUNG RIÊNG, MỖI KHUNG MỘT TRỤC NGANG ════════════════════════════════════
    Ba lớp `.kqkd-chong` `.kqkd-tang` `.kqkd-ten` đã XOÁ cùng với bố cục hai tầng của TC-47 (lý do
@@ -1016,7 +1018,7 @@ table.bang-doc{width:100%}
    Một hàng điều khiển dùng chung cho cả thanh chọn năm lẫn hàng nút Lưu: cùng một hình dạng cho
    cùng một loại việc, nên người dùng không phải học hai bố cục trên cùng một màn hình. */
 .kh-hang{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.kh-nam{font-size:18px;font-variant-numeric:tabular-nums;min-width:64px;text-align:center}
+.kh-nam{font-size:calc(18/14*1rem);font-variant-numeric:tabular-nums;min-width:64px;text-align:center}
 .kh-pv{margin-left:auto}
 
 /* Ô NHẬP TIỀN. Dóng phải và dùng chữ số đều bề ngang: 12 tháng × nhiều pháp nhân xếp thành cột,
@@ -1024,7 +1026,7 @@ table.bang-doc{width:100%}
    Ô RỖNG PHẢI TRÔNG RA RỖNG, không giống ô đang chứa số 0 — viền nhạt hơn là chưa đủ, nên thêm
    chữ gợi ý mờ ở thuộc tính placeholder của chính ô (xem page.tsx). */
 .kh-o{width:100%;min-width:96px;text-align:right;font-variant-numeric:tabular-nums;
-  font-family:inherit;font-size:13px;padding:5px 7px;
+  font-family:inherit;font-size:calc(13/14*1rem);padding:5px 7px;
   border:1px solid var(--vtos-line);border-radius:var(--vtos-radius-sm);
   background:var(--vtos-surface);color:var(--vtos-text)}
 .kh-o:focus-visible{outline:2px solid var(--vtos-navy);outline-offset:1px}
@@ -1038,18 +1040,18 @@ table.bang-doc{width:100%}
    Lý do tìm ra bằng cách dựng ảnh chứ không bằng cách đọc mã: .num đổi sang phông chữ đơn cách,
    mà phông ấy không có chữ "Ế" — nên "LỢI NHUẬN TRƯỚC THUẾ" in ra thành "THUÊ´", dấu sắc rơi ra
    thành một ký tự riêng. Bỏ luôn text-transform vì chữ hoa toàn phần làm dấu tiếng Việt khó đọc. */
-.kh-ct{text-align:right;text-transform:none;font-size:12px}
+.kh-ct{text-align:right;text-transform:none;font-size:calc(12/14*1rem)}
 .kh-thang{white-space:nowrap}
 /* Lý do sửa gần nhất hiện ngay trên dòng, nhưng CẮT BỚT khi dài: một lý do ba dòng sẽ kéo cả bảng
    rộng ra và đẩy các cột số ra ngoài tầm mắt. Bản đầy đủ nằm ở title và ở nhật ký. */
-.kh-ly{display:inline-block;max-width:280px;overflow:hidden;text-overflow:ellipsis;
+.kh-ly{display:inline-block;max-width:calc(280/14*1rem);overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;vertical-align:bottom}
 /* Cột "Sửa muộn" và cột nút: dóng trái và CÓ KHOẢNG THỞ bên trái. Cột số dóng phải chạm sát mép ô,
    nên không chừa khoảng thì nhãn cột này dính liền vào nhãn cột số trước nó. */
 .kh-sua{padding-left:18px;white-space:nowrap}
 .kh-bo{margin-left:6px}
 /* Ổ khoá của tháng đã khép. Nhỏ, đứng sau tên tháng, không chiếm một cột riêng. */
-.kh-khoa{margin-left:6px;font-size:11px;opacity:.75}
+.kh-khoa{margin-left:6px;font-size:calc(11/14*1rem);opacity:.75}
 /* Dòng có ô vừa sửa mà chưa lưu: tô nền mờ. Mất điện giữa chừng thì người dùng phải nhìn ra ngay
    mình còn đang nợ nút Lưu ở những dòng nào. */
 .kh-dang-sua>td{background:color-mix(in srgb,var(--vtos-sky) 12%,transparent)}
@@ -1058,8 +1060,8 @@ table.bang-doc{width:100%}
    phải một ghi chú tuỳ chọn: chưa điền thì không lưu được. */
 .kh-lydo{margin-top:10px;padding:10px;border:1px solid var(--vtos-danger);
   border-radius:var(--vtos-radius-sm)}
-.kh-lydo label{display:block;font-size:12px;margin-bottom:6px}
-.kh-lydo-o{width:100%;font-family:inherit;font-size:13px;padding:6px 8px;
+.kh-lydo label{display:block;font-size:calc(12/14*1rem);margin-bottom:6px}
+.kh-lydo-o{width:100%;font-family:inherit;font-size:calc(13/14*1rem);padding:6px 8px;
   border:1px solid var(--vtos-line);border-radius:var(--vtos-radius-sm);
   background:var(--vtos-surface);color:var(--vtos-text)}
 .kh-lydo-o:focus-visible{outline:2px solid var(--vtos-navy);outline-offset:1px}
@@ -1076,7 +1078,7 @@ table.bang-doc{width:100%}
 /* Bảng đối chiếu chỉ tiêu giao với tổng phân bổ. Viền cảnh báo vì nó là câu hỏi cần trả lời, nhưng
    KHÔNG phải lỗi — nên không dùng nền đỏ đặc như khối cảnh báo thật. */
 .kh-doi-chieu{border-color:var(--vtos-warning)}
-.kh-dc-ds{margin:0;padding-left:18px;font-size:13px;line-height:1.7}
+.kh-dc-ds{margin:0;padding-left:18px;font-size:calc(13/14*1rem);line-height:1.7}
 .kh-dc-ds li{margin:0}
 
 @media print{
@@ -1097,9 +1099,9 @@ table.bang-doc{width:100%}
 @media (min-width:560px){ .dt-moc{grid-template-columns:repeat(4,1fr)} }
 .dt-moc-o{background:var(--vtos-surface);border:1px solid var(--vtos-line);
   border-radius:var(--vtos-radius-md);padding:10px 12px;min-width:0}
-.dt-moc-o b{display:block;font-size:17px;font-weight:700;line-height:1.25;
+.dt-moc-o b{display:block;font-size:calc(17/14*1rem);font-weight:700;line-height:1.25;
   font-variant-numeric:tabular-nums;font-family:var(--vtos-font-mono)}
-.dt-moc-o small{display:block;font-size:11.5px;color:var(--vtos-text-mute);margin-top:3px}
+.dt-moc-o small{display:block;font-size:calc(11.5/14*1rem);color:var(--vtos-text-mute);margin-top:3px}
 
 /* ═══ TC-59 · BIỂU ĐỒ ĐƯỜNG BA CHUỖI, VÀ MỘT KHUNG GỘP CHO KHỐI DÒNG TIỀN ═══════════════════
    "em thiet ke lai cho anh biểu đồ giống nhu hình mẫu 1, và gòm hinh 2 lai cho gọn nằm trong
@@ -1125,7 +1127,7 @@ table.bang-doc{width:100%}
 .bd-duong-truc .bd-truc-nhan{right:0;transform:translateY(50%)}
 .bd-duong-truc.bd-truc-phai .bd-truc-nhan{right:auto;left:0}
 .bd-duong-nhanx{grid-row:2;grid-column:2;display:grid;gap:10px;margin-top:5px}
-.bd-duong-nhanx>span{font-size:10.5px;color:var(--vtos-text-mute);text-align:center;
+.bd-duong-nhanx>span{font-size:calc(10.5/14*1rem);color:var(--vtos-text-mute);text-align:center;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bd-duong-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .bd-net{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
@@ -1140,7 +1142,7 @@ table.bang-doc{width:100%}
 .bd-cham.d3{background:var(--vtos-navy)}
 /* Nhãn số hai đầu mỗi chuỗi. Chữ mang MÀU CHỮ, không mang màu chuỗi — màu nằm ở cái chấm cạnh
    nó. Bóng chữ trùng màu nền để con số không bị lưới cắt ngang. */
-.bd-duong-nhan{position:absolute;transform:translate(2px,50%);font-size:10.5px;font-weight:700;
+.bd-duong-nhan{position:absolute;transform:translate(2px,50%);font-size:calc(10.5/14*1rem);font-weight:700;
   color:var(--vtos-text);font-variant-numeric:tabular-nums;white-space:nowrap;z-index:3;
   margin-bottom:14px;
   text-shadow:0 0 3px var(--vtos-card),0 0 3px var(--vtos-card),0 0 3px var(--vtos-card)}
@@ -1166,11 +1168,131 @@ table.bang-doc{width:100%}
    khoảng cách trong hàng khác nhau thì đọc ra là hai khối, đúng cái vừa gộp xong. */
 .dt-hang{display:flex;flex-wrap:wrap;align-items:center;gap:7px 10px;min-width:0}
 .dt-day-day{flex:1}                      /* đẩy phần bên phải ra mép, không dùng margin-left auto */
-.dt-nhan-nho{font-size:12px;font-weight:700;color:var(--vtos-heading)}
-.dt-nhan-nho-mo{font-size:12px}
+.dt-nhan-nho{font-size:calc(12/14*1rem);font-weight:700;color:var(--vtos-heading)}
+.dt-nhan-nho-mo{font-size:calc(12/14*1rem)}
 .dt-gop .dt-moc{margin-top:10px}
 /* TC-63 · Hàng thao tác của khối Bảng bốn mốc trên /dong-tien dùng LẠI `.dt-hang` — cùng loại
    nội dung thì cùng hình dạng. Chỉ thêm khe dưới, vì ở đây nó không nằm trong cột dọc `.dt-chan`
    (nơi khe do `gap` của cột lo) mà đứng thẳng trong `.panel`. */
 #bang-bon-moc .dt-hang{margin:0 0 12px}
 
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   TC-67 · CHỌN NỀN VÀ CỠ CHỮ · 18/09/2026 — anh Tuấn giao năm mục, duyệt sau khi xem bản thử
+   ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+   MỘT CON SỐ ĐIỀU KHIỂN CẢ MÀN HÌNH. 115 khai báo cỡ chữ trong tệp này đã đổi từ `12px` sang
+   `calc(12/14*1rem)`. Chia cho 14 chứ không phải 16, vì thân bài TRƯỚC vòng này là 14px: đặt núm
+   ở 14 thì mọi chữ ra đúng bằng bản cũ, không lệch một điểm ảnh — nhờ vậy có thể chứng minh vòng
+   này không đổi gì ngoài thứ được phép đổi. Ở 16 cả màn hình to lên 1,143 lần; ở 20 là 1,429 lần.
+   Thứ bậc tiêu đề / thân bài / chữ phụ giữ nguyên vì mọi cỡ cùng nhân một hệ số.
+
+   BỐN CHỖ KHOÁ CỨNG BẰNG px CŨNG ĐỔI THEO (sửa tại chỗ, không khai lại ở đây):
+     --top-h 72px · aside.side 252px · .mh01-cuon 420px · .kh-ly 280px
+   Để nguyên bằng px thì chữ to lên mà cái khung đựng nó không to theo — đó chính là chỗ cắt chữ.
+
+   ĐO 45 KHỔ TRƯỚC KHI CHỐT: 15 bề rộng (1920 … 320) × 3 cỡ chữ. Tràn ngang bằng 0 ở cả 45 khổ,
+   không phần tử nào đè ra ngoài thân trang. Số đo lưu ở vòng TC-67.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* Cỡ chữ gốc. Giá trị do người dùng chọn, Shell.tsx đặt vào; chưa chọn thì 16px theo yêu cầu 18/9.
+   Khai `var(… , 16px)` chứ không dựa vào JavaScript đặt kịp: trang phải đọc được cả khi kịch bản
+   chưa chạy hoặc chạy hỏng. */
+html{font-size:var(--vtos-co-chu,16px)}
+
+/* ── NHÃN TRỤC NGANG: THÀ HIỆN ÍT NHÃN CÒN HƠN HIỆN ĐỦ MÀ BA CÁI CỤT ──────────────────────────
+   Lỗi này CÓ SẴN TỪ TRƯỚC vòng này, không phải do cỡ chữ đẻ ra — đo bằng bản đối chứng chạy
+   globals.css nguyên bản ở 14px: màn 1280 đã cắt T10 T11 T12, màn 1024 cắt cả mười hai nhãn.
+   Cỡ chữ 16px chỉ dịch ngưỡng từ 1280 lên 1366, tức thêm đúng một cỡ màn hình gặp phải.
+
+   Cách chữa: khi ô nhãn hẹp hơn chữ thì ẨN nhãn chẵn, và cho nhãn lẻ tràn sang chỗ vừa trống —
+   ra T1 T3 T5 T7 T9 T11, đọc được và không cái nào cụt. Đây là cách vẽ biểu đồ thông thường, và
+   nó nói thật: một nhãn `T…` không cho biết tháng mấy, mà lại chiếm chỗ như thể có cho biết.
+   Số tháng bị ẩn KHÔNG mất: rê chuột lên cột là đọc được, `title` của cột vẫn mang đủ.
+
+   NGƯỠNG TÍNH BẰNG `em` NÊN TỰ ĐI THEO CỠ CHỮ: 30em ở cỡ 14 là 420px, ở cỡ 20 là 600px — đúng
+   chỗ chữ bắt đầu không vừa. Không phải nhớ ba ngưỡng cho ba cỡ.
+
+   CHỈ ÁP CHO HÌNH NHIỀU NHÃN (`dong-nhan`, từ 10 nhãn trở lên — BieuDo.tsx gắn). Hình bốn quý
+   trong một khung hẹp thì bốn nhãn vẫn vừa; ẩn bớt ở đó là giấu đi thứ đang đọc được. */
+.bd-nhanx.dong-nhan{container-type:inline-size;container-name:nhanx}
+@container nhanx (max-width:30em){
+  .bd-nhanx.dong-nhan>span{overflow:visible;text-overflow:clip}
+  .bd-nhanx.dong-nhan>span:nth-child(even){visibility:hidden}
+}
+
+/* ── BẢN SÁNG: CỘT CHI CÓ VẠCH CHÉO, BẢN TỐI KHÔNG CẦN ────────────────────────────────────────
+   TC-59 đo cặp THU / CHI của bản tối: với mắt không phân biệt đỏ–lục hai màu cách nhau ΔE 14,7.
+   Trên nền trắng KHÔNG đạt lại được con số ấy — cả hai màu đều buộc phải đậm để chữ đọc được trên
+   nền trắng, mà đậm cả hai thì mất luôn khoảng cách sáng–tối mà bản tối đang dựa vào. Cặp tốt
+   nhất tìm được chỉ còn ΔE 9,6, tức nằm trong vùng "chỉ hợp lệ khi có dấu hiệu thứ hai".
+   Vạch chéo LÀ dấu hiệu thứ hai ấy. Bỏ nó đi là để bản sáng kém bản tối ở đúng chỗ không ai nhìn
+   ra bằng mắt thường. */
+:root[data-nen="sang"] .bd-cg-cham.d2,
+:root[data-nen="sang"] .bd-mot.chi>.bd-thanh{
+  background-image:repeating-linear-gradient(45deg,
+    rgba(255,255,255,.55) 0 2px,transparent 2px 5px)}
+
+/* ── NÚT "GIAO DIỆN" TRÊN THANH NGANG ─────────────────────────────────────────────────────── */
+.gd-nut{display:inline-flex;align-items:center;gap:6px}
+
+/* ── BẢNG CHỌN ────────────────────────────────────────────────────────────────────────────────
+   BẢNG NẰM NGOÀI `.top`, KHÔNG NẰM TRONG — và đây là lỗi đã mắc thật một lần khi dựng bản xem
+   thử, ghi lại kẻo vòng sau lại gom nó vào cho "gọn": để bảng bên trong thanh ngang thì nó ăn
+   luật `.top .bar a,.top .bar button` (chữ trắng, nền trắng mờ). Trên nền tối không ai thấy gì
+   lạ, nhưng ở NỀN SÁNG thì thành chữ trắng trên thẻ trắng — hai nút "Trắng sáng" và "Theo máy"
+   biến mất hẳn khỏi màn hình. Kê lại độ ưu tiên chọn lọc chỉ là vá; đưa bảng ra khỏi thanh mới
+   là sửa. Shell.tsx dựng nó làm anh em của `.top`, không phải con. */
+.gd-bang{position:fixed;right:calc(16/14*1rem);top:var(--top-h);z-index:60;width:min(19rem,92vw);
+  display:flex;flex-direction:column;gap:calc(14/14*1rem);
+  background:var(--vtos-card);color:var(--vtos-text);
+  border:1px solid var(--vtos-line);border-radius:var(--vtos-radius-md);
+  padding:calc(14/14*1rem);margin-top:6px;
+  box-shadow:0 10px 30px rgba(2,11,24,.34)}
+/* `display:flex` ở trên đè mất thuộc tính `hidden` của trình duyệt, nên phải khai lại. */
+.gd-bang[hidden]{display:none}
+.gd-bang h3{margin:0;font-size:calc(13/14*1rem);color:var(--vtos-heading);
+  font-family:var(--vtos-font-display)}
+.gd-nhan{display:block;font-size:calc(11.5/14*1rem);letter-spacing:.04em;text-transform:uppercase;
+  color:var(--vtos-text-mute);margin:0 0 6px}
+
+/* Ba lựa chọn nền. `flex-wrap` chứ không chia ba cột cứng: ở cỡ 20px ba chữ không nằm vừa một
+   hàng, và một nút bị cắt mất chữ thì không ai biết nó là nút gì. */
+.gd-nen{display:flex;flex-wrap:wrap;gap:6px}
+.gd-nen button{flex:1 1 auto;min-width:0;padding:8px 10px;cursor:pointer;
+  font:inherit;font-size:calc(12.5/14*1rem);
+  background:var(--vtos-info-bg);color:var(--vtos-text);
+  border:1px solid var(--vtos-line);border-radius:var(--vtos-radius-sm)}
+.gd-nen button[aria-pressed="true"]{background:var(--vtos-sky);color:#fff;
+  border-color:var(--vtos-sky);font-weight:600}
+
+/* Cỡ chữ: A− · thanh trượt · A+ · số đang dùng. Ba cách chỉnh cho cùng một con số, vì thanh trượt
+   khó bấm trúng trên điện thoại và hai nút A−/A+ thì khó biết mình đang ở đâu. */
+.gd-co{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gd-co button{flex:0 0 auto;width:2.2rem;height:2.2rem;cursor:pointer;
+  font:inherit;font-size:calc(14/14*1rem);line-height:1;
+  background:var(--vtos-info-bg);color:var(--vtos-text);
+  border:1px solid var(--vtos-line);border-radius:var(--vtos-radius-sm)}
+.gd-truot-boc{flex:1 1 7rem;min-width:6rem;display:flex;flex-direction:column;gap:2px}
+.gd-co input[type=range]{width:100%;margin:0;accent-color:var(--vtos-sky)}
+.gd-co b{flex:0 0 auto;font-family:var(--vtos-font-mono);font-size:calc(12.5/14*1rem);
+  color:var(--vtos-navy);font-variant-numeric:tabular-nums}
+.gd-vach{display:flex;justify-content:space-between;font-size:calc(10.5/14*1rem);
+  color:var(--vtos-text-faint);font-variant-numeric:tabular-nums}
+
+/* Câu chữ mẫu: người chọn cỡ chữ cần thấy NGAY cỡ ấy đọc ra sao, chứ không phải đóng bảng lại
+   rồi mới biết. Có cả một dòng chữ phụ vì chữ phụ mới là chỗ khó đọc. */
+.gd-ve{margin:0;padding:10px 12px;border-radius:var(--vtos-radius-sm);
+  background:var(--vtos-info-bg);border:1px solid var(--vtos-line);
+  font-size:calc(12.5/14*1rem);color:var(--vtos-text)}
+.gd-ve small{display:block;margin-top:3px;font-size:calc(11/14*1rem);color:var(--vtos-text-mute)}
+
+.gd-tra{align-self:flex-start;background:none;border:0;padding:0;cursor:pointer;
+  font:inherit;font-size:calc(12/14*1rem);color:var(--vtos-navy);
+  text-decoration:underline;text-underline-offset:2px}
+
+/* Dòng trạng thái dưới đáy bảng: nói rõ lựa chọn đã ghi về máy chủ hay chưa. Không có dòng này
+   thì người dùng đổi nền, thấy màn hình đổi ngay, và tưởng là đã lưu — trong khi cửa ghi có thể
+   vừa hỏng. Màn hình đổi màu là việc của trình duyệt, không phải bằng chứng đã lưu. */
+.gd-trangthai{font-size:calc(11/14*1rem);color:var(--vtos-text-mute)}
+.gd-trangthai.loi{color:var(--vtos-danger)}
