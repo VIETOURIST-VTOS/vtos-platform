@@ -61,11 +61,28 @@
   --vtos-card:         #122C45;  /* nền thẻ, bảng */
   --vtos-line:         #2E4E6B;  /* viền bảng, khung nhập */
 
-  /* Chữ */
-  --vtos-text:         #E8F1F8;
-  --vtos-heading:      #DCE9F4;  /* chữ tiêu đề */
-  --vtos-text-mute:    #9BB2C6;
-  --vtos-text-faint:   #7B93A8;
+  /* Chữ — TC-64 (anh Tuấn 18/9/2026: "chỉnh chữ màu trắng sáng trên toàn web")
+   *
+   * BỐN NẤC CHỮ SÁNG LÊN MỘT BẬC, và một nấc trong đó vốn đang SAI chứ không chỉ tối:
+   *   · `--vtos-text-faint` cũ #7B93A8 trên nền `--vtos-info-bg` chỉ đạt tỉ lệ tương phản 3,96 —
+   *     DƯỚI ngưỡng 4,5 của WCAG AA. Nấc mới đạt 6,51.
+   *   · `--vtos-heading` cũ #DCE9F4 TỐI HƠN chính chữ thường #E8F1F8 — tiêu đề mờ hơn thân bài là
+   *     ngược thứ bậc. Nấc mới là trắng hẳn.
+   * Đo trên bốn nền thật của bộ nhận diện (nền màn hình #091624 · thẻ #122C45 · thanh #10273E ·
+   * nền thông tin #183550); con số ghi kèm từng dòng là tỉ lệ trên nền THẺ, nền khó nhất trong bốn.
+   *
+   * VẪN GIỮ BỐN NẤC RÕ RỆT. Sáng đều tất cả lên trắng thì không còn phân biệt được chữ chính với
+   * chữ phụ, và mọi màn hình đọc ra như một khối chữ phẳng. Khoảng cách giữa nấc 1 và nấc 4 sau
+   * khi sửa (13,46 ↔ 7,36) vẫn gần bằng trước khi sửa (12,48 ↔ 4,47).
+   *
+   * KHÔNG ĐỤNG `--vtos-navy`: nó vừa là màu CHỮ của số nổi bật vừa là màu TÔ của cột biểu đồ, và
+   * bộ ba màu biểu đồ đã được đo lại cho người không phân biệt màu ở TC-59 (ΔE ≥ 14,7). Đổi nó là
+   * phải đo lại cả bộ ba — việc riêng, không gộp vào vòng chỉnh chữ.
+   */
+  --vtos-text:         #F4F9FD;  /* 13,46 trên nền thẻ (cũ #E8F1F8 · 12,48) */
+  --vtos-heading:      #FFFFFF;  /* 14,27 — tiêu đề phải sáng hơn thân bài (cũ #DCE9F4 · 11,55) */
+  --vtos-text-mute:    #C3D5E4;  /*  9,48 (cũ #9BB2C6 · 6,51) */
+  --vtos-text-faint:   #A7BDD0;  /*  7,36 (cũ #7B93A8 · 4,47 — dưới AA trên nền thông tin) */
   --vtos-text-on-navy: #FFFFFF;
 
   /* Bo góc */

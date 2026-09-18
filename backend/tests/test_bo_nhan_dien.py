@@ -30,21 +30,30 @@ def test_tokens_css_dung_bang_mau_toi_v11():
 
     Bốn giá trị KHÁC bản vẽ V1.4 đều vì đo tương phản, không vì thẩm mỹ; lý do từng cái ghi trong
     phần chú thích đầu tokens.css. Ai muốn kéo chúng về đúng bản vẽ thì phải đo lại trước.
+
+    TC-64 (18/9/2026) · BỐN NẤC CHỮ SÁNG LÊN MỘT BẬC — anh Tuấn: "chỉnh chữ màu trắng sáng trên
+    toàn web". Luật của phép thử này KHÔNG đổi một chữ: tokens.css vẫn là bản GỐC, và mọi khác
+    biệt so với bản vẽ vẫn phải có một con số đo được đi kèm. Chỉ có bốn giá trị chữ là đổi, và
+    hai trong số đó sửa một cái SAI chứ không chỉ làm sáng hơn:
+      · `--vtos-text-faint` cũ #7B93A8 trên nền thông tin chỉ đạt 3,96 — dưới ngưỡng AA 4,5;
+      · `--vtos-heading` cũ #DCE9F4 TỐI HƠN chính chữ thường, tức tiêu đề mờ hơn thân bài.
+    Giá trị cũ giữ lại trong chú thích của tokens.css để đo lại được.
     """
     src = _doc(TOKENS)
     for bien, gia_tri in (("--vtos-nav-bg", "#10273E"),    # bản vẽ --nav
                           ("--vtos-surface", "#091624"),   # bản vẽ --bg
                           ("--vtos-card", "#122C45"),      # bản vẽ --panel
                           ("--vtos-info-bg", "#183550"),   # bản vẽ --panel2
-                          ("--vtos-text", "#E8F1F8"),      # bản vẽ --text
-                          ("--vtos-text-mute", "#9BB2C6"), # bản vẽ --muted
+                          ("--vtos-text", "#F4F9FD"),      # TC-64 · sáng lên từ #E8F1F8
+                          ("--vtos-text-mute", "#C3D5E4"), # TC-64 · sáng lên từ #9BB2C6
+                          ("--vtos-text-faint", "#A7BDD0"),# TC-64 · cũ #7B93A8 chỉ đạt 3,96
                           ("--vtos-success", "#53C49A"),   # bản vẽ --green
                           ("--vtos-warning", "#F4C36A"),   # bản vẽ --gold
                           ("--vtos-line", "#2E4E6B"),      # nâng từ #29445D (bản vẽ chỉ 1,41 lần)
                           ("--vtos-navy", "#6FA8F0"),      # nâng từ #438BEA (chữ 13px chỉ 4,16)
                           ("--vtos-danger", "#FF6B90"),    # nâng từ #FC4D7A (chỉ 4,40)
                           ("--vtos-sky", "#1E63C8"),       # nền nút, chữ trắng 5,72
-                          ("--vtos-heading", "#DCE9F4")):
+                          ("--vtos-heading", "#FFFFFF")):   # TC-64 · cũ #DCE9F4, mờ hơn thân bài
         assert re.search(re.escape(bien) + r":\s*" + gia_tri, src, re.I), \
             f"tokens.css thiếu hoặc sai {bien} = {gia_tri}"
 

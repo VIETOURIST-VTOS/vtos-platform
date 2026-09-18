@@ -296,8 +296,13 @@ def _ky_ra_thang(ky: str) -> tuple[int, int]:
     return int(y), int(m)
 
 
-def doc_that(db) -> Callable[[str, str], float | None]:
+def doc_that(db, nho: dict | None = None) -> Callable[[str, str], float | None]:
     """Hàm đọc nối vào sổ thật. Trả một closure để `chuoi()` không phải biết gì về cơ sở dữ liệu.
+
+    TC-64 · `nho` là chỗ nhớ của MỘT lần dựng bảng, do chỗ gọi tạo ra (xem chú thích dài ở
+    `ket_qua_kinh_doanh.bang`). Nó đi thẳng xuống `ket_qua_that.thang` — nhờ vậy chỗ gọi và hàm
+    đọc này DÙNG CHUNG một chỗ nhớ, chứ không mỗi bên một cái rồi vẫn hỏi máy hai lần.
+    Không truyền `nho` thì hàm chạy y như trước.
 
     DÒNG CHẢY gọi ĐÚNG những hàm mà bảng điều hành đang gọi (`_month_tours` +
     `settlement_summary`, `income_statement`) — không viết công thức thứ hai ở đây. Hai nơi cùng
@@ -318,7 +323,7 @@ def doc_that(db) -> Callable[[str, str], float | None]:
                 # và hệ quả của từng cái ghi ở đầu services/ket_qua_that.py.
                 from app.services import ket_qua_that as KQ
                 if ma in ("doanh_thu_thang", "lai_tour_thang"):
-                    t = KQ.thang(db, ky)
+                    t = KQ.thang(db, ky, nho=nho)
                     return t["doanh_thu"] if ma == "doanh_thu_thang" else t["lai_tour"]
                 if ma == "ln_ke_toan_thang":
                     from app.services import reports as RP

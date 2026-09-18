@@ -301,7 +301,10 @@ def test_xu_huong_doc_loi_nhuan_theo_dung_pham_vi_me():
 def test_khong_con_hai_cong_thuc_cho_cung_mot_cau_hoi():
     """Doanh thu tháng của công ty chỉ được tính ở ĐÚNG MỘT chỗ."""
     ma = _ma_py(_doc(XU_HUONG))
-    assert "KQ.thang(db, ky)" in ma, "xu_huong phải đi qua ket_qua_that, không tự truy vấn."
+    # TC-64 (18/9/2026): thêm tham số `nho` — chỗ nhớ của MỘT lần dựng bảng, để một tháng không bị
+    # hỏi ba lần (xem `ket_qua_kinh_doanh.bang`). Luật canh ở đây KHÔNG đổi: phải đi qua
+    # `ket_qua_that`, không được tự viết truy vấn lần hai. Nên canh tiền tố của lời gọi.
+    assert "KQ.thang(db, ky" in ma, "xu_huong phải đi qua ket_qua_that, không tự truy vấn."
     assert "settlement_summary" not in ma, (
         "`settlement_summary` là ống kính của quỹ thưởng (căn cứ là số Kế toán đã xác nhận), "
         "không phải ống kính 'công ty đang thế nào'. Hai câu hỏi khác nhau, hai phép tính khác "
