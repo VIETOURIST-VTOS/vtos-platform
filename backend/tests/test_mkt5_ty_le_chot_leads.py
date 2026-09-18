@@ -156,23 +156,23 @@ def test_MOT_NGUOI_hai_kenh_trong_mot_thang_van_la_MOT_so_dien_thoai(db):
     assert mm["ty_le_tren_sdt_dem_duoc"] == 1.0, "mẫu số mức tháng đang lấy số DÒNG, không phải số người"
 
 
-def test_RANG_BUOC_DUY_NHAT_dang_chan_lan_lien_he_thu_hai_cung_ky_cung_kenh(db):
-    """Khách gọi hotline ngày 3 rồi GỌI LẠI ngày 20 cùng tháng — cơ sở dữ liệu TỪ CHỐI dòng thứ hai.
+def test_LAN_LIEN_HE_THU_HAI_cung_ky_cung_kenh_NAY_DA_LUU_DUOC(db):
+    """Khách gọi hotline ngày 3 rồi GỌI LẠI ngày 20 cùng tháng — nay lưu được thành HAI dòng.
 
-    Đây không phải suy đoán, và cũng không phải lỗi của tệp này: đó là ràng buộc
-    `uq_lead_phone_month_channel` trên bảng `leads`. Hệ quả không nhìn thấy trên màn hình: một lần
-    liên hệ CÓ THẬT biến mất, và cửa nhập buộc phải ghi đè lên lần thứ nhất.
+    LẬT NGƯỢC NGÀY 18/9/2026, và đây là ngày mà bản cũ của chính phép thử này đã hẹn trước.
+    Trước hôm nay, ràng buộc `uq_lead_phone_month_channel` từ chối dòng thứ hai, nên một lần liên
+    hệ CÓ THẬT biến mất và cửa nhập buộc phải ghi đè lên lần thứ nhất. Bản nâng cấp
+    `mkt1a9c4e7b2d63` gỡ ràng buộc ấy và chuyển tính duy nhất sang `ma_lead`.
 
-    Bản nâng cấp của gói Marketing gỡ ràng buộc này và thay bằng `ma_lead` duy nhất. NGÀY NÀO BẢN
-    ẤY LÊN, phép thử này sẽ đỏ — và lúc ấy phải đổi nó thành phép thử ngược lại: hai lần liên hệ
-    phải lưu được thành hai dòng. Đỏ ở đây là TIN TỐT, không phải hỏng.
+    Bản cũ viết: "NGÀY NÀO BẢN ẤY LÊN, phép thử này sẽ đỏ — và lúc ấy phải đổi nó thành phép thử
+    ngược lại. Đỏ ở đây là TIN TỐT." Hôm nay là ngày ấy, và đây là câu ngược lại.
     """
     sdt = "0933000099"
     _lead(db, sdt)
     db.add(Lead(phone=sdt, channel=KENH, lead_month=KY, created_by="test", note="gọi lại ngày 20"))
-    with pytest.raises(sa.exc.IntegrityError):
-        db.commit()
-
+    db.commit()                      # KHÔNG còn IntegrityError
+    assert db.query(Lead).filter(Lead.phone == sdt, Lead.lead_month == KY).count() == 2, (
+        "Hai lần liên hệ thật phải nằm thành hai dòng. Gộp lại là xoá mất một lần có thật.")
 
 def test_khong_co_sdt_nao_thi_ty_le_cung_don_vi_la_KHONG_XAC_DINH_chu_khong_phai_0(db):
     L.set_stat(db, "test", KY, KENH, leads=7)      # khai 7, nhưng không có dòng chi tiết nào
@@ -330,17 +330,30 @@ def test_dong_TONG_cua_ky_bao_cao_cung_dem_NGUOI_chu_khong_cong_don_tung_kenh(db
 # Khi hàng rào được gỡ: câu ràng buộc ở trên sẽ ĐỎ. Người gỡ phải quay lại đây, đổi câu ấy thành
 # "hai lần liên hệ lưu được thành hai dòng", và thêm một câu mức KÊNH cho tỷ lệ cùng đơn vị.
 
-def test_ghim_dieu_kien_lam_cho_dot_bien_M10_la_tuong_duong():
-    """Đỏ = phải xem lại ghi chú đột biến ở ngay trên.
+def test_MOT_NGUOI_goi_HAI_LAN_cung_kenh_la_HAI_DONG_nhung_MOT_nguoi(db):
+    """Đây là phép thử THAY CHỖ câu ghim đột biến M10, và nó ra đời đúng ngày câu ghim ấy đỏ.
 
-    Câu này đọc THẲNG khai báo bảng, không đi qua cơ sở dữ liệu: ngày nào ràng buộc duy nhất biến
-    khỏi mô hình thì nó đỏ ngay, kể cả trước khi có ai chạy bản nâng cấp.
+    LỊCH SỬ NGẮN, ghi ra để lần sau ai đọc còn hiểu vì sao có câu này:
+    Ngày 18/9/2026 em chạy đột biến trên tệp này. Đột biến M10 — đổi `so_sdt` thành `so_dong` ở
+    mức kênh — KHÔNG bị bắt. Lúc ấy nó là đột biến TƯƠNG ĐƯƠNG thật: ràng buộc duy nhất
+    (phone, lead_month, channel) ép mỗi khách chỉ có một dòng mỗi kênh, nên hai con số luôn bằng
+    nhau và không phép thử nào phân biệt được. Em đã ghim điều kiện ấy lại bằng một câu đọc thẳng
+    khai báo bảng, để ngày nào ràng buộc biến mất thì nó đỏ lên mà nhắc.
+
+    Hôm nay ràng buộc đã biến mất. M10 KHÔNG còn tương đương — và đây là câu giết nó.
     """
-    bo_ba = {"phone", "lead_month", "channel"}
-    co_rang_buoc_cu = any(c.__class__.__name__ == "UniqueConstraint" and set(c.columns.keys()) == bo_ba
-                          for c in Lead.__table__.constraints)
-    assert co_rang_buoc_cu, (
-        "ràng buộc duy nhất (phone, lead_month, channel) đã được gỡ — đột biến M10 nay KHÔNG còn "
-        "tương đương. Thêm một phép thử mức KÊNH cho ty_le_tren_sdt_dem_duoc, và sửa câu "
-        "test_RANG_BUOC_DUY_NHAT_... thành câu ngược lại. Xem ghi chú ngay trên."
-    )
+    sdt = "0933111222"
+    _lead(db, sdt)                                    # lần liên hệ thứ nhất
+    _lead(db, sdt)                                    # lần thứ hai, CÙNG kênh cùng kỳ
+    _lead(db, "0933111333")                           # một người khác
+    db.commit()
+
+    r = L.conversion_report(db, THANG_BAO_CAO)
+    dong = [a for a in r["by_channel_month"] if a["channel"] == KENH and a["lead_month"] == KY]
+    assert len(dong) == 1
+    a = dong[0]
+    assert a["so_dong"] == 3, f"Ba lần liên hệ là ba DÒNG; đang đếm {a['so_dong']}"
+    assert a["so_sdt"] == 2, (
+        f"Ba dòng ấy chỉ của HAI số điện thoại; đang đếm {a['so_sdt']}. Đếm dòng thay vì đếm "
+        f"người là làm mẫu số phồng lên, và tỷ lệ chốt tụt xuống mà không ai biết vì sao.")
+

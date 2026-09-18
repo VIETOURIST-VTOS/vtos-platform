@@ -338,6 +338,13 @@ BO_NAP.update(_dch1.bo_nap(_c))
 from app.services import intake_bang_thang as _bth   # noqa: E402
 BO_NAP.update(_bth.bo_nap(_c))
 
+# CỬA THỨ TÁM (14/9/2026, đẩy 18/9/2026) – MARKETING. Hai cửa: khách tiềm năng, và số lead + chi
+# phí theo kênh. Cửa thứ hai CỐ Ý tách khỏi cửa thứ nhất: số Marketing khai tay và số đếm được từ
+# dữ liệu thô là HAI NGUỒN khác nhau, và việc đối chiếu chúng chính là nhóm "Đối soát dữ liệu".
+# Gộp hai cửa làm một là xoá mất chính việc ấy.
+from app.services import intake_marketing as _mkt   # noqa: E402
+BO_NAP.update(_mkt.bo_nap(_c))
+
 
 # Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
 # không có nghĩa là nạp được mọi thứ. Kinh doanh nạp danh sách khách của mình, HCNS nạp hồ sơ nhân sự và
@@ -361,6 +368,7 @@ VAI_TRO.update(_kho.vai_tro(QUAN_TRI))
 VAI_TRO.update(_taoc.vai_tro(QUAN_TRI))
 VAI_TRO.update(_dch1.vai_tro(QUAN_TRI))
 VAI_TRO.update(_bth.vai_tro(QUAN_TRI))
+VAI_TRO.update(_mkt.vai_tro(QUAN_TRI))
 
 
 # P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.

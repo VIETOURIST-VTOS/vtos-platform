@@ -2,6 +2,7 @@
 doanh thu lũy kế – đúng mẫu 'Báo cáo Lead & Chuyển đổi' của Marketing), phân công sale, nhắn Zalo cho lead."""
 from datetime import datetime, date, timedelta
 from io import BytesIO
+import sqlalchemy as sa
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.core import User, Tour, Booking
@@ -41,11 +42,37 @@ CANON.update({"hotline": "Hotline 1", "web": "Đặt tour web", "website": "Đ�
 # không mặc định là quá hạn — cùng một lẽ với "chưa đối chiếu thì chưa xác định, không phải 0%".
 
 
-def han_xu_ly(l: Lead, gio: float) -> datetime | None:
-    """Thời điểm hết hạn xử lý của một lead. None khi không biết lead vào sổ lúc nào."""
+def han_theo_quy_tac(l: Lead, gio: float) -> datetime | None:
+    """Hạn SUY RA từ quy tắc: lúc lead vào sổ cộng N giờ. None khi không biết lead vào sổ lúc nào.
+
+    ĐỔI TÊN 18/9/2026. Bản đầu tên là `han_xu_ly`, nhưng gói bàn giao R3 mang theo một CỘT cũng tên
+    `han_xu_ly` trên bảng `leads` — hạn mà NGƯỜI NHẬP hẹn cho riêng lead ấy, có cửa nhập hẳn hoi
+    trong `intake_marketing.py`. Hai thứ khác nhau mà cùng một tên là cách chắc chắn nhất để sau
+    này không ai biết con số trên màn hình là lời hẹn hay là luật.
+        · CỘT  `Lead.han_xu_ly`   – hạn ĐÃ HẸN, người nhập ghi
+        · HÀM  `han_theo_quy_tac` – hạn THEO LUẬT, suy từ tham số P.TGĐ ký
+    `han_hieu_luc()` ngay dưới chọn giữa hai cái, và nói ra đã chọn cái nào.
+    """
     if not l.received_at:
         return None
     return l.received_at + timedelta(hours=gio)
+
+
+def han_hieu_luc(l: Lead, gio: float) -> tuple[datetime | None, str]:
+    """Hạn ĐANG CÓ HIỆU LỰC cho một lead, kèm nguồn của nó.
+
+    LỜI HẸN THẮNG LUẬT. Luật 24 giờ là mức mặc định cho lead không ai hẹn riêng; khi Sales đã hẹn
+    một ngày cụ thể với khách thì đó mới là lời hứa có thật, và chấm người ta theo luật chung trong
+    khi họ đã hẹn khác là chấm sai.
+
+    Trả về ("nguồn") theo đúng lối `nguon_mau_so` của báo cáo chuyển đổi: con số nào cũng phải nói
+    được nó ra từ đâu, nếu không thì không ai kiểm được.
+    """
+    hen = getattr(l, "han_xu_ly", None)
+    if hen is not None:
+        # Cột là KIỂU NGÀY. Hẹn "ngày 20" nghĩa là hết ngày 20 mới trễ, không phải 0 giờ sáng 20.
+        return datetime(hen.year, hen.month, hen.day, 23, 59, 59), "da_hen"
+    return han_theo_quy_tac(l, gio), "theo_quy_tac"
 
 
 def da_xu_ly(l: Lead) -> bool:
@@ -54,7 +81,7 @@ def da_xu_ly(l: Lead) -> bool:
 
 
 def qua_han(l: Lead, gio: float, bay_gio: datetime | None = None) -> bool:
-    han = han_xu_ly(l, gio)
+    han, _ = han_hieu_luc(l, gio)
     if han is None or da_xu_ly(l):
         return False
     return (bay_gio or datetime.now()) > han
@@ -67,8 +94,18 @@ def loc_qua_han(qs, gio: float, bay_gio: datetime | None = None):
     đánh dấu bằng Python là hai đầu, và hai đầu thì sớm muộn lệch nhau — đúng kiểu hỏng mà bản sửa
     tỷ lệ chốt ngày 18/9 vừa dọn xong ở chỗ khác.
     """
-    moc = (bay_gio or datetime.now()) - timedelta(hours=gio)
-    return qs.where(Lead.last_contact_at.is_(None), Lead.status == "moi", Lead.received_at < moc)
+    now = bay_gio or datetime.now()
+    moc = now - timedelta(hours=gio)
+    # HAI NHÁNH, ĐÚNG NHƯ `han_hieu_luc()` bên Python — và phép thử đối chiếu hai đầu canh cho
+    # chúng không lệch nhau. Lead có hạn đã hẹn thì so với hạn ấy (hết ngày mới trễ); không có thì
+    # so với lúc vào sổ cộng N giờ.
+    het_ngay_hen = Lead.han_xu_ly < now.date()
+    qua_theo_luat = Lead.received_at < moc
+    return qs.where(
+        Lead.last_contact_at.is_(None),
+        Lead.status == "moi",
+        sa.case((Lead.han_xu_ly.is_not(None), het_ngay_hen), else_=qua_theo_luat),
+    )
 
 
 def gio_han(db: Session) -> float:
@@ -372,7 +409,8 @@ def _han_ra(l: Lead, db: Session) -> dict:
     hạn của luật cũ kèm cờ quá hạn của luật mới thì không giải thích được cho ai.
     """
     g = gio_han(db)
-    return {"han_xu_ly": han_xu_ly(l, g), "qua_han": qua_han(l, g)}
+    han, nguon = han_hieu_luc(l, g)
+    return {"han_xu_ly": han, "nguon_han": nguon, "qua_han": qua_han(l, g)}
 
 
 def lead_out(l: Lead, db: Session | None = None) -> dict:
@@ -383,4 +421,4 @@ def lead_out(l: Lead, db: Session | None = None) -> dict:
             "last_contact_at": l.last_contact_at, "booking_id": l.booking_id, "booking_code": b.code if b else "", "booking_tour": b.tour.code if b and b.tour else "", "converted_at": l.converted_at, "created_at": l.created_at,
             # HẠN XỬ LÝ (P.TGĐ Phan Ngọc Tuấn chốt 18/9/2026). Cần `db` để đọc tham số đã ký; gọi
             # lead_out() không kèm db thì hai khoá này là None — KHÔNG đoán bằng một số viết cứng.
-            **(_han_ra(l, db) if db else {"han_xu_ly": None, "qua_han": None})}
+            **(_han_ra(l, db) if db else {"han_xu_ly": None, "nguon_han": None, "qua_han": None})}
