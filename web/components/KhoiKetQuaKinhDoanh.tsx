@@ -328,8 +328,22 @@ export default function KhoiKetQuaKinhDoanh() {
   // mắt lướt qua luôn.
   const thieu_gv = Number(th.chuyen_thieu_gia_von || 0);
   const thieu_pn = Number(th.chuyen_chua_gan_phap_nhan || 0);
-  const cau_thieu = thieu_gv || thieu_pn ? (
+  // TC-68 · Tháng chưa có một bút toán nào. Đây là lý do THẬT của ô "Lợi nhuận trước thuế" rỗng;
+  // nói ra ở đây chứ không để người đọc tự đoán từ một dấu gạch.
+  const chua_ghi: string[] = Array.isArray(th.thang_chua_ghi_so) ? th.thang_chua_ghi_so : [];
+  const cau_thieu = thieu_gv || thieu_pn || chua_ghi.length ? (
     <p className="muted v14-ghi kqkd-thieu">
+      {chua_ghi.length > 0 && (
+        // NÊU ĐÍCH DANH THÁNG NÀO, không phải "3 tháng chưa có số": người đi bù cần biết mở tháng
+        // nào ra nhập. Và đi kèm một LỐI TẮT sang đúng cửa — ranh giới 09/9/2026 nói mỗi con số
+        // phải có một cửa nhập; ở đây cửa đã có sẵn, cái thiếu là đường dẫn tới nó.
+        <>Chưa có bút toán nào của Vietourist trong{" "}
+          <b>{chua_ghi.length > 1 ? "các tháng " : "tháng "}
+            {chua_ghi.map((t) => soTrongNam(t)).join(", ")}/{String(chua_ghi[0]).slice(0, 4)}</b>
+          {" "}— nên <b>Lợi nhuận trước thuế</b> để trống, KHÔNG phải bằng 0.{" "}
+          <b>{th.ai_ghi_so || "Kế toán"}</b> nhập tay hoặc nạp từ MISA ở{" "}
+          <Link className="the-cua" href="/accounting">Chứng từ ghi sổ →</Link>{" "}</>
+      )}
       {thieu_gv > 0 && (
         <>Còn <b>{thieu_gv} chuyến</b> đã đóng số mà chưa có giá vốn
           ({gonSo(Number(th.tien_thieu_gia_von || 0), "tien")} doanh thu) — chưa vào hai con số

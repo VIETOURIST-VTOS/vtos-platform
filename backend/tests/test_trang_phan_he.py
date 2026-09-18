@@ -65,7 +65,15 @@ def test_moi_thanh_phan_he_deu_bam_di_duoc():
     """
     shell = _khong_ghi_chu(_shell())
     for khoa in TAM_KHOA:
-        m = re.search(r'\{ key: "%s", label: "[^"]+", icon: "\w+", href: "([^"]+)"' % khoa, shell)
+        # ══ TC-69 · 18/9/2026 — NỚI KHUÔN DÒ, KHÔNG ĐỔI LUẬT ═══════════════════════════════════
+        # Luật giữ nguyên: mỗi nhóm phải có `href`, và href phải trỏ đúng chỗ. Chỉ khuôn dò là nới.
+        # Bản cũ đòi `icon` đứng NGAY SAU `label`. Từ 18/9 nhóm "nhansu" có thêm `label_ngan`
+        # ("HC – NS") xen vào giữa, nên khuôn cũ trượt và phép thử báo "không có href" trong khi
+        # href vẫn nằm nguyên đó – nó tố cáo sai, chứ mã không hỏng.
+        # Khuôn mới cho phép bất kỳ thuộc tính nào nằm giữa `label` và `href`, nhưng `[^{}]*?`
+        # KHÔNG cho phép vượt qua dấu ngoặc nhọn, nên nó không thể vơ nhầm `href` của nhóm kế tiếp:
+        # cả `key`, `label` và `href` vẫn buộc phải ở trong CÙNG một khai báo nhóm.
+        m = re.search(r'\{ key: "%s", label: "[^"]+",[^{}]*?href: "([^"]+)"' % khoa, shell)
         assert m, f"nhóm {khoa} không có href – bấm vào thanh phân hệ sẽ không đi đâu cả"
         mong = "/" if khoa == "tongquan" else f"/phan-he/{khoa}"
         assert m.group(1) == mong, f"nhóm {khoa} trỏ {m.group(1)}, phải là {mong}"

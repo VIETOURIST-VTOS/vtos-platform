@@ -334,6 +334,19 @@ def doc_that(db, nho: dict | None = None) -> Callable[[str, str], float | None]:
                     if me is None:
                         return None
                     pl = RP.income_statement(db, ky, company_id=me)
+                    # ══ TC-68 · RỖNG KHÁC KHÔNG — CHỖ LỌT CỦA LUẬT NÀY NẰM ĐÚNG Ở DÒNG DƯỚI ════
+                    # `income_statement` cộng từ một dict RỖNG khi kỳ chưa có bút toán nào, nên mọi
+                    # dòng ra 0,0 và `float(...)` biến nó thành một con số thật. Màn hình Chủ tịch
+                    # in ra "0" — tức nói rằng công ty hoà vốn tháng ấy.
+                    #
+                    # Đo trên sổ thật 18/9/2026: T7, T8, T9 đều có ĐÚNG 0 chứng từ đã ghi sổ. Ba
+                    # tháng liền báo hoà vốn mà không ai nghi ngờ, vì 0 trông y như một kết quả.
+                    #
+                    # Trả None thì cả dải phía sau đã biết cách xử: biểu đồ vẽ ô trống có gạch đứt,
+                    # thẻ hiện "—", và phép so kỳ trước bỏ qua kỳ rỗng thay vì tính "giảm 100%".
+                    # Không phải dựng gì mới — chỉ là đừng bịa ra một con số ở đây.
+                    if not pl.get("co_but_toan"):
+                        return None
                     return float(dict((r[0], r[2]) for r in pl["rows"])["50"])
                 return None
             # TỒN KHO: chỉ đọc bản đã chụp.

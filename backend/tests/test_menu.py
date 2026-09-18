@@ -247,7 +247,11 @@ def test_moi_nhom_deu_co_bieu_tuong_va_bieu_tuong_phai_co_chu_thich():
     """
     src = _doc()
     _, block = menu_paths()
-    icons = re.findall(r'key:\s*"[a-z_]+",\s*label:\s*"[^"]+",\s*icon:\s*"([^"]+)"', block)
+    # TC-69 · mẫu cho phép có `label_ngan` chen giữa `label` và `icon`. Luật không đổi — vẫn là
+    # "tám nhóm đều phải có biểu tượng"; chỉ là thứ tự trường trong mã không còn cố định sau khi
+    # nhóm Nhân sự có thêm nhãn ngắn cho thanh dọc.
+    icons = re.findall(r'key:\s*"[a-z_]+",\s*label:\s*"[^"]+",(?:\s*label_ngan:\s*"[^"]*",)?\s*icon:\s*"([^"]+)"',
+                       block)
     assert len(icons) == 8, f"phải đủ 8 biểu tượng cho 8 nhóm, đang có {len(icons)}: {icons}"
     assert all(i.strip() for i in icons), f"có biểu tượng rỗng: {icons}"
     # Nhãn nhóm phải đi vào title và aria-label, không được mất khi thu.
@@ -284,6 +288,33 @@ def test_be_rong_thanh_doc_dung_dac_ta():
     BỀ RỘNG KHI THU THÌ VẪN LÀ px, và đó là một quyết định chứ không phải chỗ bỏ sót: lúc thu,
     thanh dọc chỉ còn BIỂU TƯỢNG — các hình SVG 24×24 cố định, không có chữ nào. Cho nó nở theo cỡ
     chữ là chừa chỗ trống cho một thứ không tồn tại.
+
+    ══ TC-69 · 18/9/2026 — NGƯỠNG DƯỚI TÍNH LẠI, PHÉP THỬ GIỮ NGUYÊN ═══════════════════════════
+    TRƯỚC:  `rộng ≥ 247`, vì nhãn "Nhân sự – Hành chính" cần 140,9 + 106 = 247px.
+    TỪ NAY: `rộng ≥ 228`, và HAI điều đã đổi nên con số cũ không còn đúng:
+
+      1. VỎ BAO QUANH CHỮ KHÔNG PHẢI 106px MÀ LÀ 87px. Đo lại trực tiếp trên trang thật 18/9/2026
+         (lấy bề rộng thanh trừ bề rộng ô nhãn) thay vì cộng tay từng phần như bản 12/9. Bản cũ
+         cộng dư một thanh cuộn 12px luôn có mặt và một biểu tượng rộng hơn thực tế.
+
+      2. NHÃN DÀI NHẤT KHÔNG CÒN LÀ "Nhân sự – Hành chính". Anh Tuấn 18/9 đổi chữ VẼ RA trên menu
+         thành "HC – NS" (tên phân hệ giữ nguyên — xem `label_ngan` ở Shell.tsx). Nhãn dài nhất
+         nay là "Báo cáo – Phân tích".
+
+    ĐO VỚI PHÔNG DỰ PHÒNG, KHÔNG PHẢI PHÔNG THẬT — và đây là chỗ bản nháp của vòng này suýt sai.
+    Lần đo đầu em để Be Vietnam Pro đã tải xong và kết luận 224px là đủ. Nhưng lúc Google Fonts
+    chưa về — vài giây đầu mỗi lần mở, hoặc vĩnh viễn trên máy chặn phông ngoài — trình duyệt rơi
+    về phông dự phòng, RỘNG HƠN 8%. Chính chú thích 12/9 ở trên đã dặn ("để còn dư một chút cho
+    phông dự phòng"), và bản nháp đã bỏ qua nó.
+
+    Bề rộng tối thiểu từng nhãn, đo ở cỡ chữ 14 với phông dự phòng rộng nhất (system-ui):
+        225px  Báo cáo – Phân tích      ← nhãn dài nhất sau khi đổi
+        220px  Tài chính – Kế toán
+        212px  Quản trị hệ thống
+        143px  HC – NS
+    Chốt 232px: dư 7px trên trần 225. KHÔNG lấy sát 228 vì con số 225 đo trên Chromium/Linux, còn
+    người dùng chạy Windows — "system-ui" ở đó là Segoe UI, bề rộng không giống hệt. 7px là khoảng
+    dự phòng cho chỗ chênh ấy, không phải một con số cho đẹp.
     """
     css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
     # Nhận cả hai cách viết; nhánh `px` giữ lại để bắt được nếu ai đó gõ ngược lại số cứng.
@@ -293,7 +324,9 @@ def test_be_rong_thanh_doc_dung_dac_ta():
     assert m_thu, "không tìm thấy bề rộng khi THU trong globals.css"
     rong, thu = int(m_rong.group(1) or m_rong.group(2)), int(m_thu.group(1))
     assert 224 <= rong <= 256, f"bề rộng {rong}px ngoài khoảng 224–256px của §I.2"
-    assert rong >= 247, f"bề rộng {rong}px CẮT nhãn 'Nhân sự – Hành chính' (đo được cần 247px)"
+    assert rong >= 228, (
+        f"bề rộng {rong}px CẮT nhãn 'Báo cáo – Phân tích' khi phông dự phòng chưa về "
+        "(đo 18/9/2026: cần 225px, chốt 232px để dư 7px cho chênh lệch phông giữa Windows và Linux)")
     assert 56 <= thu <= 64, f"bề rộng khi thu {thu}px ngoài khoảng 56–64px của §I.2"
 
 
@@ -447,9 +480,18 @@ def test_tong_quan_khong_con_muc_con_va_bam_thang_ve_trang_chu():
     # dem nữa (tám phân hệ hiện đủ với mọi vai trò), nên chỉ cần canh rằng bộ lọc ấy không quay lại.
     assert "g.dem > 0 : duoc(g.href)" not in src, \
         "bộ lọc theo dem đã quay lại – nhóm Tổng quan (dem == 0) sẽ biến mất khỏi menu"
-    # Không mục con thì không vẽ mũi tên xổ – một mũi tên mở ra khoảng trắng là lời hứa suông.
-    assert "g.dem > 0 && <span className=\"grp-mui\"" in src, \
-        "mũi tên xổ phải phụ thuộc nhóm có mục con hay không"
+    # ══ TC-69 · 18/9/2026 — LUẬT NÀY ĐÃ BỊ ĐẢO, ghi cả hai bên ═══════════════════════════════
+    # BÊN CŨ (12/9/2026): "Không mục con thì không vẽ mũi tên xổ – một mũi tên mở ra khoảng trắng
+    #   là lời hứa suông." Khẳng định cũ là `g.dem > 0 && <span className="grp-mui"` PHẢI có mặt.
+    # BÊN MỚI (18/9/2026): anh Tuấn bảo "bỏ đường gạch dưới chữ, mũi tên của 8 phân hệ này". Mũi
+    #   tên bỏ hẳn cho MỌI nhóm, nên câu hỏi "có mục con hay không" không còn quyết định gì nữa.
+    #
+    # LÝ DO CŨ VẪN ĐÚNG, CHỈ LÀ KHÔNG CÒN ÁP DỤNG: nếu mai kia ai dựng lại mũi tên, thì nó vẫn
+    # phải phụ thuộc `dem` chứ không được vẽ cho mọi nhóm. Nên khẳng định lật thành: mũi tên đã bỏ,
+    # và nếu quay lại thì phải quay lại ĐÚNG cách cũ.
+    assert 'className="grp-mui"' not in src, (
+        "mũi tên đã bỏ 18/9/2026. Nếu dựng lại thì phải kèm điều kiện `g.dem > 0` như bản 12/9 — "
+        "vẽ mũi tên cho nhóm không có mục con là mở ra một khoảng trắng.")
 
 
 def test_khoi_logo_noi_len_khoi_thanh_ngang():

@@ -8,7 +8,7 @@
    Vẫn KHÔNG có khối @media (prefers-color-scheme): màu không được đổi theo cài đặt của máy, vì như
    thế hai người mở cùng một trang thấy hai màu khác nhau. Bảng màu tối nằm trong tokens.css v1.1,
    lấy từ bản vẽ V1.4 và đã đo tương phản từng cặp chữ–nền. */
-:root{--top-h:calc(72/14*1rem);
+:root{--top-h:calc(64/14*1rem);
   /* --navy là màu CHỮ, --navy2 là màu NỀN của nút. Bản sáng dùng chung một navy cho cả hai;
      bản tối thì không thể, xem ghi chú "MỘT BIẾN, MỘT VAI" trong tokens.css.
      --orange nay là VÀNG chú ý của bản vẽ, không còn dùng lại màu xanh của --vtos-info: một thẻ
@@ -24,8 +24,17 @@ a{color:var(--navy);font-weight:600}
 /* Thanh ngang – nền tối theo bản vẽ giao diện chốt 12/9/2026. Màu đặt THẲNG, không qua biến
    --panel: thanh này phải giữ nguyên một màu ở cả chế độ sáng lẫn tối, giống thanh dọc. */
 /* Đệm dọc 8px chứ không phải 12px: khối logo cao lên 55px sau khi mở rộng khung (12/9), 12+55+12
-   là 79px – vượt khoảng 64–72px của §I.2. 8+55+8 = 71px, vừa khít. */
-.top{background:var(--vtos-nav-bg);color:#fff;padding:8px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(255,255,255,.16)}
+   là 79px – vượt khoảng 64–72px của §I.2. 8+55+8 = 71px, vừa khít.
+   TC-69 (18/9/2026) hạ xuống 6px cùng lúc với `--top-h` 72 → 64: 6+55+6 = 67px, vừa trong 64–72
+   khi tính cả viền dưới. */
+/* ══ TC-69 · `min-height` CHỨ KHÔNG PHẢI `height`, và đó là lý do hạ chiều cao thanh là AN TOÀN ══
+   Anh Tuấn hỏi thẳng 18/9: "nếu 73px thì có bị tràn chữ không?". Câu trả lời nằm ở chính chữ
+   `min-height` dưới đây: con số ấy là SÀN, không phải TRẦN. Nội dung cần cao hơn thì thanh tự nở
+   ra — nó không bao giờ nuốt chữ, chỉ đẩy nội dung xuống.
+   Đo thật 90 khổ (2 bản × 3 cỡ chữ × 15 bề rộng): số phần tử bị cắt theo chiều cao là 0 ở TẤT CẢ.
+   Chỗ chật nhất là khối logo, và nó vẫn dư: 13px ở cỡ 14, 17px ở cỡ 16, 32px ở cỡ 20.
+   Đổi `min-height` thành `height` là xoá đúng cái tính chất ấy — phép thử test_tc69 canh nó. */
+.top{background:var(--vtos-nav-bg);color:#fff;padding:6px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(255,255,255,.16)}
 /* Dấu hiệu nhận biết: logo nền trong suốt xếp TRÊN, tên hệ thống xếp DƯỚI (cột dọc). Logo cao cố
    định 24px và để ảnh tự tính bề ngang theo tỉ lệ – khoá cả hai chiều thì ảnh bẹp. Dòng chữ dưới
    giãn chữ .14em cho bằng bề ngang logo, và không bao giờ vỡ dòng. */
@@ -149,7 +158,21 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* THANH PHÂN HỆ – nền xanh đậm theo hình anh Tuấn gửi 12/9/2026. Màu đặt THẲNG chứ không qua biến
    --panel: biến ấy đảo màu theo chế độ tối của máy, mà thanh này phải giữ nguyên một màu ở cả hai
    chế độ, nếu không thì nửa sáng nửa tối. Chữ trên nền này dùng màu riêng, không dùng --ink. */
-aside.side{flex:0 0 calc(252/14*1rem);width:calc(252/14*1rem);background:var(--vtos-nav-bg);color:rgba(255,255,255,.86);border-right:1px solid rgba(255,255,255,.16);position:sticky;top:var(--top-h);max-height:calc(100vh - var(--top-h));min-height:calc(100vh - var(--top-h));overflow-y:auto;padding:8px 0 14px}
+/* ══ TC-69 · THANH DỌC HẸP LẠI 252 → 224 (ở cỡ chữ gốc) — anh Tuấn 18/9/2026 ══════════════
+   Anh gửi ảnh thanh dọc tám phân hệ và bảo thu hẹp lại, lấy chỗ ấy bù cho vùng nội dung chính.
+   224 là ĐÁY của khoảng 224–256px mà §I.2 cho phép, nên không phải sửa đặc tả.
+
+   CHỖ CHẶN KHÔNG CHO HẸP HƠN, đo 18/9/2026 ở cỡ chữ 16px:
+       nhãn dài nhất "Nhân sự – Hành chính"        144px chữ
+       vỏ bao quanh (lề 16 · viền 2 · đệm 24 · biểu tượng 20 · hai khe 20 · mũi tên 12 · cuộn 12)
+                                                   106px
+       cần tối thiểu                               250px
+   Ở cỡ 16px, 224 nở thành 256px — dư 6px. Hẹp hơn nữa là nhãn ấy cụt thành "Nhân sự – Hành ch…",
+   đúng cái mà con số 240px cũ từng gây ra (xem test_menu, phép thử bề rộng thanh dọc).
+
+   VÌ SAO ĐO Ở CỠ 16 CHỨ KHÔNG Ở CỠ GỐC: từ TC-67 bề rộng đi theo cỡ chữ người dùng chọn, mà cỡ
+   MẶC ĐỊNH là 16. Đo ở cỡ gốc rồi kết luận "vừa" là đo một cỡ gần như không ai dùng. */
+aside.side{flex:0 0 calc(232/14*1rem);width:calc(232/14*1rem);background:var(--vtos-nav-bg);color:rgba(255,255,255,.86);border-right:1px solid rgba(255,255,255,.16);position:sticky;top:var(--top-h);max-height:calc(100vh - var(--top-h));min-height:calc(100vh - var(--top-h));overflow-y:auto;padding:8px 0 14px}
 /* Mục nhóm: viên bo 6px theo bản vẽ 12/9 (bo góc của cả hệ là 8px cho thẻ, 6px cho nút và mục
    menu). Bỏ vạch màu bên trái – mục đang mở tô nền xanh, đọc rõ hơn một vạch 3px. */
 /* DẢI MÀU ĐẶC THEO BẢN VẼ V1.4 (sửa 13/9/2026, sau khi anh Tuấn nhận xét bản của Claude tối hơn).
@@ -160,18 +183,32 @@ aside.side{flex:0 0 calc(252/14*1rem);width:calc(252/14*1rem);background:var(--v
    mắt chạm vào.
    Cao 15px đệm thay 11px để mục cao 58px như bản vẽ; bóng đổ và vệt sáng mép trên cho khối có bề
    dày, đúng bản vẽ. */
-aside.side .grp{display:flex;align-items:center;gap:10px;width:calc(100% - 16px);margin:0 8px 8px;text-align:left;
+aside.side .grp{display:flex;align-items:center;gap:10px;width:calc(100% - 16px);margin:0 8px 6px;text-align:left;
   border:1px solid rgba(255,255,255,.10);
   background:linear-gradient(180deg,var(--vtos-muc-nav) 0%,var(--vtos-muc-nav-2) 100%);
   font-family:inherit;font-size:calc(14/14*1rem);
-  font-weight:500;color:rgba(255,255,255,.92);padding:15px 12px;cursor:pointer;
+  /* TC-69 · đệm dọc 15 → 11px: tám nút nên cả cột bớt 64px (518 → 454). CHO GỌN MẮT và cho
+     khớp hình anh Tuấn vẽ — KHÔNG phải để chữa việc cuộn: đo lại thì tám nút chỉ cao 518px và
+     không phải cuộn trên laptop. Ghi rõ ở đây vì bản nháp đầu của vòng này nói sai điều đó. */
+  /* TC-69 · `text-decoration:none` — BỎ GẠCH CHÂN (anh Tuấn 18/9/2026).
+     Tám nút này là thẻ <a>, mà luật `a{...}` ở đầu tệp không tắt gạch chân, nên trình duyệt vẽ
+     mặc định. Trước vòng này không ai thấy vì nền nút tối và gạch chân mảnh; chụp ảnh mockup lên
+     mới lộ ra. Đây là NÚT, không phải một liên kết trong câu văn — gạch chân ở đây chỉ làm hàng
+     chữ rối chứ không nói thêm điều gì, vì cả khối đã trông như nút rồi. */
+  text-decoration:none;
+  font-weight:500;color:rgba(255,255,255,.92);padding:11px 12px;cursor:pointer;
   border-radius:10px;white-space:nowrap;
   box-shadow:0 4px 8px rgba(2,11,24,.20),inset 0 1px 0 rgba(255,255,255,.10)}
 aside.side .grp .bt-hinh{flex:0 0 auto;opacity:.86}
 /* Nhãn nhóm PHẢI nằm một dòng (anh Tuấn 12/9: "Nhân sự – Hành chính" đang vỡ hai dòng).
    Dài quá thì cắt bằng dấu ba chấm, không xuống dòng – hai dòng làm lệch chiều cao cả cột. */
 aside.side .grp .grp-ten{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-aside.side .grp .grp-mui{opacity:.55;font-size:calc(13/14*1rem)}
+/* TC-69 · LỚP `.grp-mui` ĐÃ XOÁ cùng với mũi tên ▸ (anh Tuấn 18/9/2026: "bỏ đường gạch dưới
+   chữ, mũi tên của 8 phân hệ này"). Ghi lại điều nó từng nói, để vòng sau biết cái gì đã mất:
+   mũi tên hiện khi nhóm có mục con, tức nó báo "bấm vào còn đi tiếp được". Câu ấy KHÔNG mất —
+   cả tám nhóm đều dẫn tới trang phân hệ, nên "bấm là đi" đúng cho mọi nút, và một dấu hiệu chỉ
+   đúng-với-tất-cả thì không phân biệt được gì. Xoá hẳn lớp chứ không để lại lớp mồ côi — bài học
+   TC-60. */
 aside.side .grp:hover{background:linear-gradient(180deg,var(--vtos-muc-nav-3) 0%,var(--vtos-muc-nav) 100%);
   border-color:rgba(255,255,255,.22);color:var(--vtos-text-on-navy)}
 /* MỤC ĐANG CHỌN GIỮ LỚP PHỦ TRẮNG 14% – quy tắc 1 của bộ nhận diện, anh Tuấn chốt 12/9: "mục đang

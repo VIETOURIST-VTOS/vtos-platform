@@ -384,11 +384,21 @@ def test_bon_cho_khoa_cung_bang_px_da_duoc_coi():
     cắt chữ". Cỡ chữ đổi mà cái khung đứng nguyên thì chữ tràn ra ngoài khung rồi bị cắt — và nó
     chỉ lộ ra ở cỡ lớn, tức chỉ với đúng những người cần chữ lớn.
     """
+    # ══ TC-69 (18/9/2026) NỚI MẪU TÌM, KHÔNG NỚI LUẬT ═══════════════════════════════════════
+    # TRƯỚC: mẫu ghim cả CON SỐ (`calc(72/14`, `calc(252/14`).
+    # TỪ NAY: mẫu chỉ ghim ĐƠN VỊ (`calc(<số>/14*1rem)`), còn con số để vòng khác chốt.
+    #
+    # Vì sao: luật của phép thử này là "không còn chỗ nào khoá cứng bằng px", chứ không phải
+    # "thanh ngang phải cao đúng 72". Ghim con số vào đây nghĩa là mỗi lần anh Tuấn đổi bố cục thì
+    # một phép thử về ĐƠN VỊ lại đỏ vì một lý do chẳng liên quan gì tới đơn vị — và người sửa sẽ
+    # quen tay sửa con số trong phép thử cho hết đỏ, đến một ngày sửa luôn cả cái nó đang canh.
+    # TC-69 hạ --top-h 72 → 64 và thanh dọc 252 → 232; hai con số ấy nay do
+    # test_tc69_thanh_ngang_thap_va_thanh_doc_hep canh, đúng chỗ của chúng.
     src = _khong_chu_thich(_doc(CSS))
-    for ten, mau in (("--top-h", r'--top-h:\s*calc\(\s*72\s*/\s*14'),
-                     ("thanh dọc", r'aside\.side\{flex:0 0 calc\(\s*252\s*/\s*14'),
-                     (".mh01-cuon", r'\.mh01-cuon\{max-height:calc\(\s*420\s*/\s*14'),
-                     (".kh-ly", r'\.kh-ly\{[^}]*max-width:calc\(\s*280\s*/\s*14')):
+    for ten, mau in (("--top-h", r'--top-h:\s*calc\(\s*\d+\s*/\s*14\s*\*\s*1rem'),
+                     ("thanh dọc", r'aside\.side\{flex:0 0 calc\(\s*\d+\s*/\s*14\s*\*\s*1rem'),
+                     (".mh01-cuon", r'\.mh01-cuon\{max-height:calc\(\s*\d+\s*/\s*14\s*\*\s*1rem'),
+                     (".kh-ly", r'\.kh-ly\{[^}]*max-width:calc\(\s*\d+\s*/\s*14\s*\*\s*1rem')):
         assert re.search(mau, src), f"{ten} vẫn khoá cứng bằng px – chữ to lên sẽ bị cắt"
 
 
