@@ -80,6 +80,23 @@ DEFAULT_PARAMS = [
     #
     # KHÔNG trừ ngày nghỉ, không quy ra giờ hành chính. P.TGĐ nói 24 giờ thì là 24 giờ đồng hồ; bịa
     # thêm luật giờ làm việc là tự ký thay một điều không ai ký.
+    # ---- Sổ hoạt động PR · Chủ tịch chốt 18/9/2026 ----
+    #
+    # HAI GIỜ, THEO ĐỒNG HỒ THẬT. Không trừ ngày nghỉ, không quy ra giờ hành chính: một việc ghi
+    # vào sổ lúc 22h thứ Bảy thì 0h là quá hạn. Đó là bản chất của khủng hoảng truyền thông, và
+    # cũng đúng cách hạn xử lý lead 24 giờ đang chạy. Bịa thêm một luật giờ làm việc ở đây là tự
+    # ký thay một điều không ai ký.
+    #
+    # MỐC ĐẾM LÀ LÚC VÀO SỔ, không phải lúc việc xảy ra ngoài đời — xem services/pr_hoat_dong.
+    ("pr_khung_hoang_gio", "2",
+     "Hạn phản hồi chính thức cho một vụ khủng hoảng truyền thông, kể từ lúc việc được GHI VÀO SỔ",
+     "giờ", "Chủ tịch chốt 18/9/2026"),
+    # BẢN GHI CHỮ KÝ, không phải hàng rào. Hàng rào thật là `require_roles` ở đường phát ngôn —
+    # bảng phân quyền toàn hệ chỉ đếm được quyền khai ở đó. Tham số này giữ thứ `require_roles`
+    # không mang được: ai chốt, ngày nào. Một phép thử chốt hai chỗ không được lệch nhau.
+    ("pr_vai_phat_ngon", "ptgd_mkt",
+     "Vai trò được bấm PHÁT trên sổ hoạt động PR – người chịu trách nhiệm cho câu nói ra ngoài",
+     "vai trò", "Chủ tịch chốt 18/9/2026"),
     # ---- Sổ tài sản thương hiệu · Chủ tịch chốt 18/9/2026 ----
     #
     # GIÁ TRỊ LÀ DANH SÁCH VAI TRÒ, không phải một con số, và cố ý để ở đây chứ không viết cứng

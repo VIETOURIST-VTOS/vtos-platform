@@ -352,6 +352,13 @@ BO_NAP.update(_mkt.bo_nap(_c))
 from app.services import intake_thuong_hieu as _th   # noqa: E402
 BO_NAP.update(_th.bo_nap(_c))
 
+# CỬA THỨ MƯỜI (18/9/2026) – HOẠT ĐỘNG PR. Sổ ghi việc truyền thông ĐÃ XẢY RA và ai chịu trách
+# nhiệm. Khác với màn hình Nội dung (`content_items`), chỗ giữ BẢN THẢO trước khi đăng: một bảng
+# không trả lời được hai câu hỏi ngược chiều nhau. Cửa này cố ý không mở ba ô – mốc đếm hạn hai
+# giờ, người phát ngôn, và trạng thái 'đã phát' – xem services/intake_pr.
+from app.services import intake_pr as _pr   # noqa: E402
+BO_NAP.update(_pr.bo_nap(_c))
+
 
 # Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
 # không có nghĩa là nạp được mọi thứ. Kinh doanh nạp danh sách khách của mình, HCNS nạp hồ sơ nhân sự và
@@ -377,6 +384,7 @@ VAI_TRO.update(_dch1.vai_tro(QUAN_TRI))
 VAI_TRO.update(_bth.vai_tro(QUAN_TRI))
 VAI_TRO.update(_mkt.vai_tro(QUAN_TRI))
 VAI_TRO.update(_th.vai_tro(QUAN_TRI))
+VAI_TRO.update(_pr.vai_tro(QUAN_TRI))
 
 
 # P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.

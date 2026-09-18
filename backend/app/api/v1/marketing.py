@@ -468,3 +468,70 @@ def ky_thuong_hieu(aid: int, u: User = Depends(require_roles("chutich", "ptgd_mk
         raise HTTPException(422, str(ex))
     db.commit()
     return kq
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# SỔ HOẠT ĐỘNG PR (18/9/2026) — xem services/pr_hoat_dong
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+
+@router.get("/marketing/pr")
+def pr_bang(loai: str = "", trang_thai: str = "", chi_khung_hoang: bool = False,
+            u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    from app.services import pr_hoat_dong as PR
+    return PR.bang(db, loai=loai, trang_thai=trang_thai, chi_khung_hoang=chi_khung_hoang, u=u)
+
+
+@router.post("/marketing/pr/{hid}/phat")
+def pr_phat(hid: int, u: User = Depends(require_roles("ptgd_mkt")),
+            db: Session = Depends(get_db)):
+    """Bấm PHÁT. Chỉ P.TGĐ Marketing – Chủ tịch chốt 18/9/2026.
+
+    ĐÂY LÀ TÁCH BẠCH TRÁCH NHIỆM, KHÔNG PHẢI PHÂN QUYỀN, và khác biệt ấy quyết định cách viết:
+    cửa này KHÔNG mở cho Chủ tịch bằng quyền toàn quyền. Người phát ngôn của công ty là một VỊ
+    TRÍ có tên; câu nói ra ngoài phải đứng tên đúng người ấy. Nếu Chủ tịch muốn tự phát ngôn thì
+    đó là một quyết định đổi người phát ngôn — đổi tham số `pr_vai_phat_ngon` và đẩy một bản, chứ
+    không phải đi vòng qua cửa.
+
+    ĐÃ THỬ KHAI VÀO `ks_toan_quyen.GIU_DONG` VÀ BỘ KIỂM TỪ CHỐI — ghi lại để người sau không thử
+    lại: sổ ấy chỉ nhận những cửa mà bộ quét NHÌN THẤY, tức là các câu từ chối theo vai trò nằm
+    TRONG THÂN HÀM. Cửa này chặn bằng `require_roles` ở chữ ký hàm, giống mọi đường ghi khác trong
+    hệ, nên bộ quét không coi nó là một "cửa chặn Chủ tịch" và dòng khai thành dòng mồ côi.
+
+    Một danh sách vai không có Chủ tịch là chuyện bình thường của hệ (ghi tăng tài sản chỉ mở cho
+    Kế toán, chẳng hạn). Chỗ đặc biệt của cửa này nằm ở LÝ DO, và lý do ấy sống trong chính đoạn
+    văn này cùng tham số `pr_vai_phat_ngon` — hai chỗ người đọc sẽ tới khi hỏi "vì sao".
+    """
+    from app.models.marketing import PrHoatDong
+    from app.services import pr_hoat_dong as PR
+
+    h = db.get(PrHoatDong, hid)
+    if not h:
+        raise HTTPException(404, "Không có việc này trong sổ PR")
+    try:
+        kq = PR.phat(db, h, u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return kq
+
+
+@router.post("/marketing/pr/{hid}/phan-hoi")
+def pr_phan_hoi(hid: int, u: User = Depends(require_roles(*LAP)), db: Session = Depends(get_db)):
+    """Ghi rằng vụ khủng hoảng ĐÃ được phản hồi bằng đường khác (gọi điện, gặp trực tiếp).
+
+    Mở rộng hơn cửa phát ngôn, và cố ý: đây không phải nói ra ngoài, đây là ghi lại một việc đã
+    làm. Không có cửa này thì những vụ xử lý bằng điện thoại nằm mãi ở bảng quá hạn, và một bảng
+    quá hạn đầy dòng đã xong là một bảng không ai nhìn nữa.
+    """
+    from app.models.marketing import PrHoatDong
+    from app.services import pr_hoat_dong as PR
+
+    h = db.get(PrHoatDong, hid)
+    if not h:
+        raise HTTPException(404, "Không có việc này trong sổ PR")
+    try:
+        kq = PR.ghi_phan_hoi(db, h, u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return kq

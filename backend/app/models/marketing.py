@@ -125,3 +125,66 @@ class ContentItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# SỔ HOẠT ĐỘNG PR — Chủ tịch chốt 18/9/2026
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# BẢNG MỚI, và lần này bảng mới là đúng — khác hẳn sổ tài sản thương hiệu cùng ngày, chỗ ấy dùng
+# chung bảng TSCĐ vì một bộ nhận diện mua ngoài vốn LÀ một thẻ tài sản. Ở đây không có bảng nào
+# đang giữ "một việc truyền thông đã xảy ra": `content_items` là BẢN THẢO trước khi đăng (có ô
+# bản thảo, ô người duyệt, ô ngày dự kiến), còn sổ này ghi VIỆC ĐÃ RA NGOÀI và ai chịu trách
+# nhiệm cho nó. Nhét vào `content_items` thì một bảng phải trả lời hai câu hỏi ngược chiều nhau.
+#
+# HAI CHỮ KÝ CỦA CHỦ TỊCH NẰM Ở ĐÂY:
+#
+#   · NGƯỜI PHÁT NGÔN LÀ P.TGĐ MARKETING. `nguoi_phat_ngon` KHÔNG phải ô gõ tên tự do — nó lưu
+#     tên tài khoản của người đã bấm nút phát, và hàng rào ở đường API chỉ mở cho đúng vai ấy.
+#     Ô gõ tự do thì ba tháng sau không ai tra được ai đã nói câu đó.
+#
+#   · KHỦNG HOẢNG TRUYỀN THÔNG: 2 GIỜ kể từ lúc việc được GHI VÀO SỔ. Mốc chạy theo đồng hồ
+#     thật, không trừ ngày nghỉ và không quy ra giờ hành chính — một việc ghi lúc 22h thứ Bảy thì
+#     0h là quá hạn. Đó là bản chất của khủng hoảng truyền thông, và cũng đúng cách VTOS đã làm
+#     với hạn xử lý lead (24 giờ, P.TGĐ chốt cùng ngày).
+PR_LOAI = {
+    "bai_bao": "Bài báo / phỏng vấn", "thong_cao": "Thông cáo báo chí",
+    "su_kien": "Sự kiện", "phat_ngon": "Phát ngôn chính thức",
+    "mang_xa_hoi": "Bài đăng mạng xã hội", "khung_hoang": "Xử lý khủng hoảng",
+}
+# `nhap` → đang soạn. `cho_phat` → đã soạn xong, chờ người phát ngôn bấm. `da_phat` → đã ra ngoài.
+# `khong_phat` → quyết định KHÔNG phát, và phải ghi lý do: một việc bị bỏ mà không ai ghi vì sao
+# thì lần sau có người lại đề xuất đúng việc ấy.
+PR_TRANG_THAI = {"nhap": "Nháp", "cho_phat": "Chờ người phát ngôn",
+                 "da_phat": "Đã phát", "khong_phat": "Quyết định không phát"}
+
+
+class PrHoatDong(Base):
+    """Một việc truyền thông: bài báo, thông cáo, sự kiện, phát ngôn, hoặc một vụ khủng hoảng."""
+    __tablename__ = "mkt_pr_hoat_dong"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ma: Mapped[str] = mapped_column(String(20), unique=True, index=True)     # PR-2026-09-0001
+    loai: Mapped[str] = mapped_column(String(16))
+    tieu_de: Mapped[str] = mapped_column(String(300))
+    tom_tat: Mapped[str] = mapped_column(Text, default="")
+    noi_dang: Mapped[str] = mapped_column(String(200), default="")           # báo nào, trang nào, ở đâu
+    link: Mapped[str] = mapped_column(String(400), default="")
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True, index=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    trang_thai: Mapped[str] = mapped_column(String(12), default="nhap")
+    # ---- Người phát ngôn ----
+    # Ô này CHỈ hệ thống ghi, lúc người có vai phát ngôn bấm nút. Xem ghi chú ở trên.
+    nguoi_phat_ngon: Mapped[str] = mapped_column(String(50), default="")
+    phat_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ly_do_khong_phat: Mapped[str] = mapped_column(String(300), default="")
+    # ---- Khủng hoảng truyền thông ----
+    # `ghi_nhan_luc` là MỐC BẮT ĐẦU ĐẾM, và nó do cơ sở dữ liệu đặt lúc dòng vào sổ. Cho người
+    # dùng sửa mốc ấy thì "quá hạn" không còn nghĩa gì: ai sắp quá hạn chỉ cần lùi mốc lại.
+    la_khung_hoang: Mapped[bool] = mapped_column(Boolean, default=False)
+    ghi_nhan_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    phan_hoi_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    phan_hoi_boi: Mapped[str] = mapped_column(String(50), default="")
+    muc_do: Mapped[str] = mapped_column(String(12), default="")              # nhe / vua / nghiem_trong
+    nguoi_tao: Mapped[str] = mapped_column(String(50), default="")
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    ghi_chu: Mapped[str] = mapped_column(Text, default="")
