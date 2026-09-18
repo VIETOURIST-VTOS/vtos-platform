@@ -415,3 +415,56 @@ def nd_chuyen(nid: int, data: NDChuyenIn, u: User = Depends(require_roles(*MK.ND
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"content": n_out(db, n), "message": f"Nội dung {n.code} → {ND_TRANG_THAI[n.status]}"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# SỔ TÀI SẢN THƯƠNG HIỆU (18/9/2026) — xem services/tai_san_thuong_hieu
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+
+@router.get("/marketing/thuong-hieu")
+def thuong_hieu(loai: str = "", trang_thai: str = "",
+                u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Sổ nhận diện. Mở cho đúng những vai đã xem được màn hình Marketing – Kế toán cũng nằm trong
+    danh sách ấy, và cố ý: thẻ nào đã khai nguyên giá thì Kế toán phải đối chiếu được hai đầu."""
+    from app.services import tai_san_thuong_hieu as TH
+    return TH.bang(db, loai=loai, trang_thai=trang_thai)
+
+
+@router.post("/marketing/thuong-hieu/{aid}/ky")
+def ky_thuong_hieu(aid: int, u: User = Depends(require_roles("chutich", "ptgd_mkt")),
+                   db: Session = Depends(get_db)):
+    """Ký một bộ nhận diện. VAI TRÒ LẤY TỪ TÀI KHOẢN ĐANG ĐĂNG NHẬP, không nhận từ thân yêu cầu.
+
+    BẢN ĐẦU CỦA HÀM NÀY ĐỌC DANH SÁCH VAI TỪ THAM SỐ `thuong_hieu_vai_ky` rồi tự so bằng `if`, để
+    đổi được người ký bằng một dòng ở màn hình Tham số. Ba bộ kiểm của kho bắt đúng chỗ ấy và
+    chúng bắt đúng:
+
+      · KS-2  – mọi đường GHI phải khai quyền ở chỗ MÁY ĐỌC ĐƯỢC. Một câu `if` trong thân hàm thì
+                bảng phân quyền toàn hệ không đếm được nó, và cái gì không đếm được thì không rà
+                soát được.
+      · P-1   – một kiểu khai quyền duy nhất cho cả hệ, không phải mỗi người một kiểu.
+      · TQ-1  – một cửa từ chối theo vai trò phải nói rõ nó là PHÂN QUYỀN hay là TÁCH BẠCH TRÁCH
+                NHIỆM.
+
+    Nên hàng rào nằm ở `require_roles` như mọi đường khác trong hệ. Tham số `thuong_hieu_vai_ky`
+    KHÔNG bị bỏ đi và cũng KHÔNG được đọc ở đây: nó là BẢN GHI CHỮ KÝ của quyết định 18/9/2026 —
+    ai chốt, ngày nào — thứ mà `require_roles` không mang được. Hai chỗ ấy không được lệch nhau,
+    và `test_th1` chốt điều đó bằng một phép thử so ba đầu: tham số, `TH.VAI_KY`, và chính danh
+    sách trong `require_roles` ở dòng trên.
+
+    CHỦ TỊCH ĐI QUA ĐƯỢC CỬA NÀY — ông nằm trong danh sách. Thứ ông KHÔNG làm được là ký thay cả
+    hai vai: `TH.ky` chỉ bật đúng ô của vai đang bấm, nên bấm hai lần vẫn là một chữ ký. Đó không
+    phải phân quyền, đó là chống ghi sai sổ.
+    """
+    from app.models.assets import FixedAsset
+    from app.services import tai_san_thuong_hieu as TH
+
+    a = db.get(FixedAsset, aid)
+    if not a or not a.th_so:
+        raise HTTPException(404, "Không có bộ nhận diện này trong sổ")
+    try:
+        kq = TH.ky(db, a, u.role, u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return kq

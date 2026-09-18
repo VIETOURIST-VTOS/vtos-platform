@@ -134,17 +134,41 @@ def test_T5_du_bay_man_hinh_theo_ban_ve_V3():
 
 
 def test_T6_man_hinh_thuong_hieu_khong_bia_mot_con_so_nao():
-    """Thương hiệu & PR chưa có bảng dữ liệu và chưa có đường API nào (đo 18/9/2026). Ranh giới
-    09/9: chỗ không có cửa nhập là VIỆC CÒN THIẾU, không phải chỗ để đổ số mẫu vào cho đủ bảy màn
-    hình. Một con số đẹp ở đây là một lời hứa không có gì đỡ."""
+    """Tab Thương hiệu & PR có HAI NỬA từ 18/9/2026, và luật của hai nửa khác nhau.
+
+    LẬT LẠI CHÍNH PHÉP THỬ NÀY, cố ý và trong cùng một lần đẩy. Bản trước đòi tab này KHÔNG được
+    hiện con số nào — đúng vào lúc nó chưa có sổ. Nay Chủ tịch đã chốt (18/9): sổ tài sản thương
+    hiệu dùng chung bảng TSCĐ, và sổ ấy đã có cửa nhập cùng đường API. Giữ nguyên luật cũ là bắt
+    một màn hình có sổ thật phải giả vờ chưa có.
+
+    Luật mới, chặt hơn chứ không lỏng hơn:
+
+      · NỬA CÓ SỔ  – mọi con số phải ĐỌC TỪ bản trả về của API (`th.dem`). Một con số viết thẳng
+        vào mã là một con số không ai sửa được và không ai truy được nguồn.
+      · NỬA CHƯA CÓ (hoạt động PR, theo dõi nhắc tên) – vẫn phải ghi "chưa có". Hai điều Chủ tịch
+        đã ký cho phần ấy (người phát ngôn, hạn 2 giờ) chưa có bảng để sống, nên màn hình nói ra
+        chứ không vẽ một ô "quá hạn" rỗng.
+    """
     src = bo_chu_thich(doc(MKT))
     i = src.index('tab === "thuonghieu"')
     khoi = src[i:]
-    so = re.findall(r'so="([^"]*)"', khoi)
-    assert so and all(not re.search(r"\d", s) for s in so), (
-        f"Tab Thương hiệu & PR đang hiện con số: {[s for s in so if re.search(r'[0-9]', s)]}. "
+
+    # Nửa chưa có sổ: `so="…"` là chuỗi viết thẳng, và chuỗi ấy không được mang chữ số.
+    so_chuoi = re.findall(r'so="([^"]*)"', khoi)
+    assert so_chuoi, "phần việc còn thiếu đã biến mất khỏi màn hình"
+    assert all(not re.search(r"\d", s) for s in so_chuoi), (
+        f"Phần chưa có sổ đang hiện con số: {[s for s in so_chuoi if re.search(r'[0-9]', s)]}. "
         f"Chưa có sổ thì phải ghi là chưa có, không được bịa.")
-    assert "chưa có" in khoi, "Tab Thương hiệu & PR phải nói thẳng ra là chưa có sổ."
+    assert "chưa có" in khoi, "phần PR chưa có sổ phải nói thẳng ra."
+
+    # Nửa có sổ: mọi `so={…}` phải chạm vào bản trả về của API, không được là một hằng số.
+    so_bieu = re.findall(r"so=\{([^}]*)\}", khoi)
+    assert so_bieu, "sổ tài sản thương hiệu chưa hiện thẻ số nào"
+    for b in so_bieu:
+        assert "th." in b, f"thẻ số {b!r} không đọc từ sổ – một con số viết thẳng vào màn hình"
+
+    # Và màn hình phải thật sự gọi đường API của sổ, chứ không chỉ khai một biến tên là `th`.
+    assert "/marketing/thuong-hieu" in src, "màn hình chưa gọi đường API của sổ tài sản thương hiệu"
 
 
 def test_T7_man_hinh_khong_khai_mau_rieng_mot_dong_nao():
