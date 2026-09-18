@@ -1,7 +1,8 @@
 """CRM nhẹ: lead theo kênh (Hotline, VCHAT, Web, Tiktok Ads, Livestream, Appier, Zalo OA…), thống kê lead theo kênh × tháng,
 tin nhắn Zalo (OA / ZNS) gửi cho lead – khách; đối chiếu lead ↔ booking để tính tỷ lệ chốt, khách mới / quay lại."""
 from datetime import datetime, date
-from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON, UniqueConstraint
+from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON, UniqueConstraint  # noqa: F401
+from sqlalchemy import Index as sa_Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 from app.models.kieu_tien import TIEN
@@ -14,7 +15,27 @@ class Lead(Base):
     __tablename__ = "leads"
     # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
     phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
-    __table_args__ = (UniqueConstraint("phone", "lead_month", "channel", name="uq_lead_phone_month_channel"),)
+    # ── SỬA CỦA LÀN PHÂN QUYỀN, 14/9/2026 – có động tới tệp của làn khác, nói rõ ở đây ─────
+    # Ràng buộc cũ: UniqueConstraint("phone", "lead_month", "channel").
+    # Nó BUỘC mỗi khách chỉ có MỘT dòng cho mỗi kỳ mỗi kênh. Hệ quả không nhìn thấy trên màn hình:
+    # khách gọi hotline ngày 3 rồi gọi lại ngày 20 cùng tháng thì lần thứ hai KHÔNG lưu được – cơ
+    # sở dữ liệu từ chối, và cửa nhập buộc phải ghi đè lên lần thứ nhất. Một lần liên hệ có thật
+    # biến mất, không dòng nhật ký nào ghi lại.
+    #
+    # Đây không phải suy đoán. Phép thử `test_nguoi_XAC_NHAN_la_lan_lien_he_khac_thi_moi_ghi_them`
+    # và `test_ma_lead_do_HE_THONG_cap_va_KHONG_trung_nhau` đều đỏ với chính lỗi
+    # "UNIQUE constraint failed: leads.phone, leads.lead_month, leads.channel" trước khi sửa dòng
+    # này. Góp ý độc lập ngày 13/9 mục 3 đòi "một khách có thể có nhiều nhu cầu" – đòi hỏi ấy
+    # KHÔNG thực hiện được chừng nào ràng buộc này còn.
+    #
+    # Thay bằng: `ma_lead` duy nhất (mỗi LẦN phát sinh nhu cầu một mã) + chỉ mục thường trên bộ ba
+    # cũ để các truy vấn đang chạy không chậm đi.
+    #
+    # CẦN MỘT BẢN NÂNG CẤP CƠ SỞ DỮ LIỆU để gỡ ràng buộc trên máy chủ thật – xem bản nháp
+    # `NHAP_migration_marketing.py` trong gói bàn giao. Mạch nâng cấp đo ngày 14/9/2026 chỉ còn
+    # MỘT đầu (a3d71e9c54b28) nên viết được ngay; nhưng CHỈ làn nhận việc này được commit nó,
+    # hai làn cùng thêm một bản là hai đầu mạch và máy chủ không khởi động được.
+    __table_args__ = (sa_Index("ix_lead_phone_month_channel", "phone", "lead_month", "channel"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     phone: Mapped[str] = mapped_column(String(20), index=True)                 # chuẩn hóa 0xxxxxxxxx
     name: Mapped[str] = mapped_column(String(120), default="")
@@ -34,6 +55,88 @@ class Lead(Base):
     converted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+    # ── MKT-2 · năm cột của cửa nhập Marketing (13/9/2026) ────────────────────────────────
+    # Tất cả NULLABLE và không có giá trị mặc định: dòng cũ chưa có dữ liệu này, và rỗng ở đây
+    # nghĩa là CHƯA AI HỎI, không phải "không có". Đặt mặc định là biến một ô chưa hỏi thành một
+    # câu trả lời, rồi báo cáo cộng nó vào như số thật.
+    #
+    # `channel` cũ GIỮ NGUYÊN, không bỏ: dữ liệu đã nhập nằm ở đó. Từ nay `diem_tiep_nhan` là ô
+    # được hỏi, còn `channel` là bản sao để mã cũ đọc tiếp – bỏ cột cũ là làm hỏng mọi báo cáo
+    # đang chạy trong cùng một lần sửa.
+    nguon_thu_hut: Mapped[str | None] = mapped_column(String(24), nullable=True, index=True)
+    diem_tiep_nhan: Mapped[str | None] = mapped_column(String(24), nullable=True, index=True)
+    mang: Mapped[str | None] = mapped_column(String(6), nullable=True)          # le / mice
+    giao_luc: Mapped[date | None] = mapped_column(Date, nullable=True)
+    han_xu_ly: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ly_do_mat: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    # ── MKT-3 · các cột thêm sau góp ý độc lập ngày 13/9/2026 ────────────────────────────
+    # Góp ý mục 3 đòi "mã lần phát sinh nhu cầu", đòi giữ NGÀY GIỜ thật thay vì chỉ tháng, và đòi
+    # nối chuyển đổi tới booking bằng MÃ chứ không bằng chữ tự do.
+    #
+    # VÌ SAO PHẢI CÓ MÃ CHO MỘT LẦN PHÁT SINH NHU CẦU
+    # Một người có thể hỏi nhiều lần, và mỗi lần là một nghiệp vụ riêng. Không có mã thì mọi phép
+    # đếm phải đoán từ số điện thoại, và đoán kiểu nào cũng sai một trong hai chiều: gộp thì mất
+    # một lần liên hệ có thật, không gộp thì một chuyến đi bị đếm hai lần vì khách vào từ hai kênh.
+    #
+    # KHÔNG CÓ MÃ KHÁCH – chốt của Chủ tịch 14/9/2026
+    # Hệ thống KHÔNG cấp mã khách. Người nhập chỉ nhập MÃ TOUR. Đơn vị "một người" khi báo cáo vì
+    # thế lấy theo SỐ ĐIỆN THOẠI đã chuẩn hoá, và điều đó mang hai sai số phải nói ra chứ không
+    # được giấu: hai người dùng chung một số thì đếm thành một; một người đổi số thì đếm thành hai.
+    # Báo cáo gọi con số ấy là "số điện thoại khác nhau", KHÔNG gọi là "số khách đã xác minh".
+    ma_lead: Mapped[str | None] = mapped_column(String(24), nullable=True, unique=True, index=True)
+    # Mã tour do Điều hành/Kinh doanh cấp. Ô MÃ, người nhập chọn từ danh mục tour – không phải ô
+    # chữ tự do. `interest` cũ giữ nguyên cho dữ liệu đã nhập, nhưng phép đếm dùng mã này: chữ tự
+    # do thì "Nha Trang 3N" và "nha trang 3 ngày" thành hai tour khác nhau.
+    ma_tour: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    # Ngày GIỜ nhu cầu phát sinh ở nguồn, không phải lúc nhập tệp. Chỉ có tháng thì không tính
+    # được mốc 30/60/90 ngày; lấy ngày nhập thay ngày phát sinh thì mọi lead nhập muộn trở thành
+    # "chốt nhanh", và hiệu quả kênh nào nhập tệp trễ nhất trông đẹp nhất.
+    phat_sinh_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    # Mã booking do Kinh doanh/Vietrip cấp. Ô MÃ, không phải ô tiền: doanh thu đọc từ booking theo
+    # mã này, Marketing không gõ lại số tiền. `booking_id` cũ giữ nguyên cho mã đang chạy.
+    ma_booking: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    # Dấu của dòng nguồn đã nhập, để nhập lại cùng một tệp không sinh thêm lead. KHÔNG unique:
+    # hai lần liên hệ thật có thể trùng dấu, và khi ấy hệ thống phải hỏi người chứ không chặn.
+    dau_van_tay: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+
+
+class LeadBanGiao(Base):
+    """Lịch sử giao – nhận – giao lại – đổi hạn của một lead. Bảng riêng, không phải hai cột.
+
+    Góp ý mục 3 đòi "ghi tự động thời điểm thao tác; hạn theo quy tắc có phiên bản". Hai cột
+    `giao_luc` / `han_xu_ly` trên bảng lead không làm được việc ấy: chúng chỉ giữ được TRẠNG THÁI
+    HIỆN TẠI. Lead giao cho người A, A không gọi, giao lại người B – sau khi ghi đè thì trên hệ
+    thống không còn dấu vết nào cho thấy A từng cầm nó. Đến lúc hỏi "vì sao lead này mất", câu trả
+    lời đã bị chính hệ thống xoá.
+
+    `phien_ban_quy_tac` giữ tên bản quy tắc đã dùng để đặt hạn. Quy tắc hạn xử lý sẽ đổi – hôm nay
+    2 ngày, sang năm 1 ngày. Không ghi lại bản đã dùng thì các lead cũ bị chấm theo thước mới, và
+    người bị chấm có quyền không nhận kết quả ấy.
+    """
+    __tablename__ = "lead_ban_giao"
+    VIEC = {
+        "giao": "Giao cho Sales",
+        "nhan": "Sales tiếp nhận",
+        "giao_lai": "Giao lại người khác",
+        "doi_han": "Đổi hạn xử lý",
+        "tra_lai": "Sales trả lại",
+    }
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id"), index=True)
+    viec: Mapped[str] = mapped_column(String(10), index=True)
+    tu_nguoi: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    den_nguoi: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    han_cu: Mapped[date | None] = mapped_column(Date, nullable=True)
+    han_moi: Mapped[date | None] = mapped_column(Date, nullable=True)
+    phien_ban_quy_tac: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    ly_do: Mapped[str] = mapped_column(String(200), default="")
+    # `luc` do hệ thống đặt lúc ghi, KHÔNG nhận từ người dùng. Cho người dùng sửa thời điểm thao
+    # tác thì lịch sử này không còn là bằng chứng nữa.
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    boi: Mapped[str] = mapped_column(String(50), default="")
 
 
 class LeadChannelStat(Base):

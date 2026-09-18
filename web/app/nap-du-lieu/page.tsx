@@ -224,6 +224,10 @@ function NapDuLieu() {
         toast(d.ket_qua ? `Đã ghi: ${d.ket_qua}` : d.message);
         // Giữ lại các ô NGÀY, xóa phần còn lại. Người nhập mười phiếu dầu của cùng một ngày không phải gõ
         // lại ngày mười lần; còn giữ cả số tiền thì dòng sau lặng lẽ mang số của dòng trước.
+        //
+        // `ngay_gio` CỐ Ý KHÔNG giữ lại (thêm 18/9/2026). Ngày thì mười dòng dùng chung được, còn
+        // GIỜ thì không: lead thứ hai không phát sinh đúng phút của lead thứ nhất. Giữ lại một mốc
+        // chính xác đến từng phút mà sai là tệ hơn một ô trống, vì nó trông như đã được khai.
         const giu: Record<string, string> = {};
         (chon?.cot || []).forEach((c: any) => { if (c.kieu === "ngay" && oNhap[c.key]) giu[c.key] = oNhap[c.key]; });
         setONhap(giu);
@@ -295,8 +299,16 @@ function NapDuLieu() {
                   <option value="">– chọn –</option>
                   {Object.entries(c.chon).map(([ma, ten]: any) => <option key={ma} value={ma}>{ten}</option>)}
                 </select>
-              : <input type={c.kieu === "ngay" ? "date" : c.kieu === "so" ? "number" : "text"}
-                       value={oNhap[c.key] || ""} placeholder={c.kieu === "ngay" ? "" : c.vi_du}
+              : c.kieu === "he_thong_cap"
+              // Ô HỆ THỐNG TỰ CẤP – chỉ để đọc. Vẽ nó thành ô gõ được là mở đường cho một con số
+              // có hai nguồn cấp: máy cấp một mã, người gõ một mã khác, và từ đó hai dòng nói về
+              // cùng một khách không còn nối lại được với nhau. Ô vẫn HIỆN, vì giấu đi thì người
+              // nhập không biết cột ấy tồn tại và đi tạo một cột mã của riêng mình trong Excel.
+              ? <input type="text" value="" disabled placeholder="hệ thống tự cấp khi ghi" />
+              : <input type={c.kieu === "ngay" ? "date" : c.kieu === "ngay_gio" ? "datetime-local"
+                             : c.kieu === "so" ? "number" : "text"}
+                       value={oNhap[c.key] || ""}
+                       placeholder={c.kieu === "ngay" || c.kieu === "ngay_gio" ? "" : c.vi_du}
                        min={c.min} max={c.max}
                        onChange={(e) => setONhap({ ...oNhap, [c.key]: e.target.value })} />}
             {c.ghi_chu && <div className="muted" style={{ fontSize: 12 }}>{c.ghi_chu}</div>}
