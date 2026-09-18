@@ -9,6 +9,12 @@ from app.models.crm import Lead, LeadChannelStat, ZaloMessage, LEAD_CHANNELS, LE
 from app.services import rules as R
 from app.services.zalo import norm_phone
 
+# Tên bản quy tắc tính TỶ LỆ CHỐT mà báo cáo đang dùng. Chủ tịch chốt 14/9/2026: lấy cách của tệp
+# OVERVIEW của phòng Marketing — nhóm theo KỲ PHÁT SINH LEAD, tử số gồm CẢ phần chốt ở các kỳ SAU.
+# Đổi quy tắc là đổi BIÊN BẢN rồi mới đổi tên ở đây, không phải sửa thầm phép tính: mọi báo cáo in
+# ra kèm tên thước đã dùng, để hai bản báo cáo khác thước không bị đem so với nhau.
+QUY_TAC_TY_LE_CHOT = "overview-v1"
+
 CANON = {c.lower().replace(" ", ""): c for c in LEAD_CHANNELS}
 CANON.update({"hotline": "Hotline 1", "web": "Đặt tour web", "website": "Đặt tour web", "dattourweb": "Đặt tour web", "tiktok": "Tiktok Ads", "tiktokads": "Tiktok Ads", "zalo": "Zalo OA", "fb": "Facebook", "khachcu": "Khách cũ"})
 
@@ -129,7 +135,33 @@ def match_conversions(db: Session, months: list[str] | None = None) -> dict:
 
 def conversion_report(db: Session, target_month: str, lead_months: list[str] | None = None) -> dict:
     """Đúng cấu trúc file Marketing: (1) lead tháng T → tour khởi hành tháng T theo kênh; (2) lead T-2, T-1, T → tour tháng T; (3) kênh × tháng lead;
-    chi tiết SĐT chốt: tour, ngày KH, khách mới / quay lại, số lần đi, tổng khách, doanh thu lũy kế."""
+    chi tiết SĐT chốt: tour, ngày KH, khách mới / quay lại, số lần đi, tổng khách, doanh thu lũy kế.
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    HAI TỶ LỆ, HAI TÊN – sửa 18/9/2026
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    Báo cáo này trả về HAI con số tỷ lệ, và chúng KHÔNG bằng nhau. Trước bản sửa này chỉ có một
+    khoá `rate`, nên hai người đọc hai nghĩa khác nhau mà không ai biết:
+
+      `rate`                  – tỷ lệ của CHÍNH BÁO CÁO NÀY: lead kỳ X chốt tour KHỞI HÀNH TRONG
+                                tháng T. Đây là một bảng chéo (kỳ lead × tháng khởi hành), có ích
+                                riêng, nhưng KHÔNG phải tỷ lệ chốt của phòng Marketing.
+      `ty_le_chot_overview`   – QUY TẮC CHỦ TỊCH KÝ 14/9/2026 (`overview-v1`): nhóm theo KỲ PHÁT
+                                SINH LEAD, tử số gồm CẢ phần chốt ở các kỳ SAU.
+
+    Hệ quả bắt buộc phải hiện lên màn hình: tỷ lệ theo overview-v1 CÒN TĂNG sau khi kỳ đã đóng –
+    lead tháng 7 có thể chốt vào tháng 9. Nên mọi chỗ in con số ấy phải kèm `tinh_den_ngay`. In nó
+    như một con số cuối cùng là hứa một điều không đúng, và tháng sau cùng một kỳ ra số khác thì
+    người đọc tưởng có ai sửa sổ.
+
+    CHƯA ĐỐI CHIẾU THÌ KHÔNG XÁC ĐỊNH, KHÔNG PHẢI 0%. `ty_le_chot_overview` đọc dấu `booking_id`
+    do `match_conversions()` gắn. Chưa ai chạy đối chiếu thì trả None kèm một câu cảnh báo – 0%
+    đọc là "chạy mà không ra khách", còn chưa xác định đọc là "chưa ai so sổ". Hai câu khác hẳn.
+
+    BA ĐƠN VỊ ĐẾM, KHÔNG GỘP: `so_dong` (số dòng) · `so_sdt` (số điện thoại chuẩn hoá khác nhau,
+    đơn vị "một người" theo chốt 14/9) · `so_khai_bao` (số Marketing tự khai trong LeadChannelStat).
+    `nguon_mau_so` ghi rõ mẫu số đã lấy từ đâu; `lech_khai_bao` phơi ra phần chênh thay vì san phẳng.
+    """
     y, m = map(int, target_month.split("-")); d1 = date(y, m, 1); d2 = date(y + (m == 12), m % 12 + 1, 1)
     if not lead_months:
         lead_months = [f"{(d1 - timedelta(days=1)).replace(day=1) - timedelta(days=0):%Y-%m}"]
@@ -141,32 +173,90 @@ def conversion_report(db: Session, target_month: str, lead_months: list[str] | N
     leads = list(db.execute(select(Lead).where(Lead.lead_month.in_(lead_months))).scalars())
     lead_counts: dict[tuple, int] = {}
     for l in leads: lead_counts[(l.lead_month, l.channel)] = lead_counts.get((l.lead_month, l.channel), 0) + 1
+    # ĐẾM RIÊNG HAI ĐƠN VỊ, KHÔNG GỘP. Sửa 18/9/2026 – xem chú thích QUY_TAC_TY_LE_CHOT ở cuối hàm.
+    #   so_dong = số DÒNG lead (một người liên hệ hai lần là hai dòng)
+    #   so_sdt  = số SỐ ĐIỆN THOẠI ĐÃ CHUẨN HOÁ khác nhau — đơn vị "một người" theo chốt 14/9/2026
+    # Nhãn màn hình phải gọi đúng tên "số điện thoại khác nhau", KHÔNG viết "số khách": hai người
+    # chung một số đếm thành một, một người đổi số đếm thành hai.
+    sdt_theo_key: dict[tuple, set] = {}
+    for l in leads: sdt_theo_key.setdefault((l.lead_month, l.channel), set()).add(l.phone)
+    # Tử số của overview-v1: SĐT của kỳ ấy đã chốt Ở BẤT KỲ LÚC NÀO (kể cả các kỳ SAU), lấy theo
+    # dấu `booking_id` do match_conversions() gắn – không phụ thuộc target_month.
+    chot_moi_luc: dict[tuple, set] = {}
+    for l in leads:
+        if l.booking_id: chot_moi_luc.setdefault((l.lead_month, l.channel), set()).add(l.phone)
+    da_tung_doi_chieu = any(l.converted_at for l in leads)
+
     detail = []; seen = set(); agg: dict[tuple, dict] = {}
     for l in sorted(leads, key=lambda x: (x.lead_month, x.channel)):
-        key = (l.lead_month, l.channel); a = agg.setdefault(key, {"lead_month": l.lead_month, "channel": l.channel, "leads": 0, "converted": 0, "new": 0, "returning": 0, "revenue": 0.0})
+        key = (l.lead_month, l.channel); a = agg.setdefault(key, {"lead_month": l.lead_month, "channel": l.channel, "leads": 0, "converted": 0, "new": 0, "returning": 0, "revenue": 0.0, "doanh_thu_booking_chot": 0.0})
         bs = bp.get(l.phone, []); hit = [b for b in bs if b.id in tours_in]
         if not hit or (l.phone, l.lead_month) in seen: continue
         seen.add((l.phone, l.lead_month)); b = min(hit, key=lambda x: x.tour.start_date)
         prior = [x for x in bs if x.tour and x.tour.start_date < b.tour.start_date]
         returning = len(prior) > 0; trips = len({x.tour_id for x in bs if x.tour and x.tour.start_date < d2}); pax = sum(x.pax for x in bs if x.tour and x.tour.start_date < d2)
+        # `rev` là chi tiêu TRỌN ĐỜI của số điện thoại ấy (mọi booking khởi hành trước d2) – KHÔNG
+        # phải doanh thu của kênh này kỳ này. Khoá `revenue` giữ NGUYÊN nghĩa cũ để không bạn đọc
+        # nào lặng lẽ đổi ý nghĩa; số của riêng booking đã chốt nằm ở `doanh_thu_booking_chot`.
         rev = sum((x.amount or 0) - (x.discount or 0) for x in bs if x.tour and x.tour.start_date < d2)
-        a["converted"] += 1; a["new"] += 0 if returning else 1; a["returning"] += 1 if returning else 0; a["revenue"] += rev
+        rev_chot = (b.amount or 0) - (b.discount or 0)
+        a["converted"] += 1; a["new"] += 0 if returning else 1; a["returning"] += 1 if returning else 0
+        a["revenue"] += rev; a["doanh_thu_booking_chot"] += rev_chot
         detail.append({"channel": l.channel, "lead_month": l.lead_month, "phone": l.phone, "name": l.name or b.customer_name, "tour": b.tour.name if b.tour else "", "tour_code": b.tour.code if b.tour else "", "start_date": b.tour.start_date if b.tour else None,
-                       "kind": "Khách quay lại" if returning else "Khách mới", "trips": trips, "pax": pax, "revenue": rev, "sales": b.sales.full_name if b.sales else "", "booking": b.code})
+                       "kind": "Khách quay lại" if returning else "Khách mới", "trips": trips, "pax": pax, "revenue": rev, "revenue_tron_doi": rev, "doanh_thu_booking_chot": rev_chot,
+                       "sales": b.sales.full_name if b.sales else "", "booking": b.code})
     rows = []
     for key in sorted(set(list(stats.keys()) + list(agg.keys()))):
-        a = agg.get(key, {"lead_month": key[0], "channel": key[1], "leads": 0, "converted": 0, "new": 0, "returning": 0, "revenue": 0.0})
-        a["leads"] = max(stats[key].leads if key in stats else 0, lead_counts.get(key, 0)); a["cost"] = stats[key].cost if key in stats else 0
-        a["rate"] = a["converted"] / a["leads"] if a["leads"] else 0; a["cost_per_lead"] = (a["cost"] or 0) / a["leads"] if a["leads"] and (a["cost"] or 0) else 0; rows.append(a)
+        a = agg.get(key, {"lead_month": key[0], "channel": key[1], "leads": 0, "converted": 0, "new": 0, "returning": 0, "revenue": 0.0, "doanh_thu_booking_chot": 0.0})
+        a["so_dong"] = lead_counts.get(key, 0); a["so_sdt"] = len(sdt_theo_key.get(key, ()))
+        a["so_khai_bao"] = stats[key].leads if key in stats else None
+        # BỎ max(khai_báo, đếm_được) – sửa 18/9/2026. max() chọn con số LỚN HƠN mà không nói đã
+        # chọn cái nào, nên mẫu số không truy được về nguồn và tỷ lệ luôn nghiêng về phía thấp.
+        # Nay: có khai báo thì dùng khai báo, không có thì dùng số đếm được, và GHI RA đã dùng cái nào.
+        a["nguon_mau_so"] = "khai_bao" if a["so_khai_bao"] is not None else "dem_duoc"
+        a["leads"] = a["so_khai_bao"] if a["so_khai_bao"] is not None else a["so_sdt"]
+        # Chênh lệch giữa lời khai và số đếm được: HIỆN RA, không san phẳng. Lệch lớn nghĩa là tệp
+        # nguồn chỉ có phần chi tiết của một số kênh – đó là việc còn thiếu, không phải số để dùng.
+        a["lech_khai_bao"] = None if a["so_khai_bao"] is None else a["so_khai_bao"] - a["so_sdt"]
+        a["cost"] = stats[key].cost if key in stats else 0
+        a["rate"] = a["converted"] / a["leads"] if a["leads"] else 0
+        # Tỷ lệ CÙNG MỘT ĐƠN VỊ: tử số và mẫu số đều là số điện thoại đếm được. `rate` ở trên chia
+        # số điện thoại cho một con số khai báo – hai đơn vị khác nhau, nên nó không tự đứng được.
+        a["ty_le_tren_sdt_dem_duoc"] = (a["converted"] / a["so_sdt"]) if a["so_sdt"] else None
+        a["chot_moi_luc"] = len(chot_moi_luc.get(key, ()))
+        a["ty_le_chot_overview"] = (a["chot_moi_luc"] / a["so_sdt"]) if (a["so_sdt"] and da_tung_doi_chieu) else None
+        a["cost_per_lead"] = (a["cost"] or 0) / a["leads"] if a["leads"] and (a["cost"] or 0) else 0; rows.append(a)
+    # SỐ NGƯỜI THEO THÁNG KHÔNG PHẢI TỔNG SỐ NGƯỜI TỪNG KÊNH. Một người liên hệ qua hai kênh trong
+    # cùng tháng là MỘT số điện thoại, nhưng cộng hai dòng kênh lại thì thành hai. Nên mức tháng
+    # phải đếm lại trên TẬP HỢP, không cộng dồn — cùng một lý do đã bắt `so_sdt` ra đời.
+    sdt_thang: dict[str, set] = {}
+    chot_thang: dict[str, set] = {}
+    for l in leads:
+        sdt_thang.setdefault(l.lead_month, set()).add(l.phone)
+        if l.booking_id: chot_thang.setdefault(l.lead_month, set()).add(l.phone)
     by_month = {}
     for a in rows:
-        mm = by_month.setdefault(a["lead_month"], {"lead_month": a["lead_month"], "leads": 0, "converted": 0, "new": 0, "returning": 0, "revenue": 0.0})
-        for k in ("leads", "converted", "new", "returning", "revenue"): mm[k] += a[k]
-    for mm in by_month.values(): mm["rate"] = mm["converted"] / mm["leads"] if mm["leads"] else 0
+        mm = by_month.setdefault(a["lead_month"], {"lead_month": a["lead_month"], "leads": 0, "converted": 0, "new": 0, "returning": 0, "revenue": 0.0,
+                                                   "doanh_thu_booking_chot": 0.0, "so_dong": 0})
+        for k in ("leads", "converted", "new", "returning", "revenue", "doanh_thu_booking_chot", "so_dong"): mm[k] += a[k]
+    for ky, mm in by_month.items():
+        mm["so_sdt"] = len(sdt_thang.get(ky, ()))
+        mm["chot_moi_luc"] = len(chot_thang.get(ky, ()))
+    for mm in by_month.values():
+        mm["rate"] = mm["converted"] / mm["leads"] if mm["leads"] else 0
+        mm["ty_le_tren_sdt_dem_duoc"] = (mm["converted"] / mm["so_sdt"]) if mm["so_sdt"] else None
+        mm["ty_le_chot_overview"] = (mm["chot_moi_luc"] / mm["so_sdt"]) if (mm["so_sdt"] and da_tung_doi_chieu) else None
     cur = [a for a in rows if a["lead_month"] == target_month]
-    tot = {"leads": sum(a["leads"] for a in cur), "converted": sum(a["converted"] for a in cur)}; tot["rate"] = tot["converted"] / tot["leads"] if tot["leads"] else 0
+    tot = {"leads": sum(a["leads"] for a in cur), "converted": sum(a["converted"] for a in cur),
+           "so_sdt": len(sdt_thang.get(target_month, ())), "chot_moi_luc": len(chot_thang.get(target_month, ()))}
+    tot["rate"] = tot["converted"] / tot["leads"] if tot["leads"] else 0
+    tot["ty_le_tren_sdt_dem_duoc"] = (tot["converted"] / tot["so_sdt"]) if tot["so_sdt"] else None
+    tot["ty_le_chot_overview"] = (tot["chot_moi_luc"] / tot["so_sdt"]) if (tot["so_sdt"] and da_tung_doi_chieu) else None
     return {"target_month": target_month, "lead_months": lead_months, "by_channel_current": cur, "total_current": tot, "by_month": sorted(by_month.values(), key=lambda x: x["lead_month"]),
-            "by_channel_month": rows, "detail": sorted(detail, key=lambda x: (x["channel"], x["lead_month"], -(x["revenue"] or 0))), "as_of": datetime.now()}
+            "by_channel_month": rows, "detail": sorted(detail, key=lambda x: (x["channel"], x["lead_month"], -(x["revenue"] or 0))), "as_of": datetime.now(),
+            "quy_tac_ty_le_chot": QUY_TAC_TY_LE_CHOT, "tinh_den_ngay": datetime.now(),
+            "da_doi_chieu": da_tung_doi_chieu,
+            "canh_bao": [] if da_tung_doi_chieu else ["Chưa chạy đối chiếu lead ↔ booking, nên tỷ lệ chốt theo quy tắc đã ký CHƯA XÁC ĐỊNH (không phải 0%)."]}
 
 
 def to_xlsx(rep: dict) -> bytes:
@@ -174,9 +264,21 @@ def to_xlsx(rep: dict) -> bytes:
     from openpyxl.styles import Font, PatternFill
     wb = Workbook(); ws = wb.active; ws.title = f"Tong hop {rep['target_month']}"
     def head(ws, cols): ws.append(cols); [setattr(c, "font", Font(bold=True)) or setattr(c, "fill", PatternFill("solid", fgColor="D9E2F3")) for c in ws[ws.max_row]]
-    ws.append([f"BÁO CÁO LEAD & CHUYỂN ĐỔI THÁNG {rep['target_month']} (VTOS, {rep['as_of']:%d/%m/%Y %H:%M})"]); ws["A1"].font = Font(bold=True, size=13); ws.append([])
-    ws.append([f"1. Lead tháng {rep['target_month']} → tour khởi hành tháng {rep['target_month']} theo kênh"]); head(ws, ["Kênh", "Số leads", "SĐT chốt tour", "Tỷ lệ chốt", "Khách mới", "Khách quay lại", "Doanh thu lũy kế (đ)", "Chi phí/lead"])
-    for a in rep["by_channel_current"]: ws.append([a["channel"], a["leads"], a["converted"], round(a["rate"], 4), a["new"], a["returning"], round((a["revenue"] or 0)), round(a["cost_per_lead"])])
+    ws.append([f"BÁO CÁO LEAD & CHUYỂN ĐỔI THÁNG {rep['target_month']} (VTOS, {rep['as_of']:%d/%m/%Y %H:%M})"]); ws["A1"].font = Font(bold=True, size=13)
+    ws.append([f"Quy tắc tỷ lệ chốt: {rep.get('quy_tac_ty_le_chot','')} — nhóm theo kỳ phát sinh lead, tử số gồm cả phần chốt ở các kỳ sau. "
+               f"Tính đến {rep['as_of']:%d/%m/%Y %H:%M}; con số này CÒN TĂNG khi lead kỳ cũ chốt ở kỳ sau."])
+    for c in rep.get("canh_bao", []): ws.append([f"CẢNH BÁO: {c}"])
+    ws.append([])
+    # Cột "Tỷ lệ chốt" của bảng này là tỷ lệ CHÉO (lead kỳ X → tour khởi hành tháng T), KHÔNG phải
+    # tỷ lệ chốt theo quy tắc đã ký. Hai cột cuối mới là con số theo `overview-v1`, và chúng có tên
+    # riêng để không ai đem hai thước so với nhau. Rỗng = chưa đối chiếu, không phải 0%.
+    ws.append([f"1. Lead tháng {rep['target_month']} → tour khởi hành tháng {rep['target_month']} theo kênh"])
+    head(ws, ["Kênh", "Số leads", "Nguồn mẫu số", "SĐT khác nhau đếm được", "Lệch so với khai báo", "SĐT chốt tour (khởi hành trong tháng)", "Tỷ lệ chéo (khởi hành trong tháng)",
+              f"SĐT đã chốt mọi lúc ({rep.get('quy_tac_ty_le_chot','')})", f"TỶ LỆ CHỐT ({rep.get('quy_tac_ty_le_chot','')})", "Khách mới", "Khách quay lại", "Doanh thu lũy kế (đ)", "Doanh thu booking đã chốt (đ)", "Chi phí/lead"])
+    for a in rep["by_channel_current"]:
+        ws.append([a["channel"], a["leads"], a.get("nguon_mau_so", ""), a.get("so_sdt"), a.get("lech_khai_bao"), a["converted"], round(a["rate"], 4),
+                   a.get("chot_moi_luc"), (round(a["ty_le_chot_overview"], 4) if a.get("ty_le_chot_overview") is not None else ""),
+                   a["new"], a["returning"], round((a["revenue"] or 0)), round((a.get("doanh_thu_booking_chot") or 0)), round(a["cost_per_lead"])])
     t = rep["total_current"]; ws.append(["TỔNG", t["leads"], t["converted"], round(t["rate"], 4)]); ws.append([])
     ws.append([f"2. Đối chiếu lead các tháng → tour tháng {rep['target_month']}"]); head(ws, ["Tháng lead", "Tổng leads", "SĐT có tour", "Tỷ lệ chốt", "Khách mới", "Khách quay lại", "Doanh thu lũy kế (đ)"])
     for mm in rep["by_month"]: ws.append([mm["lead_month"], mm["leads"], mm["converted"], round(mm["rate"], 4), mm["new"], mm["returning"], round((mm["revenue"] or 0))])
