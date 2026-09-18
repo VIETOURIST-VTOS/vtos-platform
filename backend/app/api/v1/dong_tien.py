@@ -240,6 +240,34 @@ def xem_so_du_tung_ngay(company_id: int, den_ngay: date | None = None,
 # một công ty là chỗ để người đọc chọn con số dễ nghe hơn.
 
 
+def danh_muc_phap_nhan(db: Session, u: User) -> list[dict]:
+    """Danh sách pháp nhân mà VAI NÀY được thấy — MỘT chỗ dựng, hai chỗ dùng.
+
+    ══════════════════════════════════════════════════════════════════════════════════════════════
+    TC-66 · TÁCH RA ĐỂ /dashboard GỬI KÈM, BỎ MỘT LƯỢT XẾP HÀNG DỌC
+    ══════════════════════════════════════════════════════════════════════════════════════════════
+    Đo trên bản chạy thật 18/9/2026: màn hình Chủ tịch gọi `/dong-tien/meta` (0,85 giây) chỉ để
+    biết mã pháp nhân, rồi mới gọi được `/dong-tien/khung/{pn}`. Hai cửa NỐI ĐUÔI nhau cộng thêm
+    khoảng 1,1 giây vào cuối lần mở trang — và cửa thứ nhất không mang con số nào cho màn hình,
+    nó chỉ trả lời một câu mà máy chủ vốn đã biết.
+
+    KHÔNG NỚI QUYỀN MỘT LI. `/dashboard` chỉ gửi kèm danh sách này khi vai đang đăng nhập nằm
+    trong `XEM` — ĐÚNG hàng rào của `/dong-tien/meta`, và danh sách vẫn đi qua `PV.loc` như cũ.
+    Vì vậy ai thấy được gì thì y hệt trước vòng này; chỉ có thời điểm nhận là sớm hơn.
+
+    VÌ SAO LÀ MỘT HÀM CHỨ KHÔNG CHÉP HAI BẢN: hai bản chép của một phép lọc phạm vi thì sớm muộn
+    lệch nhau, và ngày chúng lệch là ngày một vai nhìn thấy pháp nhân mà vai ấy không được thấy —
+    kiểu sai không ai phát hiện ra bằng mắt. Đây đúng là bài học vòng 1 của Sự cố tour 10/9/2026.
+
+    Danh sách pháp nhân đi qua hàng rào phạm vi: người chỉ phụ trách một pháp nhân không thấy tên
+    các pháp nhân khác — thấy tên cũng đã là biết công ty có những pháp nhân nào.
+    """
+    from app.models.core import Company
+    qs = PV.loc(select(Company).where(Company.active == True), Company, u)   # noqa: E712
+    return [{"id": c.id, "code": c.code, "name": c.name}
+            for c in db.execute(qs.order_by(Company.code)).scalars()]
+
+
 @router.get("/meta")
 def meta(u: User = Depends(require_roles(*XEM, mo_ta="danh mục cho màn hình dòng tiền")),
          db: Session = Depends(get_db)):
@@ -254,11 +282,8 @@ def meta(u: User = Depends(require_roles(*XEM, mo_ta="danh mục cho màn hình 
     pháp nhân khác trong ô chọn – thấy tên cũng đã là biết công ty có những pháp nhân nào.
     """
     from app.models.banks import BankAccount
-    from app.models.core import Company
 
-    qs = PV.loc(select(Company).where(Company.active == True), Company, u)   # noqa: E712
-    cty = [{"id": c.id, "code": c.code, "name": c.name}
-           for c in db.execute(qs.order_by(Company.code)).scalars()]
+    cty = danh_muc_phap_nhan(db, u)
     tk = [{"id": t.id, "code": t.code, "bank_name": t.bank_name}
           for t in db.execute(select(BankAccount).where(BankAccount.active == True)   # noqa: E712
                               .order_by(BankAccount.code)).scalars()]

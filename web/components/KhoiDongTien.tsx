@@ -227,13 +227,36 @@ function BonMocDuBao({ d }: { d?: any }) {
   );
 }
 
-export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any }) {
+export default function KhoiDongTien({ day, du_bao, phap_nhan }: {
+  day?: any; du_bao?: any;
+  /** TC-66 · Danh mục pháp nhân do gói `/dashboard` gửi kèm — xem chú thích ngay dưới. */
+  phap_nhan?: DonViChon[];
+}) {
   const { toast } = useShell();
   const [pn, setPn] = useState<number | null>(null);
   const [k, setK] = useState<any>(null);
   const [an, setAn] = useState(false);   // vai này không mở khối dòng tiền → không vẽ gì
 
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  // TC-66 · KHÔNG HỎI LẠI ĐIỀU GÓI /dashboard ĐÃ TRẢ LỜI
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  // Đo 18/9/2026: khối này gọi `/dong-tien/meta` (0,85 giây) chỉ để biết mã pháp nhân, rồi mới
+  // gọi được `/dong-tien/khung/{pn}`. Hai cửa NỐI ĐUÔI nhau — cửa sau không thể bắt đầu trước khi
+  // cửa trước xong — cộng thêm ~1,1 giây vào cuối lần mở trang.
+  //
+  // Nay máy chủ gửi kèm danh mục ấy ngay trong gói `/dashboard`, dựng bằng CHÍNH hàm mà
+  // `/dong-tien/meta` gọi và sau CHÍNH hàng rào vai trò ấy (xem `danh_muc_phap_nhan`). Không vai
+  // nào thấy thêm một pháp nhân nào so với trước.
+  //
+  // LỐI LUI VẪN CÒN, và nó không thừa: máy chủ bản cũ chưa có trường này, và vai ngoài danh sách
+  // `XEM` thì máy chủ cố ý KHÔNG gửi. Cả hai trường hợp đều rơi về đúng lối cũ. Bỏ lối lui đi là
+  // một ngày nào đó khối này im lặng biến mất khỏi màn hình mà không lỗi nào báo.
   useEffect(() => {
+    if (phap_nhan) {
+      const c = vietouristMe(xepDonVi<DonViChon>(phap_nhan));
+      if (c) setPn(c.id); else setAn(true);
+      return;
+    }
     api("/dong-tien/meta")
       .then((r: any) => {
         // Ghi rõ kiểu phần tử: `r` là any nên nếu để suy diễn, T rơi về đúng ràng buộc {code} và
@@ -243,7 +266,7 @@ export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any 
         else setAn(true);
       })
       .catch(() => setAn(true));   // 403: vai này không xem khối dòng tiền – im lặng, không báo lỗi
-  }, []);
+  }, [phap_nhan]);
 
   const tai = useCallback(async () => {
     if (!pn) return;

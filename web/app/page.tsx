@@ -172,7 +172,8 @@ function Dash() {
         `d.kpis?.so_du_thap_nhat` và `sec.du_bao_13_tuan` đều do MÁY CHỦ tính sẵn — ranh giới 09/9,
         màn hình chỉ bày. Vai nào không được xem khối dòng tiền thì máy chủ không gửi hai trường
         này, nên không có nhánh ẩn/hiện nào ở đây: cắt hàng nằm trong truy vấn (SEC-02). */}
-    <KhoiDongTien day={d.kpis?.so_du_thap_nhat} du_bao={sec.du_bao_13_tuan} />
+    <KhoiDongTien day={d.kpis?.so_du_thap_nhat} du_bao={sec.du_bao_13_tuan}
+      phap_nhan={d.dong_tien_phap_nhan} />
 
     <KhoiTonDongMuc d={sec.ton_dong_theo_muc} />
 
