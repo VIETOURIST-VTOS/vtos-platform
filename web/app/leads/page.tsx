@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
-import { api, vnd, pct, fmtD, fmtDT, getToken } from "@/lib/api";
+import { api, fmtDT, getToken } from "@/lib/api";
 import { Tag, Gate, errMsg } from "@/components/ui";
+import BaoCaoChuyenDoi from "@/components/BaoCaoChuyenDoi";
 
 const ST_CLS: Record<string, string> = { moi: "navy", dang_cham_soc: "warn", chot: "ok", mat: "" };
 
@@ -62,21 +63,10 @@ function Leads() {
 
     {tab === "report" && <div className="panel wrap">
       <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap" }}><label>Tháng tour khởi hành<input type="month" value={repMonth} onChange={(e) => setRepMonth(e.target.value)} /></label><button className="act grey" style={{ margin: 0 }} onClick={xlsx}>Xuất Excel (mẫu Marketing)</button>{rep && <span className="muted">Đối chiếu lúc {fmtDT(rep.as_of)} · lead các tháng {rep.lead_months.join(", ")}</span>}</div>
-      {rep && <>
-        <h2>1. Lead tháng {rep.target_month} → tour khởi hành tháng {rep.target_month} theo kênh</h2>
-        <table><thead><tr><th>Kênh</th><th className="num">Số leads</th><th className="num">SĐT chốt tour</th><th className="num">Tỷ lệ chốt</th><th className="num">Khách mới</th><th className="num">Quay lại</th><th className="num">Doanh thu lũy kế</th><th className="num">Chi phí/lead</th></tr></thead>
-          <tbody>{rep.by_channel_current.map((a: any) => <tr key={a.channel}><td>{a.channel}</td><td className="num">{a.leads}</td><td className="num">{a.converted}</td><td className="num"><b>{pct(a.rate)}</b></td><td className="num">{a.new}</td><td className="num">{a.returning}</td><td className="num">{vnd(a.revenue)}</td><td className="num">{a.cost_per_lead ? vnd(a.cost_per_lead) : "–"}</td></tr>)}
-            <tr><td><b>TỔNG</b></td><td className="num"><b>{rep.total_current.leads}</b></td><td className="num"><b>{rep.total_current.converted}</b></td><td className="num"><b>{pct(rep.total_current.rate)}</b></td><td colSpan={4}></td></tr></tbody></table>
-        <h2>2. Lead các tháng → tour tháng {rep.target_month}</h2>
-        <table><thead><tr><th>Tháng lead</th><th className="num">Tổng leads</th><th className="num">SĐT có tour</th><th className="num">Tỷ lệ chốt</th><th className="num">Khách mới</th><th className="num">Quay lại</th><th className="num">Doanh thu lũy kế</th></tr></thead>
-          <tbody>{rep.by_month.map((m: any) => <tr key={m.lead_month}><td>{m.lead_month}</td><td className="num">{m.leads}</td><td className="num">{m.converted}</td><td className="num"><b>{pct(m.rate)}</b></td><td className="num">{m.new}</td><td className="num">{m.returning}</td><td className="num">{vnd(m.revenue)}</td></tr>)}</tbody></table>
-        <h2>3. Kênh × tháng lead</h2>
-        <table><thead><tr><th>Kênh</th><th>Tháng lead</th><th className="num">Tổng leads</th><th className="num">SĐT có tour</th><th className="num">Tỷ lệ</th><th className="num">Mới</th><th className="num">Quay lại</th><th className="num">Doanh thu lũy kế</th></tr></thead>
-          <tbody>{rep.by_channel_month.map((a: any, i: number) => <tr key={i}><td>{a.channel}</td><td>{a.lead_month}</td><td className="num">{a.leads}</td><td className="num">{a.converted}</td><td className="num">{pct(a.rate)}</td><td className="num">{a.new}</td><td className="num">{a.returning}</td><td className="num">{vnd(a.revenue)}</td></tr>)}</tbody></table>
-        <h2>Chi tiết SĐT đã chốt ({rep.detail.length})</h2>
-        <table><thead><tr><th>Kênh</th><th>Tháng lead</th><th>SĐT</th><th>Khách</th><th>Tour</th><th>KH</th><th>Phân loại</th><th className="num">Lần đi</th><th className="num">Khách</th><th className="num">DT lũy kế</th><th>Sale</th></tr></thead>
-          <tbody>{rep.detail.map((d: any, i: number) => <tr key={i}><td>{d.channel}</td><td>{d.lead_month}</td><td>{d.phone}</td><td>{d.name}</td><td>{d.tour_code}<div className="muted">{d.tour}</div></td><td>{fmtD(d.start_date)}</td><td><Tag cls={d.kind === "Khách mới" ? "ok" : "navy"}>{d.kind}</Tag></td><td className="num">{d.trips}</td><td className="num">{d.pax}</td><td className="num">{vnd(d.revenue)}</td><td>{d.sales}</td></tr>)}</tbody></table>
-      </>}
+      {/* BẢNG NÀY KHÔNG CÒN VIẾT TAY Ở ĐÂY (18/9/2026). Không gian Marketing cần đúng bảng ấy; chép
+          sang là có hai đầu, và sửa một đầu thì đầu kia lặng lẽ hiện số theo quy tắc cũ. Cả hai màn
+          hình nay gọi chung components/BaoCaoChuyenDoi.tsx. */}
+      <BaoCaoChuyenDoi rep={rep} />
     </div>}
 
     {tab === "zalo" && <div className="panel wrap">
