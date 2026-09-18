@@ -75,7 +75,13 @@ def list_leads(month: str = "", channel: str = "", status: str = "", q: str = ""
         like = f"%{q.strip()}%"; qs = qs.where((Lead.phone.ilike(like)) | (Lead.name.ilike(like)) | (Lead.interest.ilike(like)))
     rows = list(db.execute(qs.limit(min(limit, 2000))).scalars())
     cnt = dict(db.execute(select(Lead.status, func.count()).where(Lead.lead_month == month if month else True).group_by(Lead.status)).all())
-    return {"rows": [L.lead_out(l, db) for l in rows], "counts": cnt}
+    # QUÁ HẠN XỬ LÝ – P.TGĐ Phan Ngọc Tuấn chốt 24 giờ ngày 18/9/2026.
+    # Đếm chạy trên `qs` TRƯỚC khi cắt 300 dòng: đếm trên trang đã cắt thì con số nhỏ hơn sự thật,
+    # và nhỏ một cách im lặng. Trả kèm `han_xu_ly_gio` để màn hình in ra ĐANG theo hạn bao nhiêu
+    # giờ, thay vì để người đọc đoán.
+    gio = L.gio_han(db)
+    return {"rows": [L.lead_out(l, db) for l in rows], "counts": cnt,
+            "han_xu_ly_gio": gio, "so_qua_han": L.dem_qua_han(db, qs, gio)}
 
 
 @router.post("/leads", status_code=201)

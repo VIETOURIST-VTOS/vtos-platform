@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
-import { api, vnd, fmtD, pct, soTien } from "@/lib/api";
+import { api, vnd, fmtD, fmtDT, pct, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import BaoCaoChuyenDoi, { tyLe } from "@/components/BaoCaoChuyenDoi";
 
@@ -149,11 +149,14 @@ function Marketing() {
 
   // Báo cáo chuyển đổi nuôi CẢ tab Tổng quan lẫn tab Chuyển đổi, nên nạp ngay từ đầu.
   useEffect(() => { api(`/leads/conversion?month=${repThang}`).then(setRep).catch(() => {}); }, [repThang]);
+  // Nạp danh sách lead cho CẢ tab Khách tiềm năng lẫn thẻ "quá hạn xử lý" của Tổng quan — thẻ ấy
+  // đọc `so_qua_han` do chính đường này trả về. Tab Thương hiệu và Ngân sách không cần, nên không nạp.
   useEffect(() => {
-    if (tab !== "khach") return;
+    if (tab !== "khach" && tab !== "tongquan") return;
+    if (xemLead === false) return;
     api(`/leads?month=${thang}&channel=${encodeURIComponent(kenh)}&status=${tt}&q=${encodeURIComponent(q)}`)
-      .then(setLeads).catch((e) => toast(errMsg(e), true));
-  }, [tab, thang, kenh, tt, q, toast]);
+      .then(setLeads).catch((e) => { if (tab === "khach") toast(errMsg(e), true); });
+  }, [tab, thang, kenh, tt, q, xemLead, toast]);
   useEffect(() => {
     if (tab !== "doisoat") return;
     api(`/leads/stats?month=${sThang}`).then((r) => setStats(Array.isArray(r) ? r : [])).catch(() => {});
@@ -244,6 +247,11 @@ function Marketing() {
              so={rep?.total_current?.so_sdt ?? "—"}
              nguon="Đếm trên tập số điện thoại của sổ lead, không cộng dồn từng kênh."
              cua={() => setTab("khach")} cuaTen="Xem danh sách lead" />
+        <The nhan={`Lead quá hạn xử lý${leads.han_xu_ly_gio ? ` · hạn ${leads.han_xu_ly_gio} giờ` : ""}`}
+             so={leads.so_qua_han ?? "—"}
+             nguon="Quá hạn đã ký mà chưa ai liên hệ và trạng thái vẫn là Mới. Hạn đếm từ lúc lead vào sổ; P.TGĐ Phan Ngọc Tuấn chốt 18/9/2026."
+             cua={() => setTab("khach")} cuaTen="Mở danh sách lead"
+             canhBao={!!leads.so_qua_han} />
         <The nhan="Lead chưa gắn chiến dịch"
              so={chua?.tong ?? "—"}
              nguon="Sổ lead, những dòng chưa có chiến dịch. Hệ thống không tự đoán."
@@ -302,19 +310,28 @@ function Marketing() {
           <label>Tìm<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="SĐT, tên, tour quan tâm" /></label>
         </div>
         <p className="muted">{Object.entries(leads.counts || {}).map(([k, v]: any) =>
-          <span key={k} style={{ marginRight: 12 }}>{(lmeta.status || {})[k] || k}: <b>{v}</b></span>)}</p>
+          <span key={k} style={{ marginRight: 12 }}>{(lmeta.status || {})[k] || k}: <b>{v}</b></span>)}
+          {leads.han_xu_ly_gio ? <span>Quá hạn {leads.han_xu_ly_gio} giờ: <b>{leads.so_qua_han ?? 0}</b></span> : null}</p>
+        {/* Con số quá hạn đếm trên TOÀN bộ lọc, không phải trên trang đang hiện — nói ra để không ai
+            đếm tay các dòng đỏ rồi tưởng bảng sai. */}
+        <p className="muted">Số quá hạn đếm trên toàn bộ bộ lọc đang chọn, không chỉ những dòng hiện trên trang này.</p>
       </div>
       <div className="panel wrap"><table>
         <thead><tr><th>SĐT</th><th>Khách</th><th>Kênh</th><th>Tháng</th><th>Tour quan tâm</th>
-          <th>Chiến dịch</th><th>Trạng thái</th><th>Booking</th><th>Sale</th><th></th></tr></thead>
+          <th>Chiến dịch</th><th>Trạng thái</th><th>Hạn xử lý</th><th>Booking</th><th>Sale</th><th></th></tr></thead>
         <tbody>{(leads.rows || []).length ? leads.rows.map((l: any) => <tr key={l.id}>
           <td>{l.phone}</td><td>{l.name}</td><td>{l.channel}</td><td>{l.lead_month}</td>
           <td>{l.interest}</td><td className="muted">{l.campaign}</td>
           <td><Tag cls={l.status === "chot" ? "ok" : l.status === "mat" ? "" : "warn"}>{l.status_name}</Tag></td>
+          {/* KHÔNG CÓ HẠN thì in dấu gạch, không in "đúng hạn". Lead không biết vào sổ lúc nào thì
+              sổ không chứng minh được gì — và im lặng gán cho nó một kết luận là kết luận sai. */}
+          <td>{l.han_xu_ly
+            ? (l.qua_han ? <Tag cls="red">quá hạn</Tag> : <span className="muted">{fmtDT(l.han_xu_ly)}</span>)
+            : <span className="muted">—</span>}</td>
           <td>{l.booking_code}{l.booking_tour && <div className="muted">{l.booking_tour}</div>}</td>
           <td>{l.sales_name}</td>
           <td><a className="the-cua" href="/leads?tab=leads">mở hồ sơ</a></td>
-        </tr>) : <tr><td colSpan={10} className="muted">Chưa có lead nào khớp bộ lọc — bấm “mở hồ sơ” để sang màn hình Kinh doanh nhập tệp lead.</td></tr>}</tbody>
+        </tr>) : <tr><td colSpan={11} className="muted">Chưa có lead nào khớp bộ lọc — bấm “mở hồ sơ” để sang màn hình Kinh doanh nhập tệp lead.</td></tr>}</tbody>
       </table></div>
     </>}
 

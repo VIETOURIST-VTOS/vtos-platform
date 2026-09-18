@@ -66,6 +66,21 @@ DEFAULT_PARAMS = [
     # làm sai cả bảng bốn mốc, và bảng ấy là thứ Chủ tịch nhìn để quyết định chi tiền. Hạn đếm từ
     # lúc LƯỢT QUÉT phát hiện, không phải từ lúc mở trang – xem services/han_dong_tien.py điều 1.
     ("dong_tien_han_xu_ly_gio", "24", "Hạn xử lý cho dòng dòng tiền chưa đủ nguồn, tính từ lúc lượt quét phát hiện", "giờ", "Chủ tịch chốt 14/9/2026"),
+    # HẠN XỬ LÝ MỘT LEAD — P.TGĐ Phan Ngọc Tuấn chốt 18/9/2026.
+    #
+    # Khai ở ĐÂY chứ không viết cứng số 24 trong services/leads.py, vì hai lẽ:
+    #   · Bảng này là chỗ DUY NHẤT của kho ghi một con số luật kèm NGƯỜI KÝ và NGÀY KÝ (cột cuối).
+    #     Một con số luật nằm trong mã thì sáu tháng nữa không ai biết ai đặt ra nó.
+    #   · Bảng này đã có cửa nhập sẵn (màn hình Tham số), nên đổi hạn là một lần duyệt tham số, không
+    #     phải một lần đẩy mã. Đúng ranh giới 09/9: mỗi con số phải có một cửa cho người dùng.
+    #
+    # ĐẾM TỪ `received_at` — lúc lead VÀO SỔ, không phải lúc ai đó mở màn hình. Cùng cách đếm với
+    # dong_tien_han_xu_ly_gio ở trên (đếm từ lúc lượt quét phát hiện): mốc phải là một sự kiện có
+    # thật trong sổ, không phải hành vi xem.
+    #
+    # KHÔNG trừ ngày nghỉ, không quy ra giờ hành chính. P.TGĐ nói 24 giờ thì là 24 giờ đồng hồ; bịa
+    # thêm luật giờ làm việc là tự ký thay một điều không ai ký.
+    ("lead_han_xu_ly_gio", "24", "Hạn xử lý một lead kể từ khi vào sổ. Quá hạn mà chưa ai liên hệ và trạng thái vẫn là Mới thì lead bị đánh dấu quá hạn", "giờ", "P.TGĐ Phan Ngọc Tuấn chốt 18/9/2026"),
     ("kn_han_muc1_gio", "72", "Hạn phản hồi khách – khiếu nại mức 1 (góp ý)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("kn_han_muc2_gio", "24", "Hạn phản hồi khách – khiếu nại mức 2 (có thiệt hại)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("kn_han_muc3_gio", "4", "Hạn phản hồi khách – khiếu nại mức 3 (nghiêm trọng)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),

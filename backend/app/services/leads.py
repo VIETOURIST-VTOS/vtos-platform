@@ -19,6 +19,78 @@ CANON = {c.lower().replace(" ", ""): c for c in LEAD_CHANNELS}
 CANON.update({"hotline": "Hotline 1", "web": "Đặt tour web", "website": "Đặt tour web", "dattourweb": "Đặt tour web", "tiktok": "Tiktok Ads", "tiktokads": "Tiktok Ads", "zalo": "Zalo OA", "fb": "Facebook", "khachcu": "Khách cũ"})
 
 
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# HẠN XỬ LÝ MỘT LEAD — P.TGĐ Phan Ngọc Tuấn chốt 24 giờ ngày 18/9/2026
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# CON SỐ KHÔNG NẰM Ở ĐÂY. Nó nằm ở tham số `lead_han_xu_ly_gio` trong rules.DEFAULT_PARAMS, chỗ duy
+# nhất của kho ghi một con số luật kèm người ký và ngày ký, và là chỗ đã có cửa nhập sẵn (màn hình
+# Tham số). Viết cứng 24 vào đây là lấy mất cả hai thứ ấy trong một dòng.
+#
+# HẠN LÀ SỐ SUY RA, KHÔNG PHẢI CỘT TRONG BẢNG. `hạn = received_at + N giờ` — không thêm cột vào
+# bảng leads, nên không có migration. Cột chỉ cần khi giá trị KHÔNG suy được từ dữ liệu đã có; ở đây
+# nó suy được, và một cột thừa thì đến ngày đổi hạn là cả bảng cũ mang hạn cũ mà không ai nhớ.
+#
+# THẾ NÀO LÀ ĐÃ XỬ LÝ — hai dấu, lấy HỢP, không lấy giao:
+#     · `last_contact_at` có giá trị  → đã có người liên hệ
+#     · `status` khác "moi"           → đã có người động vào hồ sơ (chăm sóc / chốt / mất)
+# Chỉ soi một dấu là đếm nhầm: sale đổi trạng thái mà quên ghi giờ liên hệ vẫn là đã xử lý, và
+# ngược lại. Lấy hợp thì một lead chỉ còn "quá hạn" khi THẬT SỰ không ai chạm vào.
+#
+# KHÔNG CÓ `received_at` THÌ KHÔNG CÓ HẠN, VÀ KHÔNG CÓ HẠN THÌ KHÔNG KẾT LUẬN QUÁ HẠN. Trả None chứ
+# không mặc định là quá hạn — cùng một lẽ với "chưa đối chiếu thì chưa xác định, không phải 0%".
+
+
+def han_xu_ly(l: Lead, gio: float) -> datetime | None:
+    """Thời điểm hết hạn xử lý của một lead. None khi không biết lead vào sổ lúc nào."""
+    if not l.received_at:
+        return None
+    return l.received_at + timedelta(hours=gio)
+
+
+def da_xu_ly(l: Lead) -> bool:
+    """Đã có người chạm vào lead này chưa. Xem ghi chú "HAI DẤU, LẤY HỢP" ở trên."""
+    return bool(l.last_contact_at) or l.status != "moi"
+
+
+def qua_han(l: Lead, gio: float, bay_gio: datetime | None = None) -> bool:
+    han = han_xu_ly(l, gio)
+    if han is None or da_xu_ly(l):
+        return False
+    return (bay_gio or datetime.now()) > han
+
+
+def loc_qua_han(qs, gio: float, bay_gio: datetime | None = None):
+    """Thêm điều kiện QUÁ HẠN vào một câu truy vấn Lead đã lọc sẵn.
+
+    Có hàm này để chỗ ĐẾM và chỗ ĐÁNH DẤU TỪNG DÒNG dùng CHUNG một định nghĩa. Đếm bằng SQL còn
+    đánh dấu bằng Python là hai đầu, và hai đầu thì sớm muộn lệch nhau — đúng kiểu hỏng mà bản sửa
+    tỷ lệ chốt ngày 18/9 vừa dọn xong ở chỗ khác.
+    """
+    moc = (bay_gio or datetime.now()) - timedelta(hours=gio)
+    return qs.where(Lead.last_contact_at.is_(None), Lead.status == "moi", Lead.received_at < moc)
+
+
+def gio_han(db: Session) -> float:
+    """Đọc hạn đã ký. Một chỗ đọc, để không ai gõ lại tên tham số ở chỗ thứ hai."""
+    return float(R.get_param(db, "lead_han_xu_ly_gio"))
+
+
+def dem_qua_han(db: Session, qs, gio: float | None = None, bay_gio: datetime | None = None) -> int:
+    """Đếm lead quá hạn trong ĐÚNG bộ lọc đang xem — không đếm trên trang đã cắt.
+
+    Danh sách lead cắt ở 300 dòng; đếm trên trang ấy thì con số quá hạn nhỏ hơn sự thật và nhỏ một
+    cách im lặng. Nên đếm chạy trên câu truy vấn TRƯỚC khi cắt.
+    """
+    g = gio if gio is not None else gio_han(db)
+    # GỠ limit/offset/order_by NGAY TẠI ĐÂY, không trông vào việc người gọi nhớ truyền câu chưa cắt.
+    # Phép thử ngày 18/9 bắt đúng chỗ này: truyền vào câu đã .limit(2) thì hàm đếm ra 2 trong khi sổ
+    # có 5 — và nó SAI THEO HƯỚNG NHỎ ĐI, kiểu sai không ai nhận ra. Một lời hứa mà phải nhờ người
+    # gọi giữ hộ thì sớm muộn có người quên; gỡ ở đây là hứa bằng chính cấu trúc.
+    q = loc_qua_han(qs.order_by(None).limit(None).offset(None), g, bay_gio)
+    return int(db.execute(select(func.count()).select_from(q.subquery())).scalar() or 0)
+
+
 def canon_channel(s: str) -> str:
     k = (s or "").strip().lower().replace(" ", "")
     return CANON.get(k, (s or "Khác").strip()[:40] or "Khác")
@@ -292,9 +364,23 @@ def to_xlsx(rep: dict) -> bytes:
     bio = BytesIO(); wb.save(bio); return bio.getvalue()
 
 
+def _han_ra(l: Lead, db: Session) -> dict:
+    """Đọc hạn đã ký MỘT lần cho mỗi dòng, rồi tính cả hai khoá từ đúng con số ấy.
+
+    Bản đầu gọi gio_han(db) hai lần trong cùng một dòng. Bộ đệm tham số làm nó rẻ, nhưng hai lần đọc
+    thì có hai cơ hội đọc ra hai giá trị khác nhau nếu ai đó duyệt tham số đúng lúc — và một dòng có
+    hạn của luật cũ kèm cờ quá hạn của luật mới thì không giải thích được cho ai.
+    """
+    g = gio_han(db)
+    return {"han_xu_ly": han_xu_ly(l, g), "qua_han": qua_han(l, g)}
+
+
 def lead_out(l: Lead, db: Session | None = None) -> dict:
     s = db.get(User, l.sales_id) if (db and l.sales_id) else None
     b = db.get(Booking, l.booking_id) if (db and l.booking_id) else None
     return {"id": l.id, "phone": l.phone, "name": l.name, "channel": l.channel, "lead_month": l.lead_month, "received_at": l.received_at, "campaign": l.campaign, "interest": l.interest, "sales_id": l.sales_id,
             "sales_name": s.full_name if s else "", "status": l.status, "status_name": LEAD_STATUS.get(l.status, l.status), "note": l.note, "zalo_uid": l.zalo_uid, "zalo_follow": l.zalo_follow,
-            "last_contact_at": l.last_contact_at, "booking_id": l.booking_id, "booking_code": b.code if b else "", "booking_tour": b.tour.code if b and b.tour else "", "converted_at": l.converted_at, "created_at": l.created_at}
+            "last_contact_at": l.last_contact_at, "booking_id": l.booking_id, "booking_code": b.code if b else "", "booking_tour": b.tour.code if b and b.tour else "", "converted_at": l.converted_at, "created_at": l.created_at,
+            # HẠN XỬ LÝ (P.TGĐ Phan Ngọc Tuấn chốt 18/9/2026). Cần `db` để đọc tham số đã ký; gọi
+            # lead_out() không kèm db thì hai khoá này là None — KHÔNG đoán bằng một số viết cứng.
+            **(_han_ra(l, db) if db else {"han_xu_ly": None, "qua_han": None})}
