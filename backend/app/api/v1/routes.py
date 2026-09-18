@@ -161,6 +161,23 @@ def _dashboard_payload(db: Session, u: User) -> dict:
               if u.role in a.to_roles.split(",") or u.role in ("chutich", "tgd", "cntt", "bks")][:60]
     from app.services import dashboard as DB_
     extra = DB_.build(db, u)
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # TC-66 · GỬI KÈM MÃ PHÁP NHÂN ĐỂ KHỐI DÒNG TIỀN KHÔNG PHẢI HỎI THÊM MỘT LƯỢT
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # Đo 18/9/2026: màn hình gọi `/dong-tien/meta` (0,85 giây) chỉ để biết mã pháp nhân, rồi mới
+    # gọi được `/dong-tien/khung/{pn}` — hai cửa nối đuôi nhau, cộng ~1,1 giây vào cuối lần mở
+    # trang. Gói này vốn đã về trước, nên nó mang luôn câu trả lời ấy đi cùng.
+    #
+    # HÀNG RÀO GIỮ NGUYÊN, KHÔNG NỚI MỘT LI: chỉ gửi cho vai nằm trong `XEM` của phân hệ dòng
+    # tiền — đúng hàng rào của `/dong-tien/meta` — và dựng bằng CHÍNH hàm mà cửa ấy gọi, nên phép
+    # lọc phạm vi không thể lệch giữa hai nơi. Vai ngoài danh sách thì trường này KHÔNG có mặt, và
+    # màn hình rơi về lối cũ là tự gọi `/dong-tien/meta`.
+    try:
+        from app.api.v1.dong_tien import XEM as DT_XEM, danh_muc_phap_nhan
+        if u.role in DT_XEM:
+            extra = {**extra, "dong_tien_phap_nhan": danh_muc_phap_nhan(db, u)}
+    except Exception:      # noqa: BLE001 — một danh mục lỗi không được làm sập cả bảng điều khiển
+        pass
     payload = {"counts": counts, "n_tours": sum(counts.values()), "todo": todo[:100],
                "pending_requests": db.execute(select(func.count()).select_from(ServiceRequest).where(ServiceRequest.booking_id == None)).scalar(),
                "pending_params": db.execute(select(func.count()).select_from(Param).where(Param.status == "pending")).scalar(),
@@ -622,6 +639,7 @@ def list_alerts(trang_thai: str = "", nguon: str = "", cua_toi: bool = False,
     Trần phải đặt SAU bộ lọc vai trò, không phải trước: cắt trước khi lọc thì người chỉ thấy cảnh
     báo của mình có thể nhận về một trang rỗng trong khi việc của họ nằm ở dòng thứ 400.
     """
+    from sqlalchemy import func as _f, or_ as _or
     qs = select(Alert).order_by(Alert.resolved, desc(Alert.created_at))
     if trang_thai:
         qs = qs.where(Alert.trang_thai.in_(trang_thai.split(",")))
@@ -629,17 +647,42 @@ def list_alerts(trang_thai: str = "", nguon: str = "", cua_toi: bool = False,
         qs = qs.where(Alert.nguon == nguon)
     if cua_toi:
         qs = qs.where(Alert.nguoi_nhan_id == u.id)
-    rows = db.execute(qs).scalars()
-    # Ai thấy MỌI cảnh báo, ai chỉ thấy cảnh báo gửi tới vai trò mình. Trước 07/9/2026 dùng nhóm "xem tất
-    # cả" cũ (bảy vai trò); nay nhóm đó đã giải thể nên liệt kê thẳng: lãnh đạo, Ban Kiểm soát, Kế toán, CNTT –
-    # bốn nhóm có trách nhiệm giám sát toàn hệ thống. Cảnh báo là thứ phải có người nhận, không phải thứ
-    # ai cũng đọc cho biết.
-    if u.role in AC.BASE_VIEW + ("ketoan", "cntt"):
-        duoc = list(rows)
-    else:
-        duoc = [a for a in rows if u.role in (a.to_roles or "").split(",")]   # chỉ cảnh báo gửi tới vai trò của mình
+
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # TC-66 · LỌC VAI TRÒ Ở MÁY CHỦ, TRONG CÂU TRUY VẤN — anh Tuấn 18/9/2026 duyệt chữa cửa này.
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # Đo trên bản chạy thật: 0,87 — 0,95 — 1,30 giây, lần nào cũng chậm, không có lần nhanh. Lý do
+    # nằm ngay ở đây: câu truy vấn KHÔNG có trần, nên mỗi lần bấm F5 là đọc TOÀN BỘ bảng alerts về
+    # bộ nhớ (KS-5 đo 10/9/2026: 1.703 dòng đang mở) rồi mới lọc bằng Python và cắt trang. Trần
+    # `limit` chỉ cắt phần TRẢ VỀ, không cắt phần ĐỌC LÊN.
+    #
+    # KHÔNG CHỮA BẰNG CHỖ NHỚ. `/alerts` là cửa CẢNH BÁO: nhớ lại năm phút nghĩa là giữ một cảnh
+    # báo cũ trên màn hình năm phút, và giữ một cảnh báo ĐÃ XỬ LÝ cũng đúng ngần ấy lâu. Cái sai
+    # ở đây là đọc quá nhiều, nên phải chữa đúng chỗ ấy.
+    #
+    # LUẬT PHÂN QUYỀN GIỮ NGUYÊN TỪNG CHỮ, chỉ đổi chỗ thi hành:
+    #   · Lãnh đạo, Ban Kiểm soát, Kế toán, CNTT thấy MỌI cảnh báo. Trước 07/9/2026 dùng nhóm "xem
+    #     tất cả" cũ (bảy vai trò); nay nhóm đó đã giải thể nên liệt kê thẳng — bốn nhóm có trách
+    #     nhiệm giám sát toàn hệ thống.
+    #   · Vai khác chỉ thấy cảnh báo GỬI TỚI vai mình. Cảnh báo là thứ phải có người nhận, không
+    #     phải thứ ai cũng đọc cho biết.
+    #
+    # `to_roles` là một chuỗi ngăn bằng dấu phẩy, nên phải so KHỚP CẢ MẨU chứ không `LIKE '%vai%'`:
+    # tìm chuỗi con thì vai "kt" trúng luôn mọi dòng gửi cho "ketoan", tức nới quyền mà không ai
+    # thấy. Bốn nhánh dưới đây phủ đúng bốn vị trí một mẩu có thể đứng trong chuỗi: một mình, đầu,
+    # cuối, giữa. Phép thử test_tc66 canh rằng nó cho ra ĐÚNG tập mà luật Python cũ cho ra.
+    if u.role not in AC.BASE_VIEW + ("ketoan", "cntt"):
+        vai = u.role
+        qs = qs.where(_or(Alert.to_roles == vai,
+                          Alert.to_roles.like(f"{vai},%"),
+                          Alert.to_roles.like(f"%,{vai}"),
+                          Alert.to_roles.like(f"%,{vai},%")))
+
     tran = max(1, min(limit, 500))
-    trang = duoc[offset:offset + tran]
+    # Đếm bằng COUNT chứ không bằng len() của danh sách đã đọc: `tong` là con số nói "còn bao nhiêu
+    # dòng nữa", và đọc cả bảng chỉ để đếm là quay lại đúng cái vừa bỏ.
+    tong = db.execute(select(_f.count()).select_from(qs.subquery())).scalar() or 0
+    trang = list(db.execute(qs.offset(offset).limit(tran)).scalars())
     # Tên người nhận lấy MỘT lượt cho cả trang. Gắn quan hệ vào Alert thì mỗi dòng một lượt hỏi –
     # đúng cái N+1 mà KS-5 vừa gỡ ở /tours, không rước lại ở đây.
     ids = {a.nguoi_nhan_id for a in trang if a.nguoi_nhan_id}
@@ -651,8 +694,8 @@ def list_alerts(trang_thai: str = "", nguon: str = "", cua_toi: bool = False,
         dong.append(v)
     # Cùng một khuôn phong bì với GET /tours: rows · tong · offset · limit · cham_tran. Một khuôn
     # cho mọi danh sách thì giao diện viết MỘT lần; hai khuôn thì chỗ nào cũng phải nhớ khuôn nào.
-    return {"rows": dong, "tong": len(duoc), "offset": offset, "limit": tran,
-            "cham_tran": offset + len(dong) < len(duoc)}
+    return {"rows": dong, "tong": tong, "offset": offset, "limit": tran,
+            "cham_tran": offset + len(dong) < tong}
 
 
 @router.post("/alerts/{aid}/nhan", tags=["alerts"])
