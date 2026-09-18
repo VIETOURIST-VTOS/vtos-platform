@@ -338,7 +338,36 @@ MAN_HINH_API = {
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
-    "/marketing": ("/api/v1/marketing", "/api/v1/products", "/api/v1/users"),
+    # 18/9/2026 – THÊM "/api/v1/leads" VÀ "/api/v1/noi-dung", anh Tuấn chốt cùng ngày.
+    #
+    # Màn hình /marketing nay là KHÔNG GIAN LÀM VIỆC bảy màn hình theo bản vẽ V3.0, nên nó đọc cả
+    # sổ lead (khách tiềm năng, chuyển đổi, đối soát) và sổ nội dung. Bản đồ này đo từ mã giao diện
+    # chứ không khai bằng trí nhớ, nên gọi thêm nhóm nào là phải khai nhóm ấy —
+    # test_p2_pham_vi_vai_tro::test_ban_do_man_hinh_api_khong_lech_voi_giao_dien canh đúng chỗ đó và
+    # đã bắt được lần đẩy đầu tiên.
+    #
+    # HỆ QUẢ PHẢI NÓI RA, KHÔNG ĐƯỢC ĐỂ NÓ LẶNG LẼ: hàng rào NGOÀI suy từ MENU_ROLES × bảng này.
+    # So ba dòng menu:
+    #     "/marketing" = BASE_VIEW + MARKETING + (ptgd_mkt, gd_kd, ketoan, cntt)
+    #     "/leads"     = BASE_VIEW + SALES + OPERATIONS + MARKETING + (ptgd_mkt, cntt)
+    #     "/noi-dung"  = BASE_VIEW + MARKETING + (ptgd_mkt, hanh_chinh, cntt)
+    # HAI vai được nới, không phải một — con số lấy từ chính phép thử, không nhẩm tay:
+    #     ketoan  +2  — cả "/api/v1/leads" lẫn "/api/v1/noi-dung"
+    #     gd_kd   +1  — chỉ "/api/v1/noi-dung"; "/api/v1/leads" ông đã có sẵn qua nhóm SALES
+    # (Bản nháp đầu của chú thích này viết "vai DUY NHẤT được nới là ketoan" — sai, vì chỉ so
+    # /marketing với /leads mà quên /noi-dung. test_p2 đếm ra gd_kd 56 → 57 và sửa lại lời mô tả.)
+    #
+    # Hàng rào TRONG vẫn chặn — mọi tuyến lead khai require_roles(*CRM_ROLES) và CRM_ROLES không có
+    # ketoan; mọi tuyến nội dung khai ND_XEM và ND_XEM không có ketoan lẫn gd_kd — nên hôm nay KHÔNG
+    # lọt một dòng dữ liệu khách nào. Cái mất là tấm lưới dự phòng: mai kia ai thêm một tuyến dưới
+    # hai nhóm ấy mà quên khai quyền thì hai vai này vào được, còn trước bản này thì không.
+    #
+    # Đổi lại, màn hình TỰ ẨN bốn tab đọc dữ liệu khách với vai không mở được /leads/meta (xem
+    # web/app/marketing/page.tsx) — Kế toán mở không gian Marketing chỉ thấy Ngân sách & chiến dịch,
+    # không thấy bốn tab báo lỗi 403. Ẩn ở giao diện KHÔNG phải hàng rào; hàng rào vẫn là hai lớp
+    # trên. Nó chỉ để người dùng không phải đoán vì sao màn hình đỏ.
+    "/marketing": ("/api/v1/marketing", "/api/v1/products", "/api/v1/users",
+                   "/api/v1/leads", "/api/v1/noi-dung"),
     "/doc-chung-tu": ("/api/v1/doc-chung-tu", "/api/v1/nap-du-lieu", "/api/v1/tep"),
 
     "/nap-du-lieu": ("/api/v1/nap-du-lieu", "/api/v1/quyet-toan-tour"),

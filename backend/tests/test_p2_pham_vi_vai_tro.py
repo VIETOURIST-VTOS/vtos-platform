@@ -229,8 +229,29 @@ PHAM_VI_DA_CHOT = {
     # và thế là MƯỜI TÁM vai trò được nới thay vì chín. Tra tỷ giá từ biểu quyết toán là một việc
     # có thật, nhưng nó phải là một quyết định riêng có người ký, không phải hệ quả phụ của việc
     # thêm một màn hình. Phép thử này bắt được, và đó đúng là việc của nó.
+    # ketoan 90 → 92 và gd_kd 56 → 57 NGÀY 18/9/2026 — anh Tuấn chốt cùng ngày, sau khi phép thử này
+    # bắt được lần đẩy đầu tiên của không gian Marketing bảy màn hình.
+    #
+    # VÌ SAO NỚI: màn hình /marketing nay đọc cả sổ lead và sổ nội dung (bản vẽ V3.0), nên bản đồ
+    # MAN_HINH_API của nó phải khai thêm "/api/v1/leads" và "/api/v1/noi-dung". Hàng rào ngoài suy từ
+    # MENU_ROLES × bản đồ ấy, nên hai vai có /marketing mà thiếu sổ tương ứng thì nhích lên:
+    #     ketoan  +2  — "/api/v1/leads" và "/api/v1/noi-dung" (ông có /marketing để đối chiếu chi phí
+    #                   chiến dịch, nhưng không có /leads lẫn /noi-dung trong ma trận menu)
+    #     gd_kd   +1  — chỉ "/api/v1/noi-dung"; "/api/v1/leads" ông đã có sẵn qua nhóm SALES
+    #
+    # HÔM NAY KHÔNG LỌT MỘT DÒNG DỮ LIỆU KHÁCH NÀO: hàng rào TRONG vẫn chặn — mọi tuyến lead khai
+    # require_roles(*CRM_ROLES) và CRM_ROLES không có ketoan; mọi tuyến nội dung khai ND_XEM và ND_XEM
+    # không có ketoan lẫn gd_kd. Cái mất là TẤM LƯỚI DỰ PHÒNG: mai kia ai thêm một tuyến dưới hai
+    # nhóm ấy mà quên khai quyền thì hai vai này vào được, còn trước bản này thì không.
+    #
+    # ĐỔI LẠI, màn hình tự ẩn bốn tab đọc dữ liệu khách với vai không mở được /leads/meta (xem
+    # web/app/marketing/page.tsx). Ẩn ở giao diện KHÔNG phải hàng rào và không được tính là hàng rào;
+    # nó chỉ để Kế toán mở không gian Marketing ra không gặp bốn tab đỏ mà không hiểu vì sao.
+    #
+    # NẾU LẦN ĐẾM SAU THẤY MỘT VAI KHÁC NHÍCH LÊN thì đó là một lần nới nhầm, không phải bản này:
+    # bản này nới đúng hai vai, đúng ba tiền tố, và cả ba đều đã kể tên ở trên.
     "chutich": 108, "tgd": 108, "bks": 108, "cntt": 105,
-    "ketoan": 90, "tp_dh": 85, "ptgd_doan": 63, "nv_dh": 59, "hcns": 55, "gd_kd": 56,
+    "ketoan": 92, "tp_dh": 85, "ptgd_doan": 63, "nv_dh": 59, "hcns": 55, "gd_kd": 57,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
