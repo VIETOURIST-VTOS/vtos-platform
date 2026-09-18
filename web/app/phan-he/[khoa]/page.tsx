@@ -14,7 +14,22 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
-import { CAY_PHAN_HE, timPhanHe, demMuc, laNhan, type MucCay } from "@/lib/cay_phan_he";
+import { CAY_PHAN_HE, PHAN_HE_CON, timPhanHe, demMuc, laNhan, type MucCay } from "@/lib/cay_phan_he";
+
+/** TC-70 · 18/9/2026 — DANH SÁCH CHIP CHUYỂN NHANH phải khớp với thanh dọc, không phải với
+ *  CAY_PHAN_HE. Từ 18/9 Kinh doanh và Điều hành không còn là một màn hình: chúng xổ ra 2 và 3 phân
+ *  hệ con. Nếu chip vẫn liệt kê hai phân hệ cha thì người đang đứng ở "Điều hành xe" nhìn xuống
+ *  không thấy chip nào sáng, và bấm chip "Điều hành" lại rơi về mục lục gộp mà menu đã bỏ.
+ *
+ *  Phân hệ cha nào CÓ con thì thay bằng các con, giữ đúng thứ tự cha; cha nào không có con thì để
+ *  nguyên. Nhờ vậy thêm hay bớt một phân hệ con sau này chỉ phải sửa PHAN_HE_CON, không phải sửa
+ *  chỗ này. */
+const CHIP_PHAN_HE = CAY_PHAN_HE.flatMap((p) => {
+  const con = PHAN_HE_CON.filter((c) => c.cha === p.khoa);
+  return con.length
+    ? con.map((c) => ({ khoa: c.khoa, ma: p.ma, ten: c.ten }))
+    : [{ khoa: p.khoa, ma: p.ma, ten: p.ten }];
+});
 
 /** `khoa` là trạng thái CỦA PHIÊN NÀY, không phải thuộc tính của cây – nên nó sống ở đây chứ không
  *  vào cay_phan_he.ts. Cùng một mục, người này khoá người kia mở. */
@@ -30,6 +45,10 @@ function Dong({ m, cap }: { m: MucKhoa; cap: number }) {
       <span className="cay-ten">{m.ten}</span>
       {m.them && <span className="cay-co them">ngoài v1.3</span>}
       {m.chuyen && <span className="cay-co chuyen">mã v1.3: {m.ma}</span>}
+      {/* TC-70 · 18/9/2026: nhánh này còn nằm ở phân hệ con anh em. Nói ra chứ không để người đọc
+          tưởng màn hình ấy của riêng phòng mình – hộp thư và hồ sơ khách là của cả hai phòng bán
+          hàng, sửa ở đây thì bên kia thấy ngay. */}
+      {m.chung && <span className="cay-co chung">dùng chung</span>}
       {m.tab ? <span className="cay-tt tab">Tab trong trang</span>
         : m.khoa ? <span className="cay-tt cam">Không có quyền</span>
           : m.href ? <span className="cay-tt co">Đã có →</span>
@@ -71,7 +90,9 @@ function Trang({ khoa }: { khoa: string }) {
   if (!ph) return (
     <div className="panel">
       <b>Không có phân hệ này.</b>
-      <p className="muted">Đường dẫn /phan-he/{khoa} không khớp phân hệ nào trong tám phân hệ của VTOS.</p>
+      <p className="muted">Đường dẫn /phan-he/{khoa} không khớp phân hệ nào của VTOS – cả tám phân hệ
+        chính lẫn năm phân hệ con (Kinh doanh lẻ, Kinh doanh đoàn, Điều hành tour, Điều hành xe,
+        Hướng dẫn viên).</p>
       <Link href="/">Về bảng điều hành</Link>
     </div>
   );
@@ -80,7 +101,7 @@ function Trang({ khoa }: { khoa: string }) {
     <>
       {/* Chuyển nhanh sang phân hệ khác mà không phải quay lên menu dọc. */}
       <nav className="cay-chuyen" aria-label="Các phân hệ khác">
-        {CAY_PHAN_HE.map((p) => (
+        {CHIP_PHAN_HE.map((p) => (
           <Link key={p.khoa} href={`/phan-he/${p.khoa}`}
             className={"cay-chip" + (p.khoa === ph.khoa ? " on" : "")}>
             <b>{p.ma}</b> {p.ten}

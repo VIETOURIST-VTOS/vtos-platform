@@ -220,8 +220,53 @@ aside.side .grp.on{background:rgba(255,255,255,.14);border-color:rgba(255,255,25
 aside.side .grp.on .bt-hinh{opacity:1;color:#fff}
 /* Thanh phân hệ chỉ có MỘT hành vi: bấm là đi (anh Tuấn chốt 13/9/2026, chiều). Bảng xổ ra khi
    rê chuột đã gỡ cùng toàn bộ luật .bay – mục lục đầy đủ của phân hệ nằm ở trang /phan-he/<khoa>.
-   `position:relative` giữ lại vì .nhom vẫn là khung chứa của thanh phân hệ. */
+   `position:relative` giữ lại vì .nhom vẫn là khung chứa của thanh phân hệ.
+
+   TC-70 · 18/9/2026 – ĐIỀU NÀY NAY CÓ NGOẠI LỆ, không bị bỏ. Sáu nhóm vẫn "bấm là đi". Hai nhóm
+   Kinh doanh và Điều hành xổ ra, vì mỗi nhóm ấy nay đại diện cho nhiều phòng chứ không phải một
+   (Kinh doanh: lẻ và đoàn · Điều hành: tour, xe, hướng dẫn viên). Luật cũ "một thanh không thể vừa
+   đi vừa bung" VẪN GIỮ: mỗi nhóm vẫn chỉ làm đúng một việc. Bảng xổ ra lần này KHÁC bảng đã gỡ
+   ngày 13/9 – nó không chứa mục lục bốn cấp của v1.3, chỉ chứa 2 hoặc 3 lối vào phân hệ con. */
 aside.side .nhom{position:relative}
+
+/* ═══ TC-70 · NHÓM XỔ RA ═══════════════════════════════════════════════════════════════════════
+   Nút của nhóm xổ ra dùng lại y nguyên hình dáng `.grp` để tám thanh vẫn là một hàng đều nhau; ở
+   đây chỉ gỡ mấy mặc định của thẻ <button> mà thẻ <a> không có. */
+aside.side .grp-xo{font:inherit;color:inherit;appearance:none}
+/* Dấu › đẩy sát mép phải: mờ khi đóng, rõ khi mở – người dùng biết mình vừa mở cái nào. */
+aside.side .grp-xo-dau{margin-left:auto;opacity:.55;font-size:calc(15/14*1rem);line-height:1}
+aside.side .nhom-xo.mo .grp-xo-dau{opacity:1}
+
+/* BẢNG XỔ RA nằm NGOÀI <aside> (đi qua cổng React ra thẳng <body>) nên KHÔNG được viết chọn tử
+   lồng trong `aside.side` – viết thế thì luật không bao giờ khớp và bảng ra trần trụi không định
+   dạng. Phải ra ngoài vì `aside.side` có `overflow-y:auto`: để bên trong thì phần thò ra bị CẮT
+   MẤT chứ không phải bị che, người dùng không cuộn tới được.
+   `position:fixed` vì toạ độ do JS đo theo khung nhìn, không theo trang.
+
+   KHÔNG ĐƯỢC thêm `.xo-bang{display:none}` rồi mở bằng `.nhom-xo.mo .xo-bang` – đó là phản xạ
+   quen tay và ở đây nó làm bảng KHÔNG BAO GIỜ HIỆN. Lý do: bảng đã đi qua cổng ra <body>, nó
+   không còn là con cháu của `.nhom-xo` nữa, nên luật dựa vào lớp `.mo` của tổ tiên không thể khớp.
+   Việc ẩn/hiện do React lo: bảng chỉ được VẼ RA khi đang mở. Cái bẫy này lộ ra khi em dựng bản mô
+   phỏng tĩnh – ở đó không có React nên cả hai bảng cùng hiện một lúc. */
+.xo-bang{position:fixed;z-index:60;min-width:calc(208/14*1rem);padding:6px;
+  background:var(--vtos-nav-bg);border:1px solid rgba(255,255,255,.18);
+  border-radius:var(--vtos-radius-md);box-shadow:0 12px 30px rgba(0,0,0,.45);
+  display:flex;flex-direction:column;gap:2px}
+.xo-dau{font-size:calc(11/14*1rem);letter-spacing:.06em;text-transform:uppercase;
+  color:rgba(255,255,255,.5);padding:4px 10px 6px}
+.xo-muc{display:block;padding:10px 12px;border-radius:8px;text-decoration:none;
+  color:rgba(255,255,255,.92);font-weight:500;white-space:nowrap}
+.xo-muc:hover,.xo-muc:focus-visible{background:rgba(255,255,255,.12);color:#fff}
+
+/* NGĂN KÉO (≤900px): bảng vẽ TẠI CHỖ, không cổng, không fixed. Bay sang phải ở đây là bay ra ngoài
+   màn hình – đo 18/9 trên màn rộng 390px thì bảng rơi vào toạ độ 388px, tức mất hẳn.
+   Ngưỡng 900px phải TRÙNG `NGUONG_NGAN_KEO` trong Shell.tsx; lệch nhau thì có một dải bề rộng mà
+   JS tưởng đang xổ ra bên phải còn CSS tưởng đang vẽ tại chỗ. Phép thử canh hai con số này. */
+@media (max-width:900px){
+  .xo-bang{position:static;min-width:0;width:calc(100% - 16px);margin:0 8px 6px;
+    box-shadow:none;background:rgba(255,255,255,.06)}
+}
+
 .shell main{flex:1;min-width:0;margin:0}
 /* Thu thanh dọc (v1.1 §I.2: rộng 224–240px, thu còn 56–64px). Ở trạng thái thu chỉ còn một cột biểu
    tượng; nhãn nhóm không mất mà chuyển vào title/aria-label, vì §I.2 đòi biểu tượng phải có chú
@@ -343,6 +388,10 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
   border:1px solid var(--vtos-line)}
 .cay-co{font-size:calc(10/14*1rem);padding:2px 7px;border-radius:999px;background:var(--vtos-info-bg);
   color:var(--vtos-info);white-space:nowrap}
+/* TC-70 · cờ "dùng chung": nhánh này còn nằm ở phân hệ con anh em. Dùng màu CẢNH BÁO chứ không
+   phải màu thông tin như hai cờ kia, vì đây là điều người sửa cần dừng lại một nhịp – đổi màn hình
+   này thì phòng bên cạnh cũng đổi theo. */
+.cay-co.chung{background:var(--vtos-warning-bg);color:var(--vtos-warning)}
 
 @media (max-width:640px){
   .cay-dau{flex-wrap:wrap;gap:10px}

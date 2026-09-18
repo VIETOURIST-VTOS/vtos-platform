@@ -45,35 +45,96 @@ def _duong_dan(src):
 
 
 def test_du_tam_phan_he_va_dung_khoa_cua_menu():
-    """Tám khoá của cây phải TRÙNG khoá nhóm menu, không phải một bộ tên khác.
+    """Khoá của cây phải TRÙNG khoá menu, không phải một bộ tên khác.
 
     Lệch một chữ thì thanh phân hệ dẫn tới /phan-he/<khoa> không có thật và người dùng gặp trang
     "Không có phân hệ này" – lỗi chỉ lộ ra khi bấm đúng nhóm ấy.
+
+    ══ TC-70 · 18/9/2026 — LUẬT ĐƯỢC NỚI, KHÔNG BỊ BỎ ═══════════════════════════════════════════
+    BÊN CŨ (12/9): cây có ĐÚNG tám khoá, và tám khoá ấy trùng khít tám nhóm menu.
+    BÊN MỚI (18/9): menu vẫn ĐÚNG TÁM NHÓM – chỗ ấy không đổi. Nhưng hai nhóm nay xổ ra thành năm
+      phân hệ CON (Kinh doanh → lẻ, đoàn · Điều hành → tour, xe, HDV), nên tệp cây có thêm năm khoá
+      nữa trong PHAN_HE_CON. Điều phải canh vẫn y nguyên về bản chất: MỌI khoá menu trỏ tới đều
+      phải có thật trong cây, và mọi khoá trong cây đều phải tới được từ menu. Chỉ có điều nay
+      "tới được" gồm cả đường đi qua bảng xổ ra.
+
+    Con số tám không được nới: tám nhóm là đặc tả §I.2, còn năm phân hệ con là cấp DƯỚI nó.
     """
     cay = _cay()
-    khoa_cay = re.findall(r'khoa: "(\w+)"', cay)
-    assert khoa_cay == TAM_KHOA, f"cây phân hệ có {khoa_cay}, phải đúng tám khoá {TAM_KHOA}"
+    # Tách hai phần: CAY_PHAN_HE (cha) và PHAN_HE_CON (con). Cắt tại chỗ khai PHAN_HE_CON chứ
+    # không dò cả tệp, nếu không `khoa:` của phần con lẫn vào phần cha và phép thử đếm ra 13.
+    cat = cay.find("export const PHAN_HE_CON")
+    assert cat > 0, "không tìm thấy khai báo PHAN_HE_CON – TC-70 đã bị gỡ mất?"
+    khoa_cha = re.findall(r'khoa: "(\w+)"', cay[:cat])
+    assert khoa_cha == TAM_KHOA, f"cây phân hệ cha có {khoa_cha}, phải đúng tám khoá {TAM_KHOA}"
+
     khoa_menu = re.findall(r'\{ key: "(\w+)", label:', _shell())
     assert khoa_menu == TAM_KHOA, f"menu có {khoa_menu}, lệch khoá với cây phân hệ"
 
+    # Năm phân hệ con: khoá khai trong menu (`phans`) phải trùng khít khoá khai trong cây.
+    con_cay = set(re.findall(r'\{ khoa: "(\w+)", cha: "(\w+)"', cay[cat:]))
+    con_menu = set()
+    for khoi in re.findall(r'phans:\s*\[(.*?)\]', _shell(), re.S):
+        con_menu |= set(re.findall(r'\{ khoa: "(\w+)"', khoi))
+    assert {k for k, _ in con_cay} == con_menu, (
+        f"menu xổ ra {sorted(con_menu)} nhưng cây khai {sorted(k for k, _ in con_cay)} – "
+        "lệch một khoá là một mục xổ ra dẫn tới trang 'Không có phân hệ này'")
+    assert len(con_menu) == 5, f"phải đúng năm phân hệ con, đang có {len(con_menu)}: {sorted(con_menu)}"
+    # Cha của mỗi phân hệ con phải là một trong tám khoá, không được trỏ vào hư không.
+    for k, cha in con_cay:
+        assert cha in TAM_KHOA, f"phân hệ con {k} khai cha '{cha}' không có trong tám phân hệ"
+
+
+# TC-70 · 18/9/2026 — hai nhóm nay XỔ RA thay vì đi. Danh sách này là phần đảo của luật bên dưới:
+# nhóm nào có tên ở đây thì KHÔNG được có href, nhóm nào không có tên ở đây thì BẮT BUỘC phải có.
+NHOM_XO_RA = {
+    "khachhang": ["kdle", "kddoan"],
+    "vanhanh": ["dhtour", "dhxe", "hdv"],
+}
+
 
 def test_moi_thanh_phan_he_deu_bam_di_duoc():
-    """Bảy nhóm nghiệp vụ dẫn tới trang phân hệ; Tổng quan dẫn thẳng bảng điều hành.
+    """Bấm vào một thanh phân hệ thì PHẢI xảy ra đúng một việc: đi tới trang, hoặc xổ ra phân hệ con.
 
     Bảng điều hành CHÍNH LÀ màn hình của phân hệ Tổng quan – dựng thêm một trang mục lục cho nó chỉ
     tổ thêm một cú bấm.
+
+    ══ TC-70 · 18/9/2026 — LUẬT BỊ ĐẢO MỘT PHẦN, ghi cả hai bên ══════════════════════════════════
+    BÊN CŨ (13/9): CẢ TÁM nhóm đều phải có `href`; "bấm vào thanh phân hệ mà không đi đâu cả" là
+      lỗi. Lý do vẫn đúng và vẫn được canh cho sáu nhóm còn lại: một thanh trông bấm được mà bấm
+      không ra gì thì người dùng tưởng phần mềm hỏng.
+    BÊN MỚI (18/9): hai nhóm Kinh doanh và Điều hành KHÔNG có href, vì mỗi nhóm nay đại diện cho
+      nhiều phòng chứ không phải một – "bấm là đi" đi đâu cũng sai một phòng. Nhưng bấm vào chúng
+      VẪN xảy ra chuyện: bảng xổ ra. Cái bị cấm vẫn nguyên – bấm mà KHÔNG XẢY RA GÌ CẢ.
+
+    Vì thế phép thử này canh hai chiều, không phải nới lỏng một chiều: nhóm thường thiếu href là
+    lỗi, mà nhóm xổ ra CÓ href cũng là lỗi – có cả hai thì thanh vừa đi vừa bung, đúng thứ luật
+    13/9 cấm và 18/9 vẫn cấm.
     """
     shell = _khong_ghi_chu(_shell())
     for khoa in TAM_KHOA:
         # ══ TC-69 · 18/9/2026 — NỚI KHUÔN DÒ, KHÔNG ĐỔI LUẬT ═══════════════════════════════════
-        # Luật giữ nguyên: mỗi nhóm phải có `href`, và href phải trỏ đúng chỗ. Chỉ khuôn dò là nới.
         # Bản cũ đòi `icon` đứng NGAY SAU `label`. Từ 18/9 nhóm "nhansu" có thêm `label_ngan`
         # ("HC – NS") xen vào giữa, nên khuôn cũ trượt và phép thử báo "không có href" trong khi
         # href vẫn nằm nguyên đó – nó tố cáo sai, chứ mã không hỏng.
         # Khuôn mới cho phép bất kỳ thuộc tính nào nằm giữa `label` và `href`, nhưng `[^{}]*?`
-        # KHÔNG cho phép vượt qua dấu ngoặc nhọn, nên nó không thể vơ nhầm `href` của nhóm kế tiếp:
-        # cả `key`, `label` và `href` vẫn buộc phải ở trong CÙNG một khai báo nhóm.
+        # KHÔNG cho phép vượt qua dấu ngoặc nhọn, nên nó không thể vơ nhầm `href` của nhóm kế tiếp.
         m = re.search(r'\{ key: "%s", label: "[^"]+",[^{}]*?href: "([^"]+)"' % khoa, shell)
+
+        if khoa in NHOM_XO_RA:
+            assert not m, (
+                f"nhóm {khoa} xổ ra phân hệ con thì KHÔNG được có href – có cả hai là thanh vừa đi "
+                f"vừa bung, đúng thứ luật 13/9 cấm")
+            # Bấm vào phải xảy ra chuyện gì đó: đủ mục con, và mỗi mục trỏ đúng /phan-he/<khoa>.
+            khoi = re.search(r'\{ key: "%s".*?phans:\s*\[(.*?)\]' % khoa, shell, re.S)
+            assert khoi, f"nhóm {khoa} không có href mà cũng không có phans – bấm vào không ra gì"
+            con = re.findall(r'\{ khoa: "(\w+)", label: "([^"]+)"', khoi.group(1))
+            assert [k for k, _ in con] == NHOM_XO_RA[khoa], (
+                f"nhóm {khoa} xổ ra {[k for k, _ in con]}, phải là {NHOM_XO_RA[khoa]}")
+            for k, ten in con:
+                assert ten.strip(), f"phân hệ con {k} không có nhãn – bảng xổ ra sẽ có một dòng trống"
+            continue
+
         assert m, f"nhóm {khoa} không có href – bấm vào thanh phân hệ sẽ không đi đâu cả"
         mong = "/" if khoa == "tongquan" else f"/phan-he/{khoa}"
         assert m.group(1) == mong, f"nhóm {khoa} trỏ {m.group(1)}, phải là {mong}"

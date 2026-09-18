@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef, createContext, useContext, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getUser, clearSession, type User } from "@/lib/api";
@@ -40,7 +41,21 @@ type Block = Item | Section;
  *  Nhờ tách hai trường, câu trả lời không mất: rê chuột lên "HC – NS" vẫn đọc được "Nhân sự –
  *  Hành chính", và máy đọc màn hình vẫn đọc tên đầy đủ. Đúng luật của kho — bớt chữ thì thứ nó nói
  *  phải còn ở đâu đó. */
-type Group = { key: string; label: string; label_ngan?: string; icon: string; blocks: Block[]; href: string };
+/** TC-70 · 18/9/2026 — `phans`: nhóm này KHÔNG tự dẫn đi đâu mà xổ ra mấy phân hệ con.
+ *
+ *  ĐÂY LÀ CHỖ ĐẢO LẠI phương án B anh Tuấn chốt 13/9/2026 ("bấm là đi, không phải bung"). Lý do
+ *  ngày 13/9 vẫn đúng và vẫn còn nguyên giá trị: một thanh không thể vừa đi vừa bung, nên PHẢI chọn
+ *  một. Với sáu nhóm còn lại, chọn "đi" – giữ nguyên. Với Kinh doanh và Điều hành thì anh Tuấn chốt
+ *  ngày 18/9 rằng chúng không còn là MỘT phòng nữa: Kinh doanh là hai phòng (lẻ và đoàn), Điều hành
+ *  là ba đơn vị (tour, xe, hướng dẫn viên – xe đã sang pháp nhân Vietrip). Một thanh đại diện cho
+ *  nhiều phòng thì "bấm là đi" đi đâu cũng sai một phòng, nên ở hai chỗ ấy chọn "bung".
+ *
+ *  `href` vì thế thành TUỲ CHỌN. Nhóm có `phans` thì vẽ bằng <button> chứ không phải <Link>: một
+ *  thẻ <a> không dẫn đi đâu là nói dối với bàn phím và với trình đọc màn hình, cả hai đều báo cho
+ *  người dùng rằng đây là một đường dẫn. */
+type PhanCon = { khoa: string; label: string };
+type Group = { key: string; label: string; label_ngan?: string; icon: string; blocks: Block[];
+               href?: string; phans?: PhanCon[] };
 
 /** Biểu tượng vẽ bằng NÉT (24×24, stroke 1.7, không tô đặc) thay cho emoji. Ba lý do, không phải
  *  chuyện thẩm mỹ: emoji mỗi máy vẽ một kiểu – Windows, máy Mac và điện thoại ra ba hình khác nhau
@@ -129,6 +144,136 @@ function tenVaChuc(u?: { full_name?: string | null; role_name?: string | null } 
   return <>{ten} · <b>{chuc}</b></>;
 }
 
+/** Ngưỡng NGĂN KÉO của thanh dọc – phải TRÙNG `@media (max-width:900px)` trong globals.css, nơi
+ *  `aside.side.hide{display:none}` biến thanh dọc thành ngăn kéo mở bằng nút ☰. Dưới ngưỡng ấy bảng
+ *  xổ ra KHÔNG được bay sang phải: màn hình rộng 390px mà thanh dọc đã chiếm gần hết, bay sang phải
+ *  là bay hẳn ra ngoài màn hình – em đo trong mockup 18/9: bảng nằm ở 388px trên màn 390px. */
+const NGUONG_NGAN_KEO = 900;
+
+/** NHÓM XỔ RA – TC-70 · 18/9/2026.
+ *
+ *  BA CHỖ PHẢI LÀM ĐÚNG, không phải chuyện trang trí:
+ *
+ *  1. <button> CHỨ KHÔNG PHẢI <a>. Nhóm này không dẫn đi đâu. Một thẻ <a> không có đích là nói dối
+ *     với bàn phím (Enter không đi đâu cả) và với trình đọc màn hình (nó xướng "liên kết").
+ *     `aria-haspopup` + `aria-expanded` là cách nói thật: đây là nút mở một bảng.
+ *
+ *  2. BẢNG PHẢI RA NGOÀI THANH DỌC. `aside.side` có `overflow-y:auto`; đặt bảng bên trong nó thì
+ *     phần thò ra bị CẮT MẤT, không phải bị che – người dùng không cuộn tới được. Nên bảng đi qua
+ *     `createPortal` ra thẳng <body> và định vị `fixed`, đúng cách đã dùng cho bảng Giao diện.
+ *     Trên ngăn kéo (≤900px) thì ngược lại: vẽ TẠI CHỖ, không cổng, không fixed.
+ *
+ *  3. NEO THEO MÉP PHẢI CỦA THANH DỌC, không theo mép nút. Nút thụt vào 8px (margin 0 8px), neo
+ *     theo nút thì bảng đè lên viền thanh dọc 3px. Em đo thấy trong mockup rồi mới sửa. */
+function NhomXo({ g, thu, dangO, dongThanhDoc }:
+                { g: Group; thu: boolean; dangO: boolean; dongThanhDoc: () => void }) {
+  const [mo, datMo] = useState(false);
+  const [toaDo, datToaDo] = useState<{ left: number; top: number } | null>(null);
+  const [taiCho, datTaiCho] = useState(false);   // true = ngăn kéo, vẽ tại chỗ
+  const boc = useRef<HTMLDivElement | null>(null);
+  const bang = useRef<HTMLDivElement | null>(null);
+  const hen = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Chế độ tại chỗ đọc từ CHÍNH cùng một ngưỡng với CSS. Đọc một lần lúc gắn rồi thôi là sai:
+   *  người dùng xoay điện thoại hoặc kéo cửa sổ hẹp lại thì chế độ phải đổi theo. */
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(`(max-width:${NGUONG_NGAN_KEO}px)`);
+    const doi = () => { datTaiCho(mq.matches); datMo(false); };
+    doi();
+    mq.addEventListener("change", doi);
+    return () => mq.removeEventListener("change", doi);
+  }, []);
+
+  const dinhVi = useCallback(() => {
+    if (taiCho || !boc.current) return;
+    const nut = boc.current.getBoundingClientRect();
+    const thanh = boc.current.closest("aside.side")?.getBoundingClientRect();
+    const cao = bang.current?.offsetHeight ?? 0;
+    const left = Math.round((thanh?.right ?? nut.right) + 6);
+    // Không để bảng tràn đáy màn hình. Đẩy LÊN chứ không cắt: cắt thì mục cuối biến mất mà không
+    // có gì báo, còn đẩy lên thì cả bảng vẫn đọc được.
+    const top = cao && nut.top + cao > window.innerHeight - 12
+      ? Math.max(8, window.innerHeight - 12 - cao)
+      : Math.round(nut.top);
+    datToaDo({ left, top });
+  }, [taiCho]);
+
+  useEffect(() => {
+    if (!mo || taiCho) return;
+    dinhVi();
+    const lai = () => dinhVi();
+    window.addEventListener("resize", lai);
+    window.addEventListener("scroll", lai, true);   // true: bắt cả cuộn TRONG thanh dọc
+    return () => { window.removeEventListener("resize", lai); window.removeEventListener("scroll", lai, true); };
+  }, [mo, taiCho, dinhVi]);
+
+  /** Bấm ra ngoài thì đóng. Nghe ở giai đoạn BẮT (capture) để một cú bấm vào nhóm xổ ra khác cũng
+   *  đóng được cái này trước khi cái kia mở. */
+  useEffect(() => {
+    if (!mo) return;
+    const ngoai = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (boc.current?.contains(t) || bang.current?.contains(t)) return;
+      datMo(false);
+    };
+    document.addEventListener("mousedown", ngoai, true);
+    return () => document.removeEventListener("mousedown", ngoai, true);
+  }, [mo]);
+
+  const huyHen = () => { if (hen.current) { clearTimeout(hen.current); hen.current = null; } };
+  // Rê chuột: chỉ trên máy có chuột THẬT. `hover: none` là màn cảm ứng – ở đó trình duyệt vẫn bắn
+  // mouseenter giả sau cú chạm, và bảng sẽ tự mở rồi tự đóng loạn lên.
+  const coChuot = () => typeof window !== "undefined" && window.matchMedia
+    && window.matchMedia("(hover: hover)").matches;
+  // MỞ CHẬM 140ms – đây là câu trả lời cho đúng lý do đã khiến anh Tuấn bỏ lối rê chuột ngày
+  // 13/9/2026: "đưa chuột ngang qua thanh dọc để tới chỗ khác là bảng bật ra chắn đường". Chuột đi
+  // lướt qua thì trong 140ms nó đã sang chỗ khác và bảng không kịp mở; chuột DỪNG LẠI ở đây mới là
+  // ý định vào nhóm. Bỏ độ trễ này là dựng lại đúng cái phiền đã khiến luật cũ bị bỏ.
+  const vao = () => {
+    if (taiCho || !coChuot()) return;
+    huyHen();
+    hen.current = setTimeout(() => datMo(true), 140);
+  };
+  // Đóng CHẬM 220ms: chuột phải đi qua khoảng trống 6px giữa thanh dọc và bảng. Đóng ngay thì bảng
+  // biến mất giữa đường và không ai bấm được vào mục nào.
+  const ra = () => { if (!taiCho && coChuot()) { huyHen(); hen.current = setTimeout(() => datMo(false), 220); } };
+  useEffect(() => huyHen, []);
+
+  const nhan = g.label_ngan || g.label;
+  const noiDung = (
+    <div ref={bang} className="xo-bang" role="menu" aria-label={g.label}
+      style={taiCho ? undefined : { left: toaDo?.left ?? -9999, top: toaDo?.top ?? -9999 }}
+      onMouseEnter={vao} onMouseLeave={ra}>
+      <div className="xo-dau">{g.label}</div>
+      {g.phans!.map((p) => (
+        <Link key={p.khoa} href={`/phan-he/${p.khoa}`} className="xo-muc" role="menuitem"
+          onClick={() => { datMo(false); dongThanhDoc(); }}>{p.label}</Link>
+      ))}
+    </div>
+  );
+
+  return (
+    <div ref={boc} className={"nhom-xo" + (mo ? " mo" : "")} onMouseEnter={vao} onMouseLeave={ra}>
+      <button type="button" className={"grp grp-xo" + (dangO ? " on" : "")}
+        title={g.label} aria-label={g.label} aria-haspopup="menu" aria-expanded={mo}
+        onClick={() => { huyHen(); datMo((m) => !m); }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && mo) { e.stopPropagation(); datMo(false); }
+          if (e.key === "ArrowRight" && !mo) datMo(true);
+        }}>
+        {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
+             : <><Hinh ten={g.icon} /><span className="grp-ten">{nhan}</span>
+                 <span className="grp-xo-dau" aria-hidden="true">›</span></>}
+      </button>
+      {/* Ở chế độ tại chỗ thì KHÔNG dùng cổng: bảng phải nằm đúng trong luồng của ngăn kéo để đẩy
+          các nhóm dưới xuống, chứ không phủ lên chúng. */}
+      {mo && (taiCho ? noiDung
+        : typeof document !== "undefined" ? createPortal(noiDung, document.body) : null)}
+    </div>
+  );
+}
+
 /** TÁM NHÓM – tên chính thức theo bản vẽ giao diện navy V1.2, anh Tuấn chốt 12/9/2026.
  *  Tối đa hai cấp, bỏ số thứ tự, nhóm Quản trị đặt cuối, ẩn mục chưa có trang.
  *
@@ -190,7 +335,14 @@ export const GROUPS: Group[] = [
   // "Hộp thư" Ở LẠI Kinh doanh dù ba kênh (Zalo OA, vChat, tổng đài) do Marketing dựng: người mở
   // hộp thư mỗi ngày để trả lời khách là nhân viên bán hàng. Phần cấu hình kênh nằm ở Quản trị hệ
   // thống → Tích hợp, đúng chỗ của nó.
-  { key: "khachhang", label: "Kinh doanh", icon: "khachhang", href: "/phan-he/khachhang", blocks: [
+  // TC-70 · 18/9/2026: KHÔNG còn `href`. Bấm thẳng vào chữ "Kinh doanh" chỉ xổ ra, không đi đâu –
+  // anh Tuấn chọn thế khi em hỏi. Hệ quả phải nói rõ: /phan-he/khachhang (mục lục GỘP hai phòng)
+  // mất lối vào từ thanh dọc. Con số hợp nhất KHÔNG mất theo – Báo cáo – Phân tích → "Kinh doanh"
+  // trỏ /sales-reports không kèm ?mang=, đúng chỗ xem tổng hai phòng. Cái mất là mục lục, không
+  // phải số liệu. Đường dẫn /phan-he/khachhang vẫn sống cho ai đã lưu dấu trang.
+  { key: "khachhang", label: "Kinh doanh", icon: "khachhang",
+    phans: [{ khoa: "kdle", label: "Kinh doanh lẻ" }, { khoa: "kddoan", label: "Kinh doanh đoàn" }],
+    blocks: [
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
     // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và
@@ -210,7 +362,13 @@ export const GROUPS: Group[] = [
       ["Hợp đồng", "/hop-dong-khach"], ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
   ] },
 
-  { key: "vanhanh", label: "Điều hành", icon: "vanhanh", href: "/phan-he/vanhanh", blocks: [
+  // TC-70 · 18/9/2026: ba đơn vị, không phải ba nhãn cho vui. Xe thuộc pháp nhân Công ty TNHH Vận
+  // tải Vietrip, hướng dẫn viên hưởng lương ở công ty mẹ, còn điều hành tour chạy quanh CHUYẾN –
+  // ba người quản khác nhau thì ba màn hình. /phan-he/vanhanh vẫn mở được bằng đường dẫn.
+  { key: "vanhanh", label: "Điều hành", icon: "vanhanh",
+    phans: [{ khoa: "dhtour", label: "Điều hành tour" }, { khoa: "dhxe", label: "Điều hành xe" },
+            { khoa: "hdv", label: "Hướng dẫn viên" }],
+    blocks: [
     ["Sản phẩm tour", "/products"],
     ["Yêu cầu chờ xử lý", "/requests"],
     ["Chuyến & quyết toán", "/tours"],
@@ -450,7 +608,12 @@ export default function Shell({ children }: { children: React.ReactNode }) {
    *  /leads thì thanh Marketing & PR phải sáng, nếu không thanh dọc không cho biết mình đang đứng
    *  ở đâu trong hệ thống. */
   const dangO = (g: Group & { dem: number }) =>
-    isOn(g.href, path) || g.blocks.some((b) =>
+    (!!g.href && isOn(g.href, path)) ||
+    // TC-70: nhóm xổ ra không có href của riêng nó, nên nó sáng khi người dùng đang đứng ở MỘT
+    // TRONG các phân hệ con. Thiếu dòng này thì vào "Điều hành xe" xong nhìn lên thanh dọc không
+    // thấy nhóm nào sáng – thanh dọc mất hẳn khả năng trả lời "tôi đang ở đâu".
+    (g.phans?.some((p) => isOn(`/phan-he/${p.khoa}`, path)) ?? false) ||
+    g.blocks.some((b) =>
       laMuc(b) ? isOn(b[1], path) : b.items.some(([, h]) => isOn(h, path)));
 
 
@@ -549,14 +712,23 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   mục nào đã có trang và mục nào còn nợ. Trước đây bấm thì ghim mở danh sách tại
                   chỗ; bỏ cách ấy vì một thanh không thể vừa đi vừa bung, và vì cây v1.3 sâu bốn cấp
                   với hơn một trăm mục chưa dựng – thanh dọc chốt tối đa hai cấp, không chứa nổi.
+
+                  TC-70 · 18/9/2026 – LUẬT NÀY NAY CÓ NGOẠI LỆ, không bị bỏ. Sáu nhóm vẫn "bấm là
+                  đi" y như 13/9. Hai nhóm Kinh doanh và Điều hành xổ ra, vì chúng không còn đại
+                  diện cho MỘT phòng nữa (xem chú thích ở `type Group`). Lý do 13/9 – một thanh
+                  không thể vừa đi vừa bung – vẫn đúng, và chính vì nó đúng nên mỗi nhóm vẫn chỉ
+                  làm MỘT việc, không có nhóm nào vừa đi vừa bung.
+
                   Khi THU thì chỉ còn biểu tượng, nhãn nhóm đi vào title và aria-label chứ không mất
                   (§I.2: "biểu tượng phải có chú thích"). */}
-              <Link href={g.href} className={"grp" + (dangO(g) ? " on" : "")}
-                title={g.label} aria-label={g.label}
-                onClick={() => setSide(false)}>
-                {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
-                     : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label_ngan || g.label}</span></>}
-              </Link>
+              {g.phans
+                ? <NhomXo g={g} thu={thu} dangO={dangO(g)} dongThanhDoc={() => setSide(false)} />
+                : <Link href={g.href!} className={"grp" + (dangO(g) ? " on" : "")}
+                    title={g.label} aria-label={g.label}
+                    onClick={() => setSide(false)}>
+                    {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
+                         : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label_ngan || g.label}</span></>}
+                  </Link>}
             </div>
           ))}
         </aside>
