@@ -30,7 +30,7 @@ def _lines(db: Session, upto_period: str | None = None, period: str | None = Non
 
 
 def _cong_theo_tk(db: Session, upto_period: str | None = None, period: str | None = None,
-                  company_id: int | None = None):
+                  company_id: int | None = None, bo_ket_chuyen: bool = False):
     """Cộng Nợ/Có theo tài khoản cấp 1 BẰNG SQL, không nạp bút toán vào bộ nhớ.
 
     Bản cũ dùng _lines(): nạp TOÀN BỘ JournalLine + JournalEntry thành đối tượng Python rồi mới lọc kỳ.
@@ -53,6 +53,14 @@ def _cong_theo_tk(db: Session, upto_period: str | None = None, period: str | Non
     company_id rỗng trên bút toán là CHƯA XÁC ĐỊNH, không phải công ty mẹ (luật
     `pham_vi_phap_nhan`): lọc theo mẹ thì những dòng ấy nằm NGOÀI, và phải có chỗ hiện chúng ra —
     xem `chua_gan_phap_nhan` trong services/ket_qua_that.
+
+    TC-68 · `bo_ket_chuyen` — MẶC ĐỊNH TẮT, và nó phải mặc định tắt.
+
+    Hàm này phục vụ CẢ số dư (bảng cân đối) lẫn phát sinh (kết quả kinh doanh), mà hai bên cần hai
+    thứ trái ngược nhau: bảng cân đối PHẢI có bút toán kết chuyển, vì chính nó đưa lãi về 421 và
+    làm bảng cân; báo cáo kết quả kinh doanh thì KHÔNG được có, vì kết chuyển ghi Nợ 511 đúng bằng
+    cả kỳ doanh thu. Bật mặc định là làm bảng cân đối lệch, và không màn hình nào báo.
+    Nơi nào cần loại thì nơi ấy nói ra — hiện chỉ có `income_statement`.
     """
     q = (select(func.substr(JournalLine.account_code, 1, 3),
                 func.coalesce(func.sum(JournalLine.debit), 0.0),
@@ -62,17 +70,84 @@ def _cong_theo_tk(db: Session, upto_period: str | None = None, period: str | Non
     if period: q = q.where(JournalEntry.period == period)
     elif upto_period: q = q.where(JournalEntry.period <= upto_period)
     if company_id is not None: q = q.where(JournalEntry.company_id == company_id)
+    if bo_ket_chuyen: q = q.where(_khong_phai_ket_chuyen())
     return db.execute(q.group_by(func.substr(JournalLine.account_code, 1, 3))).all()
 
 
+def _khong_phai_ket_chuyen():
+    """Điều kiện loại TRỌN VẸN mọi chứng từ kết chuyển cuối kỳ.
+
+    ══ LUẬT NÀY KHÔNG PHẢI EM NGHĨ RA — nó đã chạy trong services/bctc.py từ trước ═════════════
+    `bctc._lines(exclude_closing=True)` gom `closing_ids` bằng đúng hai điều kiện dưới đây rồi bỏ
+    CẢ chứng từ. Báo cáo BCTC TT99 vì thế đọc đúng; `income_statement` — cái mà màn hình Chủ tịch
+    đang đọc — thì không. Hai công thức cho cùng một câu hỏi, và chúng đã lệch nhau thật.
+
+    ĐO ĐƯỢC TRÊN SỔ THẬT 18/9/2026, kỳ 2026-06 của cả tập đoàn:
+        doanh thu (01) = −45.216.354.515      giá vốn (11) = −36.373.329.530
+    Doanh thu ÂM, vì bút toán kết chuyển ghi Nợ 511 đúng bằng cả kỳ doanh thu và triệt tiêu nó.
+    Con số ấy đã nằm trên màn hình Chủ tịch, dưới nhãn "Doanh thu".
+
+    HAI ĐIỀU KIỆN, VÀ VÌ SAO PHẢI CÓ CẢ HAI:
+      · `source_type == "ket_chuyen"` bắt được chứng từ do robot R5 lập theo mẫu ở hach_toan.py.
+      · Chạm tài khoản 911 bắt được chứng từ kết chuyển ai đó lập TAY, không gắn nguồn — mà 911
+        thì chỉ dùng để xác định kết quả kinh doanh, không có nghiệp vụ nào khác đi qua nó.
+    Bỏ điều kiện thứ hai là để lọt đúng những chứng từ nguy hiểm nhất: loại lập tay, không ai gắn
+    nhãn, và không cách nào đếm được.
+
+    LOẠI CẢ CHỨNG TỪ chứ không chỉ loại dòng 911: một bút toán kết chuyển có hai vế — Nợ 511 và
+    Có 911. Bỏ mỗi vế 911 thì vế Nợ 511 ở lại, và đó đúng là vế đang phá con số doanh thu.
+    """
+    kc = select(JournalLine.entry_id).where(JournalLine.account_code.like("911%")).scalar_subquery()
+    return (JournalEntry.source_type != "ket_chuyen") & (JournalEntry.id.notin_(kc))
+
+
+def so_but_toan(db: Session, period: str, company_id: int | None = None) -> int:
+    """Đếm chứng từ ĐÃ GHI SỔ của kỳ. Đây là câu trả lời cho "kỳ này đã có số kế toán chưa".
+
+    Đếm TRƯỚC khi loại kết chuyển, và cố ý như vậy: một kỳ chỉ có mỗi bút toán kết chuyển vẫn là
+    một kỳ ĐÃ CÓ người ghi sổ, khác hẳn một kỳ chưa ai đụng tới. Câu hỏi ở đây là "đã có ai ghi
+    chưa", không phải "có phát sinh nào không".
+
+    Vì sao cần hàm này: `movements()` trả về một dict RỖNG cho kỳ chưa có bút toán nào, và mọi
+    phép cộng sau đó ra 0,0. Không có chỗ nào phân biệt được "0 vì hoà vốn" với "0 vì chưa ai ghi
+    sổ" — và hai điều ấy nói hai chuyện hoàn toàn khác nhau với người đọc báo cáo.
+    """
+    return so_but_toan_nhieu_ky(db, [period], company_id=company_id).get(period, 0)
+
+
+def so_but_toan_nhieu_ky(db: Session, cac_ky, company_id: int | None = None) -> dict[str, int]:
+    """{kỳ: số chứng từ đã ghi sổ} cho NHIỀU kỳ trong MỘT lượt truy vấn.
+
+    Một truy vấn chứ không mười hai: khối Kết quả kinh doanh hỏi câu này cho cả mười hai tháng của
+    năm. Hỏi từng tháng một là cộng thêm mười hai lượt đi về cơ sở dữ liệu vào mỗi lần mở màn hình
+    — đúng cái vòng TC-64b vừa bỏ đi (60 lượt xuống còn vài lượt, `/ket-qua-kinh-doanh` từ 2,19
+    giây còn 0,23 giây). Thêm lại chúng ở đây là đi lùi mà không ai đo.
+
+    Kỳ không có dòng nào thì KHÔNG có mặt trong kết quả; bên gọi dùng `.get(ky, 0)`.
+    """
+    ds = [k for k in cac_ky if k]
+    if not ds:
+        return {}
+    q = (select(JournalEntry.period, func.count(func.distinct(JournalEntry.id)))
+         .select_from(JournalEntry)
+         .where(JournalEntry.status == "da_ghi_so", JournalEntry.period.in_(ds)))
+    if company_id is not None: q = q.where(JournalEntry.company_id == company_id)
+    return {k: int(n) for k, n in db.execute(q.group_by(JournalEntry.period)).all()}
+
+
 def balances(db: Session, upto_period: str) -> dict[str, float]:
-    """Số dư (Nợ − Có) lũy kế đến hết kỳ theo tài khoản cấp 1 (gộp tiểu khoản 3331→333, 3387→338)."""
+    """Số dư (Nợ − Có) lũy kế đến hết kỳ theo tài khoản cấp 1 (gộp tiểu khoản 3331→333, 3387→338).
+
+    KHÔNG loại kết chuyển: số dư cuối kỳ phải có nó, xem chú thích `bo_ket_chuyen` ở trên.
+    """
     return {k: float(d) - float(c) for k, d, c in _cong_theo_tk(db, upto_period=upto_period)}
 
 
-def movements(db: Session, period: str, company_id: int | None = None) -> dict[str, dict]:
+def movements(db: Session, period: str, company_id: int | None = None,
+              bo_ket_chuyen: bool = False) -> dict[str, dict]:
     return {k: {"debit": float(d), "credit": float(c)}
-            for k, d, c in _cong_theo_tk(db, period=period, company_id=company_id)}
+            for k, d, c in _cong_theo_tk(db, period=period, company_id=company_id,
+                                         bo_ket_chuyen=bo_ket_chuyen)}
 
 
 def balance_sheet(db: Session, period: str) -> dict:
@@ -112,8 +187,23 @@ def income_statement(db: Session, period: str, company_id: int | None = None) ->
 
     `company_id` (TC-47): None là cả tập đoàn — giữ nguyên hành vi cũ của mọi nơi đang gọi. Truyền
     id pháp nhân vào thì bảng này là của RIÊNG pháp nhân ấy; xem chú thích ở `_cong_theo_tk`.
+
+    ══ TC-68 · HAI ĐIỀU ĐỔI Ở ĐÂY, 18/9/2026 — anh Tuấn duyệt sau khi xem số đo ════════════════
+
+    1. LOẠI BÚT TOÁN KẾT CHUYỂN khỏi phát sinh trong kỳ. Lý do và số đo ghi ở
+       `_khong_phai_ket_chuyen`. HỆ QUẢ NHÌN THẤY ĐƯỢC: doanh thu và giá vốn của những kỳ có chứng
+       từ kết chuyển ĐỔI SỐ — kỳ 2026-06 từ −45,2 tỷ về số dương thật. Đây là số ĐƯỢC SỬA, không
+       phải số bị mất; ai so với ảnh chụp màn hình cũ sẽ thấy khác và phải thấy khác.
+
+    2. `so_but_toan` ĐI KÈM BẢNG. Không có nó thì người đọc không phân biệt được một kỳ hoà vốn
+       với một kỳ chưa ai ghi sổ — cả hai đều ra 0. Đây chính là chỗ luật "rỗng khác không" của
+       kho bị lọt: đo 18/9/2026 thì T7, T8, T9 đều có ĐÚNG 0 chứng từ, mà màn hình Chủ tịch in ra
+       số 0 như một kết quả kinh doanh.
+
+    CÁC DÒNG TRONG `rows` GIỮ NGUYÊN TÊN VÀ THỨ TỰ — nhiều nơi đang đọc theo mã dòng ("01", "50").
+    Trường mới đứng riêng ở ngoài, không chen vào `rows`.
     """
-    m = movements(db, period, company_id=company_id)
+    m = movements(db, period, company_id=company_id, bo_ket_chuyen=True)
     rev = lambda c: m.get(c, {}).get("credit", 0.0) - m.get(c, {}).get("debit", 0.0)
     exp = lambda c: m.get(c, {}).get("debit", 0.0) - m.get(c, {}).get("credit", 0.0)
     revenue, cogs = rev("511"), exp("632")
@@ -132,6 +222,19 @@ def income_statement(db: Session, period: str, company_id: int | None = None) ->
         ("26", "Chi phí quản lý doanh nghiệp", admin), ("30", "Lợi nhuận thuần từ HĐKD", op), ("40", "Lợi nhuận khác", other),
         ("50", "Tổng lợi nhuận kế toán trước thuế", ebt), ("51", "Chi phí thuế TNDN", tax), ("60", "Lợi nhuận sau thuế", ebt - tax)],
         "company_id": company_id,
+        # TC-68 · 0 nghĩa là CHƯA AI GHI SỔ kỳ này, không phải công ty hoà vốn. Mọi nơi đọc `rows`
+        # phải hỏi trường này trước khi in một con số ra màn hình.
+        #
+        # CHỈ ĐẾM KHI `m` RỖNG, và đó là chỗ tiết kiệm đáng kể: `m` có dòng nghĩa là kỳ CHẮC CHẮN
+        # đã có bút toán, không cần hỏi thêm câu nào. Chỉ khi `m` rỗng mới còn lại đúng hai khả
+        # năng cần phân biệt — chưa ai ghi sổ, hay chỉ có mỗi bút toán kết chuyển vừa bị loại — và
+        # lúc ấy mới đáng một lượt đếm. Nhờ vậy vòng này KHÔNG thêm lượt truy vấn nào vào những kỳ
+        # đang có số, tức là hầu hết các kỳ. Bài học TC-64b.
+        #
+        # Trả về BOOLEAN chứ không phải con số: câu hỏi duy nhất bên đọc cần trả lời là "kỳ này đã
+        # có ai ghi sổ chưa". Trả ra một con số thì sớm muộn có người đem nó đi hiển thị hoặc đi
+        # cộng, trong khi nó không phải một chỉ tiêu của báo cáo nào cả.
+        "co_but_toan": bool(m) or so_but_toan(db, period, company_id=company_id) > 0,
         "management": {"interest": fin_exp, "depreciation": dep, "profit_after_interest_before_dep": ebt + dep,
                        "note": "Lợi nhuận Công ty dùng tính thưởng GĐ KD = sau lãi vay, trước khấu hao (BCKQKD tháng TGĐ duyệt)"}}
 

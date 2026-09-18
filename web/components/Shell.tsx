@@ -29,7 +29,18 @@ type Block = Item | Section;
  *  mục nào đã có trang thì bấm đi được, mục nào còn nợ thì ghi rõ "chưa dựng". Riêng Tổng quan dẫn
  *  thẳng "/" vì bảng điều hành CHÍNH LÀ màn hình của phân hệ ấy – dựng thêm một trang mục lục cho
  *  nó chỉ tổ thêm một cú bấm. */
-type Group = { key: string; label: string; icon: string; blocks: Block[]; href: string };
+/** TC-69 · `label_ngan` — CHỮ VẼ RA trên thanh dọc khi nó khác với TÊN THẬT của phân hệ.
+ *
+ *  Anh Tuấn 18/9/2026: thu hẹp thanh dọc, và đổi nhãn menu "Nhân sự – Hành chính" thành "HC – NS".
+ *
+ *  Vì sao là một trường RIÊNG chứ không sửa thẳng `label`: `label` là TÊN của phân hệ — nó đi vào
+ *  `title`, `aria-label`, và là thứ phép thử canh danh sách tám nhóm đọc. Rút gọn nó là rút gọn
+ *  tên phân hệ trong cả hệ thống, trong khi việc anh Tuấn giao chỉ là chữ VẼ RA cho vừa thanh.
+ *
+ *  Nhờ tách hai trường, câu trả lời không mất: rê chuột lên "HC – NS" vẫn đọc được "Nhân sự –
+ *  Hành chính", và máy đọc màn hình vẫn đọc tên đầy đủ. Đúng luật của kho — bớt chữ thì thứ nó nói
+ *  phải còn ở đâu đó. */
+type Group = { key: string; label: string; label_ngan?: string; icon: string; blocks: Block[]; href: string };
 
 /** Biểu tượng vẽ bằng NÉT (24×24, stroke 1.7, không tô đặc) thay cho emoji. Ba lý do, không phải
  *  chuyện thẩm mỹ: emoji mỗi máy vẽ một kiểu – Windows, máy Mac và điện thoại ra ba hình khác nhau
@@ -223,7 +234,8 @@ export const GROUPS: Group[] = [
       ["Phòng Hướng dẫn", "/huong-dan"], ["HDV & phân chuyến (cũ)", "/ops?tab=guides"]] },
   ] },
 
-  { key: "nhansu", label: "Nhân sự – Hành chính", icon: "nhansu", href: "/phan-he/nhansu", blocks: [
+  { key: "nhansu", label: "Nhân sự – Hành chính", label_ngan: "HC – NS", icon: "nhansu",
+    href: "/phan-he/nhansu", blocks: [
     ["Hồ sơ nhân sự", "/hr?tab=employees"],
     ["Hợp đồng lao động", "/hop-dong-lao-dong"],
     ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
@@ -543,8 +555,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 title={g.label} aria-label={g.label}
                 onClick={() => setSide(false)}>
                 {thu ? <span className="bt"><Hinh ten={g.icon} /></span>
-                     : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label}</span>
-                         {g.dem > 0 && <span className="grp-mui" aria-hidden="true">▸</span>}</>}
+                     : <><Hinh ten={g.icon} /><span className="grp-ten">{g.label_ngan || g.label}</span></>}
               </Link>
             </div>
           ))}

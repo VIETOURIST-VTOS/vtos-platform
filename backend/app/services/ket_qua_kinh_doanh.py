@@ -61,6 +61,25 @@ from sqlalchemy.orm import Session
 from app.services import ke_hoach as KH
 from app.services import xu_huong as XH
 
+
+def _thang_chua_ghi_so(db: Session, cac_thang: list[str]) -> list[str]:
+    """Những tháng của kỳ mà Vietourist mẹ chưa có một chứng từ ghi sổ nào. TC-68, 18/9/2026.
+
+    Trả về DANH SÁCH TÊN THÁNG chứ không phải một con số đếm: người đọc cần biết THÁNG NÀO thiếu
+    thì mới đi bù được. "3 tháng chưa có số" không cho ai biết phải mở tháng nào ra nhập.
+
+    Chưa xác định được công ty mẹ thì trả về danh sách RỖNG, không phải "tất cả đều thiếu": lúc ấy
+    ta không biết gì cả, và nói "cả ba tháng chưa ghi sổ" là một khẳng định không có cơ sở. Cùng
+    một lối nghĩ với chỗ `xu_huong` trả None khi chưa có công ty mẹ.
+    """
+    from app.services import ket_qua_that as KQ
+    from app.services import reports as RP
+    me = KQ.cong_ty_me(db)
+    if me is None or not cac_thang:
+        return []
+    dem = RP.so_but_toan_nhieu_ky(db, cac_thang, company_id=me)
+    return [t for t in cac_thang if not dem.get(t)]
+
 # Hai chỉ tiêu của khối, và cặp khoá nối chúng lại: chuỗi xu hướng ở xu_huong dùng một mã, bảng kế
 # hoạch dùng một mã. Khai cặp ấy ở ĐÚNG MỘT chỗ — hai chỗ thì ngày một bên đổi tên là ngày biểu đồ
 # và mục tiêu nói về hai thứ khác nhau mà vẫn vẽ chồng lên nhau.
@@ -216,6 +235,24 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
         "ai_nhap_gia_von": "Điều hành",
         "ai_gan_phap_nhan": "Hành chính",
         "co_nguon": all(x["co_nguon"] for x in trong) if trong else False,
+        # ══ TC-68 · THÁNG CHƯA CÓ MỘT BÚT TOÁN NÀO — anh Tuấn 18/9/2026 ════════════════════════
+        # Đây là lý do thật của ô "Lợi nhuận trước thuế" rỗng, và nó nói ra ở ĐÚNG chỗ mà ba thứ
+        # còn thiếu khác đang nói: cùng khối `con_thieu`, cùng dòng chân thẻ, cùng nếp "nói ra
+        # phần thiếu VÀ chỉ ai nhập ở cửa nào".
+        #
+        # Đo trên sổ thật 18/9/2026: T7, T8, T9 đều có ĐÚNG 0 chứng từ đã ghi sổ, trong khi màn
+        # hình in ra số 0 như một kết quả kinh doanh. KHÔNG phải thiếu cửa — cửa đã có sẵn hai cái
+        # trên màn hình /accounting (nhập tay từng bút toán ở tab "Chứng từ ghi sổ", và nạp hàng
+        # loạt từ MISA theo khoảng ngày ở tab "MISA ↔ VTOS"). Thiếu là thiếu một câu cho người
+        # nhìn thấy ô trống biết phải đi đâu.
+        #
+        # PHẠM VI ĐÚNG BẰNG PHẠM VI CỦA CON SỐ: lọc theo công ty mẹ y như `xu_huong` làm khi đọc
+        # lợi nhuận trước thuế. Đếm cả tập đoàn rồi nói "tháng 7 đã có số" trong khi Vietourist mẹ
+        # chưa có dòng nào là một câu đúng về một phạm vi mà màn hình không hề nói tới.
+        #
+        # MỘT LƯỢT TRUY VẤN cho cả kỳ, không phải mỗi tháng một lượt — bài học TC-64b.
+        "thang_chua_ghi_so": _thang_chua_ghi_so(db, sorted(de_cong)),
+        "ai_ghi_so": "Kế toán",
     }
 
     # 17/9/2026 · SỐ VÀO BẰNG CỬA ĐÓNG SỐ BÙ (Chủ tịch ký thay các phòng ban cho lô kho quyết toán
