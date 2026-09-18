@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, soTien, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import BangBonMoc from "@/components/BangBonMoc";
 
 /** Dòng tiền – bảng bốn mốc, đường số dư từng ngày, và cửa Kế toán chốt số dư.
  *
@@ -61,7 +62,6 @@ function DongTien() {
   }, [pn, toast]);
   useEffect(() => { load(); }, [load]);
 
-  const cot = bang?.cot || [];
 
   return (<>
     <h1>Dòng tiền</h1>
@@ -100,32 +100,26 @@ function DongTien() {
           </div>
         </div>) : null}
 
-      <div className="panel wrap">
-        <h2>Bảng bốn mốc</h2>
-        <p className="muted" style={{ fontSize: 12 }}>{bang.cong_bon_cot_la_sai}</p>
-        <table><thead><tr>
-          <th>Khoản mục</th>
-          {cot.map((c: any) => <th key={c.ma} className="num">{c.ten}
-            <div className="muted" style={{ fontWeight: 400, fontSize: 11 }}>
-              {fmtD(c.tu_ngay)} – {fmtD(c.den_ngay)}</div></th>)}
-        </tr></thead><tbody>
-          {(bang.dong || []).map((d: any) => (
-            <tr key={d.ma} className={d.chua_co_nguon ? "muted" : ""}>
-              <td>{d.ten}
-                {d.chua_co_nguon && <div className="muted" style={{ fontSize: 11 }}>
-                  Chưa có nguồn — {d.bo_phan_chiu_trach_nhiem}</div>}
-                {!d.chua_co_nguon && <Tag cls={d.chieu === "vao" ? "ok" : "warn"}>
-                  {d.chieu === "vao" ? "vào" : "ra"}</Tag>}
-              </td>
-              {cot.map((c: any) => <td key={c.ma} className="num">{so(d.so?.[c.ma])}</td>)}
-            </tr>))}
-          <tr><td><b>Dòng tiền thuần</b></td>
-            {cot.map((c: any) => <td key={c.ma} className="num"><b>{so(bang.dong_tien_thuan?.[c.ma])}</b></td>)}</tr>
-          <tr><td><b>Số dư dự kiến cuối khoảng</b></td>
-            {cot.map((c: any) => <td key={c.ma} className="num"><b>{so(bang.so_du_du_kien_cuoi_khoang?.[c.ma])}</b></td>)}</tr>
-        </tbody></table>
-      </div>
     </>}
+
+    {/* ══════════════════════════════════════════════════════════════════════════════════════════
+        TC-63 · BẢNG BỐN MỐC CŨ ĐÃ THAY BẰNG KHỐI TỪ MÀN HÌNH CHỦ TỊCH
+        ══════════════════════════════════════════════════════════════════════════════════════════
+        "em chuyển qua gộp với dòng tiền hoặc là ẩn khỏi màn hình chủ tịch"  — anh Tuấn 18/9/2026
+
+        Trang này vốn tự dựng một bảng bốn mốc từ `/dong-tien/bang`. Khối chuyển sang dựng từ
+        `/dong-tien/khung`, mà `khung_dong_tien.ghep()` nhận CHÍNH `bang` ấy làm đầu vào rồi bổ
+        sung trạng thái nguồn số, số theo từng khoảng và dòng đáy — tức nó là tập CHA của bảng cũ.
+        Vì vậy THAY chứ không đặt cạnh: để cả hai là chuyển cái trùng từ màn hình Chủ tịch sang
+        đây, không phải bỏ nó đi.
+
+        BA THỨ BẢNG CŨ KHÔNG CÓ mà khối mới mang sang: nút đổi kiểu xem (luỹ kế ↔ trong từng
+        khoảng), nút Xuất Excel, và hình bốn mốc kèm câu đọc hộ.
+
+        CÁC PHẦN KHÁC CỦA TRANG GIỮ NGUYÊN `/dong-tien/bang`: hàng bốn ô ở trên (tiền khả dụng đầu
+        kỳ, ngày đối soát, hai khoản ghi nhớ) và ô cảnh báo "còn N dòng chưa có nguồn" — hai thứ ấy
+        gói khung không trả về. */}
+    <BangBonMoc pn={pn} />
 
     {ngay && <div className="panel wrap">
       <h2>Số dư theo từng ngày</h2>

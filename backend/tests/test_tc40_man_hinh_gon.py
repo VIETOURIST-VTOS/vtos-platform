@@ -34,6 +34,7 @@ TRANG = GOC / "web" / "app" / "page.tsx"
 V14 = GOC / "web" / "components" / "KhoiV14.tsx"
 KD = GOC / "web" / "components" / "KhoiKinhDoanh.tsx"
 DT = GOC / "web" / "components" / "KhoiDongTien.tsx"
+BM = GOC / "web" / "components" / "BangBonMoc.tsx"   # TC-63 · bảng bốn mốc đã sang tệp riêng
 DAU = GOC / "web" / "components" / "DauManHinh01.tsx"
 CSS = GOC / "web" / "app" / "globals.css"
 
@@ -159,10 +160,14 @@ def test_the_chi_tieu_doc_ho_thanh_cau_khong_chi_mot_mui_ten():
 
 def test_khoi_dong_tien_co_so_hinh_va_cau_doc_ho():
     """Anh Tuấn: "dòng tiền rất quan trọng, cần có số và biểu đồ phân tích"."""
-    t = _doc(DT)
-    assert "BieuDoCot" in t, "Khối dòng tiền phải dùng bộ biểu đồ chung."
+    # TC-63 (18/9/2026): hình bốn mốc và câu đọc hộ đổi tệp sang components/BangBonMoc.tsx khi anh
+    # Tuấn chốt "chuyển qua gộp với dòng tiền". Luật giữ nguyên: dòng tiền phải có SỐ và có HÌNH,
+    # và hình phải có một câu đọc hộ chỉ ra mốc âm sớm nhất.
+    t = _doc(BM)
+    assert "BieuDoCot" in t, "Bảng bốn mốc phải dùng bộ biểu đồ chung."
+    assert "BieuDoDuong" in _doc(DT), "Khối dòng tiền màn hình Chủ tịch phải còn hình 13 tuần."
     assert "docHoDongTien" in t, "Thiếu câu đọc hộ."
-    than = t[t.index("function docHoDongTien"): t.index("/** Bốn mốc dòng tiền thuần.")]
+    than = t[t.index("function docHoDongTien"): t.index("/** Hình bốn mốc dòng tiền thuần.")]
     # Mốc ÂM SỚM NHẤT là điều đáng lo nhất — nó là hạn phải xoay tiền.
     assert "am[0]" in than, "Câu đọc hộ phải chỉ ra mốc âm SỚM NHẤT, không phải mốc âm nặng nhất."
 

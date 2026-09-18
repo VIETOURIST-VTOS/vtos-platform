@@ -649,12 +649,11 @@ table.bang-doc{width:100%}
 /* Hai lớp này bị cắt nhầm khi dọn CSS chết của biểu đồ vẽ tay — phát hiện bằng phép soát "lớp
    nào TSX dùng mà CSS không có". Trả lại nguyên văn. */
 .dt-nut-chi-tiet{margin:10px 0 0}
-.dt-gap{margin:10px 0 0}
-.dt-gap>summary{cursor:pointer;font-size:12px;color:var(--vtos-text-mute)}
-@media print{.dt-gap>summary{display:none}
+/* TC-63 · Bốn luật `.dt-gap` đã XOÁ cùng nếp gấp "Bảng bốn mốc": bảng ấy sang hẳn /dong-tien nên
+   không còn nếp gấp nào để mở ra khi in. Xoá chứ không để lại lớp không ai dùng — bài học TC-60. */
+@media print{
   /* Nội dung bên trong <details> đóng bị trình duyệt ẩn; ép hiện khi in, không thì bản in mất
-     nguyên bảng bốn mốc — đúng thứ Chủ tịch mang vào phòng họp. */
-  .dt-gap>*:not(summary){display:block !important}
+     nguyên khối đang gấp — đúng thứ Chủ tịch mang vào phòng họp. */
   .mh01-gap>*:not(summary){display:block !important}}
 
 .mh01-ngan{border:0;border-top:1px solid var(--vtos-line);margin:22px 0 12px}
@@ -1162,4 +1161,8 @@ table.bang-doc{width:100%}
 .dt-nhan-nho{font-size:12px;font-weight:700;color:var(--vtos-heading)}
 .dt-nhan-nho-mo{font-size:12px}
 .dt-gop .dt-moc{margin-top:10px}
+/* TC-63 · Hàng thao tác của khối Bảng bốn mốc trên /dong-tien dùng LẠI `.dt-hang` — cùng loại
+   nội dung thì cùng hình dạng. Chỉ thêm khe dưới, vì ở đây nó không nằm trong cột dọc `.dt-chan`
+   (nơi khe do `gap` của cột lo) mà đứng thẳng trong `.panel`. */
+#bang-bon-moc .dt-hang{margin:0 0 12px}
 

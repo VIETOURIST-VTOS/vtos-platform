@@ -219,7 +219,16 @@ def test_dai_chu_thich_dung_HAI_hang_khong_hon():
         "Ngoài hàng do `DayDuBao` dựng, dải chú thích chỉ được có ĐÚNG MỘT hàng nữa. Ba hàng vẫn "
         "gọn hơn bản cũ nên sẽ lọt qua nếu chỉ canh 'ít đi' — nên canh đúng con số."
     )
-    assert "dt-kieu" in dai and "Xuất Excel" in dai, "Hàng 2 là thao tác."
+    # TC-63 (18/9/2026) · VẾ SAU ĐỔI, CÁCH CHIA THÌ KHÔNG. Anh Tuấn chốt "chuyển qua gộp với dòng
+    # tiền": nút đổi kiểu xem (`dt-kieu`) và nút Xuất Excel theo bảng bốn mốc sang /dong-tien, vì
+    # chúng điều khiển CÁI BẢNG — bảng đi rồi mà nút ở lại thì chúng không điều khiển gì nữa.
+    # Hàng 2 vẫn là hàng THAO TÁC, nay mang tóm tắt nguồn số và cửa sang trang nguyên nhân: đọc
+    # xong là biết phải giao ai làm gì. Canh cả hai chiều để không ai lặng lẽ kéo bảng về lại.
+    assert "Nguồn số" in dai and "/dong-tien/nguon" in dai, "Hàng 2 là thao tác."
+    assert "dt-kieu" not in dai and "Xuất Excel" not in dai, (
+        "Nút đổi kiểu xem và nút Xuất Excel đã theo bảng bốn mốc sang /dong-tien (TC-63); dựng "
+        "lại chúng ở đây là kéo cả bảng về theo."
+    )
 
     j = ma.index("function DayDuBao(")
     than = ma[j:ma.index("\n}", j)]

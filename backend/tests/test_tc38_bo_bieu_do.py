@@ -362,17 +362,22 @@ def test_khoi_dong_tien_dung_bo_bieu_do_chung():
     Bản vẽ tay cũ trong KhoiDongTien đúng về hình nhưng là bản chép THỨ TƯ của cùng một phép tính
     trục — và bốn bản chép thì sớm muộn lệch nhau. Nay gọi bộ chung, và thêm một câu đọc hộ nói
     mốc nào âm sớm nhất, thiếu bao nhiêu."""
+    # TC-63 (18/9/2026): hình bốn mốc và câu đọc hộ theo bảng bốn mốc sang components/BangBonMoc.tsx
+    # (anh Tuấn: "chuyển qua gộp với dòng tiền"). Luật không đổi — canh cái RÀNG BUỘC, không canh
+    # tên tệp. Soát cả hai tệp để bản vẽ tay cũ không sống lại ở bên nào.
     dt = _bo_chu_thich_tsx(_doc(GOC / "web" / "components" / "KhoiDongTien.tsx"))
-    assert "BieuDoCot" in dt, "Khối dòng tiền phải dùng bộ biểu đồ chung."
-    assert "dt-bd-thanh" not in dt, "Bản vẽ tay cũ còn sót lại."
-    assert "docHoDongTien" in dt, "Thiếu câu đọc hộ cho khối quan trọng nhất màn hình."
+    bm = _bo_chu_thich_tsx(_doc(GOC / "web" / "components" / "BangBonMoc.tsx"))
+    assert "BieuDoCot" in bm, "Hình bốn mốc phải dùng bộ biểu đồ chung."
+    assert "BieuDoDuong" in dt, "Khối dòng tiền trên màn hình Chủ tịch phải dùng bộ biểu đồ chung."
+    assert "dt-bd-thanh" not in dt and "dt-bd-thanh" not in bm, "Bản vẽ tay cũ còn sót lại."
+    assert "docHoDongTien" in bm, "Thiếu câu đọc hộ cho bảng bốn mốc."
 
 
 def test_cau_doc_ho_khong_tu_tinh_chi_tieu_moi():
     """Câu đọc hộ chỉ ĐỌC LẠI số máy chủ gửi: mốc nào âm, thiếu bao nhiêu. Nó không cộng, không
     chia, không suy ra một chỉ tiêu nào — ranh giới 09/9 giữ nguyên."""
-    dt = _doc(GOC / "web" / "components" / "KhoiDongTien.tsx")
-    than = dt[dt.index("function docHoDongTien"): dt.index("/** Bốn mốc dòng tiền thuần.")]
+    dt = _doc(GOC / "web" / "components" / "BangBonMoc.tsx")   # TC-63 · câu đọc hộ đổi tệp
+    than = dt[dt.index("function docHoDongTien"): dt.index("/** Hình bốn mốc dòng tiền thuần.")]
     assert "Math.abs" in than, "Được phép lấy trị tuyệt đối để đọc thành chữ."
     for phep in (" / ", " * "):
         assert phep not in _bo_chu_thich_tsx(than), f"Câu đọc hộ đang tự tính: {phep!r}"
