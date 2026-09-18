@@ -3,16 +3,84 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, pct, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import BaoCaoChuyenDoi, { tyLe } from "@/components/BaoCaoChuyenDoi";
+
+/** KHÔNG GIAN LÀM VIỆC MARKETING & PR — bảy màn hình, một chỗ (18/9/2026)
+ *
+ *  Dựng theo bản vẽ "VTOS · Marketing & PR · V3.0" anh Tuấn gửi, với MỘT khác biệt đã xin ý kiến và
+ *  được chốt: bản vẽ nền SÁNG, còn VTOS đã chuyển sang nền TỐI từ 13/9/2026 (xem đầu tệp
+ *  app/tokens.css). Dựng đúng bản vẽ thì Marketing thành căn phòng trắng duy nhất trong toà nhà
+ *  tối, và mỗi lần đổi nhận diện phải sửa hai nơi. Nên bố cục, luồng và nội dung của V3.0 giữ
+ *  nguyên; lớp màu lấy từ bộ nhận diện đang chạy. Màn hình này KHÔNG khai màu riêng một dòng nào.
+ *
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════════
+ *  HAI ĐƯỜNG DẪN CŨ KHÔNG ĐƯỢC GÃY
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════════
+ *  Thanh menu (components/Shell.tsx) đang trỏ hai chỗ vào màn hình này, và test_menu.py canh đúng
+ *  từng ký tự của hai dòng ấy:
+ *      ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"]
+ *      ["Chiến dịch",           "/marketing"]
+ *  Nên: `/marketing` không tham số vẫn mở THẲNG Chiến dịch (menu nói Chiến dịch thì phải ra Chiến
+ *  dịch), và `?tab=ngansach` vẫn mở thẳng phần Ngân sách. Tổng quan là tab ĐẦU của dải, cách một
+ *  cú bấm. Đổi nhãn menu để `/marketing` mở Tổng quan là việc HAI ĐẦU (Shell.tsx + test_menu.py),
+ *  thuộc làn menu — không gộp vào đây, vì sửa một đầu là đầu kia đỏ.
+ *
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════════
+ *  BA MÀN HÌNH CỦA BẢN VẼ CHƯA CÓ SỐ ĐỂ CHẠY — VÀ MÀN HÌNH NÓI THẲNG RA
+ *  ═══════════════════════════════════════════════════════════════════════════════════════════════
+ *  Ranh giới 09/9/2026: mỗi con số phải có một CỬA cho người dùng đưa số vào; không có cửa thì đó
+ *  là việc còn thiếu, không phải chỗ để bịa một con số mẫu. Đo ngày 18/9 trên chính kho mã:
+ *      · Tổng quan          – KHÔNG cần cửa mới: gộp lại từ bốn cửa đã có. Dựng được.
+ *      · Đối soát dữ liệu   – có sẵn POST /leads/match và POST /leads/stats. Dựng được.
+ *      · Thương hiệu & PR   – KHÔNG có bảng, KHÔNG có đường API nào. Dựng ra chỉ có thể là số giả.
+ *  Nên tab Thương hiệu & PR ở đây là một BẢN KÊ VIỆC CÒN THIẾU, không phải một bảng trống.
+ */
 
 const today = () => new Date().toISOString().slice(0, 10);
+const thang0 = () => new Date().toISOString().slice(0, 7);
 const RONG = { name: "", objective: "ra_lead", product_id: "", mang: "le", channels: [] as string[],
                from_date: today(), to_date: "", budget: "", target_leads: "", target_bookings: "",
                owner_id: "", note: "", nguon_tao: "nguoi", ai_ghi_chu: "" };
+
+const TABS: [string, string, string][] = [
+  ["tongquan",   "Tổng quan",                "Nhìn kết quả, nhận biết tồn đọng, mở đúng hồ sơ cần xử lý."],
+  ["khach",      "Khách tiềm năng & Sales",  "Một hồ sơ khách, nhiều nhu cầu; tiếp nhận và phối hợp trên cùng dữ liệu."],
+  ["chuyendoi",  "Chuyển đổi & doanh thu",   "Tách tháng phát sinh lead, tháng chốt booking và tháng khởi hành."],
+  ["chiendich",  "Ngân sách & chiến dịch",   "Theo dõi kế hoạch, chi phí và kết quả trên cùng chiến dịch."],
+  ["doisoat",    "Đối soát dữ liệu",         "Xử lý trùng, thiếu nguồn và sai liên kết trước khi xác nhận báo cáo."],
+  ["noidung",    "Nội dung & kênh",          "Tổ chức nội dung theo lịch, người phụ trách và trạng thái duyệt."],
+  ["thuonghieu", "Thương hiệu & PR",         "Quản lý nhận diện, tài sản thương hiệu và hoạt động truyền thông."],
+];
+
+/** Một THẺ SỐ của Tổng quan. Bốn phần, và phần thứ tư không được bỏ:
+ *      nhãn · số · số ấy đọc từ đâu · CỬA để đi tới chỗ sửa nó.
+ *  Thẻ không có cửa là một con số người đọc không làm gì được với nó. */
+function The({ nhan, so, nguon, cua, cuaTen, rong, canhBao }:
+  { nhan: string; so: React.ReactNode; nguon: string; cua?: () => void; cuaTen?: string; rong?: boolean; canhBao?: boolean }) {
+  return <div className={"the-ct" + (rong ? " rong" : "")}>
+    <div className="the-nhan">{nhan}</div>
+    <div className={"the-so" + (canhBao ? " do" : "")}>{so}</div>
+    <div className="the-duoi">{nguon}</div>
+    {cua && <div className="the-thieu">
+      <button type="button" className="the-cua" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}
+        onClick={cua}>{cuaTen || "Mở cửa nhập"}</button>
+    </div>}
+  </div>;
+}
 
 function Marketing() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const lapDuoc = ["ptgd_mkt", "nv_mkt", "cntt"].includes(role);
+  // Gương của hàng rào THẬT ở backend (`require_roles(*EDIT_ROLES, "tp_dh")` trên POST
+  // /leads/match). Đây chỉ để KHÔNG hiện một cái nút bấm vào là bị từ chối — hàng rào vẫn nằm
+  // ở phía sổ, không nằm ở đây.
+  const doiSoatDuoc = ["nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_mkt", "ptgd_mkt", "cntt", "tgd", "tp_dh"].includes(role);
+
+  const [tab, setTab] = useState("chiendich");
+  const [sub, setSub] = useState("chiendich");          // trong tab "chiendich": chiendich | ngansach
+
+  // ── chiến dịch & ngân sách (giữ nguyên từ bản trước, không sửa logic) ──
   const [meta, setMeta] = useState<any>({ muc_tieu: {}, kenh: {}, trang_thai: {}, mang: {} });
   const [ds, setDs] = useState<any[]>([]);
   const [sp, setSp] = useState<any[]>([]);
@@ -21,26 +89,75 @@ function Marketing() {
   const [mo, setMo] = useState<number | null>(null);
   const [f, setF] = useState<any>({ ...RONG });
   const [hienForm, setHienForm] = useState(false);
-  const [tab, setTab] = useState("chiendich");
   const [ns, setNs] = useState<any[]>([]);
   const [hm, setHm] = useState<any>({});
-  const [moNs, setMoNs] = useState<number | null>(null);
-  const [fn, setFn] = useState<any>({ period: new Date().toISOString().slice(0, 7), target_leads: "", target_revenue: "", rationale: "", lines: {} as Record<string, string>, nguon_tao: "nguoi", ai_ghi_chu: "" });
+  const [fn, setFn] = useState<any>({ period: thang0(), target_leads: "", target_revenue: "", rationale: "", lines: {} as Record<string, string>, nguon_tao: "nguoi", ai_ghi_chu: "" });
   const [hienNs, setHienNs] = useState(false);
+
+  // ── khách tiềm năng ──
+  const [lmeta, setLmeta] = useState<any>({ channels: [], status: {} });
+  const [thang, setThang] = useState(thang0());
+  const [kenh, setKenh] = useState(""); const [tt, setTt] = useState(""); const [q, setQ] = useState("");
+  const [leads, setLeads] = useState<any>({ rows: [], counts: {} });
+
+  // ── chuyển đổi ──
+  const [repThang, setRepThang] = useState(thang0());
+  const [rep, setRep] = useState<any>(null);
+
+  // ── đối soát: cửa nhập thống kê kênh ──
+  const [stats, setStats] = useState<any[]>([]);
+  const [sThang, setSThang] = useState(thang0());
+  const [sMoi, setSMoi] = useState<any>({ channel: "", leads: "", cost: "" });
+
+  // ── nội dung ──
+  const [nd, setNd] = useState<any[]>([]);
+
+  /** BỐN TAB ĐỌC DỮ LIỆU KHÁCH TỰ ẨN VỚI VAI KHÔNG MỞ ĐƯỢC SỔ LEAD (18/9/2026)
+   *
+   *  Bảng quyền thật nằm ở backend/app/services/access.py. Chép nó sang đây là dựng bản thứ hai của
+   *  một bảng đã có — và bản thứ hai thì luôn là bản lạc hậu. Nên màn hình KHÔNG đọc vai trò để
+   *  đoán: nó gọi thử `/leads/meta` và `/noi-dung/meta`, gọi được thì hiện tab, bị chặn thì ẩn.
+   *
+   *  ĐÂY KHÔNG PHẢI HÀNG RÀO. Hàng rào là hai lớp ở phía sổ (phạm vi ngoài suy từ MENU_ROLES, và
+   *  require_roles trên từng tuyến). Ẩn tab chỉ để Kế toán — vai có /marketing mà không có /leads —
+   *  mở không gian Marketing ra không gặp bốn tab đỏ mà không hiểu vì sao.
+   *
+   *  `null` = chưa biết. Hiện tab rồi giật mất còn khó chịu hơn là chờ nửa giây. */
+  const [xemLead, setXemLead] = useState<boolean | null>(null);
+  const [xemNoiDung, setXemNoiDung] = useState<boolean | null>(null);
 
   const load = useCallback(() => {
     api("/marketing/campaigns").then(setDs).catch((e) => toast(errMsg(e), true));
     api("/marketing/campaigns/lead-chua-gan").then(setChua).catch(() => {});
     api("/marketing/budgets").then(setNs).catch(() => {});
+    api("/noi-dung").then((r) => setNd(Array.isArray(r) ? r : [])).catch(() => {});
   }, []); // eslint-disable-line
+
   useEffect(() => {
     api("/marketing/meta").then(setMeta).catch(() => {});
+    api("/leads/meta").then((r) => { setLmeta(r); setXemLead(true); }).catch(() => setXemLead(false));
+    api("/noi-dung/meta").then(() => setXemNoiDung(true)).catch(() => setXemNoiDung(false));
     api("/products").then((r) => setSp(Array.isArray(r) ? r : r.rows || [])).catch(() => {});
     api("/users").then((r) => setNv(Array.isArray(r) ? r : [])).catch(() => {});
     api("/marketing/budgets/hang-muc").then(setHm).catch(() => {});
-    const q = new URLSearchParams(window.location.search).get("tab"); if (q) setTab(q);
+    const url = new URLSearchParams(window.location.search).get("tab");
+    // Đường dẫn CŨ của menu vẫn phải mở đúng chỗ cũ – xem ghi chú "HAI ĐƯỜNG DẪN CŨ" ở đầu tệp.
+    if (url === "ngansach") { setTab("chiendich"); setSub("ngansach"); }
+    else if (url && TABS.some(([k]) => k === url)) setTab(url);
     load();
   }, [load]);
+
+  // Báo cáo chuyển đổi nuôi CẢ tab Tổng quan lẫn tab Chuyển đổi, nên nạp ngay từ đầu.
+  useEffect(() => { api(`/leads/conversion?month=${repThang}`).then(setRep).catch(() => {}); }, [repThang]);
+  useEffect(() => {
+    if (tab !== "khach") return;
+    api(`/leads?month=${thang}&channel=${encodeURIComponent(kenh)}&status=${tt}&q=${encodeURIComponent(q)}`)
+      .then(setLeads).catch((e) => toast(errMsg(e), true));
+  }, [tab, thang, kenh, tt, q, toast]);
+  useEffect(() => {
+    if (tab !== "doisoat") return;
+    api(`/leads/stats?month=${sThang}`).then((r) => setStats(Array.isArray(r) ? r : [])).catch(() => {});
+  }, [tab, sThang]);
 
   const post = async (path: string, json?: any, method = "POST") => {
     try { const r = await api(path, { method, json }); toast(r.message || "Xong"); load(); return r; }
@@ -64,158 +181,417 @@ function Marketing() {
       .then((r) => { if (r) { setFn({ ...fn, rationale: "", lines: {} }); setHienNs(false); } });
   };
 
+  /** ĐỐI SOÁT CHẠY TRÊN TOÀN BỘ SỔ LEAD, KHÔNG GIỚI HẠN MỘT THÁNG.
+   *
+   *  `/leads/match` nhận tham số `months` để lọc theo THÁNG PHÁT SINH LEAD. Truyền tháng đang xem
+   *  vào đó là sai hai lần: tháng đang xem là tháng TOUR KHỞI HÀNH (khác loại), và quy tắc đã ký
+   *  `overview-v1` cần cả lead của các kỳ TRƯỚC được gắn booking thì tử số mới đúng. Lọc một tháng
+   *  là tự tay làm tỷ lệ của các kỳ trước tụt xuống mà không ai biết vì sao. Nên: không truyền gì. */
+  const chayDoiSoat = async () => {
+    try {
+      const r = await api("/leads/match", { method: "POST" });
+      toast(`Đã gắn ${r.matched} lead với booking (soát ${r.leads} lead)`);
+      api(`/leads/conversion?month=${repThang}`).then(setRep).catch(() => {});
+      load();
+    } catch (x) { toast(errMsg(x), true); }
+  };
+  const luuStat = () => {
+    if (!sMoi.channel) return;
+    post("/leads/stats", [{ lead_month: sThang, channel: sMoi.channel, leads: Number(sMoi.leads) || 0, cost: soTien(sMoi.cost) || 0 }])
+      .then((r) => { if (r) { setSMoi({ channel: "", leads: "", cost: "" }); api(`/leads/stats?month=${sThang}`).then((x) => setStats(Array.isArray(x) ? x : [])).catch(() => {}); } });
+  };
+
+  /** Tab nào hiện được. Ba tab KHÔNG đụng sổ khách (Tổng quan, Ngân sách & chiến dịch, Thương hiệu)
+   *  luôn hiện. Bốn tab còn lại chờ đo xong rồi mới quyết. */
+  const hienTab = (k: string) => {
+    if (k === "khach" || k === "chuyendoi" || k === "doisoat") return xemLead !== false;
+    if (k === "noidung") return xemNoiDung !== false;
+    return true;
+  };
+  // Đang đứng ở một tab vừa bị đo là không mở được thì đưa về Chiến dịch, đừng để màn hình trắng.
+  useEffect(() => { if (!hienTab(tab)) setTab("chiendich"); }); // eslint-disable-line
+
+  // ── số của Tổng quan, gộp từ các cửa đã có ──
+  const nsKy = ns[0]?.bang || null;
+  const dangChay = ds.filter((c) => c.status === "dang_chay").length;
+  const ndChoDuyet = nd.filter((n) => ["cho_duyet", "cho_ky_2"].includes(n.status)).length;
+  const lechLon = (rep?.by_channel_month || []).filter((a: any) => a.lech_khai_bao).length;
+
   return (<>
-    <h1>Marketing</h1>
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-      {[["chiendich", "Chiến dịch"], ["ngansach", "Kế hoạch & ngân sách"]].map(([k, l]) =>
-        <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
+    <h1>Marketing &amp; PR</h1>
+
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+      {TABS.filter(([k]) => hienTab(k)).map(([k, l]) =>
+        <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }}
+          onClick={() => setTab(k)}>{l}</button>)}
     </div>
+    <p className="muted">{TABS.find(([k]) => k === tab)?.[2]}</p>
 
-    {tab === "ngansach" && <>
-      <p className="muted">Màn hình này chỉ giữ phần <b>dự toán</b>. Số <b>đã chi</b> đọc từ đề nghị chi đã duyệt — không có ô nào để gõ tay. Chi vượt phần còn lại của hạng mục sẽ tự bật cờ ngoài dự toán và cần hai chữ ký; hệ thống không chặn cứng việc chi, nhưng không cho chi âm thầm.</p>
-      {lapDuoc && <button className="act" onClick={() => setHienNs(!hienNs)}>{hienNs ? "Đóng biểu mẫu" : "+ Lập ngân sách kỳ"}</button>}
-      {hienNs && <div className="panel"><h2>Biểu mẫu ngân sách kỳ</h2>
-        <div className="grid">
-          <label>Kỳ *<input value={fn.period} onChange={(e) => setFn({ ...fn, period: e.target.value })} placeholder="2026-09 hoặc 2026-Q4" /></label>
-          <label>Mục tiêu lead *<input type="number" value={fn.target_leads} onChange={(e) => setFn({ ...fn, target_leads: e.target.value })} /></label>
-          <label>Mục tiêu doanh thu quy đổi<input type="number" value={fn.target_revenue} onChange={(e) => setFn({ ...fn, target_revenue: e.target.value })} /></label>
-        </div>
-        <b>Dự toán theo hạng mục *</b>
-        <div className="grid">{Object.entries(hm).map(([k, v]: any) =>
-          <label key={k}>{v}<input type="number" value={fn.lines[k] || ""} onChange={(e) => setFn({ ...fn, lines: { ...fn.lines, [k]: e.target.value } })} /></label>)}</div>
-        <p className="muted">Tổng dự toán: <b>{vnd(Object.values(fn.lines).reduce((s: number, v: any) => s + (Number(v) || 0), 0))}</b> — tổng tự cộng, không có ô gõ tay.</p>
-        <label>Căn cứ lập ngân sách *<textarea rows={2} style={{ width: "100%" }} value={fn.rationale}
-          onChange={(e) => setFn({ ...fn, rationale: e.target.value })} placeholder="Vì sao con số này – kỳ sau còn đối chiếu lại được" /></label>
-        <div className="panel" style={{ background: "var(--bg2)" }}>
-          <label><input type="checkbox" checked={fn.nguon_tao === "ai"} onChange={(e) => setFn({ ...fn, nguon_tao: e.target.checked ? "ai" : "nguoi" })} /> <b>Đề xuất do trợ lý AI soạn</b></label>
-          {fn.nguon_tao === "ai" && <label>Căn cứ đề xuất (bắt buộc)<textarea rows={2} style={{ width: "100%" }} value={fn.ai_ghi_chu} onChange={(e) => setFn({ ...fn, ai_ghi_chu: e.target.value })} /></label>}
-        </div>
-        <button className="act" disabled={!fn.rationale} onClick={luuNs}>Lưu ở trạng thái Nháp</button>
-      </div>}
+    {/* ═══════════════ 1 · TỔNG QUAN ═══════════════ */}
+    {tab === "tongquan" && <>
+      <div className="mh01-the">
+        {xemLead === false && <The rong nhan="Số liệu khách tiềm năng" so="không mở"
+             nguon="Vai trò của anh/chị không mở được sổ lead, nên bốn tab đọc dữ liệu khách đã tự ẩn. Đây là hàng rào ở phía sổ, không phải lỗi màn hình." />}
+        {xemLead !== false && <>
+        <The nhan={`Tỷ lệ chốt ${rep?.quy_tac_ty_le_chot || "đã ký"} · ${repThang}`}
+             so={tyLe(rep?.total_current?.ty_le_chot_overview)}
+             nguon={rep?.da_doi_chieu ? "Sổ lead ↔ booking, tính đến hôm nay. Còn tăng khi kỳ trước chốt muộn."
+                                      : "Chưa chạy đối chiếu lead ↔ booking — đây là CHƯA XÁC ĐỊNH, không phải 0%."}
+             cua={() => setTab(rep?.da_doi_chieu ? "chuyendoi" : "doisoat")}
+             cuaTen={rep?.da_doi_chieu ? "Xem bảng chuyển đổi" : "Chạy đối chiếu"}
+             rong={!rep?.da_doi_chieu} />
+        <The nhan={`Số điện thoại phát sinh · ${repThang}`}
+             so={rep?.total_current?.so_sdt ?? "—"}
+             nguon="Đếm trên tập số điện thoại của sổ lead, không cộng dồn từng kênh."
+             cua={() => setTab("khach")} cuaTen="Xem danh sách lead" />
+        <The nhan="Lead chưa gắn chiến dịch"
+             so={chua?.tong ?? "—"}
+             nguon="Sổ lead, những dòng chưa có chiến dịch. Hệ thống không tự đoán."
+             cua={() => setTab("doisoat")} cuaTen="Gán chiến dịch"
+             canhBao={!!chua?.tong} />
+        </>}
+        <The nhan="Chiến dịch đang chạy"
+             so={dangChay}
+             nguon={`${ds.length} chiến dịch đã lập. Chi phí đọc từ đề nghị chi đã duyệt.`}
+             cua={() => { setTab("chiendich"); setSub("chiendich"); }} cuaTen="Mở chiến dịch" />
+        <The nhan={nsKy ? `Ngân sách kỳ ${ns[0].period} · còn lại` : "Ngân sách kỳ"}
+             so={nsKy ? vnd(nsKy.tong_con_lai) : "chưa lập"}
+             nguon={nsKy ? "Dự toán trừ đã chi và đang treo. Không có ô gõ tay cho phần đã chi."
+                         : "Chưa có kỳ ngân sách nào — đây là việc còn thiếu, không phải số 0."}
+             cua={() => { setTab("chiendich"); setSub("ngansach"); }} cuaTen="Mở ngân sách"
+             rong={!nsKy} canhBao={!!nsKy && nsKy.tong_con_lai < 0} />
+        <The nhan="Nội dung chờ duyệt"
+             so={ndChoDuyet}
+             nguon={`${nd.length} nội dung trong sổ. Bản có cam kết hoặc số liệu tài chính cần chữ ký thứ hai.`}
+             cua={() => setTab("noidung")} cuaTen="Mở hàng đợi duyệt" />
+      </div>
 
-      {ns.map((b) => { const g = b.bang || {}; return <div className="panel" key={b.id}>
-        <h2>Kỳ {b.period} · <Tag cls={b.status === "hieu_luc" ? "ok" : b.status === "cho_duyet" ? "warn" : "grey"}>{b.status_ten}</Tag>
-          {b.nguon_tao === "ai" && <Tag cls="warn">AI</Tag>}</h2>
-        <div className="kpis">
-          <div className="kpi"><b>{vnd(g.tong_du_toan)}</b><span>Dự toán</span></div>
-          <div className="kpi"><b>{vnd(g.tong_da_chi)}</b><span>Đã chi</span></div>
-          <div className="kpi"><b>{vnd(g.tong_treo)}</b><span>Đang treo (đã cam kết)</span></div>
-          <div className="kpi"><b style={{ color: g.tong_con_lai < 0 ? "var(--red)" : undefined }}>{vnd(g.tong_con_lai)}</b><span>Còn lại</span></div>
-        </div>
-        <div className="wrap"><table><thead><tr><th>Hạng mục</th><th style={{ textAlign: "right" }}>Dự toán</th>
-          <th style={{ textAlign: "right" }}>Đã chi</th><th style={{ textAlign: "right" }}>Đang treo</th>
-          <th style={{ textAlign: "right" }}>Còn lại</th></tr></thead><tbody>
-          {(g.rows || []).map((r: any) => <tr key={r.hang_muc}>
-            <td>{r.ten}</td><td style={{ textAlign: "right" }}>{vnd(r.du_toan)}</td>
-            <td style={{ textAlign: "right" }}>{vnd(r.da_chi)}</td><td style={{ textAlign: "right" }}>{vnd(r.dang_treo)}</td>
-            <td style={{ textAlign: "right", color: r.vuot ? "var(--red)" : undefined }}><b>{vnd(r.con_lai)}</b>{r.vuot && <Tag cls="red">vượt</Tag>}</td></tr>)}
-          {g.chua_phan_muc && (g.chua_phan_muc.da_chi > 0 || g.chua_phan_muc.dang_treo > 0) && <tr>
-            <td><i>Chi marketing chưa gán hạng mục</i></td><td style={{ textAlign: "right" }}>—</td>
-            <td style={{ textAlign: "right" }}>{vnd(g.chua_phan_muc.da_chi)}</td>
-            <td style={{ textAlign: "right" }}>{vnd(g.chua_phan_muc.dang_treo)}</td>
-            <td style={{ textAlign: "right" }}><Tag cls="warn">cần gán</Tag></td></tr>}
-          {(g.ngoai_ngan_sach || []).map((x: any) => <tr key={x.hang_muc}>
-            <td><i>{x.ten} — ngoài ngân sách kỳ</i></td><td style={{ textAlign: "right" }}>—</td>
-            <td style={{ textAlign: "right" }}>{vnd(x.da_chi)}</td><td style={{ textAlign: "right" }}>{vnd(x.dang_treo)}</td>
-            <td style={{ textAlign: "right" }}><Tag cls="warn">ngoài</Tag></td></tr>)}
-        </tbody></table></div>
-        <p className="muted">Chi phí/lead kế hoạch <b>{vnd(g.chi_phi_lead_ke_hoach)}</b> · thực tế <b>{vnd(g.chi_phi_lead_thuc_te)}</b> ({g.so_lead} lead trong kỳ) · Mục tiêu {b.target_leads} lead</p>
-        <p className="muted"><b>Căn cứ:</b> {b.rationale}</p>
-        {b.ai_ghi_chu && <p className="muted"><b>Căn cứ AI:</b> {b.ai_ghi_chu}</p>}
-        <p className="muted">Người lập {b.created_by}{b.approved_by && ` · Duyệt bởi ${b.approved_by}`}</p>
-        {b.status === "nhap" && lapDuoc && <button className="act" onClick={() => post(`/marketing/budgets/${b.id}/trinh`)}>Trình duyệt</button>}
-        {b.status === "cho_duyet" && ["tgd", "chutich"].includes(role) && <button className="act" onClick={() => post(`/marketing/budgets/${b.id}/duyet`)}>Duyệt ngân sách</button>}
-      </div>; })}
-      {!ns.length && <p className="muted">Chưa có ngân sách kỳ nào.</p>}
+      {(rep?.canh_bao || []).map((c: string, i: number) =>
+        <div className="panel" key={i} style={{ borderColor: "var(--vtos-warning)" }}><b>⚠ {c}</b></div>)}
+
+      <div className="panel">
+        <h2>Việc còn thiếu của phòng</h2>
+        {/* Danh sách này ĐỌC TỪ SỐ THẬT, không phải một bảng kê viết cứng. Không có việc nào thì nói
+            là không có, chứ không ẩn đi cho đẹp. */}
+        <ul>
+          {!!chua?.tong && <li><b>{chua.tong} lead chưa gắn chiến dịch</b> — chưa gán thì chi phí không quy được về chiến dịch nào.</li>}
+          {!rep?.da_doi_chieu && <li><b>Chưa chạy đối chiếu lead ↔ booking</b> — tỷ lệ chốt theo quy tắc đã ký đang là <i>chưa xác định</i>.</li>}
+          {!!lechLon && <li><b>{lechLon} dòng kênh × tháng lệch giữa khai báo và số đếm được</b> — tệp nguồn có thể chỉ có phần chi tiết của vài kênh.</li>}
+          {!nsKy && <li><b>Chưa lập ngân sách kỳ</b> — không có dự toán thì không có chỗ để so phần đã chi.</li>}
+          {!!ndChoDuyet && <li><b>{ndChoDuyet} nội dung đang chờ duyệt</b>.</li>}
+          <li><b>Thương hiệu &amp; PR chưa có sổ</b> — xem tab cuối, chưa có bảng dữ liệu nào để mở màn hình thật.</li>
+        </ul>
+      </div>
     </>}
 
-    {tab === "chiendich" && <>
-    <h2>Chiến dịch</h2>
-    <p className="muted">Chiến dịch là trục nối tiền – khách – doanh thu. Chi phí đọc từ đề nghị chi đã duyệt, lead đọc từ Nguồn khách, doanh thu đọc từ booking đã chốt — <b>không có ô nào để gõ tay ba con số đó</b>.</p>
-
-    {lapDuoc && <button className="act" onClick={() => setHienForm(!hienForm)}>{hienForm ? "Đóng biểu mẫu" : "+ Lập chiến dịch mới"}</button>}
-
-    {hienForm && <div className="panel">
-      <h2>Biểu mẫu chiến dịch</h2>
-      <div className="grid">
-        <label>Tên chiến dịch *<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Tết 2026 – Miền Bắc" /></label>
-        <label>Mục tiêu *<select value={f.objective} onChange={(e) => setF({ ...f, objective: e.target.value })}>
-          {Object.entries(meta.muc_tieu).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
-        <label>Mảng kinh doanh *<select value={f.mang} onChange={(e) => setF({ ...f, mang: e.target.value })}>
-          {Object.entries(meta.mang).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
-        <label>Sản phẩm / tuyến {f.objective === "ban_tour" && <b style={{ color: "var(--red)" }}>*</b>}
-          <select value={f.product_id} onChange={(e) => setF({ ...f, product_id: e.target.value })}>
-            <option value="">— không gắn sản phẩm —</option>
-            {sp.map((p: any) => <option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}</select></label>
-        <label>Từ ngày *<input type="date" value={f.from_date} onChange={(e) => setF({ ...f, from_date: e.target.value })} /></label>
-        <label>Đến ngày<input type="date" value={f.to_date} onChange={(e) => setF({ ...f, to_date: e.target.value })} /></label>
-        <label>Ngân sách duyệt (đ) *<input type="number" value={f.budget} onChange={(e) => setF({ ...f, budget: e.target.value })} /></label>
-        <label>Chỉ tiêu lead *<input type="number" value={f.target_leads} onChange={(e) => setF({ ...f, target_leads: e.target.value })} /></label>
-        <label>Chỉ tiêu booking<input type="number" value={f.target_bookings} onChange={(e) => setF({ ...f, target_bookings: e.target.value })} /></label>
-        <label>Người phụ trách<select value={f.owner_id} onChange={(e) => setF({ ...f, owner_id: e.target.value })}>
-          <option value="">— chọn —</option>{nv.map((x: any) => <option key={x.id} value={x.id}>{x.full_name}</option>)}</select></label>
+    {/* ═══════════════ 2 · KHÁCH TIỀM NĂNG & SALES ═══════════════ */}
+    {tab === "khach" && <>
+      <p className="muted">Đây là <b>cửa nhìn</b> của Marketing vào sổ khách hàng do Kinh doanh giữ.
+        Sửa hồ sơ, nhắn Zalo và nhập tệp lead nằm ở màn hình <a href="/leads?tab=leads">Khách hàng &amp;
+        nguồn khách</a> — dựng thêm một biểu nhập thứ hai ở đây là hai đầu cho cùng một việc, và sớm
+        muộn hai đầu nói khác nhau.</p>
+      <div className="panel">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}>
+          <label>Tháng lead<input type="month" value={thang} onChange={(e) => setThang(e.target.value)} /></label>
+          <label>Kênh<select value={kenh} onChange={(e) => setKenh(e.target.value)}>
+            <option value="">— tất cả —</option>
+            {(lmeta.channels || []).map((x: string) => <option key={x}>{x}</option>)}</select></label>
+          <label>Trạng thái<select value={tt} onChange={(e) => setTt(e.target.value)}>
+            <option value="">— tất cả —</option>
+            {Object.entries(lmeta.status || {}).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
+          <label>Tìm<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="SĐT, tên, tour quan tâm" /></label>
+        </div>
+        <p className="muted">{Object.entries(leads.counts || {}).map(([k, v]: any) =>
+          <span key={k} style={{ marginRight: 12 }}>{(lmeta.status || {})[k] || k}: <b>{v}</b></span>)}</p>
       </div>
-      <div style={{ margin: "8px 0" }}><b>Kênh triển khai *</b>{" "}
-        {Object.entries(meta.kenh).map(([k, v]: any) => <button key={k} className={"act " + (f.channels.includes(k) ? "" : "grey")}
-          style={{ margin: "4px 6px 0 0", fontSize: 13 }} onClick={() => doiKenh(k)}>{v}</button>)}</div>
-      <label>Ghi chú<textarea rows={2} style={{ width: "100%" }} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></label>
-      <div className="panel" style={{ background: "var(--bg2)" }}>
-        <label><input type="checkbox" checked={f.nguon_tao === "ai"} onChange={(e) => setF({ ...f, nguon_tao: e.target.checked ? "ai" : "nguoi" })} /> <b>Đề xuất do trợ lý AI soạn</b></label>
-        <p className="muted" style={{ margin: "4px 0" }}>Bản do AI soạn luôn dừng ở <b>Nháp</b> và phải người có thẩm quyền xem lại rồi duyệt — AI đề xuất, người quyết.</p>
-        {f.nguon_tao === "ai" && <label>Căn cứ đề xuất (bắt buộc)<textarea rows={2} style={{ width: "100%" }} value={f.ai_ghi_chu}
-          onChange={(e) => setF({ ...f, ai_ghi_chu: e.target.value })} placeholder="Dựa trên 3 kỳ gần nhất: chi phí/lead kênh Zalo thấp hơn Facebook 32%…" /></label>}
+      <div className="panel wrap"><table>
+        <thead><tr><th>SĐT</th><th>Khách</th><th>Kênh</th><th>Tháng</th><th>Tour quan tâm</th>
+          <th>Chiến dịch</th><th>Trạng thái</th><th>Booking</th><th>Sale</th><th></th></tr></thead>
+        <tbody>{(leads.rows || []).length ? leads.rows.map((l: any) => <tr key={l.id}>
+          <td>{l.phone}</td><td>{l.name}</td><td>{l.channel}</td><td>{l.lead_month}</td>
+          <td>{l.interest}</td><td className="muted">{l.campaign}</td>
+          <td><Tag cls={l.status === "chot" ? "ok" : l.status === "mat" ? "" : "warn"}>{l.status_name}</Tag></td>
+          <td>{l.booking_code}{l.booking_tour && <div className="muted">{l.booking_tour}</div>}</td>
+          <td>{l.sales_name}</td>
+          <td><a className="the-cua" href="/leads?tab=leads">mở hồ sơ</a></td>
+        </tr>) : <tr><td colSpan={10} className="muted">Chưa có lead nào khớp bộ lọc — bấm “mở hồ sơ” để sang màn hình Kinh doanh nhập tệp lead.</td></tr>}</tbody>
+      </table></div>
+    </>}
+
+    {/* ═══════════════ 3 · CHUYỂN ĐỔI & DOANH THU ═══════════════ */}
+    {tab === "chuyendoi" && <div className="panel wrap">
+      <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap" }}>
+        <label>Tháng tour khởi hành<input type="month" value={repThang} onChange={(e) => setRepThang(e.target.value)} /></label>
+        {rep && <span className="muted">Lead các tháng {(rep.lead_months || []).join(", ")}</span>}
       </div>
-      <button className="act" disabled={!f.name || !f.channels.length} onClick={luu}>Lưu ở trạng thái Nháp</button>
+      {/* Bảng dùng CHUNG với màn hình Khách hàng & nguồn khách — một đầu, hai nơi gọi. */}
+      <BaoCaoChuyenDoi rep={rep} />
     </div>}
 
-    {chua && chua.tong > 0 && <div className="panel" style={{ borderColor: "var(--orange)" }}>
-      <b>{chua.tong} lead chưa gắn chiến dịch</b>
-      <p className="muted">Gom theo ô chữ chiến dịch cũ. Hệ thống không tự đoán — chọn một chiến dịch bên dưới rồi bấm gán.</p>
-      <div className="wrap"><table><thead><tr><th>Ô chữ cũ</th><th style={{ textAlign: "right" }}>Số lead</th><th>Gán vào</th></tr></thead><tbody>
-        {chua.nhom.slice(0, 12).map((n: any) => <tr key={n.campaign_cu}>
-          <td>{n.campaign_cu}</td><td style={{ textAlign: "right" }}>{n.so_lead}</td>
-          <td>{lapDuoc && <select defaultValue="" onChange={(e) => { if (e.target.value) post(`/marketing/campaigns/${e.target.value}/gan-lead`, { campaign_cu: n.campaign_cu === "(không ghi)" ? "" : n.campaign_cu }); }}>
-            <option value="">— chọn chiến dịch —</option>{ds.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select>}</td></tr>)}
-      </tbody></table></div></div>}
+    {/* ═══════════════ 4 · NGÂN SÁCH & CHIẾN DỊCH ═══════════════ */}
+    {tab === "chiendich" && <>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        {[["chiendich", "Chiến dịch"], ["ngansach", "Kế hoạch & ngân sách"]].map(([k, l]) =>
+          <button key={k} className={"act " + (sub === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setSub(k)}>{l}</button>)}
+      </div>
 
-    <h2>Danh sách chiến dịch</h2>
-    <div className="panel wrap"><table><thead><tr>
-      <th>Mã</th><th>Tên</th><th>Mục tiêu</th><th>Kênh</th><th>Thời gian</th>
-      <th style={{ textAlign: "right" }}>Ngân sách</th><th style={{ textAlign: "right" }}>Đã chi</th>
-      <th style={{ textAlign: "right" }}>Lead</th><th style={{ textAlign: "right" }}>Chốt</th>
-      <th style={{ textAlign: "right" }}>CP/lead</th><th>Trạng thái</th><th></th></tr></thead><tbody>
-      {ds.map((c) => { const k = c.ket_qua || {}; return [
-        <tr key={c.id}>
-          <td><b>{c.code}</b>{c.nguon_tao === "ai" && <Tag cls="warn">AI</Tag>}</td>
-          <td>{c.name}{c.san_pham && <div className="muted">{c.san_pham}</div>}</td>
-          <td>{c.objective_ten}</td><td className="muted">{c.kenh_ten.join(" · ")}</td>
-          <td>{fmtD(c.from_date)}{c.to_date ? ` → ${fmtD(c.to_date)}` : " → nay"}</td>
-          <td style={{ textAlign: "right" }}>{vnd(c.budget)}</td>
-          <td style={{ textAlign: "right", color: k.vuot_ngan_sach ? "var(--red)" : undefined }}>{vnd(k.chi_phi)}{k.chi_phi_treo > 0 && <div className="muted">treo {vnd(k.chi_phi_treo)}</div>}</td>
-          <td style={{ textAlign: "right" }}>{k.so_lead}{c.target_leads > 0 && <div className="muted">/{c.target_leads}</div>}</td>
-          <td style={{ textAlign: "right" }}>{k.chuyen_doi}{k.so_lead > 0 && <div className="muted">{pct(k.ty_le_chuyen_doi)}</div>}</td>
-          <td style={{ textAlign: "right" }}>{k.chi_phi_moi_lead ? vnd(k.chi_phi_moi_lead) : "—"}</td>
-          <td><Tag cls={mau[c.status] || "grey"}>{c.status_ten}</Tag></td>
-          <td><button className="act grey" style={{ margin: 0, fontSize: 12 }} onClick={() => setMo(mo === c.id ? null : c.id)}>{mo === c.id ? "Ẩn" : "Xem"}</button></td>
-        </tr>,
-        mo === c.id && <tr key={c.id + "d"}><td colSpan={12} style={{ background: "var(--bg2)" }}>
-          <div className="kpis">
-            <div className="kpi"><b>{vnd(k.doanh_thu)}</b><span>Doanh thu quy về</span></div>
-            <div className="kpi"><b>{k.hieu_qua ? k.hieu_qua.toFixed(2) + "×" : "—"}</b><span>Doanh thu / chi phí</span></div>
-            <div className="kpi"><b>{k.chi_phi_moi_booking ? vnd(k.chi_phi_moi_booking) : "—"}</b><span>Chi phí / booking</span></div>
-            <div className="kpi"><b style={{ color: k.con_lai_ngan_sach < 0 ? "var(--red)" : undefined }}>{vnd(k.con_lai_ngan_sach)}</b><span>Còn lại ngân sách</span></div>
+      {sub === "ngansach" && <>
+        <p className="muted">Màn hình này chỉ giữ phần <b>dự toán</b>. Số <b>đã chi</b> đọc từ đề nghị chi đã duyệt — không có ô nào để gõ tay. Chi vượt phần còn lại của hạng mục sẽ tự bật cờ ngoài dự toán và cần hai chữ ký; hệ thống không chặn cứng việc chi, nhưng không cho chi âm thầm.</p>
+        {lapDuoc && <button className="act" onClick={() => setHienNs(!hienNs)}>{hienNs ? "Đóng biểu mẫu" : "+ Lập ngân sách kỳ"}</button>}
+        {hienNs && <div className="panel"><h2>Biểu mẫu ngân sách kỳ</h2>
+          <div className="grid">
+            <label>Kỳ *<input value={fn.period} onChange={(e) => setFn({ ...fn, period: e.target.value })} placeholder="2026-09 hoặc 2026-Q4" /></label>
+            <label>Mục tiêu lead *<input type="number" value={fn.target_leads} onChange={(e) => setFn({ ...fn, target_leads: e.target.value })} /></label>
+            <label>Mục tiêu doanh thu quy đổi<input type="number" value={fn.target_revenue} onChange={(e) => setFn({ ...fn, target_revenue: e.target.value })} /></label>
           </div>
-          {c.nguon_tao === "ai" && c.ai_ghi_chu && <p><b>Căn cứ AI đề xuất:</b> {c.ai_ghi_chu}</p>}
-          {c.evaluation && <p><b>Đánh giá kết thúc:</b> {c.evaluation}</p>}
-          <p className="muted">Người lập {c.created_by}{c.approved_by && ` · Duyệt bởi ${c.approved_by}`}</p>
-          {c.chuyen_duoc.map((s: string) => <button key={s} className="act" style={{ marginRight: 6 }} onClick={() => {
-            if (s === "da_danh_gia") { const dg = prompt("Đánh giá kết thúc chiến dịch (bắt buộc):"); if (dg && dg.trim()) post(`/marketing/campaigns/${c.id}/chuyen-trang-thai`, { status: s, danh_gia: dg.trim() }); }
-            else post(`/marketing/campaigns/${c.id}/chuyen-trang-thai`, { status: s });
-          }}>→ {meta.trang_thai[s]}</button>)}
-        </td></tr>,
-      ]; })}
-      {!ds.length && <tr><td colSpan={12} className="muted">Chưa có chiến dịch nào.</td></tr>}
-    </tbody></table></div>
+          <b>Dự toán theo hạng mục *</b>
+          <div className="grid">{Object.entries(hm).map(([k, v]: any) =>
+            <label key={k}>{v}<input type="number" value={fn.lines[k] || ""} onChange={(e) => setFn({ ...fn, lines: { ...fn.lines, [k]: e.target.value } })} /></label>)}</div>
+          <p className="muted">Tổng dự toán: <b>{vnd(Object.values(fn.lines).reduce((s: number, v: any) => s + (Number(v) || 0), 0))}</b> — tổng tự cộng, không có ô gõ tay.</p>
+          <label>Căn cứ lập ngân sách *<textarea rows={2} style={{ width: "100%" }} value={fn.rationale}
+            onChange={(e) => setFn({ ...fn, rationale: e.target.value })} placeholder="Vì sao con số này – kỳ sau còn đối chiếu lại được" /></label>
+          <div className="panel">
+            <label><input type="checkbox" checked={fn.nguon_tao === "ai"} onChange={(e) => setFn({ ...fn, nguon_tao: e.target.checked ? "ai" : "nguoi" })} /> <b>Đề xuất do trợ lý AI soạn</b></label>
+            {fn.nguon_tao === "ai" && <label>Căn cứ đề xuất (bắt buộc)<textarea rows={2} style={{ width: "100%" }} value={fn.ai_ghi_chu} onChange={(e) => setFn({ ...fn, ai_ghi_chu: e.target.value })} /></label>}
+          </div>
+          <button className="act" disabled={!fn.rationale} onClick={luuNs}>Lưu ở trạng thái Nháp</button>
+        </div>}
+
+        {ns.map((b) => { const g = b.bang || {}; return <div className="panel" key={b.id}>
+          <h2>Kỳ {b.period} · <Tag cls={b.status === "hieu_luc" ? "ok" : b.status === "cho_duyet" ? "warn" : "grey"}>{b.status_ten}</Tag>
+            {b.nguon_tao === "ai" && <Tag cls="warn">AI</Tag>}</h2>
+          <div className="kpis">
+            <div className="kpi"><b>{vnd(g.tong_du_toan)}</b><span>Dự toán</span></div>
+            <div className="kpi"><b>{vnd(g.tong_da_chi)}</b><span>Đã chi</span></div>
+            <div className="kpi"><b>{vnd(g.tong_treo)}</b><span>Đang treo (đã cam kết)</span></div>
+            <div className="kpi"><b style={{ color: g.tong_con_lai < 0 ? "var(--vtos-danger)" : undefined }}>{vnd(g.tong_con_lai)}</b><span>Còn lại</span></div>
+          </div>
+          <div className="wrap"><table><thead><tr><th>Hạng mục</th><th className="num">Dự toán</th>
+            <th className="num">Đã chi</th><th className="num">Đang treo</th>
+            <th className="num">Còn lại</th></tr></thead><tbody>
+            {(g.rows || []).map((r: any) => <tr key={r.hang_muc}>
+              <td>{r.ten}</td><td className="num">{vnd(r.du_toan)}</td>
+              <td className="num">{vnd(r.da_chi)}</td><td className="num">{vnd(r.dang_treo)}</td>
+              <td className="num" style={{ color: r.vuot ? "var(--vtos-danger)" : undefined }}><b>{vnd(r.con_lai)}</b>{r.vuot && <Tag cls="red">vượt</Tag>}</td></tr>)}
+            {g.chua_phan_muc && (g.chua_phan_muc.da_chi > 0 || g.chua_phan_muc.dang_treo > 0) && <tr>
+              <td><i>Chi marketing chưa gán hạng mục</i></td><td className="num">—</td>
+              <td className="num">{vnd(g.chua_phan_muc.da_chi)}</td>
+              <td className="num">{vnd(g.chua_phan_muc.dang_treo)}</td>
+              <td className="num"><Tag cls="warn">cần gán</Tag></td></tr>}
+            {(g.ngoai_ngan_sach || []).map((x: any) => <tr key={x.hang_muc}>
+              <td><i>{x.ten} — ngoài ngân sách kỳ</i></td><td className="num">—</td>
+              <td className="num">{vnd(x.da_chi)}</td><td className="num">{vnd(x.dang_treo)}</td>
+              <td className="num"><Tag cls="warn">ngoài</Tag></td></tr>)}
+          </tbody></table></div>
+          <p className="muted">Chi phí/lead kế hoạch <b>{vnd(g.chi_phi_lead_ke_hoach)}</b> · thực tế <b>{vnd(g.chi_phi_lead_thuc_te)}</b> ({g.so_lead} lead trong kỳ) · Mục tiêu {b.target_leads} lead</p>
+          <p className="muted"><b>Căn cứ:</b> {b.rationale}</p>
+          {b.ai_ghi_chu && <p className="muted"><b>Căn cứ AI:</b> {b.ai_ghi_chu}</p>}
+          <p className="muted">Người lập {b.created_by}{b.approved_by && ` · Duyệt bởi ${b.approved_by}`}</p>
+          {b.status === "nhap" && lapDuoc && <button className="act" onClick={() => post(`/marketing/budgets/${b.id}/trinh`)}>Trình duyệt</button>}
+          {b.status === "cho_duyet" && ["tgd", "chutich"].includes(role) && <button className="act" onClick={() => post(`/marketing/budgets/${b.id}/duyet`)}>Duyệt ngân sách</button>}
+        </div>; })}
+        {!ns.length && <p className="muted">Chưa có ngân sách kỳ nào.</p>}
+      </>}
+
+      {sub === "chiendich" && <>
+        <p className="muted">Chiến dịch là trục nối tiền – khách – doanh thu. Chi phí đọc từ đề nghị chi đã duyệt, lead đọc từ Nguồn khách, doanh thu đọc từ booking đã chốt — <b>không có ô nào để gõ tay ba con số đó</b>.</p>
+
+        {lapDuoc && <button className="act" onClick={() => setHienForm(!hienForm)}>{hienForm ? "Đóng biểu mẫu" : "+ Lập chiến dịch mới"}</button>}
+
+        {hienForm && <div className="panel">
+          <h2>Biểu mẫu chiến dịch</h2>
+          <div className="grid">
+            <label>Tên chiến dịch *<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Tết 2026 – Miền Bắc" /></label>
+            <label>Mục tiêu *<select value={f.objective} onChange={(e) => setF({ ...f, objective: e.target.value })}>
+              {Object.entries(meta.muc_tieu).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
+            <label>Mảng kinh doanh *<select value={f.mang} onChange={(e) => setF({ ...f, mang: e.target.value })}>
+              {Object.entries(meta.mang).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
+            <label>Sản phẩm / tuyến {f.objective === "ban_tour" && <b style={{ color: "var(--vtos-danger)" }}>*</b>}
+              <select value={f.product_id} onChange={(e) => setF({ ...f, product_id: e.target.value })}>
+                <option value="">— không gắn sản phẩm —</option>
+                {sp.map((p: any) => <option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}</select></label>
+            <label>Từ ngày *<input type="date" value={f.from_date} onChange={(e) => setF({ ...f, from_date: e.target.value })} /></label>
+            <label>Đến ngày<input type="date" value={f.to_date} onChange={(e) => setF({ ...f, to_date: e.target.value })} /></label>
+            <label>Ngân sách duyệt (đ) *<input type="number" value={f.budget} onChange={(e) => setF({ ...f, budget: e.target.value })} /></label>
+            <label>Chỉ tiêu lead *<input type="number" value={f.target_leads} onChange={(e) => setF({ ...f, target_leads: e.target.value })} /></label>
+            <label>Chỉ tiêu booking<input type="number" value={f.target_bookings} onChange={(e) => setF({ ...f, target_bookings: e.target.value })} /></label>
+            <label>Người phụ trách<select value={f.owner_id} onChange={(e) => setF({ ...f, owner_id: e.target.value })}>
+              <option value="">— chọn —</option>{nv.map((x: any) => <option key={x.id} value={x.id}>{x.full_name}</option>)}</select></label>
+          </div>
+          <div style={{ margin: "8px 0" }}><b>Kênh triển khai *</b>{" "}
+            {Object.entries(meta.kenh).map(([k, v]: any) => <button key={k} className={"act " + (f.channels.includes(k) ? "" : "grey")}
+              style={{ margin: "4px 6px 0 0", fontSize: 13 }} onClick={() => doiKenh(k)}>{v}</button>)}</div>
+          <label>Ghi chú<textarea rows={2} style={{ width: "100%" }} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></label>
+          <div className="panel">
+            <label><input type="checkbox" checked={f.nguon_tao === "ai"} onChange={(e) => setF({ ...f, nguon_tao: e.target.checked ? "ai" : "nguoi" })} /> <b>Đề xuất do trợ lý AI soạn</b></label>
+            <p className="muted" style={{ margin: "4px 0" }}>Bản do AI soạn luôn dừng ở <b>Nháp</b> và phải người có thẩm quyền xem lại rồi duyệt — AI đề xuất, người quyết.</p>
+            {f.nguon_tao === "ai" && <label>Căn cứ đề xuất (bắt buộc)<textarea rows={2} style={{ width: "100%" }} value={f.ai_ghi_chu}
+              onChange={(e) => setF({ ...f, ai_ghi_chu: e.target.value })} placeholder="Dựa trên 3 kỳ gần nhất: chi phí/lead kênh Zalo thấp hơn Facebook 32%…" /></label>}
+          </div>
+          <button className="act" disabled={!f.name || !f.channels.length} onClick={luu}>Lưu ở trạng thái Nháp</button>
+        </div>}
+
+        <h2>Danh sách chiến dịch</h2>
+        <div className="panel wrap"><table><thead><tr>
+          <th>Mã</th><th>Tên</th><th>Mục tiêu</th><th>Kênh</th><th>Thời gian</th>
+          <th className="num">Ngân sách</th><th className="num">Đã chi</th>
+          <th className="num">Lead</th><th className="num">Chốt</th>
+          <th className="num">CP/lead</th><th>Trạng thái</th><th></th></tr></thead><tbody>
+          {ds.map((c) => { const k = c.ket_qua || {}; return [
+            <tr key={c.id}>
+              <td><b>{c.code}</b>{c.nguon_tao === "ai" && <Tag cls="warn">AI</Tag>}</td>
+              <td>{c.name}{c.san_pham && <div className="muted">{c.san_pham}</div>}</td>
+              <td>{c.objective_ten}</td><td className="muted">{c.kenh_ten.join(" · ")}</td>
+              <td>{fmtD(c.from_date)}{c.to_date ? ` → ${fmtD(c.to_date)}` : " → nay"}</td>
+              <td className="num">{vnd(c.budget)}</td>
+              <td className="num" style={{ color: k.vuot_ngan_sach ? "var(--vtos-danger)" : undefined }}>{vnd(k.chi_phi)}{k.chi_phi_treo > 0 && <div className="muted">treo {vnd(k.chi_phi_treo)}</div>}</td>
+              <td className="num">{k.so_lead}{c.target_leads > 0 && <div className="muted">/{c.target_leads}</div>}</td>
+              <td className="num">{k.chuyen_doi}{k.so_lead > 0 && <div className="muted">{pct(k.ty_le_chuyen_doi)}</div>}</td>
+              <td className="num">{k.chi_phi_moi_lead ? vnd(k.chi_phi_moi_lead) : "—"}</td>
+              <td><Tag cls={mau[c.status] || "grey"}>{c.status_ten}</Tag></td>
+              <td><button className="act grey" style={{ margin: 0, fontSize: 12 }} onClick={() => setMo(mo === c.id ? null : c.id)}>{mo === c.id ? "Ẩn" : "Xem"}</button></td>
+            </tr>,
+            mo === c.id && <tr key={c.id + "d"}><td colSpan={12}>
+              <div className="kpis">
+                <div className="kpi"><b>{vnd(k.doanh_thu)}</b><span>Doanh thu quy về</span></div>
+                <div className="kpi"><b>{k.hieu_qua ? k.hieu_qua.toFixed(2) + "×" : "—"}</b><span>Doanh thu / chi phí</span></div>
+                <div className="kpi"><b>{k.chi_phi_moi_booking ? vnd(k.chi_phi_moi_booking) : "—"}</b><span>Chi phí / booking</span></div>
+                <div className="kpi"><b style={{ color: k.con_lai_ngan_sach < 0 ? "var(--vtos-danger)" : undefined }}>{vnd(k.con_lai_ngan_sach)}</b><span>Còn lại ngân sách</span></div>
+              </div>
+              {c.nguon_tao === "ai" && c.ai_ghi_chu && <p><b>Căn cứ AI đề xuất:</b> {c.ai_ghi_chu}</p>}
+              {c.evaluation && <p><b>Đánh giá kết thúc:</b> {c.evaluation}</p>}
+              <p className="muted">Người lập {c.created_by}{c.approved_by && ` · Duyệt bởi ${c.approved_by}`}</p>
+              {c.chuyen_duoc.map((s: string) => <button key={s} className="act" style={{ marginRight: 6 }} onClick={() => {
+                if (s === "da_danh_gia") { const dg = prompt("Đánh giá kết thúc chiến dịch (bắt buộc):"); if (dg && dg.trim()) post(`/marketing/campaigns/${c.id}/chuyen-trang-thai`, { status: s, danh_gia: dg.trim() }); }
+                else post(`/marketing/campaigns/${c.id}/chuyen-trang-thai`, { status: s });
+              }}>→ {meta.trang_thai[s]}</button>)}
+            </td></tr>,
+          ]; })}
+          {!ds.length && <tr><td colSpan={12} className="muted">Chưa có chiến dịch nào.</td></tr>}
+        </tbody></table></div>
+      </>}
+    </>}
+
+    {/* ═══════════════ 5 · ĐỐI SOÁT DỮ LIỆU ═══════════════ */}
+    {tab === "doisoat" && <>
+      <div className="panel">
+        <h2>Đối soát lead ↔ booking</h2>
+        <p className="muted">Đây là việc biến <b>chưa xác định</b> thành một con số. Chưa chạy lần nào
+          thì tỷ lệ chốt theo quy tắc đã ký không có giá trị — và báo cáo sẽ nói đúng như vậy chứ
+          không hiện 0%.</p>
+        <p className="muted">Lần đối chiếu gần nhất:{" "}
+          {rep?.da_doi_chieu ? <b>đã có dấu đối chiếu trên sổ lead</b> : <Tag cls="warn">chưa chạy lần nào</Tag>}</p>
+        {doiSoatDuoc
+          ? <button className="act" onClick={chayDoiSoat}>Chạy đối chiếu toàn bộ sổ lead</button>
+          : <p className="muted">Vai trò của anh/chị không chạy được đối chiếu — việc này thuộc Marketing hoặc Trưởng phòng Điều hành.</p>}
+      </div>
+
+      <div className="panel">
+        <h2>Cửa nhập thống kê kênh — mẫu số khai báo</h2>
+        <p className="muted">Mẫu số của tỷ lệ chốt lấy <b>số khai báo</b> nếu có, và chỉ khi không có
+          mới lấy số đếm được. Đây là cửa để khai con số ấy, kèm chi phí kênh. Không khai thì không
+          sao — báo cáo sẽ ghi rõ mẫu số là “đếm được”.</p>
+        <div style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap" }}>
+          <label>Tháng lead<input type="month" value={sThang} onChange={(e) => setSThang(e.target.value)} /></label>
+        </div>
+        <div className="wrap"><table>
+          <thead><tr><th>Kênh</th><th className="num">Lead khai báo</th><th className="num">Chi phí kênh</th><th>Người khai</th></tr></thead>
+          <tbody>
+            {stats.length ? stats.map((s) => <tr key={s.id}>
+              <td>{s.channel}</td><td className="num">{s.leads}</td><td className="num">{vnd(s.cost)}</td>
+              <td className="muted">{s.updated_by}</td>
+            </tr>) : <tr><td colSpan={4} className="muted">Chưa khai kênh nào cho tháng này.</td></tr>}
+          </tbody>
+        </table></div>
+        {lapDuoc && <div className="grid">
+          <label>Kênh<select value={sMoi.channel} onChange={(e) => setSMoi({ ...sMoi, channel: e.target.value })}>
+            <option value="">— chọn kênh —</option>
+            {(lmeta.channels || []).map((x: string) => <option key={x}>{x}</option>)}</select></label>
+          <label>Lead khai báo<input type="number" value={sMoi.leads} onChange={(e) => setSMoi({ ...sMoi, leads: e.target.value })} /></label>
+          <label>Chi phí kênh (đ)<input type="number" value={sMoi.cost} onChange={(e) => setSMoi({ ...sMoi, cost: e.target.value })} /></label>
+        </div>}
+        {lapDuoc && <button className="act" disabled={!sMoi.channel} onClick={luuStat}>Lưu dòng khai báo</button>}
+      </div>
+
+      <div className="panel">
+        <h2>Lệch giữa khai báo và số đếm được</h2>
+        <p className="muted">Lệch không phải lỗi — nhưng lệch lớn thường nghĩa là tệp nguồn chỉ có
+          phần chi tiết của vài kênh. Hiện ra để người khai nhìn thấy, không san phẳng.</p>
+        <div className="wrap"><table>
+          <thead><tr><th>Kênh</th><th>Tháng lead</th><th className="num">Khai báo</th>
+            <th className="num">SĐT đếm được</th><th className="num">Lệch</th></tr></thead>
+          <tbody>{(rep?.by_channel_month || []).filter((a: any) => a.lech_khai_bao).length
+            ? rep.by_channel_month.filter((a: any) => a.lech_khai_bao).map((a: any, i: number) => <tr key={i}>
+              <td>{a.channel}</td><td>{a.lead_month}</td>
+              <td className="num">{a.so_khai_bao}</td><td className="num">{a.so_sdt}</td>
+              <td className="num"><Tag cls="warn">{a.lech_khai_bao > 0 ? "+" : ""}{a.lech_khai_bao}</Tag></td>
+            </tr>)
+            : <tr><td colSpan={5} className="muted">Không có dòng nào lệch trong các tháng đang xem.</td></tr>}
+          </tbody>
+        </table></div>
+      </div>
+
+      {chua && chua.tong > 0 && <div className="panel" style={{ borderColor: "var(--vtos-warning)" }}>
+        <h2>{chua.tong} lead chưa gắn chiến dịch</h2>
+        <p className="muted">Gom theo ô chữ chiến dịch cũ. Hệ thống không tự đoán — chọn một chiến dịch bên dưới rồi bấm gán.</p>
+        <div className="wrap"><table><thead><tr><th>Ô chữ cũ</th><th className="num">Số lead</th><th>Gán vào</th></tr></thead><tbody>
+          {chua.nhom.slice(0, 20).map((n: any) => <tr key={n.campaign_cu}>
+            <td>{n.campaign_cu}</td><td className="num">{n.so_lead}</td>
+            <td>{lapDuoc && <select defaultValue="" onChange={(e) => { if (e.target.value) post(`/marketing/campaigns/${e.target.value}/gan-lead`, { campaign_cu: n.campaign_cu === "(không ghi)" ? "" : n.campaign_cu }); }}>
+              <option value="">— chọn chiến dịch —</option>{ds.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select>}</td></tr>)}
+        </tbody></table></div>
+      </div>}
+    </>}
+
+    {/* ═══════════════ 6 · NỘI DUNG & KÊNH ═══════════════ */}
+    {tab === "noidung" && <>
+      <p className="muted">Soạn bài, đính tệp và chuyển trạng thái nằm ở màn hình{" "}
+        <a href="/noi-dung">Nội dung &amp; thương hiệu</a>. Ở đây là <b>hàng đợi</b> của phòng: cái gì
+        đang chờ ai.</p>
+      <div className="panel wrap"><table>
+        <thead><tr><th>Mã</th><th>Tiêu đề</th><th>Loại</th><th>Chiến dịch</th><th>Kênh</th>
+          <th>Ngày dự kiến</th><th>Người soạn</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody>{nd.length ? nd.map((n) => <tr key={n.id}>
+          <td><b>{n.code}</b>{n.nguon_tao === "ai" && <Tag cls="warn">AI</Tag>}</td>
+          <td>{n.title}</td><td>{n.loai_ten}</td><td className="muted">{n.chien_dich}</td>
+          <td className="muted">{(n.kenh_ten || []).join(" · ")}</td>
+          <td>{fmtD(n.ngay_du_kien)}</td><td>{n.nguoi_soan}</td>
+          <td><Tag cls={n.status === "da_dang" ? "ok" : n.status === "go" ? "red" : ["cho_duyet", "cho_ky_2"].includes(n.status) ? "warn" : "grey"}>{n.status_ten}</Tag>
+            {n.can_ky_2 && <div className="muted">cần chữ ký thứ hai</div>}</td>
+          <td><a className="the-cua" href="/noi-dung">mở</a></td>
+        </tr>) : <tr><td colSpan={9} className="muted">Chưa có nội dung nào — bấm “Nội dung &amp; thương hiệu” ở menu để soạn bài đầu tiên.</td></tr>}</tbody>
+      </table></div>
+    </>}
+
+    {/* ═══════════════ 7 · THƯƠNG HIỆU & PR ═══════════════ */}
+    {tab === "thuonghieu" && <>
+      <div className="panel" style={{ borderColor: "var(--vtos-warning)" }}>
+        <h2>Màn hình này chưa có sổ — đây là bản kê việc còn thiếu</h2>
+        <p className="muted">Đo ngày 18/9/2026 trên kho mã: <b>không có bảng dữ liệu và không có đường
+          API nào</b> cho tài sản thương hiệu hay hoạt động PR. Theo ranh giới 09/9, chỗ không có cửa
+          nhập là việc còn thiếu — không phải chỗ để dựng một bảng trống rồi đổ số mẫu vào cho đủ
+          bảy màn hình.</p>
+      </div>
+      <div className="mh01-the">
+        <The rong nhan="Kho tài sản nhận diện" so="chưa có"
+             nguon="Cần: một bảng tài sản (logo, phông, bộ màu, mẫu ấn phẩm) có phiên bản và ngày hết hiệu lực. Kho tệp dùng chung `attachments` đã có sẵn để đính bản gốc." />
+        <The rong nhan="Hoạt động PR & báo chí" so="chưa có"
+             nguon="Cần: một sổ hoạt động (bài đăng báo, sự kiện, phát ngôn) gắn với chiến dịch và với người phát ngôn được uỷ quyền." />
+        <The rong nhan="Theo dõi nhắc tên thương hiệu" so="chưa có"
+             nguon="Cần: một cửa nhập hoặc một mối nối với dịch vụ đo bên ngoài. Không có cửa thì con số này không thể có, kể cả ước lượng." />
+        <The rong nhan="Khủng hoảng truyền thông" so="chưa có"
+             nguon="Cần: quy trình và sổ ghi — ai được phát ngôn, trong bao lâu, và ai duyệt. Việc này cần chữ ký trước khi viết mã." />
+      </div>
+      <div className="panel">
+        <h2>Hai chỗ cần anh quyết trước khi dựng</h2>
+        <ol>
+          <li><b>Sổ tài sản thương hiệu nằm ở đâu</b> — dựng bảng riêng cho Marketing, hay dùng chung
+            bảng tài sản đã có của Hành chính? Dùng chung thì tiết kiệm, nhưng vòng đời một bộ nhận
+            diện khác hẳn vòng đời một cái máy tính.</li>
+          <li><b>Ai được phát ngôn</b> — chưa có danh sách này thì sổ PR không có cột “người chịu
+            trách nhiệm”, mà một sổ PR không có cột ấy thì không dùng được lúc cần.</li>
+        </ol>
+      </div>
     </>}
   </>);
 }
