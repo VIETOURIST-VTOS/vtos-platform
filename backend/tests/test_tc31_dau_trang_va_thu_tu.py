@@ -67,8 +67,11 @@ def _bo_chu_thich_css(s: str) -> str:
 # `<KhoiKetQuaKinhDoanh` dùng chung một bộ chọn kỳ — bản vẽ anh Tuấn gửi chiều cùng ngày.
 # Hai ô cũ đã XOÁ khỏi KhoiSauO.tsx, không để lại bản sao. Luật không đổi một chữ: các khối
 # còn trên màn hình phải đủ và đúng thứ tự dọc, vì thứ tự ấy là thứ tự đọc.
+# SỬA 18/9/2026 (TC-65): `<KhoiQuyetDinh` rời danh sách vì nó không còn là một khối — hàng nút
+# chờ quyết nhập thẳng vào thanh ngang `<TieuDe` ở đầu trang (anh Tuấn: "gom lại thành 1 thanh
+# ngang, bỏ chữ chờ chủ tịch quyết"). Luật "việc chờ mình đứng trước mọi con số" còn nguyên và
+# nay mạnh hơn: nó nằm trong chính dòng đầu tiên. Vế canh ngược ở test_tc18.
 THU_TU_BAN_VE = [
-    "<KhoiQuyetDinh",            # 02  · Cần Chủ tịch quyết định
     "<KhoiKetQuaKinhDoanh",      # Ô 1+2 · Doanh thu & Lợi nhuận trước thuế, một bộ chọn kỳ
     # SỬA 17/9/2026 (TC-57) — DÒNG TIỀN XUỐNG SAU HAI KHỐI CÔNG NỢ. Anh Tuấn mở trang, chụp đúng
     # khối Dòng tiền và bảo: "xoá bỏ cái này khỏi màn hình chủ tịch, thay vào đó là biểu đồ và số

@@ -78,6 +78,26 @@ import { xepDonVi, type DonViChon } from "@/lib/thu_tu_don_vi";
  */
 function DayDuBao({ d }: { d: any }) {
   if (!d || d.gia_tri === null || d.gia_tri === undefined) return null;
+  /* ══════════════════════════════════════════════════════════════════════════════════════════
+     TC-65 · YÊN THÌ IM, NGUY THÌ NÓI — anh Tuấn 18/9/2026: "hình 3 xoá hoặc ẩn khỏi màn hình
+     chủ tịch", kèm ảnh chụp đúng hàng này ở trạng thái XANH ("Trên ngưỡng dự phòng").
+     ══════════════════════════════════════════════════════════════════════════════════════════
+     ẨN, KHÔNG XOÁ, và ẩn có điều kiện. Ba lý do, theo đúng thứ tự quan trọng:
+
+     1. Ở trạng thái XANH, hàng này nói lại đúng điều hình ngay trên nó đã vẽ: đường TỒN nằm trên
+        vạch ngưỡng. Một dòng chữ báo "mọi thứ ổn" in ra mỗi ngày dạy người ta thôi đọc chỗ ấy —
+        và đúng hôm nó đổi sang đỏ thì mắt cũng lướt qua luôn. Bỏ nó đi làm nó MẠNH hơn.
+
+     2. Ở trạng thái ĐỎ ("ÂM — không đủ tiền trả") hay VÀNG ("dưới ngưỡng dự phòng") thì đây là
+        dòng quan trọng nhất cả màn hình: nó nói tuần nào hết tiền và thiếu bao nhiêu. Xoá hẳn là
+        bỏ mất đúng cái cảnh báo ấy — không được.
+
+     3. Con số và tuần KHÔNG mất ở trạng thái xanh: rê chuột lên điểm thấp nhất của đường TỒN là
+        đọc được. Và cửa nhập dự báo cũng không mất — `Hinh13Tuan` đã mang sẵn `cua` của nó.
+
+     Nếu một vòng sau muốn bỏ hẳn, phải trả lời được: lúc dòng tiền âm thì ai nói cho Chủ tịch
+     biết, và nói ở đâu. */
+  if (!d.am && !d.duoi_nguong) return null;
   const muc = d.am ? "red" : d.duoi_nguong ? "warn" : "ok";
   const nhan = d.am ? "ÂM — không đủ tiền trả"
     : d.duoi_nguong ? "Dưới ngưỡng dự phòng" : "Trên ngưỡng dự phòng";
@@ -166,6 +186,12 @@ function Hinh13Tuan({ d }: { d?: any }) {
          nên danh tính ba đường không mất.
          Con số ngưỡng thì KHÔNG được mất theo: nó chuyển vào nhãn rê chuột của chính vạch ấy
          (`BieuDoDuong` dựng từ `moc.nhan` + giá trị), chứ không biến khỏi màn hình. */
+      /* TC-65 · CỬA SANG MÀN HÌNH DÒNG TIỀN ĐỨNG NGAY CẠNH TÊN HÌNH — anh Tuấn 18/9/2026: "đưa
+         chữ cấu trúc chi tiết dòng tiền lên kề bên chữ dự báo dòng tiền 13 tuần".
+         Trước vòng này nó là một đoạn văn một dòng nằm dưới đáy khối, cách khung biểu đồ một dải
+         trống rộng bằng nửa màn hình — anh Tuấn chụp đúng dải trống ấy. Đưa lên cạnh tên hình thì
+         hết dải trống, và cửa đọc ra ngay là "chi tiết CỦA chính cái đang xem". */
+      ben_ten={<Link className="the-cua" href="/dong-tien">Cấu trúc chi tiết dòng tiền →</Link>}
       ai="Kế toán" cua="/finance?tab=forecast" cua_ten="Cửa nhập dự báo 13 tuần" />
   );
 }
@@ -297,19 +323,13 @@ export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any 
       </div>
 
 
-      {/* ═══ TC-63 · BẢNG BỐN MỐC ĐÃ SANG /dong-tien ══════════════════════════════════════════
-          "em chuyển qua gộp với dòng tiền hoặc là ẩn khỏi màn hình chủ tịch" — anh Tuấn 18/9/2026.
-
-          Chỗ này trước đây là một nếp gấp "Bảng bốn mốc" (TC-61) chứa hình bốn mốc và bảng 14
-          dòng. Nếp gấp ấy đã giấu bảng khỏi màn hình, nhưng KHÔNG bỏ được cái trùng: cùng một
-          dòng tiền vẫn được đếm ba lần trên cùng một trang. Nay cả khối sang /dong-tien, thay cho
-          bảng bốn mốc CŨ ở đó — xem chú thích đầu components/BangBonMoc.tsx.
-
-          CỬA DẪN SANG VẪN Ở ĐÂY, và giờ nó mới đúng nghĩa: bấm vào là tới CHÍNH cái bảng vừa rời
-          đi, chứ không phải tới một màn hình có bảng na ná. */}
-      <p className="dt-nut-chi-tiet">
-        <Link className="the-cua" href="/dong-tien">Cấu trúc chi tiết dòng tiền →</Link>
-      </p>
+      {/* ═══ TC-63 → TC-65 · BẢNG BỐN MỐC SANG /dong-tien, RỒI CỬA DẪN SANG CŨNG ĐI THEO ═════
+          TC-63 (18/9/2026): cả khối bốn mốc chuyển sang /dong-tien, chỉ để lại ở đây một đoạn văn
+          mang cửa "Cấu trúc chi tiết dòng tiền →".
+          TC-65 (cùng ngày, sau khi anh Tuấn chụp màn hình): đoạn văn ấy nằm một mình dưới đáy
+          khối, cách khung biểu đồ một dải trống rộng gần cả màn hình — anh Tuấn chụp đúng dải
+          trống và bảo lấp. Cửa nay đứng NGAY CẠNH tên hình 13 tuần (`ben_ten` ở `Hinh13Tuan`),
+          nên đoạn văn này xoá hẳn và dải trống đi theo nó. */}
     </section>
   );
 }

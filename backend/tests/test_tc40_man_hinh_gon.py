@@ -61,7 +61,10 @@ def _bo_chu_thich_css(s: str) -> str:
 # tám — một hàm tên "TamThe" bày năm thẻ là một lời nói dối nhỏ nằm ngay trong mã.
 # Danh sách BỎ không đổi một dòng: không khối nào anh Tuấn chốt gỡ được lắp lại.
 # SỬA 16/9/2026 (TC-44): `<KhoiDoanhThu` + `<KhoiLoiNhuan` → `<KhoiKetQuaKinhDoanh`.
-GIU = ["<KhoiQuyetDinh", "<HangThe", "<KhoiHieuQuaXe", "<KhoiDongTien",
+# SỬA 18/9/2026 (TC-65): `<KhoiQuyetDinh` rời danh sách GIỮ vì nó không còn là một khối — hàng
+# nút chờ quyết nhập vào thanh ngang `<TieuDe`. Nó KHÔNG sang danh sách BỎ: việc chờ quyết vẫn
+# trên màn hình, chỉ là không còn khung riêng. test_tc18 canh cả hai vế.
+GIU = ["<HangThe", "<KhoiHieuQuaXe", "<KhoiDongTien",
        "<KhoiKetQuaKinhDoanh", "<KhoiTonDongMuc",
        "<KhoiPhaiThu", "<KhoiPhaiTra",
        "<KhoiKinhDoanhLe", "<KhoiKinhDoanhDoan", "<KhoiBaoCaoNgay"]

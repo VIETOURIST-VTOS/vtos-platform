@@ -342,15 +342,22 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 .mh01-thanh-ngay{font-variant-numeric:tabular-nums}
 .mh01-thanh-day{flex:1 1 0}
 
-.mh01-qd{border-left:3px solid var(--vtos-info)}
 .mh01-dau{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .mh01-dau h2{margin:0}
-.mh01-qd-ds{display:flex;flex-wrap:wrap;gap:8px}
-/* Nút là một ĐƯỜNG DẪN chứ không phải <button> – bấm giữa chuột mở tab mới được. Nhưng luật cũ
+/* TC-65 · `.mh01-qd` và `.mh01-qd-ds` đã XOÁ cùng khối "Cần Chủ tịch quyết định" — hàng nút ấy
+   nay nằm thẳng trên thanh ngang đầu trang, nên không còn khung riêng để viền trái, cũng không
+   còn dải riêng để xếp lưới. Xoá chứ không để lại lớp mồ côi (bài học TC-60).
+
+   Nút là một ĐƯỜNG DẪN chứ không phải <button> – bấm giữa chuột mở tab mới được. Nhưng luật cũ
    viết `button.act{...}`, nên một <a class="act"> không nhận màu nào cả và ra một dòng chữ trần.
-   Đây đúng là lỗi đã có sẵn ở khối "Việc chờ tôi xử lý" cũ, chỗ ấy phải chữa bằng style nội tuyến. */
-.mh01-qd-nut{display:inline-block;text-decoration:none;margin:0;padding:7px 13px;font-size:13px;
-  font-weight:600;color:#fff;background:var(--vtos-sky);border-radius:var(--vtos-radius-sm,6px)}
+   Đây đúng là lỗi đã có sẵn ở khối "Việc chờ tôi xử lý" cũ, chỗ ấy phải chữa bằng style nội tuyến.
+
+   CỠ THU LẠI CHO VỪA THANH (TC-65): nút cũ cao 7px đệm trên dưới, đứng trong một khung riêng thì
+   vừa; đứng chung một thanh với chữ cỡ 13px thì nó đội thanh cao lên gần gấp rưỡi. Giảm đệm và
+   cỡ chữ để thanh giữ đúng một hàng. */
+.mh01-qd-nut{display:inline-block;text-decoration:none;margin:0;padding:4px 11px;font-size:12.5px;
+  font-weight:600;color:#fff;background:var(--vtos-sky);border-radius:var(--vtos-radius-sm,6px);
+  white-space:nowrap;line-height:1.5}
 .mh01-qd-nut:hover{background:var(--vtos-sky)}
 
 /* Tám thẻ: để lưới tự xuống dòng theo bề rộng thật. Khoá cứng bốn cột thì ở 1280px nhãn dài như
@@ -648,7 +655,8 @@ table.bang-doc{width:100%}
    bản chép thì sớm muộn lệch nhau. Toàn bộ lớp .dt-bd-* / .dt-bieudo* đã dọn đi cùng với nó. */
 /* Hai lớp này bị cắt nhầm khi dọn CSS chết của biểu đồ vẽ tay — phát hiện bằng phép soát "lớp
    nào TSX dùng mà CSS không có". Trả lại nguyên văn. */
-.dt-nut-chi-tiet{margin:10px 0 0}
+/* TC-65 · `.dt-nut-chi-tiet` đã XOÁ: cửa "Cấu trúc chi tiết dòng tiền →" lên đứng cạnh tên hình
+   13 tuần, nên không còn đoạn văn nào dưới đáy khối để mà chừa lề. */
 /* TC-63 · Bốn luật `.dt-gap` đã XOÁ cùng nếp gấp "Bảng bốn mốc": bảng ấy sang hẳn /dong-tien nên
    không còn nếp gấp nào để mở ra khi in. Xoá chứ không để lại lớp không ai dùng — bài học TC-60. */
 @media print{
