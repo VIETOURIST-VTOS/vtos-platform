@@ -257,7 +257,7 @@ const CAO = 168;   // chiều cao vùng vẽ, px
  *  không phải một trục tung thứ hai — xem luật 4 ở đầu tệp.
  */
 export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, cua, cua_ten,
-                           theo_dau, ten_duong, chuGiai, ten_cot2, ten_cho, an_nhan_x }: {
+                           theo_dau, ten_duong, chuGiai, ten_cot2, ten_cho }: {
   ten: string; phu?: string; diem: Diem[]; dinh_dang?: DinhDang;
   moc?: { gt: number; nhan: string } | null;
   chan?: ReactNode; ai?: string; cua?: string; cua_ten?: string;
@@ -266,10 +266,6 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
   /** TC-47 · tên của khúc nối tiếp mờ (`Diem.cho`). Có tên thì mới vẽ, và tên ấy đi thẳng vào câu
    *  chân: một khúc màu khác mà không nói nó là gì thì người đọc tự đoán, và đoán sai. */
   ten_cho?: string;
-  /** TC-47 · giấu hàng nhãn trục ngang của hình này. Dùng khi hai hình xếp dọc DÙNG CHUNG một
-   *  trục ngang: hình trên giấu, hình dưới hiện, và nhãn ấy nói cho cả hai. In hai lần thì người
-   *  đọc phải kiểm xem hai hàng có khớp nhau không — một việc thừa trên mọi lần mở màn hình. */
-  an_nhan_x?: boolean;
   /** TC-44 · tô cột theo DẤU: dương xanh lá, âm hồng. Dùng cho lãi/lỗ, nơi dấu chính là điều
    *  người đọc tìm. KHÔNG bật cho doanh thu: doanh thu âm là chuyện khác hẳn, và tô nó cùng màu
    *  với "lỗ" là trộn hai khái niệm. */
@@ -399,11 +395,11 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
           </div>
         </div>
         <div className="bd-goc" />
-        {/* TC-47 · hình trên của một cặp dùng chung trục ngang thì giấu hàng nhãn này. Giấu bằng
-            `aria-hidden` + CSS chứ không bỏ hẳn thẻ: bỏ hẳn thì hai hình lệch nhau đúng chiều cao
-            hàng nhãn, và tháng 9 của hình trên không còn nằm trên tháng 9 của hình dưới — mất
-            chính cái mà "chung một trục ngang" sinh ra để có. */}
-        <div className={"bd-nhanx" + (an_nhan_x ? " an" : "")} aria-hidden={an_nhan_x || undefined}>
+        {/* TC-62 · `an_nhan_x` ĐÃ XOÁ cùng với bố cục hai tầng của TC-47. Nó chỉ có một người
+            dùng — hình Doanh thu — và người ấy nay nằm ở khung riêng, mang đủ nhãn tháng của
+            mình. Giữ lại một thuộc tính không ai truyền là để vòng sau dựng lại bố cục cũ mà
+            không đọc lý do đảo chiều (ghi trong KhoiKetQuaKinhDoanh.tsx). */}
+        <div className="bd-nhanx">
           {diem.map((d) => <span key={d.nhan} className={d.gt === null ? "muted" : ""}>{d.nhan}</span>)}
         </div>
       </div>

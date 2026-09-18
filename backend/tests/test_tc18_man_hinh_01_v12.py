@@ -35,10 +35,18 @@ def test_viec_can_quyet_dinh_dung_truoc_cac_con_so():
     s = _ma(TRANG)
     # TC-42: `<TamThe` → `<HangThe`, và hàng thẻ nhỏ nay đứng SAU sáu ô lớn. Luật giữ nguyên —
     # tiêu đề, hàng lọc và khối "Cần quyết định" vẫn phải đứng trước mọi con số.
-    vt = {t: s.index(t) for t in ("<TieuDe", "<DongLoc", "<KhoiQuyetDinh", "<KhoiDongTien", "<HangThe")}
+    #
+    # TC-62 (18/9/2026): `<DongLoc` rời khỏi danh sách vì nó không còn tồn tại — anh Tuấn chốt
+    # "gộp thành 1 thanh ngang", hàng lọc nhập vào `<TieuDe`. Luật vẫn nguyên một chữ: đầu trang
+    # → việc cần quyết định → rồi mới tới con số. Mặt cũ của luật (hàng lọc là một khối riêng
+    # đứng giữa `<TieuDe` và `<KhoiQuyetDinh`) được canh ngược lại ngay dưới đây.
+    vt = {t: s.index(t) for t in ("<TieuDe", "<KhoiQuyetDinh", "<KhoiDongTien", "<HangThe")}
     thu_tu = sorted(vt, key=lambda t: vt[t])
-    assert thu_tu == ["<TieuDe", "<DongLoc", "<KhoiQuyetDinh", "<KhoiDongTien", "<HangThe"], \
+    assert thu_tu == ["<TieuDe", "<KhoiQuyetDinh", "<KhoiDongTien", "<HangThe"], \
         f"thứ tự khối trên màn hình 01 lệch bản vẽ V1.2: {thu_tu}"
+    assert "<DongLoc" not in s, (
+        "`<DongLoc />` sống lại trên trang — đầu trang phải là MỘT thanh ngang (TC-62)."
+    )
 
 
 def test_sau_o_lon_va_nam_the_nho():

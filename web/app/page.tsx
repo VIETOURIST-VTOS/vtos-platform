@@ -9,7 +9,7 @@ import {
   KhoiKinhDoanhLe, KhoiKinhDoanhDoan, KhoiBaoCaoNgay,
 } from "@/components/KhoiKinhDoanh";
 import {
-  DongLoc, KhoiQuyetDinh, HangThe, TieuDe, dem, type The,
+  KhoiQuyetDinh, HangThe, TieuDe, dem, type The,
 } from "@/components/DauManHinh01";
 import { KhoiTonDongMuc } from "@/components/KhoiSauO";
 import KhoiKetQuaKinhDoanh from "@/components/KhoiKetQuaKinhDoanh";
@@ -105,7 +105,6 @@ function Dash() {
 
   return (<>
     <TieuDe vai={user?.role} ten_vai={user?.role_name} />
-    <DongLoc />
 
     {/* ══ TC-42 · SÁU Ô LỚN, RỒI MỚI ĐẾN NHỮNG CON SỐ ĐỂ LIẾC (anh Tuấn chốt 16/9/2026) ═══════
         "8 ô này anh muốn thay đổi vị trí — doanh thu, lợi nhuận trước thuế, dòng tiền, phải thu,

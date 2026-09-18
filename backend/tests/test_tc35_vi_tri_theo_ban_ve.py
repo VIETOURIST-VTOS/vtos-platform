@@ -94,20 +94,39 @@ def _than_ham(ma: str, ten: str) -> str:
     return ma[i:j if j > 0 else len(ma)]
 
 
-def test_nut_in_nam_trong_hang_loc():
-    """Bản vẽ đặt nút In trong `.filters`, ngang với "Kỳ báo cáo" — nó là thao tác TRÊN KỲ ĐANG
-    CHỌN. TC-31 đặt nhầm lên cạnh tiêu đề: đúng nút, sai chỗ."""
+def test_nut_in_dung_cung_hang_voi_ky_dang_chon():
+    """LUẬT KHÔNG ĐỔI, CHỖ ĐỨNG ĐỔI TÊN — ghi cả hai mặt để vòng sau không lật ngược nhầm.
+
+    MẶT CŨ (TC-31 → TC-35, 16/9/2026): nút In từng nằm cạnh tiêu đề. Sai, vì In là thao tác TRÊN
+    KỲ ĐANG CHỌN — in đúng cái kỳ ghi bên cạnh. Nên nó bị dời xuống hàng lọc `DongLoc`, và phép
+    thử này canh "nút In nằm trong `DongLoc`".
+
+    MẶT MỚI (TC-62, 18/9/2026): anh Tuấn chốt "gộp thành 1 thanh ngang". `DongLoc` bị xoá, kỳ báo
+    cáo chuyển lên chính `TieuDe`, và `TieuDe` bây giờ CHÍNH LÀ hàng lọc. Nút In theo kỳ mà đi.
+
+    Cái phép thử canh không phải TÊN CỦA HÀM, mà là RÀNG BUỘC: nút In phải đứng cùng thân hàm với
+    kỳ báo cáo. Đứng tách ra là nó lại thành một nút trôi nổi, không ai biết nó in kỳ nào.
+    """
     ma = _bo_chu_thich_tsx(_doc(DAU))
-    loc = _than_ham(ma, "DongLoc")
-    assert "In / Lưu PDF" in loc and "window.print()" in loc, (
-        "Nút In / Lưu PDF phải nằm trong hàng lọc `DongLoc`."
+    than = _than_ham(ma, "TieuDe")
+    assert "In / Lưu PDF" in than and "window.print()" in than, (
+        "Nút In / Lưu PDF phải nằm cùng thân hàm với kỳ báo cáo — nay là `TieuDe`."
+    )
+    assert "tenThang()" in than, (
+        "Kỳ báo cáo phải nằm cùng hàm với nút In; tách ra là nút In mất cái nó in."
     )
 
 
-def test_nut_in_khong_con_o_tieu_de():
+def test_khong_con_hang_loc_rieng():
+    """Mặt cũ của luật trên: có `DongLoc` là đầu trang lại tách thành hai tầng.
+
+    Dựng lại một hàng lọc riêng thì đầu trang trở về BA tầng chữ không mang con số nào — đúng cái
+    anh Tuấn bảo gộp ngày 18/9/2026. Nếu một vòng sau thật sự cần tách lại, sửa phép thử này VÀ
+    ghi lý do, đừng xoá nó.
+    """
     ma = _bo_chu_thich_tsx(_doc(DAU))
-    assert "In / Lưu PDF" not in _than_ham(ma, "TieuDe"), (
-        "Nút In vẫn còn ở tiêu đề — hai chỗ cùng một nút là một nút thừa."
+    assert "function DongLoc" not in ma, (
+        "`DongLoc` sống lại — đầu trang phải là MỘT thanh ngang (TC-62)."
     )
 
 

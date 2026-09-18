@@ -302,8 +302,12 @@ def test_dong_loc_ghi_ro_pham_vi_la_vietourist_va_khong_dan_toi_man_hinh_chua_du
     ngang" — một ô không tồn tại. Màn hình Báo cáo tài chính hợp nhất cũng CHƯA DỰNG (hợp nhất
     nằm ở giai đoạn 4), nên không được đặt đường dẫn sang đó.
     """
+    # SỬA 18/9/2026 (TC-62): nhãn chữ "Phạm vi:" xuống chỗ rê chuột (`title="Phạm vi"`) khi ba
+    # tầng đầu trang gộp thành một thanh ngang — nhãn dài gần bằng chính giá trị nó giới thiệu.
+    # LUẬT KHÔNG ĐỔI: câu trả lời "Vietourist — công ty mẹ" vẫn phải HIỆN RA trên màn hình.
     src = _doc("web/components/DauManHinh01.tsx")
-    assert "Phạm vi:" in src and "Vietourist" in src, "Phải ghi rõ màn hình đang nói về công ty nào."
+    assert 'title="Phạm vi"' in src, "Mất nhãn Phạm vi (nay nằm ở thuộc tính title)."
+    assert "Vietourist — công ty mẹ" in src, "Phải ghi rõ màn hình đang nói về công ty nào."
     assert "chưa đổi được đơn vị" not in src, (
         "Câu cũ đọc ra như một hạn chế; nay đó là một quyết định, phải nói như một quyết định."
     )

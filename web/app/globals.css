@@ -61,7 +61,13 @@ nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:13px;
 nav.tabs a.on{color:var(--navy);border-color:var(--orange);font-weight:600}
 main{max-width:1180px;margin:0 auto;padding:16px}
 h1{font-size:19px;margin:4px 0 12px;color:var(--navy);font-family:var(--vtos-font-display);letter-spacing:-.01em}h2{font-size:14.5px;margin:0 0 10px;color:var(--vtos-heading);font-family:var(--vtos-font-display)}h3{font-size:12.5px;color:var(--ink2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px}
+/* TC-62 · KHUNG NỔI HƠN HÌNH NỀN (anh Tuấn 18/9/2026: "các khung phân hệ nổi hơn so với hình nền").
+   Nền trang là một dải chuyển sắc navy, nên chỉ một đường viền 1px thì khung chìm vào nền ở đúng
+   khúc nền sáng. Chọn NỔI NHẸ (phương án B trong ba bản thử) chứ không tô nền khung sáng lên một
+   bậc (phương án C): sáng nền lên thì chữ mờ `.muted` mất tương phản, mà `.muted` là chỗ ghi ai
+   nhập và cửa nào. Bóng đổ không đụng tới màu chữ. Dùng rgba chứ không mã màu mới. */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px;
+  box-shadow:0 1px 2px rgba(2,11,24,.24),0 8px 20px rgba(2,11,24,.26)}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
 /* Ô lưới phải CO LẠI ĐƯỢC. Mặc định của lưới là min-width:auto – ô không bao giờ hẹp hơn nội dung
    bên trong, nên chỉ cần một bảng dài trong một khung là cả trang cuộn ngang, mà thủ phạm lại nằm
@@ -317,13 +323,24 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 /* ── MÀN HÌNH 01 · phần đầu theo bản vẽ "Bảng điều hành Chủ tịch" V1.2 ──────────────────────────
    Hàng lọc – tám thẻ chỉ tiêu – khối "Cần quyết định". Màu lấy trọn từ bộ nhận diện VTOS; bản vẽ
    dùng navy #10283E và hồng #EC5988 nằm ngoài bộ nên không mang sang. */
-.mh01-loc{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 14px;
-  padding:10px 12px;background:var(--vtos-card);border:1px solid var(--vtos-line);
-  border-radius:var(--vtos-radius-md)}
-.mh01-ky{display:inline-flex;align-items:center;gap:8px;margin:0}
-.mh01-ky>span{font-size:12px;color:var(--vtos-text-mute)}
-.mh01-ky select{width:auto;min-width:150px}
-.mh01-ngay{margin-left:auto}
+/* TC-62 · MỘT THANH NGANG THAY BA TẦNG (anh Tuấn chốt 18/9/2026: "gộp thành 1 thanh ngang").
+   Ba lớp `.mh01-loc` `.mh01-ky` `.mh01-ngay` đã XOÁ cùng với hàm `DongLoc` — để lại lớp không ai
+   dùng thì vòng sau có người dựng lại hàng lọc cũ chỉ vì thấy còn kiểu dáng sẵn (đúng bài học bốn
+   lớp mồ côi ở TC-60).
+
+   Thanh này KHÔNG phải một `.panel`: nó không mang con số nào, nên nó phải nhẹ hơn mọi khối số ở
+   dưới. Nền card + một viền mảnh là đủ để nó tách khỏi hình nền mà không tranh chỗ. */
+.mh01-thanh{display:flex;flex-wrap:wrap;align-items:center;gap:0 14px;margin:0 0 14px;
+  padding:9px 14px;background:var(--vtos-card);border:1px solid var(--vtos-line);
+  border-radius:var(--vtos-radius-md);font-size:13px}
+.mh01-thanh-ten{font-family:var(--vtos-font-display);font-size:16px;font-weight:700;
+  color:var(--vtos-navy);letter-spacing:-.01em;margin-right:2px}
+/* Vạch ngăn thay cho ba nhãn chữ đã bỏ: mắt vẫn thấy đây là bốn mẩu tin rời, mà không tốn chữ. */
+.mh01-thanh>b,.mh01-thanh>.the-cua{padding-left:14px;border-left:1px solid var(--vtos-line);
+  white-space:nowrap;line-height:1.9}
+.mh01-thanh>b{font-weight:600;color:var(--vtos-text)}
+.mh01-thanh-ngay{font-variant-numeric:tabular-nums}
+.mh01-thanh-day{flex:1 1 0}
 
 .mh01-qd{border-left:3px solid var(--vtos-info)}
 .mh01-dau{display:flex;align-items:center;gap:10px;margin-bottom:8px}
@@ -507,22 +524,17 @@ table.bang-doc{width:100%}
   .wrap{max-width:100%}
 }
 
-/* ═══ TC-31 · ĐẦU TRANG MÀN HÌNH 01 THEO BẢN VẼ V1.4 ═══════════════════════════════════════
-   Bản vẽ mở đầu bằng ba thứ mà VTOS chưa có: đường dẫn (breadcrumb), một dòng phụ nói trang
-   này trả lời những câu hỏi nào, và nút In / Lưu PDF. Hai cái đầu là định hướng cho người đọc;
-   cái thứ ba là việc thật — Chủ tịch mang bảng này vào phòng họp. */
-.mh01-duong{display:flex;flex-wrap:wrap;align-items:center;gap:6px;
-  font-size:11px;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--vtos-text-mute);margin:0 0 4px}
-/* TÊN LỚP RIÊNG, KHÔNG DÙNG LẠI .mh01-dau. Lớp .mh01-dau ở trên đã là đầu ĐẦU KHỐI (h2 + thẻ
-   nhãn), dùng ở cả sáu khối V14, khối Tồn đọng và khối Cần quyết định. Đặt lại cùng tên ở đây thì
-   quy tắc sau đè quy tắc trước: mọi đầu khối nhận justify-content:space-between và thẻ nhãn văng
-   sang mép phải. Đầu TRANG và đầu KHỐI là hai việc khác nhau, nên hai tên khác nhau. */
-.mh01-trang{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px}
-.mh01-trang h1{margin:0}
-.mh01-phu{margin:2px 0 0;font-size:13px;color:var(--vtos-text-mute)}
-/* Nút In nay nằm cuối HÀNG LỌC (TC-35), nên đẩy nó sang mép phải đúng như bản vẽ. `.mh01-ngay`
-   ở trước nó đã có `margin-left:auto`, nên chỉ cần không cho nút co lại. */
+/* ═══ TC-62 · ĐẦU TRANG LÀ MỘT THANH NGANG ═════════════════════════════════════════════════
+   Bốn lớp `.mh01-duong` `.mh01-trang` `.mh01-trang h1` `.mh01-phu` đã XOÁ cùng với đường dẫn và
+   dòng phụ. Lý do TC-31 đặt ra chúng vẫn ghi ở components/DauManHinh01.tsx, kèm lý do bỏ.
+
+   MỘT LỜI CẢNH BÁO CỦA TC-31 VẪN CÒN NGUYÊN GIÁ TRỊ, ghi lại kẻo mất: đầu TRANG không được dùng
+   lại lớp `.mh01-dau` của đầu KHỐI. `.mh01-dau` là h2 + thẻ nhãn, đang dùng ở sáu khối V14, khối
+   Tồn đọng và khối Cần quyết định; đặt lại cùng tên ở đầu trang thì quy tắc sau đè quy tắc trước
+   và mọi đầu khối trên màn hình đổi bố cục theo. Vì vậy thanh ngang mang tên riêng `.mh01-thanh`
+   (khai ở phần MÀN HÌNH 01 phía trên). Đây là lỗi đã xảy ra thật khi dựng TC-31.
+
+   Nút In nằm cuối thanh, sau `.mh01-thanh-day` (một ô đệm `flex:1`), nên chỉ cần không cho nó co. */
 .mh01-in{flex:0 0 auto;margin-left:8px}
 
 /* ═══ IN RA GIẤY — bản vẽ có nút "In / Lưu PDF", nên trang phải in ra được tử tế ═════════
@@ -552,7 +564,9 @@ table.bang-doc{width:100%}
   .shell,.main{display:block;padding:0;margin:0;max-width:none}
   body{background:#fff}
   /* Không cắt một khối hay một hàng làm đôi giữa hai trang giấy. */
-  .panel{break-inside:avoid;page-break-inside:avoid;border:1px solid var(--vtos-line);margin:0 0 10px}
+  /* Bóng đổ là việc của màn hình. Trên giấy nó ra một vệt xám bẩn quanh mỗi khung. */
+  .panel{break-inside:avoid;page-break-inside:avoid;border:1px solid var(--vtos-line);margin:0 0 10px;
+    box-shadow:none}
   tr{break-inside:avoid;page-break-inside:avoid}
   thead{display:table-header-group}
   .wrap{overflow:visible}
@@ -683,13 +697,34 @@ table.bang-doc{width:100%}
 /* Vạch mốc (kế hoạch tháng…): NÉT ĐỨT để không lẫn với lưới, và nằm trên CÙNG một trục — đây
    không phải trục tung thứ hai. Xem luật 4 ở đầu components/BieuDo.tsx. */
 .bd-moc{position:absolute;left:0;right:0;height:0;border-top:2px dashed var(--vtos-warning)}
-.bd-cot{position:absolute;inset:0;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:10px}
+/* TC-62 · MỘT BỀ RỘNG THÂN CỘT DUY NHẤT CHO MỌI HÌNH — anh Tuấn chốt 18/9/2026: "cột biểu đồ của
+   doanh thu và lợi nhuận bằng nhau, hiện tại cái to cái nhỏ".
+
+   ĐÂY LÀ MỘT LỖI THẬT, KHÔNG PHẢI CHUYỆN THẨM MỸ. Trước vòng này thân cột không hề được khai báo:
+   cột đơn ăn TRỌN ô lưới, còn cột đôi (`.doi`) chia đôi chính ô ấy. Hệ quả: một cây cột ở hình
+   Doanh thu rộng gấp đôi một cây cột ở hình Lợi nhuận, dù hai hình cùng một trục ngang và cùng
+   mười hai tháng. Bề rộng là một kênh thị giác — hai bề rộng khác nhau cho hai chỉ tiêu ngang
+   hàng nhau nói một điều mà số liệu không nói.
+
+   NÊN: khai báo `--bd-cot-rong` ĐÚNG MỘT LẦN, và mọi thân cột đều lấy từ đó. Cột đôi là HAI thân rộng
+   `--bd-cot-rong` đặt hai bên tâm ô, chừa 2px ở giữa — không phải một thân bị xẻ đôi.
+
+   Ô TRỐNG PHẢI THEO CÙNG BỀ RỘNG. Trước đây `.bd-khuyet` chính là ô lưới nên nó luôn khớp với cột
+   đơn (chú thích cũ ở TC-47 đã ghi đúng điều này và vì thế đã chọn nới KHE thay vì thu thân cột).
+   Nay thân cột hẹp lại thì khung nét đứt phải hẹp theo, nếu không một tháng chưa có số lại rộng
+   hơn một tháng đã có số — tức là hình nói ngược. Vẽ bằng `::before` chứ không đổi viền của chính
+   `.bd-mot`: `.bd-mot` còn phải giữ nguyên bề rộng ô để nhãn tháng bên dưới vẫn thẳng tâm. */
+.bd-cot{position:absolute;inset:0;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:10px;
+  --bd-cot-rong:26%;--bd-cot-le:calc((100% - var(--bd-cot-rong))/2)}
 .bd-mot{position:relative;display:block;height:100%}
-.bd-thanh{position:absolute;left:0;right:0;border-radius:3px 3px 0 0;background:var(--vtos-navy)}
+.bd-thanh{position:absolute;left:var(--bd-cot-le);right:var(--bd-cot-le);
+  border-radius:3px 3px 0 0;background:var(--vtos-navy)}
 .bd-thanh.am{border-radius:0 0 3px 3px;background:var(--vtos-danger)}
 /* Ô trống: khung nét đứt chạy suốt chiều cao, KHÔNG phải cột cao 0. Cột cao 0 đọc ra là "kỳ ấy
    bằng không", mà sự thật là "kỳ ấy chưa ai nộp số". */
-.bd-khuyet{border:1px dashed var(--vtos-line);border-radius:3px;opacity:.85}
+.bd-khuyet::before{content:"";position:absolute;top:0;bottom:0;
+  left:var(--bd-cot-le);right:var(--bd-cot-le);
+  border:1px dashed var(--vtos-line);border-radius:3px;opacity:.85}
 /* Nhãn số trên đầu cột. `position:relative` + z-index để nó nằm TRÊN vạch mốc: khi kế hoạch rơi
    đúng tầm một cột, vạch nét đứt cắt ngang giữa chữ số và con số thành ra bị gạch bỏ — tìm ra
    bằng cách dựng ảnh ở TC-42, đọc mã thì không thấy. Không dùng nền đục để lấp vạch: nền đục làm
@@ -749,8 +784,11 @@ table.bang-doc{width:100%}
 /* CỘT THỨ HAI đứng cạnh, CÙNG một trục tung. Hai cột chia đôi bề ngang ô, chừa 2px ở giữa để mắt
    đọc ra hai cây chứ không một cây bị chia màu. Màu đậm hơn (navy) cạnh màu lãi (xanh lá) — khác
    sắc hẳn nhau nên phân biệt được cả với người không phân biệt được đỏ–lục. */
-.bd-mot.doi>.bd-thanh{right:calc(50% + 1px)}
-.bd-mot.doi>.bd-thanh.hai{left:calc(50% + 1px);right:0}
+/* TC-62 · HAI THÂN CỘT RỘNG BẰNG ĐÚNG `--bd-cot-rong`, KHÔNG PHẢI MỘT THÂN XẺ ĐÔI (xem chú thích dài
+   ở `.bd-cot`). Nhóm hai cột vì thế rộng gấp đôi cột đơn — đó là chủ ý: ô ấy đang mang hai con số,
+   và một cây cột ở đây bằng đúng một cây cột ở hình Doanh thu. */
+.bd-mot.doi>.bd-thanh{left:calc(50% - var(--bd-cot-rong) - 1px);right:calc(50% + 1px)}
+.bd-mot.doi>.bd-thanh.hai{left:calc(50% + 1px);right:calc(50% - var(--bd-cot-rong) - 1px)}
 /* `:not(.lo)` là BẮT BUỘC, không phải cho gọn. Không có nó thì hạng cụ thể (0,3,0) của luật này
    thắng `.bd-thanh.lo` (0,2,0), và một tháng LỖ của cột thứ hai vẫn tô xanh navy như tháng lãi —
    tức hình giấu đi đúng điều người đọc mở nó ra để tìm. Tìm ra bằng cách dựng ảnh: tháng 2 có
@@ -760,16 +798,14 @@ table.bang-doc{width:100%}
 .bd-cg-cham.cho{background:repeating-linear-gradient(45deg,
     var(--vtos-navy) 0 3px, transparent 3px 6px);opacity:.55}
 
-/* TRỤC NGANG DÙNG CHUNG: hàng nhãn của hình trên GIỮ CHỖ nhưng không hiện chữ. `visibility` chứ
-   không `display:none` — chiều cao phải còn nguyên, nếu không hai hình lệch nhau đúng chiều cao
-   ấy và cả ý nghĩa "chung trục ngang" mất sạch. */
-.bd-nhanx.an{visibility:hidden}
-
 /* TC-47 · CỘT MẢNH HƠN TRÊN MÀN RỘNG. Mười hai cột chia đều một khung 1800px cho ra những cây cột
    rộng gần 130px — chúng đọc được, nhưng cái mắt nhìn thấy trước là khối màu chứ không phải hình
    dáng của chuỗi. Nới khe ra thì cùng một dữ liệu đọc ra thành một ĐƯỜNG VIỀN đi lên đi xuống.
-   Nới KHE chứ không thu hẹp riêng thân cột: ô trống `.bd-khuyet` là chính cái ô lưới, nên thu thân
-   cột lại sẽ để những ô trống rộng nguyên cạnh những cột đã hẹp — hai bề rộng cho cùng một tháng.
+   Nới KHE chứ không thu hẹp riêng thân cột — LÝ DO NÀY ĐÃ HẾT HIỆU LỰC TỪ TC-62, ghi lại để vòng
+   sau hiểu vì sao: hồi ấy thu thân cột lại sẽ để những ô trống `.bd-khuyet` rộng nguyên cạnh những
+   cột đã hẹp, tức hai bề rộng cho cùng một tháng. TC-62 khai báo `--bd-cot-rong` và cho ô trống
+   lấy CÙNG bề rộng ấy, nên trở ngại không còn; luật nới khe thì vẫn giữ vì nó làm chuỗi mười hai
+   tháng đọc ra thành một đường viền lên xuống.
    `.bd-nhanx` phải đổi khe y hệt, nếu không nhãn tháng lệch khỏi tâm cột. */
 @media (min-width:900px){
   .bd-than.day .bd-cot,.bd-than.day .bd-nhanx{gap:18px}
@@ -944,41 +980,30 @@ table.bang-doc{width:100%}
 .kqkd-chon{display:inline-flex;align-items:center;gap:6px;font-size:12px}
 .kqkd-chon select{width:auto;min-width:96px;padding:5px 8px;font-size:12.5px}
 
-/* ═══ TC-47 · HAI HÌNH XẾP DỌC, CHUNG MỘT TRỤC NGANG ════════════════════════════════════════
-   Anh Tuấn chốt 16/9/2026: "hai hình, chung trục ngang". Hình trên giấu hàng nhãn tháng bằng
-   lớp `.bd-nhanx.an` — GIỮ CHỖ chứ không bỏ thẻ, nếu không hai hình lệch nhau đúng chiều cao
-   hàng nhãn và cột tháng 9 của hình trên không còn nằm trên cột tháng 9 của hình dưới.
-   Khe giữa hai tầng hẹp hơn khe thường (10px) để mắt đọc chúng như MỘT hình hai tầng. */
-.kqkd-chong{display:grid;gap:10px;grid-template-columns:1fr}
-.kqkd-chong>*{min-width:0}
-.kqkd-tang{display:grid;grid-template-rows:auto 1fr;align-content:start;min-width:0}
+/* ═══ TC-62 · HAI KHUNG RIÊNG, MỖI KHUNG MỘT TRỤC NGANG ════════════════════════════════════
+   Ba lớp `.kqkd-chong` `.kqkd-tang` `.kqkd-ten` đã XOÁ cùng với bố cục hai tầng của TC-47 (lý do
+   đảo chiều ghi đầy đủ trong components/KhoiKetQuaKinhDoanh.tsx). Không giữ lại lớp không ai
+   dùng: vòng sau thấy còn kiểu dáng sẵn là dựng lại bố cục cũ mà không đọc lý do.
+   `.kqkd-doi` `.kqkd-the` và khối @supports subgrid đi kèm cũng xoá — chúng đã mồ côi từ TC-47,
+   vòng này soát ra thì dọn luôn. */
 .kqkd-dau-hinh{margin:0 0 4px}
 /* Hai con số của hình dưới nằm cạnh nhau ở màn rộng, xuống dòng ở điện thoại. `min-width:0` để ô
    dài không đẩy ô kia tràn khỏi khung. */
 .kqkd-hai-so{display:grid;gap:4px 18px;grid-template-columns:1fr}
 .kqkd-hai-so>*{min-width:0}
-@media (min-width:640px){ .kqkd-hai-so{grid-template-columns:1fr 1fr} }
+/* TC-62 · HAI CỘT THEO NỘI DUNG, KHÔNG PHẢI 1fr 1fr. Khi khối còn nằm trong một khung nửa bề
+   ngang thì `1fr 1fr` cho hai con số đứng cạnh nhau vừa vặn; nay mỗi chỉ tiêu có KHUNG RIÊNG rộng
+   hết trang, `1fr` đẩy con số thứ hai ra tận giữa khung và hai con số đọc ra như hai khối rời.
+   `auto auto` + `justify-content:start` giữ chúng đứng cạnh nhau, cách nhau đúng một khe. */
+@media (min-width:640px){
+  .kqkd-hai-so{grid-template-columns:auto auto;justify-content:start;gap:4px 44px}
+}
 /* Dòng "còn thiếu": nằm sát dưới hai hình và mang vạch cảnh báo bên trái để đọc ra ngay là một
    việc còn tồn, không phải một câu chú thích. */
 .kqkd-thieu{border-left:3px solid var(--vtos-warning);padding-left:10px;margin-top:10px}
 
-.kqkd-doi{display:grid;gap:14px;align-items:start;grid-template-columns:1fr}
-.kqkd-doi>*{min-width:0}
-@media (min-width:900px){ .kqkd-doi{grid-template-columns:1fr 1fr} }
-.kqkd-the{display:grid;grid-template-rows:auto auto 1fr;align-content:start;min-width:0}
-/* HAI HÌNH PHẢI BẮT ĐẦU Ở CÙNG MỘT ĐỘ CAO. Câu đọc hộ bên Doanh thu có thể dài thành hai dòng
-   ("chưa có mục tiêu… còn thiếu hai pháp nhân") trong khi bên Lợi nhuận chỉ một dòng — lúc ấy hai
-   biểu đồ lệch nhau một dòng chữ, và mắt so hai đường kế hoạch với nhau sẽ lệch theo. `subgrid`
-   cho hai thẻ dùng CHUNG ba hàng của lưới cha, nên ba phần luôn dóng thẳng. Trình duyệt chưa hiểu
-   subgrid thì rơi về luật trên: mỗi thẻ tự xếp ba hàng của nó, vẫn đọc được, chỉ không dóng. */
-@supports (grid-template-rows: subgrid){
-  .kqkd-doi{grid-template-rows:auto auto 1fr}
-  .kqkd-the{grid-row:span 3;grid-template-rows:subgrid}
-}
-.kqkd-ten{font-size:14px;margin:0 0 2px;color:var(--vtos-heading)}
-/* Câu đọc hộ ("Đạt 102,2% kế hoạch…") xuống DÒNG RIÊNG chứ không nối đuôi nhãn kỳ: nó dài, và nối
-   đuôi thì ở bề ngang hẹp nó ngắt giữa chừng thành hai mẩu không ai ghép lại được. */
-.kqkd-phu{flex-basis:100%;font-size:12px;line-height:1.5}
+/* Chân khối chỉ còn MỘT cửa nhập, nên nó không cần vạch ngăn trên như một đoạn ghi chú dài. */
+.kqkd-cua{border-top:0;margin-top:8px;padding-top:0}
 
 /* ═══ TC-41 · CỬA NHẬP KẾ HOẠCH THÁNG ════════════════════════════════════════════════════════
    Một hàng điều khiển dùng chung cho cả thanh chọn năm lẫn hàng nút Lưu: cùng một hình dạng cho
