@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, fmtD, taiTep, vnd } from "@/lib/api";
-import { BieuDoCot, BieuDoDuong, type Diem } from "@/components/BieuDo";
+import { api, fmtD, vnd } from "@/lib/api";
+import { BieuDoDuong, type Diem } from "@/components/BieuDo";
 import { useShell } from "@/components/Shell";
 import { xepDonVi, type DonViChon } from "@/lib/thu_tu_don_vi";
 
@@ -34,121 +34,31 @@ import { xepDonVi, type DonViChon } from "@/lib/thu_tu_don_vi";
  *    mang cờ la_dong_chay=false, vì chúng là mức tại mốc chứ không phải lượng tiền chảy qua.
  */
 
-/** Nhãn ba mức. Màu lấy từ bộ nhận diện: xanh lá đủ · vàng cần chú ý · đỏ còn thiếu. */
-function ChipTrangThai({ ma, nhan }: { ma?: string; nhan?: string }) {
-  if (!ma || !nhan) return null;
-  const cls = ma === "day_du" ? "ok" : ma === "chua_doi_soat" ? "warn" : "red";
-  return <span className={"tag " + cls}>{nhan}</span>;
-}
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   TC-63 · BẢNG BỐN MỐC ĐÃ RỜI KHỐI NÀY, VỀ VỚI MÀN HÌNH DÒNG TIỀN
+   ══════════════════════════════════════════════════════════════════════════════════════════════
+   "em chuyển qua gộp với dòng tiền hoặc là ẩn khỏi màn hình chủ tịch"   — anh Tuấn, 18/9/2026
 
-const RONG = (vi_sao?: string) => (
-  <span className="muted" title={vi_sao || "Chưa có số — khác hẳn với bằng 0"}>Chưa có nguồn</span>
-);
+   ĐI CÙNG NHAU SANG components/BangBonMoc.tsx, không xoá thứ nào: hình bốn mốc `BieuDoBonMoc`,
+   câu đọc hộ `docHoDongTien`, nhãn ba mức `ChipTrangThai`, ô rỗng `RONG`, bảng 14 dòng, nút đổi
+   kiểu xem (luỹ kế ↔ trong từng khoảng) và nút Xuất Excel.
+
+   VÌ SAO ĐI CẢ CỤM: hai cái nút ấy KHÔNG có ở đâu khác trong hệ thống. Xoá khối khỏi màn hình
+   Chủ tịch mà bỏ chúng lại là âm thầm mất hai tính năng — đúng cái lỗi TC-61 đã ghi ra khi cân
+   nhắc chuyện này lần đầu. Chúng điều khiển CÁI BẢNG, nên chúng theo bảng.
+
+   MÀN HÌNH CHỦ TỊCH GIỮ LẠI GÌ: hình 13 tuần (trả lời "ba tháng tới tiền đi thế nào"), dải chú
+   thích hai hàng, bốn ô mốc dự báo, và cửa "Cấu trúc chi tiết dòng tiền →" dẫn sang chỗ bảng bốn
+   mốc đang đứng. Tóm tắt NGUỒN SỐ vẫn ở lại — nó là cảnh báo, không phải bảng số.
+
+   LÝ DO SÂU HƠN (anh Tuấn hỏi 17/9, đã đếm): bảng bốn mốc TRÙNG với hai khối khác ngay trên cùng
+   màn hình, theo ba cách đếm khác nhau — bốn mốc luỹ kế theo ngày cam kết, Phải thu/Phải trả theo
+   bảy nhóm hạn, hình 13 tuần theo tuần. Ba con số cùng một dòng tiền đứng cạnh nhau là ba con số
+   người đọc sẽ cộng trừ lẫn nhau trong đầu, mà phép tính ấy không có đáp án đúng. */
 
 /* TC-57 · Ô CẢNH BÁO `O` ĐÃ GỠ cùng với bốn ô dùng nó (anh Tuấn chốt 17/9/2026 — xem chú thích
    tại chỗ gỡ, trong thân khối). Xoá luôn hàm thay vì để lại: một thành phần không ai gọi vẫn qua
    được mọi phép kiểm, và vòng sau có người dựng lại bốn ô ấy chỉ vì thấy hàm còn nằm đó. */
-
-/** TC-35 · BIỂU ĐỒ DÒNG TIỀN THUẦN QUA BỐN MỐC.
- *
- *  Bản vẽ V1.4 đặt đúng chỗ này một biểu đồ, kèm câu quy định cách cư xử khi thiếu số:
- *
- *      "Dự báo chưa đủ dữ liệu. Biểu đồ số dư và ngưỡng dự phòng sẽ hiển thị khi có số dư đã đối
- *       soát cùng lịch thu–chi đầy đủ. KHÔNG QUY ĐỔI DỮ LIỆU THIẾU THÀNH SỐ 0."
- *
- *  Câu cuối là luật, không phải lời khuyên. Một đường phẳng ở mức 0 trên biểu đồ dòng tiền đọc ra
- *  là "không có tiền vào ra" — khác hẳn "chưa ai nạp số". Nên THIẾU MỘT MỐC LÀ KHÔNG VẼ, và ghi ra
- *  còn thiếu mốc nào.
- *
- *  NGUỒN SỐ: `k.dong_tien_thuan` / `k.dong_tien_thuan_khoang` — đúng hai trường mà dòng đáy của
- *  bảng đang đọc, nên biểu đồ không thể nói khác bảng ngay dưới nó. Cố ý KHÔNG tự dò dòng "số dư
- *  cuối khoảng" theo tên tiếng Việt: tên đổi một chữ là biểu đồ âm thầm vẽ sang dòng khác.
- *
- *  Biểu đồ đổi theo KIỂU XEM cùng với bảng. Ở kiểu luỹ kế bốn cột chồng nhau nên đây là đường đi
- *  lên của cùng một dòng tiền; ở kiểu từng khoảng bốn cột rời nhau nên đây là bốn lượng độc lập —
- *  chú thích dưới biểu đồ nói rõ đang là kiểu nào.
- */
-/** TC-40 · DÙNG BỘ BIỂU ĐỒ CHUNG, và thêm một câu ĐỌC HỘ.
- *
- *  Anh Tuấn chốt 15/9/2026: "dòng tiền rất quan trọng, cần có số và biểu đồ phân tích". Hai việc:
- *
- *   1. Biểu đồ bỏ bản vẽ tay ở đây, gọi `BieuDoCot` của components/BieuDo.tsx. Bản vẽ tay cũ đúng
- *      về hình nhưng là bản chép thứ tư của cùng một phép tính trục — và bốn bản chép thì sớm
- *      muộn lệch nhau. Bộ chung còn có thứ bản vẽ tay không có: trục tung ghi mốc, lưới mờ, nhãn
- *      số trên từng cột.
- *   2. Thêm một câu đọc hộ. Đây là khối quan trọng nhất màn hình, mà bốn con số bốn mốc thì phải
- *      tự so trong đầu mới ra được điều đáng lo. Câu ấy chỉ ĐỌC LẠI số máy chủ gửi — nó nói mốc
- *      nào âm sớm nhất và thiếu bao nhiêu, không tính ra chỉ tiêu mới nào.
- */
-function docHoDongTien(cot: any[], v: (number | null | undefined)[], khoang: boolean): string {
-  const co = cot.map((c, i) => ({ ten: c.ten, gt: v[i] }))
-    .filter((x) => typeof x.gt === "number") as { ten: string; gt: number }[];
-  if (co.length === 0) return "";
-  const am = co.filter((x) => x.gt < 0);
-  if (am.length === 0) {
-    return khoang
-      ? `Cả ${co.length} khoảng đều dương — không khoảng nào thu không đủ bù chi.`
-      : `Dòng tiền luỹ kế dương ở cả ${co.length} mốc.`;
-  }
-  // Mốc ÂM SỚM NHẤT là điều đáng lo nhất, vì nó là hạn phải xoay tiền. Cột thứ tự trong `cot` đã
-  // là thứ tự thời gian, nên phần tử âm đầu tiên chính là mốc sớm nhất — không cần sắp lại.
-  const dau = am[0];
-  const sau = am.length > 1 ? ` (${am.length}/${co.length} mốc âm)` : "";
-  return khoang
-    ? `Thu không đủ bù chi từ khoảng ${dau.ten}, thiếu ${vnd(Math.abs(dau.gt))}${sau}.`
-    : `Dòng tiền luỹ kế âm từ mốc ${dau.ten}, thiếu ${vnd(Math.abs(dau.gt))}${sau}.`;
-}
-
-/** Bốn mốc dòng tiền thuần.
- *
- *  Bản vẽ V1.4 đặt đúng chỗ này một biểu đồ, kèm câu quy định cách cư xử khi thiếu số:
- *
- *      "Dự báo chưa đủ dữ liệu. Biểu đồ số dư và ngưỡng dự phòng sẽ hiển thị khi có số dư đã đối
- *       soát cùng lịch thu–chi đầy đủ. KHÔNG QUY ĐỔI DỮ LIỆU THIẾU THÀNH SỐ 0."
- *
- *  Câu cuối là luật, không phải lời khuyên. Một đường phẳng ở mức 0 trên biểu đồ dòng tiền đọc ra
- *  là "không có tiền vào ra" — khác hẳn "chưa ai nạp số". Bộ biểu đồ chung giữ đúng luật ấy: mốc
- *  thiếu là một ô trống có khung nét đứt, không phải một cột cao 0.
- *
- *  NGUỒN SỐ: `k.dong_tien_thuan` / `k.dong_tien_thuan_khoang` — đúng hai trường mà dòng đáy của
- *  bảng đang đọc, nên biểu đồ không thể nói khác bảng ngay dưới nó. Cố ý KHÔNG tự dò dòng "số dư
- *  cuối khoảng" theo tên tiếng Việt: tên đổi một chữ là biểu đồ âm thầm vẽ sang dòng khác.
- *
- *  Biểu đồ đổi theo KIỂU XEM cùng với bảng. Ở kiểu luỹ kế bốn cột chồng nhau nên đây là đường đi
- *  lên của cùng một dòng tiền; ở kiểu từng khoảng bốn cột rời nhau nên đây là bốn lượng độc lập —
- *  chú thích dưới biểu đồ nói rõ đang là kiểu nào.
- */
-function BieuDoBonMoc({ cot, so, khoang, vi_sao }: {
-  cot: any[]; so: Record<string, number | null | undefined>; khoang: boolean; vi_sao?: string;
-}) {
-  const gt = cot.map((c: any) => so?.[c.ma]);
-  const diem: Diem[] = cot.map((c: any, i: number) => ({
-    nhan: c.ten,
-    gt: gt[i] === null || gt[i] === undefined ? null : Number(gt[i]),
-  }));
-  const thieu = cot.filter((c: any, i: number) => gt[i] === null || gt[i] === undefined);
-  const doc = docHoDongTien(cot, gt as any, khoang);
-  return (
-    <>
-      <BieuDoCot
-        ten={`Dòng tiền thuần qua bốn mốc`}
-        phu={khoang ? "trong từng khoảng — bốn cột rời nhau" : "luỹ kế — bốn cột chồng lên nhau"}
-        diem={diem}
-        ai="Kế toán" cua="/dong-tien/nguon" cua_ten="Nguyên nhân · bộ phận · cửa nhập"
-        chan={<>
-          {/* CÂU ĐỌC HỘ ĐỨNG TRƯỚC mọi chú thích khác: nó là điều người đọc cần biết, còn phần
-              còn lại là cách đọc hình. */}
-          {doc && <><b>{doc}</b>{" "}</>}
-          {thieu.length > 0 && <>
-            Còn thiếu {thieu.length}/{cot.length} mốc: {thieu.map((c: any) => c.ten).join(" · ")}.
-            {vi_sao ? " " + vi_sao : ""} Không quy đổi dữ liệu thiếu thành số 0.
-          </>}
-          {/* KHÔNG nhắc lại "vạch đậm là mốc 0": `BieuDoCot` tự in câu ấy khi có cột âm. Trên ảnh
-              dựng ra hai câu gần y hệt nhau đứng liền nhau. */}
-        </>} />
-    </>
-  );
-}
 
 /** TC-48 · ĐÁY CỦA DỰ BÁO 13 TUẦN — anh Tuấn chốt 17/9/2026: "để đáy thấp nhất, bỏ số tuần 13".
  *
@@ -296,10 +206,6 @@ export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any 
   const [pn, setPn] = useState<number | null>(null);
   const [k, setK] = useState<any>(null);
   const [an, setAn] = useState(false);   // vai này không mở khối dòng tiền → không vẽ gì
-  // Mặc định LUỸ KẾ, không phải kiểu mới. Kiểu luỹ kế là kiểu đã in ra trong tài liệu v1.1 và là
-  // kiểu người đọc đang quen; đổi mặc định là hôm sau có người đọc bảng mới bằng thói quen cũ.
-  const [khoang, setKhoang] = useState(false);
-  const [dangXuat, setDangXuat] = useState(false);
 
   useEffect(() => {
     api("/dong-tien/meta")
@@ -323,12 +229,9 @@ export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any 
   if (an || !k) return null;
   if (!k.xem_duoc) return null;
 
-  const cot = k.cot || [];
-  const nCot = cot.length;
+  // CHỈ CÒN ĐỌC PHẦN TÓM TẮT của gói khung. `cot`, `dong`, `dong_tien_thuan` theo bảng bốn mốc
+  // sang /dong-tien; ở đây giữ đúng cái cảnh báo "nguồn số" và số dòng quá hạn.
   const tt = k.tom_tat_trang_thai || {};
-
-  /** Số của một dòng ở kiểu xem đang chọn. Dòng MỨC không có số theo khoảng nên luôn lấy `so`. */
-  const soCua = (d: any) => (khoang && d.la_dong_chay ? d.so_khoang : d.so) || {};
 
   return (
     <section style={{ marginBottom: 14 }}>
@@ -363,14 +266,13 @@ export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any 
           <DayDuBao d={day} />
 
           <div className="dt-hang">
-            <span className="dt-nhan-nho">Bốn mốc</span>
-            <div className="dt-kieu" role="group" aria-label="Kiểu xem bốn mốc">
-              <button type="button" className={"act" + (khoang ? " grey" : "")}
-                aria-pressed={!khoang} onClick={() => setKhoang(false)}>Lũy kế</button>
-              <button type="button" className={"act" + (khoang ? "" : " grey")}
-                aria-pressed={khoang} onClick={() => setKhoang(true)}>Trong từng khoảng</button>
-            </div>
-            {/* TÓM TẮT NGUỒN SỐ — phần "một nhãn thay cho cột cửa nhập" của phương án dung hoà.
+            {/* TC-63 · NÚT ĐỔI KIỂU XEM VÀ NÚT XUẤT EXCEL ĐÃ THEO BẢNG BỐN MỐC SANG /dong-tien.
+                Cả hai điều khiển CÁI BẢNG; bảng đi rồi mà để nút ở lại thì chúng không còn điều
+                khiển gì trên màn hình này.
+
+                TÓM TẮT NGUỒN SỐ THÌ Ở LẠI, và đây là ranh giới của vòng này: nó không phải một
+                bảng số, nó là CẢNH BÁO — "còn ba dòng chưa ai nạp" là việc Chủ tịch phải giao
+                người làm, đọc xong là xong, đúng loại thông tin màn hình này giữ.
                 Đếm theo DÒNG CÓ CỬA (bỏ dòng tự cộng), vì dòng tự cộng không ai nhập được. */}
             <span className="muted dt-nhan-nho-mo">Nguồn số</span>
             <span className="tag ok">{tt.day_du ?? 0} đầy đủ</span>
@@ -385,19 +287,6 @@ export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any 
                 dưới nó: câu ấy nói "bảng này gồm toàn bộ dòng tiền của pháp nhân đang xem", mà
                 đầu màn hình đã ghi "Phạm vi: Vietourist — công ty mẹ". Hai câu cùng nói một điều
                 thì câu thứ hai chỉ làm khối dài thêm. */}
-            <span className="dt-day-day" />
-            {/* NÚT XUẤT EXCEL THẬT (14/9/2026). Trước đây nó chỉ hiện câu "đang xây dựng" — một
-                nút hứa rồi không làm còn tệ hơn không có nút, vì lần sau người dùng không tin nút
-                nào nữa. Tệp do MÁY CHỦ dựng từ đúng gói mà màn hình này đang đọc, nên Excel không
-                thể nói khác màn hình; và máy chủ ghi một dòng nhật ký cho mỗi lần xuất. */}
-            <button type="button" className="act grey" disabled={dangXuat || !pn}
-              onClick={async () => {
-                if (!pn) return;
-                setDangXuat(true);
-                try { toast("Đã tải " + await taiTep(`/dong-tien/khung/${pn}/excel`)); }
-                catch (e: any) { toast(e?.message || "Không xuất được Excel", true); }
-                finally { setDangXuat(false); }
-              }}>{dangXuat ? "Đang dựng tệp…" : "Xuất Excel"}</button>
           </div>
         </div>
 
@@ -408,116 +297,19 @@ export default function KhoiDongTien({ day, du_bao }: { day?: any; du_bao?: any 
       </div>
 
 
-      {/* ═══ TC-35 · BIỂU ĐỒ TRƯỚC, BẢNG SAU NÚT ═══════════════════════════════════════════════
-          Anh Tuấn chỉ ra 15/9/2026: bảng 14 dòng × 4 mốc "không cần chi tiết ra màn hình, đưa vào
-          nút click, ở ngoài để con số báo cáo tổng". Đối chiếu lại thì BẢN VẼ V1.4 vốn đã làm đúng
-          như thế: khối này trong bản vẽ chỉ có bốn ô tổng, một biểu đồ, và một nút "Cấu trúc chi
-          tiết dòng tiền →". Không có bảng nào trên màn hình.
+      {/* ═══ TC-63 · BẢNG BỐN MỐC ĐÃ SANG /dong-tien ══════════════════════════════════════════
+          "em chuyển qua gộp với dòng tiền hoặc là ẩn khỏi màn hình chủ tịch" — anh Tuấn 18/9/2026.
 
-          Đo hậu quả của cách cũ: khối dòng tiền đổ cả bảng ra làm trang Chủ tịch cao 8.192px so với
-          2.791px của bản vẽ. Người mở trang phải cuộn qua bảng mới thấy khối kế tiếp.
+          Chỗ này trước đây là một nếp gấp "Bảng bốn mốc" (TC-61) chứa hình bốn mốc và bảng 14
+          dòng. Nếp gấp ấy đã giấu bảng khỏi màn hình, nhưng KHÔNG bỏ được cái trùng: cùng một
+          dòng tiền vẫn được đếm ba lần trên cùng một trang. Nay cả khối sang /dong-tien, thay cho
+          bảng bốn mốc CŨ ở đó — xem chú thích đầu components/BangBonMoc.tsx.
 
-          VÌ SAO GẤP TẠI CHỖ chứ không dời hẳn sang /dong-tien: màn hình ấy CÓ "Bảng bốn mốc" nhưng
-          KHÔNG có nút đổi kiểu xem (luỹ kế ↔ từng khoảng) và KHÔNG có nút Xuất Excel. Dời đi là âm
-          thầm bỏ mất hai tính năng — trong đó nút Excel vừa sửa xong ở vòng TC-28. Gấp lại thì giữ
-          đủ, mà khối vẫn co về đúng chiều cao bản vẽ. Nút sang màn hình chi tiết vẫn có, đúng bản vẽ. */}
-      {/* ═══ TC-61 · HÌNH BỐN MỐC RỜI KHỎI MÀN HÌNH CHỦ TỊCH ═══════════════════════════════════
-          "BỎ khỏi màn hình chủ tịch, và thiết kế lại cho đẹp giống bản thử 01"
-                                                                    — anh Tuấn, 17/9/2026
-
-          Anh Tuấn chụp đúng chỗ này: một khung biểu đồ rỗng kèm câu "Chưa có kỳ nào có số trong 4
-          kỳ gần nhất". Từ TC-59, câu hỏi "ba tháng tới tiền đi thế nào" đã có hình 13 tuần trả lời
-          ở đầu khối — nên hình bốn mốc ở đây vừa rỗng vừa nói lại một việc đã có người nói.
-
-          CHUYỂN XUỐNG chứ KHÔNG XOÁ, và đây là chỗ phải cân nhắc thật: `/dong-tien` KHÔNG có hình
-          nào vẽ bốn mốc (đã soát). Xoá hẳn là bỏ mất bản vẽ duy nhất của một con số mà Kế toán sẽ
-          nạp — mất một năng lực vì hôm nay nó chưa có số. Nên nó xuống nằm cạnh CHÍNH cái bảng nó
-          mô tả, trong nếp gấp "Bảng bốn mốc": màn hình lúc mở ra không còn thấy nó, ai cần thì bung
-          nếp gấp là có cả hình lẫn bảng.
-
-          Nếu anh Tuấn muốn xoá hẳn thì xoá ở đây, và phải gỡ luôn `BieuDoBonMoc` + `docHoDongTien`
-          cùng hai phép thử canh chúng — để lại một thành phần không ai gọi là cách vòng sau dựng
-          lại nó mà không biết vì sao nó từng bị bỏ. */}
+          CỬA DẪN SANG VẪN Ở ĐÂY, và giờ nó mới đúng nghĩa: bấm vào là tới CHÍNH cái bảng vừa rời
+          đi, chứ không phải tới một màn hình có bảng na ná. */}
       <p className="dt-nut-chi-tiet">
         <Link className="the-cua" href="/dong-tien">Cấu trúc chi tiết dòng tiền →</Link>
       </p>
-
-      <details className="dt-gap">
-        <summary>Bảng bốn mốc — {(k.dong || []).length} dòng · {nCot} mốc</summary>
-      {/* Hình đứng TRƯỚC bảng, trong cùng nếp gấp: hình trả lời "bốn mốc đi lên hay đi xuống",
-          bảng trả lời "dòng nào làm nên điều đó". Ai bung nếp gấp là muốn cả hai. */}
-      <BieuDoBonMoc cot={cot}
-        so={(khoang ? k.dong_tien_thuan_khoang : k.dong_tien_thuan) || {}}
-        khoang={khoang} vi_sao={k.vi_sao_khong_co_so_cuoi} />
-      <div className="panel wrap">
-        <table>
-          <thead><tr>
-            <th style={{ minWidth: 240 }}>Dòng tiền</th>
-            {cot.map((c: any) => <th key={c.ma} className="num">{c.ten}
-              <div className="muted" style={{ fontWeight: 400, fontSize: 11 }}>
-                {/* Ngày đầu ĐỔI theo kiểu xem: luỹ kế thì mọi cột cùng bắt đầu từ ngày báo cáo,
-                    theo khoảng thì cột sau bắt đầu ngay sau ngày kết thúc của cột trước. In sai
-                    ngày ở đây là người đọc cộng nhầm hai khoảng chồng nhau.
-
-                    CẢ HAI ĐẦU LẤY CHUỖI ĐÃ ĐỊNH DẠNG SẴN CỦA MÁY CHỦ (tu_hien · den_hien ·
-                    tu_hien_khoang). fmtD chỉ là lối lui khi máy chủ chưa gửi chuỗi ấy. Trộn hai
-                    nơi định dạng thì ra đúng cái ô đã gặp: "14/09/2026 – 20-09-2026". */}
-                {khoang
-                  ? (c.tu_hien_khoang || fmtD(c.tu_ngay_khoang || c.tu_ngay))
-                  : (c.tu_hien || fmtD(c.tu_ngay))}
-                {" – "}{c.den_hien || fmtD(c.den_ngay)}</div></th>)}
-            <th style={{ minWidth: 130 }}>Nguồn số</th>
-          </tr></thead>
-          <tbody>
-            {(k.dong || []).map((d: any) => (
-              <tr key={d.ma}>
-                <td>{d.ten}</td>
-                {d.mot_moc
-                  ? <td className="num" colSpan={nCot} style={{ textAlign: "right" }}>
-                      {d.so_mot_moc === null || d.so_mot_moc === undefined
-                        ? RONG(d.vi_sao_rong)
-                        : <>{vnd(d.so_mot_moc)} <span className="muted" style={{ fontSize: 11 }}>
-                            (một mốc, không theo khoảng)</span></>}
-                    </td>
-                  : cot.map((c: any) => <td key={c.ma} className="num">
-                      {soCua(d)[c.ma] === null || soCua(d)[c.ma] === undefined
-                        ? RONG(d.vi_sao_rong || d.bo_phan_chiu_trach_nhiem)
-                        : vnd(soCua(d)[c.ma])}
-                    </td>)}
-                <td style={{ fontSize: 11.5 }}>
-                  {d.tu_tinh
-                    ? <span className="muted">Tự cộng</span>
-                    : <ChipTrangThai ma={d.trang_thai} nhan={d.nhan_trang_thai} />}
-                  {khoang && d.la_dong_chay === false && !d.mot_moc &&
-                    <div className="muted" style={{ marginTop: 3 }}>mức tại mốc</div>}
-                </td>
-              </tr>))}
-            <tr>
-              <td><b>{k.ten_dong_thuan}</b></td>
-              {cot.map((c: any) => {
-                const t = ((khoang ? k.dong_tien_thuan_khoang : k.dong_tien_thuan) || {})[c.ma];
-                return <td key={c.ma} className="num"><b>
-                  {t === null || t === undefined ? RONG(k.vi_sao_khong_co_so_cuoi) : vnd(t)}
-                </b></td>;
-              })}
-              <td />
-            </tr>
-          </tbody>
-        </table>
-
-        {/* CÂU NHẮC ĐỔI THEO KIỂU XEM. Giữ nguyên một câu cho cả hai kiểu là chắc chắn sai một
-            nửa số lần: luỹ kế thì cộng bốn cột là sai, theo khoảng thì cộng bốn cột lại đúng. */}
-        <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
-          {khoang ? k.cong_bon_cot_khi_xem_khoang : k.cong_bon_cot_la_sai}</p>
-        {k.vi_sao_khong_co_so_cuoi && <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
-          {k.vi_sao_khong_co_so_cuoi}</p>}
-        <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
-          Tập dòng và tên dòng đáy do MÁY CHỦ cắt theo vai đang đăng nhập (SEC-02); màn hình không
-          lọc gì thêm. Số làm tròn đến đồng, dòng tổng cộng từ các dòng đã làm tròn.
-          {k.doi_soat_den_ngay ? ` Đối soát đến ${fmtD(String(k.doi_soat_den_ngay))}.` : ""}
-        </p>
-      </div>
-      </details>
     </section>
   );
 }

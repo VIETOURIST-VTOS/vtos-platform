@@ -23,6 +23,12 @@ from pathlib import Path
 GOC = Path(__file__).resolve().parents[2]
 DV = GOC / "backend" / "app" / "services" / "khung_dong_tien.py"
 KHOI = GOC / "web" / "components" / "KhoiDongTien.tsx"
+# TC-63 (18/9/2026) · BẢNG BỐN MỐC ĐỔI TỆP, LUẬT KHÔNG ĐỔI MỘT CHỮ. Anh Tuấn chốt "chuyển qua gộp
+# với dòng tiền": cả khối bốn mốc — nhãn ba mức, số theo từng khoảng, hai đầu ngày, câu nhắc đổi
+# theo kiểu xem, nút Xuất Excel — sang components/BangBonMoc.tsx và đứng trên màn hình /dong-tien.
+# Những phép thử dưới đây canh CHÍNH khối ấy nên chúng đi theo nó; phép thử nào canh màn hình Chủ
+# tịch (lối sang trang nguồn) thì vẫn đọc KHOI.
+BANG = GOC / "web" / "components" / "BangBonMoc.tsx"
 NGUON = GOC / "web" / "app" / "dong-tien" / "nguon" / "page.tsx"
 CSS = GOC / "web" / "app" / "globals.css"
 
@@ -70,7 +76,7 @@ def test_khong_co_muc_thu_tu():
 
 
 def test_trang_chu_tich_hien_nhan_thay_cot_cua_nhap():
-    ma = _bo_chu_thich_tsx(_doc(KHOI))
+    ma = _bo_chu_thich_tsx(_doc(BANG))
     assert "Cửa nhập · bộ phận" not in ma, (
         "Cột 'Cửa nhập · bộ phận' vẫn còn trên trang Chủ tịch — phương án dung hoà chuyển nó sang "
         "trang chi tiết."
@@ -156,7 +162,7 @@ def test_trang_chi_tiet_khong_tu_loc_theo_vai():
 def test_hieu_tinh_o_may_chu():
     s = _doc(DV)
     assert "def theo_khoang" in s and "def moc_khoang" in s
-    ma = _bo_chu_thich_tsx(_doc(KHOI))
+    ma = _bo_chu_thich_tsx(_doc(BANG))
     # Trình duyệt chỉ được ĐỌC so_khoang, không được tự trừ.
     assert "so_khoang" in ma
     assert re.search(r"\bso\[[^\]]+\]\s*-\s*so\[", ma) is None, (
@@ -193,7 +199,7 @@ def test_hai_dau_ngay_dung_chung_mot_cho_dinh_dang():
     s = _doc(DV)
     assert "tu_hien_khoang" in s, "Máy chủ chưa sinh chuỗi ngày đầu khoảng đã định dạng."
     assert '%d-%m-%Y' in s, "Ngày đầu khoảng phải định dạng đúng kiểu máy chủ đang dùng."
-    ma = _bo_chu_thich_tsx(_doc(KHOI))
+    ma = _bo_chu_thich_tsx(_doc(BANG))
     assert "c.tu_hien_khoang" in ma and "c.den_hien" in ma, (
         "Đầu cột phải ưu tiên chuỗi đã định dạng của máy chủ ở CẢ HAI đầu."
     )
@@ -221,7 +227,7 @@ def test_cau_nhac_doi_theo_kieu_xem():
         "Thiếu câu nhắc cho kiểu xem theo khoảng — ở kiểu ấy cộng bốn cột LÀ ĐÚNG, giữ nguyên câu "
         "của kiểu luỹ kế là nói ngược."
     )
-    ma = _bo_chu_thich_tsx(_doc(KHOI))
+    ma = _bo_chu_thich_tsx(_doc(BANG))
     assert "cong_bon_cot_khi_xem_khoang" in ma and "cong_bon_cot_la_sai" in ma, (
         "Màn hình phải đổi câu nhắc theo kiểu xem đang chọn."
     )
@@ -229,7 +235,7 @@ def test_cau_nhac_doi_theo_kieu_xem():
 
 def test_mac_dinh_van_la_luy_ke():
     """Đổi mặc định sang kiểu mới là hôm sau có người đọc bảng mới bằng thói quen cũ."""
-    ma = _bo_chu_thich_tsx(_doc(KHOI))
+    ma = _bo_chu_thich_tsx(_doc(BANG))
     assert "useState(false)" in ma and "setKhoang" in ma, (
         "Kiểu xem mặc định phải là luỹ kế (khoang = false)."
     )

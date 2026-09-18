@@ -23,6 +23,10 @@ XL = GOC / "backend" / "app" / "services" / "xuat_dong_tien_excel.py"
 API = GOC / "backend" / "app" / "api" / "v1" / "dong_tien.py"
 TRANG = GOC / "web" / "app" / "page.tsx"
 KHOI = GOC / "web" / "components" / "KhoiDongTien.tsx"
+# TC-63 (18/9/2026) · Nút Xuất Excel theo bảng bốn mốc sang components/BangBonMoc.tsx khi anh Tuấn
+# chốt "chuyển qua gộp với dòng tiền". Nút điều khiển CÁI BẢNG nên nó đi cùng bảng; luật ở đây —
+# "không có nút hứa suông, nút phải gọi cửa tải tệp thật" — không đổi một chữ.
+BANG = GOC / "web" / "components" / "BangBonMoc.tsx"
 APITS = GOC / "web" / "lib" / "api.ts"
 
 
@@ -78,7 +82,7 @@ def test_bo_cau_in_ca_hai_con_so():
 # ───────────────────────────── 2 · XUẤT EXCEL THẬT ─────────────────────────────
 
 def test_khong_con_nut_hua_suong():
-    ma = _bo_chu_thich_tsx(_doc(KHOI))
+    ma = _bo_chu_thich_tsx(_doc(BANG))
     assert "đang xây dựng" not in ma, "Nút Xuất Excel vẫn chỉ hiện câu 'đang xây dựng'."
     assert "taiTep(" in ma, "Nút Xuất Excel chưa gọi cửa tải tệp."
 
