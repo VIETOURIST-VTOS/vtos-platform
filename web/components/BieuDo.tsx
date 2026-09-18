@@ -409,7 +409,12 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
             dùng — hình Doanh thu — và người ấy nay nằm ở khung riêng, mang đủ nhãn tháng của
             mình. Giữ lại một thuộc tính không ai truyền là để vòng sau dựng lại bố cục cũ mà
             không đọc lý do đảo chiều (ghi trong KhoiKetQuaKinhDoanh.tsx). */}
-        <div className="bd-nhanx">
+        {/* TC-67 · `dong-nhan` BẬT LUẬT ẨN NHÃN CHẴN KHI Ô NHÃN HẸP HƠN CHỮ (luật ở globals.css).
+            Ngưỡng 10 nhãn, chứ không phải "cứ hẹp là ẩn": hình mười hai tháng thì ẩn bớt là đúng,
+            còn hình bốn quý trong cùng bề rộng ấy thì bốn nhãn vẫn vừa — ẩn ở đó là giấu đi thứ
+            đang đọc được. Luật CSS không đếm được số cột nên phải nói cho nó biết từ đây.
+            Nhãn bị ẩn KHÔNG mất câu trả lời: rê chuột lên cột là đọc được tên và số của cột ấy. */}
+        <div className={"bd-nhanx" + (diem.length >= 10 ? " dong-nhan" : "")}>
           {diem.map((d) => <span key={d.nhan} className={d.gt === null ? "muted" : ""}>{d.nhan}</span>)}
         </div>
       </div>

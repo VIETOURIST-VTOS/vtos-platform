@@ -147,6 +147,19 @@ TU_PHUC_VU: dict[str, str] = {
     "POST /api/v1/page-shifts/{sid}/respond": (
         "Người trực trả lời ca trực của chính mình; ca trực đã gắn với tài khoản nên phạm vi ghi "
         "khoá sẵn theo người đăng nhập."),
+    # TC-67 · 18/9/2026. Hai cửa chọn nền và cỡ chữ, anh Tuấn giao.
+    "PUT /api/v1/auth/giao-dien": (
+        "Người đặt nền và cỡ chữ cho chính mình. Không có vai trò nào để khai vì mọi vai trò đều "
+        "được, và phạm vi ghi khoá vào chính tài khoản đang đăng nhập: cửa KHÔNG nhận mã người "
+        "dùng, nó ghi thẳng vào bản ghi của người đang cầm phiếu đăng nhập. Không có tham số nào "
+        "để trỏ sang người khác, nên hàng rào nằm ở HÌNH DẠNG của cửa chứ không ở một phép kiểm "
+        "có thể bị sửa hỏng về sau. Giá trị nhận vào vẫn kiểm ở máy chủ theo hằng số GIAO_DIEN_* "
+        "của models/core.py, không tin màn hình."),
+    "DELETE /api/v1/auth/giao-dien": (
+        "Cùng cửa với PUT ở trên, chiều ngược lại: XOÁ lựa chọn giao diện của chính mình để trở "
+        "về mặc định. Xoá chứ không ghi đè bằng giá trị mặc định, vì rỗng nghĩa là CHƯA CHỌN và "
+        "khác với ĐÃ CHỌN đúng giá trị mặc định. Cũng không nhận mã người dùng, nên cũng không có "
+        "đường nào xoá lựa chọn của người khác."),
 }
 
 # --------------------------------------------------------------------------- HỞ THẬT

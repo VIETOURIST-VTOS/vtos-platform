@@ -82,6 +82,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             media={`(device-width: ${rong}px) and (device-height: ${cao}px) and (-webkit-device-pixel-ratio: ${ty_le}) and (orientation: portrait)`}
           />
         ))}
+
+        {/* ══ TC-67 · ĐẶT NỀN VÀ CỠ CHỮ TRƯỚC KHI TRANG VẼ RA ═══════════════════════════════
+            Kịch bản này CHẶN, và nó cố ý chặn: nó phải chạy xong TRƯỚC nét vẽ đầu tiên. Nếu để
+            React đặt nền sau khi trang đã vẽ, thì người chọn nền sáng sẽ thấy một nháy NỀN TỐI
+            mỗi lần đổi trang — chớp một cái rồi mới sáng lên. Một phần mười giây, nhưng lặp lại
+            mỗi lần bấm, cả ngày.
+
+            Nó chỉ đọc BẢN CHÉP trong localStorage, không gọi máy chủ: bản cất nằm ở máy chủ và
+            về sau vài trăm mili giây, còn nét vẽ đầu tiên thì không đợi được lâu thế.
+            ChonGiaoDien.tsx đọc bản của máy chủ rồi đè lên — hai bên lệch thì máy chủ thắng.
+
+            BỌC TRY/CATCH VÀ KHÔNG LÀM GÌ KHI HỎNG: máy chặn localStorage (chế độ riêng tư, chính
+            sách máy công ty) thì trang phải mở ra bằng mặc định chứ không được trắng màn hình.
+            Đây là đoạn mã chạy sớm nhất của cả trang; nó hỏng là không còn gì chạy nữa.
+
+            HAI NƠI CÙNG MỘT PHÉP TÍNH: hàm `apDung()` trong ChonGiaoDien.tsx làm đúng việc này.
+            Lệch một chữ giữa hai nơi là trang loé màu đúng lúc React tiếp quản. */}
+        <script dangerouslySetInnerHTML={{ __html:
+          "try{var g=JSON.parse(localStorage.getItem('vtos_giao_dien')||'null');if(g){"
+          + "var n=g.nen==='may'?(matchMedia('(prefers-color-scheme: light)').matches?'sang':'toi')"
+          + ":(g.nen==='sang'?'sang':'toi');"
+          + "document.documentElement.setAttribute('data-nen',n);"
+          + "if(g.co)document.documentElement.style.setProperty('--vtos-co-chu',g.co+'px')}}catch(e){}" }} />
       </head>
       <body>
         {children}

@@ -115,6 +115,33 @@ class User(Base):
     # để danh sách đối chiếu không báo lệch, và để rà quyền hằng tháng nhìn ra ngay ai là người ngoài.
     role_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     role_changed_by: Mapped[str] = mapped_column(String(50), default="")
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # GIAO DIỆN RIÊNG CỦA TỪNG NGƯỜI – TC-67, anh Tuấn giao 18/9/2026
+    # ══════════════════════════════════════════════════════════════════════════════════════════
+    # Anh Tuấn viết: "Lưu lựa chọn riêng theo tài khoản nhân viên, giữ nguyên khi chuyển trang và
+    # đăng nhập lại." Chữ ĐĂNG NHẬP LẠI là chỗ quyết định nó phải nằm ở đây chứ không nằm trong
+    # localStorage của trình duyệt: localStorage đi theo MÁY, không đi theo NGƯỜI – chỉnh ở máy
+    # tính thì mở điện thoại vẫn về mặc định, và xoá bộ nhớ trình duyệt là mất. Trình duyệt vẫn
+    # giữ một BẢN CHÉP, nhưng chỉ để vẽ ngay khỏi loé nền; bản CẤT nằm ở đây.
+    #
+    # HAI CỘT CHỨ KHÔNG MỘT: hai câu trả lời khác nhau thì kiểm từng cái một, và đếm được riêng
+    # ("bao nhiêu người đang để nền sáng"). Nhét "sang/18" vào một cột là sớm muộn có người ghi
+    # vào đó một chuỗi thứ ba.
+    #
+    # RỖNG KHÁC MẶC ĐỊNH – đây là lý do `gd_nen` để "" và `gd_co_chu` để NULL chứ không điền sẵn
+    # "toi" và 16. "" nghĩa là NGƯỜI NÀY CHƯA CHỌN GÌ, còn "toi" nghĩa là người này đã chọn nền
+    # tối. Hai điều ấy khác nhau ở đúng cái ngày ai đó đổi mặc định của hệ thống: người chưa chọn
+    # phải đi theo mặc định mới, người đã chọn thì không. Điền sẵn giá trị mặc định vào cột là
+    # xoá mất sự khác biệt ấy, và không cách nào lấy lại.
+    gd_nen: Mapped[str] = mapped_column(String(8), default="")          # "" | "toi" | "sang" | "may"
+    gd_co_chu: Mapped[int | None] = mapped_column(Integer, nullable=True)   # NULL | 14..20
+
+
+# Bộ giá trị hợp lệ của giao diện, khai MỘT CHỖ để cửa ghi, phép thử và màn hình cùng đọc một
+# nguồn. Đổi dải cỡ chữ thì đổi ở đây, không đi sửa ba nơi.
+GIAO_DIEN_NEN = ("toi", "sang", "may")   # navy tối · trắng sáng · theo cài đặt máy
+GIAO_DIEN_CO_MIN, GIAO_DIEN_CO_MAX = 14, 20
+GIAO_DIEN_MAC_DINH_NEN, GIAO_DIEN_MAC_DINH_CO = "toi", 16
 
 
 GRANT_KINDS = {"menu": "Màn hình", "capability": "Năng lực"}

@@ -9,7 +9,10 @@ from app.api.deps import current_user, require_roles, robot_auth, Gate, loc_theo
 from app.api import schemas as S
 from pydantic import BaseModel
 from app.core.security import verify_password, create_token, hash_password
-from app.models.core import User, Tour, ServiceRequest, Booking, Param, Alert, AuditLog, ROLES, TOUR_TYPES, TOUR_STATUS
+from app.models.core import (User, Tour, ServiceRequest, Booking, Param, Alert, AuditLog, ROLES,
+                             TOUR_TYPES, TOUR_STATUS,
+                             GIAO_DIEN_NEN, GIAO_DIEN_CO_MIN, GIAO_DIEN_CO_MAX,
+                             GIAO_DIEN_MAC_DINH_NEN, GIAO_DIEN_MAC_DINH_CO)
 from app.services import rules as R
 from app.services import mat_khau_yeu as MKY
 from app.services import tours as T
@@ -48,7 +51,73 @@ def me(u: User = Depends(loc_theo_nguoi_dung("hồ sơ của chính người đ�
             "can_create_request": u.role in AC.REQUEST_CREATE_ROLES or toan_quyen(u), "can_create_booking": u.role in AC.OPERATIONS or toan_quyen(u),
             "must_change_password": bool(u.must_change_password), "hr_tabs": AC.hr_tabs_for(db, u),
             "company_id": u.company_id, "ngoai_bien_che": bool(u.ngoai_bien_che),
-            "pham_vi": PV.mo_ta(db, u)}
+            "pham_vi": PV.mo_ta(db, u),
+            # TC-67 · Giao diện của chính người này. Gửi kèm ở đây chứ không đẻ thêm một cửa đọc
+            # riêng: màn hình nào cũng gọi /auth/me ngay khi mở, nên thêm một cửa nữa là thêm một
+            # lượt xếp hàng dọc – đúng cái TC-66 vừa bỏ đi ở /dong-tien/meta.
+            #
+            # TRẢ RA ĐÚNG THỨ ĐANG CẤT, KHÔNG ĐIỀN SẴN MẶC ĐỊNH. `None` nghĩa là người này chưa
+            # chọn, và màn hình phải phân biệt được "chưa chọn" với "đã chọn nền tối" – xem lý do
+            # dài ở models/core.py. Mặc định gửi kèm riêng một trường để màn hình không phải
+            # chép cứng hai con số ấy vào mã JavaScript; đổi mặc định thì đổi một chỗ ở máy chủ.
+            "giao_dien": {"nen": u.gd_nen or None, "co_chu": u.gd_co_chu},
+            "giao_dien_mac_dinh": {"nen": GIAO_DIEN_MAC_DINH_NEN, "co_chu": GIAO_DIEN_MAC_DINH_CO}}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# TC-67 · CỬA GHI GIAO DIỆN – anh Tuấn 18/9/2026
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# RANH GIỚI 09/9/2026 nói mỗi con số hệ thống cần một cửa nhập cho người dùng. Đây là một trong số
+# ít trường hợp cửa và dữ liệu là MỘT: người dùng tự chọn giao diện của chính mình, không ai nhập
+# hộ ai, nên cửa này chính là bảng "Giao diện" trên màn hình.
+#
+# KHÔNG NHẬN ID NGƯỜI DÙNG, và đó là hàng rào thật chứ không phải hàng rào bằng lời: cửa ghi thẳng
+# vào `u` – người đang cầm phiếu đăng nhập. Không có tham số nào để trỏ sang người khác, nên không
+# có đường nào để một người đổi giao diện của người khác, kể cả khi ai đó sửa nhầm luật phân quyền
+# về sau. Một cửa nhận `user_id` rồi kiểm "có phải chính mình không" thì an toàn đúng đến lần sửa
+# tiếp theo.
+#
+# KIỂM Ở MÁY CHỦ chứ không tin màn hình: `nen` phải nằm trong ba giá trị đã khai, `co_chu` phải
+# nằm trong dải đã khai. Màn hình có thanh trượt 14–20 thì cửa vẫn phải chặn, vì ai cũng gọi được
+# API bằng tay. Dải và bộ giá trị lấy từ CHÍNH hằng số mà mô hình dùng, không chép lại – chép lại
+# là ngày nào đó dải ở hai nơi lệch nhau.
+#
+# KHÔNG GHI NHẬT KÝ KIỂM TOÁN. `R.audit` dành cho việc đụng tới tiền, quyền và số liệu. Một người
+# đổi nền màn hình của chính mình không phải việc ấy; ghi vào đó là làm loãng sổ kiểm toán đến mức
+# lúc cần tra một việc thật thì phải lọc qua hàng nghìn dòng đổi cỡ chữ.
+class GiaoDienVao(BaseModel):
+    nen: str | None = None
+    co_chu: int | None = None
+
+
+@router.put("/auth/giao-dien", tags=["auth"])
+def dat_giao_dien(data: GiaoDienVao, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    if data.nen is not None:
+        if data.nen not in GIAO_DIEN_NEN:
+            raise HTTPException(422, f"Nền không hợp lệ – chỉ nhận: {', '.join(GIAO_DIEN_NEN)}")
+        u.gd_nen = data.nen
+    if data.co_chu is not None:
+        if not (GIAO_DIEN_CO_MIN <= data.co_chu <= GIAO_DIEN_CO_MAX):
+            raise HTTPException(422, f"Cỡ chữ phải từ {GIAO_DIEN_CO_MIN} đến {GIAO_DIEN_CO_MAX} px")
+        u.gd_co_chu = data.co_chu
+    db.commit()
+    # Trả lại ĐÚNG thứ vừa cất, đọc từ chính bản ghi chứ không dội lại thứ màn hình gửi lên: màn
+    # hình cần biết máy chủ đã nhận cái gì, không phải biết nó đã gửi cái gì.
+    return {"nen": u.gd_nen or None, "co_chu": u.gd_co_chu}
+
+
+@router.delete("/auth/giao-dien", tags=["auth"])
+def xoa_giao_dien(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Trả về mặc định – XOÁ lựa chọn, không ghi đè bằng giá trị mặc định.
+
+    Khác nhau ở chỗ: xoá rồi thì người này quay về "chưa chọn", nên mai kia hệ thống đổi mặc định
+    là họ đi theo mặc định mới. Ghi đè bằng "toi"/16 thì họ bị đóng đinh vào hai con số của hôm
+    nay, và chính họ cũng không biết. Nút trên màn hình viết là "Trả về mặc định", nên nó phải
+    làm đúng nghĩa ấy.
+    """
+    u.gd_nen, u.gd_co_chu = "", None
+    db.commit()
+    return {"nen": None, "co_chu": None}
 
 
 @router.post("/auth/password", tags=["auth"])
