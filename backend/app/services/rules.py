@@ -80,6 +80,35 @@ DEFAULT_PARAMS = [
     #
     # KHÔNG trừ ngày nghỉ, không quy ra giờ hành chính. P.TGĐ nói 24 giờ thì là 24 giờ đồng hồ; bịa
     # thêm luật giờ làm việc là tự ký thay một điều không ai ký.
+    # ---- Sổ hoạt động PR · Chủ tịch chốt 18/9/2026 ----
+    #
+    # HAI GIỜ, THEO ĐỒNG HỒ THẬT. Không trừ ngày nghỉ, không quy ra giờ hành chính: một việc ghi
+    # vào sổ lúc 22h thứ Bảy thì 0h là quá hạn. Đó là bản chất của khủng hoảng truyền thông, và
+    # cũng đúng cách hạn xử lý lead 24 giờ đang chạy. Bịa thêm một luật giờ làm việc ở đây là tự
+    # ký thay một điều không ai ký.
+    #
+    # MỐC ĐẾM LÀ LÚC VÀO SỔ, không phải lúc việc xảy ra ngoài đời — xem services/pr_hoat_dong.
+    ("pr_khung_hoang_gio", "2",
+     "Hạn phản hồi chính thức cho một vụ khủng hoảng truyền thông, kể từ lúc việc được GHI VÀO SỔ",
+     "giờ", "Chủ tịch chốt 18/9/2026"),
+    # BẢN GHI CHỮ KÝ, không phải hàng rào. Hàng rào thật là `require_roles` ở đường phát ngôn —
+    # bảng phân quyền toàn hệ chỉ đếm được quyền khai ở đó. Tham số này giữ thứ `require_roles`
+    # không mang được: ai chốt, ngày nào. Một phép thử chốt hai chỗ không được lệch nhau.
+    ("pr_vai_phat_ngon", "ptgd_mkt",
+     "Vai trò được bấm PHÁT trên sổ hoạt động PR – người chịu trách nhiệm cho câu nói ra ngoài",
+     "vai trò", "Chủ tịch chốt 18/9/2026"),
+    # ---- Sổ tài sản thương hiệu · Chủ tịch chốt 18/9/2026 ----
+    #
+    # GIÁ TRỊ LÀ DANH SÁCH VAI TRÒ, không phải một con số, và cố ý để ở đây chứ không viết cứng
+    # trong mã: "ai được ký một bộ nhận diện mới" là một quyết định quản trị, và ngày nó đổi thì
+    # phải đổi bằng một dòng ở màn hình Tham số kèm tên người đổi — không phải bằng một bản nâng
+    # cấp mà sáu tháng sau không ai tra được ai đã quyết.
+    #
+    # Mã đọc SỐNG từ đây (tai_san_thuong_hieu.VAI_KY đối chiếu với tham số này), nên thêm một vai
+    # vào đây là thêm một ô chữ ký trên màn hình, không phải thêm một dòng mã.
+    ("thuong_hieu_vai_ky", "chutich,ptgd_mkt",
+     "Những vai trò phải ký thì một bộ nhận diện mới mới có hiệu lực. ĐỦ CẢ hai, không phải một trong hai",
+     "danh sách vai trò", "Chủ tịch chốt 18/9/2026"),
     ("lead_han_xu_ly_gio", "24", "Hạn xử lý một lead kể từ khi vào sổ. Quá hạn mà chưa ai liên hệ và trạng thái vẫn là Mới thì lead bị đánh dấu quá hạn", "giờ", "P.TGĐ Phan Ngọc Tuấn chốt 18/9/2026"),
     ("kn_han_muc1_gio", "72", "Hạn phản hồi khách – khiếu nại mức 1 (góp ý)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("kn_han_muc2_gio", "24", "Hạn phản hồi khách – khiếu nại mức 2 (có thiệt hại)", "giờ", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
@@ -327,6 +356,22 @@ def _param_value(db: Session, key: str, on: date | None) -> str | None:
         if eff <= on:
             return val
     return None
+
+
+def get_param_chu(db: Session, key: str, on: date | None = None) -> str:
+    """Đọc một tham số DẠNG CHỮ. `get_param` ở dưới ép về float và nổ với thứ không phải số.
+
+    Thêm 18/9/2026 cho `thuong_hieu_vai_ky` – tham số đầu tiên của sổ mang giá trị là một DANH
+    SÁCH VAI TRÒ chứ không phải một con số. Không nới `get_param` cho nhận cả hai kiểu: một hàm
+    trả khi thì số khi thì chữ là hàm mà nơi gọi phải đoán, và chỗ đoán sai sẽ im lặng.
+    """
+    val = _param_value(db, key, on)
+    if val is None:
+        for k, v, *_ in DEFAULT_PARAMS:
+            if k == key:
+                return str(v)
+        raise KeyError(key)
+    return str(val)
 
 
 def get_param(db: Session, key: str, on: date | None = None) -> float:

@@ -72,7 +72,10 @@ class AssetIn(BaseModel):
 
 @router.get("/fixed-assets")
 def list_assets(status: str = "", department: str = "", u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
-    q = select(FixedAsset).order_by(FixedAsset.code)
+    # HÀNG RÀO SỔ THƯƠNG HIỆU (18/9/2026) – xem services/tai_san_thuong_hieu. Màn hình /tai-san là
+    # danh sách thẻ TSCĐ của Kế toán; thẻ nhận diện chưa khai nguyên giá không thuộc về đây.
+    from app.services.tai_san_thuong_hieu import loc_so_ke_toan
+    q = loc_so_ke_toan(select(FixedAsset)).order_by(FixedAsset.code)
     if status:
         q = q.where(FixedAsset.status == status)
     if department:

@@ -415,3 +415,123 @@ def nd_chuyen(nid: int, data: NDChuyenIn, u: User = Depends(require_roles(*MK.ND
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"content": n_out(db, n), "message": f"Nội dung {n.code} → {ND_TRANG_THAI[n.status]}"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# SỔ TÀI SẢN THƯƠNG HIỆU (18/9/2026) — xem services/tai_san_thuong_hieu
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+
+@router.get("/marketing/thuong-hieu")
+def thuong_hieu(loai: str = "", trang_thai: str = "",
+                u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Sổ nhận diện. Mở cho đúng những vai đã xem được màn hình Marketing – Kế toán cũng nằm trong
+    danh sách ấy, và cố ý: thẻ nào đã khai nguyên giá thì Kế toán phải đối chiếu được hai đầu."""
+    from app.services import tai_san_thuong_hieu as TH
+    return TH.bang(db, loai=loai, trang_thai=trang_thai)
+
+
+@router.post("/marketing/thuong-hieu/{aid}/ky")
+def ky_thuong_hieu(aid: int, u: User = Depends(require_roles("chutich", "ptgd_mkt")),
+                   db: Session = Depends(get_db)):
+    """Ký một bộ nhận diện. VAI TRÒ LẤY TỪ TÀI KHOẢN ĐANG ĐĂNG NHẬP, không nhận từ thân yêu cầu.
+
+    BẢN ĐẦU CỦA HÀM NÀY ĐỌC DANH SÁCH VAI TỪ THAM SỐ `thuong_hieu_vai_ky` rồi tự so bằng `if`, để
+    đổi được người ký bằng một dòng ở màn hình Tham số. Ba bộ kiểm của kho bắt đúng chỗ ấy và
+    chúng bắt đúng:
+
+      · KS-2  – mọi đường GHI phải khai quyền ở chỗ MÁY ĐỌC ĐƯỢC. Một câu `if` trong thân hàm thì
+                bảng phân quyền toàn hệ không đếm được nó, và cái gì không đếm được thì không rà
+                soát được.
+      · P-1   – một kiểu khai quyền duy nhất cho cả hệ, không phải mỗi người một kiểu.
+      · TQ-1  – một cửa từ chối theo vai trò phải nói rõ nó là PHÂN QUYỀN hay là TÁCH BẠCH TRÁCH
+                NHIỆM.
+
+    Nên hàng rào nằm ở `require_roles` như mọi đường khác trong hệ. Tham số `thuong_hieu_vai_ky`
+    KHÔNG bị bỏ đi và cũng KHÔNG được đọc ở đây: nó là BẢN GHI CHỮ KÝ của quyết định 18/9/2026 —
+    ai chốt, ngày nào — thứ mà `require_roles` không mang được. Hai chỗ ấy không được lệch nhau,
+    và `test_th1` chốt điều đó bằng một phép thử so ba đầu: tham số, `TH.VAI_KY`, và chính danh
+    sách trong `require_roles` ở dòng trên.
+
+    CHỦ TỊCH ĐI QUA ĐƯỢC CỬA NÀY — ông nằm trong danh sách. Thứ ông KHÔNG làm được là ký thay cả
+    hai vai: `TH.ky` chỉ bật đúng ô của vai đang bấm, nên bấm hai lần vẫn là một chữ ký. Đó không
+    phải phân quyền, đó là chống ghi sai sổ.
+    """
+    from app.models.assets import FixedAsset
+    from app.services import tai_san_thuong_hieu as TH
+
+    a = db.get(FixedAsset, aid)
+    if not a or not a.th_so:
+        raise HTTPException(404, "Không có bộ nhận diện này trong sổ")
+    try:
+        kq = TH.ky(db, a, u.role, u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return kq
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# SỔ HOẠT ĐỘNG PR (18/9/2026) — xem services/pr_hoat_dong
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+
+@router.get("/marketing/pr")
+def pr_bang(loai: str = "", trang_thai: str = "", chi_khung_hoang: bool = False,
+            u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    from app.services import pr_hoat_dong as PR
+    return PR.bang(db, loai=loai, trang_thai=trang_thai, chi_khung_hoang=chi_khung_hoang, u=u)
+
+
+@router.post("/marketing/pr/{hid}/phat")
+def pr_phat(hid: int, u: User = Depends(require_roles("ptgd_mkt")),
+            db: Session = Depends(get_db)):
+    """Bấm PHÁT. Chỉ P.TGĐ Marketing – Chủ tịch chốt 18/9/2026.
+
+    ĐÂY LÀ TÁCH BẠCH TRÁCH NHIỆM, KHÔNG PHẢI PHÂN QUYỀN, và khác biệt ấy quyết định cách viết:
+    cửa này KHÔNG mở cho Chủ tịch bằng quyền toàn quyền. Người phát ngôn của công ty là một VỊ
+    TRÍ có tên; câu nói ra ngoài phải đứng tên đúng người ấy. Nếu Chủ tịch muốn tự phát ngôn thì
+    đó là một quyết định đổi người phát ngôn — đổi tham số `pr_vai_phat_ngon` và đẩy một bản, chứ
+    không phải đi vòng qua cửa.
+
+    ĐÃ THỬ KHAI VÀO `ks_toan_quyen.GIU_DONG` VÀ BỘ KIỂM TỪ CHỐI — ghi lại để người sau không thử
+    lại: sổ ấy chỉ nhận những cửa mà bộ quét NHÌN THẤY, tức là các câu từ chối theo vai trò nằm
+    TRONG THÂN HÀM. Cửa này chặn bằng `require_roles` ở chữ ký hàm, giống mọi đường ghi khác trong
+    hệ, nên bộ quét không coi nó là một "cửa chặn Chủ tịch" và dòng khai thành dòng mồ côi.
+
+    Một danh sách vai không có Chủ tịch là chuyện bình thường của hệ (ghi tăng tài sản chỉ mở cho
+    Kế toán, chẳng hạn). Chỗ đặc biệt của cửa này nằm ở LÝ DO, và lý do ấy sống trong chính đoạn
+    văn này cùng tham số `pr_vai_phat_ngon` — hai chỗ người đọc sẽ tới khi hỏi "vì sao".
+    """
+    from app.models.marketing import PrHoatDong
+    from app.services import pr_hoat_dong as PR
+
+    h = db.get(PrHoatDong, hid)
+    if not h:
+        raise HTTPException(404, "Không có việc này trong sổ PR")
+    try:
+        kq = PR.phat(db, h, u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return kq
+
+
+@router.post("/marketing/pr/{hid}/phan-hoi")
+def pr_phan_hoi(hid: int, u: User = Depends(require_roles(*LAP)), db: Session = Depends(get_db)):
+    """Ghi rằng vụ khủng hoảng ĐÃ được phản hồi bằng đường khác (gọi điện, gặp trực tiếp).
+
+    Mở rộng hơn cửa phát ngôn, và cố ý: đây không phải nói ra ngoài, đây là ghi lại một việc đã
+    làm. Không có cửa này thì những vụ xử lý bằng điện thoại nằm mãi ở bảng quá hạn, và một bảng
+    quá hạn đầy dòng đã xong là một bảng không ai nhìn nữa.
+    """
+    from app.models.marketing import PrHoatDong
+    from app.services import pr_hoat_dong as PR
+
+    h = db.get(PrHoatDong, hid)
+    if not h:
+        raise HTTPException(404, "Không có việc này trong sổ PR")
+    try:
+        kq = PR.ghi_phan_hoi(db, h, u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return kq

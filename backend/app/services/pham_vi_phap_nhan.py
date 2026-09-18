@@ -241,6 +241,10 @@ PHAI_LOC = {
     "ChotSoDu":       "bản chốt số dư đã đối soát của ĐÚNG MỘT pháp nhân – nền của hàm tiền khả "
                       "dụng; lọt sang pháp nhân khác là bù trừ tiền giữa hai pháp nhân",
     "ContentItem":    "nội dung đăng dưới thương hiệu của một pháp nhân",
+    # Sổ hoạt động PR (18/9/2026). Cùng lý do với ContentItem: một bài báo, một sự kiện, một vụ
+    # khủng hoảng đều xảy ra DƯỚI THƯƠNG HIỆU của một pháp nhân cụ thể, và người chỉ phụ trách một
+    # pháp nhân không có việc gì phải đọc vụ của pháp nhân khác.
+    "PrHoatDong":     "hoạt động PR diễn ra dưới thương hiệu của một pháp nhân",
     # VPM-11, 11/9/2026. Sổ nghĩa vụ thanh toán là NỀN của bảng dòng tiền bốn mốc, và đề xuất
     # 11/9 nói thẳng: "Không mặc định tiền công ty này dùng được cho công ty khác". Không lọc ở
     # đây thì người phụ trách một pháp nhân mở bảng dòng tiền ra sẽ thấy nghĩa vụ của cả nhóm —
