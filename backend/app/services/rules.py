@@ -97,6 +97,39 @@ DEFAULT_PARAMS = [
     ("pr_vai_phat_ngon", "ptgd_mkt",
      "Vai trò được bấm PHÁT trên sổ hoạt động PR – người chịu trách nhiệm cho câu nói ra ngoài",
      "vai trò", "Chủ tịch chốt 18/9/2026"),
+    # ---- Cửa lọc tin khủng hoảng · 19/9/2026 ----
+    #
+    # BỐN THAM SỐ NÀY ĐIỀU KHIỂN MỘT CÁI XẾP HÀNG, KHÔNG ĐIỀU KHIỂN MỘT QUYẾT ĐỊNH. Không tham số
+    # nào trong đây đặt `la_khung_hoang` hay bấm đồng hồ hai giờ; cả bốn chỉ quyết tin nào được đọc
+    # trước. Sửa sai một tham số ở đây làm người trực đọc thừa hoặc đọc muộn, không làm hệ thống tự
+    # tuyên bố một vụ khủng hoảng — xem services/loc_khung_hoang.
+    #
+    # DANH SÁCH TỪ ĐỎ để ở tham số chứ không viết cứng, vì nó là thứ SẼ SAI và phải sửa được trong
+    # ngày: mỗi vụ đi qua lại dạy cho công ty một từ mới. Viết trong mã thì sửa nó là một bản nâng
+    # cấp; để ở đây thì Marketing tự sửa và người sửa có tên.
+    # So khớp KHÔNG dấu và theo RANH GIỚI TỪ (loc_khung_hoang.tim_tu_do), nên viết có dấu hay không
+    # đều được — "lừa đảo" và "lua dao" là một.
+    ("pr_tu_do",
+     "lua dao,lua gat,bip,to cao,khieu nai,kien,luat su,cong an,bao chi,nha bao,quyt,bung tien,"
+     "doi tien,hoan tien,tra tien,ngo doc,tai nan,bo roi,mat do,to,phot,scandal,tay chay",
+     "Những từ làm một tin được xếp lên đầu hàng đợi Marketing. Sửa được ở màn hình này, không "
+     "phải bằng bản nâng cấp – mỗi vụ đi qua lại dạy thêm một từ",
+     "từ, cách nhau bằng dấu phẩy", "Marketing đề xuất – Chủ tịch chốt 19/9/2026"),
+    # NGƯỠNG 2 nghĩa là: một từ đỏ (+2) đủ vào hàng đợi, hoặc dốc (+1) cộng quá hạn trả lời (+1)
+    # cũng đủ. Hạ xuống 1 thì mọi tin của một hội thoại đang dốc đều vào — dùng được khi muốn xem
+    # lại, nhưng để thường trực thì hàng đợi dài đến mức không ai mở.
+    ("pr_nguong_canh_bao", "2",
+     "Điểm tối thiểu để một tin vào hàng đợi Marketing. Dưới ngưỡng là XẾP SAU, không phải bị bỏ – "
+     "màn hình hạ ngưỡng xuống là xem lại được",
+     "điểm", "Chủ tịch chốt 19/9/2026"),
+    # DỐC: đếm theo HỘI THOẠI, không theo cả hộp thư. Cả hộp thư đông lên vào chủ nhật là chuyện
+    # bình thường của một công ty lữ hành; một người nhắn sáu tin trong một giờ thì không.
+    ("pr_cum_phut", "60",
+     "Cửa sổ đếm 'dốc': bao nhiêu phút gần nhất được tính là một cụm tin trên cùng một hội thoại",
+     "phút", "Chủ tịch chốt 19/9/2026"),
+    ("pr_cum_so_tin", "5",
+     "Bao nhiêu tin của khách trong cửa sổ ấy thì tính là một 'dốc' và cộng điểm",
+     "tin", "Chủ tịch chốt 19/9/2026"),
     # ---- Sổ tài sản thương hiệu · Chủ tịch chốt 18/9/2026 ----
     #
     # GIÁ TRỊ LÀ DANH SÁCH VAI TRÒ, không phải một con số, và cố ý để ở đây chứ không viết cứng

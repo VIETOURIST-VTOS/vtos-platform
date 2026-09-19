@@ -117,6 +117,13 @@ function Marketing() {
   const [pr, setPr] = useState<any>({ rows: [], dem: {}, loai: {}, trang_thai_ds: {}, han_khung_hoang_gio: 0 });
   const [prKh, setPrKh] = useState(false);
 
+  // ── cửa lọc tin khủng hoảng ──
+  const [lk, setLk] = useState<any>({ rows: [], dem: {}, tu_do: [], nguong: 0, nguong_ky: 0, ngay: 7 });
+  const [lkNgay, setLkNgay] = useState(7);
+  const [lkRong, setLkRong] = useState(false);          // hạ ngưỡng để XEM LẠI, không đổi luật
+  const [lkLyDo, setLkLyDo] = useState<any>({});
+  const [lkDo, setLkDo] = useState<any>(null);
+
   // ── nội dung ──
   const [nd, setNd] = useState<any[]>([]);
 
@@ -194,6 +201,32 @@ function Marketing() {
   }, [prKh]);
   useEffect(() => { if (tab === "thuonghieu") napPr().catch((e) => toast(errMsg(e), true)); },
            [tab, napPr, toast]);
+
+  /** Hàng đợi cảnh báo hộp thư. Bộ lọc chỉ XẾP HÀNG — nó không đặt "là khủng hoảng" và không bấm
+   *  đồng hồ hai giờ. Ô tích ở nút "Lập dòng PR" mới làm việc đó, và người tích mới là người
+   *  quyết. Nút hạ ngưỡng ở dưới là cách giữ lời hứa "không vứt tin nào đi". */
+  const napLk = useCallback(async () => {
+    setLk(await api(`/marketing/hop-thu-canh-bao?ngay=${lkNgay}${lkRong ? "&nguong=1" : ""}`));
+  }, [lkNgay, lkRong]);
+  useEffect(() => { if (tab === "thuonghieu") napLk().catch((e) => toast(errMsg(e), true)); },
+           [tab, napLk, toast]);
+  const lkBoQua = async (mid: number) => {
+    const ly_do = (lkLyDo[mid] || "").trim();
+    if (!ly_do) { toast("Phải ghi lý do bỏ qua – hàng đợi chỉ sửa được khi biết nó sai ở đâu", true); return; }
+    try { toast((await api(`/marketing/hop-thu-canh-bao/${mid}/bo-qua`, { method: "POST", json: { ly_do } })).message); await napLk(); }
+    catch (e) { toast(errMsg(e), true); }
+  };
+  const lkLapPr = async (mid: number, kh: boolean) => {
+    try {
+      toast((await api(`/marketing/hop-thu-canh-bao/${mid}/lap-pr`,
+        { method: "POST", json: { la_khung_hoang: kh, loai: "khung_hoang" } })).message);
+      await napLk(); await napPr();
+    } catch (e) { toast(errMsg(e), true); }
+  };
+  const napLkDo = async () => {
+    try { setLkDo(await api(`/marketing/hop-thu-canh-bao/do`)); }
+    catch (e) { toast(errMsg(e), true); }
+  };
 
   // Sổ nhận diện. Chỉ nạp khi mở tab – sổ này đọc từ bảng tài sản, không phải thứ cần sẵn ở
   // mọi màn hình.
@@ -735,9 +768,88 @@ function Marketing() {
             </tbody>
           </table>}
       </div>
+      <div className="panel">
+        <h2>Hàng đợi cảnh báo hộp thư</h2>
+        <p className="muted">Bộ lọc đọc tin khách gửi vào Facebook Messenger / Zalo OA / chat web và
+          <b> xếp lên đầu</b> những tin đáng đọc trước. Nó <b>không</b> tự đánh dấu khủng hoảng và
+          <b> không</b> tự bấm đồng hồ {pr.han_khung_hoang_gio} giờ — đồng hồ chạy đúng lúc người
+          trực tích ô “là khủng hoảng” ở nút Lập dòng PR.</p>
+        <p className="muted">Ba dấu hiệu cộng điểm: <b>từ đỏ</b> (+2), <b>dốc</b> – nhiều tin liên
+          tiếp trên cùng hội thoại (+1), <b>quá hạn trả lời</b> (+1). Ngưỡng đang ký
+          là <b>{lk.nguong_ky}</b>. Danh sách từ đỏ sửa ở màn hình Tham số, không phải bằng bản nâng cấp.</p>
+      </div>
+      <div className="mh01-the">
+        <The nhan="Chờ người xem" so={lk.dem?.cho_xem ?? 0} canhBao={(lk.dem?.cho_xem ?? 0) > 0}
+             nguon={`tin đạt ngưỡng trong ${lk.ngay} ngày gần nhất, chưa ai kết luận`} />
+        <The nhan="Có từ đỏ" so={lk.dem?.co_tu_do ?? 0} nguon="tin chứa ít nhất một từ trong danh sách đã ký" />
+        <The nhan="Bắt đúng" so={lkDo ? lkDo.bat_dung : "—"} nguon="hàng đợi nêu, người xác nhận là khủng hoảng"
+             cua={napLkDo} cuaTen="Đo bộ lọc" />
+        <The nhan="Bỏ sót" so={lkDo ? lkDo.bo_sot : "—"} canhBao={!!lkDo && lkDo.bo_sot > 0}
+             nguon="vụ khủng hoảng có tin nguồn mà chấm lại vẫn dưới ngưỡng – con số duy nhất thật sự quan trọng, mục tiêu 0"
+             cua={napLkDo} cuaTen="Đo bộ lọc" />
+      </div>
+      <div className="panel">
+        <div className="hang">
+          <label>Nhìn lại{" "}
+            <select value={lkNgay} onChange={(e) => setLkNgay(Number(e.target.value))}>
+              <option value={1}>1 ngày</option><option value={7}>7 ngày</option>
+              <option value={30}>30 ngày</option>
+            </select>
+          </label>{" "}
+          <label><input type="checkbox" checked={lkRong} onChange={(e) => setLkRong(e.target.checked)} />
+            {" "}Hạ ngưỡng xuống 1 để xem lại tin bị xếp sau</label>
+        </div>
+        {lkRong && <p className="muted">Đang XEM LẠI ở ngưỡng 1. Đây chỉ là cách nhìn của một lần
+          xem — tham số đã ký vẫn là {lk.nguong_ky}.</p>}
+        {/* Chạm trần thì NÓI RA. Một hàng đợi thiếu dòng mà im lặng tệ hơn hẳn một hàng đợi chậm:
+            người trực đóng màn hình với cảm giác đã nhìn hết, trong khi phần chưa nhìn mới là
+            phần có thể đang chứa vụ thật. */}
+        {lk.cat_bot && <p className="muted" style={{ color: "var(--vtos-danger)" }}>Đang nhìn <b>một phần</b>: khoảng thời gian này có
+          nhiều hơn {lk.tran_dong} tin nên hàng đợi chỉ chấm {lk.tran_dong} tin gần nhất. Thu hẹp
+          số ngày lại để nhìn đủ.</p>}
+        {(lk.rows || []).length === 0
+          ? <p className="muted">Không có tin nào đạt ngưỡng trong {lk.ngay} ngày gần nhất.</p>
+          : <table className="bang">
+            <thead><tr>
+              <th>Điểm</th><th>Lúc</th><th>Kênh</th><th>Khách</th><th>Trích tin</th>
+              <th>Vì sao được nêu</th><th></th>
+            </tr></thead>
+            <tbody>
+              {lk.rows.map((r: any) => <tr key={r.message_id}>
+                <td>{r.co_tu_do ? <Tag cls="err">{r.diem}</Tag> : <Tag cls="warn">{r.diem}</Tag>}</td>
+                <td>{r.luc}</td>
+                <td>{r.kenh}</td>
+                <td>{r.khach}</td>
+                <td style={{ maxWidth: 420 }}>{r.trich}</td>
+                <td>{(r.ly_do || []).map((l: string, i: number) => <div key={i}>{l}</div>)}</td>
+                <td>
+                  {r.ket_luan
+                    ? <span className="muted">{r.ket_luan === "lap_pr" ? "đã lập dòng PR" : "đã bỏ qua"}
+                        {r.xu_ly_boi ? ` – ${r.xu_ly_boi}` : ""}</span>
+                    : lapDuoc && <>
+                      <button className="act teal" onClick={() => lkLapPr(r.message_id, true)}>Lập dòng PR – là khủng hoảng</button>{" "}
+                      <button className="act" onClick={() => lkLapPr(r.message_id, false)}>Lập dòng PR – chưa phải</button>
+                      <div style={{ marginTop: 4 }}>
+                        <input placeholder="lý do bỏ qua (bắt buộc)" value={lkLyDo[r.message_id] || ""}
+                               onChange={(e) => setLkLyDo({ ...lkLyDo, [r.message_id]: e.target.value })} />{" "}
+                        <button className="act grey" onClick={() => lkBoQua(r.message_id)}>Bỏ qua</button>
+                      </div>
+                    </>}
+                </td>
+              </tr>)}
+            </tbody>
+          </table>}
+        {lkDo && <p className="muted">Đo bộ lọc: bắt đúng <b>{lkDo.bat_dung}</b> · báo nhầm{" "}
+          <b>{lkDo.bao_nham}</b> · bỏ sót <b>{lkDo.bo_sot}</b> · không có tin nguồn để đối chiếu{" "}
+          <b>{lkDo.khong_co_tin_nguon}</b>. {lkDo.ghi_chu}</p>}
+      </div>
       <div className="panel" style={{ borderColor: "var(--vtos-warning)" }}>
         <h2>Còn thiếu</h2>
         <div className="mh01-the">
+          <The rong nhan="Bình luận công khai Fanpage" so="chưa có"
+               nguon="Hộp thư đa kênh chỉ nhận TIN NHẮN RIÊNG. Bình luận dưới bài đăng là một luồng Graph API khác, chưa nối vào VTOS – mà đó mới là chỗ người ngoài đọc được ngay." />
+          <The rong nhan="Ai trực ngoài giờ, báo về đâu" so="chưa ký"
+               nguon="Đồng hồ 2 giờ chạy theo đồng hồ thật, kể cả 22h thứ Bảy. Chưa có ca trực và đường báo thì hàng đợi này không ai mở lúc nửa đêm." />
           <The rong nhan="Theo dõi nhắc tên thương hiệu" so="chưa có"
                nguon="Cần một cửa nhập hoặc một mối nối với dịch vụ đo bên ngoài. Không có cửa thì con số này không thể có, kể cả ước lượng." />
         </div>
