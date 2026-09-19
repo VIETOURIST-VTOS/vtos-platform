@@ -46,6 +46,8 @@ CUA_TAY = (
     # `users.sales_group`: ba chuỗi chữ tự do cũ gõ tay suốt bốn năm là thứ hai bảng này sinh ra để
     # thay, chép sang là biến một đống không ai dám tin thành một bảng trông rất đáng tin.
     "don_vi_kd", "phan_cong_kd",
+    # TC-74 – danh muc doi tac ban hang. Cua nhap tay o man hinh /nguoi-ban-hang.
+    "doi_tac_ban_hang",
     # TC-41 – chỉ tiêu doanh thu và lợi nhuận trước thuế theo tháng × pháp nhân. Cửa nhập tay ở màn
     # hình /ke-hoach-thang. Máy KHÔNG sinh được bảng này và cũng không được phép: kế hoạch là điều
     # người ta QUYẾT ĐỊNH, không phải điều hệ thống đo được. Suy nó từ thực hiện kỳ trước là biến
@@ -164,20 +166,6 @@ MAY_SINH = {
     "lan_chay_tac_vu": "Lần chạy do hệ thống chạy tác vụ báo về qua /tu-dong/bao-cao – nhập tay một "
                        "dòng 'đã chạy thành công' là tạo bằng chứng giả về việc có thể chưa hề chạy.",
     "tong_dai_su_kien": "Nhật ký nguyên văn webhook tổng đài – tổng đài ghi vào, không ai nhập tay.",
-    # Nối tài khoản Zalo (19/9/2026). Hai bảng, và CẢ HAI đều máy sinh — nhưng vì hai lý do khác
-    # nhau, nên chép ra đây cả hai chứ không gộp một dòng:
-    #
-    #   · zalo_ma_noi         – mã do máy sinh ngẫu nhiên khi người dùng bấm "xin mã" ở màn hình
-    #                           /doi-mat-khau. Người KHÔNG được gõ mã vào: một mã nhập tay là một
-    #                           mã có người thứ hai biết, và cả tính an toàn của việc nối nằm ở chỗ
-    #                           chỉ chính chủ nhìn thấy nó.
-    #   · zalo_noi_tai_khoan  – UID do ZALO nói ra qua webhook khi chính người ấy nhắn mã vào OA.
-    #                           Mở cửa nhập tay ở đây là mở lại đúng cái lỗ mà thiết kế này sinh ra
-    #                           để bịt: một người gõ nhầm UID thì cảnh báo của Chủ tịch đi tới máy
-    #                           người khác, và không ai biết.
-    "zalo_ma_noi": "Mã nối do máy sinh ngẫu nhiên; nhập tay là để lộ mã cho người thứ hai.",
-    "zalo_noi_tai_khoan": "UID do Zalo nói ra qua webhook khi chính chủ nhắn mã; gõ tay UID là mở "
-                          "đường cho cảnh báo đi nhầm người.",
     # Bình luận công khai Fanpage (19/9/2026). Facebook đẩy sang qua webhook trường `feed`; người
     # KHÔNG gõ tay dòng nào, và không nên: một bình luận nhập tay là lời của một người có thật bị
     # người khác viết hộ, và sáu tháng sau không ai phân biệt nổi dòng nào là thật.

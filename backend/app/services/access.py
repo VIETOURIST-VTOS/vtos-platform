@@ -266,10 +266,7 @@ MAN_HINH_API = {
                      "/api/v1/sepay", "/api/v1/bookings"),
     "/companies": ("/api/v1/companies",),
     "/cong-no": ("/api/v1/cong-no",),
-    # 19/9/2026 – màn hình này nay còn là chỗ người tự nối Zalo của mình để nhận cảnh báo khủng
-    # hoảng. Cùng một màn hình vì cùng một việc: những thứ thuộc về TÀI KHOẢN của chính mình, và
-    # không vai trò nào làm hộ được cho ai.
-    "/doi-mat-khau": ("/api/v1/auth", "/api/v1/zalo"),
+    "/doi-mat-khau": ("/api/v1/auth",),
     "/doi-xe": ("/api/v1/fleet", "/api/v1/vehicles", "/api/v1/drivers"),
     "/expenses": ("/api/v1/cashflow", "/api/v1/payment-requests", "/api/v1/tours"),
     "/finance": ("/api/v1/fin", "/api/v1/cashflow"),
@@ -412,6 +409,7 @@ MAN_HINH_API = {
     # kết cho người bấm, không phải một lượt gọi máy chủ của màn hình này.
     "/so-con-no": ("/api/v1/so-con-no",),
     "/to-chuc-kd": ("/api/v1/to-chuc-kd",),
+    "/nguoi-ban-hang": ("/api/v1/nguoi-ban-hang",),
     "/robot-reports": ("/api/v1/auto-reports",),
     "/sales-reports": ("/api/v1/sales-reports",),
     "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
@@ -573,6 +571,10 @@ MENU_ROLES = {
     # cung team khong phai bi mat. GHI thi hep hon nhieu, khai rieng o api/v1/to_chuc_kd.py – nguoi tu
     # ve duoc cay to chuc cua minh la nguoi tu cap duoc pham vi xem cua minh.
     "/to-chuc-kd": BASE_VIEW + SALES + ("hcns", "hanh_chinh", "ptgd_doan", "cntt"),
+    # TC-74 – ai duoc ban hang: nhan vien ngoai khoi da mo quyen, va doi tac ngoai cong ty.
+    # Ke toan co mat o day ma khong co o /to-chuc-kd: doi tac la ben thu ba co cong no va hoa don,
+    # nen Ke toan phai biet danh muc ay; con so do to chuc noi bo thi khong lien quan den ho.
+    "/nguoi-ban-hang": BASE_VIEW + SALES + ("hcns", "hanh_chinh", "ptgd_doan", "ketoan", "cntt"),
 
     # V7 Đợt 3 – Sự cố tour. Điều hành cầm việc; Kinh doanh có mặt vì sale thường là người khách gọi
     # đầu tiên khi chuyến trục trặc; Kế toán đọc để biết khoản chi phát sinh của chuyến từ đâu ra.

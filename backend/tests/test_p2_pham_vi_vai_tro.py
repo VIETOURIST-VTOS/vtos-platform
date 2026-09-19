@@ -142,26 +142,13 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # Hai lần đổi trên TRỰC GIAO nhau (một bên thêm phân hệ, một bên bỏ dòng thừa) nên con số dưới đây
 # được ĐẾM LẠI TỪ MÃ, không phải cộng trừ tay hai bảng cũ.
 PHAM_VI_DA_CHOT = {
-    # NỐI ZALO (19/9/2026) – +1 cho MƯỜI vai trò: nhóm "/api/v1/zalo" gắn thêm vào màn hình
-    # /doi-mat-khau, là màn hình MỌI NGƯỜI đều vào được. Mười ba vai còn lại không đổi vì họ đã có
-    # nhóm ấy sẵn qua các màn hình CRM.
+    # TC-74 (19/9/2026) – +1 cho MƯỜI BA vai trò: nhóm "/api/v1/nguoi-ban-hang" gắn vào màn hình mới
+    # /nguoi-ban-hang (ai được đứng tên một booking: nhân viên khối Kinh doanh, người ngoài khối đã
+    # mở quyền bán, và đối tác ngoài công ty).
     #
-    # VÌ SAO NỚI NÀY KHÔNG PHẢI MỘT LẦN NỚI NHẦM, và vì sao nó đúng là hình hai lớp rào của P2:
-    #
-    #   · Rào NGOÀI (bảng này) cắt theo MÀN HÌNH, nên nó thô: cho vào màn hình /doi-mat-khau là
-    #     cho chạm tới cả nhóm "/api/v1/zalo".
-    #   · Rào TRONG cắt theo VIỆC, và nó mới là rào thật. Mọi cửa Zalo có hậu quả ra ngoài đều
-    #     khoá bằng require_roles ngay ở chữ ký hàm: /zalo/send, /zalo/send-pending,
-    #     /zalo/uy-quyen/*, /zalo/messages, /zalo/status. Một tài xế hay một robot lọt qua rào
-    #     ngoài vẫn không gửi được một tin Zalo nào.
-    #
-    # Ba cửa mới thật sự mở thêm cho mười vai này là ba cửa TỰ PHỤC VỤ: xin mã nối cho chính mình,
-    # xem mình đã nối chưa, gỡ nối của chính mình. Cả ba đều khoá phạm vi ghi vào tài khoản đang
-    # đăng nhập, và cố ý KHÔNG khai theo vai trò — vì không vai nào được nối hộ người khác.
-    #
-    # Đúng ra mà nói thì mười vai ấy PHẢI được nới: cảnh báo khủng hoảng gửi qua Zalo chỉ tới được
-    # người đã nối máy, và một nhân viên không tự nối được máy của mình là một người vĩnh viễn
-    # không nhận được cảnh báo nào.
+    # Mười hai vai giống hệt TC-73, CỘNG `ketoan`. Kế toán có ở đây mà không có ở /to-chuc-kd, và đó
+    # là chủ ý: đối tác là bên thứ ba có công nợ và hoá đơn nên Kế toán phải biết danh mục ấy; còn
+    # sơ đồ tổ chức nội bộ thì không liên quan đến họ.
     # TC-73 (19/9/2026) – +1 cho MƯỜI HAI vai trò: nhóm "/api/v1/to-chuc-kd" gắn vào màn hình mới
     # /to-chuc-kd – sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
     #
@@ -300,25 +287,25 @@ PHAM_VI_DA_CHOT = {
     #   Đây đúng bài học đã ghi ở nhóm "/api/v1/tong-dai" ngày 09/9/2026: "gắn ở đó là mở tiền tố
     #   cho mười ba vai trò trong khi chỉ bốn vai gọi được, và PHẦN DÔI RA VẪN LÀ QUYỀN ĐÃ CẤP."
     #   Chín số +1 ở đây là cái giá ĐÚNG BẰNG phần cần, và đó là lý do chọn nó.
-    "chutich": 110, "tgd": 110, "bks": 110, "cntt": 107,
-    "ketoan": 94, "tp_dh": 86, "ptgd_doan": 66, "nv_dh": 60, "hcns": 57, "gd_kd": 58,
+    "chutich": 111, "tgd": 111, "bks": 111, "cntt": 108,
+    "ketoan": 94, "tp_dh": 86, "ptgd_doan": 66, "nv_dh": 60, "hcns": 57, "gd_kd": 59,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 43, "nv_kd": 43, "tn_kd": 43, "tp_kd": 45, "nv_mkt": 31,
+    "ptgd_mkt": 43, "nv_kd": 44, "tn_kd": 44, "tp_kd": 46, "nv_mkt": 31,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
     # chỉ không còn cầm bản tổng hợp cả bộ phận. Đúng nguyên tắc "nhân viên trong phòng KHÔNG mặc
     # định xem báo cáo phòng"; dòng cũ là chỗ vá tạm khi Visa chưa có người phụ trách.
-    "gd_doi_xe": 27, "hanh_chinh": 27, "tp_hd": 25, "xe_hdv": 16, "nv_visa": 18,
+    "gd_doi_xe": 26, "hanh_chinh": 27, "tp_hd": 24, "xe_hdv": 15, "nv_visa": 17,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 110, "robot_vpm": 17,
+    "robot_pq": 17, "robot_ks": 111, "robot_vpm": 16,
 }
 
 
