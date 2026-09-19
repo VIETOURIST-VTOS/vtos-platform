@@ -146,25 +146,63 @@ def test_khuyen_mai_van_la_mot_dong_gia_von():
 # ═════════════════ 2 và 3 · PHẠM VI PHÁP NHÂN ═════════════════
 
 def test_chuyen_cua_cong_ty_con_khong_cong_vao_vietourist():
-    """Chỗ hỏng số 2. Chuyến C có 999 đ doanh thu — không được lọt vào con số nào của mẹ."""
+    """Chỗ hỏng số 2. Chuyến C có 999 đ doanh thu — không được lọt vào con số nào của mẹ.
+
+    LUẬT NÀY KHÔNG BỊ ĐẢO và không bao giờ được đảo: pháp nhân KHÁC thì không phải Vietourist.
+    TC-71 chỉ đổi cách xử chuyến có pháp nhân RỖNG (xem phép thử ngay dưới) — rỗng là chưa ai
+    điền, còn 'của Vận tải Vietrip' là đã điền và điền một cái tên khác.
+
+    Con số kỳ vọng đổi vì TC-71 kéo thêm chuyến D (pháp nhân rỗng, 77) và chuyến F (chưa đóng sổ,
+    40) vào. Điều phép thử này canh vẫn y nguyên: 999 không được xuất hiện ở bất kỳ đâu.
+    """
     db, _, _ = _so_gia()
     r = KQ.thang(db, "2026-08")
-    assert r["doanh_thu"] == 100.0 and r["lai_tour"] == 40.0
+    # 217 = A(100) + D(77, pháp nhân rỗng) + F(40, chưa đóng sổ). Lãi 136 = 40 + 76 + 20.
+    assert r["doanh_thu"] == 217.0 and r["lai_tour"] == 136.0
     assert r["dt_thieu_gia_von"] == 50.0
     assert 999.0 not in (r["doanh_thu"], r["lai_tour"], r["dt_thieu_gia_von"],
-                         r["dt_chua_gan_phap_nhan"]), (
+                         r["dt_chua_gan_phap_nhan"], r["dt_da_dong_so"], r["dt_chua_dong_so"]), (
         "Doanh thu công ty con cộng vào Vietourist là số hợp nhất mang nhãn công ty mẹ."
     )
+    # Và canh chặt hơn bằng phép trừ: tổng của mẹ phải KHÔNG chứa 999 dù cộng kiểu nào.
+    assert r["dt_da_dong_so"] + r["dt_chua_dong_so"] == 217.0 + 50.0, (
+        "Hai nửa của con số gộp phải cộng lại đúng bằng tổng doanh thu của tập chuyến thuộc mẹ "
+        "(gồm cả phần thiếu giá vốn) — thừa ra là có chuyến của pháp nhân khác lọt vào."
+    )
 
 
-def test_chuyen_chua_gan_phap_nhan_khong_gop_va_cung_khong_bien_mat():
-    """Chỗ hỏng số 3 — luật `pham_vi_phap_nhan` số 1 và số 2, cả hai cùng lúc."""
-    db, _, _ = _so_gia()
+def test_chua_gan_phap_nhan_nay_QUY_VE_VIETOURIST_va_van_dem_duoc():
+    """══ TC-71 · 19/9/2026 — LUẬT BỊ ĐẢO, ghi cả hai bên ══════════════════════════════════════
+
+    BÊN CŨ (TC-47, 16/9 — tên phép thử cũ: `test_chuyen_chua_gan_phap_nhan_khong_gop_va_cung_
+    khong_bien_mat`): chuyến chưa gán pháp nhân KHÔNG cộng vào Vietourist, chỉ ra một dòng riêng.
+    Lý do — dẫn từ `services/pham_vi_phap_nhan` — vẫn đúng và vẫn đáng nhớ: đoán sai pháp nhân thì
+    mọi con số tiền là của một công ty khác, mà nhìn thì không khác gì số đúng.
+
+    BÊN MỚI (18/9): anh Tuấn — "7,26 tỷ em tự gắn pháp nhân cố định cho vietourist luôn". Đo trên
+    sổ thật hôm ấy: cả 38 chuyến chưa gán đều là DỊCH VỤ LẺ (mã DVL-*, visa và dịch vụ khác), đã
+    đóng sổ xong; và anh Tuấn đã chốt từ trước "gán hết cho Vietourist Holdings". Nên đây không
+    phải máy đoán pháp nhân — đây là chép lại một quyết định đã có của người có thẩm quyền.
+
+    HAI ĐIỀU BÊN MỚI VẪN PHẢI GIỮ, và phép thử này canh cả hai:
+      1. VẪN ĐẾM ĐƯỢC. Một quy tắc mặc định mà không đếm được là quy tắc không ai kiểm tra lại
+         được. `chua_gan_phap_nhan` giữ nguyên tên, đổi nghĩa thành "đang vào đây bằng mặc định".
+      2. KHÔNG GHI VÀO CƠ SỞ DỮ LIỆU. Cột `company_id` của chuyến D phải vẫn RỖNG sau khi tính —
+         nếu nó bị ghi thành id của mẹ thì đó là em nhập số liệu hộ, phạm ranh giới 09/9, và
+         Hành chính mất luôn khả năng gắn đè.
+    """
+    db, me, _ = _so_gia()
     r = KQ.thang(db, "2026-08")
     assert r["chua_gan_phap_nhan"] == 1 and r["dt_chua_gan_phap_nhan"] == 77.0, (
-        "Chuyến chưa gán pháp nhân phải có chỗ hiện ra, kèm số tiền của nó."
+        "Phần vào bằng quy tắc mặc định phải đếm được, kèm số tiền của nó."
     )
-    assert r["doanh_thu"] == 100.0, "…nhưng không được cộng vào Vietourist."
+    assert r["doanh_thu"] == 217.0, "…và nay ĐÃ cộng vào Vietourist (100 + 77 + 40)."
+
+    d = db.query(Tour).filter_by(code="D").one()
+    assert d.company_id is None, (
+        "Quy tắc mặc định chỉ GOM LÚC TÍNH, không được ghi vào cột. Ghi vào cột là nhập số liệu "
+        "hộ (phạm ranh giới 09/9) và Hành chính mất đường gắn đè."
+    )
 
 
 def test_chua_co_cong_ty_me_thi_noi_ra_chu_khong_lay_cong_ty_dau_bang():
@@ -196,39 +234,112 @@ def test_moc_la_ngay_dong_so_khong_phai_ngay_ke_toan_xac_nhan():
     db.commit()
     t8 = KQ.thang(db, "2026-08")
     t9 = KQ.thang(db, "2026-09")
-    assert t8["doanh_thu"] == 300.0, (
+    # LUẬT KHÔNG ĐỔI: chuyến G đóng số 30/8, Kế toán duyệt 12/9 → vẫn là doanh thu THÁNG 8.
+    # Con số kỳ vọng đổi vì TC-71 kéo thêm D (77) và F (40) vào tháng 8: 100 + 200 + 77 + 40.
+    assert t8["doanh_thu"] == 417.0, (
         "Doanh thu tháng 8 không được phụ thuộc vào tốc độ duyệt của Kế toán."
     )
+    # Và canh thẳng vào chỗ dễ hỏng nhất: G phải nằm ở nửa ĐÃ ĐÓNG SỔ, không rơi sang nửa kia.
+    assert t8["dt_da_dong_so"] == 427.0, "G (200) phải vào phần đã đóng sổ của tháng 8."
     assert t9["doanh_thu"] == 30.0 and t9["lai_tour"] == 20.0, "Tháng 9 chỉ có chuyến E."
 
 
-def test_chuyen_chua_dong_so_chua_tinh():
-    """Chuyến F đã kết thúc hành trình nhưng Điều hành chưa bấm đóng số — chưa có số để tính."""
+def test_chuyen_chua_dong_so_NAY_DUOC_TINH_va_tach_rieng_duoc():
+    """══ TC-71 · 19/9/2026 — LUẬT BỊ ĐẢO, ghi cả hai bên ══════════════════════════════════════
+
+    BÊN CŨ (TC-47, 16/9 — tên cũ `test_chuyen_chua_dong_so_chua_tinh`): chuyến F đã kết thúc hành
+    trình nhưng Điều hành chưa bấm đóng số thì CHƯA có số để tính. Lý do vẫn đúng: đóng số là lúc
+    người điều hành chốt sổ quyết toán, trước đó con số còn nhúc nhích, và chỉ con số đã đóng mới
+    khớp sổ kế toán.
+
+    BÊN MỚI (18/9): anh Tuấn chọn "gộp thành một số". Đo trên sổ thật hôm ấy: 670 chuyến đã chạy
+    xong, doanh thu thật 24,38 tỷ nằm trong máy mà không hiện ở đâu trên màn hình chủ tịch, chỉ vì
+    chưa ai bấm đóng sổ. Tiền đã về mà lãnh đạo không thấy là kiểu mù tệ hơn con số nhúc nhích.
+
+    ĐỔI LẠI PHẢI TRẢ ĐƯỢC HAI NỬA. Con số gộp không còn khớp sổ kế toán, nên `dt_da_dong_so` và
+    `dt_chua_dong_so` là thứ giữ cho nó khỏi thành lời nói dối: ngày kiểm toán hỏi "85 hay 116"
+    thì chỉ ra được chỗ chênh nằm ở đâu, chuyến nào. Thiếu hai khoá ấy thì luật mới KHÔNG được
+    phép tồn tại.
+    """
     db, _, _ = _so_gia()
     r = KQ.thang(db, "2026-08")
-    assert r["du_so"] == 1, "Chỉ chuyến A. Chuyến F còn ở 'ket_thuc'."
+    assert r["du_so"] == 3, "A (đã đóng sổ), D (pháp nhân rỗng) và F (chưa đóng sổ) đều đủ số."
+    assert r["chuyen_chua_dong_so"] == 1 and r["dt_chua_dong_so"] == 40.0, (
+        "Phần chưa đóng sổ phải TÁCH RA ĐƯỢC. Gộp mà không tách được là con số không đối chiếu "
+        "ngược về sổ kế toán được nữa."
+    )
+    assert r["chuyen_da_dong_so"] == 3 and r["dt_da_dong_so"] == 227.0, (
+        "Phần đã đóng sổ (A 100 + B 50 + D 77) là con số KHỚP SỔ KẾ TOÁN, phải giữ nguyên vẹn."
+    )
 
 
-def test_ke_toan_tra_lai_thi_chuyen_roi_khoi_thang_va_man_hinh_noi_duoc_dieu_do():
-    """Hệ quả phải chịu của mốc đóng số — và `da_khoa` là chỗ nói ra nó.
+def test_chuyen_CHUA_KHOI_HANH_thi_van_khong_duoc_tinh():
+    """Luật A chỉ kéo chuyến ĐÃ CHẠY. Chuyến của ngày mai mà đã cộng doanh thu là ghi nhận trước
+    doanh thu — sai ở mọi chuẩn kế toán, và sai cả về lẽ thường.
 
-    `settlement.py` đặt `closed_at = None` khi Kế toán trả lại, nên chuyến rời khỏi tháng đã tính.
-    Một tháng còn chuyến chưa khoá là một tháng con số còn nhúc nhích được.
+    Đây là hàng rào của chính luật mới: nới "chưa đóng sổ cũng tính" mà không có hàng rào này thì
+    cả lịch khởi hành năm 2027 nhảy vào doanh thu hôm nay.
+    """
+    db, me, u = _so_gia()
+    mai = dt.date.today() + dt.timedelta(days=1)
+    db.add(Tour(code="H", name="H", tour_type="package",
+                start_date=mai, end_date=mai + dt.timedelta(days=2),
+                operator_id=u.id, status="da_duyet", actual_revenue=5000.0, actual_cost=1.0,
+                closed_at=None, company_id=me.id))
+    db.commit()
+    r = KQ.thang(db, f"{mai.year:04d}-{mai.month:02d}")
+    assert (r["dt_chua_dong_so"] or 0) == 0.0, (
+        "Chuyến chưa khởi hành không được cộng một đồng nào — đó là ghi nhận trước doanh thu."
+    )
+
+
+def test_ke_toan_tra_lai_thi_chuyen_CHUYEN_SANG_NUA_CHUA_DONG_SO():
+    """══ TC-71 · 19/9/2026 — LUẬT ĐỔI MỘT NỬA, ghi cả hai bên ═════════════════════════════════
+
+    BÊN CŨ (TC-47, 16/9): Kế toán trả lại một chuyến thì `settlement.py` đặt `closed_at = None`,
+    chuyến RỜI KHỎI tháng đã tính và tổng tháng ấy giảm xuống.
+
+    BÊN MỚI (18/9): chuyến ấy không rời khỏi tháng nữa — nó CHUYỂN từ nửa "đã đóng sổ" sang nửa
+    "chưa đóng sổ" của cùng tháng ấy, vì luật A nay tính cả phần chưa đóng sổ.
+
+    Điều này thật ra LÀNH HƠN bên cũ, và đó là cái được không định trước của luật A: trước đây một
+    chuyến bị trả lại làm tổng tháng tụt xuống mà trên màn hình không có gì giải thích. Nay tổng
+    gộp đứng yên, chỉ có tỷ lệ giữa hai nửa đổi — và hai nửa ấy hiện ra chữ.
+
+    `da_khoa` VẪN đúng và nay chặt hơn: còn chuyến chưa đóng sổ thì tháng CHƯA đứng yên, dù mọi
+    chuyến đã đóng sổ đều đã khoá.
     """
     db, me, u = _so_gia()
     assert KQ.thang(db, "2026-08")["da_khoa"] is False
-    for t in db.query(Tour).filter(Tour.company_id == me.id).all():
+
+    # LỌC THEO `(me.id, None)` CHỨ KHÔNG CHỈ `me.id` — và đây chính là một hệ quả của luật B mà
+    # bản nháp đầu của phép thử này bỏ sót: chuyến D pháp nhân rỗng nay THUỘC Vietourist, nên
+    # chừng nào nó chưa khoá thì tháng vẫn chưa đứng yên. Quy một chuyến về Vietourist nghĩa là
+    # nhận nó về đủ mọi mặt, không phải chỉ nhận phần doanh thu.
+    for t in db.query(Tour).filter(Tour.company_id.in_([me.id]) | Tour.company_id.is_(None)).all():
         if t.closed_at and t.closed_at.month == 8:
             t.status = "khoa"
     db.commit()
+    # Chuyến F (mẹ, chưa đóng sổ) vẫn nằm trong tháng 8, nên tháng CHƯA đứng yên.
+    assert KQ.thang(db, "2026-08")["da_khoa"] is False, (
+        "Còn chuyến chưa đóng sổ thì tháng chưa đứng yên — `da_khoa` phải nói ra điều đó."
+    )
+    f = db.query(Tour).filter_by(code="F").one()
+    f.closed_at, f.status = dt.datetime(2026, 8, 20), "khoa"
+    db.commit()
     assert KQ.thang(db, "2026-08")["da_khoa"] is True
 
+    truoc = KQ.thang(db, "2026-08")
     t = db.query(Tour).filter_by(code="A").one()
     t.status, t.closed_at = "ket_thuc", None
     db.commit()
-    assert KQ.thang(db, "2026-08")["doanh_thu"] is None, (
-        "Chuyến bị trả lại phải rời khỏi tháng, không ở lại với con số cũ."
+    sau = KQ.thang(db, "2026-08")
+    assert sau["doanh_thu"] == truoc["doanh_thu"], (
+        "Tổng GỘP không đổi khi Kế toán trả lại — chuyến chỉ đổi nửa, không rời tháng."
     )
+    assert sau["dt_da_dong_so"] == truoc["dt_da_dong_so"] - 100.0, "A rời khỏi nửa đã đóng sổ."
+    assert sau["dt_chua_dong_so"] == truoc["dt_chua_dong_so"] + 100.0, "…và sang nửa chưa đóng sổ."
+    assert sau["da_khoa"] is False, "Trả lại một chuyến thì tháng thôi đứng yên."
 
 
 def test_thang_rong_tra_none_chu_khong_tra_khong():
@@ -249,8 +360,19 @@ def test_doanh_thu_va_lai_tour_dung_cung_mot_tap_chuyen():
     """
     db, _, _ = _so_gia()
     r = KQ.thang(db, "2026-08")
-    assert r["doanh_thu"] == 100.0 and r["lai_tour"] == 40.0
-    assert r["lai_tour"] / r["doanh_thu"] == 0.4
+    # TC-71 · LUẬT NÀY KHÔNG BỊ ĐẢO — chỉ con số kỳ vọng đổi vì tập chuyến rộng ra (thêm D và F).
+    # Điều phải canh vẫn y nguyên: hai con số đến từ CÙNG MỘT TẬP. Nên phép thử nay canh bằng
+    # CHÍNH ĐỊNH NGHĨA chứ không bằng một tỷ lệ gõ cứng — gõ cứng thì lần sau đổi fixture là lại
+    # phải sửa con số, và người sửa không còn biết mình đang canh điều gì.
+    assert r["doanh_thu"] == 217.0 and r["lai_tour"] == 136.0
+    du = [t for t in db.query(Tour).all()
+          if KQ._lai(t) is not None and t.company_id in (None, 1)
+          and (t.closed_at or t.start_date).month == 8]
+    assert r["doanh_thu"] == sum(float(t.actual_revenue) for t in du), (
+        "Tử số và mẫu số phải đến từ cùng một tập chuyến, nếu không biên đọc ra là phép chia giữa "
+        "tử của tập này và mẫu của tập kia."
+    )
+    assert r["lai_tour"] == sum(KQ._lai(t) for t in du)
 
 
 def test_phan_doanh_thu_bi_bo_ra_van_hien_duoc_thanh_khuc_mo():

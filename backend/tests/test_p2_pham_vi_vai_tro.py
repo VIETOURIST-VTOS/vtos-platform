@@ -250,8 +250,25 @@ PHAM_VI_DA_CHOT = {
     #
     # NẾU LẦN ĐẾM SAU THẤY MỘT VAI KHÁC NHÍCH LÊN thì đó là một lần nới nhầm, không phải bản này:
     # bản này nới đúng hai vai, đúng ba tiền tố, và cả ba đều đã kể tên ở trên.
-    "chutich": 108, "tgd": 108, "bks": 108, "cntt": 105,
-    "ketoan": 92, "tp_dh": 85, "ptgd_doan": 63, "nv_dh": 59, "hcns": 55, "gd_kd": 57,
+    #
+    # ══ +1 CHO CHÍN VAI NGÀY 19/9/2026 · TC-71 ════════════════════════════════════════════════
+    # Nhóm "/api/v1/so-con-no" gắn vào màn hình mới /so-con-no (Sổ chuyến còn nợ: chuyến đã chạy
+    # mà chưa đóng sổ). Chín vai được nới đúng một nhóm, và nhóm ấy chỉ có MỘT cửa GET:
+    #   chutich · tgd · bks · robot_ks · cntt · ketoan · tp_dh · ptgd_doan · nv_dh
+    # Đúng bằng danh sách của /lai-lo-tour, vì hai màn hình cùng nói về sổ quyết toán của chuyến.
+    # Bốn vai Kinh doanh KHÔNG có mặt: giá vốn chuyến ngoài phạm vi của họ, y như /lai-lo-tour.
+    #
+    # VÌ SAO LÀ MỘT TIỀN TỐ RIÊNG CHỨ KHÔNG NẰM TRONG "/api/v1/bao-cao" — ghi lại vì đây là chỗ
+    # bản nháp đầu đã làm sai và bộ kiểm này bắt được:
+    #   Đặt cửa trong nhóm /bao-cao thì chỉ NỚI HAI VAI (nv_dh 59→60, cntt 105→106) thay vì chín,
+    #   nghe thì ít hơn — nhưng hai vai ấy được nới TOÀN BỘ nhóm báo cáo, trong khi thứ họ cần
+    #   đúng một cửa. Hàng rào trong của từng cửa /bao-cao vẫn giữ nên hôm nay chưa mở thêm gì,
+    #   nhưng cửa /bao-cao nào thêm về sau sẽ tự mở cho họ mà không ai nhận ra.
+    #   Đây đúng bài học đã ghi ở nhóm "/api/v1/tong-dai" ngày 09/9/2026: "gắn ở đó là mở tiền tố
+    #   cho mười ba vai trò trong khi chỉ bốn vai gọi được, và PHẦN DÔI RA VẪN LÀ QUYỀN ĐÃ CẤP."
+    #   Chín số +1 ở đây là cái giá ĐÚNG BẰNG phần cần, và đó là lý do chọn nó.
+    "chutich": 109, "tgd": 109, "bks": 109, "cntt": 106,
+    "ketoan": 93, "tp_dh": 86, "ptgd_doan": 64, "nv_dh": 60, "hcns": 55, "gd_kd": 57,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
@@ -268,7 +285,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 17, "robot_ks": 108, "robot_vpm": 16,
+    "robot_pq": 17, "robot_ks": 109, "robot_vpm": 16,
 }
 
 

@@ -195,16 +195,28 @@ def test_gan_phap_nhan_xong_thi_man_hinh_chu_tich_dem_duoc_chuyen_ay():
 
     Trước khi vá, `thang()` đếm 0 đồng dù chuyến đã đóng số và có đủ doanh thu/giá vốn: nó bị lọc
     ra vì chưa thuộc pháp nhân nào. Sau khi vá, đúng chuyến ấy phải hiện lên.
+
+    ══ TC-71 · 19/9/2026 — TIỀN ĐỀ ĐỔI, LUẬT GIỮ NGUYÊN ═════════════════════════════════════════
+    BÊN CŨ: chuyến chưa gán pháp nhân BỊ LỌC RA khỏi con số của mẹ, nên "trước khi vá" là 0 đồng.
+      Lý do cũ vẫn đáng nhớ: đoán sai pháp nhân thì mọi con số tiền là của một công ty khác, mà
+      nhìn thì không khác gì số đúng.
+    BÊN MỚI: anh Tuấn chốt 18/9 — "7,26 tỷ em tự gắn pháp nhân cố định cho vietourist luôn". Nên
+      chuyến pháp nhân rỗng nay ĐÃ cộng vào Vietourist bằng quy tắc mặc định, và "trước khi vá"
+      không còn bằng 0.
+
+    LUẬT PHÉP THỬ NÀY CANH VẪN Y NGUYÊN, và nay chặt hơn: chuyến KHÔNG ĐƯỢC vô hình. Trước TC-71
+    nó vô hình cho tới khi Hành chính gắn tay; nay nó hiện ngay, mang dấu "vào bằng quy tắc mặc
+    định", và gắn tay xong thì dấu ấy MẤT ĐI. Cả hai chặng đều canh ở dưới.
     """
     db, me, _ = _so_gia()
     truoc = KQ.thang(db, "2026-08")
-    assert (truoc["doanh_thu"] or 0) == 0, (
-        "Dựng sai số giả: chuyến phải BỊ LỌC RA trước khi vá, không thì phép thử này không chứng "
-        "minh được gì."
+    assert truoc["doanh_thu"] == 200.0, (
+        "TC-71: chuyến pháp nhân rỗng nay ĐÃ cộng vào Vietourist bằng quy tắc mặc định — không "
+        "còn phải chờ Hành chính gắn tay mới hiện lên."
     )
     assert truoc["chua_gan_phap_nhan"] >= 1, (
-        "Chuyến chưa gán pháp nhân phải được ĐẾM RIÊNG chứ không biến mất — luật pham_vi_phap_nhan "
-        "số 2: không gộp im lặng, cũng không giấu."
+        "…nhưng vẫn phải ĐẾM RIÊNG được phần vào bằng quy tắc mặc định. Một quy tắc mặc định "
+        "không đếm được là quy tắc không ai kiểm tra lại được."
     )
 
     VT.gan_phap_nhan_con_rong(db)
@@ -216,3 +228,11 @@ def test_gan_phap_nhan_xong_thi_man_hinh_chu_tich_dem_duoc_chuyen_ay():
         "Vá xong mà màn hình Chủ tịch vẫn trống thì cả vòng này vô nghĩa."
     )
     assert sau["lai_tour"] == 80.0
+    # TC-71 · và ĐÂY mới là điều gắn pháp nhân thật sự đổi từ 19/9: con số không nhúc nhích (nó đã
+    # đúng từ trước nhờ quy tắc mặc định), nhưng DẤU "vào bằng mặc định" biến mất. Đó là cách biết
+    # Hành chính đã làm xong việc — nếu dấu ấy không mất thì quy tắc mặc định đang che mất phần
+    # việc còn nợ, và không ai còn lý do đi gắn nữa.
+    assert sau["chua_gan_phap_nhan"] == 0, (
+        "Gắn pháp nhân xong thì phần 'vào bằng quy tắc mặc định' phải về 0 — quy tắc mặc định "
+        "không được che mất phần việc của Hành chính."
+    )

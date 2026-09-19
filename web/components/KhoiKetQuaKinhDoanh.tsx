@@ -331,7 +331,16 @@ export default function KhoiKetQuaKinhDoanh() {
   // TC-68 · Tháng chưa có một bút toán nào. Đây là lý do THẬT của ô "Lợi nhuận trước thuế" rỗng;
   // nói ra ở đây chứ không để người đọc tự đoán từ một dấu gạch.
   const chua_ghi: string[] = Array.isArray(th.thang_chua_ghi_so) ? th.thang_chua_ghi_so : [];
-  const cau_thieu = thieu_gv || thieu_pn || chua_ghi.length ? (
+  // ══ TC-71 · 19/9/2026 — NHÃN CƠ SỞ CỦA CON SỐ GỘP ═══════════════════════════════════════════
+  // Anh Tuấn chốt 18/9: doanh thu GỘP cả chuyến chưa đóng sổ. Hệ quả em đã nói trước với anh và
+  // ghi lại ở đây để không ai phải hỏi lại: con số ấy KHÔNG còn khớp sổ kế toán và không khớp
+  // BCTC. Nên nó bắt buộc đi kèm hai thứ — phần đã đóng sổ (con số khớp sổ), và phần chưa đóng
+  // sổ (chỗ chênh). Thiếu hai thứ ấy thì VTOS và BCTC báo hai con số doanh thu khác nhau mà không
+  // ai chỉ ra được chênh nằm ở đâu, và người hỏi đầu tiên sẽ là kiểm toán.
+  const chua_dong = Number(th.chuyen_chua_dong_so || 0);
+  const tien_chua_dong = Number(th.tien_chua_dong_so || 0);
+  const tien_da_dong = Number(th.tien_da_dong_so || 0);
+  const cau_thieu = thieu_gv || thieu_pn || chua_ghi.length || chua_dong ? (
     <p className="muted v14-ghi kqkd-thieu">
       {chua_ghi.length > 0 && (
         // NÊU ĐÍCH DANH THÁNG NÀO, không phải "3 tháng chưa có số": người đi bù cần biết mở tháng
@@ -349,10 +358,22 @@ export default function KhoiKetQuaKinhDoanh() {
           ({gonSo(Number(th.tien_thieu_gia_von || 0), "tien")} doanh thu) — chưa vào hai con số
           trên, hiện thành khúc mờ trên cột. <b>{th.ai_nhap_gia_von}</b> nhập ở cửa đóng số.{" "}</>
       )}
+      {/* TC-71 · CHỖ CHÊNH VỚI SỔ KẾ TOÁN. Đặt TRƯỚC hai dòng dưới vì đây là khoản lớn nhất và là
+          thứ trả lời câu "vì sao VTOS 116 tỷ mà BCTC 85 tỷ". */}
+      {chua_dong > 0 && (
+        <>Doanh thu trên đây là <b>doanh thu vận hành</b> — gộp cả chuyến chưa đóng sổ, nên{" "}
+          <b>không khớp sổ kế toán</b>. Phần đã đóng sổ:{" "}
+          <b>{gonSo(tien_da_dong, "tien")}</b>; còn <b>{chua_dong} chuyến</b> đã chạy xong chưa đóng
+          sổ ({gonSo(tien_chua_dong, "tien")}). <b>{th.ai_dong_so || "Điều hành"}</b> đóng sổ ở{" "}
+          <Link className="the-cua" href="/so-con-no">Sổ chuyến còn nợ →</Link>{" "}</>
+      )}
       {thieu_pn > 0 && (
-        <>Còn <b>{thieu_pn} chuyến</b> chưa gán pháp nhân
-          ({gonSo(Number(th.tien_chua_gan_phap_nhan || 0), "tien")}) — không cộng vào Vietourist vì
-          chưa biết thuộc công ty nào. <b>{th.ai_gan_phap_nhan}</b> gán.</>
+        // TC-71 · CÂU NÀY BỊ ĐẢO NGHĨA, không phải sửa chữ cho gọn. Trước 18/9: chuyến chưa gán
+        // pháp nhân KHÔNG cộng vào Vietourist. Từ 18/9 anh Tuấn chốt quy về Vietourist cố định,
+        // nên nay chúng ĐÃ cộng vào. Để nguyên câu cũ là để màn hình nói ngược sự thật.
+        <>Trong đó <b>{thieu_pn} chuyến</b> ({gonSo(Number(th.tien_chua_gan_phap_nhan || 0), "tien")})
+          chưa ai gán pháp nhân, đang <b>quy về Vietourist theo quy tắc mặc định</b>.{" "}
+          <b>{th.ai_gan_phap_nhan}</b> gắn đè được nếu chuyến thuộc pháp nhân khác.</>
       )}
     </p>
   ) : null;
