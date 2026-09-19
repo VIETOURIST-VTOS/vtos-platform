@@ -72,3 +72,9 @@ from app.models.ty_gia import *  # noqa  # k2-doc-an-toan: dòng NHẬP MODULE, 
 # TC-73 · 19/9/2026. Cơ cấu tổ chức khối Kinh doanh (don_vi_kd, phan_cong_kd). Lần thứ bảy nhắc cùng một điều ở tệp này – thiếu dòng nhập thì create_all không
 # tạo bảng, phép thử soi mô hình mù đúng phần ấy, và alembic autogenerate sẽ đòi XOÁ bảng.
 from app.models.to_chuc_kd import *  # noqa
+
+# 19/9/2026 · Nối tài khoản VTOS với Zalo, để cảnh báo khủng hoảng tới được NGƯỜI chứ không chỉ tới
+# màn hình. Mang khoá ngoài sang `users` nên đứng SAU core. Và lần thứ TÁM nhắc cùng một điều ở tệp
+# này: bảng khai dưới app/models mà thiếu dòng nhập ở đây thì `import app.models` không thấy nó,
+# create_all không tạo, và alembic autogenerate sẽ đòi XOÁ bảng.
+from app.models.zalo_noi import *  # noqa

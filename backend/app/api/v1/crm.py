@@ -331,3 +331,40 @@ def tong_dai_chan_doan(u: User = Depends(require_roles("cntt", "tgd", "chutich")
     if not PA.da_khai():
         raise HTTPException(400, "Chưa khai PA_TONG_DAI_API_KEY trên máy chủ")
     return PA.chan_doan()
+
+
+# ============================ NỐI TÀI KHOẢN VTOS VỚI ZALO (19/9/2026) ============================
+# Ba cửa dưới đây chỉ làm việc cho CHÍNH NGƯỜI ĐANG ĐĂNG NHẬP. Không có cửa nào nối hộ người khác,
+# và đó là toàn bộ tính chất an toàn của thiết kế: UID do Zalo nói ra khi người ấy tự nhắn mã, nên
+# không tồn tại đường nào để nối nhầm UID của người này vào tài khoản người kia — kể cả do quản
+# trị viên gõ nhầm. Xem app/services/zalo_nguoi_dung.py.
+@router.post("/zalo/ma-noi")
+def zalo_tao_ma_noi(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Xin một mã nối cho chính mình. Mã sống 10 phút, dùng một lần, và mã cũ chưa dùng bị huỷ."""
+    from app.services import zalo_nguoi_dung as ZN
+    m = ZN.tao_ma(db, u)
+    R.audit(db, u.username, u.role, "zalo_xin_ma_noi", f"user:{u.id}")
+    db.commit()
+    return {"ma": m.ma, "het_han": f"{m.het_han:%H:%M}", "song_phut": ZN.SONG_PHUT,
+            "huong_dan": "Mở Zalo, vào OA của công ty, nhắn đúng mã này. Hệ thống tự nối."}
+
+
+@router.get("/zalo/trang-thai-noi")
+def zalo_trang_thai_noi(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    from app.services import zalo_nguoi_dung as ZN
+    return ZN.trang_thai(db, u)
+
+
+@router.delete("/zalo/noi")
+def zalo_go_noi(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Gỡ nối Zalo của chính mình – đổi máy, mất máy, hoặc nghỉ việc.
+
+    Gỡ được là một phần của an toàn, không phải một tiện ích: một tài khoản không gỡ nối được thì
+    chiếc điện thoại cũ vẫn nhận cảnh báo khủng hoảng của công ty mãi mãi.
+    """
+    from app.services import zalo_nguoi_dung as ZN
+    da = ZN.go_noi(db, u)
+    if da:
+        R.audit(db, u.username, u.role, "zalo_go_noi", f"user:{u.id}")
+    db.commit()
+    return {"message": "Đã gỡ nối Zalo" if da else "Tài khoản này chưa nối Zalo", "da_go": da}

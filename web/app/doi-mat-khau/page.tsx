@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
 import { api, getUser, setSession, getToken } from "@/lib/api";
@@ -16,6 +16,26 @@ function DoiMatKhau() {
   const [moi, setMoi] = useState("");
   const [lai, setLai] = useState("");
   const [dangGui, setDangGui] = useState(false);
+
+  // ── Nối Zalo (19/9/2026) ──
+  // Cảnh báo khủng hoảng phải tới được NGƯỜI, không chỉ tới màn hình. Hàm gửi tin OA cần một UID
+  // Zalo, mà VTOS không có chỗ nào giữ UID. Chiều nối cố ý NGƯỢC với trực giác: người tự xin một
+  // mã ở đây rồi tự nhắn mã ấy vào OA công ty — Zalo nói cho máy chủ biết UID, không ai phải gõ
+  // nó, nên không tồn tại đường nào để nối nhầm UID người này vào tài khoản người kia.
+  const [zl, setZl] = useState<any>({ da_noi: false, duoi_uid: "" });
+  const [zlMa, setZlMa] = useState<any>(null);
+  const napZl = useCallback(async () => {
+    try { setZl(await api<any>("/zalo/trang-thai-noi")); } catch { /* chưa nối thì thôi */ }
+  }, []);
+  useEffect(() => { napZl(); }, [napZl]);
+  const xinMa = async () => {
+    try { setZlMa(await api<any>("/zalo/ma-noi", { method: "POST" })); }
+    catch (e) { toast(errMsg(e), true); }
+  };
+  const goNoi = async () => {
+    try { toast((await api<any>("/zalo/noi", { method: "DELETE" })).message); setZlMa(null); await napZl(); }
+    catch (e) { toast(errMsg(e), true); }
+  };
 
   const luu = async () => {
     if (moi !== lai) { toast("Hai ô mật khẩu mới không giống nhau", true); return; }
@@ -44,6 +64,30 @@ function DoiMatKhau() {
       <label>Nhập lại mật khẩu mới<input type="password" value={lai} onChange={(e) => setLai(e.target.value)} autoComplete="new-password" /></label>
       <button className="act" disabled={dangGui || !cu || !moi} onClick={luu}>{dangGui ? "Đang lưu…" : "Đổi mật khẩu"}</button>
       <p className="muted" style={{ marginTop: 10 }}>Không đặt mật khẩu bằng mã nhân viên: mã đó có trên bảng lương và danh bạ nội bộ.</p>
+    </div>
+
+    <h2 style={{ marginTop: 22 }}>Nhận cảnh báo qua Zalo</h2>
+    <div className="card" style={{ maxWidth: 460 }}>
+      {zl.da_noi
+        ? <>
+            <p>Tài khoản này <b>đã nối</b> với một Zalo (…{zl.duoi_uid}). Cảnh báo của hệ thống sẽ
+              gửi về máy đó.</p>
+            <p className="muted">Đổi máy hoặc mất máy thì gỡ nối ngay: máy cũ vẫn nhận cảnh báo của
+              công ty cho tới khi được gỡ.</p>
+            <button className="act grey" onClick={goNoi}>Gỡ nối Zalo</button>
+          </>
+        : <>
+            <p>Chưa nối. Cảnh báo khủng hoảng sẽ <b>không</b> gửi tới Zalo của anh/chị.</p>
+            <button className="act" onClick={xinMa}>Lấy mã nối</button>
+          </>}
+      {zlMa && <div style={{ marginTop: 12 }}>
+        <p>Mở Zalo → vào OA <b>Công ty cổ phần Vietourist Holdings</b> → nhắn đúng mã này:</p>
+        <p className="mono" style={{ fontSize: "1.6rem", letterSpacing: "0.18em" }}>{zlMa.ma}</p>
+        <p className="muted">Mã sống {zlMa.song_phut} phút (đến {zlMa.het_han}), dùng một lần.
+          Nhắn xong Zalo sẽ trả lời xác nhận. Không đưa mã này cho ai — người cầm mã sẽ nhận cảnh
+          báo thay anh/chị.</p>
+        <button className="act grey" onClick={() => { setZlMa(null); napZl(); }}>Tôi đã nhắn xong</button>
+      </div>}
     </div>
   </>;
 }
