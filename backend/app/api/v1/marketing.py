@@ -569,8 +569,8 @@ def hop_thu_canh_bao(ngay: int = 7, nguong: int | None = None, ke_ca_da_xu_ly: b
     return LK.canh_bao(db, ngay=ngay, nguong_tuy=nguong, ke_ca_da_xu_ly=ke_ca_da_xu_ly)
 
 
-@router.post("/marketing/hop-thu-canh-bao/{mid}/bo-qua")
-def hop_thu_bo_qua(mid: int, data: BoQuaIn, u: User = Depends(require_roles(*LAP)),
+@router.post("/marketing/hop-thu-canh-bao/{nguon}/{mid}/bo-qua")
+def hop_thu_bo_qua(nguon: str, mid: int, data: BoQuaIn, u: User = Depends(require_roles(*LAP)),
                    db: Session = Depends(get_db)):
     """Kết luận: không phải việc của Marketing. LÝ DO BẮT BUỘC.
 
@@ -579,14 +579,16 @@ def hop_thu_bo_qua(mid: int, data: BoQuaIn, u: User = Depends(require_roles(*LAP
     được ngay.
     """
     from app.services import loc_khung_hoang as LK
+    if nguon not in ("tin", "binh_luan"):
+        raise HTTPException(404, "Nguồn không hợp lệ")
     try:
-        return LK.bo_qua(db, mid, u.username, data.ly_do)
+        return LK.bo_qua(db, mid, u.username, data.ly_do, nguon=nguon)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
 
 
-@router.post("/marketing/hop-thu-canh-bao/{mid}/lap-pr")
-def hop_thu_lap_pr(mid: int, data: LapPrIn, u: User = Depends(require_roles(*LAP)),
+@router.post("/marketing/hop-thu-canh-bao/{nguon}/{mid}/lap-pr")
+def hop_thu_lap_pr(nguon: str, mid: int, data: LapPrIn, u: User = Depends(require_roles(*LAP)),
                    db: Session = Depends(get_db)):
     """Kết luận: lập một dòng vào sổ hoạt động PR.
 
@@ -594,8 +596,10 @@ def hop_thu_lap_pr(mid: int, data: LapPrIn, u: User = Depends(require_roles(*LAP
     lúc ấy — không sớm hơn vì máy đoán, không muộn hơn vì máy còn đang nghĩ.
     """
     from app.services import loc_khung_hoang as LK
+    if nguon not in ("tin", "binh_luan"):
+        raise HTTPException(404, "Nguồn không hợp lệ")
     try:
-        return LK.lap_pr(db, mid, u.username, data.model_dump())
+        return LK.lap_pr(db, mid, u.username, data.model_dump(), nguon=nguon)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
 

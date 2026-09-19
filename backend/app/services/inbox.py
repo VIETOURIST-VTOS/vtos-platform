@@ -122,7 +122,12 @@ def _graph(method: str, path: str, body: dict | None = None) -> dict:
     except Exception as ex: return {"error": -1, "message": str(ex)}
 
 
-FB_FIELDS = "messages,messaging_postbacks,standby,messaging_handovers"
+# `feed` (19/9/2026) là trường webhook của BÌNH LUẬN công khai dưới bài đăng — một luồng KHÁC
+# hẳn `messages`. Đăng ký trường này không tự kéo theo trường kia, và đó là lý do suốt thời
+# gian qua Fanpage vẫn nhận bình luận mà VTOS không thấy dòng nào.
+# Bình luận KHÔNG đi vào `conversations`/`messages` — xem app/services/fb_binh_luan.py để
+# biết vì sao (tóm tắt: đổ vào đây thì mỗi người bình luận thành một Lead giả).
+FB_FIELDS = "messages,messaging_postbacks,standby,messaging_handovers,feed"
 
 
 def fb_subscribe(fields: str = FB_FIELDS) -> dict:
@@ -194,7 +199,7 @@ def outbound_external(db: Session, channel: str, external_id: str, text: str, pa
 def fb_webhook(db: Session, payload: dict) -> dict:
     """Sự kiện Messenger: entry[].messaging[] (app là Người nhận chính) hoặc entry[].standby[] (app là Người nhận phụ – nhận bản sao mọi tin khi chatbot khác giữ hội thoại).
     Echo (tin do Page gửi qua app khác) được ghi nhận là đã trả lời."""
-    n = 0; echoes = 0
+    n = 0; echoes = 0; binh_luan = {}
     for entry in payload.get("entry") or []:
         page_id = str(entry.get("id") or "")
         for ev in (entry.get("messaging") or []) + (entry.get("standby") or []):
@@ -212,7 +217,12 @@ def fb_webhook(db: Session, payload: dict) -> dict:
             c = db.execute(select(Conversation).where(Conversation.channel == "facebook", Conversation.external_id == psid)).scalars().first()
             name = c.customer_name if c and c.customer_name else fb_profile(psid)
             if inbound(db, "facebook", psid, text, page_id, name, msg.get("mid") or "", atts): n += 1
-    return {"received": n, "echoes": echoes}
+        # BÌNH LUẬN CÔNG KHAI (19/9/2026). Cùng một webhook, khác hẳn một nhánh: `changes[]` chứ
+        # không phải `messaging[]`. Giữ ở một tệp riêng vì nó ghi vào bảng riêng và có luật riêng.
+        from app.services import fb_binh_luan as BL
+        d = BL.nhan_changes(db, entry)
+        for k, v in d.items(): binh_luan[k] = binh_luan.get(k, 0) + v
+    return {"received": n, "echoes": echoes, "binh_luan": binh_luan}
 
 
 # ---------- AI ----------

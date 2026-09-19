@@ -210,15 +210,16 @@ function Marketing() {
   }, [lkNgay, lkRong]);
   useEffect(() => { if (tab === "thuonghieu") napLk().catch((e) => toast(errMsg(e), true)); },
            [tab, napLk, toast]);
-  const lkBoQua = async (mid: number) => {
-    const ly_do = (lkLyDo[mid] || "").trim();
+  const lkBoQua = async (r: any) => {
+    const mid = r.nguon_id;
+    const ly_do = (lkLyDo[`${r.nguon}-${mid}`] || "").trim();
     if (!ly_do) { toast("Phải ghi lý do bỏ qua – hàng đợi chỉ sửa được khi biết nó sai ở đâu", true); return; }
-    try { toast((await api(`/marketing/hop-thu-canh-bao/${mid}/bo-qua`, { method: "POST", json: { ly_do } })).message); await napLk(); }
+    try { toast((await api(`/marketing/hop-thu-canh-bao/${r.nguon}/${r.nguon_id}/bo-qua`, { method: "POST", json: { ly_do } })).message); await napLk(); }
     catch (e) { toast(errMsg(e), true); }
   };
-  const lkLapPr = async (mid: number, kh: boolean) => {
+  const lkLapPr = async (r: any, kh: boolean) => {
     try {
-      toast((await api(`/marketing/hop-thu-canh-bao/${mid}/lap-pr`,
+      toast((await api(`/marketing/hop-thu-canh-bao/${r.nguon}/${r.nguon_id}/lap-pr`,
         { method: "POST", json: { la_khung_hoang: kh, loai: "khung_hoang" } })).message);
       await napLk(); await napPr();
     } catch (e) { toast(errMsg(e), true); }
@@ -770,17 +771,21 @@ function Marketing() {
       </div>
       <div className="panel">
         <h2>Hàng đợi cảnh báo hộp thư</h2>
-        <p className="muted">Bộ lọc đọc tin khách gửi vào Facebook Messenger / Zalo OA / chat web và
+        <p className="muted">Bộ lọc đọc <b>hai nguồn</b>: tin nhắn riêng (Messenger / Zalo OA / chat web)
+          và <b>bình luận công khai dưới bài đăng Fanpage</b>, rồi
           <b> xếp lên đầu</b> những tin đáng đọc trước. Nó <b>không</b> tự đánh dấu khủng hoảng và
           <b> không</b> tự bấm đồng hồ {pr.han_khung_hoang_gio} giờ — đồng hồ chạy đúng lúc người
           trực tích ô “là khủng hoảng” ở nút Lập dòng PR.</p>
-        <p className="muted">Ba dấu hiệu cộng điểm: <b>từ đỏ</b> (+2), <b>dốc</b> – nhiều tin liên
-          tiếp trên cùng hội thoại (+1), <b>quá hạn trả lời</b> (+1). Ngưỡng đang ký
+        <p className="muted">Bốn dấu hiệu cộng điểm: <b>từ đỏ</b> (+2), <b>công khai</b> (+1),
+          <b> dốc</b> – nhiều tin liên tiếp trên cùng hội thoại, hoặc nhiều bình luận dồn vào cùng
+          một bài đăng (+1), <b>quá hạn trả lời</b> (+1). Ngưỡng đang ký
           là <b>{lk.nguong_ky}</b>. Danh sách từ đỏ sửa ở màn hình Tham số, không phải bằng bản nâng cấp.</p>
       </div>
       <div className="mh01-the">
         <The nhan="Chờ người xem" so={lk.dem?.cho_xem ?? 0} canhBao={(lk.dem?.cho_xem ?? 0) > 0}
              nguon={`tin đạt ngưỡng trong ${lk.ngay} ngày gần nhất, chưa ai kết luận`} />
+        <The nhan="Bình luận công khai" so={lk.dem?.cong_khai ?? 0} canhBao={(lk.dem?.cong_khai ?? 0) > 0}
+             nguon="bình luận dưới bài đăng Fanpage – người ngoài đọc được ngay, nên nó được cộng điểm và đứng trên tin nhắn riêng" />
         <The nhan="Có từ đỏ" so={lk.dem?.co_tu_do ?? 0} nguon="tin chứa ít nhất một từ trong danh sách đã ký" />
         <The nhan="Bắt đúng" so={lkDo ? lkDo.bat_dung : "—"} nguon="hàng đợi nêu, người xác nhận là khủng hoảng"
              cua={napLkDo} cuaTen="Đo bộ lọc" />
@@ -815,24 +820,32 @@ function Marketing() {
               <th>Vì sao được nêu</th><th></th>
             </tr></thead>
             <tbody>
-              {lk.rows.map((r: any) => <tr key={r.message_id}>
+              {lk.rows.map((r: any) => <tr key={`${r.nguon}-${r.nguon_id}`}>
                 <td>{r.co_tu_do ? <Tag cls="err">{r.diem}</Tag> : <Tag cls="warn">{r.diem}</Tag>}</td>
                 <td>{r.luc}</td>
-                <td>{r.kenh}</td>
+                <td>
+                  {r.nguon === "binh_luan" ? <Tag cls="err">công khai</Tag> : <Tag>riêng</Tag>}{" "}
+                  {r.kenh}
+                  {r.da_xoa && <> <Tag cls="warn">đã xoá</Tag></>}
+                  {r.da_sua && <> <Tag>đã sửa</Tag></>}
+                </td>
                 <td>{r.khach}</td>
-                <td style={{ maxWidth: 420 }}>{r.trich}</td>
+                <td style={{ maxWidth: 420 }}>
+                  {r.trich}
+                  {r.link && <> <a href={r.link} target="_blank" rel="noreferrer">mở</a></>}
+                </td>
                 <td>{(r.ly_do || []).map((l: string, i: number) => <div key={i}>{l}</div>)}</td>
                 <td>
                   {r.ket_luan
                     ? <span className="muted">{r.ket_luan === "lap_pr" ? "đã lập dòng PR" : "đã bỏ qua"}
                         {r.xu_ly_boi ? ` – ${r.xu_ly_boi}` : ""}</span>
                     : lapDuoc && <>
-                      <button className="act teal" onClick={() => lkLapPr(r.message_id, true)}>Lập dòng PR – là khủng hoảng</button>{" "}
-                      <button className="act" onClick={() => lkLapPr(r.message_id, false)}>Lập dòng PR – chưa phải</button>
+                      <button className="act teal" onClick={() => lkLapPr(r, true)}>Lập dòng PR – là khủng hoảng</button>{" "}
+                      <button className="act" onClick={() => lkLapPr(r, false)}>Lập dòng PR – chưa phải</button>
                       <div style={{ marginTop: 4 }}>
-                        <input placeholder="lý do bỏ qua (bắt buộc)" value={lkLyDo[r.message_id] || ""}
-                               onChange={(e) => setLkLyDo({ ...lkLyDo, [r.message_id]: e.target.value })} />{" "}
-                        <button className="act grey" onClick={() => lkBoQua(r.message_id)}>Bỏ qua</button>
+                        <input placeholder="lý do bỏ qua (bắt buộc)" value={lkLyDo[`${r.nguon}-${r.nguon_id}`] || ""}
+                               onChange={(e) => setLkLyDo({ ...lkLyDo, [`${r.nguon}-${r.nguon_id}`]: e.target.value })} />{" "}
+                        <button className="act grey" onClick={() => lkBoQua(r)}>Bỏ qua</button>
                       </div>
                     </>}
                 </td>
@@ -846,8 +859,6 @@ function Marketing() {
       <div className="panel" style={{ borderColor: "var(--vtos-warning)" }}>
         <h2>Còn thiếu</h2>
         <div className="mh01-the">
-          <The rong nhan="Bình luận công khai Fanpage" so="chưa có"
-               nguon="Hộp thư đa kênh chỉ nhận TIN NHẮN RIÊNG. Bình luận dưới bài đăng là một luồng Graph API khác, chưa nối vào VTOS – mà đó mới là chỗ người ngoài đọc được ngay." />
           <The rong nhan="Ai trực ngoài giờ, báo về đâu" so="chưa ký"
                nguon="Đồng hồ 2 giờ chạy theo đồng hồ thật, kể cả 22h thứ Bảy. Chưa có ca trực và đường báo thì hàng đợi này không ai mở lúc nửa đêm." />
           <The rong nhan="Theo dõi nhắc tên thương hiệu" so="chưa có"

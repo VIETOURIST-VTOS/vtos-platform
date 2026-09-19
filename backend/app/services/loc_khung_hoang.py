@@ -75,7 +75,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.crm import Conversation, Message
-from app.models.marketing import HopThuXuLy, PrHoatDong
+from app.models.marketing import FbBinhLuan, HopThuXuLy, PrHoatDong
+from app.services import fb_binh_luan as BL
 from app.services import rules as R
 
 THAM_SO_TU_DO = "pr_tu_do"
@@ -90,6 +91,12 @@ NGAY_MAC_DINH = 7
 DIEM_TU_DO = 2
 DIEM_DOC = 1
 DIEM_QUA_HAN = 1
+# CÔNG KHAI (+1), 19/9/2026 — khi bình luận Fanpage được nối vào.
+#
+# Cùng một câu chữ, viết trong tin nhắn riêng và viết dưới bài đăng, KHÔNG cùng mức khẩn: cái thứ
+# hai thì mọi người đang xem bài đăng ấy đều đọc được ngay. Đây là lý do bình luận phải nằm ở một
+# bảng riêng chứ không trộn vào hộp thư — trộn vào là xoá mất đúng cái khác biệt này.
+DIEM_CONG_KHAI = 1
 
 
 # ---------------------------------------------------------------------------------------------
@@ -142,7 +149,7 @@ def tim_tu_do(text: str, danh_sach: list[str]) -> list[str]:
 
 
 def cham_diem(text: str, danh_sach_tu_do: list[str], la_doc: bool = False,
-              qua_han_tra_loi: bool = False) -> tuple[int, list[str]]:
+              qua_han_tra_loi: bool = False, cong_khai: bool = False) -> tuple[int, list[str]]:
     """Trả về (điểm, danh sách lý do đọc được). Lý do là thứ người trực đọc, nên nó viết bằng
     tiếng người chứ không phải mã."""
     diem, ly_do = 0, []
@@ -156,6 +163,9 @@ def cham_diem(text: str, danh_sach_tu_do: list[str], la_doc: bool = False,
     if qua_han_tra_loi:
         diem += DIEM_QUA_HAN
         ly_do.append("Quá hạn trả lời: chưa ai trả lời và đã quá hạn SLA")
+    if cong_khai:
+        diem += DIEM_CONG_KHAI
+        ly_do.append("Công khai: bình luận dưới bài đăng – người ngoài đọc được ngay")
     return diem, ly_do
 
 
@@ -215,11 +225,12 @@ def _dem_cum(db: Session, ids: list[int], phut: int, bay_gio: datetime | None = 
     return {cid: n for cid, n in rows}
 
 
-def _da_xu_ly(db: Session, ids: list[int]) -> dict:
+def _da_xu_ly(db: Session, ids: list[int], nguon: str = "tin") -> dict:
     if not ids:
         return {}
-    rows = db.execute(select(HopThuXuLy).where(HopThuXuLy.message_id.in_(ids))).scalars().all()
-    return {x.message_id: x for x in rows}
+    cot = HopThuXuLy.binh_luan_id if nguon == "binh_luan" else HopThuXuLy.message_id
+    rows = db.execute(select(HopThuXuLy).where(cot.in_(ids))).scalars().all()
+    return {(x.binh_luan_id if nguon == "binh_luan" else x.message_id): x for x in rows}
 
 
 def canh_bao(db: Session, ngay: int = NGAY_MAC_DINH, nguong_tuy: int | None = None,
@@ -254,7 +265,34 @@ def canh_bao(db: Session, ngay: int = NGAY_MAC_DINH, nguong_tuy: int | None = No
         if x is not None and not ke_ca_da_xu_ly:
             continue
         dong.append(mot_dong(m, c, diem, ly_do, x))
-    dong.sort(key=lambda d: (-d["diem"], d["luc"]), reverse=False)
+
+    # ---- BÌNH LUẬN CÔNG KHAI (19/9/2026) ----
+    # Cùng một hàng đợi, vì người trực chỉ có một buổi sáng và không nên phải mở hai màn hình. Hai
+    # NGUỒN, chấm bằng cùng một thước cộng thêm điểm CÔNG KHAI — nên một bình luận và một tin nhắn
+    # cùng nội dung sẽ không đứng ngang nhau, và đó là đúng.
+    bl_hang = BL.trong_cua_so(db, ngay, bay_gio, TRAN_DONG)
+    if len(bl_hang) > TRAN_DONG:
+        cat_bot = True
+        bl_hang = bl_hang[:TRAN_DONG]
+    cum_bai = BL.dem_cum_bai(db, sorted({b.post_id for b in bl_hang if b.post_id}),
+                             cum_phut(db), bay_gio)
+    bl_cham = []
+    for b in bl_hang:
+        if not BL.dang_doc_duoc(b):
+            continue
+        la_doc = cum_bai.get(b.post_id, 0) >= nguong_cum
+        diem, ly_do = cham_diem(b.noi_dung or "", ds, la_doc, False, cong_khai=True)
+        if diem >= n:
+            bl_cham.append((b, diem, ly_do))
+    bl_xu_ly = _da_xu_ly(db, [b.id for b, _d, _l in bl_cham], "binh_luan")
+    for b, diem, ly_do in bl_cham:
+        x = bl_xu_ly.get(b.id)
+        if x is not None and not ke_ca_da_xu_ly:
+            continue
+        dong.append(mot_dong_bl(b, diem, ly_do, x))
+    cham = cham + bl_cham
+
+    dong.sort(key=lambda d: d["luc"], reverse=True)
     dong.sort(key=lambda d: d["diem"], reverse=True)
 
     return {
@@ -270,6 +308,7 @@ def canh_bao(db: Session, ngay: int = NGAY_MAC_DINH, nguong_tuy: int | None = No
         "dem": {
             "cho_xem": sum(1 for d in dong if d["ket_luan"] == ""),
             "co_tu_do": sum(1 for d in dong if d["co_tu_do"]),
+            "cong_khai": sum(1 for d in dong if d["nguon"] == "binh_luan" and d["ket_luan"] == ""),
             "tong_cham": len(cham),
         },
     }
@@ -283,6 +322,8 @@ def mot_dong(m: Message, c: Conversation, diem: int, ly_do: list[str], x) -> dic
     hộp thư, nơi quyền đã được đặt riêng cho việc ấy.
     """
     return {
+        "nguon": "tin",
+        "nguon_id": m.id,
         "message_id": m.id,
         "conversation_id": c.id,
         "kenh": c.channel,
@@ -299,14 +340,50 @@ def mot_dong(m: Message, c: Conversation, diem: int, ly_do: list[str], x) -> dic
     }
 
 
+def mot_dong_bl(b: FbBinhLuan, diem: int, ly_do: list[str], x) -> dict:
+    """Một dòng hàng đợi đến từ BÌNH LUẬN công khai.
+
+    Cùng bộ khoá với dòng tin nhắn, để màn hình dựng một bảng chứ không hai. Khác đúng ba chỗ và
+    cả ba đều có nghĩa: `nguon`, `link` (bình luận có địa chỉ công khai, tin nhắn thì không), và
+    `da_xoa` — một bình luận đã bị gỡ vẫn nằm trong hàng đợi, có dấu, vì gỡ không làm việc đã xảy
+    ra biến mất.
+    """
+    return {
+        "nguon": "binh_luan",
+        "nguon_id": b.id,
+        "message_id": None,
+        "conversation_id": None,
+        "kenh": "Bình luận Fanpage",
+        "khach": b.tac_gia_ten or "(chưa có tên)",
+        "trich": (b.noi_dung or "")[:400],
+        "luc": f"{b.tao_luc:%Y-%m-%d %H:%M:%S}" if b.tao_luc else "",
+        "link": b.link or "",
+        "da_xoa": bool(b.da_xoa),
+        "da_sua": bool(b.da_sua),
+        "diem": diem,
+        "ly_do": ly_do,
+        "co_tu_do": any(l.startswith("Từ đỏ") for l in ly_do),
+        "ket_luan": (x.ket_luan if x is not None else ""),
+        "pr_id": (x.pr_id if x is not None else None),
+        "xu_ly_boi": (x.nguoi if x is not None else ""),
+        "xu_ly_luc": (f"{x.luc:%Y-%m-%d %H:%M:%S}" if x is not None and x.luc else ""),
+    }
+
+
 # ---------------------------------------------------------------------------------------------
 # Ghi kết luận của NGƯỜI
 # ---------------------------------------------------------------------------------------------
-def _ghi(db: Session, m: Message, c: Conversation, diem: int, ly_do: list[str],
+def _ghi(db: Session, nguon: str, doi_tuong, c, diem: int, ly_do: list[str],
          ket_luan: str, boi: str, ghi_chu: str = "", pr_id: int | None = None) -> HopThuXuLy:
-    x = db.execute(select(HopThuXuLy).where(HopThuXuLy.message_id == m.id)).scalars().first()
+    cot = HopThuXuLy.binh_luan_id if nguon == "binh_luan" else HopThuXuLy.message_id
+    x = db.execute(select(HopThuXuLy).where(cot == doi_tuong.id)).scalars().first()
     if x is None:
-        x = HopThuXuLy(message_id=m.id, conversation_id=c.id)
+        x = HopThuXuLy(nguon=nguon)
+        if nguon == "binh_luan":
+            x.binh_luan_id = doi_tuong.id
+        else:
+            x.message_id = doi_tuong.id
+            x.conversation_id = c.id if c is not None else None
         db.add(x)
     x.diem_luc_do = diem
     x.ly_do_luc_do = " | ".join(ly_do)
@@ -320,13 +397,22 @@ def _ghi(db: Session, m: Message, c: Conversation, diem: int, ly_do: list[str],
     return x
 
 
-def _lay(db: Session, message_id: int, bay_gio: datetime | None = None):
+def _lay(db: Session, message_id: int, bay_gio: datetime | None = None, nguon: str = "tin"):
     """Lấy tin + hội thoại + điểm CHẤM LẠI TẠI THỜI ĐIỂM BẤM.
 
     Chấm lại chứ không đọc lại điểm cũ: tham số có thể đã đổi giữa lúc màn hình tải và lúc người
     bấm, và con số được lưu phải là con số bộ lọc thật sự nói ra lúc ấy — nếu không thì phép đo
     `do_bo_loc()` đo một bộ lọc không còn tồn tại.
     """
+    if nguon == "binh_luan":
+        b = db.get(FbBinhLuan, int(message_id))
+        if b is None:
+            return None, None, 0, []
+        gio = bay_gio or datetime.now()
+        cum = BL.dem_cum_bai(db, [b.post_id] if b.post_id else [], cum_phut(db), gio)
+        la_doc = cum.get(b.post_id, 0) >= cum_so_tin(db)
+        diem, ly_do = cham_diem(b.noi_dung or "", tu_do(db), la_doc, False, cong_khai=True)
+        return b, None, diem, ly_do
     row = db.execute(
         select(Message, Conversation)
         .join(Conversation, Conversation.id == Message.conversation_id)
@@ -342,7 +428,7 @@ def _lay(db: Session, message_id: int, bay_gio: datetime | None = None):
     return m, c, diem, ly_do
 
 
-def bo_qua(db: Session, message_id: int, boi: str, ly_do: str) -> dict:
+def bo_qua(db: Session, message_id: int, boi: str, ly_do: str, nguon: str = "tin") -> dict:
     """Người xem xong và kết luận đây không phải việc của Marketing.
 
     `ly_do` BẮT BUỘC. Không phải để hành người trực, mà vì hàng đợi này chỉ sống được nếu tỷ lệ
@@ -351,15 +437,15 @@ def bo_qua(db: Session, message_id: int, boi: str, ly_do: str) -> dict:
     """
     if not (ly_do or "").strip():
         raise ValueError("Phải ghi lý do bỏ qua – hàng đợi chỉ sửa được khi biết nó sai ở đâu")
-    m, c, diem, ds_ly_do = _lay(db, message_id)
+    m, c, diem, ds_ly_do = _lay(db, message_id, nguon=nguon)
     if m is None:
-        raise ValueError("Không tìm thấy tin này")
-    _ghi(db, m, c, diem, ds_ly_do, "bo_qua", boi, ly_do)
+        raise ValueError("Không tìm thấy dòng này")
+    _ghi(db, nguon, m, c, diem, ds_ly_do, "bo_qua", boi, ly_do)
     db.commit()
-    return {"message": "Đã bỏ qua", "message_id": m.id}
+    return {"message": "Đã bỏ qua", "nguon": nguon, "nguon_id": m.id}
 
 
-def lap_pr(db: Session, message_id: int, boi: str, r: dict) -> dict:
+def lap_pr(db: Session, message_id: int, boi: str, r: dict, nguon: str = "tin") -> dict:
     """Người xem xong và lập một dòng vào sổ hoạt động PR.
 
     ĐÂY LÀ CHỖ DUY NHẤT `la_khung_hoang` ĐƯỢC ĐẶT TỪ HÀNG ĐỢI, và nó đọc từ ô người tích, không
@@ -368,25 +454,33 @@ def lap_pr(db: Session, message_id: int, boi: str, r: dict) -> dict:
     """
     from app.services import pr_hoat_dong as PR
 
-    m, c, diem, ds_ly_do = _lay(db, message_id)
+    m, c, diem, ds_ly_do = _lay(db, message_id, nguon=nguon)
     if m is None:
-        raise ValueError("Không tìm thấy tin này")
-    cu = db.execute(select(HopThuXuLy).where(HopThuXuLy.message_id == m.id)).scalars().first()
+        raise ValueError("Không tìm thấy dòng này")
+    cot = HopThuXuLy.binh_luan_id if nguon == "binh_luan" else HopThuXuLy.message_id
+    cu = db.execute(select(HopThuXuLy).where(cot == m.id)).scalars().first()
     if cu is not None and cu.ket_luan == "lap_pr" and cu.pr_id:
-        raise ValueError(f"Tin này đã lập dòng PR rồi (#{cu.pr_id}) – không lập hai lần")
+        raise ValueError(f"Dòng này đã lập dòng PR rồi (#{cu.pr_id}) – không lập hai lần")
 
-    tieu_de = str(r.get("tieu_de") or "").strip() or f"Tin từ {c.channel}: {(m.text or '')[:80]}"
+    la_bl = nguon == "binh_luan"
+    chu = (m.noi_dung if la_bl else m.text) or ""
+    noi = "Bình luận công khai Fanpage" if la_bl else f"Hộp thư đa kênh – {c.channel}"
+    tieu_de = str(r.get("tieu_de") or "").strip() or f"{noi}: {chu[:80]}"
     h = PR.tao(db, {
         "loai": str(r.get("loai") or "khung_hoang").strip() or "khung_hoang",
         "tieu_de": tieu_de,
-        "tom_tat": (m.text or "")[:2000],
-        "noi_dang": f"Hộp thư đa kênh – {c.channel}",
+        "tom_tat": chu[:2000],
+        "noi_dang": noi,
+        "link": (m.link or "") if la_bl else "",
         "la_khung_hoang": bool(r.get("la_khung_hoang")),
         "muc_do": str(r.get("muc_do") or "").strip(),
         "ghi_chu": str(r.get("ghi_chu") or "").strip(),
     }, boi)
-    h.nguon_message_id = m.id
-    _ghi(db, m, c, diem, ds_ly_do, "lap_pr", boi, str(r.get("ghi_chu") or ""), pr_id=h.id)
+    if la_bl:
+        h.nguon_binh_luan_id = m.id
+    else:
+        h.nguon_message_id = m.id
+    _ghi(db, nguon, m, c, diem, ds_ly_do, "lap_pr", boi, str(r.get("ghi_chu") or ""), pr_id=h.id)
     db.commit()
     return {"message": f"Đã lập dòng {h.ma}", "pr_id": h.id, "ma": h.ma,
             "la_khung_hoang": bool(h.la_khung_hoang)}
@@ -413,17 +507,22 @@ def do_bo_loc(db: Session, tu: datetime | None = None, den: datetime | None = No
     n = nguong(db)
     bo_sot, khong_co_tin, bat_dung = [], 0, 0
     for h in vu:
-        if not h.nguon_message_id:
+        # Hai nguồn, cùng một câu hỏi: bộ lọc HÔM NAY có nêu dòng ấy lên không.
+        if h.nguon_binh_luan_id:
+            nguon, nid = "binh_luan", h.nguon_binh_luan_id
+        elif h.nguon_message_id:
+            nguon, nid = "tin", h.nguon_message_id
+        else:
             khong_co_tin += 1
             continue
-        _m, _c, diem, _ly = _lay(db, h.nguon_message_id, bay_gio)
+        _m, _c, diem, _ly = _lay(db, nid, bay_gio, nguon=nguon)
         if _m is None:
             khong_co_tin += 1
         elif diem >= n:
             bat_dung += 1
         else:
             bo_sot.append({"ma": h.ma, "tieu_de": h.tieu_de, "diem_cham_lai": diem,
-                           "message_id": h.nguon_message_id})
+                           "nguon": nguon, "nguon_id": nid})
 
     qbo = select(func.count(HopThuXuLy.id)).where(HopThuXuLy.ket_luan == "bo_qua")
     if tu is not None:
@@ -439,6 +538,6 @@ def do_bo_loc(db: Session, tu: datetime | None = None, den: datetime | None = No
         "bo_sot_ds": bo_sot,
         "khong_co_tin_nguon": khong_co_tin,
         "nguong": n,
-        "ghi_chu": "Bỏ sót chỉ đo được trên vụ CÓ gắn tin nguồn; vụ nổ trên báo không có tin nào "
-                   "trong hộp thư để đối chiếu và được đếm riêng ở khong_co_tin_nguon.",
+        "ghi_chu": "Bỏ sót chỉ đo được trên vụ CÓ gắn nguồn (tin nhắn hoặc bình luận); vụ nổ trên "
+                   "báo không có gì trong hệ để đối chiếu và được đếm riêng ở khong_co_tin_nguon.",
     }
