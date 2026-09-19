@@ -167,14 +167,15 @@ def test_T6_man_hinh_thuong_hieu_khong_bia_mot_con_so_nao():
     # Nửa có sổ: mọi `so={…}` phải chạm vào bản trả về của API, không được là một hằng số.
     so_bieu = re.findall(r"so=\{([^}]*)\}", khoi)
     assert so_bieu, "sổ tài sản thương hiệu chưa hiện thẻ số nào"
-    # Hai sổ trên tab này: `th` (tài sản thương hiệu) và `pr` (hoạt động PR). Mọi thẻ số phải đọc
-    # từ bản trả về của một trong hai, không được là một hằng số.
+    # Ba nguồn trên tab này: `th` (tài sản thương hiệu), `pr` (hoạt động PR), `lk`/`lkDo` (hàng
+    # đợi cảnh báo hộp thư và phép đo chính bộ lọc). Mọi thẻ số phải đọc từ bản trả về của một
+    # trong ba, không được là một hằng số.
     for b in so_bieu:
-        assert re.search(r"\b(th|pr)\.", b), \
+        assert re.search(r"\b(th|pr|lk|lkDo)\.", b), \
             f"thẻ số {b!r} không đọc từ sổ nào – một con số viết thẳng vào màn hình"
 
-    # Và màn hình phải thật sự gọi hai đường API ấy, chứ không chỉ khai hai biến tên là `th`, `pr`.
-    for duong in ("/marketing/thuong-hieu", "/marketing/pr"):
+    # Và màn hình phải thật sự gọi các đường API ấy, chứ không chỉ khai mấy biến trùng tên.
+    for duong in ("/marketing/thuong-hieu", "/marketing/pr", "/marketing/hop-thu-canh-bao"):
         assert duong in src, f"màn hình chưa gọi đường API {duong}"
 
 

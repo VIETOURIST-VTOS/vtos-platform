@@ -188,3 +188,41 @@ class PrHoatDong(Base):
     nguoi_tao: Mapped[str] = mapped_column(String(50), default="")
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    # Tin trong hộp thư đa kênh đã sinh ra dòng này, nếu có (19/9/2026 – cửa lọc tin khủng hoảng).
+    # Không có cột này thì KHÔNG đo được "bộ lọc bỏ sót bao nhiêu vụ": không còn đường nào đi
+    # ngược từ một vụ đã xảy ra về cái tin lẽ ra phải báo động. Rỗng là bình thường — một vụ nổ
+    # trên báo thì không có tin nào trong hộp thư, và `loc_khung_hoang.do_bo_loc()` đếm riêng
+    # phần ấy thay vì để nó rơi khỏi mẫu số.
+    nguon_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
+
+# ---------- Đợt 6b: CỬA LỌC TIN KHỦNG HOẢNG (19/9/2026) ----------
+# Kết luận của NGƯỜI về một dòng trong hàng đợi. Bảng này không chứa điểm "hiện tại" của bộ lọc —
+# điểm hiện tại chấm lại bất cứ lúc nào từ tin gốc. Nó chứa đúng hai thứ máy không tự biết:
+# NGƯỜI ĐÃ KẾT LUẬN GÌ, và ĐIỂM BỘ LỌC NÓI RA LÚC ẤY. Cặp ấy là toàn bộ nguyên liệu của phép đo
+# "bắt đúng / báo nhầm / bỏ sót".
+KET_LUAN = {"bo_qua": "Bỏ qua – không phải việc của Marketing",
+            "lap_pr": "Đã lập dòng vào sổ hoạt động PR"}
+
+
+class HopThuXuLy(Base):
+    """Một tin trong hộp thư đã được người của Marketing xem và kết luận.
+
+    Chỉ dòng ĐÃ XỬ LÝ mới nằm ở đây. Ghi mọi tin vào bảng này là nhân đôi bảng `messages` (hơn
+    một trăm nghìn dòng) để lưu một chữ "chưa xem" — hàng đợi suy ra được bằng phép trừ, còn
+    kết luận của người thì không suy ra được từ đâu cả.
+    """
+    __tablename__ = "mkt_hop_thu_xu_ly"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Một tin chỉ có một kết luận. Khoá duy nhất ở đây là thứ chặn hai người cùng mở hàng đợi rồi
+    # cùng lập hai dòng PR cho một vụ.
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id"), unique=True, index=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    diem_luc_do: Mapped[int] = mapped_column(Integer, default=0)
+    ly_do_luc_do: Mapped[str] = mapped_column(Text, default="")
+    co_tu_do: Mapped[bool] = mapped_column(Boolean, default=False)
+    ket_luan: Mapped[str] = mapped_column(String(10))                        # KET_LUAN
+    pr_id: Mapped[int | None] = mapped_column(ForeignKey("mkt_pr_hoat_dong.id"), nullable=True)
+    ghi_chu: Mapped[str] = mapped_column(String(300), default="")            # lý do bỏ qua – bắt buộc
+    nguoi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

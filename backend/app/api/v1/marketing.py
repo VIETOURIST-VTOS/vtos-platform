@@ -535,3 +535,77 @@ def pr_phan_hoi(hid: int, u: User = Depends(require_roles(*LAP)), db: Session = 
         raise HTTPException(422, str(ex))
     db.commit()
     return kq
+
+
+# ---------------------------------------------------------------------------------------------
+# CỬA LỌC TIN KHỦNG HOẢNG (19/9/2026)
+#
+# Ba cửa dưới đây đọc hộp thư đa kênh và xếp hàng những tin đáng đọc trước. KHÔNG cửa nào đặt
+# `la_khung_hoang` từ điểm của bộ lọc: ô ấy chỉ nhận giá trị người tích ở cửa `lap-pr`. Ranh giới
+# ấy là toàn bộ lý do tệp services/loc_khung_hoang.py tồn tại — đọc đầu tệp ấy trước khi sửa
+# bất cứ dòng nào ở đây.
+# ---------------------------------------------------------------------------------------------
+class BoQuaIn(BaseModel):
+    ly_do: str = ""
+
+
+class LapPrIn(BaseModel):
+    tieu_de: str = ""
+    loai: str = "khung_hoang"
+    la_khung_hoang: bool = False
+    muc_do: str = ""
+    ghi_chu: str = ""
+
+
+@router.get("/marketing/hop-thu-canh-bao")
+def hop_thu_canh_bao(ngay: int = 7, nguong: int | None = None, ke_ca_da_xu_ly: bool = False,
+                     u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Hàng đợi tin đáng đọc trước.
+
+    `nguong` cho màn hình HẠ ngưỡng xuống để xem lại những tin bị xếp sau. Nó không sửa tham số đã
+    ký — đó là điểm khác nhau giữa "xem lại" và "đổi luật", và cửa này chỉ làm việc thứ nhất.
+    """
+    from app.services import loc_khung_hoang as LK
+    return LK.canh_bao(db, ngay=ngay, nguong_tuy=nguong, ke_ca_da_xu_ly=ke_ca_da_xu_ly)
+
+
+@router.post("/marketing/hop-thu-canh-bao/{mid}/bo-qua")
+def hop_thu_bo_qua(mid: int, data: BoQuaIn, u: User = Depends(require_roles(*LAP)),
+                   db: Session = Depends(get_db)):
+    """Kết luận: không phải việc của Marketing. LÝ DO BẮT BUỘC.
+
+    Bắt buộc không phải để hành người trực. Tỷ lệ báo nhầm chỉ sửa được nếu đọc được nó sai ở đâu:
+    một trăm dòng "bỏ qua" trống không nói được từ nào đang bắt nhầm, mười dòng có lý do thì nói
+    được ngay.
+    """
+    from app.services import loc_khung_hoang as LK
+    try:
+        return LK.bo_qua(db, mid, u.username, data.ly_do)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+
+
+@router.post("/marketing/hop-thu-canh-bao/{mid}/lap-pr")
+def hop_thu_lap_pr(mid: int, data: LapPrIn, u: User = Depends(require_roles(*LAP)),
+                   db: Session = Depends(get_db)):
+    """Kết luận: lập một dòng vào sổ hoạt động PR.
+
+    `la_khung_hoang` đọc từ ô NGƯỜI TÍCH, không từ điểm bộ lọc. Đồng hồ hai giờ bắt đầu chạy đúng
+    lúc ấy — không sớm hơn vì máy đoán, không muộn hơn vì máy còn đang nghĩ.
+    """
+    from app.services import loc_khung_hoang as LK
+    try:
+        return LK.lap_pr(db, mid, u.username, data.model_dump())
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+
+
+@router.get("/marketing/hop-thu-canh-bao/do")
+def hop_thu_do(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Đo CHÍNH BỘ LỌC: bắt đúng / báo nhầm / bỏ sót.
+
+    Bộ lọc nào cũng mòn, và mòn trong im lặng. Con số duy nhất thật sự quan trọng là BỎ SÓT, và
+    mục tiêu của nó là 0.
+    """
+    from app.services import loc_khung_hoang as LK
+    return LK.do_bo_loc(db)

@@ -70,6 +70,14 @@ CUA_TAY = (
     #   nhat_ky_giu_cho     – màn hình /bookings, nút gia hạn và nút khôi phục giữ chỗ; ô lý do là
     #                         người gõ, và chính ô ấy làm nó thành dòng do người tạo ra
     "prepaid_allocations", "nhat_ky_giu_cho",
+    # Cửa lọc tin khủng hoảng (19/9/2026). Cửa tay ở màn hình /marketing, tab "Thương hiệu & PR":
+    # hai nút "Bỏ qua" (bắt buộc gõ lý do) và "Lập dòng PR" trên hàng đợi cảnh báo hộp thư.
+    #
+    # Xếp vào CỬA TAY chứ không phải MÁY SINH, và khác biệt ấy quan trọng: bảng này không ghi điểm
+    # của bộ lọc — điểm chấm lại được bất cứ lúc nào từ tin gốc. Nó ghi KẾT LUẬN CỦA NGƯỜI, thứ
+    # không suy ra được từ đâu cả. Gọi nó là "máy sinh" là nói rằng máy tự kết luận được một vụ
+    # khủng hoảng, mà đó đúng là điều cả cửa lọc này được dựng ra để KHÔNG làm.
+    "mkt_hop_thu_xu_ly",
     # Lớp 3 quyết toán tour (11/9/2026). Năm bảng, cửa API là /api/v1/quyet-toan-lop3
     # (app/api/v1/quyet_toan_lop3.py), gắn vào màn hình "Quyết toán tour" đã có:
     #   POST .../{tid}/khach            – dòng khách, có ngày sinh
