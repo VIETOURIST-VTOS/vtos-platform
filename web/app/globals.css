@@ -252,8 +252,12 @@ aside.side .nhom-xo.mo .grp-xo-dau{opacity:1}
   background:var(--vtos-nav-bg);border:1px solid rgba(255,255,255,.18);
   border-radius:var(--vtos-radius-md);box-shadow:0 12px 30px rgba(0,0,0,.45);
   display:flex;flex-direction:column;gap:2px}
-.xo-dau{font-size:calc(11/14*1rem);letter-spacing:.06em;text-transform:uppercase;
-  color:rgba(255,255,255,.5);padding:4px 10px 6px}
+/* TC-72 · 19/9/2026 — LỚP `.xo-dau` ĐÃ XOÁ cùng với dòng tiêu đề trong bảng xổ ra (anh Tuấn:
+   "em xoá bỏ chữ kinh doanh và chữ điều hành, không lặp lại"). Tên nhóm vốn đã hiện ở ba chỗ:
+   trên chính cái nút bên cạnh, trong tooltip khi rê chuột, và ở dòng tiêu đề ấy.
+   Xoá CẢ LỚP chứ không chỉ xoá thẻ: một lớp mồ côi trong CSS là thứ người sau đọc thấy rồi dựng
+   lại cái thẻ đã bỏ, tưởng mình đang sửa một chỗ thiếu. Tên nhóm vẫn nói ra cho trình đọc màn
+   hình qua `aria-label` của `.xo-bang`. */
 .xo-muc{display:block;padding:10px 12px;border-radius:8px;text-decoration:none;
   color:rgba(255,255,255,.92);font-weight:500;white-space:nowrap}
 .xo-muc:hover,.xo-muc:focus-visible{background:rgba(255,255,255,.12);color:#fff}

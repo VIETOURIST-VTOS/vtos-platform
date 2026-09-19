@@ -296,6 +296,35 @@ def test_ba_nhanh_dung_chung_dung_la_ba_nhanh_da_chot():
         assert not khai[k], f"{k} không dùng chung nhánh nào với ai – khai {khai[k]}"
 
 
+def test_bang_xo_ra_khong_lap_lai_ten_nhom():
+    """══ TC-72 · 19/9/2026 — anh Tuấn: "em xoá bỏ chữ kinh doanh và chữ điều hành, không lặp lại."
+
+    Tên nhóm vốn hiện ở BA chỗ cùng một lúc: trên chính cái nút bên cạnh bảng, trong tooltip khi
+    rê chuột, và ở dòng tiêu đề trong bảng. Ba lần cho một thông tin thì hai lần sau chỉ làm mắt
+    người đọc phải lọc.
+
+    XOÁ CẢ HAI ĐẦU — thẻ trong Shell.tsx và lớp `.xo-dau` trong globals.css. Để lại lớp mồ côi là
+    để người sau đọc thấy rồi dựng lại cái thẻ đã bỏ, tưởng mình đang vá một chỗ thiếu.
+
+    VÀ THÔNG TIN KHÔNG ĐƯỢC MẤT: `aria-label` trên `.xo-bang` vẫn xướng tên nhóm cho trình đọc
+    màn hình. Bỏ chữ VẼ RA chứ không bỏ chữ NÓI RA — cùng nếp với TC-69 lúc rút "Nhân sự – Hành
+    chính" thành "HC – NS".
+    """
+    shell = _doc(SHELL)
+    assert 'className="xo-dau"' not in shell, (
+        "dòng tiêu đề trong bảng xổ ra đã bỏ 19/9/2026 — nó lặp lại đúng chữ đã có trên nút "
+        "bên cạnh và trong tooltip"
+    )
+    css = _khong_ghi_chu(_doc(CSS))
+    assert ".xo-dau{" not in css, "lớp .xo-dau còn mồ côi trong CSS — xoá cả lớp, đừng để lại"
+    # Bỏ chữ vẽ ra thì chữ nói ra PHẢI còn, nếu không người dùng trình đọc màn hình nghe được một
+    # bảng không tên và không biết mình vừa mở nhóm nào.
+    assert re.search(r'className="xo-bang"[^>]*aria-label=\{g\.label\}', shell), (
+        "bảng xổ ra phải giữ aria-label mang tên nhóm — bỏ cả chữ vẽ lẫn chữ nói là làm mất "
+        "thông tin, không phải làm gọn"
+    )
+
+
 def test_trang_phan_he_tra_duoc_ca_hai_loai_khoa():
     """`timPhanHe` phải trả lời được cả khoá cha lẫn khoá con.
 
