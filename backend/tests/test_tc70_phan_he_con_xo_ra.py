@@ -284,7 +284,7 @@ def test_muc_dung_chung_duoc_noi_ra():
         "cờ dùng chung nên mang màu cảnh báo – sửa màn hình này thì phòng bên cạnh cũng đổi"
 
 
-def test_bon_nhanh_dung_chung_dung_la_bon_nhanh_da_chot():
+def test_nam_nhanh_dung_chung_dung_la_nam_nhanh_da_chot():
     """Đúng BỐN nhánh dùng chung ở hai phòng bán hàng, không nhiều hơn.
 
     Khai thừa thì cờ "dùng chung" mất nghĩa – dán lên mọi thứ thì nó không còn cảnh báo ai.
@@ -299,12 +299,22 @@ def test_bon_nhanh_dung_chung_dung_la_bon_nhanh_da_chot():
     Nhét nó vào riêng một phòng là buộc phòng kia đi vòng qua menu của phòng bạn để xem sơ đồ của
     chính mình — đúng cái phiền mà cờ "dùng chung" sinh ra để tránh.
 
-    Con số BỐN vẫn là một con số chốt, không phải một cái trần bỏ ngỏ. Nhánh thứ năm phải qua đúng
-    cửa này một lần nữa.
+    19/9/2026 (TC-74), nhánh 3.7 "Người bán hàng" vào tiếp, thành NĂM. Đối tác ghép lẻ bán được cả
+    tour lẻ lẫn chỗ trong đoàn, nên danh mục ấy đúng là của cả hai phòng.
+
+    ══ CẢNH BÁO CHO NGƯỜI SỬA TIẾP ══
+    Vòng trước đã viết "con số BỐN là một con số chốt, nhánh thứ năm phải qua đúng cửa này một lần
+    nữa" — và đây chính là lần ấy, chỉ cách một vòng. Giờ 5 trên 7 nhánh của nhóm Kinh doanh là dùng
+    chung, tức là DÙNG CHUNG đã thành thông lệ còn RIÊNG mới là ngoại lệ. Một cái cờ dán lên đa số
+    thì không còn cảnh báo được ai.
+
+    Nhánh thứ sáu KHÔNG nên đi tiếp đường này. Đến đó thì việc phải làm là ĐẢO cờ: đánh dấu hai
+    nhánh RIÊNG (3.3 Lẻ, 3.4 Đoàn) thay vì đánh dấu phần dùng chung. Ghi lại ở đây để lần sau không
+    ai phải nghĩ lại từ đầu, và để việc đảo cờ là một quyết định chứ không phải một lần nới nữa.
     """
     khai = {k: chung for k, _cha, _lay, chung in _khai_phan_he_con(_doc(CAY))}
-    assert set(khai["kdle"]) == {"3.1", "3.2", "3.5", "3.6"}, f'kdle khai chung {khai["kdle"]}'
-    assert set(khai["kddoan"]) == {"3.1", "3.2", "3.5", "3.6"}, f'kddoan khai chung {khai["kddoan"]}'
+    assert set(khai["kdle"]) == {"3.1", "3.2", "3.5", "3.6", "3.7"}, f'kdle khai chung {khai["kdle"]}'
+    assert set(khai["kddoan"]) == {"3.1", "3.2", "3.5", "3.6", "3.7"}, f'kddoan khai chung {khai["kddoan"]}'
     for k in ("dhtour", "dhxe", "hdv"):
         assert not khai[k], f"{k} không dùng chung nhánh nào với ai – khai {khai[k]}"
 
