@@ -557,6 +557,155 @@ def _doc_khach(ws) -> list[dict]:
     return ra
 
 
+# -------------------------------------------------------------------------------------------
+# PHƯƠNG NGỮ THỨ HAI: CHI PHÍ NẰM NGANG THÀNH CỘT, NGAY CẠNH BẢNG KHÁCH
+# -------------------------------------------------------------------------------------------
+#
+# VÌ SAO CÓ KHỐI NÀY
+#
+# Đo 19/9/2026 trên hệ thật: 30 chuyến kho cũ mang 26.716.442.308 đ doanh thu mà giá vốn BẰNG 0 –
+# trong đó 11 chuyến tour ngoại tệ (EU / UK / Mỹ) chiếm 23.087.962.308 đ. Không phải tệp thiếu số:
+# mở ra thì chi phí có đủ, chỉ là nó KHÔNG nằm thành bảng dọc như `_doc_bang_tien` biết đọc.
+#
+# Ba loại tệp ấy đặt chi phí thành CỘT, ngay bên phải bảng khách, dưới một nhãn `CHI` đứng đối
+# xứng với nhãn `THU`:
+#
+#     EU / Mỹ  : mỗi khách một dòng, mỗi khoản một cột
+#                VMB | BÁNH NƯỚC | PHÍ LSQ | NÓN BAO HỘ CHIẾU | LAND | BH | PHÍ TL | PHÍ ĐH+DT
+#     UK       : như trên, sheet `QuyetToan_Tour`
+#     SIN-MAL  : KHÔNG theo từng khách – cả chuyến gói vào MỘT dòng tổng nằm ngang
+#                LAND | CODE ĐI | CODE VỀ | BH | PHÍ TL | NÓN BAO HC | PHÍ CK
+#
+# Các khoản ấy đúng đủ những gì Chủ tịch chốt ngày 17/9: land tour, vé máy bay, khách sạn, nhà
+# hàng, bảo hiểm, quà tặng. Tệp đã quy đổi sẵn ra tiền Việt – đo tệp EU 14.01.26: cột LAND cộng
+# lại 910.684.597 đ, đúng bằng TỔNG CHI 30.356,15 EUR trên sheet `LAND` nhân tỉ giá 30.000 ghi ở
+# chính sheet `QT`. Hai đường tính độc lập gặp nhau ở đúng một con số.
+#
+# CÁI BẪY, VÀ LUẬT CHẶN NÓ
+#
+# Dòng tổng của bảng khách tệp EU nằm ở hàng 65 và KHÔNG MANG MỘT CHỮ NÀO – cột số thứ tự trống,
+# cột tên khách trống, chỉ có tiền. Cộng bừa cả cột là ra ĐÚNG GẤP ĐÔI (1.821.369.193 thay vì
+# 910.684.597), và vì kết quả vẫn là một con số nên không chỗ nào đỏ lên. Đúng kiểu lỗi 3,09 tỷ
+# giá vốn ảo vừa phải gỡ ra khỏi báo cáo ngày 19/9.
+#
+# Luật chặn nó là luật 1 Chủ tịch chốt ngày 17/9: THỐNG NHẤT GHI HỌ VÀ TÊN. Dòng nào không có tên
+# khách thì không phải dòng của khách, nên không cộng. Ở đây nó không còn là quy ước trình bày –
+# nó là cái duy nhất phân biệt được dòng dữ liệu với dòng tổng.
+#
+# Tệp SIN-MAL thì cả chuyến chỉ có dòng tổng ấy. Nên phải cho phép đọc nó – nhưng CHỈ KHI không
+# một khách nào mang chi phí, và CHỈ KHI có đúng MỘT dòng như thế. Hai dòng là không biết dòng nào,
+# và đoán thì lại thành cái bẫy trên.
+
+# Tiêu đề chắc chắn KHÔNG phải một khoản tiền. Danh sách ngắn có chủ ý: thà bỏ sót một cột lạ và
+# nói ra, còn hơn nhận nhầm một cột ghi chú thành tiền.
+TD_CHI_KHONG_PHAI_TIEN = ("GHI CHÚ", "GHI CHU", "NOTE", "HOÁ ĐƠN", "HOA DON", "CHỨNG TỪ",
+                          "CHUNG TU", "DIỄN GIẢI", "SỐ LƯỢNG", "SO LUONG", "QUANTITY", "STT",
+                          "TỔNG CHI", "TONG CHI", "CỘNG", "TOTAL", "LÃI", "LỢI NHUẬN", "%")
+
+
+def _cot_chi_canh_bang_khach(ws) -> tuple[dict, int] | tuple[None, None]:
+    """{tên khoản: cột} của khối CHI nằm ngang, và hàng tiêu đề con của nó.
+
+    Tìm nhãn `CHI` đứng một mình trên tiêu đề bảng khách, rồi lấy MỌI cột từ đó sang phải có tên
+    khoản. Không chép cứng danh sách khoản: mỗi loại tour một bộ khoản khác nhau, chép cứng là
+    tháng sau có tệp mới lại mất tiền mà không ai biết.
+    """
+    h = _hang_tieu_de_khach(ws)
+    if h is None:
+        return None, None
+    hang = [r for r in (h - 1, h, h + 1) if 1 <= r <= ws.max_row]
+    m = {r: _map_cot(ws, r) for r in hang}
+
+    c_chi = r_chi = None
+    for r in hang:
+        for k, c in m[r].items():
+            if k == "CHI" and (c_chi is None or c < c_chi):
+                c_chi, r_chi = c, r
+    if c_chi is None:
+        return None, None
+
+    # HÀNG TÊN KHOẢN nằm ở đâu – chỗ này sai một hàng là đọc nhầm dòng dữ liệu thành tên khoản.
+    #
+    # `CHI` là nhãn tầng trên, tên khoản nằm ngay dưới nó; nhưng nó cũng không được cao hơn hàng
+    # tiêu đề bảng khách, vì bảng khách UK đặt `CHI` ở hàng TRÊN hàng tên khách, còn EU và SIN-MAL
+    # đặt cùng hàng. Đo trên 16 tệp thật: EU (CHI 11, khách 11) → 12 · UK (CHI 13, khách 14) → 14 ·
+    # SIN-MAL (CHI 7, khách 7) → 8. Lấy `max(hang)` như bản đầu thì tệp UK ra tên khoản là
+    # "20803921.3793103" – tức là đã đọc trúng dòng khách đầu tiên.
+    r_ten = max(r_chi + 1, h)
+    ra = {}
+    for c in range(c_chi, ws.max_column + 1):
+        t = _hoa(ws.cell(r_ten, c).value).replace("\n", " ").strip()
+        if not t:
+            continue
+        if any(t.startswith(k) for k in TD_CHI_KHONG_PHAI_TIEN):
+            continue
+        if t in ra:                      # hai cột cùng tên: giữ cột đầu, nói ra ở chỗ khác
+            continue
+        # Tên khoản là CHỮ. Gặp số nghĩa là đã trúng một dòng dữ liệu chứ không phải hàng tiêu đề –
+        # thà bỏ cả khối và để tệp báo "không nhận ra bảng chi phí", còn hơn ghi giá vốn dưới những
+        # cái tên vô nghĩa mà không ai đọc lại.
+        if _so(ws.cell(r_ten, c).value) is not None:
+            return None, None
+        ra[t] = c
+    return (ra, r_ten) if ra else (None, None)
+
+
+def _doc_chi_theo_cot(ws) -> dict:
+    """Đọc khối CHI nằm ngang. Trả {'dong': [...], 'kieu': ..., 'canh_bao': [...]}.
+
+    `dong` mang cùng hình dạng với `_doc_bang_tien` để phần còn lại của bộ đọc không phải biết
+    mình đang đọc phương ngữ nào.
+    """
+    cot, r_ten = _cot_chi_canh_bang_khach(ws)
+    if not cot:
+        return {"dong": [], "kieu": "", "canh_bao": []}
+
+    khach = _doc_khach(ws)
+    hang_khach = {k["_hang"] for k in khach}
+    canh_bao = []
+
+    # 1) Cộng theo TỪNG KHÁCH. Chỉ dòng có tên mới được cộng – xem chú thích ở đầu khối.
+    tong = {ten: 0.0 for ten in cot}
+    co = False
+    for r in hang_khach:
+        for ten, c in cot.items():
+            v = _so(ws.cell(r, c).value)
+            if v:
+                tong[ten] += v
+                co = True
+    kieu = "theo_khach"
+
+    # 2) Không khách nào mang chi phí → tệp gói cả chuyến vào MỘT dòng tổng nằm ngang (SIN-MAL).
+    if not co:
+        ung_vien = []
+        for r in range(r_ten + 1, het_hang_that(ws) + 1):
+            if r in hang_khach:
+                continue
+            v = {ten: _so(ws.cell(r, c).value) for ten, c in cot.items()}
+            if any(x for x in v.values()):
+                ung_vien.append((r, v))
+        if len(ung_vien) > 1:
+            canh_bao.append(
+                f"có {len(ung_vien)} dòng tổng chi nằm ngang (hàng "
+                + ", ".join(str(r) for r, _ in ung_vien)
+                + ") mà không dòng nào mang tên khách – KHÔNG đoán dòng nào là thật, "
+                  "người lập cần sửa tệp hoặc nhập tay")
+            return {"dong": [], "kieu": "", "canh_bao": canh_bao}
+        if not ung_vien:
+            return {"dong": [], "kieu": "", "canh_bao": []}
+        tong = {k: (v or 0.0) for k, v in ung_vien[0][1].items()}
+        kieu = "mot_dong_tong"
+
+    dong = []
+    for ten, v in tong.items():
+        if not v:
+            continue
+        dong.append({"noi_dung": ten[:200], "thanh_tien": round(v, 2), "phan": "chi",
+                     "nhom": "", "so_luong": None, "don_gia": None,
+                     "_nguon": f"cột {ten} cạnh bảng khách ({kieu})"})
+    return {"dong": dong, "kieu": kieu, "canh_bao": canh_bao}
+
+
 def _cot_bang_tien(ws, hang_td: int, can_nd: bool = True) -> dict | None:
     """Vị trí các cột của MỘT hàng tiêu đề bảng tiền. None nếu hàng ấy không đủ làm tiêu đề.
 
@@ -775,6 +924,7 @@ def doc_tep(noi_dung: bytes, ten_tep: str = "") -> dict:
     d.update(_doc_dau_bo_sheet_ma(wb, sheet_ma))
 
     khach, thu, chi, hdv = [], [], [], {"dong": [], "tien_ung": None, "hoan_ung": None, "ctp": None}
+    chi_cot, kieu_chi_cot, canh_bao_cot = [], "", []
     ngoai_te = []
     dien_giai = []
     sheet_khach = sheet_chi = sheet_hdv = ""
@@ -794,6 +944,11 @@ def doc_tep(noi_dung: bytes, ten_tep: str = "") -> dict:
             k = _doc_khach(ws)
             if k:
                 khach, sheet_khach = k, ws.title
+                # Cùng sheet ấy có thể mang khối CHI nằm ngang – phương ngữ EU / UK / SIN-MAL.
+                # Giữ riêng, chỉ dùng khi KHÔNG có bảng chi dọc: xem chỗ ráp ở dưới.
+                q = _doc_chi_theo_cot(ws)
+                chi_cot, kieu_chi_cot = q["dong"], q["kieu"]
+                canh_bao_cot = q["canh_bao"]
         # Sheet HDV nhận ra bằng TÊN – đây là chỗ duy nhất tên sheet mang thông tin thật, vì bảng
         # chi của HDV và bảng chi của chuyến có hình dạng giống hệt nhau.
         la_hdv = "HDV" in ten or "CTP" in ten or ten.startswith("ỨNG") or ten.startswith("UNG")
@@ -820,6 +975,25 @@ def doc_tep(noi_dung: bytes, ten_tep: str = "") -> dict:
             if t and not thu:
                 thu = t
 
+    # RÁP HAI PHƯƠNG NGỮ – và KHÔNG BAO GIỜ CỘNG CẢ HAI.
+    #
+    # Bảng chi dọc là đường đã đọc đúng cho 769 tệp; khối cột chỉ được dùng khi đường ấy không ra
+    # gì. Thấy cả hai thì giữ nguyên bảng dọc và NÓI RA, chứ không tự cộng thêm: cộng cả hai là
+    # tính hai lần, mà tính hai lần thì ra một con số trông vẫn bình thường.
+    dung_cot = bool(chi_cot) and not chi
+    if dung_cot:
+        chi, sheet_chi = chi_cot, sheet_khach
+    elif chi_cot and chi:
+        canh_bao_cot.append(
+            f"tệp có CẢ bảng chi dọc (sheet {sheet_chi!r}) LẪN khối chi nằm ngang cạnh bảng khách "
+            f"(sheet {sheet_khach!r}, {len(chi_cot)} khoản). Đã lấy bảng dọc và BỎ khối cột – "
+            f"cộng cả hai là tính hai lần. Người lập cần xác nhận khối nào là thật.")
+    # `dung` – giá vốn CÓ THẬT SỰ lấy từ khối cột không. Khác hẳn `kieu`: `kieu` chỉ nói "có thấy
+    # khối cột", mà thấy thì chưa chắc dùng (tệp có bảng dọc thì bảng dọc thắng). Hai câu soi ở
+    # `thieu_gi` phải nhìn `dung`, không nhìn `kieu` – nhìn nhầm thì tệp lấy số từ bảng dọc lại bị
+    # mắng là "các cột chi của tệp lệch nhau", một câu vừa sai vừa làm người đọc đi tìm nhầm chỗ.
+    d["chi_theo_cot"] = {"kieu": kieu_chi_cot, "dung": dung_cot, "so_khoan": len(chi_cot),
+                         "canh_bao": canh_bao_cot}
     d.update({"khach": khach, "thu": thu, "chi": chi, "hdv": hdv, "ngoai_te": ngoai_te,
               "dien_giai": dien_giai,
               "sheet_khach": sheet_khach, "sheet_chi": sheet_chi, "sheet_hdv": sheet_hdv})
@@ -832,7 +1006,7 @@ def doc_tep(noi_dung: bytes, ten_tep: str = "") -> dict:
     # Vùng quét bị cắt theo `het_hang_that()` để không treo máy chủ (xem chú thích ở đầu tệp).
     # Nhưng cái làm treo lại là một Ô CÓ SỐ TIỀN THẬT: 199.500.000 ở hàng 1.048.525. Cắt vùng rồi
     # im lặng là đổi một lỗi treo lấy một lỗi THIẾU TIỀN, mà lỗi thiếu tiền thì không ai thấy.
-    lac = []
+    lac = list(canh_bao_cot)
     for ws in wb.worksheets:
         for r, c, v in o_lac(ws):
             lac.append(f"Sheet {ws.title!r}: ô rời ở hàng {r:,} cột {c} mang {v!r} – cách khối dữ "
@@ -1020,8 +1194,12 @@ def thieu_gi(d: dict) -> list[str]:
                      f"ghi {b:,.0f} – lệch {abs(a - b):,.0f}")
     # TỔNG TỆP GHI ≠ CỘNG TỪ DÒNG. Không phải lúc nào cũng là lỗi (nhiều tệp có khoản chỉ ghi ở
     # tổng), nhưng lệch lớn thì phải mở tệp gốc xem, nên nêu tên.
+    doc_cot = bool((d.get("chi_theo_cot") or {}).get("dung"))
     for ten, ghi, cd in (("Doanh thu", g.get("thu"), d.get("tong_thu_cong_dong")),
                          ("Giá vốn", g.get("chi"), d.get("tong_chi_cong_dong"))):
+        # Giá vốn đọc theo cột có câu soi riêng, chặt hơn, ở cuối hàm – nói ở đây nữa là nói hai lần.
+        if ten == "Giá vốn" and doc_cot:
+            continue
         if ghi is not None and cd is not None and ghi and abs(ghi - cd) > max(1000.0, ghi * 0.02):
             t.append(f"{ten}: tệp ghi tổng {ghi:,.0f} nhưng cộng lại từ dòng được {cd:,.0f} – "
                      f"lệch {ghi - cd:+,.0f}. Đang lấy số tệp ghi.")
@@ -1033,7 +1211,32 @@ def thieu_gi(d: dict) -> list[str]:
         t.append("không đọc được ngày đi")
     if d.get("ngoai_te"):
         tt = ", ".join(sorted({x["tien_te"] for x in d["ngoai_te"]}))
-        t.append(f"có bảng chi bằng {tt} chưa quy đổi ra đồng – giá vốn đọc được KHÔNG gồm phần này")
+        if (d.get("chi_theo_cot") or {}).get("dung"):
+            # Giá vốn đã lấy từ khối CỘT bên cạnh bảng khách, và khối ấy ghi bằng ĐỒNG – sheet
+            # ngoại tệ là bản chi tiết đứng sau nó, không phải một khoản còn thiếu.
+            #
+            # Câu cũ ("giá vốn KHÔNG gồm phần này") ở đây sẽ là một lời nói dối có hại: người đọc
+            # tưởng còn thiếu tiền land nên đi cộng thêm vào, thành ra tính hai lần. Đo tệp EU
+            # 14.01.26: cột LAND 910.684.597 đ ĐÚNG BẰNG 30.356,15 EUR trên sheet `LAND` nhân tỉ
+            # giá 30.000 – cùng một khoản tiền, viết hai lần bằng hai đơn vị.
+            t.append(f"sheet chi bằng {tt} là bản chi tiết của các cột chi bên cạnh bảng khách "
+                     f"(đã tính bằng đồng) – KHÔNG cộng thêm lần nữa, cộng là tính hai lần")
+        else:
+            t.append(f"có bảng chi bằng {tt} chưa quy đổi ra đồng – giá vốn đọc được KHÔNG gồm "
+                     f"phần này")
+    # ĐỌC CHI THEO CỘT: soi tổng CHẶT HƠN hẳn đường bảng dọc.
+    #
+    # Ở đây ô 'TỔNG CHI' của tệp và các cột chi của tệp nằm trên CÙNG MỘT HÀNG – hai cách đọc cùng
+    # một chỗ, nên lệch một đồng cũng là tệp tự mâu thuẫn với chính nó, không phải chuyện "khoản
+    # chỉ ghi ở tổng" như bảng dọc. Ngưỡng 2% ở trên là để bảng dọc đỡ ồn; áp vào đây thì
+    # 18.847.565 đ của tệp EU 14.01.26 lọt qua im lặng, mà 18 triệu giá vốn im lặng là đúng thứ
+    # tệp này sinh ra để chặn.
+    if (d.get("chi_theo_cot") or {}).get("dung"):
+        ghi, cd = g.get("chi"), d.get("tong_chi_cong_dong")
+        if ghi is not None and cd is not None and abs(ghi - cd) > 1:
+            t.append(f"Giá vốn: ô TỔNG CHI của tệp ghi {ghi:,.0f} nhưng cộng chính các cột chi của "
+                     f"tệp ra {cd:,.0f} – lệch {ghi - cd:+,.0f}. Hai con số này nằm cùng một hàng "
+                     f"nên tệp đang tự mâu thuẫn; đang lấy số tệp ghi.")
     # Giá vốn nhỏ bất thường so với doanh thu là dấu hiệu đọc nhầm bảng hoặc nhầm đơn vị tiền.
     if d["tong_thu"] and d["tong_chi"] is not None and d["tong_chi"] < d["tong_thu"] * 0.30:
         t.append(f"giá vốn đọc được chỉ bằng {d['tong_chi']/d['tong_thu']*100:.0f}% doanh thu – "
