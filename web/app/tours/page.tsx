@@ -8,6 +8,7 @@ import { TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
 import { Tag, errMsg, MangTag } from "@/components/ui";
 import KhoCuLo from "@/components/KhoCuLo";
 import KhoCuNguoiBan from "@/components/KhoCuNguoiBan";
+import KhoCuDongSoBu from "@/components/KhoCuDongSoBu";
 
 function Tours() {
   const { user, toast } = useShell();
@@ -40,6 +41,11 @@ function Tours() {
     {/* Gán tên người bán trong tệp ↔ tài khoản VTOS. Đặt cạnh ô trên vì hai việc đi liền nhau:
         nạp xong thì phần máy không khớp được nằm ở đây, và gán xong thì doanh số về đúng người. */}
     <KhoCuNguoiBan onXong={load} />
+    {/* Đóng số bù cho kho cũ, chạy THEO LÔ. Đặt ngay sau hai ô trên vì đây là bước CUỐI của cùng
+        một việc: nạp xong, gán người bán xong, thì phải đóng số thì doanh thu và giá vốn mới lên
+        báo cáo. Trước 19/9/2026 cửa này chỉ bấm được bằng cách gõ lệnh trong bảng điều khiển
+        trình duyệt — một cửa ghi vào 476 chuyến mà chỉ mình người viết nó dùng được. */}
+    <KhoCuDongSoBu onXong={load} />
     <p className="muted">
       {chamTran
         ? `Đang hiện ${rows.length} chuyến mới nhất trong ${tong} chuyến khớp bộ lọc — thu hẹp bằng tìm kiếm, tháng hoặc trạng thái để thấy phần còn lại.`
