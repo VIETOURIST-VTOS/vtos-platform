@@ -43,6 +43,9 @@ from app.api.v1.cskh import router as cskh_router
 from app.api.v1.ban_hang import router as ban_hang_router
 from app.api.v1.tu_dong import router as tu_dong_router
 from app.api.v1.bao_cao import router as bao_cao_router
+# TC-71 · Sổ chuyến còn nợ có TIỀN TỐ RIÊNG, không nằm trong /api/v1/bao-cao — lý do ghi ở đầu
+# app/api/v1/so_con_no.py (gắn vào nhóm báo cáo là nới cả nhóm cho hai vai chỉ cần một cửa).
+from app.api.v1.so_con_no import router as so_con_no_router
 from app.api.v1.ks_ra_soat import router as ks_ra_soat_router
 from app.api.v1.ks_ra_soat import rst as rst_router
 from app.api.v1.lai_lo_tour import router as ll_router
@@ -246,6 +249,7 @@ app.include_router(cskh_router)
 app.include_router(ban_hang_router)
 app.include_router(tu_dong_router)
 app.include_router(bao_cao_router)
+app.include_router(so_con_no_router)
 app.include_router(ks_ra_soat_router)
 app.include_router(rst_router)
 app.include_router(debts_router)

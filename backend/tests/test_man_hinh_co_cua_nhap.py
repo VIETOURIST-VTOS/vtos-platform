@@ -52,6 +52,20 @@ CHI_XEM = {
     "/bao-cao": ("Báo cáo tự động theo phòng ban: mọi con số tính TẠI CHỖ từ dữ liệu của các phân hệ "
                  "khác, không sở hữu con số nào của riêng mình. Cửa nhập nằm ở màn hình của từng "
                  "phòng. Màn hình này mà ghi được thì nó thôi là báo cáo.", ("/bao-cao",)),
+    # TC-71 · 19/9/2026 — Sổ chuyến còn nợ. Đây là chỉ-xem THẬT, không phải khai vòng cho qua:
+    # màn hình không sở hữu con số nào của riêng nó, mà liệt kê chuyến chưa đóng sổ và đưa đường
+    # dẫn sang đúng chuyến để người có quyền đóng ở CỬA THẬT (`services/tours.close`).
+    #
+    # VÀ VIỆC KHÔNG CÓ CỬA GHI Ở ĐÂY LÀ MỘT LỰA CHỌN, không phải chỗ còn thiếu. Em đã hỏi và anh
+    # Tuấn chốt 18/9: "Danh sách + đường dẫn sang chuyến", không đóng sổ hàng loạt. Lý do: đóng sổ
+    # là việc khó lùi — làm hàng loạt từ một màn hình tổng thì một cú bấm nhầm đi xa hơn nhiều so
+    # với cái lợi về tốc độ, và ở màn hình tổng người bấm không nhìn thấy dòng quyết toán của
+    # chuyến để mà biết mình đang chốt cái gì.
+    "/so-con-no": ("Sổ chuyến còn nợ: liệt kê chuyến đã chạy mà chưa đóng sổ. Không sở hữu con số "
+                   "nào của riêng mình — mọi số lấy từ sổ quyết toán của chính chuyến. Cửa đóng sổ "
+                   "nằm ở từng chuyến (/tours/<id>), và anh Tuấn chốt 18/9/2026 là KHÔNG dựng cửa "
+                   "đóng hàng loạt ở đây vì đóng sổ là việc khó lùi.",
+                   ("/so-con-no",)),
 }
 
 

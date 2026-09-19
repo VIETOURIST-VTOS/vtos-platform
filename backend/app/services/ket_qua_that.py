@@ -82,7 +82,7 @@ thì người đọc thấy ngay chứ không phải đi tra.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -96,6 +96,51 @@ DA_DONG_SO = ("da_dong_so", "kt_xac_nhan", "khoa")
 # Bước cuối của chuyến: từ đây trở đi Kế toán không trả lại được nữa, nên tháng ấy mới thật sự đứng
 # yên. Dùng để trả lời "con số này còn nhúc nhích được không", xem luật 1 ở đầu tệp.
 KHONG_TRA_LAI_DUOC = ("khoa",)
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#  TC-71 · 19/9/2026 — HAI LUẬT BỊ ĐẢO. Ghi cả hai bên, vì bên cũ có lý do thật và lý do ấy
+#  KHÔNG mất đi, chỉ bị anh Tuấn cân nhắc rồi chọn khác.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+#  ─── LUẬT A · CHUYẾN CHƯA ĐÓNG SỐ NAY CŨNG ĐƯỢC CỘNG ─────────────────────────────────────────
+#  BÊN CŨ (TC-47, 16/9): chỉ chuyến ĐÃ ĐÓNG SỐ mới được cộng. Lý do: đóng số là lúc người điều
+#    hành chốt sổ quyết toán, trước đó con số còn nhúc nhích. Con số khớp sổ kế toán.
+#  BÊN MỚI (18/9): anh Tuấn chọn "gộp thành một số". Lý do đo được hôm ấy: 670 chuyến đã chạy
+#    xong, có doanh thu thật trong máy, tổng 24,38 tỷ — nhưng không hiện ở đâu trên màn hình chủ
+#    tịch vì chưa ai bấm đóng số. Tiền đã về mà lãnh đạo không thấy là một kiểu mù còn tệ hơn con
+#    số nhúc nhích.
+#  HỆ QUẢ PHẢI CHỊU, VÀ ĐÃ NÓI TRƯỚC VỚI ANH TUẤN: con số này KHÔNG còn khớp sổ kế toán và không
+#    khớp BCTC. Nên nó BẮT BUỘC đi kèm nhãn cơ sở, và phần "đã đóng sổ" phải trả về RIÊNG để màn
+#    hình luôn bày được cả hai. Xem `dt_da_dong_so` / `dt_chua_dong_so` dưới đây — chúng không
+#    phải số phụ, chúng là thứ giữ cho con số gộp không thành lời nói dối.
+#
+#  MỐC THÁNG CỦA CHUYẾN CHƯA ĐÓNG SỐ là NGÀY KHỞI HÀNH, vì nó chưa có `closed_at` để mà theo.
+#  Hai mốc khác nhau trong cùng một cột là điều phải nói ra chứ không giấu — nhưng trộn hai mốc
+#  vẫn đúng hơn là bỏ hẳn 24,38 tỷ ra ngoài màn hình.
+#
+#  CHỈ TÍNH CHUYẾN ĐÃ KHỞI HÀNH. Chuyến của tháng sau chưa chạy mà đã cộng doanh thu là ghi nhận
+#  trước doanh thu — sai ở mọi chuẩn kế toán, và sai cả về lẽ thường.
+#
+#  ─── LUẬT B · PHÁP NHÂN RỖNG NAY QUY VỀ CÔNG TY MẸ ───────────────────────────────────────────
+#  BÊN CŨ (TC-47 luật 2, dẫn `services/pham_vi_phap_nhan`): `company_id` rỗng là CHƯA XÁC ĐỊNH,
+#    không mặc định về công ty mẹ; chuyến ấy ra một dòng riêng chứ không cộng vào Vietourist.
+#    Lý do: đoán sai pháp nhân thì mọi con số tiền là của một công ty khác mà nhìn không khác gì
+#    số đúng.
+#  BÊN MỚI (18/9): anh Tuấn — "7,26 tỷ em tự gắn pháp nhân cố định cho vietourist luôn". Đo được
+#    hôm ấy: cả 38 chuyến chưa gắn đều là DỊCH VỤ LẺ (visa, dịch vụ khác, mã DVL-*), đã đóng số
+#    xong, và anh Tuấn đã chốt từ trước "gán hết cho Vietourist Holdings". Nên đây không phải máy
+#    đoán pháp nhân — đây là chép lại một quyết định đã có của người có thẩm quyền.
+#  RANH GIỚI 09/9 VẪN NGUYÊN: tệp này KHÔNG ghi một dòng dữ liệu nào. Nó không đặt `company_id`
+#    cho chuyến nào cả — nó chỉ CỘNG chuyến rỗng vào phạm vi công ty mẹ lúc tính. Cột trong cơ sở
+#    dữ liệu vẫn rỗng, Hành chính vẫn gắn đè được bất cứ lúc nào, và lúc ấy luật này tự nhường
+#    chỗ. Nếu ghi thẳng vào cột thì mới là em nhập số liệu hộ, và em không làm thế.
+#  VÀ NÓ PHẢI ĐẾM ĐƯỢC: `gan_mac_dinh` nói ra bao nhiêu chuyến đang vào đây bằng luật mặc định
+#    chứ không do ai gắn thật. Một quy tắc mặc định mà không đếm được là một quy tắc không ai
+#    kiểm tra lại được.
+
+# Chuyến CHƯA đóng số nhưng đã chạy xong — phần mà luật A kéo thêm vào. "ket_thuc" là chuyến đã
+# về, "da_duyet" là chuyến đã duyệt và tới ngày khởi hành thì coi như đã chạy.
+CHUA_DONG_SO = ("ket_thuc", "da_duyet")
 
 
 def cong_ty_me(db: Session) -> int | None:
@@ -154,8 +199,15 @@ def thang(db: Session, ky: str, nho: dict | None = None) -> dict:
       du_so                  – số chuyến góp vào hai con số trên.
       thieu_gia_von          – chuyến đã đóng số mà giá vốn còn rỗng (Điều hành nhập).
       dt_thieu_gia_von       – phần doanh thu của những chuyến ấy: khúc mờ trên cột.
-      chua_gan_phap_nhan     – chuyến đã đóng số mà chưa ai gán pháp nhân (Hành chính gán).
-                               KHÔNG cộng vào Vietourist — xem luật 2.
+      chua_gan_phap_nhan     – TC-71 · ĐỔI NGHĨA: chuyến chưa ai gán pháp nhân, nay ĐÃ CỘNG vào
+                               Vietourist bằng quy tắc mặc định (luật B). Trước 18/9 thì ngược
+                               lại: bị để ngoài. Tên khoá giữ nguyên để chỗ đọc khỏi sửa, nhưng
+                               CHỮ TRÊN MÀN HÌNH phải đổi theo, nếu không nó nói ngược sự thật.
+      dt_da_dong_so          – TC-71 · phần doanh thu của chuyến ĐÃ đóng số. Đây là con số khớp
+                               sổ kế toán; giữ riêng để đối chiếu ngược được.
+      dt_chua_dong_so        – TC-71 · phần luật A kéo thêm vào: chuyến đã chạy, chưa đóng số.
+      chuyen_da_dong_so /
+      chuyen_chua_dong_so    – số chuyến của hai phần trên.
       da_khoa                – tháng này còn chuyến Kế toán trả lại được hay không.
       co_nguon               – danh mục pháp nhân đã có công ty mẹ chưa.
       dong_so_bu             – trong số chuyến của Vietourist mẹ tháng này, bao nhiêu chuyến vào
@@ -170,30 +222,74 @@ def thang(db: Session, ky: str, nho: dict | None = None) -> dict:
     dau, cuoi = _khoang_thang(y, m)
     me = cong_ty_me(db)
 
-    chuyen = list(db.execute(
+    # ── LUẬT A · hai lượt gom, hai mốc thời gian khác nhau ────────────────────────────────────
+    # (1) Chuyến ĐÃ đóng số, xếp theo NGÀY ĐÓNG SỐ — y như TC-47, không đổi một chữ.
+    da_dong = list(db.execute(
         select(Tour).where(Tour.status.in_(DA_DONG_SO),
                            Tour.closed_at >= dau, Tour.closed_at < cuoi)).scalars())
 
-    chua_gan = [t for t in chuyen if t.company_id is None]
-    cua_me = [t for t in chuyen if me is not None and t.company_id == me]
+    # (2) Chuyến CHƯA đóng số nhưng ĐÃ KHỞI HÀNH, xếp theo NGÀY KHỞI HÀNH.
+    #     `Tour.closed_at.is_(None)` là điều kiện quyết định, không phải trạng thái: một chuyến bị
+    #     Kế toán trả lại có `closed_at = None` và trạng thái về "ket_thuc" (xem hệ quả của luật 1
+    #     ở đầu tệp). Lọc theo trạng thái không thôi thì chuyến ấy rơi vào cả hai lượt và bị đếm
+    #     hai lần — lỗi cộng đúp không ai nhìn ra vì tổng vẫn "hợp lý".
+    hom_nay = date.today()
+    ngay_cuoi = min(cuoi.date(), hom_nay + timedelta(days=1))
+    chua_dong: list[Tour] = []
+    if ngay_cuoi > dau.date():
+        chua_dong = list(db.execute(
+            select(Tour).where(Tour.status.in_(CHUA_DONG_SO),
+                               Tour.closed_at.is_(None),
+                               Tour.start_date >= dau.date(),
+                               Tour.start_date < ngay_cuoi)).scalars())
+
+    chuyen = da_dong + chua_dong
+
+    # ── LUẬT B · pháp nhân rỗng quy về công ty mẹ ─────────────────────────────────────────────
+    # KHÔNG ghi vào `t.company_id` — chỉ gom lúc tính. Xem khối luật B ở đầu tệp.
+    gan_that = [t for t in chuyen if me is not None and t.company_id == me]
+    gan_mac_dinh = [t for t in chuyen if t.company_id is None]
+    cua_me = gan_that + gan_mac_dinh if me is not None else []
+
+    # Danh sách CHƯA ĐÓNG SỐ, sau khi đã quy pháp nhân — đây là phần luật A kéo thêm vào, và là
+    # phần mà màn hình "Sổ chuyến còn nợ" sẽ liệt kê cho Điều hành đi đóng.
+    cua_me_chua_dong = [t for t in cua_me if t.closed_at is None]
+    cua_me_da_dong = [t for t in cua_me if t.closed_at is not None]
 
     du = [t for t in cua_me if _lai(t) is not None]
     thieu = [t for t in cua_me if _lai(t) is None]
 
     ra = {
         "ky": ky,
+        # ── CON SỐ GỘP (anh Tuấn chọn 18/9) ──────────────────────────────────────────────────
+        # Gồm CẢ chuyến chưa đóng số. Không khớp sổ kế toán — màn hình phải ghi nhãn cơ sở.
         "doanh_thu": float(sum(float(t.actual_revenue or 0) for t in du)) if du else None,
         "lai_tour": float(sum(_lai(t) or 0 for t in du)) if du else None,
         "du_so": len(du),
+        # ── HAI NỬA CỦA CON SỐ GỘP, luôn trả riêng ───────────────────────────────────────────
+        # Thiếu hai dòng này thì con số gộp không còn cách nào đối chiếu ngược về sổ kế toán, và
+        # ngày kiểm toán hỏi "85 hay 116" thì không ai chỉ ra được chỗ chênh nằm ở đâu.
+        "dt_da_dong_so": float(sum(float(t.actual_revenue or 0) for t in cua_me_da_dong)),
+        "dt_chua_dong_so": float(sum(float(t.actual_revenue or 0) for t in cua_me_chua_dong)),
+        "chuyen_da_dong_so": len(cua_me_da_dong),
+        "chuyen_chua_dong_so": len(cua_me_chua_dong),
         "thieu_gia_von": len(thieu),
         # Doanh thu của chuyến thiếu giá vốn vẫn có thể rỗng nốt — lúc ấy cộng 0 là đúng, vì phần
         # được vẽ ra là phần ĐÃ BIẾT, và số chuyến bên cạnh nói phần chưa biết còn bao nhiêu dòng.
         "dt_thieu_gia_von": float(sum(float(t.actual_revenue or 0) for t in thieu)),
-        "chua_gan_phap_nhan": len(chua_gan),
-        "dt_chua_gan_phap_nhan": float(sum(float(t.actual_revenue or 0) for t in chua_gan)),
-        "da_khoa": bool(cua_me) and all(t.status in KHONG_TRA_LAI_DUOC for t in cua_me),
+        # ── LUẬT B · đếm phần vào bằng quy tắc mặc định ──────────────────────────────────────
+        # Tên cũ `chua_gan_phap_nhan` GIỮ NGUYÊN để mọi chỗ đọc nó không phải sửa, nhưng NGHĨA đã
+        # đổi: trước là "bị để ngoài Vietourist", nay là "đã vào Vietourist bằng quy tắc mặc
+        # định, Hành chính gắn đè được". Màn hình phải đổi chữ theo — xem KhoiKetQuaKinhDoanh.
+        "chua_gan_phap_nhan": len(gan_mac_dinh),
+        "dt_chua_gan_phap_nhan": float(sum(float(t.actual_revenue or 0) for t in gan_mac_dinh)),
+        # `da_khoa` chỉ xét phần ĐÃ ĐÓNG SỐ: phần chưa đóng số thì đương nhiên còn nhúc nhích, hỏi
+        # nó có khoá chưa là hỏi một câu vô nghĩa. Và còn chuyến chưa đóng số thì tháng CHƯA đứng
+        # yên, nên thêm điều kiện ấy chứ không bỏ qua.
+        "da_khoa": (bool(cua_me_da_dong) and not cua_me_chua_dong
+                    and all(t.status in KHONG_TRA_LAI_DUOC for t in cua_me_da_dong)),
         "co_nguon": me is not None,
-        "dong_so_bu": _dem_dong_bu(cua_me),
+        "dong_so_bu": _dem_dong_bu(cua_me_da_dong),
     }
     if nho is not None:
         nho[khoa] = ra

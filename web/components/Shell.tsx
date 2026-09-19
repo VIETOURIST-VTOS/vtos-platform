@@ -372,6 +372,10 @@ export const GROUPS: Group[] = [
     ["Sản phẩm tour", "/products"],
     ["Yêu cầu chờ xử lý", "/requests"],
     ["Chuyến & quyết toán", "/tours"],
+    // TC-71 · 19/9/2026. Đặt NGAY SAU "Chuyến & quyết toán" vì nó là mặt còn thiếu của đúng màn
+    // hình ấy: bên kia là mọi chuyến, bên này là những chuyến còn nợ sổ. Đặt cuối nhóm thì người
+    // điều hành phải nhớ là có nó mới đi tìm, mà thứ này đúng ra phải đập vào mắt mỗi ngày.
+    ["Sổ chuyến còn nợ", "/so-con-no"],
     ["Sự cố tour", "/su-co-tour"],
     // Lãi lỗ tour đứng NGAY SAU Chuyến vì đó là thứ tự thật của việc: nhập xong dòng chi phí quyết
     // toán thì mới có giá vốn, có giá vốn mới có lãi lỗ. Đặt trước thì người dùng gặp bảng lãi lỗ

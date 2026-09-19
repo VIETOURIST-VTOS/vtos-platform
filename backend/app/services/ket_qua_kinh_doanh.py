@@ -231,8 +231,21 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
         "tien_thieu_gia_von": float(sum(x["dt_thieu_gia_von"] for x in trong)),
         "chuyen_chua_gan_phap_nhan": sum(x["chua_gan_phap_nhan"] for x in trong),
         "tien_chua_gan_phap_nhan": float(sum(x["dt_chua_gan_phap_nhan"] for x in trong)),
+        # ══ TC-71 · 19/9/2026 — HAI NỬA CỦA CON SỐ GỘP ════════════════════════════════════════
+        # Anh Tuấn chốt 18/9 gộp chuyến chưa đóng sổ vào doanh thu. Con số gộp vì thế KHÔNG còn
+        # khớp sổ kế toán, và đây là chỗ nói ra chênh lệch ấy bằng CON SỐ chứ không bằng lời hứa.
+        #
+        # Đặt trong `con_thieu` là đúng chỗ, vì đây đúng là thứ còn thiếu: chuyến đã chạy xong,
+        # tiền đã về, nhưng chưa ai bấm đóng sổ nên chưa vào sổ kế toán. Nó nằm cùng khối với ba
+        # thứ còn thiếu kia, cùng nếp "nói ra phần thiếu VÀ chỉ ai làm ở cửa nào".
+        "tien_da_dong_so": float(sum(x["dt_da_dong_so"] for x in trong)),
+        "tien_chua_dong_so": float(sum(x["dt_chua_dong_so"] for x in trong)),
+        "chuyen_chua_dong_so": sum(x["chuyen_chua_dong_so"] for x in trong),
         # Ai đi nhập, ghi thẳng ở đây: màn hình chỉ bày, không tự đoán tên bộ phận (ranh giới 09/9).
         "ai_nhap_gia_von": "Điều hành",
+        "ai_dong_so": "Điều hành",
+        # TC-71 · Hành chính VẪN là người gắn pháp nhân thật. Quy tắc mặc định chỉ đỡ cho con số
+        # khỏi rơi ra ngoài màn hình; nó không làm thay ai việc gì cả.
         "ai_gan_phap_nhan": "Hành chính",
         "co_nguon": all(x["co_nguon"] for x in trong) if trong else False,
         # ══ TC-68 · THÁNG CHƯA CÓ MỘT BÚT TOÁN NÀO — anh Tuấn 18/9/2026 ════════════════════════

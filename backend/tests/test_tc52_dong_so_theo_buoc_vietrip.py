@@ -249,14 +249,36 @@ def test_cua_va_co_that_trong_api_va_co_gac_vai_tro():
 # ═════════════════ PHÉP THỬ ĐẦU–CUỐI ═════════════════
 
 def test_dong_so_xong_thi_man_hinh_chu_tich_dem_duoc_ca_hai_chuyen():
-    """Lý do cả vòng này tồn tại."""
+    """Lý do cả vòng này tồn tại.
+
+    ══ TC-71 · 19/9/2026 — TIỀN ĐỀ ĐỔI, LUẬT GIỮ NGUYÊN ═════════════════════════════════════════
+    BÊN CŨ: trước khi đóng số, `thang()` trả về 0 — chuyến chưa đóng số thì không được tính.
+    BÊN MỚI: anh Tuấn chốt 18/9 gộp cả chuyến chưa đóng số vào doanh thu, nên "trước" nay ĐÃ có
+      số. Đó không phải phép thử hỏng — đó đúng là việc TC-71 sinh ra để làm: 24,38 tỷ của 670
+      chuyến đã chạy xong không còn vô hình trên màn hình chủ tịch nữa.
+
+    LUẬT PHÉP THỬ NÀY CANH VẪN Y NGUYÊN: đóng số xong thì màn hình đếm được chuyến ấy. Chỗ đổi là
+    đóng số nay CHUYỂN chuyến từ nửa "chưa đóng sổ" sang nửa "đã đóng sổ" thay vì làm nó xuất
+    hiện từ hư không — và hai nửa ấy chính là thứ phải canh, vì chúng là đường đối chiếu ngược về
+    sổ kế toán.
+    """
     db, me, u = _so_gia()
     ky = f"{HOM_QUA:%Y-%m}"
     truoc = KQ.thang(db, ky)
-    assert (truoc["doanh_thu"] or 0) == 0, "Dựng sai số giả: trước khi vá phải chưa đếm được gì."
+    assert truoc["dt_chua_dong_so"] > 0, (
+        "Dựng sai số giả: trước khi đóng số, chuyến phải nằm ở nửa CHƯA ĐÓNG SỔ."
+    )
+    assert truoc["dt_da_dong_so"] == 0, "…và chưa có gì ở nửa đã đóng sổ."
 
     VT.dong_so_theo_buoc_vietrip(db)
 
     sau = KQ.thang(db, ky)
-    assert sau["doanh_thu"] == 200.0, "Vá xong mà màn hình vẫn trống thì cả vòng này vô nghĩa."
-    assert sau["lai_tour"] == 80.0
+    # 300 chứ không phải 200 kể từ TC-71: B5 và B8 được đóng số (200), CÒN B3 mới ở bước 3 nên
+    # KHÔNG được đóng — và chuyến ấy nay vẫn vào con số gộp ở nửa chưa đóng sổ (100). Đúng ý luật
+    # A: chuyến đã chạy xong thì tiền của nó hiện ra, dù chưa ai chốt sổ.
+    assert sau["doanh_thu"] == 300.0, "Vá xong mà màn hình vẫn trống thì cả vòng này vô nghĩa."
+    # TC-71 · và ĐÂY mới là điều đóng số thật sự đổi: hai chuyến sang nửa khớp sổ kế toán, chuyến
+    # chưa đủ bước thì ở lại nửa kia. Không có hai khoá này thì phép thử không phân biệt được
+    # "đã đóng số" với "chưa đóng số mà vẫn được cộng" — tức là không canh được gì.
+    assert sau["dt_da_dong_so"] == 200.0, "B5 và B8 đóng số xong thì sang nửa ĐÃ ĐÓNG SỔ"
+    assert sau["dt_chua_dong_so"] == 100.0, "B3 mới bước 3, chưa được đóng số — ở lại nửa kia"

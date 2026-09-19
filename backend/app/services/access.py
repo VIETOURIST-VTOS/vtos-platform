@@ -399,6 +399,15 @@ MAN_HINH_API = {
     "/requests": ("/api/v1/requests", "/api/v1/bookings", "/api/v1/tours", "/api/v1/meta",
                   "/api/v1/mang"),
     "/lai-lo-tour": ("/api/v1/lai-lo-tour",),
+    # TC-71 · Màn hình chỉ đọc, một nhóm API RIÊNG.
+    #
+    # Bản nháp đầu đặt cửa trong nhóm `/api/v1/bao-cao` cho tiện. Đo bằng bộ kiểm P2 thì `nv_dh`
+    # và `cntt` được nới TOÀN BỘ nhóm báo cáo chỉ vì mở được màn hình này — đúng cái bẫy đã ghi ở
+    # nhóm `/api/v1/tong-dai` ngày 09/9: "phần dôi ra vẫn là quyền đã cấp".
+    #
+    # KHÔNG khai `/api/v1/tours` dù mỗi dòng có đường dẫn sang chuyến: đường dẫn ấy là một liên
+    # kết cho người bấm, không phải một lượt gọi máy chủ của màn hình này.
+    "/so-con-no": ("/api/v1/so-con-no",),
     "/robot-reports": ("/api/v1/auto-reports",),
     "/sales-reports": ("/api/v1/sales-reports",),
     "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
@@ -549,6 +558,13 @@ MENU_ROLES = {
     # Lãi lỗ theo tour: số quản trị. Sale KHÔNG có mặt – họ xem doanh thu và công nợ booking mình
     # phụ trách ở màn hình bán hàng, còn giá vốn của chuyến thì ngoài phạm vi của họ.
     "/lai-lo-tour": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
+    # TC-71 · Sổ chuyến còn nợ — anh Tuấn 18/9/2026 chọn ba nhóm: Chủ tịch/TGĐ, Điều hành, Kế toán.
+    # ĐÚNG BẰNG `/lai-lo-tour` và cùng một lý do: cả hai màn hình nói về sổ quyết toán của chuyến,
+    # nên hai danh sách vai khác nhau cho cùng một miền là hai danh sách sẽ lệch nhau về sau.
+    # Kế toán CÓ mặt dù họ không đóng sổ chuyến: họ cần biết còn bao nhiêu chuyến chưa về sổ để
+    # liệu việc ghi sổ tháng — không thấy thì đến cuối tháng mới biết còn 24 tỷ chưa vào.
+    # Sale KHÔNG có mặt, y như /lai-lo-tour: giá vốn chuyến ngoài phạm vi của họ.
+    "/so-con-no": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
 
     # V7 Đợt 3 – Sự cố tour. Điều hành cầm việc; Kinh doanh có mặt vì sale thường là người khách gọi
     # đầu tiên khi chuyến trục trặc; Kế toán đọc để biết khoản chi phát sinh của chuyến từ đâu ra.

@@ -503,6 +503,36 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 .v14-bang th{white-space:nowrap}
 .v14-trong{text-align:center;padding:18px 8px}
 .v14-ghi{font-size:calc(12/14*1rem);line-height:1.7;margin:9px 0 0}
+
+/* ═══ TC-71 · 19/9/2026 — SỔ CHUYẾN CÒN NỢ ═════════════════════════════════════════════════════
+   Bảng "đọng theo tháng": thanh ngang thay cho biểu đồ cột, vì ở đây chỉ có chín dòng và cái
+   người đọc cần là SO SÁNH THÁNG NÀO ĐỌNG NHIỀU NHẤT, không phải đọc xu hướng theo thời gian.
+   Thanh ngang đọc tên tháng dễ hơn cột dọc và không phải xoay nhãn.
+
+   MỘT TRỤC TUNG: bề rộng thanh do JS chia cho CÙNG một đỉnh (`dinh`), không mỗi thanh một thang
+   đo. Luật này của kho, ghi lại ở đây vì đây là chỗ dễ phạm nhất. */
+.sn-cot{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.sn-dong{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px}
+.sn-ky{font-family:var(--vtos-font-mono);font-size:calc(12/14*1rem);color:var(--ink2);
+  min-width:calc(62/14*1rem)}
+.sn-thanh{display:block;height:calc(14/14*1rem);border-radius:4px;background:var(--panel2);
+  overflow:hidden}
+/* Dùng màu CẢNH BÁO chứ không phải màu thương hiệu: đây là tiền chưa vào sổ, không phải thành
+   tích. Vẽ nó bằng màu doanh thu là khen ngược một khoản đang còn nợ. */
+.sn-thanh i{display:block;height:100%;background:var(--vtos-warning);border-radius:4px;
+  min-width:2px}
+.sn-so{font-family:var(--vtos-font-mono);font-size:calc(12.5/14*1rem);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.sn-dem{font-size:calc(11.5/14*1rem);white-space:nowrap}
+.sn-loc{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-left:auto}
+.sn-loc label{font-size:calc(12/14*1rem);color:var(--ink2);display:inline-flex;align-items:center;
+  gap:6px}
+@media (max-width:640px){
+  /* Điện thoại: bỏ cột đếm chuyến xuống dòng dưới thay vì ép bốn cột vào màn hẹp rồi chữ vỡ. */
+  .sn-dong{grid-template-columns:auto 1fr auto}
+  .sn-dem{grid-column:2 / -1}
+  .sn-loc{margin-left:0;width:100%}
+}
 /* TC-33 · Nửa "Kết luận chỉ đạo" của khối 08. Tách hẳn bằng một đường kẻ trên: nó là phần CHƯA
    BẮT ĐẦU, không phải một dòng nữa của bảng tiến độ ngay trên. Nằm liền mạch thì người đọc tưởng
    khối đã xong cả hai nửa. */
