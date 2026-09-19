@@ -1,9 +1,60 @@
+# CI CHẠY HAI HÌNH, VÀ ĐÓ LÀ CHỦ Ý — 19/9/2026
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# VÌ SAO ĐỔI
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+#
+# Bản trước khai `push: [main, develop]` VÀ `pull_request`. Hệ quả: bộ 251 tệp phép thử ~24 phút
+# chạy HAI LẦN cho cùng một công việc — một lần trên PR, một lần nữa trên main sau khi gộp.
+#
+# Lần thứ nhất CHẶN được: đỏ thì không gộp. Lần thứ hai thì mã đã nằm trong kho rồi, đỏ cũng không
+# chặn được gì nữa — nó chỉ BÁO. Và cái giá của việc báo ấy là một nửa hoá đơn.
+#
+# Đo ngày 19/9/2026: tháng này kho dùng 7.974 phút cho ci.yml. Trần chi tiêu Actions chạm đáy lúc
+# 13 giờ và GitHub DỪNG HẲN mọi việc — "The job was not started because recent account payments
+# have failed or your spending limit needs to be increased". Bốn làn cùng đứng, không ai đẩy được.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# NHƯNG KHÔNG BỎ HẲN CI TRÊN MAIN — VÌ CÓ MỘT LOẠI HỎNG CHỈ MAIN MỚI THẤY
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+#
+# Hai PR cùng xanh RIÊNG LẺ vẫn có thể hỏng khi GỘP LẠI: làn A thêm một bản di trú, làn B cũng
+# thêm một bản — mỗi nhánh một đầu mạch nên cả hai đều xanh, gộp xong thành hai đầu và hộp chứa
+# chết lúc khởi động. Cùng hình ấy với bảng phân quyền, bảng khai cửa nhập, bảng giữ chỗ làn.
+#
+# Đúng ngày 19/9 chuyện này suýt xảy ra HAI LẦN trong một buổi chiều: một nhánh dựng trên bản kho
+# cũ suýt xoá mất TC-71, rồi sau khi dựng lại thì TC-73 vào kho và suýt bị xoá tiếp. Cả hai lần CI
+# ĐỀU KHÔNG BẮT ĐƯỢC trên PR — vì xoá một màn hình của làn khác thì phép thử vẫn xanh.
+#
+# Nên main VẪN có một cửa kiểm, nhưng là cửa HẸP và NHANH: đúng những phép thử soi chuyện hai làn
+# đụng nhau. 86 phép thử, 12 giây, thay vì 251 tệp và 24 phút.
+#
+#   · test_mach_migration                 – đúng MỘT đầu mạch di trú
+#   · test_menu                           – mọi màn hình trong ma trận đều có lối vào
+#   · test_p11_khai_quyen_phai_co_man_hinh – mọi mục khai quyền đều có trang thật
+#   · test_ks_ma_tran                     – không khai quyền cho màn hình không tồn tại
+#   · test_p2_pham_vi_vai_tro             – bảng phạm vi ĐÃ CHỐT khớp với mã
+#   · test_giu_cho_lan                    – hai làn không cùng giữ một tệp
+#   · test_ks_do_dai                      – độ dài chuỗi khớp bề rộng cột
+#   · test_ks2_khai_quyen_may_doc_duoc    – mọi cửa ghi đều khai quyền máy đọc được
+#   · test_ks_cua_nhap                    – mọi bảng đều khai một cửa nhập
+#   · test_man_hinh_co_cua_nhap           – màn hình có số thì phải có cửa nhập số ấy
+#
+# `backend/tests/test_ci_hang_rao_main.py` ĐỌC CHÍNH TỆP NÀY và đỏ nếu một tệp kể trên bị đổi tên
+# hay xoá đi. Không có phép thử ấy thì một tệp đổi tên sẽ làm cửa kiểm này lặng lẽ chạy thiếu, và
+# một cửa kiểm chạy thiếu mà vẫn xanh là thứ nguy hiểm hơn không có cửa nào.
+#
+# MUỐN CHẠY ĐỦ BỘ TRÊN MAIN: vào Actions → CI → "Run workflow". `workflow_dispatch` để sẵn cho
+# việc ấy — trước khi ra bản thật, hoặc khi nghi một lần gộp làm hỏng thứ cửa hẹp không soi tới.
 name: CI
 on:
-  push: { branches: [main, develop] }
   pull_request:
+  push: { branches: [main, develop] }
+  workflow_dispatch:
 jobs:
+  # ĐỦ BỘ — chỉ trên PR (và khi bấm tay). Đây là cửa CHẶN.
   backend:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: backend } }
     steps:
@@ -14,6 +65,7 @@ jobs:
       - run: ruff check app --select E9,F63,F7,F82
       - run: bash tests/run_all.sh
   web:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: web } }
     steps:
@@ -24,8 +76,23 @@ jobs:
       - run: npm run build
         env: { NEXT_TELEMETRY_DISABLED: 1 }
   docker:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     needs: [backend, web]
     steps:
       - uses: actions/checkout@v4
       - run: docker compose build
+
+  # CỬA HẸP — chỉ khi đẩy vào main/develop. Đây là cửa BÁO, và nó chỉ soi chuyện hai làn đụng nhau.
+  # Giữ NGUYÊN TÊN TỆP ở dòng `pytest` bên dưới: test_ci_hang_rao_main.py đọc đúng dòng ấy.
+  hang-rao-gop:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check app --select E9,F63,F7,F82
+      - run: python -m pytest -q tests/test_mach_migration.py tests/test_menu.py tests/test_p11_khai_quyen_phai_co_man_hinh.py tests/test_ks_ma_tran.py tests/test_p2_pham_vi_vai_tro.py tests/test_giu_cho_lan.py tests/test_ks_do_dai.py tests/test_ks2_khai_quyen_may_doc_duoc.py tests/test_ks_cua_nhap.py tests/test_man_hinh_co_cua_nhap.py
