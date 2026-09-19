@@ -113,6 +113,10 @@ function Marketing() {
   const [th, setTh] = useState<any>({ rows: [], dem: {}, loai: {}, trang_thai_ds: {} });
   const [thLoai, setThLoai] = useState("");
 
+  // ── hoạt động PR ──
+  const [pr, setPr] = useState<any>({ rows: [], dem: {}, loai: {}, trang_thai_ds: {}, han_khung_hoang_gio: 0 });
+  const [prKh, setPrKh] = useState(false);
+
   // ── nội dung ──
   const [nd, setNd] = useState<any[]>([]);
 
@@ -171,6 +175,25 @@ function Marketing() {
       setTh(await api(`/marketing/thuong-hieu?loai=${encodeURIComponent(thLoai)}`));
     } catch (e) { toast(errMsg(e), true); }
   };
+
+  /** Bấm PHÁT. Nút chỉ hiện cho P.TGĐ Marketing – gương của hàng rào thật ở máy chủ, không thay
+   *  cho nó. Phát ngôn CHÍNH LÀ phản hồi với một vụ khủng hoảng, nên bấm nút này cũng dừng luôn
+   *  đồng hồ hai giờ; không bắt người ta bấm thêm một nút nữa. */
+  const prPhat = async (id: number) => {
+    try { toast((await api(`/marketing/pr/${id}/phat`, { method: "POST" })).message); await napPr(); }
+    catch (e) { toast(errMsg(e), true); }
+  };
+  /** Ghi rằng vụ khủng hoảng đã xử lý bằng đường khác (gọi điện, gặp trực tiếp). Không có cửa này
+   *  thì những vụ ấy nằm mãi ở bảng quá hạn, và bảng quá hạn mất hết ý nghĩa. */
+  const prPhanHoi = async (id: number) => {
+    try { toast((await api(`/marketing/pr/${id}/phan-hoi`, { method: "POST" })).message); await napPr(); }
+    catch (e) { toast(errMsg(e), true); }
+  };
+  const napPr = useCallback(async () => {
+    setPr(await api(`/marketing/pr?chi_khung_hoang=${prKh}`));
+  }, [prKh]);
+  useEffect(() => { if (tab === "thuonghieu") napPr().catch((e) => toast(errMsg(e), true)); },
+           [tab, napPr, toast]);
 
   // Sổ nhận diện. Chỉ nạp khi mở tab – sổ này đọc từ bảng tài sản, không phải thứ cần sẵn ở
   // mọi màn hình.
@@ -659,15 +682,62 @@ function Marketing() {
             </tbody>
           </table>}
       </div>
+      <div className="panel">
+        <h2>Sổ hoạt động PR &amp; truyền thông</h2>
+        <p className="muted">Sổ ghi việc truyền thông <b>đã xảy ra</b> và ai chịu trách nhiệm —
+          khác với màn hình Nội dung, chỗ giữ bản thảo trước khi đăng. Chủ tịch chốt 18/9/2026:
+          người phát ngôn là <b>P.TGĐ Marketing</b>, và một vụ khủng hoảng phải có phản hồi trong
+          <b> {pr.han_khung_hoang_gio} giờ</b> kể từ lúc việc được ghi vào sổ.</p>
+        <p className="muted">Mốc ấy chạy theo <b>đồng hồ thật</b>: không trừ ngày nghỉ, không quy ra
+          giờ hành chính — một việc ghi lúc 22h thứ Bảy thì 0h là quá hạn. Chỉ dòng có đánh dấu
+          khủng hoảng mới có hạn; những dòng khác không nằm trong con số quá hạn.</p>
+      </div>
+      <div className="mh01-the">
+        <The nhan="Quá hạn phản hồi" so={pr.dem?.qua_han ?? 0} canhBao={(pr.dem?.qua_han ?? 0) > 0}
+             nguon={`vụ khủng hoảng chưa có phản hồi sau ${pr.han_khung_hoang_gio} giờ – đếm trên CẢ sổ, không phải trang đang xem`} />
+        <The nhan="Vụ khủng hoảng" so={pr.dem?.khung_hoang ?? 0} nguon="dòng có đánh dấu khủng hoảng" />
+        <The nhan="Chờ người phát ngôn" so={pr.dem?.cho_phat ?? 0} nguon="đã soạn xong, chờ P.TGĐ Marketing bấm phát" />
+        <The nhan="Đã phát" so={pr.dem?.da_phat ?? 0} nguon="đã ra ngoài, có tên người phát ngôn" />
+      </div>
+      <div className="panel">
+        <div className="hang">
+          <label><input type="checkbox" checked={prKh} onChange={(e) => setPrKh(e.target.checked)} />
+            {" "}Chỉ xem vụ khủng hoảng</label>
+        </div>
+        {(pr.rows || []).length === 0
+          ? <p className="muted">Sổ chưa có dòng nào. Nhập ở màn hình <b>Nạp dữ liệu</b> — mục
+              “Hoạt động PR &amp; truyền thông”.</p>
+          : <table className="bang">
+            <thead><tr>
+              <th>Mã</th><th>Loại</th><th>Tiêu đề</th><th>Nơi đăng</th><th>Vào sổ</th>
+              <th>Hạn phản hồi</th><th>Người phát ngôn</th><th>Trạng thái</th><th></th>
+            </tr></thead>
+            <tbody>
+              {pr.rows.map((r: any) => <tr key={r.id}>
+                <td>{r.ma}</td>
+                <td>{r.loai_ten}{r.la_khung_hoang && <> <Tag cls="warn">khủng hoảng</Tag></>}</td>
+                <td>{r.tieu_de}</td>
+                <td>{r.noi_dang || <span className="muted">chưa ghi</span>}</td>
+                <td>{fmtDT(r.ghi_nhan_luc)}</td>
+                <td>{!r.la_khung_hoang ? <span className="muted">không có hạn</span>
+                     : r.phan_hoi_luc ? <>đã phản hồi {fmtDT(r.phan_hoi_luc)}</>
+                     : r.qua_han ? <Tag cls="err">QUÁ HẠN {fmtDT(r.han_phan_hoi)}</Tag>
+                     : <>hạn {fmtDT(r.han_phan_hoi)}</>}</td>
+                <td>{r.nguoi_phat_ngon || <span className="muted">chưa phát</span>}</td>
+                <td>{r.trang_thai_ten}</td>
+                <td>
+                  {r.trang_thai !== "da_phat" && role === "ptgd_mkt" &&
+                    <button className="act teal" onClick={() => prPhat(r.id)}>Phát</button>}
+                  {r.la_khung_hoang && !r.phan_hoi_luc && lapDuoc &&
+                    <> <button className="act grey" onClick={() => prPhanHoi(r.id)}>Đã phản hồi</button></>}
+                </td>
+              </tr>)}
+            </tbody>
+          </table>}
+      </div>
       <div className="panel" style={{ borderColor: "var(--vtos-warning)" }}>
-        <h2>Phần PR còn thiếu — đã có chữ ký, chưa có sổ</h2>
-        <p className="muted">Hai điều Chủ tịch chốt 18/9/2026 và hệ thống CHƯA dựng: người phát ngôn
-          là <b>P.TGĐ Marketing</b>, và <b>hạn phản hồi khủng hoảng truyền thông là 2 giờ</b> kể từ
-          lúc việc được ghi vào sổ. Chưa có bảng hoạt động PR thì hai con số ấy chưa có chỗ để
-          sống — nên màn hình này nói ra chứ không hiện một ô “quá hạn” rỗng.</p>
+        <h2>Còn thiếu</h2>
         <div className="mh01-the">
-          <The rong nhan="Hoạt động PR &amp; báo chí" so="chưa có"
-               nguon="Cần: một sổ hoạt động (bài đăng, sự kiện, phát ngôn) gắn với chiến dịch và với người phát ngôn." />
           <The rong nhan="Theo dõi nhắc tên thương hiệu" so="chưa có"
                nguon="Cần một cửa nhập hoặc một mối nối với dịch vụ đo bên ngoài. Không có cửa thì con số này không thể có, kể cả ước lượng." />
         </div>

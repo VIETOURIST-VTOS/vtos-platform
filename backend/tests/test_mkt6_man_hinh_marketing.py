@@ -145,12 +145,15 @@ def test_T6_man_hinh_thuong_hieu_khong_bia_mot_con_so_nao():
 
       · NỬA CÓ SỔ  – mọi con số phải ĐỌC TỪ bản trả về của API (`th.dem`). Một con số viết thẳng
         vào mã là một con số không ai sửa được và không ai truy được nguồn.
-      · NỬA CHƯA CÓ (hoạt động PR, theo dõi nhắc tên) – vẫn phải ghi "chưa có". Hai điều Chủ tịch
-        đã ký cho phần ấy (người phát ngôn, hạn 2 giờ) chưa có bảng để sống, nên màn hình nói ra
-        chứ không vẽ một ô "quá hạn" rỗng.
+      · NỬA CHƯA CÓ (theo dõi nhắc tên thương hiệu) – vẫn phải ghi "chưa có". Sổ hoạt động PR đã
+        chuyển sang nửa CÓ SỔ cùng ngày; phần còn lại cần một cửa nhập hoặc một mối nối với dịch vụ đo
+        bên ngoài, chưa có thì không được vẽ một con số nào.
     """
     src = bo_chu_thich(doc(MKT))
-    i = src.index('tab === "thuonghieu"')
+    # LẤY TỪ LẦN XUẤT HIỆN CUỐI CÙNG, không phải lần đầu. Chữ `tab === "thuonghieu"` còn nằm ở
+    # chỗ khai danh sách tab phía trên; cắt từ đó thì khối này ôm luôn thẻ số của các tab khác, và
+    # phép thử đi bắt nhầm người. (Bản trước không lộ ra vì nó chỉ đọc `so="…"`.)
+    i = src.rindex('tab === "thuonghieu"')
     khoi = src[i:]
 
     # Nửa chưa có sổ: `so="…"` là chuỗi viết thẳng, và chuỗi ấy không được mang chữ số.
@@ -164,11 +167,15 @@ def test_T6_man_hinh_thuong_hieu_khong_bia_mot_con_so_nao():
     # Nửa có sổ: mọi `so={…}` phải chạm vào bản trả về của API, không được là một hằng số.
     so_bieu = re.findall(r"so=\{([^}]*)\}", khoi)
     assert so_bieu, "sổ tài sản thương hiệu chưa hiện thẻ số nào"
+    # Hai sổ trên tab này: `th` (tài sản thương hiệu) và `pr` (hoạt động PR). Mọi thẻ số phải đọc
+    # từ bản trả về của một trong hai, không được là một hằng số.
     for b in so_bieu:
-        assert "th." in b, f"thẻ số {b!r} không đọc từ sổ – một con số viết thẳng vào màn hình"
+        assert re.search(r"\b(th|pr)\.", b), \
+            f"thẻ số {b!r} không đọc từ sổ nào – một con số viết thẳng vào màn hình"
 
-    # Và màn hình phải thật sự gọi đường API của sổ, chứ không chỉ khai một biến tên là `th`.
-    assert "/marketing/thuong-hieu" in src, "màn hình chưa gọi đường API của sổ tài sản thương hiệu"
+    # Và màn hình phải thật sự gọi hai đường API ấy, chứ không chỉ khai hai biến tên là `th`, `pr`.
+    for duong in ("/marketing/thuong-hieu", "/marketing/pr"):
+        assert duong in src, f"màn hình chưa gọi đường API {duong}"
 
 
 def test_T7_man_hinh_khong_khai_mau_rieng_mot_dong_nao():
