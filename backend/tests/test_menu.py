@@ -421,29 +421,59 @@ def test_chieu_cao_thanh_ngang_trong_dac_ta():
 
 
 def test_thanh_phan_he_chi_co_mot_hanh_vi_la_bam():
-    """Anh Tuấn chốt 13/9/2026 (chiều): TẮT rê chuột, chỉ để lại bấm.
+    """Mỗi thanh phân hệ làm ĐÚNG MỘT việc: hoặc đi, hoặc xổ ra. Không có thanh nào làm cả hai.
 
-    Lịch sử của chỗ này, ghi cả ba nước để lần sau không ai đi vòng lại:
+    ══ LỊCH SỬ, ghi đủ để lần sau không ai đi vòng lại ═══════════════════════════════════════════
       · 12/9 sáng – bấm thì GHIM MỞ danh sách mục con ngay dưới thanh.
       · 12/9 chiều – rê chuột thì XỔ RA một bảng bên cạnh; bấm vẫn ghim mở.
       · 13/9 – bỏ cả hai. Bấm là ĐI TỚI trang phân hệ, hết.
+      · 18/9 – anh Tuấn: "Kinh doanh: rê chuột vào xổ ra kinh doanh lẻ và kinh doanh đoàn, click
+        chuột vào sẽ ra 2 màn hình riêng biệt" và "Điều hành: rê chuột vào sẽ xổ ra ĐH tour / ĐH xe
+        và HDV, 3 phân hệ sẽ ra 3 màn hình giao diện khác nhau."
 
-    Vì sao bỏ rê chuột: đưa chuột ngang qua thanh dọc để tới chỗ khác là bảng bật ra chắn đường, và
-    máy bảng thì không có "rê chuột" nên một nửa người dùng chưa từng thấy nó. Mục lục đầy đủ – kể
-    cả phần còn nợ và mục không có quyền – nằm ở trang phân hệ, chỗ đọc kỹ được.
+    ══ BÊN CŨ (13/9) — hai lý do bỏ rê chuột, CẢ HAI VẪN ĐÚNG ════════════════════════════════════
+      (a) "Đưa chuột ngang qua thanh dọc để tới chỗ khác là bảng bật ra chắn đường."
+      (b) "Máy bảng không có rê chuột nên một nửa người dùng chưa từng thấy nó."
 
-    Phép thử canh phần MÃ ĐÃ GỠ, không chỉ canh phần còn lại: một cái onMouseEnter sót lại là hành
-    vi cũ sống lại lặng lẽ, và không ai nhận ra cho tới khi anh Tuấn nhắc lần nữa.
+    ══ BÊN MỚI (18/9) — vì sao vẫn quay lại, và hai lý do trên được trả lời thế nào ═══════════════
+    Cái đổi không phải là ý thích, mà là SỰ THẬT VỀ TỔ CHỨC: Kinh doanh nay là hai phòng (lẻ và
+    đoàn), Điều hành là ba đơn vị (tour · xe – đã sang pháp nhân Vietrip · hướng dẫn viên – hưởng
+    lương ở công ty mẹ). Một thanh đại diện cho nhiều phòng thì "bấm là đi" đi đâu cũng sai một
+    phòng. Sáu nhóm còn lại vẫn "bấm là đi" y nguyên 13/9.
+      (a) trả lời bằng ĐỘ TRỄ MỞ 140ms: chuột lướt qua thì chưa kịp mở; chuột dừng lại mới là ý
+          định. Bỏ độ trễ ấy là dựng lại đúng cái phiền đã khiến luật cũ bị bỏ – nên nó được canh.
+      (b) trả lời bằng `hover: hover`: máy cảm ứng KHÔNG đi đường rê chuột, mà chạm lần 1 xổ ra,
+          chạm lần 2 đi. Và dưới 900px thì bảng xổ ngay tại chỗ chứ không bay sang phải – bay sang
+          phải trên màn 390px là bay hẳn ra ngoài màn hình (đo 18/9: bảng rơi vào toạ độ 388px).
+
+    Bảng xổ ra lần này KHÁC hẳn bảng đã gỡ 13/9: nó không chứa mục lục bốn cấp của v1.3, chỉ chứa
+    2 hoặc 3 lối vào phân hệ con. Mục lục đầy đủ vẫn nằm ở trang phân hệ, đúng như 13/9 đã chốt.
     """
-    src = re.sub(r'/\*.*?\*/|//[^\n]*', '', _doc(), flags=re.S)
-    for tan_du in ("onMouseEnter", "onMouseLeave", "moBay", "dongBay", "khoiMuc",
-                   'className="bay"', "bay-tat-ca", "opened"):
-        assert tan_du not in src, f"còn tàn dư của lối rê chuột/ghim mở đã bỏ: {tan_du}"
+    src_that = _doc()
+    src = re.sub(r'/\*.*?\*/|//[^\n]*', '', src_that, flags=re.S)
+
+    # Tàn dư của lối GHIM MỞ 12/9 thì vẫn phải sạch – lối ấy chưa bao giờ được dựng lại.
+    for tan_du in ("moBay", "dongBay", "khoiMuc", 'className="bay"', "bay-tat-ca", "opened"):
+        assert tan_du not in src, f"còn tàn dư của lối ghim mở đã bỏ: {tan_du}"
     css = re.sub(r'/\*.*?\*/', '', open(os.path.join(ROOT, "web", "app", "globals.css"),
                                           encoding="utf-8").read(), flags=re.S)
-    assert ".bay" not in css, "luật CSS của bảng xổ ra còn sống dù không ai vẽ nó nữa"
-    # Thanh phân hệ vẫn phải là một ĐƯỜNG DẪN thật, không phải nút chờ JavaScript.
-    assert '<Link href={g.href}' in _doc(), "thanh phân hệ phải là đường dẫn – bấm giữa chuột, mở tab mới"
+    assert ".bay" not in css, "luật CSS của bảng xổ ra kiểu cũ còn sống dù không ai vẽ nó nữa"
+
+    # MỖI NHÓM ĐÚNG MỘT HÀNH VI. Nhóm không có `phans` thì vẫn là đường dẫn thật (bấm giữa chuột
+    # mở được tab mới); nhóm có `phans` thì là <button>, vì một thẻ <a> không có đích là nói dối
+    # với bàn phím và với trình đọc màn hình.
+    assert "<Link href={g.href!}" in src_that, \
+        "nhóm KHÔNG xổ ra phải là đường dẫn thật – bấm giữa chuột, mở tab mới"
+    assert "g.phans" in src_that, "phải có nhánh vẽ riêng cho nhóm xổ ra"
+    assert 'aria-haspopup="menu"' in src_that and "aria-expanded={mo}" in src_that, \
+        "nút xổ ra phải tự khai là nút mở bảng, nếu không trình đọc màn hình xướng sai"
+
+    # Hai lý do của bên cũ được canh thành hai khẳng định, không phải chỉ ghi trong chú thích.
+    assert re.search(r"setTimeout\(\(\) => datMo\(true\), \d+\)", src), \
+        "MỞ phải có độ trễ – chuột lướt qua mà bảng bật ra chắn đường là đúng cái đã khiến luật " \
+        "13/9 bỏ rê chuột"
+    assert '"(hover: hover)"' in src, \
+        "phải hỏi máy có chuột thật không; màn cảm ứng vẫn bắn mouseenter giả sau cú chạm"
 
 
 def test_nho_trang_thai_theo_tung_nguoi_dung():

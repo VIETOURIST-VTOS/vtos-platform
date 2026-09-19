@@ -22,6 +22,11 @@
  */
 export type MucCay = {
   ma: string; ten: string; href?: string; tab?: boolean; them?: boolean; chuyen?: boolean;
+  /** TC-70 · 18/9/2026 — nhánh này hiện ở NHIỀU HƠN MỘT phân hệ con. Cờ do
+   *  `cayCuaPhanHeCon` gắn lúc dựng khung nhìn, KHÔNG khai tay trong CAY_PHAN_HE: cùng một nhánh
+   *  có thể dùng chung ở phòng này mà là của riêng ở phòng kia, nên nó là tính chất của KHUNG
+   *  NHÌN chứ không phải của nhánh. */
+  chung?: boolean;
   con?: MucCay[];
 };
 export type PhanHeCay = { khoa: string; ma: string; ten: string; tom_tat: string; con: MucCay[] };
@@ -332,8 +337,84 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
     ] },
 ];
 
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   PHÂN HỆ CON — anh Tuấn chốt 18/9/2026.
+
+   "Kinh doanh: rê chuột vào xổ ra kinh doanh lẻ và kinh doanh đoàn, click chuột vào sẽ ra 2 màn
+    hình riêng biệt." · "Điều hành: rê chuột vào sẽ xổ ra ĐH tour / ĐH xe và HDV, 3 phân hệ sẽ ra
+    3 màn hình giao diện khác nhau."
+
+   VÌ SAO LÀ KHUNG NHÌN, KHÔNG PHẢI NĂM CÂY MỚI: bản vẽ v1.3 đã tách sẵn rồi — Kinh doanh có 3.3
+   "Kinh doanh Lẻ" và 3.4 "Kinh doanh Đoàn"; Điều hành có 4.9 "Quản lý đội xe" và 4.10 "Hướng dẫn
+   viên". Chép chúng ra thành cây riêng là tạo hai bản của cùng một sự thật, và bản nào sửa trước
+   thì bản kia thành lời nói dối. Ở đây mỗi phân hệ con chỉ khai NÓ LẤY NHÁNH NÀO của cây cha; cây
+   v1.3 vẫn là nguồn duy nhất, sửa một chỗ là cả hai màn hình cùng đổi.
+
+   VÌ SAO CÂY CHA VẪN CÒN: thanh dọc không còn trỏ tới /phan-he/khachhang và /phan-he/vanhanh nữa,
+   nhưng hai đường dẫn ấy vẫn sống — ai đã lưu dấu trang, hoặc màn hình khác còn trỏ tới, thì vẫn
+   mở được. Xoá đi là bẻ gãy một đường đang có mà chẳng được gì.
+
+   MỘT NHÁNH NẰM Ở HAI NƠI LÀ CHUYỆN BÌNH THƯỜNG Ở TỆP NÀY: 3.5 "Chăm sóc khách hàng" vốn đã nằm
+   cả ở Marketing (mã chuyển) lẫn ở Kinh doanh. Hộp thư và Khách hàng cũng vậy — nhân viên bán lẻ
+   và nhân viên bán đoàn cùng mở một hộp thư, cùng tra một hồ sơ khách. Khai `chung` để trang nói
+   rõ "dùng chung", chứ không giả vờ màn hình ấy là của riêng một phòng.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+export type PhanHeCon = {
+  khoa: string;      // khoá của ĐƯỜNG DẪN /phan-he/<khoa>
+  cha: string;       // khoá phân hệ cha trong CAY_PHAN_HE
+  ten: string;
+  tom_tat: string;
+  lay: string[];     // mã các nhánh cấp một lấy từ cây cha, THEO ĐÚNG THỨ TỰ khai ở đây
+  chung?: string[];  // mã nào trong `lay` là nhánh dùng chung với phân hệ con anh em
+};
+
+export const PHAN_HE_CON: PhanHeCon[] = [
+  { khoa: "kdle", cha: "khachhang", ten: "Kinh doanh lẻ",
+    tom_tat: "Lịch khởi hành · Booking lẻ · Dịch vụ riêng lẻ · Chính sách bán",
+    lay: ["3.1", "3.2", "3.3", "3.5"], chung: ["3.1", "3.2", "3.5"] },
+  { khoa: "kddoan", cha: "khachhang", ten: "Kinh doanh đoàn",
+    tom_tat: "Cơ hội · Hồ sơ đoàn · Báo giá · Hợp đồng",
+    lay: ["3.1", "3.2", "3.4", "3.5"], chung: ["3.1", "3.2", "3.5"] },
+
+  // 4.1–4.8 ở lại Điều hành tour: sản phẩm, chuyến, quyết toán, sự cố, hiệu quả và dịch vụ – toàn
+  // bộ phần việc chạy quanh CHUYẾN. Xe và hướng dẫn viên tách ra vì đã là hai đơn vị riêng từ
+  // 07/9/2026: xe thuộc pháp nhân Công ty TNHH Vận tải Vietrip, hướng dẫn viên hưởng lương ở công
+  // ty mẹ. Đây là tách theo PHÁP NHÂN và theo người quản, không phải tách cho menu ngắn lại.
+  { khoa: "dhtour", cha: "vanhanh", ten: "Điều hành tour",
+    tom_tat: "Sản phẩm · Chuyến · Quyết toán · Sự cố · Dịch vụ & NCC",
+    lay: ["4.1", "4.2", "4.3", "4.4", "4.5", "4.6", "4.7", "4.8"] },
+  { khoa: "dhxe", cha: "vanhanh", ten: "Điều hành xe",
+    tom_tat: "Hồ sơ xe · Tài xế · Lệnh điều xe · Hiệu quả khai thác",
+    lay: ["4.9"] },
+  { khoa: "hdv", cha: "vanhanh", ten: "Hướng dẫn viên",
+    tom_tat: "Hồ sơ HDV · Bố trí hướng dẫn · Đối soát thù lao",
+    lay: ["4.10"] },
+];
+
+/** Dựng cây của một phân hệ CON: cắt đúng những nhánh nó khai, giữ nguyên thứ tự trong `lay` chứ
+ *  không theo thứ tự cây cha – phòng khi sau này muốn đảo thứ tự cho riêng một phòng.
+ *
+ *  Mã khai trong `lay` mà KHÔNG có trong cây cha thì ném lỗi ngay, không lặng lẽ bỏ qua: một nhánh
+ *  biến mất khỏi màn hình mà không ai hay là kiểu hỏng tệ nhất – nó trông như chưa bao giờ có.
+ *  Phép thử canh đúng chỗ này. */
+export function cayCuaPhanHeCon(pc: PhanHeCon): PhanHeCay {
+  const cha = CAY_PHAN_HE.find((p) => p.khoa === pc.cha);
+  if (!cha) throw new Error(`PHAN_HE_CON "${pc.khoa}" khai cha "${pc.cha}" không có trong cây`);
+  const con = pc.lay.map((ma) => {
+    const nhanh = cha.con.find((m) => m.ma === ma);
+    if (!nhanh) throw new Error(`PHAN_HE_CON "${pc.khoa}" lấy mã "${ma}" không có trong ${pc.cha}`);
+    return pc.chung?.includes(ma) ? { ...nhanh, chung: true } : nhanh;
+  });
+  return { khoa: pc.khoa, ma: cha.ma, ten: pc.ten, tom_tat: pc.tom_tat, con };
+}
+
+/** Tra một khoá: phân hệ cha nếu có, nếu không thì dựng phân hệ con. Nhờ vậy trang
+ *  /phan-he/[khoa] không phải biết hai loại khoá là hai thứ khác nhau. */
 export function timPhanHe(khoa: string): PhanHeCay | undefined {
-  return CAY_PHAN_HE.find((p) => p.khoa === khoa);
+  const cha = CAY_PHAN_HE.find((p) => p.khoa === khoa);
+  if (cha) return cha;
+  const pc = PHAN_HE_CON.find((p) => p.khoa === khoa);
+  return pc ? cayCuaPhanHeCon(pc) : undefined;
 }
 
 /** Một mục CHỈ LÀ NHÃN GOM NHÓM: có mục con nhưng bản thân không dẫn tới màn hình nào. "Quản lý
