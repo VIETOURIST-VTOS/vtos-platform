@@ -159,6 +159,14 @@ MAY_SINH = {
     "lan_chay_tac_vu": "Lần chạy do hệ thống chạy tác vụ báo về qua /tu-dong/bao-cao – nhập tay một "
                        "dòng 'đã chạy thành công' là tạo bằng chứng giả về việc có thể chưa hề chạy.",
     "tong_dai_su_kien": "Nhật ký nguyên văn webhook tổng đài – tổng đài ghi vào, không ai nhập tay.",
+    # Bình luận công khai Fanpage (19/9/2026). Facebook đẩy sang qua webhook trường `feed`; người
+    # KHÔNG gõ tay dòng nào, và không nên: một bình luận nhập tay là lời của một người có thật bị
+    # người khác viết hộ, và sáu tháng sau không ai phân biệt nổi dòng nào là thật.
+    #
+    # Dòng vào bảng này rồi thì việc của NGƯỜI bắt đầu ở hàng đợi cảnh báo (bảng mkt_hop_thu_xu_ly,
+    # nằm ở CỬA TAY) – chỗ người đọc và kết luận. Hai bảng đi cùng nhau, khác hẳn về cửa.
+    "mkt_fb_binh_luan": "Bình luận dưới bài đăng Fanpage – Facebook đẩy sang qua webhook trường "
+                        "feed. Nhập tay một bình luận là viết hộ lời của một người có thật.",
     # Lớp 3 quyết toán tour (11/9/2026). Sổ dấu vết sửa sau khi ký: hệ thống ghi khi người bấm sửa
     # một tờ đã ký, và KHÔNG được có cửa nhập tay. Một sổ dấu vết mà người ta gõ thẳng vào được thì
     # không còn là dấu vết – ai cũng viết được rằng mình đã sửa vì lý do gì, kể cả khi không sửa.

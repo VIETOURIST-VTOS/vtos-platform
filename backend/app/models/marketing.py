@@ -194,6 +194,8 @@ class PrHoatDong(Base):
     # trên báo thì không có tin nào trong hộp thư, và `loc_khung_hoang.do_bo_loc()` đếm riêng
     # phần ấy thay vì để nó rơi khỏi mẫu số.
     nguon_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # Cùng vai trò, cho bình luận công khai (19/9/2026).
+    nguon_binh_luan_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
 
 # ---------- Đợt 6b: CỬA LỌC TIN KHỦNG HOẢNG (19/9/2026) ----------
@@ -214,10 +216,18 @@ class HopThuXuLy(Base):
     """
     __tablename__ = "mkt_hop_thu_xu_ly"
     id: Mapped[int] = mapped_column(primary_key=True)
-    # Một tin chỉ có một kết luận. Khoá duy nhất ở đây là thứ chặn hai người cùng mở hàng đợi rồi
-    # cùng lập hai dòng PR cho một vụ.
-    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id"), unique=True, index=True)
-    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    # HAI NGUỒN, HAI CỘT KHOÁ NGOẠI RIÊNG – cố ý không dùng một cặp (loại, mã) chung.
+    #
+    # Cặp chung nghe gọn hơn, nhưng nó vứt bỏ ràng buộc khoá ngoại: một mã trỏ vào hư không thì cơ
+    # sở dữ liệu không kêu, và ba tháng sau hàng đợi có những dòng không mở ra được. Hai cột, mỗi
+    # cột một khoá ngoại thật, ĐÚNG MỘT cột có giá trị – `nguon` nói cột nào.
+    nguon: Mapped[str] = mapped_column(String(10), default="tin")        # tin / binh_luan
+    message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"), unique=True,
+                                                  index=True, nullable=True)
+    binh_luan_id: Mapped[int | None] = mapped_column(ForeignKey("mkt_fb_binh_luan.id"), unique=True,
+                                                    index=True, nullable=True)
+    conversation_id: Mapped[int | None] = mapped_column(ForeignKey("conversations.id"),
+                                                        index=True, nullable=True)
     diem_luc_do: Mapped[int] = mapped_column(Integer, default=0)
     ly_do_luc_do: Mapped[str] = mapped_column(Text, default="")
     co_tu_do: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -226,3 +236,47 @@ class HopThuXuLy(Base):
     ghi_chu: Mapped[str] = mapped_column(String(300), default="")            # lý do bỏ qua – bắt buộc
     nguoi: Mapped[str] = mapped_column(String(50), default="")
     luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+# ---------- Đợt 6c: BÌNH LUẬN CÔNG KHAI FANPAGE (19/9/2026) ----------
+#
+# VÌ SAO BẢNG RIÊNG, KHÔNG ĐỔ VÀO `messages` CỦA HỘP THƯ
+#
+# Đổ vào hộp thư là cách viết ít dòng nhất, và nó hỏng ba chỗ cùng lúc:
+#
+#   1. SINH LEAD GIẢ. `inbox.get_or_create` tạo một Lead cho mỗi hội thoại mới. Mỗi người bình luận
+#      "đẹp quá" hay "giá bao nhiêu ạ" sẽ thành một lead, và TỶ LỆ CHỐT LEAD – con số Sales đang
+#      được đo bằng – bị pha loãng bằng thứ không phải lead. Một chỉ tiêu bị pha loãng thì không ai
+#      phát hiện ra, người ta chỉ thấy "dạo này chốt kém".
+#   2. ĐỒNG HỒ SLA CỦA SALES CHẠY NHẦM VIỆC. Hộp thư đặt hạn trả lời cho Sales. Bình luận dưới bài
+#      đăng là việc của Marketing.
+#   3. MẤT ĐÚNG CÁI KHÁC BIỆT QUAN TRỌNG NHẤT. Một bình luận thì CÔNG KHAI – người ngoài đọc được
+#      ngay. Một tin nhắn riêng thì chưa. Gộp hai thứ vào một bảng là xoá mất cái làm nên mức độ
+#      khẩn, đúng lúc cần nó nhất.
+#
+# BÌNH LUẬN BỊ XOÁ THÌ GIỮ LẠI DÒNG, chỉ đánh dấu `da_xoa`. Một bình luận bị xoá là bằng chứng nó đã
+# TỪNG có, và nó thường bị xoá đúng vào lúc đáng giữ nhất.
+BL_ITEM = ("comment",)
+
+
+class FbBinhLuan(Base):
+    """Một bình luận công khai dưới bài đăng Fanpage."""
+    __tablename__ = "mkt_fb_binh_luan"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Khoá chống trùng là mã của Facebook. Webhook có thể gửi lại cùng một sự kiện; không có khoá này
+    # thì một bình luận thành ba dòng và con số "bao nhiêu bình luận đáng đọc" sai ngay.
+    comment_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    post_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    parent_id: Mapped[str] = mapped_column(String(64), default="")     # bình luận trả lời bình luận
+    page_id: Mapped[str] = mapped_column(String(40), default="")
+    tac_gia_id: Mapped[str] = mapped_column(String(64), default="")
+    tac_gia_ten: Mapped[str] = mapped_column(String(120), default="")
+    noi_dung: Mapped[str] = mapped_column(Text, default="")
+    link: Mapped[str] = mapped_column(String(400), default="")
+    # Page tự trả lời dưới bài của mình. KHÔNG chấm điểm: câu trả lời của mình mà bị bộ lọc nêu lên
+    # thì hàng đợi tự nuôi chính nó.
+    la_cua_page: Mapped[bool] = mapped_column(Boolean, default=False)
+    da_sua: Mapped[bool] = mapped_column(Boolean, default=False)
+    da_xoa: Mapped[bool] = mapped_column(Boolean, default=False)
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    nhan_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
