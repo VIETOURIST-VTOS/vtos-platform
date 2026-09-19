@@ -92,11 +92,45 @@ TD_KHACH = ("TÊN KHÁCH HÀNG", "TEN KHACH HANG", "HỌ VÀ TÊN", "HỌ TÊN",
 # Những dòng KHÔNG phải dòng dữ liệu – gặp thì bỏ qua (không phải dừng: nhiều tệp có tổng nhóm ở
 # giữa bảng rồi lại tiếp tục nhóm sau).
 DONG_TONG = ("TỔNG", "TONG", "CỘNG", "CONG", "TOTAL", "SUM")
+
+# Ô CHỈ CHỨA MỘT KÝ HIỆU TIỂU TỔNG, không phải mô tả một khoản chi.
+#
+# Mẫu quyết toán Phan Thiết / Nam Cát Tiên đặt tổng của từng mục ở dòng ngay dưới mục ấy và chỉ
+# ghi đúng hai chữ "TC" vào cột SỐ LƯỢNG. Hai chữ ấy có CHỮ CÁI, nên phép kiểm "dòng không có
+# chữ ở cột mô tả nào thì là dòng tổng" cho nó lọt qua, và `_la_dong_tong()` cũng không bắt vì
+# "TC" không bắt đầu bằng "TỔNG" hay "CỘNG".
+#
+# Đo ngày 18/9/2026 trên tệp PHAN THIẾT 14.07.2026: bảng chi có 11 dòng thật cộng được
+# 39.991.500, ba dòng tiểu tổng 37.560.000 + 384.000 + 2.047.500 = 39.991.500, và một ô 2.025
+# nằm dưới bảng. Cộng tất cả ra 79.985.025 — ĐÚNG BẰNG con số `intake_kho_cu` đã ghi vào
+# `tour_cost_lines` cho chuyến ấy. Trên toàn hệ: 57 chuyến mang giá vốn gấp đôi, ghi dư
+# 2.633.963.180 đồng, và không có gì đỏ lên vì mọi bảng vẫn cộng đúng từ dòng.
+#
+# So khớp TRỌN Ô chứ không so phần đầu: "TC" là một ký hiệu, còn "TCP", "TC Land" là mô tả thật.
+O_TIEU_TONG = {"TC", "T.C", "TC:", "T/C", "TỔNG", "TONG", "CỘNG", "CONG", "TỔNG CỘNG", "TONG CONG"}
+
+
+def _la_o_tieu_tong(v) -> bool:
+    return _hoa(v).strip().rstrip(":.").strip() in {x.rstrip(":.") for x in O_TIEU_TONG}
 # Tiêu đề nhóm trong bảng chi: "A. LAND TOUR", "II/ CHI PHÍ:", "B. TRẺ EM"…
 RE_NHOM = re.compile(r"^\s*(?:[IVX]+\s*[/.]|[A-H]\s*[.)])\s*", re.I)
 # Phần THU trong sheet chiết tính, để tách khỏi phần CHI.
 MOC_THU = ("I/GIÁ TOUR", "I/ GIÁ TOUR", "A. THU", "GIÁ TOUR:")
 MOC_CHI = ("II/ CHI PHÍ", "II/CHI PHÍ", "B. CHI PHÍ", "II/ CHI PHI")
+# KHỐI KÝ TÊN – hết bảng, dừng đọc.
+#
+# Bản vá đầu dừng ở hàng "TỔNG CỘNG CHI". Đo lại trên 769 tệp thì nó cắt nhầm 12 tệp họ
+# SAMTENHIL / ĐÀ LẠT 4N3D: những tệp ấy có một hàng "TỔNG CHI PHÍ TRÊN TOUR" ở GIỮA bảng rồi
+# còn mấy khoản nữa ở dưới, nên dừng ở đó là mất 2,0–2,6 triệu mỗi tệp. Một bản vá làm 12 tệp
+# đang đúng thành sai thì không phải bản vá.
+#
+# Cái thật sự kết thúc bảng là KHỐI KÝ TÊN. Tệp nào cũng có, luôn nằm dưới cùng, và không tệp
+# nào đặt một khoản chi phía dưới nó. Dưới khối ấy là mấy dòng tóm tắt ("GIÁ NÉT", "TỶ LỆ LN",
+# "Ngày … tháng … năm 2025") — `_so()` đọc "năm 2025" ra 2025, đúng con số 2.025 lẻ mà 57 chuyến
+# sai đều mang theo.
+KHOI_KY_TEN = ("TP. ĐIỀU HÀNH", "TP.ĐIỀU HÀNH", "TP ĐIỀU HÀNH", "TRƯỞNG PHÒNG ĐIỀU HÀNH",
+               "TỔNG GIÁM ĐỐC", "TONG GIAM DOC", "GIÁM ĐỐC", "NGƯỜI LẬP", "NGUOI LAP",
+               "KẾ TOÁN TRƯỞNG", "GIÁ NÉT", "TỶ LỆ LN", "LN 1 KHÁCH")
 
 NHAN_UNG = ("TIỀN CTY ỨNG", "TIỀN ỨNG", "CTY ỨNG", "ỨNG")
 NHAN_HOAN_UNG = ("HOÀN ỨNG",)
@@ -321,8 +355,12 @@ def _sach_ma_tour(v) -> str:
 
 def _la_dong_tong(ws, r: int, het_cot: int) -> bool:
     for c in range(1, het_cot + 1):
-        t = _hoa(ws.cell(r, c).value)
+        v = ws.cell(r, c).value
+        t = _hoa(v)
         if t and any(t.startswith(k) for k in DONG_TONG):
+            return True
+        # Ký hiệu tiểu tổng trọn ô ("TC") – xem chú thích ở O_TIEU_TONG.
+        if _la_o_tieu_tong(v):
             return True
     return False
 
@@ -603,6 +641,8 @@ def _doc_bang_tien(ws, hang_td: int) -> list[dict]:
                 chu_dau = t
                 break
         H = _hoa(chu_dau)
+        if H and any(H.startswith(k) for k in KHOI_KY_TEN):
+            break
         if H:
             if any(H.startswith(k) for k in MOC_THU):
                 phan = "thu"
@@ -655,7 +695,10 @@ def _doc_bang_tien(ws, hang_td: int) -> list[dict]:
         #
         # Câu hỏi thật là "ô này có phải MÔ TẢ không", và mô tả thì có CHỮ CÁI. Hỏi thẳng như vậy.
         # Dòng tổng không tên vẫn bị loại đúng như cũ, vì nó không có chữ cái nào.
+        # Ô chỉ chứa ký hiệu tiểu tổng KHÔNG được tính là mô tả – nếu tính, dòng tổng của mục
+        # đi thẳng vào bảng chi và giá vốn của chuyến gấp đôi.
         co_chu = any(any(k.isalpha() for k in _chu(ws.cell(r, c).value))
+                     and not _la_o_tieu_tong(ws.cell(r, c).value)
                      for c in range(1, min(c_tt, het_cot + 1)))
         if not co_chu:
             continue
