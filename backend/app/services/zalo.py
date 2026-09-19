@@ -205,6 +205,28 @@ def on_webhook(db: Session, ev: dict) -> dict:
     """Sự kiện OA: follow → lead kênh Zalo OA (chưa có SĐT); user_send_text → cập nhật last_contact; user_submit_info (chia sẻ SĐT) → gắn SĐT vào lead."""
     name = ev.get("event_name") or ""; uid = str((ev.get("follower") or ev.get("sender") or {}).get("id") or ev.get("user_id") or "")
     if not uid: return {"ignored": True}
+
+    # ---- NỐI TÀI KHOẢN & CHẶN LEAD GIẢ (19/9/2026) — xem app/services/zalo_nguoi_dung.py ----
+    #
+    # Hai chốt, đặt TRƯỚC mọi thứ khác trong hàm này, vì cả hai đều phải chặn được việc tạo lead:
+    #
+    #   1. Tin khách nhắn vào có thể là MỘT MÃ NỐI. Nối xong thì dừng hẳn — một mã nối không phải
+    #      một câu hỏi của khách, không vào hộp thư, không thành lead.
+    #   2. UID đã nối với tài khoản nhân viên thì KHÔNG tạo lead và KHÔNG vào hộp thư khách. Chủ
+    #      tịch bấm "Quan tâm" OA để nhận cảnh báo, chứ không phải để thành một khách hàng tiềm
+    #      năng trong mẫu số tỷ lệ chốt lead của Sales.
+    from app.services import zalo_nguoi_dung as ZN
+    if name == "user_send_text":
+        kq = ZN.thu_ma(db, uid, (ev.get("message") or {}).get("text") or "")
+        if kq.get("noi"):
+            db.commit()
+            try: send_oa_text(db, uid, f"Đã nối Zalo này với tài khoản VTOS {kq['username']}. Từ nay cảnh báo của hệ thống sẽ gửi về đây.")
+            except Exception: pass
+            return {"event": name, "uid": uid, "noi_tai_khoan": kq["username"]}
+    if ZN.la_nhan_vien(db, uid):
+        # Vẫn ghi nhận sự kiện để đếm được, nhưng không chạm vào sổ lead và hộp thư khách.
+        return {"event": name, "uid": uid, "la_nhan_vien": True, "bo_qua_lead": True}
+
     if name in ("user_send_text", "user_send_image", "user_send_sticker"):
         try:
             from app.services import inbox as IB

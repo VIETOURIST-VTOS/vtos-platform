@@ -266,7 +266,10 @@ MAN_HINH_API = {
                      "/api/v1/sepay", "/api/v1/bookings"),
     "/companies": ("/api/v1/companies",),
     "/cong-no": ("/api/v1/cong-no",),
-    "/doi-mat-khau": ("/api/v1/auth",),
+    # 19/9/2026 – màn hình này nay còn là chỗ người tự nối Zalo của mình để nhận cảnh báo khủng
+    # hoảng. Cùng một màn hình vì cùng một việc: những thứ thuộc về TÀI KHOẢN của chính mình, và
+    # không vai trò nào làm hộ được cho ai.
+    "/doi-mat-khau": ("/api/v1/auth", "/api/v1/zalo"),
     "/doi-xe": ("/api/v1/fleet", "/api/v1/vehicles", "/api/v1/drivers"),
     "/expenses": ("/api/v1/cashflow", "/api/v1/payment-requests", "/api/v1/tours"),
     "/finance": ("/api/v1/fin", "/api/v1/cashflow"),

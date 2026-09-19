@@ -138,6 +138,16 @@ TU_PHUC_VU: dict[str, str] = {
     "POST /api/v1/auth/password": (
         "Người đổi mật khẩu của chính mình. Không có vai trò nào để khai vì mọi vai trò đều được, và "
         "phạm vi ghi đã khoá vào chính tài khoản đang đăng nhập."),
+    # Nối Zalo · 19/9/2026. Hai cửa này CỐ Ý không theo vai trò, và đó chính là tính chất an toàn
+    # của chúng: không tồn tại đường nào để nối hộ người khác, kể cả cho quản trị viên. UID do Zalo
+    # nói ra khi chính người ấy nhắn mã vào OA — nên không có chỗ nào để gõ nhầm UID của người này
+    # vào tài khoản người kia. Mở thêm một cửa "quản trị nối hộ" là mở lại đúng cái lỗ ấy.
+    "POST /api/v1/zalo/ma-noi": (
+        "Người xin mã nối Zalo cho CHÍNH MÌNH. Mã chỉ gắn với tài khoản đang đăng nhập, sống 10 "
+        "phút, dùng một lần. Không có vai trò nào để khai vì mọi vai trò đều được nối máy của mình."),
+    "DELETE /api/v1/zalo/noi": (
+        "Người gỡ nối Zalo của CHÍNH MÌNH – đổi máy, mất máy, nghỉ việc. Phạm vi ghi khoá vào tài "
+        "khoản đang đăng nhập."),
     "POST /api/v1/daily-reports": (
         "Người nộp báo cáo ngày của chính mình; phòng ban suy từ hồ sơ nhân sự của tài khoản đang "
         "đăng nhập chứ không nhận từ người gọi."),
