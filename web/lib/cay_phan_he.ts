@@ -146,7 +146,15 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "3.5.1", ten: "Chăm sóc sau tour", href: "/cham-soc" },
           { ma: "3.5.2", ten: "Phản hồi & khiếu nại", href: "/khieu-nai" },
           { ma: "3.5.3", ten: "Báo cáo chăm sóc" }
-        ] }
+        ] },
+      // TC-73 (19/9/2026) – sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
+      //
+      // ĐỨNG Ở NHÓM KINH DOANH, KHÔNG Ở NHÂN SỰ – HÀNH CHÍNH, dù HC-NS mới là người cầm bút ghi.
+      // Người đi tìm "team mình gồm những ai" là nhân viên kinh doanh, và họ tìm ở phân hệ của họ.
+      // Quyền GHI vẫn hẹp đúng như cũ (chutich, tgd, hcns, cntt) – nó nằm ở máy chủ, không nằm ở
+      // chỗ treo mục menu. Cố ý KHÔNG treo thêm một lối vào thứ hai dưới 5.x: hai lối vào cho cùng
+      // một màn hình là cách chắc chắn để người dùng không biết nên bấm vào đâu.
+      { ma: "3.6", ten: "Cơ cấu tổ chức Kinh doanh", href: "/to-chuc-kd", chung: true }
     ] },
   { khoa: "vanhanh", ma: "04", ten: "Điều hành",
     tom_tat: "Sản phẩm · Chuyến · Dịch vụ · Đội xe và Hướng dẫn viên là hai nhóm độc lập",
@@ -377,10 +385,10 @@ export type PhanHeCon = {
 export const PHAN_HE_CON: PhanHeCon[] = [
   { khoa: "kdle", cha: "khachhang", ten: "Kinh doanh lẻ",
     tom_tat: "Lịch khởi hành · Booking lẻ · Dịch vụ riêng lẻ · Chính sách bán",
-    lay: ["3.1", "3.2", "3.3", "3.5"], chung: ["3.1", "3.2", "3.5"] },
+    lay: ["3.1", "3.2", "3.3", "3.5", "3.6"], chung: ["3.1", "3.2", "3.5", "3.6"] },
   { khoa: "kddoan", cha: "khachhang", ten: "Kinh doanh đoàn",
     tom_tat: "Cơ hội · Hồ sơ đoàn · Báo giá · Hợp đồng",
-    lay: ["3.1", "3.2", "3.4", "3.5"], chung: ["3.1", "3.2", "3.5"] },
+    lay: ["3.1", "3.2", "3.4", "3.5", "3.6"], chung: ["3.1", "3.2", "3.5", "3.6"] },
 
   // 4.1–4.8 ở lại Điều hành tour: sản phẩm, chuyến, quyết toán, sự cố, hiệu quả và dịch vụ – toàn
   // bộ phần việc chạy quanh CHUYẾN. Xe và hướng dẫn viên tách ra vì đã là hai đơn vị riêng từ

@@ -284,14 +284,27 @@ def test_muc_dung_chung_duoc_noi_ra():
         "cờ dùng chung nên mang màu cảnh báo – sửa màn hình này thì phòng bên cạnh cũng đổi"
 
 
-def test_ba_nhanh_dung_chung_dung_la_ba_nhanh_da_chot():
-    """Đúng ba nhánh dùng chung ở hai phòng bán hàng, không nhiều hơn.
+def test_bon_nhanh_dung_chung_dung_la_bon_nhanh_da_chot():
+    """Đúng BỐN nhánh dùng chung ở hai phòng bán hàng, không nhiều hơn.
 
     Khai thừa thì cờ "dùng chung" mất nghĩa – dán lên mọi thứ thì nó không còn cảnh báo ai.
+
+    ══ MỘT LUẬT BỊ SỬA, GHI LẠI CẢ HAI BÊN ══
+    18/9/2026 (TC-70), phép thử này chốt BA nhánh: 3.1 Hộp thư, 3.2 Khách hàng, 3.5 Chăm sóc khách
+    hàng. Lý do vẫn nguyên giá trị và KHÔNG bị bãi: cờ "dùng chung" chỉ có ích khi nó hiếm.
+
+    19/9/2026 (TC-73), anh Tuấn giao dựng bảng cơ cấu tổ chức khối Kinh doanh. Nhánh 3.6 vào danh
+    sách dùng chung, thành bốn. Đây KHÔNG phải nới cho tiện: sơ đồ chi nhánh → phòng → team → người
+    đúng nghĩa là của cả hai phòng, và màn hình có sẵn ô đổi mảng để mỗi phòng xem cây của mình.
+    Nhét nó vào riêng một phòng là buộc phòng kia đi vòng qua menu của phòng bạn để xem sơ đồ của
+    chính mình — đúng cái phiền mà cờ "dùng chung" sinh ra để tránh.
+
+    Con số BỐN vẫn là một con số chốt, không phải một cái trần bỏ ngỏ. Nhánh thứ năm phải qua đúng
+    cửa này một lần nữa.
     """
     khai = {k: chung for k, _cha, _lay, chung in _khai_phan_he_con(_doc(CAY))}
-    assert set(khai["kdle"]) == {"3.1", "3.2", "3.5"}, f'kdle khai chung {khai["kdle"]}'
-    assert set(khai["kddoan"]) == {"3.1", "3.2", "3.5"}, f'kddoan khai chung {khai["kddoan"]}'
+    assert set(khai["kdle"]) == {"3.1", "3.2", "3.5", "3.6"}, f'kdle khai chung {khai["kdle"]}'
+    assert set(khai["kddoan"]) == {"3.1", "3.2", "3.5", "3.6"}, f'kddoan khai chung {khai["kddoan"]}'
     for k in ("dhtour", "dhxe", "hdv"):
         assert not khai[k], f"{k} không dùng chung nhánh nào với ai – khai {khai[k]}"
 

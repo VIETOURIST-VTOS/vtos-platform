@@ -142,6 +142,19 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # Hai lần đổi trên TRỰC GIAO nhau (một bên thêm phân hệ, một bên bỏ dòng thừa) nên con số dưới đây
 # được ĐẾM LẠI TỪ MÃ, không phải cộng trừ tay hai bảng cũ.
 PHAM_VI_DA_CHOT = {
+    # TC-73 (19/9/2026) – +1 cho MƯỜI HAI vai trò: nhóm "/api/v1/to-chuc-kd" gắn vào màn hình mới
+    # /to-chuc-kd – sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
+    #
+    # Mười hai vai: bốn vai nền (chutich, tgd, bks, robot_ks), bốn vai Kinh doanh (gd_kd, tp_kd,
+    # tn_kd, nv_kd), cộng hcns, hanh_chinh, ptgd_doan, cntt. Đúng bằng danh sách khai ở MENU_ROLES,
+    # không dôi vai nào.
+    #
+    # ĐÚNG MỘT TIỀN TỐ, VÀ ĐÓ LÀ CHỖ SUÝT SAI. Bản đầu của vòng này màn hình còn gọi sang
+    # "/api/v1/access" và "/api/v1/companies" chỉ để đổ hai ô chọn, và bộ đối chiếu bản đồ màn hình
+    # bắt phải khai thêm hai tiền tố ấy – thành +3 cho cả mười hai vai, trong đó nv_kd được đọc danh
+    # sách 220 tài khoản toàn công ty vì cần một ô chọn. Cách chữa KHÔNG phải khai thêm mà là bỏ hai
+    # lời gọi: cửa "/to-chuc-kd/danh-muc" trả đúng hai danh sách ấy và chỉ trả cho vai được GHI.
+    # Cùng bài học đã ghi ở "/api/v1/tong-dai" và "/api/v1/so-con-no": phần dôi ra vẫn là quyền đã cấp.
     # LỚP 3 QUYẾT TOÁN TOUR (11/9/2026) – +1 cho MƯỜI BỐN vai trò: nhóm "/api/v1/quyet-toan-lop3"
     # (dòng khách có ngày sinh, dòng doanh thu, phương tiện từng chặng, HDV chi, sổ dấu vết sửa sau
     # ký) gắn vào màn hình /tours, tức mục "Quyết toán tour" đã có sẵn trong menu.
@@ -267,25 +280,25 @@ PHAM_VI_DA_CHOT = {
     #   Đây đúng bài học đã ghi ở nhóm "/api/v1/tong-dai" ngày 09/9/2026: "gắn ở đó là mở tiền tố
     #   cho mười ba vai trò trong khi chỉ bốn vai gọi được, và PHẦN DÔI RA VẪN LÀ QUYỀN ĐÃ CẤP."
     #   Chín số +1 ở đây là cái giá ĐÚNG BẰNG phần cần, và đó là lý do chọn nó.
-    "chutich": 109, "tgd": 109, "bks": 109, "cntt": 106,
-    "ketoan": 93, "tp_dh": 86, "ptgd_doan": 64, "nv_dh": 60, "hcns": 55, "gd_kd": 57,
+    "chutich": 110, "tgd": 110, "bks": 110, "cntt": 107,
+    "ketoan": 93, "tp_dh": 86, "ptgd_doan": 65, "nv_dh": 60, "hcns": 56, "gd_kd": 58,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 43, "nv_kd": 42, "tn_kd": 42, "tp_kd": 44, "nv_mkt": 31,
+    "ptgd_mkt": 43, "nv_kd": 43, "tn_kd": 43, "tp_kd": 45, "nv_mkt": 31,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
     # chỉ không còn cầm bản tổng hợp cả bộ phận. Đúng nguyên tắc "nhân viên trong phòng KHÔNG mặc
     # định xem báo cáo phòng"; dòng cũ là chỗ vá tạm khi Visa chưa có người phụ trách.
-    "gd_doi_xe": 26, "hanh_chinh": 25, "tp_hd": 24, "xe_hdv": 15, "nv_visa": 17,
+    "gd_doi_xe": 26, "hanh_chinh": 26, "tp_hd": 24, "xe_hdv": 15, "nv_visa": 17,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 17, "robot_ks": 109, "robot_vpm": 16,
+    "robot_pq": 17, "robot_ks": 110, "robot_vpm": 16,
 }
 
 

@@ -41,6 +41,11 @@ CUA_TAY = (
     "fleet_shared_invoices", "fleet_trip_costs", "fleet_trips", "fleet_verifications",
     "guide_assignments", "guide_rates", "hop_dong_khach", "incidents", "intake_runs", "invoices",
     "journal_entries",
+    # TC-73 – cơ cấu tổ chức khối Kinh doanh. Cửa nhập tay ở màn hình /to-chuc-kd: khung "Khai đơn
+    # vị mới" và khung "Phân công người vào đơn vị". CỐ Ý KHÔNG có bộ nạp tệp, và cố ý không suy từ
+    # `users.sales_group`: ba chuỗi chữ tự do cũ gõ tay suốt bốn năm là thứ hai bảng này sinh ra để
+    # thay, chép sang là biến một đống không ai dám tin thành một bảng trông rất đáng tin.
+    "don_vi_kd", "phan_cong_kd",
     # TC-41 – chỉ tiêu doanh thu và lợi nhuận trước thuế theo tháng × pháp nhân. Cửa nhập tay ở màn
     # hình /ke-hoach-thang. Máy KHÔNG sinh được bảng này và cũng không được phép: kế hoạch là điều
     # người ta QUYẾT ĐỊNH, không phải điều hệ thống đo được. Suy nó từ thực hiện kỳ trước là biến

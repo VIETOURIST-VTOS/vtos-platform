@@ -352,6 +352,16 @@ export const GROUPS: Group[] = [
     blocks: [
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
+    // TC-73 · 19/9/2026. Sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
+    //
+    // ĐỨNG NGOÀI hai khối "Lẻ" và "MICE", vì nó là của CẢ HAI phòng: một người có thể ở cây Lẻ,
+    // người khác ở cây Đoàn, và màn hình đổi được mảng ngay trên đó. Nhét vào một trong hai khối
+    // là buộc phòng kia đi vòng qua menu của phòng bạn để xem sơ đồ của chính mình.
+    //
+    // Hành chính – Nhân sự mới là người GHI sổ này, nhưng mục menu vẫn treo ở Kinh doanh: người đi
+    // tìm "team mình gồm những ai" là nhân viên kinh doanh, và họ tìm ở phân hệ của họ. Quyền ghi
+    // nằm ở máy chủ (api/v1/to_chuc_kd.py), không nằm ở chỗ treo mục menu.
+    ["Cơ cấu tổ chức", "/to-chuc-kd"],
     // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và
     // được nhận theo HỢP của hai quy tắc: loại chuyến là đoàn, HOẶC mã tour bắt đầu bằng MICE. Đo
     // 07/9: 115/115 tour có chữ MICE đều là tour đoàn, nên hôm nay hai quy tắc trùng nhau – lấy hợp

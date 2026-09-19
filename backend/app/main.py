@@ -57,6 +57,9 @@ from app.api.v1.kiem_toan import router as kiem_toan_router
 from app.api.v1.ty_gia import router as ty_gia_router
 # TC-41 (16/9/2026) – cửa nhập kế hoạch tháng, anh Tuấn duyệt 15/9.
 from app.api.v1.ke_hoach import router as ke_hoach_router
+# TC-73 – co cau to chuc khoi Kinh doanh. Tien to RIENG `/api/v1/to-chuc-kd`, cung ly do da ghi o
+# dong so_con_no.py ngay tren: gan vao mot nhom co san la noi CA NHOM cho moi vai dang co nhom ay.
+from app.api.v1.to_chuc_kd import router as to_chuc_kd_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -270,6 +273,7 @@ app.include_router(kiem_toan_router)
 # Robot A · 16/9/2026. Cửa tỷ giá – Chủ tịch chốt nhân viên tự nhập tại từng thời điểm.
 app.include_router(ty_gia_router)
 app.include_router(ke_hoach_router)
+app.include_router(to_chuc_kd_router)
 
 
 @app.get("/", include_in_schema=False)

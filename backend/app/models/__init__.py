@@ -68,3 +68,7 @@ from app.models.ke_hoach import *  # noqa
 # cùng một điều ở tệp này – thiếu dòng nhập thì create_all không tạo bảng, phép thử soi mô hình mù
 # đúng phần ấy, và alembic autogenerate sẽ đòi XOÁ bảng.
 from app.models.ty_gia import *  # noqa  # k2-doc-an-toan: dòng NHẬP MODULE, không đọc cột tiền nào — bộ dò thấy dấu sao của `import *` và tưởng là phép nhân
+
+# TC-73 · 19/9/2026. Cơ cấu tổ chức khối Kinh doanh (don_vi_kd, phan_cong_kd). Lần thứ bảy nhắc cùng một điều ở tệp này – thiếu dòng nhập thì create_all không
+# tạo bảng, phép thử soi mô hình mù đúng phần ấy, và alembic autogenerate sẽ đòi XOÁ bảng.
+from app.models.to_chuc_kd import *  # noqa

@@ -278,6 +278,19 @@ CO_Y_KHONG_LOC = {
     "User":     "danh sách tài khoản chỉ mở cho quản trị (/access); lọc ở đây là giấu tài khoản "
                 "khỏi đúng người có nhiệm vụ đi gán pháp nhân cho chúng",
     "Employee": "hồ sơ nhân sự do HCNS quản lý tập trung; HCNS làm việc trên cả tập đoàn",
+    # TC-73 – cùng họ với User và Employee ngay trên: đây là SỔ CƠ CẤU, không phải chứng từ mang tiền.
+    #
+    # Cột `company_id` trên đơn vị có nghĩa thật (chi nhánh thuộc pháp nhân nào) và sẽ dùng khi cộng
+    # doanh thu theo pháp nhân. Nhưng LỌC DANH MỤC theo pháp nhân đang xem thì hỏng đúng việc màn
+    # hình sinh ra để làm: một nhân viên mở sơ đồ để biết team mình gồm những ai, mà cây lại bị cắt
+    # theo pháp nhân đang chọn thì họ thấy một cái cây cụt và không hiểu vì sao. Tệ hơn: HC-NS là
+    # người đi GÁN pháp nhân cho các đơn vị, lọc ở đây là giấu khỏi họ đúng những đơn vị chưa gán —
+    # cùng cái bẫy đã ghi ở dòng User ngay trên.
+    #
+    # Phạm vi của người xem vẫn được cắt, nhưng cắt theo ĐƠN VỊ ĐƯỢC PHÂN CÔNG
+    # (to_chuc_kd.pham_vi_xem), không theo pháp nhân. Hai trục khác nhau, cố ý không trộn.
+    "DonViKD":  "sổ cơ cấu tổ chức khối Kinh doanh; cắt phạm vi theo đơn vị được phân công, "
+                "không theo pháp nhân — xem to_chuc_kd.pham_vi_xem",
 }
 
 
