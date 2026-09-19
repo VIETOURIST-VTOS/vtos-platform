@@ -38,6 +38,7 @@ from app.models.lop3_tour import (BookingKhach, DeNghiLanhSu, DeNghiLanhSuDong,
                                   LOAI_DONG_BEN_BAN, CACH_CHIA)
 from app.services import ben_ban_tour as BBT
 from app.services import cong_no_truong_doan as TLCN
+from app.services import dat_ma_kho_cu as DMK
 from app.services import de_nghi_lanh_su as DNLS
 from app.services import dich_vu_le_thang as DVL
 from app.services import dong_so_kho_cu as DSK
@@ -1822,3 +1823,57 @@ def dat_thue_suat(tid: int, v: ThueSuatVao, u: User = Depends(require_roles(*NHA
     return {**moi, "canh_bao": [c for c in (
         TIP.canh_bao_phan_tram(v.thue_suat_ra_pt),
         TIP.canh_bao_phan_tram(v.thue_suat_ngoai_vn_pt)) if c]}
+
+
+# =================================================================================================
+# ĐẶT MÃ TOUR cho tệp quyết toán cũ không khai mã — Chủ tịch chốt 18/9/2026
+#
+#   "(EU220726 = Châu Âu khởi hành 22/07/2026) = em đặt theo cách này"
+#
+# Đo 18/9/2026: trong 91 bản ghi quyết toán chưa ghép được với chuyến nào, 19 tệp KHÔNG khai mã
+# tour — 29,85 tỷ đồng, chiếm 82% phần chưa ghép. Không có mã thì không tạo được chuyến, và cũng
+# không đối chiếu được xem đã có trên VTOS hay chưa.
+#
+# Cửa tạo chuyến đã đặt sẵn mã tạm KHOCU-… và bày ra ở bảng xem trước, nhưng KHÔNG NHẬN LẠI GÌ —
+# tức là có chỗ đọc mà không có chỗ ghi. Đó là việc còn thiếu, không phải việc để máy tự quyết.
+#
+# QUYỀN: hẹp bằng đúng cửa tạo chuyến (`tao_chuyen_kho_cu`: QUẢN TRỊ + tp_dh). Đặt mã là đặt TÊN
+# cho một chuyến trong lịch sử vận hành của công ty; Kế toán không có việc gì phải làm ở đây.
+DAT_MA = ("chutich", "tgd", "cntt", "tp_dh")
+
+
+class DatMaDong(BaseModel):
+    ten_tep: str
+    ma_tour: str
+
+
+class DatMaVao(BaseModel):
+    cap: list[DatMaDong]
+    xac_nhan: bool = False
+    ke_ca_phai_hoi: bool = False
+
+
+@router.post("/kho-cu/dat-ma/xem")
+def xem_dat_ma_kho_cu(v: DatMaVao, u: User = Depends(require_roles(*DAT_MA)),
+                      db: Session = Depends(get_db)):
+    """SOÁT, KHÔNG GHI. Trả về từng dòng kèm mọi chỗ có thể sai."""
+    return DMK.soat(db, [x.model_dump() for x in v.cap])
+
+
+@router.post("/kho-cu/dat-ma")
+def dat_ma_kho_cu(v: DatMaVao, u: User = Depends(require_roles(*DAT_MA)),
+                  db: Session = Depends(get_db)):
+    """GHI mã người đặt. `xac_nhan` mặc định False nên gọi nhầm KHÔNG ghi gì.
+
+    KHÔNG tạo chuyến. Tạo chuyến vẫn là cửa 'Tạo CHUYẾN còn thiếu', một lần bấm riêng — vì tạo
+    chuyến là ghi lại lịch sử vận hành, còn cửa này chỉ đặt tên cho tệp.
+    """
+    kq = DMK.dat(db, [x.model_dump() for x in v.cap], boi=u.username,
+                 xac_nhan=v.xac_nhan, ke_ca_phai_hoi=v.ke_ca_phai_hoi)
+    if v.xac_nhan:
+        R.audit(db, u.username, u.role, "dat_ma_tour_kho_cu", "nguon:kho_cu_h1_2026",
+                after={"da_ghi": kq["da_ghi"],
+                       "ma": [{"tep": h["ten_tep"], "ma": h["ma_tour"]}
+                              for h in kq["hang"] if not h["chan"]][:50]})
+        db.commit()
+    return kq

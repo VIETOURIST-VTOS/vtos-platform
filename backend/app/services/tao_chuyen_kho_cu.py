@@ -265,7 +265,8 @@ def _ten_chuyen(d: dict, vo_cu: bool = False) -> str:
     return (t or "Chuyến kho cũ")[:200]
 
 
-def de_xuat(d: dict, ma_da_co: set[str], ma_vo_cu: set[str] | None = None) -> dict:
+def de_xuat(d: dict, ma_da_co: set[str], ma_vo_cu: set[str] | None = None,
+            ma_nguoi_dat: dict[str, str] | None = None) -> dict:
     """Một tệp -> một dòng đề xuất. KHÔNG ghi gì, KHÔNG chạm cơ sở dữ liệu.
 
     `ma_da_co` là tập mã chuyến đang có trong VTOS, viết HOA. Người gọi truyền vào, để hàm này thuần
@@ -275,12 +276,20 @@ def de_xuat(d: dict, ma_da_co: set[str], ma_vo_cu: set[str] | None = None) -> di
     loai = phan_loai(tep)
     ma_goc = (d.get("ma_tour") or "").strip()
 
+    # MÃ NGƯỜI ĐẶT ĐỨNG TRÊN MỌI NGUỒN KHÁC, kể cả mã ghi trong tệp.
+    #
+    # Người đặt mã đã nhìn tệp và đã qua bốn phép soát của `dat_ma_kho_cu` – trong đó có phép soát
+    # "không trùng mã chuyến đang có", thứ mà chỗ này không tự làm được vì nó thuần tính toán.
+    # Để mã trong tệp thắng mã người đặt thì cửa đặt mã thành ra vô nghĩa: người sửa xong, bấm tạo
+    # chuyến, và chuyến vẫn mang cái mã cũ.
+    ma_dat = ((ma_nguoi_dat or {}).get(khoa_tep(tep)) or "").strip()
+
     ra = {
         "tep": tep, "loai": loai, "ma_goc": ma_goc,
         "viec": "", "ma": "", "ten": "", "ngay_di": None, "ngay_ve": None,
         "so_khach": d.get("so_khach"), "dieu_hanh_ghi_trong_tep": (d.get("hdv") or {}).get("ten", "")
         if isinstance(d.get("hdv"), dict) else "",
-        "ma_la_may_dat": False, "vi_sao": "",
+        "ma_la_may_dat": False, "ma_la_nguoi_dat": False, "vi_sao": "",
     }
 
     if loai != "mot_chuyen":
@@ -297,7 +306,16 @@ def de_xuat(d: dict, ma_da_co: set[str], ma_vo_cu: set[str] | None = None) -> di
     vo_cu = vo_mau_cu(d) or (bool(ma_goc) and ma_goc.upper() in (ma_vo_cu or set()))
     ra["vo_mau_cu"] = vo_cu
 
-    if not vo_cu and ma_goc and ma_goc.upper() in ma_da_co:
+    if ma_dat:
+        ra["ma_la_nguoi_dat"] = True
+        ra["vi_sao"] = f"Mã do người đặt qua cửa 'Đặt mã' (tệp khai {ma_goc!r})"
+        if ma_dat.upper() in ma_da_co:
+            # Không thể xảy ra nếu đi qua cửa đặt mã, nhưng chuyến có thể vừa được tạo sau đó.
+            ra.update(viec="da_co", ma=ma_dat,
+                      vi_sao="Chuyến mang mã người đặt đã có trong VTOS – chỉ nạp quyết toán")
+            return ra
+
+    if not ma_dat and not vo_cu and ma_goc and ma_goc.upper() in ma_da_co:
         ra.update(viec="da_co", ma=ma_goc, vi_sao="Chuyến đã có trong VTOS – chỉ nạp quyết toán")
         return ra
 
@@ -311,7 +329,9 @@ def de_xuat(d: dict, ma_da_co: set[str], ma_vo_cu: set[str] | None = None) -> di
     if not isinstance(ngay, date):
         ngay = ngay_tu_ten_tep(tep) or ngay_tu_ma(ma_goc) or ngay_tu_duoi_ten_tep(tep)
 
-    if vo_cu:
+    if ma_dat:
+        ra["ma"] = ma_dat[:30]
+    elif vo_cu:
         ra["ma"] = _ma_tam(tep, ngay)
         ra["ma_la_may_dat"] = True
         ra["vi_sao"] = (f"Phần đầu tệp là VỎ MẪU CŨ: ngày ghi trong tệp lệch quá {LECH_LA_VO_CU} "
@@ -345,12 +365,12 @@ def de_xuat(d: dict, ma_da_co: set[str], ma_vo_cu: set[str] | None = None) -> di
     return ra
 
 
-def bang(ds: list[dict], ma_da_co: set[str]) -> dict:
+def bang(ds: list[dict], ma_da_co: set[str], ma_nguoi_dat: dict[str, str] | None = None) -> dict:
     """Bảng XEM TRƯỚC cho người duyệt. Đây là toàn bộ những gì cửa ghi sẽ làm, nói ra trước."""
     # LƯỢT 1 – tìm những mã bị chứng minh là vỏ mẫu cũ, để lượt 2 áp cho mọi tệp mang mã ấy.
     ma_vo_cu = {(d.get("ma_tour") or "").strip().upper()
                 for d in ds if vo_mau_cu(d) and (d.get("ma_tour") or "").strip()}
-    hang = [de_xuat(d, ma_da_co, ma_vo_cu) for d in ds]
+    hang = [de_xuat(d, ma_da_co, ma_vo_cu, ma_nguoi_dat) for d in ds]
 
     # MÃ TẠM PHẢI DUY NHẤT. Mã tạm dựng từ ngày + vài chữ đầu tên tệp, nên hai tệp khác nhau vẫn có
     # thể ra cùng một chuỗi ("QUYẾT TOÁN …" và "QUYẾT TOÁN …"). Trùng mã thì cửa ghi sẽ gộp hai
