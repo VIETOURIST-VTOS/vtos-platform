@@ -1704,17 +1704,36 @@ XEM_DONG_BU = KY_DONG_BU + ("tgd", "tp_dh", "ketoan", "cntt")
 
 
 @router.get("/kho-cu/dong-so-bu/xem")
-def xem_dong_so_bu(u: User = Depends(require_roles(*XEM_DONG_BU)), db: Session = Depends(get_db)):
+def xem_dong_so_bu(moi_lo: int | None = None, bo_qua: int = 0,
+                   u: User = Depends(require_roles(*XEM_DONG_BU)), db: Session = Depends(get_db)):
     """XEM TRƯỚC – không ghi một dòng nào.
 
     Trả về đủ ba thứ người ký cần biết TRƯỚC khi ký: đóng bao nhiêu chuyến, tiền rơi vào THÁNG NÀO
     (`theo_ky`), và những chuyến không đóng được thì vì sao (`vi_sao_khong_dong`).
+
+    Xem theo LÔ như cửa ghi: `moi_lo` chuyến mỗi lần, `bo_qua` là con trỏ lấy từ `bo_qua_tiep` của
+    lần gọi trước. Bỏ trống cả hai thì xem lô đầu.
     """
-    return DSK.xem(db)
+    return DSK.xem(db, gioi_han=moi_lo if moi_lo is not None else DSK.MOI_LO, bo_qua=bo_qua)
 
 
 class DongSoBuVao(BaseModel):
     xac_nhan: bool = False
+    # Số chuyến xử trong MỘT lần gọi. Bỏ trống thì lấy mặc định của bộ dịch vụ (50).
+    #
+    # Vì sao cửa này làm theo lô, đo 19/9/2026 trên hệ thật: gọi một lần cho cả 476 chuyến thì
+    # cổng cắt giữa chừng và trả về một trang HTML — trình duyệt chỉ thấy "Unexpected token '<'".
+    # Giao dịch bị huỷ trọn nên dữ liệu không hỏng, nhưng nút thì không bao giờ bấm xong.
+    #
+    # Nay MỖI LẦN GỌI LÀ MỘT GIAO DỊCH: xử một lô, ghi nhật ký, chốt, trả về `con_lai`. Người bấm
+    # gọi tiếp cho tới khi `con_lai` = 0. Dừng giữa chừng thì phần đã làm vẫn sạch.
+    moi_lo: int | None = None
+    # CON TRỎ. Lấy từ `bo_qua_tiep` của lần gọi trước và truyền lại y nguyên.
+    #
+    # Không có nó thì vòng lặp có thể KẸT: chuyến không đóng được (và ở cửa gỡ là chuyến Điều hành
+    # đã đóng THẬT — đo 17/9/2026 có 82 chuyến, nhiều hơn một lô) vẫn khớp điều kiện lấy lô và luôn
+    # đứng đầu hàng, nên lô sau lấy đúng chúng, làm được 0 chuyến, `con_lai` không giảm.
+    bo_qua: int = 0
 
 
 @router.post("/kho-cu/dong-so-bu")
@@ -1725,13 +1744,18 @@ def chay_dong_so_bu(v: DongSoBuVao, u: User = Depends(require_roles(*KY_DONG_BU)
     Nhật ký ghi TRƯỚC khi commit, và ghi cả số tiền theo từng kỳ — vì câu sẽ phải trả lời sau này
     không phải "ai bấm nút" mà là "ai đã ký cho 36 tỷ rơi vào những tháng nào".
     """
-    kq = DSK.chay(db, boi=u.username, xac_nhan=v.xac_nhan)
+    kq = DSK.chay(db, boi=u.username, xac_nhan=v.xac_nhan,
+                  gioi_han=v.moi_lo if v.moi_lo is not None else DSK.MOI_LO, bo_qua=v.bo_qua)
     if v.xac_nhan:
         R.audit(db, u.username, u.role, "dong_so_bu_kho_cu_h1_2026", f"nguon:{DSK.NGUON}",
                 after={"da_dong": kq["da_dong"],
                        "tong_doanh_thu": kq.get("tong_doanh_thu"),
                        "tong_gia_von": kq.get("tong_gia_von"),
                        "theo_ky": kq.get("theo_ky_da_dong"),
+                       # Ghi cả vị trí lô vào nhật ký: 476 chuyến đóng làm mươi lần bấm, nhật ký
+                       # phải ráp lại được thành một việc chứ không phải mươi việc rời.
+                       "moi_lo": kq.get("moi_lo"), "bo_qua": kq.get("bo_qua"),
+                       "con_lai": kq.get("con_lai"),
                        "khong_dong_duoc": kq.get("khong_dong_duoc"),
                        "ky_thay": "toàn bộ các phòng ban – Chủ tịch chốt 17/9/2026"})
         db.commit()
@@ -1745,10 +1769,12 @@ def go_dong_so_bu(v: DongSoBuVao, u: User = Depends(require_roles(*KY_DONG_BU)),
 
     Cùng quyền với cửa ký: không được phép gỡ một chữ ký mà mình không đủ quyền đặt xuống.
     """
-    kq = DSK.go(db, boi=u.username, xac_nhan=v.xac_nhan)
+    kq = DSK.go(db, boi=u.username, xac_nhan=v.xac_nhan,
+                gioi_han=v.moi_lo if v.moi_lo is not None else DSK.MOI_LO, bo_qua=v.bo_qua)
     if v.xac_nhan:
         R.audit(db, u.username, u.role, "go_dong_so_bu_kho_cu", f"nguon:{DSK.NGUON}",
-                after={"da_go": kq["da_go"],
+                after={"da_go": kq["da_go"], "con_lai": kq.get("con_lai"),
+                       "moi_lo": kq.get("moi_lo"), "bo_qua": kq.get("bo_qua"),
                        "giu_lai_do_dong_that": kq.get("giu_lai_do_dong_that")})
         db.commit()
     return kq

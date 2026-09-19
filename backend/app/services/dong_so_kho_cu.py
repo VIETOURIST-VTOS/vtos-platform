@@ -89,6 +89,35 @@ from app.models.core import Tour
 from app.services.tao_chuyen_kho_cu import NGUON
 
 # Trạng thái chuyến được phép đóng bù. Giống cửa đóng số thật.
+# SỐ CHUYẾN MỖI LÔ. Vì sao phải chia lô, đo được 19/9/2026 trên hệ thật:
+#
+# Cả hai cửa dưới đây nuốt trọn 476 chuyến trong MỘT lần gọi. Cửa đóng số còn tệ hơn cửa gỡ: nó
+# gọi `xem()` (một lần chiết tính mỗi chuyến), rồi trong vòng lặp gọi lại `_soat_mot` (lần hai)
+# và `ST.summary` (lần ba) — 1.428 lần chiết tính cho 476 chuyến. Cổng cắt giữa chừng và trả về
+# một trang HTML; phía trình duyệt chỉ thấy "Unexpected token '<'". Giao dịch bị huỷ trọn nên
+# KHÔNG hỏng dữ liệu, nhưng cũng không ai bấm xong được nút.
+#
+# Chia lô sửa cả hai vế: mỗi lần gọi là một giao dịch nhỏ, xong thì commit và trả về `con_lai`.
+# Người bấm (hoặc màn hình) gọi tiếp cho tới khi `con_lai` = 0. Dừng giữa chừng — mất mạng, đóng
+# máy — thì phần đã làm vẫn sạch và gọi lại là chạy tiếp, không làm lại từ đầu.
+#
+# 50 là chỗ đứng giữa: đủ nhỏ để một lô chạy dưới vài giây, đủ lớn để 476 chuyến xong trong mươi
+# lần gọi. Người gọi đổi được qua tham số; `gioi_han=0` nghĩa là không chia lô (giữ nết cũ).
+MOI_LO = 50
+
+# CON TRỎ `bo_qua` — chỗ dễ làm sai nhất của việc chia lô, và là chỗ suýt sai ở bản đầu.
+#
+# Lô lấy theo điều kiện "chưa đóng số". Chuyến ĐÓNG ĐƯỢC thì sau khi đóng nó rời khỏi điều kiện,
+# nên lần gọi sau không gặp lại. Nhưng chuyến KHÔNG đóng được (thiếu dòng chi, doanh thu 0) thì
+# vẫn nằm nguyên trong điều kiện — và vì sắp theo `id`, nó luôn đứng ở ĐẦU hàng. Không có con trỏ,
+# lần gọi sau lấy đúng những chuyến ấy, đóng được 0 chuyến, `con_lai` không giảm: màn hình quay
+# vòng mãi mãi. Cửa gỡ y hệt, với những chuyến Điều hành đã đóng THẬT mà cửa này phải giữ nguyên —
+# đo 17/9/2026 đã có 82 chuyến như thế, nhiều hơn một lô, nên vòng lặp sẽ kẹt ngay lô đầu.
+#
+# Vì vậy mỗi lần gọi trả về `bo_qua_tiep` = số dòng đã xét mà VẪN CÒN Ở LẠI trong điều kiện.
+# Người gọi truyền lại con số ấy ở lần sau. `con_lai` cũng đếm theo con trỏ: còn bao nhiêu dòng
+# CHƯA XÉT, chứ không phải còn bao nhiêu dòng khớp điều kiện.
+
 CHO_DONG = ("ket_thuc", "da_duyet")
 
 # Trạng thái sau khi đóng — cũng giống cửa thật, để mọi bước sau (Kế toán xác nhận, khoá) đi tiếp
@@ -105,15 +134,38 @@ def moc_ky(t: Tour) -> datetime:
     return datetime.combine(t.end_date, time(23, 59, 59))
 
 
-def _ung_vien(db: Session) -> list[Tour]:
+def _cau_ung_vien(gioi_han: int | None = None, bo_qua: int = 0):
+    """Câu hỏi CSDL cho "chuyến kho cũ chưa đóng số" — tách riêng để phép thử soi được thứ tự.
+
+    `order_by(Tour.id)` KHÔNG phải để cho đẹp. Cả cơ chế chia lô dựa trên nó: `bo_qua` bỏ qua
+    `n` dòng ĐẦU, mà "đầu" chỉ có nghĩa khi thứ tự cố định. Thiếu `order_by` thì thứ tự do cơ sở
+    dữ liệu quyết (Postgres đổi thứ tự sau mỗi lần UPDATE), lô sau có thể lặp lại chuyến của lô
+    trước hoặc nhảy cóc bỏ sót — cả hai đều lặng lẽ.
+    """
+    q = select(Tour).where(Tour.confirmed_by == NGUON, Tour.closed_at.is_(None)).order_by(Tour.id)
+    if bo_qua:
+        q = q.offset(bo_qua)
+    if gioi_han:
+        q = q.limit(gioi_han)
+    return q
+
+
+def _ung_vien(db: Session, gioi_han: int | None = None, bo_qua: int = 0) -> list[Tour]:
     """Chuyến do kho cũ dựng ra mà CHƯA đóng số.
 
     Nhận diện bằng `confirmed_by` — cửa tạo chuyến kho cũ ghi sẵn nguồn vào đấy
     (`intake_tao_chuyen.nap_lo`). Không cần thêm cột, không cần bản nâng cấp CSDL.
+
+    `gioi_han` cắt bớt để làm THEO LÔ; `bo_qua` là CON TRỎ — xem chú thích ở `MOI_LO`.
     """
-    return list(db.execute(
-        select(Tour).where(Tour.confirmed_by == NGUON, Tour.closed_at.is_(None))
-    ).scalars())
+    return list(db.execute(_cau_ung_vien(gioi_han, bo_qua)).scalars())
+
+
+def _dem_ung_vien(db: Session) -> int:
+    """Đếm, KHÔNG tải. `len(_ung_vien(db))` kéo cả 476 đối tượng Tour về chỉ để lấy một con số."""
+    from sqlalchemy import func
+    return db.scalar(select(func.count(Tour.id)).where(
+        Tour.confirmed_by == NGUON, Tour.closed_at.is_(None))) or 0
 
 
 def _soat_mot(db: Session, t: Tour, hom_nay: date) -> dict:
@@ -124,7 +176,12 @@ def _soat_mot(db: Session, t: Tour, hom_nay: date) -> dict:
     d = {"tour_id": t.id, "ma": t.code, "ten": t.name,
          "ngay_ket_thuc": t.end_date, "ky": f"{t.end_date:%Y-%m}" if t.end_date else "",
          "doanh_thu": float(sm["revenue"] or 0), "gia_von": float(sm["actual"] or 0),
-         "so_dong_chi": sm["lines"], "dong_duoc": False, "vi_sao": ""}
+         "so_dong_chi": sm["lines"], "dong_duoc": False, "vi_sao": "",
+         # Giữ luôn kết quả `ST.summary` để cửa ghi khỏi tính lại. Trước đây `chay()` gọi
+         # `xem()` (1 lần/chuyến) rồi trong vòng lặp gọi `_soat_mot` (lần 2) và `ST.summary`
+         # (lần 3) — BA lần cho cùng một chuyến. Với 476 chuyến là 1.428 lần chiết tính, và
+         # cổng cắt giữa chừng: đo 19/9/2026, cửa trả về trang HTML thay vì JSON.
+         "_sm": sm}
 
     if t.status not in CHO_DONG:
         d["vi_sao"] = f"trạng thái {t.status!r} không ở bước quyết toán"
@@ -158,13 +215,28 @@ def _gom(hang: list[dict]) -> dict:
     return dict(sorted(theo_ky.items()))
 
 
-def xem(db: Session) -> dict:
+def _sach(hang: list[dict]) -> list[dict]:
+    """Bỏ `_sm` trước khi trả ra ngoài.
+
+    `_sm` là kết quả chiết tính giữ lại cho `chay()` dùng — việc BÊN TRONG. Để nó lọt ra câu trả
+    lời của cửa API thì mỗi chuyến gánh thêm một khối chiết tính, 50 chuyến một lô là một câu trả
+    lời phình ra vô ích; và một trường bắt đầu bằng dấu gạch dưới lọt ra ngoài rồi thì sớm muộn sẽ
+    có màn hình đọc nó, lúc ấy sửa bên trong hoá ra là phá cửa.
+    """
+    return [{k: v for k, v in h.items() if k != "_sm"} for h in hang]
+
+
+def xem(db: Session, gioi_han: int | None = MOI_LO, bo_qua: int = 0,
+        _giu_sm: bool = False) -> dict:
     """XEM TRƯỚC — không ghi một dòng nào.
 
     Nói ra đúng ba thứ người ký cần biết trước khi ký: sẽ đóng bao nhiêu chuyến, tiền rơi vào
     THÁNG NÀO, và những chuyến không đóng được thì vì sao.
     """
-    hang = [_soat_mot(db, t, date.today()) for t in _ung_vien(db)]
+    hang = [_soat_mot(db, t, date.today()) for t in _ung_vien(db, gioi_han, bo_qua)]
+    # `xem` không ghi gì nên KHÔNG chuyến nào rời khỏi điều kiện: con trỏ tiến đủ cả lô.
+    bo_qua_tiep = bo_qua + len(hang)
+    con_lai = _dem_ung_vien(db) - bo_qua_tiep
     dong = [h for h in hang if h["dong_duoc"]]
     bo = [h for h in hang if not h["dong_duoc"]]
 
@@ -176,13 +248,19 @@ def xem(db: Session) -> dict:
     return {
         "nguon": NGUON,
         "ung_vien": len(hang),
+        # Bao nhiêu chuyến CHƯA được xét trong lần gọi này. Màn hình đọc con số này để biết còn
+        # phải gọi tiếp hay không — và người bấm biết mình đang xem một PHẦN chứ không phải tất cả.
+        "con_lai": con_lai,
+        "moi_lo": gioi_han or 0,
+        "bo_qua": bo_qua,
+        "bo_qua_tiep": bo_qua_tiep,
         "se_dong": len(dong),
         "khong_dong_duoc": len(bo),
         "vi_sao_khong_dong": vi_sao,
         "theo_ky": list(theo_ky.values()),
         "tong_doanh_thu": round(sum(h["doanh_thu"] for h in dong), 2),
         "tong_gia_von": round(sum(h["gia_von"] for h in dong), 2),
-        "chi_tiet": hang,
+        "chi_tiet": hang if _giu_sm else _sach(hang),
         "ghi_chu": (
             f"XEM TRƯỚC – chưa ghi gì. Sẽ đóng số {len(dong)} chuyến của kho quyết toán cũ, "
             f"Chủ tịch ký thay các phòng ban. Mốc kỳ (`closed_at`) lấy theo NGÀY KẾT THÚC CỦA "
@@ -191,7 +269,8 @@ def xem(db: Session) -> dict:
     }
 
 
-def chay(db: Session, boi: str, xac_nhan: bool = False) -> dict:
+def chay(db: Session, boi: str, xac_nhan: bool = False,
+         gioi_han: int | None = MOI_LO, bo_qua: int = 0) -> dict:
     """ĐÓNG SỐ THẬT. `xac_nhan` mặc định False nên gọi nhầm KHÔNG ghi gì.
 
     Không commit — người gọi (cửa API) commit sau khi đã ghi nhật ký kiểm toán, để nhật ký và dữ
@@ -200,18 +279,21 @@ def chay(db: Session, boi: str, xac_nhan: bool = False) -> dict:
     from app.services import settlement as ST
     from app.services.products import event as EV
 
-    kq = xem(db)
+    kq = xem(db, gioi_han, bo_qua, _giu_sm=True)
     if not xac_nhan:
-        return {**kq, "da_dong": 0,
+        return {**kq, "chi_tiet": _sach(kq["chi_tiet"]), "da_dong": 0,
                 "message": "XEM TRƯỚC – chưa ghi gì. Gọi lại với xac_nhan = true để đóng thật."}
 
     luc = datetime.now()
     da = []
-    for t in _ung_vien(db):
-        d = _soat_mot(db, t, date.today())
-        if not d["dong_duoc"]:
+    # DÙNG LẠI kết quả của `xem` ở trên, KHÔNG soát lại và KHÔNG chiết tính lại. Bản trước gọi
+    # `_soat_mot` và `ST.summary` thêm hai lần nữa cho mỗi chuyến — cùng một con số, tính ba lần.
+    bang = {d["tour_id"]: d for d in kq["chi_tiet"]}
+    for t in _ung_vien(db, gioi_han, bo_qua):
+        d = bang.get(t.id)
+        if d is None or not d["dong_duoc"]:
             continue
-        sm = ST.summary(db, t)
+        sm = d["_sm"]
         t.actual_revenue = float(sm["revenue"] or 0)
         t.actual_cost = float(sm["actual"] or 0)
         t.closed_at = moc_ky(t)          # KỲ CỦA CHUYẾN – xem moc_ky()
@@ -225,9 +307,19 @@ def chay(db: Session, boi: str, xac_nhan: bool = False) -> dict:
     db.flush()
 
     theo_ky = _gom(da)
+    # Chuyến vừa đóng đã rời khỏi điều kiện; chuyến KHÔNG đóng được thì ở lại và luôn đứng đầu
+    # hàng, nên con trỏ phải tiến qua đúng số ấy — nếu không, lô sau lấy lại chính chúng và màn
+    # hình quay vòng mãi. Xem chú thích ở `MOI_LO`.
+    bo_qua_tiep = bo_qua + (len(kq["chi_tiet"]) - len(da))
     return {
         **kq,
+        "chi_tiet": _sach(kq["chi_tiet"]),
         "da_dong": len(da),
+        "bo_qua_tiep": bo_qua_tiep,
+        # Còn bao nhiêu chuyến CHƯA XÉT. Màn hình gọi tiếp khi con số này > 0.
+        # Sau `db.flush()` ở trên, `_dem_ung_vien` ĐÃ phản ánh trạng thái mới — những chuyến vừa
+        # đóng không còn đếm vào nữa. Trừ thêm `len(da)` là trừ hai lần.
+        "con_lai": _dem_ung_vien(db) - bo_qua_tiep,
         "theo_ky_da_dong": list(theo_ky.values()),
         "luc": luc,
         "boi": boi,
@@ -237,6 +329,14 @@ def chay(db: Session, boi: str, xac_nhan: bool = False) -> dict:
                                               for k in theo_ky.values())
             + f". {kq['khong_dong_duoc']} chuyến không đóng được, xem `vi_sao_khong_dong`."),
     }
+
+
+def _dem_da_dong(db: Session) -> int:
+    """Đếm chuyến kho cũ đang ở trạng thái đã đóng số. Đếm ở CSDL, không tải đối tượng về."""
+    from sqlalchemy import func
+    return db.scalar(select(func.count(Tour.id)).where(
+        Tour.confirmed_by == NGUON, Tour.status == SAU_DONG,
+        Tour.closed_at.is_not(None))) or 0
 
 
 def _do_cua_nay(t: Tour) -> bool:
@@ -256,20 +356,42 @@ def _do_cua_nay(t: Tour) -> bool:
     return bool(t.end_date) and t.closed_at == moc_ky(t)
 
 
-def go(db: Session, boi: str, xac_nhan: bool = False) -> dict:
+def _cau_da_dong(gioi_han: int | None = None, bo_qua: int = 0):
+    """Câu hỏi CSDL cho "chuyến kho cũ đang ở trạng thái đã đóng số". Xem `_cau_ung_vien` về
+    `order_by` — cùng một lý do, và ở cửa gỡ nó còn quan trọng hơn vì số chuyến ở lại nhiều hơn."""
+    q = (select(Tour).where(Tour.confirmed_by == NGUON, Tour.status == SAU_DONG,
+                            Tour.closed_at.is_not(None)).order_by(Tour.id))
+    if bo_qua:
+        q = q.offset(bo_qua)
+    if gioi_han:
+        q = q.limit(gioi_han)
+    return q
+
+
+def go(db: Session, boi: str, xac_nhan: bool = False,
+       gioi_han: int | None = MOI_LO, bo_qua: int = 0) -> dict:
     """GỠ lại phần cửa này đã đóng — bắt buộc phải có, vì không có nút gỡ là nút không ai dám bấm.
 
     CHỈ đụng chuyến còn ở `da_dong_so` VÀ mang dấu của cửa này (xem `_do_cua_nay`). Chuyến đã đi
     tiếp (Kế toán xác nhận, đã khoá) thì để yên: gỡ ngược một chuyến Kế toán đã xác nhận là kéo con
     số của họ về mà họ không biết.
     """
-    tat_ca = list(db.execute(
-        select(Tour).where(Tour.confirmed_by == NGUON, Tour.status == SAU_DONG,
-                           Tour.closed_at.is_not(None))).scalars())
+    # Lấy theo LÔ, và lọc `_do_cua_nay` SAU khi lấy — nên một lô có thể ra ít hơn `gioi_han`
+    # chuyến gỡ được. Đó là chủ ý: lọc trong câu truy vấn thì phải so `closed_at` với một biểu
+    # thức tính từ `end_date` của từng dòng, và mỗi cơ sở dữ liệu viết một kiểu.
+    tat_ca = list(db.execute(_cau_da_dong(gioi_han, bo_qua)).scalars())
     ds = [t for t in tat_ca if _do_cua_nay(t)]
     giu = len(tat_ca) - len(ds)
+    # Chuyến GIỮ LẠI vẫn ở trạng thái đã đóng nên lô sau gặp lại đúng chúng — con trỏ phải tiến
+    # qua. Đo 17/9/2026: 82 chuyến kho cũ đã đóng THẬT, nhiều hơn một lô, nên không có con trỏ là
+    # vòng lặp kẹt ngay ở lô đầu và không bao giờ tới chuyến cần gỡ.
+    bo_qua_tiep = bo_qua + giu
     if not xac_nhan:
         return {"se_go": len(ds), "da_go": 0, "giu_lai_do_dong_that": giu,
+                # Xem trước không ghi gì, nên cả lô còn ở lại: con trỏ tiến đủ `len(tat_ca)`.
+                "bo_qua": bo_qua, "bo_qua_tiep": bo_qua + len(tat_ca),
+                "con_lai": _dem_da_dong(db) - bo_qua - len(tat_ca),
+                "moi_lo": gioi_han or 0,
                 "ma": [t.code for t in ds[:50]],
                 "message": (f"XEM TRƯỚC – chưa gỡ gì. Sẽ gỡ {len(ds)} chuyến về lại 'kết thúc' và "
                             f"xoá doanh thu / giá vốn / mốc kỳ do cửa này ghi. Giữ nguyên {giu} "
@@ -281,5 +403,10 @@ def go(db: Session, boi: str, xac_nhan: bool = False) -> dict:
         t.status = "ket_thuc"
     db.flush()
     return {"se_go": len(ds), "da_go": len(ds), "giu_lai_do_dong_that": giu,
+            "moi_lo": gioi_han or 0, "bo_qua": bo_qua, "bo_qua_tiep": bo_qua_tiep,
+            # Như trên: sau flush, chuyến vừa gỡ không còn ở trạng thái đã đóng nên không đếm vào.
+            # Trừ con trỏ ra để còn lại đúng số CHƯA XÉT.
+            "con_lai": _dem_da_dong(db) - bo_qua_tiep,
+            "ma": [t.code for t in ds[:50]],
             "message": (f"Đã gỡ {len(ds)} chuyến về lại 'kết thúc'. Giữ nguyên {giu} chuyến đã đóng "
                         f"số thật. Chạy lại cửa đóng bù được.")}
