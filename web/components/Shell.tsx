@@ -245,7 +245,14 @@ function NhomXo({ g, thu, dangO, dongThanhDoc }:
     <div ref={bang} className="xo-bang" role="menu" aria-label={g.label}
       style={taiCho ? undefined : { left: toaDo?.left ?? -9999, top: toaDo?.top ?? -9999 }}
       onMouseEnter={vao} onMouseLeave={ra}>
-      <div className="xo-dau">{g.label}</div>
+      {/* TC-72 · 19/9/2026 — BỎ DÒNG TIÊU ĐỀ trong bảng xổ ra. Anh Tuấn: "em xoá bỏ chữ kinh
+          doanh và chữ điều hành, không lặp lại."
+          Tên nhóm đã hiện ở BA chỗ cùng lúc: trên chính cái nút bên cạnh, trong tooltip khi rê
+          chuột, và ở dòng tiêu đề này. Ba lần cho một thông tin thì hai lần sau chỉ làm mắt
+          người đọc phải lọc.
+          THÔNG TIN KHÔNG MẤT: `aria-label={g.label}` ngay trên thẻ này vẫn xướng đúng tên nhóm
+          cho trình đọc màn hình — bỏ chữ VẼ RA chứ không bỏ chữ NÓI RA. Đây cùng một nếp với
+          TC-69 lúc rút "Nhân sự – Hành chính" thành "HC – NS". */}
       {g.phans!.map((p) => (
         <Link key={p.khoa} href={`/phan-he/${p.khoa}`} className="xo-muc" role="menuitem"
           onClick={() => { datMo(false); dongThanhDoc(); }}>{p.label}</Link>
