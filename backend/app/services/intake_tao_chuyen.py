@@ -102,7 +102,8 @@ def _ma_da_co(db) -> set[str]:
 
 def kiem_lo(db, rows: list[dict]) -> dict:
     """CỬA SOÁT – KHÔNG ghi một dòng nào. Trả về đúng thứ người duyệt cần nhìn trước khi quyết."""
-    b = TC.bang(rows, _ma_da_co(db))
+    from app.services import dat_ma_kho_cu as DM
+    b = TC.bang(rows, _ma_da_co(db), DM.ma_nguoi_dat(db))
     may_dat = sum(1 for h in b["hang"] if h["viec"] == "tao_moi" and h["ma_la_may_dat"])
     vo_cu = sum(1 for h in b["hang"] if h.get("vo_mau_cu"))
 
