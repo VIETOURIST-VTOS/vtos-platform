@@ -408,6 +408,7 @@ MAN_HINH_API = {
     # KHÔNG khai `/api/v1/tours` dù mỗi dòng có đường dẫn sang chuyến: đường dẫn ấy là một liên
     # kết cho người bấm, không phải một lượt gọi máy chủ của màn hình này.
     "/so-con-no": ("/api/v1/so-con-no",),
+    "/to-chuc-kd": ("/api/v1/to-chuc-kd",),
     "/robot-reports": ("/api/v1/auto-reports",),
     "/sales-reports": ("/api/v1/sales-reports",),
     "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
@@ -565,6 +566,10 @@ MENU_ROLES = {
     # liệu việc ghi sổ tháng — không thấy thì đến cuối tháng mới biết còn 24 tỷ chưa vào.
     # Sale KHÔNG có mặt, y như /lai-lo-tour: giá vốn chuyến ngoài phạm vi của họ.
     "/so-con-no": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
+    # TC-73 – so do to chuc khoi Kinh doanh. Ca khoi Kinh doanh XEM duoc: biet minh thuoc dau va ai
+    # cung team khong phai bi mat. GHI thi hep hon nhieu, khai rieng o api/v1/to_chuc_kd.py – nguoi tu
+    # ve duoc cay to chuc cua minh la nguoi tu cap duoc pham vi xem cua minh.
+    "/to-chuc-kd": BASE_VIEW + SALES + ("hcns", "hanh_chinh", "ptgd_doan", "cntt"),
 
     # V7 Đợt 3 – Sự cố tour. Điều hành cầm việc; Kinh doanh có mặt vì sale thường là người khách gọi
     # đầu tiên khi chuyến trục trặc; Kế toán đọc để biết khoản chi phát sinh của chuyến từ đâu ra.
