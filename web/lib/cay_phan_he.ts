@@ -71,9 +71,12 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
         ] },
       { ma: "2.6", ten: "Chuyển đổi & phối hợp Sales",
         con: [
-          { ma: "2.6.1", ten: "Chuyển đổi sau 30 / 60 / 90 ngày" },
-          { ma: "2.6.2", ten: "Lead tồn đọng & thời hạn xử lý" },
-          { ma: "2.6.3", ten: "Lý do mất khách & tái chăm sóc" }
+          // TC-78 · 23/9/2026 – ba mục con trỏ vào MỘT màn hình, khác nhau ở thẻ đang mở. Cùng
+          // lý lẽ với nhóm 2.7: ba màn hình riêng thì ba nơi cùng quyết một phép tính hạn, và
+          // ngày một nơi lệch thì ba bảng ra ba con số mà không ai biết bảng nào đúng.
+          { ma: "2.6.1", ten: "Chuyển đổi sau 30 / 60 / 90 ngày", href: "/chuyen-doi-lead" },
+          { ma: "2.6.2", ten: "Lead tồn đọng & thời hạn xử lý", href: "/chuyen-doi-lead" },
+          { ma: "2.6.3", ten: "Lý do mất khách & tái chăm sóc", href: "/chuyen-doi-lead" }
         ] },
       // TC-77 · 23/9/2026 – cả ba mục con trỏ vào MỘT màn hình, khác nhau ở bộ lọc luồng.
       // Dựng ba màn hình riêng thì ba nơi cùng quyết một phép truy nguồn, và ngày một nơi lệch
