@@ -342,7 +342,14 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
         con: [
           { ma: "8.1.1", ten: "Cơ cấu tổ chức", href: "/companies" },
           { ma: "8.1.2", ten: "Tài khoản", href: "/access" },
-          { ma: "8.1.3", ten: "Vai trò & phân quyền", href: "/access" }
+          { ma: "8.1.3", ten: "Vai trò & phân quyền", href: "/access" },
+          // TC-75 – gộp hai tài khoản trùng của cùng một người. Đo 19/9/2026: 6 người có từ hai
+          // tài khoản trở lên, bốn cặp đang mở cả hai và doanh số bị xẻ đôi.
+          //
+          // ĐỨNG DƯỚI 8.1 "Tổ chức & truy cập" chứ không dưới 8.2 "Nhập & đối chiếu", dù nó là
+          // việc dọn dữ liệu: cái nó sửa là TÀI KHOẢN, và người đi tìm nó đi tìm ở chỗ quản lý
+          // tài khoản. `them: true` vì v1.3 không liệt kê màn hình này.
+          { ma: "8.1.4", ten: "Tài khoản trùng", href: "/gop-tai-khoan", them: true }
         ] },
       { ma: "8.2", ten: "Dữ liệu & kết nối",
         con: [

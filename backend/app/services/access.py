@@ -413,6 +413,7 @@ MAN_HINH_API = {
     "/so-con-no": ("/api/v1/so-con-no",),
     "/to-chuc-kd": ("/api/v1/to-chuc-kd",),
     "/nguoi-ban-hang": ("/api/v1/nguoi-ban-hang",),
+    "/gop-tai-khoan": ("/api/v1/gop-tai-khoan",),
     "/kinh-doanh-le": ("/api/v1/kinh-doanh",),
     "/dong-gop-marketing": ("/api/v1/dong-gop-marketing",),
     "/chuyen-doi-lead": ("/api/v1/chuyen-doi-lead",),
@@ -581,6 +582,11 @@ MENU_ROLES = {
     # TC-74 - ai duoc ban hang. Ke toan co o day ma khong co o /to-chuc-kd: doi tac la ben thu ba
     # co cong no va hoa don nen Ke toan phai biet danh muc ay; so do to chuc noi bo thi khong.
     "/nguoi-ban-hang": BASE_VIEW + SALES + ("hcns", "hanh_chinh", "ptgd_doan", "ketoan", "cntt"),
+    # TC-75 - gop tai khoan trung. HEP: khong co vai Kinh doanh nao. Doc bang cap trung thi HCNS
+    # va Ke toan can (ho la nguoi phat hien ra trung), nhung nut gop thi chi cntt va Ban TGD -
+    # khai rieng o api/v1/gop_tai_khoan.py. Gop la viec mot chieu: chuyen 290 booking sang nham
+    # nguoi roi thi khong co nut tach ra lai.
+    "/gop-tai-khoan": BASE_VIEW + ("hcns", "ketoan", "cntt"),
     # TC-76 - man hinh Kinh doanh Le. Dong da duoc cat o may chu theo phan cong
     # (to_chuc_kd.pham_vi_xem), nen rong o day khong co nghia la ai cung thay so cua nguoi khac.
     "/kinh-doanh-le": BASE_VIEW + SALES + ("hcns", "ketoan", "ptgd_doan", "cntt"),

@@ -142,6 +142,17 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # Hai lần đổi trên TRỰC GIAO nhau (một bên thêm phân hệ, một bên bỏ dòng thừa) nên con số dưới đây
 # được ĐẾM LẠI TỪ MÃ, không phải cộng trừ tay hai bảng cũ.
 PHAM_VI_DA_CHOT = {
+    # TC-75 (24/9/2026) – +1 cho BẢY vai trò: nhóm "/api/v1/gop-tai-khoan" gắn vào màn hình mới
+    # /gop-tai-khoan (gộp hai tài khoản trùng của cùng một người).
+    #
+    # KHÔNG CÓ MỘT VAI KINH DOANH NÀO, và đó là điểm của cả vòng. Bảy vai: bốn vai nền (chutich,
+    # tgd, bks, robot_ks), cộng hcns, ketoan, cntt. HC-NS và Kế toán ĐỌC được bảng cặp trùng – họ là
+    # người phát hiện ra trùng khi đối chiếu bảng lương và công nợ. Nút GỘP thì hẹp hơn nữa
+    # (chutich, tgd, cntt), khai riêng ở api/v1/gop_tai_khoan.py, vì gộp là việc MỘT CHIỀU: chuyển
+    # 290 booking sang nhầm người rồi thì không có nút tách ra lại, phải gộp ngược từng bảng bằng tay.
+    #
+    # SỐ CỘNG LÊN TỪ NỀN CỦA NHÓM 2.8 NGAY DƯỚI, không phải từ nền ngày 19/9 khi vòng này viết xong:
+    # tệp được dựng lại từ `git show origin/main` sau khi nhóm 2.6, 2.7, 2.8 đã vào main.
     # TC-74 (19/9/2026) – +1 cho MƯỜI BA vai trò: nhóm "/api/v1/nguoi-ban-hang" gắn vào màn hình mới
     # /nguoi-ban-hang (ai được đứng tên một booking: nhân viên khối Kinh doanh, người ngoài khối đã
     # mở quyền bán, và đối tác ngoài công ty).
@@ -352,8 +363,8 @@ PHAM_VI_DA_CHOT = {
     # Nhóm CHỐT SỐ còn hẹp hơn nữa và nằm ở tầng cửa (chutich, tgd, ptgd_mkt, cntt): chốt số là
     # đặt một mốc mà mọi báo cáo sau đó đem ra so, nên `nv_mkt` có mặt ở bảng này mà không chốt
     # được — dù họ ghi được ở cả nhóm 2.6 lẫn 2.7.
-    "chutich": 115, "tgd": 115, "bks": 115, "cntt": 112,
-    "ketoan": 98, "tp_dh": 86, "ptgd_doan": 69, "nv_dh": 60, "hcns": 60, "gd_kd": 63,
+    "chutich": 116, "tgd": 116, "bks": 116, "cntt": 113,
+    "ketoan": 99, "tp_dh": 86, "ptgd_doan": 69, "nv_dh": 60, "hcns": 61, "gd_kd": 63,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
@@ -370,7 +381,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 115, "robot_vpm": 17,
+    "robot_pq": 18, "robot_ks": 116, "robot_vpm": 17,
 }
 
 
