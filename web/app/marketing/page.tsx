@@ -49,7 +49,10 @@ const TABS: [string, string, string][] = [
   ["chiendich",  "Ngân sách & chiến dịch",   "Theo dõi kế hoạch, chi phí và kết quả trên cùng chiến dịch."],
   ["doisoat",    "Đối soát dữ liệu",         "Xử lý trùng, thiếu nguồn và sai liên kết trước khi xác nhận báo cáo."],
   ["noidung",    "Nội dung & kênh",          "Tổ chức nội dung theo lịch, người phụ trách và trạng thái duyệt."],
-  ["thuonghieu", "Thương hiệu & PR",         "Quản lý nhận diện, tài sản thương hiệu và hoạt động truyền thông."],
+  // Tên cũ là "Thương hiệu & PR". Đổi 19/9/2026 vì tab này giữ HÀNG ĐỢI KHỦNG HOẢNG và sổ PR
+  // kèm đồng hồ hai giờ — thứ người ta cần tìm lúc gấp nhất. Tên cũ không gợi gì tới việc ấy.
+  ["thuonghieu", "Khủng hoảng, PR & thương hiệu",
+   "Hàng đợi tin nghi ngờ, sổ hoạt động PR kèm hạn phản hồi, và tài sản thương hiệu."],
 ];
 
 /** Một THẺ SỐ của Tổng quan. Bốn phần, và phần thứ tư không được bỏ:

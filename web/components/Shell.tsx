@@ -332,6 +332,11 @@ export const GROUPS: Group[] = [
   // giữ khách, cùng một việc với Nội dung & thương hiệu. Phiếu chăm sóc VẪN tự giao cho nhân viên
   // đã bán như chốt 07/9; đổi nhóm menu không đổi người được giao việc.
   { key: "marketing", label: "Marketing & PR", icon: "marketing", href: "/phan-he/marketing", blocks: [
+    // 19/9/2026 · ĐẶT ĐẦU TIÊN, và đó là chủ ý. Trước hôm nay cửa lọc khủng hoảng nằm lẫn trong
+    // tab "Thương hiệu & PR" — sâu ba lớp, sau một cái tên không gợi gì tới khủng hoảng. Chính
+    // anh Tuấn, người đặt làm nó, mở web mà không thấy; người trực lúc 2 giờ sáng càng không.
+    // Một cửa báo động phải biết đường mới mò ra được thì nó không phải cửa báo động.
+    ["Khủng hoảng & phản ứng nhanh", "/marketing?tab=thuonghieu"],
     ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"],
     ["Chiến dịch", "/marketing"],
     ["Nội dung & thương hiệu", "/noi-dung"],

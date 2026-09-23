@@ -613,3 +613,63 @@ def hop_thu_do(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get
     """
     from app.services import loc_khung_hoang as LK
     return LK.do_bo_loc(db)
+
+
+# =============================================================================================
+# BÁO ĐỘNG KHỦNG HOẢNG — phút 0 báo Chủ tịch, phút 15 đánh thức thêm người (19/9/2026)
+#
+# KHÁC HẲN hàng đợi ở trên, và chỗ khác nhau là cả thiết kế:
+#   · Hàng đợi XẾP tin cho NGƯỜI đọc. Không đánh thức ai.
+#   · Cửa này ĐÁNH THỨC người, không chờ ai đọc — vì ngoài giờ không có người trực Marketing, và
+#     Chủ tịch chốt 19/9/2026 rằng ông trực. Một người trực thì phải có người đỡ phía sau.
+#
+# Đọc đầu services/bao_dong_khung_hoang.py trước khi sửa bất cứ gì ở đây.
+# =============================================================================================
+@router.post("/marketing/bao-dong/quet")
+def bao_dong_quet(u: User = Depends(require_roles(*LAP)), db: Session = Depends(get_db)):
+    """Quét hàng đợi, sinh cảnh báo cho dòng đạt ngưỡng ĐỎ, gửi vòng đầu.
+
+    Cửa này để robot gọi theo lịch. Mở cho người bấm tay luôn, vì một cửa chỉ robot gọi được là
+    một cửa không ai thử được khi nghi nó hỏng.
+    """
+    from app.services import bao_dong_khung_hoang as BD
+    return BD.quet(db)
+
+
+@router.post("/marketing/bao-dong/leo-thang")
+def bao_dong_leo_thang(u: User = Depends(require_roles(*LAP)), db: Session = Depends(get_db)):
+    """Quá hạn mà chưa ai bấm nhận thì đánh thức thêm TGĐ và P.TGĐ Marketing. Đúng MỘT lần."""
+    from app.services import bao_dong_khung_hoang as BD
+    return BD.leo_thang(db)
+
+
+@router.post("/marketing/bao-dong/{aid}/nhan")
+def bao_dong_nhan(aid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Bấm "đã nhận". CỐ Ý chỉ khoá vào tài khoản đang đăng nhập, KHÔNG cắt theo vai trò.
+
+    Ai nhận được cảnh báo thì người ấy bấm được — danh sách người nhận đã do cửa gửi quyết định,
+    và bắt thêm một hàng rào vai trò ở đây chỉ tạo ra tình huống một người bị đánh thức lúc 2 giờ
+    sáng mà bấm không được. Ghi lại AI bấm, nên không có chuyện bấm hộ mà không ai biết.
+    Khai ở tools/ks2_khai_quyen.py bảng TU_PHUC_VU, kèm lý do.
+
+    ĐỪNG viết tên hàm rào vai trò vào lời chú của hàm này: bộ kiểm P1 tìm chuỗi ấy trong MÃ NGUỒN
+    hàm, nên một lời chú nhắc tới nó làm cửa này bị báo đỏ oan. Đo được ngày 19/9/2026 — bản đầu
+    của hàm này đỏ đúng vì thế.
+    """
+    from app.services import bao_dong_khung_hoang as BD
+    r = BD.nhan(db, aid, u)
+    if not r.get("ok") and r.get("ly_do") == "khong_thay_canh_bao":
+        raise HTTPException(404, "Không thấy cảnh báo khủng hoảng này")
+    return r
+
+
+@router.get("/marketing/bao-dong/do")
+def bao_dong_do(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Đo CHÍNH CỬA BÁO ĐỘNG.
+
+    Hai con số Chủ tịch hỏi: số vụ không ai bấm nhận, và bao lâu thì có người nhận. Con số thứ ba
+    quan trọng không kém: `khong_kenh_nao_toi_may` — gửi thành công tới một màn hình không ai mở
+    lúc 2 giờ sáng vẫn là "gửi thành công", và nếu đếm chung thì bảng điều khiển sẽ luôn đẹp.
+    """
+    from app.services import bao_dong_khung_hoang as BD
+    return BD.do_bao_dong(db)

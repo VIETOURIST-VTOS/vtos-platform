@@ -84,3 +84,9 @@ from app.models.zalo_noi import *  # noqa
 # thử soi mô hình mù đúng phần ấy, và alembic autogenerate sẽ đòi XOÁ bảng.
 from app.models.doi_tac_ban_hang import *  # noqa
 from app.models.chi_tieu_kd import *  # noqa
+
+# 19/9/2026 · Sổ gửi báo động khủng hoảng. Mang khoá ngoài sang `alerts` và `users` nên đứng SAU
+# core. Và lần thứ CHÍN nhắc cùng một điều ở tệp này: bảng khai dưới app/models mà thiếu dòng nhập
+# ở đây thì `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate sẽ
+# đòi XOÁ bảng.
+from app.models.bao_dong import *  # noqa

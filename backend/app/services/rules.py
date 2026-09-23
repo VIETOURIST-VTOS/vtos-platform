@@ -130,6 +130,27 @@ DEFAULT_PARAMS = [
     ("pr_cum_so_tin", "5",
      "Bao nhiêu tin của khách trong cửa sổ ấy thì tính là một 'dốc' và cộng điểm",
      "tin", "Chủ tịch chốt 19/9/2026"),
+    # ---- Báo động khủng hoảng: phút 0 và phút 15 · Chủ tịch chốt 19/9/2026 ----
+    #
+    # HAI NGƯỠNG chứ không một. Trên `pr_nguong_canh_bao` thì vào hàng chờ người đọc; trên ngưỡng
+    # ĐỎ dưới đây, hoặc gặp DỐC, thì reo chuông NGAY kể cả 2 giờ sáng. Một ngưỡng thì phải chọn
+    # giữa hai cái hỏng: reo cho mọi tin thì vài đêm sau người ta tắt chuông, còn chỉ reo khi có
+    # người tích tay thì ban đêm chuông không bao giờ reo — mà ban đêm chính là lúc không có người
+    # trực Marketing để tích.
+    ("pr_nguong_bao_dong", "4",
+     "Từ bao nhiêu điểm thì máy TỰ reo chuông cho lãnh đạo, không chờ ai đọc hàng đợi",
+     "điểm", "Chủ tịch chốt 19/9/2026"),
+    # Phút 0 báo Chủ tịch. Hết số phút này mà CHƯA AI bấm 'đã nhận' thì báo tiếp TGĐ và P.TGĐ
+    # Marketing — không phải để chia quyền quyết, mà để một người trực có người đỡ phía sau.
+    ("pr_phut_leo_thang", "15",
+     "Chưa ai bấm 'đã nhận' sau bao nhiêu phút thì báo tiếp TGĐ và P.TGĐ Marketing",
+     "phút", "Chủ tịch chốt 19/9/2026"),
+    # Kênh là THAM SỐ chứ không viết cứng trong mã: bật thêm một kênh là một cái gạt, không phải
+    # một vòng dựng lại. 'chuong' luôn nên có mặt (nó rẻ và là dấu vết trong VTOS); ba kênh còn
+    # lại — zalo_oa, zns, email — là ba kênh làm ĐIỆN THOẠI kêu.
+    ("pr_kenh_bao_dong", "chuong,zns,email",
+     "Kênh gửi báo động, cách nhau bằng dấu phẩy: chuong, zalo_oa, zns, email",
+     "kênh", "Chủ tịch chốt 19/9/2026"),
     # ---- Sổ tài sản thương hiệu · Chủ tịch chốt 18/9/2026 ----
     #
     # GIÁ TRỊ LÀ DANH SÁCH VAI TRÒ, không phải một con số, và cố ý để ở đây chứ không viết cứng
