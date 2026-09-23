@@ -182,6 +182,10 @@ MAY_SINH = {
     #                           Mở cửa nhập tay ở đây là mở lại đúng cái lỗ mà thiết kế này sinh ra
     #                           để bịt: một người gõ nhầm UID thì cảnh báo của Chủ tịch đi tới máy
     #                           người khác, và không ai biết.
+    # Sổ gửi báo động (19/9/2026). MÁY SINH, và phải là máy sinh: mỗi hàng là dấu vết của một
+    # lần gửi thật — ai, kênh nào, thành công hay không, vì sao không. Mở cửa nhập tay ở đây là
+    # cho phép sửa nhật ký, mà nhật ký sửa được thì phép đo cuối tháng không còn là phép đo.
+    "canh_bao_gui": "Nhật ký gửi thật; nhập tay được nghĩa là sửa được dấu vết, và phép đo mất nghĩa.",
     "zalo_ma_noi": "Mã nối do máy sinh ngẫu nhiên; nhập tay là để lộ mã cho người thứ hai.",
     "zalo_noi_tai_khoan": "UID do Zalo nói ra qua webhook khi chính chủ nhắn mã; gõ tay UID là mở "
                           "đường cho cảnh báo đi nhầm người.",

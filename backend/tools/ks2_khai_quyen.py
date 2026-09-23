@@ -148,6 +148,15 @@ TU_PHUC_VU: dict[str, str] = {
     "DELETE /api/v1/zalo/noi": (
         "Người gỡ nối Zalo của CHÍNH MÌNH – đổi máy, mất máy, nghỉ việc. Phạm vi ghi khoá vào tài "
         "khoản đang đăng nhập."),
+    # Báo động khủng hoảng · 19/9/2026. Nút "đã nhận" CỐ Ý không theo vai trò.
+    #
+    # Danh sách người được đánh thức đã do CỬA GỬI quyết định (Chủ tịch ở phút 0; TGĐ và P.TGĐ
+    # Marketing ở phút 15). Bắt thêm một hàng rào vai trò ở nút bấm chỉ tạo ra đúng một tình huống:
+    # một người bị đánh thức lúc 2 giờ sáng, mở máy ra, và bấm không được. Ghi lại AI bấm, nên
+    # không có chuyện bấm hộ mà không ai biết — và người thứ hai không ghi đè được người thứ nhất.
+    "POST /api/v1/marketing/bao-dong/{aid}/nhan": (
+        "Người bị đánh thức bấm 'đã nhận'. Phạm vi ghi khoá vào chính tài khoản đang đăng nhập; "
+        "ai bấm trước thì tên người ấy vào sổ, người sau không ghi đè được."),
     "POST /api/v1/daily-reports": (
         "Người nộp báo cáo ngày của chính mình; phòng ban suy từ hồ sơ nhân sự của tài khoản đang "
         "đăng nhập chứ không nhận từ người gọi."),
