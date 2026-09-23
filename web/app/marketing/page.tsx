@@ -91,7 +91,7 @@ function Marketing() {
   const [hienForm, setHienForm] = useState(false);
   const [ns, setNs] = useState<any[]>([]);
   const [hm, setHm] = useState<any>({});
-  const [fn, setFn] = useState<any>({ period: thang0(), target_leads: "", target_revenue: "", rationale: "", lines: {} as Record<string, string>, nguon_tao: "nguoi", ai_ghi_chu: "" });
+  const [fn, setFn] = useState<any>({ period: thang0(), target_leads: "", target_revenue: "", rationale: "", lines: [] as any[], nguon_tao: "nguoi", ai_ghi_chu: "" });
   const [hienNs, setHienNs] = useState(false);
 
   // ── khách tiềm năng ──
@@ -255,12 +255,15 @@ function Marketing() {
   const mau: Record<string, string> = { nhap: "grey", cho_duyet: "warn", dang_chay: "ok", tam_dung: "warn", ket_thuc: "grey", da_danh_gia: "ok" };
 
   const luuNs = () => {
-    const lines = Object.entries(fn.lines).filter(([, v]) => Number(v) > 0)
-      .map(([hang_muc, v]) => ({ hang_muc, amount: Number(v) }));
+    // TC-77 – mỗi dòng mang thêm chiến dịch. Rỗng vẫn hợp lệ: chi chung cả tháng là việc có
+    // thật, ép gắn chiến dịch là ép người nhập chọn bừa một cái cho qua cửa.
+    const lines = (fn.lines || []).filter((l: any) => Number(l.amount) > 0)
+      .map((l: any) => ({ hang_muc: l.hang_muc, amount: Number(l.amount),
+                          campaign_id: l.campaign_id ? Number(l.campaign_id) : null }));
     post("/marketing/budgets", { period: fn.period, target_leads: Number(fn.target_leads) || 0,
       target_revenue: soTien(fn.target_revenue), rationale: fn.rationale, lines,
       nguon_tao: fn.nguon_tao, ai_ghi_chu: fn.ai_ghi_chu })
-      .then((r) => { if (r) { setFn({ ...fn, rationale: "", lines: {} }); setHienNs(false); } });
+      .then((r) => { if (r) { setFn({ ...fn, rationale: "", lines: [] }); setHienNs(false); } });
   };
 
   /** ĐỐI SOÁT CHẠY TRÊN TOÀN BỘ SỔ LEAD, KHÔNG GIỚI HẠN MỘT THÁNG.
@@ -441,9 +444,31 @@ function Marketing() {
             <label>Mục tiêu doanh thu quy đổi<input type="number" value={fn.target_revenue} onChange={(e) => setFn({ ...fn, target_revenue: e.target.value })} /></label>
           </div>
           <b>Dự toán theo hạng mục *</b>
-          <div className="grid">{Object.entries(hm).map(([k, v]: any) =>
-            <label key={k}>{v}<input type="number" value={fn.lines[k] || ""} onChange={(e) => setFn({ ...fn, lines: { ...fn.lines, [k]: e.target.value } })} /></label>)}</div>
-          <p className="muted">Tổng dự toán: <b>{vnd(Object.values(fn.lines).reduce((s: number, v: any) => s + (Number(v) || 0), 0))}</b> — tổng tự cộng, không có ô gõ tay.</p>
+          {/* TC-77 · 23/9/2026 – trước đây khối này là một lưới CỐ ĐỊNH, mỗi hạng mục đúng một ô số.
+              Nay mỗi dòng gắn thêm một chiến dịch, nên một hạng mục có thể xuất hiện nhiều lần:
+              tháng 9 chi Facebook Ads 100 triệu cho chiến dịch A và 50 triệu cho chiến dịch B là
+              hai dòng cùng hạng mục. Lưới cố định không diễn đạt được điều đó, nên nó thành danh
+              sách dòng thêm được.
+              Ô chiến dịch để TRỐNG vẫn hợp lệ – chi chung cả tháng là việc có thật. */}
+          <div className="wrap"><table>
+            <thead><tr><th>Hạng mục</th><th>Chiến dịch</th><th className="num">Số tiền</th><th></th></tr></thead>
+            <tbody>{(fn.lines || []).map((l: any, i: number) => <tr key={i}>
+              <td><select value={l.hang_muc || ""} onChange={(e) => { const d = [...fn.lines]; d[i] = { ...d[i], hang_muc: e.target.value }; setFn({ ...fn, lines: d }); }}>
+                <option value="">— chọn hạng mục —</option>
+                {Object.entries(hm).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></td>
+              <td><select value={l.campaign_id || ""} onChange={(e) => { const d = [...fn.lines]; d[i] = { ...d[i], campaign_id: e.target.value }; setFn({ ...fn, lines: d }); }}>
+                <option value="">— chi chung, không gắn chiến dịch —</option>
+                {ds.map((c: any) => <option key={c.id} value={c.id}>{c.code} – {c.name}</option>)}</select></td>
+              <td className="num"><input type="number" value={l.amount || ""} onChange={(e) => { const d = [...fn.lines]; d[i] = { ...d[i], amount: e.target.value }; setFn({ ...fn, lines: d }); }} /></td>
+              <td><button className="act" onClick={() => setFn({ ...fn, lines: fn.lines.filter((_: any, j: number) => j !== i) })}>Bỏ</button></td>
+            </tr>)}
+            {!(fn.lines || []).length && <tr><td colSpan={4} className="muted">Chưa có dòng nào – bấm “Thêm dòng chi”.</td></tr>}
+            </tbody></table></div>
+          <button className="act" onClick={() => setFn({ ...fn, lines: [...(fn.lines || []), { hang_muc: "", campaign_id: "", amount: "" }] })}>+ Thêm dòng chi</button>
+          <p className="muted">Tổng dự toán: <b>{vnd((fn.lines || []).reduce((s: number, l: any) => s + (Number(l.amount) || 0), 0))}</b> — tổng tự cộng, không có ô gõ tay.</p>
+          <p className="muted">Gắn chiến dịch cho dòng chi thì màn hình <b>Đóng góp doanh thu của Marketing</b>
+            mới tính được chiến dịch ấy tiêu thật bao nhiêu và thu về bao nhiêu. Để trống cũng chạy
+            bình thường, phần ấy hiện riêng là “chi chưa gắn chiến dịch”.</p>
           <label>Căn cứ lập ngân sách *<textarea rows={2} style={{ width: "100%" }} value={fn.rationale}
             onChange={(e) => setFn({ ...fn, rationale: e.target.value })} placeholder="Vì sao con số này – kỳ sau còn đối chiếu lại được" /></label>
           <div className="panel">

@@ -146,7 +146,25 @@ def tao_ngan_sach(db: Session, u: User, data: dict) -> MarketingBudget:
     for l in dong:
         if l.get("hang_muc") not in HANG_MUC: raise ValueError(f"Hạng mục không hợp lệ: {l.get('hang_muc')}")
         if (l.get("amount") or 0) <= 0: raise ValueError("Số tiền dự toán từng hạng mục phải lớn hơn 0")
-    if len({l["hang_muc"] for l in dong}) != len(dong): raise ValueError("Mỗi hạng mục chỉ được một dòng")
+    # TC-77 · 23/9/2026 – LUẬT CŨ ĐƯỢC NỚI, ghi lại cả hai vế.
+    #
+    # CŨ : mỗi hạng mục chỉ được MỘT dòng trong một kỳ.
+    # MỚI: mỗi (hạng mục × chiến dịch) một dòng.
+    #
+    # Vì sao phải nới: từ vòng này dòng chi gắn được chiến dịch, mà tháng 9 chi Facebook Ads 100
+    # triệu cho chiến dịch A và 50 triệu cho chiến dịch B là HAI dòng cùng hạng mục — luật cũ
+    # chặn đúng việc mà cột mới sinh ra để làm.
+    #
+    # Phần luật cũ VẪN CÒN NGUYÊN cho dòng không gắn chiến dịch: hai dòng "Facebook Ads" cùng để
+    # trống chiến dịch vẫn bị chặn, vì đó đúng là trường hợp luật cũ nói tới — cùng một khoản chi
+    # bị gõ hai lần. Xem test_tc77_luat_cu_duoc_noi_va_ghi_ca_hai_ve.
+    khoa = [(l["hang_muc"], l.get("campaign_id")) for l in dong]
+    if len(set(khoa)) != len(khoa):
+        raise ValueError("Mỗi hạng mục chỉ được một dòng cho mỗi chiến dịch "
+                         "(dòng không gắn chiến dịch thì mỗi hạng mục một dòng)")
+    for l in dong:
+        if l.get("campaign_id") is not None and db.get(Campaign, l["campaign_id"]) is None:
+            raise ValueError(f"Không có chiến dịch id {l['campaign_id']}")
     if (data.get("target_leads") or 0) <= 0:
         raise ValueError("Phải có mục tiêu lead – không có mục tiêu thì không so được chi phí/lead kế hoạch với thực tế")
     if not (data.get("rationale") or "").strip():
@@ -165,7 +183,8 @@ def tao_ngan_sach(db: Session, u: User, data: dict) -> MarketingBudget:
                         nguon_tao=nguon, ai_ghi_chu=data.get("ai_ghi_chu", ""), status="nhap", created_by=u.username)
     db.add(b); db.flush()
     for l in dong:
-        db.add(MarketingBudgetLine(budget_id=b.id, hang_muc=l["hang_muc"], amount=float(l["amount"]), note=l.get("note", "")))
+        db.add(MarketingBudgetLine(budget_id=b.id, hang_muc=l["hang_muc"], amount=float(l["amount"]),
+                                   note=l.get("note", ""), campaign_id=l.get("campaign_id")))
     R.audit(db, u.username, u.role, "lap_ngan_sach_marketing", f"mkt_budget:{b.id}",
             after={"ky": period, "so_hang_muc": len(dong), "tong": sum(float((l["amount"] or 0)) for l in dong), "nguon": nguon})
     db.commit(); db.refresh(b)
