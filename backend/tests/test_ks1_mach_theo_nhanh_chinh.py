@@ -16,6 +16,7 @@ Bốn phép thử dưới đây, và ý nghĩa của từng cái khi nó đỏ:
   KS1-1  cây làm việc kín mạch          – rẻ, luôn chạy; giữ nguyên mức bảo vệ cũ
   KS1-2  NHÁNH CHÍNH kín mạch           – đỏ = nhánh đang triển khai đã hỏng, mọi deploy sẽ chết
   KS1-3  NHÁNH CHÍNH đúng một đầu       – đỏ = alembic từ chối chạy trên nhánh ấy
+                                          (24/9: cho qua khi chính nhánh này chữa được – xem dưới)
   KS1-4  XEM TRƯỚC BẢN GỘP đúng một đầu – đỏ = từng nhánh xanh nhưng gộp vào là hỏng
   KS1-5  không đổi cha của bản đã đẩy   – đỏ = nơi đã chạy migration không lùi lại được
   KS1-6  bản mới phải bám được nhánh chính – đỏ = đúng hình dạng sự cố 10/9, bắt TRƯỚC khi đẩy
@@ -47,6 +48,21 @@ _LY_DO_BO_QUA = (
         ", ".join((M.NHANH_CHINH,) + M.REF_DU_PHONG))
 )
 can_git = pytest.mark.skipif(_REF is None, reason=_LY_DO_BO_QUA)
+
+
+def dang_chua(dau_nhanh: list, dau_hop: list) -> bool:
+    """Nhánh này có phải là THUỐC CHỮA cho nhánh chính đang nhiều đầu không.
+
+    Tách thành hàm riêng chứ không viết thẳng vào KS1-3, vì đây là ĐƯỜNG CHO QUA của một hàng rào
+    — và một đường cho qua phải có phép đo của chính nó. Viết trong thân phép thử thì không phép
+    thử nào soi được nó, và một đường cho qua không ai soi là một lỗ hổng chờ ngày rộng ra.
+    Phép đo nằm ở `test_ks1_3b_duong_cho_qua_dung_lai_bang_so_lieu_bia`.
+
+    Đúng khi VÀ CHỈ KHI: nhánh chính đang hỏng (khác 1 đầu) và hợp nó với cây làm việc thì lành
+    (đúng 1 đầu). Nhánh không chữa gì sẽ mang luôn các đầu của nhánh chính sang bản gộp, nên nó
+    không lọt qua đây.
+    """
+    return len(dau_nhanh) != 1 and len(dau_hop) == 1
 
 
 def _nhanh():
@@ -90,14 +106,90 @@ def test_ks1_2_nhanh_chinh_kin_mach():
 
 @can_git
 def test_ks1_3_nhanh_chinh_dung_mot_dau_va_mot_goc():
+    """ĐỎ = nhánh đang triển khai từ chối khởi động. NHƯNG nhánh ĐANG CHỮA nó thì cho qua.
+
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    VÌ SAO THÊM ĐƯỜNG CHO QUA — đo ngày 24/9/2026
+    ──────────────────────────────────────────────────────────────────────────────────────────
+
+    Bản đầu của phép thử này đọc CHÍNH nhánh chính và đỏ ngay khi nhánh ấy nhiều hơn một đầu.
+    Đúng về mặt sự thật, nhưng nó có một hệ quả không ai tính tới: **mọi PR đều đỏ ở đây khi main
+    đang hỏng — kể cả PR đang mang thuốc chữa**. Mà main chỉ hết hỏng khi một PR được gộp. Vòng
+    tròn ấy tự khoá chính nó.
+
+    Đêm 23 rạng 24/9/2026 nó đã khoá thật: PR #128 và #127 cùng nối vào tc76ct5a6b7c8d, gộp xong
+    main thành hai đầu, API trả 502 lúc 03:09. Bản vá mở PR thì đỏ đúng ở dòng này — không phải
+    vì bản vá sai, mà vì main chưa được vá. Phải gộp trong lúc CI đỏ mới ra khỏi vòng tròn, và
+    "gộp trong lúc CI đỏ" là thói quen mà một hàng rào KHÔNG được phép dạy cho người dùng nó.
+
+    NÊN: nếu BẢN GỘP (cây làm việc hợp với nhánh chính) đúng một đầu, thì nhánh này chính là
+    thuốc chữa — nói to ra rằng main đang hỏng, rồi cho qua. Nếu bản gộp VẪN nhiều đầu thì nhánh
+    này không chữa gì cả: đỏ như cũ.
+
+    KHÔNG nới cho ai khác: một nhánh không liên quan sẽ mang luôn hai đầu của main vào bản gộp,
+    nên nó vẫn đỏ — đúng như phải thế, vì dây chuyền đang dừng.
+
+    Chữ "một gốc" và "không vòng lặp" bên dưới KHÔNG có đường nới: hai thứ ấy không phải là thứ
+    một nhánh khác chữa được.
+    """
     nhanh = _nhanh()
     dau = M.dau_mach(nhanh)
-    assert len(dau) == 1, (
-        f"nhánh {_REF} có {len(dau)} đầu mạch: {dau}. alembic từ chối chạy khi có nhiều hơn một đầu, "
-        f"nên container không khởi động được.\n{M.bao_cao(nhanh, _REF)}")
+    if len(dau) != 1:
+        hop, _ = M.hop_mach(M.doc_mach_tu_cay(), nhanh)
+        dau_hop = M.dau_mach(hop)
+        assert dang_chua(dau, dau_hop), (
+            f"nhánh {_REF} có {len(dau)} đầu mạch: {dau}, VÀ nhánh này không chữa được: gộp vào "
+            f"vẫn {len(dau_hop)} đầu {dau_hop}. alembic từ chối chạy khi có nhiều hơn một đầu, nên "
+            f"container không khởi động được.\n"
+            f"Nhánh đang chữa main thì phép thử này cho qua — nhánh này thì chưa.\n"
+            f"{M.bao_cao(nhanh, _REF)}\n{M.bao_cao(hop, 'bản gộp')}")
+        print(  # noqa: T201 - cố ý in ra: đây là tin phải đọc được ngay trong nhật ký CI
+            f"\n!! {_REF} ĐANG HỎNG: {len(dau)} đầu mạch {dau}. Mọi lần triển khai đều chết ở "
+            f"'alembic upgrade head'.\n"
+            f"!! Nhánh này CHỮA được (gộp vào còn một đầu: {dau_hop}) nên phép thử cho qua — "
+            f"gộp nó vào càng sớm càng tốt.\n")
+
     goc = M.goc_mach(nhanh)
     assert len(goc) == 1, f"nhánh {_REF} phải có đúng một bản khởi tạo, đang có {goc}"
     assert not M.vong_lap(nhanh), f"nhánh {_REF} có vòng lặp tại {M.vong_lap(nhanh)}"
+
+
+def test_ks1_3b_duong_cho_qua_dung_lai_bang_so_lieu_bia():
+    """Dựng lại đúng đêm 23–24/9/2026 bằng số liệu bịa, để đường cho qua của KS1-3 có phép đo riêng.
+
+    Ba cảnh, và cả ba đều phải đúng chiều — nếu không thì đường cho qua ở trên thành một lỗ hổng
+    thay vì một lối thoát:
+
+      A. main hai đầu, nhánh CHỮA           → bản gộp một đầu  → KS1-3 cho qua
+      B. main hai đầu, nhánh KHÔNG liên quan → bản gộp hai đầu → KS1-3 vẫn đỏ
+      C. main một đầu                        → không đụng tới đường cho qua
+
+    Chạy trên dict chứ không trên git, nên nó chạy được ở mọi máy, kể cả máy không có kho.
+    """
+    goc = {"x": None, "tc76": "x"}
+    # A · hai bản cùng nối vào tc76 — đúng hình dạng PR #127 và #128
+    main_hong = {**goc, "bd": "tc76", "tc77": "tc76"}
+    dau_main = M.dau_mach(main_hong)
+    assert dau_main == ["bd", "tc77"], "cảnh dựng sai: main phải có HAI đầu"
+
+    cay_chua = {**goc, "bd": "tc76", "tc77": "bd"}          # trỏ tc77 nối sau bd
+    hop_a, _ = M.hop_mach(cay_chua, main_hong)
+    assert M.dau_mach(hop_a) == ["tc77"], "nhánh chữa mà bản gộp vẫn nhiều đầu — dựng cảnh sai"
+    assert dang_chua(dau_main, M.dau_mach(hop_a)), "A: nhánh CHỮA phải được cho qua"
+
+    # B · nhánh làm việc khác, không đụng gì tới chỗ hỏng
+    cay_khong_lien_quan = {**main_hong, "moi": "tc77"}
+    hop_b, _ = M.hop_mach(cay_khong_lien_quan, main_hong)
+    assert len(M.dau_mach(hop_b)) == 2, "dựng cảnh sai: nhánh này lẽ ra không chữa gì"
+    assert not dang_chua(dau_main, M.dau_mach(hop_b)), (
+        "B: nhánh KHÔNG liên quan mà lại lọt qua — đường cho qua đang nới cho cả những nhánh "
+        "không chữa gì cả, đúng thứ nó KHÔNG được phép làm")
+
+    # C · main lành thì đường cho qua không được phép mở ra
+    main_lanh = {**goc, "bd": "tc76", "tc77": "bd"}
+    assert M.dau_mach(main_lanh) == ["tc77"]
+    assert not dang_chua(M.dau_mach(main_lanh), ["tc77"]), (
+        "C: main đang LÀNH mà đường cho qua vẫn mở — nó phải chỉ mở khi nhánh chính hỏng")
 
 
 # ------------------------------------------------------------------ KS1-4
