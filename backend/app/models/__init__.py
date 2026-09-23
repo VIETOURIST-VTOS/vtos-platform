@@ -83,3 +83,4 @@ from app.models.zalo_noi import *  # noqa
 # tệp này: bảng khai dưới app/models mà thiếu dòng nhập ở đây thì create_all không tạo, phép
 # thử soi mô hình mù đúng phần ấy, và alembic autogenerate sẽ đòi XOÁ bảng.
 from app.models.doi_tac_ban_hang import *  # noqa
+from app.models.chi_tieu_kd import *  # noqa
