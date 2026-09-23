@@ -332,6 +332,11 @@ export const GROUPS: Group[] = [
   // giữ khách, cùng một việc với Nội dung & thương hiệu. Phiếu chăm sóc VẪN tự giao cho nhân viên
   // đã bán như chốt 07/9; đổi nhóm menu không đổi người được giao việc.
   { key: "marketing", label: "Marketing & PR", icon: "marketing", href: "/phan-he/marketing", blocks: [
+    // 19/9/2026 · ĐẶT ĐẦU TIÊN, và đó là chủ ý. Trước hôm nay cửa lọc khủng hoảng nằm lẫn trong
+    // tab "Thương hiệu & PR" — sâu ba lớp, sau một cái tên không gợi gì tới khủng hoảng. Chính
+    // anh Tuấn, người đặt làm nó, mở web mà không thấy; người trực lúc 2 giờ sáng càng không.
+    // Một cửa báo động phải biết đường mới mò ra được thì nó không phải cửa báo động.
+    ["Khủng hoảng & phản ứng nhanh", "/marketing?tab=thuonghieu"],
     ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"],
     ["Chiến dịch", "/marketing"],
     ["Nội dung & thương hiệu", "/noi-dung"],
@@ -362,12 +367,6 @@ export const GROUPS: Group[] = [
     // tìm "team mình gồm những ai" là nhân viên kinh doanh, và họ tìm ở phân hệ của họ. Quyền ghi
     // nằm ở máy chủ (api/v1/to_chuc_kd.py), không nằm ở chỗ treo mục menu.
     ["Cơ cấu tổ chức", "/to-chuc-kd"],
-    // TC-74 · 19/9/2026. Ai được đứng tên một booking: nhân viên khối Kinh doanh, người bộ phận
-    // khác đã mở quyền bán (HDV, điều hành, visa), và ĐỐI TÁC ngoài công ty.
-    //
-    // Đứng ngay dưới "Cơ cấu tổ chức" vì hai màn hình trả lời hai nửa của cùng một câu: bên kia là
-    // "ai thuộc đơn vị nào", bên này là "ai được bán".
-    ["Người bán hàng", "/nguoi-ban-hang"],
     // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và
     // được nhận theo HỢP của hai quy tắc: loại chuyến là đoàn, HOẶC mã tour bắt đầu bằng MICE. Đo
     // 07/9: 115/115 tour có chữ MICE đều là tour đoàn, nên hôm nay hai quy tắc trùng nhau – lấy hợp
