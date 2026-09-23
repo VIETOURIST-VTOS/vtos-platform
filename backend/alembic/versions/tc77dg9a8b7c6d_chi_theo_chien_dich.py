@@ -7,7 +7,19 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "tc77dg9a8b7c6d"
-down_revision = "tc76ct5a6b7c8d"   # noi SAU ban chi tieu kinh doanh cua TC-76
+# SUA 24/9/2026 - NOI LAI MACH, ban nay tung lam main co HAI DAU.
+#
+# TC-77 va lan bao dong khung hoang (bd5a2f8c1e94) cung noi vao tc76ct5a6b7c8d, moi ban dung
+# tren goc cua rieng minh nen CI cua tung PR deu xanh. Gop ca hai vao main thi mach co hai
+# dau, va `alembic upgrade head` trong Dockerfile khong chay duoc - container khong khoi dong.
+#
+# PR #128 (bao dong) gop TRUOC PR #127 (TC-77), nen ban viet sau la ban nay, va ban nay phai
+# noi tiep. Doi down_revision cua CHINH TEP MINH, khong dung tep cua lan kia.
+#
+# BAI HOC DA GHI MOT LAN NGAY 19/9 va lap lai hom nay: hai lan gop lien nhau trong mot ngay
+# thi cua hep `hang-rao-gop` tren main la cho duy nhat bat duoc, vi CI cua tung PR khong the
+# thay ban nang cap cua lan kia.
+down_revision = "bd5a2f8c1e94"
 branch_labels = None
 depends_on = None
 

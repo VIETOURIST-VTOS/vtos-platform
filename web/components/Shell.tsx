@@ -346,6 +346,12 @@ export const GROUPS: Group[] = [
     // truy vấn doanh thu riêng nào cho Marketing. Một ống số thì chỉ có một con số, và mọi câu
     // hỏi còn lại là câu hỏi về cách CHIA con số ấy.
     ["Đóng góp doanh thu", "/dong-gop-marketing"],
+    // TC-78 · 23/9/2026. Nhóm 2.6 – quãng giữa hai phòng: Marketing giao lead, Sales xử lý.
+    //
+    // Phép tính hạn xử lý gọi thẳng services/leads, không có bản chép thứ hai. Định nghĩa "quá
+    // hạn" đã được dọn về một mối ngày 18/9 để chỗ đếm và chỗ đánh dấu dùng chung một luật; chép
+    // nó sang đây là dựng lại đúng cái vừa dọn xong.
+    ["Chuyển đổi & phối hợp Sales", "/chuyen-doi-lead"],
     { label: "Chăm sóc & khiếu nại", items: [
       ["Chăm sóc sau bán", "/cham-soc"], ["Phản hồi & khiếu nại", "/khieu-nai"]] },
   ] },
