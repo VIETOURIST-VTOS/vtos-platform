@@ -506,6 +506,12 @@ export const GROUPS: Group[] = [
 
   // ĐẶT CUỐI theo v1.1 §I.2 (tên nhóm đổi theo bản vẽ giao diện 12/9, thứ tự giữ nguyên).
   { key: "quantri", label: "Quản trị hệ thống", icon: "quantri", href: "/phan-he/quantri", blocks: [
+    // TC-75 · 19/9/2026. Gộp hai tài khoản trùng của cùng một người.
+    //
+    // ĐỨNG Ở QUẢN TRỊ HỆ THỐNG chứ không ở Nhân sự, dù HC-NS là người phát hiện ra trùng: nút gộp
+    // chuyển dữ liệu giữa hai tài khoản và KHÔNG tách ngược được, nên nó thuộc nhóm những việc chỉ
+    // CNTT và Ban Tổng giám đốc bấm. HC-NS đọc được bảng cặp trùng để soát, đó là phần việc của họ.
+    ["Tài khoản trùng", "/gop-tai-khoan"],
     ["Tổ chức & đơn vị", "/companies"],
     { label: "Quyền", items: [
       ["Tài khoản & phân quyền", "/access"], ["Vị trí AI & quyền hạn", "/ai-roles"]] },

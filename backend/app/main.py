@@ -62,6 +62,7 @@ from app.api.v1.ke_hoach import router as ke_hoach_router
 from app.api.v1.to_chuc_kd import router as to_chuc_kd_router
 # TC-74 - nguoi ban hang: doi tac ngoai cong ty va quyen ban cua nhan vien ngoai khoi.
 from app.api.v1.nguoi_ban_hang import router as nguoi_ban_hang_router
+from app.api.v1.gop_tai_khoan import router as gop_tai_khoan_router
 from app.api.v1.kinh_doanh import router as kinh_doanh_router
 from app.api.v1.dong_gop_marketing import router as dong_gop_marketing_router
 from app.api.v1.chuyen_doi_lead import router as chuyen_doi_lead_router
@@ -281,6 +282,7 @@ app.include_router(ty_gia_router)
 app.include_router(ke_hoach_router)
 app.include_router(to_chuc_kd_router)
 app.include_router(nguoi_ban_hang_router)
+app.include_router(gop_tai_khoan_router)
 app.include_router(kinh_doanh_router)
 app.include_router(dong_gop_marketing_router)
 app.include_router(chuyen_doi_lead_router)
