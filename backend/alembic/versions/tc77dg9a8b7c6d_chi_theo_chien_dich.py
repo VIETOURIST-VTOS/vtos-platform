@@ -1,13 +1,22 @@
 """TC-77: noi dong chi ngan sach Marketing vao chien dich
 
 Revision ID: tc77dg9a8b7c6d
-Revises: tc76ct5a6b7c8d
+Revises: bd5a2f8c1e94
 """
 import sqlalchemy as sa
 from alembic import op
 
 revision = "tc77dg9a8b7c6d"
-down_revision = "tc76ct5a6b7c8d"   # noi SAU ban chi tieu kinh doanh cua TC-76
+# 23/9/2026 - SUA MOT DONG, doi gia tri chu khong doi y dinh cua TC-77.
+#
+# Ban nay va bd5a2f8c1e94 (bao dong khung hoang, PR #128) CUNG noi vao tc76ct5a6b7c8d. Moi
+# nhanh rieng le chi co MOT dau nen ca hai PR deu xanh; gop lai thanh HAI DAU, va alembic tu
+# choi chay khi co hon mot dau - hop chua API se khong khoi dong duoc o lan trien khai toi.
+#
+# Noi sau bd5a2f8c1e94 vi ban ay vao kho truoc (PR #128 gop luc 17:06, PR #127 sau do). Thu tu
+# nay khong anh huong gi ve mat du lieu: mot ban them cot cho dong chi ngan sach Marketing,
+# mot ban tao bang canh bao gui - hai ban khong dung chung bang nao.
+down_revision = "bd5a2f8c1e94"   # noi SAU ban bao dong khung hoang - giu MOT dau duy nhat
 branch_labels = None
 depends_on = None
 

@@ -26,6 +26,32 @@ là chỗ tra "ai đã đụng tệp này lần trước".
 `backend/tests/test_giu_cho_lan.py` đọc chính tệp này và **ĐỎ** khi hai dòng `đang làm` cùng khai
 một đường dẫn. Không có phép thử canh thì một bảng khai đúng ba ngày là không ai điền nữa.
 
+### 23/9/2026 — thêm ba luật, vì hàng rào cũ chưa nổ được lần nào
+
+Đo lại ngày 23/9: trong 40 dòng của bảng dưới, **không có dòng nào ở trạng thái `đang làm`**. Mọi
+làn ghi thẳng `xong` ngay lúc đẩy. Luật cũ chỉ so các dòng `đang làm` với nhau — nên một bảng toàn
+`xong` là một bảng không giữ chỗ cho ai, và phép thử soi nó thì **luôn xanh**.
+
+Hôm ấy hỏng hai lần trong một ngày: 14:51 làn Vòng đè lên ba tệp của làn Phân quyền; 16:10 làn
+TC-77 đè tiếp lên ba tệp nữa, xoá sạch bốn cửa báo động vừa viết xong. **Cả hai lần CI đều xanh** —
+xoá phần của làn khác không làm phép thử nào đỏ.
+
+`backend/tests/test_giu_cho_nhanh.py` thêm ba luật, chạy trên **pull request**:
+
+1. Danh sách tệp nhánh đổi phải đọc được (ci.yml tính sẵn) — không đọc được là đỏ.
+2. Nhánh đụng **tệp mã** thì chính tệp `docs/DANG-LAM.md` phải nằm trong danh sách ấy: **mỗi vòng
+   đẩy lên phải tự ghi một dòng**, không đi nhờ dòng của làn khác.
+3. Mọi tệp mã nhánh đụng phải được một dòng **`đang làm`** gọi tên. `xong` không giữ chỗ.
+
+Khép lại với luật cũ: làn A mở dòng `đang làm` cho `marketing.py` → làn B muốn đụng cùng tệp buộc
+phải khai → hai dòng `đang làm` trùng tệp → **đỏ trên PR của B**, trước khi gộp, trước khi ai mất
+gì.
+
+Đường dẫn khai nhận ba kiểu: đúng tên tệp, thư mục kết bằng `/`, và mẫu sao (`backend/tests/*.py`).
+
+`docs/` ngoài chính quyển sổ này **không** bị canh: hai làn đè một tệp tài liệu thì gỡ bằng mắt
+trong một phút, đè một tệp mã thì mất nửa ngày. Hàng rào đặt ở chỗ đắt.
+
 Phép thử **cố ý KHÔNG** đỏ theo thời gian — không có luật "quá N ngày thì đỏ". Một phép thử tự đỏ
 mà không ai sửa mã là thứ làm người ta thôi nhìn CI, và chính lệnh giao việc đã cảnh báo điều đó.
 
@@ -78,3 +104,4 @@ tệp; hai làn viết cùng một KHÁI NIỆM vào hai tệp khác tên thì b
 | Phân quyền | Nối tài khoản VTOS với Zalo bằng mã dùng một lần — để cảnh báo tới được NGƯỜI; và chốt chặn người của công ty biến thành lead giả trong sổ khách hàng | backend/alembic/versions/zn8c3e1f7a4d26_noi_tai_khoan_zalo.py, backend/app/models/zalo_noi.py, backend/app/models/__init__.py, backend/app/services/zalo_nguoi_dung.py, backend/app/services/zalo.py, backend/app/services/ks_cua_nhap.py, backend/app/api/v1/crm.py, backend/tools/ks2_khai_quyen.py, backend/app/services/access.py, backend/tests/test_zn1_noi_tai_khoan_zalo.py, backend/tests/test_p2_pham_vi_vai_tro.py, web/app/doi-mat-khau/page.tsx | 19-09-2026 15:00 | xong |
 | Phân quyền | CI chạy hai hình — bộ đủ 24 phút chỉ trên PR (cửa chặn), main còn cửa hẹp 12 giây soi đúng chuyện hai làn đụng nhau (cửa báo). Trần chi tiêu Actions chạm đáy 19/9 làm bốn làn cùng đứng | .github/workflows/ci.yml, backend/tests/test_ci_hang_rao_main.py | 19-09-2026 17:30 | xong |
 | Phân quyền | Báo động khủng hoảng — ngưỡng ĐỎ tự reo chuông phút 0 cho Chủ tịch, phút 15 chưa ai bấm nhận thì đánh thức TGĐ và P.TGĐ Marketing; sổ gửi ghi CẢ lần không gửi được kèm lý do | backend/alembic/versions/bd5a2f8c1e94_bao_dong_khung_hoang.py, backend/app/models/bao_dong.py, backend/app/models/__init__.py, backend/app/services/bao_dong_khung_hoang.py, backend/app/services/rules.py, backend/app/services/ks_cua_nhap.py, backend/app/api/v1/marketing.py, backend/tools/ks2_khai_quyen.py, backend/tests/test_bd1_bao_dong_khung_hoang.py, web/components/Shell.tsx, web/app/marketing/page.tsx | 19-09-2026 22:30 | xong |
+| Phân quyền | Hàng rào giữ chỗ làn — đẩy mã lên mà không có dòng `đang làm` thì ĐỎ; kèm vá mạch nâng cấp HAI ĐẦU do PR #127 và #128 cùng nối vào tc76ct5a6b7c8d | .github/workflows/ci.yml, backend/tests/test_giu_cho_nhanh.py, backend/tests/test_ci_hang_rao_main.py, backend/alembic/versions/tc77dg9a8b7c6d_chi_theo_chien_dich.py | 23-09-2026 17:00 | đang làm |

@@ -42,6 +42,11 @@ HANG_RAO = (
     "tests/test_ks_ma_tran.py",
     "tests/test_p2_pham_vi_vai_tro.py",
     "tests/test_giu_cho_lan.py",
+    # 23/9/2026. Gọi tên ở đây KHÔNG phải để chạy ba luật của nó — ba luật ấy chỉ đo được trên PR,
+    # nơi có danh sách tệp nhánh đổi. Gọi tên là để XOÁ TỆP NÀY THÌ ĐỎ: `pytest` gặp đường dẫn
+    # không tồn tại thì thoát 4, và Actions coi mã thoát khác 0 là đỏ. Không có dây ấy thì gỡ hàng
+    # rào chỉ cần xoá một tệp, vì run_all.sh quét theo mẫu tên chứ không theo danh sách.
+    "tests/test_giu_cho_nhanh.py",
     "tests/test_ks_do_dai.py",
     "tests/test_ks2_khai_quyen_may_doc_duoc.py",
     "tests/test_ks_cua_nhap.py",
@@ -113,6 +118,33 @@ def test_ci4_bo_do_du_khong_chay_lai_tren_main():
     assert "if: github.event_name == 'push'" in lenh, (
         "Phải còn cửa hẹp `hang-rao-gop` chạy khi đẩy vào main. Bỏ hẳn CI trên main thì hai PR cùng "
         "xanh riêng lẻ mà gộp lại hỏng sẽ không ai biết — đúng chuyện suýt xảy ra hai lần ngày 19/9."
+    )
+
+
+def test_ci6_buoc_tinh_danh_sach_tep_doi_con_nguyen():
+    """Hàng rào giữ chỗ làn đứng trên MỘT bước của ci.yml — gỡ bước ấy là nó tắt mà vẫn xanh.
+
+    `backend/tests/test_giu_cho_nhanh.py` không tự gọi `git`: nó đọc danh sách tệp nhánh đổi từ
+    biến `VTOS_TEP_DOI` do ci.yml tính sẵn. Cách ấy tốt hơn (bộ phép thử còn chạy ở hai chỗ không
+    có thư mục .git), nhưng đổi lại nó nợ ci.yml một bước — và một món nợ không ai canh thì có
+    ngày mất.
+
+    Phép thử `test_gn1` bên kia đỏ khi CHẠY trên PR mà không thấy danh sách. Phép thử này đỏ sớm
+    hơn một nhịp: khi bước ấy biến khỏi tệp cấu hình, kể cả lúc đang chạy ở chỗ khác.
+    """
+    lenh = "\n".join(_dong_lenh())
+    assert "VTOS_TEP_DOI" in lenh, (
+        "ci.yml không còn đặt biến `VTOS_TEP_DOI`. Không có nó thì hàng rào “đẩy mã lên phải có "
+        "dòng đang làm trong docs/DANG-LAM.md” lặng lẽ không chạy nữa — đúng kiểu hỏng đã để "
+        "TC-76 và TC-77 đè lên làn khác hai lần trong ngày 23/9/2026, cả hai lần CI đều xanh."
+    )
+    assert "git diff --name-only" in lenh, (
+        "Mất dòng `git diff --name-only` thì tệp danh sách rỗng, và một danh sách rỗng làm hàng "
+        "rào giữ chỗ làn xanh với mọi nhánh."
+    )
+    assert "if: github.event_name == 'pull_request'" in lenh, (
+        "Bước tính danh sách phải giới hạn ở pull request. Trên push vào main, HEAD là một lần "
+        "gộp và phép so với nhánh gốc không còn nghĩa như trên PR."
     )
 
 
