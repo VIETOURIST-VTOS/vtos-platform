@@ -64,6 +64,7 @@ from app.api.v1.to_chuc_kd import router as to_chuc_kd_router
 from app.api.v1.nguoi_ban_hang import router as nguoi_ban_hang_router
 from app.api.v1.kinh_doanh import router as kinh_doanh_router
 from app.api.v1.dong_gop_marketing import router as dong_gop_marketing_router
+from app.api.v1.chuyen_doi_lead import router as chuyen_doi_lead_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -281,6 +282,7 @@ app.include_router(to_chuc_kd_router)
 app.include_router(nguoi_ban_hang_router)
 app.include_router(kinh_doanh_router)
 app.include_router(dong_gop_marketing_router)
+app.include_router(chuyen_doi_lead_router)
 
 
 @app.get("/", include_in_schema=False)
