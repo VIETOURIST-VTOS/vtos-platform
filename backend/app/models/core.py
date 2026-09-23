@@ -115,6 +115,18 @@ class User(Base):
     # để danh sách đối chiếu không báo lệch, và để rà quyền hằng tháng nhìn ra ngay ai là người ngoài.
     role_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     role_changed_by: Mapped[str] = mapped_column(String(50), default="")
+    # TC-74 (19/9/2026) – anh Tuấn: "ngoài khối kinh doanh em mở thêm cho nhân viên sau này nhập tay
+    # vào, ví dụ hdv, dh... cũng được quyền bán khách".
+    #
+    # QUYỀN BÁN THÀNH DỮ LIỆU, KHÔNG CÒN LÀ MỘT TUPLE TRONG MÃ. Trước đây "ai bán được" là bốn vai
+    # Kinh doanh viết chết trong services; hướng dẫn viên bán một chuyến là phải sửa mã. Đo 19/9:
+    # Điều hành đã bán 4,24 tỷ và Visa 2,64 tỷ trong chín tháng – việc có thật, chỉ là hệ thống
+    # không có chỗ ghi.
+    #
+    # CỘT NÀY KHÔNG ÁP CHO KHỐI KINH DOANH: bốn vai ấy bán hàng là đương nhiên và luôn có chỉ tiêu.
+    # Ô tick chỉ dành cho người bộ phận khác, và bật nó KHÔNG kéo người ta vào bảng xếp hạng kinh
+    # doanh – quyền BÁN khác nghĩa vụ ĐẠT CHỈ TIÊU. Xem services/nguoi_ban_hang.py.
+    duoc_ban_hang: Mapped[bool] = mapped_column(Boolean, default=False)
     # ══════════════════════════════════════════════════════════════════════════════════════════
     # GIAO DIỆN RIÊNG CỦA TỪNG NGƯỜI – TC-67, anh Tuấn giao 18/9/2026
     # ══════════════════════════════════════════════════════════════════════════════════════════
@@ -420,6 +432,12 @@ class Booking(Base):
     request_id: Mapped[int] = mapped_column(Integer)
     sales_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # TC-74 – booking do ĐỐI TÁC bán (J Travel, JTV…). Rỗng = do nhân viên bán, không phải "chưa rõ".
+    #
+    # KHÔNG thay `sales_id` bằng đối tác: cột ấy NOT NULL và vẫn phải trỏ vào người tiếp nhận hồ sơ
+    # bên trong công ty – ai đó phải chịu trách nhiệm chuyến ấy. Cột này nói THÊM rằng nguồn khách
+    # đến từ đối tác, nên doanh thu KHÔNG vào chỉ tiêu của người tiếp nhận.
+    doi_tac_id: Mapped[int | None] = mapped_column(ForeignKey("doi_tac_ban_hang.id"), nullable=True, index=True)
     customer_name: Mapped[str] = mapped_column(String(120))
     customer_phone: Mapped[str] = mapped_column(String(30))
     source: Mapped[str] = mapped_column(String(60))

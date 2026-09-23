@@ -412,6 +412,7 @@ MAN_HINH_API = {
     # kết cho người bấm, không phải một lượt gọi máy chủ của màn hình này.
     "/so-con-no": ("/api/v1/so-con-no",),
     "/to-chuc-kd": ("/api/v1/to-chuc-kd",),
+    "/nguoi-ban-hang": ("/api/v1/nguoi-ban-hang",),
     "/robot-reports": ("/api/v1/auto-reports",),
     "/sales-reports": ("/api/v1/sales-reports",),
     "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
@@ -573,6 +574,9 @@ MENU_ROLES = {
     # cung team khong phai bi mat. GHI thi hep hon nhieu, khai rieng o api/v1/to_chuc_kd.py – nguoi tu
     # ve duoc cay to chuc cua minh la nguoi tu cap duoc pham vi xem cua minh.
     "/to-chuc-kd": BASE_VIEW + SALES + ("hcns", "hanh_chinh", "ptgd_doan", "cntt"),
+    # TC-74 - ai duoc ban hang. Ke toan co o day ma khong co o /to-chuc-kd: doi tac la ben thu ba
+    # co cong no va hoa don nen Ke toan phai biet danh muc ay; so do to chuc noi bo thi khong.
+    "/nguoi-ban-hang": BASE_VIEW + SALES + ("hcns", "hanh_chinh", "ptgd_doan", "ketoan", "cntt"),
 
     # V7 Đợt 3 – Sự cố tour. Điều hành cầm việc; Kinh doanh có mặt vì sale thường là người khách gọi
     # đầu tiên khi chuyến trục trặc; Kế toán đọc để biết khoản chi phát sinh của chuyến từ đâu ra.

@@ -60,6 +60,8 @@ from app.api.v1.ke_hoach import router as ke_hoach_router
 # TC-73 – co cau to chuc khoi Kinh doanh. Tien to RIENG `/api/v1/to-chuc-kd`, cung ly do da ghi o
 # dong so_con_no.py ngay tren: gan vao mot nhom co san la noi CA NHOM cho moi vai dang co nhom ay.
 from app.api.v1.to_chuc_kd import router as to_chuc_kd_router
+# TC-74 - nguoi ban hang: doi tac ngoai cong ty va quyen ban cua nhan vien ngoai khoi.
+from app.api.v1.nguoi_ban_hang import router as nguoi_ban_hang_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -274,6 +276,7 @@ app.include_router(kiem_toan_router)
 app.include_router(ty_gia_router)
 app.include_router(ke_hoach_router)
 app.include_router(to_chuc_kd_router)
+app.include_router(nguoi_ban_hang_router)
 
 
 @app.get("/", include_in_schema=False)

@@ -362,6 +362,12 @@ export const GROUPS: Group[] = [
     // tìm "team mình gồm những ai" là nhân viên kinh doanh, và họ tìm ở phân hệ của họ. Quyền ghi
     // nằm ở máy chủ (api/v1/to_chuc_kd.py), không nằm ở chỗ treo mục menu.
     ["Cơ cấu tổ chức", "/to-chuc-kd"],
+    // TC-74 · 19/9/2026. Ai được đứng tên một booking: nhân viên khối Kinh doanh, người bộ phận
+    // khác đã mở quyền bán (HDV, điều hành, visa), và ĐỐI TÁC ngoài công ty.
+    //
+    // Đứng ngay dưới "Cơ cấu tổ chức" vì hai màn hình trả lời hai nửa của cùng một câu: bên kia là
+    // "ai thuộc đơn vị nào", bên này là "ai được bán".
+    ["Người bán hàng", "/nguoi-ban-hang"],
     // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và
     // được nhận theo HỢP của hai quy tắc: loại chuyến là đoàn, HOẶC mã tour bắt đầu bằng MICE. Đo
     // 07/9: 115/115 tour có chữ MICE đều là tour đoàn, nên hôm nay hai quy tắc trùng nhau – lấy hợp
