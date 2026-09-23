@@ -76,12 +76,14 @@ function DoiSoatMarketing() {
         <div className="wrap"><table>
           <thead><tr><th>Sổ</th><th className="num">Số tiền</th></tr></thead>
           <tbody>
-            <tr><td>Theo <b>hạng mục &amp; chiến dịch</b> (ngân sách)</td>
-              <td className="num">{vnd(d.hai_so_chi_phi.theo_ngan_sach)}</td></tr>
+            <tr><td>Theo <b>đề nghị chi</b> đã chi (hạng mục &amp; chiến dịch)</td>
+              <td className="num">{vnd(d.hai_so_chi_phi.theo_de_nghi_chi)}</td></tr>
             <tr><td>Theo <b>kênh</b> (Marketing khai khi nhập số lead)</td>
               <td className="num">{d.hai_so_chi_phi.theo_kenh_khai === null
                 ? <span className="muted">chưa ai khai</span> : vnd(d.hai_so_chi_phi.theo_kenh_khai)}</td></tr>
             <tr><td><b>Chênh</b></td><td className="num"><Lech x={d.hai_so_chi_phi.lech} tien /></td></tr>
+            <tr><td className="muted">Dự toán kỳ (không đem trừ – khác loại)</td>
+              <td className="num muted">{vnd(d.hai_so_chi_phi.du_toan_ky)}</td></tr>
           </tbody></table></div>
         <p className="muted">{d.hai_so_chi_phi.co_so}</p>
         <p className="muted"><b>Màn hình này không chọn bên nào đúng.</b> Người duy nhất biết bên nào

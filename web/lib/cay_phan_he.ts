@@ -57,17 +57,30 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "2.3", ten: "Nội dung & kênh truyền thông",
         con: [
           { ma: "2.3.1", ten: "Lịch nội dung & duyệt bài", href: "/noi-dung" },
-          { ma: "2.3.2", ten: "Website, mạng xã hội & chăm sóc" }
+          // TC-80 · 24/9/2026 – mục này KHÔNG thiếu màn hình, nó thiếu đường dẫn. Hộp thư đa
+          // kênh (Zalo + Facebook) đã chạy từ lâu và đang treo ở mục 3.1 của nhánh Kinh doanh.
+          // Trỏ cả hai mục vào cùng một màn hình là ĐÚNG ở đây: người Marketing đi tìm "chăm sóc
+          // mạng xã hội" và người Kinh doanh đi tìm "hộp thư" là hai câu hỏi khác nhau dẫn tới
+          // cùng một chỗ làm việc. Dựng màn hình thứ hai mới là cái sai.
+          //
+          // CỐ Ý KHÔNG ĐẶT `chung: true`. Cờ ấy do `cayCuaPhanHeCon` gắn lúc dựng khung nhìn, và
+          // `test_nam_nhanh_dung_chung_dung_la_nam_nhanh_da_chot` chốt đúng năm nhánh – nhánh thứ
+          // sáu phải là một quyết định có người ký, không phải một dòng thêm cho tiện.
+          { ma: "2.3.2", ten: "Website, mạng xã hội & chăm sóc", href: "/inbox" }
         ] },
       { ma: "2.4", ten: "Khách hàng tiềm năng",
         con: [
           { ma: "2.4.1", ten: "Nguồn khách & chống trùng", href: "/leads?tab=leads" },
-          { ma: "2.4.2", ten: "Bàn giao Sales & theo dõi xử lý" }
+          // TC-80 · 24/9/2026 – việc này đã làm xong ở nhóm 2.6 (TC-78b): màn hình
+          // /chuyen-doi-lead có cả bảng lead tồn đọng kèm thời hạn xử lý lẫn cửa bàn giao sang
+          // Sales. Vòng ấy quên nối mục này, nên máy có mà không ai tìm ra lối vào.
+          { ma: "2.4.2", ten: "Bàn giao Sales & theo dõi xử lý", href: "/chuyen-doi-lead" }
         ] },
       { ma: "2.5", ten: "Báo cáo hiệu quả",
         con: [
           { ma: "2.5.1", ten: "Lead, tỷ lệ chốt & chi phí/khách", href: "/leads?tab=report" },
-          { ma: "2.5.2", ten: "Doanh thu truy vết & hiệu quả kênh" }
+          // TC-80 · 24/9/2026 – đã làm xong ở nhóm 2.7 (TC-77), cũng quên nối như trên.
+          { ma: "2.5.2", ten: "Doanh thu truy vết & hiệu quả kênh", href: "/dong-gop-marketing" }
         ] },
       { ma: "2.6", ten: "Chuyển đổi & phối hợp Sales",
         con: [
@@ -101,7 +114,9 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
         con: [
           { ma: "3.5.1", ten: "Chăm sóc sau tour", href: "/cham-soc", chuyen: true },
           { ma: "3.5.2", ten: "Phản hồi & khiếu nại", href: "/khieu-nai", chuyen: true },
-          { ma: "3.5.3", ten: "Báo cáo chăm sóc", chuyen: true }
+          // TC-80 · 24/9/2026 – cửa /cham-soc/chi-so đã chạy và chính màn hình /cham-soc đang
+          // đọc nó; chỉ thiếu đường dẫn ở cả hai chỗ treo mục này.
+          { ma: "3.5.3", ten: "Báo cáo chăm sóc", href: "/cham-soc", chuyen: true }
         ] }
     ] },
   { khoa: "khachhang", ma: "03", ten: "Kinh doanh",
@@ -155,7 +170,7 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
         con: [
           { ma: "3.5.1", ten: "Chăm sóc sau tour", href: "/cham-soc" },
           { ma: "3.5.2", ten: "Phản hồi & khiếu nại", href: "/khieu-nai" },
-          { ma: "3.5.3", ten: "Báo cáo chăm sóc" }
+          { ma: "3.5.3", ten: "Báo cáo chăm sóc", href: "/cham-soc" }
         ] },
       // TC-73 (19/9/2026) – sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
       //

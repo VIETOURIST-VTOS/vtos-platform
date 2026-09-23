@@ -36,18 +36,33 @@ biết mức nhiễu của phép khớp.
 ═══════════════════════════════════════════════════════════════════════════════════════════════
 CHI PHÍ — MỘT MẶT PHẲNG LỆCH, PHẢI NÓI RA
 ═══════════════════════════════════════════════════════════════════════════════════════════════
-Từ 23/9/2026 dòng ngân sách mang thêm `campaign_id` (anh Tuấn chọn), nên chi THỰC TẾ của từng
-chiến dịch tính được. Hai điều kèm theo, cả hai đều phải hiện lên màn hình:
+SỬA NGÀY 24/9/2026 — VÒNG TRƯỚC NỐI NHẦM BẢNG, VÀ MÀN HÌNH ĐÃ IN SỐ SAI.
 
-MỘT — DÒNG CHI CŨ KHÔNG CÓ CHIẾN DỊCH. Cột mới rỗng cho mọi dòng đã nhập trước hôm nay, và cố ý
-không suy ngược từ tên hạng mục: đoán "hạng mục Facebook tháng 9 chắc là của chiến dịch CD2609-01"
-là bịa số liệu, đúng thứ ranh giới 09/9/2026 cấm. Phần chi chưa gắn chiến dịch nằm riêng ở
-`chi_chua_gan`, không bị chia đều cho các chiến dịch để cho đẹp bảng.
+Anh Tuấn chốt 23/9 là "nối chi vào chiến dịch". Bản TC-77 nối `campaign_id` vào DÒNG NGÂN SÁCH rồi
+lấy `amount` của dòng ấy làm "chi thực tế". `amount` là DỰ TOÁN — tiền ĐỊNH tiêu. Tiền ĐÃ tiêu nằm
+ở đề nghị chi, và `payment_requests.campaign_id` vốn đã có sẵn từ trước. Hệ quả của bản sai: ô
+"Thu / chi" chia doanh thu cho dự toán, nên chiến dịch tiêu ít hơn kế hoạch thì hiệu quả hiện THẤP
+hơn sự thật, tiêu vượt thì hiện CAO hơn — và không có dấu hiệu nào trên màn hình để ai nghi ngờ.
 
-HAI — CHI VÀ THU KHÔNG CÙNG MỘT MỐC THỜI GIAN. Chi tính theo THÁNG NGÂN SÁCH (`mkt_budgets.period`),
+Nay hàm trả BA con số tiền cho mỗi chiến dịch, mỗi con số một cái tên riêng và không bao giờ trộn:
+`du_toan_gan` (tiền định tiêu, từ dòng ngân sách), `da_chi` (tiền đã tiêu, từ đề nghị chi trạng
+thái da_chi), `treo` (tiền sắp tiêu, đề nghị đang chạy duyệt). `thu_tren_chi` chia cho `da_chi`.
+
+BA ĐIỀU KÈM THEO, cả ba đều phải hiện lên màn hình:
+
+MỘT — DÒNG CHI CHƯA GẮN CHIẾN DỊCH. Ô chiến dịch của đề nghị chi rỗng cho mọi dòng đã nhập trước
+hôm nay, và cố ý không suy ngược từ tên hạng mục: đoán "hạng mục Facebook tháng 9 chắc là của
+chiến dịch CD2609-01" là bịa số liệu, đúng thứ ranh giới 09/9/2026 cấm. Phần ấy nằm riêng ở
+`da_chi_chua_gan`, không bị chia đều cho các chiến dịch để cho đẹp bảng.
+
+HAI — CHI VÀ THU KHÔNG CÙNG MỘT MỐC THỜI GIAN. Chi tính theo THÁNG LẬP ĐỀ NGHỊ CHI,
 thu tính theo THÁNG TOUR KẾT THÚC. Tiền quảng cáo tháng 7 sinh ra tour khởi hành tháng 9 kết thúc
 tháng 10, nên tỷ lệ của một tháng đơn lẻ luôn lệch; đọc theo quý hoặc theo cả vòng đời chiến dịch
 mới đúng. Hàm trả về `canh_bao_lech_ky` để màn hình in câu ấy ra, chứ không để người đọc tự vấp.
+
+BA — TIỀN ĐANG TREO KHÔNG PHẢI TIỀN ĐÃ TIÊU, và cũng không phải số không. Một chiến dịch có 300
+triệu đang chạy duyệt thì "thu trên chi" hôm nay đẹp hơn tuần sau, nên `treo` phải nằm cạnh
+`da_chi` trên cùng một dòng chứ không bị giấu đi. Đề nghị bị TỪ CHỐI không vào sổ nào cả.
 """
 from sqlalchemy import select
 
@@ -132,12 +147,24 @@ def nguon_cua(dong: dict, lead: Lead | None, cd_theo_id: dict, cd_theo_ma: dict)
 
 
 def _chi_thang(db, ky: str) -> dict:
-    """Chi Marketing của kỳ, tách phần đã gắn chiến dịch và phần chưa gắn.
+    """HAI CON SỐ TIỀN, GỌI ĐÚNG TÊN TỪNG CÁI.
 
-    KHÔNG chia phần chưa gắn cho các chiến dịch. Chia đều là bịa: một dòng chi 200 triệu không
-    gắn chiến dịch có thể là của một chiến dịch, có thể là chi chung cả tháng, và không ai ở đây
-    biết là cái nào.
+    LỖI ĐÃ SỬA 24/9/2026 — bản TC-77 của hàm này cộng `mkt_budget_lines.amount` rồi trả về dưới
+    tên `tong_chi`, và màn hình in nó dưới nhãn "Chi thực tế". `amount` là DỰ TOÁN. Hệ quả: ô
+    "Thu / chi" là doanh thu chia cho tiền ĐỊNH tiêu, nên chiến dịch tiêu ít hơn kế hoạch thì hiệu
+    quả hiện thấp hơn sự thật và tiêu vượt thì hiện cao hơn. Xem `marketing.chi_thuc_te`.
+
+    Nay trả về CẢ HAI, và không bao giờ trộn:
+        du_toan_*  – dòng ngân sách đã duyệt cho kỳ, tiền ĐỊNH tiêu
+        da_chi_*   – đề nghị chi trạng thái `da_chi` của kỳ, tiền ĐÃ tiêu
+        treo_*     – đề nghị chi đang chạy duyệt, tiền SẮP tiêu
+
+    KHÔNG chia phần chưa gắn cho các chiến dịch, ở cả hai sổ. Chia đều là bịa: một dòng 200 triệu
+    không gắn chiến dịch có thể là của một chiến dịch, có thể là chi chung cả tháng, và không ai ở
+    đây biết là cái nào.
     """
+    from app.services import marketing as MK
+
     ngan_sach = list(db.execute(
         select(MarketingBudget).where(MarketingBudget.period == ky)).scalars())
     ids = [b.id for b in ngan_sach]
@@ -146,23 +173,30 @@ def _chi_thang(db, ky: str) -> dict:
         dong = list(db.execute(
             select(MarketingBudgetLine).where(MarketingBudgetLine.budget_id.in_(ids))).scalars())
 
-    theo_cd: dict[int, float] = {}
-    chua_gan = 0.0
+    du_theo_cd: dict[int, float] = {}
+    du_chua_gan = 0.0
     for d in dong:
         tien = float(d.amount or 0)
         if getattr(d, "campaign_id", None):
-            theo_cd[d.campaign_id] = theo_cd.get(d.campaign_id, 0.0) + tien
+            du_theo_cd[d.campaign_id] = du_theo_cd.get(d.campaign_id, 0.0) + tien
         else:
-            chua_gan += tien
-    tong = float(sum(float(d.amount or 0) for d in dong))
-    return {
-        "tong_chi": tong,
-        "theo_chien_dich": theo_cd,
-        "chi_chua_gan": chua_gan,
-        "so_dong": len(dong),
-        "co_ngan_sach": bool(ngan_sach),
-    }
+            du_chua_gan += tien
 
+    tt = MK.chi_thuc_te(db, ky)
+    return {
+        "du_toan_tong": float(sum(float(d.amount or 0) for d in dong)),
+        "du_toan_theo_chien_dich": du_theo_cd,
+        "du_toan_chua_gan": du_chua_gan,
+        "so_dong_du_toan": len(dong),
+        "co_ngan_sach": bool(ngan_sach),
+        "da_chi_tong": tt["da_chi_tong"],
+        "da_chi_theo_chien_dich": tt["da_chi_theo_chien_dich"],
+        "da_chi_chua_gan": tt["da_chi_chua_gan"],
+        "treo_tong": tt["treo_tong"],
+        "treo_theo_chien_dich": tt["treo_theo_chien_dich"],
+        "treo_chua_gan": tt["treo_chua_gan"],
+        "so_dong_chi": tt["so_dong"],
+    }
 
 def thang(db, ky: str, mang: str = "") -> dict:
     """Đóng góp doanh thu của Marketing trong một kỳ.
@@ -220,24 +254,39 @@ def thang(db, ky: str, mang: str = "") -> dict:
                              "theo_lead": ng["cd_theo_lead"], "theo_booking": ng["cd_theo_booking"]})
 
     chi = _chi_thang(db, ky)
+
+    def _so_chi(cd_id_: int, cd) -> dict:
+        """Ba con số tiền của một chiến dịch, mỗi con số một cái tên riêng.
+
+        `thu_tren_chi` CHIA CHO TIỀN ĐÃ TIÊU, không chia cho dự toán — đó chính là chỗ bản TC-77
+        sai. Chưa chi đồng nào thì để RỖNG chứ không để 0 và cũng không chia cho 0: "chưa tiêu
+        đồng nào" khác hẳn "tiêu mà không thu được gì".
+        """
+        da_chi = chi["da_chi_theo_chien_dich"].get(cd_id_, 0.0)
+        return {
+            "da_chi": da_chi,
+            "treo": chi["treo_theo_chien_dich"].get(cd_id_, 0.0),
+            "du_toan_gan": chi["du_toan_theo_chien_dich"].get(cd_id_, 0.0),
+            "chi_ke_hoach": float(cd.budget or 0) if cd else 0.0,
+            "thu_tren_chi": None,
+        }
+
     for c in theo_cd.values():
-        cd = cd_id.get(c["chien_dich_id"])
-        c["chi_thuc_te"] = chi["theo_chien_dich"].get(c["chien_dich_id"], 0.0)
-        c["chi_ke_hoach"] = float(cd.budget or 0) if cd else 0.0
-        # Thu trên mỗi đồng chi. Chi bằng 0 thì để RỖNG chứ không để 0 và cũng không chia cho 0:
-        # "chưa gắn đồng chi nào" khác hẳn "chi mà không thu được gì".
-        c["thu_tren_chi"] = (c["tien"] / c["chi_thuc_te"]) if c["chi_thuc_te"] else None
+        c.update(_so_chi(c["chien_dich_id"], cd_id.get(c["chien_dich_id"])))
+        c["thu_tren_chi"] = (c["tien"] / c["da_chi"]) if c["da_chi"] else None
 
     # Chiến dịch CÓ CHI mà KHÔNG có doanh thu nào — không tự hiện ra nếu chỉ duyệt theo booking,
     # mà đó lại đúng là nhóm đáng xem nhất.
-    for cd_id_, tien_chi in chi["theo_chien_dich"].items():
+    # Duyệt CẢ HAI sổ: một chiến dịch mới lập ngân sách mà chưa tiêu đồng nào cũng phải hiện ra,
+    # và một chiến dịch đã tiêu mà chưa ai lập dự toán thì càng phải hiện ra.
+    co_tien = set(chi["da_chi_theo_chien_dich"]) | set(chi["treo_theo_chien_dich"]) \
+        | set(chi["du_toan_theo_chien_dich"])
+    for cd_id_ in co_tien:
         if cd_id_ not in theo_cd:
             cd = cd_id.get(cd_id_)
             theo_cd[cd_id_] = {"chien_dich_id": cd_id_, "ma": cd.code if cd else "",
                                "ten": cd.name if cd else "", "tien": 0.0, "so_booking": 0,
-                               "so_khach": 0, "chi_thuc_te": tien_chi,
-                               "chi_ke_hoach": float(cd.budget or 0) if cd else 0.0,
-                               "thu_tren_chi": 0.0}
+                               "so_khach": 0, **_so_chi(cd_id_, cd)}
 
     tong = float(sum(d["tien"] for d in dong))
     return {
@@ -259,11 +308,14 @@ def thang(db, ky: str, mang: str = "") -> dict:
         # Bản chi theo từng chiến dịch đã nằm trong `theo_chien_dich` ở trên; ở đây chỉ trả phần
         # tổng và phần CHƯA GẮN CHIẾN DỊCH — đúng con số mà người đọc cần để biết bảng trên còn
         # thiếu bao nhiêu tiền chi.
-        "chi_marketing": {k: chi[k] for k in ("tong_chi", "chi_chua_gan", "so_dong", "co_ngan_sach")},
+        "chi_marketing": {k: chi[k] for k in (
+            "da_chi_tong", "da_chi_chua_gan", "treo_tong", "treo_chua_gan",
+            "du_toan_tong", "du_toan_chua_gan", "so_dong_chi", "so_dong_du_toan",
+            "co_ngan_sach")},
         "bat_dong": {"so_dong": len(bat_dong), "rows": bat_dong[:200]},
         "nhieu_lead_mot_booking": nhieu_lead,
         "canh_bao_lech_ky":
-            "Chi tính theo THÁNG NGÂN SÁCH, thu tính theo THÁNG TOUR KẾT THÚC. Tiền quảng cáo "
+            "Chi tính theo THÁNG LẬP ĐỀ NGHỊ CHI, thu tính theo THÁNG TOUR KẾT THÚC. Tiền quảng cáo "
             "tháng này thường sinh ra doanh thu của tháng sau hoặc tháng sau nữa, nên tỷ lệ của "
             "một tháng đơn lẻ luôn lệch — đọc theo quý hoặc theo cả vòng đời chiến dịch mới đúng.",
     }

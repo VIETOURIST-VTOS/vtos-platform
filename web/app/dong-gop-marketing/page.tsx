@@ -150,22 +150,29 @@ function DongGopMarketing() {
       <div className="panel wrap"><h2>Theo chiến dịch</h2>
         <table><thead><tr>
           <th>Mã</th><th>Chiến dịch</th><th className="num">Doanh thu</th><th className="num">Booking</th>
-          <th className="num">Chi thực tế</th><th className="num">Chi kế hoạch</th><th className="num">Thu / chi</th>
+          <th className="num">Đã chi</th><th className="num">Đang treo</th>
+          <th className="num">Dự toán đã gắn</th><th className="num">Thu / chi</th>
         </tr></thead>
           <tbody>{(d.theo_chien_dich || []).map((r: any) => <tr key={r.chien_dich_id}>
             <td className="mono"><a href="#" onClick={(e) => { e.preventDefault(); moChienDich(r.chien_dich_id); }}>{r.ma}</a></td>
             <td>{r.ten}</td>
             <td className="num">{vnd(r.tien)}</td>
             <td className="num">{r.so_booking}</td>
-            <td className="num">{r.chi_thuc_te ? vnd(r.chi_thuc_te) : <span className="muted">chưa gắn</span>}</td>
-            <td className="num">{r.chi_ke_hoach ? vnd(r.chi_ke_hoach) : <span className="muted">–</span>}</td>
+            <td className="num">{r.da_chi ? vnd(r.da_chi) : <span className="muted">chưa chi</span>}</td>
+            <td className="num">{r.treo ? vnd(r.treo) : <span className="muted">–</span>}</td>
+            <td className="num">{r.du_toan_gan ? vnd(r.du_toan_gan) : <span className="muted">–</span>}</td>
             <td className="num"><ThuTrenChi x={r.thu_tren_chi} /></td>
           </tr>)}
-          {!(d.theo_chien_dich || []).length && <tr><td colSpan={7} className="muted">Kỳ này chưa có booking nào gắn được chiến dịch.</td></tr>}
+          {!(d.theo_chien_dich || []).length && <tr><td colSpan={8} className="muted">Kỳ này chưa có booking nào gắn được chiến dịch.</td></tr>}
           </tbody></table>
         <p className="muted">Chiến dịch <b>có chi mà không có doanh thu</b> vẫn nằm trong bảng này với
           doanh thu bằng 0 – đó thường là nhóm đáng xem nhất, và nó sẽ không tự hiện ra nếu chỉ duyệt
           theo booking.</p>
+        <p className="muted"><b>Ba cột tiền là ba thứ khác nhau, đừng cộng vào nhau.</b> <i>Đã chi</i> là
+          tiền đã ra khỏi tài khoản (đề nghị chi trạng thái “Đã chi”). <i>Đang treo</i> là đề nghị còn
+          đang chạy duyệt – chưa ra tiền, nhưng sắp. <i>Dự toán đã gắn</i> là tiền <b>định</b> tiêu theo
+          dòng ngân sách. Ô <b>Thu / chi</b> chia doanh thu cho <b>Đã chi</b>; chưa chi đồng nào thì để
+          trống chứ không để 0 – “chưa tiêu đồng nào” khác hẳn “tiêu mà không thu được gì”.</p>
       </div>
 
       {/* CHI MARKETING CỦA KỲ */}
@@ -173,13 +180,17 @@ function DongGopMarketing() {
         {!d.chi_marketing.co_ngan_sach
           ? <p><Tag cls="warn">Kỳ này chưa có ngân sách Marketing nào được lập, nên chưa có số chi để so.</Tag></p>
           : <>
-            <p>Tổng chi <b>{vnd(d.chi_marketing.tong_chi)}</b> đ trên {d.chi_marketing.so_dong} dòng.</p>
-            {!!d.chi_marketing.chi_chua_gan && <p><Tag cls="warn">
-              {vnd(d.chi_marketing.chi_chua_gan)} đ chưa gắn chiến dịch</Tag></p>}
+            <p>Đã chi <b>{vnd(d.chi_marketing.da_chi_tong)}</b> đ, đang treo <b>{vnd(d.chi_marketing.treo_tong)}</b> đ
+              trên {d.chi_marketing.so_dong_chi} đề nghị chi.</p>
+            <p className="muted">Dự toán kỳ này <b>{vnd(d.chi_marketing.du_toan_tong)}</b> đ
+              trên {d.chi_marketing.so_dong_du_toan} dòng ngân sách – in kèm để đối chiếu, <b>không</b> phải
+              tiền đã tiêu.</p>
+            {!!d.chi_marketing.da_chi_chua_gan && <p><Tag cls="warn">
+              {vnd(d.chi_marketing.da_chi_chua_gan)} đ đã chi nhưng chưa gắn chiến dịch</Tag></p>}
             <p className="muted">Phần chưa gắn <b>không được chia đều</b> cho các chiến dịch. Chia đều
               là đoán: một dòng chi có thể là của một chiến dịch, cũng có thể là chi chung cả tháng,
-              và không ai ở đây biết là cái nào. Gắn chiến dịch cho từng dòng ở màn hình <b>Ngân sách
-              &amp; chiến dịch</b> thì bảng trên đầy dần lên.</p>
+              và không ai ở đây biết là cái nào. Gắn chiến dịch ngay lúc <b>lập đề nghị chi</b> thì bảng
+              trên đầy dần lên.</p>
           </>}
       </div>
 

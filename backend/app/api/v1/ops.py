@@ -230,6 +230,36 @@ class PRIn(BaseModel):
     ngay_den_han: date | None = None
 
 
+@router.get("/payment-requests/danh-muc-marketing")
+def pr_danh_muc_marketing(u: User = Depends(require_roles(*AC.PAYMENT_REQUEST_ROLES,
+                                                          mo_ta="danh mục cho ô chi marketing")),
+                          db: Session = Depends(get_db)):
+    """Hạng mục ngân sách và danh sách chiến dịch, cho hai ô chọn của phiếu chi marketing.
+
+    CỬA NÀY NẰM DƯỚI TIỀN TỐ CỦA CHÍNH PHÂN HỆ ĐỀ NGHỊ CHI, không phải `/api/v1/marketing`. Màn
+    hình `/expenses` khai ba tiền tố (`cashflow`, `payment-requests`, `tours`); thêm
+    `/api/v1/marketing` vào đó là nới CẢ NHÓM Marketing — hai mươi mấy cửa, gồm cả ngân sách, nội
+    dung và sổ PR — cho mọi vai lập được đề nghị chi, trong đó có `nv_dh` và bốn vai Kinh doanh.
+    Đúng cái bẫy đã ghi ở `/api/v1/tong-dai`, `/api/v1/so-con-no` và `/to-chuc-kd`: phần dôi ra vẫn
+    là quyền đã cấp.
+
+    Trả về ĐÚNG hai danh mục mà hai ô chọn cần, không trả gì thêm. Danh sách chiến dịch bị cắt theo
+    phạm vi pháp nhân của người đang xem, cùng luật với bảng đề nghị chi ngay bên cạnh.
+    """
+    from app.models.marketing import Campaign, HANG_MUC
+
+    q = select(Campaign).order_by(desc(Campaign.id))
+    q = PV.loc(q, Campaign, u)
+    return {
+        "hang_muc": HANG_MUC,
+        "chien_dich": [{"id": c.id, "ma": c.code, "ten": c.name}
+                       for c in db.execute(q.limit(300)).scalars()],
+        "ghi_chu": "Hai ô này chỉ dùng cho chi marketing. Để trống là CHƯA GẮN – khoản chi vẫn "
+                   "lập được, nhưng nó nằm ở phần chưa gắn của bảng hiệu quả chiến dịch, và "
+                   "chưa gắn hạng mục thì cổng ngân sách coi là ngoài dự toán.",
+    }
+
+
 @router.post("/payment-requests", status_code=201)
 def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptgd_mkt", "hcns", "cntt", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt")), db: Session = Depends(get_db)):
     try:

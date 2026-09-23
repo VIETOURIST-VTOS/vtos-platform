@@ -235,6 +235,72 @@ def _chi_theo_muc(db: Session, period: str, company_id: int | None) -> dict:
     return {"da_chi": da_chi, "treo": treo}
 
 
+def chi_thuc_te(db: Session, period: str, company_id: int | None = None) -> dict:
+    """Tiền ĐÃ CHI và ĐANG TREO của kỳ, tách theo TỪNG CHIẾN DỊCH.
+
+    VÌ SAO TỆP NÀY MỌC THÊM HÀM — MỘT LỖI SỐ TIỀN ĐÃ LÊN MÀN HÌNH CHỦ TỊCH
+
+    TC-77 (23/9/2026) nối `campaign_id` vào `mkt_budget_lines` rồi lấy `amount` của dòng ấy làm
+    "chi thực tế" của chiến dịch. `amount` là DỰ TOÁN — tiền ĐỊNH tiêu. Cột trên màn hình Đóng góp
+    doanh thu ghi "Chi thực tế" và ô "Thu / chi" chia doanh thu cho con số ấy, nên chiến dịch tiêu
+    ít hơn kế hoạch thì hiệu quả hiện THẤP hơn sự thật, tiêu vượt thì hiện CAO hơn.
+
+    Anh Tuấn chốt ngày 23/9 là "nối chi vào chiến dịch". Chi là ĐỀ NGHỊ CHI. Cột `campaign_id` của
+    `payment_requests` đã có sẵn từ trước — vòng ấy nối nhầm bảng chứ không thiếu cột.
+
+    CÙNG MỘT NGUỒN VỚI `_chi_theo_muc` NGAY TRÊN, và cố ý: màn hình Ngân sách đã đọc đề nghị chi để
+    ra "đã chi / đang treo" theo hạng mục. Nếu hàm này đi lối khác thì hai màn hình cùng nói về một
+    khoản tiền mà ra hai con số — đúng cái bệnh nhóm 2.8 sinh ra để chữa.
+
+    KỲ TÍNH THEO NGÀY LẬP ĐỀ NGHỊ, không theo ngày chi. Giống hệt `_chi_theo_muc`, và phải giống:
+    hai cách chia kỳ khác nhau thì bảng ngân sách và bảng hiệu quả lệch nhau ở tháng giao mùa mà
+    không ai biết vì sao. Ngày chi nằm ở `paid_at` cho ai cần soát riêng.
+
+    TỪ CHỐI KHÔNG TÍNH VÀO ĐÂU CẢ — không vào đã chi, không vào treo.
+
+    RỖNG `campaign_id` NGHĨA LÀ CHƯA GẮN, KHÔNG PHẢI "CHI CHUNG". Phần ấy trả riêng ở
+    `da_chi_chua_gan`, KHÔNG chia đều cho các chiến dịch: chia đều là bịa số.
+    """
+    dau, sau = _khoang_ngay(period)
+    q = (select(PaymentRequest.campaign_id, PaymentRequest.status,
+                func.coalesce(func.sum(PaymentRequest.amount), 0.0),
+                func.count(PaymentRequest.id))
+         .where(PaymentRequest.category == "marketing",
+                PaymentRequest.created_at >= dau, PaymentRequest.created_at < sau))
+    if company_id:
+        q = q.where(PaymentRequest.company_id == company_id)
+    rows = db.execute(q.group_by(PaymentRequest.campaign_id, PaymentRequest.status)).all()
+
+    da_chi_cd: dict[int, float] = {}
+    treo_cd: dict[int, float] = {}
+    da_chi_chua_gan = treo_chua_gan = 0.0
+    so_dong = 0
+    for cd, tt, tien, dem in rows:
+        if tt == "da_chi":
+            d, chua = da_chi_cd, "da_chi"
+        elif tt in ("cho_tp", "cho_kt", "cho_duyet", "cho_chi"):
+            d, chua = treo_cd, "treo"
+        else:
+            continue                      # từ chối
+        so_dong += int(dem or 0)
+        if cd:
+            d[cd] = d.get(cd, 0.0) + float(tien)
+        elif chua == "da_chi":
+            da_chi_chua_gan += float(tien)
+        else:
+            treo_chua_gan += float(tien)
+
+    return {
+        "da_chi_theo_chien_dich": da_chi_cd,
+        "treo_theo_chien_dich": treo_cd,
+        "da_chi_chua_gan": da_chi_chua_gan,
+        "treo_chua_gan": treo_chua_gan,
+        "da_chi_tong": float(sum(da_chi_cd.values())) + da_chi_chua_gan,
+        "treo_tong": float(sum(treo_cd.values())) + treo_chua_gan,
+        "so_dong": so_dong,
+    }
+
+
 def bang_ngan_sach(db: Session, b: MarketingBudget) -> dict:
     """Bảng theo dõi: dự toán – đã chi – đang treo – còn lại, theo từng hạng mục."""
     lines = list(db.execute(select(MarketingBudgetLine).where(MarketingBudgetLine.budget_id == b.id)).scalars())

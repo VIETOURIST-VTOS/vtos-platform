@@ -113,14 +113,37 @@ def test_kenh_chi_co_trong_khai_bao_van_hien_ra():
 
 
 def test_hai_so_chi_phi_dat_canh_nhau_va_KHONG_chon_ben_nao():
+    """ĐỔI VẾ THỨ NHẤT 24/9/2026, và ghi lại cả hai bên.
+
+    LUẬT CŨ (23/9): vế thứ nhất là `theo_ngan_sach` — tổng dòng ngân sách của kỳ, tức DỰ TOÁN.
+    Đem dự toán trừ "chi đã khai theo kênh" là trừ hai thứ khác loại, và phần lệch ra được không
+    nói lên điều gì: một kỳ chưa tiêu hết ngân sách cũng lệch y như một kỳ khai sai.
+
+    LUẬT MỚI (24/9): vế thứ nhất là `theo_de_nghi_chi` — tiền ĐÃ tiêu. Dự toán vẫn in, nhưng
+    xuống làm `du_toan_ky` để đọc kèm và KHÔNG đem trừ.
+    """
     db = _db()
     _lead(db, "0900000001", "facebook")
     _khai(db, "facebook", 1, chi=30_000_000)
     kq = DS.doi_chieu(db, "2026-09")["hai_so_chi_phi"]
     assert kq["theo_kenh_khai"] == 30_000_000
-    assert kq["theo_ngan_sach"] == 0            # chưa lập ngân sách kỳ này
+    assert kq["theo_de_nghi_chi"] == 0          # chưa có đề nghị chi nào trong kỳ
     assert kq["lech"] == -30_000_000
+    assert kq["du_toan_ky"] == 0                # cũng chưa lập ngân sách kỳ này
+    assert "theo_ngan_sach" not in kq, "Tên cũ mang nghĩa dự toán – không được sống lại"
     assert "KHÔNG buộc phải bằng nhau" in kq["co_so"]
+
+
+def test_o_chot_so_chi_phi_DOI_TEN_de_ban_chup_cu_khong_bi_doc_nham():
+    """Bản chụp cũ giữ DỰ TOÁN dưới tên `chi_marketing`. Giữ nguyên tên là báo trôi giả.
+
+    `do_troi` so ô theo TÊN. Nếu ô mới (tiền đã chi) vẫn mang tên cũ thì nó đem dự toán của bản
+    chụp tháng trước trừ tiền-đã-chi của hôm nay rồi báo một độ trôi không có thật — và người đọc
+    sẽ đi tìm nguyên nhân của một thứ chưa từng xảy ra. Đổi tên thì ô ấy không có trong bản chụp
+    cũ, và `do_troi` trả RỖNG, đúng nghĩa "chưa từng chốt số này".
+    """
+    assert "chi_marketing_da_chi" in DS.TEN_O
+    assert "chi_marketing" not in DS.TEN_O
 
 
 def test_chua_ai_khai_chi_thi_lech_chi_phi_cung_RONG():
