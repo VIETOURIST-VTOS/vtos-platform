@@ -194,7 +194,7 @@ def b_out(db: Session, b: MarketingBudget, kem_bang: bool = True) -> dict:
          "ai_ghi_chu": b.ai_ghi_chu, "created_by": b.created_by, "created_at": b.created_at,
          "approved_by": b.approved_by, "approved_at": b.approved_at,
          "lines": [{"hang_muc": l.hang_muc, "ten": HANG_MUC.get(l.hang_muc, l.hang_muc),
-                    "amount": l.amount, "note": l.note}
+                    "amount": l.amount, "note": l.note, "campaign_id": l.campaign_id}
                    for l in db.execute(select(MarketingBudgetLine).where(MarketingBudgetLine.budget_id == b.id)).scalars()]}
     if kem_bang: d["bang"] = MK.bang_ngan_sach(db, b)
     return d
@@ -221,6 +221,9 @@ class DongIn(BaseModel):
     hang_muc: str
     amount: float | None = None
     note: str = ""
+    # TC-77 – ô chọn chiến dịch trên từng dòng chi. Rỗng vẫn hợp lệ: chi chung cả tháng là việc
+    # có thật, ép gắn chiến dịch là ép người nhập chọn bừa một cái cho qua cửa.
+    campaign_id: int | None = None
 
 
 class BudgetIn(BaseModel):

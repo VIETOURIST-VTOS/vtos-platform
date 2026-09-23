@@ -322,14 +322,24 @@ PHAM_VI_DA_CHOT = {
     # phân công của chính người đăng nhập (to_chuc_kd.pham_vi_xem), trong truy vấn, trước khi gửi
     # xuống. Một nhân viên mở cửa này bằng tay cũng chỉ nhận về phần của mình. Đó là SEC-02, và nó
     # là lý do danh sách vai được phép rộng.
-    "chutich": 112, "tgd": 112, "bks": 112, "cntt": 109,
-    "ketoan": 96, "tp_dh": 86, "ptgd_doan": 68, "nv_dh": 60, "hcns": 59, "gd_kd": 60,
+    # TC-77 (23/9/2026) – +1 cho CHÍN vai trò: nhóm "/api/v1/dong-gop-marketing" gắn vào màn hình
+    # mới /dong-gop-marketing (tiền quảng cáo bỏ ra thu về bao nhiêu doanh thu).
+    #
+    # DANH SÁCH BẰNG ĐÚNG "/marketing", không rộng hơn một vai nào: ai lập được ngân sách thì xem
+    # được kết quả của ngân sách ấy. Cố ý KHÔNG có SALES, dù bảng này đầy doanh thu — người bán
+    # xem doanh số của mình ở /kinh-doanh-le; câu hỏi ở đây là câu hỏi của người tiêu tiền quảng
+    # cáo, không phải của người bán hàng.
+    #
+    # Nhóm GHI còn hẹp hơn nữa (chutich, tgd, ptgd_mkt, nv_mkt, cntt) và nằm ở tầng cửa, nên
+    # `ketoan` cùng `gd_kd` có mặt ở bảng này mà vẫn không gắn nguồn cho booking được.
+    "chutich": 113, "tgd": 113, "bks": 113, "cntt": 110,
+    "ketoan": 97, "tp_dh": 86, "ptgd_doan": 68, "nv_dh": 60, "hcns": 59, "gd_kd": 61,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 43, "nv_kd": 45, "tn_kd": 45, "tp_kd": 47, "nv_mkt": 31,
+    "ptgd_mkt": 44, "nv_kd": 45, "tn_kd": 45, "tp_kd": 47, "nv_mkt": 32,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -340,7 +350,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 112, "robot_vpm": 17,
+    "robot_pq": 18, "robot_ks": 113, "robot_vpm": 17,
 }
 
 

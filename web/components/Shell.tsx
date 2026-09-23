@@ -340,6 +340,12 @@ export const GROUPS: Group[] = [
     ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"],
     ["Chiến dịch", "/marketing"],
     ["Nội dung & thương hiệu", "/noi-dung"],
+    // TC-77 · 23/9/2026. Nhóm 2.7 – tiền quảng cáo bỏ ra thu về được bao nhiêu doanh thu.
+    //
+    // Đọc doanh thu bằng ĐÚNG ống số của màn hình Kinh doanh lẻ và màn hình Chủ tịch, không có
+    // truy vấn doanh thu riêng nào cho Marketing. Một ống số thì chỉ có một con số, và mọi câu
+    // hỏi còn lại là câu hỏi về cách CHIA con số ấy.
+    ["Đóng góp doanh thu", "/dong-gop-marketing"],
     { label: "Chăm sóc & khiếu nại", items: [
       ["Chăm sóc sau bán", "/cham-soc"], ["Phản hồi & khiếu nại", "/khieu-nai"]] },
   ] },

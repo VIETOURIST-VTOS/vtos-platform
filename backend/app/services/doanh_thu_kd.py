@@ -170,6 +170,12 @@ def dong_ban(db, ky: str) -> dict:
             "tien": float(b.amount or 0), "khach_so": b.pax,
             "user_id": b.sales_id, "nguoi_ban": u.full_name if u else "",
             "vai": u.role if u else "",
+            # TC-77 – ba ô cho phép truy nguồn của Marketing. Để Ở ĐÂY chứ không truy vấn lại
+            # bookings ở tệp kia: hai nơi cùng đọc một bảng là hai nơi có thể lọc khác nhau, và
+            # ngày chúng lệch thì không ai biết bảng nào đúng.
+            "nguon": b.source or "",
+            "ma_chien_dich": b.campaign_code or "",
+            "dien_thoai": b.customer_phone or "",
             "doi_tac_id": b.doi_tac_id,
             "doi_tac": doi_tac[b.doi_tac_id].ten if b.doi_tac_id in doi_tac else "",
             "don_vi_id": dv.id if dv else None,

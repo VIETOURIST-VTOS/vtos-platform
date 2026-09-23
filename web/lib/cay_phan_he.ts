@@ -75,11 +75,14 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "2.6.2", ten: "Lead tồn đọng & thời hạn xử lý" },
           { ma: "2.6.3", ten: "Lý do mất khách & tái chăm sóc" }
         ] },
+      // TC-77 · 23/9/2026 – cả ba mục con trỏ vào MỘT màn hình, khác nhau ở bộ lọc luồng.
+      // Dựng ba màn hình riêng thì ba nơi cùng quyết một phép truy nguồn, và ngày một nơi lệch
+      // thì ba bảng ra ba con số mà không ai biết bảng nào đúng.
       { ma: "2.7", ten: "Đóng góp doanh thu",
         con: [
-          { ma: "2.7.1", ten: "Truy vết nguồn đến booking" },
-          { ma: "2.7.2", ten: "Hiệu quả khách lẻ & MICE" },
-          { ma: "2.7.3", ten: "Doanh thu theo kênh & chiến dịch" }
+          { ma: "2.7.1", ten: "Truy vết nguồn đến booking", href: "/dong-gop-marketing" },
+          { ma: "2.7.2", ten: "Hiệu quả khách lẻ & MICE", href: "/dong-gop-marketing?mang=le" },
+          { ma: "2.7.3", ten: "Doanh thu theo kênh & chiến dịch", href: "/dong-gop-marketing" }
         ] },
       { ma: "2.8", ten: "Đối soát dữ liệu",
         con: [

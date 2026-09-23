@@ -85,6 +85,17 @@ class MarketingBudgetLine(Base):
     hang_muc: Mapped[str] = mapped_column(String(20))
     amount: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     note: Mapped[str] = mapped_column(String(300), default="")
+    # TC-77 · 23/9/2026 – anh Tuấn chốt: nối dòng chi vào chiến dịch, để trả lời được câu "chiến
+    # dịch này tiêu thật bao nhiêu, thu về bao nhiêu". Trước đó chi chỉ chia theo tháng × hạng
+    # mục, nên hiệu quả từng chiến dịch chỉ so được với ngân sách DỰ KIẾN chứ không với tiền ĐÃ
+    # tiêu.
+    #
+    # RỖNG NGHĨA LÀ CHƯA GẮN, KHÔNG PHẢI "CHI CHUNG". Mọi dòng nhập trước 23/9 đều rỗng, và cố ý
+    # KHÔNG suy ngược từ tên hạng mục: đoán "hạng mục Facebook tháng 9 chắc của chiến dịch
+    # CD2609-01" là bịa số liệu — ranh giới 09/9/2026. Phần rỗng ấy hiện riêng ở `chi_chua_gan`,
+    # không bị chia đều cho các chiến dịch để bảng trông cân.
+    campaign_id: Mapped[int | None] = mapped_column(
+        ForeignKey("campaigns.id"), nullable=True, index=True)
 
 
 # ---------- Đợt 5: NỘI DUNG & THƯƠNG HIỆU ----------
