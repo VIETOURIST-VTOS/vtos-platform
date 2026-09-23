@@ -368,6 +368,13 @@ export const GROUPS: Group[] = [
     // Đứng ngay dưới "Cơ cấu tổ chức" vì hai màn hình trả lời hai nửa của cùng một câu: bên kia là
     // "ai thuộc đơn vị nào", bên này là "ai được bán".
     ["Người bán hàng", "/nguoi-ban-hang"],
+    // TC-76 · 19/9/2026. Doanh thu và chỉ tiêu Kinh doanh lẻ – một màn hình cho cả bốn vai
+    // (viết thường chữ "lẻ" theo đúng nếp đặt tên của khối menu này; test_khong_quay_lai_ten_cu
+    // quét CẢ dòng chú thích, nên viết hoa ở đây làm phép thử đỏ vì một lý do không có thật)
+    // (Giám đốc, Trưởng phòng, Team Leader, Nhân viên); độ sâu do MÁY CHỦ quyết theo phân công,
+    // không do màn hình tự chọn. Đứng dưới hai màn hình trên vì nó ĐỌC cả hai: cơ cấu tổ chức
+    // cho biết cộng lên đâu, người bán hàng cho biết ai được tính.
+    ["Doanh thu & chỉ tiêu KD Lẻ", "/kinh-doanh-le"],
     // Kinh doanh tách làm hai phòng (chỉ đạo 07/9/2026). Mảng nằm ở TOUR chứ không ở booking, và
     // được nhận theo HỢP của hai quy tắc: loại chuyến là đoàn, HOẶC mã tour bắt đầu bằng MICE. Đo
     // 07/9: 115/115 tour có chữ MICE đều là tour đoàn, nên hôm nay hai quy tắc trùng nhau – lấy hợp

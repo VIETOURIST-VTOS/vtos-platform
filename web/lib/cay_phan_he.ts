@@ -157,7 +157,16 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "3.6", ten: "Cơ cấu tổ chức Kinh doanh", href: "/to-chuc-kd", chung: true },
       // TC-74 – danh mục người bán: nhân viên được mở quyền bán và đối tác ngoài công ty. Dùng
       // chung hai phòng vì một đối tác ghép lẻ có thể bán cả tour lẻ lẫn chỗ trong đoàn.
-      { ma: "3.7", ten: "Người bán hàng", href: "/nguoi-ban-hang", chung: true }
+      { ma: "3.7", ten: "Người bán hàng", href: "/nguoi-ban-hang", chung: true },
+      // TC-76 – doanh thu và chỉ tiêu của Kinh doanh Lẻ, xem xuống chi nhánh → phòng → team →
+      // người. CỐ Ý KHÔNG đặt `chung: true`, dù màn hình có tham số `mang` chạy được cả hai bên.
+      //
+      // Nhánh dùng chung đã tăng BA → BỐN → NĂM trong ba vòng liên tiếp, và
+      // test_nam_nhanh_dung_chung_dung_la_nam_nhanh_da_chot ghi rõ nhánh thứ sáu không nên đi
+      // tiếp đường ấy. Đây là nhánh thứ sáu. Kinh doanh Đoàn sẽ có mục riêng của mình khi bản
+      // bàn giao KDĐ về, vì hai phòng đọc hai bảng chỉ tiêu khác nhau — treo chung một mục thì
+      // người phòng Đoàn bấm vào và thấy số phòng Lẻ, rồi tự đi tìm nút đổi mảng.
+      { ma: "3.8", ten: "Doanh thu & chỉ tiêu KD Lẻ", href: "/kinh-doanh-le" }
     ] },
   { khoa: "vanhanh", ma: "04", ten: "Điều hành",
     tom_tat: "Sản phẩm · Chuyến · Dịch vụ · Đội xe và Hướng dẫn viên là hai nhóm độc lập",
@@ -388,7 +397,7 @@ export type PhanHeCon = {
 export const PHAN_HE_CON: PhanHeCon[] = [
   { khoa: "kdle", cha: "khachhang", ten: "Kinh doanh lẻ",
     tom_tat: "Lịch khởi hành · Booking lẻ · Dịch vụ riêng lẻ · Chính sách bán",
-    lay: ["3.1", "3.2", "3.3", "3.5", "3.6", "3.7"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
+    lay: ["3.1", "3.2", "3.3", "3.5", "3.6", "3.7", "3.8"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
   { khoa: "kddoan", cha: "khachhang", ten: "Kinh doanh đoàn",
     tom_tat: "Cơ hội · Hồ sơ đoàn · Báo giá · Hợp đồng",
     lay: ["3.1", "3.2", "3.4", "3.5", "3.6", "3.7"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },

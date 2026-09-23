@@ -48,6 +48,11 @@ CUA_TAY = (
     "don_vi_kd", "phan_cong_kd",
     # TC-74 - danh muc doi tac ban hang. Cua nhap tay o man hinh /nguoi-ban-hang.
     "doi_tac_ban_hang",
+    # TC-76 - chi tieu doanh thu theo don vi hoac theo nguoi. Cua nhap tay o man hinh
+    # /kinh-doanh-le, khung "Giao chi tieu". May KHONG suy duoc bang nay va cung khong duoc
+    # phep: chi tieu la dieu nguoi ta QUYET DINH. Suy no tu thuc hien ky truoc la bien thuoc
+    # do thanh cai bong cua chinh so bi do - cung ly le da ghi cho ke_hoach_thang ngay duoi.
+    "chi_tieu_kd",
     # TC-41 – chỉ tiêu doanh thu và lợi nhuận trước thuế theo tháng × pháp nhân. Cửa nhập tay ở màn
     # hình /ke-hoach-thang. Máy KHÔNG sinh được bảng này và cũng không được phép: kế hoạch là điều
     # người ta QUYẾT ĐỊNH, không phải điều hệ thống đo được. Suy nó từ thực hiện kỳ trước là biến
