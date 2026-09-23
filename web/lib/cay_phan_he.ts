@@ -89,9 +89,13 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
         ] },
       { ma: "2.8", ten: "Đối soát dữ liệu",
         con: [
-          { ma: "2.8.1", ten: "Trùng khách & thiếu nguồn" },
-          { ma: "2.8.2", ten: "Đối chiếu lead, booking & chi phí" },
-          { ma: "2.8.3", ten: "Chuẩn kỳ báo cáo & lịch sử cập nhật" }
+          // TC-79 · 24/9/2026 – ba mục con trỏ vào MỘT màn hình, khác nhau ở thẻ đang mở. Cùng
+          // lý lẽ với nhóm 2.6 và 2.7. Riêng nhóm này còn một lý do nữa: cả ba câu đều đọc CÙNG
+          // một bộ số, và tách ba màn hình là tạo ba chỗ có thể đọc lệch nhau — đúng cái bệnh mà
+          // nhóm 2.8 sinh ra để chữa.
+          { ma: "2.8.1", ten: "Trùng khách & thiếu nguồn", href: "/doi-soat-marketing" },
+          { ma: "2.8.2", ten: "Đối chiếu lead, booking & chi phí", href: "/doi-soat-marketing" },
+          { ma: "2.8.3", ten: "Chuẩn kỳ báo cáo & lịch sử cập nhật", href: "/doi-soat-marketing" }
         ] },
       { ma: "3.5", ten: "Chăm sóc khách hàng", chuyen: true,
         con: [

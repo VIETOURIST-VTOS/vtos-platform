@@ -352,6 +352,10 @@ export const GROUPS: Group[] = [
     // hạn" đã được dọn về một mối ngày 18/9 để chỗ đếm và chỗ đánh dấu dùng chung một luật; chép
     // nó sang đây là dựng lại đúng cái vừa dọn xong.
     ["Chuyển đổi & phối hợp Sales", "/chuyen-doi-lead"],
+    // TC-79 · 24/9/2026. Nhóm 2.8 – bàn cân. Đặt cuối nhóm Marketing vì nó chỉ có nghĩa khi đã
+    // có hai vật để cân: màn hình này KHÔNG tự tính doanh thu, tỷ lệ hay chi phí nào của riêng
+    // nó, mà gọi lại máy của nhóm 2.6 và 2.7 rồi đặt cạnh những con số người dùng đã tự khai.
+    ["Đối soát dữ liệu", "/doi-soat-marketing"],
     { label: "Chăm sóc & khiếu nại", items: [
       ["Chăm sóc sau bán", "/cham-soc"], ["Phản hồi & khiếu nại", "/khieu-nai"]] },
   ] },

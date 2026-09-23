@@ -342,14 +342,24 @@ PHAM_VI_DA_CHOT = {
     #
     # Nhóm GHI hẹp hơn hẳn và nằm ở tầng cửa: KHÔNG có `nv_kd`. Nhân viên kinh doanh có mặt ở
     # bảng này để nhìn, không để tự chuyển lead đang nằm im của mình sang người khác.
-    "chutich": 114, "tgd": 114, "bks": 114, "cntt": 111,
-    "ketoan": 97, "tp_dh": 86, "ptgd_doan": 69, "nv_dh": 60, "hcns": 60, "gd_kd": 62,
+    # TC-79 (24/9/2026) – +1 cho CHÍN vai trò: nhóm "/api/v1/doi-soat-marketing" gắn vào màn hình
+    # mới /doi-soat-marketing (nhóm 2.8 – bàn cân của phân hệ Marketing).
+    #
+    # BẰNG ĐÚNG danh sách vai của /dong-gop-marketing, không rộng hơn một vai nào: đây là câu hỏi
+    # về SỐ của Marketing, không phải về việc của từng người bán — nên không có SALES, khác hẳn
+    # nhóm 2.6 vốn hỏi về quãng giữa hai phòng.
+    #
+    # Nhóm CHỐT SỐ còn hẹp hơn nữa và nằm ở tầng cửa (chutich, tgd, ptgd_mkt, cntt): chốt số là
+    # đặt một mốc mà mọi báo cáo sau đó đem ra so, nên `nv_mkt` có mặt ở bảng này mà không chốt
+    # được — dù họ ghi được ở cả nhóm 2.6 lẫn 2.7.
+    "chutich": 115, "tgd": 115, "bks": 115, "cntt": 112,
+    "ketoan": 98, "tp_dh": 86, "ptgd_doan": 69, "nv_dh": 60, "hcns": 60, "gd_kd": 63,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 45, "nv_kd": 46, "tn_kd": 46, "tp_kd": 48, "nv_mkt": 33,
+    "ptgd_mkt": 46, "nv_kd": 46, "tn_kd": 46, "tp_kd": 48, "nv_mkt": 34,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -360,7 +370,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 114, "robot_vpm": 17,
+    "robot_pq": 18, "robot_ks": 115, "robot_vpm": 17,
 }
 
 

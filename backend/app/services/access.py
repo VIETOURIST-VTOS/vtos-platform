@@ -416,6 +416,7 @@ MAN_HINH_API = {
     "/kinh-doanh-le": ("/api/v1/kinh-doanh",),
     "/dong-gop-marketing": ("/api/v1/dong-gop-marketing",),
     "/chuyen-doi-lead": ("/api/v1/chuyen-doi-lead",),
+    "/doi-soat-marketing": ("/api/v1/doi-soat-marketing",),
     "/robot-reports": ("/api/v1/auto-reports",),
     "/sales-reports": ("/api/v1/sales-reports",),
     "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
@@ -590,6 +591,9 @@ MENU_ROLES = {
     # GIUA hai phong (Marketing giao lead, Sales xu ly), nen ca hai ben phai nhin cung mot bang.
     # Giau nua bang khoi mot ben la cach chac chan de moi phong tu giu mot con so rieng.
     "/chuyen-doi-lead": BASE_VIEW + MARKETING + SALES + ("ptgd_mkt", "ptgd_doan", "hcns", "cntt"),
+    # TC-79 - nhom 2.8, ban can doi soat. BANG DUNG danh sach vai cua /dong-gop-marketing: day
+    # la cau hoi ve so cua Marketing, khong phai ve viec cua tung nguoi ban.
+    "/doi-soat-marketing": BASE_VIEW + MARKETING + ("ptgd_mkt", "gd_kd", "ketoan", "cntt"),
 
     # V7 Đợt 3 – Sự cố tour. Điều hành cầm việc; Kinh doanh có mặt vì sale thường là người khách gọi
     # đầu tiên khi chuyến trục trặc; Kế toán đọc để biết khoản chi phát sinh của chuyến từ đâu ra.
