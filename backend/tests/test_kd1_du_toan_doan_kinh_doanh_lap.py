@@ -73,6 +73,12 @@ class _Data:
         self.rest_stops = kw.get("rest_stops", "")
         self.company_id = None
         self.note = ""
+        # Ô bắt buộc thêm ngày 24/9/2026 (xem test_hh1). Khuôn này mặc định TRẢ LỜI "khong" để mọi
+        # phép thử bên dưới vẫn đo đúng thứ chúng được viết ra để đo — chuỗi trạng thái, cổng của
+        # Sale Admin, luật toàn quyền — chứ không cùng đỏ vì một ô mới.
+        # Phép thử của CHÍNH cái ô ấy nằm ở tệp riêng và cố ý bỏ trống nó.
+        self.hoa_hong_khach = kw.get("hoa_hong_khach", "khong")
+        self.hoa_hong_khach_tien = kw.get("hoa_hong_khach_tien", 0)
 
 
 # ───────────────────────── 1 · tour lẻ không đổi một dòng ─────────────────────────

@@ -78,7 +78,14 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     t = db.get(Tour, tid)
     if not t: raise HTTPException(404, "Không có tour")
     v = T.tour_view(db, t, u)
-    if not AC.can_see_cost(u):
+    # 24/9/2026 — hỏi theo CHUYẾN chứ không theo vai trò, y như cửa `GET /tours/{id}`.
+    #
+    # ĐÂY MỚI LÀ CỬA MÀN HÌNH CHI TIẾT DÙNG. Vòng 2 đã đổi `get_tour` sang
+    # `can_see_cost_tren_chuyen` nhưng bỏ sót cửa này, nên Kinh doanh Đoàn mở đúng chuyến mình vừa
+    # lập vẫn nhận `calc = None` và không thấy giá vốn — quyền có trong mã, màn hình vẫn che.
+    # Hai cửa đọc cùng một chuyến mà hỏi hai luật khác nhau thì luật lỏng hơn là luật vô nghĩa và
+    # luật chặt hơn là lỗi người dùng báo về.
+    if not AC.can_see_cost_tren_chuyen(u, t):
         for k in ("settlement", "fixed_cost", "var_cost_per_pax", "actual_cost", "promo_value", "calc", "justification"): v[k] = None
         vis = AC.sales_ids_visible(db, u)
         if vis is not None: v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") in vis]

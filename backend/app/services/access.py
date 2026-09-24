@@ -420,6 +420,10 @@ MAN_HINH_API = {
     # /so-con-no: gắn nhờ vào một nhóm có sẵn (ví dụ /api/v1/tours) là nới CẢ nhóm ấy cho mọi vai mở
     # được màn hình này, và phần dôi ra vẫn là quyền đã cấp dù hàng rào trong chưa cho dùng hôm nay.
     "/ptgd-doan": ("/api/v1/ptgd-doan",),
+    # Bàn làm việc của Sale Admin phòng Đoàn — cùng khuôn mẫu và cùng lý do như dòng ngay trên.
+    # MÀN HÌNH CHỈ ĐỌC: hai cửa GHI của vai này nằm trên chính chuyến
+    # (`POST /tours/{id}/chuyen-dieu-hanh` và `.../tra-lai-kinh-doanh`), không nhân bản sang đây.
+    "/sales-admin": ("/api/v1/sales-admin",),
     "/requests": ("/api/v1/requests", "/api/v1/bookings", "/api/v1/tours", "/api/v1/meta",
                   "/api/v1/mang"),
     "/lai-lo-tour": ("/api/v1/lai-lo-tour",),
@@ -637,6 +641,12 @@ MENU_ROLES = {
     # lo. Ai cần nhìn việc của cả phòng thì nhìn ở /so-con-no và /lai-lo-tour.
     # Điều hành KHÔNG có mặt: họ trình dự toán, không đứng cùng phía với người duyệt nó.
     "/ptgd-doan": BASE_VIEW + ("ptgd_doan", "cntt"),
+    # Bàn làm việc của Sale Admin phòng Đoàn. `ptgd_doan` CÓ mặt — khác hẳn dòng trên, và có lý do:
+    # đây không phải hàng đợi ký của một người, nó là danh sách việc tồn đọng của một phòng, và
+    # người phụ trách mảng đoàn phải nhìn được phòng mình đang đọng ở đâu.
+    # Khối Kinh doanh KHÔNG có mặt: màn hình này là chỗ SOÁT hồ sơ của chính họ; để người bị soát
+    # đứng cùng chỗ với người soát thì cái cổng chỉ còn là một dòng chữ.
+    "/sales-admin": BASE_VIEW + SALES_ADMIN + ("ptgd_doan", "cntt"),
     "/lai-lo-tour": BASE_VIEW + OPERATIONS + SALES_ADMIN + ("ptgd_doan", "ketoan", "cntt"),
     # TC-71 · Sổ chuyến còn nợ — anh Tuấn 18/9/2026 chọn ba nhóm: Chủ tịch/TGĐ, Điều hành, Kế toán.
     # ĐÚNG BẰNG `/lai-lo-tour` và cùng một lý do: cả hai màn hình nói về sổ quyết toán của chuyến,

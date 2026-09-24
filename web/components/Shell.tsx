@@ -390,6 +390,10 @@ export const GROUPS: Group[] = [
     // Đứng đầu nhóm KHÔNG đẩy mục nào của nhân viên bán hàng xuống: mục này chỉ hiện cho sáu vai
     // khai ở MENU_ROLES["/ptgd-doan"]. Với mọi vai khác, nhóm này bắt đầu bằng "Hộp thư" y như cũ.
     ["Duyệt dự toán đoàn", "/ptgd-doan"],
+    // Bàn làm việc của Sale Admin phòng Đoàn — đặt NGAY SAU mục trên vì hai màn hình là hai đầu
+    // của cùng một dây chuyền: chị ấy chuyển sang Điều hành, ông ấy ký ở cuối. Cùng nhóm "Kinh
+    // doanh" và cùng lý do: vị trí này thuộc Phòng Kinh doanh Đoàn.
+    ["Bàn làm việc Sale Admin", "/sales-admin"],
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
     // TC-73 · 19/9/2026. Sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.

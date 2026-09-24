@@ -43,6 +43,10 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       // ô "chờ duyệt" chung trên bảng điều hành; nhánh này là bàn làm việc riêng, có đủ biên kế
       // hoạch, trường còn thiếu và sổ quá hạn — thứ ô chung không mang nổi.
       { ma: "1.3b", ten: "Duyệt dự toán đoàn", href: "/ptgd-doan" },
+      // 24/9/2026 · Bàn làm việc của Sale Admin phòng Đoàn: sáu khối việc trong bản mô tả công
+      // việc hiệu lực 01/9/2026. Đứng cạnh 1.3b vì hai màn hình là hai đầu của cùng một dây
+      // chuyền — chuyển sang Điều hành ở đầu này, ký ở đầu kia.
+      { ma: "1.3c", ten: "Bàn làm việc Sale Admin", href: "/sales-admin" },
       { ma: "1.4", ten: "Thông báo", href: "/alerts" },
       { ma: "1.5", ten: "Trợ lý AI" }
     ] },

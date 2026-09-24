@@ -335,6 +335,34 @@ class Tour(Base):
     planned_pax: Mapped[int] = mapped_column(Integer, default=0)
     rest_stops: Mapped[str] = mapped_column(Text, default="")             # điểm dừng nghỉ
     strategic: Mapped[bool] = mapped_column(Boolean, default=False)       # tour chiến lược (Chủ tịch công bố)
+    # ── Hoa hồng dành cho khách · Chủ tịch quyết 24/9/2026 ──────────────────────────────────────
+    #
+    # Mục 4.2 bản mô tả Sale Admin buộc kiểm hoa hồng và quà tặng dành cho khách đã nằm trong giá
+    # vốn của chính đoàn ấy chưa. Rủi ro thật: người bán hứa miệng 5% cho khách rồi không ghi vào
+    # dự toán, nên biên kế hoạch in ra đẹp hơn sự thật và cổng 10% mở cho một đoàn lẽ ra không qua.
+    #
+    # VÌ SAO LÀ MỘT Ô BẮT BUỘC CHỨ KHÔNG PHẢI MỘT PHÉP TÍNH: phần mềm không nhìn thấy một lời hứa
+    # chưa ai viết ra. Không có ô này thì chỗ trống và "không có hoa hồng" trông giống hệt nhau, và
+    # người bỏ trống không phải nói dối lần nào. Có ô này thì bỏ trống là KHÔNG CHUYỂN ĐƯỢC, còn
+    # ghi "không" trong khi đã hứa 5% là một câu nói dối có tên người và có dấu thời gian.
+    #
+    # VÌ SAO LÀ CHUỖI CHỨ KHÔNG PHẢI BOOLEAN: boolean chỉ có hai giá trị, nên "chưa trả lời" phải
+    # mượn NULL – và NULL trong một cột boolean là đúng cái đã chặn deploy ngày 14/9. Ba trạng thái
+    # thì khai ba giá trị: "" chưa trả lời · "co" · "khong".
+    hoa_hong_khach: Mapped[str] = mapped_column(String(10), default="", server_default="")
+    # Số tiền hoa hồng khách đã khai. CHỈ có nghĩa khi `hoa_hong_khach == "co"`.
+    #
+    # Nó KHÔNG tự cộng vào `fixed_cost`: giá vốn là con số người lập dự toán gõ, và cộng thêm sau
+    # lưng họ thì hai màn hình sẽ in ra hai giá vốn khác nhau cho cùng một chuyến. Thay vào đó,
+    # `rules.bien_neu_hoa_hong_chua_vao()` đặt CẠNH biên đã nhập một biên thứ hai – biên trong
+    # trường hợp khoản này chưa nằm trong giá vốn – để người ký nhìn thấy cả hai và tự hỏi.
+    #
+    # RỖNG ĐƯỢC, và đó là điểm chính — hàng rào K2 (test_kt12) bắt đúng chỗ này ngày 25/9/2026:
+    # một cột tiền vừa `default=0` vừa NOT NULL thì "chưa nhập" bị ghi thành 0, và không ai còn
+    # phân biệt được "khai là 0 đồng" với "chưa ai gõ". Ở cột này sự phân biệt ấy càng quan trọng:
+    # số tiền CHỈ có nghĩa khi câu trả lời là "co"; với "khong" và với chuyến chưa ai trả lời thì
+    # không có khoản tiền nào cả — rỗng, không phải 0.
+    hoa_hong_khach_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     # Cổng biên
     below_margin: Mapped[bool] = mapped_column(Boolean, default=False)    # cờ 'dưới biên'
     justification: Mapped[str] = mapped_column(Text, default="")          # giải trình 4 mục

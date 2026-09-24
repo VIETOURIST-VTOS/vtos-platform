@@ -154,6 +154,24 @@ def test_gv11_cua_doc_tour_hoi_theo_chuyen_chu_khong_theo_vai():
     assert not re.search(r"can_see_cost\(", than), "còn chỗ hỏi theo vai trò – hai luật song song sẽ lệch"
 
 
+def test_gv11b_cua_MAN_HINH_CHI_TIET_cung_hoi_theo_chuyen():
+    """`GET /tours/{id}/detail` là cửa màn hình chi tiết THẬT SỰ dùng — không phải `GET /tours/{id}`.
+
+    Vòng 2 sửa đúng cửa thứ hai và bỏ sót cửa này, nên Kinh doanh Đoàn mở chính chuyến mình vừa lập
+    vẫn nhận `calc = None`. Quyền nằm trong mã mà màn hình vẫn che thì trên thực tế là chưa mở.
+
+    Hai cửa đọc cùng một chuyến mà hỏi hai luật khác nhau: luật lỏng hơn thành vô nghĩa, luật chặt
+    hơn thành lỗi người dùng báo về. Phép thử này khoá cả hai cửa vào một luật.
+    """
+    import re
+    from app.api.v1 import products as PR
+    nguon = open(PR.__file__, encoding="utf-8").read()
+    i = nguon.find("def tour_detail")
+    than = re.sub(r"#[^\n]*", "", nguon[i:nguon.find("\n@router", i)])
+    assert "can_see_cost_tren_chuyen" in than, "cửa chi tiết phải hỏi theo CHUYẾN"
+    assert not re.search(r"can_see_cost\(", than), "còn chỗ hỏi theo vai trò – hai luật song song sẽ lệch"
+
+
 def test_gv12_cong_bien_va_hai_chu_ky_khong_bi_dung_toi():
     """Lần nới này đổi việc NHÌN, không đổi việc DUYỆT.
 
