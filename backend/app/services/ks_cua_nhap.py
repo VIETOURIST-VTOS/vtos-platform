@@ -224,6 +224,14 @@ MAY_SINH = {
                            "chứng từ nào đứng sau.",
     "bao_cao_luu": "Ảnh chụp bảng chỉ tiêu do lịch tự động lưu mỗi kỳ, sinh từ chính hàm màn hình "
                    "gọi – nhập tay vào đây là viết lại quá khứ, đúng thứ bản chụp sinh ra để chống.",
+    # TC-83 (24/9/2026) – bia mộ tài khoản đã xoá. Hệ thống ghi đúng MỘT dòng ở đây mỗi lần có người
+    # bấm xoá một tài khoản, ngay trước khi hàng ở `users` biến mất. Không có cửa nhập tay, và cũng
+    # KHÔNG CÓ CỬA XOÁ: nhật ký nghiệp vụ ghi người làm bằng tên đăng nhập dạng chữ, nên bảng này là
+    # thứ duy nhất tra ngược được `nv.thao` trong một dòng nhật ký ba tháng trước ra người nào. Mở
+    # cửa nhập tay ở đây là cho phép khai một lần xoá chưa từng xảy ra; mở cửa xoá là bịt lại đúng
+    # cái lỗ mà bảng này sinh ra để vá.
+    "tai_khoan_da_xoa": "Bia mộ do chính thao tác xoá tài khoản ghi ra, ngay trước khi hàng ở users "
+                        "biến mất – nhập tay là khai một lần xoá chưa từng xảy ra.",
 }
 
 
