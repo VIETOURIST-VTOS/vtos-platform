@@ -18,16 +18,29 @@ function Expenses() {
   const [rows, setRows] = useState<any[]>([]);
   const [cf, setCf] = useState<any[]>([]);
   const [tours, setTours] = useState<any[]>([]);
-  const [f, setF] = useState<any>({ category: "chi_tour", tour_id: "", supplier_name: "", supplier_tax_code: "", supplier_bank: "", amount: "", description: "", has_document: false, document_ref: "", has_invoice: false, ngay_den_han: "" });
+  const [f, setF] = useState<any>({ category: "chi_tour", tour_id: "", supplier_name: "", supplier_tax_code: "", supplier_bank: "", amount: "", description: "", has_document: false, document_ref: "", has_invoice: false, ngay_den_han: "", marketing_muc: "", campaign_id: "" });
   // VPM-17 – danh sách đề nghị chi CHƯA ai gõ ngày phải trả. Mỗi dòng ở đây là một khoản tiền hệ
   // thống biết phải trả nhưng không biết trả NGÀY NÀO, nên không xếp được vào cột nào của bảng dòng tiền.
   const [thieuNgay, setThieuNgay] = useState<any>(null);
+  // Hai ô của phiếu chi marketing. Cột `marketing_muc` và `campaign_id` của đề nghị chi có từ lâu
+  // và API vẫn nhận, nhưng MÀN HÌNH NÀY CHƯA BAO GIỜ CÓ Ô NÀO — nên tới 24/9/2026 chưa một dòng
+  // chi marketing nào được gắn hạng mục hay chiến dịch. Hệ quả: cổng ngân sách không bao giờ đối
+  // chiếu được hạn mục nào, và bảng hiệu quả chiến dịch không có chi phí thực tế để chia.
+  //
+  // Danh mục lấy qua cửa của CHÍNH phân hệ đề nghị chi, không gọi sang /api/v1/marketing – xem
+  // ghi chú ở api/v1/ops.py.
+  const [dmMkt, setDmMkt] = useState<any>(null);
   const load = useCallback(() => {
     if (!tours.length) api("/tours").then((r) => setTours(r.rows || [])).catch(() => {});
     if (tab === "requests") api(`/payment-requests${filter ? `?status=${filter}` : ""}`).then(setRows);
     if (tab === "cashflow") api("/cashflow").then(setCf).catch((e) => toast(errMsg(e), true));
     if (tab === "thieu_ngay") api("/payment-requests/thieu-ngay-den-han").then(setThieuNgay).catch((e) => toast(errMsg(e), true));
   }, [tab, filter]); // eslint-disable-line
+  // Chỉ nạp khi người dùng thật sự chọn Marketing: phần lớn phiếu chi là chi phí tour, không việc
+  // gì bắt mọi người tải danh sách chiến dịch.
+  useEffect(() => {
+    if (f.category === "marketing" && !dmMkt) api("/payment-requests/danh-muc-marketing").then(setDmMkt).catch(() => {});
+  }, [f.category, dmMkt]);
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
   const step = (r: any, action: string, reason = "") => post(`/payment-requests/${r.id}/step`, { action, reason });
@@ -76,7 +89,17 @@ function Expenses() {
           <span className="muted">Chưa hẹn được thì để trống – đừng đoán. Khoản để trống sẽ nằm ở tab “Chưa có ngày phải trả” cho tới khi có người gõ.</span></label>
         <label>Chứng từ đính kèm (số HĐ/HĐơn/báo giá)<input value={f.document_ref} onChange={(e) => setF({ ...f, document_ref: e.target.value, has_document: !!e.target.value })} /></label>
         <label><input type="checkbox" checked={f.has_invoice} onChange={(e) => setF({ ...f, has_invoice: e.target.checked })} /> Có hóa đơn GTGT (không có → không được trừ TNDN)</label>
-      </div><button className="act" disabled={!f.supplier_name || !f.amount || !f.description} onClick={() => post("/payment-requests", { ...f, tour_id: f.tour_id ? Number(f.tour_id) : null, amount: Number(f.amount), ngay_den_han: f.ngay_den_han || null }).then((r) => r && setF({ ...f, supplier_name: "", amount: "", description: "", document_ref: "", has_document: false, ngay_den_han: "" }))}>Lập đề nghị</button></div>}
+        {f.category === "marketing" && <>
+          <label>Hạng mục ngân sách Marketing<select value={f.marketing_muc} onChange={(e) => setF({ ...f, marketing_muc: e.target.value })}>
+            <option value="">– chưa gắn –</option>
+            {Object.entries(dmMkt?.hang_muc || {}).map(([k, v]) => <option key={k} value={k}>{v as string}</option>)}</select>
+            <span className="muted">Chưa gắn hạng mục thì cổng ngân sách coi khoản này là ngoài dự toán và cần hai chữ ký.</span></label>
+          <label>Chiến dịch<select value={f.campaign_id} onChange={(e) => setF({ ...f, campaign_id: e.target.value })}>
+            <option value="">– chưa gắn –</option>
+            {(dmMkt?.chien_dich || []).map((c: any) => <option key={c.id} value={c.id}>{c.ma} · {c.ten}</option>)}</select>
+            <span className="muted">Để trống được. Nhưng khoản để trống nằm ở phần “chưa gắn chiến dịch” của bảng Đóng góp doanh thu, và không chiến dịch nào nhận nó.</span></label>
+        </>}
+      </div><button className="act" disabled={!f.supplier_name || !f.amount || !f.description} onClick={() => post("/payment-requests", { ...f, tour_id: f.tour_id ? Number(f.tour_id) : null, amount: Number(f.amount), ngay_den_han: f.ngay_den_han || null, marketing_muc: f.category === "marketing" ? f.marketing_muc : "", campaign_id: f.category === "marketing" && f.campaign_id ? Number(f.campaign_id) : null }).then((r) => r && setF({ ...f, supplier_name: "", amount: "", description: "", document_ref: "", has_document: false, ngay_den_han: "", marketing_muc: "", campaign_id: "" }))}>Lập đề nghị</button></div>}
       <div>{[["cho_tp,cho_kt,cho_duyet,cho_chi", "Đang xử lý"], ["cho_chi", "Lệnh chi chờ"], ["da_chi", "Đã chi"], ["tu_choi", "Từ chối"], ["", "Tất cả"]].map(([v, l]) => <button key={v} className={"act " + (filter === v ? "" : "grey")} onClick={() => setFilter(v)}>{l}</button>)}</div>
       <div className="panel wrap"><table><thead><tr><th>Số ĐN</th><th>Loại / Tour</th><th>NCC</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Nội dung</th><th>Hạn trả</th><th>Cờ R3</th><th>Trạng thái → bước tiếp</th><th>Người</th><th></th></tr></thead>
         <tbody>{rows.length ? rows.map((r) => <tr key={r.id}><td><b>{r.code}</b><div className="muted">{fmtDT(r.created_at)}</div></td><td>{CAT[r.category]}<div className="muted">{r.tour_code}</div></td><td>{r.supplier_name}<div className="muted">{r.supplier_tax_code || <Tag cls="warn">chưa MST</Tag>}</div></td><td style={{ textAlign: "right" }}><b>{vnd(r.amount)}</b></td><td>{r.description}<div className="muted">{r.document_ref || <Tag cls="warn">thiếu chứng từ</Tag>}{!r.has_invoice && !["hoan_tien", "tam_ung"].includes(r.category) && <Tag cls="warn">không HĐ</Tag>}</div></td>

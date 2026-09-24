@@ -106,9 +106,18 @@ def doi_chieu(db, ky: str) -> dict:
             "khai_boi": s.updated_by if s else "",
         })
 
-    # HAI SỔ CHI PHÍ. Gọi lại máy của nhóm 2.7 để lấy sổ ngân sách; không đếm lại.
+    # HAI SỔ CHI PHÍ. Gọi lại máy của nhóm 2.7 để lấy sổ chi; không đếm lại.
+    #
+    # ĐỔI NGÀY 24/9/2026: vế thứ nhất trước đây là `tong_chi`, mà con số ấy hoá ra là DỰ TOÁN chứ
+    # không phải tiền đã tiêu (lỗi của TC-77, xem dong_gop_marketing). Nay lấy `da_chi_tong` —
+    # tiền ĐÃ tiêu theo đề nghị chi. Phép so mới có nghĩa hơn hẳn: hai sổ cũ là "định tiêu" so với
+    # "khai đã tiêu theo kênh", tức so hai thứ khác loại và phần lệch không nói lên điều gì.
+    #
+    # Dự toán KHÔNG biến mất, nó xuống làm con số thứ ba để đọc kèm: một kỳ mà đã chi thấp hơn hẳn
+    # dự toán thì phần lệch với sổ kênh có thể chỉ là tiền chưa tiêu, không phải ai khai sai.
     gop = DG.thang(db, ky)
-    chi_ngan_sach = float(gop["chi_marketing"]["tong_chi"])
+    chi_da_chi = float(gop["chi_marketing"]["da_chi_tong"])
+    chi_du_toan = float(gop["chi_marketing"]["du_toan_tong"])
     chi_theo_kenh = sum(d["chi_theo_kenh_khai"] or 0 for d in dong)
     co_khai_chi = any(d["chi_theo_kenh_khai"] is not None for d in dong)
 
@@ -119,13 +128,16 @@ def doi_chieu(db, ky: str) -> dict:
         "tong_lead_khai_bao": (sum(d["so_lead_khai_bao"] or 0 for d in dong)
                                if any(d["so_lead_khai_bao"] is not None for d in dong) else None),
         "hai_so_chi_phi": {
-            "theo_ngan_sach": chi_ngan_sach,
+            "theo_de_nghi_chi": chi_da_chi,
             "theo_kenh_khai": chi_theo_kenh if co_khai_chi else None,
-            "lech": (chi_ngan_sach - chi_theo_kenh) if co_khai_chi else None,
-            "co_so": "Hai sổ ghi cùng một khoản tiền theo hai trục khác nhau: ngân sách ghi theo "
+            "lech": (chi_da_chi - chi_theo_kenh) if co_khai_chi else None,
+            # Con số thứ ba, để đọc kèm chứ KHÔNG đem trừ: nó khác loại với hai số trên.
+            "du_toan_ky": chi_du_toan,
+            "co_so": "Hai sổ ghi cùng một khoản tiền theo hai trục khác nhau: đề nghị chi ghi theo "
                      "HẠNG MỤC và CHIẾN DỊCH, sổ kênh ghi theo KÊNH. Chúng KHÔNG buộc phải bằng "
                      "nhau — nhưng phần chênh phải có người giải thích, chứ không phải mỗi báo "
-                     "cáo lấy một sổ rồi hai báo cáo ra hai con số.",
+                     "cáo lấy một sổ rồi hai báo cáo ra hai con số. Dự toán kỳ in kèm làm nền: "
+                     "đã chi thấp hơn hẳn dự toán thì phần lệch có thể chỉ là tiền chưa tiêu.",
         },
         "doanh_thu": {
             "tong": gop["tong_doanh_thu"],
@@ -210,7 +222,11 @@ def _so_cua_ky(db, ky: str) -> dict:
     return {
         "tong_doanh_thu": gop["tong_doanh_thu"],
         "truy_duoc_nguon": gop["do_phu"]["truy_duoc_nguon"],
-        "chi_marketing": gop["chi_marketing"]["tong_chi"],
+        # ĐỔI TÊN Ô 24/9/2026 cùng lúc với việc sửa nguồn số. Cố ý ĐỔI TÊN chứ không giữ tên cũ:
+        # bản chụp cũ đang giữ DỰ TOÁN dưới tên `chi_marketing`, và nếu tên không đổi thì `do_troi`
+        # đem dự toán cũ trừ tiền-đã-chi mới rồi báo một độ trôi không có thật. Tên mới không có
+        # trong bản chụp cũ, nên `do_troi` trả RỖNG cho ô ấy — đúng nghĩa "chưa từng chốt số này".
+        "chi_marketing_da_chi": gop["chi_marketing"]["da_chi_tong"],
         "tong_lead": cd["tong_lead"],
         "da_chot": cd["da_chot"],
     }
@@ -219,7 +235,7 @@ def _so_cua_ky(db, ky: str) -> dict:
 TEN_O = {
     "tong_doanh_thu": "Tổng doanh thu kỳ",
     "truy_duoc_nguon": "Doanh thu truy được nguồn",
-    "chi_marketing": "Chi Marketing",
+    "chi_marketing_da_chi": "Chi Marketing đã chi",
     "tong_lead": "Số lead",
     "da_chot": "Số lead đã chốt",
 }

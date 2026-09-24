@@ -92,6 +92,24 @@ def _chi(db, ky, hang_muc, tien, cd=None):
     db.commit()
 
 
+def _de_nghi_chi(db, tien, cd=None, trang_thai="da_chi", luc=None, muc="quang_cao"):
+    """Một đề nghị chi marketing THẬT — đây mới là tiền đã tiêu.
+
+    THÊM 24/9/2026 cùng lúc với việc sửa lỗi: helper `_chi` ở trên lập DÒNG NGÂN SÁCH, tức tiền
+    ĐỊNH tiêu. Bản TC-77 dùng nó để dựng "chi thực tế", và đó chính là chỗ sai. Hai helper để cạnh
+    nhau, tên khác hẳn nhau, để lần sau không ai lẫn nữa.
+    """
+    from app.models.ops import PaymentRequest
+    n = db.query(PaymentRequest).count() + 1
+    r = PaymentRequest(code=f"DC2609-{n:04d}", category="marketing", amount=tien,
+                       supplier_name="NCC", description="chi thu",
+                       status=trang_thai, created_by="mkt", marketing_muc=muc,
+                       campaign_id=cd.id if cd else None,
+                       created_at=luc or dt.datetime(2026, 9, 10, 9, 0))
+    db.add(r); db.commit()
+    return r
+
+
 def _nen(db):
     """Một kỳ 2026-09 với ba booking: một qua lead-có-chiến-dịch, một chỉ có ô trên booking, một trống."""
     u = _u(db, "sale1", "nv_kd")
@@ -240,25 +258,60 @@ def test_booking_da_huy_khong_vao_so():
 
 # ═════════════════════════ CHI PHÍ ═════════════════════════
 
+def test_chi_thuc_te_KHONG_DUOC_lay_tu_dong_ngan_sach():
+    """PHÉP THỬ CỦA MỘT LỖI ĐÃ LÊN MÀN HÌNH CHỦ TỊCH — 23/9 sai, 24/9 sửa.
+
+    LUẬT CŨ (TC-77, 23/9/2026): "chi thực tế của chiến dịch = `mkt_budget_lines.amount` của dòng
+    ngân sách đã gắn chiến dịch ấy". Luật ấy SAI, vì `amount` là tiền ĐỊNH tiêu. Màn hình in nó
+    dưới nhãn "Chi thực tế" và chia doanh thu cho nó, nên chiến dịch tiêu ít hơn kế hoạch thì hiệu
+    quả hiện thấp hơn sự thật.
+
+    LUẬT MỚI (24/9/2026): tiền đã tiêu chỉ đến từ ĐỀ NGHỊ CHI trạng thái `da_chi`. Dự toán không
+    biến mất, nó sang cột `du_toan_gan` và mang đúng tên nó.
+
+    Phép thử này dựng đúng thế trận đã làm lộ lỗi: một chiến dịch có dự toán 100 triệu mà chưa
+    tiêu đồng nào. Bản cũ trả 100 triệu; bản đúng trả 0 và để `thu_tren_chi` RỖNG.
+    """
+    db = _db()
+    _, _, cdA = _nen(db)
+    _chi(db, "2026-09", "quang_cao", 100_000_000, cdA)     # DỰ TOÁN, chưa tiêu
+    cd = [c for c in DG.thang(db, "2026-09")["theo_chien_dich"] if c["ma"] == "CD-A"][0]
+    assert cd["du_toan_gan"] == 100_000_000
+    assert cd["da_chi"] == 0, "Dự toán KHÔNG được đếm là tiền đã tiêu"
+    assert cd["thu_tren_chi"] is None, "Chưa tiêu đồng nào thì không có tỷ lệ nào để in"
+
+
+def test_tien_dang_treo_khong_phai_tien_da_tieu_va_cung_khong_phai_khong():
+    """Ba trạng thái, ba chỗ. Đề nghị bị TỪ CHỐI không vào sổ nào cả."""
+    db = _db()
+    _, _, cdA = _nen(db)
+    _de_nghi_chi(db, 30_000_000, cdA, "da_chi")
+    _de_nghi_chi(db, 50_000_000, cdA, "cho_duyet")
+    _de_nghi_chi(db, 90_000_000, cdA, "tu_choi")
+    cd = [c for c in DG.thang(db, "2026-09")["theo_chien_dich"] if c["ma"] == "CD-A"][0]
+    assert (cd["da_chi"], cd["treo"]) == (30_000_000, 50_000_000)
+    assert 90_000_000 not in (cd["da_chi"], cd["treo"]), "Từ chối thì không tính vào đâu cả"
+
+
 def test_chi_chua_gan_chien_dich_KHONG_bi_chia_deu():
     """Chia đều làm bảng cân và làm mọi tỷ lệ sai cùng một lúc."""
     db = _db()
     _, _, cdA = _nen(db)
-    _chi(db, "2026-09", "quang_cao", 100_000_000, cdA)
-    _chi(db, "2026-09", "su_kien", 40_000_000)            # không gắn chiến dịch
+    _de_nghi_chi(db, 100_000_000, cdA)
+    _de_nghi_chi(db, 40_000_000, None, muc="su_kien")      # không gắn chiến dịch
     kq = DG.thang(db, "2026-09")
-    assert kq["chi_marketing"]["tong_chi"] == 140_000_000
-    assert kq["chi_marketing"]["chi_chua_gan"] == 40_000_000
+    assert kq["chi_marketing"]["da_chi_tong"] == 140_000_000
+    assert kq["chi_marketing"]["da_chi_chua_gan"] == 40_000_000
     cd = [c for c in kq["theo_chien_dich"] if c["ma"] == "CD-A"][0]
-    assert cd["chi_thuc_te"] == 100_000_000, "Chỉ nhận phần chi ĐÃ gắn đúng chiến dịch ấy"
+    assert cd["da_chi"] == 100_000_000, "Chỉ nhận phần chi ĐÃ gắn đúng chiến dịch ấy"
 
 
-def test_chien_dich_chua_gan_dong_chi_nao_thi_thu_tren_chi_la_RONG():
-    """Rỗng khác 0. 'Chưa gắn đồng chi nào' khác hẳn 'chi mà không thu được gì'."""
+def test_chien_dich_chua_chi_dong_nao_thi_thu_tren_chi_la_RONG():
+    """Rỗng khác 0. 'Chưa tiêu đồng nào' khác hẳn 'tiêu mà không thu được gì'."""
     db = _db()
     _nen(db)
     cd = [c for c in DG.thang(db, "2026-09")["theo_chien_dich"] if c["ma"] == "CD-A"][0]
-    assert cd["chi_thuc_te"] == 0
+    assert cd["da_chi"] == 0
     assert cd["thu_tren_chi"] is None
 
 
@@ -267,15 +320,25 @@ def test_chien_dich_co_chi_ma_khong_doanh_thu_van_hien_ra():
     db = _db()
     _nen(db)
     lo = _cd(db, "CD-LO", "Đốt tiền")
-    _chi(db, "2026-09", "quang_cao", 70_000_000, lo)
+    _de_nghi_chi(db, 70_000_000, lo)
     cd = [c for c in DG.thang(db, "2026-09")["theo_chien_dich"] if c["ma"] == "CD-LO"]
-    assert len(cd) == 1 and cd[0]["tien"] == 0 and cd[0]["chi_thuc_te"] == 70_000_000
+    assert len(cd) == 1 and cd[0]["tien"] == 0 and cd[0]["da_chi"] == 70_000_000
+
+
+def test_chien_dich_moi_lap_du_toan_ma_chua_tieu_van_hien_ra():
+    """Duyệt CẢ HAI sổ. Chiến dịch có dự toán mà chưa tiêu là chiến dịch đáng hỏi 'bao giờ chạy'."""
+    db = _db()
+    _nen(db)
+    moi = _cd(db, "CD-MOI", "Sắp chạy")
+    _chi(db, "2026-09", "quang_cao", 25_000_000, moi)
+    cd = [c for c in DG.thang(db, "2026-09")["theo_chien_dich"] if c["ma"] == "CD-MOI"]
+    assert len(cd) == 1 and cd[0]["du_toan_gan"] == 25_000_000 and cd[0]["da_chi"] == 0
 
 
 def test_luon_co_canh_bao_lech_ky():
-    """Chi theo tháng ngân sách, thu theo tháng tour kết thúc. Bỏ câu cảnh báo là để người đọc tự vấp."""
+    """Chi theo tháng lập đề nghị, thu theo tháng tour kết thúc. Bỏ câu cảnh báo là để người đọc tự vấp."""
     kq = DG.thang(_db(), "2026-09")
-    assert "THÁNG NGÂN SÁCH" in kq["canh_bao_lech_ky"]
+    assert "THÁNG LẬP ĐỀ NGHỊ CHI" in kq["canh_bao_lech_ky"]
     assert "TOUR KẾT THÚC" in kq["canh_bao_lech_ky"]
 
 

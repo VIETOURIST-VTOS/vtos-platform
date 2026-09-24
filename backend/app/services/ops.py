@@ -223,8 +223,19 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
         r.ngay_den_han_boi, r.ngay_den_han_luc = u.username, datetime.now()
     # R3: xếp cấp duyệt
     if cat == "marketing":
-        r.marketing_muc = data.get("marketing_muc", "") or ""
-        r.campaign_id = data.get("campaign_id")
+        # KIỂM HAI Ô, 24/9/2026. Trước đây hai ô này không màn hình nào gửi nên chưa ai gõ sai
+        # được; nay phiếu chi có ô chọn thật, và một mã hạng mục gõ sai thì cổng ngân sách đối
+        # chiếu với một hạn mức không tồn tại rồi im lặng cho qua. Rỗng vẫn hợp lệ – rỗng nghĩa là
+        # CHƯA GẮN, và phần dưới đã xử riêng trường hợp ấy.
+        from app.models.marketing import Campaign as _CD, HANG_MUC as _HM
+        muc = (data.get("marketing_muc") or "").strip()
+        if muc and muc not in _HM:
+            raise ValueError(f"Hạng mục marketing không hợp lệ: {muc}")
+        cd_id = data.get("campaign_id")
+        if cd_id and db.get(_CD, int(cd_id)) is None:
+            raise ValueError(f"Không có chiến dịch id {cd_id}.")
+        r.marketing_muc = muc
+        r.campaign_id = int(cd_id) if cd_id else None
         if (r.amount or 0) >= R.get_param(db, "han_muc_mkt"):
             r.two_signatures = True
         # Cổng ngân sách marketing: vượt phần còn lại của HẠNG MỤC thì bật cờ ngoài dự toán và cần hai
