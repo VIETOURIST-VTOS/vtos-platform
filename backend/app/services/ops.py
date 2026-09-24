@@ -71,6 +71,25 @@ def mail_text(u: User, dept: str, d: date, p1: str, p2: dict, p3: str, p4: str, 
 CATEGORY_ACCOUNT = {"chi_tour": "154", "marketing": "641", "hanh_chinh": "642"}   # tam_ung: ghi 141 khi chi, hoàn ứng vào 154 khi Kế toán xác nhận quyết toán
 CATEGORY_CONFIRMER = {"chi_tour": ("tp_dh",), "marketing": ("ptgd_mkt",), "hanh_chinh": ("hcns",), "hoan_tien": ("gd_kd", "tp_kd", "tp_dh"), "tam_ung": ("tp_dh",)}
 
+# Vai DUY NHẤT duyệt được chi Marketing, kể từ chỉ đạo 23/9/2026.
+VAI_DUYET_MKT = "ptgd_mkt"
+
+
+def ai_duyet_duoc_mkt(db: Session) -> list[str]:
+    """Danh sách tài khoản ĐANG HOẠT ĐỘNG giữ vai P.TGĐ Marketing.
+
+    Vì sao cần hàm này: từ 23/9/2026 mọi hồ sơ chi Marketing dừng ở MỘT chữ ký của vai này. Một vai
+    rỗng thì mọi hồ sơ nằm chờ vĩnh viễn — và nằm chờ thì trông y hệt "đang xử lý" trên màn hình.
+    Không ai báo lỗi, không ai thấy đỏ, tiền chỉ đơn giản là không được duyệt. Đó là kiểu hỏng tệ
+    nhất: im lặng.
+
+    Hàm trả về DANH SÁCH chứ không trả về True/False, để chỗ gọi nói được ra TÊN người duyệt khi có,
+    và nói được "chưa ai" khi rỗng.
+    """
+    return sorted(
+        u for (u,) in db.execute(
+            select(User.username).where(User.role == VAI_DUYET_MKT, User.active.is_(True))).all())
+
 
 # ====================== BÁO CÁO NGÀY ======================
 def robot_score(r: DailyReport) -> tuple[float, str]:
@@ -223,6 +242,33 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
         r.ngay_den_han_boi, r.ngay_den_han_luc = u.username, datetime.now()
     # R3: xếp cấp duyệt
     if cat == "marketing":
+        # ═══════════════════════════════════════════════════════════════════════════════════════
+        # MARKETING ĐI MỘT CHỮ KÝ — CHỦ TỊCH CHỐT 23/9/2026, xác nhận lại 24/9/2026
+        # ═══════════════════════════════════════════════════════════════════════════════════════
+        #
+        # Luật: MỌI đề xuất chi Marketing do P.TGĐ Marketing duyệt là xong. Không có mốc tiền, không
+        # có nhánh. Dữ liệu vẫn đẩy lên TGĐ và Chủ tịch — nhưng để XEM, không phải để bấm.
+        #
+        # ĐÂY LÀ MỘT BƯỚC NỚI, KHÔNG PHẢI MỘT BƯỚC SIẾT. Trước hôm nay Marketing có HAI phanh, và
+        # quyết định này gỡ cả hai:
+        #   · `han_muc_mkt` = 5.000.000đ — từ mức ấy trở lên phải thêm chữ ký Chủ tịch
+        #   · vượt phần còn lại của hạng mục ngân sách — cũng bật hai chữ ký
+        # Chủ tịch đã được nêu rõ cả hai phanh này cùng hệ quả (một hồ sơ 500 triệu, hoặc một hồ sơ
+        # vượt dự toán, nay cũng chỉ cần một chữ ký) và vẫn chốt bỏ. Ghi ra đây để người sửa sau
+        # biết đây là quyết định có chủ đích, không phải một chỗ sót.
+        #
+        # NHỮNG THỨ KHÔNG BỊ GỠ, và đừng ai gỡ tiếp vì tưởng là cùng một mạch:
+        #   · Kế toán vẫn kiểm chứng từ và mã số thuế trước khi chi — đó là kiểm soát tài chính và
+        #     điều kiện trừ thuế, không phải một cấp duyệt.
+        #   · Phép kiểm hai ô hạng mục/chiến dịch ngay dưới đây (TC-80, 24/9) — giữ nguyên.
+        #   · Cờ `over_budget` vẫn được tính và vẫn ghi vào mô tả. Nó thôi CHẶN, nhưng không thôi
+        #     NÓI: người duyệt và hai màn hình lãnh đạo vẫn thấy khoản nào đang vượt dự toán.
+        #   · Người lập không tự duyệt, và P.TGĐ Marketing không lập hồ sơ (chặn ngay dưới đây).
+        if u.role == "ptgd_mkt":
+            raise ValueError(
+                "P.TGĐ Marketing không lập hồ sơ đề xuất chi, chỉ duyệt (Chủ tịch chốt 23/9/2026). "
+                "Vì mọi hồ sơ Marketing dừng ở một chữ ký của P.TGĐ, nếu chính người ấy lập thì hồ "
+                "sơ không còn ai ký được ngoài chính mình. Giao cho một nhân viên Marketing lập.")
         # KIỂM HAI Ô, 24/9/2026. Trước đây hai ô này không màn hình nào gửi nên chưa ai gõ sai
         # được; nay phiếu chi có ô chọn thật, và một mã hạng mục gõ sai thì cổng ngân sách đối
         # chiếu với một hạn mức không tồn tại rồi im lặng cho qua. Rỗng vẫn hợp lệ – rỗng nghĩa là
@@ -236,20 +282,21 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
             raise ValueError(f"Không có chiến dịch id {cd_id}.")
         r.marketing_muc = muc
         r.campaign_id = int(cd_id) if cd_id else None
-        if (r.amount or 0) >= R.get_param(db, "han_muc_mkt"):
-            r.two_signatures = True
-        # Cổng ngân sách marketing: vượt phần còn lại của HẠNG MỤC thì bật cờ ngoài dự toán và cần hai
-        # chữ ký – đúng cơ chế đã dùng cho chi phí tour. KHÔNG chặn cứng: có lúc phải chi thật; nhưng
-        # không cho chi âm thầm. Chưa gán hạng mục cũng tính là ngoài dự toán, vì không đối chiếu được
-        # với hạn mức nào – chưa lập ngân sách không phải là ngân sách vô hạn.
+        # Vượt phần còn lại của HẠNG MỤC thì vẫn ghi cờ và vẫn ghi vào mô tả — chỉ không còn bật hai
+        # chữ ký. Chưa gán hạng mục cũng tính là ngoài dự toán: không đối chiếu được với hạn mức nào,
+        # và chưa lập ngân sách không phải là ngân sách vô hạn.
         if r.marketing_muc:
             from app.services import marketing as MK
             con, vi_sao = MK.con_lai_hang_muc(db, r.marketing_muc, r.company_id)
             if (r.amount or 0) > con:
-                r.over_budget, r.two_signatures = True, True
+                r.over_budget = True
                 r.description = (r.description + f" [ngoài dự toán: còn {con:,.0f}đ theo {vi_sao}]")[:300]
         else:
-            r.over_budget, r.two_signatures = True, True
+            r.over_budget = True
+        # Bỏ luôn bước "bộ phận xác nhận": người xác nhận bộ phận của Marketing CHÍNH LÀ P.TGĐ MKT
+        # (xem CATEGORY_CONFIRMER), mà nay ông ấy là người DUYỆT ở cuối. Giữ cả hai bước là bắt cùng
+        # một người bấm hai lần cho cùng một hồ sơ — thủ tục chứ không phải kiểm soát.
+        r.status = "cho_kt"
     if t and cat in ("chi_tour", "tam_ung"):
         cf = tour_cashflow(db, t)
         if (cf["paid"] or 0) + cf["committed"] + cf["pending"] + (r.amount or 0) > (cf["budget"] or 0) + 1:
@@ -282,6 +329,22 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         msg = f"{r.code}: Kế toán đã kiểm tra, trình {'Chủ tịch + TGĐ' if r.two_signatures else 'TGĐ'} duyệt"
     elif action == "approve":
         if r.status != "cho_duyet": raise ValueError("Không ở bước duyệt")
+        if r.category == "marketing":
+            # Một chữ ký, và là chữ ký của P.TGĐ Marketing (Chủ tịch chốt 23/9/2026).
+            # Chủ tịch toàn quyền vẫn ký được — đó là luật 13/9, không phải ngoại lệ mở riêng ở đây.
+            if not (u.role == "ptgd_mkt" or toan_quyen(u)):
+                raise ValueError("Chi Marketing chỉ P.TGĐ Marketing duyệt (Chủ tịch chốt 23/9/2026)")
+            # Người lập không tự duyệt. Cửa lập đã chặn P.TGĐ MKT, nhưng Chủ tịch toàn quyền thì lập
+            # được — nên ranh giới này phải đứng ở ĐÂY mới kín, không chỉ ở cửa lập.
+            if (r.created_by or "") == u.username:
+                raise ValueError("Người lập không tự duyệt hồ sơ của chính mình")
+            r.status, r.approved_by, r.approved_at = "cho_chi", u.username, datetime.now()
+            _post_liability(db, r)
+            R.audit(db, u.username, u.role, "de_nghi_chi_approve", f"dc:{r.code}",
+                    after={"trang_thai": r.status, "mot_chu_ky_mkt": True, "ngoai_du_toan": r.over_budget})
+            db.commit()
+            return (f"{r.code} đã duyệt – lập lệnh chi chờ Kế toán thực hiện"
+                    + (" (khoản này NGOÀI DỰ TOÁN)" if r.over_budget else ""))
         if u.role == "tgd": r.signed_tgd = True
         elif u.role == "chutich" and r.two_signatures: r.signed_chutich = True
         else: raise ValueError("Chỉ TGĐ (và Chủ tịch khi cần 2 chữ ký) duyệt chi")
