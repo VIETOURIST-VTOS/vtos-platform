@@ -90,3 +90,9 @@ from app.models.chi_tieu_kd import *  # noqa
 # ở đây thì `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate sẽ
 # đòi XOÁ bảng.
 from app.models.bao_dong import *  # noqa
+
+# TC-81 · 24/9/2026. KOL / KOC — danh bạ người hợp tác nội dung và từng lần hợp tác có tiền. Mang
+# khoá ngoài sang `campaigns`, `companies` và `payment_requests` nên đứng SAU core và marketing.
+# Lần thứ MƯỜI nhắc cùng một điều ở tệp này: bảng khai dưới app/models mà thiếu dòng nhập ở đây
+# thì `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate đòi XOÁ bảng.
+from app.models.kol import *  # noqa

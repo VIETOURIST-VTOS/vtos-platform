@@ -224,8 +224,52 @@ def ma_moi(db: Session, luc: datetime | None = None) -> str:
     return f"{dau}{n + 1:04d}"
 
 
-def tao(db: Session, r: dict, boi: str) -> PrHoatDong:
-    """Ghi một việc vào sổ. `ghi_nhan_luc` do HỆ THỐNG đặt – xem ghi chú ở models/marketing.py."""
+def kiem_du_lieu(db: Session, r: dict, tu_tay: bool = False) -> None:
+    """Hàng rào của cửa tạo — THÊM 24/9/2026 khi sổ này có cửa tạo tay đầu tiên.
+
+    Tới hôm nay `tao()` chỉ được gọi từ một chỗ: nút "lập PR" trên hàng đợi tin cảnh báo, nơi
+    `loai` do chính mã ấy đặt. Nên chưa ai gõ sai được, và hàm không cần kiểm gì. Nay mục 2.2.2 có
+    màn hình với ô nhập thật, người gõ được mọi thứ — và một `loai` sai chính tả sẽ nằm im trong
+    sổ, không lọt vào bộ lọc nào, không hiện ở thẻ nào, mà cũng không báo lỗi.
+
+    KIỂM Ở SERVICE CHỨ KHÔNG Ở CỬA API: hai cửa gọi chung một hàm này, và hàng rào đặt ở cửa thì
+    cửa thứ ba viết sau sẽ quên.
+    """
+    from app.models.marketing import Campaign
+
+    if r.get("loai") not in PR_LOAI:
+        raise ValueError(f"Loại hoạt động không hợp lệ: {r.get('loai')!r}")
+    if not str(r.get("tieu_de") or "").strip():
+        raise ValueError("Phải có tiêu đề — một dòng không tên thì ba tháng sau không ai tra ra.")
+    muc = str(r.get("muc_do") or "").strip()
+    if muc and muc not in ("nhe", "vua", "nghiem_trong"):
+        raise ValueError(f"Mức độ không hợp lệ: {muc!r}")
+    # MỨC ĐỘ BẮT BUỘC Ở CỬA TAY, KHÔNG BẮT BUỘC Ở LUỒNG HỘP THƯ — và chỗ khác nhau này đáng ghi,
+    # vì bản đầu của vòng TC-81 đặt nó thành luật chung rồi làm gãy bảy phép thử của cửa lọc tin.
+    #
+    # Người ngồi gõ một bài báo vào sổ thì đã đọc xong bài ấy: hỏi thêm một ô mức độ không tốn gì,
+    # và bỏ trống ô ấy nghĩa là sổ có một vụ khủng hoảng không ai xếp hạng.
+    #
+    # Người bấm "lập PR" trên hàng đợi tin cảnh báo lúc hai giờ sáng thì KHÁC HẲN. Việc của họ lúc
+    # ấy là đưa vụ vào sổ để đồng hồ bắt đầu chạy — nhanh nhất có thể. Bắt họ dừng lại chọn một ô
+    # là đặt thêm một bước vào đúng khoảnh khắc phải ít bước nhất, và bộ lọc thì đã chấm điểm tin
+    # ấy rồi. Xếp hạng để sau, sửa được bất cứ lúc nào.
+    if tu_tay and r.get("la_khung_hoang") and not muc:
+        raise ValueError(
+            "Đánh dấu khủng hoảng thì phải chọn mức độ. Mốc hai giờ bắt đầu chạy từ lúc dòng này "
+            "vào sổ, và người trực cần biết ngay nó nặng tới đâu.")
+    cd = r.get("campaign_id")
+    if cd and db.get(Campaign, int(cd)) is None:
+        raise ValueError(f"Không có chiến dịch id {cd}.")
+
+
+def tao(db: Session, r: dict, boi: str, tu_tay: bool = False) -> PrHoatDong:
+    """Ghi một việc vào sổ. `ghi_nhan_luc` do HỆ THỐNG đặt – xem ghi chú ở models/marketing.py.
+
+    `tu_tay=True` là gọi từ màn hình có người ngồi gõ; mặc định False là luồng hộp thư cảnh báo.
+    Khác nhau đúng một điều: mức độ của vụ khủng hoảng. Xem `kiem_du_lieu`.
+    """
+    kiem_du_lieu(db, r, tu_tay=tu_tay)
     h = PrHoatDong(
         ma=ma_moi(db),
         loai=str(r.get("loai") or "").strip()[:16],
@@ -236,6 +280,10 @@ def tao(db: Session, r: dict, boi: str) -> PrHoatDong:
         la_khung_hoang=bool(r.get("la_khung_hoang")),
         muc_do=str(r.get("muc_do") or "").strip()[:12],
         ghi_chu=str(r.get("ghi_chu") or "").strip(),
+        # THÊM 24/9/2026 — hai ô sổ vẫn có cột mà `tao()` chưa bao giờ điền, vì cửa duy nhất gọi nó
+        # (nút "lập PR" từ hàng đợi tin) không biết chiến dịch nào. Nay màn hình 2.2.2 hỏi được.
+        campaign_id=r.get("campaign_id"),
+        company_id=r.get("company_id"),
         trang_thai="nhap", nguoi_tao=(boi or "")[:50],
         ghi_nhan_luc=datetime.now(),
     )

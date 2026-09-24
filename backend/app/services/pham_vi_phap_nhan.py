@@ -291,6 +291,17 @@ CO_Y_KHONG_LOC = {
     # (to_chuc_kd.pham_vi_xem), không theo pháp nhân. Hai trục khác nhau, cố ý không trộn.
     "DonViKD":  "sổ cơ cấu tổ chức khối Kinh doanh; cắt phạm vi theo đơn vị được phân công, "
                 "không theo pháp nhân — xem to_chuc_kd.pham_vi_xem",
+    # TC-81 – cùng họ với ba dòng trên: đây là DANH BẠ, không phải chứng từ mang tiền.
+    #
+    # Cột `company_id` có nghĩa thật (pháp nhân ký hợp đồng chính với người này) và sẽ dùng khi
+    # cộng chi phí KOL theo pháp nhân. Nhưng LỌC DANH BẠ theo pháp nhân đang xem thì hỏng đúng việc
+    # nó sinh ra để làm: một KOL từng chạy cho Vietourist mà lần này chạy cho pháp nhân khác vẫn là
+    # cùng một người, cùng một giá tham khảo, cùng một người liên hệ. Cắt đi là buộc phòng khai lại
+    # người ấy dưới pháp nhân thứ hai — tức là tự tay dựng bản trùng, đúng thứ sổ này chống.
+    #
+    # TIỀN THÌ VẪN CẮT. Chi phí thật đi đường đề nghị chi, và `PaymentRequest` nằm trong PHAI_LOC.
+    "MktKol":   "danh bạ người hợp tác nội dung; một KOL chạy cho nhiều pháp nhân vẫn là một "
+                "người — cắt danh bạ là buộc phòng khai trùng. Tiền vẫn cắt ở đề nghị chi.",
 }
 
 

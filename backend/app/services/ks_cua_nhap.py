@@ -46,6 +46,10 @@ CUA_TAY = (
     # `users.sales_group`: ba chuỗi chữ tự do cũ gõ tay suốt bốn năm là thứ hai bảng này sinh ra để
     # thay, chép sang là biến một đống không ai dám tin thành một bảng trông rất đáng tin.
     "don_vi_kd", "phan_cong_kd",
+    # TC-81 - KOL / KOC. Cua nhap tay o man hinh /bao-chi-kol: khung "Them KOL" va khung "Ghi mot
+    # lan hop tac". CO Y khong co bo nap tep: danh ba nay dung dan tung nguoi mot theo tung dot
+    # thuong luong, khong ai co san mot bang Excel 200 KOL de tai len.
+    "mkt_kol", "mkt_kol_hop_tac",
     # TC-74 - danh muc doi tac ban hang. Cua nhap tay o man hinh /nguoi-ban-hang.
     "doi_tac_ban_hang",
     # TC-76 - chi tieu doanh thu theo don vi hoac theo nguoi. Cua nhap tay o man hinh
