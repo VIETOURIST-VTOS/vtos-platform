@@ -320,7 +320,9 @@ def _tour(db: Session, tid: int) -> Tour:
 def get_tour(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
     t = _tour(db, tid)
     v = T.tour_view(db, t, u)
-    if not AC.can_see_cost(u):   # Kinh doanh / HCNS: không xem cơ cấu chi phí, quyết toán, bút toán
+    # 24/9/2026 – hỏi theo CHUYẾN chứ không theo vai trò: Kinh doanh Đoàn tự lập dự toán nên xem
+    # được giá vốn của chuyến ĐOÀN, còn tour lẻ vẫn che y như cũ. Lý do đầy đủ ở can_see_cost_tren_chuyen.
+    if not AC.can_see_cost_tren_chuyen(u, t):   # Kinh doanh lẻ / HCNS: không xem cơ cấu chi phí, quyết toán, bút toán
         for k in ("settlement", "fixed_cost", "var_cost_per_pax", "actual_cost", "promo_value", "calc", "justification"): v[k] = None
         vis = AC.sales_ids_visible(db, u)
         if vis is not None: v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") in vis]
@@ -332,6 +334,28 @@ def get_tour(tid: int, u: User = Depends(current_user), db: Session = Depends(ge
 @router.put("/tours/{tid}", tags=["tours"])
 def edit_tour(tid: int, data: S.TourEdit, u: User = Depends(current_user), db: Session = Depends(get_db)):
     return T.tour_view(db, T.edit(db, u, _tour(db, tid), data), u)
+
+
+# ── Hai cửa của Sale Admin phòng Đoàn (24/9/2026) ───────────────────────────────────────────
+# Khai quyền Ở CHỮ KÝ HÀM, đúng luật KS-2: chặn trong thân hàm thì bộ kiểm quyền của robot Kiểm
+# soát không đọc được, và nó sẽ báo hai cửa này là "không có chặn nào".
+#
+# `cntt` KHÔNG có trong danh sách: đây là hai cửa NGHIỆP VỤ, không phải cửa vận hành hệ thống.
+# Chủ tịch vẫn đi qua được bằng luật toàn quyền, và chỗ ấy khai trong chính hàm dịch vụ.
+@router.post("/tours/{tid}/chuyen-dieu-hanh", tags=["tours"])
+def chuyen_dieu_hanh_tour(tid: int, data: S.ActionNote | None = None,
+                          u: User = Depends(require_roles("sales_admin", "chutich",
+                                                          mo_ta="chuyển dự toán đoàn sang Điều hành")),
+                          db: Session = Depends(get_db)):
+    return {"message": T.chuyen_dieu_hanh(db, u, _tour(db, tid), (data.note if data else ""))}
+
+
+@router.post("/tours/{tid}/tra-lai-kinh-doanh", tags=["tours"])
+def tra_lai_kinh_doanh_tour(tid: int, data: S.ActionNote | None = None,
+                            u: User = Depends(require_roles("sales_admin", "chutich",
+                                                            mo_ta="trả dự toán đoàn về Kinh doanh")),
+                            db: Session = Depends(get_db)):
+    return {"message": T.tra_lai_kinh_doanh(db, u, _tour(db, tid), (data.note if data else ""))}
 
 
 @router.post("/tours/{tid}/submit", tags=["tours"])
