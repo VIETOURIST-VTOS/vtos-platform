@@ -568,10 +568,47 @@ PRODUCT_COST_KEYS = ("cost_structure", "cost_lines", "fixed_cost", "var_cost_per
 
 
 def mask_product(out: dict, u: User) -> dict:
-    """Kinh doanh / HCNS thấy sản phẩm, giá bán, chương trình – không thấy cơ cấu chi phí NCC."""
+    """Kinh doanh / HCNS thấy sản phẩm, giá bán, chương trình – không thấy cơ cấu chi phí NCC.
+
+    CỐ Ý KHÔNG nới theo quyết định 24/9/2026 (xem `can_see_cost_tren_chuyen` ngay dưới): quyết định
+    ấy mở giá vốn của MỘT CHUYẾN ĐOÀN cho người bán chuyến ấy, không mở bảng giá nhà cung cấp của
+    cả danh mục sản phẩm. Hai thứ khác nhau: một bên là con số của đoàn đang thương lượng, bên kia
+    là giá mua của công ty trên 313 mã sản phẩm.
+    """
     if not can_see_cost(u):
         for k in PRODUCT_COST_KEYS: out[k] = None
     return out
+
+
+def can_see_cost_tren_chuyen(u: User, tour) -> bool:
+    """Người này xem được giá vốn CỦA CHUYẾN NÀY không?
+
+    ── LẦN NỚI 24/9/2026, VÀ VÌ SAO NÓ HẸP ĐÚNG NHƯ THẾ NÀY ───────────────────────────────────
+    Chủ tịch quyết: Kinh doanh Đoàn tự lập dự toán, kể cả phần giá vốn. Muốn lập được thì phải
+    nhìn thấy — nên khối Kinh doanh được mở giá vốn.
+
+    Nhưng mở ở ĐÂU thì quyết định cả hậu quả, và ba cách mở dưới đây khác nhau rất xa:
+
+      a) Thêm SALES vào COST_ROLES  → khối Kinh doanh xem được giá vốn MỌI chuyến, cả tour lẻ,
+         cộng cơ cấu chi phí của toàn bộ danh mục sản phẩm qua `mask_product`. Rộng nhất, và
+         phần dôi ra không ai dùng tới nhưng vẫn là quyền đã cấp.
+      b) Mở theo CHUYẾN, chỉ chuyến đoàn  → đúng bằng việc được giao. Đây là cách đang làm.
+      c) Mở theo chuyến VÀ theo người phụ trách  → hẹp hơn nữa, nhưng nó khoá luôn Trưởng phòng
+         và Giám đốc Kinh doanh khỏi dự toán của nhân viên mình, trong khi chính họ là người
+         phải rà trước khi Sale Admin chuyển đi. Hẹp quá thành ra chặn nhầm người kiểm.
+
+    Cái này KHÔNG mở: màn hình /nha-cung-cap, bảng giá NCC ngoài chuyến, và giá vốn tour LẺ.
+    Người ngồi với khách đoàn nhìn thấy giá mua của đoàn ấy — không nhìn thấy giá mua của công ty.
+
+    Hàm nhận `tour` chứ không nhận `tour_type`: phân mảng là luật đã có chủ ở `rules.is_doan`, và
+    hỏi lại nó thì hàm này không bao giờ lệch với chỗ định tuyến duyệt.
+    """
+    if can_see_cost(u):
+        return True
+    if u.role not in SALES or tour is None:
+        return False
+    from app.services import rules as R
+    return R.is_doan(tour)
 
 
 # Menu giao diện web theo vai trò (đường dẫn trang → vai trò được thấy). Trang không liệt kê = mọi vai trò đã đăng nhập.
