@@ -24,10 +24,22 @@ function Tours() {
     .then((r) => { setRows(r.rows || []); setTong(r.tong || 0); setChamTran(!!r.cham_tran); }).catch(() => {});
   useEffect(() => { load(); }, [q, month, st, mang]); // eslint-disable-line
   useEffect(() => { api("/users?role=nv_dh,tp_dh").then(setOps).catch(() => {}); }, []);
-  const canCreate = ["nv_dh", "tp_dh"].includes(user?.role || "");
+  // Chủ tịch quyết 24/9/2026: Kinh doanh Đoàn tự lập dự toán đoàn. Cửa máy chủ đã mở từ vòng 2;
+  // thiếu dòng này thì quyền có trong mã mà không có ô nào để dùng — và một quyền không bấm được
+  // thì trên thực tế là chưa mở.
+  const laKinhDoanh = ["gd_kd", "tp_kd", "tn_kd", "nv_kd"].includes(user?.role || "");
+  const canCreate = ["nv_dh", "tp_dh"].includes(user?.role || "") || laKinhDoanh;
+  // Kinh doanh chỉ mở được chuyến ĐOÀN (ĐH Điều 2 còn nguyên cho mảng lẻ), nên danh sách loại
+  // chuyến của họ hẹp lại ngay tại ô chọn — thay vì để họ chọn rồi nhận 403.
+  const loaiChoPhep = laKinhDoanh
+    ? { doan_noi_dia: TOUR_TYPES.doan_noi_dia, doan_nuoc_ngoai: TOUR_TYPES.doan_nuoc_ngoai }
+    : TOUR_TYPES;
+  const [loai, setLoai] = useState(laKinhDoanh ? "doan_noi_dia" : "le_noi_dia");
+  const laDoan = loai.startsWith("doan_");
+  const [hhKhach, setHhKhach] = useState("");
   async function create(e: React.FormEvent) {
     e.preventDefault(); const f = new FormData(e.target as HTMLFormElement); const d: any = Object.fromEntries(f.entries());
-    ["price_per_pax", "fixed_cost", "var_cost_per_pax"].forEach((k) => (d[k] = soTien(d[k])));
+    ["price_per_pax", "fixed_cost", "var_cost_per_pax", "hoa_hong_khach_tien"].forEach((k) => (d[k] = soTien(d[k])));
     ["planned_pax", "operator_id"].forEach((k) => (d[k] = Number(d[k] || 0)));
     try { const t = await api("/tours", { method: "POST", json: d }); toast("Đã tạo tour – kiểm tra 3 con số rồi trình Trưởng phòng"); location.href = `/tours/${t.id}`; } catch (x) { toast(errMsg(x), true); }
   }
@@ -59,10 +71,11 @@ function Tours() {
       {canCreate && <Link href="/products" className="act" style={{ margin: 0 }}>Mở chuyến từ sản phẩm →</Link>}
     </div>
     {canCreate && <details className="panel" open={open} onToggle={(e) => setOpen((e.target as any).open)}>
-      <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--navy)" }}>+ Tạo tour / dự toán (chỉ Điều hành)</summary>
+      <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--navy)" }}>
+        + Tạo tour / dự toán {laKinhDoanh ? "(Kinh doanh Đoàn – chỉ chuyến đoàn)" : "(Điều hành)"}</summary>
       <form onSubmit={create}>
         <div className="grid"><div><label>Mã tour</label><input name="code" required placeholder="VD: PT-DL-1015" /></div>
-          <div><label>Loại chuyến</label><select name="tour_type">{Object.entries(TOUR_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div></div>
+          <div><label>Loại chuyến</label><select name="tour_type" value={loai} onChange={(e) => setLoai(e.target.value)}>{Object.entries(loaiChoPhep).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div></div>
         <label>Tên tour</label><input name="name" required />
         <div className="grid"><div><label>Khởi hành</label><input type="date" name="start_date" required /></div><div><label>Kết thúc</label><input type="date" name="end_date" required /></div>
           <div><label>Người điều hành duy nhất</label><select name="operator_id" defaultValue={user?.id}>{ops.map((o) => <option key={o.id} value={o.id}>{o.full_name}</option>)}</select></div></div>
@@ -70,6 +83,19 @@ function Tours() {
         <div className="grid"><div><label>Giá bán / khách (đ)</label><input type="number" name="price_per_pax" step="1000" /></div><div><label>Chi phí cố định</label><input type="number" name="fixed_cost" step="1000" /></div>
           <div><label>Chi phí theo khách</label><input type="number" name="var_cost_per_pax" step="1000" /></div><div><label>Số khách dự toán</label><input type="number" name="planned_pax" /></div></div>
         <label>Điểm dừng nghỉ (bắt buộc)</label><input name="rest_stops" />
+        {laDoan && <>
+          <h3>Hoa hồng dành cho khách (bắt buộc – Chủ tịch quyết 24/9/2026)</h3>
+          <p className="muted">Mục 4.2 bản mô tả Sale Admin: hoa hồng và quà tặng dành cho khách phải nằm trong
+            giá vốn của chính đoàn này. Bỏ trống ô này thì <b>Sale Admin không chuyển được</b> dự toán sang Điều hành.</p>
+          <div className="grid">
+            <div><label>Đoàn này có hoa hồng dành cho khách không?</label>
+              <select name="hoa_hong_khach" value={hhKhach} onChange={(e) => setHhKhach(e.target.value)}>
+                <option value="">— chưa trả lời —</option><option value="khong">Không</option><option value="co">Có</option>
+              </select></div>
+            <div><label>Số tiền hoa hồng (đ)</label>
+              <input type="number" name="hoa_hong_khach_tien" step="1000" disabled={hhKhach !== "co"} placeholder={hhKhach === "co" ? "" : "chỉ điền khi chọn Có"} /></div>
+          </div>
+        </>}
         <button className="act teal">Lưu nháp</button>
       </form></details>}
     <MangTag mang={mang} />

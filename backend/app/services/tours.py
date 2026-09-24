@@ -14,7 +14,12 @@ from fastapi import HTTPException
 def snap(t: Tour) -> dict:
     return {"code": t.code, "status": t.status, "price": t.price_per_pax, "fixed": t.fixed_cost, "var": t.var_cost_per_pax,
             "pax": t.planned_pax, "below_margin": t.below_margin, "actual_revenue": t.actual_revenue,
-            "actual_cost": t.actual_cost, "promo": t.promo_value}
+            "actual_cost": t.actual_cost, "promo": t.promo_value,
+            # Ô hoa hồng khách đi vào nhật ký kiểm: ai đổi câu trả lời, từ gì sang gì, lúc nào.
+            # Một ô bắt buộc mà không để lại vết đổi thì đổi lúc nào cũng được, và cái nó chặn
+            # chỉ còn là sự bất tiện.
+            "hoa_hong_khach": getattr(t, "hoa_hong_khach", ""),
+            "hoa_hong_khach_tien": getattr(t, "hoa_hong_khach_tien", 0)}
 
 
 def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
@@ -35,6 +40,10 @@ def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
         "closed_at": t.closed_at, "kt_confirmed_at": t.kt_confirmed_at, "cntt_checked_at": t.cntt_checked_at,
         "calc": c, "booked_pax": bk, "days_left": days_left, "settlement_deadline": R.settlement_deadline(db, t),
         "approver_role": R.approver_role(t), "settlement": s, "is_doan": R.is_doan(t),
+        "hoa_hong_khach": getattr(t, "hoa_hong_khach", ""),
+        "hoa_hong_khach_tien": getattr(t, "hoa_hong_khach_tien", 0),
+        # Biên thứ hai đặt CẠNH biên đã nhập, không thay nó. Xem `rules.bien_neu_hoa_hong_chua_vao`.
+        "hoa_hong_khach_bien": R.bien_neu_hoa_hong_chua_vao(t, c),
         "company_id": t.company_id, "chua_gan_phap_nhan": t.company_id is None,   # P6: chưa xác định pháp nhân là một trạng thái phải nhìn thấy, không gộp về công ty mẹ
         "imported": t.imported, "product_code": t.product_code, "product_id": t.product_id, "days": t.days, "transport": t.transport, "vehicle_type": t.vehicle_type, "departure_point": t.departure_point,
         "d7_flag": bool(c["breakeven_pax"] and bk < c["breakeven_pax"] and 0 <= days_left <= int(R.get_param(db, "moc_d7")) and t.status == "da_duyet"),
@@ -104,6 +113,32 @@ def _la_doan(data_hoac_tour) -> bool:
                           tour_type=getattr(data_hoac_tour, "tour_type", "")))
 
 
+HOA_HONG_KHACH_HOP_LE = ("", "co", "khong")
+
+
+def _dat_hoa_hong_khach(t: Tour, data) -> None:
+    """Ghi câu trả lời ô hoa hồng khách — dùng chung cho `create` và `edit`.
+
+    RỖNG NGHĨA LÀ "KHÔNG ĐỤNG TỚI", KHÔNG PHẢI "XOÁ CÂU TRẢ LỜI". Màn hình cũ chưa có ô này vẫn
+    gửi lên chuỗi rỗng ở mọi lần sửa; nếu rỗng mà ghi đè thì một người sửa điểm dừng nghỉ sẽ lặng
+    lẽ xoá câu trả lời của người khác, và dự toán quay về trạng thái chưa khai mà không ai biết vì
+    sao. Muốn đổi câu trả lời thì gửi "co" hoặc "khong" — một giá trị, không phải một khoảng trống.
+
+    Giá trị lạ bị từ chối thẳng: một chuỗi không đọc được nằm trong cột này sẽ làm cổng chuyển đọc
+    ra "chưa trả lời" mãi mãi, và người dùng thấy mình đã điền rồi mà máy vẫn chặn.
+    """
+    khai = (getattr(data, "hoa_hong_khach", "") or "").strip()
+    if khai not in HOA_HONG_KHACH_HOP_LE:
+        raise Gate("HOA_HONG_KHACH", "Ô hoa hồng khách chỉ nhận 'co' hoặc 'khong'")
+    if not khai:
+        return
+    t.hoa_hong_khach = khai
+    # "khong" thì số tiền về RỖNG, không về 0: không có khoản tiền nào cả. Để lại một con số dưới
+    # một câu trả lời "không" là để lại một con số mồ côi mà màn hình sau sẽ đọc ra theo cách của
+    # nó — và 0 đồng đọc như "đã khai là 0", khác hẳn "không áp dụng".
+    t.hoa_hong_khach_tien = float(getattr(data, "hoa_hong_khach_tien", 0) or 0) if khai == "co" else None
+
+
 def create(db: Session, u: User, data) -> Tour:
     from app.services import access as AC
     kd_lap_doan = u.role in AC.SALES and _la_doan(data)
@@ -118,6 +153,7 @@ def create(db: Session, u: User, data) -> Tour:
              operator_id=data.operator_id, price_per_pax=data.price_per_pax, fixed_cost=data.fixed_cost,
              var_cost_per_pax=data.var_cost_per_pax, planned_pax=data.planned_pax, rest_stops=data.rest_stops,
              company_id=getattr(data, "company_id", None))   # bỏ trống → tour vào danh sách đối chiếu pháp nhân
+    _dat_hoa_hong_khach(t, data)
     # Kinh doanh Đoàn lập thì dự toán đứng ở `nhap_kd`, chưa phải `nhap`: nó còn phải qua cổng
     # chuyển của Sale Admin. Điều hành lập thì vào thẳng `nhap` y như trước.
     if kd_lap_doan:
@@ -155,6 +191,7 @@ def edit(db: Session, u: User, t: Tour, data) -> Tour:
                                 "rest_stops": t.rest_stops, "justification": t.justification})
     t.price_per_pax, t.fixed_cost, t.var_cost_per_pax, t.planned_pax = data.price_per_pax, data.fixed_cost, data.var_cost_per_pax, data.planned_pax
     t.rest_stops, t.justification = data.rest_stops, data.justification
+    _dat_hoa_hong_khach(t, data)
     GML.tang_phien_ban(t)
     EV(db, t, "sua_du_toan", u.username, "")
     R.audit(db, u.username, u.role, "sua_du_toan", f"tour:{t.code}", before=before, after=snap(t)); db.commit()
@@ -193,6 +230,22 @@ def _thieu_truong_de_chuyen(db: Session, t: Tour) -> list[str]:
                 thieu.append(ten)
     if not t.operator_id:
         thieu.append("người điều hành phụ trách")
+    # Ô bắt buộc hoa hồng khách — Chủ tịch quyết 24/9/2026, mục 4.2 bản mô tả Sale Admin.
+    #
+    # CHỈ ĐÒI Ở CHUYẾN ĐOÀN. Cổng này là cổng của phòng Đoàn; tour lẻ đi đường cũ của Điều hành và
+    # không có ai ở bước này để trả lời, nên đòi ở đó là chặn một dây chuyền vì một câu hỏi không
+    # dành cho nó.
+    #
+    # "khong" LÀ MỘT CÂU TRẢ LỜI HỢP LỆ và cổng cho qua. Cổng này không phán đoàn có hoa hồng hay
+    # không — nó chỉ buộc phải có người trả lời. Chỗ trống và "không có" trông giống hệt nhau cho
+    # tới lúc có ô này; sau khi có, ai ghi "không" trong khi đã hứa 5% cho khách thì đó là một câu
+    # nói dối mang tên người và dấu thời gian, không còn là một ô bỏ quên.
+    if R.is_doan(t):
+        khai = (getattr(t, "hoa_hong_khach", "") or "").strip()
+        if khai not in ("co", "khong"):
+            thieu.append("trả lời ô hoa hồng dành cho khách: có hay không")
+        elif khai == "co" and float(getattr(t, "hoa_hong_khach_tien", 0) or 0) <= 0:
+            thieu.append("số tiền hoa hồng dành cho khách (đã khai là CÓ)")
     return thieu
 
 

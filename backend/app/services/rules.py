@@ -560,6 +560,37 @@ def calc(tour: Tour, threshold: float, fixed: float | None = None, var: float | 
             "gate_state": "dat" if passed else ("chua_du_co_so" if not complete else "khong_dat")}
 
 
+def bien_neu_hoa_hong_chua_vao(tour: Tour, c: dict) -> dict:
+    """Biên thứ hai đặt cạnh biên đã nhập: biên NẾU hoa hồng khách chưa nằm trong giá vốn.
+
+    ĐÂY LÀ CHỖ CÁI Ô BẮT BUỘC CÓ RĂNG (Chủ tịch quyết 24/9/2026).
+
+    `calc()` đọc giá vốn từ đúng hai con số người lập dự toán gõ: `fixed_cost` và
+    `var_cost_per_pax`. Nó KHÔNG đọc các dòng chi phí chi tiết. Nghĩa là một ô "hoa hồng khách"
+    nằm riêng, tự nó, không chạm được vào cổng biên 10% — người bán vẫn khai "có, 124 triệu" rồi
+    vẫn gõ một giá vốn không chứa 124 triệu ấy, và cổng vẫn đo trên con số cũ. Một cái ô trang trí.
+
+    Hàm này không sửa điều đó bằng cách CỘNG thêm — cộng sau lưng người lập dự toán thì hai màn
+    hình sẽ in hai giá vốn khác nhau cho cùng một chuyến, và không ai biết con số nào là con số họ
+    đã gõ. Nó làm việc khác: tính một biên thứ hai với giả định khoản ấy CHƯA nằm trong giá vốn,
+    rồi đưa cả hai cho người ký. Con số thứ hai là một CẬN DƯỚI, không phải một khẳng định.
+
+    Trả về `{"co": bool, "tien": float, "bien_neu_chua_vao": float|None, "lech": float|None}`.
+    `bien_neu_chua_vao` là None khi không khai "có" hoặc khi doanh thu bằng 0 — không trả về 0,
+    vì 0 đọc như một biên bằng không, còn None đọc đúng là "không có câu trả lời".
+    """
+    khai = (getattr(tour, "hoa_hong_khach", "") or "").strip()
+    tien = float(getattr(tour, "hoa_hong_khach_tien", 0) or 0)
+    if khai != "co" or tien <= 0:
+        return {"co": khai == "co", "tien": tien, "bien_neu_chua_vao": None, "lech": None}
+    rev = c.get("revenue") or 0
+    if not rev:
+        return {"co": True, "tien": tien, "bien_neu_chua_vao": None, "lech": None}
+    bien2 = (rev - (c.get("cost") or 0) - tien) / rev
+    return {"co": True, "tien": tien, "bien_neu_chua_vao": bien2,
+            "lech": (c.get("margin") or 0.0) - bien2}
+
+
 def budget_of(db: Session, t: Tour) -> tuple[float, float, str]:
     """Dự toán của chuyến và NGUỒN của nó – tách hẳn khỏi chi phí thực chi (B2).
 

@@ -48,7 +48,7 @@ function TourDetail() {
   const run = async (path: string, json?: any) => { try { const r = await api(`/tours/${t.id}/${path}`, { method: "POST", json: { note, ...(json || {}) } }); toast(r.message); setNote(""); load(); } catch (e) { toast(errMsg(e), true); } };
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
-    ["price_per_pax", "fixed_cost", "var_cost_per_pax"].forEach((k) => (d[k] = soTien(d[k])));
+    ["price_per_pax", "fixed_cost", "var_cost_per_pax", "hoa_hong_khach_tien"].forEach((k) => (d[k] = soTien(d[k])));
     d.planned_pax = Number(d.planned_pax || 0);
     try { await api(`/tours/${t.id}`, { method: "PUT", json: d }); toast("Đã lưu dự toán"); load(); } catch (x) { toast(errMsg(x), true); }
   };
@@ -88,6 +88,21 @@ function TourDetail() {
         {t.product?.program && <details><summary>Chương trình tour (từ sản phẩm)</summary><pre style={{ whiteSpace: "pre-wrap", fontSize: 12 }}>{t.product.program}</pre></details>}
       </div>
       <div className="panel"><h2>Luồng phê duyệt</h2>
+        {/* Bước Kinh doanh Đoàn soạn — Chủ tịch quyết 24/9/2026. Cổng của Sale Admin là cổng CHẶN
+            duy nhất của vị trí ấy (Phần V bản mô tả), nên nó phải là hai cái nút thật ở đây, chứ
+            không phải một dòng nhắc. Sale Admin KHÔNG có nút duyệt — và không bao giờ có. */}
+        {t.status === "nhap_kd" && <>
+          <p>Dự toán đang ở bước <b>Kinh doanh Đoàn soạn</b>. Sale Admin soát rồi chuyển sang Phòng Điều hành,
+            hoặc trả lại nhân viên phụ trách kèm ghi rõ thiếu gì.</p>
+          {can("edit") && <p className="muted">Sửa dự toán ở tab <b>Dự toán 3 con số</b>.</p>}
+          {can("chuyen_dieu_hanh") && <>
+            <NoteBox />
+            <button className="act teal" onClick={() => run("chuyen-dieu-hanh")}>Chuyển Phòng Điều hành</button>
+            <button className="act grey" onClick={() => run("tra-lai-kinh-doanh")}>Trả lại Kinh doanh (ghi rõ lý do)</button>
+            <p className="muted">Trả lại phải ghi lý do tối thiểu 20 ký tự vào ô trên — trả lại mà không nói thiếu gì
+              thì người nhận lại hồ sơ phải đoán.</p>
+          </>}
+        </>}
         {t.status === "nhap" && (can("edit") ? <p className="muted">Sửa dự toán ở tab <b>Dự toán 3 con số</b> rồi bấm Trình.</p> : <p className="muted">Chỉ người điều hành chuyến ({t.operator_name}) hoặc TP Điều hành sửa được dự toán.</p>)}
         {t.status === "nhap" && can("submit") && <><NoteBox /><button className="act teal" onClick={() => run("submit")}>Trình Trưởng phòng Điều hành</button></>}
         {t.status === "cho_xac_nhan" && <><p>Chờ Trưởng phòng Điều hành xác nhận.</p>{can("confirm") && <><NoteBox /><button className="act teal" onClick={() => run("confirm")}>Xác nhận dự toán</button></>}</>}
@@ -136,13 +151,41 @@ function TourDetail() {
         {t.product && <p className="muted">Cơ cấu chi phí sản phẩm {t.product.code}: cố định {vnd(t.product.fixed_cost)} · theo khách {vnd(t.product.var_cost_per_pax)} · giá tham khảo {vnd(t.product.reference_price)}</p>}
       </div>
       <div className="panel"><h2>Sửa dự toán</h2>
-        {t.status === "nhap" && can("edit") ? <form onSubmit={saveEdit}>
+        {/* `nhap_kd` là bước Kinh doanh Đoàn soạn (24/9/2026). Trước đây ô này chỉ mở ở `nhap`,
+            nên quyền sửa đã mở ở máy chủ mà trên màn hình không có ô nào để gõ. */}
+        {["nhap", "nhap_kd"].includes(t.status) && can("edit") ? <form onSubmit={saveEdit}>
           <div className="grid"><div><label>Giá bán/khách</label><input type="number" name="price_per_pax" defaultValue={t.price_per_pax} step="1000" /></div><div><label>Chi phí cố định</label><input type="number" name="fixed_cost" defaultValue={t.fixed_cost} step="1000" /></div>
             <div><label>Chi phí theo khách</label><input type="number" name="var_cost_per_pax" defaultValue={t.var_cost_per_pax} step="1000" /></div><div><label>Số khách dự toán</label><input type="number" name="planned_pax" defaultValue={t.planned_pax} /></div></div>
-          <label>Điểm dừng nghỉ (bắt buộc)</label><input name="rest_stops" defaultValue={t.rest_stops} />
+          <label>Điểm dừng nghỉ{t.status === "nhap_kd" ? " (Điều hành điền ở bước sau)" : " (bắt buộc)"}</label><input name="rest_stops" defaultValue={t.rest_stops} />
+          {t.is_doan && <>
+            <label>Đoàn này có hoa hồng dành cho khách không? (bắt buộc – Chủ tịch quyết 24/9/2026)</label>
+            <select name="hoa_hong_khach" defaultValue={t.hoa_hong_khach || ""}>
+              <option value="">— chưa trả lời —</option><option value="khong">Không</option><option value="co">Có</option>
+            </select>
+            <label>Số tiền hoa hồng dành cho khách (đ) – chỉ điền khi chọn Có</label>
+            <input type="number" name="hoa_hong_khach_tien" step="1000" defaultValue={t.hoa_hong_khach_tien || 0} />
+          </>}
           <label>Giải trình chuyến dưới biên (4 mục) – bắt buộc khi biên &lt; {pct(c.threshold)}</label><textarea name="justification" defaultValue={t.justification} />
           <button className="act grey" type="submit">Lưu dự toán</button>
         </form> : <p className="muted">Dự toán đã trình – không sửa ({TOUR_STATUS[t.status]}).</p>}
+        {t.is_doan && <>
+          <h3>Hoa hồng dành cho khách</h3>
+          {!t.hoa_hong_khach
+            ? <Gate ok={false}>CHƯA TRẢ LỜI. Sale Admin không chuyển được dự toán này sang Điều hành cho tới khi có câu trả lời.</Gate>
+            : t.hoa_hong_khach === "khong"
+              ? <p className="muted">Đã khai: <b>không có</b> hoa hồng dành cho khách.</p>
+              : <table><tbody>
+                <tr><td>Đã khai</td><td className="num"><b>{vnd(t.hoa_hong_khach_tien)}</b></td></tr>
+                <tr><td>Biên kế hoạch theo giá vốn đã nhập</td><td className="num"><b>{pct(c.margin)}</b></td></tr>
+                <tr><td>Biên <i>nếu khoản này chưa nằm trong giá vốn ấy</i></td>
+                  <td className="num">{t.hoa_hong_khach_bien?.bien_neu_chua_vao != null
+                    ? <b style={{ color: "var(--red)" }}>{pct(t.hoa_hong_khach_bien.bien_neu_chua_vao)}</b>
+                    : <span className="muted">–</span>}</td></tr>
+              </tbody></table>}
+          {t.hoa_hong_khach === "co" && <p className="muted">Con số thứ hai là một <b>cận dưới</b>, không phải một khẳng định:
+            phần mềm không biết khoản hoa hồng này có thật sự nằm trong giá vốn đã nhập hay không. Nó đặt hai con số cạnh
+            nhau để người ký tự hỏi — và để người khai phải khai.</p>}
+        </>}
       </div>
     </div>}
 

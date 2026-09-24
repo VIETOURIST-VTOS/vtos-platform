@@ -61,27 +61,54 @@ CHI_XEM = {
     # là việc khó lùi — làm hàng loạt từ một màn hình tổng thì một cú bấm nhầm đi xa hơn nhiều so
     # với cái lợi về tốc độ, và ở màn hình tổng người bấm không nhìn thấy dòng quyết toán của
     # chuyến để mà biết mình đang chốt cái gì.
-    # 24/9/2026 — Bàn làm việc của Phó TGĐ tour đoàn. Chỉ-xem THẬT, cùng một khuôn với /so-con-no
-    # ngay dưới, và việc không có cửa ghi ở đây là một LỰA CHỌN chứ không phải chỗ còn thiếu:
-    #
-    #   · Ký dự toán đã có cửa thật — POST /api/v1/tours/{id}/approve, với cổng biên, luật hai chữ
-    #     ký cho chuyến dưới biên, và nhật ký. Dựng cửa ký thứ hai ở đây là tạo bản sao thứ hai của
-    #     một luật, và bản sao nào rồi cũng lệch với bản gốc.
-    #   · Ký HÀNG LOẠT từ màn hình tổng thì người bấm không nhìn thấy dòng dự toán để biết mình vừa
-    #     duyệt cái gì. Duyệt dự toán là việc phải ĐỌC, không phải việc phải bấm.
-    #
-    # Màn hình không sở hữu con số nào của riêng nó: biên lợi nhuận lấy từ đúng `rules.calc` mà cổng
-    # biên dùng, hạn quyết toán từ tham số `han_qt_doan`, lãi lỗ từ `rules.settlement_summary`.
-    "/ptgd-doan": ("Bàn làm việc Phó TGĐ tour đoàn: hàng đợi dự toán đoàn chờ ký, sổ quá hạn quyết "
-                   "toán và bảng lãi lỗ đã chốt. Không sở hữu con số nào của riêng mình. Cửa ký nằm "
-                   "ở chính chuyến (POST /tours/{id}/approve), mỗi dòng có đường dẫn sang đó.",
-                   ("/ptgd-doan/ban-lam-viec",)),
     "/so-con-no": ("Sổ chuyến còn nợ: liệt kê chuyến đã chạy mà chưa đóng sổ. Không sở hữu con số "
                    "nào của riêng mình — mọi số lấy từ sổ quyết toán của chính chuyến. Cửa đóng sổ "
                    "nằm ở từng chuyến (/tours/<id>), và anh Tuấn chốt 18/9/2026 là KHÔNG dựng cửa "
                    "đóng hàng loạt ở đây vì đóng sổ là việc khó lùi.",
                    ("/so-con-no",)),
 }
+
+# ── BÀN LÀM VIỆC THEO VAI — nhóm ĐẾM RIÊNG, mở ngày 24/9/2026 ───────────────────────────────────
+#
+# ĐÂY LÀ VIỆC CHÍNH PHÉP THỬ NÀY ĐÃ DẶN PHẢI LÀM. Dòng cảnh giác viết ngày 24/9/2026 ở
+# `test_danh_sach_chi_xem_co_tran` nói rõ: ba vai của phòng Đoàn thì còn hai vai chưa dựng, và
+# "nếu vòng sau lại nâng trần thêm hai lần với cùng một lý do, thì lý do ấy đã thành thói quen chứ
+# không còn là lý do — lúc ấy việc phải làm là ĐỔI CÁCH ĐẾM (tách riêng nhóm bàn làm việc), không
+# phải nâng tiếp."
+#
+# Vòng 3/3 tới đúng chỗ ấy. Nên nâng trần lên 10 là làm đúng cái đã tự dặn mình đừng làm; tách
+# nhóm thì trần của CHI_XEM tụt về 8 (đúng con số ngày 19/9, trước khi bàn làm việc đầu tiên ra
+# đời) và nhóm mới mang trần riêng cùng một câu hỏi riêng.
+#
+# CÂU HỎI CỦA NHÓM NÀY KHÁC câu hỏi của CHI_XEM. CHI_XEM hỏi "con số này vào hệ thống bằng cửa
+# nào". Bàn làm việc hỏi thêm một câu nữa: "cửa GHI của chính vai này nằm ở đâu, và vì sao nó
+# không nằm ở đây" — vì một bàn làm việc không có cửa ghi nào mà cũng không chỉ được cửa ghi của
+# mình thì nó là một bảng tin, không phải một bàn làm việc.
+BAN_LAM_VIEC = {
+    "/ptgd-doan": ("Bàn làm việc Phó TGĐ tour đoàn: hàng đợi dự toán đoàn chờ ký, sổ quá hạn quyết "
+                   "toán và bảng lãi lỗ đã chốt. Không sở hữu con số nào của riêng mình.",
+                   ("/ptgd-doan/ban-lam-viec",),
+                   # Cửa ghi của vai này, và vì sao nó không nằm trên màn hình:
+                   # ký dự toán đã có cửa thật với cổng biên, luật hai chữ ký và nhật ký. Dựng cửa
+                   # ký thứ hai ở đây là tạo bản sao thứ hai của một luật, và bản sao nào rồi cũng
+                   # lệch. Ký hàng loạt thì người bấm không nhìn thấy dòng dự toán để biết mình vừa
+                   # duyệt cái gì — duyệt là việc phải ĐỌC, không phải việc phải bấm.
+                   "POST /api/v1/tours/{id}/approve"),
+    "/sales-admin": ("Bàn làm việc Sale Admin phòng Đoàn: dự toán chờ chuyển, soát giá vốn và chứng "
+                     "từ NCC, hồ sơ đoàn, tiến độ thu tiền, tiến độ quyết toán, dữ liệu khách. "
+                     "Không sở hữu con số nào của riêng mình.",
+                     ("/sales-admin/ban-lam-viec",),
+                     # Hai cửa ghi của vai này nằm trên CHÍNH CHUYẾN, và cùng một lý do như trên:
+                     # chuyển một dự toán là việc phải đọc dự toán ấy. Một nút "chuyển" cạnh một
+                     # dòng tóm tắt là lời mời chuyển mà chưa mở ra xem — và cổng chặn duy nhất của
+                     # vị trí này mất hết ý nghĩa đúng vào lúc nó trở nên tiện tay.
+                     "POST /api/v1/tours/{id}/chuyen-dieu-hanh · .../tra-lai-kinh-doanh"),
+}
+
+# Hai nhóm gộp lại mới là toàn bộ màn hình không có cửa ghi. Khoá tên riêng để không nhóm nào lặng
+# lẽ nuốt nhóm kia.
+KHONG_CUA_GHI = {**{k: v[:2] for k, v in BAN_LAM_VIEC.items()}, **CHI_XEM}
+assert len(KHONG_CUA_GHI) == len(CHI_XEM) + len(BAN_LAM_VIEC), "hai nhóm không được trùng tên màn hình"
 
 
 def _ma(src: str) -> str:
@@ -149,7 +176,7 @@ def test_moi_man_hinh_hoac_co_cua_ghi_hoac_khai_la_chi_xem():
     thieu = []
     for d in _man_hinh():
         n = _so_cua_ghi(d)
-        if n <= 0 and d not in CHI_XEM:
+        if n <= 0 and d not in KHONG_CUA_GHI:
             thieu.append((d, "không có tệp màn hình" if n < 0 else "không có lời gọi ghi nào"))
     assert not thieu, (
         "Màn hình không có cửa nhập nào và cũng không khai là chỉ xem: "
@@ -166,7 +193,7 @@ def test_man_hinh_chi_xem_van_dung_la_chi_xem():
     """
     if not SHELL.exists():
         return
-    sai = [d for d in CHI_XEM if _so_cua_ghi(d) > 0]
+    sai = [d for d in KHONG_CUA_GHI if _so_cua_ghi(d) > 0]
     assert not sai, (
         f"Màn hình khai là chỉ xem nhưng đã có cửa ghi: {sai}. Bỏ khỏi CHI_XEM.")
 
@@ -182,7 +209,7 @@ def test_duong_doc_da_khai_van_con_tren_man_hinh():
     if not SHELL.exists():
         return
     hong = []
-    for d, (ly_do, duong) in CHI_XEM.items():
+    for d, (ly_do, duong) in KHONG_CUA_GHI.items():
         assert len(ly_do) > 60, f"Lý do chỉ xem của {d} quá ngắn để là một lý do thật"
         assert duong, f"{d} khai là chỉ xem mà không nói đọc từ đâu"
         p = WEB / "app" / d.strip("/") / "page.tsx" if d != "/" else WEB / "app" / "page.tsx"
@@ -202,18 +229,37 @@ def test_duong_doc_da_khai_van_con_tren_man_hinh():
 def test_danh_sach_chi_xem_co_tran():
     """Danh sách ngoại lệ không trần là cách một phép thử tự tắt mình.
 
-    6 (09/9/2026) → 8 (19/9/2026) → 9 (24/9/2026, bàn làm việc P.TGĐ tour đoàn).
+    6 (09/9/2026) → 8 (19/9/2026) → 9 (24/9/2026, bàn làm việc P.TGĐ tour đoàn) → 8 (24/9/2026,
+    vòng 3/3: bàn làm việc tách sang nhóm riêng).
 
-    Dòng thứ chín phải trả lời được đúng câu mà trần này đặt ra — "con số kia vào hệ thống bằng cửa
-    nào?" — và nó trả lời được: dự toán vào hệ thống ở màn hình Chuyến, ký ở cửa
-    POST /tours/{id}/approve, đóng sổ ở `tours.close`. Màn hình mới không sinh ra con số nào cả, nó
-    chỉ gom những con số ấy về trước mặt người phải ký.
+    LẦN NÀY TRẦN ĐI XUỐNG, và đó là chuyện đáng ghi. Dòng cảnh giác viết cùng ngày ở bản trước đã
+    dặn: nếu lại nâng trần với cùng một lý do thì lý do ấy đã thành thói quen, và việc phải làm là
+    ĐỔI CÁCH ĐẾM chứ không phải nâng tiếp. Vòng 3/3 tới đúng chỗ ấy nên đã tách `BAN_LAM_VIEC`
+    thành nhóm riêng, có trần riêng và có thêm một câu hỏi riêng phải trả lời.
 
-    Chỗ cần cảnh giác cho lần sau: từ đây trở đi, mỗi "bàn làm việc theo vai" đều sẽ là một dòng
-    chỉ-xem nữa, và ba vai của phòng Đoàn thì còn hai vai chưa dựng. Nếu vòng sau lại nâng trần
-    thêm hai lần với cùng một lý do, thì lý do ấy đã thành thói quen chứ không còn là lý do — lúc
-    ấy việc phải làm là đổi cách đếm (tách riêng nhóm "bàn làm việc"), không phải nâng tiếp.
+    CHI_XEM trở lại đúng con số ngày 19/9/2026 — trước khi bàn làm việc đầu tiên ra đời.
     """
-    assert len(CHI_XEM) <= 9, (
-        f"Đang khai {len(CHI_XEM)} màn hình chỉ xem. Ngày 09/9/2026 là 6. Con số này to lên nghĩa là "
-        "mỗi lần đỏ lại thêm một dòng thay vì hỏi con số kia vào hệ thống bằng cửa nào.")
+    assert len(CHI_XEM) <= 8, (
+        f"Đang khai {len(CHI_XEM)} màn hình chỉ xem. Ngày 09/9/2026 là 6, ngày 19/9 là 8. Con số này "
+        "to lên nghĩa là mỗi lần đỏ lại thêm một dòng thay vì hỏi con số kia vào hệ thống bằng cửa "
+        "nào. Bàn làm việc theo vai KHÔNG khai ở đây – nhóm ấy là BAN_LAM_VIEC.")
+
+
+def test_ban_lam_viec_co_tran_rieng_va_chi_duoc_cua_ghi_cua_minh():
+    """Nhóm bàn làm việc có trần RIÊNG và phải trả lời thêm MỘT CÂU nữa.
+
+    Câu ấy là: cửa GHI của chính vai này nằm ở đâu. Một bàn làm việc không có cửa ghi nào mà cũng
+    không chỉ ra được cửa ghi của mình thì nó là một bảng tin, không phải một bàn làm việc — và
+    người mở nó hằng ngày sẽ dần đọc nó như đọc báo.
+
+    Trần 3: phòng Kinh doanh Đoàn có ba vai (P.TGĐ, Sale Admin, NV Sales đoàn). Vai thứ ba lập dự
+    toán nên màn hình của họ CÓ cửa ghi thật và sẽ không vào nhóm này — nhưng để trần ở 3 thì dòng
+    thứ tư phải dừng lại giải thích vì sao lại có thêm một vai chỉ đọc nữa, thay vì trôi qua.
+    """
+    assert len(BAN_LAM_VIEC) <= 3, (
+        f"Đang khai {len(BAN_LAM_VIEC)} bàn làm việc chỉ đọc. Mỗi dòng thêm vào đây là một vai được "
+        "cho một màn hình mà không có việc nào bấm được trên đó – hỏi lại xem vai ấy làm gì.")
+    thieu = [d for d, x in BAN_LAM_VIEC.items() if len(x) < 3 or not str(x[2]).strip()]
+    assert not thieu, (
+        f"Bàn làm việc khai thiếu CỬA GHI của vai: {thieu}. Phải ghi rõ cửa ghi nằm ở đâu, và chú "
+        "thích ngay trên dòng ấy phải nói vì sao nó không nằm trên màn hình này.")

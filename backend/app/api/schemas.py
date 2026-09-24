@@ -34,6 +34,10 @@ class TourCreate(BaseModel):
     planned_pax: int = 0
     rest_stops: str = ""
     company_id: int | None = None      # pháp nhân chủ quản; bỏ trống thì tour vào danh sách đối chiếu
+    # Ô bắt buộc của dự toán ĐOÀN (Chủ tịch quyết 24/9/2026): "" chưa trả lời · "co" · "khong".
+    # Mặc định là "" chứ không phải "khong": mặc định một câu trả lời là trả lời hộ người chưa hỏi.
+    hoa_hong_khach: str = ""
+    hoa_hong_khach_tien: float = 0
 
 
 class TourEdit(BaseModel):
@@ -46,6 +50,10 @@ class TourEdit(BaseModel):
     planned_pax: int = 0
     rest_stops: str = ""
     justification: str = ""
+    # Xem chú thích ở TourCreate. Để RỖNG khi sửa nghĩa là "không đụng tới ô này", không phải
+    # "xoá câu trả lời" — `tours.edit` chỉ gán khi giá trị gửi lên khác rỗng.
+    hoa_hong_khach: str = ""
+    hoa_hong_khach_tien: float = 0
 
 
 class TourClose(BaseModel):

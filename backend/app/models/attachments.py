@@ -112,6 +112,16 @@ DOI_TUONG = {k: (v[0], v[1]) for k, v in DOI_TUONG_DAY_DU.items()}
 NHOM_NHAY_CAM = {"06_Nhan_su"}
 
 LOAI_TEP = {"chung_tu": "Chứng từ gốc", "hoa_don": "Hóa đơn", "hop_dong": "Hợp đồng",
+            # Ba loại thêm 24/9/2026 cho hồ sơ đoàn (bản mô tả Sale Admin: năm loại giấy tờ lưu
+            # theo từng mã đoàn). Không thêm bảng lưu nào — hồ sơ vẫn nằm ở `attachments` với
+            # `doi_tuong="tour"`; cái thiếu trước đây là người tải lên KHÔNG KHAI ĐƯỢC đây là loại
+            # gì, nên không ai dựng nổi một bảng "đoàn này còn thiếu giấy tờ nào".
+            #
+            # Suy loại từ TÊN TỆP thì rẻ hơn và sai lặng: một tệp tên "PL sửa đổi 2.pdf" là phụ lục
+            # với người đặt tên và là thứ khác với máy, và bảng thiếu-đủ in ra từ phép đoán ấy
+            # trông y hệt một bảng thật.
+            "bao_gia": "Báo giá đã gửi khách", "phu_luc": "Phụ lục hợp đồng",
+            "nghiem_thu": "Biên bản nghiệm thu", "chuong_trinh": "Chương trình tour",
             "hinh_anh": "Hình ảnh", "bang_bieu": "Bảng biểu", "khac": "Khác"}
 
 
