@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -21,6 +21,19 @@ import { Tag, errMsg } from "@/components/ui";
  *  tối, màn hình in ra CÂU GIẢI THÍCH chứ không để một nút tối câm. Một nút tối không nói vì sao
  *  là một nút người dùng bấm mãi rồi đi hỏi CNTT.
  *
+ *  HAI CHỖ TỪNG LÀM MÀN HÌNH NÀY THÀNH NGÕ CỤT (anh Tuấn bắt được 25/9/2026, TC-85):
+ *
+ *    · Nút Gộp chỉ hiện khi tài khoản thừa CÒN ĐANG MỞ. Máy chủ chưa bao giờ đòi điều ấy –
+ *      `services/gop_tai_khoan.py` không hề đọc `active`. Màn hình tự thêm vào. Hệ quả: một tài
+ *      khoản đã bị khoá tay mà vẫn còn dòng dữ liệu thì không xoá được (còn dòng) và cũng không
+ *      gộp được (không có nút) – kẹt cứng, không lối ra nào trên màn hình.
+ *
+ *    · Nút Gộp chỉ hiện khi MÁY ĐOÁN ĐƯỢC nên giữ cái nào, tức là đúng một tài khoản có mã nhân
+ *      viên. Cả nhóm không ai có mã thì không dòng nào gộp được. Máy đoán không ra là chuyện của
+ *      máy; người vẫn biết rõ giữ cái nào. Nay mỗi dòng có nút "Giữ cái này" để người tự chỉ.
+ *
+ *  Gợi ý của máy vẫn còn và vẫn được ưu tiên hiện, nhưng người chọn thì thắng gợi ý.
+ *
  *  Màn hình cố ý KHÔNG có nút "gộp tất cả" hay "xoá tất cả". Mỗi dòng là một con người thật.
  */
 function GopTaiKhoan() {
@@ -37,6 +50,24 @@ function GopTaiKhoan() {
   const [xoa, setXoa] = useState<any>(null);      // kết quả co-the-xoa
   const [bm, setBm] = useState<any>(null);        // bia mộ
   const [moBm, setMoBm] = useState(false);
+  // NGƯỜI CHỌN GIỮ CÁI NÀO, khi máy không đoán được. Khoá là id nhỏ nhất của nhóm, không phải họ
+  // tên: hai người trùng tên là đúng cái mà màn hình này sinh ra để xử lý, lấy tên làm khoá là
+  // gộp nhầm hai nhóm vào nhau.
+  const [chonGiu, setChonGiu] = useState<Record<number, number>>({});
+
+  // "BAM KHONG AN" (anh Tuan bao 25/9/2026). Ba khung Xem truoc / Sua / Xoa duoc ve SAU bang tai
+  // khoan trung. Bang ay cao 8 dong, nen tren dien thoai mot cu bam mo khung o ngoai tam nhin:
+  // man hinh dung im, va nguoi bam ket luan la nut hong. Khung VAN mo dung — cai thieu la nguoi
+  // dung khong duoc dua toi cho no. Day la lan thu hai cung mot man hinh bi bao "bam khong an",
+  // lan truoc la nut Gop that su khong lam gi; lan nay nut chay dung ma khong ai thay.
+  //
+  // KHONG doi cho ve khung len tren bang: khung mo ra tu MOT DONG cu the, doc no phai con thay
+  // dong nao dang noi toi. Cuon toi khung la cach giu duoc ca hai.
+  const khungRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!(xt || sua || xoa)) return;
+    khungRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [xt, sua, xoa]);
 
   const load = useCallback(() => {
     api("/gop-tai-khoan/cap-trung").then(setD).catch(() => {});
@@ -102,26 +133,37 @@ function GopTaiKhoan() {
 
     <div className="panel wrap"><h2>Những người có nhiều hơn một tài khoản</h2>
       <table><thead><tr><th>Họ tên</th><th>Tài khoản</th><th>Vai</th><th>Mã NV</th><th className="num">Dòng dữ liệu</th><th>Trạng thái</th>{(canGop || canSua || canXoa) && <th></th>}</tr></thead>
-        <tbody>{(d?.rows || []).map((n: any) => n.tai_khoan.map((t: any, i: number) => (
+        <tbody>{(d?.rows || []).map((n: any) => {
+          const khoa = Math.min(...n.tai_khoan.map((x: any) => x.id));
+          const giu = chonGiu[khoa] ?? n.goi_y_giu ?? null;     // người chọn thắng gợi ý của máy
+          const tenGiu = n.tai_khoan.find((x: any) => x.id === giu)?.tai_khoan;
+          return n.tai_khoan.map((t: any, i: number) => (
           <tr key={t.id}>
             {i === 0 && <td rowSpan={n.tai_khoan.length}><b>{n.ten}</b>
-              <small style={{ display: "block", color: "var(--vtos-text-faint)" }}>{n.vi_sao}</small></td>}
-            <td className="mono">{t.tai_khoan}{t.id === n.goi_y_giu && <> <Tag cls="ok">nên giữ</Tag></>}</td>
+              <small style={{ display: "block", color: "var(--vtos-text-faint)" }}>{n.vi_sao}</small>
+              {!giu && <small style={{ display: "block", color: "var(--vtos-text-faint)" }}>
+                Bấm <b>Giữ cái này</b> ở dòng muốn giữ, rồi các dòng còn lại sẽ có nút gộp.</small>}</td>}
+            <td className="mono">{t.tai_khoan}
+              {t.id === n.goi_y_giu && <> <Tag cls="ok">nên giữ</Tag></>}
+              {t.id === giu && t.id !== n.goi_y_giu && <> <Tag cls="ok">đang chọn giữ</Tag></>}</td>
             <td>{t.vai}</td>
             <td className="mono">{t.ma_nv || <span className="muted">–</span>}</td>
             <td className="num">{t.so_dong}</td>
             <td>{t.dang_mo ? <Tag cls="navy">Đang mở</Tag> : <Tag cls="red">Đã khoá</Tag>}</td>
             {(canGop || canSua || canXoa) && <td style={{ whiteSpace: "nowrap" }}>
-              {canGop && t.id !== n.goi_y_giu && n.goi_y_giu && t.dang_mo &&
-                <button className="act" onClick={() => xem(n.goi_y_giu, t.id)}>Gộp vào {n.tai_khoan.find((x: any) => x.id === n.goi_y_giu)?.tai_khoan}</button>}
+              {canGop && t.id !== giu &&
+                <button className="act grey" onClick={() => setChonGiu({ ...chonGiu, [khoa]: t.id })}>Giữ cái này</button>}
+              {canGop && giu && t.id !== giu && <> <button className="act" onClick={() => xem(giu, t.id)}>Gộp vào {tenGiu}</button></>}
               {canSua && <> <button className="act grey" onClick={() => moSua(t)}>Sửa</button></>}
               {canXoa && <> <button className="act grey" onClick={() => moXoa(t)}>Xoá…</button></>}
             </td>}
-          </tr>))).flat()}
+          </tr>));
+        }).flat()}
         {!(d?.rows || []).length && <tr><td colSpan={soCot}><Tag cls="ok">Không còn ai trùng tài khoản</Tag></td></tr>}
         </tbody></table>
       <p className="muted">{d?.ghi_chu}</p></div>
 
+    <div ref={khungRef}>
     {/* ───────────── XEM TRƯỚC GỘP ───────────── */}
     {xt && <div className="panel"><h2>Xem trước – chưa ghi gì</h2>
       <p>Chuyển <b>{xt.tong_dong_se_chuyen}</b> dòng từ <b className="mono">{xt.bo.tai_khoan}</b> ({xt.bo.ho_ten})
@@ -180,6 +222,7 @@ function GopTaiKhoan() {
         </>}
       <p className="muted">{xoa.ghi_chu}</p>
     </div>}
+    </div>
 
     {/* ───────────── BIA MỘ ───────────── */}
     <div className="panel">
