@@ -236,7 +236,13 @@ function TourDetail() {
     </>}
   </>);
 }
-const EMPTY = { description: "", service_type: "HOTEL", cost_kind: "theo_khach", supplier_name: "", supplier_tax_code: "", unit_price: 0, qty: 0, coef: 1, budget: 0, note: "" };
+const EMPTY = { description: "", service_type: "HOTEL", cost_kind: "theo_khach", supplier_name: "", supplier_tax_code: "", unit_price: 0, qty: 0, coef: 1, budget: 0, note: "", tien_te: "", so_tien_goc: 0, ty_gia: 0, ngay_ty_gia: "" };
+// Danh sách ĐỒNG TIỀN chỉ để GỢI Ý, không để chặn — `models/ty_gia.py` nói rõ: gặp đồng tiền lạ
+// mà chặn là đẩy người dùng sang gõ tay ra ngoài hệ. Nên ô cuối là "khác…" cho gõ tự do.
+const DONG_TIEN: [string, string][] = [["", "VND (tiền đồng)"], ["USD", "USD – Đô la Mỹ"], ["EUR", "EUR – Euro"],
+  ["THB", "THB – Baht Thái"], ["SGD", "SGD – Đô la Singapore"], ["JPY", "JPY – Yên Nhật"], ["KRW", "KRW – Won Hàn"],
+  ["CNY", "CNY – Nhân dân tệ"], ["AUD", "AUD – Đô la Úc"], ["GBP", "GBP – Bảng Anh"], ["CAD", "CAD – Đô la Canada"],
+  ["TWD", "TWD – Đô la Đài Loan"], ["HKD", "HKD – Đô la Hồng Kông"], ["KHAC", "khác – gõ mã 3 chữ"]];
 function Settlement({ t, note, NoteBox, run, load, toast }: any) {
   const se = t.settlement_edit || {}; const sm = se.summary || {}; const checks: any[] = se.checks || []; const st: Record<string, string> = se.service_types || {};
   const [edit, setEdit] = useState<any>(null);
@@ -246,10 +252,13 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
   const base = `/tours/${t.id}/settlement`;
   const lines = (t.cost_lines || []).filter((l: any) => showCancelled || l.status === "hd");
   const calc = (f: any) => Math.round(f.cost_kind === "theo_khach" ? f.unit_price * f.qty * f.coef : f.unit_price * f.coef);
+  // Rỗng = VND. Chuỗi rỗng và "VND" là cùng một câu trả lời; "KHAC" là đang chờ gõ mã.
+  const ngoaiTe = !!edit && !!edit.tien_te && edit.tien_te !== "VND";
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const body = { ...edit }; ["unit_price", "budget"].forEach((k) => (body[k] = soTien(body[k])));
-    ["qty", "coef"].forEach((k) => (body[k] = Number(body[k] || 0)));
+    const body = { ...edit }; ["unit_price", "budget", "so_tien_goc"].forEach((k) => (body[k] = soTien(body[k])));
+    ["qty", "coef", "ty_gia"].forEach((k) => (body[k] = Number(body[k] || 0)));
+    if (body.tien_te === "KHAC") body.tien_te = (edit.tien_te_khac || "").trim().toUpperCase();
     try { await api(edit.id ? `${base}/lines/${edit.id}` : `${base}/lines`, { method: edit.id ? "PUT" : "POST", json: body }); toast(edit.id ? "Đã sửa dòng" : "Đã thêm dòng"); setEdit(null); load(); } catch (x) { toast(errMsg(x), true); }
   };
   const cancel = async (l: any) => { const r = prompt(`Lý do hủy dòng ${l.line_no} – ${l.description}?`); if (!r) return; try { await api(`${base}/lines/${l.id}/cancel`, { method: "POST", json: { note: r } }); toast("Đã hủy dòng"); load(); } catch (x) { toast(errMsg(x), true); } };
@@ -286,10 +295,32 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
         <div><label>Loại dịch vụ *</label><select value={edit.service_type} onChange={(e) => setEdit({ ...edit, service_type: e.target.value })}>{Object.entries(st).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
         {F("supplier_name", "Nhà cung cấp *")}{F("supplier_tax_code", "Mã số thuế NCC")}
         <div><label>Cách tính chi *</label><select value={edit.cost_kind} onChange={(e) => setEdit({ ...edit, cost_kind: e.target.value })}><option value="theo_khach">Theo khách (đơn giá × pax × hệ số)</option><option value="co_dinh">Cố định (đơn giá × hệ số)</option></select></div>
-        {F("unit_price", "Đơn giá thực tế (đ)", "number", { step: 1000, min: 0 })}{F("qty", "Số khách (pax)", "number", { min: 0 })}{F("coef", "Hệ số / số lượng", "number", { step: "0.5", min: 0 })}
+        {ngoaiTe
+          ? <div><label>Đơn giá thực tế (đ)</label><input value={Math.round(Number(edit.so_tien_goc || 0) * Number(edit.ty_gia || 0))} readOnly title="Máy nhân số gốc với tỷ giá — không gõ tay, để ba con số không lệch nhau" /></div>
+          : F("unit_price", "Đơn giá thực tế (đ)", "number", { step: 1000, min: 0 })}
+        {F("qty", "Số khách (pax)", "number", { min: 0 })}{F("coef", "Hệ số / số lượng", "number", { step: "0.5", min: 0 })}
         {F("budget", "Dự toán của dòng (đ)", "number", { step: 1000, min: 0 })}
-        <div><label>Thực chi</label><input value={vnd(calc({ ...edit, unit_price: Number(edit.unit_price || 0), qty: Number(edit.qty || 0), coef: Number(edit.coef || 0) }))} readOnly /></div>
+        <div><label>Thực chi</label><input value={vnd(calc({ ...edit, unit_price: ngoaiTe ? Number(edit.so_tien_goc || 0) * Number(edit.ty_gia || 0) : Number(edit.unit_price || 0), qty: Number(edit.qty || 0), coef: Number(edit.coef || 0) }))} readOnly /></div>
       </div>
+      {/* NGOẠI TỆ — mở cửa 25/9/2026 cho bốn cột đã có trên bảng từ lâu.
+          Ô mặc định là VND và KHÔNG đòi gì thêm: tuyệt đại đa số dòng giá vốn là tiền đồng, bắt
+          tất cả khai "VND" là thêm một ô bắt buộc cho hàng nghìn dòng để phục vụ vài chục dòng. */}
+      <div className="grid">
+        <div><label>Đồng tiền của khoản này</label>
+          <select value={edit.tien_te || ""} onChange={(e) => setEdit({ ...edit, tien_te: e.target.value })}>
+            {DONG_TIEN.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+        {edit.tien_te === "KHAC" && <div><label>Mã đồng tiền (3 chữ) *</label>
+          <input value={edit.tien_te_khac || ""} maxLength={3} placeholder="VD: MMK" onChange={(e) => setEdit({ ...edit, tien_te_khac: e.target.value })} /></div>}
+        {ngoaiTe && <>
+          {F("so_tien_goc", `Số tiền bằng ${edit.tien_te === "KHAC" ? (edit.tien_te_khac || "đồng gốc") : edit.tien_te} *`, "number", { step: "0.01", min: 0 })}
+          {F("ty_gia", "Tỷ giá *", "number", { step: "0.000001", min: 0 })}
+          {F("ngay_ty_gia", "Ngày của tỷ giá *", "date")}
+        </>}
+      </div>
+      {ngoaiTe && <p className="muted">Ba ô này đi cùng nhau: thiếu một ô thì không lưu được. Một số tiền ngoại tệ
+        thiếu tỷ giá là con số không quy đổi được; một tỷ giá thiếu ngày là con số không kiểm lại được.
+        Đơn giá đồng Việt Nam ở trên là <b>số máy nhân</b> — anh/chị không gõ, để ba con số không lệch nhau.
+        Tỷ giá lấy theo <b>ngày chi thật</b> của khoản này; tra ở <Link href="/ty-gia">Sổ tỷ giá</Link>, máy không chọn hộ.</p>}
       <label>Ghi chú / lời giải trình (bắt buộc khi vượt dự toán)</label><input value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} />
       <button className="act teal" type="submit">Lưu dòng</button> <button type="button" className="act grey" onClick={() => setEdit(null)}>Đóng</button>
     </form>}
@@ -297,13 +328,27 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
       <tbody>{lines.length ? lines.flatMap((l: any) => [<tr key={l.id} style={{ opacity: l.status === "hd" ? 1 : 0.45 }}>
         <td>{l.line_no}</td><td>{l.description} <Tag>{l.cost_kind === "theo_khach" ? "theo khách" : "cố định"}</Tag>{l.source === "vietrip" && <Tag>Vietrip</Tag>}</td><td>{l.service_name || l.service_type}</td>
         <td>{l.supplier_name}{l.supplier_tax_code && <span className="muted"> ({l.supplier_tax_code})</span>}</td>
-        <td className="num">{vnd(l.unit_price)}</td><td className="num">{l.qty}</td><td className="num">{l.coef}</td><td className="num muted">{l.budget ? vnd(l.budget) : "–"}</td>
+        {/* Ngoại tệ: hiện SỐ GỐC trước, số VND sau. Người soát cần thấy con số đã cam kết với nhà
+            cung cấp, không phải con số quy đổi — quy đổi là việc của máy và có thể tính lại. */}
+        <td className="num">{l.tien_te
+          ? <><b>{Number(l.so_tien_goc || 0).toLocaleString("vi-VN")} {l.tien_te}</b>
+              <div className="muted" style={{ fontSize: 12 }}>× {Number(l.ty_gia || 0).toLocaleString("vi-VN")} · {fmtD(l.ngay_ty_gia)}</div>
+              <div className="muted" style={{ fontSize: 12 }}>= {vnd(l.unit_price)}</div></>
+          : vnd(l.unit_price)}</td><td className="num">{l.qty}</td><td className="num">{l.coef}</td><td className="num muted">{l.budget ? vnd(l.budget) : "–"}</td>
         <td className="num"><b style={{ color: l.budget && l.over_pct > 0.1 ? "var(--red)" : undefined }}>{vnd(l.actual)}</b></td>
         <td className="num">{l.remaining > 0 ? <Tag cls="warn">{vnd(l.paid)}</Tag> : <Tag cls="ok">{vnd(l.paid)}</Tag>}</td>
         <td>{l.has_doc ? <a href="#" onClick={(e) => { e.preventDefault(); viewDoc(l); }}>📎 {l.doc_name || "xem"}</a> : <span className="muted">–</span>} {(se.can_edit || t.status === "da_dong_so") && l.status === "hd" && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => upload(l)}>tải</button>}
           {" "}<button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setMoHoSo(moHoSo === l.id ? null : l.id)}>hồ sơ</button></td>
         <td className="muted">{l.note}</td>
-        <td>{se.can_edit && l.status === "hd" && <><button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setEdit({ ...l })}>sửa</button> <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => cancel(l)}>hủy</button></>}</td>
+        <td>{se.can_edit && l.status === "hd" && <><button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setEdit({
+          ...EMPTY, ...l,
+          // Ngày từ máy chủ về dạng ISO đầy đủ; ô <input type="date"> chỉ nhận 10 ký tự đầu.
+          ngay_ty_gia: l.ngay_ty_gia ? String(l.ngay_ty_gia).slice(0, 10) : "",
+          // Đồng tiền ngoài danh sách gợi ý thì ô chọn về "khác" và giữ nguyên mã đã lưu,
+          // thay vì im lặng rơi về VND — rơi về VND là xoá một lời khai đã có.
+          ...(l.tien_te && !DONG_TIEN.some(([v]) => v === l.tien_te)
+              ? { tien_te: "KHAC", tien_te_khac: l.tien_te } : {}),
+        })}>sửa</button> <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => cancel(l)}>hủy</button></>}</td>
       </tr>,
         /* Đ-11 (13/9/2026) · CỬA của kho chứng từ chung cho từng dòng chi.
          *
