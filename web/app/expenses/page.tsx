@@ -65,7 +65,14 @@ function Expenses() {
     const out: any[] = [];
     if (r.status === "cho_tp" && CONFIRMER[r.category]?.includes(role)) out.push(["Xác nhận", "confirm", "teal"]);
     if (r.status === "cho_kt" && role === "ketoan") out.push(["Kế toán kiểm tra", "check", "teal"]);
-    if (r.status === "cho_duyet" && (role === "tgd" || (role === "chutich" && r.two_signatures))) out.push([role === "tgd" ? "TGĐ duyệt" : "Chủ tịch ký", "approve", ""]);
+    // Chi MARKETING đi MỘT chữ ký, và là chữ ký của P.TGĐ Marketing (Chủ tịch chốt 23/9/2026).
+    // TGĐ và Chủ tịch vẫn THẤY hồ sơ trong danh sách — chỉ không có nút bấm. Đó đúng là điều đã
+    // chốt: "dữ liệu vẫn đẩy lên cho TGĐ và CT xem, và không cần duyệt".
+    // Máy chủ mới là chỗ chặn thật (services/ops.py::step); dòng này chỉ để không vẽ ra một cái
+    // nút bấm vào là báo lỗi.
+    if (r.status === "cho_duyet" && r.category === "marketing" && role === "ptgd_mkt" && r.created_by !== user?.username)
+      out.push(["P.TGĐ Marketing duyệt", "approve", ""]);
+    if (r.status === "cho_duyet" && r.category !== "marketing" && (role === "tgd" || (role === "chutich" && r.two_signatures))) out.push([role === "tgd" ? "TGĐ duyệt" : "Chủ tịch ký", "approve", ""]);
     if (r.status === "cho_chi" && role === "ketoan") out.push(["Đã chi (nhập mã GD)", "pay", "orange"]);
     if (!["da_chi", "tu_choi"].includes(r.status) && ["tgd", "chutich", "ketoan", "tp_dh", "ptgd_mkt"].includes(role)) out.push(["Từ chối", "reject", "grey"]);
     return out;
@@ -78,7 +85,11 @@ function Expenses() {
 
     {tab === "requests" && <>
       {canCreate && <div className="panel"><h2>Lập đề nghị chi (mẫu 05-TT)</h2><div className="grid">
-        <label>Loại<select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>{Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+        {/* P.TGĐ Marketing KHÔNG lập hồ sơ chi Marketing, chỉ duyệt (Chủ tịch chốt 23/9/2026): mọi
+            hồ sơ Marketing dừng ở một chữ ký của ông ấy, nên hồ sơ do chính ông ấy lập thì không
+            còn ai ký được ngoài chính mình. Bỏ hẳn lựa chọn khỏi ô chọn loại thay vì để người ta
+            điền xong cả biểu mẫu rồi mới bị máy chủ từ chối. */}
+        <label>Loại<select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>{Object.entries(CAT).filter(([k]) => !(k === "marketing" && role === "ptgd_mkt")).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label>Tour (bắt buộc với chi tour/hoàn tiền)<select value={f.tour_id} onChange={(e) => setF({ ...f, tour_id: e.target.value })}><option value="">–</option>{tours.map((t) => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}</select></label>
         <label>NCC / người thụ hưởng<input value={f.supplier_name} onChange={(e) => setF({ ...f, supplier_name: e.target.value })} /></label>
         <label>MST NCC<input value={f.supplier_tax_code} onChange={(e) => setF({ ...f, supplier_tax_code: e.target.value })} /></label>

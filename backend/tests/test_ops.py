@@ -84,8 +84,14 @@ def test_payment_request_gates_flow_and_journal():
     assert r1["status"] == "cho_tp" and not r1["two_signatures"]
     r2 = client.post("/api/v1/payment-requests", json={**base, "supplier_name": "Nhà hàng Biển", "amount": 25_000_000, "description": "Ăn uống"}, headers=login("dh.lan")).json()
     assert r2["request"]["over_budget"] and r2["request"]["two_signatures"] and "NGOÀI DỰ TOÁN" in r2["message"]
-    mk = client.post("/api/v1/payment-requests", json={"category": "marketing", "supplier_name": "Meta", "supplier_tax_code": "x", "amount": 6_000_000, "description": "Quảng cáo", "has_document": True}, headers=login("ptgd.mkt")).json()
-    assert mk["request"]["two_signatures"] and "hạn mức Marketing" in mk["message"]
+    # 23/9/2026 — Chủ tịch chốt: chi Marketing đi MỘT chữ ký của P.TGĐ Marketing ở mọi mức tiền, và
+    # chính P.TGĐ KHÔNG lập hồ sơ (lập thì không còn ai ký được ngoài chính mình). Bản trước lập hồ
+    # sơ bằng tài khoản `ptgd.mkt` và đòi `two_signatures` — cả hai đều theo luật cũ.
+    # Tuyến Marketing có bộ phép thử riêng ở `tests/test_mkt_mot_chu_ky.py`; ở đây chỉ canh hai điều
+    # mà tệp này vốn canh: cửa lập chặn đúng người, và hồ sơ Marketing không đi lối hai chữ ký.
+    assert client.post("/api/v1/payment-requests", json={"category": "marketing", "supplier_name": "Meta", "supplier_tax_code": "x", "amount": 6_000_000, "description": "Quảng cáo", "has_document": True}, headers=login("ptgd.mkt")).status_code == 422
+    mk = client.post("/api/v1/payment-requests", json={"category": "marketing", "marketing_muc": "quang_cao", "supplier_name": "Meta", "supplier_tax_code": "x", "amount": 6_000_000, "description": "Quảng cáo", "has_document": True}, headers=login("cntt")).json()
+    assert mk["request"]["two_signatures"] is False and mk["request"]["status"] == "cho_kt"
     # luồng r1: TP ĐH → KT → TGĐ → chi
     st = lambda rid, a, reason="", who="tp.dieuhanh": client.post(f"/api/v1/payment-requests/{rid}/step", json={"action": a, "reason": reason}, headers=login(who))
     assert st(r1["id"], "check", who="ketoan").status_code == 422

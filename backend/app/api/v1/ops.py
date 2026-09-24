@@ -186,7 +186,11 @@ def respond(sid: int, data: RespondIn, u: User = Depends(current_user), db: Sess
 # ---------- Đề nghị chi – lệnh chi ----------
 def pr_out(r: PaymentRequest, db: Session) -> dict:
     t = db.get(Tour, r.tour_id) if r.tour_id else None
-    nxt = {"cho_tp": "Bộ phận xác nhận", "cho_kt": "Kế toán kiểm tra", "cho_duyet": ("Chủ tịch + TGĐ" if r.two_signatures else "TGĐ") + " duyệt", "cho_chi": "Kế toán chi trên ngân hàng",
+    # Dòng "ai bấm tiếp" — phải nói ĐÚNG TÊN người đang được chờ, vì người đọc màn hình sẽ đi gõ
+    # đúng người ấy. Marketing từ 23/9/2026 dừng ở một chữ ký của P.TGĐ Marketing; viết "TGĐ duyệt"
+    # ở đó là chỉ sai người, và hồ sơ sẽ nằm chờ thêm một vòng vì gõ nhầm cửa.
+    ai_duyet = "P.TGĐ Marketing" if r.category == "marketing" else ("Chủ tịch + TGĐ" if r.two_signatures else "TGĐ")
+    nxt = {"cho_tp": "Bộ phận xác nhận", "cho_kt": "Kế toán kiểm tra", "cho_duyet": ai_duyet + " duyệt", "cho_chi": "Kế toán chi trên ngân hàng",
            "da_chi": "Hoàn tất", "tu_choi": "Từ chối"}[r.status]
     return {"id": r.id, "code": r.code, "category": r.category, "tour_id": r.tour_id, "tour_code": t.code if t else "", "supplier_name": r.supplier_name, "supplier_tax_code": r.supplier_tax_code,
             "supplier_bank": r.supplier_bank, "amount": r.amount, "description": r.description, "has_document": r.has_document, "document_ref": r.document_ref, "has_invoice": r.has_invoice,
@@ -269,10 +273,17 @@ def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptg
     flags = []
     # Hai lý do KHÁC NHAU cùng dẫn tới hai chữ ký, nên nêu cả hai: vượt dự toán là chuyện của ngân sách,
     # còn vượt hạn mức là chuyện của số tiền. Gộp làm một thì người duyệt không biết mình đang duyệt gì.
-    if r.over_budget: flags.append("NGOÀI DỰ TOÁN → 2 chữ ký (cổng 15)")
-    if r.category == "marketing" and (r.amount or 0) >= R.get_param(db, "han_muc_mkt"):
-        flags.append("≥ hạn mức Marketing → 2 chữ ký (cổng 15)")
-    elif r.two_signatures and not r.over_budget: flags.append("≥ hạn mức → 2 chữ ký (cổng 15)")
+    # 23/9/2026 — Marketing tách khỏi mạch này: một chữ ký cho mọi mức tiền (Chủ tịch chốt). Nên với
+    # Marketing, "ngoài dự toán" là một lời BÁO chứ không còn là một cấp duyệt, và câu chữ phải nói
+    # đúng thế — viết "→ 2 chữ ký" cho một hồ sơ chỉ cần một chữ ký là nói dối người đọc màn hình.
+    if r.category == "marketing":
+        if r.over_budget:
+            flags.append("NGOÀI DỰ TOÁN (vẫn một chữ ký P.TGĐ Marketing – Chủ tịch chốt 23/9)")
+        if not O.ai_duyet_duoc_mkt(db):
+            flags.append("CHƯA AI GIỮ VAI P.TGĐ MARKETING → hồ sơ này sẽ nằm chờ, không ai duyệt được")
+    else:
+        if r.over_budget: flags.append("NGOÀI DỰ TOÁN → 2 chữ ký (cổng 15)")
+        elif r.two_signatures: flags.append("≥ hạn mức → 2 chữ ký (cổng 15)")
     return {"request": pr_out(r, db), "message": f"Đã lập {r.code}" + (" – " + "; ".join(flags) if flags else "")}
 
 

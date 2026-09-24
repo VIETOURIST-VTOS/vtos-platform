@@ -9,7 +9,7 @@ là hai con số sẽ lệch nhau, và không ai biết tin con số nào.
   N3 người lập không tự duyệt
   N4 đã chi / đang treo đọc từ đề nghị chi, tách theo hạng mục
   N5 chi chưa gán hạng mục nêu riêng, KHÔNG chia bừa vào hạng mục khác
-  N6 chi vượt phần còn lại của hạng mục → cờ ngoài dự toán + hai chữ ký (không chặn cứng)
+  N6 chi vượt phần còn lại của hạng mục → cờ ngoài dự toán (từ 23/9/2026 KHÔNG còn bật hai chữ ký)
   N7 chưa có ngân sách hiệu lực KHÔNG phải là ngân sách vô hạn
   N8 kỳ quý cộng đúng chi phí của cả ba tháng
 """
@@ -115,7 +115,13 @@ def test_n6_chi_vuot_con_lai_cua_hang_muc_thi_bat_co_ngoai_du_toan():
                                                      "description": "Đẩy mạnh cuối kỳ"}, headers=mk)
     assert r.status_code == 201
     d = r.json()["request"] if "request" in r.json() else r.json()
-    assert d["over_budget"] is True and d["two_signatures"] is True
+    # 23/9/2026 — Chủ tịch chốt: chi Marketing đi MỘT chữ ký ở mọi mức tiền, kể cả khi vượt dự
+    # toán. Cờ `over_budget` VẪN bật (nó là lời báo, và hai màn hình lãnh đạo đọc nó), nhưng nó
+    # thôi kéo theo chữ ký thứ hai. Hai khẳng định dưới đây canh đúng ranh giới ấy: còn NÓI, hết
+    # CHẶN. Bản trước đòi `two_signatures is True` — đổi ở đây là đổi theo luật, không phải nới
+    # phép thử cho hết đỏ.
+    assert d["over_budget"] is True, "vượt dự toán vẫn phải ghi cờ — thôi chặn không có nghĩa là thôi nói"
+    assert d["two_signatures"] is False, "chi Marketing không còn chữ ký thứ hai (Chủ tịch chốt 23/9/2026)"
     assert "ngoài dự toán" in d["description"]
     # trong hạn mức thì không bật cờ
     r2 = client.post("/api/v1/payment-requests", json={"category": "marketing", "marketing_muc": "noi_dung",
@@ -131,7 +137,8 @@ def test_n7_chua_gan_hang_muc_cung_la_ngoai_du_toan():
                                                      "amount": 500_000, "description": "Không ghi hạng mục"},
                     headers=login("cntt")).json()
     d = r["request"] if "request" in r else r
-    assert d["over_budget"] is True and d["two_signatures"] is True
+    assert d["over_budget"] is True
+    assert d["two_signatures"] is False, "một chữ ký cho mọi hồ sơ Marketing – Chủ tịch chốt 23/9/2026"
 
 
 def test_n8_ky_quy_cong_du_ba_thang():
