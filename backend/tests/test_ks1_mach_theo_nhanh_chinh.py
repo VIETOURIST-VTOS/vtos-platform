@@ -19,6 +19,7 @@ Bốn phép thử dưới đây, và ý nghĩa của từng cái khi nó đỏ:
                                           (24/9: cho qua khi chính nhánh này chữa được – xem dưới)
   KS1-4  XEM TRƯỚC BẢN GỘP đúng một đầu – đỏ = từng nhánh xanh nhưng gộp vào là hỏng
   KS1-5  không đổi cha của bản đã đẩy   – đỏ = nơi đã chạy migration không lùi lại được
+                                          (24/9: mở đúng một ngoại lệ – Chủ tịch chốt, xem dưới)
   KS1-6  bản mới phải bám được nhánh chính – đỏ = đúng hình dạng sự cố 10/9, bắt TRƯỚC khi đẩy
 
 Bẫy đang chờ sẵn lúc viết tệp này (11/9/2026): `gop-dot2` có v14 nối sau v11; nhánh chính có w1 nối
@@ -227,15 +228,81 @@ def test_ks1_5_khong_doi_cha_cua_ban_da_day():
 
     Nơi nào đã chạy bản ấy thì bảng alembic_version ghi mã cũ; đổi cha xong, đường downgrade không
     còn khớp với thứ đã chạy. Bản CHƯA đẩy thì đổi thoải mái — đó mới là chỗ để sửa.
+
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    MỘT NGOẠI LỆ, CHỦ TỊCH CHỐT 24/9/2026
+    ──────────────────────────────────────────────────────────────────────────────────────────
+
+    Kho này có HAI tệp nói ngược nhau, và người sửa sau cần biết chuyện ấy đã được xử thế nào:
+
+      · `test_mach_migration.py` (07/9): "Sửa bằng cách cho bản viết sau nối tiếp bản viết trước
+        (ĐỔI down_revision), KHÔNG gộp bằng merge revision."
+      · KS1-5 ở đây (11/9): cấm đổi cha của bản đã đẩy.
+
+    Hai luật ấy sống chung được suốt hai tuần vì trong mọi lần đụng độ luôn có MỘT bản còn chưa
+    gộp — trỏ lại bản chưa gộp là xong, không ai phạm luật nào. Đêm 23 rạng 24/9/2026 cả hai bản
+    cùng vào kho (PR #127 và #128) và lúc ấy không còn đường nào thoả mãn cả hai.
+
+    CHỦ TỊCH CHỐT: **đổi down_revision**. Nên KS1-5 cho qua đúng một tình huống — nhánh chính
+    đang nhiều đầu VÀ nhánh này gộp vào thì còn một đầu, tức nó chính là thuốc chữa. Cùng điều
+    kiện với KS1-3, dùng chung hàm `dang_chua`, nên hai hàng rào không thể lệch nhau.
+
+    VÌ SAO NGOẠI LỆ NÀY KHÔNG NGUY HIỂM NHƯ NGHE THẤY: khi mạch có hai đầu thì alembic **từ chối
+    chạy**. Nghĩa là từ lúc hai đầu xuất hiện, không nơi nào áp được bản nào trong hai bản ấy nữa
+    — chúng chưa bao giờ nằm trong `alembic_version` của một cơ sở dữ liệu thật, nên không có
+    đường downgrade nào để làm lệch. Đúng chuyện đã xảy ra: API trả 502 lúc 03:09, hộp chứa không
+    lên được, không một bản nâng cấp nào chạy.
+
+    NGOÀI tình huống ấy thì cấm như cũ, không nới một ly.
     """
     cay = M.doc_mach_tu_cay()
     nhanh = _nhanh()
     _, xung_dot = M.hop_mach(cay, nhanh)
-    assert not xung_dot, (
-        "có bản ĐÃ trên nhánh chính bị đổi down_revision trong cây làm việc:\n"
-        + "\n".join(f"  {r}: trên {_REF} nối sau {a}, trong cây nối sau {b}" for r, a, b in xung_dot)
-        + "\nNơi đã chạy migration sẽ không lùi lại được. Muốn đổi thứ tự thì đổi down_revision của "
-          "bản CHƯA đẩy, không đổi của bản đã đẩy.")
+    if xung_dot:
+        hop, _ = M.hop_mach(cay, nhanh)
+        assert dang_chua(M.dau_mach(nhanh), M.dau_mach(hop)), (
+            "có bản ĐÃ trên nhánh chính bị đổi down_revision trong cây làm việc:\n"
+            + "\n".join(f"  {r}: trên {_REF} nối sau {a}, trong cây nối sau {b}"
+                        for r, a, b in xung_dot)
+            + f"\nNơi đã chạy migration sẽ không lùi lại được. Muốn đổi thứ tự thì đổi "
+              f"down_revision của bản CHƯA đẩy, không đổi của bản đã đẩy.\n"
+              f"Ngoại lệ DUY NHẤT là khi nhánh chính đang nhiều đầu và nhánh này chữa được — "
+              f"{_REF} đang có {len(M.dau_mach(nhanh))} đầu, gộp vào còn "
+              f"{len(M.dau_mach(hop))} đầu, nên ngoại lệ ấy không áp dụng ở đây.")
+        print(  # noqa: T201 - cố ý in ra: đổi cha một bản đã đẩy là việc phải đọc được trong nhật ký
+            f"\n!! ĐỔI CHA CỦA BẢN ĐÃ ĐẨY: {[r for r, _, _ in xung_dot]}. Cho qua theo luật Chủ "
+            f"tịch chốt 24/9/2026, vì {_REF} đang {len(M.dau_mach(nhanh))} đầu và nhánh này đưa "
+            f"về một đầu.\n")
+
+
+def test_ks1_5b_ngoai_le_doi_cha_chi_mo_dung_mot_tinh_huong():
+    """Phép đo riêng cho NGOẠI LỆ của KS1-5 — cùng nếp với KS1-3b: một đường cho qua phải đo được.
+
+    Hai cảnh, và cảnh thứ hai mới là cảnh quan trọng:
+
+      A. main HAI đầu, nhánh đổi cha để đưa về một đầu → có xung đột, nhưng được cho qua
+      B. main MỘT đầu, nhánh vẫn đổi cha của một bản đã đẩy → có xung đột, KHÔNG được cho qua
+
+    Cảnh B là thứ KS1-5 sinh ra để chặn, và ngoại lệ mới không được phép chạm vào nó.
+    """
+    goc = {"x": None, "tc76": "x"}
+
+    # A · đúng đêm 23–24/9: bd và tc77 cùng nối tc76; nhánh trỏ tc77 nối sau bd
+    main_hai_dau = {**goc, "bd": "tc76", "tc77": "tc76"}
+    cay_chua = {**goc, "bd": "tc76", "tc77": "bd"}
+    hop_a, xung_a = M.hop_mach(cay_chua, main_hai_dau)
+    assert xung_a == [("tc77", "tc76", "bd")], "cảnh A phải có đúng một xung đột đổi cha"
+    assert dang_chua(M.dau_mach(main_hai_dau), M.dau_mach(hop_a)), (
+        "A: nhánh đang chữa main hai đầu — ngoại lệ phải mở")
+
+    # B · main đang LÀNH mà vẫn đi đổi cha một bản đã đẩy: đúng thứ KS1-5 sinh ra để chặn
+    main_lanh = {**goc, "bd": "tc76", "tc77": "bd"}
+    cay_sua_bua = {**goc, "bd": "tc77", "tc77": "bd"}      # đảo ngược, tạo vòng lặp
+    hop_b, xung_b = M.hop_mach(cay_sua_bua, main_lanh)
+    assert xung_b, "cảnh B phải có xung đột đổi cha"
+    assert not dang_chua(M.dau_mach(main_lanh), M.dau_mach(hop_b)), (
+        "B: main đang lành mà ngoại lệ vẫn mở — nó đang nới cho cả những lần đổi cha không chữa "
+        "gì cả, đúng thứ KS1-5 sinh ra để chặn")
 
 
 # ------------------------------------------------------------------ KS1-6
