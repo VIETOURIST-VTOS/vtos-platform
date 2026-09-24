@@ -96,3 +96,9 @@ from app.models.bao_dong import *  # noqa
 # Lần thứ MƯỜI nhắc cùng một điều ở tệp này: bảng khai dưới app/models mà thiếu dòng nhập ở đây
 # thì `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate đòi XOÁ bảng.
 from app.models.kol import *  # noqa
+
+# TC-83 · 24/9/2026. Bia mộ tài khoản đã xoá. KHÔNG mang khoá ngoài sang `users` — cố ý, vì hàng ở
+# users đã biến mất đúng lúc hàng này được ghi, khoá ngoài sẽ chặn chính việc ghi. Lần thứ MƯỜI MỘT
+# nhắc cùng một điều ở tệp này: bảng khai dưới app/models mà thiếu dòng nhập ở đây thì
+# `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate đòi XOÁ bảng.
+from app.models.tai_khoan_da_xoa import *  # noqa
