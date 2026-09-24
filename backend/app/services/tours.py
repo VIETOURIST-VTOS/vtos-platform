@@ -49,6 +49,11 @@ def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
 
 def allowed_actions(db: Session, t: Tour, u: User) -> list[str]:
     a = []
+    from app.services import access as AC
+    # Bước Kinh doanh soạn (24/9/2026): khối Kinh doanh sửa, Sale Admin chuyển hoặc trả lại.
+    if t.status == NHAP_KD:
+        if u.role in AC.SALES or u.role == "sales_admin": a.append("edit")
+        if u.role == "sales_admin": a += ["chuyen_dieu_hanh", "tra_lai_kinh_doanh"]
     if t.status == "nhap" and (u.id == t.operator_id or u.role == "tp_dh"): a += ["edit", "submit"]
     if t.status == "cho_xac_nhan" and u.role == "tp_dh": a.append("confirm")
     if t.status == "cho_duyet":
@@ -62,9 +67,50 @@ def allowed_actions(db: Session, t: Tour, u: User) -> list[str]:
     return a
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# VÒNG ĐỜI DỰ TOÁN ĐOÀN — đổi ngày 24/9/2026 theo quyết định của Chủ tịch
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# Trước bản này: "Chỉ Phòng Điều hành tạo tour và lập dự toán" (ĐH Điều 2), một chuỗi cho cả lẻ
+# lẫn đoàn. Nay Kinh doanh Đoàn tự lập dự toán đoàn, và Sale Admin giữ cổng chuyển sang Điều hành
+# (Phần V Bản mô tả công việc Sale Admin, hiệu lực 01/9/2026).
+#
+# HÌNH CỦA THAY ĐỔI — và đây là chỗ đáng đọc kỹ nhất:
+#
+#     nhap_kd ──(Sale Admin chuyển)──> nhap ──(Điều hành trình)──> cho_xac_nhan ──> cho_duyet ──> ...
+#        ▲                               │
+#        └──(Sale Admin trả lại)─────────┘
+#
+# Hai bước mới nằm TRƯỚC `nhap`, và bước chuyển đổ về ĐÚNG trạng thái `nhap` vốn đã có. Nghĩa là
+# từ `nhap` trở đi KHÔNG một dòng nào phải sửa: cổng biên 10%, luật hai chữ ký cho chuyến dưới
+# biên, hạn quyết toán, quỹ thưởng — tất cả giữ nguyên.
+#
+# Đó là lựa chọn có chủ ý. Cách khác là cho Kinh doanh trình thẳng vào `cho_xac_nhan`, ngắn hơn
+# một bước; nhưng lúc ấy chuỗi cổng chặn có HAI lối vào thay vì một, và mọi phép thử đang canh
+# chuỗi ấy phải viết lại. Một thay đổi vòng đời an toàn là thay đổi chỉ NỐI THÊM vào đầu chuỗi.
+#
+# TOUR LẺ KHÔNG ĐỔI GÌ: vẫn Điều hành tạo, vẫn vào thẳng `nhap`. ĐH Điều 2 còn nguyên cho mảng lẻ.
+NHAP_KD = "nhap_kd"
+
+
+def _la_doan(data_hoac_tour) -> bool:
+    """Dữ liệu này là ĐOÀN không — hỏi lại `rules.is_doan`, không tự đọc `tour_type`.
+
+    Lúc TẠO thì chưa có bản ghi Tour, nên dựng một bản tạm đủ để `is_doan` đọc. Vẫn là hỏi lại
+    một luật đã có chủ, chứ không phải chép luật ấy ra đây lần thứ hai.
+    """
+    if isinstance(data_hoac_tour, Tour):
+        return R.is_doan(data_hoac_tour)
+    return R.is_doan(Tour(code=(getattr(data_hoac_tour, "code", "") or "").strip().upper(),
+                          tour_type=getattr(data_hoac_tour, "tour_type", "")))
+
+
 def create(db: Session, u: User, data) -> Tour:
-    if u.role not in ("nv_dh", "tp_dh") and not toan_quyen(u):
-        raise HTTPException(403, "Chỉ Phòng Điều hành tạo tour và lập dự toán (ĐH Điều 2)")
+    from app.services import access as AC
+    kd_lap_doan = u.role in AC.SALES and _la_doan(data)
+    if u.role not in ("nv_dh", "tp_dh") and not kd_lap_doan and not toan_quyen(u):
+        raise HTTPException(403,
+            "Tour lẻ: chỉ Phòng Điều hành tạo và lập dự toán (ĐH Điều 2). "
+            "Tour đoàn: Phòng Điều hành hoặc Kinh doanh Đoàn (Chủ tịch quyết 24/9/2026)")
     code = data.code.strip().upper()
     if db.execute(select(Tour).where(Tour.code == code)).scalars().first():
         raise Gate("MA_TOUR", "Mã tour đã tồn tại")
@@ -72,6 +118,10 @@ def create(db: Session, u: User, data) -> Tour:
              operator_id=data.operator_id, price_per_pax=data.price_per_pax, fixed_cost=data.fixed_cost,
              var_cost_per_pax=data.var_cost_per_pax, planned_pax=data.planned_pax, rest_stops=data.rest_stops,
              company_id=getattr(data, "company_id", None))   # bỏ trống → tour vào danh sách đối chiếu pháp nhân
+    # Kinh doanh Đoàn lập thì dự toán đứng ở `nhap_kd`, chưa phải `nhap`: nó còn phải qua cổng
+    # chuyển của Sale Admin. Điều hành lập thì vào thẳng `nhap` y như trước.
+    if kd_lap_doan:
+        t.status = NHAP_KD
     db.add(t); db.flush()
     from app.services.misa import ensure_project_for_tour
     ensure_project_for_tour(db, t)   # mỗi tour = một công trình (mã công trình = mã tour)
@@ -81,9 +131,21 @@ def create(db: Session, u: User, data) -> Tour:
 
 
 def edit(db: Session, u: User, t: Tour, data) -> Tour:
-    if t.status != "nhap":
+    from app.services import access as AC
+    if t.status not in ("nhap", NHAP_KD):
         raise Gate("KHOA_DU_TOAN", "Dự toán đã trình, không sửa được (muốn sửa phải rút về nháp, có ghi nhật ký)")
-    if not (u.id == t.operator_id or u.role == "tp_dh" or toan_quyen(u)):
+    if t.status == NHAP_KD:
+        # Giai đoạn Kinh doanh soạn. Mở cho CẢ KHỐI Kinh doanh chứ không riêng người tạo, và đây
+        # là một lựa chọn có lý do: Trưởng phòng và Giám đốc Kinh doanh phải rà được dự toán của
+        # nhân viên TRƯỚC khi Sale Admin chuyển đi — khoá theo người tạo là khoá luôn người rà.
+        # Phạm vi vẫn hẹp: đúng một mảng (đoàn), đúng một trạng thái (nháp của Kinh doanh), và mọi
+        # lần sửa đều để lại một dòng nhật ký mang tên người sửa.
+        if not (u.role in AC.SALES or u.role == "sales_admin" or toan_quyen(u)):
+            raise HTTPException(403, "Dự toán đoàn đang ở bước Kinh doanh soạn – chỉ khối Kinh doanh sửa")
+        # Sale Admin sửa được Ở ĐÂY mà vẫn KHÔNG bán hàng và KHÔNG duyệt: Phần V cấm ba việc khác
+        # hẳn — nhận khách, chốt đoàn, duyệt dự toán. Vá một trường còn thiếu trong bản nháp là
+        # đúng việc mục 4.2 giao cho chị ấy.
+    elif not (u.id == t.operator_id or u.role == "tp_dh" or toan_quyen(u)):
         raise HTTPException(403, "Chỉ người điều hành chuyến hoặc TP Điều hành sửa dự toán")
     before = snap(t)
     # V10 – hai người cùng sửa một dự toán thì người sau phải biết. Kiểm TRƯỚC khi gán, và từ chối
@@ -97,6 +159,86 @@ def edit(db: Session, u: User, t: Tour, data) -> Tour:
     EV(db, t, "sua_du_toan", u.username, "")
     R.audit(db, u.username, u.role, "sua_du_toan", f"tour:{t.code}", before=before, after=snap(t)); db.commit()
     return t
+
+
+# ─────────────────── CỔNG CỦA SALE ADMIN: chuyển, hoặc trả lại ───────────────────
+# Phần V Bản mô tả công việc: "Từ chối chuyển sang Phòng Điều hành những dự toán chưa đủ trường
+# bắt buộc". Đây là quyền CHẶN duy nhất của vị trí ấy, và nó phải là một cổng thật trong mã —
+# một lời nhắc trên màn hình thì không chặn được gì.
+TOI_THIEU_LY_DO = 20     # độ dài tối thiểu của lý do trả lại, xem chú thích ở `tra_lai_kinh_doanh`
+
+
+def _thieu_truong_de_chuyen(db: Session, t: Tour) -> list[str]:
+    """Những trường còn thiếu khiến dự toán chưa đủ tư cách chuyển sang Điều hành.
+
+    DÙNG LẠI ĐÚNG `R.calc` mà cổng biên dùng, không dựng phép kiểm thứ hai. Nếu chép tay danh
+    sách này thì ngày bước trình siết thêm một điều kiện, cổng của Sale Admin vẫn cho qua một hồ
+    sơ mà bước sau sẽ từ chối — và người bị trả lại hai lần sẽ thôi tin cả hai cổng.
+
+    CỐ Ý KHÔNG ĐÒI ĐIỂM DỪNG NGHỈ: đó là việc của Điều hành (ĐH Điều 11), và họ điền nó ở bước
+    sau. Bắt Kinh doanh khai hộ là bắt người không biết phải đoán.
+    """
+    c = R.calc(t, R.get_param(db, "nguong_bien", t.start_date))
+    thieu = []
+    if not (t.name or "").strip():
+        thieu.append("tên đoàn / khách")
+    if not t.start_date or not t.end_date:
+        thieu.append("ngày khởi hành và kết thúc")
+    if not c["complete"]:
+        for ten, ok in (("giá bán mỗi khách", (t.price_per_pax or 0) > 0),
+                        ("số khách dự toán", t.planned_pax > 0),
+                        ("giá vốn: chi phí cố định hoặc chi phí theo khách", c["has_cost"]),
+                        ("giá bán phải lớn hơn chi phí theo khách", c["breakeven_pax"] is not None)):
+            if not ok:
+                thieu.append(ten)
+    if not t.operator_id:
+        thieu.append("người điều hành phụ trách")
+    return thieu
+
+
+def chuyen_dieu_hanh(db: Session, u: User, t: Tour, note: str = "") -> str:
+    """Sale Admin chuyển dự toán đoàn sang Phòng Điều hành. `nhap_kd` → `nhap`."""
+    if u.role != "sales_admin" and not toan_quyen(u):
+        raise HTTPException(403, "Chỉ Sale Admin phòng Đoàn chuyển dự toán sang Điều hành")
+    if t.status != NHAP_KD:
+        raise Gate("TRANG_THAI", "Chỉ dự toán đang ở bước Kinh doanh soạn mới chuyển được")
+    thieu = _thieu_truong_de_chuyen(db, t)
+    if thieu:
+        raise Gate("THIEU_TRUONG",
+                   "Chưa chuyển được, còn thiếu: " + "; ".join(thieu) +
+                   ". Trả lại nhân viên phụ trách kèm ghi rõ thiếu gì (Phần V bản mô tả).")
+    t.status = "nhap"
+    EV(db, t, "chuyen_dieu_hanh", u.username, note)
+    R.audit(db, u.username, u.role, "chuyen_du_toan_sang_dieu_hanh", f"tour:{t.code}", after=snap(t))
+    db.commit()
+    return "Đã chuyển Phòng Điều hành – chờ điền điểm dừng nghỉ, rà giá vốn rồi trình"
+
+
+def tra_lai_kinh_doanh(db: Session, u: User, t: Tour, ly_do: str = "") -> str:
+    """Sale Admin trả dự toán về cho nhân viên phụ trách. Trạng thái GIỮ NGUYÊN `nhap_kd`.
+
+    BẮT BUỘC CÓ LÝ DO, và đây là cùng một luật đã đặt cho nút đóng cảnh báo ngày 11/9/2026:
+    "đóng mà không phải nói dựa vào đâu thì nút đóng là nút giấu việc". Trả lại mà không nói
+    thiếu gì thì người nhận lại chỉ biết là mình bị trả, không biết phải sửa gì — và bản sau sẽ
+    bị trả lần nữa. Bản mô tả cũng viết đúng thế: "trả lại ... KÈM GHI RÕ TRƯỜNG CÒN THIẾU".
+
+    Danh sách máy đo được đính kèm tự động, nhưng KHÔNG thay cho lý do người viết: máy chỉ thấy
+    trường trống, còn "giá bán thấp hơn bảng giá đã duyệt" thì chỉ người đọc mới thấy.
+    """
+    if u.role != "sales_admin" and not toan_quyen(u):
+        raise HTTPException(403, "Chỉ Sale Admin phòng Đoàn trả lại dự toán")
+    if t.status != NHAP_KD:
+        raise Gate("TRANG_THAI", "Dự toán không còn ở bước Kinh doanh soạn")
+    if len((ly_do or "").strip()) < TOI_THIEU_LY_DO:
+        raise Gate("THIEU_LY_DO",
+                   f"Phải ghi rõ vì sao trả lại (tối thiểu {TOI_THIEU_LY_DO} ký tự). "
+                   "Trả lại mà không nói thiếu gì thì bản sau sẽ bị trả lần nữa.")
+    may_do = _thieu_truong_de_chuyen(db, t)
+    ghi = ly_do.strip() + (" · Máy đo thấy thiếu: " + "; ".join(may_do) if may_do else "")
+    EV(db, t, "tra_lai_kinh_doanh", u.username, ghi)
+    R.audit(db, u.username, u.role, "tra_lai_du_toan_kinh_doanh", f"tour:{t.code}", after=snap(t))
+    db.commit()
+    return "Đã trả lại nhân viên phụ trách kèm lý do"
 
 
 def submit(db: Session, u: User, t: Tour, note: str = "") -> str:
