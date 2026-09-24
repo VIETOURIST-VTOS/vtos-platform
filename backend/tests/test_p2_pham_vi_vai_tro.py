@@ -385,8 +385,13 @@ PHAM_VI_DA_CHOT = {
     # ở "/api/v1/so-con-no" ngày 18/9 và "/api/v1/tong-dai" ngày 09/9.
     #
     # Điều hành KHÔNG được +1: họ trình dự toán, không đứng cùng phía với người duyệt nó.
-    "chutich": 118, "tgd": 118, "bks": 118, "cntt": 115,
-    "ketoan": 99, "tp_dh": 86, "ptgd_doan": 70, "nv_dh": 60, "hcns": 61, "gd_kd": 63,
+    #
+    # +1 LẦN THỨ HAI ngày 24/9/2026 (vòng 3/3): "/api/v1/sales-admin" — bàn làm việc của Sale Admin
+    # phòng Đoàn. Cũng là một nhóm API RIÊNG chỉ đọc, cùng lý do đã ghi ở dòng trên. Lần này
+    # `sales_admin` và `ptgd_doan` cùng +1 với bốn vai nền; khối Kinh doanh KHÔNG được +1 vì màn
+    # hình ấy là chỗ SOÁT hồ sơ của chính họ.
+    "chutich": 119, "tgd": 119, "bks": 119, "cntt": 116,
+    "ketoan": 99, "tp_dh": 86, "ptgd_doan": 71, "nv_dh": 60, "hcns": 61, "gd_kd": 63,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -399,7 +404,9 @@ PHAM_VI_DA_CHOT = {
     #
     # Và mọi thứ dẫn tới việc BÁN thì không có: không gửi được yêu cầu đặt dịch vụ, không giữ chỗ,
     # không mở màn hình nhà cung cấp. Hàng rào canh ba điều ấy là test_sa2, test_sa3, test_sa5.
-    "sales_admin": 34,
+    #
+    # 34 → 35 ngày 24/9/2026: +1 cho chính bàn làm việc của mình ("/api/v1/sales-admin").
+    "sales_admin": 35,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
@@ -416,7 +423,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 118, "robot_vpm": 17,   # +1 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan
+    "robot_pq": 18, "robot_ks": 119, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 
