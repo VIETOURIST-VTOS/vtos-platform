@@ -22,6 +22,49 @@ import { Tag, errMsg } from "@/components/ui";
 const THE: [string, string][] = [
   ["baochi", "Báo chí & phát ngôn"], ["sukien", "Sự kiện"], ["kol", "KOL / KOC"]];
 
+/** DÒNG VÍ DỤ — chỉ hiện khi bảng còn TRỐNG, và KHÔNG có trong cơ sở dữ liệu.
+ *
+ *  Anh Tuấn chốt 24/9/2026: cần số nháp cho nhân viên thấy format phải điền. Hai cách, và đây là
+ *  cách đã chọn.
+ *
+ *  CÁCH KIA LÀ NẠP VÀI DÒNG THẬT VÀO SỔ, và nó hỏng theo một kiểu chỉ lộ ra sau vài tháng: dòng
+ *  nháp nạp vào rồi thì KHÔNG có cột nào đánh dấu nó là nháp. Ba tháng sau không ai phân biệt
+ *  được nó với dòng thật, bảng hiệu quả kênh cộng cả nó vào, và người đọc báo cáo không có cách
+ *  nào biết. Đúng thứ ranh giới 09/9/2026 cấm: phần mềm không tự bịa số liệu.
+ *
+ *  Ở đây dòng ví dụ sống TRONG MÃ MÀN HÌNH, không đi qua máy chủ, không vào bảng nào. Nó biến mất
+ *  ngay khi có dòng thật đầu tiên, nên không bao giờ nằm lẫn. Và nó có nhãn trên từng dòng chứ
+ *  không chỉ một câu ở đầu bảng — người cuộn tới giữa bảng vẫn phải đọc được là mình đang xem gì.
+ */
+const VI_DU_PR: any[] = [
+  { ma: "PR-2026-09-0001", loai: "bai_bao", tieu_de: "Vietourist mở tuyến charter Phú Quốc – Đài Bắc",
+    noi_dang: "Báo Thanh Niên, chuyên mục Du lịch", trang_thai: "da_phat", ghi_nhan_luc: "18/09/2026 09:20" },
+  { ma: "PR-2026-09-0002", loai: "thong_cao", tieu_de: "Thông cáo kết quả kinh doanh quý III",
+    noi_dang: "Website công ty + 4 đầu báo", trang_thai: "cho_phat", ghi_nhan_luc: "22/09/2026 14:05" },
+];
+const VI_DU_SU_KIEN: any[] = [
+  { ma: "PR-2026-09-0003", loai: "su_kien", tieu_de: "Hội chợ ITE HCMC 2026 – gian hàng B12",
+    noi_dang: "SECC Quận 7, 04–06/09", trang_thai: "da_phat", ghi_nhan_luc: "01/09/2026 08:00" },
+];
+const VI_DU_KOL: any[] = [
+  { ma: "KOL-0001", ho_ten: "Nguyễn Thị Lan Anh", biet_danh: "Lan Anh Travel", kenh_ten: "TikTok",
+    luong_theo_doi: 320000, theo_doi_do_ngay: "2026-09-20", gia_tham_khao: 15000000,
+    so_lan: 3, da_dang: 2, tong_chi_thoa_thuan: 35000000, so_lan_chua_co_gia: 1,
+    trang_thai_ten: "Đang hợp tác" },
+  { ma: "KOL-0002", ho_ten: "Trần Minh Quân", biet_danh: "Quân Đi Đâu", kenh_ten: "YouTube",
+    luong_theo_doi: null, theo_doi_do_ngay: "", gia_tham_khao: null,
+    so_lan: 0, da_dang: 0, tong_chi_thoa_thuan: 0, so_lan_chua_co_gia: 0,
+    trang_thai_ten: "Tạm dừng" },
+];
+
+/** Khung bao quanh bảng đang ở chế độ ví dụ. Nhãn đặt CẢ TRÊN lẫn TRÊN TỪNG DÒNG. */
+function BangTrong({ so_cot, chu }: { so_cot: number; chu: string }) {
+  return (<tr><td colSpan={so_cot} className="muted" style={{ paddingTop: 10 }}>
+    <b>Bảng còn trống.</b> {chu} Mấy dòng dưới là <b>ví dụ</b> để anh chị thấy cần điền gì —
+    chúng <b>không nằm trong sổ</b> và sẽ biến mất ngay khi có dòng thật đầu tiên.
+  </td></tr>);
+}
+
 /** RỖNG hiện chữ, KHÔNG hiện 0 – "chưa ai gõ" khác hẳn "đo được và bằng không". */
 function So({ x }: { x: number | null | undefined }) {
   if (x === null || x === undefined) return <span className="muted">chưa có</span>;
@@ -155,7 +198,19 @@ function BaoChiKol() {
                 {r.la_khung_hoang && !r.da_phan_hoi &&
                   <button className="act grey" onClick={() => post(`/marketing/pr/${r.id}/phan-hoi`)}>Đã trả lời bằng đường khác</button>}
               </td></tr>)}
-              {!(pr.rows || []).length && <tr><td colSpan={7} className="muted">Sổ chưa có dòng nào.</td></tr>}
+              {!(pr.rows || []).length && <>
+                <BangTrong so_cot={7} chu={the === "sukien"
+                  ? "Sự kiện ghi chung sổ với báo chí, chọn loại “Sự kiện” ở khung trên."
+                  : "Dùng khung “Ghi một việc vào sổ” ở trên để thêm dòng đầu tiên."} />
+                {(the === "sukien" ? VI_DU_SU_KIEN : VI_DU_PR).map((r) => <tr key={r.ma} className="vidu">
+                  <td className="mono muted">{r.ma}</td>
+                  <td className="muted">{pr.loai?.[r.loai] || r.loai}</td>
+                  <td className="muted"><i>{r.tieu_de}</i> <Tag cls="grey">ví dụ</Tag></td>
+                  <td className="muted">{r.noi_dang}</td>
+                  <td className="muted">{pr.trang_thai_ds?.[r.trang_thai] || r.trang_thai}</td>
+                  <td className="muted">{r.ghi_nhan_luc}</td>
+                  <td></td></tr>)}
+              </>}
             </tbody></table>
         </div>
       </>}
@@ -197,7 +252,20 @@ function BaoChiKol() {
             <td className="num">{vnd(r.tong_chi_thoa_thuan)}
               {!!r.so_lan_chua_co_gia && <span className="muted"> (+{r.so_lan_chua_co_gia} chưa có giá)</span>}</td>
             <td>{r.trang_thai_ten}</td></tr>)}
-            {!(ds.rows || []).length && <tr><td colSpan={8} className="muted">Danh bạ chưa có ai.</td></tr>}
+            {!(ds.rows || []).length && <>
+              <BangTrong so_cot={8} chu="Dùng khung “Thêm KOL / KOC” ở trên để thêm người đầu tiên." />
+              {VI_DU_KOL.map((r) => <tr key={r.ma} className="vidu">
+                <td className="mono muted">{r.ma}</td>
+                <td className="muted"><i>{r.ho_ten}</i> <span className="muted">· {r.biet_danh}</span> <Tag cls="grey">ví dụ</Tag></td>
+                <td className="muted">{r.kenh_ten}</td>
+                <td className="num muted"><So x={r.luong_theo_doi} />
+                  {r.theo_doi_do_ngay && <span className="muted"> (đo {r.theo_doi_do_ngay})</span>}</td>
+                <td className="num muted"><Tien x={r.gia_tham_khao} /></td>
+                <td className="num muted">{r.so_lan}{r.da_dang ? ` (${r.da_dang} đã đăng)` : ""}</td>
+                <td className="num muted">{vnd(r.tong_chi_thoa_thuan)}
+                  {!!r.so_lan_chua_co_gia && <span className="muted"> (+{r.so_lan_chua_co_gia} chưa có giá)</span>}</td>
+                <td className="muted">{r.trang_thai_ten}</td></tr>)}
+            </>}
           </tbody></table>
         <p className="muted">Cột <b>Đã chi (thoả thuận)</b> là số Marketing thoả thuận với KOL, <b>không</b> phải
           tiền đã ra khỏi tài khoản. Lần hợp tác đã huỷ không được cộng vào. Tiền thật đi đường đề
