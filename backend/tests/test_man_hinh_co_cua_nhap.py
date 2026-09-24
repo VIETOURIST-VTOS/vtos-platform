@@ -61,6 +61,21 @@ CHI_XEM = {
     # là việc khó lùi — làm hàng loạt từ một màn hình tổng thì một cú bấm nhầm đi xa hơn nhiều so
     # với cái lợi về tốc độ, và ở màn hình tổng người bấm không nhìn thấy dòng quyết toán của
     # chuyến để mà biết mình đang chốt cái gì.
+    # 24/9/2026 — Bàn làm việc của Phó TGĐ tour đoàn. Chỉ-xem THẬT, cùng một khuôn với /so-con-no
+    # ngay dưới, và việc không có cửa ghi ở đây là một LỰA CHỌN chứ không phải chỗ còn thiếu:
+    #
+    #   · Ký dự toán đã có cửa thật — POST /api/v1/tours/{id}/approve, với cổng biên, luật hai chữ
+    #     ký cho chuyến dưới biên, và nhật ký. Dựng cửa ký thứ hai ở đây là tạo bản sao thứ hai của
+    #     một luật, và bản sao nào rồi cũng lệch với bản gốc.
+    #   · Ký HÀNG LOẠT từ màn hình tổng thì người bấm không nhìn thấy dòng dự toán để biết mình vừa
+    #     duyệt cái gì. Duyệt dự toán là việc phải ĐỌC, không phải việc phải bấm.
+    #
+    # Màn hình không sở hữu con số nào của riêng nó: biên lợi nhuận lấy từ đúng `rules.calc` mà cổng
+    # biên dùng, hạn quyết toán từ tham số `han_qt_doan`, lãi lỗ từ `rules.settlement_summary`.
+    "/ptgd-doan": ("Bàn làm việc Phó TGĐ tour đoàn: hàng đợi dự toán đoàn chờ ký, sổ quá hạn quyết "
+                   "toán và bảng lãi lỗ đã chốt. Không sở hữu con số nào của riêng mình. Cửa ký nằm "
+                   "ở chính chuyến (POST /tours/{id}/approve), mỗi dòng có đường dẫn sang đó.",
+                   ("/ptgd-doan/ban-lam-viec",)),
     "/so-con-no": ("Sổ chuyến còn nợ: liệt kê chuyến đã chạy mà chưa đóng sổ. Không sở hữu con số "
                    "nào của riêng mình — mọi số lấy từ sổ quyết toán của chính chuyến. Cửa đóng sổ "
                    "nằm ở từng chuyến (/tours/<id>), và anh Tuấn chốt 18/9/2026 là KHÔNG dựng cửa "
@@ -185,7 +200,20 @@ def test_duong_doc_da_khai_van_con_tren_man_hinh():
 
 
 def test_danh_sach_chi_xem_co_tran():
-    """Danh sách ngoại lệ không trần là cách một phép thử tự tắt mình."""
-    assert len(CHI_XEM) <= 8, (
+    """Danh sách ngoại lệ không trần là cách một phép thử tự tắt mình.
+
+    6 (09/9/2026) → 8 (19/9/2026) → 9 (24/9/2026, bàn làm việc P.TGĐ tour đoàn).
+
+    Dòng thứ chín phải trả lời được đúng câu mà trần này đặt ra — "con số kia vào hệ thống bằng cửa
+    nào?" — và nó trả lời được: dự toán vào hệ thống ở màn hình Chuyến, ký ở cửa
+    POST /tours/{id}/approve, đóng sổ ở `tours.close`. Màn hình mới không sinh ra con số nào cả, nó
+    chỉ gom những con số ấy về trước mặt người phải ký.
+
+    Chỗ cần cảnh giác cho lần sau: từ đây trở đi, mỗi "bàn làm việc theo vai" đều sẽ là một dòng
+    chỉ-xem nữa, và ba vai của phòng Đoàn thì còn hai vai chưa dựng. Nếu vòng sau lại nâng trần
+    thêm hai lần với cùng một lý do, thì lý do ấy đã thành thói quen chứ không còn là lý do — lúc
+    ấy việc phải làm là đổi cách đếm (tách riêng nhóm "bàn làm việc"), không phải nâng tiếp.
+    """
+    assert len(CHI_XEM) <= 9, (
         f"Đang khai {len(CHI_XEM)} màn hình chỉ xem. Ngày 09/9/2026 là 6. Con số này to lên nghĩa là "
         "mỗi lần đỏ lại thêm một dòng thay vì hỏi con số kia vào hệ thống bằng cửa nào.")

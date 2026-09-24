@@ -38,6 +38,11 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "1.1", ten: "Bảng điều hành", href: "/" },
       { ma: "1.2", ten: "Công việc của tôi", href: "/#viec-cua-toi" },
       { ma: "1.3", ten: "Chờ duyệt", href: "/#cho-toi-duyet" },
+      // 24/9/2026 · Hàng đợi dự toán đoàn của Phó TGĐ tour đoàn. Nằm ở nhóm 01 chứ không ở nhóm 04
+      // "Điều hành": người ký dự toán không đứng cùng phía với phòng trình nó. Nhánh 1.3 ở trên là
+      // ô "chờ duyệt" chung trên bảng điều hành; nhánh này là bàn làm việc riêng, có đủ biên kế
+      // hoạch, trường còn thiếu và sổ quá hạn — thứ ô chung không mang nổi.
+      { ma: "1.3b", ten: "Duyệt dự toán đoàn", href: "/ptgd-doan" },
       { ma: "1.4", ten: "Thông báo", href: "/alerts" },
       { ma: "1.5", ten: "Trợ lý AI" }
     ] },

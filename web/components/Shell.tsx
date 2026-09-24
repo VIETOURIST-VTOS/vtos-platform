@@ -378,6 +378,18 @@ export const GROUPS: Group[] = [
   { key: "khachhang", label: "Kinh doanh", icon: "khachhang",
     phans: [{ khoa: "kdle", label: "Kinh doanh lẻ" }, { khoa: "kddoan", label: "Kinh doanh đoàn" }],
     blocks: [
+    // 24/9/2026 · Bàn làm việc của Phó TGĐ tour đoàn — hàng đợi dự toán đoàn chờ chính ông ký
+    // (Điều 4 Văn bản đính chính). ĐỨNG ĐẦU NHÓM, và ba chỗ đặt em đã cân rồi mới chọn chỗ này:
+    //
+    //   · KHÔNG đặt ở "Tổng quan": anh Tuấn chốt 12/9/2026 nhóm ấy không có mục con nào, và
+    //     test_menu canh đúng điều đó. Một quyết định đã chốt thì không lách bằng một mục mới.
+    //   · KHÔNG đặt ở "Điều hành": người ký dự toán không đứng cùng phía với phòng trình nó.
+    //   · ĐẶT ở "Kinh doanh" vì đúng chức danh của ông: "Phó Tổng giám đốc phụ trách KINH DOANH
+    //     tour đoàn". Ông duyệt dự toán với tư cách người chịu trách nhiệm mảng đoàn.
+    //
+    // Đứng đầu nhóm KHÔNG đẩy mục nào của nhân viên bán hàng xuống: mục này chỉ hiện cho sáu vai
+    // khai ở MENU_ROLES["/ptgd-doan"]. Với mọi vai khác, nhóm này bắt đầu bằng "Hộp thư" y như cũ.
+    ["Duyệt dự toán đoàn", "/ptgd-doan"],
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
     // TC-73 · 19/9/2026. Sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
