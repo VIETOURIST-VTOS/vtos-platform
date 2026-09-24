@@ -414,6 +414,12 @@ MAN_HINH_API = {
     "/to-chuc-kd": ("/api/v1/to-chuc-kd",),
     "/nguoi-ban-hang": ("/api/v1/nguoi-ban-hang",),
     "/gop-tai-khoan": ("/api/v1/gop-tai-khoan",),
+    # TC-81 - Bao chi, KOL & su kien (muc 2.2.2). HAI tien to, va da kiem ky truoc khi khai cai
+    # thu hai: danh sach vai cua man hinh nay nam GON trong danh sach vai cua "/marketing", nen
+    # khai "/api/v1/marketing" o day KHONG noi them nhom nao cho bat ky vai nao. So PR da co cua
+    # doc va cua phat duoi tien to ay - dung cua san co thay vi dung cua doc thu hai cho cung mot
+    # bang. Neu mot ngay danh sach vai cua man hinh nay rong ra thi phai kiem lai dung cho nay.
+    "/bao-chi-kol": ("/api/v1/bao-chi-kol", "/api/v1/marketing"),
     "/kinh-doanh-le": ("/api/v1/kinh-doanh",),
     "/dong-gop-marketing": ("/api/v1/dong-gop-marketing",),
     "/chuyen-doi-lead": ("/api/v1/chuyen-doi-lead",),
@@ -587,6 +593,10 @@ MENU_ROLES = {
     # khai rieng o api/v1/gop_tai_khoan.py. Gop la viec mot chieu: chuyen 290 booking sang nham
     # nguoi roi thi khong co nut tach ra lai.
     "/gop-tai-khoan": BASE_VIEW + ("hcns", "ketoan", "cntt"),
+    # TC-81 - Bao chi, KOL & su kien. HEP HON "/marketing": khong co gd_kd va khong co ketoan.
+    # Day la so thuong hieu va danh ba nguoi hop tac noi dung, khong phai so tien - phan tien cua
+    # KOL di duong de nghi chi nhu moi khoan khac, va Ke toan doc no o man hinh Ngan sach.
+    "/bao-chi-kol": BASE_VIEW + MARKETING + ("ptgd_mkt", "cntt"),
     # TC-76 - man hinh Kinh doanh Le. Dong da duoc cat o may chu theo phan cong
     # (to_chuc_kd.pham_vi_xem), nen rong o day khong co nghia la ai cung thay so cua nguoi khac.
     "/kinh-doanh-le": BASE_VIEW + SALES + ("hcns", "ketoan", "ptgd_doan", "cntt"),
