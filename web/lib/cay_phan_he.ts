@@ -52,7 +52,10 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "2.2", ten: "Thương hiệu & PR",
         con: [
           { ma: "2.2.1", ten: "Nhận diện & thư viện thương hiệu", href: "/noi-dung" },
-          { ma: "2.2.2", ten: "Báo chí, KOL & sự kiện" }
+          // TC-81 · 24/9/2026. Ba thứ một màn hình, và sự kiện dùng CHUNG sổ với báo chí (anh
+          // Tuấn chốt) – lọc theo loại chứ không dựng bảng thứ hai. Hai nơi cùng đếm "tháng này
+          // làm bao nhiêu việc truyền thông" là hai báo cáo ra hai con số.
+          { ma: "2.2.2", ten: "Báo chí, KOL & sự kiện", href: "/bao-chi-kol" }
         ] },
       { ma: "2.3", ten: "Nội dung & kênh truyền thông",
         con: [

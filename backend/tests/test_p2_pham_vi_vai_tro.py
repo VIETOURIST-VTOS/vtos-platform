@@ -142,6 +142,17 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # Hai lần đổi trên TRỰC GIAO nhau (một bên thêm phân hệ, một bên bỏ dòng thừa) nên con số dưới đây
 # được ĐẾM LẠI TỪ MÃ, không phải cộng trừ tay hai bảng cũ.
 PHAM_VI_DA_CHOT = {
+    # TC-81 (24/9/2026) – +1 cho BẢY vai: nhóm "/api/v1/bao-chi-kol" gắn vào màn hình mới
+    # /bao-chi-kol (sổ báo chí, sự kiện, phát ngôn + danh bạ KOL/KOC). Bảy vai: bốn vai nền, cộng
+    # ptgd_mkt, nv_mkt, cntt. Không một vai Kinh doanh nào và không có ketoan: đây là sổ thương
+    # hiệu, không phải sổ tiền — phần tiền của KOL đi đường đề nghị chi và Kế toán đọc nó ở màn
+    # hình Ngân sách.
+    #
+    # ĐÚNG MỘT TIỀN TỐ DÔI RA, DÙ MÀN HÌNH KHAI HAI. Màn hình khai cả "/api/v1/marketing" để dùng
+    # cửa đọc và cửa phát của sổ PR đã có sẵn, thay vì dựng cửa đọc thứ hai cho cùng một bảng. Bảy
+    # vai này đều đã có nhóm Marketing từ màn hình /marketing, nên khai thêm KHÔNG nới cho ai —
+    # đã đo bằng chính phép thử này chứ không suy luận: chạy trước khi sửa bảng, nó báo đúng +1.
+    # Nếu một ngày danh sách vai của /bao-chi-kol rộng ra thì phải đo lại đúng chỗ này.
     # TC-75 (24/9/2026) – +1 cho BẢY vai trò: nhóm "/api/v1/gop-tai-khoan" gắn vào màn hình mới
     # /gop-tai-khoan (gộp hai tài khoản trùng của cùng một người).
     #
@@ -363,14 +374,14 @@ PHAM_VI_DA_CHOT = {
     # Nhóm CHỐT SỐ còn hẹp hơn nữa và nằm ở tầng cửa (chutich, tgd, ptgd_mkt, cntt): chốt số là
     # đặt một mốc mà mọi báo cáo sau đó đem ra so, nên `nv_mkt` có mặt ở bảng này mà không chốt
     # được — dù họ ghi được ở cả nhóm 2.6 lẫn 2.7.
-    "chutich": 116, "tgd": 116, "bks": 116, "cntt": 113,
+    "chutich": 117, "tgd": 117, "bks": 117, "cntt": 114,
     "ketoan": 99, "tp_dh": 86, "ptgd_doan": 69, "nv_dh": 60, "hcns": 61, "gd_kd": 63,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 46, "nv_kd": 46, "tn_kd": 46, "tp_kd": 48, "nv_mkt": 34,
+    "ptgd_mkt": 47, "nv_kd": 46, "tn_kd": 46, "tp_kd": 48, "nv_mkt": 35,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -381,7 +392,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 116, "robot_vpm": 17,
+    "robot_pq": 18, "robot_ks": 117, "robot_vpm": 17,
 }
 
 

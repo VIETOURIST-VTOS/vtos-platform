@@ -340,6 +340,13 @@ export const GROUPS: Group[] = [
     ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"],
     ["Chiến dịch", "/marketing"],
     ["Nội dung & thương hiệu", "/noi-dung"],
+    // TC-81 · 24/9/2026. Mục 2.2.2 – sổ báo chí, sự kiện, phát ngôn, và danh bạ KOL/KOC.
+    //
+    // ĐẶT NGAY SAU "Nội dung & thương hiệu" vì cùng một việc của phòng: một bên là bài mình tự
+    // đăng, một bên là bài người khác đăng về mình. Cố ý KHÔNG nhét vào tab của màn hình
+    // /marketing: sổ PR đã sống ở đó ba tuần sau một cái tên không gợi gì tới báo chí, và không
+    // màn hình nào gọi tới cửa của nó — tức là chưa ai vào được. Cùng bài học với dòng đầu khối.
+    ["Báo chí, KOL & sự kiện", "/bao-chi-kol"],
     // TC-77 · 23/9/2026. Nhóm 2.7 – tiền quảng cáo bỏ ra thu về được bao nhiêu doanh thu.
     //
     // Đọc doanh thu bằng ĐÚNG ống số của màn hình Kinh doanh lẻ và màn hình Chủ tịch, không có
