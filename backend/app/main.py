@@ -68,6 +68,8 @@ from app.api.v1.kinh_doanh import router as kinh_doanh_router
 from app.api.v1.dong_gop_marketing import router as dong_gop_marketing_router
 from app.api.v1.chuyen_doi_lead import router as chuyen_doi_lead_router
 from app.api.v1.doi_soat_marketing import router as doi_soat_marketing_router
+# 24/9/2026 - ban lam viec cua Pho TGD tour doan. Tien to RIENG, cung ly do da ghi o so_con_no.py.
+from app.api.v1.ptgd_doan import router as ptgd_doan_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -289,6 +291,7 @@ app.include_router(kinh_doanh_router)
 app.include_router(dong_gop_marketing_router)
 app.include_router(chuyen_doi_lead_router)
 app.include_router(doi_soat_marketing_router)
+app.include_router(ptgd_doan_router)
 
 
 @app.get("/", include_in_schema=False)

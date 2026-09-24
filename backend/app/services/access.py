@@ -23,6 +23,12 @@ LEADERSHIP = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt")
 CONTROL = ("ketoan", "cntt", "bks")
 OPERATIONS = ("tp_dh", "nv_dh")
 SALES = ("gd_kd", "tp_kd", "tn_kd", "nv_kd")
+# Sale Admin phòng Đoàn (mở 24/9/2026 theo bản mô tả công việc hiệu lực 01/9/2026). CỐ Ý ĐỨNG RIÊNG,
+# không gộp vào SALES: nhóm SALES là nguồn của REQUEST_CREATE_ROLES (gửi yêu cầu đặt dịch vụ) và của
+# GIU_CHO_ROLES (giữ chỗ) — đúng hai việc Phần V bản mô tả cấm vị trí này làm. Gộp vào cho gọn là trao
+# lại bằng mã đúng thứ văn bản vừa lấy đi, và tệ hơn: mọi quyền SALES nhận thêm về sau sẽ tự chảy sang
+# đây mà không ai quyết định.
+SALES_ADMIN = ("sales_admin",)
 MARKETING = ("nv_mkt",)
 FIELD = ("xe_hdv",)                                     # tài xế & HDV: người ở hiện trường, chỉ xem việc của chính mình
 FLEET_MGR = ("gd_doi_xe",)                              # GĐ điều hành đội xe: toàn bộ phần đội xe, KHÔNG xem
@@ -58,7 +64,18 @@ HR_TAB_ROLES = {
 HR_TAB_CAPABILITY = {"payroll": "bang_luong"}     # tab mở thêm được bằng ngoại lệ theo người
 # Cơ cấu chi phí NCC, quyết toán, dòng tiền tour. Phó TGĐ tour đoàn GIỮ quyền này vì phải duyệt dự toán
 # đoàn; Phó TGĐ Marketing mất, vì duyệt chi marketing không cần nhìn giá vốn nhà cung cấp của tour.
-COST_ROLES = BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt")
+#
+# `sales_admin` vào đây ngày 24/9/2026 theo quyết định của Chủ tịch, và đây là một lần NỚI nên phải
+# ghi lý do: bản mô tả công việc buộc vị trí này (mục 4.2) kiểm "hoa hồng và quà tặng dành cho khách
+# đã được đưa vào dự toán ngay từ đầu và tính vào giá vốn của chính đoàn đó", và (Phần VI) báo cáo
+# tháng lợi nhuận từng đoàn theo người chốt. Không thấy giá vốn thì không kiểm được cả hai, mà biên
+# kế hoạch in ra sẽ đẹp hơn sự thật đúng bằng khoản bỏ sót — cổng biên 10% mở cho một đoàn lẽ ra
+# phải đi đường hai chữ ký.
+#
+# Nới quyền ĐỌC giá vốn KHÔNG kéo theo quyền làm việc với nhà cung cấp: đặt dịch vụ và liên hệ NCC
+# vẫn cấm (Phần V), và lệnh cấm ấy nằm ở chỗ khác — `sales_admin` không có trong REQUEST_CREATE_ROLES
+# và không mở màn hình /nha-cung-cap. Xem giá vốn là để SOÁT, không phải để gọi.
+COST_ROLES = BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt") + SALES_ADMIN
 # Giao dịch ngân hàng và tổng hợp thu tiền toàn công ty: thu về Kế toán. Trưởng phòng Điều hành mất quyền
 # này – điều hành cần dòng tiền TỪNG TOUR (COST_ROLES ở trên), không cần sổ tiền gửi của công ty.
 FINANCE_ROLES = BASE_VIEW + ("ketoan",)
@@ -399,6 +416,10 @@ MAN_HINH_API = {
     # tài xế xem được phiếu của mình là hạ hàng rào ngoài của cả bảng lương công ty, chỉ còn hàng rào
     # trong đỡ.
     "/phieu-luong": ("/api/v1/phieu-luong",),
+    # Bàn làm việc của Phó TGĐ tour đoàn — MỘT nhóm API riêng, cùng khuôn mẫu với /lai-lo-tour và
+    # /so-con-no: gắn nhờ vào một nhóm có sẵn (ví dụ /api/v1/tours) là nới CẢ nhóm ấy cho mọi vai mở
+    # được màn hình này, và phần dôi ra vẫn là quyền đã cấp dù hàng rào trong chưa cho dùng hôm nay.
+    "/ptgd-doan": ("/api/v1/ptgd-doan",),
     "/requests": ("/api/v1/requests", "/api/v1/bookings", "/api/v1/tours", "/api/v1/meta",
                   "/api/v1/mang"),
     "/lai-lo-tour": ("/api/v1/lai-lo-tour",),
@@ -566,28 +587,34 @@ MENU_ROLES = {
 
     # --- Kinh doanh & sản phẩm ---
     "/products": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt"),
-    "/tours": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt"),
-    "/requests": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "cntt"),
-    "/bookings": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt"),
+    "/tours": BASE_VIEW + SALES + OPERATIONS + SALES_ADMIN + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt"),
+    "/requests": BASE_VIEW + SALES + OPERATIONS + SALES_ADMIN + ("ptgd_doan", "cntt"),
+    "/bookings": BASE_VIEW + SALES + OPERATIONS + SALES_ADMIN + ("ptgd_doan", "ptgd_mkt", "ketoan", "cntt"),
     "/non-package": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
     "/sales-reports": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ptgd_mkt", "ketoan", "hcns", "cntt"),
     # Lãi lỗ theo tour: số quản trị. Sale KHÔNG có mặt – họ xem doanh thu và công nợ booking mình
     # phụ trách ở màn hình bán hàng, còn giá vốn của chuyến thì ngoài phạm vi của họ.
-    "/lai-lo-tour": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
+    # Bàn làm việc của Phó TGĐ tour đoàn (24/9/2026). HẸP NHẤT trong cả bảng, và cố ý: màn hình này
+    # là HÀNG ĐỢI KÝ của đúng một người. Thêm một vai vào đây không phải là "cho xem thêm" mà là làm
+    # cho hàng đợi của người ký trông như hàng đợi của nhiều người — rồi ai cũng tưởng có người khác
+    # lo. Ai cần nhìn việc của cả phòng thì nhìn ở /so-con-no và /lai-lo-tour.
+    # Điều hành KHÔNG có mặt: họ trình dự toán, không đứng cùng phía với người duyệt nó.
+    "/ptgd-doan": BASE_VIEW + ("ptgd_doan", "cntt"),
+    "/lai-lo-tour": BASE_VIEW + OPERATIONS + SALES_ADMIN + ("ptgd_doan", "ketoan", "cntt"),
     # TC-71 · Sổ chuyến còn nợ — anh Tuấn 18/9/2026 chọn ba nhóm: Chủ tịch/TGĐ, Điều hành, Kế toán.
     # ĐÚNG BẰNG `/lai-lo-tour` và cùng một lý do: cả hai màn hình nói về sổ quyết toán của chuyến,
     # nên hai danh sách vai khác nhau cho cùng một miền là hai danh sách sẽ lệch nhau về sau.
     # Kế toán CÓ mặt dù họ không đóng sổ chuyến: họ cần biết còn bao nhiêu chuyến chưa về sổ để
     # liệu việc ghi sổ tháng — không thấy thì đến cuối tháng mới biết còn 24 tỷ chưa vào.
     # Sale KHÔNG có mặt, y như /lai-lo-tour: giá vốn chuyến ngoài phạm vi của họ.
-    "/so-con-no": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
+    "/so-con-no": BASE_VIEW + OPERATIONS + SALES_ADMIN + ("ptgd_doan", "ketoan", "cntt"),
     # TC-73 – so do to chuc khoi Kinh doanh. Ca khoi Kinh doanh XEM duoc: biet minh thuoc dau va ai
     # cung team khong phai bi mat. GHI thi hep hon nhieu, khai rieng o api/v1/to_chuc_kd.py – nguoi tu
     # ve duoc cay to chuc cua minh la nguoi tu cap duoc pham vi xem cua minh.
-    "/to-chuc-kd": BASE_VIEW + SALES + ("hcns", "hanh_chinh", "ptgd_doan", "cntt"),
+    "/to-chuc-kd": BASE_VIEW + SALES + SALES_ADMIN + ("hcns", "hanh_chinh", "ptgd_doan", "cntt"),
     # TC-74 - ai duoc ban hang. Ke toan co o day ma khong co o /to-chuc-kd: doi tac la ben thu ba
     # co cong no va hoa don nen Ke toan phai biet danh muc ay; so do to chuc noi bo thi khong.
-    "/nguoi-ban-hang": BASE_VIEW + SALES + ("hcns", "hanh_chinh", "ptgd_doan", "ketoan", "cntt"),
+    "/nguoi-ban-hang": BASE_VIEW + SALES + SALES_ADMIN + ("hcns", "hanh_chinh", "ptgd_doan", "ketoan", "cntt"),
     # TC-75 - gop tai khoan trung. HEP: khong co vai Kinh doanh nao. Doc bang cap trung thi HCNS
     # va Ke toan can (ho la nguoi phat hien ra trung), nhung nut gop thi chi cntt va Ban TGD -
     # khai rieng o api/v1/gop_tai_khoan.py. Gop la viec mot chieu: chuyen 290 booking sang nham
@@ -624,7 +651,7 @@ MENU_ROLES = {
     # /suppliers, /tours nên nới cho gd_doi_xe thêm chín nhóm API. Nay cả bốn ô đi qua chính phân hệ
     # này (xem MAN_HINH_API ở trên), và tên khách chỉ trả cho vai trò trong su_co_tour.KHACH – hai
     # vai này không có trong đó.
-    "/su-co-tour": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ptgd_doan", "ketoan", "cntt"),
+    "/su-co-tour": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + SALES_ADMIN + ("ptgd_doan", "ketoan", "cntt"),
 
     # --- Marketing & CSKH. Kế toán và CNTT KHÔNG có mặt: đây là dữ liệu khách của Marketing. ---
     "/inbox": BASE_VIEW + SALES + OPERATIONS + MARKETING + ("ptgd_mkt", "cntt"),
@@ -667,7 +694,7 @@ MENU_ROLES = {
     "/bank-accounts": FINANCE_ROLES,
     # Sổ công nợ toàn hệ thống: phải thu của khách và phải trả nhà cung cấp là số tiền của cả công ty.
     # Nhân viên kinh doanh theo dõi booking của mình ở màn hình bán hàng, không mở sổ công nợ toàn công ty.
-    "/cong-no": BASE_VIEW + ("ketoan", "ptgd_doan", "tp_dh", "cntt"),
+    "/cong-no": BASE_VIEW + SALES_ADMIN + ("ketoan", "ptgd_doan", "tp_dh", "cntt"),
     # Nhà cung cấp & đặt dịch vụ: Điều hành đặt dịch vụ, Kế toán xác nhận đổi tài khoản. Khối Kinh doanh
     # không xem – đây là cơ cấu chi phí nhà cung cấp.
     "/nha-cung-cap": BASE_VIEW + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
@@ -683,7 +710,7 @@ MENU_ROLES = {
     # Mở màn hình KHÔNG nới quyền nạp: chặn theo từng bộ nạp vẫn nằm ở intake.VAI_TRO, nên mỗi ông chỉ
     # nạp được đúng những loại dữ liệu của phòng mình, và màn hình nói thẳng "chỉ xem" với loại của
     # phòng khác.
-    "/nap-du-lieu": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ketoan", "hcns", "cntt",
+    "/nap-du-lieu": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + SALES_ADMIN + ("ketoan", "hcns", "cntt",
                                                                               "nv_mkt", "ptgd_doan",
                                                                               "ptgd_mkt"),
     # Đọc chứng từ ảnh (cửa 3). Mở cho phòng SỞ HỮU con số, cộng CNTT vì CNTT vận hành mô hình – nhưng
@@ -692,7 +719,7 @@ MENU_ROLES = {
     # bảo hiểm thì cấm đọc bằng máy (Nghị định 13/2023) – mở màn hình cho họ là mời hiểu nhầm.
     "/doc-chung-tu": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "ptgd_doan", "cntt"),
     # Tệp & hình ảnh: chứng từ đi kèm gần như mọi nghiệp vụ nên mở rộng; gỡ tệp thì hẹp hơn (xem API).
-    "/tep": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + ("ketoan", "hcns", "cntt", "nv_mkt",
+    "/tep": BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + SALES_ADMIN + ("ketoan", "hcns", "cntt", "nv_mkt",
                                                                       "nv_visa", "hanh_chinh"),
     # Phòng Hướng dẫn: màn hình riêng của người điều phối. KHÔNG mở /ops cho vai trò này – màn hình đó
     # lấy danh sách người từ /employees, tức là kèm luôn lương của mọi phòng.
@@ -776,10 +803,10 @@ MENU_ROLES = {
     # V6 – chuỗi bán hàng. Bảng giá là CHÍNH SÁCH nên hẹp hơn báo giá: từng sale soạn báo giá
     # được, nhưng đặt giá niêm yết thì không.
     "/bang-gia": BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt", "ketoan", "cntt"),
-    "/bao-gia": BASE_VIEW + ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "ptgd_mkt", "nv_mkt",
+    "/bao-gia": BASE_VIEW + SALES_ADMIN + ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "ptgd_mkt", "nv_mkt",
                              "tp_dh", "nv_dh", "ptgd_doan", "ketoan", "cntt"),
     # Hợp đồng là căn cứ ghi nhận doanh thu nên Kế toán phải xem được.
-    "/hop-dong-khach": BASE_VIEW + ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "ptgd_mkt",
+    "/hop-dong-khach": BASE_VIEW + SALES_ADMIN + ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "ptgd_mkt",
                                     "ketoan", "cntt"),
     # Bảng quy ước hạch toán + cổng chặn giá vốn. Điều hành (tp_dh) xem được vì hàng đợi thiếu giá vốn
     # đứng tên phòng họ – bắt một phòng trả lời mà không cho họ nhìn thấy việc là cách chắc chắn để không ai trả lời.

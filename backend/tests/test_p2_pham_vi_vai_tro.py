@@ -374,8 +374,32 @@ PHAM_VI_DA_CHOT = {
     # Nhóm CHỐT SỐ còn hẹp hơn nữa và nằm ở tầng cửa (chutich, tgd, ptgd_mkt, cntt): chốt số là
     # đặt một mốc mà mọi báo cáo sau đó đem ra so, nên `nv_mkt` có mặt ở bảng này mà không chốt
     # được — dù họ ghi được ở cả nhóm 2.6 lẫn 2.7.
-    "chutich": 117, "tgd": 117, "bks": 117, "cntt": 114,
-    "ketoan": 99, "tp_dh": 86, "ptgd_doan": 69, "nv_dh": 60, "hcns": 61, "gd_kd": 63,
+    # ── 24/9/2026 · BÀN LÀM VIỆC P.TGĐ TOUR ĐOÀN — +1 cho ĐÚNG SÁU vai ──────────────────────
+    # Nhóm "/api/v1/ptgd-doan" gắn vào màn hình mới /ptgd-doan: hàng đợi dự toán đoàn chờ ký.
+    # Sáu vai: bốn vai nền (chutich, tgd, bks, robot_ks) + ptgd_doan + cntt. Đúng bằng danh sách
+    # khai ở MENU_ROLES["/ptgd-doan"], không dôi vai nào.
+    #
+    # MỘT TIỀN TỐ RIÊNG, và đó là chỗ dễ sai. Gắn hàng đợi này vào "/api/v1/tours" cho tiện thì
+    # số ở đây KHÔNG đổi một dòng nào — trông như không nới gì cả. Nhưng lúc ấy mọi cửa /tours
+    # thêm về sau tự mở cho sáu vai này, và phần dôi ra vẫn là quyền đã cấp. Cùng bài học đã ghi
+    # ở "/api/v1/so-con-no" ngày 18/9 và "/api/v1/tong-dai" ngày 09/9.
+    #
+    # Điều hành KHÔNG được +1: họ trình dự toán, không đứng cùng phía với người duyệt nó.
+    "chutich": 118, "tgd": 118, "bks": 118, "cntt": 115,
+    "ketoan": 99, "tp_dh": 86, "ptgd_doan": 70, "nv_dh": 60, "hcns": 61, "gd_kd": 63,
+    # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
+    # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
+    # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
+    # nhưng KHÔNG có nhóm nào để bán.
+    #
+    # Ba nhóm vị trí này CÓ mà nhân viên kinh doanh KHÔNG: "/api/v1/lai-lo-tour",
+    # "/api/v1/so-con-no", "/api/v1/cong-no" — ba cửa của phần soát giá vốn, tiến độ quyết toán và
+    # công nợ mà Phần IV bản mô tả giao. Đây là lần nới quyền xem giá vốn Chủ tịch quyết 24/9/2026;
+    # hàng rào canh nó là test_sa7 trong test_sa1_vai_sales_admin.py.
+    #
+    # Và mọi thứ dẫn tới việc BÁN thì không có: không gửi được yêu cầu đặt dịch vụ, không giữ chỗ,
+    # không mở màn hình nhà cung cấp. Hàng rào canh ba điều ấy là test_sa2, test_sa3, test_sa5.
+    "sales_admin": 34,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
@@ -392,7 +416,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 117, "robot_vpm": 17,
+    "robot_pq": 18, "robot_ks": 118, "robot_vpm": 17,   # +1 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan
 }
 
 

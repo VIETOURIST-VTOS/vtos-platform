@@ -60,6 +60,12 @@ ROLES = {
     "tn_kd": "Trưởng nhóm Kinh doanh",
     "tp_kd": "Trưởng phòng Kinh doanh",
     "gd_kd": "Giám đốc Kinh doanh",
+    # Mở 24/9/2026 theo Bản mô tả công việc Sale Admin — Phòng Kinh doanh Đoàn, hiệu lực 01/9/2026.
+    # Vị trí này KHÔNG bán hàng và KHÔNG điều hành tour, nên nó không nằm trong nhóm SALES của
+    # access.py: nhóm ấy mang theo quyền GỬI yêu cầu đặt dịch vụ và quyền giữ chỗ, hai thứ Phần V
+    # bản mô tả cấm đích danh. Một vai trò mới tốn một dòng; nhét nhờ vào nhóm có sẵn thì rẻ hơn
+    # hôm nay và sai vĩnh viễn — mọi quyền nhóm ấy nhận về sau sẽ tự chảy sang vị trí này.
+    "sales_admin": "Sale Admin phòng Đoàn",
     "nv_mkt": "Nhân viên Marketing",
     "ketoan": "Kế toán",
     "hcns": "Nhân sự Hành chính",
