@@ -103,6 +103,17 @@ BAN_LAM_VIEC = {
                      # dòng tóm tắt là lời mời chuyển mà chưa mở ra xem — và cổng chặn duy nhất của
                      # vị trí này mất hết ý nghĩa đúng vào lúc nó trở nên tiện tay.
                      "POST /api/v1/tours/{id}/chuyen-dieu-hanh · .../tra-lai-kinh-doanh"),
+    "/ban-tour-le": ("Bàn bán tour lẻ của Phòng Kinh doanh Lẻ: chuyến lẻ đang bán, mỗi dòng kèm "
+                     "thông tin chuyến và ba con số dự toán cùng biên. Không sở hữu con số nào của "
+                     "riêng mình — mọi số tính từ dự toán do Điều hành lập.",
+                     ("/ban-tour-le/ban-lam-viec",),
+                     # Cửa ghi của vai này là cửa BÁN, và nó đã có từ đầu. Vì sao không đặt ở đây:
+                     # bán một chỗ là việc phải mở chuyến ra đọc trước — chương trình, điểm dừng
+                     # nghỉ, hạn huỷ. Một nút "đặt" cạnh một dòng tóm tắt là lời mời đặt mà chưa
+                     # xem, và người nhận hậu quả là khách. Thêm nữa, chỗ ngồi có hàng rào sức
+                     # chứa (25/9/2026) nằm trong `tours.create_booking`; một cửa đặt thứ hai ở
+                     # đây là một chỗ nữa phải nhớ gọi hàng rào ấy.
+                     "POST /api/v1/requests"),
 }
 
 # Hai nhóm gộp lại mới là toàn bộ màn hình không có cửa ghi. Khoá tên riêng để không nhóm nào lặng

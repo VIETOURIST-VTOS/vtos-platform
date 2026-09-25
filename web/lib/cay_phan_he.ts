@@ -47,6 +47,10 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       // việc hiệu lực 01/9/2026. Đứng cạnh 1.3b vì hai màn hình là hai đầu của cùng một dây
       // chuyền — chuyển sang Điều hành ở đầu này, ký ở đầu kia.
       { ma: "1.3c", ten: "Bàn làm việc Sale Admin", href: "/sales-admin" },
+      // 25/9/2026 · Bàn bán tour lẻ. Phần đầu của bảng quyết toán — thông tin chuyến và ba con số
+      // dự toán — nối về cho Phòng Kinh doanh Lẻ, mỗi chuyến đang bán một dòng. Không có dòng
+      // nhà cung cấp: "không liên quan giá vốn".
+      { ma: "1.3d", ten: "Bàn bán tour lẻ", href: "/ban-tour-le" },
       { ma: "1.4", ten: "Thông báo", href: "/alerts" },
       { ma: "1.5", ten: "Trợ lý AI" }
     ] },

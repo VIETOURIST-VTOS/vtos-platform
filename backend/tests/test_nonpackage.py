@@ -25,8 +25,14 @@ def _startup():
 def test_create_pay_print_edit_cancel_summary():
     h = login("kd.hoa")
     assert client.post("/api/v1/non-package", json={"service_type": "VISA", "customer_name": "Hoàng Văn Nam", "customer_phone": "", "source": "Zalo", "amount": 7000000}, headers=h).json()["detail"]["gate"] == "CONG_4"
-    r = client.post("/api/v1/non-package", json={"service_type": "VISA", "description": "Visa Mỹ B1/B2", "country": "MỸ", "customer_name": "Hoàng Văn Nam", "customer_phone": "0765090170", "source": "Facebook", "amount": 7000000, "cost_amount": 4500000, "supplier_name": "Đại lý visa ABC", "service_date": str(date.today() + timedelta(days=10))}, headers=h)
+    # Chủ tịch quyết 25/9/2026: Phòng Kinh doanh Lẻ gỡ hết khỏi ô giá vốn – kể cả ở cửa TẠO, vì
+    # chặn cửa sửa mà để hở cửa tạo thì người bị gỡ quyền chỉ cần tạo lại một dòng mới.
+    assert client.post("/api/v1/non-package", json={"service_type": "VISA", "customer_name": "Hoàng Văn Nam", "customer_phone": "0765090170", "source": "Facebook", "amount": 7000000, "cost_amount": 4500000}, headers=h).status_code == 403
+    r = client.post("/api/v1/non-package", json={"service_type": "VISA", "description": "Visa Mỹ B1/B2", "country": "MỸ", "customer_name": "Hoàng Văn Nam", "customer_phone": "0765090170", "source": "Facebook", "amount": 7000000, "service_date": str(date.today() + timedelta(days=10))}, headers=h)
     assert r.status_code == 201, r.text
+    # …rồi Điều hành điền giá vốn. Trước bước này dịch vụ chưa có dòng chi phí nào: ô trống là
+    # CHƯA CÓ SỐ, không phải bằng 0.
+    assert client.put(f"/api/v1/non-package/{r.json()['row']['id']}", json={"cost_amount": 4500000, "supplier_name": "Đại lý visa ABC"}, headers=login("dh.lan")).status_code == 200
     row = r.json()["row"]; assert row["tour_code"] == f"KLE{date.today():%d%m%y}" and row["pmt_status"] == "UNPAID" and row["profit"] == 2500000 and row["deposit_pct"] if "deposit_pct" in row else True
     r2 = client.post("/api/v1/non-package", json={"service_type": "FLIGHT", "description": "Vé SGN–BKK", "country": "THÁI LAN", "customer_name": "Trần Mai Linh", "customer_phone": "0969662280", "source": "Zalo", "amount": 4448000, "cost_amount": 4000000}, headers=login("dh.lan")).json()["row"]
     assert r2["tour_code"] == f"KLE{date.today():%d%m%y}_2"
@@ -40,7 +46,8 @@ def test_create_pay_print_edit_cancel_summary():
     lst = client.get("/api/v1/non-package?paid=paid", headers=h).json(); assert any(x["id"] == row["id"] and x["pmt_status"] == "PAID" for x in lst["rows"])
     p = client.get(f"/api/v1/non-package/{row['id']}/print", headers=h); assert p.status_code == 200 and "PHIẾU XÁC NHẬN DỊCH VỤ" in p.text and "7,000,000" in p.text
     # sửa giá vốn → dòng chi phí cập nhật; đổi giá khi đã khóa bị chặn
-    e = client.put(f"/api/v1/non-package/{row['id']}", json={"cost_amount": 4800000}, headers=h).json(); assert e["cost_amount"] == 4800000 and e["profit"] == 2200000
+    assert client.put(f"/api/v1/non-package/{row['id']}", json={"cost_amount": 4800000}, headers=h).status_code == 403   # sale không sửa giá vốn nữa
+    e = client.put(f"/api/v1/non-package/{row['id']}", json={"cost_amount": 4800000}, headers=login("dh.lan")).json(); assert e["cost_amount"] == 4800000 and e["profit"] == 2200000
     assert client.get(f"/api/v1/tours/{row['tour_id']}/settlement", headers=kt).json()["summary"]["actual"] == 4800000
     client.post("/api/v1/bookings/check", headers=login("tp.dieuhanh"))
     assert client.put(f"/api/v1/non-package/{row['id']}", json={"amount": 7500000}, headers=h).json()["detail"]["gate"] == "KHOA_BOOKING"

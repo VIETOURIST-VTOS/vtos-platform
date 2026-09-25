@@ -142,6 +142,20 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # Hai lần đổi trên TRỰC GIAO nhau (một bên thêm phân hệ, một bên bỏ dòng thừa) nên con số dưới đây
 # được ĐẾM LẠI TỪ MÃ, không phải cộng trừ tay hai bảng cũ.
 PHAM_VI_DA_CHOT = {
+    # BÀN BÁN TOUR LẺ (25/9/2026) – +1 cho CHÍN vai: nhóm "/api/v1/ban-tour-le" gắn vào màn hình
+    # mới /ban-tour-le (chuyến lẻ đang bán, mỗi dòng kèm ba con số dự toán và biên).
+    #
+    # Chín vai: bốn vai nền (chutich, tgd, bks, robot_ks), cộng TOÀN KHỐI KINH DOANH LẺ (gd_kd,
+    # tp_kd, tn_kd, nv_kd) và cntt.
+    #
+    # KHÔNG có sales_admin, KHÔNG có ptgd_doan, KHÔNG có ketoan. Hai vai đầu thuộc phòng Đoàn và
+    # Chủ tịch nói rõ ngày 25/9: "ý là PKDL, còn PKDĐ vẫn giữ nguyên" — bàn của họ là /sales-admin
+    # và /ptgd-doan. Kế toán không có vì màn hình này KHÔNG có một con số quyết toán nào: mọi số ở
+    # đây tính từ ba con số dự toán, và Kế toán đã đọc số thật ở bảng quyết toán.
+    #
+    # Đây là lần NỚI QUYỀN XEM GIÁ VỐN đầu tiên cho phòng Lẻ, nên nó hẹp đúng bằng ba con số:
+    # không dòng nhà cung cấp, không đơn giá mua, không số đã chi. Xem test_bcs1 và
+    # access.can_see_du_toan_ba_con_so.
     # TC-81 (24/9/2026) – +1 cho BẢY vai: nhóm "/api/v1/bao-chi-kol" gắn vào màn hình mới
     # /bao-chi-kol (sổ báo chí, sự kiện, phát ngôn + danh bạ KOL/KOC). Bảy vai: bốn vai nền, cộng
     # ptgd_mkt, nv_mkt, cntt. Không một vai Kinh doanh nào và không có ketoan: đây là sổ thương
@@ -390,8 +404,8 @@ PHAM_VI_DA_CHOT = {
     # phòng Đoàn. Cũng là một nhóm API RIÊNG chỉ đọc, cùng lý do đã ghi ở dòng trên. Lần này
     # `sales_admin` và `ptgd_doan` cùng +1 với bốn vai nền; khối Kinh doanh KHÔNG được +1 vì màn
     # hình ấy là chỗ SOÁT hồ sơ của chính họ.
-    "chutich": 119, "tgd": 119, "bks": 119, "cntt": 116,
-    "ketoan": 99, "tp_dh": 86, "ptgd_doan": 71, "nv_dh": 60, "hcns": 61, "gd_kd": 63,
+    "chutich": 120, "tgd": 120, "bks": 120, "cntt": 117,
+    "ketoan": 99, "tp_dh": 86, "ptgd_doan": 71, "nv_dh": 60, "hcns": 61, "gd_kd": 64,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -412,7 +426,7 @@ PHAM_VI_DA_CHOT = {
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 47, "nv_kd": 46, "tn_kd": 46, "tp_kd": 48, "nv_mkt": 35,
+    "ptgd_mkt": 47, "nv_kd": 47, "tn_kd": 47, "tp_kd": 49, "nv_mkt": 35,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -423,7 +437,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 119, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 120, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

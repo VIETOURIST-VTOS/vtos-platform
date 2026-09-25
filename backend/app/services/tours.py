@@ -73,6 +73,11 @@ def allowed_actions(db: Session, t: Tour, u: User) -> list[str]:
     if t.status in ("da_duyet", "ket_thuc") and u.id == t.operator_id: a.append("edit_settlement")
     if t.status == "kt_xac_nhan" and u.role == "cntt": a.append("cntt_check")
     if t.status == "da_duyet" and u.role in ("chutich", "tp_dh") and not t.chairman_run_decision: a.append("d7")
+    # Mở thêm chỗ — Chủ tịch quyết 25/9/2026. Chỉ khi chuyến đang bán: trần bán là con số của dự
+    # toán ĐÃ DUYỆT, nên trước khi duyệt thì sửa thẳng trong dự toán chứ không đi qua cửa này.
+    # `toan_quyen` có ở đây vì thân hàm `mo_them_cho` cũng cho Chủ tịch đi qua. Bảng nút mà không
+    # khai lại thì Chủ tịch gọi được cửa nhưng không nhìn thấy nút — cửa mở mà không có tay nắm.
+    if t.status == "da_duyet" and (u.role in MO_THEM_CHO_ROLES or toan_quyen(u)): a.append("mo_them_cho")
     return a
 
 
@@ -359,6 +364,126 @@ def d7(db: Session, u: User, t: Tour, decision: str, note: str = "") -> str:
     return "Đã ghi quyết định D-7"
 
 
+# ─────────────────── TRẦN BÁN VÀ CỬA MỞ THÊM CHỖ — Chủ tịch quyết 25/9/2026 ───────────────────
+#
+# "Điều hành có form nhập số khách. Duyệt dự toán xong thì con số ấy thành trần bán."
+#
+# Trước ngày này hệ thống KHÔNG kiểm sức chứa ở đâu cả trên đường bán: cả `create_request` lẫn
+# `create_booking` đều không gọi `giu_cho.con_trong()`, và `seats_open` chỉ được ĐỌC để hiển thị.
+# Một tour 45 chỗ nhận booking thứ 46 bình thường — không cần hai người bấm trùng giây, chỉ cần
+# bấm lần lượt. Chỗ duy nhất trong cả kho có kiểm sức chứa là `giu_cho.gia_han` khi KHÔI PHỤC một
+# chỗ đã hết hạn: hàng rào dựng ở chiều quay lại, không dựng ở chiều bán ra.
+#
+# Và `giu_cho.gia_han` còn bảo người dùng "Điều hành phải mở thêm chỗ" — một việc chưa có cửa nào
+# để làm. Cửa `mo_them_cho` dưới đây là cửa ấy.
+MO_THEM_CHO_ROLES = ("nv_dh", "tp_dh", "sales_admin")
+
+
+def _tran_ban(t: Tour) -> int | None:
+    """Trần bán của chuyến, hoặc None khi chuyến CHƯA KHAI số chỗ.
+
+    None KHÁC 0, và đây là chỗ phải phân biệt. Hơn 1.200 chuyến nhập từ Vietrip có thể không mang
+    số chỗ; đọc "chưa khai" thành "0 chỗ" là chặn đứng toàn bộ việc bán của những chuyến ấy trong
+    một đêm. Chưa khai thì cổng cho qua và ghi cảnh báo — đúng luật `rỗng khác không` của kho.
+    """
+    tran = int(t.seats_open or 0) or int(t.planned_pax or 0)
+    return tran or None
+
+
+def kiem_suc_chua(db: Session, t: Tour, pax: int) -> tuple[bool, str]:
+    """(qua_duoc, câu nói). Không ném lỗi — người gọi quyết định chặn hay chỉ cảnh báo.
+
+    Tách ra khỏi hai cửa gọi nó vì hai cửa ấy xử lý kết quả KHÁC NHAU: cửa gửi yêu cầu chỉ cảnh
+    báo (để Kinh doanh biết trước khi hứa với khách), cửa tạo booking thì CHẶN CỨNG (đây là lúc
+    chỗ thật sự bị chiếm). Một hàm, hai cách dùng — thay vì hai phép kiểm rồi lệch nhau.
+    """
+    from app.services import giu_cho as GC
+    tran = _tran_ban(t)
+    if tran is None:
+        return True, (f"Chuyến {t.code} chưa khai số chỗ mở bán – cổng sức chứa không đo được. "
+                      "Điều hành khai số chỗ để cổng này có hiệu lực.")
+    con = GC.con_trong(db, t)
+    if pax > con:
+        return False, (f"Chuyến {t.code} còn {con} chỗ, yêu cầu {pax} chỗ. Trần bán là {tran} "
+                       f"(số khách trong dự toán đã duyệt). Muốn nhận thêm thì Điều hành hoặc "
+                       f"Sale Admin phải MỞ THÊM CHỖ, và cửa ấy chặn nếu lợi nhuận tụt.")
+    return True, ""
+
+
+def mo_them_cho(db: Session, u: User, t: Tour, so_cho_moi: int,
+                fixed_cost_moi: float | None, ly_do: str) -> str:
+    """Mở thêm chỗ trên chuyến đang bán — và CHẶN NGAY nếu lợi nhuận tụt (Chủ tịch quyết 25/9).
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    VÌ SAO CỬA NÀY PHẢI ĐO LẠI LỢI NHUẬN, KHÔNG CHỈ SỬA MỘT CON SỐ
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    Mở 29 chỗ lên 45 chỗ thường phải đổi xe to hơn, tức là chi phí cố định tăng. Số chỗ nằm TRONG
+    dự toán đã ký, nên sửa nó là sửa một phần của thứ đã được duyệt — và nếu chỉ sửa số chỗ mà
+    không đo lại thì cổng biên 10% đã ký trở thành một con số của quá khứ.
+
+    HAI CON SỐ CÓ THỂ ĐI NGƯỢC CHIỀU NHAU, và đó là lý do phải kiểm cả hai:
+        · lợi nhuận (đồng) có thể TĂNG  — bán thêm 16 khách
+        · biên (%)     có thể TỤT       — xe đắt hơn ăn vào phần trăm
+    Chặn theo một con số thôi thì lần sau chuyện ngược lại xảy ra và cổng cho qua. Nên: tụt MỘT
+    TRONG HAI là chặn. Chặt hơn cả hai cách — đúng chữ "chặn ngay", và nới thì dễ hơn siết.
+
+    CHỈ MỞ THÊM, KHÔNG THU HẸP. Thu hẹp số chỗ dưới số đã bán là tạo ra những booking không có ghế
+    mà không cửa nào thông báo cho ai; việc ấy thuộc huỷ hoặc dời chuyến, có cửa riêng.
+    """
+    if u.role not in MO_THEM_CHO_ROLES and not toan_quyen(u):
+        raise HTTPException(403, "Chỉ Phòng Điều hành hoặc Sale Admin mở thêm chỗ "
+                                 "(Chủ tịch quyết 25/9/2026)")
+    if t.status != "da_duyet":
+        raise Gate("TRANG_THAI", "Chỉ mở thêm chỗ cho chuyến đã duyệt dự toán và đang bán. "
+                                 "Chuyến chưa duyệt thì sửa thẳng số khách trong dự toán.")
+    if len((ly_do or "").strip()) < TOI_THIEU_LY_DO:
+        raise Gate("MO_THEM_CHO",
+                   f"Mở thêm chỗ phải ghi rõ vì sao (tối thiểu {TOI_THIEU_LY_DO} ký tự) — "
+                   "số chỗ nằm trong dự toán đã ký, sửa nó mà không nói lý do thì "
+                   "người duyệt lần sau không biết mình đang nhìn con số của ai.")
+    cu = _tran_ban(t) or 0
+    moi = int(so_cho_moi or 0)
+    if moi <= cu:
+        raise Gate("MO_THEM_CHO", f"Trần hiện tại là {cu} chỗ – cửa này chỉ MỞ THÊM. "
+                                  "Thu hẹp số chỗ là việc của huỷ hoặc dời chuyến, có cửa riêng.")
+
+    thr = R.get_param(db, "nguong_bien", t.start_date)
+    truoc = R.calc(t, thr)
+    fc_moi = t.fixed_cost if fixed_cost_moi is None else float(fixed_cost_moi)
+    # Dựng bản SAO để tính, KHÔNG gán vào `t` trước khi qua cổng: gán rồi mới kiểm là để lại một
+    # bản ghi hỏng trong phiên khi cổng từ chối — và phiên ấy còn đi tiếp.
+    sau = R.calc(Tour(code=t.code, name=t.name, tour_type=t.tour_type, start_date=t.start_date,
+                          end_date=t.end_date, operator_id=t.operator_id,
+                          price_per_pax=t.price_per_pax, fixed_cost=fc_moi,
+                          var_cost_per_pax=t.var_cost_per_pax, planned_pax=moi), thr)
+    tut_loi = (sau["profit"] or 0) < (truoc["profit"] or 0)
+    tut_bien = (sau["margin"] or 0) < (truoc["margin"] or 0)
+    if tut_loi or tut_bien:
+        raise Gate("MO_THEM_CHO",
+                   f"KHÔNG mở được: {cu} → {moi} chỗ làm "
+                   + (f"lợi nhuận kế hoạch tụt từ {truoc['profit']:,.0f} xuống {sau['profit']:,.0f} đ"
+                      if tut_loi else "")
+                   + ("; " if tut_loi and tut_bien else "")
+                   + (f"biên kế hoạch tụt từ {truoc['margin']*100:.1f}% xuống {sau['margin']*100:.1f}%"
+                      if tut_bien else "")
+                   + ". Số chỗ nằm trong dự toán đã ký – mở thêm mà lãi ít đi thì phải sửa dự toán "
+                     "và trình lại, không sửa lén ở đây.")
+
+    before = {"tran": cu, "planned_pax": t.planned_pax, "seats_open": t.seats_open,
+              "fixed_cost": t.fixed_cost, "loi_nhuan": truoc["profit"], "bien": truoc["margin"]}
+    t.seats_open = t.planned_pax = moi
+    if fixed_cost_moi is not None:
+        t.fixed_cost = fc_moi
+    EV(db, t, "mo_them_cho", u.username, ly_do.strip(),
+       title=f"Mở thêm chỗ {cu} → {moi} (biên {truoc['margin']*100:.1f}% → {sau['margin']*100:.1f}%)")
+    R.audit(db, u.username, u.role, "mo_them_cho", f"tour:{t.code}", before=before,
+            after={"tran": moi, "fixed_cost": t.fixed_cost, "loi_nhuan": sau["profit"],
+                   "bien": sau["margin"], "ly_do": ly_do.strip()[:200]})
+    db.commit()
+    return (f"Đã mở trần bán {cu} → {moi} chỗ. Biên kế hoạch {truoc['margin']*100:.1f}% → "
+            f"{sau['margin']*100:.1f}%, lợi nhuận {truoc['profit']:,.0f} → {sau['profit']:,.0f} đ.")
+
+
 def close(db: Session, u: User, t: Tour, data, note: str = "") -> str:
     if t.status not in ("ket_thuc", "da_duyet"): raise Gate("TRANG_THAI", "Chưa đến bước quyết toán")
     if u.id != t.operator_id: raise Gate("CONG_6", f"Một cửa: chỉ người điều hành chuyến ({t.operator.full_name}) mới được nhập quyết toán")
@@ -408,10 +533,23 @@ def create_request(db: Session, u: User, data) -> ServiceRequest:
         raise Gate("CONG_4", "Thiếu trường bắt buộc: " + ", ".join(missing) + " (booking sẽ không tính chỉ tiêu, không hoa hồng)")
     t = db.get(Tour, data.tour_id)
     if not t: raise Gate("TOUR", "Không có tour")
+    # Cổng sức chứa ở cửa này chỉ CẢNH BÁO, không chặn — Chủ tịch quyết 25/9/2026.
+    #
+    # Gửi yêu cầu chưa chiếm chỗ; chỗ bị chiếm ở bước Điều hành tạo booking, và cổng CHẶN nằm ở đó.
+    # Nhưng người bán cần biết TRƯỚC KHI hứa với khách, nên câu nói hiện ra ngay đây. Chặn ở đây
+    # thay vì cảnh báo là chặn nhầm chỗ: một yêu cầu gửi lúc tour đầy vẫn có nghĩa nếu Điều hành
+    # định mở thêm chỗ hoặc một booking khác sắp hết hạn giữ.
+    qua, loi_suc_chua = kiem_suc_chua(db, t, int(data.pax or 0))
     r = ServiceRequest(tour_id=t.id, sales_id=u.id, customer_name=data.customer_name, customer_phone=data.customer_phone,
                        source=data.source, care_note=data.care_note, pax=data.pax, campaign_code=data.campaign_code,
                        promo_code=data.promo_code, discount=data.discount)
     db.add(r); db.flush()
+    if not qua:
+        ref = f"YC-{r.id}"
+        if not db.execute(select(Alert).where(Alert.kind == "vuot_cho", Alert.ref == ref)).scalars().first():
+            db.add(Alert(kind="vuot_cho", level="warn", ref=ref,
+                         message=f"{loi_suc_chua} (yêu cầu của {u.full_name})",
+                         to_roles="nv_dh,tp_dh,gd_kd,tp_kd"))
     R.audit(db, u.username, u.role, "gui_yeu_cau_dat_dich_vu", f"yeucau:{r.id}", after={"tour": t.code, "pax": r.pax, "khach": r.customer_name}); db.commit(); db.refresh(r)
     return r
 
@@ -438,6 +576,16 @@ def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, st
         nm = (nr - (c["cost"] or 0)) / nr if nr > 0 else 0
         if nm < thr:
             raise Gate("CONG_3", f"Mã KM/giảm giá {(r.discount or 0):,.0f} đ làm biên chuyến tụt còn {nm*100:.1f}% (< {thr*100:.0f}%): treo, cần TGĐ duyệt")
+    # CỔNG SỨC CHỨA — chặn cứng. Chủ tịch quyết 25/9/2026: số khách Điều hành nhập, duyệt dự toán
+    # xong thì con số ấy thành TRẦN BÁN.
+    #
+    # Đây là lúc chỗ thật sự bị chiếm, nên đây là chỗ chặn. Trước ngày này không cửa nào trên đường
+    # bán gọi `giu_cho.con_trong()` — một tour 45 chỗ nhận booking thứ 46 bình thường, không cần ai
+    # bấm trùng giây. Chuyến chưa khai số chỗ thì cổng cho qua và nói ra (xem `_tran_ban`): chưa
+    # khai khác với không còn chỗ.
+    qua, loi_suc_chua = kiem_suc_chua(db, t, int(r.pax or 0))
+    if not qua:
+        raise Gate("SUC_CHUA", loi_suc_chua)
     mins = int((datetime.now() - r.created_at).total_seconds() / 60)
     sla = int(R.get_param(db, "sla_booking_phut"))
     n = db.execute(select(func.count()).select_from(Booking)).scalar() + 1

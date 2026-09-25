@@ -70,6 +70,7 @@ from app.api.v1.chuyen_doi_lead import router as chuyen_doi_lead_router
 from app.api.v1.doi_soat_marketing import router as doi_soat_marketing_router
 # 24/9/2026 - ban lam viec cua Pho TGD tour doan. Tien to RIENG, cung ly do da ghi o so_con_no.py.
 from app.api.v1.ptgd_doan import router as ptgd_doan_router
+from app.api.v1.ban_tour_le import router as ban_tour_le_router
 from app.api.v1.sales_admin import router as sales_admin_router
 from app.services import rules as R
 from app.services import accounting as ACC
@@ -294,6 +295,7 @@ app.include_router(chuyen_doi_lead_router)
 app.include_router(doi_soat_marketing_router)
 app.include_router(ptgd_doan_router)
 app.include_router(sales_admin_router)
+app.include_router(ban_tour_le_router)
 
 
 @app.get("/", include_in_schema=False)

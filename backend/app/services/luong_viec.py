@@ -239,9 +239,11 @@ _BOOKING = (
          vi_sao="Huỷ là trả chỗ về kho và có thể sinh phí huỷ – một cửa, chỉ Điều hành."),
 
     Buoc("booking", "mo_khoa", "Mở khoá booking đã khoá",
-         vai_tro=("tp_dh", "gd_kd", "tp_kd", "cntt", "tgd"), cach_canh=CHI_VAI_TRO,
+         vai_tro=("tp_dh", "sales_admin", "cntt", "tgd"), cach_canh=CHI_VAI_TRO,
          nguon="bookings.py::unlock + UNLOCK_ROLES",
-         vi_sao="Mở khoá là bẻ một quy tắc đã chặn – phải là cấp trưởng, và có ghi ngoại lệ."),
+         vi_sao="Mở khoá là bẻ một quy tắc đã chặn, và nó là quyền SỬA SỐ SAU KHI ĐÃ CHỐT. "
+                "Chủ tịch quyết 25/9/2026: gỡ Giám đốc và Trưởng phòng Kinh doanh – người bán "
+                "không mở lại con số doanh thu của chính mình; thêm Sale Admin, vai giữ hồ sơ."),
 )
 
 _BAO_LUU = (
@@ -275,10 +277,24 @@ _DICH_VU_LE = (
          cach_canh=HOAC, nguon="nonpackage.py::update",
          vi_sao="Sale phụ trách sửa của mình; cấp trưởng sửa được của cả nhóm."),
 
+    # Ô GIÁ VỐN tách thành một bước riêng, vì nó KHÁC quyền với các ô còn lại của cùng cửa `update`:
+    # sửa tên khách là một việc, sửa giá vốn là sửa mẫu số của hoa hồng. KHÔNG có chủ sở hữu —
+    # không đường vòng theo operator_id hay sales_id — nên nó là CHI_VAI_TRO thuần.
+    Buoc("dich_vu_le", "sua_gia_von", "Sửa giá vốn / nhà cung cấp của dịch vụ lẻ",
+         vai_tro=("nv_dh", "tp_dh"), cach_canh=CHI_VAI_TRO,
+         nguon="nonpackage.py::create + update + GIA_VON_ROLES",
+         vi_sao="Ghi ô này là ghi thẳng `t.fixed_cost` và một dòng TourCostLine — trên chuyến đoàn "
+                "việc ấy khoá theo 'Một cửa'. Chủ tịch quyết 25/9/2026: Phòng Kinh doanh LẺ gỡ hết, "
+                "kể cả sale phụ trách; họ vẫn XEM được số, chỉ không sửa. Giá vốn là số của bên đặt "
+                "dịch vụ với nhà cung cấp. Phòng Kinh doanh ĐOÀN giữ nguyên quyền của mình."),
+
     Buoc("dich_vu_le", "chot_thang", "Chốt dịch vụ lẻ theo tháng",
-         vai_tro=("ketoan", "tp_dh", "tgd"), cach_canh=CHI_VAI_TRO,
-         nguon="nonpackage.py::close_month",
-         vi_sao="Chốt tháng là khoá kỳ – sau đó số không sửa bằng tay được nữa."),
+         vai_tro=("ketoan",), cach_canh=CHI_VAI_TRO,
+         nguon="nonpackage.py::close_month + CHOT_THANG_ROLES",
+         vi_sao="Chốt tháng là khoá kỳ – sau đó số không sửa bằng tay được nữa. Và nút này đặt "
+                "một lượt cả `kt_xac_nhan` lẫn `kt_confirmed_at`, tức là ĐÓNG SỐ và KÝ XÁC NHẬN "
+                "KẾ TOÁN trong cùng một cú bấm; trên chuyến đoàn hai việc ấy là hai người và hai "
+                "bước. Chủ tịch quyết 25/9/2026: gỡ tp_dh và tgd – không ai ký thay Kế toán."),
 
     Buoc("dich_vu_le", "mo_tour_tu_san_pham", "Mở chuyến khởi hành từ sản phẩm",
          vai_tro=("nv_dh", "tp_dh", "cntt"), cach_canh=CHI_VAI_TRO, nguon="products.py::open_tour",

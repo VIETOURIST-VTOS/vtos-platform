@@ -424,6 +424,7 @@ MAN_HINH_API = {
     # MÀN HÌNH CHỈ ĐỌC: hai cửa GHI của vai này nằm trên chính chuyến
     # (`POST /tours/{id}/chuyen-dieu-hanh` và `.../tra-lai-kinh-doanh`), không nhân bản sang đây.
     "/sales-admin": ("/api/v1/sales-admin",),
+    "/ban-tour-le": ("/api/v1/ban-tour-le",),
     "/requests": ("/api/v1/requests", "/api/v1/bookings", "/api/v1/tours", "/api/v1/meta",
                   "/api/v1/mang"),
     "/lai-lo-tour": ("/api/v1/lai-lo-tour",),
@@ -615,6 +616,76 @@ def can_see_cost_tren_chuyen(u: User, tour) -> bool:
     return R.is_doan(tour)
 
 
+def can_see_du_toan_ba_con_so(u: User, tour=None) -> bool:
+    """BẬC HAI của cùng một câu hỏi: được nhìn BA CON SỐ DỰ TOÁN, nhưng không nhìn giá vốn thật.
+
+    Chủ tịch quyết 25/9/2026: "Tour lẻ là do Phòng Điều hành tạo lịch khởi hành, sales lẻ chỉ việc
+    bán." — và "sales lẻ chỉ nhìn thấy dự toán 3 con số như trong file quyết toán tour của Điều
+    hành." Người bán cần biết chuyến còn lời bao nhiêu để trả lời khách xin giảm giá; họ không cần
+    biết công ty mua của ai với giá nào.
+
+    Ba bậc, không phải hai:
+
+        can_see_cost                 → mọi thứ, mọi chuyến (Điều hành, Kế toán, Ban lãnh đạo…)
+        can_see_cost_tren_chuyen     → thêm: Kinh doanh trên chuyến ĐOÀN của mình (24/9/2026)
+        can_see_du_toan_ba_con_so    → thêm: Kinh doanh trên chuyến LẺ — CHỈ ba con số + số máy
+                                       tính ra từ ba con số ấy (hoà vốn, lợi nhuận, biên)
+
+    Bậc ba KHÔNG mở: dòng chi phí nhà cung cấp, tên và giá của NCC, đề nghị chi, bảng quyết toán,
+    nhật ký sửa giá vốn. Đó là ranh giới "không liên quan giá vốn" của Chủ tịch — ba con số là một
+    bản tóm tắt, giá vốn là danh sách mình mua của ai.
+    """
+    return can_see_cost_tren_chuyen(u, tour) or (u.role in SALES and tour is not None)
+
+
+# Khoá thuộc GIÁ VỐN THẬT: dòng NCC, chứng từ, số quyết toán, nhật ký sửa giá vốn.
+CHE_GIA_VON = ("settlement", "actual_cost", "promo_value", "justification",
+               "cost_lines", "cost_total", "settlement_edit", "payment_requests", "audit")
+# Khoá thuộc BA CON SỐ DỰ TOÁN và những số máy tính ra từ chúng.
+CHE_BA_CON_SO = ("fixed_cost", "var_cost_per_pax", "calc", "hoa_hong_khach_bien")
+# Trong `summary` của màn hình chi tiết: những ô dựng trên chi phí THỰC TẾ.
+CHE_SUMMARY = ("cost_actual", "cost_paid", "profit", "profit_state", "cost_basis", "cost_lines", "warning")
+# Rỗng kiểu nào: danh sách trả về [] để màn hình `.map` không nổ; còn lại trả None.
+_RONG_LA_LIST = ("cost_lines", "payment_requests", "audit")
+
+
+def che_gia_von(v: dict, u: User, tour, db=None) -> dict:
+    """Che phần giá vốn của một bản `tour_view` theo đúng ba bậc trên. Sửa tại chỗ và trả lại `v`.
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    VÌ SAO LÀ MỘT HÀM, VÀ VÌ SAO NÓ PHẢI CHẠY CUỐI CÙNG
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    `GET /tours/{id}` và `GET /tours/{id}/detail` đọc cùng một chuyến. Trước hôm nay mỗi cửa chép
+    một khối che riêng — và hai bản chép đã lệch nhau một lần rồi (vòng 2 sửa cửa này, bỏ sót cửa
+    kia). Một hàm thì không lệch được.
+
+    CHẠY CUỐI CÙNG là phần quan trọng hơn. Khối che cũ của `tour_detail` nằm ở GIỮA hàm, còn
+    `cost_lines`, `cost_total`, `settlement_edit`, `payment_requests` và `audit` được gắn vào SAU
+    nó — nên chúng chưa từng bị che một lần nào. Màn hình không bày ra (tab bị ẩn khi `calc` rỗng),
+    nhưng dữ liệu vẫn nằm nguyên trong phản hồi: tên nhà cung cấp, đơn giá mua, số tiền đã chi.
+    Màn hình che không phải là cửa che.
+    """
+    # Hai lá cờ cho MÀN HÌNH. Trước nay màn hình đoán quyền bằng `calc != null` — suy quyền từ
+    # hình dạng dữ liệu. Nay bậc ba trả `calc` CÓ mà giá vốn KHÔNG, nên phép đoán ấy sai: tab
+    # "Chi NCC & quyết toán" sẽ hiện ra rỗng cho người không được xem. Máy chủ nói thẳng.
+    v["xem_gia_von"] = can_see_cost_tren_chuyen(u, tour)
+    v["xem_du_toan"] = can_see_du_toan_ba_con_so(u, tour)
+    if v["xem_gia_von"]:
+        return v
+    for k in CHE_GIA_VON:
+        if k in v: v[k] = [] if k in _RONG_LA_LIST else None
+    if isinstance(v.get("summary"), dict):
+        for k in CHE_SUMMARY: v["summary"].pop(k, None)
+    if not can_see_du_toan_ba_con_so(u, tour):
+        for k in CHE_BA_CON_SO:
+            if k in v: v[k] = None
+    if db is not None:
+        vis = sales_ids_visible(db, u)
+        if vis is not None:
+            v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") in vis]
+    return v
+
+
 # Menu giao diện web theo vai trò (đường dẫn trang → vai trò được thấy). Trang không liệt kê = mọi vai trò đã đăng nhập.
 MENU_ROLES = {
     # Mỗi dòng = BASE_VIEW (Chủ tịch, TGĐ, Ban Kiểm soát) + đúng những vai trò có việc trên màn hình đó.
@@ -647,6 +718,10 @@ MENU_ROLES = {
     # Khối Kinh doanh KHÔNG có mặt: màn hình này là chỗ SOÁT hồ sơ của chính họ; để người bị soát
     # đứng cùng chỗ với người soát thì cái cổng chỉ còn là một dòng chữ.
     "/sales-admin": BASE_VIEW + SALES_ADMIN + ("ptgd_doan", "cntt"),
+    # Bàn bán tour lẻ — Chủ tịch quyết 25/9/2026. SALES chứ không phải SALES_ADMIN: đây là phòng
+    # Kinh doanh LẺ. Phòng Đoàn không có tên ở đây ("ý là PKDL, còn PKDĐ vẫn giữ nguyên") —
+    # bàn của họ là /sales-admin và /ptgd-doan, và chỗ ngồi tour lẻ không phải việc của họ.
+    "/ban-tour-le": BASE_VIEW + SALES + ("cntt",),
     "/lai-lo-tour": BASE_VIEW + OPERATIONS + SALES_ADMIN + ("ptgd_doan", "ketoan", "cntt"),
     # TC-71 · Sổ chuyến còn nợ — anh Tuấn 18/9/2026 chọn ba nhóm: Chủ tịch/TGĐ, Điều hành, Kế toán.
     # ĐÚNG BẰNG `/lai-lo-tour` và cùng một lý do: cả hai màn hình nói về sổ quyết toán của chuyến,
