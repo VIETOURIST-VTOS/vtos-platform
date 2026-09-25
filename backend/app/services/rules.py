@@ -53,6 +53,10 @@ DEFAULT_PARAMS = [
     # rồi triển khai lại. Giá trị dưới đây là ĐỀ XUẤT, còn hiệu lực cho tới khi Ban TGĐ ký con số khác.
     ("cham_soc_han_ngay", "3", "Hạn liên hệ chăm sóc khách sau khi tour kết thúc", "ngày", "MKT/CSKH đề xuất 07/9/2026 – chờ Ban TGĐ chốt"),
     ("cham_soc_hai_long_mo_kn", "3", "Điểm hài lòng DƯỚI mức này thì tự mở hồ sơ khiếu nại", "điểm (1–5)", "MKT/CSKH đề xuất 07/9/2026"),
+    ("khao_sat_han_ngay", "14", "Mã khảo sát khách tự chấm sống bao nhiêu ngày. Đủ dài để khách đi công tác về vẫn chấm được, đủ ngắn để không thành một cửa mở mãi", "ngày", "Đề xuất tự động hoá CSKH 25/9/2026"),
+    ("khao_sat_gio_gui", "9", "Giờ trong ngày gửi tin xin đánh giá. Tin chăm sóc đến lúc 2 giờ sáng làm hỏng đúng thiện chí mà nó đi xin", "giờ (0–23)", "Đề xuất tự động hoá CSKH 25/9/2026, bước 1"),
+    ("khao_sat_nhac_gio", "48", "Không trả lời sau bao nhiêu giờ thì nhắc MỘT lần. Một lần, và không gọi điện — đề xuất 25/9/2026 bước 6", "giờ", "Đề xuất tự động hoá CSKH 25/9/2026, bước 6"),
+    ("cham_soc_goi_lai_gio", "24", "Hạn gọi lại khách chấm điểm thấp, tính từ lúc khách chấm. Đây là hạn của MỘT VIỆC CÓ CHỦ (cảnh báo mang tên người), không phải hạn của một thông báo", "giờ", "Đề xuất tự động hoá CSKH 25/9/2026, bước 4"),
     ("cham_soc_lui_ngay", "30", "Chỉ sinh phiếu chăm sóc cho tour kết thúc trong khoảng lùi này (chặn việc mở phiếu cho toàn bộ lịch sử chuyến đã đóng)", "ngày", "MKT/CSKH Đợt 4"),
     # KS-4 (11/9/2026) – hai mốc của vòng đời cảnh báo. Chủ tịch chốt 30 ngày / 48 giờ.
     #
@@ -61,7 +65,12 @@ DEFAULT_PARAMS = [
     # hai dòng cùng tên thì không ai biết dòng nào đang có hiệu lực. KS-4 ĐỌC mốc ấy qua
     # moi_truong_du_lieu.moc_van_hanh_that(); chưa ký thì đọc ra None và cảnh báo để nguồn TRỐNG.
     ("canh_bao_lui_ngay", "30", "Chỉ sinh cảnh báo cho sự kiện trong khoảng lùi này. Không có mốc này thì mỗi lượt quét là một lượt quét lại toàn bộ lịch sử – đúng cơ chế đã đẻ ra 851 dòng quá hạn quyết toán", "ngày", "Chủ tịch chốt 11/9/2026, bằng cham_soc_lui_ngay"),
-    ("canh_bao_han_mac_dinh_gio", "48", "Hạn xử lý mặc định cho loại cảnh báo chưa khai hạn riêng. Không có hạn thì không có gì trễ", "giờ", "Chủ tịch chốt 11/9/2026, bằng han_giu_cho_gio"),
+    # GIỮ 48, KHÔNG đổi theo `han_giu_cho_gio`. Lời khai cũ nói "bằng han_giu_cho_gio" — từ
+    # 25/9/2026 hai con số TÁCH NHAU, nên lời khai ấy sửa lại cho đúng. Hai thứ khác nhau: một
+    # cái là hạn giữ một CHỖ NGỒI (ghế không bán cho người khác — càng ngắn càng tốt), cái kia
+    # là hạn xử lý một CẢNH BÁO (người phải đọc và làm — 4 giờ thì mọi cảnh báo tạo sau giờ
+    # chiều đều trễ ngay sáng hôm sau, và một bảng đỏ toàn bộ thì không còn chỉ được chỗ nào gấp).
+    ("canh_bao_han_mac_dinh_gio", "48", "Hạn xử lý mặc định cho loại cảnh báo chưa khai hạn riêng. Không có hạn thì không có gì trễ", "giờ", "Chủ tịch chốt 11/9/2026; tách khỏi han_giu_cho_gio ngày 25/9/2026"),
     # Hạn RIÊNG của dòng tiền, cố ý ngắn hơn hạn mặc định 48 giờ ở trên: một dòng tiền thiếu nguồn
     # làm sai cả bảng bốn mốc, và bảng ấy là thứ Chủ tịch nhìn để quyết định chi tiền. Hạn đếm từ
     # lúc LƯỢT QUÉT phát hiện, không phải từ lúc mở trang – xem services/han_dong_tien.py điều 1.
@@ -266,7 +275,20 @@ DEFAULT_PARAMS = [
     ("thue_gtgt", "0.10", "Thuế suất GTGT dịch vụ lữ hành (Kế toán chỉnh theo mức giảm thuế hiện hành)", "tỷ lệ", "Luật Thuế GTGT"),
     ("giam_tru_ban_than", "11000000", "Giảm trừ gia cảnh cho bản thân người nộp thuế TNCN (Kế toán chỉnh khi Nhà nước nâng mức)", "đồng/tháng", "NQ 954/2020/UBTVQH14"),
     ("giam_tru_nguoi_phu_thuoc", "4400000", "Giảm trừ gia cảnh cho mỗi người phụ thuộc (Kế toán chỉnh khi Nhà nước nâng mức)", "đồng/tháng/người", "NQ 954/2020/UBTVQH14"),
-    ("han_giu_cho_gio", "48", "Giữ chỗ cho booking CHƯA thu đồng nào; quá hạn thì trả chỗ về tour (booking vẫn còn)", "giờ", "VPM-7 11/9/2026"),
+    # 48 → 4 ngày 25/9/2026, Chủ tịch quyết. Bản đề xuất Phòng Điều hành viết 4 giờ; anh Tuấn chốt 4.
+    #
+    # HỆ QUẢ PHẢI NÓI RA, vì nó xảy ra ngay đêm đầu tiên: hạn tính bằng GIỜ ĐỒNG HỒ, không phải
+    # giờ làm việc (`giu_cho.han_mac_dinh` cộng thẳng timedelta). Nên booking tạo 16h30 chiều hết
+    # hạn 20h30 tối cùng ngày, và robot trả chỗ về tour ngay trong đêm — sáng hôm sau ngân hàng
+    # báo có thì chỗ đã mất.
+    #
+    # Cái làm cho điều đó KHÔNG thành mất khách: robot chỉ đụng booking CHƯA THU ĐỒNG NÀO
+    # (`giu_cho.het_han_giu_cho`, luật 1), và booking VẪN CÒN — chỉ là không còn chiếm ghế.
+    # Khách trả tiền muộn thì Điều hành bấm khôi phục nếu tour còn chỗ.
+    #
+    # Muốn đổi sang "4 giờ LÀM VIỆC" thì sửa `giu_cho.han_mac_dinh` cộng theo giờ hành chính,
+    # không phải sửa con số này.
+    ("han_giu_cho_gio", "4", "Giữ chỗ cho booking CHƯA thu đồng nào; quá hạn thì trả chỗ về tour (booking vẫn còn)", "giờ", "VPM-7 11/9/2026; Chủ tịch đổi 48 → 4 ngày 25/9/2026"),
 
     # ── PQ-4 · Hai mốc chuyển VTOS từ chạy thử sang vận hành thật ────────────────────────────
     # Thêm 11/9/2026. Trước hôm nay hai khóa này KHÔNG TỒN TẠI, và hệ quả không nhìn thấy được từ

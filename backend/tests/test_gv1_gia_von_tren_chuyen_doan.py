@@ -165,11 +165,23 @@ def test_gv11b_cua_MAN_HINH_CHI_TIET_cung_hoi_theo_chuyen():
     """
     import re
     from app.api.v1 import products as PR
-    nguon = open(PR.__file__, encoding="utf-8").read()
-    i = nguon.find("def tour_detail")
-    than = re.sub(r"#[^\n]*", "", nguon[i:nguon.find("\n@router", i)])
-    assert "can_see_cost_tren_chuyen" in than, "cửa chi tiết phải hỏi theo CHUYẾN"
-    assert not re.search(r"can_see_cost\(", than), "còn chỗ hỏi theo vai trò – hai luật song song sẽ lệch"
+    from app.api.v1 import routes as RT
+
+    def _than(mod, ten, ket):
+        n = open(mod.__file__, encoding="utf-8").read()
+        i = n.find(f"def {ten}")
+        return re.sub(r"#[^\n]*", "", n[i:n.find(ket, i)])
+
+    chi_tiet = _than(PR, "tour_detail", "\n@router")
+    doc_tour = _than(RT, "get_tour", "\n@router")
+    # 25/9/2026 — mạnh hơn bản cũ: không chỉ đòi hai cửa hỏi CÙNG MỘT LUẬT, mà đòi chúng gọi CÙNG
+    # MỘT HÀM. Bản cũ chấp nhận hai khối che chép đôi miễn là cùng tên hàm kiểm quyền — và hai bản
+    # chép ấy đã lệch nhau một lần rồi (vòng 2 sửa cửa này, bỏ sót cửa kia).
+    for ten, than in (("tour_detail", chi_tiet), ("get_tour", doc_tour)):
+        assert "che_gia_von" in than, f"{ten} không gọi hàm che dùng chung"
+        assert not re.search(r"can_see_cost\(", than), f"{ten} còn hỏi theo vai trò – hai luật song song sẽ lệch"
+        assert '"var_cost_per_pax"' not in than, (
+            f"{ten} còn giữ danh sách khoá che RIÊNG – đó đúng là thứ đã lệch một lần")
 
 
 def test_gv12_cong_bien_va_hai_chu_ky_khong_bi_dung_toi():

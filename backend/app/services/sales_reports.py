@@ -39,6 +39,19 @@ def _office_of(db: Session) -> dict[int, str]:
     return {e.user_id: e.office for e in db.execute(select(Employee).where(Employee.user_id != None)).scalars()}
 
 
+# GỠ CỘT "QUÁ SLA 2H" KHỎI BẢNG NÀY — Chủ tịch quyết 25/9/2026.
+#
+# Đồng hồ SLA chạy từ lúc KINH DOANH gửi yêu cầu tới lúc ĐIỀU HÀNH bấm tạo booking
+# (`tours.create_booking`), và cảnh báo quá hạn bắn về `tp_dh, nv_dh`. Tức là nó đo Điều hành.
+# Nhưng cột ấy lại nằm ở đây, trên bảng điểm gom THEO TÊN SALE.
+#
+# Một nhân viên Kinh doanh vì thế mang trên bảng điểm của mình một con số họ không làm gì để đổi
+# được. Một thước đo như vậy không đo ai cả — nó chỉ dạy người bị đo rằng bảng điểm không đáng
+# tin, và bài học ấy lan sang mọi cột khác trên cùng bảng.
+#
+# `booking.sla_ok` VẪN ĐƯỢC GHI như cũ, không mất dữ liệu; nó chuyển sang bảng điểm Điều hành ở
+# `bao_cao_phong._dieu_hanh` (dòng "Booking quá hạn 2 giờ"). Cột "Đủ 4 trường" thì Ở LẠI: bốn
+# trường ấy do chính sale điền lúc gửi yêu cầu.
 def ban_tour_le(db: Session, d1: date, d2: date, mang: str = "") -> dict:
     q = select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.created_at >= datetime.combine(d1, datetime.min.time()), Booking.created_at < datetime.combine(d2 + timedelta(days=1), datetime.min.time()), Tour.tour_type != "non_package")
     cond = SEG.tour_cond(mang)
@@ -46,16 +59,16 @@ def ban_tour_le(db: Session, d1: date, d2: date, mang: str = "") -> dict:
     rows = list(db.execute(q.order_by(Booking.created_at)).scalars())
     by: dict[str, dict] = {}
     for b in rows:
-        s = by.setdefault(_sales_name(b) or "(không có sale)", {"sale": _sales_name(b) or "(không có sale)", "bookings": 0, "pax": 0, "revenue": 0.0, "paid": 0.0, "due": 0.0, "cancelled": 0, "du_4_truong": 0, "sla_qua": 0})
+        s = by.setdefault(_sales_name(b) or "(không có sale)", {"sale": _sales_name(b) or "(không có sale)", "bookings": 0, "pax": 0, "revenue": 0.0, "paid": 0.0, "due": 0.0, "cancelled": 0, "du_4_truong": 0})
         if b.cancelled: s["cancelled"] += 1; continue
         s["bookings"] += 1; s["pax"] += b.pax; s["revenue"] += (b.amount or 0) - (b.discount or 0); s["paid"] += (b.paid or 0); s["due"] += max(0.0, (b.amount or 0) - (b.discount or 0) - (b.paid or 0))
-        s["du_4_truong"] += 1 if b.counts_for_target else 0; s["sla_qua"] += 0 if b.sla_ok else 1
+        s["du_4_truong"] += 1 if b.counts_for_target else 0
     summary = sorted(by.values(), key=lambda x: -(x["revenue"] or 0))
     detail = [{"created_at": b.created_at, "code": b.code, "tour_code": b.tour.code, "start_date": b.tour.start_date, "customer": b.customer_name, "phone": b.customer_phone, "source": b.source, "pax": b.pax,
                "revenue": (b.amount or 0) - (b.discount or 0), "paid": (b.paid or 0), "due": max(0.0, (b.amount or 0) - (b.discount or 0) - (b.paid or 0)), "status": BK.pmt_status_of(b), "sale": _sales_name(b), "counts": b.counts_for_target, "sla_ok": b.sla_ok, "cancelled": b.cancelled} for b in rows]
     tot = {"bookings": sum(s["bookings"] for s in summary), "pax": sum(s["pax"] for s in summary), "revenue": sum((s["revenue"] or 0) for s in summary), "paid": sum((s["paid"] or 0) for s in summary), "due": sum(s["due"] for s in summary), "cancelled": sum(s["cancelled"] for s in summary)}
     return {"report": "ban_tour_le", "from": d1, "to": d2, "mang": SEG.valid(mang), "summary": summary, "total": tot, "detail": detail,
-            "columns": {"summary": [("sale", "Sale"), ("bookings", "Booking"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn phải thu"), ("cancelled", "Hủy"), ("du_4_truong", "Đủ 4 trường"), ("sla_qua", "Quá SLA 2h")],
+            "columns": {"summary": [("sale", "Sale"), ("bookings", "Booking"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn phải thu"), ("cancelled", "Hủy"), ("du_4_truong", "Đủ 4 trường")],
                         "detail": [("created_at", "Ngày tạo"), ("code", "Booking"), ("tour_code", "Tour"), ("start_date", "Khởi hành"), ("customer", "Khách"), ("phone", "SĐT"), ("source", "Nguồn"), ("pax", "Khách"), ("revenue", "Doanh thu"), ("paid", "Đã thu"), ("due", "Còn lại"), ("status", "TT"), ("sale", "Sale")]}}
 
 

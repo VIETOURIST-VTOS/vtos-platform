@@ -23,15 +23,27 @@ function NonPackage() {
     const [y, m] = month.split("-");
     api(`/quyet-toan-lop3/dich-vu-le/${y}/${Number(m)}`).then(setSoat).catch(() => setSoat(null));
   }, [month]);
-  const canCreate = ["nv_kd", "gd_kd", "nv_dh", "tp_dh"].includes(role), isDH = ["nv_dh", "tp_dh"].includes(role), canClose = ["ketoan", "tp_dh", "tgd"].includes(role);
+  const canCreate = ["nv_kd", "gd_kd", "nv_dh", "tp_dh"].includes(role), isDH = ["nv_dh", "tp_dh"].includes(role);
+  // Chủ tịch quyết 25/9/2026 – "gỡ quyền". Chốt tháng chỉ còn Kế toán: nút ấy vừa đóng số vừa ký
+  // xác nhận kế toán trong một cú bấm. Giá vốn chỉ còn Điều hành và người điều hành của chính
+  // dịch vụ ấy (với dịch vụ do Kinh doanh tạo thì đó là sale phụ trách).
+  const canClose = role === "ketoan" || role === "chutich";
+  // Giá vốn + nhà cung cấp: chỉ Phòng Điều hành. Phòng Kinh doanh LẺ gỡ hết, kể cả sale phụ trách
+  // của chính dịch vụ ấy — họ vẫn XEM được số, chỉ không sửa. (Phòng Kinh doanh ĐOÀN không liên
+  // quan tới màn hình này: quyền giá vốn của họ nằm trên chuyến đoàn, ở /tours.)
+  const canCost = isDH || role === "chutich";
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); const f = e.target as HTMLFormElement; const d: any = Object.fromEntries(new FormData(f).entries());
     ["amount", "discount", "cost_amount"].forEach((k) => (d[k] = soTien(d[k]))); d.pax = Number(d.pax || 1); if (!d.service_date) delete d.service_date;
+    if (!canCost) { delete d.cost_amount; delete d.supplier_name; }
     try { const r = await api("/non-package", { method: "POST", json: d }); toast(r.message); f.reset(); setShowForm(false); load(); } catch (x) { toast(errMsg(x), true); }
   };
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
     ["amount", "cost_amount"].forEach((k) => (d[k] = d[k] === "" ? undefined : Number(d[k]))); if (!d.service_date) delete d.service_date;
+    // Ô giá vốn không hiện với người không được sửa, nên FormData không có nó – xoá cho chắc:
+    // gửi kèm một ô mình không được ghi thì cả lần sửa tên khách cũng bị từ chối 403.
+    if (!canCost) { delete d.cost_amount; delete d.supplier_name; }
     try { await api(`/non-package/${edit.id}`, { method: "PUT", json: d }); toast("Đã lưu dịch vụ"); setEdit(null); load(); } catch (x) { toast(errMsg(x), true); }
   };
   const cancel = async (r: any) => { const reason = prompt(`Lý do hủy ${r.tour_code} – ${r.customer_name}?`); if (!reason) return; const ch = prompt(`Phí hủy giữ lại (đ), đã thu ${vnd(r.paid)} – để 0 nếu không thu phí:`, "0"); if (ch === null) return;
@@ -66,7 +78,11 @@ function NonPackage() {
           <div><label>Tên khách *</label><input name="customer_name" required /></div><div><label>SĐT *</label><input name="customer_phone" required /></div><div><label>Email</label><input name="customer_email" type="email" /></div>
           <div><label>Nguồn khách *</label><input name="source" required placeholder="Zalo / Facebook / Web / Khách cũ…" /></div><div><label>Số khách</label><input name="pax" type="number" min={1} defaultValue={1} /></div>
           <div><label>Giá dịch vụ (đ) *</label><input name="amount" type="number" step={1000} min={1} required /></div><div><label>Giảm giá (đ)</label><input name="discount" type="number" step={1000} defaultValue={0} /></div>
-          <div><label>Giá vốn NCC (đ)</label><input name="cost_amount" type="number" step={1000} defaultValue={0} /></div><div><label>Nhà cung cấp</label><input name="supplier_name" /></div>
+          {canCost
+            ? <><div><label>Giá vốn NCC (đ)</label><input name="cost_amount" type="number" step={1000} defaultValue={0} /></div><div><label>Nhà cung cấp</label><input name="supplier_name" /></div></>
+            : <div style={{ gridColumn: "span 2" }}><p className="muted">Giá vốn NCC và nhà cung cấp do <b>Phòng Điều hành</b> nhập sau
+                (Chủ tịch quyết 25/9/2026). Ô để trống là <b>chưa có số</b>, không phải bằng 0 — dòng lãi lỗ của dịch vụ này
+                chưa đọc được cho tới lúc ấy.</p></div>}
         </div>
         <label>Ghi chú chăm sóc</label><input name="note" />
         <button className="act teal" type="submit">Tạo dịch vụ</button> <button type="button" className="act grey" onClick={() => setShowForm(false)}>Đóng</button></form>}
@@ -76,7 +92,11 @@ function NonPackage() {
           <div><label>Nội dung</label><input name="description" defaultValue={edit.description} /></div><div><label>Quốc gia</label><input name="country" defaultValue={edit.country} /></div>
           <div><label>Ngày sử dụng</label><input name="service_date" type="date" defaultValue={edit.service_date || ""} /></div>
           <div><label>Giá dịch vụ (đ)</label><input name="amount" type="number" step={1000} defaultValue={edit.amount} disabled={edit.locked} /></div>
-          <div><label>Giá vốn NCC (đ)</label><input name="cost_amount" type="number" step={1000} defaultValue={edit.cost_amount} /></div><div><label>Nhà cung cấp</label><input name="supplier_name" defaultValue={edit.supplier_name} /></div>
+          {canCost
+            ? <><div><label>Giá vốn NCC (đ)</label><input name="cost_amount" type="number" step={1000} defaultValue={edit.cost_amount} /></div><div><label>Nhà cung cấp</label><input name="supplier_name" defaultValue={edit.supplier_name} /></div></>
+            : <div style={{ gridColumn: "span 2" }}><label>Giá vốn NCC · nhà cung cấp</label>
+                <p className="muted">{edit.cost_amount ? vnd(edit.cost_amount) : "chưa có — chờ Phòng Điều hành nhập"}{edit.supplier_name ? ` · ${edit.supplier_name}` : ""}
+                  {" — "}Phòng Điều hành nhập ô này (Chủ tịch quyết 25/9/2026).</p></div>}
         </div>
         <button className="act teal" type="submit">Lưu</button> <button type="button" className="act grey" onClick={() => setEdit(null)}>Đóng</button></form>}
       <h2 style={{ marginTop: 10 }}>Danh sách dịch vụ Non-Package ({data.rows.length})</h2>

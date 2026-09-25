@@ -37,7 +37,10 @@ def test_moi_trang_giao_dien_deu_duoc_khai_quyen_hoac_co_trong_danh_sach_mo():
     """Chốt chặn chống tái phạm: trang mới trong web/app phải hoặc khai quyền, hoặc nằm trong danh sách
     mở cho mọi người một cách CÓ Ý THỨC. Không có lựa chọn thứ ba là quên."""
     app_dir = os.path.join(ROOT, "web", "app")
-    bo_qua = {"/login", "/tours/[id]"}          # trang đăng nhập và trang con của /tours
+    # `/y-kien/[ma]` là trang CÔNG KHAI cho khách tự chấm điểm sau tour (25/9/2026): khách không
+    # có tài khoản nên không có vai trò nào để khai. Nó không dùng Shell, không gọi hàm `api` của
+    # kho, và cửa máy chủ của nó khai ở tools/ks2_khai_quyen.CONG_KHAI kèm lý do.
+    bo_qua = {"/login", "/tours/[id]", "/y-kien/[ma]"}   # đăng nhập · trang con của /tours · trang khách
     for d, _, fs in os.walk(app_dir):
         if "page.tsx" not in fs: continue
         rel = os.path.relpath(d, app_dir).replace(os.sep, "/")

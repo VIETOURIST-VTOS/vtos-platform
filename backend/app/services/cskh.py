@@ -66,6 +66,39 @@ def kiem_du_lieu(db: Session, d: dict) -> None:
         raise ValueError("Không có booking này")
 
 
+def giao_viec(db: Session, kind: str, ref: str, msg: str, *, nguoi_id: int | None,
+              han_gio: float | None, roles: str, level: str = "warn") -> Alert | None:
+    """Sinh MỘT cảnh báo CÓ CHỦ và CÓ HẠN. Trả None nếu đã có cảnh báo cùng loại chưa đóng.
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    VÌ SAO CẦN HÀM NÀY, TRONG KHI `Alert(...)` GỌI THẲNG CŨNG CHẠY
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    Bảng `alerts` có sẵn `nguoi_phu_trach` và `han_xu_ly` từ PQ-9 và KS-4, kèm một chú thích dài
+    trong `models/core.py` giải thích vì sao: đo bản đang chạy cho thấy 1.557 trên 1.703 cảnh báo
+    chưa ai xử lý, và lý do là chúng gửi cho `to_roles` — bốn vai trò, tức không ai.
+
+    `rules.run_robots` điền hai cột ấy. `robot_cskh` thì KHÔNG — nó gọi `Alert(kind=..., level=...,
+    ref=..., message=..., to_roles=...)` và bỏ trống phần còn lại. Đó là chỗ sót, không phải quyết
+    định: cùng một kho, cùng một bảng, hai lối dùng khác nhau.
+
+    Hàm này đóng chỗ sót ấy, và đóng bằng cách làm cho việc điền dễ hơn việc bỏ trống.
+
+    `nguoi_id` để trống là HỢP LỆ và phải đếm được — có loại việc thật sự không suy ra được chủ
+    (một chuyến đông khách có nhiều sale). Chỗ nguy hiểm không phải ô trống, mà là ô trống không
+    ai biết là trống.
+    """
+    co = db.execute(select(Alert).where(Alert.kind == kind, Alert.ref == ref,
+                                        Alert.resolved == False)).scalars().first()
+    if co: return None
+    a = Alert(kind=kind, level=level, ref=ref, message=msg, to_roles=roles,
+              nguoi_phu_trach=nguoi_id,
+              giao_luc=datetime.now() if nguoi_id else None,
+              han_xu_ly=(datetime.now() + timedelta(hours=han_gio)) if han_gio else None,
+              gom_khoa=f"{kind}:{ref}", nguon="phat_sinh")
+    db.add(a)
+    return a
+
+
 def tao(db: Session, u: User, data: dict, tu_dong: bool = False) -> Complaint:
     """Lập hồ sơ khiếu nại.
 
@@ -298,14 +331,29 @@ def ghi_ket_qua(db: Session, u: User, t: CareTicket, data: dict) -> tuple[CareTi
     nguong = int(R.get_param(db, "cham_soc_hai_long_mo_kn") or 3)
     if t.lien_he_duoc == "co" and 0 < t.hai_long < nguong and not t.complaint_id:
         ten = ", ".join(CS_DIEM[x] for x in diem) or "không nêu cụ thể"
+        # NGƯỜI XỬ LÝ là SALE ĐÃ BÁN, không phải người đang gõ. Trước hôm nay `handler` nhận
+        # `u.username` — đúng khi người gõ là nhân viên chăm sóc gọi điện hộ, nhưng sai ngay khi
+        # khách TỰ chấm điểm qua Zalo: lúc ấy `u` là tài khoản máy, và hồ sơ sẽ mang tên robot.
+        ban = db.get(User, t.owner_id) if t.owner_id else None
         c = tao(db, u, {"source": "cham_soc", "customer_name": t.customer_name,
                         "customer_phone": t.customer_phone, "booking_id": t.booking_id,
                         "nhom": _nhom_tu_diem(diem), "level": 2,
                         "noi_dung": (f"Hồ sơ tự mở từ phiếu chăm sóc sau bán: khách chấm {t.hai_long}/5 điểm. "
                                      f"Điểm chưa hài lòng: {ten}." + (f" Ghi chú của nhân viên: {t.ghi_chu}" if t.ghi_chu else "")),
-                        "handler": u.username, "care_id": t.id}, tu_dong=True)
+                        "handler": (ban.username if ban else u.username), "care_id": t.id}, tu_dong=True)
         t.complaint_id = c.id
         sinh.append(f"Đã mở hồ sơ khiếu nại {c.code} (khách chấm {t.hai_long}/5) – cần liên hệ khách ghi lại đề nghị của họ")
+        # …và một VIỆC CÓ CHỦ, CÓ HẠN đi kèm. Hồ sơ khiếu nại là nơi GHI; cảnh báo có chủ là thứ
+        # làm cho ai đó thật sự cầm lấy nó. Thiếu cái thứ hai thì hồ sơ nằm trong một danh sách
+        # mà không ai coi là việc của mình.
+        gio = float(R.get_param(db, "cham_soc_goi_lai_gio") or 24)
+        if giao_viec(db, "cham_soc_diem_thap", c.code,
+                     f"Khách {t.customer_name} chấm {t.hai_long}/5 cho chuyến – gọi lại trong {gio:.0f} giờ "
+                     f"và ghi lại đề nghị của khách vào hồ sơ {c.code}",
+                     nguoi_id=(ban.id if ban else None), han_gio=gio,
+                     roles="tp_kd,gd_kd,ptgd_mkt", level="red" if t.hai_long <= 2 else "warn"):
+            sinh.append(f"Đã giao việc gọi lại trong {gio:.0f} giờ cho "
+                        + (ban.full_name if ban else "Trưởng phòng Kinh doanh (phiếu chưa có người phụ trách)"))
 
     # Khách còn nhu cầu thì tự tạo lead khách cũ, gắn đúng nhân viên đã bán.
     if t.lien_he_duoc == "co" and t.nhu_cau_tiep == "co" and not t.lead_id and (t.customer_phone or "").strip():
@@ -361,14 +409,14 @@ def robot_cskh(db: Session) -> dict:
     """
     n_phieu = sinh_phieu(db)
     n_va = va_han_lien_he(db)
+    n_moi_cham, n_nhac = gui_loi_moi_cham_diem(db), nhac_chua_tra_loi(db)
     them = 0
 
-    def add(kind, level, ref, msg, roles):
+    def add(kind, level, ref, msg, roles, nguoi_id=None, han_gio=None):
         nonlocal them
-        co = db.execute(select(Alert).where(Alert.kind == kind, Alert.ref == ref,
-                                            Alert.resolved == False)).scalars().first()
-        if not co:
-            db.add(Alert(kind=kind, level=level, ref=ref, message=msg, to_roles=roles)); them += 1
+        if giao_viec(db, kind, ref, msg, nguoi_id=nguoi_id, han_gio=han_gio,
+                     roles=roles, level=level) is not None:
+            them += 1
 
     bay_gio = datetime.now()
     for c in db.execute(select(Complaint).where(Complaint.status.in_(["moi", "dang_xu_ly", "cho_khach", "tai_mo"]),
@@ -376,9 +424,12 @@ def robot_cskh(db: Session) -> dict:
         if not c.han_phan_hoi or c.han_phan_hoi >= bay_gio: continue
         tre = int((bay_gio - c.han_phan_hoi).total_seconds() // 3600)
         vai = "ptgd_mkt,gd_kd,tp_dh" if c.level < 3 else "ptgd_mkt,tgd,chutich"
+        # Chủ của việc này là NGƯỜI ĐANG GIỮ HỒ SƠ. `handler` là tên đăng nhập dạng chữ chứ không
+        # phải khoá ngoại, nên phải tra ra; tra không thấy thì để trống — và ô trống ấy đếm được.
+        nguoi = db.execute(select(User).where(User.username == c.handler)).scalars().first() if c.handler else None
         add("kn_qua_han", "red" if c.level >= 2 else "warn", c.code,
             f"Khiếu nại {c.code} ({KN_MUC[c.level]}) của khách {c.customer_name} đã quá hạn phản hồi {tre} giờ – chưa ai trả lời khách",
-            vai)
+            vai, nguoi_id=(nguoi.id if nguoi else None), han_gio=None)
     # Phiếu chăm sóc quá hạn liên hệ: nhắc chính nhân viên đã bán, gom một cảnh báo cho mỗi tour để
     # không dội hàng trăm dòng cho một chuyến đông khách.
     con_qua_han = set()
@@ -397,4 +448,86 @@ def robot_cskh(db: Session) -> dict:
         if a.ref not in con_qua_han:
             a.resolved = True; go += 1
     if them or go: db.commit()
-    return {"phieu_moi": n_phieu, "phieu_va_han": n_va, "canh_bao_moi": them, "canh_bao_go": go}
+    return {"phieu_moi": n_phieu, "phieu_va_han": n_va, "canh_bao_moi": them, "canh_bao_go": go,
+            "moi_cham_diem": n_moi_cham, "nhac_lai": n_nhac}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# GỬI LỜI MỜI CHẤM ĐIỂM — đề xuất tự động hoá CSKH 25/9/2026, bước 1 và bước 6
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+
+def _gio_gui_toi(db: Session) -> datetime:
+    """Lần tới giờ gửi. Hôm nay chưa qua giờ ấy thì hôm nay, qua rồi thì sáng mai.
+
+    KHÔNG gửi ngay lúc phiếu sinh ra: phiếu sinh lúc nào là tuỳ vòng quét, và một tin chăm sóc
+    đến lúc 2 giờ sáng làm hỏng đúng thiện chí mà nó đi xin.
+    """
+    gio = int(R.get_param(db, "khao_sat_gio_gui") or 9)
+    bay_gio = datetime.now()
+    hom_nay = bay_gio.replace(hour=max(0, min(23, gio)), minute=0, second=0, microsecond=0)
+    return hom_nay if hom_nay > bay_gio else hom_nay + timedelta(days=1)
+
+
+def gui_loi_moi_cham_diem(db: Session, limit: int = 200) -> int:
+    """Phiếu chăm sóc chưa có mã khảo sát → sinh mã và XẾP HÀNG một tin ZNS.
+
+    Không gọi Zalo trực tiếp: chỉ xếp vào hàng đợi đã có (`zalo.queue`), để mọi luật gửi, làm mới
+    token, ghi sổ lỗi và gửi lại đều dùng chung một đường. Một chỗ gửi thứ hai là một chỗ nữa phải
+    nhớ xử lý token chết.
+
+    Phiếu KHÔNG có số điện thoại thì bỏ qua và KHÔNG sinh mã — sinh mã cho một phiếu không gửi
+    được là tạo ra một con số "đã mời" không có thật, và tỷ lệ trả lời sẽ bị chia cho nó.
+    """
+    from app.models.danh_gia import MaKhaoSat
+    from app.services import danh_gia as DG
+    from app.services import zalo as Z
+
+    da_co = {x for x in db.execute(select(MaKhaoSat.care_id)).scalars()}
+    hen = _gio_gui_toi(db)
+    n = 0
+    for t in db.execute(select(CareTicket).where(
+            CareTicket.status == "moi").order_by(CareTicket.id).limit(limit)).scalars():
+        if t.id in da_co: continue
+        if not (t.customer_phone or "").strip(): continue
+        m = DG.sinh_ma(db, t)
+        tour = db.get(Tour, t.tour_id)
+        Z.queue(db, "robot_cskh", phone=t.customer_phone, purpose="cham_soc",
+                params={"ten_khach": t.customer_name, "ten_tour": (tour.name if tour else ""),
+                        "ma_khao_sat": m.ma},
+                booking_id=t.booking_id, gui_tu_luc=hen)
+        n += 1
+    if n: db.commit()
+    return n
+
+
+def nhac_chua_tra_loi(db: Session, limit: int = 200) -> int:
+    """Bước 6: không trả lời sau hạn thì nhắc MỘT lần. Một lần, và không gọi điện.
+
+    "Một lần" là luật, không phải lời khuyên — nên nó được đo bằng chính sổ tin: đã có tin nhắc
+    cho phiếu này thì thôi. Không dựng thêm cột "đã nhắc" trên phiếu: một sự thật hai nơi giữ thì
+    rồi sẽ lệch, và nơi đúng để hỏi "đã gửi gì cho khách này" là sổ tin.
+    """
+    from app.models.crm import ZaloMessage
+    from app.models.danh_gia import MaKhaoSat
+    from app.services import zalo as Z
+
+    gio = float(R.get_param(db, "khao_sat_nhac_gio") or 48)
+    moc = datetime.now() - timedelta(hours=gio)
+    n = 0
+    for m in db.execute(select(MaKhaoSat).where(
+            MaKhaoSat.dung_luc.is_(None), MaKhaoSat.het_han > datetime.now(),
+            MaKhaoSat.tao_luc <= moc).order_by(MaKhaoSat.id).limit(limit)).scalars():
+        t = db.get(CareTicket, m.care_id)
+        if not t or not (t.customer_phone or "").strip(): continue
+        da_nhac = db.execute(select(func.count()).select_from(ZaloMessage).where(
+            ZaloMessage.booking_id == t.booking_id,
+            ZaloMessage.purpose == "cham_soc_nhac")).scalar() or 0
+        if da_nhac: continue
+        tour = db.get(Tour, t.tour_id)
+        Z.queue(db, "robot_cskh", phone=t.customer_phone, purpose="cham_soc_nhac",
+                params={"ten_khach": t.customer_name, "ten_tour": (tour.name if tour else ""),
+                        "ma_khao_sat": m.ma},
+                booking_id=t.booking_id, gui_tu_luc=_gio_gui_toi(db))
+        n += 1
+    if n: db.commit()
+    return n

@@ -55,6 +55,13 @@ CONG_KHAI: dict[str, str] = {
     "POST /api/v1/sepay/webhook": (
         "SePay gọi vào, xác thực bằng header Authorization: Apikey <SEPAY_WEBHOOK_KEY>. Không có "
         "người dùng nào ở đầu kia nên không có vai trò để khai."),
+    "POST /api/v1/khao-sat/{ma}": (
+        "Trang khách TỰ CHẤM ĐIỂM sau tour (đề xuất CSKH 25/9/2026). Khác mọi dòng còn lại của "
+        "danh sách này: đầu kia KHÔNG phải máy của đối tác mà là MỘT NGƯỜI THẬT — khách hàng, và "
+        "khách hàng không có tài khoản VTOS. Thay cho đăng nhập: một mã dùng một lần sinh bằng "
+        "secrets.token_urlsafe(24), hết hạn sau 14 ngày, ghi được đúng MỘT lần, kèm phanh số lần "
+        "thử theo địa chỉ mạng. Cửa chỉ ghi vào phiếu chăm sóc của chính mã ấy và không đọc ra "
+        "thứ gì khách chưa biết."),
     "POST /api/v1/zalo/webhook": (
         "Zalo OA gọi vào, xác thực bằng chữ ký X-ZEvent-Signature kiểm trong Z.verify_signature. "
         "Không có người dùng ở đầu kia nên không có vai trò để khai."),

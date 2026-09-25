@@ -394,6 +394,14 @@ export const GROUPS: Group[] = [
     // của cùng một dây chuyền: chị ấy chuyển sang Điều hành, ông ấy ký ở cuối. Cùng nhóm "Kinh
     // doanh" và cùng lý do: vị trí này thuộc Phòng Kinh doanh Đoàn.
     ["Bàn làm việc Sale Admin", "/sales-admin"],
+    // Bàn bán tour lẻ — Chủ tịch quyết 25/9/2026. Đặt cạnh hai mục trên vì cùng nhóm "Kinh
+    // doanh", nhưng nó là của phòng LẺ: lịch khởi hành do Điều hành mở, phòng Lẻ chỉ bán, và
+    // bảng này là thứ họ mở trước khi trả lời khách xin giảm giá.
+    ["Bàn bán tour lẻ", "/ban-tour-le"],
+    // Đánh giá sau tour — Chủ tịch quyết 25/9/2026. Đặt trong nhóm "Kinh doanh" vì người đọc nó
+    // hằng tuần là Kinh doanh và Điều hành; trang KHÁCH tự chấm nằm ở /y-kien/<mã>, ngoài
+    // thanh điều hướng — khách không có tài khoản và không nên thấy sơ đồ phân hệ của công ty.
+    ["Đánh giá sau tour", "/danh-gia"],
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
     // TC-73 · 19/9/2026. Sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.

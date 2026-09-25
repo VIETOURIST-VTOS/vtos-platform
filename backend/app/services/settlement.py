@@ -1,7 +1,7 @@
 """Quyết toán tour soạn trên VTOS (theo bố cục bảng quyết toán Vietrip):
 dòng chi phí theo NCC (mô tả, loại DV, NCC–MST, cách tính, đơn giá, SL, hệ số, dự toán, thực chi, đã thanh toán, chứng từ),
 kiểm tra nhập theo dòng, phiên bản V.01/V.02, khớp 'đã thanh toán' với lệnh chi NCC / tạm ứng, so dự toán – thực chi, chấm thiếu chứng từ."""
-from datetime import datetime
+from datetime import date, datetime
 from fastapi import HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -42,11 +42,73 @@ def _assert_edit(u: User, t: Tour):
         raise Gate("TRANG_THAI", "Quyết toán đã đóng số / Kế toán đã xác nhận – chỉ sửa khi Kế toán trả lại" if t.status in ("da_dong_so", "kt_xac_nhan", "khoa") else "Tour chưa được duyệt")
 
 
+def _ngoai_te(d: dict, out: dict) -> None:
+    """Bốn ô ngoại tệ của dòng giá vốn — MỞ CỬA cho bốn cột ĐÃ CÓ, 25/9/2026.
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    ĐÂY LÀ MỘT CỬA, KHÔNG PHẢI MỘT CỘT MỚI
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    `models/vietrip.py:89-92` đã có `tien_te`, `so_tien_goc`, `ty_gia`, `ngay_ty_gia` từ lâu. Chỗ
+    thiếu là `validate()` dựng dữ liệu từ một danh sách trường cố định và bốn tên ấy không nằm
+    trong danh sách — nên `add_line`/`update_line` không bao giờ ghi chúng.
+
+    Hệ quả đo được trên dữ liệu: chuyến nước ngoài NẠP TỪ KHO CŨ có số gốc và tỷ giá (bộ nạp ghi
+    thẳng vào bảng, không đi qua cửa này); chuyến nước ngoài SOẠN MỚI trên VTOS thì không. Hai
+    loại chuyến nằm chung một sổ, một loại truy được về đồng gốc, loại kia không — và không có gì
+    trên màn hình nói cho người đọc biết mình đang nhìn loại nào.
+
+    Ranh giới Chủ tịch chốt 09/9/2026: mỗi con số cần một cửa nhập; không có cửa thì đó là việc
+    còn thiếu, không phải việc để bộ nạp làm hộ.
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    BỐN ĐIỀU CỐ Ý
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    1. RỖNG NGHĨA LÀ VND, VÀ KHÔNG ĐÒI GÌ THÊM. Tuyệt đại đa số dòng giá vốn là tiền đồng. Bắt cả
+       chúng khai `tien_te = "VND"` là thêm một ô bắt buộc cho hàng nghìn dòng để phục vụ vài chục
+       dòng — và ô bắt buộc mà ai cũng gõ cùng một giá trị thì chỉ còn là phiền.
+
+    2. KHAI NGOẠI TỆ THÌ PHẢI ĐỦ BA Ô CÒN LẠI. Một số tiền USD không có tỷ giá là một con số không
+       quy đổi được; một tỷ giá không có ngày là một con số không kiểm lại được. Thiếu ô nào thì
+       từ chối ngay tại cửa, đừng để dòng ấy nằm trong sổ rồi ba tháng sau mới có người hỏi.
+
+    3. `unit_price` (VND) là SỐ SUY RA, người không gõ. Gõ tay cả số gốc, tỷ giá lẫn số VND là mở
+       đường cho ba con số không khớp nhau — chính câu `models/ty_gia.py` đã ghi. Máy nhân.
+
+    4. KHÔNG TỰ TRA SỔ TỶ GIÁ. Sổ chỉ ĐIỀN SẴN vào form cho người nhập; máy không chọn hộ. Tỷ giá
+       của một khoản là tỷ giá NGÀY CHI THẬT của khoản ấy — một sự thật đã xảy ra, không được sửa
+       lùi khi sổ đổi. Luật ấy đã viết trong `models/ty_gia.py`, đây chỉ là chỗ không phá nó.
+    """
+    tt = (d.get("tien_te") or "").strip().upper()[:3]
+    if tt in ("", "VND"):
+        # Không ghi đè bằng None: dòng cũ đã có ngoại tệ mà màn hình cũ gửi lên thiếu ô thì sẽ bị
+        # xoá trắng. Rỗng ở đây nghĩa là "không đụng tới", đúng cách `tours._dat_hoa_hong_khach`
+        # xử lý chuỗi rỗng ngày 24/9.
+        return
+    goc = float(d.get("so_tien_goc") or 0)
+    tg = float(d.get("ty_gia") or 0)
+    ngay = d.get("ngay_ty_gia") or ""
+    thieu = [ten for ten, ok in (("số tiền bằng đồng gốc", goc > 0),
+                                 ("tỷ giá", tg > 0),
+                                 ("ngày tỷ giá", bool(str(ngay).strip()))) if not ok]
+    if thieu:
+        raise Gate("QT_NHAP", f"Khai ngoại tệ {tt} thì phải có: {', '.join(thieu)}. "
+                              "Một số tiền ngoại tệ thiếu tỷ giá là con số không quy đổi được; "
+                              "một tỷ giá thiếu ngày là con số không kiểm lại được.")
+    if isinstance(ngay, str):
+        try:
+            ngay = date.fromisoformat(ngay[:10])
+        except ValueError:
+            raise Gate("QT_NHAP", f"Ngày tỷ giá không đọc được: {ngay!r}. Dạng đúng là 2026-09-25.")
+    out["tien_te"], out["so_tien_goc"], out["ty_gia"], out["ngay_ty_gia"] = tt, goc, tg, ngay
+    out["unit_price"] = round(goc * tg, 2)      # ghi chú 3: máy nhân, người không gõ
+
+
 def validate(d: dict) -> dict:
     out = {"description": (d.get("description") or "").strip()[:200], "service_type": (d.get("service_type") or "OTHER").upper()[:30], "cost_kind": d.get("cost_kind") or "co_dinh",
            "supplier_name": (d.get("supplier_name") or "").strip()[:200], "supplier_tax_code": (d.get("supplier_tax_code") or "").strip()[:20],
            "unit_price": float(d.get("unit_price") or 0), "qty": float(d.get("qty") or 0), "coef": float(d.get("coef") or 1), "budget": float(d.get("budget") or 0),
            "note": (d.get("note") or "").strip()[:200]}
+    _ngoai_te(d, out)     # đặt TRƯỚC các phép kiểm dưới: nó có thể thay `unit_price`
     if not out["description"]: raise Gate("QT_NHAP", "Vui lòng nhập Mô tả chi tiết")
     if out["service_type"] not in SERVICE_TYPES: raise Gate("QT_NHAP", "Loại dịch vụ không hợp lệ")
     if not out["supplier_name"]: raise Gate("QT_NHAP", "Vui lòng nhập Nhà cung cấp")
@@ -71,7 +133,13 @@ def line_out(l: TourCostLine) -> dict:
     return {"id": l.id, "line_no": l.line_no, "description": l.description, "cost_kind": l.cost_kind, "service_type": l.service_type, "service_name": SERVICE_TYPES.get(l.service_type, l.service_type),
             "supplier_name": l.supplier_name, "supplier_tax_code": l.supplier_tax_code, "unit_price": l.unit_price, "qty": l.qty, "coef": l.coef, "budget": l.budget, "actual": l.actual, "paid": l.paid,
             "remaining": max(0.0, (l.actual or 0) - (l.paid or 0)), "over_pct": over, "note": l.note, "source": l.source, "status": l.status, "version": l.version, "has_doc": bool(l.doc_data), "doc_name": l.doc_name,
-            "updated_by": l.updated_by, "updated_at": l.updated_at}
+            "updated_by": l.updated_by, "updated_at": l.updated_at,
+            # Bốn ô ngoại tệ. Trả về CẢ KHI RỖNG, để màn hình phân biệt được "dòng tiền đồng" với
+            # "dòng ngoại tệ chưa ai khai" — hai thứ khác nhau, và gộp lại thì không nhìn ra dòng
+            # nào là dòng cần đi hỏi.
+            "tien_te": l.tien_te, "so_tien_goc": l.so_tien_goc,
+            "ty_gia": float(l.ty_gia) if l.ty_gia is not None else None,
+            "ngay_ty_gia": l.ngay_ty_gia}
 
 
 def add_line(db: Session, u: User, t: Tour, d: dict) -> TourCostLine:

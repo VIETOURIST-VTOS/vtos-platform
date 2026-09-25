@@ -160,13 +160,21 @@ def send_zns(db: Session, phone: str, template_id: str, params: dict) -> dict:
     return _post(ZNS_API, {"phone": intl(phone), "template_id": str(template_id), "template_data": params, "tracking_id": f"vtos-{datetime.now():%Y%m%d%H%M%S}"}, token(db))
 
 
-def queue(db: Session, actor: str, *, phone: str = "", zalo_uid: str = "", text: str = "", purpose: str = "", template: str = "", params: dict | None = None, lead_id: int | None = None, booking_id: int | None = None, send_now: bool = True) -> ZaloMessage:
-    """Tạo tin và gửi ngay nếu có cấu hình: có uid → OA text; không có uid nhưng có mẫu ZNS cho mục đích → ZNS theo SĐT; còn lại → chờ cấu hình."""
+def queue(db: Session, actor: str, *, phone: str = "", zalo_uid: str = "", text: str = "", purpose: str = "", template: str = "", params: dict | None = None, lead_id: int | None = None, booking_id: int | None = None, send_now: bool = True, gui_tu_luc: datetime | None = None) -> ZaloMessage:
+    """Tạo tin và gửi ngay nếu có cấu hình: có uid → OA text; không có uid nhưng có mẫu ZNS cho mục đích → ZNS theo SĐT; còn lại → chờ cấu hình.
+
+    `gui_tu_luc` là GIỜ HẸN: tin nằm im trong hàng đợi cho tới lúc ấy. Rỗng = gửi ngay, đúng như
+    trước, nên mọi lời gọi cũ không đổi hành vi. Hẹn giờ thì `send_now` tự tắt — hẹn mà vẫn gửi
+    ngay là một cái hẹn không có tác dụng, và loại lỗi ấy chỉ lộ ra khi khách nhận tin lúc 2 giờ
+    sáng.
+    """
     cfg = configured(db); kind = "oa" if zalo_uid else "zns"
     tid = template or cfg["zns_templates"].get(purpose, "")
     m = ZaloMessage(kind=kind, phone=norm_phone(phone), zalo_uid=zalo_uid, lead_id=lead_id, booking_id=booking_id, template_id=tid, params=params or {}, text=text, purpose=purpose, created_by=actor,
+                    gui_tu_luc=gui_tu_luc,
                     status="cho_gui" if (cfg["oa"] and (zalo_uid or tid)) else "cho_cau_hinh")
     db.add(m); db.flush()
+    if gui_tu_luc: send_now = False
     if send_now and m.status == "cho_gui": _send(db, m)
     return m
 
@@ -187,7 +195,13 @@ def _send(db: Session, m: ZaloMessage) -> None:
 
 def send_pending(db: Session, limit: int = 100) -> dict:
     cfg = configured(db); n = 0
-    for m in db.execute(select(ZaloMessage).where(ZaloMessage.status.in_(["cho_gui", "cho_cau_hinh"])).order_by(ZaloMessage.id).limit(limit)).scalars():
+    bay_gio = datetime.now()
+    for m in db.execute(select(ZaloMessage).where(
+            ZaloMessage.status.in_(["cho_gui", "cho_cau_hinh"]),
+            # Tin có giờ hẹn thì nằm im cho tới lúc ấy. `is_(None)` phải đứng trong phép HOẶC chứ
+            # không lọc riêng: tin cũ đều có cột này rỗng, lọc sai là chúng tắc trong hàng đợi.
+            (ZaloMessage.gui_tu_luc.is_(None)) | (ZaloMessage.gui_tu_luc <= bay_gio),
+    ).order_by(ZaloMessage.id).limit(limit)).scalars():
         if not cfg["oa"]: break
         if m.kind == "zns" and not m.template_id: m.template_id = cfg["zns_templates"].get(m.purpose, "")
         if m.kind == "zns" and not m.template_id: continue

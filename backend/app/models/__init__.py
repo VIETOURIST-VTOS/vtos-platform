@@ -102,3 +102,10 @@ from app.models.kol import *  # noqa
 # nhắc cùng một điều ở tệp này: bảng khai dưới app/models mà thiếu dòng nhập ở đây thì
 # `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate đòi XOÁ bảng.
 from app.models.tai_khoan_da_xoa import *  # noqa
+
+# CSKH tự động · 25/9/2026. Đánh giá sau tour do KHÁCH tự chấm, và mã khảo sát dùng một lần cho
+# cửa công khai. Mang khoá ngoài sang `care_tickets`, `bookings`, `tours` nên đứng SAU cskh và
+# core. Lần thứ MƯỜI HAI nhắc cùng một điều ở tệp này: bảng khai dưới app/models mà thiếu dòng
+# nhập ở đây thì `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate
+# đòi XOÁ bảng.
+from app.models.danh_gia import *  # noqa
