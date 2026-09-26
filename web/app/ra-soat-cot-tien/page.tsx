@@ -37,6 +37,7 @@ function RaSoatCotTien() {
   const [loc, setLoc] = useState("chua_ro");
   const [d, setD] = useState<any>(null);
   const [dang, setDang] = useState(false);
+  const [nt, setNt] = useState<any>(null);
   const quyetDuoc = ["ketoan", "cntt", "chutich", "tgd"].includes(user?.role || "");
 
   const load = useCallback(async () => {
@@ -63,6 +64,7 @@ function RaSoatCotTien() {
   };
 
   const rows: Dong[] = d?.rows || [];
+  const ntRows: any[] = nt?.rows || [];
 
   return (
     <div className="wrap">
@@ -145,6 +147,61 @@ function RaSoatCotTien() {
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* ══ SOÁT NGOẠI TỆ TRÊN DÒNG GIÁ VỐN — Chủ tịch quyết 27/9/2026 ══
+          Đặt ở đây chứ không dựng màn hình mới: cùng một câu hỏi với cả trang này — con số tiền
+          trong sổ có đang mang đúng nghĩa của nó không. CHỈ ĐỌC, cố ý không có nút nắn hàng loạt. */}
+      <div className="card" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0 }}>Soát ngoại tệ trên dòng giá vốn</h2>
+        <p className="muted small">
+          Bảng <span className="mono">tour_cost_lines</span> có <b>hai cửa ghi</b>, và tới 27/9/2026 chúng hiểu
+          ô <b>“số tiền gốc”</b> ngược nhau: cửa Điều hành hiểu là <b>đơn giá một đơn vị</b> (máy nhân tiếp với
+          số lượng và hệ số), cửa Quyết toán chi tiết hiểu là <b>tổng cả dòng</b> (số lượng và hệ số biến mất).
+          Chủ tịch chốt: <b>số tiền gốc là đơn giá</b>. Bảng này đếm xem bao nhiêu dòng đã ghi theo nghĩa kia
+          và lệch bao nhiêu tiền — <b>máy không tự nắn</b>.
+        </p>
+        {!nt ? (
+          <button className="ghost" onClick={() => api("/ra-soat-cot-tien/ngoai-te")
+            .then(setNt).catch((e) => toast(errMsg(e), true))}>Chạy bản soát</button>
+        ) : (<>
+          <div className="so">
+            <span><b>{nt.tong_dong_ngoai_te}</b> dòng khai ngoại tệ</span>
+            <span><b>{nt.dem?.dung ?? 0}</b> đúng quy ước</span>
+            <span style={{ color: nt.dem?.sai_bo_nhan ? "var(--vtos-danger)" : undefined }}>
+              <b>{nt.dem?.sai_bo_nhan ?? 0}</b> bỏ mất số lượng/hệ số</span>
+            <span><b>{nt.dem?.khong_phan_biet_duoc ?? 0}</b> chưa phân biệt được</span>
+            <span><b>{nt.dem?.thieu_o ?? 0}</b> thiếu ô</span>
+            <span><b>{nt.dem?.khong_khop_ca_hai ?? 0}</b> không khớp quy ước nào</span>
+          </div>
+          {!!nt.tong_lech && <p className="warn">
+            Tổng thiếu so với quy ước đơn giá: <b>{Number(nt.tong_lech).toLocaleString("vi-VN")} đ</b>
+          </p>}
+          <p className="muted small">{nt.luu_y}</p>
+          {ntRows.length > 0 && <table className="tbl">
+            <thead><tr>
+              <th>Chuyến</th><th>Dòng</th><th>Nhà cung cấp</th><th>Nhóm</th>
+              <th>Gốc × tỷ giá</th><th>SL × hệ số</th><th>Đang ghi</th><th>Đáng lẽ</th><th>Thiếu</th>
+            </tr></thead>
+            <tbody>{ntRows.map((r: any, i: number) => (
+              <tr key={i}>
+                <td className="mono">{r.tour}</td>
+                <td className="mono">#{r.dong}<div className="muted small">{r.mo_ta}</div></td>
+                <td>{r.ncc}</td>
+                <td>{r.nhom === "sai_bo_nhan" ? <Tag cls="red">{r.nhom_ten}</Tag> : <Tag cls="warn">{r.nhom_ten}</Tag>}
+                  <div className="muted small">đơn giá đang mang: {r.don_gia_dang_mang === "dong_goc" ? "đồng gốc" : r.don_gia_dang_mang}</div></td>
+                <td className="mono">{r.so_tien_goc?.toLocaleString("vi-VN")} {r.tien_te}
+                  {r.ty_gia != null && <> × {Number(r.ty_gia).toLocaleString("vi-VN")}</>}</td>
+                <td className="mono">{r.so_luong} × {r.he_so}<div className="muted small">{r.cach_tinh}</div></td>
+                <td className="mono">{Number(r.actual || 0).toLocaleString("vi-VN")}</td>
+                <td className="mono">{r.actual_dung != null ? Number(r.actual_dung).toLocaleString("vi-VN") : "—"}</td>
+                <td className="mono" style={{ color: r.lech ? "var(--vtos-danger)" : undefined }}>
+                  {r.lech ? Number(r.lech).toLocaleString("vi-VN") : "—"}</td>
+              </tr>
+            ))}</tbody>
+          </table>}
+          {nt.cham_tran && <p className="muted small">Đang hiện {ntRows.length} dòng đầu — còn nữa.</p>}
+        </>)}
       </div>
 
       <style jsx>{`
