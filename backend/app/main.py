@@ -70,6 +70,9 @@ from app.api.v1.chuyen_doi_lead import router as chuyen_doi_lead_router
 from app.api.v1.doi_soat_marketing import router as doi_soat_marketing_router
 # 24/9/2026 - ban lam viec cua Pho TGD tour doan. Tien to RIENG, cung ly do da ghi o so_con_no.py.
 from app.api.v1.ptgd_doan import router as ptgd_doan_router
+from app.api.v1.ban_tour_le import router as ban_tour_le_router
+from app.api.v1.danh_gia import router as danh_gia_router
+from app.api.v1.khao_sat_cong_khai import router as khao_sat_cong_khai_router
 from app.api.v1.sales_admin import router as sales_admin_router
 from app.services import rules as R
 from app.services import accounting as ACC
@@ -294,6 +297,11 @@ app.include_router(chuyen_doi_lead_router)
 app.include_router(doi_soat_marketing_router)
 app.include_router(ptgd_doan_router)
 app.include_router(sales_admin_router)
+app.include_router(ban_tour_le_router)
+app.include_router(danh_gia_router)
+# CỬA CÔNG KHAI — cửa DUY NHẤT của VTOS không cần đăng nhập. Để cuối danh sách và có dòng chú
+# thích này để ai đọc app/main.py cũng nhìn thấy nó, thay vì phát hiện ra khi đọc tệp thứ tám.
+app.include_router(khao_sat_cong_khai_router)
 
 
 @app.get("/", include_in_schema=False)

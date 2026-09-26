@@ -12,7 +12,18 @@ from app.services import accounting as ACC
 from app.services import payments as PAY
 from app.api.deps import toan_quyen   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
-UNLOCK_ROLES = ("tp_dh", "gd_kd", "tp_kd", "cntt", "tgd")
+# MỞ KHOÁ BOOKING — Chủ tịch quyết lại 25/9/2026: "tp dh, sale admin".
+#
+# GỠ `gd_kd` và `tp_kd`. Hai vai ấy mở khoá được từ bản cũ, thừa kế chứ chưa ai xác nhận lại. Mở
+# khoá không phải xem — nó là quyền SỬA SỐ SAU KHI ĐÃ CHỐT, và người bán không nên tự mở lại con
+# số doanh thu của chính mình. Đây là một lần SIẾT, ghi ra để ai đọc sau cũng thấy là cố ý.
+#
+# THÊM `sales_admin`: đúng vai giữ hồ sơ phòng Đoàn, và Phần V bản mô tả cấm chị ấy ba việc —
+# nhận khách, chốt đoàn, duyệt dự toán — mở khoá một booking để sửa hồ sơ không nằm trong ba việc ấy.
+#
+# GIỮ `cntt` và `tgd`: một bên vận hành hệ thống, một bên là cấp trên của cả hai phòng. Chủ tịch đi
+# qua bằng luật toàn quyền, không cần có tên ở đây.
+UNLOCK_ROLES = ("tp_dh", "sales_admin", "cntt", "tgd")
 CANCEL_ROLES = ("nv_dh", "tp_dh")
 
 
@@ -93,7 +104,7 @@ def lock(db: Session, b: Booking, reason: str, actor: str = "robot", audit: bool
 
 
 def unlock(db: Session, u: User, b: Booking, note: str) -> str:
-    if u.role not in UNLOCK_ROLES and not toan_quyen(u): raise HTTPException(403, "Chỉ TP Điều hành / GĐ Kinh doanh / CNTT mở khóa booking")
+    if u.role not in UNLOCK_ROLES and not toan_quyen(u): raise HTTPException(403, "Chỉ TP Điều hành / Sale Admin / CNTT mở khóa booking")
     if not b.locked: raise Gate("TRANG_THAI", "Booking chưa khóa")
     if not (note or "").strip(): raise Gate("KHOA_BOOKING", "Mở khóa phải ghi lý do")
     b.locked, b.lock_reason = False, ""

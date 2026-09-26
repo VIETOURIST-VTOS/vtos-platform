@@ -67,6 +67,18 @@ class ActionNote(BaseModel):
     note: str = ""          # lời giải trình / ghi chú của bước (hiển thị ở Quy trình & Lịch sử)
 
 
+class MoThemCho(BaseModel):
+    """Mở thêm chỗ trên chuyến đang bán — Chủ tịch quyết 25/9/2026.
+
+    `fixed_cost` để RỖNG nghĩa là chi phí cố định KHÔNG ĐỔI, không phải bằng 0. Mở 29 lên 45 chỗ
+    mà vẫn dùng xe cũ thì đúng là không đổi; đổi xe to hơn thì gõ số mới, và cổng sẽ đo lại lợi
+    nhuận trước khi cho qua.
+    """
+    so_cho: int
+    fixed_cost: float | None = None
+    ly_do: str = ""
+
+
 class ProductIn(BaseModel):
     phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm
     code: str

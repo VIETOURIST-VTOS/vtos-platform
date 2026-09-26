@@ -320,15 +320,13 @@ def _tour(db: Session, tid: int) -> Tour:
 def get_tour(tid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
     t = _tour(db, tid)
     v = T.tour_view(db, t, u)
-    # 24/9/2026 – hỏi theo CHUYẾN chứ không theo vai trò: Kinh doanh Đoàn tự lập dự toán nên xem
-    # được giá vốn của chuyến ĐOÀN, còn tour lẻ vẫn che y như cũ. Lý do đầy đủ ở can_see_cost_tren_chuyen.
-    if not AC.can_see_cost_tren_chuyen(u, t):   # Kinh doanh lẻ / HCNS: không xem cơ cấu chi phí, quyết toán, bút toán
-        for k in ("settlement", "fixed_cost", "var_cost_per_pax", "actual_cost", "promo_value", "calc", "justification"): v[k] = None
-        vis = AC.sales_ids_visible(db, u)
-        if vis is not None: v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") in vis]
-    else:
+    # Hỏi theo CHUYẾN chứ không theo vai trò, và CÙNG MỘT HÀM với `GET /tours/{id}/detail`:
+    # `AC.che_gia_von` giữ ba bậc (giá vốn đầy đủ · chuyến đoàn của Kinh doanh · ba con số dự toán
+    # cho Kinh doanh trên tour lẻ, Chủ tịch quyết 25/9/2026). Hai cửa chép hai khối che riêng đã
+    # lệch nhau một lần rồi — lý do đầy đủ nằm trong chính hàm ấy.
+    if AC.can_see_cost_tren_chuyen(u, t):
         v["audit"] = [audit_out(l) for l in db.execute(select(AuditLog).where(AuditLog.entity == f"tour:{t.code}").order_by(desc(AuditLog.id))).scalars()]
-    return v
+    return AC.che_gia_von(v, u, t, db)
 
 
 @router.put("/tours/{tid}", tags=["tours"])
@@ -371,6 +369,17 @@ def confirm_tour(tid: int, data: S.ActionNote | None = None, u: User = Depends(c
 @router.post("/tours/{tid}/approve", tags=["tours"])
 def approve_tour(tid: int, data: S.ActionNote | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
     return {"message": T.approve(db, u, _tour(db, tid), (data.note if data else ""))}
+
+
+# CỬA MỞ THÊM CHỖ — Chủ tịch quyết 25/9/2026, và nó đóng đúng một vòng hở đã có từ trước:
+# `giu_cho.gia_han` bảo người dùng "Điều hành phải mở thêm chỗ" trong khi KHÔNG có cửa nào làm việc
+# ấy. Quyền khai ở chữ ký (Điều hành + Sale Admin), và thân hàm khai lại — hai hàng rào, một danh
+# sách, vì `tours.mo_them_cho` còn kiểm cả trạng thái, lý do và lợi nhuận.
+@router.post("/tours/{tid}/mo-them-cho", tags=["tours"])
+def mo_them_cho_tour(tid: int, data: S.MoThemCho,
+                     u: User = Depends(require_roles(*T.MO_THEM_CHO_ROLES, mo_ta="mở thêm chỗ trên chuyến đang bán")),
+                     db: Session = Depends(get_db)):
+    return {"message": T.mo_them_cho(db, u, _tour(db, tid), data.so_cho, data.fixed_cost, data.ly_do)}
 
 
 @router.post("/tours/{tid}/d7", tags=["tours"])
@@ -593,8 +602,13 @@ def tong_hop_giu_cho(u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="t
     return GC.tong_hop(db)
 
 
+# KS-2 (sửa 25/9/2026): cửa này khai quyền ở THÂN HÀM (`bookings.UNLOCK_ROLES`) còn chữ ký endpoint
+# để trống, trong khi `/lock` ngay dưới thì khai ở chữ ký. Bộ kiểm quyền đọc chữ ký endpoint nên nó
+# đọc ra "ai đăng nhập cũng gọi được" — người bị từ chối vẫn nhận 403 từ thân hàm, nhưng bản khai
+# quyền của hệ thống nói sai. Khai ở CẢ HAI: hàng rào ngoài chặn theo màn hình, hàng rào trong chặn
+# theo việc, và `bookings.unlock` còn được gọi từ chỗ khác chứ không chỉ từ endpoint này.
 @router.post("/bookings/{bid}/unlock", tags=["bookings"])
-def unlock_booking(bid: int, data: S.ActionNote, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def unlock_booking(bid: int, data: S.ActionNote, u: User = Depends(require_roles(*BK.UNLOCK_ROLES, mo_ta="mở khóa booking")), db: Session = Depends(get_db)):
     return {"message": BK.unlock(db, u, _booking(db, bid), data.note)}
 
 

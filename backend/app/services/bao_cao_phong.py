@@ -194,6 +194,10 @@ def _dieu_hanh(db: Session, tu: date, den: date) -> list[dict]:
                                                  ThieuGiaVon.phong_ban == "dieu_hanh")).scalars().all()
     cho_bk = db.execute(select(func.count()).select_from(ServiceRequest)
                         .where(ServiceRequest.booking_id == None)).scalar()          # noqa: E711
+    from app.models.core import Booking
+    qua_sla = [b for b in db.execute(select(Booking).where(Booking.sla_ok == False)).scalars()   # noqa: E712
+               if b.created_at and tu <= b.created_at.date() <= den]
+    sla_phut = float(R.get_param(db, "sla_booking_phut"))
     return [
         ct("khoi_hanh", "Chuyến khởi hành trong kỳ", len(kh), "chuyến",
            "Đếm tour có ngày khởi hành nằm trong kỳ", "tours.start_date",
@@ -218,6 +222,19 @@ def _dieu_hanh(db: Session, tu: date, den: date) -> list[dict]:
         ct("yeu_cau_cho", "Yêu cầu dịch vụ chưa tạo booking", cho_bk, "yêu cầu",
            "Đếm yêu cầu dịch vụ chưa gắn booking nào", "service_requests.booking_id rỗng",
            muc=_muc(cho_bk > 0), viec="Tạo booking hoặc đóng yêu cầu kèm lý do"),
+        # CHUYỂN VỀ ĐÂY từ báo cáo bán hàng — Chủ tịch quyết 25/9/2026.
+        #
+        # Đồng hồ chạy từ lúc Kinh doanh gửi yêu cầu tới lúc Điều hành bấm tạo booking, và cảnh báo
+        # quá hạn đã bắn về `tp_dh, nv_dh` từ đầu. Nhưng cột đếm thì nằm ở bảng điểm SALE, gom theo
+        # tên sale — một con số người bán không làm gì để đổi được. Nay nó nằm đúng bảng của người
+        # gây ra nó. Dữ liệu không đổi: vẫn là `bookings.sla_ok` đã ghi sẵn từ lúc tạo booking.
+        ct("booking_qua_sla", "Booking quá hạn 2 giờ", len(qua_sla), "booking",
+           f"Đếm booking tạo trong kỳ mà mất quá {sla_phut:.0f} phút kể từ lúc Kinh doanh gửi yêu cầu",
+           "bookings.sla_ok = false (tham số sla_booking_phut, ĐH Điều 2)",
+           muc=_muc(len(qua_sla) > 0),
+           viec="Nhận yêu cầu thì tạo booking ngay. Chậm một giờ ở đây là một giờ khách chưa có "
+                "chỗ chắc chắn, và người bán không làm gì để rút ngắn được",
+           chi_tiet=[b.code for b in qua_sla[:20]]),
     ] + _bo_phan_truc_thuoc(db, "dieu_hanh", tu, den)
 
 

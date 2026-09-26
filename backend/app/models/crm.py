@@ -170,6 +170,10 @@ class ZaloMessage(Base):
     created_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # GIỜ HẸN GỬI. Rỗng = gửi ngay khi tới lượt, đúng như cũ. Có giờ thì `send_pending` bỏ qua cho
+    # tới lúc ấy. Đề xuất CSKH 25/9/2026 đòi gửi 9h sáng hôm sau — và quan trọng hơn cái giờ cụ
+    # thể: một tin chăm sóc đến lúc 2 giờ sáng làm hỏng đúng thiện chí mà nó đi xin.
+    gui_tu_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
 
 class Conversation(Base):

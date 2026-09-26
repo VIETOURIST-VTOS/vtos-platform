@@ -14,9 +14,58 @@ from app.api.deps import toan_quyen   # Chủ tịch toàn quyền – MỘT lu�
 
 CREATE_ROLES = ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_dh", "tp_dh")
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# CÂU 7 — Chủ tịch quyết 25/9/2026: "gỡ quyền". Hai đường tắt của dịch vụ lẻ, đóng lại.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# ĐƯỜNG TẮT 1 · GIÁ VỐN. `update` cũ cho nv_dh, tp_dh, gd_kd, tp_kd, tn_kd và sale phụ trách cùng
+# ghi `cost_amount` — mà ghi ô ấy là ghi thẳng `t.fixed_cost` VÀ một dòng `TourCostLine`. Trên
+# chuyến đoàn, cửa giá vốn khoá theo "Một cửa": chỉ người điều hành của chuyến. Dịch vụ lẻ không
+# có khoá nào, nên Trưởng phòng Kinh doanh sửa được giá vốn của một dịch vụ không phải của mình —
+# và giá vốn là mẫu số của hoa hồng chính phòng ấy nhận.
+#
+# CHỦ TỊCH QUYẾT 25/9/2026: "Phòng kinh doanh lẻ gỡ hết, không liên quan giá vốn; chỉ nắm được dự
+# toán 3 con số đã có trong phần quyết toán tour."
+#
+# Gỡ HẾT khối Kinh doanh — kể cả sale phụ trách, kể cả trên dịch vụ do chính họ tạo. Bản trước em
+# giữ sale lại với lý do "họ là người điều hành của dịch vụ ấy"; lý do đó sai ở chỗ nó lấy một
+# chi tiết kỹ thuật (`create` đặt `operator_id = sales_id`) làm căn cứ cho một ranh giới nghề
+# nghiệp. Giá vốn là số của bên ĐẶT DỊCH VỤ với nhà cung cấp, không phải của bên bán.
+#
+# HỆ QUẢ PHẢI NÓI RA: ô giá vốn của dịch vụ do Kinh doanh tạo sẽ TRỐNG cho tới khi Điều hành điền.
+# Đó là trống thật, không phải bằng 0 — và nó hiện ra trên màn hình chứ không im lặng, để không ai
+# đọc một dòng lãi lỗ dựng trên giá vốn chưa có.
+GIA_VON_ROLES = ("nv_dh", "tp_dh")
+
+# Vòng NGOÀI của `update`. Nó rộng hơn GIA_VON_ROLES vì sửa tên khách, số điện thoại, ngày dịch vụ
+# là việc khác với sửa giá vốn. `nv_kd` có tên ở đây vì sale phụ trách đi qua bằng `u.id ==
+# b.sales_id` trong thân hàm — chữ ký endpoint không diễn được vế ấy, nên nó phải đủ rộng để
+# không chặn nhầm người mà thân hàm sẽ cho qua. Hai hàng rào, không phải một hàng rào hai bản.
+SUA_ROLES = ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_dh", "tp_dh")
+
+# ĐƯỜNG TẮT 2 · CHỐT THÁNG. `close_month` đặt một lượt `status="kt_xac_nhan"` + `kt_confirmed_at`,
+# tức là ĐÓNG SỐ và KÝ XÁC NHẬN KẾ TOÁN trong cùng một cú bấm, rồi chạy bút toán. Trên chuyến đoàn
+# hai việc ấy là hai người và hai bước (`close` → `kt_confirm`). Để tp_dh hoặc tgd bấm nút này là
+# để họ ký thay Kế toán. GỠ cả hai; Chủ tịch vẫn đi qua bằng luật toàn quyền.
+CHOT_THANG_ROLES = ("ketoan",)
+
 
 class Gate(HTTPException):
     def __init__(self, code: str, msg: str): super().__init__(422, {"gate": code, "message": msg})
+
+
+def _cong_gia_von(u: User) -> None:
+    """Một cổng, gọi từ CẢ `create` lẫn `update`.
+
+    Chặn ở cửa sửa mà để hở cửa tạo thì người bị gỡ quyền chỉ cần tạo lại một dòng mới — cửa đóng
+    một nửa là cửa mở. Đây là lý do nó là hàm chứ không phải hai dòng chép đôi.
+
+    Chỉ CHẶN GHI. Xem thì không đụng tới: Chủ tịch nói Phòng Kinh doanh Lẻ "chỉ nắm được dự toán
+    3 con số đã có trong phần quyết toán tour" — nắm được nghĩa là vẫn đọc.
+    """
+    if u.role not in GIA_VON_ROLES and not toan_quyen(u):
+        raise HTTPException(403, "Giá vốn và nhà cung cấp của dịch vụ lẻ do Phòng Điều hành nhập. "
+                                 "Phòng Kinh doanh Lẻ xem được số, không sửa được "
+                                 "(Chủ tịch quyết 25/9/2026).")
 
 
 def next_code(db: Session, d: date) -> str:
@@ -37,6 +86,11 @@ def create(db: Session, u: User, d: dict) -> tuple[Tour, Booking]:
     if not (d.get("source") or "").strip(): raise Gate("CONG_4", "Thiếu nguồn khách (4 trường bắt buộc)")
     amount = float(d.get("amount") or 0)
     if amount <= 0: raise Gate("NP_NHAP", "Giá dịch vụ phải > 0")
+    # Cửa TẠO cũng phải qua cổng giá vốn — xem `_cong_gia_von`. Người bán gõ số vào đây thì cổng
+    # nói ngay, chứ không nhận rồi bỏ im lặng: một ô nhập nuốt số là thứ chỉ phát hiện ra ở bảng
+    # lãi lỗ ba tuần sau. Dịch vụ do Kinh doanh tạo sẽ có giá vốn TRỐNG cho tới khi Điều hành điền.
+    if d.get("cost_amount") or (d.get("supplier_name") or "").strip():
+        _cong_gia_von(u)
     cost = max(0.0, float(d.get("cost_amount") or 0))
     sd = date.fromisoformat(d["service_date"]) if d.get("service_date") else date.today()
     desc = (d.get("description") or SERVICE_KINDS[st]).strip()[:200]
@@ -70,6 +124,11 @@ def update(db: Session, u: User, b: Booking, d: dict) -> Booking:
     if b.cancelled: raise Gate("TRANG_THAI", "Dịch vụ đã hủy")
     if t.status not in ("da_duyet", "ket_thuc"): raise Gate("TRANG_THAI", "Dịch vụ đã chốt – không sửa")
     if u.role not in ("nv_dh", "tp_dh", "gd_kd", "tp_kd", "tn_kd") and u.id != b.sales_id and not toan_quyen(u): raise HTTPException(403, "Chỉ sale phụ trách / Điều hành sửa")
+    # Cổng giá vốn đứng TRƯỚC mọi lệnh gán, không đứng cạnh ô nó canh: gán rồi mới từ chối là để
+    # lại một bản ghi sửa dở trong phiên, và phiên ấy còn đi tiếp. Xem GIA_VON_ROLES ở đầu tệp —
+    # KHÔNG có đường vòng theo `operator_id` hay `sales_id`: khối Kinh doanh gỡ hết.
+    if d.get("cost_amount") is not None or d.get("supplier_name") is not None:
+        _cong_gia_von(u)
     before = {"gia": b.amount, "gia_von": b.cost_amount, "loai": b.service_type}
     if d.get("service_type"):
         st = d["service_type"].upper()
@@ -132,7 +191,11 @@ def summary(rows: list[Booking]) -> dict:
 def close_month(db: Session, u: User, month: str) -> dict:
     """Kế toán chốt dịch vụ lẻ đã hoàn thành trong tháng: đóng số (doanh thu = booking, giá vốn = dòng NCC) → Kế toán xác nhận → bút toán 154/335/632.
     Chỉ chốt dịch vụ đã thu đủ hoặc đã hủy có phí; dịch vụ còn nợ để lại (báo danh sách)."""
-    if u.role not in ("ketoan", "tp_dh", "tgd") and not toan_quyen(u): raise HTTPException(403, "Chỉ Kế toán / TP Điều hành chốt dịch vụ lẻ tháng")
+    # Xem CHOT_THANG_ROLES ở đầu tệp: nút này đóng số VÀ ký xác nhận Kế toán trong một cú bấm,
+    # nên nó phải là tay của Kế toán. Chủ tịch quyết 25/9/2026 gỡ tp_dh và tgd.
+    if u.role not in CHOT_THANG_ROLES and not toan_quyen(u):
+        raise HTTPException(403, "Chỉ Kế toán chốt dịch vụ lẻ tháng — nút này vừa đóng số vừa ký "
+                                 "xác nhận kế toán, không ai ký thay (Chủ tịch gỡ quyền 25/9/2026)")
     from app.services import accounting as ACC
     y, m = [int(x) for x in month.split("-")]
     first = date(y, m, 1); last = (date(y + (m == 12), m % 12 + 1, 1) - timedelta(days=1))

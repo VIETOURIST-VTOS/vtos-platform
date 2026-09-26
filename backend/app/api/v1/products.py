@@ -78,17 +78,6 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     t = db.get(Tour, tid)
     if not t: raise HTTPException(404, "Không có tour")
     v = T.tour_view(db, t, u)
-    # 24/9/2026 — hỏi theo CHUYẾN chứ không theo vai trò, y như cửa `GET /tours/{id}`.
-    #
-    # ĐÂY MỚI LÀ CỬA MÀN HÌNH CHI TIẾT DÙNG. Vòng 2 đã đổi `get_tour` sang
-    # `can_see_cost_tren_chuyen` nhưng bỏ sót cửa này, nên Kinh doanh Đoàn mở đúng chuyến mình vừa
-    # lập vẫn nhận `calc = None` và không thấy giá vốn — quyền có trong mã, màn hình vẫn che.
-    # Hai cửa đọc cùng một chuyến mà hỏi hai luật khác nhau thì luật lỏng hơn là luật vô nghĩa và
-    # luật chặt hơn là lỗi người dùng báo về.
-    if not AC.can_see_cost_tren_chuyen(u, t):
-        for k in ("settlement", "fixed_cost", "var_cost_per_pax", "actual_cost", "promo_value", "calc", "justification"): v[k] = None
-        vis = AC.sales_ids_visible(db, u)
-        if vis is not None: v["bookings"] = [b for b in v.get("bookings", []) if b.get("sales_id") in vis]
     p = db.get(Product, t.product_id) if t.product_id else db.execute(select(Product).where(Product.code == t.product_code)).scalars().first() if t.product_code else None
     v["product"] = AC.mask_product(PS.product_out(p), u) if p else None
     v["seats"] = {"open": t.seats_open, "promo": (t.seats_promo or 0), "booked": R.booked_pax(t), "left": max(0, (t.seats_open or t.planned_pax) - R.booked_pax(t))}
@@ -145,4 +134,8 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     from app.models.core import AuditLog
     v["audit"] = [{"id": l.id, "ts": l.ts, "actor": l.actor, "role": l.role, "action": l.action, "before": l.before, "after": l.after}
                   for l in db.execute(select(AuditLog).where(AuditLog.entity == f"tour:{t.code}").order_by(desc(AuditLog.id)).limit(100)).scalars()]
-    return v
+    # Che ở BƯỚC CUỐI, không ở giữa hàm: `cost_lines`, `cost_total`, `settlement_edit`,
+    # `payment_requests` và `audit` đều được gắn vào SAU khối che cũ, nên trước hôm nay chúng chưa
+    # từng bị che — tab bị ẩn trên màn hình nhưng tên NCC và đơn giá mua vẫn nằm trong phản hồi.
+    # Cùng một hàm với `GET /tours/{id}`: xem `AC.che_gia_von`.
+    return AC.che_gia_von(v, u, t, db)

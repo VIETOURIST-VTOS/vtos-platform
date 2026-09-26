@@ -27,15 +27,69 @@ def _nhom(path: str) -> str:
     return "/api/v1/" + path[len("/api/v1/"):].split("/")[0]
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# NGOẠI LỆ DUY NHẤT: nhóm API KHÔNG CẦN ĐĂNG NHẬP
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# Một nhóm nằm ở đây KHÔNG phải vì nó bị quên, mà vì người dùng của nó không có tài khoản. Khai
+# tên ra để nó là một QUYẾT ĐỊNH đọc được, chứ không phải một ô trống trong hàng rào.
+#
+# Thêm một dòng vào đây là mở thêm một cửa ra đường. Phép thử ngay dưới đòi mỗi dòng phải chứng
+# minh được là nó THẬT SỰ không có hàng rào quyền — để không ai bỏ một nhóm bình thường vào đây
+# cho qua phép thử.
+CONG_KHAI = {
+    "/api/v1/khao-sat": "Trang khách tự chấm điểm sau tour (đề xuất CSKH 25/9/2026). Khách không "
+                        "có tài khoản VTOS, nên cửa này mở bằng MỘT MÃ DÙNG MỘT LẦN thay cho đăng "
+                        "nhập. Hàng rào của nó là: mã sinh ngẫu nhiên không đoán được, một mã một "
+                        "lần ghi, có hạn, có phanh số lần thử theo địa chỉ mạng, và trang chỉ in "
+                        "ra những gì khách đã biết.",
+}
+
+
 def test_khong_nhom_api_nao_mo_coi():
     """Nhóm API không vai trò nào chạm được là một phân hệ vừa bị khóa mà chưa ai biết."""
     nhom = {_nhom(r.path) for r in app.routes if getattr(r, "path", "").startswith("/api/v1/")}
     phu = set()
     for vai in ROLES:
         phu |= set(AC.pham_vi_day_du(vai))
-    mo_coi = sorted(n for n in nhom if not any(n.startswith(x) or x.startswith(n) for x in phu))
+    mo_coi = sorted(n for n in nhom
+                    if n not in CONG_KHAI
+                    and not any(n.startswith(x) or x.startswith(n) for x in phu))
     assert not mo_coi, ("Nhóm API không màn hình nào gọi tới, nên không vai trò nào vào được. Gắn vào "
-                        f"MAN_HINH_API của đúng màn hình: {mo_coi}")
+                        f"MAN_HINH_API của đúng màn hình: {mo_coi}. Nếu đây là cửa cho người KHÔNG "
+                        "có tài khoản thì khai vào CONG_KHAI kèm lý do — và đọc phép thử ngay dưới.")
+
+
+def test_nhom_cong_khai_dung_la_khong_co_hang_rao_quyen():
+    """Canh chiều ngược lại: mỗi dòng trong CONG_KHAI phải THẬT SỰ không có hàng rào quyền.
+
+    Không có phép thử này thì CONG_KHAI thành chỗ đổ rác — ai quên khai quyền cho một nhóm bình
+    thường cũng bỏ tên vào đây là phép thử trên xanh lại, và hàng rào mất tác dụng đúng vào lúc
+    nó đang làm việc của mình.
+    """
+    import inspect
+    from app.api.deps import current_user, require_roles          # noqa: F401
+    for nhom, ly_do in CONG_KHAI.items():
+        assert len(ly_do) > 80, f"{nhom}: lý do quá ngắn để là một lý do thật"
+        duong = [r for r in app.routes if getattr(r, "path", "").startswith(nhom + "/")
+                 or getattr(r, "path", "") == nhom]
+        assert duong, f"{nhom} khai là công khai nhưng không có đường nào — dòng thừa, xoá đi"
+        for r in duong:
+            ten = [p.name for p in inspect.signature(r.endpoint).parameters.values()]
+            nguon = inspect.getsource(r.endpoint)
+            assert "current_user" not in nguon and "require_roles" not in nguon, (
+                f"{r.path} nằm trong CONG_KHAI nhưng CÓ hàng rào quyền – bỏ khỏi CONG_KHAI")
+            assert "u" not in ten or "User" not in str(inspect.signature(r.endpoint)), (
+                f"{r.path} nhận tham số người dùng – nó không phải cửa công khai")
+
+
+def test_cua_cong_khai_co_phanh_so_lan_thu():
+    """Cửa ra đường không có phanh là cửa người ta dội vào được. Phép thử này khoá cái phanh, vì
+    nó là thứ dễ bị gỡ nhất khi ai đó sửa cho "chạy nhanh hơn lúc thử"."""
+    from app.api.v1 import khao_sat_cong_khai as KS
+    nguon = open(KS.__file__, encoding="utf-8").read()
+    assert "_phanh(request)" in nguon, "cửa công khai không còn gọi phanh số lần thử"
+    assert nguon.count("_phanh(request)") >= 2, "có đường không qua phanh"
+    assert KS.TOI_DA_TRONG_CUA_SO <= 60, "phanh nới quá rộng – xem lại vì sao cần nới"
 
 
 def test_ban_do_man_hinh_api_khong_lech_voi_giao_dien():
@@ -142,6 +196,31 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # Hai lần đổi trên TRỰC GIAO nhau (một bên thêm phân hệ, một bên bỏ dòng thừa) nên con số dưới đây
 # được ĐẾM LẠI TỪ MÃ, không phải cộng trừ tay hai bảng cũ.
 PHAM_VI_DA_CHOT = {
+    # ĐÁNH GIÁ SAU TOUR (25/9/2026) – +1 cho MƯỜI BA vai: nhóm "/api/v1/danh-gia" gắn vào màn
+    # hình mới /danh-gia (bảng điểm khách chấm cho chuyến, HDV, tài xế; ba con số đã gửi / đã
+    # trả lời / không gửi được).
+    #
+    # nv_kd và tn_kd CÓ màn hình, nhưng chỉ dùng được một nửa: danh sách "khách chưa chấm" và cửa
+    # ghi hộ cho khách của chính họ. BẢNG XẾP HẠNG HDV / tài xế thì không – đó là xếp hạng người
+    # của phòng khác, và hàng rào nằm ở chữ ký cửa `bang-diem` (api/v1/danh_gia.XEM), không ở
+    # màn hình. Mở màn hình mà một cửa trên đó trả 403 là chuyện BÌNH THƯỜNG và có chủ ý.
+    #
+    # Nhóm "/api/v1/khao-sat" KHÔNG cộng cho vai nào: đó là cửa công khai cho khách không có tài
+    # khoản, khai ở CONG_KHAI đầu tệp này kèm phép thử riêng.
+    # BÀN BÁN TOUR LẺ (25/9/2026) – +1 cho CHÍN vai: nhóm "/api/v1/ban-tour-le" gắn vào màn hình
+    # mới /ban-tour-le (chuyến lẻ đang bán, mỗi dòng kèm ba con số dự toán và biên).
+    #
+    # Chín vai: bốn vai nền (chutich, tgd, bks, robot_ks), cộng TOÀN KHỐI KINH DOANH LẺ (gd_kd,
+    # tp_kd, tn_kd, nv_kd) và cntt.
+    #
+    # KHÔNG có sales_admin, KHÔNG có ptgd_doan, KHÔNG có ketoan. Hai vai đầu thuộc phòng Đoàn và
+    # Chủ tịch nói rõ ngày 25/9: "ý là PKDL, còn PKDĐ vẫn giữ nguyên" — bàn của họ là /sales-admin
+    # và /ptgd-doan. Kế toán không có vì màn hình này KHÔNG có một con số quyết toán nào: mọi số ở
+    # đây tính từ ba con số dự toán, và Kế toán đã đọc số thật ở bảng quyết toán.
+    #
+    # Đây là lần NỚI QUYỀN XEM GIÁ VỐN đầu tiên cho phòng Lẻ, nên nó hẹp đúng bằng ba con số:
+    # không dòng nhà cung cấp, không đơn giá mua, không số đã chi. Xem test_bcs1 và
+    # access.can_see_du_toan_ba_con_so.
     # TC-81 (24/9/2026) – +1 cho BẢY vai: nhóm "/api/v1/bao-chi-kol" gắn vào màn hình mới
     # /bao-chi-kol (sổ báo chí, sự kiện, phát ngôn + danh bạ KOL/KOC). Bảy vai: bốn vai nền, cộng
     # ptgd_mkt, nv_mkt, cntt. Không một vai Kinh doanh nào và không có ketoan: đây là sổ thương
@@ -390,8 +469,8 @@ PHAM_VI_DA_CHOT = {
     # phòng Đoàn. Cũng là một nhóm API RIÊNG chỉ đọc, cùng lý do đã ghi ở dòng trên. Lần này
     # `sales_admin` và `ptgd_doan` cùng +1 với bốn vai nền; khối Kinh doanh KHÔNG được +1 vì màn
     # hình ấy là chỗ SOÁT hồ sơ của chính họ.
-    "chutich": 119, "tgd": 119, "bks": 119, "cntt": 116,
-    "ketoan": 99, "tp_dh": 86, "ptgd_doan": 71, "nv_dh": 60, "hcns": 61, "gd_kd": 63,
+    "chutich": 121, "tgd": 121, "bks": 121, "cntt": 118,
+    "ketoan": 99, "tp_dh": 87, "ptgd_doan": 72, "nv_dh": 61, "hcns": 62, "gd_kd": 65,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -412,7 +491,7 @@ PHAM_VI_DA_CHOT = {
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 47, "nv_kd": 46, "tn_kd": 46, "tp_kd": 48, "nv_mkt": 35,
+    "ptgd_mkt": 48, "nv_kd": 48, "tn_kd": 48, "tp_kd": 50, "nv_mkt": 36,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -423,7 +502,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 119, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 121, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

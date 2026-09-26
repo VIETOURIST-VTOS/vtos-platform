@@ -62,22 +62,25 @@ def list_np(month: str = "", service_type: str = "", paid: str = "", q: str = ""
     return {"kinds": SERVICE_KINDS, "rows": [NP.row(b) for b in rows], "summary": NP.summary(rows)}
 
 
+# KS-2: ba cửa dưới đây khai quyền ở THÂN HÀM còn chữ ký để trống, nên bộ kiểm quyền đọc ra "ai
+# đăng nhập cũng gọi được". Người bị từ chối vẫn nhận 403, nhưng bản khai quyền nói sai — và bản
+# khai sai là thứ người ta dùng để trả lời câu "ai làm được việc này".
 @router.post("/non-package", status_code=201)
-def create_np(data: NPIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def create_np(data: NPIn, u: User = Depends(require_roles(*NP.CREATE_ROLES, mo_ta="tạo dịch vụ lẻ")), db: Session = Depends(get_db)):
     t, b = NP.create(db, u, data.model_dump())
     return {"row": NP.row(b), "message": f"Đã tạo dịch vụ lẻ {t.code} – booking {b.code} ({b.amount:,.0f} đ)"}
 
 
 @router.put("/non-package/{bid}")
-def edit_np(bid: int, data: NPEdit, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def edit_np(bid: int, data: NPEdit, u: User = Depends(require_roles(*NP.SUA_ROLES, mo_ta="sửa dịch vụ lẻ")), db: Session = Depends(get_db)):
     return NP.row(NP.update(db, u, _b(db, bid), data.model_dump(exclude_none=True)))
 
 
 @router.get("/non-package/{bid}/print", response_class=HTMLResponse)
-def print_np(bid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def print_np(bid: int, u: User = Depends(require_roles(*AC.BOOKING_ROLES, mo_ta="in phiếu dịch vụ lẻ")), db: Session = Depends(get_db)):
     return HTMLResponse(NP.print_html(_b(db, bid)))
 
 
 @router.post("/non-package/close-month")
-def close_month(data: MonthIn, u: User = Depends(require_roles("ketoan", "tp_dh", "tgd")), db: Session = Depends(get_db)):
+def close_month(data: MonthIn, u: User = Depends(require_roles(*NP.CHOT_THANG_ROLES, mo_ta="chốt dịch vụ lẻ tháng")), db: Session = Depends(get_db)):
     return NP.close_month(db, u, data.month)

@@ -33,7 +33,13 @@ CUA_TAY = (
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",
     "campaigns", "care_tickets", "cash_plan_items", "chot_so_du", "companies", "complaints",
     "content_items",
-    "conversations", "daily_reports", "dependents", "dispatch_orders", "employee_profiles",
+    "conversations", "daily_reports",
+    # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
+    # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
+    # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
+    # ấy mang nguon="nhan_vien" để bảng điểm tách được hai loại số.
+    "danh_gia_sau_tour", "ma_khao_sat",
+    "dependents", "dispatch_orders", "employee_profiles",
     "employees", "fin_contracts", "fin_schedules", "fleet_ai_runs", "fleet_collaterals",
     "fleet_debt_payments", "fleet_maintenance", "fleet_offset_applications", "fleet_partners",
     "fleet_period_costs", "fleet_repayment_installments", "fleet_repayment_plans",

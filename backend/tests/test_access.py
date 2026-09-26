@@ -33,7 +33,17 @@ def test_read_matrix_cost_finance_audit():
         for path in (f"/api/v1/tours/{tid}/settlement", f"/api/v1/tours/{tid}/cost-lines", f"/api/v1/tours/{tid}/cashflow", "/api/v1/bank-transactions", "/api/v1/audit"):
             assert client.get(path, headers=h).status_code == 403, (who, path)
         v = client.get(f"/api/v1/tours/{tid}", headers=h).json()
-        assert v["fixed_cost"] is None and v["calc"] is None and v["settlement"] is None and "audit" not in v and v["price_per_pax"]   # giá bán vẫn thấy
+        assert v["settlement"] is None and "audit" not in v and v["price_per_pax"]   # giá bán vẫn thấy
+    # BA CON SỐ: từ 25/9/2026 khối Kinh doanh nhìn thấy dự toán (Chủ tịch: "sales lẻ chỉ nhìn thấy
+    # dự toán 3 con số như trong file quyết toán tour của Điều hành") — nhưng KHÔNG thấy giá vốn
+    # thật: dòng NCC, bảng quyết toán, chi phí thực tế. Xem test_bcs1_ba_con_so_cho_sales_le.py.
+    for who in ("kd.hoa", "gd.kd"):
+        v = client.get(f"/api/v1/tours/{tid}", headers=login(who)).json()
+        assert v["fixed_cost"] is not None and v["calc"] is not None, who
+        assert v["actual_cost"] is None, who
+    # HC-NS không thuộc khối Kinh doanh nên không lên bậc ba: mất cả ba con số.
+    v = client.get(f"/api/v1/tours/{tid}", headers=login("hcns")).json()
+    assert v["fixed_cost"] is None and v["calc"] is None
     # Điều hành xem chi phí nhưng không xem ngân hàng / nhật ký
     h = login("dh.lan")
     assert client.get(f"/api/v1/tours/{tid}/settlement", headers=h).status_code == 200
