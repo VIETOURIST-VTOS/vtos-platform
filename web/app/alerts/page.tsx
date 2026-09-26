@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { ROLES } from "@/lib/meta";
 
 // KS-4 · 11/9/2026. Đo trên hệ thống thật: 1.703 cảnh báo đang mở, 1.310 đỏ. Màn hình cũ đổ cả bảng
 // ra một danh sách phẳng và cho mọi người một nút "Đóng" duy nhất, bấm là xong, không hỏi gì.
@@ -28,6 +29,7 @@ function Alerts() {
   const [chamTran, setChamTran] = useState(false);
   const [trangThai, setTrangThai] = useState("moi,dang_xu_ly");
   const [cuaToi, setCuaToi] = useState(false);
+  const [thang, setThang] = useState<any>(null);
 
   const load = useCallback(async () => {
     const q = new URLSearchParams();
@@ -37,6 +39,9 @@ function Alerts() {
     setRows(r.rows || []); setTong(r.tong || 0); setChamTran(!!r.cham_tran);
   }, [trangThai, cuaToi]);
   useEffect(() => { load().catch((x) => toast(errMsg(x), true)); }, [load]);
+  // Thang bậc đòi nợ — cửa HẸP HƠN màn hình (Kinh doanh + Kế toán + BLĐ). 403 ở đây là câu trả
+  // lời đúng, không phải sự cố: không vẽ khối này chứ không kêu lỗi đỏ.
+  useEffect(() => { api("/alerts/thang-doi-no").then(setThang).catch(() => setThang(null)); }, []);
 
   const goi = async (path: string, json?: any) => {
     try { await api(path, { method: "POST", json }); load(); }
@@ -71,6 +76,30 @@ function Alerts() {
           catch (x) { toast(errMsg(x), true); }
         }}>R9 – quét bất thường</button>}
     </div>
+    {/* THANG BẬC ĐÒI NỢ KHÁCH — Chủ tịch quyết 25/9/2026, câu 5. In ra để người nhận một cảnh
+        báo bậc 2 hiểu vì sao nó tới tay mình, và để hai con số mốc ngày không nằm im trong cơ sở
+        dữ liệu: tham số mà không ai nhìn thấy thì không ai sửa. */}
+    {thang && <details className="panel"><summary><b>Thang bậc đòi nợ khách quá hạn</b> — {thang.moc_bac2_ngay} ngày lên cấp trên, {thang.moc_bac3_ngay} ngày lên lãnh đạo khối</summary>
+      <table>
+        <thead><tr><th>Mảng</th><th>Bậc 1 — ngay</th><th>Bậc 2 — sau {thang.moc_bac2_ngay} ngày</th><th>Bậc 3 — sau {thang.moc_bac3_ngay} ngày</th></tr></thead>
+        <tbody>
+          <tr><td><b>Kinh doanh Đoàn</b></td>{(thang.thang?.doan || []).map((v: string, i: number) => <td key={i}>{ROLES[v] || v}</td>)}</tr>
+          <tr><td><b>Kinh doanh Lẻ</b></td>{(thang.thang?.le || []).map((v: string, i: number) => <td key={i}>{ROLES[v] || v}</td>)}</tr>
+        </tbody>
+      </table>
+      <p className="muted">Một khoản nợ là <b>một dòng cảnh báo</b> — lên bậc là đổi người chịu trên chính dòng ấy,
+        không sinh thêm dòng mới. Hai mốc ngày sửa ở màn hình <b>Chính sách</b> (tham số <code>no_khach_bac2_ngay</code>,
+        <code> no_khach_bac3_ngay</code>).</p>
+      {["gd_kd", "tp_kd", "sales_admin", "ptgd_doan", "ketoan", "cntt", "tgd", "chutich"].includes(user?.role || "") &&
+        <button className="act grey" onClick={async () => {
+          try {
+            const r = await api("/alerts/thang-doi-no/quet", { method: "POST" });
+            toast(`Bậc 1: ${r.bac_1} · bậc 2: ${r.bac_2} · bậc 3: ${r.bac_3}` +
+                  (r.khong_ro_chu?.length ? ` — ${r.khong_ro_chu.length} khoản CHƯA BIẾT giao cho ai` : ""));
+            load();
+          } catch (x) { toast(errMsg(x), true); }
+        }}>Quét lại thang bậc</button>}
+    </details>}
     <div className="panel wrap"><table>
       <thead><tr>
         <th>Mức</th><th>Trạng thái</th><th>Loại</th><th>Tham chiếu</th><th>Nội dung</th>
@@ -80,7 +109,9 @@ function Alerts() {
         <tr key={a.id} style={{ opacity: ["dong", "bo_qua"].includes(a.trang_thai) ? 0.5 : 1 }}>
           <td><Tag cls={a.level}>{a.level}</Tag></td>
           <td>{a.tre && <Tag cls="do">trễ</Tag>} {NHAN[a.trang_thai] || a.trang_thai}</td>
-          <td>{a.kind}</td><td>{a.ref}</td><td>{a.message}</td>
+          {/* Bậc in CẠNH loại, không thay nó: "bậc 3" mà không biết bậc của việc gì thì vô nghĩa. */}
+          <td>{a.kind}{a.bac ? <> <Tag cls={a.bac >= 3 ? "red" : "warn"}>bậc {a.bac}</Tag></> : null}</td>
+          <td>{a.ref}</td><td style={{ whiteSpace: "pre-wrap" }}>{a.message}</td>
           <td className="muted">{a.nguoi_nhan || a.to_roles}</td>
           <td className="muted">{a.han_xu_ly ? fmtDT(a.han_xu_ly) : "—"}</td>
           <td className="muted">{fmtDT(a.created_at)}</td>

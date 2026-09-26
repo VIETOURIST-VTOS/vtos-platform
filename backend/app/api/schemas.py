@@ -79,6 +79,17 @@ class MoThemCho(BaseModel):
     ly_do: str = ""
 
 
+class GiaoHoSo(BaseModel):
+    """Bàn giao hồ sơ quyết toán sang người khác — Chủ tịch quyết 25/9/2026, câu 4.
+
+    `ly_do` KHÔNG có giá trị mặc định rỗng như phần lớn ô ghi chú khác trong tệp này: bàn giao
+    trách nhiệm về một con số mà không ai ghi vì sao thì ba tháng sau không đọc lại được. Độ dài
+    tối thiểu kiểm ở `chu_ho_so.giao_ho_so`, cùng chỗ với mọi luật khác của cửa này.
+    """
+    nguoi_id: int
+    ly_do: str
+
+
 class ProductIn(BaseModel):
     phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm
     code: str

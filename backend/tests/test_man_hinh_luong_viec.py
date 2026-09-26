@@ -72,7 +72,12 @@ def test_buoc_mot_cua_noi_ro_khong_ai_lam_thay_duoc():
     dong_so = [b for n in d["nhom"] for b in n["buoc"] if b["ma"] == "dong_so"][0]
     assert dong_so["mot_cua"] is True
     assert "không ai làm thay được" in dong_so["ai_duoc"]
-    assert dong_so["chu_so_huu"] == "người điều hành chuyến"
+    # Đổi 25/9/2026 (Chủ tịch, câu 4): chủ của bước này không còn khoá cứng vào người điều hành
+    # chuyến. Điều PHẢI GIỮ là hai dòng trên — vẫn là cổng một cửa, và trang vẫn nói ra bằng lời
+    # rằng không ai làm thay được. Tên người thì đổi được; tính chất thì không.
+    assert dong_so["chu_so_huu"] == "chủ hồ sơ quyết toán"
+    assert dong_so["chu_so_huu"] and "operator_id" not in dong_so["chu_so_huu"], (
+        "trang rà soát đang in tên CỘT ra cho người đọc thay vì tên việc")
 
 
 def test_vai_tro_tinh_luc_chay_duoc_dien_giai_bang_loi():

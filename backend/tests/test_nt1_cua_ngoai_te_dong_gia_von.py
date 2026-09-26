@@ -172,12 +172,16 @@ def test_nt8_cua_doc_tra_ve_ca_bon_o_KE_CA_KHI_RONG():
 
 # ───────────────────────── không phá luật đã có ─────────────────────────
 
-def test_nt9_cong_MOT_CUA_khong_bi_dung_toi():
-    """Lần mở cửa này đổi việc KHAI, không đổi việc AI ĐƯỢC KHAI."""
+def test_nt9_cong_MOT_CHU_HO_SO_khong_bi_dung_toi():
+    """Lần mở cửa này đổi việc KHAI, không đổi việc AI ĐƯỢC KHAI.
+
+    Cổng đổi TÊN ngày 25/9/2026 ("Một cửa" → "Một chủ hồ sơ", Chủ tịch quyết câu 4) nhưng điều
+    phép thử này canh thì không đổi một chữ: Trưởng phòng Điều hành VẪN BỊ TỪ CHỐI trên chuyến
+    của người khác. Bốn ô ngoại tệ là việc khai thêm dữ liệu, không phải việc mở thêm người."""
     db = _db(); t = _tour(db)
     with pytest.raises(Gate) as e:
         ST.add_line(db, _u(db, "tpdh"), t, {**DONG, "unit_price": 1_000_000})
-    assert "Một cửa" in str(e.value.detail["message"])
+    assert "Một chủ hồ sơ" in str(e.value.detail["message"])
 
 
 def test_nt10_KHONG_tu_tra_so_ty_gia():
