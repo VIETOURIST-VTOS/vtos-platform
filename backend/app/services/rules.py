@@ -253,6 +253,36 @@ DEFAULT_PARAMS = [
     ("xe_ky_quyet_toan_ap_dung_tu", "2026-09", "Kỳ đầu tiên áp dụng cách cắt kỳ theo tháng dương lịch; kỳ "
      "trước mốc này đã quyết toán xong theo cách cũ nên máy không dựng lại", "YYYY-MM", "Chủ tịch 07/9/2026"),
     ("xe_nguoi_lap_lenh", "53","Tài khoản (hoặc mã nhân viên) được tạo và chốt lệnh điều xe – để trống là theo vai trò", "danh sách", "Chủ tịch 07/9/2026"),
+
+    # ── Chủ hồ sơ quyết toán mảng Đoàn · Chủ tịch quyết 25/9/2026, câu 4 ─────────────────────
+    #
+    # GIÁ TRỊ ĐỂ TRỐNG, VÀ ĐÓ LÀ MẶC ĐỊNH ĐÚNG. Trống = mọi chuyến vẫn theo luật cũ (người điều
+    # hành chuyến soạn quyết toán). Phòng Đoàn khai tài khoản Sale Admin vào đây thì từ lúc ấy
+    # mọi tour ĐOÀN chưa ai chạm vào sẽ thuộc về chị ấy.
+    #
+    # ĐÚNG MỘT TÀI KHOẢN. Khác `xe_nguoi_lap_lenh` ở trên — ô ấy nhận một danh sách, ô này thì
+    # không: "một chủ hồ sơ" mà khai hai người là một câu hỏi cấu hình chưa trả lời xong, và
+    # `chu_ho_so.nguoi_giu_ho_so_doan` từ chối đoán hộ thay vì lấy bừa người đầu danh sách.
+    #
+    # ĐỔI Ô NÀY LÀ CHUYỂN CHỦ HÀNG TRĂM CHUYẾN CÙNG LÚC — nhưng chỉ những chuyến CHƯA AI GHI dòng
+    # quyết toán nào. Hồ sơ vừa có dòng đầu tiên là tên người ghi được đóng cứng vào
+    # `tours.chu_ho_so_id`, và từ đó tham số này không với tới nữa.
+    # ── Thang bậc đòi nợ khách · Chủ tịch quyết 25/9/2026, câu 5 ───────────────────────────────
+    #
+    # Chủ tịch chỉ định AI chịu ở từng bậc; hai con số NGÀY dưới đây là phần hệ thống phải có để
+    # câu ấy chạy được, và chúng là ĐỀ XUẤT — 3 ngày lên cấp trên trực tiếp, 7 ngày lên lãnh đạo
+    # khối. Cả hai sửa ở màn hình Chính sách, không phải sửa mã.
+    #
+    # ĐẾM TỪ HẠN HỦY CHỖ (`booking.cancel_deadline`), không phải từ ngày khởi hành: hạn hủy chỗ là
+    # mốc đã ký với khách, còn ngày khởi hành thì tiền lẽ ra phải thu xong từ trước đó.
+    ("no_khach_bac2_ngay", "3", "Quá hạn thu tiền bao nhiêu ngày thì chuyển cấp trên trực tiếp "
+     "(Đoàn: Sale Admin · Lẻ: TP Kinh doanh)", "ngày", "Chủ tịch quyết 25/9/2026, câu 5"),
+    ("no_khach_bac3_ngay", "7", "Quá hạn thu tiền bao nhiêu ngày thì chuyển lãnh đạo khối "
+     "(Đoàn: Phó TGĐ Đoàn · Lẻ: Giám đốc Kinh doanh)", "ngày", "Chủ tịch quyết 25/9/2026, câu 5"),
+
+    ("chu_ho_so_doan", "", "Tài khoản (hoặc mã nhân viên) giữ hồ sơ quyết toán của mọi tour mảng Đoàn – "
+     "để trống là người điều hành chuyến soạn như cũ. Đúng MỘT người.", "tài khoản",
+     "Chủ tịch quyết 25/9/2026, câu 4"),
     # Hạn TRẢ LỜI của lời chào chuyến, không phải hạn tuân thủ của hướng dẫn viên: hết hạn thì lời chào
     # hết hiệu lực và chuyến được chào cho người khác. Toàn bộ HDV là cộng tác viên (07/9/2026), nên một
     # mốc thời gian mang nghĩa "bắt buộc phải trả lời" là dấu hiệu quản lý, điều hành – thứ mà luật nhìn

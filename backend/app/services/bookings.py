@@ -281,5 +281,11 @@ def robot_check(db: Session) -> dict:
         if left < 0: add("bao_luu_het_han", "red", f"baoluu:{rt.code}", f"Bảo lưu {rt.code} ({rt.customer_name}, {(rt.remaining or 0):,.0f} đ) đã hết hạn {rt.expires_on:%d/%m} – hoàn tiền hoặc hủy bảo lưu", "tp_dh,gd_kd,ketoan")
         elif left <= 7: add("bao_luu_sap_het_han", "warn", f"baoluu:{rt.code}", f"Bảo lưu {rt.code} ({rt.customer_name}, {(rt.remaining or 0):,.0f} đ) hết hạn {rt.expires_on:%d/%m} – liên hệ khách chọn tour", "nv_kd,tp_dh")
     db.commit()
+    # THANG BẬC ĐÒI NỢ — Chủ tịch quyết 25/9/2026, câu 5. Chạy NGAY SAU khi sinh cảnh báo, trong
+    # cùng một lượt robot: bộ sinh và bộ giao chủ tách nhau thì có một khoảng thời gian cảnh báo
+    # đỏ nằm đó không có chủ, và đó đúng là trạng thái PQ-9 đã đo được trên 1.557 dòng.
+    from app.services import thang_doi_no as TDN
+    thang = TDN.quet(db)
     return {"locked": locked, "new_alerts": made,
-            "giu_cho_dat_han": gc["dat_han"], "giu_cho_het_han": gc["het_han"]}
+            "giu_cho_dat_han": gc["dat_han"], "giu_cho_het_han": gc["het_han"],
+            "thang_doi_no": thang}

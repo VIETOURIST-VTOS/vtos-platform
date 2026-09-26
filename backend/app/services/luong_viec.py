@@ -53,6 +53,10 @@ VA = "va"
 # Chủ sở hữu hồ sơ được xác định bằng cột nào
 NGUOI_DIEU_HANH = "operator_id"   # người điều hành chuyến
 SALE_PHU_TRACH = "sales_id"       # sale phụ trách booking
+# Chủ hồ sơ quyết toán — Chủ tịch quyết 25/9/2026, câu 4. KHÔNG phải một cột: là kết quả của
+# `chu_ho_so.chu_ho_so()`, đọc theo ba bậc (chỉ định riêng của chuyến → mặc định mảng Đoàn →
+# người điều hành chuyến). Vẫn đúng MỘT người, nên vẫn canh bằng CHI_CHU_SO_HUU như trước.
+CHU_HO_SO = "chu_ho_so"
 
 
 @dataclass(frozen=True)
@@ -84,7 +88,8 @@ class Buoc:
         return ten_vt
 
 
-_TEN_CHU = {NGUOI_DIEU_HANH: "người điều hành chuyến", SALE_PHU_TRACH: "sale phụ trách booking", "": "—"}
+_TEN_CHU = {NGUOI_DIEU_HANH: "người điều hành chuyến", SALE_PHU_TRACH: "sale phụ trách booking",
+            CHU_HO_SO: "chủ hồ sơ quyết toán", "": "—"}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -130,10 +135,19 @@ _TOUR = (
                 "Chủ tịch – đó là quyết định tiêu tiền, không phải quyết định điều hành."),
 
     Buoc("chuyen_tour", "dong_so", "Đóng sổ quyết toán",
-         chu_so_huu=NGUOI_DIEU_HANH, cach_canh=CHI_CHU_SO_HUU,
+         chu_so_huu=CHU_HO_SO, cach_canh=CHI_CHU_SO_HUU,
          tu_trang_thai="ket_thuc|da_duyet", den_trang_thai="da_dong_so", nguon="tours.py::close",
-         vi_sao="Cổng 6 – một cửa. Chỉ người điều hành chuyến nhập quyết toán của chuyến đó, kể cả "
-                "Trưởng phòng cũng không nhập thay: nhập thay là mất dấu người chịu trách nhiệm."),
+         vi_sao="Cổng 6 – MỘT CHỦ HỒ SƠ. Ai soạn thì người ấy đóng, kể cả Trưởng phòng cũng không "
+                "đóng thay: đóng thay là mất dấu người chịu trách nhiệm về con số. Đổi 25/9/2026: "
+                "chủ hồ sơ không còn khoá cứng vào người điều hành chuyến, vì ở phòng Đoàn người "
+                "gom chứng từ và gõ quyết toán là Sale Admin."),
+
+    Buoc("chuyen_tour", "giao_ho_so", "Bàn giao hồ sơ quyết toán",
+         vai_tro=("tp_dh",), chu_so_huu=CHU_HO_SO, cach_canh=HOAC,
+         nguon="chu_ho_so.py::giao_ho_so",
+         vi_sao="Trao đi được, LẤY VỀ thì không: `sales_admin` cố ý không có trong danh sách vai, "
+                "vì cho người nhận tự lấy hồ sơ về tay mình là bỏ luôn ý nghĩa của bàn giao. "
+                "Không chuyển thưởng chuyến – cột `operator_id` không đổi."),
 
     Buoc("chuyen_tour", "kt_xac_nhan", "Kế toán xác nhận quyết toán",
          vai_tro=("ketoan",), cach_canh=CHI_VAI_TRO,
@@ -156,12 +170,14 @@ _TOUR = (
 # ---------------------------------------------------------------------------------------------
 _QUYET_TOAN = (
     Buoc("quyet_toan", "soan_dong", "Thêm/sửa/huỷ dòng nhà cung cấp",
-         chu_so_huu=NGUOI_DIEU_HANH, cach_canh=CHI_CHU_SO_HUU,
+         chu_so_huu=CHU_HO_SO, cach_canh=CHI_CHU_SO_HUU,
          nguon="settlement.py::_assert_edit",
-         vi_sao="Cùng cổng 6 với việc đóng sổ – soạn và đóng phải là một người."),
+         vi_sao="Cùng cổng 6 với việc đóng sổ – soạn và đóng phải là một người. Dòng đầu tiên ghi "
+                "vào đây còn ĐÓNG DẤU tên người ghi lên chuyến, để đổi tham số mảng Đoàn về sau "
+                "không lấy được một hồ sơ đang soạn dở khỏi tay người đang soạn."),
 
     Buoc("quyet_toan", "gan_chung_tu", "Gắn chứng từ vào một dòng",
-         vai_tro=("ketoan", "cntt"), chu_so_huu=NGUOI_DIEU_HANH, cach_canh=HOAC,
+         vai_tro=("ketoan", "cntt"), chu_so_huu=CHU_HO_SO, cach_canh=HOAC,
          nguon="settlement.py::set_doc",
          vi_sao="Chứng từ có thể về tay Kế toán trước; mở thêm đúng hai vai trò ấy, không mở rộng hơn."),
 )

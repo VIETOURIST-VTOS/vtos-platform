@@ -328,6 +328,18 @@ class Tour(Base):
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
     operator_id: Mapped[int] = mapped_column(ForeignKey("users.id"))      # người điều hành duy nhất
+    # ── Chủ hồ sơ quyết toán · Chủ tịch quyết 25/9/2026, câu 4 ─────────────────────────────────
+    #
+    # AI SOẠN VÀ ĐÓNG QUYẾT TOÁN CỦA CHUYẾN NÀY. Để TRỐNG là câu trả lời bình thường, không phải
+    # dữ liệu thiếu: trống nghĩa là "chưa chỉ đích danh ai", và khi đó `chu_ho_so.chu_ho_so()` trả
+    # về mặc định của mảng Đoàn, hoặc người điều hành chuyến. Vì vậy không cần nạp ngược cột này
+    # cho hơn một nghìn chuyến cũ — luật cũ vẫn là đường rơi cuối cùng.
+    #
+    # TÁCH KHỎI `operator_id` CÓ CHỦ Ý. `operator_id` trả lời "ai chạy chuyến, thưởng chuyến thuộc
+    # về ai"; cột này trả lời "ai chịu trách nhiệm về con số quyết toán". Ở tour lẻ hai câu trùng
+    # nhau; ở phòng Đoàn thì người gom chứng từ và gõ quyết toán là Sale Admin. Ghi đè
+    # `operator_id` lúc bàn giao sẽ chuyển luôn tiền thưởng sang người gõ — nên có cột riêng.
+    chu_ho_so_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     # Dự toán
     price_per_pax: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     fixed_cost: Mapped[float | None] = mapped_column(TIEN, nullable=True)
@@ -431,7 +443,9 @@ class Tour(Base):
     settled_vietrip: Mapped[bool] = mapped_column(Boolean, default=False)  # Vietrip: quyết toán / duyệt chi
     imported: Mapped[bool] = mapped_column(Boolean, default=False)         # nhập từ Vietrip – không qua cổng duyệt VTOS
 
-    operator: Mapped["User"] = relationship()
+    # Hai khoá ngoại cùng trỏ về `users` từ ngày 25/9/2026 (thêm `chu_ho_so_id`), nên phải nói rõ
+    # quan hệ này đi theo cột nào — bỏ trống thì SQLAlchemy không đoán được và nổ lúc khởi tạo.
+    operator: Mapped["User"] = relationship(foreign_keys=[operator_id])
     bookings: Mapped[list["Booking"]] = relationship(back_populates="tour")
 
 
@@ -590,6 +604,19 @@ class Alert(Base):
     # Khoá gom trùng: cùng một vấn đề sinh lại mỗi lượt quét thì cộng dồn vào một dòng, không đẻ
     # dòng mới. Trước đây mỗi robot tự dò theo (kind, ref) bằng tay — nơi nào quên là nơi ấy ngập.
     gom_khoa: Mapped[str] = mapped_column(String(100), default="", server_default="", index=True)
+    # ── Bậc của thang leo · Chủ tịch quyết 25/9/2026, câu 5 ─────────────────────────────────
+    #
+    # Một cảnh báo ĐI LÊN thay vì đẻ thêm dòng mới, nên phải có chỗ ghi nó đang ở bậc mấy. RỖNG
+    # nghĩa là loại cảnh báo này không có thang — phần lớn các loại đều thế.
+    #
+    # Bản đầu em định KHÔNG thêm cột, suy bậc ra từ `to_roles`. Nó sai ở một chỗ cụ thể: thang
+    # mảng Lẻ là (nv_kd → tp_kd → gd_kd), mà `gd_kd` VỐN ĐÃ nằm trong danh sách báo tin gốc của
+    # cảnh báo trễ thu tiền. Suy ra từ đó thì mọi khoản nợ lẻ trông như đã ở bậc 3 ngay từ đầu.
+    #
+    # `to_roles` KHÔNG thu hẹp khi leo bậc, chỉ CỘNG THÊM: Điều hành giữ ghế và Kế toán giữ sổ
+    # vẫn cần nhìn thấy khoản nợ ấy. Hai cột trả lời hai câu khác nhau, đúng như PQ-9 đã tách —
+    # `nguoi_phu_trach` là người PHẢI ĐÒI, `to_roles` là những người ĐƯỢC BIẾT.
+    bac: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 # ---------- Nhật ký bất biến ----------

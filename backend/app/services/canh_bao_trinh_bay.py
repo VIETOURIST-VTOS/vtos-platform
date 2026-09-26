@@ -68,7 +68,9 @@ NHAN = {
     "sla_booking": Loai("Booking quá hạn xử lý theo cam kết",
                         nguon_khai="rules.py – add('sla_booking', …)"),
     "qua_deadline_thu": Loai("Quá hạn thu tiền khách",
-                             nguon_khai="chu_canh_bao.py – ref = booking:<mã>, chủ là sale"),
+                             nguon_khai="chu_canh_bao.py – ref = booking:<mã>, chủ là sale. Từ "
+                                        "25/9/2026 chủ ĐI LÊN theo thang bậc đòi nợ ba cấp "
+                                        "(thang_doi_no.py::quet), khác nhau giữa mảng Đoàn và Lẻ"),
     "bc_ngay_1": Loai("Thiếu báo cáo ngày (lần nhắc 1)",
                       nguon_khai="chu_canh_bao.py – ref = <mã NV>:<ngày>"),
     "bc_ngay_2": Loai("Thiếu báo cáo ngày (lần nhắc 2)",

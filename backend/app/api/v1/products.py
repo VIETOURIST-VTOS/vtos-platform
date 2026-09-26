@@ -100,7 +100,7 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     lines = [l for l in lines if l.status == "hd"]
     v["cost_lines"] = [ST.line_out(l) for l in ST.lines_of(db, t)]
     v["cost_total"] = {"actual": sum((l.actual or 0) for l in lines), "paid": sum((l.paid or 0) for l in lines)}
-    v["settlement_edit"] = {"can_edit": ST.can_edit(u, t), "version": t.settlement_version, "service_types": ST.SERVICE_TYPES, "summary": ST.summary(db, t), "checks": ST.checks(db, t)}
+    v["settlement_edit"] = {"can_edit": ST.can_edit(db, u, t), "version": t.settlement_version, "service_types": ST.SERVICE_TYPES, "summary": ST.summary(db, t), "checks": ST.checks(db, t)}
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
     # Như trên: đơn giá hiển thị giữ nguyên rỗng, chỉ thù lao mới xử rỗng thành 0.
     v["guides"] = [{"id": a.id, "guide": emps.get(a.guide_id, ""), "days": a.days,
