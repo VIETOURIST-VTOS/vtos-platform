@@ -102,21 +102,53 @@ def test_bang_khop_voi_luat_dang_chay(nv, ma, tep, ham):
         "MÃ ĐÚNG, BẢNG SAI – sửa bảng cho khớp mã.")
 
 
-def test_cong_mot_cua_van_la_mot_cua_trong_ma():
-    """Hai cổng 'một cửa' phải KHÔNG có đường thoát theo vai trò trong mã.
+def test_cong_mot_chu_ho_so_van_la_MOT_nguoi_trong_ma():
+    """Hai cổng quyết toán phải KHÔNG có đường thoát theo vai trò, và phải hỏi ĐÚNG MỘT người.
 
     Đóng sổ quyết toán và soạn dòng quyết toán là chỗ duy nhất trong hệ thống mà chức vụ không
     thay được trách nhiệm: Trưởng phòng cũng không nhập hộ. Thêm một vai trò vào đây là xoá dấu
     người chịu trách nhiệm về con số, và không ai nhận ra vì bảng vẫn cân.
+
+    ĐỔI NGÀY 25/9/2026 (Chủ tịch, câu 4). Bản cũ canh bằng cách đòi chữ `operator_id` có mặt
+    trong thân hai hàm. Nay người chịu trách nhiệm do `chu_ho_so.chu_ho_so()` chỉ ra, nên phép
+    thử đòi đúng ba điều còn lại — và chúng mới là nội dung thật của luật:
+
+      1. Hai hàm KHÔNG chặn theo vai trò. Đây là điều quan trọng nhất và nó KHÔNG đổi.
+      2. Hai hàm hỏi `chu_ho_so` (qua `la_chu_ho_so`), không tự dựng luật riêng. Bản cũ từng để
+         hai bản chép của cùng một luật lệch nhau một lần rồi.
+      3. `chu_ho_so` bản thân nó trả về MỘT người: vẫn rơi về `operator_id`, và KHÔNG xét
+         `u.role` ở bất cứ đâu. Nếu một ngày ai đó viết `if u.role == "tp_dh": return u.id` vào
+         đó thì cổng một chủ hồ sơ đã bị nới — ở một tệp mà hai phép thử trên không nhìn tới.
     """
     for tep, ham in (("tours.py", "close"), ("settlement.py", "_assert_edit")):
         than = _than_ham(tep, ham)
-        assert "operator_id" in than, f"{tep}::{ham} không còn kiểm người điều hành chuyến"
         assert not _vai_tro_trong(than), (
-            f"{tep}::{ham} nay có chặn theo vai trò – cổng một cửa đã bị nới, bảng phải khai lại")
+            f"{tep}::{ham} nay có chặn theo vai trò – cổng một chủ hồ sơ đã bị nới, bảng phải khai lại")
+        assert "la_chu_ho_so" in than, (
+            f"{tep}::{ham} không còn hỏi chu_ho_so.la_chu_ho_so – luật đang được chép lại chỗ khác")
+
+    than_chs = _than_ham("chu_ho_so.py", "chu_ho_so")
+    assert "operator_id" in than_chs, "chu_ho_so() không còn rơi về người điều hành chuyến"
+    assert "u.role" not in than_chs and "role" not in than_chs, (
+        "chu_ho_so() nay xét vai trò – một chủ hồ sơ không còn là một người")
+
     for nv, ma in (("chuyen_tour", "dong_so"), ("quyet_toan", "soan_dong")):
         b = LV.buoc(nv, ma)
         assert b.cach_canh == LV.CHI_CHU_SO_HUU and not b.vai_tro
+        assert b.chu_so_huu == LV.CHU_HO_SO
+
+
+def test_ban_giao_ho_so_khong_dong_thoi_chuyen_thuong_chuyen():
+    """Bàn giao hồ sơ quyết toán KHÔNG được chạm vào `operator_id`.
+
+    `operator_id` là căn cứ duy nhất tính thưởng chuyến. Một cú bấm mang tên "bàn giao hồ sơ" mà
+    ghi đè cột ấy là chuyển tiền thưởng của điều hành sang người gõ quyết toán, và không màn hình
+    nào nói ra điều đó. Phép thử này tồn tại vì "cho gọn, dùng luôn operator_id" là đúng cái cách
+    sửa mà ba tháng nữa trông rất hợp lý.
+    """
+    than = _than_ham("chu_ho_so.py", "giao_ho_so")
+    assert "t.chu_ho_so_id = nguoi_moi.id" in than, "bàn giao không ghi vào cột chủ hồ sơ"
+    assert "t.operator_id =" not in than, "bàn giao đang ghi đè người điều hành – thưởng chuyến đi theo"
 
 
 def test_duyet_du_toan_lay_vai_tro_dong_khong_viet_cung():
@@ -202,4 +234,4 @@ def test_tra_cuu_nguoc_theo_vai_tro():
     assert not any(b.nghiep_vu == "chuyen_tour" and b.ma == "duyet"
                    for b in LV.buoc_cua_vai_tro("nv_kd")), "Kinh doanh không duyệt dự toán"
     d = {r["ma"]: r for r in LV.bang()}
-    assert d["dong_so"]["ai_duoc"] == "chỉ người điều hành chuyến"
+    assert d["dong_so"]["ai_duoc"] == "chỉ chủ hồ sơ quyết toán"

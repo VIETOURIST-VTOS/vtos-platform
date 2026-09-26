@@ -51,7 +51,7 @@ def _line(db: Session, t: Tour, lid: int) -> TourCostLine:
 @router.get("/tours/{tid}/settlement")
 def get_settlement(tid: int, u: User = Depends(require_roles(*AC.COST_ROLES, mo_ta="quyết toán tour")), db: Session = Depends(get_db)):
     t = _tour(db, tid)
-    return {"tour": t.code, "status": t.status, "version": t.settlement_version, "can_edit": ST.can_edit(u, t), "service_types": ST.SERVICE_TYPES,
+    return {"tour": t.code, "status": t.status, "version": t.settlement_version, "can_edit": ST.can_edit(db, u, t), "service_types": ST.SERVICE_TYPES,
             "lines": [ST.line_out(l) for l in ST.lines_of(db, t)], "summary": ST.summary(db, t), "checks": ST.checks(db, t)}
 
 
