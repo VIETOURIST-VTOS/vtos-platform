@@ -554,10 +554,37 @@ def test_f5_khong_tu_gop_chung_tu_nghi_trung():
 TGD = "tgd"
 
 
+def _trong_thang_nay() -> date:
+    """Một ngày CHẮC CHẮN nằm trong cửa sổ của `nghia_vu.bang()`.
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    SỬA 26/9/2026 — PHÉP THỬ NÀY TỰ ĐỎ THEO NGÀY TRONG THÁNG
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    Bản cũ đặt hạn là `date.today() + 5 ngày`. Mà `bang()` cộng từ HÔM NAY tới NGÀY CUỐI THÁNG
+    LỊCH. Nên từ ngày 26 trở đi (tháng 30 ngày), today+5 rơi sang tháng sau, bảng trả về RỖNG, và
+    `test_g2` đỏ với câu "Chủ tịch mất toàn cảnh" — trong khi phân quyền của Chủ tịch không hề sai.
+
+    Đo ngày 26/9/2026: hôm nay 26/9 → cửa sổ đến 30/9; today+5 = 1/10 → ngoài cửa sổ.
+    Ngày 25/9 thì today+5 = 30/9 → vẫn lọt. Đúng vì sao CI xanh hôm qua và đỏ hôm nay.
+
+    Đây là lỗi của PHÉP THỬ, không phải của mã: cộng "nghĩa vụ trong tháng này" mà không tính một
+    khoản đến hạn tháng sau là đúng luật `bang()` đang chạy.
+
+    Và nó còn làm HỎNG NGẦM một phép thử nữa: `test_g1` khẳng định Tổng giám đốc KHÔNG thấy năm
+    nhóm ngoài tầm — với bảng rỗng thì câu ấy đúng một cách vô nghĩa. Năm ngày cuối mỗi tháng,
+    hàng rào phân quyền ở đây không canh gì cả mà bảng CI vẫn xanh.
+    """
+    hom_nay = date.today()
+    cuoi_thang = (date(hom_nay.year + (hom_nay.month == 12), hom_nay.month % 12 + 1, 1)
+                  - timedelta(days=1))
+    return min(hom_nay + timedelta(days=5), cuoi_thang)
+
+
 def _nap_du_moi_nhom():
     """Dựng đủ nghĩa vụ ở cả nhóm trong tầm lẫn ngoài tầm của Tổng giám đốc."""
     from sqlalchemy import select
     from app.models.nghia_vu import NghiaVuThanhToan
+    han = _trong_thang_nay()
     db = _phien()
     try:
         for i, (nhom, huong) in enumerate([("tra_ncc", "chi"), ("thu_khach", "thu"),
@@ -570,8 +597,7 @@ def _nap_du_moi_nhom():
                 continue
             db.add(NghiaVuThanhToan(
                 ma_goc=ma, huong=huong, nhom=nhom, tong_nghia_vu=7_000_000 + i,
-                ngay_cam_ket=date.today() + timedelta(days=5),
-                ngay_du_kien_tra=date.today() + timedelta(days=5),
+                ngay_cam_ket=han, ngay_du_kien_tra=han,
                 trang_thai="du_kien", nguon_bang="test", nguon_id=8100 + i))
         db.commit()
     finally:
@@ -585,6 +611,14 @@ def test_g1_tgd_KHONG_thay_nam_nhom_ngoai_tam():
     r = client.get("/api/v1/fin/nghia-vu", headers=login(TGD))
     assert r.status_code == 200, r.text
     b = r.json()
+    # BẢNG PHẢI CÓ SỐ THÌ PHÉP THỬ "KHÔNG THẤY" MỚI CÓ NGHĨA (thêm 26/9/2026).
+    #
+    # Một phép thử khẳng định thứ gì đó VẮNG MẶT thì luôn xanh trên một bảng rỗng — và bảng này
+    # đã rỗng suốt năm ngày cuối mỗi tháng mà không ai biết (xem `_trong_thang_nay`). Nên trước
+    # khi khẳng định Tổng giám đốc không thấy năm nhóm, phải chứng minh ông ấy CÓ thấy những nhóm
+    # trong tầm. Không có dòng này thì hàng rào phân quyền ở đây canh một cái bảng trống.
+    assert set(b["cam_ket"]) | set(b["du_kien"]), (
+        "bảng nghĩa vụ trả về RỖNG – phép thử 'không thấy nhóm ngoài tầm' đang xanh vô nghĩa")
     for nhom in NHOM_NGOAI_TAM_TGD:
         assert nhom not in b["cam_ket"], f"Tổng giám đốc thấy nhóm ngoài tầm: {nhom}"
         assert nhom not in b["du_kien"], f"Tổng giám đốc thấy nhóm ngoài tầm: {nhom}"

@@ -7,6 +7,7 @@ from app.services import rules as R
 from app.services import ghi_mot_lan as GML
 from app.services import accounting as ACC
 from app.services.products import event as EV
+from app.services import chu_ho_so as _CHS
 from app.api.deps import Gate, toan_quyen, toan_quyen_ke_ca_tach_bach
 from fastapi import HTTPException
 
@@ -32,6 +33,10 @@ def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
         "id": t.id, "code": t.code, "name": t.name, "tour_type": t.tour_type, "start_date": t.start_date, "end_date": t.end_date,
         "phien_ban": getattr(t, "phien_ban", 1),   # V10 – màn hình gửi lại số này khi lưu
         "operator_id": t.operator_id, "operator_name": t.operator.full_name if t.operator else "",
+        # Chủ hồ sơ quyết toán — gửi kèm NGUỒN ("vì sao là người này") chứ không chỉ cái tên. Một
+        # cái tên trơ trọi thì người đọc không biết nó đến từ chỉ định riêng của chuyến hay từ
+        # tham số mảng Đoàn, mà hai thứ ấy sửa ở hai chỗ khác hẳn nhau.
+        "chu_ho_so": _CHS.xem(db, t),
         "price_per_pax": t.price_per_pax, "fixed_cost": t.fixed_cost, "var_cost_per_pax": t.var_cost_per_pax, "planned_pax": t.planned_pax,
         "rest_stops": t.rest_stops, "strategic": t.strategic, "below_margin": t.below_margin, "justification": t.justification,
         "status": t.status, "confirmed_by": t.confirmed_by, "approved_by": t.approved_by,
@@ -68,9 +73,17 @@ def allowed_actions(db: Session, t: Tour, u: User) -> list[str]:
     if t.status == "cho_duyet":
         if t.below_margin and u.role in ("chutich", "tgd") and not getattr(t, f"signed_{u.role}"): a.append("sign")
         if not t.below_margin and u.role == R.approver_role(t): a.append("approve")
-    if t.status in ("ket_thuc", "da_duyet") and u.id == t.operator_id and date.today() >= t.end_date: a.append("close")
+    # Hai nút quyết toán đi theo CHỦ HỒ SƠ, không theo người điều hành (25/9/2026, câu 4). Bảng
+    # nút và cổng phải đọc cùng một hàm: bản cũ chép luật ra hai chỗ và đó là kiểu lệch không ai
+    # thấy — nút hiện ra nhưng bấm vào thì 422.
+    from app.services import chu_ho_so as CHS
+    la_chu = CHS.la_chu_ho_so(db, t=t, u=u)
+    if t.status in ("ket_thuc", "da_duyet") and la_chu and date.today() >= t.end_date: a.append("close")
     if t.status == "da_dong_so" and u.role == "ketoan": a += ["kt_confirm", "kt_return"]
-    if t.status in ("da_duyet", "ket_thuc") and u.id == t.operator_id: a.append("edit_settlement")
+    if t.status in ("da_duyet", "ket_thuc") and la_chu: a.append("edit_settlement")
+    # Bàn giao hồ sơ: TP Điều hành, hoặc chính người đang giữ. Hồ sơ đã đóng số thì không giao nữa.
+    if t.status not in CHS.TRANG_THAI_KHONG_GIAO and (u.role in CHS.GIAO_ROLES or la_chu or toan_quyen(u)):
+        a.append("giao_ho_so")
     if t.status == "kt_xac_nhan" and u.role == "cntt": a.append("cntt_check")
     if t.status == "da_duyet" and u.role in ("chutich", "tp_dh") and not t.chairman_run_decision: a.append("d7")
     # Mở thêm chỗ — Chủ tịch quyết 25/9/2026. Chỉ khi chuyến đang bán: trần bán là con số của dự
@@ -486,7 +499,12 @@ def mo_them_cho(db: Session, u: User, t: Tour, so_cho_moi: int,
 
 def close(db: Session, u: User, t: Tour, data, note: str = "") -> str:
     if t.status not in ("ket_thuc", "da_duyet"): raise Gate("TRANG_THAI", "Chưa đến bước quyết toán")
-    if u.id != t.operator_id: raise Gate("CONG_6", f"Một cửa: chỉ người điều hành chuyến ({t.operator.full_name}) mới được nhập quyết toán")
+    # Cổng MỘT CHỦ HỒ SƠ. Chủ tịch quyết 25/9/2026: ai soạn thì người ấy đóng — soạn và đóng vẫn
+    # là MỘT người, chỉ khác là người ấy nay do `chu_ho_so.chu_ho_so()` chỉ ra chứ không còn khoá
+    # cứng vào cột thưởng chuyến. Vẫn KHÔNG có đường thoát theo vai trò ở đây.
+    from app.services import chu_ho_so as CHS
+    if not CHS.la_chu_ho_so(db, u, t):
+        raise Gate("CONG_6", f"Một chủ hồ sơ: chỉ {CHS.ten_chu_ho_so(db, t)} mới được đóng số quyết toán chuyến này")
     if date.today() < t.end_date: raise Gate("CONG_6", "Chuyến chưa kết thúc")
     from app.services import settlement as ST
     blocks = [c["msg"] for c in ST.checks(db, t) if c["level"] == "block"]

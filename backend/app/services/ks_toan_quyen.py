@@ -166,6 +166,15 @@ GIU_DONG: dict[tuple[str, str], str] = {
     ("api/v1/attachments.py", "tai_ve"):
         "Đọc tệp nhạy cảm, cùng danh sách AT.VAI_TRO_NHAY_CAM đã có “chutich”. Quyền nằm trong "
         "AT.duoc_doc() nên bộ kiểm không tra tĩnh được. Không chặn.",
+
+    ("services/chu_ho_so.py", "giao_ho_so"):
+        "Điều kiện bộ kiểm bắt được là `nguoi_moi.role not in CHU_HO_SO_ROLES` — vai của NGƯỜI "
+        "NHẬN hồ sơ, không phải vai của người gọi cửa. Bộ kiểm đọc mọi lệnh từ chối có chữ `role` "
+        "và không phân biệt được hai thứ ấy, nên phải khai ra đây thay vì để nó báo oan. Cửa dành "
+        "cho NGƯỜI GỌI nằm ngay phía trên và ĐÃ có `or toan_quyen(u)`: Chủ tịch bàn giao được hồ "
+        "sơ của bất kỳ chuyến nào. Thứ dòng này chặn là giao hồ sơ quyết toán cho một vai không "
+        "giữ hồ sơ quyết toán — Chủ tịch cũng không giao cho Kinh doanh được, và đó là cùng một "
+        "ranh giới câu 7 ngày 25/9/2026 đã chốt: quyết toán là số của bên ĐẶT dịch vụ.",
 }
 
 

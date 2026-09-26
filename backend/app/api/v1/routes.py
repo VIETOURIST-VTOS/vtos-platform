@@ -19,6 +19,7 @@ from app.services import tours as T
 from app.services import bookings as BK
 from app.services import access as AC
 from app.services import pham_vi_phap_nhan as PV
+from app.services import chu_ho_so as CHS
 
 router = APIRouter(prefix="/api/v1")
 
@@ -382,6 +383,34 @@ def mo_them_cho_tour(tid: int, data: S.MoThemCho,
     return {"message": T.mo_them_cho(db, u, _tour(db, tid), data.so_cho, data.fixed_cost, data.ly_do)}
 
 
+# CỬA BÀN GIAO HỒ SƠ QUYẾT TOÁN — Chủ tịch quyết 25/9/2026, câu 4.
+#
+# Quyền khai ở CHỮ KÝ là hợp của hai nhóm: người được bàn giao đi (`GIAO_ROLES` = TP Điều hành) và
+# người được GIỮ hồ sơ (`CHU_HO_SO_ROLES`) — vì chính chủ hồ sơ hiện tại cũng trao đi được, mà
+# vai của người ấy có thể là nv_dh hoặc sales_admin. Chữ ký là hàng rào NGOÀI, rộng hơn;
+# `chu_ho_so.giao_ho_so` mới là hàng rào trong và nó kiểm đúng người ấy có phải chủ hiện tại không.
+# Khai rộng ở chữ ký rồi siết ở thân hàm là cách duy nhất để bản khai quyền của máy đọc ra đúng
+# nhóm người có thể gọi tới cửa này (KS-2) mà không nói dối theo hướng nào.
+@router.post("/tours/{tid}/giao-ho-so", tags=["tours"])
+def giao_ho_so_tour(tid: int, data: S.GiaoHoSo,
+                    u: User = Depends(require_roles(*CHS.GIAO_ROLES, *CHS.CHU_HO_SO_ROLES,
+                                                    mo_ta="bàn giao hồ sơ quyết toán")),
+                    db: Session = Depends(get_db)):
+    nguoi = db.get(User, data.nguoi_id)
+    if not nguoi: raise HTTPException(404, "Không có tài khoản này")
+    return {"message": CHS.giao_ho_so(db, u, _tour(db, tid), nguoi, data.ly_do)}
+
+
+@router.get("/tours/{tid}/giao-ho-so/nguoi-nhan", tags=["tours"])
+def nguoi_nhan_ho_so(tid: int, u: User = Depends(require_roles(*CHS.GIAO_ROLES, *CHS.CHU_HO_SO_ROLES,
+                                                              mo_ta="danh sách người nhận hồ sơ quyết toán")),
+                     db: Session = Depends(get_db)):
+    """Ai nhận được hồ sơ. Không có cửa này thì màn hình phải hỏi người dùng gõ một con số id."""
+    rows = db.execute(select(User).where(User.active == True,  # noqa: E712
+                                         User.role.in_(CHS.CHU_HO_SO_ROLES)).order_by(User.full_name)).scalars()
+    return {"rows": [{"id": x.id, "ten": x.full_name, "vai": x.role, "tai_khoan": x.username} for x in rows]}
+
+
 @router.post("/tours/{tid}/d7", tags=["tours"])
 def d7_tour(tid: int, data: S.D7Decision, u: User = Depends(current_user), db: Session = Depends(get_db)):
     return {"message": T.d7(db, u, _tour(db, tid), data.decision, getattr(data, "note", "") or "")}
@@ -730,7 +759,34 @@ def alert_out(a: Alert) -> dict:
             "tre": bool(han and not a.resolved and han < _dt.now()),
             "nguoi_nhan_id": getattr(a, "nguoi_nhan_id", None), "nhan_luc": getattr(a, "nhan_luc", None),
             "dong_luc": getattr(a, "dong_luc", None), "dong_boi_id": getattr(a, "dong_boi_id", None),
-            "bang_chung": getattr(a, "bang_chung", ""), "nguon": getattr(a, "nguon", "")}
+            "bang_chung": getattr(a, "bang_chung", ""), "nguon": getattr(a, "nguon", ""),
+            # Bậc thang (25/9/2026, câu 5). RỖNG với mọi loại cảnh báo không có thang — màn hình
+            # phải phân biệt "không có thang" với "đang ở bậc 1", vì chúng khác nhau.
+            "bac": getattr(a, "bac", None)}
+
+
+# THANG BẬC ĐÒI NỢ KHÁCH — Chủ tịch quyết 25/9/2026, câu 5.
+#
+# Hai cửa, và chúng khác nhau ở chỗ quan trọng nhất: cửa ĐỌC nói hiện trạng, cửa CHẠY đặt lại chủ.
+# Cửa chạy để ở đây (không chỉ trong robot) vì bộ quét cũng là cách SỬA những dòng cũ: cảnh báo
+# sinh trước hôm nay mang `to_roles` bốn vai và chủ để trống, và người xem bảng phải kéo được
+# chúng về đúng luật mà không phải chờ một lượt robot.
+@router.get("/alerts/thang-doi-no", tags=["alerts"])
+def xem_thang_doi_no(u: User = Depends(require_roles(*AC.BOOKING_ROLES, "sales_admin",
+                                                     mo_ta="thang bậc đòi nợ khách")),
+                     db: Session = Depends(get_db)):
+    from app.services import thang_doi_no as TDN
+    m2, m3 = TDN.moc_ngay(db)
+    return {"moc_bac2_ngay": m2, "moc_bac3_ngay": m3, "thang": TDN.THANG, "ten_bac": TDN.TEN_BAC}
+
+
+@router.post("/alerts/thang-doi-no/quet", tags=["alerts"])
+def quet_thang_doi_no(u: User = Depends(require_roles("gd_kd", "tp_kd", "sales_admin", "ptgd_doan",
+                                                      "ketoan", "cntt", "tgd", "chutich",
+                                                      mo_ta="quét lại thang bậc đòi nợ")),
+                      db: Session = Depends(get_db)):
+    from app.services import thang_doi_no as TDN
+    return TDN.quet(db)
 
 
 @router.get("/alerts", tags=["alerts"])

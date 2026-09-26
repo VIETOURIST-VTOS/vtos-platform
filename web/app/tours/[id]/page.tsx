@@ -35,6 +35,7 @@ function TourDetail() {
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get("tab") || "info");
   const [note, setNote] = useState("");
+  const [nguoiNhan, setNguoiNhan] = useState<any[]>([]);
   const load = useCallback(() => api(`/tours/${id}/detail`).then(setT).catch((e) => toast(errMsg(e), true)), [id, toast]);
   useEffect(() => { load(); }, [load]);
   if (!t) return <p className="muted">Đang tải…</p>;
@@ -65,6 +66,19 @@ function TourDetail() {
     try {
       const r = await api(`/tours/${t.id}/mo-them-cho`, { method: "POST", json: {
         so_cho: Number(d.so_cho || 0), fixed_cost: fc === "" ? null : soTien(fc), ly_do: String(d.ly_do || "") } });
+      toast(r.message); f.reset(); load();
+    } catch (x) { toast(errMsg(x), true); }
+  };
+  const taiNguoiNhan = () => {
+    if (nguoiNhan.length) return;
+    api(`/tours/${t.id}/giao-ho-so/nguoi-nhan`).then((r: any) => setNguoiNhan(r.rows || [])).catch(() => setNguoiNhan([]));
+  };
+  const giaoHoSo = async (e: React.FormEvent) => {
+    e.preventDefault(); const f = e.target as HTMLFormElement;
+    const d: any = Object.fromEntries(new FormData(f).entries());
+    try {
+      const r = await api(`/tours/${t.id}/giao-ho-so`, { method: "POST", json: {
+        nguoi_id: Number(d.nguoi_id || 0), ly_do: String(d.ly_do || "") } });
       toast(r.message); f.reset(); load();
     } catch (x) { toast(errMsg(x), true); }
   };
@@ -103,7 +117,17 @@ function TourDetail() {
           <tr><td>Khởi hành – kết thúc</td><td>{fmtD(t.start_date)} – {fmtD(t.end_date)}</td></tr>
           <tr><td>Số chỗ mở bán / khuyến mãi</td><td>{t.seats.open} / {t.seats.promo}</td></tr>
           <tr><td>Giá ADL / CHD / INF / KM</td><td>{vnd(t.prices.adl)} / {vnd(t.prices.chd)} / {vnd(t.prices.inf)} / {vnd(t.prices.promo)}</td></tr>
-          <tr><td>Người điều hành duy nhất</td><td>{t.operator_name}</td></tr>
+          <tr><td>Người điều hành duy nhất</td><td>{t.operator_name} <span className="muted">· thưởng chuyến tính trên ô này</span></td></tr>
+          {/* CHỦ HỒ SƠ QUYẾT TOÁN — Chủ tịch quyết 25/9/2026, câu 4. In kèm VÌ SAO là người này:
+              chỉ định riêng của chuyến sửa ở nút bên dưới, còn mặc định mảng Đoàn sửa ở màn hình
+              Chính sách (tham số chu_ho_so_doan). Một cái tên trơ trọi thì người đọc không biết
+              phải đi đâu để đổi nó. */}
+          {t.chu_ho_so && <tr><td>Chủ hồ sơ quyết toán</td><td>
+            <b>{t.chu_ho_so.chu_ho_so_ten || "chưa có ai"}</b>
+            {t.chu_ho_so.chu_ho_so_vai && <> <Tag>{ROLES[t.chu_ho_so.chu_ho_so_vai] || t.chu_ho_so.chu_ho_so_vai}</Tag></>}
+            <div className="muted">{t.chu_ho_so.nguon_mo_ta} · soạn và đóng số quyết toán là người này</div>
+            {t.chu_ho_so.canh_bao_tham_so && <div className="gate">{t.chu_ho_so.canh_bao_tham_so}</div>}
+          </td></tr>}
           <tr><td>Điểm dừng nghỉ</td><td>{t.rest_stops || "–"}</td></tr>
           <tr><td>Duyệt</td><td>{t.confirmed_by && `TP ĐH: ${t.confirmed_by}`} {t.approved_by && `· ${t.approved_by}`} {t.chairman_run_decision}</td></tr>
         </tbody></table>
@@ -150,6 +174,24 @@ function TourDetail() {
             <button className="act teal" type="submit">Mở thêm chỗ</button>
             <p className="muted">Số chỗ nằm trong dự toán đã ký. Cửa này tính lại lợi nhuận và biên với số chỗ mới:
               <b> tụt một trong hai là chặn</b>, kể cả khi con số kia tăng.</p>
+          </form>
+        </details>}
+        {/* CỬA BÀN GIAO HỒ SƠ QUYẾT TOÁN — Chủ tịch quyết 25/9/2026, câu 4.
+            Danh sách người nhận lấy từ máy chủ, KHÔNG bắt người dùng gõ một con số id: một ô id
+            là một ô gõ nhầm, và gõ nhầm ở đây là giao hồ sơ cho người khác. */}
+        {can("giao_ho_so") && <details style={{ marginTop: 10 }}>
+          <summary><b>Bàn giao hồ sơ quyết toán</b></summary>
+          <form onSubmit={giaoHoSo}>
+            <label>Giao cho
+              <select name="nguoi_id" required onFocus={taiNguoiNhan}>
+                <option value="">— chọn người nhận —</option>
+                {nguoiNhan.map((x: any) => <option key={x.id} value={x.id}>{x.ten} ({ROLES[x.vai] || x.vai})</option>)}
+              </select></label>
+            <label>Vì sao bàn giao (tối thiểu 20 ký tự)
+              <input name="ly_do" required minLength={20} placeholder="VD: Sale Admin nghỉ phép dài, điều hành chuyến gom nốt chứng từ…" /></label>
+            <button className="act teal" type="submit">Bàn giao</button>
+            <p className="muted">Bàn giao đổi người <b>soạn và đóng số quyết toán</b>. Nó KHÔNG đổi người điều
+              hành chuyến, nên <b>thưởng chuyến vẫn thuộc {t.operator_name}</b>.</p>
           </form>
         </details>}
         {t.d7_flag && <>

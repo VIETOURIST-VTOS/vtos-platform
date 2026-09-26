@@ -9,6 +9,7 @@ from app.models.core import User, Tour
 from app.models.vietrip import TourCostLine
 from app.models.ops import PaymentRequest
 from app.services import rules as R
+from app.services import chu_ho_so as CHS
 from app.services.vietrip import _strip_accents
 from app.api.deps import toan_quyen, toan_quyen_ke_ca_tach_bach   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
@@ -32,12 +33,19 @@ def calc_actual(kind: str, unit_price: float, qty: float, coef: float) -> float:
     return round(unit_price * qty * coef if kind == "theo_khach" else unit_price * coef)
 
 
-def can_edit(u: User, t: Tour) -> bool:
-    return u.id == t.operator_id and t.status in EDITABLE
+def can_edit(db: Session, u: User, t: Tour) -> bool:
+    return CHS.la_chu_ho_so(db, u, t) and t.status in EDITABLE
 
 
-def _assert_edit(u: User, t: Tour):
-    if u.id != t.operator_id: raise Gate("CONG_6", f"Một cửa: chỉ người điều hành chuyến ({t.operator.full_name}) soạn quyết toán")
+def _assert_edit(db: Session, u: User, t: Tour):
+    """Cổng MỘT CHỦ HỒ SƠ (trước 25/9/2026 tên là "Một cửa", khoá cứng vào `operator_id`).
+
+    Vẫn đúng MỘT người, và vẫn KHÔNG CÓ ĐƯỜNG THOÁT THEO VAI TRÒ: Trưởng phòng cũng không nhập hộ.
+    Chỗ đổi là người ấy được xác định bằng `chu_ho_so.chu_ho_so()` thay vì bằng cột thưởng chuyến.
+    Vì sao đổi: xem đầu tệp `services/chu_ho_so.py`.
+    """
+    if not CHS.la_chu_ho_so(db, u, t):
+        raise Gate("CONG_6", f"Một chủ hồ sơ: chỉ {CHS.ten_chu_ho_so(db, t)} soạn quyết toán chuyến này")
     if t.status not in EDITABLE:
         raise Gate("TRANG_THAI", "Quyết toán đã đóng số / Kế toán đã xác nhận – chỉ sửa khi Kế toán trả lại" if t.status in ("da_dong_so", "kt_xac_nhan", "khoa") else "Tour chưa được duyệt")
 
@@ -143,7 +151,10 @@ def line_out(l: TourCostLine) -> dict:
 
 
 def add_line(db: Session, u: User, t: Tour, d: dict) -> TourCostLine:
-    _assert_edit(u, t); v = validate(d)
+    _assert_edit(db, u, t); v = validate(d)
+    # Đóng dấu chủ hồ sơ ở LẦN GHI ĐẦU: từ giây này hồ sơ có tên một người, và đổi tham số
+    # `chu_ho_so_doan` không lấy đi được nữa. Xem `chu_ho_so.ghi_dau_chu`.
+    CHS.ghi_dau_chu(db, t, u.id)
     n = (db.execute(select(func.max(TourCostLine.line_no)).where(TourCostLine.tour_id == t.id)).scalar() or 0) + 1
     l = TourCostLine(tour_id=t.id, line_no=n, source="vtos", version=t.settlement_version, updated_by=u.username, paid=v.pop("paid", 0.0), **v)
     db.add(l); db.flush()
@@ -152,7 +163,8 @@ def add_line(db: Session, u: User, t: Tour, d: dict) -> TourCostLine:
 
 
 def update_line(db: Session, u: User, t: Tour, l: TourCostLine, d: dict) -> TourCostLine:
-    _assert_edit(u, t)
+    _assert_edit(db, u, t)
+    CHS.ghi_dau_chu(db, t, u.id)
     if l.status != "hd": raise Gate("QT_NHAP", "Dòng đã hủy – không sửa")
     from app.services import ghi_mot_lan as GML
     pb = d.pop("phien_ban", None)
@@ -167,7 +179,8 @@ def update_line(db: Session, u: User, t: Tour, l: TourCostLine, d: dict) -> Tour
 
 
 def cancel_line(db: Session, u: User, t: Tour, l: TourCostLine, reason: str) -> None:
-    _assert_edit(u, t)
+    _assert_edit(db, u, t)
+    CHS.ghi_dau_chu(db, t, u.id)
     if not (reason or "").strip(): raise Gate("QT_NHAP", "Hủy dòng phải có lý do")
     l.status, l.note, l.updated_by, l.version = "huy", (f"[HỦY] {reason.strip()} | " + l.note)[:200], u.username, t.settlement_version
     R.audit(db, u.username, u.role, "qt_huy_dong", f"tour:{t.code}", after={"dong": l.line_no, "mo_ta": l.description, "ly_do": reason.strip()[:120]})
@@ -176,7 +189,7 @@ def cancel_line(db: Session, u: User, t: Tour, l: TourCostLine, reason: str) -> 
 
 def set_doc(db: Session, u: User, t: Tour, l: TourCostLine, name: str, data: str) -> None:
     """Gắn chứng từ (ảnh/PDF data URL) cho dòng. Sau đóng số vẫn cho bổ sung chứng từ (không đổi số)."""
-    if u.id != t.operator_id and u.role not in ("ketoan", "cntt") and not toan_quyen(u): raise Gate("CONG_6", "Chỉ người điều hành chuyến hoặc Kế toán gắn chứng từ")
+    if not CHS.la_chu_ho_so(db, u, t) and u.role not in ("ketoan", "cntt") and not toan_quyen(u): raise Gate("CONG_6", f"Chỉ chủ hồ sơ quyết toán ({CHS.ten_chu_ho_so(db, t)}) hoặc Kế toán gắn chứng từ")
     if t.status in ("kt_xac_nhan", "khoa"): raise Gate("TRANG_THAI", "Tour đã xác nhận/khóa – không thay chứng từ")
     if data and not data.startswith(("data:image/", "data:application/pdf")): raise Gate("QT_NHAP", "Chứng từ phải là ảnh hoặc PDF")
     if len(data) > MAX_DOC: raise Gate("QT_NHAP", "Tệp quá lớn (tối đa ~1,5 MB) – vui lòng nén ảnh")
