@@ -306,3 +306,39 @@ def test_nt2_row_mang_TRANG_THAI_CHUYEN_va_NGAY_KHOI_HANH():
     assert r["trang_thai_chuyen"] == "ket_thuc"
     assert r["ngay_khoi_hanh"] == HOM_NAY
     assert r["trang_thai_dong"] == "hd"
+
+
+# ═══════ MÃ ĐỒNG TIỀN TRÙNG CHỮ VIẾT TẮT TIẾNG VIỆT — đo được 27/9/2026 trên dữ liệu thật ═══════
+
+def test_nt2_HKD_trong_ten_NCC_la_HO_KINH_DOANH_khong_phai_do_la_Hong_Kong():
+    """4 trong 28 dòng bộ dò bắt được hôm 27/9/2026 là "HKD TÀU DU LỊCH TÚ ÂN", "HKD NHỮNG CHÀNG
+    TRAI" — hộ kinh doanh Việt Nam, không một đồng ngoại tệ nào.
+
+    Một bộ soát báo nhầm thì người ta thôi đọc nó, và lần sau nó báo đúng cũng không ai tin."""
+    db, t = _db()
+    l = _dong(db, t, tien_te="", so_tien_goc=None, ty_gia=None,
+              description="Ăn sáng tại sân bay", supplier_name="HKD NHỮNG CHÀNG TRAI")
+    assert NT.dong_tien_trong_chu(l) == ""
+    assert NT.bang(db)["ngoai_te_an"]["tong"] == 0
+
+
+def test_nt2_HKD_trong_MO_TA_van_tinh_vi_do_la_cho_nguoi_ta_viet_phep_tinh():
+    db, t = _db()
+    l = _dong(db, t, tien_te="", so_tien_goc=None, ty_gia=None,
+              description="Thanh toan 500 HKD tien tau", supplier_name="CTY ABC")
+    assert NT.dong_tien_trong_chu(l) == "HKD"
+
+
+def test_nt2_ma_khac_trong_ten_NCC_van_tinh_binh_thuong():
+    """Chỉ HKD bị loại khỏi tên NCC. Không được lấy cớ ấy để bỏ luôn cả việc đọc tên nhà cung cấp."""
+    db, t = _db()
+    l = _dong(db, t, tien_te="", so_tien_goc=None, ty_gia=None,
+              description="Land tour", supplier_name="NCC THANH TOAN USD")
+    assert NT.dong_tien_trong_chu(l) == "USD"
+
+
+def test_nt2_MO_TA_duoc_xet_TRUOC_ten_NCC():
+    db, t = _db()
+    l = _dong(db, t, tien_te="", so_tien_goc=None, ty_gia=None,
+              description="800CNY X 4000", supplier_name="NCC USD")
+    assert NT.dong_tien_trong_chu(l) == "CNY"
