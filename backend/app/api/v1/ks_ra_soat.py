@@ -65,6 +65,23 @@ def quyet_cot_tien(data: QuyetIn, u: User = Depends(require_roles(*QUYET)),
         db.rollback(); raise HTTPException(422, str(ex))
 
 
+# ═══════════════ SOÁT NGOẠI TỆ TRÊN DÒNG GIÁ VỐN — Chủ tịch quyết 27/9/2026 ═══════════════
+#
+# Ở ĐÚNG hai địa chỉ như sổ rà soát cột tiền phía trên, và vì đúng lý do ấy: Kế toán vào bằng
+# `/ra-soat-cot-tien`, lãnh đạo vào bằng `/kiem-soat`. Không mở tiền tố mới — một nhóm API mới là
+# xin thêm quyền cho một loạt vai trò mà chưa ai ký.
+#
+# CHỈ ĐỌC, và cố ý không có cửa "nắn hàng loạt" đi kèm. Chỗ sai ở đây là "người nhập đã hiểu ô số
+# tiền gốc theo nghĩa nào" — máy không biết, nên máy không tự sửa một con số tiền.
+@router.get("/ngoai-te")
+@rst.get("/ngoai-te")
+def soat_ngoai_te(gioi_han: int = 300, u: User = Depends(require_roles(*XEM)),
+                  db: Session = Depends(get_db)):
+    """Dòng giá vốn ngoại tệ nào đang ghi theo quy ước nào, và lệch bao nhiêu tiền."""
+    from app.services import soat_ngoai_te as NT
+    return NT.bang(db, gioi_han)
+
+
 @router.get("/su-kien-ky-thuat")
 def su_kien(ngay: int = 7, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
     """Lỗi 5xx, đường dẫn chậm, tác vụ nền hỏng, lần khởi động máy chủ."""

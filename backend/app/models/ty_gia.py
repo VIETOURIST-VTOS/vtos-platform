@@ -9,7 +9,7 @@ VÌ SAO PHẢI CÓ SỔ, KHI TỪNG DÒNG TIỀN ĐÃ CÓ CỘT `ty_gia` RỒI
 ────────────────────────────────────────────────────────────────────────────────
 
 Quy tắc quy đổi của VTOS đã có và không đổi: người khai `tien_te`, `so_tien_goc`, `ty_gia` và
-`ngay_ty_gia` trên từng khoản, rồi MÁY NHÂN (`quyet_toan_lop3.quy_doi`). Người không gõ số VND bên
+`ngay_ty_gia` trên từng khoản, rồi MÁY NHÂN (`quyet_toan_lop3.don_gia_vnd`). Người không gõ số VND bên
 cạnh số gốc và tỷ giá, vì gõ tay cả ba là mở đường cho ba con số không khớp nhau.
 
 Chỗ hở không nằm ở phép nhân. Nó nằm ở chỗ **mỗi người tự nhớ lấy tỷ giá**:
