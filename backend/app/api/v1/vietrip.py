@@ -146,7 +146,7 @@ def nap_bu_tour(data: NapBuIn, u: User = Depends(require_roles("cntt", "ketoan")
 
 
 @router.post("/import/vietrip/nap-bu/booking-cho-phieu-thu")
-def nap_bu_booking_cho_phieu_thu(gioi_han: int = 500,
+def nap_bu_booking_cho_phieu_thu(gioi_han: int = 500, bat_dau: int = 0,
                                  u: User = Depends(require_roles(*SYNC_ROLES)),
                                  db: Session = Depends(get_db)):
     """Gỡ chỗ phiếu thu treo vì "chưa có booking": đi tìm đúng những booking ấy rồi ánh xạ lại.
@@ -159,6 +159,11 @@ def nap_bu_booking_cho_phieu_thu(gioi_han: int = 500,
     những booking mà phiếu thu ĐANG CÓ trỏ tới. Lấy một booking tháng 3 để gắn khoản tiền khách
     trả tháng 9 không phải là nạp lại tháng 3 — Chủ tịch chốt 26/9/2026 (phương án A).
 
+    CHIA LÔ (27/9/2026): mỗi lượt gọi chỉ lật một số trang có đáy rồi trả `bat_dau_tiep`. Bản đầu
+    lật tới 60 trang trong một lượt và Render giết máy chủ giữa chừng vì nhịp tim `/health` quá 5
+    giây — yêu cầu đang chạy nhận 503, và trông y như lỗi mã. Chưa `xong` thì gọi lại đúng cửa này
+    với `bat_dau` vừa nhận. Ánh xạ chạy ở MỖI lượt, nên dừng giữa chừng không mất phần đã lấy được.
+
     Ba bước, và bước nào cũng đếm được để đối chiếu:
         1. đọc id còn thiếu từ chính bản ghi thô đã kéo về
         2. tìm những booking ấy trên Vietrip rồi nạp thô
@@ -167,8 +172,9 @@ def nap_bu_booking_cho_phieu_thu(gioi_han: int = 500,
     from app.services import vietrip_client as VC
     ids = VT.id_booking_con_thieu(db, gioi_han)
     if not ids:
-        return {"can_tim": 0, "message": "Không còn phiếu thu nào treo vì thiếu booking."}
-    ket = VC.nap_booking_theo_id(db, ids)
+        return {"can_tim": 0, "xong": True, "bat_dau_tiep": None,
+                "message": "Không còn phiếu thu nào treo vì thiếu booking."}
+    ket = VC.nap_booking_theo_id(db, ids, bat_dau=bat_dau)
     da_booking, da_phieu, vong = 0, 0, 0
     while vong < 20:
         n = VT.apply_bookings(db, limit=400)
@@ -186,11 +192,13 @@ def nap_bu_booking_cho_phieu_thu(gioi_han: int = 500,
                    "booking_da_anh_xa": da_booking, "phieu_thu_da_anh_xa": da_phieu,
                    "phieu_thu_con_treo": con})
     db.commit()
+    con_nua = ("" if ket["xong"] else
+               f" CHƯA XONG — gọi lại cửa này với bat_dau={ket['bat_dau_tiep']} để lật tiếp.")
     return {**ket, "booking_da_anh_xa": da_booking, "phieu_thu_da_anh_xa": da_phieu,
             "phieu_thu_con_treo": con,
             "message": (f"Tìm {ket['can_tim']} booking, thấy {ket['tim_thay']} qua {ket['so_trang']} "
                         f"trang. Ánh xạ {da_booking} booking và {da_phieu} phiếu thu. "
-                        f"Còn treo {con} phiếu.")}
+                        f"Còn treo {con} phiếu.{con_nua}")}
 
 
 @router.post("/import/vietrip/nap-bu/quyet-toan")

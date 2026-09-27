@@ -391,24 +391,53 @@ def start_background(from_date: date, to_date: date, products: bool, settlements
 
 MOI_TRANG_BOOKING = 1000
 TRAN_TRANG_BOOKING = 60        # phanh: 60 × 1.000 = 60.000 dòng, quá thừa cho khoảng id thực tế
+TRANG_MOI_LUOT = 3             # mỗi LƯỢT GỌI lật tối đa 3 trang — xem ghi chú ở nap_booking_theo_id
 
 
-def nap_booking_theo_id(db: Session, ids: list[int], log=None) -> dict:
-    """Tìm và nạp đúng những booking mang `recID` trong `ids`. Chỉ ĐỌC ở phía Vietrip."""
+def nap_booking_theo_id(db: Session, ids: list[int], log=None,
+                        bat_dau: int = 0, trang_moi_luot: int = TRANG_MOI_LUOT) -> dict:
+    """Tìm và nạp đúng những booking mang `recID` trong `ids`. Chỉ ĐỌC ở phía Vietrip.
+
+    CHIA LÔ CÓ CON TRỎ (27/9/2026). Bản đầu lật tới 60 trang trong MỘT lượt gọi. Trên gói 0,5 CPU
+    của Render, một yêu cầu chạy dài như thế cạnh tranh CPU với nhịp tim `/health`; nhịp tim quá 5
+    giây là Render GIẾT máy chủ giữa chừng, và chính yêu cầu đang chạy nhận 503. Sổ sự kiện Render
+    ngày 27/9 ghi đúng câu ấy nhiều lần.
+
+    Nên mỗi lượt gọi nay có ĐÁY: tối đa `trang_moi_luot` trang. Chưa xong thì trả `bat_dau_tiep` để
+    người gọi gọi tiếp từ đúng chỗ ấy — cùng một hình với `xem/chay/go` của kho cũ (TC-63) và với
+    cửa nạp bù quyết toán (TC-53).
+
+    `xong` là câu trả lời dứt khoát, KHÔNG để người gọi tự suy từ `bat_dau_tiep`: có bốn đường ra
+    khác nhau (tìm đủ · hết dữ liệu · lùi qua id nhỏ nhất · chạm phanh 60 trang) và cả bốn đều là
+    xong, trong khi chỉ một đường là "còn nữa".
+
+    CÁCH GỌI TIẾP, và đây là chỗ dễ sai nhất: gọi lại với `con_thieu` VỪA NHẬN chứ không phải danh
+    sách ban đầu. Mỗi lượt chỉ biết những gì nó tự tìm thấy; đưa lại danh sách gốc thì lượt cuối sẽ
+    khai thiếu cả những id lượt trước đã lấy được — chia lô hoá ra thành một cách báo sai. Vì lý do
+    ấy `con_thieu` trả về ĐỦ, không cắt ngắn cho gọn: cắt ngắn ở đây là đánh rơi id thật.
+    """
     log = log or (lambda m: None)
     con_tim = {int(i) for i in ids if i}
     if not con_tim:
-        return {"can_tim": 0, "tim_thay": 0, "so_trang": 0, "con_thieu": []}
+        return {"can_tim": 0, "tim_thay": 0, "so_trang": 0, "con_thieu": [],
+                "bat_dau_tiep": None, "xong": True}
 
     nho_nhat = min(con_tim)
     c = _dang_nhap()
-    thay, trang, start = [], 0, 0
-    while trang < TRAN_TRANG_BOOKING and con_tim:
+    thay, trang, start = [], 0, max(0, int(bat_dau or 0))
+    xong = False
+    while trang < trang_moi_luot and con_tim:
+        # Phanh tổng tính theo TỔNG số dòng đã lướt qua, không theo số trang của riêng lượt này —
+        # nếu tính theo lượt thì chia lô càng nhỏ, phanh càng lùi xa, tức là gỡ mất chính cái phanh.
+        if start >= TRAN_TRANG_BOOKING * MOI_TRANG_BOOKING:
+            xong = True
+            break
         j = json.loads(c.get(f"/api/booking/search?draw=1&start={start}&length={MOI_TRANG_BOOKING}"
                              f"&showAll=true&order[0][column]=0&order[0][dir]=desc"))
         lo = j.get("data") or []
         trang += 1
         if not lo:
+            xong = True
             break
         for b in lo:
             rid = int(b.get("recID") or 0)
@@ -416,15 +445,25 @@ def nap_booking_theo_id(db: Session, ids: list[int], log=None) -> dict:
                 thay.append(b)
                 con_tim.discard(rid)
         start += len(lo)
+        # Chạm phanh thì khai xong NGAY tại đây, không để lượt sau gọi ra rồi mới biết: một lượt gọi
+        # chỉ để nghe "hết rồi" vẫn là một lần đăng nhập Vietrip và một vòng chờ.
+        if start >= TRAN_TRANG_BOOKING * MOI_TRANG_BOOKING:
+            xong = True
+            break
         nho_nhat_trang = min((int(b.get("recID") or 0) for b in lo), default=0)
         log(f"trang {trang}: {len(lo)} dòng, tới id {nho_nhat_trang}, còn tìm {len(con_tim)}")
         # Danh sách giảm dần: lùi qua id nhỏ nhất cần tìm thì những id còn lại không thể ở phía sau.
         if nho_nhat_trang and nho_nhat_trang < nho_nhat:
+            xong = True
             break
         if len(lo) < MOI_TRANG_BOOKING:
+            xong = True
             break
+    if not con_tim:
+        xong = True
 
     if thay:
         VT.upsert(db, "booking", thay)
     return {"can_tim": len(ids), "tim_thay": len(thay), "so_trang": trang,
-            "con_thieu": sorted(con_tim)[:50]}
+            "con_thieu": sorted(con_tim),
+            "bat_dau_tiep": None if xong else start, "xong": xong}

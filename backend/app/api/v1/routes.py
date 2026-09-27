@@ -1110,9 +1110,41 @@ def ai_hau_kiem(rid: int, data: HauKiemIn,
 
 
 @router.get("/health", tags=["meta"])
-def health(db: Session = Depends(get_db)):
-    ok, n, msg = R.verify_chain(db)
-    return {"status": "ok", "audit_chain_ok": ok, "audit_records": n, "time": datetime.now().isoformat()}
+def health():
+    """CÒN SỐNG KHÔNG — chỉ trả lời đúng câu ấy, và KHÔNG chạm vào cơ sở dữ liệu.
+
+    ĐO ĐƯỢC 27/9/2026, và đây là lý do cửa này bị viết lại. Bản cũ gọi `R.verify_chain(db)`, tức là
+    duyệt LẠI toàn bộ chuỗi băm của mọi bản ghi kiểm toán — 4.259 bản ghi vào ngày đo — cho MỖI lần
+    Render hỏi "còn sống không". Render hỏi khoảng 5 giây một lần và giết máy chủ nếu quá 5 giây
+    không trả lời.
+
+    Năm lần bấm giờ trên hệ thật, lúc máy RẢNH HOÀN TOÀN:
+
+        1073 ms · 1509 ms · 724 ms · 1053 ms · 1530 ms
+
+    Một giây rưỡi cho cửa nhẹ nhất, trên gói 0,5 CPU. Chỉ cần có một việc thật chạy song song là
+    vượt 5 giây, và sổ sự kiện Render ghi đúng câu ấy nhiều lần trong ngày 27/9:
+
+        Instance failed — HTTP health check failed (timed out after 5 seconds) while running your code
+
+    Máy chủ bị giết GIỮA CHỪNG một yêu cầu đang chạy, nên yêu cầu ấy trả về 503. Suốt ngày 19/9 và
+    27/9 chuỗi 502/503 đã bị đổ cho "máy 512 MB hết bộ nhớ" — SAI. Nguyên nhân là cửa này.
+
+    Ba điều cửa này CỐ Ý không làm, và lý do từng cái:
+
+    1. KHÔNG nhận `db`. Không phải để tiết kiệm một câu lệnh, mà để cửa này không bao giờ phải XẾP
+       HÀNG chờ một kết nối trong bể. Đúng lúc hệ thống bận nhất — lúc cần biết nó còn sống nhất —
+       là lúc bể kết nối cạn; một cửa health phải chờ bể thì sẽ im đúng lúc không được phép im.
+    2. KHÔNG soát chuỗi kiểm toán. Việc ấy vẫn còn, ở cửa `/api/v1/audit` mà Ban kiểm soát mở —
+       nơi một người ĐỌC kết quả. Không mất khả năng nào, chỉ thôi chạy nó 17.000 lần một ngày.
+    3. KHÔNG trả `audit_chain_ok` nữa. Cố ý để trống chứ không trả bừa `true`: một cửa im lặng trả
+       "chuỗi lành" mà không hề kiểm là thứ nguy hiểm hơn hẳn việc không có khoá ấy.
+
+    Hệ quả phải nói thẳng: cửa này không còn phát hiện được cơ sở dữ liệu chết. Đổi lấy điều đó là
+    máy chủ thôi bị giết khi đang làm việc. Muốn canh cơ sở dữ liệu thì canh ở cửa nghiệp vụ, nơi
+    hỏng là thấy ngay — chứ không phải bắt nhịp tim gánh việc soát sổ.
+    """
+    return {"status": "ok", "time": datetime.now().isoformat()}
 
 
 @router.post("/robot/run", tags=["robot"], dependencies=[Depends(robot_auth)])
