@@ -25,6 +25,8 @@ Bộ soát này ĐO, không sửa. Bốn điều phải canh:
 """
 import datetime as dt
 
+import pytest
+
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
@@ -209,3 +211,98 @@ def test_nt2_dung_chung_calc_actual_voi_cua_thuc():
     than = inspect.getsource(NT.phep_nhan)
     assert "calc_actual" in than
     assert "theo_khach" not in than, "bộ soát đang tự phân biệt cách tính thay vì gọi calc_actual"
+
+
+# ═════════ NGOẠI TỆ ẨN VÀ QUY MÔ CỦA NHÓM `thieu_o` — thêm 27/9/2026 sau lần đo THẬT ═════════
+#
+# Lần đo đầu tiên trên dữ liệu thật trả về 61 dòng, TẤT CẢ đều `thieu_o`, `tong_lech` = 0 và
+# `actual` = 0. Hai chỗ hở lộ ra ngay từ con số ấy, và cả hai đều làm bảng đọc NHẸ HƠN sự thật:
+#
+#   1. `tong_lech` = 0 đọc y hệt "không mất gì", trong khi thật ra là "không đo được vì chưa có
+#      tỷ giá" — mà 61 dòng ấy đang ghi giá vốn bằng 0.
+#   2. Câu truy vấn chỉ lấy dòng CÓ ô `tien_te`. Kho cũ để đồng tiền trong CÂU MÔ TẢ, nên dòng nào
+#      bộ nạp không điền được ô ấy thì bộ soát không thấy — và 61 là con số thấp hơn sự thật.
+
+def test_nt2_chua_co_ty_gia_thi_CONG_SO_NGOAI_TE_de_biet_quy_mo():
+    """`tong_lech` = 0 mà 61 dòng ghi giá vốn 0 là một bảng nói dối bằng cách im lặng."""
+    db, t = _db()
+    _dong(db, t, ty_gia=None, unit_price=None, actual=0)          # 692,34 × 43 khách
+    _dong(db, t, ty_gia=None, cost_kind="co_dinh", coef=2, unit_price=None, actual=0)
+    b = NT.bang(db)
+    assert b["dem"]["thieu_o"] == 2 and b["tong_lech"] == 0
+    assert b["chua_quy_doi"]["GBP"] == round(GBP * PAX + GBP * 2, 2)
+    assert "đừng đọc" in b["luu_y"]
+
+
+def test_nt2_dong_NOI_minh_la_ngoai_te_trong_mo_ta_ma_o_tien_te_bo_trong():
+    """Hình thật của kho cũ: "Phí LSQ Phí (CAD) – NGUYEN TUYET NHI", ô `tien_te` rỗng."""
+    db, t = _db()
+    _dong(db, t, tien_te="", so_tien_goc=None, ty_gia=None,
+          description="Phí LSQ Phí (CAD) – NGUYEN TUYET NHI", unit_price=0, actual=0)
+    b = NT.bang(db)
+    assert b["tong_dong_ngoai_te"] == 0, "dòng không khai tien_te thì không vào sổ xếp loại"
+    assert b["ngoai_te_an"]["tong"] == 1
+    assert b["ngoai_te_an"]["theo_dong_tien"] == {"CAD": 1}
+    assert b["ngoai_te_an"]["rows"][0]["doan_la"] == "CAD"
+
+
+def test_nt2_ngoai_te_an_KHONG_xep_loai_va_KHONG_ket_luan_sai():
+    """Phép dò bằng câu chữ thì thô. Nó nói "cần người nhìn", không nói "dòng này sai"."""
+    db, t = _db()
+    _dong(db, t, tien_te="", so_tien_goc=None, ty_gia=None, description="Vé USD Airlines",
+          unit_price=0, actual=0)
+    r = NT.bang(db)["ngoai_te_an"]["rows"][0]
+    assert "nhom" not in r and "lech" not in r and "actual_dung" not in r
+
+
+@pytest.mark.parametrize("chu,thay", [
+    ("Phí LSQ Phí (CAD)", "CAD"),
+    ("Thanh toán USD cho NCC", "USD"),
+    ("Land AUD 436.2", "AUD"),
+    ("Xe đưa đón nội thành", ""),        # không có mã nào
+    ("Khách sạn CADILLAC", ""),          # CAD nằm trong một từ dài hơn – không phải đồng tiền
+    ("USDA chứng nhận", ""),
+])
+def test_nt2_do_ma_dong_tien_dung_nhu_MOT_TU_rieng(chu, thay):
+    """“CADILLAC” chứa “CAD”. Dò bằng chuỗi con thì mỗi khách sạn thành một khoản ngoại tệ."""
+    db, t = _db()
+    l = _dong(db, t, description=chu, supplier_name="")
+    assert NT.dong_tien_trong_chu(l) == thay
+
+
+def test_nt2_dong_da_khai_tien_te_KHONG_bi_dem_hai_lan():
+    db, t = _db()
+    _dong(db, t, description="Land tour (GBP)")
+    b = NT.bang(db)
+    assert b["tong_dong_ngoai_te"] == 1 and b["ngoai_te_an"]["tong"] == 0
+
+
+def test_nt2_dem_theo_trang_thai_de_biet_dong_nao_da_huy():
+    """Một dòng đã huỷ không đi vào giá vốn. Gộp nó vào con số báo lên Chủ tịch là thổi phồng."""
+    db, t = _db()
+    _dong(db, t, unit_price=GBP, actual=SAI)
+    _dong(db, t, unit_price=GBP, actual=SAI, status="huy")
+    b = NT.bang(db)
+    assert b["theo_trang_thai"] == {"hd": 1, "huy": 1}
+    assert b["theo_nguon"] == {"vtos": 2}
+
+
+def test_nt2_dem_CAP_dong_tien_x_ngay_chu_khong_dem_dong():
+    """61 dòng của 10 chuyến chỉ cần chừng mươi con số tỷ giá, không phải 61 lần gõ. Đếm CẶP là
+    cách duy nhất nói đúng khối lượng việc cho người sắp phải làm nó."""
+    db, t = _db()
+    _dong(db, t, ty_gia=None, unit_price=None, actual=0)
+    _dong(db, t, ty_gia=None, unit_price=None, actual=0)       # cùng chuyến, cùng GBP → MỘT cặp
+    b = NT.bang(db)
+    assert b["can_ty_gia"] == [{"tien_te": "GBP", "ngay": HOM_NAY.isoformat()}]
+
+
+def test_nt2_row_mang_TRANG_THAI_CHUYEN_va_NGAY_KHOI_HANH():
+    """Chuyến đã đóng số thì KHÔNG ai được nắn lặng lẽ — người đọc bảng phải thấy điều đó ngay trên
+    dòng, không phải đi mở từng chuyến."""
+    db, t = _db()
+    _dong(db, t, ty_gia=None, unit_price=None, actual=0)
+    r = NT.bang(db)["rows"][0]
+    assert r["trang_thai_chuyen"] == "ket_thuc"
+    assert r["ngay_khoi_hanh"] == HOM_NAY
+    assert r["trang_thai_dong"] == "hd"

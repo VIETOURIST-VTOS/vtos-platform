@@ -18,7 +18,7 @@ function Expenses() {
   const [rows, setRows] = useState<any[]>([]);
   const [cf, setCf] = useState<any[]>([]);
   const [tours, setTours] = useState<any[]>([]);
-  const [f, setF] = useState<any>({ category: "chi_tour", tour_id: "", supplier_name: "", supplier_tax_code: "", supplier_bank: "", amount: "", description: "", has_document: false, document_ref: "", has_invoice: false, ngay_den_han: "", marketing_muc: "", campaign_id: "" });
+  const [f, setF] = useState<any>({ category: "chi_tour", tour_id: "", supplier_name: "", supplier_tax_code: "", supplier_bank: "", amount: "", description: "", has_document: false, document_ref: "", has_invoice: false, ngay_den_han: "", marketing_muc: "", campaign_id: "", tien_te: "", so_tien_ngoai_te: "", ty_gia: "", ngay_ty_gia: "" });
   // VPM-17 – danh sách đề nghị chi CHƯA ai gõ ngày phải trả. Mỗi dòng ở đây là một khoản tiền hệ
   // thống biết phải trả nhưng không biết trả NGÀY NÀO, nên không xếp được vào cột nào của bảng dòng tiền.
   const [thieuNgay, setThieuNgay] = useState<any>(null);
@@ -94,7 +94,21 @@ function Expenses() {
         <label>NCC / người thụ hưởng<input value={f.supplier_name} onChange={(e) => setF({ ...f, supplier_name: e.target.value })} /></label>
         <label>MST NCC<input value={f.supplier_tax_code} onChange={(e) => setF({ ...f, supplier_tax_code: e.target.value })} /></label>
         <label>Tài khoản thụ hưởng<input value={f.supplier_bank} onChange={(e) => setF({ ...f, supplier_bank: e.target.value })} placeholder="số TK – ngân hàng" /></label>
-        <label>Số tiền (đ)<input type="number" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
+        {/* BỐN Ô NGOẠI TỆ – Chủ tịch chốt 27/9/2026. Để trống đồng tiền = khoản đồng Việt Nam (đại
+            đa số), ô VND gõ như cũ. Khai đồng tiền thì MÁY NHÂN và ô VND thành chỉ-đọc: gõ tay cả ba
+            con số là mở đường cho ba con số không khớp nhau – cùng lý do đã ghi ở models/ty_gia.py. */}
+        <label>Đồng tiền<select value={f.tien_te} onChange={(e) => setF({ ...f, tien_te: e.target.value, amount: "" })}>
+          <option value="">VND – đồng Việt Nam</option>
+          {["USD", "EUR", "AUD", "CAD", "GBP", "JPY", "KRW", "CNY", "SGD", "THB", "TWD", "HKD"].map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
+        {f.tien_te ? <>
+          <label>Số tiền ({f.tien_te})<input type="number" step="0.01" value={f.so_tien_ngoai_te} onChange={(e) => setF({ ...f, so_tien_ngoai_te: e.target.value })} />
+            <span className="muted">TỔNG số ngoại tệ phải chuyển, không phải đơn giá – đề nghị chi không có số lượng.</span></label>
+          <label>Tỷ giá (1 {f.tien_te} = ? đ)<input type="number" step="0.000001" value={f.ty_gia} onChange={(e) => setF({ ...f, ty_gia: e.target.value })} /></label>
+          <label>Ngày tỷ giá<input type="date" value={f.ngay_ty_gia} onChange={(e) => setF({ ...f, ngay_ty_gia: e.target.value })} />
+            <span className="muted">Ngày CHUYỂN TIỀN thật, không phải ngày lập phiếu. Nên có dòng tương ứng trong Sổ tỷ giá kèm chứng từ.</span></label>
+          <label>Số tiền quy đổi (đ) – máy nhân<input readOnly value={f.so_tien_ngoai_te && f.ty_gia ? Math.round(Number(f.so_tien_ngoai_te) * Number(f.ty_gia)).toLocaleString("vi-VN") : "–"} />
+            <span className="muted">Máy nhân, người không gõ. Chênh lệch tỷ giá so với tỷ giá quyết toán được đo riêng, không lẫn vào “còn phải trả NCC”.</span></label>
+        </> : <label>Số tiền (đ)<input type="number" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>}
         <label>Nội dung<input value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
         <label>Ngày phải trả (đã hẹn với NCC)<input type="date" value={f.ngay_den_han} onChange={(e) => setF({ ...f, ngay_den_han: e.target.value })} />
           <span className="muted">Chưa hẹn được thì để trống – đừng đoán. Khoản để trống sẽ nằm ở tab “Chưa có ngày phải trả” cho tới khi có người gõ.</span></label>
@@ -110,10 +124,10 @@ function Expenses() {
             {(dmMkt?.chien_dich || []).map((c: any) => <option key={c.id} value={c.id}>{c.ma} · {c.ten}</option>)}</select>
             <span className="muted">Để trống được. Nhưng khoản để trống nằm ở phần “chưa gắn chiến dịch” của bảng Đóng góp doanh thu, và không chiến dịch nào nhận nó.</span></label>
         </>}
-      </div><button className="act" disabled={!f.supplier_name || !f.amount || !f.description} onClick={() => post("/payment-requests", { ...f, tour_id: f.tour_id ? Number(f.tour_id) : null, amount: Number(f.amount), ngay_den_han: f.ngay_den_han || null, marketing_muc: f.category === "marketing" ? f.marketing_muc : "", campaign_id: f.category === "marketing" && f.campaign_id ? Number(f.campaign_id) : null }).then((r) => r && setF({ ...f, supplier_name: "", amount: "", description: "", document_ref: "", has_document: false, ngay_den_han: "", marketing_muc: "", campaign_id: "" }))}>Lập đề nghị</button></div>}
+      </div><button className="act" disabled={!f.supplier_name || !f.description || (f.tien_te ? !(f.so_tien_ngoai_te && f.ty_gia && f.ngay_ty_gia) : !f.amount)} onClick={() => post("/payment-requests", { ...f, tour_id: f.tour_id ? Number(f.tour_id) : null, amount: f.tien_te ? 0 : Number(f.amount), tien_te: f.tien_te, so_tien_ngoai_te: f.tien_te && f.so_tien_ngoai_te ? Number(f.so_tien_ngoai_te) : null, ty_gia: f.tien_te && f.ty_gia ? Number(f.ty_gia) : null, ngay_ty_gia: f.tien_te && f.ngay_ty_gia ? f.ngay_ty_gia : null, ngay_den_han: f.ngay_den_han || null, marketing_muc: f.category === "marketing" ? f.marketing_muc : "", campaign_id: f.category === "marketing" && f.campaign_id ? Number(f.campaign_id) : null }).then((r) => r && setF({ ...f, supplier_name: "", amount: "", description: "", document_ref: "", has_document: false, ngay_den_han: "", marketing_muc: "", campaign_id: "", so_tien_ngoai_te: "", ty_gia: "", ngay_ty_gia: "" }))}>Lập đề nghị</button></div>}
       <div>{[["cho_tp,cho_kt,cho_duyet,cho_chi", "Đang xử lý"], ["cho_chi", "Lệnh chi chờ"], ["da_chi", "Đã chi"], ["tu_choi", "Từ chối"], ["", "Tất cả"]].map(([v, l]) => <button key={v} className={"act " + (filter === v ? "" : "grey")} onClick={() => setFilter(v)}>{l}</button>)}</div>
       <div className="panel wrap"><table><thead><tr><th>Số ĐN</th><th>Loại / Tour</th><th>NCC</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Nội dung</th><th>Hạn trả</th><th>Cờ R3</th><th>Trạng thái → bước tiếp</th><th>Người</th><th></th></tr></thead>
-        <tbody>{rows.length ? rows.map((r) => <tr key={r.id}><td><b>{r.code}</b><div className="muted">{fmtDT(r.created_at)}</div></td><td>{CAT[r.category]}<div className="muted">{r.tour_code}</div></td><td>{r.supplier_name}<div className="muted">{r.supplier_tax_code || <Tag cls="warn">chưa MST</Tag>}</div></td><td style={{ textAlign: "right" }}><b>{vnd(r.amount)}</b></td><td>{r.description}<div className="muted">{r.document_ref || <Tag cls="warn">thiếu chứng từ</Tag>}{!r.has_invoice && !["hoan_tien", "tam_ung"].includes(r.category) && <Tag cls="warn">không HĐ</Tag>}</div></td>
+        <tbody>{rows.length ? rows.map((r) => <tr key={r.id}><td><b>{r.code}</b><div className="muted">{fmtDT(r.created_at)}</div></td><td>{CAT[r.category]}<div className="muted">{r.tour_code}</div></td><td>{r.supplier_name}<div className="muted">{r.supplier_tax_code || <Tag cls="warn">chưa MST</Tag>}</div></td><td style={{ textAlign: "right" }}><b>{vnd(r.amount)}</b>{r.ngoai_te_loi_nhan && <div className="muted">{r.ngoai_te_loi_nhan}</div>}</td><td>{r.description}<div className="muted">{r.document_ref || <Tag cls="warn">thiếu chứng từ</Tag>}{!r.has_invoice && !["hoan_tien", "tam_ung"].includes(r.category) && <Tag cls="warn">không HĐ</Tag>}</div></td>
           <td>{r.ngay_den_han ? <b>{String(r.ngay_den_han).slice(0, 10).split("-").reverse().join("/")}</b> : <Tag cls="warn">Chưa có hạn</Tag>}
             <div className="muted">{r.ngay_den_han_boi ? `${r.ngay_den_han_boi} gõ` : ""}{!["da_chi", "tu_choi"].includes(r.status) && <> <button className="act grey" style={{ margin: 0, padding: "1px 6px", fontSize: 11 }} onClick={() => datNgay(r)}>{r.ngay_den_han ? "Sửa" : "Gõ hạn"}</button></>}</div></td>
           <td>{r.over_budget && <Tag cls="red">Ngoài dự toán</Tag>}{r.two_signatures && <Tag cls="navy">2 chữ ký</Tag>}</td><td><Tag cls={ST[r.status]?.[1]}>{ST[r.status]?.[0]}</Tag><div className="muted">{r.next}{r.two_signatures && r.status === "cho_duyet" && ` (CT ${r.signed_chutich ? "✔" : "…"} · TGĐ ${r.signed_tgd ? "✔" : "…"})`}{r.reject_reason && ` – ${r.reject_reason}`}{r.paid_ref && ` – ${r.paid_ref}`}</div></td>

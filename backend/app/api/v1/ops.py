@@ -201,7 +201,13 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
             # VPM-17. Rỗng là CHƯA AI NHẬP – màn hình phải hiện "Chưa có hạn", tuyệt đối không hiện
             # ngày lập thay vào đó.
             "ngay_den_han": r.ngay_den_han, "ngay_den_han_boi": r.ngay_den_han_boi,
-            "ngay_den_han_luc": r.ngay_den_han_luc}
+            "ngay_den_han_luc": r.ngay_den_han_luc,
+            # Bốn ô ngoại tệ, 27/9/2026. `tien_te` rỗng = khoản đồng Việt Nam, KHÔNG phải "chưa nhập".
+            # `amount` vẫn là cột VND duy nhất mọi màn hình cộng – bốn ô này nói nó từ đâu ra.
+            "tien_te": r.tien_te, "so_tien_ngoai_te": r.so_tien_ngoai_te,
+            "ty_gia": r.ty_gia, "ngay_ty_gia": r.ngay_ty_gia,
+            "ngoai_te_loi_nhan": (f"{r.so_tien_ngoai_te:,.2f} {r.tien_te} × {r.ty_gia:,.2f}"
+                                  if r.tien_te and r.so_tien_ngoai_te and r.ty_gia else "")}
 
 
 @router.get("/payment-requests")
@@ -220,7 +226,7 @@ class PRIn(BaseModel):
     supplier_name: str
     supplier_tax_code: str = ""
     supplier_bank: str = ""
-    amount: float
+    amount: float = 0          # khoản ngoại tệ: để 0, máy nhân ra số VND
     description: str
     has_document: bool = False
     document_ref: str = ""
@@ -232,6 +238,13 @@ class PRIn(BaseModel):
     # VPM-17 – ngày đã hẹn trả nhà cung cấp. Để trống được: chưa hẹn được thì đừng đoán, khoản này
     # sẽ nằm ở danh sách còn thiếu ngày cho tới khi người lập quay lại gõ.
     ngay_den_han: date | None = None
+    # BỐN Ô NGOẠI TỆ – Chủ tịch chốt 27/9/2026. Để trống cả bốn = khoản đồng Việt Nam (đại đa số).
+    # Khai `tien_te` thì phải đủ ba ô còn lại, và `amount` KHÔNG gõ – máy nhân. Kiểm ở
+    # `services/ngoai_te_chi.chuan_hoa`.
+    tien_te: str = ""
+    so_tien_ngoai_te: float | None = None
+    ty_gia: float | None = None
+    ngay_ty_gia: date | None = None
 
 
 @router.get("/payment-requests/danh-muc-marketing")
@@ -276,6 +289,14 @@ def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptg
     # 23/9/2026 — Marketing tách khỏi mạch này: một chữ ký cho mọi mức tiền (Chủ tịch chốt). Nên với
     # Marketing, "ngoài dự toán" là một lời BÁO chứ không còn là một cấp duyệt, và câu chữ phải nói
     # đúng thế — viết "→ 2 chữ ký" cho một hồ sơ chỉ cần một chữ ký là nói dối người đọc màn hình.
+    # Lời báo tỷ giá, 27/9/2026. Sổ tỷ giá là BẢN THAM CHIẾU, không phải quan toà: lệch thì nói ra
+    # cho người duyệt biết, KHÔNG chặn và không sửa. Tỷ giá của khoản này là tỷ giá ngày chuyển tiền
+    # thật của khoản này – xem `models/ty_gia.py`.
+    if r.tien_te:
+        from app.services import ngoai_te_chi as NTC
+        flags.append(f"{r.so_tien_ngoai_te:,.2f} {r.tien_te} × {r.ty_gia:,.2f} = {r.amount:,.0f}đ")
+        so = NTC.doi_chieu_so_ty_gia(db, r.tien_te, r.ngay_ty_gia, r.ty_gia)
+        if so["loi_nhan"]: flags.append(so["loi_nhan"])
     if r.category == "marketing":
         if r.over_budget:
             flags.append("NGOÀI DỰ TOÁN (vẫn một chữ ký P.TGĐ Marketing – Chủ tịch chốt 23/9)")

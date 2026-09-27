@@ -10,6 +10,7 @@ from app.models.vietrip import TourCostLine
 from app.models.ops import PaymentRequest
 from app.services import rules as R
 from app.services import chu_ho_so as CHS
+from app.services import ngoai_te_chi as NT
 from app.services.vietrip import _strip_accents
 from app.api.deps import toan_quyen, toan_quyen_ke_ca_tach_bach   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
 
@@ -28,9 +29,30 @@ class Gate(HTTPException):
     def __init__(self, code: str, msg: str): super().__init__(422, {"gate": code, "message": msg})
 
 
-def calc_actual(kind: str, unit_price: float, qty: float, coef: float) -> float:
-    """Theo khách: đơn giá × số khách × hệ số. Cố định: đơn giá × hệ số (SL chỉ để ghi nhận số khách)."""
-    return round(unit_price * qty * coef if kind == "theo_khach" else unit_price * coef)
+def calc_actual(kind: str, unit_price: float, qty: float, coef: float, ndigits: int | None = None) -> float:
+    """Theo khách: đơn giá × số khách × hệ số. Cố định: đơn giá × hệ số (SL chỉ để ghi nhận số khách).
+
+    `ndigits=None` (mặc định) làm tròn về ĐỒNG – đúng cho tiền Việt: đồng Việt Nam không có đơn vị
+    nhỏ hơn đồng. Truyền `ndigits=2` khi `unit_price` là ĐƠN GIÁ NGOẠI TỆ: 29.770,62 GBP làm tròn
+    về 29.771 là mất 0,62 GBP – một khoản tiền có thật, và nhân tỷ giá lên thành hơn hai chục nghìn
+    đồng lệch trên mỗi dòng.
+
+    Ô `ndigits` thêm vào 27/9/2026 chứ không dựng một hàm nhân thứ hai cho ngoại tệ: LUẬT PHÉP NHÂN
+    (`theo_khach` nhân số khách, `co_dinh` không) phải nằm đúng MỘT chỗ. Hai bản chép của một phép
+    tính thì sớm muộn lệch nhau – đã trả hơn một tỷ đồng để học điều đó ngày 27/9/2026.
+    """
+    tich = unit_price * qty * coef if kind == "theo_khach" else unit_price * coef
+    return round(tich) if ndigits is None else round(tich, ndigits)
+
+
+def tong_ngoai_te(l: TourCostLine) -> float:
+    """Tổng nghĩa vụ của MỘT dòng giá vốn, tính bằng ĐỒNG GỐC (không quy đổi).
+
+    Dùng để khớp lệnh chi ngoại tệ theo đồng gốc: nhà cung cấp hết nợ khi nhận đủ số ngoại tệ này,
+    bất kể mình mua ngoại tệ ấy giá nào. Gọi CHÍNH `calc_actual` – xem lý do ở hàm trên.
+    """
+    return calc_actual(l.cost_kind or "co_dinh", float(l.so_tien_goc or 0),
+                       float(l.qty or 0), float(l.coef or 1), 2)
 
 
 def can_edit(db: Session, u: User, t: Tour) -> bool:
@@ -198,28 +220,115 @@ def set_doc(db: Session, u: User, t: Tour, l: TourCostLine, name: str, data: str
 
 
 def match_paid(db: Session, t: Tour) -> dict:
-    """Khớp cột 'Đã thanh toán' với lệnh chi NCC đã chi (chi_tour) và tạm ứng đã chi (tam_ung) của tour: ưu tiên trùng MST, sau đó trùng tên NCC (bỏ dấu);
-    mỗi lệnh chi chỉ dùng một lần, phân bổ tuần tự theo thứ tự dòng."""
+    """Khớp cột 'Đã thanh toán' của dòng quyết toán với lệnh chi NCC / tạm ứng đã chi của chuyến.
+
+    Ưu tiên trùng MST, sau đó trùng tên NCC (bỏ dấu); mỗi lệnh chi chỉ dùng một lần, phân bổ tuần
+    tự theo thứ tự dòng.
+
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    NGOẠI TỆ: KHỚP THEO ĐỒNG GỐC, CHÊNH TỶ GIÁ ĐỨNG RIÊNG — Chủ tịch chốt 27/9/2026
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    Bản cũ so số VND của lệnh chi với số VND của dòng. Hai số ấy dùng HAI TỶ GIÁ khác nhau (tỷ giá
+    ngày chuyển tiền ≠ tỷ giá lúc làm quyết toán), nên phần chênh tỷ giá chui vào cột "còn phải trả
+    NCC" — hoặc hiện thành "trả thừa". Không ai đọc được chuyến còn nợ NCC thật hay chỉ lệch tỷ giá.
+
+    Luật mới, khi dòng và lệnh chi CÙNG một đồng tiền và cả hai đều có tỷ giá:
+
+        phân bổ theo SỐ NGOẠI TỆ (nhà cung cấp hết nợ khi nhận đủ số ngoại tệ)
+        `paid` của dòng = số ngoại tệ đã trả × TỶ GIÁ CỦA DÒNG   → "còn phải trả" về 0 đúng lúc
+        chênh tỷ giá   = số ngoại tệ đã trả × (tỷ giá lệnh chi − tỷ giá dòng)   → đứng RIÊNG
+
+    Chênh ấy được ĐO và in ra, KHÔNG sinh bút toán 635/515 (Chủ tịch chọn đo trước, 27/9/2026).
+
+    Khác đồng tiền, hoặc một bên không khai ngoại tệ → rơi về khớp theo VND như cũ VÀ hiện ra ở
+    `canh_bao`. Im lặng quy đổi giữa hai đồng tiền khác nhau ở đây là bịa một tỷ giá không ai khai.
+    """
     prs = list(db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.status == "da_chi", PaymentRequest.category.in_(["chi_tour", "tam_ung"]))).scalars())
-    pool = [{"id": p.id, "mst": (p.supplier_tax_code or "").strip(), "name": _norm(p.supplier_name), "left": p.amount} for p in prs]
+    pool = [{"id": p.id, "code": p.code, "mst": (p.supplier_tax_code or "").strip(), "name": _norm(p.supplier_name),
+             "left": p.amount,                                   # còn lại tính bằng VND (đường cũ)
+             "tien_te": NT.hoa(p.tien_te), "ty_gia": float(p.ty_gia) if p.ty_gia else None,
+             "left_nt": float(p.so_tien_ngoai_te) if p.so_tien_ngoai_te else None,  # còn lại tính bằng ngoại tệ
+             "pr": p} for p in prs]
     matched, unmatched = 0, 0
+    tong_chenh = 0.0
+    chenh_dong: list[dict] = []
+    canh_bao: list[str] = []
+
     for l in lines_of(db, t, active_only=True):
         if l.source == "vietrip" and (l.paid or 0) > 0 and not prs: continue
         mst, name = (l.supplier_tax_code or "").strip(), _norm(l.supplier_name)
-        cands = [p for p in pool if p["left"] > 0 and ((mst and p["mst"] == mst) or (name and p["name"] == name))]
-        paid = 0.0
+        # Tổng nghĩa vụ của dòng tính bằng ĐỒNG GỐC. Bằng 0 nghĩa là dòng khai `tien_te` mà THIẾU
+        # `so_tien_goc` – hình của dòng kho cũ và dòng ghi thẳng vào bảng. KHÔNG được đi đường ngoại
+        # tệ với dòng ấy: nghĩa vụ 0 thì mọi lần trả đều lấy được 0, và `paid` sẽ bị ghi thành 0 –
+        # tức XOÁ con số đã trả đang nằm đó. Rơi về khớp theo VND và hiện ra ở `canh_bao`.
+        nt_tong = tong_ngoai_te(l) if NT.la_ngoai_te(l) else 0.0
+
+        def _theo_nt(p, l=l, nt_tong=nt_tong) -> bool:
+            return (NT.cung_dong_tien(l, p["pr"]) and nt_tong > NT.DUNG_SAI_NT
+                    and (p["left_nt"] or 0) > NT.DUNG_SAI_NT)
+
+        cands = [p for p in pool if ((mst and p["mst"] == mst) or (name and p["name"] == name))
+                 and (_theo_nt(p) or p["left"] > 0)]
+        paid = 0.0            # nghĩa vụ đã dập, tính bằng VND theo tỷ giá CỦA DÒNG
+        chenh_l = 0.0         # chênh tỷ giá của riêng dòng này (dương = lỗ)
+        nt_da_tra = 0.0
+        # Tỷ giá ĐÃ DÙNG để phân bổ — giữ lại để in ra. In con số đã dùng chứ không đọc lại cột:
+        # đọc lại là mở đường cho bảng nói một tỷ giá khác với tỷ giá phép tính thật sự chạy.
+        tg_da_dung = 0.0
         for p in cands:
-            take = min(p["left"], max(0.0, (l.actual or 0) - paid))
-            if take <= 0: break
-            p["left"] -= take; paid += take
+            if _theo_nt(p):
+                # ── Cùng đồng tiền: phân bổ theo NGOẠI TỆ ────────────────────────────────────
+                tg_dong = float(l.ty_gia)
+                con_no_nt = max(0.0, nt_tong - nt_da_tra)
+                take_nt = min(p["left_nt"], con_no_nt)
+                if take_nt <= NT.DUNG_SAI_NT: continue
+                p["left_nt"] -= take_nt
+                p["left"] = round(max(0.0, p["left"] - take_nt * float(p["ty_gia"])), 2)
+                nt_da_tra += take_nt
+                tg_da_dung = tg_dong
+                paid += take_nt * tg_dong
+                chenh_l += NT.chenh_mot_lan_tra(take_nt, tg_dong, float(p["ty_gia"]))
+            else:
+                # ── Đường cũ: phân bổ theo VND ───────────────────────────────────────────────
+                if NT.la_ngoai_te(l) and NT.hoa(l.tien_te) == p["tien_te"] and nt_tong <= NT.DUNG_SAI_NT:
+                    canh_bao.append(
+                        f"Dòng {l.line_no} khai {NT.hoa(l.tien_te)} nhưng THIẾU đơn giá đồng gốc – "
+                        f"khớp lệnh chi {p['code']} theo số VND; chênh lệch tỷ giá KHÔNG đo được. "
+                        "Chủ hồ sơ quyết toán cần gõ lại bốn ô ngoại tệ của dòng này.")
+                elif NT.la_ngoai_te(l) != NT.la_ngoai_te(p["pr"]) or (
+                        NT.la_ngoai_te(l) and NT.hoa(l.tien_te) != p["tien_te"]):
+                    canh_bao.append(
+                        f"Dòng {l.line_no} ({NT.hoa(l.tien_te) or 'VND'}) khớp với lệnh chi {p['code']} "
+                        f"({p['tien_te'] or 'VND'}) – khác đồng tiền nên khớp theo số VND; "
+                        "chênh lệch tỷ giá của lần trả này KHÔNG đo được.")
+                take = min(p["left"], max(0.0, (l.actual or 0) - paid))
+                if take <= 0: break
+                p["left"] -= take; paid += take
         if cands:
             l.paid = round(paid); matched += 1
+            if abs(chenh_l) > NT.DUNG_SAI:
+                tong_chenh += chenh_l
+                chenh_dong.append({"dong": l.line_no, "mo_ta": (l.description or "")[:80],
+                                   "ncc": (l.supplier_name or "")[:60], "tien_te": NT.hoa(l.tien_te),
+                                   "so_ngoai_te_da_tra": round(nt_da_tra, 2),
+                                   "ty_gia_quyet_toan": tg_da_dung, "nghia_vu_vnd": round(paid),
+                                   "chenh": round(chenh_l)})
         else:
             unmatched += 1
+
     leftover = round(sum(p["left"] for p in pool))
     db.commit()
+    tong_chenh = round(tong_chenh)
     return {"matched": matched, "unmatched": unmatched, "payments": len(prs), "leftover": leftover,
-            "message": f"Đã khớp {matched} dòng với {len(prs)} lệnh chi/tạm ứng đã chi" + (f"; {unmatched} dòng chưa có lệnh chi" if unmatched else "") + (f"; còn {leftover:,.0f} đ lệnh chi chưa gắn dòng" if leftover > 0 else "")}
+            # Chênh lệch tỷ giá: ĐO, chưa hạch toán. Dương = LỖ. Xem `services/ngoai_te_chi.py`.
+            "chenh_ty_gia": tong_chenh, "chenh_ty_gia_nhan_xet": NT.nhan_xet_chenh(tong_chenh),
+            "chenh_ty_gia_dong": chenh_dong, "canh_bao": canh_bao,
+            "message": f"Đã khớp {matched} dòng với {len(prs)} lệnh chi/tạm ứng đã chi"
+                       + (f"; {unmatched} dòng chưa có lệnh chi" if unmatched else "")
+                       + (f"; còn {leftover:,.0f} đ lệnh chi chưa gắn dòng" if leftover > 0 else "")
+                       + (f"; {NT.nhan_xet_chenh(tong_chenh)}" if abs(tong_chenh) > NT.DUNG_SAI else "")
+                       + (f"; {len(canh_bao)} lần khớp khác đồng tiền" if canh_bao else "")}
+
 
 
 def summary(db: Session, t: Tour) -> dict:
