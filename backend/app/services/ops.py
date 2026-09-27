@@ -9,6 +9,7 @@ from app.models.core import Tour, Booking, User, Alert
 from app.models.hr import Employee
 from app.models.ops import DailyReport, PageShift, PaymentRequest
 from app.models.payments import Receipt
+from app.services import ngoai_te_chi as NT
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.api.deps import toan_quyen, toan_quyen_ke_ca_tach_bach   # Chủ tịch toàn quyền – MỘT luật, xem deps.toan_quyen
@@ -228,10 +229,14 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
         raise ValueError("Chi phí tour / hoàn tiền / tạm ứng bắt buộc gắn mã tour (cổng 14)")
     if cat == "tam_ung" and t and t.status in ("da_dong_so", "kt_xac_nhan", "khoa"):
         raise ValueError("Tour đã đóng số quyết toán – không tạm ứng thêm")
-    if (data["amount"] or 0) <= 0: raise ValueError("Số tiền phải > 0")
+    # BỐN Ô NGOẠI TỆ – Chủ tịch chốt 27/9/2026. Khoản ngoại tệ thì MÁY NHÂN ra `amount`; khoản đồng
+    # Việt Nam đi đúng đường cũ. Kiểm đủ ô và phép nhân nằm ở `services/ngoai_te_chi.py` – một chỗ,
+    # để cửa này và mọi cửa sau dùng cùng một luật.
+    nt = NT.chuan_hoa(data)
+    if (nt["amount"] or 0) <= 0: raise ValueError("Số tiền phải > 0")
     if not data.get("supplier_name"): raise ValueError("Thiếu nhà cung cấp / người thụ hưởng")
     r = PaymentRequest(code=_next_code(db), category=cat, tour_id=t.id if t else None, supplier_name=data["supplier_name"], supplier_tax_code=data.get("supplier_tax_code", ""),
-                       supplier_bank=data.get("supplier_bank", ""), amount=float(data["amount"]), description=data["description"], has_document=bool(data.get("has_document")),
+                       supplier_bank=data.get("supplier_bank", ""), amount=nt["amount"], description=data["description"], has_document=bool(data.get("has_document")),
                        document_ref=data.get("document_ref", ""), has_invoice=bool(data.get("has_invoice")), created_by=u.username,
                        company_id=t.company_id if t else None)
     # VPM-17 – ngày đến hạn, nếu người lập đã hẹn được với nhà cung cấp. Rỗng thì để rỗng: khoản này
@@ -240,6 +245,9 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     if data.get("ngay_den_han"):
         r.ngay_den_han = data["ngay_den_han"]
         r.ngay_den_han_boi, r.ngay_den_han_luc = u.username, datetime.now()
+    # Bốn ô ngoại tệ đã qua kiểm. `tien_te` rỗng nghĩa là khoản đồng Việt Nam – ba ô còn lại để None.
+    r.tien_te = nt["tien_te"]
+    r.so_tien_ngoai_te, r.ty_gia, r.ngay_ty_gia = nt["so_tien_ngoai_te"], nt["ty_gia"], nt["ngay_ty_gia"]
     # R3: xếp cấp duyệt
     if cat == "marketing":
         # ═══════════════════════════════════════════════════════════════════════════════════════

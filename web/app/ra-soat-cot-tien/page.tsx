@@ -38,6 +38,9 @@ function RaSoatCotTien() {
   const [d, setD] = useState<any>(null);
   const [dang, setDang] = useState(false);
   const [nt, setNt] = useState<any>(null);
+  // Sổ soát thứ hai: ĐỀ NGHỊ CHI khai ngoại tệ. Cùng một câu hỏi, khác chỗ — đây là nơi tiền
+  // THẬT rời ngân hàng, còn sổ trên là nơi con số đi vào báo cáo.
+  const [ntc, setNtc] = useState<any>(null);
   const quyetDuoc = ["ketoan", "cntt", "chutich", "tgd"].includes(user?.role || "");
 
   const load = useCallback(async () => {
@@ -65,6 +68,7 @@ function RaSoatCotTien() {
 
   const rows: Dong[] = d?.rows || [];
   const ntRows: any[] = nt?.rows || [];
+  const ntcRows: any[] = ntc?.rows || [];
 
   return (
     <div className="wrap">
@@ -201,6 +205,120 @@ function RaSoatCotTien() {
             ))}</tbody>
           </table>}
           {nt.cham_tran && <p className="muted small">Đang hiện {ntRows.length} dòng đầu — còn nữa.</p>}
+
+          {/* SỐ NGOẠI TỆ CHƯA QUY ĐỔI. Nhóm `thieu_o` không có tỷ giá nên `lech` không đo được và
+              `tong_lech` KHÔNG bao gồm chúng — một bảng chỉ có `tong_lech` = 0 đọc y hệt "không mất
+              gì", trong khi những dòng ấy đang ghi giá vốn bằng 0. */}
+          {Object.keys(nt.chua_quy_doi || {}).length > 0 && <>
+            <h3>Số ngoại tệ chưa quy đổi (dòng thiếu tỷ giá)</h3>
+            <p className="warn">
+              {Object.entries(nt.chua_quy_doi).map(([tt, so]: any) => `${Number(so).toLocaleString("vi-VN")} ${tt}`).join(" · ")}
+            </p>
+            <p className="muted small">
+              Những dòng này <b>chưa có tỷ giá</b> nên phần thiếu <b>không đo được</b> và <b>không</b> nằm trong
+              tổng ở trên. Nhập tỷ giá cho đúng cặp (đồng tiền × ngày) vào <b>Sổ tỷ giá</b> là quy đổi được cả nhóm.
+            </p>
+            {(nt.can_ty_gia || []).length > 0 && <p className="muted small">
+              Cần <b>{nt.can_ty_gia.length}</b> con số tỷ giá (ngày lấy theo <b>ngày khởi hành chuyến</b> —
+              Chủ tịch chốt 27/9/2026, và đó là <b>ngày ước</b> vì kho cũ không mang ngày tỷ giá nào):{" "}
+              {nt.can_ty_gia.map((c: any) => `${c.tien_te} ${String(c.ngay).split("-").reverse().join("/")}`).join(" · ")}
+            </p>}
+            {Object.keys(nt.theo_trang_thai_chuyen || {}).length > 0 && <p className="muted small">
+              Trạng thái chuyến của các dòng này: {Object.entries(nt.theo_trang_thai_chuyen).map(([k, v]: any) => `${k} ${v}`).join(" · ")}
+              {" — "}chuyến đã đóng số hoặc Kế toán đã xác nhận thì <b>không nắn lặng lẽ được</b>, phải đi qua đường Kế toán trả lại.
+            </p>}
+          </>}
+
+          {(nt.theo_trang_thai || nt.theo_nguon) && <p className="muted small">
+            Trạng thái: {Object.entries(nt.theo_trang_thai || {}).map(([k, v]: any) => `${k} ${v}`).join(" · ")}
+            {" — "}Nguồn: {Object.entries(nt.theo_nguon || {}).map(([k, v]: any) => `${k} ${v}`).join(" · ")}
+          </p>}
+
+          {/* NGOẠI TỆ ẨN — dòng nói mình là ngoại tệ trong câu chữ mà ô `tien_te` bỏ trống. Bảng
+              phía trên KHÔNG thấy chúng, nên con số của nó thấp hơn sự thật nếu không có khối này. */}
+          {nt.ngoai_te_an?.tong > 0 && <>
+            <h3>Ngoại tệ “ẩn” — mô tả có mã đồng tiền mà ô Tiền tệ bỏ trống ({nt.ngoai_te_an.tong})</h3>
+            <p className="muted small">
+              Bảng phía trên chỉ đếm dòng <b>có khai</b> ô Tiền tệ. Kho quyết toán cũ để đồng tiền trong
+              <b> câu mô tả</b>, nên dòng nào bộ nạp không điền được ô ấy thì <b>không được đếm</b>.
+              Phép dò này cố ý thô: nó <b>không xếp loại</b> và <b>không kết luận sai</b> — chỉ nói chỗ nào cần người nhìn.
+              {" "}{Object.entries(nt.ngoai_te_an.theo_dong_tien || {}).map(([k, v]: any) => `${k}: ${v}`).join(" · ")}
+            </p>
+            <table className="tbl">
+              <thead><tr><th>Chuyến</th><th>Dòng</th><th>Đoán là</th><th>Đơn giá</th><th>SL × hệ số</th><th>Đang ghi</th><th>Nguồn</th></tr></thead>
+              <tbody>{(nt.ngoai_te_an.rows || []).map((r: any, i: number) => (
+                <tr key={i}>
+                  <td className="mono">{r.tour}</td>
+                  <td className="mono">#{r.dong}<div className="muted small">{r.mo_ta}</div></td>
+                  <td><Tag cls="warn">{r.doan_la}</Tag></td>
+                  <td className="mono">{Number(r.don_gia || 0).toLocaleString("vi-VN")}</td>
+                  <td className="mono">{r.so_luong} × {r.he_so}</td>
+                  <td className="mono" style={{ color: !r.actual ? "var(--vtos-danger)" : undefined }}>
+                    {Number(r.actual || 0).toLocaleString("vi-VN")}</td>
+                  <td className="muted small">{r.nguon}<div>{r.trang_thai}</div></td>
+                </tr>))}</tbody>
+            </table>
+            {nt.ngoai_te_an.cham_tran && <p className="muted small">Đang hiện {(nt.ngoai_te_an.rows || []).length} dòng đầu — còn nữa.</p>}
+          </>}
+        </>)}
+      </div>
+
+      {/* ══ SOÁT NGOẠI TỆ TRÊN ĐỀ NGHỊ CHI — Chủ tịch quyết 27/9/2026 ══
+          Bốn ô ngoại tệ mở cho `payment_requests` cùng ngày. Sổ này hỏi hai câu KHÁC NHAU và đo
+          riêng: (1) số VND có đúng bằng số gốc × tỷ giá; (2) tỷ giá khai có khớp Sổ tỷ giá cùng ngày.
+          Phép nhân đúng không có nghĩa tỷ giá đúng. CHỈ ĐỌC. */}
+      <div className="card">
+        <h2 style={{ marginTop: 0 }}>Soát ngoại tệ trên đề nghị chi</h2>
+        <p className="muted small">
+          Đây là chỗ <b>tiền thật rời ngân hàng</b>. Trước 27/9/2026 đề nghị chi chỉ có <b>một ô tiền VND</b>:
+          trả nhà cung cấp nước ngoài thì người lập tự nhân tỷ giá ở ngoài rồi gõ số VND vào, nên số ngoại tệ,
+          tỷ giá và ngày tỷ giá không nằm ở đâu cả — và phần <b>chênh lệch tỷ giá</b> chui vào cột “còn phải
+          trả NCC”. Bốn ô ngoại tệ mở từ 27/9/2026; khoản lập trước ngày đó <b>không truy lại được</b>.
+        </p>
+        {!ntc ? (
+          <button className="ghost" onClick={() => api("/ra-soat-cot-tien/chi-ngoai-te")
+            .then(setNtc).catch((e) => toast(errMsg(e), true))}>Chạy bản soát</button>
+        ) : (<>
+          <div className="so">
+            <span><b>{ntc.tong_de_nghi_chi_ngoai_te}</b> đề nghị chi khai ngoại tệ</span>
+            <span><b>{ntc.dem?.dung ?? 0}</b> phép nhân đúng</span>
+            <span style={{ color: ntc.dem?.phep_nhan_lech ? "var(--vtos-danger)" : undefined }}>
+              <b>{ntc.dem?.phep_nhan_lech ?? 0}</b> phép nhân lệch</span>
+            <span><b>{ntc.dem?.thieu_o ?? 0}</b> thiếu ô</span>
+          </div>
+          <div className="so" style={{ marginTop: 6 }}>
+            <span>Đối chiếu Sổ tỷ giá:</span>
+            <span><b>{ntc.doi_chieu_so_ty_gia?.khop ?? 0}</b> khớp sổ</span>
+            <span style={{ color: ntc.doi_chieu_so_ty_gia?.lech ? "var(--vtos-danger)" : undefined }}>
+              <b>{ntc.doi_chieu_so_ty_gia?.lech ?? 0}</b> khác mọi nguồn trong sổ</span>
+            <span><b>{ntc.doi_chieu_so_ty_gia?.chua_co_trong_so ?? 0}</b> sổ chưa có ngày ấy</span>
+          </div>
+          <p className="muted small">{ntc.luu_y}</p>
+          {ntcRows.length > 0 && <table className="tbl">
+            <thead><tr>
+              <th>Số ĐN</th><th>Chuyến</th><th>Nhà cung cấp</th><th>Nhóm</th>
+              <th>Gốc × tỷ giá</th><th>Đang ghi (đ)</th><th>Đáng lẽ (đ)</th><th>Sổ tỷ giá</th>
+            </tr></thead>
+            <tbody>{ntcRows.map((r: any, i: number) => (
+              <tr key={i}>
+                <td className="mono">{r.ma}<div className="muted small">{r.trang_thai}</div></td>
+                <td className="mono">{r.tour || "—"}</td>
+                <td>{r.ncc}<div className="muted small">{r.boi} lập</div></td>
+                <td>{r.nhom === "phep_nhan_lech" ? <Tag cls="red">{r.nhom_ten}</Tag>
+                  : r.nhom === "thieu_o" ? <Tag cls="warn">{r.nhom_ten}</Tag> : <Tag cls="ok">{r.nhom_ten}</Tag>}</td>
+                <td className="mono">{Number(r.so_tien_ngoai_te || 0).toLocaleString("vi-VN")} {r.tien_te}
+                  {r.ty_gia != null && <> × {Number(r.ty_gia).toLocaleString("vi-VN")}</>}
+                  <div className="muted small">{r.ngay_ty_gia ? String(r.ngay_ty_gia).slice(0, 10).split("-").reverse().join("/") : "chưa có ngày"}</div></td>
+                <td className="mono">{Number(r.amount || 0).toLocaleString("vi-VN")}</td>
+                <td className="mono">{r.phep_nhan_dung != null ? Number(r.phep_nhan_dung).toLocaleString("vi-VN") : "—"}</td>
+                <td className="muted small">{r.so_ty_gia?.khop === false ? <Tag cls="warn">khác sổ</Tag>
+                  : r.so_ty_gia?.khop === null ? "sổ chưa có ngày này" : "khớp"}
+                  {(r.so_ty_gia?.cac_nguon || []).map((n: any, j: number) => (
+                    <div key={j}>{n.nguon || "không ghi nguồn"}: {Number(n.ty_gia).toLocaleString("vi-VN")}</div>))}</td>
+              </tr>
+            ))}</tbody>
+          </table>}
+          {ntc.cham_tran && <p className="muted small">Đang hiện {ntcRows.length} dòng đầu — còn nữa.</p>}
         </>)}
       </div>
 

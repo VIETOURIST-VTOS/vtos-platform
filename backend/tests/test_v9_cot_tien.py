@@ -148,6 +148,7 @@ def cot_tien_trong_moi_ban_nang_cap() -> set[tuple[str, str]]:
         op.add_column("t", sa.Column("c", TIEN))
         for ten, kieu in DANH_SACH: op.add_column("t", sa.Column(ten, kieu))   <- w1a2b3c4d5e6
         COT = [("t", "c", ...), ...]                                            <- các bản V9/K1
+        with op.batch_alter_table("t") as b: b.add_column(sa.Column("c", TIEN))  <- nt1c4f7b2e8a
 
     Kiểu được coi là TIỀN khi nó viết là `TIEN` hoặc `sa.Numeric(18, 2)` / `Numeric(18, 2)`. Đây là
     quy ước đã dùng suốt kho, xem app/models/kieu_tien.py.
@@ -251,6 +252,41 @@ def cot_tien_trong_moi_ban_nang_cap() -> set[tuple[str, str]]:
                                     and getattr(tham_so.func, "attr", "") == "Column" \
                                     and len(tham_so.args) >= 2 and la_tien(tham_so.args[1]):
                                 kq.update((bang, c) for c in ten_cot)
+
+            # Hình 5: `with op.batch_alter_table("t") as b: b.add_column(sa.Column("c", TIEN))`.
+            #
+            # Thêm 27/9/2026, khi hàng rào này báo đỏ cho bản nâng cấp `nt1c4f7b2e8a` (bốn ô ngoại
+            # tệ của đề nghị chi). Bản ấy KHÔNG sai: `batch_alter_table` là cách đúng để bảng đã tạo
+            # chịu được cả SQLite (máy lập trình) lẫn PostgreSQL (máy chạy thật) — chính bản
+            # `ch1f5a8d3e6b` trước đó cũng dùng, chỉ là nó không thêm cột TIỀN nào nên hàng rào
+            # chưa gặp hình này bao giờ.
+            #
+            # Cách sửa SAI mà người sau dễ chọn: đổi bản nâng cấp sang `op.add_column` thẳng cho
+            # hàng rào im. Làm thế là để cái LỖ y nguyên — bản nâng cấp sau dùng batch sẽ lại đỏ, và
+            # lần ấy người ta nới danh sách bỏ qua. Dạy hàng rào ĐỌC ĐƯỢC hình thứ năm không phải là
+            # nới: nó nhìn thấy NHIỀU hơn trước, không phải ít hơn.
+            #
+            # Tên bảng nằm ở `batch_alter_table("t")`, còn `add_column` bên trong KHÔNG mang tên
+            # bảng — nên hình 1/2 ở trên (đọc `nut.args[0]` làm tên bảng) không bắt được.
+            if isinstance(nut, ast.With):
+                bang = None
+                for muc in nut.items:
+                    g = muc.context_expr
+                    if isinstance(g, ast.Call) and getattr(g.func, "attr", "") == "batch_alter_table" \
+                            and g.args:
+                        bang = chu(g.args[0])
+                if not bang:
+                    continue
+                for con in ast.walk(nut):
+                    if isinstance(con, ast.Call) and getattr(con.func, "attr", "") == "add_column" \
+                            and con.args:
+                        for tham_so in con.args:
+                            if isinstance(tham_so, ast.Call) \
+                                    and getattr(tham_so.func, "attr", "") == "Column" \
+                                    and len(tham_so.args) >= 2:
+                                ten = chu(tham_so.args[0])
+                                if ten and la_tien(tham_so.args[1]):
+                                    kq.add((bang, ten))
 
         # Hình 4: hằng số COT = [(bang, cot, kieu), ...] của các đợt chuyển kiểu V9/K1.
         for ten_hang, gia_tri in hang.items():

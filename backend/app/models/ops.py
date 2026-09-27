@@ -4,6 +4,7 @@ from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, Fo
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 from app.models.kieu_tien import TIEN
+from app.models.ty_gia import TY_GIA_KIEU
 
 
 class DailyReport(Base):
@@ -94,3 +95,37 @@ class PaymentRequest(Base):
     ngay_den_han_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     paid_method: Mapped[str] = mapped_column(String(20), default="")      # chuyen_khoan / tien_mat
     entry_ids: Mapped[list] = mapped_column(JSON, default=list)
+    # ═══════════════════════════════════════════════════════════════════════════════════════════
+    # BỐN Ô NGOẠI TỆ — Chủ tịch chốt 27/9/2026
+    # ═══════════════════════════════════════════════════════════════════════════════════════════
+    #
+    # Trước hôm nay đề nghị chi chỉ có MỘT ô tiền: `amount`, đồng Việt Nam. Trả nhà cung cấp nước
+    # ngoài 29.770,62 GBP thì người lập tự nhân tỷ giá ở ngoài rồi gõ số VND vào — và số ngoại tệ,
+    # tỷ giá, ngày tỷ giá KHÔNG nằm ở đâu cả. Hệ quả đo được:
+    #
+    #   · `settlement.match_paid` so số VND của lệnh chi với số VND của dòng quyết toán. Hai số ấy
+    #     dùng hai tỷ giá khác nhau (tỷ giá ngày chuyển tiền ≠ tỷ giá lúc làm quyết toán), nên phần
+    #     chênh tỷ giá chui vào cột "còn phải trả NCC" — hoặc thành "trả thừa". Không ai đọc được
+    #     một chuyến còn nợ NCC thật hay chỉ lệch tỷ giá.
+    #   · Không đối chiếu được với sao kê ngoại tệ: số GBP ngân hàng trừ không có chỗ nào để so.
+    #   · Không dựng được bút toán chênh lệch tỷ giá (VAS: 635 / 515) vì thiếu cả ba dữ kiện.
+    #
+    # VÌ SAO KHÔNG ĐẶT TÊN `so_tien_goc` NHƯ Ở `tour_cost_lines`:
+    # Trên dòng giá vốn, `so_tien_goc` là ĐƠN GIÁ MỘT ĐƠN VỊ (Chủ tịch chốt 27/9/2026) — máy nhân
+    # với số lượng và hệ số sau. Đề nghị chi KHÔNG có số lượng: nó là một khoản tiền phải chuyển,
+    # trọn gói. Dùng lại đúng cái tên ấy cho một nghĩa khác là dựng lại đúng cái bẫy vừa phải trả
+    # hơn một tỷ đồng để phát hiện — hai cửa hiểu một cái tên theo hai nghĩa. Nên tên ở đây nói rõ
+    # nó là TỔNG: `so_tien_ngoai_te`.
+    #
+    # `amount` VẪN LÀ CỘT VND DUY NHẤT và vẫn là cột mọi màn hình cộng. Máy nhân, người không gõ:
+    # `amount = round(so_tien_ngoai_te × ty_gia, 2)`. Gõ tay cả ba là mở đường cho ba con số không
+    # khớp nhau — cùng một lý do đã ghi ở `models/ty_gia.py`.
+    #
+    # RỖNG `tien_te` nghĩa là khoản chi bằng đồng Việt Nam (đại đa số) — không phải "chưa ai nhập".
+    tien_te: Mapped[str] = mapped_column(String(3), default="")
+    so_tien_ngoai_te: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    # Tỷ giá là TỶ LỆ, không phải tiền — dùng đúng kiểu của sổ tỷ giá, xem `models/ty_gia.py` điểm 1.
+    ty_gia: Mapped[float | None] = mapped_column(TY_GIA_KIEU, nullable=True)
+    # Ngày của tỷ giá = ngày chuyển tiền thật, không phải ngày lập phiếu.
+    ngay_ty_gia: Mapped[date | None] = mapped_column(Date, nullable=True)
+

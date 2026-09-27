@@ -82,6 +82,19 @@ def soat_ngoai_te(gioi_han: int = 300, u: User = Depends(require_roles(*XEM)),
     return NT.bang(db, gioi_han)
 
 
+@router.get("/chi-ngoai-te")
+@rst.get("/chi-ngoai-te")
+def soat_chi_ngoai_te(gioi_han: int = 300, u: User = Depends(require_roles(*XEM)),
+                      db: Session = Depends(get_db)):
+    """Đề nghị chi khai ngoại tệ: phép nhân có khớp, tỷ giá có khớp SỔ TỶ GIÁ. CHỈ ĐỌC.
+
+    Sổ `/ngoai-te` soát DÒNG GIÁ VỐN (ảnh hưởng báo cáo). Sổ này soát LỆNH CHI – chỗ tiền thật rời
+    ngân hàng. Hai chỗ khác nhau, hai sổ khác nhau, cùng một quy ước đơn giá Chủ tịch chốt 27/9/2026.
+    """
+    from app.services import ngoai_te_chi as NTC
+    return NTC.bang(db, gioi_han)
+
+
 @router.get("/su-kien-ky-thuat")
 def su_kien(ngay: int = 7, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
     """Lỗi 5xx, đường dẫn chậm, tác vụ nền hỏng, lần khởi động máy chủ."""

@@ -351,7 +351,10 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
       try { await api(`${base}/lines/${l.id}/doc`, { method: "POST", json: { name: f.name, data } }); toast("Đã gắn chứng từ"); load(); } catch (x) { toast(errMsg(x), true); } };
     inp.click();
   };
-  const matchPaid = async () => { try { const r = await api(`${base}/match-paid`, { method: "POST" }); toast(r.message); load(); } catch (x) { toast(errMsg(x), true); } };
+  // Chênh lệch tỷ giá và cảnh báo khác đồng tiền KHÔNG được để chỉ hiện trong một dòng toast rồi
+  // biến mất: đây là con số Kế toán phải đọc theo từng dòng. Giữ lại kết quả để in ra bảng.
+  const [khopKq, setKhopKq] = useState<any>(null);
+  const matchPaid = async () => { try { const r = await api(`${base}/match-paid`, { method: "POST" }); setKhopKq(r); toast(r.message); load(); } catch (x) { toast(errMsg(x), true); } };
   const viewDoc = async (l: any) => { try { const r = await fetch(`/api/v1${base}/lines/${l.id}/doc`, { headers: { Authorization: `Bearer ${getToken() || ""}` } }); if (!r.ok) throw new Error("Không tải được chứng từ"); const u = URL.createObjectURL(await r.blob()); window.open(u, "_blank"); } catch (x: any) { toast(x.message || String(x), true); } };
   const F = (k: string, label: string, type = "text", extra: any = {}) => <div><label>{label}</label><input type={type} value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} {...extra} /></div>;
   return (<div className="panel wrap">
@@ -370,6 +373,21 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
       <label style={{ margin: 0 }}><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> hiện dòng đã hủy</label>
       {!se.can_edit && <span className="muted">{t.status === "da_dong_so" ? "Đã đóng số – chờ Kế toán xác nhận (Kế toán có thể trả lại để sửa)" : ["kt_xac_nhan", "khoa"].includes(t.status) ? "Kế toán đã xác nhận – số này là căn cứ duy nhất, không sửa" : "Chỉ người điều hành chuyến soạn quyết toán sau khi tour được duyệt"}</span>}
     </div>
+    {/* CHÊNH LỆCH TỶ GIÁ – Chủ tịch chốt 27/9/2026: "đã thanh toán" tính theo tỷ giá QUYẾT TOÁN, nên
+        "còn phải trả NCC" về 0 đúng lúc và phần chênh tỷ giá đứng RIÊNG ở bảng này. Đợt này chỉ ĐO,
+        chưa sinh bút toán 635/515. Một con số tổng không bấm vào được là một tin đồn – nên in cả dòng. */}
+    {khopKq && (khopKq.chenh_ty_gia || (khopKq.canh_bao || []).length > 0) && <div className="panel" style={{ marginTop: 8 }}>
+      <h3>Chênh lệch tỷ giá của lần khớp vừa rồi</h3>
+      <p className="muted">{khopKq.chenh_ty_gia_nhan_xet}</p>
+      {(khopKq.chenh_ty_gia_dong || []).length > 0 && <div className="wrap"><table><thead><tr><th>Dòng</th><th>Mô tả / NCC</th><th style={{ textAlign: "right" }}>Ngoại tệ đã trả</th><th style={{ textAlign: "right" }}>Tỷ giá quyết toán</th><th style={{ textAlign: "right" }}>Nghĩa vụ (đ)</th><th style={{ textAlign: "right" }}>Chênh (đ)</th></tr></thead>
+        <tbody>{khopKq.chenh_ty_gia_dong.map((d: any) => <tr key={d.dong}>
+          <td>{d.dong}</td><td>{d.mo_ta}<div className="muted">{d.ncc}</div></td>
+          <td style={{ textAlign: "right" }}>{Number(d.so_ngoai_te_da_tra).toLocaleString("vi-VN")} {d.tien_te}</td>
+          <td style={{ textAlign: "right" }}>{Number(d.ty_gia_quyet_toan).toLocaleString("vi-VN")}</td>
+          <td style={{ textAlign: "right" }}>{vnd(d.nghia_vu_vnd)}</td>
+          <td style={{ textAlign: "right" }}><b>{d.chenh > 0 ? "lỗ " : "lãi "}{vnd(Math.abs(d.chenh))}</b></td></tr>)}</tbody></table></div>}
+      {(khopKq.canh_bao || []).map((c: string, i: number) => <Gate key={i} ok={false}>{c}</Gate>)}
+    </div>}
     {edit && <form onSubmit={save} className="panel" style={{ marginTop: 8 }}>
       <h3>{edit.id ? `Sửa dòng ${edit.line_no}` : "Thêm chi phí quyết toán thực tế"}</h3>
       <div className="grid">
