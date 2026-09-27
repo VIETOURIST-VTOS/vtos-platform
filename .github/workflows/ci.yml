@@ -52,6 +52,25 @@ on:
   pull_request:
   push: { branches: [main, develop] }
   workflow_dispatch:
+
+# ĐẨY LẦN HAI THÌ HUỶ LƯỢT ĐANG CHẠY CỦA LẦN MỘT — 27/9/2026.
+#
+# Bộ đủ mất ~25 phút và GitHub tính tiền theo PHÚT ĐÃ CHẠY, không theo lượt có ai đọc kết quả hay
+# không. Khi một vòng sửa phải đẩy vài lần — hôm 27/9 nhánh TC-65 đẩy bốn lần — thì ba lượt đầu
+# vẫn chạy hết 25 phút cho một bản mã KHÔNG AI CÒN QUAN TÂM. Đó là ~75 phút trả tiền cho kết quả
+# đã lỗi thời trước khi nó kịp hiện.
+#
+# Đo ngày 27/9: ngân sách Actions chạm trần $50, mức tiêu ba ngày gần nhất là $4,58 · $4,94 ·
+# $5,50 mỗi ngày. Trần đầy thì CI KHÔNG CHẠY, và trang PR vẫn khoe "All checks have passed" vì
+# Vercel xanh — một màu xanh giả, nguy hiểm hơn hẳn màu đỏ.
+#
+# Nhóm theo SỐ PR chứ không theo `github.ref`: cùng một PR đẩy tiếp thì huỷ lượt cũ, còn hai PR
+# khác nhau thì không đụng nhau. `github.ref` trên sự kiện pull_request là `refs/pull/N/merge` nên
+# cũng tách được, nhưng để số PR lên trước thì đọc log biết ngay đang nói về PR nào.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ĐỦ BỘ — chỉ trên PR (và khi bấm tay). Đây là cửa CHẶN.
   backend:
