@@ -569,3 +569,28 @@ def apply_all(db: Session, actor: str, limit: int = 400) -> dict:
     out["blocked"] = db.execute(select(func.count()).select_from(VtRecord).where(VtRecord.applied == False, VtRecord.apply_note.in_(["chưa có tour", "chưa có booking"]))).scalar()
     R.audit(db, actor, "cntt", "dong_bo_vietrip_ap_dung", "vietrip", after=out); db.commit()
     return out
+
+
+def id_booking_con_thieu(db: Session, gioi_han: int = 500) -> list[int]:
+    """Mã booking Vietrip mà một phiếu thu ĐANG CÓ trỏ tới, nhưng VTOS chưa có booking ấy.
+
+    Đây là danh sách đầu vào cho `vietrip_client.nap_booking_theo_id`. Đọc từ chính bản ghi thô đã
+    kéo về, không đoán và không gọi ra ngoài.
+
+    Chỉ lấy phiếu ĐÃ XÁC NHẬN (`Status == "KC"`): phiếu chưa xác nhận vốn bị bỏ qua ở
+    `apply_receipts`, đi kéo booking cho chúng là kéo thừa.
+    """
+    co = {b.vietrip_id for b in db.execute(
+        select(Booking.vietrip_id).where(Booking.vietrip_id != None)).scalars()}
+    ra: list[int] = []
+    for r in db.execute(select(VtRecord).where(
+            VtRecord.entity == "receipt", VtRecord.applied == False).limit(gioi_han * 4)).scalars():
+        raw = r.raw or {}
+        if raw.get("Status") != "KC":
+            continue
+        bid = int(raw.get("BookingID") or 0)
+        if bid and bid not in co and bid not in ra:
+            ra.append(bid)
+            if len(ra) >= gioi_han:
+                break
+    return ra
