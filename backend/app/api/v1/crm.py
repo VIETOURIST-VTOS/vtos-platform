@@ -161,10 +161,7 @@ def zalo_send(data: ZaloSendIn, u: User = Depends(require_roles(*EDIT_ROLES, "tp
     lead = db.get(Lead, data.lead_id) if data.lead_id else None
     bk = db.get(Booking, data.booking_id) if data.booking_id else None
     phone = data.phone or (lead.phone if lead else "") or (bk.customer_phone if bk else "")
-    uid = lead.zalo_uid if lead else ""
-    if not uid and phone:
-        other = db.execute(select(Lead).where(Lead.phone == Z.norm_phone(phone), Lead.zalo_uid != "")).scalars().first()
-        if other: uid = other.zalo_uid
+    uid = (lead.zalo_uid if lead else "") or Z.uid_theo_sdt(db, phone)
     if not (phone or uid): raise HTTPException(422, "Thiếu SĐT / lead / booking")
     if not data.text and not data.template_id and data.purpose not in Z.configured(db)["zns_templates"]: raise HTTPException(422, "Thiếu nội dung tin (hoặc mẫu ZNS cho mục đích này)")
     m = Z.queue(db, u.username, phone=phone, zalo_uid=uid, text=data.text, purpose=data.purpose, template=data.template_id, params=data.params, lead_id=data.lead_id, booking_id=data.booking_id)

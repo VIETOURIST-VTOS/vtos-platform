@@ -219,8 +219,29 @@ def ghi_danh_gia(db: Session, ma: str, data: dict) -> dict:
         "diem_chua_hai_long": chua_hl,
         "ghi_chu": (data.get("gop_y") or "").strip()[:2000],
     })
-    return {"hai_long": care.hai_long, "so_muc": len(ghi), "sinh_them": sinh,
-            "loi_cam_on": "Cảm ơn anh/chị đã dành thời gian. Đánh giá đã được ghi nhận."}
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # KHÁCH 4–5 SAO: MỜI ĐÁNH GIÁ GOOGLE MAPS — đề xuất CSKH 25/9, bước 3
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # CHỈ MỜI NGƯỜI ĐÃ HÀI LÒNG, và chỉ mời SAU KHI họ đã chấm xong trong sổ của mình. Hai điều
+    # kiện ấy không phải để lọc lấy điểm đẹp ngoài kia — mà vì mời một khách vừa chấm 2 sao đi
+    # viết đánh giá công khai là mời họ viết đúng điều họ vừa nói, ở chỗ ta không sửa được.
+    #
+    # LINK LÀ THAM SỐ, không viết cứng: hồ sơ Google của công ty đổi được, và một đường dẫn chết
+    # nằm trong mã thì ba tháng sau không ai biết nó chết.
+    #
+    # KHÔNG gửi tin thứ hai qua Zalo cho việc này. Khách vừa bấm gửi xong đang ở trên trang —
+    # hiện lời mời ngay tại đó là chỗ duy nhất họ còn đang chú ý, và không tốn thêm một phí tin.
+    ra = {"hai_long": care.hai_long, "so_muc": len(ghi), "sinh_them": sinh,
+          "loi_cam_on": "Cảm ơn anh/chị đã dành thời gian. Đánh giá đã được ghi nhận."}
+    if (diem_tour or 0) >= 4:
+        # `get_param` ép về float và nổ với thứ không phải số — đường dẫn phải đi qua
+        # `get_param_text`, cửa dành cho tham số dạng chữ (xem chú thích ở rules.py).
+        link = (R.get_param_text(db, "link_danh_gia_google") or "").strip()
+        if link:
+            ra["link_danh_gia_google"] = link
+            ra["loi_moi_danh_gia"] = ("Anh/chị dành thêm một phút viết vài dòng trên Google giúp "
+                                      "Vietourist nhé — điều đó giúp khách sau chọn được đúng tour.")
+    return ra
 
 
 def ghi_ho(db: Session, u: User, care: CareTicket, data: dict) -> dict:

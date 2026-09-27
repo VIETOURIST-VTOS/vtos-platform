@@ -13,7 +13,7 @@ from datetime import datetime, date, timedelta
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import Session
 from app.models.core import User, Booking, Tour, Alert
-from app.models.crm import Lead
+from app.models.crm import Lead, ZaloMessage
 from app.models.ops import PaymentRequest
 from app.models.cskh import (Complaint, CareTicket, KN_NGUON, KN_NHOM, KN_NHOM_CAN_BOOKING, KN_MUC,
                              KN_TRANG_THAI, KN_NGUYEN_NHAN, KN_HUONG, KN_HUONG_CO_TIEN, KN_HAN_THAM_SO,
@@ -447,9 +447,42 @@ def robot_cskh(db: Session) -> dict:
                                             Alert.resolved == False)).scalars():
         if a.ref not in con_qua_han:
             a.resolved = True; go += 1
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # HÀNG ĐỢI ZALO KẸT — thêm 27/9/2026, sau khi đo bản đang chạy
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # Đo ngày 27/9: 200 lời mời chấm điểm do chính `gui_loi_moi_cham_diem` ở trên xếp vào hàng đợi
+    # lúc 20:45 ngày 26/9 đã nằm im hai ngày ở trạng thái `cho_cau_hinh`. Không tin nào tới khách,
+    # và KHÔNG AI ĐƯỢC BÁO. Nguyên nhân: webhook OA chưa khai nên không tài khoản khách nào có
+    # `zalo_uid`, mọi tin rơi xuống đường ZNS, mà ZNS thì chưa có mẫu được Zalo duyệt.
+    #
+    # Robot ở trên vẫn chạy đúng và vẫn báo "đã xếp N tin" mỗi lượt. Đó chính là chỗ nguy hiểm: một
+    # con số tăng đều trông như một hệ thống đang chạy. Mỗi lời mời còn đeo một mã khảo sát CÓ HẠN,
+    # nên im lặng đủ lâu thì mã chết trước khi khách kịp mở, và phần khảo sát của kỳ ấy mất trắng
+    # mà không để lại dấu vết nào ngoài một hàng đợi dài.
+    #
+    # Cảnh báo này gửi CNTT và P.TGĐ Marketing vì hai việc phải làm đều là cấu hình, không phải mã:
+    # khai địa chỉ webhook trong trang quản trị Zalo OA, và đăng ký mẫu ZNS.
+    ket = db.execute(select(func.count(), func.min(ZaloMessage.created_at)).where(
+        ZaloMessage.status == "cho_cau_hinh")).first()
+    so_ket, cu_nhat = int(ket[0] or 0), ket[1]
+    nguong = int(float(R.get_param(db, "zalo_hang_doi_nguong") or 20))
+    if so_ket >= nguong:
+        add("zalo_ket_hang", "red", "zalo:cho_cau_hinh",
+            f"{so_ket} tin Zalo đang kẹt ở trạng thái chờ cấu hình"
+            + (f", cũ nhất từ {cu_nhat:%d/%m/%Y %H:%M}" if cu_nhat else "")
+            + ". Khách KHÔNG nhận được gì và hệ thống vẫn xếp thêm mỗi ngày. Cần khai địa chỉ "
+              "webhook OA (/api/v1/zalo/webhook) và đăng ký mẫu ZNS; xong thì đẩy hàng đợi, nhưng "
+              "kiểm hạn mã khảo sát trước khi đẩy.",
+            "cntt,ptgd_mkt,tgd,chutich")
+    else:
+        # Cảnh báo phải tự rút khi hết chuyện — cùng luật với `cham_soc_qua_han` ngay trên.
+        for a in db.execute(select(Alert).where(Alert.kind == "zalo_ket_hang",
+                                                Alert.resolved == False)).scalars():   # noqa: E712
+            a.resolved = True; go += 1
+
     if them or go: db.commit()
     return {"phieu_moi": n_phieu, "phieu_va_han": n_va, "canh_bao_moi": them, "canh_bao_go": go,
-            "moi_cham_diem": n_moi_cham, "nhac_lai": n_nhac}
+            "moi_cham_diem": n_moi_cham, "nhac_lai": n_nhac, "zalo_ket": so_ket}
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -466,6 +499,35 @@ def _gio_gui_toi(db: Session) -> datetime:
     bay_gio = datetime.now()
     hom_nay = bay_gio.replace(hour=max(0, min(23, gio)), minute=0, second=0, microsecond=0)
     return hom_nay if hom_nay > bay_gio else hom_nay + timedelta(days=1)
+
+
+def _soan_tin(db: Session, khoa_mau: str, ten_khach: str, ten_tour: str, ma: str) -> str:
+    """Nội dung tin cho ĐƯỜNG OA. Rỗng nghĩa là chưa khai mẫu chữ — khi ấy chỉ còn đường ZNS.
+
+    VÌ SAO PHẢI CÓ, TRONG KHI ZNS ĐÃ CÓ MẪU
+
+    Hai đường gửi của Zalo khác nhau ở chỗ ai giữ nội dung. ZNS: mẫu nằm bên Zalo, đã duyệt, mình
+    chỉ đẩy tham số sang. OA: mình tự soạn cả câu và gửi thẳng. Robot trước 27/9/2026 chỉ chuẩn bị
+    cho đường ZNS — nó gửi `params` mà không gửi `text` — nên kể cả khi khách đã quan tâm OA, tin
+    đi ra vẫn là một tin RỖNG nếu ai đó bật đường OA lên.
+
+    Đường OA KHÔNG CẦN Zalo duyệt mẫu. Đó là lý do hàm này tồn tại: nó là đường duy nhất chạy thử
+    được trong lúc mẫu ZNS còn đang chờ duyệt.
+
+    Mẫu là THAM SỐ dạng chữ, không viết cứng: câu chữ gửi khách là việc của Marketing, và mỗi lần
+    sửa một dấu phẩy mà phải đẩy một vòng mã là cách chắc chắn để không ai sửa nữa.
+    """
+    mau = (R.get_param_text(db, khoa_mau) or "").strip()
+    if not mau:
+        return ""
+    goc = (R.get_param_text(db, "khao_sat_link_goc") or "").strip().rstrip("/")
+    try:
+        return mau.format(ten_khach=ten_khach or "anh/chị", ten_tour=ten_tour or "",
+                          link=f"{goc}/y-kien/{ma}" if goc else "")
+    except (KeyError, IndexError):
+        # Mẫu có chỗ điền lạ. KHÔNG gửi một câu vỡ ra cho khách — bỏ trống để tin rơi về đường ZNS,
+        # và người khai mẫu thấy ngay là mình gõ sai chứ không phải khách nhận được câu hỏng.
+        return ""
 
 
 def gui_loi_moi_cham_diem(db: Session, limit: int = 200) -> int:
@@ -491,8 +553,16 @@ def gui_loi_moi_cham_diem(db: Session, limit: int = 200) -> int:
         if not (t.customer_phone or "").strip(): continue
         m = DG.sinh_ma(db, t)
         tour = db.get(Tour, t.tour_id)
-        Z.queue(db, "robot_cskh", phone=t.customer_phone, purpose="cham_soc",
-                params={"ten_khach": t.customer_name, "ten_tour": (tour.name if tour else ""),
+        ten_tour = tour.name if tour else ""
+        # Khách đã quan tâm OA thì đi đường OA (không cần Zalo duyệt mẫu); chưa thì rơi về ZNS.
+        uid = Z.uid_theo_sdt(db, t.customer_phone)
+        # SOẠN TRƯỚC, RỒI MỚI CHỌN ĐƯỜNG. `queue` chọn kênh bằng chính ô uid, nên truyền uid kèm
+        # một nội dung rỗng là gửi cho khách một tin trắng. Không soạn được thì bỏ uid đi và để
+        # tin rơi về ZNS — thà chờ mẫu duyệt còn hơn gửi một tin không có chữ nào.
+        noi_dung = _soan_tin(db, "khao_sat_mau_tin", t.customer_name, ten_tour, m.ma) if uid else ""
+        Z.queue(db, "robot_cskh", phone=t.customer_phone,
+                zalo_uid=(uid if noi_dung else ""), purpose="cham_soc", text=noi_dung,
+                params={"ten_khach": t.customer_name, "ten_tour": ten_tour,
                         "ma_khao_sat": m.ma},
                 booking_id=t.booking_id, gui_tu_luc=hen)
         n += 1
@@ -524,8 +594,12 @@ def nhac_chua_tra_loi(db: Session, limit: int = 200) -> int:
             ZaloMessage.purpose == "cham_soc_nhac")).scalar() or 0
         if da_nhac: continue
         tour = db.get(Tour, t.tour_id)
-        Z.queue(db, "robot_cskh", phone=t.customer_phone, purpose="cham_soc_nhac",
-                params={"ten_khach": t.customer_name, "ten_tour": (tour.name if tour else ""),
+        ten_tour = tour.name if tour else ""
+        uid = Z.uid_theo_sdt(db, t.customer_phone)
+        noi_dung = _soan_tin(db, "khao_sat_mau_nhac", t.customer_name, ten_tour, m.ma) if uid else ""
+        Z.queue(db, "robot_cskh", phone=t.customer_phone,
+                zalo_uid=(uid if noi_dung else ""), purpose="cham_soc_nhac", text=noi_dung,
+                params={"ten_khach": t.customer_name, "ten_tour": ten_tour,
                         "ma_khao_sat": m.ma},
                 booking_id=t.booking_id, gui_tu_luc=_gio_gui_toi(db))
         n += 1

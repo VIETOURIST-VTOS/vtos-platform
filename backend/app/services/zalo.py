@@ -160,6 +160,25 @@ def send_zns(db: Session, phone: str, template_id: str, params: dict) -> dict:
     return _post(ZNS_API, {"phone": intl(phone), "template_id": str(template_id), "template_data": params, "tracking_id": f"vtos-{datetime.now():%Y%m%d%H%M%S}"}, token(db))
 
 
+def uid_theo_sdt(db: Session, phone: str) -> str:
+    """UID Zalo OA của một số điện thoại — rỗng nếu chưa ai từng nhắn vào OA từ số ấy.
+
+    MỘT CHỖ TRA DUY NHẤT. Trước 27/9/2026 phép tra này nằm trong `api/v1/crm.py::zalo_send` và chỉ
+    ở đó, nên mọi đường gửi TỰ ĐỘNG (robot chăm sóc) không hề tra uid: chúng gọi `queue` không kèm
+    `zalo_uid`, mà `queue` chọn kênh theo đúng ô ấy — nên mọi tin robot đều rơi xuống ZNS, kể cả
+    gửi cho khách ĐÃ quan tâm OA. Đo ngày 27/9: 200 tin mời chấm điểm nằm chờ mẫu ZNS trong khi
+    token OA vẫn sống.
+
+    Đưa ra đây để đường tay và đường robot dùng chung một luật. Hai luật tra uid ở hai nơi thì rồi
+    sẽ lệch, và chỗ lệch ấy im lặng: tin vẫn đi, chỉ là đi sai kênh.
+    """
+    p = norm_phone(phone or "")
+    if not p:
+        return ""
+    r = db.execute(select(Lead).where(Lead.phone == p, Lead.zalo_uid != "")).scalars().first()
+    return r.zalo_uid if r else ""
+
+
 def queue(db: Session, actor: str, *, phone: str = "", zalo_uid: str = "", text: str = "", purpose: str = "", template: str = "", params: dict | None = None, lead_id: int | None = None, booking_id: int | None = None, send_now: bool = True, gui_tu_luc: datetime | None = None) -> ZaloMessage:
     """Tạo tin và gửi ngay nếu có cấu hình: có uid → OA text; không có uid nhưng có mẫu ZNS cho mục đích → ZNS theo SĐT; còn lại → chờ cấu hình.
 
