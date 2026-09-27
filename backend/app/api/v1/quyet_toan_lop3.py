@@ -413,10 +413,30 @@ class KhachChiPhiVao(BaseModel):
     ly_do_sua: str = ""
 
 
-def quy_doi(tien_te, so_tien_goc, ty_gia, ngay_ty_gia, so_vnd_neu_noi_te):
-    """Số tiền VND của một khoản, và phép kiểm ngoại tệ đi kèm. MỘT chỗ duy nhất làm việc này.
+def don_gia_vnd(tien_te, so_tien_goc, ty_gia, ngay_ty_gia, don_gia_neu_noi_te):
+    """ĐƠN GIÁ bằng VND của MỘT đơn vị, và phép kiểm ngoại tệ đi kèm. MỘT chỗ duy nhất làm việc này.
 
-    Khoản VND thì trả lại đúng số đã tính sẵn. Khoản ngoại tệ thì MÁY QUY ĐỔI – người không gõ số
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    ĐỔI NGHĨA VÀ ĐỔI TÊN — Chủ tịch quyết 27/9/2026
+    ═══════════════════════════════════════════════════════════════════════════════════════════
+    Hàm này trước mang tên "quy đổi" và trả về THÀNH TIỀN cả dòng, nên mọi nơi gọi đều viết
+
+        thanh_tien = don_gia × số lượng × hệ số
+        thanh_tien = <hàm này>             ← GHI ĐÈ, số lượng và hệ số BIẾN MẤT
+
+    Đo trên bảng `tour_cost_lines`, nơi cửa này ghi chung với `settlement.py`: land 692,34 GBP ×
+    43 khách × 36.000 — cửa Điều hành ra 1.071.742.320 đ, cửa này ra 24.924.240 đ. Lệch
+    1.046.818.080 đ TRÊN MỘT DÒNG. Và `/doanh-thu` còn nặng hơn: nó ghi đè `thành tiền` nhưng để
+    `thành tiền trước thuế` và `tiền thuế` nguyên ở ĐỒNG GỐC — ba cột của một dòng ở hai loại
+    tiền, mà `tiền thuế` là cột đi vào tờ khai thuế GTGT.
+
+    Chủ tịch chốt: **"số tiền gốc" là ĐƠN GIÁ MỘT ĐƠN VỊ** — một ô đơn giá thì luôn là đơn giá,
+    đồng nào cũng vậy. Nên hàm quy đổi TRƯỚC, nơi gọi nhân SAU, đúng thứ tự của `settlement.py`.
+
+    ĐỔI TÊN là cố ý: giữ tên cũ thì một nơi gọi bị quên sẽ lặng lẽ chạy tiếp với nghĩa cũ. Đổi
+    tên thì chỗ quên là một lỗi ngay lúc nạp mã.
+
+    Khoản VND thì trả lại đúng đơn giá đã gõ. Khoản ngoại tệ thì MÁY QUY ĐỔI – người không gõ số
     VND bên cạnh số gốc và tỷ giá, vì gõ tay cả ba là mở đường cho ba con số không khớp nhau.
 
     Chủ tịch chốt 11/9/2026: quy đổi theo tỷ giá NGÀY CHI THẬT, nên ngày tỷ giá là bắt buộc. Không
@@ -428,7 +448,7 @@ def quy_doi(tien_te, so_tien_goc, ty_gia, ngay_ty_gia, so_vnd_neu_noi_te):
     đọc mã (và bộ dò K2) không thấy được phép nhân này đã chặn rỗng hay chưa.
     """
     if not tien_te or tien_te == "VND":
-        return so_vnd_neu_noi_te
+        return don_gia_neu_noi_te
     if ty_gia is None or ngay_ty_gia is None:
         raise HTTPException(422, "Khoản ngoại tệ phải khai cả tỷ giá và NGÀY tỷ giá "
                                  "(tỷ giá của ngày chi thật).")
@@ -445,7 +465,9 @@ def them_khach_chi_phi(tid: int, v: KhachChiPhiVao, u: User = Depends(require_ro
     k = db.get(BookingKhach, v.khach_id)
     if not k or k.tour_id != tid:
         raise HTTPException(422, "khách không thuộc chuyến này")
-    so_tien = quy_doi(v.tien_te, v.so_tien_goc, v.ty_gia, v.ngay_ty_gia, v.so_tien)
+    # Không có đơn giá × số lượng ở cửa này — một khách, một khoản. Số gốc CHÍNH LÀ khoản ấy,
+    # nên hai cách hiểu trùng nhau và đổi tên hàm là đủ.
+    so_tien = don_gia_vnd(v.tien_te, v.so_tien_goc, v.ty_gia, v.ngay_ty_gia, v.so_tien)
 
     x = KhachChiPhi(khach_id=k.id, tour_id=tid, loai=v.loai, noi_dung=v.noi_dung, so_tien=so_tien,
                     tien_te=v.tien_te, so_tien_goc=v.so_tien_goc, ty_gia=v.ty_gia,
@@ -502,8 +524,11 @@ def them_doanh_thu(tid: int, v: DoanhThuVao, u: User = Depends(require_roles(*NH
     _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
     if v.loai and v.loai not in LOAI_DOANH_THU:
         raise HTTPException(422, f"loai phải thuộc {sorted(LOAI_DOANH_THU)}")
-    truoc, thue, tong = _thanh_tien(v.don_gia_truoc_thue, v.so_luong, v.thue_suat)
-    tong = quy_doi(v.tien_te, v.so_tien_goc, v.ty_gia, v.ngay_ty_gia, tong)
+    # QUY ĐỔI ĐƠN GIÁ TRƯỚC, rồi mới nhân và cộng thuế — để cả BA cột (trước thuế, tiền thuế,
+    # thành tiền) cùng một loại tiền. Bản cũ chỉ ghi đè `tong`, nên dòng ngoại tệ có `tiền thuế`
+    # bằng đồng gốc nằm cạnh `thành tiền` bằng VND, và `tiền thuế` là cột đi vào tờ khai GTGT.
+    dg = don_gia_vnd(v.tien_te, v.so_tien_goc, v.ty_gia, v.ngay_ty_gia, v.don_gia_truoc_thue)
+    truoc, thue, tong = _thanh_tien(dg, v.so_luong, v.thue_suat)
     # Dòng ÂM được phép – hoàn tiền theo biên bản thanh lý là chuyện bình thường. Nhưng phải có căn
     # cứ: không có số hiệu biên bản thì không phân biệt được với gõ nhầm dấu trừ.
     if tong is not None and tong < 0 and not (v.chung_tu or "").strip():
@@ -512,7 +537,9 @@ def them_doanh_thu(tid: int, v: DoanhThuVao, u: User = Depends(require_roles(*NH
 
     d = TourDoanhThuDong(tour_id=tid, booking_id=v.booking_id, khach_id=v.khach_id, loai=v.loai,
                          noi_dung=v.noi_dung, doi_tuong=v.doi_tuong,
-                         don_gia_truoc_thue=v.don_gia_truoc_thue, so_luong=v.so_luong,
+                         # Đơn giá lưu bằng VND, giống `settlement.unit_price`. Số gốc và tỷ giá
+                         # nằm ngay bên cạnh nên vẫn tra ngược được.
+                         don_gia_truoc_thue=dg, so_luong=v.so_luong,
                          thanh_tien_truoc_thue=truoc, thue_suat=v.thue_suat, tien_thue=thue,
                          thanh_tien=tong, chung_tu=v.chung_tu, tien_te=v.tien_te,
                          so_tien_goc=v.so_tien_goc, ty_gia=v.ty_gia, ngay_ty_gia=v.ngay_ty_gia,
@@ -615,10 +642,12 @@ def them_dong_chi(tid: int, v: ChiVao, u: User = Depends(require_roles(*NHAP)),
         ten_ncc, mst = ncc.ten, ncc.ma_so_thue
 
     # Thành tiền do MÁY nhân. Cửa không nhận tham số "thành tiền".
+    # QUY ĐỔI ĐƠN GIÁ TRƯỚC, NHÂN SAU — đúng thứ tự của `settlement._ngoai_te`, vì hai cửa ghi
+    # vào CÙNG bảng `tour_cost_lines` và cột `unit_price` không được mang hai nghĩa.
+    dg = don_gia_vnd(v.tien_te, v.so_tien_goc, v.ty_gia, v.ngay_ty_gia, v.don_gia)
     thuc = v.thuc_chi
-    if v.don_gia is not None and v.so_luong is not None:
-        thuc = round(v.don_gia * v.so_luong * (v.he_so or 1), 2)
-    thuc = quy_doi(v.tien_te, v.so_tien_goc, v.ty_gia, v.ngay_ty_gia, thuc)
+    if dg is not None and v.so_luong is not None:
+        thuc = round(dg * v.so_luong * (v.he_so or 1), 2)
 
     d = TourCostLine(
         tour_id=tid, ma_khoan_muc=v.ma_khoan_muc,
@@ -628,7 +657,12 @@ def them_dong_chi(tid: int, v: ChiVao, u: User = Depends(require_roles(*NHAP)),
         doi_tuong=v.doi_tuong or md["doi_tuong"],
         quy_tac_phan_bo=v.quy_tac_phan_bo or md["quy_tac_phan_bo"],
         supplier_id=v.supplier_id, supplier_name=ten_ncc, supplier_tax_code=mst,
-        unit_price=v.don_gia, qty=v.so_luong or 0, coef=v.he_so or 1,
+        # `unit_price` bằng VND — CÙNG nghĩa với cửa `settlement.py`. Số gốc nằm ở `so_tien_goc`.
+        unit_price=dg, qty=v.so_luong or 0, coef=v.he_so or 1,
+        # KHAI cost_kind cho khớp phép nhân cửa này thật sự làm. Bỏ trống thì cột rơi về mặc định
+        # `co_dinh` — tức nói "đừng nhân với số khách" trong khi cửa vừa nhân — và mọi bộ đọc sau
+        # này (bảng tổng, bộ soát ngoại tệ) đều dựng lại sai phép nhân của dòng.
+        cost_kind=("theo_khach" if v.so_luong is not None else "co_dinh"),
         budget=v.du_chi, actual=thuc,
         tien_te=v.tien_te, so_tien_goc=v.so_tien_goc, ty_gia=v.ty_gia, ngay_ty_gia=v.ngay_ty_gia,
         thue_suat=v.thue_suat,
@@ -765,10 +799,11 @@ def them_phuong_tien(tid: int, v: PhuongTienVao, u: User = Depends(require_roles
     _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
     if v.loai not in LOAI_PHUONG_TIEN:
         raise HTTPException(422, f"loai phải thuộc {sorted(LOAI_PHUONG_TIEN)}")
+    # Quy đổi ĐƠN GIÁ trước, nhân sau — bản cũ ghi đè cả tích nên số lượng biến mất.
+    dg = don_gia_vnd(v.tien_te, v.so_tien_goc, v.ty_gia, v.ngay_ty_gia, v.don_gia)
     tt = None
-    if v.don_gia is not None and v.so_luong is not None:
-        tt = round(v.don_gia * v.so_luong, 2)
-    tt = quy_doi(v.tien_te, v.so_tien_goc, v.ty_gia, v.ngay_ty_gia, tt)
+    if dg is not None and v.so_luong is not None:
+        tt = round(dg * v.so_luong, 2)
 
     x = TourPhuongTien(tour_id=tid, loai=v.loai, chang=v.chang, ngay=v.ngay, gio_di=v.gio_di,
                        gio_den=v.gio_den, so_hieu=v.so_hieu, ma_dat_cho=v.ma_dat_cho,
@@ -841,10 +876,11 @@ def them_hdv_chi(tid: int, v: HdvChiVao, u: User = Depends(require_roles(*NHAP))
     from app.models.vietrip import TourCostLine
     t = _tour(db, tid, u)
     _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
+    # Quy đổi ĐƠN GIÁ trước, nhân sau — bản cũ ghi đè cả tích nên số lượng biến mất.
+    dg = don_gia_vnd(v.tien_te, v.so_tien_goc, v.ty_gia, v.ngay_ty_gia, v.don_gia)
     tt = None
-    if v.don_gia is not None and v.so_luong is not None:
-        tt = round(v.don_gia * v.so_luong, 2)
-    tt = quy_doi(v.tien_te, v.so_tien_goc, v.ty_gia, v.ngay_ty_gia, tt)
+    if dg is not None and v.so_luong is not None:
+        tt = round(dg * v.so_luong, 2)
 
     ct = vuot = None
     if v.dong_chiet_tinh_id:
