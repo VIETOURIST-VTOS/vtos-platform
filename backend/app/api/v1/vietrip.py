@@ -1,7 +1,8 @@
 """API đồng bộ Vietrip → VTOS: nạp thô theo entity, xem trạng thái, ánh xạ sang nghiệp vụ, dòng chi phí tour."""
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles
@@ -56,10 +57,32 @@ class SyncIn(BaseModel):
     settlements_days: int = 10     # quét bảng quyết toán tour kết thúc trong N ngày
 
 
+# MỐC SỚM NHẤT ROBOT ĐƯỢC CHẠM TỚI — Chủ tịch chốt 26/9/2026.
+#
+# Tháng 1 đến tháng 7/2026 trên VTOS đã là số CHỐT: 604 tệp quyết toán gốc của Điều hành, nạp qua
+# cửa có người ký, đóng số xong. Chính Chủ tịch đã ra lệnh xoá phần Vietrip của khoảng ấy ngày
+# 12/9/2026 vì "số trên Vietrip từ T1 đến T6 không chính xác".
+#
+# Robot chạy hai lượt mỗi ngày. Chỉ cần MỘT lần ai đó gọi tay với `from_date` cũ — hoặc một lần
+# sửa mã đặt nhầm cửa sổ mặc định — là hai tháng số chốt bị đè bằng đúng nguồn đã bị bác, và
+# không có gì đỏ lên để báo. Nên mốc này không nằm ở lịch chạy mà nằm ở ĐÂY, chỗ mọi đường gọi
+# đều phải đi qua: cửa robot, cửa bấm tay, và mọi lần gọi sau này.
+#
+# Muốn nạp lại T1–T7 thì sửa dòng này, và đó phải là một quyết định có người ký chứ không phải
+# một tham số truyền vào lúc 11 giờ đêm.
+MOC_SOM_NHAT = date(2026, 8, 1)
+
+
 def _dates(data: SyncIn):
     from datetime import date as _d, timedelta
     t = _d.fromisoformat(data.to_date) if data.to_date else _d.today()
     f = _d.fromisoformat(data.from_date) if data.from_date else t - timedelta(days=7)
+    if f < MOC_SOM_NHAT:
+        f = MOC_SOM_NHAT
+    if t < MOC_SOM_NHAT:
+        # Cả khoảng nằm trước mốc: không có gì để kéo, và trả về một khoảng ngược đời còn tệ hơn.
+        raise HTTPException(400, f"Robot Vietrip chỉ nạp từ {MOC_SOM_NHAT:%d/%m/%Y} trở đi – "
+                                 f"tháng 1 đến tháng 7/2026 là số đã chốt trên VTOS, không nạp đè.")
     return f, t
 
 
@@ -120,6 +143,54 @@ def nap_bu_tour(data: NapBuIn, u: User = Depends(require_roles("cntt", "ketoan")
     ra = VC.nap_tour_theo_khoang(db, f, t)
     R.audit(db, u.username, u.role, "nap_bu_tour_vietrip", "vietrip", after=ra); db.commit()
     return ra
+
+
+@router.post("/import/vietrip/nap-bu/booking-cho-phieu-thu")
+def nap_bu_booking_cho_phieu_thu(gioi_han: int = 500,
+                                 u: User = Depends(require_roles(*SYNC_ROLES)),
+                                 db: Session = Depends(get_db)):
+    """Gỡ chỗ phiếu thu treo vì "chưa có booking": đi tìm đúng những booking ấy rồi ánh xạ lại.
+
+    ĐO ĐƯỢC 26/9/2026: 227 phiếu thu/chi treo, tổng 1.519.979.111 đ, tất cả cùng một lý do. Cả 227
+    phiếu đều MANG mã booking Vietrip — 183 booking khác nhau — chỉ là VTOS chưa có chúng, vì robot
+    kéo booking theo NGÀY ĐẶT với cửa sổ 7 ngày, còn khách thì đặt tháng 3 trả tiền tháng 9.
+
+    Cửa này KHÔNG truyền khoảng ngày nào, nên không chạm vào `MOC_SOM_NHAT`. Nó lần theo id của
+    những booking mà phiếu thu ĐANG CÓ trỏ tới. Lấy một booking tháng 3 để gắn khoản tiền khách
+    trả tháng 9 không phải là nạp lại tháng 3 — Chủ tịch chốt 26/9/2026 (phương án A).
+
+    Ba bước, và bước nào cũng đếm được để đối chiếu:
+        1. đọc id còn thiếu từ chính bản ghi thô đã kéo về
+        2. tìm những booking ấy trên Vietrip rồi nạp thô
+        3. ánh xạ booking, rồi ánh xạ lại phiếu thu
+    """
+    from app.services import vietrip_client as VC
+    ids = VT.id_booking_con_thieu(db, gioi_han)
+    if not ids:
+        return {"can_tim": 0, "message": "Không còn phiếu thu nào treo vì thiếu booking."}
+    ket = VC.nap_booking_theo_id(db, ids)
+    da_booking, da_phieu, vong = 0, 0, 0
+    while vong < 20:
+        n = VT.apply_bookings(db, limit=400)
+        da_booking += n; vong += 1
+        if n == 0: break
+    vong = 0
+    while vong < 20:
+        n = VT.apply_receipts(db, limit=400)
+        da_phieu += n; vong += 1
+        if n == 0: break
+    con = db.execute(select(func.count()).select_from(VtRecord).where(
+        VtRecord.entity == "receipt", VtRecord.applied == False)).scalar()
+    R.audit(db, u.username, u.role, "nap_bu_booking_cho_phieu_thu", "vietrip",
+            after={"can_tim": ket["can_tim"], "tim_thay": ket["tim_thay"],
+                   "booking_da_anh_xa": da_booking, "phieu_thu_da_anh_xa": da_phieu,
+                   "phieu_thu_con_treo": con})
+    db.commit()
+    return {**ket, "booking_da_anh_xa": da_booking, "phieu_thu_da_anh_xa": da_phieu,
+            "phieu_thu_con_treo": con,
+            "message": (f"Tìm {ket['can_tim']} booking, thấy {ket['tim_thay']} qua {ket['so_trang']} "
+                        f"trang. Ánh xạ {da_booking} booking và {da_phieu} phiếu thu. "
+                        f"Còn treo {con} phiếu.")}
 
 
 @router.post("/import/vietrip/nap-bu/quyet-toan")

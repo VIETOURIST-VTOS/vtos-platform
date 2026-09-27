@@ -2,7 +2,16 @@ name: VTOS robots (lịch tự động)
 # Lịch chạy robot trên web thật – không tốn hạ tầng: GitHub Actions gọi API VTOS bằng ROBOT_TOKEN (Settings → Secrets → ROBOT_TOKEN, cùng giá trị Render).
 on:
   schedule:
-    - cron: "0 20 * * *"      # 03:00 giờ VN: đồng bộ Vietrip 3 ngày gần nhất + quyết toán tour kết thúc 10 ngày
+    # Chủ tịch chốt 26/9/2026: kéo Vietrip HAI LẦN MỖI NGÀY, 11 giờ và 18 giờ VN — thay cho một
+    # lượt 3 giờ sáng. Giờ VN là UTC+7 và không đổi theo mùa, nên 11:00 VN = 04:00 UTC, 18:00 VN =
+    # 11:00 UTC.
+    #
+    # Vì sao lệch 10 phút chứ không đúng phút 0: lịch SePay ở dòng dưới chạy mỗi 30 phút, tức là
+    # nó cũng nổ đúng 04:00 và 11:00 UTC. Máy chủ chỉ có 512 MB và tự khởi động lại khi quá bộ
+    # nhớ (xem chú thích ở bước đánh thức API bên dưới), nên cho hai việc nặng cùng bấm một giây
+    # là tự chuốc 502. Dịch 10 phút là đủ tránh mà vẫn đúng ý "11 giờ và 6 giờ chiều".
+    - cron: "10 4 * * *"      # 11:10 giờ VN: đồng bộ Vietrip + quyết toán tour kết thúc 10 ngày
+    - cron: "10 11 * * *"     # 18:10 giờ VN: lượt thứ hai trong ngày
     - cron: "*/30 0-15 * * *" # mỗi 30 phút giờ hành chính VN (07:00–22:00): kéo bù SePay, chốt sự vụ hết hạn
     - cron: "30 13 * * *"     # 20:30 giờ VN: robot R7 báo cáo ngày
     - cron: "0 2 * * 6"       # Thứ Bảy 09:00 VN: báo cáo tuần
@@ -37,7 +46,8 @@ jobs:
           J="${{ github.event.inputs.job }}"
           if [ -z "$J" ]; then
             case "${{ github.event.schedule }}" in
-              "0 20 * * *") J=vietrip ;;
+              "10 4 * * *") J=vietrip ;;
+              "10 11 * * *") J=vietrip ;;
               "*/30 0-15 * * *") J=sepay ;;
               "30 13 * * *") J=ngay ;;
               "0 2 * * 6") J=tuan ;;

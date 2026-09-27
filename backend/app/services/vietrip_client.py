@@ -354,3 +354,77 @@ def start_background(from_date: date, to_date: date, products: bool, settlements
             db.close(); STATE["running"] = False; STATE["finished"] = datetime.now()
     threading.Thread(target=_job, daemon=True).start()
     return True
+
+
+# ==============================================================================================
+# KÉO BOOKING CÒN THIẾU THEO ID — gỡ chỗ 227 phiếu thu treo vì "chưa có booking"
+# ==============================================================================================
+#
+# ĐO ĐƯỢC 26/9/2026 TRÊN HỆ THẬT
+#
+# 227 phiếu thu/chi Vietrip nằm treo, tổng 1.519.979.111 đ, tất cả cùng một lý do: "chưa có
+# booking". Không phải phiếu mồ côi — CẢ 227 phiếu đều mang mã booking của Vietrip, trỏ tới 183
+# booking khác nhau, id từ 95241 đến 127507. Chỉ là 183 booking ấy chưa có trên VTOS.
+#
+# Vì sao chưa có: `run_sync` kéo booking theo NGÀY ĐẶT, cửa sổ 7 ngày. Khách đặt tour từ tháng 3,
+# trả tiền tháng 9 — phiếu thu tháng 9 lọt vào lưới, booking tháng 3 thì không. Càng chạy càng
+# tích lại, và không có gì đỏ lên vì bộ ánh xạ xếp chúng vào rổ "blocked" chứ không phải "lỗi".
+#
+# VÌ SAO PHẢI LẦN THEO ID CHỨ KHÔNG LỌC Ở VIETRIP
+#
+# Đo ngày 26/9/2026: cửa `/api/booking/search` KHÔNG nhận bộ lọc nào ngoài khoảng ngày đặt. Thử
+# `bookingID=`, `recID=`, `tourcode=`, `search[value]=` — cả bốn đều trả nguyên 122.783 dòng, tức
+# tham số bị bỏ qua chứ không phải lọc ra 0. Và không có cửa `/api/bookings/{id}` (404).
+#
+# Nên cách duy nhất là lật trang danh sách. Danh sách trả về theo recID GIẢM DẦN, nên lật từ đầu
+# là đi từ id mới nhất về id cũ, và DỪNG ĐƯỢC ngay khi trang hiện tại đã lùi qua id nhỏ nhất cần
+# tìm. Với khoảng 95241–127507 trên tổng 122.783 dòng thì tệ nhất khoảng 33 trang, thực tế ít hơn.
+#
+# CHỖ NÀY KHÔNG ĐỤNG MỐC 01/08/2026
+#
+# `MOC_SOM_NHAT` chặn theo KHOẢNG NGÀY, để không nạp đè số quyết toán T1–T7 đã chốt. Hàm này không
+# truyền khoảng ngày nào cả — nó đi tìm đúng những booking mà một phiếu thu ĐANG CÓ trỏ tới. Lấy
+# một booking tháng 3 để gắn khoản tiền khách trả tháng 9 không phải là nạp lại tháng 3.
+#
+# Chủ tịch chốt 26/9/2026 (phương án A): cho phép lần theo id bất kể ngày đặt; mốc vẫn chặn tour
+# và quyết toán như cũ.
+
+MOI_TRANG_BOOKING = 1000
+TRAN_TRANG_BOOKING = 60        # phanh: 60 × 1.000 = 60.000 dòng, quá thừa cho khoảng id thực tế
+
+
+def nap_booking_theo_id(db: Session, ids: list[int], log=None) -> dict:
+    """Tìm và nạp đúng những booking mang `recID` trong `ids`. Chỉ ĐỌC ở phía Vietrip."""
+    log = log or (lambda m: None)
+    con_tim = {int(i) for i in ids if i}
+    if not con_tim:
+        return {"can_tim": 0, "tim_thay": 0, "so_trang": 0, "con_thieu": []}
+
+    nho_nhat = min(con_tim)
+    c = _dang_nhap()
+    thay, trang, start = [], 0, 0
+    while trang < TRAN_TRANG_BOOKING and con_tim:
+        j = json.loads(c.get(f"/api/booking/search?draw=1&start={start}&length={MOI_TRANG_BOOKING}"
+                             f"&showAll=true&order[0][column]=0&order[0][dir]=desc"))
+        lo = j.get("data") or []
+        trang += 1
+        if not lo:
+            break
+        for b in lo:
+            rid = int(b.get("recID") or 0)
+            if rid in con_tim:
+                thay.append(b)
+                con_tim.discard(rid)
+        start += len(lo)
+        nho_nhat_trang = min((int(b.get("recID") or 0) for b in lo), default=0)
+        log(f"trang {trang}: {len(lo)} dòng, tới id {nho_nhat_trang}, còn tìm {len(con_tim)}")
+        # Danh sách giảm dần: lùi qua id nhỏ nhất cần tìm thì những id còn lại không thể ở phía sau.
+        if nho_nhat_trang and nho_nhat_trang < nho_nhat:
+            break
+        if len(lo) < MOI_TRANG_BOOKING:
+            break
+
+    if thay:
+        VT.upsert(db, "booking", thay)
+    return {"can_tim": len(ids), "tim_thay": len(thay), "so_trang": trang,
+            "con_thieu": sorted(con_tim)[:50]}
