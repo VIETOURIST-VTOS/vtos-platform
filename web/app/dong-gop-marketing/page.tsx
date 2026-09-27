@@ -40,7 +40,18 @@ function ThuTrenChi({ x }: { x: number | null | undefined }) {
 function DongGopMarketing() {
   const { user, toast } = useShell();
   const [ky, setKy] = useState(kyMacDinh());
-  const [mang, setMang] = useState("");
+  // LUỒNG LẤY TỪ ĐƯỜNG DẪN (TC-86 · 25/9/2026). Mục 2.7.2 trên cây phân hệ trỏ tới
+  // `/dong-gop-marketing?mang=le` để mở thẳng phần khách lẻ, nhưng màn hình chưa bao giờ đọc tham
+  // số ấy — nó khởi động với ô Luồng để trống, nên 2.7.2 mở ra ĐÚNG BẰNG 2.7.1 và 2.7.3. Ba mục
+  // khác tên, một màn hình giống hệt: người bấm không biết mình đang xem cái gì.
+  //
+  // CHỈ NHẬN GIÁ TRỊ CÓ TRONG DANH SÁCH. Một `?mang=abc` gõ sai mà lọt xuống máy chủ thì bảng trả
+  // về rỗng, và màn hình rỗng trông y hệt "kỳ này không có doanh thu nào" — sai im lặng.
+  const [mang, setMang] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const q = new URLSearchParams(window.location.search).get("mang") || "";
+    return MANG.some(([v]) => v === q) ? q : "";
+  });
   const [d, setD] = useState<any>(null);
   const [cd, setCd] = useState<any>(null);
   const [hienChuaRo, setHienChuaRo] = useState(false);

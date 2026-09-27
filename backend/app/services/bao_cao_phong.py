@@ -334,6 +334,119 @@ def _huong_dan(db: Session, tu: date, den: date) -> list[dict]:
     ]
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# CHĂM SÓC SAU TOUR — năm dòng giữ cho phép đo còn nghĩa (27/9/2026)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# Đề xuất tự động hoá CSKH 25/9 có bước 7: "báo cáo tự động hằng tuần gửi BLĐ". Anh Tuấn chốt
+# 27/9: KHÔNG làm báo cáo gửi đi, vì báo cáo hằng ngày đã có sẵn ở chính tệp này — đúng quyết định
+# của Chủ tịch 09/9 ghi ở đầu tệp: báo cáo HIỆN trên màn hình, không gửi mail hay Zalo.
+#
+# VÌ SAO NĂM DÒNG NÀY, KHÔNG PHẢI "ĐIỂM TRUNG BÌNH SAU TOUR"
+#
+# Đề xuất bỏ bộ phận chăm sóc riêng và giao việc gọi lại khách chấm thấp cho CHÍNH NGƯỜI ĐÃ BÁN
+# tour ấy. Mục 6 của đề xuất tự nhận ra rủi ro: hai phòng ấy có thể ít báo lên hơn, vì chính họ
+# bán và vận hành. Một bảng chỉ có điểm trung bình sẽ KHÔNG bao giờ lộ ra điều đó — điểm trung
+# bình đẹp lên khi người không hài lòng thôi trả lời, và đó là hướng nó tự trôi tới.
+#
+# Nên bốn trong năm dòng dưới đây không đo mức hài lòng. Chúng đo phần CÓ THỂ TRÔI: bao nhiêu
+# khách thật sự trả lời, bao nhiêu điểm là do nhân viên gõ hộ, bao nhiêu phiếu chấm thấp còn treo,
+# và bao nhiêu chuyến không ai nói gì cả.
+def _cskh_dong(db: Session, tu: date, den: date) -> list[dict]:
+    from app.models.cskh import CareTicket, Complaint
+    from app.models.crm import ZaloMessage
+    from app.models.core import Tour
+    try:
+        from app.models.danh_gia import DanhGiaSauTour
+    except ImportError:          # vòng đánh giá chưa có trên nhánh này
+        return []
+
+    # Lời mời ĐÃ GỬI THẬT. Tin còn nằm trong hàng đợi không phải lời mời — tính nó vào mẫu số là
+    # tự hạ tỷ lệ trả lời vì một lỗi cấu hình, và khi ấy con số không nói được điều gì về khách.
+    da_gui = db.execute(select(func.count()).select_from(ZaloMessage).where(
+        ZaloMessage.purpose == "cham_soc", ZaloMessage.status == "da_gui",
+        func.date(ZaloMessage.created_at) >= tu, func.date(ZaloMessage.created_at) <= den)).scalar() or 0
+    khach_cham = db.execute(select(func.count(func.distinct(DanhGiaSauTour.care_id))).where(
+        DanhGiaSauTour.nguon == "khach",
+        func.date(DanhGiaSauTour.tao_luc) >= tu, func.date(DanhGiaSauTour.tao_luc) <= den)).scalar() or 0
+    ghi_ho = db.execute(select(func.count(func.distinct(DanhGiaSauTour.care_id))).where(
+        DanhGiaSauTour.nguon == "nhan_vien",
+        func.date(DanhGiaSauTour.tao_luc) >= tu, func.date(DanhGiaSauTour.tao_luc) <= den)).scalar() or 0
+    ty_le = round(khach_cham / da_gui, 3) if da_gui else None
+
+    # Phiếu khách chấm thấp mà chưa đóng. `hai_long = 0` là CHƯA CHẤM, không phải chấm 0 điểm —
+    # nên điều kiện là 1..3, không phải <= 3.
+    thap_treo = db.execute(select(func.count()).select_from(CareTicket).where(
+        CareTicket.hai_long >= 1, CareTicket.hai_long <= 3,
+        CareTicket.status != "xong")).scalar() or 0
+
+    # Chuyến kết thúc trong kỳ mà KHÔNG một khách nào chấm. Đây là chỗ mù của điểm trung bình.
+    da_ket = [t for (t,) in db.execute(select(Tour.id).where(
+        Tour.end_date >= tu, Tour.end_date <= den)).all()]
+    co_cham = {x for (x,) in db.execute(select(func.distinct(DanhGiaSauTour.tour_id)).where(
+        DanhGiaSauTour.tour_id.in_(da_ket))).all()} if da_ket else set()
+    im_lang = len([t for t in da_ket if t not in co_cham])
+
+    ket = db.execute(select(func.count()).select_from(ZaloMessage).where(
+        ZaloMessage.status == "cho_cau_hinh")).scalar() or 0
+
+    # NGƯỜI XỬ LÝ TỰ ĐÓNG HỒ SƠ CỦA MÌNH — đo, không chặn (anh Tuấn chốt 27/9/2026).
+    #
+    # Khiếu nại sinh từ đánh giá ≤3 sao được giao cho SALE ĐÃ BÁN tour ấy. Người đó vừa là người bị
+    # khách chấm thấp, vừa gọi lại, vừa gõ "khách đã chấp nhận phương án", vừa bấm đóng — bốn vai
+    # trong một người. Không ai cần gian dối để con số sai; chỉ cần bận và muốn cho xong.
+    #
+    # `services/cskh.dong()` đã cấm điều này cho khiếu nại MỨC 3 ("không cho một người vừa xử lý
+    # vừa đóng"). Mức 1–2 thì không cấm, và Chủ tịch chọn giữ nguyên như vậy: độc lập bằng TẦM
+    # NHÌN, không bằng hàng rào — mọi số liệu chăm sóc lên thẳng Ban Giám đốc và Chủ tịch. Dòng này
+    # là cái làm cho lựa chọn ấy có nghĩa: không cản ai, nhưng đếm được.
+    dong_kn = db.execute(select(Complaint).where(
+        Complaint.source == "cham_soc", Complaint.status == "da_dong",
+        Complaint.closed_at.is_not(None),
+        func.date(Complaint.closed_at) >= tu, func.date(Complaint.closed_at) <= den)).scalars().all()
+    tu_dong = [c for c in dong_kn
+               if c.handler and c.handler in [x for x in (c.closed_by or "").split(",") if x]]
+
+    return [
+        ct("cs_ty_le_tra_loi", "Khách trả lời khảo sát sau tour", ty_le, "tỷ lệ",
+           "Số phiếu KHÁCH TỰ CHẤM ÷ số lời mời ĐÃ GỬI THẬT trong kỳ. Tin còn nằm trong hàng đợi "
+           "không tính vào mẫu số. Rỗng khi chưa gửi lời mời nào",
+           "danh_gia_sau_tour.nguon='khach' + zalo_messages.status='da_gui'",
+           muc=_muc(ty_le is not None and ty_le < 0.5),
+           viec="Dưới 50% thì mốc nghiệm thu 31/10 của đề xuất CSKH chưa đạt – xem lại giờ gửi và "
+                "nội dung tin trước khi kết luận về khách"),
+        ct("cs_ghi_ho", "Đánh giá do nhân viên ghi hộ", ghi_ho, "phiếu",
+           "Đếm phiếu có điểm nhập bởi nhân viên, tách khỏi phần khách tự chấm",
+           "danh_gia_sau_tour.nguon='nhan_vien'",
+           muc=_muc(ghi_ho > khach_cham, "do"),
+           viec="Ghi hộ nhiều hơn khách tự chấm nghĩa là điểm đang do người bị đo nhập vào – "
+                "phần ấy không dùng để đánh giá ai được"),
+        ct("cs_thap_treo", "Phiếu khách chấm 1–3 sao chưa đóng", thap_treo, "phiếu",
+           "Đếm phiếu chăm sóc có điểm 1..3 và chưa ở trạng thái xong. Điểm 0 là CHƯA CHẤM, không "
+           "tính", "care_tickets.hai_long 1..3 và status != xong",
+           muc=_muc(thap_treo > 0), viec="Gọi khách trong 24 giờ theo đề xuất CSKH 25/9"),
+        ct("cs_im_lang", "Chuyến kết thúc không ai chấm điểm", im_lang, "chuyến",
+           "Đếm chuyến có ngày kết thúc trong kỳ mà không có dòng đánh giá nào",
+           "tours.end_date + danh_gia_sau_tour.tour_id",
+           muc=_muc(im_lang > 0),
+           viec="Điểm trung bình đẹp vì chỉ người hài lòng trả lời là cách một bảng số nói dối mà "
+                "không sai dòng nào – xem các chuyến này trước khi đọc điểm"),
+        ct("cs_zalo_ket", "Tin Zalo đang kẹt chờ cấu hình", ket, "tin",
+           "Đếm toàn bộ tin ở trạng thái chờ cấu hình, không giới hạn theo kỳ vì đây là tồn đọng",
+           "zalo_messages.status='cho_cau_hinh'",
+           muc=_muc(ket > 0, "do"),
+           viec="Khai địa chỉ webhook OA và đăng ký mẫu ZNS; khách không nhận được gì cho tới lúc đó"),
+        ct("cs_tu_dong", "Phiếu chấm thấp do chính người xử lý đóng", len(tu_dong), "hồ sơ",
+           "Đếm khiếu nại nguồn 'phiếu chăm sóc' đã đóng trong kỳ mà tên người xử lý nằm trong "
+           "danh sách người ký đóng. KHÔNG chặn — mức 3 đã cấm sẵn ở cskh.dong(), mức 1–2 cố ý để "
+           "mở và đo",
+           "complaints.handler nằm trong complaints.closed_by",
+           muc=_muc(len(tu_dong) > 0),
+           viec="Người bị khách chấm thấp cũng là người bấm đóng hồ sơ ấy – đọc lại vài hồ sơ "
+                "trong danh sách trước khi tin vào điểm trung bình của kỳ",
+           chi_tiet=[f"{c.code} · {c.customer_name} · người xử lý {c.handler}" for c in tu_dong[:12]]),
+    ]
+
+
 def _marketing(db: Session, tu: date, den: date) -> list[dict]:
     from app.models.nap_bo_sung import MktChannelSpend
     from app.models.marketing import Campaign
@@ -369,7 +482,7 @@ def _marketing(db: Session, tu: date, den: date) -> list[dict]:
            "mkt_channel_spend + leads"),
         ct("chien_dich", "Chiến dịch đang chạy", dang_chay, "chiến dịch",
            "Đếm chiến dịch ở trạng thái đang chạy", "campaigns.status='dang_chay'"),
-    ]
+    ] + _cskh_dong(db, tu, den)
 
 
 def _ketoan(db: Session, tu: date, den: date) -> list[dict]:
@@ -534,6 +647,10 @@ def _toan_cty(db: Session, tu: date, den: date) -> list[dict]:
                      f"báo cáo phòng {cfg['ten']}",
                      muc=_muc(len(viec_do) > 0, "do"),
                      chi_tiet=[f"{x['ten']}: {x['gia_tri']} {x['don_vi']}" for x in viec_do]))
+    # Chăm sóc sau tour lên CẢ bảng toàn công ty, dùng CHUNG một hàm với bảng Marketing. Chép
+    # công thức ra lần thứ hai là mở đường cho hai bảng nói hai con số khác nhau về cùng một
+    # việc — và khi ấy người đọc chọn con số hợp ý mình.
+    ds += _cskh_dong(db, tu, den)
     return ds
 
 

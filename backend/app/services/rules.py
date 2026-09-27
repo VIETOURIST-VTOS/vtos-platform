@@ -318,6 +318,13 @@ DEFAULT_PARAMS = [
     #
     # Muốn đổi sang "4 giờ LÀM VIỆC" thì sửa `giu_cho.han_mac_dinh` cộng theo giờ hành chính,
     # không phải sửa con số này.
+    # Đo 27/9/2026: 200 lời mời chấm điểm do robot CSKH xếp lúc 20:45 ngày 26/9 nằm im hai ngày ở
+    # trạng thái "chờ cấu hình" — khách không nhận gì, không ai được báo, và robot vẫn báo "đã xếp
+    # N tin" mỗi lượt. Ngưỡng này là chỗ biến một hàng đợi dài thành một tiếng chuông.
+    # Chỉ hiện cho khách đã chấm 4–5 sao, ngay trên trang khảo sát sau khi họ bấm gửi. Để TRỐNG
+    # thì màn hình không mời ai cả — đó là cách tắt bước này mà không phải sửa mã.
+    ("link_danh_gia_google", "https://www.google.com/maps/place/TOURISM+CORPORATION+VIETOURIST/data=!4m2!3m1!1s0x31752f6a4ac8537d:0x99072d754b108707", "Đường dẫn hồ sơ Google của công ty, mời khách 4-5 sao viết đánh giá công khai", "đường dẫn", "anh Tuấn gửi 27/9/2026"),
+    ("zalo_hang_doi_nguong", "20", "Bao nhiêu tin Zalo kẹt ở 'chờ cấu hình' thì robot CSKH reo cảnh báo", "tin", "27/9/2026 – sau khi đo bản đang chạy"),
     ("han_giu_cho_gio", "4", "Giữ chỗ cho booking CHƯA thu đồng nào; quá hạn thì trả chỗ về tour (booking vẫn còn)", "giờ", "VPM-7 11/9/2026; Chủ tịch đổi 48 → 4 ngày 25/9/2026"),
 
     # ── PQ-4 · Hai mốc chuyển VTOS từ chạy thử sang vận hành thật ────────────────────────────
