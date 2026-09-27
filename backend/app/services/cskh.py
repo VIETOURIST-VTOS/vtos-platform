@@ -13,7 +13,7 @@ from datetime import datetime, date, timedelta
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import Session
 from app.models.core import User, Booking, Tour, Alert
-from app.models.crm import Lead
+from app.models.crm import Lead, ZaloMessage
 from app.models.ops import PaymentRequest
 from app.models.cskh import (Complaint, CareTicket, KN_NGUON, KN_NHOM, KN_NHOM_CAN_BOOKING, KN_MUC,
                              KN_TRANG_THAI, KN_NGUYEN_NHAN, KN_HUONG, KN_HUONG_CO_TIEN, KN_HAN_THAM_SO,
@@ -447,9 +447,42 @@ def robot_cskh(db: Session) -> dict:
                                             Alert.resolved == False)).scalars():
         if a.ref not in con_qua_han:
             a.resolved = True; go += 1
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # HÀNG ĐỢI ZALO KẸT — thêm 27/9/2026, sau khi đo bản đang chạy
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # Đo ngày 27/9: 200 lời mời chấm điểm do chính `gui_loi_moi_cham_diem` ở trên xếp vào hàng đợi
+    # lúc 20:45 ngày 26/9 đã nằm im hai ngày ở trạng thái `cho_cau_hinh`. Không tin nào tới khách,
+    # và KHÔNG AI ĐƯỢC BÁO. Nguyên nhân: webhook OA chưa khai nên không tài khoản khách nào có
+    # `zalo_uid`, mọi tin rơi xuống đường ZNS, mà ZNS thì chưa có mẫu được Zalo duyệt.
+    #
+    # Robot ở trên vẫn chạy đúng và vẫn báo "đã xếp N tin" mỗi lượt. Đó chính là chỗ nguy hiểm: một
+    # con số tăng đều trông như một hệ thống đang chạy. Mỗi lời mời còn đeo một mã khảo sát CÓ HẠN,
+    # nên im lặng đủ lâu thì mã chết trước khi khách kịp mở, và phần khảo sát của kỳ ấy mất trắng
+    # mà không để lại dấu vết nào ngoài một hàng đợi dài.
+    #
+    # Cảnh báo này gửi CNTT và P.TGĐ Marketing vì hai việc phải làm đều là cấu hình, không phải mã:
+    # khai địa chỉ webhook trong trang quản trị Zalo OA, và đăng ký mẫu ZNS.
+    ket = db.execute(select(func.count(), func.min(ZaloMessage.created_at)).where(
+        ZaloMessage.status == "cho_cau_hinh")).first()
+    so_ket, cu_nhat = int(ket[0] or 0), ket[1]
+    nguong = int(float(R.get_param(db, "zalo_hang_doi_nguong") or 20))
+    if so_ket >= nguong:
+        add("zalo_ket_hang", "red", "zalo:cho_cau_hinh",
+            f"{so_ket} tin Zalo đang kẹt ở trạng thái chờ cấu hình"
+            + (f", cũ nhất từ {cu_nhat:%d/%m/%Y %H:%M}" if cu_nhat else "")
+            + ". Khách KHÔNG nhận được gì và hệ thống vẫn xếp thêm mỗi ngày. Cần khai địa chỉ "
+              "webhook OA (/api/v1/zalo/webhook) và đăng ký mẫu ZNS; xong thì đẩy hàng đợi, nhưng "
+              "kiểm hạn mã khảo sát trước khi đẩy.",
+            "cntt,ptgd_mkt,tgd,chutich")
+    else:
+        # Cảnh báo phải tự rút khi hết chuyện — cùng luật với `cham_soc_qua_han` ngay trên.
+        for a in db.execute(select(Alert).where(Alert.kind == "zalo_ket_hang",
+                                                Alert.resolved == False)).scalars():   # noqa: E712
+            a.resolved = True; go += 1
+
     if them or go: db.commit()
     return {"phieu_moi": n_phieu, "phieu_va_han": n_va, "canh_bao_moi": them, "canh_bao_go": go,
-            "moi_cham_diem": n_moi_cham, "nhac_lai": n_nhac}
+            "moi_cham_diem": n_moi_cham, "nhac_lai": n_nhac, "zalo_ket": so_ket}
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
