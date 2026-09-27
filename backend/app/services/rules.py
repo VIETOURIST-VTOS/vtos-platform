@@ -320,6 +320,26 @@ DEFAULT_PARAMS = [
     # không phải sửa con số này.
     ("han_giu_cho_gio", "4", "Giữ chỗ cho booking CHƯA thu đồng nào; quá hạn thì trả chỗ về tour (booking vẫn còn)", "giờ", "VPM-7 11/9/2026; Chủ tịch đổi 48 → 4 ngày 25/9/2026"),
 
+    # ── CSKH 27/9/2026 · Ba tham số cho đường Zalo OA, một cho Google, một cho ngưỡng chuông ──
+    # ZNS giữ mẫu bên Zalo và phải chờ duyệt; OA thì mình tự soạn cả câu, KHÔNG cần duyệt — nên
+    # đây là đường duy nhất chạy thử được trong lúc mẫu ZNS còn đang đăng ký. Để TRỐNG mẫu là tắt
+    # đường OA, tin rơi về ZNS như cũ.
+    #
+    # Câu chữ gửi khách là việc của Marketing. Viết cứng trong mã thì mỗi lần sửa một dấu phẩy
+    # phải đẩy một vòng mã — cách chắc chắn để không ai sửa nữa.
+    ("khao_sat_mau_tin", "Vietourist cam on anh/chi {ten_khach} da dong hanh cung chuyen {ten_tour}. Anh/chi danh 1 phut cham diem chuyen di, huong dan vien va tai xe giup Vietourist phuc vu tot hon: {link} (duong dan chi dung mot lan).", "Nội dung tin OA mời chấm điểm sau tour. Chỗ điền: ten_khach, ten_tour, link", "mẫu chữ", "27/9/2026"),
+    ("khao_sat_mau_nhac", "Vietourist gui lai duong dan danh gia chuyen {ten_tour} toi anh/chi {ten_khach}: {link}. Day la lan nhac duy nhat, neu khong tien thi anh/chi bo qua giup.", "Nội dung tin OA nhắc một lần khi khách chưa trả lời", "mẫu chữ", "27/9/2026"),
+    ("khao_sat_link_goc", "https://vtos.infinitytours.org", "Gốc đường dẫn trang khảo sát; trang khách mở là <gốc>/y-kien/<mã>", "đường dẫn", "27/9/2026"),
+
+    # Chỉ hiện cho khách đã chấm 4–5 sao, ngay trên trang khảo sát sau khi họ bấm gửi. Để TRỐNG
+    # thì màn hình không mời ai cả — đó là cách tắt bước này mà không phải sửa mã.
+    ("link_danh_gia_google", "https://www.google.com/maps/place/TOURISM+CORPORATION+VIETOURIST/data=!4m2!3m1!1s0x31752f6a4ac8537d:0x99072d754b108707", "Đường dẫn hồ sơ Google của công ty, mời khách 4-5 sao viết đánh giá công khai", "đường dẫn", "anh Tuấn gửi 27/9/2026"),
+
+    # Đo 27/9/2026: 200 lời mời chấm điểm do robot CSKH xếp lúc 20:45 ngày 26/9 nằm im hai ngày ở
+    # trạng thái "chờ cấu hình" — khách không nhận gì, không ai được báo, và robot vẫn báo "đã xếp
+    # N tin" mỗi lượt. Ngưỡng này là chỗ biến một hàng đợi dài thành một tiếng chuông.
+    ("zalo_hang_doi_nguong", "20", "Bao nhiêu tin Zalo kẹt ở 'chờ cấu hình' thì robot CSKH reo cảnh báo", "tin", "27/9/2026 – sau khi đo bản đang chạy"),
+
     # ── PQ-4 · Hai mốc chuyển VTOS từ chạy thử sang vận hành thật ────────────────────────────
     # Thêm 11/9/2026. Trước hôm nay hai khóa này KHÔNG TỒN TẠI, và hệ quả không nhìn thấy được từ
     # màn hình: propose_param chặn mọi khóa chưa có dòng nào trong bảng, còn ô chọn tham số trên
