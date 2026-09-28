@@ -179,6 +179,34 @@ def uid_theo_sdt(db: Session, phone: str) -> str:
     return r.zalo_uid if r else ""
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# ĐƯỜNG NÀO GỬI ĐƯỢC — TC-95, 29/9/2026
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Đo ngày 29/9 trên máy chủ thật: **401 tin** nằm ở `cho_cau_hinh`, tăng ~200 mỗi ngày, và KHÔNG
+# tin nào từng tới khách. Mỗi tin ấy còn đeo một mã khảo sát có hạn 14 ngày, nên đến hạn là mã
+# chết trong khi khách chưa hề biết có ai hỏi mình.
+#
+# Hàm này trả lời MỘT câu, ở MỘT chỗ: gửi cho số này, với mục đích này, NGAY BÂY GIỜ thì đi được
+# đường nào. Trước TC-95 câu ấy được trả lời rải rác — `queue` tự xét, `send_pending` xét lại theo
+# cách hơi khác, còn người gọi thì không hỏi bao giờ. Ba nơi cùng đoán một chuyện là ba nơi có thể
+# đoán khác nhau.
+def duong_gui_duoc(db: Session, phone: str, purpose: str = "") -> tuple[str, str]:
+    """('oa', uid) · ('zns', '') · ('', lý do bằng tiếng Việt) nếu chưa đường nào gửi được.
+
+    Lý do trả về bằng CHỮ chứ không phải mã lỗi: nó đi thẳng lên màn hình và vào cảnh báo, và
+    người đọc cần biết phải làm gì chứ không cần một con số để tra."""
+    cfg = configured(db)
+    if not cfg["oa"]:
+        return "", "chưa nối được tài khoản Zalo OA (thiếu hoặc hết hạn access token)"
+    uid = uid_theo_sdt(db, phone)
+    if uid:
+        return "oa", uid
+    if cfg["zns_templates"].get(purpose, ""):
+        return "zns", ""
+    return "", "khách chưa quan tâm OA, và chưa có mẫu ZNS được duyệt cho mục đích này"
+
+
 def queue(db: Session, actor: str, *, phone: str = "", zalo_uid: str = "", text: str = "", purpose: str = "", template: str = "", params: dict | None = None, lead_id: int | None = None, booking_id: int | None = None, send_now: bool = True, gui_tu_luc: datetime | None = None) -> ZaloMessage:
     """Tạo tin và gửi ngay nếu có cấu hình: có uid → OA text; không có uid nhưng có mẫu ZNS cho mục đích → ZNS theo SĐT; còn lại → chờ cấu hình.
 
@@ -212,8 +240,29 @@ def _send(db: Session, m: ZaloMessage) -> None:
         m.status, m.response = "loi", str(ex)[:500]
 
 
+def _ma_khao_sat_da_het_han(db: Session, m: ZaloMessage) -> bool:
+    """Tin chăm sóc mang mã khảo sát đã quá hạn? Mục đích khác thì luôn là không.
+
+    Đọc hạn từ chính bảng mã, KHÔNG tính lại từ `created_at` cộng tham số: tham số hạn đổi được,
+    và lúc ấy hai cách tính cho hai câu trả lời khác nhau về cùng một mã."""
+    if m.purpose not in ("cham_soc", "cham_soc_nhac"):
+        return False
+    ma = (m.params or {}).get("ma_khao_sat") or ""
+    if not ma:
+        return False
+    from app.models.danh_gia import MaKhaoSat
+    x = db.execute(select(MaKhaoSat).where(MaKhaoSat.ma == ma)).scalars().first()
+    # KHÔNG TÌM THẤY cũng là chết, và đây KHÔNG phải một trường hợp lý thuyết: `danh_gia.sinh_ma`
+    # cấp lại mã cho phiếu có mã cũ đã hết hạn chưa ai chạm, và lúc ấy chuỗi mã cũ nằm trong tin
+    # đang xếp hàng không còn trỏ vào đâu nữa. Coi "không tìm thấy" là còn sống thì đúng những tin
+    # ấy được gửi đi, mang theo một đường dẫn mở ra chỉ để báo lỗi.
+    if x is None:
+        return True
+    return bool(x.het_han and x.het_han <= datetime.now())
+
+
 def send_pending(db: Session, limit: int = 100) -> dict:
-    cfg = configured(db); n = 0
+    cfg = configured(db); n = 0; het = 0
     bay_gio = datetime.now()
     for m in db.execute(select(ZaloMessage).where(
             ZaloMessage.status.in_(["cho_gui", "cho_cau_hinh"]),
@@ -221,11 +270,24 @@ def send_pending(db: Session, limit: int = 100) -> dict:
             # không lọc riêng: tin cũ đều có cột này rỗng, lọc sai là chúng tắc trong hàng đợi.
             (ZaloMessage.gui_tu_luc.is_(None)) | (ZaloMessage.gui_tu_luc <= bay_gio),
     ).order_by(ZaloMessage.id).limit(limit)).scalars():
+        # MÃ KHẢO SÁT ĐÃ CHẾT THÌ ĐỪNG GỬI — TC-95. Tin chăm sóc mang theo một mã có hạn; tin nằm
+        # trong hàng đợi lâu hơn hạn ấy thì đường dẫn trong tin mở ra chỉ còn câu "liên kết không
+        # đúng hoặc đã hết hiệu lực". Gửi nó đi tệ hơn không gửi: khách bị làm phiền, mất lòng tin,
+        # và bảng số vẫn ghi "đã gửi" nên tỷ lệ trả lời bị chia cho một tin không ai trả lời được.
+        #
+        # ĐỨNG TRƯỚC HAI CÂU CHẶN DƯỚI, CÓ CHỦ Ý. Một mã chết là chết dù tài khoản OA đã nối hay
+        # chưa, dù mẫu ZNS đã duyệt hay chưa. Đặt sau, đúng những tin đang kẹt chờ cấu hình — tức
+        # toàn bộ 401 tin đo được ngày 29/9 — không bao giờ tới được dòng này, và hàng đợi không
+        # bao giờ tự cạn.
+        if _ma_khao_sat_da_het_han(db, m):
+            m.status, m.response = "het_han", "mã khảo sát hết hạn trước khi tin kịp gửi"
+            het += 1
+            continue
         if not cfg["oa"]: break
         if m.kind == "zns" and not m.template_id: m.template_id = cfg["zns_templates"].get(m.purpose, "")
         if m.kind == "zns" and not m.template_id: continue
         _send(db, m); n += 1
-    db.commit(); return {"sent": n}
+    db.commit(); return {"sent": n, "het_han": het}
 
 
 def verify_signature(body: bytes, sig: str, ts: str) -> bool:

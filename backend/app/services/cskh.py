@@ -530,6 +530,11 @@ def _soan_tin(db: Session, khoa_mau: str, ten_khach: str, ten_tour: str, ma: str
         return ""
 
 
+def _goc_khao_sat(db: Session) -> str:
+    """Gốc đường dẫn trang khảo sát, đọc từ tham số chính sách. Rỗng = chưa khai."""
+    return (R.get_param_text(db, "khao_sat_link_goc") or "").strip().rstrip("/")
+
+
 def gui_loi_moi_cham_diem(db: Session, limit: int = 200) -> int:
     """Phiếu chăm sóc chưa có mã khảo sát → sinh mã và XẾP HÀNG một tin ZNS.
 
@@ -544,8 +549,22 @@ def gui_loi_moi_cham_diem(db: Session, limit: int = 200) -> int:
     from app.services import danh_gia as DG
     from app.services import zalo as Z
 
-    da_co = {x for x in db.execute(select(MaKhaoSat.care_id)).scalars()}
+    # PHIẾU ĐÃ CÓ MÃ CÒN DÙNG ĐƯỢC thì thôi. "Còn dùng được" chứ không phải "đã từng có" — TC-95,
+    # 29/9/2026.
+    #
+    # Đo trên máy chủ thật 29/9: 401 lời mời chưa bao giờ gửi được (khách chưa quan tâm OA, chưa có
+    # mẫu ZNS được duyệt). Mã của chúng cứ thế hết hạn. Với luật cũ — "phiếu đã có mã thì bỏ qua" —
+    # 401 khách ấy VĨNH VIỄN không được mời lại, vì `care_id` là khoá duy nhất: một phiếu một mã,
+    # và mã ấy đã chết. Hệ thống im lặng bỏ rơi họ, không dòng nào trên màn hình nói ra.
+    #
+    # Nay chỉ những mã CÒN SỐNG, hoặc đã có người chạm vào, mới giữ chỗ. Mã chết mà chưa ai mở thì
+    # phiếu quay lại hàng chờ và `danh_gia.sinh_ma` cấp cho nó một mã mới còn nguyên hạn.
+    bay_gio = datetime.now()
+    da_co = {x.care_id for x in db.execute(select(MaKhaoSat)).scalars()
+             if (x.het_han and x.het_han > bay_gio)
+             or x.dung_luc is not None or (x.so_lan_mo or 0) > 0}
     hen = _gio_gui_toi(db)
+    goc = (R.get_param_text(db, "khao_sat_link_goc") or "").strip().rstrip("/")
     n = 0
     for t in db.execute(select(CareTicket).where(
             CareTicket.status == "moi").order_by(CareTicket.id).limit(limit)).scalars():
@@ -563,7 +582,11 @@ def gui_loi_moi_cham_diem(db: Session, limit: int = 200) -> int:
         Z.queue(db, "robot_cskh", phone=t.customer_phone,
                 zalo_uid=(uid if noi_dung else ""), purpose="cham_soc", text=noi_dung,
                 params={"ten_khach": t.customer_name, "ten_tour": ten_tour,
-                        "ma_khao_sat": m.ma},
+                        "ma_khao_sat": m.ma,
+                        # `link` đầy đủ gửi kèm để mẫu ZNS nào không gắn được tham số vào đường dẫn
+                        # của nút vẫn dùng được. Thừa một khoá thì vô hại; thiếu nó thì phải sửa mã
+                        # và chờ thêm một vòng, trong khi mẫu đã đăng ký xong và đang nằm chờ dùng.
+                        "link": f"{goc}/y-kien/{m.ma}" if goc else ""},
                 booking_id=t.booking_id, gui_tu_luc=hen)
         n += 1
     if n: db.commit()
@@ -600,7 +623,8 @@ def nhac_chua_tra_loi(db: Session, limit: int = 200) -> int:
         Z.queue(db, "robot_cskh", phone=t.customer_phone,
                 zalo_uid=(uid if noi_dung else ""), purpose="cham_soc_nhac", text=noi_dung,
                 params={"ten_khach": t.customer_name, "ten_tour": ten_tour,
-                        "ma_khao_sat": m.ma},
+                        "ma_khao_sat": m.ma,
+                        "link": f"{_goc_khao_sat(db)}/y-kien/{m.ma}" if _goc_khao_sat(db) else ""},
                 booking_id=t.booking_id, gui_tu_luc=_gio_gui_toi(db))
         n += 1
     if n: db.commit()
