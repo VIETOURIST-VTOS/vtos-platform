@@ -74,7 +74,7 @@ SO_THANH_NGHIA_VU = ("da_xac_nhan", "da_su_dung")
 # Sáu bảng mà phép đồng bộ dựng lại được. Dòng nào trong sổ mang một trong sáu tên này mà lần chạy
 # hiện tại không dựng lại được thì bị ĐÓNG – xem _thu_hoi_dong_khong_con_can_cu.
 NGUON_DONG_BO = ("lich_thanh_toan_hd", "bookings", "payment_requests", "service_orders",
-                 "fin_schedules", "cash_plan_items", "cong_no_vietrip")
+                 "fin_schedules", "cash_plan_items", "cong_no_vietrip", "phai_tra_vietrip")
 
 # Trạng thái lịch vay còn là nhu cầu tiền.
 FS_CON_HAN = ("ke_hoach", "qua_han")
@@ -165,9 +165,14 @@ def _nap_de_nghi_chi(db: Session, dem: list[int], hom_nay: date, cham: set) -> i
     n = 0
     tours = {t.id: t for t in db.execute(select(Tour)).scalars()}
     n_suy_ra = 0
+    # 29/9/2026: có ảnh phải trả theo dự toán Vietrip thì phần TRẢ NCC lấy từ ảnh ấy
+    # (_nap_phai_tra_vietrip); đề nghị chi tour ở đây bỏ qua để một khoản không bị đếm hai lần.
+    co_anh_tra = _anh_phai_tra_vietrip_moi_nhat(db) is not None
     for pr in db.execute(select(PaymentRequest).where(
             PaymentRequest.status.in_(PR_CHUA_CHI))).scalars():
         nhom = NHOM_THEO_PR.get(pr.category, "van_hanh_khac")
+        if co_anh_tra and nhom == "tra_ncc":
+            continue
         tong = float(pr.amount or 0)
         t = tours.get(pr.tour_id) if pr.tour_id else None
         du_kien = pr.ngay_den_han
@@ -360,7 +365,7 @@ def _anh_cong_no_vietrip_moi_nhat(db: Session):
     from app.models.cong_no_vietrip import CongNoVietripAnh
     # Bảng chưa có (kho chưa chạy migration) thì đi đường cũ. Hỏi trước chứ không bắt lỗi rồi
     # rollback: rollback giữa phép dựng sổ là xoá mất các dòng vừa ghi của những bộ nạp trước.
-    if not inspect(db.get_bind()).has_table(CongNoVietripAnh.__tablename__):
+    if not inspect(db.connection()).has_table(CongNoVietripAnh.__tablename__):
         return None
     return db.execute(select(CongNoVietripAnh).order_by(CongNoVietripAnh.ngay.desc())
                       .limit(1)).scalars().first()
@@ -399,6 +404,49 @@ def _nap_tu_anh_vietrip(db: Session, anh, dem: list[int], hom_nay: date, bo_qua:
             "trang_thai": _trang_thai(tong - da, uoc, hom_nay),
             "ghi_chu": (f"Theo công nợ Vietrip ngày {anh.ngay:%d/%m/%Y}; ngày là ƯỚC D-7 trước khởi hành"
                         + (f" · {d.ghi_chu}" if d.ghi_chu else "")),
+        }, dem, cham)
+        n += 1
+    return n
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 29/9/2026 · PHẢI TRẢ NCC LẤY ĐÚNG THEO DỰ TOÁN TOUR TRÊN VIETRIP
+# ══════════════════════════════════════════════════════════════════════════════
+# Anh Tuấn: "dựa vào dự toán tour để xác định số phải trả và sửa lại VTOS đúng theo Vietrip".
+# Mỗi tour một dòng nhóm `tra_ncc`: Tổng = Tổng chi dự toán, Đã trả = Thực tế đã chi (Quyết toán
+# tour → Thống kê thu chi). Hạn = ngày kết thúc tour — chốt 17/9: "sau khi tour về gọi là quá hạn".
+# Chưa có ảnh nào thì giữ đường cũ từ đề nghị chi.
+def _anh_phai_tra_vietrip_moi_nhat(db: Session):
+    from sqlalchemy import inspect
+    from app.models.cong_no_vietrip import PhaiTraVietripAnh
+    if not inspect(db.connection()).has_table(PhaiTraVietripAnh.__tablename__):
+        return None
+    return db.execute(select(PhaiTraVietripAnh).order_by(PhaiTraVietripAnh.ngay.desc())
+                      .limit(1)).scalars().first()
+
+
+def _nap_phai_tra_vietrip(db: Session, dem: list[int], hom_nay: date, cham: set) -> int:
+    anh = _anh_phai_tra_vietrip_moi_nhat(db)
+    if anh is None:
+        return 0
+    from app.models.cong_no_vietrip import PhaiTraVietripDong
+    theo_ma = {t.code: t for t in db.execute(select(Tour)).scalars()}
+    n = 0
+    for d in db.execute(select(PhaiTraVietripDong).where(PhaiTraVietripDong.anh_id == anh.id)).scalars():
+        tong, da = float(d.tong_chi or 0), float(d.da_chi or 0)
+        if tong - da <= 0:
+            continue
+        t = theo_ma.get(d.ma_tour or "")
+        han = d.ket_thuc or d.khoi_hanh
+        _dat(db, {
+            "nhom": "tra_ncc", "nguon_bang": "phai_tra_vietrip", "nguon_id": int(d.tour_id),
+            "nguon_ma": d.ma_tour, "company_id": t.company_id if t is not None else None,
+            "tour_id": t.id if t is not None else None,
+            "doi_tuong": f"NCC tour {d.ma_tour}", "noi_dung": d.ten_tour or d.ma_tour or "",
+            "tong_nghia_vu": tong, "da_tra": da,
+            "ngay_cam_ket": None, "ngay_du_kien_tra": han,
+            "trang_thai": _trang_thai(tong - da, han, hom_nay),
+            "ghi_chu": f"Theo dự toán tour Vietrip ngày {anh.ngay:%d/%m/%Y}; hạn = ngày kết thúc tour",
         }, dem, cham)
         n += 1
     return n
@@ -497,6 +545,7 @@ def dong_bo(db: Session, hom_nay: date | None = None) -> dict:
         "lich_thanh_toan_hd": len([k for k in cham if k[0] == "lich_thanh_toan_hd"]),
         "bookings": _nap_booking(db, dem, hom_nay, da_co_lich, cham),
         "payment_requests": _nap_de_nghi_chi(db, dem, hom_nay, cham),
+        "phai_tra_vietrip": _nap_phai_tra_vietrip(db, dem, hom_nay, cham),
         "service_orders": _nap_don_dat_dich_vu(db, dem, hom_nay, cham),
         "fin_schedules": _nap_lich_vay(db, dem, hom_nay, cham),
         "cash_plan_items": _nap_ke_hoach_tien(db, dem, hom_nay, cham),

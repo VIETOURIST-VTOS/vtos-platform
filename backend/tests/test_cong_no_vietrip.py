@@ -145,3 +145,40 @@ def test_so_nghia_vu_phai_thu_lay_dung_theo_anh_vietrip():
         assert round(sum(x.con_lai() for x in mo)) == 11_000_000
         assert s.execute(select(func.count()).select_from(NghiaVuThanhToan).where(
             NghiaVuThanhToan.nguon_ma == "VT990004")).scalar() == 0
+
+
+def test_so_nghia_vu_phai_tra_lay_dung_theo_du_toan_vietrip():
+    """29/9/2026 · "dựa vào dự toán tour để xác định số phải trả": nạp ảnh phải trả xong thì nhóm
+    trả NCC của sổ = Tổng chi dự toán − Đã chi từng tour; tour đã chi đủ bị bỏ; hạn = ngày kết thúc."""
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.models.nghia_vu import TRANG_THAI_DONG, NghiaVuThanhToan
+
+    h = login("ketoan")
+    ngay = date.today()
+    lo = {"ngay": str(ngay), "dong": [
+        {"tour_id": 880001, "ma_tour": "ZZ001.01010126", "ten_tour": "Tour A",
+         "khoi_hanh": str(ngay - timedelta(days=5)), "ket_thuc": str(ngay - timedelta(days=2)),
+         "tong_chi": 30_000_000, "da_chi": 20_000_000},
+        {"tour_id": 880002, "ma_tour": "ZZ001.02010126", "ten_tour": "Tour B",
+         "khoi_hanh": str(ngay + timedelta(days=10)), "ket_thuc": str(ngay + timedelta(days=12)),
+         "tong_chi": 8_000_000, "da_chi": 3_000_000},
+        {"tour_id": 880003, "ma_tour": "ZZ001.03010126", "ten_tour": "Tour C",
+         "tong_chi": 5_000_000, "da_chi": 5_000_000},                     # đã chi đủ → bỏ
+    ]}
+    r = client.post("/api/v1/cong-no-vietrip/nap-phai-tra", json=lo, headers=h)
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["so_tour"] == 2 and round(j["tong_con_phai_chi"]) == 15_000_000
+    assert "so_nghia_vu" in j, j
+    with SessionLocal() as s:
+        mo = s.execute(select(NghiaVuThanhToan).where(
+            NghiaVuThanhToan.nhom == "tra_ncc",
+            NghiaVuThanhToan.trang_thai.not_in(TRANG_THAI_DONG))).scalars().all()
+        assert all(x.nguon_bang == "phai_tra_vietrip" for x in mo), [x.nguon_bang for x in mo]
+        assert round(sum(x.con_lai() for x in mo)) == 15_000_000
+        a = next(x for x in mo if x.nguon_ma == "ZZ001.01010126")
+        assert a.ngay_du_kien_tra == ngay - timedelta(days=2) and a.trang_thai == "qua_han"
+    x = client.get("/api/v1/cong-no-vietrip/phai-tra", headers=h).json()
+    assert x["co_du_lieu"] and x["so_tour"] == 2 and x["dong"][0]["ma_tour"] == "ZZ001.01010126"
