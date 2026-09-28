@@ -182,3 +182,12 @@ def test_so_nghia_vu_phai_tra_lay_dung_theo_du_toan_vietrip():
         assert a.ngay_du_kien_tra == ngay - timedelta(days=2) and a.trang_thai == "qua_han"
     x = client.get("/api/v1/cong-no-vietrip/phai-tra", headers=h).json()
     assert x["co_du_lieu"] and x["so_tour"] == 2 and x["dong"][0]["ma_tour"] == "ZZ001.01010126"
+
+
+def test_cua_cong_no_vietrip_duoc_gan_vao_app():
+    """29/9/2026: lượt gộp TC-94 ghi đè app/main.py và làm rơi dòng gắn router — web trả 404 cho
+    cả cửa nạp phải thu lẫn phải trả. Canh bằng danh sách đường dẫn thật của app."""
+    duong = {getattr(r, "path", "") for r in app.routes}
+    for p in ("/api/v1/cong-no-vietrip", "/api/v1/cong-no-vietrip/nap",
+              "/api/v1/cong-no-vietrip/nap-phai-tra", "/api/v1/cong-no-vietrip/phai-tra"):
+        assert p in duong, f"Thiếu {p} — kiểm lại app.include_router(cong_no_vietrip_router) trong app/main.py"
