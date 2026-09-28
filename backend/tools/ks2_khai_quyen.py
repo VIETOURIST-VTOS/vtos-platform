@@ -134,6 +134,20 @@ CHAN_TAI_CHO: dict[str, str] = {
     "POST /api/v1/incidents/{iid}/opinion": (
         "Chỉ chính người bị lập sự vụ mới được gửi ý kiến, kiểm ngay trong thân hàm. Đây là quyền "
         "theo NGƯỜI chứ không theo vai trò nên không khai được bằng require_roles."),
+    # Cửa NẮN dòng ngoại tệ thiếu tỷ giá · 27/9/2026. Hai đường dẫn, một hàm: màn hình Kiểm soát
+    # của lãnh đạo gọi đường cũ, màn hình Rà soát cột tiền của Kế toán gọi đường riêng — cùng lý do
+    # đã ghi ở đầu tệp này cho `/cot-tien`.
+    "POST /api/v1/kiem-soat/nan-ngoai-te": (
+        "Chặn theo NGƯỜI, không theo vai trò: chỉ CHỦ HỒ SƠ của chính chuyến ấy nắn được dòng của "
+        "chuyến ấy (services/nan_ngoai_te gọi chu_ho_so.la_chu_ho_so). Đây là luật 'một chủ hồ sơ' "
+        "26/9/2026, và cửa nắn CỐ Ý không được là ngoại lệ đầu tiên của nó — nhất là khi nó sửa "
+        "thẳng con số giá vốn. Khai require_roles ở đây sẽ NỚI chứ không siết: nó cho cả vai ấy nắn "
+        "chuyến của người khác. Hai cổng nữa cũng nằm trong thân hàm và cũng không khai được bằng "
+        "vai trò: chuyến phải đang soạn được (Kế toán đã trả lại), và tỷ giá phải là một dòng CÓ "
+        "THẬT trong Sổ tỷ giá đúng đồng tiền đúng ngày."),
+    "POST /api/v1/ra-soat-cot-tien/nan-ngoai-te": (
+        "Cùng một hàm với đường /kiem-soat ở trên, khác địa chỉ để hàng rào phạm vi ngoài tách được "
+        "màn hình Kế toán khỏi màn hình Kiểm soát. Chặn giống hệt: chủ hồ sơ của chuyến."),
     "POST /api/v1/leaves": (
         "Hai đường trong một cửa: HCNS nhập hộ cho người khác, còn lại chỉ nhập cho chính mình. "
         "Nhánh rẽ nằm trong thân hàm nên máy không đọc được từ chữ ký."),
