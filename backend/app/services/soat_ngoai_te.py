@@ -179,10 +179,35 @@ _MA_TIEN = ("USD", "EUR", "AUD", "CAD", "GBP", "JPY", "KRW", "CNY", "SGD", "THB"
 _DO_NGOAI_TE = re.compile(r"(?<![A-Za-z])(" + "|".join(_MA_TIEN) + r")(?![A-Za-z])")
 
 
+# MÃ ĐỒNG TIỀN TRÙNG VỚI CHỮ VIẾT TẮT TIẾNG VIỆT TRONG TÊN NHÀ CUNG CẤP.
+#
+# "HKD" là đô la Hồng Kông, và cũng là "HỘ KINH DOANH" — cách gọi loại hình đăng ký kinh doanh
+# nằm ngay đầu tên hàng trăm nhà cung cấp: "HKD TÀU DU LỊCH TÚ ÂN", "HKD NHỮNG CHÀNG TRAI".
+# Đo ngày 27/9/2026 trên dữ liệu thật: 4 trong 28 dòng bộ dò bắt được là hộ kinh doanh Việt Nam,
+# không một đồng ngoại tệ nào.
+#
+# Một bộ soát báo nhầm thì người ta thôi đọc nó — và lần sau nó báo đúng cũng không ai tin. Nên
+# với những mã này, CHỈ tính khi mã nằm trong MÔ TẢ khoản chi (nơi người ta viết phép tính ngoại
+# tệ: "800CNY X 4000"), KHÔNG tính khi nó chỉ nằm trong tên nhà cung cấp.
+#
+# Cái giá phải trả: một khoản chi bằng đô la Hồng Kông mà chỉ lộ ra ở tên NCC sẽ bị bỏ sót. Đổi
+# lại là bộ soát không kêu oan bốn lần cho mỗi lần kêu đúng. Vietourist chưa có dòng nào khai
+# `tien_te = "HKD"` (đo 27/9/2026: chỉ CAD, USD, AUD), nên đánh đổi này nghiêng hẳn một bên.
+_DE_NHAM_TRONG_TEN_NCC = {"HKD"}
+
+
 def dong_tien_trong_chu(l: TourCostLine) -> str:
-    """Mã đồng tiền xuất hiện trong MÔ TẢ hay TÊN NCC của dòng, nếu có. Rỗng là không thấy gì."""
-    m = _DO_NGOAI_TE.search(f"{l.description or ''} {l.supplier_name or ''}".upper())
-    return m.group(1) if m else ""
+    """Mã đồng tiền xuất hiện trong MÔ TẢ hay TÊN NCC của dòng, nếu có. Rỗng là không thấy gì.
+
+    Mô tả xét trước: đó là nơi người nhập viết phép tính ngoại tệ bằng tay.
+    """
+    m = _DO_NGOAI_TE.search((l.description or "").upper())
+    if m:
+        return m.group(1)
+    m = _DO_NGOAI_TE.search((l.supplier_name or "").upper())
+    if m and m.group(1) not in _DE_NHAM_TRONG_TEN_NCC:
+        return m.group(1)
+    return ""
 
 
 def bang(db: Session, gioi_han: int = 300) -> dict:

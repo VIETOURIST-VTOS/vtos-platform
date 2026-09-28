@@ -356,6 +356,29 @@ def checks(db: Session, t: Tour) -> list[dict]:
             out.append({"level": "block", "line": l.line_no, "msg": f"Dòng {l.line_no} {l.description}: thực chi vượt dự toán {(((l.actual or 0) - (l.budget or 0)) / (l.budget or 0)) * 100:.0f}% – phải ghi lời giải trình ở Ghi chú"})
         if not l.supplier_tax_code and l.service_type in ("HOTEL", "RESTAURANT", "VEHICLE", "FLIGHT", "LAND", "INSURANCE") and (l.actual or 0) >= 5_000_000:
             out.append({"level": "warn", "line": l.line_no, "msg": f"Dòng {l.line_no}: NCC {l.supplier_name} chưa có MST (chi ≥ 5 triệu cần hóa đơn)"})
+        # NHẮC, KHÔNG CHẶN — Chủ tịch chốt 27/9/2026.
+        #
+        # Đo trên dữ liệu thật hôm ấy: 13 dòng của tour ĐANG CHẠY (nguồn `vietrip`) viết phép tính
+        # ngoại tệ bằng tay vào ô MÔ TẢ rồi gõ số VND vào, bốn ô ngoại tệ bỏ trống:
+        #     "Tổng chi phí (bao gồm phụ thu): 4,341 USD x 26,500 + BANK FEE 2tr"
+        #     "(13GBP*10days*9pax+13GBP*8days*2pax)*35,724 + 100$*11 days *26,5"
+        # Mỗi dòng như thế là một tỷ giá không ai truy được, và không đối chiếu được với sao kê.
+        #
+        # Cửa nhập bốn ô đã có từ 25/9 — đây KHÔNG phải lỗi mã, mà là người dùng chưa dùng cửa ấy.
+        # Chủ tịch chọn NHẮC chứ không CHẶN: chặn thì Điều hành kẹt ngay hôm sau với những dòng mô
+        # tả chỉ vô tình có ba chữ cái trùng mã đồng tiền. Mức `warn` để nó hiện trên màn hình chủ
+        # hồ sơ trước khi đóng số, và đi vào sổ soát — nhưng không chặn ai.
+        #
+        # Nhập tại chỗ, KHÔNG nhập ở đầu tệp: `soat_ngoai_te` nhập `calc_actual` từ chính tệp này,
+        # nên nhập ngược ở đầu tệp là vòng tròn và cả máy chủ không khởi động được.
+        from app.services.soat_ngoai_te import dong_tien_trong_chu
+        doan = dong_tien_trong_chu(l)
+        if doan and not (l.tien_te or "").strip():
+            out.append({"level": "warn", "line": l.line_no,
+                        "msg": f"Dòng {l.line_no}: mô tả có \"{doan}\" nhưng bốn ô ngoại tệ bỏ trống "
+                               f"– hãy khai Tiền tệ / Số tiền gốc / Tỷ giá / Ngày tỷ giá để máy nhân, "
+                               f"thay vì tự nhân ngoài hệ rồi gõ số VND (tỷ giá gõ tay không đối "
+                               f"chiếu được với sao kê)"})
         if (l.paid or 0) > (l.actual or 0) + 1:
             out.append({"level": "warn", "line": l.line_no, "msg": f"Dòng {l.line_no}: đã thanh toán {l.paid:,.0f} lớn hơn thực chi {l.actual:,.0f}"})
     nodoc = [l.line_no for l in ls if not l.doc_data and (l.actual or 0) > 0]

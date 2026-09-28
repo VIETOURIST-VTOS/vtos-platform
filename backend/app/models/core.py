@@ -224,7 +224,20 @@ class Param(Base):
     # điền" và báo hai dòng ấy là dữ liệu thiếu. Hai lane nói ngược nhau vì MÔ HÌNH không nói rõ.
     # Khai default="" là để mô hình nói đúng điều hệ thống đang làm: chưa chốt thì trống, và trống
     # đọc ra "chưa chốt" chứ không đọc ra số 0 hay một ngày ai đó đoán hộ.
-    value: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    # NỚI 200 → 500 ngày 27/9/2026, vì một tham số CÓ THẬT không vừa cột.
+    #
+    # Làn CSKH thêm `khao_sat_mau_tin` — mẫu tin nhắn Zalo gửi khách — dài 210 ký tự, và nó được
+    # gộp vào main đúng lúc CI chết vì hạn mức chi tiêu GitHub Actions, nên hàng rào K11 (độ dài
+    # chuỗi so với cột) không kêu. CI sống lại thì main đỏ, và mọi nhánh của mọi làn đỏ theo.
+    #
+    # VÌ SAO NỚI CỘT CHỨ KHÔNG CẮT CÂU CHỮ: bảng `params` sinh ra để câu chữ gửi khách và các con
+    # số vận hành nằm NGOÀI mã — sửa một dấu phẩy không phải đẩy một vòng mã. Cắt mẫu tin cho vừa
+    # một con số 200 là lấy cột làm chủ và bắt Marketing viết theo giới hạn kỹ thuật; mà đây mới
+    # là tham số mẫu tin ĐẦU TIÊN, sẽ còn mẫu ZNS, mẫu nhắc, mẫu xin lỗi sự cố.
+    #
+    # 500 chứ không phải 2000: cột này vẫn là THAM SỐ, không phải chỗ chứa văn bản dài. Một giá trị
+    # quá 500 ký tự là dấu hiệu thứ đang cất vào đây đáng lẽ phải là một bảng riêng.
+    value: Mapped[str] = mapped_column(String(500), default="", server_default="")
     label: Mapped[str] = mapped_column(String(200))
     unit: Mapped[str] = mapped_column(String(30), default="")
     effective_from: Mapped[date] = mapped_column(Date)
