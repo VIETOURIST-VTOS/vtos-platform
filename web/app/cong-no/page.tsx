@@ -20,6 +20,11 @@ function CongNo() {
     try { setD(await api("/cong-no")); } catch (e) { toast(errMsg(e), true); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
+  // Lối "Xem chi tiết" của khối Phải trả trên màn hình Chủ tịch mở thẳng tab Phải trả (?tab=tra).
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "thu" || t === "tra" || t === "xe") setTab(t);
+  }, []);
 
   if (!d) return <p className="muted">Đang tải…</p>;
   const thu = d.phai_thu_khach, tra = d.phai_tra_ncc, xe = d.doi_xe;
