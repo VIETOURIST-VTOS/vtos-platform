@@ -3,6 +3,9 @@ import { useCallback, useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import NhipPhanDau, { Nhip } from "@/components/NhipPhanDau";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 /** Kinh doanh Lẻ – doanh thu, chỉ tiêu, và xem xuống từng cấp.
  *
@@ -51,16 +54,22 @@ function KinhDoanhLe() {
   const [duong, setDuong] = useState<any[]>([]);      // đường đã bấm xuống: [{id, ten, cap}]
   const [nguoi, setNguoi] = useState<any>(null);      // booking của một người đang mở
   const [giao, setGiao] = useState<any>(null);        // ô đang giao chỉ tiêu
+  const [nhip, setNhip] = useState<Nhip | null>(null);  // biểu đồ phấn đấu của CHÍNH tôi
 
-  const mang = "le";
+  // Mảng lấy từ đường dẫn: mục 3.8 (Lẻ) và 3.9 (Đoàn) trỏ vào cùng màn hình này. Trước 28/9 ô
+  // này viết cứng "le", nên phòng Đoàn không có màn hình chỉ tiêu nào — xem TC-92.
+  const mangTuUrl = useSearchParams().get("mang") || "";
+  const mang = mangTuUrl === "doan" ? "doan" : "le";
   const q = `ky=${ky}&mang=${mang}${luong ? `&luong=${luong}` : ""}`;
   const dangO = duong.length ? duong[duong.length - 1] : null;
 
   const load = useCallback(() => {
     api(`/kinh-doanh/toi-la-ai?ky=${ky}&mang=${mang}`).then(setToi).catch(() => {});
+    // Cửa này KHÔNG nhận user_id — máy chủ luôn trả nhịp của chính người đăng nhập.
+    api(`/kinh-doanh/nhip-cua-toi?ky=${ky}&mang=${mang}`).then(setNhip).catch(() => setNhip(null));
     const url = dangO ? `/kinh-doanh/don-vi/${dangO.id}?${q}` : `/kinh-doanh/thang?${q}`;
     api(url).then(setD).catch((x) => { toast(errMsg(x), true); setD(null); });
-  }, [ky, luong, dangO?.id]);         // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ky, luong, mang, dangO?.id]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [load]);
 
   const xuong = (dv: any) => { setNguoi(null); setDuong([...duong, { id: dv.don_vi_id ?? dv.id, ten: dv.ten, cap: dv.cap }]); };
@@ -89,7 +98,9 @@ function KinhDoanhLe() {
   const coTheGiao = !!toi?.duoc_giao_chi_tieu;
 
   return (<>
-    <h1>Kinh doanh Lẻ</h1>
+    <h1>Kinh doanh {mang === "doan" ? "Đoàn" : "Lẻ"}</h1>
+
+    <NhipPhanDau d={nhip} />
 
     <div className="panel">
       <div className="row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -235,4 +246,4 @@ function KinhDoanhLe() {
   </>);
 }
 
-export default function Page() { return <Shell><KinhDoanhLe /></Shell>; }
+export default function Page() { return <Shell><Suspense><KinhDoanhLe /></Suspense></Shell>; }
