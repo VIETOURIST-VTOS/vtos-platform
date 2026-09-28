@@ -41,6 +41,11 @@ function RaSoatCotTien() {
   // Sổ soát thứ hai: ĐỀ NGHỊ CHI khai ngoại tệ. Cùng một câu hỏi, khác chỗ — đây là nơi tiền
   // THẬT rời ngân hàng, còn sổ trên là nơi con số đi vào báo cáo.
   const [ntc, setNtc] = useState<any>(null);
+  // Cửa NẮN: xem trước (chỉ đọc) và lần bấm nắn từng dòng. `nanLyDo` giữ lý do của từng dòng —
+  // một con số tiền bị nắn mà không ai nói vì sao là một con số không giải trình được.
+  const [nan, setNan] = useState<any>(null);
+  const [nanLyDo, setNanLyDo] = useState<Record<number, string>>({});
+  const [nanBan, setNanBan] = useState(false);
   const quyetDuoc = ["ketoan", "cntt", "chutich", "tgd"].includes(user?.role || "");
 
   const load = useCallback(async () => {
@@ -319,6 +324,87 @@ function RaSoatCotTien() {
             ))}</tbody>
           </table>}
           {ntc.cham_tran && <p className="muted small">Đang hiện {ntcRows.length} dòng đầu — còn nữa.</p>}
+        </>)}
+      </div>
+
+      {/* ══ CỬA NẮN DÒNG NGOẠI TỆ THIẾU TỶ GIÁ — Chủ tịch quyết 27/9/2026, SAU KHI ĐÃ ĐO ══
+          Không có nút "nắn hết". Mỗi dòng một lần bấm, một lý do, một người ký — và chuyến phải
+          được Kế toán trả lại trước, vì 61 dòng đo được đều nằm trên chuyến đã đóng số. */}
+      <div className="card">
+        <h2 style={{ marginTop: 0 }}>Nắn dòng ngoại tệ thiếu tỷ giá</h2>
+        <p className="muted small">
+          Bộ soát ở trên <b>chỉ đo</b>. Cửa này là chỗ <b>người</b> nắn lại — và nó <b>không có ô gõ tỷ giá</b>:
+          con số lấy từ <b>Sổ tỷ giá</b>, ai nhập sổ thì người ấy chịu trách nhiệm. Chưa có tỷ giá trong sổ
+          thì dòng ấy không nắn được, và bảng nói ra thiếu con số nào. Máy <b>không</b> tự mở khoá chuyến đã
+          đóng số, và <b>không</b> chạm vào dòng đã có số thực chi.
+        </p>
+        {!nan ? (
+          <button className="ghost" onClick={() => api("/ra-soat-cot-tien/nan-ngoai-te/xem-truoc")
+            .then(setNan).catch((e) => toast(errMsg(e), true))}>Xem trước</button>
+        ) : (<>
+          <div className="so">
+            <span><b>{nan.dem?.nan_duoc ?? 0}</b> dòng nắn được ngay</span>
+            <span style={{ color: nan.dem?.vuong ? "var(--vtos-danger)" : undefined }}>
+              <b>{nan.dem?.vuong ?? 0}</b> dòng còn vướng</span>
+            <span><b>{nan.dem_vuong?.thieu_ty_gia ?? 0}</b> thiếu tỷ giá trong sổ</span>
+            <span><b>{nan.dem_vuong?.nhieu_nguon ?? 0}</b> sổ có nhiều nguồn</span>
+            <span><b>{nan.dem_vuong?.chuyen_da_dong ?? 0}</b> chuyến đã đóng số</span>
+          </div>
+          <p className="muted small">{nan.luu_y}</p>
+
+          {(nan.can_ty_gia || []).length > 0 && <p className="warn">
+            Cần nhập vào <b>Sổ tỷ giá</b> {nan.can_ty_gia.length} con số:{" "}
+            {nan.can_ty_gia.map((c: any) => `${c.tien_te} ${String(c.ngay).split("-").reverse().join("/")} (${c.so_dong} dòng)`).join(" · ")}
+          </p>}
+
+          {(nan.nan_duoc || []).length > 0 && <>
+            <h3>Nắn được ngay ({nan.nan_duoc.length})</h3>
+            <table className="tbl">
+              <thead><tr>
+                <th>Chuyến</th><th>Dòng</th><th>Gốc × tỷ giá</th><th>Sẽ thành</th><th>Chủ hồ sơ</th><th>Lý do *</th><th></th>
+              </tr></thead>
+              <tbody>{nan.nan_duoc.map((r: any) => (
+                <tr key={r.line_id}>
+                  <td className="mono">{r.tour}</td>
+                  <td className="mono">#{r.dong}<div className="muted small">{r.mo_ta}</div></td>
+                  <td className="mono">{Number(r.tong_dong_goc).toLocaleString("vi-VN")} {r.tien_te} × {Number(r.ty_gia).toLocaleString("vi-VN")}
+                    <div className="muted small">{r.nhan_ngay} {String(r.ngay_ty_gia).split("-").reverse().join("/")} · {r.nguon_chon || "không ghi nguồn"}</div></td>
+                  <td className="mono"><b>{Number(r.actual_se_thanh).toLocaleString("vi-VN")}</b>
+                    <div className="muted small">đang là 0</div></td>
+                  <td className="muted small">{r.chu_ho_so}</td>
+                  <td><input value={nanLyDo[r.line_id] || ""} placeholder="vì sao nắn dòng này"
+                    onChange={(e) => setNanLyDo({ ...nanLyDo, [r.line_id]: e.target.value })} /></td>
+                  <td><button className="ghost" disabled={nanBan || !(nanLyDo[r.line_id] || "").trim()}
+                    onClick={async () => {
+                      setNanBan(true);
+                      try {
+                        const kq = await api("/ra-soat-cot-tien/nan-ngoai-te", { method: "POST", json: {
+                          line_id: r.line_id, ty_gia_id: (r.nguon_ty_gia || [])[0]?.id, ly_do: nanLyDo[r.line_id] } });
+                        toast(kq.message || "Đã nắn");
+                        setNan(await api("/ra-soat-cot-tien/nan-ngoai-te/xem-truoc"));
+                      } catch (e) { toast(errMsg(e), true); } finally { setNanBan(false); }
+                    }}>Nắn dòng này</button></td>
+                </tr>))}</tbody>
+            </table>
+          </>}
+
+          {(nan.vuong || []).length > 0 && <>
+            <h3>Còn vướng ({nan.vuong.length})</h3>
+            <table className="tbl">
+              <thead><tr><th>Chuyến</th><th>Dòng</th><th>Gốc</th><th>Vướng gì</th><th>Chủ hồ sơ</th></tr></thead>
+              <tbody>{nan.vuong.map((r: any) => (
+                <tr key={r.line_id}>
+                  <td className="mono">{r.tour}<div className="muted small">{r.trang_thai_chuyen}</div></td>
+                  <td className="mono">#{r.dong}<div className="muted small">{r.mo_ta}</div></td>
+                  <td className="mono">{Number(r.tong_dong_goc).toLocaleString("vi-VN")} {r.tien_te}</td>
+                  <td><Tag cls="warn">{r.vuong_ten}</Tag>
+                    {(r.nguon_ty_gia || []).length > 1 && <div className="muted small">
+                      {r.nguon_ty_gia.map((n: any, i: number) => (
+                        <div key={i}>{n.nguon || "không ghi nguồn"}: {Number(n.ty_gia).toLocaleString("vi-VN")}</div>))}</div>}</td>
+                  <td className="muted small">{r.chu_ho_so}</td>
+                </tr>))}</tbody>
+            </table>
+          </>}
         </>)}
       </div>
 
