@@ -43,7 +43,7 @@ Chủ tịch, TGĐ và Ban Kiểm soát xem tất cả – hai người đầu v
 kiểm soát mà chỉ được xem bản tóm tắt do bên bị kiểm soát chọn thì không kiểm được gì.
 """
 from datetime import date, datetime, timedelta
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
 from app.services import access as AC
 
@@ -55,7 +55,17 @@ TEN_KY = {"ngay": "ngày", "tuan": "tuần", "thang": "tháng"}
 # sẽ tự có quyền xem bản tổng hợp của phòng đó mà không ai cân nhắc – nới quyền không ai quyết định.
 PHONG = {
     "dieu_hanh": {"ten": "Điều hành", "xem": ("tp_dh", "ptgd_doan")},
-    "kd_le":     {"ten": "Kinh doanh", "xem": ("gd_kd", "tp_kd", "ptgd_mkt")},
+    # HAI PHÒNG, HAI BẢNG – 28/9/2026. Trước hôm nay ở đây chỉ có MỘT dòng tên "Kinh doanh", và
+    # bảng của nó đếm cả Lẻ lẫn Đoàn. Hai hậu quả ngược nhau từ cùng một dòng: Giám đốc Kinh doanh
+    # mở bảng "phòng mình" ra thì thấy số của phòng Đoàn cộng vào, còn P.TGĐ tour đoàn thì không có
+    # bảng nào để mở.
+    #
+    # `kd_doan` CHỈ có ptgd_doan xem – cùng nguyên tắc đã áp cho Visa ngày 10/9: người chịu trách
+    # nhiệm về con số, không phải ai tò mò. Đây là một lần SIẾT với ba vai trò của phòng Lẻ: từ hôm
+    # nay họ không còn thấy số của phòng Đoàn lẫn trong bảng mình nữa. Muốn mở lại thì thêm vai trò
+    # vào đúng dòng dưới đây – một dòng, và có người quyết.
+    "kd_le":     {"ten": "Kinh doanh Lẻ", "xem": ("gd_kd", "tp_kd", "ptgd_mkt")},
+    "kd_doan":   {"ten": "Kinh doanh Đoàn", "xem": ("ptgd_doan",)},
     "doi_xe":    {"ten": "Đội xe", "xem": ("gd_doi_xe",)},
     "huong_dan": {"ten": "Hướng dẫn", "xem": ("tp_hd",)},
     "marketing": {"ten": "Marketing", "xem": ("ptgd_mkt",)},
@@ -238,47 +248,160 @@ def _dieu_hanh(db: Session, tu: date, den: date) -> list[dict]:
     ] + _bo_phan_truc_thuoc(db, "dieu_hanh", tu, den)
 
 
-def _kd_le(db: Session, tu: date, den: date) -> list[dict]:
-    from app.models.core import Booking, ServiceRequest
+# ═══════════════════ KINH DOANH: LẺ VÀ ĐOÀN LÀ HAI BẢNG RỜI ═══════════════════
+#
+# HAI BỘ TỪ VỰNG, KHÔNG PHẢI MỘT — chỗ dễ sai nhất của cả phần này:
+#   · mảng của TOUR : "le" / "doan"        – định nghĩa MỘT CHỖ, ở services/segments.py
+#   · mã PHÒNG BAN  : "kd_le" / "kd_doan"  – models/hr.DEPARTMENTS, và cột `bao_gia.mang`
+# Hai bộ trông na ná nhau nên rất dễ đem mã phòng đi so với mảng tour hoặc ngược lại. Lúc ấy bộ lọc
+# KHÔNG báo lỗi: nó lặng lẽ trả về rỗng, và một bảng trống trông y hệt một phòng chưa làm gì.
+# `MANG_CUA_PHONG` là chỗ DUY NHẤT dịch giữa hai bộ.
+MANG_CUA_PHONG = {"kd_le": "le", "kd_doan": "doan"}
+
+
+def _tour_khong_thuoc_mang_nao():
+    """Điều kiện SQL: tour KHÔNG thuộc mảng nào – dịch vụ lẻ (non_package) và các loại khác.
+
+    Dựng bằng chính hai điều kiện của `segments`, rồi phủ định hợp của chúng. KHÔNG chép tay danh
+    sách loại chuyến vào đây: chép thì tới ngày segments đổi luật, ngăn "dùng chung" đứng yên với
+    luật cũ, và một phần doanh thu biến mất khỏi cả hai bảng mà không ai thấy.
+    """
+    from app.services import segments as SEG
+    return ~or_(SEG.tour_cond("le"), SEG.tour_cond("doan"))
+
+
+def _kd(db: Session, tu: date, den: date, phong: str) -> list[dict]:
+    """Bảng chỉ tiêu của MỘT phòng kinh doanh. `phong` là MÃ PHÒNG: "kd_le" hoặc "kd_doan".
+
+    Trước 28/9/2026 hàm này là `_kd_le` và không lọc mảng ở dòng nào: nó đếm MỌI booking, MỌI báo
+    giá, MỌI yêu cầu dịch vụ rồi treo tên "Kinh doanh" lên. Số trên bảng ấy sai với cả hai phòng.
+    """
+    from app.models.core import Booking, ServiceRequest, Tour
     from app.models.crm import Lead
     from app.models.ban_hang import BaoGia
-    bk = [b for b in db.execute(select(Booking)).scalars() if tu <= b.created_at.date() <= den]
+    from app.services import segments as SEG
+
+    mang = MANG_CUA_PHONG[phong]
+    la_doan = mang == "doan"
+
+    def _trong_ky(ds):
+        return [x for x in ds if x.created_at and tu <= x.created_at.date() <= den]
+
+    # Booking và yêu cầu dịch vụ lọc QUA TOUR, bằng đúng điều kiện của `segments`. Không viết lại
+    # ở đây câu "thế nào là tour đoàn": viết lại là có ngày một tour nằm trên bảng phòng này trong
+    # khi hoa hồng của nó tính theo bậc thang phòng kia – lệch tiền chứ không chỉ lệch màn hình.
+    bk = _trong_ky(db.execute(select(Booking).join(Tour, Booking.tour_id == Tour.id)
+                              .where(SEG.tour_cond(mang))).scalars())
     dt = sum((b.amount or 0) - (b.discount or 0) for b in bk)
+
+    # Dịch vụ lẻ không thuộc mảng nào, và CẢ HAI phòng đều bán được. Nó đứng thành một dòng riêng,
+    # giống hệt nhau ở hai bảng, thay vì bị nhét vào một phòng cho tròn tổng.
+    chung = _trong_ky(db.execute(select(Booking).join(Tour, Booking.tour_id == Tour.id)
+                                 .where(_tour_khong_thuoc_mang_nao())).scalars())
+    dt_chung = sum((b.amount or 0) - (b.discount or 0) for b in chung)
+
     lead = [l for l in db.execute(select(Lead)).scalars() if tu <= l.received_at.date() <= den]
-    bg = db.execute(select(BaoGia)).scalars().all()
+
+    # Báo giá lọc theo CỘT `mang` của chính nó (người soạn khai lúc tạo), không suy từ tour: một
+    # báo giá có thể chưa gắn tour nào – `bao_gia.tour_id` cho phép rỗng.
+    bg = db.execute(select(BaoGia).where(BaoGia.mang == phong)).scalars().all()
     gui = [b for b in bg if b.trang_thai == "da_gui"]
     chot = [b for b in bg if b.trang_thai == "khach_chot"]
     duoi = [b for b in bg if b.duoi_bien]
     cho = db.execute(select(func.count()).select_from(ServiceRequest)
-                     .where(ServiceRequest.booking_id == None)).scalar()             # noqa: E711
+                     .join(Tour, ServiceRequest.tour_id == Tour.id)
+                     .where(ServiceRequest.booking_id == None,                        # noqa: E711
+                            SEG.tour_cond(mang))).scalar()
     # Tỷ lệ chốt: mẫu số bằng 0 thì để RỖNG, không để 0%. "Chưa gửi báo giá nào" và "gửi mà không ai
     # chốt" là hai tình huống ngược nhau, hiện cùng một con số 0% là sai.
     mau = len(gui) + len(chot)
     ty_le = round(len(chot) / mau * 100, 1) if mau else None
-    return [
+
+    ds = [
         ct("booking", "Booking mới trong kỳ", len(bk), "booking",
-           "Đếm booking có ngày tạo trong kỳ", "bookings.created_at"),
+           f"Đếm booking có ngày tạo trong kỳ, CHỈ chuyến thuộc mảng {SEG.MANG[mang]}",
+           "bookings.created_at · services.segments.tour_cond"),
         ct("doanh_thu", "Doanh thu booking trong kỳ", dt, "đ",
-           "Tổng (số tiền − giảm giá) của các booking tạo trong kỳ",
-           "bookings.amount − bookings.discount"),
-        ct("lead", "Khách mới (lead) trong kỳ", len(lead), "khách",
-           "Đếm lead có ngày nhận trong kỳ", "leads.received_at"),
+           "Tổng (số tiền − giảm giá) của các booking tạo trong kỳ, chỉ chuyến thuộc mảng này",
+           "bookings.amount − bookings.discount · services.segments.tour_cond"),
+    ]
+
+    if la_doan:
+        # ĐOÀN ĐO LỢI NHUẬN, KHÔNG ĐO DOANH THU (cùng lý lẽ đã ghi ở doanh_thu_kd.py): tour đoàn
+        # giá trị lớn mà biên mỏng, lấy doanh thu làm thước là dạy người bán hạ giá để chạy số.
+        # Dòng doanh thu ở trên vẫn giữ để đối chiếu, nhưng thước của phòng này là dòng dưới đây.
+        from app.services.ket_qua_that import DA_DONG_SO
+        from app.services import rules as R
+        dong_so = list(db.execute(select(Tour).where(
+            Tour.status.in_(DA_DONG_SO), Tour.end_date >= tu, Tour.end_date <= den,
+            SEG.tour_cond("doan"))).scalars())
+        # RỖNG chứ không 0 khi chưa chuyến nào đóng sổ. `settlement_summary` đọc actual_revenue /
+        # actual_cost, và hai ô ấy để trống thì nó trả lợi nhuận 0 – một con số 0 không phân biệt
+        # được với "quyết toán xong, hoà vốn". Chặn ngay tại đây, đừng để nó lên màn hình.
+        ln = float(sum(R.settlement_summary(db, t)["profit"] for t in dong_so)) if dong_so else None
+        ds.append(ct("loi_nhuan_dong_so", "Lợi nhuận chuyến đã đóng sổ", ln, "đ",
+                     "Cộng lợi nhuận quyết toán của các chuyến ĐOÀN kết thúc trong kỳ VÀ đã đóng "
+                     "sổ. Chưa chuyến nào đóng sổ thì để RỖNG, không để 0 – 'chưa quyết toán' và "
+                     "'quyết toán ra 0 đồng' là hai chuyện ngược nhau",
+                     "tours.status (ket_qua_that.DA_DONG_SO) + rules.settlement_summary",
+                     chi_tiet=[t.code for t in dong_so[:20]]))
+
+    ds += [
+        ct("dung_chung_dich_vu_le", "Dịch vụ lẻ – KHÔNG thuộc mảng nào", len(chung), "booking",
+           "Booking của chuyến không thuộc mảng Lẻ cũng không thuộc mảng Đoàn (dịch vụ lẻ – "
+           "non_package). CẢ HAI phòng đều bán được loại này, nên nó KHÔNG cộng vào hai dòng trên "
+           "và hiện y hệt nhau ở hai bảng",
+           "bookings · phủ định hợp hai điều kiện của services.segments",
+           chi_tiet=[f"Số tiền: {dt_chung:,.0f} đ"] if chung else []),
+        ct("lead", "Khách mới (lead) trong kỳ – DÙNG CHUNG", len(lead), "khách",
+           "Đếm lead có ngày nhận trong kỳ. KHÔNG chia được theo mảng: bảng leads chưa có cột mảng "
+           "và cũng chưa gắn tour, nên con số này GIỐNG NHAU ở hai bảng và không phải chỉ tiêu "
+           "riêng của phòng nào. Muốn chia thì phải mở thêm một cửa nhập, không phải thêm một phép "
+           "đoán", "leads.received_at"),
         ct("bao_gia_cho", "Báo giá đang chờ khách trả lời", len(gui), "báo giá",
-           "Báo giá ở trạng thái đã gửi", "bao_gia.trang_thai='da_gui'",
+           "Báo giá của mảng này ở trạng thái đã gửi",
+           f"bao_gia.trang_thai='da_gui' + mang='{phong}'",
            muc=_muc(len(gui) > 0), viec="Gọi lại khách trước khi báo giá hết hạn hiệu lực"),
         ct("bao_gia_chot", "Báo giá khách đã chốt", len(chot), "báo giá",
-           "Báo giá ở trạng thái khách chốt", "bao_gia.trang_thai='khach_chot'"),
+           "Báo giá của mảng này ở trạng thái khách chốt",
+           f"bao_gia.trang_thai='khach_chot' + mang='{phong}'"),
         ct("ty_le_chot", "Tỷ lệ chốt báo giá", ty_le, "%",
-           "Khách chốt ÷ (đang chờ + khách chốt) × 100. Chưa gửi báo giá nào thì để RỖNG, "
-           "không để 0% – hai tình huống đó ngược nhau", "bao_gia.trang_thai"),
+           "Khách chốt ÷ (đang chờ + khách chốt) × 100, tính trong mảng này. Chưa gửi báo giá nào "
+           "thì để RỖNG, không để 0% – hai tình huống đó ngược nhau",
+           f"bao_gia.trang_thai + mang='{phong}'"),
         ct("duoi_bien", "Báo giá từng gửi dưới ngưỡng biên", len(duoi), "báo giá",
-           "Báo giá có cờ dưới biên (gửi khi biên thấp hơn ngưỡng, kèm giải trình)",
-           "bao_gia.duoi_bien", muc=_muc(len(duoi) > 0),
+           "Báo giá của mảng này có cờ dưới biên (gửi khi biên thấp hơn ngưỡng, kèm giải trình)",
+           f"bao_gia.duoi_bien + mang='{phong}'", muc=_muc(len(duoi) > 0),
            viec="Đọc lại giải trình – mỗi bản dưới biên đều bắt buộc có"),
         ct("yeu_cau_cho", "Yêu cầu chưa tạo booking", cho, "yêu cầu",
-           "Đếm yêu cầu dịch vụ chưa gắn booking", "service_requests.booking_id rỗng",
+           "Đếm yêu cầu dịch vụ chưa gắn booking, chỉ chuyến thuộc mảng này",
+           "service_requests.booking_id rỗng · services.segments.tour_cond",
            muc=_muc(cho > 0)),
     ]
+
+    # Hệ thống NÓI RA chỗ nó không chắc, thay vì im lặng chọn một bên. Mảng của một tour suy từ HỢP
+    # của hai quy tắc (loại chuyến, và quy ước mã MICE), nên tour nào hai quy tắc bất đồng cũng rơi
+    # về bảng phòng ĐOÀN – không tour nào bị đếm hai lần, nhưng cũng có nghĩa một chuyến mà phòng Lẻ
+    # tưởng là của mình đang nằm ở bảng phòng Đoàn. Dòng này để cả hai phòng cùng thấy.
+    lech = SEG.lech_quy_tac(db)
+    ds.append(ct("lech_quy_tac_mang", "Tour hai quy tắc mảng nói khác nhau", lech["tong_lech"], "tour",
+                 "Đếm tour mà LOẠI CHUYẾN và QUY ƯỚC MÃ MICE không khớp. Hệ thống lấy hợp hai quy "
+                 "tắc nên mọi tour bất đồng đều tính về mảng Đoàn – không bỏ sót, nhưng cũng không "
+                 "chắc đúng phòng", "services.segments.lech_quy_tac",
+                 muc=_muc(lech["tong_lech"] > 0),
+                 viec="Kinh doanh sửa DỮ LIỆU GỐC cho hai quy tắc khớp lại: đặt lại loại chuyến, "
+                      "hoặc đặt lại mã tour. Hệ thống không tự đoán hộ",
+                 chi_tiet=(lech["ma_MICE_nhung_loai_chuyen_ghi_le"]
+                           + lech["loai_chuyen_doan_nhung_ma_khong_MICE"])[:20]))
+    return ds
+
+
+def _kd_le(db: Session, tu: date, den: date) -> list[dict]:
+    return _kd(db, tu, den, "kd_le")
+
+
+def _kd_doan(db: Session, tu: date, den: date) -> list[dict]:
+    return _kd(db, tu, den, "kd_doan")
 
 
 def _doi_xe(db: Session, tu: date, den: date) -> list[dict]:
@@ -654,8 +777,9 @@ def _toan_cty(db: Session, tu: date, den: date) -> list[dict]:
     return ds
 
 
-HAM = {"dieu_hanh": _dieu_hanh, "kd_le": _kd_le, "doi_xe": _doi_xe, "huong_dan": _huong_dan,
-       "marketing": _marketing, "ketoan": _ketoan, "hcns": _hcns, "visa": _visa}
+HAM = {"dieu_hanh": _dieu_hanh, "kd_le": _kd_le, "kd_doan": _kd_doan, "doi_xe": _doi_xe,
+       "huong_dan": _huong_dan, "marketing": _marketing, "ketoan": _ketoan, "hcns": _hcns,
+       "visa": _visa}
 
 
 def bao_cao(db: Session, kind: str, pham_vi: str, moc: date | None = None) -> dict:
