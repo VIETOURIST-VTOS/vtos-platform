@@ -339,6 +339,11 @@ app.include_router(ptgd_doan_router)
 app.include_router(sales_admin_router)
 app.include_router(ban_tour_le_router)
 app.include_router(danh_gia_router)
+# Công nợ Vietrip hằng ngày (phải thu + phải trả theo dự toán tour). Gắn lại 29/9/2026: lượt gộp
+# TC-94 ghi đè hai dòng này nên cả /api/v1/cong-no-vietrip trả 404. Phép thử
+# test_cong_no_vietrip.test_cua_cong_no_vietrip_duoc_gan_vao_app canh không để mất lần nữa.
+from app.api.v1.cong_no_vietrip import router as cong_no_vietrip_router  # noqa: E402
+app.include_router(cong_no_vietrip_router)
 # CỬA CÔNG KHAI — cửa DUY NHẤT của VTOS không cần đăng nhập. Để cuối danh sách và có dòng chú
 # thích này để ai đọc app/main.py cũng nhìn thấy nó, thay vì phát hiện ra khi đọc tệp thứ tám.
 app.include_router(khao_sat_cong_khai_router)
