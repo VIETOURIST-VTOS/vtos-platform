@@ -58,11 +58,37 @@ def _may(db: Session) -> User:
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 
 def sinh_ma(db: Session, care: CareTicket) -> MaKhaoSat:
-    """Một phiếu một mã. Gọi lại trên phiếu đã có mã thì trả lại mã cũ, không sinh mã thứ hai —
-    hai mã cho một phiếu nghĩa là khách chấm được hai lần."""
-    co = db.execute(select(MaKhaoSat).where(MaKhaoSat.care_id == care.id)).scalars().first()
-    if co: return co
+    """Một phiếu một mã — MỘT mã còn sống tại một thời điểm. Gọi lại trên phiếu đã có mã thì trả
+    lại mã cũ, không sinh mã thứ hai: hai mã sống cùng lúc cho một phiếu nghĩa là khách chấm được
+    hai lần.
+
+    TC-95 thêm đúng một ngoại lệ: mã đã HẾT HẠN mà chưa ai chạm vào thì được cấp lại — cùng dòng,
+    mã mới, hạn mới. Xem lời khai trong thân hàm; ngoại lệ ấy không mở thêm cửa nào, vì mã cũ lúc
+    ấy đã không mở được nữa."""
     ngay = int(R.get_param(db, "khao_sat_han_ngay") or MA_HAN_NGAY_MAC_DINH)
+    co = db.execute(select(MaKhaoSat).where(MaKhaoSat.care_id == care.id)).scalars().first()
+    if co:
+        # CẤP LẠI khi mã cũ đã chết mà CHƯA AI CHẠM VÀO — TC-95, 29/9/2026.
+        #
+        # Vì sao cần: `care_id` là khoá duy nhất, một phiếu một mã, đời đời. Đo ngày 29/9 có 401
+        # lời mời chưa bao giờ gửi được (chưa có mẫu ZNS, khách chưa quan tâm OA); mã của chúng cứ
+        # thế hết hạn. Không có đường cấp lại thì 401 khách ấy VĨNH VIỄN không được mời — hệ thống
+        # im lặng bỏ rơi họ, và không dòng nào trên màn hình nói ra điều đó.
+        #
+        # Ba điều kiện, và cả ba đều cần:
+        #   · `het_han` đã qua   – mã còn sống thì dùng tiếp, cấp mã mới là mở hai cửa cho một phiếu;
+        #   · `dung_luc` rỗng    – khách đã chấm rồi thì thôi, hỏi lại là làm phiền;
+        #   · `so_lan_mo` = 0    – khách ĐÃ MỞ mà không chấm là một câu trả lời, dù không thành lời.
+        #                          Đuổi theo người đã cố tình bỏ qua là cách mất một khách hàng.
+        con_song = co.het_han and co.het_han > datetime.now()
+        ai_do_da_cham = co.dung_luc is not None or (co.so_lan_mo or 0) > 0
+        if con_song or ai_do_da_cham:
+            return co
+        co.ma = secrets.token_urlsafe(24)
+        co.het_han = datetime.now() + timedelta(days=ngay)
+        co.tao_luc = datetime.now()
+        db.flush()
+        return co
     m = MaKhaoSat(ma=secrets.token_urlsafe(24), care_id=care.id,
                   het_han=datetime.now() + timedelta(days=ngay))
     db.add(m); db.flush()
