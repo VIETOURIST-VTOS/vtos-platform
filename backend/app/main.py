@@ -79,44 +79,84 @@ from app.services import accounting as ACC
 from app.services.seed import seed_all
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# VIỆC NỀN CHẠY Ở LUỒNG RIÊNG — TC-94, 28/9/2026
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# ĐO ĐƯỢC TRÊN MÁY CHỦ THẬT, không phải suy đoán. Render báo "HTTP health check failed (timed out
+# after 5 seconds)" đều đặn mỗi 12–13 phút suốt ngày 28/9 (08:38 · 08:50 · 09:03 · 09:34 · 09:47 ·
+# 09:59 · 10:14 · 10:26 · 10:39 · … · 22:07). Nhật ký ứng dụng ghi lời chào health check mỗi ~5
+# giây; lúc 20:14:12 → 20:14:34 KHÔNG CÓ DÒNG NÀO — một khoảng câm **22 giây**.
+#
+# Vì sao 12–13 phút chứ không phải 10: chu kỳ thật của vòng này là 60 giây CỘNG thời gian làm việc,
+# nên nhánh `i % 10` trôi dần. 10 lượt × (60 + ~15) giây ≈ 12,5 phút — khớp đúng khoảng cách đo được.
+#
+# Hậu quả người dùng KHÔNG báo vì nó tự khỏi: cứ ~12 phút, mọi người đang mở VTOS bị đứng máy vài
+# giây. Render chờ 5 giây rồi kêu; người thì bấm lại và cho qua.
+#
+# NGUYÊN NHÂN là hình dạng của mã, không phải một phép tính nào sai: `robot_loop` là hàm `async`,
+# nhưng thân nó gọi THẲNG các việc cơ sở dữ liệu — mà chúng đồng bộ. Trong lúc chúng chạy, vòng lặp
+# sự kiện của uvicorn không quay được, nên máy chủ không trả lời một ai. Việc nền không có lỗi; chỗ
+# nó đứng mới có lỗi.
+#
+# CÁCH SỬA: một lượt việc nền nằm gọn trong một hàm ĐỒNG BỘ (`_mot_luot_robot`), và vòng `async`
+# đẩy nó sang luồng khác bằng `asyncio.to_thread`. Vòng lặp sự kiện rảnh ngay.
+#
+# Ba điều CỐ Ý GIỮ NGUYÊN, để bản vá này không lặng lẽ đổi hành vi nào khác:
+#   · vẫn MỘT lượt một lúc — `await` chặn tới khi luồng xong, nên không có hai lượt chồng nhau;
+#   · vẫn đúng nhịp cũ: mỗi phút, `i % 10`, `i % 2`;
+#   · phiên cơ sở dữ liệu mở và đóng BÊN TRONG luồng ấy, không dùng chung với luồng chính.
+def _mot_luot_robot(i: int) -> None:
+    """MỘT lượt việc nền. Hàm ĐỒNG BỘ, cố ý — nó được gọi trong một luồng riêng, không trên vòng
+    lặp sự kiện. Đừng biến nó thành `async`, và đừng gọi thẳng nó từ `robot_loop`."""
+    db = SessionLocal()
+    try:
+        from app.services import inbox as IB
+        IB.robot_check(db)                      # R12 mỗi phút: AI trả lời thay khi sale trễ SLA
+        from app.services import ky_thuat as KT
+        KT.nap_nguong(db)       # ngưỡng "chậm bất thường" nằm ở tham số chính sách, không viết cứng
+        # Lịch theo GIỜ (09/9/2026). Vòng lặp này đếm phút từ lúc khởi động nên không làm đúng
+        # được việc "20:30 mỗi ngày": mỗi lần deploy là bộ đếm về 0, và báo cáo của hôm đó bị bỏ
+        # luôn mà không ai biết. app/services/lich_trong.py khóa theo MÃ KỲ suy từ đồng hồ tường,
+        # nên việc bị lỡ được làm bù và không bao giờ chạy hai lần trong một kỳ.
+        #
+        # Gọi mỗi phút, KHÔNG kèm điều kiện i % n: bản thân mã kỳ đã là điều kiện, và đặt thêm
+        # một điều kiện thứ hai ở đây là dựng hai chỗ quyết định cho cùng một việc.
+        try:
+            from app.services import lich_trong as LT
+            LT.den_luot(db)
+        except Exception as e:  # noqa
+            print("lich trong error", e)
+        if i % 10 == 0: R.run_robots(db)         # các robot khác mỗi 10 phút
+        if i % 10 == 0:
+            # Sinh phiếu chăm sóc cho tour vừa kết thúc và cảnh báo khiếu nại quá hạn phản hồi.
+            # Tách khỏi run_robots để một lỗi ở đây không làm chết cả cụm robot cũ.
+            try:
+                from app.services import cskh as CS
+                CS.robot_cskh(db)
+            except Exception as e:  # noqa
+                print("robot cskh error", e)
+        # Dựng sẵn bảng điều khiển mỗi 2 phút khi có thay đổi: người mở trang không phải là
+        # người trả giá cho lần dựng đầu (4 giây trên dữ liệu thật).
+        from app.api.v1 import routes as _r
+        if i % 2 == 0 and getattr(_r, "_DASH_DIRTY", True):
+            _r._DASH_DIRTY = False
+            _r.lam_moi_cache_nen(db)
+    finally:
+        # `finally` chứ không phải dòng cuối thân hàm: trước TC-94, một lỗi giữa chừng làm
+        # `db.close()` không bao giờ chạy, và mỗi lượt hỏng bỏ lại một kết nối treo.
+        db.close()
+
+
 async def robot_loop():
     i = 0
     while True:
         await asyncio.sleep(60); i += 1
         try:
-            db = SessionLocal()
-            from app.services import inbox as IB
-            IB.robot_check(db)                      # R12 mỗi phút: AI trả lời thay khi sale trễ SLA
-            from app.services import ky_thuat as KT
-            KT.nap_nguong(db)       # ngưỡng "chậm bất thường" nằm ở tham số chính sách, không viết cứng
-            # Lịch theo GIỜ (09/9/2026). Vòng lặp này đếm phút từ lúc khởi động nên không làm đúng
-            # được việc "20:30 mỗi ngày": mỗi lần deploy là bộ đếm về 0, và báo cáo của hôm đó bị bỏ
-            # luôn mà không ai biết. app/services/lich_trong.py khóa theo MÃ KỲ suy từ đồng hồ tường,
-            # nên việc bị lỡ được làm bù và không bao giờ chạy hai lần trong một kỳ.
-            #
-            # Gọi mỗi phút, KHÔNG kèm điều kiện i % n: bản thân mã kỳ đã là điều kiện, và đặt thêm
-            # một điều kiện thứ hai ở đây là dựng hai chỗ quyết định cho cùng một việc.
-            try:
-                from app.services import lich_trong as LT
-                LT.den_luot(db)
-            except Exception as e:  # noqa
-                print("lich trong error", e)
-            if i % 10 == 0: R.run_robots(db)         # các robot khác mỗi 10 phút
-            if i % 10 == 0:
-                # Sinh phiếu chăm sóc cho tour vừa kết thúc và cảnh báo khiếu nại quá hạn phản hồi.
-                # Tách khỏi run_robots để một lỗi ở đây không làm chết cả cụm robot cũ.
-                try:
-                    from app.services import cskh as CS
-                    CS.robot_cskh(db)
-                except Exception as e:  # noqa
-                    print("robot cskh error", e)
-            # Dựng sẵn bảng điều khiển mỗi 2 phút khi có thay đổi: người mở trang không phải là
-            # người trả giá cho lần dựng đầu (4 giây trên dữ liệu thật).
-            from app.api.v1 import routes as _r
-            if i % 2 == 0 and getattr(_r, "_DASH_DIRTY", True):
-                _r._DASH_DIRTY = False
-                _r.lam_moi_cache_nen(db)
-            db.close()
+            # ĐẨY SANG LUỒNG KHÁC. Đây là cả nội dung của bản vá TC-94; đừng đổi lại thành gọi
+            # thẳng `_mot_luot_robot(i)` — xem lời khai dài ở trên, và phép thử
+            # `test_tc94_viec_nen_khong_chan_may_chu.py` canh đúng dòng này.
+            await asyncio.to_thread(_mot_luot_robot, i)
         except Exception as e:  # noqa
             print("robot error", e)
             # Tác vụ nền hỏng thì không hiện trên màn hình nào – phải ghi lại, nếu không nó dừng lặng lẽ.
