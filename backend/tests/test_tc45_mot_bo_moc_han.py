@@ -191,17 +191,12 @@ def test_qua_han_mang_mau_trang_thai_va_van_dung_dau():
 
 
 def test_khoi_du_so_khong_duoc_noi_chua_noi_nguon():
-    """Chỗ hỏng số 4: ba trạng thái, không phải hai."""
+    """SỬA 29/9/2026: khối không in câu nguồn nào nữa (anh Tuấn: "xoá hết ghi chú"), nên cũng
+    không còn chỗ nào dán "chưa nối nguồn" lên một khối đầy số. Chỉ còn một lối "Xem chi tiết"."""
     ma = _ma(_doc(V14))
     than = ma[ma.index("function KhoiHan"): ma.index("export function KhoiPhaiThu")]
-    assert "thieu" in than and "vi_sao" in than, "Phải phân biệt 'rỗng cả sổ' với 'thiếu vài nhóm'."
-    assert than.count("ChuaNoi") == 1, (
-        "Câu 'chưa nối nguồn' chỉ được in ở ĐÚNG nhánh còn thiếu số. In nó ở nhánh mặc định là dán "
-        "'chưa có nguồn' lên một khối đầy số thật."
-    )
-    assert "Số lấy từ sổ nghĩa vụ thanh toán" in than, (
-        "Khối đủ số vẫn phải nói NGUỒN và giữ lối vào cửa nhập — người đi sửa một khoản cần cửa ấy."
-    )
+    assert "ChuaNoi" not in than and "Số lấy từ sổ nghĩa vụ thanh toán" not in than
+    assert than.count("Xem chi tiết") == 1
 
 
 def test_khong_con_bay_o_so_vuong_lap_lai_bieu_do():
@@ -219,8 +214,9 @@ def test_khong_con_bay_o_so_vuong_lap_lai_bieu_do():
 def test_moc_tinh_tu_dau_van_con_tren_man_hinh():
     """Bỏ bảy câu mô tả dưới bảy ô KHÔNG được thành bỏ luôn thông tin: '4 tuần' đếm từ ngày nào."""
     ma = _ma(_doc(V14))
-    assert "Mốc tính từ ngày báo cáo" in ma, "Thiếu dòng nói mốc đếm từ đâu."
-    assert "tháng lịch" in ma, "Mốc tháng tính theo tháng lịch, không mặc định 60 hay 90 ngày."
+    # SỬA 29/9/2026: dòng "Mốc tính từ ngày báo cáo" bỏ khỏi màn hình theo lệnh anh Tuấn; câu mô
+    # tả từng nhóm vẫn giữ trong BAY_NHOM để khung biểu đồ và phép thử đọc được.
+    assert "Mốc tính từ ngày báo cáo" not in ma
     doan = ma[ma.index("const BAY_NHOM"): ma.index("];", ma.index("const BAY_NHOM"))]
     assert doan.count("mo_ta:") == 7, "Mỗi nhóm phải còn câu mô tả khoảng của nó."
 

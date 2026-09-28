@@ -129,7 +129,9 @@ def test_moi_o_rong_deu_noi_ai_nhap_va_di_dau():
         "Mảnh ô rỗng phải nói đủ ba thứ: chưa kết nối · ai nhập · đường dẫn tới cửa nhập."
     )
     # Sáu khối, mỗi khối phải chỉ ra một bộ phận.
-    for bo_phan in ("Đội xe", "Công nghệ thông tin", "Kế toán", "Các phòng ban"):
+    # SỬA 29/9/2026: bỏ "Kế toán" — hai khối Phải thu · Phải trả thôi in "Kế toán nạp chứng từ"
+    # theo lệnh anh Tuấn "xoá hết ghi chú, chỉ để lại biểu đồ và con số, link vào xem chi tiết".
+    for bo_phan in ("Đội xe", "Công nghệ thông tin", "Các phòng ban"):
         assert bo_phan in nguon, f"Chưa khối nào chỉ ra bộ phận {bo_phan}"
 
 
@@ -145,33 +147,24 @@ def test_bang_chua_co_dong_van_dung_du_dau_cot():
 
 # --------------------------------------------- Luật nghiệp vụ của bản vẽ phải được ghi ra
 
-def test_nhom_han_khong_trung_nhau_va_noi_ro_khac_bang_luy_ke():
-    """Đây là chỗ dễ đọc sai nhất trên cả màn hình.
+def test_khoi_cong_no_chi_con_bieu_do_so_va_loi_xem_chi_tiet():
+    """LUẬT ĐẢO NGÀY 29/9/2026.
 
-    Bảy nhóm hạn KHÔNG trùng nhau nên cộng cả bảy ra đúng tổng công nợ. Bảng dòng tiền bốn mốc ở
-    trên thì LŨY KẾ – cột 14 ngày đã chứa trọn cột 7 ngày, cộng vào là sai gấp mấy lần. Hai bảng
-    trông giống nhau nằm trên cùng một màn hình, nên màn hình phải tự nói ra sự khác biệt.
+        "trong phần phải thu phải trả em xoá hết ghi chú cho anh, chỉ để lại biểu đồ và con số,
+         link vào xem chi tiết"                                        — anh Tuấn, 29/9/2026
 
-    SỬA 16/9/2026 (TC-45): câu ấy chuyển xuống CHÂN BIỂU ĐỒ (BaKhuBieuDo.tsx), vì bảy ô số vuông
-    đã nhường chỗ cho bảy thanh ngang và câu giải thích phải đứng cạnh hình nó giải thích. Viết ở
-    cả hai chỗ là hai đoạn gần y hệt nhau cách nhau một khối — nên phép thử ĐI THEO câu, không bắt
-    nó ở lại chỗ cũ.
+    Bản cũ (TC-23, TC-45) bắt hai khối in câu "bảy nhóm không trùng nhau", mốc tháng lịch và câu
+    "không xếp vào Dài hạn". Chủ tịch đọc màn hình mỗi ngày và bảo bỏ: khối chỉ còn biểu đồ, con
+    số và một lối vào chi tiết. Luật chia nhóm không mất — nó nằm ở services/han_cong_no.py.
     """
     nguon = _doc(KHOI)
     khu = (GOC / "web" / "components" / "BaKhuBieuDo.tsx").read_text(encoding="utf-8")
-    assert "trùng nhau nên cộng cả bảy" in khu, (
-        "Chân biểu đồ phải nói rõ bảy nhóm không lũy kế, và khác bảng dòng tiền bốn mốc ở trên."
-    )
-    assert "tháng lịch" in nguon, (
-        "Mốc 2 tháng / 3 tháng tính theo THÁNG LỊCH từ ngày báo cáo, không mặc định 60/90 ngày "
-        "(bản vẽ ghi rõ) – phải ghi ra màn hình."
-    )
-    # SỬA 16/9/2026 (TC-45): câu này nay nằm TRONG ô "Chưa có hạn thanh toán", tức chỉ hiện khi
-    # thật sự có khoản như thế. Luật y nguyên — không tự xếp vào Dài hạn — nhưng nó thôi nằm trong
-    # một đoạn chữ chạy suốt kể cả khi không có khoản nào để nói.
-    assert "Chưa có hạn thanh toán" in nguon and "xếp vào Dài hạn" in nguon, (
-        "Khoản chưa có hạn thanh toán theo dõi riêng, không tự xếp vào Dài hạn."
-    )
+    assert "trùng nhau nên cộng cả bảy" not in khu, "Câu chân biểu đồ công nợ phải bỏ."
+    i = nguon.index("function KhoiHan")
+    than = nguon[i:nguon.index("07 · RỦI RO", i)]
+    for cau in ("Mốc tính từ ngày báo cáo", "xếp vào Dài hạn", "Số lấy từ sổ nghĩa vụ"):
+        assert cau not in than, f"Khối công nợ còn ghi chú: {cau}"
+    assert "Xem chi tiết" in than and 'chi_tiet="/cong-no"' in than and 'chi_tiet="/cong-no?tab=tra"' in than
 
 
 def test_qua_han_la_mot_nhom_va_chi_nam_dung_mot_cho():

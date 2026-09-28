@@ -74,12 +74,6 @@ const KHUNG_HAN = [
   { nhan: "4 tuần" }, { nhan: "2 tháng" }, { nhan: "3 tháng" }, { nhan: "Dài hạn" },
 ];
 
-/* Câu chân dùng chung cho cả hai khối công nợ: một câu, hai chỗ gọi. Viết riêng hai bản là để
-   ngày luật đổi thì một bản được sửa còn bản kia nói điều cũ. */
-const CHAN_HAN = "Bảy nhóm KHÔNG trùng nhau nên cộng cả bảy ra đúng tổng công nợ — khác bảng dòng "
-  + "tiền bốn mốc, ở đó cột sau đã chứa trọn cột trước. Nhóm Quá hạn mang màu cảnh báo vì nó là "
-  + "TRẠNG THÁI: tiền đã trễ, không phải nấc gần nhất của thang hạn còn lại.";
-
 /* ─────────────────────────── DỰNG BIỂU ĐỒ CHO TỪNG KHỐI ─────────────────────────── */
 
 /** Tập biểu đồ của màn hình 01. Mỗi trường là một phần tử JSX, hoặc `null` khi chưa đủ số để vẽ.
@@ -122,10 +116,11 @@ export function bieuDoCua(sec: any): BoBieuDo {
    *  kiểm `null`. Đó là chủ ý — luôn luôn có hình, chỉ là hình rỗng hay hình đầy.
    */
   return {
-    phai_thu: <BieuDoThanh ten="Bảy nhóm hạn" phu="gần → xa" ds={thu} dinh_dang="tien" xep={false}
-      chan={CHAN_HAN} ai="Kế toán" cua="/ra-soat-cot-tien" cua_ten="Cửa nhập công nợ phải thu" />,
-    phai_tra: <BieuDoThanh ten="Bảy nhóm hạn" phu="gần → xa" ds={tra} dinh_dang="tien" xep={false}
-      chan={CHAN_HAN} ai="Kế toán" cua="/nha-cung-cap" cua_ten="Cửa nhập công nợ phải trả" />,
+    // 29/9/2026: bỏ câu chân và dòng phụ — khối Phải thu · Phải trả chỉ còn biểu đồ và con số.
+    phai_thu: <BieuDoThanh ten="Theo hạn" ds={thu} dinh_dang="tien" xep={false}
+      cua="/cong-no" cua_ten="Xem chi tiết" />,
+    phai_tra: <BieuDoThanh ten="Theo hạn" ds={tra} dinh_dang="tien" xep={false}
+      cua="/cong-no?tab=tra" cua_ten="Xem chi tiết" />,
     kd_le: <BieuDoThanh ten="Xếp hạng theo nhân viên" ds={le} dinh_dang="tien"
       ai="Kinh doanh" cua="/bookings" cua_ten="Cửa nhập booking" />,
     kd_doan: <BieuDoThanh ten="Xếp hạng theo nhân viên" ds={doan} dinh_dang="tien"

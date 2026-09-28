@@ -133,11 +133,11 @@ function ChuaNoi({ ai, cua, cua_ten }: { ai: string; cua?: string; cua_ten?: str
   );
 }
 
-function DauKhoi({ ten, phu, id }: { ten: string; phu: string; id?: string }) {
+function DauKhoi({ ten, phu, id }: { ten: string; phu?: string; id?: string }) {
   return (
     <div className="mh01-dau" id={id}>
       <h2>{ten}</h2>
-      <span className="tag">{phu}</span>
+      {phu && <span className="tag">{phu}</span>}
     </div>
   );
 }
@@ -384,70 +384,25 @@ const BAY_NHOM: NhomHan[] = [
    dòng ở chân khối. Bỏ hẳn mấy câu ấy là để người mới đọc tự đoán "4 tuần" đếm từ ngày nào.
    ═══════════════════════════════════════════════════════════════════════════════════════════════ */
 
-function KhoiHan({ ten, khung, ds, ai, cua, cua_ten, id, chua_co_han, vi_sao, bieu_do }: {
-  ten: string; khung: NhomHan[]; ds?: Record<string, number | null> | null;
-  ai: string; cua: string; cua_ten: string; id: string;
-  chua_co_han?: number | null; vi_sao?: string | null; bieu_do?: React.ReactNode;
+/* 29/9/2026 · anh Tuấn: "trong phần phải thu phải trả em xoá hết ghi chú cho anh, chỉ để lại biểu
+   đồ và con số, link vào xem chi tiết". Khối chỉ còn: tên · bảy thanh ngang có số · khoản chưa có
+   hạn (nếu có) · một lối "Xem chi tiết →". Mọi lời giải thích (mốc tính, nguồn số, cửa nhập) bỏ khỏi
+   màn hình; luật chia nhóm vẫn nằm ở backend/app/services/han_cong_no.py. */
+function KhoiHan({ ten, id, chua_co_han, bieu_do, chi_tiet }: {
+  ten: string; khung?: NhomHan[]; ds?: Record<string, number | null> | null;
+  id: string; chua_co_han?: number | null; vi_sao?: string | null; bieu_do?: React.ReactNode;
+  chi_tiet: string;
 }) {
-  const s = ds || {};
-  // Còn nhóm nào chưa có số không — quyết định khối nói câu nào ở chân. KHÔNG phải điều kiện vẽ:
-  // điều kiện ấy nằm ở `duVeThanh` của bộ biểu đồ dùng chung và khối không viết lại.
-  const thieu = khung.some((n) => s[n.nhan] === null || s[n.nhan] === undefined);
   return (
     <section className="panel" id={id}>
-      <DauKhoi ten={ten} phu="7 nhóm không trùng nhau" />
-      {/* TC-40 · BIỂU ĐỒ NẰM NGAY ĐÂY, trong khối của chính nó.
-          Đường đi ba vòng: TC-37 vẽ ở đây → TC-38 dời sang một khu biểu đồ riêng → TC-40 đưa về.
-          Bài học đáng ghi: gom biểu đồ ra khu riêng nghe rất hợp lý ("khu biểu đồ" là thứ bảng
-          điều hành nào cũng có), nhưng trên bản chạy thật nó tách CON SỐ khỏi HÌNH của chính con
-          số ấy, và người đọc phải cuộn qua lại để ghép hai thứ vốn là một.
-
-          TC-45 · BIỂU ĐỒ NAY LÀ CHỖ DUY NHẤT BÀY SỐ. Bản cũ có bảy ô vuông ở trên rồi một thanh
-          chia khúc ở dưới — hai bức tranh của cùng một hàng số. Nay bảy thanh ngang mang cả con số
-          lẫn tỉ lệ, nên khối không còn ô vuông nào.
-
-          `bieu_do` là `null` khi chưa đủ số (bộ biểu đồ dùng chung quyết bằng `duVeThanh`, khối
-          KHÔNG viết lại điều kiện ấy). Lúc ấy dòng "Chưa có nguồn" phía dưới là chỗ duy nhất nói
-          điều đó, kèm bộ phận và cửa nhập. */}
+      <DauKhoi ten={ten} />
       {bieu_do}
-      {/* KHOẢN CHƯA CÓ HẠN — theo dõi riêng, KHÔNG gộp vào Dài hạn. Dòng chú thích bên dưới hứa
-          điều này từ vòng TC-23 nhưng chưa có chỗ hiện; vòng TC-30 thêm chỗ. "Chưa ai điền ngày"
-          và "đến hạn sau ba tháng" là hai việc khác hẳn, và cái thứ nhất là việc phải đi đòi. */}
       {chua_co_han !== null && chua_co_han !== undefined && chua_co_han > 0 && (
         <div className="v14-quahan">
-          <b>Chưa có hạn thanh toán:</b>{" "}
-          {/* Cùng cách đọc số với bảy thanh ngay trên ("2 tỷ", "600 tr"). In đủ chữ số ở đây
-              trong khi biểu đồ in gọn là bắt mắt đổi thước giữa hai con số cạnh nhau. */}
+          <b>Chưa có hạn:</b>{" "}
           <span className="the-so v14-qh-so">{gonSo(chua_co_han, "tien")}</span>
-          <div className="muted">Chưa ai điền ngày cam kết — <b>không</b> xếp vào Dài hạn.</div>
         </div>)}
-      {/* AI NẠP VÀ NẠP Ở ĐÂU — ba trạng thái, KHÔNG phải hai.
-          Bản cũ chỉ có hai nhánh (có `vi_sao` thì nói vì sao rỗng, còn lại thì "Chưa nối nguồn"),
-          nên một khối ĐỦ SỐ vẫn in câu "Chưa nối nguồn — Kế toán nạp" ngay dưới bảy con số thật.
-          Tìm ra bằng cách dựng ảnh ở vòng TC-45; đọc mã thì nhánh `else` trông hoàn toàn hợp lý.
-          Nay: rỗng cả sổ → nói vì sao · thiếu vài nhóm → gọi đúng bộ phận · đủ số → chỉ nói nguồn
-          và để lối vào cửa nhập, vì cửa ấy vẫn cần cho người đi sửa một khoản. */}
-      {vi_sao
-        ? <p className="v14-ghi"><Tag>Chưa có nguồn</Tag> {vi_sao}</p>
-        : thieu
-          ? <p className="v14-ghi"><ChuaNoi ai={ai} cua={cua} cua_ten={cua_ten} /></p>
-          : <p className="muted v14-ghi">
-              Số lấy từ sổ nghĩa vụ thanh toán (VPM-11), {ai} nạp chứng từ.{" "}
-              <Link className="the-cua" href={cua}>{cua_ten} →</Link>
-            </p>}
-      {/* MỐC TÍNH TỪ ĐÂU — một dòng cho cả bảy nhóm, thay cho bảy câu rải dưới bảy ô vuông. Bỏ hẳn
-          là để người mới đọc tự đoán "4 tuần" đếm từ ngày nào; giữ bảy câu là bảy lần lặp.
-
-          Câu "bảy nhóm không lũy kế, cộng cả bảy ra đúng tổng" KHÔNG viết ở đây: chân biểu đồ ngay
-          trên đã in đúng câu ấy. Bản đầu của vòng TC-45 in cả hai và trên ảnh dựng ra hai đoạn gần
-          y hệt nhau cách nhau một khối — đúng kiểu lặp anh Tuấn bảo bỏ, chỉ ở quy mô nhỏ. */}
-      <p className="muted v14-ghi v14-moc">
-        <b>Mốc tính từ ngày báo cáo:</b>{" "}
-        {khung.map((n, i2) => (
-          <span key={n.nhan}>{i2 > 0 && " · "}<b>{n.nhan}</b> {n.mo_ta.toLowerCase()}</span>
-        ))}. Mốc tháng tính theo <b>tháng lịch</b>, không mặc định 60 hay 90 ngày. Hạn rơi đúng ngày
-        báo cáo thuộc nhóm sắp đến hạn đầu tiên, không phải nhóm quá hạn.
-      </p>
+      <p className="v14-ghi"><Link className="the-cua" href={chi_tiet}>Xem chi tiết →</Link></p>
     </section>
   );
 }
@@ -457,21 +412,15 @@ export function KhoiPhaiThu({ ds, chua_co_han, vi_sao, bieu_do }: {
   bieu_do?: React.ReactNode;
 }) {
   return <KhoiHan id="phai-thu" ten="Phải thu theo hạn thanh toán" khung={BAY_NHOM} ds={ds}
-    chua_co_han={chua_co_han} vi_sao={vi_sao} bieu_do={bieu_do}
-    ai="Kế toán" cua="/ra-soat-cot-tien" cua_ten="Cửa nhập công nợ phải thu" />;
+    chua_co_han={chua_co_han} vi_sao={vi_sao} bieu_do={bieu_do} chi_tiet="/cong-no" />;
 }
 
 export function KhoiPhaiTra({ ds, chua_co_han, vi_sao, bieu_do }: {
   ds?: Record<string, number | null> | null;
   chua_co_han?: number | null; vi_sao?: string | null; bieu_do?: React.ReactNode;
 }) {
-  /* TC-45 · KHÔNG CÒN Ô "PHẢI TRẢ QUÁ HẠN" RIÊNG. Trước đây quá hạn nằm NGOÀI năm nhóm và hiện ở
-     một ô riêng dưới khối; nghĩa là tổng năm nhóm không gồm khoản đã trễ, và ai cộng thử sẽ ra một
-     con số khác con số trên màn hình. Nay quá hạn là nhóm ĐẦU TIÊN trong bảy — vẫn mang màu cảnh
-     báo để đọc ra ngay đó là TRẠNG THÁI, nhưng chỉ nằm đúng một chỗ. */
   return <KhoiHan id="phai-tra" ten="Phải trả theo hạn thanh toán" khung={BAY_NHOM} ds={ds}
-    chua_co_han={chua_co_han} vi_sao={vi_sao} bieu_do={bieu_do}
-    ai="Kế toán" cua="/nha-cung-cap" cua_ten="Cửa nhập công nợ phải trả" />;
+    chua_co_han={chua_co_han} vi_sao={vi_sao} bieu_do={bieu_do} chi_tiet="/cong-no?tab=tra" />;
 }
 
 /* ───────────────────────── 07 · RỦI RO TRỌNG YẾU ───────────────────────── */
