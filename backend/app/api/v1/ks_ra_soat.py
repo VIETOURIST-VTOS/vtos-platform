@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.api.deps import require_roles
+from app.api.deps import current_user, require_roles
 from app.models.core import User
 from app.services import ks_cot_tien as CT
 from app.services import ky_thuat as KT
@@ -93,6 +93,45 @@ def soat_chi_ngoai_te(gioi_han: int = 300, u: User = Depends(require_roles(*XEM)
     """
     from app.services import ngoai_te_chi as NTC
     return NTC.bang(db, gioi_han)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# CỬA NẮN DÒNG NGOẠI TỆ THIẾU TỶ GIÁ — Chủ tịch quyết 27/9/2026, SAU KHI ĐÃ ĐO
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# XEM TRƯỚC mở cho nhóm XEM (chỉ đọc). NẮN thì KHÔNG: nó sửa thẳng con số tiền, nên đi qua đúng
+# luật "một chủ hồ sơ" — `services/nan_ngoai_te` tự kiểm người bấm có phải chủ hồ sơ của chuyến
+# ấy không. Không khai một danh sách vai trò ở đây, vì khai ở hai chỗ thì sớm muộn hai chỗ lệch
+# nhau, và chỗ lỏng hơn là chỗ có hiệu lực.
+@router.get("/nan-ngoai-te/xem-truoc")
+@rst.get("/nan-ngoai-te/xem-truoc")
+def nan_xem_truoc(gioi_han: int = 300, u: User = Depends(require_roles(*XEM)),
+                  db: Session = Depends(get_db)):
+    """Dòng nào nắn được, dòng nào còn vướng và vướng vì cái gì. CHỈ ĐỌC."""
+    from app.services import nan_ngoai_te as NAN
+    return NAN.xem_truoc(db, gioi_han)
+
+
+class NanVao(BaseModel):
+    line_id: int
+    ty_gia_id: int        # MỘT DÒNG CÓ THẬT trong sổ tỷ giá — không phải một con số gõ tay
+    ly_do: str = ""
+
+
+@router.post("/nan-ngoai-te")
+@rst.post("/nan-ngoai-te")
+def nan_mot_dong(data: NanVao, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Nắn MỘT dòng, một lần bấm, có lý do. KHÔNG có cửa nắn cả lô.
+
+    Vì sao không có nút "nắn hết": đo được 27/9/2026 là 61 dòng trên 10 chuyến, và mỗi chuyến phải
+    được Kế toán trả lại trước — tức mỗi lần nắn đã có một người ký ở đầu kia. Một nút nắn cả lô
+    biến chuỗi ấy thành một cú bấm không ai đọc, đúng lúc nó chạm vào giá vốn đã đóng số.
+    """
+    from app.models.vietrip import TourCostLine
+    from app.services import nan_ngoai_te as NAN
+    l = db.get(TourCostLine, data.line_id)
+    if not l:
+        raise HTTPException(404, "Không có dòng ấy")
+    return NAN.nan_mot_dong(db, u, l, data.ty_gia_id, data.ly_do)
 
 
 @router.get("/su-kien-ky-thuat")
