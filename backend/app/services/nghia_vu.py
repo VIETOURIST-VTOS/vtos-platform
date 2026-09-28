@@ -74,7 +74,7 @@ SO_THANH_NGHIA_VU = ("da_xac_nhan", "da_su_dung")
 # Sáu bảng mà phép đồng bộ dựng lại được. Dòng nào trong sổ mang một trong sáu tên này mà lần chạy
 # hiện tại không dựng lại được thì bị ĐÓNG – xem _thu_hoi_dong_khong_con_can_cu.
 NGUON_DONG_BO = ("lich_thanh_toan_hd", "bookings", "payment_requests", "service_orders",
-                 "fin_schedules", "cash_plan_items")
+                 "fin_schedules", "cash_plan_items", "cong_no_vietrip")
 
 # Trạng thái lịch vay còn là nhu cầu tiền.
 FS_CON_HAN = ("ke_hoach", "qua_han")
@@ -305,6 +305,9 @@ def _nap_booking(db: Session, dem: list[int], hom_nay: date, bo_qua: set[int], c
     quá khứ RIÊNG mà vẫn cộng vào nhu cầu tiền ("Không tự ẩn" — ghi ở chính hàm ấy). Phép kéo cũ
     thực ra đang VÔ HIỆU HOÁ cái rổ đó.
     """
+    anh = _anh_cong_no_vietrip_moi_nhat(db)
+    if anh is not None:
+        return _nap_tu_anh_vietrip(db, anh, dem, hom_nay, bo_qua, cham)
     n = 0
     tours = {t.id: t for t in db.execute(select(Tour)).scalars()}
     con_thu = (func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0)
@@ -330,6 +333,72 @@ def _nap_booking(db: Session, dem: list[int], hom_nay: date, bo_qua: set[int], c
             "trang_thai": _trang_thai(
                 float((b.amount or 0) - (b.discount or 0) - (b.paid or 0)), uoc, hom_nay),
             "ghi_chu": "Ngày là ƯỚC theo D-7 trước khởi hành, chưa có lịch thu ký với khách",
+        }, dem, cham)
+        n += 1
+    return n
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 28/9/2026 · PHẢI THU LẤY ĐÚNG THEO VIETRIP
+# ══════════════════════════════════════════════════════════════════════════════
+# Anh Tuấn: "lấy đúng theo Vietrip · sửa lại VTOS cho khớp với Vietrip".
+#
+# Đo ngày 28/9: khối Phải thu dựng từ bảng `bookings` ra ~18 tỷ, còn báo cáo công nợ Vietrip cùng
+# ngày là 7,6 tỷ. Lệch vì `bookings.paid` chỉ cộng những phiếu thu đã đồng bộ về (phiếu trước
+# 01/6/2026 và phiếu chưa ánh xạ được thì thiếu), nên booking khách đã trả đủ vẫn hiện còn nợ;
+# thêm vào đó báo cáo đã loại các booking trừ lương sale / khuyến mãi / booking test.
+#
+# Nên khi đã có ẢNH CÔNG NỢ VIETRIP (POST /api/v1/cong-no-vietrip/nap, nạp mỗi sáng 8h), phía THU
+# KHÁCH đọc thẳng ảnh mới nhất: Tổng = totalOrderValue, Đã thu = totalPaidAmount của chính Vietrip,
+# đã qua danh sách loại trừ; bảo lưu không tính nợ. Chưa có ảnh nào thì giữ đường cũ từ `bookings`.
+#
+# Khoá dòng: booking có trong VTOS thì dùng ("bookings", booking.id) — mã gốc giữ nguyên với sổ
+# đã dựng; booking chưa về VTOS thì ("cong_no_vietrip", recID Vietrip).
+# Ngày hạn vẫn là D-7 trước khởi hành như mọi khoản thu khách khác.
+def _anh_cong_no_vietrip_moi_nhat(db: Session):
+    from sqlalchemy import inspect
+    from app.models.cong_no_vietrip import CongNoVietripAnh
+    # Bảng chưa có (kho chưa chạy migration) thì đi đường cũ. Hỏi trước chứ không bắt lỗi rồi
+    # rollback: rollback giữa phép dựng sổ là xoá mất các dòng vừa ghi của những bộ nạp trước.
+    if not inspect(db.get_bind()).has_table(CongNoVietripAnh.__tablename__):
+        return None
+    return db.execute(select(CongNoVietripAnh).order_by(CongNoVietripAnh.ngay.desc())
+                      .limit(1)).scalars().first()
+
+
+def _nap_tu_anh_vietrip(db: Session, anh, dem: list[int], hom_nay: date, bo_qua: set[int],
+                        cham: set) -> int:
+    from app.models.cong_no_vietrip import CongNoVietripDong
+    theo_vt = {b.vietrip_id: b for b in db.execute(
+        select(Booking).where(Booking.vietrip_id.is_not(None))).scalars()}
+    n = 0
+    for d in db.execute(select(CongNoVietripDong).where(
+            CongNoVietripDong.anh_id == anh.id, CongNoVietripDong.bao_luu == False)).scalars():  # noqa: E712
+        tong, da = float(d.tong or 0), float(d.da_thu or 0)
+        if tong - da <= 0:
+            continue
+        try:
+            vt_id = int(str(d.booking_id).strip())
+        except ValueError:
+            continue
+        b = theo_vt.get(vt_id)
+        if b is not None and b.id in bo_qua:
+            continue
+        uoc = d.khoi_hanh - timedelta(days=D_TRUOC_KHOI_HANH) if d.khoi_hanh else None
+        _dat(db, {
+            "nhom": "thu_khach",
+            "nguon_bang": "bookings" if b is not None else "cong_no_vietrip",
+            "nguon_id": b.id if b is not None else vt_id,
+            "nguon_ma": b.code if b is not None else f"VT{vt_id}",
+            "company_id": getattr(b, "company_id", None) if b is not None else None,
+            "tour_id": b.tour_id if b is not None else None,
+            "doi_tuong": d.khach or (b.customer_name if b is not None else ""),
+            "noi_dung": d.ten_tour or d.ma_tour or "",
+            "tong_nghia_vu": tong, "da_tra": da,
+            "ngay_cam_ket": None, "ngay_du_kien_tra": uoc,
+            "trang_thai": _trang_thai(tong - da, uoc, hom_nay),
+            "ghi_chu": (f"Theo công nợ Vietrip ngày {anh.ngay:%d/%m/%Y}; ngày là ƯỚC D-7 trước khởi hành"
+                        + (f" · {d.ghi_chu}" if d.ghi_chu else "")),
         }, dem, cham)
         n += 1
     return n

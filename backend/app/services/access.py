@@ -282,7 +282,7 @@ MAN_HINH_API = {
     "/collections": ("/api/v1/bank-transactions", "/api/v1/collections", "/api/v1/receipts",
                      "/api/v1/sepay", "/api/v1/bookings"),
     "/companies": ("/api/v1/companies",),
-    "/cong-no": ("/api/v1/cong-no",),
+    "/cong-no": ("/api/v1/cong-no", "/api/v1/cong-no-vietrip"),
     # 19/9/2026 – màn hình này nay còn là chỗ người tự nối Zalo của mình để nhận cảnh báo khủng
     # hoảng. Cùng một màn hình vì cùng một việc: những thứ thuộc về TÀI KHOẢN của chính mình, và
     # không vai trò nào làm hộ được cho ai.
