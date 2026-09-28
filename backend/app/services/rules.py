@@ -217,6 +217,21 @@ DEFAULT_PARAMS = [
     ("visa_gui_doi_tac", "50000", "Đơn giá visa – gửi đối tác", "đồng/hồ sơ", "ĐH Điều 7"),
     ("moc_chi_tieu_hcm", "200000000", "Mốc chỉ tiêu doanh thu NV kinh doanh lẻ HCM", "đồng/tháng", "KD Lẻ"),
     ("moc_chi_tieu_cantho", "120000000", "Mốc chỉ tiêu doanh thu NV Cần Thơ và văn phòng tỉnh (Bình Dương khách lẻ dùng mốc HCM)", "đồng/tháng", "KD Lẻ Phụ lục B.2"),
+    # ── ĐÍCH PHẤN ĐẤU ≠ MỐC TÍNH TIỀN. Chủ tịch chốt 28/9/2026 ────────────────────────────────
+    # Ba khóa dưới đây CHỈ để vẽ vạch đích trên biểu đồ của nhân viên. Chúng KHÔNG tham gia một
+    # phép tính tiền nào: hoa hồng NV lẻ vẫn chạy trên `moc_chi_tieu_hcm` / `moc_chi_tieu_cantho`
+    # qua bảng thang f, hoa hồng NV đoàn vẫn chạy trên `hh_doan_moc`.
+    #
+    # PHẢI NÓI RA, vì hai bộ số này chênh nhau 2,5 lần và nằm cạnh nhau: ai đọc lướt rất dễ tưởng
+    # đích phấn đấu là mốc mới rồi "dọn cho gọn" bằng cách xóa một bộ. Nâng mốc tính tiền lên 2,5
+    # lần thì hoa hồng của hầu hết nhân viên về 0 — một thay đổi về thu nhập, phải có quyết định
+    # riêng và ngày hiệu lực riêng, không phải hệ quả phụ của việc dựng một biểu đồ.
+    #
+    # Tỷ lệ 5:3 giữa HCM và tỉnh giữ đúng như bảng chính sách đang dùng (200:120).
+    ("dich_dt_nv_le_hcm", "500000000", "ĐÍCH PHẤN ĐẤU doanh thu NV kinh doanh lẻ HCM — vạch đích trên biểu đồ, KHÔNG dùng tính hoa hồng", "đồng/tháng", "Chủ tịch chốt 28/9/2026"),
+    ("dich_dt_nv_le_tinh", "300000000", "ĐÍCH PHẤN ĐẤU doanh thu NV kinh doanh lẻ Cần Thơ và văn phòng tỉnh — giữ tỷ lệ 5:3 so với HCM như bảng chính sách", "đồng/tháng", "Chủ tịch chốt 28/9/2026"),
+    ("dich_ln_nv_doan", "50000000", "ĐÍCH PHẤN ĐẤU lợi nhuận NV kinh doanh đoàn — vạch đích trên biểu đồ, KHÔNG dùng tính hoa hồng", "đồng/tháng", "Chủ tịch chốt 28/9/2026"),
+
     ("thang_f_bang", "65:0,70:0,90:0,100:0,110:0.5,130:0.8,160:1.1,200:1.4,250:1.7,300:2,350:2.3,400:2.6,450:2.9,500:3.2,550:3.5,600:3.8,700:4.1,800:4.4,900:4.7,1000:5",
      "Bảng B.1 thang f: 'ngưỡng % mốc:hệ số %' từ f1 đến f19 và trần 1000%; f0 dưới ngưỡng đầu; ngưỡng tiền = % × mốc văn phòng", "bảng", "KD Lẻ Phụ lục A, B.1"),
     ("ca_truc_phut", "5", "Thời gian trả lời khách trong ca trực page", "phút", "KD Lẻ Điều 2a"),
@@ -576,6 +591,25 @@ def verify_chain(db: Session) -> tuple[bool, int, str]:
 
 
 # ====================== DỰ TOÁN 3 CON SỐ & CỔNG BIÊN ======================
+def ln_doan_cua_booking(loi_nhuan_tour: float, doanh_thu_tour: float, tien_booking: float) -> float:
+    """Phần lợi nhuận một tour đoàn thuộc về người bán MỘT booking: chia theo tỷ trọng tiền booking.
+
+    MỘT CHỖ CHIA DUY NHẤT. Trước 28/9/2026 công thức này nằm CHÉP BA LẦN: ở bảng lương (`hr.payroll`),
+    ở bảng thưởng Điều hành ngay trong tệp này, và lần thứ ba khi dựng biểu đồ phấn đấu. Ba bản sao
+    của một luật chia tiền là ba nơi có thể lệch, và chỗ lệch ấy im lặng — cả ba đều trông hợp lý,
+    chỉ khác con số.
+
+    Đặt ở `rules.py` chứ không ở `hr.py` vì đây là tầng thấp nhất: `hr` và `doanh_thu_kd` đều import
+    được nó mà không tạo vòng.
+
+    Doanh thu tour bằng 0 thì trả 0, không chia cho 0: chưa thu đồng nào thì chưa có lợi nhuận để
+    chia — đó là 0 thật, không phải thiếu số liệu.
+    """
+    if not doanh_thu_tour:
+        return 0.0
+    return loi_nhuan_tour * (tien_booking / doanh_thu_tour)
+
+
 def is_doan(tour: Tour) -> bool:
     """Tour có thuộc mảng Đoàn không – dùng cho định tuyến duyệt, hạn quyết toán, và cách tính hoa hồng.
 
@@ -850,7 +884,7 @@ def monthly_payroll_draft(db: Session, year: int, month: int) -> list[dict]:
         o["fund_tp"] += s["fund_tp"]
         if is_doan(t):
             for b in t.bookings:
-                doan_profit_by_sales[b.sales_id] = doan_profit_by_sales.get(b.sales_id, 0) + s["profit"] * ((b.amount or 0) / (s["revenue"] or 0) if (s["revenue"] or 0) else 0)
+                doan_profit_by_sales[b.sales_id] = doan_profit_by_sales.get(b.sales_id, 0) + ln_doan_cua_booking(s["profit"], s["revenue"] or 0, b.amount or 0)
     for uid, o in by_op.items():
         rows.append({"nguoi": o["name"], "khoan": "Thưởng chuyến Điều hành (70%)", "so_chuyen": o["chuyen"], "tien": round(o["fund_nv"])})
     tp_total = sum(o["fund_tp"] for o in by_op.values())

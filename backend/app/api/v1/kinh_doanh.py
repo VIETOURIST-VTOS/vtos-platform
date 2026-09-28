@@ -174,6 +174,22 @@ def cua_toi(ky: str, luong: str = "",
         raise HTTPException(422, str(ex))
 
 
+@router.get("/nhip-cua-toi")
+def nhip_cua_toi(ky: str, mang: str = "le",
+                 u: User = Depends(require_roles(*XEM, mo_ta="biểu đồ phấn đấu của chính tôi")),
+                 db: Session = Depends(get_db)):
+    """Chuỗi ngày cho biểu đồ phấn đấu của CHÍNH người đăng nhập: lũy kế, nhịp cần đi, vạch đích.
+
+    KHÔNG nhận `user_id` — cố ý, đúng như `/cua-toi` ngay trên. Quản lý muốn xem nhịp của một nhân
+    viên thì đi qua `/nguoi/{user_id}`, nơi đã có hàng rào phạm vi xem; mở thêm một tham số ở đây
+    là dựng cửa thứ hai vào cùng dữ liệu, và cửa thứ hai bao giờ cũng là cửa bị quên khi siết.
+    """
+    try:
+        return DT.nhip_cua_nguoi(db, u.id, ky, mang)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+
+
 @router.get("/nguoi/{user_id}")
 def mot_nguoi(user_id: int, ky: str, mang: str = "le", luong: str = "",
               u: User = Depends(require_roles(*XEM, mo_ta="doanh thu của một nhân viên")),

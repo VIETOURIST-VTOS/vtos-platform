@@ -321,3 +321,231 @@ def cua_nguoi(db, user_id: int, ky: str, luong: str = "") -> dict:
             "so_booking": len(cua_toi),
             "so_khach": sum(d["khach_so"] or 0 for d in cua_toi),
             "rows": sorted(cua_toi, key=lambda x: x["ket_thuc"])}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# BIỂU ĐỒ PHẤN ĐẤU CỦA MỘT NHÂN VIÊN — TC-91, Chủ tịch chốt 28/9/2026
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# "để cho nv thấy được động lực phấn đấu hằng ngày theo biểu đồ doanh thu của mình".
+#
+# ĐƯỜNG NHỊP LÀ THỨ LÀM CHO NÓ HẰNG NGÀY. Một vạch đích không đổi hành vi hằng ngày: "đã bán 180
+# triệu / đích 500 triệu" đọc ngày 5 và ngày 25 giống hệt nhau. Nhịp ngày thứ n = đích × n ÷ số
+# ngày trong kỳ, nên mỗi sáng người mở lên biết mình đang TRÊN hay DƯỚI — đó mới là tín hiệu để
+# hành động hôm nay.
+#
+# ĐÍCH KHÁC MỐC TÍNH TIỀN. Đọc `dich_dt_nv_le_*` / `dich_ln_nv_doan`, KHÔNG đọc `moc_chi_tieu_*`.
+# Hai bộ chênh nhau 2,5 lần; xem lời khai dài ở `rules.py` cạnh chính hai khóa ấy.
+#
+# LẺ ĐO DOANH THU, ĐOÀN ĐO LỢI NHUẬN. Tour đoàn giá trị lớn mà biên mỏng: đo doanh thu là dạy
+# người bán hạ giá để chạy số.
+#
+# CƠ SỞ NGÀY LÀ NGÀY TOUR KẾT THÚC, đúng bằng cơ sở tính chỉ tiêu (`ky_cua`). Vẽ theo ngày bán thì
+# biểu đồ đẹp hơn nhưng cuối tháng nó không khớp con số chấm chỉ tiêu, và hai số đá nhau trên cùng
+# một màn hình thì người xem tin số nào cũng sai.
+def ln_doan_cua_ky(db, user_id: int, ky: str) -> float:
+    """Lợi nhuận đoàn QUYẾT TOÁN thuộc về một người trong một kỳ.
+
+    Dùng đúng `hr.month_tours` + `rules.settlement_summary` + `rules.ln_doan_cua_booking` mà bảng
+    lương đang dùng — cùng nguồn, cùng luật chia. Nếu viết một đường lấy số riêng cho biểu đồ thì
+    nhân viên sẽ thấy một con số ở màn hình và một con số khác trên phiếu lương, và không ai nói
+    được bên nào đúng.
+    """
+    from app.services import rules as R
+    from app.services.hr import month_tours
+
+    nam, thg = _bien_ky(ky)[0].year, _bien_ky(ky)[0].month
+    tot = 0.0
+    for t in month_tours(db, nam, thg):
+        if not R.is_doan(t):
+            continue
+        sm = R.settlement_summary(db, t)
+        tot += sum(R.ln_doan_cua_booking(sm["profit"], sm["revenue"] or 0, b.amount or 0)
+                   for b in t.bookings if b.sales_id == user_id)
+    return tot
+
+
+def _ba_ky_gan_nhat(ky: str) -> list[str]:
+    """Kỳ này và hai kỳ liền trước, thứ tự từ xa tới gần — đúng cửa sổ Điều 5 Phòng Đoàn."""
+    dau = _bien_ky(ky)[0]
+    ra = []
+    for k in range(2, -1, -1):
+        mm, yy = dau.month - k, dau.year
+        while mm <= 0:
+            mm += 12
+            yy -= 1
+        ra.append(f"{yy:04d}-{mm:02d}")
+    return ra
+
+
+def thang_nac(db, mang: str, dich: float | None) -> list[dict]:
+    """Các NẤC để nhân viên leo, đọc thẳng từ bảng chính sách — không chép bảng vào đây.
+
+    Chủ tịch 28/9/2026: "chia ra nhiều mức, không nên giới hạn". Thang đã có sẵn và đã ký:
+
+      · Lẻ  – `thang_f_bang`, 20 nấc theo % mốc doanh thu; hoa hồng = hệ số × (doanh thu − MỐC),
+              chỉ phần VƯỢT mốc mới được hưởng.
+      · Đoàn – `hr.DOAN_F` (Phụ lục A), 11 nấc theo % chỉ tiêu `moc_luong_doan`, quyết định % LƯƠNG
+              CƠ BẢN chứ không phải hoa hồng. Hoa hồng đoàn là tuyến tính 10% phần vượt
+              `hh_doan_moc` — Điều 7 CỐ Ý bỏ bậc nhảy ("không có bậc nào bị cắt"), nên ở đây nấc
+              chỉ để NHÌN, tiền vẫn tính tuyến tính.
+
+    `dich` chỉ dùng để đánh DẤU một nấc là mức công ty kỳ vọng. Nó không cắt thang: trên nó vẫn còn
+    nấc, và đó là chủ ý — một vạch đích là một cái trần.
+    """
+    from app.services import hr as HR
+    from app.services import rules as R
+
+    ra = []
+    if mang == "doan":
+        moc = R.get_param(db, "moc_luong_doan")
+        moc_hh = R.get_param(db, "hh_doan_moc")
+        ty_le_hh = R.get_param(db, "hh_doan_ty_le")
+        for i, (nguong, he_so) in enumerate(sorted(HR.DOAN_F)):
+            tien = moc * nguong
+            ra.append({"bac": "Đạt" if he_so >= 1 else f"f{i}", "pct_moc": round(nguong * 100),
+                       "nguong": round(tien), "he_so": he_so,
+                       "y_nghia": "phần trăm lương cơ bản",
+                       "hoa_hong_uoc": round(max(0.0, tien - moc_hh) * ty_le_hh),
+                       "la_dich": dich is not None and abs(tien - dich) < 1})
+    else:
+        bang = HR.parse_f_table(R.get_param_text(db, "thang_f_bang"))
+        moc = dich_moc_le(db)
+        for i, (nguong, he_so) in enumerate(bang):
+            tien = moc * nguong
+            ra.append({"bac": f"f{i + 1}", "pct_moc": round(nguong * 100),
+                       "nguong": round(tien), "he_so": he_so,
+                       "y_nghia": "hệ số hoa hồng trên phần vượt mốc",
+                       # HOA HỒNG = hệ số × (doanh thu − MỐC), không phải × doanh thu. Chép nhầm
+                       # chỗ này là hứa với nhân viên một số tiền không có thật.
+                       "hoa_hong_uoc": round(he_so * max(0.0, tien - moc)),
+                       "la_dich": dich is not None and abs(tien - dich) < 1})
+    return ra
+
+
+def dich_moc_le(db) -> float:
+    """Mốc TÍNH TIỀN của mảng Lẻ, mặc định văn phòng HCM — dùng để quy các nấc ra tiền."""
+    from app.services import rules as R
+    return R.get_param(db, "moc_chi_tieu_hcm")
+
+
+def nhip_cua_nguoi(db, user_id: int, ky: str, mang: str = "le") -> dict:
+    """Chuỗi ngày trong kỳ cho biểu đồ phấn đấu của MỘT người: lũy kế, nhịp cần đi, vạch đích."""
+    from app.models.hr import Employee
+    from app.services import hr as HR
+    from app.services import rules as R
+
+    mang = SEG.valid(mang) or "le"
+    dau, cuoi = _bien_ky(ky)                       # ném ValueError nếu kỳ không đọc được
+    so_ngay = (cuoi - dau).days + 1
+    e = db.execute(select(Employee).where(Employee.user_id == user_id)).scalars().first()
+
+    # ── Vạch đích. Chưa khai thì RỖNG, không phải 0: "chưa giao đích" và "giao rồi mà chưa bán
+    #    được đồng nào" là hai tình huống ngược nhau, hiện cùng một con số là sai.
+    def _dich(khoa: str):
+        """Giá trị đích, hoặc None nếu đã TẮT.
+
+        Đặt tham số về 0 trên màn hình Chính sách là cách tắt vạch đích mà không phải sửa mã — và
+        0 phải trả về RỖNG chứ không phải số 0, vì "không giao đích" khác hẳn "đích bằng không".
+        """
+        try:
+            v = R.get_param(db, khoa)
+        except KeyError:
+            return None
+        return v if v else None
+
+    if mang == "doan":
+        thuoc_do, dich = "loi_nhuan", _dich("dich_ln_nv_doan")
+    else:
+        hcm, tinh = _dich("dich_dt_nv_le_hcm"), _dich("dich_dt_nv_le_tinh")
+        # MỘT luật văn phòng, dùng chung với mốc tính tiền. Viết lại "hcm hay không" lần thứ hai
+        # là cầm chắc ngày Bình Dương nằm hai bên hai bảng.
+        dich = HR.moc_of(e, hcm, tinh) if (e and hcm and tinh) else hcm
+        thuoc_do = "doanh_thu"
+
+    # ── Số của từng ngày, gom theo NGÀY TOUR KẾT THÚC.
+    theo_ngay: dict[str, float] = {}
+    theo_ngay_du_kien: dict[str, float] = {}
+    if mang == "doan":
+        from app.services import settlement as ST
+        for t in db.execute(select(Tour).where(Tour.end_date >= dau, Tour.end_date <= cuoi,
+                                               SEG.tour_cond("doan"))).scalars():
+            sm = ST.summary(db, t)
+            dt_tour = float(sm.get("revenue") or 0)
+            # HAI LỚP, HAI CƠ SỞ KHÁC NHAU — đó là lý do chúng không được cộng vào nhau:
+            #   chắc    = doanh thu − THỰC CHI đã ghi dòng quyết toán  (`profit`, chỉ có khi có dòng)
+            #   dự kiến = doanh thu − DỰ TOÁN                          (chưa ai chi, chưa ai ký)
+            # Chưa có dòng quyết toán nào thì lớp chắc là 0 THẬT, không phải thiếu số liệu: chưa
+            # chi đồng nào thì chưa chốt được đồng lợi nhuận nào.
+            ln_chac = float(sm.get("profit") or 0) if sm.get("lines") else 0.0
+            ln_du_kien = dt_tour - float(sm.get("budget") or 0) if sm.get("has_budget") else ln_chac
+            for b in t.bookings:
+                if b.cancelled or b.sales_id != user_id:
+                    continue
+                tien = float(b.amount or 0)
+                n = t.end_date.isoformat()
+                theo_ngay[n] = theo_ngay.get(n, 0.0) + R.ln_doan_cua_booking(ln_chac, dt_tour, tien)
+                theo_ngay_du_kien[n] = theo_ngay_du_kien.get(n, 0.0) + R.ln_doan_cua_booking(
+                    ln_du_kien, dt_tour, tien)
+    else:
+        for d in cua_nguoi(db, user_id, ky)["rows"]:
+            if d["luong"] == "doan":
+                continue                            # mảng Lẻ không ăn doanh thu tour đoàn
+            theo_ngay[d["ket_thuc"]] = theo_ngay.get(d["ket_thuc"], 0.0) + float(d["tien"])
+
+    diem, luy, luy_dk = [], 0.0, 0.0
+    for i in range(so_ngay):
+        ngay = date(dau.year, dau.month, i + 1).isoformat()
+        luy += theo_ngay.get(ngay, 0.0)
+        luy_dk += theo_ngay_du_kien.get(ngay, 0.0)
+        diem.append({
+            "ngay": ngay,
+            "luy_ke": round(luy),
+            # Hai lớp TÁCH RỜI cho đoàn: lợi nhuận chỉ chắc sau quyết toán, mà quyết toán về sau
+            # tour hàng tuần. Gộp vào một đường là tạo một con số đẹp không ai kiểm được.
+            "luy_ke_du_kien": round(luy_dk) if mang == "doan" else None,
+            "nhip": round(dich * (i + 1) / so_ngay) if dich else None,
+        })
+
+    # ── Nấc thang: bậc đang đứng và bậc kế tiếp. Luôn còn nấc phía trước cho tới nấc cuối.
+    nac = thang_nac(db, mang, dich)
+    # Đoàn chấm theo BÌNH QUÂN BA THÁNG (Điều 5): một đoàn lớn mất hai ba tháng để tiếp cận, khảo
+    # sát, báo giá và ký, nhưng lợi nhuận chỉ ghi vào đúng tháng quyết toán. Xếp bậc theo tháng đơn
+    # là đúng cái mà Điều 5 cố ý tránh — và sẽ lệch với phiếu lương.
+    binh_quan = None
+    if mang == "doan":
+        cac_ky = _ba_ky_gan_nhat(ky)
+        lich_su = [{"ky": k, "loi_nhuan": round(ln_doan_cua_ky(db, user_id, k))} for k in cac_ky]
+        binh_quan = {"gia_tri": round(sum(x["loi_nhuan"] for x in lich_su) / len(lich_su)),
+                     "so_ky": len(lich_su), "cac_ky": lich_su}
+        do_bang = binh_quan["gia_tri"]
+    else:
+        do_bang = luy
+
+    dang_o, ke_tiep = None, None
+    for n in nac:
+        if do_bang >= n["nguong"]:
+            dang_o = n
+        elif ke_tiep is None:
+            ke_tiep = dict(n, con_thieu=round(n["nguong"] - do_bang))
+
+    hom_nay = date.today()
+    thu_may = so_ngay if hom_nay > cuoi else (hom_nay - dau).days + 1 if hom_nay >= dau else 0
+    nhip_hom_nay = round(dich * thu_may / so_ngay) if (dich and thu_may) else None
+    return {
+        "ky": ky, "user_id": user_id, "mang": mang, "thuoc_do": thuoc_do,
+        "dich": dich, "so_ngay": so_ngay, "ngay_thu": thu_may,
+        "luy_ke": round(luy),
+        "luy_ke_du_kien": round(luy_dk) if mang == "doan" else None,
+        "dat_pct": round(luy / dich * 100, 1) if dich else None,
+        "nhip_hom_nay": nhip_hom_nay,
+        "truoc_sau_nhip": round(luy - nhip_hom_nay) if nhip_hom_nay is not None else None,
+        # Thang nấc: KHÔNG có trần. Đích chỉ là một nấc được đánh dấu, phía trên nó vẫn còn nấc.
+        "thang": nac, "bac_dang_o": dang_o, "bac_ke_tiep": ke_tiep,
+        "do_bang": round(do_bang),
+        # Đoàn: con số xếp bậc là bình quân ba tháng, KHÁC lũy kế tháng này. Trả cả hai và nói rõ
+        # cái nào dùng để xếp bậc — giấu một cái đi là để lại hai số mà không ai biết bên nào đúng.
+        "binh_quan_3_thang": binh_quan,
+        "co_so_xep_bac": "binh_quan_3_thang" if mang == "doan" else "luy_ke_thang",
+        "diem": diem,
+    }

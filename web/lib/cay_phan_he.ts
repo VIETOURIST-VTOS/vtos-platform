@@ -211,7 +211,13 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       // tiếp đường ấy. Đây là nhánh thứ sáu. Kinh doanh Đoàn sẽ có mục riêng của mình khi bản
       // bàn giao KDĐ về, vì hai phòng đọc hai bảng chỉ tiêu khác nhau — treo chung một mục thì
       // người phòng Đoàn bấm vào và thấy số phòng Lẻ, rồi tự đi tìm nút đổi mảng.
-      { ma: "3.8", ten: "Doanh thu & chỉ tiêu KD Lẻ", href: "/kinh-doanh-le" }
+      { ma: "3.8", ten: "Doanh thu & chỉ tiêu KD Lẻ", href: "/kinh-doanh-le" },
+      // 28/9/2026 — BẢN KDĐ ĐÃ VỀ, nên đây chính là "mục riêng" mà lời hẹn ngay trên nói tới.
+      // Chính sách Phòng Đoàn hiệu lực 01/9/2026 đo bằng một thước KHÁC hẳn phòng Lẻ: lợi nhuận
+      // chứ không doanh thu, và xếp bậc trên BÌNH QUÂN BA THÁNG (Điều 5) chứ không tháng đơn.
+      // Hai thước khác nhau thì hai mục, đúng như đã hẹn — không treo chung rồi bắt người ta đi
+      // tìm nút đổi mảng.
+      { ma: "3.9", ten: "Lợi nhuận & chỉ tiêu KD Đoàn", href: "/kinh-doanh-le?mang=doan", them: true }
     ] },
   { khoa: "vanhanh", ma: "04", ten: "Điều hành",
     tom_tat: "Sản phẩm · Chuyến · Dịch vụ · Đội xe và Hướng dẫn viên là hai nhóm độc lập",
@@ -452,7 +458,7 @@ export const PHAN_HE_CON: PhanHeCon[] = [
     lay: ["3.1", "3.2", "3.3", "3.5", "3.6", "3.7", "3.8"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
   { khoa: "kddoan", cha: "khachhang", ten: "Kinh doanh đoàn",
     tom_tat: "Cơ hội · Hồ sơ đoàn · Báo giá · Hợp đồng",
-    lay: ["3.1", "3.2", "3.4", "3.5", "3.6", "3.7"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
+    lay: ["3.1", "3.2", "3.4", "3.5", "3.6", "3.7", "3.9"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
 
   // 4.1–4.8 ở lại Điều hành tour: sản phẩm, chuyến, quyết toán, sự cố, hiệu quả và dịch vụ – toàn
   // bộ phần việc chạy quanh CHUYẾN. Xe và hướng dẫn viên tách ra vì đã là hai đơn vị riêng từ
