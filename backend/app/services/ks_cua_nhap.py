@@ -181,6 +181,12 @@ MAY_SINH = {
     "lan_chay_tac_vu": "Lần chạy do hệ thống chạy tác vụ báo về qua /tu-dong/bao-cao – nhập tay một "
                        "dòng 'đã chạy thành công' là tạo bằng chứng giả về việc có thể chưa hề chạy.",
     "tong_dai_su_kien": "Nhật ký nguyên văn webhook tổng đài – tổng đài ghi vào, không ai nhập tay.",
+    # 28/9/2026. Ảnh chụp công nợ khách theo Vietrip. Số là của VIETRIP, do lịch chạy 8h sáng đọc từ
+    # Vietrip rồi đẩy vào qua POST /cong-no-vietrip/nap. Gõ tay một dòng ở đây là bịa ra một con số
+    # Vietrip chưa từng nói – muốn sửa số thì sửa ở Vietrip, sáng hôm sau ảnh mới tự thay.
+    "cong_no_vietrip_anh": "Ảnh chụp công nợ do lịch chạy 8h sáng nạp từ Vietrip qua /cong-no-vietrip/nap "
+                           "– số của Vietrip, không nhập tay.",
+    "cong_no_vietrip_dong": "Dòng của ảnh chụp công nợ Vietrip – nạp cùng ảnh, không nhập tay.",
     # Nối tài khoản Zalo (19/9/2026). Hai bảng, và CẢ HAI đều máy sinh — nhưng vì hai lý do khác
     # nhau, nên chép ra đây cả hai chứ không gộp một dòng:
     #

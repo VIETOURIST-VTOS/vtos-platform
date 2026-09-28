@@ -109,3 +109,7 @@ from app.models.tai_khoan_da_xoa import *  # noqa
 # nhập ở đây thì `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate
 # đòi XOÁ bảng.
 from app.models.danh_gia import *  # noqa
+
+# 28/9/2026 · Công nợ khách theo Vietrip – ảnh chụp mỗi ngày (báo cáo 8h sáng). Không mang khoá
+# ngoài sang bảng nào ngoài hai bảng của chính nó.
+from app.models.cong_no_vietrip import *  # noqa  # k2-doc-an-toan: dòng NHẬP MODULE, không đọc cột tiền nào

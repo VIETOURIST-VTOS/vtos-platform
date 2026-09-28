@@ -114,4 +114,54 @@ function CongNo() {
   </>);
 }
 
-export default function Page() { return <Shell><CongNo /></Shell>; }
+/** Công nợ khách theo VIETRIP – ảnh chụp báo cáo 8h sáng mỗi ngày (nạp qua /cong-no-vietrip/nap, tệp gốc
+ *  lưu R2). Tải RIÊNG với sổ bên dưới: sổ lỗi thì khối này vẫn hiện, và ngược lại. */
+function CongNoVietrip() {
+  const [d, setD] = useState<any>(null);
+  const [ls, setLs] = useState<any[]>([]);
+  const [nhom, setNhom] = useState<number>(1);
+  const [loi, setLoi] = useState<string>("");
+  useEffect(() => {
+    api("/cong-no-vietrip").then(setD).catch((e) => setLoi(errMsg(e)));
+    api("/cong-no-vietrip/lich-su?so_ngay=30").then(setLs).catch(() => {});
+  }, []);
+  if (loi) return null;                       // vai không được xem – không hiện khối này
+  if (!d) return <div className="panel"><p className="muted">Đang tải công nợ Vietrip…</p></div>;
+  if (!d.co_du_lieu) return <div className="panel"><h2>Công nợ khách theo Vietrip</h2><p className="muted">{d.thong_bao}</p></div>;
+  const mau: Record<number, string> = { 1: "var(--red)", 2: "var(--orange)", 3: "#c9a400", 4: "#3b82f6", 0: undefined as any };
+  const dong = d.dong.filter((r: any) => r.nhom === nhom);
+  const truoc = ls.length > 1 ? ls[ls.length - 2] : null;
+  return (<>
+    <div className="panel">
+      <h2>Công nợ khách theo Vietrip — {fmtD(d.ngay)}</h2>
+      <p className="muted">Báo cáo tự động 8h sáng, nạp lúc {fmtDT(d.luc)} ({d.so_lan_nap} lần)
+        {d.cu_ngay > 1 && <b style={{ color: "var(--red)" }}> · đã cũ {d.cu_ngay} ngày — lịch chạy sáng có thể đã hỏng</b>}
+        {!d.tep.ben_vung && <span> · tệp gốc CHƯA nằm trên R2 (kho tạm)</span>}.</p>
+      <div className="kpis">
+        <div className="kpi"><b>{n(d.tong_con_thieu)}</b><span>tổng còn thiếu ({d.so_booking} booking)
+          {truoc && <> · {d.tong_con_thieu - truoc.tong_con_thieu >= 0 ? "tăng " : "giảm "}
+            {n(Math.abs(d.tong_con_thieu - truoc.tong_con_thieu))} so với {fmtD(truoc.ngay)}</>}</span></div>
+        {d.nhom.filter((g: any) => g.nhom > 0).map((g: any) => <div className="kpi" key={g.nhom} style={{ cursor: "pointer" }} onClick={() => setNhom(g.nhom)}>
+          <b style={{ color: mau[g.nhom] }}>{n(g.con_thieu)}</b><span>{g.ten} ({g.so_booking})</span></div>)}
+      </div>
+    </div>
+    <div style={{ display: "flex", gap: 8, margin: "10px 0", flexWrap: "wrap" }}>
+      {d.nhom.map((g: any) => <button key={g.nhom} className={`act ${nhom === g.nhom ? "teal" : "grey"}`} onClick={() => setNhom(g.nhom)}>
+        {g.nhom ? `Nhóm ${g.nhom}` : "Bảo lưu"} ({g.so_booking})</button>)}
+      <button className={`act ${nhom === -1 ? "teal" : "grey"}`} onClick={() => setNhom(-1)}>Theo Sale</button>
+    </div>
+    {nhom === -1 ? <div className="panel wrap"><table><thead><tr><th>Sales</th><th>Số booking</th><th>Còn thiếu</th></tr></thead>
+      <tbody>{d.theo_sale.map((s: any) => <tr key={s.sales}><td>{s.sales}</td><td className="num">{s.so_booking}</td>
+        <td className="num"><b>{n(s.con_thieu)}</b></td></tr>)}</tbody></table></div>
+    : <div className="panel wrap"><table><thead><tr><th>Booking</th><th>Mã tour</th><th>Tên tour</th><th>Khách</th><th>SĐT</th>
+        <th>Sales</th><th>Tổng</th><th>Đã thu</th><th>Còn thiếu</th><th>Khởi hành</th><th>Ghi chú</th></tr></thead>
+      <tbody>{dong.length ? dong.map((r: any) => <tr key={r.booking_id}>
+        <td>{r.booking_id}</td><td>{r.ma_tour}</td><td className="muted">{r.ten_tour}</td><td>{r.khach}</td>
+        <td className="muted">{r.sdt_khach}</td><td className="muted">{r.sales}</td>
+        <td className="num">{n(r.tong)}</td><td className="num">{n(r.da_thu)}</td><td className="num"><b>{n(r.con_thieu)}</b></td>
+        <td className="muted">{r.khoi_hanh ? fmtD(r.khoi_hanh) : "—"}</td><td>{r.ghi_chu && <Tag cls="warn">{r.ghi_chu}</Tag>}</td>
+      </tr>) : <tr><td colSpan={11} className="muted">Không có booking nào trong nhóm này.</td></tr>}</tbody></table></div>}
+  </>);
+}
+
+export default function Page() { return <Shell><CongNoVietrip /><CongNo /></Shell>; }
