@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import require_roles, robot_auth
 from app.db.session import get_db
 from app.models.core import User
 from app.models.dong_tien import NGUON_TIEN, ChotSoDu
@@ -318,7 +318,16 @@ def meta(u: User = Depends(require_roles(*XEM, mo_ta="danh mục cho màn hình 
 #
 # Nghi vấn còn lại, chưa đo: 512 MB bộ nhớ cho một lượt quét 12.198 phiếu đặt. Phải ĐẾM trước khi
 # kết luận. Cửa bấm tay chạy đồng bộ và thấy kết quả ngay, nên đặt lịch chờ được tới lúc biết thật.
-DUNG_SO = ("ketoan", "cntt")
+#
+# 28/9/2026 · CHỦ TỊCH ĐƯỢC BẤM, VÀ ROBOT TỰ DỰNG SAU MỖI LƯỢT KÉO VIETRIP
+# Anh Tuấn mở màn hình Chủ tịch, thấy hai khối Phải thu · Phải trả vẫn trống ("Chưa có nguồn") dù
+# robot Vietrip kéo đều hai lần mỗi ngày: sổ chỉ được dựng khi Kế toán/CNTT bấm tay, mà không ai bấm.
+# Anh chốt: "update lên đây hằng ngày". Nên:
+#   1. Thêm "chutich" vào DUNG_SO — người đọc hai khối ấy phải tự làm mới được sổ của chính mình.
+#   2. Mở cửa robot /dong-tien/robot/nghia-vu/dong-bo (ROBOT_TOKEN); robots.yml gọi nó ngay sau
+#      mỗi lượt kéo Vietrip 11:10 và 18:10, nên sổ luôn khớp lô Vietrip mới nhất trong ngày.
+# Phép dựng vẫn là CÙNG MỘT hàm `NV.dong_bo`, chạy lại bao nhiêu lần cũng ra cùng một sổ.
+DUNG_SO = ("ketoan", "cntt", "chutich")
 
 
 @router.post("/nghia-vu/dong-bo")
@@ -341,3 +350,22 @@ def dong_bo_nghia_vu(u: User = Depends(require_roles(*DUNG_SO, mo_ta="dựng l�
     # Dựng lại sổ nghĩa vụ đổi số của MỌI pháp nhân, nên xoá sạch kho chứ không lọc.
     KHO_KHUNG.xoa()
     return {**ra, "message": f"Đã dựng lại sổ nghĩa vụ — {ra['tong_dong']} dòng"}
+
+
+@router.post("/robot/nghia-vu/dong-bo", dependencies=[Depends(robot_auth)])
+def robot_dong_bo_nghia_vu(db: Session = Depends(get_db)):
+    """Robot lịch (GitHub Actions) dựng lại sổ nghĩa vụ ngay sau mỗi lượt kéo Vietrip.
+
+    Cùng hàm, cùng kết quả với cửa bấm tay ở trên; chỉ khác người gọi. Ghi nhật ký dưới tên
+    "robot" để soát lại được lượt nào do lịch chạy.
+    """
+    from app.services import nghia_vu as NV
+    try:
+        ra = NV.dong_bo(db)
+    except Exception as e:      # noqa: BLE001
+        db.rollback()
+        raise HTTPException(500, f"Dựng sổ lỗi: {type(e).__name__}: {str(e)[:600]}")
+    R.audit(db, "robot", "robot", "dong_bo_nghia_vu", "nghia_vu_thanh_toan", after=ra)
+    db.commit()
+    KHO_KHUNG.xoa()
+    return {**ra, "message": f"Robot đã dựng lại sổ nghĩa vụ — {ra['tong_dong']} dòng"}

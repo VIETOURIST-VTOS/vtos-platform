@@ -75,7 +75,10 @@ jobs:
               sleep 600
               call "robot chạy nền" -m 170 -X POST "$API/robot/run" -H "$H"
               call "soát booking" -m 170 -X POST "$API/robot/bookings/check" -H "$H"
-              call "robot R9" -m 170 -X POST "$API/robot/r9/auto" -H "$H" ;;
+              call "robot R9" -m 170 -X POST "$API/robot/r9/auto" -H "$H"
+              # 28/9/2026: dựng lại sổ nghĩa vụ để hai khối Phải thu · Phải trả (màn hình Chủ tịch)
+              # có số mới sau mỗi lượt kéo Vietrip.
+              call "dựng sổ nghĩa vụ (phải thu/phải trả)" -m 170 -X POST "$API/dong-tien/robot/nghia-vu/dong-bo" -H "$H" ;;
             vietrip_products)
               call "đồng bộ sản phẩm Vietrip" -m 120 -X POST "$API/robot/vietrip/sync" -H "$H" -H "$C" -d '{"products":true,"settlements_days":10}' ;;
             sepay)
