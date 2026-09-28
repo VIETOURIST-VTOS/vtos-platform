@@ -69,3 +69,38 @@ class CongNoVietripDong(Base):
     nhom: Mapped[int] = mapped_column(Integer, default=0)             # 0 = bảo lưu
     bao_luu: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     ghi_chu: Mapped[str] = mapped_column(Text, default="")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# 29/9/2026 · PHẢI TRẢ NCC THEO DỰ TOÁN TOUR TRÊN VIETRIP
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# Anh Tuấn: "kiểm tra lại trên Vietrip, dựa vào dự toán tour để xác định số phải trả và sửa lại
+# VTOS đúng theo Vietrip". Nguồn là trang Quyết toán tour (/tour-settlement/overview/{id}), khối
+# "Thống kê thu chi": Tổng chi (dự toán) · Thực tế đã chi · Còn phải chi. Một ngày một ảnh, mỗi
+# tour một dòng; `con_phai_chi` do MÁY CHỦ tính = tong_chi − da_chi.
+class PhaiTraVietripAnh(Base):
+    __tablename__ = "phai_tra_vietrip_anh"
+    __table_args__ = (Index("ux_phai_tra_vietrip_anh_ngay", "ngay", unique=True),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ngay: Mapped[date] = mapped_column(Date)
+    so_tour: Mapped[int] = mapped_column(Integer, default=0)
+    tong_con_phai_chi: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    so_lan_nap: Mapped[int] = mapped_column(Integer, default=1)
+    ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    nguoi_nap: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class PhaiTraVietripDong(Base):
+    __tablename__ = "phai_tra_vietrip_dong"
+    __table_args__ = (Index("ix_phai_tra_vietrip_dong_anh", "anh_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    anh_id: Mapped[int] = mapped_column(ForeignKey("phai_tra_vietrip_anh.id", ondelete="CASCADE"))
+    tour_id: Mapped[int] = mapped_column(Integer)                       # recID tour trên Vietrip
+    ma_tour: Mapped[str] = mapped_column(String(80), default="")
+    ten_tour: Mapped[str] = mapped_column(Text, default="")
+    khoi_hanh: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ket_thuc: Mapped[date | None] = mapped_column(Date, nullable=True)
+    tong_chi: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    da_chi: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    con_phai_chi: Mapped[float | None] = mapped_column(TIEN, nullable=True)

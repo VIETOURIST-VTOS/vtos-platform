@@ -80,6 +80,7 @@ function CongNo() {
     </>}
 
     {tab === "tra" && <>
+      <PhaiTraVietrip />
       <div className="panel wrap"><h2>Phải trả nhà cung cấp — đã duyệt, chờ chi</h2>
         <table><thead><tr><th>Phiếu</th><th>Nhà cung cấp</th><th>Tour</th><th>Nội dung</th><th>Số tiền</th><th>Chứng từ</th></tr></thead>
           <tbody>{tra.chi_tiet.length ? tra.chi_tiet.map((p: any) => <tr key={p.id}>
@@ -117,6 +118,32 @@ function CongNo() {
         <b> Đội xe → Công nợ đội xe</b>.</p>
     </div>}
   </>);
+}
+
+/** Phải trả NCC theo DỰ TOÁN TOUR trên Vietrip (29/9/2026) — mỗi tour một dòng: Tổng chi dự toán,
+ *  Thực tế đã chi, Còn phải chi. Đây là nguồn của khối "Phải trả theo hạn" trên màn hình Chủ tịch;
+ *  hạn = ngày kết thúc tour. */
+function PhaiTraVietrip() {
+  const [d, setD] = useState<any>(null);
+  useEffect(() => { api("/cong-no-vietrip/phai-tra").then(setD).catch(() => setD({ an: true })); }, []);
+  if (!d || d.an) return null;
+  if (!d.co_du_lieu) return <div className="panel"><h2>Phải trả NCC theo dự toán tour (Vietrip)</h2><p className="muted">{d.thong_bao}</p></div>;
+  const hom_nay = new Date().toISOString().slice(0, 10);
+  return (
+    <div className="panel wrap">
+      <h2>Phải trả NCC theo dự toán tour (Vietrip) — {fmtD(d.ngay)}</h2>
+      <p><b>{n(d.tong_con_phai_chi)}</b> <span className="muted">còn phải chi · {d.so_tour} tour</span></p>
+      <table><thead><tr><th>Mã tour</th><th>Tên tour</th><th>Khởi hành</th><th>Kết thúc</th>
+        <th>Tổng chi dự toán</th><th>Đã chi</th><th>Còn phải chi</th></tr></thead>
+        <tbody>{d.dong.map((r: any) => <tr key={r.tour_id}>
+          <td>{r.ma_tour}</td><td className="muted">{r.ten_tour}</td>
+          <td>{fmtD(r.khoi_hanh)}</td>
+          <td style={{ color: r.ket_thuc && String(r.ket_thuc) < hom_nay ? "var(--red)" : undefined }}>{fmtD(r.ket_thuc)}</td>
+          <td className="num">{n(r.tong_chi)}</td><td className="num">{n(r.da_chi)}</td>
+          <td className="num"><b>{n(r.con_phai_chi)}</b></td>
+        </tr>)}</tbody></table>
+    </div>
+  );
 }
 
 /** Công nợ khách theo VIETRIP – ảnh chụp báo cáo 8h sáng mỗi ngày (nạp qua /cong-no-vietrip/nap, tệp gốc

@@ -23,7 +23,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.db.session import get_db
-from app.models.cong_no_vietrip import TEN_NHOM, CongNoVietripAnh, CongNoVietripDong
+from app.models.cong_no_vietrip import (TEN_NHOM, CongNoVietripAnh, CongNoVietripDong,
+                                        PhaiTraVietripAnh, PhaiTraVietripDong)
 from app.models.core import User
 
 router = APIRouter(prefix="/api/v1/cong-no-vietrip", tags=["cong-no-vietrip"])
@@ -191,3 +192,85 @@ def lich_su(so_ngay: int = 60, u: User = Depends(require_roles(*XEM)), db: Sessi
     anhs = db.execute(select(CongNoVietripAnh).where(CongNoVietripAnh.ngay >= tu)
                       .order_by(CongNoVietripAnh.ngay)).scalars().all()
     return [{"ngay": a.ngay, "so_booking": a.so_booking, "tong_con_thieu": float(a.tong_con_thieu or 0)} for a in anhs]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# 29/9/2026 · PHẢI TRẢ NCC THEO DỰ TOÁN TOUR (Vietrip → Quyết toán tour → Thống kê thu chi)
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+class TourPhaiTraIn(BaseModel):
+    tour_id: int
+    ma_tour: str = ""
+    ten_tour: str = ""
+    khoi_hanh: date | None = None
+    ket_thuc: date | None = None
+    tong_chi: float = 0          # Tổng chi (dự toán)
+    da_chi: float = 0            # Thực tế đã chi
+
+
+class NapPhaiTraIn(BaseModel):
+    ngay: date
+    dong: list[TourPhaiTraIn]
+    ghi_chu: str = ""
+
+
+def _dung_lai_so(db: Session, kq: dict) -> None:
+    try:
+        from app.api.v1.dong_tien import KHO_KHUNG
+        from app.services import nghia_vu as NV
+        kq["so_nghia_vu"] = NV.dong_bo(db)
+        db.commit()
+        KHO_KHUNG.xoa()
+    except Exception as e:      # noqa: BLE001 — ảnh đã lưu; sổ dựng lại ở lượt robot kế tiếp
+        db.rollback()
+        kq["canh_bao_so_nghia_vu"] = f"{type(e).__name__}: {str(e)[:300]}"
+
+
+@router.post("/nap-phai-tra")
+def nap_phai_tra(data: NapPhaiTraIn, u: User = Depends(require_roles(*NAP)), db: Session = Depends(get_db)):
+    """Nạp ảnh phải trả NCC theo dự toán từng tour. Còn phải chi = Tổng chi − Đã chi (máy chủ tính);
+    tour hết phải chi thì bỏ. Nạp lại cùng ngày thì THAY ảnh."""
+    if data.ngay > date.today() + timedelta(days=1):
+        raise HTTPException(422, "Ngày báo cáo nằm ở tương lai.")
+    ids = [d.tour_id for d in data.dong]
+    trung = sorted({i for i in ids if ids.count(i) > 1})
+    if trung:
+        raise HTTPException(422, f"Tour trùng trong lô: {', '.join(map(str, trung[:10]))}")
+    con = [(d, round(float(d.tong_chi or 0) - float(d.da_chi or 0), 2)) for d in data.dong]
+    no = [(d, c) for d, c in con if c > 0]
+    anh = db.execute(select(PhaiTraVietripAnh).where(PhaiTraVietripAnh.ngay == data.ngay)).scalar_one_or_none()
+    if anh is None:
+        anh = PhaiTraVietripAnh(ngay=data.ngay, so_lan_nap=1)
+        db.add(anh)
+        db.flush()
+    else:
+        db.execute(delete(PhaiTraVietripDong).where(PhaiTraVietripDong.anh_id == anh.id))
+        anh.so_lan_nap = (anh.so_lan_nap or 0) + 1
+    anh.so_tour = len(no)
+    anh.tong_con_phai_chi = round(sum(c for _, c in no), 2)
+    anh.ghi_chu = data.ghi_chu or ""
+    anh.nguoi_nap = u.username
+    anh.luc = datetime.now()
+    for d, c in no:
+        db.add(PhaiTraVietripDong(
+            anh_id=anh.id, tour_id=d.tour_id, ma_tour=d.ma_tour, ten_tour=d.ten_tour,
+            khoi_hanh=d.khoi_hanh, ket_thuc=d.ket_thuc, tong_chi=float(d.tong_chi or 0),
+            da_chi=float(d.da_chi or 0), con_phai_chi=c))
+    db.commit()
+    kq = {"ngay": anh.ngay, "so_tour": anh.so_tour, "tong_con_phai_chi": float(anh.tong_con_phai_chi or 0),
+          "nhan": len(data.dong), "bo_qua_het_no": len(data.dong) - len(no), "so_lan_nap": anh.so_lan_nap}
+    _dung_lai_so(db, kq)
+    return kq
+
+
+@router.get("/phai-tra")
+def xem_phai_tra(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    anh = db.execute(select(PhaiTraVietripAnh).order_by(desc(PhaiTraVietripAnh.ngay)).limit(1)).scalars().first()
+    if anh is None:
+        return {"co_du_lieu": False, "thong_bao": "Chưa có ảnh phải trả NCC theo dự toán Vietrip."}
+    rows = db.execute(select(PhaiTraVietripDong).where(PhaiTraVietripDong.anh_id == anh.id)
+                      .order_by(desc(PhaiTraVietripDong.con_phai_chi))).scalars().all()
+    return {"co_du_lieu": True, "ngay": anh.ngay, "so_tour": anh.so_tour,
+            "tong_con_phai_chi": float(anh.tong_con_phai_chi or 0), "luc": anh.luc,
+            "dong": [{"tour_id": r.tour_id, "ma_tour": r.ma_tour, "ten_tour": r.ten_tour,
+                      "khoi_hanh": r.khoi_hanh, "ket_thuc": r.ket_thuc, "tong_chi": float(r.tong_chi or 0),
+                      "da_chi": float(r.da_chi or 0), "con_phai_chi": float(r.con_phai_chi or 0)} for r in rows]}
