@@ -342,7 +342,12 @@ DEFAULT_PARAMS = [
     #
     # Câu chữ gửi khách là việc của Marketing. Viết cứng trong mã thì mỗi lần sửa một dấu phẩy
     # phải đẩy một vòng mã — cách chắc chắn để không ai sửa nữa.
-    ("khao_sat_mau_tin", "Vietourist cam on anh/chi {ten_khach} da dong hanh cung chuyen {ten_tour}. Anh/chi danh 1 phut cham diem chuyen di, huong dan vien va tai xe giup Vietourist phuc vu tot hon: {link} (duong dan chi dung mot lan).", "Nội dung tin OA mời chấm điểm sau tour. Chỗ điền: ten_khach, ten_tour, link", "mẫu chữ", "27/9/2026"),
+    # Câu chữ anh Tuấn gửi 28/9/2026. NGẮN HƠN 200 KÝ TỰ — đó là trần của cột `Param.value`,
+    # không phải sở thích.
+    # Bản đầu dài 210 ký tự và làm MÁY CHỦ CHẾT NGAY LÚC KHỞI ĐỘNG trên PostgreSQL
+    # (StringDataRightTruncation), trong khi 24 phép thử vẫn xanh vì chúng chạy SQLite — nơi
+    # String(200) chỉ là lời khai chứ không ép. Xem `test_tham_so_khong_vuot_do_dai_cot`.
+    ("khao_sat_mau_tin", "Vietourist cảm ơn anh/chị {ten_khach} đã đồng hành trong chuyến {ten_tour}. Mời anh/chị dành 1 phút đánh giá trải nghiệm để chúng tôi phục vụ tốt hơn: {link}", "Nội dung tin OA mời chấm điểm sau tour. Chỗ điền: ten_khach, ten_tour, link", "mẫu chữ", "27/9/2026"),
     ("khao_sat_mau_nhac", "Vietourist gui lai duong dan danh gia chuyen {ten_tour} toi anh/chi {ten_khach}: {link}. Day la lan nhac duy nhat, neu khong tien thi anh/chi bo qua giup.", "Nội dung tin OA nhắc một lần khi khách chưa trả lời", "mẫu chữ", "27/9/2026"),
     ("khao_sat_link_goc", "https://vtos.infinitytours.org", "Gốc đường dẫn trang khảo sát; trang khách mở là <gốc>/y-kien/<mã>", "đường dẫn", "27/9/2026"),
 
