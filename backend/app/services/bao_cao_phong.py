@@ -512,6 +512,34 @@ def _cskh_dong(db: Session, tu: date, den: date) -> list[dict]:
     ket = db.execute(select(func.count()).select_from(ZaloMessage).where(
         ZaloMessage.status == "cho_cau_hinh")).scalar() or 0
 
+    # ── CẤU HÌNH ZALO CHO LỜI MỜI CHẤM ĐIỂM — TC-96, 29/9/2026 ──────────────────────────────
+    #
+    # Tới hôm nay trạng thái này chỉ nằm trong BIẾN MÔI TRƯỜNG trên máy chủ. Không màn hình nào
+    # cho thấy nó. Hệ quả đo được ngày 29/9: 401 tin nằm chờ mẫu ZNS suốt ba ngày, bảng chỉ báo
+    # "kẹt chờ cấu hình" — nhưng không nói CẤU HÌNH NÀO, nên người đọc không biết phải làm gì,
+    # và người làm xong cũng không có chỗ nào xác nhận là đã xong.
+    #
+    # Dòng này đếm SỐ MỤC ĐÍCH ĐÃ CÓ MẪU, không đếm tổng số mẫu: hệ thống cần đúng hai mẫu, mỗi
+    # mẫu cho một mục đích, và khai mười mẫu cho cùng một mục đích thì vẫn thiếu.
+    #
+    # Đọc qua `zalo.configured` — CÙNG hàm mà đường gửi thật đọc. Tự đọc lấy biến môi trường ở
+    # đây là dựng chỗ thứ hai trả lời cùng một câu, và ngày hai chỗ lệch nhau thì màn hình báo
+    # "đã khai đủ" trong khi robot vẫn không gửi được.
+    from app.services import zalo as Z
+    try:
+        cfg_zalo = Z.configured(db)
+    except Exception as e:      # noqa – hỏng chỗ đọc cấu hình không được làm chết cả bảng
+        cfg_zalo = {"oa": False, "zns_templates": {}, "loi": f"{type(e).__name__}: {str(e)[:80]}"}
+    can_mau = ("cham_soc", "cham_soc_nhac")
+    co_mau = [m for m in can_mau if (cfg_zalo.get("zns_templates") or {}).get(m)]
+    thieu = [m for m in can_mau if m not in co_mau]
+    chi_tiet_zalo = [("Tài khoản OA: đã nối" if cfg_zalo.get("oa") else
+                      "Tài khoản OA: CHƯA nối — không đường nào gửi được")]
+    chi_tiet_zalo += [f"Mẫu ZNS '{m}': đã khai" for m in co_mau]
+    chi_tiet_zalo += [f"Mẫu ZNS '{m}': CHƯA khai" for m in thieu]
+    if cfg_zalo.get("loi"):
+        chi_tiet_zalo.append("Không đọc được cấu hình: " + cfg_zalo["loi"])
+
     # NGƯỜI XỬ LÝ TỰ ĐÓNG HỒ SƠ CỦA MÌNH — đo, không chặn (anh Tuấn chốt 27/9/2026).
     #
     # Khiếu nại sinh từ đánh giá ≤3 sao được giao cho SALE ĐÃ BÁN tour ấy. Người đó vừa là người bị
@@ -553,6 +581,16 @@ def _cskh_dong(db: Session, tu: date, den: date) -> list[dict]:
            muc=_muc(im_lang > 0),
            viec="Điểm trung bình đẹp vì chỉ người hài lòng trả lời là cách một bảng số nói dối mà "
                 "không sai dòng nào – xem các chuyến này trước khi đọc điểm"),
+        ct("cs_zalo_cau_hinh", "Mẫu ZNS đã khai cho lời mời chấm điểm", len(co_mau), "trên 2 mẫu",
+           "Đếm số MỤC ĐÍCH đã có mã mẫu ZNS (cham_soc, cham_soc_nhac), đọc qua chính hàm cấu "
+           "hình mà đường gửi thật dùng. Cần đủ 2; thiếu mẫu nào thì khách của mục đích ấy không "
+           "nhận được gì, trừ người đã quan tâm OA",
+           "biến môi trường ZALO_ZNS_TEMPLATES trên máy chủ + services.zalo.configured",
+           muc=_muc(len(thieu) > 0, "do"),
+           viec="Đăng ký mẫu tại zalo.cloud rồi dán mã vào biến ZALO_ZNS_TEMPLATES trên máy chủ. "
+                "Zalo duyệt 1–2 ngày làm việc; duyệt xong mà chưa dán mã thì với VTOS không có gì "
+                "thay đổi" if thieu else "",
+           chi_tiet=chi_tiet_zalo),
         ct("cs_zalo_ket", "Tin Zalo đang kẹt chờ cấu hình", ket, "tin",
            "Đếm toàn bộ tin ở trạng thái chờ cấu hình, không giới hạn theo kỳ vì đây là tồn đọng",
            "zalo_messages.status='cho_cau_hinh'",
