@@ -1424,9 +1424,13 @@ html{font-size:var(--vtos-co-chu,16px)}
 .mh01-khong-ghi-chu .bd-chan{display:none !important}
 /* TC-98 · anh Tuấn 29/9/2026: "để lại nút bấm chi tiết trên mỗi phân hệ". Dòng ghi chú ẩn CHỮ,
    giữ lại các nút (thẻ <a>) nằm trong nó; dòng nào không có nút thì ẩn hẳn. */
-.mh01-khong-ghi-chu .v14-ghi{font-size:0 !important;line-height:0;margin:10px 0 0;
-  display:flex;flex-wrap:wrap;gap:8px}
+.mh01-khong-ghi-chu .v14-ghi{font-size:0 !important;line-height:0;margin:10px 0 0;padding:0;
+  border:0 !important;display:block}
 .mh01-khong-ghi-chu .v14-ghi:not(:has(a)){display:none !important}
+/* TC-98b · chỉ còn nút: mọi thẻ con không phải nút (nhãn "Chưa kết nối", "· Đội xe nhập"…) ẩn hẳn,
+   để nút đứng sát lề trái như mọi nút khác. */
+.mh01-khong-ghi-chu .v14-ghi *:not(a):not(:has(a)){display:none !important}
+.mh01-khong-ghi-chu .v14-ghi a{margin:0 8px 6px 0}
 .mh01-khong-ghi-chu .v14-ghi a,
 .mh01-khong-ghi-chu .the-chi-tiet{font-size:calc(12/14*1rem);line-height:1.4;display:inline-block;
   padding:4px 10px;border:1px solid var(--vtos-line);border-radius:6px;border-bottom-width:1px}
