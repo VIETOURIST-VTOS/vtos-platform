@@ -71,21 +71,21 @@ function Dash() {
 
   const the: The[] = [
     { nhan: "Tour đang bán", so: dem(gd.dang_ban),
-      ai: "Điều hành", cua: "/tours" },
+      ai: "Điều hành", cua: "/tours", chi_tiet: "/tours" },
     { nhan: "Tour đang chạy", so: dem(gd.dang_chay),
-      ai: "Điều hành", cua: "/tours" },
+      ai: "Điều hành", cua: "/tours", chi_tiet: "/tours" },
     { nhan: "Tour sắp khởi hành", so: dem(sec.sap_khoi_hanh?.length),
-      duoi: `${soNgayKH} ngày tới`, ai: "Điều hành", cua: "/tours" },
+      duoi: `${soNgayKH} ngày tới`, ai: "Điều hành", cua: "/tours", chi_tiet: "/tours" },
     { nhan: "Tour chờ quyết toán", so: dem((c.ket_thuc || 0) + (c.da_dong_so || 0)),
       duoi: `${sec.qua_han_qt?.length ?? 0} chuyến quá hạn quyết toán`
         + (typeof chuaDongSo === "number" && chuaDongSo > 0
            ? ` · ${chuaDongSo} chuyến đã qua ngày về mà chưa đóng sổ (Điều hành)` : ""),
-      do: (sec.qua_han_qt?.length ?? 0) > 0 || (chuaDongSo ?? 0) > 0 },
+      do: (sec.qua_han_qt?.length ?? 0) > 0 || (chuaDongSo ?? 0) > 0, chi_tiet: "/so-con-no" },
     /* XE ĐANG ĐI — cùng luật với tour: lịch hôm nay trùng lịch điều xe. `co_nguon` phân biệt
        "hôm nay không điều xe nào" (số THẬT, bằng 0) với "chưa ai nhập bảng xe" (chưa có nguồn);
        không có nó thì hai việc khác hẳn nhau hiện ra y hệt một con số 0. */
     { nhan: "Xe đang đi", so: xe.co_nguon ? dem(xe.dang_chay) : null,
-      ai: "Đội xe", cua: "/doi-xe",
+      ai: "Đội xe", cua: "/doi-xe", chi_tiet: "/doi-xe",
       duoi: xe.co_nguon
         ? `${xe.o_bai} xe nằm bãi trên ${xe.dieu_duoc} xe điều được`
           + (xe.bat_thuong > 0 ? ` · ${xe.bat_thuong} xe có bất thường` : "")
@@ -93,7 +93,7 @@ function Dash() {
         : undefined,
       do: (xe.bat_thuong ?? 0) > 0 || (xe.lech ?? 0) > 0 },
     { nhan: "Khách tiềm năng mới", so: null,
-      ai: "Marketing", cua: "/leads?tab=leads" },
+      ai: "Marketing", cua: "/leads?tab=leads", chi_tiet: "/leads?tab=leads" },
   ];
 
   /* Biểu đồ dựng một lần, giao cho từng khối tự bày. Khối nào chưa đủ số thì nhận `null` và chỉ
@@ -185,8 +185,8 @@ function Dash() {
     {/* Ba khối kinh doanh & nội bộ xếp một hàng: cả ba đều ngắn sau khi bỏ bảng, và đọc cạnh nhau
         thì thấy được bức tranh "bán hàng · lợi nhuận · kỷ luật nội bộ" trong một cái nhìn. */}
     <div className="mh01-hang-3">
-      <KhoiKinhDoanhLe ds={sec.kd_le} bieu_do={bd.kd_le} />
-      <KhoiKinhDoanhDoan d={sec.kd_doan} bieu_do={bd.kd_doan} />
+      <KhoiKinhDoanhLe ds={sec.kd_le} bieu_do={bd.kd_le} dt={sec.doanh_thu_phong} />
+      <KhoiKinhDoanhDoan d={sec.kd_doan} bieu_do={bd.kd_doan} dt={sec.doanh_thu_phong} />
       <KhoiBaoCaoNgay d={sec.bao_cao_ngay} bieu_do={bd.bao_cao_ngay} />
     </div>
 

@@ -36,6 +36,8 @@ const TEN_TRANG: Record<string, string> = {
  *  `ai` (bộ phận phải nhập), để người đọc biết đi hỏi ai chứ không chỉ thấy một ô trống. */
 export type The = {
   nhan: string; phu?: string; so: string | null; duoi?: string;
+  /** TC-98 · đường tới trang chi tiết; có thì thẻ có số hiện nút "Xem chi tiết →". */
+  chi_tiet?: string;
   cua?: string; ai?: string; do?: boolean;
   xu_huong?: XuHuong | null;
 };
@@ -151,6 +153,7 @@ export function TheChiTieu({ t }: { t: The }) {
             {t.cua && <Link className="the-cua" href={t.cua}>Cửa nhập →</Link>}
           </div>
         : t.duoi && <div className="the-duoi">{t.duoi}</div>}
+      {!rong && t.chi_tiet && <Link className="the-cua the-chi-tiet" href={t.chi_tiet}>Xem chi tiết →</Link>}
       {/* Biểu đồ đặt DƯỚI dòng mô tả: con số lớn vẫn là thứ đọc trước, xu hướng là thứ đọc sau.
           Thẻ chưa có số thì cũng chưa có xu hướng — không vẽ một dãy cột rỗng dưới một ô trống. */}
       {!rong && t.xu_huong && <BieuDoNho xh={t.xu_huong} />}

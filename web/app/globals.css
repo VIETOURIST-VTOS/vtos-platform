@@ -1420,6 +1420,20 @@ html{font-size:var(--vtos-co-chu,16px)}
 /* TC-97 · Màn hình Chủ tịch không hiện ghi chú (anh Tuấn 29/9/2026). Chỉ trong vỏ của trang
    chủ (web/app/page.tsx) — các màn hình khác dùng chung khối vẫn giữ ghi chú. */
 .mh01-khong-ghi-chu{display:contents}
-.mh01-khong-ghi-chu .v14-ghi,
 .mh01-khong-ghi-chu .bd-chu,
 .mh01-khong-ghi-chu .bd-chan{display:none !important}
+/* TC-98 · anh Tuấn 29/9/2026: "để lại nút bấm chi tiết trên mỗi phân hệ". Dòng ghi chú ẩn CHỮ,
+   giữ lại các nút (thẻ <a>) nằm trong nó; dòng nào không có nút thì ẩn hẳn. */
+.mh01-khong-ghi-chu .v14-ghi{font-size:0 !important;line-height:0;margin:10px 0 0;
+  display:flex;flex-wrap:wrap;gap:8px}
+.mh01-khong-ghi-chu .v14-ghi:not(:has(a)){display:none !important}
+.mh01-khong-ghi-chu .v14-ghi a,
+.mh01-khong-ghi-chu .the-chi-tiet{font-size:calc(12/14*1rem);line-height:1.4;display:inline-block;
+  padding:4px 10px;border:1px solid var(--vtos-line);border-radius:6px;border-bottom-width:1px}
+.mh01-khong-ghi-chu .the-chi-tiet{margin-top:8px;align-self:flex-start}
+/* TC-98 · Doanh thu PKD Lẻ / PKD Đoàn (components/KhoiKinhDoanh.tsx). */
+.kd-dt{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 10px}
+.kd-dt-o{border:1px solid var(--vtos-line);border-radius:8px;padding:8px 10px}
+.kd-dt-nhan{font-size:calc(11.5/14*1rem);color:var(--vtos-text-mute)}
+.kd-dt-so{font-size:calc(20/14*1rem);font-weight:700;color:var(--vtos-navy);margin-top:2px}
+.kd-dt-phu{font-size:calc(11.5/14*1rem);color:var(--vtos-text-mute)}
