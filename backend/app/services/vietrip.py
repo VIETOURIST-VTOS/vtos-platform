@@ -580,8 +580,13 @@ def id_booking_con_thieu(db: Session, gioi_han: int = 500) -> list[int]:
     Chỉ lấy phiếu ĐÃ XÁC NHẬN (`Status == "KC"`): phiếu chưa xác nhận vốn bị bỏ qua ở
     `apply_receipts`, đi kéo booking cho chúng là kéo thừa.
     """
-    co = {b.vietrip_id for b in db.execute(
-        select(Booking.vietrip_id).where(Booking.vietrip_id != None)).scalars()}
+    # `select(MỘT CỘT)` + `.scalars()` trả về CHÍNH giá trị cột, không trả về hàng ORM. Bản đầu
+    # viết `{b.vietrip_id for b in ...}` và nổ ngay dòng đầu:
+    #     AttributeError: 'int' object has no attribute 'vietrip_id'
+    # Nổ trên hệ thật ngày 29/9/2026, và không phép thử nào bắt được vì hàm này CHƯA TỪNG có phép
+    # thử nào gọi tới — bộ phép thử của TC-65 chỉ soi vòng lật trang, truyền thẳng `db=None`.
+    co = set(db.execute(
+        select(Booking.vietrip_id).where(Booking.vietrip_id != None)).scalars())
     ra: list[int] = []
     for r in db.execute(select(VtRecord).where(
             VtRecord.entity == "receipt", VtRecord.applied == False).limit(gioi_han * 4)).scalars():
