@@ -241,7 +241,7 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       // Nó là mặt còn thiếu của chính "Quyết toán tour": bên kia là mọi chuyến, bên này là những
       // chuyến chưa đóng sổ. Làm con thì bản vẽ v1.3 vẫn đọc được theo mã, và `lay: [... "4.5" ...]`
       // của phân hệ con Điều hành tour tự kéo theo — không phải sửa PHAN_HE_CON thêm dòng nào.
-      { ma: "4.5", ten: "Quyết toán tour", href: "/tours", con: [
+      { ma: "4.5", ten: "Quyết toán tour", href: "/lai-lo-tour", con: [
         { ma: "4.5.1", ten: "Sổ chuyến còn nợ", href: "/so-con-no", them: true },
       ] },
       { ma: "4.6", ten: "Sự cố & phát sinh", href: "/su-co-tour" },

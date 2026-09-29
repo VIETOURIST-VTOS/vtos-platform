@@ -428,7 +428,15 @@ MAN_HINH_API = {
     "/danh-gia": ("/api/v1/danh-gia",),
     "/requests": ("/api/v1/requests", "/api/v1/bookings", "/api/v1/tours", "/api/v1/meta",
                   "/api/v1/mang"),
-    "/lai-lo-tour": ("/api/v1/lai-lo-tour",),
+    # 29/9/2026 — thêm nhóm sổ quyết toán lớp 1 vào ĐÚNG màn hình này, vì khối "hàng đợi còn
+    # thiếu số" gắn vào /lai-lo-tour chứ không thành trang riêng (hàng rào
+    # test_lop1_stt_gia_ban_va_man_hinh_lop2 cấm trang thứ hai, và nó cấm đúng).
+    #
+    # KHAI RA phần dôi: màn hình này mở cho `sales_admin` và `robot_ks`, hai vai KHÔNG nằm
+    # trong tuple READ của `api/v1/quyet_toan_tour.py`. Cửa vẫn trả 403 cho họ — quyền thật
+    # không đổi — và màn hình ẨN hẳn khối sổ với hai vai ấy để họ không gặp một khối luôn báo
+    # lỗi. Ghi ra đây để lần rà quyền sau đọc được, thay vì phải suy từ mã giao diện.
+    "/lai-lo-tour": ("/api/v1/lai-lo-tour", "/api/v1/quyet-toan-tour"),
     # TC-71 · Màn hình chỉ đọc, một nhóm API RIÊNG.
     #
     # Bản nháp đầu đặt cửa trong nhóm `/api/v1/bao-cao` cho tiện. Đo bằng bộ kiểm P2 thì `nv_dh`

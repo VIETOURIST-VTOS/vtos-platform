@@ -12,7 +12,19 @@ import { Tag, errMsg } from "@/components/ui";
  *
  *  Hai điều màn hình phải nói ra, không được giấu:
  *   1. Dòng nào CHƯA có giá vốn thì để TRỐNG ở cột lợi nhuận, không hiện 0. Hiện 0 là báo lãi 100%.
- *   2. Tổng ở chân bảng chỉ cộng dòng đã có giá vốn, và phải ghi rõ đã bỏ ra bao nhiêu dòng. */
+ *   2. Tổng ở chân bảng chỉ cộng dòng đã có giá vốn, và phải ghi rõ đã bỏ ra bao nhiêu dòng.
+ *
+ *  ── 29/9/2026 · SỔ QUYẾT TOÁN ĐIỀU HÀNH (lớp 1) GẮN VÀO ĐÂY, KHÔNG THÀNH TRANG RIÊNG ─────────
+ *  Đo ngày 29/9: bảng `tour_settlements` và SÁU cửa `/api/v1/quyet-toan-tour/**` có đủ từ 10/9 mà
+ *  không màn hình nào gọi tới — sáu cửa sống không có lối vào, tức là việc còn thiếu theo ranh
+ *  giới 09/9/2026. Bản nháp đầu dựng một trang `/quyet-toan-tour` riêng; hàng rào
+ *  `test_lop1_stt_gia_ban_va_man_hinh_lop2` đỏ ngay, và nó ĐỎ ĐÚNG: kho này từng có bốn công thức
+ *  lãi lỗ tour chạy song song, hai trang trông giống nhau thì sinh cái thứ năm. Anh Tuấn chọn
+ *  phương án gắn vào đây, KHÔNG nới hàng rào một dòng nào.
+ *
+ *  Khối thêm vào chỉ mang phần lớp 1 mà màn hình này chưa có: HAI HÀNG ĐỢI còn thiếu số, cửa nhập
+ *  giá vốn và cửa phân loại. BỐN MẶT chi tiết KHÔNG nhân bản — chúng vẫn chỉ nằm ở lớp 2 ngay bên
+ *  dưới, mở theo từng chuyến. */
 
 const NHAN: Record<string, { ten: string; cls: string }> = {
   // globals.css chỉ khai bốn lớp thẻ: ok · warn · red · navy. "green" từng được dùng ở đây và nó
@@ -30,6 +42,181 @@ const so = (v: any) => (v === null || v === undefined
 const pc = (v: any) => (v === null || v === undefined
   ? <span className="muted">—</span>
   : <span className={Number(v) < 0 ? "red" : ""}>{(Number(v) * 100).toFixed(1)}%</span>);
+
+/** Vai ĐỌC được sổ quyết toán lớp 1 — đúng bằng tuple `READ` của `api/v1/quyet_toan_tour.py`.
+ *
+ *  Màn hình này mở cho rộng hơn thế (có `sales_admin` và `robot_ks`), nên nếu vẽ khối sổ cho mọi
+ *  người thì hai vai ấy thấy một khối luôn báo lỗi 403 — người dùng không phân biệt được "không có
+ *  quyền" với "màn hình hỏng". Ẩn ở đây là TIỆN NGHI; hàng rào thật vẫn nằm ở chữ ký của cửa. */
+const VAI_DOC_SO = ["chutich", "tgd", "ptgd_doan", "tp_dh", "nv_dh", "ketoan", "bks", "cntt"];
+/** Vai GHI — đúng bằng tuple `WRITE` của cùng tệp ấy. */
+const VAI_GHI_SO = ["tp_dh", "nv_dh", "ketoan", "cntt"];
+
+/** SỔ QUYẾT TOÁN ĐIỀU HÀNH — lớp 1. Hai hàng đợi và hai cửa ghi, không có mặt chi tiết nào.
+ *
+ *  Không tự cộng một con số nào: băng tổng hợp lấy nguyên từ `/quyet-toan-tour/tong-hop`, kể cả
+ *  dòng lời khai "lợi nhuận chỉ cộng trên đơn đã có giá vốn" (`ghi_chu`) — chép cứng câu ấy vào
+ *  đây là dựng bản sao thứ hai của một lời hứa, và bản sao thì sẽ cũ đi.
+ */
+function SoQuyetToan({ toast, duocGhi }: { toast: (m: string, x?: boolean) => void; duocGhi: boolean }) {
+  const [meta, setMeta] = useState<any>(null);
+  const [tong, setTong] = useState<any>(null);
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [ky, setKy] = useState("");
+  const [hangDoi, setHangDoi] = useState<"" | "thieu_gia_von" | "cho_phan_loai">("thieu_gia_von");
+  const [dang, setDang] = useState(false);
+  const [oGiaVon, setOGiaVon] = useState<any>(null);
+  const [oPhanLoai, setOPhanLoai] = useState<any>(null);
+
+  const napTong = useCallback(async () => {
+    try {
+      const [t, m] = await Promise.all([
+        api(`/quyet-toan-tour/tong-hop${ky ? `?ky=${ky}` : ""}`),
+        api("/quyet-toan-tour/meta"),
+      ]);
+      setTong(t); setMeta(m);
+    } catch (e) { toast(errMsg(e), true); }
+  }, [ky, toast]);
+  useEffect(() => { void napTong(); }, [napTong]);
+
+  const moSo = useCallback(async () => {
+    setDang(true);
+    try {
+      const q = new URLSearchParams();
+      if (ky) q.set("ky", ky);
+      if (hangDoi === "thieu_gia_von") q.set("thieu_gia_von", "true");
+      if (hangDoi === "cho_phan_loai") q.set("cho_phan_loai", "true");
+      setRows(await api(`/quyet-toan-tour${q.toString() ? `?${q}` : ""}`));
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  }, [ky, hangDoi, toast]);
+
+  const luuGiaVon = async () => {
+    // `soTien` trả null khi ô rỗng hoặc gõ chữ — và null KHÔNG so sánh được với 0 theo kiểu
+    // "lớn hơn", nên phải quy về 0 trước. Đây đúng là chỗ "rỗng khác không" mà cả bảng này sinh ra
+    // để canh: rỗng ở đây nghĩa là chưa gõ gì, và nó phải bị chặn y như gõ số 0.
+    const v = Number(soTien(oGiaVon.gia_von) ?? 0);
+    if (!(v > 0)) {
+      // Cùng một câu với máy chủ, cố ý: người đọc không phải đoán hai cách nói là một luật.
+      toast("Giá vốn phải lớn hơn 0. Đơn không phát sinh giá vốn thì PHÂN LOẠI, đừng ghi 0 – "
+            + "0 và “chưa có số” là hai chuyện khác nhau.", true);
+      return;
+    }
+    try {
+      await api(`/quyet-toan-tour/${oGiaVon.id}/gia-von`, { method: "POST",
+        json: { gia_von: v, ghi_chu: oGiaVon.ghi_chu || "" } });
+      setOGiaVon(null); toast("Đã ghi giá vốn"); await napTong(); await moSo();
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
+  const luuPhanLoai = async () => {
+    if (!oPhanLoai.phan_loai) { toast("Chọn một phân loại", true); return; }
+    try {
+      await api(`/quyet-toan-tour/${oPhanLoai.id}/phan-loai`, { method: "POST",
+        json: { phan_loai: oPhanLoai.phan_loai, ghi_chu: oPhanLoai.ghi_chu || "",
+                han_bao_luu: oPhanLoai.han_bao_luu || null } });
+      setOPhanLoai(null); toast("Đã phân loại"); await napTong(); await moSo();
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
+  const hdTour = tong?.hang_doi_thieu_gia_von;
+  const hdLe = tong?.khach_le_cho_phan_loai;
+
+  return (<>
+    <h3 style={{ marginTop: 18 }}>Sổ quyết toán Điều hành — hàng đợi còn thiếu số</h3>
+    <p className="muted" style={{ marginTop: -6 }}>
+      Sổ lớp 1 do Điều hành nạp qua màn hình <b>Nạp dữ liệu</b>. Ở đây chỉ có hai hàng đợi và hai
+      cửa người làm được: <b>nhập giá vốn</b> và <b>phân loại</b>. Bốn mặt chi tiết của một bản
+      quyết toán nằm ở <b>lớp 2 ngay bên dưới</b>, mở theo từng chuyến — không nhân bản lên đây.
+    </p>
+
+    <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(140px, 1fr))", gap: 8 }}>
+      <div><label>Kỳ (tháng tour kết thúc)</label>
+        <input type="month" value={ky} onChange={(e) => setKy(e.target.value)} /></div>
+      <div><label>Hàng đợi</label>
+        <select value={hangDoi} onChange={(e) => setHangDoi(e.target.value as any)}>
+          <option value="thieu_gia_von">Tour thiếu giá vốn</option>
+          <option value="cho_phan_loai">Khách lẻ chờ phân loại</option>
+          <option value="">Tất cả bản quyết toán</option>
+        </select></div>
+    </div>
+
+    {tong && <div className="kpis" style={{ marginTop: 10 }}>
+      <div className="kpi"><b className={Number(hdTour?.so_don || 0) > 0 ? "red" : ""}>{hdTour?.so_don ?? 0}</b>
+        <span>tour thiếu giá vốn — {so(hdTour?.doanh_thu)}</span></div>
+      <div className="kpi"><b className={Number(hdLe?.so_don || 0) > 0 ? "red" : ""}>{hdLe?.so_don ?? 0}</b>
+        <span>khách lẻ chờ phân loại — {so(hdLe?.doanh_thu)}</span></div>
+      <div className="kpi"><b>{tong.so_don_du_so ?? 0}</b><span>đơn đã đủ số / {tong.so_don ?? 0}</span></div>
+      <div className="kpi"><b className={Number(tong.chua_anh_xa_dieu_hanh || 0) > 0 ? "red" : ""}>
+        {tong.chua_anh_xa_dieu_hanh ?? 0}</b><span>dòng chưa tra ra người điều hành</span></div>
+    </div>}
+    {tong?.ghi_chu && <p className="muted" style={{ fontSize: 12 }}>{tong.ghi_chu}</p>}
+
+    <p><button className="btn" onClick={() => void moSo()} disabled={dang}>
+      {dang ? "Đang mở…" : rows ? "Nạp lại sổ" : "Mở sổ"}</button></p>
+
+    {rows && (rows.length ? <table><thead><tr>
+      <th>Mã tour</th><th>Kỳ</th><th>Loại</th><th>Điều hành</th><th>Kết thúc</th>
+      <th className="num">Doanh thu</th><th className="num">Giá vốn</th><th className="num">Lợi nhuận</th>
+      <th>Trạng thái</th><th>Phân loại</th><th></th>
+    </tr></thead><tbody>
+      {rows.map((r: any) => (<tr key={r.id}>
+        <td><b>{r.ma_tour}</b><div className="muted" style={{ fontSize: 12 }}>{r.ten_tour}</div></td>
+        <td>{r.ky}</td><td>{r.loai_ten}</td>
+        <td>{r.dieu_hanh || "—"}
+          {r.dieu_hanh && !r.da_anh_xa && <div className="muted" style={{ fontSize: 12 }}>chưa tra ra người thật</div>}</td>
+        <td>{fmtD(r.ngay_kt)}</td>
+        <td className="num">{so(r.doanh_thu)}</td><td className="num">{so(r.gia_von)}</td>
+        <td className="num">{so(r.loi_nhuan)}</td>
+        <td><Tag cls={r.trang_thai_qt === "da_qt" ? "ok" : ""}>{r.trang_thai_ten}</Tag></td>
+        <td>{r.phan_loai ? <>{r.phan_loai_ten}
+          {r.han_bao_luu && <div className="muted" style={{ fontSize: 12 }}>hạn {fmtD(r.han_bao_luu)}</div>}</>
+          : <span className="muted">—</span>}</td>
+        <td className="num">{duocGhi && r.gia_von === null && (<>
+          <button className="btn" onClick={() => setOGiaVon({ id: r.id, ma: r.ma_tour, gia_von: "", ghi_chu: "" })}>Nhập giá vốn</button>{" "}
+          <button className="btn" onClick={() => setOPhanLoai({ id: r.id, ma: r.ma_tour, phan_loai: "", ghi_chu: "", han_bao_luu: "" })}>Phân loại</button>
+        </>)}</td>
+      </tr>))}
+    </tbody></table> : <p className="muted">Hàng đợi này đang rỗng.</p>)}
+
+    {oGiaVon && <div className="note warn" style={{ marginTop: 10 }}>
+      <b>Nhập giá vốn — {oGiaVon.ma}</b>
+      <div className="muted" style={{ fontSize: 13 }}>
+        Đơn <b>không phát sinh</b> giá vốn thì dùng cửa Phân loại, đừng ghi 0: “0 đồng” và “chưa ai
+        điền” là hai chuyện khác nhau, và sổ không phân biệt được hai chuyện ấy là sổ báo lãi 100%.
+      </div>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(140px, 1fr))", gap: 8 }}>
+        <div><label>Giá vốn (đ)</label>
+          <input value={oGiaVon.gia_von} onChange={(e) => setOGiaVon({ ...oGiaVon, gia_von: e.target.value })} /></div>
+        <div><label>Ghi chú</label>
+          <input value={oGiaVon.ghi_chu} onChange={(e) => setOGiaVon({ ...oGiaVon, ghi_chu: e.target.value })} /></div>
+      </div>
+      <p><button className="btn" onClick={() => void luuGiaVon()}>Ghi giá vốn</button>{" "}
+        <button className="btn" onClick={() => setOGiaVon(null)}>Thôi</button></p>
+    </div>}
+
+    {oPhanLoai && meta && <div className="note warn" style={{ marginTop: 10 }}>
+      <b>Phân loại — {oPhanLoai.ma}</b>
+      <div className="muted" style={{ fontSize: 13 }}>
+        Máy <b>không đoán</b> thay: chỉ người đọc chứng từ mới biết một khoản là doanh thu khách lẻ
+        hay chi phí nội bộ ghi nhầm. Hai thứ đó khác nhau hoàn toàn trên báo cáo.
+      </div>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(3, minmax(140px, 1fr))", gap: 8 }}>
+        <div><label>Phân loại</label>
+          <select value={oPhanLoai.phan_loai} onChange={(e) => setOPhanLoai({ ...oPhanLoai, phan_loai: e.target.value })}>
+            <option value="">— chọn —</option>
+            {Object.entries(meta.phan_loai).filter(([k]) => k).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+          </select></div>
+        {oPhanLoai.phan_loai === "bao_luu_huy_tour" && <div><label>Hạn bảo lưu</label>
+          <input type="date" value={oPhanLoai.han_bao_luu}
+                 onChange={(e) => setOPhanLoai({ ...oPhanLoai, han_bao_luu: e.target.value })} /></div>}
+        <div><label>Ghi chú</label>
+          <input value={oPhanLoai.ghi_chu} onChange={(e) => setOPhanLoai({ ...oPhanLoai, ghi_chu: e.target.value })} /></div>
+      </div>
+      <p><button className="btn" onClick={() => void luuPhanLoai()}>Ghi phân loại</button>{" "}
+        <button className="btn" onClick={() => setOPhanLoai(null)}>Thôi</button></p>
+    </div>}
+  </>);
+}
 
 function LaiLoTour() {
   const { user, toast } = useShell();
@@ -71,6 +258,8 @@ function LaiLoTour() {
   };
 
   const c = d?.cong;
+  const doc_so = !!user && VAI_DOC_SO.includes(user.role);
+  const ghi_so = !!user && VAI_GHI_SO.includes(user.role);
   return (<>
     <h2>Lãi lỗ theo tour</h2>
     <p className="muted" style={{ marginTop: -6 }}>
@@ -115,6 +304,9 @@ function LaiLoTour() {
     </div>}
     {c && <p className="muted" style={{ fontSize: 12 }}>{c.ghi_chu}</p>}
 
+    {doc_so && <SoQuyetToan toast={toast} duocGhi={ghi_so} />}
+
+    <h3 style={{ marginTop: 18 }}>Lãi lỗ từng chuyến</h3>
     {busy ? <p className="muted">Đang tính…</p> : <table><thead><tr>
       <th>Mã tour</th><th>Tên tour</th><th>Khởi hành</th><th>Kết thúc</th>
       <th className="num">Khách</th><th className="num">Doanh thu</th><th className="num">Giá vốn</th>
