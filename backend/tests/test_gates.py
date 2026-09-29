@@ -39,7 +39,17 @@ def _startup():
 
 
 def test_health_and_chain():
-    r = client.get("/api/v1/health"); assert r.json()["audit_chain_ok"] is True
+    """Nhịp tim còn sống, VÀ chuỗi kiểm toán vẫn soát được — nhưng ở HAI cửa khác nhau (27/9/2026).
+
+    Trước đây `/health` tự soát chuỗi, nên Render vô tình chạy phép soát ấy 5 giây một lần và giết
+    máy chủ khi nó quá 5 giây. Việc soát chuyển về `/api/v1/audit`, nơi một người ĐỌC kết quả.
+    Phép thử giữ cả hai vế để lần sau không ai gộp lại cho gọn.
+    """
+    r = client.get("/api/v1/health")
+    assert r.status_code == 200 and r.json()["status"] == "ok"
+    assert "audit_chain_ok" not in r.json(), "nhịp tim không được gánh việc soát sổ"
+    a = client.get("/api/v1/audit", headers=login("bks"))
+    assert a.status_code == 200 and a.json()["chain_ok"] is True
 
 
 def test_gate5_three_numbers_required():

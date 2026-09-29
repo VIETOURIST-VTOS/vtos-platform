@@ -37,7 +37,11 @@ class GiaClient:
     def get(self, path: str, timeout: int = 90) -> str:
         self.goi.append(path)
         start = int(path.split("start=")[1].split("&")[0])
-        lo = self.ids[start:start + self.moi_trang]
+        # Đọc ĐÚNG `length` của đường dẫn chứ không dùng kích thước trang của riêng mình: máy chủ
+        # thật trả đúng số dòng được hỏi, và một bản giả trả khác đi sẽ làm nhánh "trang vơi thì
+        # dừng" xanh hoặc đỏ vì lý do không có thật.
+        length = int(path.split("length=")[1].split("&")[0])
+        lo = self.ids[start:start + min(self.moi_trang, length)]
         return json.dumps({"data": [{"recID": i, "tourcode": f"T{i}", "tenNguoiBook": "KHACH",
                                      "phone": "0900000000", "totalDue": 1000} for i in lo]})
 
@@ -93,12 +97,18 @@ def test_danh_sach_rong_thi_khong_goi_vietrip(gia):
     dat, kho = gia
     c = dat(GiaClient([1, 2, 3]))
     kq = VC.nap_booking_theo_id(None, [])
-    assert kq == {"can_tim": 0, "tim_thay": 0, "so_trang": 0, "con_thieu": []}
+    assert kq == {"can_tim": 0, "tim_thay": 0, "so_trang": 0, "con_thieu": [],
+                  "bat_dau_tiep": None, "xong": True}
     assert c.goi == [], "không có gì để tìm mà vẫn gọi ra Vietrip"
 
 
 def test_co_phanh_khong_lat_vo_han(gia):
-    """Máy chủ trả trang đầy mãi mãi (id không bao giờ lùi qua mốc): phải dừng ở TRAN_TRANG_BOOKING."""
+    """Máy chủ trả trang đầy mãi mãi (id không bao giờ lùi qua mốc): phải dừng ở TRAN_TRANG_BOOKING.
+
+    Từ 27/9/2026 mỗi LƯỢT gọi chỉ lật `TRANG_MOI_LUOT` trang, nên phanh tổng chỉ chạm được sau
+    nhiều lượt. Phép thử gọi vòng như người gọi thật, và bắt hai điều: mỗi lượt đúng đáy của nó,
+    và tổng số dòng lướt qua không vượt phanh.
+    """
     class KhongBaoGioHet(GiaClient):
         def get(self, path, timeout=90):
             self.goi.append(path)
@@ -106,9 +116,87 @@ def test_co_phanh_khong_lat_vo_han(gia):
                                         for i in range(1000)]})
     dat, kho = gia
     c = dat(KhongBaoGioHet([]))
-    kq = VC.nap_booking_theo_id(None, [1])
-    assert kq["so_trang"] == VC.TRAN_TRANG_BOOKING
-    assert kq["con_thieu"] == [1]
+
+    bat_dau, tong_trang, luot = 0, 0, 0
+    while luot < 100:
+        kq = VC.nap_booking_theo_id(None, [1], bat_dau=bat_dau)
+        tong_trang += kq["so_trang"]
+        luot += 1
+        assert kq["so_trang"] <= VC.TRANG_MOI_LUOT, "một lượt lật quá đáy của nó"
+        if kq["xong"]:
+            break
+        bat_dau = kq["bat_dau_tiep"]
+
+    assert kq["xong"] and kq["con_thieu"] == [1]
+    assert tong_trang == VC.TRAN_TRANG_BOOKING, f"lướt {tong_trang} trang, phanh là {VC.TRAN_TRANG_BOOKING}"
+    assert luot == VC.TRAN_TRANG_BOOKING // VC.TRANG_MOI_LUOT
+
+
+def test_moi_luot_co_day_va_noi_ra_cho_di_tiep(gia):
+    """PHÉP THỬ CHÍNH của lần sửa 27/9: một lượt gọi KHÔNG được lật quá đáy, và phải nói chỗ đi tiếp.
+
+    Bản đầu lật tới 60 trang trong một lượt. Trên gói 0,5 CPU của Render, yêu cầu chạy dài như thế
+    làm nhịp tim `/health` quá 5 giây, Render giết máy chủ, và yêu cầu ấy trả 503 — trông y hệt một
+    lỗi mã. Đáy này là thứ ngăn chuyện đó.
+    """
+    dat, kho = gia
+    c = dat(GiaClient(list(range(1, 60001)), moi_trang=1000))    # 60 trang, id 60000 → 1
+    kq = VC.nap_booking_theo_id(None, [5])                       # id nhỏ nhất: phải lật gần hết
+
+    assert kq["so_trang"] == VC.TRANG_MOI_LUOT
+    assert kq["xong"] is False, "chưa tìm ra mà đã khai xong"
+    assert kq["bat_dau_tiep"] == VC.TRANG_MOI_LUOT * 1000
+    assert len(c.goi) == VC.TRANG_MOI_LUOT
+
+
+def test_lam_theo_lo_ra_dung_ket_qua_nhu_lam_mot_luot(gia):
+    """Chia lô rồi ghép lại phải BẰNG làm một hơi — nếu không thì chia lô là một cách mất dữ liệu.
+
+    Đây là phép thử đã bắt lỗi ở TC-63, và nó lại bắt lỗi ngay lần chạy đầu ở đây: bản đầu của vòng
+    lặp đưa lại DANH SÁCH GỐC cho mỗi lượt, nên lượt cuối khai thiếu cả ba id mà ba lượt trước đã
+    lấy được. Cách gọi đúng là đưa lại `con_thieu` vừa nhận.
+    """
+    can = [5, 12000, 33000, 58000]
+    dat, kho = gia
+
+    dat(GiaClient(list(range(1, 60001)), moi_trang=1000))
+    mot_hoi = VC.nap_booking_theo_id(None, can, trang_moi_luot=999)
+
+    kho["da_upsert"].clear()
+    dat(GiaClient(list(range(1, 60001)), moi_trang=1000))
+    bat_dau, con, thay, trang = 0, list(can), 0, 0
+    while True:
+        kq = VC.nap_booking_theo_id(None, con, bat_dau=bat_dau)
+        thay += kq["tim_thay"]; trang += kq["so_trang"]; con = kq["con_thieu"]
+        if kq["xong"]:
+            break
+        bat_dau = kq["bat_dau_tiep"]
+
+    assert thay == mot_hoi["tim_thay"] == 4
+    assert trang == mot_hoi["so_trang"]
+    assert con == mot_hoi["con_thieu"] == []
+    assert len(kho["da_upsert"]) == 4
+
+
+def test_con_thieu_tra_ve_DU_khong_cat_ngan(gia):
+    """`con_thieu` là đầu vào của lượt sau, nên cắt ngắn nó là đánh rơi id thật.
+
+    Trên hệ thật có 183 booking cần tìm. Bản đầu trả `sorted(con_tim)[:50]` cho gọn mắt — gọn mắt
+    ở màn hình, nhưng vòng gọi tiếp đọc đúng khoá ấy, nên 133 id sẽ biến mất không một dòng báo.
+    """
+    dat, kho = gia
+    dat(GiaClient(list(range(1, 1001)), moi_trang=1000))
+    can = list(range(900001, 900081))                            # 80 id không có thật
+    kq = VC.nap_booking_theo_id(None, can)
+    assert len(kq["con_thieu"]) == 80, f"trả về {len(kq['con_thieu'])}/80 id — đã cắt ngắn"
+
+
+def test_bat_dau_am_thi_ve_0_chu_khong_lui_nguoc(gia):
+    """`bat_dau` bậy không được thành một cách đọc ngược danh sách."""
+    dat, kho = gia
+    c = dat(GiaClient(list(range(1, 3001)), moi_trang=1000))
+    VC.nap_booking_theo_id(None, [2999], bat_dau=-500)
+    assert "start=0" in c.goi[0], f"bắt đầu từ chỗ âm: {c.goi[0]}"
 
 
 def test_khong_truyen_khoang_ngay_nao(gia):
