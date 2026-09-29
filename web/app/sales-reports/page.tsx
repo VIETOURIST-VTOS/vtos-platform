@@ -5,6 +5,12 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, pct, fmtD, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg, MangTag } from "@/components/ui";
 
+/** Số dòng chi tiết in ra màn hình. Máy chủ vẫn trả đủ, và Xuất Excel vẫn ra đủ — đây chỉ là mức
+ *  mà TRÌNH DUYỆT chịu được. Ngày 29/9/2026 báo cáo "bán tour lẻ" kỳ 01–29/9 mảng Lẻ ra 6.682 dòng
+ *  chi tiết; trang dựng hết ngần ấy thẻ <tr> thành ~900 KB văn bản trong một màn hình, máy cấu hình
+ *  thấp ở chi nhánh mở là đứng. Mảng Đoàn chỉ 85 dòng nên suốt thời gian qua không ai gặp.
+ *  Bảng tổng hợp KHÔNG cắt: nó xếp theo sale nên số dòng bằng số người, luôn đọc hết được. */
+const CT_TOI_DA = 300;
 const PCT_KEYS = new Set(["margin", "pct_moc", "rate"]);
 const DATE_KEYS = new Set(["created_at", "cancelled_at", "deadline", "start_date", "end_date"]);
 function cell(k: string, v: any) {
@@ -53,8 +59,9 @@ function SalesReports() {
       <table><thead><tr>{rep.columns.summary.map((c: any) => <th key={c[0]} className={["sale", "office", "f", "status", "tour_code", "name", "operator"].includes(c[0]) ? "" : "num"}>{c[1]}</th>)}</tr></thead>
         <tbody>{rep.summary.length ? rep.summary.map((r: any, i: number) => <tr key={i}>{rep.columns.summary.map((c: any) => <td key={c[0]} className={typeof r[c[0]] === "number" ? "num" : ""}>{cell(c[0], r[c[0]])}</td>)}</tr>) : <tr><td colSpan={rep.columns.summary.length} className="muted">Không có dữ liệu trong kỳ.</td></tr>}</tbody></table></div>}
     {rep && rep.detail?.length > 0 && <div className="panel wrap"><h2>Chi tiết ({rep.detail.length})</h2>
+      {rep.detail.length > CT_TOI_DA && <p className="muted">Đang hiện {CT_TOI_DA} dòng đầu trong tổng số <b>{rep.detail.length}</b>. Thu hẹp khoảng ngày để xem phần còn lại, hoặc bấm <b>Xuất Excel</b> – tệp Excel lấy thẳng từ máy chủ nên vẫn đủ cả {rep.detail.length} dòng.</p>}
       <table><thead><tr>{rep.columns.detail.map((c: any) => <th key={c[0]}>{c[1]}</th>)}</tr></thead>
-        <tbody>{rep.detail.map((r: any, i: number) => <tr key={i} style={{ opacity: r.cancelled ? 0.55 : 1, color: r.overdue || r.late ? "var(--red)" : undefined }}>{rep.columns.detail.map((c: any) => <td key={c[0]} className={typeof r[c[0]] === "number" ? "num" : ""}>{cell(c[0], r[c[0]])}</td>)}</tr>)}</tbody></table></div>}
+        <tbody>{rep.detail.slice(0, CT_TOI_DA).map((r: any, i: number) => <tr key={i} style={{ opacity: r.cancelled ? 0.55 : 1, color: r.overdue || r.late ? "var(--red)" : undefined }}>{rep.columns.detail.map((c: any) => <td key={c[0]} className={typeof r[c[0]] === "number" ? "num" : ""}>{cell(c[0], r[c[0]])}</td>)}</tr>)}</tbody></table></div>}
   </>);
 }
 

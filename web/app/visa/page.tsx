@@ -72,6 +72,10 @@ function Visa() {
   const at = (s: string) => stage === s && ct?.case?.lifecycle_status === "ACTIVE";
 
   return (<>
+    {/* Màn hình này KHÔNG có tiêu đề cho tới 29/9/2026 — mọi màn hình khác của bốn phòng đều có một
+        <h1>, riêng đây mở ra là vào thẳng đoạn giải thích, và thứ đập vào mắt đầu tiên lại là ô cảnh
+        báo thiếu tệp bên dưới. Người dùng không có chỗ nào để biết mình đang đứng ở phân hệ nào. */}
+    <h1>Hồ sơ visa</h1>
     <p className="muted">Hồ sơ Visa theo <b>từng đương đơn</b>: mỗi người một form, một checklist, một lịch hẹn và một kết quả –
       kể cả khi cả nhà đi chung một booking. Khách hàng, booking, tour và chứng từ thu chi vẫn lấy từ các phân hệ sẵn có
       của VTOS, phân hệ này không giữ bản sao.</p>

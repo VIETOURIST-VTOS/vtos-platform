@@ -79,8 +79,14 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const empName = (id: number) => emps.find((e) => e.id === id)?.full_name || id;
 
   return (<>
-    <h1>Nhân sự – Lương (robot R6)</h1>
-    <p className="muted">Thưởng và hoa hồng tính theo <b>tháng quyết toán</b>, căn cứ duy nhất là số liệu Kế toán đã xác nhận; chế tài chỉ chạm thưởng/hoa hồng, không trừ lương cơ bản (Điều 127.2 BLLĐ). Luồng: robot nháp → Kế toán xác nhận cơ sở → HCNS lập → TGĐ ký lô → bút toán 642/334, 632/338, TNCN 10% CTV.</p>
+    {/* Cùng một thành phần phục vụ hai phân hệ, nên tiêu đề phải theo phân hệ đang vào. Trước
+        29/9/2026 nó ghi cứng "Nhân sự – Lương (robot R6)": người Điều hành bấm "Bảng giá vận tải"
+        hay "Lịch & bố trí hướng dẫn" mở đúng tab, nhưng đọc tiêu đề lại tưởng mình lạc sang màn
+        hình Lương của Nhân sự — và đoạn giải thích ngay dưới cũng nói chuyện bảng lương. */}
+    <h1>{scope === "ops" ? "Điều hành – Visa, hướng dẫn viên & đội xe" : "Nhân sự – Lương (robot R6)"}</h1>
+    {scope === "ops"
+      ? <p className="muted">Ba việc của Điều hành nằm chung một màn hình: <b>hồ sơ visa</b>, <b>hướng dẫn viên và phân chuyến</b>, <b>đội xe</b>. Số liệu thù lao ở đây là phần Điều hành xác nhận; bảng lương và bút toán vẫn do Nhân sự lập ở màn hình riêng.</p>
+      : <p className="muted">Thưởng và hoa hồng tính theo <b>tháng quyết toán</b>, căn cứ duy nhất là số liệu Kế toán đã xác nhận; chế tài chỉ chạm thưởng/hoa hồng, không trừ lương cơ bản (Điều 127.2 BLLĐ). Luồng: robot nháp → Kế toán xác nhận cơ sở → HCNS lập → TGĐ ký lô → bút toán 642/334, 632/338, TNCN 10% CTV.</p>}
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
       {TABS.map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
       <label style={{ marginLeft: "auto" }}>Kỳ lương <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></label>
