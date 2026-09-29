@@ -224,11 +224,39 @@ def kn_lap_su_vu(cid: int, data: LapSuVuIn, u: User = Depends(require_roles("hcn
 
 
 # ---------------- Chăm sóc sau bán ----------------
-def cs_out(db: Session, t: CareTicket) -> dict:
-    tour = db.get(Tour, t.tour_id)
-    bk = db.get(Booking, t.booking_id)
-    nv = db.get(User, t.owner_id) if t.owner_id else None
-    c = db.get(Complaint, t.complaint_id) if t.complaint_id else None
+def cs_ctx(db: Session, rows: list[CareTicket]) -> dict:
+    """Nạp sẵn tour, booking, người phụ trách và hồ sơ khiếu nại cho CẢ danh sách — mỗi bảng một lượt.
+
+    Trước 29/9/2026 `cs_out` gọi `db.get` bốn lần cho MỖI phiếu. Với 1.267 phiếu đang tồn của
+    Vietourist, cửa `/cham-soc` mất 12 giây mới trả lời. Mười hai giây ấy không chỉ là chậm: màn
+    hình đứng trong trạng thái chưa có dữ liệu suốt thời gian đó, và số phiếu thì chỉ có tăng chứ
+    không giảm. Nên chỗ phải sửa là số lượt hỏi cơ sở dữ liệu, không phải chỗ chờ máy chủ khoẻ lên.
+
+    Trả về `{}` cho danh sách rỗng cũng được: `cs_out` tra `.get(...)` nên không có khoá thì ra None,
+    đúng như `db.get` trả về None cho một id không tồn tại.
+    """
+    def _bang(model, ids) -> dict:
+        can = {i for i in ids if i}
+        if not can:
+            return {}
+        return {x.id: x for x in db.execute(select(model).where(model.id.in_(can))).scalars()}
+    return {"tour": _bang(Tour, [t.tour_id for t in rows]),
+            "booking": _bang(Booking, [t.booking_id for t in rows]),
+            "nguoi": _bang(User, [t.owner_id for t in rows]),
+            "khieu_nai": _bang(Complaint, [t.complaint_id for t in rows])}
+
+
+def cs_out(db: Session, t: CareTicket, ctx: dict | None = None) -> dict:
+    """`ctx` là bảng đã nạp sẵn của `cs_ctx`. Không truyền thì hàm tự hỏi từng dòng như cũ — các
+    tuyến trả về MỘT phiếu (PUT, đổi người phụ trách) vẫn gọi thẳng, không cần dựng bảng."""
+    def _lay(khoa: str, model, i):
+        if not i:
+            return None
+        return ctx[khoa].get(i) if ctx else db.get(model, i)
+    tour = _lay("tour", Tour, t.tour_id)
+    bk = _lay("booking", Booking, t.booking_id)
+    nv = _lay("nguoi", User, t.owner_id)
+    c = _lay("khieu_nai", Complaint, t.complaint_id)
     return {"id": t.id, "booking_id": t.booking_id, "booking_code": bk.code if bk else "",
             "tour_id": t.tour_id, "tour_code": tour.code if tour else "",
             "tour_name": tour.name if tour else "", "ket_thuc": tour.end_date if tour else None,
@@ -262,7 +290,9 @@ def cs_ds(status: str = "", cua_toi: int = 0, qua_han: int = 0,
     ids = AC.sales_ids_visible(db, u)
     if ids is not None: q = q.where(CareTicket.owner_id.in_(ids))
     elif cua_toi: q = q.where(CareTicket.owner_id == u.id)
-    ra = [cs_out(db, t) for t in db.execute(q).scalars()]
+    phieu = list(db.execute(q).scalars())
+    ctx = cs_ctx(db, phieu)
+    ra = [cs_out(db, t, ctx) for t in phieu]
     if qua_han: ra = [x for x in ra if x["qua_han"]]
     return ra
 

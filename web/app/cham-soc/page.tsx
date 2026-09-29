@@ -19,13 +19,21 @@ function ChamSoc() {
   const sinhDuoc = ["ptgd_mkt", "nv_mkt", "gd_kd", "tp_dh", "tgd", "chutich", "cntt"].includes(role);
   const [meta, setMeta] = useState<any>({ cs_hinh_thuc: {}, cs_diem: {}, cs_trang_thai: {} });
   const [ds, setDs] = useState<any[]>([]);
+  const [dangTai, setDangTai] = useState(true);
   const [cs, setCs] = useState<any>({});
   const [loc, setLoc] = useState("moi");
   const [mo, setMo] = useState<number | null>(null);
   const [f, setF] = useState<any>({ ...RONG });
 
+  /** Danh sách này mất vài giây: cuối tháng 9/2026 đã là 1.267 phiếu, và con số ấy chỉ có tăng.
+   *  Trong lúc chờ, bảng PHẢI nói là đang tải. Trước 29/9/2026 nó in thẳng câu "Không có phiếu nào
+   *  ở bộ lọc này" ngay từ mili-giây đầu tiên — nhân viên mở lên, đọc đúng câu ấy, đóng trang, và
+   *  tưởng hôm nay không có việc. Một câu KHẲNG ĐỊNH VỀ DỮ LIỆU chỉ được in sau khi đã biết dữ
+   *  liệu, không phải khi còn chưa hỏi xong. */
   const load = useCallback(() => {
-    api("/cham-soc" + (loc ? `?status=${loc}` : "")).then(setDs).catch((e) => toast(errMsg(e), true));
+    setDangTai(true);
+    api("/cham-soc" + (loc ? `?status=${loc}` : ""))
+      .then(setDs).catch((e) => toast(errMsg(e), true)).finally(() => setDangTai(false));
     api("/cham-soc/chi-so").then(setCs).catch(() => {});
   }, [loc]); // eslint-disable-line
   useEffect(() => { api("/cskh/meta").then(setMeta).catch(() => {}); }, []);
@@ -110,7 +118,9 @@ function ChamSoc() {
           </>}
         </td></tr>,
       ])}
-      {!ds.length && <tr><td colSpan={8} className="muted">Không có phiếu nào ở bộ lọc này.</td></tr>}
+      {dangTai
+        ? <tr><td colSpan={8} className="muted">Đang tải danh sách phiếu…</td></tr>
+        : !ds.length && <tr><td colSpan={8} className="muted">Không có phiếu nào ở bộ lọc này.</td></tr>}
     </tbody></table></div>
   </>);
 }
