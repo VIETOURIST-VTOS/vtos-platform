@@ -259,7 +259,7 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "4.9.3", ten: "Tài xế", href: "/xe-hdv" },
           { ma: "4.9.4", ten: "Bảng giá vận tải", href: "/ops?tab=fleet" },
           { ma: "4.9.5", ten: "Lịch & lệnh điều xe", href: "/lenh-dieu-xe" },
-          { ma: "4.9.6", ten: "Bảo dưỡng & sửa chữa" },
+          { ma: "4.9.6", ten: "Bảo dưỡng & sửa chữa", href: "/doi-xe?tab=bao-duong" },
           { ma: "4.9.7", ten: "Quyết toán chuyến xe" },
           { ma: "4.9.8", ten: "Hiệu quả khai thác", href: "/hieu-qua-doi-xe" },
           { ma: "4.9.9", ten: "Lãi lỗ đội xe", href: "/lai-lo-doi-xe", them: true }

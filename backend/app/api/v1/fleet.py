@@ -575,6 +575,28 @@ def ds_bao_duong(vehicle_id: int | None = None, u: User = Depends(require_roles(
              "chung_tu": m.chung_tu} for m in db.execute(q.limit(500)).scalars()]
 
 
+@router.get("/bao-duong/theo-xe")
+def bao_duong_theo_xe(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Cả đội xe đứng đâu so với mốc bảo dưỡng — câu người quản đội hỏi mỗi sáng.
+
+    Trước bản này luật ngưỡng chỉ chạy BÊN TRONG `kiem_tra()`, tức là chỉ trả lời được khi đang lập
+    một lệnh điều xe cụ thể. Cửa này gọi ĐÚNG hàm ấy (`FL.tinh_trang_bao_duong`) chứ không dựng lại
+    phép so sánh: hai bản chép của một ngưỡng thì ngày ai đó đổi tham số, hai chỗ nói hai điều.
+
+    Xe đã thanh lý/ngừng khai thác không nằm trong danh sách — nhắc bảo dưỡng một chiếc xe đã bán là
+    một dòng cảnh báo không ai xử lý được, và hàng đợi có dòng như thế thì người ta thôi đọc nó.
+    """
+    ds, dem = [], {FL.OK: 0, FL.UNKNOWN: 0, FL.REVIEW: 0, FL.BLOCK: 0}
+    for v in db.execute(select(Vehicle).where(Vehicle.active == True).order_by(Vehicle.code, Vehicle.plate)).scalars():
+        t = FL.tinh_trang_bao_duong(db, v)
+        dem[t["muc"]] = dem.get(t["muc"], 0) + 1
+        ds.append({"vehicle_id": v.id, "code": v.code, "plate": v.plate, "lifecycle": v.lifecycle, **t,
+                   "muc_ten": FL.MUC_TEN.get(t["muc"], t["muc"])})
+    return {"xe": ds, "theo_muc": dem,
+            "ghi_chu": "“Chưa đủ dữ liệu” KHÔNG được đọc là đạt: đó là xe chưa có lịch sử bảo dưỡng "
+                       "hoặc chưa có số km đồng hồ đã xác nhận, nên máy không so được với mốc nào."}
+
+
 @router.post("/bao-duong", status_code=201)
 def them_bao_duong(data: BaoDuongIn, u: User = Depends(require_roles(*WRITE, *KETOAN)), db: Session = Depends(get_db)):
     """Ghi bảo dưỡng/sửa chữa. Không có số km lúc làm thì hệ thống nói thẳng là không tính được mốc kỳ tới,

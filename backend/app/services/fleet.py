@@ -194,26 +194,9 @@ def kiem_tra_dieu_xe(db: Session, v: Vehicle, d1: date, d2: date, driver_id: int
                           "Chọn tài xế khác hoặc dời lịch"))
     # 4c. Mốc bảo dưỡng (chặn cứng B3 của đặc tả). Chưa biết mốc thì là CHƯA ĐỦ DỮ LIỆU, không phải là đạt –
     # đây đúng là chỗ dễ mặc định thành "không sao" rồi để xe chạy quá kỳ mà không ai biết.
-    bd = moc_bao_duong(db, v)
-    if bd["km_ky_toi"] is None:
-        kq.append(_mo("CHUA_BIET_MOC_BAO_DUONG", UNKNOWN,
-                      f"Xe {v.plate}: {bd.get('ghi_chu', 'chưa xác định được mốc bảo dưỡng kỳ tới')}",
-                      "Nhập phiếu bảo dưỡng gần nhất kèm số km lúc làm"))
-    elif not v.odo_km:
-        kq.append(_mo("CHUA_CO_SO_KM", UNKNOWN,
-                      f"Xe {v.plate} chưa có số km đồng hồ đã xác nhận nên không so được với mốc bảo dưỡng",
-                      "Cập nhật số km đồng hồ trước khi lập kế hoạch mới"))
-    elif v.odo_km > bd["km_ky_toi"]:
-        kq.append(_mo("VUOT_MOC_BAO_DUONG", BLOCK,
-                      f"Xe {v.plate} đã ở {v.odo_km:,} km, vượt mốc bảo dưỡng {bd['km_ky_toi']:,} km",
-                      "Làm bảo dưỡng hoặc đổi xe khác"))
-    else:
-        con = bd["km_ky_toi"] - v.odo_km
-        gap = int(R.get_param(db, "xe_bd_gap_km"))
-        if con <= gap:
-            kq.append(_mo("SAP_TOI_MOC_BAO_DUONG", REVIEW,
-                          f"Xe {v.plate} còn {con:,} km tới mốc bảo dưỡng {bd['km_ky_toi']:,} km",
-                          "Đặt lịch garage trước khi phát lệnh dài ngày"))
+    t = tinh_trang_bao_duong(db, v)
+    if t["muc"] != OK:
+        kq.append(_mo(t["ma"], t["muc"], t["loi"], t["viec"]))
 
     # 4d. Giấy tờ sắp hết hạn – vàng/đỏ theo tham số chính sách, tách khỏi nhánh ĐÃ hết hạn ở trên.
     vang = int(R.get_param(db, "xe_giay_to_vang_ngay")); do = int(R.get_param(db, "xe_giay_to_do_ngay"))
@@ -371,6 +354,45 @@ def moc_bao_duong(db: Session, v: Vehicle) -> dict:
                 "ghi_chu": f"Phiếu lần trước không ghi mốc kế tiếp – tạm lấy chu kỳ chung {chu_ky:,} km"}
     return {"km_ky_toi": None, "nguon": "phieu_thieu_km",
             "ghi_chu": "Phiếu bảo dưỡng lần trước không ghi số km lúc làm – không tính được mốc kỳ tới"}
+
+
+def tinh_trang_bao_duong(db: Session, v: Vehicle) -> dict:
+    """MỘT chỗ duy nhất trả lời "xe này đang đứng đâu so với mốc bảo dưỡng" — 30/9/2026.
+
+    Trước bản này luật ấy chỉ nằm bên trong `kiem_tra()`, tức là chỉ trả lời được khi có người ĐANG
+    lập một lệnh điều xe cụ thể. Không có chỗ nào hỏi được câu "cả đội xe, xe nào sắp tới hạn" — mà
+    đó đúng là câu người quản đội hỏi mỗi sáng, và là mục 4.9.6 còn trống trong cây phân hệ.
+
+    Tách ra thành hàm riêng chứ KHÔNG chép luật sang màn hình: chép là dựng công thức thứ hai cho
+    cùng một ngưỡng, và ngày ai đó đổi tham số `xe_bd_gap_km` thì hai chỗ nói hai điều khác nhau —
+    đúng cái bẫy đã sinh ra bốn công thức lãi lỗ tour trong kho này.
+
+    Trả về CẢ mã cổng, lời và việc phải làm, để `kiem_tra()` dựng cổng từ đúng nguồn này và màn
+    hình vẽ lại y nguyên câu chữ ấy. Rỗng vẫn khác không: chưa biết mốc là CHƯA ĐỦ DỮ LIỆU, không
+    phải là đạt.
+    """
+    bd = moc_bao_duong(db, v)
+    chung = {"km_ky_toi": bd["km_ky_toi"], "nguon": bd.get("nguon", ""),
+             "lan_truoc": bd.get("lan_truoc"), "ghi_chu_moc": bd.get("ghi_chu", ""),
+             "odo_km": v.odo_km, "odo_at": v.odo_at, "con_km": None}
+    if bd["km_ky_toi"] is None:
+        return {**chung, "muc": UNKNOWN, "ma": "CHUA_BIET_MOC_BAO_DUONG",
+                "loi": f"Xe {v.plate}: {bd.get('ghi_chu', 'chưa xác định được mốc bảo dưỡng kỳ tới')}",
+                "viec": "Nhập phiếu bảo dưỡng gần nhất kèm số km lúc làm"}
+    if not v.odo_km:
+        return {**chung, "muc": UNKNOWN, "ma": "CHUA_CO_SO_KM",
+                "loi": f"Xe {v.plate} chưa có số km đồng hồ đã xác nhận nên không so được với mốc bảo dưỡng",
+                "viec": "Cập nhật số km đồng hồ trước khi lập kế hoạch mới"}
+    if v.odo_km > bd["km_ky_toi"]:
+        return {**chung, "con_km": bd["km_ky_toi"] - v.odo_km, "muc": BLOCK, "ma": "VUOT_MOC_BAO_DUONG",
+                "loi": f"Xe {v.plate} đã ở {v.odo_km:,} km, vượt mốc bảo dưỡng {bd['km_ky_toi']:,} km",
+                "viec": "Làm bảo dưỡng hoặc đổi xe khác"}
+    con = bd["km_ky_toi"] - v.odo_km
+    if con <= int(R.get_param(db, "xe_bd_gap_km")):
+        return {**chung, "con_km": con, "muc": REVIEW, "ma": "SAP_TOI_MOC_BAO_DUONG",
+                "loi": f"Xe {v.plate} còn {con:,} km tới mốc bảo dưỡng {bd['km_ky_toi']:,} km",
+                "viec": "Đặt lịch garage trước khi phát lệnh dài ngày"}
+    return {**chung, "con_km": con, "muc": OK, "ma": "", "loi": "", "viec": ""}
 
 
 def _han_giay(kq: list, chu_the: str, ten: str, het: date, den_ngay: date, vang: int, do: int):

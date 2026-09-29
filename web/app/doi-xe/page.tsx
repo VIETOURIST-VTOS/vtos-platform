@@ -19,7 +19,10 @@ function DoiXe() {
   const [xe, setXe] = useState<any[]>([]);
   const [chon, setChon] = useState<any>(null);
   const [xm, setXm] = useState<any[]>([]);
-  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan" | "congno">("xe");
+  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan" | "congno" | "baoduong">("xe");
+  const [bd, setBd] = useState<any>(null);          // tình trạng bảo dưỡng của cả đội
+  const [bdLs, setBdLs] = useState<any[]>([]);      // lịch sử phiếu bảo dưỡng
+  const [formBD, setFormBD] = useState<any>(null);  // form ghi phiếu bảo dưỡng
   const [chuyen, setChuyen] = useState<any[]>([]);
   const [gd, setGd] = useState<any>(null);
   const [chuXe, setChuXe] = useState<any[]>([]);
@@ -36,6 +39,16 @@ function DoiXe() {
   const [formDX, setFormDX] = useState<any>(null);  // form đề xuất chi
   const [dangLuu, setDangLuu] = useState(false);
 
+  // Mục 4.9.6 "Bảo dưỡng & sửa chữa" của cây phân hệ trỏ thẳng vào tab này bằng ?tab=bao-duong.
+  // Đọc từ window chứ không dùng useSearchParams: hook ấy đòi bọc Suspense, và một trang hỏng khi
+  // dựng vì thiếu bọc là cái giá quá đắt cho việc đọc một chữ trên địa chỉ.
+  useEffect(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get("tab");
+      if (t === "bao-duong") setTab("baoduong");
+    } catch { /* không có địa chỉ thì giữ tab mặc định */ }
+  }, []);
+
   const load = useCallback(async () => {
     try {
       setTq(await api("/fleet/tong-quan"));
@@ -47,9 +60,36 @@ function DoiXe() {
       setQt(await api("/fleet/quyet-toan"));
       setDm3(await api("/fleet/danh-muc-dot3"));
       setCn(await api("/fleet/cong-no"));
+      setBd(await api("/fleet/bao-duong/theo-xe"));
+      setBdLs(await api("/fleet/bao-duong"));
     } catch (e) { toast(errMsg(e), true); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
+
+  /** Ghi một phiếu bảo dưỡng / sửa chữa.
+   *
+   *  KHÔNG tự điền mốc kỳ tới khi người nhập bỏ trống: máy chủ nói thẳng là chưa tính được, còn
+   *  suy ra từ chu kỳ chung là cách chi phí bị ghi sai kỳ mà không ai phát hiện.
+   *
+   *  Cảnh báo máy chủ trả về (`canh_bao`) phải HIỆN RA, không nuốt: nó bắt đúng lỗi có thật —
+   *  mốc km ghi trên phiếu lớn hơn km đồng hồ đã xác nhận, tức là sai ngày hoặc sai kỳ.
+   */
+  const luuBaoDuong = async () => {
+    if (!formBD.vehicle_id) return toast("Chọn xe trước đã", true);
+    if (!formBD.ngay) return toast("Nhập ngày thực hiện", true);
+    setDangLuu(true);
+    try {
+      const r = await api<any>("/fleet/bao-duong", { method: "POST", json: {
+        vehicle_id: Number(formBD.vehicle_id), ngay: formBD.ngay, kind: formBD.kind || "dinh_ky",
+        km_luc_lam: soTien(formBD.km_luc_lam), km_ky_toi: soTien(formBD.km_ky_toi),
+        noi_dung: formBD.noi_dung || "", garage: formBD.garage || "",
+        so_tien: soTien(formBD.so_tien), chung_tu: formBD.chung_tu || "" } });
+      toast(r.message);
+      (r.canh_bao || []).forEach((c: string) => toast(c, true));
+      setFormBD(null);
+      await load();
+    } catch (e) { toast(errMsg(e), true); } finally { setDangLuu(false); }
+  };
 
   const mo = async (id: number) => { try { setChon(await api(`/fleet/xe/${id}`)); } catch (e) { toast(errMsg(e), true); } };
 
@@ -117,7 +157,7 @@ function DoiXe() {
     <p className="muted">{tq.ghi_chu}{tq.chan_khi_thieu_giay ? " Đang BẬT chế độ chặn khi thiếu giấy tờ." : " Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo, chưa dừng lệnh điều xe."}</p>
 
     <div style={{ display: "flex", gap: 8, margin: "10px 0" }}>
-      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`], ["congno", "Công nợ đội xe"]] as const)
+      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`], ["congno", "Công nợ đội xe"], ["baoduong", bd ? `Bảo dưỡng (${(bd.theo_muc?.BLOCK || 0) + (bd.theo_muc?.REVIEW || 0)} cần xếp lịch)` : "Bảo dưỡng"]] as const)
         .map(([k, ten]) => <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} onClick={() => setTab(k as any)}>{ten}</button>)}
     </div>
 
@@ -473,6 +513,113 @@ function DoiXe() {
           <p className="muted">Xe này <b>chưa có mã xe cố định</b> nên chưa gắn tệp được. Tệp gắn theo mã chứ
           không theo biển – biển đổi mà hồ sơ đi theo biển thì giấy tờ của một chiếc xe nằm rải ở hai chỗ.
           Đặt mã cho xe ở bảng trên rồi quay lại.</p></div>)}
+
+    {/* ── 4.9.6 · BẢO DƯỠNG & SỬA CHỮA ────────────────────────────────────────────────────────
+        Bảng `fleet_maintenance`, hai cửa API và thuật toán `moc_bao_duong()` có từ Đợt 1; tới
+        29/9/2026 KHÔNG màn hình nào gọi tới, nên mục 4.9.6 của cây phân hệ vẫn trống và đội xe
+        không có chỗ nhập lịch bảo dưỡng. Đây là chỗ đó.
+
+        Màn hình KHÔNG tự tính mốc hay ngưỡng: cả cột "còn bao nhiêu km" lẫn mức Chặn/Cần xem lại
+        đều do `/fleet/bao-duong/theo-xe` trả về, và cửa ấy gọi đúng hàm mà bộ điều kiện phát lệnh
+        điều xe đang dùng. Chép ngưỡng sang đây là dựng công thức thứ hai cho cùng một luật. */}
+    {tab === "baoduong" && <>
+      {bd && <div className="kpis">
+        <div className="kpi"><b style={{ color: bd.theo_muc?.BLOCK ? "var(--red)" : undefined }}>{bd.theo_muc?.BLOCK || 0}</b><span>đã vượt mốc – chặn phát lệnh</span></div>
+        <div className="kpi"><b style={{ color: bd.theo_muc?.REVIEW ? "var(--orange)" : undefined }}>{bd.theo_muc?.REVIEW || 0}</b><span>sắp tới mốc – cần xếp lịch garage</span></div>
+        <div className="kpi"><b style={{ color: bd.theo_muc?.UNKNOWN ? "var(--orange)" : undefined }}>{bd.theo_muc?.UNKNOWN || 0}</b><span>chưa đủ dữ liệu để kết luận</span></div>
+        <div className="kpi"><b>{bd.theo_muc?.OK || 0}</b><span>còn trong hạn</span></div>
+      </div>}
+      {bd?.ghi_chu && <p className="muted">{bd.ghi_chu}</p>}
+
+      <div className="panel wrap">
+        <h2>Từng xe đứng đâu so với mốc</h2>
+        <table><thead><tr>
+          <th>Xe</th><th className="num">Đồng hồ</th><th className="num">Mốc kỳ tới</th>
+          <th className="num">Còn</th><th>Nguồn mốc</th><th>Tình trạng</th>{canNhap && <th></th>}
+        </tr></thead><tbody>
+          {(bd?.xe || []).map((x: any) => <tr key={x.vehicle_id}>
+            <td><b>{x.code || x.plate}</b>{x.code && <div className="muted">{x.plate}</div>}</td>
+            <td className="num">{x.odo_km ? `${x.odo_km.toLocaleString("vi-VN")} km` : <span className="muted" title="Chưa có số – khác với bằng 0">—</span>}
+              {x.odo_at && <div className="muted">{fmtD(x.odo_at)}</div>}</td>
+            <td className="num">{x.km_ky_toi ? `${x.km_ky_toi.toLocaleString("vi-VN")} km` : <span className="muted">—</span>}</td>
+            <td className="num">{x.con_km === null || x.con_km === undefined
+              ? <span className="muted">—</span>
+              : <b className={x.con_km < 0 ? "red" : ""}>{x.con_km.toLocaleString("vi-VN")} km</b>}</td>
+            <td className="muted">{x.nguon === "ghi_tren_phieu" ? "Ghi trên phiếu lần trước"
+              : x.nguon === "chu_ky_chung" ? "Chu kỳ chung (phiếu trước không ghi mốc)"
+              : x.nguon === "chua_co_lich_su" ? "Chưa có lịch sử"
+              : x.nguon === "phieu_thieu_km" ? "Phiếu trước thiếu số km" : x.nguon}</td>
+            <td><Tag cls={MUC_CLS[x.muc]}>{MUC_TEN[x.muc]}</Tag>
+              {x.loi && <div className="muted">{x.loi}</div>}
+              {x.viec && <div className="muted"><b>Việc cần làm:</b> {x.viec}</div>}</td>
+            {canNhap && <td><button className="act teal" onClick={() => setFormBD({
+              vehicle_id: x.vehicle_id, ngay: new Date().toISOString().slice(0, 10), kind: "dinh_ky",
+              km_luc_lam: x.odo_km || "", km_ky_toi: "", noi_dung: "", garage: "", so_tien: "", chung_tu: "",
+            })}>Ghi phiếu</button></td>}
+          </tr>)}
+          {!bd?.xe?.length && <tr><td colSpan={canNhap ? 7 : 6} className="muted">Chưa có xe nào đang khai thác.</td></tr>}
+        </tbody></table>
+      </div>
+
+      {formBD && <div className="panel">
+        <h2>Ghi phiếu bảo dưỡng / sửa chữa</h2>
+        <p className="muted">
+          Bỏ trống <b>mốc kỳ tới</b> thì hệ thống nói thẳng là chưa tính được, <b>không</b> suy ra từ
+          chu kỳ chung — suy ra là cách chi phí bị ghi sai kỳ mà không ai phát hiện.
+        </p>
+        <div className="grid">
+          <div><label>Xe</label>
+            <select value={formBD.vehicle_id} onChange={(e) => setFormBD({ ...formBD, vehicle_id: e.target.value })}>
+              {xe.map((v: any) => <option key={v.id} value={v.id}>{v.code || v.plate} · {v.plate}</option>)}
+            </select></div>
+          <div><label>Ngày thực hiện</label>
+            <input type="date" value={formBD.ngay} onChange={(e) => setFormBD({ ...formBD, ngay: e.target.value })} /></div>
+          <div><label>Loại</label>
+            <select value={formBD.kind} onChange={(e) => setFormBD({ ...formBD, kind: e.target.value })}>
+              <option value="dinh_ky">Bảo dưỡng định kỳ</option>
+              <option value="sua_chua">Sửa chữa</option>
+              <option value="vo_xe">Vỏ xe</option>
+              <option value="khac">Khác</option>
+            </select></div>
+          <div><label>Km lúc làm</label>
+            <input value={formBD.km_luc_lam} onChange={(e) => setFormBD({ ...formBD, km_luc_lam: e.target.value })} /></div>
+          <div><label>Mốc km kỳ tới (ghi trên phiếu)</label>
+            <input value={formBD.km_ky_toi} onChange={(e) => setFormBD({ ...formBD, km_ky_toi: e.target.value })} /></div>
+          <div><label>Garage</label>
+            <input value={formBD.garage} onChange={(e) => setFormBD({ ...formBD, garage: e.target.value })} /></div>
+          <div><label>Số tiền</label>
+            <input value={formBD.so_tien} onChange={(e) => setFormBD({ ...formBD, so_tien: e.target.value })} /></div>
+          <div><label>Chứng từ</label>
+            <input value={formBD.chung_tu} onChange={(e) => setFormBD({ ...formBD, chung_tu: e.target.value })} /></div>
+        </div>
+        <label>Nội dung</label>
+        <input value={formBD.noi_dung} onChange={(e) => setFormBD({ ...formBD, noi_dung: e.target.value })} />
+        <p>
+          <button className="act teal" disabled={dangLuu} onClick={() => luuBaoDuong()}>{dangLuu ? "Đang lưu…" : "Ghi phiếu"}</button>{" "}
+          <button className="act grey" onClick={() => setFormBD(null)}>Thôi</button>
+        </p>
+      </div>}
+
+      <div className="panel wrap">
+        <h2>Lịch sử phiếu ({bdLs.length})</h2>
+        <table><thead><tr>
+          <th>Ngày</th><th>Xe</th><th>Loại</th><th className="num">Km lúc làm</th>
+          <th className="num">Mốc kỳ tới</th><th>Nội dung</th><th>Garage</th>
+          <th className="num">Số tiền</th><th>Bên chịu</th><th>Chứng từ</th>
+        </tr></thead><tbody>
+          {bdLs.map((m: any) => <tr key={m.id}>
+            <td>{fmtD(m.ngay)}</td><td>{m.xe}</td><td>{m.kind_ten}</td>
+            <td className="num">{m.km_luc_lam ? m.km_luc_lam.toLocaleString("vi-VN") : <span className="muted">—</span>}</td>
+            <td className="num">{m.km_ky_toi ? m.km_ky_toi.toLocaleString("vi-VN") : <span className="muted">—</span>}</td>
+            <td>{m.noi_dung}</td><td>{m.garage}</td>
+            <td className="num">{m.so_tien === null || m.so_tien === undefined ? <span className="muted" title="Chưa có số – khác với bằng 0">—</span> : m.so_tien.toLocaleString("vi-VN")}</td>
+            <td>{m.ben_chiu_ten}</td>
+            <td>{m.chung_tu || <Tag cls="warn">chưa có</Tag>}</td>
+          </tr>)}
+          {!bdLs.length && <tr><td colSpan={10} className="muted">Chưa có phiếu bảo dưỡng nào được ghi.</td></tr>}
+        </tbody></table>
+      </div>
+    </>}
 
     {tab === "xe" && <div className="panel wrap"><h2>Hàng đợi xác minh hồ sơ ({xm.filter((x) => x.status !== "xong" && x.status !== "khong_ap_dung").length} còn treo)</h2>
       <p className="muted">Những việc hệ thống không tự quyết được và cần người trả lời. Hệ thống nói ra chỗ nó không chắc, thay vì tự điền cho đủ form.</p>
