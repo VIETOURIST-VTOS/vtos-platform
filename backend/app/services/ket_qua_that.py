@@ -182,6 +182,17 @@ def _dem_dong_bu(ds: list[Tour]) -> int:
     return sum(1 for t in ds if t.confirmed_by == N_BU and _do_cua_nay(t))
 
 
+def _theo_mang(ds: list[Tour]) -> dict:
+    """Doanh thu và số chuyến của một danh sách chuyến, chia theo mảng le · doan · khac."""
+    from app.services import segments as SEG
+    ra = {m: {"doanh_thu": 0.0, "chuyen": 0} for m in ("le", "doan", "khac")}
+    for t in ds:
+        m = SEG.mang_of(t) or "khac"
+        ra[m]["doanh_thu"] += float(t.actual_revenue or 0)
+        ra[m]["chuyen"] += 1
+    return ra
+
+
 def thang(db: Session, ky: str, nho: dict | None = None) -> dict:
     """Doanh thu và lãi tour của MỘT tháng, phạm vi Vietourist mẹ.
 
@@ -290,6 +301,11 @@ def thang(db: Session, ky: str, nho: dict | None = None) -> dict:
                     and all(t.status in KHONG_TRA_LAI_DUOC for t in cua_me_da_dong)),
         "co_nguon": me is not None,
         "dong_so_bu": _dem_dong_bu(cua_me_da_dong),
+        # TC-98 · DOANH THU THEO PHÒNG (anh Tuấn 29/9/2026: "nối doanh thu của PKD Lẻ và PKD Đoàn
+        # vào màn hình chủ tịch"). Chia ĐÚNG tập `du` đã cộng ra `doanh_thu` ở trên — không phải
+        # một phép tính thứ hai — nên lẻ + đoàn + khác luôn bằng `doanh_thu`. Mảng theo
+        # `segments.mang_of`, cùng luật với bộ lọc phòng và bảng lương.
+        "theo_mang": _theo_mang(du),
     }
     if nho is not None:
         nho[khoa] = ra

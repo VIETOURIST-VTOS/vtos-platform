@@ -40,6 +40,27 @@ function Dau({ ten, phu }: { ten: string; phu?: string }) {
 
 /** Câu đọc hộ cho một bảng xếp hạng. Chỉ đếm lại dòng máy chủ gửi — không tính chỉ tiêu mới.
  *  Trả về chuỗi rỗng khi không có gì đáng nói: một câu "có 0 người" không giúp ai cả. */
+/** TC-98 · Doanh thu của phòng (anh Tuấn 29/9/2026): tháng này và lũy kế năm, do máy chủ tính
+ *  (`sections.doanh_thu_phong`, services/dashboard.doanh_thu_phong). Màn hình chỉ bày. */
+function DoanhThuPhong({ p, ky, nam }: { p?: any; ky?: string; nam?: number }) {
+  if (!p) return null;
+  const thang = ky ? `${ky.slice(5, 7)}/${ky.slice(0, 4)}` : "tháng này";
+  return (
+    <div className="kd-dt">
+      <div className="kd-dt-o">
+        <div className="kd-dt-nhan">Doanh thu tháng {thang}</div>
+        <div className="kd-dt-so">{gonSo(Number(p.thang) || 0, "tien")}</div>
+        <div className="kd-dt-phu">{p.chuyen_thang} chuyến</div>
+      </div>
+      <div className="kd-dt-o">
+        <div className="kd-dt-nhan">Lũy kế năm {nam ?? ""}</div>
+        <div className="kd-dt-so">{gonSo(Number(p.nam) || 0, "tien")}</div>
+        <div className="kd-dt-phu">{p.chuyen_nam} chuyến</div>
+      </div>
+    </div>
+  );
+}
+
 export function docHoXepHang(ds: Thanh[], don_vi: "doanh thu" | "lợi nhuận"): string {
   const co = ds.filter((h) => typeof h.gt === "number") as { ten: string; gt: number }[];
   if (co.length === 0) return "";
@@ -55,7 +76,7 @@ export function docHoXepHang(ds: Thanh[], don_vi: "doanh thu" | "lợi nhuận")
   return phan.join(" · ") + ".";
 }
 
-export function KhoiKinhDoanhLe({ ds, bieu_do }: { ds?: any[] | null; bieu_do?: any }) {
+export function KhoiKinhDoanhLe({ ds, bieu_do, dt }: { ds?: any[] | null; bieu_do?: any; dt?: any }) {
   const co = ds || [];
   const thanh: Thanh[] = co.map((r: any) => ({
     ten: r.sales, gt: r.revenue === null || r.revenue === undefined ? null : Number(r.revenue),
@@ -64,6 +85,7 @@ export function KhoiKinhDoanhLe({ ds, bieu_do }: { ds?: any[] | null; bieu_do?: 
   return (
     <section className="panel" id="kd-le">
       <Dau ten="Kinh doanh Lẻ" phu="doanh thu tính chỉ tiêu tháng" />
+      <DoanhThuPhong p={dt?.le} ky={dt?.ky} nam={dt?.nam} />
       {co.length === 0
         ? <p className="muted">Chưa có chuyến nào quyết toán trong tháng.</p>
         : <>
@@ -78,7 +100,7 @@ export function KhoiKinhDoanhLe({ ds, bieu_do }: { ds?: any[] | null; bieu_do?: 
   );
 }
 
-export function KhoiKinhDoanhDoan({ d, bieu_do }: { d?: any | null; bieu_do?: any }) {
+export function KhoiKinhDoanhDoan({ d, bieu_do, dt }: { d?: any | null; bieu_do?: any; dt?: any }) {
   const rows = d?.rows || [];
   const thanh: Thanh[] = rows.map((r: any) => ({
     ten: r.sales,
@@ -88,6 +110,7 @@ export function KhoiKinhDoanhDoan({ d, bieu_do }: { d?: any | null; bieu_do?: an
   return (
     <section className="panel" id="kd-doan">
       <Dau ten="Kinh doanh Đoàn (MICE)" phu="lợi nhuận chia tháng" />
+      <DoanhThuPhong p={dt?.doan} ky={dt?.ky} nam={dt?.nam} />
       {rows.length === 0
         ? <p className="muted">Chưa có chuyến đoàn nào quyết toán trong tháng.</p>
         : <>

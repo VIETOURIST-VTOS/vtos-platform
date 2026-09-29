@@ -39,6 +39,29 @@ def _month_tours(db: Session, y: int, m: int) -> list[Tour]:
                                   Tour.kt_confirmed_at >= dau, Tour.kt_confirmed_at < cuoi)).scalars())
 
 
+def doanh_thu_phong(db: Session, today: date) -> dict:
+    """TC-98 · Doanh thu PKD Lẻ và PKD Đoàn: tháng này và lũy kế năm đến hôm nay.
+
+    Đọc qua ĐÚNG `ket_qua_that.thang` mà khối Doanh thu ở đầu màn hình dùng, nên tổng hai phòng
+    (cộng phần "khác") khớp con số doanh thu tháng/năm ở trên — không có công thức thứ hai.
+    Tháng chưa có chuyến nào đủ số thì phòng ấy là 0 đồng, 0 chuyến."""
+    from app.services import ket_qua_that as KQT
+    nho: dict = {}
+    ky_nay = f"{today:%Y-%m}"
+    ra = {"ky": ky_nay, "nam": today.year}
+    thang_nay = KQT.thang(db, ky_nay, nho=nho)["theo_mang"]
+    luy_ke = {m: {"doanh_thu": 0.0, "chuyen": 0} for m in ("le", "doan", "khac")}
+    for mth in range(1, today.month + 1):
+        tm = KQT.thang(db, f"{today.year:04d}-{mth:02d}", nho=nho)["theo_mang"]
+        for m in luy_ke:
+            luy_ke[m]["doanh_thu"] += tm[m]["doanh_thu"]
+            luy_ke[m]["chuyen"] += tm[m]["chuyen"]
+    for m in ("le", "doan"):
+        ra[m] = {"thang": thang_nay[m]["doanh_thu"], "chuyen_thang": thang_nay[m]["chuyen"],
+                 "nam": luy_ke[m]["doanh_thu"], "chuyen_nam": luy_ke[m]["chuyen"]}
+    return ra
+
+
 def build(db: Session, u: User) -> dict:
     """Số liệu dashboard theo vai trò – chỉ đọc, tính từ dữ liệu hiện có."""
     today = date.today(); p = f"{today:%Y-%m}"
@@ -200,6 +223,7 @@ def build(db: Session, u: User) -> dict:
         sec["kd_le"] = sorted([{"sales": users.get(i, i), "revenue": v, "pct": v / moc if moc else 0} for i, v in le.items()], key=lambda r: -(r["revenue"] or 0))
         sec["kd_doan"] = {"so_chuyen": doan_tours,
                           "rows": sorted([{"sales": users.get(i, i), "profit_share": v} for i, v in doan.items()], key=lambda r: -r["profit_share"])}
+        sec["doanh_thu_phong"] = doanh_thu_phong(db, today)
     if role in ("tp_dh", "nv_dh", "chutich", "tgd"):
         d7 = int(R.get_param(db, "moc_d7")); rows = []
         for t in db.execute(select(Tour).options(selectinload(Tour.bookings))
