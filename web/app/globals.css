@@ -1416,3 +1416,10 @@ html{font-size:var(--vtos-co-chu,16px)}
    vừa hỏng. Màn hình đổi màu là việc của trình duyệt, không phải bằng chứng đã lưu. */
 .gd-trangthai{font-size:calc(11/14*1rem);color:var(--vtos-text-mute)}
 .gd-trangthai.loi{color:var(--vtos-danger)}
+
+/* TC-97 · Màn hình Chủ tịch không hiện ghi chú (anh Tuấn 29/9/2026). Chỉ trong vỏ của trang
+   chủ (web/app/page.tsx) — các màn hình khác dùng chung khối vẫn giữ ghi chú. */
+.mh01-khong-ghi-chu{display:contents}
+.mh01-khong-ghi-chu .v14-ghi,
+.mh01-khong-ghi-chu .bd-chu,
+.mh01-khong-ghi-chu .bd-chan{display:none !important}

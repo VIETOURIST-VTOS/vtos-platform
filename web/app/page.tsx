@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
-import { api, pct } from "@/lib/api";
+import { api } from "@/lib/api";
 import { errMsg } from "@/components/ui";
 import KhoiDongTien from "@/components/KhoiDongTien";
 import { KhoiHieuQuaXe, KhoiPhaiThu, KhoiPhaiTra } from "@/components/KhoiV14";
@@ -71,10 +71,8 @@ function Dash() {
 
   const the: The[] = [
     { nhan: "Tour đang bán", so: dem(gd.dang_ban),
-      duoi: "Đã duyệt, chưa tới ngày khởi hành · chưa có sức chứa từng chuyến nên chưa tính được chỗ còn (Điều hành)",
       ai: "Điều hành", cua: "/tours" },
     { nhan: "Tour đang chạy", so: dem(gd.dang_chay),
-      duoi: "Đang trong hành trình hôm nay · chưa có sổ sự cố chuyến nên chưa đếm được chuyến cần xử lý (Điều hành)",
       ai: "Điều hành", cua: "/tours" },
     { nhan: "Tour sắp khởi hành", so: dem(sec.sap_khoi_hanh?.length),
       duoi: `${soNgayKH} ngày tới`, ai: "Điều hành", cua: "/tours" },
@@ -92,18 +90,21 @@ function Dash() {
         ? `${xe.o_bai} xe nằm bãi trên ${xe.dieu_duoc} xe điều được`
           + (xe.bat_thuong > 0 ? ` · ${xe.bat_thuong} xe có bất thường` : "")
           + (xe.lech > 0 ? ` · ${xe.lech} lệnh điều xe trỏ tới xe không còn điều được (Đội xe)` : "")
-        : "Xe đang chạy hôm nay · xe nằm bãi · xe có bất thường",
+        : undefined,
       do: (xe.bat_thuong ?? 0) > 0 || (xe.lech ?? 0) > 0 },
     { nhan: "Khách tiềm năng mới", so: null,
-      ai: "Marketing", cua: "/leads?tab=leads",
-      duoi: "Chưa bàn giao Kinh doanh · quá hạn bàn giao" },
+      ai: "Marketing", cua: "/leads?tab=leads" },
   ];
 
   /* Biểu đồ dựng một lần, giao cho từng khối tự bày. Khối nào chưa đủ số thì nhận `null` và chỉ
      hiện ô số của nó — ô số vốn đã ghi "Chưa kết nối" kèm bộ phận và cửa nhập. */
   const bd = bieuDoCua(sec);
 
-  return (<>
+  /* TC-97 · BỎ HẾT GHI CHÚ TRÊN MÀN HÌNH CHỦ TỊCH (anh Tuấn 29/9/2026: "trên màn hình chủ tịch
+     em xoá hết các ghi chú"). Các dòng chữ giải thích nhỏ (.v14-ghi, .bd-chu, .bd-chan) bị ẩn
+     BẰNG CSS trong vỏ `.mh01-khong-ghi-chu` — chỉ ở màn hình này, các khối dùng chung ở màn hình
+     khác vẫn giữ ghi chú. Vỏ dùng `display:contents` nên không đổi bố cục. */
+  return (<div className="mh01-khong-ghi-chu">
     <TieuDe vai={user?.role} ten_vai={user?.role_name} quyet_dinh={d.approvals || []} />
 
     {/* ══ TC-42 · SÁU Ô LỚN, RỒI MỚI ĐẾN NHỮNG CON SỐ ĐỂ LIẾC (anh Tuấn chốt 16/9/2026) ═══════
@@ -189,7 +190,6 @@ function Dash() {
       <KhoiBaoCaoNgay d={sec.bao_cao_ngay} bieu_do={bd.bao_cao_ngay} />
     </div>
 
-    <p className="muted">Ngưỡng biên đang áp dụng {pct(d.threshold)} · Robot chạy mỗi 10 phút; CNTT có thể chạy tay ở trang Cảnh báo.</p>
-  </>);
+  </div>);
 }
 export default function Page() { return <Shell><Dash /></Shell>; }

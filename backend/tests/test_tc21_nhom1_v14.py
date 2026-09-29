@@ -149,12 +149,11 @@ def test_dong_phu_khong_bia_so_so_sanh():
     )
 
 
-def test_the_tour_dang_ban_noi_ro_chua_tinh_duoc_cho_con():
+def test_the_tour_dang_ban_khong_con_ghi_chu():
+    """SỬA 29/9/2026 (TC-97): anh Tuấn "trên màn hình chủ tịch em xoá hết các ghi chú". Dòng phụ
+    giải thích "chưa có sức chứa… chỗ còn" là ghi chú nên bỏ; thẻ chỉ còn con số."""
     the = _the(_doc(TRANG), "Tour đang bán")
-    assert "chỗ còn" in the and "sức chứa" in the, (
-        'Bản vẽ chốt dòng phụ là "Khách đã chốt / chỗ còn". Chưa có sức chứa từng chuyến thì phải '
-        "ghi ra, không thay bằng một con số khác.\n" + the
-    )
+    assert "sức chứa" not in the and "duoi:" not in the, the
 
 
 def test_khoi_ton_dong_noi_ro_hai_chi_so_con_thieu():
