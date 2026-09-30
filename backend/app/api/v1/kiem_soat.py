@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.api.deps import require_roles
+from app.api.deps import require_roles, robot_auth
 from app.models.core import User
 from app.services import ks_robot as KS
 
@@ -61,6 +61,27 @@ def quet(u: User = Depends(require_roles(*CHAY)), db: Session = Depends(get_db))
     """Một vòng quét: mạch nâng cấp, quyền lệch, vai trò trống, ngoại lệ tồn, AI chưa hậu kiểm.
     Chỉ sinh báo cáo gửi Chủ tịch khi có việc NGHIÊM TRỌNG mới."""
     return KS.quet(db, boi=u.username)
+
+
+@router.post("/robot/quet", dependencies=[Depends(robot_auth)])
+def robot_quet(db: Session = Depends(get_db)):
+    """CỬA LỊCH của vòng quét: GitHub Actions gọi mỗi ngày bằng X-Robot-Token.
+
+    Vì sao phải có cửa này, và vì sao nó mở bằng token chứ không bằng vai trò người: tới 30/9/2026
+    vòng quét CHỈ chạy được bằng nút "Chạy một vòng quét" trên màn hình, tức là chỉ chạy khi có người
+    nhớ ra mà bấm. Đo trên hệ thật ngày 30/9: lần quét cuối cùng là 10/9/2026 22:15 – mười chín ngày.
+    Suốt mười chín ngày ấy bàn giám sát treo đỏ một việc đã hết ("POST /api/v1/robot/sepay/pull ×116",
+    lần cuối 10/9) và không mở ra được việc nào mới, kể cả lỗi 500 của cửa nạp bù chạy từ 27/9.
+
+    Bàn giám sát mà đứng hình thì nguy hơn bàn giám sát trống: người đọc nó tin rằng mình đang nhìn
+    hôm nay. `KS.quet` đã biết tự đóng việc đã hết (`con=False` cho mã không còn thấy) – nó chỉ thiếu
+    một cái lịch.
+
+    Cửa này KHÔNG chấm điểm. Chấm điểm phòng ban là việc gắn vào hồ sơ con người, và theo chỉ đạo
+    07/9/2026 điểm máy chấm chỉ là ĐỀ XUẤT tới khi Chủ tịch hậu kiểm; một cái lịch tự chấm điểm mỗi
+    đêm sẽ đẻ ra hàng loạt điểm không ai đối chất được. Quét là đọc, chấm là phán – chỉ đem đọc ra lịch.
+    """
+    return KS.quet(db, boi="robot_ks")
 
 
 @router.post("/cham-diem")

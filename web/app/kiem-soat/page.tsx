@@ -53,6 +53,26 @@ function KiemSoatPage() {
 
       {loi && <div className="gate fail">{loi}</div>}
 
+      {/* TUỔI CỦA TẤM ẢNH. Ngày 30/9/2026 bàn này vẽ số liệu chốt 10/9 mà không có một chữ nào nói ra
+          điều đó: một việc đã hết từ 19 ngày trước vẫn treo đỏ "nghiêm trọng · đã báo Chủ tịch". Một
+          bàn giám sát đứng hình còn nguy hơn bàn trống, vì người đọc tin rằng mình đang nhìn hôm nay. */}
+      {d && d.ban_cu && (
+        <div className="gate fail" style={{ marginBottom: 12 }}>
+          <b>Bàn giám sát đang là ảnh cũ.</b>{" "}
+          {d.ban_cu_ly_do}
+          {d.quet_lan_cuoi
+            ? ` Lần quét gần nhất: ${new Date(d.quet_lan_cuoi).toLocaleString("vi-VN")}.`
+            : ""}{" "}
+          Số dưới đây là tình trạng của lần quét ấy, không phải của hôm nay.
+        </div>
+      )}
+      {d && !d.ban_cu && d.quet_lan_cuoi && (
+        <p className="muted" style={{ marginTop: -2 }}>
+          Vòng quét gần nhất: <b>{new Date(d.quet_lan_cuoi).toLocaleString("vi-VN")}</b>
+          {" "}({d.quet_cach_day_gio} giờ trước) · lịch tự động 20:30 mỗi ngày.
+        </p>
+      )}
+
       {th && (
         <div className="kpis" style={{ marginBottom: 12 }}>
           <div className="kpi" style={{ borderColor: th.con_do ? "var(--red)" : undefined }}>
