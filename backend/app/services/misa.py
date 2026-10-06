@@ -446,7 +446,25 @@ def reconcile(db: Session, tb: bytes, column: str = "close") -> dict:
 
 # ---------- 7. Xuất ngược sang MISA ----------
 MISA_PURCHASE_COLS = ["Phương thức thanh toán", "Nhận kèm hóa đơn", "Là CP mua hàng", "Ngày hạch toán (*)", "Ngày chứng từ (*)", "Số chứng từ (*)", "Số tài khoản chi", "Tên ngân hàng chi", "Nhà cung cấp", "Tên nhà cung cấp", "Địa chỉ", "Diễn giải/Lý do chi/Nội dung thanh toán", "Số tài khoản nhận", "Tên ngân hàng nhận", "Mã nhân viên mua hàng", "Hạn thanh toán", "Loại tiền", "Tỷ giá", "Mã dịch vụ (*)", "Tên dịch vụ", "Là dòng ghi chú", "TK kho/TK chi phí (*)", "TK công nợ/TK tiền (*)", "Mã đối tượng", "ĐVT", "Số lượng", "Đơn giá", "Thành tiền", "Thành tiền quy đổi", "Tỷ lệ CK (%)", "Tiền chiết khấu", "Tiền chiết khấu quy đổi", "Mã khoản mục chi phí", "Mã đơn vị", "Mã đối tượng THCP", "Mã công trình", "Số đơn đặt hàng", "Số hợp đồng mua", "Số hợp đồng bán", "Mã thống kê", "Số khế ước đi vay", "Số khế ước cho vay", "CP không hợp lý", "% thuế GTGT", "% thuế suất KHAC", "Tiền thuế GTGT", "Tiền thuế GTGT quy đổi", "TK thuế GTGT", "Ngày hóa đơn", "Số hóa đơn", "Mẫu số HĐ", "Ký hiệu HĐ", "Nhóm HHDV mua vào", "Mã NCC", "Tên NCC", "Mã số thuế NCC", "Địa chỉ NCC"]
-CATEGORY_ACCOUNT = {"chi_tour": "1541", "marketing": "6417", "hanh_chinh": "6428", "hoan_tien": "131", "tam_ung": "141"}
+# Tài khoản đối ứng khi xuất bảng kê sang MISA. Loại chi KHÔNG có trong bảng này thì không ra bảng
+# kê – xem `thieu_tai_khoan()` ngay dưới, và đó là chỗ nói ra chứ không phải chỗ im lặng bỏ qua.
+#
+# `tam_ung_tai_xe` ghi 141 theo đúng quy ước đã chốt cho `tam_ung`: tiền giao cho người của công ty
+# là TẠM ỨNG, không phải phải thu khác (xem quy tắc TAM_UNG trong services/hach_toan.py).
+#
+# `sua_chua_xe` CỐ Ý CHƯA CÓ ở đây. Sửa chữa một chiếc xe có thể là giá vốn của chuyến (154), chi
+# phí quản lý (642), hay chi phí vận hành đội xe theo đầu xe (1541) – ba cách ghi khác nhau, ba con
+# số lãi lỗ khác nhau, và chọn cái nào là quyết định của Kế toán trưởng chứ không phải của người
+# viết phần mềm. Để trống là để câu hỏi ấy còn nhìn thấy được; điền bừa một tài khoản thì câu hỏi
+# biến mất và sổ sai âm thầm.
+CATEGORY_ACCOUNT = {"chi_tour": "1541", "marketing": "6417", "hanh_chinh": "6428", "hoan_tien": "131",
+                    "tam_ung": "141", "tam_ung_tai_xe": "141"}
+
+
+def thieu_tai_khoan() -> list[str]:
+    """Loại chi đang chạy mà chưa ai khai tài khoản MISA – tiền chi được nhưng không lên bảng kê."""
+    from app.services.ops import CATEGORY_CONFIRMER
+    return sorted(c for c in CATEGORY_CONFIRMER if c not in CATEGORY_ACCOUNT)
 
 
 def export_purchases(db: Session, date_from: date, date_to: date) -> bytes:

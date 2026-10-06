@@ -211,10 +211,15 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
 
 
 @router.get("/payment-requests")
-def list_pr(status: str | None = None, tour_id: int | None = None, u: User = Depends(require_roles(*AC.PAYMENT_REQUEST_ROLES, mo_ta="đề nghị chi")), db: Session = Depends(get_db)):
+def list_pr(status: str | None = None, tour_id: int | None = None,
+            u: User = Depends(require_roles(*AC.PAYMENT_REQUEST_ROLES, "tai_xe", mo_ta="đề nghị chi")),
+            db: Session = Depends(get_db)):
     q = select(PaymentRequest).order_by(desc(PaymentRequest.id))
     q = PV.loc(q, PaymentRequest, u)         # P6: phạm vi pháp nhân của phiên đăng nhập
-    if u.role in ("gd_kd", "tp_kd", "ptgd_mkt", "hcns"): q = q.where(PaymentRequest.created_by == u.username)   # bộ phận ngoài Điều hành chỉ thấy đề nghị mình lập
+    # Bộ phận ngoài Điều hành chỉ thấy đề nghị MÌNH LẬP. `tai_xe` vào đây 05/10/2026 và đây là dòng
+    # giữ cho việc mở cửa ấy không thành mở sổ chi toàn công ty: thiếu nó, một tài xế đăng nhập là
+    # đọc được mọi khoản chi của mọi phòng.
+    if u.role in ("gd_kd", "tp_kd", "ptgd_mkt", "hcns", "tai_xe"): q = q.where(PaymentRequest.created_by == u.username)
     if status: q = q.where(PaymentRequest.status.in_(status.split(",")))
     if tour_id: q = q.where(PaymentRequest.tour_id == tour_id)
     return [pr_out(r, db) for r in db.execute(q.limit(300)).scalars()]
@@ -278,7 +283,7 @@ def pr_danh_muc_marketing(u: User = Depends(require_roles(*AC.PAYMENT_REQUEST_RO
 
 
 @router.post("/payment-requests", status_code=201)
-def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptgd_mkt", "hcns", "cntt", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt")), db: Session = Depends(get_db)):
+def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptgd_mkt", "hcns", "cntt", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt", "gd_doi_xe", "tai_xe")), db: Session = Depends(get_db)):
     try:
         r = O.create_request(db, u, data.model_dump())
     except ValueError as ex:
