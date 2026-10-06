@@ -17,6 +17,9 @@ function XeHdv() {
   // có hiện ra thì bấm vẫn 403. Màn hình giấu để đỡ rối, máy chủ chặn để đỡ sai.
   const { toast, user } = useShell();
   const laTaiXe = user?.role === "tai_xe";
+  /** Người ở hiện trường — cả tài xế và hướng dẫn viên đều nộp được đơn nghỉ. Dùng để ẨN khối, KHÔNG
+   *  để canh quyền: ai KÝ được đơn nào thì máy chủ trả lời bằng cờ `co_the_ky` của từng dòng. */
+  const laHienTruong = user?.role === "tai_xe" || user?.role === "hdv";
   const [d, setD] = useState<any>(null);
   const [err, setErr] = useState("");
   /** Đề nghị tạm ứng của CHÍNH người đang đăng nhập. Máy chủ lọc theo `created_by`; màn hình không
@@ -26,10 +29,18 @@ function XeHdv() {
   /** Báo hư hỏng của CHÍNH mình. Máy chủ lọc theo người báo; màn hình không gửi bộ lọc nào. */
   const [hong, setHong] = useState<any>(null);
   const [formHong, setFormHong] = useState<any>({ mo: false, vehicle_id: "", hien_tuong: "", muc_do: "con_chay_duoc", odo_km: "", noi_xay_ra: "" });
+  /** Đơn nghỉ / ốm / vắng việc. MỘT lời gọi cho cả hai việc: máy chủ lọc ba tầng (xem
+   *  `api/v1/hrm.py::list_leaves`), nên người ở hiện trường nhận về đơn của chính mình còn người ký
+   *  nhận về đơn của phòng mình. Màn hình không gửi bộ lọc nào — lọc ở màn hình là lọc tin được. */
+  const [don, setDon] = useState<any[]>([]);
+  const [quy, setQuy] = useState<any>(null);
+  const [formDon, setFormDon] = useState<any>({ mo: false, kind: "phep_nam", date_from: "", date_to: "", days: "", reason: "" });
   const tai = () => {
     api("/xe-hdv/cua-toi").then(setD).catch((x) => { setErr(errMsg(x)); toast(errMsg(x), true); });
     api<any[]>("/payment-requests").then(setUng).catch(() => setUng([]));
     api<any>("/fleet/bao-hong").then(setHong).catch(() => setHong(null));
+    api<any[]>("/leaves").then(setDon).catch(() => setDon([]));
+    api<any[]>("/leave-balance").then((r) => setQuy(r?.[0] || null)).catch(() => setQuy(null));
   };
   useEffect(() => { tai(); }, []); // eslint-disable-line
 
@@ -90,6 +101,50 @@ function XeHdv() {
 
   if (err) return <><h1>Xe Vietrip &amp; HDV</h1><p className="muted">{err}</p></>;
   if (!d) return <p className="muted">Đang tải…</p>;
+  /** Gửi đơn nghỉ. Màn hình KHÔNG tự tính quỹ phép và KHÔNG tự đặt tên người duyệt: quỹ phép do
+   *  `hrm.create_leave` canh lúc gửi, người duyệt do `hrm.nguoi_ky_don` quyết. Hai con số ấy mà
+   *  tính ở đây là tính lần thứ hai, và lần thứ hai bao giờ cũng là lần sai. */
+  const luuDon = async () => {
+    if (!formDon.date_from) { toast("Chọn ngày bắt đầu nghỉ", true); return; }
+    if (!String(formDon.reason).trim()) { toast("Ghi lý do — người ký cần biết để quyết", true); return; }
+    try {
+      await api("/leaves", {
+        method: "POST",
+        json: {
+          kind: formDon.kind, date_from: formDon.date_from,
+          date_to: formDon.date_to || formDon.date_from,
+          days: formDon.days ? Number(formDon.days) : null,
+          reason: String(formDon.reason).trim(),
+        },
+      });
+      setFormDon({ mo: false, kind: "phep_nam", date_from: "", date_to: "", days: "", reason: "" });
+      toast("Đã gửi đơn. Đơn nằm ở hàng đợi của người ký cho tới khi có quyết định.");
+      tai();
+    } catch (x: any) { toast(errMsg(x), true); }
+  };
+
+  /** Duyệt / từ chối. Nút này chỉ hiện khi máy chủ nói dòng ấy `co_the_ky`; chặn thật nằm trong
+   *  `hrm.decide_leave`, không ở đây. Từ chối bắt buộc có lý do — máy chủ cũng đòi, và đòi ở cả hai
+   *  chỗ là có chủ ý: màn hình đòi để người dùng khỏi mất công gửi đi rồi bị trả về. */
+  const quyetDon = async (id: number, duyet: boolean) => {
+    let note = "";
+    if (!duyet) {
+      const v = window.prompt("Từ chối đơn này. Ghi lý do để người làm đơn biết vì sao:");
+      if (v === null) return;
+      if (!v.trim()) { toast("Từ chối phải ghi lý do", true); return; }
+      note = v.trim();
+    }
+    try {
+      await api(`/leaves/${id}/decide`, { method: "POST", json: { approve: duyet, note } });
+      toast(duyet ? "Đã duyệt đơn" : "Đã từ chối đơn");
+      tai();
+    } catch (x: any) { toast(errMsg(x), true); }
+  };
+
+  const stDon = (s: string) => s === "duyet" ? <Tag cls="ok">Đã duyệt</Tag>
+    : s === "tu_choi" ? <Tag cls="red">Từ chối</Tag>
+    : s === "huy" ? <Tag>Đã hủy</Tag> : <Tag cls="warn">Chờ ký</Tag>;
+
   const st = (s: string) => s === "hoan_thanh" ? <Tag cls="ok">Hoàn thành</Tag> : s === "da_xac_nhan" ? <Tag cls="navy">Đã nhận</Tag> : s === "huy" ? <Tag cls="red">Hủy</Tag> : s === "tu_choi" ? <Tag>Đã từ chối</Tag> : s === "het_han" ? <Tag>Lời chào hết hạn</Tag> : <Tag cls="warn">Đang chờ trả lời</Tag>;
 
   return (<>
@@ -208,6 +263,63 @@ function XeHdv() {
             : <Tag cls="warn">Chờ đội xe tiếp nhận</Tag>}</td>
           <td className="muted">{x.ket_qua}</td></tr>)}</tbody></table>}
       {!hong?.rows?.length && !formHong.mo && <p className="muted">Bạn chưa báo hỏng xe nào.</p>}
+    </div>}
+
+    {laHienTruong && <div className="panel"><h2>Đơn nghỉ phép / ốm / vắng việc</h2>
+      <p className="muted">Gửi đơn ở đây. Đơn đi thẳng tới người ký của phòng bạn — <b>một chữ ký</b>,
+        không qua bàn nào khác. Tổng giám đốc và Chủ tịch đọc được mọi đơn nhưng không ký ở bước này.
+        {quy ? <> Phép năm {quy.year}: còn <b>{quy.remaining}</b> ngày
+          {quy.pending > 0 ? <> (đang chờ ký {quy.pending} ngày)</> : null}.</> : null}</p>
+
+      {!formDon.mo
+        ? <button className="act teal" onClick={() => setFormDon({ ...formDon, mo: true })}>Gửi đơn</button>
+        : <div className="wrap">
+            <label>Loại đơn<br />
+              <select value={formDon.kind} onChange={(e) => setFormDon({ ...formDon, kind: e.target.value })}>
+                <option value="phep_nam">Nghỉ phép năm</option>
+                <option value="om_dau">Nghỉ ốm</option>
+                <option value="khong_luong">Nghỉ không lương</option>
+                <option value="thai_san">Nghỉ thai sản</option>
+                <option value="cong_tac">Đi công tác</option>
+              </select></label>
+            <label>Từ ngày<br />
+              <input type="date" value={formDon.date_from}
+                     onChange={(e) => setFormDon({ ...formDon, date_from: e.target.value })} /></label>
+            <label>Đến ngày <span className="muted">(để trống = nghỉ một ngày)</span><br />
+              <input type="date" value={formDon.date_to}
+                     onChange={(e) => setFormDon({ ...formDon, date_to: e.target.value })} /></label>
+            <label>Số ngày <span className="muted">(để trống = máy tính; 0.5 = nửa ngày)</span><br />
+              <input value={formDon.days} inputMode="decimal" style={{ width: 90 }}
+                     onChange={(e) => setFormDon({ ...formDon, days: e.target.value })} /></label>
+            <label>Lý do<br />
+              <input value={formDon.reason} style={{ minWidth: 320 }}
+                     placeholder="vd: về quê giỗ, đã nhờ anh Hùng chạy thay chuyến ngày 12"
+                     onChange={(e) => setFormDon({ ...formDon, reason: e.target.value })} /></label>
+            <div>
+              <button className="act teal" onClick={luuDon}>Gửi đơn</button>{" "}
+              <button className="act grey" onClick={() => setFormDon({ mo: false, kind: "phep_nam", date_from: "", date_to: "", days: "", reason: "" })}>Thôi</button>
+            </div>
+          </div>}
+
+      {don.length > 0 && <table style={{ marginTop: 12 }}>
+        <thead><tr><th>Loại</th><th>Từ – đến</th><th className="num">Số ngày</th><th>Lý do</th><th>Trạng thái</th><th>Ghi chú của người ký</th></tr></thead>
+        <tbody>{don.map((x: any) => <tr key={x.id}><td>{x.kind_name}</td>
+          <td>{fmtD(x.date_from)} → {fmtD(x.date_to)}</td><td className="num">{x.days}</td>
+          <td>{x.reason}</td><td>{stDon(x.status)}</td>
+          <td className="muted">{x.decision_note}</td></tr>)}</tbody></table>}
+      {don.length === 0 && !formDon.mo && <p className="muted">Bạn chưa gửi đơn nào.</p>}
+    </div>}
+
+    {don.some((x: any) => x.co_the_ky) && <div className="panel wrap"><h2>Đơn chờ bạn ký</h2>
+      <p className="muted">Đơn của người thuộc phòng bạn phụ trách. <b>Từ chối phải ghi lý do</b> —
+        người làm đơn cần biết để sửa và gửi lại. Không ai ký được đơn của chính mình.</p>
+      <table><thead><tr><th>Người làm đơn</th><th>Loại</th><th>Từ – đến</th><th className="num">Số ngày</th><th>Lý do</th><th></th></tr></thead>
+        <tbody>{don.filter((x: any) => x.co_the_ky).map((x: any) => <tr key={`k${x.id}`}>
+          <td>{x.employee_name} <span className="muted mono">{x.employee_code}</span></td>
+          <td>{x.kind_name}</td><td>{fmtD(x.date_from)} → {fmtD(x.date_to)}</td>
+          <td className="num">{x.days}</td><td>{x.reason}</td>
+          <td><button className="act teal" onClick={() => quyetDon(x.id, true)}>Duyệt</button>{" "}
+            <button className="act grey" onClick={() => quyetDon(x.id, false)}>Từ chối</button></td></tr>)}</tbody></table>
     </div>}
 
     {d.xe.length === 0 && d.lenh_dieu_xe.length === 0 && d.phan_chuyen.length === 0 &&
