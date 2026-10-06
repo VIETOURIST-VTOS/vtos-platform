@@ -23,9 +23,13 @@ function XeHdv() {
    *  gửi kèm một bộ lọc nào – lọc ở màn hình là lọc tin được, lọc ở máy chủ mới là lọc. */
   const [ung, setUng] = useState<any[]>([]);
   const [formUng, setFormUng] = useState<any>({ mo: false, amount: "", description: "" });
+  /** Báo hư hỏng của CHÍNH mình. Máy chủ lọc theo người báo; màn hình không gửi bộ lọc nào. */
+  const [hong, setHong] = useState<any>(null);
+  const [formHong, setFormHong] = useState<any>({ mo: false, vehicle_id: "", hien_tuong: "", muc_do: "con_chay_duoc", odo_km: "", noi_xay_ra: "" });
   const tai = () => {
     api("/xe-hdv/cua-toi").then(setD).catch((x) => { setErr(errMsg(x)); toast(errMsg(x), true); });
     api<any[]>("/payment-requests").then(setUng).catch(() => setUng([]));
+    api<any>("/fleet/bao-hong").then(setHong).catch(() => setHong(null));
   };
   useEffect(() => { tai(); }, []); // eslint-disable-line
 
@@ -62,6 +66,25 @@ function XeHdv() {
       const d2 = await api<any>(`/xe-hdv/chao-chuyen/${id}/${nhan ? "nhan" : "tu-choi"}`,
                                 { method: "POST", json: nhan ? {} : { ly_do } });
       toast(d2.message); await tai();
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
+  /** Báo một chiếc xe đang hỏng. Màn hình KHÔNG hỏi số tiền và KHÔNG hỏi garage: lúc đứng cạnh
+   *  chiếc xe thì tài xế chưa biết hai con số ấy, và một ô bắt buộc mà người gõ không biết câu trả
+   *  lời thì ô ấy sẽ được điền bừa. Đề nghị sửa chữa do đội xe lập sau khi có báo giá. */
+  const luuHong = async () => {
+    if (!formHong.vehicle_id) { toast("Chọn xe", true); return; }
+    if (!String(formHong.hien_tuong).trim()) { toast("Ghi rõ hiện tượng — người tiếp nhận cần biết hỏng cái gì", true); return; }
+    try {
+      const km = String(formHong.odo_km).replace(/[^\d]/g, "");
+      const r = await api<any>("/fleet/bao-hong", {
+        method: "POST",
+        json: { vehicle_id: Number(formHong.vehicle_id), hien_tuong: formHong.hien_tuong,
+                muc_do: formHong.muc_do, odo_km: km ? Number(km) : null, noi_xay_ra: formHong.noi_xay_ra },
+      });
+      toast(r.message);
+      setFormHong({ mo: false, vehicle_id: "", hien_tuong: "", muc_do: "con_chay_duoc", odo_km: "", noi_xay_ra: "" });
+      tai();
     } catch (e) { toast(errMsg(e), true); }
   };
 
@@ -140,10 +163,52 @@ function XeHdv() {
       {ung.length === 0 && !formUng.mo && <p className="muted">Chưa có đề nghị tạm ứng nào.</p>}
     </div>}
 
-    {laTaiXe && <div className="panel"><h2>Xe hỏng thì báo thế nào</h2>
-      <p className="muted">Hiện <b>chưa có cửa báo hư hỏng</b> trên phần mềm — báo trực tiếp cho Giám đốc
-        đội xe. Đề nghị sửa chữa do đội xe lập sau khi có báo giá của garage, vì lúc xe vừa hỏng thì
-        chưa ai biết số tiền và chưa chọn garage; bắt bạn gõ hai con số ấy là bắt bạn đoán.</p></div>}
+    {laTaiXe && <div className="panel"><h2>Báo xe hỏng</h2>
+      <p className="muted">Báo xe nào hỏng gì, <b>không cần biết tiền</b>. Đội xe tiếp nhận, rồi lập
+        đề nghị sửa chữa khi có báo giá của garage. Chọn <b>Phải dừng xe</b> thì chiếc xe này bị
+        chặn khi ai đó lập lệnh điều xe, cho tới khi đội xe đóng báo hỏng.</p>
+
+      {!formHong.mo
+        ? <button className="act teal" onClick={() => setFormHong({ ...formHong, mo: true })}>Báo xe hỏng</button>
+        : <div className="wrap">
+            <label>Xe<br />
+              <select value={formHong.vehicle_id} onChange={(e) => setFormHong({ ...formHong, vehicle_id: e.target.value })}>
+                <option value="">— chọn xe —</option>
+                {(d.xe || []).map((v: any) => <option key={v.id} value={v.id}>{v.plate}</option>)}
+                {(d.lenh_dieu_xe || []).map((x: any) => <option key={`l${x.id}`} value={x.vehicle_id}>{x.vehicle}</option>)}
+              </select></label>
+            <label>Hỏng cái gì<br />
+              <input value={formHong.hien_tuong} style={{ minWidth: 320 }}
+                     placeholder="vd: phanh kêu và ăn lệch về bên trái khi đạp gấp"
+                     onChange={(e) => setFormHong({ ...formHong, hien_tuong: e.target.value })} /></label>
+            <label>Mức độ<br />
+              <select value={formHong.muc_do} onChange={(e) => setFormHong({ ...formHong, muc_do: e.target.value })}>
+                <option value="con_chay_duoc">Còn chạy được</option>
+                <option value="phai_dung_xe">Phải dừng xe</option>
+              </select></label>
+            <label>Số km đồng hồ <span className="muted">(nếu nhớ)</span><br />
+              <input value={formHong.odo_km} inputMode="numeric"
+                     onChange={(e) => setFormHong({ ...formHong, odo_km: e.target.value })} /></label>
+            <label>Đang ở đâu <span className="muted">(không bắt buộc)</span><br />
+              <input value={formHong.noi_xay_ra}
+                     onChange={(e) => setFormHong({ ...formHong, noi_xay_ra: e.target.value })} /></label>
+            <div>
+              <button className="act teal" onClick={luuHong}>Gửi báo hỏng</button>{" "}
+              <button className="act grey" onClick={() => setFormHong({ mo: false, vehicle_id: "", hien_tuong: "", muc_do: "con_chay_duoc", odo_km: "", noi_xay_ra: "" })}>Thôi</button>
+            </div>
+          </div>}
+
+      {hong?.rows?.length > 0 && <table style={{ marginTop: 12 }}>
+        <thead><tr><th>Xe</th><th>Báo lúc</th><th>Hiện tượng</th><th>Mức độ</th><th>Đang ở đâu</th><th>Kết quả</th></tr></thead>
+        <tbody>{hong.rows.map((x: any) => <tr key={x.id}><td className="mono">{x.plate}</td><td>{fmtDT(x.bao_luc)}</td>
+          <td>{x.hien_tuong}{x.noi_xay_ra ? <div className="muted">{x.noi_xay_ra}</div> : null}</td>
+          <td>{x.muc_do === "phai_dung_xe" ? <Tag cls="red">Phải dừng xe</Tag> : <Tag cls="warn">Còn chạy được</Tag>}</td>
+          <td>{x.trang_thai === "da_dong" ? <Tag cls="ok">Đã xử lý xong</Tag>
+            : x.trang_thai === "da_tiep_nhan" ? <Tag cls="navy">Đội xe đã tiếp nhận</Tag>
+            : <Tag cls="warn">Chờ đội xe tiếp nhận</Tag>}</td>
+          <td className="muted">{x.ket_qua}</td></tr>)}</tbody></table>}
+      {!hong?.rows?.length && !formHong.mo && <p className="muted">Bạn chưa báo hỏng xe nào.</p>}
+    </div>}
 
     {d.xe.length === 0 && d.lenh_dieu_xe.length === 0 && d.phan_chuyen.length === 0 &&
       <p className="muted">Chưa có xe, lệnh điều xe hay chuyến nào gắn với hồ sơ của bạn. Nếu sai, báo Điều hành hoặc HCNS.</p>}

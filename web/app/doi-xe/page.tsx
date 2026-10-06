@@ -19,7 +19,8 @@ function DoiXe() {
   const [xe, setXe] = useState<any[]>([]);
   const [chon, setChon] = useState<any>(null);
   const [xm, setXm] = useState<any[]>([]);
-  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan" | "congno" | "baoduong">("xe");
+  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan" | "congno" | "baoduong" | "baohong">("xe");
+  const [bh, setBh] = useState<any>(null);          // sổ báo hư hỏng của cả đội
   const [bd, setBd] = useState<any>(null);          // tình trạng bảo dưỡng của cả đội
   const [bdLs, setBdLs] = useState<any[]>([]);      // lịch sử phiếu bảo dưỡng
   const [formBD, setFormBD] = useState<any>(null);  // form ghi phiếu bảo dưỡng
@@ -46,8 +47,23 @@ function DoiXe() {
     try {
       const t = new URLSearchParams(window.location.search).get("tab");
       if (t === "bao-duong") setTab("baoduong");
+      if (t === "bao-hong") setTab("baohong");
     } catch { /* không có địa chỉ thì giữ tab mặc định */ }
   }, []);
+
+  /** Đội xe tiếp nhận một báo hỏng. KHÔNG đóng — xe vẫn bị chặn nếu mức là phải dừng xe.
+   *  Tách hai nút là để trả lời được hai câu khác nhau: đã có ai nhìn chưa, và đã sửa xong chưa. */
+  const tiepNhanHong = async (id: number) => {
+    try { const r = await api<any>(`/fleet/bao-hong/${id}/tiep-nhan`, { method: "POST" }); toast(r.message); load(); }
+    catch (e) { toast(errMsg(e), true); }
+  };
+  /** Đóng báo hỏng. Máy chủ BẮT BUỘC ghi kết quả, nên màn hình hỏi trước khi gọi. */
+  const dongHong = async (id: number) => {
+    const v = window.prompt("Đã xử lý thế nào? (bắt buộc)\n\nGhi rõ để lần sau gặp lại hiện tượng này còn tra được.");
+    if (v === null) return;
+    try { const r = await api<any>(`/fleet/bao-hong/${id}/dong`, { method: "POST", json: { ket_qua: v } }); toast(r.message); load(); }
+    catch (e) { toast(errMsg(e), true); }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -62,6 +78,7 @@ function DoiXe() {
       setCn(await api("/fleet/cong-no"));
       setBd(await api("/fleet/bao-duong/theo-xe"));
       setBdLs(await api("/fleet/bao-duong"));
+      setBh(await api("/fleet/bao-hong"));
     } catch (e) { toast(errMsg(e), true); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
@@ -157,7 +174,7 @@ function DoiXe() {
     <p className="muted">{tq.ghi_chu}{tq.chan_khi_thieu_giay ? " Đang BẬT chế độ chặn khi thiếu giấy tờ." : " Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo, chưa dừng lệnh điều xe."}</p>
 
     <div style={{ display: "flex", gap: 8, margin: "10px 0" }}>
-      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`], ["congno", "Công nợ đội xe"], ["baoduong", bd ? `Bảo dưỡng (${(bd.theo_muc?.BLOCK || 0) + (bd.theo_muc?.REVIEW || 0)} cần xếp lịch)` : "Bảo dưỡng"]] as const)
+      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`], ["congno", "Công nợ đội xe"], ["baoduong", bd ? `Bảo dưỡng (${(bd.theo_muc?.BLOCK || 0) + (bd.theo_muc?.REVIEW || 0)} cần xếp lịch)` : "Bảo dưỡng"], ["baohong", bh ? `Báo hỏng (${bh.dem?.dang_mo || 0} đang mở)` : "Báo hỏng"]] as const)
         .map(([k, ten]) => <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} onClick={() => setTab(k as any)}>{ten}</button>)}
     </div>
 
@@ -631,6 +648,41 @@ function DoiXe() {
           {canWrite && <td>{x.status !== "xong" && x.status !== "khong_ap_dung" && <button className="act teal" onClick={() => dongViec(x.id)}>Kết luận</button>}</td>}
         </tr>)}</tbody></table>
     </div>}
+
+    {/* BÁO HƯ HỎNG — hàng đợi của đội xe. Sổ này KHÔNG có cột tiền, và đó là chủ ý: tiền xuất hiện
+        ở bước sau, bằng một đề nghị chi loại `sua_chua_xe` do chính đội xe lập khi có báo giá. */}
+    {tab === "baohong" && <>
+      <div className="panel"><h2>Báo hư hỏng</h2>
+        <p className="muted">Tài xế báo xe nào hỏng gì, <b>không kèm tiền</b>. Xe có báo hỏng mức
+          <b> Phải dừng xe</b> chưa đóng thì <b>bị chặn</b> khi lập lệnh điều xe; mức
+          <b> Còn chạy được</b> chỉ hiện cảnh báo cho người phát lệnh nhìn thấy trước khi ký.</p>
+        <div className="kpis">
+          <div className="kpi"><div className="k">Đang mở</div><div className="v">{bh?.dem?.dang_mo ?? "—"}</div></div>
+          <div className="kpi"><div className="k">Phải dừng xe</div><div className="v">{bh?.dem?.phai_dung_xe ?? "—"}</div></div>
+        </div>
+        {bh?.ghi_chu && <p className="muted">{bh.ghi_chu}</p>}
+      </div>
+
+      <div className="panel wrap"><h2>Sổ báo hỏng</h2>
+        <table><thead><tr><th>Xe</th><th>Báo lúc</th><th>Người báo</th><th>Hiện tượng</th><th>Mức độ</th>
+          <th className="num">Km</th><th>Trạng thái</th><th>Kết quả</th>{canNhap && <th></th>}</tr></thead>
+          <tbody>{(bh?.rows || []).map((x: any) => <tr key={x.id} style={{ opacity: x.trang_thai === "da_dong" ? 0.55 : 1 }}>
+            <td className="mono"><b>{x.plate}</b></td><td>{fmtDT(x.bao_luc)}</td><td>{x.nguoi_bao}</td>
+            <td>{x.hien_tuong}{x.noi_xay_ra ? <div className="muted">{x.noi_xay_ra}</div> : null}</td>
+            <td>{x.muc_do === "phai_dung_xe" ? <Tag cls="red">Phải dừng xe</Tag> : <Tag cls="warn">Còn chạy được</Tag>}</td>
+            <td className="num">{x.odo_km ? x.odo_km.toLocaleString("vi-VN") : "—"}</td>
+            <td>{x.trang_thai === "da_dong" ? <Tag cls="ok">Đã xử lý xong</Tag>
+              : x.trang_thai === "da_tiep_nhan" ? <Tag cls="navy">Đã tiếp nhận</Tag>
+              : <Tag cls="warn">Mới báo</Tag>}</td>
+            <td className="muted">{x.ket_qua}{x.maintenance_id ? <div className="muted">phiếu sửa chữa #{x.maintenance_id}</div> : null}</td>
+            {canNhap && <td style={{ whiteSpace: "nowrap" }}>
+              {x.trang_thai === "moi" && <><button className="act grey" style={{ margin: 0 }} onClick={() => tiepNhanHong(x.id)}>Tiếp nhận</button>{" "}</>}
+              {x.trang_thai !== "da_dong" && <button className="act teal" style={{ margin: 0 }} onClick={() => dongHong(x.id)}>Đóng</button>}
+            </td>}
+          </tr>)}</tbody></table>
+        {!(bh?.rows || []).length && <p className="muted">Chưa có báo hỏng nào.</p>}
+      </div>
+    </>}
   </>);
 }
 

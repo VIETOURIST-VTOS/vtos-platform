@@ -199,6 +199,47 @@ class Maintenance(Base):
     created_by: Mapped[str] = mapped_column(String(50), default="")
 
 
+MUC_DO_HONG = {"con_chay_duoc": "Còn chạy được", "phai_dung_xe": "Phải dừng xe"}
+TRANG_THAI_HONG = {"moi": "Mới báo", "da_tiep_nhan": "Đội xe đã tiếp nhận", "da_dong": "Đã xử lý xong",
+                   "bo_qua": "Không phải hư hỏng"}
+
+
+class Fault(Base):
+    """BÁO HƯ HỎNG — tài xế nói XE NÀO HỎNG GÌ. Cố ý KHÔNG có ô tiền và ô garage.
+
+    Vì sao đây là một bảng riêng chứ không phải một đề nghị chi: lúc tài xế phát hiện xe hỏng thì
+    chưa có số tiền và chưa chọn garage, mà cửa lập đề nghị chi bắt buộc có cả hai. Bắt tài xế gõ
+    hai con số ấy là bắt họ bịa — đúng thứ ranh giới 09/9/2026 cấm. Đề nghị sửa chữa (loại chi
+    `sua_chua_xe`) do Giám đốc đội xe lập SAU khi có báo giá, và nối ngược về đây bằng `maintenance_id`.
+
+    Vì sao `muc_do` chỉ có HAI giá trị: câu hỏi duy nhất người điều xe cần trả lời ngay là "chiếc xe
+    này tối nay còn chạy được không". Một thang năm mức nghe chuyên nghiệp hơn nhưng không ai trả lời
+    nổi lúc đứng bên đường, và mức giữa thì không ai biết nên điều hay không.
+    """
+    __tablename__ = "fleet_faults"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"), index=True)
+    # Người báo. Nullable vì đội xe cũng ghi hộ được khi tài xế gọi điện — nhưng khi tài xế tự báo
+    # thì cột này mang đúng tên họ, và đó là thứ sau này trả lời được câu "ai là người báo hỏng".
+    nguoi_bao_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
+    bao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    hien_tuong: Mapped[str] = mapped_column(String(300))
+    muc_do: Mapped[str] = mapped_column(String(20), default="con_chay_duoc")
+    odo_km: Mapped[int | None] = mapped_column(Integer, nullable=True)   # số km lúc báo, nếu nhớ
+    noi_xay_ra: Mapped[str] = mapped_column(String(160), default="")
+    trang_thai: Mapped[str] = mapped_column(String(20), default="moi")
+    tiep_nhan_boi: Mapped[str] = mapped_column(String(50), default="")
+    tiep_nhan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ket_qua: Mapped[str] = mapped_column(String(300), default="")        # đội xe ghi khi đóng
+    dong_boi: Mapped[str] = mapped_column(String(50), default="")
+    dong_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Phiếu bảo dưỡng/sửa chữa sinh ra từ báo hỏng này, nếu có. Rỗng KHÁC với "không tốn tiền":
+    # có hỏng xử lý xong mà không phải trả đồng nào (siết lại một con ốc), và cột rỗng nói đúng thế.
+    maintenance_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_maintenance.id"), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
 NGUON_NGOAI = {"the_dau": "Sao kê thẻ dầu", "epass": "Báo cáo ePass/VETC",
                "de_xuat_vietrip": "Đề xuất chi trên phần mềm Vietrip"}
 
