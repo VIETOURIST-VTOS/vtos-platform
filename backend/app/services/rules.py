@@ -702,6 +702,82 @@ def bien_neu_hoa_hong_chua_vao(tour: Tour, c: dict) -> dict:
             "lech": (c.get("margin") or 0.0) - bien2}
 
 
+# ====================== DỰ TOÁN THAM CHIẾU: NẠP CẢ LÔ, KHÔNG HỎI TỪNG CHUYẾN ======================
+# ĐO ĐƯỢC ngày 30/9/2026 bằng bộ đếm câu truy vấn, trên đúng đường mà `GET /api/v1/tours` đi:
+#
+#      5 chuyến →   9 lượt truy vấn  (trong vòng lặp:  5)
+#     20 chuyến →  24 lượt truy vấn  (trong vòng lặp: 20)
+#     80 chuyến →  84 lượt truy vấn  (trong vòng lặp: 80)
+#
+# ĐÚNG MỘT LƯỢT MỖI CHUYẾN, và lượt ấy là câu tra sản phẩm ở `budget_of`. Màn hình mặc định lấy 300
+# chuyến, nên một lần mở bảng tour là 300 vòng đi–về tới cơ sở dữ liệu đặt ở máy khác. Trên hệ thật
+# cửa này chạy 16–30 giây, và nó nằm dưới cả màn hình Chủ tịch (13,5 giây) lẫn Bàn bán tour lẻ (18
+# giây) — ba màn hình chậm, một nguyên nhân.
+#
+# KS-5 hồi 11/9 đã dọn N+1 của `t.operator` · `t.bookings` · `b.sales` bằng `selectinload`. Câu này
+# sót lại vì nó KHÔNG phải một quan hệ ORM: `product_code` là một cột chữ, `selectinload` không với
+# tới. Bài học ghi ra để lần sau khỏi tìm lại: dọn N+1 bằng `selectinload` chỉ dọn được phần đi qua
+# quan hệ; phần tra cứu bằng TAY trong thân hàm phải tự nạp lấy.
+#
+# Vì sao là kho theo PHIÊN chứ không phải tham số truyền tay: `tour_view` được gọi từ hơn chục chỗ,
+# thêm một tham số bắt buộc là sửa cả chục nơi và chỗ nào quên thì lặng lẽ chạy đường cũ. Kho đặt
+# trong `db.info` nên sống đúng một lượt gọi API (mỗi lượt một phiên), và hàm dưới đây CHỈ dùng kho
+# cho những khoá đã thật sự được nạp — chuyến nằm ngoài lô vẫn đi đường truy vấn cũ. Không có kho thì
+# không có gì đổi: một chuyến lẻ gọi `budget_of` vẫn ra đúng con số ấy bằng đúng câu ấy.
+KHO_SAN_PHAM = "rules.kho_san_pham"
+
+
+def nap_san_du_toan(db: Session, tours) -> int:
+    """Nạp trước MỌI sản phẩm mà lô chuyến này sẽ hỏi tới, bằng ĐÚNG MỘT câu truy vấn.
+
+    Nạp cả theo `product_id` lẫn theo `product_code` vì `budget_of` hỏi cả hai: chuyến có
+    `product_id` trỏ vào một hàng đã bị xoá thì nó rơi xuống tra theo mã. Nạp thiếu một trong hai
+    đường là làm con số dự toán ĐỔI — nhanh mà sai thì tệ hơn chậm.
+
+    Khoá không tìm thấy vẫn được ghi vào kho với giá trị None: "đã tra, không có" khác hẳn "chưa
+    tra", và không phân biệt được hai điều đó thì mỗi chuyến thiếu sản phẩm lại đẻ ra một câu.
+    """
+    from sqlalchemy import or_
+    from app.models.core import Product
+    kho = db.info.setdefault(KHO_SAN_PHAM, {"id": {}, "ma": {}})
+    ids = {t.product_id for t in tours if getattr(t, "product_id", None)} - set(kho["id"])
+    ma = {t.product_code for t in tours if getattr(t, "product_code", "")} - set(kho["ma"])
+    if not ids and not ma:
+        return 0
+    dk = []
+    if ids: dk.append(Product.id.in_(ids))
+    if ma: dk.append(Product.code.in_(ma))
+    n = 0
+    for p in db.execute(select(Product).where(or_(*dk))).scalars():
+        kho["id"][p.id] = p; kho["ma"][p.code] = p; n += 1
+    for i in ids: kho["id"].setdefault(i, None)
+    for c in ma: kho["ma"].setdefault(c, None)
+    return n
+
+
+def quen_kho_san_pham(db: Session) -> None:
+    """Bỏ kho của phiên. Phép thử sửa sản phẩm giữa chừng gọi cái này; mã chạy thật không cần."""
+    db.info.pop(KHO_SAN_PHAM, None)
+
+
+def _san_pham_cua(db: Session, t: Tour):
+    """Sản phẩm của chuyến — đọc kho nếu CHUYẾN NÀY đã nằm trong lô đã nạp, còn lại đi đường cũ."""
+    from app.models.core import Product
+    kho = db.info.get(KHO_SAN_PHAM)
+    if kho is not None:
+        da_nap = ((not t.product_id or t.product_id in kho["id"])
+                  and (not t.product_code or t.product_code in kho["ma"]))
+        if da_nap:
+            p = kho["id"].get(t.product_id) if t.product_id else None
+            if p is None and t.product_code:
+                p = kho["ma"].get(t.product_code)
+            return p
+    p = db.get(Product, t.product_id) if t.product_id else None
+    if p is None and t.product_code:
+        p = db.execute(select(Product).where(Product.code == t.product_code)).scalars().first()
+    return p
+
+
 def budget_of(db: Session, t: Tour) -> tuple[float, float, str]:
     """Dự toán của chuyến và NGUỒN của nó – tách hẳn khỏi chi phí thực chi (B2).
 
@@ -712,11 +788,7 @@ def budget_of(db: Session, t: Tour) -> tuple[float, float, str]:
     """
     if (t.fixed_cost or 0) > 0 or (t.var_cost_per_pax or 0) > 0:
         return t.fixed_cost, t.var_cost_per_pax, "du_toan_tour"
-    from app.models.core import Product
-    p = None
-    if t.product_id: p = db.get(Product, t.product_id)
-    if p is None and t.product_code:
-        p = db.execute(select(Product).where(Product.code == t.product_code)).scalars().first()
+    p = _san_pham_cua(db, t)
     if p is not None:
         f, v = p.fixed_cost(), p.var_cost_per_pax()
         if f > 0 or v > 0:
