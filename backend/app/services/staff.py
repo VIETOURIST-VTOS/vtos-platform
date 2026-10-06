@@ -18,6 +18,7 @@ from app.core.security import hash_password
 from app.models.core import User, ROLES
 from app.models.hr import Employee
 from app.services import rules as R
+from app.services import so_lo_nap as SLN
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "nhan_su_2026-09.json"
 ACCOUNT_DEPTS = ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt", "ketoan", "hcns", "ban_tgd", "doi_xe", "huong_dan", "visa")
@@ -141,6 +142,16 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
         # sửa lại được bằng một nút, nên phải nhìn thấy danh sách trước khi bấm.
         db.rollback(); stat["xem_truoc"] = True
         return stat
+    # K5 – NHẬT KÝ LÔ. CHỈ ghi ở nhánh làm thật: nhánh `dry_run` ở trên `db.rollback()` rồi trả về,
+    # nên một dòng sổ viết ở đó vừa bị cuốn đi vừa nói dối rằng đã nạp.
+    #
+    # `updated` là ĐÃ GHI chứ không phải bỏ qua — cửa này là upsert theo mã nhân viên. `skipped` mới
+    # là dòng không vào được, nên nó nằm ở ô dòng lỗi.
+    SLN.ghi_lo(db, loai="nhan_su_danh_sach_goc", so_dong=len(rows),
+               da_nap=int(stat.get("created", 0)) + int(stat.get("updated", 0)),
+               dong_loi=len(stat.get("skipped", [])), ten_tep=DATA.name,
+               boi=(actor.username if actor else "he_thong"), nguon="he_thong", dau_vao=rows,
+               ket_qua={k: (v if not isinstance(v, list) else v[:30]) for k, v in stat.items()})
     if actor: R.audit(db, actor.username, actor.role, "nap_danh_sach_nhan_vien", "employees", after={k: (v if not isinstance(v, list) else len(v)) for k, v in stat.items()})
     db.commit()
     return stat

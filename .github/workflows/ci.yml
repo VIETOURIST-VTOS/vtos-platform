@@ -86,7 +86,8 @@ jobs:
       # DANH SÁCH TỆP NHÁNH NÀY ĐỔI — 23/9/2026.
       #
       # `backend/tests/test_giu_cho_nhanh.py` đọc tệp này qua biến VTOS_TEP_DOI và đỏ nếu có tệp mã
-      # nào không được một dòng `đang làm` trong docs/DANG-LAM.md giữ chỗ.
+      # nào không được một dòng `đang làm` trong sổ giữ chỗ giữ chỗ. Từ 06/10/2026 sổ tách ra
+      # mỗi làn một tệp: `docs/dang-lam/<làn>.md`, cộng quyển cũ `docs/DANG-LAM.md` vẫn đọc tiếp.
       #
       # VÌ SAO TÍNH Ở ĐÂY MÀ KHÔNG ĐỂ PHÉP THỬ TỰ GỌI GIT: bộ phép thử còn chạy ở hai chỗ không có
       # thư mục .git — máy của người, và hộp cát giải nén từ `git archive`. Một phép thử tự gọi git
