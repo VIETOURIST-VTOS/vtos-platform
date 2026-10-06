@@ -2,7 +2,7 @@
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles
@@ -16,6 +16,10 @@ from app.services import rules as R
 router = APIRouter(prefix="/api/v1", tags=["nhan-su-ho-so"])
 HR_ADMIN = ("hcns", "cntt", "tgd", "chutich")
 HR_READ = ("hcns", "cntt", "tgd", "chutich", "bks", "ketoan")
+# Chữ ký cửa duyệt đơn: HỢP của mọi vai ký được, SUY RA từ bảng luật chứ không khai tay lần thứ hai.
+# Khai tay hai chỗ thì sớm muộn cũng lệch, và lúc lệch thì hoặc một người ký được thứ không phải của
+# mình, hoặc một người đúng luật lại bị cửa chặn mà không ai hiểu vì sao.
+KY_DON = tuple(sorted({v for vais in H.TUYEN_KY_DON.values() for v in vais} | set(H.KY_MAC_DINH)))
 
 
 def _emp(db: Session, eid: int) -> Employee:
@@ -52,8 +56,17 @@ def profile_out(p: EmployeeProfile | None) -> dict | None:
             "note": p.note, "updated_by": p.updated_by, "updated_at": p.updated_at}
 
 
-def leave_out(r: LeaveRequest, e: Employee | None = None) -> dict:
+def leave_out(r: LeaveRequest, e: Employee | None = None, u: User | None = None) -> dict:
+    """`co_the_ky` do MÁY CHỦ trả lời, không để màn hình tự suy.
+
+    Màn hình mà tự khai "vai nào ký được đơn nào" là khai luật lần thứ hai, ở chỗ không ai chạy
+    phép thử. Trả thẳng câu trả lời ra đây thì nút Duyệt chỉ hiện đúng chỗ nó bấm được, và lúc luật
+    đổi thì màn hình đổi theo mà không phải sửa một dòng nào.
+    """
+    ky = bool(u and e and u.role in H.nguoi_ky_don(e.department)
+              and e.user_id != u.id and r.status == "cho_duyet")
     return {"id": r.id, "employee_id": r.employee_id, "employee_code": e.code if e else "",
+            "co_the_ky": ky, "nguoi_ky": list(H.nguoi_ky_don(e.department)) if e else [],
             "employee_name": e.full_name if e else "", "department": e.department if e else "",
             "kind": r.kind, "kind_name": LEAVE_KINDS.get(r.kind, {}).get("ten", r.kind),
             "date_from": r.date_from, "date_to": r.date_to, "days": r.days, "ot_hours": r.ot_hours,
@@ -272,12 +285,26 @@ class LeaveIn(BaseModel):
 @router.get("/leaves")
 def list_leaves(status: str = "", employee_id: int = 0, kind: str = "",
                 u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Ba tầng, và tầng giữa là tầng mới (30/9/2026).
+
+    HCNS và nhóm đọc toàn công ty thấy tất cả. NGƯỜI KÝ của một phòng thấy đơn của phòng ấy cộng
+    đơn của chính mình — không có tầng này thì Giám đốc đội xe mở màn hình ra chỉ thấy đơn của
+    riêng ông, tức là có nút ký mà không có đơn nào để ký. Còn lại chỉ thấy đơn của chính mình.
+    """
     q = select(LeaveRequest).order_by(LeaveRequest.date_from.desc(), LeaveRequest.id.desc())
-    if u.role not in HR_READ:                                # nhân viên thường chỉ xem đơn của mình
+    if u.role not in HR_READ:
         me = _self_employee(db, u)
-        if not me:
+        phong = H.phong_minh_ky(u.role)
+        if phong:
+            cua_phong = select(Employee.id).where(Employee.department.in_(phong))
+            dieu = LeaveRequest.employee_id.in_(cua_phong)
+            if me:
+                dieu = or_(dieu, LeaveRequest.employee_id == me.id)
+            q = q.where(dieu)
+        elif me:
+            q = q.where(LeaveRequest.employee_id == me.id)
+        else:
             return []
-        q = q.where(LeaveRequest.employee_id == me.id)
     elif employee_id:
         q = q.where(LeaveRequest.employee_id == employee_id)
     if status:
@@ -285,7 +312,7 @@ def list_leaves(status: str = "", employee_id: int = 0, kind: str = "",
     if kind:
         q = q.where(LeaveRequest.kind == kind)
     emps = {e.id: e for e in db.execute(select(Employee)).scalars()}
-    return [leave_out(r, emps.get(r.employee_id)) for r in db.execute(q).scalars()]
+    return [leave_out(r, emps.get(r.employee_id), u) for r in db.execute(q).scalars()]
 
 
 @router.post("/leaves", status_code=201)
@@ -300,7 +327,7 @@ def add_leave(data: LeaveIn, u: User = Depends(current_user), db: Session = Depe
         r = H.create_leave(db, u, e, data.model_dump())
     except ValueError as ex:
         raise HTTPException(422, str(ex))
-    return leave_out(r, e)
+    return leave_out(r, e, u)
 
 
 class DecisionIn(BaseModel):
@@ -309,16 +336,19 @@ class DecisionIn(BaseModel):
 
 
 @router.post("/leaves/{lid}/decide")
-def decide_leave(lid: int, data: DecisionIn, u: User = Depends(require_roles("hcns", "tgd", "chutich", "gd_kd", "ptgd_doan", "tp_kd", "cntt")),
+def decide_leave(lid: int, data: DecisionIn, u: User = Depends(require_roles(*KY_DON)),
                  db: Session = Depends(get_db)):
+    """Chữ ký cửa là HỢP của mọi người ký; ai ký được đơn của phòng nào thì `H.decide_leave` canh."""
     r = db.get(LeaveRequest, lid)
     if not r:
         raise HTTPException(404, "Không tìm thấy đơn")
+    if not data.approve and not (data.note or "").strip():
+        raise HTTPException(422, "Từ chối đơn phải ghi lý do – người làm đơn cần biết sửa gì để gửi lại")
     try:
         H.decide_leave(db, u, r, data.approve, data.note)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
-    return leave_out(r, db.get(Employee, r.employee_id))
+    return leave_out(r, db.get(Employee, r.employee_id), u)
 
 
 @router.get("/leave-balance")
