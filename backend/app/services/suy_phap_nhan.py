@@ -40,10 +40,12 @@ from app.services import rules as R
 #
 #   "Tài xế và GĐ Huấn là pháp nhân Công ty TNHH Vận tải Vietrip, còn lại là Vietourist Holdings."
 #
-# Viết theo PHÒNG BAN chứ không theo vai trò, và đó là chỗ phải đọc kỹ: vai trò xe_hdv gộp CẢ tài xế
-# lẫn hướng dẫn viên vào một tên. Chốt theo vai trò thì toàn bộ HDV bị kéo sang công ty vận tải – điều
-# Chủ tịch không nói, và là điều sai: HDV nay là cộng tác viên của phòng Hướng dẫn, không phải người
-# của đội xe. Phòng ban phân biệt được hai nhóm ấy; vai trò thì không.
+# Viết theo PHÒNG BAN chứ không theo vai trò. Khi bản này ra đời, lý do là vai trò `xe_hdv` gộp CẢ tài
+# xế lẫn hướng dẫn viên vào một tên, nên chốt theo vai trò thì toàn bộ HDV bị kéo sang công ty vận tải.
+# Từ 05/10/2026 vai ấy đã tách làm `tai_xe` và `hdv`, nên lý do cũ hết hiệu lực — nhưng CÁCH VIẾT thì
+# giữ nguyên, vì phòng ban mới là thứ quyết định pháp nhân: một người đổi vai mà không đổi phòng thì
+# hợp đồng lao động của họ không đổi theo. Vai trò nói người ấy LÀM GÌ; phòng ban nói người ấy thuộc
+# PHÁP NHÂN NÀO. Hai câu hỏi khác nhau, và chỉ câu thứ hai là câu Chủ tịch trả lời ở trên.
 #
 # Mã pháp nhân chứ không phải số thứ tự: số thứ tự đổi theo từng cơ sở dữ liệu, mã thì không.
 PHONG_THEO_PHAP_NHAN = {

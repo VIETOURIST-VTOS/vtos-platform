@@ -188,7 +188,7 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 #
 # SIẾT 09/9/2026 – sáu dòng khai tay THỪA bị bỏ, sáu vai trò giảm 1–2 nhóm mà KHÔNG mất quyền nào:
 #   "/api/v1/auth/" ở 5 vai trò – mọi vai trò đã có "/api/v1/auth" qua API_CHUNG
-#   "/api/v1/xe-hdv/" ở xe_hdv   – vai trò này đã suy được tiền tố ấy từ ma trận menu
+#   "/api/v1/xe-hdv/" ở tai_xe   – vai trò này đã suy được tiền tố ấy từ ma trận menu
 # Hàng rào so bằng startswith nên tiền tố có dấu gạch cuối chỉ là bản sao hẹp hơn. Với gd_doi_xe và
 # tp_hd thì dòng "/api/v1/xe-hdv" KHÔNG thừa – hai vai trò ấy lấy màn hình từ danh sách CHO PHÉP nên
 # không suy ra được, bỏ đi là họ mất cả phân hệ xe & HDV.
@@ -323,7 +323,7 @@ PHAM_VI_DA_CHOT = {
     #   +2  chutich, tgd, bks, robot_ks, cntt, ptgd_doan, tp_dh, ketoan  (mở được CẢ HAI)
     #   +1  nv_dh và bốn vai Kinh doanh, gd_doi_xe, tp_hd                (chỉ Sự cố tour)
     #   +1  hcns, hanh_chinh                                             (chỉ Hồ sơ kiểm toán)
-    #   không đổi: ptgd_mkt, nv_mkt, xe_hdv, nv_visa, robot_pq, robot_vpm
+    #   không đổi: ptgd_mkt, nv_mkt, tai_xe, hdv, nv_visa, robot_pq, robot_vpm
     #
     # KHÔNG nhóm nào khác dôi ra, và đó là chủ ý: mọi ô chọn của hai màn hình đi qua CHÍNH phân hệ ấy
     # (/su-co-tour/meta, /su-co-tour/chon/..., /kiem-toan/meta) thay vì gọi thẳng /api/v1/suppliers,
@@ -501,7 +501,9 @@ PHAM_VI_DA_CHOT = {
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
     # chỉ không còn cầm bản tổng hợp cả bộ phận. Đúng nguyên tắc "nhân viên trong phòng KHÔNG mặc
     # định xem báo cáo phòng"; dòng cũ là chỗ vá tạm khi Visa chưa có người phụ trách.
-    "gd_doi_xe": 27, "hanh_chinh": 28, "tp_hd": 25, "xe_hdv": 16, "nv_visa": 18,
+    # tai_xe và hdv: hai vai tách ra từ `xe_hdv` ngày 05/10/2026, mỗi vai giữ ĐÚNG con số 16 của vai cũ.
+    # Bằng nhau là điều phải canh: tách vai là để tách TUYẾN KÝ, không phải để ai đó rộng thêm một cửa.
+    "gd_doi_xe": 27, "hanh_chinh": 28, "tp_hd": 25, "tai_xe": 16, "hdv": 16, "nv_visa": 18,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
@@ -540,6 +542,7 @@ def test_thu_tu_pham_vi_hop_ly():
     vụ nào rộng bằng Chủ tịch. Ba câu này đúng bất kể con số thay đổi thế nào."""
     pv = {v: len(AC.pham_vi_day_du(v)) for v in ROLES}
     assert pv["chutich"] == pv["tgd"] == pv["bks"], "Chủ tịch, TGĐ và Ban Kiểm soát phải nhìn như nhau"
-    assert pv["xe_hdv"] < pv["nv_dh"] < pv["tp_dh"], "người ở hiện trường phải hẹp hơn văn phòng"
-    for vai in ("nv_kd", "nv_mkt", "hanh_chinh", "nv_visa", "xe_hdv", "gd_doi_xe", "tp_hd"):
+    assert pv["tai_xe"] == pv["hdv"], "tách vai không được làm một trong hai rộng hơn vai kia"
+    assert pv["tai_xe"] < pv["nv_dh"] < pv["tp_dh"], "người ở hiện trường phải hẹp hơn văn phòng"
+    for vai in ("nv_kd", "nv_mkt", "hanh_chinh", "nv_visa", "tai_xe", "hdv", "gd_doi_xe", "tp_hd"):
         assert pv[vai] < pv["chutich"], f"{vai} rộng bằng Chủ tịch"

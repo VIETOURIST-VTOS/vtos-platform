@@ -405,7 +405,7 @@ VAI_TRO.update(_pr.vai_tro(QUAN_TRI))
 BO_NAP_CHAM_TIEN = ("doi_chieu_h1_2026",
                     "don_dich_vu", "chuyen_xe", "quyet_toan_tour", "sao_ke_ngan_hang", "cham_cong"
                     ) + _pb2.CHAM_TIEN + _pb3.CHAM_TIEN + _kho.CHAM_TIEN
-NHAN_VIEN = ("nv_dh", "nv_kd", "tn_kd", "nv_mkt", "nv_visa", "xe_hdv", "hanh_chinh")
+NHAN_VIEN = ("nv_dh", "nv_kd", "tn_kd", "nv_mkt", "nv_visa", "tai_xe", "hdv", "hanh_chinh")
 # Suy ra từ VAI_TRO chứ không khai tay lần thứ hai: hai bảng khai tay thì sớm muộn cũng lệch, và lúc
 # lệch thì không ai biết bảng nào đúng.
 VAI_TRO_NAP_TEP = {k: (tuple(v for v in vs if v not in NHAN_VIEN) if k in BO_NAP_CHAM_TIEN else vs)

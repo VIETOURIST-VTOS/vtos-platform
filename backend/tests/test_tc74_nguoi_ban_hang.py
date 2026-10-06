@@ -132,7 +132,7 @@ def test_doi_tac_khac_hoan_toan_voi_chua_biet_ai_ban():
 def test_bon_ngan_roi_nhau_va_cong_du():
     """Điều kiện tồn tại của cả cấu trúc: bốn ngăn cộng lại bằng toàn bộ doanh thu của kỳ."""
     db = _db(); hc = _u(db, "hcns", "hcns")
-    nv = _u(db, "chi", "nv_kd"); hdv = _u(db, "hdv1", "xe_hdv"); kho = _u(db, "khocu", "nv_kd")
+    nv = _u(db, "chi", "nv_kd"); hdv = _u(db, "hdv1", "hdv"); kho = _u(db, "khocu", "nv_kd")
     NB.dat_quyen_ban(db, hc, hdv.id, True, "HDV bán thêm chỗ lẻ"); db.commit()
     d = NB.tao_doi_tac(db, hc, "JTV", "J Travel", hieu_luc_tu=dt.date(2026, 1, 1)); db.commit()
     t = _tour(db, "X", dt.date(2026, 9, 10))
@@ -153,7 +153,7 @@ def test_bon_ngan_roi_nhau_va_cong_du():
 # ── 4. Quyền bán là dữ liệu, không phải tuple trong mã ─────────────────────────────────────────
 
 def test_hdv_chua_bat_thi_nam_o_ngan_chua_ro():
-    db = _db(); hdv = _u(db, "hdv1", "xe_hdv")
+    db = _db(); hdv = _u(db, "hdv1", "hdv")
     t = _tour(db, "X", dt.date(2026, 9, 10))
     _bk(db, "B1", t, hdv, 4_000_000)
     assert DT.thang(db, "2026-09")["theo_ngan"]["chua_ro"]["tien"] == 4_000_000
@@ -161,7 +161,7 @@ def test_hdv_chua_bat_thi_nam_o_ngan_chua_ro():
 
 def test_bat_o_tick_khong_keo_nguoi_ngoai_khoi_vao_chi_tieu():
     """Quyền BÁN khác nghĩa vụ ĐẠT CHỈ TIÊU — bật ô tick không đưa ai vào bảng xếp hạng."""
-    db = _db(); hc = _u(db, "hcns", "hcns"); hdv = _u(db, "hdv1", "xe_hdv")
+    db = _db(); hc = _u(db, "hcns", "hcns"); hdv = _u(db, "hdv1", "hdv")
     NB.dat_quyen_ban(db, hc, hdv.id, True, "HDV bán thêm chỗ lẻ"); db.commit()
     t = _tour(db, "X", dt.date(2026, 9, 10))
     _bk(db, "B1", t, hdv, 4_000_000)
@@ -179,7 +179,7 @@ def test_khong_bat_o_tick_cho_nguoi_khoi_kinh_doanh():
 
 
 def test_doi_quyen_ban_phai_co_ly_do_va_phai_doi_that():
-    db = _db(); hc = _u(db, "hcns", "hcns"); hdv = _u(db, "hdv1", "xe_hdv")
+    db = _db(); hc = _u(db, "hcns", "hcns"); hdv = _u(db, "hdv1", "hdv")
     with pytest.raises(ValueError):
         NB.dat_quyen_ban(db, hc, hdv.id, True, "")
     NB.dat_quyen_ban(db, hc, hdv.id, True, "HDV bán thêm"); db.commit()
@@ -198,7 +198,7 @@ def test_khong_con_danh_sach_vai_viet_chet_trong_doanh_thu():
 
 def test_ba_nhom_nhan_vien_roi_nhau():
     db = _db(); hc = _u(db, "hcns", "hcns")
-    nv = _u(db, "chi", "nv_kd"); a = _u(db, "hdv1", "xe_hdv"); b = _u(db, "dh1", "nv_dh")
+    nv = _u(db, "chi", "nv_kd"); a = _u(db, "hdv1", "hdv"); b = _u(db, "dh1", "nv_dh")
     NB.dat_quyen_ban(db, hc, a.id, True, "bán thêm"); db.commit()
     r = NB.ai_duoc_ban(db)
     ten = lambda k: {x["tai_khoan"] for x in r[k]}

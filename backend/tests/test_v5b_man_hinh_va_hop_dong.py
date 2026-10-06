@@ -91,7 +91,7 @@ def test_hai_man_hinh_co_trong_ma_tran_va_khop_pham_vi_api():
 def test_hop_dong_lao_dong_khong_mo_cho_kinh_doanh_va_doi_xe():
     """Hợp đồng lao động là thu nhập của từng người – Nghị định 13/2023."""
     from app.services.access import MENU_ROLES
-    for vt in ("nv_kd", "tn_kd", "gd_doi_xe", "xe_hdv", "nv_mkt"):
+    for vt in ("nv_kd", "tn_kd", "gd_doi_xe", "tai_xe", "nv_mkt"):
         assert vt not in MENU_ROLES["/hop-dong-lao-dong"], vt
 
 

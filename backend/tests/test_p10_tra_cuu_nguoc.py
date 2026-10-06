@@ -33,13 +33,13 @@ def _startup():
         from app.db.session import SessionLocal
         from app.core.security import hash_password
         db = SessionLocal()
-        for vai in ("cntt", "nv_kd", "xe_hdv", "hcns", "ketoan", "nv_visa"):
+        for vai in ("cntt", "nv_kd", "tai_xe", "hcns", "ketoan", "nv_visa"):
             un = f"tc_{vai}"
             if db.execute(select(User).where(User.username == un)).scalars().first() is None:
                 db.add(User(username=un, full_name=f"Thử {vai}", role=vai, department="Kiểm thử",
                             staff_code=f"TC{vai[:3]}", password_hash=hash_password(MK), active=True))
         db.commit()
-        for vai in ("cntt", "nv_kd", "xe_hdv", "hcns", "ketoan", "nv_visa"):
+        for vai in ("cntt", "nv_kd", "tai_xe", "hcns", "ketoan", "nv_visa"):
             UID[vai] = db.execute(select(User).where(User.username == f"tc_{vai}")).scalars().first().id
         db.close()
         yield
@@ -60,7 +60,7 @@ def tra(vai_xem, uid):
 # ---------------- Điều kiện nghiệm thu ----------------
 def test_moi_man_hinh_deu_tra_loi_duoc_cau_vi_sao():
     """Không dòng nào được bỏ trống lý do. Bảng quyền thiếu lý do vẫn trông như đã xong."""
-    for vai in ("nv_kd", "xe_hdv", "hcns", "ketoan", "nv_visa", "cntt"):
+    for vai in ("nv_kd", "tai_xe", "hcns", "ketoan", "nv_visa", "cntt"):
         d = tra("cntt", UID[vai])
         for dong in d["man_hinh"]:
             assert dong.get("cau"), f"{vai}: màn hình {dong['path']} không có câu trả lời 'vì sao'"
@@ -82,13 +82,13 @@ def test_ly_do_chi_dung_dong_trong_ma_tran_chu_khong_phai_cau_chung():
 def test_vai_tro_hep_noi_ro_la_danh_sach_khai_tay_chu_khong_phai_ma_tran():
     """Bảy vai trò hẹp KHÔNG lấy quyền từ MENU_ROLES. Nói nhầm nguồn thì người rà đi sửa nhầm chỗ và
     tưởng đã siết xong."""
-    d = tra("cntt", UID["xe_hdv"])
+    d = tra("cntt", UID["tai_xe"])
     assert d["man_hinh"], "vai trò hẹp vẫn phải có màn hình"
     rieng = [x for x in d["man_hinh"] if x["path"] not in AC.MAN_HINH_KHONG_DUOC_AN]
     assert rieng, "vai trò hẹp phải có ít nhất một màn hình riêng của nghề"
     for dong in rieng:
         assert dong["nguon"] == "danh_sach_hep_khai_tay", \
-            f"{dong['path']} khai nguồn {dong['nguon']}, trong khi xe_hdv nằm trong RESTRICTED_ROLE_MENUS"
+            f"{dong['path']} khai nguồn {dong['nguon']}, trong khi tai_xe nằm trong RESTRICTED_ROLE_MENUS"
         assert "RESTRICTED_ROLE_MENUS" in dong["dong"]
 
 
@@ -99,7 +99,7 @@ def test_vai_tro_hep_van_lam_duoc_hai_viec_cua_chinh_minh():
     Ba màn hình khác – trang chủ, cảnh báo, báo cáo công việc – KHÔNG nằm ở đây, và đó là chủ ý: bộ
     mẫu báo cáo ngày chỉ có bảy phòng văn phòng, đội xe và visa không phải nộp. Phép thử này từng
     khẳng định ngược lại và nó đã sai."""
-    for vai in ("xe_hdv", "nv_visa"):
+    for vai in ("tai_xe", "nv_visa"):
         d = tra("cntt", UID[vai])
         thay = {x["path"] for x in d["man_hinh"]}
         an = set(d["man_hinh_bi_an"])
@@ -143,7 +143,7 @@ def test_tra_theo_vai_tro_dem_dung_so_nguoi_dang_o_do():
 
 def test_vai_tro_khong_co_ai_van_tra_cuu_duoc_va_bi_bao():
     """Vai trò trống vẫn mở sẵn một bộ quyền. Trả 404 ở đây là giấu mất đúng thứ cần nhìn."""
-    trong = [v for v in ROLES if not (v in ("nv_kd", "xe_hdv", "hcns", "ketoan", "nv_visa", "cntt"))]
+    trong = [v for v in ROLES if not (v in ("nv_kd", "tai_xe", "hcns", "ketoan", "nv_visa", "cntt"))]
     r = client.get(f"/api/v1/access/tra-cuu-vai-tro/{trong[0]}", headers=login("cntt"))
     assert r.status_code == 200, r.text
     d = r.json()
@@ -190,7 +190,7 @@ def test_pham_vi_phap_nhan_hien_ngay_trong_cung_mot_lan_bam():
 
 def test_man_hinh_bi_an_va_man_hinh_thay_khong_giao_nhau():
     """Hai danh sách nói hai điều trái ngược về cùng một người là lỗi đã xảy ra một lần ở đợt 1."""
-    for vai in ("nv_kd", "xe_hdv", "ketoan"):
+    for vai in ("nv_kd", "tai_xe", "ketoan"):
         d = tra("cntt", UID[vai])
         thay = {x["path"] for x in d["man_hinh"]}
         an = set(d["man_hinh_bi_an"])

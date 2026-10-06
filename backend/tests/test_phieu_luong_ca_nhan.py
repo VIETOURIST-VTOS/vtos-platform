@@ -39,18 +39,18 @@ def _startup():
         from app.db.session import SessionLocal
         from app.core.security import hash_password
         db = SessionLocal()
-        # một tài xế THẬT: hồ sơ nhân sự có sẵn trong dữ liệu mẫu, nối thêm một tài khoản vai trò xe_hdv
+        # một tài xế THẬT: hồ sơ nhân sự có sẵn trong dữ liệu mẫu, nối thêm một tài khoản vai trò tai_xe
         e = db.execute(select(Employee).where(Employee.code == MA_TX)).scalars().first()
         assert e is not None, f"dữ liệu mẫu không có hồ sơ {MA_TX}"
         u = db.execute(select(User).where(User.username == "pl_taixe")).scalars().first()
         if u is None:
-            u = User(username="pl_taixe", full_name=e.full_name, role="xe_hdv",
+            u = User(username="pl_taixe", full_name=e.full_name, role="tai_xe",
                      department=e.department, staff_code=MA_TX, password_hash=hash_password(MK), active=True)
             db.add(u); db.commit(); db.refresh(u)
         e.user_id = u.id; db.commit()
         # một tài khoản KHÔNG có hồ sơ nhân sự – trạng thái phải nói ra, không được im lặng
         if db.execute(select(User).where(User.username == "pl_khong_ho_so")).scalars().first() is None:
-            db.add(User(username="pl_khong_ho_so", full_name="Không hồ sơ", role="xe_hdv",
+            db.add(User(username="pl_khong_ho_so", full_name="Không hồ sơ", role="tai_xe",
                         department="van_tai", staff_code="", password_hash=hash_password(MK), active=True))
             db.commit()
         db.close()
@@ -85,7 +85,7 @@ def test_moi_vai_tro_deu_cham_duoc_tien_to_phieu_luong_ca_nhan():
 def test_khong_mo_tien_to_bang_luong_toan_cong_ty_cho_vai_tro_hep():
     """Nếu ai đó sửa cho tiện bằng cách khai /api/v1/payroll-runs vào màn hình của mọi người, hàng rào
     ngoài của bảng lương TOÀN CÔNG TY biến mất với cả 20 vai trò và chỉ còn hàng rào trong đỡ."""
-    for vai in ("xe_hdv", "nv_visa", "nv_kd", "tp_hd", "gd_doi_xe"):
+    for vai in ("tai_xe", "nv_visa", "nv_kd", "tp_hd", "gd_doi_xe"):
         cho = AC.pham_vi_day_du(vai)
         assert not any(p.startswith("/api/v1/payroll-runs") for p in cho), \
             f"{vai} chạm được tiền tố bảng lương toàn công ty"
@@ -161,7 +161,7 @@ def test_phieu_luong_khong_bi_an_khoi_menu_cua_bat_ky_vai_tro_nao():
         "quyết định 07/9: bốn vai trò hẹp không thấy màn hình bảng lương công ty"
     from app.db.session import SessionLocal
     db = SessionLocal()
-    for vai in ("xe_hdv", "nv_visa", "tp_hd", "gd_doi_xe", "nv_kd"):
+    for vai in ("tai_xe", "nv_visa", "tp_hd", "gd_doi_xe", "nv_kd"):
         gia = User(id=0, username="x", full_name="x", role=vai, department="", staff_code="",
                    active=True, password_hash="")
         assert "/phieu-luong" in AC.menus_for(gia, None), f"{vai} không có mục phiếu lương trên menu"

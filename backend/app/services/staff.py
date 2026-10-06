@@ -3,8 +3,10 @@
 - Mã NV = mã trên bảng lương HCNS (vd 114), dùng làm Employee.code và User.staff_code – khớp với ô "Mã nhân viên" của form báo cáo ngày.
 - Ghép với tài khoản VTOS theo họ tên (không dấu, không phân biệt hoa thường); người có tài khoản (Vietrip/seed) được cập nhật vai trò, phòng, nhóm.
 - Người chưa có tài khoản nhưng thuộc khối phải báo cáo ngày (KD, Đoàn, ĐH, MKT, CNTT, Kế toán, HCNS) → tạo tài khoản: username = họ tên không dấu, mật khẩu mặc định = mã NV (HCNS yêu cầu đổi khi đăng nhập lần đầu).
-- Từ 07/9/2026: tài xế đang đứng tên lái xe, HDV và chuyên viên visa CÓ tài khoản (vai trò xe_hdv / nv_visa,
-  chỉ thấy màn hình của mình). Bảo vệ, pháp chế, QH nhà đầu tư chưa có vai trò → chỉ hồ sơ nhân sự.
+- Từ 07/9/2026: tài xế đang đứng tên lái xe, HDV và chuyên viên visa CÓ tài khoản (chỉ thấy màn hình của
+  mình). Bảo vệ, pháp chế, QH nhà đầu tư chưa có vai trò → chỉ hồ sơ nhân sự.
+- Từ 05/10/2026: vai trò `xe_hdv` tách làm `tai_xe` và `hdv`. Bản trích HCNS vẫn ghi mã cũ cho tới kỳ
+  xuất tiếp theo, nên phép đổi nằm trong `vai_tro_cua()` bên dưới chứ không nằm trong tệp dữ liệu.
 - Tài khoản của người không còn trong bảng lương bị KHÓA (active=False), không xóa: nhật ký nghiệp vụ và
   chứng từ đã ghi vẫn trỏ tới tài khoản đó, xóa đi là mất dấu vết người thực hiện.
 """
@@ -22,6 +24,30 @@ ACCOUNT_DEPTS = ("kd_le", "kd_doan", "dieu_hanh", "marketing", "cntt", "ketoan",
 DEPT_ROLE_DEFAULT = {"kd_le": "nv_kd", "kd_doan": "nv_kd", "dieu_hanh": "nv_dh", "marketing": "nv_mkt", "cntt": "cntt", "ketoan": "ketoan", "hcns": "hcns", "visa": "nv_visa"}
 GIU_TAI_KHOAN = ("chutich", "tgd", "cntt", "bks")   # tài khoản hệ thống (Ban Kiểm soát do AI vận hành):
                                                     # không hạ quyền, không khóa theo bảng lương
+
+# Vai trò đã nghỉ hưu → cách suy ra vai trò mới, bằng CỘT ĐÃ CÓ trong chính dòng dữ liệu HCNS.
+#
+# `xe_hdv` nghỉ hưu 05/10/2026 khi Chủ tịch tách tài xế và hướng dẫn viên thành hai vai (xem ROLES).
+# Bảng nhân sự HCNS không được sửa để chạy theo việc đổi mã bên trong phần mềm: tệp ấy là bản trích từ
+# bảng lương, do HCNS giữ, và mỗi lần phần mềm bắt họ gõ lại một cột là một lần bản trích lệch khỏi
+# bản gốc. Nên phép đổi nằm ở ĐÂY, đọc được và thử được, cho tới khi HCNS xuất bản tháng mới bằng mã mới.
+#
+# Suy theo `vi_tri` chứ không theo `phong`: một người có thể ngồi ở phòng Đội xe mà không lái xe.
+# Dòng nào `vi_tri` không phải tài xế cũng không phải HDV thì giữ nguyên PHẠM VI HÔM NAY của họ —
+# vai hiện trường của đúng phòng ấy — chứ không tự nâng lên vai quản lý. Nâng quyền cho một tài khoản
+# đang chạy là việc phải có người ký, không phải việc một phép đổi mã tự quyết.
+VAI_NGHI_HUU = {
+    "xe_hdv": {"tai_xe": "tai_xe", "hdv": "hdv", "_theo_phong": {"doi_xe": "tai_xe", "huong_dan": "hdv"}},
+}
+
+
+def vai_tro_cua(r: dict) -> str:
+    """Vai trò của một dòng nhân sự, sau khi dịch những vai trò đã nghỉ hưu."""
+    vai = r["vai_tro"] if "vai_tro" in r else DEPT_ROLE_DEFAULT.get(r["phong"], "")
+    bang = VAI_NGHI_HUU.get(vai)
+    if not bang:
+        return vai
+    return bang.get(r.get("vi_tri", "")) or bang["_theo_phong"].get(r.get("phong", ""), "")
 
 
 def strip_accents(s: str) -> str:
@@ -72,7 +98,7 @@ def import_master(db: Session, actor: User | None = None, create_accounts: bool 
         if u is None: u = u_by_code.get(code) or u_by_name.get(name_key(name))
         # vai_tro RỖNG là quyết định "chưa cấp quyền", khác hẳn với vai_tro KHÔNG CÓ trong dòng dữ liệu
         # (lúc đó mới suy theo phòng). Gộp hai trường hợp bằng "or" là lý do bảo vệ được suy thành hcns.
-        role = r["vai_tro"] if "vai_tro" in r else DEPT_ROLE_DEFAULT.get(r["phong"], "")
+        role = vai_tro_cua(r)
         if u is None and create_accounts and r["phong"] in ACCOUNT_DEPTS and role:
             base = name_key(name)[:24] or f"nv{code}"
             uname = base; n = 1

@@ -36,7 +36,8 @@ MAC_DINH: dict[str, tuple] = {
     # mức 3 nghĩa là TỰ ĐỘNG TRONG HẠN MỨC, người hậu kiểm là Chủ tịch. Ô tin_khach để 0 và phải ở 0:
     # người đi giám sát không nói chuyện với khách hàng. Ô cảnh báo là mức 4 vì đó là quy tắc xác định.
     "bks":        (3, 0, 3, 2, 3, 4),
-    "xe_hdv":     (1, 0, 0, 1, 0, 4), "gd_doi_xe":  (1, 0, 1, 1, 0, 4),
+    "tai_xe":     (1, 0, 0, 1, 0, 4), "hdv":        (1, 0, 0, 1, 0, 4),
+    "gd_doi_xe":  (1, 0, 1, 1, 0, 4),
     "nv_visa":    (1, 2, 1, 2, 0, 4),
 }
 COT = ("hoi_dap", "tin_khach", "vb_noi_bo", "doc_chung_tu", "cham_diem", "canh_bao")

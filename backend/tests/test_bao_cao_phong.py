@@ -73,7 +73,7 @@ def test_truong_phong_chi_xem_phong_minh_khong_xem_toan_cong_ty():
 
 def test_nhan_vien_khong_xem_bao_cao_phong():
     """Mỗi người thấy VIỆC CỦA MÌNH là một chuyện; bản tổng hợp hiệu quả cả phòng là chuyện khác."""
-    for vai in ("nv_kd", "nv_dh", "nv_mkt", "xe_hdv", "hanh_chinh"):
+    for vai in ("nv_kd", "nv_dh", "nv_mkt", "tai_xe", "hanh_chinh"):
         assert BP.pham_vi_duoc_xem(vai) == [], f"{vai} đang xem được báo cáo phòng"
 
 
