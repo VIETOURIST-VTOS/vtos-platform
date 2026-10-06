@@ -51,8 +51,22 @@ def _line(db: Session, t: Tour, lid: int) -> TourCostLine:
 @router.get("/tours/{tid}/settlement")
 def get_settlement(tid: int, u: User = Depends(require_roles(*AC.COST_ROLES, mo_ta="quyết toán tour")), db: Session = Depends(get_db)):
     t = _tour(db, tid)
+    ct = ST.checks(db, t)
+    # Phòng HDV Đợt 2 · Chủ tịch chốt 06/10/2026: "báo cáo HDV chưa đủ thì quyết toán tour KHÔNG được
+    # hiển thị hoàn tất". Nối ở đây, trong hàm ĐỌC, chứ không chặn ở hàm GHI: chặn ghi thì một báo cáo
+    # chưa nộp sẽ khoá luôn việc nhập chi phí của Điều hành, mà hai việc ấy không phụ thuộc nhau.
+    #
+    # Mức `block` chứ không `warn`: đây là điều kiện để gọi một tờ là xong, không phải một lời nhắc.
+    # Nói ra TÊN NGƯỜI còn nợ, không chỉ một ô đỏ — người làm quyết toán cần biết phải gọi ai.
+    from app.services import hdv as HDV
+    thieu_bc = HDV.thieu_bao_cao_cua_tour(db, t.id)
+    for x in thieu_bc:
+        ct.append({"level": "block", "line": 0,
+                   "msg": f"Thiếu báo cáo sau tour của {x['hdv']} ({x['tinh_trang']})"
+                          f"{' – đã quá hạn' if x['tre_han'] else ''} – chưa gọi tour này là hoàn tất được"})
     return {"tour": t.code, "status": t.status, "version": t.settlement_version, "can_edit": ST.can_edit(db, u, t), "service_types": ST.SERVICE_TYPES,
-            "lines": [ST.line_out(l) for l in ST.lines_of(db, t)], "summary": ST.summary(db, t), "checks": ST.checks(db, t)}
+            "lines": [ST.line_out(l) for l in ST.lines_of(db, t)], "summary": ST.summary(db, t), "checks": ct,
+            "thieu_bao_cao_hdv": thieu_bc, "duoc_goi_hoan_tat": len(thieu_bc) == 0}
 
 
 @router.post("/tours/{tid}/settlement/lines", status_code=201)

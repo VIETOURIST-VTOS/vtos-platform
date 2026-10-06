@@ -272,3 +272,133 @@ class TamUngHdv(Base):
 
 Index("ix_tam_ung_hdv_guide_trang_thai", TamUngHdv.guide_id, TamUngHdv.trang_thai)
 Index("ix_tam_ung_hdv_tui", TamUngHdv.guide_id, TamUngHdv.chu_tien, TamUngHdv.loai_tien)
+
+
+# ══════════════ Đợt 4 · ĐỀ XUẤT CỦA PHÒNG HDV VÀ BƯỚC DUYỆT CÓ CẤP (07/10/2026) ══════════════
+#
+# Đặc tả v1.0 §10–§12. Đợt này dựng CÁI MÁY; các CON SỐ (loại hồ sơ nào, hạn mức bao nhiêu, ai duyệt)
+# là chính sách và phải có người ký — xem `CauHinhDuyetHdv` dưới đây, bảng ấy sinh ra RỖNG.
+#
+# THIẾU CẤU HÌNH THÌ CHẶN TRÌNH, KHÔNG CHO BỎ CẤP. Đây là câu quan trọng nhất của cả đợt, và nó lấy
+# nguyên từ §10 của đặc tả. Nếu thiếu cấu hình mà vẫn cho trình thì hệ thống phải tự chọn một đường
+# đi — và đường nó chọn sẽ thành tiền lệ, không ai ký mà vẫn thành luật. Chặn thì có người đi hỏi,
+# và câu trả lời được ghi lại thành cấu hình có chữ ký.
+#
+# KHÔNG GIẢ ĐỊNH TGĐ VÀ CHỦ TỊCH THAY NHAU. §10 nói rõ: "Không giả định hai người thay nhau hoặc hồ
+# sơ nào cũng cần cả hai". Nên các cấp lưu thành MỘT DANH SÁCH CÓ THỨ TỰ, mỗi cấp một vai trò; muốn
+# hai người cùng ký một cấp thì khai hai cấp. Không có đường tắt nào trong mã.
+LOAI_DE_XUAT = {
+    "thue_ctv": "Thuê hướng dẫn viên / cộng tác viên",
+    "thu_lao": "Thù lao, phụ cấp, công tác phí",
+    "tam_ung": "Tạm ứng / hoàn ứng",
+    "phat_sinh_tour": "Phát sinh trong tour",
+    "dao_tao": "Đào tạo, bổ sung nhân sự",
+    "doi_soat_ky": "Đối soát thù lao kỳ",
+}
+TRANG_THAI_DX = {
+    "nhap": "Nháp",
+    "cho_duyet": "Đang chờ duyệt",
+    "can_bo_sung": "Trả lại, cần bổ sung",
+    "tu_choi": "Đã từ chối",
+    "da_duyet": "Đã duyệt đủ cấp",
+}
+DX_DANG_CHAY = ("nhap", "cho_duyet", "can_bo_sung")
+QUYET_DINH = ("dong_y", "tra_bo_sung", "tu_choi")
+
+
+class CauHinhDuyetHdv(Base):
+    """Một dòng = một khoảng tiền của một loại hồ sơ, và danh sách cấp duyệt cho khoảng ấy.
+
+    BẢNG NÀY SINH RA RỖNG, CỐ Ý. Nội dung của nó là chính sách phê duyệt — ai duyệt tới mức tiền nào —
+    và đó là thứ phải có chữ ký, không phải thứ robot tự đặt. Chừng nào chưa có dòng nào khớp thì cửa
+    trình CHẶN, kèm câu nói rõ thiếu cấu hình nào.
+
+    `den_so_tien` RỖNG nghĩa là KHÔNG CÓ TRẦN (khoảng cuối cùng). Không phải "chưa biết": một khoảng
+    tiền thiếu trần sẽ để lọt mọi hồ sơ lớn hơn mức cao nhất đã khai, và đó là đúng những hồ sơ cần
+    cấp cao nhất.
+
+    `cac_cap` là chuỗi vai trò ngăn bằng dấu phẩy, THEO THỨ TỰ phải ký. Ví dụ "ptgd_doan,tgd,chutich".
+
+    Trong MỘT cấp, nhiều vai trò ngăn bằng dấu `|` nghĩa là MỘT NGƯỜI BẤT KỲ trong số đó ký là xong cấp
+    ấy — không phải tất cả. Ví dụ "chutich|tgd" là MỘT cấp, Chủ tịch hoặc Tổng giám đốc ký đều được
+    (quyết định 06/10/2026). So với "chutich,tgd" là HAI cấp, phải đủ cả hai chữ ký. Phân biệt hai cái
+    bằng dấu là cố ý: ghi nhầm dấu thì sai số lượng chữ ký, nên dấu phải khác nhau rõ, không suy diễn.
+    """
+
+    __tablename__ = "cau_hinh_duyet_hdv"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    loai: Mapped[str] = mapped_column(String(20), index=True)
+    tu_so_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    den_so_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    cac_cap: Mapped[str] = mapped_column(String(200), default="")
+    hieu_luc_tu: Mapped[date | None] = mapped_column(Date, nullable=True)
+    trang_thai: Mapped[str] = mapped_column(String(12), default="cho_ky", index=True)
+    ky_boi: Mapped[str] = mapped_column(String(120), default="")
+    ky_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ghi_chu: Mapped[str] = mapped_column(String(200), default="")
+    lap_boi: Mapped[str] = mapped_column(String(50), default="")
+    lap_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    def danh_sach_cap(self) -> list[str]:
+        return [x.strip() for x in (self.cac_cap or "").split(",") if x.strip()]
+
+
+class DeXuatHdv(Base):
+    """Đề xuất của phòng Hướng dẫn trình lên cấp có thẩm quyền (đặc tả v1.0 §10)."""
+
+    __tablename__ = "de_xuat_hdv"
+
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ma: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    loai: Mapped[str] = mapped_column(String(20), index=True)
+    tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True, index=True)
+    guide_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
+    ky: Mapped[str] = mapped_column(String(7), default="")
+
+    noi_dung: Mapped[str] = mapped_column(Text, default="")
+    ly_do: Mapped[str] = mapped_column(Text, default="")
+    can_cu_tinh: Mapped[str] = mapped_column(Text, default="")
+    # Rỗng được: có đề xuất không mang tiền (xin bổ sung nhân sự). Rỗng KHÁC 0, và phép chọn cấu hình
+    # phân biệt hai cái: không có tiền thì rơi vào khoảng bắt đầu từ 0.
+    so_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    loai_tien: Mapped[str] = mapped_column(String(3), default="VND")
+    han_xu_ly: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    trang_thai: Mapped[str] = mapped_column(String(14), default="nhap", index=True)
+    cap_dang_cho: Mapped[int] = mapped_column(Integer, default=0)   # thứ tự bước đang chờ, 0 = chưa trình
+    cau_hinh_id: Mapped[int | None] = mapped_column(ForeignKey("cau_hinh_duyet_hdv.id"), nullable=True)
+
+    nguoi_lap: Mapped[str] = mapped_column(String(50), default="")
+    lap_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    trinh_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    xong_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class BuocDuyetHdv(Base):
+    """Một bước duyệt của một đề xuất. Lập đủ các bước NGAY LÚC TRÌNH, không sinh dần từng bước.
+
+    Lập sẵn thì người trình nhìn thấy cả đường đi trước khi gửi, và ai cũng đọc được hồ sơ này còn
+    qua mấy cửa. Sinh dần thì mỗi lần chỉ biết cửa kế tiếp, và không ai trả lời được "bao giờ xong".
+    """
+
+    __tablename__ = "buoc_duyet_hdv"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    de_xuat_id: Mapped[int] = mapped_column(ForeignKey("de_xuat_hdv.id", ondelete="CASCADE"), index=True)
+    thu_tu: Mapped[int] = mapped_column(Integer, default=1)
+    # Rộng hơn một tên vai trò vì một bước có thể nhận NHIỀU vai trò thay thế nhau, ngăn bằng `|`.
+    vai_tro: Mapped[str] = mapped_column(String(60))
+    trang_thai: Mapped[str] = mapped_column(String(14), default="cho", index=True)  # cho / dong_y / tra_bo_sung / tu_choi
+    nguoi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    y_kien: Mapped[str] = mapped_column(Text, default="")
+
+    def cac_vai(self) -> list[str]:
+        """Các vai trò ký được bước này. Một phần tử = một cấp một vai; nhiều phần tử = ai cũng được."""
+        return [x.strip() for x in (self.vai_tro or "").split("|") if x.strip()]
+
+
+Index("ix_buoc_duyet_hdv_de_xuat_thu_tu", BuocDuyetHdv.de_xuat_id, BuocDuyetHdv.thu_tu)

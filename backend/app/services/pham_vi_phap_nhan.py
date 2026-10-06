@@ -267,6 +267,10 @@ PHAI_LOC = {
     # luật gốc "không bù trừ giữa hai pháp nhân" cấm.
     "TamUngHdv":      "khoản ứng do ĐÚNG MỘT pháp nhân chi ra; lộ chéo là mở đường cho một lần cấn "
                       "trừ tiền giữa hai pháp nhân",
+    # Đợt 4 · 07/10/2026. Đề xuất mang số tiền và đường duyệt của MỘT pháp nhân. Lộ chéo thì người
+    # phụ trách pháp nhân khác đọc được hạn mức, căn cứ tính và ý kiến từng cấp của đơn vị không
+    # phải việc của mình.
+    "DeXuatHdv":      "đề xuất chi và đường duyệt của ĐÚNG MỘT pháp nhân",
     "Vehicle":        "xe thuộc sở hữu của công ty vận tải, không phải của lữ hành",
 
     # Sáu dòng dưới thêm ngày 11/9/2026 sau khi đếm lại trên đủ 34 tệp mô hình (xem đính chính ở

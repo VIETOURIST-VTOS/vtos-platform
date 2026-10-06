@@ -315,3 +315,90 @@ def so_du_ung(db: Session, guide_id: int) -> list[dict]:
         t["cong_ty_no_lai"] = t["so_du"] < 0
         t["khong_bu_tru"] = t["chu_tien"] == "khach"
     return sorted(tui.values(), key=lambda t: (t["chu_tien"], t["loai_tien"]))
+
+
+# ══════════════ Đợt 4 · BƯỚC DUYỆT CÓ CẤP (07/10/2026) ══════════════
+
+from fastapi import HTTPException as _HTTP
+
+from app.models.hdv import BuocDuyetHdv, CauHinhDuyetHdv, DeXuatHdv
+
+
+def tra_cau_hinh(db: Session, loai: str, so_tien: float | None, ngay: date | None = None) -> CauHinhDuyetHdv:
+    """Dòng cấu hình áp cho một đề xuất. KHÔNG tìm thấy thì NÉM LỖI, không tự chọn một đường đi.
+
+    Đặc tả v1.0 §10: "Thiếu cấu hình thì chặn trình; không cho TP tự bỏ cấp." Lý do: nếu hệ thống tự
+    chọn khi thiếu cấu hình thì đường nó chọn sẽ thành tiền lệ — không ai ký mà vẫn thành luật, và
+    phát hiện ra thì đã có hàng chục hồ sơ đi theo đường ấy.
+
+    `den_so_tien` rỗng = không có trần. Thiếu quy ước ấy thì hồ sơ lớn hơn mức cao nhất đã khai sẽ
+    không khớp dòng nào — mà đó đúng là những hồ sơ cần cấp cao nhất.
+    """
+    t = float(so_tien or 0)
+    hom_nay = ngay or date.today()
+    hop = []
+    for c in db.execute(select(CauHinhDuyetHdv).where(CauHinhDuyetHdv.loai == loai)).scalars():
+        if c.trang_thai != "hieu_luc":
+            continue
+        if c.hieu_luc_tu is not None and c.hieu_luc_tu > hom_nay:
+            continue
+        if t < float(c.tu_so_tien or 0):
+            continue
+        if c.den_so_tien is not None and t > float(c.den_so_tien):
+            continue
+        if not c.danh_sach_cap():
+            continue
+        hop.append(c)
+    if not hop:
+        raise _HTTP(422, {
+            "gate": "THIEU_CAU_HINH_DUYET",
+            "message": f"Chưa có cấu hình cấp duyệt cho loại '{loai}' ở mức tiền {t:,.0f}. "
+                       f"Hồ sơ bị CHẶN TRÌNH — hệ thống không tự chọn cấp duyệt, vì đường nó tự chọn "
+                       f"sẽ thành tiền lệ mà không ai ký. Cần người có thẩm quyền khai cấu hình trước.",
+            "loai": loai, "so_tien": t})
+    # Nhiều dòng cùng khớp thì lấy dòng có hiệu lực MUỘN NHẤT, rồi tới dòng có cận dưới CAO NHẤT —
+    # tức dòng hẹp nhất và mới nhất. Lấy dòng rộng nhất thì một khoảng mới khai cho mức cao sẽ bị một
+    # dòng cũ "từ 0 trở lên" nuốt mất.
+    return sorted(hop, key=lambda c: (c.hieu_luc_tu or date.min, float(c.tu_so_tien or 0), c.id))[-1]
+
+
+def lap_cac_buoc(db: Session, dx: DeXuatHdv, ch: CauHinhDuyetHdv) -> list[BuocDuyetHdv]:
+    """Lập ĐỦ các bước ngay lúc trình, không sinh dần. Xem chú thích ở BuocDuyetHdv."""
+    cu = db.execute(select(BuocDuyetHdv).where(BuocDuyetHdv.de_xuat_id == dx.id)).scalars().all()
+    for b in cu:
+        db.delete(b)
+    db.flush()
+    ds = []
+    for i, vai in enumerate(ch.danh_sach_cap(), start=1):
+        b = BuocDuyetHdv(de_xuat_id=dx.id, thu_tu=i, vai_tro=vai)
+        db.add(b)
+        ds.append(b)
+    db.flush()
+    return ds
+
+
+def buoc_dang_cho(db: Session, dx: DeXuatHdv) -> BuocDuyetHdv | None:
+    for b in db.execute(select(BuocDuyetHdv).where(BuocDuyetHdv.de_xuat_id == dx.id)
+                        .order_by(BuocDuyetHdv.thu_tu)).scalars():
+        if b.trang_thai == "cho":
+            return b
+    return None
+
+
+def kiem_nguoi_quyet(dx: DeXuatHdv, b: BuocDuyetHdv, username: str, vai_tro: str) -> None:
+    """Ba hàng rào, và cả ba đều cần:
+
+      1. Đúng VAI TRÒ của bước đang chờ — không phải vai nào cũng ký được mọi bước. Một bước có thể
+         nhận nhiều vai trò thay thế nhau (`chutich|tgd`): khi đó MỘT trong các vai ấy là đủ, và đủ
+         rồi thì bước xong — không chờ nốt những vai còn lại.
+      2. Không phải NGƯỜI TRÌNH — tự trình rồi tự duyệt thì cái duyệt ấy không kiểm gì cả.
+      3. Chưa ai quyết bước này — chống bấm hai lần, và chống hai người cùng quyết một bước.
+    """
+    if b.trang_thai != "cho":
+        raise _HTTP(422, f"Bước {b.thu_tu} đã được quyết rồi ({b.trang_thai}) – không quyết lại")
+    vai_hop = b.cac_vai()
+    if vai_tro not in vai_hop:
+        cho = " hoặc ".join(f"'{v}'" for v in vai_hop) or "(chưa khai vai trò)"
+        raise _HTTP(403, f"Bước {b.thu_tu} chờ chữ ký của {cho}, không phải '{vai_tro}'")
+    if dx.nguoi_lap and username == dx.nguoi_lap:
+        raise _HTTP(422, "Người trình hồ sơ không được tự duyệt hồ sơ mình trình")

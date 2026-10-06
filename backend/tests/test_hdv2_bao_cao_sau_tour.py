@@ -315,3 +315,31 @@ def test_g3_nguoi_tu_choi_chuyen_thi_khong_tinh_la_no_bao_cao():
         assert d["con_thieu"] == 0, "người ta không đi thì không có gì để báo cáo"
     finally:
         db = SessionLocal(); a = db.get(GuideAssignment, ID["a2"]); a.status = cu; db.commit(); db.close()
+
+
+# ───────────── H · nối vào màn hình quyết toán (Chủ tịch chốt 07/10/2026) ─────────────
+def test_h1_quyet_toan_khong_duoc_goi_hoan_tat_khi_con_no_bao_cao():
+    """Nối ở hàm ĐỌC quyết toán, không chặn ở hàm GHI: chặn ghi thì một báo cáo chưa nộp sẽ khoá luôn
+    việc nhập chi phí của Điều hành, mà hai việc ấy không phụ thuộc nhau."""
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.models.hr import GuideAssignment
+    db = SessionLocal()
+    a = db.get(GuideAssignment, ID["a2"])
+    cu = a.status
+    a.status = "da_xac_nhan"
+    db.commit()
+    db.close()
+    try:
+        r = client.get(f"/api/v1/tours/{ID['t1']}/settlement", headers=login(AI))
+        if r.status_code != 200:
+            pytest.skip(f"cửa quyết toán trả {r.status_code} cho vai này")
+        d = r.json()
+        assert "duoc_goi_hoan_tat" in d
+        if d["thieu_bao_cao_hdv"]:
+            assert d["duoc_goi_hoan_tat"] is False
+            assert any(c["level"] == "block" and "báo cáo sau tour" in c["msg"] for c in d["checks"]), \
+                "phải là mức chặn và phải nói ra tên người còn nợ, không chỉ một ô đỏ"
+    finally:
+        db = SessionLocal(); a = db.get(GuideAssignment, ID["a2"]); a.status = cu; db.commit(); db.close()

@@ -3,12 +3,12 @@ import json
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select, desc
+from sqlalchemy import func, select, desc
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles, cong_chan_quyen, loc_theo_nguoi_dung, toan_quyen_ke_ca_tach_bach
-from app.models.core import Tour, User, Company
-from app.models.hdv import CHU_TIEN, TRANG_THAI as YC_TRANG_THAI, TRANG_THAI_BC, TRANG_THAI_UNG, BaoCaoSauTour, TamUngHdv, YeuCauHdv
+from app.models.core import ROLES, Tour, User, Company
+from app.models.hdv import CHU_TIEN, LOAI_DE_XUAT, QUYET_DINH, TRANG_THAI as YC_TRANG_THAI, TRANG_THAI_BC, TRANG_THAI_DX, TRANG_THAI_UNG, BaoCaoSauTour, BuocDuyetHdv, CauHinhDuyetHdv, DeXuatHdv, TamUngHdv, YeuCauHdv
 from app.models.hr import SALES_GROUPS, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, GuideRate, INCIDENT_LEVELS, INCIDENT_STATUS, DEPARTMENTS, POSITIONS, OFFICES
 from app.services import hr as H
 from app.services import rules as R
@@ -269,14 +269,37 @@ def xe_hdv_cua_toi(u: User = Depends(require_roles("tai_xe", "hdv", "nv_dh", "tp
                        "advance_settled": a.advance_settled, "ly_do": a.ly_do,
                        "han_tra_loi": a.han_tra_loi,
                        "con_tra_loi_duoc": (a.status == "cho_xac_nhan"
-                                            and (a.han_tra_loi is None or datetime.now() <= a.han_tra_loi))})
+                                            and (a.han_tra_loi is None or datetime.now() <= a.han_tra_loi)),
+                       # Đợt 2 · báo cáo sau tour. Gửi kèm NGAY Ở ĐÂY thay vì bắt màn hình gọi thêm một
+                       # cửa cho từng chuyến: hướng dẫn viên mở máy ngoài hiện trường, mỗi lần gọi thêm
+                       # là một lần chờ sóng.
+                       "bao_cao": _bc_tom_tat(db, a)})
 
     the = None
     if e.department == "huong_dan":
         ok, vi_sao = H.guide_eligible(e, date.today())
         the = {"card_no": e.card_no, "card_expiry": e.card_expiry, "du_dieu_kien": ok, "vi_sao": vi_sao}
 
-    return {"ho_so": ho_so, "xe": xe, "lenh_dieu_xe": lenh, "phan_chuyen": chuyen, "the_hdv": the}
+    # Đợt 3 · số dư tạm ứng CỦA CHÍNH MÌNH, tách theo túi. Người ở hiện trường cần biết mình đang
+    # giữ bao nhiêu tiền công ty trước khi xin thêm — và phải thấy đúng từng túi, vì tiền thu hộ
+    # khách không bù trừ sang túi công ty.
+    tui = HDV.so_du_ung(db, e.id) if e.department == "huong_dan" else []
+    return {"ho_so": ho_so, "xe": xe, "lenh_dieu_xe": lenh, "phan_chuyen": chuyen, "the_hdv": the,
+            "tui_ung": tui}
+
+
+def _bc_tom_tat(db: Session, a: GuideAssignment) -> dict | None:
+    """Tóm tắt báo cáo sau tour của một phân công, cho màn hình hiện trường.
+
+    Trả None khi CHƯA CÓ BẢN NÀO — và màn hình phải phân biệt None với "có bản chưa xong": một bên là
+    chưa ai viết gì, một bên là viết rồi đang chờ. Hai cái gọi hai hành động khác nhau.
+    """
+    b = HDV.ban_dang_xet(db, a.id)
+    if b is None:
+        return None
+    return {"id": b.id, "ban_so": b.ban_so, "trang_thai": b.trang_thai, "phien_ban": b.phien_ban,
+            "han_nop": b.han_nop, "tre_han": b.tre_han(), "da_khoa": b.da_khoa(),
+            "y_kien_kiem": b.y_kien_kiem}
 
 
 class TraLoiIn(BaseModel):
@@ -966,6 +989,290 @@ def thu_lao_doi_soat(tu_ngay: date, den_ngay: date,
             "tong_thu_lao_tinh_duoc": tong, "so_dong_thieu_bang_gia": thieu_gia,
             "dong": dong,
             "ghi_chu": "Bảng ĐỌC, không ghi. Dòng thiếu bảng giá để trống và đếm riêng, không tính 0."}
+
+
+# ---------- Phòng HDV Đợt 4: đề xuất và bước duyệt có cấp (07/10/2026) ----------
+# Đặc tả v1.0 §10–§12. Đợt này dựng CÁI MÁY; các CON SỐ — loại hồ sơ nào, hạn mức bao nhiêu, ai duyệt
+# — là chính sách và phải có người ký. Bảng cấu hình sinh ra RỖNG, và cửa trình CHẶN khi chưa có dòng
+# nào khớp. Đó không phải chỗ làm dở: hệ thống tự chọn cấp duyệt khi thiếu cấu hình thì đường nó chọn
+# thành tiền lệ, không ai ký mà vẫn thành luật.
+DX_LAP = ("tp_hd", "hcns", "cntt")
+CH_KY = ("chutich", "tgd")
+
+
+def _ten_cap(vai: str) -> str:
+    """Tên người đọc được của một cấp. `chutich|tgd` ra "Chủ tịch HĐQT hoặc Tổng giám đốc".
+
+    Màn hình phải đọc được chữ "hoặc", vì nhìn chuỗi `chutich|tgd` thì người dùng không phân biệt
+    được với hai cấp nối tiếp — mà hai cái ấy khác nhau ở số chữ ký.
+    """
+    return " hoặc ".join(ROLES.get(v, v) for v in [x.strip() for x in vai.split("|") if x.strip()])
+
+
+def ch_out(c: CauHinhDuyetHdv) -> dict:
+    return {"id": c.id, "loai": c.loai, "loai_ten": LOAI_DE_XUAT.get(c.loai, c.loai),
+            "tu_so_tien": c.tu_so_tien, "den_so_tien": c.den_so_tien,
+            "cac_cap": c.danh_sach_cap(), "cac_cap_ten": [_ten_cap(x) for x in c.danh_sach_cap()],
+            "hieu_luc_tu": c.hieu_luc_tu,
+            "trang_thai": c.trang_thai, "ky_boi": c.ky_boi, "ky_luc": c.ky_luc,
+            "ghi_chu": c.ghi_chu, "lap_boi": c.lap_boi}
+
+
+def dx_out(db: Session, d: DeXuatHdv) -> dict:
+    buoc = db.execute(select(BuocDuyetHdv).where(BuocDuyetHdv.de_xuat_id == d.id)
+                      .order_by(BuocDuyetHdv.thu_tu)).scalars().all()
+    t = db.get(Tour, d.tour_id) if d.tour_id else None
+    return {"id": d.id, "ma": d.ma, "phien_ban": d.phien_ban, "loai": d.loai,
+            "loai_ten": LOAI_DE_XUAT.get(d.loai, d.loai), "ky": d.ky,
+            "tour_id": d.tour_id, "tour_code": t.code if t else "", "guide_id": d.guide_id,
+            "noi_dung": d.noi_dung, "ly_do": d.ly_do, "can_cu_tinh": d.can_cu_tinh,
+            # Số tiền ra màn hình để nguyên: đề xuất không mang tiền (xin bổ sung nhân sự) phải hiện
+            # ô trống, không phải 0.
+            "so_tien": d.so_tien, "loai_tien": d.loai_tien, "han_xu_ly": d.han_xu_ly,
+            "trang_thai": d.trang_thai, "trang_thai_ten": TRANG_THAI_DX.get(d.trang_thai, d.trang_thai),
+            "cap_dang_cho": d.cap_dang_cho,
+            "duong_di": [{"thu_tu": b.thu_tu, "vai_tro": b.vai_tro, "cac_vai": b.cac_vai(),
+                          "vai_tro_ten": _ten_cap(b.vai_tro), "trang_thai": b.trang_thai,
+                          "nguoi": b.nguoi, "luc": b.luc, "y_kien": b.y_kien} for b in buoc],
+            "nguoi_lap": d.nguoi_lap, "lap_luc": d.lap_luc, "trinh_luc": d.trinh_luc,
+            "xong_luc": d.xong_luc}
+
+
+class CauHinhIn(BaseModel):
+    loai: str
+    tu_so_tien: float | None = None
+    # RỖNG = KHÔNG CÓ TRẦN. Không phải "chưa biết" – xem chú thích ở CauHinhDuyetHdv.
+    den_so_tien: float | None = None
+    cac_cap: list[str] = []
+    hieu_luc_tu: date | None = None
+    ghi_chu: str = ""
+
+
+@router.get("/guide-assignments/de-xuat/cau-hinh")
+def ch_ds(u: User = Depends(require_roles(*HR_READ, "tp_hd")), db: Session = Depends(get_db)):
+    ds = db.execute(select(CauHinhDuyetHdv).order_by(CauHinhDuyetHdv.loai, CauHinhDuyetHdv.id)).scalars().all()
+    return {"so_dong": len(ds), "dong": [ch_out(c) for c in ds],
+            "ghi_chu": "Bảng này sinh ra RỖNG. Chưa có dòng hiệu lực nào khớp thì cửa trình bị chặn – "
+                       "hệ thống không tự chọn cấp duyệt."}
+
+
+@router.post("/guide-assignments/de-xuat/cau-hinh", status_code=201)
+def ch_lap(data: CauHinhIn, u: User = Depends(require_roles("hcns", "cntt", "tp_hd")), db: Session = Depends(get_db)):
+    """Trình một dòng cấu hình. CHƯA có hiệu lực cho tới khi Chủ tịch hoặc TGĐ ký."""
+    if data.loai not in LOAI_DE_XUAT:
+        raise HTTPException(422, f"Loại hồ sơ phải là một trong: {', '.join(LOAI_DE_XUAT)}")
+    if not data.cac_cap:
+        raise HTTPException(422, "Phải khai ít nhất một cấp duyệt – một cấu hình không cấp nào là "
+                                 "một đường đi vòng qua mọi chữ ký")
+    # Mỗi phần tử của `cac_cap` là MỘT cấp; trong một cấp, `|` nghĩa là ai trong số đó ký cũng được.
+    # Kiểm từng tên vai trò ở cửa nhập, vì một tên viết sai sẽ thành một cấp KHÔNG AI ký được, và hồ sơ
+    # đứng mãi ở cấp ấy mà không ai biết tại sao — lỗi lúc nhập thì sửa một dòng, lỗi lúc chạy thì phải
+    # dò cả bảng.
+    cac_cap: list[str] = []
+    for cap in data.cac_cap:
+        vais = [x.strip() for x in str(cap).split("|") if x.strip()]
+        if not vais:
+            raise HTTPException(422, "Có một cấp duyệt để trống")
+        for v in vais:
+            if v not in ROLES:
+                raise HTTPException(422, f"Vai trò không có trong danh mục: '{v}'")
+        if len(set(vais)) != len(vais):
+            raise HTTPException(422, f"Một cấp khai trùng vai trò: '{cap}'")
+        cac_cap.append("|".join(vais))
+    if (data.tu_so_tien is not None and data.den_so_tien is not None
+            and data.den_so_tien < data.tu_so_tien):
+        raise HTTPException(422, "Trần phải lớn hơn sàn")
+    c = CauHinhDuyetHdv(loai=data.loai, tu_so_tien=data.tu_so_tien, den_so_tien=data.den_so_tien,
+                        cac_cap=",".join(cac_cap),
+                        hieu_luc_tu=data.hieu_luc_tu, ghi_chu=data.ghi_chu, lap_boi=u.username)
+    db.add(c); db.flush()
+    R.audit(db, u.username, u.role, "trinh_cau_hinh_duyet_hdv", f"cauhinh:{c.id}",
+            after={"loai": c.loai, "cac_cap": c.cac_cap})
+    db.commit()
+    return {"id": c.id, "message": "Đã trình cấu hình – chờ Chủ tịch hoặc TGĐ ký mới có hiệu lực"}
+
+
+@router.post("/guide-assignments/de-xuat/cau-hinh/khai-mot-cap", status_code=201)
+def ch_khai_mot_cap(u: User = Depends(require_roles(*CH_KY)), db: Session = Depends(get_db)):
+    """Khai THẲNG luật đã chốt 06/10/2026: MỘT CẤP, Chủ tịch HOẶC TGĐ ký là xong, MỌI MỨC TIỀN.
+
+    Cửa này KHÔNG NHẬN THAM SỐ. Cố ý: nó chỉ làm được đúng một việc — áp luật ấy cho sáu loại hồ sơ,
+    một khoảng duy nhất từ 0 không trần. Nếu nó nhận tham số thì nó thành một cửa khai cấu hình thứ
+    hai, và cửa thứ hai ấy đi vòng qua vòng trình–ký của cửa thường. Muốn một đường đi KHÁC luật
+    06/10 thì phải qua `POST .../cau-hinh` rồi có người ký, như mọi dòng cấu hình khác.
+
+    Chỉ CHỦ TỊCH hoặc TGĐ gọi được, và `ky_boi` là chính người gọi — không phải robot. Ở đây người
+    trình và người ký là một, khác quy tắc "người trình không tự ký" của cửa thường. Đó là có lý do:
+    quy tắc kia để chặn cấp dưới tự duyệt hồ sơ mình trình; còn đây là cấp cao nhất CÔNG BỐ chính
+    sách, và một công bố thì không có ai cao hơn để ký tiếp. Nhật ký ghi rõ là công bố trực tiếp.
+
+    KHÔNG ĐÈ dòng đã có hiệu lực. Loại nào đã có đường đi rồi thì BỎ QUA và kể tên ra, vì đè lên một
+    chính sách đang chạy là đổi luật mà không ai thấy — nguy hơn cả việc thiếu luật.
+    """
+    hom_nay = date.today()
+    CAC_CAP = "chutich|tgd"
+    GHI_CHU = "Quyết định Chủ tịch 06/10/2026: một cấp, CT hoặc TGĐ ký là xong, mọi mức tiền"
+    da_khai, bo_qua = [], []
+    for loai in LOAI_DE_XUAT:
+        try:
+            cu = HDV.tra_cau_hinh(db, loai, 0, hom_nay)
+        except HTTPException:
+            cu = None
+        if cu is not None:
+            bo_qua.append({"loai": loai, "loai_ten": LOAI_DE_XUAT[loai], "cau_hinh_id": cu.id,
+                           "cac_cap": cu.danh_sach_cap()})
+            continue
+        c = CauHinhDuyetHdv(loai=loai, tu_so_tien=0, den_so_tien=None, cac_cap=CAC_CAP,
+                            hieu_luc_tu=hom_nay, trang_thai="hieu_luc",
+                            ky_boi=u.username, ky_luc=datetime.now(),
+                            ghi_chu=GHI_CHU, lap_boi=u.username)
+        db.add(c); db.flush()
+        da_khai.append({"loai": loai, "loai_ten": LOAI_DE_XUAT[loai], "cau_hinh_id": c.id})
+        R.audit(db, u.username, u.role, "cong_bo_cau_hinh_duyet_hdv", f"cauhinh:{c.id}",
+                after={"loai": loai, "cac_cap": CAC_CAP, "tu_so_tien": 0, "den_so_tien": None,
+                       "can_cu": GHI_CHU, "nguoi_cong_bo": u.username})
+    db.commit()
+    return {"da_khai": da_khai, "bo_qua": bo_qua,
+            "message": (f"Đã công bố {len(da_khai)} loại hồ sơ theo luật một cấp CT hoặc TGĐ."
+                        + (f" Bỏ qua {len(bo_qua)} loại đã có đường đi — không đè lên chính sách đang chạy."
+                           if bo_qua else ""))}
+
+
+@router.post("/guide-assignments/de-xuat/cau-hinh/{cid}/ky")
+def ch_ky(cid: int, u: User = Depends(require_roles(*CH_KY)), db: Session = Depends(get_db)):
+    c = db.get(CauHinhDuyetHdv, cid)
+    if not c or c.trang_thai != "cho_ky":
+        raise HTTPException(404, "Không có cấu hình chờ ký")
+    if c.lap_boi and u.username == c.lap_boi:
+        raise HTTPException(422, "Người trình cấu hình không tự ký cấu hình mình trình")
+    c.trang_thai, c.ky_boi, c.ky_luc = "hieu_luc", u.username, datetime.now()
+    R.audit(db, u.username, u.role, "ky_cau_hinh_duyet_hdv", f"cauhinh:{c.id}")
+    db.commit()
+    return {"message": "Đã ký – cấu hình có hiệu lực"}
+
+
+class DeXuatIn(BaseModel):
+    loai: str
+    tour_id: int | None = None
+    guide_id: int | None = None
+    ky: str = ""
+    noi_dung: str = ""
+    ly_do: str = ""
+    can_cu_tinh: str = ""
+    so_tien: float | None = None
+    loai_tien: str = "VND"
+    han_xu_ly: date | None = None
+
+
+@router.post("/guide-assignments/de-xuat", status_code=201)
+def dx_lap(data: DeXuatIn, u: User = Depends(require_roles(*DX_LAP)), db: Session = Depends(get_db)):
+    if data.loai not in LOAI_DE_XUAT:
+        raise HTTPException(422, f"Loại hồ sơ phải là một trong: {', '.join(LOAI_DE_XUAT)}")
+    t = db.get(Tour, data.tour_id) if data.tour_id else None
+    n = db.execute(select(func.count()).select_from(DeXuatHdv)).scalar() or 0
+    d = DeXuatHdv(**data.model_dump(), ma=f"HDV-DX-{n + 1:05d}", nguoi_lap=u.username,
+                  company_id=getattr(t, "company_id", None))
+    db.add(d); db.flush()
+    R.audit(db, u.username, u.role, "lap_de_xuat_hdv", f"dx:{d.ma}", after={"loai": d.loai, "so_tien": d.so_tien})
+    db.commit()
+    return {"id": d.id, "ma": d.ma, "message": "Đã lưu nháp – chưa trình, chưa ai thấy"}
+
+
+class DxTrinh(BaseModel):
+    phien_ban: int | None = None
+
+
+@router.post("/guide-assignments/de-xuat/{did}/trinh")
+def dx_trinh(did: int, data: DxTrinh, u: User = Depends(require_roles(*DX_LAP)), db: Session = Depends(get_db)):
+    """Trình hồ sơ. Lập ĐỦ các bước ngay tại đây, theo cấu hình đang hiệu lực."""
+    d = db.get(DeXuatHdv, did)
+    if not d:
+        raise HTTPException(404, "Không có đề xuất")
+    if d.trang_thai not in ("nhap", "can_bo_sung"):
+        raise HTTPException(422, f"Đề xuất đang ở '{d.trang_thai}' – không trình lại")
+    GML.kiem_phien_ban(d, data.phien_ban, f"Đề xuất {d.ma}", lambda: dx_out(db, d))
+    if not (d.ly_do or "").strip():
+        raise HTTPException(422, "Phải ghi lý do trước khi trình")
+    # Ném 422 THIEU_CAU_HINH_DUYET nếu chưa ai khai cấp duyệt cho mức tiền này.
+    ch = HDV.tra_cau_hinh(db, d.loai, d.so_tien)
+    HDV.lap_cac_buoc(db, d, ch)
+    d.cau_hinh_id, d.trang_thai, d.cap_dang_cho = ch.id, "cho_duyet", 1
+    d.trinh_luc = datetime.now()
+    GML.tang_phien_ban(d)
+    R.audit(db, u.username, u.role, "trinh_de_xuat_hdv", f"dx:{d.ma}",
+            after={"duong_di": ch.danh_sach_cap()})
+    db.commit()
+    return {"message": f"Đã trình – đường đi: {' → '.join(ch.danh_sach_cap())}",
+            "duong_di": ch.danh_sach_cap()}
+
+
+class DxQuyet(BaseModel):
+    phien_ban: int | None = None
+    quyet_dinh: str          # dong_y / tra_bo_sung / tu_choi
+    y_kien: str = ""
+
+
+@router.post("/guide-assignments/de-xuat/{did}/quyet")
+def dx_quyet(did: int, data: DxQuyet, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Cấp đang xử lý quyết định. Ba hành động, đúng như §12: đồng ý, trả bổ sung, từ chối.
+
+    Quyền KHÔNG lấy từ require_roles: nó phụ thuộc DỮ LIỆU — bước đang chờ cần vai nào. Khai cứng một
+    danh sách vai ở đây thì mỗi lần cấu hình thêm một cấp mới lại phải sửa mã.
+    """
+    d = db.get(DeXuatHdv, did)
+    if not d:
+        raise HTTPException(404, "Không có đề xuất")
+    if d.trang_thai != "cho_duyet":
+        raise HTTPException(422, f"Đề xuất đang ở '{d.trang_thai}' – không có bước nào chờ quyết")
+    if data.quyet_dinh not in QUYET_DINH:
+        raise HTTPException(422, f"Quyết định phải là một trong: {', '.join(QUYET_DINH)}")
+    b = HDV.buoc_dang_cho(db, d)
+    if b is None:
+        raise HTTPException(422, "Không có bước nào đang chờ")
+    GML.kiem_phien_ban(d, data.phien_ban, f"Đề xuất {d.ma}", lambda: dx_out(db, d))
+    HDV.kiem_nguoi_quyet(d, b, u.username, u.role)
+    if data.quyet_dinh in ("tra_bo_sung", "tu_choi") and not (data.y_kien or "").strip():
+        raise HTTPException(422, "Trả bổ sung hoặc từ chối đều PHẢI ghi lý do – không ghi thì người "
+                                 "trình phải đoán, và thường đoán sai")
+    b.trang_thai, b.nguoi, b.luc = data.quyet_dinh, u.username, datetime.now()
+    b.y_kien = (data.y_kien or "")[:2000]
+    if data.quyet_dinh == "dong_y":
+        tiep = HDV.buoc_dang_cho(db, d)
+        if tiep is None:
+            d.trang_thai, d.cap_dang_cho, d.xong_luc = "da_duyet", 0, datetime.now()
+            loi = "Đã duyệt đủ cấp"
+        else:
+            d.cap_dang_cho = tiep.thu_tu
+            loi = f"Đã đồng ý – chuyển cấp {tiep.thu_tu} ({tiep.vai_tro})"
+    else:
+        d.trang_thai = "can_bo_sung" if data.quyet_dinh == "tra_bo_sung" else "tu_choi"
+        d.cap_dang_cho = 0
+        if data.quyet_dinh == "tu_choi":
+            d.xong_luc = datetime.now()
+        loi = "Đã trả lại kèm lý do" if data.quyet_dinh == "tra_bo_sung" else "Đã từ chối kèm lý do"
+    GML.tang_phien_ban(d)
+    R.audit(db, u.username, u.role, "quyet_de_xuat_hdv", f"dx:{d.ma}",
+            after={"buoc": b.thu_tu, "quyet_dinh": data.quyet_dinh, "trang_thai": d.trang_thai})
+    db.commit()
+    return {"message": loi, "trang_thai": d.trang_thai}
+
+
+@router.get("/guide-assignments/de-xuat")
+def dx_ds(u: User = Depends(require_roles(*HR_READ, "tp_hd", "nv_dh")), db: Session = Depends(get_db)):
+    q = PV.loc(select(DeXuatHdv).order_by(desc(DeXuatHdv.id)), DeXuatHdv, u)
+    return [dx_out(db, d) for d in db.execute(q).scalars()]
+
+
+@router.get("/guide-assignments/de-xuat/cho-toi-quyet")
+def dx_cho_toi(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Hồ sơ đang chờ ĐÚNG vai trò của người đang đăng nhập. Không trả hồ sơ do chính họ trình."""
+    ra = []
+    q = PV.loc(select(DeXuatHdv).where(DeXuatHdv.trang_thai == "cho_duyet"), DeXuatHdv, u)
+    for d in db.execute(q).scalars():
+        b = HDV.buoc_dang_cho(db, d)
+        if b is not None and b.vai_tro == u.role and d.nguoi_lap != u.username:
+            ra.append(dx_out(db, d))
+    return {"so_ho_so": len(ra), "ho_so": ra}
 
 
 # ---------- Đội xe ----------

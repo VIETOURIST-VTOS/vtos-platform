@@ -103,6 +103,9 @@ CUA_SUA_CO_KHOA = {
     # Đợt 3 · sổ tạm ứng. Cửa sửa là cửa GHI TIỀN của Kế toán – chỗ hai người dễ chạm nhau nhất:
     # phòng HDV đang xin thêm ứng trong khi Kế toán đang ghi khoản vừa chi.
     "tam_ung_hdv":       ("app/api/v1/hr.py",         "ung_ghi_tien"),
+    # Đợt 4 · đề xuất của phòng HDV. Cửa sửa là cửa QUYẾT ĐỊNH: hai cấp cùng mở một hồ sơ, một người
+    # bấm đồng ý trong khi người kia đang bấm trả lại.
+    "de_xuat_hdv":       ("app/api/v1/hr.py",         "dx_quyet"),
     "bao_gia":          ("app/api/v1/ban_hang.py",   "sua_bao_gia"),
     "hop_dong_khach":   ("app/api/v1/ban_hang.py",   "dat_lich"),
     "booking_khach":    ("app/api/v1/quyet_toan_lop3.py", "sua_khach"),
