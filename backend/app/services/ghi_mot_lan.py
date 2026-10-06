@@ -92,6 +92,20 @@ CUA_SUA_CO_KHOA = {
     "suppliers":        ("app/api/v1/suppliers.py",  "sua_ncc"),
     "leads":            ("app/api/v1/crm.py",        "patch_lead"),
     "tour_cost_lines":  ("app/services/settlement.py", "update_line"),
+    # Phòng HDV Đợt 1 · 06/10/2026. Hai bảng này có cửa sửa THẬT ngay từ lúc sinh ra, nên vào thẳng
+    # đây chứ không qua CHUA_CO_CUA_SUA: giờ của phân công là thứ thương lượng lại được (đoàn đổi giờ
+    # bay là chuyện thường), và số người của yêu cầu đổi khi đoàn tăng khách.
+    "guide_assignments": ("app/api/v1/hr.py",         "assign_gio"),
+    "yeu_cau_hdv":       ("app/api/v1/hr.py",         "yeu_cau_huy"),
+    # Đợt 2 · báo cáo sau tour. Cửa sửa là cửa KIỂM: Trưởng phòng xác nhận hoặc trả lại, và đó là lúc
+    # hai người dễ chạm nhau nhất – người nộp đang gửi bản mới trong khi người kiểm đang xác nhận bản cũ.
+    "bao_cao_sau_tour":  ("app/api/v1/hr.py",         "bc_kiem"),
+    # Đợt 3 · sổ tạm ứng. Cửa sửa là cửa GHI TIỀN của Kế toán – chỗ hai người dễ chạm nhau nhất:
+    # phòng HDV đang xin thêm ứng trong khi Kế toán đang ghi khoản vừa chi.
+    "tam_ung_hdv":       ("app/api/v1/hr.py",         "ung_ghi_tien"),
+    # Đợt 4 · đề xuất của phòng HDV. Cửa sửa là cửa QUYẾT ĐỊNH: hai cấp cùng mở một hồ sơ, một người
+    # bấm đồng ý trong khi người kia đang bấm trả lại.
+    "de_xuat_hdv":       ("app/api/v1/hr.py",         "dx_quyet"),
     "bao_gia":          ("app/api/v1/ban_hang.py",   "sua_bao_gia"),
     "hop_dong_khach":   ("app/api/v1/ban_hang.py",   "dat_lich"),
     "booking_khach":    ("app/api/v1/quyet_toan_lop3.py", "sua_khach"),
