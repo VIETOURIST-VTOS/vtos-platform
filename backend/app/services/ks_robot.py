@@ -469,6 +469,23 @@ def hau_kiem_diem(db: Session, u: User, diem_id: int, chap_nhan: bool, ghi_chu: 
 
 
 # ============================== ĐỌC ==============================
+# Bàn giám sát quá bao nhiêu giờ thì phải nói ra là mình đang cũ. 26 giờ = một ngày cộng hai giờ
+# rộng rãi cho lượt 20:30 VN chạy trễ hoặc trượt một lượt vì Render đang khởi động lại.
+GIO_BAN_CU = 26
+
+
+def quet_lan_cuoi(db: Session) -> datetime | None:
+    """Lần vòng quét gần nhất, đọc từ chuỗi kiểm toán – KHÔNG đọc từ `lan_cuoi` của phát hiện.
+
+    `max(lan_cuoi)` trông như cùng một con số nhưng nó trả lời câu khác: một vòng quét không tìm thấy
+    gì thì không có phát hiện nào để đóng dấu thời gian, và khi ấy `max(lan_cuoi)` đứng lại y như lúc
+    robot chết. Hệ quả đúng là hệ quả xấu nhất: bảng sạch và bảng đứng hình đọc ra giống nhau.
+    """
+    r = db.execute(select(AuditLog).where(AuditLog.action == "robot_ks_quet")
+                   .order_by(desc(AuditLog.ts)).limit(1)).scalars().first()
+    return r.ts if r else None
+
+
 def bang(db: Session) -> dict:
     ph = db.execute(select(KsPhatHien).order_by(KsPhatHien.con.desc(), KsPhatHien.muc,
                                                 desc(KsPhatHien.lan_cuoi))).scalars().all()
@@ -496,7 +513,24 @@ def bang(db: Session) -> dict:
             "diem_cho_hau_kiem": len([d for d in dm if d.trang_thai == "cho_hau_kiem"]),
         },
         "chi_tieu": CHI_TIEU, "loai_phat_hien": LOAI_PHAT_HIEN, "muc": MUC_KS,
+        # Ba ô dưới đây để màn hình nói được TUỔI của tấm ảnh nó đang vẽ. Thiếu chúng thì ngày
+        # 30/9/2026 Chủ tịch đọc một bàn giám sát chốt ngày 10/9 mà không có gì trên màn hình cho
+        # biết điều đó – và tưởng "1 việc nghiêm trọng còn tồn" là tình trạng hôm nay.
+        # RỖNG = chưa quét lần nào, khác hẳn "quét rồi mà không thấy gì".
+        **_tuoi_ban(db),
     }
+
+
+def _tuoi_ban(db: Session) -> dict:
+    lc = quet_lan_cuoi(db)
+    if lc is None:
+        return {"quet_lan_cuoi": None, "quet_cach_day_gio": None, "ban_cu": True,
+                "ban_cu_ly_do": "Chưa có vòng quét nào – mọi con số trên bàn này đều chưa được kiểm"}
+    gio = (datetime.now() - lc).total_seconds() / 3600
+    cu = gio > GIO_BAN_CU
+    return {"quet_lan_cuoi": lc.isoformat(), "quet_cach_day_gio": round(gio, 1), "ban_cu": cu,
+            "ban_cu_ly_do": (f"Vòng quét gần nhất cách đây {round(gio / 24, 1)} ngày – bàn này là ảnh cũ, "
+                             f"việc đã hết vẫn treo và việc mới chưa mở" if cu else "")}
 
 
 def danh_dau_da_xem(db: Session, u: User, bao_cao_id: int) -> str:
