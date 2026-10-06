@@ -41,7 +41,12 @@ CUA_TAY = (
     "danh_gia_sau_tour", "ma_khao_sat",
     "dependents", "dispatch_orders", "employee_profiles",
     "employees", "fin_contracts", "fin_schedules", "fleet_ai_runs", "fleet_collaterals",
-    "fleet_debt_payments", "fleet_maintenance", "fleet_offset_applications", "fleet_partners",
+    "fleet_debt_payments",
+    # Báo hư hỏng xe, 06/10/2026. Cửa nhập tay là khung "Báo xe hỏng" trên màn hình /xe-hdv của
+    # chính tài xế, và khung tương tự trên tab Báo hỏng của /doi-xe cho đội xe ghi hộ khi tài xế
+    # gọi điện. CỐ Ý không có bộ nạp tệp: báo hỏng là việc xảy ra từng lần một, ngay lúc nó xảy ra.
+    "fleet_faults",
+    "fleet_maintenance", "fleet_offset_applications", "fleet_partners",
     "fleet_period_costs", "fleet_repayment_installments", "fleet_repayment_plans",
     "fleet_sale_cases", "fleet_settlement_lines", "fleet_settlements", "fleet_shared_invoice_lines",
     "fleet_shared_invoices", "fleet_trip_costs", "fleet_trips", "fleet_verifications",

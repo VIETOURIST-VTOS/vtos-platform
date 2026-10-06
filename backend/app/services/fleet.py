@@ -21,7 +21,8 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import Session
 from app.models.hr import Vehicle, Employee, DispatchOrder
-from app.models.fleet import VehiclePlate, VehicleDocument, FleetVerification, VEHICLE_DOCS, DRIVER_DOCS
+from app.models.fleet import (VehiclePlate, VehicleDocument, FleetVerification, Fault,
+                               VEHICLE_DOCS, DRIVER_DOCS, MUC_DO_HONG, TRANG_THAI_HONG)
 from app.services import rules as R
 
 BLOCK, APPROVAL, REVIEW, UNKNOWN, OK = "BLOCK", "APPROVAL_REQUIRED", "REVIEW", "UNKNOWN", "OK"
@@ -127,6 +128,38 @@ def trung_lich(db: Session, vehicle_id: int, d1: date, d2: date, bo_qua: int | N
     return list(db.execute(q).scalars())
 
 
+HONG_CON_MO = ("moi", "da_tiep_nhan")   # hai trạng thái nghĩa là CHƯA XỬ LÝ XONG
+
+
+def bao_hong_dang_mo(db: Session, v: Vehicle) -> dict:
+    """MỘT chỗ duy nhất trả lời "chiếc xe này đang có báo hỏng nào chưa xử lý xong" — 06/10/2026.
+
+    Cùng khuôn với `tinh_trang_bao_duong`: cửa chặn lệnh điều xe và màn hình đội xe đều hỏi hàm này,
+    không ai tự đếm lại. Hai chỗ tự đếm thì có ngày cửa chặn nói XE ĐANG HỎNG còn màn hình nói xe
+    sạch — hai câu trả lời cãi nhau mà không ai sai.
+
+    `phai_dung_xe` chặn cứng. `con_chay_duoc` chỉ REVIEW: một vết xước hay tiếng kêu lạ không đáng
+    dừng cả chuyến, nhưng người phát lệnh phải NHÌN THẤY nó trước khi ký, chứ không phải đọc được
+    trong báo cáo tháng sau.
+    """
+    rows = list(db.execute(
+        select(Fault).where(Fault.vehicle_id == v.id, Fault.trang_thai.in_(HONG_CON_MO))
+        .order_by(Fault.id.desc())).scalars())
+    chan = [r for r in rows if r.muc_do == "phai_dung_xe"]
+    chung = {"so_bao_hong": len(rows), "so_phai_dung_xe": len(chan),
+             "moi_nhat": rows[0].hien_tuong if rows else "", "ma": "", "loi": "", "viec": ""}
+    if chan:
+        r = chan[0]
+        return {**chung, "muc": BLOCK, "ma": "XE_DANG_BAO_HONG",
+                "loi": f"Xe {v.plate} đang có {len(chan)} báo hỏng mức PHẢI DỪNG XE: {r.hien_tuong}",
+                "viec": "Đội xe xử lý và đóng báo hỏng, hoặc chọn xe khác"}
+    if rows:
+        return {**chung, "muc": REVIEW, "ma": "CO_BAO_HONG_CHUA_XU_LY",
+                "loi": f"Xe {v.plate} có {len(rows)} báo hỏng chưa xử lý xong: {rows[0].hien_tuong}",
+                "viec": "Xem lại trước khi phát lệnh; xử lý xong thì đóng báo hỏng"}
+    return {**chung, "muc": OK}
+
+
 def kiem_tra_dieu_xe(db: Session, v: Vehicle, d1: date, d2: date, driver_id: int | None = None,
                      bo_qua_lenh: int | None = None, chan_khi_thieu_giay: bool = False) -> dict:
     """Chạy toàn bộ điều kiện cho một phương án điều xe. Luôn trả về ĐẦY ĐỦ danh sách, không dừng ở lỗi đầu.
@@ -197,6 +230,11 @@ def kiem_tra_dieu_xe(db: Session, v: Vehicle, d1: date, d2: date, driver_id: int
     t = tinh_trang_bao_duong(db, v)
     if t["muc"] != OK:
         kq.append(_mo(t["ma"], t["muc"], t["loi"], t["viec"]))
+
+    # 4c-bis. Báo hư hỏng chưa xử lý xong. Luật ở `bao_hong_dang_mo`, một chỗ — xem hàm ấy.
+    h = bao_hong_dang_mo(db, v)
+    if h["muc"] != OK:
+        kq.append(_mo(h["ma"], h["muc"], h["loi"], h["viec"]))
 
     # 4d. Giấy tờ sắp hết hạn – vàng/đỏ theo tham số chính sách, tách khỏi nhánh ĐÃ hết hạn ở trên.
     vang = int(R.get_param(db, "xe_giay_to_vang_ngay")); do = int(R.get_param(db, "xe_giay_to_do_ngay"))

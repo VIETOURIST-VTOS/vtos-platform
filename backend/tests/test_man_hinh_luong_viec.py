@@ -100,8 +100,15 @@ def test_tra_cuu_nguoc_theo_vai_tro():
     t = BC.tra_cuu_vai_tro("ketoan")
     assert t["ten"] == "Kế toán" and t["so_buoc"] >= 5 and not t["khong_co_buoc_nao"]
     assert any("quyết toán" in b["ten"].lower() for b in t["buoc"])
+    # 06/10/2026: vai `tai_xe` KHÔNG còn là ví dụ của "vai không đẩy bước nào" — tài xế nay đẩy
+    # được bước đầu của nghiệp vụ báo hư hỏng xe. Giữ nguyên điều phép thử này sinh ra để canh
+    # (vai trống phải NÓI RA, không trả rỗng im lặng) bằng một vai thật sự còn trống: `hdv`.
+    t = BC.tra_cuu_vai_tro("hdv")
+    assert t["khong_co_buoc_nao"], "Hướng dẫn viên không đẩy bước nào – phải nói ra, không trả rỗng im lặng"
     t = BC.tra_cuu_vai_tro("tai_xe")
-    assert t["khong_co_buoc_nao"], "Tài xế & HDV không đẩy bước nào – phải nói ra, không trả rỗng im lặng"
+    assert not t["khong_co_buoc_nao"] and t["so_buoc"] >= 1
+    assert any("báo xe hỏng" in b["ten"].lower() for b in t["buoc"]), \
+        "tài xế phải tra ra được bước báo hư hỏng của chính mình"
 
 
 # ---------------------------------------------------------------------------------------------

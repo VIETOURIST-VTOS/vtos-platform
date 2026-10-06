@@ -113,7 +113,11 @@ def test_tx2_6_man_hinh_hien_truong_goi_dung_cua_va_khong_tu_dat_luat():
     # Màn hình KHÔNG tự tính tuyến ký: không có bảng người duyệt nào viết cứng trong tsx.
     assert "const CONFIRMER" not in mh and "const CAT" not in mh, (
         "màn hình của tài xế tự khai bảng người xác nhận – luật phải nằm ở máy chủ, một chỗ")
-    # Và phải nói ra chỗ CÒN THIẾU thay vì im lặng: chưa có cửa báo hư hỏng.
-    assert "chưa có cửa báo hư hỏng" in mh, (
-        "màn hình im lặng về việc báo hư hỏng – người dùng sẽ tưởng phần mềm không có chức năng ấy "
-        "là do họ chưa tìm ra")
+    # 06/10/2026 — dòng canh cũ ở đây đòi màn hình NÓI RA rằng chưa có cửa báo hư hỏng. Cửa ấy nay
+    # đã có (TX-3), nên lời nhắn kia thành SAI. Đổi thành hai điều còn đúng mãi: cửa phải có mặt, và
+    # lời nhắn "chưa có" phải BIẾN MẤT. Một màn hình nói mình thiếu thứ nó đang có là một lời nói dối
+    # khó phát hiện hơn im lặng, vì người đọc tin nó.
+    assert '"/fleet/bao-hong"' in mh, "màn hình tài xế mất cửa báo hư hỏng"
+    assert "chưa có cửa báo hư hỏng" not in mh, (
+        "màn hình vẫn nói là chưa có cửa báo hư hỏng, trong khi cửa ấy đã có – lời nhắn cũ phải gỡ "
+        "cùng lúc với việc lấp chỗ thiếu")
