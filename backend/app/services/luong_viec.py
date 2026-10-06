@@ -347,8 +347,35 @@ _BAO_HONG = (
                 "danh sách đã-bấm-nút, và lần sau cùng hiện tượng ấy không ai tra được lần trước xử lý sao."),
 )
 
+# ---------------------------------------------------------------------------------------------
+# ĐƠN TỪ NHÂN SỰ – nghỉ phép, ốm đau, vắng việc, công tác, tăng ca
+# ---------------------------------------------------------------------------------------------
+# Chủ tịch quyết 30/9/2026, nhóm việc CON NGƯỜI: "nghỉ phép, ốm đau, vắng việc sẽ do Huấn duyệt,
+# TGĐ và CT thấy." MỘT chữ ký, và chuỗi dừng ở đó – nhóm này không sinh tiền nên không đi qua bàn
+# ký tiền. (Đơn nghỉ kéo theo trừ lương thì phần trừ lương đi đường bảng lương của HCNS, luồng
+# khác, và Nghị định 13/2023 chặn không cho đọc bảng lương ở đây.)
+#
+# Bước duyệt KHÔNG khai cứng vai trò: người ký phụ thuộc PHÒNG của người làm đơn
+# (`hrm.nguoi_ky_don`). Khai cứng ở đây là khai luật lần thứ hai, và hai bảng khai tay thì sớm
+# muộn cũng lệch – lúc lệch thì bảng đem đi ký mô tả một chuỗi chỉ huy không có thật.
+_DON_NHAN_SU = (
+    Buoc("don_nhan_su", "gui", "Gửi đơn nghỉ / ốm / vắng việc",
+         vai_tro=(), cach_canh=CHI_VAI_TRO, vai_tro_dong="mọi người cho đơn của chính mình",
+         den_trang_thai="cho_duyet", nguon="hrm.py::create_leave",
+         vi_sao="Đơn là của chính người gửi, nên không có danh sách vai trò nào cả – điều kiện là "
+                "tài khoản đã ghép với hồ sơ nhân sự. Quỹ phép năm canh ngay lúc gửi, không đợi "
+                "tới bàn ký: báo hết phép lúc đã nghỉ xong thì không còn là một lời cảnh báo."),
+
+    Buoc("don_nhan_su", "quyet", "Duyệt hoặc từ chối đơn",
+         vai_tro=(), cach_canh=CHI_VAI_TRO, vai_tro_dong="hrm.nguoi_ky_don(phòng của người làm đơn)",
+         tu_trang_thai="cho_duyet", den_trang_thai="duyet|tu_choi", nguon="hrm.py::decide_leave",
+         vi_sao="Đội xe một chữ ký của Giám đốc đội xe – Chủ tịch quyết 30/9/2026. TGĐ và Chủ tịch "
+                "THẤY mọi đơn nhưng không ký ở bước này. Từ chối bắt buộc ghi lý do, và không ai "
+                "tự ký đơn của chính mình kể cả khi đúng vai."),
+)
+
 LUONG_VIEC: tuple[Buoc, ...] = (_TOUR + _QUYET_TOAN + _DE_NGHI_CHI + _BOOKING + _BAO_LUU
-                                + _DICH_VU_LE + _BAO_HONG)
+                                + _DICH_VU_LE + _BAO_HONG + _DON_NHAN_SU)
 
 NGHIEP_VU = {
     "chuyen_tour": "Chuyến tour – dự toán đến quyết toán",
@@ -358,6 +385,7 @@ NGHIEP_VU = {
     "bao_luu": "Bảo lưu tiền khách",
     "dich_vu_le": "Dịch vụ lẻ và sản phẩm",
     "bao_hong_xe": "Báo hư hỏng xe",
+    "don_nhan_su": "Đơn từ nhân sự – nghỉ phép, ốm đau, vắng việc",
 }
 
 

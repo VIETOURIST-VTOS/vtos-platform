@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.core import User
-from app.models.hr import Employee
+from app.models.hr import Employee, DEPARTMENTS
 from app.models.hrm import (EmployeeProfile, LaborContract, Dependent, LeaveRequest, AttendanceDay,
                             CONTRACT_KINDS, CONTRACT_STATUS, LEAVE_KINDS, LEAVE_STATUS, ATT_KINDS)
 from app.services import rules as R
@@ -136,6 +136,56 @@ def leave_balance(db: Session, e: Employee, year: int) -> dict:
 
 
 # ---------- Đơn từ ----------
+#
+# AI KÝ ĐƠN CỦA AI — Chủ tịch quyết 30/9/2026, nhóm việc con người.
+#
+#     "Liên quan đến con người như nghỉ phép, ốm đau, vắng việc sẽ do Huấn duyệt, TGĐ và CT thấy."
+#
+# Trước bản này `decide_leave` không hỏi người ký là ai của người làm đơn: BẢY vai trong danh sách
+# chữ ký cửa API đều ký được đơn của BẤT KỲ ai trong công ty. Một Trưởng phòng Kinh doanh ký được
+# đơn nghỉ của một tài xế — không phải vì ai quyết thế, mà vì chưa ai hỏi câu ấy. Đơn vẫn chạy
+# đúng suốt thời gian qua chỉ vì trên thực tế HCNS là người bấm.
+#
+# `TUYEN_KY_DON` là nơi câu hỏi ấy được trả lời, mỗi dòng một phòng, và CHỈ ghi những phòng đã có
+# người quyết. Phòng chưa quyết thì giữ nguyên danh sách hôm nay (`KY_MAC_DINH`) — bản này sửa
+# đúng chỗ Chủ tịch đã nói, không nhân tiện đặt luật cho chín phòng còn lại. Chỗ chưa quyết phải
+# ĐẾM ĐƯỢC chứ không chìm đi, nên có `phong_chua_chot_nguoi_ky()` và một phép thử gọi nó.
+#
+# MỘT NGƯỜI KÝ, KHÔNG CÓ NGƯỜI KÝ THAY. Đội xe đúng một vai `gd_doi_xe`, như Chủ tịch nói. Hệ quả
+# phải nói thẳng: Huấn nghỉ thì đơn của đội xe đứng lại. Mở người ký thay là nới quyền ký cho một
+# vai khác — việc ấy cần người quyết, không phải việc phần mềm tự thêm cho tiện.
+TUYEN_KY_DON = {
+    # Chủ tịch quyết 30/9/2026 — một chữ ký của Giám đốc điều hành đội xe. TGĐ và Chủ tịch THẤY
+    # (họ nằm trong HR_READ nên đọc được mọi đơn) nhưng KHÔNG ký ở đây.
+    "doi_xe": ("gd_doi_xe",),
+    # Hệ quả trực tiếp của lần tách vai 05/10/2026, đã ghi trong chính lý do tách (models/core.py):
+    # "đơn của tài xế đi về Giám đốc đội xe, đơn của hướng dẫn viên đi về Trưởng phòng Hướng dẫn".
+    "huong_dan": ("tp_hd",),
+}
+
+# Danh sách hôm nay, giữ NGUYÊN cho các phòng chưa có người quyết. Chép đúng chữ ký cửa
+# `POST /leaves/{id}/decide` trước bản này, để bản này không lặng lẽ siết ai.
+KY_MAC_DINH = ("hcns", "tgd", "chutich", "gd_kd", "ptgd_doan", "tp_kd", "cntt")
+
+
+def nguoi_ky_don(phong: str) -> tuple[str, ...]:
+    """Những vai trò ký được đơn của một người thuộc phòng này."""
+    return TUYEN_KY_DON.get(phong) or KY_MAC_DINH
+
+
+def phong_minh_ky(vai_tro: str) -> tuple[str, ...]:
+    """Những phòng mà vai trò này là người ký — dùng để lọc hàng đợi duyệt."""
+    return tuple(sorted(p for p, vais in TUYEN_KY_DON.items() if vai_tro in vais))
+
+
+def phong_chua_chot_nguoi_ky() -> tuple[str, ...]:
+    """Phòng còn đang chạy bằng danh sách cũ, chưa ai quyết người ký.
+
+    KHÔNG phải lỗi, và cố ý không tự điền: đặt người ký cho một phòng là việc có người quyết.
+    Trả ra đây để câu hỏi ấy còn đếm được thay vì chìm đi.
+    """
+    return tuple(p for p in DEPARTMENTS if p not in TUYEN_KY_DON)
+
 
 def create_leave(db: Session, u: User, e: Employee, data: dict) -> LeaveRequest:
     kind = data.get("kind") or "phep_nam"
@@ -167,6 +217,17 @@ def decide_leave(db: Session, u: User, r: LeaveRequest, approve: bool, note: str
     if r.status != "cho_duyet":
         raise ValueError(f"Đơn đã ở trạng thái '{LEAVE_STATUS.get(r.status, r.status)}'")
     e = db.get(Employee, r.employee_id)
+    # Chặn nằm Ở ĐÂY, trong hàm, không chỉ ở chữ ký cửa API. Chữ ký cửa nói AI được gõ vào cửa này;
+    # chỉ chỗ này nói người ấy được ký ĐƠN CỦA AI — và chỉ chỗ này còn đúng khi mai kia có một cửa
+    # khác (robot, màn hình khác) gọi vào cùng hàm.
+    ky_duoc = nguoi_ky_don(e.department if e else "")
+    if u.role not in ky_duoc:
+        raise ValueError(
+            f"Vai trò '{u.role}' không ký được đơn của phòng "
+            f"{DEPARTMENTS.get(e.department if e else '', '—')}: người ký là {', '.join(ky_duoc)}")
+    # Người làm đơn không tự ký đơn của mình, kể cả khi họ đúng là vai được ký cho phòng ấy.
+    if e is not None and e.user_id == u.id:
+        raise ValueError("Không tự duyệt đơn của chính mình – đơn này phải do cấp trên ký")
     if approve and r.kind == "phep_nam":
         bal = leave_balance(db, e, r.date_from.year)
         if r.days > (bal["remaining"] or 0):

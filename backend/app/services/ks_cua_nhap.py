@@ -74,7 +74,21 @@ CUA_TAY = (
     # thước đo thành cái bóng của chính số bị đo.
     "ke_hoach_thang",
     "journal_lines", "khoa_ghi", "labor_contracts", "lead_channel_stats",
-    "leads", "leave_requests",
+    "leads",
+    # Đơn từ nhân sự. 07/10/2026 — DÒNG NÀY TỪNG NÓI KHÔNG ĐÚNG, ghi lại để lần sau ai đọc cũng
+    # thấy. Bảng được khai "có cửa nhập tay" từ bản rà 09/9, trong khi rà cả `web/app` thì KHÔNG
+    # một tệp nào gọi `/leaves`: cửa có trên máy chủ, người phải dùng nó không với tới. Đúng loại
+    # lệch mà docstring đầu tệp này nói trước là phép thử ở đây không bắt được — nó chỉ biết bảng
+    # ĐÃ ĐƯỢC KHAI, không biết màn hình còn sống hay chưa bao giờ có.
+    #
+    # Cửa thật, từ 07/10/2026: khung "Đơn nghỉ phép / ốm / vắng việc" trên màn hình /xe-hdv, và
+    # khung "Đơn chờ bạn ký" ngay dưới nó cho người ký. CỐ Ý không có bộ nạp tệp: đơn nghỉ là việc
+    # của từng người một, gửi lúc cần, không ai nạp một tệp đơn nghỉ hàng loạt.
+    #
+    # CÒN THIẾU và nói ra ở đây: màn hình ấy mới mở cho phòng Đội xe và phòng Hướng dẫn. Người của
+    # chín phòng còn lại vẫn chưa có chỗ bấm — cửa máy chủ nhận đơn của họ, nhưng chưa ai dựng ô
+    # nhập. Đó là một vòng riêng, không phải thứ sửa kèm ở đây.
+    "leave_requests",
     # VPM-9 – lịch thanh toán theo tiến độ của hợp đồng khách. Cửa nhập tay ở màn hình
     # /hop-dong-khach: người soạn chia hợp đồng thành các đợt, gõ số tiền và mốc hạn từng đợt.
     # Máy KHÔNG tự chia được: tiến độ trả tiền là điều hai bên thỏa thuận, không suy ra từ đâu.
