@@ -193,7 +193,7 @@ RESTRICTED_API_PREFIXES = {
     # cuối cho thống nhất; hàng rào so bằng startswith nên quyền không đổi.
     "gd_doi_xe": ("/api/v1/fleet", "/api/v1/xe-hdv", "/api/v1/dispatch",
                   "/api/v1/vehicles", "/api/v1/nap-du-lieu", "/api/v1/tep",
-                  "/api/v1/doc-chung-tu"),
+                  "/api/v1/doc-chung-tu", "/api/v1/tai-xe"),
     "nv_visa": ("/api/v1/visa",),
     # --- Ba vai trò máy (P8, 08/9/2026) ---
     # Danh sách của mỗi robot hẹp đúng bằng việc nó được giao, và HAI CHỖ TRỐNG dưới đây là chỗ trống
@@ -465,6 +465,9 @@ MAN_HINH_API = {
     "/robot-reports": ("/api/v1/auto-reports",),
     "/sales-reports": ("/api/v1/sales-reports",),
     "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
+    # Hồ sơ tài xế: MỘT cửa và chỉ đọc. Sửa hồ sơ ở Nhân sự, nạp bằng lái ở bộ nạp tệp, gán xe
+    # ở màn hình Đội xe – nên ở đây không mở thêm tiền tố nào của ba nơi ấy.
+    "/tai-xe": ("/api/v1/tai-xe",),
     "/tep": ("/api/v1/tep",),
     # Robot A · 16/9/2026. Sổ tỷ giá. Kèm /api/v1/tep vì chính màn hình này đính ảnh bảng tỷ giá
     # ngân hàng làm chứng từ – tỷ giá không có chứng từ là con số không ai kiểm được.
@@ -872,6 +875,9 @@ MENU_ROLES = {
     "/hop-dong-lao-dong": BASE_VIEW + ("hcns", "cntt"),
     # Tài sản & mua sắm: nguyên giá, khấu hao và ghi sổ – việc của Kế toán. Hành chính xem để theo dõi
     # tài sản đang ở bộ phận nào.
+    # Hồ sơ tài xế: ĐÚNG BẰNG dòng "/doi-xe" ở trên. Hồ sơ xe và hồ sơ người lái xe là cùng một
+    # tập hồ sơ đội xe; mở lệch nhau là mở một đường vòng vào thứ mình vừa đóng ở cửa kia.
+    "/tai-xe": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "hcns", "cntt"),
     "/tai-san": BASE_VIEW + ("ketoan", "cntt", "hanh_chinh", "hcns"),
 
     # --- Hành chính & Nhân sự (tách quyền theo tab, xem HR_TAB_ROLES) ---
@@ -1034,8 +1040,9 @@ RESTRICTED_ROLE_MENUS = {
     # /su-co-tour thêm 10/9/2026 cho cả hai: xe hỏng giữa đèo là việc của GĐ Đội xe, hướng dẫn viên
     # bỏ đoàn là việc của TP Hướng dẫn – bắt họ nghe lại qua Điều hành là mất đúng mười lăm phút đầu.
     # Màn hình không mang theo dữ liệu khách: xem ghi chú ở dòng "/su-co-tour" của MENU_ROLES.
-    "gd_doi_xe": ("/doi-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe", "/xe-hdv",
-                  "/nap-du-lieu", "/tep", "/doc-chung-tu", "/su-co-tour", "/doi-mat-khau"),
+    "gd_doi_xe": ("/doi-xe", "/tai-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe",
+                  "/xe-hdv", "/nap-du-lieu", "/tep", "/doc-chung-tu", "/su-co-tour",
+                  "/doi-mat-khau"),
     "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/su-co-tour", "/doi-mat-khau"),
     # Ba vai trò máy: danh sách CHO PHÉP, giống bốn vai trò hẹp ở trên. Robot không có menu để bấm,
     # nhưng khai ở đây thì màn hình tra cứu ngược (P10) nói được nó chạm tới đâu, và bộ quét vai trò
