@@ -6,13 +6,46 @@ import { Tag, errMsg } from "@/components/ui";
 
 /** Xe Vietrip & HDV – màn hình của chính người ở hiện trường (chỉ đạo 07/9/2026).
  *  Tài xế và hướng dẫn viên được cấp tài khoản nhưng chỉ thấy việc của mình: xe mình đứng tên, lệnh điều
- *  xe của mình, chuyến mình dẫn và hạn thẻ HDV. Không thấy giá xe nội bộ, không thấy hàng đợi của cả đội. */
+ *  xe của mình, chuyến mình dẫn và hạn thẻ HDV. Không thấy giá xe nội bộ, không thấy hàng đợi của cả đội.
+ *
+ *  05/10/2026 — thêm CỬA GHI đầu tiên của người ở hiện trường: đề nghị tạm ứng của chính mình.
+ *  Màn hình KHÔNG tự tính tuyến ký và không tự đặt tên người duyệt: nó in lại đúng những gì máy chủ
+ *  trả về sau khi lập. Luật nằm ở `services/ops.py::CATEGORY_CONFIRMER`, một chỗ. */
 function XeHdv() {
-  const { toast } = useShell();
+  // `user.role` chỉ dùng để ẨN khối không liên quan cho hướng dẫn viên — KHÔNG phải để canh quyền.
+  // Cửa thật nằm ở máy chủ: `require_roles` của /payment-requests không có `hdv`, nên dù khối này
+  // có hiện ra thì bấm vẫn 403. Màn hình giấu để đỡ rối, máy chủ chặn để đỡ sai.
+  const { toast, user } = useShell();
+  const laTaiXe = user?.role === "tai_xe";
   const [d, setD] = useState<any>(null);
   const [err, setErr] = useState("");
-  const tai = () => api("/xe-hdv/cua-toi").then(setD).catch((x) => { setErr(errMsg(x)); toast(errMsg(x), true); });
+  /** Đề nghị tạm ứng của CHÍNH người đang đăng nhập. Máy chủ lọc theo `created_by`; màn hình không
+   *  gửi kèm một bộ lọc nào – lọc ở màn hình là lọc tin được, lọc ở máy chủ mới là lọc. */
+  const [ung, setUng] = useState<any[]>([]);
+  const [formUng, setFormUng] = useState<any>({ mo: false, amount: "", description: "" });
+  const tai = () => {
+    api("/xe-hdv/cua-toi").then(setD).catch((x) => { setErr(errMsg(x)); toast(errMsg(x), true); });
+    api<any[]>("/payment-requests").then(setUng).catch(() => setUng([]));
+  };
   useEffect(() => { tai(); }, []); // eslint-disable-line
+
+  /** Lập đề nghị tạm ứng. Người thụ hưởng là chính mình, nên màn hình KHÔNG hỏi nhà cung cấp —
+   *  máy chủ điền tên người đăng nhập. Hỏi một ô mà câu trả lời luôn giống nhau là cách chắc chắn
+   *  nhất để người ta gõ bừa. */
+  const luuUng = async () => {
+    const soTien = Number(String(formUng.amount).replace(/[^\d]/g, ""));
+    if (!(soTien > 0)) { toast("Số tiền phải lớn hơn 0", true); return; }
+    if (!String(formUng.description).trim()) { toast("Ghi rõ xin ứng để làm gì — người duyệt cần biết", true); return; }
+    try {
+      const r = await api<any>("/payment-requests", {
+        method: "POST",
+        json: { category: "tam_ung_tai_xe", supplier_name: "", amount: soTien, description: formUng.description },
+      });
+      toast(r.message);
+      setFormUng({ mo: false, amount: "", description: "" });
+      tai();
+    } catch (e) { toast(errMsg(e), true); }
+  };
 
   /** Nhận hoặc từ chối một lời chào chuyến.
    *  Từ chối KHÔNG kèm hệ quả gì: hướng dẫn viên là cộng tác viên, và từ chối một lời chào là quyền của
@@ -70,6 +103,47 @@ function XeHdv() {
             <button className="act grey" style={{ margin: 0 }} onClick={() => traLoi(x.id, false)}>Từ chối</button>
             <div className="muted">trả lời trước {fmtDT(x.han_tra_loi)}</div>
           </> : x.ly_do ? <span className="muted">{x.ly_do}</span> : null}</td></tr>)}</tbody></table></div>}
+
+    {/* ĐỀ NGHỊ TẠM ỨNG — cửa GHI đầu tiên của người ở hiện trường (Chủ tịch quyết 05/10/2026).
+        Khối này KHÔNG tự đặt tuyến ký và không in tên người duyệt từ màn hình: câu trả lời nằm ở
+        máy chủ, và màn hình chỉ in lại lời máy chủ trả về. */}
+    {laTaiXe && <div className="panel"><h2>Đề nghị tạm ứng của tôi</h2>
+      <p className="muted">Xin ứng tiền đi đường. Hồ sơ đi qua <b>Giám đốc đội xe</b> xác nhận, rồi
+        <b> Kế toán</b> kiểm chứng từ, rồi <b>Tổng giám đốc</b> ký. Bạn chỉ thấy đề nghị của chính mình.</p>
+
+      {!formUng.mo
+        ? <button className="act teal" onClick={() => setFormUng({ ...formUng, mo: true })}>Xin tạm ứng</button>
+        : <div className="wrap">
+            <label>Số tiền (đồng)<br />
+              <input value={formUng.amount} inputMode="numeric"
+                     onChange={(e) => setFormUng({ ...formUng, amount: e.target.value })} /></label>
+            <label>Xin ứng để làm gì<br />
+              <input value={formUng.description} style={{ minWidth: 320 }}
+                     placeholder="vd: tiền cầu đường và ăn dọc đường chuyến Đà Lạt 12–14/10"
+                     onChange={(e) => setFormUng({ ...formUng, description: e.target.value })} /></label>
+            <div>
+              <button className="act teal" onClick={luuUng}>Gửi đề nghị</button>{" "}
+              <button className="act grey" onClick={() => setFormUng({ mo: false, amount: "", description: "" })}>Thôi</button>
+            </div>
+          </div>}
+
+      {ung.length > 0 && <table style={{ marginTop: 12 }}>
+        <thead><tr><th>Mã</th><th>Lập lúc</th><th className="num">Số tiền</th><th>Nội dung</th><th>Đang ở đâu</th></tr></thead>
+        <tbody>{ung.map((x: any) => <tr key={x.id}><td className="mono">{x.code}</td><td>{fmtDT(x.created_at)}</td>
+          <td className="num"><b>{vnd(x.amount)}</b></td><td>{x.description}</td>
+          <td>{x.status === "da_chi" ? <Tag cls="ok">Đã chi</Tag>
+            : x.status === "tu_choi" ? <Tag cls="red">Từ chối{x.reject_reason ? ` – ${x.reject_reason}` : ""}</Tag>
+            : x.status === "cho_chi" ? <Tag cls="navy">Đã duyệt, chờ chi</Tag>
+            : x.status === "cho_duyet" ? <Tag cls="warn">Chờ Tổng giám đốc ký</Tag>
+            : x.status === "cho_kt" ? <Tag cls="warn">Chờ Kế toán kiểm</Tag>
+            : <Tag cls="warn">Chờ Giám đốc đội xe xác nhận</Tag>}</td></tr>)}</tbody></table>}
+      {ung.length === 0 && !formUng.mo && <p className="muted">Chưa có đề nghị tạm ứng nào.</p>}
+    </div>}
+
+    {laTaiXe && <div className="panel"><h2>Xe hỏng thì báo thế nào</h2>
+      <p className="muted">Hiện <b>chưa có cửa báo hư hỏng</b> trên phần mềm — báo trực tiếp cho Giám đốc
+        đội xe. Đề nghị sửa chữa do đội xe lập sau khi có báo giá của garage, vì lúc xe vừa hỏng thì
+        chưa ai biết số tiền và chưa chọn garage; bắt bạn gõ hai con số ấy là bắt bạn đoán.</p></div>}
 
     {d.xe.length === 0 && d.lenh_dieu_xe.length === 0 && d.phan_chuyen.length === 0 &&
       <p className="muted">Chưa có xe, lệnh điều xe hay chuyến nào gắn với hồ sơ của bạn. Nếu sai, báo Điều hành hoặc HCNS.</p>}

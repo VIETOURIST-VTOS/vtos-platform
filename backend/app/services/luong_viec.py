@@ -192,6 +192,10 @@ NGUOI_XAC_NHAN_THEO_LOAI = {
     "hanh_chinh": ("hcns",),
     "hoan_tien":  ("gd_kd", "tp_kd", "tp_dh"),
     "tam_ung":    ("tp_dh",),
+    # Đội xe – Chủ tịch quyết 05/10/2026. Giám đốc đội xe XÁC NHẬN nghiệp vụ; cửa DUYỆT vẫn là
+    # TGĐ / Chủ tịch như mọi loại chi khác, nên bảng bước bên dưới không đổi một dòng nào.
+    "sua_chua_xe":    ("gd_doi_xe",),
+    "tam_ung_tai_xe": ("gd_doi_xe",),
 }
 
 _DE_NGHI_CHI = (

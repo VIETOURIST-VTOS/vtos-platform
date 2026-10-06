@@ -172,7 +172,11 @@ RESTRICTED_API_PREFIXES = {
     # "/api/v1/xe-hdv/" thì vai trò này đã suy được từ ma trận menu. Hàng rào so bằng startswith nên
     # tiền tố có dấu gạch cuối chỉ là bản sao hẹp hơn của tiền tố không dấu – giữ lại chỉ làm bảng dài
     # ra và làm bộ tra cứu ngược báo "còn dòng khai tay chưa rà".
-    "tai_xe": ("/api/v1/incidents",),
+    # /payment-requests mở 05/10/2026 để tài xế lập đề nghị tạm ứng của CHÍNH MÌNH. Mở tiền tố này
+    # KHÔNG mở sổ chi toàn công ty: cửa đọc lọc theo `created_by` (xem ops.py::list_pr), và cửa ghi
+    # chỉ nhận đúng loại `tam_ung_tai_xe` (xem ops.py::LOAI_CHI_TAI_XE_TU_LAP). Ba lớp, và cả ba đều
+    # cần: bỏ lớp nào thì một tài xế đọc được hoặc lập được thứ không phải của mình.
+    "tai_xe": ("/api/v1/incidents", "/api/v1/payment-requests"),
     "hdv": ("/api/v1/incidents",),
     # GĐ điều hành đội xe: cả phân hệ đội xe và lệnh điều xe, cộng danh mục xe để chọn trong form. Không có
     # /tours, /bookings, /banks, /payroll – phạm vi công việc của ông là chiếc xe, không phải khách hàng và
@@ -476,7 +480,7 @@ MAN_HINH_API = {
                "/api/v1/quyet-toan-lop3"),
     "/vietrip": ("/api/v1/import",),
     "/visa": ("/api/v1/visa",),
-    "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents"),
+    "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents", "/api/v1/payment-requests"),
 }
 
 

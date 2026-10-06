@@ -503,7 +503,15 @@ PHAM_VI_DA_CHOT = {
     # định xem báo cáo phòng"; dòng cũ là chỗ vá tạm khi Visa chưa có người phụ trách.
     # tai_xe và hdv: hai vai tách ra từ `xe_hdv` ngày 05/10/2026, mỗi vai giữ ĐÚNG con số 16 của vai cũ.
     # Bằng nhau là điều phải canh: tách vai là để tách TUYẾN KÝ, không phải để ai đó rộng thêm một cửa.
-    "gd_doi_xe": 27, "hanh_chinh": 28, "tp_hd": 25, "tai_xe": 16, "hdv": 16, "nv_visa": 18,
+    #
+    # 16 → 17 ngày 06/10/2026, CẢ HAI VAI, và là một lần NỚI có chủ ý: màn hình /xe-hdv nay gọi
+    # /api/v1/payment-requests để tài xế lập đề nghị tạm ứng của chính mình (Chủ tịch quyết 05/10).
+    # Tiền tố khai ở MÀN HÌNH nên cả hai vai cùng nhận — và hdv nhận một cánh cửa KHÓA: hai hàm
+    # `list_pr` và `create_pr` đều không có `hdv` trong `require_roles`, nên bấm vẫn 403. Khai rộng
+    # hơn cửa thật ở đúng chỗ này là có chủ ý: bảng phạm vi mô tả MÀN HÌNH chạm tới đâu, còn ai
+    # bấm được thì là việc của hàm. Giữ hai con số bằng nhau để hàng rào test_tx1_3 còn canh được
+    # rằng lần tách vai không lặng lẽ cho một bên rộng hơn bên kia.
+    "gd_doi_xe": 27, "hanh_chinh": 28, "tp_hd": 25, "tai_xe": 17, "hdv": 17, "nv_visa": 18,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng

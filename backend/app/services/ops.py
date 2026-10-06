@@ -70,7 +70,32 @@ def mail_text(u: User, dept: str, d: date, p1: str, p2: dict, p3: str, p4: str, 
     return subject, "\n".join(lines)
 
 CATEGORY_ACCOUNT = {"chi_tour": "154", "marketing": "641", "hanh_chinh": "642"}   # tam_ung: ghi 141 khi chi, hoàn ứng vào 154 khi Kế toán xác nhận quyết toán
-CATEGORY_CONFIRMER = {"chi_tour": ("tp_dh",), "marketing": ("ptgd_mkt",), "hanh_chinh": ("hcns",), "hoan_tien": ("gd_kd", "tp_kd", "tp_dh"), "tam_ung": ("tp_dh",)}
+# ĐỘI XE — Chủ tịch quyết 05/10/2026: "liên quan đến sửa chữa, hư hỏng, tiền bạc là do TGĐ / CT
+# duyệt và thấy". Hai loại `sua_chua_xe` và `tam_ung_tai_xe` KHÔNG đổi người ký: cửa duyệt vẫn là
+# TGĐ (và Chủ tịch khi cần hai chữ ký), y như mọi loại chi khác. Thứ chúng đổi là người XÁC NHẬN
+# NGHIỆP VỤ ở bước đầu — Giám đốc đội xe, người duy nhất biết đúng xe ấy có hỏng thật không và giá
+# garage báo có hợp lý không.
+#
+# Vì sao không dùng lại `tam_ung` sẵn có cho tạm ứng tài xế: `tam_ung` bắt buộc gắn mã tour và do
+# Trưởng phòng Điều hành xác nhận. Tiền đi đường của tài xế gắn với CHUYẾN XE, và người xác nhận là
+# Giám đốc đội xe. Nhét vào loại cũ thì hồ sơ chạy sang bàn người không quản tài xế, và lần nào
+# cũng phải bịa ra một mã tour.
+#
+# GIỮ BẢNG NÀY GỌN TRONG MỘT KHỐI LIỀN: hàng rào `test_luong_viec` đọc 400 ký tự sau tên biến để so
+# bảng luồng công việc với mã đang chạy. Chú thích chen vào giữa các dòng khai là đẩy dòng cuối ra
+# ngoài tầm đọc ấy, và hàng rào mù đi mà không báo gì.
+CATEGORY_CONFIRMER = {"chi_tour": ("tp_dh",), "marketing": ("ptgd_mkt",), "hanh_chinh": ("hcns",),
+                      "hoan_tien": ("gd_kd", "tp_kd", "tp_dh"), "tam_ung": ("tp_dh",),
+                      "sua_chua_xe": ("gd_doi_xe",), "tam_ung_tai_xe": ("gd_doi_xe",)}
+
+# Loại chi tài xế được TỰ LẬP. Đúng một loại, và cố ý.
+#
+# `sua_chua_xe` KHÔNG có trong danh sách này: lúc tài xế phát hiện xe hỏng thì CHƯA CÓ số tiền và
+# CHƯA CÓ garage — hai thứ `create_request` bắt buộc phải có. Bắt tài xế lập đề nghị chi lúc ấy là
+# bắt họ bịa ra một con số, đúng thứ ranh giới 09/9/2026 cấm. Đề nghị sửa chữa do Giám đốc đội xe
+# lập SAU KHI có báo giá. Việc "báo hư hỏng" là một việc khác, chưa có cửa, và nó chưa có cửa là
+# một việc CÒN THIẾU chứ không phải một việc đã xong.
+LOAI_CHI_TAI_XE_TU_LAP = ("tam_ung_tai_xe",)
 
 # Vai DUY NHẤT duyệt được chi Marketing, kể từ chỉ đạo 23/9/2026.
 VAI_DUYET_MKT = "ptgd_mkt"
@@ -224,9 +249,19 @@ def _next_code(db: Session) -> str:
 def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     cat = data["category"]
     if cat not in CATEGORY_CONFIRMER: raise ValueError("Loại chi không hợp lệ")
+    # Tài xế mở được đúng MỘT loại, và chỉ cho chính mình. Chặn ở đây chứ không chỉ ở cửa API: cửa
+    # API nói ai gõ được, chỗ này nói gõ được CÁI GÌ — và chỗ thứ hai là chỗ còn đúng khi mai kia có
+    # thêm một cửa khác gọi vào cùng hàm này.
+    if u.role == "tai_xe" and cat not in LOAI_CHI_TAI_XE_TU_LAP:
+        raise ValueError("Tài xế chỉ lập được đề nghị tạm ứng của chính mình. Đề nghị sửa chữa do "
+                         "Giám đốc đội xe lập sau khi có báo giá – báo hư hỏng cho đội xe trước.")
     t = db.get(Tour, data.get("tour_id")) if data.get("tour_id") else None
     if cat in ("chi_tour", "hoan_tien", "tam_ung") and not t:
         raise ValueError("Chi phí tour / hoàn tiền / tạm ứng bắt buộc gắn mã tour (cổng 14)")
+    # Hai loại của đội xe CỐ Ý không bắt mã tour. Một xe hỏng giữa đường thì hỏng của chiếc xe, không
+    # phải của một chuyến; và tiền đi đường của tài xế có thể rơi vào ngày không chạy tour nào. Bắt mã
+    # tour ở đây là bắt người lập chọn đại một mã, và một mã chọn đại thì mọi báo cáo lãi lỗ theo tour
+    # sau đó đều sai mà không ai biết.
     if cat == "tam_ung" and t and t.status in ("da_dong_so", "kt_xac_nhan", "khoa"):
         raise ValueError("Tour đã đóng số quyết toán – không tạm ứng thêm")
     # BỐN Ô NGOẠI TỆ – Chủ tịch chốt 27/9/2026. Khoản ngoại tệ thì MÁY NHÂN ra `amount`; khoản đồng
@@ -234,6 +269,11 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     # để cửa này và mọi cửa sau dùng cùng một luật.
     nt = NT.chuan_hoa(data)
     if (nt["amount"] or 0) <= 0: raise ValueError("Số tiền phải > 0")
+    # Tạm ứng tài xế: người thụ hưởng LÀ người lập. Máy điền, không hỏi. Hỏi một ô mà câu trả lời
+    # luôn giống nhau là cách chắc chắn nhất để người ta gõ bừa – và một ô "người thụ hưởng" gõ bừa
+    # trên một đề nghị chi tiền mặt thì sau này không truy được tiền đã vào tay ai.
+    if cat == "tam_ung_tai_xe" and not data.get("supplier_name"):
+        data = {**data, "supplier_name": u.full_name or u.username}
     if not data.get("supplier_name"): raise ValueError("Thiếu nhà cung cấp / người thụ hưởng")
     r = PaymentRequest(code=_next_code(db), category=cat, tour_id=t.id if t else None, supplier_name=data["supplier_name"], supplier_tax_code=data.get("supplier_tax_code", ""),
                        supplier_bank=data.get("supplier_bank", ""), amount=nt["amount"], description=data["description"], has_document=bool(data.get("has_document")),
