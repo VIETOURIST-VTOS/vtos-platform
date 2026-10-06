@@ -237,3 +237,81 @@ def thieu_bao_cao_cua_tour(db: Session, tour_id: int) -> list[dict]:
             "tre_han": bool(bc and bc.tre_han()),
         })
     return thieu
+
+
+# ═════════════════════ Đợt 3 · TIỀN CỦA HƯỚNG DẪN VIÊN (07/10/2026) ═════════════════════
+
+from app.models.hdv import UNG_DANG_MO, TamUngHdv
+from app.models.hr import GuideRate
+
+
+def tra_don_gia(db: Session, route: str, loai_tour: str, ngay: date | None) -> GuideRate | None:
+    """Đơn giá đang hiệu lực cho một tuyến và một loại tour.
+
+    Chủ tịch chốt 06/10/2026: thù lao = số ngày của tour × đơn giá(tuyến, loại tour).
+
+    HAI BẬC, bậc sau chỉ chạy khi bậc trước không có:
+      1. Bản giá khai ĐÚNG loại tour ấy.
+      2. Bản giá CHUNG (`loai_tour` rỗng).
+
+    Làm ngược thứ tự thì một bản chung mới ký sẽ che mất bản riêng đã có, và không ai thấy vì cả hai
+    đều đang hiệu lực.
+
+    Thiếu ngày thì lấy bản mới nhất đang hiệu lực – KHÔNG trả None, vì "chưa biết ngày áp dụng" là
+    chuyện của người gọi, còn ở đây câu hỏi là "tuyến này đang có giá nào".
+    """
+    def _lay(lt: str) -> GuideRate | None:
+        q = select(GuideRate).where(GuideRate.route == route,
+                                    GuideRate.loai_tour == lt,
+                                    GuideRate.status == "active")
+        ds = [r for r in db.execute(q).scalars()
+              if ngay is None or (r.effective_from is not None and r.effective_from <= ngay)]
+        if not ds:
+            return None
+        return sorted(ds, key=lambda r: (r.effective_from, r.id))[-1]
+
+    return _lay(loai_tour or "") or (_lay("") if loai_tour else None)
+
+
+def thu_lao(so_ngay: int | float | None, don_gia: float | None, le_tet: bool = False) -> float | None:
+    """số ngày × đơn giá, lễ Tết nhân đôi.
+
+    Trả về None khi THIẾU đơn giá – và đó là điều cố ý: "chưa có bảng giá cho tuyến này" phải hiện ra
+    thành ô trống chứ không thành số 0. Một bảng thù lao toàn số 0 trông như đã tính xong và trả đủ.
+    Thiếu số ngày thì coi là 0 ngày, vì 0 ngày là một con số có thật (phân công vừa lập, chưa đi).
+    """
+    if don_gia is None:
+        return None
+    return float(so_ngay or 0) * float(don_gia) * (2 if le_tet else 1)
+
+
+def so_du_ung(db: Session, guide_id: int) -> list[dict]:
+    """Số dư tạm ứng của một hướng dẫn viên, TÁCH THEO TỪNG TÚI.
+
+    Trả về danh sách chứ không trả một con số, và đó là điểm chính của hàm này. Đặc tả v1.0 §06:
+    "không tự gộp khác pháp nhân/ngoại tệ". Một người có thể cầm 5 triệu đồng của Vietourist và 300
+    đô của một đối tác; cộng lại thành "5.3" là một con số không có thật và không ai trả được.
+
+    Túi = (chủ tiền, loại tiền). Tiền thu hộ khách là một túi RIÊNG và không bao giờ bù trừ sang túi
+    của công ty – trộn vào là lấy tiền khách che một khoản công ty nợ.
+
+    Số âm nghĩa là công ty nợ lại người ấy. Không phải lỗi, và hệ thống không tự trả.
+    """
+    tui: dict[tuple[str, str], dict] = {}
+    for u in db.execute(select(TamUngHdv).where(TamUngHdv.guide_id == guide_id)).scalars():
+        if u.trang_thai == "huy":
+            continue
+        k = (u.chu_tien, u.loai_tien)
+        t = tui.setdefault(k, {"chu_tien": u.chu_tien, "loai_tien": u.loai_tien,
+                               "da_nhan": 0.0, "chi_ho_duyet": 0.0, "da_nop_lai": 0.0,
+                               "so_du": 0.0, "so_khoan_dang_mo": 0})
+        t["da_nhan"] += float(u.da_nhan or 0)
+        t["chi_ho_duyet"] += float(u.chi_ho_duyet or 0)
+        t["da_nop_lai"] += float(u.da_nop_lai or 0)
+        t["so_du"] += u.so_du()
+        if u.dang_mo():
+            t["so_khoan_dang_mo"] += 1
+    for t in tui.values():
+        t["cong_ty_no_lai"] = t["so_du"] < 0
+        t["khong_bu_tru"] = t["chu_tien"] == "khach"
+    return sorted(tui.values(), key=lambda t: (t["chu_tien"], t["loai_tien"]))

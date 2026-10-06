@@ -163,10 +163,20 @@ class VehicleRate(Base):
 
 
 class GuideRate(Base):
-    """Bảng giá thù lao HDV theo tuyến (đồng/ngày) – master data, Chủ tịch + TGĐ ký, hiệu lực theo ngày; lễ Tết ×2."""
+    """Bảng giá thù lao HDV theo tuyến (đồng/ngày) – master data, Chủ tịch + TGĐ ký, hiệu lực theo ngày; lễ Tết ×2.
+
+    Đợt 3 phòng HDV · 07/10/2026 – THÊM `loai_tour`. Chủ tịch chốt 06/10: "thù lao theo ngày × chặng
+    tour, và tuỳ LOẠI TOUR có phí khác nhau". Trước đó bảng chỉ khoá theo tuyến, nên một tuyến chỉ có
+    đúng một đơn giá — không nói được rằng dẫn đoàn nước ngoài tuyến ấy trả khác dẫn khách lẻ.
+
+    `loai_tour` RỖNG nghĩa là "áp cho mọi loại tour", KHÔNG phải "chưa biết": đó là bản giá chung, và
+    hàng trăm bản giá cũ đều thuộc loại này. Phép tra lấy bản KHỚP ĐÚNG loại trước, không có mới rơi
+    về bản chung — nếu làm ngược thì một bản chung mới ký sẽ che mất bản riêng đã có.
+    """
     __tablename__ = "guide_rates"
     id: Mapped[int] = mapped_column(primary_key=True)
     route: Mapped[str] = mapped_column(String(80))
+    loai_tour: Mapped[str] = mapped_column(String(20), default="", server_default="", index=True)
     days: Mapped[float] = mapped_column(Float, default=0)
     rate_per_day: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     old_rate_per_day: Mapped[float | None] = mapped_column(TIEN, nullable=True)

@@ -262,6 +262,11 @@ PHAI_LOC = {
     # sự cố và khoản chi hộ, tức là đọc được chỗ yếu của một đơn vị không phải việc của mình.
     "BaoCaoSauTour":  "báo cáo sau tour của chuyến thuộc ĐÚNG MỘT pháp nhân; bên trong có đánh giá "
                       "nhà cung cấp, sự cố và khoản chi hộ của đơn vị ấy",
+    # Đợt 3 · 07/10/2026. Sổ tạm ứng mang TIỀN THẬT của một pháp nhân. Không lọc thì người phụ trách
+    # một pháp nhân thấy số dư ứng của pháp nhân khác, và tệ hơn là có thể cấn trừ chéo – đúng cái
+    # luật gốc "không bù trừ giữa hai pháp nhân" cấm.
+    "TamUngHdv":      "khoản ứng do ĐÚNG MỘT pháp nhân chi ra; lộ chéo là mở đường cho một lần cấn "
+                      "trừ tiền giữa hai pháp nhân",
     "Vehicle":        "xe thuộc sở hữu của công ty vận tải, không phải của lữ hành",
 
     # Sáu dòng dưới thêm ngày 11/9/2026 sau khi đếm lại trên đủ 34 tệp mô hình (xem đính chính ở

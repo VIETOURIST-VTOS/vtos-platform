@@ -32,6 +32,7 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, Stri
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 # Trạng thái của một yêu cầu. "da_du" KHÁC "da_phan_cong": phân công một người cho yêu cầu cần hai
 # người thì yêu cầu vẫn còn thiếu một — và phần còn thiếu ấy chính là thứ bảng này sinh ra để đếm.
@@ -180,3 +181,94 @@ class BaoCaoSauTour(Base):
 
 
 Index("ix_bao_cao_sau_tour_assignment_trang_thai", BaoCaoSauTour.assignment_id, BaoCaoSauTour.trang_thai)
+
+
+# ═════════════════════ Đợt 3 · TIỀN CỦA HƯỚNG DẪN VIÊN (07/10/2026) ═════════════════════
+#
+# VÌ SAO PHẢI CÓ SỔ TẠM ỨNG THEO NGƯỜI
+#
+# Hôm nay tiền ứng cho hướng dẫn viên nằm ở `tour_guide_advances`, và bảng ấy gắn vào
+# `settlement_id` — tức gắn vào TỜ QUYẾT TOÁN, không gắn vào CON NGƯỜI. Hệ quả: câu "hướng dẫn viên
+# Thắng còn nợ ứng bao nhiêu" không hỏi được, vì không có chỗ nào cộng theo người. Mà đó lại là câu
+# duy nhất cần trả lời trước khi đưa tiếp một khoản ứng mới.
+#
+# Bảng này KHÔNG thay `tour_guide_advances`. Bảng kia là dòng chi trên tờ quyết toán của một chuyến;
+# bảng này là SỔ của một người. Hai cái trả lời hai câu khác nhau và cùng tồn tại.
+#
+# KHÔNG GỘP KHÁC CHỦ TIỀN, KHÁC LOẠI TIỀN
+#
+# Đặc tả v1.0 §06 nói thẳng: "không tự gộp khác pháp nhân/ngoại tệ". Một người có thể cầm 5 triệu
+# đồng của Vietourist và 300 đô của một đối tác — cộng lại thành "số dư 5.3" là một con số không có
+# thật và không ai trả được. Nên hàm tính số dư trả về NHIỀU TÚI, không trả một con số; xem
+# `app/services/hdv.py`.
+#
+# SỐ ÂM KHÔNG PHẢI LỖI. Chi hộ vượt tiền ứng là chuyện thường: hướng dẫn viên bỏ tiền túi trả thêm
+# cho đoàn. Số âm nghĩa là CÔNG TY NỢ LẠI, và nó phải hiện ra để có người xem xét trả — hệ thống
+# KHÔNG tự trả.
+#
+# TIỀN THU HỘ KHÁCH THEO DÕI RIÊNG, không bù trừ tự động vào số dư ứng: tiền ấy là của khách, chỉ
+# đang nằm trong túi hướng dẫn viên. Trộn vào số dư ứng là lấy tiền khách che một khoản công ty nợ.
+CHU_TIEN = {
+    "vietourist": "Tiền của Vietourist",
+    "doi_tac": "Tiền của đối tác / nhà cung cấp",
+    "khach": "Tiền thu hộ khách — KHÔNG bù trừ vào số dư ứng",
+}
+TRANG_THAI_UNG = {
+    "de_nghi": "Đề nghị, chưa nhận tiền",
+    "da_nhan": "Đã nhận tiền, đang mở",
+    "tat_toan": "Đã tất toán",
+    "huy": "Đã huỷ",
+}
+UNG_DANG_MO = ("de_nghi", "da_nhan")
+
+
+class TamUngHdv(Base):
+    """Một khoản ứng của MỘT hướng dẫn viên. Sổ theo người, không theo tờ quyết toán."""
+
+    __tablename__ = "tam_ung_hdv"
+
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    guide_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
+    assignment_id: Mapped[int | None] = mapped_column(ForeignKey("guide_assignments.id"), nullable=True, index=True)
+    tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True, index=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
+
+    chu_tien: Mapped[str] = mapped_column(String(16), default="vietourist", index=True)
+    loai_tien: Mapped[str] = mapped_column(String(3), default="VND", index=True)
+
+    # BỐN CỘT TIỀN, TẤT CẢ ĐỂ TRỐNG ĐƯỢC VÀ KHÔNG MẶC ĐỊNH (luật K2). "Chưa nhận tiền" khác "nhận 0
+    # đồng": khoản mới đề nghị chưa chi thì `da_nhan` phải TRỐNG, không phải 0 — nếu là 0 thì nó lẫn
+    # vào những khoản đã chi xong và trả về đúng 0.
+    de_nghi: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    da_nhan: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    chi_ho_duyet: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    da_nop_lai: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+
+    muc_dich: Mapped[str] = mapped_column(String(200), default="")
+    trang_thai: Mapped[str] = mapped_column(String(12), default="de_nghi", index=True)
+    ngay_de_nghi: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ngay_nhan: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ngay_tat_toan: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ghi_chu: Mapped[str] = mapped_column(Text, default="")
+
+    nguoi_lap: Mapped[str] = mapped_column(String(50), default="")
+    lap_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    sua_boi: Mapped[str] = mapped_column(String(50), default="")
+    sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    def so_du(self) -> float:
+        """Thực nhận − chi hộ được duyệt − đã nộp lại.
+
+        Dương: hướng dẫn viên còn giữ tiền công ty. Âm: công ty nợ lại người ấy — KHÔNG phải lỗi, và
+        hệ thống không tự trả. Mọi cột đọc với `or 0` theo luật K2: rỗng là chưa có, và chưa có thì
+        không đóng góp gì vào phép trừ.
+        """
+        return float(self.da_nhan or 0) - float(self.chi_ho_duyet or 0) - float(self.da_nop_lai or 0)
+
+    def dang_mo(self) -> bool:
+        return self.trang_thai in UNG_DANG_MO
+
+
+Index("ix_tam_ung_hdv_guide_trang_thai", TamUngHdv.guide_id, TamUngHdv.trang_thai)
+Index("ix_tam_ung_hdv_tui", TamUngHdv.guide_id, TamUngHdv.chu_tien, TamUngHdv.loai_tien)

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles, cong_chan_quyen, loc_theo_nguoi_dung, toan_quyen_ke_ca_tach_bach
 from app.models.core import Tour, User, Company
-from app.models.hdv import TRANG_THAI as YC_TRANG_THAI, TRANG_THAI_BC, BaoCaoSauTour, YeuCauHdv
+from app.models.hdv import CHU_TIEN, TRANG_THAI as YC_TRANG_THAI, TRANG_THAI_BC, TRANG_THAI_UNG, BaoCaoSauTour, TamUngHdv, YeuCauHdv
 from app.models.hr import SALES_GROUPS, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, GuideRate, INCIDENT_LEVELS, INCIDENT_STATUS, DEPARTMENTS, POSITIONS, OFFICES
 from app.services import hr as H
 from app.services import rules as R
@@ -775,6 +775,199 @@ def bc_thieu_theo_tour(tour_id: int, u: User = Depends(require_roles(*HR_READ, "
             "duoc_goi_hoan_tat": len(thieu) == 0}
 
 
+# ---------- Phòng HDV Đợt 3: tiền của hướng dẫn viên (07/10/2026) ----------
+# Ba cửa: lập khoản ứng · ghi nhận tiền đã nhận / chi hộ / nộp lại · đọc sổ theo NGƯỜI.
+#
+# SỔ NÀY KHÔNG THAY `tour_guide_advances`. Bảng kia là dòng chi trên tờ quyết toán của MỘT CHUYẾN;
+# sổ này là sổ của MỘT NGƯỜI. Hai cái trả lời hai câu khác nhau: "chuyến này chi cho HDV bao nhiêu"
+# và "người này còn giữ bao nhiêu tiền công ty". Câu thứ hai là câu phải trả lời trước khi đưa tiếp
+# một khoản ứng mới, và hôm nay chưa hỏi được.
+#
+# TIỀN THÌ KẾ TOÁN GHI. Cửa lập khoản ứng mở cho phòng HDV (đề nghị), nhưng ba cột tiền thật sự —
+# đã nhận, chi hộ được duyệt, đã nộp lại — chỉ Kế toán ghi. Để phòng tự ghi "đã nhận" thì con số ấy
+# không còn là chứng cứ, nó chỉ là lời khai.
+UNG_LAP = ("tp_hd", "hcns", "cntt", "ketoan")
+UNG_GHI_TIEN = ("ketoan", "cntt")
+
+
+def ung_out(db: Session, x: TamUngHdv) -> dict:
+    t = db.get(Tour, x.tour_id) if x.tour_id else None
+    return {"id": x.id, "phien_ban": x.phien_ban, "guide_id": x.guide_id,
+            "assignment_id": x.assignment_id, "tour_id": x.tour_id,
+            "tour_code": t.code if t else "",
+            "chu_tien": x.chu_tien, "chu_tien_ten": CHU_TIEN.get(x.chu_tien, x.chu_tien),
+            "loai_tien": x.loai_tien,
+            # Bốn cột tiền gửi ra màn hình ĐỂ NGUYÊN, kể cả rỗng: "chưa nhận tiền" phải hiện ô trống,
+            # không phải số 0. Chỉ phép TÍNH mới xử rỗng thành 0.
+            "de_nghi": x.de_nghi, "da_nhan": x.da_nhan,
+            "chi_ho_duyet": x.chi_ho_duyet, "da_nop_lai": x.da_nop_lai,
+            "so_du": x.so_du(), "muc_dich": x.muc_dich,
+            "trang_thai": x.trang_thai, "trang_thai_ten": TRANG_THAI_UNG.get(x.trang_thai, x.trang_thai),
+            "ngay_de_nghi": x.ngay_de_nghi, "ngay_nhan": x.ngay_nhan, "ngay_tat_toan": x.ngay_tat_toan,
+            "ghi_chu": x.ghi_chu, "nguoi_lap": x.nguoi_lap}
+
+
+class UngIn(BaseModel):
+    guide_id: int
+    assignment_id: int | None = None
+    tour_id: int | None = None
+    chu_tien: str = "vietourist"
+    loai_tien: str = "VND"
+    de_nghi: float | None = None
+    muc_dich: str = ""
+    ngay_de_nghi: date | None = None
+    ghi_chu: str = ""
+
+
+@router.post("/guide-assignments/tam-ung", status_code=201)
+def ung_lap(data: UngIn, u: User = Depends(require_roles(*UNG_LAP)), db: Session = Depends(get_db)):
+    e = db.get(Employee, data.guide_id)
+    if not e:
+        raise HTTPException(404, "Không có hướng dẫn viên")
+    if data.chu_tien not in CHU_TIEN:
+        raise HTTPException(422, f"Chủ tiền phải là một trong: {', '.join(CHU_TIEN)}")
+    t = db.get(Tour, data.tour_id) if data.tour_id else None
+    x = TamUngHdv(**data.model_dump(), nguoi_lap=u.username,
+                  company_id=getattr(t, "company_id", None))
+    db.add(x); db.flush()
+    R.audit(db, u.username, u.role, "lap_tam_ung_hdv", f"hdv:{e.code or e.id}",
+            after={"de_nghi": data.de_nghi, "chu_tien": data.chu_tien, "loai_tien": data.loai_tien})
+    db.commit()
+    return {"id": x.id, "message": f"Đã lập đề nghị ứng cho {e.full_name} – chờ Kế toán chi"}
+
+
+class UngTien(BaseModel):
+    """Ba cột tiền. Gửi RỖNG một cột = KHÔNG đổi cột ấy; muốn xoá về chưa-có thì gửi `xoa` kèm tên cột.
+    Phân biệt hai việc ấy là bắt buộc: không phân biệt thì mỗi lần ghi chi hộ sẽ vô tình xoá số đã nhận."""
+    phien_ban: int | None = None
+    da_nhan: float | None = None
+    chi_ho_duyet: float | None = None
+    da_nop_lai: float | None = None
+    ngay_nhan: date | None = None
+    xoa: list[str] = []
+    ghi_chu: str = ""
+
+
+@router.post("/guide-assignments/tam-ung/{uid}/tien")
+def ung_ghi_tien(uid: int, data: UngTien, u: User = Depends(require_roles(*UNG_GHI_TIEN)), db: Session = Depends(get_db)):
+    x = db.get(TamUngHdv, uid)
+    if not x:
+        raise HTTPException(404, "Không có khoản ứng")
+    if x.trang_thai in ("tat_toan", "huy"):
+        raise HTTPException(422, f"Khoản ứng đã ở trạng thái '{x.trang_thai}' – ghi thêm tiền vào một "
+                                 f"khoản đã đóng chỉ làm sai lại một việc đã xong")
+    GML.kiem_phien_ban(x, data.phien_ban, f"Khoản ứng #{x.id}", lambda: ung_out(db, x))
+    for c in ("da_nhan", "chi_ho_duyet", "da_nop_lai"):
+        v = getattr(data, c)
+        if c in data.xoa:
+            setattr(x, c, None)
+        elif v is not None:
+            if v < 0:
+                raise HTTPException(422, f"{c} không âm – chi hộ vượt ứng thì để số dư âm, không để cột âm")
+            setattr(x, c, v)
+    if data.ngay_nhan is not None:
+        x.ngay_nhan = data.ngay_nhan
+    if x.da_nhan is not None and x.trang_thai == "de_nghi":
+        x.trang_thai = "da_nhan"
+    if data.ghi_chu:
+        x.ghi_chu = data.ghi_chu
+    x.sua_boi, x.sua_luc = u.username, datetime.now()
+    GML.tang_phien_ban(x)
+    R.audit(db, u.username, u.role, "ghi_tien_tam_ung_hdv", f"ung:{x.id}",
+            after={"da_nhan": x.da_nhan, "chi_ho": x.chi_ho_duyet, "nop_lai": x.da_nop_lai, "so_du": x.so_du()})
+    db.commit()
+    return {"so_du": x.so_du(),
+            "message": "Đã ghi. Số dư âm nghĩa là công ty nợ lại hướng dẫn viên – hệ thống không tự trả."
+                       if x.so_du() < 0 else "Đã ghi"}
+
+
+class UngTatToan(BaseModel):
+    phien_ban: int | None = None
+    ngay: date | None = None
+
+
+@router.post("/guide-assignments/tam-ung/{uid}/tat-toan")
+def ung_tat_toan(uid: int, data: UngTatToan, u: User = Depends(require_roles(*UNG_GHI_TIEN)), db: Session = Depends(get_db)):
+    x = db.get(TamUngHdv, uid)
+    if not x:
+        raise HTTPException(404, "Không có khoản ứng")
+    GML.kiem_phien_ban(x, data.phien_ban, f"Khoản ứng #{x.id}", lambda: ung_out(db, x))
+    if abs(x.so_du()) > 0.004:
+        raise HTTPException(422, {
+            "gate": "UNG_CHUA_VE_KHONG",
+            "message": f"Số dư còn {x.so_du():,.0f} – tất toán một khoản chưa về 0 là giấu mất phần "
+                       f"chênh. Ghi nốt tiền nộp lại, hoặc để Kế toán trả phần công ty nợ.",
+            "so_du": x.so_du()})
+    x.trang_thai, x.ngay_tat_toan = "tat_toan", data.ngay or date.today()
+    x.sua_boi, x.sua_luc = u.username, datetime.now()
+    GML.tang_phien_ban(x)
+    R.audit(db, u.username, u.role, "tat_toan_tam_ung_hdv", f"ung:{x.id}")
+    db.commit()
+    return {"message": "Đã tất toán"}
+
+
+@router.get("/guide-assignments/tam-ung/so-theo-nguoi")
+def ung_so_theo_nguoi(guide_id: int, u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd")), db: Session = Depends(get_db)):
+    """Câu hỏi mà hôm nay chưa hỏi được: hướng dẫn viên này còn giữ bao nhiêu tiền công ty.
+
+    Trả về NHIỀU TÚI, không một con số – xem `so_du_ung` trong app/services/hdv.py.
+    """
+    e = db.get(Employee, guide_id)
+    if not e:
+        raise HTTPException(404, "Không có hướng dẫn viên")
+    q = PV.loc(select(TamUngHdv).where(TamUngHdv.guide_id == guide_id)
+               .order_by(desc(TamUngHdv.id)), TamUngHdv, u)
+    return {"guide_id": guide_id, "hdv": e.full_name,
+            "cac_tui": HDV.so_du_ung(db, guide_id),
+            "cac_khoan": [ung_out(db, x) for x in db.execute(q).scalars()],
+            "ghi_chu": "Không gộp khác chủ tiền hoặc khác loại tiền. Tiền thu hộ khách là túi riêng, "
+                       "không bù trừ sang túi công ty."}
+
+
+@router.get("/guide-assignments/thu-lao/doi-soat")
+def thu_lao_doi_soat(tu_ngay: date, den_ngay: date,
+                     u: User = Depends(require_roles(*HR_READ, "tp_hd")), db: Session = Depends(get_db)):
+    """BẢNG ĐỐI SOÁT THÙ LAO KỲ — CHỈ ĐỌC. Chủ tịch chốt 06/10/2026: quyết toán tour là sổ gốc, bảng
+    kỳ chỉ đọc và tổng hợp, KHÔNG ghi tiền lần hai.
+
+    Nên ở đây không có một cột nào được ghi xuống cơ sở dữ liệu. Mọi con số tính lại từ phân công và
+    bảng giá mỗi lần mở. Chậm hơn một bảng lưu sẵn, và đó là cái giá phải trả để không bao giờ có hai
+    con số thù lao khác nhau cho cùng một chuyến.
+
+    Thiếu bảng giá thì để TRỐNG và đếm riêng, không trả 0: một bảng thù lao toàn số 0 trông như đã
+    tính xong và đã trả đủ.
+    """
+    ten = {e.id: e for e in db.execute(select(Employee)).scalars()}
+    dong, thieu_gia = [], 0
+    for a in db.execute(select(GuideAssignment)).scalars():
+        if a.status in HDV.KHONG_CHIEM_LICH:
+            continue
+        t = db.get(Tour, a.tour_id)
+        if t is None or t.end_date is None or not (tu_ngay <= t.end_date <= den_ngay):
+            continue
+        gr = db.get(GuideRate, a.rate_id) if a.rate_id else None
+        don_gia = a.rate_per_day if a.rate_per_day is not None else (gr.rate_per_day if gr else None)
+        tien = HDV.thu_lao(a.days, don_gia, a.holiday)
+        if tien is None:
+            thieu_gia += 1
+        e = ten.get(a.guide_id)
+        bc = HDV.ban_dang_xet(db, a.id)
+        dong.append({"assignment_id": a.id, "guide_id": a.guide_id,
+                     "hdv": e.full_name if e else "", "tour_code": t.code, "loai_tour": t.tour_type,
+                     "ngay_ket_thuc": t.end_date, "so_ngay": a.days, "don_gia": don_gia,
+                     "le_tet": a.holiday, "thu_lao": tien, "vai_tro": a.vai_tro,
+                     "da_bao_cao": bool(bc and bc.trang_thai == "da_xac_nhan"),
+                     "da_hoan_ung": a.advance_settled,
+                     # Treo thù lao là luật ĐÃ CÓ ở app/services/luong.py – ở đây chỉ HIỂN THỊ lại,
+                     # không đặt luật thứ hai.
+                     "treo_thu_lao": not (a.report_submitted and a.advance_settled)})
+    tong = sum(d["thu_lao"] or 0 for d in dong)
+    return {"tu_ngay": tu_ngay, "den_ngay": den_ngay, "so_dong": len(dong),
+            "tong_thu_lao_tinh_duoc": tong, "so_dong_thieu_bang_gia": thieu_gia,
+            "dong": dong,
+            "ghi_chu": "Bảng ĐỌC, không ghi. Dòng thiếu bảng giá để trống và đếm riêng, không tính 0."}
+
+
 # ---------- Đội xe ----------
 @router.get("/vehicles")
 def vehicles(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
@@ -838,7 +1031,7 @@ def rate_out(r: VehicleRate) -> dict:
 
 # ---------- Bảng giá HDV theo tuyến ----------
 def grate_out(r: GuideRate) -> dict:
-    return {"id": r.id, "route": r.route, "days": r.days, "rate_per_day": r.rate_per_day, "old_rate_per_day": r.old_rate_per_day, "effective_from": r.effective_from,
+    return {"id": r.id, "route": r.route, "loai_tour": r.loai_tour, "days": r.days, "rate_per_day": r.rate_per_day, "old_rate_per_day": r.old_rate_per_day, "effective_from": r.effective_from,
             "status": r.status, "signed_chutich": r.signed_chutich, "signed_tgd": r.signed_tgd, "note": r.note, "proposed_by": r.proposed_by}
 
 
@@ -849,6 +1042,8 @@ def guide_rates(u: User = Depends(current_user), db: Session = Depends(get_db)):
 
 class GuideRateIn(BaseModel):
     route: str
+    # RỖNG = bản giá chung, áp cho mọi loại tour. Không phải "chưa biết" – xem chú thích ở GuideRate.
+    loai_tour: str = ""
     days: float = 0
     rate_per_day: float | None = None
     old_rate_per_day: float | None = None
@@ -873,7 +1068,9 @@ def guide_rate_sign(rid: int, u: User = Depends(require_roles("chutich", "tgd"))
     if u.role == "chutich": r.signed_chutich = True
     else: r.signed_tgd = True
     if r.signed_chutich and r.signed_tgd:
-        for old in db.execute(select(GuideRate).where(GuideRate.route == r.route, GuideRate.status == "active", GuideRate.id != r.id)).scalars():
+        # Chỉ thay bản cũ CÙNG TUYẾN VÀ CÙNG LOẠI TOUR. Thiếu vế loại tour thì một bản giá mới cho
+        # đoàn nước ngoài sẽ hạ luôn bản giá khách lẻ cùng tuyến – hai con số khác nhau bị coi là một.
+        for old in db.execute(select(GuideRate).where(GuideRate.route == r.route, GuideRate.loai_tour == r.loai_tour, GuideRate.status == "active", GuideRate.id != r.id)).scalars():
             if old.effective_from <= r.effective_from: old.status = "rejected"; old.note = (old.note + f" | thay bởi #{r.id}")[:200]
         r.status = "active"
     R.audit(db, u.username, u.role, "ky_gia_hdv", f"grate:{r.id}", after={"trang_thai": r.status}); db.commit()
