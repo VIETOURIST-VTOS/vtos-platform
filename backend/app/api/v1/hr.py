@@ -8,9 +8,13 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles, cong_chan_quyen, loc_theo_nguoi_dung, toan_quyen_ke_ca_tach_bach
 from app.models.core import Tour, User, Company
+from app.models.hdv import TRANG_THAI as YC_TRANG_THAI, YeuCauHdv
 from app.models.hr import SALES_GROUPS, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, GuideRate, INCIDENT_LEVELS, INCIDENT_STATUS, DEPARTMENTS, POSITIONS, OFFICES
 from app.services import hr as H
 from app.services import rules as R
+from app.services import hdv as HDV
+from app.services import pham_vi_phap_nhan as PV
+from app.services import ghi_mot_lan as GML
 
 router = APIRouter(prefix="/api/v1", tags=["nhan-su"])
 HR_WRITE = ("hcns", "cntt")
@@ -170,7 +174,6 @@ def update_employee(eid: int, data: EmployeeIn, u: User = Depends(require_roles(
         xe = db.execute(select(Vehicle).where(Vehicle.driver_id == e.id, Vehicle.active == True)).scalars().all()
         if xe: raise HTTPException(422, f"{e.full_name} đang là tài xế của xe {', '.join(v.plate for v in xe)} – giao xe cho người khác trước khi ngưng hồ sơ")
     before = {"luong": e.base_salary, "chuc_vu": e.position, "phong": e.department, "dang_lam": e.active}
-    from app.services import ghi_mot_lan as GML
     GML.kiem_phien_ban(e, fields.pop("phien_ban", None), f"Hồ sơ nhân sự {e.code}",
                        lambda: {**before, "phien_ban": e.phien_ban})
     for k, v in fields.items(): setattr(e, k, v)
@@ -352,7 +355,18 @@ class AssignIn(BaseModel):
     days: int
     rate_per_day: float | None = None
     holiday: bool = False
-    rate_id: int | None = None
+    # Phòng HDV Đợt 1 · 06/10/2026.
+    #
+    # Giờ ở đây CÒN ĐỂ TRỐNG ĐƯỢC, và đó là một món nợ có chủ ý, không phải một chỗ quên. Cấm chồng
+    # giờ chỉ áp được khi có giờ; nhưng bắt buộc ngay hôm nay thì mọi màn hình đang gọi cửa này sẽ
+    # hỏng trong một lần nâng cấp — cùng lý do mà `kiem_phien_ban` cho qua khi người gọi chưa gửi
+    # phiên bản. Chỗ siết lại là ĐÂY, khi màn hình đã gửi giờ; ghi ra để người sau biết còn nợ.
+    #
+    # Khi CÓ giờ thì chặn thật: trùng là từ chối, không phải cảnh báo rồi vẫn ghi.
+    bat_dau: datetime | None = None
+    ket_thuc: datetime | None = None
+    vai_tro: str = "chinh"
+    yeu_cau_id: int | None = None
 
 
 @router.post("/guide-assignments", status_code=201)
@@ -368,8 +382,24 @@ def assign(data: AssignIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "tp
         a.rate_per_day = gr.rate_per_day
         if not data.days or data.days <= 0: a.days = max(1, int(round(gr.days)))
     if (a.rate_per_day or 0) <= 0: raise HTTPException(422, "Chọn tuyến trong bảng giá HDV hoặc nhập đơn giá/ngày")
+    if data.bat_dau and data.ket_thuc and data.ket_thuc <= data.bat_dau:
+        raise HTTPException(422, "Giờ kết thúc phải sau giờ bắt đầu")
+    yc = db.get(YeuCauHdv, data.yeu_cau_id) if data.yeu_cau_id else None
+    if data.yeu_cau_id and not yc:
+        raise HTTPException(404, "Không có yêu cầu HDV")
+    # Giờ chưa gõ thì LẤY THEO YÊU CẦU, nếu yêu cầu đã có giờ. Đây không phải suy đoán: Điều hành đã
+    # ghi khoảng cần người ở đúng chỗ ấy, và người được xếp vào đúng yêu cầu đó thì đi đúng khoảng đó.
+    if yc and not a.bat_dau and not a.ket_thuc and not yc.thieu_gio():
+        a.bat_dau, a.ket_thuc = yc.bat_dau, yc.ket_thuc
+    # Khoá TRƯỚC khi ghi, kiểm lại SAU khi ghi – xem app/services/hdv.py, mục "chặn thật".
+    if not HDV.khong_so_duoc(a.bat_dau, a.ket_thuc):
+        HDV.khoa_hdv(db, a.guide_id)
     db.add(a); db.flush()
-    R.audit(db, u.username, u.role, "phan_cong_hdv", f"tour:{t.code}", after={"hdv": e.full_name, "ngay": data.days, "don_gia": data.rate_per_day})
+    if not HDV.khong_so_duoc(a.bat_dau, a.ket_thuc):
+        HDV.canh_trung_sau_khi_ghi(db, a)
+    if yc:
+        HDV.cap_nhat_trang_thai(db, yc)
+    R.audit(db, u.username, u.role, "phan_cong_hdv", f"tour:{t.code}", after={"hdv": e.full_name, "ngay": data.days, "don_gia": data.rate_per_day, "bat_dau": str(a.bat_dau or ""), "ket_thuc": str(a.ket_thuc or "")})
     db.commit()
     return {"message": f"Đã lập văn bản phân công {e.full_name} dẫn {t.code} – HDV xác nhận trong 24 giờ"}
 
@@ -390,6 +420,157 @@ def assign_update(aid: int, data: AssignUpdate, u: User = Depends(require_roles(
     R.audit(db, u.username, u.role, "cap_nhat_phan_cong_hdv", f"assign:{a.id}", after=data.model_dump(exclude_none=True, mode="json"))
     db.commit()
     return {"message": "Đã cập nhật"}
+
+
+# ---------- Phòng HDV Đợt 1: yêu cầu HDV và giờ phân công (06/10/2026) ----------
+# Ba cửa, đúng ba việc của Đợt 1:
+#   · POST /guide-assignments/yeu-cau      – Điều hành ĐẶT HÀNG phòng HDV. Trước đây không có chỗ nào chứa một
+#                                 chuyến CHƯA xếp được người, nên không đếm được phần còn thiếu.
+#   · POST /guide-assignments/{id}/gio – gõ hoặc sửa hai mốc giờ cho phân công CŨ. Hàng trăm bản ghi
+#                                 cũ không có giờ; không có cửa sửa thì chúng kẹt mãi ở ô "chưa kiểm
+#                                 được trùng", và cái cấm Chủ tịch chốt 06/10 chỉ áp cho dữ liệu mới.
+#   · GET  /guide-assignments/yeu-cau/thieu – DANH SÁCH VIỆC. Một con số thiếu mà không ai nhìn thấy thì không
+#                                 ai đi nhập.
+#
+# Vai trò: KHÔNG nghĩ ra vai trò mới. Cửa lập yêu cầu dùng đúng danh sách đang được phép lập phân
+# công (`nv_dh`, `tp_dh`, `tp_hd`, `hcns`, `cntt`) — vì người đặt hàng và người xếp người là cùng hai
+# phòng ấy. Cửa đọc dùng đúng danh sách đang đọc được phân công.
+YC_LAP = ("nv_dh", "tp_dh", "tp_hd", "hcns", "cntt")
+
+
+def yc_out(db: Session, y: YeuCauHdv) -> dict:
+    t = db.get(Tour, y.tour_id)
+    return {"id": y.id, "phien_ban": y.phien_ban, "tour_id": y.tour_id,
+            "tour_code": t.code if t else "", "tour_name": t.name if t else "",
+            "so_hdv": y.so_hdv, "con_thieu": HDV.con_thieu(db, y),
+            "bat_dau": y.bat_dau, "ket_thuc": y.ket_thuc, "thieu_gio": y.thieu_gio(),
+            "ngoai_ngu": y.ngoai_ngu, "nang_luc": y.nang_luc, "diem_hen": y.diem_hen,
+            "han_phan_hoi": y.han_phan_hoi, "ghi_chu": y.ghi_chu,
+            "trang_thai": y.trang_thai, "trang_thai_ten": YC_TRANG_THAI.get(y.trang_thai, y.trang_thai),
+            "nguoi_lap": y.nguoi_lap, "lap_luc": y.lap_luc}
+
+
+class YeuCauIn(BaseModel):
+    tour_id: int
+    so_hdv: int = 1
+    # Giờ ĐỂ TRỐNG ĐƯỢC ở cửa yêu cầu: lúc Điều hành gửi yêu cầu thì giờ đón nhiều khi chưa chốt với
+    # khách. Cửa PHÂN CÔNG mới là chỗ bắt buộc có giờ, vì đó là lúc phải chặn trùng.
+    bat_dau: datetime | None = None
+    ket_thuc: datetime | None = None
+    ngoai_ngu: str = ""
+    nang_luc: str = ""
+    diem_hen: str = ""
+    han_phan_hoi: datetime | None = None
+    ghi_chu: str = ""
+
+
+@router.get("/guide-assignments/yeu-cau")
+def yeu_cau_ds(u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd")), db: Session = Depends(get_db)):
+    # P6 – hàng rào phạm vi pháp nhân, khai ở PHAI_LOC. Khai mà không nối thì hàng rào chưa bật, và
+    # tệ hơn là người đọc mã tin rằng chỗ này đã được canh.
+    q = PV.loc(select(YeuCauHdv).order_by(desc(YeuCauHdv.id)), YeuCauHdv, u)
+    return [yc_out(db, y) for y in db.execute(q).scalars().all()]
+
+
+@router.get("/guide-assignments/yeu-cau/thieu")
+def yeu_cau_con_thieu(u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd")), db: Session = Depends(get_db)):
+    """Hai rổ, KHÔNG gộp làm một con số: "còn thiếu người" và "chưa đủ giờ để kiểm trùng" là hai việc
+    khác nhau, giao cho hai người khác nhau. Gộp lại thì không ai biết phải làm gì."""
+    thieu_nguoi, thieu_gio = [], []
+    q = PV.loc(select(YeuCauHdv).order_by(YeuCauHdv.bat_dau), YeuCauHdv, u)
+    for y in db.execute(q).scalars():
+        if y.trang_thai == "huy":
+            continue
+        d = yc_out(db, y)
+        if d["con_thieu"] > 0:
+            thieu_nguoi.append(d)
+        if y.thieu_gio():
+            thieu_gio.append(d)
+    pc_thieu_gio = []
+    for a in db.execute(select(GuideAssignment)).scalars():
+        if a.status in HDV.KHONG_CHIEM_LICH:
+            continue
+        if HDV.khong_so_duoc(a.bat_dau, a.ket_thuc):
+            t = db.get(Tour, a.tour_id)
+            pc_thieu_gio.append({"id": a.id, "tour_id": a.tour_id, "tour_code": t.code if t else "",
+                                 "guide_id": a.guide_id, "days": a.days, "status": a.status})
+    return {"yeu_cau_con_thieu_nguoi": thieu_nguoi,
+            "yeu_cau_chua_co_gio": thieu_gio,
+            "phan_cong_chua_co_gio": pc_thieu_gio,
+            "ghi_chu": "Phân công chưa có giờ thì KHÔNG kiểm được trùng lịch – đây là việc còn thiếu, "
+                       "không phải đã kiểm và không trùng."}
+
+
+@router.post("/guide-assignments/yeu-cau", status_code=201)
+def yeu_cau_lap(data: YeuCauIn, u: User = Depends(require_roles(*YC_LAP)), db: Session = Depends(get_db)):
+    t = db.get(Tour, data.tour_id)
+    if not t:
+        raise HTTPException(404, "Không có chuyến")
+    if (data.so_hdv or 0) <= 0:
+        raise HTTPException(422, "Số hướng dẫn viên phải lớn hơn 0")
+    if data.bat_dau and data.ket_thuc and data.ket_thuc <= data.bat_dau:
+        raise HTTPException(422, "Giờ kết thúc phải sau giờ bắt đầu")
+    y = YeuCauHdv(**data.model_dump(), nguoi_lap=u.username,
+                  company_id=getattr(t, "company_id", None))
+    db.add(y); db.flush()
+    R.audit(db, u.username, u.role, "lap_yeu_cau_hdv", f"tour:{t.code}",
+            after={"so_hdv": y.so_hdv, "bat_dau": str(y.bat_dau or ""), "ket_thuc": str(y.ket_thuc or "")})
+    db.commit()
+    return {"id": y.id, "message": f"Đã gửi yêu cầu {y.so_hdv} hướng dẫn viên cho {t.code}"}
+
+
+class YeuCauHuy(BaseModel):
+    phien_ban: int | None = None
+    ly_do: str = ""
+
+
+@router.post("/guide-assignments/yeu-cau/{yid}/huy")
+def yeu_cau_huy(yid: int, data: YeuCauHuy, u: User = Depends(require_roles(*YC_LAP)), db: Session = Depends(get_db)):
+    y = db.get(YeuCauHdv, yid)
+    if not y:
+        raise HTTPException(404, "Không có yêu cầu")
+    if not (data.ly_do or "").strip():
+        raise HTTPException(422, "Huỷ yêu cầu phải ghi lý do")
+    GML.kiem_phien_ban(y, data.phien_ban, f"Yêu cầu HDV #{y.id}", lambda: yc_out(db, y))
+    y.trang_thai, y.ly_do_huy = "huy", data.ly_do[:200]
+    y.sua_boi, y.sua_luc = u.username, datetime.now()
+    GML.tang_phien_ban(y)
+    R.audit(db, u.username, u.role, "huy_yeu_cau_hdv", f"yeu_cau:{y.id}", after={"ly_do": y.ly_do_huy})
+    db.commit()
+    return {"message": "Đã huỷ yêu cầu"}
+
+
+class GioIn(BaseModel):
+    """Gửi RỖNG cả hai mốc = GỠ giờ, đưa phân công về lại ô 'chưa kiểm được trùng'. Gỡ được là bắt
+    buộc: gõ nhầm mà không xoá về 'chưa biết' được thì người nhập sẽ để nguyên giờ sai – tệ hơn trống."""
+    phien_ban: int | None = None
+    bat_dau: datetime | None = None
+    ket_thuc: datetime | None = None
+
+
+@router.post("/guide-assignments/{aid}/gio")
+def assign_gio(aid: int, data: GioIn, u: User = Depends(require_roles(*YC_LAP)), db: Session = Depends(get_db)):
+    a = db.get(GuideAssignment, aid)
+    if not a:
+        raise HTTPException(404, "Không có phân công")
+    if a.status in ("tu_choi", "huy", "het_han"):
+        raise HTTPException(422, f"Phân công đã ở trạng thái '{a.status}' – sửa giờ không còn ý nghĩa")
+    GML.kiem_phien_ban(a, data.phien_ban, f"Phân công HDV #{a.id}",
+                       lambda: {"id": a.id, "bat_dau": a.bat_dau, "ket_thuc": a.ket_thuc, "phien_ban": a.phien_ban})
+    if data.bat_dau and data.ket_thuc and data.ket_thuc <= data.bat_dau:
+        raise HTTPException(422, "Giờ kết thúc phải sau giờ bắt đầu")
+    a.bat_dau, a.ket_thuc = data.bat_dau, data.ket_thuc
+    a.gio_boi, a.gio_luc = u.username, datetime.now()
+    GML.tang_phien_ban(a)
+    if not HDV.khong_so_duoc(a.bat_dau, a.ket_thuc):
+        HDV.khoa_hdv(db, a.guide_id)
+        db.flush()
+        HDV.canh_trung_sau_khi_ghi(db, a)
+    R.audit(db, u.username, u.role, "dat_gio_phan_cong_hdv", f"assign:{a.id}",
+            after={"bat_dau": str(a.bat_dau or ""), "ket_thuc": str(a.ket_thuc or "")})
+    db.commit()
+    return {"message": "Đã gỡ giờ – phân công quay lại danh sách chưa kiểm được trùng"
+                       if HDV.khong_so_duoc(a.bat_dau, a.ket_thuc) else "Đã ghi giờ, không trùng với chuyến nào"}
 
 
 # ---------- Đội xe ----------

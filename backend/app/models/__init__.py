@@ -3,6 +3,11 @@ from app.models.payments import *  # noqa
 from app.models.accounting import *  # noqa
 from app.models.assets import *  # noqa
 from app.models.banks import *  # noqa
+# Phòng HDV Đợt 1 · 06/10/2026. Đặt TRƯỚC hr vì `guide_assignments` mang khoá ngoài sang
+# `yeu_cau_hdv`, và sau core vì bảng này mang khoá ngoài sang `tours` và `companies`. Lần thứ MƯỜI BA
+# nhắc cùng một điều ở tệp này: bảng khai dưới app/models mà thiếu dòng nhập ở đây thì
+# `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate đòi XOÁ bảng.
+from app.models.hdv import *  # noqa
 from app.models.hr import *  # noqa
 from app.models.hrm import *  # noqa
 from app.models.ops import *  # noqa

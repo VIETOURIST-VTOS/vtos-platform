@@ -92,6 +92,28 @@ class GuideAssignment(Base):
     han_tra_loi: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)   # lời chào hết hiệu lực lúc nào
     tra_loi_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)   # nhận hoặc từ chối lúc nào
 
+    # ─────────── Phòng HDV Đợt 1 · 06/10/2026 ───────────
+    # V10 – phân công là bản ghi mà Điều hành, phòng HDV và Kế toán cùng chạm: một bên đổi người, một
+    # bên sửa giờ, một bên đánh dấu đã hoàn ứng. Trước Đợt 1 bảng này không có cột phiên bản, nên ba
+    # bên vẫn đè lên nhau lặng lẽ.
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    yeu_cau_id: Mapped[int | None] = mapped_column(ForeignKey("yeu_cau_hdv.id"), nullable=True, index=True)
+    # KHOẢNG CẦN NGƯỜI, tính cả chuẩn bị và di chuyển. Chủ tịch chốt 06/10: không xếp một hướng dẫn
+    # viên vào hai chuyến chồng giờ. Muốn so hai khoảng thì phải có hai đầu mốc — `days` là một con
+    # số, không có đầu mốc nào, nên tám tuần qua hệ thống chặn được một chiếc xe bị đặt hai lần
+    # (lệnh điều xe có date_from/date_to) mà không chặn được một con người.
+    #
+    # RỖNG VẪN LÀ RỖNG: hàng trăm phân công cũ không có giờ. Suy giờ từ ngày khởi hành của tour thì
+    # mỗi bản ghi đều có một khoảng trông như thật, xếp gọn trên màn hình, và không ai còn nhớ đó là
+    # số đoán. Phân công thiếu giờ KHÔNG tham gia phép chặn trùng và hiện ở danh sách việc còn thiếu.
+    bat_dau: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    ket_thuc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Một tour vẫn có thể có nhiều hướng dẫn viên; phân biệt bằng VAI TRÒ chứ không bằng chặng —
+    # Chủ tịch chốt 06/10: mỗi hướng dẫn viên đi xuyên suốt hết tour, không chia chặng theo người.
+    vai_tro: Mapped[str] = mapped_column(String(10), default="chinh")
+    gio_boi: Mapped[str] = mapped_column(String(50), default="")
+    gio_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
 
 class Vehicle(Base):
     __tablename__ = "vehicles"

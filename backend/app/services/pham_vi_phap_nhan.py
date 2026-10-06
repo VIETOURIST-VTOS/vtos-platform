@@ -251,6 +251,12 @@ PHAI_LOC = {
     # và tệ hơn con số sai, đó là một con số TRÔNG NHƯ ĐÚNG.
     "NghiaVuThanhToan": "nghĩa vụ phải trả và khoản sắp thu của ĐÚNG MỘT pháp nhân; nền của bảng "
                         "dòng tiền bốn mốc, nơi lộ chéo pháp nhân thành quyết định điều tiền sai",
+    # Phòng HDV Đợt 1 · 06/10/2026. Yêu cầu HDV mang pháp nhân của chuyến, GIỮ LẠI lúc gửi chứ không
+    # tra lại mỗi lần đọc. Không lọc ở đây thì người phụ trách một pháp nhân mở danh sách "chuyến
+    # chưa có hướng dẫn viên" ra sẽ thấy chuyến của cả nhóm — và sẽ đi xếp người cho một chuyến không
+    # phải của mình, tức là điều phối nhân sự chéo pháp nhân mà không ai quyết.
+    "YeuCauHdv":      "yêu cầu hướng dẫn viên của ĐÚNG MỘT pháp nhân; nền của danh sách chuyến còn "
+                      "thiếu người, nơi lộ chéo pháp nhân thành một lần điều người sai công ty",
     "Vehicle":        "xe thuộc sở hữu của công ty vận tải, không phải của lữ hành",
 
     # Sáu dòng dưới thêm ngày 11/9/2026 sau khi đếm lại trên đủ 34 tệp mô hình (xem đính chính ở

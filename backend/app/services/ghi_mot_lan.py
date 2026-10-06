@@ -92,6 +92,11 @@ CUA_SUA_CO_KHOA = {
     "suppliers":        ("app/api/v1/suppliers.py",  "sua_ncc"),
     "leads":            ("app/api/v1/crm.py",        "patch_lead"),
     "tour_cost_lines":  ("app/services/settlement.py", "update_line"),
+    # Phòng HDV Đợt 1 · 06/10/2026. Hai bảng này có cửa sửa THẬT ngay từ lúc sinh ra, nên vào thẳng
+    # đây chứ không qua CHUA_CO_CUA_SUA: giờ của phân công là thứ thương lượng lại được (đoàn đổi giờ
+    # bay là chuyện thường), và số người của yêu cầu đổi khi đoàn tăng khách.
+    "guide_assignments": ("app/api/v1/hr.py",         "assign_gio"),
+    "yeu_cau_hdv":       ("app/api/v1/hr.py",         "yeu_cau_huy"),
     "bao_gia":          ("app/api/v1/ban_hang.py",   "sua_bao_gia"),
     "hop_dong_khach":   ("app/api/v1/ban_hang.py",   "dat_lich"),
     "booking_khach":    ("app/api/v1/quyet_toan_lop3.py", "sua_khach"),
