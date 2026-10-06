@@ -87,6 +87,13 @@ jobs:
               call "soát hộp thư" -m 60 -X POST "$API/robot/inbox/check" -H "$H"
               call "gửi Zalo còn treo" -m 60 -X POST "$API/robot/zalo/send-pending" -H "$H" ;;
             ngay|tuan|thang)
+              # 30/9/2026: vòng quét Kiểm soát đi TRƯỚC báo cáo, và đi ở đây vì tới ngày này nó chưa
+              # có lịch nào cả. Hậu quả đo được trên hệ thật: lần quét cuối là 10/9, nên suốt 19 ngày
+              # bàn giám sát của Chủ tịch là MỘT TẤM ẢNH CŨ – nó vẫn treo đỏ
+              # "POST /api/v1/robot/sepay/pull ×116" trong khi bảng sự kiện kỹ thuật 7 ngày gần nhất
+              # không còn lượt nào của đường dẫn ấy. Một bàn giám sát không tự làm mới thì sai theo
+              # cả hai chiều: báo việc đã hết, và im lặng với việc mới.
+              call "quét Kiểm soát" -m 170 -X POST "$API/kiem-soat/robot/quet" -H "$H"
               call "báo cáo $J" -m 170 -X POST "$API/robot/report/$J" -H "$H" -H "$C" -d '{}' ;;
           esac
           exit $FAIL
