@@ -257,6 +257,11 @@ PHAI_LOC = {
     # phải của mình, tức là điều phối nhân sự chéo pháp nhân mà không ai quyết.
     "YeuCauHdv":      "yêu cầu hướng dẫn viên của ĐÚNG MỘT pháp nhân; nền của danh sách chuyến còn "
                       "thiếu người, nơi lộ chéo pháp nhân thành một lần điều người sai công ty",
+    # Đợt 2 · 06/10/2026. Báo cáo sau tour mang pháp nhân của chuyến. Không lọc thì người phụ trách
+    # một pháp nhân đọc được báo cáo chuyến của pháp nhân khác – trong đó có đánh giá nhà cung cấp,
+    # sự cố và khoản chi hộ, tức là đọc được chỗ yếu của một đơn vị không phải việc của mình.
+    "BaoCaoSauTour":  "báo cáo sau tour của chuyến thuộc ĐÚNG MỘT pháp nhân; bên trong có đánh giá "
+                      "nhà cung cấp, sự cố và khoản chi hộ của đơn vị ấy",
     "Vehicle":        "xe thuộc sở hữu của công ty vận tải, không phải của lữ hành",
 
     # Sáu dòng dưới thêm ngày 11/9/2026 sau khi đếm lại trên đủ 34 tệp mô hình (xem đính chính ở

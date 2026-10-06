@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles, cong_chan_quyen, loc_theo_nguoi_dung, toan_quyen_ke_ca_tach_bach
 from app.models.core import Tour, User, Company
-from app.models.hdv import TRANG_THAI as YC_TRANG_THAI, YeuCauHdv
+from app.models.hdv import TRANG_THAI as YC_TRANG_THAI, TRANG_THAI_BC, BaoCaoSauTour, YeuCauHdv
 from app.models.hr import SALES_GROUPS, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, GuideRate, INCIDENT_LEVELS, INCIDENT_STATUS, DEPARTMENTS, POSITIONS, OFFICES
 from app.services import hr as H
 from app.services import rules as R
@@ -571,6 +571,193 @@ def assign_gio(aid: int, data: GioIn, u: User = Depends(require_roles(*YC_LAP)),
     db.commit()
     return {"message": "Đã gỡ giờ – phân công quay lại danh sách chưa kiểm được trùng"
                        if HDV.khong_so_duoc(a.bat_dau, a.ket_thuc) else "Đã ghi giờ, không trùng với chuyến nào"}
+
+
+# ---------- Phòng HDV Đợt 2: báo cáo sau tour (06/10/2026) ----------
+# Bốn cửa, đúng một vòng đời: lập nháp → gửi → trả bổ sung / xác nhận.
+#
+# AI ĐƯỢC LÀM GÌ. Người NỘP là hướng dẫn viên của chính phân công ấy (Chủ tịch chốt 06/10: HDV có tài
+# khoản VTOS). Người KIỂM là Trưởng phòng Hướng dẫn. Hai vai KHÔNG được là một: tự nộp rồi tự xác
+# nhận thì cái kiểm ấy không kiểm gì cả. Cổng `_khong_tu_kiem` canh đúng điều đó.
+#
+# Vai trò lấy từ danh sách ĐÃ CÓ, không nghĩ ra vai mới.
+BC_KIEM = ("tp_hd", "hcns", "cntt")
+
+
+def bc_out(db: Session, b: BaoCaoSauTour) -> dict:
+    t = db.get(Tour, b.tour_id)
+    return {"id": b.id, "phien_ban": b.phien_ban, "assignment_id": b.assignment_id,
+            "tour_id": b.tour_id, "tour_code": t.code if t else "", "guide_id": b.guide_id,
+            "ban_so": b.ban_so, "thay_cho_id": b.thay_cho_id, "bi_thay": b.bi_thay,
+            "chuong_trinh_thuc_hien": b.chuong_trinh_thuc_hien,
+            # Số khách gửi ra màn hình ĐỂ NGUYÊN, kể cả rỗng: "chưa đếm" phải hiện là ô trống, không
+            # phải số 0. Chỉ phép TÍNH mới xử rỗng thành 0.
+            "so_khach_thuc_te": b.so_khach_thuc_te,
+            "danh_gia_ncc": b.danh_gia_ncc, "su_co": b.su_co,
+            "khoan_chi_thu_ho": b.khoan_chi_thu_ho, "viec_chua_xong": b.viec_chua_xong,
+            "trang_thai": b.trang_thai, "trang_thai_ten": TRANG_THAI_BC.get(b.trang_thai, b.trang_thai),
+            "han_nop": b.han_nop, "tre_han": b.tre_han(), "da_khoa": b.da_khoa(),
+            "nguoi_nop": b.nguoi_nop, "nop_luc": b.nop_luc,
+            "nguoi_kiem": b.nguoi_kiem, "kiem_luc": b.kiem_luc, "y_kien_kiem": b.y_kien_kiem}
+
+
+def _phan_cong_cua_toi(db: Session, u: User, aid: int) -> GuideAssignment:
+    """Hướng dẫn viên chỉ chạm được phân công của chính mình. Kiểm bằng hồ sơ nhân sự nối với tài
+    khoản, KHÔNG bằng tên — hai người trùng tên là chuyện có thật."""
+    a = db.get(GuideAssignment, aid)
+    if not a:
+        raise HTTPException(404, "Không có phân công")
+    if u.role in BC_KIEM:
+        return a
+    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    if e is None or e.id != a.guide_id:
+        raise HTTPException(403, "Chỉ hướng dẫn viên của chuyến này mới nộp được báo cáo")
+    return a
+
+
+class BaoCaoIn(BaseModel):
+    chuong_trinh_thuc_hien: str = ""
+    so_khach_thuc_te: int | None = None
+    danh_gia_ncc: str = ""
+    su_co: str = ""
+    khoan_chi_thu_ho: str = ""
+    viec_chua_xong: str = ""
+
+
+@router.get("/guide-assignments/{aid}/bao-cao")
+def bc_doc(aid: int, u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd", "hdv")), db: Session = Depends(get_db)):
+    a = _phan_cong_cua_toi(db, u, aid)
+    # P6 – hàng rào phạm vi pháp nhân, khai ở PHAI_LOC. Khai mà không nối thì hàng rào chưa bật.
+    q = PV.loc(select(BaoCaoSauTour).where(BaoCaoSauTour.assignment_id == a.id)
+               .order_by(BaoCaoSauTour.ban_so), BaoCaoSauTour, u)
+    ds = db.execute(q).scalars().all()
+    dang_xet = HDV.ban_dang_xet(db, a.id)
+    return {"dang_xet": bc_out(db, dang_xet) if dang_xet else None,
+            "cac_ban": [bc_out(db, b) for b in ds],
+            "ghi_chu": "Chưa có bản nào KHÁC với có bản chưa xong – hai việc gọi hai người khác nhau."}
+
+
+@router.post("/guide-assignments/{aid}/bao-cao", status_code=201)
+def bc_lap(aid: int, data: BaoCaoIn, u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd", "hdv")), db: Session = Depends(get_db)):
+    """Lập bản nháp, hoặc sửa bản nháp đang có. Bản ĐÃ GỬI thì không sửa ở đây – gửi bản mới."""
+    a = _phan_cong_cua_toi(db, u, aid)
+    cu = HDV.ban_dang_xet(db, a.id)
+    if cu is not None and cu.da_khoa():
+        raise HTTPException(422, {
+            "gate": "BAO_CAO_DA_KHOA",
+            "message": f"Bản {cu.ban_so} đã gửi, không sửa đè được. Dùng cửa 'gửi bản mới' để lập bản "
+                       f"tiếp theo – bản cũ vẫn giữ nguyên để đọc lại.",
+            "ban_dang_co": cu.id})
+    t = db.get(Tour, a.tour_id)
+    if cu is None:
+        b = BaoCaoSauTour(assignment_id=a.id, tour_id=a.tour_id, guide_id=a.guide_id,
+                          company_id=getattr(t, "company_id", None),
+                          han_nop=HDV.han_nop_cua(getattr(t, "end_date", None)),
+                          nguoi_nop=u.username, **data.model_dump())
+        db.add(b)
+    else:
+        b = cu
+        for k, v in data.model_dump().items():
+            setattr(b, k, v)
+        b.trang_thai = "nhap"
+        GML.tang_phien_ban(b)
+    db.flush()
+    HDV.dong_bo_co_bao_cao(db, a)
+    R.audit(db, u.username, u.role, "luu_nhap_bao_cao_tour", f"assign:{a.id}", after={"ban_so": b.ban_so})
+    db.commit()
+    return {"id": b.id, "ban_so": b.ban_so, "message": "Đã lưu nháp – chưa gửi, Trưởng phòng chưa thấy"}
+
+
+class BcGui(BaseModel):
+    phien_ban: int | None = None
+
+
+@router.post("/guide-assignments/{aid}/bao-cao/gui")
+def bc_gui(aid: int, data: BcGui, u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd", "hdv")), db: Session = Depends(get_db)):
+    a = _phan_cong_cua_toi(db, u, aid)
+    b = HDV.ban_dang_xet(db, a.id)
+    if b is None:
+        raise HTTPException(404, "Chưa có bản nháp nào để gửi")
+    if b.da_khoa():
+        raise HTTPException(422, f"Bản {b.ban_so} đã gửi rồi")
+    GML.kiem_phien_ban(b, data.phien_ban, f"Báo cáo tour bản {b.ban_so}", lambda: bc_out(db, b))
+    # Gửi một tờ trống thì không phải là đã báo cáo. Chương trình thực hiện là phần tối thiểu: nó là
+    # thứ người kiểm đối chiếu với chương trình đã bán.
+    if not (b.chuong_trinh_thuc_hien or "").strip():
+        raise HTTPException(422, "Phải ghi chương trình thực hiện trước khi gửi")
+    b.trang_thai, b.nop_luc, b.nguoi_nop = "da_gui", datetime.now(), u.username
+    GML.tang_phien_ban(b)
+    HDV.dong_bo_co_bao_cao(db, a)
+    R.audit(db, u.username, u.role, "gui_bao_cao_tour", f"assign:{a.id}", after={"ban_so": b.ban_so})
+    db.commit()
+    return {"message": f"Đã gửi bản {b.ban_so}. Nội dung khoá lại; muốn sửa thì gửi bản mới.",
+            "tre_han": b.tre_han()}
+
+
+class BcKiem(BaseModel):
+    phien_ban: int | None = None
+    xac_nhan: bool
+    y_kien: str = ""
+
+
+@router.post("/guide-assignments/{aid}/bao-cao/kiem")
+def bc_kiem(aid: int, data: BcKiem, u: User = Depends(require_roles(*BC_KIEM)), db: Session = Depends(get_db)):
+    """Trưởng phòng xác nhận, hoặc trả lại kèm lý do."""
+    a = db.get(GuideAssignment, aid)
+    if not a:
+        raise HTTPException(404, "Không có phân công")
+    b = HDV.ban_dang_xet(db, a.id)
+    if b is None or b.trang_thai != "da_gui":
+        raise HTTPException(422, "Không có bản nào đang chờ kiểm")
+    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    if e is not None and e.id == a.guide_id:
+        raise HTTPException(403, "Không tự kiểm báo cáo của chính mình")
+    GML.kiem_phien_ban(b, data.phien_ban, f"Báo cáo tour bản {b.ban_so}", lambda: bc_out(db, b))
+    if not data.xac_nhan and not (data.y_kien or "").strip():
+        raise HTTPException(422, "Trả lại phải ghi rõ thiếu gì – không ghi thì người nộp phải đoán")
+    b.trang_thai = "da_xac_nhan" if data.xac_nhan else "can_bo_sung"
+    b.nguoi_kiem, b.kiem_luc, b.y_kien_kiem = u.username, datetime.now(), (data.y_kien or "")[:2000]
+    GML.tang_phien_ban(b)
+    HDV.dong_bo_co_bao_cao(db, a)
+    R.audit(db, u.username, u.role, "kiem_bao_cao_tour", f"assign:{a.id}",
+            after={"ban_so": b.ban_so, "ket_qua": b.trang_thai})
+    db.commit()
+    return {"message": "Đã xác nhận – gỡ treo chào chuyến và treo thù lao cho phân công này"
+                       if data.xac_nhan else "Đã trả lại kèm lý do – phân công vẫn còn nợ báo cáo"}
+
+
+@router.post("/guide-assignments/{aid}/bao-cao/ban-moi", status_code=201)
+def bc_ban_moi(aid: int, data: BaoCaoIn, u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd", "hdv")), db: Session = Depends(get_db)):
+    """Lập bản TIẾP THEO thay cho bản đã gửi. Bản cũ giữ nguyên, chỉ đánh dấu đã bị thay."""
+    a = _phan_cong_cua_toi(db, u, aid)
+    cu = HDV.ban_dang_xet(db, a.id)
+    if cu is None:
+        raise HTTPException(404, "Chưa có bản nào – dùng cửa lập nháp")
+    if not cu.da_khoa() and cu.trang_thai != "can_bo_sung":
+        raise HTTPException(422, f"Bản {cu.ban_so} còn là nháp, sửa thẳng chứ không cần bản mới")
+    t = db.get(Tour, a.tour_id)
+    moi = BaoCaoSauTour(assignment_id=a.id, tour_id=a.tour_id, guide_id=a.guide_id,
+                        company_id=getattr(t, "company_id", None),
+                        han_nop=cu.han_nop, ban_so=cu.ban_so + 1, thay_cho_id=cu.id,
+                        nguoi_nop=u.username, **data.model_dump())
+    cu.bi_thay = True
+    db.add(moi); db.flush()
+    HDV.dong_bo_co_bao_cao(db, a)
+    R.audit(db, u.username, u.role, "lap_ban_moi_bao_cao_tour", f"assign:{a.id}",
+            after={"ban_so": moi.ban_so, "thay_cho": cu.id})
+    db.commit()
+    return {"id": moi.id, "ban_so": moi.ban_so,
+            "message": f"Đã lập bản {moi.ban_so} thay cho bản {cu.ban_so} – bản cũ vẫn đọc lại được"}
+
+
+@router.get("/guide-assignments/bao-cao/thieu-theo-tour")
+def bc_thieu_theo_tour(tour_id: int, u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd")), db: Session = Depends(get_db)):
+    """Căn cứ để màn hình quyết toán KHÔNG gọi một tờ là 'hoàn tất' khi phần hướng dẫn viên chưa xong
+    – Chủ tịch chốt 06/10/2026. Trả về DANH SÁCH NGƯỜI, không trả một ô đỏ: người làm quyết toán cần
+    biết phải gọi ai."""
+    thieu = HDV.thieu_bao_cao_cua_tour(db, tour_id)
+    return {"tour_id": tour_id, "con_thieu": len(thieu), "danh_sach": thieu,
+            "duoc_goi_hoan_tat": len(thieu) == 0}
 
 
 # ---------- Đội xe ----------

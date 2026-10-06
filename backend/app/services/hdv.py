@@ -159,3 +159,81 @@ def cap_nhat_trang_thai(db: Session, yc: YeuCauHdv) -> None:
         yc.trang_thai = "dang_xep"
     else:
         yc.trang_thai = "moi"
+
+
+# ═══════════════════════════ Đợt 2 · BÁO CÁO SAU TOUR (06/10/2026) ═══════════════════════════
+#
+# Hai điều cần nói trước khi đọc mã:
+#
+# 1. CỘT CŨ `report_submitted` KHÔNG BỊ BỎ. Nó đang gánh hai quyết định thật — treo chào chuyến mới
+#    sau 3 ngày (app/api/v1/huong_dan.py) và treo thù lao (app/services/luong.py). Bỏ nó thì hai chỗ
+#    ấy im lặng ngừng hoạt động. Thay vào đó, từ Đợt 2 nó thành TẤM GƯƠNG của bảng mới: bật khi báo
+#    cáo được XÁC NHẬN, tắt khi bị trả lại. Hai chỗ kia không phải sửa một dòng nào.
+#
+# 2. GỬI KHÔNG BẰNG XONG. Chỉ bản `da_xac_nhan` mới gỡ treo. Nếu "đã gửi" là đủ thì gửi một tờ trống
+#    cũng hết bị treo, và cái treo ấy mất hết tác dụng ngay ngày đầu.
+from datetime import date, timedelta
+
+from app.models.hdv import BC_DA_XONG, HAN_NOP_NGAY, BaoCaoSauTour
+
+
+def han_nop_cua(ngay_ket_thuc: date | None) -> date | None:
+    """Hạn nộp = ngày tour kết thúc + 3 ngày. Chuyến chưa có ngày kết thúc thì KHÔNG đoán hạn: một
+    hạn bịa ra sẽ sinh cảnh báo trễ cho người chưa hề trễ, và cảnh báo sai vài lần thì người dùng
+    thôi đọc cảnh báo."""
+    if ngay_ket_thuc is None:
+        return None
+    return ngay_ket_thuc + timedelta(days=HAN_NOP_NGAY)
+
+
+def ban_dang_xet(db: Session, assignment_id: int) -> BaoCaoSauTour | None:
+    """Bản còn hiệu lực của một phân công: bản mới nhất chưa bị thay. Trả None khi chưa có bản nào —
+    và 'chưa có bản nào' KHÁC 'có bản chưa xong', nên người gọi phải phân biệt hai cái."""
+    ds = db.execute(
+        select(BaoCaoSauTour)
+        .where(BaoCaoSauTour.assignment_id == assignment_id, BaoCaoSauTour.bi_thay == False)  # noqa: E712
+        .order_by(BaoCaoSauTour.ban_so.desc())
+    ).scalars().all()
+    return ds[0] if ds else None
+
+
+def dong_bo_co_bao_cao(db: Session, a: GuideAssignment) -> None:
+    """Chép trạng thái báo cáo sang cột cũ `report_submitted`.
+
+    Gọi sau MỖI lần trạng thái báo cáo đổi. Không gọi thì hai quyết định đang dựa vào cột cũ sẽ nói
+    một đằng, bảng mới nói một nẻo — và người dùng tin cái nào cũng sai một nửa.
+    """
+    bc = ban_dang_xet(db, a.id)
+    a.report_submitted = bool(bc and bc.trang_thai in BC_DA_XONG)
+
+
+def thieu_bao_cao_cua_tour(db: Session, tour_id: int) -> list[dict]:
+    """Những hướng dẫn viên của chuyến này còn nợ báo cáo đã xác nhận.
+
+    Đây là CĂN CỨ để màn hình quyết toán không gọi một tờ là "hoàn tất" khi phần hướng dẫn viên chưa
+    xong — Chủ tịch chốt 06/10/2026. Hàm trả về DANH SÁCH NGƯỜI chứ không trả về đúng/sai: người làm
+    quyết toán cần biết phải gọi ai, không cần biết thêm một ô đỏ.
+
+    Phân công đã từ chối / huỷ / hết hạn KHÔNG tính: người ta không đi thì không có gì để báo cáo.
+    """
+    from app.models.hr import Employee
+    thieu = []
+    for a in db.execute(select(GuideAssignment).where(GuideAssignment.tour_id == tour_id)).scalars():
+        if a.status in KHONG_CHIEM_LICH:
+            continue
+        bc = ban_dang_xet(db, a.id)
+        if bc is not None and bc.trang_thai in BC_DA_XONG:
+            continue
+        e = db.get(Employee, a.guide_id)
+        thieu.append({
+            "assignment_id": a.id,
+            "guide_id": a.guide_id,
+            "hdv": e.full_name if e else f"nhân sự {a.guide_id}",
+            # Ba tình trạng khác nhau, KHÔNG gộp thành một chữ "thiếu": chưa nộp gì, đã nộp đang chờ
+            # kiểm, và đã bị trả lại. Ba cái ấy gọi ba người khác nhau để xử lý.
+            "tinh_trang": "chua_nop" if bc is None else bc.trang_thai,
+            "ban_so": bc.ban_so if bc else 0,
+            "han_nop": bc.han_nop if bc else None,
+            "tre_han": bool(bc and bc.tre_han()),
+        })
+    return thieu

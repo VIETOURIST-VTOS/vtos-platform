@@ -97,6 +97,9 @@ CUA_SUA_CO_KHOA = {
     # bay là chuyện thường), và số người của yêu cầu đổi khi đoàn tăng khách.
     "guide_assignments": ("app/api/v1/hr.py",         "assign_gio"),
     "yeu_cau_hdv":       ("app/api/v1/hr.py",         "yeu_cau_huy"),
+    # Đợt 2 · báo cáo sau tour. Cửa sửa là cửa KIỂM: Trưởng phòng xác nhận hoặc trả lại, và đó là lúc
+    # hai người dễ chạm nhau nhất – người nộp đang gửi bản mới trong khi người kiểm đang xác nhận bản cũ.
+    "bao_cao_sau_tour":  ("app/api/v1/hr.py",         "bc_kiem"),
     "bao_gia":          ("app/api/v1/ban_hang.py",   "sua_bao_gia"),
     "hop_dong_khach":   ("app/api/v1/ban_hang.py",   "dat_lich"),
     "booking_khach":    ("app/api/v1/quyet_toan_lop3.py", "sua_khach"),
