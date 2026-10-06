@@ -36,7 +36,15 @@ function BaoCao() {
   useEffect(() => {
     api<any>("/bao-cao/pham-vi").then((m) => {
       setMeta(m);
-      if (m.pham_vi.length) setPv(m.pham_vi[0].ma);
+      // Phạm vi lấy từ đường dẫn trước, rồi mới tới mặc định. Mục 4.1 của cây phân hệ Điều hành
+      // trỏ vào /bao-cao?pham_vi=dieu_hanh; trước 05/10/2026 dòng này luôn kéo về pham_vi[0] =
+      // Toàn công ty, nên người Điều hành bấm "Tổng quan điều hành" lại mở ra báo cáo của cả
+      // công ty rồi phải tự đổi ô. Phạm vi lạ trong đường dẫn thì bỏ qua, về mặc định – không
+      // để màn hình trống vì một chữ gõ sai.
+      if (m.pham_vi.length) {
+        const q = new URLSearchParams(window.location.search).get("pham_vi") || "";
+        setPv(m.pham_vi.some((x: any) => x.ma === q) ? q : m.pham_vi[0].ma);
+      }
     }).catch((e) => toast(errMsg(e), true));
   }, [toast]);
 

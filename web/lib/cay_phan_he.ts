@@ -222,7 +222,7 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
   { khoa: "vanhanh", ma: "04", ten: "Điều hành",
     tom_tat: "Sản phẩm · Chuyến · Dịch vụ · Đội xe và Hướng dẫn viên là hai nhóm độc lập",
     con: [
-      { ma: "4.1", ten: "Tổng quan điều hành", href: "/bao-cao" },
+      { ma: "4.1", ten: "Tổng quan điều hành", href: "/bao-cao?pham_vi=dieu_hanh" },
       { ma: "4.2", ten: "Danh mục tour", href: "/products" },
       { ma: "4.3", ten: "Yêu cầu điều hành", href: "/requests" },
       { ma: "4.4", ten: "Điều hành tour", href: "/tours",
@@ -256,7 +256,7 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
         con: [
           { ma: "4.9.1", ten: "Tổng quan đội xe" },
           { ma: "4.9.2", ten: "Hồ sơ xe", href: "/doi-xe" },
-          { ma: "4.9.3", ten: "Tài xế", href: "/xe-hdv" },
+          { ma: "4.9.3", ten: "Tài xế", href: "/tai-xe" },
           { ma: "4.9.4", ten: "Bảng giá vận tải", href: "/ops?tab=fleet" },
           { ma: "4.9.5", ten: "Lịch & lệnh điều xe", href: "/lenh-dieu-xe" },
           { ma: "4.9.6", ten: "Bảo dưỡng & sửa chữa", href: "/doi-xe?tab=bao-duong" },

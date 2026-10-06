@@ -16,6 +16,18 @@ def login(u):
     return {"Authorization": f"Bearer {TOK[u]}"}
 
 
+# Mã booking của bộ dữ liệu thử SINH THEO THÁNG HIỆN TẠI. Phải tự suy, không được gõ cứng:
+# services/seed.py dựng mã bằng `f"BK{today:%y%m}{n:04d}"`, nên sang tháng mới là mã đổi. Ba tệp
+# phép thử Kế toán từng gõ cứng "BK26090001"; sáng 06/10/2026 cả ba đỏ cùng lúc với StopIteration
+# — bộ dữ liệu sinh ra BK2610xxxx còn phép thử đi tìm BK2609xxxx.
+#
+# Chỗ ấy đáng sợ không phải vì nó đỏ, mà vì nó đỏ ĐỀU ĐẶN mỗi đầu tháng mà không ai đụng vào mã
+# nguồn. Một hàng rào tháng nào cũng đỏ là một hàng rào người ta thôi nhìn, và đúng hôm nó đỏ vì
+# chuyện thật thì không còn ai đọc nữa.
+def ma_bk(n: int) -> str:
+    return f"BK{date.today():%y%m}{n:04d}"
+
+
 @pytest.fixture(scope="module", autouse=True)
 def _startup():
     with TestClient(app) as c:
@@ -24,7 +36,7 @@ def _startup():
 
 def test_statements_balance_and_tax_forms():
     kt = login("ketoan")
-    b = next(x for x in client.get("/api/v1/bookings", headers=kt).json() if x["code"] == "BK26090001")
+    b = next(x for x in client.get("/api/v1/bookings", headers=kt).json() if x["code"] == ma_bk(1))
     client.post("/api/v1/receipts/cash", json={"booking_id": b["id"], "amount": 7960000, "payer": "A"}, headers=kt)
     inv = client.post("/api/v1/invoices", json={"booking_id": b["id"], "customer_tax_code": "0301"}, headers=kt).json()["invoice"]
     client.post(f"/api/v1/invoices/{inv['id']}/issue", headers=kt)

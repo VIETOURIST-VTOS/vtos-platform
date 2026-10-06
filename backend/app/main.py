@@ -72,6 +72,7 @@ from app.api.v1.doi_soat_marketing import router as doi_soat_marketing_router
 from app.api.v1.ptgd_doan import router as ptgd_doan_router
 from app.api.v1.ban_tour_le import router as ban_tour_le_router
 from app.api.v1.danh_gia import router as danh_gia_router
+from app.api.v1.tai_xe import router as tai_xe_router
 from app.api.v1.khao_sat_cong_khai import router as khao_sat_cong_khai_router
 from app.api.v1.sales_admin import router as sales_admin_router
 from app.services import rules as R
@@ -339,6 +340,7 @@ app.include_router(ptgd_doan_router)
 app.include_router(sales_admin_router)
 app.include_router(ban_tour_le_router)
 app.include_router(danh_gia_router)
+app.include_router(tai_xe_router)
 # Công nợ Vietrip hằng ngày (phải thu + phải trả theo dự toán tour). Gắn lại 29/9/2026: lượt gộp
 # TC-94 ghi đè hai dòng này nên cả /api/v1/cong-no-vietrip trả 404. Phép thử
 # test_cong_no_vietrip.test_cua_cong_no_vietrip_duoc_gan_vao_app canh không để mất lần nữa.

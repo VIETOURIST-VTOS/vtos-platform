@@ -175,6 +175,20 @@ GIU_DONG: dict[tuple[str, str], str] = {
         "sơ của bất kỳ chuyến nào. Thứ dòng này chặn là giao hồ sơ quyết toán cho một vai không "
         "giữ hồ sơ quyết toán — Chủ tịch cũng không giao cho Kinh doanh được, và đó là cùng một "
         "ranh giới câu 7 ngày 25/9/2026 đã chốt: quyết toán là số của bên ĐẶT dịch vụ.",
+
+    ("services/hrm.py", "decide_leave"):
+        "CHÍNH CHỦ TỊCH ĐẶT CỬA NÀY, và đặt bằng một chữ trong câu nói ngày 30/9/2026: “nghỉ phép, "
+        "ốm đau, vắng việc sẽ do Huấn duyệt, TGĐ và CT THẤY.” Thấy, không ký. Đây không phải lần "
+        "phân quyền quên mở cho Chủ tịch — đây là tách bạch trách nhiệm do người có toàn quyền tự "
+        "vạch ra cho mình, và loại cửa ấy mở ra thì không còn là cửa. "
+        "VÀ NÓ KHÔNG PHẢI CỬA CHẶN CHỦ TỊCH THEO NGHĨA THƯỜNG: Chủ tịch vẫn ĐỌC được mọi đơn của "
+        "mọi phòng (ông nằm trong HR_READ), vẫn ký được đơn của chín phòng chưa chốt người ký "
+        "(hrm.KY_MAC_DINH có “chutich”). Thứ dòng này nói là đơn của Đội xe và Hướng dẫn đi về "
+        "đúng một người — nếu không thì một đơn ký ở trên xuống sẽ qua mặt chính người quản lý "
+        "trực tiếp, và người ấy không biết hôm sau thiếu ai. "
+        "ĐỔI THÌ ĐỔI Ở BẢNG, KHÔNG ĐỔI Ở ĐÂY: thêm “chutich” vào hrm.TUYEN_KY_DON['doi_xe'] là "
+        "một dòng, đọc được, và có người quyết. Thêm `or toan_quyen(u)` vào hàm thì cùng kết quả "
+        "mà không ai thấy, và bảng luồng công việc vẫn khai một chuỗi chỉ huy không còn thật.",
 }
 
 
