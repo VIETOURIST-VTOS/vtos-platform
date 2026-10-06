@@ -494,8 +494,16 @@ PHAM_VI_DA_CHOT = {
     # hình /cong-no có sẵn (ảnh chụp báo cáo công nợ 8h sáng từ Vietrip, 4 nhóm theo ngày khởi
     # hành). Đúng chín vai đã thấy màn hình /cong-no. sales_admin thấy màn hình nhưng cửa đọc
     # (api/v1/cong_no_vietrip.XEM) KHÔNG có vai ấy – khớp READ của /api/v1/cong-no; màn hình tự ẩn khối.
+    # ĐƠN TỪ NHÂN SỰ (07/10/2026) – nhóm việc CON NGƯỜI Chủ tịch quyết 30/9. Màn hình /xe-hdv nay
+    # gọi thêm "/api/v1/leaves" và "/api/v1/leave-balance", nên SÁU vai thấy màn hình ấy qua ma
+    # trận menu cùng +2: tp_dh, nv_dh, tai_xe, hdv (và hai vai nền đã có sẵn cả hai nhóm).
+    #
+    # Hai NGƯỜI KÝ chỉ +1 ("/api/v1/leaves"), và khai tay ở RESTRICTED_API_PREFIXES vì hai vai này
+    # lấy /xe-hdv từ danh sách CHO PHÉP chứ không từ ma trận. KHÔNG cho họ "/api/v1/leave-balance":
+    # cửa ấy trả quỹ phép của CẢ CÔNG TY cho nhóm HR_READ và chỉ quỹ phép của chính mình cho người
+    # khác — với người ký thì nó vừa thừa vừa vô dụng, nên không mở.
     "chutich": 124, "tgd": 124, "bks": 124, "cntt": 121,
-    "ketoan": 101, "tp_dh": 90, "ptgd_doan": 73, "nv_dh": 63, "hcns": 64, "gd_kd": 65,
+    "ketoan": 101, "tp_dh": 92, "ptgd_doan": 73, "nv_dh": 65, "hcns": 64, "gd_kd": 65,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -536,7 +544,7 @@ PHAM_VI_DA_CHOT = {
     # hư hỏng xe). Đây là một NHÁNH CON, không phải cả phân hệ đội xe — xem phép thử bản đồ màn
     # hình ở trên, nay so bằng đường đầy đủ nên bản đồ nói được "màn hình này chỉ chạm nhánh ấy".
     # Mười vai cùng +1 vì cả mười đều thấy màn hình /xe-hdv; không vai nào nhận thêm gì khác.
-    "gd_doi_xe": 28, "hanh_chinh": 28, "tp_hd": 25, "tai_xe": 18, "hdv": 18, "nv_visa": 18,
+    "gd_doi_xe": 29, "hanh_chinh": 28, "tp_hd": 26, "tai_xe": 20, "hdv": 20, "nv_visa": 18,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng

@@ -179,8 +179,16 @@ RESTRICTED_API_PREFIXES = {
     # /fleet/bao-hong thêm 06/10/2026: cửa báo hư hỏng. Khai ĐÚNG nhánh con, không khai cả
     # "/api/v1/fleet" — hàng rào so bằng startswith, nên khai tiền tố cha là mở luôn toàn bộ phân
     # hệ đội xe (hồ sơ xe, bảng giá, quyết toán chủ xe) cho một vai chỉ cần một cửa.
-    "tai_xe": ("/api/v1/incidents", "/api/v1/payment-requests", "/api/v1/fleet/bao-hong"),
-    "hdv": ("/api/v1/incidents",),
+    # /leaves và /leave-balance thêm 07/10/2026: cửa nộp đơn nghỉ phép / ốm / vắng việc, nhóm việc
+    # CON NGƯỜI Chủ tịch quyết 30/9. Hai cửa này ĐÃ CHẠY trên máy chủ từ trước mà không màn hình nào
+    # gọi tới – tức là một bảng được khai "có cửa nhập tay" trong khi người phải dùng nó không với
+    # tới cửa ấy. Mở tiền tố không mở sổ đơn công ty: `GET /leaves` lọc ba tầng theo người ký
+    # (hrm.py::phong_minh_ky), và tài xế không nằm trong tầng nào ngoài tầng "đơn của chính mình".
+    "tai_xe": ("/api/v1/incidents", "/api/v1/payment-requests", "/api/v1/fleet/bao-hong",
+               "/api/v1/leaves", "/api/v1/leave-balance"),
+    # HDV cũng nộp được đơn: cùng màn hình /xe-hdv, và người ký của phòng Hướng dẫn đã khai trong
+    # hrm.TUYEN_KY_DON. Không mở /fleet/bao-hong cho vai này – hướng dẫn viên không đứng tên xe.
+    "hdv": ("/api/v1/incidents", "/api/v1/leaves", "/api/v1/leave-balance"),
     # GĐ điều hành đội xe: cả phân hệ đội xe và lệnh điều xe, cộng danh mục xe để chọn trong form. Không có
     # /tours, /bookings, /banks, /payroll – phạm vi công việc của ông là chiếc xe, không phải khách hàng và
     # dòng tiền công ty.
@@ -191,9 +199,13 @@ RESTRICTED_API_PREFIXES = {
     # /xe-hdv từ danh sách CHO PHÉP chứ không từ ma trận menu, nên không suy ra được tiền tố ấy. Bỏ đi
     # là họ mất cả phân hệ xe & HDV – đúng kiểu siết đúng nguyên tắc mà sai hậu quả. Chỉ bỏ dấu gạch
     # cuối cho thống nhất; hàng rào so bằng startswith nên quyền không đổi.
+    # "/api/v1/leaves" thêm 07/10/2026 cho CẢ HAI người ký, và phải khai TAY ở đây đúng vì lý do
+    # ghi ngay phía trên: hai vai này lấy /xe-hdv từ danh sách CHO PHÉP, nên không suy được tiền tố
+    # nào của màn hình ấy. Thiếu dòng này thì màn hình hiện nút Duyệt mà bấm vào là 403 – và tệ hơn
+    # một cửa thiếu, vì bảng luồng công việc lúc ấy khai một người ký không ký được.
     "gd_doi_xe": ("/api/v1/fleet", "/api/v1/xe-hdv", "/api/v1/dispatch",
                   "/api/v1/vehicles", "/api/v1/nap-du-lieu", "/api/v1/tep",
-                  "/api/v1/doc-chung-tu", "/api/v1/tai-xe"),
+                  "/api/v1/doc-chung-tu", "/api/v1/tai-xe", "/api/v1/leaves"),
     "nv_visa": ("/api/v1/visa",),
     # --- Ba vai trò máy (P8, 08/9/2026) ---
     # Danh sách của mỗi robot hẹp đúng bằng việc nó được giao, và HAI CHỖ TRỐNG dưới đây là chỗ trống
@@ -215,8 +227,11 @@ RESTRICTED_API_PREFIXES = {
     # Trưởng phòng Hướng dẫn: phần hướng dẫn, chào chuyến, bảng giá tuyến, tệp đính kèm và bộ nạp dữ
     # liệu của phòng. Không có /bookings, /tours, /payroll, /banks – ông chọn người cho chuyến, không
     # quản khách và không quản tiền công ty.
+    # "/api/v1/leaves" thêm 07/10/2026: Trưởng phòng Hướng dẫn là người ký đơn của hướng dẫn viên
+    # (hrm.TUYEN_KY_DON), và cùng lý do như gd_doi_xe ở trên, tiền tố ấy không suy ra được.
     "tp_hd": ("/api/v1/huong-dan", "/api/v1/guide-assignments", "/api/v1/guide-rates",
-              "/api/v1/incidents", "/api/v1/tep", "/api/v1/nap-du-lieu", "/api/v1/xe-hdv"),
+              "/api/v1/incidents", "/api/v1/tep", "/api/v1/nap-du-lieu", "/api/v1/xe-hdv",
+              "/api/v1/leaves"),
 }
 
 
@@ -298,6 +313,10 @@ MAN_HINH_API = {
     # hoảng. Cùng một màn hình vì cùng một việc: những thứ thuộc về TÀI KHOẢN của chính mình, và
     # không vai trò nào làm hộ được cho ai.
     "/doi-mat-khau": ("/api/v1/auth", "/api/v1/zalo"),
+    # Đơn nghỉ KHÔNG nằm ở đây. 07/10/2026 em đã định gắn hàng đợi ký vào màn hình này rồi bỏ:
+    # /doi-xe là màn hình của CHIẾC XE (hồ sơ, bảo dưỡng, báo hỏng), còn đơn nghỉ là việc của NGƯỜI.
+    # Và Trưởng phòng Hướng dẫn – người ký đơn của hướng dẫn viên – không có màn hình này. Cả hai
+    # người ký cùng có /xe-hdv, nên hàng đợi nằm ở đó, cạnh chính những người làm đơn.
     "/doi-xe": ("/api/v1/fleet", "/api/v1/vehicles", "/api/v1/drivers"),
     "/expenses": ("/api/v1/cashflow", "/api/v1/payment-requests", "/api/v1/tours"),
     "/finance": ("/api/v1/fin", "/api/v1/cashflow"),
@@ -486,7 +505,8 @@ MAN_HINH_API = {
                "/api/v1/quyet-toan-lop3"),
     "/vietrip": ("/api/v1/import",),
     "/visa": ("/api/v1/visa",),
-    "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents", "/api/v1/payment-requests", "/api/v1/fleet/bao-hong"),
+    "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents", "/api/v1/payment-requests",
+                "/api/v1/fleet/bao-hong", "/api/v1/leaves", "/api/v1/leave-balance"),
 }
 
 
