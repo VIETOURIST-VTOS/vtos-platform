@@ -16,6 +16,7 @@ from app.models.accounting import Account, JournalEntry, JournalLine, Partner, P
 from app.models.ops import PaymentRequest
 from app.services import accounting as ACC
 from app.services import rules as R
+from app.services import so_lo_nap as SLN
 from app.services.bctc import BY_PARTNER
 
 TECHNICAL_PROJECTS = ("0000", "CHUA RO", "CHUARO", "CPXD", "CPCD", "CPBH", "CPQL", "CHOTHUEMATBANG", "DLPTLUHANH")
@@ -92,6 +93,21 @@ def parse_object_balances(data: bytes) -> list[dict]:
 
 
 # ---------- 3. Danh mục ----------
+def _ghi_so_danh_muc(db: Session, loai: str, stat: dict, dau_vao, so_dong_tep: int) -> None:
+    """Nhật ký lô cho hai bộ nạp DANH MỤC (đối tượng, công trình).
+
+    Đơn vị đếm là DÒNG CÓ KHOÁ, không phải số dòng thô của tệp: bảng MISA có dòng tiêu đề, dòng
+    trống và dòng tổng, và bộ nạp cố ý bỏ qua chúng. Đếm cả chúng vào `so_dong` sẽ làm đẳng thức
+    K5 lệch ở MỌI lô, biến một ngoại lệ có nghĩa thành tiếng ồn cố định. Số dòng thô vẫn được ghi
+    trong `ket_qua` nên không giấu gì.
+
+    Danh mục KHÔNG mang tiền, nên bốn ô tiền để TRỐNG — trống là "không đo được", khác hẳn số 0.
+    """
+    co_khoa = int(stat.get("created", 0)) + int(stat.get("updated", 0))
+    SLN.ghi_lo(db, loai=loai, so_dong=co_khoa, da_nap=co_khoa, nguon="nap_tep", dau_vao=dau_vao,
+               ket_qua={"so_dong_tho_cua_tep": so_dong_tep, **stat})
+
+
 def import_partners(db: Session, data: bytes, kind: str = "auto") -> dict:
     """Danh sách khách hàng / nhà cung cấp MISA, hoặc DataNCC (Tên NCC, MST, Tên pháp nhân, Địa chỉ)."""
     rows = _rows(data)
@@ -110,6 +126,7 @@ def import_partners(db: Session, data: bytes, kind: str = "auto") -> dict:
             p.is_supplier, p.trade_name, p.tax_code = True, trade[:200], code[:20]
             if legal is not None and r[legal]: p.name = str(r[legal]).strip()[:300]
             if addr is not None and r[addr]: p.address = str(r[addr]).strip()[:300]
+        _ghi_so_danh_muc(db, "misa_doi_tuong", stat, data, so_dong_tep=len(rows))
         db.commit(); return stat
     h = _find_header(rows, "mã", "tên")
     hdr = [str(c or "").strip().lower() for c in rows[h]]
@@ -133,6 +150,7 @@ def import_partners(db: Session, data: bytes, kind: str = "auto") -> dict:
         if itax is not None and r[itax]: p.tax_code = str(r[itax]).strip()[:20]
         if iphone is not None and r[iphone]: p.phone = str(r[iphone]).strip()[:40]
         if iint is not None and r[iint]: p.internal = str(r[iint]).strip().lower() in ("có", "x", "true", "1")
+    _ghi_so_danh_muc(db, "misa_doi_tuong", stat, data, so_dong_tep=len(rows))
     db.commit()
     return stat
 
@@ -162,6 +180,7 @@ def import_projects(db: Session, data: bytes) -> dict:
         if p.technical: stat["technical"] += 1
         if PROJECT_STD.match(code): stat["standard"] += 1
         if code in tours and p.tour_id != tours[code]: p.tour_id = tours[code]; stat["linked"] += 1
+    _ghi_so_danh_muc(db, "misa_cong_trinh", stat, data, so_dong_tep=len(rows))
     db.commit()
     return stat
 
@@ -219,6 +238,12 @@ def import_opening_balance(db: Session, u: User, tb: bytes, as_of: date, column:
     if abs(td - tc) >= 1:
         raise ValueError(f"Bảng cân đối MISA không cân ở tài khoản chi tiết: Nợ {td:,.0f} ≠ Có {tc:,.0f}")
     e = ACC.post_entry(db, u.username, u.role, as_of, f"Số dư đầu kỳ {as_of:%d/%m/%Y} nhập từ MISA ({parsed['period']})", lines, "so_du_dau_ky", ref)
+    # Đơn vị đếm ở đây là DÒNG SỐ DƯ đã dựng, không phải dòng excel: bảng cân đối MISA có dòng tổng
+    # và dòng tài khoản cha, và bộ nạp cố ý chỉ lấy tài khoản chi tiết.
+    SLN.ghi_lo(db, loai="misa_so_du_dau_ky", so_dong=len(lines), da_nap=len(lines),
+               tong_tien_tep=td, tong_tien_da_nap=td, tong_tien_bo_qua=0, tong_tien_loi=0,
+               cot_tien=["dư nợ"], boi=u.username, nguon="nap_tep", dau_vao=tb,
+               ket_qua={"chung_tu": e.code, "as_of": str(as_of), "canh_bao": missing[:50], **stat})
     db.commit()
     return {"entry": e.code, "total": td, "lines": len(lines), "warnings": missing, **stat}
 
@@ -350,6 +375,10 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
         return {"entry": None, "as_of": as_of, "total": 0, "lines": 0, "source": data["nguon"], "message_extra": "Sổ VTOS đã khớp đúng số kiểm toán, không cần điều chỉnh", **stat}
     e = ACC.post_entry(db, u.username, u.role, as_of, f"Điều chỉnh chốt sổ theo BCTC kiểm toán/soát xét tại {as_of:%d/%m/%Y} ({data['nguon']})", lines, "kiem_toan", ref_adj)
     db.commit()
+    SLN.ghi_lo(db, loai="misa_moc_kiem_toan", so_dong=len(lines), da_nap=len(lines),
+               tong_tien_tep=td, tong_tien_da_nap=td, tong_tien_bo_qua=0, tong_tien_loi=0,
+               cot_tien=["dư nợ"], boi=u.username, nguon="he_thong", dau_vao=lines,
+               ket_qua={"chung_tu": e.code, "as_of": str(as_of), "nguon": data["nguon"], **stat})
     return {"entry": e.code, "as_of": as_of, "total": td, "lines": len(lines), "source": data["nguon"], **stat}
 
 
@@ -386,12 +415,17 @@ def import_journal(db: Session, u: User, data: bytes, date_from: date | None = N
     used = set(x for x in db.execute(select(JournalEntry.code)).scalars())
     accs = {a.code for a in db.execute(select(Account)).scalars()}
     stat = {"docs": len(docs), "imported": 0, "skipped_existing": 0, "unbalanced": 0, "created_accounts": 0, "amount": 0.0, "from": None, "to": None}
+    # Tổng tiền của CẢ TỆP, cộng trước khi lọc — đây là con số K5 so với tổng đã nạp + bỏ qua + lỗi.
+    # Cộng ở đây chứ không cộng lại ở cuối: `docs` bị `del` ở cuối hàm để trả bộ nhớ cho máy 512 MB.
+    tien_tep = tien_bo_qua = tien_loi = 0.0
+    for _k, _d in docs.items():
+        tien_tep += sum((l["debit"] or 0) for l in _d["lines"])
     n = 0
     for (no, d), doc in sorted(docs.items(), key=lambda x: (x[0][1], x[0][0])):
         ref = f"misa:{no}:{d:%Y%m%d}"
-        if ref in have: stat["skipped_existing"] += 1; continue
         td = sum((l["debit"] or 0) for l in doc["lines"]); tc = sum((l["credit"] or 0) for l in doc["lines"])
-        if td <= 0 or abs(td - tc) >= 1: stat["unbalanced"] += 1; continue
+        if ref in have: stat["skipped_existing"] += 1; tien_bo_qua += td; continue
+        if td <= 0 or abs(td - tc) >= 1: stat["unbalanced"] += 1; tien_loi += td; continue
         stat["imported"] += 1; stat["amount"] += td
         stat["from"] = min(stat["from"] or d, d); stat["to"] = max(stat["to"] or d, d)
         if dry_run: continue
@@ -412,6 +446,19 @@ def import_journal(db: Session, u: User, data: bytes, date_from: date | None = N
     if not dry_run:
         R.audit(db, u.username, u.role, "nap_so_nhat_ky_misa", "journal", after={k: (str(v) if isinstance(v, date) else v) for k, v in stat.items()})
         db.commit()
+    # K5 – NHẬT KÝ LÔ. Đây là "lô lớn nhất hệ thống" nói trong ks_nap_lo: 25.728 bút toán vào sổ
+    # trong một tháng mà bộ đối chiếu lô không biết là có. Bốn con số DÒNG đếm theo CHỨNG TỪ chứ
+    # không theo dòng excel — chứng từ mới là đơn vị mà bộ nạp này nhận hay bỏ, nên đó là thứ cộng
+    # lại được. `limit` cắt giữa chừng thì phần chưa xét không nằm trong ô nào, và `ghi_lo` tự khai
+    # chỗ lệch ấy thay vì để K5 đoán.
+    SLN.ghi_lo(db, loai="misa_nhat_ky", so_dong=stat["docs"], da_nap=stat["imported"],
+               bo_qua_da_co=stat["skipped_existing"], dong_loi=stat["unbalanced"],
+               tong_tien_tep=tien_tep, tong_tien_da_nap=stat["amount"],
+               tong_tien_bo_qua=tien_bo_qua, tong_tien_loi=tien_loi,
+               cot_tien=["phát sinh nợ"], boi=u.username, nguon="nap_tep", dau_vao=data,
+               ket_qua={"dry_run": dry_run, "limit": limit, "tu": str(stat["from"] or ""),
+                        "den": str(stat["to"] or ""), "tk_moi_mo": stat["created_accounts"]})
+    if not dry_run: db.commit()
     wb.close(); del docs
     import gc; gc.collect()
     return stat
