@@ -80,9 +80,9 @@ def _startup():
         # 6. tài khoản ĐÃ CÓ pháp nhân B, hồ sơ nói A → LỆCH, báo ra chứ không tự sửa
         hs("SPN06", tk("spn_lech", cid=ID["B"]), ID["A"])
         # 7. QUY TẮC 09/9: phòng Đội xe → VTRIP-VT, còn lại → VTD
-        e = hs("SPN07", tk("spn_taixe", "xe_hdv"), None); e.department = "doi_xe"
+        e = hs("SPN07", tk("spn_taixe", "tai_xe"), None); e.department = "doi_xe"
         e = hs("SPN08", tk("spn_gd_doi_xe", "gd_doi_xe"), None); e.department = "doi_xe"
-        e = hs("SPN09", tk("spn_hdv", "xe_hdv"), None); e.department = "huong_dan"
+        e = hs("SPN09", tk("spn_hdv", "hdv"), None); e.department = "huong_dan"
         e = hs("SPN10", tk("spn_vanphong", "nv_kd"), None); e.department = "kd_le"
         # hồ sơ ghi NGƯỢC quy tắc – phải nêu ra, không im lặng lấy bên nào
         e = hs("SPN11", tk("spn_lech_quy_tac"), ID["A"]); e.department = "doi_xe"
@@ -269,9 +269,10 @@ def test_moi_phong_con_lai_thuoc_cong_ty_me():
 
 
 def test_huong_dan_vien_KHONG_bi_keo_sang_cong_ty_van_tai():
-    """Chỗ dễ sai nhất của quy tắc này. Vai trò xe_hdv gộp CẢ tài xế lẫn hướng dẫn viên vào một tên,
-    nên chốt theo vai trò là kéo toàn bộ HDV sang công ty vận tải – điều Chủ tịch không nói, và là
-    điều sai: HDV nay là cộng tác viên của phòng Hướng dẫn, không phải người của đội xe."""
+    """Chỗ dễ sai nhất của quy tắc này. Tới 05/10/2026 một vai trò `xe_hdv` gộp CẢ tài xế lẫn hướng
+    dẫn viên vào một tên, nên chốt theo vai trò là kéo toàn bộ HDV sang công ty vận tải. Vai ấy nay đã
+    tách, nhưng phép thử này KHÔNG mất lý do tồn tại: pháp nhân đi theo PHÒNG BAN, và một người đổi vai
+    mà không đổi phòng thì hợp đồng lao động của họ không đổi theo. Hàng rào canh đúng điều đó."""
     d = go_phap_nhan("spn_hdv")
     assert d["spn_hdv"]["company"] == "VTD", \
         "hướng dẫn viên bị kéo sang công ty vận tải – quy tắc đang đọc theo vai trò thay vì phòng ban"

@@ -52,9 +52,9 @@ def test_import_master_and_group_scope():
     assert rows["267"]["department"] == "marketing", "CSKH về Marketing"
     assert rows["303"]["department"] == "marketing", "Bùi Phúc Bửu Lâm về Marketing"
 
-    # tài xế đứng tên lái xe và HDV được cấp tài khoản, vai trò xe_hdv
+    # tài xế đứng tên lái xe và HDV được cấp tài khoản; từ 05/10/2026 là hai vai tai_xe và hdv
     tx = client.get("/api/v1/auth/me", headers=login("tranvinh", "297")).json()
-    assert tx["role"] == "xe_hdv"
+    assert tx["role"] == "tai_xe"
     assert client.get("/api/v1/tours", headers=login("tranvinh", "297")).status_code == 403
 
     # tài khoản tạo mới: username không dấu, mật khẩu = mã NV; vai trò trưởng nhóm

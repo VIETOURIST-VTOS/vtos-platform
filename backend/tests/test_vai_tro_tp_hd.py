@@ -58,7 +58,7 @@ def _startup():
                             department="Hướng dẫn", password_hash=hash_password("Vtos@Demo#2026")))
             hdv = db.execute(select(Employee).where(Employee.department == "huong_dan")).scalars().first()
             if _chua_co(db, "hdv.khang"):
-                db.add(User(username="hdv.khang", full_name=hdv.full_name, role="xe_hdv",
+                db.add(User(username="hdv.khang", full_name=hdv.full_name, role="hdv",
                         department="Hướng dẫn", staff_code=hdv.code,
                         password_hash=hash_password("Vtos@Demo#2026")))
             db.commit()
@@ -178,9 +178,24 @@ def test_hdv_doc_duoc_su_vu_cua_chinh_minh(_startup):
     """Bị ghi nhận một sự vụ mà không được xem nó thì không đối chất được.
 
     Lỗi cũ: màn hình gọi mã "hdv" như một vai trò, nhưng đó là mã chức danh – không tài khoản nào có
-    vai trò tên như vậy, nên nhánh lọc "chỉ xem sự vụ của mình" không bao giờ chạy tới."""
+    vai trò tên như vậy, nên nhánh lọc "chỉ xem sự vụ của mình" không bao giờ chạy tới.
+
+    05/10/2026: dòng canh cũ ở đây là `assert "hdv" not in ROLES`, kèm lời dặn "nếu sau này có vai trò
+    tên 'hdv' thì phải xem lại hai chỗ lọc ở màn hình sự vụ". Chuông ấy đã reo: Chủ tịch tách `xe_hdv`
+    thành `tai_xe` và `hdv`, nên nay CÓ một vai trò tên 'hdv'. Hai chỗ lọc đã được xem lại, và lời dặn
+    đổi thành phép thử thật thay vì một lệnh cấm — cấm một cái tên thì chặn được lỗi đúng một lần, còn
+    canh hai chỗ lọc thì canh được mãi."""
     from app.models.core import ROLES
-    assert "hdv" not in ROLES, "nếu sau này có vai trò tên 'hdv' thì phải xem lại hai chỗ lọc ở màn hình sự vụ"
+    import io as _io, os as _os
+    assert ROLES.get("hdv") == "Hướng dẫn viên"
+    goc = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+    hr = _io.open(_os.path.join(goc, "app", "api", "v1", "hr.py"), encoding="utf-8").read()
+    than = hr[hr.index('@router.get("/incidents")'):]
+    than = than[:than.index("\n@router")] if "\n@router" in than else than
+    assert '"hdv"' in than.split("def incidents")[0] + than.split("def incidents")[1].split("\n")[0], \
+        "cửa /incidents chưa cho vai trò hdv vào — người bị lập biên bản không đọc được biên bản của mình"
+    assert '"tai_xe", "hdv"' in than, "nhánh lọc 'chỉ xem sự vụ của mình' chưa kể tên hai vai hiện trường"
+
     r = client.get("/api/v1/incidents", headers=login("hdv.khang"))
     assert r.status_code == 200, r.text
 

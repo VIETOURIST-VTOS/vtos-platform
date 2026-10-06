@@ -78,7 +78,7 @@ def test_gv4_danh_muc_san_pham_van_che_nguyen_nhu_cu():
 
 
 def test_gv5_cac_vai_ngoai_khoi_kinh_doanh_khong_ke_theo():
-    for vai in ("nv_mkt", "ptgd_mkt", "hcns", "hanh_chinh", "xe_hdv", "nv_visa", "tp_hd", "gd_doi_xe"):
+    for vai in ("nv_mkt", "ptgd_mkt", "hcns", "hanh_chinh", "tai_xe", "nv_visa", "tp_hd", "gd_doi_xe"):
         assert AC.can_see_cost_tren_chuyen(_u(vai), DOAN) is False, f"{vai} không nằm trong lần nới này"
 
 

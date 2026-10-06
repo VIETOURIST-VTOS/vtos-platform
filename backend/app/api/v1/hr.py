@@ -225,7 +225,7 @@ def visa_complete(vid: int, u: User = Depends(require_roles("nv_dh", "tp_dh", "h
 
 # ---------- Xe Vietrip & HDV: màn hình của chính người ở hiện trường ----------
 @router.get("/xe-hdv/cua-toi")
-def xe_hdv_cua_toi(u: User = Depends(require_roles("xe_hdv", "nv_dh", "tp_dh", "hcns", "cntt", "tgd", "chutich", "ketoan", "bks", "ptgd_doan", "ptgd_mkt")),
+def xe_hdv_cua_toi(u: User = Depends(require_roles("tai_xe", "hdv", "nv_dh", "tp_dh", "hcns", "cntt", "tgd", "chutich", "ketoan", "bks", "ptgd_doan", "ptgd_mkt")),
                    db: Session = Depends(get_db)):
     """Tài xế thấy xe mình đứng tên và lệnh điều xe của mình; HDV thấy phân chuyến và hạn thẻ của mình.
 
@@ -297,7 +297,7 @@ def _loi_chao_cua_toi(db: Session, u: User, aid: int) -> GuideAssignment:
 
 
 @router.post("/xe-hdv/chao-chuyen/{aid}/nhan")
-def nhan_chuyen(aid: int, u: User = Depends(require_roles("xe_hdv")), db: Session = Depends(get_db)):
+def nhan_chuyen(aid: int, u: User = Depends(require_roles("hdv")), db: Session = Depends(get_db)):
     """Hướng dẫn viên nhận chuyến được chào."""
     a = _loi_chao_cua_toi(db, u, aid)
     if a.status != "cho_xac_nhan":
@@ -311,7 +311,7 @@ def nhan_chuyen(aid: int, u: User = Depends(require_roles("xe_hdv")), db: Sessio
 
 
 @router.post("/xe-hdv/chao-chuyen/{aid}/tu-choi")
-def tu_choi_chuyen(aid: int, data: TraLoiIn, u: User = Depends(require_roles("xe_hdv")),
+def tu_choi_chuyen(aid: int, data: TraLoiIn, u: User = Depends(require_roles("hdv")),
                    db: Session = Depends(get_db)):
     """Hướng dẫn viên từ chối lời chào.
 
@@ -704,15 +704,17 @@ def inc_out(i: Incident, emps: dict, my_emp_ids: set | None = None) -> dict:
 
 
 @router.get("/incidents")
-# "hdv" là mã CHỨC DANH (POSITIONS), không phải mã vai trò – hệ thống không có vai trò nào tên như vậy,
-# nên trước bản này hướng dẫn viên (vai trò xe_hdv) không xem được sự vụ của chính mình, còn nhánh lọc
-# bên dưới thì không bao giờ chạy tới. Đây là kiểu lỗi im lặng: không báo gì, chỉ là một cánh cửa khóa.
-def incidents(u: User = Depends(require_roles(*HR_READ, "nv_kd", "nv_dh", "xe_hdv", "tp_hd")),
+# Trước 05/10/2026 "hdv" chỉ là mã CHỨC DANH (POSITIONS) và KHÔNG có vai trò nào tên như vậy, nên dòng
+# này từng viết "hdv" vào chỗ chờ mã VAI TRÒ: hướng dẫn viên (khi ấy mang vai `xe_hdv`) không xem được
+# sự vụ của chính mình, còn nhánh lọc bên dưới thì không bao giờ chạy tới. Kiểu lỗi im lặng: không báo
+# gì, chỉ là một cánh cửa khóa. Từ 05/10/2026 hai bảng dùng CHUNG mã `hdv` và `tai_xe`, nên viết nhầm
+# bảng này sang bảng kia không còn sinh ra cánh cửa khóa im lặng nữa.
+def incidents(u: User = Depends(require_roles(*HR_READ, "nv_kd", "nv_dh", "tai_xe", "hdv", "tp_hd")),
               db: Session = Depends(get_db)):
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
     rows = db.execute(select(Incident).order_by(desc(Incident.id))).scalars().all()
     mine = {e.id for e in db.execute(select(Employee).where(Employee.user_id == u.id)).scalars()}
-    if u.role in ("nv_kd", "nv_dh", "xe_hdv"):   # nhân viên chỉ xem sự vụ của mình
+    if u.role in ("nv_kd", "nv_dh", "tai_xe", "hdv"):   # nhân viên chỉ xem sự vụ của mình
         rows = [i for i in rows if i.employee_id in mine]
     return [inc_out(i, emps, mine) for i in rows]
 

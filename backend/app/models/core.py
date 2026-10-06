@@ -73,7 +73,20 @@ ROLES = {
     "bks": "Ban Kiểm soát (chỉ đọc)",
     # Hai vai trò mở ngày 07/9/2026 theo bảng lương T07-08: người ở hiện trường và ban visa cần đăng nhập,
     # nhưng không được thấy hàng đợi điều hành hay dữ liệu khách của phòng khác.
-    "xe_hdv": "Tài xế & Hướng dẫn viên",
+    #
+    # TÁCH 05/10/2026 — Chủ tịch quyết. Trước bản này MỘT vai trò `xe_hdv` mang tên "Tài xế & Hướng dẫn
+    # viên" gộp hai nghề vào một. Gộp được tám tuần vì cả hai chỉ ĐỌC việc của chính mình, và hai người
+    # chỉ-đọc thì giống nhau. Hết gộp được khi họ bắt đầu ĐỀ XUẤT: đơn của tài xế đi về Giám đốc đội xe,
+    # đơn của hướng dẫn viên đi về Trưởng phòng Hướng dẫn — hai tuyến ký khác nhau, mà một vai trò thì chỉ
+    # chở được một tuyến. Giữ gộp thì phải suy tuyến từ dữ liệu ("người này có xe đứng tên không"), tức là
+    # luật quản trị nằm trong một câu lệnh truy vấn thay vì nằm trong bảng phân quyền Chủ tịch ký.
+    #
+    # Hai mã này CỐ Ý trùng mã chức danh trong `POSITIONS` (`tai_xe`, `hdv`): cùng một người, cùng một
+    # nghề, nên cùng một tên. Nhờ vậy migration tách vai đọc thẳng `employees.position` chứ không phải
+    # đoán. Trước đó mã chức danh `hdv` từng bị viết nhầm vào chỗ chờ mã VAI TRÒ (xem `hr.py::incidents`)
+    # và nhánh lọc không bao giờ chạy — nay hai bảng dùng chung tên nên nhầm kiểu ấy không còn im lặng.
+    "tai_xe": "Tài xế",
+    "hdv": "Hướng dẫn viên",
     # Mở 07/9/2026. Trước bản này Giám đốc điều hành đội xe mang chung vai trò xe_hdv với tài xế, nên bị
     # khoá ngoài đúng ba màn hình đội xe mà chính ông phụ trách – và vì tham số xe_nguoi_lap_lenh chỉ định
     # ông là người duy nhất được lập lệnh điều xe, kết quả là KHÔNG AI lập được lệnh: người có quyền theo

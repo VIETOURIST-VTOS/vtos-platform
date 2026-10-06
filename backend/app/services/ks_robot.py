@@ -33,7 +33,7 @@ PHONG_CUA_VAI_TRO = {
     "nv_mkt": "Marketing", "ptgd_mkt": "Marketing",
     "ketoan": "Kế toán", "hcns": "Hành chính Nhân sự", "hanh_chinh": "Hành chính Nhân sự",
     "cntt": "Công nghệ thông tin", "nv_visa": "Visa",
-    "gd_doi_xe": "Đội xe", "xe_hdv": "Đội xe", "tp_hd": "Hướng dẫn",
+    "gd_doi_xe": "Đội xe", "tai_xe": "Đội xe", "tp_hd": "Hướng dẫn", "hdv": "Hướng dẫn",
     "ptgd_doan": "Ban Tổng giám đốc", "tgd": "Ban Tổng giám đốc", "chutich": "Ban Tổng giám đốc",
 }
 

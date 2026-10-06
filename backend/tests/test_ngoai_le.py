@@ -236,7 +236,7 @@ def test_menu_ngoai_le_theo_dung_ma_tran():
     assert "/ngoai-le" in MENU_ROLES
     for vai in ("chutich", "tgd", "bks", "ketoan", "cntt", "tp_dh"):
         assert vai in MENU_ROLES["/ngoai-le"]
-    for vai in ("nv_kd", "xe_hdv", "nv_visa", "hanh_chinh"):
+    for vai in ("nv_kd", "tai_xe", "nv_visa", "hanh_chinh"):
         assert vai not in MENU_ROLES["/ngoai-le"], f"{vai} không được thấy màn hình rà ngoại lệ"
 
 

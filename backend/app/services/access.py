@@ -30,7 +30,10 @@ SALES = ("gd_kd", "tp_kd", "tn_kd", "nv_kd")
 # đây mà không ai quyết định.
 SALES_ADMIN = ("sales_admin",)
 MARKETING = ("nv_mkt",)
-FIELD = ("xe_hdv",)                                     # tài xế & HDV: người ở hiện trường, chỉ xem việc của chính mình
+# Người ở hiện trường, chỉ xem việc của chính mình. Hai vai chứ không một: tách 05/10/2026 vì tuyến ký
+# của hai nghề khác nhau (tài xế → GĐ đội xe, HDV → TP Hướng dẫn). Nhóm FIELD giữ nguyên tên và vẫn
+# dùng chung ở mọi dòng cũ, nên việc tách KHÔNG nới thêm màn hình nào cho ai.
+FIELD = ("tai_xe", "hdv")
 FLEET_MGR = ("gd_doi_xe",)                              # GĐ điều hành đội xe: toàn bộ phần đội xe, KHÔNG xem
                                                         # dữ liệu khách, booking, bảng lương hay ngân hàng
 GUIDE_MGR = ("tp_hd",)                                  # Trưởng phòng Hướng dẫn: điều phối đội HDV cộng tác
@@ -169,7 +172,8 @@ RESTRICTED_API_PREFIXES = {
     # "/api/v1/xe-hdv/" thì vai trò này đã suy được từ ma trận menu. Hàng rào so bằng startswith nên
     # tiền tố có dấu gạch cuối chỉ là bản sao hẹp hơn của tiền tố không dấu – giữ lại chỉ làm bảng dài
     # ra và làm bộ tra cứu ngược báo "còn dòng khai tay chưa rà".
-    "xe_hdv": ("/api/v1/incidents",),
+    "tai_xe": ("/api/v1/incidents",),
+    "hdv": ("/api/v1/incidents",),
     # GĐ điều hành đội xe: cả phân hệ đội xe và lệnh điều xe, cộng danh mục xe để chọn trong form. Không có
     # /tours, /bookings, /banks, /payroll – phạm vi công việc của ông là chiếc xe, không phải khách hàng và
     # dòng tiền công ty.
@@ -239,7 +243,7 @@ RESTRICTED_API_PREFIXES = {
 # "incident", nên phép so tiền tố không trùng. Quyền đọc sự vụ vẫn nguyên như cũ.
 # /incidents cũng vào nhóm chung, và đây là chỗ cần đọc kỹ trước khi ai đó rút nó ra:
 #
-#   - Endpoint TỰ LỌC: nhân viên (nv_kd, nv_dh, xe_hdv) chỉ thấy sự vụ của CHÍNH MÌNH – lọc nằm ngay
+#   - Endpoint TỰ LỌC: nhân viên (nv_kd, nv_dh, tai_xe, hdv) chỉ thấy sự vụ của CHÍNH MÌNH – lọc nằm ngay
 #     trong hàm, không phải lời hứa ở đây.
 #   - Endpoint đã có require_roles riêng ở chữ ký. Vai trò không nằm trong danh sách đó vẫn nhận 403
 #     như trước, kể cả khi tiền tố này mở.
@@ -1013,7 +1017,12 @@ ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/
 RESTRICTED_ROLE_MENUS = {
     # Màn hình đổi mật khẩu có mặt ở cả hai danh sách: đây là danh sách CHO PHÉP, mà tài xế, HDV và chuyên
     # viên visa cũng phải đổi được mật khẩu tạm của mình – thiếu dòng này là họ bị khóa ngoài hệ thống.
-    "xe_hdv": ("/xe-hdv", "/doi-mat-khau"),
+    # Hai vai cùng một danh sách màn hình: /xe-hdv là màn hình của người ở hiện trường, và nội dung
+    # bên trong nó đi theo DỮ LIỆU của người đăng nhập (có xe đứng tên thì hiện khối xe, có thẻ HDV thì
+    # hiện khối thẻ), không đi theo vai trò. Tách vai 05/10/2026 là để tách TUYẾN KÝ, không phải để
+    # tách màn hình — nên hai dòng này giống nhau, và giống nhau ở đây là đúng.
+    "tai_xe": ("/xe-hdv", "/doi-mat-khau"),
+    "hdv": ("/xe-hdv", "/doi-mat-khau"),
     "nv_visa": ("/visa", "/doi-mat-khau"),
     # /su-co-tour thêm 10/9/2026 cho cả hai: xe hỏng giữa đèo là việc của GĐ Đội xe, hướng dẫn viên
     # bỏ đoàn là việc của TP Hướng dẫn – bắt họ nghe lại qua Điều hành là mất đúng mười lăm phút đầu.

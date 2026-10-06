@@ -1,4 +1,7 @@
-"""Vai trò Tài xế & HDV và vai trò Chuyên viên Visa (chỉ đạo 07/9/2026).
+"""Vai trò Tài xế, vai trò Hướng dẫn viên và vai trò Chuyên viên Visa (chỉ đạo 07/9/2026).
+
+TÊN TỆP GIỮ NGUYÊN theo vai gộp cũ `xe_hdv`, vì đổi tên tệp phép thử là mất lịch sử của nó.
+Vai ấy tách làm `tai_xe` và `hdv` ngày 05/10/2026; điều bộ phép thử này canh thì không đổi.
 
 Trước đây quy ước "trang không liệt kê trong MENU_ROLES = ai đăng nhập cũng thấy" là an toàn với nhân viên
 văn phòng, nhưng sai với hai vai trò mới: nó cho tài xế thấy cả Bảng lương và Tài khoản ngân hàng chỉ vì hai
@@ -52,11 +55,12 @@ def tao_tai_khoan(username, role, ten, phong, vi_tri, ma):
 
 
 def test_hai_vai_tro_moi_co_trong_danh_muc():
-    assert ROLES["xe_hdv"] and ROLES["nv_visa"]
+    assert ROLES["tai_xe"] and ROLES["hdv"] and ROLES["nv_visa"]
+    assert "xe_hdv" not in ROLES, "vai gộp đã nghỉ hưu 05/10/2026 – không được sống lại"
 
 
 def test_vai_tro_bi_gioi_han_chi_thay_dung_mot_man_hinh():
-    tao_tai_khoan("taixe.kt", "xe_hdv", "Tài xế kiểm thử", "doi_xe", "tai_xe", "KT901")
+    tao_tai_khoan("taixe.kt", "tai_xe", "Tài xế kiểm thử", "doi_xe", "tai_xe", "KT901")
     me = client.get("/api/v1/auth/me", headers=login("taixe.kt")).json()
     an = set(me["hidden_menus"])
     assert "/xe-hdv" not in an
@@ -77,7 +81,7 @@ def test_vai_tro_bi_gioi_han_chi_thay_dung_mot_man_hinh():
     # Trang này KHÔNG nới phạm vi của tài xế một chút nào: nó không gọi máy chủ, không hiện một con
     # số nghiệp vụ nào, chỉ liệt kê TÊN màn hình – và chính những cái tên ấy hiện ra ở trạng thái
     # khoá. Dòng 63 ở trên vẫn giữ nguyên: mọi màn hình nghiệp vụ vẫn nằm trong danh sách ẩn.
-    assert AC.menus_for(type("U", (), {"role": "xe_hdv"})()) == [
+    assert AC.menus_for(type("U", (), {"role": "tai_xe"})()) == [
         "/xe-hdv", "/doi-mat-khau", "/phieu-luong", "/phan-he/[khoa]"]
     assert "/phieu-luong" not in an, "tài xế phải xem được phiếu lương của chính mình"
 
@@ -99,7 +103,7 @@ def test_vai_tro_van_phong_khong_bi_anh_huong():
 
 
 def test_man_hinh_cua_toi_chi_tra_ve_viec_cua_chinh_minh():
-    eid = tao_tai_khoan("taixe.kt2", "xe_hdv", "Tài xế kiểm thử hai", "doi_xe", "tai_xe", "KT903")
+    eid = tao_tai_khoan("taixe.kt2", "tai_xe", "Tài xế kiểm thử hai", "doi_xe", "tai_xe", "KT903")
     xe = client.get("/api/v1/vehicles", headers=login("cntt")).json()
     x = next(v for v in xe if v["active"])
     assert client.put(f"/api/v1/vehicles/{x['id']}", json={"driver_id": eid}, headers=login("cntt")).status_code == 200
@@ -116,7 +120,7 @@ def test_man_hinh_cua_toi_chi_tra_ve_viec_cua_chinh_minh():
 def test_tai_xe_khong_goi_duoc_api_dieu_hanh():
     for path in ("/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/employees", "/api/v1/payroll-runs/2026-08", "/api/v1/tours"):
         r = client.get(path, headers=login("taixe.kt"))
-        assert r.status_code == 403, f"{path} phải bị chặn với vai trò xe_hdv (đang trả {r.status_code})"
+        assert r.status_code == 403, f"{path} phải bị chặn với vai trò tai_xe (đang trả {r.status_code})"
 
 
 def test_tai_khoan_chua_ghep_ho_so_bao_loi_ro_rang():
@@ -124,7 +128,7 @@ def test_tai_khoan_chua_ghep_ho_so_bao_loi_ro_rang():
     from app.models.core import User
     from app.core.security import hash_password
     db = SessionLocal()
-    db.add(User(username="taixe.mocoi", full_name="Tài xế chưa ghép", role="xe_hdv", department="doi_xe",
+    db.add(User(username="taixe.mocoi", full_name="Tài xế chưa ghép", role="tai_xe", department="doi_xe",
                 password_hash=hash_password("Vtos@Demo#2026"), active=True))
     db.commit(); db.close()
     r = client.get("/api/v1/xe-hdv/cua-toi", headers=login("taixe.mocoi"))

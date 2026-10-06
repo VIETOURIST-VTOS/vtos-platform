@@ -100,7 +100,7 @@ def test_tra_cuu_nguoc_theo_vai_tro():
     t = BC.tra_cuu_vai_tro("ketoan")
     assert t["ten"] == "Kế toán" and t["so_buoc"] >= 5 and not t["khong_co_buoc_nao"]
     assert any("quyết toán" in b["ten"].lower() for b in t["buoc"])
-    t = BC.tra_cuu_vai_tro("xe_hdv")
+    t = BC.tra_cuu_vai_tro("tai_xe")
     assert t["khong_co_buoc_nao"], "Tài xế & HDV không đẩy bước nào – phải nói ra, không trả rỗng im lặng"
 
 

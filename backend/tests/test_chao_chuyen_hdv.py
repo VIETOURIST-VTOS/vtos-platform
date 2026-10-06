@@ -58,7 +58,7 @@ def _startup():
             assert hdv, "bản demo phải có ít nhất một HDV đủ điều kiện"
             e = hdv[0]
             if _chua_co(db, "hdv.mot"):
-                db.add(User(username="hdv.mot", full_name=e.full_name, role="xe_hdv",
+                db.add(User(username="hdv.mot", full_name=e.full_name, role="hdv",
                             department="Hướng dẫn", staff_code=e.code,
                             password_hash=hash_password("Vtos@Demo#2026")))
             ID["hdv"] = e.id
@@ -134,7 +134,7 @@ def test_khong_tra_loi_thay_loi_chao_cua_nguoi_khac(_startup):
     from app.models.core import User
     from app.core.security import hash_password
     with SessionLocal() as db:
-        db.add(User(username="hdv.hai", full_name="HDV khác", role="xe_hdv", department="Hướng dẫn",
+        db.add(User(username="hdv.hai", full_name="HDV khác", role="hdv", department="Hướng dẫn",
                     staff_code="KHONG-CO", password_hash=hash_password("Vtos@Demo#2026")))
         db.commit()
     assert client.post(f"/api/v1/xe-hdv/chao-chuyen/{aid}/nhan",
