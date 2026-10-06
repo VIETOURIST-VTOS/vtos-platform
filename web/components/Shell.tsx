@@ -471,7 +471,8 @@ export const GROUPS: Group[] = [
       // Hồ sơ đội xe theo đặc tả "Quản lý vận hành xe Vietrip" v1.3: mã xe cố định, lịch sử biển,
       // giấy tờ có hạn và điều kiện khai thác. Màn hình /ops?tab=fleet cũ giữ nguyên cho phần bảng
       // giá và lệnh điều xe.
-      ["Hồ sơ xe & điều kiện khai thác", "/doi-xe"], ["Bảng giá & lệnh", "/ops?tab=fleet"],
+      ["Hồ sơ xe & điều kiện khai thác", "/doi-xe"], ["Hồ sơ tài xế", "/tai-xe"],
+      ["Bảng giá & lệnh", "/ops?tab=fleet"],
       ["Lệnh điều xe", "/lenh-dieu-xe"], ["Chi phí & hiệu quả", "/hieu-qua-doi-xe"],
       ["Lãi lỗ đội xe", "/lai-lo-doi-xe"], ["Việc của tài xế & HDV", "/xe-hdv"]] },
     { label: "Hướng dẫn viên", items: [
