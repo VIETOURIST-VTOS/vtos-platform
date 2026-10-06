@@ -59,7 +59,7 @@ function XeHdv() {
       danh_gia_ncc: bc.danh_gia_ncc || "", su_co: bc.su_co || "",
       khoan_chi_thu_ho: bc.khoan_chi_thu_ho || "", viec_chua_xong: bc.viec_chua_xong || "" };
     try {
-      const duong = banMoi ? `/guide-assignments/${aid}/bao-cao/ban-moi` : `/guide-assignments/${aid}/bao-cao`;
+      const duong = banMoi ? `/xe-hdv/bao-cao/${aid}/ban-moi` : `/xe-hdv/bao-cao/${aid}`;
       const r = await api<any>(duong, { method: "POST", json: than });
       toast(r.message); setBc({ ...bc, mo: 0 }); tai();
     } catch (e) { toast(errMsg(e), true); }
@@ -67,7 +67,7 @@ function XeHdv() {
 
   const guiBaoCao = async (aid: number, pb: number | null) => {
     try {
-      const r = await api<any>(`/guide-assignments/${aid}/bao-cao/gui`,
+      const r = await api<any>(`/xe-hdv/bao-cao/${aid}/gui`,
         { method: "POST", json: { phien_ban: pb } });
       toast(r.message + (r.tre_han ? " (nộp trễ hạn)" : "")); tai();
     } catch (e) { toast(errMsg(e), true); }

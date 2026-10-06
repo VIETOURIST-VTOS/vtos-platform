@@ -738,6 +738,35 @@ class BcKiem(BaseModel):
     y_kien: str = ""
 
 
+# ───── Cửa báo cáo cho CHÍNH HDV, nằm trong nhóm API của màn hình /xe-hdv ─────
+# Màn hình /xe-hdv khai nhóm `/api/v1/xe-hdv` (app/services/access.py::MAN_HINH_API). Nếu màn hình ấy
+# gọi thẳng `/api/v1/guide-assignments` thì phải khai thêm nhóm ấy cho nó — mà khai như vậy là NỚI
+# QUYỀN THẬT: tài xế cũng mở màn hình này, và nhóm guide-assignments chứa cả cửa điều động, cửa tạm
+# ứng, cửa đề xuất. Mở một cửa cho HDV mà kéo theo cả chùm cho tài xế là trả giá sai chỗ.
+#
+# Nên bốn cửa dưới đây chỉ là LỐI VÀO KHÁC của đúng bốn hàm trên: cùng một thân, cùng `_phan_cong_cua_toi`
+# canh người, nhưng đường dẫn nằm trong nhóm màn hình này đã được khai, và vai trò thu lại còn ĐÚNG `hdv`.
+# Tài xế không vào được, và bản đồ quyền không phải sửa một dòng nào.
+@router.get("/xe-hdv/bao-cao/{aid}")
+def bc_doc_cua_toi(aid: int, u: User = Depends(require_roles("hdv")), db: Session = Depends(get_db)):
+    return bc_doc(aid, u, db)
+
+
+@router.post("/xe-hdv/bao-cao/{aid}", status_code=201)
+def bc_lap_cua_toi(aid: int, data: BaoCaoIn, u: User = Depends(require_roles("hdv")), db: Session = Depends(get_db)):
+    return bc_lap(aid, data, u, db)
+
+
+@router.post("/xe-hdv/bao-cao/{aid}/gui")
+def bc_gui_cua_toi(aid: int, data: BcGui, u: User = Depends(require_roles("hdv")), db: Session = Depends(get_db)):
+    return bc_gui(aid, data, u, db)
+
+
+@router.post("/xe-hdv/bao-cao/{aid}/ban-moi", status_code=201)
+def bc_ban_moi_cua_toi(aid: int, data: BaoCaoIn, u: User = Depends(require_roles("hdv")), db: Session = Depends(get_db)):
+    return bc_ban_moi(aid, data, u, db)
+
+
 @router.post("/guide-assignments/{aid}/bao-cao/kiem")
 def bc_kiem(aid: int, data: BcKiem, u: User = Depends(require_roles(*BC_KIEM)), db: Session = Depends(get_db)):
     """Trưởng phòng xác nhận, hoặc trả lại kèm lý do."""

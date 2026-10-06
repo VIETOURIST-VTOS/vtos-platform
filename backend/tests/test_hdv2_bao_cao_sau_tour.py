@@ -343,3 +343,33 @@ def test_h1_quyet_toan_khong_duoc_goi_hoan_tat_khi_con_no_bao_cao():
                 "phải là mức chặn và phải nói ra tên người còn nợ, không chỉ một ô đỏ"
     finally:
         db = SessionLocal(); a = db.get(GuideAssignment, ID["a2"]); a.status = cu; db.commit(); db.close()
+
+
+# ───── I · cửa báo cáo của chính HDV nằm trong nhóm API của màn hình /xe-hdv ─────
+def test_i1_bon_cua_bao_cao_nam_trong_nhom_xe_hdv():
+    """Màn hình /xe-hdv khai nhóm `/api/v1/xe-hdv`. Nếu nó gọi thẳng `/api/v1/guide-assignments` thì
+    bản đồ quyền phải khai thêm cả nhóm ấy cho màn hình — mà TÀI XẾ cũng mở màn hình này, nên khai
+    như vậy là mở luôn chùm cửa điều động / tạm ứng / đề xuất cho tài xế. Bốn cửa dưới đây là lối vào
+    khác của đúng bốn hàm cũ, đặt trong nhóm đã khai sẵn."""
+    duong = {r.path for r in app.routes if hasattr(r, "path")}
+    for d in ("/api/v1/xe-hdv/bao-cao/{aid}", "/api/v1/xe-hdv/bao-cao/{aid}/gui",
+              "/api/v1/xe-hdv/bao-cao/{aid}/ban-moi"):
+        assert d in duong, d
+
+
+def test_i2_vai_tro_thu_lai_dung_hdv():
+    """Nhóm `/api/v1/xe-hdv` mở cho cả tài xế lẫn HDV, nên cửa báo cáo phải tự thu vai trò lại.
+    Mở cửa theo cả nhóm là cho tài xế nộp báo cáo tour."""
+    r = client.post(f"/api/v1/xe-hdv/bao-cao/{ID['a1']}",
+                    json={"chuong_trinh_thuc_hien": "x"}, headers=login("cntt"))
+    assert r.status_code == 403, \
+        "cửa này chỉ dành cho chính HDV – kể cả CNTT cũng không nộp hộ báo cáo tour"
+
+
+def test_i3_man_hinh_khong_con_goi_thang_guide_assignments():
+    from pathlib import Path
+    p = Path(__file__).resolve().parents[2] / "web" / "app" / "xe-hdv" / "page.tsx"
+    if not p.exists():
+        return
+    assert "guide-assignments" not in p.read_text(encoding="utf-8"), \
+        "gọi thẳng nhóm khác là ép bản đồ quyền phải nới cho mọi vai trò thấy màn hình này"
