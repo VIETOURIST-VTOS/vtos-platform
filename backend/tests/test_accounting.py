@@ -34,6 +34,18 @@ def booking(code):
     return next(b for b in client.get("/api/v1/bookings", headers=login("ketoan")).json() if b["code"] == code)
 
 
+# Mã booking của bộ dữ liệu thử SINH THEO THÁNG HIỆN TẠI. Phải tự suy, không được gõ cứng:
+# services/seed.py dựng mã bằng `f"BK{today:%y%m}{n:04d}"`, nên sang tháng mới là mã đổi. Ba tệp
+# phép thử Kế toán từng gõ cứng "BK26090001"; sáng 06/10/2026 cả ba đỏ cùng lúc với StopIteration
+# — bộ dữ liệu sinh ra BK2610xxxx còn phép thử đi tìm BK2609xxxx.
+#
+# Chỗ ấy đáng sợ không phải vì nó đỏ, mà vì nó đỏ ĐỀU ĐẶN mỗi đầu tháng mà không ai đụng vào mã
+# nguồn. Một hàng rào tháng nào cũng đỏ là một hàng rào người ta thôi nhìn, và đúng hôm nó đỏ vì
+# chuyện thật thì không còn ai đọc nữa.
+def ma_bk(n: int) -> str:
+    return f"BK{date.today():%y%m}{n:04d}"
+
+
 def journal(**q):
     return client.get("/api/v1/journal", params=q, headers=login("ketoan")).json()
 
@@ -45,7 +57,7 @@ def test_accounts_seeded_and_read_roles():
 
 
 def test_cash_receipt_posts_111_131():
-    b = booking("BK26090003")
+    b = booking(ma_bk(3))
     r = client.post("/api/v1/receipts/cash", json={"booking_id": b["id"], "amount": 1000000, "payer": "Lê C", "note": "quầy"}, headers=login("ketoan")).json()
     e = next(x for x in journal() if x["source_ref"] == f"receipt:{r['receipt']['code']}")
     assert e["status"] == "da_ghi_so" and e["source_type"] == "thu_tien"
@@ -54,7 +66,7 @@ def test_cash_receipt_posts_111_131():
 
 
 def test_invoice_flow_and_vat_split():
-    b = booking("BK26090001")  # 7.960.000 gồm thuế
+    b = booking(ma_bk(1))  # 7.960.000 gồm thuế
     inv = client.post("/api/v1/invoices", json={"booking_id": b["id"], "customer_tax_code": "0301234567", "customer_address": "Q1, TP.HCM"}, headers=login("ketoan")).json()["invoice"]
     assert inv["status"] == "nhap" and inv["vat_rate"] == 0.10 and inv["pre_tax"] + inv["vat"] == inv["total"] == 7960000
     assert client.post("/api/v1/invoices", json={"booking_id": b["id"]}, headers=login("ketoan")).status_code == 422  # trùng
