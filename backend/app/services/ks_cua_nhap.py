@@ -192,6 +192,23 @@ MAY_SINH = {
     "cong_no_vietrip_anh": "Ảnh chụp công nợ do lịch chạy 8h sáng nạp từ Vietrip qua /cong-no-vietrip/nap "
                            "– số của Vietrip, không nhập tay.",
     "cong_no_vietrip_dong": "Dòng của ảnh chụp công nợ Vietrip – nạp cùng ảnh, không nhập tay.",
+    # 06/10/2026. Cặp sinh đôi của hai dòng ngay trên: số PHẢI TRẢ nhà cung cấp theo dự toán từng
+    # tour trên Vietrip, nạp qua POST /cong-no-vietrip/nap-phai-tra. Thêm ở PR #175 nhưng quên khai,
+    # nên hàng rào này đã đỏ trên main suốt từ 29/9 tới 06/10.
+    #
+    # KHAI MUỘN MỘT TUẦN LÀ CÓ LÝ DO, chép ra đây để lần sau không ai khai vội: lúc mới thấy đỏ,
+    # trong mã nguồn KHÔNG có chỗ nào gọi cửa ấy – không lịch chạy, không nút trên màn hình. Khai
+    # "robot nạp" lúc ấy là viết một câu không kiểm được, đúng kiểu cho qua cửa mà hàng rào này sinh
+    # ra để chặn. Nên đã chờ, và ngày 06/10 gọi thẳng cửa đọc trên máy chủ thật để nhìn: ảnh ngày
+    # 2026-10-06, 132 tour, tổng còn phải chi 10.581.208.714 đ, nạp lúc 23:20. Robot có thật, nó
+    # nạp thật, và lời khai dưới đây mô tả đúng cái đã nhìn thấy.
+    #
+    # KHÔNG hứa nhịp chạy. Dòng của cặp sinh đôi ghi "lịch chạy 8h sáng", nhưng sổ ảnh công nợ 30
+    # ngày gần nhất chỉ có ba ngày 29/9, 30/9 và 06/10 – tức nhịp ấy không đúng như đang viết. Khai
+    # nhịp mình chưa đo được là thêm một câu nữa không kiểm được.
+    "phai_tra_vietrip_anh": "Ảnh chụp phải trả NCC theo dự toán tour, robot đọc từ Vietrip rồi đẩy "
+                            "vào qua /cong-no-vietrip/nap-phai-tra – số của Vietrip, không nhập tay.",
+    "phai_tra_vietrip_dong": "Dòng của ảnh chụp phải trả Vietrip – nạp cùng ảnh, không nhập tay.",
     # Nối tài khoản Zalo (19/9/2026). Hai bảng, và CẢ HAI đều máy sinh — nhưng vì hai lý do khác
     # nhau, nên chép ra đây cả hai chứ không gộp một dòng:
     #
