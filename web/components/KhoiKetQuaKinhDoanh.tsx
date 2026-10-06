@@ -354,8 +354,22 @@ export default function KhoiKetQuaKinhDoanh() {
           <Link className="the-cua" href="/accounting">Chứng từ ghi sổ →</Link>{" "}</>
       )}
       {thieu_gv > 0 && (
+        // TC-71 · 06/10/2026 — SỐ 0 Ở ĐÂY KHÔNG CÓ NGHĨA LÀ KHÔNG ĐỒNG NÀO.
+        //
+        // Đo trên hệ thật hôm nay: 19 chuyến đã đóng số mà chưa có giá vốn, và màn hình in
+        // "(0 doanh thu)". Người đọc hiểu là mười chín chuyến ấy không đáng bao nhiêu, nên bỏ qua.
+        // Sự thật ngược lại: chính chú thích của `ket_qua_that.dt_thieu_gia_von` đã ghi rằng doanh
+        // thu của những chuyến ấy "vẫn có thể rỗng nốt", nên con số 0 là PHẦN ĐÃ BIẾT bằng không —
+        // tức là CHƯA BIẾT GÌ CẢ, không phải biết rằng bằng không.
+        //
+        // Đây đúng là luật mà kho mã này nhắc đi nhắc lại ở chỗ khác: `KsDiem.diem` để rỗng chứ
+        // không chấm 0, `bon_so_tien` trả None chứ không trả 0, `chua_phan_bo` rỗng khác 0. Ô duy
+        // nhất chưa theo luật ấy lại là ô nằm trên màn hình Chủ tịch.
         <>Còn <b>{thieu_gv} chuyến</b> đã đóng số mà chưa có giá vốn
-          ({gonSo(Number(th.tien_thieu_gia_von || 0), "tien")} doanh thu) — chưa vào hai con số
+          {Number(th.tien_thieu_gia_von || 0) > 0
+            ? <> ({gonSo(Number(th.tien_thieu_gia_von), "tien")} doanh thu)</>
+            : <> (<b>chưa biết doanh thu</b> — những chuyến này cũng chưa ghi doanh thu, nên đây là
+              số chuyến chứ không phải số tiền)</>} — chưa vào hai con số
           trên, hiện thành khúc mờ trên cột. <b>{th.ai_nhap_gia_von}</b> nhập ở cửa đóng số.{" "}</>
       )}
       {/* TC-71 · CHỖ CHÊNH VỚI SỔ KẾ TOÁN. Đặt TRƯỚC hai dòng dưới vì đây là khoản lớn nhất và là
