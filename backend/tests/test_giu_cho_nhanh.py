@@ -78,7 +78,9 @@ from pathlib import Path
 import pytest
 
 GOC = Path(__file__).resolve().parents[2]
-SO = "docs/DANG-LAM.md"
+SO_CU = "docs/DANG-LAM.md"
+THU_MUC_SO = "docs/dang-lam/"
+SO = SO_CU                      # giữ tên cũ cho lời báo lỗi và cho phép thử cũ còn đọc được
 
 # Thư mục MÃ — chỗ một lần đụng độ là nửa ngày. `docs/` cố ý không có mặt (xem điều 4 ở trên).
 GOC_MA = ("backend/", "web/", "mobile/", "infra/", "scripts/", ".github/")
@@ -117,6 +119,23 @@ def _tep_doi() -> list[str] | None:
 
 def la_tep_ma(t: str) -> bool:
     return t.startswith(GOC_MA)
+
+
+def la_tep_so(t: str) -> bool:
+    """Tệp này có phải MỘT quyển sổ giữ chỗ không — quyển cũ, hoặc tệp riêng của một làn.
+
+    Từ 06/10/2026 sổ tách thành `docs/dang-lam/<làn>.md`. N2 hỏi "nhánh này có ghi sổ không", nên
+    ghi vào tệp riêng của làn mình là ĐÃ ghi sổ. Bắt phải đụng đúng quyển cũ là ép mọi làn quay
+    lại cùng một tệp – tức là xoá sạch cái vừa tách ra.
+
+    README của thư mục KHÔNG tính: nó là lời giải thích, không chứa dòng giữ chỗ nào, và nhận nó
+    là mở một đường đi vòng – sửa một chữ trong README là qua được N2 mà chưa khai gì cả.
+    """
+    t = t.strip()
+    if t == SO_CU:
+        return True
+    return (t.startswith(THU_MUC_SO) and t.endswith(".md")
+            and t != THU_MUC_SO + "README.md" and "/" not in t[len(THU_MUC_SO):])
 
 
 def phu(tep: str, khai: str) -> bool:
@@ -178,10 +197,12 @@ def test_gn2_day_ma_len_thi_phai_kem_mot_dong_trong_so():
     ma = [t for t in tep if la_tep_ma(t)]
     if not ma:
         return                                    # vòng chỉ sửa tài liệu: không giữ chỗ gì cả
-    assert SO in tep, (
-        f"Nhánh này đụng {len(ma)} tệp mã nhưng KHÔNG sửa {SO}.\n\n"
+    assert any(la_tep_so(t) for t in tep), (
+        f"Nhánh này đụng {len(ma)} tệp mã nhưng KHÔNG sửa quyển sổ giữ chỗ nào "
+        f"({SO_CU} hoặc {THU_MUC_SO}<làn>.md).\n\n"
         "Mỗi vòng đẩy lên phải tự ghi một dòng vào sổ giữ chỗ — trước khi viết dòng mã đầu tiên "
         "thì tốt nhất, nhưng chậm nhất là trong chính lần đẩy này.\n\n"
+        "Từ 06/10/2026 mỗi làn ghi vào tệp của chính mình – xem docs/dang-lam/README.md.\n\n"
         "Mẫu một dòng:\n"
         "| <Làn> | <mã việc> | " + ", ".join(ma[:3]) + (", …" if len(ma) > 3 else "") +
         " | DD-MM-YYYY HH:MM | đang làm |\n\n"
@@ -202,7 +223,7 @@ def test_gn3_moi_tep_ma_deu_phai_co_mot_dong_dang_lam_giu_cho():
     assert not thieu, (
         "CÓ TỆP MÃ KHÔNG DÒNG `đang làm` NÀO GIỮ CHỖ:\n"
         + "\n".join(f"  · {t}" for t in thieu)
-        + "\n\nCách xử: mở " + SO + ", thêm (hoặc mở lại) một dòng `đang làm` của làn mình gọi đủ "
+        + "\n\nCách xử: mở " + THU_MUC_SO + "<làn>.md, thêm (hoặc mở lại) một dòng `đang làm` gọi đủ "
           "tên các tệp trên. Đường dẫn viết từ gốc kho; mẫu sao kiểu `backend/tests/*.py` cũng "
           "nhận.\n\nĐỪNG sửa phép thử này cho hết đỏ — sổ không ai giữ chỗ đã làm hỏng hai lần "
           "trong ngày 23/9/2026, và cả hai lần CI đều xanh."
@@ -282,3 +303,41 @@ def test_gn9_so_that_hien_nay_doc_duoc_va_dem_duoc_dong_dang_lam():
     assert isinstance(dang, list)
     for d in dang:
         assert d["lan"] and d["tep"], f"Dòng {d['so_dong']} của {SO} khai thiếu"
+
+
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# TÁCH SỔ 06/10/2026 — phần xét của N2 sau khi mỗi làn có tệp riêng.
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+def test_gn10_ghi_vao_tep_rieng_cua_lan_la_da_ghi_so():
+    """Nhánh chỉ sửa `docs/dang-lam/robot-a.md` vẫn phải qua N2.
+
+    Không có điều này thì mọi làn lại buộc phải đụng quyển sổ cũ ở mỗi lần đẩy – tức là xoá sạch
+    cái vừa tách ra ngày 06/10, mà vẫn giữ nguyên cây thư mục cho người ta tưởng đã tách.
+    """
+    assert la_tep_so("docs/dang-lam/robot-a.md")
+    assert la_tep_so("docs/dang-lam/phan-quyen.md")
+    assert la_tep_so("docs/DANG-LAM.md"), "Quyển sổ cũ vẫn phải tính – nhánh đang bay còn trỏ vào nó"
+
+
+def test_gn11_README_va_tep_lac_khong_tinh_la_ghi_so():
+    """README là lời giải thích, không phải chỗ giữ chỗ.
+
+    Nhận nó là mở một đường đi vòng rẻ tiền: sửa một chữ chính tả trong README là qua được N2 mà
+    chưa khai một tệp mã nào. Tệp ngoài thư mục, tệp không phải `.md`, và tệp nằm sâu một bậc nữa
+    cũng không tính – ba kiểu viết nhầm dễ xảy ra nhất.
+    """
+    assert not la_tep_so("docs/dang-lam/README.md")
+    assert not la_tep_so("docs/dang-lam/cu/robot-a.md")
+    assert not la_tep_so("docs/dang-lam/robot-a.txt")
+    assert not la_tep_so("docs/Bao-cao-thang-9.md")
+    assert not la_tep_so("backend/app/services/rules.py")
+
+
+def test_gn12_tep_so_van_khong_bi_canh_nhu_tep_ma():
+    """Sổ nằm trong `docs/` nên điều 4 vẫn đúng với nó: không làn nào phải giữ chỗ cho quyển sổ.
+
+    Đây là chỗ dễ sai nhất khi tách: nếu `docs/dang-lam/*.md` lọt vào GOC_MA thì mỗi nhánh lại phải
+    khai chính quyển sổ của mình trong cột tệp, và N3 đỏ ở mọi vòng cho tới khi ai đó khai lấy lệ.
+    """
+    assert tep_khong_ai_giu(["docs/dang-lam/robot-a.md", "docs/dang-lam/README.md"], []) == []
+    assert not la_tep_ma("docs/dang-lam/robot-a.md")
