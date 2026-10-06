@@ -35,6 +35,10 @@ RE_FETCH = re.compile(r'\bfetch\(([^;]{0,300}?)\)\s*[;,.\)\}]', re.S)
 CHI_XEM = {
     "/": ("Bảng tổng quan: gộp lại con số của các phân hệ khác, không sở hữu con số nào của riêng "
           "mình. Số vào hệ thống ở màn hình của từng phân hệ.", ("/dashboard",)),
+    "/tai-xe": ("Hồ sơ tài xế: màn hình gom ba thứ đã có cửa ở nơi khác – hồ sơ người nạp ở Nhân "
+                "sự, bằng lái nạp bằng bộ nạp tệp 'Bằng lái tài xế', xe gán tài xế ở màn hình Đội "
+                "xe. Thêm cửa ghi thứ hai cho cùng dữ liệu là thêm một chỗ để hai bên ghi lệch "
+                "nhau; mỗi dòng trên màn hình đã chỉ sẵn chỗ phải đi để sửa.", ("/tai-xe",)),
     "/sales-reports": ("Báo cáo bán hàng: tính từ booking và tour đã có. Cửa nhập nằm ở màn hình "
                        "Booking và Tour, không phải ở đây.", ("/sales-reports",)),
     "/cong-no": ("Công nợ: suy ra từ booking, phiếu thu và đề nghị chi. Sửa công nợ bằng cách sửa "
@@ -249,11 +253,26 @@ def test_danh_sach_chi_xem_co_tran():
     thành nhóm riêng, có trần riêng và có thêm một câu hỏi riêng phải trả lời.
 
     CHI_XEM trở lại đúng con số ngày 19/9/2026 — trước khi bàn làm việc đầu tiên ra đời.
+
+    → 9 (05/10/2026, /tai-xe). Nâng trần, nên phải trả lời đúng câu dòng trên đặt ra: lý do lần
+    này CÓ PHẢI cùng một lý do đã thành thói quen không?
+
+    KHÔNG. Lý do bị bác hồi 24/9 là "bàn làm việc theo vai" — và nó bị bác vì cách sửa đúng là
+    tách nhóm, việc đã làm. /tai-xe thuộc đúng loại đã nằm sẵn trong danh sách này từ 09/9: màn
+    hình GOM LẠI dữ liệu mà cửa nhập nằm ở chỗ khác — y như /sales-reports gom từ booking, hay
+    /cong-no gom từ chứng từ gốc. Ba cửa của nó đều có thật và đều ở nơi khác: hồ sơ người ở Nhân
+    sự, bằng lái ở bộ nạp tệp, gán xe ở màn hình Đội xe.
+
+    MỐC CHO LẦN SAU, để câu trả lời này không tự nó thành thói quen mới: một màn hình chỉ được
+    vào đây khi chỉ RA ĐƯỢC từng cửa nhập thật của từng con số nó hiện. Chỉ không ra thì đó là
+    cửa còn thiếu, và việc phải làm là dựng cửa. Tới dòng thứ MƯỜI thì dừng nâng và tách nhóm,
+    đúng cách vòng 3/3 đã làm với bàn làm việc.
     """
-    assert len(CHI_XEM) <= 8, (
-        f"Đang khai {len(CHI_XEM)} màn hình chỉ xem. Ngày 09/9/2026 là 6, ngày 19/9 là 8. Con số này "
-        "to lên nghĩa là mỗi lần đỏ lại thêm một dòng thay vì hỏi con số kia vào hệ thống bằng cửa "
-        "nào. Bàn làm việc theo vai KHÔNG khai ở đây – nhóm ấy là BAN_LAM_VIEC.")
+    assert len(CHI_XEM) <= 9, (
+        f"Đang khai {len(CHI_XEM)} màn hình chỉ xem. Ngày 09/9/2026 là 6, ngày 19/9 là 8, ngày "
+        "05/10/2026 là 9. Con số này to lên nghĩa là mỗi lần đỏ lại thêm một dòng thay vì hỏi con "
+        "số kia vào hệ thống bằng cửa nào. Bàn làm việc theo vai KHÔNG khai ở đây – nhóm ấy là "
+        "BAN_LAM_VIEC.")
 
 
 def test_ban_lam_viec_co_tran_rieng_va_chi_duoc_cua_ghi_cua_minh():

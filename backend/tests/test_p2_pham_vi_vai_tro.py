@@ -473,8 +473,8 @@ PHAM_VI_DA_CHOT = {
     # hình /cong-no có sẵn (ảnh chụp báo cáo công nợ 8h sáng từ Vietrip, 4 nhóm theo ngày khởi
     # hành). Đúng chín vai đã thấy màn hình /cong-no. sales_admin thấy màn hình nhưng cửa đọc
     # (api/v1/cong_no_vietrip.XEM) KHÔNG có vai ấy – khớp READ của /api/v1/cong-no; màn hình tự ẩn khối.
-    "chutich": 122, "tgd": 122, "bks": 122, "cntt": 119,
-    "ketoan": 100, "tp_dh": 88, "ptgd_doan": 73, "nv_dh": 61, "hcns": 62, "gd_kd": 65,
+    "chutich": 123, "tgd": 123, "bks": 123, "cntt": 120,
+    "ketoan": 101, "tp_dh": 89, "ptgd_doan": 73, "nv_dh": 62, "hcns": 63, "gd_kd": 65,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -503,12 +503,12 @@ PHAM_VI_DA_CHOT = {
     # định xem báo cáo phòng"; dòng cũ là chỗ vá tạm khi Visa chưa có người phụ trách.
     # tai_xe và hdv: hai vai tách ra từ `xe_hdv` ngày 05/10/2026, mỗi vai giữ ĐÚNG con số 16 của vai cũ.
     # Bằng nhau là điều phải canh: tách vai là để tách TUYẾN KÝ, không phải để ai đó rộng thêm một cửa.
-    "gd_doi_xe": 27, "hanh_chinh": 28, "tp_hd": 25, "tai_xe": 16, "hdv": 16, "nv_visa": 18,
+    "gd_doi_xe": 28, "hanh_chinh": 28, "tp_hd": 25, "tai_xe": 16, "hdv": 16, "nv_visa": 18,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 122, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 123, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 
