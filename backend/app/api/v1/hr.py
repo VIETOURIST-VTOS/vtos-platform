@@ -331,6 +331,22 @@ def tu_choi_chuyen(aid: int, data: TraLoiIn, u: User = Depends(require_roles("hd
                        "lợi nào cho anh/chị."}
 
 
+# AI ĐẶT HÀNG, AI CHỌN NGƯỜI — Chủ tịch chốt 06/10/2026, và đây là hai việc khác nhau:
+#
+#   · YC_LAP    – ĐẶT HÀNG. Điều hành biết chuyến cần mấy người, đi từ giờ nào, cần ngoại ngữ gì.
+#                 Họ gửi yêu cầu. Họ KHÔNG chọn ai đi.
+#   · DIEU_DONG – CHỌN NGƯỜI. "Việc quyết định điều động HDV là do TP HD làm" – Chủ tịch 06/10/2026.
+#                 Trưởng phòng Hướng dẫn biết ai rảnh, ai hợp tuyến, ai vừa đi về mệt. Điều hành
+#                 không có thông tin ấy, và nếu Điều hành xếp thẳng được người thì phòng HDV mất
+#                 quyền điều phối chính nhân sự của mình.
+#
+# GIỜ CỦA PHÂN CÔNG CŨNG THUỘC DIEU_DONG. Điều hành ghi giờ cần người ở YÊU CẦU; phòng HDV chốt giờ
+# của từng người. Hai mốc ấy thường bằng nhau — cửa lập phân công tự chép sang — nhưng khi lệch thì
+# người chịu trách nhiệm xếp lịch là người được sửa.
+YC_LAP = ("nv_dh", "tp_dh", "tp_hd", "hcns", "cntt")
+DIEU_DONG = ("tp_hd", "hcns", "cntt")
+
+
 # ---------- HDV & phân chuyến (cổng 13) ----------
 @router.get("/guide-assignments")
 def assignments(u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd")), db: Session = Depends(get_db)):
@@ -370,7 +386,7 @@ class AssignIn(BaseModel):
 
 
 @router.post("/guide-assignments", status_code=201)
-def assign(data: AssignIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "tp_hd", "hcns", "cntt")), db: Session = Depends(get_db)):
+def assign(data: AssignIn, u: User = Depends(require_roles(*DIEU_DONG)), db: Session = Depends(get_db)):
     e = db.get(Employee, data.guide_id); t = db.get(Tour, data.tour_id)
     if not e or not t: raise HTTPException(404, "Không có HDV hoặc tour")
     ok, why = H.guide_eligible(e, t.start_date)
@@ -435,7 +451,6 @@ def assign_update(aid: int, data: AssignUpdate, u: User = Depends(require_roles(
 # Vai trò: KHÔNG nghĩ ra vai trò mới. Cửa lập yêu cầu dùng đúng danh sách đang được phép lập phân
 # công (`nv_dh`, `tp_dh`, `tp_hd`, `hcns`, `cntt`) — vì người đặt hàng và người xếp người là cùng hai
 # phòng ấy. Cửa đọc dùng đúng danh sách đang đọc được phân công.
-YC_LAP = ("nv_dh", "tp_dh", "tp_hd", "hcns", "cntt")
 
 
 def yc_out(db: Session, y: YeuCauHdv) -> dict:
@@ -549,7 +564,7 @@ class GioIn(BaseModel):
 
 
 @router.post("/guide-assignments/{aid}/gio")
-def assign_gio(aid: int, data: GioIn, u: User = Depends(require_roles(*YC_LAP)), db: Session = Depends(get_db)):
+def assign_gio(aid: int, data: GioIn, u: User = Depends(require_roles(*DIEU_DONG)), db: Session = Depends(get_db)):
     a = db.get(GuideAssignment, aid)
     if not a:
         raise HTTPException(404, "Không có phân công")

@@ -337,3 +337,41 @@ def test_g1_hai_phien_cung_xep_mot_nguoi_chi_mot_phien_vao_duoc():
         GuideAssignment.tour_id == t3_id, GuideAssignment.guide_id == ID["e2"])).scalars().all()
     db_b.close()
     assert len(con) == 1, "hai phiên cùng xếp một người vào một khoảng – chỉ một phiên được vào sổ"
+
+
+# ───────────────── H · ai đặt hàng, ai chọn người (Chủ tịch chốt 06/10/2026) ─────────────────
+# "Việc quyết định điều động HDV là do TP HD làm." Điều hành đặt hàng; phòng Hướng dẫn chọn người.
+# Trước quyết định này cửa lập phân công mở cho cả nv_dh và tp_dh — tức Điều hành xếp thẳng được
+# người, và phòng HDV mất quyền điều phối chính nhân sự của mình.
+def test_h1_dieu_hanh_dat_hang_duoc():
+    r = client.post("/api/v1/guide-assignments/yeu-cau",
+                    json={"tour_id": ID["t1"], "so_hdv": 1}, headers=login("tp.dieuhanh"))
+    assert r.status_code == 201, r.text
+
+
+def test_h2_dieu_hanh_KHONG_chot_duoc_phan_cong():
+    r = client.post("/api/v1/guide-assignments",
+                    json={"tour_id": ID["t1"], "guide_id": ID["e1"], "days": 3,
+                          "rate_per_day": 800_000}, headers=login("tp.dieuhanh"))
+    assert r.status_code == 403, "Điều hành không chọn người – đó là việc của Trưởng phòng Hướng dẫn"
+
+
+def test_h3_dieu_hanh_KHONG_sua_duoc_gio_cua_phan_cong():
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.models.hr import GuideAssignment
+    db = SessionLocal()
+    aid = db.execute(select(GuideAssignment)).scalars().first().id
+    db.close()
+    r = client.post(f"/api/v1/guide-assignments/{aid}/gio",
+                    json={"bat_dau": D.isoformat(), "ket_thuc": (D + timedelta(days=1)).isoformat()},
+                    headers=login("tp.dieuhanh"))
+    assert r.status_code == 403, "giờ của phân công thuộc người chịu trách nhiệm xếp lịch"
+
+
+def test_h4_hai_danh_sach_vai_tro_phai_khac_nhau_va_tp_hd_co_trong_ca_hai():
+    from app.api.v1.hr import DIEU_DONG, YC_LAP
+    assert "tp_hd" in YC_LAP and "tp_hd" in DIEU_DONG
+    assert "nv_dh" in YC_LAP and "nv_dh" not in DIEU_DONG
+    assert "tp_dh" in YC_LAP and "tp_dh" not in DIEU_DONG

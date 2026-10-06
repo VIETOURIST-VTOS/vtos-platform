@@ -81,10 +81,16 @@ def test_gate13_guide_conditions_and_pending_hold():
     tours = client.get("/api/v1/tours", headers=login("tp.dieuhanh")).json()["rows"]
     t = next(x for x in tours if x["code"] == "PT-DL-0912")
     emps = {e["code"]: e for e in client.get("/api/v1/employees", headers=login("hcns")).json()}
-    bad = client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": emps["NS0012"]["id"], "days": 2, "rate_per_day": 400000}, headers=login("dh.lan"))
+    # Người CHỐT phân công đổi từ Điều hành sang phòng Hướng dẫn — Chủ tịch chốt 06/10/2026: "việc
+    # quyết định điều động HDV là do TP HD làm". Trước đó cửa này mở cho cả nv_dh và tp_dh, nên bộ thử
+    # cũ gọi bằng dh.lan. Dùng hcns ở đây vì vai tp_hd CHƯA CÓ TÀI KHOẢN nào trong bộ gieo — việc tạo
+    # tài khoản cho Trưởng phòng Hướng dẫn là của HCNS, không phải của bộ phép thử này.
+    bad = client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": emps["NS0012"]["id"], "days": 2, "rate_per_day": 400000}, headers=login("hcns"))
     assert bad.status_code == 422 and bad.json()["detail"]["gate"] == "CONG_13"
-    ok = client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": emps["NS0011"]["id"], "days": 2, "rate_per_day": 400000}, headers=login("dh.lan"))
+    ok = client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": emps["NS0011"]["id"], "days": 2, "rate_per_day": 400000}, headers=login("hcns"))
     assert ok.status_code == 201
+    # Và Điều hành thì KHÔNG còn chốt được – đây mới là nội dung của quyết định 06/10.
+    assert client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": emps["NS0011"]["id"], "days": 2, "rate_per_day": 400000}, headers=login("dh.lan")).status_code == 403
 
 
 def test_incident_workflow_and_penalty():
@@ -127,11 +133,11 @@ def test_guide_rate_table_and_assignment():
     emps = client.get("/api/v1/employees", headers=login("hcns")).json()
     g = next(e for e in emps if e["department"] == "huong_dan" and e["guide_ok"])
     t = client.get("/api/v1/tours", headers=login("hcns")).json()["rows"][0]
-    r = client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": g["id"], "days": 0, "rate_per_day": 0, "rate_id": dl["id"], "holiday": True}, headers=login("tp.dieuhanh"))
+    r = client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": g["id"], "days": 0, "rate_per_day": 0, "rate_id": dl["id"], "holiday": True}, headers=login("hcns"))
     assert r.status_code == 201, r.text
     a = client.get("/api/v1/guide-assignments", headers=login("hcns")).json()[0]
     assert a["rate_per_day"] == 600000 and a["days"] == 3 and a["amount"] == 600000 * 3 * 2
-    assert client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": g["id"], "days": 2, "rate_per_day": 0, "holiday": False}, headers=login("tp.dieuhanh")).status_code == 422
+    assert client.post("/api/v1/guide-assignments", json={"tour_id": t["id"], "guide_id": g["id"], "days": 2, "rate_per_day": 0, "holiday": False}, headers=login("hcns")).status_code == 422
     # đề xuất giá mới 2 chữ ký thay giá cũ cùng tuyến
     r = client.post("/api/v1/guide-rates", json={"route": "Đà Lạt 3N2Đ", "days": 3, "rate_per_day": 650000, "old_rate_per_day": 600000, "effective_from": "2026-12-01"}, headers=login("hcns")); assert r.status_code == 201
     nid = [x for x in client.get("/api/v1/guide-rates", headers=login("hcns")).json() if x["status"] == "pending"][0]["id"]
