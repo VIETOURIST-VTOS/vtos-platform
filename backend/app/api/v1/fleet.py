@@ -597,6 +597,145 @@ def bao_duong_theo_xe(u: User = Depends(require_roles(*READ)), db: Session = Dep
                        "hoặc chưa có số km đồng hồ đã xác nhận, nên máy không so được với mốc nào."}
 
 
+# ─────────────────────────── BÁO HƯ HỎNG ───────────────────────────
+# Cửa GHI đầu tiên của tài xế trên phân hệ đội xe (Chủ tịch chọn 06/10/2026).
+#
+# Ba điều cửa này CỐ Ý KHÔNG hỏi: số tiền, garage, và "nên sửa thế nào". Lúc đứng bên đường thì tài
+# xế không biết ba thứ ấy, và một ô bắt buộc mà người gõ không biết câu trả lời thì ô ấy sẽ được
+# điền bừa. Đề nghị sửa chữa (loại chi `sua_chua_xe`) do Giám đốc đội xe lập sau khi có báo giá.
+from datetime import datetime                                     # noqa: E402
+from app.models.hr import DispatchOrder                           # noqa: E402
+from app.models.fleet import Fault, MUC_DO_HONG, TRANG_THAI_HONG  # noqa: E402
+
+
+class BaoHongIn(BaseModel):
+    vehicle_id: int
+    hien_tuong: str
+    muc_do: str = "con_chay_duoc"
+    odo_km: int | None = None
+    noi_xay_ra: str = ""
+
+
+class XuLyHongIn(BaseModel):
+    ket_qua: str = ""
+    maintenance_id: int | None = None
+
+
+def _hong_ra(f: Fault, xe: dict, ten: dict) -> dict:
+    return {"id": f.id, "vehicle_id": f.vehicle_id, "plate": xe.get(f.vehicle_id, ""),
+            "nguoi_bao": ten.get(f.nguoi_bao_id, "") or f.created_by,
+            "bao_luc": f.bao_luc, "hien_tuong": f.hien_tuong,
+            "muc_do": f.muc_do, "muc_do_ten": MUC_DO_HONG.get(f.muc_do, f.muc_do),
+            "odo_km": f.odo_km, "noi_xay_ra": f.noi_xay_ra,
+            "trang_thai": f.trang_thai, "trang_thai_ten": TRANG_THAI_HONG.get(f.trang_thai, f.trang_thai),
+            "tiep_nhan_boi": f.tiep_nhan_boi, "tiep_nhan_luc": f.tiep_nhan_luc,
+            "ket_qua": f.ket_qua, "maintenance_id": f.maintenance_id}
+
+
+@router.get("/bao-hong")
+def danh_sach_bao_hong(u: User = Depends(require_roles(*READ, "tai_xe")), db: Session = Depends(get_db)):
+    """Sổ báo hỏng. Tài xế CHỈ thấy báo hỏng của chính mình — lọc ở đây, không lọc ở màn hình.
+
+    Lọc ở màn hình là lọc tin được; lọc ở máy chủ mới là lọc. Mở tiền tố `/api/v1/fleet/bao-hong` cho
+    vai `tai_xe` mà quên dòng này là cho một tài xế đọc toàn bộ tình trạng hỏng hóc của cả đội xe.
+    """
+    q = select(Fault).order_by(Fault.id.desc())
+    if u.role == "tai_xe":
+        emp = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+        if not emp:
+            raise HTTPException(404, "Tài khoản chưa ghép với hồ sơ nhân sự — báo HCNS")
+        q = q.where(Fault.nguoi_bao_id == emp.id)
+    rows = list(db.execute(q.limit(300)).scalars())
+    xe = {v.id: v.plate for v in db.execute(select(Vehicle)).scalars()}
+    ten = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
+    dem = {"dang_mo": sum(1 for f in rows if f.trang_thai in FL.HONG_CON_MO),
+           "phai_dung_xe": sum(1 for f in rows if f.trang_thai in FL.HONG_CON_MO and f.muc_do == "phai_dung_xe")}
+    return {"rows": [_hong_ra(f, xe, ten) for f in rows], "dem": dem,
+            "muc_do": MUC_DO_HONG, "trang_thai": TRANG_THAI_HONG,
+            "ghi_chu": "Báo hỏng KHÔNG có ô tiền và ô garage: lúc báo thì chưa ai biết hai con số ấy. "
+                       "Đề nghị sửa chữa do đội xe lập sau khi có báo giá."}
+
+
+@router.post("/bao-hong", status_code=201)
+def them_bao_hong(data: BaoHongIn, u: User = Depends(require_roles(*WRITE, "tai_xe")),
+                  db: Session = Depends(get_db)):
+    """Báo một chiếc xe đang hỏng.
+
+    Tài xế chỉ báo được xe CỦA MÌNH — xe đang đứng tên, hoặc xe có lệnh điều cho mình. Không phải để
+    giữ bí mật, mà vì một báo hỏng cho chiếc xe người khác đang chạy thì người tiếp nhận không biết
+    hỏi ai, còn chiếc xe ấy thì bị chặn lệnh mà tài xế của nó không hay.
+    """
+    v = db.get(Vehicle, data.vehicle_id)
+    if not v: raise HTTPException(404, "Không có xe")
+    if data.muc_do not in MUC_DO_HONG:
+        raise HTTPException(422, f"Mức độ không hợp lệ. Chỉ nhận {', '.join(MUC_DO_HONG)}")
+    if not data.hien_tuong.strip():
+        raise HTTPException(422, "Ghi rõ hiện tượng — người tiếp nhận cần biết hỏng cái gì")
+
+    emp = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    if u.role == "tai_xe":
+        if not emp:
+            raise HTTPException(404, "Tài khoản chưa ghép với hồ sơ nhân sự — báo HCNS")
+        co_lenh = db.execute(select(DispatchOrder).where(
+            DispatchOrder.vehicle_id == v.id, DispatchOrder.driver_id == emp.id,
+            DispatchOrder.status != "huy")).scalars().first()
+        if v.driver_id != emp.id and not co_lenh:
+            raise HTTPException(403, f"Xe {v.plate} không phải xe bạn đứng tên và cũng không có lệnh "
+                                     "điều xe cho bạn. Báo trực tiếp cho Giám đốc đội xe.")
+    f = Fault(vehicle_id=v.id, nguoi_bao_id=emp.id if emp else None,
+              hien_tuong=data.hien_tuong.strip()[:300], muc_do=data.muc_do,
+              odo_km=data.odo_km, noi_xay_ra=data.noi_xay_ra.strip()[:160],
+              created_by=u.username)
+    db.add(f); db.flush()
+    R.audit(db, u.username, u.role, "bao_hong_xe", f"vehicle:{v.code or v.plate}",
+            after=data.model_dump(mode="json"))
+    db.commit()
+    chan = data.muc_do == "phai_dung_xe"
+    return {"id": f.id, "chan_lenh_dieu_xe": chan,
+            "message": (f"Đã báo hỏng xe {v.plate}. " +
+                        ("Xe này sẽ BỊ CHẶN khi lập lệnh điều xe cho tới khi đội xe đóng báo hỏng."
+                         if chan else
+                         "Người lập lệnh điều xe sẽ nhìn thấy báo hỏng này trước khi ký, nhưng xe "
+                         "vẫn điều được."))}
+
+
+@router.post("/bao-hong/{fid}/tiep-nhan")
+def tiep_nhan_bao_hong(fid: int, u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
+    """Đội xe xác nhận đã thấy. KHÔNG đóng — xe vẫn bị chặn nếu mức là phải dừng xe.
+
+    Tách tiếp nhận khỏi đóng là để trả lời được hai câu khác nhau: "đã có ai nhìn chưa" và "đã sửa
+    xong chưa". Gộp làm một thì một người bấm cho hết hàng đợi là xe hỏng biến khỏi màn hình.
+    """
+    f = db.get(Fault, fid)
+    if not f: raise HTTPException(404, "Không có báo hỏng")
+    if f.trang_thai != "moi": raise HTTPException(422, "Báo hỏng này đã được tiếp nhận hoặc đã đóng")
+    f.trang_thai, f.tiep_nhan_boi, f.tiep_nhan_luc = "da_tiep_nhan", u.username, datetime.now()
+    R.audit(db, u.username, u.role, "tiep_nhan_bao_hong", f"fleet_faults:{f.id}")
+    db.commit()
+    return {"id": f.id, "trang_thai": f.trang_thai, "message": "Đã tiếp nhận. Xe vẫn ở trạng thái đang hỏng."}
+
+
+@router.post("/bao-hong/{fid}/dong")
+def dong_bao_hong(fid: int, data: XuLyHongIn, u: User = Depends(require_roles(*WRITE)),
+                  db: Session = Depends(get_db)):
+    """Đóng báo hỏng. Bắt buộc ghi KẾT QUẢ — đóng mà không nói đã làm gì thì sổ báo hỏng chỉ còn là
+    một danh sách đã-bấm-nút, và lần sau cùng hiện tượng ấy không ai tra được lần trước xử lý sao."""
+    f = db.get(Fault, fid)
+    if not f: raise HTTPException(404, "Không có báo hỏng")
+    if f.trang_thai == "da_dong": raise HTTPException(422, "Báo hỏng này đã đóng")
+    if not data.ket_qua.strip():
+        raise HTTPException(422, "Ghi kết quả xử lý — đóng mà không nói đã làm gì thì lần sau không ai tra được")
+    if data.maintenance_id and not db.get(Maintenance, data.maintenance_id):
+        raise HTTPException(404, "Không có phiếu bảo dưỡng ấy")
+    f.trang_thai, f.ket_qua = "da_dong", data.ket_qua.strip()[:300]
+    f.maintenance_id, f.dong_boi, f.dong_luc = data.maintenance_id, u.username, datetime.now()
+    R.audit(db, u.username, u.role, "dong_bao_hong", f"fleet_faults:{f.id}", after=data.model_dump(mode="json"))
+    db.commit()
+    v = db.get(Vehicle, f.vehicle_id)
+    return {"id": f.id, "trang_thai": f.trang_thai,
+            "message": f"Đã đóng báo hỏng xe {v.plate if v else ''}. Xe hết bị chặn vì lý do này."}
+
+
 @router.post("/bao-duong", status_code=201)
 def them_bao_duong(data: BaoDuongIn, u: User = Depends(require_roles(*WRITE, *KETOAN)), db: Session = Depends(get_db)):
     """Ghi bảo dưỡng/sửa chữa. Không có số km lúc làm thì hệ thống nói thẳng là không tính được mốc kỳ tới,

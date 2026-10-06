@@ -176,7 +176,10 @@ RESTRICTED_API_PREFIXES = {
     # KHÔNG mở sổ chi toàn công ty: cửa đọc lọc theo `created_by` (xem ops.py::list_pr), và cửa ghi
     # chỉ nhận đúng loại `tam_ung_tai_xe` (xem ops.py::LOAI_CHI_TAI_XE_TU_LAP). Ba lớp, và cả ba đều
     # cần: bỏ lớp nào thì một tài xế đọc được hoặc lập được thứ không phải của mình.
-    "tai_xe": ("/api/v1/incidents", "/api/v1/payment-requests"),
+    # /fleet/bao-hong thêm 06/10/2026: cửa báo hư hỏng. Khai ĐÚNG nhánh con, không khai cả
+    # "/api/v1/fleet" — hàng rào so bằng startswith, nên khai tiền tố cha là mở luôn toàn bộ phân
+    # hệ đội xe (hồ sơ xe, bảng giá, quyết toán chủ xe) cho một vai chỉ cần một cửa.
+    "tai_xe": ("/api/v1/incidents", "/api/v1/payment-requests", "/api/v1/fleet/bao-hong"),
     "hdv": ("/api/v1/incidents",),
     # GĐ điều hành đội xe: cả phân hệ đội xe và lệnh điều xe, cộng danh mục xe để chọn trong form. Không có
     # /tours, /bookings, /banks, /payroll – phạm vi công việc của ông là chiếc xe, không phải khách hàng và
@@ -480,7 +483,7 @@ MAN_HINH_API = {
                "/api/v1/quyet-toan-lop3"),
     "/vietrip": ("/api/v1/import",),
     "/visa": ("/api/v1/visa",),
-    "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents", "/api/v1/payment-requests"),
+    "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents", "/api/v1/payment-requests", "/api/v1/fleet/bao-hong"),
 }
 
 

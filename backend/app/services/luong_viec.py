@@ -321,7 +321,34 @@ _DICH_VU_LE = (
          vi_sao="Điều 2 Điều hành: sản phẩm là khuôn, chuyến là lần chạy thật – chỉ Điều hành mở."),
 )
 
-LUONG_VIEC: tuple[Buoc, ...] = _TOUR + _QUYET_TOAN + _DE_NGHI_CHI + _BOOKING + _BAO_LUU + _DICH_VU_LE
+# ---------------------------------------------------------------------------------------------
+# BÁO HƯ HỎNG XE — Chủ tịch chọn 06/10/2026
+# ---------------------------------------------------------------------------------------------
+# Chuỗi này ngắn và cố ý ngắn: ba bước, không có cấp duyệt nào. Báo hỏng KHÔNG sinh tiền, nên nó
+# không đi qua bàn ký nào cả. Tiền chỉ xuất hiện ở bước sau và đi bằng nghiệp vụ `de_nghi_chi`
+# (loại `sua_chua_xe`), nơi TGĐ / Chủ tịch ký như mọi khoản chi khác.
+_BAO_HONG = (
+    Buoc("bao_hong_xe", "bao", "Báo xe hỏng",
+         vai_tro=("cntt", "hcns", "tp_dh", "nv_dh", "gd_doi_xe", "tai_xe"), cach_canh=CHI_VAI_TRO,
+         den_trang_thai="moi", nguon="fleet.py::them_bao_hong",
+         vi_sao="Tài xế là người đứng cạnh chiếc xe. Trong hàm còn một lớp hẹp hơn vai trò: tài xế "
+                "chỉ báo được xe mình đứng tên hoặc xe có lệnh điều cho mình."),
+
+    Buoc("bao_hong_xe", "tiep_nhan", "Đội xe tiếp nhận báo hỏng",
+         vai_tro=("cntt", "hcns", "tp_dh", "nv_dh", "gd_doi_xe"), cach_canh=CHI_VAI_TRO,
+         tu_trang_thai="moi", den_trang_thai="da_tiep_nhan", nguon="fleet.py::tiep_nhan_bao_hong",
+         vi_sao="Tiếp nhận KHÔNG đóng. Hai câu hỏi khác nhau – “đã có ai nhìn chưa” và “đã sửa xong "
+                "chưa” – và gộp làm một thì một lần bấm cho hết hàng đợi là xe hỏng biến khỏi màn hình."),
+
+    Buoc("bao_hong_xe", "dong", "Đóng báo hỏng",
+         vai_tro=("cntt", "hcns", "tp_dh", "nv_dh", "gd_doi_xe"), cach_canh=CHI_VAI_TRO,
+         tu_trang_thai="moi|da_tiep_nhan", den_trang_thai="da_dong", nguon="fleet.py::dong_bao_hong",
+         vi_sao="Bắt buộc ghi kết quả. Đóng mà không nói đã làm gì thì sổ báo hỏng chỉ còn là một "
+                "danh sách đã-bấm-nút, và lần sau cùng hiện tượng ấy không ai tra được lần trước xử lý sao."),
+)
+
+LUONG_VIEC: tuple[Buoc, ...] = (_TOUR + _QUYET_TOAN + _DE_NGHI_CHI + _BOOKING + _BAO_LUU
+                                + _DICH_VU_LE + _BAO_HONG)
 
 NGHIEP_VU = {
     "chuyen_tour": "Chuyến tour – dự toán đến quyết toán",
@@ -330,6 +357,7 @@ NGHIEP_VU = {
     "booking": "Booking",
     "bao_luu": "Bảo lưu tiền khách",
     "dich_vu_le": "Dịch vụ lẻ và sản phẩm",
+    "bao_hong_xe": "Báo hư hỏng xe",
 }
 
 

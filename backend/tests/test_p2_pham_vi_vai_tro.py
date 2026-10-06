@@ -94,21 +94,42 @@ def test_cua_cong_khai_co_phanh_so_lan_thu():
 
 def test_ban_do_man_hinh_api_khong_lech_voi_giao_dien():
     """Bản đồ đo từ mã giao diện. Sửa màn hình để gọi thêm một nhóm API mà quên khai ở đây thì màn
-    hình đó gãy trên hệ thống thật – phép thử này bắt trước khi đẩy."""
+    hình đó gãy trên hệ thống thật – phép thử này bắt trước khi đẩy.
+
+    06/10/2026 — ĐỔI CÁCH SO, và là một lần SIẾT chứ không phải nới. Bản cũ cắt đường gọi xuống còn
+    ĐOẠN ĐẦU (`/api/v1/fleet`) rồi đòi đúng chuỗi ấy có trong bản đồ. Hệ quả: một màn hình chỉ cần
+    MỘT nhánh con của phân hệ cũng buộc phải khai cả phân hệ — và bản đồ này chính là thứ `pham_vi_day_du`
+    cộng ra, nên khai rộng ở đây là NỚI QUYỀN THẬT cho mọi vai trò thấy màn hình đó. Màn hình /xe-hdv
+    của tài xế gọi đúng một cửa `/api/v1/fleet/bao-hong`; bắt nó khai `/api/v1/fleet` là trao cho tài xế
+    hồ sơ xe, bảng giá và quyết toán chủ xe.
+
+    Nay so bằng ĐƯỜNG ĐẦY ĐỦ: đường gọi được coi là đã khai khi có MỘT mục trong bản đồ là tiền tố của
+    nó. `/api/v1/tours` vẫn phủ `/api/v1/tours/{id}/...` như trước, nhưng `/api/v1/fleet/bao-hong` thì
+    KHÔNG phủ `/api/v1/fleet/xe` — tức là bản đồ nói được "màn hình này chỉ chạm nhánh ấy".
+    """
     if not WEB.exists():
         return
     thieu = []
     for p in sorted((WEB / "app").glob("*/page.tsx")):
         man = "/" + p.parent.name
-        khai = set(AC.MAN_HINH_API.get(man, ()))
-        if not khai:
+        khai = tuple(AC.MAN_HINH_API.get(man, ())) + tuple(AC.API_CHUNG)
+        if not AC.MAN_HINH_API.get(man):
             continue          # màn hình chưa gắn bản đồ thì phép thử mồ côi ở trên lo
         src = p.read_text(encoding="utf-8")
-        goi = {"/api/v1/" + m.group(1) for m in
-               re.finditer(r'(?:api(?:<[^>]*>)?|fetch)\(\s*[`"\'](?:/api/v1)?/([a-z0-9\-]+)', src)}
-        goi.discard("/api/v1/api")           # lib/api.ts, không phải nhóm thật
-        for g in sorted(goi - khai - set(AC.API_CHUNG)):
-            thieu.append(f"{man} gọi {g} nhưng MAN_HINH_API không khai")
+        # Màn hình gọi qua `api("/x")` (bọc sẵn tiền tố) lẫn `fetch("/api/v1/x")` (viết đủ) – gom cả
+        # hai về một dạng rồi mới so, chứ không thì "/api/v1/api/v1/..." lọt vào danh sách thiếu.
+        goi = set()
+        for m in re.finditer(r'(?:api(?:<[^>]*>)?|fetch)\(\s*[`"\'](?:/api/v1)?/([a-z0-9\-]+(?:/[a-z0-9\-]+)*)', src):
+            duong = m.group(1)
+            if duong == "api/v1" or duong == "api":
+                continue      # đường dựng bằng biến (`/api/v1${path}`) – không đọc được từ chuỗi
+            if duong.startswith("api/v1/"):
+                duong = duong[len("api/v1/"):]
+            if duong:
+                goi.add("/api/v1/" + duong)
+        for g in sorted(goi):
+            if not any(g == k or g.startswith(k.rstrip("/") + "/") for k in khai):
+                thieu.append(f"{man} gọi {g} nhưng MAN_HINH_API không khai")
     assert not thieu, thieu
 
 
@@ -473,8 +494,8 @@ PHAM_VI_DA_CHOT = {
     # hình /cong-no có sẵn (ảnh chụp báo cáo công nợ 8h sáng từ Vietrip, 4 nhóm theo ngày khởi
     # hành). Đúng chín vai đã thấy màn hình /cong-no. sales_admin thấy màn hình nhưng cửa đọc
     # (api/v1/cong_no_vietrip.XEM) KHÔNG có vai ấy – khớp READ của /api/v1/cong-no; màn hình tự ẩn khối.
-    "chutich": 122, "tgd": 122, "bks": 122, "cntt": 119,
-    "ketoan": 100, "tp_dh": 88, "ptgd_doan": 73, "nv_dh": 61, "hcns": 62, "gd_kd": 65,
+    "chutich": 123, "tgd": 123, "bks": 123, "cntt": 120,
+    "ketoan": 100, "tp_dh": 89, "ptgd_doan": 73, "nv_dh": 62, "hcns": 63, "gd_kd": 65,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -511,12 +532,16 @@ PHAM_VI_DA_CHOT = {
     # hơn cửa thật ở đúng chỗ này là có chủ ý: bảng phạm vi mô tả MÀN HÌNH chạm tới đâu, còn ai
     # bấm được thì là việc của hàm. Giữ hai con số bằng nhau để hàng rào test_tx1_3 còn canh được
     # rằng lần tách vai không lặng lẽ cho một bên rộng hơn bên kia.
-    "gd_doi_xe": 27, "hanh_chinh": 28, "tp_hd": 25, "tai_xe": 17, "hdv": 17, "nv_visa": 18,
+    # +1 cho mười vai ngày 06/10/2026: màn hình /xe-hdv gọi thêm `/api/v1/fleet/bao-hong` (cửa báo
+    # hư hỏng xe). Đây là một NHÁNH CON, không phải cả phân hệ đội xe — xem phép thử bản đồ màn
+    # hình ở trên, nay so bằng đường đầy đủ nên bản đồ nói được "màn hình này chỉ chạm nhánh ấy".
+    # Mười vai cùng +1 vì cả mười đều thấy màn hình /xe-hdv; không vai nào nhận thêm gì khác.
+    "gd_doi_xe": 27, "hanh_chinh": 28, "tp_hd": 25, "tai_xe": 18, "hdv": 18, "nv_visa": 18,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 122, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 123, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 
