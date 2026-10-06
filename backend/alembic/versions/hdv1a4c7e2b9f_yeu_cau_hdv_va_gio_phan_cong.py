@@ -21,17 +21,22 @@ thì phép thử sẽ XANH trong khi thực tế vẫn hỏng — đúng loại 
 (`app/services/hdv.py`): khoá hàng trước khi ghi, đếm lại sau khi ghi và trước khi chốt giao dịch.
 Cách ấy chạy đúng trên cả hai, và phép thử bắt được nó.
 
+NỐI LẠI MẠCH 06/10/2026: bản này ban đầu nối sau `tx1f3a9c2e5b`. Trong lúc Đợt 1 đang viết, làn TX
+gộp `tx3b7e4d1a92` (bảng báo hỏng xe) cũng nối sau `tx1f3a9c2e5b` — hai bản cùng một cha là hai đầu
+mạch, và `alembic upgrade head` với hai đầu thì máy chủ KHÔNG LÊN. Đổi cha sang `tx3b7e4d1a92` để
+mạch còn đúng một đầu. Không đổi nội dung bản nâng cấp, chỉ đổi chỗ nối.
+
 ĐỔI NGƯỢC ĐƯỢC: `downgrade` xoá bảng và bốn cột. Mất dữ liệu yêu cầu và giờ đã gõ — không khôi phục
 được từ chỗ nào khác, nên chỉ chạy khi thật sự muốn bỏ Đợt 1.
 
 Revision ID: hdv1a4c7e2b9f
-Revises: tx1f3a9c2e5b
+Revises: tx3b7e4d1a92
 """
 import sqlalchemy as sa
 from alembic import op
 
 revision = "hdv1a4c7e2b9f"
-down_revision = "tx1f3a9c2e5b"
+down_revision = "tx3b7e4d1a92"
 branch_labels = None
 depends_on = None
 
