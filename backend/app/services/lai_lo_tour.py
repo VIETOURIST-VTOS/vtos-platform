@@ -45,7 +45,7 @@ from datetime import date
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.models.core import Booking, Tour
+from app.models.core import Booking, Tour, TOUR_TRON_GOI
 from app.models.suppliers import Supplier
 from app.models.vietrip import TourCostLine
 from app.services import thue_gtgt_chuyen as THUE
@@ -86,6 +86,12 @@ LY_DO_CHUA_CO_TANG_BA = ("Chưa có cơ sở phân bổ chi phí chung được 
                          "khác nhau, nên đây là chính sách chờ duyệt chứ không phải phép tính.")
 RONG_CP = {"gia_von_dong": 0.0, "da_tra": 0.0, "so_dong_cp": 0, "thieu_hoa_don": 0}
 
+# Nhãn của từng dòng trên bảng. Tra bằng bảng chứ KHÔNG bằng một phép ba ngôi
+# `"dich_vu_le" if ... else "tour_ghep"`: phép ba ngôi chỉ có hai ngả, nên loại chuyến thứ sáu bị
+# dán nhãn "tour_ghep" mà không ai sửa một dòng nào. `.get(..., "tour_ghep")` giữ nguyên hành vi cũ
+# cho bốn loại tour trọn gói, và nói tên thật cho hai loại không trọn gói.
+LOAI_DONG = {"non_package": "dich_vu_le", "thue_xe": "thue_xe"}
+
 
 def _khung(tu: date | None, den: date | None, loai: str, trang_thai: str):
     """Khung lọc dùng chung cho mọi truy vấn, để các con số luôn nói về cùng một tập tour."""
@@ -97,7 +103,13 @@ def _khung(tu: date | None, den: date | None, loai: str, trang_thai: str):
     if loai == "le":
         q = q.where(Tour.tour_type == "non_package")
     elif loai == "ghep":
-        q = q.where(Tour.tour_type != "non_package")
+        q = q.where(Tour.tour_type.in_(TOUR_TRON_GOI))
+    elif loai == "thue_xe":
+        # Thêm 07/10/2026. Trước bản này nhánh `ghep` lọc bằng `!= "non_package"`, nên hợp đồng thuê
+        # xe sẽ rơi thẳng vào bảng Lãi lỗ TOUR và cộng vào doanh thu, giá vốn, biên bình quân của
+        # tour — còn nhánh `le` thì lại không nhận nó. Không `loai` nào đúng, và không ai thấy sai
+        # vì cả hai bảng vẫn ra một con số trông hợp lý. Nay nó có ngăn của chính nó.
+        q = q.where(Tour.tour_type == "thue_xe")
     if trang_thai:
         q = q.where(Tour.status.in_([x for x in trang_thai.split(",") if x]))
     return q
@@ -217,7 +229,7 @@ def _mot_dong(t: Tour, bk: dict, cp: dict, thue: dict | None = None) -> dict:
         "gia_ban": (float(t.price_per_pax) if getattr(t, "price_per_pax", None) is not None
                     else None),
         "ngay_khoi_hanh": t.start_date, "ngay_ket_thuc": t.end_date,
-        "loai": "dich_vu_le" if t.tour_type == "non_package" else "tour_ghep",
+        "loai": LOAI_DONG.get(t.tour_type, "tour_ghep"),
         "trang_thai": t.status,
         "so_khach": bk["khach"], "so_booking": bk["so_booking"], "so_booking_huy": bk["so_huy"],
         "doanh_thu": doanh_thu if co_bk else None,

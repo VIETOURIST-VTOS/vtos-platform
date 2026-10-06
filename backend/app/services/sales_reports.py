@@ -12,7 +12,7 @@ from datetime import datetime, date, timedelta
 from io import BytesIO
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from app.models.core import Tour, Booking, User, Alert, AuditLog
+from app.models.core import Tour, Booking, User, Alert, AuditLog, TOUR_TRON_GOI
 from app.models.payments import Receipt, Retention, BankTransaction
 from app.models.ops import PaymentRequest
 from app.models.hr import Employee
@@ -53,7 +53,7 @@ def _office_of(db: Session) -> dict[int, str]:
 # `bao_cao_phong._dieu_hanh` (dòng "Booking quá hạn 2 giờ"). Cột "Đủ 4 trường" thì Ở LẠI: bốn
 # trường ấy do chính sale điền lúc gửi yêu cầu.
 def ban_tour_le(db: Session, d1: date, d2: date, mang: str = "") -> dict:
-    q = select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.created_at >= datetime.combine(d1, datetime.min.time()), Booking.created_at < datetime.combine(d2 + timedelta(days=1), datetime.min.time()), Tour.tour_type != "non_package")
+    q = select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.created_at >= datetime.combine(d1, datetime.min.time()), Booking.created_at < datetime.combine(d2 + timedelta(days=1), datetime.min.time()), Tour.tour_type.in_(TOUR_TRON_GOI))
     cond = SEG.tour_cond(mang)
     if cond is not None: q = q.where(cond)
     rows = list(db.execute(q.order_by(Booking.created_at)).scalars())
@@ -117,7 +117,7 @@ def huy_cho(db: Session, d1: date, d2: date, mang: str = "") -> dict:
 def kinh_doanh(db: Session, month: str, mang: str = "") -> dict:
     from app.services import hr as HR
     y, m = map(int, month.split("-")); d1 = date(y, m, 1); d2 = date(y + (m == 12), m % 12 + 1, 1)
-    q = select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.created_at >= datetime.combine(d1, datetime.min.time()), Booking.created_at < datetime.combine(d2, datetime.min.time()), Booking.cancelled == False, Tour.tour_type != "non_package")
+    q = select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.created_at >= datetime.combine(d1, datetime.min.time()), Booking.created_at < datetime.combine(d2, datetime.min.time()), Booking.cancelled == False, Tour.tour_type.in_(TOUR_TRON_GOI))
     cond = SEG.tour_cond(mang)
     if cond is not None: q = q.where(cond)
     emps = {e.user_id: e for e in db.execute(select(Employee).where(Employee.user_id != None)).scalars()}
@@ -127,7 +127,13 @@ def kinh_doanh(db: Session, month: str, mang: str = "") -> dict:
         e = emps.get(b.sales_id)
         s = by.setdefault(b.sales_id, {"sale": _sales_name(b), "office": e.office if e else "", "department": e.department if e else "", "bookings": 0, "pax": 0, "revenue": 0.0, "revenue_target": 0.0, "paid": 0.0, "moc": HR.moc_of(e, moc_hcm, moc_ct) if e else moc_hcm})
         s["bookings"] += 1; s["pax"] += b.pax; s["revenue"] += (b.amount or 0) - (b.discount or 0); s["paid"] += (b.paid or 0)
-        if b.counts_for_target and (not R.is_doan(b.tour)): s["revenue_target"] += (b.amount or 0) - (b.discount or 0)
+        # `not is_doan(...)` nghĩa là "mảng Lẻ" — một phép NHỊ PHÂN, nên mọi loại chuyến không
+        # phải đoàn đều rơi vào đây, kể cả thứ không phải tour. Khung truy vấn ở trên nay lọc
+        # `tour_type in TOUR_TRON_GOI` nên hợp đồng thuê xe không tới được dòng này; giữ thêm
+        # điều kiện dương ở đây vì đây là chỗ cộng CHỈ TIÊU DOANH SỐ, tức tiền hoa hồng của
+        # một người thật — chặn hai lớp ở chỗ tính tiền là rẻ hơn một lần trả nhầm.
+        la_tour = (b.tour is not None and b.tour.tour_type in TOUR_TRON_GOI)
+        if b.counts_for_target and la_tour and (not R.is_doan(b.tour)): s["revenue_target"] += (b.amount or 0) - (b.discount or 0)
     out = []
     for s in by.values():
         lvl, rate = HR.f_rate(s["revenue_target"], s["moc"], table)
@@ -220,7 +226,7 @@ def r9_anomalies(db: Session) -> list[dict]:
     out = []; today = date.today(); now = datetime.now(); m0 = today.replace(day=1)
     def add(kind, level, ref, msg): out.append({"kind": kind, "level": level, "ref": ref, "msg": msg})
     # 1. Booking tạo mà không có yêu cầu (request_id=0) ngoài dịch vụ lẻ
-    for b in db.execute(select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.request_id == 0, Tour.tour_type != "non_package", Booking.vietrip_id == None, Booking.created_at >= datetime.combine(m0, datetime.min.time()))).scalars():
+    for b in db.execute(select(Booking).join(Tour, Tour.id == Booking.tour_id).where(Booking.request_id == 0, Tour.tour_type.in_(TOUR_TRON_GOI), Booking.vietrip_id == None, Booking.created_at >= datetime.combine(m0, datetime.min.time()))).scalars():
         add("r9_booking_khong_yeu_cau", "warn", f"booking:{b.code}", f"{b.code} tạo trực tiếp không qua yêu cầu đặt dịch vụ (cổng 12) – kiểm tra")
     # 2. Giảm giá lớn > 15% hoặc booking không đủ 4 trường trong tháng, theo sale
     q = select(Booking).where(Booking.created_at >= datetime.combine(m0, datetime.min.time()), Booking.cancelled == False)

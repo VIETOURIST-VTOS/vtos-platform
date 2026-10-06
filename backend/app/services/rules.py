@@ -3,7 +3,8 @@ import hashlib, json, math
 from datetime import datetime, date, timedelta
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
-from app.models.core import Param, AuditLog, Tour, Booking, ServiceRequest, Alert, TOUR_TYPES, User
+from app.models.core import (Param, AuditLog, Tour, Booking, ServiceRequest, Alert, TOUR_TYPES,
+                             TOUR_TRON_GOI, KHONG_TRON_GOI, User)
 
 # ====================== THAM SỐ MẶC ĐỊNH (theo bộ chính sách 27/8/2026 + Văn bản đính chính) ======================
 DEFAULT_PARAMS = [
@@ -772,8 +773,21 @@ def settlement_summary(db: Session, tour: Tour) -> dict:
     thr = get_param(db, "nguong_bien", tour.end_date)
     deadline = settlement_deadline(db, tour)
     on_time = tour.closed_at is not None and tour.closed_at.date() <= deadline
-    key = {"le_noi_dia": "quy_dh_le_noi_dia", "le_nuoc_ngoai": "quy_dh_le_nuoc_ngoai", "non_package": "quy_dh_le_noi_dia"}.get(tour.tour_type, "quy_dh_doan")
-    rate = get_param(db, key, tour.end_date)
+    # KHOÁ TRA QUỸ THƯỞNG ĐIỀU HÀNH — và chỗ `.get()` rơi về đâu là một con số tiền.
+    #
+    # Dòng này trước đây để `"quy_dh_doan"` làm giá trị rơi cuối cùng, nên BẤT KỲ loại chuyến nào
+    # không có tên trong bảng đều ăn tỷ lệ quỹ của tour ĐOÀN — tỷ lệ cao nhất — mà không ai gõ một
+    # con số nào. Một loại chuyến mới thêm vào là một lần chi tiền thưởng sai, lặng lẽ.
+    #
+    # Nay bảng khai ĐỦ sáu loại, và hợp đồng thuê xe khai `""`: thuê xe KHÔNG sinh quỹ thưởng
+    # Điều hành. Không phải vì nó không có lãi, mà vì quỹ ấy trả cho việc ĐIỀU HÀNH MỘT CHUYẾN —
+    # dựng chương trình, gom nhà cung cấp, chạy đoàn. Cho thuê một chiếc xe không có việc ấy.
+    # Nếu Chủ tịch muốn có quỹ cho đội xe thì đó là một tham số mới và một quyết định riêng,
+    # không phải một dòng rơi thầm vào tỷ lệ của phòng khác.
+    key = {"le_noi_dia": "quy_dh_le_noi_dia", "le_nuoc_ngoai": "quy_dh_le_nuoc_ngoai",
+           "doan_noi_dia": "quy_dh_doan", "doan_nuoc_ngoai": "quy_dh_doan",
+           "non_package": "quy_dh_le_noi_dia", "thue_xe": ""}.get(tour.tour_type, "quy_dh_doan")
+    rate = get_param(db, key, tour.end_date) if key else 0.0
     # ĐC Điều 7: tour lẻ < ngưỡng hoặc duyệt dưới biên → không quỹ; đoàn không phụ thuộc biên. Quá hạn → mất thưởng chuyến.
     eligible = on_time and (is_doan(tour) or (margin >= thr and not tour.below_margin))
     fund = profit * rate if (eligible and profit > 0) else 0
@@ -822,7 +836,7 @@ def run_robots(db: Session) -> int:
 
     d7 = int(get_param(db, "moc_d7"))
     for t in db.execute(select(Tour).where(Tour.status == "da_duyet")).scalars():
-        if t.tour_type == "non_package":
+        if t.tour_type in KHONG_TRON_GOI:
             if t.end_date < today: t.status = "ket_thuc"
             continue
         thr = get_param(db, "nguong_bien", t.start_date)
@@ -839,7 +853,7 @@ def run_robots(db: Session) -> int:
     # trạng thái "ket_thuc" từ đầu lịch sử; với dữ liệu đổ từ Vietrip sang nó đẻ ra 851 dòng đỏ
     # trong một lượt, và 851 dòng đỏ thì không ai đọc dòng nào. Chuyến cũ hơn mốc lùi vẫn quá hạn
     # thật, nhưng đó là việc DỌN DỮ LIỆU một lần, không phải việc nhắc mỗi lượt quét.
-    for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.tour_type != "non_package",
+    for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.tour_type.in_(TOUR_TRON_GOI),
                                            Tour.end_date >= moc_lui)).scalars():
         dl = settlement_deadline(db, t)
         if today > dl:

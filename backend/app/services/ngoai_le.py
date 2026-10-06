@@ -19,7 +19,7 @@ from datetime import datetime, date, timedelta
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
 
-from app.models.core import AuditLog, Tour, User, UserGrant, AiRun, AiPause, Param, CAPABILITIES
+from app.models.core import AuditLog, Tour, User, UserGrant, AiRun, AiPause, Param, CAPABILITIES, KHONG_TRON_GOI
 from app.models.ngoai_le import NgoaiLeXuLy, TRANG_THAI
 from app.services import rules as R
 
@@ -129,7 +129,7 @@ def _ban_khong_du_toan(db: Session) -> list[dict]:
     ra = []
     thr = R.get_param(db, "nguong_bien")
     for t in db.execute(select(Tour).where(Tour.status.in_(["da_duyet", "ket_thuc"]))).scalars():
-        if not getattr(t, "imported", False) or t.tour_type == "non_package": continue
+        if not getattr(t, "imported", False) or t.tour_type in KHONG_TRON_GOI: continue
         if not t.bookings: continue
         if R.calc_db(db, t, thr)["complete"]: continue
         ra.append({"ma": _mo("ban_khong_du_toan", t.code), "loai": "ban_khong_du_toan", "muc": "do",

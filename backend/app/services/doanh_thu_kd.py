@@ -89,12 +89,21 @@ NGAN = NB.NGAN
 # KHÔNG CHÉP LUẬT PHÂN MẢNG SANG ĐÂY. Gọi thẳng `SEG.mang_of()`. Quy tắc ấy là HỢP của hai điều kiện
 # (loại chuyến HOẶC mã MICE) và `segments.py` còn có sẵn `lech_quy_tac()` chỉ ra chuyến nào hai quy
 # tắc bất đồng. Giữ một bản chép ở đây là cầm chắc ngày hai nơi nói khác nhau.
-LUONG = ("le", "doan", "dich_vu_le")
+LUONG = ("le", "doan", "dich_vu_le", "thue_xe")
 
 
 def luong_cua(t: Tour) -> str:
-    """Luồng của một chuyến. Rỗng ở `segments` nghĩa là dịch vụ lẻ — ở đây gọi đúng tên nó."""
-    return SEG.mang_of(t) or "dich_vu_le"
+    """Luồng của một chuyến.
+
+    07/10/2026 — THÊM LUỒNG THỨ TƯ. Dòng cũ viết `SEG.mang_of(t) or "dich_vu_le"`: rỗng ở
+    `segments` thì gọi là dịch vụ lẻ. Câu ấy đúng khi chỉ có một loại chuyến đứng ngoài hai mảng.
+    Hợp đồng thuê xe cũng đứng ngoài hai mảng, nên với dòng cũ nó sẽ được GỌI LÀ DỊCH VỤ LẺ và
+    cộng vào đúng ngăn ấy — một lời nói sai, không phải một phép tính sai, và vì thế khó thấy hơn.
+
+    Nay tra bằng bảng: rỗng ở `segments` thì hỏi loại chuyến. Loại nào chưa ai xếp vẫn rơi về
+    "dich_vu_le" như cũ, nhưng `test_tx4` canh để chuyện ấy không xảy ra lặng lẽ.
+    """
+    return SEG.mang_of(t) or {"thue_xe": "thue_xe"}.get(t.tour_type, "dich_vu_le")
 
 
 def _bien_ky(ky: str) -> tuple[date, date]:
