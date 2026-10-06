@@ -159,14 +159,23 @@ def test_nl6_bo_doi_chieu_phai_tu_noi_ra_vung_mu_cua_no():
 
     Trên hệ thống thật ngày 09/9/2026: nhật ký lô có ĐÚNG MỘT dòng (11 dòng bằng lái xe), trong khi
     cùng tháng 25.728 bút toán đã vào sổ qua bộ nạp MISA – một cửa không ghi nhật ký lô.
+
+    SỬA NGÀY 30/9/2026, và ghi ra vì sao: bản đầu của phép thử này đòi đích danh
+    `misa.import_journal` phải nằm trong danh sách vùng mù. Ngày ấy đòi thế là đúng – nó là lô lớn
+    nhất và đang thật sự ngoài sổ. Nhưng một phép thử khoá cứng vào TÌNH TRẠNG HÔM ẤY thì đến ngày
+    người ta SỬA được nó, phép thử đỏ lên như thể việc sửa là một lỗi. Nay phép thử đòi đúng cái
+    luật nó sinh ra để giữ: mỗi cửa còn ngoài sổ PHẢI được gọi tên, và danh sách trên màn hình phải
+    khớp từng chữ với sổ đăng ký. Còn bao nhiêu cửa ngoài sổ là việc của `test_nl9`.
     """
     from app.services import ks_nap_lo as NL
     from app.db.session import SessionLocal
     db = SessionLocal()
     ds = _tim(NL.quet(db), "nap_lo_khong_so#")
-    assert ds, "phải mở ngoại lệ cho từng cửa nạp hàng loạt không ghi nhật ký lô"
     cua = {x["doi_tuong"] for x in ds}
-    assert "misa.import_journal" in cua, "lô lớn nhất hệ thống mà bộ đối chiếu không thấy thì phải nêu"
+    ngoai_so = {c["cua"] for c in NL.cua_khong_ghi_so()}
+    assert cua == ngoai_so, (
+        f"Ngoại lệ mở ra không khớp sổ đăng ký: quét ra {cua}, sổ khai {ngoai_so}. Lệch nghĩa là "
+        f"có cửa ngoài sổ mà robot không mở việc cho nó – đúng vùng mù mà bộ kiểm này sinh ra để nói.")
     b = NL.bang(db)
     assert b["cua_khong_ghi_so"], "màn hình cũng phải thấy phần không che được, không chỉ ngoại lệ"
     db.close()
