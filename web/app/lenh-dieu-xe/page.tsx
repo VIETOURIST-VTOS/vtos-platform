@@ -16,6 +16,7 @@ function LenhDieuXe() {
   const [khach, setKhach] = useState(0);
   const [km, setKm] = useState(0);
   const [gy, setGy] = useState<any>(null);
+  const [dm, setDm] = useState<any>(null);           // danh mục: tên của từng mức kiểm tra
   const [ds, setDs] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
   // Mẫu chốt lệnh. Trước 09/9/2026 màn hình này chỉ XEM: có bảng gợi ý, có bảng lệnh đã lập, không có
@@ -31,6 +32,8 @@ function LenhDieuXe() {
 
   const load = useCallback(async () => {
     try { setDs(await api("/fleet/lenh-dieu-xe")); } catch (e) { toast(errMsg(e), true); }
+    // Tên của từng mức kiểm tra lấy từ máy chủ (MUC_TEN), để màn hình không gõ lại thang mức.
+    try { setDm(await api("/fleet/danh-muc")); } catch { /* thiếu danh mục thì in mã mức, vẫn đúng */ }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
 
@@ -148,7 +151,11 @@ function LenhDieuXe() {
             <td><b>{i + 1}</b></td><td>{p.ma_xe} · {p.xe}</td><td className="num">{p.so_cho}</td>
             <td className="num">{p.diem}</td>
             <td>{p.ly_do.join(" · ")}</td>
-            <td><Tag cls={p.muc_kiem_tra === "OK" ? "ok" : "warn"}>{p.muc_kiem_tra === "OK" ? "Đạt" : p.muc_kiem_tra === "UNKNOWN" ? "Chưa đủ dữ liệu" : "Cần xem lại"}</Tag></td>
+            <td><Tag cls={p.muc_kiem_tra === "OK" ? "ok" : p.muc_kiem_tra === "BLOCK" ? "red" : "warn"}>
+              {/* Tên mức lấy từ danh mục của máy chủ (danh-muc.muc_kiem_tra = MUC_TEN), không gõ lại
+                  ba nhánh ở đây: bản cũ dồn mọi mức khác OK và UNKNOWN vào "Cần xem lại", nên một xe
+                  BỊ CHẶN cũng hiện là "cần xem lại" — nhẹ hơn sự thật, đúng chỗ không được nhẹ. */}
+              {dm?.muc_kiem_tra?.[p.muc_kiem_tra] || p.muc_kiem_tra}</Tag></td>
             <td>{coQuyen && <button className="act teal" style={{ margin: 0 }} disabled={busy || !tour}
               title={tour ? "" : "Chọn tour trước"} onClick={() => chot(p, "")}>Chốt lệnh</button>}</td>
           </tr>)}</tbody></table>

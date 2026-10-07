@@ -26,7 +26,31 @@ from app.models.fleet import (VehiclePlate, VehicleDocument, FleetVerification, 
 from app.services import rules as R
 
 BLOCK, APPROVAL, REVIEW, UNKNOWN, OK = "BLOCK", "APPROVAL_REQUIRED", "REVIEW", "UNKNOWN", "OK"
-NANG = {BLOCK: 4, APPROVAL: 3, REVIEW: 2, UNKNOWN: 1, OK: 0}      # để lấy mức nghiêm trọng nhất
+# Thang độ nặng, dùng để lấy mức NGHIÊM TRỌNG NHẤT trong các mục đã soát của một chiếc xe.
+#
+# 07/10/2026 — Chủ tịch chốt ĐƯA "CHƯA ĐỦ DỮ LIỆU" LÊN NẶNG THỨ HAI, ngay sau "chặn". Thang cũ là
+# {BLOCK:4, APPROVAL:3, REVIEW:2, UNKNOWN:1, OK:0}, và nó gây ra đúng một chỗ hỏng đo được trên hệ
+# thật hôm ấy:
+#
+#   màn hình /doi-xe:  16 xe trong danh mục
+#                       0 sẵn sàng
+#                       0 chưa đủ dữ liệu      ← 11 chiếc đáng nằm ở đây
+#                       5 đang bị chặn
+#
+#   16 ≠ 0 + 0 + 5. Mười một chiếc biến mất khỏi mọi ô đếm.
+#
+# Vì sao: mười một chiếc ấy vừa THIẾU dữ liệu đăng kiểm (UNKNOWN) vừa có giấy còn hạn mà chưa đối
+# chiếu bản gốc (REVIEW). Thang cũ cho REVIEW nặng hơn, nên mức tổng ra REVIEW — còn ô đếm trên màn
+# hình chỉ in ba trong năm mức (OK, UNKNOWN, BLOCK). Dòng xe in LÝ DO của UNKNOWN nhưng NHÃN của
+# REVIEW: một chiếc xe mang lý do của mức này và nhãn của mức kia.
+#
+# Và thang cũ trái đúng câu tệp này tự viết ở đầu: "UNKNOWN là mức dễ bị bỏ qua nhất khi lập trình,
+# và cũng là mức nguy hiểm nhất nếu bỏ". "KHÔNG BIẾT" tệ hơn "biết và cần xem lại": cần xem lại thì
+# đã có người nhìn và biết nhìn cái gì; chưa đủ dữ liệu thì chưa ai biết mình đang thiếu gì.
+#
+# BLOCK vẫn ở trên cùng và KHÔNG đổi — đó là mức duy nhất chặn lệnh điều xe (api/v1/hr.py), nên đổi
+# nó là đổi luật cho xe ra đường. Thứ tự này chỉ đổi cách XẾP NHÓM để nhìn, không đổi cửa nào chặn.
+NANG = {BLOCK: 4, UNKNOWN: 3, APPROVAL: 2, REVIEW: 1, OK: 0}
 MUC_TEN = {BLOCK: "Chặn", APPROVAL: "Cần duyệt ngoại lệ", REVIEW: "Cần xem lại", UNKNOWN: "Chưa đủ dữ liệu",
            OK: "Đạt"}
 # Xe được phép điều đi khi quyền khai thác nằm trong nhóm này
