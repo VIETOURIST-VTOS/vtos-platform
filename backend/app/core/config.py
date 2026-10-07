@@ -67,6 +67,13 @@ class Settings(BaseSettings):
     TT_ACCESS_TOKEN: str = ""                # token TikTok Business API - CNTT dan vao Render
     TT_API_VERSION: str = "v1.3"             # ban Events API (tra 07/10/2026)
     TT_EVENT_NAME: str = "VTOS_ChotTour"     # su kien CRM BAT BUOC la ten tuy chinh - khong
+
+    # ---- Zalo Ads Form: KEO lead ve. Xem app/services/zalo_form_ads.py ----
+    # Zalo KHONG co cua nhan chuyen doi tu may chu nhu Meta va TikTok, nen vong Zalo chi khep
+    # duoc nua dau: lay lead kem nguon quang cao, khong bao nguoc duoc doanh thu.
+    # Can QUYEN QUAN LY ADS tren OA - khac quyen nhan tin VTOS dang dung.
+    ZALO_FORM_IDS: str = ""   # ma bieu mau, ngan nhau bang dau phay. Bieu mau MOI ma quen khai
+                              # thi lead cua no khong duoc keo ve va KHONG co loi nao bao.
                                              # dung duoc "Purchase". MKT phai khai DUNG ten nay
                                              # trong Trinh quan ly su kien TikTok.
 

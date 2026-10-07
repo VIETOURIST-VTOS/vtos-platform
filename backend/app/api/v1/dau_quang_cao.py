@@ -24,6 +24,7 @@ from app.services import access as AC
 from app.services import chuyen_doi_di as CD
 from app.services import gui_meta as GM
 from app.services import gui_tiktok as GT
+from app.services import zalo_form_ads as ZF
 from app.services import dau_quang_cao as DQ
 from app.services import rules as R
 
@@ -113,6 +114,25 @@ def ghep(db: Session = Depends(get_db)):
     """Quét lại những dấu chưa khớp lead. Lead thường tới SAU cái chạm."""
     n = DQ.ghep_lead_con_thieu(db)
     return {"da_ghep": n, "message": f"Ghép thêm {n} dấu vào lead"}
+
+
+@router.post("/keo-zalo-form", dependencies=[Depends(robot_auth)])
+def keo_zalo_form(so_ngay: int = 7, form_id: str = "", db: Session = Depends(get_db)):
+    """Kéo lead biểu mẫu quảng cáo Zalo về bảng dấu.
+
+    Khác hai cửa gửi của Meta và TikTok: đây là cửa KÉO VÀO, không phải đẩy ra. Zalo không có
+    cửa nhận chuyển đổi từ máy chủ, nên vòng Zalo chỉ khép được nửa đầu – lý do đầy đủ ở đầu
+    `app/services/zalo_form_ads.py`.
+
+    Zalo chỉ cho lấy tối đa 30 ngày một lượt; `so_ngay` vượt mức đó bị cắt xuống 30.
+    """
+    return ZF.keo(db, so_ngay, form_id)
+
+
+@router.get("/cau-hinh-zalo-form")
+def cau_hinh_zalo_form(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Bộ kéo Zalo đã cắm được chưa, và đang đọc những biểu mẫu nào. KHÔNG trả token."""
+    return ZF.cau_hinh(db)
 
 
 @router.get("/meta")
