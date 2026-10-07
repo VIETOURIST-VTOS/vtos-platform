@@ -41,6 +41,11 @@ CUA_KHONG_THEO_VAI_TRO: dict[str, str] = {
     "robot_auth": (
         "Cửa token robot: khai ở dependencies=[Depends(robot_auth)] nên máy đọc được. Người dùng "
         "không đi qua cửa này, chỉ n8n và GitHub Actions gọi bằng X-Robot-Token."),
+    "cong_xem_chi_luong": (
+        "Cổng xem các lần chi của một kỳ lương (GET /payroll-runs/{period}/chi) · 08/10/2026. "
+        "Không mang danh sách vai trò vì luật là 'mở được thẻ payroll' HOẶC 'thuộc nhóm vai "
+        "được chi', mà vế đầu phụ thuộc ngoại lệ theo TỪNG NGƯỜI trong cơ sở dữ liệu. Máy vẫn "
+        "đọc được: cổng nằm ở chữ ký và mang dấu la_cong_chan_quyen."),
 }
 
 

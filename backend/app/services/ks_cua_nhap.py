@@ -224,6 +224,19 @@ MAY_SINH = {
     "bang_luong_khoa": "Bản chụp kỳ lương do máy ghi đúng lúc có chữ ký (services/luong_khoa.khoa). "
                        "Gõ tay được vào đây là làm giả được bằng chứng của một chữ ký.",
     "tong_dai_su_kien": "Nhật ký nguyên văn webhook tổng đài – tổng đài ghi vào, không ai nhập tay.",
+    # 08/10/2026 · Hai bảng của TC-103 và TC-105. Không có cửa nhập tay là CHỦ Ý, và lý do nằm ở
+    # chỗ: số ở đây không phải số của Vietourist, nó là số của Google / Meta / TikTok / Zalo.
+    # Gõ tay một dòng dấu quảng cáo là bịa ra một lần khách chạm chưa từng xảy ra; mà dấu ấy sau
+    # đó được đẩy NGƯỢC lên nền tảng như một chuyển đổi thật, tức là tự dạy nền tảng tối ưu sai
+    # rồi trả tiền thật cho nó. Đây đúng loại "nhập hộ vào cơ sở dữ liệu" mà ranh giới 09/9/2026
+    # cấm, chứ không phải một cửa còn thiếu.
+    "dau_quang_cao": "Lần chạm giữa khách và một kênh quảng cáo. Nền tảng ghi vào qua webhook "
+                     "hoặc qua cửa máy chủ POST /dau-quang-cao/nhan; người KHÔNG tạo được dòng "
+                     "mới. Người chỉ gắn lại một dấu đã có vào đúng lead khi máy khớp sai "
+                     "(POST /dau-quang-cao/{did}/gan-lead) – sửa liên kết, không nhập số liệu.",
+    "chuyen_doi_gui_di": "Hàng đợi báo ngược doanh thu về nền tảng, do services/chuyen_doi_di.sinh "
+                         "dựng từ dấu đã khớp lead và booking đã chốt. Gõ tay một dòng ở đây là "
+                         "báo cho Meta hoặc TikTok một đơn hàng không có thật.",
     # 28/9/2026. Ảnh chụp công nợ khách theo Vietrip. Số là của VIETRIP, do lịch chạy 8h sáng đọc từ
     # Vietrip rồi đẩy vào qua POST /cong-no-vietrip/nap. Gõ tay một dòng ở đây là bịa ra một con số
     # Vietrip chưa từng nói – muốn sửa số thì sửa ở Vietrip, sáng hôm sau ảnh mới tự thay.
