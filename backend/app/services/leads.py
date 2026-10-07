@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.core import User, Tour, Booking
 from app.models.crm import Lead, LeadChannelStat, ZaloMessage, LEAD_CHANNELS, LEAD_STATUS
 from app.services import rules as R
+from app.services import so_lo_nap as SLN
 from app.services.zalo import norm_phone
 
 # Tên bản quy tắc tính TỶ LỆ CHỐT mà báo cáo đang dùng. Chủ tịch chốt 14/9/2026: lấy cách của tệp
@@ -168,12 +169,23 @@ def upsert_lead(db: Session, actor: str, d: dict) -> tuple[Lead, bool]:
     db.flush(); return l, new
 
 
-def import_rows(db: Session, actor: str, rows: list[dict]) -> dict:
+def import_rows(db: Session, actor: str, rows: list[dict], ghi_so: bool = True) -> dict:
+    """`ghi_so=False` khi được gọi từ `import_xlsx`: MỘT tệp phải để lại MỘT dòng nhật ký lô.
+
+    Ghi cả hai chỗ thì sổ có hai dòng cho cùng một tệp và bộ đối chiếu K5 đếm đôi mọi thứ — đúng
+    kiểu hỏng khó thấy nhất, vì mỗi con số riêng lẻ đều đúng.
+    """
     n_new = n_upd = 0; errs = []
     for i, r in enumerate(rows):
         try:
             _, new = upsert_lead(db, actor, r); n_new += new; n_upd += (not new)
         except ValueError as ex: errs.append(f"dòng {i + 1}: {ex}")
+    if ghi_so:
+        # Lead KHÔNG mang tiền nên bốn ô tiền để TRỐNG. `updated` vẫn là ĐÃ GHI, không phải bỏ qua:
+        # cửa này là upsert, dòng trùng số điện thoại được cập nhật chứ không bị ném đi.
+        SLN.ghi_lo(db, loai="lead_nhap_dong", so_dong=len(rows), da_nap=n_new + n_upd,
+                   dong_loi=len(errs), boi=actor, nguon="nguoi_nhap", dau_vao=rows,
+                   ket_qua={"moi": n_new, "cap_nhat": n_upd, "loi": errs[:20]})
     db.commit(); return {"new": n_new, "updated": n_upd, "errors": errs[:20], "n_errors": len(errs)}
 
 
@@ -207,7 +219,11 @@ def import_xlsx(db: Session, actor: str, data: bytes, default_month: str = "") -
                              "lead_month": r[im] if im is not None else (r[idate] if idate is not None else default_month), "received_at": r[idate] if idate is not None and isinstance(r[idate], datetime) else None,
                              "interest": r[iint] if iint is not None else "", "note": r[inote] if inote is not None else "", "campaign": r[icamp] if icamp is not None else ""})
             break
-    out = import_rows(db, actor, rows); out["stats"] = stats; out["rows"] = len(rows)
+    out = import_rows(db, actor, rows, ghi_so=False); out["stats"] = stats; out["rows"] = len(rows)
+    SLN.ghi_lo(db, loai="lead_nhap_excel", so_dong=len(rows), da_nap=out["new"] + out["updated"],
+               dong_loi=out["n_errors"], boi=actor, nguon="nap_tep", dau_vao=data,
+               ket_qua={"moi": out["new"], "cap_nhat": out["updated"], "thong_ke_kenh_thang": stats,
+                        "loi": out["errors"]})
     R.audit(db, actor, "user", "nhap_lead_excel", "crm", after={"moi": out["new"], "cap_nhat": out["updated"], "thong_ke": stats, "loi": out["n_errors"]}); db.commit()
     return out
 

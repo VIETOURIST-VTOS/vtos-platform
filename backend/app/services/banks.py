@@ -27,6 +27,7 @@ from app.models.accounting import Account, JournalEntry, JournalLine
 from app.models.banks import BankAccount, BankDocMap, CURRENCIES
 from app.models.core import User
 from app.services import rules as R
+from app.services import so_lo_nap as SLN
 
 BANK_ROOT = "112"
 POSTED = "da_ghi_so"
@@ -457,6 +458,17 @@ def import_bank_book(db: Session, u: User, data: bytes, filename: str = "") -> d
     R.audit(db, u.username, u.role, "nap_so_tien_gui_misa", f"nh:{filename[:40]}",
             after={"so_tai_khoan": len(parsed["accounts"]), "moi_mo": created,
                    "so_dong_ban_do": len(parsed["entries"]), "so_chung_tu": parsed["docs"]})
+    # K5 – NHẬT KÝ LÔ. Cửa này ghi ĐÈ bản đồ của chính những ngân hàng có trong tệp (xóa rồi ghi
+    # lại) nên không có dòng nào "bỏ qua vì đã có": nạp lại cùng tệp ra cùng kết quả, và cả ba ô
+    # bỏ-qua/lỗi đều bằng 0 THẬT chứ không phải không đo được.
+    SLN.ghi_lo(db, loai="ngan_hang_so_tien_gui", so_dong=len(parsed["entries"]),
+               da_nap=len(parsed["entries"]), ten_tep=filename, boi=u.username, nguon="nap_tep",
+               dau_vao=data, cot_tien=["số tiền"],
+               tong_tien_tep=sum(float(e["amount"] or 0) for e in parsed["entries"]),
+               tong_tien_da_nap=sum(float(e["amount"] or 0) for e in parsed["entries"]),
+               tong_tien_bo_qua=0, tong_tien_loi=0,
+               ket_qua={"so_tai_khoan": len(parsed["accounts"]), "moi_mo": created,
+                        "so_chung_tu": parsed["docs"], "ghi_de_ban_do": list(parsed["accounts"])})
     db.commit()
     banks = {b.code: b for b in db.execute(select(BankAccount)).scalars()}
     return {"accounts": [{"code": c, "bank_name": parsed["accounts"][c],
