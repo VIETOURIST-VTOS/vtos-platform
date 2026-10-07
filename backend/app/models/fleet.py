@@ -127,6 +127,50 @@ CO = {"xanh": "Xanh – đủ chứng từ, số khớp", "vang": "Vàng – l�
 MAINT_KINDS = {"dinh_ky": "Bảo dưỡng định kỳ", "sua_chua": "Sửa chữa", "vo_xe": "Vỏ xe", "khac": "Khác"}
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# NGUỒN CỦA SỐ KM — khai thành bảng, không để chuỗi tự do (07/10/2026)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# `Trip.km_nguon` xưa nay là `String(40)` tự do với chú thích "anh_dong_ho / nhap_tay / gps". Chuỗi
+# tự do thì ba người gõ ba cách — "GPS", "gps", "Vietmap" — và lúc đi hỏi "số này ở đâu ra" thì
+# không nhóm lại được.
+#
+# Chủ tịch cho biết 07/10/2026: đội xe Vietourist đang theo dõi hành trình trên BA cổng khác nhau
+# (TTC · TCD · Vietmap), mỗi cổng một tài khoản riêng. Nên "gps" không còn là một câu trả lời đủ:
+# khi km đồng hồ lệch km GPS, câu hỏi tiếp theo luôn là LỆCH VỚI CỔNG NÀO — ba cổng có thể cho ba
+# con số khác nhau cho cùng một chiếc xe, và chọn tin cổng nào là một quyết định của người, không
+# phải của phần mềm.
+#
+# Giữ "gps" trong bảng làm giá trị CŨ, không bỏ: những dòng đã ghi trước hôm nay mang đúng chữ ấy,
+# và xoá nó đi là làm chúng thành giá trị lạ.
+KM_NGUON = {
+    "anh_dong_ho": "Ảnh đồng hồ công-tơ-mét",
+    "nhap_tay": "Người nhập tay",
+    "gps": "GPS (chưa rõ cổng nào — cách ghi cũ)",
+    "gps_ttc": "GPS – cổng TTC",
+    "gps_tcd": "GPS – cổng TCD",
+    "gps_vietmap": "GPS – cổng Vietmap",
+}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# TÀI KHOẢN ePass — HAI PHÁP NHÂN, HAI VÍ (Chủ tịch cho biết 07/10/2026)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Đội xe đi đường bằng HAI tài khoản ePass thuộc hai pháp nhân khác nhau. Trước bản này bộ nạp
+# "Phí cầu đường" không có ô tài khoản và `_gd_nap` không ghi cột `tai_khoan`, nên giao dịch của cả
+# hai ví rơi chung một rổ `source="epass"` — chi phí cầu đường của hai pháp nhân TRỘN VÀO NHAU,
+# cùng một kiểu hỏng với doanh thu thuê xe chạy lẫn vào doanh thu tour (xem TX-4 ngày 07/10).
+#
+# Đây là một BẢNG LUẬT, không phải số liệu: nó trả lời "ví này là của ai", và câu trả lời do người
+# cho chứ máy không suy được. Ví thứ ba xuất hiện thì bộ nạp NÓI RA chứ không đoán — xem
+# `_epass_kiem`.
+VI_EPASS = {
+    "V001889627": "Vận tải Vietrip",
+    "V003014969": "Vietourist (VTD)",
+}
+
+
 class Trip(Base):
     """Một chuyến xe – nhật trình. Km đầu/cuối là số ĐO, nên phải đi kèm nguồn và thời điểm.
 
@@ -146,7 +190,9 @@ class Trip(Base):
     km_dau: Mapped[int | None] = mapped_column(Integer, nullable=True)
     km_cuoi: Mapped[int | None] = mapped_column(Integer, nullable=True)
     km_gps: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    km_nguon: Mapped[str] = mapped_column(String(40), default="")      # anh_dong_ho / nhap_tay / gps
+    # Nguồn của số km – xem KM_NGUON ở đầu tệp. Số đo mà không kèm nguồn thì không đối chiếu được với
+    # số GPS: lấy GPS so với GPS thì luôn khớp, và cái "luôn khớp" đó làm người xem tin là đã kiểm.
+    km_nguon: Mapped[str] = mapped_column(String(40), default="")      # khóa của KM_NGUON
     doanh_thu: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="cho_xac_nhan")
     co: Mapped[str] = mapped_column(String(10), default="vang")        # cờ tổng hợp của chuyến

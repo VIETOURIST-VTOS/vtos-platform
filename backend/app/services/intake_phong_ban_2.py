@@ -85,6 +85,7 @@ def _gd_nap(db: Session, r, boi, source: str):
     bien = str(r.get("bien_so") or "").strip()
     v = _xe(db, bien, d or date.today()) if bien else None
     t = ExternalTxn(source=source, ma_gd=str(r.get("ma_gd") or "").strip()[:120],
+                    tai_khoan=str(r.get("tai_khoan") or "").strip()[:40],
                     the_4so=str(r.get("the_4so") or "").strip()[:8], bien_so=bien[:20],
                     vehicle_id=(v.id if v is not None else None), thoi_diem=luc,
                     so_tien=_so(r.get("so_tien")), lit=_so(r.get("lit")),
@@ -96,7 +97,36 @@ def _gd_nap(db: Session, r, boi, source: str):
 
 def _dau_kiem(db, r): return _gd_kiem(db, r, "the_dau", "Thẻ dầu")
 def _dau_nap(db, r, boi): return _gd_nap(db, r, boi, "the_dau")
-def _epass_kiem(db, r): return _gd_kiem(db, r, "epass", "ePass/VETC")
+
+
+def _epass_kiem(db, r):
+    """Kiểm ePass = kiểm chung + MỘT câu hỏi riêng: giao dịch này của ví nào.
+
+    Đội xe đi đường bằng HAI tài khoản ePass thuộc HAI pháp nhân khác nhau (Chủ tịch cho biết
+    07/10/2026 – xem models/fleet.py::VI_EPASS). Trước bản này bộ nạp không có ô tài khoản và hàm ghi
+    không ghi cột `tai_khoan`, nên giao dịch của cả hai ví rơi chung một rổ `source="epass"`: chi phí
+    cầu đường của hai pháp nhân TRỘN VÀO NHAU. Cùng một kiểu hỏng với doanh thu thuê xe chạy lẫn vào
+    doanh thu tour (TX-4, 07/10/2026), và cũng khó thấy đúng vì tổng vẫn khớp – chỉ phần của từng pháp
+    nhân là sai.
+
+    Ví lạ thì CẢNH BÁO chứ không chặn, và cũng không đoán hộ. Chặn thì một ví mới mở là một tệp không
+    nạp được, mà đoán thì số của ví mới chạy vào tên pháp nhân cũ – hỏng nặng hơn chính cái đang sửa.
+    Bỏ trống cũng chỉ cảnh báo, vì sao kê các kỳ trước không có cột này: dòng cũ nằm ở nhóm "chưa quy
+    được về ví", đếm được, và sửa được bằng cách nạp lại khi có số."""
+    from app.models.fleet import VI_EPASS
+    loi, cb, trung = _gd_kiem(db, r, "epass", "ePass/VETC")
+    tk = str(r.get("tai_khoan") or "").strip()
+    if not tk:
+        cb.append("Thiếu số tài khoản ePass – dòng này sẽ nằm ở nhóm CHƯA QUY ĐƯỢC VỀ VÍ, không được "
+                  "cộng vào chi phí của pháp nhân nào cả")
+    elif tk not in VI_EPASS:
+        cb.append(f"Tài khoản ePass '{tk}' chưa khai trong hệ thống (đang khai: "
+                  + ", ".join(f"{k} = {v}" for k, v in VI_EPASS.items())
+                  + "). Giao dịch vẫn được ghi đúng số tài khoản này, nhưng chưa quy về pháp nhân nào – "
+                    "nếu đội xe mới mở thêm ví thì khai vào models/fleet.py::VI_EPASS")
+    return loi, cb, trung
+
+
 def _epass_nap(db, r, boi): return _gd_nap(db, r, boi, "epass")
 
 
@@ -941,9 +971,15 @@ def bo_nap(_c) -> dict:
             "ten": "Phí cầu đường – báo cáo ePass / VETC",
             "mo_ta": "Báo cáo trạm thu phí. Báo cáo ePass tháng 8/2026 có hai bản ghi lặp hoàn toàn – bản "
                      "trùng vẫn được GIỮ trong bảng thô với cờ riêng, chỉ loại ở tầng tính, để còn chứng "
-                     "minh được mình đã loại đúng cái gì.",
+                     "minh được mình đã loại đúng cái gì. ĐỘI XE ĐI BẰNG HAI VÍ ePass CỦA HAI PHÁP NHÂN "
+                     "(Vận tải Vietrip và Vietourist) – mỗi tệp sao kê tải từ một ví, nên phải điền số "
+                     "tài khoản của ví đó, không thì hai pháp nhân bị cộng chung một rổ.",
             "khoa_chong_trung": "Mã giao dịch trên báo cáo ePass/VETC",
             "cot": [_c("ma_gd", "Mã giao dịch", True, vi_du="EP2608310001"),
+                    _c("tai_khoan", "Tài khoản ePass", vi_du="V003014969",
+                       ghi_chu="số ví lấy sao kê này. Hai ví đang dùng: V001889627 = Vận tải Vietrip, "
+                               "V003014969 = Vietourist (VTD). Để trống thì dòng nằm ở nhóm CHƯA QUY "
+                               "ĐƯỢC VỀ VÍ – không bị mất, nhưng chưa vào chi phí của pháp nhân nào"),
                     _c("thoi_diem", "Thời điểm", True, kieu="ngay", vi_du="31/08/2026",
                        khong_tuong_lai=True),
                     _c("bien_so", "Biển số xe", vi_du="50F-034.71"),

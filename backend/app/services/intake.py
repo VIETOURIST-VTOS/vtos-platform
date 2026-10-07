@@ -203,6 +203,11 @@ def _chuyen_nap(db, r, boi):
            "ten_tour": str(r.get("ten_tour") or ""), "ngay_di": _ngay(r.get("ngay_di")),
            "ngay_ve": _ngay(r.get("ngay_ve")),
            "km_dau": int(_so(r.get("km_dau"))) or None, "km_cuoi": int(_so(r.get("km_cuoi"))) or None,
+           # `or None` giữ đúng nghĩa "chưa đo" cho cả ba ô km: ô trống đọc ra 0, và 0 ở đây KHÔNG
+           # phải một số đo — nó là chỗ chưa ai điền. Ghi 0 vào `km_gps` thì nhánh `elif t.km_gps:`
+           # của cửa kiểm vẫn im, nhưng màn hình lại hiện một con số, tức là nói dối gọn gàng hơn.
+           "km_gps": int(_so(r.get("km_gps"))) or None,
+           "km_nguon": str(r.get("km_nguon") or "").strip(),
            "doanh_thu": _so(r.get("doanh_thu")),
            "chi_phi": {"dau": _so(r.get("tien_dau")), "lit": _so(r.get("so_lit")),
                        "cau_duong": _so(r.get("cau_duong")), "cong_tac_phi": _so(r.get("cong_tac_phi")),
@@ -288,6 +293,26 @@ BO_NAP = {
                 _c("ngay_ve", "Ngày về", True, kieu="ngay", vi_du="03/08/2026"),
                 _c("km_dau", "Km đầu", kieu="so", ghi_chu="để trống nghĩa là CHƯA ĐO, không phải 0"),
                 _c("km_cuoi", "Km cuối", kieu="so"),
+                # ── KM THEO GPS · 07/10/2026 ──────────────────────────────────────────────────
+                # Hai cột này mở cửa cho một con số ĐÃ CÓ NGƯỜI ĐỌC nhưng chưa bao giờ có đường vào.
+                #
+                # Trước bản này: cột `fleet_trips.km_gps` có; tham số ngưỡng `xe_lech_km_gps` có;
+                # và `fleet.kiem_tra_chuyen` ĐỌC nó để bật cờ ĐỎ "km đồng hồ lệch GPS quá ngưỡng".
+                # Nhưng rà cả kho thì KHÔNG một bộ nạp nào và KHÔNG một ô nào trên màn hình ghi vào
+                # cột ấy — nên nhánh `elif t.km_gps:` chưa bao giờ chạy một lần.
+                #
+                # Một cờ không thể đỏ còn tệ hơn không có cờ: màn hình đội xe hiện "không lệch"
+                # trong khi sự thật là nó chưa từng so. Đây đúng là ranh giới 09/9/2026 — mỗi con số
+                # cần một cửa; không cửa thì là việc CÒN THIẾU, không phải số liệu để ai đó nhập hộ.
+                _c("km_gps", "Km theo GPS", kieu="so",
+                   ghi_chu="lấy từ cổng giám sát hành trình. Để trống nghĩa là KỲ NÀY KHÔNG CÓ SỐ "
+                           "GPS — khác hẳn 0, và khác hẳn 'đã so, không lệch'"),
+                # Đội xe đang theo dõi trên BA cổng (TTC · TCD · Vietmap), nên ô này phải nói CỔNG
+                # NÀO chứ không chỉ "gps": lúc km đồng hồ lệch, câu hỏi tiếp theo luôn là lệch với
+                # cổng nào, và ba cổng có thể cho ba con số cho cùng một chiếc xe.
+                _c("km_nguon", "Nguồn số km", vi_du="gps_vietmap",
+                   ghi_chu="anh_dong_ho / nhap_tay / gps_ttc / gps_tcd / gps_vietmap — xem "
+                           "models/fleet.py::KM_NGUON. Ghi sai tên thì cửa nạp báo lại, không nuốt"),
                 _c("doanh_thu", "Doanh thu", kieu="so"),
                 _c("tien_dau", "Tiền dầu", kieu="so"), _c("so_lit", "Số lít", kieu="so"),
                 _c("cau_duong", "Phí cầu đường", kieu="so"),

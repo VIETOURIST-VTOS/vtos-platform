@@ -290,7 +290,7 @@ def ket_luan(xid: int, data: KetLuanIn, u: User = Depends(require_roles(*WRITE))
 
 # ====================== ĐỢT 2: NHẬT TRÌNH, BẢO DƯỠNG, NGUỒN NGOÀI ======================
 from app.models.fleet import (Trip, TripCost, Maintenance, ExternalTxn, BEN_CHIU, COST_KINDS, NGUON_NGOAI,
-                              BEN_CHIU_MAC_DINH, TRIP_STATUS, CO, MAINT_KINDS)
+                              BEN_CHIU_MAC_DINH, TRIP_STATUS, CO, MAINT_KINDS, VI_EPASS, KM_NGUON)
 
 KETOAN = ("ketoan",)
 
@@ -311,6 +311,9 @@ def danh_muc_dot2(u: User = Depends(require_roles(*READ)), db: Session = Depends
     return {"ben_chiu": BEN_CHIU, "loai_chi_phi": COST_KINDS,
             "ben_chiu_mac_dinh": {**BEN_CHIU_MAC_DINH, "sua_chua": sc},
             "trang_thai_chuyen": TRIP_STATUS, "co": CO, "loai_bao_duong": MAINT_KINDS,
+            # Hai bảng khai báo mới 07/10/2026. Mở ra ở đây để màn hình dựng ô chọn từ MỘT nguồn, không
+            # gõ lại danh sách trong TypeScript – gõ lại là ngày nào đó hai bên lệch nhau mà không ai biết.
+            "km_nguon": KM_NGUON, "vi_epass": VI_EPASS,
             "ghi_chu": "Chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe. "
                        f"Sửa chữa hiện đặt là \"{BEN_CHIU[sc]}\" (chủ tịch chốt lại cuối ngày 07/9/2026: giữ "
                        "cách chi hộ rồi cấn trừ). Khoản chi hộ vẫn phải có chứng từ và có căn cứ đồng ý của "
@@ -339,6 +342,9 @@ def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict) -> dict:
             "tai_xe": emps.get(t.driver_id, ""), "ten_tour": t.ten_tour, "ngay_di": t.ngay_di,
             "ngay_ve": t.ngay_ve, "so_ngay": (t.ngay_ve - t.ngay_di).days + 1,
             "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "km_gps": t.km_gps,
+            "km_nguon": t.km_nguon, "km_nguon_ten": KM_NGUON.get(t.km_nguon, t.km_nguon or ""),
+            "km_lech_gps": (abs((t.km_cuoi - t.km_dau) - t.km_gps) if
+                            (t.km_dau is not None and t.km_cuoi is not None and t.km_gps) else None),
             "km_chay": (t.km_cuoi - t.km_dau) if (t.km_dau is not None and t.km_cuoi is not None) else None,
             "doanh_thu": t.doanh_thu, "status": t.status, "co": t.co, "co_ly_do": t.co_ly_do,
             "note": t.note, "ma_phieu": t.ma_phieu, "nguon": t.nguon,
@@ -372,6 +378,14 @@ def tao_chuyen(data: ChuyenIn, u: User = Depends(require_roles(*WRITE, *KETOAN))
     if data.ngay_ve < data.ngay_di: raise HTTPException(422, "Ngày về trước ngày đi")
     if data.km_dau is not None and data.km_cuoi is not None and data.km_cuoi < data.km_dau:
         raise HTTPException(422, "Km cuối nhỏ hơn km đầu – kiểm tra lại số đọc trên đồng hồ")
+    if data.km_nguon and data.km_nguon not in KM_NGUON:
+        raise HTTPException(422, f"Nguồn số km '{data.km_nguon}' không có trong danh mục. "
+                                 f"Chỉ nhận: {', '.join(KM_NGUON)}")
+    # Số GPS mà không nói lấy từ cổng nào thì sau này không đối chất được với bên nào. Ba cổng đang dùng:
+    # TTC, TCD, Vietmap (Chủ tịch cho biết 07/10/2026) – khai đủ trong KM_NGUON.
+    if data.km_gps and not data.km_nguon:
+        raise HTTPException(422, "Có số km theo GPS nhưng chưa ghi nguồn số km – chọn cổng GPS đã lấy số "
+                                 "(gps_ttc / gps_tcd / gps_vietmap) hoặc nguồn của số đồng hồ")
     t = Trip(**data.model_dump(), created_by=u.username)
     db.add(t); db.flush()
     kt = FL.kiem_chuyen(db, t)
@@ -422,6 +436,8 @@ class SuaChuyenIn(BaseModel):
     ngay_ve: date | None = None
     km_dau: int | None = None
     km_cuoi: int | None = None
+    km_gps: int | None = None
+    km_nguon: str | None = None
     doanh_thu: float | None = None
     driver_id: int | None = None
     note: str | None = None
@@ -439,7 +455,8 @@ def sua_chuyen(tid: int, data: SuaChuyenIn, u: User = Depends(require_roles(*WRI
     if t.status == "da_xac_nhan":
         raise HTTPException(422, "Chuyến đã xác nhận – mở lại (kèm lý do) rồi mới sửa được")
     truoc = {"ten_tour": t.ten_tour, "ngay_di": str(t.ngay_di), "ngay_ve": str(t.ngay_ve),
-             "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "doanh_thu": t.doanh_thu}
+             "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "km_gps": t.km_gps, "km_nguon": t.km_nguon,
+             "doanh_thu": t.doanh_thu}
     d = data.model_dump(exclude_none=True)
     from app.services import ghi_mot_lan as GML
     GML.kiem_phien_ban(t, d.pop("phien_ban", None), f"Chuyến {t.id}",
@@ -449,6 +466,12 @@ def sua_chuyen(tid: int, data: SuaChuyenIn, u: User = Depends(require_roles(*WRI
     if t.ngay_ve < t.ngay_di: raise HTTPException(422, "Ngày về trước ngày đi")
     if t.km_dau is not None and t.km_cuoi is not None and t.km_cuoi < t.km_dau:
         raise HTTPException(422, "Km cuối nhỏ hơn km đầu – kiểm tra lại số đọc trên đồng hồ")
+    if t.km_nguon and t.km_nguon not in KM_NGUON:
+        raise HTTPException(422, f"Nguồn số km '{t.km_nguon}' không có trong danh mục. "
+                                 f"Chỉ nhận: {', '.join(KM_NGUON)}")
+    if t.km_gps and not t.km_nguon:
+        raise HTTPException(422, "Có số km theo GPS nhưng chưa ghi nguồn số km – chọn cổng GPS đã lấy số "
+                                 "(gps_ttc / gps_tcd / gps_vietmap) hoặc nguồn của số đồng hồ")
     db.flush()
     kt = FL.kiem_chuyen(db, t); t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
     R.audit(db, u.username, u.role, "sua_chuyen", f"trip:{tid}", before=truoc,
@@ -796,6 +819,8 @@ def ds_giao_dich(source: str = "", chua_khop: bool = False, gom_ban_trung: bool 
     rows = list(db.execute(q.limit(1000)).scalars())
     return {"rows": [{"id": t.id, "source": t.source, "source_ten": NGUON_NGOAI.get(t.source, t.source),
                       "ma_gd": t.ma_gd, "thoi_diem": t.thoi_diem,
+                      "tai_khoan": t.tai_khoan,
+                      "vi": VI_EPASS.get(t.tai_khoan, "") if t.source == "epass" else "",
                       "bien_so": t.bien_so, "the_4so": t.the_4so, "xe": veh.get(t.vehicle_id, ""),
                       "vehicle_id": t.vehicle_id, "so_tien": t.so_tien, "lit": t.lit, "khop": t.khop,
                       "co": t.co, "trung": t.trung, "nhom": t.nhom,
@@ -808,10 +833,28 @@ def ds_giao_dich(source: str = "", chua_khop: bool = False, gom_ban_trung: bool 
                            "so_khoan": sum(1 for t in rows if (t.nhom or "") == n),
                            "so_tien": sum((t.so_tien or 0) for t in rows if (t.nhom or "") == n)}
                           for n in sorted({(t.nhom or "") for t in rows})],
+            # Chia theo VÍ ePass. Đội xe đi đường bằng hai ví thuộc hai pháp nhân khác nhau (VI_EPASS);
+            # trước bản 07/10/2026 cột `tai_khoan` không ai ghi và cũng không ai đọc, nên chi phí cầu
+            # đường của hai pháp nhân cộng chung một rổ. Tổng vẫn khớp – chỉ phần của từng bên là sai,
+            # nên không ai nhìn ra. Nhóm "(chưa ghi tài khoản)" là nợ số liệu của các kỳ cũ: ĐẾM ĐƯỢC
+            # ở đây, nạp lại tệp có cột tài khoản là hết, chứ không phải chia hộ theo tỷ lệ.
+            "theo_vi": [{"tai_khoan": tk or "",
+                         "ten": (VI_EPASS.get(tk, "(ví chưa khai trong hệ thống)") if tk
+                                 else "(chưa ghi tài khoản – chưa quy về pháp nhân nào)"),
+                         "so_khoan": sum(1 for t in rows if t.source == "epass" and (t.tai_khoan or "") == tk),
+                         "so_tien": sum((t.so_tien or 0) for t in rows
+                                        if t.source == "epass" and (t.tai_khoan or "") == tk
+                                        and not t.khong_phai_chi_phi)}
+                        for tk in sorted({(t.tai_khoan or "") for t in rows if t.source == "epass"})],
+            "tong_chua_quy_ve_vi": sum((t.so_tien or 0) for t in rows
+                                       if t.source == "epass" and not (t.tai_khoan or "")
+                                       and not t.khong_phai_chi_phi),
+            "vi_epass": VI_EPASS,
             "nguon": NGUON_NGOAI,
             "ghi_chu": "Đã loại bản ghi lặp (thêm gom_ban_trung=true để xem cả bản đã loại). Tổng chi phí "
                        "KHÔNG bao gồm khoản điều chuyển tiền nội bộ – hai thứ đó khác bản chất, cộng chung "
-                       "là báo cáo sai."}
+                       "là báo cáo sai. Riêng ePass còn chia theo VÍ: hai ví là hai pháp nhân, cộng chung "
+                       "thì tổng đúng mà phần của từng bên sai."}
 
 
 # ====================== ĐỢT 3: CHỦ XE, CÔNG NỢ, CẤN TRỪ, THẾ CHẤP, QUYẾT TOÁN ======================
