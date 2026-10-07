@@ -307,7 +307,10 @@ def tong_dai_khoi_luong(tu: str = "", den: str = "",
     from datetime import date, timedelta
     from app.services import pa_tong_dai as PA
     if not PA.da_khai():
-        return {"da_khai_khoa": False,
+        return {"da_khai_khoa": False, "doc_duoc": False,
+                "ly_do": "Chưa khai khoá API tổng đài trên máy chủ",
+                "viec": "Khai PA_TONG_DAI_API_KEY trên máy chủ. Khoá lấy ở crm.pavietnam.vn → "
+                        "Người phát triển → Kiểm thử API → API Call Now, ô api_key.",
                 "huong_dan": "Khai PA_TONG_DAI_API_KEY trên máy chủ. Khoá lấy ở crm.pavietnam.vn → "
                              "Người phát triển → Kiểm thử API → API Call Now, ô api_key."}
     hom_nay = date.today()
@@ -315,9 +318,28 @@ def tong_dai_khoi_luong(tu: str = "", den: str = "",
     den = den or str(hom_nay)
     try:
         d = PA.do_khoi_luong(tu, den)
-    except Exception as ex:
-        raise HTTPException(502, f"Không đọc được lịch sử cuộc gọi: {str(ex)[:200]}")
-    return {"da_khai_khoa": True, **d, "uoc_chi_phi": PA.uoc_chi_phi_chuyen_chu(d["phut_co_ghi_am"])}
+    except PA.TongDaiTuChoi as ex:
+        # NHÀ CUNG CẤP TỪ CHỐI KHÔNG PHẢI LÀ VTOS HỎNG, và cửa này đã nói nhầm suốt một tháng.
+        #
+        # Đo trên hệ thật 30/9 và 05/10/2026: cửa trả 502 "Tham số không hợp lệ" (mã 1003 của P.A),
+        # nên nó nằm trong bộ đếm 5xx và đi thẳng lên bàn giám sát của Chủ tịch dưới nhãn "màn hình
+        # làm máy chủ lỗi". Nhưng phép chẩn đoán `/tong-dai/chan-doan` trả lời dứt khoát: gửi một
+        # KHOÁ BỊA cũng nhận đúng mã 1003 ấy, và cả bốn dạng tham số — kể cả dạng đã xác minh là
+        # đúng — đều nhận 1003. Nghĩa là 1003 ở đây không nói gì về tham số; nó nghĩa là P.A TỪ
+        # CHỐI, và việc phải làm nằm ở trang quản trị của P.A chứ không nằm trong mã VTOS.
+        #
+        # Hai câu "VTOS hỏng" và "khoá tổng đài hết hiệu lực" dẫn tới hai người khác nhau đi làm hai
+        # việc khác nhau. Nên: 200 kèm `doc_duoc: False`, lý do, và VIỆC PHẢI LÀM — chứ không phải
+        # 502. Đây cũng là hình mà chính cửa này ĐÃ dùng cho nhánh "chưa khai khoá": cùng một tình
+        # huống con người (ai đó phải đi sửa cấu hình), trước nay hai câu trả lời máy khác nhau.
+        #
+        # CỐ Ý KHÔNG nuốt mọi ngoại lệ: lỗi của chính mã VTOS vẫn ném lên thành 500 như cũ. Bịt cả
+        # hai thành 200 là làm mù bộ đếm lỗi, đúng cái sai ngược lại.
+        return {"da_khai_khoa": True, "doc_duoc": False, "ma": ex.ma, "ly_do": ex.thong_bao,
+                "viec": PA.viec_phai_lam(ex.ma),
+                "chan_doan_tai": "/api/v1/tong-dai/chan-doan"}
+    return {"da_khai_khoa": True, "doc_duoc": True, **d,
+            "uoc_chi_phi": PA.uoc_chi_phi_chuyen_chu(d["phut_co_ghi_am"])}
 
 
 @router.get("/tong-dai/chan-doan")
