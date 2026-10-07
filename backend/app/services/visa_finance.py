@@ -19,6 +19,7 @@ from app.models.payments import Receipt, Retention
 from app.models.ops import PaymentRequest
 from app.models.visa import VisaCase, VisaResult, VisaTask, STAGES
 from app.services import rules as R
+from app.services import so_lo_nap as SLN
 from app.services.visa import VisaError, get_case, ensure_see, scope, _audit, resolve_company
 
 # Vai trò được xem cơ cấu tiền: theo ma trận sẵn có của VTOS, Kinh doanh KHÔNG xem giá vốn.
@@ -339,6 +340,16 @@ def import_portal(db: Session, u: User, data: bytes, filename: str, apply: bool 
                     "cũng không tự xóa. Dòng ghi test chỉ được đánh dấu thử nghiệm khi CHÍNH cột đó ghi, "
                     "không suy ra cả lô.")}
     if apply:
+        # K5 – NHẬT KÝ LÔ, CHỈ ở chế độ làm thật. Lượt xem trước không ghi gì vào bảng nghiệp vụ nên
+        # nó cũng không được để lại một dòng sổ nói rằng đã nạp; người dùng thường bấm xem trước vài
+        # lần trước khi bấm thật, và mỗi lượt một dòng sổ thì bộ đối chiếu đếm lô gấp mấy lần.
+        #
+        # Hồ sơ visa KHÔNG mang tiền ở cửa này (tiền đi đường khác), nên bốn ô tiền để TRỐNG.
+        SLN.ghi_lo(db, loai="visa_portal", so_dong=len(rows), da_nap=len(tao_moi),
+                   bo_qua_da_co=len(da_co), dong_loi=len(loi), ten_tep=filename,
+                   boi=u.username, nguon="nap_tep", dau_vao=rows,
+                   ket_qua={"nghi_trung": len(nghi_trung), "danh_dau_thu_nghiem": len(danh_dau_test),
+                            "loi": loi[:30]})
         R.audit(db, u.username, u.role, "visa_nap_du_lieu_portal", f"visa_portal:{filename}",
                 after={k: kq[k] for k in ("so_dong", "tao_moi", "da_co_tu_truoc", "loi", "nghi_trung")})
     return kq
