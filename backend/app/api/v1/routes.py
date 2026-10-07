@@ -302,11 +302,19 @@ def list_tours(status: str | None = None, q: str = "", month: str = "", limit: i
     # đổi PHÁ VỠ với mọi bên đang đọc mảng trần, nên web và phép thử sửa cùng một lần với chỗ này.
     tran = max(1, min(limit, 1000))
     tong = db.execute(select(func.count()).select_from(qs.order_by(None).subquery())).scalar_one()
-    out = []
-    for t in db.execute(qs.offset(offset).limit(tran)).scalars():
-        v = T.tour_view(db, t)
-        v.pop("bookings", None)
-        out.append(v)
+    # KS-9 (30/9/2026): NẠP SẴN sản phẩm của cả lô trước khi vào vòng lặp.
+    #
+    # KS-5 hồi 11/9 đã dọn ba quan hệ ORM bằng `selectinload` ngay ở câu truy vấn trên. Đo lại
+    # 30/9 bằng bộ đếm câu truy vấn thì vẫn còn ĐÚNG MỘT lượt cho MỖI chuyến (5→5, 20→20, 80→80),
+    # và lượt ấy là câu tra sản phẩm trong `budget_of` — nó tra theo CỘT CHỮ `product_code` nên
+    # `selectinload` không với tới. Màn hình mặc định lấy 300 chuyến: 300 vòng đi–về tới cơ sở dữ
+    # liệu, và cửa này đo được 16–30 giây trên hệ thật.
+    #
+    # `kem_bookings=False` thay cho `v.pop("bookings")` ở bản cũ: kết quả trả về y hệt, khác ở chỗ
+    # danh sách khách không còn được dựng ra rồi vứt đi.
+    rows = list(db.execute(qs.offset(offset).limit(tran)).scalars())
+    R.nap_san_du_toan(db, rows)
+    out = [T.tour_view(db, t, kem_bookings=False) for t in rows]
     return {"rows": out, "tong": tong, "offset": offset, "limit": tran,
             "cham_tran": offset + len(out) < tong}
 
