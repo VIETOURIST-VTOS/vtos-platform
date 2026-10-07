@@ -23,7 +23,7 @@ def snap(t: Tour) -> dict:
             "hoa_hong_khach_tien": getattr(t, "hoa_hong_khach_tien", 0)}
 
 
-def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
+def tour_view(db: Session, t: Tour, user: User | None = None, kem_bookings: bool = True) -> dict:
     thr = R.get_param(db, "nguong_bien", t.start_date)
     c = R.calc_db(db, t, thr)
     s = R.settlement_summary(db, t) if t.status in ("da_dong_so", "kt_xac_nhan", "khoa") else None
@@ -52,10 +52,16 @@ def tour_view(db: Session, t: Tour, user: User | None = None) -> dict:
         "company_id": t.company_id, "chua_gan_phap_nhan": t.company_id is None,   # P6: chưa xác định pháp nhân là một trạng thái phải nhìn thấy, không gộp về công ty mẹ
         "imported": t.imported, "product_code": t.product_code, "product_id": t.product_id, "days": t.days, "transport": t.transport, "vehicle_type": t.vehicle_type, "departure_point": t.departure_point,
         "d7_flag": bool(c["breakeven_pax"] and bk < c["breakeven_pax"] and 0 <= days_left <= int(R.get_param(db, "moc_d7")) and t.status == "da_duyet"),
-        "bookings": [{"id": b.id, "code": b.code, "sales_id": b.sales_id, "customer_name": b.customer_name, "customer_phone": b.customer_phone, "source": b.source,
-                      "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code, "sales_name": b.sales.full_name if b.sales else "",
-                      "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok, "counts_for_target": b.counts_for_target, "created_at": b.created_at} for b in t.bookings],
     }
+    # `kem_bookings=False`: KHÔNG dựng danh sách khách. Màn hình DANH SÁCH tour không dùng tới nó —
+    # trước 30/9/2026 nó vẫn được dựng đủ rồi bị `v.pop("bookings")` ném đi ngay dòng sau. Với 300
+    # chuyến và 12.697 booking trên hệ thật, đó là hàng nghìn từ điển dựng ra để vứt, trên một máy
+    # chủ có nửa lõi CPU. `booked_pax(t)` vẫn đọc `t.bookings` để đếm khách nên quan hệ ấy vẫn phải
+    # nạp sẵn — thứ bỏ đi ở đây là việc DỰNG TỪ ĐIỂN, không phải việc đọc cơ sở dữ liệu.
+    if kem_bookings:
+        out["bookings"] = [{"id": b.id, "code": b.code, "sales_id": b.sales_id, "customer_name": b.customer_name, "customer_phone": b.customer_phone, "source": b.source,
+                            "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code, "sales_name": b.sales.full_name if b.sales else "",
+                            "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok, "counts_for_target": b.counts_for_target, "created_at": b.created_at} for b in t.bookings]
     if user:
         out["actions"] = allowed_actions(db, t, user)
     return out
