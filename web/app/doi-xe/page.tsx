@@ -210,9 +210,20 @@ function DoiXe() {
       <div className="kpi"><b>{tq.tong_so_xe}</b><span>xe trong danh mục</span></div>
       <div className="kpi"><b style={{ color: "var(--ok, green)" }}>{tq.san_sang}</b><span>sẵn sàng (đủ hồ sơ, qua kiểm tra)</span></div>
       <div className="kpi"><b style={{ color: "var(--orange)" }}>{tq.chua_du_du_lieu}</b><span>chưa đủ dữ liệu để kết luận</span></div>
+      {/* Hai ô dưới đây thêm 07/10/2026. Trước đó dãy ô chỉ in ba trong NĂM mức mà máy chủ trả về,
+          nên xe ở mức "cần xem lại" hay "cần duyệt ngoại lệ" biến mất khỏi mọi ô đếm: đo trên hệ
+          thật là 16 xe = 0 + 0 + 5, mười một chiếc không ở đâu cả. In điều kiện `> 0` để dãy ô không
+          dài ra khi không có xe nào ở mức ấy, nhưng con số thì KHÔNG được phép thiếu. */}
+      {tq.can_xem_lai > 0 && <div className="kpi"><b style={{ color: "var(--orange)" }}>{tq.can_xem_lai}</b><span>cần xem lại (có giấy, chưa đối chiếu bản gốc)</span></div>}
+      {tq.can_duyet_ngoai_le > 0 && <div className="kpi"><b style={{ color: "var(--orange)" }}>{tq.can_duyet_ngoai_le}</b><span>cần duyệt ngoại lệ</span></div>}
       <div className="kpi"><b style={{ color: tq.bi_chan ? "var(--red)" : undefined }}>{tq.bi_chan}</b><span>đang bị chặn khai thác</span></div>
       <div className="kpi"><b>{tq.viec_xac_minh_dang_mo}</b><span>việc xác minh hồ sơ còn treo</span></div>
     </div>
+    {/* Nếu năm mức cộng lại không đủ tổng số xe thì NÓI RA ngay, đừng để người đọc tự trừ. Máy chủ
+        tự khai số lệch (`thieu_trong_o_dem`), nên màn hình không phải đoán. */}
+    {tq.thieu_trong_o_dem > 0 && <p className="note red">Có <b>{tq.thieu_trong_o_dem}</b> xe không nằm
+      trong ô đếm nào ở trên — nghĩa là máy chủ xếp chúng vào một mức mà dãy ô này chưa in. Đừng đọc
+      các con số trên như đã đủ; báo CNTT.</p>}
     <p className="muted">{tq.ghi_chu}{tq.chan_khi_thieu_giay ? " Đang BẬT chế độ chặn khi thiếu giấy tờ." : " Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo, chưa dừng lệnh điều xe."}</p>
 
     <div style={{ display: "flex", gap: 8, margin: "10px 0" }}>

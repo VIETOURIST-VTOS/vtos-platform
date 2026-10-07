@@ -228,11 +228,27 @@ def tong_quan(u: User = Depends(require_roles(*READ)), db: Session = Depends(get
         ds.append({"id": v.id, "code": v.code, "plate": v.plate, "op_right": v.op_right,
                    "lifecycle": v.lifecycle, "muc": s["muc"], "ly_do": s["ly_do"]})
     cho_xm = db.execute(select(FleetVerification).where(FleetVerification.status.in_(["cho_xac_minh", "dang_xu_ly"]))).scalars().all()
+    # ĐẾM ĐỦ NĂM MỨC, và tự kiểm tổng. Trước 07/10/2026 cửa này chỉ in ba mức (OK, UNKNOWN, BLOCK)
+    # trong khi `san_sang()` trả về năm, nên xe ở mức REVIEW hay APPROVAL biến mất khỏi mọi ô đếm.
+    # Đo trên hệ thật hôm ấy: 16 xe = 0 sẵn sàng + 0 chưa đủ dữ liệu + 5 chặn, và 11 chiếc không ở
+    # đâu cả. Một ô đếm cộng không đủ tổng là một ô đếm nói sai, và nó nói sai một cách êm ái: không
+    # báo lỗi, không hiện màu, chỉ thiếu.
+    #
+    # `thieu_trong_o_dem` là phần tự khai: nếu một ngày có người thêm mức thứ sáu mà quên thêm ô đếm,
+    # con số này khác 0 và phép thử đỏ, thay vì lại mười một chiếc xe lặng lẽ rơi ra ngoài.
+    theo_muc_day_du = {k: muc.get(k, 0) for k in FL.NANG}
+    da_dem = sum(theo_muc_day_du.values())
     return {"tong_so_xe": len(ds), "theo_quyen_khai_thac": nhom, "theo_muc_kiem_tra": muc,
+            "theo_muc_day_du": [{"muc": k, "ten": FL.MUC_TEN[k], "so_xe": theo_muc_day_du[k],
+                                 "nang": FL.NANG[k]}
+                                for k in sorted(theo_muc_day_du, key=lambda x: -FL.NANG[x])],
+            "thieu_trong_o_dem": len(ds) - da_dem,
             "san_sang": muc.get(FL.OK, 0), "chua_du_du_lieu": muc.get(FL.UNKNOWN, 0), "bi_chan": muc.get(FL.BLOCK, 0),
+            "can_xem_lai": muc.get(FL.REVIEW, 0), "can_duyet_ngoai_le": muc.get(FL.APPROVAL, 0),
             "viec_xac_minh_dang_mo": len(cho_xm), "chan_khi_thieu_giay": chan, "xe": ds,
             "ghi_chu": "Số xe sẵn sàng chỉ đếm xe đã đủ hồ sơ và qua kiểm tra. Xe ở mức 'Chưa đủ dữ liệu' "
-                       "không được cộng vào sẵn sàng – thiếu dữ liệu không phải là đạt."}
+                       "không được cộng vào sẵn sàng – thiếu dữ liệu không phải là đạt. Năm mức cộng lại "
+                       "phải bằng tổng số xe; lệch là có mức bị bỏ khỏi ô đếm."}
 
 
 class ViecXacMinhIn(BaseModel):
@@ -611,7 +627,10 @@ def bao_duong_theo_xe(u: User = Depends(require_roles(*READ)), db: Session = Dep
     Xe đã thanh lý/ngừng khai thác không nằm trong danh sách — nhắc bảo dưỡng một chiếc xe đã bán là
     một dòng cảnh báo không ai xử lý được, và hàng đợi có dòng như thế thì người ta thôi đọc nó.
     """
-    ds, dem = [], {FL.OK: 0, FL.UNKNOWN: 0, FL.REVIEW: 0, FL.BLOCK: 0}
+    # Dựng rổ đếm TỪ chính thang mức, không gõ lại danh sách: bản cũ gõ tay bốn mức và thiếu
+    # APPROVAL_REQUIRED, nên một chiếc xe ở mức ấy không được cộng vào đâu. Cùng một chỗ hỏng với ô
+    # đếm của /tong-quan, chỉ nhỏ hơn nên lâu hơn mới có người thấy.
+    ds, dem = [], {k: 0 for k in FL.NANG}
     for v in db.execute(select(Vehicle).where(Vehicle.active == True).order_by(Vehicle.code, Vehicle.plate)).scalars():
         t = FL.tinh_trang_bao_duong(db, v)
         dem[t["muc"]] = dem.get(t["muc"], 0) + 1
