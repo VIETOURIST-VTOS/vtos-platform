@@ -468,10 +468,23 @@ def kiem_chuyen(db: Session, t) -> dict:
         if km < 0:
             do(f"Km cuối nhỏ hơn km đầu ({t.km_cuoi:,} < {t.km_dau:,})")
         elif t.km_gps:
-            lech = abs(km - t.km_gps) / t.km_gps if t.km_gps else 0
-            nguong = R.get_param(db, "xe_lech_km_gps")
-            if lech > nguong:
-                do(f"Km đọc từ đồng hồ lệch GPS {lech*100:.1f}% (ngưỡng {nguong*100:.0f}%)")
+            # Phép đối chiếu này chỉ có nghĩa khi km đầu/cuối là số ĐỌC TỪ ĐỒNG HỒ. Nếu chính km đầu/cuối
+            # đã lấy từ cổng GPS thì đây là lấy GPS so với GPS – luôn khớp, và cái "luôn xanh" đó còn tệ
+            # hơn không có cờ, vì nó làm người xem tin là đã đối chiếu. Nói thẳng ra là chưa đối chiếu.
+            if (t.km_nguon or "").startswith("gps"):
+                vang("Km đầu/cuối cũng lấy từ GPS nên CHƯA ĐỐI CHIẾU được với số GPS – muốn bắt lệch thì "
+                     "phải có một số đọc từ đồng hồ công-tơ-mét (ảnh đồng hồ hoặc tài xế ghi)")
+            else:
+                lech = abs(km - t.km_gps) / t.km_gps if t.km_gps else 0
+                nguong = R.get_param(db, "xe_lech_km_gps")
+                if lech > nguong:
+                    do(f"Km đọc từ đồng hồ lệch GPS {lech*100:.1f}% (ngưỡng {nguong*100:.0f}%)")
+        elif t.km_nguon and not (t.km_nguon or "").startswith("gps"):
+            # Cờ lệch GPS nằm trong mã từ bản đầu nhưng trước 07/10/2026 KHÔNG bộ nạp và KHÔNG màn hình
+            # nào ghi `km_gps`, nên nhánh trên chưa từng chạy một lần nào. Một cái cờ không bao giờ đỏ
+            # được thì vô hại về mặt số nhưng nguy hiểm về mặt niềm tin. Từ bản này: thiếu số GPS là NÓI
+            # RA, để còn đếm được còn bao nhiêu chuyến chưa có số mà đối chiếu.
+            vang("Chưa có số km theo GPS cho chuyến này – chưa đối chiếu được đồng hồ với hành trình")
         # Nối chuyến: km cuối chuyến trước phải khớp km đầu chuyến sau của cùng chiếc xe.
         truoc = db.execute(select(Trip).where(Trip.vehicle_id == t.vehicle_id, Trip.id != t.id,
                                               Trip.ngay_ve <= t.ngay_di)

@@ -29,6 +29,7 @@ function DoiXe() {
   const [chuXe, setChuXe] = useState<any[]>([]);
   const [qt, setQt] = useState<any[]>([]);
   const [dm3, setDm3] = useState<any>(null);
+  const [dm2, setDm2] = useState<any>(null);     // danh mục đợt 2: nguồn số km, ví ePass
   const [cn, setCn] = useState<any>(null);
   const [soChuXe, setSoChuXe] = useState<any>(null);
   const canWrite = ["cntt", "hcns", "tp_dh", "nv_dh"].includes(user?.role || "");
@@ -75,6 +76,7 @@ function DoiXe() {
       setChuXe(await api("/fleet/chu-xe"));
       setQt(await api("/fleet/quyet-toan"));
       setDm3(await api("/fleet/danh-muc-dot3"));
+      setDm2(await api("/fleet/danh-muc-dot2"));
       setCn(await api("/fleet/cong-no"));
       setBd(await api("/fleet/bao-duong/theo-xe"));
       setBdLs(await api("/fleet/bao-duong"));
@@ -118,12 +120,14 @@ function DoiXe() {
       if (form.id) {
         await api(`/fleet/chuyen/${form.id}`, { method: "PUT", json: {
           ten_tour: form.ten_tour, ngay_di: form.ngay_di, ngay_ve: form.ngay_ve,
-          km_dau: form.km_dau, km_cuoi: form.km_cuoi, doanh_thu: form.doanh_thu, note: form.note } });
+          km_dau: form.km_dau, km_cuoi: form.km_cuoi, km_gps: form.km_gps,
+          km_nguon: form.km_nguon || "", doanh_thu: form.doanh_thu, note: form.note } });
         toast("Đã cập nhật phiếu chuyến");
       } else {
         const r = await api<any>("/fleet/chuyen", { method: "POST", json: {
           vehicle_id: form.vehicle_id, ten_tour: form.ten_tour, ngay_di: form.ngay_di, ngay_ve: form.ngay_ve,
-          km_dau: form.km_dau, km_cuoi: form.km_cuoi, doanh_thu: form.doanh_thu, note: form.note } });
+          km_dau: form.km_dau, km_cuoi: form.km_cuoi, km_gps: form.km_gps,
+          km_nguon: form.km_nguon || "nhap_tay", doanh_thu: form.doanh_thu, note: form.note } });
         // Bốn khoản chi phí ghi thành bốn dòng riêng: mỗi dòng phải trả lời được loại gì, ai chịu, chứng từ đâu.
         for (const k of ["dau", "cau_duong", "cong_tac_phi", "giu_xe"]) {
           const tien = soTien(form[k]);
@@ -199,6 +203,15 @@ function DoiXe() {
           <label>Ngày về<input type="date" value={form.ngay_ve || ""} onChange={(e) => setForm({ ...form, ngay_ve: e.target.value })} /></label>
           <label>Km đầu<input type="number" value={form.km_dau ?? ""} onChange={(e) => setForm({ ...form, km_dau: soTien(e.target.value) })} /></label>
           <label>Km cuối<input type="number" value={form.km_cuoi ?? ""} onChange={(e) => setForm({ ...form, km_cuoi: soTien(e.target.value) })} /></label>
+          <label>Km theo GPS<input type="number" value={form.km_gps ?? ""} onChange={(e) => setForm({ ...form, km_gps: soTien(e.target.value) })} placeholder="để trống nếu kỳ này chưa lấy số GPS" /></label>
+          <label>Nguồn số km
+            {/* Ô chọn dựng từ danh mục của máy chủ, KHÔNG gõ lại danh sách ở đây: gõ lại là ngày nào
+                đó hai bên lệch nhau mà không ai biết. Nguồn là bắt buộc về nghiệp vụ khi có số GPS —
+                lấy GPS so với GPS thì luôn khớp, và cái "luôn khớp" ấy làm người xem tin là đã kiểm. */}
+            <select value={form.km_nguon || ""} onChange={(e) => setForm({ ...form, km_nguon: e.target.value })}>
+              <option value="">— chọn nguồn —</option>
+              {Object.entries(dm2?.km_nguon || {}).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+            </select></label>
           <label>Doanh thu (đ)<input type="number" value={form.doanh_thu ?? ""} onChange={(e) => setForm({ ...form, doanh_thu: soTien(e.target.value) })} /></label>
           <label>Ghi chú<input value={form.note || ""} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
         </div>
@@ -237,7 +250,11 @@ function DoiXe() {
             {t.nguon === "bao_cao_vietrip" && <div><Tag cls="warn">dữ liệu thử</Tag></div>}</td>
           <td>{t.xe}</td><td>{t.ten_tour || <span className="muted">—</span>}</td>
           <td>{fmtD(t.ngay_di)} → {fmtD(t.ngay_ve)} <span className="muted">({t.so_ngay} ngày)</span></td>
-          <td className="num">{t.km_chay === null ? <span className="muted">chưa đo</span> : t.km_chay.toLocaleString("vi-VN")}</td>
+          <td className="num">{t.km_chay === null ? <span className="muted">chưa đo</span> : t.km_chay.toLocaleString("vi-VN")}
+            {t.km_nguon_ten && <div className="muted">{t.km_nguon_ten}</div>}
+            {t.km_gps ? <div className="muted">GPS {t.km_gps.toLocaleString("vi-VN")}
+              {t.km_lech_gps !== null && t.km_lech_gps !== undefined ? ` · lệch ${t.km_lech_gps.toLocaleString("vi-VN")}` : ""}</div>
+              : <div className="muted">chưa có số GPS</div>}</td>
           <td className="num">{t.doanh_thu ? t.doanh_thu.toLocaleString("vi-VN") : ""}</td>
           <td className="num">{t.tong_chi_vietourist.toLocaleString("vi-VN")}</td>
           <td className="num">{t.tong_chi_chu_xe.toLocaleString("vi-VN")}</td>
@@ -249,7 +266,8 @@ function DoiXe() {
             : <button className="act grey" onClick={() => setForm({
                 id: t.id, vehicle_id: t.vehicle_id, ten_tour: t.ten_tour,
                 ngay_di: (t.ngay_di || "").slice(0, 10), ngay_ve: (t.ngay_ve || "").slice(0, 10),
-                km_dau: t.km_dau, km_cuoi: t.km_cuoi, doanh_thu: t.doanh_thu, note: t.note })}>Sửa</button>}</td>}
+                km_dau: t.km_dau, km_cuoi: t.km_cuoi, km_gps: t.km_gps, km_nguon: t.km_nguon,
+                doanh_thu: t.doanh_thu, note: t.note })}>Sửa</button>}</td>}
         </tr>) : <tr><td colSpan={canNhap ? 10 : 9} className="muted">Chưa có chuyến nào được ghi nhật trình.</td></tr>}</tbody></table>
       </div>
     </>}
@@ -309,8 +327,24 @@ function DoiXe() {
         <div className="kpi"><b>{Number(gd.tong_chi_phi || 0).toLocaleString("vi-VN")}</b><span>chi phí (đã loại bản ghi lặp)</span></div>
         <div className="kpi"><b style={{ color: "var(--orange)" }}>{Number(gd.tong_chua_quy_ve_xe || 0).toLocaleString("vi-VN")}</b><span>chưa quy được về xe nào</span></div>
         <div className="kpi"><b className="muted">{Number(gd.tong_dieu_chuyen || 0).toLocaleString("vi-VN")}</b><span>điều chuyển tiền nội bộ – KHÔNG phải chi phí</span></div>
+        {gd.tong_chua_quy_ve_vi > 0 && <div className="kpi"><b style={{ color: "var(--orange)" }}>{Number(gd.tong_chua_quy_ve_vi).toLocaleString("vi-VN")}</b><span>ePass chưa ghi tài khoản – chưa quy về pháp nhân nào</span></div>}
       </div>
       <p className="muted">{gd.ghi_chu} Biển số được tra về xe theo <b>thời điểm giao dịch</b>, không theo biển hiện tại — xe đổi biển giữa kỳ vẫn gộp đúng về một chiếc.</p>
+      {/* Chia theo VÍ ePass. Đội xe đi đường bằng hai ví của hai pháp nhân khác nhau; cộng chung thì
+          tổng vẫn đúng mà phần của từng bên sai — nên không ai nhìn ra. Phần "chưa ghi tài khoản" là
+          nợ số liệu của các kỳ cũ: nạp lại tệp có cột tài khoản là hết, KHÔNG chia hộ theo tỷ lệ. */}
+      {gd.theo_vi?.length > 0 && <>
+        <h3>Phí cầu đường theo ví ePass</h3>
+        <table><thead><tr><th>Ví / pháp nhân</th><th>Số tài khoản</th><th>Số khoản</th><th>Số tiền</th></tr></thead>
+          <tbody>{gd.theo_vi.map((v: any) => <tr key={v.tai_khoan || "khong"}>
+            <td>{v.tai_khoan && gd.vi_epass?.[v.tai_khoan] ? v.ten : <Tag cls="warn">{v.ten}</Tag>}</td>
+            <td className="muted">{v.tai_khoan || "—"}</td><td>{v.so_khoan}</td>
+            <td className="num">{Number(v.so_tien).toLocaleString("vi-VN")}</td>
+          </tr>)}</tbody></table>
+        {gd.theo_vi.length === 1 && gd.theo_vi[0].tai_khoan === "" && <p className="muted">Toàn bộ giao dịch
+          ePass hiện chưa ghi số tài khoản, nên chưa tách được chi phí cầu đường của hai pháp nhân. Nạp lại
+          sao kê theo từng ví (cửa nạp &quot;Phí cầu đường&quot; đã có ô <b>Tài khoản ePass</b>) là tách được.</p>}
+      </>}
       {gd.theo_nhom?.length > 1 && <table><thead><tr><th>Nhóm khoản</th><th>Số khoản</th><th>Số tiền</th></tr></thead>
         <tbody>{gd.theo_nhom.map((n: any) => <tr key={n.nhom}>
           <td>{n.nhom}</td><td>{n.so_khoan}</td><td className="num">{Number(n.so_tien).toLocaleString("vi-VN")}</td>
@@ -318,7 +352,8 @@ function DoiXe() {
       <table><thead><tr><th>Nguồn</th><th>Mã giao dịch</th><th>Thời điểm</th><th>Biển / thẻ</th><th>Xe</th><th>Nhóm</th><th>Số tiền</th><th>Trạng thái</th></tr></thead>
         <tbody>{gd.rows.length ? gd.rows.map((r: any) => <tr key={r.id}>
           <td>{r.source_ten || (r.source === "epass" ? "ePass/VETC" : "Thẻ dầu")}</td><td>{r.ma_gd}</td><td>{fmtDT(r.thoi_diem)}</td>
-          <td>{r.bien_so || (r.the_4so ? `••••${r.the_4so}` : "")}</td>
+          <td>{r.bien_so || (r.the_4so ? `••••${r.the_4so}` : "")}
+            {r.source === "epass" && <div className="muted">{r.vi || (r.tai_khoan ? `ví ${r.tai_khoan} – chưa khai` : "chưa ghi ví")}</div>}</td>
           <td>{r.xe || (r.khong_phai_chi_phi ? <span className="muted">không thuộc xe nào</span> : <Tag cls="red">chưa tra được xe</Tag>)}</td>
           <td className="muted">{r.nhom || ""}</td>
           <td className="num">{r.so_tien.toLocaleString("vi-VN")}</td>
