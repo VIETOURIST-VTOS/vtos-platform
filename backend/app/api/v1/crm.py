@@ -253,7 +253,20 @@ async def zalo_webhook(request: Request, db: Session = Depends(get_db), x_zevent
     try: ev = __import__("json").loads(body.decode() or "{}")
     except ValueError: raise HTTPException(400, "JSON không hợp lệ")
     if not Z.verify_signature(body, x_zevent_signature or "", str(ev.get("timestamp") or "")): raise HTTPException(401, "Sai chữ ký Zalo")
-    return Z.on_webhook(db, ev)
+    kq = Z.on_webhook(db, ev)
+    # TC-106 · 07/10/2026. Ghi dấu SAU khi `on_webhook` chạy, và đọc KẾT QUẢ của nó thay vì tự
+    # suy lại: nó đã quyết uid này là khách hay nhân viên, và quyết định ấy có luật riêng
+    # (zalo_nguoi_dung). Suy lại ở đây là dựng chỗ thứ hai trả lời cùng câu hỏi, rồi ngày hai
+    # chỗ lệch nhau thì Chủ tịch bấm "Quan tâm" OA sẽ thành một dấu quảng cáo trong báo cáo
+    # hiệu quả kênh.
+    from app.services import dau_meta_zalo as MZ
+    try:
+        kq["dau_quang_cao"] = MZ.tu_zalo(db, ev, kq)
+        db.commit()
+    except Exception as ex:          # noqa: BLE001 – webhook không được chết vì phần ghi dấu
+        db.rollback()
+        kq["dau_quang_cao"] = {"loi": f"{type(ex).__name__}: {str(ex)[:160]}"}
+    return kq
 
 
 # ============================ TỔNG ĐÀI – NGHE TRƯỚC, HIỂU SAU ============================
