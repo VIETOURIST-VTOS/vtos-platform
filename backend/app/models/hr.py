@@ -263,6 +263,11 @@ class PayrollRun(Base):
     tgd_by: Mapped[str] = mapped_column(String(50), default="")
     tgd_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     entry_ids: Mapped[list] = mapped_column(JSON, default=list)
+    # Đợt A2 – khúc cuối của chuỗi. BẢN GỐC của việc đã trả là các dòng `chi_ky_luong`; hai cột
+    # dưới đây là BẢN TÓM cho báo cáo đọc, và chỉ được ghi trong cùng giao dịch với nơi sinh ra nó
+    # (services/chi_luong.py::ghi_nhan). Rỗng nghĩa là chưa chi lần nào – khác "đã chi 0 đồng".
+    tra_trang_thai: Mapped[str] = mapped_column(String(16), default="")   # dang_chi/da_tra_du/loi_chi
+    tra_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     inputs: Mapped[dict] = mapped_column(JSON, default=dict)     # đầu vào do HCNS nhập: công chuẩn, công thực tế theo mã NV
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)

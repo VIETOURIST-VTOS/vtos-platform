@@ -1,7 +1,7 @@
 """API nhân sự – lương: hồ sơ, visa, HDV & phân chuyến, đội xe & lệnh điều xe, sự vụ, bảng lương (robot R6)."""
 import json
 from datetime import date, datetime
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select, desc
 from sqlalchemy.orm import Session
@@ -10,6 +10,8 @@ from app.api.deps import current_user, require_roles, cong_chan_quyen, loc_theo_
 from app.models.core import ROLES, Tour, User, Company
 from app.models.hdv import CHU_TIEN, LOAI_DE_XUAT, QUYET_DINH, TRANG_THAI as YC_TRANG_THAI, TRANG_THAI_BC, TRANG_THAI_DX, TRANG_THAI_UNG, BaoCaoSauTour, BuocDuyetHdv, CauHinhDuyetHdv, DeXuatHdv, TamUngHdv, YeuCauHdv
 from app.models.hr import SALES_GROUPS, Employee, VisaFile, GuideAssignment, Vehicle, VehicleRate, DispatchOrder, Incident, PayrollRun, GuideRate, INCIDENT_LEVELS, INCIDENT_STATUS, DEPARTMENTS, POSITIONS, OFFICES
+from app.models.chi_luong import (ChiKyLuong, KET_LUAN as CL_KET_LUAN,
+                                  TRA_TRANG_THAI as CL_TRA_TRANG_THAI)
 from app.services import hr as H
 from app.services import rules as R
 from app.services import hdv as HDV
@@ -2106,3 +2108,207 @@ def payroll_advance(period: str, u: User = Depends(require_roles("hcns", "tgd", 
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"message": msg, "run": run_out(run)}
+
+
+# ====================== ĐỢT A2 · KẾ TOÁN CHI – UNC – ĐỐI CHIẾU ======================
+#
+# Khúc cuối của chuỗi Chủ tịch chốt 07/10/2026. Năm cửa, và thứ tự của chúng là thứ tự có thật trên
+# bàn kế toán: mở một lần chi → tải Ủy nhiệm chi → tải phụ lục → sửa chỗ máy đọc sai → bấm đối chiếu.
+#
+# VÌ SAO KẾ TOÁN KHÔNG BẤM ĐƯỢC "ĐÃ TRẢ ĐỦ"
+#
+# Không có cửa nào cho người gõ vào kết luận. Kết luận đủ / một phần / lỗi do `services/chi_luong.py`
+# tính ra từ bản khóa, mặt UNC và phụ lục — người sửa được SỐ LIỆU máy đọc sai, không sửa được KẾT
+# LUẬN. Một ô cho người gõ "đã trả đủ" sẽ biến cả chuỗi này thành một lời khai, mà lời khai thì không
+# cần tới phần mềm nào.
+CHI_LUONG_ROLES = ("ketoan", "cntt")
+
+
+class ChiSuaIn(BaseModel):
+    """Người sửa chỗ máy đọc sai. Chỉ các ô máy ĐỌC, không có ô nào cho kết luận."""
+    so_tien_unc: float | None = None
+    ngan_hang: str | None = None
+    tai_khoan_cong_ty: str | None = None
+    ngay_chuyen: date | None = None
+    so_tham_chieu: str | None = None
+    noi_dung_unc: str | None = None
+    dong_phu_luc: list[dict] | None = None
+
+
+def _ban_da_ky(db: Session, period: str):
+    """Bản khóa đang hiệu lực của kỳ. Không có thì chưa chi được, và lý do phải nói thẳng."""
+    from app.services import luong_khoa as LK
+    b = LK.ban_dang_hieu_luc(db, period)
+    if b is None:
+        raise HTTPException(422, f"Kỳ {period} chưa có bản khóa nào – phải có chữ ký Chủ tịch hoặc "
+                                 "TGĐ trước, rồi mới tới bước chi")
+    return b
+
+
+def _chi_out(c) -> dict:
+    return {"id": c.id, "period": c.period, "lan": c.lan, "ban_khoa_id": c.ban_khoa_id,
+            "ngan_hang": c.ngan_hang, "tai_khoan_cong_ty": c.tai_khoan_cong_ty,
+            "ngay_chuyen": c.ngay_chuyen, "so_tham_chieu": c.so_tham_chieu,
+            "so_tien_unc": c.so_tien_unc, "noi_dung_unc": c.noi_dung_unc,
+            "co_unc": c.unc_attachment_id is not None, "co_phu_luc": c.phu_luc_attachment_id is not None,
+            "so_dong_phu_luc": len(c.dong_phu_luc or []), "dong_phu_luc": c.dong_phu_luc or [],
+            "phu_luc_ghi_chu": c.phu_luc_ghi_chu, "ket_luan": c.ket_luan,
+            "ket_luan_ten": CL_KET_LUAN.get(c.ket_luan, ""), "ket_qua": c.ket_qua or {},
+            "doi_chieu_luc": c.doi_chieu_luc, "chi_boi": c.chi_boi, "luc": c.luc}
+
+
+def _lay_chi(db: Session, period: str, lan: int):
+    c = db.execute(select(ChiKyLuong).where(ChiKyLuong.period == period,
+                                            ChiKyLuong.lan == lan)).scalars().first()
+    if c is None:
+        raise HTTPException(404, f"Không có lần chi {lan} của kỳ {period}")
+    return c
+
+
+@router.get("/payroll-runs/{period}/chi")
+def chi_danh_sach(period: str, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Các lần chi của kỳ, kèm trạng thái trả tiền của cả kỳ.
+
+    Không dùng cổng `bang_luong` ở đây: cổng ấy gác BẢNG LƯƠNG TOÀN CÔNG TY, mà vai trò "ketoan"
+    chỉ vào được bằng ngoại lệ theo người. Người chi tiền phải thấy được việc mình vừa chi, kể cả
+    khi họ không được mở bảng lương – và màn hình này không có dòng lương của ai, chỉ có số tiền
+    chuyển, ngày, số tham chiếu và kết luận đối chiếu.
+    """
+    from app.services import access as AC, chi_luong as CL
+    if "payroll" not in AC.hr_tabs_for(db, u) and u.role not in CHI_LUONG_ROLES:
+        raise HTTPException(403, "Vai trò của bạn không xem được các lần chi lương")
+    ds = list(db.execute(select(ChiKyLuong).where(ChiKyLuong.period == period)
+                         .order_by(ChiKyLuong.lan)).scalars())
+    return {"period": period, "tra_trang_thai": CL.trang_thai_ky(db, period),
+            "tra_trang_thai_ten": CL_TRA_TRANG_THAI.get(CL.trang_thai_ky(db, period), ""),
+            "lan_chi": [_chi_out(c) for c in ds]}
+
+
+@router.post("/payroll-runs/{period}/chi", status_code=201)
+def chi_mo_lan(period: str, u: User = Depends(require_roles(*CHI_LUONG_ROLES)),
+               db: Session = Depends(get_db)):
+    """Mở một lần chi mới cho kỳ. Gắn vào BẢN KHÓA đang hiệu lực, không gắn vào kỳ.
+
+    Trả lương hai đợt, trả bù một người bị sót, chuyển nhầm rồi chuyển lại – mỗi việc một lần chi.
+    Cộng dồn vào một dòng là xoá mất câu "tiền ra khỏi tài khoản mấy lần".
+    """
+    run = H.get_or_draft(db, period)
+    if run.status not in H.DA_KY:
+        raise HTTPException(422, f"Kỳ {period} chưa được ký (đang ở '{run.status}') – chưa chi được")
+    b = _ban_da_ky(db, period)
+    cu = db.execute(select(ChiKyLuong).where(ChiKyLuong.period == period)
+                    .order_by(ChiKyLuong.lan.desc())).scalars().first()
+    c = ChiKyLuong(period=period, ban_khoa_id=b.id, lan=(cu.lan + 1) if cu else 1,
+                   chi_boi=u.username, chi_vai=u.role)
+    db.add(c)
+    R.audit(db, u.username, u.role, "mo_lan_chi_luong", f"payroll:{period}",
+            after={"lan": c.lan, "ban_khoa_id": b.id})
+    db.commit()
+    return {"message": f"Đã mở lần chi {c.lan} cho kỳ {period} – tải Ủy nhiệm chi lên để máy đọc",
+            "chi": _chi_out(c)}
+
+
+@router.post("/payroll-runs/{period}/chi/{lan}/unc")
+async def chi_tai_unc(period: str, lan: int, tep: UploadFile = File(...),
+                      u: User = Depends(require_roles(*CHI_LUONG_ROLES)),
+                      db: Session = Depends(get_db)):
+    """Tải MẶT Ủy nhiệm chi. Máy đọc sáu ô: ngân hàng, tài khoản công ty, ngày, số tham chiếu,
+    số tiền, nội dung. Không đọc danh sách người trên tấm này."""
+    from app.services import chi_luong as CL, doc_chung_tu as DCT
+    c = _lay_chi(db, period, lan)
+    if c.ket_luan:
+        raise HTTPException(422, f"Lần chi {lan} đã đối chiếu xong – mở lần chi mới nếu có chuyển bù")
+    data = await tep.read()
+    try:
+        kq = CL.doc_mat_unc(db, c, tep.filename or "unc", data, tep.content_type or "",
+                            u.username, u.role)
+    except DCT.KhongDocDuoc as ex:
+        raise HTTPException(400, str(ex))
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+    db.commit()
+    return {**kq, "chi": _chi_out(c),
+            "message": ("Máy đã đọc mặt Ủy nhiệm chi. Số này là NHÁP – kiểm lại rồi mới bấm đối chiếu."
+                        if kq.get("so_tien_unc") is not None else
+                        "Máy KHÔNG đọc được số tiền – ô để TRỐNG chứ không điền 0. Mời nhập tay.")}
+
+
+@router.post("/payroll-runs/{period}/chi/{lan}/phu-luc")
+async def chi_tai_phu_luc(period: str, lan: int, tep: UploadFile = File(...),
+                          u: User = Depends(require_roles(*CHI_LUONG_ROLES)),
+                          db: Session = Depends(get_db)):
+    """Tải PHỤ LỤC danh sách chuyển lương. Máy đọc ĐÚNG hai ô mỗi dòng: họ tên và số tiền.
+
+    Mở theo ngoại lệ có chữ ký Chủ tịch 07/10/2026, khai ở models/doc_chung_tu.py::MO_DOC_CO_CHU_KY.
+    Số tài khoản, ngày sinh, CCCD, lương cơ bản, bảo hiểm, thuế – máy không đọc, và nếu mô hình tự
+    trả về thì bị bỏ ở phía ta trước khi lưu, kèm một dòng ghi chú nói đã bỏ cái gì.
+    """
+    from app.services import chi_luong as CL, doc_chung_tu as DCT
+    c = _lay_chi(db, period, lan)
+    if c.ket_luan:
+        raise HTTPException(422, f"Lần chi {lan} đã đối chiếu xong – mở lần chi mới nếu có chuyển bù")
+    data = await tep.read()
+    try:
+        kq = CL.doc_phu_luc(db, c, tep.filename or "phu-luc", data, tep.content_type or "",
+                            u.username, u.role)
+    except DCT.KhongDocDuoc as ex:
+        raise HTTPException(400, str(ex))
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+    db.commit()
+    return {**kq, "chi": _chi_out(c),
+            "message": f"Máy đọc được {kq['so_dong']} dòng. Kiểm lại rồi bấm đối chiếu."}
+
+
+@router.put("/payroll-runs/{period}/chi/{lan}")
+def chi_sua(period: str, lan: int, body: ChiSuaIn,
+            u: User = Depends(require_roles(*CHI_LUONG_ROLES)), db: Session = Depends(get_db)):
+    """Người sửa chỗ máy đọc sai. Không có ô nào cho kết luận – xem chú thích đầu khối này."""
+    c = _lay_chi(db, period, lan)
+    if c.ket_luan:
+        raise HTTPException(422, f"Lần chi {lan} đã đối chiếu xong – không sửa được nữa")
+    truoc = {"so_tien_unc": c.so_tien_unc, "so_dong": len(c.dong_phu_luc or [])}
+    for k in ("so_tien_unc", "ngan_hang", "tai_khoan_cong_ty", "ngay_chuyen", "so_tham_chieu",
+              "noi_dung_unc"):
+        v = getattr(body, k)
+        if v is not None:
+            setattr(c, k, v)
+    if body.dong_phu_luc is not None:
+        # Chỉ giữ hai ô cho phép. Người gõ tay cũng đi qua đúng bộ lọc mà máy đi qua: cửa nhập tay
+        # mà rộng hơn cửa máy đọc thì lệnh cấm chỉ còn cấm được cái máy.
+        from app.models.doc_chung_tu import MO_DOC_CO_CHU_KY
+        cho_phep = MO_DOC_CO_CHU_KY["phu_luc_unc_luong"]["truong"]
+        c.dong_phu_luc = [{k: d.get(k) for k in cho_phep} for d in body.dong_phu_luc
+                          if str(d.get("ho_ten") or "").strip()]
+    R.audit(db, u.username, u.role, "sua_lan_chi_luong", f"payroll:{period}:{lan}",
+            before=truoc, after={"so_tien_unc": c.so_tien_unc, "so_dong": len(c.dong_phu_luc or [])})
+    db.commit()
+    return {"message": "Đã lưu", "chi": _chi_out(c)}
+
+
+@router.post("/payroll-runs/{period}/chi/{lan}/doi-chieu")
+def chi_doi_chieu(period: str, lan: int, u: User = Depends(require_roles(*CHI_LUONG_ROLES)),
+                  db: Session = Depends(get_db)):
+    """Đối chiếu lần chi với bản đã ký và ghi nhận ĐÃ TRẢ.
+
+    Kết luận do quy tắc xác định tính ra, không do mô hình ngôn ngữ và không do người gõ. Chạy lại
+    với cùng dữ liệu luôn ra cùng kết luận – đó là điều kiện để một kết luận "đã trả đủ" có giá trị.
+    """
+    from app.models.luong_khoa import BangLuongKhoa
+    from app.services import chi_luong as CL
+    c = _lay_chi(db, period, lan)
+    run = H.get_or_draft(db, period)
+    ban = db.get(BangLuongKhoa, c.ban_khoa_id)
+    if ban is None:
+        raise HTTPException(422, "Không tìm thấy bản khóa của lần chi này")
+    kq = CL.ghi_nhan(db, c, ban, run)
+    if not c.ket_luan:
+        db.rollback()
+        raise HTTPException(422, kq.get("ly_do") or "Chưa đối chiếu được")
+    R.audit(db, u.username, u.role, f"doi_chieu_chi_luong_{c.ket_luan}", f"payroll:{period}:{lan}",
+            after={"ket_luan": c.ket_luan, "tra_trang_thai": run.tra_trang_thai})
+    db.commit()
+    return {"message": f"{CL_KET_LUAN.get(c.ket_luan, c.ket_luan)} – {kq['ly_do']}",
+            "ket_luan": c.ket_luan, "ket_qua": kq, "chi": _chi_out(c),
+            "tra_trang_thai": run.tra_trang_thai,
+            "tra_trang_thai_ten": CL_TRA_TRANG_THAI.get(run.tra_trang_thai, "")}

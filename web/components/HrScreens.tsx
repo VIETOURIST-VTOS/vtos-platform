@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useShell } from "@/components/Shell";
 import DinhKem from "@/components/DinhKem";
-import { api, vnd, fmtD, fmtDT } from "@/lib/api";
+import { api, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 /** Visa, HDV & phân chuyến, Đội xe là nghiệp vụ của Điều hành (Đề xuất 06/9/2026 mục 2) nên nằm ở trang
@@ -26,6 +26,10 @@ const NEXT: Record<string, [string[], string]> = {
   hcns_kiem: [["chutich", "tgd"], "Ký & khóa kỳ lương"],
   kt_xac_nhan: [["hcns"], "HCNS kiểm xong – trình ký"],
   hcns_lap: [["chutich", "tgd"], "Ký & khóa kỳ lương"] };
+// Trạng thái trả tiền của cả kỳ. Cộng từ các lần chi ở máy chủ; màn hình chỉ đặt tên cho nó.
+const TRA: Record<string, [string, string]> = {
+  "": ["Chưa chi", "warn"], dang_chi: ["Đã chi một phần", "warn"],
+  da_tra_du: ["Đã trả đủ", "ok"], loi_chi: ["Có lần chi sai số", "red"] };
 const lastMonth = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); };
 
 export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
@@ -57,6 +61,10 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   // còn `[]` là đã kiểm và không còn gì phải xử lý. Gộp hai cái thành một là nói với người dùng
   // rằng bảng sạch trong khi chưa ai kiểm.
   const [co, setCo] = useState<any[] | null>(null);
+  // Các lần chi của kỳ. `null` là chưa hỏi máy chủ; `[]` là đã hỏi và kỳ này chưa chi lần nào —
+  // hai điều khác nhau, và gộp lại là nói "chưa chi" trong khi chưa ai biết.
+  const [chi, setChi] = useState<any | null>(null);
+  const [dangTai, setDangTai] = useState("");
   const [cong, setCong] = useState<Record<string, string>>({});
   const [visa, setVisa] = useState<any[]>([]);
   const [asg, setAsg] = useState<any[]>([]);
@@ -82,6 +90,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     if (!tours.length) api("/tours").then((r) => setTours(r.rows || [])).catch(() => {});
     if (tab === "payroll") api(`/payroll-runs/${period}`).then(setRun).catch((e) => toast(errMsg(e), true));
     if (tab === "payroll") { api("/payroll/khoan-treo").then(setTreo).catch(() => {}); api("/payroll/xung-dot-ho-so").then(setXungDot).catch(() => {}); }
+    if (tab === "payroll") api(`/payroll-runs/${period}/chi`).then(setChi).catch(() => setChi(null));
     if (tab === "payroll") { api(`/payroll-runs/${period}/phieu-luong`).then(setPhieu).catch(() => setPhieu(null)); api(`/payroll-runs/${period}/theo-phap-nhan`).then(setPhapNhan).catch(() => setPhapNhan(null)); }
     if (tab === "employees") { api("/employees").then(setEmps); api("/companies").then(setCos).catch(() => {}); }
     if (tab === "employees") api("/users/khoa").then(setKhoa).catch(() => {});
@@ -99,6 +108,21 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
       toast(r.message);
       load();
     } catch (x) { toast(errMsg(x), true); }
+  };
+
+  const chiDanhSach = async () => { try { setChi(await api(`/payroll-runs/${period}/chi`)); } catch { setChi(null); } };
+  // Tải tệp phải đi bằng fetch chứ không dùng `api`: FormData cần trình duyệt tự đặt ranh giới
+  // multipart, mà `api` thì gán sẵn Content-Type cho thân JSON.
+  const taiTep = async (lan: number, cua: "unc" | "phu-luc", f: File) => {
+    setDangTai(`${lan}:${cua}`);
+    try {
+      const fd = new FormData(); fd.append("tep", f);
+      const r = await fetch(`/api/v1/payroll-runs/${period}/chi/${lan}/${cua}`, {
+        method: "POST", body: fd, headers: { Authorization: `Bearer ${getToken() || ""}` } });
+      const d = await r.json();
+      if (!r.ok) throw { status: r.status, message: d?.detail || "Không tải được tệp" };
+      toast(d.message); await chiDanhSach();
+    } catch (x) { toast(errMsg(x), true); } finally { setDangTai(""); }
   };
 
   const post = async (path: string, json?: any, method = "POST") => { try { const r = await api(path, { method, json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
@@ -144,6 +168,58 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
               <td><Tag cls={c.muc === "chan" ? "red" : "warn"}>{c.muc === "chan" ? "Chặn" : "Cảnh báo"}</Tag></td>
               <td className="mono">{c.ma}</td><td>{c.thong_diep}</td></tr>)}
           </tbody></table>}</div>}
+      {["da_ky", "tgd_ky"].includes(run.status) && chi && <div className="panel wrap">
+        <h2>Kế toán chi · {TRA[chi.tra_trang_thai]?.[0] || "Chưa chi"}</h2>
+        <p className="muted">Khúc cuối của chuỗi: kế toán chuyển tiền, tải <b>Ủy nhiệm chi</b> lên, máy đọc rồi
+          <b> đối chiếu với bản đã ký</b>. Kết luận đủ / một phần / lỗi do quy tắc xác định tính ra —
+          <b> không có ô nào cho người gõ “đã trả đủ”</b>, vì một ô như thế biến cả chuỗi này thành một lời khai.
+          Phụ lục từng người là tuỳ chọn, nhưng <b>thiếu nó thì chỉ kết luận được ở mức tổng</b>: tổng khớp vẫn
+          có thể một người nhận thừa và một người nhận thiếu.</p>
+        {["ketoan", "cntt"].includes(role) &&
+          <button className="act" onClick={() => post(`/payroll-runs/${period}/chi`).then(chiDanhSach)}>Mở lần chi mới</button>}
+        {(chi.lan_chi || []).length === 0 ? <p className="muted">Kỳ này chưa chi lần nào.</p> :
+          <table><thead><tr><th>Lần</th><th>Ủy nhiệm chi</th><th className="num">Số tiền</th><th>Phụ lục</th><th>Kết luận</th><th>Việc tiếp</th></tr></thead>
+            <tbody>{chi.lan_chi.map((c: any) => <>
+              <tr key={c.lan}>
+                <td className="mono">{c.lan}</td>
+                <td>{c.ngan_hang} {c.ngay_chuyen && fmtD(c.ngay_chuyen)}<div className="muted mono">{c.so_tham_chieu}</div></td>
+                {/* RỖNG ≠ 0: máy chưa đọc được thì nói là chưa đọc được, không in “0 đ”. */}
+                <td className="num">{c.so_tien_unc === null || c.so_tien_unc === undefined
+                  ? <Tag cls="warn">chưa đọc được</Tag> : <b>{vnd(c.so_tien_unc)}</b>}</td>
+                <td>{c.co_phu_luc ? `${c.so_dong_phu_luc} dòng` : <span className="muted">chưa có</span>}</td>
+                <td>{c.ket_luan
+                  ? <Tag cls={c.ket_luan === "du" ? "ok" : c.ket_luan === "mot_phan" ? "warn" : "red"}>{c.ket_luan_ten}</Tag>
+                  : <span className="muted">chưa đối chiếu</span>}</td>
+                <td>{!c.ket_luan && ["ketoan", "cntt"].includes(role) && <>
+                  <label className="act grey" style={{ cursor: "pointer" }}>{dangTai === `${c.lan}:unc` ? "Đang đọc…" : "Tải UNC"}
+                    <input type="file" style={{ display: "none" }} accept="image/*,application/pdf"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) taiTep(c.lan, "unc", f); e.target.value = ""; }} /></label>
+                  <label className="act grey" style={{ cursor: "pointer" }}>{dangTai === `${c.lan}:phu-luc` ? "Đang đọc…" : "Tải phụ lục"}
+                    <input type="file" style={{ display: "none" }} accept="image/*,application/pdf"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) taiTep(c.lan, "phu-luc", f); e.target.value = ""; }} /></label>
+                  <button className="act teal" onClick={() => post(`/payroll-runs/${period}/chi/${c.lan}/doi-chieu`).then(chiDanhSach)}>Đối chiếu</button>
+                </>}</td></tr>
+              {c.ket_qua?.ly_do && <tr key={c.lan + "x"}><td colSpan={6} className="muted" style={{ padding: "2px 24px" }}>
+                <b>{c.ket_qua.ly_do}</b>
+                {c.ket_qua.tong && <> · bản đã ký {vnd(c.ket_qua.tong.ban_khoa)} · chuyển {vnd(c.ket_qua.tong.unc)}
+                  {c.ket_qua.tong.sepay ? <> · <Tag cls="ok">SePay xác nhận tiền đã ra</Tag></>
+                    : <> · <Tag cls="warn">chưa thấy giao dịch SePay khớp</Tag></>}</>}
+              </td></tr>}
+              {(c.ket_qua?.tung_nguoi?.thieu?.length > 0 || c.ket_qua?.tung_nguoi?.lech?.length > 0
+                || c.ket_qua?.tung_nguoi?.thua?.length > 0 || c.ket_qua?.tung_nguoi?.nhap_nhang?.length > 0) &&
+                <tr key={c.lan + "n"}><td colSpan={6}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}>
+                  <thead><tr><th>Mã</th><th>Họ tên</th><th className="num">Phải trả</th><th className="num">Đã chuyển</th><th>Vì sao</th></tr></thead>
+                  <tbody>{[...(c.ket_qua.tung_nguoi.thieu || []), ...(c.ket_qua.tung_nguoi.lech || []),
+                           ...(c.ket_qua.tung_nguoi.thua || []), ...(c.ket_qua.tung_nguoi.nhap_nhang || [])]
+                    .map((x: any, i: number) => <tr key={i}>
+                      <td className="mono">{x.ma_nv || ""}</td><td>{x.ho_ten}</td>
+                      <td className="num">{x.phai_tra === undefined ? "" : vnd(x.phai_tra)}</td>
+                      <td className="num">{x.da_chuyen === undefined ? (x.so_tien === undefined ? "" : vnd(x.so_tien)) : vnd(x.da_chuyen)}</td>
+                      <td className="muted">{x.ly_do || (x.lech ? `lệch ${vnd(x.lech)}` : "")}</td></tr>)}
+                  </tbody></table></td></tr>}
+              {c.phu_luc_ghi_chu && <tr key={c.lan + "g"}><td colSpan={6} className="muted" style={{ padding: "2px 24px" }}>Máy ghi chú: {c.phu_luc_ghi_chu}</td></tr>}
+            </>)}</tbody></table>}
+      </div>}
       <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th>HĐ</th><th>Chế độ công</th><th style={{ textAlign: "right" }}>Lương CB</th><th style={{ textAlign: "right" }}>Biến đổi</th><th style={{ textAlign: "right" }}>BHXH</th><th style={{ textAlign: "right" }}>Đoàn phí</th><th style={{ textAlign: "right" }}>TNCN</th><th style={{ textAlign: "right" }}>Thực nhận</th><th>Ghi chú robot</th></tr></thead>
         <tbody>{run.rows.map((r: any) => <>
           <tr key={r.ma} style={{ cursor: "pointer" }} onClick={() => setOpen(open === r.ma ? null : r.ma)}><td className="mono">{r.ma}</td><td><b>{r.ten}</b></td><td>{meta.departments[r.phong] || r.phong}<div className="muted">{meta.positions[r.chuc_vu]}</div></td><td>{r.hop_dong === "hdld" ? "HĐLĐ" : "CTV"}</td><td className="muted">{CD[r.che_do_cong] || ""}</td>
