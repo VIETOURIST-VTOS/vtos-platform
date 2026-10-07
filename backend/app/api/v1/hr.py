@@ -2083,6 +2083,21 @@ def payroll_kiem_co_so(period: str, u: User = Depends(require_roles("hcns", "cnt
             "ghi_chu": "Không có cờ nghĩa là những thứ đã biết cách kiểm đều sạch, không nghĩa là bảng đúng."}
 
 
+@router.get("/payroll-runs/{period}/so-thu-nhap")
+def payroll_so_thu_nhap(period: str, u: User = Depends(bang_luong), db: Session = Depends(get_db)):
+    """Sổ sự kiện thu nhập của kỳ: ai đã được trả khoản gì, vì căn cứ nào, nguồn là những gì.
+
+    Đây là cửa trả lời câu "khoản này đã trả chưa" — câu mà trước Đợt B hệ thống không có chỗ nào
+    trả lời được, vì mọi khoản đều được tính lại từ đầu và dấu vết duy nhất là một dòng chữ.
+
+    Chỉ ĐỌC. Sổ ghi lúc ký, trong cùng giao dịch với bản khóa; không có cửa nào gõ tay vào đây, và
+    việc không có cửa ấy là tính chất an toàn chứ không phải việc còn thiếu.
+    """
+    from app.services import thu_nhap_su_kien as TN
+    return {"period": period, "loai_khoan": TN.LOAI_KHOAN, "doc_chiem": list(TN.DOC_CHIEM),
+            "dong": TN.so_cua_ky(db, period)}
+
+
 @router.get("/payroll-runs/{period}/ban-khoa")
 def payroll_ban_khoa(period: str, u: User = Depends(bang_luong), db: Session = Depends(get_db)):
     """Bản khóa của kỳ, và kết quả tính lại hôm nay so với nó.

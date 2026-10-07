@@ -64,6 +64,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   // Các lần chi của kỳ. `null` là chưa hỏi máy chủ; `[]` là đã hỏi và kỳ này chưa chi lần nào —
   // hai điều khác nhau, và gộp lại là nói "chưa chi" trong khi chưa ai biết.
   const [chi, setChi] = useState<any | null>(null);
+  const [soTN, setSoTN] = useState<any | null>(null);
   const [dangTai, setDangTai] = useState("");
   const [cong, setCong] = useState<Record<string, string>>({});
   const [visa, setVisa] = useState<any[]>([]);
@@ -91,6 +92,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     if (tab === "payroll") api(`/payroll-runs/${period}`).then(setRun).catch((e) => toast(errMsg(e), true));
     if (tab === "payroll") { api("/payroll/khoan-treo").then(setTreo).catch(() => {}); api("/payroll/xung-dot-ho-so").then(setXungDot).catch(() => {}); }
     if (tab === "payroll") api(`/payroll-runs/${period}/chi`).then(setChi).catch(() => setChi(null));
+    if (tab === "payroll") api(`/payroll-runs/${period}/so-thu-nhap`).then(setSoTN).catch(() => setSoTN(null));
     if (tab === "payroll") { api(`/payroll-runs/${period}/phieu-luong`).then(setPhieu).catch(() => setPhieu(null)); api(`/payroll-runs/${period}/theo-phap-nhan`).then(setPhapNhan).catch(() => setPhapNhan(null)); }
     if (tab === "employees") { api("/employees").then(setEmps); api("/companies").then(setCos).catch(() => {}); }
     if (tab === "employees") api("/users/khoa").then(setKhoa).catch(() => {});
@@ -168,6 +170,19 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
               <td><Tag cls={c.muc === "chan" ? "red" : "warn"}>{c.muc === "chan" ? "Chặn" : "Cảnh báo"}</Tag></td>
               <td className="mono">{c.ma}</td><td>{c.thong_diep}</td></tr>)}
           </tbody></table>}</div>}
+      {soTN && soTN.dong?.length > 0 && <div className="panel wrap"><h2>Sổ thu nhập đã ký · {soTN.dong.length} khoản</h2>
+        <p className="muted">Ghi tại đúng lúc có chữ ký, trong cùng giao dịch với bản khóa. Đây là chỗ trả lời câu
+          <b> “khoản này đã trả chưa”</b> — trước đây hệ thống tính lại mọi khoản từ đầu mỗi lần, nên câu ấy không có
+          chỗ nào trả lời được. <b>Không có cửa gõ tay vào sổ này</b>, và việc không có cửa là tính chất an toàn:
+          sửa được sổ thì xoá được dấu vết một lần đã trả.</p>
+        <table><thead><tr><th>Mã NV</th><th>Loại khoản</th><th>Căn cứ</th><th className="num">Số tiền</th><th>Nguồn</th></tr></thead>
+          <tbody>{soTN.dong.map((d: any, i: number) => <tr key={i}>
+            <td className="mono">{d.ma_nv}</td>
+            <td>{d.loai_ten}{soTN.doc_chiem?.includes(d.loai) && <Tag cls="warn">một quỹ</Tag>}</td>
+            <td className="mono muted">{d.can_cu}</td>
+            <td className="num">{d.so_tien === null || d.so_tien === undefined ? <Tag cls="warn">rỗng</Tag> : vnd(d.so_tien)}</td>
+            <td className="muted mono" style={{ maxWidth: 320 }}>{(d.nguon || []).join(", ")}</td></tr>)}
+          </tbody></table></div>}
       {["da_ky", "tgd_ky"].includes(run.status) && chi && <div className="panel wrap">
         <h2>Kế toán chi · {TRA[chi.tra_trang_thai]?.[0] || "Chưa chi"}</h2>
         <p className="muted">Khúc cuối của chuỗi: kế toán chuyển tiền, tải <b>Ủy nhiệm chi</b> lên, máy đọc rồi

@@ -114,8 +114,23 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
                                       "bhxh": 0.0, "bhxh_base": 0.0, "doan_phi": 0.0, "tru_su_vu": 0.0,
                                       "thu_nhap": 0.0, "khoan_tru": 0.0, "thuc_nhan": 0.0, "ghi_chu": []})
 
-    def add(e: Employee, ten: str, tien: float, note: str = ""):
-        r = row(e); r["khoan"].append({"ten": ten, "tien": round(tien), "ghi_chu": note}); r["bien_doi"] += round(tien)
+    def add(e: Employee, ten: str, tien: float, note: str = "", *, loai: str, can_cu: str,
+            nguon: list | None = None):
+        """Một khoản thu nhập biến đổi.
+
+        `loai` và `can_cu` BẮT BUỘC (tham số chỉ nhận theo tên, nên quên là lỗi ngay lúc gọi, không
+        phải lỗi lặng). Không có chúng thì sổ sự kiện thu nhập không chống trùng được cho khoản này,
+        mà một khoản không ai chống trùng được là một khoản có thể trả hai lần.
+
+        `nguon` là các vật thể ở ngoài đã nuôi con số: mã chuyến, mã hồ sơ, mã lệnh điều xe. Phần
+        lớn căn cứ gắn với THÁNG (hoa hồng thang f tính trên tổng doanh thu tháng, không trên từng
+        chuyến), nên hai tháng luôn là hai căn cứ khác tên — chỉ có `nguon` mới bắt được một chuyến
+        nằm trong căn cứ của cả hai.
+        """
+        r = row(e)
+        r["khoan"].append({"ten": ten, "tien": round(tien), "ghi_chu": note, "loai": loai,
+                           "can_cu": can_cu, "nguon": sorted(nguon or [])})
+        r["bien_doi"] += round(tien)
 
     moc_hcm = R.get_param(db, "moc_chi_tieu_hcm"); moc_ct = R.get_param(db, "moc_chi_tieu_cantho")
     thr = R.get_param(db, "nguong_bien")
@@ -149,12 +164,17 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
     # ---------- Kinh doanh Lẻ: doanh thu tính chỉ tiêu theo tháng quyết toán ----------
     rev_by_sales: dict[int, float] = {}; share_by_sales: dict[int, float] = {}
     doan_profit_by_sales: dict[int, float] = {}; doan_profit_total = 0.0
+    # Chuyến nào đã nuôi con số nào, theo từng người. Gom ngay tại chỗ cộng tiền chứ không dựng lại
+    # sau: dựng lại là chép đôi điều kiện lọc, và hai bản điều kiện sẽ lệch nhau ở lần sửa thứ nhất.
+    ng_rev: dict[int, set] = {}; ng_bien: dict[int, set] = {}
+    ng_doan: dict[int, set] = {}; ng_doan_tong: set = set()
     for t in tours:
         s = qt(t)
         for b in t.bookings:
             if R.is_doan(t):
                 share = R.ln_doan_cua_booking(s["profit"], s["revenue"] or 0, b.amount or 0)
                 doan_profit_by_sales[b.sales_id] = doan_profit_by_sales.get(b.sales_id, 0) + share
+                ng_doan.setdefault(b.sales_id, set()).add(t.code)
                 continue
             if not b.counts_for_target:
                 continue                         # thiếu 4 trường → không chỉ tiêu, không hoa hồng
@@ -163,10 +183,13 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
             net = (b.amount or 0) - (b.discount or 0)           # mã KM: tính theo doanh thu đã giảm
             if t.below_margin and not t.strategic and s["margin"] < thr:
                 share_by_sales[b.sales_id] = share_by_sales.get(b.sales_id, 0) + max(0.0, R.ln_doan_cua_booking(s["profit"], s["revenue"] or 0, b.amount or 0)) * 0.10
+                ng_bien.setdefault(b.sales_id, set()).add(t.code)
             else:
                 rev_by_sales[b.sales_id] = rev_by_sales.get(b.sales_id, 0) + net
+                ng_rev.setdefault(b.sales_id, set()).add(t.code)
         if R.is_doan(t) and s["profit"] > 0:
             doan_profit_total += s["profit"]
+            ng_doan_tong.add(t.code)
 
     # Chuyến đã kết thúc nhưng CHƯA chốt quyết toán, theo người bán: doanh thu tính chỉ tiêu chưa gồm những
     # chuyến này, nên "0 đồng" của người còn chuyến treo là CHƯA BIẾT chứ không phải bán được 0.
@@ -193,27 +216,34 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
             k, rate = f_rate(rev, moc, f_table)
             comm = rate * max(0.0, rev - moc)
             if comm > 0:
-                add(e, f"Hoa hồng thang f{k} ({rate*100:.1f}%) × (DT {rev:,.0f} − mốc)", comm)
+                add(e, f"Hoa hồng thang f{k} ({rate*100:.1f}%) × (DT {rev:,.0f} − mốc)", comm,
+                    loai="hh_thang_f", can_cu=f"dt_kd_le:{period}", nguon=ng_rev.get(e.user_id) or [])
             if share_by_sales.get(e.user_id):
-                add(e, "10% lợi nhuận booking chuyến duyệt chạy dưới biên", share_by_sales[e.user_id])
+                add(e, "10% lợi nhuận booking chuyến duyệt chạy dưới biên", share_by_sales[e.user_id],
+                    loai="ln_duoi_bien", can_cu=f"duoi_bien:{period}", nguon=ng_bien.get(e.user_id) or [])
             if e.office == "cantho" and doan_profit_by_sales.get(e.user_id):
-                add(e, "10% lợi nhuận đoàn tự chốt (Cần Thơ)", doan_profit_by_sales[e.user_id] * 0.10)
+                add(e, "10% lợi nhuận đoàn tự chốt (Cần Thơ)", doan_profit_by_sales[e.user_id] * 0.10,
+                    loai="ln_doan_cantho", can_cu=f"doan_cantho:{period}", nguon=ng_doan.get(e.user_id) or [])
             n_inc = incidents_of(db, e.id, y, m)
             if n_inc:
                 pen = min(max(row(e)["bien_doi"], 0), n_inc * phat_su_vu)
-                if pen: add(e, f"Chế tài sự vụ ≥ mức 2 ({n_inc} vụ) – chỉ trừ hoa hồng", -pen)
+                if pen: add(e, f"Chế tài sự vụ ≥ mức 2 ({n_inc} vụ) – chỉ trừ hoa hồng", -pen,
+                            loai="che_tai_su_vu", can_cu=f"su_vu:{period}")
                 if pen < n_inc * phat_su_vu: row(e)["ghi_chu"].append(f"Sự vụ ≥ mức 2: {n_inc} vụ, chế tài {n_inc * phat_su_vu:,.0f} nhưng hoa hồng chỉ {pen:,.0f} – không trừ lương cơ bản (Điều 127.2 BLLĐ)")
             if e.id in shift_pen:
                 p_amt, n_miss, kicked = shift_pen[e.id]
                 pen = min(max(row(e)["bien_doi"], 0), p_amt)
-                if pen: add(e, f"Chế tài ca trực page: {n_miss} lượt sót – chỉ trừ hoa hồng", -pen)
+                if pen: add(e, f"Chế tài ca trực page: {n_miss} lượt sót – chỉ trừ hoa hồng", -pen,
+                            loai="che_tai_ca_truc", can_cu=f"ca_truc:{period}")
                 if kicked: row(e)["ghi_chu"].append("≥ 6 lượt sót: loại khỏi ca trực tháng sau, điều chỉnh chỉ tiêu")
         elif e.position == "gd_kd":
             staff = [x for x in emps.values() if x.department == "kd_le" and x.position in ("nv", "tl", "tp") and x.contract_type == "hdld"]
             hit = sum(1 for x in staff if rev_by_sales.get(x.user_id, 0) >= moc_of(x, moc_hcm, moc_ct))
             pct = hit / len(staff) if staff else 0
-            if pct >= 0.85: add(e, f"Thưởng GĐ KD: {pct*100:.0f}% NV đạt chỉ tiêu (≥85%)", R.get_param(db, "gd_kd_thuong_85"), "+1% LN Công ty theo BCKQKD tháng – nhập tay khi TGĐ duyệt")
-            elif pct >= 0.5: add(e, f"Thưởng GĐ KD: {pct*100:.0f}% NV đạt chỉ tiêu (50–85%)", R.get_param(db, "gd_kd_thuong_50"), "+0,5% LN Công ty – nhập tay khi TGĐ duyệt")
+            if pct >= 0.85: add(e, f"Thưởng GĐ KD: {pct*100:.0f}% NV đạt chỉ tiêu (≥85%)", R.get_param(db, "gd_kd_thuong_85"), "+1% LN Công ty theo BCKQKD tháng – nhập tay khi TGĐ duyệt",
+                                 loai="gd_kd_thuong", can_cu=f"chi_tieu_kd:{period}")
+            elif pct >= 0.5: add(e, f"Thưởng GĐ KD: {pct*100:.0f}% NV đạt chỉ tiêu (50–85%)", R.get_param(db, "gd_kd_thuong_50"), "+0,5% LN Công ty – nhập tay khi TGĐ duyệt",
+                                 loai="gd_kd_thuong", can_cu=f"chi_tieu_kd:{period}")
             else: row(e)["ghi_chu"].append(f"{pct*100:.0f}% NV đạt chỉ tiêu (<50%) – chỉ lương")
 
     # ---------- Kinh doanh Đoàn ----------
@@ -241,24 +271,35 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
             row(e)["luong_cb"] = round(xd["muc_ky"] * (0.85 if e.probation else 1.0))
             if xd["ty_le"] < 1: row(e)["ghi_chu"].append(xd["giai_thich"])
             if pr > moc_hh:
-                add(e, f"Hoa hồng đoàn {rate_hh*100:.0f}% × (LN {pr:,.0f} − {moc_hh:,.0f})", (pr - moc_hh) * rate_hh)
+                add(e, f"Hoa hồng đoàn {rate_hh*100:.0f}% × (LN {pr:,.0f} − {moc_hh:,.0f})", (pr - moc_hh) * rate_hh,
+                    loai="hh_doan", can_cu=f"ln_doan:{period}", nguon=ng_doan.get(e.user_id) or [])
         elif e.position == "ptgd_doan" and doan_profit_total > 0:
             n_inc = incidents_of(db, e.id, y, m)
             rate = R.get_param(db, "ptgd_doan_ty_le") - 0.005 * n_inc
-            add(e, f"PTGĐ tour đoàn {rate*100:.1f}% LN các đoàn có lãi", doan_profit_total * max(rate, 0))
+            add(e, f"PTGĐ tour đoàn {rate*100:.1f}% LN các đoàn có lãi", doan_profit_total * max(rate, 0),
+                loai="ptgd_doan", can_cu=f"ln_doan_tong:{period}", nguon=ng_doan_tong)
         elif e.position == "sale_admin" and doan_profit_total > 0:
-            add(e, "Sale Admin 2% LN các đoàn có lãi", doan_profit_total * R.get_param(db, "sale_admin_ty_le"))
+            add(e, "Sale Admin 2% LN các đoàn có lãi", doan_profit_total * R.get_param(db, "sale_admin_ty_le"),
+                loai="sale_admin", can_cu=f"ln_doan_tong:{period}", nguon=ng_doan_tong)
 
     # ---------- Điều hành: quỹ 2%/1%/1% chia 70/30 ----------
     fund_by_op: dict[int, float] = {}; fund_tp = 0.0
+    ng_quy_op: dict[int, set] = {}; ng_quy_tp: set = set()
     for t in tours:
         s = qt(t)
         fund_by_op[t.operator_id] = fund_by_op.get(t.operator_id, 0) + s["fund_nv"]; fund_tp += s["fund_tp"]
+        if s["fund_nv"]: ng_quy_op.setdefault(t.operator_id, set()).add(t.code)
+        if s["fund_tp"]: ng_quy_tp.add(t.code)
     for e in emps.values():
         if e.department == "dieu_hanh" and e.position == "nv" and fund_by_op.get(e.user_id):
-            add(e, "Thưởng chuyến Điều hành (70% quỹ)", fund_by_op[e.user_id])
+            add(e, "Thưởng chuyến Điều hành (70% quỹ)", fund_by_op[e.user_id],
+                loai="quy_dh_nv", can_cu=f"quy_dh:{period}", nguon=ng_quy_op.get(e.user_id) or [])
         if e.department == "dieu_hanh" and e.position == "tp" and fund_tp:
-            add(e, "Trưởng phòng ĐH – 30% quỹ toàn phòng", fund_tp)
+            # MỘT QUỸ, trả đủ cho MỖI trưởng phòng. Hai trưởng phòng là chi gấp đôi quỹ. Giữ nguyên
+            # công thức ở đây – đổi cách chia tiền phải có chữ ký – nhưng khai loại này là ĐỘC CHIẾM
+            # (thu_nhap_su_kien.DOC_CHIEM) để bộ kiểm cơ sở nói ra mỗi kỳ, thay vì không ai thấy.
+            add(e, "Trưởng phòng ĐH – 30% quỹ toàn phòng", fund_tp,
+                loai="quy_dh_tp", can_cu=f"quy_dh:{period}", nguon=ng_quy_tp)
 
     # ---------- Ban Visa: quỹ theo tháng hoàn thành ----------
     gia_tu = R.get_param(db, "visa_tu_xu_ly"); gia_dt = R.get_param(db, "visa_gui_doi_tac"); gia_lm = R.get_param(db, "visa_lien_minh")
@@ -270,9 +311,13 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         else: hcm_pool += v
     hcm_staff = [e for e in emps.values() if e.department == "visa" and e.office == "hcm" and e.position != "tp"]
     for e in hcm_staff:
-        if hcm_pool: add(e, f"Quỹ visa HCM chia đều {len(hcm_staff)} người ({len([f for f in files if f.office != 'hanoi'])} hồ sơ)", hcm_pool / len(hcm_staff))
+        if hcm_pool: add(e, f"Quỹ visa HCM chia đều {len(hcm_staff)} người ({len([f for f in files if f.office != 'hanoi'])} hồ sơ)", hcm_pool / len(hcm_staff),
+                         loai="quy_visa_hcm", can_cu=f"quy_visa_hcm:{period}",
+                         nguon=[f"visa:{f.id}" for f in files if f.office != "hanoi"])
     for eid, v in hn.items():
-        if eid in emps: add(emps[eid], "Quỹ visa Hà Nội (hưởng riêng)", v)
+        if eid in emps: add(emps[eid], "Quỹ visa Hà Nội (hưởng riêng)", v,
+                            loai="quy_visa_hn", can_cu=f"quy_visa_hn:{period}",
+                            nguon=[f"visa:{f.id}" for f in files if f.office == "hanoi" and f.handler_id == eid])
 
     # ---------- HDV cộng tác viên: thù lao theo chuyến quyết toán trong tháng, TNCN 10% ----------
     tncn = R.get_param(db, "hdv_tncn")
@@ -284,19 +329,25 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
         gross = (a.rate_per_day or 0) * a.days * (2 if a.holiday else 1)
         if not a.report_submitted or not a.advance_settled:
             row(e)["ghi_chu"].append(f"TREO thù lao {t.code}: thiếu báo cáo tour / chưa hoàn ứng"); continue
-        add(e, f"Thù lao dẫn {t.code}: {a.days} ngày × {a.rate_per_day:,.0f}{' ×2 lễ' if a.holiday else ''}", gross)
+        # Căn cứ gắn với CHÍNH LẦN PHÂN CHUYẾN, không gắn với tháng: một lần dẫn chỉ được trả một
+        # lần, dù chuyến ấy có được chốt lại vào tháng nào.
+        add(e, f"Thù lao dẫn {t.code}: {a.days} ngày × {a.rate_per_day:,.0f}{' ×2 lễ' if a.holiday else ''}", gross,
+            loai="thu_lao_hdv", can_cu=f"hdv_phan_chuyen:{a.id}", nguon=[t.code])
         r = row(e); r["tncn"] += round(gross * tncn)
     # ---------- Tài xế: công tác phí theo lệnh điều xe ----------
     ctp = R.get_param(db, "tai_xe_cong_tac_phi")
-    days_by_driver: dict[int, int] = {}
+    days_by_driver: dict[int, int] = {}; lenh_by_driver: dict[int, set] = {}
     for d in db.execute(select(DispatchOrder).where(DispatchOrder.status.in_(["da_xac_nhan", "hoan_thanh"]))).scalars():
         v = db.get(Vehicle, d.vehicle_id)
         if v and v.kind == "hop_tac":
             continue                                  # xe hợp tác: tài xế đối tác, không tính công tác phí
         if d.date_to.year == y and d.date_to.month == m:
             days_by_driver[d.driver_id] = days_by_driver.get(d.driver_id, 0) + (d.date_to - d.date_from).days + 1
+            lenh_by_driver.setdefault(d.driver_id, set()).add(f"dieu_xe:{d.id}")
     for eid, n in days_by_driver.items():
-        if eid in emps: add(emps[eid], f"Công tác phí tài xế {n} ngày tour × {ctp:,.0f}", n * ctp, "Phụ cấp lễ/đêm theo luật do HCNS tính thêm")
+        if eid in emps: add(emps[eid], f"Công tác phí tài xế {n} ngày tour × {ctp:,.0f}", n * ctp, "Phụ cấp lễ/đêm theo luật do HCNS tính thêm",
+                            loai="cong_tac_phi_tx", can_cu=f"dieu_xe:{period}",
+                            nguon=sorted(lenh_by_driver.get(eid) or []))
 
     # ---------- BƯỚC 3: khoản trừ của người lao động (Bộ tính lương từ 01/9/2026) ----------
     # Khác hẳn với bước xác định mức lương ở trên: đây mới là khoản TRỪ thật – bảo hiểm xã hội phần người

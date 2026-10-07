@@ -10,6 +10,7 @@ from app.models.banks import *  # noqa
 from app.models.hdv import *  # noqa
 from app.models.luong_khoa import *  # noqa
 from app.models.chi_luong import *  # noqa
+from app.models.su_kien_thu_nhap import *  # noqa
 from app.models.hr import *  # noqa
 from app.models.hrm import *  # noqa
 from app.models.ops import *  # noqa
