@@ -222,6 +222,23 @@ MAY_SINH = {
     "cong_no_vietrip_anh": "Ảnh chụp công nợ do lịch chạy 8h sáng nạp từ Vietrip qua /cong-no-vietrip/nap "
                            "– số của Vietrip, không nhập tay.",
     "cong_no_vietrip_dong": "Dòng của ảnh chụp công nợ Vietrip – nạp cùng ảnh, không nhập tay.",
+    # 07/10/2026. Cặp bảng SONG SINH với hai dòng ngay trên, và khai muộn hơn đúng một tuần – nên bộ
+    # soát `test_cn1` đỏ trên main suốt từ đó: hai bảng có người ghi mà chưa ai KHAI là ai ghi.
+    #
+    # Khai MÁY SINH ở đây là nói đúng sự thật, không phải để cho phép thử xanh. Số là của VIETRIP,
+    # đọc từ trang Quyết toán tour (khối "Thống kê thu chi": Tổng chi dự toán · Thực tế đã chi · Còn
+    # phải chi) rồi đẩy vào qua POST /api/v1/cong-no-vietrip/nap-phai-tra – đúng một đường, đúng một
+    # hình với /cong-no-vietrip/nap của cặp công nợ khách. `con_phai_chi` do MÁY CHỦ tính
+    # (tong_chi − da_chi) và tour hết nợ thì bỏ, nên không có chỗ nào cho một con số gõ tay chen vào
+    # mà vẫn nhất quán.
+    #
+    # Vì sao KHÔNG mở cửa nhập tay: đây là ảnh chụp số của một hệ thống khác vào một ngày. Gõ tay một
+    # dòng là bịa ra một con số Vietrip chưa từng nói, và cái ảnh ấy mất hẳn công dụng duy nhất của
+    # nó – làm chứng cứ để SO. Muốn sửa số thì sửa trên Vietrip, sáng hôm sau ảnh tự thay.
+    "phai_tra_vietrip_anh": "Ảnh chụp phải trả NCC theo dự toán tour, nạp từ Vietrip qua "
+                            "/cong-no-vietrip/nap-phai-tra – số của Vietrip, không nhập tay.",
+    "phai_tra_vietrip_dong": "Dòng của ảnh chụp phải trả Vietrip – nạp cùng ảnh; con_phai_chi do máy "
+                             "chủ tính, không nhận từ bên gửi.",
     # Nối tài khoản Zalo (19/9/2026). Hai bảng, và CẢ HAI đều máy sinh — nhưng vì hai lý do khác
     # nhau, nên chép ra đây cả hai chứ không gộp một dòng:
     #
