@@ -58,10 +58,23 @@ BASE_VIEW = FULL_VIEW + READ_ALL                        # nền của MỌI dòn
 # ba tab – nên không có cách nào cho một người xem hồ sơ nhân sự mà không xem luôn bảng lương.
 # Bảng lương chỉ còn HCNS theo vai trò; Kế toán trưởng xem toàn công ty bằng NGOẠI LỆ THEO NGƯỜI
 # (năng lực "bang_luong"), vì vai trò "ketoan" có nhiều người mà quyền chỉ cấp cho một.
-HR_TABS = {"payroll": "Bảng lương", "employees": "Hồ sơ nhân sự", "incidents": "Đánh giá & sự vụ"}
+HR_TABS = {"payroll": "Bảng lương", "tong_quan": "Tổng quan HCNS",
+           "employees": "Hồ sơ nhân sự", "cham_cong": "Chấm công & nghỉ phép",
+           "incidents": "Đánh giá & sự vụ"}
 HR_TAB_ROLES = {
     "payroll": BASE_VIEW + ("hcns",),
     "employees": BASE_VIEW + ("ptgd_doan", "tp_dh", "gd_kd", "ketoan", "hcns", "cntt"),
+    # Hai thẻ Đợt C DÙNG LẠI đúng bộ vai của thẻ Hồ sơ nhân sự, không khai bộ mới.
+    # Cùng một tập người, cùng một loại dữ liệu: ai xem được hồ sơ nhân sự thì xem được
+    # tổng quan nhân sự và bảng chấm công. Khai một bộ vai mới ở đây là LẦN VIẾT PHẦN MỀM
+    # TỰ ĐẶT QUYỀN, mà quyền thì thuộc làn Phân quyền. Muốn hẹp hơn – ví dụ chỉ HCNS – thì
+    # sửa hai dòng này, và đó là một quyết định có chữ ký chứ không phải một lần tinh chỉnh.
+    #
+    # Khối bảng lương trên Tổng quan KHÔNG đi theo bộ vai này: nó chỉ hiện khi người gọi
+    # thật sự mở được thẻ Bảng lương (services/hcns_tong_quan.py). Không có vế ấy thì thẻ
+    # Tổng quan mở bảng lương cho Kế toán và các Trưởng phòng bằng cửa sau.
+    "tong_quan": BASE_VIEW + ("ptgd_doan", "tp_dh", "gd_kd", "ketoan", "hcns", "cntt"),
+    "cham_cong": BASE_VIEW + ("ptgd_doan", "tp_dh", "gd_kd", "ketoan", "hcns", "cntt"),
     "incidents": BASE_VIEW + ("ptgd_doan", "tp_dh", "gd_kd", "hcns", "cntt"),
 }
 HR_TAB_CAPABILITY = {"payroll": "bang_luong"}     # tab mở thêm được bằng ngoại lệ theo người
@@ -901,7 +914,8 @@ MENU_ROLES = {
     "/tai-san": BASE_VIEW + ("ketoan", "cntt", "hanh_chinh", "hcns"),
 
     # --- Hành chính & Nhân sự (tách quyền theo tab, xem HR_TAB_ROLES) ---
-    "/hr": HR_TAB_ROLES["payroll"] + HR_TAB_ROLES["employees"] + HR_TAB_ROLES["incidents"],
+    "/hr": HR_TAB_ROLES["payroll"] + HR_TAB_ROLES["employees"] + HR_TAB_ROLES["incidents"]
+           + HR_TAB_ROLES["tong_quan"] + HR_TAB_ROLES["cham_cong"],
 
     # --- Kiểm soát & Chính sách ---
     "/params": PARAM_ROLES,
