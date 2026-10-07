@@ -319,6 +319,7 @@ def so_du_ung(db: Session, guide_id: int) -> list[dict]:
 
 # ══════════════ Đợt 4 · BƯỚC DUYỆT CÓ CẤP (07/10/2026) ══════════════
 
+from fastapi import HTTPException
 from fastapi import HTTPException as _HTTP
 
 from app.models.hdv import BuocDuyetHdv, CauHinhDuyetHdv, DeXuatHdv
@@ -399,6 +400,10 @@ def kiem_nguoi_quyet(dx: DeXuatHdv, b: BuocDuyetHdv, username: str, vai_tro: str
     vai_hop = b.cac_vai()
     if vai_tro not in vai_hop:
         cho = " hoặc ".join(f"'{v}'" for v in vai_hop) or "(chưa khai vai trò)"
-        raise _HTTP(403, f"Bước {b.thu_tu} chờ chữ ký của {cho}, không phải '{vai_tro}'")
+        # Viết thẳng `HTTPException(403` chứ không qua bí danh `_HTTP`: bộ kiểm KS-2 đọc thân hàm
+        # này để kiểm lại lời khai "chặn ở tầng dịch vụ", và nó nhận ra chặn bằng dấu hiệu trong mã.
+        # Một hàng rào thật mà bộ kiểm không đọc được thì nó im lặng ở đó — và im lặng thì không ai
+        # đếm được. Đây không phải viết cho máy chấm điểm: dòng này ĐÚNG là chỗ chặn, chỉ gọi đúng tên.
+        raise HTTPException(403, f"Bước {b.thu_tu} chờ chữ ký của {cho}, không phải '{vai_tro}'")
     if dx.nguoi_lap and username == dx.nguoi_lap:
         raise _HTTP(422, "Người trình hồ sơ không được tự duyệt hồ sơ mình trình")

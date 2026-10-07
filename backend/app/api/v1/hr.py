@@ -1249,12 +1249,17 @@ def dx_quyet(did: int, data: DxQuyet, u: User = Depends(current_user), db: Sessi
     danh sách vai ở đây thì mỗi lần cấu hình thêm một cấp mới lại phải sửa mã, và cấp mới ấy sẽ bị
     chặn ở cửa dù cấu hình đã có chữ ký.
 
-    HỆ QUẢ ĐÃ BIẾT, chưa xử lý: bộ kiểm KS-2 đọc quyền bằng máy nên nó KHÔNG đọc được cửa này, và báo
-    đỏ. Hai lối ra đều KHÔNG thuộc quyền của làn Viết phần mềm — khai một danh sách vai ở đây là tự
-    khai quyền, còn ghi một dòng vào bảng ngoại lệ KS-2 là tự đóng ngoại lệ của mình. Đã thử hàng rào
-    thô `require_roles("chutich", "tgd")` và nó làm đỏ 7 phép thử của chính Đợt 4: đặc tả §10 cho phép
-    khai cấu hình nhiều cấp với vai khác, nên thu hẹp ở đây là bóp một năng lực đã chốt để cho một
-    phép thử xanh. Để nguyên và báo lên.
+    CHỦ TỊCH QUYẾT 07/10/2026: cửa này khai vào bảng ngoại lệ KS-2 (`tools/ks2_khai_quyen.py`,
+    mục CHAN_TANG_DICH_VU → `hdv:kiem_nguoi_quyet`), chứ KHÔNG khai một danh sách vai ở đây.
+
+    Lý do chọn như vậy: danh sách vai được phép ký nằm trong bảng cấu hình ĐÃ CÓ CHỮ KÝ, không nằm
+    trong mã. Khai cứng ở đây thì mã sẽ chặn đúng những cấp mà người ký vừa thêm — mã phủ quyết chữ
+    ký. Đã thử `require_roles("chutich", "tgd")` và nó làm đỏ 7 phép thử của chính Đợt 4, vì đặc tả
+    §10 cho phép khai cấu hình nhiều cấp với vai khác.
+
+    Lời khai ấy KHÔNG được tin suông: phép thử KS-2 mở `hdv.kiem_nguoi_quyet` ra đọc, và đỏ ngay nếu
+    hàng rào trong đó bị gỡ. Ba hàng rào: đúng vai của bước đang chờ, không phải người trình, và bước
+    chưa ai quyết.
     """
     d = db.get(DeXuatHdv, did)
     if not d:
