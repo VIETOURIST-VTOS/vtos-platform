@@ -43,6 +43,7 @@ from datetime import datetime
 from sqlalchemy import String, Integer, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
+from app.models.kieu_tien import TIEN
 
 # Gợi ý, không phải hàng rào – xem chốt 3 ở đầu tệp. Cửa nhận KHÔNG từ chối giá trị lạ; nó chỉ
 # cắt độ dài và ghi thường hoá.
@@ -127,3 +128,73 @@ class DauQuangCao(Base):
     than_nguyen_van: Mapped[str] = mapped_column(Text, default="")
     ghi_chu: Mapped[str] = mapped_column(String(300), default="")
     boi: Mapped[str] = mapped_column(String(50), default="")
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# HÀNG ĐỢI ĐẨY CHUYỂN ĐỔI NGƯỢC VỀ NỀN TẢNG
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# Bắt được cái chạm mới là nửa việc. Nửa còn lại: khi khách ấy CHỐT TOUR, phải nói ngược lại cho
+# nền tảng biết, kèm DOANH THU THẬT. Không nói thì Google và Facebook chỉ học được "có người điền
+# form" và sẽ rất giỏi trong việc mua thêm người điền form — đúng loại khách rẻ nhất và không chốt.
+#
+# VÌ SAO LÀ HÀNG ĐỢI, KHÔNG PHẢI GỌI THẲNG LÚC CHỐT. Ba lý do, lý do thứ ba là lý do thật:
+#   1. Nền tảng có lúc lỗi, có hạn số lần gọi, và có cửa sổ thời gian nhận chuyển đổi.
+#   2. Gọi mạng ngay trong luồng chốt tour là cho một dịch vụ bên ngoài quyền làm chậm việc bán hàng.
+#   3. HÔM NAY CHƯA CÓ TOKEN của nền tảng nào. Không có hàng đợi thì mọi chuyển đổi phát sinh từ
+#      giờ tới lúc CNTT dán token đều mất trắng — đúng cái sai mà cả hai vòng này sinh ra để chặn.
+
+CD_TRANG_THAI = {
+    "cho_gui": "Chờ gửi",
+    "da_gui": "Đã gửi",
+    "loi": "Gửi lỗi",
+    "thieu_doanh_thu": "Thiếu doanh thu – chưa gửi",
+    "bo_qua": "Bỏ qua",
+}
+
+
+class ChuyenDoiGuiDi(Base):
+    """Một chuyển đổi cần báo cho MỘT nền tảng.
+
+    MỘT LẦN CHỐT SINH NHIỀU DÒNG, MỖI NỀN TẢNG MỘT DÒNG, VÀ MỖI DÒNG MANG DOANH THU ĐẦY ĐỦ —
+    không chia. Điều này trông như đếm trùng, nên phải nói cho rõ vì sao nó đúng:
+
+    Mỗi nền tảng tự quy kết theo mô hình của riêng nó, trên dữ liệu của riêng nó. Gửi cho Google
+    một phần ba doanh thu vì khách còn chạm Facebook và hotline thì Google sẽ tối ưu theo một con
+    số không phải giá trị thật của khách ấy, và nó sẽ ra giá thầu thấp hơn giá trị thật. Cách các
+    nền tảng được thiết kế là mỗi bên nhận giá trị ĐẦY ĐỦ của chuyển đổi mà nó dự phần.
+
+    HỆ QUẢ PHẢI IN RA MÀN HÌNH, KHÔNG ĐƯỢC ĐỂ AI TỰ PHÁT HIỆN: tổng doanh thu báo lên ba nền tảng
+    CÓ THỂ LỚN HƠN doanh thu thật của công ty, và điều đó không phải lỗi. Ba con số ấy KHÔNG ĐƯỢC
+    CỘNG LẠI. Câu "tháng này kênh nào mang về bao nhiêu tiền" là câu hỏi QUY KẾT — nó có luật
+    riêng, có số phiên bản, và thuộc một bảng khác chưa dựng. Báo cáo tháng 9/2026 đang trả lời
+    câu ấy bằng tay, với mười một dòng "đã loại trùng" và một quy tắc không ghi ở đâu cả.
+
+    DOANH THU ĐỌC TỪ BOOKING, KHÔNG AI GÕ. Và `amount` rỗng thì dòng nằm ở "thiếu doanh thu" chứ
+    KHÔNG gửi đi với số 0: gửi 0 là dạy nền tảng rằng khách ấy vô giá trị, tệ hơn hẳn việc im lặng.
+    """
+    __tablename__ = "chuyen_doi_gui_di"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    dau_id: Mapped[int] = mapped_column(ForeignKey("dau_quang_cao.id"), index=True)
+    lead_id: Mapped[int | None] = mapped_column(ForeignKey("leads.id"), nullable=True, index=True)
+    # Chép từ dấu để truy vấn và lọc không phải nối bảng. Nguồn thật vẫn là `dau_id`.
+    nen_tang: Mapped[str] = mapped_column(String(24), index=True)
+    loai_ma: Mapped[str] = mapped_column(String(24))
+    ma: Mapped[str] = mapped_column(String(200), default="")
+
+    ma_booking: Mapped[str] = mapped_column(String(40), index=True)
+    # RỖNG = chưa đọc được từ booking, KHÁC HẲN 0 đồng. Xem docstring.
+    doanh_thu: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    tien_te: Mapped[str] = mapped_column(String(3), default="VND")
+    chot_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+
+    trang_thai: Mapped[str] = mapped_column(String(20), default="cho_gui", index=True)
+    lan_thu: Mapped[int] = mapped_column(Integer, default=0)
+    loi_cuoi: Mapped[str] = mapped_column(Text, default="")
+    gui_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Nền tảng trả về gì thì giữ nguyên văn – cùng lập luận với `than_nguyen_van` ở bảng dấu.
+    tra_loi: Mapped[str] = mapped_column(Text, default="")
+
+    # Khoá = nền tảng + booking + dấu. Chạy lại lượt sinh không nhân đôi; một booking chạm hai mẫu
+    # quảng cáo CÙNG nền tảng thì vẫn là hai dòng, vì hai mẫu ấy cần hai lời báo riêng.
+    khoa_chong_trung: Mapped[str] = mapped_column(String(300), unique=True, index=True)
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)

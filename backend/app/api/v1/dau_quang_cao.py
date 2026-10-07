@@ -21,6 +21,7 @@ from app.db.session import get_db
 from app.models.core import User
 from app.models.quang_cao import DauQuangCao, NEN_TANG_QUEN, LOAI_MA_QUEN, NGUON_GHI
 from app.services import access as AC
+from app.services import chuyen_doi_di as CD
 from app.services import dau_quang_cao as DQ
 from app.services import rules as R
 
@@ -158,3 +159,64 @@ def gan_lead(did: int, data: GanIn,
             before={"lead_id": cu}, after={"lead_id": l.id})
     db.commit()
     return {**ra(r), "message": f"Đã gắn dấu {r.nen_tang} vào lead {l.phone}"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# HÀNG ĐỢI CHUYỂN ĐỔI GỬI NGƯỢC
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+class KetQuaIn(BaseModel):
+    xong: bool
+    tra_loi: str = ""
+    loi: str = ""
+
+
+def cd_ra(c) -> dict:
+    from app.models.quang_cao import CD_TRANG_THAI
+    return {"id": c.id, "dau_id": c.dau_id, "lead_id": c.lead_id, "nen_tang": c.nen_tang,
+            "nen_tang_ten": NEN_TANG_QUEN.get(c.nen_tang, c.nen_tang),
+            "loai_ma": c.loai_ma, "ma": c.ma, "ma_booking": c.ma_booking,
+            "doanh_thu": c.doanh_thu, "tien_te": c.tien_te, "chot_luc": c.chot_luc,
+            "trang_thai": c.trang_thai,
+            "trang_thai_ten": CD_TRANG_THAI.get(c.trang_thai, c.trang_thai),
+            "lan_thu": c.lan_thu, "loi_cuoi": c.loi_cuoi, "gui_luc": c.gui_luc,
+            "tao_luc": c.tao_luc}
+
+
+@router.post("/chuyen-doi/sinh", dependencies=[Depends(robot_auth)])
+def cd_sinh(db: Session = Depends(get_db)):
+    """Xếp việc cho bộ gửi: lead đã chốt tour thì mỗi nền tảng có dấu được một dòng."""
+    return {**CD.sinh(db), "message": "Đã quét và xếp hàng đợi chuyển đổi"}
+
+
+@router.get("/chuyen-doi/cho-gui", dependencies=[Depends(robot_auth)])
+def cd_cho_gui(gioi_han: int = 100, db: Session = Depends(get_db)):
+    """Bộ gửi lấy việc. Chỉ trả dòng CÓ doanh thu – gửi 0 đồng là dạy nền tảng sai."""
+    return [cd_ra(c) for c in CD.cho_gui(db, gioi_han)]
+
+
+@router.post("/chuyen-doi/{cid}/ket-qua", dependencies=[Depends(robot_auth)])
+def cd_ket_qua(cid: int, data: KetQuaIn, db: Session = Depends(get_db)):
+    """Bộ gửi báo lại. Lỗi không xoá dòng – giữ để đếm được và để gửi lại."""
+    from app.models.quang_cao import ChuyenDoiGuiDi
+    c = db.get(ChuyenDoiGuiDi, cid)
+    if not c:
+        raise HTTPException(404, "Không có dòng chuyển đổi này")
+    return cd_ra(CD.ghi_ket_qua(db, c, data.xong, data.tra_loi, data.loi))
+
+
+@router.get("/chuyen-doi/bang-do")
+def cd_bang_do(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    return CD.bang_do(db)
+
+
+@router.get("/chuyen-doi")
+def cd_danh_sach(trang_thai: str = "", nen_tang: str = "", limit: int = 200,
+                 u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    from sqlalchemy import select as _sel
+    from app.models.quang_cao import ChuyenDoiGuiDi
+    q = _sel(ChuyenDoiGuiDi).order_by(desc(ChuyenDoiGuiDi.id))
+    if trang_thai:
+        q = q.where(ChuyenDoiGuiDi.trang_thai == trang_thai.strip())
+    if nen_tang:
+        q = q.where(ChuyenDoiGuiDi.nen_tang == nen_tang.strip().lower())
+    return [cd_ra(c) for c in db.execute(q.limit(min(max(limit, 1), 2000))).scalars()]
