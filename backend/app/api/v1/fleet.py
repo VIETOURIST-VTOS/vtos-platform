@@ -290,7 +290,8 @@ def ket_luan(xid: int, data: KetLuanIn, u: User = Depends(require_roles(*WRITE))
 
 # ====================== ĐỢT 2: NHẬT TRÌNH, BẢO DƯỠNG, NGUỒN NGOÀI ======================
 from app.models.fleet import (Trip, TripCost, Maintenance, ExternalTxn, BEN_CHIU, COST_KINDS, NGUON_NGOAI,
-                              BEN_CHIU_MAC_DINH, TRIP_STATUS, CO, MAINT_KINDS, VI_EPASS, KM_NGUON)
+                              BEN_CHIU_MAC_DINH, TRIP_STATUS, CO, MAINT_KINDS, VI_EPASS, KM_NGUON,
+                              NGA_CHI_PHI, NGA_CUA_DOI_XE)
 
 KETOAN = ("ketoan",)
 
@@ -314,6 +315,7 @@ def danh_muc_dot2(u: User = Depends(require_roles(*READ)), db: Session = Depends
             # Hai bảng khai báo mới 07/10/2026. Mở ra ở đây để màn hình dựng ô chọn từ MỘT nguồn, không
             # gõ lại danh sách trong TypeScript – gõ lại là ngày nào đó hai bên lệch nhau mà không ai biết.
             "km_nguon": KM_NGUON, "vi_epass": VI_EPASS,
+            "nga_chi_phi": NGA_CHI_PHI, "nga_cua_doi_xe": list(NGA_CUA_DOI_XE),
             "ghi_chu": "Chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe. "
                        f"Sửa chữa hiện đặt là \"{BEN_CHIU[sc]}\" (chủ tịch chốt lại cuối ngày 07/9/2026: giữ "
                        "cách chi hộ rồi cấn trừ). Khoản chi hộ vẫn phải có chứng từ và có căn cứ đồng ý của "
@@ -820,6 +822,8 @@ def ds_giao_dich(source: str = "", chua_khop: bool = False, gom_ban_trung: bool 
     return {"rows": [{"id": t.id, "source": t.source, "source_ten": NGUON_NGOAI.get(t.source, t.source),
                       "ma_gd": t.ma_gd, "thoi_diem": t.thoi_diem,
                       "tai_khoan": t.tai_khoan,
+                      "nga": t.nga, "nga_ten": NGA_CHI_PHI.get(t.nga, ""),
+                      "nga_ly_do": t.nga_ly_do, "nga_boi": t.nga_boi, "nga_luc": t.nga_luc,
                       "vi": VI_EPASS.get(t.tai_khoan, "") if t.source == "epass" else "",
                       "bien_so": t.bien_so, "the_4so": t.the_4so, "xe": veh.get(t.vehicle_id, ""),
                       "vehicle_id": t.vehicle_id, "so_tien": t.so_tien, "lit": t.lit, "khop": t.khop,
@@ -850,6 +854,18 @@ def ds_giao_dich(source: str = "", chua_khop: bool = False, gom_ban_trung: bool 
                                        if t.source == "epass" and not (t.tai_khoan or "")
                                        and not t.khong_phai_chi_phi),
             "vi_epass": VI_EPASS,
+            # Chia theo NGẢ. Trước 07/10/2026 màn hình chỉ có một con số "chưa quy được về xe nào",
+            # và trên hệ thật nó bằng ĐÚNG tổng chi phí — 100%, cả 36 dòng. Con số ấy đọc ra như
+            # "chi phí đội xe chưa gắn xe", trong khi phần lớn là khoản của TOUR: phiếu đề xuất chi
+            # Vietrip gắn vào tour và KHÔNG có ô xe (khảo sát 05/9/2026). Một con số gộp hai thứ
+            # khác bản chất thì mỗi tháng báo động một tỷ hai mà không ai làm được gì.
+            "theo_nga": [{"nga": k, "ten": NGA_CHI_PHI.get(k, "Chưa định tuyến — chưa ai đọc chứng từ"),
+                          "cua_doi_xe": k in NGA_CUA_DOI_XE,
+                          "so_khoan": sum(1 for t in rows if (t.nga or "") == k),
+                          "so_tien": sum((t.so_tien or 0) for t in rows if (t.nga or "") == k)}
+                         for k in sorted({(t.nga or "") for t in rows})],
+            "tong_chua_dinh_tuyen": sum((t.so_tien or 0) for t in rows if not (t.nga or "")),
+            "nga_chi_phi": NGA_CHI_PHI, "nga_cua_doi_xe": list(NGA_CUA_DOI_XE),
             "nguon": NGUON_NGOAI,
             "ghi_chu": "Đã loại bản ghi lặp (thêm gom_ban_trung=true để xem cả bản đã loại). Tổng chi phí "
                        "KHÔNG bao gồm khoản điều chuyển tiền nội bộ – hai thứ đó khác bản chất, cộng chung "
@@ -1705,6 +1721,105 @@ def phan_loai_giao_dich(data: PhanLoaiIn, u: User = Depends(require_roles(*QT_WR
     db.commit()
     return {"da_sua": sua, "khong_tim_thay": khong_thay,
             "ghi_chu": "Chỉ sửa nhóm và cờ không-phải-chi-phí. Số tiền và ngày phải sửa ở nguồn rồi nạp lại."}
+
+
+class DinhTuyenIn(BaseModel):
+    """Định tuyến một hoặc nhiều giao dịch nguồn ngoài về một NGẢ."""
+    ma_gd: list[str]
+    nga: str
+    ly_do: str = ""
+    bien_so: str = ""                 # chỉ dùng cho ngả "xe": gắn luôn vào chiếc nào
+
+
+@router.post("/giao-dich/dinh-tuyen")
+def dinh_tuyen_giao_dich(data: DinhTuyenIn,
+                         u: User = Depends(require_roles(*QT_WRITE, "chutich", "tgd")),
+                         db: Session = Depends(get_db)):
+    """Trả lời câu hỏi "khoản này chạy về đâu" cho một dòng nguồn ngoài.
+
+    Vì sao cần một câu hỏi MỚI thay vì tra thêm cho ra xe: phiếu đề xuất chi trên Vietrip gắn vào
+    TOUR và không có ô xe (khảo sát 05/9/2026, bộ trường: tour · NCC · hình thức TT · loại tiền ·
+    dòng dịch vụ). Hỏi mãi "của xe nào" thì mỗi tháng lại một nắm dòng không ai trả lời được.
+
+    Ba điều cửa này BẮT BUỘC, và cả ba đều vì ngả quyết định tiền vào sổ của ai:
+
+      1. Ngả phải nằm trong danh mục. Chữ tự do thì ba tháng sau có "doi", "đội", "Đội xe" cùng một cột
+         và không phép tính nào gom lại được — đúng chỗ cột `nhom` đang hỏng.
+      2. Ngả "xe" phải quy được về MỘT CHIẾC. Nói "của xe" mà không nói xe nào là không nói gì.
+      3. Phải có LÝ DO và tên người. Đây là một phán xét của người đọc chứng từ, không phải phép tính;
+         ba tháng sau có người hỏi "vì sao khoản này là của đội" thì phải có câu trả lời tại chỗ.
+
+    Cửa này KHÔNG tự cộng tiền vào báo cáo. Nó chỉ ghi ngả. Khoản của đội muốn vào ba tầng chi phí thì
+    vẫn phải đi qua cửa "Chi phí kỳ của đội xe" — một khoản, một cửa, một lần; cộng ở hai đường là
+    tính hai lần đúng một khoản."""
+    if data.nga not in NGA_CHI_PHI:
+        raise HTTPException(422, f"Ngả '{data.nga}' không có trong danh mục. "
+                                 f"Chỉ nhận: {', '.join(NGA_CHI_PHI)}")
+    if not (data.ly_do or "").strip():
+        raise HTTPException(422, "Phải ghi lý do chọn ngả này – đây là phán xét của người đọc chứng "
+                                 "từ, không phải phép tính, nên phải để lại căn cứ")
+    if not data.ma_gd:
+        raise HTTPException(422, "Không có dòng nào để định tuyến")
+    v = None
+    if data.nga == "xe":
+        bien = (data.bien_so or "").strip()
+        if not bien:
+            raise HTTPException(422, "Ngả 'của một chiếc xe cụ thể' phải kèm biển số – nói 'của xe' "
+                                     "mà không nói xe nào thì chưa trả lời câu hỏi")
+        v = FL.xe_theo_bien(db, bien, date.today())
+        if v is None:
+            raise HTTPException(422, f"Không tra được xe nào từ biển '{bien}'")
+    theo_ma = {t.ma_gd: t for t in db.execute(
+        select(ExternalTxn).where(ExternalTxn.ma_gd.in_(data.ma_gd),
+                                  ExternalTxn.trung == False)).scalars()}   # noqa: E712
+    sua, khong_thay = [], []
+    for ma in data.ma_gd:
+        t = theo_ma.get((ma or "").strip())
+        if t is None:
+            khong_thay.append(ma); continue
+        t.nga = data.nga
+        t.nga_ly_do = data.ly_do.strip()[:300]
+        t.nga_boi = u.username
+        t.nga_luc = datetime.now()
+        if data.nga == "khong_phai_chi_phi":
+            t.khong_phai_chi_phi = True
+        if v is not None and t.vehicle_id is None:
+            t.vehicle_id = v.id
+        sua.append(t.ma_gd)
+    R.audit(db, u.username, u.role, "dinh_tuyen_giao_dich", f"nga:{data.nga}",
+            after={"so_dong": len(sua), "nga": data.nga, "ly_do": data.ly_do[:200],
+                   "xe": (v.plate if v is not None else ""), "khong_thay": khong_thay})
+    db.commit()
+    return {"da_dinh_tuyen": len(sua), "ma_gd": sua, "khong_tim_thay": khong_thay,
+            "nga": data.nga, "nga_ten": NGA_CHI_PHI[data.nga],
+            "ghi_chu": ("Đã ghi ngả. Khoản của ĐỘI muốn vào ba tầng chi phí của báo cáo lãi lỗ thì "
+                        "vẫn phải nạp qua cửa 'Chi phí kỳ của đội xe' – một khoản một cửa, cộng ở "
+                        "hai đường là tính hai lần.")}
+
+
+@router.post("/giao-dich/tra-lai-xe")
+def tra_lai_xe_giao_dich(source: str = "", u: User = Depends(require_roles(*QT_WRITE, "chutich", "tgd")),
+                         db: Session = Depends(get_db)):
+    """Tra lại xe theo biển số cho các dòng nguồn ngoài chưa gắn được xe. Xem services/fleet.py."""
+    if source and source not in NGUON_NGOAI:
+        raise HTTPException(422, f"Nguồn không hợp lệ. Chỉ nhận {', '.join(NGUON_NGOAI)}")
+    kq = FL.tra_lai_xe(db, source)
+    R.audit(db, u.username, u.role, "tra_lai_xe_giao_dich", f"nguon:{source or 'tat_ca'}",
+            after={k: v for k, v in kq.items() if k != "dong"})
+    db.commit()
+    return kq
+
+
+@router.post("/chuyen/tinh-lai-co")
+def tinh_lai_co(tu: date | None = None, den: date | None = None,
+                u: User = Depends(require_roles(*QT_WRITE, "chutich", "tgd")),
+                db: Session = Depends(get_db)):
+    """Tính lại cờ của các chuyến theo luật kiểm hiện hành. Xem services/fleet.py."""
+    kq = FL.tinh_lai_co_chuyen(db, tu, den)
+    R.audit(db, u.username, u.role, "tinh_lai_co_chuyen", f"tu:{tu}|den:{den}",
+            after={k: v for k, v in kq.items() if k != "dong"})
+    db.commit()
+    return kq
 
 
 class DeXuatChiIn(BaseModel):
