@@ -7,7 +7,8 @@ import { Tag, errMsg } from "@/components/ui";
 
 /** Visa, HDV & phân chuyến, Đội xe là nghiệp vụ của Điều hành (Đề xuất 06/9/2026 mục 2) nên nằm ở trang
  *  /ops với quyền của Điều hành; Nhân sự giữ hồ sơ lao động, lương và sự vụ. Cùng một màn hình, hai lối vào. */
-const TABS_HR: [string, string][] = [["payroll", "Bảng lương"], ["employees", "Hồ sơ nhân sự"], ["incidents", "Đánh giá & sự vụ"]];
+const TABS_HR: [string, string][] = [["tong_quan", "Tổng quan HCNS"], ["payroll", "Bảng lương"],
+  ["employees", "Hồ sơ nhân sự"], ["cham_cong", "Chấm công & nghỉ phép"], ["incidents", "Đánh giá & sự vụ"]];
 const TABS_OPS: [string, string][] = [["visa", "Hồ sơ visa"], ["guides", "HDV & phân chuyến"], ["fleet", "Đội xe"]];
 const CD: Record<string, string> = { cham_cong: "Chấm công ngày", bao_cao_ngay: "Báo cáo ngày", theo_chuyen: "Theo chuyến", luong_cong_tac_phi: "Lương + công tác phí" };
 // Tên trạng thái CŨ giữ nguyên trong bảng này: những kỳ đã chạy qua chuỗi cũ vẫn mang tên cũ, và
@@ -65,6 +66,12 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   // hai điều khác nhau, và gộp lại là nói "chưa chi" trong khi chưa ai biết.
   const [chi, setChi] = useState<any | null>(null);
   const [soTN, setSoTN] = useState<any | null>(null);
+  const [tongQuan, setTongQuan] = useState<any | null>(null);
+  const [cham, setCham] = useState<any | null>(null);
+  const [donNghi, setDonNghi] = useState<any[]>([]);
+  const [hrmMeta, setHrmMeta] = useState<any>({ leave_kinds: {}, leave_status: {} });
+  const [lsMa, setLsMa] = useState("");
+  const [lsNV, setLsNV] = useState<any | null>(null);
   const [dangTai, setDangTai] = useState("");
   const [cong, setCong] = useState<Record<string, string>>({});
   const [visa, setVisa] = useState<any[]>([]);
@@ -94,6 +101,9 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     if (tab === "payroll") api(`/payroll-runs/${period}/chi`).then(setChi).catch(() => setChi(null));
     if (tab === "payroll") api(`/payroll-runs/${period}/so-thu-nhap`).then(setSoTN).catch(() => setSoTN(null));
     if (tab === "payroll") { api(`/payroll-runs/${period}/phieu-luong`).then(setPhieu).catch(() => setPhieu(null)); api(`/payroll-runs/${period}/theo-phap-nhan`).then(setPhapNhan).catch(() => setPhapNhan(null)); }
+    if (tab === "tong_quan") api("/hr/tong-quan").then(setTongQuan).catch((e) => toast(errMsg(e), true));
+    if (tab === "cham_cong") { api(`/attendance?period=${period}`).then(setCham).catch(() => setCham(null)); api("/leaves").then((r: any) => setDonNghi(r?.rows || (Array.isArray(r) ? r : []))).catch(() => setDonNghi([])); }
+    if (tab === "cham_cong" && !Object.keys(hrmMeta.leave_kinds || {}).length) api("/hrm/meta").then(setHrmMeta).catch(() => {});
     if (tab === "employees") { api("/employees").then(setEmps); api("/companies").then(setCos).catch(() => {}); }
     if (tab === "employees") api("/users/khoa").then(setKhoa).catch(() => {});
     if (tab === "visa") api("/visa").then(setVisa);
@@ -112,6 +122,11 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     } catch (x) { toast(errMsg(x), true); }
   };
 
+  const moLichSu = async (eid: number) => {
+    if (!eid) { setLsNV(null); return; }
+    try { setLsNV(await api(`/employees/${eid}/lich-su-to-chuc`)); }
+    catch (x) { toast(errMsg(x), true); setLsNV(null); }
+  };
   const chiDanhSach = async () => { try { setChi(await api(`/payroll-runs/${period}/chi`)); } catch { setChi(null); } };
   // Tải tệp phải đi bằng fetch chứ không dùng `api`: FormData cần trình duyệt tự đặt ranh giới
   // multipart, mà `api` thì gán sẵn Content-Type cho thân JSON.
@@ -144,6 +159,76 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
       {TABS.map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
       <label style={{ marginLeft: "auto" }}>Kỳ lương <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></label>
     </div>
+
+    {tab === "tong_quan" && tongQuan && <>
+      <p className="muted">Màn hình này <b>chỉ đọc</b> và không sinh ra con số nào của riêng nó: mỗi ô là một phép
+        đếm trên bảng đã có, chạy bằng đúng hàm mà các màn hình kia đang dùng. Viết lại phép đếm ở đây là tạo ra
+        một nguồn thứ hai, và hai nguồn sẽ lệch.</p>
+      <div className="kpis">
+        <div className="kpi"><b>{tongQuan.nhan_su.tong}</b><span>Đang làm việc · {tongQuan.nhan_su.hdld} HĐLĐ · {tongQuan.nhan_su.ctv} CTV</span></div>
+        <div className="kpi"><b>{tongQuan.ho_so_thieu.so_nguoi}</b><span>Hồ sơ còn thiếu thông tin bắt buộc</span></div>
+        <div className="kpi"><b>{tongQuan.hop_dong?.het_han?.length ?? 0}</b><span>Hợp đồng đã hết hạn</span></div>
+        <div className="kpi"><b>{tongQuan.hop_dong?.sap_het_han?.length ?? 0}</b><span>Hợp đồng sắp đến hạn</span></div>
+        <div className="kpi"><b>{tongQuan.nghi_phep_cho_duyet.so_don}</b><span>Đơn nghỉ chờ duyệt</span></div>
+        <div className="kpi"><b>{tongQuan.su_vu_trong_thang.so_vu}</b><span>Sự vụ hiệu lực trong tháng</span></div>
+      </div>
+      {tongQuan.bang_luong && <p><b>Kỳ lương {tongQuan.bang_luong.period}:</b>{" "}
+        <Tag cls={PST[tongQuan.bang_luong.trang_thai]?.[1]}>{PST[tongQuan.bang_luong.trang_thai]?.[0] || tongQuan.bang_luong.trang_thai}</Tag>
+        {" "}{tongQuan.bang_luong.so_nguoi} người · thực nhận {vnd(tongQuan.bang_luong.thuc_nhan)}
+        {tongQuan.bang_luong.tra_trang_thai && <> · <Tag cls={TRA[tongQuan.bang_luong.tra_trang_thai]?.[1]}>{TRA[tongQuan.bang_luong.tra_trang_thai]?.[0]}</Tag></>}</p>}
+      {!tongQuan.co_bang_luong && <p className="muted">Khối bảng lương không hiện vì vai trò của bạn không mở được thẻ Bảng lương.
+        Thẻ này mở rộng hơn thẻ Bảng lương, nên in thẳng số lương ở đây là mở bảng lương bằng cửa sau.</p>}
+      <div className="panel wrap"><h2>Nhân sự theo phòng</h2>
+        <table><thead><tr><th>Phòng</th><th className="num">Tổng</th><th className="num">HĐLĐ</th><th className="num">CTV</th></tr></thead>
+          <tbody>{tongQuan.nhan_su.theo_phong.map((g: any) => <tr key={g.ma}><td>{g.ten}</td>
+            <td className="num"><b>{g.tong}</b></td><td className="num">{g.hdld}</td><td className="num">{g.ctv}</td></tr>)}</tbody></table></div>
+      {tongQuan.ho_so_thieu.so_nguoi > 0 && <div className="panel wrap"><h2>Hồ sơ còn thiếu · {tongQuan.ho_so_thieu.so_nguoi} người</h2>
+        <table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th className="num">Đủ</th><th>Thiếu</th></tr></thead>
+          <tbody>{tongQuan.ho_so_thieu.rows.map((r: any) => <tr key={r.ma}><td className="mono">{r.ma}</td><td>{r.ten}</td>
+            <td>{meta.departments[r.phong] || r.phong}</td><td className="num">{r.phan_tram}%</td>
+            <td className="muted">{(r.thieu || []).join(", ")}</td></tr>)}</tbody></table></div>}
+      <div className="panel wrap"><h2>Lịch sử tổ chức</h2>
+        <p className="muted">{tongQuan.lich_su_to_chuc.ghi_chu} Hiện có <b>{tongQuan.lich_su_to_chuc.chua_co_dong_nao}</b> người chưa có chặng nào.</p>
+        <label>Xem của&nbsp;
+          <select value={lsMa} onChange={(e) => { setLsMa(e.target.value); moLichSu(Number(e.target.value)); }}>
+            <option value="">— chọn người —</option>
+            {emps.map((e: any) => <option key={e.id} value={e.id}>{e.code} · {e.full_name}</option>)}
+          </select></label>
+        {lsNV && (!lsNV.chang.length ? <p className="muted">Chưa có chặng nào cho {lsNV.ten}.</p> :
+          <table><thead><tr><th>Từ</th><th>Đến</th><th>Phòng</th><th>Chức vụ</th><th>Văn phòng</th><th>Ghi chú</th></tr></thead>
+            <tbody>{lsNV.chang.map((c: any) => <tr key={c.id}>
+              <td>{fmtD(c.tu_ngay)}</td><td>{c.den_ngay ? fmtD(c.den_ngay) : <Tag cls="ok">đang mở</Tag>}</td>
+              <td>{meta.departments[c.phong] || c.phong}</td><td>{meta.positions[c.chuc_vu] || c.chuc_vu}</td>
+              <td>{meta.offices?.[c.van_phong] || c.van_phong}</td>
+              {/* Chặng DỰNG LẠI không phải bản ghi lập lúc ấy. Để nó nằm cùng hàng với bản ghi thật
+                  mà không nói gì là biến một phỏng đoán hợp lý thành chứng cứ. */}
+              <td className="muted">{c.suy_ra && <Tag cls="warn">dựng lại</Tag>} {c.ly_do}</td></tr>)}</tbody></table>)}
+      </div>
+    </>}
+
+    {tab === "cham_cong" && <>
+      <p className="muted">Bảng và cửa nhập <b>đã có từ trước</b>; đợt này chỉ dựng màn hình cho HCNS. Chấm công theo ngày
+        áp dụng cho Kế toán và Nhân sự Hành chính; năm phòng còn lại lấy căn cứ là báo cáo công việc trước 20 giờ,
+        nên không có mẫu số công chuẩn để chấm.</p>
+      {cham && <div className="panel wrap"><h2>Bảng chấm công kỳ {period}</h2>
+        {!(cham.rows || []).length ? <p className="muted">Kỳ này chưa có dòng chấm công nào.</p> :
+          <table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th className="num">Công</th><th className="num">Giờ tăng ca</th></tr></thead>
+            <tbody>{cham.rows.map((r: any, i: number) => <tr key={r.employee_id ?? i}>
+              <td className="mono">{r.code}</td><td>{r.full_name}</td>
+              <td>{meta.departments[r.department] || r.department}</td>
+              <td className="num"><b>{r.work ?? r.total_work ?? ""}</b></td>
+              <td className="num">{r.ot_hours || ""}</td></tr>)}</tbody></table>}</div>}
+      <div className="panel wrap"><h2>Đơn nghỉ · {donNghi.length}</h2>
+        {!donNghi.length ? <p className="muted">Không có đơn nào.</p> :
+          <table><thead><tr><th>Người</th><th>Loại</th><th>Từ</th><th>Đến</th><th className="num">Số ngày</th><th>Trạng thái</th><th>Lý do</th></tr></thead>
+            <tbody>{donNghi.map((r: any) => <tr key={r.id}>
+              <td>{r.full_name || empName(r.employee_id)}</td>
+              <td>{hrmMeta.leave_kinds?.[r.kind] || r.kind}</td>
+              <td>{fmtD(r.date_from)}</td><td>{fmtD(r.date_to)}</td>
+              <td className="num">{r.days}</td>
+              <td><Tag cls={r.status === "duyet" ? "ok" : r.status === "cho_duyet" ? "warn" : "red"}>{hrmMeta.leave_status?.[r.status] || r.status}</Tag></td>
+              <td className="muted">{r.reason}</td></tr>)}</tbody></table>}</div>
+    </>}
 
     {tab === "payroll" && run && <>
       <DinhKem doiTuong="bang_luong" doiTuongId={period} loai="bang_bieu"

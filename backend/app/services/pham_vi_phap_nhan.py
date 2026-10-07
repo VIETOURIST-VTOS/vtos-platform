@@ -298,6 +298,13 @@ CO_Y_KHONG_LOC = {
     "User":     "danh sách tài khoản chỉ mở cho quản trị (/access); lọc ở đây là giấu tài khoản "
                 "khỏi đúng người có nhiệm vụ đi gán pháp nhân cho chúng",
     "Employee": "hồ sơ nhân sự do HCNS quản lý tập trung; HCNS làm việc trên cả tập đoàn",
+    # Đợt C – LỊCH SỬ của chính hồ sơ ấy, nên đi cùng họ với nó. Cột `company_id` ở đây có
+    # nghĩa thật (pháp nhân trả lương trong chặng đó) và chính là thứ cần để trả lời "tháng
+    # ấy người này ăn lương ở pháp nhân nào" — nhưng CẮT DANH SÁCH theo pháp nhân đang xem
+    # thì hỏng đúng việc bảng này sinh ra để làm: một người chuyển từ Vietourist sang Vận
+    # tải Vietrip sẽ mất nửa lịch sử tuỳ theo đang chọn pháp nhân nào, và nửa lịch sử là
+    # thứ nguy hơn không có lịch sử. Cùng lập luận đã ghi ở dòng Employee ngay trên.
+    "LichSuToChuc": "lịch sử tổ chức của hồ sơ nhân sự; cắt theo pháp nhân thì một người chuyển pháp nhân chỉ còn nửa lịch sử, mà nửa lịch sử nguy hơn không có lịch sử",
     # TC-73 – cùng họ với User và Employee ngay trên: đây là SỔ CƠ CẤU, không phải chứng từ mang tiền.
     #
     # Cột `company_id` trên đơn vị có nghĩa thật (chi nhánh thuộc pháp nhân nào) và sẽ dùng khi cộng

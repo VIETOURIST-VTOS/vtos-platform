@@ -57,6 +57,11 @@ def employees(department: str | None = None, u: User = Depends(require_roles(*HR
 
 
 class EmployeeIn(BaseModel):
+    # Đợt C – chỉ dùng khi lần sửa này là một lần ĐIỀU CHUYỂN (đổi phòng / chức vụ /
+    # văn phòng / pháp nhân). Rỗng thì lấy ngày hôm nay, và màn hình phải nói rõ điều đó:
+    # một điều chuyển có hiệu lực lùi mà ghi ngày hôm nay là ghi sai lịch sử.
+    dieu_chuyen_tu_ngay: date | None = None
+    dieu_chuyen_ly_do: str = ""
     """Sửa hồ sơ chỉ ghi đè những trường được gửi lên (exclude_unset), nên màn hình cũ gửi thiếu
     trường mới sẽ không xóa mất dữ liệu đã nạp (ngày sinh, điện thoại, pháp nhân, chức danh)."""
     phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm
@@ -160,7 +165,9 @@ def reset_password(uid: int, data: ResetPwIn, u: User = Depends(require_roles(*H
 @router.post("/employees", status_code=201)
 def create_employee(data: EmployeeIn, u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
     if data.department not in DEPARTMENTS or data.position not in POSITIONS: raise HTTPException(422, "Phòng/chức danh không hợp lệ")
-    e = Employee(code=H.next_code(db, Employee, "NS"), **data.model_dump(exclude_none=True))
+    tao = {k: v for k, v in data.model_dump(exclude_none=True).items()
+           if k not in ("dieu_chuyen_tu_ngay", "dieu_chuyen_ly_do")}
+    e = Employee(code=H.next_code(db, Employee, "NS"), **tao)
     db.add(e); db.flush()
     R.audit(db, u.username, u.role, "tao_ho_so_nhan_su", f"emp:{e.code}", after={"ten": e.full_name, "phong": e.department, "luong": e.base_salary})
     db.commit(); db.refresh(e)
@@ -172,6 +179,10 @@ def update_employee(eid: int, data: EmployeeIn, u: User = Depends(require_roles(
     e = db.get(Employee, eid)
     if not e: raise HTTPException(404, "Không có hồ sơ")
     fields = data.model_dump(exclude_unset=True)
+    from app.services import to_chuc_lich_su as LS
+    dc_tu = fields.pop("dieu_chuyen_tu_ngay", None)
+    dc_ly_do = fields.pop("dieu_chuyen_ly_do", "")
+    truoc_to_chuc = LS.anh_chup(e)
     if fields.get("active") is False and e.active:
         xe = db.execute(select(Vehicle).where(Vehicle.driver_id == e.id, Vehicle.active == True)).scalars().all()
         if xe: raise HTTPException(422, f"{e.full_name} đang là tài xế của xe {', '.join(v.plate for v in xe)} – giao xe cho người khác trước khi ngưng hồ sơ")
@@ -180,11 +191,62 @@ def update_employee(eid: int, data: EmployeeIn, u: User = Depends(require_roles(
                        lambda: {**before, "phien_ban": e.phien_ban})
     for k, v in fields.items(): setattr(e, k, v)
     GML.tang_phien_ban(e)
+    # Điều chuyển ghi Ở ĐÂY, không ở một cửa riêng: đổi phòng đã có một cửa là màn hình này, và
+    # cửa thứ hai nghĩa là có một đường đổi phòng không ghi lịch sử. `truoc_to_chuc` chụp trước khi
+    # gán nên chặng cũ mang giá trị CŨ – thiếu nó thì lịch sử ghi rằng người này vốn đã ở phòng mới
+    # từ ngày vào làm, và sai kiểu ấy không bao giờ tự lộ.
+    dieu_chuyen = LS.can_dieu_chuyen(e, truoc_to_chuc)
+    if dieu_chuyen:
+        try:
+            LS.ghi_dieu_chuyen(db, e, truoc_to_chuc, dc_tu, dc_ly_do, u.username)
+        except ValueError as ex:
+            db.rollback()
+            raise HTTPException(422, str(ex))
     R.audit(db, u.username, u.role, "sua_ho_so_nhan_su", f"emp:{e.code}", before=before,
             after={"luong": e.base_salary, "chuc_vu": e.position, "phong": e.department, "dang_lam": e.active})
     db.commit()
     ngung = " – hồ sơ đã chuyển sang Ngưng làm việc" if e.active is False else ""
-    return {"employee": emp_out(e), "message": "Đã cập nhật (tăng lương/điều chỉnh nhân sự cần Chủ tịch duyệt theo Điều 9 – ghi nhật ký)" + ngung}
+    dc = (f" – đã ghi một chặng lịch sử tổ chức từ {dc_tu or date.today():%d/%m/%Y}" if dieu_chuyen else "")
+    return {"employee": emp_out(e), "message": "Đã cập nhật (tăng lương/điều chỉnh nhân sự cần Chủ tịch duyệt theo Điều 9 – ghi nhật ký)" + ngung + dc}
+
+
+@router.get("/employees/{eid}/lich-su-to-chuc")
+def lich_su_to_chuc(eid: int, u: User = Depends(require_roles(*HR_WRITE, "tgd", "chutich", "bks")),
+                    db: Session = Depends(get_db)):
+    """Các chặng tổ chức của một người, theo thứ tự thời gian.
+
+    Dòng có `suy_ra = true` là chặng hệ thống DỰNG LẠI từ hồ sơ đang có tại lần điều chuyển đầu
+    tiên, không phải bản ghi lập lúc ấy. Màn hình phải nói ra điều đó: trộn một phỏng đoán hợp lý
+    vào cùng hàng với bản ghi thật là biến nó thành chứng cứ, mà chứng cứ thì có người sẽ dựa vào
+    để trả lời kiểm toán.
+    """
+    from app.services import to_chuc_lich_su as LS
+    e = db.get(Employee, eid)
+    if not e:
+        raise HTTPException(404, "Không có hồ sơ")
+    return {"ma_nv": e.code, "ten": e.full_name,
+            "hien_tai": {"phong": e.department, "chuc_vu": e.position, "van_phong": e.office},
+            "chang": [LS.ra(c) for c in LS.lich_su(db, e.code)],
+            "ghi_chu": "Lịch sử bắt đầu được ghi từ 07/10/2026. Người chưa điều chuyển lần nào kể "
+                       "từ đó thì chưa có chặng nào – đó là chưa có dữ liệu, không phải thiếu hồ sơ."}
+
+
+@router.get("/hr/tong-quan")
+def hcns_tong_quan(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """HC01 – Tổng quan HCNS. Chỉ đọc, và không sinh con số nào của riêng nó.
+
+    Đặt dưới tiền tố `/api/v1/hr` vì tiền tố ấy ĐÃ được khai cho màn hình `/hr` trong bảng
+    `MAN_HINH_API`. Mở một tiền tố mới `/api/v1/hcns` là khai thêm một mảnh quyền, mà khai quyền
+    thuộc làn Phân quyền chứ không thuộc lần viết này.
+
+    Khối bảng lương chỉ gắn vào khi người gọi thật sự mở được thẻ Bảng lương. Thẻ Tổng quan mở
+    rộng hơn thẻ Bảng lương, nên in thẳng tổng thực nhận ở đây là mở bảng lương bằng cửa sau.
+    """
+    from app.services import access as AC, hcns_tong_quan as TQ
+    tabs = AC.hr_tabs_for(db, u)
+    if "tong_quan" not in tabs:
+        raise HTTPException(403, "Vai trò của bạn không mở được Tổng quan HCNS")
+    return TQ.tong_quan(db, co_bang_luong="payroll" in tabs)
 
 
 # ---------- Hồ sơ visa ----------
