@@ -138,11 +138,53 @@ def _co_chan_vai_tro(route) -> bool:
     return chan_o_chu_ky(route) or _doc_ma_nguon(route)
 
 
+def _khai_chan_tang_dich_vu() -> set[str]:
+    """Những cửa ĐÃ KHAI là chặn ở tầng dịch vụ, đọc từ bảng KS-2 (`tools/ks2_khai_quyen.py`).
+
+    VÌ SAO P1 PHẢI ĐỌC BẢNG NÀY. P1 viết 07/9/2026, trước khi bảng khai KS-2 có hình như hôm nay. Ý
+    của P1 là: MÁY phải nhận ra quyền mà không phải phân tích mã nguồn. Một dòng trong bảng KS-2
+    đúng là thứ máy đọc được — nên nó THOẢ ý P1, không phải một lối lách. Trước thay đổi này P1 đỏ
+    trên chính main vì cửa `POST /guide-assignments/de-xuat/{did}/quyet` khai ở bảng mà P1 không
+    biết bảng ấy có tồn tại: hai hàng rào cùng canh một việc, đọc hai nguồn khác nhau.
+
+    VÌ SAO CHỈ MỘT BẢNG TRONG SÁU. Chỉ `CHAN_TANG_DICH_VU` mới có người kiểm lại lời khai: phép thử
+    Q2 của KS-2 mở đúng hàm dịch vụ được nêu tên ra đọc, và đỏ nếu hàng rào trong hàm ấy bị gỡ. Năm
+    bảng kia không có vòng kiểm ấy. `CHAN_TAI_CHO` còn nói thẳng ra rằng chặn nằm NGAY TRONG THÂN
+    HÀM — miễn bảng đó là tắt đúng cái P1 sinh ra để canh. Đo lúc viết: mở theo một bảng miễn đúng
+    MỘT cửa; mở theo cả sáu bảng miễn thêm hàng chục cửa mà không ai đọc lại.
+
+    ĐỌC KHÔNG ĐƯỢC THÌ TRẢ RỖNG, tức là NGHIÊM HƠN chứ không lỏng hơn. Một hàng rào hỏng phải kêu
+    lên, không được im lặng mở cửa — nên nhánh hỏng ở đây nghiêng về phía báo thừa.
+    """
+    try:
+        from tools.ks2_khai_quyen import CHAN_TANG_DICH_VU
+        return set(CHAN_TANG_DICH_VU)
+    except Exception:
+        return set()
+
+
+def _khoa_khai(route) -> str:
+    """Khoá tra bảng khai: 'POST /api/v1/...'. Dựng ĐÚNG CÙNG MỘT CÁCH với `ks2_khai_quyen`.
+
+    Dựng khác một chữ là bảng khai không bao giờ khớp, và cái không-khớp ấy im lặng: nó chỉ làm P1
+    đỏ mãi ở một cửa đã khai đàng hoàng, chứ không ai thấy nguyên nhân.
+    """
+    ghi = sorted(set(getattr(route, "methods", []) or []) & {"POST", "PUT", "PATCH", "DELETE"})
+    return f"{ghi[0]} {route.path}" if ghi else ""
+
+
 def endpoint_phai_doc_ma_nguon(app) -> list[str]:
-    """Những endpoint mà bộ kiểm chỉ nhận ra được nhờ đọc mã nguồn. Danh sách này phải RỖNG."""
+    """Những endpoint mà bộ kiểm chỉ nhận ra được nhờ đọc mã nguồn. Danh sách này phải RỖNG.
+
+    Cửa đã khai ở `CHAN_TANG_DICH_VU` không tính — xem `_khai_chan_tang_dich_vu` để biết vì sao chỉ
+    bảng ấy, và vì sao đó không phải một lối lách.
+    """
+    khai = _khai_chan_tang_dich_vu()
     ra = []
     for r in app.routes:
         if not hasattr(r, "endpoint") or not str(getattr(r, "path", "")).startswith("/api/v1"):
+            continue
+        if _khoa_khai(r) in khai:
             continue
         if not chan_o_chu_ky(r) and _doc_ma_nguon(r):
             ra.append(f"{sorted(getattr(r, 'methods', []) or [])} {r.path}")
