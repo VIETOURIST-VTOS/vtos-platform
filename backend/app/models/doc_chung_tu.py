@@ -82,6 +82,41 @@ CAM_DOC_BANG_MAY = {
     "bang_bao_hiem": "Bảng bảo hiểm – mức đóng gắn với thu nhập của từng người, dữ liệu cá nhân theo Nghị định 13/2023",
 }
 
+# NGOẠI LỆ CÓ CHỮ KÝ – mở HẸP, mở Ở ĐÂY, và mở bằng tên người ký.
+#
+# Lệnh cấm trên vẫn nguyên vẹn: không đọc bảng lương, không đọc bảng bảo hiểm. Ngày 07/10/2026 Chủ
+# tịch mở một ngoại lệ cho PHỤ LỤC DANH SÁCH CHUYỂN LƯƠNG kèm Ủy nhiệm chi, để máy trả lời được câu
+# "tiền đã chuyển có khớp bảng đã ký không" ở mức từng người, thay vì chỉ ở mức tổng.
+#
+# BA RÀNG BUỘC LÀM NGOẠI LỆ NÀY ĐỨNG ĐƯỢC, và cả ba đều kiểm được bằng phép thử:
+#
+#   1. HẸP VỀ TRƯỜNG. Chỉ họ tên và số tiền chuyển. Không lương cơ bản, không phụ cấp, không bảo
+#      hiểm, không thuế, không khoản trừ – tức là không đọc ra cơ cấu thu nhập của bất kỳ ai. Phụ lục
+#      ngân hàng vốn chỉ có từng ấy; điều mã này làm là bảo đảm nó mãi chỉ từng ấy.
+#   2. KHÔNG ĐỌC SỐ TÀI KHOẢN. Hồ sơ nhân sự trong hệ thống không lưu số tài khoản người lao động,
+#      nên đọc ra cũng không đối chiếu được với gì. Một dữ liệu định danh đọc về mà không dùng được
+#      là rủi ro thuần, nên nó nằm trong `cam_truong` và bị lọc bỏ kể cả khi mô hình tự trả về.
+#   3. CÓ TÊN NGƯỜI KÝ VÀ NGÀY KÝ. Ngoại lệ không người ký thì năm sau không ai biết nó từ đâu ra,
+#      và một ngoại lệ không ai nhận là một ngoại lệ không ai dám bỏ.
+#
+# Người vào sau muốn mở thêm một loại nữa thì thêm một mục ở đây, kèm chữ ký – không mở được bằng
+# cách gạt một công tắc trên màn hình.
+MO_DOC_CO_CHU_KY = {
+    "phu_luc_unc_luong": {
+        "ten": "Phụ lục danh sách chuyển lương kèm Ủy nhiệm chi",
+        "nguoi_ky": "Chủ tịch HĐQT",
+        "ngay_ky": "2026-10-07",
+        "ly_do": ("Chủ tịch quyết ngày 07/10/2026: cho máy đọc phụ lục chuyển lương để đối chiếu Ủy "
+                  "nhiệm chi với bảng lương đã ký ở mức TỪNG NGƯỜI. Không có tầng này thì chỉ đối "
+                  "chiếu được tổng, mà tổng khớp vẫn có thể có một người nhận thừa và một người "
+                  "nhận thiếu – đúng chỗ người lao động mất tiền mà không ai phát hiện."),
+        "truong": ("ho_ten", "so_tien"),
+        "cam_truong": ("so_tai_khoan", "stk", "luong_cb", "luong_co_ban", "phu_cap", "thu_nhap",
+                       "bhxh", "bao_hiem", "tncn", "thue", "khoan_tru", "ngay_sinh", "cccd",
+                       "cmnd", "so_dien_thoai", "dia_chi", "ma_so_thue"),
+    },
+}
+
 TRANG_THAI = {
     "nhap": "Máy đã đọc – CHỜ NGƯỜI XÁC NHẬN",
     "da_xac_nhan": "Người đã xác nhận và ghi vào hệ thống",

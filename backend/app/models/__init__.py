@@ -9,6 +9,7 @@ from app.models.banks import *  # noqa
 # `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate đòi XOÁ bảng.
 from app.models.hdv import *  # noqa
 from app.models.luong_khoa import *  # noqa
+from app.models.chi_luong import *  # noqa
 from app.models.hr import *  # noqa
 from app.models.hrm import *  # noqa
 from app.models.ops import *  # noqa

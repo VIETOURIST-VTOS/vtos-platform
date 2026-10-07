@@ -104,8 +104,13 @@ def _loc_ket_qua(loai: str, tho: dict) -> tuple[dict, list, str]:
     return so, thieu, str(tho.get("_ghi_chu") or "")[:2000]
 
 
-def _goi_mo_hinh(loai: str, data: bytes, kieu: str) -> dict:
+def _goi_mo_hinh(loai: str, data: bytes, kieu: str, nhac: str = "") -> dict:
     """Gọi mô hình. Không có khóa API thì trả về biểu RỖNG chứ không trả về số bịa.
+
+    `nhac` để một phân hệ khác dùng lại đúng đường gọi này với lời nhắc riêng (Đợt A2 –
+    đọc Ủy nhiệm chi lương). Dùng lại chứ không chép ra chỗ khác, vì mọi lần gọi mô hình
+    phải đi qua cùng một chỗ: chỗ đó là nơi duy nhất có khoá API, có xử lý lỗi, và có quy
+    tắc "hỏng thì trả biểu rỗng chứ không trả số bịa".
 
     Biểu rỗng vẫn hữu ích: người dùng có sẵn ảnh gắn vào bản ghi và một biểu đúng cột để gõ tay, và
     nhật ký vẫn ghi rằng lần đọc này chạy mà không có mô hình."""
@@ -123,7 +128,7 @@ def _goi_mo_hinh(loai: str, data: bytes, kieu: str) -> dict:
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
         msg = client.messages.create(
             model=settings.ANTHROPIC_MODEL, max_tokens=1500,
-            messages=[{"role": "user", "content": [khoi, {"type": "text", "text": _nhac_viec(loai)}]}])
+            messages=[{"role": "user", "content": [khoi, {"type": "text", "text": nhac or _nhac_viec(loai)}]}])
         text = "".join(getattr(b, "text", "") for b in msg.content).strip()
         if text.startswith("```"):
             text = text.split("\n", 1)[-1].rsplit("```", 1)[0]
