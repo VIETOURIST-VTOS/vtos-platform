@@ -9,13 +9,19 @@ phải cột mới — nên không cần đổi lược đồ cho chúng, và nh
 được, đúng như hàm `advance` đã khai.
 
 Revision ID: lk1a7f3c9e2b4
-Revises: hdv4d9a3c6e1b5
+Revises: tc105cdg3b8f1a
+
+NỐI TIẾP tc105cdg3b8f1a, KHÔNG nối tiếp hdv4d9a3c6e1b5 như lúc viết. Lúc viết bản này thì
+hdv4d9a3c6e1b5 còn là đầu mạch; tới lúc gộp thì làn khác đã đưa tc105cdg3b8f1a vào main, và
+hai đầu mạch nghĩa là `alembic upgrade head` trong Dockerfile không chạy được – container
+không khởi động. Sửa bằng cách cho bản viết sau nối tiếp bản viết trước, KHÔNG gộp bằng
+merge revision. Nội dung bản nâng cấp không đổi một dòng nào.
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "lk1a7f3c9e2b4"
-down_revision = "hdv4d9a3c6e1b5"
+down_revision = "tc105cdg3b8f1a"
 branch_labels = None
 depends_on = None
 
