@@ -47,7 +47,22 @@ async def fb_webhook(request: Request, db: Session = Depends(get_db), x_hub_sign
     try: payload = json.loads(body.decode() or "{}")
     except ValueError: raise HTTPException(400, "JSON không hợp lệ")
     if payload.get("object") not in ("page", None): return {"ignored": True}
-    return IB.fb_webhook(db, payload)
+    # TC-106 · 07/10/2026. Bóc dấu nguồn quảng cáo TRƯỚC khi trao gói cho hộp thư.
+    #
+    # Cùng một gói, hai việc khác hẳn: hộp thư lo nội dung khách nhắn, dấu quảng cáo lo bằng
+    # chứng khách đến từ mẫu nào. Để chung một hàm thì mỗi lần sửa luật hộp thư lại phải đọc cả
+    # phần quảng cáo. Gọi trước vì `ad_id` là thứ KHÔNG lấy lại được nếu lượt này hỏng.
+    #
+    # KHÔNG để lỗi ở đây làm hỏng webhook: Meta tắt webhook sau vài lần nhận mã lỗi, và mất
+    # webhook là mất mọi dấu VỀ SAU, không chỉ gói này.
+    from app.services import dau_meta_zalo as MZ
+    try:
+        dau = MZ.tu_meta(db, payload)
+        db.commit()
+    except Exception as ex:          # noqa: BLE001 – xem lý do ngay trên
+        db.rollback()
+        dau = {"loi": [f"{type(ex).__name__}: {str(ex)[:160]}"]}
+    return {**IB.fb_webhook(db, payload), "dau_quang_cao": dau}
 
 
 @router.get("/facebook/status")
