@@ -2180,8 +2180,50 @@ def _lay_chi(db: Session, period: str, lan: int):
     return c
 
 
+@cong_chan_quyen
+def cong_xem_chi_luong(u: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
+    """Cổng xem các lần chi của một kỳ lương. ĐẶT Ở CHỮ KÝ để máy đọc được, không viết trong thân.
+
+    LUẬT KHÔNG ĐỔI MỘT CHỮ so với lúc nó nằm trong thân `chi_danh_sach` – chỉ dời ra chữ ký và
+    đặt tên. Lý do dời:
+
+    Hàng rào P1 đòi MÁY nhận ra quyền mà không phải phân tích mã nguồn. Chặn viết trong thân một
+    hàm endpoint thì máy chỉ thấy được bằng cách đọc mã, và ngày 08/10/2026 chính cửa này làm P1
+    đỏ trên `main` – kéo theo mọi làn đang mở, vì main đỏ thì không gì gộp được.
+
+    HAI LỐI SỬA SAI đã cân nhắc và bỏ, ghi ra đây để không ai đi lại:
+
+    (1) Đổi thành `require_roles(...)` ở chữ ký – rẻ nhất, và SAI. Luật này không phải một danh
+        sách vai trò: nó là "mở được thẻ payroll" HOẶC "thuộc nhóm vai được chi", mà vế đầu phụ
+        thuộc ngoại lệ theo TỪNG NGƯỜI trong cơ sở dữ liệu. Ép thành danh sách vai cố định vừa
+        chặn nhầm người đang có ngoại lệ, vừa mở cho người cùng vai mà không có ngoại lệ. Sửa
+        hàng rào cho hợp phép thử là đúng cái việc phép thử sinh ra để chặn.
+
+    (2) Dời chặn sang một hàm dịch vụ rồi thôi. Làm thế thì `inspect.getsource` của endpoint
+        không còn thấy dấu hiệu nào nữa và P1 xanh – nhưng xanh vì P1 ĐÃ MÙ, không vì quyền đã
+        khai. Bảng `CHAN_TANG_DICH_VU` sinh ra cho lối ấy và có Q2 đọc lại hàm được nêu tên, song
+        khoá tra bảng (`ks_robot._khoa_khai`) chỉ dựng cho POST/PUT/PATCH/DELETE – một cửa GET
+        như cửa này KHÔNG khai vào đó được. Nên lối ấy ở đây là giấu, không phải khai.
+
+    Còn lại đúng một lối thẳng, và kho đã có sẵn đúng cái móc ấy: `@cong_chan_quyen` của
+    `api/deps.py` – docstring của nó lấy chính BẢNG LƯƠNG làm ví dụ, vì đây đúng loại cửa mà
+    quyền phụ thuộc DỮ LIỆU chứ không phụ thuộc vai trò. Cổng nằm ở chữ ký nên
+    `ks_robot.chan_o_chu_ky` đọc được, và tên cổng khai vào `CUA_KHONG_THEO_VAI_TRO` của KS-2.
+    """
+    from app.api.deps import toan_quyen
+    from app.services import access as AC
+    # `and not toan_quyen(u)` theo quyết định 06/9/2026: không cửa TỪ CHỐI THEO VAI TRÒ nào
+    # được chặn Chủ tịch, trừ khi đó là TÁCH BẠCH TRÁCH NHIỆM và có khai ở ks_toan_quyen.
+    # Đây là cửa XEM, không phải cửa ký hay cửa chi, nên không có gì để tách bạch.
+    if ("payroll" not in AC.hr_tabs_for(db, u) and u.role not in CHI_LUONG_ROLES
+            and not toan_quyen(u)):
+        raise HTTPException(403, "Vai trò của bạn không xem được các lần chi lương")
+    return u
+
+
 @router.get("/payroll-runs/{period}/chi")
-def chi_danh_sach(period: str, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def chi_danh_sach(period: str, u: User = Depends(cong_xem_chi_luong),
+                  db: Session = Depends(get_db)):
     """Các lần chi của kỳ, kèm trạng thái trả tiền của cả kỳ.
 
     Không dùng cổng `bang_luong` ở đây: cổng ấy gác BẢNG LƯƠNG TOÀN CÔNG TY, mà vai trò "ketoan"
@@ -2189,9 +2231,7 @@ def chi_danh_sach(period: str, u: User = Depends(current_user), db: Session = De
     khi họ không được mở bảng lương – và màn hình này không có dòng lương của ai, chỉ có số tiền
     chuyển, ngày, số tham chiếu và kết luận đối chiếu.
     """
-    from app.services import access as AC, chi_luong as CL
-    if "payroll" not in AC.hr_tabs_for(db, u) and u.role not in CHI_LUONG_ROLES:
-        raise HTTPException(403, "Vai trò của bạn không xem được các lần chi lương")
+    from app.services import chi_luong as CL
     ds = list(db.execute(select(ChiKyLuong).where(ChiKyLuong.period == period)
                          .order_by(ChiKyLuong.lan)).scalars())
     return {"period": period, "tra_trang_thai": CL.trang_thai_ky(db, period),

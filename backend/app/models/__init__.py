@@ -121,3 +121,8 @@ from app.models.danh_gia import *  # noqa
 # 28/9/2026 · Công nợ khách theo Vietrip – ảnh chụp mỗi ngày (báo cáo 8h sáng). Không mang khoá
 # ngoài sang bảng nào ngoài hai bảng của chính nó.
 from app.models.cong_no_vietrip import *  # noqa  # k2-doc-an-toan: dòng NHẬP MODULE, không đọc cột tiền nào
+
+# 08/10/2026 · Dấu nguồn quảng cáo + hàng đợi chuyển đổi gửi đi (TC-103, TC-105). Thiếu dòng
+# này thì hai bảng ấy KHÔNG vào Base.metadata khi nạp app.models, và mọi bộ kiểm soi metadata
+# mù đúng phần đó mà vẫn báo xanh – đúng chuyện đã xảy ra với Đội xe ngày 09/9/2026.
+from app.models.quang_cao import *  # noqa
