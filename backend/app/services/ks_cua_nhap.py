@@ -217,6 +217,16 @@ MAY_SINH = {
     "lan_chay_tac_vu": "Lần chạy do hệ thống chạy tác vụ báo về qua /tu-dong/bao-cao – nhập tay một "
                        "dòng 'đã chạy thành công' là tạo bằng chứng giả về việc có thể chưa hề chạy.",
     "tong_dai_su_kien": "Nhật ký nguyên văn webhook tổng đài – tổng đài ghi vào, không ai nhập tay.",
+    # TC-105 · 07/10/2026. Hàng đợi báo ngược chuyển đổi cho nền tảng quảng cáo. MÁY SINH thật,
+    # không phải lối thoát cho một bảng thiếu cửa: mỗi dòng được suy ra từ ba thứ ĐÃ CÓ CỬA —
+    # dấu quảng cáo (cửa nhận có khoá), lead (cửa nạp "Khách tiềm năng"), và booking (cửa nạp
+    # "booking"). Doanh thu đọc từ booking, không ai gõ lại.
+    #
+    # VÌ SAO KHÔNG MỞ CỬA NHẬP TAY: gõ tay một dòng ở đây là báo cho Google một chuyển đổi mà
+    # trong sổ công ty không có khách nào tương ứng — và nền tảng sẽ học theo con số bịa ấy rồi
+    # tiêu tiền thật theo nó. Sai số liệu ở bảng này đi thẳng ra tiền quảng cáo.
+    "chuyen_doi_gui_di": "Hàng đợi báo ngược chuyển đổi cho nền tảng – máy suy từ dấu quảng cáo "
+                         "cộng booking đã chốt; doanh thu đọc từ booking, không nhập tay.",
     # 28/9/2026. Ảnh chụp công nợ khách theo Vietrip. Số là của VIETRIP, do lịch chạy 8h sáng đọc từ
     # Vietrip rồi đẩy vào qua POST /cong-no-vietrip/nap. Gõ tay một dòng ở đây là bịa ra một con số
     # Vietrip chưa từng nói – muốn sửa số thì sửa ở Vietrip, sáng hôm sau ảnh mới tự thay.
