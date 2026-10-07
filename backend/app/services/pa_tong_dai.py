@@ -54,6 +54,51 @@ MA_LOI = {
 }
 
 
+class TongDaiTuChoi(ValueError):
+    """P.A TỪ CHỐI hoặc không với tới được — KHÁC HẲN "VTOS hỏng".
+
+    Vì sao phải có một kiểu ngoại lệ riêng, và vì sao nó quan trọng hơn vẻ ngoài: cửa
+    `/tong-dai/khoi-luong` bắt mọi `Exception` rồi ném 502. Hậu quả đo được trên hệ thật ngày
+    30/9/2026 — cửa ấy nằm trong bảng "màn hình làm máy chủ lỗi" của robot Kiểm soát, tức là bàn
+    giám sát của Chủ tịch đọc "VTOS hỏng" trong khi sự thật là "khoá tổng đài của nhà cung cấp
+    không còn được chấp nhận". Hai câu ấy dẫn tới hai người khác nhau đi làm hai việc khác nhau.
+
+    Kiểu riêng này cho phép cửa phân biệt ba chuyện vốn bị trộn làm một:
+      · nhà cung cấp từ chối / không với tới  → 200, nói rõ phải làm gì, KHÔNG vào bộ đếm 5xx;
+      · không có cuộc gọi nào trong khoảng    → 200, số 0 (xem `MA_KHONG_CO_BAN_GHI` dưới);
+      · mã của CHÍNH VTOS hỏng                 → vẫn 500, và phải vẫn là 500.
+    Nuốt cả ba thành 200 là bịt mắt bộ đếm lỗi; ném cả ba thành 502 là việc đang xảy ra hôm nay.
+
+    Kế thừa `ValueError` chứ không `Exception` là CỐ Ý: trước vòng này `_goi` ném `ValueError`, và
+    phép thử PA3 cùng mọi nơi gọi khác đều bắt theo kiểu ấy. Đổi sang một gốc khác là bắt những chỗ
+    đó phải sửa theo, mà mỗi chỗ quên là một lỗi lọt. Kiểu mới HẸP HƠN kiểu cũ nên nơi nào chưa biết
+    tới nó vẫn chạy y như trước; nơi nào cần phân biệt thì bắt đích danh.
+    """
+    def __init__(self, ma: str, thong_bao: str):
+        self.ma, self.thong_bao = ma, thong_bao
+        super().__init__(thong_bao)
+
+
+# "Không tìm thấy bản ghi nào" KHÔNG phải lỗi. Một tháng không ai gọi điện là một câu trả lời hợp lệ
+# cho câu hỏi "tháng này gọi bao nhiêu phút", và trước 05/10/2026 nó bị ném thành ngoại lệ rồi thành
+# 502 — tức là một tháng yên ắng đọc ra y hệt một máy chủ hỏng.
+MA_KHONG_CO_BAN_GHI = "1005"
+
+
+def viec_phai_lam(ma: str) -> str:
+    """Người đọc cảnh báo là nhân viên vận hành. Nói họ phải đi đâu, làm gì — đừng chỉ nêu mã lỗi."""
+    if ma in ("1004", "1003", "1001"):
+        return ("Cấp lại khoá API tổng đài: crm.pavietnam.vn → Người phát triển → Kiểm thử API → ô "
+                "api_key, rồi đặt lại PA_TONG_DAI_API_KEY trên Render. Mã 1003 ở đây KHÔNG có nghĩa "
+                "là sai tham số: phép chẩn đoán gửi một khoá bịa cũng nhận đúng mã ấy, nên nó chỉ "
+                "nghĩa là P.A từ chối.")
+    if ma == "1006":
+        return "P.A đang chặn vì nghi tấn công – chờ rồi thử lại, đừng gọi dồn."
+    if ma == "1007":
+        return "Tổng đài trả lời quá chậm – thử lại sau, hoặc thu hẹp khoảng ngày."
+    return "Liên hệ P.A Việt Nam kèm mã lỗi này."
+
+
 def khoa() -> str:
     return (os.getenv("PA_TONG_DAI_API_KEY") or "").strip()
 
@@ -70,15 +115,21 @@ def _goi(url: str, tham_so: dict) -> dict:
     du_lieu = urllib.parse.urlencode({**tham_so, "api_key": k}).encode()
     req = urllib.request.Request(url, data=du_lieu, method="POST",
                                  headers={"Content-Type": "application/x-www-form-urlencoded"})
-    with urllib.request.urlopen(req, timeout=CHO_GIAY) as r:
-        tho = r.read().decode("utf-8", "replace")
+    try:
+        with urllib.request.urlopen(req, timeout=CHO_GIAY) as r:
+            tho = r.read().decode("utf-8", "replace")
+    except Exception as ex:
+        # Không với tới được tổng đài cũng là chuyện của NHÀ CUNG CẤP, không phải VTOS hỏng.
+        raise TongDaiTuChoi("mang", f"Không gọi được tổng đài P.A: {type(ex).__name__}")
     try:
         j = json.loads(tho)
     except Exception:
-        raise ValueError(f"Tổng đài trả về thứ không phải JSON: {tho[:160]}")
+        raise TongDaiTuChoi("khong_json", f"Tổng đài trả về thứ không phải JSON: {tho[:160]}")
     ma = str(j.get("code", ""))
+    if ma == MA_KHONG_CO_BAN_GHI:
+        return {"code": "1000", "data": []}      # không có cuộc nào ≠ lỗi
     if ma and ma != "1000":
-        raise ValueError(MA_LOI.get(ma) or f"Tổng đài báo lỗi {ma}: {str(j.get('message'))[:120]}")
+        raise TongDaiTuChoi(ma, MA_LOI.get(ma) or f"Tổng đài báo lỗi {ma}: {str(j.get('message'))[:120]}")
     return j
 
 
