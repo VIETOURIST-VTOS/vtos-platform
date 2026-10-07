@@ -49,6 +49,27 @@ class Settings(BaseSettings):
     FB_APP_ID: str = ""                # xác thực chữ ký webhook (X-Hub-Signature-256)
     FB_VERIFY_TOKEN: str = "vtos-fb-verify"  # chuỗi xác minh khi đăng ký webhook trên Meta for Developers           # "nhac_coc:1234,xac_nhan_booking:2345" – mẫu ZNS đã duyệt             # MST pháp nhân – điền trong .env / Render env
 
+    # ---- Conversions API: bao nguoc doanh thu that len Meta. Xem app/services/gui_meta.py ----
+    # KHONG dung lai FB_PAGE_ACCESS_TOKEN o tren: token Trang la cho Messenger, token duoi day
+    # phai co quyen ads_management tren Dataset. Lay nham thi Meta tra loi QUYEN, ma loi quyen
+    # doc rat giong loi du lieu - mat nua ngay moi lan ra.
+    FB_DATASET_ID: str = ""                  # ID Dataset / Pixel cua Vietourist (Trinh quan ly su kien)
+    FB_CAPI_TOKEN: str = ""                  # token co quyen ads_management - anh hoac CNTT dan vao Render
+    FB_CAPI_VERSION: str = "v25.0"           # ban Graph API dang hieu luc (tra 07/10/2026)
+    FB_CAPI_EVENT_NAME: str = "Purchase"     # khach da mua tour va co so tien - doi duoc neu MKT dung pheu nhieu bac
+    FB_CAPI_ACTION_SOURCE: str = ""          # de rong = tu suy (xem gui_meta._nguon_hanh_dong)
+    FB_CAPI_TEST_EVENT_CODE: str = ""        # bat len de thu tren Trinh kiem tra su kien, KHONG tinh vao bao cao
+
+    # ---- TikTok Events API 2.0, nguon CRM. Xem app/services/gui_tiktok.py ----
+    # CANH BAO cho nguoi doc ma: TikTok doi so dien thoai dang "+84..." con Meta doi
+    # "84..." khong dau cong. Hai ham bam nam o hai tep va PHAI giu rieng.
+    TT_EVENT_SET_ID: str = ""                # CRM Event Set ID - lay bang cua /crm/list/
+    TT_ACCESS_TOKEN: str = ""                # token TikTok Business API - CNTT dan vao Render
+    TT_API_VERSION: str = "v1.3"             # ban Events API (tra 07/10/2026)
+    TT_EVENT_NAME: str = "VTOS_ChotTour"     # su kien CRM BAT BUOC la ten tuy chinh - khong
+                                             # dung duoc "Purchase". MKT phai khai DUNG ten nay
+                                             # trong Trinh quan ly su kien TikTok.
+
 
 settings = Settings()
 # Render/Heroku cấp DATABASE_URL dạng postgres:// – SQLAlchemy cần postgresql+psycopg2://

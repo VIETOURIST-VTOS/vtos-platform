@@ -149,6 +149,10 @@ CD_TRANG_THAI = {
     "loi": "Gửi lỗi",
     "thieu_doanh_thu": "Thiếu doanh thu – chưa gửi",
     "bo_qua": "Bỏ qua",
+    # Meta chi nhan event_time trong 7 ngay ke tu luc chot. Qua han thi gui di cung bi tu
+    # choi, nen danh dau va DUNG - gui de bi tu choi chi to lam ban bang loi va che mat loi
+    # that. Dem duoc so dong o day la dem duoc so tien da mat co hoi quy cong tu dong.
+    "qua_han": "Quá hạn nền tảng – không gửi được nữa",
 }
 
 
