@@ -171,6 +171,41 @@ VI_EPASS = {
 }
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# NGẢ CỦA MỘT GIAO DỊCH NGUỒN NGOÀI — khai 07/10/2026, sau khi đo trên hệ thật
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# ĐO ĐƯỢC chứ không suy đoán. Trên bản đang chạy ngày 07/10/2026, tab "Đối soát nguồn ngoài" của
+# /doi-xe hiện: tổng chi phí 1.121.825.494 đ, và CHƯA QUY ĐƯỢC VỀ XE NÀO cũng đúng 1.121.825.494 đ —
+# tức 100%, cả 36 dòng. Cùng lúc màn hình Lãi lỗ đội xe kỳ 08/2026 báo LỢI NHUẬN 50,3%, vì ba tầng
+# chi phí của nó đọc `fleet_trip_costs`, `fleet_maintenance` và `fleet_period_costs`, KHÔNG đọc bảng
+# này. Một tỷ hai nằm ngoài sổ mà không màn hình nào nói ra.
+#
+# Vì sao không sửa bằng cách "tra lại xe cho 36 dòng": bản khảo sát Vietrip 05/9/2026 ghi bộ trường
+# của phiếu đề xuất chi là *tour · nhà cung cấp · hình thức thanh toán · loại tiền · dòng dịch vụ*.
+# KHÔNG CÓ Ô XE, và sẽ không có — phiếu ấy gắn vào TOUR. Nên "1,12 tỷ này của xe nào" là câu hỏi sai
+# ngay từ đầu; hỏi mãi câu sai thì mỗi tháng lại 29 dòng không trả lời được.
+#
+# Một giao dịch nguồn ngoài chạy về MỘT trong năm ngả dưới đây, và chỉ hai ngả đầu được cộng vào lãi
+# lỗ đội xe. Ngả do NGƯỜI ĐỌC CHỨNG TỪ chọn, không phải máy đoán từ cột `nhom` — `nhom` là chữ tự do
+# (xem /giao-dich/phan-loai), nên suy ngả từ nó là dựng một phép tính trên cát.
+#
+# "" (rỗng) = CHƯA ĐỊNH TUYẾN, và đó là một trạng thái tử tế: nó đếm được, nói ra được, và sửa được.
+# Mặc định một ngả nào đó cho đủ form thì tiền chạy vào sổ của người không tiêu nó.
+NGA_CHI_PHI = {
+    "xe": "Của một chiếc xe cụ thể",
+    "doi": "Của cả đội, không quy về chiếc nào",
+    "chu_xe": "Của chủ xe / đối tác — vào khối quyết toán chủ xe",
+    "tour": "Của TOUR, không phải chi phí đội xe",
+    "khong_phai_chi_phi": "Điều chuyển tiền nội bộ — không phải chi phí",
+}
+
+# Hai ngả này, và chỉ hai ngả này, là chi phí của đội xe. Dùng ở fleet_lai_lo.py để đếm phần còn
+# nằm ngoài sổ. Đừng thêm "chu_xe" vào đây: khoản của chủ xe đi qua khối quyết toán chủ xe, cộng cả
+# hai chỗ là tính hai lần đúng một khoản.
+NGA_CUA_DOI_XE = ("xe", "doi")
+
+
 class Trip(Base):
     """Một chuyến xe – nhật trình. Km đầu/cuối là số ĐO, nên phải đi kèm nguồn và thời điểm.
 
@@ -321,6 +356,11 @@ class ExternalTxn(Base):
     trung: Mapped[bool] = mapped_column(Boolean, default=False)        # bản ghi lặp: giữ lại, không tính
     trung_cua_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     khop: Mapped[str] = mapped_column(String(20), default="chua_khop")  # chua_khop / da_khop / khong_khop
+    # Ngả của khoản này – khoá của NGA_CHI_PHI, rỗng = CHƯA ĐỊNH TUYẾN. Xem chú thích ở NGA_CHI_PHI.
+    nga: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    nga_ly_do: Mapped[str] = mapped_column(String(300), default="")     # vì sao chọn ngả ấy
+    nga_boi: Mapped[str] = mapped_column(String(50), default="")        # ai định tuyến
+    nga_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     co: Mapped[str] = mapped_column(String(10), default="vang")
     ghi_chu: Mapped[str] = mapped_column(String(300), default="")
     imported_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

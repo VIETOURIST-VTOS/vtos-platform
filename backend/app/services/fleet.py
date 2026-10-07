@@ -331,6 +331,78 @@ def xe_theo_bien(db: Session, bien: str, luc: date):
     return next((v for v in db.execute(select(Vehicle)).scalars() if chuan_bien(v.plate) == b), None)
 
 
+def tra_lai_xe(db: Session, source: str = "") -> dict:
+    """Tra lại xe theo biển số cho những giao dịch nguồn ngoài CHƯA gắn được xe.
+
+    Vì sao cần một cửa riêng thay vì nạp lại tệp. `vehicle_id` được tra đúng MỘT LẦN, lúc nạp. Lúc
+    ấy xe có thể chưa có trong danh mục — và đó là chuyện bình thường: sao kê về trước, hồ sơ xe
+    nhập sau. Sau đó không gì tra lại: cửa phân loại (`/giao-dich/phan-loai`) cố ý không sửa
+    `vehicle_id`, và nạp lại cùng một tệp thì khoá chống trùng theo mã giao dịch đánh dấu bản thứ hai
+    là `trùng` chứ KHÔNG cập nhật bản cũ. Nên một dòng có biển số đúng vẫn nằm mãi ở nhóm "chưa tra
+    được xe", không đường nào ra.
+
+    Đo trên hệ thật 07/10/2026: 7 khoản (35.725.835 đ) mang biển `50F 017.37`, `50F 034.71`,
+    `50F 046.22`, `50F 022.59` — bốn biển ấy ĐỀU có trong danh mục, và `chuan_bien()` bỏ dấu cách
+    với dấu gạch nên lẽ ra khớp. Chúng chỉ chờ một lần tra lại.
+
+    Cửa này KHÔNG đoán gì: nó chạy lại đúng phép tra cũ (`xe_theo_bien`, theo lịch sử biển số tại
+    thời điểm giao dịch), chỉ ghi khi tìm RA xe, và không bao giờ xoá một liên kết đã có. Nó trả về
+    số dòng đã đổi, vì một cửa im lặng thì lần sau không ai biết nó có chạy hay không."""
+    q = select(ExternalTxn).where(ExternalTxn.vehicle_id.is_(None))
+    if source: q = q.where(ExternalTxn.source == source)
+    doi, khong_ra, khong_co_bien = [], 0, 0
+    for t in db.execute(q).scalars():
+        bien = (t.bien_so or "").strip()
+        if not bien:
+            khong_co_bien += 1
+            continue
+        v = xe_theo_bien(db, bien, (t.thoi_diem.date() if t.thoi_diem else date.today()))
+        if v is None:
+            khong_ra += 1
+            continue
+        t.vehicle_id = v.id
+        # Cờ của dòng được tính lại theo đúng luật lúc nạp: đỏ chỉ dành cho dòng là chi phí thật mà
+        # chưa quy được về xe. Đã quy được thì không còn lý do đỏ.
+        if t.co == "do" and not t.khong_phai_chi_phi:
+            t.co = "xanh"
+            t.ghi_chu = f"Đã tra lại được xe {v.plate} từ biển '{bien}'"
+        doi.append({"ma_gd": t.ma_gd, "bien_so": bien, "xe": v.plate})
+    return {"da_gan": len(doi), "dong": doi[:200], "khong_tra_ra_xe": khong_ra,
+            "khong_co_bien_so": khong_co_bien,
+            "ghi_chu": ("Chỉ ghi khi tra RA xe; không đoán và không xoá liên kết đã có. Dòng không có "
+                        "biển số thì phép tra này không giúp được — phải ĐỊNH TUYẾN bằng tay, vì phiếu "
+                        "đề xuất chi trên Vietrip không có ô xe.")}
+
+
+def tinh_lai_co_chuyen(db: Session, tu: date | None = None, den: date | None = None) -> dict:
+    """Tính lại cờ của các chuyến đã ghi, theo luật kiểm HIỆN HÀNH.
+
+    Cờ `Trip.co` được tính lúc GHI rồi lưu vào dòng. Nên mỗi lần luật kiểm đổi, các dòng cũ mang cờ
+    của luật cũ — và không ai thấy, vì cờ vẫn hiện một màu trông có thẩm quyền.
+
+    Đo trên hệ thật 07/10/2026, ngay sau khi thêm phép đối chiếu km GPS: cả 24 chuyến in rõ "Người
+    nhập tay · chưa có số GPS" ở cột km — màn hình nói thật — mà cột Cờ vẫn XANH cả 24, vì cờ lưu
+    sẵn từ lần nạp trước. Màn hình và cờ nói hai điều khác nhau về cùng một chuyến.
+
+    Cửa này KHÔNG đổi trạng thái chuyến, KHÔNG đổi một con số nào: chỉ tính lại cờ và lý do cờ. Chuyến
+    ĐÃ XÁC NHẬN cũng được tính lại — cờ là lời cảnh báo, không phải con số đã chốt; giữ một cảnh báo
+    cũ trên một chuyến đã chốt là đúng cái hại mà cửa này đi sửa."""
+    q = select(Trip)
+    if tu: q = q.where(Trip.ngay_di >= tu)
+    if den: q = q.where(Trip.ngay_di <= den)
+    doi = []
+    for t in db.execute(q).scalars():
+        kt = kiem_chuyen(db, t)
+        co_moi, ly_do_moi = kt["co"], " · ".join(kt["ly_do"])
+        if co_moi != t.co or ly_do_moi != (t.co_ly_do or ""):
+            doi.append({"trip_id": t.id, "ma_phieu": t.ma_phieu, "co_cu": t.co, "co_moi": co_moi,
+                        "ly_do_moi": ly_do_moi})
+            t.co, t.co_ly_do = co_moi, ly_do_moi
+    return {"da_tinh_lai": len(doi), "dong": doi[:200],
+            "ghi_chu": ("Chỉ tính lại cờ và lý do cờ. Không đổi trạng thái, không đổi km, không đổi "
+                        "tiền. Chuyến đã xác nhận cũng tính lại – cờ là cảnh báo, không phải số đã chốt.")}
+
+
 def nhap_giao_dich(db: Session, source: str, rows: list[dict], boi: str) -> dict:
     """Nhập giao dịch nguồn ngoài, khử trùng theo mã giao dịch gốc.
 

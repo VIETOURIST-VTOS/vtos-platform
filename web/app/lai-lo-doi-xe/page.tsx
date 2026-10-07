@@ -104,6 +104,34 @@ function LaiLo() {
         </div>
       </div>
 
+      {/* TIỀN NẰM NGOÀI BA TẦNG. Đo trên hệ thật 07/10/2026: bảng giao dịch nguồn ngoài giữ
+          1.121.825.494 đ, cả 36 dòng chưa khớp chuyến, trong khi khối lãi lỗ ngay trên đây in LỢI
+          NHUẬN 50,3% cho kỳ 08/2026. Ba tầng chi phí đọc chi phí chuyến, bảo dưỡng và chi phí kỳ —
+          KHÔNG đọc bảng nguồn ngoài. Người đọc không có cách nào biết điều đó, nên con số 50,3% đọc
+          ra như kết quả thật của đội xe. Khối này tồn tại để nó không đọc ra như vậy nữa. */}
+      {d.ngoai_so?.so_khoan > 0 && <div className="panel" style={{ borderColor: "var(--orange)" }}>
+        <h2>Còn {vnd(d.ngoai_so.tong)} nằm NGOÀI ba tầng chi phí trên</h2>
+        <p className="muted">{d.ngoai_so.so_khoan} khoản đã nạp vào bảng giao dịch nguồn ngoài (sao kê
+          thẻ dầu, ePass, đề xuất chi Vietrip) nhưng chưa khớp vào chuyến nào và chưa nạp qua cửa chi
+          phí kỳ — nên <b>lợi nhuận ở trên chưa trừ phần nào của số này</b>.</p>
+        <div className="kpis" style={{ marginBottom: 10 }}>
+          <div className="kpi"><b style={{ color: "var(--orange)" }}>{vnd(d.ngoai_so.cua_doi_xe)}</b>
+            <span>đã xác định là CỦA ĐỘI XE — phải trừ thêm</span></div>
+          <div className="kpi"><b style={{ color: "var(--orange)" }}>{vnd(d.ngoai_so.chua_dinh_tuyen)}</b>
+            <span>chưa định tuyến — chưa biết của ai</span></div>
+        </div>
+        <table><thead><tr><th>Ngả</th><th>Của đội xe?</th><th className="num">Số khoản</th><th className="num">Số tiền</th></tr></thead>
+          <tbody>{(d.ngoai_so.theo_nga || []).map((n: any) => <tr key={n.nga || "chua"}>
+            <td>{n.nga ? n.ten : <Tag cls="warn">{n.ten}</Tag>}</td>
+            <td>{n.nga ? (n.cua_doi_xe ? "có" : "không") : "—"}</td>
+            <td className="num">{n.so_khoan}</td>
+            <td className="num">{vnd(n.so_tien)}</td>
+          </tr>)}</tbody></table>
+        <p className="muted">{d.ngoai_so.ghi_chu} Định tuyến ở <b>Hồ sơ xe › Đối soát nguồn ngoài</b>.
+          Khoản của đội muốn vào ba tầng thì vẫn phải nạp qua cửa <b>Chi phí kỳ của đội xe</b> — một
+          khoản một cửa, cộng ở hai đường là tính hai lần.</p>
+      </div>}
+
       <div className="panel wrap">
         <h2>Chi phí của đội trong kỳ</h2>
         <table><thead><tr><th>Nhóm</th><th className="num">Số tiền</th></tr></thead>
