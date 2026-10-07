@@ -22,6 +22,7 @@ from app.models.core import User
 from app.models.quang_cao import DauQuangCao, NEN_TANG_QUEN, LOAI_MA_QUEN, NGUON_GHI
 from app.services import access as AC
 from app.services import chuyen_doi_di as CD
+from app.services import gui_meta as GM
 from app.services import dau_quang_cao as DQ
 from app.services import rules as R
 
@@ -202,6 +203,30 @@ def cd_ket_qua(cid: int, data: KetQuaIn, db: Session = Depends(get_db)):
     if not c:
         raise HTTPException(404, "Không có dòng chuyển đổi này")
     return cd_ra(CD.ghi_ket_qua(db, c, data.xong, data.tra_loi, data.loi))
+
+
+@router.post("/chuyen-doi/gui-meta", dependencies=[Depends(robot_auth)])
+def cd_gui_meta(gioi_han: int = 100, db: Session = Depends(get_db)):
+    """Đẩy chuyển đổi Facebook lên Meta Conversions API. GỌI HẰNG NGÀY.
+
+    Hằng ngày, không phải hằng tuần: Meta chỉ nhận chuyển đổi trong 7 ngày kể từ lúc chốt,
+    nên lỡ một tuần là mất trắng một tuần doanh thu không quy công được. Lý do đầy đủ ở đầu
+    `app/services/gui_meta.py`.
+
+    Chưa có token thì cửa này trả về tình trạng thiếu gì và KHÔNG đụng vào dòng nào.
+    """
+    return GM.gui(db, gioi_han)
+
+
+@router.get("/chuyen-doi/cau-hinh-meta")
+def cd_cau_hinh_meta(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Bộ gửi Meta đã cắm được chưa, và còn bao nhiêu tiền sắp hết hạn gửi.
+
+    KHÔNG trả token, chỉ trả có/không. Màn hình nào cũng mở được cửa này, và `sap_qua_han`
+    là con số phải đặt lên đầu màn hình Marketing: nó đếm ngược số chuyển đổi sắp vĩnh viễn
+    không báo lên Meta được nữa.
+    """
+    return {**GM.cau_hinh(), **GM.con_lai(db)}
 
 
 @router.get("/chuyen-doi/bang-do")

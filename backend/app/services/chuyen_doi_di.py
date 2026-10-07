@@ -75,11 +75,17 @@ def sinh(db: Session) -> dict:
     return {"moi": moi, "da_co": da_co, "thieu_doanh_thu": thieu}
 
 
-def cho_gui(db: Session, gioi_han: int = 100) -> list[ChuyenDoiGuiDi]:
-    """Việc bộ gửi lấy ra làm. Chỉ dòng CÓ doanh thu – xem vì sao ở docstring của bảng."""
-    return list(db.execute(select(ChuyenDoiGuiDi)
-                           .where(ChuyenDoiGuiDi.trang_thai == "cho_gui")
-                           .order_by(ChuyenDoiGuiDi.id)
+def cho_gui(db: Session, gioi_han: int = 100, nen_tang: str = "") -> list[ChuyenDoiGuiDi]:
+    """Việc bộ gửi lấy ra làm. Chỉ dòng CÓ doanh thu – xem vì sao ở docstring của bảng.
+
+    `nen_tang` KHÔNG phải tiện nghi mà là hàng rào. Mỗi nền tảng có bộ gửi riêng, và bộ gửi
+    Meta mà cầm nhầm một dòng gclid thì nó sẽ đánh dấu dòng ấy "bỏ qua" – tức là cướp việc
+    của bộ gửi Google và dòng ấy không bao giờ được gửi đi đâu nữa. Lọc ở đây, một chỗ.
+    """
+    q = select(ChuyenDoiGuiDi).where(ChuyenDoiGuiDi.trang_thai == "cho_gui")
+    if nen_tang.strip():
+        q = q.where(ChuyenDoiGuiDi.nen_tang == nen_tang.strip().lower())
+    return list(db.execute(q.order_by(ChuyenDoiGuiDi.id)
                            .limit(max(1, min(gioi_han, 1000)))).scalars())
 
 
