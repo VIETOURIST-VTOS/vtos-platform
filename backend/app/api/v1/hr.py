@@ -1246,7 +1246,15 @@ def dx_quyet(did: int, data: DxQuyet, u: User = Depends(current_user), db: Sessi
     """Cấp đang xử lý quyết định. Ba hành động, đúng như §12: đồng ý, trả bổ sung, từ chối.
 
     Quyền KHÔNG lấy từ require_roles: nó phụ thuộc DỮ LIỆU — bước đang chờ cần vai nào. Khai cứng một
-    danh sách vai ở đây thì mỗi lần cấu hình thêm một cấp mới lại phải sửa mã.
+    danh sách vai ở đây thì mỗi lần cấu hình thêm một cấp mới lại phải sửa mã, và cấp mới ấy sẽ bị
+    chặn ở cửa dù cấu hình đã có chữ ký.
+
+    HỆ QUẢ ĐÃ BIẾT, chưa xử lý: bộ kiểm KS-2 đọc quyền bằng máy nên nó KHÔNG đọc được cửa này, và báo
+    đỏ. Hai lối ra đều KHÔNG thuộc quyền của làn Viết phần mềm — khai một danh sách vai ở đây là tự
+    khai quyền, còn ghi một dòng vào bảng ngoại lệ KS-2 là tự đóng ngoại lệ của mình. Đã thử hàng rào
+    thô `require_roles("chutich", "tgd")` và nó làm đỏ 7 phép thử của chính Đợt 4: đặc tả §10 cho phép
+    khai cấu hình nhiều cấp với vai khác, nên thu hẹp ở đây là bóp một năng lực đã chốt để cho một
+    phép thử xanh. Để nguyên và báo lên.
     """
     d = db.get(DeXuatHdv, did)
     if not d:
