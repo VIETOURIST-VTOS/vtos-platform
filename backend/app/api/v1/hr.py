@@ -2050,8 +2050,56 @@ def payroll_by_company(period: str, u: User = Depends(bang_luong), db: Session =
                        "thành một dòng riêng, không dồn vào công ty mẹ."}
 
 
+@router.post("/payroll-runs/{period}/kiem-co-so")
+def payroll_kiem_co_so(period: str, u: User = Depends(require_roles("hcns", "cntt")), db: Session = Depends(get_db)):
+    """Chạy bộ kiểm cơ sở của kỳ. Máy quyết đạt hay không, người chỉ bấm cho nó chạy.
+
+    Chủ tịch gọi bước này là "AI kiểm tra cơ sở" (07/10/2026). Mã thực hiện bằng QUY TẮC XÁC ĐỊNH:
+    cùng đầu vào luôn ra cùng danh sách cờ, chạy lại được, từng dòng mở ra xem được bằng chứng. Mô
+    hình ngôn ngữ có thể diễn giải một cờ cho dễ hiểu, nhưng không được là thứ quyết định bảng lương
+    đi tiếp hay không — một bộ kiểm hôm nay nói đạt hôm mai nói không, với cùng con số, thì không ai
+    dám dùng nó để trả tiền.
+
+    CÒN CỜ CHẶN THÌ KHÔNG QUA. Không có cờ KHÔNG có nghĩa là bảng đúng, chỉ nghĩa là những thứ đã
+    biết cách kiểm thì đều sạch — nên trạng thái mới tên là `da_kiem_co_so`, không phải `dung`.
+    """
+    from app.services import luong_khoa as LK
+    run = H.get_or_draft(db, period)
+    if run.status not in ("nhap",) + H.DA_KIEM:
+        raise HTTPException(422, f"Kỳ {period} đã qua bước kiểm (đang ở '{run.status}')")
+    co = LK.kiem_co_so(db, run)
+    chan = LK.co_chan(co)
+    if not chan and run.status == "nhap":
+        run.status = "da_kiem_co_so"
+        R.audit(db, u.username, u.role, "bang_luong_kiem_co_so", f"payroll:{period}",
+                after={"so_co": len(co), "so_chan": 0})
+        db.commit()
+    return {"period": period, "trang_thai": run.status, "dat": not chan,
+            "so_co": len(co), "co": co,
+            "message": ("Đủ điều kiện trình" if not chan else
+                        f"Còn {len(chan)} điều kiện chặn – chưa trình được"),
+            "ghi_chu": "Không có cờ nghĩa là những thứ đã biết cách kiểm đều sạch, không nghĩa là bảng đúng."}
+
+
+@router.get("/payroll-runs/{period}/ban-khoa")
+def payroll_ban_khoa(period: str, u: User = Depends(bang_luong), db: Session = Depends(get_db)):
+    """Bản khóa của kỳ, và kết quả tính lại hôm nay so với nó.
+
+    Đây là cửa trả lời câu "cùng đầu vào có ra cùng kết quả không" — câu người ta hỏi khi giải trình
+    một kỳ lương. Lệch KHÔNG tự là sai, nhưng lệch phải hiện ra chứ không được im.
+    """
+    from app.services import luong_khoa as LK
+    run = H.get_or_draft(db, period)
+    b = LK.ban_dang_hieu_luc(db, period)
+    return {"period": period, "trang_thai": run.status,
+            "ban_khoa": None if b is None else {
+                "ban_so": b.ban_so, "khoa_boi": b.khoa_boi, "khoa_vai": b.khoa_vai,
+                "khoa_luc": b.khoa_luc, "dau_van_tay": b.dau_van_tay, "quy_tac": b.quy_tac},
+            "doi_chieu": LK.doi_chieu_voi_ban_khoa(db, run)}
+
+
 @router.post("/payroll-runs/{period}/advance")
-def payroll_advance(period: str, u: User = Depends(require_roles("ketoan", "hcns", "tgd")), db: Session = Depends(get_db)):
+def payroll_advance(period: str, u: User = Depends(require_roles("hcns", "tgd", "chutich")), db: Session = Depends(get_db)):
     run = H.get_or_draft(db, period)
     try:
         msg = H.advance(db, u, run)

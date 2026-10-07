@@ -402,20 +402,52 @@ def get_or_draft(db: Session, period: str, refresh: bool = False) -> PayrollRun:
     return run
 
 
+# Chuỗi bảng lương, Chủ tịch chốt 07/10/2026:
+#
+#   nhap → [máy kiểm cơ sở] da_kiem_co_so → [HCNS kiểm] hcns_kiem → [CT hoặc TGĐ ký] da_ky
+#
+# BA THAY ĐỔI SO VỚI CHUỖI CŨ, và mỗi cái có lý do riêng:
+#
+#  1. Bước đầu KHÔNG còn là "Kế toán xác nhận cơ sở". Thứ Kế toán xác nhận ở đó — chuyến đã chốt
+#     quyết toán chưa, tham số đã ký chưa — là những SỰ THẬT hệ thống tự kiểm được bằng quy tắc.
+#     Bắt một người ngồi xác nhận thứ máy kiểm được là tạo ra một chữ ký không mang thông tin gì.
+#     Kế toán chuyển về cuối chuỗi, chỗ họ làm việc thật: CHI tiền và trả lại kết quả.
+#
+#  2. `hcns_lap` đổi tên thành `hcns_kiem`. Máy lập bảng (`compute_draft`), HCNS kiểm. Tên cũ làm
+#     người đọc tưởng HCNS gõ số, và từ hiểu nhầm ấy mới sinh ra câu hỏi "ai duyệt người lập".
+#     Người lập là máy, nên HCNS vốn đã là người kiểm — không cần thêm một cấp nào.
+#
+#  3. Chữ ký cuối mở cho CHỦ TỊCH HOẶC TGĐ, một cấp, ai ký cũng xong — đúng luật 06/10/2026 đang
+#     chạy ở phòng HDV. Trước bản này Chủ tịch không ký được bảng lương, và lý do không phải là
+#     luật cấm: chỉ là bảng không có cột cho ông ký.
+#
+# TRẠNG THÁI CŨ VẪN ĐỌC ĐƯỢC. Những kỳ đã chạy qua chuỗi cũ mang `kt_xac_nhan` / `hcns_lap` /
+# `tgd_ky`; hàm này nhận cả hai bộ tên. Đổi tên trạng thái mà bỏ rơi dữ liệu cũ là làm hỏng lịch sử
+# để cho mã đẹp.
+VAI_KY_LUONG = ("chutich", "tgd")
+DA_KIEM = ("da_kiem_co_so", "kt_xac_nhan")
+DA_HCNS = ("hcns_kiem", "hcns_lap")
+DA_KY = ("da_ky", "tgd_ky")
+
+
 def advance(db: Session, u: User, run: PayrollRun) -> str:
-    """Bước tiếp theo theo vai trò: ketoan (nhap→kt_xac_nhan), hcns (kt_xac_nhan→hcns_lap), tgd (hcns_lap→tgd_ky + ghi sổ)."""
+    """Bước tiếp theo theo vai trò. Xem chú thích chuỗi ở trên."""
+    from app.services import luong_khoa as LK
     now = datetime.now()
-    if run.status == "nhap" and u.role == "ketoan":
-        run.status, run.kt_confirmed_by, run.kt_confirmed_at = "kt_xac_nhan", u.username, now
-        msg = "Kế toán đã xác nhận cơ sở tính lương"
-    elif run.status == "kt_xac_nhan" and u.role == "hcns":
-        run.status, run.hcns_by, run.hcns_at = "hcns_lap", u.username, now
-        msg = "HCNS đã lập bảng lương – chờ TGĐ ký lô"
-    elif run.status == "hcns_lap" and u.role == "tgd":
-        run.status, run.tgd_by, run.tgd_at = "tgd_ky", u.username, now
+    if run.status == "nhap":
+        raise ValueError("Kỳ này chưa qua bước kiểm cơ sở – gọi cửa 'kiem-co-so' trước khi trình")
+    if run.status in DA_KIEM and u.role == "hcns":
+        run.status, run.hcns_by, run.hcns_at = "hcns_kiem", u.username, now
+        msg = "HCNS đã kiểm bảng lương – chờ Chủ tịch hoặc TGĐ ký"
+    elif run.status in DA_HCNS and u.role in VAI_KY_LUONG:
+        # Khóa TRƯỚC khi ghi sổ, và trong cùng một giao dịch với việc đổi trạng thái: bản chụp phải
+        # là thứ người ký vừa nhìn, không phải thứ còn lại sau khi ghi sổ xong.
+        ban = LK.khoa(db, run, u)
+        run.status, run.tgd_by, run.tgd_at = "da_ky", u.username, now
         ids = post_payroll_entries(db, run)
         run.entry_ids = ids
-        msg = f"TGĐ đã ký lô bảng lương {run.period}" + (f" – đã ghi sổ {len(ids)} chứng từ" if ids else "")
+        msg = (f"{'Chủ tịch' if u.role == 'chutich' else 'TGĐ'} đã ký bảng lương {run.period} – "
+               f"đã khóa bản {ban.ban_so}" + (f", ghi sổ {len(ids)} chứng từ" if ids else ""))
     else:
         raise ValueError(f"Vai trò {u.role} không thực hiện được bước này ở trạng thái {run.status}")
     R.audit(db, u.username, u.role, f"bang_luong_{run.status}", f"payroll:{run.period}", after={"tong_thuc_nhan": run.totals.get("thuc_nhan")})

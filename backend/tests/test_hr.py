@@ -151,13 +151,17 @@ def test_payroll_flow_roles_and_journal():
     ds = client.get("/api/v1/employees?limit=1000", headers=login("cntt")).json()
     rows = [{"ma": e["code"], "muc": 5_310_000} for e in ds if e["active"] and e["contract_type"] == "hdld"]
     assert client.post("/api/v1/bhxh/nap", json={"rows": rows, "ky": "2026-08"}, headers=login("hcns")).status_code == 200
+    # Chuỗi mới, Chủ tịch chốt 07/10/2026: máy kiểm cơ sở → HCNS kiểm → Chủ tịch HOẶC TGĐ ký.
+    # Kế toán không còn đứng đầu chuỗi: thứ họ xác nhận ở đó là sự thật máy tự kiểm được.
     client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("hcns"))
-    assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("hcns")).status_code == 422   # chưa qua Kế toán
-    assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("ketoan")).json()["run"]["status"] == "kt_xac_nhan"
+    assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("hcns")).status_code == 422   # chưa kiểm cơ sở
+    kq = client.post(f"/api/v1/payroll-runs/{P}/kiem-co-so", headers=login("hcns")).json()
+    assert kq["dat"] is True, kq["co"]
+    assert kq["trang_thai"] == "da_kiem_co_so"
     assert client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("hcns")).status_code == 422  # khóa tính lại
-    assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("hcns")).json()["run"]["status"] == "hcns_lap"
+    assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("hcns")).json()["run"]["status"] == "hcns_kiem"
     res = client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("tgd")).json()
-    assert res["run"]["status"] == "tgd_ky" and len(res["run"]["entry_ids"]) >= 3
+    assert res["run"]["status"] == "da_ky" and len(res["run"]["entry_ids"]) >= 3
     # Từ 07/9/2026 bút toán lương lập RIÊNG theo từng pháp nhân trả lương, và có thêm hai dòng khoản trừ
     # của người lao động (BHXH 3383, đoàn phí 3382), nên số chứng từ nhiều hơn ba.
     js = [e for e in client.get("/api/v1/journal", headers=login("ketoan")).json() if e["source_ref"].startswith(f"payroll:{P}")]
