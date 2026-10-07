@@ -34,6 +34,19 @@ CUA_TAY = (
     "campaigns", "care_tickets", "cash_plan_items", "chot_so_du", "companies", "complaints",
     "content_items",
     "conversations", "daily_reports",
+    # Hướng dẫn viên, 07/10/2026 — khai sau khi phân hệ HDV của làn Phân quyền gộp vào main
+    # mà sáu bảng của nó chưa ai khai, và `test_cn1` ĐỎ trên chính main. Mỗi dòng dưới đây đã
+    # được SOÁT TẬN CỬA trước khi khai: có hàm ghi trong `services/hr.py`, có cửa API gọi hàm
+    # ấy, và có màn hình gọi cửa — chứ không khai theo tên bảng cho hết đỏ.
+    #
+    #   bao_cao_sau_tour    POST /xe-hdv/bao-cao/{aid} (+/gui, +/ban-moi) · màn hình /xe-hdv,
+    #                       khung "Báo cáo sau tour" — chính hướng dẫn viên gõ sau chuyến
+    #   yeu_cau_hdv         POST /guide-assignments/yeu-cau · màn hình /huong-dan
+    #   de_xuat_hdv         POST /guide-assignments/de-xuat (+/trinh, +/{did}/quyet)
+    #   cau_hinh_duyet_hdv  POST /guide-assignments/de-xuat/cau-hinh (+/khai-mot-cap, +/{cid}/ky)
+    #                       — tuyến ký do người khai và KÝ, không phải máy đặt
+    #   tam_ung_hdv         POST /guide-assignments/tam-ung (+/tien, +/tat-toan)
+    "bao_cao_sau_tour", "cau_hinh_duyet_hdv", "de_xuat_hdv", "tam_ung_hdv", "yeu_cau_hdv",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
@@ -205,6 +218,14 @@ MAY_SINH = {
     # Khai ở đây KHÔNG phải là lối thoát cho một bảng thiếu cửa — cửa có thật và gọi tên được ngay
     # trên. Nếu mai kia cặp bảng này nhận số do người gõ từng dòng thì phải gỡ hai dòng này ra và
     # dựng cửa nhập thật.
+    # Bước duyệt của một đề nghị HDV. 07/10/2026 — MÁY SINH, và đây là chỗ khác hẳn năm bảng
+    # anh em vừa khai ở CUA_TAY: người KHAI TUYẾN KÝ một lần ở `cau_hinh_duyet_hdv` rồi KÝ nó,
+    # còn các BƯỚC thì `hdv.lap_cac_buoc()` dựng đủ một lượt ngay lúc đề nghị được TRÌNH
+    # (hr.py gọi đúng một chỗ, dòng 1227), chép từ cấu hình đã ký. Không ai gõ một bước.
+    # Mở cửa tay cho bảng này là mở đường thêm hoặc bớt một bước ký NGOÀI tuyến Chủ tịch đã
+    # duyệt — đúng thứ cấu hình ký sinh ra để chặn.
+    "buoc_duyet_hdv": "Bước duyệt do máy lập đủ một lượt lúc trình đề nghị, chép từ cấu hình "
+                      "tuyến ký đã được người khai và ký – không ai gõ tay một bước.",
     "phai_tra_vietrip_anh": "Ảnh phải trả NCC theo dự toán tour, nạp từ Vietrip qua "
                             "/cong-no-vietrip/nap-phai-tra – số của Vietrip, không nhập tay.",
     "phai_tra_vietrip_dong": "Dòng của ảnh phải trả NCC Vietrip – nạp cùng ảnh; còn phải chi do máy "
