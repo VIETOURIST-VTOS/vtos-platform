@@ -60,6 +60,16 @@ class Settings(BaseSettings):
     FB_CAPI_ACTION_SOURCE: str = ""          # de rong = tu suy (xem gui_meta._nguon_hanh_dong)
     FB_CAPI_TEST_EVENT_CODE: str = ""        # bat len de thu tren Trinh kiem tra su kien, KHONG tinh vao bao cao
 
+    # ---- TikTok Events API 2.0, nguon CRM. Xem app/services/gui_tiktok.py ----
+    # CANH BAO cho nguoi doc ma: TikTok doi so dien thoai dang "+84..." con Meta doi
+    # "84..." khong dau cong. Hai ham bam nam o hai tep va PHAI giu rieng.
+    TT_EVENT_SET_ID: str = ""                # CRM Event Set ID - lay bang cua /crm/list/
+    TT_ACCESS_TOKEN: str = ""                # token TikTok Business API - CNTT dan vao Render
+    TT_API_VERSION: str = "v1.3"             # ban Events API (tra 07/10/2026)
+    TT_EVENT_NAME: str = "VTOS_ChotTour"     # su kien CRM BAT BUOC la ten tuy chinh - khong
+                                             # dung duoc "Purchase". MKT phai khai DUNG ten nay
+                                             # trong Trinh quan ly su kien TikTok.
+
 
 settings = Settings()
 # Render/Heroku cấp DATABASE_URL dạng postgres:// – SQLAlchemy cần postgresql+psycopg2://

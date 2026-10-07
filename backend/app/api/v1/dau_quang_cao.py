@@ -23,6 +23,7 @@ from app.models.quang_cao import DauQuangCao, NEN_TANG_QUEN, LOAI_MA_QUEN, NGUON
 from app.services import access as AC
 from app.services import chuyen_doi_di as CD
 from app.services import gui_meta as GM
+from app.services import gui_tiktok as GT
 from app.services import dau_quang_cao as DQ
 from app.services import rules as R
 
@@ -227,6 +228,25 @@ def cd_cau_hinh_meta(u: User = Depends(require_roles(*XEM)), db: Session = Depen
     không báo lên Meta được nữa.
     """
     return {**GM.cau_hinh(), **GM.con_lai(db)}
+
+
+@router.post("/chuyen-doi/gui-tiktok", dependencies=[Depends(robot_auth)])
+def cd_gui_tiktok(gioi_han: int = 100, db: Session = Depends(get_db)):
+    """Đẩy chuyển đổi TikTok lên Events API, nguồn CRM.
+
+    Khác cửa Meta một điểm đáng nhớ: TikTok không công bố hạn tuổi nào cho sự kiện CRM,
+    nên ở đây không có trạng thái "quá hạn". Chạy hằng ngày vẫn là nếp đúng, nhưng lỡ một
+    ngày thì chưa mất gì.
+
+    Chưa có token thì cửa này trả về tình trạng thiếu gì và KHÔNG đụng vào dòng nào.
+    """
+    return GT.gui(db, gioi_han)
+
+
+@router.get("/chuyen-doi/cau-hinh-tiktok")
+def cd_cau_hinh_tiktok(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Bộ gửi TikTok đã cắm được chưa. KHÔNG trả token, chỉ trả có/không."""
+    return {**GT.cau_hinh(), **GT.con_lai(db)}
 
 
 @router.get("/chuyen-doi/bang-do")
