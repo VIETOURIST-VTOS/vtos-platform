@@ -19,10 +19,11 @@ cùng như kết quả thật của chiếc xe, rồi lấy nó ra quyết đị
 riêng một khối – đúng như bảng Excel đang làm – và ai muốn xem thử khi phân bổ thì phải CHỌN tiêu thức,
 và bảng ghi rõ đó là số phân bổ.
 """
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.models.fleet import Trip, TripCost, Maintenance, FleetPeriodCost, NHOM_CHI_PHI_KY
+from app.models.fleet import (Trip, TripCost, Maintenance, FleetPeriodCost, ExternalTxn,
+                              NHOM_CHI_PHI_KY, NGA_CHI_PHI, NGA_CUA_DOI_XE)
 from app.models.hr import Vehicle, Employee
 from app.services import fleet_settlement as QT
 
@@ -80,6 +81,56 @@ def _rong(v: Vehicle | None, vid: int | None) -> dict:
             "tai_xe": "", "so_chuyen": 0, "doanh_thu": 0.0, "chi_phi_chuyen": 0.0,
             "km": 0, "so_lit": 0.0, "ngay_khai_thac": set(), "chi_phi_xe": 0.0,
             "chi_tiet_cp_xe": {}}
+
+
+def ngoai_so(db: Session, d1: date, d2: date) -> dict:
+    """Tiền đã nạp vào `fleet_external_txns` mà KHÔNG nằm trong ba tầng chi phí của báo cáo.
+
+    Vì sao phải đếm, và vì sao phải in ra chứ không im: ba tầng đọc `fleet_trip_costs`,
+    `fleet_maintenance` và `fleet_period_costs`. Bảng giao dịch nguồn ngoài KHÔNG nằm trong số đó —
+    một dòng sao kê thẻ dầu hay một phiếu đề xuất chi Vietrip chỉ vào được sổ khi có người KHỚP nó
+    vào chuyến (thành `fleet_trip_costs`) hoặc NẠP nó qua cửa chi phí kỳ.
+
+    Đo trên hệ thật 07/10/2026: 1.121.825.494 đ nằm ở bảng ấy, cả 36 dòng chưa khớp chuyến, trong khi
+    báo cáo kỳ 08/2026 in LỢI NHUẬN 50,3%. Hai con số không nói chuyện với nhau, và màn hình không
+    nói ra là chúng không nói chuyện. Người đọc không có cách nào biết — đó mới là chỗ hỏng, chứ
+    không phải bản thân việc tiền chưa vào sổ.
+
+    Chia theo NGẢ vì chỉ hai ngả là chi phí đội xe (NGA_CUA_DOI_XE). Khoản của TOUR hay của CHỦ XE
+    nằm ở bảng này là đúng chỗ và KHÔNG thiếu gì cả — gộp chung vào một con số "còn thiếu" thì mỗi
+    tháng báo động một tỷ hai mà chẳng ai làm gì được, rồi quen dần và thôi nhìn."""
+    q = select(ExternalTxn).where(
+        ExternalTxn.thoi_diem >= datetime.combine(d1, datetime.min.time()),
+        ExternalTxn.thoi_diem <= datetime.combine(d2, datetime.max.time()),
+        ExternalTxn.trung == False,                       # noqa: E712 — bản lặp không tính
+        ExternalTxn.khong_phai_chi_phi == False,          # noqa: E712 — điều chuyển không phải chi phí
+        ExternalTxn.khop != "da_khop")                    # đã khớp thì đã thành dòng chi phí chuyến
+    rows = list(db.execute(q).scalars())
+    theo_nga: dict[str, dict] = {}
+    for t in rows:
+        k = t.nga or ""
+        o = theo_nga.setdefault(k, {"nga": k, "so_khoan": 0, "so_tien": 0.0})
+        o["so_khoan"] += 1
+        o["so_tien"] += (t.so_tien or 0)
+    cua_doi_xe = sum(o["so_tien"] for k, o in theo_nga.items() if k in NGA_CUA_DOI_XE)
+    chua_dinh_tuyen = theo_nga.get("", {}).get("so_tien", 0.0)
+    return {
+        "so_khoan": len(rows),
+        "tong": sum((t.so_tien or 0) for t in rows),
+        # Phần CHẮC CHẮN là chi phí đội xe mà vẫn chưa vào ba tầng – con số phải trừ thêm.
+        "cua_doi_xe": cua_doi_xe,
+        # Phần chưa ai đọc chứng từ. Chưa biết nó của ai, nên KHÔNG trừ và cũng không bỏ qua.
+        "chua_dinh_tuyen": chua_dinh_tuyen,
+        # Cờ `cua_doi_xe` do MÁY CHỦ trả, không để màn hình tự gõ lại danh sách hai ngả: gõ lại là
+        # ngày nào đó thêm một ngả mà hai bên hiểu khác nhau, và không ai biết bên nào đúng.
+        "theo_nga": [{**o, "cua_doi_xe": o["nga"] in NGA_CUA_DOI_XE,
+                      "ten": (NGA_CHI_PHI.get(o["nga"]) or "Chưa định tuyến — chưa ai đọc chứng từ")}
+                     for o in sorted(theo_nga.values(), key=lambda x: -x["so_tien"])],
+        "ghi_chu": ("Tiền đã nạp vào bảng giao dịch nguồn ngoài nhưng CHƯA nằm trong ba tầng chi phí "
+                    "ở trên. Lợi nhuận phía trên chưa trừ phần 'của đội xe' trong bảng này. Phần "
+                    "'chưa định tuyến' thì chưa biết của ai – định tuyến ở tab Đối soát nguồn ngoài "
+                    "của màn hình Hồ sơ xe."),
+    }
 
 
 def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
@@ -176,6 +227,8 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
         },
         "chi_tiet_chi_phi_doi": [{"nhom": k, "ten": NHOM_CHI_PHI_KY.get(k, (k,))[0], "so_tien": v}
                                  for k, v in sorted(chi_tiet_doi.items(), key=lambda kv: -kv[1])],
+        # Phần nằm NGOÀI ba tầng – xem ngoai_so(). In ra ngay cạnh lợi nhuận, không để ở cuối.
+        "ngoai_so": ngoai_so(db, d1, d2),
         "nhom_chi_phi_doi_chua_nhap": thieu,
         "ghi_chu": ("Ba tầng chi phí để riêng: chi phí chuyến, chi phí của xe, chi phí của đội. "
                     "Chi phí đội mặc định KHÔNG chia về từng xe – chia theo tiêu thức nào cũng ra một "

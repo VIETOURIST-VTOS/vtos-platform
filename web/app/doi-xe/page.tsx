@@ -39,6 +39,7 @@ function DoiXe() {
   const canNhap = ["cntt", "hcns", "tp_dh", "nv_dh", "ketoan", "chutich", "tgd", "gd_doi_xe"].includes(user?.role || "");
   const [form, setForm] = useState<any>(null);      // form nhật trình chuyến (thêm / sửa)
   const [formDX, setFormDX] = useState<any>(null);  // form đề xuất chi
+  const [formNga, setFormNga] = useState<any>(null); // form định tuyến một giao dịch nguồn ngoài
   const [dangLuu, setDangLuu] = useState(false);
 
   // Mục 4.9.6 "Bảo dưỡng & sửa chữa" của cây phân hệ trỏ thẳng vào tab này bằng ?tab=bao-duong.
@@ -108,6 +109,43 @@ function DoiXe() {
       setFormBD(null);
       await load();
     } catch (e) { toast(errMsg(e), true); } finally { setDangLuu(false); }
+  };
+
+  /** Định tuyến một giao dịch nguồn ngoài. Lý do là BẮT BUỘC ở máy chủ — đây là phán xét của người
+   *  đọc chứng từ, không phải phép tính, nên ba tháng sau phải còn căn cứ để trả lời "vì sao". */
+  const luuNga = async () => {
+    if (!formNga?.nga) return toast("Chọn ngả đã", true);
+    if (!formNga?.ly_do?.trim()) return toast("Phải ghi lý do chọn ngả này", true);
+    setDangLuu(true);
+    try {
+      const r = await api<any>("/fleet/giao-dich/dinh-tuyen", { method: "POST", json: {
+        ma_gd: [formNga.ma_gd], nga: formNga.nga, ly_do: formNga.ly_do,
+        bien_so: formNga.bien_so || "" } });
+      toast(`Đã định tuyến ${r.da_dinh_tuyen} khoản về "${r.nga_ten}"`);
+      setFormNga(null); await load();
+    } catch (e) { toast(errMsg(e), true); } finally { setDangLuu(false); }
+  };
+
+  /** Tra lại xe theo biển cho các dòng chưa gắn được xe. Cửa này cần vì `vehicle_id` được tra ĐÚNG
+   *  MỘT LẦN lúc nạp: sao kê về trước, hồ sơ xe nhập sau, và sau đó không gì tra lại. */
+  const traLaiXe = async () => {
+    try {
+      const r = await api<any>("/fleet/giao-dich/tra-lai-xe", { method: "POST" });
+      toast(`Đã gắn được ${r.da_gan} khoản. Không tra ra xe: ${r.khong_tra_ra_xe}. `
+            + `Không có biển số: ${r.khong_co_bien_so} – những dòng này phải định tuyến bằng tay.`);
+      await load();
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
+  /** Tính lại cờ chuyến theo luật kiểm hiện hành. Cờ được tính lúc GHI rồi lưu vào dòng, nên mỗi lần
+   *  luật đổi là các dòng cũ mang cờ của luật cũ — và không ai thấy. */
+  const tinhLaiCo = async () => {
+    try {
+      const r = await api<any>("/fleet/chuyen/tinh-lai-co", { method: "POST" });
+      toast(r.da_tinh_lai ? `Đã tính lại cờ cho ${r.da_tinh_lai} chuyến`
+                          : "Không chuyến nào đổi cờ – cờ đang khớp với luật kiểm hiện hành");
+      await load();
+    } catch (e) { toast(errMsg(e), true); }
   };
 
   const mo = async (id: number) => { try { setChon(await api(`/fleet/xe/${id}`)); } catch (e) { toast(errMsg(e), true); } };
@@ -242,8 +280,14 @@ function DoiXe() {
       </div>}
       <div className="panel wrap"><h2>Nhật trình chuyến</h2>
       <p className="muted">Km để trống nghĩa là <b>chưa đo</b>, không phải bằng 0. Cột &quot;Vietourist tạm ứng&quot; và &quot;Chủ xe chịu&quot; tách theo quy tắc chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe.</p>
-      {canNhap && !form && <button className="act teal" style={{ marginBottom: 10 }}
-        onClick={() => setForm({ ngay_di: "", ngay_ve: "" })}>+ Nhập phiếu chi phí xe</button>}
+      {canNhap && !form && <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="act teal" onClick={() => setForm({ ngay_di: "", ngay_ve: "" })}>+ Nhập phiếu chi phí xe</button>
+        {/* Cờ được tính lúc GHI rồi lưu vào dòng. Đo trên hệ thật 07/10/2026: cả 24 chuyến in rõ
+            "chưa có số GPS" ở cột km mà cột Cờ vẫn XANH, vì cờ lưu sẵn từ lần nạp trước — màn hình
+            và cờ nói hai điều khác nhau về cùng một chuyến. Cửa này chỉ tính lại cờ và lý do cờ:
+            không đổi trạng thái, không đổi km, không đổi tiền. */}
+        <button className="act grey" onClick={tinhLaiCo}>Tính lại cờ chuyến</button>
+      </div>}
       <table><thead><tr><th>Phiếu</th><th>Xe</th><th>Tour</th><th>Đi → về</th><th>Km chạy</th><th>Doanh thu</th><th>VTS tạm ứng</th><th>Chủ xe chịu</th><th>Cờ</th>{canNhap && <th></th>}</tr></thead>
         <tbody>{chuyen.length ? chuyen.map((t) => <tr key={t.id}>
           <td className="muted">{t.ma_phieu || `#${t.id}`}
@@ -271,6 +315,34 @@ function DoiXe() {
         </tr>) : <tr><td colSpan={canNhap ? 10 : 9} className="muted">Chưa có chuyến nào được ghi nhật trình.</td></tr>}</tbody></table>
       </div>
     </>}
+
+    {tab === "giaodich" && formNga && <div className="panel" style={{ borderColor: "var(--orange)" }}>
+      <h2>Định tuyến khoản {formNga.ma_gd}</h2>
+      {/* Vì sao hỏi NGẢ chứ không hỏi "của xe nào": phiếu đề xuất chi trên Vietrip gắn vào TOUR và
+          không có ô xe (khảo sát 05/9/2026 — bộ trường: tour · NCC · hình thức TT · loại tiền · dòng
+          dịch vụ). Hỏi mãi "của xe nào" thì mỗi tháng lại một nắm dòng không ai trả lời được. */}
+      <p className="muted">Khoản này chạy về đâu? Chỉ hai ngả <b>của một chiếc xe</b> và <b>của cả đội</b>
+        là chi phí đội xe. Ghi ngả KHÔNG tự cộng tiền vào báo cáo — khoản của đội vẫn phải nạp qua cửa
+        <b> Chi phí kỳ của đội xe</b>; cộng ở hai đường là tính hai lần đúng một khoản.</p>
+      <div className="grid2">
+        <label>Ngả
+          {/* Danh sách dựng từ máy chủ, không gõ lại ở đây. */}
+          <select value={formNga.nga} onChange={(e) => setFormNga({ ...formNga, nga: e.target.value })}>
+            <option value="">— chọn ngả —</option>
+            {Object.entries(gd?.nga_chi_phi || {}).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+          </select></label>
+        {formNga.nga === "xe" && <label>Biển số xe
+          <input value={formNga.bien_so || ""} onChange={(e) => setFormNga({ ...formNga, bien_so: e.target.value })}
+            placeholder="50F-034.71" /></label>}
+        <label style={{ gridColumn: "1 / -1" }}>Lý do (bắt buộc)
+          <input value={formNga.ly_do || ""} onChange={(e) => setFormNga({ ...formNga, ly_do: e.target.value })}
+            placeholder="VD: nạp quỹ thẻ dầu của cả đội, không phải chi phí của chiếc nào" /></label>
+      </div>
+      <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+        <button className="act teal" disabled={dangLuu} onClick={luuNga}>{dangLuu ? "Đang lưu…" : "Lưu ngả"}</button>
+        <button className="act grey" onClick={() => setFormNga(null)}>Đóng</button>
+      </div>
+    </div>}
 
     {tab === "giaodich" && formDX && <div className="panel">
       <h2>Lập đề xuất chi</h2>
@@ -321,15 +393,38 @@ function DoiXe() {
     </div>}
 
     {tab === "giaodich" && gd && <div className="panel wrap"><h2>Đối soát dữ liệu nguồn ngoài</h2>
-      {canNhap && !formDX && <button className="act teal" style={{ marginBottom: 10 }}
-        onClick={() => setFormDX({ ngay: new Date().toISOString().slice(0, 10) })}>+ Lập đề xuất chi</button>}
+      {canNhap && !formDX && <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="act teal" onClick={() => setFormDX({ ngay: new Date().toISOString().slice(0, 10) })}>+ Lập đề xuất chi</button>
+        <button className="act grey" onClick={traLaiXe}>Tra lại xe theo biển</button>
+      </div>}
       <div className="kpis">
         <div className="kpi"><b>{Number(gd.tong_chi_phi || 0).toLocaleString("vi-VN")}</b><span>chi phí (đã loại bản ghi lặp)</span></div>
         <div className="kpi"><b style={{ color: "var(--orange)" }}>{Number(gd.tong_chua_quy_ve_xe || 0).toLocaleString("vi-VN")}</b><span>chưa quy được về xe nào</span></div>
         <div className="kpi"><b className="muted">{Number(gd.tong_dieu_chuyen || 0).toLocaleString("vi-VN")}</b><span>điều chuyển tiền nội bộ – KHÔNG phải chi phí</span></div>
+        {gd.tong_chua_dinh_tuyen > 0 && <div className="kpi"><b style={{ color: "var(--orange)" }}>{Number(gd.tong_chua_dinh_tuyen).toLocaleString("vi-VN")}</b><span>chưa định tuyến – chưa biết của xe, của đội hay của tour</span></div>}
         {gd.tong_chua_quy_ve_vi > 0 && <div className="kpi"><b style={{ color: "var(--orange)" }}>{Number(gd.tong_chua_quy_ve_vi).toLocaleString("vi-VN")}</b><span>ePass chưa ghi tài khoản – chưa quy về pháp nhân nào</span></div>}
       </div>
       <p className="muted">{gd.ghi_chu} Biển số được tra về xe theo <b>thời điểm giao dịch</b>, không theo biển hiện tại — xe đổi biển giữa kỳ vẫn gộp đúng về một chiếc.</p>
+      {/* Chia theo NGẢ. Trước 07/10/2026 màn hình chỉ có MỘT con số "chưa quy được về xe nào", và
+          trên hệ thật nó bằng ĐÚNG tổng chi phí — 1.121.825.494 đ, 100%, cả 36 dòng. Con số ấy đọc
+          ra như "chi phí đội xe chưa gắn xe", trong khi phần lớn là khoản của TOUR: phiếu đề xuất
+          chi trên Vietrip gắn vào tour và KHÔNG có ô xe (khảo sát 05/9/2026). Gộp hai thứ khác bản
+          chất vào một con số thì mỗi tháng báo động một tỷ hai mà không ai làm được gì — rồi quen
+          dần và thôi nhìn. */}
+      {gd.theo_nga?.length > 0 && <>
+        <h3>Chia theo ngả</h3>
+        <table><thead><tr><th>Ngả</th><th>Của đội xe?</th><th>Số khoản</th><th>Số tiền</th></tr></thead>
+          <tbody>{gd.theo_nga.map((n: any) => <tr key={n.nga || "chua"}>
+            <td>{n.nga ? n.ten : <Tag cls="warn">{n.ten}</Tag>}</td>
+            <td>{n.nga ? (n.cua_doi_xe ? <b>có</b> : <span className="muted">không</span>) : <span className="muted">—</span>}</td>
+            <td>{n.so_khoan}</td>
+            <td className="num">{Number(n.so_tien).toLocaleString("vi-VN")}</td>
+          </tr>)}</tbody></table>
+        <p className="muted">Chỉ hai ngả <b>của một chiếc xe</b> và <b>của cả đội</b> là chi phí đội xe.
+          Khoản của <b>tour</b> nằm ở bảng này là đúng chỗ, không thiếu gì cả. Khoản của <b>chủ xe</b>
+          đi qua khối quyết toán chủ xe — cộng cả hai nơi là tính hai lần đúng một khoản.</p>
+      </>}
+
       {/* Chia theo VÍ ePass. Đội xe đi đường bằng hai ví của hai pháp nhân khác nhau; cộng chung thì
           tổng vẫn đúng mà phần của từng bên sai — nên không ai nhìn ra. Phần "chưa ghi tài khoản" là
           nợ số liệu của các kỳ cũ: nạp lại tệp có cột tài khoản là hết, KHÔNG chia hộ theo tỷ lệ. */}
@@ -349,17 +444,23 @@ function DoiXe() {
         <tbody>{gd.theo_nhom.map((n: any) => <tr key={n.nhom}>
           <td>{n.nhom}</td><td>{n.so_khoan}</td><td className="num">{Number(n.so_tien).toLocaleString("vi-VN")}</td>
         </tr>)}</tbody></table>}
-      <table><thead><tr><th>Nguồn</th><th>Mã giao dịch</th><th>Thời điểm</th><th>Biển / thẻ</th><th>Xe</th><th>Nhóm</th><th>Số tiền</th><th>Trạng thái</th></tr></thead>
+      <table><thead><tr><th>Nguồn</th><th>Mã giao dịch</th><th>Thời điểm</th><th>Biển / thẻ</th><th>Xe</th><th>Nhóm</th><th>Ngả</th><th>Số tiền</th><th>Trạng thái</th></tr></thead>
         <tbody>{gd.rows.length ? gd.rows.map((r: any) => <tr key={r.id}>
           <td>{r.source_ten || (r.source === "epass" ? "ePass/VETC" : "Thẻ dầu")}</td><td>{r.ma_gd}</td><td>{fmtDT(r.thoi_diem)}</td>
           <td>{r.bien_so || (r.the_4so ? `••••${r.the_4so}` : "")}
             {r.source === "epass" && <div className="muted">{r.vi || (r.tai_khoan ? `ví ${r.tai_khoan} – chưa khai` : "chưa ghi ví")}</div>}</td>
           <td>{r.xe || (r.khong_phai_chi_phi ? <span className="muted">không thuộc xe nào</span> : <Tag cls="red">chưa tra được xe</Tag>)}</td>
           <td className="muted">{r.nhom || ""}</td>
+          <td>{r.nga ? <><span>{r.nga_ten}</span>{r.nga_ly_do && <div className="muted">{r.nga_ly_do}</div>}
+              {r.nga_boi && <div className="muted">— {r.nga_boi}</div>}</>
+            : <Tag cls="warn">chưa định tuyến</Tag>}
+            {canNhap && <div><button className="act grey" onClick={() => setFormNga({
+              ma_gd: r.ma_gd, nga: r.nga || "", ly_do: "", bien_so: r.bien_so || "" })}>
+              {r.nga ? "Đổi ngả" : "Định tuyến"}</button></div>}</td>
           <td className="num">{r.so_tien.toLocaleString("vi-VN")}</td>
           <td><Tag cls={r.co === "do" ? "red" : "warn"}>{r.khop === "da_khop" ? "Đã khớp chuyến" : "Chưa khớp chuyến"}</Tag>
             {r.ghi_chu && <div className="muted">{r.ghi_chu}</div>}</td>
-        </tr>) : <tr><td colSpan={8} className="muted">Chưa nhập sao kê thẻ dầu, báo cáo ePass hay đề xuất chi Vietrip nào.</td></tr>}</tbody></table>
+        </tr>) : <tr><td colSpan={9} className="muted">Chưa nhập sao kê thẻ dầu, báo cáo ePass hay đề xuất chi Vietrip nào.</td></tr>}</tbody></table>
     </div>}
 
     {tab === "quyettoan" && <>

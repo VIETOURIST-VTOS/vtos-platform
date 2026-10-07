@@ -225,18 +225,38 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "4.1", ten: "Tổng quan điều hành", href: "/bao-cao?pham_vi=dieu_hanh" },
       { ma: "4.2", ten: "Danh mục tour", href: "/products" },
       { ma: "4.3", ten: "Yêu cầu điều hành", href: "/requests" },
+      // 07/10/2026 — SỬA NHÃN, không dựng gì mới. Trang mục lục đếm mục KHÔNG có `href` là "Chưa
+      // dựng", nên bảy mục dưới đây bị khai là còn nợ trong khi chúng CÓ THẬT, chỉ nằm dưới tên khác
+      // trong trang chi tiết chuyến. Đã bấm thử từng tab trên hệ thật và đọc `tours/[id]/page.tsx`
+      // ngày 07/10/2026 để đối chiếu từng mục, chứ không suy từ tên tab.
+      //
+      // Vì sao đáng sửa: đây là trang Chủ tịch mở ra để biết hệ thống còn nợ gì. Nó đang nói
+      // "11/20 màn hình" trong khi sự thật là 11 màn hình + 7 tab + 2 mục thiếu. Một mục lục nói sai
+      // về chính hệ thống thì mọi quyết định đọc từ nó đều lệch — và lệch theo chiều làm người ta
+      // dựng lại cái đã có.
       { ma: "4.4", ten: "Điều hành tour", href: "/tours",
         con: [
-          { ma: "4.4.1", ten: "Tổng quan chuyến" },
-          { ma: "4.4.2", ten: "Chương trình" },
-          { ma: "4.4.3", ten: "Danh sách khách" },
-          { ma: "4.4.4", ten: "Dịch vụ" },
-          { ma: "4.4.5", ten: "Nhân sự" },
-          { ma: "4.4.6", ten: "Dự toán" },
+          { ma: "4.4.1", ten: "Tổng quan chuyến — tab «Thông tin & quy trình»", tab: true },
+          // CHỈ XEM: khối "Chương trình tour (từ sản phẩm)" trên tab Thông tin in nguyên văn chương
+          // trình của SẢN PHẨM. Chưa có lịch trình từng ngày của riêng chuyến, và chưa sửa được theo
+          // chuyến — nên không gọi là xong, cũng không gọi là chưa có gì.
+          { ma: "4.4.2", ten: "Chương trình — chỉ XEM, lấy từ sản phẩm; chưa sửa được theo chuyến",
+            tab: true },
+          { ma: "4.4.3", ten: "Danh sách khách — tab «Booking & thu tiền»", tab: true },
+          { ma: "4.4.4", ten: "Dịch vụ — tab «Chi NCC & quyết toán»", tab: true },
+          { ma: "4.4.5", ten: "Nhân sự — tab «HDV & xe»", tab: true },
+          { ma: "4.4.6", ten: "Dự toán — tab «Dự toán 3 con số»", tab: true },
+          // THIẾU THẬT. Sự cố & phát sinh có màn hình riêng (4.6) nhưng không gắn vào chuyến: trang
+          // chi tiết chuyến không có một chữ "sự cố" nào (đã đếm trong mã, 0 lần).
           { ma: "4.4.7", ten: "Phát sinh" },
-          { ma: "4.4.8", ten: "Quyết toán" },
-          { ma: "4.4.9", ten: "Tài liệu & lịch sử" }
+          { ma: "4.4.8", ten: "Quyết toán — tab «Quyết toán chi tiết»", tab: true },
+          // Cả hai nửa đều có: tab Quy trình & lịch sử gồm ô đính kèm tài liệu, dòng thời gian các
+          // bước, và nhật ký bất biến.
+          { ma: "4.4.9", ten: "Tài liệu & lịch sử — tab «Quy trình & lịch sử»", tab: true }
         ] },
+      // Hợp đồng thuê xe riêng (Chủ tịch chọn 07/10/2026, đã chạy thật từ PR #211): một loại chuyến
+      // mới `thue_xe`, lập ngay trên danh sách tour. `them: true` vì bản vẽ v1.3 không có mục này.
+      { ma: "4.4b", ten: "Hợp đồng thuê xe riêng", href: "/tours", them: true },
       // TC-71 · 19/9/2026 — "Sổ chuyến còn nợ" là CON của 4.5, không phải một mã cấp một mới.
       // Nó là mặt còn thiếu của chính "Quyết toán tour": bên kia là mọi chuyến, bên này là những
       // chuyến chưa đóng sổ. Làm con thì bản vẽ v1.3 vẫn đọc được theo mã, và `lay: [... "4.5" ...]`
@@ -260,9 +280,14 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "4.9.4", ten: "Bảng giá vận tải", href: "/ops?tab=fleet" },
           { ma: "4.9.5", ten: "Lịch & lệnh điều xe", href: "/lenh-dieu-xe" },
           { ma: "4.9.6", ten: "Bảo dưỡng & sửa chữa", href: "/doi-xe?tab=bao-duong" },
-          { ma: "4.9.7", ten: "Quyết toán chuyến xe" },
+          // Đã bấm thử trên hệ thật 07/10/2026: tab "Chủ xe & quyết toán" của màn hình Hồ sơ xe.
+          { ma: "4.9.7", ten: "Quyết toán chuyến xe — tab «Chủ xe & quyết toán» của Hồ sơ xe",
+            tab: true },
           { ma: "4.9.8", ten: "Hiệu quả khai thác", href: "/hieu-qua-doi-xe" },
-          { ma: "4.9.9", ten: "Lãi lỗ đội xe", href: "/lai-lo-doi-xe", them: true }
+          { ma: "4.9.9", ten: "Lãi lỗ đội xe", href: "/lai-lo-doi-xe", them: true },
+          // Cửa BÁO HƯ HỎNG XE (Chủ tịch chọn 06/10/2026, đã chạy thật từ PR #200). Chạy được từ
+          // ngày ấy mà KHÔNG có mục nào trong cây, nên không ai tìm ra nó từ mục lục.
+          { ma: "4.9.10", ten: "Báo hư hỏng xe", href: "/doi-xe?tab=bao-hong", them: true }
         ] },
       { ma: "4.10", ten: "Hướng dẫn viên",
         con: [
@@ -280,7 +305,12 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "5.1", ten: "Tổng quan nhân sự" },
       { ma: "5.2", ten: "Hồ sơ nhân sự", href: "/hr?tab=employees" },
       { ma: "5.3", ten: "Hợp đồng nhân sự", href: "/hop-dong-lao-dong" },
-      { ma: "5.4", ten: "Chấm công & nghỉ phép" },
+      // 07/10/2026 — mục này đang khai là "Chưa dựng", và đó là nói SAI: từ PR #206 một tài xế hoặc
+      // hướng dẫn viên ĐÃ gửi được đơn nghỉ phép / ốm đau / vắng việc trên màn hình /xe-hdv, và
+      // người ký đơn thấy đơn của phòng mình. Nhưng chín phòng còn lại thì cửa máy chủ nhận đơn mà
+      // chưa có màn hình nào gọi tới — nên cũng không gọi là xong được. Tên mục nói đúng chỗ đang
+      // đứng, vì cây này không có trạng thái "làm một nửa".
+      { ma: "5.4", ten: "Chấm công & nghỉ phép — hiện chỉ có cửa cho tài xế & HDV", href: "/xe-hdv" },
       { ma: "5.5", ten: "Lương & thu nhập", href: "/hr?tab=payroll" },
       { ma: "5.6", ten: "Đánh giá nhân sự", href: "/hr?tab=incidents" },
       { ma: "5.7", ten: "Hồ sơ sự vụ", href: "/hr?tab=incidents" },
