@@ -502,8 +502,8 @@ PHAM_VI_DA_CHOT = {
     # lấy /xe-hdv từ danh sách CHO PHÉP chứ không từ ma trận. KHÔNG cho họ "/api/v1/leave-balance":
     # cửa ấy trả quỹ phép của CẢ CÔNG TY cho nhóm HR_READ và chỉ quỹ phép của chính mình cho người
     # khác — với người ký thì nó vừa thừa vừa vô dụng, nên không mở.
-    "chutich": 124, "tgd": 124, "bks": 124, "cntt": 121,
-    "ketoan": 101, "tp_dh": 92, "ptgd_doan": 73, "nv_dh": 65, "hcns": 64, "gd_kd": 65,
+    "chutich": 125, "tgd": 125, "bks": 125, "cntt": 122,
+    "ketoan": 101, "tp_dh": 93, "ptgd_doan": 73, "nv_dh": 66, "hcns": 64, "gd_kd": 66,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -524,7 +524,7 @@ PHAM_VI_DA_CHOT = {
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 48, "nv_kd": 48, "tn_kd": 48, "tp_kd": 50, "nv_mkt": 36,
+    "ptgd_mkt": 49, "nv_kd": 49, "tn_kd": 49, "tp_kd": 51, "nv_mkt": 37,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -549,7 +549,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 124, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 125, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

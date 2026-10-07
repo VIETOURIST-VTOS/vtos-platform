@@ -32,6 +32,7 @@ CUA_TAY = (
     "auto_reports", "ban_doc_chung_tu", "bang_gia", "bang_gia_dong", "bank_accounts_cat",
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",
     "campaigns", "care_tickets", "cash_plan_items", "chot_so_du", "companies", "complaints",
+    "dau_quang_cao",
     "content_items",
     "conversations", "daily_reports",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của

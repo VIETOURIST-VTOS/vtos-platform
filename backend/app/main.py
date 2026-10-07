@@ -40,6 +40,7 @@ from app.api.v1.ngoai_le import router as ngoai_le_router
 from app.api.v1.kiem_soat import router as kiem_soat_router
 from app.api.v1.hach_toan import router as hach_toan_router
 from app.api.v1.cskh import router as cskh_router
+from app.api.v1.dau_quang_cao import router as dau_quang_cao_router
 from app.api.v1.ban_hang import router as ban_hang_router
 from app.api.v1.tu_dong import router as tu_dong_router
 from app.api.v1.bao_cao import router as bao_cao_router
@@ -304,6 +305,7 @@ app.include_router(ngoai_le_router)
 app.include_router(kiem_soat_router)
 app.include_router(hach_toan_router)
 app.include_router(cskh_router)
+app.include_router(dau_quang_cao_router)
 app.include_router(ban_hang_router)
 app.include_router(tu_dong_router)
 app.include_router(bao_cao_router)

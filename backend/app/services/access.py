@@ -386,7 +386,7 @@ MAN_HINH_API = {
     # cấp cho Kế toán một đường vòng vào bảng điều hành của Chủ tịch.
     "/ke-hoach-thang": ("/api/v1/ke-hoach",),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
-    "/leads": ("/api/v1/leads", "/api/v1/zalo"),
+    "/leads": ("/api/v1/leads", "/api/v1/zalo", "/api/v1/dau-quang-cao"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
     # 18/9/2026 – THÊM "/api/v1/leads" VÀ "/api/v1/noi-dung", anh Tuấn chốt cùng ngày.
     #
