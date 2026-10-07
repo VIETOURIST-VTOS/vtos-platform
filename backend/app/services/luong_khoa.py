@@ -153,6 +153,10 @@ def kiem_co_so(db: Session, run: PayrollRun) -> list[dict]:
                        "thong_diep": f"{r.get('ma')} – thực nhận âm {tn:,.0f}; cần người xác nhận trước khi trình",
                        "bang_chung": {"ma_nv": r.get("ma"), "thuc_nhan": tn}})
 
+    # 5 · Chống trùng thu nhập liên phòng, liên kỳ. Ba phép, xem services/thu_nhap_su_kien.py.
+    from app.services import thu_nhap_su_kien as TN
+    co.extend(TN.kiem_trung(db, run.period, run.rows or []))
+
     return co
 
 
@@ -180,6 +184,10 @@ def khoa(db: Session, run: PayrollRun, u: User) -> BangLuongKhoa:
                       khoa_boi=u.username, khoa_vai=u.role, khoa_luc=datetime.now())
     db.add(b)
     db.flush()
+    # Ghi sổ sự kiện thu nhập TRONG CÙNG GIAO DỊCH với bản khóa. Tách ra một bước sau nghĩa là có
+    # một khoảnh khắc kỳ đã ký mà sổ chưa ghi, và mọi lần hỏng đều rơi đúng vào khoảnh khắc ấy.
+    from app.services import thu_nhap_su_kien as TN
+    TN.ghi_so(db, run.period, run.rows or [], ban_khoa_id=b.id)
     return b
 
 

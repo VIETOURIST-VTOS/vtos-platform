@@ -200,6 +200,7 @@ CUA_TAY = (
 # Máy sinh – bảng KHÔNG cần cửa nhập, kèm lý do. Xem ghi chú đầu tệp: không viết được lý do nghĩa là
 # chưa chắc nó máy sinh.
 MAY_SINH = {
+    "su_kien_thu_nhap": "Sổ ghi khoản thu nhập đã KÝ, do services/luong_khoa.khoa ghi đúng lúc có chữ ký. Không có cửa là TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: gõ tay được vào sổ này thì xoá được dấu vết một lần đã trả, mà đó đúng là thứ nó sinh ra để giữ.",
     "ai_runs": "Nhật ký robot chạy – hệ thống tự ghi, không ai nhập tay.",
     "ks_bao_cao": "Báo cáo robot Kiểm soát tự lập.",
     "ks_cot_tien": "Cột tiền robot Kiểm soát tự dựng từ sổ.",
