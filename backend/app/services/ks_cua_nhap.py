@@ -192,6 +192,23 @@ MAY_SINH = {
     "cong_no_vietrip_anh": "Ảnh chụp công nợ do lịch chạy 8h sáng nạp từ Vietrip qua /cong-no-vietrip/nap "
                            "– số của Vietrip, không nhập tay.",
     "cong_no_vietrip_dong": "Dòng của ảnh chụp công nợ Vietrip – nạp cùng ảnh, không nhập tay.",
+    # 29/9/2026 thêm cặp bảng PHẢI TRẢ NCC theo dự toán tour, và quên khai ở đây. Hệ quả đo được
+    # 06/10: `test_cn1` ĐỎ TRÊN CHÍNH main, nên mọi nhánh của mọi làn đỏ theo và không gì gộp được
+    # suốt sáu ngày — main không nhúc nhích từ 30/9.
+    #
+    # Khai MÁY SINH chứ không khai cửa tay, cùng lý do và cùng chữ với cặp bảng anh em ngay trên:
+    # số đến từ khối "Thống kê thu chi" của trang Quyết toán tour trên Vietrip, vào qua
+    # POST /cong-no-vietrip/nap-phai-tra theo từng ẢNH một ngày, và `con_phai_chi` do MÁY CHỦ tính
+    # (tong_chi − da_chi). Gõ tay một dòng ở đây là bịa ra một con số Vietrip chưa từng nói; muốn
+    # sửa số thì sửa trên Vietrip rồi nạp ảnh mới.
+    #
+    # Khai ở đây KHÔNG phải là lối thoát cho một bảng thiếu cửa — cửa có thật và gọi tên được ngay
+    # trên. Nếu mai kia cặp bảng này nhận số do người gõ từng dòng thì phải gỡ hai dòng này ra và
+    # dựng cửa nhập thật.
+    "phai_tra_vietrip_anh": "Ảnh phải trả NCC theo dự toán tour, nạp từ Vietrip qua "
+                            "/cong-no-vietrip/nap-phai-tra – số của Vietrip, không nhập tay.",
+    "phai_tra_vietrip_dong": "Dòng của ảnh phải trả NCC Vietrip – nạp cùng ảnh; còn phải chi do máy "
+                             "chủ tính = tổng chi − đã chi, không nhập tay.",
     # Nối tài khoản Zalo (19/9/2026). Hai bảng, và CẢ HAI đều máy sinh — nhưng vì hai lý do khác
     # nhau, nên chép ra đây cả hai chứ không gộp một dòng:
     #
