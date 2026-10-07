@@ -10,8 +10,22 @@ import { Tag, errMsg } from "@/components/ui";
 const TABS_HR: [string, string][] = [["payroll", "Bảng lương"], ["employees", "Hồ sơ nhân sự"], ["incidents", "Đánh giá & sự vụ"]];
 const TABS_OPS: [string, string][] = [["visa", "Hồ sơ visa"], ["guides", "HDV & phân chuyến"], ["fleet", "Đội xe"]];
 const CD: Record<string, string> = { cham_cong: "Chấm công ngày", bao_cao_ngay: "Báo cáo ngày", theo_chuyen: "Theo chuyến", luong_cong_tac_phi: "Lương + công tác phí" };
-const PST: Record<string, [string, string]> = { nhap: ["Robot nháp", "warn"], kt_xac_nhan: ["Kế toán đã xác nhận cơ sở", "navy"], hcns_lap: ["HCNS đã lập – chờ TGĐ", "warn"], tgd_ky: ["TGĐ đã ký lô", "ok"] };
-const NEXT: Record<string, [string, string]> = { nhap: ["ketoan", "Kế toán xác nhận cơ sở"], kt_xac_nhan: ["hcns", "HCNS lập bảng lương"], hcns_lap: ["tgd", "TGĐ ký lô & ghi sổ"] };
+// Tên trạng thái CŨ giữ nguyên trong bảng này: những kỳ đã chạy qua chuỗi cũ vẫn mang tên cũ, và
+// màn hình phải đọc được lịch sử chứ không chỉ đọc được hiện tại.
+const PST: Record<string, [string, string]> = {
+  nhap: ["Robot nháp", "warn"], da_kiem_co_so: ["Đã kiểm cơ sở – chờ HCNS", "navy"],
+  hcns_kiem: ["HCNS đã kiểm – chờ Chủ tịch/TGĐ ký", "warn"], da_ky: ["Đã ký & khóa", "ok"],
+  kt_xac_nhan: ["Kế toán đã xác nhận cơ sở (chuỗi cũ)", "navy"],
+  hcns_lap: ["HCNS đã lập (chuỗi cũ)", "warn"], tgd_ky: ["TGĐ đã ký lô (chuỗi cũ)", "ok"] };
+// Bước kế tiếp: [các vai làm được, nhãn nút]. DANH SÁCH vai chứ không phải một vai — chữ ký cuối
+// mở cho Chủ tịch HOẶC TGĐ (quyết định 07/10/2026), và một ô chỉ chứa được một vai thì màn hình
+// lại giấu nút của Chủ tịch đúng như bảng cũ đã giấu cột của ông.
+// Ẩn nút KHÔNG phải hàng rào: hàng rào nằm ở require_roles và ở hàm advance của máy chủ.
+const NEXT: Record<string, [string[], string]> = {
+  da_kiem_co_so: [["hcns"], "HCNS kiểm xong – trình ký"],
+  hcns_kiem: [["chutich", "tgd"], "Ký & khóa kỳ lương"],
+  kt_xac_nhan: [["hcns"], "HCNS kiểm xong – trình ký"],
+  hcns_lap: [["chutich", "tgd"], "Ký & khóa kỳ lương"] };
 const lastMonth = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); };
 
 export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
@@ -39,6 +53,10 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const [phieu, setPhieu] = useState<any>(null);
   const [phapNhan, setPhapNhan] = useState<any>(null);
   const [xungDot, setXungDot] = useState<any>(null);
+  // Danh sách cờ của lần kiểm cơ sở gần nhất. RỖNG khác CHƯA CHẠY: `null` là chưa bấm kiểm lần nào,
+  // còn `[]` là đã kiểm và không còn gì phải xử lý. Gộp hai cái thành một là nói với người dùng
+  // rằng bảng sạch trong khi chưa ai kiểm.
+  const [co, setCo] = useState<any[] | null>(null);
   const [cong, setCong] = useState<Record<string, string>>({});
   const [visa, setVisa] = useState<any[]>([]);
   const [asg, setAsg] = useState<any[]>([]);
@@ -74,6 +92,15 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     if (tab === "incidents") { api("/incidents").then(setInc); api("/incident-levels").then(setIncMeta); }
   }, [tab, period]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
+  const kiemCoSo = async () => {
+    try {
+      const r = await api<any>(`/payroll-runs/${period}/kiem-co-so`, { method: "POST" });
+      setCo(r.co || []);
+      toast(r.message);
+      load();
+    } catch (x) { toast(errMsg(x), true); }
+  };
+
   const post = async (path: string, json?: any, method = "POST") => { try { const r = await api(path, { method, json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
   const guides = emps.filter((e) => e.department === "huong_dan");
   const empName = (id: number) => emps.find((e) => e.id === id)?.full_name || id;
@@ -106,7 +133,17 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
       </div>
       <p><Tag cls={PST[run.status]?.[1]}>{PST[run.status]?.[0]}</Tag> {run.kt_confirmed_by && <span className="muted"> · KT {run.kt_confirmed_by} {fmtDT(run.kt_confirmed_at)}</span>}{run.hcns_by && <span className="muted"> · HCNS {run.hcns_by} {fmtDT(run.hcns_at)}</span>}{run.tgd_by && <span className="muted"> · TGĐ {run.tgd_by} {fmtDT(run.tgd_at)} · {run.entry_ids?.length} chứng từ</span>}
         {run.status === "nhap" && ["hcns", "ketoan", "cntt"].includes(role) && <button className="act grey" onClick={() => api(`/payroll-runs/${period}?refresh=true`).then(setRun).then(() => toast("Đã tính lại nháp")).catch((e) => toast(errMsg(e), true))}>Tính lại nháp</button>}
-        {NEXT[run.status] && NEXT[run.status][0] === role && <button className="act teal" onClick={() => post(`/payroll-runs/${period}/advance`)}>{NEXT[run.status][1]}</button>}</p>
+        {run.status === "nhap" && ["hcns", "cntt"].includes(role) && <button className="act" onClick={() => kiemCoSo()}>Kiểm cơ sở</button>}
+        {NEXT[run.status] && NEXT[run.status][0].includes(role) && <button className="act teal" onClick={() => post(`/payroll-runs/${period}/advance`)}>{NEXT[run.status][1]}</button>}</p>
+      {co !== null && <div className="panel"><h2>Kiểm cơ sở · {co.length} điều cần biết</h2>
+        <p className="muted">Quy tắc xác định, không phải suy đoán: cùng đầu vào luôn ra cùng danh sách.
+          <b> Không có cờ nghĩa là những thứ đã biết cách kiểm đều sạch, không nghĩa là bảng đúng.</b></p>
+        {co.length === 0 ? <p className="muted">Không còn điều gì phải xử lý.</p> :
+          <table><thead><tr><th>Mức</th><th>Mã</th><th>Nội dung</th></tr></thead><tbody>
+            {co.map((c: any, i: number) => <tr key={i}>
+              <td><Tag cls={c.muc === "chan" ? "red" : "warn"}>{c.muc === "chan" ? "Chặn" : "Cảnh báo"}</Tag></td>
+              <td className="mono">{c.ma}</td><td>{c.thong_diep}</td></tr>)}
+          </tbody></table>}</div>}
       <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th>HĐ</th><th>Chế độ công</th><th style={{ textAlign: "right" }}>Lương CB</th><th style={{ textAlign: "right" }}>Biến đổi</th><th style={{ textAlign: "right" }}>BHXH</th><th style={{ textAlign: "right" }}>Đoàn phí</th><th style={{ textAlign: "right" }}>TNCN</th><th style={{ textAlign: "right" }}>Thực nhận</th><th>Ghi chú robot</th></tr></thead>
         <tbody>{run.rows.map((r: any) => <>
           <tr key={r.ma} style={{ cursor: "pointer" }} onClick={() => setOpen(open === r.ma ? null : r.ma)}><td className="mono">{r.ma}</td><td><b>{r.ten}</b></td><td>{meta.departments[r.phong] || r.phong}<div className="muted">{meta.positions[r.chuc_vu]}</div></td><td>{r.hop_dong === "hdld" ? "HĐLĐ" : "CTV"}</td><td className="muted">{CD[r.che_do_cong] || ""}</td>

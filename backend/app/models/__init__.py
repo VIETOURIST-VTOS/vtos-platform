@@ -8,6 +8,7 @@ from app.models.banks import *  # noqa
 # nhắc cùng một điều ở tệp này: bảng khai dưới app/models mà thiếu dòng nhập ở đây thì
 # `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate đòi XOÁ bảng.
 from app.models.hdv import *  # noqa
+from app.models.luong_khoa import *  # noqa
 from app.models.hr import *  # noqa
 from app.models.hrm import *  # noqa
 from app.models.ops import *  # noqa
@@ -107,12 +108,6 @@ from app.models.kol import *  # noqa
 # nhắc cùng một điều ở tệp này: bảng khai dưới app/models mà thiếu dòng nhập ở đây thì
 # `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate đòi XOÁ bảng.
 from app.models.tai_khoan_da_xoa import *  # noqa
-
-# TC-103 · 07/10/2026. Dấu nguồn quảng cáo. Mang khoá ngoài sang `leads` nên đứng SAU crm. Lần
-# thứ MƯỜI HAI nhắc cùng một điều ở tệp này: bảng khai dưới app/models mà thiếu dòng nhập ở đây
-# thì `import app.models` không thấy nó, create_all không tạo, và alembic autogenerate đòi XOÁ
-# bảng.
-from app.models.quang_cao import *  # noqa
 
 # CSKH tự động · 25/9/2026. Đánh giá sau tour do KHÁCH tự chấm, và mã khảo sát dùng một lần cho
 # cửa công khai. Mang khoá ngoài sang `care_tickets`, `bookings`, `tours` nên đứng SAU cskh và
