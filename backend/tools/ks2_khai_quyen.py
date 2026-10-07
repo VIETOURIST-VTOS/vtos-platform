@@ -114,6 +114,13 @@ CHAN_TANG_DICH_VU: dict[str, str] = {
     "PUT /api/v1/non-package/{bid}": "nonpackage:update",
     "POST /api/v1/products/{pid}/open-tour": "products:open_tour",
     "POST /api/v1/payment-requests/{rid}/step": "ops:step",
+    # Phòng HDV · Chủ tịch quyết 07/10/2026 (lối (a) trong hai lối đã trình). Cửa quyết định của một
+    # bước duyệt chặn theo DỮ LIỆU chứ không theo vai trò cố định: bước đang chờ cần vai nào thì chỉ
+    # vai ấy ký được, và danh sách vai ấy nằm trong bảng cấu hình ĐÃ CÓ CHỮ KÝ, không nằm trong mã.
+    # Khai một danh sách vai ở chữ ký hàm sẽ chặn đúng những cấp mà người ký vừa thêm — tức là mã
+    # phủ quyết chữ ký. Ba hàng rào thật nằm trong hdv.kiem_nguoi_quyet: đúng vai của bước đang chờ,
+    # không phải người trình, và bước chưa ai quyết.
+    "POST /api/v1/guide-assignments/de-xuat/{did}/quyet": "hdv:kiem_nguoi_quyet",
 }
 
 # Dấu hiệu "có chặn" khi đọc thân hàm. Cố ý nhận cả cổng MỘT CỬA theo người phụ trách

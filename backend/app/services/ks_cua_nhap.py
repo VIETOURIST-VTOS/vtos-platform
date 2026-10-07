@@ -50,7 +50,23 @@ CUA_TAY = (
     "fleet_period_costs", "fleet_repayment_installments", "fleet_repayment_plans",
     "fleet_sale_cases", "fleet_settlement_lines", "fleet_settlements", "fleet_shared_invoice_lines",
     "fleet_shared_invoices", "fleet_trip_costs", "fleet_trips", "fleet_verifications",
-    "guide_assignments", "guide_rates", "hop_dong_khach", "incidents", "intake_runs", "invoices",
+    "guide_assignments", "guide_rates",
+    # Phòng Hướng dẫn, 06-07/10/2026. Năm bảng, năm cửa nhập tay THẬT, không bảng nào máy sinh:
+    #   yeu_cau_hdv      – khung "Yêu cầu HDV" trên /huong-dan (Điều hành ĐẶT HÀNG).
+    #   bao_cao_sau_tour – khung "Báo cáo sau tour của tôi" trên /xe-hdv (chính HDV nộp), và vòng
+    #                      kiểm của TP HD ở thẻ "Báo cáo sau tour" trên /huong-dan.
+    #   tam_ung_hdv      – khung Tiền HDV trên /huong-dan; Kế toán ghi số tiền thực nhận/nộp lại.
+    #   de_xuat_hdv      – thẻ "Đề xuất" trên /huong-dan.
+    #   cau_hinh_duyet_hdv – cùng thẻ ấy: cửa trình cấu hình, và nút công bố của Chủ tịch/TGĐ.
+    # CỐ Ý không có bộ nạp tệp cho bảng nào: cả năm là việc xảy ra từng lần một, ngay lúc nó xảy ra,
+    # và mỗi dòng cần một người chịu trách nhiệm chứ không phải một tệp tải lên hàng loạt.
+    # buoc_duyet_hdv: DÒNG do máy lập (đủ các bước ngay lúc trình), nhưng NỘI DUNG của mỗi dòng —
+    # ai quyết, lúc nào, ý kiến gì — là người gõ vào, qua nút Duyệt / Trả bổ sung / Từ chối. Nên nó
+    # là cửa nhập tay chứ không phải bảng máy sinh: khai "máy sinh" ở đây là nói sai về chỗ mà chữ ký
+    # của Chủ tịch được ghi lại.
+    "yeu_cau_hdv", "bao_cao_sau_tour", "tam_ung_hdv", "de_xuat_hdv", "cau_hinh_duyet_hdv",
+    "buoc_duyet_hdv",
+    "hop_dong_khach", "incidents", "intake_runs", "invoices",
     "journal_entries",
     # TC-73 – cơ cấu tổ chức khối Kinh doanh. Cửa nhập tay ở màn hình /to-chuc-kd: khung "Khai đơn
     # vị mới" và khung "Phân công người vào đơn vị". CỐ Ý KHÔNG có bộ nạp tệp, và cố ý không suy từ
