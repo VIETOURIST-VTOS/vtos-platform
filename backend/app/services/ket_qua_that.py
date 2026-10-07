@@ -182,12 +182,30 @@ def _dem_dong_bu(ds: list[Tour]) -> int:
     return sum(1 for t in ds if t.confirmed_by == N_BU and _do_cua_nay(t))
 
 
+NGAN = ("le", "doan", "dich_vu_le", "thue_xe", "khac")
+
+
 def _theo_mang(ds: list[Tour]) -> dict:
-    """Doanh thu và số chuyến của một danh sách chuyến, chia theo mảng le · doan · khac."""
+    """Doanh thu và số chuyến của một danh sách chuyến, chia theo ngăn.
+
+    07/10/2026 — NGĂN "khac" ĐƯỢC TÁCH LÀM BA, và đây không phải việc làm đẹp bảng.
+
+    Trước bản này mọi chuyến không thuộc mảng Lẻ và không thuộc mảng Đoàn rơi chung vào `khac`:
+    dịch vụ lẻ, và từ hôm nay cả hợp đồng thuê xe. Màn hình Chủ tịch (`dashboard`) chỉ IN ra `le`
+    và `doan`, trong khi con số tổng ở trên lại cộng đủ cả ba — nên hai con số trên cùng một màn
+    hình không cộng lại được với nhau, và phần chênh không có tên.
+
+    Chủ tịch dặn khi chốt hợp đồng thuê xe: doanh thu thuê xe không được chạy lẫn vào doanh thu
+    tour. Giữ nó trong một ngăn tên là "khác" thì vẫn là chạy lẫn — chỉ là lẫn ở một chỗ khó thấy
+    hơn. Nên mỗi thứ một ngăn, mang đúng tên của nó, và `khac` nay chỉ còn nghĩa "chưa ai xếp".
+
+    `khac` RỖNG là trạng thái bình thường và đáng mong; nó khác 0 nghĩa là có loại chuyến chưa ai
+    quyết xếp vào đâu — xem `KHONG_TRON_GOI` ở `models/core.py` và phép thử `test_tx4`.
+    """
     from app.services import segments as SEG
-    ra = {m: {"doanh_thu": 0.0, "chuyen": 0} for m in ("le", "doan", "khac")}
+    ra = {m: {"doanh_thu": 0.0, "chuyen": 0} for m in NGAN}
     for t in ds:
-        m = SEG.mang_of(t) or "khac"
+        m = SEG.mang_of(t) or {"non_package": "dich_vu_le", "thue_xe": "thue_xe"}.get(t.tour_type, "khac")
         ra[m]["doanh_thu"] += float(t.actual_revenue or 0)
         ra[m]["chuyen"] += 1
     return ra

@@ -10,7 +10,7 @@ from app.api import schemas as S
 from pydantic import BaseModel
 from app.core.security import verify_password, create_token, hash_password
 from app.models.core import (User, Tour, ServiceRequest, Booking, Param, Alert, AuditLog, ROLES,
-                             TOUR_TYPES, TOUR_STATUS,
+                             TOUR_TYPES, TOUR_STATUS, TOUR_TRON_GOI,
                              GIAO_DIEN_NEN, GIAO_DIEN_CO_MIN, GIAO_DIEN_CO_MAX,
                              GIAO_DIEN_MAC_DINH_NEN, GIAO_DIEN_MAC_DINH_CO)
 from app.services import rules as R
@@ -282,7 +282,12 @@ def list_tours(status: str | None = None, q: str = "", month: str = "", limit: i
         raise HTTPException(422, str(ex))
     if cond is not None: qs = qs.where(cond)
     if tour_type: qs = qs.where(Tour.tour_type == tour_type)
-    elif not (q and q.upper().startswith("KLE")): qs = qs.where(Tour.tour_type != "non_package")
+    # Mặc định danh sách chuyến chỉ hiện TOUR TRỌN GÓI. Dòng cũ viết `!= "non_package"`, tức là
+    # mọi loại chuyến mới thêm vào bảng sẽ TỰ ĐỘNG hiện lẫn giữa các tour mà không ai quyết — hợp
+    # đồng thuê xe nằm chung danh sách với tour đoàn là một kiểu lẫn như thế. Nay hỏi bằng danh
+    # sách dương; muốn xem loại nào thì chọn đích danh bằng tham số `tour_type` (màn hình có ô
+    # chọn, lấy từ `meta()`), đúng cách đang dùng cho dịch vụ lẻ qua tiền tố mã KLE.
+    elif not (q and q.upper().startswith("KLE")): qs = qs.where(Tour.tour_type.in_(TOUR_TRON_GOI))
     if status: qs = qs.where(Tour.status.in_(status.split(",")))
     if q: qs = qs.where(or_(Tour.code.ilike(f"%{q}%"), Tour.name.ilike(f"%{q}%"), Tour.product_code.ilike(f"%{q}%")))
     if month:

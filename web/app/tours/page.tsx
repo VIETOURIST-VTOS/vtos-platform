@@ -36,11 +36,21 @@ function Tours() {
     : TOUR_TYPES;
   const [loai, setLoai] = useState(laKinhDoanh ? "doan_noi_dia" : "le_noi_dia");
   const laDoan = loai.startsWith("doan_");
+  /** Hợp đồng thuê xe riêng — Chủ tịch chọn 07/10/2026: dựng như một CHUYẾN RÚT GỌN, không sửa
+   *  bảng lệnh điều xe. Màn hình đổi lời chứ KHÔNG đổi luật: máy chủ vẫn nhận đúng một cửa
+   *  `POST /tours`, vẫn qua đúng cổng biên và cổng điểm dừng nghỉ như mọi chuyến khác. */
+  const laThueXe = loai === "thue_xe";
   const [hhKhach, setHhKhach] = useState("");
   async function create(e: React.FormEvent) {
     e.preventDefault(); const f = new FormData(e.target as HTMLFormElement); const d: any = Object.fromEntries(f.entries());
     ["price_per_pax", "fixed_cost", "var_cost_per_pax", "hoa_hong_khach_tien"].forEach((k) => (d[k] = soTien(d[k])));
     ["planned_pax", "operator_id"].forEach((k) => (d[k] = Number(d[k] || 0)));
+    // MỘT HỢP ĐỒNG = MỘT "KHÁCH". Đây là cách ghi, nói thẳng ra để không ai đọc nhầm: hợp đồng
+    // thuê xe bán trọn gói chứ không bán theo đầu người, nên `price_per_pax` mang GIÁ TRỌN HỢP
+    // ĐỒNG và `planned_pax` bằng 1. Nhờ vậy mọi phép tính doanh thu, giá vốn và biên đang chạy
+    // vẫn ra đúng số mà không phải dựng một công thức thứ hai cho riêng loại này — và một công
+    // thức thứ hai là chỗ hai màn hình bắt đầu nói hai con số khác nhau.
+    if (d.tour_type === "thue_xe") d.planned_pax = 1;
     try { const t = await api("/tours", { method: "POST", json: d }); toast("Đã tạo tour – kiểm tra 3 con số rồi trình Trưởng phòng"); location.href = `/tours/${t.id}`; } catch (x) { toast(errMsg(x), true); }
   }
   const today = new Date().toISOString().slice(0, 10);
@@ -76,12 +86,19 @@ function Tours() {
       <form onSubmit={create}>
         <div className="grid"><div><label>Mã tour</label><input name="code" required placeholder="VD: PT-DL-1015" /></div>
           <div><label>Loại chuyến</label><select name="tour_type" value={loai} onChange={(e) => setLoai(e.target.value)}>{Object.entries(loaiChoPhep).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div></div>
-        <label>Tên tour</label><input name="name" required />
-        <div className="grid"><div><label>Khởi hành</label><input type="date" name="start_date" required /></div><div><label>Kết thúc</label><input type="date" name="end_date" required /></div>
+        {laThueXe && <p className="muted">Hợp đồng thuê xe riêng dựng như một <b>chuyến rút gọn</b>: có mã, có ngày,
+          có người phụ trách, để lệnh điều xe gắn vào được. Doanh thu của nó <b>đứng thành một dòng riêng</b> trên
+          bảng Kết quả kinh doanh, không cộng vào doanh thu tour và không tính chỉ tiêu doanh số của sale.
+          Giá ghi là <b>giá trọn hợp đồng</b>, không phải giá một người.</p>}
+        <label>{laThueXe ? "Tên khách thuê và tuyến đi" : "Tên tour"}</label><input name="name" required />
+        <div className="grid"><div><label>{laThueXe ? "Ngày bắt đầu thuê" : "Khởi hành"}</label><input type="date" name="start_date" required /></div><div><label>{laThueXe ? "Ngày trả xe" : "Kết thúc"}</label><input type="date" name="end_date" required /></div>
           <div><label>Người điều hành duy nhất</label><select name="operator_id" defaultValue={user?.id}>{ops.map((o) => <option key={o.id} value={o.id}>{o.full_name}</option>)}</select></div></div>
-        <h3>Dự toán – tách chi phí cố định / theo khách (ĐH Điều 11)</h3>
-        <div className="grid"><div><label>Giá bán / khách (đ)</label><input type="number" name="price_per_pax" step="1000" /></div><div><label>Chi phí cố định</label><input type="number" name="fixed_cost" step="1000" /></div>
-          <div><label>Chi phí theo khách</label><input type="number" name="var_cost_per_pax" step="1000" /></div><div><label>Số khách dự toán</label><input type="number" name="planned_pax" /></div></div>
+        <h3>{laThueXe ? "Giá thuê và giá vốn" : "Dự toán – tách chi phí cố định / theo khách (ĐH Điều 11)"}</h3>
+        <div className="grid"><div><label>{laThueXe ? "Giá thuê trọn hợp đồng (đ)" : "Giá bán / khách (đ)"}</label><input type="number" name="price_per_pax" step="1000" /></div><div><label>{laThueXe ? "Chi phí cố định (dầu, cầu đường, lương lái)" : "Chi phí cố định"}</label><input type="number" name="fixed_cost" step="1000" /></div>
+          {!laThueXe && <><div><label>Chi phí theo khách</label><input type="number" name="var_cost_per_pax" step="1000" /></div><div><label>Số khách dự toán</label><input type="number" name="planned_pax" /></div></>}</div>
+        {/* Điểm dừng nghỉ KHÔNG bỏ cho hợp đồng thuê xe, và đó là có chủ ý: ĐH Điều 11 là điều về
+            giờ nghỉ của người lái, không phải về chương trình tour. Xe chở khách thuê thì điều ấy
+            càng áp dụng chứ không kém. Máy chủ cũng vẫn đòi ở cổng trình. */}
         <label>Điểm dừng nghỉ (bắt buộc)</label><input name="rest_stops" />
         {laDoan && <>
           <h3>Hoa hồng dành cho khách (bắt buộc – Chủ tịch quyết 24/9/2026)</h3>

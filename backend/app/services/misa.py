@@ -11,7 +11,7 @@ from datetime import date, datetime
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from openpyxl import load_workbook, Workbook
-from app.models.core import Tour, User
+from app.models.core import Tour, User, TOUR_TRON_GOI
 from app.models.accounting import Account, JournalEntry, JournalLine, Partner, Project
 from app.models.ops import PaymentRequest
 from app.services import accounting as ACC
@@ -493,7 +493,7 @@ def export_projects(db: Session, date_from: date | None = None) -> bytes:
     """Tour VTOS → mẫu Import 'Danh mục công trình' MISA (9 cột)."""
     wb = Workbook(); ws = wb.active; ws.title = "CongTrinh"
     ws.append(["Mã công trình (*)", "Tên công trình (*)", "Công trình phụ thuộc", "Loại công trình", "Ngày bắt đầu", "Ngày kết thúc", "Dự toán", "Chủ đầu tư", "Ghi chú"])
-    q = select(Tour).where(Tour.tour_type != "non_package").order_by(Tour.start_date)
+    q = select(Tour).where(Tour.tour_type.in_(TOUR_TRON_GOI)).order_by(Tour.start_date)
     for t in db.execute(q).scalars():
         if date_from and t.start_date < date_from: continue
         ws.append([t.code, t.name[:200], None, None, f"{t.start_date:%d/%m/%Y}", f"{t.end_date:%d/%m/%Y}", (t.fixed_cost or 0) + (t.var_cost_per_pax or 0) * t.planned_pax, None, "VTOS"])

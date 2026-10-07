@@ -50,13 +50,17 @@ def doanh_thu_phong(db: Session, today: date) -> dict:
     ky_nay = f"{today:%Y-%m}"
     ra = {"ky": ky_nay, "nam": today.year}
     thang_nay = KQT.thang(db, ky_nay, nho=nho)["theo_mang"]
-    luy_ke = {m: {"doanh_thu": 0.0, "chuyen": 0} for m in ("le", "doan", "khac")}
+    luy_ke = {m: {"doanh_thu": 0.0, "chuyen": 0} for m in KQT.NGAN}
     for mth in range(1, today.month + 1):
         tm = KQT.thang(db, f"{today.year:04d}-{mth:02d}", nho=nho)["theo_mang"]
         for m in luy_ke:
             luy_ke[m]["doanh_thu"] += tm[m]["doanh_thu"]
             luy_ke[m]["chuyen"] += tm[m]["chuyen"]
-    for m in ("le", "doan"):
+    # 07/10/2026 — IN RA CẢ NĂM NGĂN, không chỉ hai. Trước bản này màn hình chỉ in `le` và `doan`
+    # trong khi con số doanh thu ở đầu màn hình cộng đủ mọi chuyến, nên phần chênh không có tên và
+    # không ai cộng ngược lại được. Hợp đồng thuê xe làm phần chênh ấy to lên và có thật, nên nó
+    # phải đứng thành một dòng — đúng lời Chủ tịch dặn: không chạy lẫn vào doanh thu tour.
+    for m in KQT.NGAN:
         ra[m] = {"thang": thang_nay[m]["doanh_thu"], "chuyen_thang": thang_nay[m]["chuyen"],
                  "nam": luy_ke[m]["doanh_thu"], "chuyen_nam": luy_ke[m]["chuyen"]}
     return ra

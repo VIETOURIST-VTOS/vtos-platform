@@ -269,7 +269,60 @@ TOUR_TYPES = {
     "doan_noi_dia": "Tour đoàn nội địa",
     "doan_nuoc_ngoai": "Tour đoàn nước ngoài",
     "non_package": "Dịch vụ lẻ (Non-package)",
+    # Chủ tịch chọn 07/10/2026: khách thuê xe riêng đi đường một hợp đồng thuê xe dựng như một
+    # CHUYẾN RÚT GỌN, không sửa bảng `dispatch_orders`. Lý do chọn hình này: `dispatch_orders.tour_id`
+    # đang BẮT BUỘC, nên muốn phát lệnh điều xe thì phải có một chuyến để gắn vào. Nới cột ấy thành
+    # nullable là mở một đường lệnh điều xe KHÔNG có chuyến nào đứng sau — và mọi báo cáo đội xe
+    # (nhật trình, nhiên liệu, hiệu quả theo đầu xe) đều đi qua chuyến để biết lệnh ấy phục vụ việc gì.
+    #
+    # KHÔNG CÓ DÒNG NÀO HÔM NAY. Giá trị này mới hoàn toàn, nên không cần bản nâng cấp và không có
+    # dữ liệu cũ nào đổi nghĩa — mọi quyết định dưới đây chỉ áp cho hợp đồng lập từ hôm nay trở đi.
+    "thue_xe": "Hợp đồng thuê xe riêng",
 }
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# HAI DANH SÁCH DƯƠNG — và vì sao phải có chúng (07/10/2026)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Trước bản này, câu hỏi "chuyến này có phải một tour trọn gói không" được hỏi ở 26 chỗ bằng đúng
+# một hình: `tour_type != "non_package"`. Tức là PHỦ ĐỊNH MỘT GIÁ TRỊ. Hình ấy đúng khi bảng loại
+# chuyến chỉ có hai nhóm, và nó hỏng lặng lẽ ngay lần đầu có nhóm thứ ba: loại mới KHÔNG phải
+# `non_package`, nên nó TỰ ĐỘNG được cộng vào doanh thu tour, vào quỹ thưởng Điều hành, vào chỉ
+# tiêu doanh số của sale — mà không một dòng mã nào phải sửa, và không một phép thử nào đỏ.
+#
+# Đó chính là điều Chủ tịch dặn khi chốt hợp đồng thuê xe: "phải có cờ tách loại, nếu không doanh
+# thu thuê xe chạy lẫn vào doanh thu tour". Cách giữ lời dặn ấy không phải là đi vá 26 chỗ cho một
+# giá trị, mà là đổi câu hỏi từ phủ định sang KHẲNG ĐỊNH: liệt kê ra cái GÌ là tour trọn gói.
+#
+# Hệ quả đo được: loại chuyến thứ bảy thêm vào năm sau sẽ KHÔNG tự chui vào đâu cả. Nó đứng ngoài
+# cho tới khi có người xếp nó vào một trong hai danh sách — và phép thử `test_tx4` đỏ ngay lúc
+# thêm, vì hợp của hai danh sách phải bằng đúng TOUR_TYPES.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# MỘT GIÁ TRỊ CŨ KHÔNG CÓ TRONG BẢNG NHÃN — và vì sao nó phải nằm trong danh sách dương
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+#
+# `"package"` KHÔNG có trong `TOUR_TYPES`, nhưng nó có thật: hơn hai mươi tệp phép thử dựng chuyến
+# bằng `tour_type="package"`, và chú thích cột `hinh_thuc` ở dưới cũng gọi tên nó ("package /
+# non_package"). Nó là cách viết cũ cho "tour trọn gói", từ thời bảng loại chuyến mới chỉ có hai
+# nhóm.
+#
+# Phép lọc cũ `!= "non_package"` nhận nó, nên nó vẫn được cộng vào doanh thu tour suốt thời gian
+# qua. Đổi sang danh sách dương mà QUÊN nó thì mọi chuyến mang giá trị ấy lặng lẽ biến mất khỏi
+# doanh thu, khỏi quỹ thưởng, khỏi bảng xuất MISA — một lần siết nhầm còn tệ hơn lần nới nhầm đang
+# đi sửa, vì tiền BIẾN MẤT thì không ai nhìn ra chỗ hụt.
+#
+# Phát hiện ra nó là nhờ chính phép thử: đổi lọc xong thì `test_p6_pham_vi_phap_nhan` đỏ năm dòng.
+# Giữ ở đây kèm lý do, KHÔNG thêm vào `TOUR_TYPES`: bảng ấy là bảng ô chọn trên màn hình, và không
+# ai nên tạo chuyến mới mang giá trị này nữa.
+LOAI_CHUYEN_CU = ("package",)
+
+TOUR_TRON_GOI = ("le_noi_dia", "le_nuoc_ngoai", "doan_noi_dia", "doan_nuoc_ngoai") + LOAI_CHUYEN_CU
+
+# Không trọn gói: bán theo từng việc, không có "giá một khách" và không có đoàn khách nào.
+# Hai loại này giống nhau ở chỗ ĐỨNG NGOÀI mọi con số tour, và khác nhau ở chỗ tiền về từ đâu —
+# nên chúng chung danh sách này mà vẫn tách nhau ở bảng doanh thu (xem `doanh_thu_kd.LUONG`).
+KHONG_TRON_GOI = ("non_package", "thue_xe")
 SERVICE_KINDS = {"VISA": "Visa", "FLIGHT": "Vé máy bay", "HOTEL": "Khách sạn", "VEHICLE": "Xe", "RESTAURANT": "Nhà hàng", "LAND": "Land", "GUIDE": "Hướng dẫn viên", "OTHER": "Khác"}
 TOUR_STATUS = {
     "nhap": "Nháp (Điều hành đang lập dự toán)",

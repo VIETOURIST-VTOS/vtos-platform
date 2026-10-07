@@ -1,5 +1,8 @@
 export const ROLES: Record<string, string> = { chutich: "Chủ tịch HĐQT", tgd: "Tổng giám đốc", ptgd_doan: "Phó TGĐ tour đoàn", ptgd_mkt: "Phó TGĐ Marketing", tp_dh: "Trưởng phòng Điều hành", nv_dh: "Nhân viên điều hành", nv_kd: "Nhân viên kinh doanh", gd_kd: "Giám đốc Kinh doanh", ketoan: "Kế toán", hcns: "Nhân sự Hành chính", cntt: "Công nghệ thông tin", bks: "Ban Kiểm soát" };
-export const TOUR_TYPES: Record<string, string> = { le_noi_dia: "Tour lẻ nội địa", le_nuoc_ngoai: "Tour lẻ nước ngoài", doan_noi_dia: "Tour đoàn nội địa", doan_nuoc_ngoai: "Tour đoàn nước ngoài", non_package: "Dịch vụ lẻ (Non-package)" };
+// BẢNG NÀY LÀ BẢN CHÉP của `models/core.py::TOUR_TYPES`, và nó phải khớp từng khoá — màn hình tra
+// tên loại chuyến ở đây chứ không gọi máy chủ. Lệch một khoá thì cột Loại chuyến hiện TRỐNG cho
+// đúng loại ấy, và người đọc tưởng dữ liệu hỏng. Phép thử `test_tx4` so hai bảng.
+export const TOUR_TYPES: Record<string, string> = { le_noi_dia: "Tour lẻ nội địa", le_nuoc_ngoai: "Tour lẻ nước ngoài", doan_noi_dia: "Tour đoàn nội địa", doan_nuoc_ngoai: "Tour đoàn nước ngoài", non_package: "Dịch vụ lẻ (Non-package)", thue_xe: "Hợp đồng thuê xe riêng" };
 // `nhap_kd` đứng TRƯỚC `nhap`: Kinh doanh Đoàn soạn, Sale Admin soát rồi mới chuyển sang Điều
 // hành (Chủ tịch quyết 24/9/2026). Thiếu dòng này thì cột Trạng thái của các chuyến ấy hiện
 // TRỐNG — người đọc bảng tưởng dữ liệu hỏng, chứ không đọc ra là chuyến đang ở bước đầu.
