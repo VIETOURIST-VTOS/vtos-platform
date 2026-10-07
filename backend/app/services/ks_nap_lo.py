@@ -26,6 +26,10 @@ chiếu lô không hề biết là có tồn tại.
 
 Đếm hết thì hệ thống có MƯỜI MỘT cửa nạp hàng loạt và đúng MỘT cửa ghi nhật ký lô.
 
+Ngày 30/9/2026 bịt lại MƯỜI cửa: mỗi cửa gọi `so_lo_nap.ghi_lo` đúng một lần trước khi trả kết quả
+(luật và lý do nằm trong chính tệp ấy). Còn `fleet.nhap_chuyen_hang_loat` — để lại cố ý, vì một làn
+khác đang giữ `services/fleet.py`; nó vẫn đứng đỏ trên bàn Kiểm soát cho tới khi tệp được trả.
+
 Một bộ đối chiếu chỉ kiểm những lô tự giác đăng ký là một bộ đối chiếu đi vòng được. Nên nó phải tự
 nói ra phần nó không nhìn thấy – đó là lý do có SO_DANG_KY dưới đây, và có một phép thử soi mã nguồn
 để bảng ấy không lạc hậu trong im lặng.
@@ -51,12 +55,15 @@ SO_NGAY = 45
 CUA_NAP = (
     ("intake.nap", "app.services.intake", True,
      "Cửa nạp chung – người nhập, tải tệp, AI đọc ảnh đều đi qua đây"),
-    ("misa.import_journal", "app.services.misa", False,
+    ("misa.import_journal", "app.services.misa", True,
      "Nạp sổ nhật ký từ MISA – lô lớn nhất hệ thống"),
-    ("misa.import_opening_balance", "app.services.misa", False, "Nạp số dư đầu kỳ từ MISA"),
-    ("misa.import_audited_checkpoint", "app.services.misa", False, "Nạp mốc kiểm toán từ MISA"),
-    ("misa.import_partners", "app.services.misa", False, "Nạp danh mục đối tượng từ MISA"),
-    ("misa.import_projects", "app.services.misa", False, "Nạp danh mục công trình từ MISA"),
+    ("misa.import_opening_balance", "app.services.misa", True, "Nạp số dư đầu kỳ từ MISA"),
+    ("misa.import_audited_checkpoint", "app.services.misa", True, "Nạp mốc kiểm toán từ MISA"),
+    ("misa.import_partners", "app.services.misa", True, "Nạp danh mục đối tượng từ MISA"),
+    ("misa.import_projects", "app.services.misa", True, "Nạp danh mục công trình từ MISA"),
+    # CỬA CUỐI CÙNG CÒN NGOÀI SỔ, và để lại CỐ Ý (30/9/2026): `services/fleet.py` đang có một làn
+    # khác giữ chỗ trong docs/DANG-LAM.md. Hai làn cùng sửa một tệp là đúng cái đã xoá mất việc của
+    # nhau ngày 19/9 và 23/9. Nó đứng đây, vẫn đỏ trên bàn Kiểm soát, cho tới khi làn kia trả tệp.
     ("fleet.nhap_chuyen_hang_loat", "app.services.fleet", False,
      "Nạp nhật trình chuyến xe hàng loạt (báo cáo VieTrip)"),
     # Lớp 2 quyết toán tour (10/9/2026): nạp cả THƯ MỤC tệp quyết toán của Điều hành, mỗi tệp một
@@ -65,14 +72,14 @@ CUA_NAP = (
      "Nạp lô tệp quyết toán chi tiết của Phòng Điều hành – bốn mặt của một chuyến"),
     # Năm cửa dưới đây do PHÉP THỬ NL7 soi mã nguồn tìm ra, không phải do đọc mà nhớ ra. Đó đúng là
     # lý do phép thử ấy tồn tại: bảng khai tay nào cũng thiếu, chỉ khác nhau ở chỗ có ai phát hiện không.
-    ("banks.import_bank_book", "app.services.banks", False,
+    ("banks.import_bank_book", "app.services.banks", True,
      "Nạp sổ tiền gửi ngân hàng – dựng bản đồ chứng từ, mở tài khoản 112 còn thiếu"),
-    ("leads.import_xlsx", "app.services.leads", False, "Nạp lead từ workbook nhiều sheet"),
-    ("leads.import_rows", "app.services.leads", False,
+    ("leads.import_xlsx", "app.services.leads", True, "Nạp lead từ workbook nhiều sheet"),
+    ("leads.import_rows", "app.services.leads", True,
      "Phần ghi lead của import_xlsx – cũng là cửa của API nạp lead"),
-    ("staff.import_master", "app.services.staff", False,
+    ("staff.import_master", "app.services.staff", True,
      "Nạp danh sách nhân sự gốc, kèm mở/đóng tài khoản đăng nhập"),
-    ("visa_finance.import_portal", "app.services.visa_finance", False,
+    ("visa_finance.import_portal", "app.services.visa_finance", True,
      "Nạp hồ sơ từ Visa Portal"),
 )
 
