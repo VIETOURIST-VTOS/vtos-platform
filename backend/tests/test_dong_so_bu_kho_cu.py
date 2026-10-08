@@ -254,7 +254,17 @@ def test_db6_chuyen_khong_phai_kho_cu_thi_khong_bao_gio_dung_toi(db):
     assert that.closed_at is None and that.status == "ket_thuc", (
         "Cửa bù đã đóng số hộ một chuyến vận hành — đó là ký thay Điều hành ngoài phạm vi "
         "Chủ tịch đã chốt.")
-    assert KQ.thang(db, "2026-03")["doanh_thu"] == 100.0
+    # 08/10/2026 · 1000 chứ không còn 100, và ĐỔI NÀY KHÔNG LÀM YẾU PHÉP THỬ. Chủ tịch chốt lấy
+    # số liệu y chang của Vietrip, nên chuyến VANHANH — đã chạy xong, có booking 900 và dòng chi
+    # phí 100 — nay CÓ cộng vào doanh thu tháng, cùng với 100 của chuyến kho cũ.
+    #
+    # ĐƯỢC CỘNG VÀO DOANH THU và ĐƯỢC ĐÓNG SỐ là hai việc khác nhau, và chính đó là điều phép thử
+    # này canh: hai dòng ngay trên vẫn đòi `closed_at is None` và trạng thái `ket_thuc`. Cửa bù
+    # vẫn không ký thay Điều hành; nó chỉ thôi giấu tiền của chuyến ấy đi.
+    assert KQ.thang(db, "2026-03")["doanh_thu"] == 1000.0
+    assert KQ.thang(db, "2026-03")["dt_da_dong_so"] == 100.0, (
+        "Và nửa KHỚP SỔ KẾ TOÁN vẫn chỉ có chuyến kho cũ — nếu 900 của chuyến vận hành lọt được "
+        "vào đây thì cửa bù đã đóng số hộ nó thật.")
 
 
 # ═════════════════ DB7 · DÙNG ĐÚNG PHÉP CỘNG CỦA HỆ ═════════════════
@@ -303,7 +313,19 @@ def test_db8_xem_truoc_noi_dung_con_so_ma_nut_se_lam(db):
     assert {k["ky"]: k["doanh_thu"] for k in truoc["theo_ky"]} == {"2026-03": 10.0,
                                                                   "2026-04": 20.0}, (
         "Bảng theo kỳ là thứ DUY NHẤT cho người ký thấy tiền sẽ rơi vào tháng nào trước khi ký.")
-    assert KQ.thang(db, "2026-03")["doanh_thu"] == 10.0
+    # 08/10/2026 · 109 chứ không còn 10 = X1 (10, đã đóng số) + X3 (99, booking mà chưa có chi).
+    #
+    # X3 kết thúc 02/4 nhưng KHỞI HÀNH 31/3 (`_chuyen` đặt start_date = ket_thuc − 2 ngày), và
+    # chuyến chưa đóng số xếp theo NGÀY KHỞI HÀNH — luật A của `ket_qua_that`, có từ 18/9, không
+    # phải điều vòng này đổi. Thứ vòng này đổi là X3 thôi mang 0 đồng: Chủ tịch chốt lấy số liệu
+    # y chang của Vietrip, nên doanh thu booking của chuyến đã chạy được cộng dù chưa có giá vốn.
+    #
+    # Bốn dòng trên KHÔNG đổi một chữ, và đó mới là điều phép thử này canh: bảng xem trước hứa
+    # đúng những gì cái nút sẽ làm. `tong_doanh_thu` của bảng xem trước vẫn là 30 — nó đếm chuyến
+    # SẼ ĐÓNG ĐƯỢC, khác hẳn doanh thu tháng.
+    assert KQ.thang(db, "2026-03")["doanh_thu"] == 109.0
+    assert KQ.thang(db, "2026-03")["dt_co_gia_von"] == 10.0, (
+        "Nửa có giá vốn vẫn chỉ X1: X3 chưa có dòng chi nào nên không được góp một đồng lãi.")
     assert KQ.thang(db, "2026-04")["doanh_thu"] == 20.0
 
 
