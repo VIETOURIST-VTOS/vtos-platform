@@ -201,9 +201,11 @@ def test_muc_luc_khong_khai_tab_la_chua_dung():
     mở ra để biết hệ thống còn nợ gì, nên nói sai ở đây là làm lệch mọi quyết định đọc từ nó – và
     lệch theo chiều làm người ta dựng lại cái đã có."""
     nguon = _doc("web", "lib", "cay_phan_he.ts")
+    # 4.4.7 vào danh sách này từ 09/10/2026 — PR DH-1 dựng tab thật, xem phép thử ngay dưới.
     for ma, dau in (("4.4.1", "Thông tin & quy trình"), ("4.4.3", "Booking & thu tiền"),
                     ("4.4.4", "Chi NCC & quyết toán"), ("4.4.5", "HDV & xe"),
-                    ("4.4.6", "Dự toán 3 con số"), ("4.4.8", "Quyết toán chi tiết"),
+                    ("4.4.6", "Dự toán 3 con số"), ("4.4.7", "Phát sinh & sự cố"),
+                    ("4.4.8", "Quyết toán chi tiết"),
                     ("4.4.9", "Quy trình & lịch sử"), ("4.9.7", "Chủ xe & quyết toán")):
         i = nguon.index(f'ma: "{ma}"')
         dong = nguon[i:i + 260]
@@ -213,8 +215,24 @@ def test_muc_luc_khong_khai_tab_la_chua_dung():
                              "biết là 'có' mà không biết tìm ở đâu.")
 
 
-def test_hai_muc_thieu_that_van_phai_khai_la_thieu():
-    """Sửa nhãn KHÔNG được tiện tay khai luôn hai mục thiếu thật là đã có."""
+def test_hai_muc_tung_thieu_nay_khai_co_thi_phai_co_that():
+    """Hai mục này ĐÃ TRẢ XONG ngày 08/10/2026, nên bản cũ của phép thử nói sai — và phải đổi.
+
+    SỬA NGÀY 09/10/2026, cùng một ca với mục 5.4 hôm qua. Bản cũ tên là
+    `test_hai_muc_thieu_that_van_phai_khai_la_thieu` và đòi 4.4.7 cùng 4.9.1 KHÔNG được khai là có.
+    Lý do ghi thẳng trong lời báo: "trang chi tiết chuyến không có một chữ 'sự cố' nào". Lý do ấy
+    hết hiệu lực từ PR DH-1 (7d128bc) cùng ngày: tab «Phát sinh & sự cố» dựng thật trên
+    `web/app/tours/[id]/page.tsx`, gọi thẳng `GET /su-co-tour?tour_id=` chứ không dựng cửa đọc thứ
+    hai, và năm phép thử của `test_dh1_phat_sinh_cua_chuyen.py` canh nó. Mục 4.9.1 thì Chủ tịch
+    chọn 08/10 là TRỎ VỀ /doi-xe thay vì dựng trang thứ hai đọc cùng nguồn số.
+
+    Giữ nguyên bản cũ là ép mục lục khai thiếu một thứ đã có — bắt cây nói sai, đúng cái phép thử
+    này sinh ra để chặn, chỉ là sai theo chiều ngược lại.
+
+    HÀNG RÀO KHÔNG YẾU ĐI, CHỈ ĐỔI CHỖ CẮN. Thứ đáng sợ vẫn là KHAI KHỐNG cho con số mục lục đẹp
+    hơn. Nên thay vì đòi hai mục khai là thiếu, nay đòi: khai có thì màn hình phải CÓ THẬT. Khai
+    khống bây giờ đỏ ngay, mà trả xong thật thì không phải sửa lại phép thử lần nữa.
+    """
     nguon = _doc("web", "lib", "cay_phan_he.ts")
     def _dong(ma: str) -> str:
         """Chỉ lấy ĐÚNG dòng khai mục ấy. Cắt theo số ký tự thì cửa sổ tràn sang mục kế tiếp, và
@@ -222,12 +240,27 @@ def test_hai_muc_thieu_that_van_phai_khai_la_thieu():
         i = nguon.index(f'ma: "{ma}"')
         return nguon[i:nguon.index("\n", i)]
 
-    assert "href" not in _dong("4.4.7") and "tab: true" not in _dong("4.4.7"), (
-        "4.4.7 Phát sinh THIẾU THẬT: trang chi tiết chuyến không có một chữ 'sự cố' nào, và màn hình "
-        "4.6 Sự cố & phát sinh không gắn vào chuyến. Khai nó là đã có để con số mục lục đẹp hơn là "
-        "đúng việc vòng này đi sửa.")
-    assert "href" not in _dong("4.9.1"), (
-        "4.9.1 Tổng quan đội xe chưa có trang riêng. Dãy KPI trên /doi-xe là của mục 4.9.2 Hồ sơ xe.")
+    # 4.4.7 — khai là tab thì trang chi tiết chuyến phải thật sự đọc sổ sự cố của ĐÚNG chuyến ấy.
+    if "tab: true" in _dong("4.4.7"):
+        chuyen = _doc("web", "app", "tours", "[id]", "page.tsx")
+        assert "/su-co-tour?tour_id=" in chuyen, (
+            "4.4.7 khai `tab: true` mà trang chi tiết chuyến không gọi `GET /su-co-tour?tour_id=`. "
+            "Khai một tab chưa dựng để con số mục lục đẹp hơn là đúng chuyện phép thử này chặn.")
+        assert "sự cố" in chuyen, (
+            "4.4.7 khai là tab mà trang chi tiết chuyến không có một chữ 'sự cố' nào cho người đọc.")
+    else:
+        assert "href" not in _dong("4.4.7"), (
+            "4.4.7 không khai tab thì cũng không được khai `href` — nó là một TAB của trang chi "
+            "tiết chuyến, không phải một màn hình riêng.")
+
+    # 4.9.1 — Chủ tịch chọn 08/10: trỏ về /doi-xe, KHÔNG dựng trang thứ hai đọc cùng nguồn số.
+    d91 = _dong("4.9.1")
+    assert 'href: "/doi-xe"' in d91, (
+        "4.9.1 Tổng quan đội xe trỏ về /doi-xe theo quyết định của Chủ tịch 08/10/2026. Một trang "
+        f"tổng quan riêng là màn hình THỨ HAI đọc cùng nguồn số. Đang khai: {d91.strip()}")
+    import os
+    assert os.path.exists(os.path.join(GOC_KHO, "web", "app", "doi-xe", "page.tsx")), (
+        "4.9.1 trỏ vào /doi-xe mà màn hình ấy không có trên đĩa.")
 
 
 def test_ba_man_hinh_da_chay_phai_co_duong_vao_tu_cay():

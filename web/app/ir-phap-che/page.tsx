@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useShell } from "@/components/Shell";
+import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
@@ -38,7 +38,7 @@ const TX_RONG = { lien_he_id: "", ngay: "", hinh_thuc: "gap", noi_dung_tom_tat: 
 const QH_RONG = { ho_so: "", nguoi_duoc_cap: "", to_chuc: "", ly_do: "", ho_so_chua_cong_bo: true, cam_ket_bao_mat: false, can_cu_cam_ket: "", tu_ngay: "", den_ngay: "" };
 const MAU_Q: Record<string, string> = { dang_hieu_luc: "ok", khong_co_han: "red", het_han: "grey", da_thu_hoi: "navy" };
 
-export default function IrPhapCheScreen() {
+function IrPhapCheScreen() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const [tab, setTab] = useState<"cong_bo" | "van_ban" | "viec" | "chu_ky" | "ndt">("cong_bo");
@@ -453,3 +453,9 @@ export default function IrPhapCheScreen() {
     </>}
   </>);
 }
+
+/* MÀN HÌNH PHẢI NẰM TRONG KHUNG SHELL — vá 09/10/2026.
+   Bản D1 xuất thẳng `IrPhapCheScreen` làm trang, nên `useShell()` gọi ở ngoài khung: thanh điều
+   hướng biến mất, `user` trả về rỗng, và mọi nút gài theo vai trò lặng lẽ không hiện. Kiểu hỏng
+   này không ném lỗi — người dùng chỉ thấy một màn hình trống nút và tưởng mình thiếu quyền. */
+export default function Page() { return <Shell><IrPhapCheScreen /></Shell>; }
