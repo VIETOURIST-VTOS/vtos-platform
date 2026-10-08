@@ -46,6 +46,11 @@ CUA_KHONG_THEO_VAI_TRO: dict[str, str] = {
         "Không mang danh sách vai trò vì luật là 'mở được thẻ payroll' HOẶC 'thuộc nhóm vai "
         "được chi', mà vế đầu phụ thuộc ngoại lệ theo TỪNG NGƯỜI trong cơ sở dữ liệu. Máy vẫn "
         "đọc được: cổng nằm ở chữ ký và mang dấu la_cong_chan_quyen."),
+    "cong_xem_tong_quan_hcns": (
+        "Cổng xem Tổng quan HCNS (GET /hr/tong-quan) · 08/10/2026. Cùng một ca với cổng chi "
+        "lương ở trên: luật là 'mở được thẻ tong_quan', mà tập thẻ ấy do access tính theo TỪNG "
+        "NGƯỜI trong cơ sở dữ liệu chứ không phải một danh sách vai cố định. Máy vẫn đọc được: "
+        "cổng nằm ở chữ ký và mang dấu la_cong_chan_quyen."),
 }
 
 

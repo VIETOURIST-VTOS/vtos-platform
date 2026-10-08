@@ -231,22 +231,43 @@ def lich_su_to_chuc(eid: int, u: User = Depends(require_roles(*HR_WRITE, "tgd", 
                        "từ đó thì chưa có chặng nào – đó là chưa có dữ liệu, không phải thiếu hồ sơ."}
 
 
+@cong_chan_quyen
+def cong_xem_tong_quan_hcns(u: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
+    """Cổng xem Tổng quan HCNS. ĐẶT Ở CHỮ KÝ để máy đọc được, không viết trong thân endpoint.
+
+    LUẬT KHÔNG ĐỔI MỘT CHỮ so với lúc nó nằm trong thân `hcns_tong_quan` – chỉ dời ra chữ ký và
+    đặt tên. Cùng một ca với `cong_xem_chi_luong` ngày 08/10/2026, và cùng một lý do:
+
+    Hàng rào P1 đòi MÁY nhận ra quyền mà không phải phân tích mã nguồn. Chặn viết trong thân một
+    hàm endpoint thì máy chỉ thấy được bằng cách đọc mã, và cửa này làm P1 cùng ba phép thử P1b
+    đỏ trên `main` sáng 08/10/2026 – kéo theo mọi làn đang mở, vì main đỏ thì không gì gộp được.
+
+    KHÔNG đổi thành `require_roles(...)`: luật ở đây là "mở được thẻ tong_quan", mà tập thẻ ấy do
+    `access` tính theo TỪNG NGƯỜI trong cơ sở dữ liệu, không phải một danh sách vai cố định. Ép
+    thành danh sách vai vừa chặn nhầm người đang có ngoại lệ, vừa mở cho người cùng vai mà không
+    có ngoại lệ – tức là sửa hàng rào cho hợp phép thử, đúng cái phép thử sinh ra để chặn.
+    """
+    from app.services import access as AC
+    if "tong_quan" not in AC.hr_tabs_for(db, u):
+        raise HTTPException(403, "Vai trò của bạn không mở được Tổng quan HCNS")
+    return u
+
+
 @router.get("/hr/tong-quan")
-def hcns_tong_quan(u: User = Depends(current_user), db: Session = Depends(get_db)):
+def hcns_tong_quan(u: User = Depends(cong_xem_tong_quan_hcns), db: Session = Depends(get_db)):
     """HC01 – Tổng quan HCNS. Chỉ đọc, và không sinh con số nào của riêng nó.
 
     Đặt dưới tiền tố `/api/v1/hr` vì tiền tố ấy ĐÃ được khai cho màn hình `/hr` trong bảng
     `MAN_HINH_API`. Mở một tiền tố mới `/api/v1/hcns` là khai thêm một mảnh quyền, mà khai quyền
     thuộc làn Phân quyền chứ không thuộc lần viết này.
 
-    Khối bảng lương chỉ gắn vào khi người gọi thật sự mở được thẻ Bảng lương. Thẻ Tổng quan mở
-    rộng hơn thẻ Bảng lương, nên in thẳng tổng thực nhận ở đây là mở bảng lương bằng cửa sau.
+    Khối Bảng lương chỉ gắn vào khi người gọi thật sự mở được thẻ ấy. Thẻ Tổng quan mở rộng hơn
+    thẻ Bảng lương, nên in thẳng tổng thực nhận ở đây là mở Bảng lương bằng cửa sau. Phép xét ấy
+    nay nằm trong `TQ.tong_quan_cho` chứ không viết lại ở đây – thân một endpoint không còn chỗ
+    nào nói về quyền nữa, đó là điều kiện để P1 đọc được cửa này.
     """
-    from app.services import access as AC, hcns_tong_quan as TQ
-    tabs = AC.hr_tabs_for(db, u)
-    if "tong_quan" not in tabs:
-        raise HTTPException(403, "Vai trò của bạn không mở được Tổng quan HCNS")
-    return TQ.tong_quan(db, co_bang_luong="payroll" in tabs)
+    from app.services import hcns_tong_quan as TQ
+    return TQ.tong_quan_cho(db, u)
 
 
 # ---------- Hồ sơ visa ----------
