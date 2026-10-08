@@ -52,6 +52,11 @@ function TyGiaPage() {
   }, [locTien]);
 
   useEffect(() => { api<any>("/ty-gia/danh-muc").then(setDm).catch(() => {}); }, []);
+  // Bản ĐO chênh lệch tỷ giá (KY-3). Đặt ngay trên màn hình này chứ không dựng màn hình riêng: người
+  // đọc thấy "ngày này sổ chưa có tỷ giá" xong thì việc tiếp theo của họ là nhập nó, mà form nhập ở
+  // ngay dưới. Một màn hình thứ hai là một cú bấm nữa giữa chỗ biết và chỗ làm.
+  const [cl, setCl] = useState<any>(null);
+  useEffect(() => { api<any>("/ty-gia/chenh-lech").then(setCl).catch(() => setCl(null)); }, []);
   useEffect(load, [load]);
 
   /* Tra cứu chạy theo đồng tiền + ngày đang gõ trong form, để người nhập THẤY NGAY là ngày ấy đã có
@@ -98,6 +103,46 @@ function TyGiaPage() {
       </p>
 
       {loi && <p className="err">{loi}</p>}
+
+      {cl && (cl.so_chuyen_hai_ty_gia > 0 || cl.so_cap_so_chua_co > 0 || cl.so_dong_lech_so > 0
+              || cl.so_dong_thieu_ngay > 0) && (
+        <div className="card">
+          <h3>Chênh lệch tỷ giá — bản đo</h3>
+          <p className="muted">{cl.ghi_chu}</p>
+          <ul>
+            {cl.so_chuyen_cung_ngay_khac_gia > 0 && (
+              <li><b>{cl.so_chuyen_cung_ngay_khac_gia}</b> chuyến dùng <b>hai tỷ giá khác nhau cho
+                cùng một ngày</b> — chỗ không giải thích được bằng &ldquo;khác ngày nên khác giá&rdquo;.</li>)}
+            {cl.so_chuyen_hai_ty_gia > 0 && (
+              <li><b>{cl.so_chuyen_hai_ty_gia}</b> chuyến dùng nhiều hơn một tỷ giá cho cùng một đồng tiền.</li>)}
+            {cl.so_dong_lech_so > 0 && (
+              <li><b>{cl.so_dong_lech_so}</b> dòng dùng tỷ giá <b>không khớp sổ</b> của đúng ngày ấy.</li>)}
+            {cl.so_cap_so_chua_co > 0 && (
+              <li><b>{cl.so_cap_so_chua_co}</b> cặp (đồng tiền, ngày) đang được dùng mà <b>sổ chưa
+                có</b> — nhập ở form ngay dưới.</li>)}
+            {cl.so_dong_thieu_ngay > 0 && (
+              <li><b>{cl.so_dong_thieu_ngay}</b> dòng có tỷ giá mà <b>không có ngày</b> nên không
+                đối chiếu được.</li>)}
+          </ul>
+          {(cl.hai_ty_gia_mot_chuyen || []).length > 0 && (
+            <table>
+              <thead><tr><th>Chuyến</th><th>Đồng tiền</th><th>Các tỷ giá</th><th>Chênh</th>
+                <th>Cùng ngày khác giá</th><th>Số dòng</th><th>Tiền ước tính</th></tr></thead>
+              <tbody>{cl.hai_ty_gia_mot_chuyen.slice(0, 20).map((x: any, i: number) => (
+                <tr key={i}>
+                  <td>{x.ma_tour || x.tour_id}</td><td>{x.tien_te}</td>
+                  <td>{(x.ty_gia || []).map((t: any) => `${t.ty_gia} (${t.so_dong} dòng)`).join(" · ")}</td>
+                  <td>{x.chenh_ty_gia}</td>
+                  <td>{(x.cung_ngay_khac_gia || []).join(", ")}</td>
+                  <td>{x.so_dong}</td>
+                  <td>{x.uoc_tinh_thieu ? "— chưa đủ cột để ước tính" : x.tien_uoc_tinh?.toLocaleString("vi-VN")}</td>
+                </tr>))}</tbody>
+            </table>)}
+          {(cl.so_chua_co || []).length > 0 && (
+            <p className="muted">Sổ còn thiếu:{" "}
+              {cl.so_chua_co.slice(0, 20).map((x: any) => `${x.tien_te} ${x.ngay}`).join(" · ")}</p>)}
+        </div>
+      )}
 
       {ghiDuoc && (
         <div className="card">
