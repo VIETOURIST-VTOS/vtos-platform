@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.core import Tour, Booking, User
 from app.models.hr import Employee, VisaFile, GuideAssignment, Vehicle, DispatchOrder, Incident, PayrollRun
 from app.services import rules as R
+from app.services import thue_tncn as TNCN
 from app.services import accounting as ACC
 from app.services import luong as L
 
@@ -373,12 +374,32 @@ def compute_draft(db: Session, period: str, inputs: dict | None = None) -> tuple
             r["ghi_chu"].append("CHƯA CÓ MỨC ĐÓNG BHXH – chưa trừ bảo hiểm và đoàn phí; HCNS nạp danh sách "
                                 "đóng BHXH của kỳ trước khi trình ký")
 
+    # ---------- BƯỚC 4: thuế TNCN lũy tiến từng phần (Luật 109/2025/QH15, từ kỳ tính thuế 2026) ----------
+    # Chủ tịch quyết 08/10/2026: "VTOS tính". Phép tính nằm ở `services/thue_tncn.py`; ở đây chỉ hỏi
+    # CÔNG TẮC. Công tắc là tham số `tncn_luy_tien_tu_ky`, để trống trong bộ mặc định và mở bằng hai
+    # chữ ký — vì thuế của người HĐLĐ có thể đang được MISA khấu trừ, và hai nơi cùng trừ một khoản
+    # thì người lao động phát hiện ra vào ngày nhận lương. Chưa bật thì cột TNCN giữ nguyên nghĩa cũ:
+    # 10% thù lao cộng tác viên, không hơn.
+    bat_tncn = TNCN.da_bat(db, period)
+    gt_ky = TNCN.muc_giam_tru(db, period) if bat_tncn else None
+    npt_ky = TNCN.npt_theo_nguoi(db, period) if bat_tncn else {}
+
     out = []
     vi_pham = []
-    for r in rows.values():
+    for _eid, r in rows.items():
         vi_pham += L.kiem_tra_khong_phai_khoan_tru(r)
         r["tru_su_vu"] = round(-sum(k["tien"] for k in r["khoan"] if k["tien"] < 0))
         r["thu_nhap"] = round(r["luong_cb"] + sum(k["tien"] for k in r["khoan"] if k["tien"] > 0))
+        # Thuế tính SAU thu_nhap (nền tính thuế là chính con số bảng lương vừa cộng, không phải một
+        # định nghĩa thu nhập thứ hai) và TRƯỚC khoan_tru (thuế là một khoản trừ).
+        _e = emps.get(_eid)
+        if bat_tncn and _e is not None and _e.contract_type == "hdld":
+            ct = TNCN.tinh_cho_dong(db, period, r, _e, gt_ky, npt_ky.get(_eid, 0))
+            r["tncn_luy_tien"] = ct
+            r["tncn"] = round(r["tncn"] + ct["thue"])
+            for _c in ct["canh_bao"]:
+                if _c not in r["ghi_chu"]:
+                    r["ghi_chu"].append(_c)
         r["khoan_tru"] = round(r["tru_su_vu"] + r["bhxh"] + r["doan_phi"] + r["tncn"])
         r["thuc_nhan"] = round(r["thu_nhap"] - r["khoan_tru"])
         r["ghi_chu"] = "; ".join(r["ghi_chu"])

@@ -126,20 +126,47 @@ def test_man_hinh_luong_noi_ra_cot_tncn_bo_sot_ai():
     assert "tncn.so_nguoi_hdld_khong_tncn" in nguon, "khung chưa nói ra bao nhiêu người bị bỏ sót"
 
 
-def test_khong_ai_lang_le_bat_dau_tinh_thue_luy_tien():
-    """Chặn đúng điều vòng này CỐ Ý KHÔNG làm, và đỏ theo cả hai chiều.
+def test_cong_tac_bat_thue_luy_tien_khong_nam_trong_ma():
+    """Phép thử này ĐÃ ĐỎ MỘT LẦN, đúng như nó được viết ra để làm — và đây là bản viết lại.
 
-    Tính thuế lũy tiến từng phần cho hơn trăm người là một quyết định có chữ ký của Kế toán trưởng,
-    không phải một lần sửa cho tiện. Nếu một ngày nó được thêm thật thì phép thử này đỏ, để người sửa
-    PHẢI quay lại viết lại `tncn_chua_tinh()` và khung trên màn hình — nếu không, màn hình sẽ còn nói
-    "chưa tính TNCN cho người HĐLĐ" trong khi bảng lương đã khấu trừ của họ.
+    Bản ngày 08/10/2026 (NS-3) chặn việc VTOS lặng lẽ bắt đầu khấu trừ thuế lũy tiến, bằng cách cấm
+    `services/hr.py` nhắc tới `pit_deduction` hay `giam_tru_ban_than`. Cùng ngày Chủ tịch quyết
+    "VTOS tính", nên vòng KY-1 dựng phép tính thật — và phép thử cũ sẽ VẪN XANH, vì phép tính mới
+    gọi `thue_tncn.muc_giam_tru()` chứ không gọi hai cái tên bị cấm. Một hàng rào canh TÊN GỌI thì
+    đổi tên là qua được; cho nên nó không canh gì cả.
+
+    Bản này canh điều thật sự phải giữ: phép tính có sẵn thì được, nhưng NGÀY BẬT không được nằm
+    trong mã. Lý do rất cụ thể — thuế của người HĐLĐ có thể đang được MISA khấu trừ, và hai nơi cùng
+    trừ một khoản thì người lao động phát hiện ra vào ngày nhận lương. Bật là việc có bàn giao và có
+    chữ ký, không phải một dòng mặc định.
     """
+    from app.services import thue_tncn as T
+    from app.services import rules as R
+    mac_dinh = {k: v for k, v, *_ in R.DEFAULT_PARAMS}
+    assert T.KY_TU_KY_KEY in mac_dinh, "công tắc thuế lũy tiến không có trong bộ tham số — không ai bật được"
+    assert (mac_dinh[T.KY_TU_KY_KEY] or "").strip() == "", (
+        "bộ tham số mặc định đã điền sẵn kỳ bật thuế lũy tiến. Điền sẵn một kỳ vào đó là ký thay "
+        "Chủ tịch bằng một dòng mã — cùng lẽ với ngay_van_hanh_that đang để trống")
+
     hr = (GOC / "backend" / "app" / "services" / "hr.py").read_text(encoding="utf-8")
-    assert "pit_deduction" not in hr and "giam_tru_ban_than" not in hr, (
-        "services/hr.py nay tính giảm trừ gia cảnh — nếu đây là quyết định của Kế toán trưởng thì phải "
-        "sửa lại hrm.tncn_chua_tinh(), khung trên màn hình Lương, và chính phép thử này")
+    assert "TNCN.da_bat(db, period)" in hr, (
+        "services/hr.py cộng thuế lũy tiến mà không hỏi công tắc — tức nó bật sẵn cho mọi kỳ")
     # Thuế suất CTV vẫn là tham số, không chôn cứng.
     assert 'R.get_param(db, "hdv_tncn")' in hr, "thuế suất khấu trừ CTV bị chôn cứng vào mã"
+
+
+def test_man_hinh_luong_doi_loi_theo_cong_tac_chu_khong_noi_mot_lo():
+    """Khung TNCN phải đọc `da_bat` của máy chủ. Một khung chỉ biết một lời sẽ nói sai vào đúng ngày đổi."""
+    nguon = _tep(MH_LUONG)
+    # KIỂM NGƯỢC 08/10/2026: bản đầu của phép thử này chỉ hỏi `"tncn.da_bat" in nguon`, và nó VẪN XANH
+    # khi tắt cứng nhánh "đã bật" — vì chuỗi ấy còn nằm trong nhánh `!tncn.da_bat` ngay dưới. Một hàng
+    # rào canh sự CÓ MẶT của một chuỗi thì chỉ cần chuỗi ấy còn ở đâu đó là qua. Nên hỏi CẢ HAI nhánh.
+    assert re.search(r'tncn\s*&&\s*tncn\.da_bat\s*&&', nguon), \
+        "khung TNCN không có nhánh cho trạng thái ĐÃ BẬT — nó sẽ còn nói 'chưa tính' sau khi đã tính"
+    assert re.search(r'tncn\s*&&\s*!tncn\.da_bat\s*&&', nguon), \
+        "khung TNCN không có nhánh cho trạng thái CHƯA BẬT — nó sẽ nói đã khấu trừ trong khi chưa"
+    assert "tncn.tham_so_lac_hau" in nguon, (
+        "màn hình không in ra chỗ mức giảm trừ đang lạc hậu so với luật — Kế toán sẽ không biết phải đề xuất gì")
 
 
 # ------------------------------------------------- cây phân hệ phải nói đúng
@@ -198,7 +225,11 @@ def test_cua_tncn_con_thieu_tra_loi_ca_khi_chua_co_bang_luong():
     kq = r.json()
     assert kq["co_bang_luong"] is False
     assert kq["so_nguoi_hdld_khong_tncn"] == 0
-    assert "Kế toán trưởng" in kq["ghi_chu"], "cửa phải nói ra ai là người quyết"
+    # Đổi 08/10/2026 (KY-1): trước đây lời này nói "quyết định của Kế toán trưởng" vì VTOS chưa có
+    # phép tính. Nay phép tính đã có và Chủ tịch đã quyết "VTOS tính", nên điều người đọc cần biết
+    # không còn là AI quyết mà là PHẢI BẤM GÌ — tên tham số công tắc, và cửa nào mở nó.
+    assert "tncn_luy_tien_tu_ky" in kq["ghi_chu"], "cửa phải nói ra bấm gì để bật, không chỉ nói chưa bật"
+    assert "Tham số" in kq["ghi_chu"], "nói tên tham số mà không chỉ màn hình nào sửa được"
 
 
 def test_cua_ho_so_chan_dung_vai():

@@ -254,12 +254,24 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         {run.status === "nhap" && ["hcns", "ketoan", "cntt"].includes(role) && <button className="act grey" onClick={() => api(`/payroll-runs/${period}?refresh=true`).then(setRun).then(() => toast("Đã tính lại nháp")).catch((e) => toast(errMsg(e), true))}>Tính lại nháp</button>}
         {run.status === "nhap" && ["hcns", "cntt"].includes(role) && <button className="act" onClick={() => kiemCoSo()}>Kiểm cơ sở</button>}
         {NEXT[run.status] && NEXT[run.status][0].includes(role) && <button className="act teal" onClick={() => post(`/payroll-runs/${period}/advance`)}>{NEXT[run.status][1]}</button>}</p>
-      {/* Ô "Khoản trừ … TNCN x đ" ở trên là con số của RIÊNG cộng tác viên: `services/hr.py` cộng TNCN
-          đúng một chỗ — 10% thù lao HDV — còn người hợp đồng lao động đi qua `row(e)` với `tncn: 0.0`
-          và không nhánh nào sửa. Số 0 ấy chìm vào tổng và đọc ra thành "công ty khấu trừ bấy nhiêu".
-          Màn hình KHÔNG tự bắt đầu tính thuế lũy tiến: việc VTOS có tính hay để MISA tính là quyết
-          định của Kế toán trưởng. Nó chỉ nói ra ô ấy đang bỏ sót ai. */}
-      {tncn && tncn.so_nguoi_hdld_khong_tncn > 0 && <p className="muted">
+      {/* Ô "Khoản trừ … TNCN x đ" ở trên nghĩa là gì thì TUỲ CÔNG TẮC, nên khung này đọc `tncn.da_bat`
+          của máy chủ chứ không tự đặt lời. Chưa bật: ô ấy là con số của RIÊNG cộng tác viên (10% thù
+          lao HDV), người HĐLĐ đi qua với `tncn: 0.0` và số 0 ấy chìm vào tổng. Đã bật: ô ấy gồm cả
+          thuế lũy tiến của người HĐLĐ, và chỗ còn hở là hồ sơ chứ không phải phép tính.
+          Màn hình KHÔNG có nút bật. Công tắc là tham số `tncn_luy_tien_tu_ky`, hai chữ ký, ở màn hình
+          Tham số — một nút "bắt đầu khấu trừ thuế" đặt cạnh bảng lương là thứ bấm nhầm được. */}
+      {tncn && (tncn.tham_so_lac_hau || []).length > 0 && <p className="muted">
+        {(tncn.tham_so_lac_hau || []).map((t: any) => <span key={t.khoa}>
+          <Tag cls="red">Mức giảm trừ cũ</Tag>{" "}<b>{t.ten}</b> đang áp <b>{vnd(t.dang_ap)}</b>,
+          theo <b>{t.can_cu}</b> phải là <b>{vnd(t.theo_luat)}</b>. {t.viec_phai_lam}{" "}
+        </span>)}</p>}
+      {tncn && tncn.da_bat && <p className="muted">
+        <Tag cls="ok">Đang khấu trừ lũy tiến từ kỳ {tncn.ky_bat_dau}</Tag>{" "}
+        {tncn.ghi_chu} Còn hở: <b>{tncn.chua_co_hop_dong}</b> người chưa có hợp đồng hiệu lực trong kỳ,{" "}
+        <b>{tncn.thieu_mst}</b> người chưa có mã số thuế, <b>{tncn.thieu_muc_bhxh}</b> người chưa có mức
+        đóng BHXH (chưa trừ bảo hiểm nên thuế tạm tính đang cao hơn số phải nộp).
+        Khai hồ sơ và người phụ thuộc ở màn hình <b>Hợp đồng lao động</b>.</p>}
+      {tncn && !tncn.da_bat && tncn.so_nguoi_hdld_khong_tncn > 0 && <p className="muted">
         <Tag cls="warn">{tncn.so_nguoi_hdld_khong_tncn} người HĐLĐ chưa có số TNCN</Tag>{" "}
         {tncn.ghi_chu} Nền dữ liệu hiện tại: <b>{tncn.thieu_mst}</b> người chưa có mã số thuế trong hồ
         sơ, <b>{tncn.co_npt}</b> người đã khai người phụ thuộc mà mức giảm trừ chưa đường nào dùng tới.

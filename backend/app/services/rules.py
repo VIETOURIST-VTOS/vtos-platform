@@ -319,8 +319,21 @@ DEFAULT_PARAMS = [
     ("gd_kd_thuong_85", "6000000", "Thưởng GĐ KD khi ≥ 85% NV đạt chỉ tiêu", "đồng", "Chính sách GĐ KD"),
     ("so_du_tien_toi_thieu", "500000000", "Ngưỡng số dư tiền tối thiểu – cảnh báo dự báo dòng tiền 13 tuần", "đồng", "Thiết kế 3.4"),
     ("thue_gtgt", "0.10", "Thuế suất GTGT dịch vụ lữ hành (Kế toán chỉnh theo mức giảm thuế hiện hành)", "tỷ lệ", "Luật Thuế GTGT"),
-    ("giam_tru_ban_than", "11000000", "Giảm trừ gia cảnh cho bản thân người nộp thuế TNCN (Kế toán chỉnh khi Nhà nước nâng mức)", "đồng/tháng", "NQ 954/2020/UBTVQH14"),
-    ("giam_tru_nguoi_phu_thuoc", "4400000", "Giảm trừ gia cảnh cho mỗi người phụ thuộc (Kế toán chỉnh khi Nhà nước nâng mức)", "đồng/tháng/người", "NQ 954/2020/UBTVQH14"),
+    # NÂNG 08/10/2026 theo Nghị quyết 110/2025/UBTVQH15, áp dụng từ kỳ tính thuế năm 2026: bản thân
+    # 11.000.000 -> 15.500.000, người phụ thuộc 4.400.000 -> 6.200.000 (mức cũ theo NQ 954/2020).
+    #
+    # SỬA Ở ĐÂY KHÔNG ĐỔI ĐƯỢC CƠ SỞ DỮ LIỆU ĐANG CHẠY, và điều đó là cố ý. `seed_params` chỉ bổ
+    # sung khóa MỚI, không đè giá trị đang hiệu lực — vì giá trị đang hiệu lực có hai chữ ký. Nên
+    # bản này làm cho một cơ sở dữ liệu mới dựng là ĐÚNG LUẬT, còn bàn đang chạy thì vẫn mang mức
+    # cũ cho tới khi Kế toán đề xuất và Chủ tịch / TGĐ ký ở màn hình Tham số. Chỗ chênh ấy không để
+    # chìm: `thue_tncn.tham_so_lac_hau()` đếm nó và màn hình in ra.
+    ("giam_tru_ban_than", "15500000", "Giảm trừ gia cảnh cho bản thân người nộp thuế TNCN (Kế toán chỉnh khi Nhà nước nâng mức)", "đồng/tháng", "NQ 110/2025/UBTVQH15 – từ kỳ tính thuế 2026"),
+    ("giam_tru_nguoi_phu_thuoc", "6200000", "Giảm trừ gia cảnh cho mỗi người phụ thuộc (Kế toán chỉnh khi Nhà nước nâng mức)", "đồng/tháng/người", "NQ 110/2025/UBTVQH15 – từ kỳ tính thuế 2026"),
+    # CÔNG TẮC thuế lũy tiến từng phần — ĐỂ TRỐNG, cùng lẽ với `ngay_van_hanh_that`: điền sẵn một kỳ
+    # vào đây là ký thay Chủ tịch bằng một dòng mã. Giá trị là kỳ đầu tiên VTOS tự khấu trừ, dạng
+    # "YYYY-MM". Trước khi ký phải chắc MISA đã dừng khấu trừ cùng kỳ — hai nơi cùng trừ một khoản
+    # thuế thì người lao động phát hiện ra vào ngày nhận lương.
+    ("tncn_luy_tien_tu_ky", "", "Kỳ đầu tiên VTOS tự khấu trừ thuế TNCN lũy tiến cho người HĐLĐ (trống = chưa bật)", "YYYY-MM", "Chủ tịch quyết 08/10/2026 – Luật Thuế TNCN 2025 số 109/2025/QH15"),
     # 48 → 4 ngày 25/9/2026, Chủ tịch quyết. Bản đề xuất Phòng Điều hành viết 4 giờ; anh Tuấn chốt 4.
     #
     # HỆ QUẢ PHẢI NÓI RA, vì nó xảy ra ngay đêm đầu tiên: hạn tính bằng GIỜ ĐỒNG HỒ, không phải

@@ -25,14 +25,20 @@ from app.services import rules as R
 
 # Giảm trừ gia cảnh – để ở tham số để Kế toán chỉnh khi Nhà nước thay đổi mức, không chôn cứng trong mã.
 PIT_SELF_KEY, PIT_DEP_KEY = "giam_tru_ban_than", "giam_tru_nguoi_phu_thuoc"
-PIT_SELF_DEFAULT, PIT_DEP_DEFAULT = 11_000_000.0, 4_400_000.0
+PIT_SELF_DEFAULT, PIT_DEP_DEFAULT = 15_500_000.0, 6_200_000.0   # NQ 110/2025/UBTVQH15, từ kỳ tính thuế 2026
 
 
-def _param(db: Session, key: str, default: float) -> float:
+def _param(db: Session, key: str, default: float, on: date | None = None) -> float:
     try:
-        return R.get_param(db, key)
+        return R.get_param(db, key, on=on)
     except KeyError:
         return default
+
+
+def _cuoi_ky(period: str) -> date:
+    """Ngày đầu tháng sau — mốc đọc tham số của một kỳ."""
+    y, m = int(period[:4]), int(period[5:7])
+    return date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
 
 
 def _period_of(d: date) -> str:
@@ -445,8 +451,11 @@ def dependents_of(db: Session, employee_id: int, period: str | None = None) -> l
 
 def pit_deduction(db: Session, employee_id: int, period: str) -> dict:
     """Giảm trừ gia cảnh của một người trong kỳ: bản thân + số người phụ thuộc đang hiệu lực."""
-    self_amt = _param(db, PIT_SELF_KEY, PIT_SELF_DEFAULT)
-    dep_amt = _param(db, PIT_DEP_KEY, PIT_DEP_DEFAULT)
+    # Đọc mức giảm trừ ÁP CHO KỲ ẤY, không phải mức của hôm nay: bảng tham số có hiệu lực theo ngày,
+    # nên một kỳ cũ tính lại phải ra đúng số của kỳ cũ. Trước 08/10/2026 hàm này gọi không kèm ngày.
+    _on = _cuoi_ky(period)
+    self_amt = _param(db, PIT_SELF_KEY, PIT_SELF_DEFAULT, on=_on)
+    dep_amt = _param(db, PIT_DEP_KEY, PIT_DEP_DEFAULT, on=_on)
     deps = dependents_of(db, employee_id, period)
     return {"period": period, "self": self_amt, "dependent_rate": dep_amt, "dependents": len(deps),
             "dependent_total": round(dep_amt * len(deps), 0), "total": round(self_amt + dep_amt * len(deps), 0),
@@ -485,52 +494,80 @@ def profile_completeness(db: Session, employee_id: int) -> dict:
             "percent": round(100 * (len(PROFILE_REQUIRED) - len(missing)) / len(PROFILE_REQUIRED))}
 
 
-# ---------- Cột TNCN của bảng lương: nói ra nó KHÔNG gồm những ai ----------
+# ---------- Cột TNCN của bảng lương: nói ra nó đang gồm những ai, và bỏ sót ai ----------
 
 def tncn_chua_tinh(db: Session, period: str, rows: list[dict] | None) -> dict:
-    """Cột TNCN trên bảng lương chỉ là 10% khấu trừ của cộng tác viên — nói ra điều đó.
+    """Cột TNCN của bảng lương nghĩa là gì trong kỳ này — và hàm phải ĐỔI LỜI khi công tắc đổi.
 
-    `services/hr.py` cộng TNCN đúng MỘT chỗ: thù lao HDV cộng tác viên, thuế suất `hdv_tncn`. Người
-    hợp đồng lao động đi qua `row(e)` với `"tncn": 0.0` và không nhánh nào sửa nó, nên ô "Khoản trừ
-    … TNCN x đ" trên màn hình là con số của RIÊNG cộng tác viên. Một người đọc ô ấy không có cách nào
-    biết điều đó — số 0 của người HĐLĐ chìm vào tổng và đọc ra thành "công ty khấu trừ bấy nhiêu".
+    Trước 08/10/2026 câu trả lời chỉ có một vế: VTOS cộng TNCN đúng một chỗ (10% thù lao cộng tác
+    viên), người hợp đồng lao động đi qua `row(e)` với `tncn: 0.0`, nên ô "Khoản trừ … TNCN x đ"
+    là con số của RIÊNG cộng tác viên và số 0 của hơn trăm người chìm vào tổng.
 
-    Đây KHÔNG phải một lỗi để sửa bằng mã. Thuế TNCN lũy tiến từng phần của người HĐLĐ có thể đang
-    tính ở MISA, và việc VTOS có tự tính hay không là quyết định của Kế toán trưởng — một phần mềm tự
-    bắt đầu khấu trừ thuế cho hơn trăm người mà không ai ký là chuyện tệ hơn nhiều so với một ô ghi 0.
-    Hàm này chỉ làm chỗ thiếu ĐẾM ĐƯỢC, cùng khuôn với `lech_cong()` ngay trên và với
-    `phong_chua_chot_nguoi_ky()`.
+    Từ bản KY-1 phép tính lũy tiến đã có (`services/thue_tncn.py`), nhưng nó chỉ chạy khi tham số
+    `tncn_luy_tien_tu_ky` được ký. Nên hàm này có HAI lời, và chọn lời theo công tắc chứ không theo
+    trí nhớ của người viết:
 
-    Đếm kèm hai con số để lúc Kế toán trưởng quyết thì biết nền dữ liệu đang ở đâu:
-      · `thieu_mst`   – người HĐLĐ chưa có mã số thuế trong hồ sơ. Chưa có MST thì chưa khấu trừ được.
-      · `co_npt`      – người HĐLĐ đã đăng ký người phụ thuộc. `pit_deduction()` tính sẵn mức giảm trừ
-                        cho họ từ lâu mà chưa đường nào dùng tới; con số này cho biết công sức khai
-                        báo ấy đang nằm không bao nhiêu.
+      · CHƯA BẬT — y như trước: đếm người HĐLĐ không bị khấu trừ, kèm `thieu_mst` và `co_npt` để
+        lúc quyết thì biết nền dữ liệu đang ở đâu.
+      · ĐÃ BẬT  — "tncn = 0" KHÔNG còn là chỗ thiếu: người có thu nhập dưới mức giảm trừ thì thuế
+        bằng 0 một cách đúng đắn. Chỗ thiếu lúc ấy là chỗ KHÁC: người chưa có hợp đồng hiệu lực
+        (chưa biết khấu trừ theo cách nào), người chưa có mã số thuế (khấu trừ rồi mà không khai
+        được), người chưa có mức đóng BHXH (chưa trừ bảo hiểm nên thuế tạm tính cao hơn số phải
+        nộp). Đếm đúng ba chỗ ấy, đừng đếm lại chỗ đã lành.
+
+    Một hàm chỉ biết nói một lời sẽ nói sai vào đúng ngày hệ thống đổi — và nói sai một cách tự tin,
+    vì nó vẫn in ra số.
     """
+    from app.services import thue_tncn as TNCN
     rows = rows or []
+    da_bat = TNCN.da_bat(db, period)
     ma_hdld = {e.code: e for e in db.execute(
         select(Employee).where(Employee.active == True, Employee.contract_type == "hdld")).scalars()}
     ho_so = {p.employee_id: p for p in db.execute(select(EmployeeProfile)).scalars()}
     npt: dict[int, int] = {}
     for d in db.execute(select(Dependent).where(Dependent.active == True)).scalars():
         npt[d.employee_id] = npt.get(d.employee_id, 0) + 1
-    dong, ctv = [], 0
+
+    dong, ctv, chua_hd, thieu_bhxh = [], 0, 0, 0
     for r in rows:
-        if float(r.get("tncn") or 0) > 0:
-            ctv += 1
-            continue
         e = ma_hdld.get(str(r.get("ma") or ""))
         if e is None:
+            if float(r.get("tncn") or 0) > 0:
+                ctv += 1
             continue
         p = ho_so.get(e.id)
-        dong.append({"ma": e.code, "ho_ten": e.full_name, "phong": e.department,
-                     "co_mst": bool(getattr(p, "tax_code", "")),
-                     "so_nguoi_phu_thuoc": npt.get(e.id, 0)})
-    return {"period": period, "so_nguoi_hdld_khong_tncn": len(dong),
+        d = {"ma": e.code, "ho_ten": e.full_name, "phong": e.department,
+             "co_mst": bool(getattr(p, "tax_code", "")),
+             "so_nguoi_phu_thuoc": npt.get(e.id, 0),
+             "thue": round(float((r.get("tncn_luy_tien") or {}).get("thue") or 0))}
+        if da_bat:
+            cach = (r.get("tncn_luy_tien") or {}).get("cach")
+            if cach == TNCN.CHUA_CO_HOP_DONG:
+                chua_hd += 1
+            if r.get("thieu_muc_bhxh"):
+                thieu_bhxh += 1
+            if cach == TNCN.CHUA_CO_HOP_DONG or not d["co_mst"] or r.get("thieu_muc_bhxh"):
+                d["cach"] = cach
+                dong.append(d)
+        elif float(r.get("tncn") or 0) <= 0:
+            dong.append(d)
+
+    if da_bat:
+        ghi_chu = (f"VTOS đang tự khấu trừ thuế TNCN lũy tiến cho người HĐLĐ từ kỳ "
+                   f"{TNCN.ky_bat_dau(db)}. Số dưới đây là các hồ sơ CÒN HỞ khiến số khấu trừ chưa "
+                   "chắc đúng — không phải những người có thuế bằng 0, vì thu nhập dưới mức giảm "
+                   "trừ thì thuế bằng 0 là đúng. Thuế quyết toán theo năm.")
+    else:
+        ghi_chu = ("Cột TNCN của bảng lương chỉ gồm 10% khấu trừ thù lao cộng tác viên. VTOS CHƯA tự "
+                   "khấu trừ thuế lũy tiến cho người hợp đồng lao động: phép tính đã dựng xong "
+                   "(services/thue_tncn.py) nhưng công tắc là tham số 'tncn_luy_tien_tu_ky' đang để "
+                   "trống — mở bằng hai chữ ký ở màn hình Tham số, và chỉ mở sau khi MISA đã dừng "
+                   "khấu trừ cùng kỳ.")
+    return {"period": period, "da_bat": da_bat, "ky_bat_dau": TNCN.ky_bat_dau(db),
+            "so_nguoi_hdld_khong_tncn": len(dong),
             "so_nguoi_ctv_co_tncn": ctv,
             "thieu_mst": sum(1 for d in dong if not d["co_mst"]),
             "co_npt": sum(1 for d in dong if d["so_nguoi_phu_thuoc"] > 0),
-            "ghi_chu": ("Cột TNCN của bảng lương chỉ gồm 10% khấu trừ thù lao cộng tác viên. "
-                        "VTOS chưa tính thuế lũy tiến từng phần cho người hợp đồng lao động — "
-                        "việc có tính ở đây hay để MISA tính là quyết định của Kế toán trưởng."),
-            "dong": dong}
+            "chua_co_hop_dong": chua_hd, "thieu_muc_bhxh": thieu_bhxh,
+            "tham_so_lac_hau": TNCN.tham_so_lac_hau(db, period),
+            "ghi_chu": ghi_chu, "dong": dong}
