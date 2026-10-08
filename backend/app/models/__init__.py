@@ -13,6 +13,7 @@ from app.models.chi_luong import *  # noqa
 from app.models.su_kien_thu_nhap import *  # noqa
 from app.models.lich_su_to_chuc import *  # noqa
 from app.models.phap_che import *  # noqa
+from app.models.phap_che_viec import *  # noqa
 from app.models.hr import *  # noqa
 from app.models.hrm import *  # noqa
 from app.models.ops import *  # noqa

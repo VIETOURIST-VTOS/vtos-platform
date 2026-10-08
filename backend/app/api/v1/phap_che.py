@@ -229,6 +229,12 @@ def ban_ghi_da_cong_bo(bid: int, body: DaCongBoIn, u: User = Depends(require_rol
                                  "chứng minh được bằng gì")
     if body.van_ban_id is not None and db.get(VanBanPhapChe, body.van_ban_id) is None:
         raise HTTPException(422, "Không có văn bản được trỏ tới")
+    # Đợt D2: chủ số liệu đã được hỏi mà chưa trả lời — hoặc đã từ chối — thì cửa này không
+    # mở. Pháp chế không phải người biết doanh thu quý đúng hay sai; người biết là chủ con số.
+    from app.services import phap_che_viec as PV
+    vuong = PV.chan_cong_bo(db, bg.id)
+    if vuong:
+        raise HTTPException(422, vuong)
     bg.da_cong_bo_luc = body.da_cong_bo_luc or datetime.now()
     bg.noi_cong_bo = body.noi_cong_bo.strip()[:160]
     bg.van_ban_id = body.van_ban_id
