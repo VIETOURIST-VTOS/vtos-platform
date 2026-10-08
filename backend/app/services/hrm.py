@@ -433,3 +433,54 @@ def profile_completeness(db: Session, employee_id: int) -> dict:
     missing = [f for f in PROFILE_REQUIRED if not getattr(p, f, None)] if p else list(PROFILE_REQUIRED)
     return {"employee_id": employee_id, "has_profile": p is not None, "missing": missing,
             "percent": round(100 * (len(PROFILE_REQUIRED) - len(missing)) / len(PROFILE_REQUIRED))}
+
+
+# ---------- Cột TNCN của bảng lương: nói ra nó KHÔNG gồm những ai ----------
+
+def tncn_chua_tinh(db: Session, period: str, rows: list[dict] | None) -> dict:
+    """Cột TNCN trên bảng lương chỉ là 10% khấu trừ của cộng tác viên — nói ra điều đó.
+
+    `services/hr.py` cộng TNCN đúng MỘT chỗ: thù lao HDV cộng tác viên, thuế suất `hdv_tncn`. Người
+    hợp đồng lao động đi qua `row(e)` với `"tncn": 0.0` và không nhánh nào sửa nó, nên ô "Khoản trừ
+    … TNCN x đ" trên màn hình là con số của RIÊNG cộng tác viên. Một người đọc ô ấy không có cách nào
+    biết điều đó — số 0 của người HĐLĐ chìm vào tổng và đọc ra thành "công ty khấu trừ bấy nhiêu".
+
+    Đây KHÔNG phải một lỗi để sửa bằng mã. Thuế TNCN lũy tiến từng phần của người HĐLĐ có thể đang
+    tính ở MISA, và việc VTOS có tự tính hay không là quyết định của Kế toán trưởng — một phần mềm tự
+    bắt đầu khấu trừ thuế cho hơn trăm người mà không ai ký là chuyện tệ hơn nhiều so với một ô ghi 0.
+    Hàm này chỉ làm chỗ thiếu ĐẾM ĐƯỢC, cùng khuôn với `lech_cong()` ngay trên và với
+    `phong_chua_chot_nguoi_ky()`.
+
+    Đếm kèm hai con số để lúc Kế toán trưởng quyết thì biết nền dữ liệu đang ở đâu:
+      · `thieu_mst`   – người HĐLĐ chưa có mã số thuế trong hồ sơ. Chưa có MST thì chưa khấu trừ được.
+      · `co_npt`      – người HĐLĐ đã đăng ký người phụ thuộc. `pit_deduction()` tính sẵn mức giảm trừ
+                        cho họ từ lâu mà chưa đường nào dùng tới; con số này cho biết công sức khai
+                        báo ấy đang nằm không bao nhiêu.
+    """
+    rows = rows or []
+    ma_hdld = {e.code: e for e in db.execute(
+        select(Employee).where(Employee.active == True, Employee.contract_type == "hdld")).scalars()}
+    ho_so = {p.employee_id: p for p in db.execute(select(EmployeeProfile)).scalars()}
+    npt: dict[int, int] = {}
+    for d in db.execute(select(Dependent).where(Dependent.active == True)).scalars():
+        npt[d.employee_id] = npt.get(d.employee_id, 0) + 1
+    dong, ctv = [], 0
+    for r in rows:
+        if float(r.get("tncn") or 0) > 0:
+            ctv += 1
+            continue
+        e = ma_hdld.get(str(r.get("ma") or ""))
+        if e is None:
+            continue
+        p = ho_so.get(e.id)
+        dong.append({"ma": e.code, "ho_ten": e.full_name, "phong": e.department,
+                     "co_mst": bool(getattr(p, "tax_code", "")),
+                     "so_nguoi_phu_thuoc": npt.get(e.id, 0)})
+    return {"period": period, "so_nguoi_hdld_khong_tncn": len(dong),
+            "so_nguoi_ctv_co_tncn": ctv,
+            "thieu_mst": sum(1 for d in dong if not d["co_mst"]),
+            "co_npt": sum(1 for d in dong if d["so_nguoi_phu_thuoc"] > 0),
+            "ghi_chu": ("Cột TNCN của bảng lương chỉ gồm 10% khấu trừ thù lao cộng tác viên. "
+                        "VTOS chưa tính thuế lũy tiến từng phần cho người hợp đồng lao động — "
+                        "việc có tính ở đây hay để MISA tính là quyết định của Kế toán trưởng."),
+            "dong": dong}

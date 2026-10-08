@@ -531,7 +531,17 @@ PHAM_VI_DA_CHOT = {
     # `ir_phapche` = 16 nhóm, và con số nhỏ ấy là ĐÚNG HÌNH của vị trí: 15 nhóm nền mọi tài
     # khoản đều có, cộng ĐÚNG MỘT nhóm của chính bàn làm việc mình. IR KHÔNG mặc định xem
     # lương, không xem công nợ, không xem giá vốn — mở thêm nhóm nào là một lần nới có chữ ký.
-    "chutich": 126, "tgd": 126, "bks": 126, "cntt": 123, "ir_phapche": 16,
+    # NS-3 · HAI LẦN NỚI NHỎ, 08/10/2026 chiều — cả hai do HÀNG RÀO REO, không do ai nhớ ra.
+    #
+    # `ir_phapche` 16 → 18: vai IR – Pháp chế mở sáng cùng ngày (Đợt D2, PR #247) nhưng chưa có trong
+    # nhóm `MOI_NHAN_VIEN`, nên người của phòng ấy KHÔNG gửi được đơn nghỉ phép. `test_ns2` tính tập
+    # vai của NGƯỜI tại chỗ từ `ROLES` và đỏ với đúng một tên. +2 là `/api/v1/leaves` và
+    # `/api/v1/leave-balance` của màn hình /cham-cong — đúng hai cửa máy chủ vẫn nhận đơn của họ.
+    #
+    # `robot_ks` 125 → 126: dòng `/ir-phap-che` khai TAY bốn tên thay vì cộng `BASE_VIEW`, nên thiếu
+    # robot Kiểm soát và `test_ma_tran_quyen` đỏ — main đỏ thì mọi làn đỏ theo. Sửa về `BASE_VIEW +
+    # ("ir_phapche", "cntt")`: KHÔNG nới cho một người nào, chỉ trả lại vai chỉ-đọc mà cả bảng đều có.
+    "chutich": 126, "tgd": 126, "bks": 126, "cntt": 123, "ir_phapche": 18,
     "ketoan": 103, "tp_dh": 93, "ptgd_doan": 75, "nv_dh": 66, "hcns": 64, "gd_kd": 68,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
@@ -578,7 +588,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 125, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 126, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

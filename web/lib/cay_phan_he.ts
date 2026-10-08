@@ -294,17 +294,28 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "4.10.1", ten: "Tổng quan hướng dẫn", href: "/huong-dan" },
           { ma: "4.10.2", ten: "Hồ sơ hướng dẫn viên", href: "/huong-dan" },
           { ma: "4.10.3", ten: "Lịch & bố trí hướng dẫn", href: "/ops?tab=guides" },
-          { ma: "4.10.4", ten: "Báo cáo sau tour" },
-          { ma: "4.10.5", ten: "Đối soát thù lao" },
+          // 08/10/2026 — khai "chưa dựng" là SAI: bảng `BaoCaoSauTour`, cửa máy chủ và form soạn báo cáo
+          // trên /xe-hdv đã gộp 06/10, và /huong-dan có cột "Sau tour" để Điều hành đọc.
+          { ma: "4.10.4", ten: "Báo cáo sau tour", href: "/xe-hdv" },
+          // Một nửa, và tên phải nói đúng chỗ đang đứng: /huong-dan có cột Thù lao và loại đề xuất
+          // "Đối soát thù lao kỳ", nhưng chưa có bảng đối soát theo kỳ đứng riêng.
+          { ma: "4.10.5", ten: "Đối soát thù lao — hiện là đề xuất theo kỳ, chưa có bảng đối soát", href: "/huong-dan" },
           { ma: "4.10.6", ten: "Việc của tài xế & hướng dẫn viên", href: "/xe-hdv", them: true }
         ] }
     ] },
   { khoa: "nhansu", ma: "05", ten: "Nhân sự – Hành chính",
     tom_tat: "Con người · Thu nhập · Hành chính · Tài sản",
     con: [
-      { ma: "5.1", ten: "Tổng quan nhân sự" },
+      // 08/10/2026 — mục này khai "chưa dựng" là NÓI SAI: làn HCNS đã dựng thẻ "Tổng quan HCNS" trên
+      // /hr sáng 08/10 (PR #240), kèm cả `services/hcns_tong_quan.py`. Cây là chỗ Chủ tịch nhìn để
+      // biết còn nợ gì, nên một dòng khai thiếu hơn thực tế vừa giấu việc đã làm xong, vừa đẩy người
+      // đọc đi tìm thứ đang có sẵn.
+      { ma: "5.1", ten: "Tổng quan nhân sự", href: "/hr?tab=tong_quan" },
       { ma: "5.2", ten: "Hồ sơ nhân sự", href: "/hr?tab=employees" },
-      { ma: "5.3", ten: "Hợp đồng nhân sự", href: "/hop-dong-lao-dong" },
+      // Đổi tên 08/10/2026 cùng vòng NS-3: màn hình này nay giữ cả HỒ SƠ ĐỊNH DANH (CCCD, MST, số tài
+      // khoản) và NGƯỜI PHỤ THUỘC / giảm trừ gia cảnh — hai cửa máy chủ mở từ lâu mà chưa màn hình nào
+      // gọi tới. Tên cũ chỉ nói "hợp đồng" thì người đi tìm chỗ khai người phụ thuộc không biết vào đâu.
+      { ma: "5.3", ten: "Hợp đồng & hồ sơ định danh", href: "/hop-dong-lao-dong" },
       // 08/10/2026 — TRẢ XONG, bằng HAI màn hình cho HAI người khác nhau, và chỗ tách ấy là điểm của
       // cả vòng. Mốc trước (07/10) tên mục phải mang cái đuôi "hiện chỉ có cửa cho tài xế & HDV".
       //
@@ -459,7 +470,12 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
         ] },
       { ma: "8.3", ten: "Quy trình & tự động hóa",
         con: [
-          { ma: "8.3.1", ten: "Quy trình phê duyệt" },
+          // 08/10/2026 — khai "chưa dựng" là SAI: bảng LUONG_VIEC hiện ở thẻ "Luồng công việc" của
+          // /access từ vòng PQ-2, và có phép thử `test_man_hinh_luong_viec` canh đúng thẻ ấy.
+          // Đường dẫn để TRẦN "/access", không phải "/access?tab=luongviec": màn hình ấy KHÔNG đọc `?tab=`
+          // từ URL (khác /hr), nên một đường dẫn có tham số sẽ mở đúng trang mà sai thẻ — một liên kết
+          // trông đúng mà không tới nơi. Tên mục nói thẳng thẻ nào, đúng cách đã dùng cho 4.4.2 và 4.9.7.
+          { ma: "8.3.1", ten: "Quy trình phê duyệt — thẻ «Luồng công việc» của Phân quyền", href: "/access" },
           { ma: "8.3.2", ten: "Quy tắc tự động", href: "/tu-dong-hoa" },
           { ma: "8.3.3", ten: "Trợ lý AI", href: "/ai-roles" }
         ] },

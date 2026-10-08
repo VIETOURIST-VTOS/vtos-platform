@@ -68,7 +68,11 @@ BASE_VIEW = FULL_VIEW + READ_ALL                        # nền của MỌI dòn
 # Hàng rào `test_ns2` tính tập vai của người TẠI CHỖ từ `ROLES` và đòi khớp đúng, không đòi một con số.
 MOI_NHAN_VIEN = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "nv_kd", "tn_kd", "tp_kd",
                  "gd_kd", "sales_admin", "nv_mkt", "ketoan", "hcns", "cntt", "bks", "tai_xe", "hdv",
-                 "gd_doi_xe", "tp_hd", "nv_visa", "hanh_chinh")
+                 "gd_doi_xe", "tp_hd", "nv_visa", "hanh_chinh", "ir_phapche")
+# `ir_phapche` thêm 08/10/2026 chiều — và nó vào đây vì HÀNG RÀO REO, không vì ai nhớ ra. Vai ấy mở
+# sáng cùng ngày ở Đợt D2 (PR #247); `test_ns2` tính tập vai của NGƯỜI tại chỗ từ `ROLES` và đỏ ngay
+# với đúng một tên. Đây là lý do phép thử ấy cố ý KHÔNG viết con số 22 vào mã: viết số thì nó đỏ mà
+# không nói được thiếu ai, và người sửa sẽ sửa con số.
 
 # Màn hình Nhân sự tách quyền theo TAB (chỉ đạo 07/9/2026). Trước bản này, ai mở được màn hình là thấy cả
 # ba tab – nên không có cách nào cho một người xem hồ sơ nhân sự mà không xem luôn bảng lương.
@@ -956,7 +960,11 @@ MENU_ROLES = {
     # văn bản HĐQT và hồ sơ công bố thông tin của một công ty niêm yết là chuyện của Ban
     # Tổng giám đốc, Pháp chế và Kiểm soát – không phải của phòng ban. Ban Kiểm soát và CNTT
     # ĐỌC mà không ghi; chữ ký ghi nằm ở api/v1/phap_che.py::GHI, không nằm ở đây.
-    "/ir-phap-che": ("chutich", "tgd", "ir_phapche", "bks", "cntt"),
+    # Sửa 08/10/2026 chiều: dòng này khai TAY bốn tên thay vì cộng `BASE_VIEW`, nên thiếu `robot_ks` và
+    # `test_ma_tran_quyen` đỏ — main đỏ thì mọi làn đỏ theo. KHÔNG nới cho ai: `BASE_VIEW` là
+    # (chutich, tgd, bks, robot_ks), tức đúng danh sách cũ cộng robot Kiểm soát, vai chỉ-đọc mà lớp
+    # `READ_ONLY_ROLES` chặn mọi thao tác ghi. Robot Kiểm soát không soi được màn hình nó không thấy.
+    "/ir-phap-che": BASE_VIEW + ("ir_phapche", "cntt"),
     "/audit": AUDIT_ROLES,
     # Bàn làm việc của robot Kiểm soát. Nguyên tắc 07/9 giữ nguyên và không bị nới ở đây: PHÒNG BAN
     # KHÔNG ĐỌC KẾT QUẢ GIÁM SÁT CHÍNH MÌNH – việc phải làm thì hiện ở màn hình Ngoại lệ của họ.

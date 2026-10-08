@@ -27,6 +27,28 @@ function HopDong() {
   const [luu, setLuu] = useState(false);
   const canGhi = ["hcns", "cntt"].includes(user?.role || "");
 
+  /** NS-3 · 08/10/2026 — HAI CỬA CÒN THIẾU CỦA PHÂN HỆ NHÂN SỰ, dựng ở đây chứ không ở màn hình mới.
+   *
+   *  `GET/PUT /employees/{id}/profile`, `/hrm/profile-gaps`, `/dependents` và `/pit-deduction` nằm trên
+   *  máy chủ từ lâu mà ra cả thư mục `web/` thì KHÔNG MỘT TỆP NÀO gọi tới. Hậu quả đo được: `pit_deduction()`
+   *  chỉ được gọi từ đúng cửa API của chính nó — người phụ thuộc không có cửa khai, nên giảm trừ gia cảnh
+   *  là một phép tính chạy không tải suốt từ ngày viết.
+   *
+   *  VÌ SAO ĐẶT Ở MÀN HÌNH HỢP ĐỒNG, KHÔNG DỰNG TRANG MỚI: `MAN_HINH_API` của /hop-dong-lao-dong đã khai
+   *  sẵn `/api/v1/hrm`, `/api/v1/dependents` và `/api/v1/employees` từ trước, và màn hình này đã là màn
+   *  hình hồ sơ-của-một-người (BASE_VIEW + hcns + cntt). Dựng trang mới là phải khai thêm một dòng trong
+   *  ma trận quyền cho đúng những cửa đã khai ở đây — thêm một chỗ để hai bản khai lệch nhau, không thêm
+   *  một quyền nào. Phạm vi vai trò sau vòng này KHÔNG đổi một đơn vị.
+   */
+  const [thieuHoSo, setThieuHoSo] = useState<any>(null);
+  const [chon, setChon] = useState<number>(0);          // nhân viên đang mở hồ sơ
+  const [hs, setHs] = useState<any>(null);              // /employees/{id}/profile
+  const [fHs, setFHs] = useState<any>({});              // ô đang sửa
+  const [npt, setNpt] = useState<any[]>([]);
+  const [fNpt, setFNpt] = useState<any>(null);
+  const [gt, setGt] = useState<any>(null);              // /pit-deduction
+  const ky = new Date().toISOString().slice(0, 7);
+
   const load = useCallback(async () => {
     try {
       setDs(await api("/labor-contracts"));
@@ -37,7 +59,45 @@ function HopDong() {
   useEffect(() => {
     api("/hrm/meta").then(setMeta).catch(() => {});
     api("/employees").then((r: any) => setEmps(r.rows || r)).catch(() => {});
+    api("/hrm/profile-gaps").then(setThieuHoSo).catch(() => setThieuHoSo(null));
   }, []);
+
+  /** Mở hồ sơ một người: ba lời gọi, và KHÔNG lời gọi nào tính lại cái máy chủ đã tính. Mức giảm trừ
+   *  gia cảnh lấy nguyên từ `/pit-deduction` — tính ở màn hình là tính lần thứ hai, và lần thứ hai bao
+   *  giờ cũng là lần lệch khi Nhà nước nâng mức. */
+  const moHoSo = useCallback((eid: number) => {
+    setChon(eid); setHs(null); setFHs({}); setNpt([]); setGt(null); setFNpt(null);
+    if (!eid) return;
+    api(`/employees/${eid}/profile`).then((r: any) => { setHs(r); setFHs(r.profile || {}); })
+      .catch((e) => toast(errMsg(e), true));
+    api<any[]>(`/dependents?employee_id=${eid}`).then(setNpt).catch(() => setNpt([]));
+    api(`/employees/${eid}/pit-deduction?period=${ky}`).then(setGt).catch(() => setGt(null));
+  }, [toast, ky]);
+
+  const luuHoSo = async () => {
+    try {
+      await api(`/employees/${chon}/profile`, { method: "PUT", json: fHs });
+      toast("Đã lưu hồ sơ");
+      api("/hrm/profile-gaps").then(setThieuHoSo).catch(() => {});
+      moHoSo(chon);
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
+  const themNpt = async () => {
+    if (!String(fNpt?.full_name || "").trim()) { toast("Thiếu họ tên người phụ thuộc", true); return; }
+    try {
+      await api("/dependents", { method: "POST", json: { ...fNpt, employee_id: chon } });
+      toast("Đã thêm người phụ thuộc"); setFNpt(null); moHoSo(chon);
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
+  /** NGỪNG, không phải XOÁ. Máy chủ đặt `active = false` và giữ lại dòng: một người phụ thuộc đã từng
+   *  được giảm trừ là căn cứ quyết toán thuế của những kỳ trước, xoá đi là xoá mất căn cứ ấy. */
+  const ngungNpt = async (d: any) => {
+    if (!window.confirm(`Ngừng giảm trừ cho ${d.full_name}? Dòng cũ vẫn giữ để tra lại.`)) return;
+    try { await api(`/dependents/${d.id}`, { method: "DELETE" }); toast("Đã ngừng"); moHoSo(chon); }
+    catch (e) { toast(errMsg(e), true); }
+  };
 
   const luuHd = async () => {
     setLuu(true);
@@ -157,6 +217,76 @@ function HopDong() {
             {canGhi && c.status !== "cham_dut" && <> <button className="act grey" style={{ margin: 0 }}
               onClick={() => chamDut(c)}>Chấm dứt</button></>}</td>
         </tr>) : <tr><td colSpan={8} className="muted">Chưa có hợp đồng nào trên hệ thống.</td></tr>}</tbody></table>
+    </div>
+
+    <div className="panel">
+      <h2>Hồ sơ định danh &amp; người phụ thuộc</h2>
+      <p className="muted">Hai cửa này nằm trên máy chủ từ lâu mà chưa màn hình nào gọi tới, nên
+        <b> giảm trừ gia cảnh là một phép tính chạy không tải</b>: không ai khai được người phụ thuộc thì
+        mức giảm trừ của mọi người đều bằng mức bản thân. Số liệu do Nhân sự nhập — dữ liệu cá nhân,
+        phân quyền riêng theo Nghị định 13/2023.</p>
+      {thieuHoSo && thieuHoSo.count > 0 && <p>
+        <Tag cls="warn">{thieuHoSo.count}</Tag> người còn thiếu thông tin hồ sơ bắt buộc
+        <span className="muted"> ({(thieuHoSo.required_fields || []).join(" · ")})</span></p>}
+
+      <div className="wrap">
+        <label>Chọn người<br />
+          <select value={chon || ""} onChange={(e) => moHoSo(Number(e.target.value))}>
+            <option value="">— chọn nhân viên —</option>
+            {emps.map((e: any) => <option key={e.id} value={e.id}>{e.code} · {e.full_name}</option>)}
+          </select></label>
+        {hs && <p className="muted" style={{ alignSelf: "end", margin: 0 }}>
+          Hồ sơ đầy đủ <b>{hs.completeness?.percent}%</b>
+          {hs.completeness?.missing?.length ? <> · còn thiếu: {hs.completeness.missing.join(", ")}</> : null}</p>}
+      </div>
+
+      {chon > 0 && hs && <>
+        <div className="wrap" style={{ marginTop: 8 }}>
+          {([["id_number", "Số CCCD"], ["dob", "Ngày sinh"], ["permanent_address", "Địa chỉ thường trú"],
+             ["phone", "Điện thoại"], ["tax_code", "Mã số thuế"], ["bank_account", "Số tài khoản"],
+             ["bank_name", "Ngân hàng"], ["social_insurance_no", "Số sổ BHXH"]] as [string, string][])
+            .map(([k, l]) => <label key={k}>{l}
+              {(hs.completeness?.missing || []).includes(k) && <Tag cls="warn">thiếu</Tag>}<br />
+              <input type={k === "dob" ? "date" : "text"} value={(fHs as any)[k] || ""}
+                     disabled={!canGhi}
+                     onChange={(e) => setFHs({ ...fHs, [k]: e.target.value })} /></label>)}
+          {canGhi && <div style={{ alignSelf: "end" }}><button className="act teal" onClick={luuHoSo}>Lưu hồ sơ</button></div>}
+        </div>
+
+        <h3 style={{ marginTop: 16 }}>Người phụ thuộc · giảm trừ gia cảnh</h3>
+        {gt && <p className="muted">Kỳ {gt.period}: bản thân <b>{vnd(gt.self)}</b>
+          {" "}+ {gt.dependents} người phụ thuộc × {vnd(gt.dependent_rate)}
+          {" "}= <b>{vnd(gt.total)}</b> mỗi tháng.
+          {" "}<span className="muted">Mức do Kế toán chỉnh trong Chính sách &amp; quy trình khi Nhà nước nâng.</span></p>}
+        <table><thead><tr><th>Họ tên</th><th>Quan hệ</th><th>Ngày sinh</th><th>MST</th><th>Từ kỳ</th><th>Đến kỳ</th><th></th></tr></thead>
+          <tbody>{npt.length ? npt.map((d: any) => <tr key={d.id}>
+            <td><b>{d.full_name}</b></td><td>{d.relation_name}</td><td>{d.dob ? fmtD(d.dob) : ""}</td>
+            <td className="mono">{d.tax_code}</td><td>{d.from_period}</td><td>{d.to_period}</td>
+            <td>{canGhi && <button className="act grey" style={{ margin: 0 }} onClick={() => ngungNpt(d)}>Ngừng</button>}</td>
+          </tr>) : <tr><td colSpan={7} className="muted">Chưa khai người phụ thuộc nào.</td></tr>}</tbody></table>
+
+        {canGhi && (!fNpt
+          ? <button className="act teal" style={{ marginTop: 8 }}
+                    onClick={() => setFNpt({ full_name: "", relation: "con", dob: "", tax_code: "", from_period: ky, to_period: "" })}>Thêm người phụ thuộc</button>
+          : <div className="wrap" style={{ marginTop: 8 }}>
+              <label>Họ tên<br /><input value={fNpt.full_name}
+                onChange={(e) => setFNpt({ ...fNpt, full_name: e.target.value })} /></label>
+              <label>Quan hệ<br /><select value={fNpt.relation}
+                onChange={(e) => setFNpt({ ...fNpt, relation: e.target.value })}>
+                {Object.entries(meta?.relations || { con: "Con" }).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+              </select></label>
+              <label>Ngày sinh<br /><input type="date" value={fNpt.dob}
+                onChange={(e) => setFNpt({ ...fNpt, dob: e.target.value })} /></label>
+              <label>Mã số thuế<br /><input value={fNpt.tax_code}
+                onChange={(e) => setFNpt({ ...fNpt, tax_code: e.target.value })} /></label>
+              <label>Từ kỳ <span className="muted">(YYYY-MM)</span><br /><input value={fNpt.from_period} style={{ width: 110 }}
+                onChange={(e) => setFNpt({ ...fNpt, from_period: e.target.value })} /></label>
+              <label>Đến kỳ <span className="muted">(để trống = còn hiệu lực)</span><br /><input value={fNpt.to_period} style={{ width: 110 }}
+                onChange={(e) => setFNpt({ ...fNpt, to_period: e.target.value })} /></label>
+              <div><button className="act teal" onClick={themNpt}>Lưu</button>{" "}
+                <button className="act grey" onClick={() => setFNpt(null)}>Thôi</button></div>
+            </div>)}
+      </>}
     </div>
 
     {tep && <DinhKem doiTuong="nhan_su" doiTuongId={tep.ma} loai="hop_dong"
