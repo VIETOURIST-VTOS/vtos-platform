@@ -494,6 +494,7 @@ export const GROUPS: Group[] = [
     ["Đánh giá & sự vụ", "/hr?tab=incidents"],
     ["Báo cáo công việc", "/reports"],
     ["Chính sách & quy trình", "/params"],
+    ["IR – Pháp chế", "/ir-phap-che"],
     ["Tài sản & mua sắm", "/tai-san"],
   ] },
 

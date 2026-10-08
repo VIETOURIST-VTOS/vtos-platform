@@ -71,6 +71,19 @@ ROLES = {
     "hcns": "Nhân sự Hành chính",
     "cntt": "Công nghệ thông tin",
     "bks": "Ban Kiểm soát (chỉ đọc)",
+    # IR – PHÁP CHẾ. Mở 08/10/2026 theo chỉ đạo trực tiếp của Chủ tịch, và ghi ra đây để
+    # một lần xem lại mã sau này biết quyền ấy từ đâu mà có: lần viết phần mềm không tự
+    # khai quyền, lần này có người quyết.
+    #
+    # MỘT VAI, KHÔNG PHẢI HAI. Chủ tịch chốt một người kiêm cả quan hệ nhà đầu tư lẫn pháp
+    # chế. Tách thành hai vai hôm nay là dựng sẵn một ranh giới chưa có người đứng hai bên,
+    # và một ranh giới không ai đứng thì mọi quyền sẽ được cấp cho cả hai cho tiện – tức là
+    # tốn một vai mà không chặn được gì. Khi tách người thì tách vai, không làm ngược.
+    #
+    # PHẠM VI TOÀN TẬP ĐOÀN (Chủ tịch chốt cùng ngày): hồ sơ công bố thông tin của VTD là
+    # của cả tập đoàn, cắt theo pháp nhân thì người chịu trách nhiệm công bố chỉ nhìn thấy
+    # một phần nghĩa vụ của chính mình.
+    "ir_phapche": "IR – Pháp chế",
     # Hai vai trò mở ngày 07/9/2026 theo bảng lương T07-08: người ở hiện trường và ban visa cần đăng nhập,
     # nhưng không được thấy hàng đợi điều hành hay dữ liệu khách của phòng khác.
     #

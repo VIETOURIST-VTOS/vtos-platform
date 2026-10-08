@@ -522,7 +522,16 @@ PHAM_VI_DA_CHOT = {
     # phạm vi của /hr KHÔNG đổi một đơn vị nào, và đã đo lại sau khi Đợt C gộp để chắc điều đó.
     #
     # Bốn vai nền và nv_dh, tp_dh, hcns, cntt, tai_xe, hdv không đổi: họ đã có đủ hai tiền tố.
-    "chutich": 125, "tgd": 125, "bks": 125, "cntt": 122,
+    # ── 08/10/2026 · VAI MỚI `ir_phapche` (IR – Pháp chế), Chủ tịch quyết ───────────────
+    # +1 cho bốn vai nền: nhóm "/api/v1/ir-phap-che" gắn vào màn hình mới /ir-phap-che
+    # (văn bản có phiên bản, nghĩa vụ và bản ghi công bố thông tin). Đúng BỐN vai nền thấy
+    # màn hình ấy, cộng chính vai mới — không vai phòng ban nào: văn bản HĐQT và hồ sơ công
+    # bố của một công ty niêm yết không phải việc của phòng ban.
+    #
+    # `ir_phapche` = 16 nhóm, và con số nhỏ ấy là ĐÚNG HÌNH của vị trí: 15 nhóm nền mọi tài
+    # khoản đều có, cộng ĐÚNG MỘT nhóm của chính bàn làm việc mình. IR KHÔNG mặc định xem
+    # lương, không xem công nợ, không xem giá vốn — mở thêm nhóm nào là một lần nới có chữ ký.
+    "chutich": 126, "tgd": 126, "bks": 126, "cntt": 123, "ir_phapche": 16,
     "ketoan": 103, "tp_dh": 93, "ptgd_doan": 75, "nv_dh": 66, "hcns": 64, "gd_kd": 68,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
