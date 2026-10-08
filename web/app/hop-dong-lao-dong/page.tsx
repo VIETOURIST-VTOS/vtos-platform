@@ -219,6 +219,22 @@ function HopDong() {
         </tr>) : <tr><td colSpan={8} className="muted">Chưa có hợp đồng nào trên hệ thống.</td></tr>}</tbody></table>
     </div>
 
+    {/* NS-4 · 08/10/2026 — mặt sau của lần siết tuyến ký đơn. Mỗi phòng nay đúng MỘT vai ký, nên một
+        vai không tài khoản nào giữ thì đơn của cả phòng ấy nằm im trong hàng đợi và KHÔNG dòng nào
+        báo. Màn hình in ra để HCNS đi cấp tài khoản, chứ không để phần mềm tự nới lại danh sách —
+        nới lại là xoá đúng quyết định vừa ký. */}
+    {(meta?.phong_thieu_nguoi_giu_vai?.length || meta?.phong_chua_chot_nguoi_ky?.length) ? <div className="panel">
+      <h2>Tuyến ký đơn nghỉ còn chỗ hở</h2>
+      {meta.phong_thieu_nguoi_giu_vai?.length > 0 && <p>
+        <Tag cls="red">{meta.phong_thieu_nguoi_giu_vai.length} phòng</Tag> đã chỉ định người ký nhưng
+        <b> chưa tài khoản nào giữ vai ấy</b> — đơn của họ sẽ nằm im trong hàng đợi:{" "}
+        {meta.phong_thieu_nguoi_giu_vai.map((x: any) => `${x.phong_ten} (cần vai ${x.vai_ky.join(", ")})`).join(" · ")}.
+        {" "}HCNS cấp tài khoản cho đúng vai là xong.</p>}
+      {meta.phong_chua_chot_nguoi_ky?.length > 0 && <p>
+        <Tag cls="warn">{meta.phong_chua_chot_nguoi_ky.length} phòng</Tag> chưa ai quyết người ký, đang
+        chạy bằng danh sách dự phòng: {meta.phong_chua_chot_nguoi_ky.join(" · ")}.</p>}
+    </div> : null}
+
     <div className="panel">
       <h2>Hồ sơ định danh &amp; người phụ thuộc</h2>
       <p className="muted">Hai cửa này nằm trên máy chủ từ lâu mà chưa màn hình nào gọi tới, nên
