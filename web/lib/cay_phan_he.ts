@@ -305,21 +305,43 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "5.1", ten: "Tổng quan nhân sự" },
       { ma: "5.2", ten: "Hồ sơ nhân sự", href: "/hr?tab=employees" },
       { ma: "5.3", ten: "Hợp đồng nhân sự", href: "/hop-dong-lao-dong" },
-      // 07/10/2026 — mục này đang khai là "Chưa dựng", và đó là nói SAI: từ PR #206 một tài xế hoặc
-      // hướng dẫn viên ĐÃ gửi được đơn nghỉ phép / ốm đau / vắng việc trên màn hình /xe-hdv, và
-      // người ký đơn thấy đơn của phòng mình. Nhưng chín phòng còn lại thì cửa máy chủ nhận đơn mà
-      // chưa có màn hình nào gọi tới — nên cũng không gọi là xong được. Tên mục nói đúng chỗ đang
-      // đứng, vì cây này không có trạng thái "làm một nửa".
-      { ma: "5.4", ten: "Chấm công & nghỉ phép — hiện chỉ có cửa cho tài xế & HDV", href: "/xe-hdv" },
+      // 08/10/2026 — TRẢ XONG, bằng HAI màn hình cho HAI người khác nhau, và chỗ tách ấy là điểm của
+      // cả vòng. Mốc trước (07/10) tên mục phải mang cái đuôi "hiện chỉ có cửa cho tài xế & HDV".
+      //
+      // 5.4 là màn hình của NGƯỜI CHẤM CÔNG: thẻ Chấm công của /hr, Đợt C dựng sáng 08/10 (bảng chấm
+      // công tháng + sổ đơn nghỉ), và vòng này lắp vào đó LƯỚI GHI — trước bản này `attendance_days`
+      // có màn hình ĐỌC mà không màn hình nào GHI được, nên HCNS xem được bảng chấm công chứ không
+      // chấm được. Mở cho sáu vai, theo `HR_TAB_ROLES["cham_cong"]`.
+      //
+      // 5.4b là cửa của NGƯỜI GỬI ĐƠN, mở cho cả 22 vai. Không gộp vào 5.4 được: thẻ của HCNS mở cho
+      // sáu vai, mà đơn nghỉ phép là thứ mọi người làm thuê đều phải gửi được.
+      { ma: "5.4", ten: "Chấm công & nghỉ phép", href: "/hr?tab=cham_cong" },
+      { ma: "5.4b", ten: "Đơn nghỉ phép của tôi", href: "/cham-cong", them: true },
       { ma: "5.5", ten: "Lương & thu nhập", href: "/hr?tab=payroll" },
-      { ma: "5.6", ten: "Đánh giá nhân sự", href: "/hr?tab=incidents" },
+      // 08/10/2026 — ĐO ĐƯỢC: 5.6 và 5.7 trỏ vào CÙNG MỘT đường dẫn, và tab thật trong /hr tên là
+      // "Đánh giá & sự vụ" — MỘT tab mang hai tên mục. Mở tab ấy ra đọc: nó gọi đúng hai cửa
+      // `/incidents` và `/incident-levels`, tức toàn bộ dữ liệu của nó là SỔ SỰ VỤ. Không có kỳ đánh
+      // giá, không có tiêu chí, không có người chấm — nên mục 5.6 đang nói to hơn sự thật. Đổi TÊN
+      // cho đúng chỗ đang đứng chứ không gộp hai mục lại: gộp hay bỏ một nhánh của bản vẽ v1.3 là
+      // việc Chủ tịch quyết, còn nói đúng cái đang có là việc phải làm ngay.
+      { ma: "5.6", ten: "Đánh giá nhân sự — hiện chỉ có sổ sự vụ, chưa có kỳ đánh giá", href: "/hr?tab=incidents" },
       { ma: "5.7", ten: "Hồ sơ sự vụ", href: "/hr?tab=incidents" },
-      { ma: "5.8", ten: "Báo cáo nhân sự", href: "/reports" },
+      // 08/10/2026 — /reports có ba tab: báo cáo công việc của tôi, tổng hợp phòng, ca trực page. Đó
+      // là báo cáo DO NHÂN VIÊN VIẾT, không phải báo cáo VỀ nhân sự: không có số đầu người, không có
+      // biến động tăng giảm, không có bảng hợp đồng sắp hết hạn (bảng ấy nằm ở mục 5.3). Giữ đường
+      // dẫn vì nó vẫn là chỗ người ta đang vào, nhưng tên phải nói đúng cái mở ra.
+      { ma: "5.8", ten: "Báo cáo nhân sự — hiện là báo cáo công việc & ca trực, chưa có báo cáo biến động", href: "/reports" },
       { ma: "5.9", ten: "Hành chính",
         con: [
           { ma: "5.9.1", ten: "Văn bản & quy trình", href: "/params" },
-          { ma: "5.9.2", ten: "Mua sắm", href: "/tai-san" },
-          { ma: "5.9.3", ten: "Tài sản & cấp phát", href: "/tai-san" }
+          // 08/10/2026 — cùng một dạng với 5.6: hai mục, một trang. /tai-san có bốn tab — tài sản cố
+          // định, khấu hao kỳ, chi phí trả trước, phân bổ kỳ — và không tab nào là ĐỀ NGHỊ MUA hay
+          // BIÊN BẢN CẤP PHÁT. Đã mở `models/assets.py` ra đọc: `FixedAsset` có cột `department`
+          // (bộ phận sử dụng) nhưng không có người nhận, ngày cấp, ngày thu hồi; và không bảng nào
+          // trong máy chủ tên là cấp phát. Nên "mua sắm" ở đây là ghi lại thứ ĐÃ MUA, còn "cấp phát"
+          // thì chưa có. Đổi tên, không đắp thêm đường dẫn gần đúng.
+          { ma: "5.9.2", ten: "Mua sắm — hiện chỉ ghi tài sản đã mua, chưa có cửa đề nghị mua", href: "/tai-san" },
+          { ma: "5.9.3", ten: "Tài sản & cấp phát — hiện chỉ có sổ tài sản, chưa có biên bản cấp phát", href: "/tai-san" }
         ] }
     ] },
   { khoa: "taichinh", ma: "06", ten: "Tài chính – Kế toán",

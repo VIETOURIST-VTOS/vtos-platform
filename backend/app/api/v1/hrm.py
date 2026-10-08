@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles
 from app.models.core import User
-from app.models.hr import Employee
+from app.models.hr import Employee, PayrollRun
 from app.models.hrm import (EmployeeProfile, LaborContract, Dependent, LeaveRequest,
                             CONTRACT_KINDS, CONTRACT_STATUS, RELATIONS, LEAVE_KINDS, LEAVE_STATUS, ATT_KINDS)
 from app.services import hrm as H
@@ -390,3 +390,22 @@ def set_attendance(data: AttendanceIn, u: User = Depends(require_roles(*HR_ADMIN
         raise HTTPException(422, str(ex))
     return {"employee_id": row.employee_id, "day": row.day, "kind": row.kind, "work": row.work,
             "ot_hours": row.ot_hours, "note": row.note}
+
+
+# ---------- Bảng chấm công đối chiếu bảng lương ----------
+
+@router.get("/payroll-runs/{period}/lech-cong")
+def lech_cong(period: str, u: User = Depends(require_roles(*HR_READ)), db: Session = Depends(get_db)):
+    """Chỗ lệch giữa bảng chấm công và số công đã nhập vào bảng lương kỳ này.
+
+    Đặt dưới `/payroll-runs/` chứ không dưới `/attendance/` là có chủ ý: câu hỏi ở đây không phải "bảng
+    chấm công nói gì" mà "bảng lương kỳ này còn chỗ nào chưa khớp bảng chấm công" – nó thuộc hồ sơ KỲ
+    LƯƠNG, và màn hình Lương đã khai sẵn tiền tố `/api/v1/payroll-runs` nên không phải nới phạm vi vai nào.
+
+    Kỳ chưa có bảng lương thì KHÔNG phải lỗi: vẫn soi được bảng chấm công, chỉ là chưa ai gõ số công nào.
+    Trả về rỗng ở đây sẽ là trả lời "không có chỗ lệch" cho một câu chưa ai hỏi.
+    """
+    run = db.execute(select(PayrollRun).where(PayrollRun.period == period)).scalars().first()
+    kq = H.lech_cong(db, period, (run.inputs or {}) if run is not None else {})
+    kq["co_bang_luong"] = run is not None
+    return kq

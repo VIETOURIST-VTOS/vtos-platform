@@ -54,6 +54,22 @@ FULL_VIEW = ("chutich", "tgd")                          # xem tất cả – đ�
 READ_ALL = ("bks", "robot_ks")                          # đọc tất cả, bị chặn mọi thao tác ghi
 BASE_VIEW = FULL_VIEW + READ_ALL                        # nền của MỌI dòng trong ma trận dưới đây
 
+# MỌI NGƯỜI LÀM VIỆC Ở ĐÂY – mở 08/10/2026 cho màn hình Đơn nghỉ phép của tôi.
+#
+# Đây là nhóm RỘNG NHẤT trong tệp, nên lý do phải viết ra: một đơn nghỉ phép là thứ mọi người làm thuê
+# đều phải gửi được. Cửa máy chủ `POST /leaves` dùng `current_user` – tức nhận đơn của bất kỳ ai đăng
+# nhập – nhưng ô bấm chỉ có trên màn hình /xe-hdv của tài xế và hướng dẫn viên, nên CHÍN PHÒNG CÒN LẠI
+# không có đường vào. Cửa mở mà người không với tới thì cửa ấy chưa tồn tại. (Màn hình HCNS ở
+# /hr?tab=cham_cong là màn hình của NGƯỜI CHẤM CÔNG – nó mở cho sáu vai, không phải cho người gửi đơn.)
+#
+# Khai THẲNG 22 tên chứ không viết `tuple(ROLES)`: ba vai robot (`robot_pq`, `robot_ks`, `robot_vpm`)
+# KHÔNG có mặt, và sẽ không có mặt – robot không nghỉ phép, và một nhóm tự sinh từ danh sách vai thì
+# ngày có vai robot thứ tư nó tự nhận thêm một tài khoản máy vào màn hình đơn từ mà không ai quyết định.
+# Hàng rào `test_ns2` tính tập vai của người TẠI CHỖ từ `ROLES` và đòi khớp đúng, không đòi một con số.
+MOI_NHAN_VIEN = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "nv_kd", "tn_kd", "tp_kd",
+                 "gd_kd", "sales_admin", "nv_mkt", "ketoan", "hcns", "cntt", "bks", "tai_xe", "hdv",
+                 "gd_doi_xe", "tp_hd", "nv_visa", "hanh_chinh")
+
 # Màn hình Nhân sự tách quyền theo TAB (chỉ đạo 07/9/2026). Trước bản này, ai mở được màn hình là thấy cả
 # ba tab – nên không có cách nào cho một người xem hồ sơ nhân sự mà không xem luôn bảng lương.
 # Bảng lương chỉ còn HCNS theo vai trò; Kế toán trưởng xem toàn công ty bằng NGOẠI LỆ THEO NGƯỜI
@@ -354,6 +370,11 @@ MAN_HINH_API = {
     # chọn. Cố ý – gắn ô chọn ở đây là mở sổ kế toán cho mọi vai trò xem được hồ sơ kiểm toán.
     "/ho-so-kiem-toan": ("/api/v1/kiem-toan", "/api/v1/companies", "/api/v1/tep"),
     "/hieu-qua-doi-xe": ("/api/v1/fleet",),
+    # Đơn nghỉ phép của tôi. ĐÚNG HAI tiền tố, và KHÔNG có "/api/v1/attendance": lưới chấm công đứng
+    # ở thẻ Chấm công của màn hình /hr, nơi tiền tố ấy đã khai từ trước và người GHI được nó đã có mặt.
+    # Khai thêm ở đây là cho cả 22 vai mang trong phạm vi một cửa máy chủ TỪ CHỐI họ (`GET /attendance`
+    # đòi HR_READ, `POST` đòi HR_ADMIN) – phạm vi vai trò CỘNG RA từ bảng này, nên đó là một lần nới thật.
+    "/cham-cong": ("/api/v1/leaves", "/api/v1/leave-balance"),
     "/hop-dong-lao-dong": ("/api/v1/employees", "/api/v1/hrm", "/api/v1/labor-contracts",
                            "/api/v1/dependents", "/api/v1/leaves", "/api/v1/leave-balance"),
     "/hr": ("/api/v1/hr", "/api/v1/employees", "/api/v1/payroll", "/api/v1/payroll-runs",
@@ -854,6 +875,17 @@ MENU_ROLES = {
 
     # --- Vận tải & Hướng dẫn viên ---
     "/xe-hdv": BASE_VIEW + OPERATIONS + FIELD + ("hcns", "cntt"),
+
+    # --- Nhân sự – Hành chính ---
+    # Đơn nghỉ phép của tôi (mục 5.4b cây phân hệ). MỞ CHO MỌI NGƯỜI LÀM VIỆC Ở ĐÂY. Màn hình chỉ có
+    # MỘT khung – khung gửi đơn của chính mình – và cửa `/leaves` tầng dưới lọc ba tầng, nên người
+    # thường thấy đơn của mình, còn người ký của một phòng thấy thêm đơn của phòng ấy.
+    #
+    # `+ READ_ALL` không phải cho gọn: `robot_ks` phải có mặt ở MỌI dòng của bảng này (hàng rào
+    # `test_ma_tran_quyen` canh đúng điều đó) – robot Kiểm soát không soi được màn hình nó không thấy.
+    # Nó KHÔNG lọt vào `MOI_NHAN_VIEN` vì nhóm ấy là nhóm của NGƯỜI; lớp `READ_ONLY_ROLES` chặn mọi
+    # thao tác ghi của nó, nên có mặt ở đây là vô hại.
+    "/cham-cong": MOI_NHAN_VIEN + READ_ALL,
     # Ba màn hình dưới trước 07/9/2026 KHÔNG khai quyền, nên theo quy ước "trang không liệt kê = ai đăng
     # nhập cũng thấy", một nhân viên kinh doanh vẫn mở được hồ sơ xe và bảng giá vốn – lợi nhuận đội xe.
     "/doi-xe": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "hcns", "cntt"),
