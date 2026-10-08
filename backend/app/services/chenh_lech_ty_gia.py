@@ -55,6 +55,8 @@ from app.models.core import Tour
 from app.models.ty_gia import TyGia
 
 TK_CHENH_LECH_DANH_GIA_LAI = "413"
+TK_GIA_VON = "632"
+TU_NGAY_KEY = "tach_ty_gia_tu_ngay"
 TK_LO_TY_GIA = "635"
 TK_LAI_TY_GIA = "515"
 
@@ -273,4 +275,117 @@ def tong_hop(db: Session, tour_id: int | None = None) -> dict:
             "dùng để đánh giá lại số dư ngoại tệ cuối kỳ, mà sổ cái VTOS không có số dư ngoại tệ nào "
             "(mọi khoản đã quy đổi VND ngay lúc nhập). "
             "Thiếu tỷ giá trong sổ thì nhân viên nhập ở màn hình Tỷ giá, có form và chỗ tải chứng từ."),
+    }
+
+# ====================== TÁCH CHÊNH LỆCH RA 635 / 515 (KY-4) ======================
+#
+# Chủ tịch quyết 09/10/2026, sau khi đọc bản đo: "nên tách, và bắt đầu tính từ hôm nay về sau".
+#
+# PHÉP TÍNH, và vì sao chiều lại là chiều này. Giá vốn ghi sổ ĐÚNG là số gốc × TỶ GIÁ CỦA NGÀY GIAO
+# DỊCH — tức tỷ giá trong sổ tỷ giá. Số VND thật sự bỏ ra là số gốc × tỷ giá NGƯỜI CHI dùng. Phần
+# lệch giữa hai cái là lãi/lỗ tỷ giá, không phải giá dịch vụ:
+#
+#     chênh = (tỷ giá dùng − tỷ giá sổ) × số gốc × số lượng
+#     chênh > 0 → trả nhiều VND hơn chuẩn → LỖ  → Nợ 635 / Có 632
+#     chênh < 0 → trả ít hơn chuẩn       → LÃI → Nợ 632 / Có 515
+#
+# "TỪ HÔM NAY VỀ SAU" LÀ MỘT NGÀY, KHÔNG PHẢI MỘT CÂU. Nó nằm trong tham số `tach_ty_gia_tu_ngay`,
+# và dòng nào có `ngay_ty_gia` TRƯỚC ngày ấy thì KHÔNG tách — nhưng vẫn được ĐẾM RIÊNG, vì "không
+# tách" khác hẳn "không có". Quá khứ không bị sửa lùi; nó chỉ thôi được giấu.
+#
+# BẢN NÀY KHÔNG ĐỔI HOA HỒNG CỦA AI. Quỹ thưởng và hoa hồng tính trên `tour.actual_cost`
+# (`rules.settlement_summary`), không tính từ các dòng quyết toán — nên một bút toán phân loại lại
+# trong sổ cái không chạm tới tiền của người bán. Nếu Chủ tịch muốn lãi lỗ CHUYẾN cũng không gánh
+# chênh lệch tỷ giá nữa thì đó là một quyết định THỨ HAI, và nó động vào tiền trả cho người.
+
+
+def tu_ngay(db: Session) -> str:
+    """Ngày bắt đầu tách. Rỗng = chưa bật."""
+    from app.services import rules as R
+    try:
+        return (R.get_param_chu(db, TU_NGAY_KEY) or "").strip()
+    except KeyError:
+        return ""
+
+
+def _trong_ky(d: date | None, ky: str | None) -> bool:
+    return ky is None or (d is not None and f"{d:%Y-%m}" == ky)
+
+
+def tinh_tach(db: Session, ky: str | None = None) -> dict:
+    """Chênh lệch tỷ giá tách được của một kỳ, chia làm BỐN rổ. Không ghi sổ gì.
+
+    Bốn rổ, không gộp: rổ tách được, rổ trước ngày áp dụng, rổ sổ chưa có tỷ giá, rổ không khai rõ
+    cột nguyên tệ. Gộp lại thành một con số thì ba rổ sau biến mất, và ba rổ sau mới là việc còn
+    phải làm của ba người khác nhau.
+    """
+    moc = tu_ngay(db)
+    moc_d = date.fromisoformat(moc) if moc else None
+    so = _so_ty_gia(db)
+    ma_tour = {t.id: t.code for t in db.execute(select(Tour)).scalars()}
+
+    tach, truoc_moc, thieu_so, khong_ro = [], [], [], []
+    for bang, m, r in _dong_ngoai_te(db):
+        tg = getattr(r, "ty_gia", None)
+        if not tg:
+            continue
+        ngay = getattr(r, m["ngay"], None) if m["ngay"] else None
+        if not _trong_ky(ngay, ky):
+            continue
+        tt = (r.tien_te or "").strip().upper()
+        tid = getattr(r, "tour_id", None)
+        chung = {"bang": bang, "ten_bang": m["ten"], "id": r.id, "tour_id": tid,
+                 "ma_tour": ma_tour.get(tid, ""), "tien_te": tt, "ty_gia": float(tg),
+                 "ngay": str(ngay) if ngay else ""}
+        if m["goc"] is None:
+            khong_ro.append({**chung, "ly_do": "bảng không khai cột nguyên tệ nên không tính được chênh"})
+            continue
+        if ngay is None:
+            khong_ro.append({**chung, "ly_do": "dòng không có ngày tỷ giá"})
+            continue
+        co = so.get((tt, ngay))
+        if not co:
+            thieu_so.append({**chung, "ly_do": "sổ tỷ giá chưa có ngày này – nhập ở màn hình Tỷ giá"})
+            continue
+        # Nhiều nguồn cùng ngày: lấy nguồn GẦN NHẤT với tỷ giá đã dùng. Sổ cố ý không nói nguồn nào
+        # đúng (máy không chọn hộ), nên lấy nguồn xa nhất là tự tạo ra một khoản chênh chưa chắc có.
+        tg_so = min(co, key=lambda x: abs(x - float(tg)))
+        goc = getattr(r, m["goc"], None)
+        if goc in (None, ""):
+            khong_ro.append({**chung, "ly_do": "dòng bỏ trống số tiền nguyên tệ"})
+            continue
+        sl = 1.0
+        if m["sl"]:
+            v = getattr(r, m["sl"], None)
+            sl = float(v) if v not in (None, "") else 1.0
+        chenh = round((float(tg) - tg_so) * float(goc) * sl)
+        if abs(chenh) < 1:
+            continue
+        dong = {**chung, "ty_gia_so": tg_so, "so_tien_goc": float(goc), "so_luong": sl,
+                "chenh": chenh, "nguon_so": len(co)}
+        if moc_d is None or ngay < moc_d:
+            truoc_moc.append({**dong, "ly_do": (f"ngày {ngay} trước mốc áp dụng {moc or '(chưa đặt)'}"
+                                                " – KHÔNG tách, và cũng không sửa lùi")})
+            continue
+        tach.append(dong)
+
+    lo = sum(d["chenh"] for d in tach if d["chenh"] > 0)
+    lai = -sum(d["chenh"] for d in tach if d["chenh"] < 0)
+    return {
+        "ky": ky, "tu_ngay": moc, "da_bat": bool(moc),
+        "tach_duoc": sorted(tach, key=lambda d: -abs(d["chenh"])),
+        "lo": round(lo), "lai": round(lai), "rong": round(lo - lai),
+        "truoc_moc": truoc_moc, "so_truoc_moc": len(truoc_moc),
+        "thieu_ty_gia_so": thieu_so, "so_thieu_ty_gia_so": len(thieu_so),
+        "khong_ro_nguyen_te": khong_ro, "so_khong_ro": len(khong_ro),
+        "but_toan": ([{"account": TK_LO_TY_GIA, "debit": round(lo)}] if lo >= 1 else [])
+                    + ([{"account": TK_GIA_VON, "credit": round(lo)}] if lo >= 1 else [])
+                    + ([{"account": TK_GIA_VON, "debit": round(lai)}] if lai >= 1 else [])
+                    + ([{"account": TK_LAI_TY_GIA, "credit": round(lai)}] if lai >= 1 else []),
+        "ghi_chu": (
+            f"Tách từ ngày {moc} về sau (Chủ tịch quyết 09/10/2026). Lỗ tỷ giá: Nợ 635 / Có 632. "
+            "Lãi tỷ giá: Nợ 632 / Có 515. Bản này KHÔNG đổi hoa hồng và quỹ thưởng – chúng tính "
+            "trên tour.actual_cost, không tính từ các dòng quyết toán."
+            if moc else
+            f"CHƯA BẬT – tham số '{TU_NGAY_KEY}' đang để trống nên không tách dòng nào."),
     }

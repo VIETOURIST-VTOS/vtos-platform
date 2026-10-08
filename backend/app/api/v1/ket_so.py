@@ -63,3 +63,22 @@ def kc(body: KetChuyen, u: User = Depends(require_roles(*GHI)), db: Session = De
         raise HTTPException(400, str(ex))
     db.commit()
     return kq
+
+
+# ---------- Tách chênh lệch tỷ giá ra 635/515 (KY-4, Chủ tịch quyết 09/10/2026) ----------
+# Đặt ở CUỐI tệp, sau `KetChuyen`: thân yêu cầu dùng lại chính lớp ấy (chỉ cần `ky`), và đặt ở đầu
+# tệp thì nó chưa tồn tại. Một lỗi nhỏ, nhưng nó nổ lúc nạp module nên cả máy chủ không lên.
+@router.get("/tach-ty-gia/xem-truoc")
+def tg_xem_truoc(ky: str, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    return KS.xem_truoc_tach_ty_gia(db, ky)
+
+
+@router.post("/tach-ty-gia")
+def tg_ghi(body: KetChuyen, u: User = Depends(require_roles(*GHI)), db: Session = Depends(get_db)):
+    """Ghi bút toán tách chênh lệch tỷ giá. Chỉ Kế toán, y như mọi đường ghi khác ở màn hình này."""
+    try:
+        kq = KS.tach_ty_gia(db, u, body.ky)
+    except KS.KhongGhiDuoc as ex:
+        raise HTTPException(400, str(ex))
+    db.commit()
+    return kq

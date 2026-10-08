@@ -334,6 +334,16 @@ DEFAULT_PARAMS = [
     # "YYYY-MM". Trước khi ký phải chắc MISA đã dừng khấu trừ cùng kỳ — hai nơi cùng trừ một khoản
     # thuế thì người lao động phát hiện ra vào ngày nhận lương.
     ("tncn_luy_tien_tu_ky", "", "Kỳ đầu tiên VTOS tự khấu trừ thuế TNCN lũy tiến cho người HĐLĐ (trống = chưa bật)", "YYYY-MM", "Chủ tịch quyết 08/10/2026 – Luật Thuế TNCN 2025 số 109/2025/QH15"),
+    # Mốc tách chênh lệch tỷ giá ra 635/515 - Chủ tịch quyết 09/10/2026 sau khi đọc bản đo KY-3:
+    # "nên tách, và bắt đầu tính từ hôm nay về sau". KHÁC với `tncn_luy_tien_tu_ky` ngay trên: cái
+    # kia để trống vì Chủ tịch chưa nói ngày, và vì MISA có thể đang khấu trừ song song nên bật
+    # nhầm là trừ hai lần tiền của người lao động. Cái này Chủ tịch đã nói đích danh NGÀY, và hệ
+    # quả của nó là một bút toán phân loại lại trong sổ - không ai bị trừ tiền. Nên điền ngày ấy là
+    # THI HÀNH quyết định, không phải ký thay.
+    #
+    # Dòng có ngày tỷ giá TRƯỚC mốc này không bị tách và cũng không bị sửa lùi - chúng chỉ thôi
+    # được giấu: `chenh_lech_ty_gia.tinh_tach()` đếm riêng chúng.
+    ("tach_ty_gia_tu_ngay", "2026-10-09", "Ngày bắt đầu tách chênh lệch tỷ giá ra 635/515 (trống = chưa tách)", "YYYY-MM-DD", "Chủ tịch quyết 09/10/2026"),
     # 48 → 4 ngày 25/9/2026, Chủ tịch quyết. Bản đề xuất Phòng Điều hành viết 4 giờ; anh Tuấn chốt 4.
     #
     # HỆ QUẢ PHẢI NÓI RA, vì nó xảy ra ngay đêm đầu tiên: hạn tính bằng GIỜ ĐỒNG HỒ, không phải
