@@ -24,11 +24,17 @@ const THU_TU = ["qua_han", "chua_ro_han", "sap_den_han", "cong_bo_tre", "chua_de
 const VB_RONG = { loai: "quy_dinh", so_hieu: "", tieu_de: "", tom_tat: "", nguoi_ky: "", ngay_ky: "" };
 const NV_RONG = { ma: "", ten: "", can_cu: "", chu_ky: "su_kien", han_sau_ngay: "", mo_ta_han: "" };
 const BG_RONG = { nghia_vu_id: "", ky: "", moc_phat_sinh: "", han_chot: "", ghi_chu: "" };
+/* D2_BAN_LAM_VIEC — bàn làm việc Pháp chế. Mỗi bảng mới đều có cửa nhập trên màn hình này:
+   không có cửa thì đó là việc còn thiếu, không phải việc để máy nhập hộ (ranh giới 09/9/2026). */
+const YC_RONG = { loai: "ra_soat_hop_dong", tieu_de: "", noi_dung: "", phong_gui: "", nguoi_gui: "", muc_do: "thuong", han_mong_muon: "" };
+const CK_RONG = { mo_ta: "", nguoi_ky: "", chuc_danh: "", ngay_ky: "", loai_chu_ky: "tuoi", can_cu_tham_quyen: "", ghi_chu: "" };
+const RS_RONG = { so_hop_dong: "", doi_tac: "", loai_hop_dong: "", gia_tri: "", ket_luan: "dat", dieu_kien: "", nguoi_ra_soat: "" };
+const MAU_YC: Record<string, string> = { moi: "warn", dang_xu_ly: "navy", cho_bo_sung: "warn", xong: "ok", tu_choi: "grey" };
 
 export default function IrPhapCheScreen() {
   const { user, toast } = useShell();
   const role = user?.role || "";
-  const [tab, setTab] = useState<"cong_bo" | "van_ban">("cong_bo");
+  const [tab, setTab] = useState<"cong_bo" | "van_ban" | "viec" | "chu_ky">("cong_bo");
   const [meta, setMeta] = useState<any>({ loai_van_ban: {}, trang_thai_van_ban: {}, chu_ky_cong_bo: {}, ghi_duoc: [] });
   const [bdk, setBdk] = useState<any>(null);
   const [nv, setNv] = useState<any>(null);
@@ -38,6 +44,16 @@ export default function IrPhapCheScreen() {
   const [fNv, setFNv] = useState<any>({ ...NV_RONG });
   const [fBg, setFBg] = useState<any>({ ...BG_RONG });
   const [noiCb, setNoiCb] = useState<Record<number, string>>({});
+  const [mv, setMv] = useState<any>({});
+  const [viec, setViec] = useState<any>(null);
+  const [ck, setCk] = useState<any>(null);
+  const [fYc, setFYc] = useState<any>({ ...YC_RONG });
+  const [fCk, setFCk] = useState<any>({ ...CK_RONG });
+  const [fRs, setFRs] = useState<any>({ ...RS_RONG });
+  const [moRs, setMoRs] = useState<number | null>(null);
+  const [ketQua, setKetQua] = useState<Record<number, string>>({});
+  const [xn, setXn] = useState<any>(null);
+  const [fXn, setFXn] = useState<any>({ chi_muc: "", chu_so_lieu: "" });
   const ghiDuoc = (meta.ghi_duoc || []).includes(role);
 
   const load = useCallback(async () => {
@@ -45,6 +61,9 @@ export default function IrPhapCheScreen() {
       if (!Object.keys(meta.loai_van_ban).length) setMeta(await api("/ir-phap-che/meta"));
       if (tab === "cong_bo") { setBdk(await api("/ir-phap-che/bang-dieu-khien")); setNv(await api("/ir-phap-che/nghia-vu")); }
       if (tab === "van_ban") setVb(await api("/ir-phap-che/van-ban"));
+      if (!Object.keys(mv).length) setMv(await api("/ir-phap-che/meta-viec"));
+      if (tab === "viec") setViec(await api("/ir-phap-che/yeu-cau"));
+      if (tab === "chu_ky") setCk(await api("/ir-phap-che/chu-ky"));
     } catch (x) { toast(errMsg(x), true); }
   }, [tab]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
@@ -67,6 +86,8 @@ export default function IrPhapCheScreen() {
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
       <button className={"act " + (tab === "cong_bo" ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab("cong_bo")}>Công bố thông tin</button>
       <button className={"act " + (tab === "van_ban" ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab("van_ban")}>Văn bản</button>
+      <button className={"act " + (tab === "viec" ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab("viec")}>Việc Pháp chế</button>
+      <button className={"act " + (tab === "chu_ky" ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab("chu_ky")}>Sổ chữ ký</button>
     </div>
 
     {tab === "cong_bo" && bdk && <>
@@ -90,6 +111,7 @@ export default function IrPhapCheScreen() {
                 <input placeholder="Nơi công bố (HNX, UBCKNN, website…)" style={{ width: 230 }}
                   value={noiCb[r.id] || ""} onChange={(e) => setNoiCb({ ...noiCb, [r.id]: e.target.value })} />
                 <button className="act teal" onClick={() => goi(`/ir-phap-che/ban-ghi/${r.id}/da-cong-bo`, { noi_cong_bo: noiCb[r.id] || "" })}>Ghi đã công bố</button>
+                <button className="act grey" onClick={async () => { try { setXn(await api(`/ir-phap-che/ban-ghi/${r.id}/xac-nhan`)); setFXn({ chi_muc: "", chu_so_lieu: "", ban_ghi_id: r.id }); } catch (x) { toast(errMsg(x), true); } }}>Xác nhận chủ số liệu</button>
               </>}</td></tr>)}</tbody></table></div>))}
 
       <div className="panel wrap"><h2>Nghĩa vụ đã khai · {nv?.so ?? 0}</h2>
@@ -192,6 +214,124 @@ export default function IrPhapCheScreen() {
             <td className="muted">{v.bi_thay_boi ? `#${v.bi_thay_boi}` : ""}</td>
             <td className="muted">{v.boi}</td></tr>)}</tbody></table>
         <button className="act grey" onClick={() => setPb(null)}>Đóng</button></div>}
+    </>}
+
+    {xn && <div className="panel wrap"><h2>Xác nhận chủ số liệu · {xn.so}</h2>
+      <p className="muted">Một con số ra khỏi công ty trước khi người chịu trách nhiệm về nó xác nhận là một
+        con số không ai đứng tên. Đã hỏi mà chưa trả lời — hoặc đã bị từ chối — thì cửa “ghi đã công bố” không mở.</p>
+      {!xn.cong_bo_duoc && <p><Tag cls="red">Chưa công bố được</Tag> {xn.vi_sao_chua}</p>}
+      {!!xn.rows.length && <table><thead><tr><th>Chỉ mục</th><th>Chủ số liệu</th><th>Trạng thái</th><th>Ý kiến</th><th></th></tr></thead>
+        <tbody>{xn.rows.map((x: any) => <tr key={x.id}>
+          <td>{x.chi_muc}</td><td>{x.chu_so_lieu}</td>
+          <td><Tag cls={x.trang_thai === "xac_nhan" ? "ok" : x.trang_thai === "tu_choi" ? "red" : "warn"}>{x.trang_thai_ten}</Tag></td>
+          <td className="muted">{x.y_kien}</td>
+          <td>{x.trang_thai === "cho" && ghiDuoc && <>
+            <button className="act teal" onClick={() => goi(`/ir-phap-che/xac-nhan/${x.id}/tra-loi`, { dong_y: true }).then(async () => setXn(await api(`/ir-phap-che/ban-ghi/${x.ban_ghi_id}/xac-nhan`)))}>Xác nhận</button>
+            <button className="act grey" onClick={() => { const y = prompt("Lý do từ chối xác nhận:") || ""; if (y.trim()) goi(`/ir-phap-che/xac-nhan/${x.id}/tra-loi`, { dong_y: false, y_kien: y }).then(async () => setXn(await api(`/ir-phap-che/ban-ghi/${x.ban_ghi_id}/xac-nhan`))); }}>Từ chối</button>
+          </>}</td></tr>)}</tbody></table>}
+      {ghiDuoc && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+        <input placeholder="Chỉ mục (Doanh thu quý 3…)" style={{ width: 240 }} value={fXn.chi_muc} onChange={(e) => setFXn({ ...fXn, chi_muc: e.target.value })} />
+        <input placeholder="Chủ số liệu (phòng / người)" style={{ width: 220 }} value={fXn.chu_so_lieu} onChange={(e) => setFXn({ ...fXn, chu_so_lieu: e.target.value })} />
+        <button className="act orange" onClick={() => goi(`/ir-phap-che/ban-ghi/${fXn.ban_ghi_id}/xac-nhan`, { chi_muc: fXn.chi_muc, chu_so_lieu: fXn.chu_so_lieu })
+          .then(async (r) => { if (r) { setFXn({ ...fXn, chi_muc: "", chu_so_lieu: "" }); setXn(await api(`/ir-phap-che/ban-ghi/${fXn.ban_ghi_id}/xac-nhan`)); } })}>Hỏi xác nhận</button>
+      </div>}
+      <button className="act grey" onClick={() => setXn(null)}>Đóng</button></div>}
+
+    {tab === "viec" && viec && <>
+      <div className="kpis">
+        <div className="kpi"><b>{viec.so_dang_chay}</b><span>Đang chạy</span></div>
+        <div className="kpi"><b>{viec.so_ton}</b><span>Treo ≥ {viec.ngay_coi_la_ton} ngày</span></div>
+        <div className="kpi"><b>{viec.so_gap_dang_chay}</b><span>Gấp, chưa đóng</span></div>
+        <div className="kpi"><b>{viec.so_tat_ca}</b><span>Tất cả</span></div>
+      </div>
+      <p className="muted">{viec.ghi_chu}</p>
+      {mv.con_thieu && <p className="muted"><b>Còn thiếu:</b> {mv.con_thieu}</p>}
+      <div className="panel wrap"><h2>Việc gửi Pháp chế</h2>
+        {!viec.rows.length ? <p className="muted">Chưa có việc nào.</p> :
+          <table><thead><tr><th>#</th><th>Loại</th><th>Tiêu đề</th><th>Bên gửi</th><th>Mức</th><th className="num">Treo</th><th>Trạng thái</th><th>Người nhận</th><th></th></tr></thead>
+            <tbody>{viec.rows.map((y: any) => <tr key={y.id}>
+              <td className="mono">{y.id}</td><td>{y.loai_ten}</td><td>{y.tieu_de}</td>
+              <td className="muted">{y.phong_gui}{y.nguoi_gui ? ` · ${y.nguoi_gui}` : ""}</td>
+              <td>{y.muc_do === "gap" ? <Tag cls="red">Gấp</Tag> : <span className="muted">Thường</span>}</td>
+              <td className="num">{y.so_ngay_treo === null ? "" : y.so_ngay_treo}</td>
+              <td><Tag cls={MAU_YC[y.trang_thai] || "navy"}>{y.trang_thai_ten}</Tag></td>
+              <td className="muted">{y.nguoi_nhan}</td>
+              <td>{ghiDuoc && <>
+                {y.trang_thai === "moi" && <button className="act teal" onClick={() => goi(`/ir-phap-che/yeu-cau/${y.id}/nhan`, {})}>Nhận việc</button>}
+                {y.trang_thai !== "xong" && y.trang_thai !== "tu_choi" && <>
+                  <input placeholder="Kết quả trả lời (bắt buộc)" style={{ width: 230 }} value={ketQua[y.id] || ""} onChange={(e) => setKetQua({ ...ketQua, [y.id]: e.target.value })} />
+                  <button className="act orange" onClick={() => goi(`/ir-phap-che/yeu-cau/${y.id}/dong`, { trang_thai: "xong", ket_qua: ketQua[y.id] || "" })}>Đóng việc</button>
+                </>}
+                {y.loai === "ra_soat_hop_dong" && <button className="act grey" onClick={() => { setMoRs(y.id); setFRs({ ...RS_RONG }); }}>Rà soát</button>}
+              </>}</td></tr>)}</tbody></table>}
+      </div>
+
+      {ghiDuoc && <div className="panel wrap"><h2>Mở một việc</h2>
+        <p className="muted">Pháp chế ghi lại việc của phòng nào, ai hỏi. <b>Chưa có cửa cho phòng ban tự gửi</b> —
+          mở cửa ấy là nới quyền trên nhóm API này cho mọi vai, phải có người ký.</p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <select value={fYc.loai} onChange={(e) => setFYc({ ...fYc, loai: e.target.value })}>
+            {Object.entries(mv.loai_yeu_cau || {}).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <input placeholder="Tiêu đề" style={{ width: 320 }} value={fYc.tieu_de} onChange={(e) => setFYc({ ...fYc, tieu_de: e.target.value })} />
+          <input placeholder="Phòng gửi" value={fYc.phong_gui} onChange={(e) => setFYc({ ...fYc, phong_gui: e.target.value })} />
+          <input placeholder="Người gửi" value={fYc.nguoi_gui} onChange={(e) => setFYc({ ...fYc, nguoi_gui: e.target.value })} />
+          <select value={fYc.muc_do} onChange={(e) => setFYc({ ...fYc, muc_do: e.target.value })}>
+            {Object.entries(mv.muc_do || {}).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <label>Hạn mong muốn <input type="date" value={fYc.han_mong_muon} onChange={(e) => setFYc({ ...fYc, han_mong_muon: e.target.value })} /></label>
+          <input placeholder="Nội dung" style={{ width: 360 }} value={fYc.noi_dung} onChange={(e) => setFYc({ ...fYc, noi_dung: e.target.value })} />
+          <button className="act orange" onClick={() => goi("/ir-phap-che/yeu-cau", { ...fYc, han_mong_muon: fYc.han_mong_muon || null }).then((r) => { if (r) setFYc({ ...YC_RONG }); })}>Mở việc</button>
+        </div>
+        <p className="muted">Hạn mong muốn của bên gửi <b>không phải</b> hạn pháp lý — hạn pháp lý nằm ở sổ nghĩa vụ công bố, có căn cứ điều khoản đi kèm.</p>
+      </div>}
+
+      {moRs !== null && ghiDuoc && <div className="panel wrap"><h2>Rà soát hợp đồng · việc #{moRs}</h2>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input placeholder="Số hợp đồng" value={fRs.so_hop_dong} onChange={(e) => setFRs({ ...fRs, so_hop_dong: e.target.value })} />
+          <input placeholder="Đối tác" style={{ width: 240 }} value={fRs.doi_tac} onChange={(e) => setFRs({ ...fRs, doi_tac: e.target.value })} />
+          <input placeholder="Loại hợp đồng" value={fRs.loai_hop_dong} onChange={(e) => setFRs({ ...fRs, loai_hop_dong: e.target.value })} />
+          <input placeholder="Giá trị (để trống nếu chưa biết)" style={{ width: 200 }} value={fRs.gia_tri} onChange={(e) => setFRs({ ...fRs, gia_tri: e.target.value })} />
+          <select value={fRs.ket_luan} onChange={(e) => setFRs({ ...fRs, ket_luan: e.target.value })}>
+            {Object.entries(mv.ket_luan_ra_soat || {}).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <input placeholder="Điều kiện (bắt buộc nếu đạt có điều kiện)" style={{ width: 360 }} value={fRs.dieu_kien} onChange={(e) => setFRs({ ...fRs, dieu_kien: e.target.value })} />
+          <input placeholder="Người rà soát" value={fRs.nguoi_ra_soat} onChange={(e) => setFRs({ ...fRs, nguoi_ra_soat: e.target.value })} />
+          <button className="act orange" onClick={() => goi(`/ir-phap-che/yeu-cau/${moRs}/ra-soat`, {
+            ...fRs, gia_tri: fRs.gia_tri === "" ? null : Number(fRs.gia_tri),
+          }, "PUT")}>Lưu rà soát</button>
+          <button className="act grey" onClick={() => setMoRs(null)}>Đóng</button>
+        </div>
+        <p className="muted"><b>Giá trị để trống là “chưa biết”, không phải 0.</b> Và kết luận “đạt có điều kiện”
+          bắt buộc ghi điều kiện — không viết ra thì lần đọc lại chỉ còn thấy chữ “đạt”.</p>
+      </div>}
+    </>}
+
+    {tab === "chu_ky" && ck && <>
+      <p className="muted">Sổ chữ ký trả lời một câu: <b>ai ký cái gì, ngày nào, theo thẩm quyền nào</b>. Căn cứ thẩm
+        quyền là bắt buộc — đó là câu hỏi đầu tiên của mọi lần soát lại một chữ ký.</p>
+      <div className="panel wrap"><h2>Sổ chữ ký · {ck.so}</h2>
+        {!ck.rows.length ? <p className="muted">Sổ còn rỗng.</p> :
+          <table><thead><tr><th>Ngày ký</th><th>Người ký</th><th>Chức danh</th><th>Đã ký</th><th>Loại</th><th>Căn cứ thẩm quyền</th></tr></thead>
+            <tbody>{ck.rows.map((b: any) => <tr key={b.id}>
+              <td>{fmtD(b.ngay_ky)}</td><td>{b.nguoi_ky}</td><td className="muted">{b.chuc_danh}</td>
+              <td>{b.mo_ta || (b.van_ban_id ? `Văn bản #${b.van_ban_id}` : "")}</td>
+              <td>{b.loai_chu_ky_ten}</td>
+              <td className="muted" style={{ maxWidth: 380 }}>{b.can_cu_tham_quyen}</td></tr>)}</tbody></table>}
+      </div>
+      {ghiDuoc && <div className="panel wrap"><h2>Ghi một chữ ký</h2>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input placeholder="Đã ký cái gì" style={{ width: 300 }} value={fCk.mo_ta} onChange={(e) => setFCk({ ...fCk, mo_ta: e.target.value })} />
+          <input placeholder="Người ký" value={fCk.nguoi_ky} onChange={(e) => setFCk({ ...fCk, nguoi_ky: e.target.value })} />
+          <input placeholder="Chức danh" value={fCk.chuc_danh} onChange={(e) => setFCk({ ...fCk, chuc_danh: e.target.value })} />
+          <label>Ngày ký <input type="date" value={fCk.ngay_ky} onChange={(e) => setFCk({ ...fCk, ngay_ky: e.target.value })} /></label>
+          <select value={fCk.loai_chu_ky} onChange={(e) => setFCk({ ...fCk, loai_chu_ky: e.target.value })}>
+            {Object.entries(mv.loai_chu_ky || {}).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <input placeholder="Căn cứ thẩm quyền (bắt buộc)" style={{ width: 380 }} value={fCk.can_cu_tham_quyen} onChange={(e) => setFCk({ ...fCk, can_cu_tham_quyen: e.target.value })} />
+          <button className="act orange" onClick={() => goi("/ir-phap-che/chu-ky", { ...fCk, ngay_ky: fCk.ngay_ky || null }).then((r) => { if (r) setFCk({ ...CK_RONG }); })}>Ghi sổ</button>
+        </div>
+      </div>}
     </>}
   </>);
 }

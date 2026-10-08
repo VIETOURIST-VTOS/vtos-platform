@@ -31,6 +31,12 @@ CUA_TAY = (
     "van_ban_phap_che",
     "nghia_vu_cong_bo",
     "ban_ghi_cong_bo",
+    # Đợt D2 — bàn làm việc Pháp chế. Cả bốn bảng người dùng tự khai qua màn hình
+    # /ir-phap-che; hệ thống không nạp sẵn dòng nào.
+    "yeu_cau_phap_che",
+    "ra_soat_hop_dong",
+    "ban_ghi_chu_ky",
+    "xac_nhan_chu_so_lieu",
     "lich_su_to_chuc",
     "chi_ky_luong",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
