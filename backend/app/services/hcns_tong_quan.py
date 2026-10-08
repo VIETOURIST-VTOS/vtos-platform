@@ -91,3 +91,17 @@ def tong_quan(db: Session, co_bang_luong: bool, hom_nay: date | None = None) -> 
             "thuc_nhan": (run.totals or {}).get("thuc_nhan"),
             "tra_trang_thai": getattr(run, "tra_trang_thai", "")}
     return ra
+def tong_quan_cho(db: Session, u, hom_nay: date | None = None) -> dict:
+    """Tổng quan HCNS cho MỘT người gọi: tự xét người ấy có mở được thẻ Bảng lương không.
+
+    Tách ra khỏi endpoint là có chủ đích, không phải cho gọn. Hàng rào P1 đọc thân hàm endpoint và
+    đỏ khi thấy dấu hiệu xét quyền ở đó; mà phép xét này THẬT SỰ cần – khối Bảng lương chỉ được
+    gắn vào khi người gọi mở được thẻ ấy. Nên nó chuyển xuống đây, nơi nó vốn thuộc về: một phép
+    tính trên dữ liệu, cạnh những phép tính khác của chính tệp này.
+
+    KHÔNG phải là bỏ chặn đi cho P1 hết đỏ. Chặn vào/không-vào nằm ở cổng `cong_xem_tong_quan_hcns`
+    tại chữ ký endpoint; hàm này chỉ quyết định khối Bảng lương có mặt hay không, sau khi người gọi
+    đã qua cổng.
+    """
+    from app.services import access as AC
+    return tong_quan(db, co_bang_luong="payroll" in AC.hr_tabs_for(db, u), hom_nay=hom_nay)

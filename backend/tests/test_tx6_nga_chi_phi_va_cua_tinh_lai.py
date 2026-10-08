@@ -238,9 +238,22 @@ def test_ba_man_hinh_da_chay_phai_co_duong_vao_tu_cay():
         "từ mục lục.")
     assert "Hợp đồng thuê xe riêng" in nguon, (
         "Hợp đồng thuê xe riêng chạy thật từ PR #211 mà cây không có lối vào.")
+    # SỬA NGÀY 08/10/2026 – phép thử này nói một điều KHÔNG CÒN ĐÚNG, nên nó phải đổi, không
+    # phải cây phân hệ. Bản cũ đòi tên mục 5.4 mang chữ "tài xế & HDV", với lý do ghi thẳng trong
+    # lời báo: "chín phòng còn lại chưa có màn hình". Lý do ấy hết hiệu lực từ PR #244 (NS-2):
+    # màn hình /cham-cong "Đơn nghỉ phép của tôi" nay mở cho cả 22 vai, và thẻ chấm công trên /hr
+    # thì GHI được chứ không chỉ đọc. Giữ nguyên bản cũ là ép mục lục dán một cái nhãn thu hẹp lên
+    # một màn hình đã mở rộng – tức là bắt cây nói sai, đúng cái phép thử này sinh ra để chặn.
+    # Thứ cần canh vẫn còn nguyên và nay canh ĐÚNG CHỖ: cả hai mục phải có lối vào, và 5.4b phải
+    # trỏ vào /cham-cong – mất nó thì chín phòng không có thẻ HCNS lại không tìm ra đường gửi đơn.
     i = nguon.index('ma: "5.4"')
     dong = nguon[i:i + 200]
-    assert "href" in dong and "tài xế & HDV" in dong, (
-        "5.4 Chấm công & nghỉ phép đang khai là 'Chưa dựng', và đó là nói SAI: từ PR #206 tài xế và "
-        "HDV đã gửi được đơn nghỉ trên /xe-hdv. Nhưng chín phòng còn lại chưa có màn hình, nên tên "
-        "mục phải nói đúng chỗ đang đứng.")
+    assert "href" in dong, (
+        "5.4 Chấm công & nghỉ phép phải có lối vào từ cây: thẻ chấm công trên /hr ghi được từ "
+        "PR #244, một mục chạy thật mà khai 'Chưa dựng' thì không ai tìm ra nó từ mục lục.")
+    j = nguon.index('ma: "5.4b"')
+    dong_b = nguon[j:j + 200]
+    assert "href" in dong_b and "/cham-cong" in dong_b, (
+        "5.4b Đơn nghỉ phép của tôi phải trỏ vào /cham-cong. Thẻ chấm công của HCNS chỉ mở cho "
+        "sáu vai, còn gửi đơn nghỉ là việc của cả 22 vai – mất mục này thì chín phòng không có "
+        "đường vào, đúng chỗ hở mà NS-2 vừa bịt ở PR #244.")
