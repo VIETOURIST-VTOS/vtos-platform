@@ -59,7 +59,12 @@ class ZaloSendIn(BaseModel):
 
 @router.get("/leads/meta")
 def meta(u: User = Depends(current_user), db: Session = Depends(get_db)):
-    return {"channels": LEAD_CHANNELS, "status": LEAD_STATUS, "zalo": Z.configured(db)}
+    # Tên tiếng Việt của nền tảng và của nguồn ghi đi THEO CỬA NÀY chứ không chép sang màn hình.
+    # Chép sang là hai đầu: thêm một nền tảng ở `models/quang_cao.py` thì màn hình lặng lẽ in ra
+    # mã máy (`getresponse`) cho tới khi có người để ý.
+    from app.models.quang_cao import NEN_TANG_QUEN, NGUON_GHI
+    return {"channels": LEAD_CHANNELS, "status": LEAD_STATUS, "zalo": Z.configured(db),
+            "nen_tang": NEN_TANG_QUEN, "nguon_ghi": NGUON_GHI}
 
 
 @router.get("/leads")
@@ -80,7 +85,12 @@ def list_leads(month: str = "", channel: str = "", status: str = "", q: str = ""
     # và nhỏ một cách im lặng. Trả kèm `han_xu_ly_gio` để màn hình in ra ĐANG theo hạn bao nhiêu
     # giờ, thay vì để người đọc đoán.
     gio = L.gio_han(db)
-    return {"rows": [L.lead_out(l, db) for l in rows], "counts": cnt,
+    # DẤU NGUỒN QUẢNG CÁO gom MỘT LẦN cho cả trang (Chủ tịch chốt 08/10/2026 – hiện cả lần chạm
+    # đầu lẫn lần chạm cuối). Hỏi trong vòng lặp thì trang 2000 dòng là 2000 câu hỏi, và kiểu chậm
+    # ấy chỉ lộ ra khi bảng đã to – tức là lúc không ai còn nhớ dòng nào sinh ra nó.
+    from app.services import dau_quang_cao as DQC
+    dau = DQC.dau_dau_cuoi(db, [l.id for l in rows])
+    return {"rows": [L.lead_out(l, db, dau.get(l.id)) for l in rows], "counts": cnt,
             "han_xu_ly_gio": gio, "so_qua_han": L.dem_qua_han(db, qs, gio)}
 
 

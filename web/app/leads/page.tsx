@@ -7,10 +7,26 @@ import BaoCaoChuyenDoi from "@/components/BaoCaoChuyenDoi";
 
 const ST_CLS: Record<string, string> = { moi: "navy", dang_cham_soc: "warn", chot: "ok", mat: "" };
 
+// DẤU NGUỒN QUẢNG CÁO của một lead — Chủ tịch chốt 08/10/2026: hiện CẢ lần chạm đầu lẫn lần chạm
+// cuối, hai cột riêng. Lần đầu là kênh MANG KHÁCH ĐẾN, lần cuối là kênh CHỐT ĐƯỢC; chênh lệch
+// giữa hai cột chính là chỗ cho thấy kênh nào đang nuôi quỹ khách mà không được ghi công.
+// Ô trống in "–": chưa có dấu nào KHÁC với có dấu mà nền tảng rỗng.
+function DauO({ d, ten }: { d: any; ten: Record<string, string> }) {
+  if (!d) return <span className="muted">–</span>;
+  const phu = d.ten_chien_dich || d.ma_chien_dich || "";
+  return (<>
+    <b>{ten[d.nen_tang] || d.nen_tang}</b>
+    {phu && <div className="muted">{phu}</div>}
+    {/* Giờ chạm rỗng là CHƯA BIẾT, không phải 0. Không lấy giờ VTOS ghi lấp vào: lấp là bịa ra
+        một mốc khách chưa từng chạm, và mốc bịa đi thẳng vào phép đếm 30 / 60 / 90 ngày. */}
+    <div className="muted">{d.cham_luc ? fmtDT(d.cham_luc) : "giờ chạm: nền tảng không gửi"}</div>
+  </>);
+}
+
 function Leads() {
   const { user, toast } = useShell();
   const role = user?.role || "";
-  const [meta, setMeta] = useState<any>({ channels: [], status: {}, zalo: {} });
+  const [meta, setMeta] = useState<any>({ channels: [], status: {}, zalo: {}, nen_tang: {}, nguon_ghi: {} });
   const month0 = new Date().toISOString().slice(0, 7);
   const [tab, setTab] = useState("leads");
   // mở đúng tab khi vào từ menu bên trái (?tab=...)
@@ -27,7 +43,11 @@ function Leads() {
     if (tab === "zalo") { api("/zalo/status").then(setZalo).catch(() => {}); api("/zalo/messages?limit=100").then(setMsgs).catch(() => {}); }
   }, [tab, month, channel, status, q, repMonth, toast]);
   useEffect(() => { load(); }, [load]);
-  const canEdit = ["nv_kd", "gd_kd", "ptgd_mkt", "cntt", "tgd"].includes(role);
+  // PHẢI KHỚP `EDIT_ROLES` ở backend/app/api/v1/crm.py. Trước 08/10/2026 màn hình HẸP HƠN máy
+  // chủ: tn_kd, tp_kd và nv_mkt được phép sửa nhưng không thấy nút nào — nên họ đi nhờ người
+  // khác sửa hộ, và nhật ký ghi sai tên người sửa. Rộng hơn máy chủ thì ngược lại: bấm vào ăn
+  // 403. Hai danh sách này là một luật, phép thử test_tc110 canh cho chúng không lệch nhau.
+  const canEdit = ["nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_mkt", "ptgd_mkt", "cntt", "tgd"].includes(role);
   const post = async (path: string, json?: any, ok?: string) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || ok || "Xong"); load(); return r; } catch (e) { toast(errMsg(e), true); } };
   const upload = () => { const inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx"; inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; const fd = new FormData(); fd.append("file", f);
     try { const r = await fetch(`/api/v1/leads/import?default_month=${month}`, { method: "POST", body: fd, headers: { Authorization: `Bearer ${getToken() || ""}` } }); const j = await r.json(); if (!r.ok) throw new Error(j.detail?.message || j.detail || "Lỗi"); toast(j.message); load(); } catch (e: any) { toast(e.message, true); } }; inp.click(); };
@@ -56,9 +76,9 @@ function Leads() {
         <div className="grid"><div><label>Mục đích</label><select name="purpose" defaultValue="cham_soc"><option value="cham_soc">Chăm sóc / tư vấn</option><option value="nhac_coc">Nhắc cọc</option><option value="xac_nhan_booking">Xác nhận booking</option><option value="khuyen_mai">Khuyến mãi</option><option value="cam_on">Cảm ơn sau tour</option></select></div></div>
         <label>Nội dung (OA) – với ZNS dùng mẫu đã duyệt theo mục đích</label><textarea name="text" defaultValue={`Vietourist chào ${zsend.name || "anh/chị"}, em là ${user?.full_name}. `} />
         <button className="act teal">Gửi</button> <button type="button" className="act grey" onClick={() => setZsend(null)}>Đóng</button></form>}
-      <table><thead><tr><th>SĐT</th><th>Khách</th><th>Kênh</th><th>Tháng</th><th>Tour quan tâm</th><th>Trạng thái</th><th>Booking</th><th>Sale</th><th>Zalo</th><th>Liên hệ cuối</th><th></th></tr></thead>
-        <tbody>{data.rows.length ? data.rows.map((l: any) => <tr key={l.id}><td><b>{l.phone}</b>{l.phone.length < 10 && <div className="muted">thiếu số</div>}</td><td>{l.name}</td><td>{l.channel}</td><td>{l.lead_month}</td><td className="muted">{l.interest}</td><td><Tag cls={ST_CLS[l.status] || ""}>{l.status_name}</Tag></td><td>{l.booking_code}<div className="muted">{l.booking_tour}</div></td><td>{l.sales_name}</td><td>{l.zalo_uid ? <Tag cls="ok">OA</Tag> : "–"}</td><td>{fmtDT(l.last_contact_at)}</td>
-          <td style={{ whiteSpace: "nowrap" }}>{canEdit && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setEdit(l)}>sửa</button>} <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setZsend(l)}>Zalo</button></td></tr>) : <tr><td colSpan={11} className="muted">Chưa có lead – bấm “Nhập Excel” để nạp file của Marketing.</td></tr>}</tbody></table>
+      <table><thead><tr><th>SĐT</th><th>Khách</th><th>Kênh</th><th>Chạm đầu</th><th>Chạm cuối</th><th>Tháng</th><th>Tour quan tâm</th><th>Trạng thái</th><th>Booking</th><th>Sale</th><th>Zalo</th><th>Liên hệ cuối</th><th></th></tr></thead>
+        <tbody>{data.rows.length ? data.rows.map((l: any) => <tr key={l.id}><td><b>{l.phone}</b>{l.phone.length < 10 && <div className="muted">thiếu số</div>}</td><td>{l.name}</td><td>{l.channel}</td><td><DauO d={l.dau_cham_dau} ten={meta.nen_tang || {}} /></td><td><DauO d={l.dau_cham_cuoi} ten={meta.nen_tang || {}} />{l.so_lan_cham > 1 && <div className="muted">{l.so_lan_cham} lần chạm</div>}</td><td>{l.lead_month}</td><td className="muted">{l.interest}</td><td><Tag cls={ST_CLS[l.status] || ""}>{l.status_name}</Tag></td><td>{l.booking_code}<div className="muted">{l.booking_tour}</div></td><td>{l.sales_name}</td><td>{l.zalo_uid ? <Tag cls="ok">OA</Tag> : "–"}</td><td>{fmtDT(l.last_contact_at)}</td>
+          <td style={{ whiteSpace: "nowrap" }}>{canEdit && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setEdit(l)}>sửa</button>} <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setZsend(l)}>Zalo</button></td></tr>) : <tr><td colSpan={13} className="muted">Chưa có lead – bấm “Nhập Excel” để nạp file của Marketing.</td></tr>}</tbody></table>
     </div>}
 
     {tab === "report" && <div className="panel wrap">
