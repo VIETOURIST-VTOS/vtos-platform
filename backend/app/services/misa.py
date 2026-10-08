@@ -499,13 +499,19 @@ MISA_PURCHASE_COLS = ["Phương thức thanh toán", "Nhận kèm hóa đơn", "
 # `tam_ung_tai_xe` ghi 141 theo đúng quy ước đã chốt cho `tam_ung`: tiền giao cho người của công ty
 # là TẠM ỨNG, không phải phải thu khác (xem quy tắc TAM_UNG trong services/hach_toan.py).
 #
-# `sua_chua_xe` CỐ Ý CHƯA CÓ ở đây. Sửa chữa một chiếc xe có thể là giá vốn của chuyến (154), chi
-# phí quản lý (642), hay chi phí vận hành đội xe theo đầu xe (1541) – ba cách ghi khác nhau, ba con
-# số lãi lỗ khác nhau, và chọn cái nào là quyết định của Kế toán trưởng chứ không phải của người
-# viết phần mềm. Để trống là để câu hỏi ấy còn nhìn thấy được; điền bừa một tài khoản thì câu hỏi
-# biến mất và sổ sai âm thầm.
+# `sua_chua_xe` ĐÃ CÓ CÂU TRẢ LỜI – Chủ tịch quyết 08/10/2026. Ô này từng để trống, và dòng chú
+# thích cũ ghi lý do: sửa một chiếc xe có thể là giá vốn chuyến (154), chi phí quản lý (642), hay
+# chi phí vận hành đội xe theo đầu xe (1541) – ba cách ghi, ba con số lãi lỗ, và chọn cái nào là
+# chữ ký chứ không phải việc của người viết phần mềm. Để trống là để câu hỏi còn nhìn thấy được.
+#
+# Quyết định: **627 – Chi phí sản xuất chung**, và **"chi phí sửa xe tháng nào tính tháng đó"**. Hai
+# vế, vế sau mới là vế dễ mất: KHÔNG treo 242 chờ phân bổ. Một lần đại tu 300 triệu đẩy sang 242 rồi
+# rải 24 tháng thì tháng nào cũng đẹp và không tháng nào thật; tháng phát sinh gánh đủ thì lãi lỗ
+# đội xe của tháng ấy mới là lãi lỗ thật. Hàng rào `test_ky2::test_sua_xe_khong_duoc_treo_242` canh.
+#
+# Cuối kỳ 627 kết chuyển về 154 – bước 0 trong `services/ket_so.py`, trước ba bước đóng về 911.
 CATEGORY_ACCOUNT = {"chi_tour": "1541", "marketing": "6417", "hanh_chinh": "6428", "hoan_tien": "131",
-                    "tam_ung": "141", "tam_ung_tai_xe": "141"}
+                    "tam_ung": "141", "tam_ung_tai_xe": "141", "sua_chua_xe": "627"}
 
 
 def thieu_tai_khoan() -> list[str]:

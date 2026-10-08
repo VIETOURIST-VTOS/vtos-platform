@@ -59,20 +59,26 @@ def test_tx2_2_bon_bang_loai_chi_phai_khop_nhau():
         assert f"{loai}:" in man_hinh, f"màn hình /expenses chưa biết loại chi “{loai}” – ô loại sẽ hiện trống"
 
 
-def test_tx2_3_loai_chi_chua_khai_tai_khoan_thi_phai_noi_ra():
+def test_tx2_3_moi_loai_chi_deu_phai_khai_tai_khoan():
     """Chi được mà không lên bảng kê MISA là tiền ra khỏi quỹ mà sổ không có dòng nào.
 
-    Phép thử này KHÔNG đòi mọi loại phải có tài khoản: `sua_chua_xe` cố ý chưa khai, vì chọn 154 /
-    642 / 1541 là quyết định của Kế toán trưởng. Nó đòi chỗ còn thiếu phải ĐẾM ĐƯỢC, để câu hỏi ấy
-    còn nhìn thấy thay vì chìm đi.
+    BẢN CŨ CHO PHÉP ĐÚNG MỘT Ô TRỐNG, và nó đã làm đúng việc của nó: `sua_chua_xe` cố ý chưa khai
+    vì chọn 154 / 642 / 1541 là ba con số lãi lỗ khác nhau, tức là một chữ ký chứ không phải một
+    dòng mã. Phép thử giữ cho câu hỏi ấy đếm được, kèm lời dặn "nếu đã chọn thì sửa phép thử này
+    kèm lý do".
+
+    Chủ tịch đã chọn 08/10/2026: **627 – Chi phí sản xuất chung**, và **"chi phí sửa xe tháng nào
+    tính tháng đó"**. Nên ô trống ấy không còn lý do tồn tại, và phép thử nay đòi KHÔNG CÒN Ô NÀO
+    TRỐNG. Để lại ngoại lệ sau khi câu hỏi đã có câu trả lời thì lần tới một loại chi mới quên khai
+    sẽ trượt qua đúng cái khe này.
     """
     thieu = MS.thieu_tai_khoan()
     assert MS.CATEGORY_ACCOUNT.get("tam_ung_tai_xe") == "141", (
         "tạm ứng tài xế là tiền giao cho người của công ty – 141, đúng quy ước đã chốt cho tam_ung")
-    assert "sua_chua_xe" in thieu, (
-        "sua_chua_xe đã được khai tài khoản mà không ai ghi lại quyết định ấy ở đâu – "
-        "nếu Kế toán trưởng đã chọn, sửa phép thử này kèm lý do")
-    assert set(thieu) <= {"sua_chua_xe"}, f"còn loại chi khác chưa khai tài khoản mà chưa ai biết: {thieu}"
+    assert MS.CATEGORY_ACCOUNT.get("sua_chua_xe") == "627", (
+        "Chủ tịch quyết 08/10/2026: sửa chữa xe hạch toán 627 – Chi phí sản xuất chung, cuối kỳ kết "
+        "chuyển 154. Đổi khỏi 627 thì phải có quyết định mới và sửa phép thử này kèm ngày, người quyết")
+    assert thieu == [], f"loại chi chạy được mà chưa khai tài khoản – tiền ra mà sổ không có dòng: {thieu}"
 
 
 def test_tx2_4_tai_xe_chi_lap_duoc_dung_mot_loai():

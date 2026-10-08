@@ -161,7 +161,7 @@ def balance_sheet(db: Session, period: str) -> dict:
         ("133", "Thuế GTGT được khấu trừ", g("133")),
         ("138", "Phải thu khác, tạm ứng", g("138", "141")),
         ("154", "Chi phí SXKD dở dang (tour)", g("154")),
-        ("242", "Chi phí trả trước", g("242")),
+        ("242", "Chi phí chờ phân bổ", g("242")),   # tên theo TT 99/2025, Phụ lục I
         ("211", "Tài sản cố định (nguyên giá − hao mòn)", g("211") + g("214")),
     ]
     liabilities = [

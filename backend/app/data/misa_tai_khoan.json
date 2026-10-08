@@ -1,5 +1,5 @@
 {
- "nguon": "MISA AMIS Vietourist Holdings – Bảng cân đối tài khoản 2024–H1/2026 (122 TK có phát sinh) + TT200; ánh xạ mã chỉ tiêu Báo cáo tình hình tài chính/KQKD theo TT99/2025 (mẫu nộp UBCK H1/2026)",
+ "nguon": "MISA AMIS Vietourist Holdings – Bảng cân đối tài khoản 2024–H1/2026 (122 TK có phát sinh); ánh xạ mã chỉ tiêu Báo cáo tình hình tài chính/KQKD theo TT99/2025 (mẫu nộp UBCK H1/2026). TÊN tài khoản: cập nhật 08/10/2026 theo Phụ lục I Thông tư 99/2025/TT-BTC (hiệu lực 01/01/2026, áp dụng cho năm tài chính bắt đầu từ 01/01/2026) – 112 'Tiền gửi không kỳ hạn', 242 'Chi phí chờ phân bổ', 244 'Ký quỹ, ký cược'; bổ sung 627 'Chi phí sản xuất chung' cho chi phí vận hành đội xe.",
  "tai_khoan": [
   {
    "code": "111",
@@ -23,7 +23,7 @@
   },
   {
    "code": "112",
-   "name": "Tiền gửi Ngân hàng",
+   "name": "Tiền gửi không kỳ hạn",
    "kind": "TS",
    "parent": "",
    "level": 1,
@@ -373,7 +373,7 @@
   },
   {
    "code": "242",
-   "name": "Chi phí trả trước",
+   "name": "Chi phí chờ phân bổ",
    "kind": "TS",
    "parent": "",
    "level": 1,
@@ -403,7 +403,7 @@
   },
   {
    "code": "244",
-   "name": "Cầm cố, thế chấp, ký quỹ, ký cược",
+   "name": "Ký quỹ, ký cược",
    "kind": "TS",
    "parent": "",
    "level": 1,
@@ -920,6 +920,16 @@
    "bs_debit": null,
    "bs_credit": null,
    "pl_code": "22"
+  },
+  {
+   "code": "627",
+   "name": "Chi phí sản xuất chung",
+   "kind": "CP",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": null
   },
   {
    "code": "632",

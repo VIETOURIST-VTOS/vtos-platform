@@ -21,7 +21,7 @@ ASSET_STATUS = {"dang_dung": "Đang sử dụng", "ngung_kh": "Ngừng trích kh
 # Loại chi phí trả trước / CCDC theo MISA
 PREPAID_KINDS = {
     "ccdc": {"ten": "Công cụ dụng cụ", "tk_von": "242"},
-    "cp_tra_truoc": {"ten": "Chi phí trả trước", "tk_von": "242"},
+    "cp_tra_truoc": {"ten": "Chi phí chờ phân bổ", "tk_von": "242"},   # tên TT 99/2025 (khóa giữ nguyên)
 }
 PREPAID_STATUS = {"dang_pb": "Đang phân bổ", "ngung_pb": "Ngừng phân bổ", "het": "Đã phân bổ hết", "ghi_giam": "Đã ghi giảm"}
 

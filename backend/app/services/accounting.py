@@ -13,13 +13,24 @@ from app.models.payments import Receipt
 from app.models.accounting import Account, JournalEntry, JournalLine, Invoice, PeriodLock
 from app.services import rules as R
 
-# Hệ thống tài khoản rút gọn cho công ty lữ hành (TT99/2025, Phụ lục I) – bổ sung dần
+# Hệ thống tài khoản rút gọn cho công ty lữ hành (TT 99/2025/TT-BTC, Phụ lục I) – bổ sung dần.
+#
+# DÒNG CHÚ THÍCH TRÊN TỪNG KHAI SAI, và sửa nó là một phần của vòng KY-2 (08/10/2026). Nó nói danh
+# mục này theo TT 99, trong khi ba tên vẫn là chữ của TT 200: 112 "Tiền gửi ngân hàng", 242 "Chi phí
+# trả trước", 244 "Cầm cố, thế chấp, ký quỹ, ký cược". Tệp `data/misa_tai_khoan.json` thì khai thật
+# hơn — nó ghi rõ "+ TT200". Một chú thích nói sai về chính đoạn mã bên dưới là thứ người đọc sau tin
+# mà không kiểm, nên nay cả hai nơi đều mang tên của Phụ lục I TT 99 (hiệu lực 01/01/2026, áp dụng
+# cho năm tài chính bắt đầu từ 01/01/2026).
+#
+# ĐỔI TÊN LÀ ĐỔI NHÃN, KHÔNG ĐỔI SỐ: `seed_accounts` ghi đè `a.name` mỗi lần chạy nên bàn đang chạy
+# đổi tên ngay lúc khởi động, còn số dư và bút toán không đụng tới. Khác hẳn với mức giảm trừ ở vòng
+# KY-1 — cái đó là TIỀN nên phải chờ hai chữ ký.
 CHART = [
-    ("111", "Tiền mặt", "TS", ""), ("112", "Tiền gửi ngân hàng", "TS", ""),
+    ("111", "Tiền mặt", "TS", ""), ("112", "Tiền gửi không kỳ hạn", "TS", ""),
     ("131", "Phải thu của khách hàng", "TS", ""), ("133", "Thuế GTGT được khấu trừ", "TS", ""),
     ("138", "Phải thu khác", "TS", ""), ("141", "Tạm ứng", "TS", ""),
     ("154", "Chi phí SXKD dở dang (chi phí tour)", "TS", ""), ("211", "Tài sản cố định hữu hình", "TS", ""),
-    ("214", "Hao mòn TSCĐ", "TS", ""), ("242", "Chi phí trả trước", "TS", ""),
+    ("214", "Hao mòn TSCĐ", "TS", ""), ("242", "Chi phí chờ phân bổ", "TS", ""),
     ("331", "Phải trả người bán (NCC dịch vụ)", "NV", ""), ("333", "Thuế và các khoản phải nộp", "NV", ""),
     ("3331", "Thuế GTGT phải nộp", "NV", "333"), ("3334", "Thuế TNDN", "NV", "333"), ("3335", "Thuế TNCN", "NV", "333"),
     ("334", "Phải trả người lao động", "NV", ""), ("335", "Chi phí phải trả (NCC chưa có hóa đơn)", "NV", ""),
@@ -27,10 +38,15 @@ CHART = [
     ("341", "Vay và nợ thuê tài chính", "NV", ""), ("411", "Vốn đầu tư của chủ sở hữu", "NV", ""),
     ("421", "Lợi nhuận sau thuế chưa phân phối", "NV", ""),
     ("511", "Doanh thu bán hàng và cung cấp dịch vụ", "DT", ""), ("515", "Doanh thu hoạt động tài chính", "DT", ""),
+    # 627 THÊM 08/10/2026 (Chủ tịch quyết): chi phí vận hành đội xe – sửa chữa xe vào thẳng 627 của
+    # THÁNG PHÁT SINH, không treo 242 chờ phân bổ. Cuối kỳ kết chuyển 627 -> 154 (bước 0 của
+    # `services/ket_so.py`). Trước bản này danh mục KHÔNG có 627 nên `misa.CATEGORY_ACCOUNT` để trống
+    # ô `sua_chua_xe` và tiền chi được mà không lên bảng kê.
+    ("627", "Chi phí sản xuất chung", "CP", ""),
     ("632", "Giá vốn hàng bán (giá vốn tour)", "CP", ""), ("635", "Chi phí tài chính", "CP", ""),
     ("641", "Chi phí bán hàng", "CP", ""), ("642", "Chi phí quản lý doanh nghiệp", "CP", ""),
     ("128", "Đầu tư nắm giữ đến ngày đáo hạn / cho vay", "TS", ""), ("222", "Đầu tư vào công ty liên kết, liên doanh", "TS", ""),
-    ("244", "Cầm cố, thế chấp, ký quỹ, ký cược", "TS", ""), ("413", "Chênh lệch tỷ giá hối đoái", "NV", ""),
+    ("244", "Ký quỹ, ký cược", "TS", ""), ("413", "Chênh lệch tỷ giá hối đoái", "NV", ""),
     ("711", "Thu nhập khác", "DT", ""), ("811", "Chi phí khác", "CP", ""),
     ("821", "Chi phí thuế TNDN", "CP", ""), ("911", "Xác định kết quả kinh doanh", "XD", ""),
 ]
