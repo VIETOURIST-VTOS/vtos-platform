@@ -37,6 +37,11 @@ CUA_TAY = (
     "ra_soat_hop_dong",
     "ban_ghi_chu_ky",
     "xac_nhan_chu_so_lieu",
+    # Đợt D3 — quan hệ nhà đầu tư. Người dùng tự khai qua màn hình /ir-phap-che;
+    # hệ thống không nạp sẵn dòng nào, và không chép số cổ phần sở hữu từ đâu cả.
+    "lien_he_nha_dau_tu",
+    "tuong_tac_nha_dau_tu",
+    "quyen_truy_cap_ho_so",
     "lich_su_to_chuc",
     "chi_ky_luong",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
