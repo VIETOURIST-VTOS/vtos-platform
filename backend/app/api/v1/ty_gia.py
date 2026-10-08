@@ -83,6 +83,23 @@ def danh_sach(tien_te: str = "", tu: date | None = None, den: date | None = None
     return {"so_dong": len(rows), "rows": [_dong(x) for x in rows]}
 
 
+@router.get("/chenh-lech")
+def chenh_lech(tour_id: int | None = None,
+               u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Bản ĐO chênh lệch tỷ giá – không ghi sổ gì, xem `services/chenh_lech_ty_gia.py`.
+
+    Để dưới cửa `/ty-gia` chứ không dựng cửa mới: màn hình Tỷ giá đã khai `/api/v1/ty-gia` trong
+    `MAN_HINH_API`, nên thêm đường này KHÔNG đổi một dòng nào của ma trận quyền. Và đúng chỗ về
+    nghĩa nữa — người đọc thấy chênh lệch xong thì việc tiếp theo của họ là nhập tỷ giá còn thiếu,
+    mà form nhập nằm ngay trên màn hình ấy.
+
+    Vai XEM giữ nguyên như cả cửa tỷ giá: con số này không phải bí mật, nó là câu hỏi cần nhiều
+    người cùng nhìn — Điều hành biết mình gõ tỷ giá nào, Kế toán biết sổ có gì.
+    """
+    from app.services import chenh_lech_ty_gia as CL
+    return CL.tong_hop(db, tour_id)
+
+
 @router.get("/tra-cuu")
 def tra_cuu(tien_te: str, ngay: date, u: User = Depends(require_roles(*XEM)),
             db: Session = Depends(get_db)):
