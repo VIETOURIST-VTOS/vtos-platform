@@ -365,12 +365,21 @@ export default function KhoiKetQuaKinhDoanh() {
         // Đây đúng là luật mà kho mã này nhắc đi nhắc lại ở chỗ khác: `KsDiem.diem` để rỗng chứ
         // không chấm 0, `bon_so_tien` trả None chứ không trả 0, `chua_phan_bo` rỗng khác 0. Ô duy
         // nhất chưa theo luật ấy lại là ô nằm trên màn hình Chủ tịch.
-        <>Còn <b>{thieu_gv} chuyến</b> đã đóng số mà chưa có giá vốn
+        // 08/10/2026 — BỎ HAI CHỮ "ĐÃ ĐÓNG SỐ" KHỎI CÂU NÀY, và đó là một việc sửa cho ĐÚNG
+        // chứ không phải cho gọn. Trước hôm nay, chuyến chưa đóng số không bao giờ rơi vào ô
+        // `chuyen_thieu_gia_von`: `apply_tours` ghi số 0 vào `actual_cost` nên máy đọc được "giá
+        // vốn 0 đồng" và xếp chúng vào cột chính. Bản vá KQ-2 đổi 0-đồng-ở-chuyến-chưa-quyết-toán
+        // thành RỖNG, nên từ nay ô này gồm cả chuyến đã chạy xong mà chưa đóng số. Giữ nguyên câu
+        // cũ là nói với Chủ tịch rằng mọi chuyến trong đó đã đóng số — một câu sai mà không có
+        // con số nào sai, đúng kiểu sai khó tìm nhất.
+        <>Còn <b>{thieu_gv} chuyến</b> chưa có giá vốn
           {Number(th.tien_thieu_gia_von || 0) > 0
             ? <> ({gonSo(Number(th.tien_thieu_gia_von), "tien")} doanh thu)</>
             : <> (<b>chưa biết doanh thu</b> — những chuyến này cũng chưa ghi doanh thu, nên đây là
-              số chuyến chứ không phải số tiền)</>} — chưa vào hai con số
-          trên, hiện thành khúc mờ trên cột. <b>{th.ai_nhap_gia_von}</b> nhập ở cửa đóng số.{" "}</>
+              số chuyến chứ không phải số tiền)</>} — doanh thu của chúng ĐÃ vào con số trên
+          (Chủ tịch chốt 08/10/2026: lấy số liệu y chang của Vietrip) và là khúc mờ ở phần trên
+          cây cột, nhưng <b>chưa vào lợi nhuận</b> vì chưa có giá vốn để trừ.{" "}
+          <b>{th.ai_nhap_gia_von}</b> nhập ở cửa đóng số.{" "}</>
       )}
       {/* TC-71 · CHỖ CHÊNH VỚI SỔ KẾ TOÁN. Đặt TRƯỚC hai dòng dưới vì đây là khoản lớn nhất và là
           thứ trả lời câu "vì sao VTOS 116 tỷ mà BCTC 85 tỷ". */}

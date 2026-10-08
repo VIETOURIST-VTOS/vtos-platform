@@ -200,13 +200,32 @@ def bang(db: Session, kind: str = XH.KY_NAM, ky: str = "",
                 "trong_ky": t in trong_ky}
                for i, (t, g) in enumerate(zip(cac_thang, gt))]
 
-        # TC-47 · KHÚC MỜ: doanh thu của chuyến ĐÃ đóng số mà CHƯA có giá vốn. Chỉ gắn vào cột
-        # doanh thu, vì đúng những chuyến ấy bị bỏ ra khỏi cả doanh thu lẫn lãi (xem chú thích
-        # "vì sao doanh thu cũng phải bỏ chuyến thiếu giá vốn ra" ở đầu services/ket_qua_that.py).
-        # Không có khúc này thì phần doanh thu ấy biến mất khỏi màn hình mà không ai biết.
+        # TC-47 · KHÚC MỜ: doanh thu của chuyến CHƯA có giá vốn. Chỉ gắn vào cột doanh thu.
+        #
+        # ══════════════════════════════════════════════════════════════════════════════════════
+        # 08/10/2026 · KHÚC MỜ TỪ NAY NẰM TRONG CỘT, KHÔNG CÒN NỐI THÊM LÊN TRÊN
+        # ══════════════════════════════════════════════════════════════════════════════════════
+        # Chủ tịch chốt hôm nay: doanh thu lấy y chang của Vietrip, nên `ket_qua_that.doanh_thu`
+        # nay GỒM CẢ chuyến thiếu giá vốn (xem khối "doanh thu đi hết, lãi thì không" bên ấy).
+        #
+        # `BieuDo` vẽ `cho` NỐI TIẾP lên đầu cột: cao cả cây = `gia_tri` + `cho`. Để `gia_tri` là
+        # con số gộp thì khúc mờ cộng thêm một lần nữa — cây cột cao gấp rưỡi sự thật, và con số
+        # in dưới nó lại đúng, nên không ai nghi ngờ cái hình. Vì vậy ở ĐÂY cột đặc đổi thành
+        # `dt_co_gia_von` (phần có giá vốn, đúng tập mà hình LÃI phía dưới vẽ), khúc mờ giữ
+        # nguyên là phần thiếu, và CAO CẢ CÂY lại đúng bằng `doanh_thu`.
+        #
+        # KHÔNG sửa `BieuDo.tsx`: bản vẽ "khúc nối tiếp" ấy vẫn đúng cho mọi hình khác dùng nó, và
+        # đổi nghĩa một thành phần dùng chung để tiện cho một chỗ gọi là cách làm hỏng những chỗ
+        # gọi chưa ai nghĩ tới.
+        #
+        # `so[...]` ở trên KHÔNG đổi: con số IN RA của kỳ vẫn là `doanh_thu` gộp, vì nó đọc `gt`
+        # trước dòng này. Hai thứ ấy phải khác nhau — một cái là cả cây cột, một cái là phần đặc.
         if ct["ma"] == "doanh_thu":
             for o, t in zip(cot, cac_thang):
-                o["cho"] = float(thieu_thang[t]["dt_thieu_gia_von"])
+                th = thieu_thang[t]
+                o["cho"] = float(th["dt_thieu_gia_von"])
+                if o["gia_tri"] is not None:
+                    o["gia_tri"] = float(th["dt_co_gia_von"] or 0)
 
         ke_hoach = None
         if ct["co_ke_hoach"]:

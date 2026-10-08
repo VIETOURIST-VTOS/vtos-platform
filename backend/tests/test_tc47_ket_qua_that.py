@@ -157,17 +157,20 @@ def test_chuyen_cua_cong_ty_con_khong_cong_vao_vietourist():
     """
     db, _, _ = _so_gia()
     r = KQ.thang(db, "2026-08")
-    # 217 = A(100) + D(77, pháp nhân rỗng) + F(40, chưa đóng sổ). Lãi 136 = 40 + 76 + 20.
-    assert r["doanh_thu"] == 217.0 and r["lai_tour"] == 136.0
+    # 08/10/2026 · 267 = A(100) + D(77) + F(40) + B(50, thiếu giá vốn — nay CŨNG vào doanh thu
+    # theo lệnh "lấy y chang của Vietrip"). Lãi vẫn 136 = 40 + 76 + 20, vì B không có giá vốn.
+    assert r["doanh_thu"] == 267.0 and r["lai_tour"] == 136.0
     assert r["dt_thieu_gia_von"] == 50.0
+    assert r["dt_co_gia_von"] == 217.0, "Mẫu số của cột lãi — xem phép thử về biên ở dưới."
     assert 999.0 not in (r["doanh_thu"], r["lai_tour"], r["dt_thieu_gia_von"],
                          r["dt_chua_gan_phap_nhan"], r["dt_da_dong_so"], r["dt_chua_dong_so"]), (
         "Doanh thu công ty con cộng vào Vietourist là số hợp nhất mang nhãn công ty mẹ."
     )
     # Và canh chặt hơn bằng phép trừ: tổng của mẹ phải KHÔNG chứa 999 dù cộng kiểu nào.
-    assert r["dt_da_dong_so"] + r["dt_chua_dong_so"] == 217.0 + 50.0, (
-        "Hai nửa của con số gộp phải cộng lại đúng bằng tổng doanh thu của tập chuyến thuộc mẹ "
-        "(gồm cả phần thiếu giá vốn) — thừa ra là có chuyến của pháp nhân khác lọt vào."
+    assert r["dt_da_dong_so"] + r["dt_chua_dong_so"] == r["doanh_thu"] == 267.0, (
+        "Hai nửa của con số gộp phải cộng lại đúng bằng doanh thu của tập chuyến thuộc mẹ — thừa "
+        "ra là có chuyến của pháp nhân khác lọt vào. Từ 08/10 `doanh_thu` đã GỒM phần thiếu giá "
+        "vốn, nên đẳng thức này gọn lại: không còn phải cộng `dt_thieu_gia_von` vào bên phải."
     )
 
 
@@ -196,7 +199,7 @@ def test_chua_gan_phap_nhan_nay_QUY_VE_VIETOURIST_va_van_dem_duoc():
     assert r["chua_gan_phap_nhan"] == 1 and r["dt_chua_gan_phap_nhan"] == 77.0, (
         "Phần vào bằng quy tắc mặc định phải đếm được, kèm số tiền của nó."
     )
-    assert r["doanh_thu"] == 217.0, "…và nay ĐÃ cộng vào Vietourist (100 + 77 + 40)."
+    assert r["doanh_thu"] == 267.0, "…và nay ĐÃ cộng vào Vietourist (100 + 77 + 40 + 50)."
 
     d = db.query(Tour).filter_by(code="D").one()
     assert d.company_id is None, (
@@ -235,8 +238,9 @@ def test_moc_la_ngay_dong_so_khong_phai_ngay_ke_toan_xac_nhan():
     t8 = KQ.thang(db, "2026-08")
     t9 = KQ.thang(db, "2026-09")
     # LUẬT KHÔNG ĐỔI: chuyến G đóng số 30/8, Kế toán duyệt 12/9 → vẫn là doanh thu THÁNG 8.
-    # Con số kỳ vọng đổi vì TC-71 kéo thêm D (77) và F (40) vào tháng 8: 100 + 200 + 77 + 40.
-    assert t8["doanh_thu"] == 417.0, (
+    # Con số kỳ vọng đổi vì TC-71 kéo thêm D (77) và F (40), rồi 08/10 kéo thêm B (50, thiếu giá
+    # vốn) vào tháng 8: 100 + 200 + 77 + 40 + 50.
+    assert t8["doanh_thu"] == 467.0, (
         "Doanh thu tháng 8 không được phụ thuộc vào tốc độ duyệt của Kế toán."
     )
     # Và canh thẳng vào chỗ dễ hỏng nhất: G phải nằm ở nửa ĐÃ ĐÓNG SỔ, không rơi sang nửa kia.
@@ -352,34 +356,65 @@ def test_thang_rong_tra_none_chu_khong_tra_khong():
 
 # ═════════════════ 5 · HAI HÌNH PHẢI NÓI VỀ CÙNG MỘT TẬP CHUYẾN ═════════════════
 
-def test_doanh_thu_va_lai_tour_dung_cung_mot_tap_chuyen():
-    """Chỗ hỏng số 5 — bài học TC-45 áp cho vòng này.
+def test_bien_loi_nhuan_van_tinh_dung_duoc_du_hai_cot_khac_tap():
+    """══ 08/10/2026 — LUẬT BỊ ĐẢO, ghi cả hai bên ══════════════════════════════════════════════
 
-    Doanh thu 100 và lãi 40 cùng đến từ chuyến A. Nếu doanh thu cộng cả chuyến B (thiếu giá vốn)
-    thành 150 thì biên đọc ra 27% trong khi biên thật của tập đang tính là 40%.
+    Tên cũ: `test_doanh_thu_va_lai_tour_dung_cung_mot_tap_chuyen`.
+
+    BÊN CŨ (TC-47, chỗ hỏng số 5 — bài học TC-45): doanh thu và lãi phải đến từ CÙNG MỘT TẬP
+    chuyến, nên cột doanh thu cũng bỏ chuyến thiếu giá vốn ra. Lý do vẫn đúng và vẫn đáng nhớ:
+    hai con số ấy đứng cạnh nhau trên một trục ngang, người đọc sẽ CHIA chúng cho nhau, và một
+    phép chia giữa tử của tập này với mẫu của tập kia cho ra biên thấp hơn thật mà không có gì
+    trên màn hình nói rằng hai cột nói về hai tập khác nhau.
+
+    BÊN MỚI (Chủ tịch 08/10/2026): *"ý của anh là lấy số liệu y chang của vietrip"*. Lý do đo
+    được hôm ấy: luật cũ giữ 10,58 tỷ của tháng 9 và 3,16 tỷ của tháng 10 ở NGOÀI cột doanh thu,
+    vì 57/116 chuyến T9 và 17/34 chuyến T10 đã khởi hành có doanh thu booking mà Vietrip chưa có
+    một dòng chi phí nào. Đổi một con số CHIA SAI thành một con số THIẾU 10,5 tỷ không phải là
+    sửa — Chủ tịch chọn con số đủ.
+
+    BÊN MỚI PHẢI GÁNH LẠI CHÍNH CÁI LÝ DO CỦA BÊN CŨ, và phép thử này canh đúng chỗ ấy: mẫu số
+    của cột lãi được TRẢ RA THÀNH MỘT CON SỐ CÓ TÊN (`dt_co_gia_von`), nên biên lợi nhuận vẫn
+    tính đúng được. Thiếu nó thì đây là lỗi TC-45 nguyên bản, không phải một luật mới.
     """
     db, _, _ = _so_gia()
     r = KQ.thang(db, "2026-08")
-    # TC-71 · LUẬT NÀY KHÔNG BỊ ĐẢO — chỉ con số kỳ vọng đổi vì tập chuyến rộng ra (thêm D và F).
-    # Điều phải canh vẫn y nguyên: hai con số đến từ CÙNG MỘT TẬP. Nên phép thử nay canh bằng
-    # CHÍNH ĐỊNH NGHĨA chứ không bằng một tỷ lệ gõ cứng — gõ cứng thì lần sau đổi fixture là lại
-    # phải sửa con số, và người sửa không còn biết mình đang canh điều gì.
-    assert r["doanh_thu"] == 217.0 and r["lai_tour"] == 136.0
-    du = [t for t in db.query(Tour).all()
-          if KQ._lai(t) is not None and t.company_id in (None, 1)
-          and (t.closed_at or t.start_date).month == 8]
-    assert r["doanh_thu"] == sum(float(t.actual_revenue) for t in du), (
-        "Tử số và mẫu số phải đến từ cùng một tập chuyến, nếu không biên đọc ra là phép chia giữa "
-        "tử của tập này và mẫu của tập kia."
-    )
+    assert r["doanh_thu"] == 267.0 and r["lai_tour"] == 136.0
+
+    # Canh bằng CHÍNH ĐỊNH NGHĨA, không bằng tỷ lệ gõ cứng — gõ cứng thì lần sau đổi fixture là
+    # lại phải sửa con số, và người sửa không còn biết mình đang canh điều gì.
+    thang8 = [t for t in db.query(Tour).all()
+              if t.company_id in (None, 1) and (t.closed_at or t.start_date).month == 8]
+    du = [t for t in thang8 if KQ._lai(t) is not None]
+    assert r["doanh_thu"] == sum(float(t.actual_revenue or 0) for t in thang8), (
+        "Cột doanh thu phải đi HẾT tập chuyến của tháng — đó là điều Chủ tịch chốt 08/10.")
     assert r["lai_tour"] == sum(KQ._lai(t) for t in du)
+    assert r["dt_co_gia_von"] == sum(float(t.actual_revenue) for t in du), (
+        "MẪU SỐ của cột lãi phải trả ra riêng và phải đúng bằng doanh thu của tập có giá vốn. "
+        "Không có nó thì `lai_tour / doanh_thu` là phép chia giữa hai tập khác nhau — đúng lỗi "
+        "TC-45 mà bên cũ sinh ra để chặn.")
+
+    # Và biên tính đúng được: 136/217 = 62,7%, KHÔNG phải 136/267 = 50,9%.
+    assert abs(r["lai_tour"] / r["dt_co_gia_von"] - 136.0 / 217.0) < 1e-9
+    assert r["dt_co_gia_von"] < r["doanh_thu"], (
+        "Bộ số giả phải có ít nhất một chuyến thiếu giá vốn, nếu không phép thử này xanh mà không "
+        "chứng minh được gì.")
 
 
-def test_phan_doanh_thu_bi_bo_ra_van_hien_duoc_thanh_khuc_mo():
-    """Bỏ chuyến thiếu giá vốn ra khỏi cột chính là đúng — làm mất tiền của nó thì không."""
+def test_phan_thieu_gia_von_van_dem_duoc_rieng_de_ve_khuc_mo():
+    """08/10/2026 ĐỔI NGHĨA, tên cũ: `test_phan_doanh_thu_bi_bo_ra_van_hien_duoc_thanh_khuc_mo`.
+
+    Phần thiếu giá vốn nay KHÔNG bị bỏ ra khỏi cột doanh thu nữa — nó ở TRONG. Nhưng nó vẫn phải
+    đếm được RIÊNG, và vì hai lý do khác nhau: (1) hình vẽ cột đặc bằng `dt_co_gia_von` rồi nối
+    khúc mờ `dt_thieu_gia_von` lên cho đủ cao — xem `ket_qua_kinh_doanh`; (2) nó là phần Điều
+    hành còn phải nhập, và câu dưới chân thẻ nêu tên bộ phận ấy.
+    """
     db, _, _ = _so_gia()
     r = KQ.thang(db, "2026-08")
     assert r["thieu_gia_von"] == 1 and r["dt_thieu_gia_von"] == 50.0
+    assert r["dt_co_gia_von"] + r["dt_thieu_gia_von"] == r["doanh_thu"], (
+        "Cột đặc cộng khúc mờ phải đúng bằng cao cả cây cột. Lệch thì cái hình nói một con số "
+        "khác với con số in ngay dưới nó.")
 
 
 def test_khoi_man_hinh_ve_khuc_cho_va_noi_ten_bo_phan():
