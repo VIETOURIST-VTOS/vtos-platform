@@ -59,6 +59,22 @@ function KetSo() {
     setDang(false);
   };
 
+  // Tách chênh lệch tỷ giá ra 635/515 (KY-4). Đứng RIÊNG khỏi bốn bước kết chuyển vì nó lấy số từ
+  // các dòng quyết toán chứ không từ số dư tài khoản – gộp chung một khung thì người đọc tưởng nó
+  // cũng đọc sổ như bốn bước kia.
+  const [tg, setTg] = useState<any>(null);
+  const taiTg = useCallback(() => {
+    api<any>(`/ket-so/tach-ty-gia/xem-truoc?ky=${ky}`).then(setTg).catch(() => setTg(null));
+  }, [ky]);
+  useEffect(taiTg, [taiTg]);
+  const tachTg = async () => {
+    setDang(true);
+    try {
+      const d = await api<any>("/ket-so/tach-ty-gia", { method: "POST", json: { ky } });
+      setTg(d); toast(d.message); load();
+    } catch (x) { toast(errMsg(x), true); } finally { setDang(false); }
+  };
+
   const ketChuyen = async (buoc?: number[]) => {
     setDang(true);
     try {
@@ -197,6 +213,19 @@ function KetSo() {
           <>
             <p className="muted small">{kc.ghi_chu}</p>
             {kc.canh_bao?.map((c: string, i: number) => <p key={i} className="warn">{c}</p>)}
+            {tg && (
+              <div className="buoc">
+                <b>Tách chênh lệch tỷ giá ra 635 / 515</b>{" "}
+                {tg.da_ghi ? <>✓ {tg.chung_tu}</> : "○"}{" "}
+                <span className="muted">
+                  lỗ {vnd(tg.lo)} · lãi {vnd(tg.lai)} · {(tg.tach_duoc || []).length} dòng
+                  {tg.tu_ngay ? <> · từ ngày {tg.tu_ngay} về sau</> : <> · <b>chưa đặt mốc ngày</b></>}
+                </span>
+                {tg.canh_bao?.map((c: string, i: number) => <p key={i} className="warn">{c}</p>)}
+                <p className="muted">{tg.ghi_chu}</p>
+                {!tg.da_ghi && tg.da_bat && (tg.but_toan || []).length > 0 && (
+                  <button onClick={tachTg} disabled={dang}>Ghi bút toán tách</button>)}
+              </div>)}
             {kc.buoc.map((b: Buoc) => (
               <div key={b.buoc} className="buoc">
                 <b>Bước {b.buoc} – {b.ten}</b>{" "}

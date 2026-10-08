@@ -538,3 +538,63 @@ def tinh_trang_ky(db: Session, ky: str) -> dict:
         "ghi_chu": ("Sẵn sàng lên báo cáo nghĩa là mọi chứng từ của kỳ đã vào sổ – KHÔNG có nghĩa là "
                     "số đã đúng. Đối chiếu vẫn là việc của người."),
     }
+
+# ====================== TÁCH CHÊNH LỆCH TỶ GIÁ RA 635 / 515 (KY-4) ======================
+#
+# Chủ tịch quyết 09/10/2026: "nên tách, và bắt đầu tính từ hôm nay về sau".
+#
+# ĐẶT Ở ĐÂY CHỨ KHÔNG THÀNH MỘT BƯỚC CỦA `BUOC_KET_CHUYEN`, và đó là một phân biệt có lý do: bốn
+# bước kia lấy số từ SỔ (`_du_trong_ky` đọc số dư tài khoản), còn số này tính TỪ CÁC DÒNG QUYẾT
+# TOÁN ở ngoài sổ. Nhét nó vào bảng ấy thì bộ dò "tài khoản không thuộc bước nào" và phép kiểm phủ
+# hết các bước — hai thứ dựng trên giả định "mọi bước đều đọc sổ" — sẽ nói những câu vô nghĩa.
+#
+# Nhưng vẫn ĐI QUA `post_entry` với nguồn `ket_chuyen`, vì nó đúng là một bút toán phân loại lại
+# cuối kỳ, và vì nguồn ấy được `account_rule_check` miễn đòi mã công trình — chênh lệch tỷ giá của
+# cả kỳ không thuộc riêng chuyến nào.
+NGUON_TACH_TY_GIA = "ket_chuyen"
+
+
+def xem_truoc_tach_ty_gia(db: Session, ky: str) -> dict:
+    """Bản xem trước. Mọi đường GHI ở tệp này đều có một đường XEM TRƯỚC – xem ghi chú đầu tệp."""
+    from app.services import chenh_lech_ty_gia as CL
+    kq = CL.tinh_tach(db, ky)
+    ref = f"tgia:{ky}"
+    da = db.execute(select(JournalEntry).where(JournalEntry.source_type == NGUON_TACH_TY_GIA,
+                                               JournalEntry.source_ref == ref,
+                                               JournalEntry.status == "da_ghi_so")).scalars().first()
+    canh = []
+    if kq["so_thieu_ty_gia_so"]:
+        canh.append(f"{kq['so_thieu_ty_gia_so']} dòng KHÔNG tách được vì sổ tỷ giá chưa có ngày ấy. "
+                    "Nhập tỷ giá ở màn hình Tỷ giá rồi chạy lại – chạy bây giờ thì phần đó ở lại "
+                    "trong giá vốn chuyến.")
+    if kq["so_khong_ro"]:
+        canh.append(f"{kq['so_khong_ro']} dòng không tính được chênh vì không khai rõ số tiền "
+                    "nguyên tệ. Đây là chỗ hở của mô hình, không phải của kỳ này.")
+    if kq["so_truoc_moc"]:
+        canh.append(f"{kq['so_truoc_moc']} dòng có ngày trước mốc {kq['tu_ngay']} – KHÔNG tách và "
+                    "KHÔNG sửa lùi, theo đúng quyết định 'từ hôm nay về sau'.")
+    return {**kq, "da_ghi": da is not None, "chung_tu": da.code if da else "", "canh_bao": canh}
+
+
+def tach_ty_gia(db: Session, u: User, ky: str) -> dict:
+    """Ghi MỘT bút toán phân loại lại cho cả kỳ. Ghi rồi thì bỏ qua, không ghi lần hai."""
+    from app.services import accounting as ACC
+    if ACC.is_locked(db, ky):
+        raise KhongGhiDuoc(f"Kỳ {ky} đã khóa sổ – không ghi được nữa.")
+    xt = xem_truoc_tach_ty_gia(db, ky)
+    if not xt["da_bat"]:
+        raise KhongGhiDuoc("Chưa đặt mốc ngày tách (tham số 'tach_ty_gia_tu_ngay') – không tách gì cả.")
+    if xt["da_ghi"]:
+        return {**xt, "message": f"Kỳ {ky} đã tách ở chứng từ {xt['chung_tu']} – bỏ qua."}
+    if not xt["but_toan"]:
+        return {**xt, "message": f"Kỳ {ky} không có chênh lệch tỷ giá nào để tách."}
+    d = date(int(ky[:4]), int(ky[5:7]), 28)
+    try:
+        e = ACC.post_entry(db, u.username, u.role, d,
+                           f"Tách chênh lệch tỷ giá ra 635/515 – kỳ {ky}", list(xt["but_toan"]),
+                           NGUON_TACH_TY_GIA, f"tgia:{ky}")
+    except ValueError as ex:
+        raise KhongGhiDuoc(f"Tách chênh lệch tỷ giá kỳ {ky}: {ex}")
+    return {**xt, "da_ghi": True, "chung_tu": e.code,
+            "message": (f"Đã tách chênh lệch tỷ giá kỳ {ky}: lỗ {xt['lo']:,.0f} đ, "
+                        f"lãi {xt['lai']:,.0f} đ, trên {len(xt['tach_duoc'])} dòng.")}

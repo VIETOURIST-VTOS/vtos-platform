@@ -293,3 +293,146 @@ def test_man_hinh_ty_gia_goi_dung_cua_va_in_ra_cai_nguoi_doc_lam_duoc():
     # còn thiếu. In gộp thành một số "có vấn đề" thì không ai biết phần nào là việc của mình.
     assert "cl.so_chuyen_cung_ngay_khac_gia" in mh, "khung chưa nêu chỗ đáng ngờ nhất"
     assert "cl.so_cap_so_chua_co" in mh, "khung chưa nói sổ còn thiếu bao nhiêu ngày – đó là cửa nhập"
+
+# ================= KY-4: tách ra 635/515, từ một NGÀY về sau =================
+
+def test_moc_ngay_tach_la_ngay_chu_tich_noi(db):
+    """Chủ tịch nói đích danh NGÀY, nên điền ngày ấy là thi hành, không phải ký thay.
+
+    Khác `tncn_luy_tien_tu_ky` để trống ở vòng KY-1: cái kia Chủ tịch chưa nói ngày, VÀ bật nhầm thì
+    trừ hai lần tiền của người lao động. Cái này hệ quả là một bút toán phân loại lại trong sổ.
+    """
+    from app.services import rules as R
+    from app.services import chenh_lech_ty_gia as CL
+    mac_dinh = {k: v for k, v, *_ in R.DEFAULT_PARAMS}
+    assert mac_dinh[CL.TU_NGAY_KEY] == "2026-10-09"
+    assert CL.tu_ngay(db) == "2026-10-09"
+
+
+def test_truoc_moc_thi_khong_tach_va_khong_sua_lui(db, tour):
+    """'Từ hôm nay về sau' – dòng cũ KHÔNG bị tách, nhưng cũng KHÔNG biến mất khỏi tầm mắt."""
+    from app.services import chenh_lech_ty_gia as CL
+    cu, moi = date(2026, 9, 15), date(2026, 10, 20)
+    _so(db, "USD", cu, 25500)
+    _so(db, "USD", moi, 25500)
+    _pt(db, tour.id, "USD", 25800, cu, goc=1000)     # trước mốc
+    _pt(db, tour.id, "USD", 25800, moi, goc=1000)    # sau mốc
+    db.flush()
+    t9 = CL.tinh_tach(db, "2026-09")
+    assert t9["tach_duoc"] == [] and t9["so_truoc_moc"] >= 1, "kỳ trước mốc mà vẫn bị tách"
+    assert any("không sửa lùi" in d["ly_do"] for d in t9["truoc_moc"])
+    t10 = CL.tinh_tach(db, "2026-10")
+    assert any(d["chenh"] == 300_000 for d in t10["tach_duoc"]), \
+        "(25.800 − 25.500) × 1.000 = 300.000 đ phải được tách"
+
+
+def test_chieu_but_toan_lo_va_lai_khong_duoc_nguoc(db, tour):
+    """Chiều sai thì sổ vẫn cân và vẫn ra số – chỉ có lãi lỗ ngược dấu. Ghim cả hai chiều.
+
+    Trả NHIỀU VND hơn tỷ giá sổ → LỖ → Nợ 635 / Có 632.
+    Trả ÍT hơn                  → LÃI → Nợ 632 / Có 515.
+    """
+    from app.services import chenh_lech_ty_gia as CL
+    ng = date(2026, 11, 5)
+    _so(db, "THB", ng, 700)
+    _pt(db, tour.id, "THB", 710, ng, goc=1000)    # trả cao hơn → lỗ 10.000
+    db.flush()
+    kq = CL.tinh_tach(db, "2026-11")
+    assert kq["lo"] == 10_000 and kq["lai"] == 0
+    bt = {(l["account"], "no" if "debit" in l else "co"): list(l.values())[1] for l in kq["but_toan"]}
+    assert bt.get(("635", "no")) == 10_000, "lỗ tỷ giá phải ghi NỢ 635"
+    assert bt.get(("632", "co")) == 10_000, "lỗ phải được lấy RA khỏi giá vốn (ghi CÓ 632)"
+
+    _pt(db, tour.id, "THB", 690, ng, goc=1000)    # trả thấp hơn → lãi 10.000, bù trừ
+    db.flush()
+    kq2 = CL.tinh_tach(db, "2026-11")
+    assert kq2["lo"] == 10_000 and kq2["lai"] == 10_000, "lãi và lỗ phải đứng riêng, không tự bù"
+    bt2 = {(l["account"], "no" if "debit" in l else "co") for l in kq2["but_toan"]}
+    assert ("515", "co") in bt2 and ("632", "no") in bt2, "lãi tỷ giá phải ghi CÓ 515 và NỢ 632"
+
+
+def test_nhieu_nguon_cung_ngay_thi_lay_nguon_GAN_NHAT(db, tour):
+    """Sổ cố ý cho hai nguồn cùng ngày và không nói nguồn nào đúng. Lấy nguồn XA nhất là tự tạo ra
+    một khoản chênh chưa chắc có thật – và khoản ấy sẽ được ghi vào sổ cái."""
+    from app.services import chenh_lech_ty_gia as CL
+    ng = date(2026, 11, 20)
+    _so(db, "KRW", ng, 18, nguon="Vietcombank")
+    _so(db, "KRW", ng, 19, nguon="thực tế chuyển khoản")
+    _pt(db, tour.id, "KRW", 19, ng, goc=1_000_000)
+    db.flush()
+    kq = CL.tinh_tach(db, "2026-11")
+    krw = [d for d in kq["tach_duoc"] if d["tien_te"] == "KRW"]
+    assert not krw, "khớp một nguồn trong sổ mà vẫn bị tính chênh – đang lấy nguồn xa nhất"
+
+
+def test_thieu_ty_gia_so_thi_khong_tach_va_phai_noi_ra(db, tour):
+    """Không có tỷ giá sổ thì KHÔNG đoán một con số để tách. Nói ra, và chỉ đường tới cửa nhập."""
+    from app.services import chenh_lech_ty_gia as CL
+    from app.services import ket_so as KS
+    _pt(db, tour.id, "HKD", 3200, date(2026, 12, 3), goc=500)
+    db.flush()
+    kq = CL.tinh_tach(db, "2026-12")
+    assert kq["tach_duoc"] == [] and kq["so_thieu_ty_gia_so"] >= 1
+    xt = KS.xem_truoc_tach_ty_gia(db, "2026-12")
+    assert any("sổ tỷ giá chưa có" in c and "Tỷ giá" in c for c in xt["canh_bao"]), \
+        "không tách được mà không chỉ đường tới chỗ nhập thì người đọc không làm gì được"
+
+
+def test_ghi_so_mot_lan_va_khong_ghi_lan_hai(db):
+    """Bấm hai lần ra hai bộ bút toán là nhân đôi lãi lỗ tài chính của kỳ."""
+    from app.models.core import User
+    from app.services import ket_so as KS
+    ke_toan = db.execute(select(User).where(User.role == "ketoan")).scalars().first()
+    # Dựng dữ liệu CỦA RIÊNG phép thử này và COMMIT: fixture `db` lăn ngược sau mỗi phép thử, nên
+    # dòng do phép thử trước tạo ra đã biến mất. Dựa vào dữ liệu của phép thử khác là dựa vào THỨ TỰ
+    # chạy – một ngày ai đó chạy riêng một phép thử là nó đỏ mà không ai hiểu vì sao.
+    from app.models.core import Tour as _T
+    t = db.execute(select(_T)).scalars().first()
+    ky, ng = "2027-01", date(2027, 1, 12)
+    _so(db, "AUD", ng, 18500)
+    _pt(db, t.id, "AUD", 18800, ng, goc=2000)     # lỗ 600.000
+    _pt(db, t.id, "AUD", 18300, ng, goc=1000)     # lãi 200.000
+    db.commit()
+    kq = KS.tach_ty_gia(db, ke_toan, ky)
+    db.commit()
+    assert kq["da_ghi"] and kq["chung_tu"], kq.get("message")
+    from app.models.accounting import JournalEntry
+    e = db.execute(select(JournalEntry).where(JournalEntry.source_ref == f"tgia:{ky}")).scalars().one()
+    tk = {}
+    for l in e.lines:
+        o = tk.setdefault(l.account_code, [0.0, 0.0])
+        o[0] += l.debit or 0; o[1] += l.credit or 0
+    assert tk["635"][0] == 600_000 and tk["515"][1] == 200_000, "lỗ và lãi không đứng đúng vế"
+    assert round(tk["632"][1] - tk["632"][0]) == 400_000, "632 phải giảm ròng đúng phần chênh"
+    assert round(sum(v[0] for v in tk.values())) == round(sum(v[1] for v in tk.values())), "bút toán không cân"
+
+    lan2 = KS.tach_ty_gia(db, ke_toan, ky)
+    assert "bỏ qua" in lan2["message"]
+    assert len(db.execute(select(JournalEntry).where(
+        JournalEntry.source_ref == f"tgia:{ky}")).scalars().all()) == 1
+
+
+def test_khong_doi_hoa_hong_cua_ai():
+    """Hệ quả PHẢI nói ra, và phải giữ: bản tách này không chạm tiền của người bán.
+
+    Quỹ thưởng và hoa hồng tính trên `tour.actual_cost` trong `rules.settlement_summary`, không
+    tính từ các dòng quyết toán. Nếu một ngày `settlement_summary` đổi sang đọc dòng quyết toán thì
+    phép thử này đỏ, và người sửa phải biết họ vừa làm đổi tiền trả cho người.
+    """
+    r = (GOC / "backend" / "app" / "services" / "rules.py").read_text(encoding="utf-8")
+    i = r.index("def settlement_summary")
+    than = r[i:i + 1200]
+    assert "tour.actual_cost" in than or "tour.actual_cost or 0" in than
+    assert "chenh_lech_ty_gia" not in than, (
+        "settlement_summary nay đọc chênh lệch tỷ giá – tức hoa hồng và quỹ thưởng vừa đổi theo. "
+        "Đó là một quyết định THỨ HAI của Chủ tịch, không phải hệ quả phụ của vòng KY-4")
+
+def test_man_hinh_ket_so_co_khung_tach_ty_gia():
+    """So ĐƯỜNG ĐẦY ĐỦ, và đòi khung in ra cả ba thứ người đọc cần để quyết có bấm hay không."""
+    mh = (GOC / "web" / "app" / "ket-so" / "page.tsx").read_text(encoding="utf-8")
+    assert re.search(r'`/ket-so/tach-ty-gia/xem-truoc\?ky=\$\{ky\}`', mh), \
+        "màn hình Kết sổ chưa gọi đúng cửa xem trước tách tỷ giá"
+    assert re.search(r'"/ket-so/tach-ty-gia"', mh), "chưa có đường ghi"
+    assert "tg.canh_bao" in mh, "khung không in cảnh báo – người bấm sẽ không biết phần nào bị bỏ lại"
+    assert "tg.ghi_chu" in mh, "khung phải in câu máy chủ nói, không tự đặt lời"
+    assert "tg.da_bat" in mh, "khung không hỏi đã đặt mốc ngày chưa"
