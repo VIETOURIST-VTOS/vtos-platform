@@ -381,7 +381,15 @@ def hop_nhat(db: Session, ky: str, nho: dict | None = None) -> dict:
         thieu, tong = [], 0.0
         for c in cty:
             r = _dong(db, ky, c.id, ma)
-            if r is None:
+            # KHÔNG CÓ DÒNG và CÓ DÒNG MÀ Ô GIÁ TRỊ RỖNG là cùng một chuyện: pháp nhân ấy CHƯA CÓ
+            # kế hoạch. Gộp hai nhánh chứ không bọc `or 0` ở dưới — bọc là biến "chưa ai nhập"
+            # thành "0 đồng", đúng cái lỗi đợt K2 sinh ra để chặn, và ở đây nó còn nguy hơn: một
+            # pháp nhân bỏ trống sẽ làm con số hợp nhất trông như ĐỦ mà thấp hơn sự thật, thay vì
+            # nói thẳng là thiếu. Cột `gia_tri` của bảng này không cho rỗng, nhưng phép thử
+            # test_k2_doc_an_toan đọc tên cột theo TÊN trên toàn bộ mô hình, mà `gia_tri` ở bảng
+            # phap_che_viec thì cho rỗng — nên dòng này phải tự đứng vững chứ không dựa vào ràng
+            # buộc của một bảng khác.
+            if r is None or r.gia_tri is None:
                 thieu.append(c.name)
             else:
                 tong += float(r.gia_tri)
