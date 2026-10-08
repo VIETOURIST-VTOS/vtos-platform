@@ -204,6 +204,37 @@ def _gia_von(t: Tour, cp: dict) -> float | None:
     return None
 
 
+def so_theo_vietrip(db: Session, tours: list[Tour]) -> dict[int, tuple[float | None, float | None]]:
+    """Doanh thu và giá vốn của từng chuyến THEO SỔ VIETRIP: booking và dòng chi phí quyết toán.
+
+    SINH RA 08/10/2026, theo lệnh Chủ tịch: *"có bao nhiêu số liệu trên vietrip em cứ nối về vtos,
+    ko cần phải đóng sổ, nghĩa là vietrip làm như thế nào thì vtos theo vậy"*.
+
+    VÌ SAO HÀM NÀY PHẢI Ở ĐÂY CHỨ KHÔNG Ở `ket_qua_that`. Chỗ gọi nó là khối Doanh thu màn hình
+    Chủ tịch, và khối ấy cần đúng cặp số mà bảng Lãi lỗ theo tour đang in. Viết lại phép tính bên
+    ấy là dựng công thức thứ năm cho cùng một câu hỏi — đúng cái bệnh bốn-công-thức mà cả tệp này
+    sinh ra để chữa (xem đầu tệp). Nên nguồn vẫn là `_gom_booking` + `_gia_von` ở đây, chỉ thêm
+    một cửa công khai để bên kia gọi mà không phải chạm vào hàm gạch dưới.
+
+    Trả về `{tour_id: (doanh_thu, giá_vốn)}`, mỗi phần RỖNG ĐƯỢC và rỗng khác 0:
+      · doanh thu None  — chuyến chưa có booking nào (kể cả booking huỷ). KHÔNG trả 0, vì 0 đồng
+        có nghĩa "bán không ra đồng nào", còn None nghĩa "chưa có sổ bán".
+      · giá vốn None    — chưa có dòng chi phí và cũng chưa có giá vốn tổng khác 0. Đây là điều
+        `_gia_von` đã giữ từ đợt K2; chép lại luật ấy ở chỗ khác là để hai bên lệch nhau.
+    """
+    ids = [t.id for t in tours]
+    if not ids:
+        return {}
+    bk, cp = _gom_booking(db, ids), _gom_chi_phi(db, ids)
+    ra: dict[int, tuple[float | None, float | None]] = {}
+    for t in tours:
+        b = bk.get(t.id, RONG)
+        c = cp.get(t.id, RONG_CP)
+        co_bk = bool(b["so_booking"] or b["so_huy"])
+        ra[t.id] = ((b["doanh_thu_bk"] + b["phi_huy"]) if co_bk else None, _gia_von(t, c))
+    return ra
+
+
 def _mot_dong(t: Tour, bk: dict, cp: dict, thue: dict | None = None) -> dict:
     """Ráp một dòng báo cáo theo đúng chuẩn phép tính. Không phép tính nào khác được phép ở nơi khác."""
     doanh_thu = bk["doanh_thu_bk"] + bk["phi_huy"]

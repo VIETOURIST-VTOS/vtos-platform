@@ -49,11 +49,16 @@ export type Diem = {
   mo?: boolean; ke_hoach?: number | null; nhan_so?: boolean;
   /* TC-47 · hai trường của bản vẽ "hai hình chung một trục ngang" anh Tuấn chốt 16/9/2026.
 
-     `cho` – phần NỐI TIẾP mờ trên chính cây cột này: giá trị ĐÃ BIẾT nhưng CHƯA ĐỦ điều kiện để
-             vào con số chính. Ở khối Kết quả kinh doanh, đó là doanh thu của chuyến đã đóng số mà
-             Điều hành chưa nhập giá vốn — không được cộng vào cột chính (vì cột lãi bên dưới
-             không có chúng, và hai hình phải nói về cùng một tập chuyến), nhưng cũng không được
-             biến mất. Vẽ nối tiếp chứ không vẽ cột riêng: nó là MỘT phần của cùng một tháng.
+     `cho` – phần NỐI TIẾP mờ trên chính cây cột này: một phần của cùng một tháng, vẽ nối tiếp
+             chứ không vẽ cột riêng. Cao cả cây = `gt` + `cho`, và hình này KHÔNG đổi.
+
+             08/10/2026 — CHỖ GỌI ĐÃ ĐỔI NGHĨA, ghi lại để người đọc sau khỏi suy ra sai từ hình.
+             Ở khối Kết quả kinh doanh, `cho` là doanh thu của chuyến chưa có giá vốn. Trước hôm
+             nay phần ấy KHÔNG nằm trong con số doanh thu (cột lãi bên dưới không có chúng, và
+             hai hình phải nói về cùng một tập chuyến). Chủ tịch chốt 08/10 lấy số liệu y chang
+             của Vietrip, nên phần ấy NAY ĐÃ nằm trong doanh thu: bên ấy truyền `gt` là phần CÓ
+             giá vốn và `cho` là phần thiếu, nên cao cả cây đúng bằng doanh thu gộp và con số in
+             dưới hình khớp với chiều cao. Hình vẫn vẽ "nối tiếp"; chỉ ý nghĩa hai mảnh là đổi.
 
      `gt2`  – cột thứ hai đứng cạnh, CÙNG một trục tung. Đây KHÔNG phải trục tung thứ hai (luật 4
              ở đầu tệp vẫn nguyên): hai cột chỉ đứng cạnh nhau khi cùng đơn vị và cùng thang đo,
@@ -425,8 +430,8 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
           {moc && <>Vạch đứt là <b>{moc.nhan}</b> ({daySo(moc.gt, dinh_dang)}), cùng một trục. </>}
           {ten_duong && <>Đường đứt là <b>{ten_duong}</b>, cùng một trục; đoạn nào đứt là kỳ ấy
             chưa có chỉ tiêu. </>}
-          {ten_cho && diem.some((d) => d.cho) && <>Khúc mờ trên đầu cột là <b>{ten_cho}</b> —
-            đã biết nhưng chưa vào con số chính. </>}
+          {ten_cho && diem.some((d) => d.cho) && <>Khúc mờ ở phần trên cây cột là{" "}
+            <b>{ten_cho}</b> — nằm TRONG con số của cột, tách ra để thấy riêng. </>}
           {diem.some((d) => d.mo) && <>Cột mờ là kỳ NGOÀI kỳ đang chọn. </>}
         </p>
       )}
