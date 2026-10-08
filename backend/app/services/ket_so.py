@@ -34,13 +34,34 @@ from app.models.core import User
 # Nhóm tài khoản của từng bước kết chuyển. Tiền tố chứ không phải tên tài khoản đích danh – xem
 # phần giải thích ở đầu tệp về vì sao.
 BUOC_KET_CHUYEN = {
+    # BƯỚC 0 THÊM 08/10/2026 (Chủ tịch quyết): 627 KHÔNG đóng về 911 như ba bước dưới, nó chạy về
+    # 154 – chi phí sản xuất chung nhập vào chi phí dở dang, rồi 154 mới ra 632 lúc quyết toán
+    # chuyến. Vì đích khác nên mỗi bước nay mang `ve_tk` của riêng nó thay vì dùng chung 911.
+    #
+    # VÀ NẾU KHÔNG CÓ BƯỚC NÀY THÌ 627 LÀ MỘT LỖ THỦNG: `TIEN_TO_KQKD` nhận mọi tài khoản đầu 5/6/7/8,
+    # nên ngay khi danh mục có 627, bộ dò "tài khoản không thuộc bước nào" sẽ kêu nó lên – kêu đúng,
+    # nhưng cách chữa không phải là nhét 627 vào một bước đóng về 911 (làm thế là tính chi phí đội xe
+    # hai lần: một lần qua 911, một lần nữa qua 154 -> 632).
+    0: {"ten": "Kết chuyển chi phí sản xuất chung qua chi phí dở dang sang giá vốn",
+        "quy_tac": "KC_627_154_632", "tien_to": ("627",), "ben_du": "no", "ve_tk": "154"},
     1: {"ten": "Kết chuyển doanh thu và thu nhập", "quy_tac": "KC_DOANH_THU",
-        "tien_to": ("511", "515", "711"), "ben_du": "co"},
+        "tien_to": ("511", "515", "711"), "ben_du": "co", "ve_tk": "911"},
     2: {"ten": "Kết chuyển giá vốn", "quy_tac": "KC_GIA_VON",
-        "tien_to": ("632", "635", "811"), "ben_du": "no"},
+        "tien_to": ("632", "635", "811"), "ben_du": "no", "ve_tk": "911"},
     3: {"ten": "Kết chuyển chi phí bán hàng và quản lý", "quy_tac": "KC_CHI_PHI",
-        "tien_to": ("641", "642", "821"), "ben_du": "no"},
+        "tien_to": ("641", "642", "821"), "ben_du": "no", "ve_tk": "911"},
 }
+BUOC_VE_911 = (1, 2, 3)
+TK_CHI_PHI_DO_DANG = "154"
+TK_GIA_VON = "632"
+# Chủ tịch quyết 09/10/2026: phần 154 nhận từ 627 đi THẲNG sang 632, KHÔNG chia cho từng chuyến.
+#
+# Lý do của quyết định, ghi lại để lần sau không ai sửa ngược: đội xe đã có màn hình lãi lỗ riêng
+# (`/lai-lo-doi-xe`, `/hieu-qua-doi-xe`). Chia chi phí sửa xe vào lãi lỗ từng chuyến nữa là cùng một
+# khoản nằm ở hai nơi, và hai nơi đọc cùng một khoản thì sớm muộn lệch nhau. Nên bước 0 ghi một
+# chứng từ bốn dòng: Nợ 154 / Có 627 rồi Nợ 632 / Có 154 — đi ĐÚNG đường Chủ tịch nói ("cuối kỳ
+# kết chuyển 154") và không để lại số dư dở dang nào không ai dọn.
+KC0_QUA_154 = True
 TK_XAC_DINH_KQ = "911"
 TK_LAI_LO = "4212"
 # Mọi tài khoản kết quả kinh doanh. Cái nào có tiền tố ở đây mà không nằm trong bước nào là một lỗ
@@ -84,6 +105,38 @@ def _tk_cua_buoc(ma: str) -> int | None:
     return None
 
 
+def du_154_khong_cong_trinh(db: Session, ky: str) -> dict:
+    """Phần 154 lũy kế KHÔNG mang mã công trình – hệ quả trực tiếp của bước 0, và phải nói ra.
+
+    `account_rule_check` bắt mọi bút toán 154 phải có mã tour, TRỪ khi nguồn là `ket_chuyen`. Nhờ
+    ngoại lệ ấy mà bước 0 ghi được 627 -> 154 mà không phải bịa ra một công thức chia chi phí đội
+    xe cho từng chuyến. Nhưng cái giá của nó có thật: phần 154 ấy KHÔNG thuộc chuyến nào, nên đường
+    quyết toán chuyến (Nợ 632 – Có 154 theo từng tour) sẽ không bao giờ dọn tới nó. Nó nằm lại.
+
+    Chủ tịch quyết 09/10/2026: đẩy THẲNG sang 632, không chia theo chuyến – vì đội xe đã có màn hình
+    lãi lỗ riêng, chia vào chuyến nữa là cùng một khoản nằm hai nơi. Nên bước 0 ghi cả hai chặng
+    trong một chứng từ và số này PHẢI bằng 0 sau mỗi lần kết chuyển.
+
+    Hàm vẫn ở lại, và đó là có chủ ý: nó đổi vai từ "đếm chỗ chưa quyết" thành CHÓ GIỮ NHÀ. Khác 0
+    nghĩa là có ai đó ghi thẳng vào 154 bằng đường `ket_chuyen` mà không kèm chặng ra, hoặc bước 0
+    bị sửa chỉ còn một chặng. Cả hai đều âm thầm: tiền vẫn cân, sổ vẫn chạy, chỉ có một khoản dở
+    dang không chuyến nào nhận lớn dần lên.
+    """
+    q = (select(func.sum(JournalLine.debit), func.sum(JournalLine.credit))
+         .join(JournalEntry)
+         .where(JournalEntry.status == "da_ghi_so", JournalEntry.period <= ky,
+                JournalLine.account_code.startswith(TK_CHI_PHI_DO_DANG),
+                (JournalLine.project_code == "") | (JournalLine.project_code.is_(None)),
+                JournalLine.tour_id.is_(None)))
+    no, co = db.execute(q).one()
+    du = round((no or 0) - (co or 0), 0)
+    return {"ky": ky, "tai_khoan": TK_CHI_PHI_DO_DANG, "so_du": du, "phai_bang_khong": True,
+            "viec_phai_quyet": ("Số này phải bằng 0: bước 0 đẩy chi phí đội xe qua 154 sang thẳng 632 "
+                                "trong cùng một chứng từ (Chủ tịch quyết 09/10/2026, không chia theo "
+                                "chuyến). Khác 0 nghĩa là có đường nào đó ghi vào 154 mà không có "
+                                "chặng ra – tìm chứng từ nguồn 'ket_chuyen' ghi Nợ 154 không mã tour.")}
+
+
 def xem_truoc_ket_chuyen(db: Session, ky: str) -> dict:
     """Bốn bước kết chuyển của kỳ, KHÔNG ghi gì. Đây là bản người đọc trước khi bấm."""
     du = _du_trong_ky(db, ky)
@@ -94,7 +147,15 @@ def xem_truoc_ket_chuyen(db: Session, ky: str) -> dict:
 
     buoc, bo_sot = [], []
     tong_911 = 0.0
-    for b in (1, 2, 3):
+    kc0_chua_ghi = 0.0
+    # Duyệt THEO CHÍNH BẢNG `BUOC_KET_CHUYEN`, không theo một bộ số viết tay.
+    #
+    # Chỗ này từng là `(1, 2, 3)` viết tay, và bẻ ngược vòng KY-2 (08/10/2026) cho thấy nó là một lỗ
+    # im lặng: bộ dò "tài khoản không thuộc bước nào" hỏi `_tk_cua_buoc()`, tức hỏi BẢNG; còn việc
+    # kết chuyển có chạy hay không thì do VÒNG LẶP quyết. Hai nguồn sự thật. Xoá một bước khỏi vòng
+    # lặp mà vẫn để nó trong bảng thì số dư của bước ấy không được kết chuyển VÀ cũng không bị báo
+    # là bỏ sót — nó chỉ biến mất. Nay vòng lặp lấy khóa từ bảng, nên hai cái không lệch nhau được.
+    for b in sorted(BUOC_KET_CHUYEN):
         d = BUOC_KET_CHUYEN[b]
         dong, tong = [], 0.0
         for ma, net in sorted(du.items()):
@@ -113,19 +174,33 @@ def xem_truoc_ket_chuyen(db: Session, ky: str) -> dict:
             dong.append({"tk": ma, "ten": accs[ma].name if ma in accs else "", "so_tien": so,
                          "nguoc_chieu": False})
             tong += so
+        # Bước 0 đẩy chi phí đội xe sang 632 NGAY TRONG LẦN CHẠY NÀY, nên bước 2 phải đóng cả phần ấy.
+        # Không gộp thì 632 của đội xe nằm lại tới kỳ sau (`_du_trong_ky` lũy kế sẽ dọn muộn một kỳ),
+        # và quan trọng hơn: BẢN XEM TRƯỚC sẽ nói sai với người sắp bấm. Chỉ gộp khi bước 0 CHƯA ghi —
+        # ghi rồi thì số ấy đã nằm trong sổ và `_du_trong_ky` đã tính.
+        if b == 2 and kc0_chua_ghi >= 1:
+            dong.append({"tk": TK_GIA_VON, "ten": "Chi phí đội xe bước 0 vừa kết chuyển sang",
+                         "so_tien": kc0_chua_ghi, "nguoc_chieu": False, "tu_buoc_0": True})
+            tong += kc0_chua_ghi
         ref = f"kc:{ky}:{b}"
         buoc.append({
             "buoc": b, "ten": d["ten"], "quy_tac": d["quy_tac"], "ben_du": d["ben_du"],
             "dong": dong, "tong": round(tong, 0),
             "da_ghi": ref in da_ghi, "chung_tu": da_ghi[ref].code if ref in da_ghi else "",
         })
-        tong_911 += tong if d["ben_du"] == "co" else -tong
+        # Bước 0 KHÔNG góp vào 911: nó chuyển chi phí sang 154, chưa ra kết quả kinh doanh. Cộng nó
+        # vào đây là trừ chi phí đội xe vào lãi của kỳ MỘT LẦN NỮA, ngoài lần đã đi qua 632.
+        if b in BUOC_VE_911:
+            tong_911 += tong if d["ben_du"] == "co" else -tong
+        if b == 0 and ref not in da_ghi:
+            kc0_chua_ghi = round(tong, 0)
 
     for ma in sorted(du):
         if _tk_cua_buoc(ma) is None and not ma.startswith(TK_XAC_DINH_KQ):
             bo_sot.append({"tk": ma, "ten": accs[ma].name if ma in accs else "",
                            "so_du": du[ma]})
 
+    du154 = du_154_khong_cong_trinh(db, ky)
     lai = round(tong_911, 0)
     ref4 = f"kc:{ky}:4"
     buoc.append({
@@ -137,10 +212,14 @@ def xem_truoc_ket_chuyen(db: Session, ky: str) -> dict:
     return {
         "ky": ky, "buoc": buoc, "lai_truoc_buoc_4": lai,
         "tai_khoan_khong_thuoc_buoc_nao": bo_sot,
+        "du_154_khong_cong_trinh": du154,
         "canh_bao": ([f"{len(bo_sot)} tài khoản kết quả kinh doanh còn số dư mà KHÔNG bước kết chuyển "
                       f"nào nhận: {', '.join(x['tk'] for x in bo_sot[:8])}. Kết chuyển xong chúng vẫn "
                       "nằm lại trên sổ và báo cáo kết quả kinh doanh sẽ thiếu đúng phần đó."]
-                     if bo_sot else []),
+                     if bo_sot else [])
+                    + ([f"154 đang giữ {du154['so_du']:,.0f} đ KHÔNG thuộc chuyến nào, mà số này lẽ ra "
+                        "phải bằng 0. " + du154["viec_phai_quyet"]]
+                       if abs(du154["so_du"]) >= 1 else []),
         "ghi_chu": ("Đây là bản XEM TRƯỚC – chưa ghi gì. Danh sách tài khoản lấy từ SỔ, không lấy từ "
                     "tên tài khoản viết trong quy ước: quy ước khai 5113 nhưng doanh thu có thể nằm ở "
                     "5111, 5112, và phần đó không được phép rơi."),
@@ -153,7 +232,7 @@ def ket_chuyen(db: Session, u: User, ky: str, buoc_chon: list[int] | None = None
     if ACC.is_locked(db, ky):
         raise KhongGhiDuoc(f"Kỳ {ky} đã khóa sổ – không kết chuyển được nữa.")
     xt = xem_truoc_ket_chuyen(db, ky)
-    chon = set(buoc_chon or [1, 2, 3, 4])
+    chon = set(buoc_chon if buoc_chon is not None else [0, 1, 2, 3, 4])
     d = date(int(ky[:4]), int(ky[5:7]), 28)      # ngày trong kỳ, để period_of ra đúng kỳ
     ra, bo_qua = [], []
 
@@ -170,10 +249,19 @@ def ket_chuyen(db: Session, u: User, ky: str, buoc_chon: list[int] | None = None
                     lines.append({"account": r["tk"], "debit": r["so_tien"], "note": f"kết chuyển kỳ {ky}"})
                 else:
                     lines.append({"account": r["tk"], "credit": r["so_tien"], "note": f"kết chuyển kỳ {ky}"})
+            ve = BUOC_KET_CHUYEN[b]["ve_tk"]
             if BUOC_KET_CHUYEN[b]["ben_du"] == "co":
-                lines.append({"account": TK_XAC_DINH_KQ, "credit": info["tong"]})
+                lines.append({"account": ve, "credit": info["tong"]})
             else:
-                lines.append({"account": TK_XAC_DINH_KQ, "debit": info["tong"]})
+                lines.append({"account": ve, "debit": info["tong"]})
+            if b == 0 and KC0_QUA_154:
+                # Chặng thứ hai, trong CÙNG một chứng từ: Nợ 632 / Có 154. Đi qua 154 chứ không
+                # nhảy thẳng 627 -> 632, vì Chủ tịch nói "cuối kỳ kết chuyển 154" và sổ phải đọc ra
+                # đúng câu ấy. Cùng một chứng từ chứ không phải hai, để không bao giờ có trạng thái
+                # "đã đẩy vào 154 mà chưa đẩy ra" — trạng thái ấy là số dư dở dang không ai dọn.
+                lines.append({"account": TK_GIA_VON, "debit": info["tong"],
+                              "note": f"chi phí đội xe kỳ {ky} – không chia theo chuyến (Chủ tịch quyết 09/10/2026)"})
+                lines.append({"account": TK_CHI_PHI_DO_DANG, "credit": info["tong"]})
         else:
             lai = xt["lai_truoc_buoc_4"]
             if abs(lai) < 1:

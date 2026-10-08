@@ -199,7 +199,7 @@ def test_tai_khoan_kqkd_khong_thuoc_buoc_nao_thi_bao_len_chu_khong_bo_im(db):
     # ngoài thì đã có rổ riêng ở trên, không có đường nào rơi im lặng.
     phu = set()
     for d in KS.BUOC_KET_CHUYEN.values(): phu |= set(d["tien_to"])
-    assert {"511", "632", "642", "641", "635", "515", "711", "811", "821"} <= phu
+    assert {"511", "632", "642", "641", "635", "515", "711", "811", "821", "627"} <= phu
 
 
 def test_ket_chuyen_bon_buoc_ghi_duoc_va_khong_ghi_lai_lan_hai(db, ke_toan):
@@ -211,11 +211,16 @@ def test_ket_chuyen_bon_buoc_ghi_duoc_va_khong_ghi_lai_lan_hai(db, ke_toan):
     but_toan(db, f"{KY}-13", [{"account": "642", "debit": 3_000_000},
                               {"account": "331", "credit": 3_000_000}])
     kq = KS.ket_chuyen(db, ke_toan, KY)
+    # Bước 0 (627 -> 154, thêm 08/10/2026) KHÔNG nằm trong tập này vì phép thử không ghi đồng 627
+    # nào — và đó chính là điều phải khẳng định: một bước không có số dư thì BỎ QUA có lý do, chứ
+    # không ghi một bút toán rỗng. Bước 0 có số dư thật thì xem `test_ky2`.
     assert {x["buoc"] for x in kq["da_ghi"]} == {1, 2, 3, 4}
+    assert any(x["buoc"] == 0 and "không có số dư" in x["ly_do"] for x in kq["bo_qua"]), \
+        "bước 0 phải được xét và bỏ qua có lý do, không phải biến mất khỏi danh sách"
     lai = KS.xem_truoc_ket_chuyen(db, KY)
-    assert all(b["da_ghi"] for b in lai["buoc"])
+    assert all(b["da_ghi"] for b in lai["buoc"] if b["buoc"] != 0)
     lan2 = KS.ket_chuyen(db, ke_toan, KY)
-    assert lan2["da_ghi"] == [] and len(lan2["bo_qua"]) == 4
+    assert lan2["da_ghi"] == [] and len(lan2["bo_qua"]) == 5
 
 
 def test_sau_ket_chuyen_tai_khoan_kqkd_ve_khong(db, ke_toan):
