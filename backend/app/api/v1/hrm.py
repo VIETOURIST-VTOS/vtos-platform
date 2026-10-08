@@ -409,3 +409,16 @@ def lech_cong(period: str, u: User = Depends(require_roles(*HR_READ)), db: Sessi
     kq = H.lech_cong(db, period, (run.inputs or {}) if run is not None else {})
     kq["co_bang_luong"] = run is not None
     return kq
+
+
+@router.get("/payroll-runs/{period}/tncn-con-thieu")
+def tncn_con_thieu(period: str, u: User = Depends(require_roles(*HR_READ)), db: Session = Depends(get_db)):
+    """Cột TNCN của kỳ này KHÔNG gồm những ai — và nền dữ liệu để tính đang ở đâu.
+
+    Đặt dưới `/payroll-runs/` như cửa lệch công: câu hỏi thuộc hồ sơ KỲ LƯƠNG, và màn hình Lương đã
+    khai sẵn tiền tố ấy nên không phải nới phạm vi vai nào.
+    """
+    run = db.execute(select(PayrollRun).where(PayrollRun.period == period)).scalars().first()
+    kq = H.tncn_chua_tinh(db, period, (run.rows or []) if run is not None else [])
+    kq["co_bang_luong"] = run is not None
+    return kq
