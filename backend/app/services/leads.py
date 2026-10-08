@@ -429,7 +429,14 @@ def _han_ra(l: Lead, db: Session) -> dict:
     return {"han_xu_ly": han, "nguon_han": nguon, "qua_han": qua_han(l, g)}
 
 
-def lead_out(l: Lead, db: Session | None = None) -> dict:
+def lead_out(l: Lead, db: Session | None = None, dau: dict | None = None) -> dict:
+    """Một dòng lead cho màn hình.
+
+    `dau` là khối DẤU NGUỒN QUẢNG CÁO (lần chạm đầu + lần chạm cuối) đã gom sẵn cho cả trang —
+    xem `services/dau_quang_cao.dau_dau_cuoi()`. Cửa danh sách gom một lần rồi truyền vào đây;
+    cửa một dòng để trống thì hàm tự hỏi. Không có tham số này thì cửa danh sách 2000 dòng sẽ hỏi
+    2000 lần, và chuyện ấy không ai thấy cho tới hôm màn hình đứng hình.
+    """
     s = db.get(User, l.sales_id) if (db and l.sales_id) else None
     b = db.get(Booking, l.booking_id) if (db and l.booking_id) else None
     return {"id": l.id, "phone": l.phone, "name": l.name, "channel": l.channel, "lead_month": l.lead_month, "received_at": l.received_at, "campaign": l.campaign, "interest": l.interest, "sales_id": l.sales_id,
@@ -437,4 +444,19 @@ def lead_out(l: Lead, db: Session | None = None) -> dict:
             "last_contact_at": l.last_contact_at, "booking_id": l.booking_id, "booking_code": b.code if b else "", "booking_tour": b.tour.code if b and b.tour else "", "converted_at": l.converted_at, "created_at": l.created_at,
             # HẠN XỬ LÝ (P.TGĐ Phan Ngọc Tuấn chốt 18/9/2026). Cần `db` để đọc tham số đã ký; gọi
             # lead_out() không kèm db thì hai khoá này là None — KHÔNG đoán bằng một số viết cứng.
-            **(_han_ra(l, db) if db else {"han_xu_ly": None, "nguon_han": None, "qua_han": None})}
+            **(_han_ra(l, db) if db else {"han_xu_ly": None, "nguon_han": None, "qua_han": None}),
+            # DẤU NGUỒN QUẢNG CÁO — Chủ tịch chốt 08/10/2026: hiện CẢ lần chạm đầu lẫn lần chạm
+            # cuối. Bảng `dau_quang_cao` trỏ sang lead từ lâu; chiều ngược lại tới hôm nay mới nối,
+            # nên trước đó màn hình lead không có một ô nào nói khách từ quảng cáo nào tới.
+            **(dau if dau is not None
+               else (_dau_nguon(db, l.id) if db else dict(_khong_co_dau())))}
+
+
+def _dau_nguon(db: Session, lead_id: int) -> dict:
+    from app.services import dau_quang_cao as DQC
+    return DQC.dau_cua_lead(db, lead_id)
+
+
+def _khong_co_dau() -> dict:
+    from app.services import dau_quang_cao as DQC
+    return dict(DQC.KHONG_CO_DAU)
