@@ -246,9 +246,11 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "4.4.4", ten: "Dịch vụ — tab «Chi NCC & quyết toán»", tab: true },
           { ma: "4.4.5", ten: "Nhân sự — tab «HDV & xe»", tab: true },
           { ma: "4.4.6", ten: "Dự toán — tab «Dự toán 3 con số»", tab: true },
-          // THIẾU THẬT. Sự cố & phát sinh có màn hình riêng (4.6) nhưng không gắn vào chuyến: trang
-          // chi tiết chuyến không có một chữ "sự cố" nào (đã đếm trong mã, 0 lần).
-          { ma: "4.4.7", ten: "Phát sinh" },
+          // 08/10/2026 — TRẢ XONG. Trước bản này sổ sự cố có màn hình riêng (4.6) mà không gắn vào
+          // chuyến: trang chi tiết chuyến không có một chữ "sự cố" nào. Dữ liệu vốn đã có — bảng
+          // `su_co_tour` mang cột `tour_id` và cửa `GET /su-co-tour?tour_id=N` lọc sẵn theo chuyến —
+          // nên việc còn thiếu là một CÁI TAB, không phải một cái bảng.
+          { ma: "4.4.7", ten: "Phát sinh — tab «Phát sinh & sự cố»", tab: true },
           { ma: "4.4.8", ten: "Quyết toán — tab «Quyết toán chi tiết»", tab: true },
           // Cả hai nửa đều có: tab Quy trình & lịch sử gồm ô đính kèm tài liệu, dòng thời gian các
           // bước, và nhật ký bất biến.
@@ -274,7 +276,11 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
         ] },
       { ma: "4.9", ten: "Quản lý đội xe",
         con: [
-          { ma: "4.9.1", ten: "Tổng quan đội xe" },
+          // 08/10/2026 — Chủ tịch chọn TRỎ VỀ /doi-xe thay vì dựng trang thứ hai. Màn hình ấy đã có đủ
+          // ô chỉ số từ vòng TX-7 (số xe trong danh mục, năm mức kiểm tra, ô tự khai `thieu_trong_o_dem`),
+          // nên một trang tổng quan riêng sẽ là màn hình thứ hai đọc cùng nguồn số — và hai màn hình
+          // đọc cùng nguồn là hai chỗ để lệch nhau ở lần sửa thứ nhất.
+          { ma: "4.9.1", ten: "Tổng quan đội xe", href: "/doi-xe" },
           { ma: "4.9.2", ten: "Hồ sơ xe", href: "/doi-xe" },
           { ma: "4.9.3", ten: "Tài xế", href: "/tai-xe" },
           { ma: "4.9.4", ten: "Bảng giá vận tải", href: "/ops?tab=fleet" },
