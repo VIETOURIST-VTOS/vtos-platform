@@ -3,7 +3,12 @@
 Ba việc HCNS làm hằng tháng mà VTOS chưa có, nay làm được ngay trên hệ thống:
   1. Hồ sơ & hợp đồng: hợp đồng nào sắp hết hạn, ai chưa có hợp đồng hiệu lực, ai thiếu hồ sơ định danh.
   2. Đơn từ & phép năm: nhân viên gửi đơn, quản lý duyệt; phép năm trừ tự động, không cho vượt quỹ phép.
-  3. Bảng chấm công tháng: sinh từ đơn đã duyệt, HCNS chỉnh tay phần còn lại; ra số công để tính lương.
+  3. Bảng chấm công tháng: sinh từ đơn đã duyệt, HCNS chỉnh tay phần còn lại.
+
+Câu thứ 3 trước ngày 08/10/2026 viết thêm bốn chữ "ra số công để tính lương", và đó là nói SAI: bảng
+lương đọc `inputs["cong_thuc_te"]` do HCNS gõ tay, không đọc `attendance_days`. Hai nguồn, một nguồn
+trả tiền. Xem `lech_cong()` ở cuối tệp – nó không nối hai nguồn lại (việc ấy là quyết định của người),
+nó làm cho chỗ lệch đếm được.
 
 Phép năm theo Bộ luật Lao động 2019 (Điều 113, 114): 12 ngày/năm với điều kiện làm việc bình thường,
 cứ đủ 5 năm làm việc cho một người sử dụng lao động thì cộng thêm 1 ngày; năm đầu chưa đủ 12 tháng thì
@@ -314,6 +319,68 @@ def set_attendance(db: Session, u: User, employee_id: int, day: date, kind: str,
     db.commit()
     return row
 
+
+# ---------- Bảng chấm công và bảng lương: hai nguồn, một nguồn trả tiền ----------
+
+# Ba loại lệch, và chúng là ba CÂU HỎI khác nhau chứ không phải ba mức của một câu. Ô đếm ở dưới dựng
+# TỪ bảng này chứ không gõ lại danh sách – đúng bài học TX-7 ngày 07/10: một ngày nào đó có người thêm
+# loại thứ tư mà quên thêm ô đếm thì số không cộng đủ, và chẳng ai thấy.
+LOAI_LECH_CONG = {
+    "lech": "Số công HCNS gõ tay KHÁC số bảng chấm công cộng ra",
+    "chua_nhap": "Phòng chấm công theo ngày mà chưa ai nhập số công – bảng lương tạm trả đủ tháng",
+    "khong_tru": "Có ngày nghỉ không lương / không phép ĐÃ DUYỆT mà bảng lương không trừ gì",
+}
+
+
+def lech_cong(db: Session, period: str, inputs: dict | None = None) -> dict:
+    """Bảng chấm công và con số công đã nhập vào bảng lương là HAI nguồn – và chỉ MỘT nguồn trả tiền.
+
+    Đường đi của một ngày nghỉ đã duyệt: `decide_leave` → `_apply_leave_to_attendance` → `attendance_days`.
+    Đường đi của TIỀN: bảng lương đọc `inputs["cong_thuc_te"]`, một từ điển HCNS gõ tay ở màn hình Lương.
+    Hai đường ấy không gặp nhau ở đâu cả – không một dòng nào trong `services/hr.py` đọc `AttendanceDay`.
+    Hệ quả: duyệt một đơn nghỉ không lương rồi không làm gì nữa thì bảng lương vẫn trả đủ công, và trước
+    bản này KHÔNG CÓ DÒNG NÀO BÁO. Chính docstring đầu tệp này khai ngược lại – "bảng chấm công… ra số
+    công để tính lương" – một câu khai một đường nối chưa bao giờ tồn tại; câu ấy đã sửa cùng bản này.
+
+    Hàm này KHÔNG đổi nguồn trả tiền. Bảng nào thắng – bảng chấm công hay số HCNS gõ – là quyết định của
+    Chủ tịch / Kế toán trưởng: lấy bảng chấm công làm căn cứ trả lương là đổi LUẬT TRẢ LƯƠNG, không phải
+    đổi một dòng mã, và một phần mềm tự chọn cho tiện ở chỗ ấy là phần mềm trả lương sai mà không ai ký.
+    Việc của hàm này là làm cho chỗ lệch ĐẾM ĐƯỢC và NÓI RA, cùng khuôn với `thieu_trong_o_dem` (TX-7),
+    `misa.thieu_tai_khoan()` và `phong_chua_chot_nguoi_ky()` ngay trong tệp này.
+
+    Chỉ soi người HỢP ĐỒNG LAO ĐỘNG: cộng tác viên và hướng dẫn viên hưởng thù lao theo chuyến quyết toán,
+    không có số công nào để lệch.
+    """
+    # Nhập trong thân hàm, không nhập ở đầu tệp: `luong.py` đọc `rules` và `hr`, nhập vòng tròn nếu đặt trên.
+    from app.services import luong as L
+
+    sheet = attendance_sheet(db, period)
+    da_nhap = {str(k): v for k, v in ((inputs or {}).get("cong_thuc_te") or {}).items()}
+    emps = {e.id: e for e in db.execute(select(Employee).where(Employee.active == True)).scalars()}
+    dong: list[dict] = []
+    for r in sheet["rows"]:
+        e = emps.get(r["employee_id"])
+        if e is None or e.contract_type != "hdld":
+            continue
+        chung = {"employee_id": e.id, "ma": e.code, "ho_ten": e.full_name, "phong": e.department,
+                 "che_do_cong": L.che_do_cong(e), "cong_theo_bang": r["work_days"],
+                 "ngay_khong_luong": r["unpaid_days"], "ngay_phep": r["leave_days"]}
+        if L.che_do_cong(e) == L.CHAM_CONG:
+            go = da_nhap.get(e.code)
+            if go in (None, ""):
+                dong.append({**chung, "loai": "chua_nhap", "cong_da_nhap": None,
+                             "viec": "HCNS nhập số công của người này trước khi trình ký"})
+            elif abs(float(go) - r["work_days"]) > 0.01:
+                dong.append({**chung, "loai": "lech", "cong_da_nhap": float(go),
+                             "viec": (f"Số gõ tay {float(go):g} công, bảng chấm công cộng ra "
+                                      f"{r['work_days']:g} công – soát lại một trong hai")})
+        elif r["unpaid_days"] > 0:
+            dong.append({**chung, "loai": "khong_tru", "cong_da_nhap": None,
+                         "viec": (f"{r['unpaid_days']:g} ngày không lương đã duyệt; phòng này trả lương "
+                                  f"cố định nên bảng lương không trừ gì – cách trừ do người quyết")})
+    return {"period": period, "loai": LOAI_LECH_CONG,
+            "dem": {k: sum(1 for d in dong if d["loai"] == k) for k in LOAI_LECH_CONG},
+            "so_dong": len(dong), "dong": dong}
 
 # ---------- Người phụ thuộc & giảm trừ gia cảnh ----------
 

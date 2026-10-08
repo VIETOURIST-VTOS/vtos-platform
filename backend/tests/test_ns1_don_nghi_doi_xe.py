@@ -143,7 +143,19 @@ def test_ns1_5_hai_buoc_khai_trong_bang_luong_viec():
 
 
 def test_ns1_6_man_hinh_goi_dung_cua_va_khong_tu_dat_luat():
+    """08/10/2026 — KHUNG ĐƠN NGHỈ ĐÃ RỜI /xe-hdv sang thành phần dùng chung `DonNghiPhep`.
+
+    Vòng NS-2 mở đơn nghỉ cho cả mười một phòng, nên khung ấy không còn là của riêng màn hình hiện
+    trường. Phép thử đi theo chỗ mã chuyển tới, và SIẾT thêm một điều: màn hình /xe-hdv phải thật sự
+    dựng thành phần ấy. Nếu chỉ đổi đường đọc sang tệp thành phần mà không hỏi câu thứ hai thì có thể
+    gỡ khung khỏi /xe-hdv mà phép thử vẫn xanh — người ở hiện trường mất ô gửi đơn trong im lặng.
+    """
     mh = _doc("..", "web", "app", "xe-hdv", "page.tsx")
+    # Hỏi THẺ JSX `<DonNghiPhep`, không hỏi chữ "DonNghiPhep". Bản đầu hỏi chữ, và kiểm ngược bắt
+    # được ngay: gỡ thẻ ra khỏi phần kết xuất thì phép thử vẫn XANH, vì dòng `import` còn chứa đúng
+    # chữ ấy. Một hàng rào hỏi tên tệp thay vì hỏi chỗ dùng là hàng rào xanh đúng lúc màn hình trống.
+    assert "<DonNghiPhep" in mh, "màn hình hiện trường không còn DỰNG khung gửi đơn nghỉ"
+    mh = mh + _doc("..", "web", "components", "DonNghiPhep.tsx")
     assert '"/leaves"' in mh, "màn hình chưa gọi cửa đơn nghỉ"
     assert '"/leave-balance"' in mh, "màn hình chưa đọc quỹ phép – người gửi đơn không biết mình còn mấy ngày"
     assert "/decide" in mh, "màn hình thiếu nút quyết định của người ký"

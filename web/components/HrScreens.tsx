@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useShell } from "@/components/Shell";
+import LuoiChamCong from "@/components/LuoiChamCong";
 import DinhKem from "@/components/DinhKem";
 import { api, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -67,13 +68,17 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const [chi, setChi] = useState<any | null>(null);
   const [soTN, setSoTN] = useState<any | null>(null);
   const [tongQuan, setTongQuan] = useState<any | null>(null);
-  const [cham, setCham] = useState<any | null>(null);
+  // `cham` đã rời khỏi đây 08/10/2026: lưới chấm công nay là thành phần `LuoiChamCong`, nó tự gọi
+  // `/attendance` và tự giữ trạng thái. Để lại một bản sao thứ hai ở đây là hai chỗ đọc cùng một cửa.
   const [donNghi, setDonNghi] = useState<any[]>([]);
   const [hrmMeta, setHrmMeta] = useState<any>({ leave_kinds: {}, leave_status: {} });
   const [lsMa, setLsMa] = useState("");
   const [lsNV, setLsNV] = useState<any | null>(null);
   const [dangTai, setDangTai] = useState("");
   const [cong, setCong] = useState<Record<string, string>>({});
+  // Chỗ lệch giữa BẢNG CHẤM CÔNG và số công đã nhập vào bảng lương. `null` là chưa hỏi máy chủ, khác
+  // hẳn "đã hỏi và không có chỗ nào lệch" — gộp hai cái là nói bảng sạch trong khi chưa ai soi.
+  const [lech, setLech] = useState<any | null>(null);
   const [visa, setVisa] = useState<any[]>([]);
   const [asg, setAsg] = useState<any[]>([]);
   const [veh, setVeh] = useState<any[]>([]);
@@ -98,11 +103,12 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     if (!tours.length) api("/tours").then((r) => setTours(r.rows || [])).catch(() => {});
     if (tab === "payroll") api(`/payroll-runs/${period}`).then(setRun).catch((e) => toast(errMsg(e), true));
     if (tab === "payroll") { api("/payroll/khoan-treo").then(setTreo).catch(() => {}); api("/payroll/xung-dot-ho-so").then(setXungDot).catch(() => {}); }
+    if (tab === "payroll") api(`/payroll-runs/${period}/lech-cong`).then(setLech).catch(() => setLech(null));
     if (tab === "payroll") api(`/payroll-runs/${period}/chi`).then(setChi).catch(() => setChi(null));
     if (tab === "payroll") api(`/payroll-runs/${period}/so-thu-nhap`).then(setSoTN).catch(() => setSoTN(null));
     if (tab === "payroll") { api(`/payroll-runs/${period}/phieu-luong`).then(setPhieu).catch(() => setPhieu(null)); api(`/payroll-runs/${period}/theo-phap-nhan`).then(setPhapNhan).catch(() => setPhapNhan(null)); }
     if (tab === "tong_quan") api("/hr/tong-quan").then(setTongQuan).catch((e) => toast(errMsg(e), true));
-    if (tab === "cham_cong") { api(`/attendance?period=${period}`).then(setCham).catch(() => setCham(null)); api("/leaves").then((r: any) => setDonNghi(r?.rows || (Array.isArray(r) ? r : []))).catch(() => setDonNghi([])); }
+    if (tab === "cham_cong") api("/leaves").then((r: any) => setDonNghi(r?.rows || (Array.isArray(r) ? r : []))).catch(() => setDonNghi([]));
     if (tab === "cham_cong" && !Object.keys(hrmMeta.leave_kinds || {}).length) api("/hrm/meta").then(setHrmMeta).catch(() => {});
     if (tab === "employees") { api("/employees").then(setEmps); api("/companies").then(setCos).catch(() => {}); }
     if (tab === "employees") api("/users/khoa").then(setKhoa).catch(() => {});
@@ -210,14 +216,13 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
       <p className="muted">Bảng và cửa nhập <b>đã có từ trước</b>; đợt này chỉ dựng màn hình cho HCNS. Chấm công theo ngày
         áp dụng cho Kế toán và Nhân sự Hành chính; năm phòng còn lại lấy căn cứ là báo cáo công việc trước 20 giờ,
         nên không có mẫu số công chuẩn để chấm.</p>
-      {cham && <div className="panel wrap"><h2>Bảng chấm công kỳ {period}</h2>
-        {!(cham.rows || []).length ? <p className="muted">Kỳ này chưa có dòng chấm công nào.</p> :
-          <table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th className="num">Công</th><th className="num">Giờ tăng ca</th></tr></thead>
-            <tbody>{cham.rows.map((r: any, i: number) => <tr key={r.employee_id ?? i}>
-              <td className="mono">{r.code}</td><td>{r.full_name}</td>
-              <td>{meta.departments[r.department] || r.department}</td>
-              <td className="num"><b>{r.work ?? r.total_work ?? ""}</b></td>
-              <td className="num">{r.ot_hours || ""}</td></tr>)}</tbody></table>}</div>}
+      {/* 08/10/2026 — THAY bảng chỉ-đọc của Đợt C bằng LƯỚI GHI, vì HAI chuyện:
+          (a) `attendance_days` có màn hình ĐỌC mà KHÔNG màn hình nào GHI được, nên HCNS xem được bảng
+              chấm công chứ không chấm được — cửa `POST /attendance` mở từ 09/9 mà chưa ai với tới.
+          (b) Bảng cũ đọc `r.work ?? r.total_work`, mà `hrm.attendance_sheet()` trả về `work_days` —
+              nên cột Công in RỖNG cho mọi dòng. Một cột trống trên bảng chấm công đọc ra là "chưa
+              chấm ngày nào", không phải "màn hình đọc sai tên trường". */}
+      <LuoiChamCong period={period} />
       <div className="panel wrap"><h2>Đơn nghỉ · {donNghi.length}</h2>
         {!donNghi.length ? <p className="muted">Không có đơn nào.</p> :
           <table><thead><tr><th>Người</th><th>Loại</th><th>Từ</th><th>Đến</th><th className="num">Số ngày</th><th>Trạng thái</th><th>Lý do</th></tr></thead>
@@ -246,6 +251,27 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         {run.status === "nhap" && ["hcns", "ketoan", "cntt"].includes(role) && <button className="act grey" onClick={() => api(`/payroll-runs/${period}?refresh=true`).then(setRun).then(() => toast("Đã tính lại nháp")).catch((e) => toast(errMsg(e), true))}>Tính lại nháp</button>}
         {run.status === "nhap" && ["hcns", "cntt"].includes(role) && <button className="act" onClick={() => kiemCoSo()}>Kiểm cơ sở</button>}
         {NEXT[run.status] && NEXT[run.status][0].includes(role) && <button className="act teal" onClick={() => post(`/payroll-runs/${period}/advance`)}>{NEXT[run.status][1]}</button>}</p>
+      {/* BẢNG CHẤM CÔNG VÀ BẢNG LƯƠNG LÀ HAI NGUỒN, VÀ CHỈ MỘT NGUỒN TRẢ TIỀN (08/10/2026).
+          Đơn nghỉ đã duyệt ghi vào `attendance_days`; bảng lương lấy số công HCNS gõ tay ở bảng
+          "Nhập công thực tế" bên dưới. Không một dòng nào trong `services/hr.py` đọc `AttendanceDay` —
+          nên trước bản này, duyệt một đơn nghỉ không lương rồi không làm gì nữa thì bảng lương vẫn
+          trả đủ công và KHÔNG CÓ DÒNG NÀO BÁO. Khung này không nối hai nguồn lại (bảng nào thắng là
+          quyết định của Chủ tịch / Kế toán trưởng, không phải của màn hình); nó làm chỗ lệch ĐẾM ĐƯỢC. */}
+      {lech && lech.so_dong > 0 && <div className="panel"><h2>Bảng chấm công chưa khớp bảng lương · {lech.so_dong} người</h2>
+        <p className="muted">Bảng lương trả theo số công <b>HCNS nhập ở bảng dưới</b>, không theo bảng
+          chấm công. Hai nơi lệch nhau thì bảng lương vẫn chạy — khung này chỉ nói ra, không tự sửa số
+          nào. Lưới chấm công ở thẻ <b>Chấm công &amp; nghỉ phép</b>.</p>
+        <div className="kpis">{Object.keys(lech.loai).map((k: string) => <div className="kpi" key={k}>
+          <b>{lech.dem[k]}</b><span>{lech.loai[k]}</span></div>)}</div>
+        <div className="wrap"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Phòng</th>
+          <th className="num">Công theo bảng chấm công</th><th className="num">Công đã nhập</th><th>Việc phải làm</th></tr></thead>
+          <tbody>{lech.dong.map((x: any) => <tr key={`${x.ma}-${x.loai}`}>
+            <td className="mono">{x.ma}</td><td>{x.ho_ten}</td><td>{meta.departments?.[x.phong] || x.phong}</td>
+            <td className="num">{x.cong_theo_bang}</td>
+            <td className="num">{x.cong_da_nhap === null ? <Tag cls="warn">chưa nhập</Tag> : x.cong_da_nhap}</td>
+            <td className="muted">{x.viec}</td></tr>)}</tbody></table></div>
+        {!lech.co_bang_luong && <p className="muted">Kỳ này chưa có bảng lương — số công chưa ai nhập là bình thường.</p>}
+      </div>}
       {co !== null && <div className="panel"><h2>Kiểm cơ sở · {co.length} điều cần biết</h2>
         <p className="muted">Quy tắc xác định, không phải suy đoán: cùng đầu vào luôn ra cùng danh sách.
           <b> Không có cờ nghĩa là những thứ đã biết cách kiểm đều sạch, không nghĩa là bảng đúng.</b></p>

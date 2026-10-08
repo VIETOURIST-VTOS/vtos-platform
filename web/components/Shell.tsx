@@ -483,6 +483,13 @@ export const GROUPS: Group[] = [
     href: "/phan-he/nhansu", blocks: [
     ["Hồ sơ nhân sự", "/hr?tab=employees"],
     ["Hợp đồng lao động", "/hop-dong-lao-dong"],
+    // HAI muc, HAI doi tuong. "Chấm công & nghỉ phép" la man hinh cua NGUOI CHAM CONG (the
+    // cham_cong cua /hr, mo cho sau vai) — Dot C dung the ay 08/10/2026 nhung chua co muc menu
+    // nao tro toi, nen no chi vao duoc tu cay phan he. "Đơn nghỉ phép của tôi" la cua cua
+    // NGUOI GUI DON, mo cho ca 22 vai. Gop hai muc lam mot thi hoac chin phong khong co duong
+    // gui don, hoac 22 vai nhin thay mot muc menu bam vao nhan 403.
+    ["Chấm công & nghỉ phép", "/hr?tab=cham_cong"],
+    ["Đơn nghỉ phép của tôi", "/cham-cong"],
     ["Lương, thưởng & hoa hồng", "/hr?tab=payroll"],
     ["Đánh giá & sự vụ", "/hr?tab=incidents"],
     ["Báo cáo công việc", "/reports"],
