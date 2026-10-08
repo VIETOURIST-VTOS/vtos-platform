@@ -530,7 +530,11 @@ MAN_HINH_API = {
     # Robot A · 16/9/2026. Sổ tỷ giá. Kèm /api/v1/tep vì chính màn hình này đính ảnh bảng tỷ giá
     # ngân hàng làm chứng từ – tỷ giá không có chứng từ là con số không ai kiểm được.
     "/ty-gia": ("/api/v1/ty-gia", "/api/v1/tep"),
-    "/tours": ("/api/v1/tours", "/api/v1/users", "/api/v1/products", "/api/v1/mang",
+    # "/api/v1/su-co-tour" thêm 08/10/2026 cho tab "Phát sinh" của trang chuyến (mục 4.4.7). Khai được
+    # vì `su_co_tour.XEM` nay PHỦ ĐỦ mọi vai mở được /tours — đã đối chiếu hai danh sách trước khi
+    # thêm, và `test_dh1` canh đúng phép phủ ấy. Khai một tiền tố rộng hơn cái máy chủ nhận là nới
+    # quyền thật, vì phạm vi vai trò CỘNG RA từ bảng này.
+    "/tours": ("/api/v1/tours", "/api/v1/su-co-tour", "/api/v1/users", "/api/v1/products", "/api/v1/mang",
                "/api/v1/quyet-toan-tour",
                # Lớp 3 (11/9/2026): dòng khách, doanh thu, phương tiện, HDV chi, sổ dấu vết.
                #

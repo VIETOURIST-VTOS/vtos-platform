@@ -21,8 +21,18 @@ router = APIRouter(prefix="/api/v1", tags=["su-co-tour"])
 
 # XEM rộng hơn GHI: quyết toán chuyến và lãi lỗ chuyến đều phải đọc được sự cố của chuyến ấy, nếu không
 # thì con số chi phí phát sinh hiện ra mà không ai giải thích được nó từ đâu.
-XEM = ("chutich", "tgd", "bks", "robot_ks", "ptgd_doan", "tp_dh", "nv_dh", "gd_kd", "tp_kd", "tn_kd",
-       "nv_kd", "tp_hd", "gd_doi_xe", "ketoan", "cntt")
+# DH-1 · 08/10/2026 — thêm `sales_admin` và `ptgd_mkt` (Chủ tịch quyết), để tab "Phát sinh" gắn được
+# vào trang chi tiết chuyến. Hai vai ấy mở được trang chuyến từ trước; không mở danh sách này thì tab
+# mới sẽ là một cái tab bấm vào nhận 403, và `MAN_HINH_API` của /tours sẽ khai hai vai gọi được một
+# cửa máy chủ từ chối — bảng phân quyền đầy đủ hơn thực tế.
+#
+# `sales_admin` KHÔNG phải một lần nới: nó đã nằm trong `MENU_ROLES["/su-co-tour"]` từ trước (qua nhóm
+# SALES_ADMIN) mà KHÔNG có ở đây — tức Sale Admin mở được màn hình Sự cố tour và MỌI cửa trên đó trả
+# 403. Một màn hình mở mà không cửa nào bấm được thì tệ hơn một màn hình bị khoá: người dùng không
+# biết mình thiếu quyền hay hệ thống hỏng. Đây là sửa chỗ hai bảng nói ngược nhau, đo được chứ không
+# suy đoán — và có phép thử canh đúng điều đó trong `test_dh1`.
+XEM = ("chutich", "tgd", "bks", "robot_ks", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "gd_kd",
+       "tp_kd", "tn_kd", "nv_kd", "tp_hd", "gd_doi_xe", "sales_admin", "ketoan", "cntt")
 
 # Ai được đọc TÊN KHÁCH trong các ô chọn của màn hình này (10/9/2026, sau khi anh Tuấn chốt mở màn
 # hình cho GĐ Đội xe và TP Hướng dẫn).

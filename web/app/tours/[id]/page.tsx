@@ -19,7 +19,15 @@ import QuyetToanForm from "@/components/QuyetToanForm";
 // có mục "Quyết toán tour" trỏ vào /tours, và thêm một lối vào thứ hai cho cùng một việc là cách
 // chắc chắn để người dùng không biết nên bấm vào đâu. Nhờ vậy cũng không phải khai thêm dòng nào
 // trong MENU_ROLES hay MAN_HINH_API: tiền tố /api/v1/quyet-toan-lop3 đã nằm sẵn dưới /tours.
-const TABS: [string, string][] = [["info", "Thông tin & quy trình"], ["budget", "Dự toán 3 con số"], ["bookings", "Booking & thu tiền"], ["cost", "Chi NCC & quyết toán"], ["lop3", "Quyết toán chi tiết"], ["ops", "HDV & xe"], ["history", "Quy trình & lịch sử"]];
+// DH-1 (08/10/2026) · tab "phatsinh" là mục 4.4.7 của bản vẽ v1.3, mục cuối còn trống của khối Điều
+// hành tour. Sổ sự cố đã có màn hình riêng (/su-co-tour) và bảng `su_co_tour` đã mang cột `tour_id`,
+// nhưng trang chi tiết chuyến không có một chữ "sự cố" nào — người đang xem một chuyến muốn biết
+// chuyến ấy có phát sinh gì thì phải nhớ ra màn hình khác, rồi tự lọc. Đúng bệnh Đ-1: có cửa mà
+// không ai thấy đường vào thì bằng không có cửa.
+//
+// KHÔNG dựng cửa đọc thứ hai: tab này gọi thẳng `GET /su-co-tour?tour_id=`, cùng cửa mà màn hình sổ
+// sự cố dùng. Lập và xử lý sự cố vẫn ở màn hình ấy — một chỗ ghi, một bộ luật.
+const TABS: [string, string][] = [["info", "Thông tin & quy trình"], ["budget", "Dự toán 3 con số"], ["bookings", "Booking & thu tiền"], ["cost", "Chi NCC & quyết toán"], ["lop3", "Quyết toán chi tiết"], ["ops", "HDV & xe"], ["phatsinh", "Phát sinh & sự cố"], ["history", "Quy trình & lịch sử"]];
 const PR_ST: Record<string, string> = { cho_tp: "Chờ TP", cho_kt: "Chờ Kế toán", cho_duyet: "Chờ duyệt", cho_chi: "Chờ chi", da_chi: "Đã chi", tu_choi: "Từ chối", huy: "Hủy" };
 
 function TourDetail() {
@@ -36,8 +44,18 @@ function TourDetail() {
   const [tab, setTab] = useState(sp.get("tab") || "info");
   const [note, setNote] = useState("");
   const [nguoiNhan, setNguoiNhan] = useState<any[]>([]);
+  /** Sự cố của CHÍNH chuyến này. `null` = chưa hỏi máy chủ, `[]` = đã hỏi và chuyến này sạch — gộp
+   *  hai cái là nói "không có sự cố nào" trong khi chưa ai hỏi. Lỗi quyền giữ nguyên để IN RA: màn
+   *  hình không đoán hộ máy chủ ai được xem. */
+  const [sc, setSc] = useState<any[] | null>(null);
+  const [scLoi, setScLoi] = useState("");
   const load = useCallback(() => api(`/tours/${id}/detail`).then(setT).catch((e) => toast(errMsg(e), true)), [id, toast]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (tab !== "phatsinh") return;
+    api<any[]>(`/su-co-tour?tour_id=${id}`).then((r) => { setSc(r); setScLoi(""); })
+      .catch((e) => { setSc(null); setScLoi(errMsg(e)); });
+  }, [tab, id]);
   if (!t) return <p className="muted">Đang tải…</p>;
   // Ba bậc, và máy chủ nói thẳng bậc nào — KHÔNG suy quyền từ hình dạng dữ liệu nữa. Từ 25/9/2026
   // Kinh doanh Lẻ nhận `calc` CÓ mà giá vốn KHÔNG, nên phép đoán cũ (`t.calc != null`) sẽ bày ra
@@ -303,6 +321,28 @@ function TourDetail() {
 
         Đặt ở tab Quy trình & lịch sử chứ không ở tab Thông tin: đây là hồ sơ của chuyến, cùng chỗ với các
         bước đã đi qua, chứ không phải một thuộc tính của tour. */}
+    {tab === "phatsinh" && <div className="panel wrap">
+      <h2>Phát sinh &amp; sự cố của chuyến này</h2>
+      <p className="muted">Lọc theo đúng chuyến đang mở. <b>Lập và xử lý sự cố ở màn hình Sự cố tour</b> —
+        tab này chỉ soi, không dựng cửa ghi thứ hai cho cùng một bảng.{" "}
+        <Link href={`/su-co-tour`}>Mở sổ sự cố</Link></p>
+      {scLoi ? <p className="muted">{scLoi}</p>
+        : sc === null ? <p className="muted">Đang tải…</p>
+        : sc.length === 0 ? <p className="muted">Chuyến này chưa có sự cố nào được ghi.</p>
+        : <table><thead><tr><th>Mã</th><th>Nhóm</th><th>Mức</th><th>Xảy ra</th><th>Mô tả</th>
+            <th className="num">Khách ảnh hưởng</th><th>Trạng thái</th><th>Chứng từ chi</th></tr></thead>
+          <tbody>{sc.map((x: any) => <tr key={x.id}>
+            <td className="mono">{x.code}</td><td>{x.nhom_ten}</td>
+            <td><Tag cls={x.muc >= 3 ? "red" : x.muc === 2 ? "warn" : ""}>{x.muc_ten}</Tag></td>
+            <td>{x.xay_ra_luc ? fmtDT(x.xay_ra_luc) : ""}<div className="muted">{x.noi_xay_ra}</div></td>
+            <td>{x.mo_ta}</td>
+            <td className="num">{x.so_khach_anh_huong || ""}</td>
+            <td>{x.qua_han ? <Tag cls="red">quá hạn</Tag> : <Tag>{x.trang_thai_ten}</Tag>}</td>
+            <td className="mono">{x.payment_request_code
+              ? <>{x.payment_request_code}<div className="muted">{vnd(x.payment_request_amount)}</div></>
+              : <span className="muted">—</span>}</td></tr>)}</tbody></table>}
+    </div>}
+
     {tab === "history" && <DinhKem doiTuong="tour" doiTuongId={t.code}
                                    tieuDe={`Hồ sơ tour ${t.code}`} />}
 

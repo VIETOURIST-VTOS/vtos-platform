@@ -541,6 +541,17 @@ PHAM_VI_DA_CHOT = {
     # `robot_ks` 125 → 126: dòng `/ir-phap-che` khai TAY bốn tên thay vì cộng `BASE_VIEW`, nên thiếu
     # robot Kiểm soát và `test_ma_tran_quyen` đỏ — main đỏ thì mọi làn đỏ theo. Sửa về `BASE_VIEW +
     # ("ir_phapche", "cntt")`: KHÔNG nới cho một người nào, chỉ trả lại vai chỉ-đọc mà cả bảng đều có.
+    # DH-1 · 08/10/2026 — +1 cho ĐÚNG MỘT vai: `ptgd_mkt` 51 → 52.
+    #
+    # Tab "Phát sinh & sự cố" gắn vào trang chuyến (mục 4.4.7) nên `MAN_HINH_API["/tours"]` khai thêm
+    # `/api/v1/su-co-tour`. Mọi vai mở được /tours đều đã có tiền tố ấy qua màn hình /su-co-tour, TRỪ
+    # `ptgd_mkt` — vai duy nhất chưa từng mở sổ sự cố. Chủ tịch quyết 08/10 cho cả Phó TGĐ Marketing
+    # và Sale Admin xem phát sinh của chuyến.
+    #
+    # `sales_admin` KHÔNG đổi con số, và đó là điều đáng ghi: vai ấy đã nằm trong
+    # `MENU_ROLES["/su-co-tour"]` từ trước nên tiền tố đã có trong phạm vi — nhưng KHÔNG nằm trong
+    # `su_co_tour.XEM`, tức mở được màn hình mà mọi cửa trả 403. Phạm vi không đổi vì bảng này đo
+    # tiền tố, không đo chữ ký cửa; chỗ hỏng ấy do `test_dh1::test_hai_bang_quyen_phai_phu_nhau` bắt.
     "chutich": 126, "tgd": 126, "bks": 126, "cntt": 123, "ir_phapche": 18,
     "ketoan": 103, "tp_dh": 93, "ptgd_doan": 75, "nv_dh": 66, "hcns": 64, "gd_kd": 68,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
@@ -563,7 +574,7 @@ PHAM_VI_DA_CHOT = {
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 51, "nv_kd": 51, "tn_kd": 51, "tp_kd": 53, "nv_mkt": 39,
+    "ptgd_mkt": 52, "nv_kd": 51, "tn_kd": 51, "tp_kd": 53, "nv_mkt": 39,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
