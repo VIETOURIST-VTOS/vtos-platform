@@ -74,6 +74,9 @@ LOAI_MA_QUEN = {
 
 NGUON_GHI = {
     "web": "Phần máy chủ của website", "webhook_fb": "Webhook Facebook",
+    # KEO ve bang API, khac han webhook: webhook la nen tang tu day sang, con day la VTOS chu
+    # dong hoi. Gop hai cai lam mot thi luc mat du lieu khong biet phia nao im lang.
+    "api_zalo_ads": "Kéo từ biểu mẫu Zalo Ads",
     "webhook_zalo": "Webhook Zalo OA", "tong_dai": "Tổng đài", "nap_tep": "Nạp tệp",
     "nhap_tay": "Nhập tay", "khac": "Khác",
 }
