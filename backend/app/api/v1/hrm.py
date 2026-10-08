@@ -76,9 +76,17 @@ def leave_out(r: LeaveRequest, e: Employee | None = None, u: User | None = None)
 
 
 @router.get("/hrm/meta")
-def meta(u: User = Depends(current_user)):
+def meta(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Thêm 08/10/2026: tuyến ký đơn, và hai chỗ thiếu ĐẾM ĐƯỢC của chính tuyến ấy.
+
+    `phong_thieu_nguoi_giu_vai` là mặt sau của lần siết hôm nay: mỗi phòng nay đúng MỘT vai ký, nên
+    một vai không tài khoản nào giữ thì đơn của cả phòng ấy nằm im trong hàng đợi mà không dòng nào
+    báo. Trả ra đây để màn hình Nhân sự in lên, thay vì để HCNS phát hiện bằng một người đi hỏi."""
     return {"contract_kinds": CONTRACT_KINDS, "contract_status": CONTRACT_STATUS, "relations": RELATIONS,
-            "leave_kinds": LEAVE_KINDS, "leave_status": LEAVE_STATUS, "attendance_kinds": ATT_KINDS}
+            "leave_kinds": LEAVE_KINDS, "leave_status": LEAVE_STATUS, "attendance_kinds": ATT_KINDS,
+            "tuyen_ky_don": {k: list(v) for k, v in H.TUYEN_KY_DON.items()},
+            "phong_chua_chot_nguoi_ky": list(H.phong_chua_chot_nguoi_ky()),
+            "phong_thieu_nguoi_giu_vai": H.phong_khong_ai_giu_vai_ky(db)}
 
 
 # ---------- Hồ sơ nhân sự ----------
