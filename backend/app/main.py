@@ -14,6 +14,7 @@ from app.api.v1.banks import router as banks_router
 from app.api.v1.hr import router as hr_router
 from app.api.v1.companies import router as companies_router
 from app.api.v1.hrm import router as hrm_router
+from app.api.v1.phap_che import router as phap_che_router
 from app.api.v1.ops import router as ops_router
 from app.api.v1.finance import router as finance_router
 from app.api.v1.vietrip import router as vietrip_router
@@ -293,6 +294,7 @@ app.include_router(banks_router)
 app.include_router(hr_router)
 app.include_router(companies_router)
 app.include_router(hrm_router)
+app.include_router(phap_che_router)
 app.include_router(marketing_router)
 app.include_router(ops_router)
 app.include_router(finance_router)

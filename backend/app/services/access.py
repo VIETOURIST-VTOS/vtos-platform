@@ -472,6 +472,7 @@ MAN_HINH_API = {
              "/api/v1/vehicles", "/api/v1/vehicle-rates", "/api/v1/dispatch", "/api/v1/tours",
              "/api/v1/companies", "/api/v1/users"),
     "/params": ("/api/v1/params",),
+    "/ir-phap-che": ("/api/v1/ir-phap-che",),
     "/products": ("/api/v1/products",),
     "/reports": ("/api/v1/daily-reports", "/api/v1/page-shifts", "/api/v1/employees"),
     # Phiếu lương CỦA CHÍNH MÌNH – tiền tố riêng, chỉ chứa endpoint tự lọc về đúng người.
@@ -951,6 +952,11 @@ MENU_ROLES = {
 
     # --- Kiểm soát & Chính sách ---
     "/params": PARAM_ROLES,
+    # IR – Pháp chế (Đợt D1, 08/10/2026). HẸP HƠN HẲN các màn hình nghiệp vụ, và có lý do:
+    # văn bản HĐQT và hồ sơ công bố thông tin của một công ty niêm yết là chuyện của Ban
+    # Tổng giám đốc, Pháp chế và Kiểm soát – không phải của phòng ban. Ban Kiểm soát và CNTT
+    # ĐỌC mà không ghi; chữ ký ghi nằm ở api/v1/phap_che.py::GHI, không nằm ở đây.
+    "/ir-phap-che": ("chutich", "tgd", "ir_phapche", "bks", "cntt"),
     "/audit": AUDIT_ROLES,
     # Bàn làm việc của robot Kiểm soát. Nguyên tắc 07/9 giữ nguyên và không bị nới ở đây: PHÒNG BAN
     # KHÔNG ĐỌC KẾT QUẢ GIÁM SÁT CHÍNH MÌNH – việc phải làm thì hiện ở màn hình Ngoại lệ của họ.

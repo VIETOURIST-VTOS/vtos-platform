@@ -334,6 +334,7 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "5.9", ten: "Hành chính",
         con: [
           { ma: "5.9.1", ten: "Văn bản & quy trình", href: "/params" },
+          { ma: "5.9.2", ten: "IR – Pháp chế", href: "/ir-phap-che" },
           // 08/10/2026 — cùng một dạng với 5.6: hai mục, một trang. /tai-san có bốn tab — tài sản cố
           // định, khấu hao kỳ, chi phí trả trước, phân bổ kỳ — và không tab nào là ĐỀ NGHỊ MUA hay
           // BIÊN BẢN CẤP PHÁT. Đã mở `models/assets.py` ra đọc: `FixedAsset` có cột `department`

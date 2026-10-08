@@ -28,6 +28,9 @@ có bảng chưa gộp về (chuỗi bán hàng V6), và bảng đã bỏ thì d
 from sqlalchemy.orm import Session
 
 CUA_TAY = (
+    "van_ban_phap_che",
+    "nghia_vu_cong_bo",
+    "ban_ghi_cong_bo",
     "lich_su_to_chuc",
     "chi_ky_luong",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
