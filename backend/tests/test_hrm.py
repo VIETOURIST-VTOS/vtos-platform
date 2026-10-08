@@ -93,8 +93,15 @@ def test_nguoi_phu_thuoc_va_giam_tru():
 def test_phep_nam_va_don_tu():
     h = login("hcns")
     emps = client.get("/api/v1/employees", headers=h).json()
-    e = emps[1] if len(emps) > 1 else emps[0]
+    # 08/10/2026 — KHÔNG lấy `emps[1]` nữa, và không ký bằng `hcns` nữa. Từ bản chốt tuyến ký đơn,
+    # mỗi phòng có ĐÚNG MỘT vai ký và HCNS không còn ký đơn của phòng khác (họ vẫn đọc được tất cả
+    # qua HR_READ). Chọn người thuộc phòng Điều hành và ký bằng chính vai ký của phòng ấy — phép thử
+    # đi theo luật thay vì giữ một lối đi mà luật vừa đóng.
+    # Và KHÔNG lấy chính trưởng phòng: `decide_leave` cấm tự ký đơn của mình, nên nếu phép thử chọn
+    # trúng người ký thì nó đỏ vì một luật ĐÚNG. Lấy một nhân viên của phòng ấy.
+    e = next(x for x in emps if x["department"] == "dieu_hanh" and x.get("position") != "tp")
     eid = e["id"]
+    ky = login("tp.dieuhanh")
     client.post("/api/v1/labor-contracts", headers=h, json={
         "employee_id": eid, "code": "HDLD-2026-PN1", "kind": "khong_xac_dinh",
         "effective_from": "2020-01-01", "salary": 12_000_000, "annual_leave_days": 12})
@@ -112,7 +119,7 @@ def test_phep_nam_va_don_tu():
     pend = [x for x in client.get("/api/v1/leave-balance?year=2026", headers=h).json() if x["employee_id"] == eid][0]
     assert pend["pending"] == 3 and pend["used"] == 0
 
-    ok = client.post(f"/api/v1/leaves/{lid}/decide", headers=h, json={"approve": True, "note": "Đồng ý"})
+    ok = client.post(f"/api/v1/leaves/{lid}/decide", headers=ky, json={"approve": True, "note": "Đồng ý"})
     assert ok.status_code == 200 and ok.json()["status"] == "duyet"
     after = [x for x in client.get("/api/v1/leave-balance?year=2026", headers=h).json() if x["employee_id"] == eid][0]
     assert after["used"] == 3 and after["remaining"] == after["entitlement"] - 3

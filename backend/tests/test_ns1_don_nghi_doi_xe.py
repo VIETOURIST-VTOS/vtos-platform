@@ -75,20 +75,35 @@ def test_ns1_2_chan_nam_trong_ham_khong_chi_o_cua_api():
 
 
 def test_ns1_3_phong_chua_chot_nguoi_ky_phai_dem_duoc():
-    """Bản này CỐ Ý chỉ sửa hai phòng Chủ tịch đã nói, không nhân tiện đặt luật cho chín phòng kia.
+    """08/10/2026 — Chủ tịch đã chốt người ký cho CẢ MƯỜI MỘT phòng, nên bộ đếm nay trả về RỖNG.
 
-    Chỗ chưa quyết phải ĐẾM ĐƯỢC để câu hỏi còn nhìn thấy, y như `misa.thieu_tai_khoan()` giữ cho
-    câu hỏi tài khoản của `sua_chua_xe` khỏi chìm đi.
+    Bản trước của phép thử này đòi `chua` KHÁC rỗng, và thông điệp lỗi của nó tự dặn: "nếu đúng thì
+    sửa phép thử này kèm ngày và người quyết, đừng xoá nó đi". Nó đã reo đúng lúc và đây là lần sửa ấy.
+
+    Nhưng KHÔNG đổi thành `assert chua == ()`: một phép thử chỉ khẳng định "hôm nay rỗng" thì ngày mai
+    thêm phòng thứ mười hai, nó vẫn xanh trong khi bộ đếm đã hỏng. Nên phép thử hỏi CÁI ĐẾM: cho một
+    phòng chưa khai vào thì nó có nhìn thấy không, và cho phòng đã khai thì nó có im không.
     """
+    from app.models.hr import DEPARTMENTS
     chua = set(H.phong_chua_chot_nguoi_ky())
-    assert "doi_xe" not in chua and "huong_dan" not in chua, "hai phòng đã chốt mà vẫn báo là chưa"
-    assert chua, (
-        "mọi phòng đều đã chốt người ký — nếu đúng thì sửa phép thử này kèm ngày và người quyết, "
-        "đừng xoá nó đi")
-    assert chua <= set(DEPARTMENTS), f"tên phòng lạ trong bảng: {chua - set(DEPARTMENTS)}"
-    for p in chua:
-        assert H.nguoi_ky_don(p) == H.KY_MAC_DINH, f"{p} chưa chốt mà đã đổi người ký"
+    assert chua == set(), f"còn phòng chưa chốt người ký: {sorted(chua)} — Chủ tịch chốt cả 11 phòng ngày 08/10"
+    assert set(H.TUYEN_KY_DON) == set(DEPARTMENTS), (
+        "bảng tuyến ký đơn phải phủ ĐÚNG danh sách phòng ban — thêm phòng mà quên khai người ký thì "
+        f"đơn của họ rơi về danh sách dự phòng: {sorted(set(DEPARTMENTS) - set(H.TUYEN_KY_DON))}")
 
+    # Bộ đếm phải THẬT SỰ nhìn thấy một phòng chưa khai, không chỉ trả rỗng cho mọi trường hợp.
+    that = dict(H.TUYEN_KY_DON)
+    try:
+        H.TUYEN_KY_DON.pop("dieu_hanh")
+        assert "dieu_hanh" in H.phong_chua_chot_nguoi_ky(), "bộ đếm không còn nhìn thấy phòng chưa khai"
+    finally:
+        H.TUYEN_KY_DON.clear(); H.TUYEN_KY_DON.update(that)
+    assert "dieu_hanh" not in H.phong_chua_chot_nguoi_ky()
+
+    # Mỗi phòng ĐÚNG MỘT vai ký — luật Chủ tịch 30/9 ("một chữ ký, không có người ký thay") nay áp
+    # cho cả mười một phòng, không riêng đội xe.
+    nhieu = {p: v for p, v in H.TUYEN_KY_DON.items() if len(v) != 1}
+    assert not nhieu, f"phòng có nhiều hơn một vai ký — mở người ký thay là việc cần người quyết: {nhieu}"
 
 def test_ns1_4_mo_cua_cho_hien_truong_khong_thanh_mo_so_don_cong_ty():
     """Ba lớp, và phép thử đòi đủ ba. Bỏ lớp nào thì một tài xế đọc được đơn không phải của mình."""

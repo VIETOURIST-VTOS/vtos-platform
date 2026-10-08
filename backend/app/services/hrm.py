@@ -166,10 +166,37 @@ TUYEN_KY_DON = {
     # Hệ quả trực tiếp của lần tách vai 05/10/2026, đã ghi trong chính lý do tách (models/core.py):
     # "đơn của tài xế đi về Giám đốc đội xe, đơn của hướng dẫn viên đi về Trưởng phòng Hướng dẫn".
     "huong_dan": ("tp_hd",),
+
+    # ---- Chủ tịch chốt 08/10/2026: CHÍN PHÒNG CÒN LẠI, mỗi phòng MỘT chữ ký ----
+    #
+    # Luật Chủ tịch: "các trưởng phòng ký, và báo dữ liệu về cho HCNS, TGĐ / Chủ tịch". Hai vế, và
+    # vế sau KHÔNG phải một chữ ký nữa: HCNS, TGĐ, Chủ tịch nằm trong `HR_READ` nên đã đọc được mọi
+    # đơn của mọi phòng từ trước — họ THẤY, không ký.
+    #
+    # BỐN PHÒNG KHÔNG CÓ VAI TRƯỞNG PHÒNG RIÊNG trong hệ thống (Visa, CNTT, Kế toán, HCNS chỉ có đúng
+    # một vai cho cả phòng), nên "trưởng phòng ký" không chỉ ra được ai. Chủ tịch chỉ đích danh người
+    # phụ trách thực tế và bản này ghi theo VAI của họ, không ghi tên người: một bảng luật ghi tên thì
+    # ngày người ấy đổi việc, luật đi theo người thay vì theo chức.
+    "kd_le": ("tp_kd",),
+    "kd_doan": ("ptgd_doan",),         # phòng Đoàn do Phó TGĐ tour đoàn phụ trách
+    "dieu_hanh": ("tp_dh",),
+    "visa": ("tp_dh",),                # Ban Visa do Trưởng phòng Điều hành phụ trách (Chủ tịch 08/10)
+    "marketing": ("ptgd_mkt",),
+    "cntt": ("ptgd_mkt",),             # CNTT do Phó TGĐ Marketing phụ trách (Chủ tịch 08/10)
+    "ketoan": ("tgd",),
+    "hcns": ("tgd",),                  # không để HCNS tự ký đơn của phòng mình
+    "ban_tgd": ("chutich",),
 }
 
-# Danh sách hôm nay, giữ NGUYÊN cho các phòng chưa có người quyết. Chép đúng chữ ký cửa
-# `POST /leaves/{id}/decide` trước bản này, để bản này không lặng lẽ siết ai.
+# Danh sách dự phòng cho một phòng CHƯA ai quyết người ký. Từ 08/10/2026 mọi phòng đang có đều đã
+# được chỉ định, nên danh sách này không còn phòng nào dùng tới — GIỮ LẠI có chủ ý: ngày thêm phòng
+# thứ mười hai, đơn của họ vẫn ký được bằng danh sách cũ thay vì rơi vào khoảng trống, và
+# `phong_chua_chot_nguoi_ky()` đếm ra ngay để có người quyết.
+#
+# PHẢI NÓI RA MỘT HỆ QUẢ: bản này SIẾT, không nới. Trước 08/10 chín phòng chạy bằng danh sách dưới,
+# nên HCNS, Giám đốc Kinh doanh và CNTT ký được đơn của gần như mọi phòng — và trên thực tế HCNS là
+# người bấm. Từ bản này mỗi phòng chỉ một vai ký được, HCNS KHÔNG còn ký (họ đọc được tất cả qua
+# `HR_READ`). Đó là đúng điều Chủ tịch quyết, nhưng người đang bấm hằng ngày sẽ thấy nút biến mất.
 KY_MAC_DINH = ("hcns", "tgd", "chutich", "gd_kd", "ptgd_doan", "tp_kd", "cntt")
 
 
@@ -181,6 +208,29 @@ def nguoi_ky_don(phong: str) -> tuple[str, ...]:
 def phong_minh_ky(vai_tro: str) -> tuple[str, ...]:
     """Những phòng mà vai trò này là người ký — dùng để lọc hàng đợi duyệt."""
     return tuple(sorted(p for p, vais in TUYEN_KY_DON.items() if vai_tro in vais))
+
+
+def phong_khong_ai_giu_vai_ky(db: Session) -> list[dict]:
+    """Phòng ĐÃ chỉ định người ký mà KHÔNG tài khoản nào đang giữ vai ấy — đơn của họ không ai ký được.
+
+    Sinh ra cùng bản 08/10/2026, và nó là mặt sau của chính bản ấy. Trước 08/10 chín phòng dùng danh
+    sách `KY_MAC_DINH` bảy vai, nên gần như luôn có ai đó ký được — rộng thì sai người, nhưng không
+    bao giờ kẹt. Nay mỗi phòng đúng MỘT vai, và một vai không ai giữ thì đơn của cả phòng ấy nằm im
+    trong hàng đợi mà không một dòng nào báo. Đo trên bản demo lúc viết: `tp_kd` không tài khoản nào
+    giữ, tức đơn của Kinh doanh Lẻ sẽ kẹt.
+
+    KHÔNG tự chữa bằng cách thêm vai dự phòng: nới lại danh sách là xoá đúng quyết định vừa ký. Việc
+    của hàm này là làm chỗ kẹt ĐẾM ĐƯỢC, cùng khuôn với `phong_chua_chot_nguoi_ky()` ngay dưới —
+    chỗ thiếu là của HCNS đi cấp tài khoản, không phải của phần mềm đi đoán.
+    """
+    from app.models.core import User
+    dang_giu = {u.role for u in db.execute(select(User).where(User.active == True)).scalars()}
+    ra = []
+    for phong, vais in TUYEN_KY_DON.items():
+        thieu = [v for v in vais if v not in dang_giu]
+        if len(thieu) == len(vais):          # KHÔNG một vai nào của phòng này có người giữ
+            ra.append({"phong": phong, "phong_ten": DEPARTMENTS.get(phong, phong), "vai_ky": list(vais)})
+    return ra
 
 
 def phong_chua_chot_nguoi_ky() -> tuple[str, ...]:
