@@ -51,10 +51,35 @@ def test_a1_mot_vai_khong_phai_hai():
         "Chủ tịch chốt MỘT người kiêm – tách hai vai là dựng sẵn ranh giới chưa có người đứng hai bên"
 
 
-def test_a2_man_hinh_hep_dung_nam_vai():
-    from app.services.access import MENU_ROLES
-    assert set(MENU_ROLES["/ir-phap-che"]) == {"chutich", "tgd", "ir_phapche", "bks", "cntt"}, \
+def test_a2_man_hinh_hep_khong_mo_cho_phong_ban_nao():
+    """Màn hình IR – Pháp chế KHÔNG mở cho một vai phòng ban nào. Giữ nguyên ý; sửa cách khai.
+
+    08/10/2026 chiều — bản đầu khai CỨNG đúng năm tên `{chutich, tgd, ir_phapche, bks, cntt}`, và nó
+    đụng một luật có trước: `test_ma_tran_quyen` đòi `robot_ks` có mặt ở MỌI dòng của ma trận (Chủ
+    tịch quyết 09/9/2026 — "robot làm việc Ban Kiểm soát thì phải nhìn được thứ Ban Kiểm soát nhìn").
+    Hai hàng rào cãi nhau thì main đỏ, và main đỏ thì mọi làn đỏ theo.
+
+    Đọc lại lý do bản đầu tự ghi — "không phải việc của PHÒNG BAN" — thì nó nói về vai phòng ban, và
+    chính bản ấy vẫn giữ `bks`. Nên việc thiếu `robot_ks` là hệ quả của khai tay một danh sách, không
+    phải một quyết định loại robot ra khỏi màn hình này.
+
+    Nay khai bằng `BASE_VIEW + (…)`: nền hệ thống cộng đúng hai vai được mở. Ý giữ nguyên từng chữ —
+    KHÔNG một vai phòng ban nào — nhưng viết theo cách không chống lại luật nền, và phép thử hỏi
+    thẳng điều cần giữ thay vì pin một tập tên.
+
+    NẾU Chủ tịch muốn robot Kiểm soát KHÔNG đọc hồ sơ công bố HĐQT thì đây là một quyết định khác và
+    phải sửa ở `test_ma_tran_quyen` bằng một ngoại lệ có khai lý do, không phải bằng cách khai tay lại
+    danh sách ở đây.
+    """
+    from app.services.access import BASE_VIEW, MENU_ROLES
+    assert set(MENU_ROLES["/ir-phap-che"]) == set(BASE_VIEW) | {"ir_phapche", "cntt"}, \
         "văn bản HĐQT và hồ sơ công bố không phải việc của phòng ban"
+    # Điều phải giữ, nói thẳng ra: không một vai phòng ban nào lọt vào.
+    PHONG_BAN = {"ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "nv_kd", "tn_kd", "tp_kd", "gd_kd",
+                 "sales_admin", "nv_mkt", "ketoan", "hcns", "tai_xe", "hdv", "gd_doi_xe", "tp_hd",
+                 "nv_visa", "hanh_chinh"}
+    lot = PHONG_BAN & set(MENU_ROLES["/ir-phap-che"])
+    assert not lot, f"vai phòng ban lọt vào màn hình IR – Pháp chế: {sorted(lot)}"
 
 
 def test_a3_pham_vi_toan_tap_doan_khong_cat_theo_phap_nhan():
