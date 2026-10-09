@@ -360,6 +360,20 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
 
 def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "") -> str:
     """confirm (người phụ trách bộ phận) → check (Kế toán) → approve (TGĐ; +Chủ tịch nếu 2 chữ ký) → pay (Kế toán) | reject."""
+    # ── Đợt E2a: tách bạch trách nhiệm THEO NGƯỜI ──────────────────────────────────────
+    # Lớp cũ ở ngay dưới (`u.role != "ketoan"`) so hai VAI. Đo 19/9/2026: 6 người giữ từ hai
+    # tài khoản trở lên, nên so vai là chưa đủ. Kiểm TRƯỚC khi làm, ghi dấu chân SAU khi làm
+    # xong — ghi trước là tạo dấu chân cho một bước chưa xảy ra.
+    from app.services import ks_tach_nhiem as _KTN
+    _pv = f"dc:{r.id}"
+    _BUOC_CUA_DE_NGHI_CHI = {"confirm": "xac_nhan_bo_phan", "check": "ke_toan_kiem",
+                             "approve": "duyet_lenh_chi", "pay": "da_chi"}
+    _b = _BUOC_CUA_DE_NGHI_CHI.get(action, "")
+    if _b:
+        _kq = _KTN.kiem(db, _pv, _b, u)
+        if _kq["chan"]:
+            raise ValueError(_kq["vi_pham"][0]["thong_diep"] if _kq["vi_pham"]
+                             else _kq["thong_diep_thieu_ma"])
     if action == "reject":
         if r.status in ("da_chi", "tu_choi"): raise ValueError("Không từ chối được")
         if not reason.strip(): raise ValueError("Từ chối phải có lý do")
@@ -390,6 +404,7 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
                 raise ValueError("Người lập không tự duyệt hồ sơ của chính mình")
             r.status, r.approved_by, r.approved_at = "cho_chi", u.username, datetime.now()
             _post_liability(db, r)
+            _KTN.ghi_buoc(db, _pv, "duyet_lenh_chi", u)
             R.audit(db, u.username, u.role, "de_nghi_chi_approve", f"dc:{r.code}",
                     after={"trang_thai": r.status, "mot_chu_ky_mkt": True, "ngoai_du_toan": r.over_budget})
             db.commit()
@@ -417,6 +432,8 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         msg = f"{r.code} đã chi ({r.paid_ref or 'không có mã GD'})"
     else:
         raise ValueError("Hành động không hợp lệ")
+    if _b:
+        _KTN.ghi_buoc(db, _pv, _b, u)   # bước đã xong, để lại dấu chân
     R.audit(db, u.username, u.role, f"de_nghi_chi_{action}", f"dc:{r.code}", after={"trang_thai": r.status, "ly_do": reason})
     db.commit()
     return msg

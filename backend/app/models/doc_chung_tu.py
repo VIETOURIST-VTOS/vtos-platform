@@ -71,15 +71,15 @@ LOAI_CHUNG_TU = {
 # Lệnh giao việc 08/9 xếp bảng lương và bảng bảo hiểm vào nhóm bốn loại chứng từ mở trước. Chủ tịch
 # quyết ngược lại ngay trong ngày: "được, nhưng LOẠI TRỪ BẢNG LƯƠNG". Lý do đứng vững hơn cả sự tiện
 # lợi: bảng lương và bảng bảo hiểm là thu nhập của từng người – dữ liệu cá nhân theo Nghị định
-# 13/2023 – và đưa chúng qua một mô hình ngôn ngữ là một lần chuyển dữ liệu cá nhân ra ngoài mà không
+# 356/2025/NĐ-CP (thay Nghị định 13/2023 từ 01/01/2026) – và đưa chúng qua một mô hình ngôn ngữ là một lần chuyển dữ liệu cá nhân ra ngoài mà không
 # ai trong danh sách đó đồng ý.
 #
 # Ghi thành hằng số ở đây, và có phép thử canh, để lần triển khai nào cũng có mặt. Người vào sau muốn
 # bỏ nó thì phải sửa mã và phải giải thích trong một lần xem lại mã – không bỏ được bằng cách gạt một
 # công tắc trên màn hình lúc 11 giờ đêm.
 CAM_DOC_BANG_MAY = {
-    "bang_luong": "Bảng lương – thu nhập của từng người, dữ liệu cá nhân theo Nghị định 13/2023",
-    "bang_bao_hiem": "Bảng bảo hiểm – mức đóng gắn với thu nhập của từng người, dữ liệu cá nhân theo Nghị định 13/2023",
+    "bang_luong": "Bảng lương – thu nhập của từng người, dữ liệu cá nhân theo Luật Bảo vệ dữ liệu cá nhân 2025 (Luật 91/2025/QH15) và Nghị định 356/2025/NĐ-CP",
+    "bang_bao_hiem": "Bảng bảo hiểm – mức đóng gắn với thu nhập của từng người, dữ liệu cá nhân theo Luật Bảo vệ dữ liệu cá nhân 2025 (Luật 91/2025/QH15) và Nghị định 356/2025/NĐ-CP",
 }
 
 # NGOẠI LỆ CÓ CHỮ KÝ – mở HẸP, mở Ở ĐÂY, và mở bằng tên người ký.

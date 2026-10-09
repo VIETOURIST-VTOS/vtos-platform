@@ -29,6 +29,9 @@ from sqlalchemy.orm import Session
 
 CUA_TAY = (
     "van_ban_phap_che",
+    # Đợt E2a — cặp xung đột tách bạch trách nhiệm. Người dùng tự khai qua màn hình /ket-so;
+    # hệ thống KHÔNG nạp sẵn dòng nào, vì mỗi dòng là một quy chế kiểm soát nội bộ có người ký.
+    "cap_tach_nhiem",
     "nghia_vu_cong_bo",
     "ban_ghi_cong_bo",
     # Đợt D2 — bàn làm việc Pháp chế. Cả bốn bảng người dùng tự khai qua màn hình
@@ -226,6 +229,7 @@ CUA_TAY = (
 # chưa chắc nó máy sinh.
 MAY_SINH = {
     "su_kien_thu_nhap": "Sổ ghi khoản thu nhập đã KÝ, do services/luong_khoa.khoa ghi đúng lúc có chữ ký. Không có cửa là TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: gõ tay được vào sổ này thì xoá được dấu vết một lần đã trả, mà đó đúng là thứ nó sinh ra để giữ.",
+    "buoc_da_lam": "Dấu chân tách bạch trách nhiệm — hệ thống tự ghi đúng lúc một bước nghiệp vụ hoàn thành. KHÔNG có cửa nhập tay là TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: gõ tay được vào sổ này thì dựng được một dấu chân cho một bước chưa ai làm, mà đó đúng là thứ nó sinh ra để chống.",
     "ai_runs": "Nhật ký robot chạy – hệ thống tự ghi, không ai nhập tay.",
     "ks_bao_cao": "Báo cáo robot Kiểm soát tự lập.",
     "ks_cot_tien": "Cột tiền robot Kiểm soát tự dựng từ sổ.",

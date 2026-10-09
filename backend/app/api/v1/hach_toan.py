@@ -312,3 +312,133 @@ def khai_chieu(data: ChieuIn, u: User = Depends(require_roles(*XEM)),
     db.commit()
     return {"message": f"Đã khai chiều cho TK {t.code}", "code": t.code,
             "chieu_bat_buoc": [ten for _c, ten in KTC.chieu_bat_buoc(t)]}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT E2a — TÁCH BẠCH TRÁCH NHIỆM THEO NGƯỜI
+#
+# Vào chung tiền tố `/api/v1/hach-toan` đã có sẵn trong MAN_HINH_API của màn hình /ket-so, nên
+# PHAM_VI_DA_CHOT KHÔNG đổi một số. Không tự khai thêm một lát quyền nào.
+# ══════════════════════════════════════════════════════════════════════════════════════════
+from datetime import datetime as _dt                             # noqa: E402
+from app.models.muc_do_chan import MUC_DO as _MUC_DO             # noqa: E402
+from app.models.muc_do_chan import MUC_DO_KHI_CHUA_KHAI as _MAC_DINH   # noqa: E402
+from app.models.tach_nhiem import CapTachNhiem as _CTN           # noqa: E402
+from app.services import ks_tach_nhiem as _KTN                   # noqa: E402
+
+
+class CapIn(BaseModel):
+    ma_cap: str
+    buoc_a: str
+    buoc_b: str
+    ten: str = ""
+    mo_ta: str = ""
+    muc_do: str | None = None
+    nguoi_ky: str = ""
+    can_cu: str = ""
+    dang_ap_dung: bool | None = None
+
+
+@router.get("/cap-tach-nhiem")
+def xem_cap_tach_nhiem(u: User = Depends(require_roles(*XEM, mo_ta="cặp tách bạch trách nhiệm")),
+                       db: Session = Depends(get_db)):
+    ds = db.execute(select(_CTN).order_by(_CTN.ma_cap)).scalars().all()
+    return {
+        "cac_cap": [{
+            "ma_cap": c.ma_cap, "buoc_a": c.buoc_a, "buoc_b": c.buoc_b, "ten": c.ten,
+            "mo_ta": c.mo_ta, "muc_do_khai": c.muc_do or "", "muc_do_dang_ap": _KTN.muc_do(c),
+            "nguoi_ky": c.nguoi_ky, "can_cu": c.can_cu, "dang_ap_dung": bool(c.dang_ap_dung),
+            "ngay_hieu_luc": c.ngay_hieu_luc.isoformat() if c.ngay_hieu_luc else "",
+        } for c in ds],
+        "muc_do": _MUC_DO,
+        "chua_dat_muc": _KTN.cap_chua_dat_muc(db),
+        "mac_dinh_khi_chua_khai": _MAC_DINH,
+    }
+
+
+@router.post("/cap-tach-nhiem")
+def khai_cap_tach_nhiem(data: CapIn,
+                        u: User = Depends(require_roles(*XEM, mo_ta="cặp tách bạch trách nhiệm")),
+                        db: Session = Depends(get_db)):
+    """THẮT thì Kế toán làm được, NỚI phải có chữ ký — cùng bất đối xứng của Đợt E1."""
+    if data.buoc_a.strip() == data.buoc_b.strip() or not data.buoc_a.strip() or not data.buoc_b.strip():
+        raise HTTPException(422, "Một cặp phải là HAI bước khác nhau, và cả hai đều phải có tên.")
+    if data.muc_do is not None and data.muc_do != "" and data.muc_do not in _MUC_DO:
+        raise HTTPException(422, f"Mức độ không hợp lệ. Nhận: {', '.join(_MUC_DO)}")
+
+    la_ky = u.role in KY
+    c = db.execute(select(_CTN).where(_CTN.ma_cap == data.ma_cap)).scalars().first()
+    noi = []
+    if c is None:
+        c = _CTN(ma_cap=data.ma_cap, buoc_a=data.buoc_a.strip(), buoc_b=data.buoc_b.strip())
+        db.add(c)
+    else:
+        cu = _KTN.muc_do(c)
+        if data.muc_do is not None and cu in ("canh_bao_va_chan",) and data.muc_do != cu:
+            noi.append(f"hạ mức cặp {c.ma_cap}: {cu} → {data.muc_do}")
+        if data.dang_ap_dung is False and c.dang_ap_dung:
+            noi.append(f"tắt cặp {c.ma_cap}")
+    if noi and not la_ky:
+        raise HTTPException(403, "Nới hàng rào phải có chữ ký Chủ tịch hoặc TGĐ: " + "; ".join(noi))
+    if noi and not (data.can_cu or "").strip():
+        raise HTTPException(422, "Nới hàng rào phải ghi CĂN CỨ — một quyết định không giải trình "
+                                 "được thì không ai dám xem lại.")
+
+    c.buoc_a, c.buoc_b = data.buoc_a.strip(), data.buoc_b.strip()
+    c.ten, c.mo_ta = data.ten or c.ten, data.mo_ta or c.mo_ta
+    if data.muc_do is not None:
+        c.muc_do = data.muc_do or None
+    if data.dang_ap_dung is not None:
+        c.dang_ap_dung = data.dang_ap_dung
+    if data.nguoi_ky:
+        c.nguoi_ky = data.nguoi_ky
+    if data.can_cu:
+        c.can_cu = data.can_cu
+    if c.muc_do and not c.ngay_hieu_luc:
+        c.ngay_hieu_luc = _dt.utcnow()
+    c.boi, c.luc = u.username, _dt.utcnow()
+    db.commit()
+    return {"message": f"Đã khai cặp {c.ma_cap}", "muc_do_dang_ap": _KTN.muc_do(c),
+            "chua_dat_muc": _KTN.cap_chua_dat_muc(db)}
+
+
+@router.get("/dau-chan/{pham_vi}")
+def xem_dau_chan(pham_vi: str,
+                 u: User = Depends(require_roles(*XEM, mo_ta="dấu chân tách bạch trách nhiệm")),
+                 db: Session = Depends(get_db)):
+    """Ai đã làm bước gì trong phạm vi này (`dc:12`, `ky:2026-09`).
+
+    Chỉ ĐỌC — dấu chân do hệ thống ghi đúng lúc một bước hoàn thành, không ai gõ tay vào được.
+    """
+    return {"pham_vi": pham_vi, "dau_chan": _KTN.dau_chan(db, pham_vi)}
+
+
+@router.post("/cap-tach-nhiem/nap-da-ky")
+def nap_cap_da_ky(u: User = Depends(require_roles(*XEM, mo_ta="cặp tách bạch trách nhiệm")),
+                  db: Session = Depends(get_db)):
+    """Nạp các cặp đã có chữ ký ghi trong mã nguồn (`models/tach_nhiem.CAP_DA_KY`).
+
+    CỬA CHỨ KHÔNG PHẢI MIGRATION, và đó là chủ ý: một lần nâng cấp cơ sở dữ liệu tự dựng
+    quy chế kiểm soát nội bộ thì không ai bấm, không ai biết, và không ai nhớ. Một cửa có
+    người bấm thì có tên người và có giờ trong nhật ký. Chạy lại được, không dựng trùng, và
+    KHÔNG đụng tới mức của dòng đã có — ai đặt mức rồi thì lần nạp sau không đặt lại hộ.
+    """
+    them = _KTN.nap_cap_da_ky(db)
+    return {"message": f"Đã nạp {len(them)} cặp đã ký" if them else "Không có cặp nào mới",
+            "da_nap": them, "chua_dat_muc": _KTN.cap_chua_dat_muc(db)}
+
+
+@router.get("/thieu-ma-nhan-vien")
+def xem_thieu_ma_nhan_vien(
+        u: User = Depends(require_roles(*XEM, mo_ta="tài khoản thiếu mã nhân viên")),
+        db: Session = Depends(get_db)):
+    """Tài khoản vai tiền chưa có mã nhân viên — lỗ CÒN LẠI sau khi so theo người.
+
+    Không có mã thì hai tài khoản của cùng một người được coi là hai người, nên họ đi được
+    cả hai bước mà không ai thấy. Lỗ này chỉ bịt được bằng dữ liệu HCNS, không bịt được bằng
+    mã — nên việc của phần mềm là ĐẾM và GỌI TÊN, để có người đi điền.
+    """
+    ds = _KTN.tai_khoan_thieu_ma_nv(db)
+    return {"so_tai_khoan": len(ds), "tai_khoan": ds,
+            "dang_bat_buoc": _KTN.bat_buoc_ma_nv(db),
+            "tham_so_bat": "tach_nhiem_bat_buoc_ma_nv_tu"}
