@@ -475,7 +475,7 @@ def _huong_dan(db: Session, tu: date, den: date) -> list[dict]:
 # khách thật sự trả lời, bao nhiêu điểm là do nhân viên gõ hộ, bao nhiêu phiếu chấm thấp còn treo,
 # và bao nhiêu chuyến không ai nói gì cả.
 def _cskh_dong(db: Session, tu: date, den: date) -> list[dict]:
-    from app.models.cskh import CareTicket, Complaint
+    from app.models.cskh import CareTicket, Complaint, KN_NHOM
     from app.models.crm import ZaloMessage
     from app.models.core import Tour
     try:
@@ -557,6 +557,40 @@ def _cskh_dong(db: Session, tu: date, den: date) -> list[dict]:
     tu_dong = [c for c in dong_kn
                if c.handler and c.handler in [x for x in (c.closed_by or "").split(",") if x]]
 
+    # ── SỔ KHIẾU NẠI VÀO BÁO CÁO PHÒNG — KN-2, 09/10/2026 ──────────────────────────────────
+    #
+    # Tới hôm nay bảng của phòng CSKH chỉ nói về CHĂM SÓC SAU BÁN: lời mời chấm điểm, phiếu chấm
+    # thấp, chuyến không ai chấm, tin Zalo kẹt. Sổ khiếu nại thì có màn hình riêng và có bảng số
+    # riêng trên ấy, nhưng KHÔNG một con số nào của nó đi vào báo cáo phòng — nên người đọc báo
+    # cáo (trưởng bộ phận, Ban TGĐ, Chủ tịch) không thấy tháng này khách kêu bao nhiêu lần trừ
+    # khi tự mở thêm một màn hình nữa. Một con số phải đi tìm mới thấy thì phần lớn thời gian
+    # không ai thấy.
+    #
+    # DÙNG LẠI ĐÚNG MỘT ĐỊNH NGHĨA 'QUÁ HẠN' của `services/cskh` (vòng KN-1 cùng ngày đã gom hai
+    # bản SQL / Python về một chỗ). Viết lại mệnh đề ấy ở đây là dựng cái đầu THỨ BA, và ba đầu
+    # thì chắc chắn có hai cái lệch — lúc ấy màn hình Khiếu nại nói 7, báo cáo phòng nói 6, không
+    # ai biết bên nào đúng. Phép thử `test_kn2` cấm tệp này tự viết lại mệnh đề.
+    from app.services import cskh as CS
+
+    trong_ky = db.execute(select(Complaint).where(
+        func.date(Complaint.received_at) >= tu,
+        func.date(Complaint.received_at) <= den)).scalars().all()
+    muc3 = [c for c in trong_ky if c.level == 3]
+    tai_mo = [c for c in trong_ky if (c.reopen_reason or "").strip()]
+    # Trễ hạn tính trên những hồ sơ ĐÃ phản hồi. Hồ sơ chưa phản hồi chưa biết sớm hay muộn, và
+    # nhét nó vào mẫu số là tự bôi đen một kỳ chỉ vì kỳ ấy còn việc đang chạy.
+    da_phan_hoi = [c for c in trong_ky if c.first_response_at and c.han_phan_hoi]
+    tre = [c for c in da_phan_hoi if c.first_response_at > c.han_phan_hoi]
+
+    # TỒN ĐỌNG, không cắt theo kỳ — cùng lý do với dòng tin Zalo kẹt ở dưới: một hồ sơ quá hạn
+    # từ tháng trước vẫn đang quá hạn hôm nay, và cắt nó ra khỏi kỳ là giấu đúng cái cần thấy.
+    kn_qua_han = db.execute(select(Complaint).where(CS.dieu_kien_qua_han())).scalars().all()
+
+    theo_nhom = {}
+    for c in trong_ky:
+        theo_nhom[c.nhom] = theo_nhom.get(c.nhom, 0) + 1
+    xep_nhom = sorted(theo_nhom.items(), key=lambda x: (-x[1], x[0]))
+
     return [
         ct("cs_ty_le_tra_loi", "Khách trả lời khảo sát sau tour", ty_le, "tỷ lệ",
            "Số phiếu KHÁCH TỰ CHẤM ÷ số lời mời ĐÃ GỬI THẬT trong kỳ. Tin còn nằm trong hàng đợi "
@@ -605,6 +639,53 @@ def _cskh_dong(db: Session, tu: date, den: date) -> list[dict]:
            viec="Người bị khách chấm thấp cũng là người bấm đóng hồ sơ ấy – đọc lại vài hồ sơ "
                 "trong danh sách trước khi tin vào điểm trung bình của kỳ",
            chi_tiet=[f"{c.code} · {c.customer_name} · người xử lý {c.handler}" for c in tu_dong[:12]]),
+
+        # ── Sổ khiếu nại (KN-2, 09/10/2026) ──
+        ct("kn_moi", "Hồ sơ khiếu nại nhận trong kỳ", len(trong_ky), "hồ sơ",
+           "Đếm hồ sơ có NGÀY NHẬN nằm trong kỳ. Mốc là lúc VTOS nhận, không phải lúc đóng: hồ "
+           "sơ nhận tháng này đóng tháng sau vẫn là tiếng kêu của tháng này",
+           "complaints.received_at",
+           chi_tiet=[f"{c.code} · mức {c.level} · {c.customer_name}" for c in trong_ky[:12]]),
+        ct("kn_qua_han", "Khiếu nại quá hạn chưa phản hồi", len(kn_qua_han), "hồ sơ",
+           "Hồ sơ còn mở, chưa có lần phản hồi đầu tiên, và đã qua hạn phản hồi theo mức độ. "
+           "KHÔNG giới hạn theo kỳ vì đây là tồn đọng — hồ sơ quá hạn từ tháng trước vẫn đang "
+           "quá hạn hôm nay. Dùng chung đúng một mệnh đề với màn hình Khiếu nại",
+           "services/cskh.dieu_kien_qua_han()",
+           muc=_muc(len(kn_qua_han) > 0, "do"),
+           viec="Khách đã chờ quá hạn đã hứa mà chưa ai trả lời — gọi trước, xử lý sau",
+           chi_tiet=[f"{c.code} · mức {c.level} · hạn {c.han_phan_hoi:%d/%m %H:%M} · {c.customer_name}"
+                     for c in kn_qua_han[:12]]),
+        ct("kn_muc3", "Khiếu nại mức 3 nhận trong kỳ", len(muc3), "hồ sơ",
+           "Mức 3 là mức nặng nhất, đóng được phải có hai chữ ký và người xử lý không tự đóng",
+           "complaints.level=3 trong kỳ",
+           muc=_muc(len(muc3) > 0),
+           viec="Mỗi hồ sơ mức 3 là một lần khách mất lòng tin — đọc nguyên văn, đừng đọc con số",
+           chi_tiet=[f"{c.code} · {c.customer_name} · {c.noi_dung[:70]}" for c in muc3[:12]]),
+        ct("kn_tre_phan_hoi", "Phản hồi khách TRỄ hạn", (len(tre) if da_phan_hoi else None), "hồ sơ",
+           "Trong số hồ sơ nhận trong kỳ ĐÃ phản hồi, đếm cái có lần phản hồi đầu muộn hơn hạn. "
+           "Chưa hồ sơ nào phản hồi thì để RỖNG chứ không ghi 0 — chưa đo được khác với đo ra "
+           "không có",
+           "complaints.first_response_at > complaints.han_phan_hoi",
+           muc=_muc(bool(tre)),
+           viec="Hạn phản hồi là lời hứa với khách; trễ đều đặn thì hoặc thiếu người, hoặc hạn "
+                "đặt sai — cả hai đều sửa được, nhưng phải chọn một",
+           chi_tiet=[f"{c.code} · hẹn {c.han_phan_hoi:%d/%m %H:%M} · trả lời {c.first_response_at:%d/%m %H:%M}"
+                     for c in tre[:12]]),
+        ct("kn_tai_mo", "Hồ sơ trong kỳ đã từng bị tái mở", len(tai_mo), "hồ sơ",
+           "Hồ sơ nhận trong kỳ mà có ghi lý do tái mở. Tái mở nghĩa là lần đóng trước đóng hụt",
+           "complaints.reopen_reason khác rỗng",
+           muc=_muc(len(tai_mo) > 0),
+           viec="Đọc lý do tái mở: đóng hụt vì chưa hỏi khách, hay vì phương án không chạy được",
+           chi_tiet=[f"{c.code} · {c.reopen_reason[:80]}" for c in tai_mo[:12]]),
+        ct("kn_nhom_dau", "Nhóm vấn đề bị kêu nhiều nhất trong kỳ",
+           (xep_nhom[0][1] if xep_nhom else None), "hồ sơ",
+           "Gom hồ sơ nhận trong kỳ theo nhóm vấn đề, lấy nhóm đông nhất. Con số là số hồ sơ của "
+           "nhóm ấy; tên nhóm và cả bảng xếp nằm ở phần chi tiết — một con số không nói được nhóm "
+           "nào thì không dùng được",
+           "complaints.nhom trong kỳ",
+           viec="Nhóm đứng đầu lặp lại ba kỳ liền là một việc phải sửa ở quy trình, không phải "
+                "một chuỗi sự cố rời",
+           chi_tiet=[f"{KN_NHOM.get(k, k)}: {n}" for k, n in xep_nhom[:8]]),
     ]
 
 
