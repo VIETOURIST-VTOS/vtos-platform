@@ -189,6 +189,49 @@ GIU_DONG: dict[tuple[str, str], str] = {
         "ĐỔI THÌ ĐỔI Ở BẢNG, KHÔNG ĐỔI Ở ĐÂY: thêm “chutich” vào hrm.TUYEN_KY_DON['doi_xe'] là "
         "một dòng, đọc được, và có người quyết. Thêm `or toan_quyen(u)` vào hàm thì cùng kết quả "
         "mà không ai thấy, và bảng luồng công việc vẫn khai một chuỗi chỉ huy không còn thật.",
+
+    # ---- BỐN CỬA CỦA ĐỢT NS-5, Chủ tịch chốt 09/10/2026 là TÁCH BẠCH TRÁCH NHIỆM ----
+
+    ("services/danh_gia_ns.py", "cham"):
+        "Chấm ba ô B của bản đánh giá nhân sự. ĐÂY LÀ CÙNG MỘT CỬA VỚI `hrm.decide_leave` ở trên, "
+        "chỉ khác tên: tuyến chấm dùng lại đúng `hrm.TUYEN_KY_DON`, tức là chính cái tuyến Chủ "
+        "tịch tự vạch ra cho mình ngày 30/9/2026 — “nghỉ phép, ốm đau, vắng việc sẽ do Huấn duyệt, "
+        "TGĐ và CT THẤY”. Thấy, không ký. Mở cửa chấm cho Chủ tịch mà không mở cửa ký đơn là để "
+        "hai cửa cùng đọc một bảng mà trả lời ngược nhau. "
+        "VÀ NÓ CÒN PHÁ MỘT CÁI NEO. Ba ô A do máy điền tồn tại để hệ thống in ra độ lệch “điểm "
+        "người – điểm máy” theo TỪNG trưởng phòng: ai chấm tay cao hơn số máy đều đặn thì hiện ra "
+        "ngay kỳ sau. Cái neo ấy chỉ có nghĩa khi mỗi phòng có đúng một người chấm. Thêm một người "
+        "chấm được mọi phòng là độ lệch không còn quy về ai, và cột ấy thành một con số không ai "
+        "đọc. "
+        "Chủ tịch KHÔNG mất gì để xem: ông ĐỌC được mọi bản của mọi phòng, và điểm chỉ để XÉT — "
+        "mức thưởng từng người vẫn do TGĐ và Chủ tịch quyết bằng tay, không một dòng mã nào biến "
+        "điểm thành tiền. ĐỔI THÌ ĐỔI Ở `hrm.TUYEN_KY_DON`, một dòng đọc được và có người quyết.",
+
+    ("services/mua_sam_cap_phat.py", "ghi_da_chi"):
+        "Chữ ký THỨ HAI của đề nghị mua, và đây là cửa KHÔNG ĐƯỢC MỞ rõ ràng nhất trong bốn cửa: "
+        "Chủ tịch ĐÃ là người ký vế MỘT — `VAI_DUYET_MUA = (tgd, chutich)`. Người duyệt nói ĐƯỢC "
+        "MUA; Kế toán nói ĐÃ CHI. Cho cùng một người ký cả hai vế thì hai chữ ký còn đúng một, và "
+        "nó sập đúng vào chỗ nguy nhất: một người vừa chuẩn chi vừa xác nhận tiền đã ra. Cùng một "
+        "ranh giới mà `services/chu_ky.py` đã giữ từ Phụ lục 27/8/2026 mục 3.2. "
+        "Chủ tịch vẫn ĐỌC được mọi đề nghị và mọi dòng đã chi; thứ ông không làm là tự tay đóng "
+        "vế hai của chứng từ mình vừa duyệt.",
+
+    ("services/mua_sam_cap_phat.py", "cap_phat"):
+        "Lập biên bản cấp phát tài sản cho nhân viên — CHÍNH CHỦ TỊCH ĐẶT CỬA NÀY ngày 08/10/2026 "
+        "(“cấp phát do HCNS lập”), và lời từ chối trong mã ghi thẳng ngày ấy. Biên bản cấp phát là "
+        "một lời chứng về HIỆN VẬT: ai trao món đồ tận tay thì người ấy ký. Nó không phải một nấc "
+        "quyền, nên mở theo vai trò là hiểu sai loại cửa. "
+        "Thêm một lý do thứ hai cùng họ với cửa ghi-đã-chi ở trên: Chủ tịch nằm trong "
+        "`VAI_DUYET_MUA`, nên mở cửa này ra là một người vừa duyệt mua một món vừa xác nhận món ấy "
+        "đã được trao cho ai — hai đầu của cùng một chuỗi, không còn ai đối chiếu.",
+
+    ("services/mua_sam_cap_phat.py", "ghi_tra"):
+        "Ghi nhận trả lại tài sản — cùng một quyển sổ và cùng một đôi tay với cửa cấp phát ngay "
+        "trên. Ghi trả là một lời chứng về TÌNH TRẠNG món đồ lúc nhận lại, và tình trạng ấy quyết "
+        "định lần cấp cho người tiếp theo. Người trao là người nhận lại thì còn một người chịu "
+        "trách nhiệm về hiện vật; hai đầu hai người thì mất đúng cái ấy. "
+        "ĐỔI THÌ ĐỔI Ở `VAI_CAP_PHAT` của `services/mua_sam_cap_phat.py` — một dòng, đọc được, và "
+        "có người quyết.",
 }
 
 
