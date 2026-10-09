@@ -136,3 +136,7 @@ from app.models.cong_no_vietrip import *  # noqa  # k2-doc-an-toan: dòng NHẬP
 # này thì hai bảng ấy KHÔNG vào Base.metadata khi nạp app.models, và mọi bộ kiểm soi metadata
 # mù đúng phần đó mà vẫn báo xanh – đúng chuyện đã xảy ra với Đội xe ngày 09/9/2026.
 from app.models.quang_cao import *  # noqa
+
+# 09/10/2026 · Đợt E1 – bảng mức độ chặn của từng phép kiểm. Thiếu dòng này thì bảng không vào
+# Base.metadata, create_all không tạo, và alembic autogenerate đòi XOÁ nó.
+from app.models.muc_do_chan import *  # noqa

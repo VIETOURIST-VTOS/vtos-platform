@@ -258,6 +258,8 @@ function KetSo() {
         </div>
       ) : null}
 
+      <MucDoChan />
+
       <style jsx>{`
         .wrap { padding: 16px; max-width: 1000px; }
         .card { border: 1px solid var(--vtos-line); border-radius: 10px; padding: 14px; margin: 14px 0; }
@@ -279,6 +281,148 @@ function KetSo() {
         .warn { color: var(--vtos-warning); background: var(--vtos-warning-bg); padding: 8px 10px; border-radius: 8px; }
       `}</style>
     </div>
+  );
+}
+
+/** Đợt E1 – cửa nhập mức độ chặn và chiều phân tích.
+ *
+ *  Hai bảng này là CHÍNH SÁCH, không phải số liệu, nên chúng ở cùng màn hình kết sổ: người quyết
+ *  một phép kiểm chặn hay không chính là người chịu trách nhiệm kỳ sổ ấy.
+ *
+ *  Ba chỗ trên giao diện là quy tắc chứ không phải trang trí:
+ *    - Ô "Mức" để TRỐNG được, và trống không phải "không chặn" — nó là CHƯA AI ĐẶT, và những
+ *      phép kiểm như vậy hiện thành một dòng đếm riêng ở đầu bảng.
+ *    - Bốn LUẬT CỨNG chỉ hiện ra để đọc, không có ô chọn. Chúng luôn chặn.
+ *    - Cờ chiều phân tích: BẬT thì Kế toán bấm được, TẮT thì máy chủ đòi chữ ký — giao diện không
+ *      giấu nút, vì giấu nút không phải một hàng rào. Máy chủ trả 403 và người dùng đọc được lý do.
+ */
+function MucDoChan() {
+  const { user, toast } = useShell();
+  const [d, setD] = useState<any>(null);
+  const [tk, setTk] = useState<any>(null);
+  const [m, setM] = useState<any>({ ma_phep_kiem: "", ten: "", muc_do: "", nguoi_xu_ly: "",
+                                    han_xu_ly_ngay: "", nguoi_thay_the: "", can_cu: "" });
+  const [maTk, setMaTk] = useState("");
+  const kyDuoc = user?.role === "chutich" || user?.role === "tgd";
+
+  const load = useCallback(async () => {
+    try {
+      setD(await api<any>("/hach-toan/muc-do-chan"));
+      setTk(await api<any>("/hach-toan/tai-khoan-chieu?chi_da_khai=true"));
+    } catch (e) { toast(errMsg(e), true); }
+  }, [toast]);
+  useEffect(() => { load(); }, [load]);
+
+  const dat = async () => {
+    try {
+      const body: any = { ...m };
+      body.han_xu_ly_ngay = m.han_xu_ly_ngay ? Number(m.han_xu_ly_ngay) : null;
+      const r = await api<any>("/hach-toan/muc-do-chan", { method: "POST", json: body });
+      toast(r.message); await load();
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
+  const khai = async (code: string, patch: any) => {
+    try {
+      const r = await api<any>("/hach-toan/tai-khoan-chieu",
+                               { method: "POST", json: { code, ...patch } });
+      toast(r.message); await load();
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
+  if (!d) return null;
+  return (
+    <>
+      <h2 style={{ marginTop: 28 }}>Mức độ chặn của từng phép kiểm</h2>
+      {d.chua_dat_muc?.length ? (
+        <p className="warn">
+          {d.chua_dat_muc.length} phép kiểm chưa ai đặt mức, đang chạy ở mức nhẹ nhất
+          (cảnh báo nhưng cho qua): {d.chua_dat_muc.join(", ")}
+        </p>
+      ) : <p className="small ok">Mọi phép kiểm của đợt này đã có người đặt mức.</p>}
+
+      <p className="small muted">
+        Bốn luật cứng luôn chặn và không đặt mức được: {d.luat_cung.join(" · ")}
+      </p>
+
+      <table><thead><tr>
+        <th>Phép kiểm</th><th>Mức</th><th>Ai xử lý</th><th>Hạn</th><th>Người thay</th>
+        <th>Hiệu lực</th><th>Người ký</th>
+      </tr></thead><tbody>
+        {d.dong.map((r: any) => (
+          <tr key={r.id}>
+            <td>{r.ten}<div className="small muted">{r.ma_phep_kiem}</div></td>
+            <td>{r.muc_do ? d.muc_do[r.muc_do] : <span className="warn">chưa đặt</span>}</td>
+            <td>{r.nguoi_xu_ly || "—"}</td>
+            <td>{r.han_xu_ly_ngay ? `${r.han_xu_ly_ngay} ngày` : "—"}</td>
+            <td>{r.nguoi_thay_the || "—"}</td>
+            <td>{r.ngay_hieu_luc || "ngay"}</td>
+            <td>{r.nguoi_ky || "—"}</td>
+          </tr>
+        ))}
+        {d.dong.length === 0 ? (
+          <tr><td colSpan={7} className="muted">Chưa có dòng nào. Bảng bắt đầu rỗng.</td></tr>
+        ) : null}
+      </tbody></table>
+
+      {kyDuoc ? (
+        <div className="row" style={{ flexWrap: "wrap", marginTop: 10 }}>
+          <input placeholder="mã phép kiểm" value={m.ma_phep_kiem}
+                 onChange={(e) => setM({ ...m, ma_phep_kiem: e.target.value })} style={{ width: 200 }} />
+          <input placeholder="tên đọc được" value={m.ten}
+                 onChange={(e) => setM({ ...m, ten: e.target.value })} style={{ width: 240 }} />
+          <select value={m.muc_do} onChange={(e) => setM({ ...m, muc_do: e.target.value })}>
+            <option value="">— chưa đặt —</option>
+            {Object.entries(d.muc_do).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <input placeholder="vai xử lý" value={m.nguoi_xu_ly}
+                 onChange={(e) => setM({ ...m, nguoi_xu_ly: e.target.value })} style={{ width: 120 }} />
+          <input placeholder="hạn (ngày)" value={m.han_xu_ly_ngay}
+                 onChange={(e) => setM({ ...m, han_xu_ly_ngay: e.target.value })} style={{ width: 100 }} />
+          <input placeholder="vai thay khi quá hạn" value={m.nguoi_thay_the}
+                 onChange={(e) => setM({ ...m, nguoi_thay_the: e.target.value })} style={{ width: 160 }} />
+          <input placeholder="căn cứ" value={m.can_cu}
+                 onChange={(e) => setM({ ...m, can_cu: e.target.value })} style={{ width: 240 }} />
+          <button onClick={dat}>Đặt mức</button>
+        </div>
+      ) : <p className="small muted">Đặt mức là việc của Chủ tịch hoặc TGĐ — hạ một mức chặn là nới một hàng rào.</p>}
+
+      <h2 style={{ marginTop: 28 }}>Chiều phân tích đã khai trên tài khoản</h2>
+      <p className="small muted">
+        {tk ? `${tk.tong} tài khoản, trong đó ${tk.chua_khai_tinh_chat} tài khoản chưa khai tính chất.` : ""}
+        {" "}Trống không phải &quot;dư Nợ&quot; — trống là chưa ai khai, nên phép kiểm số dư bất thường
+        bỏ qua tài khoản ấy.
+      </p>
+      <table><thead><tr>
+        <th>TK</th><th>Tên</th><th>Tính chất</th><th>Đối tượng</th><th>Công trình</th><th>Khoản mục</th>
+      </tr></thead><tbody>
+        {(tk?.dong || []).map((t: any) => (
+          <tr key={t.code}>
+            <td>{t.code}</td><td>{t.name}</td>
+            <td>{t.tinh_chat ? tk.tinh_chat[t.tinh_chat] : <span className="muted">chưa khai</span>}</td>
+            <td>{t.td_doi_tuong ? (t.td_doi_tuong_loai || "tất cả") : "—"}</td>
+            <td>{t.td_cong_trinh ? "bắt buộc" : "—"}</td>
+            <td>{t.td_khoan_muc ? "bắt buộc" : "—"}</td>
+          </tr>
+        ))}
+        {(tk?.dong || []).length === 0 ? (
+          <tr><td colSpan={6} className="muted">Chưa tài khoản nào khai chiều.</td></tr>
+        ) : null}
+      </tbody></table>
+      <div className="row" style={{ marginTop: 10 }}>
+        <input placeholder="số tài khoản" value={maTk}
+               onChange={(e) => setMaTk(e.target.value)} style={{ width: 120 }} />
+        <button className="ghost" onClick={() => khai(maTk, { td_cong_trinh: true })}>
+          Bắt buộc mã tour
+        </button>
+        <button className="ghost" onClick={() => khai(maTk, { td_doi_tuong: true })}>
+          Bắt buộc đối tượng
+        </button>
+        <button className="ghost" onClick={() => khai(maTk, { td_khoan_muc: true })}>
+          Bắt buộc khoản mục
+        </button>
+      </div>
+    </>
   );
 }
 

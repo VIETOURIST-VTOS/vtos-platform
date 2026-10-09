@@ -51,6 +51,9 @@ CUA_TAY = (
     "danh_gia_nhan_su",      # /hr thẻ "Đánh giá & sự vụ" — trưởng phòng chấm
     "de_nghi_mua",           # /de-nghi-mua — mọi phòng gửi, TGĐ/Chủ tịch duyệt, Kế toán ghi đã chi
     "cap_phat_tai_san",      # /tai-san — HCNS lập biên bản cấp phát
+    # Đợt E1 (09/10/2026). CỬA TAY trên màn hình /ket-so. Bảng bắt đầu rỗng và PHẢI rỗng: mỗi
+    # dòng là một mức chặn có người ký, nên máy nạp sẵn một dòng là máy tự đặt mức hộ người.
+    "muc_do_chan",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
     "auto_reports", "ban_doc_chung_tu", "bang_gia", "bang_gia_dong", "bank_accounts_cat",
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",
