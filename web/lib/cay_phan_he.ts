@@ -352,7 +352,11 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       // là báo cáo DO NHÂN VIÊN VIẾT, không phải báo cáo VỀ nhân sự: không có số đầu người, không có
       // biến động tăng giảm, không có bảng hợp đồng sắp hết hạn (bảng ấy nằm ở mục 5.3). Giữ đường
       // dẫn vì nó vẫn là chỗ người ta đang vào, nhưng tên phải nói đúng cái mở ra.
-      { ma: "5.8", ten: "Báo cáo nhân sự — hiện là báo cáo công việc & ca trực, chưa có báo cáo biến động", href: "/reports" },
+      // 09/10/2026 — DỰNG THẬT, và ĐỔI ĐƯỜNG DẪN. Trước bản này mục trỏ về /reports, nơi có ba thẻ
+      // báo cáo DO NHÂN VIÊN VIẾT (báo cáo công việc của tôi, tổng hợp phòng, ca trực) — không phải
+      // báo cáo VỀ nhân sự: không đầu người, không tăng giảm, không cơ cấu. Nay báo cáo biến động
+      // đứng ở thẻ "Tổng quan HCNS" của màn hình Nhân sự, nên mục trỏ thẳng về đó.
+      { ma: "5.8", ten: "Báo cáo biến động nhân sự — đầu kỳ, tăng, giảm, cơ cấu, tỷ lệ nghỉ việc", href: "/hr?tab=tong_quan" },
       { ma: "5.9", ten: "Hành chính",
         con: [
           { ma: "5.9.1", ten: "Văn bản & quy trình", href: "/params" },

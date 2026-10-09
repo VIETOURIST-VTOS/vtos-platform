@@ -388,6 +388,10 @@ MAN_HINH_API = {
     "/hr": ("/api/v1/hr", "/api/v1/employees", "/api/v1/payroll", "/api/v1/payroll-runs",
             "/api/v1/incidents", "/api/v1/incident-levels", "/api/v1/companies", "/api/v1/users",
             "/api/v1/attendance", "/api/v1/bhxh", "/api/v1/staff", "/api/v1/doan-vien",
+            # 5.8 Báo cáo biến động nhân sự (09/10/2026). Đi theo thẻ "Tổng quan HCNS" của
+            # chính màn hình này: cùng một tập người, cùng một nhóm người đọc. Dựng màn hình
+            # riêng là tách hai thứ phải đọc cạnh nhau ra hai chỗ.
+            "/api/v1/bien-dong-ns",
             # 5.6 Đánh giá nhân sự (09/10/2026). Đi theo thẻ "Đánh giá & sự vụ" của chính màn hình
             # này, dùng lại HR_TAB_ROLES["incidents"] — không khai bộ vai thứ hai. Cửa "bản của
             # tôi" KHÔNG ở đây: nó mở cho cả công ty, xem /cham-cong ngay dưới.
