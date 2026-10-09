@@ -1056,12 +1056,26 @@ MENU_ROLES = {
     "/ke-hoach-thang": BASE_VIEW + ("ketoan", "cntt"),
     # V6 – chuỗi bán hàng. Bảng giá là CHÍNH SÁCH nên hẹp hơn báo giá: từng sale soạn báo giá
     # được, nhưng đặt giá niêm yết thì không.
-    "/bang-gia": BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt", "ketoan", "cntt"),
+    #
+    # PD-1 · 09/10/2026 — thêm `ptgd_doan` (Chủ tịch chốt). Hai P.TGĐ đang lệch nhau ở đúng hai
+    # màn hình NGOÀI Marketing, và cả hai đều thuộc chuỗi bán hàng: bảng giá và hợp đồng khách.
+    # Bảng giá là con số mà mọi báo giá của mảng Đoàn phải theo; người phụ trách mảng ấy không
+    # đọc được chính sách giá thì duyệt báo giá bằng gì.
+    "/bang-gia": BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt", "ptgd_doan", "ketoan", "cntt"),
     "/bao-gia": BASE_VIEW + SALES_ADMIN + ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "ptgd_mkt", "nv_mkt",
                              "tp_dh", "nv_dh", "ptgd_doan", "ketoan", "cntt"),
     # Hợp đồng là căn cứ ghi nhận doanh thu nên Kế toán phải xem được.
+    #
+    # PD-1 · 09/10/2026 — thêm `ptgd_doan` (Chủ tịch chốt). Đây là chỗ lệch rõ nhất của cả bảng:
+    # `nv_kd` — một nhân viên bán hàng — xem được hợp đồng khách, còn P.TGĐ phụ trách mảng Đoàn
+    # thì không. Hợp đồng là căn cứ ghi nhận doanh thu CỦA CHÍNH MẢNG ông chịu trách nhiệm.
+    #
+    # MỞ MÀN HÌNH KHÔNG PHẢI MỞ QUYỀN, và lần này câu ấy kiểm được: ba màn hình của chuỗi bán
+    # hàng (`/bang-gia`, `/bao-gia`, `/hop-dong-khach`) dùng CHUNG đúng một tiền tố
+    # `/api/v1/ban-hang`, mà ông đã có sẵn từ `/bao-gia`. Nên số phạm vi vai trò ở `test_p2`
+    # KHÔNG đổi, và không có chuyện "màn hình mở mà cửa trả 403" — đúng bệnh vòng DH-1 đi chữa.
     "/hop-dong-khach": BASE_VIEW + SALES_ADMIN + ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "ptgd_mkt",
-                                    "ketoan", "cntt"),
+                                    "ptgd_doan", "ketoan", "cntt"),
     # Bảng quy ước hạch toán + cổng chặn giá vốn. Điều hành (tp_dh) xem được vì hàng đợi thiếu giá vốn
     # đứng tên phòng họ – bắt một phòng trả lời mà không cho họ nhìn thấy việc là cách chắc chắn để không ai trả lời.
     # Kết sổ một kỳ: sao kê vào sổ hàng loạt, kết chuyển, và trạng thái cả kỳ. Chỉ Kế toán GHI –
