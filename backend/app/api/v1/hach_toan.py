@@ -321,6 +321,7 @@ def khai_chieu(data: ChieuIn, u: User = Depends(require_roles(*XEM)),
 # PHAM_VI_DA_CHOT KHÔNG đổi một số. Không tự khai thêm một lát quyền nào.
 # ══════════════════════════════════════════════════════════════════════════════════════════
 from datetime import datetime as _dt                             # noqa: E402
+from sqlalchemy import select as _select                         # noqa: E402
 from app.models.muc_do_chan import MUC_DO as _MUC_DO             # noqa: E402
 from app.models.muc_do_chan import MUC_DO_KHI_CHUA_KHAI as _MAC_DINH   # noqa: E402
 from app.models.tach_nhiem import CapTachNhiem as _CTN           # noqa: E402
@@ -342,7 +343,7 @@ class CapIn(BaseModel):
 @router.get("/cap-tach-nhiem")
 def xem_cap_tach_nhiem(u: User = Depends(require_roles(*XEM, mo_ta="cặp tách bạch trách nhiệm")),
                        db: Session = Depends(get_db)):
-    ds = db.execute(select(_CTN).order_by(_CTN.ma_cap)).scalars().all()
+    ds = db.execute(_select(_CTN).order_by(_CTN.ma_cap)).scalars().all()
     return {
         "cac_cap": [{
             "ma_cap": c.ma_cap, "buoc_a": c.buoc_a, "buoc_b": c.buoc_b, "ten": c.ten,
@@ -367,7 +368,7 @@ def khai_cap_tach_nhiem(data: CapIn,
         raise HTTPException(422, f"Mức độ không hợp lệ. Nhận: {', '.join(_MUC_DO)}")
 
     la_ky = u.role in KY
-    c = db.execute(select(_CTN).where(_CTN.ma_cap == data.ma_cap)).scalars().first()
+    c = db.execute(_select(_CTN).where(_CTN.ma_cap == data.ma_cap)).scalars().first()
     noi = []
     if c is None:
         c = _CTN(ma_cap=data.ma_cap, buoc_a=data.buoc_a.strip(), buoc_b=data.buoc_b.strip())
