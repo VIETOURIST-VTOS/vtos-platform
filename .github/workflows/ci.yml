@@ -123,10 +123,26 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker compose build
 
-  # CỬA HẸP — chỉ khi đẩy vào main/develop. Đây là cửa BÁO, và nó chỉ soi chuyện hai làn đụng nhau.
+  # CỬA HẸP — 12 giây. Từ 09/10/2026 chạy CẢ trên PR, KHÔNG chỉ sau khi gộp.
+  #
+  # VÌ SAO ĐỔI. Trước đó việc này khai `if: github.event_name == 'push'`, nên nó chỉ chạy SAU khi
+  # mã đã vào kho: nó BÁO, chứ không CHẶN được gì. Ngày 09/10/2026 main đỏ đúng vì thế — hai làn
+  # cùng giữ `backend/app/services/access.py` (dòng VB-1 của làn Phân quyền và dòng PD-1 của làn
+  # Vòng đều còn `đang làm`), và `test_giu_cho_lan` đỏ.
+  #
+  # Điều đáng nói: cửa chặn ĐÃ CÓ mà bị đi vòng. Bộ đủ trên PR #268 CÓ chạy `test_giu_cho_lan` và
+  # SẼ đỏ, nhưng nó mất ~37 phút, còn PR được gộp vài phút sau khi mở — lượt ấy đến lúc main đã đỏ
+  # vẫn còn trạng thái "In progress". Một cửa chặn mà không ai chờ nổi thì trên thực tế là không có.
+  #
+  # Nên cửa hẹp nay chạy cả trên PR: 12 giây thì chờ được, và chờ được thì nó CHẶN. Bộ đủ ~37 phút
+  # vẫn KHÔNG chạy lại trên main (test_ci4 canh điều ấy), nên giá phải trả là ~50 giây Actions mỗi
+  # PR, không phải 37 phút. Bật "Require status checks" cho RIÊNG việc này ở Settings của kho thì
+  # mọi lần gộp bị chặn 12 giây thay vì 37 phút — việc ấy nằm ngoài tệp này.
+  #
+  # KHÔNG khai `if:` ở việc này, và đó là chủ ý: bỏ trống là chạy trên push, pull_request và cả
+  # workflow_dispatch. `test_ci7` đỏ nếu ai khai lại một điều kiện chặn nó khỏi push hay khỏi PR.
   # Giữ NGUYÊN TÊN TỆP ở dòng `pytest` bên dưới: test_ci_hang_rao_main.py đọc đúng dòng ấy.
   hang-rao-gop:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: backend } }
     steps:
@@ -135,4 +151,23 @@ jobs:
         with: { python-version: "3.12", cache: pip }
       - run: pip install -r requirements-dev.txt
       - run: ruff check app --select E9,F63,F7,F82
+      # BƯỚC NÀY CÓ HAI BẢN, Ở HAI VIỆC — và `test_ci6` bắt phải thế.
+      #
+      # `test_giu_cho_nhanh.py` nằm trong danh sách hàng rào bên dưới, và luật `gn1` của nó BẮT
+      # BUỘC phải thấy danh sách tệp nhánh đổi khi đang chạy trên pull_request. Việc `backend`
+      # tính danh sách ấy cho bộ đủ; việc này chạy ở một máy khác nên phải tự tính lại. Thiếu
+      # bước này thì cửa hẹp đỏ trên MỌI PR — đỏ vì thiếu môi trường, không vì có lỗi thật, và
+      # đó là kiểu đỏ làm người ta tắt hàng rào.
+      #
+      # `test_ci6` không đếm hai bản: nó đọc từng việc, và việc nào chạy hàng rào giữ chỗ nhánh
+      # thì việc ấy phải đặt `VTOS_TEP_DOI`. Thêm việc thứ ba cũng tự động bị soi.
+      - name: Tep nhanh nay doi
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+          git diff --name-only FETCH_HEAD HEAD > "$GITHUB_WORKSPACE/_tep_doi.txt"
+          echo "VTOS_TEP_DOI=$GITHUB_WORKSPACE/_tep_doi.txt" >> "$GITHUB_ENV"
+          echo "--- nhanh nay doi $(wc -l < "$GITHUB_WORKSPACE/_tep_doi.txt") tep ---"
+          cat "$GITHUB_WORKSPACE/_tep_doi.txt"
       - run: python -m pytest -q tests/test_mach_migration.py tests/test_menu.py tests/test_p11_khai_quyen_phai_co_man_hinh.py tests/test_ks_ma_tran.py tests/test_p2_pham_vi_vai_tro.py tests/test_giu_cho_lan.py tests/test_giu_cho_nhanh.py tests/test_ks_do_dai.py tests/test_ks2_khai_quyen_may_doc_duoc.py tests/test_ks_cua_nhap.py tests/test_man_hinh_co_cua_nhap.py
