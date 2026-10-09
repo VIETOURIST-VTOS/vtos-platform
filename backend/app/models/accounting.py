@@ -21,6 +21,28 @@ class Account(Base):
     pl_code: Mapped[str] = mapped_column(String(6), default="")           # mã chỉ tiêu KQKD (01, 11, 22, 23, 25, 26, 31, 32, 51)
     misa: Mapped[bool] = mapped_column(Boolean, default=False)            # có trên sổ MISA của Vietourist
 
+    # ───── Đợt E1 (09/10/2026) · CHIỀU PHÂN TÍCH KHAI NGAY TRÊN TÀI KHOẢN ─────
+    # Học từ MISA: form tài khoản của họ có khối "Theo dõi chi tiết theo" gồm các ô tích, và bộ
+    # ghi sổ đọc chính khai báo ấy. Một nơi khai, mọi nơi đọc.
+    #
+    # Trước bản này `journal_lines` đã có ba cột chiều (partner_code, project_code, item_code)
+    # nhưng KHÔNG nơi nào nói tài khoản nào bắt buộc chiều nào — nên quy ước và bộ kiểm kết sổ
+    # nói hai điều khác nhau về TK3388 mà không chỗ nào là nguồn (P1·07, rà soát 09/10/2026).
+    #
+    # CHỈ BA CỜ, vì journal_lines chỉ có ba cột để kiểm. Bảy chiều còn lại của MISA chờ Đợt E3
+    # mở cột rồi mới khai cờ — một cờ không có cột là một cờ bật được mà không kiểm được gì.
+    #
+    # tinh_chat ĐỂ TRỐNG cho 273 tài khoản đang có: trống = CHƯA AI KHAI, không phải "dư Nợ".
+    # Khác hẳn cột `kind` ở trên — kind là phân loại báo cáo (TS/NV/DT/CP/XD), tinh_chat là
+    # chiều số dư, dùng cho phép kiểm số dư bất thường.
+    tinh_chat: Mapped[str | None] = mapped_column(String(12), nullable=True)   # du_no / du_co / luong_tinh
+    co_ngoai_te: Mapped[bool] = mapped_column(Boolean, default=False)
+    ngung_su_dung: Mapped[bool] = mapped_column(Boolean, default=False)
+    td_doi_tuong: Mapped[bool] = mapped_column(Boolean, default=False)
+    td_doi_tuong_loai: Mapped[str] = mapped_column(String(10), default="")     # kh / ncc / nv / tat_ca
+    td_cong_trinh: Mapped[bool] = mapped_column(Boolean, default=False)        # mã công trình = mã tour
+    td_khoan_muc: Mapped[bool] = mapped_column(Boolean, default=False)
+
 
 class JournalEntry(Base):
     """Chứng từ ghi sổ. Sinh tự động từ nghiệp vụ (robot R2) hoặc Kế toán lập tay. Đã ghi sổ thì không sửa – chỉ lập bút toán đảo."""
