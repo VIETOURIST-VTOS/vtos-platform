@@ -102,7 +102,20 @@ def test_man_hinh_cham_cong_khai_du_hai_bang_va_khong_khai_thua():
     # được màn hình nó không thấy. Robot không nằm trong nhóm người: nó không nghỉ phép.
     assert set(AC.MENU_ROLES["/cham-cong"]) == set(AC.MOI_NHAN_VIEN) | set(AC.READ_ALL), \
         "màn hình đơn nghỉ phải mở cho mọi người làm việc ở đây (MOI_NHAN_VIEN) cộng nhóm đọc toàn hệ"
+    # ĐỌC CẢ CÁC THÀNH PHẦN TRANG NÀY NHẬP VÀO, không chỉ hai tệp viết tay.
+    #
+    # Sửa 09/10/2026, và lý do đáng ghi: bản cũ ghim đúng `page.tsx` + `DonNghiPhep.tsx`. Ngày màn
+    # hình mọc thêm một khối — khối "Đánh giá của tôi" của mục 5.6 — thì cửa mới nằm trong thành
+    # phần thứ ba và hàng rào đỏ, dù màn hình gọi cửa ấy thật. Một hàng rào đỏ vì người ta làm
+    # ĐÚNG sẽ bị sửa cho hết đỏ, và lần sửa ấy thường là nới chỗ nó đang canh. Nên nó đi THEO
+    # dòng `import ... from "@/components/..."` của chính trang, và giữ nguyên câu hỏi cũ: mọi
+    # tiền tố khai cho màn hình này phải có người gọi thật.
+    import re as _re
     nguon = _tep(TRANG_CC) + _tep(TP_DON)
+    for ten in _re.findall(r'from "@/components/([A-Za-z0-9_]+)"', _tep(TRANG_CC)):
+        tp = WEB / "components" / f"{ten}.tsx"
+        if tp.exists():
+            nguon += _tep(tp)
     for tien_to in AC.MAN_HINH_API["/cham-cong"]:
         duong = tien_to.replace("/api/v1", "")
         assert duong in nguon, f"khai {tien_to} cho /cham-cong mà màn hình không gọi tới"

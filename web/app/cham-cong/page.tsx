@@ -1,6 +1,10 @@
 "use client";
 import Shell from "@/components/Shell";
 import DonNghiPhep from "@/components/DonNghiPhep";
+// 5.6 · 09/10/2026 — "nhan vien duoc thay cua minh" (Chu tich chot 08/10). Khoi nay dung o
+// DAY chu khong o /hr vi /hr chi mo cho sau vai; dat o /hr thi hoac phai noi /hr cho ca cong
+// ty (mo luon ho so nhan su va bang luong), hoac nhan vien khong voi toi ban cua chinh minh.
+import { DanhGiaCuaToi } from "@/components/DanhGiaNhanSu";
 
 /** Đơn nghỉ phép của tôi — mục 5.4b cây phân hệ, dựng 08/10/2026.
  *
@@ -23,6 +27,7 @@ function ChamCong() {
       màn hình <b>Lương, thưởng &amp; hoa hồng</b>, và chỗ hai số lệch nhau được đếm ra ở chính màn
       hình ấy. Lưới chấm công tháng nằm ở màn hình <b>Chấm công &amp; nghỉ phép</b> của Nhân sự, vì chỉ Nhân sự ghi được.</p>
     <DonNghiPhep />
+    <DanhGiaCuaToi />
   </>);
 }
 

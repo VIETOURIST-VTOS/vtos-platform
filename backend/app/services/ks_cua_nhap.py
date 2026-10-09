@@ -44,6 +44,13 @@ CUA_TAY = (
     "quyen_truy_cap_ho_so",
     "lich_su_to_chuc",
     "chi_ky_luong",
+    # Ba bảng HCNS mở 09/10/2026. Cả ba là CỬA TAY, và không bảng nào được khai MAY_SINH — kể cả
+    # bảng đánh giá, nơi ba ô A do máy điền sẵn: ba ô ấy chỉ là GIÁ TRỊ máy tính ra, còn DÒNG thì
+    # vẫn do trưởng phòng mở và ba ô B vẫn do người chấm. Khai nó là máy sinh thì ngày không ai
+    # chấm, bảng rỗng mà không bộ đếm nào kêu.
+    "danh_gia_nhan_su",      # /hr thẻ "Đánh giá & sự vụ" — trưởng phòng chấm
+    "de_nghi_mua",           # /de-nghi-mua — mọi phòng gửi, TGĐ/Chủ tịch duyệt, Kế toán ghi đã chi
+    "cap_phat_tai_san",      # /tai-san — HCNS lập biên bản cấp phát
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
     "auto_reports", "ban_doc_chung_tu", "bang_gia", "bang_gia_dong", "bank_accounts_cat",
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",

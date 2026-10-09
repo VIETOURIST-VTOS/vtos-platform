@@ -495,7 +495,12 @@ export const GROUPS: Group[] = [
     ["Báo cáo công việc", "/reports"],
     ["Chính sách & quy trình", "/params"],
     ["IR – Pháp chế", "/ir-phap-che"],
-    ["Tài sản & mua sắm", "/tai-san"],
+    ["Tài sản & cấp phát", "/tai-san"],
+    // 5.9.2 · 09/10/2026 — MỤC RIÊNG, không nhập vào "/tai-san". Mục trên mở cho sáu vai (Kế toán,
+    // CNTT, hành chính, HCNS và hai vai nền); mục này mở cho MỌI người làm việc ở đây, vì người đề
+    // nghị mua là người của mọi phòng. Một mục menu chở được một tập vai, nên gộp hai việc vào một
+    // mục là hoặc chín phòng không thấy đường gửi, hoặc cả công ty nhìn thấy sổ tài sản.
+    ["Đề nghị mua", "/de-nghi-mua"],
   ] },
 
   { key: "taichinh", label: "Tài chính – Kế toán", icon: "taichinh", href: "/phan-he/taichinh", blocks: [

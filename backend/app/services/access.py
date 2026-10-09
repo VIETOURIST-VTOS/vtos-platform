@@ -378,12 +378,20 @@ MAN_HINH_API = {
     # ở thẻ Chấm công của màn hình /hr, nơi tiền tố ấy đã khai từ trước và người GHI được nó đã có mặt.
     # Khai thêm ở đây là cho cả 22 vai mang trong phạm vi một cửa máy chủ TỪ CHỐI họ (`GET /attendance`
     # đòi HR_READ, `POST` đòi HR_ADMIN) – phạm vi vai trò CỘNG RA từ bảng này, nên đó là một lần nới thật.
-    "/cham-cong": ("/api/v1/leaves", "/api/v1/leave-balance"),
+    # `/api/v1/danh-gia-cua-toi` vào đây 09/10/2026, KHÔNG vào /hr. Chủ tịch chốt 08/10 "nhân viên
+    # được thấy của mình"; /hr chỉ mở cho sáu vai, nên đặt cửa ấy ở /hr thì hoặc phải nới /hr cho
+    # cả công ty (mở luôn hồ sơ nhân sự và bảng lương), hoặc nhân viên không với tới. Màn hình này
+    # đã mở cho MOI_NHAN_VIEN từ 08/10, nên 0 dòng đổi trong MENU_ROLES.
+    "/cham-cong": ("/api/v1/leaves", "/api/v1/leave-balance", "/api/v1/danh-gia-cua-toi"),
     "/hop-dong-lao-dong": ("/api/v1/employees", "/api/v1/hrm", "/api/v1/labor-contracts",
                            "/api/v1/dependents", "/api/v1/leaves", "/api/v1/leave-balance"),
     "/hr": ("/api/v1/hr", "/api/v1/employees", "/api/v1/payroll", "/api/v1/payroll-runs",
             "/api/v1/incidents", "/api/v1/incident-levels", "/api/v1/companies", "/api/v1/users",
-            "/api/v1/attendance", "/api/v1/bhxh", "/api/v1/staff", "/api/v1/doan-vien"),
+            "/api/v1/attendance", "/api/v1/bhxh", "/api/v1/staff", "/api/v1/doan-vien",
+            # 5.6 Đánh giá nhân sự (09/10/2026). Đi theo thẻ "Đánh giá & sự vụ" của chính màn hình
+            # này, dùng lại HR_TAB_ROLES["incidents"] — không khai bộ vai thứ hai. Cửa "bản của
+            # tôi" KHÔNG ở đây: nó mở cho cả công ty, xem /cham-cong ngay dưới.
+            "/api/v1/danh-gia-ns"),
     "/huong-dan": ("/api/v1/huong-dan", "/api/v1/guide-rates", "/api/v1/guide-assignments"),
     "/inbox": ("/api/v1/inbox", "/api/v1/facebook", "/api/v1/zalo"),
     "/khieu-nai": ("/api/v1/khieu-nai", "/api/v1/cskh", "/api/v1/bookings", "/api/v1/payment-requests"),
@@ -522,7 +530,14 @@ MAN_HINH_API = {
     "/doi-soat-marketing": ("/api/v1/doi-soat-marketing",),
     "/robot-reports": ("/api/v1/auto-reports",),
     "/sales-reports": ("/api/v1/sales-reports",),
-    "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid"),
+    # 5.9.3 Cấp phát tài sản (09/10/2026) ở lại đây: Chủ tịch chốt "cấp phát tài sản do HCNS làm",
+    # và HCNS đã có màn hình này. 5.9.2 Đề nghị mua thì KHÔNG — xem màn hình /de-nghi-mua.
+    "/tai-san": ("/api/v1/assets", "/api/v1/fixed-assets", "/api/v1/prepaid", "/api/v1/cap-phat"),
+    # 5.9.2 Đề nghị mua — MÀN HÌNH MỚI 09/10/2026. Người đề nghị mua là người của MỌI phòng; gắn
+    # cửa ấy vào /tai-san (chỉ Kế toán, CNTT, hành chính, HCNS mở được) thì chín phòng còn lại
+    # không có đường gửi và họ sẽ nhắn Zalo như hôm nay. Mở MÀN HÌNH rộng không phải mở QUYỀN:
+    # duyệt vẫn chỉ TGĐ/Chủ tịch, ghi đã chi vẫn chỉ Kế toán, chặn ở tầng dịch vụ.
+    "/de-nghi-mua": ("/api/v1/de-nghi-mua",),
     # Hồ sơ tài xế: MỘT cửa và chỉ đọc. Sửa hồ sơ ở Nhân sự, nạp bằng lái ở bộ nạp tệp, gán xe
     # ở màn hình Đội xe – nên ở đây không mở thêm tiền tố nào của ba nơi ấy.
     "/tai-xe": ("/api/v1/tai-xe",),
@@ -953,6 +968,10 @@ MENU_ROLES = {
     # tập hồ sơ đội xe; mở lệch nhau là mở một đường vòng vào thứ mình vừa đóng ở cửa kia.
     "/tai-xe": BASE_VIEW + OPERATIONS + FLEET_MGR + ("ketoan", "hcns", "cntt"),
     "/tai-san": BASE_VIEW + ("ketoan", "cntt", "hanh_chinh", "hcns"),
+    # 5.9.2 Đề nghị mua — mở cho MỌI NGƯỜI LÀM VIỆC Ở ĐÂY, cùng khuôn với /cham-cong. `+ READ_ALL`
+    # không phải cho gọn: `robot_ks` phải có mặt ở MỌI dòng của bảng này (test_ma_tran_quyen canh
+    # đúng điều đó), và lớp READ_ONLY_ROLES chặn mọi thao tác ghi của nó nên có mặt là vô hại.
+    "/de-nghi-mua": MOI_NHAN_VIEN + READ_ALL,
 
     # --- Hành chính & Nhân sự (tách quyền theo tab, xem HR_TAB_ROLES) ---
     "/hr": HR_TAB_ROLES["payroll"] + HR_TAB_ROLES["employees"] + HR_TAB_ROLES["incidents"]
