@@ -44,8 +44,10 @@ def _chuan_ten(s: str) -> str:
 
 
 def ma_moi(db: Session) -> str:
-    n = db.execute(select(func.count()).select_from(MktKol)).scalar() or 0
-    return f"KOL-{n + 1:04d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, MktKol, "KOL-", 4, cot="ma")
 
 
 def _kiem_kol(db: Session, d: dict, tru_id: int | None = None) -> None:

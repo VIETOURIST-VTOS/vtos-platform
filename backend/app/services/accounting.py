@@ -104,8 +104,10 @@ def _company_of_tour(db: Session, tour_id):
 
 
 def _next_code(db: Session, prefix: str, d: date) -> str:
-    n = db.execute(select(func.count()).select_from(JournalEntry)).scalar() + 1
-    return f"{prefix}{d:%y%m}-{n:04d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng cả bảng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, JournalEntry, f"{prefix}{d:%y%m}-", 4)
 
 
 def post_entry(db: Session, actor: str, role: str, entry_date: date, description: str, lines: list[dict],

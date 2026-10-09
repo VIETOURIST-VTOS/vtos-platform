@@ -218,10 +218,11 @@ def bang(db: Session, loai: str = "", trang_thai: str = "",
 
 def ma_moi(db: Session, luc: datetime | None = None) -> str:
     d = luc or datetime.now()
+    # Lọc theo tiền tố là ĐÚNG RỒI, nhưng ĐẾM số dòng khớp thì vẫn hỏng khi có dòng bị xoá:
+    # số lùi một bước và mã kế tiếp đụng một mã đang còn sống. Lấy số LỚN NHẤT thì không.
+    from app.services.ma_tu_sinh import tiep_theo
     dau = f"PR-{d:%Y-%m}-"
-    n = db.execute(select(func.count()).select_from(PrHoatDong)
-                   .where(PrHoatDong.ma.like(dau + "%"))).scalar() or 0
-    return f"{dau}{n + 1:04d}"
+    return tiep_theo(db, PrHoatDong, dau, 4, cot="ma")
 
 
 def kiem_du_lieu(db: Session, r: dict, tu_tay: bool = False) -> None:

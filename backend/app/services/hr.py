@@ -610,5 +610,9 @@ def guide_eligible(e: Employee, on: date) -> tuple[bool, str]:
 
 
 def next_code(db: Session, model, prefix: str, width: int = 4) -> str:
-    n = db.execute(select(func.count()).select_from(model)).scalar() + 1
-    return f"{prefix}{n:0{width}d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng cả bảng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    # Riêng bảng `employees` còn một lý do thứ hai: nó chứa cả NS#### do người lập lẫn VT####
+    # do robot Vietrip nạp. Đếm cả bảng thì mỗi lần robot nạp một người là dãy NS nhảy một quãng.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, model, prefix, width)

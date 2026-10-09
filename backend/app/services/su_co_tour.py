@@ -33,8 +33,10 @@ DONG = ("tp_dh", "ptgd_doan", "tgd", "chutich")
 
 
 def next_code(db: Session) -> str:
-    n = db.execute(select(func.count()).select_from(SuCoTour)).scalar() + 1
-    return f"SC{date.today():%y%m}-{n:03d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng cả bảng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, SuCoTour, f"SC{date.today():%y%m}-", 3)
 
 
 def han_theo_muc(db: Session, muc: int, tu: datetime | None = None) -> datetime:

@@ -22,8 +22,10 @@ DUYET = ("ptgd_mkt", "tgd", "chutich")      # ai được đưa chiến dịch v
 
 
 def next_code(db: Session) -> str:
-    n = db.execute(select(func.count()).select_from(Campaign)).scalar() + 1
-    return f"CD{date.today():%y%m}-{n:02d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng cả bảng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, Campaign, f"CD{date.today():%y%m}-", 2)
 
 
 def kiem_du_lieu(d: dict) -> None:
@@ -372,8 +374,10 @@ ND_CHUYEN = {"nhap": ("cho_duyet",), "cho_duyet": ("nhap",), "cho_ky_2": ("nhap"
 
 
 def nd_next_code(db: Session) -> str:
-    n = db.execute(select(func.count()).select_from(ContentItem)).scalar() + 1
-    return f"ND{date.today():%y%m}-{n:03d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng cả bảng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, ContentItem, f"ND{date.today():%y%m}-", 3)
 
 
 def nd_can_ky_2(n: ContentItem) -> bool:
