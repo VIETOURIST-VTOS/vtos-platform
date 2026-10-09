@@ -140,3 +140,4 @@ from app.models.quang_cao import *  # noqa
 # 09/10/2026 · Đợt E1 – bảng mức độ chặn của từng phép kiểm. Thiếu dòng này thì bảng không vào
 # Base.metadata, create_all không tạo, và alembic autogenerate đòi XOÁ nó.
 from app.models.muc_do_chan import *  # noqa
+from app.models.tach_nhiem import *  # noqa

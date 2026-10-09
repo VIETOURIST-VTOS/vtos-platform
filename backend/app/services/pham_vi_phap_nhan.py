@@ -298,6 +298,20 @@ CO_Y_KHONG_LOC = {
     "User":     "danh sách tài khoản chỉ mở cho quản trị (/access); lọc ở đây là giấu tài khoản "
                 "khỏi đúng người có nhiệm vụ đi gán pháp nhân cho chúng",
     "Employee": "hồ sơ nhân sự do HCNS quản lý tập trung; HCNS làm việc trên cả tập đoàn",
+    # Đợt E2a — tách bạch trách nhiệm. Cả hai bảng CỐ Ý không lọc, và lý do khác nhau:
+    #
+    # `CapTachNhiem` là QUY CHẾ, không phải chứng từ. Một quy chế "người ký lệnh chi khác người
+    # bấm ĐÃ CHI" đúng cho mọi pháp nhân trong tập đoàn; cắt theo pháp nhân là mở đường cho một
+    # pháp nhân tự hạ mức kiểm soát của riêng mình mà Holdings không nhìn thấy.
+    #
+    # `BuocDaLam` là DẤU CHÂN của người, và người thì đi qua nhiều pháp nhân — đúng lập luận đã
+    # ghi ở dòng Employee ngay trên. Nguy hơn nữa: cắt dấu chân theo pháp nhân thì một người ký
+    # lệnh ở pháp nhân A rồi bấm ĐÃ CHI ở pháp nhân B sẽ KHÔNG bị bắt, vì bộ kiểm không còn nhìn
+    # thấy nửa kia. Lọc ở đây là tự tay mở lại đúng cái lỗ bảng này sinh ra để bịt.
+    "CapTachNhiem": "quy chế tách bạch trách nhiệm áp cho cả tập đoàn; cắt theo pháp nhân là cho "
+                    "một pháp nhân tự hạ mức kiểm soát của mình mà Holdings không thấy",
+    "BuocDaLam":    "dấu chân của NGƯỜI; cắt theo pháp nhân thì một người làm hai bước ở hai pháp "
+                    "nhân sẽ không bị bắt — đúng cái lỗ bảng này sinh ra để bịt",
     # Đợt C – LỊCH SỬ của chính hồ sơ ấy, nên đi cùng họ với nó. Cột `company_id` ở đây có
     # nghĩa thật (pháp nhân trả lương trong chặng đó) và chính là thứ cần để trả lời "tháng
     # ấy người này ăn lương ở pháp nhân nào" — nhưng CẮT DANH SÁCH theo pháp nhân đang xem

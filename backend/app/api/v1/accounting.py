@@ -85,10 +85,17 @@ def create_entry(data: EntryIn, u: User = Depends(require_roles("ketoan")), db: 
 def post_entry(eid: int, u: User = Depends(require_roles("ketoan")), db: Session = Depends(get_db)):
     e = db.get(JournalEntry, eid)
     if not e: raise HTTPException(404, "Không có chứng từ")
+    from app.services import ks_tach_nhiem as _KTN_E2        # Đợt E2a
+    _kq = _KTN_E2.kiem(db, f"ky:{e.period}", "ghi_so", u)
+    if _kq["chan"]:
+        raise HTTPException(422, {"gate": "TACH_NHIEM", "message": (
+            _kq["vi_pham"][0]["thong_diep"] if _kq["vi_pham"] else _kq["thong_diep_thieu_ma"])})
     try:
         ACC.post_draft(db, u, e)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
+    _KTN_E2.ghi_buoc(db, f"ky:{e.period}", "ghi_so", u)
+    db.commit()
     return {"message": f"Đã ghi sổ {e.code}"}
 
 
@@ -188,10 +195,17 @@ class LockIn(BaseModel):
 
 @router.post("/periods/{period}/lock")
 def lock(period: str, data: LockIn, u: User = Depends(require_roles("ketoan")), db: Session = Depends(get_db)):
+    from app.services import ks_tach_nhiem as _KTN_E2        # Đợt E2a
+    _kq = _KTN_E2.kiem(db, f"ky:{period}", "khoa_so_ky", u)
+    if _kq["chan"]:
+        raise HTTPException(422, {"gate": "TACH_NHIEM", "message": (
+            _kq["vi_pham"][0]["thong_diep"] if _kq["vi_pham"] else _kq["thong_diep_thieu_ma"])})
     try:
         ACC.lock_period(db, u, period, data.note)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
+    _KTN_E2.ghi_buoc(db, f"ky:{period}", "khoa_so_ky", u)
+    db.commit()
     return {"message": f"Đã khóa kỳ {period}"}
 
 
