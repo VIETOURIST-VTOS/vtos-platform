@@ -242,8 +242,10 @@ def tour_cashflow(db: Session, t: Tour) -> dict:
 
 
 def _next_code(db: Session) -> str:
-    n = db.execute(select(func.count()).select_from(PaymentRequest)).scalar() + 1
-    return f"DC{date.today():%y%m}-{n:04d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng cả bảng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, PaymentRequest, f"DC{date.today():%y%m}-", 4)
 
 
 def create_request(db: Session, u: User, data: dict) -> PaymentRequest:

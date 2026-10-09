@@ -12,8 +12,10 @@ from app.services import reports as RP
 
 
 def next_code(db: Session) -> str:
-    n = db.execute(select(func.count()).select_from(FinContract)).scalar() + 1
-    return f"HD{date.today():%y%m}-{n:04d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng cả bảng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, FinContract, f"HD{date.today():%y%m}-", 4)
 
 
 def add_months(d: date, n: int) -> date:

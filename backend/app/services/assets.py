@@ -58,8 +58,10 @@ def period_last_day(period: str) -> date:
 
 
 def _next_code(db: Session, model, prefix: str) -> str:
-    n = db.execute(select(func.count()).select_from(model)).scalar() + 1
-    return f"{prefix}{n:04d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng cả bảng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, model, prefix, 4)
 
 
 # ---------- Khấu hao TSCĐ ----------

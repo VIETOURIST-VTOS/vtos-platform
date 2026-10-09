@@ -129,8 +129,10 @@ def auto_lock(db: Session) -> int:
 
 # ---------- hủy booking, tiền bảo lưu ----------
 def _next_bl(db: Session) -> str:
-    n = db.execute(select(func.count()).select_from(Retention)).scalar() + 1
-    return f"BL{date.today():%y%m}-{n:04d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, Retention, f"BL{date.today():%y%m}-", 4)
 
 
 def cancel(db: Session, u: User, b: Booking, reason: str, charge: float = 0, retain: bool = True, expires_days: int | None = None) -> dict:

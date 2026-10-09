@@ -28,8 +28,10 @@ CHUYEN = {"moi": ("dang_xu_ly",), "dang_xu_ly": ("cho_khach", "da_dong"),
 
 # ====================== ĐỢT 3: PHẢN HỒI & KHIẾU NẠI ======================
 def next_code(db: Session) -> str:
-    n = db.execute(select(func.count()).select_from(Complaint)).scalar() + 1
-    return f"KN{date.today():%y%m}-{n:03d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng cả bảng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, Complaint, f"KN{date.today():%y%m}-", 3)
 
 
 def han_theo_muc(db: Session, level: int, tu: datetime | None = None) -> datetime:
