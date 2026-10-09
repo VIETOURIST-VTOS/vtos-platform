@@ -64,6 +64,7 @@ from app.api.v1.ty_gia import router as ty_gia_router
 # chung mot tien to thi hoac phai noi /hr cho ca cong ty hoac nhan vien khong voi toi cua ay.
 from app.api.v1.danh_gia_ns import router as danh_gia_ns_router, router_toi as danh_gia_toi_router
 from app.api.v1.mua_sam import router_mua as de_nghi_mua_router, router_cap as cap_phat_router
+from app.api.v1.bien_dong_ns import router as bien_dong_ns_router
 # TC-41 (16/9/2026) – cửa nhập kế hoạch tháng, anh Tuấn duyệt 15/9.
 from app.api.v1.ke_hoach import router as ke_hoach_router
 # TC-73 – co cau to chuc khoi Kinh doanh. Tien to RIENG `/api/v1/to-chuc-kd`, cung ly do da ghi o
@@ -344,6 +345,7 @@ app.include_router(danh_gia_ns_router)
 app.include_router(danh_gia_toi_router)
 app.include_router(de_nghi_mua_router)
 app.include_router(cap_phat_router)
+app.include_router(bien_dong_ns_router)
 app.include_router(ke_hoach_router)
 app.include_router(to_chuc_kd_router)
 app.include_router(nguoi_ban_hang_router)

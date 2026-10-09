@@ -6,6 +6,10 @@ import LuoiChamCong from "@/components/LuoiChamCong";
 // VU — khong ky danh gia, khong tieu chi, khong nguoi cham. Bang cham dung o DAU the, tren so su
 // vu, vi danh gia la viec lam moi ky con bien ban su vu la viec chi lam khi co chuyen.
 import { BangChamDiem } from "@/components/DanhGiaNhanSu";
+// 5.8 Bao cao bien dong nhan su · 09/10/2026. Dat o the "Tong quan HCNS" chu khong dung man hinh
+// rieng: cung mot tap nguoi, cung mot nhom nguoi doc. Tach ra hai cho thi nguoi xem phai nho di
+// hai noi de tra loi mot cau hoi.
+import BienDongNhanSu from "@/components/BienDongNhanSu";
 import DinhKem from "@/components/DinhKem";
 import { api, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -174,6 +178,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     </div>
 
     {tab === "tong_quan" && tongQuan && <>
+      <div className="panel"><BienDongNhanSu /></div>
       <p className="muted">Màn hình này <b>chỉ đọc</b> và không sinh ra con số nào của riêng nó: mỗi ô là một phép
         đếm trên bảng đã có, chạy bằng đúng hàm mà các màn hình kia đang dùng. Viết lại phép đếm ở đây là tạo ra
         một nguồn thứ hai, và hai nguồn sẽ lệch.</p>

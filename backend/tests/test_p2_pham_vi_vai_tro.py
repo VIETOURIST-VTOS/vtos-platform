@@ -231,6 +231,13 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # MỞ MÀN HÌNH KHÔNG PHẢI MỞ QUYỀN: duyệt đề nghị mua vẫn chỉ TGĐ/Chủ tịch, ghi đã chi vẫn chỉ Kế
 # toán, cấp phát vẫn chỉ HCNS, chấm điểm vẫn đúng tuyến ký đơn nghỉ — chặn ở tầng dịch vụ, và mỗi
 # chỗ chặn có một phép thử gọi sai vai để chắc nó trả 403.
+# ── 5.8 BÁO CÁO BIẾN ĐỘNG NHÂN SỰ, 09/10/2026 ────────────────────────────────────────────────
+# MỘT nhóm API mới: `/api/v1/bien-dong-ns`, +1 cho MƯỜI vai mở được màn hình /hr. Không có màn
+# hình mới và không một dòng nào đổi trong MENU_ROLES — báo cáo đứng ở thẻ "Tổng quan HCNS" của
+# chính màn hình Nhân sự, cùng tập người và cùng nhóm người đọc.
+#
+# XEM rộng bằng đúng thẻ ấy; GHI (ngày nghỉ việc) hẹp bằng HR_ADMIN — ghi ngày nghỉ là đóng một
+# người khỏi bảng lương, không phải một ô ghi chú, và có phép thử gọi sai vai để chắc nó trả 403.
 PHAM_VI_DA_CHOT = {
     # ĐÁNH GIÁ SAU TOUR (25/9/2026) – +1 cho MƯỜI BA vai: nhóm "/api/v1/danh-gia" gắn vào màn
     # hình mới /danh-gia (bảng điểm khách chấm cho chuyến, HDV, tài xế; ba con số đã gửi / đã
@@ -567,8 +574,8 @@ PHAM_VI_DA_CHOT = {
     # `MENU_ROLES["/su-co-tour"]` từ trước nên tiền tố đã có trong phạm vi — nhưng KHÔNG nằm trong
     # `su_co_tour.XEM`, tức mở được màn hình mà mọi cửa trả 403. Phạm vi không đổi vì bảng này đo
     # tiền tố, không đo chữ ký cửa; chỗ hỏng ấy do `test_dh1::test_hai_bang_quyen_phai_phu_nhau` bắt.
-    "chutich": 130, "tgd": 130, "bks": 130, "cntt": 127, "ir_phapche": 20,
-    "ketoan": 107, "tp_dh": 96, "ptgd_doan": 78, "nv_dh": 68, "hcns": 68, "gd_kd": 71,
+    "chutich": 131, "tgd": 131, "bks": 131, "cntt": 128, "ir_phapche": 20,
+    "ketoan": 108, "tp_dh": 97, "ptgd_doan": 79, "nv_dh": 68, "hcns": 69, "gd_kd": 72,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -614,7 +621,7 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
-    "robot_pq": 18, "robot_ks": 130, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 131, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

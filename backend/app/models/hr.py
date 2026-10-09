@@ -44,6 +44,21 @@ class Employee(Base):
     ctv_contract: Mapped[bool] = mapped_column(Boolean, default=False)        # hợp đồng cộng tác đã ký
     advance_limit: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # VB-1 · 09/10/2026 — NGÀY NGHỈ VIỆC, nền của mục 5.8 Báo cáo biến động nhân sự.
+    #
+    # `active` trả lời "còn làm hay không"; ba cột này trả lời "nghỉ từ hôm nào và vì sao". Một báo
+    # cáo biến động chỉ có đúng một phép tính — đầu kỳ + tăng − giảm = cuối kỳ — và không có ngày
+    # nghỉ thì vế "giảm trong kỳ" không tính được, cả báo cáo rút xuống còn con số đầu người hôm nay.
+    #
+    # KHÔNG dùng `labor_contracts.terminated_on` thay: đó là ngày chấm dứt một HỢP ĐỒNG, không phải
+    # ngày rời công ty (hết hạn rồi ký tiếp là chấm dứt một bản mà người vẫn ở lại), và phần lớn
+    # người phải đếm — HDV cộng tác, tài xế khoán — không có bản hợp đồng lao động nào.
+    #
+    # ĐỂ RỖNG VỚI NGƯỜI ĐÃ `active = False`, không đoán ngược: một ngày đoán nằm trong báo cáo trông
+    # y hệt một ngày thật, và nó đi thẳng vào tỷ lệ nghỉ việc HCNS báo cáo lên.
+    ended_on: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    end_kind: Mapped[str] = mapped_column(String(20), default="")      # xem bien_dong_ns.LY_DO_GIAM
+    end_reason: Mapped[str] = mapped_column(String(300), default="")
     # Đội xe Đợt 2: bốn số cuối thẻ dầu gắn với TÀI XẾ, không gắn với xe – đổi tài xế thì đổi luôn
     # ánh xạ, nếu gắn vào xe thì mọi giao dịch thẻ sau ngày bàn giao sẽ gán nhầm chi phí sang người khác.
     fuel_card_last4: Mapped[str] = mapped_column(String(8), default="")
