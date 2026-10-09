@@ -25,12 +25,27 @@ function KhieuNai() {
   const [hien, setHien] = useState(false);
   const [mo, setMo] = useState<number | null>(null);
   const [loc, setLoc] = useState("");
+  // KN-1 · lọc KỲ và cắt trang. Trước vòng này màn hình kéo về MỌI hồ sơ từng có và không có
+  // cách nào xem riêng một tháng — tức là câu hỏi đơn giản nhất của phòng CSKH ("tháng này khách
+  // kêu bao nhiêu lần, hơn hay kém tháng trước") không trả lời được ngay trên màn hình của họ.
+  const [ky, setKy] = useState(new Date().toISOString().slice(0, 7));
+  const [chiQuaHan, setChiQuaHan] = useState(false);
+  const [tong, setTong] = useState(0);
+  const [catBot, setCatBot] = useState(false);
   const [d, setD] = useState<any>({ nguyen_nhan_nhom: "do_ta", nguyen_nhan: "", huong_xu_ly: [] as string[], de_nghi_khach: "", khach_chap_nhan: "", payment_request_id: "" });
 
   const load = useCallback(() => {
-    api("/khieu-nai" + (loc ? `?status=${loc}` : "")).then(setDs).catch((e) => toast(errMsg(e), true));
-    api("/khieu-nai/chi-so").then(setCs).catch(() => {});
-  }, [loc]); // eslint-disable-line
+    // Bảng số đi THEO cùng bộ lọc kỳ với danh sách. Hai bên lệch kỳ thì người đọc thấy "tổng 812"
+    // ngay trên một danh sách 14 dòng, và không con số nào còn nghĩa.
+    const q = new URLSearchParams();
+    if (loc) q.set("status", loc);
+    if (ky) q.set("ky", ky);
+    if (chiQuaHan) q.set("qua_han", "1");
+    api(`/khieu-nai?${q}`).then((r) => {
+      setDs(r.rows || []); setTong(r.tong_khop ?? (r.rows || []).length); setCatBot(!!r.cat_bot);
+    }).catch((e) => toast(errMsg(e), true));
+    api(`/khieu-nai/chi-so${ky ? `?ky=${ky}` : ""}`).then(setCs).catch(() => {});
+  }, [loc, ky, chiQuaHan]); // eslint-disable-line
   useEffect(() => {
     api("/cskh/meta").then(setMeta).catch(() => {});
     api("/bookings?limit=300").then((r) => setBk(Array.isArray(r) ? r : r.rows || [])).catch(() => {});
@@ -67,7 +82,18 @@ function KhieuNai() {
       <select value={loc} onChange={(e) => setLoc(e.target.value)}>
         <option value="">— tất cả trạng thái —</option>
         {Object.entries(meta.kn_trang_thai).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select>
+      <label style={{ margin: 0 }}>Kỳ (tháng nhận hồ sơ)
+        <input type="month" value={ky} onChange={(e) => setKy(e.target.value)} /></label>
+      {ky && <button className="act grey" style={{ margin: 0 }} onClick={() => setKy("")}>Xem mọi kỳ</button>}
+      <label style={{ margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
+        <input type="checkbox" checked={chiQuaHan} onChange={(e) => setChiQuaHan(e.target.checked)} />
+        Chỉ hồ sơ quá hạn chưa phản hồi</label>
     </div>
+    {/* NÓI RA KHI ĐÃ CẮT BỚT. Lặng lẽ trả 300 dòng đầu rồi để người đọc tưởng đó là tất cả thì
+        tệ hơn hẳn một màn hình chậm: họ sẽ kết luận trên một nửa sự thật mà không biết. */}
+    <p className="muted" style={{ margin: "4px 0" }}>
+      {catBot ? `Đang xem ${ds.length} hồ sơ mới nhất trên ${tong} hồ sơ khớp bộ lọc — thu hẹp kỳ hoặc trạng thái để xem hết.`
+              : `${tong} hồ sơ khớp bộ lọc.`}</p>
 
     {hien && <div className="panel"><h2>Hồ sơ phản hồi / khiếu nại</h2>
       <div className="grid">
@@ -157,7 +183,8 @@ function KhieuNai() {
           </div>}
         </td></tr>,
       ])}
-      {!ds.length && <tr><td colSpan={8} className="muted">Chưa có hồ sơ nào.</td></tr>}
+      {!ds.length && <tr><td colSpan={8} className="muted">
+        {ky || loc || chiQuaHan ? "Không có hồ sơ nào khớp bộ lọc đang chọn." : "Chưa có hồ sơ nào."}</td></tr>}
     </tbody></table></div>
   </>);
 }

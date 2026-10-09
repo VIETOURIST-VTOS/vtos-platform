@@ -6,7 +6,7 @@ khách lẻ. Cả hai là cố ý, xem app/services/cskh.py.
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import current_user, require_roles
@@ -31,7 +31,6 @@ def kn_out(db: Session, c: Complaint) -> dict:
     t = db.get(Tour, c.tour_id) if c.tour_id else None
     pr = db.get(PaymentRequest, c.payment_request_id) if c.payment_request_id else None
     bay_gio = datetime.now()
-    dang_mo = c.status in ("moi", "dang_xu_ly", "cho_khach", "tai_mo")
     return {"id": c.id, "code": c.code, "source": c.source, "source_ten": KN_NGUON.get(c.source, c.source),
             "customer_name": c.customer_name, "customer_phone": c.customer_phone,
             "booking_id": c.booking_id, "booking_code": bk.code if bk else "",
@@ -43,7 +42,10 @@ def kn_out(db: Session, c: Complaint) -> dict:
             "han_phan_hoi": c.han_phan_hoi, "first_response_at": c.first_response_at,
             # Quá hạn là một SỰ KIỆN, không phải một cột lưu sẵn: lưu sẵn thì tới lúc quá hạn không ai
             # ghi lại và cờ mãi mãi là "chưa".
-            "qua_han": bool(dang_mo and not c.first_response_at and c.han_phan_hoi and c.han_phan_hoi < bay_gio),
+            # MỘT định nghĩa cho cả phép đếm lẫn dòng này — xem `services/cskh.qua_han_cua`.
+            # Trước KN-1 chỗ này là một bản chép tay bằng Python của mệnh đề SQL trong `chi_so()`,
+            # và hai bản ấy không có gì buộc phải giống nhau.
+            "qua_han": CS.qua_han_cua(c, bay_gio),
             "tre_khi_phan_hoi": bool(c.first_response_at and c.han_phan_hoi and c.first_response_at > c.han_phan_hoi),
             "nguyen_nhan_nhom": c.nguyen_nhan_nhom,
             "nguyen_nhan_ten": KN_NGUYEN_NHAN.get(c.nguyen_nhan_nhom, ""),
@@ -72,19 +74,47 @@ def meta(u: User = Depends(require_roles(*XEM))):
 
 
 @router.get("/khieu-nai/chi-so")
-def kn_chi_so(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
-    return CS.chi_so(db)
+def kn_chi_so(ky: str = "", u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    try:
+        return CS.chi_so(db, ky)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
 
 
 @router.get("/khieu-nai")
-def kn_ds(status: str = "", level: int = 0, qua_han: int = 0,
+def kn_ds(status: str = "", level: int = 0, qua_han: int = 0, ky: str = "", limit: int = 300,
           u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Danh sách hồ sơ khiếu nại — KN-1 09/10/2026: thêm bộ lọc KỲ và CẮT TRANG.
+
+    BA CHỖ ĐỔI, và mỗi chỗ vá một lỗi khác nhau:
+
+    MỘT · CẮT TRANG. Bản cũ trả về MỌI hồ sơ từng có, không một giới hạn nào. Hôm nay bảng còn
+    nhỏ nên không ai thấy; nó hỏng vào đúng cái ngày không ai còn nhớ dòng này — và hỏng theo
+    kiểu tệ nhất, là màn hình đứng chứ không phải báo lỗi.
+
+    HAI · LỌC KỲ. Không có bộ lọc kỳ thì phòng CSKH không trả lời được câu hỏi đơn giản nhất của
+    họ: tháng này khách kêu bao nhiêu lần, so với tháng trước thế nào.
+
+    BA · `qua_han` LỌC TRONG SQL. Bản cũ dựng xong MỌI dòng rồi mới vứt bớt bằng Python, nên bộ
+    lọc càng hẹp máy chủ càng không nhẹ đi chút nào. Nay nó là một mệnh đề, và là ĐÚNG mệnh đề
+    mà bảng số dùng để đếm.
+
+    Trả về một KHỐI CÓ `tong_khop` chứ không còn là mảng trần: đếm chạy trên câu hỏi TRƯỚC khi
+    cắt, nên màn hình nói được "đang xem 300 trên 812" thay vì lặng lẽ giấu 512 hồ sơ.
+    """
     q = select(Complaint).order_by(desc(Complaint.id))
     if status: q = q.where(Complaint.status == status)
     if level: q = q.where(Complaint.level == level)
-    ra = [kn_out(db, c) for c in db.execute(q).scalars()]
-    if qua_han: ra = [x for x in ra if x["qua_han"]]
-    return ra
+    if qua_han: q = q.where(CS.dieu_kien_qua_han())
+    try:
+        dk = CS.dieu_kien_ky(ky)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    if dk is not None: q = q.where(dk)
+    tong = int(db.execute(select(func.count()).select_from(q.subquery())).scalar() or 0)
+    n = max(1, min(limit, 2000))
+    rows = [kn_out(db, c) for c in db.execute(q.limit(n)).scalars()]
+    return {"rows": rows, "tong_khop": tong, "limit": n, "cat_bot": tong > len(rows)}
 
 
 @router.get("/khieu-nai/{cid}")

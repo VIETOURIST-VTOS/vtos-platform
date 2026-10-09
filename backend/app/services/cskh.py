@@ -9,8 +9,9 @@ Ba chốt chặn của tệp này, viết ra để lần sau không ai gỡ nh�
 3. Phiếu chăm sóc TỰ SINH từ tour đã kết thúc. Không có nút thêm phiếu nhập tay: danh sách nhập tay sẽ
    đầy đủ hai tuần đầu rồi thưa dần và bỏ hẳn.
 """
+import re
 from datetime import datetime, date, timedelta
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, and_
 from sqlalchemy.orm import Session
 from app.models.core import User, Booking, Tour, Alert
 from app.models.crm import Lead, ZaloMessage
@@ -24,6 +25,65 @@ XU_LY = ("nv_mkt", "ptgd_mkt", "gd_kd", "tp_kd", "nv_kd", "tn_kd", "tp_dh", "nv_
 DONG_MUC3 = ("ptgd_mkt", "ptgd_doan", "tgd", "chutich")     # mức 3 phải có Ban TGĐ trong danh sách xử lý
 CHUYEN = {"moi": ("dang_xu_ly",), "dang_xu_ly": ("cho_khach", "da_dong"),
           "cho_khach": ("dang_xu_ly", "da_dong"), "da_dong": ("tai_mo",), "tai_mo": ("dang_xu_ly",)}
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# MỘT ĐỊNH NGHĨA CHO MỖI LUẬT — KN-1, 09/10/2026
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Trước vòng này, "hồ sơ đang mở" được viết ra BA LẦN: một lần trong `chi_so()`, một lần trong
+# `nhac_han()`, một lần trong `api/v1/cskh.kn_out()`. Và "quá hạn chưa phản hồi" được viết HAI
+# LẦN theo hai thứ tiếng khác nhau — một bản SQL để đếm, một bản Python để đánh dấu từng dòng.
+#
+# Hai đầu thì sớm muộn lệch nhau, và kiểu lệch ấy không kêu: bảng số nói 7 hồ sơ quá hạn, danh
+# sách bên dưới tô đỏ 6 dòng, không ai biết bên nào đúng. Làn Marketing đã học đúng bài này ở
+# hạn xử lý lead (`test_mkt7`, điều 4). Nay ghi một lần ở đây, và phép thử `test_kn1` canh hai
+# bản SQL / Python phải chọn ra CÙNG MỘT tập hồ sơ trên cùng một mớ dữ liệu.
+DANG_MO = ("moi", "dang_xu_ly", "cho_khach", "tai_mo")
+
+
+def dieu_kien_qua_han(bay_gio: datetime | None = None):
+    """Mệnh đề SQL 'quá hạn mà chưa phản hồi'. Dùng cho CẢ phép đếm LẪN bộ lọc danh sách.
+
+    Lọc trong SQL chứ không lọc bằng Python sau khi đã dựng xong mọi dòng: lọc sau thì máy chủ
+    vẫn phải nạp cả bảng rồi mới vứt đi, tức là bộ lọc càng hẹp máy càng không nhẹ đi chút nào.
+    """
+    return and_(Complaint.status.in_(DANG_MO),
+                Complaint.first_response_at.is_(None),
+                Complaint.han_phan_hoi.is_not(None),
+                Complaint.han_phan_hoi < (bay_gio or datetime.now()))
+
+
+def qua_han_cua(c: Complaint, bay_gio: datetime | None = None) -> bool:
+    """Bản Python của ĐÚNG mệnh đề trên, cho một dòng. Đổi một bên thì phải đổi bên kia."""
+    bg = bay_gio or datetime.now()
+    return bool(c.status in DANG_MO and not c.first_response_at
+                and c.han_phan_hoi is not None and c.han_phan_hoi < bg)
+
+
+def dieu_kien_ky(ky: str):
+    """Mệnh đề lọc theo KỲ `YYYY-MM` trên `received_at` — None nếu không khai kỳ.
+
+    Mốc là lúc VTOS NHẬN hồ sơ, không phải lúc đóng: một hồ sơ nhận tháng 9 đóng tháng 11 vẫn
+    thuộc về tháng 9, vì con số phòng CSKH cần là 'tháng ấy khách kêu bao nhiêu lần'.
+
+    Chặn trên là ĐẦU THÁNG SAU chứ không phải cuối tháng này: viết `<= 31/10` là mất mọi hồ sơ
+    nhận trong ngày 31 sau 00:00 — `received_at` là một MỐC GIỜ, không phải một ngày.
+    """
+    ky = (ky or "").strip()
+    if not ky:
+        return None
+    # Khớp ĐÚNG KHUÔN chứ không cắt chuỗi theo vị trí. Cắt theo vị trí thì `2026/10` vẫn lọt —
+    # phép thử bắt được đúng chỗ này — và một kỳ sai khuôn lọt qua là người đọc tin vào một bảng
+    # số không phải của kỳ họ chọn.
+    m = re.fullmatch(r"(\d{4})-(\d{2})", ky)
+    if not m:
+        raise ValueError(f"Kỳ không đọc được: {ky!r} – cần dạng 2026-10")
+    nam, thang = int(m.group(1)), int(m.group(2))
+    if not 1 <= thang <= 12:
+        raise ValueError(f"Kỳ không đọc được: {ky!r} – tháng phải từ 01 đến 12")
+    dau = datetime(nam, thang, 1)
+    sau = datetime(nam + (thang == 12), (thang % 12) + 1, 1)
+    return and_(Complaint.received_at >= dau, Complaint.received_at < sau)
 
 
 # ====================== ĐỢT 3: PHẢN HỒI & KHIẾU NẠI ======================
@@ -221,20 +281,32 @@ def chuyen_trang_thai(db: Session, u: User, c: Complaint, moi: str) -> Complaint
     return c
 
 
-def chi_so(db: Session) -> dict:
-    """Bảng số của màn hình. Cộng bằng SQL – không nạp cả bảng hồ sơ vào bộ nhớ."""
-    dang_mo = ["moi", "dang_xu_ly", "cho_khach", "tai_mo"]
-    tong = int(db.execute(select(func.count()).select_from(Complaint)).scalar() or 0)
-    mo = int(db.execute(select(func.count()).select_from(Complaint).where(Complaint.status.in_(dang_mo))).scalar() or 0)
-    qua_han = int(db.execute(select(func.count()).select_from(Complaint).where(
-        Complaint.status.in_(dang_mo), Complaint.first_response_at.is_(None),
-        Complaint.han_phan_hoi < datetime.now())).scalar() or 0)
-    theo_muc = {int(k): int(n) for k, n in db.execute(
-        select(Complaint.level, func.count()).where(Complaint.status.in_(dang_mo)).group_by(Complaint.level)).all()}
-    theo_nhom = [{"nhom": k, "ten": KN_NHOM.get(k, k), "so": int(n)} for k, n in db.execute(
-        select(Complaint.nhom, func.count()).group_by(Complaint.nhom).order_by(desc(func.count()))).all()]
+def chi_so(db: Session, ky: str = "") -> dict:
+    """Bảng số của màn hình. Cộng bằng SQL – không nạp cả bảng hồ sơ vào bộ nhớ.
+
+    KN-1 · `ky` để bảng số đi THEO bộ lọc kỳ của danh sách bên dưới. Để trống là toàn bộ lịch
+    sử, y như trước. Bảng số không theo kỳ mà danh sách lại theo kỳ thì người đọc thấy "tổng
+    812" ngay trên một danh sách 14 dòng, và con số nào cũng mất nghĩa.
+    """
+    k = dieu_kien_ky(ky)
+    def dem(*dk):
+        q = select(func.count()).select_from(Complaint)
+        for d in dk:
+            q = q.where(d)
+        return int(db.execute(q.where(k) if k is not None else q).scalar() or 0)
+
+    tong = dem()
+    mo = dem(Complaint.status.in_(DANG_MO))
+    qua_han = dem(dieu_kien_qua_han())
+    qm = select(Complaint.level, func.count()).where(Complaint.status.in_(DANG_MO))
+    qn = select(Complaint.nhom, func.count())
+    if k is not None:
+        qm, qn = qm.where(k), qn.where(k)
+    theo_muc = {int(a): int(n) for a, n in db.execute(qm.group_by(Complaint.level)).all()}
+    theo_nhom = [{"nhom": a, "ten": KN_NHOM.get(a, a), "so": int(n)} for a, n in db.execute(
+        qn.group_by(Complaint.nhom).order_by(desc(func.count()))).all()]
     return {"tong": tong, "dang_mo": mo, "qua_han_chua_phan_hoi": qua_han,
-            "theo_muc": theo_muc, "theo_nhom": theo_nhom}
+            "theo_muc": theo_muc, "theo_nhom": theo_nhom, "ky": (ky or "").strip()}
 
 
 # ====================== ĐỢT 4: CHĂM SÓC SAU BÁN ======================
@@ -421,7 +493,7 @@ def robot_cskh(db: Session) -> dict:
             them += 1
 
     bay_gio = datetime.now()
-    for c in db.execute(select(Complaint).where(Complaint.status.in_(["moi", "dang_xu_ly", "cho_khach", "tai_mo"]),
+    for c in db.execute(select(Complaint).where(Complaint.status.in_(DANG_MO),
                                                 Complaint.first_response_at.is_(None))).scalars():
         if not c.han_phan_hoi or c.han_phan_hoi >= bay_gio: continue
         tre = int((bay_gio - c.han_phan_hoi).total_seconds() // 3600)
