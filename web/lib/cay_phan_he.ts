@@ -341,7 +341,12 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       // giá, không có tiêu chí, không có người chấm — nên mục 5.6 đang nói to hơn sự thật. Đổi TÊN
       // cho đúng chỗ đang đứng chứ không gộp hai mục lại: gộp hay bỏ một nhánh của bản vẽ v1.3 là
       // việc Chủ tịch quyết, còn nói đúng cái đang có là việc phải làm ngay.
-      { ma: "5.6", ten: "Đánh giá nhân sự — hiện chỉ có sổ sự vụ, chưa có kỳ đánh giá", href: "/hr?tab=incidents" },
+      // 09/10/2026 — DỰNG THẬT. Bảng `danh_gia_nhan_su`: kỳ tháng / quý / năm, sáu tiêu chí chia hai
+      // cột (ba ô máy điền từ số có sẵn, ba ô trưởng phòng chấm kèm lý do bắt buộc ở hai đầu thang).
+      // Tuyến chấm DÙNG LẠI tuyến ký đơn nghỉ (NS-4), không dựng tuyến thứ hai. Nhân viên đọc bản
+      // của chính mình ở màn hình Chấm công — Chủ tịch chốt 08/10. Điểm CHỈ ĐỂ XÉT thưởng: không
+      // một dòng mã nào biến điểm thành tiền.
+      { ma: "5.6", ten: "Đánh giá nhân sự — kỳ tháng/quý/năm, trưởng phòng chấm", href: "/hr?tab=incidents" },
       { ma: "5.7", ten: "Hồ sơ sự vụ", href: "/hr?tab=incidents" },
       // 08/10/2026 — /reports có ba tab: báo cáo công việc của tôi, tổng hợp phòng, ca trực page. Đó
       // là báo cáo DO NHÂN VIÊN VIẾT, không phải báo cáo VỀ nhân sự: không có số đầu người, không có
@@ -351,15 +356,25 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "5.9", ten: "Hành chính",
         con: [
           { ma: "5.9.1", ten: "Văn bản & quy trình", href: "/params" },
-          { ma: "5.9.2", ten: "IR – Pháp chế", href: "/ir-phap-che" },
+          // ĐỔI SỐ 09/10/2026, và đây là SỬA MỘT LỖI chứ không phải sắp xếp lại cho đẹp: mục này
+          // mang mã "5.9.2" TRÙNG với mục Mua sắm ngay dưới. Hai mục cùng một mã thì mọi thứ tra
+          // theo mã — phép thử, báo cáo độ phủ, đường dẫn sâu — chỉ thấy một trong hai, và không
+          // ai biết nó đang bỏ qua cái nào. Bản vẽ v1.3 đánh 5.9.1 Văn bản, 5.9.2 Mua sắm, 5.9.3
+          // Tài sản & cấp phát; IR – Pháp chế mở sau (08/10/2026) nên nhận số tiếp theo là 5.9.4.
+          { ma: "5.9.4", ten: "IR – Pháp chế", href: "/ir-phap-che" },
           // 08/10/2026 — cùng một dạng với 5.6: hai mục, một trang. /tai-san có bốn tab — tài sản cố
           // định, khấu hao kỳ, chi phí trả trước, phân bổ kỳ — và không tab nào là ĐỀ NGHỊ MUA hay
           // BIÊN BẢN CẤP PHÁT. Đã mở `models/assets.py` ra đọc: `FixedAsset` có cột `department`
           // (bộ phận sử dụng) nhưng không có người nhận, ngày cấp, ngày thu hồi; và không bảng nào
           // trong máy chủ tên là cấp phát. Nên "mua sắm" ở đây là ghi lại thứ ĐÃ MUA, còn "cấp phát"
           // thì chưa có. Đổi tên, không đắp thêm đường dẫn gần đúng.
-          { ma: "5.9.2", ten: "Mua sắm — hiện chỉ ghi tài sản đã mua, chưa có cửa đề nghị mua", href: "/tai-san" },
-          { ma: "5.9.3", ten: "Tài sản & cấp phát — hiện chỉ có sổ tài sản, chưa có biên bản cấp phát", href: "/tai-san" }
+          // 09/10/2026 — DỰNG THẬT, và hai mục này đi hai màn hình KHÁC NHAU vì hai nhóm người khác
+          // nhau. Đề nghị mua có màn hình riêng mở cho MỌI người làm việc ở đây: người đề nghị mua
+          // là người của mọi phòng, gắn vào /tai-san (chỉ Kế toán, CNTT, hành chính, HCNS mở được)
+          // thì chín phòng còn lại không có đường gửi. Cấp phát ở lại /tai-san vì Chủ tịch chốt
+          // "cấp phát tài sản do HCNS làm".
+          { ma: "5.9.2", ten: "Mua sắm — đề nghị mua, TGĐ/Chủ tịch duyệt, Kế toán ghi đã chi", href: "/de-nghi-mua" },
+          { ma: "5.9.3", ten: "Tài sản & cấp phát — biên bản cấp phát, ai đang giữ gì", href: "/tai-san" }
         ] }
     ] },
   { khoa: "taichinh", ma: "06", ten: "Tài chính – Kế toán",

@@ -17,6 +17,12 @@ from app.models.phap_che_viec import *  # noqa
 from app.models.nha_dau_tu import *  # noqa
 from app.models.hr import *  # noqa
 from app.models.hrm import *  # noqa
+# Ba bang HCNS mo cung MOT migration 09/10/2026: 5.6 danh gia nhan su, 5.9.2 de nghi mua,
+# 5.9.3 cap phat tai san. Dat SAU `assets` va SAU `hr` co ly do: `cap_phat_tai_san` mang khoa
+# ngoai sang CA `fixed_assets` (assets) LAN `employees` (hr), nen hai bang ay phai co mat trong
+# metadata truoc. Thieu dong nhap nay thi ba bang khong vao Base.metadata: create_all khong tao,
+# moi phep thu soi metadata mu dung phan nay ma van bao xanh, va alembic autogenerate doi XOA chung.
+from app.models.nhan_su_danh_gia import *  # noqa
 from app.models.ops import *  # noqa
 from app.models.finance import *  # noqa
 from app.models.reports_auto import *  # noqa

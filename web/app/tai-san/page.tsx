@@ -4,6 +4,10 @@ import Shell, { useShell } from "@/components/Shell";
 import DinhKem from "@/components/DinhKem";
 import { api, vnd, fmtD, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+// 5.9.3 Cap phat tai san · 09/10/2026 (Chu tich chot 08/10 "cap phat tai san do HCNS lam").
+// So nay KHONG phai so tai san thu hai: nguyen gia va khau hao van o the TSCD ngay tren. No tra
+// loi dung MOT cau — mon nao dang o tay ai — va do la cau HCNS phai hoi moi lan co nguoi nghi viec.
+import { CapPhatTaiSan } from "@/components/DeNghiMuaCapPhat";
 
 /** Tài sản cố định & chi phí trả trước — V5 của lệnh 08/9/2026.
  *
@@ -178,6 +182,7 @@ function TaiSan() {
       tieuDe={`Hồ sơ tài sản – ${tep.ten} (${tep.ma})`}
       goi={"Hóa đơn mua, biên bản bàn giao, giấy tờ đăng ký. Hồ sơ tài sản là thứ kiểm toán hỏi khi " +
            "đối chiếu nguyên giá và ngày bắt đầu khấu hao."} />}
+    <div className="panel"><CapPhatTaiSan /></div>
   </>);
 }
 

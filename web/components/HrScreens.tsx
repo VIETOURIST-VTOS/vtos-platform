@@ -2,6 +2,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useShell } from "@/components/Shell";
 import LuoiChamCong from "@/components/LuoiChamCong";
+// 5.6 Danh gia nhan su · 09/10/2026. The nay ten la "Danh gia & su vu" ma truoc ban nay chi co SU
+// VU — khong ky danh gia, khong tieu chi, khong nguoi cham. Bang cham dung o DAU the, tren so su
+// vu, vi danh gia la viec lam moi ky con bien ban su vu la viec chi lam khi co chuyen.
+import { BangChamDiem } from "@/components/DanhGiaNhanSu";
 import DinhKem from "@/components/DinhKem";
 import { api, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -595,6 +599,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     </>}
 
     {tab === "incidents" && <>
+      <div className="panel"><BangChamDiem /></div>
       {incMeta && <div className="panel"><h2>Bảng phân mức sự vụ (áp dụng từ 05/9/2026 – Chủ tịch + TGĐ ban hành)</h2>
         <table><thead><tr><th>Mức</th><th>Hành vi điển hình</th><th>Chế tài</th><th>Thẩm quyền duyệt</th></tr></thead><tbody>
           {Object.entries(incMeta.levels).map(([k, v]: any) => <tr key={k}><td><Tag cls={k === "3" ? "red" : k === "2" ? "warn" : ""}>{v.ten}</Tag></td><td>{v.mo_ta}</td><td>{v.che_tai}</td><td className="muted">{v.duyet.length ? v.duyet.join(", ") : "không cần duyệt"}</td></tr>)}</tbody></table>
