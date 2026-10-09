@@ -32,10 +32,11 @@ VAI_CAP_PHAT = ("hcns",)
 
 
 def _ma_moi(db: Session, model, tien_to: str) -> str:
-    nam = date.today().year
-    dem = db.execute(select(func.count()).select_from(model)
-                     .where(model.ma.like(f"{tien_to}{nam}-%"))).scalar() or 0
-    return f"{tien_to}{nam}-{dem + 1:04d}"
+    # Lọc theo tiền tố là ĐÚNG RỒI, nhưng ĐẾM số dòng khớp thì vẫn hỏng khi có dòng bị xoá: số
+    # lùi một bước và mã kế tiếp đụng một mã đang còn sống, mà cột `ma` thì UNIQUE. Lấy số LỚN
+    # NHẤT thì không — xem `services/ma_tu_sinh.py`.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, model, f"{tien_to}{date.today().year}-", 4, cot="ma")
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════

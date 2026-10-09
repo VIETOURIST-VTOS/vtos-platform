@@ -55,8 +55,10 @@ MAU_DANH_MUC = (
 
 
 def next_code(db: Session, ky: str) -> str:
-    n = db.execute(select(func.count()).select_from(HoSoKiemToan)).scalar() + 1
-    return f"KT{(ky or '').upper()}-{n:03d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng cả bảng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, HoSoKiemToan, f"KT{(ky or '').upper()}-", 3)
 
 
 def kiem_du_lieu(db: Session, d: dict, tru_id: int | None = None) -> None:

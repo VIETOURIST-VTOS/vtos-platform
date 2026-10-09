@@ -48,10 +48,11 @@ def _ngay(v):
 
 def _ma_moi(db: Session, loai: str) -> str:
     """TH-LOGO-0001. Đếm theo LOẠI để mã nói được cái gì, thay vì một dãy số chạy chung."""
+    # Lọc theo tiền tố là ĐÚNG RỒI, nhưng ĐẾM số dòng khớp thì vẫn hỏng khi có dòng bị xoá:
+    # số lùi một bước và mã kế tiếp đụng một mã đang còn sống. Lấy số LỚN NHẤT thì không.
+    from app.services.ma_tu_sinh import tiep_theo
     dau = f"{TIEN_TO}{(loai or 'KHAC').upper()[:8]}-"
-    n = db.execute(select(func.count()).select_from(FixedAsset)
-                   .where(FixedAsset.code.like(dau + "%"))).scalar() or 0
-    return f"{dau}{n + 1:04d}"
+    return tiep_theo(db, FixedAsset, dau, 4)
 
 
 def _tim(db: Session, loai: str, phien_ban: str) -> FixedAsset | None:

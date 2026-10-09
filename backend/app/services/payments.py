@@ -38,8 +38,10 @@ def paid_amount_map(db: Session, booking_ids: list[int] | None = None) -> dict[i
 
 
 def _next_receipt_code(db: Session) -> str:
-    n = db.execute(select(func.count()).select_from(Receipt)).scalar() + 1
-    return f"PT{date.today():%y%m}-{n:04d}"
+    # Số lấy theo SỐ LỚN NHẤT đã cấp cho đúng tiền tố này, không phải số dòng —
+    # xem `services/ma_tu_sinh.py` cho ba chỗ hỏng của lối đếm cũ.
+    from app.services.ma_tu_sinh import tiep_theo
+    return tiep_theo(db, Receipt, f"PT{date.today():%y%m}-", 4)
 
 
 def _make_receipt(db: Session, booking: Booking, txn: BankTransaction | None, amount: float, actor: str, status: str, payer: str = "", note: str = "") -> Receipt:
