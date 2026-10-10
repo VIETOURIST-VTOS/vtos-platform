@@ -21,7 +21,8 @@ router = APIRouter(prefix="/api/v1/tai-xe", tags=["tai-xe"])
 # ĐÚNG BẰNG dòng "/doi-xe" trong ma trận quyền của access.py – hồ sơ tài xế và hồ sơ xe là cùng một
 # tập hồ sơ đội xe, mở lệch nhau là mở một đường vòng. Giữ hai nơi khớp nhau bằng mắt chứ không bằng
 # cách nhập access.py vào đây: tệp ấy nhập ngược lại các router, nhập vòng là hỏng lúc khởi động.
-READ = ("chutich", "tgd", "bks", "robot_ks", "tp_dh", "nv_dh", "gd_doi_xe", "ketoan", "hcns", "cntt")
+READ = ("chutich", "tgd", "bks", "robot_ks", "tp_dh", "nv_dh", "gd_doi_xe", "ketoan",
+        "ketoan_truong", "hcns", "cntt")   # ketoan_truong 09/10/2026 - khop MENU_ROLES
 
 
 @router.get("")

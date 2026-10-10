@@ -621,6 +621,31 @@ PHAM_VI_DA_CHOT = {
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
     # READ_ONLY_ROLES. Đây là lần nới lớn nhất từ đầu đợt 2 – ghi ra đây để lần sau ai đọc cũng thấy.
+    # ── BA VAI KẾ TOÁN, 09/10/2026 (Chủ tịch chốt) ─────────────────────────────────────────
+    # BA CON SỐ NÀY ĐO ĐƯỢC, KHÔNG ĐOÁN: chạy `len(AC.pham_vi_day_du(vai))` trên chính cây
+    # này sau khi vá, trước khi viết vào đây.
+    #
+    # `ketoan_truong` = 108 = ĐÚNG BẰNG `ketoan`, và bằng nhau là chủ ý: Kế toán trưởng nhìn
+    # đúng những màn hình Kế toán nhìn. Suy ra bằng `_mo_cho_ba_vai` trong access.py chứ
+    # không chép tay ba mươi dòng — chép tay thì một ngày ai đó thêm `ketoan` vào màn hình
+    # mới và quên cấp trên, lúc ấy cấp dưới xem được mà cấp trên thì không.
+    #
+    # BA CỬA TIỀN THẬT KHÔNG NẰM TRONG CON SỐ NÀY. Xác nhận phiếu thu, phiếu thu tiền mặt và
+    # bấm ĐÃ CHI chặn ở TẦNG DỊCH VỤ (ops.py::VAI_GHI_DA_CHI, payments.py), không chặn ở màn
+    # hình. Kế toán trưởng mở được /collections mà không bấm được ba cửa ấy — người ký và
+    # người cầm tiền là hai người.
+    #
+    # `ketoan_tt` 27 và `thu_quy` 23 là PHẠM VI HẸP NHẤT đủ để làm việc tiền của mình. Đợt
+    # này CỐ Ý không quét 69 cửa còn lại: chúng chờ chữ ký trên bảng 71 cửa. Ba vai sinh ra
+    # hẹp rồi rộng dần theo chữ ký — siết một quyền đã cấp bao giờ cũng khó hơn mở thêm.
+    #
+    # HAI SỐ NÀY TỪNG LÀ 31 VÀ 27, và chúng tụt xuống vì một lỗi THẬT, không vì đổi ý: bản
+    # đầu mở `/ket-so` cho cả hai vai, nên họ thấy menu rồi nhận 403 — `hach_toan.py` khai
+    # danh sách vai đọc của riêng nó. Rà soát 10/10/2026 bắt được. Gỡ `/ket-so` khỏi hai vai
+    # hẹp là cách chữa đúng hướng ĐI XUỐNG: sổ tách bạch trách nhiệm là sổ KIỂM SOÁT, người
+    # bị kiểm soát không cần mở nó. Chữa hướng đi lên — nới `XEM` — là mở cả bảng quy tắc
+    # hạch toán cho thủ quỹ để họ xem được một bảng kiểm soát về mình.
+    "ketoan_truong": 108, "ketoan_tt": 27, "thu_quy": 23,
     "robot_pq": 18, "robot_ks": 131, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 

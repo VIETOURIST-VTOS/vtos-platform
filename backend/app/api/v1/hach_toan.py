@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/v1/hach-toan", tags=["hach-toan"])
 # tp_dh có mặt vì hàng đợi thiếu giá vốn đứng tên phòng Điều hành. Bảng quy ước cũng mở cho họ đọc:
 # đây là chính sách nội bộ, không phải số tiền – và phòng phải nhập giá vốn thì nên biết dòng họ nhập
 # sẽ chạy vào tài khoản nào. Ma trận quyền và tuple này phải khớp nhau, lệch một cái là menu mở mà API chặn.
-XEM = ("chutich", "tgd", "bks", "ketoan", "cntt", "tp_dh")
+XEM = ("chutich", "tgd", "bks", "ketoan", "ketoan_truong", "cntt", "tp_dh")
 TRINH = ("ketoan",)                 # Chủ tịch/TGĐ vẫn qua được (FULL_ACCESS trong deps)
 KY = ("chutich", "tgd")
 QUET = ("ketoan", "cntt", "bks")
@@ -374,6 +374,19 @@ def khai_cap_tach_nhiem(data: CapIn,
         c = _CTN(ma_cap=data.ma_cap, buoc_a=data.buoc_a.strip(), buoc_b=data.buoc_b.strip())
         db.add(c)
     else:
+        # HAI BƯỚC CỦA MỘT CẶP LÀ BẤT BIẾN. Trước bản vá này hai dòng ở cuối hàm ghi
+        # `c.buoc_a, c.buoc_b = ...` vô điều kiện, nên giữ mã cặp mà đổi bước là gỡ được
+        # kiểm soát trong khi mức vẫn đọc là "chặn" và người ký vẫn là Chủ tịch. Chữ ký nằm
+        # trên CẶP BƯỚC, không nằm trên mã cặp — nên đây không phải một việc "nới có ký",
+        # mà là một việc KHÔNG LÀM Ở ĐÂY. Canh cặp bước khác thì tạo cặp mới rồi tắt cặp cũ
+        # (tắt đã là nới, đã phải ký và ghi căn cứ), và cả hai dòng ở lại bảng làm lịch sử.
+        if {data.buoc_a.strip(), data.buoc_b.strip()} != {c.buoc_a, c.buoc_b}:
+            raise HTTPException(422,
+                f"Cặp `{c.ma_cap}` đang canh `{c.buoc_a}` ↔ `{c.buoc_b}`. Hai bước của một cặp "
+                "KHÔNG đổi được sau khi tạo: chữ ký nằm trên chính cặp bước, nên đổi bước mà giữ "
+                "mã là mang chữ ký của quyết định này sang một quyết định khác. Muốn canh cặp "
+                "bước khác thì tạo cặp MỚI với mã mới, rồi tắt cặp này — tắt cặp cần chữ ký "
+                "Chủ tịch hoặc TGĐ và một dòng căn cứ.")
         cu = _KTN.muc_do(c)
         if data.muc_do is not None and cu in ("canh_bao_va_chan",) and data.muc_do != cu:
             noi.append(f"hạ mức cặp {c.ma_cap}: {cu} → {data.muc_do}")
@@ -443,3 +456,29 @@ def xem_thieu_ma_nhan_vien(
     return {"so_tai_khoan": len(ds), "tai_khoan": ds,
             "dang_bat_buoc": _KTN.bat_buoc_ma_nv(db),
             "tham_so_bat": "tach_nhiem_bat_buoc_ma_nv_tu"}
+
+
+@router.get("/hai-vai-trung-nguoi")
+def xem_hai_vai_trung_nguoi(
+        u: User = Depends(require_roles(*XEM, mo_ta="hai vai không được kiêm nhau")),
+        db: Session = Depends(get_db)):
+    """Ai đang giữ cả hai tài khoản của một cặp vai không được kiêm nhau.
+
+    CHỈ ĐỌC, và cố ý chỉ đọc. Việc phải sửa là thu hồi một quyền — việc của HCNS và người phê
+    duyệt quyền, không phải việc của sổ kế toán. Phần mềm làm cho nó đếm được và gọi được tên.
+
+    `mu_khi_thieu_ma_nv` không phải một cờ trang trí: nó nói rằng con số 0 ở đây KHÔNG có nghĩa
+    là sạch khi còn tài khoản chưa có mã nhân viên. Hai con số phải đọc cùng nhau.
+
+    Nó đếm bằng `thieu_ma_lam_mu_phep_do`, KHÔNG bằng `tai_khoan_thieu_ma_nv` — hai danh sách
+    vai khác nhau, và dùng lẫn là lỗi đã mắc một lần: `tai_khoan_thieu_ma_nv` chỉ xét `VAI_TIEN`,
+    không có `hcns`, nên cờ mù báo "không mù" đúng lúc đang mù vì tài khoản HCNS thiếu mã.
+    """
+    ds = _KTN.hai_vai_trung_nguoi(db)
+    mu = _KTN.thieu_ma_lam_mu_phep_do(db)
+    return {"so_truong_hop": len(ds), "cac_truong_hop": ds,
+            "cac_cap": [dict(c) for c in _KTN.CAP_VAI_KHONG_KIEM],
+            "mu_khi_thieu_ma_nv": len(mu) > 0,
+            "so_tai_khoan_thieu_ma_nv": len(mu),
+            "vai_can_ma": list(_KTN.vai_can_ma_de_phep_do_thay()),
+            "tai_khoan_lam_mu": mu}

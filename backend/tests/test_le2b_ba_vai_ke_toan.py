@@ -1,0 +1,201 @@
+"""Đợt E2b-0 — ba vai kế toán mở ở phạm vi hẹp nhất, và hai cửa tiền.
+
+  A. Ba vai có mặt, và `ketoan` KHÔNG mất gì — vai nền ở lại nguyên vẹn.
+  B. Kế toán trưởng nhìn ĐÚNG tập màn hình Kế toán nhìn. Đây là bất biến quan trọng nhất của
+     đợt: nó được SUY RA, nên không lệch được khi có người thêm `ketoan` vào màn hình mới.
+  C. Thủ quỹ vào được đúng ba màn hình đã khai, không hơn.
+  D. Hai cửa tiền rời nhau, và giao của chúng đúng bằng vai nền.
+  E. Phạm vi đo được: Kế toán trưởng bằng Kế toán; hai vai kia hẹp hơn hẳn.
+  F. ĐỢT NÀY CHƯA QUÉT 69 CỬA — kiểm được bằng máy, không nói miệng.
+"""
+import io
+import os
+import re
+import sys
+
+os.environ["DATABASE_URL"] = "sqlite:///./test_le2b.db"
+os.environ["SEED_DEMO"] = "1"
+os.environ["ENV"] = "dev"
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+for _f in ("test_le2b.db", "test_le2b.db-journal"):
+    if os.path.exists(_f):
+        os.remove(_f)
+
+from app.models.core import ROLES
+from app.services import access as AC
+from app.services import ops as O
+
+BA_VAI = ("ketoan_truong", "ketoan_tt", "thu_quy")
+
+# ĐÚNG MỘT CỬA đợt này mở, và nó được khai ra chứ không lặng lẽ. `test_tc100` buộc danh sách vai
+# trên router /tai-xe phải TRÙNG dòng trong MENU_ROLES; phép suy "Kế toán trưởng nhìn đúng những
+# gì Kế toán nhìn" thêm vai ấy vào dòng ma trận, nên router phải theo. Không nới cho một con
+# người nào: ai là Kế toán trưởng hôm nay cũng đang là `ketoan`, và `ketoan` đã có ở dòng ấy.
+# BA VAI MỚI ĐƯỢC PHÉP XUẤT HIỆN Ở ĐÚNG NHỮNG CHỖ NÀY, ngoài hai tệp định nghĩa chúng
+# (`models/core.py` khai tên vai, `services/access.py` suy ra bảng màn hình).
+#
+# `services/ops.py` — hai cửa tiền, chính là việc của đợt này.
+# `api/v1/tai_xe.py` — `test_tc100` buộc danh sách vai trên router phải TRÙNG dòng MENU_ROLES;
+#   phép suy thêm Kế toán trưởng vào dòng ma trận nên router phải theo. Không nới cho một con
+#   người nào: ai là Kế toán trưởng hôm nay cũng đang là `ketoan`, đã có sẵn ở dòng ấy.
+# `models/tach_nhiem.py` — `VAI_TIEN` đã liệt sẵn ba tên từ Đợt E2a, CỐ Ý: để ngày mở ba vai
+#   không ai phải nhớ quay lại sửa tệp ấy. Nay ngày ấy đã tới và nó đúng sẵn.
+# `services/ks_tach_nhiem.py` — Đợt E2b-1, cặp vai KHÔNG ĐƯỢC KIÊM NHAU (`CAP_VAI_KHONG_KIEM`).
+#   Chủ tịch chốt 10/10/2026: HCNS riêng, thủ quỹ riêng. Tên vai phải viết ra ở đây vì phép đo so
+#   `User.role` với đúng hai chuỗi ấy. Đây là chỗ THỨ HAI trong `services/` được phép nhắc
+#   `thu_quy`, và nó được KHAI RA chứ không lặng lẽ — chính phép thử f1 bắt nếu ai thêm chỗ thứ ba.
+CHO_DA_KHAI_BA_VAI = [
+    "models/tach_nhiem.py: ketoan_truong",
+    "models/tach_nhiem.py: ketoan_tt",
+    "models/tach_nhiem.py: thu_quy",
+    "services/ks_tach_nhiem.py: thu_quy",
+    # `api/v1/hach_toan.py` — Đợt E2b sau rà soát 10/10/2026: Kế toán trưởng vào `XEM` để ĐỌC
+    #   được những gì Kế toán đọc. Bản đầu chỉ mở bảng màn hình và quên danh sách vai đọc của
+    #   router, nên ba vai thấy menu rồi nhận 403. Chính phép thử f1 dưới đây bắt dòng này khi
+    #   em thêm nó mà chưa khai — đúng việc nó sinh ra để làm.
+    "api/v1/hach_toan.py: ketoan_truong",
+    "services/ops.py: ketoan_truong",
+    "services/ops.py: ketoan_tt",
+    "services/ops.py: thu_quy",
+    "api/v1/tai_xe.py: ketoan_truong",
+]
+GOC_APP = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app")
+
+
+def man_hinh(vai: str) -> set:
+    return {m for m, v in AC.MENU_ROLES.items() if vai in v}
+
+
+# ─────────────────────────── A ───────────────────────────
+def test_a1_ba_vai_co_mat_va_co_ten_tieng_viet():
+    for v in BA_VAI:
+        assert v in ROLES, f"Vai `{v}` chưa có trong ROLES"
+        assert ROLES[v].strip(), f"Vai `{v}` không có tên hiển thị"
+
+
+def test_a2_vai_nen_ketoan_o_lai_nguyen_ven():
+    """Tách KHÔNG phải thay thế. Ai đang làm được gì hôm nay thì mai vẫn thế."""
+    assert "ketoan" in ROLES
+    assert len(man_hinh("ketoan")) > 0
+
+
+# ─────────────────────────── B ───────────────────────────
+def test_b1_ke_toan_truong_nhin_dung_bang_ke_toan():
+    """Bất biến quan trọng nhất của đợt.
+
+    Nếu một ngày ai đó thêm `ketoan` vào một màn hình mới mà quên Kế toán trưởng thì cấp dưới
+    xem được màn hình còn cấp trên thì không — và không ai phát hiện ra, vì cả hai dòng đều
+    trông đúng. Phép thử này làm chuyện ấy không xảy ra được.
+    """
+    thieu = man_hinh("ketoan") - man_hinh("ketoan_truong")
+    thua = man_hinh("ketoan_truong") - man_hinh("ketoan")
+    assert not thieu, f"Kế toán xem được mà Kế toán trưởng thì không: {sorted(thieu)}"
+    assert not thua, f"Kế toán trưởng xem được mà Kế toán thì không: {sorted(thua)}"
+
+
+# ─────────────────────────── C ───────────────────────────
+def test_c1_thu_quy_dung_ba_man_hinh_da_khai():
+    assert man_hinh("thu_quy") == set(AC.MAN_HINH_THU_QUY)
+
+
+def test_c2_hai_man_hinh_ay_la_cho_nam_bon_cua_cua_thu_quy():
+    """Cấp cửa mà khoá màn hình là dựng một vai không dùng được — chính là dòng CHẶN NL-1.
+
+    `/ket-so` KHÔNG thuộc thủ quỹ, và bản đầu của đợt này đã khai sai. Rà soát 10/10/2026:
+    mở `/ket-so` cho thủ quỹ làm họ THẤY MENU rồi nhận 403, vì `hach_toan.py` khai danh sách
+    vai đọc của riêng nó. Chữa theo hướng ĐI XUỐNG, không nới `XEM`: sổ tách bạch trách
+    nhiệm là sổ KIỂM SOÁT, người bị kiểm soát không cần mở nó.
+    """
+    mh = man_hinh("thu_quy")
+    assert "/expenses" in mh, "Cửa bấm ĐÃ CHI nằm sau màn hình /expenses"
+    assert "/collections" in mh, "Xác nhận phiếu thu và phiếu thu tiền mặt nằm sau /collections"
+    assert "/ket-so" not in mh, (
+        "Thủ quỹ KHÔNG có /ket-so: màn hình ấy đọc /api/v1/hach-toan, mà thủ quỹ không nằm "
+        "trong danh sách vai đọc của router ấy — cấp menu mà không cấp quyền đọc là dựng lại "
+        "đúng cái bẫy 13/9/2026")
+
+
+def test_c3_ke_toan_thanh_toan_dung_tap_da_khai():
+    assert man_hinh("ketoan_tt") == set(AC.MAN_HINH_KETOAN_TT)
+
+
+# ─────────────────────────── D ───────────────────────────
+def test_d1_hai_cua_tien_roi_nhau_tru_vai_nen():
+    """Giao của hai cửa đúng bằng `ketoan`, và đó là điều phải ghi ra chứ không để ngầm.
+
+    Vai nền còn ở cả hai vì hôm nay chỉ có họ làm cả hai việc. Khi đã có người cho từng vai
+    mới thì `ketoan` ra khỏi một trong hai — và lúc ấy lớp chống gian lận mới đứng được bằng
+    chính bảng phân quyền. Cho tới lúc ấy, thứ giữ nó là ks_tach_nhiem so theo NGƯỜI.
+    """
+    assert set(O.VAI_KIEM_CHUNG_TU) & set(O.VAI_GHI_DA_CHI) == {"ketoan"}
+
+
+def test_d2_thu_quy_khong_kiem_chung_tu_ke_toan_truong_khong_bam_da_chi():
+    assert "thu_quy" not in O.VAI_KIEM_CHUNG_TU, "Thủ quỹ cầm tiền, không kiểm chứng từ"
+    assert "ketoan_truong" not in O.VAI_GHI_DA_CHI, (
+        "Kế toán trưởng KÝ, thủ quỹ CẦM TIỀN — gộp vào một vai là mất lớp kiểm soát")
+    assert "ketoan_tt" not in O.VAI_GHI_DA_CHI, (
+        "Người lập chứng từ thanh toán không được tự bấm ĐÃ CHI")
+
+
+def test_d3_hai_cua_tien_la_hang_so_co_ten_de_may_doc_duoc():
+    """Trước bản này hai cửa viết cứng trong thân hàm nên bộ kiểm quyền không đọc được.
+
+    Cùng bài học 13/9/2026 đã khiến `toan_quyen()` phải là một HÀM chứ không phải một hằng số
+    nhập tay: một hằng số thì người ta quên nhập, một cái tên thì phép thử canh được.
+    """
+    nguon = io.open(os.path.join(GOC_APP, "services/ops.py"), encoding="utf-8").read()
+    # BỎ DÒNG CHÚ THÍCH TRƯỚC KHI TÌM. Chính chú thích giải thích lỗi cũ có chứa đúng chuỗi ấy,
+    # nên bản đầu của phép thử này đỏ vì lời giải thích chứ không vì mã — bắt được ngay lần chạy
+    # đầu, và ghi lại vì đó là cái bẫy chung của mọi phép thử đọc mã nguồn bằng chuỗi.
+    ma = "\n".join(d for d in nguon.split("\n") if not d.lstrip().startswith("#"))
+    assert 'u.role != "ketoan"' not in ma, (
+        "Còn một cửa tiền viết cứng `u.role != \"ketoan\"` trong thân hàm")
+
+
+# ─────────────────────────── E ───────────────────────────
+def test_e1_pham_vi_do_duoc():
+    pv = {v: len(AC.pham_vi_day_du(v)) for v in ("ketoan",) + BA_VAI}
+    assert pv["ketoan_truong"] == pv["ketoan"], "Kế toán trưởng phải bằng đúng Kế toán"
+    assert pv["ketoan_tt"] < pv["ketoan"], "Kế toán thanh toán phải hẹp hơn vai nền"
+    assert pv["thu_quy"] < pv["ketoan_tt"], "Thủ quỹ phải là vai hẹp nhất trong ba"
+    assert pv["thu_quy"] < pv["chutich"] if "chutich" in pv else True
+
+
+def test_e2_khong_vai_nao_rong_bang_chu_tich():
+    rong_nhat = len(AC.pham_vi_day_du("chutich"))
+    for v in BA_VAI:
+        assert len(AC.pham_vi_day_du(v)) < rong_nhat, f"`{v}` rộng bằng Chủ tịch"
+
+
+# ─────────────────────────── F ───────────────────────────
+def test_f1_dot_nay_chi_mo_dung_nhung_cho_da_khai():
+    """Lời hứa "đợt này mở ba vai ở phạm vi hẹp nhất" phải ĐO ĐƯỢC, không nói miệng.
+
+    Quét MỌI dòng mã (bỏ chú thích) dưới `app/` tìm ba tên vai mới, trừ hai tệp nơi chúng
+    được ĐỊNH NGHĨA và SUY RA. Những gì còn lại phải khớp đúng danh sách khai sẵn dưới đây.
+
+    Bản đầu của phép thử này chỉ soi bên trong `require_roles(...)` và đã BỎ SÓT `tai_xe.py`,
+    vì tệp ấy khai một tuple `READ` rồi mới trải vào. Soi theo cú pháp thì luôn có một cách
+    viết khác lọt qua; soi theo TÊN VAI thì không.
+    """
+    NOI_DINH_NGHIA = {"models/core.py", "services/access.py"}
+    co = []
+    for goc, _d, tep in os.walk(GOC_APP):
+        for t_ in tep:
+            if not t_.endswith(".py"):
+                continue
+            p_ = os.path.join(goc, t_)
+            rel = os.path.relpath(p_, GOC_APP).replace(os.sep, "/")
+            if rel in NOI_DINH_NGHIA:
+                continue
+            s = io.open(p_, encoding="utf-8").read()
+            ma = "\n".join(d for d in s.split("\n") if not d.lstrip().startswith("#"))
+            for v in BA_VAI:
+                if f'"{v}"' in ma:
+                    co.append(f"{rel}: {v}")
+    assert sorted(co) == sorted(CHO_DA_KHAI_BA_VAI), (
+        "Ba vai mới chỉ được xuất hiện ở những chỗ đã khai. "
+        f"Thừa: {sorted(set(co) - set(CHO_DA_KHAI_BA_VAI))} · "
+        f"Thiếu: {sorted(set(CHO_DA_KHAI_BA_VAI) - set(co))}. "
+        "Nếu đây là lần quét 71 cửa có chữ ký thì sửa luôn danh sách này.")

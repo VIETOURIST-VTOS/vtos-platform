@@ -358,6 +358,22 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     return r
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# HAI CỬA TIỀN — ai kiểm chứng từ, ai bấm ĐÃ CHI. Chủ tịch chốt 09/10/2026 (NL-2).
+#
+# Trước bản này cả hai viết cứng `u.role != "ketoan"` ngay trong thân hàm, nên chúng KHÔNG đi
+# qua `require_roles` và bộ kiểm quyền không đọc được. Khai thành hai hằng số có tên là để
+# máy đọc được và phép thử canh được — cùng lý do `toan_quyen()` phải là một HÀM chứ không
+# phải một hằng số nhập tay (xem deps.py, bài học 13/9/2026).
+#
+# HAI DANH SÁCH RỜI NHAU VÀ PHẢI RỜI NHAU. Giao của chúng là `ketoan` — vai nền, còn ở lại vì
+# hôm nay chỉ có họ làm cả hai việc. Khi đã có người cho từng vai mới thì `ketoan` ra khỏi
+# một trong hai, và lúc ấy lớp chống gian lận mới đứng được bằng chính bảng phân quyền. Cho
+# tới lúc ấy, thứ giữ nó là `ks_tach_nhiem` so theo NGƯỜI (Đợt E2a), không phải bảng này.
+VAI_KIEM_CHUNG_TU = ("ketoan", "ketoan_tt", "ketoan_truong")
+VAI_GHI_DA_CHI = ("ketoan", "thu_quy")
+
+
 def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "") -> str:
     """confirm (người phụ trách bộ phận) → check (Kế toán) → approve (TGĐ; +Chủ tịch nếu 2 chữ ký) → pay (Kế toán) | reject."""
     # ── Đợt E2a: tách bạch trách nhiệm THEO NGƯỜI ──────────────────────────────────────
@@ -386,7 +402,7 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         msg = f"{r.code}: bộ phận đã xác nhận, chuyển Kế toán kiểm tra"
     elif action == "check":
         if r.status != "cho_kt": raise ValueError("Không ở bước Kế toán kiểm tra")
-        if u.role != "ketoan" and not toan_quyen_ke_ca_tach_bach(u, db): raise ValueError("Chỉ Kế toán kiểm tra")
+        if u.role not in VAI_KIEM_CHUNG_TU and not toan_quyen_ke_ca_tach_bach(u, db): raise ValueError("Chỉ Kế toán kiểm tra")
         if not r.has_document: raise ValueError("Thiếu chứng từ đính kèm (hợp đồng/hóa đơn/báo giá) – không chuyển duyệt")
         if r.category not in ("hoan_tien", "tam_ung") and not r.supplier_tax_code: raise ValueError("NCC chưa có MST – phải xác nhận trước khi thanh toán")
         r.status, r.kt_by = "cho_duyet", u.username
@@ -422,7 +438,7 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
             msg = f"{r.code}: đã ký {'TGĐ' if r.signed_tgd else 'Chủ tịch'}, chờ chữ ký còn lại"
     elif action == "pay":
         if r.status != "cho_chi": raise ValueError("Chưa có lệnh chi được duyệt")
-        if u.role != "ketoan" and not toan_quyen_ke_ca_tach_bach(u, db): raise ValueError("Chỉ Kế toán ghi nhận đã chi")
+        if u.role not in VAI_GHI_DA_CHI and not toan_quyen_ke_ca_tach_bach(u, db): raise ValueError("Chỉ Kế toán ghi nhận đã chi")
         r.status, r.paid_at, r.paid_ref = "da_chi", datetime.now(), reason
         r.paid_method = "tien_mat" if reason.lower().startswith("tm") else "chuyen_khoan"
         _post_payment(db, r)
