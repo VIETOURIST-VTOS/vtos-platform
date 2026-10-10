@@ -1,4 +1,5 @@
 """API v1 – toàn bộ endpoint JSON cho web/app/n8n."""
+import os
 from datetime import timedelta, date, datetime
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
@@ -1122,6 +1123,29 @@ def ai_hau_kiem(rid: int, data: HauKiemIn,
     return {"message": f"Đã ghi nhận: {AI_REVIEW_STATES[ket_luan]}", "id": rid, "trang_thai": ket_luan}
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# BẢN DỰNG ĐANG CHẠY — đọc MỘT LẦN lúc nạp mô-đun, không đọc lại ở mỗi nhịp tim.
+#
+# VÌ SAO CÓ. Ngày 09/10/2026 có một câu phải rút lại: "lỗ hổng này đang chạy thật". Thứ đo
+# được là mã NGUỒN trên `origin/main`; còn bản đang chạy trên Render là commit nào thì không
+# cách nào biết. `/health` trả `status` và `time`; `/` trả `APP_VERSION`, vốn là một chuỗi
+# cấu hình người gõ tay chứ không gắn với lần dựng. Thiếu số này thì mọi câu về "hệ thống
+# đang chạy" đều là suy đoán, và một suy đoán nói bằng giọng chắc chắn là thứ đã phải rút lại
+# một lần.
+#
+# RỖNG KHI KHÔNG CÓ BIẾN, và rỗng là một câu trả lời thật: "không biết". Render tự đặt
+# `RENDER_GIT_COMMIT`; chạy ở máy khác thì không có, và bịa một giá trị còn tệ hơn để trống —
+# cùng luật K2 đã dùng cho mọi cột tiền: RỖNG ≠ 0.
+#
+# ĐỌC MỘT BIẾN MÔI TRƯỜNG KHÔNG CHẠM CƠ SỞ DỮ LIỆU, nên hai luật của cửa này còn nguyên: không
+# nhận `db`, không soát chuỗi kiểm toán. Đọc lúc nạp mô-đun chứ không mỗi lần gọi, để nhịp tim
+# 5 giây một lần không gánh thêm một lệnh hệ thống nào.
+BAN_DUNG_DANG_CHAY = (os.getenv("RENDER_GIT_COMMIT")
+                      or os.getenv("GIT_COMMIT")
+                      or os.getenv("SOURCE_VERSION")
+                      or "")
+
+
 @router.get("/health", tags=["meta"])
 def health():
     """CÒN SỐNG KHÔNG — chỉ trả lời đúng câu ấy, và KHÔNG chạm vào cơ sở dữ liệu.
@@ -1157,7 +1181,8 @@ def health():
     máy chủ thôi bị giết khi đang làm việc. Muốn canh cơ sở dữ liệu thì canh ở cửa nghiệp vụ, nơi
     hỏng là thấy ngay — chứ không phải bắt nhịp tim gánh việc soát sổ.
     """
-    return {"status": "ok", "time": datetime.now().isoformat()}
+    return {"status": "ok", "time": datetime.now().isoformat(),
+            "commit": BAN_DUNG_DANG_CHAY}
 
 
 @router.post("/robot/run", tags=["robot"], dependencies=[Depends(robot_auth)])
