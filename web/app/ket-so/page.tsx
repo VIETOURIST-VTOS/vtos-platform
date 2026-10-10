@@ -521,7 +521,7 @@ function TachNhiem() {
           Nạp các cặp đã ký
         </button>
         {chuaDat.length > 0 ? (
-          <Tag tone="warn">{chuaDat.length} cặp chưa ai đặt mức — đang chạy mức nhẹ nhất
+          <Tag cls="warn">{chuaDat.length} cặp chưa ai đặt mức — đang chạy mức nhẹ nhất
             “{d?.muc_do?.[d?.mac_dinh_khi_chua_khai] || d?.mac_dinh_khi_chua_khai}”</Tag>
         ) : null}
         {!kyDuoc ? <span className="muted">Hạ mức hoặc tắt một cặp cần chữ ký Chủ tịch/TGĐ.</span> : null}
@@ -533,7 +533,7 @@ function TachNhiem() {
       </tr></thead><tbody>
         {(d?.cac_cap || []).map((c: any) => (
           <tr key={c.ma_cap}>
-            <td>{c.ma_cap}{!c.dang_ap_dung ? <> <Tag tone="warn">đã tắt</Tag></> : null}</td>
+            <td>{c.ma_cap}{!c.dang_ap_dung ? <> <Tag cls="warn">đã tắt</Tag></> : null}</td>
             <td>{c.ten || `${c.buoc_a} ↔ ${c.buoc_b}`}</td>
             <td>
               {d?.muc_do?.[c.muc_do_dang_ap] || c.muc_do_dang_ap}
@@ -593,10 +593,10 @@ function TachNhiem() {
       {hv ? (
         <div className="row" style={{ gap: 8, marginBottom: 8 }}>
           {hv.so_truong_hop === 0
-            ? <Tag tone="ok">Không trường hợp nào</Tag>
-            : <Tag tone="bad">{hv.so_truong_hop} người đang giữ cả hai vai</Tag>}
+            ? <Tag cls="ok">Không trường hợp nào</Tag>
+            : <Tag cls="red">{hv.so_truong_hop} người đang giữ cả hai vai</Tag>}
           {hv.mu_khi_thieu_ma_nv ? (
-            <Tag tone="warn">
+            <Tag cls="warn">
               Chưa đọc được hết: {hv.so_tai_khoan_thieu_ma_nv} tài khoản chưa có mã nhân viên,
               số trên không có nghĩa là sạch
             </Tag>
@@ -620,8 +620,8 @@ function TachNhiem() {
       <h4 style={{ marginTop: 22 }}>Tài khoản vai tiền chưa có mã nhân viên</h4>
       <div className="row" style={{ gap: 8, marginBottom: 8 }}>
         {tk ? (tk.so_tai_khoan === 0
-          ? <Tag tone="ok">Đủ mã</Tag>
-          : <Tag tone="warn">{tk.so_tai_khoan} tài khoản thiếu mã</Tag>) : null}
+          ? <Tag cls="ok">Đủ mã</Tag>
+          : <Tag cls="warn">{tk.so_tai_khoan} tài khoản thiếu mã</Tag>) : null}
         {tk ? (
           <span className="muted">
             {tk.dang_bat_buoc
