@@ -35,6 +35,38 @@ def _startup():
         yield
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _nguong_f1(_startup):
+    """ĐỢT F1 — bối cảnh: công ty ĐÃ CHỐT ngưỡng duyệt chi.
+
+    Từ F1, bước duyệt một đề nghị chi KHÔNG đi được khi tham số `nguong_chu_tich_duyet_chi` còn
+    rỗng: rỗng nghĩa là CHƯA AI CHỐT mốc phân cấp duyệt, và một công tắc an toàn hỏng phải hỏng
+    về phía ĐÓNG. Bộ mặc định cố ý để trống, vì `seed_params` nạp mọi khóa kèm hai chữ ký mang
+    tên "seed" — điền sẵn con số vào đó là ký thay Chủ tịch bằng một dòng mã.
+
+    Nên tệp này phải tự dựng bối cảnh "đã ký", y như nó vẫn tự dựng tour mẫu và người dùng mẫu.
+    Mốc 100 triệu ở đây là DỮ LIỆU CỦA PHÉP THỬ, không phải mốc đã ký của công ty. Luật mốc có
+    bộ phép thử riêng ở `tests/test_f1_nguong_chu_tich.py`; chỗ này chỉ cần nó không chặn.
+    """
+    from datetime import date as _date
+    from app.db.session import SessionLocal as _SL
+    from app.models.core import Param as _P
+    from app.services import ops as _O
+    from app.services import rules as _R
+    _db = _SL()
+    try:
+        _db.add(_P(key=_O.NGUONG_CHU_TICH_KEY, value="100000000",
+                   label="Ngưỡng Chủ tịch duyệt chi", unit="đồng",
+                   effective_from=_date(2026, 9, 2), source="bối cảnh phép thử F1",
+                   status="active", signed_chutich=True, signed_tgd=True,
+                   proposed_by="phep_thu"))
+        _db.commit()
+    finally:
+        _db.close()
+    _R.clear_param_cache()
+    yield
+
+
 def tour(code):
     return next(t for t in client.get("/api/v1/tours", headers=login("tp.dieuhanh")).json()["rows"] if t["code"] == code)
 
@@ -97,7 +129,12 @@ def test_payment_request_gates_flow_and_journal():
     assert st(r1["id"], "check", who="ketoan").status_code == 422
     assert st(r1["id"], "confirm").json()["request"]["status"] == "cho_kt"
     assert st(r1["id"], "check", who="ketoan").json()["request"]["status"] == "cho_duyet"
-    assert st(r1["id"], "approve", who="chutich").status_code == 422          # không cần 2 chữ ký → Chủ tịch không ký
+    # LUẬT ĐỔI Ở ĐỢT F1. Câu cũ ở đây đòi Chủ tịch bị TỪ CHỐI, kèm chú thích "không cần 2 chữ ký
+    # → Chủ tịch không ký" — và đó chính là chỗ hỏng F1 sửa: mã cũ từ chối Chủ tịch ở MỌI khoản
+    # không bật cờ ngoài dự toán, kể cả khoản 300 triệu mà theo luật ông phải duyệt. Nay cấp duyệt
+    # do MỐC TIỀN quyết, và Chủ tịch toàn quyền ký được cả hai mức (luật 06/9/2026).
+    # Điều tệp này vốn canh — KHÔNG phải ai cũng ký được — vẫn được canh, bằng một vai khác.
+    assert st(r1["id"], "approve", who="ketoan").status_code == 422
     res = st(r1["id"], "approve", who="tgd").json()
     assert res["request"]["status"] == "cho_chi" and len(res["request"]["entry_ids"]) == 1
     # SePay tiền ra khớp mã lệnh chi + số tiền → tự ghi đã chi
@@ -120,7 +157,10 @@ def test_payment_request_gates_flow_and_journal():
 def test_settlement_uses_335_for_uninvoiced_difference():
     t = tour("DN-HCM-0820")
     r = client.post("/api/v1/payment-requests", json={"category": "chi_tour", "tour_id": t["id"], "supplier_name": "KS Đà Nẵng", "supplier_tax_code": "0400", "amount": 100_000_000, "description": "Phòng đoàn", "has_document": True, "has_invoice": True}, headers=login("dh.lan")).json()["request"]
-    for a, w in (("confirm", "tp.dieuhanh"), ("check", "ketoan"), ("approve", "tgd")):
+    # 100 triệu ĐÚNG BẰNG mốc của bối cảnh phép thử, và "từ 100 triệu" tính CẢ mốc → CHỦ TỊCH
+    # duyệt, không phải TGĐ (Đợt F1). Giữ nguyên "tgd" ở đây thì đỏ, và đỏ ấy là luật mới đang
+    # làm việc chứ không phải một hỏng hóc.
+    for a, w in (("confirm", "tp.dieuhanh"), ("check", "ketoan"), ("approve", "chutich")):
         assert client.post(f"/api/v1/payment-requests/{r['id']}/step", json={"action": a}, headers=login(w)).status_code == 200
     client.post(f"/api/v1/tours/{t['id']}/close", json={"actual_revenue": 189000000, "actual_cost": 158000000}, headers=login("dh.lan"))
     assert client.post(f"/api/v1/tours/{t['id']}/kt-confirm", headers=login("ketoan")).status_code == 200

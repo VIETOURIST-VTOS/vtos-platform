@@ -22,6 +22,38 @@ def _startup():
         global client; client = c; yield
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _nguong_f1(_startup):
+    """ĐỢT F1 — bối cảnh: công ty ĐÃ CHỐT ngưỡng duyệt chi.
+
+    Từ F1, bước duyệt một đề nghị chi KHÔNG đi được khi tham số `nguong_chu_tich_duyet_chi` còn
+    rỗng: rỗng nghĩa là CHƯA AI CHỐT mốc phân cấp duyệt, và một công tắc an toàn hỏng phải hỏng
+    về phía ĐÓNG. Bộ mặc định cố ý để trống, vì `seed_params` nạp mọi khóa kèm hai chữ ký mang
+    tên "seed" — điền sẵn con số vào đó là ký thay Chủ tịch bằng một dòng mã.
+
+    Nên tệp này phải tự dựng bối cảnh "đã ký", y như nó vẫn tự dựng tour mẫu và người dùng mẫu.
+    Mốc 100 triệu ở đây là DỮ LIỆU CỦA PHÉP THỬ, không phải mốc đã ký của công ty. Luật mốc có
+    bộ phép thử riêng ở `tests/test_f1_nguong_chu_tich.py`; chỗ này chỉ cần nó không chặn.
+    """
+    from datetime import date as _date
+    from app.db.session import SessionLocal as _SL
+    from app.models.core import Param as _P
+    from app.services import ops as _O
+    from app.services import rules as _R
+    _db = _SL()
+    try:
+        _db.add(_P(key=_O.NGUONG_CHU_TICH_KEY, value="100000000",
+                   label="Ngưỡng Chủ tịch duyệt chi", unit="đồng",
+                   effective_from=_date(2026, 9, 2), source="bối cảnh phép thử F1",
+                   status="active", signed_chutich=True, signed_tgd=True,
+                   proposed_by="phep_thu"))
+        _db.commit()
+    finally:
+        _db.close()
+    _R.clear_param_cache()
+    yield
+
+
 def tour(code):
     return next(t for t in client.get("/api/v1/tours", headers=login("cntt")).json()["rows"] if t["code"] == code)
 

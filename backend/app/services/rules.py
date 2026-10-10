@@ -18,6 +18,26 @@ DEFAULT_PARAMS = [
     # theo giấy tờ khi chưa có giấy tờ nào trong hệ thống thì mọi lệnh điều xe đều dừng.
     ("xe_chan_khi_thieu_giay", "0", "Chặn phát lệnh khi thiếu dữ liệu giấy tờ xe/tài xế", "0 hoặc 1", "Đội xe Vietrip v1.3 §7"),
     ("han_muc_mkt", "5000000", "Hạn mức chi Marketing cần 2 chữ ký", "đồng", "MKT Điều 8"),
+    # ═══════════════════════════════════════════════════════════════════════════════════════
+    # NGƯỠNG DUYỆT CHI — ĐỂ TRỐNG, VÀ PHẢI ĐỂ TRỐNG (Đợt F1)
+    # ═══════════════════════════════════════════════════════════════════════════════════════
+    #
+    # Chủ tịch chốt bằng lời: dưới 100 triệu TGĐ duyệt, từ 100 triệu Chủ tịch duyệt. Điền sẵn
+    # "100000000" vào đây là KÝ THAY CHỦ TỊCH BẰNG MỘT DÒNG MÃ: `seed_params` nạp mọi khóa trong bộ
+    # này với `status="active"` và CẢ HAI chữ ký mang tên "seed". Cùng lẽ với `ngay_van_hanh_that`
+    # và `tncn_luy_tien_tu_ky` đang để trống — xem chú thích ở `models/core.py::Param`.
+    #
+    # RỖNG THÌ CHẶN, KHÔNG PHẢI CHO QUA. `services/ops.py::cap_duyet` đọc rỗng ra "chưa chốt" và
+    # bước duyệt dừng kèm lời nói rõ phải ký ở đâu. Một công tắc an toàn hỏng phải hỏng về phía
+    # ĐÓNG — cùng câu đã viết ở `deps.toan_quyen_ke_ca_tach_bach`.
+    #
+    # TÊN KHÔNG DÙNG `han_muc_*`. Dòng ngay trên là `han_muc_mkt`, nghĩa khác hẳn (hạn mức
+    # Marketing, và từ 23/9/2026 là một tham số CHẾT — Marketing đi một chữ ký cho mọi mức tiền).
+    # Hai cái tên gần nhau cho hai luật khác nhau là đúng cái bẫy đã phải trả giá một lần ở
+    # `so_tien_goc` (xem `models/ops.py`).
+    ("nguong_chu_tich_duyet_chi", "",
+     "Từ mức này trở lên lệnh chi do CHỦ TỊCH duyệt, dưới mức là TGĐ. Rỗng = chưa chốt, và chưa chốt thì không duyệt được khoản nào",
+     "đồng", "Chủ tịch chốt 10/10/2026 – chờ hai chữ ký trên màn hình Tham số"),
     # Giá theo tuổi – Chủ tịch chốt 10/9/2026, sửa tỷ lệ 11/9/2026. Bốn con số này KHÔNG viết cứng
     # trong mã vì chúng là chính sách giá, và chính sách giá thì đổi: đổi thì sửa tham số, ký duyệt
     # theo quy trình tham số đã có, không phải sửa phần mềm rồi triển khai lại.

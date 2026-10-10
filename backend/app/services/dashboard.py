@@ -78,10 +78,51 @@ def build(db: Session, u: User) -> dict:
         if n: ap.append({"label": f"{n} tham số chính sách chờ ký", "href": "/params"})
         n = db.execute(select(func.count()).select_from(VehicleRate).where(VehicleRate.status == "pending")).scalar()
         if n: ap.append({"label": f"{n} giá xe chờ ký", "href": "/hr"})
-        q = select(func.count()).select_from(PaymentRequest).where(PaymentRequest.status == "cho_duyet")
-        if role == "chutich": q = q.where(PaymentRequest.two_signatures == True)
-        n = db.execute(q).scalar()
-        if n: ap.append({"label": f"{n} đề nghị chi chờ duyệt", "href": "/expenses"})
+        # ═══════════════════════════════════════════════════════════════════════════════════
+        # HÀNG ĐỢI CHỜ DUYỆT — phải TRÙNG KHÍT với người thật sự bấm được (Đợt F1)
+        # ═══════════════════════════════════════════════════════════════════════════════════
+        #
+        # Hai dòng cũ ở đây lọc `two_signatures == True` cho Chủ tịch, tức CHỈ khoản ngoài dự toán.
+        # Một khoản 300 triệu trong dự toán không hiện ra ở đâu trên bàn ông, trong khi theo luật
+        # mốc tiền nó là khoản ông phải duyệt. Nên chỗ này hỏi `OPS.cap_duyet` — ĐÚNG hàm mà bước
+        # duyệt hỏi — chứ không tự suy từ một cờ. Hai chỗ suy riêng là hình của lỗi 13/9 và 10/10.
+        #
+        # ĐỔI MỘT CÂU ĐẾM THÀNH MỘT LƯỢT ĐỌC: `cap_duyet` cần `amount` và cột mốc của TỪNG hồ sơ,
+        # không viết được thành một câu `count`. Tập đọc là hồ sơ ĐANG chờ duyệt — vài chục dòng,
+        # không phải cả bảng.
+        #
+        # MARKETING ĐỨNG NGOÀI CẢ HAI Ô: do P.TGĐ Marketing duyệt một chữ ký (23/9/2026).
+        _cho = db.execute(select(PaymentRequest).where(
+            PaymentRequest.status == "cho_duyet",
+            PaymentRequest.category != "marketing")).scalars().all()
+        _cd = [(p, OPS.cap_duyet(db, p)) for p in _cho]
+        _cua_toi = "can_chutich" if role == "chutich" else "can_tgd"
+        n = sum(1 for p, c in _cd if c[_cua_toi])
+        if n: ap.append({"label": f"{n} đề nghị chi chờ " + ("CHỦ TỊCH ký" if role == "chutich"
+                                                            else "TGĐ duyệt"), "href": "/expenses"})
+        # CẢ HAI VẪN THẤY CẢ HAI PHÍA CỦA MỐC — Chủ tịch chốt 10/10/2026, hai câu liền nhau:
+        # "dưới 100 triệu TGĐ duyệt nhưng Chủ tịch vẫn phải thấy", và "trên 100 triệu TGĐ cũng vẫn
+        # thấy, nhưng không bấm duyệt". Mốc chia QUYỀN BẤM, không chia TẦM NHÌN.
+        #
+        # Bản đầu của đợt này lọc hẳn phía bên kia mốc khỏi bàn mỗi người, và đó là đổi một chỗ
+        # hỏng thành chỗ hỏng ngược lại: trước thì Chủ tịch không thấy khoản LỚN, sau thì không
+        # thấy khoản NHỎ.
+        #
+        # PHẢI LÀ MỘT DÒNG RIÊNG, và câu chữ nói rõ ĐỂ XEM chứ không phải để bấm. Gộp vào ô trên
+        # thì con số ấy thành một việc đang chờ chính người đọc — họ bấm vào, không ký được khoản
+        # nào, và lần sau không ai tin con số trên bàn mình nữa. Cùng cách Marketing đã làm
+        # 23/9/2026: dữ liệu vẫn đẩy lên TGĐ và Chủ tịch, nhưng để XEM, không phải để bấm.
+        nx = sum(1 for p, c in _cd if not c[_cua_toi] and not c["chua_chot"])
+        if nx:
+            _ben = ("dưới mốc, TGĐ duyệt" if role == "chutich" else "từ mốc trở lên, Chủ tịch ký")
+            ap.append({"label": f"{nx} đề nghị chi {_ben} — để xem, không phải để bấm",
+                       "href": "/expenses"})
+        # Hồ sơ ĐỨNG CHỜ vì chưa chốt mốc: đếm RIÊNG và trỏ sang màn hình Tham số. Lọc chúng ra
+        # khỏi ô trên mà không nói gì là làm một đống việc tắc nghẽn trở thành vô hình — đúng kiểu
+        # hỏng im lặng mà M5 của Marketing đã phải dựng một cái miệng để chống.
+        nk = sum(1 for p, c in _cd if c["chua_chot"])
+        if nk: ap.append({"label": f"{nk} đề nghị chi KHÔNG DUYỆT ĐƯỢC: chưa chốt ngưỡng duyệt chi",
+                          "href": "/params"})
         n = sum(1 for t in db.execute(select(Tour).where(Tour.status == "cho_duyet")).scalars())
         if n: ap.append({"label": f"{n} dự toán tour chờ duyệt", "href": "/tours"})
     if role == "tgd":
