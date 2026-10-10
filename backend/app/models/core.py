@@ -117,6 +117,29 @@ ROLES = {
     # quả không nằm ở quyền mà nằm ở NHẬT KÝ: mọi việc ba robot làm đều mang tên một con người, nên khi
     # cần biết ai đã đổi cái gì thì câu trả lời là "cntt" – đúng nhưng vô dụng. Người vận hành bị ghi
     # tên cho việc mình không làm, và robot thì không ai truy được.
+    # ══════════════════════════════════════════════════════════════════════════════════
+    # BA VAI KẾ TOÁN — Chủ tịch chốt 09/10/2026. Ghi ra đây để lần đọc lại nào cũng biết
+    # quyền ấy từ đâu mà có: lần viết phần mềm không tự khai quyền, lần này có người quyết.
+    #
+    # `ketoan` Ở LẠI VÀ KHÔNG ĐỔI MỘT CỬA NÀO. Ba vai dưới đây là vai MỚI, không phải vai
+    # thay thế: ai đang làm được gì hôm nay thì mai vẫn thế. Đo được trước khi mở: chữ
+    # "ketoan" nằm ở 71 cửa ghi quyền (60 khai ở chữ ký hàm, 11 tự viết trong thân hàm).
+    #
+    # BA VAI SINH RA HẸP. Đợt này chỉ mở đúng phần việc TIỀN của chúng; 69 cửa còn lại chờ
+    # chữ ký trên bảng 71 cửa. Siết một quyền đã cấp bao giờ cũng khó hơn mở thêm, vì lúc
+    # ấy đã có người đang dùng nó.
+    #
+    # VÌ SAO TÁCH, VÀ VÌ SAO TÁCH VAI THÔI THÌ CHƯA ĐỦ. Người KÝ lệnh chi và người bấm ĐÃ
+    # CHI phải là hai người — `ks_toan_quyen.py` đã ghi đúng ý ấy từ 13/9/2026, nhưng mã
+    # chỉ kiểm hai VAI. Đo 19/9/2026 trên máy thật: 220 tài khoản, SÁU người giữ từ hai tài
+    # khoản trở lên. Nên tách vai đi cùng `ks_tach_nhiem` (Đợt E2a) so theo NGƯỜI; thiếu vế
+    # sau thì ba vai này chỉ là ba cái tên.
+    "ketoan_truong": "Kế toán trưởng",
+    # Lập chứng từ thanh toán, công nợ nhà cung cấp, đối chiếu sao kê, phân bổ tiền.
+    "ketoan_tt": "Kế toán thanh toán",
+    # CHỈ cầm tiền thật: xác nhận phiếu thu, lập phiếu thu tiền mặt, bấm ĐÃ CHI. Kế toán
+    # trưởng CỐ Ý không có ba cửa ấy — người ký và người cầm tiền là hai người.
+    "thu_quy": "Thủ quỹ",
     "robot_pq": "Robot Phân quyền",
     "robot_ks": "Robot Kiểm soát",
     "robot_vpm": "Robot Viết phần mềm",

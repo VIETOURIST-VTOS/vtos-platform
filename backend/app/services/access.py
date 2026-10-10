@@ -134,6 +134,8 @@ CANH_BAO_ROLES = BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + (
     "ketoan", "cntt", "hcns", "ptgd_doan", "ptgd_mkt", "hanh_chinh")
 REQUEST_CREATE_ROLES = OPERATIONS + SALES               # được GỬI yêu cầu đặt dịch vụ: Điều hành + toàn khối Kinh doanh
                                                         # (nguồn duy nhất – máy chủ và giao diện dùng chung, tránh lệch vai trò)
+# Thủ quỹ vào đây để bấm ĐÃ CHI — cửa ấy nằm sau màn hình /expenses. Cấp cửa mà khoá
+# màn hình là dựng một vai không dùng được (NL-1, Chủ tịch chốt 09/10/2026).
 PAYMENT_REQUEST_ROLES = (BASE_VIEW + OPERATIONS +
                          ("ptgd_doan", "ptgd_mkt", "gd_kd", "ketoan", "hcns", "hanh_chinh", "cntt"))
 # hanh_chinh mới được thêm: nhóm chi "hành chính" là việc của họ, mà trước nay họ không có màn hình nào
@@ -1111,6 +1113,62 @@ MENU_ROLES = {
     # đa kênh – nơi AI tiếp xúc khách hàng.
     "/ai-roles": BASE_VIEW + ("ptgd_mkt", "cntt"),
 }
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# BA VAI KE TOAN - MAN HINH, Chủ tịch chốt 09/10/2026
+#
+# KẾ TOÁN TRƯỞNG NHÌN ĐÚNG NHỮNG MÀN HÌNH KẾ TOÁN NHÌN — và đây là một PHÉP SUY, không phải
+# ba mươi dòng chép tay. Chép tay thì một ngày nào đó ai đó thêm `ketoan` vào một màn hình
+# mới và quên thêm Kế toán trưởng; lúc ấy cấp dưới xem được màn hình mà cấp trên thì không,
+# và không ai phát hiện ra vì cả hai dòng đều trông đúng. Suy ra thì không lệch được, và có
+# phép thử canh đúng câu ấy.
+#
+# MỞ MÀN HÌNH KHÔNG PHẢI MỞ QUYỀN. Ba cửa tiền thật (xác nhận phiếu thu, phiếu thu tiền mặt,
+# bấm ĐÃ CHI) chặn ở TẦNG DỊCH VỤ trong `services/ops.py` và `api/v1/payments.py`, không chặn
+# ở màn hình. Kế toán trưởng mở được màn hình /collections nhưng không bấm được ba cửa ấy —
+# đó là chủ ý: người ký và người cầm tiền là hai người.
+#
+# `/ket-so` KHÔNG CÓ Ở ĐÂY, và lần đầu nó có. Bản rà soát 10/10/2026 bắt đúng chỗ ấy: mở
+# `/ket-so` cho hai vai hẹp làm họ THẤY MENU rồi nhận 403 khi bấm, vì `hach_toan.py` khai
+# danh sách vai đọc của riêng nó và không ai mở. Hai hàng rào — ma trận menu suy ra tiền tố
+# API, và `require_roles` trên từng cửa — là HAI danh sách độc lập, không có gì so chúng với
+# nhau ngoài `test_tc100` cho đúng một màn hình. Chữa bằng cách nới `XEM` là mở cả bảng quy
+# tắc hạch toán cho thủ quỹ; nên chữa bằng cách THU HẸP: sổ tách bạch trách nhiệm là sổ KIỂM
+# SOÁT, người bị kiểm soát không cần mở nó. Kế toán trưởng vẫn có `/ket-so` vì suy từ `ketoan`.
+MAN_HINH_KETOAN_TT = (
+    # Lập chứng từ thanh toán, công nợ nhà cung cấp, đối chiếu sao kê, phân bổ tiền.
+    "/collections", "/expenses", "/cong-no", "/nha-cung-cap", "/finance",
+)
+MAN_HINH_THU_QUY = (
+    # ĐÚNG hai màn hình, và chỉ vì bốn cửa của thủ quỹ nằm sau chúng: /collections (xác nhận
+    # phiếu thu, phiếu thu tiền mặt, đọc giao dịch để đối chiếu quỹ) và /expenses (bấm ĐÃ CHI).
+    "/collections", "/expenses",
+)
+
+
+def _mo_cho_ba_vai(menu: dict) -> dict:
+    """Thêm ba vai mới vào bảng màn hình. Suy từ `ketoan`, không chép tay."""
+    ra = {}
+    for m, vai in menu.items():
+        v = tuple(vai)
+        if "ketoan" in v and "ketoan_truong" not in v:
+            v = v + ("ketoan_truong",)
+        if m in MAN_HINH_KETOAN_TT and "ketoan_tt" not in v:
+            v = v + ("ketoan_tt",)
+        if m in MAN_HINH_THU_QUY and "thu_quy" not in v:
+            v = v + ("thu_quy",)
+        ra[m] = v
+    return ra
+
+
+MENU_ROLES = _mo_cho_ba_vai(MENU_ROLES)
+
+# Gõ sai tên một màn hình thì dòng khai ấy KHÔNG LÀM GÌ CẢ và không ai biết — đã gặp đúng lúc
+# viết đợt này: khai "/suppliers" trong khi màn hình tên "/nha-cung-cap", vai mới lặng lẽ thiếu
+# một màn hình. Nổ ngay lúc nạp mô-đun thì không đi xa được.
+for _m in MAN_HINH_KETOAN_TT + MAN_HINH_THU_QUY:
+    assert _m in MENU_ROLES, f"Màn hình `{_m}` khai cho vai kế toán mới nhưng không có trong MENU_ROLES"
 
 MATRIX = {
     "tours": MENU_ROLES["/tours"],

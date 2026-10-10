@@ -259,6 +259,7 @@ function KetSo() {
       ) : null}
 
       <MucDoChan />
+      <TachNhiem />
 
       <style jsx>{`
         .wrap { padding: 16px; max-width: 1000px; }
@@ -422,6 +423,225 @@ function MucDoChan() {
           Bắt buộc khoản mục
         </button>
       </div>
+    </>
+  );
+}
+
+
+/** Sổ tách bạch trách nhiệm — Đợt E2b-1, cửa cho những gì Đợt E2a đã dựng.
+ *
+ *  Đợt E2a dựng hai bảng, một bộ kiểm và năm cửa API rồi dừng. Không màn hình nào. Mà quy tắc đã
+ *  ghi từ 09/9/2026: mỗi con số hệ thống cần một cửa cho người bấm; không có cửa thì đó là việc
+ *  CÒN THIẾU. Màn hình này là cái cửa ấy, không thêm một phép tính nào mới.
+ *
+ *  Bốn chỗ trên giao diện là quy tắc chứ không phải trang trí:
+ *
+ *    - Ô "Mức" để TRỐNG được, và trống KHÔNG phải "không chặn" — nó là CHƯA AI ĐẶT, và những cặp
+ *      như vậy hiện thành một dòng đếm riêng. Cho qua mà có người đếm thì được; cho qua trong im
+ *      lặng thì không.
+ *    - HẠ mức hay TẮT một cặp thì hỏi CĂN CỨ trước khi gửi. Máy chủ vẫn đòi lần nữa và vẫn đòi
+ *      chữ ký Chủ tịch/TGĐ — giao diện hỏi sớm để người bấm biết mình đang nới cái gì, chứ không
+ *      phải để thay hàng rào. Giấu nút không phải một hàng rào.
+ *    - Dấu chân CHỈ ĐỌC, không có nút thêm. Gõ tay được vào sổ này thì dựng được một dấu chân cho
+ *      một bước chưa ai làm — đúng thứ nó sinh ra để chống.
+ *    - Bảng HAI VAI TRÙNG NGƯỜI không có nút sửa. Việc phải làm là thu hồi một quyền, ở màn hình
+ *      phân quyền và do người có quyền ấy làm. Ở đây nó chỉ phải ĐẾM ĐƯỢC và GỌI ĐƯỢC TÊN.
+ */
+function TachNhiem() {
+  const { user, toast } = useShell();
+  const [d, setD] = useState<any>(null);
+  const [tk, setTk] = useState<any>(null);
+  const [hv, setHv] = useState<any>(null);
+  const [pv, setPv] = useState("");
+  const [dc, setDc] = useState<any>(null);
+  const [dang, setDang] = useState(false);
+  const kyDuoc = user?.role === "chutich" || user?.role === "tgd";
+
+  const load = useCallback(async () => {
+    try {
+      const [a, b, c] = await Promise.all([
+        api<any>("/hach-toan/cap-tach-nhiem"),
+        api<any>("/hach-toan/thieu-ma-nhan-vien"),
+        api<any>("/hach-toan/hai-vai-trung-nguoi"),
+      ]);
+      setD(a); setTk(b); setHv(c);
+    } catch (e) { toast(errMsg(e)); }
+  }, [toast]);
+  useEffect(() => { load(); }, [load]);
+
+  const nap = async () => {
+    setDang(true);
+    try {
+      const r = await api<any>("/hach-toan/cap-tach-nhiem/nap-da-ky", { method: "POST" });
+      toast(r.message); await load();
+    } catch (e) { toast(errMsg(e)); } finally { setDang(false); }
+  };
+
+  const datMuc = async (c: any, muc_do: string) => {
+    // NỚI thì hỏi căn cứ TRƯỚC khi gửi. Máy chủ vẫn kiểm lại — đây là để người bấm đọc được
+    // mình đang làm gì, không phải để thay hàng rào.
+    const dangChan = c.muc_do_dang_ap === "canh_bao_va_chan";
+    const noi = dangChan && muc_do !== "canh_bao_va_chan";
+    let can_cu = "";
+    if (noi) {
+      can_cu = prompt(
+        `Hạ mức cặp "${c.ma_cap}" từ "chặn" xuống "${d?.muc_do?.[muc_do] || muc_do}".\n` +
+        `Phải ghi CĂN CỨ, và phải có chữ ký Chủ tịch hoặc TGĐ.\nCăn cứ:`) || "";
+      if (!can_cu.trim()) { toast("Chưa ghi căn cứ — không gửi."); return; }
+    }
+    setDang(true);
+    try {
+      const r = await api<any>("/hach-toan/cap-tach-nhiem", {
+        method: "POST",
+        json: { ma_cap: c.ma_cap, buoc_a: c.buoc_a, buoc_b: c.buoc_b, muc_do, can_cu },
+      });
+      toast(r.message); await load();
+    } catch (e) { toast(errMsg(e)); } finally { setDang(false); }
+  };
+
+  const xemDauChan = async () => {
+    if (!pv.trim()) { toast("Nhập phạm vi, ví dụ dc:12 hoặc ky:2026-09"); return; }
+    try {
+      setDc(await api<any>(`/hach-toan/dau-chan/${encodeURIComponent(pv.trim())}`));
+    } catch (e) { toast(errMsg(e)); }
+  };
+
+  const chuaDat = d?.chua_dat_muc || [];
+
+  return (
+    <>
+      <h3 style={{ marginTop: 28 }}>Sổ tách bạch trách nhiệm</h3>
+      <p className="muted">
+        Một người không được đi cả hai bước của một cặp đã ký. So theo NGƯỜI (mã nhân viên), không
+        theo tài khoản — hai tài khoản của cùng một người vẫn là một người.
+      </p>
+
+      <div className="row" style={{ gap: 8, marginBottom: 10 }}>
+        <button className="ghost" onClick={nap} disabled={dang}>
+          Nạp các cặp đã ký
+        </button>
+        {chuaDat.length > 0 ? (
+          <Tag tone="warn">{chuaDat.length} cặp chưa ai đặt mức — đang chạy mức nhẹ nhất
+            “{d?.muc_do?.[d?.mac_dinh_khi_chua_khai] || d?.mac_dinh_khi_chua_khai}”</Tag>
+        ) : null}
+        {!kyDuoc ? <span className="muted">Hạ mức hoặc tắt một cặp cần chữ ký Chủ tịch/TGĐ.</span> : null}
+      </div>
+
+      <table><thead><tr>
+        <th>Mã cặp</th><th>Hai bước không được cùng người</th><th>Mức đang áp</th>
+        <th>Đặt mức</th><th>Người ký</th><th>Căn cứ</th>
+      </tr></thead><tbody>
+        {(d?.cac_cap || []).map((c: any) => (
+          <tr key={c.ma_cap}>
+            <td>{c.ma_cap}{!c.dang_ap_dung ? <> <Tag tone="warn">đã tắt</Tag></> : null}</td>
+            <td>{c.ten || `${c.buoc_a} ↔ ${c.buoc_b}`}</td>
+            <td>
+              {d?.muc_do?.[c.muc_do_dang_ap] || c.muc_do_dang_ap}
+              {!c.muc_do_khai ? <> <span className="muted">(chưa ai đặt)</span></> : null}
+            </td>
+            <td>
+              <select value={c.muc_do_khai || ""} disabled={dang}
+                      onChange={(e) => datMuc(c, e.target.value)}>
+                <option value="">— chưa đặt —</option>
+                {Object.entries(d?.muc_do || {}).map(([k, v]: any) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </td>
+            <td>{c.nguoi_ky || <span className="muted">—</span>}</td>
+            <td style={{ maxWidth: 320 }}>{c.can_cu || <span className="muted">—</span>}</td>
+          </tr>
+        ))}
+        {(d?.cac_cap || []).length === 0 ? (
+          <tr><td colSpan={6} className="muted">
+            Chưa nạp cặp nào. Bấm “Nạp các cặp đã ký”.
+          </td></tr>
+        ) : null}
+      </tbody></table>
+
+      <h4 style={{ marginTop: 22 }}>Dấu chân — ai đã làm bước gì</h4>
+      <div className="row" style={{ gap: 8 }}>
+        <input placeholder="dc:12 hoặc ky:2026-09" value={pv}
+               onChange={(e) => setPv(e.target.value)} style={{ width: 200 }} />
+        <button className="ghost" onClick={xemDauChan}>Xem dấu chân</button>
+        <span className="muted">Chỉ đọc — hệ thống tự ghi khi một bước hoàn thành.</span>
+      </div>
+      {dc ? (
+        <table style={{ marginTop: 8 }}><thead><tr>
+          <th>Bước</th><th>Mã người</th><th>Tài khoản</th><th>Vai</th><th>Lúc</th>
+        </tr></thead><tbody>
+          {(dc.dau_chan || []).map((x: any, i: number) => (
+            <tr key={i}>
+              <td>{x.ma_buoc}</td><td>{x.ma_nguoi}</td><td>{x.username}</td>
+              <td>{x.vai}</td><td>{x.luc}</td>
+            </tr>
+          ))}
+          {(dc.dau_chan || []).length === 0 ? (
+            <tr><td colSpan={5} className="muted">
+              Phạm vi “{dc.pham_vi}” chưa có dấu chân nào.
+            </td></tr>
+          ) : null}
+        </tbody></table>
+      ) : null}
+
+      <h4 style={{ marginTop: 22 }}>Hai vai không được kiêm nhau</h4>
+      <p className="muted">
+        Chủ tịch chốt 10/10/2026: HCNS riêng, thủ quỹ riêng. Một tài khoản không thể là cả hai —
+        chỗ lọt được là một người hai tài khoản. Bảng này chỉ ĐẾM và GỌI TÊN; thu hồi quyền làm ở
+        màn hình phân quyền.
+      </p>
+      {hv ? (
+        <div className="row" style={{ gap: 8, marginBottom: 8 }}>
+          {hv.so_truong_hop === 0
+            ? <Tag tone="ok">Không trường hợp nào</Tag>
+            : <Tag tone="bad">{hv.so_truong_hop} người đang giữ cả hai vai</Tag>}
+          {hv.mu_khi_thieu_ma_nv ? (
+            <Tag tone="warn">
+              Chưa đọc được hết: {hv.so_tai_khoan_thieu_ma_nv} tài khoản chưa có mã nhân viên,
+              số trên không có nghĩa là sạch
+            </Tag>
+          ) : null}
+        </div>
+      ) : null}
+      {(hv?.cac_truong_hop || []).length > 0 ? (
+        <table><thead><tr>
+          <th>Cặp vai</th><th>Mã người</th><th>Họ tên</th><th>Tài khoản</th>
+        </tr></thead><tbody>
+          {hv.cac_truong_hop.map((x: any, i: number) => (
+            <tr key={i}>
+              <td>{x.ten || x.ma_cap}</td><td>{x.ma_nguoi}</td>
+              <td>{x.ho_ten || <span className="muted">—</span>}</td>
+              <td>{(x.tai_khoan || []).join(", ")}</td>
+            </tr>
+          ))}
+        </tbody></table>
+      ) : null}
+
+      <h4 style={{ marginTop: 22 }}>Tài khoản vai tiền chưa có mã nhân viên</h4>
+      <div className="row" style={{ gap: 8, marginBottom: 8 }}>
+        {tk ? (tk.so_tai_khoan === 0
+          ? <Tag tone="ok">Đủ mã</Tag>
+          : <Tag tone="warn">{tk.so_tai_khoan} tài khoản thiếu mã</Tag>) : null}
+        {tk ? (
+          <span className="muted">
+            {tk.dang_bat_buoc
+              ? "Đang BẮT BUỘC: thiếu mã thì chặn bước nhạy cảm."
+              : `Chưa bắt buộc. Tham số bật: ${tk.tham_so_bat}`}
+          </span>
+        ) : null}
+      </div>
+      {(tk?.tai_khoan || []).length > 0 ? (
+        <table><thead><tr>
+          <th>Tài khoản</th><th>Họ tên</th><th>Vai</th><th>Bộ phận</th>
+        </tr></thead><tbody>
+          {tk.tai_khoan.map((x: any) => (
+            <tr key={x.id}>
+              <td>{x.username}</td><td>{x.ho_ten || <span className="muted">—</span>}</td>
+              <td>{x.vai}</td><td>{x.bo_phan || <span className="muted">—</span>}</td>
+            </tr>
+          ))}
+        </tbody></table>
+      ) : null}
     </>
   );
 }

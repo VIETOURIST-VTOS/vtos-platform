@@ -182,6 +182,99 @@ def tai_khoan_thieu_ma_nv(db) -> list[dict]:
     return sorted(ra, key=lambda d: (d["vai"], d["username"]))
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# HAI VAI KHÔNG ĐƯỢC KIÊM NHAU — Chủ tịch chốt 10/10/2026.
+#
+# Quyết định: HCNS RIÊNG, thủ quỹ RIÊNG. Nó THAY phương án "thủ quỹ kiêm HCNS" từng được ghi là
+# đã chốt, và nó BỎ ĐƯỢC một cặp tách nhiệm thứ ba: không ai kiêm thì không cần cặp để canh.
+#
+# ĐÂY LÀ LUẬT CẤP QUYỀN, KHÔNG PHẢI LUẬT MÃ. `users.role` là MỘT chuỗi, nên một tài khoản không
+# thể vừa `hcns` vừa `thu_quy` — mã đã chặn sẵn mà không ai phải viết gì. Chỗ lọt được là MỘT
+# NGƯỜI HAI TÀI KHOẢN, và nó lọt trong im lặng vì cả hai tài khoản đều trông đúng.
+#
+# NÊN PHẦN MỀM ĐẾM VÀ GỌI TÊN, KHÔNG CHẶN HỘ. Chặn ở đây là chặn sai chỗ: việc phải sửa là việc
+# cấp quyền của HCNS, không phải một bước nghiệp vụ trong sổ kế toán. Cùng lựa chọn đã dùng cho
+# `tai_khoan_thieu_ma_nv`: cái gì chỉ con người sửa được thì phần mềm làm cho nó ĐẾM ĐƯỢC.
+#
+# PHÉP ĐO MÙ Ở ĐÚNG MỘT CHỖ, và chỗ ấy ghi ra đây để không ai đọc con số 0 thành "sạch": tài
+# khoản chưa có mã nhân viên thì `ma_nguoi()` trả `u:<id>`, nên mỗi tài khoản là một người riêng
+# và hai tài khoản của cùng một người KHÔNG bị ghép. Hai phép đo bù nhau — `tai_khoan_thieu_ma_nv`
+# đếm chỗ mù, hàm này đếm chỗ thấy được.
+CAP_VAI_KHONG_KIEM = (
+    {"ma": "hcns-vs-thu-quy", "vai_a": "hcns", "vai_b": "thu_quy",
+     "ten": "Nhân sự Hành chính và Thủ quỹ",
+     "can_cu": "Chủ tịch chốt 10/10/2026: HCNS riêng và thủ quỹ riêng, bỏ bố trí kiêm nhiệm. "
+               "Người nhập dữ liệu công và lương không đồng thời là người giữ tiền."},
+)
+
+
+def vai_can_ma_de_phep_do_thay(db=None) -> tuple[str, ...]:
+    """Mọi vai mà thiếu mã nhân viên làm MỘT PHÉP ĐO BỊ MÙ — rộng hơn `VAI_TIEN`.
+
+    Hai danh sách khác nhau và cố ý khác nhau. `VAI_TIEN` là danh sách vai BỊ CHẶN khi thiếu mã
+    (luật của Đợt E2a, bật theo ngày hiệu lực). Danh sách này là vai mà thiếu mã làm phép đo
+    KHÔNG THẤY — gồm `VAI_TIEN` cộng mọi vai xuất hiện trong các cặp vai không được kiêm nhau.
+
+    Bản rà soát 10/10/2026 bắt đúng khoảng giữa hai danh sách: `hcns` không thuộc `VAI_TIEN`,
+    nên tài khoản HCNS thiếu mã không được đếm; thủ quỹ có mã, HCNS cùng người không có, phép
+    đo không ghép được VÀ cờ mù vẫn báo không mù. Màn hình khi ấy hiện "Không trường hợp nào"
+    trên một phép đo đang mù — đúng kiểu sai mà không có lỗi nào hiện ra.
+
+    Mở rộng danh sách CHẶN thì sẽ chặn HCNS ở những bước họ không làm, nên không mở; thay vào
+    đó đếm riêng, bằng hàm riêng, đặt tên theo đúng việc của nó.
+    """
+    ra = set(VAI_TIEN)
+    for c in CAP_VAI_KHONG_KIEM:
+        ra.add(c["vai_a"])
+        ra.add(c["vai_b"])
+    return tuple(sorted(ra))
+
+
+def thieu_ma_lam_mu_phep_do(db) -> list[dict]:
+    """Tài khoản thiếu mã nhân viên thuộc một vai mà phép đo cần đọc được.
+
+    Trả danh sách, không trả số: con số nói có vấn đề, danh sách nói đi tìm ai.
+    """
+    from app.models.core import User
+    vai = vai_can_ma_de_phep_do_thay()
+    ra = []
+    for x in db.execute(select(User).where(User.active == True)).scalars():   # noqa: E712
+        if (getattr(x, "role", "") in vai
+                and not (getattr(x, "staff_code", "") or "").strip()):
+            ra.append({"id": x.id, "username": x.username, "ho_ten": x.full_name,
+                       "vai": x.role, "bo_phan": x.department or ""})
+    return sorted(ra, key=lambda d: (d["vai"], d["username"]))
+
+
+def hai_vai_trung_nguoi(db) -> list[dict]:
+    """Những người đang giữ cả hai tài khoản của một cặp vai không được kiêm nhau.
+
+    Trả về danh sách có TÊN và có TÀI KHOẢN, không chỉ một con số: một con số thì không ai biết
+    phải đi tìm ai mà thu hồi quyền.
+    """
+    from app.models.core import User
+    theo_nguoi: dict[str, list] = {}
+    for x in db.execute(select(User).where(User.active == True)).scalars():   # noqa: E712
+        theo_nguoi.setdefault(ma_nguoi(x), []).append(x)
+
+    ra = []
+    for c in CAP_VAI_KHONG_KIEM:
+        for ma, ds in theo_nguoi.items():
+            if ma.startswith("u:"):
+                continue      # chưa có mã nhân viên — chỗ mù, xem `tai_khoan_thieu_ma_nv`
+            a = [x for x in ds if x.role == c["vai_a"]]
+            b = [x for x in ds if x.role == c["vai_b"]]
+            if a and b:
+                ra.append({
+                    "ma_cap": c["ma"], "ten": c["ten"], "ma_nguoi": ma,
+                    "ho_ten": (a[0].full_name or b[0].full_name or ""),
+                    "vai_a": c["vai_a"], "vai_b": c["vai_b"],
+                    "tai_khoan": sorted(x.username for x in a + b),
+                    "can_cu": c["can_cu"],
+                })
+    return sorted(ra, key=lambda d: (d["ma_cap"], d["ma_nguoi"]))
+
+
 def dau_chan(db, pham_vi: str) -> list[dict]:
     """Toàn bộ dấu chân của một phạm vi, cũ trước — để Ban Kiểm soát đọc được ai làm gì."""
     ds = db.execute(
