@@ -189,7 +189,11 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
     # Dòng "ai bấm tiếp" — phải nói ĐÚNG TÊN người đang được chờ, vì người đọc màn hình sẽ đi gõ
     # đúng người ấy. Marketing từ 23/9/2026 dừng ở một chữ ký của P.TGĐ Marketing; viết "TGĐ duyệt"
     # ở đó là chỉ sai người, và hồ sơ sẽ nằm chờ thêm một vòng vì gõ nhầm cửa.
-    ai_duyet = "P.TGĐ Marketing" if r.category == "marketing" else ("Chủ tịch + TGĐ" if r.two_signatures else "TGĐ")
+    # Hỏi CHÍNH hàm mà bước duyệt hỏi. Bản trước suy từ `two_signatures` nên viết "TGĐ" cho mọi
+    # khoản trong dự toán, kể cả khoản mà TGĐ không ký được — chỉ sai người, và hồ sơ nằm chờ
+    # thêm một vòng vì gõ nhầm cửa, đúng điều ba dòng chú thích ngay trên đã cảnh báo.
+    ai_duyet = ("P.TGĐ Marketing" if r.category == "marketing"
+                else (O.cap_duyet(db, r)["ai"] or "KHÔNG AI — chưa chốt ngưỡng duyệt chi"))
     nxt = {"cho_tp": "Bộ phận xác nhận", "cho_kt": "Kế toán kiểm tra", "cho_duyet": ai_duyet + " duyệt", "cho_chi": "Kế toán chi trên ngân hàng",
            "da_chi": "Hoàn tất", "tu_choi": "Từ chối"}[r.status]
     return {"id": r.id, "code": r.code, "category": r.category, "tour_id": r.tour_id, "tour_code": t.code if t else "", "supplier_name": r.supplier_name, "supplier_tax_code": r.supplier_tax_code,
@@ -198,6 +202,12 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
             "kt_by": r.kt_by, "approved_by": r.approved_by, "signed_chutich": r.signed_chutich, "signed_tgd": r.signed_tgd, "approved_at": r.approved_at, "reject_reason": r.reject_reason,
             "paid_at": r.paid_at, "paid_ref": r.paid_ref, "paid_method": r.paid_method, "entry_ids": r.entry_ids,
             "marketing_muc": r.marketing_muc, "campaign_id": r.campaign_id,
+            # Mốc đã áp cho hồ sơ này. RỖNG = chưa chốt mốc lúc lập (hoặc khoản Marketing, nơi mốc
+            # không áp) — màn hình phải hiện "chưa chốt", tuyệt đối không hiện số 0.
+            "nguong_duyet_ap_dung": r.nguong_duyet_ap_dung,
+            # Vai nào đang ở cấp duyệt của hồ sơ — màn hình ĐỌC ô này chứ không tự suy. Rỗng là
+            # KHÔNG AI bấm được lúc này, và màn hình phải nói ra. Xem `services/ops.py::vai_ky_duoc`.
+            "vai_ky_duoc": O.vai_ky_duoc(db, r),
             # VPM-17. Rỗng là CHƯA AI NHẬP – màn hình phải hiện "Chưa có hạn", tuyệt đối không hiện
             # ngày lập thay vào đó.
             "ngay_den_han": r.ngay_den_han, "ngay_den_han_boi": r.ngay_den_han_boi,
@@ -308,8 +318,19 @@ def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptg
         if not O.ai_duyet_duoc_mkt(db):
             flags.append("CHƯA AI GIỮ VAI P.TGĐ MARKETING → hồ sơ này sẽ nằm chờ, không ai duyệt được")
     else:
-        if r.over_budget: flags.append("NGOÀI DỰ TOÁN → 2 chữ ký (cổng 15)")
-        elif r.two_signatures: flags.append("≥ hạn mức → 2 chữ ký (cổng 15)")
+        # NGOÀI DỰ TOÁN và MỐC TIỀN là hai lý do KHÁC NHAU, nên nói cả hai, mỗi lý do một câu.
+        # Câu cũ ở đây viết "≥ hạn mức → 2 chữ ký" cho cờ `two_signatures`, mà cờ ấy nghĩa là
+        # NGOÀI DỰ TOÁN — không phải một mốc tiền nào. Nhãn nói sai thì người đọc đi gõ sai người,
+        # và lần ấy không ai thấy vì màn hình vẫn có một câu trông hợp lý.
+        if r.two_signatures: flags.append("NGOÀI DỰ TOÁN → cần CẢ HAI chữ ký Chủ tịch + TGĐ (cổng 15)")
+        elif r.over_budget: flags.append("NGOÀI DỰ TOÁN (cổng 15)")
+        _cd = O.cap_duyet(db, r)
+        if _cd["chua_chot"]:
+            flags.append("CHƯA CHỐT NGƯỠNG DUYỆT CHI → hồ sơ này sẽ nằm chờ, không ai duyệt được "
+                         f"(tham số `{O.NGUONG_CHU_TICH_KEY}`, hai chữ ký)")
+        else:
+            flags.append(("≥ " if _cd["tren_moc"] else "< ")
+                         + f"{_cd['nguong']:,.0f}đ → {_cd['ai']} duyệt")
     return {"request": pr_out(r, db), "message": f"Đã lập {r.code}" + (" – " + "; ".join(flags) if flags else "")}
 
 

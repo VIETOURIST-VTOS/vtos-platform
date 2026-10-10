@@ -74,9 +74,21 @@ function Expenses() {
     // chốt: "dữ liệu vẫn đẩy lên cho TGĐ và CT xem, và không cần duyệt".
     // Máy chủ mới là chỗ chặn thật (services/ops.py::step); dòng này chỉ để không vẽ ra một cái
     // nút bấm vào là báo lỗi.
-    if (r.status === "cho_duyet" && r.category === "marketing" && role === "ptgd_mkt" && r.created_by !== user?.username)
-      out.push(["P.TGĐ Marketing duyệt", "approve", ""]);
-    if (r.status === "cho_duyet" && r.category !== "marketing" && (role === "tgd" || (role === "chutich" && r.two_signatures))) out.push([role === "tgd" ? "TGĐ duyệt" : "Chủ tịch ký", "approve", ""]);
+    // ĐỢT F1 — màn hình ĐỌC cấp duyệt từ máy chủ (`vai_ky_duoc`), KHÔNG tự suy.
+    // Dòng cũ ở đây viết `role === "tgd" || (role === "chutich" && r.two_signatures)` — đúng cái
+    // cờ sai mà F1 sửa ở máy chủ, nên để nguyên là màn hình sai cả hai đầu: TGĐ thấy nút trên
+    // khoản từ mốc trở lên rồi bấm vào nhận 422, Chủ tịch không có nút trên khoản ông phải ký.
+    // Máy chủ vẫn là chỗ chặn thật (`services/ops.py::step`); dòng này chỉ để không vẽ ra một
+    // cái nút bấm vào là báo lỗi, và không giấu đi một cái nút đáng lẽ phải có.
+    //
+    // DANH SÁCH RỖNG nghĩa là KHÔNG AI bấm được lúc này — chưa chốt ngưỡng, hoặc chưa ai giữ vai
+    // P.TGĐ Marketing. Hồ sơ vẫn hiện trong danh sách cho cả TGĐ và Chủ tịch XEM, chỉ không có
+    // nút: đúng điều Chủ tịch chốt 10/10/2026 — dưới mốc TGĐ duyệt nhưng Chủ tịch vẫn phải thấy,
+    // trên mốc TGĐ cũng vẫn thấy nhưng không bấm duyệt.
+    if (r.status === "cho_duyet" && (r.vai_ky_duoc || []).includes(role)
+        && !(r.category === "marketing" && r.created_by === user?.username))
+      out.push([r.category === "marketing" ? "P.TGĐ Marketing duyệt"
+                : role === "tgd" ? "TGĐ duyệt" : "Chủ tịch ký", "approve", ""]);
     if (r.status === "cho_chi" && role === "ketoan") out.push(["Đã chi (nhập mã GD)", "pay", "orange"]);
     if (!["da_chi", "tu_choi"].includes(r.status) && ["tgd", "chutich", "ketoan", "tp_dh", "ptgd_mkt"].includes(role)) out.push(["Từ chối", "reject", "grey"]);
     return out;

@@ -64,6 +64,26 @@ class PaymentRequest(Base):
     has_invoice: Mapped[bool] = mapped_column(Boolean, default=False)     # có hóa đơn GTGT (không → không được trừ TNDN)
     over_budget: Mapped[bool | None] = mapped_column(Boolean, default=False)     # ngoài dự toán → 2 chữ ký (cổng 15, nullable=True)
     two_signatures: Mapped[bool] = mapped_column(Boolean, default=False)  # cần Chủ tịch + TGĐ
+    # ═══════════════════════════════════════════════════════════════════════════════════════
+    # NGƯỠNG DUYỆT CHI ĐÃ ÁP CHO HỒ SƠ NÀY — Đợt F1
+    # ═══════════════════════════════════════════════════════════════════════════════════════
+    #
+    # Mốc tiền phân cấp duyệt: dưới mốc TGĐ ký, từ mốc trở lên Chủ tịch ký. Mốc nằm ở tham số
+    # `nguong_chu_tich_duyet_chi` (hai chữ ký, màn hình Tham số) — KHÔNG trong mã.
+    #
+    # VÌ SAO GHI MỐC XUỐNG HỒ SƠ thay vì đọc tham số lúc duyệt: tham số đổi được. Một hồ sơ đã
+    # trình theo mốc 100 triệu mà hôm sau mốc nâng lên 500 triệu thì nó TỰ TỤT xuống cấp TGĐ, không
+    # ai bấm gì và không dòng nhật ký nào ghi lại. Cấp duyệt của một hồ sơ phải là cấp lúc hồ sơ ấy
+    # được trình, nên con số ấy phải nằm TRÊN hồ sơ.
+    #
+    # RỖNG (K2) nghĩa là CHƯA CHỐT MỐC, không phải "không có mốc" và không phải số 0. Hồ sơ rỗng ô
+    # này bị CHẶN ở bước duyệt kèm lời nói rõ phải ký ở đâu — xem `services/ops.py::cap_duyet`.
+    # Hồ sơ lập TRƯỚC bản nâng cấp này cũng rỗng; `step` lấy mốc đang hiệu lực và ghi xuống đúng
+    # lúc duyệt, nên từ đó về sau đọc lại không đổi nữa.
+    #
+    # KHOẢN MARKETING CỐ Ý ĐỂ RỖNG: nó do P.TGĐ Marketing duyệt một chữ ký (Chủ tịch chốt
+    # 23/9/2026), mốc tiền không áp vào nó. Điền một con số vào đó là mời người đọc sau này hiểu sai.
+    nguong_duyet_ap_dung: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="cho_tp")     # cho_tp / cho_kt / cho_duyet / cho_chi / da_chi / tu_choi
     created_by: Mapped[str] = mapped_column(String(50))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

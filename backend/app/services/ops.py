@@ -248,6 +248,102 @@ def _next_code(db: Session) -> str:
     return tiep_theo(db, PaymentRequest, f"DC{date.today():%y%m}-", 4)
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# NGƯỠNG DUYỆT CHI — "dưới mốc TGĐ, từ mốc trở lên CHỦ TỊCH" (Đợt F1)
+# ══════════════════════════════════════════════════════════════════════════════════════════
+NGUONG_CHU_TICH_KEY = "nguong_chu_tich_duyet_chi"
+
+CHUA_CHOT_NGUONG = (
+    "CHƯA CHỐT NGƯỠNG DUYỆT CHI. Mức tiền mà từ đó trở lên lệnh chi do Chủ tịch duyệt nằm ở tham "
+    f"số `{NGUONG_CHU_TICH_KEY}` trên màn hình Tham số, và nó mở bằng HAI CHỮ KÝ. Chưa có người ký "
+    "mức ấy thì không duyệt được khoản nào: rỗng nghĩa là CHƯA AI CHỐT, không phải là không có mốc."
+)
+
+
+def nguong_chu_tich_dang_hieu_luc(db: Session) -> float | None:
+    """Mốc tiền đang hiệu lực. `None` = CHƯA CHỐT.
+
+    ĐỌC BẰNG `get_param_text`, KHÔNG `get_param`. Giá trị mặc định của khóa này là RỖNG, và
+    `get_param` làm `float("")` — nổ `ValueError` ngay ở chỗ không ai bắt, trên một endpoint mà mọi
+    vai trò đều gọi. Cùng khuôn với `thue_tncn.ky_bat_dau()`, vì cùng một loại công tắc: phép tính
+    viết được bằng mã, còn MỐC thì phải có người ký.
+    """
+    try:
+        v = (R.get_param_text(db, NGUONG_CHU_TICH_KEY) or "").strip()
+    except KeyError:
+        return None
+    if not v:
+        return None
+    try:
+        return float(v)
+    except ValueError:
+        # Giá trị có mà không đọc ra số: đóng về phía CHẶN. Cửa `POST /params` đã ép `float()` nên
+        # chỉ một lần sửa thẳng cơ sở dữ liệu mới vào được đây — và lúc ấy chặn là đúng.
+        return None
+
+
+def cap_duyet(db: Session, r: PaymentRequest) -> dict:
+    """MỘT chỗ duy nhất trả lời câu "khoản này ai duyệt".
+
+    BỐN NƠI ĐỌC: `step` (ai bấm được), `pr_out` (dòng "ai bấm tiếp"), nhãn trên cửa lập, và hàng
+    đợi chờ duyệt ở `dashboard`.
+
+    VÌ SAO PHẢI LÀ MỘT HÀM. Lỗi 13/9/2026 và lại 10/10/2026 cùng một hình: hai chỗ tự suy ra cùng
+    một câu trả lời theo hai cách rồi lệch nhau — cửa mở mà biển đề đóng. Trước bản này hàng đợi
+    của Chủ tịch lọc `two_signatures == True` còn `step` hỏi một câu khác hẳn; hai câu khác nhau về
+    cùng một hồ sơ là chỗ hỏng, không phải một tiện lợi. Hàm có tên thì bộ kiểm đọc được và phép
+    thử canh được.
+
+    KHÔNG GỌI CHO KHOẢN MARKETING: nó đi một chữ ký của P.TGĐ Marketing (23/9/2026), mốc tiền không
+    áp vào nó. Nơi gọi tự chặn trước, và mỗi nơi gọi đều ghi rõ điều ấy.
+    """
+    nguong, nguon = r.nguong_duyet_ap_dung, "ho_so"
+    if nguong is None:
+        # Hồ sơ lập TRƯỚC bản nâng cấp này không có ô ấy. Lấy mốc đang hiệu lực — sự thật tốt nhất
+        # đọc được — và `step` ghi nó xuống hồ sơ đúng lúc duyệt, nên lần đọc sau không đổi nữa.
+        nguong, nguon = nguong_chu_tich_dang_hieu_luc(db), "tham_so"
+    if nguong is None:
+        return {"nguong": None, "nguon": "chua_chot", "chua_chot": True, "tren_moc": None,
+                "can_tgd": False, "can_chutich": False, "ai": "", "ly_do": CHUA_CHOT_NGUONG}
+    nguong = float(nguong)
+    tren_moc = float(r.amount or 0) >= nguong
+    # `two_signatures` = NGOÀI DỰ TOÁN (cổng 15). Lý do KHÁC với mốc tiền, và CỘNG THÊM vào chứ
+    # không thay thế: một khoản 50 triệu ngoài dự toán vẫn cần cả hai chữ ký, một khoản 300 triệu
+    # trong dự toán chỉ cần Chủ tịch. Trộn hai lý do vào một cờ là mất một trong hai.
+    can_tgd = bool(r.two_signatures) or not tren_moc
+    can_chutich = bool(r.two_signatures) or tren_moc
+    ai = " + ".join(t for t in (("Chủ tịch" if can_chutich else ""), ("TGĐ" if can_tgd else "")) if t)
+    return {"nguong": nguong, "nguon": nguon, "chua_chot": False, "tren_moc": tren_moc,
+            "can_tgd": can_tgd, "can_chutich": can_chutich, "ai": ai, "ly_do": ""}
+
+
+def vai_ky_duoc(db: Session, r: PaymentRequest) -> list[str]:
+    """Vai nào ĐANG Ở CẤP DUYỆT của hồ sơ này — tức vai nào màn hình được vẽ nút bấm cho.
+
+    VÌ SAO HÀM NÀY PHẢI CÓ. `web/app/expenses/page.tsx` tự suy ra cùng câu trả lời bằng tay:
+        role === "tgd" || (role === "chutich" && r.two_signatures)
+    Đó là ĐÚNG cái cờ sai mà đợt này sửa ở máy chủ, nên nếu để nguyên thì sau F1 màn hình sai cả
+    hai đầu: TGĐ thấy nút trên khoản từ mốc trở lên rồi bấm vào nhận 422, còn Chủ tịch KHÔNG có
+    nút trên khoản ông phải ký. Cửa mở biển đề đóng, lần thứ tư, và lần này là biển.
+    Nên máy chủ TRẢ RA danh sách vai, màn hình chỉ đọc. Một chỗ suy, nhiều chỗ đọc.
+
+    CHỦ TỊCH TOÀN QUYỀN KHÔNG NẰM TRONG DANH SÁCH NÀY khi khoản ở dưới mốc. Toàn quyền
+    (06/9/2026) là một ĐƯỜNG VƯỢT, không phải đường mặc định: máy chủ vẫn nhận chữ ký của ông,
+    nhưng màn hình không mời ông bấm — đúng điều Chủ tịch chốt 10/10/2026, "dưới 100 triệu TGĐ
+    duyệt nhưng Chủ tịch vẫn phải thấy". Thấy, không phải bấm.
+
+    RỖNG nghĩa là KHÔNG AI bấm được lúc này: khoản Marketing chưa ai giữ vai `ptgd_mkt`, hoặc
+    chưa chốt mốc. Màn hình phải nói ra chứ không vẽ một danh sách rỗng trong im lặng.
+    """
+    if r.status != "cho_duyet":
+        return []
+    if r.category == "marketing":
+        return [VAI_DUYET_MKT]
+    c = cap_duyet(db, r)
+    return ([] if c["chua_chot"]
+            else [v for v, co in (("chutich", c["can_chutich"]), ("tgd", c["can_tgd"])) if co])
+
+
 def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     cat = data["category"]
     if cat not in CATEGORY_CONFIRMER: raise ValueError("Loại chi không hợp lệ")
@@ -351,6 +447,16 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
         cf = tour_cashflow(db, t)
         if (cf["paid"] or 0) + cf["committed"] + cf["pending"] + (r.amount or 0) > (cf["budget"] or 0) + 1:
             r.over_budget, r.two_signatures = True, True
+    # NGƯỠNG DUYỆT CHI — CHỐT Ở LÚC LẬP và ghi xuống hồ sơ (Đợt F1). Xem `models/ops.py` tại cột
+    # `nguong_duyet_ap_dung` để biết vì sao không đọc tham số lúc duyệt.
+    #
+    # RỖNG Ở ĐÂY NGHĨA LÀ CHƯA CHỐT MỐC, và `step` sẽ CHẶN chứ không cho qua. Lập VẪN ĐƯỢC: chặn ở
+    # cửa lập là bắt người lập chịu một việc chưa ký của cấp trên, và hồ sơ không lập được thì
+    # không có gì đếm ra để ai đó đi ký. Nhãn trả về từ cửa lập nói rõ hồ sơ sẽ nằm chờ.
+    #
+    # Marketing KHÔNG ghi ô này — một chữ ký của P.TGĐ Marketing, mốc tiền không áp.
+    if cat != "marketing":
+        r.nguong_duyet_ap_dung = nguong_chu_tich_dang_hieu_luc(db)
     db.add(r); db.flush()
     R.audit(db, u.username, u.role, "lap_de_nghi_chi", f"dc:{r.code}", after={"loai": cat, "tour": t.code if t else "", "ncc": r.supplier_name, "so_tien": r.amount,
                                                                               "ngoai_du_toan": r.over_budget, "hai_chu_ky": r.two_signatures})
@@ -406,7 +512,13 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         if not r.has_document: raise ValueError("Thiếu chứng từ đính kèm (hợp đồng/hóa đơn/báo giá) – không chuyển duyệt")
         if r.category not in ("hoan_tien", "tam_ung") and not r.supplier_tax_code: raise ValueError("NCC chưa có MST – phải xác nhận trước khi thanh toán")
         r.status, r.kt_by = "cho_duyet", u.username
-        msg = f"{r.code}: Kế toán đã kiểm tra, trình {'Chủ tịch + TGĐ' if r.two_signatures else 'TGĐ'} duyệt"
+        # Câu này là thứ Kế toán đọc rồi đi gõ đúng người, nên nó phải hỏi CHÍNH hàm mà bước duyệt
+        # hỏi. Bản trước suy từ `two_signatures`, tức luôn viết "TGĐ" cho mọi khoản trong dự toán —
+        # kể cả khoản 300 triệu mà TGĐ không ký được.
+        _c = cap_duyet(db, r) if r.category != "marketing" else None
+        _ai = ("P.TGĐ Marketing" if _c is None
+               else (_c["ai"] or "KHÔNG AI — chưa chốt ngưỡng duyệt chi"))
+        msg = f"{r.code}: Kế toán đã kiểm tra, trình {_ai} duyệt"
     elif action == "approve":
         if r.status != "cho_duyet": raise ValueError("Không ở bước duyệt")
         if r.category == "marketing":
@@ -426,10 +538,36 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
             db.commit()
             return (f"{r.code} đã duyệt – lập lệnh chi chờ Kế toán thực hiện"
                     + (" (khoản này NGOÀI DỰ TOÁN)" if r.over_budget else ""))
-        if u.role == "tgd": r.signed_tgd = True
-        elif u.role == "chutich" and r.two_signatures: r.signed_chutich = True
-        else: raise ValueError("Chỉ TGĐ (và Chủ tịch khi cần 2 chữ ký) duyệt chi")
-        done = r.signed_tgd and (r.signed_chutich or not r.two_signatures)
+        # ═══════════════════════════════════════════════════════════════════════════════════
+        # AI ĐƯỢC BẤM — Đợt F1. Ba dòng cũ nằm ở đây đã nói NGƯỢC luật:
+        #     if u.role == "tgd": ...
+        #     elif u.role == "chutich" and r.two_signatures: ...
+        #     else: raise ValueError("Chỉ TGĐ (và Chủ tịch khi cần 2 chữ ký) duyệt chi")
+        # Một khoản 300 triệu TRONG dự toán có `two_signatures = False`, nên Chủ tịch rơi vào `else`
+        # và BỊ TỪ CHỐI, còn TGĐ lại ký được. Đúng ngược hai đầu.
+        # ═══════════════════════════════════════════════════════════════════════════════════
+        cd = cap_duyet(db, r)
+        if cd["chua_chot"]:
+            raise ValueError(cd["ly_do"])
+        if r.nguong_duyet_ap_dung is None:
+            # Hồ sơ cũ: ghi mốc đang áp xuống hồ sơ NGAY LÚC DUYỆT, để lần đọc sau không đổi nữa.
+            r.nguong_duyet_ap_dung = cd["nguong"]
+        if u.role == "tgd" and cd["can_tgd"]:
+            r.signed_tgd = True
+        elif toan_quyen(u):
+            # Chủ tịch. Trên mốc thì đây LÀ cấp duyệt của khoản; dưới mốc thì ông ký thay cấp TGĐ
+            # theo luật toàn quyền 06/9/2026 — ghi vào ô TGĐ vì đó là cấp duyệt của khoản này, còn
+            # AI BẤM thì nhật ký kiểm toán ghi tên, nên vẫn truy được trách nhiệm.
+            if cd["can_chutich"]: r.signed_chutich = True
+            else: r.signed_tgd = True
+        else:
+            raise ValueError(
+                f"Khoản {float(r.amount or 0):,.0f}đ "
+                + ("TỪ MỐC" if cd["tren_moc"] else "dưới mốc")
+                + f" {cd['nguong']:,.0f}đ → {cd['ai']} duyệt."
+                + (" Khoản NGOÀI DỰ TOÁN cần cả hai chữ ký (cổng 15)." if r.two_signatures else "")
+                + " Vai của anh/chị không ở cấp duyệt của khoản này.")
+        done = (r.signed_tgd or not cd["can_tgd"]) and (r.signed_chutich or not cd["can_chutich"])
         if done:
             r.status, r.approved_by, r.approved_at = "cho_chi", u.username, datetime.now()
             _post_liability(db, r)
