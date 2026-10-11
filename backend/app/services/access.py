@@ -18,6 +18,7 @@ xem được dòng tiền, tài khoản ngân hàng, sổ kế toán và nhật 
 """
 from fastapi import HTTPException
 from app.models.core import User, ROLES
+from app.services import vai_ke_thua as VKT   # phep suy vai ke thua, Dot LG1
 
 LEADERSHIP = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt")
 CONTROL = ("ketoan", "cntt", "bks")
@@ -68,7 +69,13 @@ BASE_VIEW = FULL_VIEW + READ_ALL                        # nền của MỌI dòn
 # Hàng rào `test_ns2` tính tập vai của người TẠI CHỖ từ `ROLES` và đòi khớp đúng, không đòi một con số.
 MOI_NHAN_VIEN = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "nv_kd", "tn_kd", "tp_kd",
                  "gd_kd", "sales_admin", "nv_mkt", "ketoan", "hcns", "cntt", "bks", "tai_xe", "hdv",
-                 "gd_doi_xe", "tp_hd", "nv_visa", "hanh_chinh", "ir_phapche")
+                 "gd_doi_xe", "tp_hd", "nv_visa", "hanh_chinh", "ir_phapche",
+                 # Ba vai tiền của Đợt E2b, thêm 11/10/2026 — và chúng vào đây vì HÀNG RÀO REO,
+                 # đúng như `ir_phapche` ngày 08/10: `test_ns2` tính tập vai của NGƯỜI từ `ROLES`
+                 # và đỏ ngay. Kế toán trưởng, Kế toán thanh toán và Thủ quỹ là người đi làm —
+                 # họ gửi đơn nghỉ phép như mọi nhân viên khác. Bảng này của làn Nhân sự; Chủ
+                 # tịch cho phép chạm vào 11/10/2026.
+                 "ketoan_truong", "ketoan_tt", "thu_quy")
 # `ir_phapche` thêm 08/10/2026 chiều — và nó vào đây vì HÀNG RÀO REO, không vì ai nhớ ra. Vai ấy mở
 # sáng cùng ngày ở Đợt D2 (PR #247); `test_ns2` tính tập vai của NGƯỜI tại chỗ từ `ROLES` và đỏ ngay
 # với đúng một tên. Đây là lý do phép thử ấy cố ý KHÔNG viết con số 22 vào mã: viết số thì nó đỏ mà
@@ -1148,12 +1155,18 @@ MAN_HINH_THU_QUY = (
 
 
 def _mo_cho_ba_vai(menu: dict) -> dict:
-    """Thêm ba vai mới vào bảng màn hình. Suy từ `ketoan`, không chép tay."""
+    """Thêm ba vai mới vào bảng màn hình.
+
+    `ketoan_truong` suy từ `ketoan` qua `services/vai_ke_thua.py` — ĐÚNG phép suy mà
+    `require_roles` dùng để mở cửa, nên hai bảng không lệch nhau được. Hai vai còn lại khai
+    thẳng danh sách màn hình của mình: chúng là vai HẸP, kế thừa sẽ xoá mất việc tách vai.
+    """
     ra = {}
     for m, vai in menu.items():
-        v = tuple(vai)
-        if "ketoan" in v and "ketoan_truong" not in v:
-            v = v + ("ketoan_truong",)
+        # Đợt LG1: phép suy `ketoan` → `ketoan_truong` chuyển vào `services/vai_ke_thua.py`, nơi
+        # `require_roles` cũng đọc. Ba dòng viết tay cũ ở đây chỉ suy MỘT BÊN — bảng màn hình —
+        # nên 28 màn hình mở ra mà cửa phía sau vẫn đóng.
+        v = VKT.mo_rong(tuple(vai))
         if m in MAN_HINH_KETOAN_TT and "ketoan_tt" not in v:
             v = v + ("ketoan_tt",)
         if m in MAN_HINH_THU_QUY and "thu_quy" not in v:

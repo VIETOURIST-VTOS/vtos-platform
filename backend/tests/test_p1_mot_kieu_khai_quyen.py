@@ -69,5 +69,16 @@ def test_moi_endpoint_khai_quyen_deu_doc_duoc_danh_sach_vai_tro():
     """require_roles gắn sẵn danh sách vai trò lên chính hàm phụ thuộc, để bộ kiểm đọc được mà không
     phải suy từ tên hàm."""
     from app.api.deps import require_roles
+    from app.services import vai_ke_thua as VKT
     dep = require_roles("ketoan", "hcns")
-    assert getattr(dep, "vai_tro_yeu_cau", None) == ("ketoan", "hcns")
+    co = getattr(dep, "vai_tro_yeu_cau", None)
+    assert co is not None, "require_roles phải gắn ô `vai_tro_yeu_cau` cho bộ kiểm đọc"
+    # ĐỔI Ở ĐỢT LG1: ô này nay ghi tập ĐÃ NỚI theo vai kế thừa, không phải tập khai tay. Câu cũ
+    # so BẰNG với tập khai tay, và nếu giữ nguyên thì nó ép ô này nói SAI về cửa thật sự đang mở.
+    #
+    # Nhưng không đổi thành "chứa là đủ" — như thế thì ô này nói gì cũng đạt. Đòi ĐÚNG BẰNG tập
+    # nới của phép suy có tên, nên thêm một vai kế thừa mới mà quên chỗ này là vẫn đỏ.
+    assert set(co) >= {"ketoan", "hcns"}, f"mất vai khai tay: {co}"
+    assert co == VKT.mo_rong(("ketoan", "hcns")), (
+        "ô `vai_tro_yeu_cau` phải đúng bằng tập đã nới của `vai_ke_thua.mo_rong`, "
+        f"đang là {co}")

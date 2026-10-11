@@ -58,6 +58,16 @@ CHO_DA_KHAI_BA_VAI = [
     "services/ops.py: ketoan_tt",
     "services/ops.py: thu_quy",
     "api/v1/tai_xe.py: ketoan_truong",
+    # ── Đợt LG1, 11/10/2026 ───────────────────────────────────────────────────────────────
+    # Hai cửa ĐỌC công nợ mở cho Kế toán thanh toán. Đây là cặp lệch thứ 29 của Đợt E2b:
+    # `/cong-no` mở trên bảng MÀN HÌNH mà `debts.READ` và `cong_no_vietrip.XEM` không có
+    # `ketoan_tt`, nên thấy menu rồi nhận 403. Hai hằng số ấy vốn đã ghi "khớp nhau".
+    #
+    # `ketoan_tt` KHÔNG kế thừa `ketoan` — nó là vai HẸP (chuyển khoản), cho kế thừa là xoá
+    # mất chính việc tách vai của E2b. Nên cặp này chữa bằng cách mở ĐÚNG hai cửa đọc, và
+    # hai dòng ấy phải khai ở đây để lần sau còn đếm được.
+    "api/v1/debts.py: ketoan_tt",
+    "api/v1/cong_no_vietrip.py: ketoan_tt",
 ]
 GOC_APP = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app")
 
@@ -94,8 +104,16 @@ def test_b1_ke_toan_truong_nhin_dung_bang_ke_toan():
 
 
 # ─────────────────────────── C ───────────────────────────
+# ĐỢT LG1, 11/10/2026: ba vai tiền vào `MOI_NHAN_VIEN` (Chủ tịch chốt: "họ là người làm việc"),
+# nên MENU của hai vai hẹp thêm ĐÚNG hai màn hình ĐƠN TỪ dưới đây. Không phải quyền tiền.
+#
+# Vẫn so BẰNG chứ không đổi sang "chứa": nới câu hỏi thành "chứa" là bỏ mất chính điều hai phép
+# thử này canh — rằng hai vai ấy HẸP ĐÚNG NHƯ ĐÃ KHAI và không ai nới thêm được mà không ai thấy.
+MAN_HINH_DON_TU = {"/cham-cong", "/de-nghi-mua"}
+
+
 def test_c1_thu_quy_dung_ba_man_hinh_da_khai():
-    assert man_hinh("thu_quy") == set(AC.MAN_HINH_THU_QUY)
+    assert man_hinh("thu_quy") == set(AC.MAN_HINH_THU_QUY) | MAN_HINH_DON_TU
 
 
 def test_c2_hai_man_hinh_ay_la_cho_nam_bon_cua_cua_thu_quy():
@@ -116,7 +134,7 @@ def test_c2_hai_man_hinh_ay_la_cho_nam_bon_cua_cua_thu_quy():
 
 
 def test_c3_ke_toan_thanh_toan_dung_tap_da_khai():
-    assert man_hinh("ketoan_tt") == set(AC.MAN_HINH_KETOAN_TT)
+    assert man_hinh("ketoan_tt") == set(AC.MAN_HINH_KETOAN_TT) | MAN_HINH_DON_TU
 
 
 # ─────────────────────────── D ───────────────────────────
@@ -179,7 +197,10 @@ def test_f1_dot_nay_chi_mo_dung_nhung_cho_da_khai():
     vì tệp ấy khai một tuple `READ` rồi mới trải vào. Soi theo cú pháp thì luôn có một cách
     viết khác lọt qua; soi theo TÊN VAI thì không.
     """
-    NOI_DINH_NGHIA = {"models/core.py", "services/access.py"}
+    # `services/vai_ke_thua.py` vào đây ở Đợt LG1 vì nó ĐÚNG LÀ nơi định nghĩa: `VAI_KE_THUA`
+    # là một dòng khai phép suy, không phải một lần mở quyền. Khai nó như một "chỗ mở quyền"
+    # thì danh sách trên kia nói sai về chính nó.
+    NOI_DINH_NGHIA = {"models/core.py", "services/access.py", "services/vai_ke_thua.py"}
     co = []
     for goc, _d, tep in os.walk(GOC_APP):
         for t_ in tep:

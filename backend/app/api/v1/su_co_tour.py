@@ -16,6 +16,7 @@ from app.models.suppliers import Supplier
 from app.models.su_co_tour import (SuCoTour, SuCoTourXuLy, SC_NHOM, SC_MUC, SC_TRANG_THAI, SC_CHUYEN,
                                    SC_NGUYEN_NHAN)
 from app.services import su_co_tour as SC
+from app.services import vai_ke_thua as VKT   # phep suy vai ke thua, Dot LG1
 
 router = APIRouter(prefix="/api/v1", tags=["su-co-tour"])
 
@@ -33,6 +34,11 @@ router = APIRouter(prefix="/api/v1", tags=["su-co-tour"])
 # suy đoán — và có phép thử canh đúng điều đó trong `test_dh1`.
 XEM = ("chutich", "tgd", "bks", "robot_ks", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "gd_kd",
        "tp_kd", "tn_kd", "nv_kd", "tp_hd", "gd_doi_xe", "sales_admin", "ketoan", "cntt")
+# Đợt LG1 — nới một lượt bằng phép suy vai kế thừa, KHÔNG gõ thêm tên vai vào bộ ở trên. `test_dh1`
+# so THẲNG hằng số này với `MENU_ROLES["/su-co-tour"]`, nên nới ở `require_roles` thôi là chưa đủ:
+# hằng số phải nói đúng cửa thật. Để thành một dòng RIÊNG thay vì gói cả bộ, để lần sau ai thêm một
+# vai vào bộ trên vẫn thấy rõ phép suy đứng ở đâu.
+XEM = VKT.mo_rong(XEM)
 
 # Ai được đọc TÊN KHÁCH trong các ô chọn của màn hình này (10/9/2026, sau khi anh Tuấn chốt mở màn
 # hình cho GĐ Đội xe và TP Hướng dẫn).
