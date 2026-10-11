@@ -3,6 +3,7 @@ from datetime import date, datetime
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.core import Tour, User, ServiceRequest, Booking, Alert, AuditLog, ROLES
+from app.services import segments as SEG   # Dot LG3
 from app.services import chu_ky as _CK   # bang chu ky, Dot LG2 - nhap o DAU TEP vi require_roles doc no luc nap mo-dun
 from app.services import rules as R
 from app.services import ghi_mot_lan as GML
@@ -360,17 +361,40 @@ def approve(db: Session, u: User, t: Tour, note: str = "") -> str:
         #
         # CỬA NÀY VẪN KHÔNG GỌI `chu_ky.kiem_tra_nguoi_ky` — Chủ tịch quyết 11/10/2026 biết và
         # chấp nhận; xem `chu_ky.KHONG_GOI_KIEM_TRA["tours.approve"]` để biết lỗ ấy là gì.
-        _can = _CK.can_ky("du_toan_duoi_bien")
+        # ĐỢT LG3: ai ký tuỳ MẢNG của chuyến — Đoàn thì P.TGĐ tour đoàn, Lẻ thì GĐ Kinh doanh.
+        # Chủ tịch chốt 11/10/2026 chọn "phòng BÁN nó" chứ không phải "phòng LÀM nó": dự toán do
+        # Điều hành lập, nhưng tiền và chỉ tiêu của chuyến thuộc phòng bán, nên người chịu hậu
+        # quả của một chuyến chạy dưới biên là người ký.
+        #
+        # LG2 khai cứng `ptgd_doan` cho MỌI chuyến; với chuyến mảng Lẻ thì đó là sai người, và
+        # đợt này sửa nốt.
+        try:
+            _can = _CK.can_ky_duoi_bien(SEG.mang_of(t))
+        except ValueError as _ex:
+            raise Gate("CONG_1", str(_ex))
         if u.role not in _can and not toan_quyen(u):
             raise Gate("CONG_1", "Chuyến dưới biên 10% chỉ "
                        + " và ".join(ROLES.get(v, v) for v in _can) + " được ký")
-        _vai = u.role if u.role in _can else next((v for v in _can if not getattr(t, f"signed_{v}", False)), "")
+
+        def _da_ky(v):
+            """Đã có chữ ký của vai này chưa — đọc CẢ cột cũ lẫn ô tên mới.
+
+            Chuyến ký dở giữa hai đợt không được mất chữ ký đã có: cột boolean là sự thật của
+            bản trước, ô `nguoi_da_ky` là sự thật từ LG3. Bỏ một trong hai là xoá một chữ ký.
+            """
+            return bool(getattr(t, f"signed_{v}", False)) or v in _CK.doc_nguoi_da_ky(t.nguoi_da_ky)
+
+        _vai = u.role if u.role in _can else next((v for v in _can if not _da_ky(v)), "")
         if not _vai: raise Gate("DA_KY", "Đã đủ chữ ký")
-        if getattr(t, f"signed_{_vai}"): raise Gate("DA_KY", "Đã ký rồi")
-        setattr(t, f"signed_{_vai}", True)
+        if _da_ky(_vai): raise Gate("DA_KY", "Đã ký rồi")
+        if hasattr(t, f"signed_{_vai}"):
+            setattr(t, f"signed_{_vai}", True)      # cột cũ còn thì vẫn ghi, để bản đọc cũ đúng
+        _ten = _CK.doc_nguoi_da_ky(t.nguoi_da_ky)
+        _ten[_vai] = u.username
+        t.nguoi_da_ky = _CK.ghi_nguoi_da_ky(_ten)
         EV(db, t, "ky", u.username, note, title=f"Ký duyệt chuyến dưới biên ({ROLES[u.role]})")
         R.audit(db, u.username, u.role, "ky_duyet_duoi_bien", f"tour:{t.code}", after=snap(t))
-        if all(getattr(t, f"signed_{v}", False) for v in _can):
+        if all(_da_ky(v) for v in _can):
             t.status, t.approved_by = "da_duyet", "+".join(_can)
             R.audit(db, u.username, u.role, "duyet_du_toan_2_chu_ky", f"tour:{t.code}", after=snap(t)); db.commit()
             return "Đủ 2 chữ ký – chuyến được duyệt với cờ 'dưới biên' (không thưởng lẻ, không tính chỉ tiêu)"

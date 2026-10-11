@@ -117,14 +117,25 @@ def test_pt3_duoi_bien_ra_khoi_hang_doi_chinh_va_tu_khai_khong_ky_duoc():
 
 
 def test_pt3b_duoi_bien_noi_ro_con_thieu_chu_ky_nao_va_mot_chu_ky_chua_phai_la_gan_xong():
+    """ĐỔI Ở ĐỢT LG3, vì NGƯỜI KÝ đổi chứ không vì phép thử sai.
+
+    Bảng này từng đòi "Chủ tịch" và "Tổng giám đốc". Chuyến dưới biên nay do NGƯỜI ĐỨNG ĐẦU
+    PHÒNG BÁN ký (Chủ tịch chốt 11/10/2026), và mã `MICE-` là mảng Đoàn, nên người thứ nhất là
+    P.TGĐ tour đoàn. Chữ ký Chủ tịch trên một chuyến cũ vẫn còn trong sổ, nhưng nó không còn
+    đếm vào luật hiện hành — nên chuyến D1 dưới đây ký bằng ĐÚNG vai của luật mới.
+
+    ĐÂY LÀ MỘT LỖI LG2 ĐỂ LẠI VÀ LG3 SỬA: bảng việc viết thẳng hai cái tên, nên từ 11/10/2026
+    nó báo sai tên người cần ký và đẩy người đọc đi gõ nhầm cửa.
+    """
     db = _db()
-    _tour(db, "MICE-D1", var_cost_per_pax=9_400_000.0, below_margin=True, signed_chutich=True,
+    _tour(db, "MICE-D1", var_cost_per_pax=9_400_000.0, below_margin=True, signed_ptgd_doan=True,
           justification="Giải trình đủ bốn mục cho chuyến dưới biên, dài hơn ba mươi ký tự")
     _tour(db, "MICE-D2", var_cost_per_pax=9_400_000.0, below_margin=True,
           justification="Giải trình đủ bốn mục cho chuyến dưới biên, dài hơn ba mươi ký tự")
     theo_ma = {d["ma"]: d for d in P.duoi_bien_cho_hai_chu_ky(db)}
     assert theo_ma["MICE-D1"]["chu_ky_con_thieu"] == ["Tổng giám đốc"]
-    assert theo_ma["MICE-D2"]["chu_ky_con_thieu"] == ["Chủ tịch", "Tổng giám đốc"]
+    assert theo_ma["MICE-D2"]["chu_ky_con_thieu"] == ["Phó TGĐ tour đoàn", "Tổng giám đốc"]
+
     # KHÔNG có trường nào kiểu "gan_xong" / "phan_tram": hai chữ ký thì một chữ ký là chưa có gì,
     # và một thanh tiến độ 50% trên màn hình người ký là một lời trấn an sai.
     assert not any(k for k in theo_ma["MICE-D1"] if "gan_xong" in k or "phan_tram" in k)

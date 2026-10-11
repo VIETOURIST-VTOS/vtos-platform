@@ -119,8 +119,21 @@ def duoi_bien_cho_hai_chu_ky(db: Session) -> list[dict]:
         if not (R.approver_role(t) == "ptgd_doan" and t.below_margin):
             continue
         d = _dong_tour(db, t)
-        con_thieu = [ten for ten, da in (("Chủ tịch", bool(getattr(t, "signed_chutich", False))),
-                                         ("Tổng giám đốc", bool(getattr(t, "signed_tgd", False)))) if not da]
+        # TÊN NGƯỜI CÒN THIẾU PHẢI ĐỌC TỪ BẢNG LUẬT — sửa ở Đợt LG3, và đây là một lỗi thật mà
+        # Đợt LG2 để lại: bảng này viết thẳng "Chủ tịch" và "Tổng giám đốc", nhưng từ 11/10/2026
+        # chuyến dưới biên do NGƯỜI ĐỨNG ĐẦU PHÒNG BÁN ký, không còn Chủ tịch. Một bảng công
+        # việc nói sai tên người cần ký là một bảng đẩy người đọc đi gõ nhầm cửa.
+        from app.models.core import ROLES as _ROLES
+        from app.services import chu_ky as _CK
+        from app.services import segments as _SEG
+        try:
+            _can = _CK.can_ky_duoi_bien(_SEG.mang_of(t))
+        except ValueError:
+            _can = ()
+            d["chu_ky_con_thieu_ghi_chu"] = _CK.CHUYEN_KHONG_THUOC_MANG
+        _da = _CK.doc_nguoi_da_ky(getattr(t, "nguoi_da_ky", "") or "")
+        con_thieu = [_ROLES.get(v, v) for v in _can
+                     if not (bool(getattr(t, f"signed_{v}", False)) or v in _da)]
         d["chu_ky_con_thieu"] = con_thieu
         d["toi_khong_ky_duoc"] = True     # nói thẳng trên dữ liệu, không để màn hình tự đoán
         ra.append(d)

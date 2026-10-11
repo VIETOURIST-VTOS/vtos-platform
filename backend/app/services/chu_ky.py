@@ -88,6 +88,127 @@ CAN_CU_VAI_KY = ("Chủ tịch chốt 11/10/2026 – ba cửa chính sách (tham
                  "giữ HAI chữ ký; luật người trình không tự ký giữ nguyên cho cả sáu")
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# NGƯỜI ĐỨNG ĐẦU PHÒNG — Chủ tịch chốt 11/10/2026 (Đợt LG3)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Luật: chữ ký thứ nhất là NGƯỜI ĐỨNG ĐẦU PHÒNG CỦA HỒ SƠ, chữ ký thứ hai là TGĐ.
+#
+# BẢNG NÀY KHAI VAI, KHÔNG KHAI TÊN NGƯỜI. Ai đang giữ vai nào là dữ liệu nhân sự, nằm ở hồ sơ
+# nhân viên, không nằm trong kho mã — cùng lẽ với mọi chỗ khác trong sổ này.
+#
+# DANH SÁCH PHÒNG KHÔNG KHAI LẠI Ở ĐÂY. Nó đã có ở `bao_cao_phong.PHONG` (9 phòng, kèm `thuoc`
+# cho bộ phận trực thuộc) và `models/hr.DEPARTMENTS` (11 mã phòng của hồ sơ nhân sự). Khai lần
+# thứ ba là dựng thêm một chỗ để ba bảng lệch nhau. `test_lg3` SO bảng này với `bao_cao_phong`
+# và đỏ nếu có phòng chưa khai người đứng đầu — thêm một phòng mà quên là bắt được ngay.
+#
+# VÌ SAO KHÔNG `import bao_cao_phong` NGAY TẠI ĐÂY: `chu_ky` là mô-đun luật, nằm dưới cùng và
+# không nhập gì ngoài `models.core`; kéo `bao_cao_phong` vào là mở đường cho một vòng nhập ngược.
+# Phép SO để cho phép thử làm — phép thử chạy một lần, vòng nhập thì hỏng mãi mãi.
+NGUOI_DUNG_DAU_PHONG: dict[str, str] = {
+    "dieu_hanh": "tp_dh",
+    "kd_le":     "gd_kd",
+    "kd_doan":   "ptgd_doan",
+    "marketing": "ptgd_mkt",
+    "hcns":      "hcns",
+    "doi_xe":    "gd_doi_xe",
+    "huong_dan": "tp_hd",
+    "ketoan":    "ketoan_truong",
+}
+
+CAN_CU_NGUOI_DUNG_DAU = ("Chủ tịch chốt 11/10/2026 – người đứng đầu phòng của hồ sơ ký vế thứ "
+                         "nhất, TGĐ ký vế thứ hai")
+
+# Bộ phận TRỰC THUỘC một phòng thì dùng người đứng đầu của phòng mẹ. `bao_cao_phong.PHONG` khai
+# quan hệ ấy ở ô `thuoc` (hôm nay: Visa thuộc Điều hành, Chủ tịch chốt 10/9/2026); bảng dưới đây
+# chép LẠI quan hệ ấy chứ không tự đặt, và `test_lg3` so hai bên.
+PHONG_ME = {"visa": "dieu_hanh"}
+
+# Mảng kinh doanh → phòng bán. Nghịch đảo của `bao_cao_phong.MANG_CUA_PHONG`, và `test_lg3` canh
+# đúng nghịch đảo. Hai bộ mã (mảng / phòng) có sẵn từ trước; chỗ này chỉ dịch giữa chúng.
+PHONG_CUA_MANG = {"doan": "kd_doan", "le": "kd_le"}
+
+CHUYEN_KHONG_THUOC_MANG = (
+    "Chuyến này không thuộc mảng kinh doanh nào nên hệ thống KHÔNG BIẾT phòng nào bán nó, mà "
+    "chuyến dưới biên 10% thì người đứng đầu phòng bán phải ký. Dịch vụ lẻ (non_package) là loại "
+    "hàng riêng, cả hai phòng đều bán được. Cách xử: đặt đúng LOẠI CHUYẾN cho nó, hoặc đưa người "
+    "quyết định lên một cấp. Hệ thống nói ra chỗ nó không biết thay vì đoán một phòng.")
+
+
+def nguoi_dung_dau(phong: str) -> str:
+    """Vai của người đứng đầu một phòng. Bộ phận trực thuộc thì lấy của phòng mẹ.
+
+    Gõ sai mã phòng là KeyError — cùng lẽ với `can_ky`: một lỗi gõ phím không được biến thành một
+    cửa chạy âm thầm bằng luật không ai khai.
+    """
+    ma = (phong or "").strip()
+    ma = PHONG_ME.get(ma, ma)
+    return NGUOI_DUNG_DAU_PHONG[ma]
+
+
+def can_ky_duoi_bien(mang: str) -> tuple[str, ...]:
+    """Ai ký một chuyến dưới biên 10%: người đứng đầu PHÒNG BÁN nó, rồi TGĐ.
+
+    Chủ tịch chốt 11/10/2026 chọn "phòng BÁN nó" chứ không phải "phòng LÀM nó": dự toán do Điều
+    hành lập, nhưng tiền và chỉ tiêu của chuyến thuộc về phòng bán, nên người chịu hậu quả của
+    một chuyến chạy dưới biên là người ký.
+
+    Mảng rỗng thì NÉM LỖI chứ không chọn bừa một phòng — xem `CHUYEN_KHONG_THUOC_MANG`.
+    """
+    phong = PHONG_CUA_MANG.get((mang or "").strip())
+    if not phong:
+        raise ValueError(CHUYEN_KHONG_THUOC_MANG)
+    return (nguoi_dung_dau(phong), "tgd")
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# NƠI CHỈ ĐỌC TRẠNG THÁI CHỮ KÝ, KHÔNG PHÁN QUYẾT — khai có tên (Đợt LG3)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Đợt LG2 dựng hàng rào `test_lg2_8` quét mọi hàm ĐẶT chữ ký. Nó bắt được hai cửa em kể thiếu —
+# nhưng nó chỉ nhìn MỘT CHIỀU, và chiều còn lại mới là chỗ LG2 để lại ba lỗi:
+#
+#   `dong_tien_ky.muc_du_phong`      đòi ĐỦ HAI cột chữ ký của tham số, nên sau khi tham số
+#                                    xuống một chữ ký thì mức dự phòng mới KHÔNG BAO GIỜ hiệu lực
+#   `ptgd_doan.duoi_bien_cho_hai_chu_ky`  báo còn thiếu chữ ký "Chủ tịch" — sai tên người ký
+#   `ngoai_le._tat_chan_giay_xe`     để TRỐNG ô "người quyết" khi tham số chỉ có một chữ ký
+#
+# Cả ba đều ĐỌC hai cột `signed_*` rồi tự suy ra luật. Nên hàng rào của LG3 quét cả nơi ĐỌC: hàm
+# nào nhắc tới `signed_chutich`/`signed_tgd` thì phải HỎI bảng luật (`can_ky`, `du_chu_ky*`,
+# `da_ky_cua`), hoặc có tên dưới đây vì nó chỉ HIỂN THỊ trạng thái chứ không quyết định gì.
+CHI_DOC_TRANG_THAI = {
+    "routes.param_out":        "Trả trạng thái hai ô chữ ký ra màn hình Tham số. Hiển thị sự "
+                               "thật, không phán quyết.",
+    "hr.grate_out":            "Trả trạng thái chữ ký của đơn giá HDV ra màn hình; hiển thị "
+                               "sự thật, không phán quyết.",
+    "hr.rate_out":             "Trả trạng thái chữ ký của giá xe ra màn hình; hiển thị sự "
+                               "thật, không phán quyết.",
+    "ops.pr_out":              "Trả trạng thái chữ ký của đề nghị chi ra màn hình; còn CẤP DUYỆT "
+                               "thì nó hỏi `cap_duyet`, không tự suy.",
+    "hach_toan.bang":          "Bảng quy tắc hạch toán; cột 'đã ký' là hiển thị trạng thái, "
+                               "không quyết định gì.",
+    "tours.tour_view":         "Màn hình chuyến; cột chữ ký là hiển thị trạng thái, còn ai "
+                               "được ký thì `approve` hỏi bảng luật.",
+    "luong_khoa.chup_tham_so": "CHỤP LẠI trạng thái chữ ký của tham số vào bản khóa lương. Ảnh "
+                               "chụp một thời điểm, không phải một phép quyết — và nó chụp đúng "
+                               "cả khi luật đổi, nên không nằm trong ba chỗ phải sửa.",
+    "vietrip.apply_supplier_payments": "Cửa NẠP dữ liệu từ hệ Vietrip, không phải cửa ký; "
+                                       "xem `KHONG_GOI_KIEM_TRA`.",
+    "rules.seed_params":       "Gieo tham số mẫu lúc dựng kho dữ liệu trống, không phải cửa "
+                               "chạy thật và không ai bấm được nó.",
+    "seed.seed_guide_rates":   "Gieo đơn giá HDV mẫu lúc dựng kho dữ liệu trống; không phải "
+                               "cửa chạy thật.",
+    "seed.seed_vehicle_rates": "Gieo giá xe mẫu lúc dựng kho dữ liệu trống; không phải cửa "
+                               "chạy thật.",
+    "chu_ky.da_ky_cua":        "Chính là nơi ĐỌC trạng thái chữ ký cho cả hệ thống dùng chung "
+                               "— gốc của phép suy, không phải một bản sao của nó.",
+    "vietrip.apply_receipts":  "Cửa NẠP dữ liệu từ hệ Vietrip, không phải cửa ký; lý do đầy "
+                               "đủ ở `KHONG_GOI_KIEM_TRA`.",
+    "hach_toan.nap_mac_dinh":  "Gieo quy tắc hạch toán mặc định lúc dựng kho dữ liệu trống; "
+                               "không phải cửa chạy thật.",
+}
+
+
 def can_ky(loai: str) -> tuple[str, ...]:
     """Vai trò phải ký loại hồ sơ này. Gõ sai tên loại là KeyError ngay — cố ý.
 

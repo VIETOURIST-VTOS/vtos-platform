@@ -70,11 +70,17 @@ def test_gate1_2_below_margin_needs_justification_then_two_signatures():
     assert post("dh.lan", f"/api/v1/tours/{t['id']}/submit").status_code == 200
     assert post("tgd", f"/api/v1/tours/{t['id']}/approve").status_code == 422          # chưa TP xác nhận
     assert post("tp.dieuhanh", f"/api/v1/tours/{t['id']}/confirm").status_code == 200
-    # ĐỔI Ở ĐỢT LG2: chuyến dưới biên 10% đổi người ký — Chủ tịch RA KHỎI LUẬT, P.TGĐ tour đoàn
-    # VÀO (Chủ tịch chốt 11/10/2026). Câu cũ đòi `ptgd.doan` bị CHẶN ở cổng 1; nay chính ông là
-    # một trong hai người ký. Điều phép thử canh KHÔNG đổi: chuyến dưới biên cần ĐỦ HAI chữ ký
-    # của hai vai khác nhau, và một mình ai cũng không duyệt nổi.
-    assert "Chờ chữ ký" in post("ptgd.doan", f"/api/v1/tours/{t['id']}/approve").json()["message"]
+    # ĐỔI HAI LẦN TRONG MỘT NGÀY, và lần thứ hai sửa lần thứ nhất.
+    #
+    # LG2 (11/10/2026) đưa Chủ tịch ra khỏi luật và khai cứng `ptgd_doan` cho MỌI chuyến dưới
+    # biên. LG3 cùng ngày sửa nốt: người ký tuỳ MẢNG của chuyến — Chủ tịch chốt "phòng BÁN nó".
+    # Chuyến mẫu `SG-CT-1020` là `le_noi_dia`, tức mảng LẺ, nên người ký là GĐ Kinh doanh chứ
+    # không phải P.TGĐ tour đoàn; `ptgd.doan` nay bị cổng 1 chặn vì không phải phòng của chuyến.
+    #
+    # Điều phép thử canh KHÔNG đổi qua cả hai lần: chuyến dưới biên cần ĐỦ HAI chữ ký của hai
+    # vai khác nhau, và một mình ai cũng không duyệt nổi.
+    assert post("ptgd.doan", f"/api/v1/tours/{t['id']}/approve").json()["detail"]["gate"] == "CONG_1"
+    assert "Chờ chữ ký" in post("gd.kd", f"/api/v1/tours/{t['id']}/approve").json()["message"]
     assert "Đủ 2 chữ ký" in post("tgd", f"/api/v1/tours/{t['id']}/approve").json()["message"]
     assert tour_by_code("SG-CT-1020")["below_margin"] is True
 

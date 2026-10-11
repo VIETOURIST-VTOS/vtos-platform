@@ -589,6 +589,19 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         # luật, nên gọi hàm kia là chặn nhầm ông.
         _da_ky = _CK.doc_nguoi_da_ky(r.nguoi_da_ky)
         _CK.kiem_tra_mot_nguoi_hai_vai(u, _da_ky)
+        # NGƯỜI XÁC NHẬN BỘ PHẬN KHÔNG DUYỆT — Đợt LG3, Chủ tịch chốt 11/10/2026, cho MỌI hồ sơ.
+        #
+        # Bước `cho_tp` là CHỮ KÝ THỨ NHẤT của hồ sơ ngoài dự toán (Chủ tịch chốt cùng ngày:
+        # chữ ký trưởng phòng chính là bước xác nhận bộ phận đã có). Mà bước ấy TGĐ cũng bấm
+        # được, và phép chặn cũ chỉ so với NGƯỜI LẬP — nên TGĐ xác nhận rồi tự duyệt là một mình
+        # ký cả hai vế, và hồ sơ trông vẫn đủ chữ ký.
+        #
+        # Áp cho mọi hồ sơ chứ không riêng hồ sơ ngoài dự toán: một người vừa xác nhận bộ phận
+        # vừa duyệt thì bước xác nhận không còn là một lớp nào cả, dù hồ sơ to hay nhỏ.
+        if (r.tp_by or "") == u.username:
+            raise ValueError(
+                f"`{u.username}` đã xác nhận bộ phận cho hồ sơ này – người xác nhận bộ phận "
+                "không duyệt lệnh chi của chính hồ sơ ấy. Hai bước phải là hai người.")
         if r.nguong_duyet_ap_dung is None:
             # Hồ sơ cũ: ghi mốc đang áp xuống hồ sơ NGAY LÚC DUYỆT, để lần đọc sau không đổi nữa.
             r.nguong_duyet_ap_dung = cd["nguong"]
