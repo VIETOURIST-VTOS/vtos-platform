@@ -574,8 +574,28 @@ PHAM_VI_DA_CHOT = {
     # `MENU_ROLES["/su-co-tour"]` từ trước nên tiền tố đã có trong phạm vi — nhưng KHÔNG nằm trong
     # `su_co_tour.XEM`, tức mở được màn hình mà mọi cửa trả 403. Phạm vi không đổi vì bảng này đo
     # tiền tố, không đo chữ ký cửa; chỗ hỏng ấy do `test_dh1::test_hai_bang_quyen_phai_phu_nhau` bắt.
-    "chutich": 131, "tgd": 131, "bks": 131, "cntt": 128, "ir_phapche": 20,
-    "ketoan": 108, "tp_dh": 97, "ptgd_doan": 79, "nv_dh": 68, "hcns": 69, "gd_kd": 72,
+    # ── CT-1 · 4.4.2 CHƯƠNG TRÌNH TỪNG CHUYẾN (11/10/2026) ───────────────────────────────────
+    # +1 cho ĐÚNG MƯỜI SÁU vai: nhóm "/api/v1/chuong-trinh" khai vào `MAN_HINH_API["/tours"]`.
+    #
+    # Mười sáu vai ấy là ĐÚNG BẰNG `MENU_ROLES["/tours"]`, không hơn một vai: bốn vai nền
+    # (chutich, tgd, bks, robot_ks), bốn vai Kinh doanh (gd_kd, tp_kd, tn_kd, nv_kd), hai vai Điều
+    # hành (tp_dh, nv_dh), sales_admin, ptgd_doan, ptgd_mkt, ketoan, ketoan_truong, cntt. Đếm lại
+    # từ mã ngày 11/10: tập vai có tiền tố này và tập vai mở được /tours khớp nhau tuyệt đối.
+    #
+    # KHÔNG dựng màn hình mới: chương trình là một MẶT của chuyến, nên nó là thẻ trên trang chuyến,
+    # đứng cạnh Dự toán và Booking. Thêm lối vào thứ hai cho cùng một việc là cách chắc chắn để
+    # người dùng không biết nên bấm vào đâu.
+    #
+    # Bốn vai Kinh doanh ĐỌC được là CỐ Ý: chương trình tour là thứ Sale đã gửi khách, họ phải đọc
+    # được đúng bản của chuyến đang chạy để trả lời khách. SOẠN thì không — hàng rào là danh sách
+    # `GHI` của api/v1/chuong_trinh.py (chutich, tgd, tp_dh, nv_dh, cntt), và test_ct1 canh việc
+    # `GHI` phải HẸP HƠN THẬT SỰ `XEM`.
+    #
+    # `bks` và `robot_ks` +1 nhưng KHÔNG ghi được: lớp `READ_ONLY_ROLES` ở access.py chặn mọi lệnh
+    # ghi của hai vai ấy, và `GHI` của cửa này cũng không có tên họ. Hai hàng rào, và test_ct1
+    # gọi THẬT một lệnh ghi bằng tài khoản bks để đo — không chỉ đọc danh sách.
+    "chutich": 132, "tgd": 132, "bks": 132, "cntt": 129, "ir_phapche": 20,
+    "ketoan": 109, "tp_dh": 98, "ptgd_doan": 80, "nv_dh": 69, "hcns": 69, "gd_kd": 73,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -590,13 +610,13 @@ PHAM_VI_DA_CHOT = {
     # không mở màn hình nhà cung cấp. Hàng rào canh ba điều ấy là test_sa2, test_sa3, test_sa5.
     #
     # 34 → 35 ngày 24/9/2026: +1 cho chính bàn làm việc của mình ("/api/v1/sales-admin").
-    "sales_admin": 40,
+    "sales_admin": 41,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 54, "nv_kd": 53, "tn_kd": 53, "tp_kd": 55, "nv_mkt": 41,
+    "ptgd_mkt": 55, "nv_kd": 54, "tn_kd": 54, "tp_kd": 56, "nv_mkt": 41,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -657,8 +677,8 @@ PHAM_VI_DA_CHOT = {
     #
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
-    "ketoan_truong": 108, "ketoan_tt": 31, "thu_quy": 27,
-    "robot_pq": 18, "robot_ks": 131, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "ketoan_truong": 109, "ketoan_tt": 31, "thu_quy": 27,
+    "robot_pq": 18, "robot_ks": 132, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 
