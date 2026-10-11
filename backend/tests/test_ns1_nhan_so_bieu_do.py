@@ -124,3 +124,80 @@ def test_nhan_khong_bat_chuot():
     assert "visibility:hidden" in m.group(1).replace(" ", ""), (
         "nhãn phải ẩn bằng cả `visibility`, không chỉ `opacity`: chỉ mờ đi thì nó vẫn chiếm chỗ và "
         "vẫn bị trình đọc màn hình đọc.")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# 12/10/2026 · NS-2 — MỌI HÌNH CỘT ĐỨNG: BỐN SỐ CỐ ĐỊNH, CÁC THÁNG CÒN LẠI RÊ CHUỘT
+#
+# Chủ tịch, sau khi thấy hình Lợi nhuận từng tháng không có lấy một con số trong khi hình Doanh
+# thu ngay trên nó có bốn: "trong các biểu đồ đứng em chọn 4 con số hiển thị, ngoài ra các tháng
+# khác em thêm phần rê chuột hoặc chạm vào sẽ hiện ra."
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+def test_hinh_hai_cot_KHONG_con_bi_cam_ghi_so():
+    """Luật cũ `!ten_cot2` đã bỏ — nhưng bỏ bằng cách CHỮA, không phải bằng cách lờ đi.
+
+    Luật cũ đúng ở chỗ nó sợ: hai con số cố định trên một tháng rộng hai chục pixel thì chồng
+    nhau. Nó sai ở cách chữa — bỏ CẢ HAI, nên hình lợi nhuận trắng trơn. Cách chữa mới giữ được
+    nỗi sợ ấy: ghi số cho đúng MỘT cột, và canh nhãn lệch sang tâm cột chính.
+    """
+    s = _ma(BIEUDO)
+    i = s.index('{ghiSo &&')
+    khoi = s[i:i + 260]
+    assert "!ten_cot2" not in khoi, (
+        "`!ten_cot2` quay lại trong điều kiện ghi nhãn — hình Lợi nhuận từng tháng sẽ trắng trơn "
+        "trở lại, đúng chỗ Chủ tịch nêu ngày 12/10/2026.")
+    assert 'ten_cot2 ? " trai"' in khoi, (
+        "hình hai cột phải canh nhãn LỆCH sang cột chính. Căn giữa ô tháng thì nhãn rơi đúng vào "
+        "KHE giữa hai cây cột, và người đọc không biết con số ấy nói về cột nào.")
+
+
+def test_nhan_lech_co_dinh_dang_rieng():
+    css = re.sub(r"/\*.*?\*/", " ", CSS.read_text(encoding="utf-8"), flags=re.S)
+    assert re.search(r"\.bd-so\.trai\{[^}]*right:\s*calc\(50%", css), (
+        "thiếu `.bd-so.trai` kéo mép phải về giữa ô — không có nó thì lớp `trai` không làm gì, và "
+        "nhãn vẫn rơi vào khe giữa hai cột.")
+
+
+def test_moi_thang_deu_co_nhan_re_chuot_ke_ca_thang_TRONG():
+    """Tháng trống cũng phải có nhãn, và nó nói "chưa có số" chứ không nói 0.
+
+    Bỏ nhãn ở tháng trống thì rê vào tháng 11 không ra gì — và người dùng không phân biệt được
+    "hình hỏng" với "tháng chưa có số". Hai việc khác hẳn nhau.
+    """
+    s = _ma(BIEUDO)
+    assert s.count('className="bd-cot-so') >= 2, (
+        "phải có nhãn rê chuột cho CẢ hai nhánh: tháng có số và tháng trống")
+    assert "chưa có số" in s, "tháng trống phải nói “chưa có số”, không được để trống hoặc hiện 0"
+
+
+def test_nhan_re_chuot_liet_ke_du_cac_con_so_CUA_THANG():
+    """Cột chính, khúc chờ, cột thứ hai — mỗi thứ một dòng, và KHÔNG cộng lại.
+
+    Khúc chờ là doanh thu của chuyến chưa có giá vốn. Cộng nó vào con số đọc được là nói quá
+    doanh thu đã ghi nhận — đúng cái bẫy `ket_qua_kinh_doanh.py` ghi lại ngày 08/10/2026.
+    """
+    s = _ma(BIEUDO)
+    i = s.index('className="bd-cot-so" aria-hidden')
+    khoi = s[i:i + 420]
+    assert "cho > 0 &&" in khoi, "nhãn phải nói ra khúc chờ khi tháng ấy có khúc chờ"
+    assert "g2 !== null &&" in khoi, "nhãn phải nói ra cột thứ hai khi hình có cột thứ hai"
+    assert not re.search(r"d\.gt\s*\+\s*d\.cho", khoi), (
+        "nhãn đang CỘNG khúc chờ vào cột chính — con số đọc được sẽ to hơn doanh thu đã ghi nhận")
+
+
+def test_o_thang_toi_duoc_bang_ban_phim():
+    s = _ma(BIEUDO)
+    assert s.count("tabIndex={0}") >= 3, (
+        "cả ô tháng có số, ô tháng trống và chấm trên đường đều phải tới được bằng Tab — nếu "
+        "không, nhãn rê chuột chỉ dành cho người dùng chuột")
+
+
+def test_nhan_cot_khong_bat_chuot_va_an_han_hoi():
+    css = re.sub(r"/\*.*?\*/", " ", CSS.read_text(encoding="utf-8"), flags=re.S)
+    m = re.search(r"\.bd-cot-so\{([^}]*)\}", css)
+    assert m, "thiếu định dạng `.bd-cot-so`"
+    than = m.group(1).replace(" ", "")
+    assert "pointer-events:none" in than, "nhãn bắt chuột thì hình nhấp nháy khi con trỏ đi lên nó"
+    assert "visibility:hidden" in than, (
+        "ẩn bằng mỗi `opacity` thì trình đọc màn hình vẫn đọc đủ mười hai nhãn đang ẩn")

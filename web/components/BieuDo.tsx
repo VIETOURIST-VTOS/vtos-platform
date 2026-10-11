@@ -365,7 +365,14 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
                 // kỳ vừa chưa có số, mà bỏ `mo` đi thì nó nhìn hệt tháng trống NẰM TRONG kỳ — hai
                 // việc khác hẳn nhau (một cái chưa xảy ra, một cái chưa ai nộp sổ).
                 return <span key={d.nhan} className={"bd-mot bd-khuyet" + (d.mo ? " mo" : "")}
-                  title={`${d.nhan}: chưa có số`} />;
+                  tabIndex={0} title={`${d.nhan}: chưa có số`}>
+                  {/* Tháng TRỐNG cũng có nhãn rê chuột, và nó nói "chưa có số" chứ không nói 0.
+                      Bỏ nhãn ở đây thì rê vào tháng 11 không ra gì, và người dùng không phân biệt
+                      được "hình hỏng" với "tháng chưa có số" — hai việc khác hẳn nhau. */}
+                  <span className="bd-cot-so trong" aria-hidden="true">
+                    <i>{d.ghi || d.nhan}</i><b className="chua">chưa có số</b>
+                  </span>
+                </span>;
               }
               const h = Math.max(1, Math.abs(y(d.gt) - y0));
               const am = d.gt < 0;
@@ -381,6 +388,7 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
               return (
                 <span key={d.nhan} className={"bd-mot" + (d.mo ? " mo" : "")
                       + (ten_cot2 ? " doi" : "")}
+                  tabIndex={0}
                   title={`${d.nhan}: ${daySo(d.gt, dinh_dang)}${d.ghi ? " · " + d.ghi : ""}`}>
                   <span className={"bd-thanh" + (am ? " am" : "")
                         + (theo_dau ? (am ? " lo" : " lai") : "")}
@@ -397,13 +405,41 @@ export function BieuDoCot({ ten, phu, diem, dinh_dang = "tien", moc, chan, ai, c
                   )}
                   {/* Nhãn số nằm NGOÀI cột, phía đầu cột — đặt trong lòng cột thì cột thấp không
                       chứa nổi chữ và chữ tràn ra trông như thuộc cột bên cạnh.
-                      CÓ CỘT THỨ HAI THÌ KHÔNG GHI SỐ: hai con số trên một tháng rộng hai chục
-                      pixel thì chồng lên nhau, và lúc ấy không đọc được con số nào thuộc cột nào.
-                      Chiều cao hai cột cạnh nhau đã nói đủ điều cần nói ở hình này. */}
-                  {ghiSo && !ten_cot2 && <span className={"bd-so" + (am ? " am" : "")}
+
+                      ══ 12/10/2026 · HÌNH CÓ HAI CỘT NAY CŨNG GHI SỐ ═══════════════════════════
+                      Luật cũ ở đây là `!ten_cot2`: hình nào có cột thứ hai thì KHÔNG ghi số nào
+                      cả. Lý do cũ ĐÚNG và vẫn giữ nguyên hiệu lực — hai con số trên một tháng
+                      rộng hai chục pixel thì chồng lên nhau. Nhưng nó chữa bằng cách bỏ CẢ HAI,
+                      nên hình Lợi nhuận từng tháng không có lấy một con số, trong khi hình Doanh
+                      thu ngay trên nó có bốn. Chủ tịch nêu đúng chỗ ấy hôm nay.
+
+                      Cách chữa giữ được cả hai điều: ghi số cho ĐÚNG MỘT cột — cột chính — và
+                      căn nhãn LỆCH sang nửa trái, đúng tâm cột chính. Không bao giờ có hai nhãn
+                      cố định trên một tháng, nên cảnh chồng chữ mà luật cũ sợ không xảy ra; mà
+                      hình vẫn có bốn con số để liếc. Con số của cột thứ hai đọc bằng rê chuột,
+                      ở nhãn ngay bên dưới. */}
+                  {ghiSo && <span className={"bd-so" + (am ? " am" : "") + (ten_cot2 ? " trai" : "")}
                     style={am ? { top: y0 + h + 2 } : { top: Math.max(0, y0 - h - cho - 15) }}>
                     {gonSo(d.gt, dinh_dang)}
                   </span>}
+                  {/* NHÃN RÊ CHUỘT CHO TỪNG THÁNG — Chủ tịch chốt 12/10/2026: "4 con số hiển thị,
+                      ngoài ra các tháng khác thêm phần rê chuột hoặc chạm vào sẽ hiện ra".
+
+                      Nó liệt kê ĐỦ các con số của tháng ấy, mỗi con một dòng: cột chính, khúc chờ
+                      nếu có, và cột thứ hai nếu có. KHÔNG cộng chúng lại — khúc chờ là doanh thu
+                      của chuyến chưa có giá vốn, gộp vào là nói quá con số đã ghi nhận, đúng cái
+                      bẫy đã ghi ở `ket_qua_kinh_doanh.py` ngày 08/10.
+
+                      Đây là thứ nhãn cố định KHÔNG làm được: đọc được cả cặp của cùng một tháng
+                      trong một lần nhìn — tháng lãi tour dương mà trước thuế âm là chuyện chỉ lộ
+                      ra khi hai con số đứng cạnh nhau. */}
+                  <span className="bd-cot-so" aria-hidden="true"
+                    style={am ? { top: y0 + h + 6 } : { top: Math.max(0, y0 - h - cho - 44) }}>
+                    <i>{d.ghi || d.nhan}</i>
+                    <b>{daySo(d.gt, dinh_dang)}</b>
+                    {cho > 0 && <i>{ten_cho}: {daySo(d.cho as number, dinh_dang)}</i>}
+                    {g2 !== null && <b className="hai">{daySo(g2, dinh_dang)}</b>}
+                  </span>
                 </span>
               );
             })}
