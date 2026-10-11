@@ -1,4 +1,4 @@
-\"\"\"Dot LG3: them o ghi TEN nguoi ky tren bang tours.
+"""Dot LG3: them o ghi TEN nguoi ky tren bang tours.
 
 Chuyen duoi bien 10% nay ky theo MANG (Doan -> ptgd_doan, Le -> gd_kd), nen so vai co the ky
 khong con co dinh. De moi vai mot cot boolean thi sau vai lan doi luat, bang co nam cot chu ky ma
@@ -9,7 +9,7 @@ HAI nguon nen chuyen dang ky do giua hai dot khong mat chu ky da co.
 
 Revision ID: lg3b2c3d4e5f6a
 Revises: lg2a1b2c3d4e5f
-\"\"\"
+"""
 from alembic import op
 import sqlalchemy as sa
 
