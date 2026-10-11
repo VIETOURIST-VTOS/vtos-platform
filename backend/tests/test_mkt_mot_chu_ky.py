@@ -1,43 +1,44 @@
 # -*- coding: utf-8 -*-
-"""CHI MARKETING ĐI MỘT CHỮ KÝ — Chủ tịch chốt 23/9/2026, xác nhận lại 24/9/2026.
+"""CHI MARKETING ĐI HAI BƯỚC — Chủ tịch chốt 10/10/2026 (Đợt F1b).
 
 ──────────────────────────────────────────────────────────────────────────────────────────────
-LUẬT
+LUẬT, VÀ LỊCH SỬ CỦA NÓ
 ──────────────────────────────────────────────────────────────────────────────────────────────
 
-MỌI đề xuất chi Marketing do **P.TGĐ Marketing** duyệt là xong. Không mốc tiền, không nhánh.
-Dữ liệu vẫn đẩy lên TGĐ và Chủ tịch — nhưng để XEM, không phải để bấm.
+  Bước 1 — P.TGĐ Marketing duyệt NỘI DUNG / KẾ HOẠCH / NGÂN SÁCH, ở bước `confirm`.
+  Bước 2 — LỆNH CHI, ở bước `approve`, theo mốc `nguong_chu_tich_duyet_chi`: dưới mốc TGĐ ký,
+           từ mốc trở lên Chủ tịch ký.
 
-Đây là một bước NỚI, và tệp này ghi lại đúng nó nới những gì, để người đọc sau không tưởng là
-chỗ sót. Trước 23/9 Marketing có HAI phanh, quyết định này gỡ cả hai:
+Tệp này TỪNG mang tên nội dung ngược lại. Ngày 23/9/2026 Chủ tịch chốt "Marketing đi MỘT chữ ký
+của P.TGĐ ở mọi mức tiền", xác nhận lại 24/9, và tệp này được viết để canh đúng luật ấy. Ngày
+10/10/2026 Chủ tịch đảo lại: hai lần duyệt, hai người khác nhau bấm.
 
-  · `han_muc_mkt` = 5.000.000đ — từ mức ấy trở lên phải thêm chữ ký Chủ tịch
-  · vượt phần còn lại của hạng mục ngân sách — cũng bật hai chữ ký
+TÊN TỆP GIỮ NGUYÊN (`test_mkt_mot_chu_ky.py`) dù nội dung đã đảo. Đổi tên tệp phép thử là làm
+đứt lịch sử của nó trong `git log --follow` và làm mọi đường dẫn đang trỏ tới nó (cửa hẹp CI, các
+dòng giữ chỗ, lời nhắn ghi mã cũ) trỏ vào hư không. Cái tên nay là một cái mốc lịch sử, không
+phải một lời mô tả — và dòng này là chỗ nói ra điều đó.
 
-Chủ tịch đã được nêu rõ cả hai cùng hệ quả (một hồ sơ 500 triệu, hoặc một hồ sơ vượt dự toán,
-nay cũng chỉ cần một chữ ký) và vẫn chốt bỏ.
+VÌ SAO BẢN VÁ GỠ CHỨ KHÔNG THÊM. Để làm được "một chữ ký", mã 23/9 CẮT BỎ bước bộ phận của
+Marketing (`r.status = "cho_kt"` ngay lúc lập), lý do khi ấy: người xác nhận bộ phận của Marketing
+CHÍNH LÀ P.TGĐ, mà ông đang ký ở cuối, nên giữ cả hai bước là bắt một người bấm hai lần. Nay hai
+bước do hai người bấm, nên lý do ấy hết hiệu lực và việc phải làm là GỠ ngoại lệ, không phải thêm
+một trạng thái mới.
 
-BỐN THỨ KHÔNG BỊ GỠ — và mỗi thứ có một phép thử ở dưới:
+──────────────────────────────────────────────────────────────────────────────────────────────
+NĂM THỨ KHÔNG ĐỔI QUA CẢ HAI LẦN ĐẢO LUẬT — mỗi thứ một phép thử
+──────────────────────────────────────────────────────────────────────────────────────────────
 
   M1  Kế toán vẫn kiểm chứng từ và mã số thuế trước khi chi
-  M2  cờ `over_budget` vẫn bật và vẫn ghi vào mô tả — thôi CHẶN, không thôi NÓI
-  M3  P.TGĐ Marketing KHÔNG lập hồ sơ (nếu ông ấy lập thì không còn ai ký được ngoài chính mình)
-  M4  người lập không tự duyệt — kể cả Chủ tịch toàn quyền
+  M2  cờ `over_budget` vẫn bật và vẫn ghi vào mô tả
+  M3  P.TGĐ Marketing KHÔNG lập hồ sơ
+  M4  người lập không tự ký — kể cả Chủ tịch toàn quyền
+  M5  vai `ptgd_mkt` rỗng thì hồ sơ nằm chờ, và hệ thống phải NÓI RA
 
-Và một thứ mới, vì luật mới đẻ ra một chỗ hỏng mới:
+M5 nay đổi CHỖ ĐỨNG chứ không mất: vai rỗng làm hồ sơ đứng ở bước `cho_tp` (xác nhận nội dung),
+không phải `cho_duyet`. Một lời báo chỉ sai bước là lời báo đẩy người đọc đi tìm nhầm chỗ.
 
-  M5  vai `ptgd_mkt` RỖNG thì mọi hồ sơ nằm chờ vĩnh viễn mà không ai thấy đỏ
-
-──────────────────────────────────────────────────────────────────────────────────────────────
-VÌ SAO M5 LÀ PHÉP THỬ QUAN TRỌNG NHẤT Ở ĐÂY
-──────────────────────────────────────────────────────────────────────────────────────────────
-
-Luật cũ có ba vai ký được (P.TGĐ, TGĐ, Chủ tịch), nên một vai trống thì hồ sơ vẫn đi tiếp. Luật
-mới dồn tất cả vào MỘT vai. Vai ấy trống — người nghỉ, tài khoản bị khoá, đổi vai trò nhầm —
-thì mọi hồ sơ chi Marketing đứng im, và trên màn hình nó trông y hệt "đang chờ duyệt". Không ai
-báo lỗi, không ai thấy đỏ, tiền chỉ đơn giản là không được duyệt.
-
-Đó là kiểu hỏng tệ nhất: im lặng. Nên luật mới phải đi kèm một cái miệng.
+M2 thì đổi RĂNG: từ 23/9 tới 10/10, `over_budget` chỉ còn NÓI chứ không CHẶN. Nay khoản ngoài dự
+toán đi qua nhánh chung, và nhánh chung đòi CẢ HAI chữ ký (cổng 15) — nên nó có răng trở lại.
 """
 import os
 import sys
@@ -56,22 +57,45 @@ from sqlalchemy import select  # noqa: E402
 
 from app.main import app  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
-from app.models.core import User  # noqa: E402
+from app.models.core import Param, User  # noqa: E402
 from app.services import ops as O  # noqa: E402
+from app.services import rules as R  # noqa: E402
 
 client = TestClient(app)
 TOK = {}
+MOC = 100_000_000.0
 
 
 @pytest.fixture(scope="module", autouse=True)
 def _startup():
     """Mở client theo kiểu ngữ cảnh để vòng đời ứng dụng chạy — đó là chỗ tạo bảng và nạp dữ liệu
-    mẫu. Không có nó thì mọi truy vấn đều 'no such table: users', và đọc lỗi ấy rất dễ tưởng là
-    mình viết sai truy vấn."""
+    mẫu. Không có nó thì mọi truy vấn đều 'no such table: users'."""
     with TestClient(app) as c:
         global client
         client = c
         yield
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _nguong_f1(_startup):
+    """ĐỢT F1 — bối cảnh: công ty ĐÃ CHỐT ngưỡng duyệt chi.
+
+    Từ F1, bước duyệt một đề nghị chi KHÔNG đi được khi tham số `nguong_chu_tich_duyet_chi` còn
+    rỗng. Bộ mặc định cố ý để trống vì `seed_params` nạp mọi khóa kèm hai chữ ký mang tên "seed".
+    Mốc 100 triệu ở đây là DỮ LIỆU CỦA PHÉP THỬ, không phải mốc đã ký của công ty.
+    """
+    db = SessionLocal()
+    try:
+        db.add(Param(key=O.NGUONG_CHU_TICH_KEY, value="100000000",
+                     label="Ngưỡng Chủ tịch duyệt chi", unit="đồng",
+                     effective_from=date(2026, 9, 2), source="bối cảnh phép thử F1b",
+                     status="active", signed_chutich=True, signed_tgd=True,
+                     proposed_by="phep_thu"))
+        db.commit()
+    finally:
+        db.close()
+    R.clear_param_cache()
+    yield
 
 
 def login(u: str) -> dict:
@@ -82,14 +106,21 @@ def login(u: str) -> dict:
 
 
 def _lap(nguoi: str = "cntt", tien: float = 2_000_000, muc: str = "quang_cao", **kw):
-    # `supplier_tax_code` là bắt buộc ở bước Kế toán kiểm tra (không có MST thì không trừ được thuế).
-    # Điền sẵn ở đây để các phép thử dưới đo đúng thứ chúng định đo là TUYẾN DUYỆT; riêng phép thử
-    # M1 cố ý bỏ `has_document` để chứng minh bước Kế toán vẫn còn nguyên.
     body = {"category": "marketing", "marketing_muc": muc, "supplier_name": "Meta",
             "supplier_tax_code": "0301234567", "amount": tien,
-            "description": "Quảng cáo tháng " + f"{date.today():%m}",
+            "description": "Quang cao thang " + f"{date.today():%m}",
             "has_document": True, "document_ref": "BG-01", **kw}
     return client.post("/api/v1/payment-requests", json=body, headers=login(nguoi))
+
+
+def _buoc(rid: int, hanh_dong: str, nguoi: str, ly_do: str = ""):
+    return client.post(f"/api/v1/payment-requests/{rid}/step",
+                       json={"action": hanh_dong, "reason": ly_do}, headers=login(nguoi))
+
+
+def _ho_so(rid: int) -> dict:
+    ds = client.get("/api/v1/payment-requests", headers=login("ketoan")).json()
+    return [x for x in ds if x["id"] == rid][0]
 
 
 def _ai_giu_vai():
@@ -101,121 +132,164 @@ def _ai_giu_vai():
 
 
 # ─────────────────────────────────────────────────────────────────────────────────────────────
-# Luật chính
+# Luật chính — HAI BƯỚC
 # ─────────────────────────────────────────────────────────────────────────────────────────────
-def test_mk1_tren_han_muc_cu_van_chi_mot_chu_ky():
-    """20 triệu — gấp bốn lần `han_muc_mkt` cũ. Trước 23/9 là hai chữ ký; nay vẫn một."""
-    r = _lap(tien=20_000_000)
-    assert r.status_code == 201, r.text
-    d = r.json()["request"]
-    assert d["two_signatures"] is False, (
-        "hồ sơ 20 triệu vẫn bật hai chữ ký — phanh `han_muc_mkt` chưa được gỡ khỏi Marketing")
-
-
-def test_mk2_bo_luon_buoc_bo_phan_xac_nhan():
-    """Người xác nhận bộ phận của Marketing CHÍNH LÀ P.TGĐ MKT, mà nay ông ấy duyệt ở cuối.
-
-    Giữ cả hai bước là bắt cùng một người bấm hai lần cho cùng một hồ sơ.
-    """
+def test_mk1_ho_so_bat_dau_o_buoc_xac_nhan_noi_dung():
+    """Trước F1b hồ sơ Marketing vào THẲNG bước Kế toán. Nay nó bắt đầu ở `cho_tp`, và `cho_tp`
+    chính là bước một: P.TGĐ Marketing duyệt nội dung."""
     d = _lap(tien=3_000_000).json()["request"]
-    assert d["status"] == "cho_kt", f"hồ sơ Marketing phải vào thẳng bước Kế toán, đang ở {d['status']}"
+    assert d["status"] == "cho_tp", (
+        f"ho so Marketing van nhay coc qua buoc xac nhan noi dung, dang o {d['status']}")
+    assert "P.TGĐ Marketing" in d["next"], d["next"]
 
 
-def test_mk3_ptgd_mkt_khong_lap_ho_so():
-    """M3. Nếu chính người duyệt lập hồ sơ thì hồ sơ ấy không còn ai ký được ngoài chính mình."""
+def test_mk2_duoi_moc_thi_TGD_ky_lenh_chi():
+    """Đường đi đầy đủ, dưới mốc: nhân viên lập → P.TGĐ MKT duyệt nội dung → Kế toán kiểm →
+    TGĐ ký lệnh chi → sang Kế toán chi."""
+    rid = _lap(tien=30_000_000, muc="noi_dung").json()["request"]["id"]
+    assert _buoc(rid, "confirm", "ptgd.mkt").status_code == 200
+    assert _ho_so(rid)["status"] == "cho_kt"
+    assert _buoc(rid, "check", "ketoan").status_code == 200
+    # P.TGĐ Marketing KHÔNG còn ký được lệnh chi — chữ ký của ông là bước một, đã bấm xong.
+    assert _buoc(rid, "approve", "ptgd.mkt").status_code == 422, (
+        "P.TGD Marketing van ky duoc lenh chi - luat mot chu ky chua duoc go")
+    r = _buoc(rid, "approve", "tgd")
+    assert r.status_code == 200, r.text
+    h = _ho_so(rid)
+    assert h["status"] == "cho_chi" and h["approved_by"] == "tgd"
+
+
+def test_mk3_tu_moc_tro_len_thi_CHU_TICH_ky_lenh_chi():
+    """200 triệu — trên mốc. Trước 10/10 khoản này chỉ cần một chữ ký P.TGĐ Marketing."""
+    rid = _lap(tien=200_000_000, muc="noi_dung").json()["request"]["id"]
+    assert _buoc(rid, "confirm", "ptgd.mkt").status_code == 200
+    assert _buoc(rid, "check", "ketoan").status_code == 200
+    assert _buoc(rid, "approve", "tgd").status_code == 422, (
+        "TGD ky duoc khoan Marketing 200 trieu - moc tien chua ap vao Marketing")
+    assert _buoc(rid, "approve", "chutich").status_code == 200
+    assert _ho_so(rid)["status"] == "cho_chi"
+
+
+def test_mk4_vai_ky_duoc_cua_marketing_theo_MOC_chu_khong_phai_ptgd_mkt():
+    """Màn hình đọc `vai_ky_duoc` để vẽ nút. Nếu nó còn trả `ptgd_mkt` ở bước lệnh chi thì màn
+    hình mời sai người bấm, và người ấy bấm vào nhận 422."""
+    rid = _lap(tien=250_000_000).json()["request"]["id"]
+    _buoc(rid, "confirm", "ptgd.mkt")
+    _buoc(rid, "check", "ketoan")
+    assert _ho_so(rid)["vai_ky_duoc"] == ["chutich"], _ho_so(rid)["vai_ky_duoc"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# M1–M5 — năm thứ không đổi qua cả hai lần đảo luật
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+def test_mk5_ke_toan_van_kiem_chung_tu(_nguong_f1):
+    """M1. Hai lần duyệt KHÔNG có nghĩa là bỏ bước kiểm chứng từ — đó là kiểm soát tài chính."""
+    rid = _lap(tien=1_000_000, has_document=False).json()["request"]["id"]
+    assert _buoc(rid, "confirm", "ptgd.mkt").status_code == 200
+    r = _buoc(rid, "check", "ketoan")
+    assert r.status_code == 422 and "chứng từ" in r.text
+
+
+def test_mk6_ptgd_mkt_khong_lap_ho_so():
+    """M3. Lý do đổi nhưng kết luận giữ: trước là vì ông ký cuối, nay là vì ông xác nhận bước
+    một — lập rồi tự xác nhận vẫn là một người bấm hai lần."""
     r = _lap(nguoi="ptgd.mkt")
-    assert r.status_code == 422, "P.TGĐ Marketing vẫn lập được hồ sơ — lỗ tự duyệt chưa bịt"
+    assert r.status_code == 422, "P.TGD Marketing van lap duoc ho so"
     assert "không lập hồ sơ" in r.text
 
 
-def test_mk4_ke_toan_van_kiem_chung_tu_truoc_khi_duyet():
-    """M1. Một chữ ký KHÔNG có nghĩa là bỏ bước kiểm chứng từ — đó là kiểm soát tài chính."""
-    d = _lap(tien=1_000_000, has_document=False).json()["request"]
-    r = client.post(f"/api/v1/payment-requests/{d['id']}/step",
-                    json={"action": "check"}, headers=login("ketoan"))
-    assert r.status_code == 422 and "chứng từ" in r.text, "thiếu chứng từ mà Kế toán vẫn chuyển duyệt được"
-
-
-def test_mk5_duyet_boi_ptgd_mkt_la_xong():
-    """Đường đi đầy đủ: nhân viên lập → Kế toán kiểm → P.TGĐ MKT duyệt → sang lệnh chi."""
-    d = _lap(tien=30_000_000, muc="noi_dung").json()["request"]
-    rid = d["id"]
-    assert client.post(f"/api/v1/payment-requests/{rid}/step", json={"action": "check"},
-                       headers=login("ketoan")).status_code == 200
-
-    # TGĐ KHÔNG còn là người duyệt chi Marketing
-    r_tgd = client.post(f"/api/v1/payment-requests/{rid}/step", json={"action": "approve"},
-                        headers=login("tgd"))
-    assert r_tgd.status_code == 422, "TGĐ vẫn duyệt được chi Marketing — luật một chữ ký chưa vào"
-
-    r = client.post(f"/api/v1/payment-requests/{rid}/step", json={"action": "approve"},
-                    headers=login("ptgd.mkt"))
-    assert r.status_code == 200, r.text
-    sau = client.get("/api/v1/payment-requests", headers=login("ketoan")).json()
-    ho_so = [x for x in sau if x["id"] == rid][0]
-    assert ho_so["status"] == "cho_chi", "duyệt xong phải sang lệnh chi ngay, không chờ chữ ký nào nữa"
-    assert ho_so["approved_by"] == "ptgd.mkt"
-
-
-def test_mk6_nguoi_lap_khong_tu_duyet():
+def test_mk7_nguoi_lap_khong_tu_ky_lenh_chi():
     """M4. Cửa lập đã chặn P.TGĐ MKT, nhưng Chủ tịch toàn quyền thì lập được — nên ranh giới này
-    phải đứng ở bước DUYỆT mới kín."""
-    d = _lap(nguoi="chutich", tien=4_000_000).json()["request"]
-    rid = d["id"]
-    client.post(f"/api/v1/payment-requests/{rid}/step", json={"action": "check"}, headers=login("ketoan"))
-    r = client.post(f"/api/v1/payment-requests/{rid}/step", json={"action": "approve"},
-                    headers=login("chutich"))
-    assert r.status_code == 422 and "tự duyệt" in r.text, (
-        "người lập tự duyệt được hồ sơ của chính mình")
+    phải đứng ở bước KÝ mới kín.
 
-
-def test_mk7_vuot_du_toan_van_noi_du_khong_con_chan():
-    """M2. Cờ `over_budget` thôi CHẶN, không thôi NÓI."""
-    d = _lap(tien=900_000_000, muc="quang_cao").json()["request"]
-    assert d["over_budget"] is True, "khoản 900 triệu chắc chắn vượt dự toán mà không ghi cờ"
-    assert d["two_signatures"] is False
-    assert "ngoài dự toán" in d["description"], "phải ghi vào mô tả để người duyệt đọc thấy"
-
-
-# ─────────────────────────────────────────────────────────────────────────────────────────────
-# M5 — chỗ hỏng mà chính luật mới đẻ ra
-# ─────────────────────────────────────────────────────────────────────────────────────────────
-def test_mk8_phai_co_nguoi_giu_vai_ptgd_mkt():
-    """HÀNG RÀO. Vai này rỗng thì mọi hồ sơ chi Marketing nằm chờ vĩnh viễn mà không ai thấy đỏ.
-
-    Đỏ ở đây KHÔNG phải lỗi mã. Nó nghĩa là: chưa gắn ai vào vai P.TGĐ Marketing, hoặc người đang
-    giữ vai đã bị khoá tài khoản. Cách xử là vào Quản trị hệ thống → Phân quyền gắn người, KHÔNG
-    phải sửa phép thử này.
+    Trước F1b phép chặn này CHỈ nằm trong nhánh riêng của Marketing; gỡ nhánh ấy mà không bù vào
+    là mở một lỗ. Đo kỹ thì nhánh chung vốn đã hở sẵn cho sáu loại chi còn lại, nên bản vá bù vào
+    nhánh chung và bịt cho cả bảy loại cùng lúc.
     """
-    ai = _ai_giu_vai()
-    assert ai, (
+    rid = _lap(nguoi="chutich", tien=4_000_000).json()["request"]["id"]
+    assert _buoc(rid, "confirm", "ptgd.mkt").status_code == 200
+    assert _buoc(rid, "check", "ketoan").status_code == 200
+    r = _buoc(rid, "approve", "chutich")
+    assert r.status_code == 422 and "không tự ký" in r.text, (
+        "nguoi lap tu ky duoc lenh chi cua chinh minh. " + r.text)
+
+
+def test_mk8_vuot_du_toan_van_chi_NOI_chu_khong_CHAN():
+    """M2 — và đây là chỗ em ĐÃ NÓI QUÁ, phép thử bắt được trước khi đẩy.
+
+    Bản đầu của phép thử này đòi "răng mọc lại": khoản Marketing ngoài dự toán đi qua nhánh chung
+    nên lại cần CẢ HAI chữ ký (cổng 15). ĐỎ. Vì `two_signatures` là một cờ RIÊNG, chỉ được bật ở
+    đúng một chỗ trong cả kho — `chi_tour`/`tam_ung` vượt dự toán TOUR — và quyết định 23/9/2026
+    đã gỡ nó khỏi Marketing. Đợt F1b gỡ ngoại lệ ở bước DUYỆT, không đụng tới chỗ bật cờ ấy.
+
+    Nên hành vi thật hôm nay: khoản Marketing ngoài dự toán vẫn NÓI mà không CHẶN — cờ bật, mô tả
+    ghi, màn hình hiện, và cấp duyệt vẫn chỉ theo MỐC TIỀN.
+
+    CÒN LẠI CHO CHỦ TỊCH QUYẾT, ghi ra để không ai tưởng đã xong: có nối lại cổng 15 cho Marketing
+    không. Không nối thì Marketing vẫn là một ngoại lệ, chỉ là một ngoại lệ nhỏ hơn: một khoản 20
+    triệu ngoài dự toán của Điều hành cần hai chữ ký, cùng khoản ấy của Marketing chỉ cần TGĐ.
+    Nối thì phải cân một hệ quả đo được: `over_budget` của Marketing còn bật cả khi CHƯA GẮN HẠNG
+    MỤC, nên nối thẳng là mọi hồ sơ chưa gắn hạng mục đều cần hai chữ ký. Đó là một quyết định
+    nghiệp vụ, không phải một dòng mã cho gọn.
+    """
+    d = _lap(tien=900_000_000, muc="quang_cao").json()["request"]
+    assert d["over_budget"] is True, "khoan 900 trieu chac chan vuot du toan ma khong ghi co"
+    assert "ngoài dự toán" in d["description"], "phai ghi vao mo ta de nguoi duyet doc thay"
+    assert d["two_signatures"] is False, (
+        "co hai chu ky da bat cho Marketing. Neu day la co y (noi lai cong 15) thi sua phep thu "
+        "nay VA ghi can cu; neu khong thi mot thay doi nao do vua lam ro ri cho bat co.")
+    rid = d["id"]
+    _buoc(rid, "confirm", "ptgd.mkt")
+    _buoc(rid, "check", "ketoan")
+    # 900 triệu ≥ mốc → Chủ tịch ký, và chỉ Chủ tịch. Ngoài dự toán KHÔNG thêm chữ ký nào.
+    assert _ho_so(rid)["vai_ky_duoc"] == ["chutich"], _ho_so(rid)["vai_ky_duoc"]
+    assert _buoc(rid, "approve", "chutich").status_code == 200
+    assert _ho_so(rid)["status"] == "cho_chi"
+
+
+def test_mk9_han_muc_mkt_van_la_mot_tham_so_CHET():
+    """`han_muc_mkt` = 5.000.000đ là phanh riêng của Marketing, gỡ ngày 23/9/2026. F1b KHÔNG nối
+    lại nó: mốc tiền của Marketing từ nay là mốc CHUNG. Hai mốc cho cùng một câu hỏi là chỗ mà
+    lần sửa sau sẽ lệch nhau."""
+    import inspect
+    ma = chr(10).join(l for l in inspect.getsource(O).splitlines()
+                      if not l.lstrip().startswith("#"))
+    assert "han_muc_mkt" not in ma, "`han_muc_mkt` da duoc noi lai vao ma nghiep vu"
+
+
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# M5 — chỗ hỏng im lặng, nay ĐỔI CHỖ ĐỨNG
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+def test_mk10_phai_co_nguoi_giu_vai_ptgd_mkt():
+    """HÀNG RÀO. Đỏ ở đây KHÔNG phải lỗi mã: nghĩa là chưa gắn ai vào vai P.TGĐ Marketing, hoặc
+    người đang giữ vai đã bị khoá. Cách xử là vào Quản trị hệ thống → Phân quyền gắn người."""
+    assert _ai_giu_vai(), (
         "KHÔNG TÀI KHOẢN ĐANG HOẠT ĐỘNG NÀO GIỮ VAI P.TGĐ MARKETING (`ptgd_mkt`).\n"
-        "Từ 23/9/2026 mọi hồ sơ chi Marketing dừng ở MỘT chữ ký của vai này. Vai rỗng nghĩa là mọi "
-        "hồ sơ đứng im — và trên màn hình nó trông y hệt 'đang chờ duyệt'.\n"
+        "Mọi hồ sơ chi Marketing dừng ở bước XÁC NHẬN NỘI DUNG của vai này. Vai rỗng nghĩa là mọi "
+        "hồ sơ đứng im — và trên màn hình nó trông y hệt 'đang chờ bộ phận'.\n"
         "Cách xử: Quản trị hệ thống → Phân quyền → gắn một người vào vai `ptgd_mkt`.")
 
 
-def test_mk9_vai_rong_thi_cua_lap_phai_noi_ra():
-    """Hàng rào ở trên canh lúc dựng bản. Còn lúc CHẠY THẬT thì người lập phải được báo ngay.
-
-    Khoá tạm tài khoản đang giữ vai, lập một hồ sơ, và đòi lời báo nói thẳng ra. Trả lại nguyên
-    trạng ở cuối — phép thử không được để lại dấu vết trong dữ liệu.
-    """
+def test_mk11_vai_rong_thi_cua_lap_phai_noi_ra_DUNG_BUOC():
+    """Hàng rào trên canh lúc dựng bản. Lúc CHẠY THẬT thì người lập phải được báo ngay, và lời
+    báo phải nói đúng BƯỚC hồ sơ sẽ đứng — nay là bước xác nhận nội dung, không phải bước duyệt.
+    Trả lại nguyên trạng ở cuối: phép thử không để lại dấu vết trong dữ liệu."""
     db = SessionLocal()
     try:
-        nguoi = db.execute(select(User).where(User.role == O.VAI_DUYET_MKT,
-                                              User.active.is_(True))).scalars().all()
-        for n in nguoi:
+        for n in db.execute(select(User).where(User.role == O.VAI_DUYET_MKT,
+                                               User.active.is_(True))).scalars().all():
             n.active = False
         db.commit()
     finally:
         db.close()
     try:
-        assert _ai_giu_vai() == [], "khoá hết rồi mà vẫn đếm ra người giữ vai"
+        assert _ai_giu_vai() == [], "khoa het roi ma van dem ra nguoi giu vai"
         kq = _lap(tien=1_500_000, muc="noi_dung").json()
         assert "CHƯA AI GIỮ VAI" in kq["message"], (
-            "vai duyệt đang rỗng mà cửa lập không nói gì — hồ sơ sẽ nằm chờ trong im lặng.\n"
-            f"Lời báo đang là: {kq['message']}")
+            "vai duyet dang rong ma cua lap khong noi gi. " + kq["message"])
+        assert "xác nhận nội dung" in kq["message"], (
+            "loi bao con chi sai BUOC - ho so nay se dung o buoc xac nhan noi dung, khong phai "
+            "buoc duyet. " + kq["message"])
     finally:
         db = SessionLocal()
         try:
@@ -224,4 +298,4 @@ def test_mk9_vai_rong_thi_cua_lap_phai_noi_ra():
             db.commit()
         finally:
             db.close()
-    assert _ai_giu_vai(), "chưa trả lại nguyên trạng sau phép thử"
+    assert _ai_giu_vai(), "chua tra lai nguyen trang sau phep thu"

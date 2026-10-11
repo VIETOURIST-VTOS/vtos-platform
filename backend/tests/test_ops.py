@@ -123,7 +123,9 @@ def test_payment_request_gates_flow_and_journal():
     # mà tệp này vốn canh: cửa lập chặn đúng người, và hồ sơ Marketing không đi lối hai chữ ký.
     assert client.post("/api/v1/payment-requests", json={"category": "marketing", "supplier_name": "Meta", "supplier_tax_code": "x", "amount": 6_000_000, "description": "Quảng cáo", "has_document": True}, headers=login("ptgd.mkt")).status_code == 422
     mk = client.post("/api/v1/payment-requests", json={"category": "marketing", "marketing_muc": "quang_cao", "supplier_name": "Meta", "supplier_tax_code": "x", "amount": 6_000_000, "description": "Quảng cáo", "has_document": True}, headers=login("cntt")).json()
-    assert mk["request"]["two_signatures"] is False and mk["request"]["status"] == "cho_kt"
+    # ĐỢT F1b: hồ sơ Marketing thôi nhảy cóc qua bước bộ phận. Nó bắt đầu ở `cho_tp` như mọi
+    # loại chi khác, và `cho_tp` chính là bước một — P.TGĐ Marketing duyệt nội dung.
+    assert mk["request"]["two_signatures"] is False and mk["request"]["status"] == "cho_tp"
     # luồng r1: TP ĐH → KT → TGĐ → chi
     st = lambda rid, a, reason="", who="tp.dieuhanh": client.post(f"/api/v1/payment-requests/{rid}/step", json={"action": a, "reason": reason}, headers=login(who))
     assert st(r1["id"], "check", who="ketoan").status_code == 422

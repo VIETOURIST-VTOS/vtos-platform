@@ -192,9 +192,14 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
     # Hỏi CHÍNH hàm mà bước duyệt hỏi. Bản trước suy từ `two_signatures` nên viết "TGĐ" cho mọi
     # khoản trong dự toán, kể cả khoản mà TGĐ không ký được — chỉ sai người, và hồ sơ nằm chờ
     # thêm một vòng vì gõ nhầm cửa, đúng điều ba dòng chú thích ngay trên đã cảnh báo.
-    ai_duyet = ("P.TGĐ Marketing" if r.category == "marketing"
-                else (O.cap_duyet(db, r)["ai"] or "KHÔNG AI — chưa chốt ngưỡng duyệt chi"))
-    nxt = {"cho_tp": "Bộ phận xác nhận", "cho_kt": "Kế toán kiểm tra", "cho_duyet": ai_duyet + " duyệt", "cho_chi": "Kế toán chi trên ngân hàng",
+    # Đợt F1b: Marketing thôi có nhánh riêng. Bước `cho_duyet` của nó nay là LỆNH CHI, do TGĐ
+    # hoặc Chủ tịch ký theo mốc — còn chữ ký nội dung của P.TGĐ Marketing là bước `cho_tp`, và
+    # dòng ấy đã do bảng `nxt` ngay dưới nói.
+    ai_duyet = O.cap_duyet(db, r)["ai"] or "KHÔNG AI — chưa chốt ngưỡng duyệt chi"
+    # Bước MỘT của Marketing là chữ ký nội dung của P.TGĐ Marketing, không phải "bộ phận xác
+    # nhận" chung chung (Đợt F1b). Người đọc màn hình đi gõ đúng tên người trên dòng này.
+    _buoc1 = ("P.TGĐ Marketing duyệt nội dung" if r.category == "marketing" else "Bộ phận xác nhận")
+    nxt = {"cho_tp": _buoc1, "cho_kt": "Kế toán kiểm tra", "cho_duyet": ai_duyet + " ký lệnh chi", "cho_chi": "Kế toán chi trên ngân hàng",
            "da_chi": "Hoàn tất", "tu_choi": "Từ chối"}[r.status]
     return {"id": r.id, "code": r.code, "category": r.category, "tour_id": r.tour_id, "tour_code": t.code if t else "", "supplier_name": r.supplier_name, "supplier_tax_code": r.supplier_tax_code,
             "supplier_bank": r.supplier_bank, "amount": r.amount, "description": r.description, "has_document": r.has_document, "document_ref": r.document_ref, "has_invoice": r.has_invoice,
@@ -312,25 +317,27 @@ def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptg
         flags.append(f"{r.so_tien_ngoai_te:,.2f} {r.tien_te} × {r.ty_gia:,.2f} = {r.amount:,.0f}đ")
         so = NTC.doi_chieu_so_ty_gia(db, r.tien_te, r.ngay_ty_gia, r.ty_gia)
         if so["loi_nhan"]: flags.append(so["loi_nhan"])
-    if r.category == "marketing":
-        if r.over_budget:
-            flags.append("NGOÀI DỰ TOÁN (vẫn một chữ ký P.TGĐ Marketing – Chủ tịch chốt 23/9)")
-        if not O.ai_duyet_duoc_mkt(db):
-            flags.append("CHƯA AI GIỮ VAI P.TGĐ MARKETING → hồ sơ này sẽ nằm chờ, không ai duyệt được")
+    # NGOÀI DỰ TOÁN và MỐC TIỀN là hai lý do KHÁC NHAU, nên nói cả hai, mỗi lý do một câu.
+    # Câu cũ ở đây viết "≥ hạn mức → 2 chữ ký" cho cờ `two_signatures`, mà cờ ấy nghĩa là
+    # NGOÀI DỰ TOÁN — không phải một mốc tiền nào. Nhãn nói sai thì người đọc đi gõ sai người,
+    # và lần ấy không ai thấy vì màn hình vẫn có một câu trông hợp lý.
+    #
+    # ĐỢT F1b — Marketing thôi có nhánh nhãn riêng: nó đi chung mốc, nên nói chung một câu. Riêng
+    # lời báo "chưa ai giữ vai P.TGĐ Marketing" thì GIỮ, và ĐỔI CHỖ NÓ ĐỨNG: vai rỗng nay làm hồ
+    # sơ đứng ở bước XÁC NHẬN NỘI DUNG, không phải bước duyệt. Lời báo chỉ sai bước là lời báo đẩy
+    # người đọc đi tìm nhầm chỗ.
+    if r.two_signatures: flags.append("NGOÀI DỰ TOÁN → cần CẢ HAI chữ ký Chủ tịch + TGĐ (cổng 15)")
+    elif r.over_budget: flags.append("NGOÀI DỰ TOÁN (cổng 15)")
+    if r.category == "marketing" and not O.ai_duyet_duoc_mkt(db):
+        flags.append("CHƯA AI GIỮ VAI P.TGĐ MARKETING → hồ sơ này sẽ nằm chờ ngay ở bước xác nhận "
+                     "nội dung, không ai bấm được")
+    _cd = O.cap_duyet(db, r)
+    if _cd["chua_chot"]:
+        flags.append("CHƯA CHỐT NGƯỠNG DUYỆT CHI → hồ sơ này sẽ nằm chờ, không ai duyệt được "
+                     f"(tham số `{O.NGUONG_CHU_TICH_KEY}`, hai chữ ký)")
     else:
-        # NGOÀI DỰ TOÁN và MỐC TIỀN là hai lý do KHÁC NHAU, nên nói cả hai, mỗi lý do một câu.
-        # Câu cũ ở đây viết "≥ hạn mức → 2 chữ ký" cho cờ `two_signatures`, mà cờ ấy nghĩa là
-        # NGOÀI DỰ TOÁN — không phải một mốc tiền nào. Nhãn nói sai thì người đọc đi gõ sai người,
-        # và lần ấy không ai thấy vì màn hình vẫn có một câu trông hợp lý.
-        if r.two_signatures: flags.append("NGOÀI DỰ TOÁN → cần CẢ HAI chữ ký Chủ tịch + TGĐ (cổng 15)")
-        elif r.over_budget: flags.append("NGOÀI DỰ TOÁN (cổng 15)")
-        _cd = O.cap_duyet(db, r)
-        if _cd["chua_chot"]:
-            flags.append("CHƯA CHỐT NGƯỠNG DUYỆT CHI → hồ sơ này sẽ nằm chờ, không ai duyệt được "
-                         f"(tham số `{O.NGUONG_CHU_TICH_KEY}`, hai chữ ký)")
-        else:
-            flags.append(("≥ " if _cd["tren_moc"] else "< ")
-                         + f"{_cd['nguong']:,.0f}đ → {_cd['ai']} duyệt")
+        flags.append(("≥ " if _cd["tren_moc"] else "< ")
+                     + f"{_cd['nguong']:,.0f}đ → {_cd['ai']} ký lệnh chi")
     return {"request": pr_out(r, db), "message": f"Đã lập {r.code}" + (" – " + "; ".join(flags) if flags else "")}
 
 

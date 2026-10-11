@@ -294,8 +294,9 @@ def cap_duyet(db: Session, r: PaymentRequest) -> dict:
     cùng một hồ sơ là chỗ hỏng, không phải một tiện lợi. Hàm có tên thì bộ kiểm đọc được và phép
     thử canh được.
 
-    KHÔNG GỌI CHO KHOẢN MARKETING: nó đi một chữ ký của P.TGĐ Marketing (23/9/2026), mốc tiền không
-    áp vào nó. Nơi gọi tự chặn trước, và mỗi nơi gọi đều ghi rõ điều ấy.
+    MARKETING CŨNG ĐI QUA ĐÂY từ Đợt F1b. Trước đó nó có nhánh riêng — một chữ ký P.TGĐ Marketing
+    ở mọi mức tiền — và hàm này cố ý không áp cho nó. Nay chữ ký của P.TGĐ là bước `confirm` (duyệt
+    nội dung), còn bước `approve` là LỆNH CHI và đi đúng mốc chung như mọi loại chi.
     """
     nguong, nguon = r.nguong_duyet_ap_dung, "ho_so"
     if nguong is None:
@@ -337,8 +338,8 @@ def vai_ky_duoc(db: Session, r: PaymentRequest) -> list[str]:
     """
     if r.status != "cho_duyet":
         return []
-    if r.category == "marketing":
-        return [VAI_DUYET_MKT]
+    # Marketing KHÔNG còn nhánh riêng ở đây (Đợt F1b): bước duyệt của nó nay là LỆNH CHI, theo
+    # mốc chung. Chữ ký nội dung của P.TGĐ Marketing nằm ở bước `confirm`, không ở đây.
     c = cap_duyet(db, r)
     return ([] if c["chua_chot"]
             else [v for v, co in (("chutich", c["can_chutich"]), ("tgd", c["can_tgd"])) if co])
@@ -389,32 +390,42 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     # R3: xếp cấp duyệt
     if cat == "marketing":
         # ═══════════════════════════════════════════════════════════════════════════════════════
-        # MARKETING ĐI MỘT CHỮ KÝ — CHỦ TỊCH CHỐT 23/9/2026, xác nhận lại 24/9/2026
+        # MARKETING ĐI HAI BƯỚC — CHỦ TỊCH CHỐT 10/10/2026 (Đợt F1b)
         # ═══════════════════════════════════════════════════════════════════════════════════════
         #
-        # Luật: MỌI đề xuất chi Marketing do P.TGĐ Marketing duyệt là xong. Không có mốc tiền, không
-        # có nhánh. Dữ liệu vẫn đẩy lên TGĐ và Chủ tịch — nhưng để XEM, không phải để bấm.
+        # Bước 1: P.TGĐ Marketing duyệt NỘI DUNG / KẾ HOẠCH / NGÂN SÁCH — ở bước `confirm`, đúng ô
+        #         `CATEGORY_CONFIRMER["marketing"]` vốn đã có.
+        # Bước 2: LỆNH CHI — ở bước `approve`, theo mốc `nguong_chu_tich_duyet_chi` của Đợt F1:
+        #         dưới mốc TGĐ ký, từ mốc trở lên Chủ tịch ký.
         #
-        # ĐÂY LÀ MỘT BƯỚC NỚI, KHÔNG PHẢI MỘT BƯỚC SIẾT. Trước hôm nay Marketing có HAI phanh, và
-        # quyết định này gỡ cả hai:
-        #   · `han_muc_mkt` = 5.000.000đ — từ mức ấy trở lên phải thêm chữ ký Chủ tịch
-        #   · vượt phần còn lại của hạng mục ngân sách — cũng bật hai chữ ký
-        # Chủ tịch đã được nêu rõ cả hai phanh này cùng hệ quả (một hồ sơ 500 triệu, hoặc một hồ sơ
-        # vượt dự toán, nay cũng chỉ cần một chữ ký) và vẫn chốt bỏ. Ghi ra đây để người sửa sau
-        # biết đây là quyết định có chủ đích, không phải một chỗ sót.
+        # ĐÂY LÀ MỘT BƯỚC SIẾT, ĐẢO LẠI MỘT BƯỚC NỚI CỦA CHÍNH CHỦ TỊCH NGÀY 23/9/2026. Luật cũ cho
+        # mọi hồ sơ Marketing dừng ở một chữ ký P.TGĐ, không mốc tiền. Để làm được thế, chỗ này CẮT
+        # BỎ bước bộ phận (`r.status = "cho_kt"` ngay lúc lập), lý do ghi rõ khi ấy: người xác nhận
+        # bộ phận của Marketing CHÍNH LÀ P.TGĐ, mà ông đang ký ở cuối, nên giữ cả hai bước là bắt
+        # một người bấm hai lần cho cùng một hồ sơ.
         #
-        # NHỮNG THỨ KHÔNG BỊ GỠ, và đừng ai gỡ tiếp vì tưởng là cùng một mạch:
-        #   · Kế toán vẫn kiểm chứng từ và mã số thuế trước khi chi — đó là kiểm soát tài chính và
-        #     điều kiện trừ thuế, không phải một cấp duyệt.
+        # NAY LÝ DO ẤY KHÔNG CÒN ĐÚNG: hai bước do HAI NGƯỜI khác nhau bấm. Nên việc phải làm không
+        # phải thêm một trạng thái mới, mà là GỠ phần ngoại lệ ấy để Marketing đi chung đúng một
+        # đường với mọi loại chi. Dòng `r.status = "cho_kt"` ở cuối khối này đã được gỡ.
+        #
+        # NHỮNG THỨ KHÔNG ĐỔI, và đừng ai gỡ tiếp vì tưởng cùng một mạch:
+        #   · Kế toán vẫn kiểm chứng từ và mã số thuế trước khi chi — kiểm soát tài chính và điều
+        #     kiện trừ thuế, không phải một cấp duyệt.
         #   · Phép kiểm hai ô hạng mục/chiến dịch ngay dưới đây (TC-80, 24/9) — giữ nguyên.
-        #   · Cờ `over_budget` vẫn được tính và vẫn ghi vào mô tả. Nó thôi CHẶN, nhưng không thôi
-        #     NÓI: người duyệt và hai màn hình lãnh đạo vẫn thấy khoản nào đang vượt dự toán.
-        #   · Người lập không tự duyệt, và P.TGĐ Marketing không lập hồ sơ (chặn ngay dưới đây).
+        #   · Cờ `over_budget` vẫn tính và vẫn ghi vào mô tả, và vẫn chỉ NÓI chứ không CHẶN. Bản
+        #     đầu của đợt này viết rằng nó "lại có răng" vì Marketing đi qua nhánh chung — SAI, và
+        #     phép thử bắt được trước khi đẩy: `two_signatures` là một cờ riêng, chỉ bật ở đúng một
+        #     chỗ (`chi_tour`/`tam_ung` vượt dự toán TOUR), và F1b không đụng tới chỗ bật cờ ấy.
+        #     CÒN LẠI CHO CHỦ TỊCH QUYẾT: có nối lại cổng 15 cho Marketing không. Hệ quả phải cân
+        #     trước khi nối: `over_budget` của Marketing còn bật cả khi CHƯA GẮN HẠNG MỤC.
+        #   · `han_muc_mkt` = 5.000.000đ vẫn là một tham số CHẾT, không nối lại. Mốc tiền của
+        #     Marketing từ nay là mốc chung `nguong_chu_tich_duyet_chi`, không phải một mốc riêng.
         if u.role == "ptgd_mkt":
             raise ValueError(
-                "P.TGĐ Marketing không lập hồ sơ đề xuất chi, chỉ duyệt (Chủ tịch chốt 23/9/2026). "
-                "Vì mọi hồ sơ Marketing dừng ở một chữ ký của P.TGĐ, nếu chính người ấy lập thì hồ "
-                "sơ không còn ai ký được ngoài chính mình. Giao cho một nhân viên Marketing lập.")
+                "P.TGĐ Marketing không lập hồ sơ đề xuất chi (Chủ tịch chốt 23/9/2026, giữ nguyên "
+                "10/10/2026). Lý do nay là: chính P.TGĐ xác nhận nội dung ở bước một, nên nếu ông "
+                "lập hồ sơ thì một người bấm hai lần cho cùng một hồ sơ. Giao cho một nhân viên "
+                "Marketing lập.")
         # KIỂM HAI Ô, 24/9/2026. Trước đây hai ô này không màn hình nào gửi nên chưa ai gõ sai
         # được; nay phiếu chi có ô chọn thật, và một mã hạng mục gõ sai thì cổng ngân sách đối
         # chiếu với một hạn mức không tồn tại rồi im lặng cho qua. Rỗng vẫn hợp lệ – rỗng nghĩa là
@@ -439,10 +450,9 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
                 r.description = (r.description + f" [ngoài dự toán: còn {con:,.0f}đ theo {vi_sao}]")[:300]
         else:
             r.over_budget = True
-        # Bỏ luôn bước "bộ phận xác nhận": người xác nhận bộ phận của Marketing CHÍNH LÀ P.TGĐ MKT
-        # (xem CATEGORY_CONFIRMER), mà nay ông ấy là người DUYỆT ở cuối. Giữ cả hai bước là bắt cùng
-        # một người bấm hai lần cho cùng một hồ sơ — thủ tục chứ không phải kiểm soát.
-        r.status = "cho_kt"
+        # KHÔNG đặt trạng thái ở đây nữa. Hồ sơ Marketing bắt đầu ở `cho_tp` như mọi loại chi
+        # khác, và bước `cho_tp` CHÍNH LÀ bước một của Chủ tịch: P.TGĐ Marketing duyệt nội dung.
+        # Dòng `r.status = "cho_kt"` cũ nằm ở đây là phần ngoại lệ 23/9 mà Đợt F1b gỡ.
     if t and cat in ("chi_tour", "tam_ung"):
         cf = tour_cashflow(db, t)
         if (cf["paid"] or 0) + cf["committed"] + cf["pending"] + (r.amount or 0) > (cf["budget"] or 0) + 1:
@@ -454,9 +464,9 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     # cửa lập là bắt người lập chịu một việc chưa ký của cấp trên, và hồ sơ không lập được thì
     # không có gì đếm ra để ai đó đi ký. Nhãn trả về từ cửa lập nói rõ hồ sơ sẽ nằm chờ.
     #
-    # Marketing KHÔNG ghi ô này — một chữ ký của P.TGĐ Marketing, mốc tiền không áp.
-    if cat != "marketing":
-        r.nguong_duyet_ap_dung = nguong_chu_tich_dang_hieu_luc(db)
+    # MARKETING CŨNG GHI Ô NÀY từ Đợt F1b: lệnh chi Marketing nay đi qua đúng mốc chung. Trước
+    # F1b ô này cố ý để rỗng cho Marketing vì mốc tiền không áp vào nó — câu ấy không còn đúng.
+    r.nguong_duyet_ap_dung = nguong_chu_tich_dang_hieu_luc(db)
     db.add(r); db.flush()
     R.audit(db, u.username, u.role, "lap_de_nghi_chi", f"dc:{r.code}", after={"loai": cat, "tour": t.code if t else "", "ncc": r.supplier_name, "so_tien": r.amount,
                                                                               "ngoai_du_toan": r.over_budget, "hai_chu_ky": r.two_signatures})
@@ -515,29 +525,18 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         # Câu này là thứ Kế toán đọc rồi đi gõ đúng người, nên nó phải hỏi CHÍNH hàm mà bước duyệt
         # hỏi. Bản trước suy từ `two_signatures`, tức luôn viết "TGĐ" cho mọi khoản trong dự toán —
         # kể cả khoản 300 triệu mà TGĐ không ký được.
-        _c = cap_duyet(db, r) if r.category != "marketing" else None
-        _ai = ("P.TGĐ Marketing" if _c is None
-               else (_c["ai"] or "KHÔNG AI — chưa chốt ngưỡng duyệt chi"))
-        msg = f"{r.code}: Kế toán đã kiểm tra, trình {_ai} duyệt"
+        _c = cap_duyet(db, r)
+        _ai = _c["ai"] or "KHÔNG AI — chưa chốt ngưỡng duyệt chi"
+        msg = f"{r.code}: Kế toán đã kiểm tra, trình {_ai} duyệt lệnh chi"
     elif action == "approve":
         if r.status != "cho_duyet": raise ValueError("Không ở bước duyệt")
-        if r.category == "marketing":
-            # Một chữ ký, và là chữ ký của P.TGĐ Marketing (Chủ tịch chốt 23/9/2026).
-            # Chủ tịch toàn quyền vẫn ký được — đó là luật 13/9, không phải ngoại lệ mở riêng ở đây.
-            if not (u.role == "ptgd_mkt" or toan_quyen(u)):
-                raise ValueError("Chi Marketing chỉ P.TGĐ Marketing duyệt (Chủ tịch chốt 23/9/2026)")
-            # Người lập không tự duyệt. Cửa lập đã chặn P.TGĐ MKT, nhưng Chủ tịch toàn quyền thì lập
-            # được — nên ranh giới này phải đứng ở ĐÂY mới kín, không chỉ ở cửa lập.
-            if (r.created_by or "") == u.username:
-                raise ValueError("Người lập không tự duyệt hồ sơ của chính mình")
-            r.status, r.approved_by, r.approved_at = "cho_chi", u.username, datetime.now()
-            _post_liability(db, r)
-            _KTN.ghi_buoc(db, _pv, "duyet_lenh_chi", u)
-            R.audit(db, u.username, u.role, "de_nghi_chi_approve", f"dc:{r.code}",
-                    after={"trang_thai": r.status, "mot_chu_ky_mkt": True, "ngoai_du_toan": r.over_budget})
-            db.commit()
-            return (f"{r.code} đã duyệt – lập lệnh chi chờ Kế toán thực hiện"
-                    + (" (khoản này NGOÀI DỰ TOÁN)" if r.over_budget else ""))
+        # NHÁNH RIÊNG CỦA MARKETING ĐÃ GỠ — Đợt F1b. Từ 23/9/2026 tới 10/10/2026 chỗ này cho
+        # P.TGĐ Marketing ký một mình ở mọi mức tiền rồi `return` sớm. Nay Marketing đi chung đúng
+        # đường này: P.TGĐ đã duyệt nội dung ở bước `confirm`, còn LỆNH CHI theo mốc chung.
+        #
+        # `return` sớm ấy là lý do nhánh cũ phải tự gọi `_KTN.ghi_buoc` — nó nhảy qua đoạn cuối
+        # hàm, nơi MỌI hành động đều để lại dấu chân qua `_b`. Gỡ nhánh đi thì dấu chân vẫn còn,
+        # và còn đúng một lần thay vì hai.
         # ═══════════════════════════════════════════════════════════════════════════════════
         # AI ĐƯỢC BẤM — Đợt F1. Ba dòng cũ nằm ở đây đã nói NGƯỢC luật:
         #     if u.role == "tgd": ...
@@ -549,6 +548,15 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         cd = cap_duyet(db, r)
         if cd["chua_chot"]:
             raise ValueError(cd["ly_do"])
+        # NGƯỜI LẬP KHÔNG TỰ KÝ LỆNH CHI CỦA CHÍNH MÌNH — Đợt F1b.
+        # Phép chặn này trước đây CHỈ nằm trong nhánh riêng của Marketing. Gỡ nhánh ấy mà không bù
+        # vào là mở một lỗ; và đo kỹ thì nhánh chung vốn đã hở sẵn cho SÁU loại chi còn lại. Cửa
+        # lập không khai `tgd`/`chutich`, nhưng Chủ tịch toàn quyền đi qua được, nên hôm nay ông
+        # lập một đề nghị rồi tự ký là đi lọt. Đây là tách bạch trách nhiệm, không phải phân quyền:
+        # toàn quyền 06/9/2026 KHÔNG nới chỗ này, cùng lẽ với `ks_toan_quyen.py`.
+        if (r.created_by or "") == u.username:
+            raise ValueError("Người lập không tự ký lệnh chi của chính mình. Hồ sơ này do "
+                             f"`{r.created_by}` lập — phải người khác ở cấp duyệt bấm.")
         if r.nguong_duyet_ap_dung is None:
             # Hồ sơ cũ: ghi mốc đang áp xuống hồ sơ NGAY LÚC DUYỆT, để lần đọc sau không đổi nữa.
             r.nguong_duyet_ap_dung = cd["nguong"]
