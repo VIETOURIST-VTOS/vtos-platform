@@ -61,9 +61,20 @@ def _khoi_cha(cay, khoa):
 
 
 def _nhanh_cap_mot(khoi):
-    """Mã các nhánh CẤP MỘT: đúng hai đoạn số ("3.1", "4.10"). Mục con sâu hơn có ba đoạn trở lên
-    ("3.3.1", "3.4.2.1") nên khuôn này không vơ nhầm chúng."""
-    return re.findall(r'\bma: "(\d+\.\d+)"', khoi)
+    """Mã các nhánh CẤP MỘT: hai đoạn số, có thể kèm MỘT chữ cái ("3.1", "4.10", "4.4b"). Mục con
+    sâu hơn có ba đoạn trở lên ("3.3.1", "3.4.2.1") nên khuôn này không vơ nhầm chúng.
+
+    CHỮ CÁI Ở CUỐI THÊM NGÀY 12/10/2026, và lý do đáng ghi lại vì nó là lỗi của chính phép thử
+    này. Khuôn cũ chỉ đọc được mã hai đoạn SỐ, nên sáu nhánh mang mã kiểu "4.4b" vô hình với nó —
+    kể cả nhánh "Hợp đồng thuê xe riêng" của Điều hành, nhánh chạy thật từ PR #211 mà không phân
+    hệ con nào nhận. Tức là phép thử canh đúng kiểu hỏng ấy đã để lọt đúng kiểu hỏng ấy, suốt từ
+    07/10 tới 12/10, và nó im lặng vì thứ nó không đọc được thì nó cũng không đếm thiếu.
+
+    BÀI HỌC: một khuôn dò hẹp hơn dữ liệu thật thì phép thử vẫn XANH và vẫn VÔ DỤNG. Nên
+    `test_khuon_do_doc_duoc_ca_ma_co_chu_cai` canh thẳng vào khuôn, để lần sau ai siết nó lại thì
+    có người biết ngay thay vì biết sau năm ngày.
+    """
+    return re.findall(r'\bma: "(\d+\.\d+[a-z]?)"', khoi)
 
 
 def _khai_phan_he_con(cay):
@@ -76,8 +87,10 @@ def _khai_phan_he_con(cay):
         than = m.group(3)
         d_lay = re.search(r'lay:\s*\[(.*?)\]', than, re.S)
         d_chung = re.search(r'chung:\s*\[(.*?)\]', than, re.S)
-        lay = re.findall(r'"(\d+\.\d+)"', d_lay.group(1)) if d_lay else []
-        chung = re.findall(r'"(\d+\.\d+)"', d_chung.group(1)) if d_chung else []
+        # Cùng khuôn với `_nhanh_cap_mot`: hai bên phải đọc được cùng một tập mã, nếu không thì
+        # phép so "lấy đủ chưa" so hai danh sách được lọc bằng hai cái sàng khác nhau.
+        lay = re.findall(r'"(\d+\.\d+[a-z]?)"', d_lay.group(1)) if d_lay else []
+        chung = re.findall(r'"(\d+\.\d+[a-z]?)"', d_chung.group(1)) if d_chung else []
         ra.append((m.group(1), m.group(2), lay, chung))
     return ra
 
@@ -110,6 +123,26 @@ def test_hop_cua_cac_lay_phu_het_nhanh_cua_cay_cha():
         assert not thua, (
             f"phân hệ con lấy mã {sorted(thua)} không có trong cây {cha} – "
             f"lúc dựng sẽ ném lỗi, màn hình trắng")
+
+
+def test_khuon_do_doc_duoc_ca_ma_co_chu_cai():
+    """Khuôn dò của chính bộ kiểm này phải đọc được MỌI mã cấp một đang có trong cây.
+
+    Phép thử trên nó (`test_hop_cua_cac_lay_phu_het_nhanh_cua_cay_cha`) chỉ mạnh bằng cái sàng nó
+    dùng: nhánh nào khuôn không đọc ra thì vừa không nằm trong "có thật" vừa không nằm trong "đã
+    lấy", nên nó biến mất khỏi cả hai vế và phép trừ ra rỗng. Xanh, và vô dụng. Chuyện này đã xảy
+    ra thật với mã "4.4b" từ 07/10 tới 12/10/2026.
+
+    Nên đếm thẳng trên văn bản cây, bằng một khuôn ĐỘC LẬP với khuôn đang kiểm.
+    """
+    cay = _doc(CAY)
+    for cha in ("khachhang", "vanhanh"):
+        khoi = _khoi_cha(cay, cha)
+        that = set(re.findall(r'\bma: "(\d+\.\d+[a-z]?)"', khoi))
+        doc_ra = set(_nhanh_cap_mot(khoi))
+        assert that == doc_ra, (
+            f"khuôn dò bỏ sót mã {sorted(that - doc_ra)} của phân hệ {cha} – "
+            f"mã nào khuôn không đọc được thì phép kiểm phủ nhánh không nhìn thấy nó")
 
 
 def test_lay_ma_khong_co_that_thi_nem_loi_chu_khong_bo_qua_lang_le():

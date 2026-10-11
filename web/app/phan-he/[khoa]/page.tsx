@@ -40,6 +40,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
 import BangChiTieuPhong, { usePhamViBaoCao } from "@/components/BangChiTieuPhong";
+import BanLamViecPhong from "@/components/BanLamViecPhong";
 import MucLucPhanHe from "@/components/MucLucPhanHe";
 import { PHONG_CUA_PHAN_HE, timPhanHe } from "@/lib/cay_phan_he";
 
@@ -68,6 +69,10 @@ function BangCuaPhong({ khoa, phamVi }: { khoa: string; phamVi: string }) {
   return (<>
     <h1>{ph?.ten || khoa}</h1>
     <LoiVaoMucLuc khoa={khoa} />
+    {/* BD-1 · 12/10/2026 — VIỆC CẦN LÀM ĐỨNG TRÊN CHỈ TIÊU. Chủ tịch chốt sau khi xem bản dựng
+        thử: người mở máy buổi sáng là để làm việc; chỉ tiêu tháng xem một lần đầu ngày là đủ.
+        Bàn tự ẩn với phòng chưa khai hàng đợi, nên bảy phòng còn lại thấy y như trước. */}
+    <BanLamViecPhong phong={phamVi} />
     <BangChiTieuPhong meta={meta} phamViCoDinh={phamVi} />
     <LoiVaoMucLuc khoa={khoa} duoi />
   </>);
