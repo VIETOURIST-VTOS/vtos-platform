@@ -8,6 +8,7 @@ import { ROLES, TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
 import { Tag, Gate, errMsg } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
 import QuyetToanForm from "@/components/QuyetToanForm";
+import ChuongTrinhChuyen from "@/components/ChuongTrinhChuyen";
 
 // Đ-1 (12/9/2026) · tab "lop3" là CỬA còn thiếu của cả phân hệ quyết toán lớp 3.
 //
@@ -27,7 +28,9 @@ import QuyetToanForm from "@/components/QuyetToanForm";
 //
 // KHÔNG dựng cửa đọc thứ hai: tab này gọi thẳng `GET /su-co-tour?tour_id=`, cùng cửa mà màn hình sổ
 // sự cố dùng. Lập và xử lý sự cố vẫn ở màn hình ấy — một chỗ ghi, một bộ luật.
-const TABS: [string, string][] = [["info", "Thông tin & quy trình"], ["budget", "Dự toán 3 con số"], ["bookings", "Booking & thu tiền"], ["cost", "Chi NCC & quyết toán"], ["lop3", "Quyết toán chi tiết"], ["ops", "HDV & xe"], ["phatsinh", "Phát sinh & sự cố"], ["history", "Quy trình & lịch sử"]];
+// 4.4.2 — thẻ «Chương trình» đứng ngay sau Thông tin, vì chương trình là thứ người Điều hành mở
+// đầu tiên sau khi đọc thông tin chuyến, và là thứ khách đã nhận.
+const TABS: [string, string][] = [["info", "Thông tin & quy trình"], ["chuongtrinh", "Chương trình"], ["budget", "Dự toán 3 con số"], ["bookings", "Booking & thu tiền"], ["cost", "Chi NCC & quyết toán"], ["lop3", "Quyết toán chi tiết"], ["ops", "HDV & xe"], ["phatsinh", "Phát sinh & sự cố"], ["history", "Quy trình & lịch sử"]];
 const PR_ST: Record<string, string> = { cho_tp: "Chờ TP", cho_kt: "Chờ Kế toán", cho_duyet: "Chờ duyệt", cho_chi: "Chờ chi", da_chi: "Đã chi", tu_choi: "Từ chối", huy: "Hủy" };
 
 function TourDetail() {
@@ -233,6 +236,8 @@ function TourDetail() {
         </tbody></table>{!s.eligible && <Gate ok={false}>Không phát sinh quỹ thưởng: {!s.on_time ? "quá hạn quyết toán" : t.below_margin ? "chuyến duyệt chạy dưới biên" : "biên thực tế dưới ngưỡng"}.</Gate>}</>}
       </div>
     </div>}
+
+    {tab === "chuongtrinh" && <div className="panel wrap"><ChuongTrinhChuyen tourId={t.id} /></div>}
 
     {tab === "budget" && <div className="grid">
       <div className="panel"><h2>Ba con số dự toán (ĐH Điều 2, 11)</h2>

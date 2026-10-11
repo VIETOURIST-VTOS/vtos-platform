@@ -57,6 +57,10 @@ CUA_TAY = (
     # Đợt E1 (09/10/2026). CỬA TAY trên màn hình /ket-so. Bảng bắt đầu rỗng và PHẢI rỗng: mỗi
     # dòng là một mức chặn có người ký, nên máy nạp sẵn một dòng là máy tự đặt mức hộ người.
     "muc_do_chan",
+    # CT-1 (4.4.2, 11/10/2026). CUA TAY tren man hinh Tour > the "Chuong trinh". Bang bat dau RONG
+    # va phai rong: chuong trinh cua mot chuyen chi sinh ra khi Dieu hanh bam "mo tu san pham". May
+    # nap san mot dong la may tu viet chuong trinh ho nguoi ban cho khach.
+    "chuong_trinh_tour", "chuong_trinh_ngay",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
     "auto_reports", "ban_doc_chung_tu", "bang_gia", "bang_gia_dong", "bank_accounts_cat",
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",

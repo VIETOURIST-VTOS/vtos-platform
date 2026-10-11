@@ -573,7 +573,15 @@ MAN_HINH_API = {
                # Hệ quả: bốn vai Kinh doanh cũng chạm được tiền tố này, vì họ xem được /tours. Phần
                # giá vốn thì họ VẪN KHÔNG xem được – hàng rào trong là danh sách XEM của chính
                # app/api/v1/quyet_toan_lop3.py, và danh sách ấy không có vai Kinh doanh nào.
-               "/api/v1/quyet-toan-lop3"),
+               "/api/v1/quyet-toan-lop3",
+               # CT-1 (11/10/2026): chương trình của riêng chuyến, thẻ «Chương trình» của chính màn
+               # hình này. Cùng lý do như Lớp 3 ở trên: KHÔNG dựng màn hình thứ hai cho một việc.
+               #
+               # Hệ quả về quyền: mọi vai xem được /tours chạm được tiền tố này — gồm cả bốn vai Kinh
+               # doanh. Đó là CỐ Ý: chương trình tour là thứ Sale đã gửi khách, họ phải đọc được đúng
+               # bản chuyến đang chạy. Nhưng SỬA thì không: hàng rào trong là danh sách `GHI` của
+               # chính app/api/v1/chuong_trinh.py — Chủ tịch, TGĐ, Điều hành, CNTT và không ai khác.
+               "/api/v1/chuong-trinh"),
     "/vietrip": ("/api/v1/import",),
     "/visa": ("/api/v1/visa",),
     "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents", "/api/v1/payment-requests",
