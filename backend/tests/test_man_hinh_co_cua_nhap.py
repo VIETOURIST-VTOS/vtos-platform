@@ -150,11 +150,30 @@ def _man_hinh() -> list:
     return sorted(set(ra))
 
 
-def _so_cua_ghi(duong: str) -> int:
-    """Đếm lời gọi ghi của một màn hình, tính cả mã của thành phần dùng chung mà nó nhập."""
+def _ma_cua_man_hinh(duong: str) -> list[str] | None:
+    """Mã CHẠY của một màn hình: tệp trang, CỘNG mã các thành phần dùng chung mà nó nhập.
+
+    Trả về None khi không có tệp trang.
+
+    VÌ SAO PHẢI TÍNH CẢ THÀNH PHẦN. Một màn hình không nhất thiết gọi máy chủ ngay trong
+    `page.tsx`: mã có thể nằm ở `components/<Tên>.tsx` mà trang nhập vào. Đọc mỗi tệp trang thì
+    một màn hình dọn mã sang thành phần sẽ TRÔNG NHƯ không đọc, không ghi gì cả — và cả hai phép
+    thử dưới đây đều hoá vô hại mà vẫn xanh.
+
+    GOM VỀ MỘT CHỖ — 11/10/2026. Trước hôm nay chỉ `_so_cua_ghi` biết đi theo thành phần, còn
+    `test_duong_doc_da_khai_van_con_tren_man_hinh` thì chỉ đọc tệp trang. Hai phép thử trong cùng
+    một tệp, cùng hỏi "màn hình này có mã gì", mà trả lời theo hai cách khác nhau. Chuyện lộ ra
+    khi `/bao-cao` dọn bảng chỉ tiêu sang `components/BangChiTieuPhong.tsx`: phần đếm cửa ghi vẫn
+    đúng, phần soát đường đọc thì đỏ và báo "/bao-cao không còn đọc /bao-cao" — trong khi màn
+    hình vẫn đọc đúng cửa ấy. Lỗi của phép thử, không phải của mã, nên sửa phép thử mới đúng.
+
+    Chỉ đi MỘT TẦNG, cố ý: thành phần của thành phần chưa có trong kho, và một phép thử đi sâu
+    hơn thứ nó cần là một phép thử khó đọc mà không canh thêm được gì. Ngày nào có tầng thứ hai
+    thật thì mở rộng ở đúng đây, một chỗ.
+    """
     p = WEB / "app" / duong.strip("/") / "page.tsx" if duong != "/" else WEB / "app" / "page.tsx"
     if not p.exists():
-        return -1
+        return None
     src = _ma(p.read_text(encoding="utf-8"))
     tep = [src]
     for m in re.findall(r'from "@/components/(\w+)"', src):
@@ -163,6 +182,14 @@ def _so_cua_ghi(duong: str) -> int:
         q = WEB / "components" / (m + ".tsx")
         if q.exists():
             tep.append(_ma(q.read_text(encoding="utf-8")))
+    return tep
+
+
+def _so_cua_ghi(duong: str) -> int:
+    """Đếm lời gọi ghi của một màn hình, tính cả mã của thành phần dùng chung mà nó nhập."""
+    tep = _ma_cua_man_hinh(duong)
+    if tep is None:
+        return -1
     n = 0
     for t in tep:
         for rx in (RE_API, RE_FETCH):
@@ -227,10 +254,10 @@ def test_duong_doc_da_khai_van_con_tren_man_hinh():
     for d, (ly_do, duong) in KHONG_CUA_GHI.items():
         assert len(ly_do) > 60, f"Lý do chỉ xem của {d} quá ngắn để là một lý do thật"
         assert duong, f"{d} khai là chỉ xem mà không nói đọc từ đâu"
-        p = WEB / "app" / d.strip("/") / "page.tsx" if d != "/" else WEB / "app" / "page.tsx"
-        if not p.exists():
+        tep = _ma_cua_man_hinh(d)
+        if tep is None:
             hong.append((d, "mất tệp màn hình")); continue
-        src = _ma(p.read_text(encoding="utf-8"))
+        src = "\n".join(tep)
         mat = [x for x in duong if x not in src]
         if mat:
             hong.append((d, f"không còn đọc {mat}"))

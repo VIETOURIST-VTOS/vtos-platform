@@ -612,3 +612,38 @@ export function demMuc(ds: MucCay[]): { tong: number; co: number } {
   di(ds);
   return { tong, co };
 }
+
+/** PHÒNG BAN ĐỨNG SAU MỖI PHÂN HỆ — Chủ tịch chốt 11/10/2026.
+ *
+ *  Khoá là `khoa` của `/phan-he/<khoa>`; giá trị là MÃ PHẠM VI mà máy chủ dùng ở
+ *  `backend/app/services/bao_cao_phong.PHONG`. Có cặp ở đây thì cửa phân hệ mở ra bảng chỉ tiêu
+ *  của phòng ấy; không có cặp thì cửa mở ra mục lục chức năng như từ 13/9/2026 tới nay.
+ *
+ *  BẢNG NÀY KHAI Ở ĐÂY, KHÔNG Ở TRANG. Cây phân hệ vốn là nơi khai mọi thứ về phân hệ — tên, tóm
+ *  tắt, nhánh con, phân hệ con. Để cặp phòng ở trang là dựng chỗ khai thứ hai cho cùng một loại
+ *  việc, và chỗ khai thứ hai thì sớm muộn lệch chỗ thứ nhất.
+ *
+ *  NĂM KHOÁ CỐ Ý KHÔNG CÓ MẶT, mỗi khoá một lý do khác nhau — ghi ra để người sau khỏi tưởng là
+ *  bỏ sót rồi đắp thêm vào:
+ *    · `tongquan` — bảng điều hành `/` ĐÃ là số toàn công ty. Trỏ phân hệ này vào bảng toàn công
+ *      ty nữa là đặt cùng một con số ở hai nơi, đúng thứ Chủ tịch bảo bỏ ở vòng TC-40.
+ *    · `baocao`   — chính nó là phân hệ Báo cáo. Trỏ vào bảng báo cáo là một vòng tròn.
+ *    · `quantri`  — Quản trị hệ thống không phải một phòng ban, nên không có chỉ tiêu phòng.
+ *    · `khachhang`, `vanhanh` — hai khoá GỘP cũ, từ 18/9/2026 đã xổ thành năm phân hệ con và
+ *      không còn trên menu. Chúng còn sống cho ai đã lưu dấu trang; một khoá gộp hai phòng thì
+ *      không có MỘT bảng nào đúng để trỏ tới.
+ *
+ *  `test_trang_phan_he` canh hai chiều: mọi mã phòng ở đây phải có thật trong `PHONG`, và mọi
+ *  phòng GỐC trong `PHONG` phải có đúng một cửa phân hệ. Thêm một phòng mới mà quên mở cửa thì
+ *  phép thử đỏ và hỏi thẳng, thay vì để phòng ấy không có lối vào mà không ai biết.
+ */
+export const PHONG_CUA_PHAN_HE: Record<string, string> = {
+  marketing: "marketing",
+  kdle: "kd_le",
+  kddoan: "kd_doan",
+  dhtour: "dieu_hanh",
+  dhxe: "doi_xe",
+  hdv: "huong_dan",
+  nhansu: "hcns",
+  taichinh: "ketoan",
+};

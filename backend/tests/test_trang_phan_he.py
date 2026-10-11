@@ -18,6 +18,13 @@ import os, re, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CAY = os.path.join(ROOT, "web", "lib", "cay_phan_he.ts")
 TRANG = os.path.join(ROOT, "web", "app", "phan-he", "[khoa]", "page.tsx")
+# 11/10/2026 — TRANG nay chỉ còn là BỘ RẼ NHÁNH. Phần vẽ mục lục dọn sang một thành phần riêng,
+# và mấy phép thử dưới đây đi theo nó, vì luật chúng canh là luật của MỤC LỤC chứ không phải của
+# đường dẫn: "không gọi máy chủ", "ghi rõ mục nào còn nợ", "khoá chứ không giấu". Để chúng đọc
+# TRANG thì từ hôm nay chúng soi nhầm chỗ — và một hàng rào soi nhầm chỗ mà vẫn xanh còn nguy
+# hiểm hơn không có hàng rào.
+MUC_LUC = os.path.join(ROOT, "web", "components", "MucLucPhanHe.tsx")
+BANG = os.path.join(ROOT, "web", "components", "BangChiTieuPhong.tsx")
 SHELL = os.path.join(ROOT, "web", "components", "Shell.tsx")
 
 TAM_KHOA = ["tongquan", "marketing", "khachhang", "vanhanh",
@@ -187,24 +194,34 @@ def test_tab_khong_bao_gio_thanh_mot_man_hinh_rieng():
     for dong in cay.splitlines():
         if "tab: true" in dong:
             assert "href:" not in dong, f"mục tab không được có đường dẫn riêng: {dong.strip()}"
-    assert "if (!m.tab)" in open(TRANG, encoding="utf-8").read() or "!m.tab" in cay, \
+    assert "if (!m.tab)" in open(MUC_LUC, encoding="utf-8").read() or "!m.tab" in cay, \
         "phép đếm phải loại tab ra khỏi tổng số màn hình"
 
 
-def test_trang_phan_he_khong_hien_mot_con_so_nghiep_vu_nao():
+def test_muc_luc_khong_hien_mot_con_so_nghiep_vu_nao():
     """Ranh giới 09/9/2026: Claude viết CẤU TRÚC, không nhập và không tải SỐ LIỆU.
 
-    Trang này là mục lục. Nó không được gọi máy chủ – có gọi là bắt đầu hiện số, mà số trên một
-    trang mục lục thì không có cửa nhập nào đứng sau.
+    Mục lục không được gọi máy chủ – có gọi là bắt đầu hiện số, mà số trên một mục lục thì không
+    có cửa nhập nào đứng sau.
+
+    PHÉP THỬ NÀY ĐỔI CHỖ SOI, KHÔNG ĐỔI LUẬT (11/10/2026). Trước đây nó tên là
+    `test_trang_phan_he_khong_hien_mot_con_so_nghiep_vu_nao` và soi `[khoa]/page.tsx`, vì hồi ấy
+    trang phân hệ CHÍNH LÀ mục lục. Từ 11/10 trang ấy mở ra bảng chỉ tiêu của phòng, nên nó PHẢI
+    gọi máy chủ; còn mục lục thì lùi sang `components/MucLucPhanHe.tsx`, nơi luật cũ vẫn đúng
+    từng chữ.
+
+    Đây là lý do mục lục được tách thành một tệp riêng thay vì ở chung một tệp với bảng: ở chung
+    thì phép thử này buộc phải gỡ bỏ. Gỡ một hàng rào vì nó cản đường là cách hàng rào chết dần,
+    nên vòng 11/10 chọn dọn mã cho vừa hàng rào chứ không dọn hàng rào cho vừa mã.
     """
-    src = open(TRANG, encoding="utf-8").read()
+    src = open(MUC_LUC, encoding="utf-8").read()
     for cam in ("api(", "fetch(", "useEffect"):
-        assert cam not in src, f"trang phân hệ không được {cam} – đây là mục lục, không phải báo cáo"
+        assert cam not in src, f"mục lục phân hệ không được {cam} – đây là mục lục, không phải báo cáo"
 
 
 def test_ghi_ro_muc_nao_con_no():
     """Ba trạng thái phải hiện thành chữ, không chỉ bằng màu: Đã có · Chưa dựng · Tab trong trang."""
-    src = open(TRANG, encoding="utf-8").read()
+    src = open(MUC_LUC, encoding="utf-8").read()
     for nhan in ("Đã có", "Chưa dựng", "Tab trong trang"):
         assert nhan in src, f"thiếu nhãn trạng thái “{nhan}”"
 
@@ -246,8 +263,8 @@ def test_khoa_muc_khong_co_quyen_chu_khong_giau_di():
 
     Luật áp dụng cho MỌI vai trò, kể cả tài xế, hướng dẫn viên và chuyên viên visa.
     """
-    src = open(TRANG, encoding="utf-8").read()
-    assert "hidden_menus" in src, "trang phân hệ phải đọc hidden_menus của phiên để biết mục nào khoá"
+    src = open(MUC_LUC, encoding="utf-8").read()
+    assert "hidden_menus" in src, "mục lục phân hệ phải đọc hidden_menus của phiên để biết mục nào khoá"
     assert "useShell" in src, "phải lấy người dùng từ Shell, không tự gọi máy chủ"
     assert "Không có quyền" in src, "thiếu nhãn khoá – mục không vào được phải nói ra bằng chữ"
     assert "Tài khoản & phân quyền" in src, "khoá thì phải chỉ chỗ xin quyền, nếu không người ta bế tắc"
@@ -281,3 +298,105 @@ def test_trang_phan_he_da_khai_quyen():
     sys.path.insert(0, os.path.join(ROOT, "backend"))
     ac = open(os.path.join(ROOT, "backend", "app", "services", "access.py"), encoding="utf-8").read()
     assert '"/phan-he/[khoa]"' in ac, "trang phân hệ chưa được khai trong ALL_MENU_PATHS"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# 11/10/2026 — CỬA PHÂN HỆ MỞ RA BẢNG CHỈ TIÊU CỦA PHÒNG
+#
+# Chủ tịch: "vào phân hệ của từng phòng ban sẽ thấy được giao diện chính của các giám đốc và
+# trưởng phòng thay vì mục lục như hiện tại." Bốn phép thử dưới đây canh bốn chỗ có thể hỏng âm
+# thầm sau quyết định ấy.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+def _bang_phong() -> dict[str, str]:
+    """Đọc PHONG_CUA_PHAN_HE từ cay_phan_he.ts bằng chuỗi, không chạy TypeScript."""
+    s = _cay()
+    m = re.search(r"export const PHONG_CUA_PHAN_HE[^{]*\{(.*?)\n\};", s, re.S)
+    assert m, "không tìm thấy PHONG_CUA_PHAN_HE trong web/lib/cay_phan_he.ts"
+    return dict(re.findall(r'(\w+)\s*:\s*"([^"]+)"', m.group(1)))
+
+
+def test_moi_phong_goc_co_dung_mot_cua_phan_he():
+    """Hai chiều, và chiều thứ hai mới là chiều hay quên.
+
+    Chiều dễ: mã phòng khai ở giao diện phải CÓ THẬT trong `bao_cao_phong.PHONG`. Gõ sai một chữ
+    thì cửa phân hệ im lặng rơi về mục lục, và không ai biết vì nó trông y như một phân hệ cố ý
+    không có bảng.
+
+    Chiều khó: mọi phòng GỐC trong PHONG phải có đúng một cửa. Thêm một phòng mới vào PHONG mà
+    quên mở cửa thì phòng ấy có bảng chỉ tiêu nhưng không có lối vào từ menu — thứ hỏng không bao
+    giờ tự lộ ra, vì màn hình nào cũng chạy đúng, chỉ là không ai tới được.
+
+    Bộ phận TRỰC THUỘC (ví dụ Visa thuộc Điều hành) KHÔNG cần cửa riêng: báo cáo của nó gộp vào
+    phòng mẹ, đúng như `PHONG['visa']['thuoc']` khai.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "backend"))
+    from app.services import bao_cao_phong as BC
+    bang = _bang_phong()
+    la = sorted(set(bang.values()) - set(BC.PHONG))
+    assert not la, f"PHONG_CUA_PHAN_HE trỏ tới mã phòng không có thật trong bao_cao_phong.PHONG: {la}"
+    thieu = sorted(set(BC.PHONG_GOC) - set(bang.values()))
+    assert not thieu, (
+        f"Phòng {thieu} có bảng chỉ tiêu nhưng KHÔNG có cửa phân hệ nào dẫn tới. Mở cửa bằng cách "
+        "thêm một cặp vào PHONG_CUA_PHAN_HE trong web/lib/cay_phan_he.ts, hoặc nếu cố ý không mở "
+        "thì ghi lý do vào khối chú thích ngay trên bảng ấy — đừng để im lặng.")
+    trung = [v for v in set(bang.values()) if list(bang.values()).count(v) > 1]
+    assert not trung, f"hai cửa phân hệ cùng trỏ vào một phòng: {sorted(trung)}"
+
+
+def test_khoa_phan_he_trong_bang_phong_deu_co_that():
+    """Khoá nào không khớp một phân hệ nào thì cặp ấy là mã chết — không bao giờ chạy tới."""
+    s = _cay()
+    co = set(re.findall(r'khoa:\s*"(\w+)"', s))
+    la = sorted(set(_bang_phong()) - co)
+    assert not la, f"PHONG_CUA_PHAN_HE khai khoá không có phân hệ nào mang tên ấy: {la}"
+
+
+def test_bang_chi_tieu_chi_co_DUNG_MOT_BAN():
+    """Hai cửa, một bảng. Chép bảng ra bản thứ hai là dựng cái đầu thứ hai cho một luật đã có chủ.
+
+    Dấu hiệu đo được: chỉ DUY NHẤT tệp thành phần được gọi cửa `/bao-cao/ban-luu`. Ngày nào một
+    màn hình khác tự gọi cửa ấy là ngày đã có bản chép thứ hai — và hai bản thì sớm muộn lệch
+    nhau, rồi người dùng tin bản dễ đọc chứ không tin bản đúng.
+    """
+    goc = os.path.join(ROOT, "web")
+    pham = []
+    for d, _, fs in os.walk(goc):
+        if "node_modules" in d or ".next" in d:
+            continue
+        for f in fs:
+            if not f.endswith((".tsx", ".ts")):
+                continue
+            duong = os.path.join(d, f)
+            if os.path.abspath(duong) == os.path.abspath(BANG):
+                continue
+            if "/bao-cao/ban-luu" in open(duong, encoding="utf-8").read():
+                pham.append(os.path.relpath(duong, ROOT).replace(os.sep, "/"))
+    assert not pham, (
+        f"{pham} tự gọi cửa báo cáo thay vì dùng components/BangChiTieuPhong.tsx. "
+        "Bảng chỉ tiêu phải có đúng một bản.")
+
+
+def test_cua_phan_he_van_con_loi_vao_muc_luc_o_CA_HAI_DAU():
+    """Chủ tịch chọn "cả hai" khi em hỏi đặt lối vào mục lục ở đâu (11/10/2026).
+
+    Vì sao phải canh: mục lục là chỗ DUY NHẤT đọc được hệ thống còn nợ gì — bản vẽ v1.3 có 184
+    mục, VTOS thật có ngót 80 trang. Bảng chỉ tiêu đẹp và hữu ích hơn hẳn, nên áp lực tự nhiên là
+    gỡ nốt lối vào mục lục cho màn hình gọn. Gỡ xong thì phần nợ không biến mất, nó chỉ thành vô
+    hình — và cái gì vô hình thì không ai đòi.
+
+    Phép thử cũng canh chiều ngược: trang KHÔNG được tự quyết định ai xem được bảng nào. Nó chỉ
+    được dựa vào hai câu trả lời của máy chủ — `hidden_menus` của phiên và danh sách phạm vi.
+    Khai một danh sách vai trò ở đây là dựng bản sao thứ hai của bảng phân quyền.
+    """
+    src = open(TRANG, encoding="utf-8").read()
+    assert src.count("<LoiVaoMucLuc") >= 2, (
+        "trang phân hệ phải có lối vào mục lục ở CẢ hai đầu (trên tiêu đề và cuối trang)")
+    assert "?xem=muc-luc" in src, "thiếu đường dẫn mở mục lục"
+    assert "usePhamViBaoCao" in src and "hidden_menus" in src, (
+        "trang phải hỏi máy chủ phạm vi nào được xem, và đọc hidden_menus để khỏi gọi một cửa "
+        "chắc chắn 403")
+    for vai in ("chutich", "tgd", "ptgd_doan", "ketoan", "hcns"):
+        assert f'"{vai}"' not in src, (
+            f"trang phân hệ đang khai tên vai trò “{vai}” — bảng vai trò chỉ được nằm ở máy chủ "
+            "(bao_cao_phong.PHONG). Khai ở giao diện là dựng bản sao thứ hai, và hai bản sẽ lệch.")
