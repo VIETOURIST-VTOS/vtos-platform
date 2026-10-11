@@ -558,9 +558,17 @@ export const PHAN_HE_CON: PhanHeCon[] = [
   // bộ phần việc chạy quanh CHUYẾN. Xe và hướng dẫn viên tách ra vì đã là hai đơn vị riêng từ
   // 07/9/2026: xe thuộc pháp nhân Công ty TNHH Vận tải Vietrip, hướng dẫn viên hưởng lương ở công
   // ty mẹ. Đây là tách theo PHÁP NHÂN và theo người quản, không phải tách cho menu ngắn lại.
+  // 12/10/2026 — NHẬN THÊM "4.4b". Mục "Hợp đồng thuê xe riêng" chạy thật từ PR #211 (Chủ tịch
+  // chọn 07/10) nhưng KHÔNG hiện trong mục lục của phòng nào: `lay` khai từ "4.1" tới "4.8" và mã
+  // của nó có chữ cái ở cuối nên không khớp mã nào. Trang có thật mà không ai dò ra lối vào từ
+  // mục lục phòng mình — đúng kiểu hỏng mà TC-70 sinh ra để chống, và nó lọt qua vì khuôn dò của
+  // chính phép thử ấy cũng chỉ đọc được mã hai đoạn số (đã sửa cùng lần này).
+  // VÌ SAO LÀ ĐIỀU HÀNH TOUR CHỨ KHÔNG PHẢI ĐIỀU HÀNH XE: nó là một LOẠI CHUYẾN (`thue_xe`) lập
+  // ngay trên danh sách tour và trỏ về /tours — màn hình của nhánh 4.4. Đội xe quản chiếc xe,
+  // không quản hợp đồng bán chuyến. Đổi chủ là đổi một chữ ở dòng dưới và phải có người quyết.
   { khoa: "dhtour", cha: "vanhanh", ten: "Điều hành tour",
     tom_tat: "Sản phẩm · Chuyến · Quyết toán · Sự cố · Dịch vụ & NCC",
-    lay: ["4.1", "4.2", "4.3", "4.4", "4.5", "4.6", "4.7", "4.8"] },
+    lay: ["4.1", "4.2", "4.3", "4.4", "4.4b", "4.5", "4.6", "4.7", "4.8"] },
   { khoa: "dhxe", cha: "vanhanh", ten: "Điều hành xe",
     tom_tat: "Hồ sơ xe · Tài xế · Lệnh điều xe · Hiệu quả khai thác",
     lay: ["4.9"] },

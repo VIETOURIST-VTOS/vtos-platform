@@ -295,9 +295,23 @@ def test_cua_so_con_no_da_khai_quyen_va_dung_lai_danh_sach_co_san():
     # ghi ở nhóm `/api/v1/tong-dai` ngày 09/9: "phần dôi ra vẫn là quyền đã cấp".
     assert 'prefix="/api/v1/so-con-no"' in api, "cửa phải có tiền tố riêng"
     bc = _doc(ROOT, "backend", "app", "api", "v1", "bao_cao.py")
-    assert "so_con_no" not in bc, (
-        "cửa không được nằm trong nhóm /api/v1/bao-cao — gắn vào đó là nới cả nhóm báo cáo cho "
-        "hai vai chỉ cần đúng một cửa"
+    # ── SOI KHAI BÁO, KHÔNG SOI CHỮ ─────────────────────────────────────────────────────────
+    # Bản đầu của phép thử này viết `assert "so_con_no" not in bc`. Nó bắt đúng việc cần bắt,
+    # nhưng bắt bằng một cái sàng quá rộng: ngày 12/10/2026 vòng BD-1 thêm vào `bao_cao.py` một
+    # cửa KHÁC, và trong chú thích có NHẮC TỚI `so_con_no.py` để nói rõ vì sao trường hợp ấy
+    # khác — thế là phép thử đỏ, trong khi `bao_cao.py` không hề mang cửa sổ chuyến còn nợ.
+    #
+    # Một phép thử bắt được LỜI GIẢI THÍCH thay vì bắt được HÀNH VI thì nó dạy người ta xoá lời
+    # giải thích, và kho mã nghèo đi đúng ở chỗ đáng giữ nhất. Nên nay nó soi hai thứ có thật:
+    # một đường dẫn mang tên sổ chuyến còn nợ khai trong nhóm này, và việc gắn bộ định tuyến ấy
+    # vào đây. Luật KHÔNG đổi một chữ — chỉ đổi chỗ cắn.
+    assert not re.search(r'@router\.\w+\(\s*["\'][^"\']*so-con-no', bc), (
+        "cửa sổ chuyến còn nợ không được khai trong nhóm /api/v1/bao-cao — gắn vào đó là nới cả "
+        "nhóm báo cáo cho hai vai chỉ cần đúng một cửa"
+    )
+    assert not re.search(r'^\s*from app\.api\.v1\.so_con_no import|'
+                         r'^\s*from app\.api\.v1 import .*\bso_con_no\b', bc, re.M), (
+        "bộ định tuyến sổ chuyến còn nợ không được gắn vào nhóm /api/v1/bao-cao"
     )
     main = _doc(ROOT, "backend", "app", "main.py")
     assert "so_con_no_router" in main, "router mới phải được đăng ký, nếu không cửa trả 404"

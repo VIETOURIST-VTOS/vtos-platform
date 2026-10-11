@@ -47,6 +47,35 @@ def pham_vi(u: User = Depends(current_user), db: Session = Depends(get_db)):
                                   [g.value for g in _grants_an_toan(db, u)]}
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# BD-1 · BÀN LÀM VIỆC CỦA MỘT PHÒNG — gắn vào ĐÚNG tiền tố này, cố ý
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# `so_con_no.py` đã ghi một bài học ngược lại: đừng gắn cửa mới vào một tiền tố rộng hơn người
+# dùng của nó, vì phần dôi ra VẪN LÀ QUYỀN ĐÃ CẤP. Bài học ấy đúng, và nó KHÔNG áp vào đây —
+# người xem bàn làm việc của một phòng đúng bằng người xem bảng chỉ tiêu của phòng ấy, không
+# thừa một ai. Dựng một tiền tố thứ hai cho cùng một tập người là dựng hai hàng rào phải canh
+# cho một cánh cửa, và ngày nào siết một bên quên bên kia thì chính là lỗ.
+#
+# HÀNG RÀO DÙNG LẠI NGUYÊN VĂN `pham_vi_cho_nguoi`: cùng một câu hỏi, cùng một câu trả lời, cùng
+# một lời từ chối. Người dùng gặp hai lời giải thích khác nhau cho cùng một lần chặn thì tưởng là
+# hai lỗi khác nhau.
+#
+# KHÔNG NHỚ TẠM. Đây là DANH SÁCH VIỆC PHẢI LÀM: người vừa xử lý xong một hồ sơ bấm lại mà nó vẫn
+# nằm đó thì họ tưởng bấm hụt, và sẽ bấm lần nữa. Cùng lý lẽ với `/api/v1/so-con-no`.
+@router.get("/ban-lam-viec")
+def ban_lam_viec(phong: str = "", u: User = Depends(current_user),
+                 db: Session = Depends(get_db)):
+    """Việc cần làm của một phòng: các hàng đợi đã có, gom về một chỗ.
+
+    Chỉ đọc. Không duyệt, không xác nhận, không đóng sổ — mọi ô chỉ dẫn sang màn hình nguồn, nơi
+    quyền và quy trình đã có chủ.
+    """
+    from app.services import ban_lam_viec as BLV
+    if phong not in BP.pham_vi_cho_nguoi(db, u):
+        raise HTTPException(403, _NGOAI_PHAM_VI)
+    return BLV.ban(db, phong)
+
+
 @router.get("")
 def xem(pham_vi: str = BP.TOAN_CTY, kind: str = "ngay", ngay: str = "",
         u: User = Depends(current_user), db: Session = Depends(get_db)):
