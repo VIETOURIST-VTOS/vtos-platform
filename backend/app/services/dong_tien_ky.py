@@ -355,7 +355,23 @@ def ro_chua_du_du_lieu(cac_nghia_vu: list[dict]) -> dict:
 # v1.1 mục III.1: tham số theo từng pháp nhân, Tổng giám đốc chốt, PHẢI ĐỦ HAI CHỮ KÝ mới có hiệu
 # lực. Chủ tịch chốt 11/9: hai chữ ký ấy là TỔNG GIÁM ĐỐC + CHỦ TỊCH.
 KHOA_THAM_SO = "muc_du_phong_toi_thieu"
-HAI_CHU_KY = ("signed_tgd", "signed_chutich")
+
+# CHỮ KÝ CỦA THAM SỐ: HỎI BẢNG LUẬT, ĐỪNG KHAI LẠI — sửa ở Đợt LG3, và đây là một LỖI THẬT.
+#
+# Chỗ này từng là `HAI_CHU_KY = ("signed_tgd", "signed_chutich")`, một hằng số ở mức mô-đun,
+# ngoài mọi hàm. Đợt LG2 (11/10/2026) hạ tham số chính sách xuống MỘT chữ ký Chủ tịch — và hằng
+# số này không biết, nên mọi mức dự phòng chốt từ sau LG2 sẽ KHÔNG BAO GIỜ có hiệu lực: tham số
+# `active` với một chữ ký, còn chỗ này vẫn đòi đủ hai cột, và màn hình dòng tiền báo "đã đề xuất
+# nhưng chưa đủ hai chữ ký" mãi mãi.
+#
+# Hàng rào của LG2 không thấy vì nó chỉ quét hàm ĐẶT chữ ký. `test_lg3` quét cả nơi ĐỌC, và quét
+# riêng kiểu hằng số mức mô-đun như dòng cũ ở đây.
+LOAI_CHU_KY = "tham_so"
+
+
+def _du_chu_ky(p) -> bool:
+    from app.services import chu_ky as _CK
+    return _CK.du_chu_ky_cua(LOAI_CHU_KY, _CK.da_ky_cua(p))
 
 
 def _khoa_theo_phap_nhan(company_id: int | None) -> str:
@@ -380,13 +396,16 @@ def muc_du_phong(db, company_id: int | None, hom_nay: date | None = None) -> dic
     rows = db.execute(select(Param).where(Param.key == khoa)).scalars().all()
     hieu_luc = [p for p in rows
                 if p.effective_from and p.effective_from <= d
-                and all(getattr(p, c, False) for c in HAI_CHU_KY)
+                and _du_chu_ky(p)
                 and (p.value or "").strip() != ""]
     if not hieu_luc:
-        thieu_chu_ky = [p for p in rows if not all(getattr(p, c, False) for c in HAI_CHU_KY)]
+        from app.services import chu_ky as _CK
+        from app.models.core import ROLES as _ROLES
+        thieu_chu_ky = [p for p in rows if not _du_chu_ky(p)]
+        _ai = " và ".join(_ROLES.get(v, v) for v in _CK.can_ky(LOAI_CHU_KY))
         return {"co_nguong": False, "hien": CHUA_CO_NGUONG, "khoa": khoa,
-                "cau": ("Mức dự phòng cho pháp nhân này đã đề xuất nhưng chưa đủ hai chữ ký của "
-                        "Tổng giám đốc và Chủ tịch." if thieu_chu_ky else
+                "cau": (f"Mức dự phòng cho pháp nhân này đã đề xuất nhưng chưa đủ chữ ký của {_ai}."
+                        if thieu_chu_ky else
                         "Chưa ai chốt mức dự phòng tối thiểu cho pháp nhân này.")}
     p = max(hieu_luc, key=lambda x: x.effective_from)
     so = lam_tron(float(p.value))

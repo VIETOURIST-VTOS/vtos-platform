@@ -513,6 +513,16 @@ class Tour(Base):
     # và bản nâng cấp này KHÔNG dời dữ liệu cũ sang cột mới. Dời là viết lại lịch sử: hôm ấy
     # Chủ tịch ký, không phải P.TGĐ.
     signed_ptgd_doan: Mapped[bool] = mapped_column(Boolean, default=False, server_default=_false())
+    # AI ĐÃ KÝ, không chỉ "đã ký hay chưa" — Đợt LG3, cùng dạng với `payment_requests.nguoi_da_ky`.
+    #
+    # VÌ SAO KHÔNG ĐẺ THÊM MỘT CỘT BOOLEAN NỮA. Chuyến dưới biên nay ký theo MẢNG: Đoàn thì
+    # `ptgd_doan`, Lẻ thì `gd_kd`. Mỗi lần luật đổi người ký là một cột mới, và sau ba lần thì
+    # bảng có năm cột chữ ký mà ba cột luôn rỗng. Ô này ghi "vai:tên", đọc bằng
+    # `chu_ky.doc_nguoi_da_ky`, nên luật đổi bao nhiêu lần nó vẫn đủ chỗ.
+    #
+    # BA CỘT CŨ Ở LẠI và vẫn là sự thật cho chuyến đã ký trước đây; phép tính "đủ chữ ký chưa"
+    # đọc CẢ HAI nguồn, nên chuyến đang ký dở giữa hai đợt không bị mất chữ ký đã có.
+    nguoi_da_ky: Mapped[str] = mapped_column(String(200), default="", server_default="")
     chairman_run_decision: Mapped[str] = mapped_column(String(200), default="")  # quyết định D-7
     # Quyết toán
     actual_revenue: Mapped[float | None] = mapped_column(TIEN, nullable=True)

@@ -68,6 +68,13 @@ CHO_DA_KHAI_BA_VAI = [
     # hai dòng ấy phải khai ở đây để lần sau còn đếm được.
     "api/v1/debts.py: ketoan_tt",
     "api/v1/cong_no_vietrip.py: ketoan_tt",
+    # ── Đợt LG3, 11/10/2026 ───────────────────────────────────────────────────────────────
+    # `chu_ky.NGUOI_DUNG_DAU_PHONG` khai người đứng đầu phòng Kế toán là Kế toán trưởng (Chủ
+    # tịch chốt 11/10/2026). Dòng ấy KHÔNG mở thêm một cửa nào: nó nói ai KÝ vế thứ nhất cho
+    # hồ sơ của phòng Kế toán. Phép thử này soi theo TÊN VAI chứ không theo loại việc — đúng
+    # như nó được thiết kế, vì soi theo cú pháp thì luôn có một cách viết khác lọt qua — nên
+    # một dòng khai NGƯỜI KÝ cũng hiện ra ở đây và phải khai.
+    "services/chu_ky.py: ketoan_truong",
 ]
 GOC_APP = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app")
 

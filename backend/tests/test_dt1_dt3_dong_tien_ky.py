@@ -308,11 +308,40 @@ def test_chua_ai_chot_thi_ghi_CHUA_CO_NGUONG_chu_khong_phai_so_khong(db):
     assert "Chưa ai chốt" in n["cau"]
 
 
-def test_thieu_mot_chu_ky_thi_CHUA_co_hieu_luc(db):
+def test_thieu_chu_ky_thi_CHUA_co_hieu_luc(db):
+    """ĐỔI Ở ĐỢT LG3 — tên cũ là `test_thieu_mot_chu_ky_thi_CHUA_co_hieu_luc`.
+
+    Câu cũ đòi lời nhắn có chữ "hai chữ ký". Tham số chính sách xuống MỘT chữ ký Chủ tịch ở Đợt
+    LG2 (11/10/2026), nên lời nhắn nay đọc tên người ký TỪ BẢNG LUẬT và nói "chữ ký của Chủ tịch
+    HĐQT". Ép nó nói "hai chữ ký" là ép màn hình nói sai luật đang chạy.
+
+    ĐÂY LÀ CHỖ LG2 ĐỂ LẠI MỘT LỖI THẬT, và câu này canh chỗ ấy từ nay: trước LG3, `muc_du_phong`
+    đòi ĐỦ HAI cột chữ ký, nên mọi mức dự phòng chốt sau LG2 sẽ KHÔNG BAO GIỜ có hiệu lực.
+
+    Điều câu này canh KHÔNG đổi: thiếu chữ ký thì CHƯA có ngưỡng, và lời nhắn phải nói rõ còn
+    thiếu ai — khác hẳn với "chưa ai chốt".
+    """
+    from app.models.core import ROLES
+    from app.services import chu_ky as CK
     _dat_nguong(db, 1, 3_000_000_000, tgd=True, ct=False)
     n = KY.muc_du_phong(db, 1, date(2026, 9, 11))
     assert n["co_nguong"] is False
-    assert "hai chữ ký" in n["cau"] and "Chủ tịch" in n["cau"]
+    assert "đã đề xuất nhưng chưa đủ chữ ký" in n["cau"], n["cau"]
+    for vai in CK.can_ky("tham_so"):
+        assert ROLES[vai] in n["cau"], f"loi nhan phai goi ten {vai}: {n['cau']}"
+
+
+def test_lg3_mot_chu_ky_chu_tich_la_du_cho_muc_du_phong(db):
+    """VẾ CÒN LẠI, thêm ở Đợt LG3: ký đủ theo LUẬT HIỆN HÀNH thì ngưỡng CÓ hiệu lực.
+
+    Không có câu này thì không gì bắt được lỗi LG2 để lại — mức dự phòng im lặng không bao giờ
+    hiệu lực, và màn hình dòng tiền chỉ nói "chưa đủ chữ ký" chứ không ai biết vì sao.
+    """
+    _dat_nguong(db, 1, 3_000_000_000, tgd=False, ct=True)
+    n = KY.muc_du_phong(db, 1, date(2026, 9, 11))
+    assert n["co_nguong"] is True, n.get("cau")
+    assert n["so"] == 3_000_000_000
+
 
 
 def test_du_hai_chu_ky_thi_co_nguong(db):

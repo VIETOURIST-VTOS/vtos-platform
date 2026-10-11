@@ -20,6 +20,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
 
 from app.models.core import AuditLog, Tour, User, UserGrant, AiRun, AiPause, Param, CAPABILITIES, KHONG_TRON_GOI
+from app.services import chu_ky as _CK   # Dot LG3
 from app.models.ngoai_le import NgoaiLeXuLy, TRANG_THAI
 from app.services import rules as R
 
@@ -228,7 +229,11 @@ def _tat_chan_giay_xe(db: Session) -> list[dict]:
     return [{"ma": _mo("tat_chan_giay_xe", "param"), "loai": "tat_chan_giay_xe", "muc": "do",
              "luc": datetime.combine(v.effective_from, datetime.min.time()),
              "doi_tuong": "param:xe_chan_khi_thieu_giay",
-             "nguoi_quyet": _u(db, v.proposed_by) if (v.signed_chutich and v.signed_tgd) else "",
+             # NGƯỜI QUYẾT ĐỌC TỪ BẢNG LUẬT — sửa ở Đợt LG3. Câu cũ đòi ĐỦ HAI cột chữ ký,
+             # nên từ 11/10/2026 (tham số xuống một chữ ký Chủ tịch) một ngoại lệ do Chủ tịch
+             # quyết sẽ hiện ra KHÔNG CÓ NGƯỜI QUYẾT. Một báo cáo ngoại lệ giấu mất người quyết
+             # thì đúng phần việc của nó là phần nó làm hỏng.
+             "nguoi_quyet": _u(db, v.proposed_by) if _CK.du_chu_ky_cua("tham_so", _CK.da_ky_cua(v)) else "",
              "ly_do": v.source or "",
              "tom_tat": "Đang TẮT chặn phát lệnh điều xe khi thiếu giấy tờ xe/tài xế – áp dụng cho mọi lệnh",
              "duong_dan": "/params?q=xe_chan_khi_thieu_giay"}]
