@@ -576,11 +576,36 @@ export function BieuDoDuong({ ten, phu, ds, nhan, dinh_dang = "tien", moc, chan,
 
           {/* Chấm: div tuyệt đối chứ không phải hình trong SVG — SVG bị kéo giãn nên hình tròn
               trong đó sẽ thành bầu dục. */}
+          {/* RÊ CHUỘT VÀO CHẤM LÀ HIỆN SỐ NGAY — Chủ tịch chốt 12/10/2026.
+                "mỗi mốc dòng tiền có 1 chấm tròn là kèm theo 1 con số khi rê chuột vào sẽ hiện ra"
+
+              Con số ĐÃ CÓ TỪ TRƯỚC, nhưng nằm trong `title` — mẹo của trình duyệt. Ba chỗ dở, và
+              chỉ chỗ thứ ba mới là chỗ thật sự đáng sửa:
+                · phải giữ chuột đứng im khoảng một giây mới hiện;
+                · hiện ra một ô xám của hệ điều hành, không mang màu của chuỗi, không theo nền tối;
+                · trên điện thoại thì KHÔNG BAO GIỜ hiện — tức là với người xem trên máy, con số
+                  ấy coi như không tồn tại.
+
+              Nay mỗi chấm mang một nhãn của chính màn hình, hiện tức thì. `title` GIỮ NGUYÊN, cố
+              ý: nó là lối đọc của trình đọc màn hình và của người rê chuột theo thói quen cũ. Bỏ
+              nó đi là đổi một chỗ dở lấy một chỗ mất.
+
+              VÙNG BẮT CHUỘT RỘNG HƠN CHẤM: chấm 9px, vùng nhận 24px, dựng bằng `::before` trong
+              CSS. Không có nó thì người dùng phải nhắm vào một chấm 9px — và bốn mươi chấm trên
+              một hình thì nhắm trượt là chuyện thường.
+
+              `tabIndex` để bàn phím tới được: Tab tới chấm thì nhãn hiện y như rê chuột. */}
           {ds.map((d) => d.diem.map((p, i) => (
             p.gt === null || p.gt === undefined ? null : (
               <span key={d.ten + "-" + i} className={"bd-cham " + d.lop}
                 style={{ left: `${x(i)}%`, bottom: `${pct(p.gt)}%` }}
-                title={`${d.ten} · ${nhan[i]}: ${daySo(p.gt, dinh_dang)}`} />
+                tabIndex={0}
+                title={`${d.ten} · ${nhan[i]}: ${daySo(p.gt, dinh_dang)}`}>
+                <span className="bd-cham-so" aria-hidden="true">
+                  <b>{daySo(p.gt, dinh_dang)}</b>
+                  <i>{d.ten} · {nhan[i]}</i>
+                </span>
+              </span>
             )
           )))}
 

@@ -1271,6 +1271,34 @@ table.bang-doc{width:100%}
   opacity:.9;z-index:1}
 .bd-duong-nhan.cuoi{transform:translate(calc(-100% - 2px),50%)}
 
+/* ── NHÃN HIỆN KHI RÊ CHUỘT VÀO CHẤM — Chủ tịch chốt 12/10/2026 ──────────────────────────────
+   Thay cho `title` của trình duyệt: hiện tức thì, mang màu nền của thẻ, và đọc được trên nền tối.
+   `title` vẫn giữ trong mã cho trình đọc màn hình — xem chú thích ở BieuDo.tsx.
+
+   VÙNG BẮT CHUỘT 24px dựng bằng `::before` trong suốt. Chấm chỉ 9px; bắt đúng 9px là bắt người
+   dùng nhắm, và một hình có bốn mươi chấm thì nhắm trượt là chuyện thường. Vùng này KHÔNG vẽ gì,
+   nên không đổi một chút nào hình đang có.
+
+   Nhãn `pointer-events:none`: nếu nó bắt chuột thì lúc con trỏ đi từ chấm lên nhãn, nhãn lại chui
+   ra khỏi vùng của chấm và tự tắt — hình nhấp nháy. */
+.bd-cham::before{content:"";position:absolute;left:50%;top:50%;width:24px;height:24px;
+  transform:translate(-50%,-50%);border-radius:50%}
+.bd-cham:hover,.bd-cham:focus-visible{z-index:5}
+.bd-cham:focus-visible{outline:2px solid var(--vtos-navy);outline-offset:3px}
+.bd-cham-so{position:absolute;left:50%;bottom:calc(100% + 9px);transform:translateX(-50%);
+  display:block;min-width:max-content;padding:5px 9px;border-radius:8px;
+  background:var(--vtos-card);border:1px solid var(--vtos-line);
+  box-shadow:0 2px 10px rgb(0 0 0 / 18%);
+  opacity:0;visibility:hidden;transition:opacity .08s;pointer-events:none;z-index:6;text-align:center}
+.bd-cham:hover .bd-cham-so,.bd-cham:focus-visible .bd-cham-so{opacity:1;visibility:visible}
+.bd-cham-so b{display:block;font-size:calc(12.5/14*1rem);font-weight:700;color:var(--vtos-text);
+  font-variant-numeric:tabular-nums;line-height:1.25}
+.bd-cham-so i{display:block;font-style:normal;font-size:calc(10.5/14*1rem);color:var(--vtos-text-mute);
+  line-height:1.3}
+/* Chấm SÁT MÉP: nhãn căn giữa sẽ thò ra ngoài khung. Hai chấm đầu và cuối mỗi chuỗi vốn đã có
+   nhãn cố định nên không cần chỉnh; chỗ này lo cho các chấm gần mép của chuỗi ngắn. */
+.bd-duong-khung{overflow:visible}
+
 /* ── KHUNG GỘP: biểu đồ · chú thích · bốn mốc, LIỀN MỘT KHỐI ──
    Anh Tuấn bảo gộp hình 2 vào trong khung biểu đồ, ở phần chú thích bên dưới, và nối liền với
    hình bốn mốc. Nên ba mảnh ấy nay nằm trong MỘT viền, không còn ba viền rời có khe hở giữa —

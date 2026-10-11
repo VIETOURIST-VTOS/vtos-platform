@@ -102,9 +102,27 @@ function phanTram(x: number | null | undefined): string | null {
 
 /** Mười hai cột của một chỉ tiêu.
  *
- *  GHI SỐ Ở ĐÚNG HAI CỘT — cột đầu và cột cuối CỦA KỲ ĐANG CHỌN. Mười hai con số chen nhau trên
- *  một khung rộng 400px thì không đọc được cái nào; hai con số ở hai đầu cho biết kỳ này bắt đầu
- *  ở đâu và kết thúc ở đâu, phần giữa đã có chiều cao cột nói hộ.
+ *  GHI SỐ Ở BỐN CỘT ĐÁNG CHÚ Ý — Chủ tịch chốt 12/10/2026.
+ *
+ *  Trước hôm nay chỉ ghi ở cột ĐẦU và cột CUỐI của kỳ. Lý do cũ vẫn đúng và vẫn giữ: mười hai con
+ *  số chen nhau trên một khung rộng 400px thì không đọc được cái nào. Nhưng hai con số ấy chỉ trả
+ *  lời "kỳ này bắt đầu ở đâu, kết thúc ở đâu" — còn câu người điều hành hỏi trước tiên khi nhìn
+ *  một dãy mười hai cột là "tháng nào cao nhất, tháng nào thấp nhất". Chiều cao cột cho thấy cột
+ *  nào cao, nhưng KHÔNG cho biết cao bao nhiêu, và đó đúng là lúc người ta phải rê chuột từng cột.
+ *
+ *  Nên thêm CAO NHẤT và THẤP NHẤT. Bốn, không phải mười hai: bốn con số trên mười hai vị trí thì
+ *  khoảng cách tối thiểu giữa hai nhãn vẫn đủ rộng ở khung hẹp nhất.
+ *
+ *  CHỈ GHI SỐ, KHÔNG GHI CHỮ (Chủ tịch chốt cùng ngày, sau khi xem bản dựng thử). Bản dựng thử có
+ *  thêm chữ ĐẦU · CUỐI · CAO NHẤT · THẤP NHẤT dưới mỗi số để nói vì sao cột ấy được chọn; Chủ tịch
+ *  bỏ. Con số tự nói được, còn bốn mẩu chữ thì chiếm đúng chỗ mà hình cần để thở.
+ *
+ *  `Set` KHÔNG phải để cho gọn: một tháng có thể vừa là cột cuối vừa là cột thấp nhất — đúng cảnh
+ *  tháng 10/2026, tháng mới chạy được một phần. Lúc ấy phải ra MỘT nhãn, không phải hai nhãn chồng
+ *  khít lên nhau thành một vệt chữ không đọc nổi.
+ *
+ *  Dùng VỊ TRÍ cột làm mốc, không dùng số tháng: nhãn "cuối" tự chạy theo dữ liệu, nên tháng sau
+ *  khi T11 có chuyến khởi hành thì nó tự nhảy sang T11 mà không ai phải sửa một dòng nào.
  */
 function diemTu(ct: any, cot2?: any): Diem[] {
   const cot: any[] = ct?.cot || [];
@@ -112,7 +130,24 @@ function diemTu(ct: any, cot2?: any): Diem[] {
     .map((c, i) => i)
     .filter((i) => cot[i].trong_ky && cot[i].gia_tri !== null && cot[i].gia_tri !== undefined);
   const ghi = new Set<number>();
-  if (trong.length) { ghi.add(trong[0]); ghi.add(trong[trong.length - 1]); }
+  if (trong.length) {
+    const gt = (i: number) => Number(cot[i].gia_tri);
+    // Vòng lặp thường, KHÔNG dùng `reduce` — và đây là một lựa chọn, không phải thói quen.
+    // `test_tc42_sau_o_lon` cấm `reduce(` trên hai tệp này để màn hình không tự GỘP số nghiệp vụ.
+    // Phép chọn dưới đây không gộp gì: nó so sánh rồi trả về một VỊ TRÍ CỘT, không đẻ ra con số
+    // nào. Nhưng hàng rào ấy soi theo chữ, nên viết `reduce` ở đây là bắt người sau phải phân biệt
+    // hai thứ trông giống hệt nhau — và sớm muộn có người phân biệt sai theo chiều nguy hiểm.
+    let cao = trong[0];
+    let thap = trong[0];
+    for (const i of trong) {
+      if (gt(i) > gt(cao)) cao = i;
+      if (gt(i) < gt(thap)) thap = i;
+    }
+    ghi.add(trong[0]);
+    ghi.add(trong[trong.length - 1]);
+    ghi.add(cao);
+    ghi.add(thap);
+  }
   const kh: (number | null)[] | null = ct?.ke_hoach || null;
   // TC-47 · `cot2` là chỉ tiêu thứ hai của CÙNG hình dưới (lợi nhuận trước thuế đứng cạnh lợi
   // nhuận tour). Ghép ở đây, theo VỊ TRÍ tháng, chứ không ghép ở máy chủ: máy chủ trả mỗi chỉ tiêu
