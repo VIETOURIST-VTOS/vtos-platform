@@ -140,6 +140,33 @@ def trung_lich_tai_xe(db: Session, driver_id: int, d1: date, d2: date, bo_qua: i
     return list(db.execute(q).scalars())
 
 
+def trung_nhat_ky(db: Session, vehicle_id: int, d1: date, d2: date) -> list:
+    """Lượt xe ĐÃ CHẠY của cùng chiếc xe chồng ngày với khoảng đang xét — đọc NHẬT KÝ XE.
+
+    Vì sao phải có hàm thứ hai cạnh `trung_lich()`, chứ không dùng một hàm cho cả hai:
+
+      `trung_lich()` đọc bảng LỆNH điều xe (`dispatch_orders`), và trong mã chỉ có ĐÚNG MỘT cửa tạo
+      lệnh: màn hình điều xe nhập tay. Cửa nạp hàng loạt — thứ đã nạp 1.051 lượt xe từ chín tệp
+      quyết toán tháng 1–9/2026 — sinh ra `Trip` và KHÔNG sinh một lệnh nào.
+
+      Hệ quả đo được ngày 11/10/2026: hệ thống tra lệnh, không thấy lệnh nào, nên coi mọi xe là rảnh
+      suốt mọi ngày. `goi_y_dieu_xe` vì thế GỢI Ý ĐƯỢC MỘT CHIẾC XE ĐANG TRÊN ĐƯỜNG. Chủ tịch xác
+      nhận cùng ngày: hiện Điều hành KHÔNG lập lệnh điều xe, họ ghi nhật ký sau khi xe chạy về —
+      nên đây không phải chỗ hở của dữ liệu lịch sử, nó là chỗ hở đang sống.
+
+    Hàm này đếm MỌI lượt, kể cả lượt không nối tour. Chủ tịch chốt 11/10/2026: lượt không nối tour
+    nghĩa là xe chạy CHO THUÊ NGOÀI — tức xe ấy ĐANG BẬN, không phải thiếu dữ liệu. Bỏ qua lượt cho
+    thuê là báo một chiếc xe đang đi kiếm tiền là "đậu bãi".
+
+    Trạng thái: bỏ lượt đã huỷ. Lượt `cho_xac_nhan` VẪN TÍNH là bận — chuyến chờ xác nhận là chuyến
+    có người đã xếp, và điều chiếc xe ấy đi việc khác là tạo ra đúng cái va chạm hàm này để chặn.
+    """
+    from app.models.fleet import Trip
+    return list(db.execute(select(Trip).where(Trip.vehicle_id == vehicle_id,
+                                              Trip.status != "huy",
+                                              Trip.ngay_di <= d2, Trip.ngay_ve >= d1)).scalars())
+
+
 def trung_lich(db: Session, vehicle_id: int, d1: date, d2: date, bo_qua: int | None = None) -> list[DispatchOrder]:
     """Lệnh còn hiệu lực của cùng chiếc xe chồng ngày với khoảng đang xét.
 
@@ -241,6 +268,15 @@ def kiem_tra_dieu_xe(db: Session, v: Vehicle, d1: date, d2: date, driver_id: int
         kq.append(_mo("TRUNG_LICH", BLOCK,
                       f"Xe {v.plate} đã có lệnh #{d.id} từ {d.date_from:%d/%m} đến {d.date_to:%d/%m}",
                       "Chọn xe khác hoặc hủy lệnh cũ trước"))
+    # 4c. Trùng NHẬT KÝ XE — xem `trung_nhat_ky()` để biết vì sao bước này tồn tại cạnh bước 4.
+    #
+    # Chặn ở mức BLOCK đúng như bước 4: một chiếc xe đã có lượt chạy chồng ngày thì nó đang trên
+    # đường, bất kể có ai lập lệnh cho nó hay không. Để ở mức cảnh báo là mời người phát lệnh bỏ qua.
+    for tr in trung_nhat_ky(db, v.id, d1, d2):
+        nguon = (f"tour {tr.ten_tour}" if (tr.tour_id or tr.ten_tour) else "chuyến CHO THUÊ NGOÀI")
+        kq.append(_mo("TRUNG_NHAT_KY", BLOCK,
+                      f"Xe {v.plate} đã có lượt chạy {tr.ngay_di:%d/%m}–{tr.ngay_ve:%d/%m} ({nguon})",
+                      "Chọn xe khác, hoặc sửa lại nhật ký xe nếu lượt đó ghi sai ngày"))
     # 4b. Trùng lịch TÀI XẾ. Chốt 07/9/2026: bỏ ràng buộc giờ lái liên tục (xe chạy theo tour, theo tuyến),
     # nhưng GIỮ ràng buộc một tài xế không nhận hai lệnh chồng ngày. Không có ràng buộc này thì một người bị
     # xếp hai chuyến cùng ngày và chỉ vỡ ra vào sáng hôm khởi hành.

@@ -70,6 +70,12 @@ def _ngay_cong(db: Session, driver_id: int, tu: date, den: date) -> int:
     return len(ngay)
 
 
+# Giá trị mặc định của `Vehicle.seats` trong mô hình. Xe mang đúng số này có thể là xe 45 chỗ thật,
+# cũng có thể là xe chưa ai nhập số ghế — mô hình không cho phân biệt. Đọc từ cột thay vì gõ lại 45:
+# ngày nào mặc định đổi thì chỗ này đổi theo, không âm thầm lệch.
+GHE_MAC_DINH = Vehicle.__table__.c.seats.default.arg
+
+
 def goi_y_dieu_xe(db: Session, d1: date, d2: date, so_khach: int = 0, km_du_kien: int = 0,
                   top: int = 3) -> dict:
     """Xếp hạng các phương án điều xe HỢP LỆ cho một khoảng ngày.
@@ -82,7 +88,7 @@ def goi_y_dieu_xe(db: Session, d1: date, d2: date, so_khach: int = 0, km_du_kien
     dùng bốn thành phần, và mỗi phương án đi kèm lý do bằng lời để người chốt lệnh đọc được vì sao."""
     chan = bool(R.get_param(db, "xe_chan_khi_thieu_giay"))
     tu_6t = d1 - timedelta(days=182)
-    hop_le, bi_loai = [], []
+    hop_le, bi_loai, chua_khai_ghe = [], [], []
     for v in db.execute(select(Vehicle).where(Vehicle.active == True)).scalars():
         kt = FL.kiem_tra_dieu_xe(db, v, d1, d2, chan_khi_thieu_giay=chan)
         block = [i for i in kt["items"] if i["level"] == FL.BLOCK]
@@ -90,14 +96,25 @@ def goi_y_dieu_xe(db: Session, d1: date, d2: date, so_khach: int = 0, km_du_kien
             bi_loai.append({"vehicle_id": v.id, "xe": v.plate, "ma_xe": v.code,
                             "ly_do": [i["msg"] for i in block]})
             continue
+        # GHẾ THẬT CỦA TỪNG XE, không dùng con số 45 chung — Chủ tịch chốt 11/10/2026.
+        #
+        # Và một cái bẫy của chính mô hình: `Vehicle.seats` mặc định 45 và không cho rỗng, nên một
+        # chiếc xe chưa ai nhập số ghế đọc ra ĐÚNG Y một chiếc 45 chỗ thật. Không phân biệt được hai
+        # thứ ấy thì phép lọc này sẽ cho một xe 29 chỗ chở 45 khách, và không ai thấy vì con số 45
+        # trông hợp lý. Ở đây chưa sửa được mô hình (đổi cột là việc có migration và có người ký), nên
+        # ít nhất NÓI RA: xe nào đúng bằng giá trị mặc định thì gắn nhãn "chưa xác nhận số ghế" vào
+        # lý do, để người phát lệnh biết mình đang tin vào một con số chưa ai khai.
         if so_khach and v.seats and v.seats < so_khach:
             bi_loai.append({"vehicle_id": v.id, "xe": v.plate, "ma_xe": v.code,
                             "ly_do": [f"Xe {v.seats} chỗ, không đủ cho {so_khach} khách"]})
             continue
+        if so_khach and v.seats == GHE_MAC_DINH:
+            chua_khai_ghe.append(v.plate)
         hop_le.append((v, kt))
 
     if not hop_le:
         return {"phuong_an": [], "bi_loai": bi_loai, "rule_version": RULE_VERSION,
+                "chua_khai_ghe": chua_khai_ghe,
                 "ghi_chu": "Không còn xe nào hợp lệ cho khoảng ngày này – xem lý do loại ở danh sách bên dưới"}
 
     # Thu thập số liệu thô trước, rồi mới chuẩn hóa: chuẩn hóa cần biết dải giá trị của cả tập.
@@ -153,6 +170,9 @@ def goi_y_dieu_xe(db: Session, d1: date, d2: date, so_khach: int = 0, km_du_kien
     # biệt "hệ thống đánh giá thấp hơn" với "chỉ là xếp sau khi điểm bằng nhau".
     return {"phuong_an": pa[:top], "tat_ca": pa, "con_lai": len(pa) - min(top, len(pa)), "bi_loai": bi_loai,
             "rule_version": RULE_VERSION,
+            # Xe đúng bằng giá trị mặc định của cột số ghế: có thể là 45 chỗ thật, có thể là chưa ai
+            # nhập. Trả ra để màn hình nói với người phát lệnh, chứ không im lặng cho qua.
+            "chua_khai_ghe": chua_khai_ghe,
             "ghi_chu": "Lọc cứng trước, xếp hạng sau. Bốn thành phần điểm: km còn lại tới kỳ bảo dưỡng, định "
                        "mức nhiên liệu, cân bằng ngày công tài xế, và hồ sơ xe còn bao nhiêu điểm cần xem lại. "
                        "Thiếu dữ liệu KHÔNG được cộng điểm – xe chưa có số liệu không được xếp trên xe đã có."}
