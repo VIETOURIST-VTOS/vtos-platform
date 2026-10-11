@@ -645,7 +645,19 @@ PHAM_VI_DA_CHOT = {
     # hẹp là cách chữa đúng hướng ĐI XUỐNG: sổ tách bạch trách nhiệm là sổ KIỂM SOÁT, người
     # bị kiểm soát không cần mở nó. Chữa hướng đi lên — nới `XEM` — là mở cả bảng quy tắc
     # hạch toán cho thủ quỹ để họ xem được một bảng kiểm soát về mình.
-    "ketoan_truong": 108, "ketoan_tt": 27, "thu_quy": 23,
+    #
+    # 11/10/2026 — HAI SỐ ẤY LÊN LẠI 31 VÀ 27, VÀ KHÔNG PHẢI VÌ `/ket-so` QUAY LẠI. Trùng số là
+    # trùng ngẫu nhiên, nên đọc kỹ chỗ này: `/ket-so` VẪN ĐÓNG cho hai vai hẹp, và `test_lg9` của
+    # Đợt LG1 canh đúng điều đó để không ai đọc dòng này thành "đã đảo lại lần siết 10/10".
+    #
+    # Bốn màn hình thêm vào là ĐƠN TỪ CỦA NGƯỜI ĐI LÀM, không phải quyền tiền: `/leaves`,
+    # `/leave-balance`, `/danh-gia-cua-toi`, `/de-nghi-mua` — đến từ việc ba vai tiền vào
+    # `MOI_NHAN_VIEN` (Chủ tịch chốt 11/10/2026: "họ là người làm việc"). `ketoan_truong` KHÔNG
+    # đổi (108 → 108) vì `ketoan` vốn đã ở trong `MOI_NHAN_VIEN` và nó kế thừa sẵn.
+    #
+    # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
+    # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
+    "ketoan_truong": 108, "ketoan_tt": 31, "thu_quy": 27,
     "robot_pq": 18, "robot_ks": 131, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 

@@ -7,6 +7,8 @@ from app.db.session import get_db
 from app.core.security import decode_token
 from app.core.config import settings
 from app.models.core import User, ROLES
+# Phép suy vai kế thừa. `vai_ke_thua` KHÔNG nhập gì cả, nên không có vòng nhập ngược.
+from app.services import vai_ke_thua as VKT
 
 oauth2 = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -112,6 +114,14 @@ def require_roles(*roles: str, mo_ta: str = ""):
     mo_ta là tên màn hình / dữ liệu, để người bị chặn đọc được mình đang thiếu quyền gì thay vì một câu
     chung chung.
     """
+    # VAI KẾ THỪA — Đợt LG1. Vai con thấy mọi cửa vai cha thấy, suy ở ĐÚNG MỘT CHỖ.
+    #
+    # Đợt E2b suy bảng MÀN HÌNH từ `ketoan` nhưng KHÔNG suy bảng CỬA, nên Kế toán trưởng mở được
+    # 28 màn hình mà bấm vào là 403 — "cửa mở, biển đề đóng" lần thứ ba. Sửa ở đây thay vì ở 60
+    # chỗ khai quyền viết thẳng, vì phần lớn cửa khai qua hằng số của từng mô-đun (`XEM` 195 lần,
+    # `READ` 130, `WRITE` 80…) — sửa tay là chắc chắn sót, và sót chỗ nào là lặp lại cái bẫy ấy.
+    roles = VKT.mo_rong(roles)
+
     def dep(u: User = Depends(current_user)) -> User:
         if roles and u.role not in roles and not toan_quyen(u):
             ten = ROLES.get(u.role, u.role)
@@ -119,7 +129,10 @@ def require_roles(*roles: str, mo_ta: str = ""):
                                 f"Vai trò {ten} không được xem {mo_ta}" if mo_ta
                                 else f"Vai trò {ten} không có quyền thực hiện thao tác này")
         return u
-    dep.vai_tro_yeu_cau = tuple(roles)      # để bộ kiểm đọc được, không phải đoán từ mã nguồn
+    # Ghi tập ĐÃ NỚI, không phải tập khai tay: bộ kiểm và hàng rào `test_lg1` đọc ô này để so
+    # với bảng màn hình, nên nó phải nói đúng cửa THẬT SỰ đang mở. Ghi tập chưa nới là để lại
+    # đúng một chỗ nữa cho hai bảng lệch nhau.
+    dep.vai_tro_yeu_cau = tuple(roles)
     return dep
 
 

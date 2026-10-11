@@ -98,9 +98,16 @@ def pham_vi_duoc_xem(vai_tro: str) -> list[str]:
     có chủ ý, để đọc mã còn thấy được "theo chức danh thì được những gì", tách khỏi "ai đang được
     cấp thêm". Gộp lại thì ba tháng nữa không ai trả lời được câu hỏi thứ nhất.
     """
-    if vai_tro in XEM_TAT_CA:
+    # Đợt LG1 — hàng rào này KHÔNG đi qua `require_roles`, nên nó phải tự đọc phép suy vai kế
+    # thừa. Thiếu đoạn này thì Kế toán trưởng mở được `/bao-cao` mà không có báo cáo nào để xem:
+    # bấm vào thấy trống và tưởng hệ thống hỏng. `test_bao_cao_phong` bắt đúng chỗ ấy 10/10.
+    #
+    # Hợp cả vai con lẫn vai cha, KHÔNG thay thế: một phạm vi cấp RIÊNG cho vai con vẫn còn.
+    from app.services.vai_ke_thua import vai_va_cha
+    vais = vai_va_cha(vai_tro)
+    if any(v in XEM_TAT_CA for v in vais):
         return [TOAN_CTY] + list(PHONG)
-    return [p for p, v in PHONG.items() if vai_tro in v["xem"]]
+    return [p for p, v in PHONG.items() if any(x in v["xem"] for x in vais)]
 
 
 def pham_vi_cho_nguoi(db, u) -> list[str]:

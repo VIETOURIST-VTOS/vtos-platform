@@ -88,8 +88,22 @@ def test_cntt_khong_xem_dong_tien_va_hieu_qua_doi_xe():
 
 
 def test_chi_ke_toan_giu_ba_man_hinh_tien():
+    """ĐỔI Ở ĐỢT LG1, và đổi vì LUẬT đổi chứ không vì phép thử sai.
+
+    Câu cũ đòi hai màn hình tiền chỉ mở cho `BASE_VIEW + ketoan`. Đợt E2b thêm ba vai kế toán và
+    `/finance` nhận thêm `ketoan_truong` (kế thừa từ `ketoan`) và `ketoan_tt` (khai thẳng ở
+    `MAN_HINH_KETOAN_TT`). Phép thử này đỏ từ 10/10 và nó đỏ ĐÚNG — nó là một trong bốn hàng rào
+    bắt được chỗ hỏng của E2b.
+
+    Điều phép thử canh KHÔNG đổi: hai màn hình tiền chỉ mở cho nhóm đọc toàn hệ CỘNG các vai kế
+    toán — không một vai kinh doanh, điều hành hay nhân sự nào lọt vào.
+    """
+    VAI_TIEN_KE_TOAN = {"ketoan", "ketoan_truong", "ketoan_tt"}
     for man in ("/finance", "/bank-accounts"):
-        assert set(AC.MENU_ROLES[man]) == set(AC.BASE_VIEW) | {"ketoan"}, f"{man} mở rộng hơn dự kiến"
+        co = set(AC.MENU_ROLES[man])
+        thua = co - set(AC.BASE_VIEW) - VAI_TIEN_KE_TOAN
+        assert not thua, f"{man} mở cho vai ngoài khối kế toán: {sorted(thua)}"
+        assert "ketoan" in co, f"{man} phải mở cho Kế toán"
 
 
 def test_khoi_kinh_doanh_khong_thay_gia_von():

@@ -30,7 +30,10 @@ from app.models.core import User
 router = APIRouter(prefix="/api/v1/cong-no-vietrip", tags=["cong-no-vietrip"])
 
 NAP = ("chutich", "tgd", "ketoan", "cntt")
-XEM = ("chutich", "tgd", "bks", "ketoan", "ptgd_doan", "tp_dh", "cntt")   # khớp READ của /cong-no
+# `ketoan_tt` thêm 11/10/2026 (Đợt LG1) — xem chú thích ở `debts.READ`. Hai hằng số này phải
+# đi cùng nhau: chú thích ngay đây đã nói "khớp READ của /cong-no", và lệch một vai là một nửa
+# màn hình trả 403 trong khi nửa kia chạy.
+XEM = ("chutich", "tgd", "bks", "ketoan", "ketoan_tt", "ptgd_doan", "tp_dh", "cntt")   # khớp READ của /cong-no
 
 
 class DongIn(BaseModel):
