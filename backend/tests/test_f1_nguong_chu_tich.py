@@ -476,18 +476,24 @@ def test_f1_f6_ngoai_du_toan_thi_ca_hai_vai_co_nut(co_moc):
     assert set(h["vai_ky_duoc"]) == {"chutich", "tgd"}, h["vai_ky_duoc"]
 
 
-def test_f1_f7_marketing_van_la_mot_vai(co_moc):
+def test_f1_f7_marketing_cung_theo_moc(co_moc):
+    """ĐỔI Ở ĐỢT F1b. Bản trước của phép thử này đòi `vai_ky_duoc == ["ptgd_mkt"]` cho một khoản
+    Marketing 700 triệu, kèm lời giải thích "Marketing một chữ ký ở mọi mức tiền". Luật ấy đảo
+    ngày 10/10/2026: chữ ký của P.TGĐ Marketing là bước XÁC NHẬN NỘI DUNG, còn LỆNH CHI đi đúng
+    mốc chung. Bộ phép thử đầy đủ của Marketing ở `tests/test_mkt_mot_chu_ky.py`."""
     r = client.post("/api/v1/payment-requests", json={
         "category": "marketing", "marketing_muc": "quang_cao", "supplier_name": "Meta",
         "supplier_tax_code": "0301234567", "amount": 700_000_000,
         "description": "Quang cao lon", "has_document": True, "document_ref": "BG-09",
     }, headers=login("cntt"))
     rid = r.json()["request"]["id"]
+    assert r.json()["request"]["status"] == "cho_tp"
+    assert _buoc(rid, "confirm", "ptgd.mkt").status_code == 200
     assert _buoc(rid, "check", "ketoan").status_code == 200
     ds = client.get("/api/v1/payment-requests", headers=login("ketoan")).json()
     h = [x for x in ds if x["id"] == rid][0]
-    assert h["vai_ky_duoc"] == ["ptgd_mkt"], (
-        "khoan Marketing 700 trieu bi moc tien keo vao — Marketing mot chu ky o moi muc tien")
+    assert h["vai_ky_duoc"] == ["chutich"], (
+        "khoan Marketing 700 trieu khong di theo moc chung. " + str(h["vai_ky_duoc"]))
 
 
 def test_f1_f8_man_hinh_khong_con_tu_suy(co_moc):
@@ -539,9 +545,10 @@ def test_f1_g2_ho_so_cu_khong_co_o_moc_thi_ghi_xuong_luc_duyet(co_moc):
 # ═════════════════════════════════════════════════════════════════════════════════════════════
 # H. Marketing đứng ngoài
 # ═════════════════════════════════════════════════════════════════════════════════════════════
-def test_f1_h1_khoan_marketing_khong_ghi_o_moc(co_moc):
-    """Marketing đi một chữ ký P.TGĐ Marketing cho MỌI mức tiền (23/9/2026). Điền một con số vào ô
-    mốc của nó là mời người đọc sau này hiểu sai."""
+def test_f1_h1_khoan_marketing_CO_ghi_o_moc(co_moc):
+    """ĐẢO Ở ĐỢT F1b. Bản trước đòi ô mốc của khoản Marketing phải RỖNG, vì "mốc tiền không áp
+    vào nó" (luật 23/9/2026). Nay lệnh chi Marketing đi đúng mốc chung, nên ô ấy phải CÓ số —
+    để rỗng thì bước duyệt sẽ chặn với lý do "chưa chốt ngưỡng", một lý do sai."""
     r = client.post("/api/v1/payment-requests", json={
         "category": "marketing", "marketing_muc": "quang_cao", "supplier_name": "Meta",
         "supplier_tax_code": "0301234567", "amount": 800_000_000,
@@ -549,29 +556,28 @@ def test_f1_h1_khoan_marketing_khong_ghi_o_moc(co_moc):
     }, headers=login("cntt"))
     assert r.status_code == 201, r.text
     d = r.json()["request"]
-    assert d["nguong_duyet_ap_dung"] is None
+    assert d["nguong_duyet_ap_dung"] == MOC
     assert d["two_signatures"] is False
-    # Hồ sơ Marketing vào THẲNG bước Kế toán (bỏ bước bộ phận xác nhận, 23/9/2026), nên dòng "ai
-    # bấm tiếp" lúc này là Kế toán. Đi thêm một bước rồi mới đòi đúng tên người duyệt.
-    assert d["status"] == "cho_kt"
-    assert _buoc(d["id"], "check", "ketoan").status_code == 200
-    ds = client.get("/api/v1/payment-requests", headers=login("ketoan")).json()
-    h = [x for x in ds if x["id"] == d["id"]][0]
-    assert "P.TGĐ Marketing" in h["next"], h["next"]
-    assert h["nguong_duyet_ap_dung"] is None
+    assert d["status"] == "cho_tp", "ho so Marketing van nhay coc qua buoc xac nhan noi dung"
+    assert "P.TGĐ Marketing" in d["next"], d["next"]
 
 
-def test_f1_h2_marketing_khong_bi_chan_khi_chua_chot_moc(khong_moc):
-    """Chưa chốt mốc KHÔNG được làm đứng luồng Marketing — mốc không áp vào nó."""
+def test_f1_h2_chua_chot_moc_thi_marketing_CUNG_dung(khong_moc):
+    """ĐẢO Ở ĐỢT F1b. Bản trước đòi luồng Marketing KHÔNG bị chặn khi chưa chốt mốc. Nay nó đi
+    chung mốc nên nó dừng chung — và đó là điều đúng: chưa ai chốt mốc thì không biết khoản này
+    ai ký. Hai bước đầu vẫn đi được, chỉ bước LỆNH CHI dừng."""
     r = client.post("/api/v1/payment-requests", json={
         "category": "marketing", "marketing_muc": "noi_dung", "supplier_name": "Meta",
         "supplier_tax_code": "0301234567", "amount": 3_000_000,
         "description": "Noi dung", "has_document": True, "document_ref": "BG-02",
     }, headers=login("cntt"))
     rid = r.json()["request"]["id"]
+    assert _buoc(rid, "confirm", "ptgd.mkt").status_code == 200
     assert _buoc(rid, "check", "ketoan").status_code == 200
-    assert _buoc(rid, "approve", "ptgd.mkt").status_code == 200
-    assert _ho_so(rid).status == "cho_chi"
+    for vai in ("tgd", "chutich", "ptgd.mkt"):
+        kq = _buoc(rid, "approve", vai)
+        assert kq.status_code == 422, f"{vai} ky duoc trong khi chua ai chot moc"
+    assert _ho_so(rid).status == "cho_duyet"
 
 
 # ═════════════════════════════════════════════════════════════════════════════════════════════

@@ -67,13 +67,11 @@ function Expenses() {
   const canCreate = ["nv_dh", "tp_dh", "ptgd_mkt", "hcns", "cntt", "gd_kd", "nv_kd"].includes(role);
   const actions = (r: any) => {
     const out: any[] = [];
-    if (r.status === "cho_tp" && CONFIRMER[r.category]?.includes(role)) out.push(["Xác nhận", "confirm", "teal"]);
+    // Bước MỘT của Marketing là chữ ký NỘI DUNG của P.TGĐ Marketing, nên nút phải nói thế —
+    // "Xác nhận" chung chung làm người bấm tưởng mình chỉ đang xác nhận giấy tờ (Đợt F1b).
+    if (r.status === "cho_tp" && CONFIRMER[r.category]?.includes(role))
+      out.push([r.category === "marketing" ? "Duyệt nội dung" : "Xác nhận", "confirm", "teal"]);
     if (r.status === "cho_kt" && role === "ketoan") out.push(["Kế toán kiểm tra", "check", "teal"]);
-    // Chi MARKETING đi MỘT chữ ký, và là chữ ký của P.TGĐ Marketing (Chủ tịch chốt 23/9/2026).
-    // TGĐ và Chủ tịch vẫn THẤY hồ sơ trong danh sách — chỉ không có nút bấm. Đó đúng là điều đã
-    // chốt: "dữ liệu vẫn đẩy lên cho TGĐ và CT xem, và không cần duyệt".
-    // Máy chủ mới là chỗ chặn thật (services/ops.py::step); dòng này chỉ để không vẽ ra một cái
-    // nút bấm vào là báo lỗi.
     // ĐỢT F1 — màn hình ĐỌC cấp duyệt từ máy chủ (`vai_ky_duoc`), KHÔNG tự suy.
     // Dòng cũ ở đây viết `role === "tgd" || (role === "chutich" && r.two_signatures)` — đúng cái
     // cờ sai mà F1 sửa ở máy chủ, nên để nguyên là màn hình sai cả hai đầu: TGĐ thấy nút trên
@@ -85,10 +83,11 @@ function Expenses() {
     // P.TGĐ Marketing. Hồ sơ vẫn hiện trong danh sách cho cả TGĐ và Chủ tịch XEM, chỉ không có
     // nút: đúng điều Chủ tịch chốt 10/10/2026 — dưới mốc TGĐ duyệt nhưng Chủ tịch vẫn phải thấy,
     // trên mốc TGĐ cũng vẫn thấy nhưng không bấm duyệt.
-    if (r.status === "cho_duyet" && (r.vai_ky_duoc || []).includes(role)
-        && !(r.category === "marketing" && r.created_by === user?.username))
-      out.push([r.category === "marketing" ? "P.TGĐ Marketing duyệt"
-                : role === "tgd" ? "TGĐ duyệt" : "Chủ tịch ký", "approve", ""]);
+    // Đợt F1b: Marketing thôi có nhãn riêng ở bước này — bước này nay là LỆNH CHI cho mọi loại
+    // chi, do TGĐ hoặc Chủ tịch ký theo mốc. Phép loại người lập cũng thôi gắn riêng Marketing:
+    // máy chủ chặn người lập tự ký ở đúng chỗ của nó.
+    if (r.status === "cho_duyet" && (r.vai_ky_duoc || []).includes(role))
+      out.push([role === "tgd" ? "TGĐ ký lệnh chi" : "Chủ tịch ký lệnh chi", "approve", ""]);
     if (r.status === "cho_chi" && role === "ketoan") out.push(["Đã chi (nhập mã GD)", "pay", "orange"]);
     if (!["da_chi", "tu_choi"].includes(r.status) && ["tgd", "chutich", "ketoan", "tp_dh", "ptgd_mkt"].includes(role)) out.push(["Từ chối", "reject", "grey"]);
     return out;
