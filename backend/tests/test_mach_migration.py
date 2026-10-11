@@ -28,6 +28,44 @@ def doc_mach() -> dict:
     return mach
 
 
+def test_moi_tep_migration_phai_bien_dich_duoc():
+    """Mọi tệp trong `versions/` phải là Python ĐỌC ĐƯỢC. Hàng rào thêm 12/10/2026, sau khi một
+    tệp sai cú pháp làm BA lần deploy liên tiếp hỏng mà không hàng rào nào kêu.
+
+    CHUYỆN ĐÃ XẢY RA, ghi đủ để người sau không phải đoán: `lg3b2c3d4e5f6a_nguoi_da_ky_tren_tour.py`
+    gộp vào main ngày 12/10 với dòng đầu là `\\"\\"\\"` thay vì `\"\"\"` — dấu gạch chéo của lệnh ghi tệp
+    còn sót lại trong nội dung. Python đọc không nổi. Alembic nạp MỌI tệp trong thư mục này lúc
+    `alembic upgrade head` chạy ở Dockerfile, nên một tệp hỏng là cả mạch chết, container không lên,
+    và mọi lần deploy TỪ ĐÓ TRỞ ĐI hỏng theo — PR #283, #284 rồi #285, ba vòng của hai làn khác nhau
+    kẹt lại vì một dòng.
+
+    VÌ SAO KHÔNG HÀNG RÀO NÀO BẮT ĐƯỢC, và đây mới là phần đáng sửa:
+      · `ruff check app` của cửa hẹp chỉ quét thư mục `app`, KHÔNG quét `alembic`.
+      · `doc_mach()` ngay trên đây đọc các tệp này bằng BIỂU THỨC CHÍNH QUY, không nạp mô-đun —
+        lý do ấy vẫn đúng (tệp migration có thể nhập thứ chưa cài trong môi trường chạy test), nhưng
+        hệ quả là cú pháp không bao giờ được kiểm.
+      · Bộ phép thử thường dùng `create_all`, không chạy migration, nên nó cũng không chạm tới.
+    Ba lớp cùng nhìn chỗ khác, và lỗi chỉ hiện ra ở Render — nơi không ai đang nhìn.
+
+    `compile()` giữ nguyên lý do của `doc_mach`: nó CHỈ phân tích cú pháp, không chạy và không nhập
+    một mô-đun nào, nên tệp có `import` lạ vẫn qua được. Phép thử này nằm trong 11 tệp của cửa hẹp,
+    tức nó chặn ngay trên PR trong khoảng mười giây — chứ không báo sau ba vòng.
+    """
+    hong = []
+    for f in sorted(os.listdir(VERSIONS)):
+        if not f.endswith(".py"): continue
+        duong = os.path.join(VERSIONS, f)
+        src = open(duong, encoding="utf-8").read()
+        try:
+            compile(src, duong, "exec")
+        except SyntaxError as ex:
+            hong.append(f"{f} dòng {ex.lineno}: {ex.msg}")
+    assert not hong, (
+        "tệp migration sai cú pháp — Dockerfile chạy `alembic upgrade head` lúc khởi động, và "
+        "alembic nạp MỌI tệp trong versions/, nên container sẽ KHÔNG lên được và mọi lần deploy "
+        "sau đó cũng hỏng theo:\n  " + "\n  ".join(hong))
+
+
 def test_dung_mot_dau_mach():
     mach = doc_mach()
     da_duoc_noi = {d for d in mach.values() if d}
