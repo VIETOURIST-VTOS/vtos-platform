@@ -1034,7 +1034,9 @@ def bo_nap(_c) -> dict:
             "mo_ta": "Khoản không gắn vào chuyến nào: bảo hiểm, lương tài xế, phí bãi, lãi vay. Nhóm "
                      "'theo xe' bắt buộc có biển số; nhóm 'cả đội' bắt buộc KHÔNG có – hệ thống cố ý "
                      "không chia lãi vay hay phí bãi cho từng chiếc, vì mọi cách chia đều 'có lý' và ra "
-                     "số khác nhau.",
+                     "số khác nhau. Lãi vay vẫn nạp qua cửa này, nhưng nó NẰM NGOÀI GIÁ VỐN (Chủ tịch "
+                     "quyết 11/10/2026): báo cáo lãi lỗ in nó thành dòng riêng dưới lợi nhuận đội xe và "
+                     "không phân bổ về xe nào.",
             "khoa_chong_trung": "Kỳ + nhóm + xe + diễn giải",
             "cot": [_c("ky", "Kỳ", True, kieu="thang", vi_du="2026-08"),
                     _c("nhom", "Nhóm chi phí", True, kieu="chon", vi_du="lai_vay", chon=nhom_ky),

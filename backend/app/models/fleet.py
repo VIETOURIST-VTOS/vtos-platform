@@ -648,6 +648,23 @@ NHOM_CHI_PHI_KY = {
     "khac_doi":    ("Chi phí phát sinh khác của đội", "doi"),
 }
 
+# Nhóm nằm NGOÀI GIÁ VỐN vận tải. Chủ tịch quyết ngày 11/10/2026: "lãi vay không tính vào giá vốn".
+#
+# Lãi vay xe là chi phí TÀI CHÍNH (TK 635), không phải giá vốn vận tải (627 → 632). Trước quyết định
+# này các bảng quyết toán T4–T9/2026 đều cộng lãi vay vào "TỔNG CHI PHÍ" đội xe rồi lấy doanh thu trừ
+# đi để ra "lợi nhuận" — nên con số lợi nhuận đội xe đã trình thấp hơn thực tế rất xa: tháng 5/2026
+# bảng ghi 123.889.302 trong khi lợi nhuận đội xe theo giá vốn vận tải là 445.504.964, lệch 3,6 lần.
+# Ai đọc bảng cũ sẽ kết luận sai rằng đội xe gần như không sinh lời.
+#
+# Vì sao là một HẰNG SỐ cạnh NHOM_CHI_PHI_KY chứ không phải một ô người nhập tự tích:
+#   Một khoản vào hay không vào giá vốn là quy ước kế toán của cả công ty, không phải lựa chọn của
+#   người gõ bảng tháng. Để người nhập tự tích thì tháng này tích tháng sau quên, và hai tháng liền
+#   nhau không còn so được với nhau. Đặt ở đây thì phép tính giá vốn tự loại ra, không ai phải nhớ.
+#
+# Thêm một nhóm vào đây là việc có người ký, không phải việc dọn mã: phép kiểm
+# test_cx1_lai_vay_ngoai_gia_von.py chốt đúng danh sách này.
+NGOAI_GIA_VON = ("lai_vay",)
+
 
 class FleetPeriodCost(Base):
     """Chi phí của một KỲ mà không gắn vào chuyến nào: bảo hiểm, lương tài xế, phí bãi, lãi vay…

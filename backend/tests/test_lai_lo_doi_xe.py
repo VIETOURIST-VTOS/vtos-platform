@@ -7,11 +7,14 @@ Ai chỉ nhìn tầng đầu tưởng đội xe lãi gấp hơn bốn lần th�
 Sáu cách một báo cáo lãi lỗ nói dối, và bộ test này chặn cả sáu:
 
   1. Chỉ trừ chi phí chuyến rồi gọi đó là lợi nhuận đội xe.
-  2. Chia lãi vay về từng xe rồi để người đọc tưởng đó là kết quả thật của chiếc xe.
+  2. Chia chi phí đội về từng xe rồi để người đọc tưởng đó là kết quả thật của chiếc xe.
   3. Nhập lại bảng tháng lần thứ hai làm chi phí nhân đôi.
   4. Gắn phí bãi xe vào một chiếc, hoặc để lương tài xế trôi vào khối chi phí chung.
   5. Tính công suất trên số xe CÓ CHẠY, nên chiếc nằm bãi cả tháng biến mất và công suất luôn đẹp.
   6. Trả 0 cho suất tiêu hao khi thiếu số lít – đọc ra là "xe không tốn dầu".
+  7. Trừ lãi vay vào giá vốn, nên đội xe hiện ra gần như không sinh lời. Chủ tịch quyết 11/10/2026:
+     lãi vay KHÔNG tính vào giá vốn. Phép kiểm cho điều đó nằm ở test_cx1_lai_vay_ngoai_gia_von.py,
+     tệp này chỉ chốt phần giá vốn ba tầng không còn chứa nó.
 """
 import os, sys, tempfile
 # CSDL thử để trong thư mục tạm của máy, không để trong thư mục làm việc: thư mục làm việc là thư mục
@@ -87,6 +90,10 @@ def test_tang_mot_la_lai_gop_chuyen_chua_phai_loi_nhuan(_startup):
     # Chưa nhập chi phí kỳ nào thì lợi nhuận ĐANG bằng lãi gộp – và báo cáo phải nói ra là thiếu.
     assert t["loi_nhuan"] == t["lai_gop_chuyen"]
     assert d["nhom_chi_phi_doi_chua_nhap"], "kỳ chưa có chi phí đội nào thì phải liệt kê ra"
+    # Chưa nhập lãi vay thì hai dòng bằng nhau, và báo cáo phải nói ra là THIẾU SỐ chứ không phải 0.
+    assert t["chi_phi_tai_chinh"] == 0
+    assert t["ket_qua_sau_tai_chinh"] == t["loi_nhuan"]
+    assert d["nhom_tai_chinh_chua_nhap"], "kỳ chưa nhập lãi vay thì phải liệt kê riêng"
 
 
 def test_theo_tour_moi_chuyen_mot_dong_va_suat_tieu_hao(_startup):
@@ -125,15 +132,19 @@ def test_chi_phi_cua_xe_tru_thang_vao_ket_qua_chiec_do(_startup):
 
 
 def test_chi_phi_doi_khong_tru_vao_xe_nao_nhung_tru_vao_loi_nhuan(_startup):
+    """Lãi vay nhập cùng lúc với phí bãi, nhưng chỉ phí bãi vào giá vốn — xem tệp kiểm riêng."""
     assert them("lai_vay", 20_000_000).status_code == 201
     assert them("bai_xe", 4_000_000).status_code == 201
     d = bc()
     t = d["tong"]
-    assert t["chi_phi_doi"] == 24_000_000
-    assert t["loi_nhuan"] == t["ket_qua_sau_chi_phi_xe"] - 24_000_000
+    # Chi phí đội (giá vốn) chỉ còn phí bãi. Lãi vay đi lối riêng.
+    assert t["chi_phi_doi"] == 4_000_000
+    assert t["loi_nhuan"] == t["ket_qua_sau_chi_phi_xe"] - 4_000_000
     for x in d["xe"]:
         assert "phan_bo_chi_phi_doi" not in x, "mặc định KHÔNG chia chi phí đội về từng xe"
-    assert any(c["nhom"] == "lai_vay" for c in d["chi_tiet_chi_phi_doi"])
+    assert any(c["nhom"] == "bai_xe" for c in d["chi_tiet_chi_phi_doi"])
+    assert not any(c["nhom"] == "lai_vay" for c in d["chi_tiet_chi_phi_doi"]), \
+        "lãi vay không được nằm trong khối chi phí đội của giá vốn"
 
 
 def test_muon_phan_bo_thi_phai_chon_tieu_thuc_va_ket_qua_nam_o_cot_rieng(_startup):
@@ -144,6 +155,11 @@ def test_muon_phan_bo_thi_phai_chon_tieu_thuc_va_ket_qua_nam_o_cot_rieng(_startu
     assert x["ket_qua_xe"] != x["ket_qua_sau_phan_bo"], "hai con số phải nằm ở hai cột khác nhau"
     # Tổng không đổi dù chia kiểu nào – phân bổ chỉ chuyển chỗ, không tạo ra hay làm mất tiền.
     assert bc("doanh_thu")["tong"]["loi_nhuan"] == d["tong"]["loi_nhuan"]
+    # Phân bổ chỉ chia phần GIÁ VỐN. 20 triệu lãi vay đã nhập ở test trên không được chia về xe nào:
+    # gán lãi vay lên đầu một chiếc là nói chiếc ấy lỗ vì chạy kém, trong khi nó lỗ vì công ty vay
+    # tiền mua nó.
+    assert sum(x["phan_bo_chi_phi_doi"] for x in d["xe"]) == d["tong"]["chi_phi_doi"]
+    assert d["tong"]["chi_phi_tai_chinh"] == 20_000_000
 
 
 def test_tieu_thuc_la_thi_tu_choi(_startup):

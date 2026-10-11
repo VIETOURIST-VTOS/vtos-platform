@@ -1478,7 +1478,11 @@ class ChiPhiKyIn(BaseModel):
 @router.post("/chi-phi-ky", status_code=201)
 def them_chi_phi_ky(data: ChiPhiKyIn, u: User = Depends(require_roles(*QT_WRITE)),
                     db: Session = Depends(get_db)):
-    """Ghi một khoản chi phí kỳ (bảo hiểm, lương tài xế, phí bãi, lãi vay…)."""
+    """Ghi một khoản chi phí kỳ (bảo hiểm, lương tài xế, phí bãi, lãi vay…).
+
+    Lãi vay nhập qua đúng cửa này, nhưng nó không vào giá vốn: `NGOAI_GIA_VON` trong mô hình quyết
+    điều đó, không phải ô người nhập (Chủ tịch quyết 11/10/2026).
+    """
     try:
         QT.ky_range(data.ky)
     except Exception:
