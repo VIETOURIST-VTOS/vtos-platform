@@ -70,9 +70,10 @@ def _ngay_cong(db: Session, driver_id: int, tu: date, den: date) -> int:
     return len(ngay)
 
 
-# Giá trị mặc định của `Vehicle.seats` trong mô hình. Xe mang đúng số này có thể là xe 45 chỗ thật,
-# cũng có thể là xe chưa ai nhập số ghế — mô hình không cho phân biệt. Đọc từ cột thay vì gõ lại 45:
-# ngày nào mặc định đổi thì chỗ này đổi theo, không âm thầm lệch.
+# Giá trị mặc định của `Vehicle.seats` trong mô hình. Giữ lại sau HX-1 vì màn hình hồ sơ xe còn dùng
+# để biết một con số có phải là giá trị chưa ai chạm tới hay không — nhưng phép lọc KHÔNG còn dùng nó
+# làm dấu hiệu "chưa biết": xem chú thích trong goi_y_dieu_xe. Đọc từ cột thay vì gõ lại 45 để ngày
+# nào mặc định đổi thì chỗ này đổi theo, không âm thầm lệch.
 GHE_MAC_DINH = Vehicle.__table__.c.seats.default.arg
 
 
@@ -98,17 +99,16 @@ def goi_y_dieu_xe(db: Session, d1: date, d2: date, so_khach: int = 0, km_du_kien
             continue
         # GHẾ THẬT CỦA TỪNG XE, không dùng con số 45 chung — Chủ tịch chốt 11/10/2026.
         #
-        # Và một cái bẫy của chính mô hình: `Vehicle.seats` mặc định 45 và không cho rỗng, nên một
-        # chiếc xe chưa ai nhập số ghế đọc ra ĐÚNG Y một chiếc 45 chỗ thật. Không phân biệt được hai
-        # thứ ấy thì phép lọc này sẽ cho một xe 29 chỗ chở 45 khách, và không ai thấy vì con số 45
-        # trông hợp lý. Ở đây chưa sửa được mô hình (đổi cột là việc có migration và có người ký), nên
-        # ít nhất NÓI RA: xe nào đúng bằng giá trị mặc định thì gắn nhãn "chưa xác nhận số ghế" vào
-        # lý do, để người phát lệnh biết mình đang tin vào một con số chưa ai khai.
+        # HX-1 (11/10/2026) đổi cách nhận ra "chưa biết số ghế". Bản DX-1 so con số với giá trị mặc
+        # định 45 — và cách ấy SAI ở một chỗ: nó gắn nhãn "chưa xác nhận" cho cả xe 45 chỗ THẬT, và
+        # cái nhãn ấy không bao giờ tắt được dù có ai xác nhận bao nhiêu lần. Nay đọc `seats_xac_nhan_boi`:
+        # có tên người là con số đã có người chịu trách nhiệm, rỗng là chưa ai khai — không phụ thuộc
+        # con số bằng bao nhiêu. Chủ tịch chọn phương án này, khác phương án Claude đề xuất.
         if so_khach and v.seats and v.seats < so_khach:
             bi_loai.append({"vehicle_id": v.id, "xe": v.plate, "ma_xe": v.code,
                             "ly_do": [f"Xe {v.seats} chỗ, không đủ cho {so_khach} khách"]})
             continue
-        if so_khach and v.seats == GHE_MAC_DINH:
+        if so_khach and not (v.seats_xac_nhan_boi or "").strip():
             chua_khai_ghe.append(v.plate)
         hop_le.append((v, kt))
 

@@ -155,21 +155,26 @@ def test_ghe_mac_dinh_doc_tu_cot_chu_khong_go_cung_45():
         "đang so với số 45 viết cứng thay vì đọc GHE_MAC_DINH"
 
 
-def test_xe_chua_khai_so_ghe_duoc_NOI_RA_chu_khong_im_lang(_startup):
-    """`Vehicle.seats` mặc định 45 và không cho rỗng — xe chưa ai nhập ghế đọc ra y như 45 chỗ thật.
+def test_xe_chua_ai_xac_nhan_so_ghe_duoc_NOI_RA_chu_khong_im_lang(_startup):
+    """Dấu hiệu "chưa biết số ghế" là KHÔNG CÓ NGƯỜI XÁC NHẬN, không phải con số bằng 45.
 
-    Mô hình chưa sửa được ở vòng này (đổi cột là việc có migration và có người ký). Nên ít nhất phải
-    NÓI RA, để người phát lệnh biết mình đang tin vào một con số chưa ai khai.
+    HX-1 (11/10/2026) đổi cơ chế này, và lý do đáng ghi: bản DX-1 so `seats` với giá trị mặc định 45,
+    nên nó gắn nhãn "chưa xác nhận" cho cả xe 45 chỗ THẬT và cái nhãn ấy không bao giờ tắt được.
+    Chủ tịch chọn thêm hai cột `seats_xac_nhan_boi` / `_luc`, khác phương án Claude đề xuất.
     """
     from app.services import fleet_ai as AI
     with SessionLocal() as db:
-        gy = AI.goi_y_dieu_xe(db, D1, D2, so_khach=20)
-        assert "chua_khai_ghe" in gy, "kết quả không có chỗ nào nói về số ghế chưa khai"
-        assert isinstance(gy["chua_khai_ghe"], list)
         v = _xe(db)
-        if v.seats == AI.GHE_MAC_DINH:
-            assert v.plate in gy["chua_khai_ghe"], \
-                "xe đúng bằng giá trị mặc định mà không được nêu ra"
+        assert not (v.seats_xac_nhan_boi or "").strip(), "cảnh dựng sai: xe này lẽ ra chưa xác nhận"
+        gy = AI.goi_y_dieu_xe(db, D1, D2, so_khach=20)
+        assert v.plate in gy["chua_khai_ghe"], "xe chưa ai xác nhận số ghế mà không được nêu ra"
+        # Xác nhận rồi thì HẾT bị nêu — kể cả khi số ghế vẫn đúng bằng 45.
+        v.seats = AI.GHE_MAC_DINH
+        v.seats_xac_nhan_boi = "gd_doi_xe"
+        db.flush()
+        gy2 = AI.goi_y_dieu_xe(db, D1, D2, so_khach=20)
+        assert v.plate not in gy2["chua_khai_ghe"], \
+            "xe 45 chỗ THẬT đã có người xác nhận mà vẫn bị gắn nhãn chưa biết"
         db.rollback()
 
 

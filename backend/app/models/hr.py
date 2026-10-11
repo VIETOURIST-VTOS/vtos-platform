@@ -155,6 +155,24 @@ class Vehicle(Base):
     contract_ref: Mapped[str] = mapped_column(String(60), default="")        # số hợp đồng hợp tác
     contract_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     contract_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # HX-1 (11/10/2026) — bốn trường hồ sơ xe mà sheet `THEO DÕI CP` của Vietrip có đủ cho 23 xe mà
+    # VTOS không có chỗ giữ. Nạp qua cửa `ho_so_xe`.
+    engine_no: Mapped[str] = mapped_column(String(40), default="")           # số máy
+    # KHÔNG thêm cột thẻ dầu vào đây, dù sheet nguồn `THEO DÕI CP` xếp thẻ theo từng DÒNG XE.
+    # Đợt 2 đội xe đã quyết ngược lại và ghi lý do ngay tại `Employee.fuel_card_last4`: thẻ gắn với
+    # TÀI XẾ, vì đổi tài xế mà thẻ gắn vào xe thì mọi giao dịch thẻ sau ngày bàn giao gán nhầm chi
+    # phí sang người khác. Thêm cột ở đây là tạo chỗ khai thứ hai cho cùng một việc, và hai chỗ khai
+    # thì sẽ có ngày nói khác nhau. Câu "ở Vietourist thẻ cấp theo xe hay theo người" đang chờ
+    # Chủ tịch trả lời — xem mục HX-1 trong sổ.
+    # AI XÁC NHẬN SỐ GHẾ — Chủ tịch chọn 11/10/2026.
+    #
+    # `seats` mặc định 45 và không cho rỗng, nên một chiếc chưa ai nhập ghế đọc ra ĐÚNG Y một chiếc
+    # 45 chỗ thật. Không sửa cột (đổi cột là việc có migration và nhiều chỗ đọc), mà ghi RIÊNG ai đã
+    # xác nhận: có tên người là con số đã có người chịu trách nhiệm, rỗng là chưa ai khai. Nhờ vậy
+    # một chiếc 45 chỗ THẬT đã xác nhận thì không bị gắn nhãn "chưa biết" mãi — đó là chỗ phương án
+    # "cảnh báo khi đúng bằng 45" sai, và là lý do Chủ tịch chọn khác.
+    seats_xac_nhan_boi: Mapped[str] = mapped_column(String(50), default="")
+    seats_xac_nhan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     odo_km: Mapped[int] = mapped_column(Integer, default=0)                   # số km đồng hồ đã xác nhận
     odo_at: Mapped[date | None] = mapped_column(Date, nullable=True)          # thời điểm của số km đó
     source_note: Mapped[str] = mapped_column(String(200), default="")
