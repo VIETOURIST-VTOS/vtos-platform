@@ -300,18 +300,24 @@ def test_f1_d1_tu_moc_tro_len_ma_NGOAI_DU_TOAN_can_ca_hai(co_moc):
     assert _ho_so(rid).status == "cho_chi"
 
 
-def test_f1_d2_DUOI_moc_ma_ngoai_du_toan_van_can_ca_hai(co_moc):
-    """CÁI BẪY. Nếu ai đó "cho gọn" mà dùng lại `two_signatures` làm cờ mốc tiền, phép thử này đỏ:
-    một khoản 20 triệu ngoài dự toán sẽ chỉ còn cần một chữ ký TGĐ."""
+def test_f1_d2_DUOI_moc_ma_ngoai_du_toan_chi_can_TGD(co_moc):
+    """ĐỔI Ở ĐỢT LG2, và đổi vì LUẬT đổi chứ không vì phép thử sai.
+
+    Câu cũ — tên nó là `..._van_can_ca_hai` — đòi một khoản 20 triệu ngoài dự toán phải có CẢ
+    Chủ tịch và TGĐ. Chủ tịch chốt 11/10/2026: chi ngoài dự toán cần chữ ký TRƯỞNG PHÒNG và TGĐ,
+    và chữ ký trưởng phòng CHÍNH LÀ bước xác nhận bộ phận đã có (`cho_tp`, ghi vào ô `tp_by`).
+    Nên khoản dưới mốc chỉ còn chờ TGĐ ở bước duyệt — trưởng phòng đã ký từ trước đó.
+
+    CÁI BẪY CÂU CŨ CANH THÌ VẪN CANH, chỉ đổi chiều: nếu ai đó dùng lại `two_signatures` làm cờ
+    MỐC TIỀN thì khoản 400 triệu ngoài dự toán sẽ mất chữ ký Chủ tịch — `test_f1_d1` đỏ. Và nếu
+    ai đó trả `two_signatures` về nghĩa cũ thì chính câu này đỏ. Hai câu kẹp hai đầu.
+    """
     rid = _den_cho_duyet(20_000_000)
     _dat_hai_chu_ky(rid)
     assert _buoc(rid, "approve", "tgd").status_code == 200
-    assert _ho_so(rid).status == "cho_duyet", (
-        "khoan DUOI moc nhung NGOAI DU TOAN da di qua voi mot chu ky - hai ly do dang bi tron vao "
-        "mot co")
-    assert _buoc(rid, "approve", "chutich").status_code == 200
-    assert _ho_so(rid).status == "cho_chi"
-
+    assert _ho_so(rid).status == "cho_chi", (
+        "khoan DUOI moc ngoai du toan phai du chu ky sau khi TGD bam - chu ky truong phong la "
+        "buoc `cho_tp` da co, khong bat ai bam them lan nua (Chu tich chot 11/10/2026)")
 
 # ═════════════════════════════════════════════════════════════════════════════════════════════
 # E. RỖNG thì CHẶN, và chỗ tắc phải ĐẾM ĐƯỢC — chỗ hỏng (b)
@@ -468,8 +474,26 @@ def test_f1_f5_chua_chot_moc_thi_danh_sach_vai_RONG(khong_moc):
     assert h["vai_ky_duoc"] == []
 
 
-def test_f1_f6_ngoai_du_toan_thi_ca_hai_vai_co_nut(co_moc):
+def test_f1_f6_ngoai_du_toan_duoi_moc_thi_chi_TGD_co_nut(co_moc):
+    """ĐỔI Ở ĐỢT LG2 — tên cũ là `..._thi_ca_hai_vai_co_nut`.
+
+    Nút trên màn hình phải nói ĐÚNG luật đang chạy, nếu không người ta đi tìm người ký sai chỗ.
+    Khoản 15 triệu ngoài dự toán: trưởng phòng đã ký ở bước `cho_tp`, nên bước duyệt chỉ còn TGĐ
+    (Chủ tịch chốt 11/10/2026). Chủ tịch VẪN THẤY hồ sơ — `test_f1_e5` canh điều đó — nhưng
+    không có nút bấm ở đây.
+    """
     rid = _den_cho_duyet(15_000_000)
+    _dat_hai_chu_ky(rid)
+    ds = client.get("/api/v1/payment-requests", headers=login("ketoan")).json()
+    h = [x for x in ds if x["id"] == rid][0]
+    assert set(h["vai_ky_duoc"]) == {"tgd"}, h["vai_ky_duoc"]
+
+
+def test_f1_f6b_ngoai_du_toan_TU_MOC_thi_ca_hai_vai_co_nut(co_moc):
+    """VẾ CÒN LẠI của cùng một luật, thêm ở Đợt LG2: từ mốc trở lên thì khoản ngoài dự toán
+    cần CẢ TGĐ và Chủ tịch — ba chữ ký kể cả bước trưởng phòng. Đây là chỗ Chủ tịch chọn SIẾT
+    ngày 11/10/2026, và không có câu này thì không gì canh nó."""
+    rid = _den_cho_duyet(400_000_000)
     _dat_hai_chu_ky(rid)
     ds = client.get("/api/v1/payment-requests", headers=login("ketoan")).json()
     h = [x for x in ds if x["id"] == rid][0]

@@ -92,6 +92,18 @@ class PaymentRequest(Base):
     approved_by: Mapped[str] = mapped_column(String(50), default="")      # TGĐ (và Chủ tịch nếu 2 chữ ký)
     signed_chutich: Mapped[bool] = mapped_column(Boolean, default=False)
     signed_tgd: Mapped[bool] = mapped_column(Boolean, default=False)
+    # AI ĐÃ KÝ, không chỉ "đã ký hay chưa" — Đợt LG2, Chủ tịch chốt 11/10/2026 bịt cổng 15.
+    #
+    # VÌ SAO PHẢI THÊM CỘT MỚI MỚI BỊT ĐƯỢC. Phép chặn "một người không ký thay cả hai vai" của
+    # `chu_ky.kiem_tra_nguoi_ky` so TÊN NGƯỜI đã ký với người đang bấm. Hai cột `signed_*` là cờ
+    # ĐÚNG/SAI, chúng không nhớ ai bấm — nên trước cột này, phép chặn ấy không có gì để so, và
+    # một người giữ cả tài khoản `tgd` lẫn `chutich` ký đủ hai chữ ký cho một khoản chi ngoài dự
+    # toán. `approved_by` không thay được: nó chỉ được ghi lúc hồ sơ ĐỦ chữ ký, tức sau khi
+    # chuyện đã rồi.
+    #
+    # Dạng lưu: "vai:tên" ngăn bằng dấu phẩy, ví dụ `tgd:nguyenvanb`. Đọc ra bằng
+    # `chu_ky.doc_nguoi_da_ky`; không nơi nào tự tách chuỗi này.
+    nguoi_da_ky: Mapped[str] = mapped_column(String(200), default="", server_default="")
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reject_reason: Mapped[str] = mapped_column(String(300), default="")
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

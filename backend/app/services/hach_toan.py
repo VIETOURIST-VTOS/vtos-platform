@@ -359,11 +359,15 @@ def ky(db: Session, u: User, qid: int) -> QuyTacHachToan:
     q = db.get(QuyTacHachToan, qid)
     if not q or q.status != "pending":
         raise ValueError("Quy tắc không ở trạng thái chờ ký")
-    CK.kiem_tra_nguoi_ky(u, ("chutich", "tgd"), nguoi_trinh=q.proposed_by,
-                         da_ky={"chutich": "x" if q.signed_chutich else "", "tgd": "x" if q.signed_tgd else ""})
+    # GIỮ NGUYÊN HAI CHỮ KÝ — Chủ tịch chốt 11/10/2026: ba cửa chính sách xuống một chữ ký,
+    # cửa này KHÔNG. Đọc từ bảng chứ không viết tay, để lần sau đổi ý thì đổi đúng một dòng.
+    can = CK.can_ky("quy_tac_hach_toan")
+    da_ky = CK.da_ky_cua(q)
+    CK.kiem_tra_nguoi_ky(u, can, nguoi_trinh=q.proposed_by, da_ky=da_ky)
     setattr(q, f"signed_{u.role}", True)
+    da_ky[u.role] = "x"
     R.audit(db, u.username, u.role, "ky_quy_tac_hach_toan", f"quy_tac:{q.ma}", after={"id": q.id})
-    if q.signed_chutich and q.signed_tgd:
+    if CK.du_chu_ky(da_ky, can):
         q.status = "active"
         R.audit(db, u.username, u.role, "quy_tac_hach_toan_hieu_luc", f"quy_tac:{q.ma}",
                 after={"no": q.tk_no, "co": q.tk_co, "hieu_luc": str(q.effective_from)})

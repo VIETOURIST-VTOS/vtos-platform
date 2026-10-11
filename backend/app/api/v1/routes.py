@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select, desc, func, text
 from sqlalchemy.orm import Session
 from app.db.session import get_db
+from app.services import chu_ky as _CK   # bang chu ky, Dot LG2 - nhap o DAU TEP vi require_roles doc no luc nap mo-dun
 from app.api.deps import current_user, require_roles, robot_auth, Gate, loc_theo_nguoi_dung, toan_quyen
 from app.api import schemas as S
 from pydantic import BaseModel
@@ -736,29 +737,61 @@ def propose_param(data: S.ParamPropose, u: User = Depends(require_roles("tp_dh",
     else:
         try: float(data.value)
         except ValueError: raise Gate("THAM_SO", "Giá trị phải là số")
+    # CHẶN TRƯỚC, không để hồ sơ lập ra rồi mới kẹt. Từ Đợt LG2 tham số chỉ cần MỘT chữ ký
+    # Chủ tịch, mà luật "người trình không tự ký" vẫn giữ — nên Chủ tịch tự trình là một hồ sơ
+    # KHÔNG AI KÝ ĐƯỢC. Nói ngay ở cửa trình, và nói rõ nhờ ai trình, thay vì để nó nằm chờ.
+    can_ky_tham_so = _CK.can_ky("tham_so")
+    if u.role in can_ky_tham_so and len(can_ky_tham_so) == 1:
+        raise Gate("THAM_SO",
+                   f"{ROLES.get(u.role, u.role)} là người ký DUY NHẤT của tham số, nên không tự "
+                   "trình được đề xuất của chính mình – chữ ký ấy khi đó không còn là một lớp "
+                   "kiểm soát. Nhờ Kế toán, HCNS hoặc CNTT trình con số, rồi ký.")
     p = Param(key=data.key, value=data.value, label=ref.label, unit=ref.unit, effective_from=data.effective_from,
               source=data.source or ref.source, status="pending", proposed_by=u.username)
     db.add(p); db.flush()
     R.audit(db, u.username, u.role, "de_xuat_tham_so", f"param:{data.key}", before={"value": ref.value}, after={"value": data.value, "hieu_luc": str(data.effective_from)}); db.commit()
-    return {"param": param_out(p), "message": "Đã trình đề xuất – chờ Chủ tịch và TGĐ ký (Điều 1 MHQT)"}
+    # LỜI NHẮN ĐỌC TỪ BẢNG, không viết tay tên vai. Viết tay là một ngày nào đó bảng đổi mà câu
+    # này còn nói luật cũ — và người đọc tin vào câu chữ trên màn hình chứ không đọc mã.
+    #
+    # CÂU TRÍCH DẪN CŨ SAI, ĐỢT LG2 SỬA: chỗ này từng ghi "(Điều 1 MHQT)" — chỗ duy nhất trong
+    # kho mã viện dẫn Điều 1 cho việc hai chữ ký. Chủ tịch xác nhận 11/10/2026 rằng Điều 1 không
+    # quy định việc này; căn cứ thật là Phụ lục đối chiếu 27/8/2026 mục 3.2 (đầu `chu_ky.py`).
+    # Trích dẫn sai tệ hơn không trích dẫn: nó gửi người đọc đi tìm nhầm điều khoản.
+    ai = " và ".join(ROLES.get(v, v) for v in _CK.can_ky("tham_so"))
+    return {"param": param_out(p),
+            "message": f"Đã trình đề xuất – chờ {ai} ký (Phụ lục đối chiếu 27/8/2026 mục 3.2)"}
 
 
 @router.post("/params/{pid}/sign", tags=["params"])
-def sign_param(pid: int, u: User = Depends(require_roles("chutich", "tgd")), db: Session = Depends(get_db)):
-    from app.services import chu_ky as CK
+def sign_param(pid: int, u: User = Depends(require_roles(*_CK.can_ky("tham_so"))), db: Session = Depends(get_db)):
+    """ĐỢT LG2: tham số chính sách đi MỘT chữ ký Chủ tịch (Chủ tịch chốt 11/10/2026).
+
+    Cửa, phép kiểm và điều kiện hiệu lực đều đọc `chu_ky.VAI_KY_CAN` — một luật, một chỗ khai.
+    Trước đợt này ba chỗ ấy viết tay cùng một tuple, và sửa luật là phải trúng cả ba.
+
+    NGƯỜI TRÌNH VẪN KHÔNG TỰ KÝ. Một chữ ký không có nghĩa là một người: Kế toán (hoặc ai đó)
+    trình con số, Chủ tịch ký là hiệu lực. Hệ quả cần biết: nếu CHÍNH Chủ tịch trình tham số thì
+    không còn ai ký được nữa — nên cửa trình chặn trước, ở `propose_param`, với lời nhắn nói rõ
+    phải nhờ ai trình. Để hồ sơ lập ra rồi mới phát hiện không ký được là bẫy người dùng.
+    """
+    CK = _CK
     p = db.get(Param, pid)
     if not p or p.status != "pending": raise Gate("TRANG_THAI", "Không ở trạng thái chờ ký")
-    # Người trình đề xuất không được tự ký duyệt đề xuất của chính mình (Phụ lục đối chiếu mục 3.2).
-    CK.kiem_tra_nguoi_ky(u, ("chutich", "tgd"), nguoi_trinh=p.proposed_by,
-                         da_ky={"chutich": "x" if p.signed_chutich else "", "tgd": "x" if p.signed_tgd else ""})
+    can = CK.can_ky("tham_so")
+    da_ky = CK.da_ky_cua(p)
+    CK.kiem_tra_nguoi_ky(u, can, nguoi_trinh=p.proposed_by, da_ky=da_ky)
     setattr(p, f"signed_{u.role}", True)
+    da_ky[u.role] = "x"
     R.audit(db, u.username, u.role, "ky_tham_so", f"param:{p.key}", after={"id": p.id, "value": p.value})
-    if p.signed_chutich and p.signed_tgd:
+    if CK.du_chu_ky(da_ky, can):
         p.status = "active"
         R.audit(db, u.username, u.role, "tham_so_hieu_luc", f"param:{p.key}", after={"value": p.value, "hieu_luc": str(p.effective_from)})
     db.commit()
     R.clear_param_cache()      # tham số vừa đổi – bỏ đệm ngay, không để hệ thống chạy bằng giá trị cũ
-    return {"param": param_out(p), "message": "Đã ký" + (" – tham số có hiệu lực theo ngày đã ghi" if p.status == "active" else ", chờ chữ ký còn lại")}
+    con = CK.con_thieu_cua("tham_so", da_ky)
+    return {"param": param_out(p),
+            "message": "Đã ký" + (" – tham số có hiệu lực theo ngày đã ghi" if p.status == "active"
+                                  else ", chờ chữ ký của " + ", ".join(con))}
 
 
 # ---------- alerts / robots ----------

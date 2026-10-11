@@ -14,6 +14,187 @@ from fastapi import HTTPException
 from app.models.core import User, ROLES
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# AI PHẢI KÝ — MỘT BẢNG CÓ TÊN, NHIỀU NƠI ĐỌC (Đợt LG2, 11/10/2026)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Trước đợt này, "cần hai chữ ký" nằm RỜI ở sáu chỗ: mỗi cửa tự viết `("chutich", "tgd")` vào
+# `require_roles`, viết lại lần nữa vào `kiem_tra_nguoi_ky`, rồi tự kiểm `if signed_chutich and
+# signed_tgd`. Ba lần viết cùng một luật ở cùng một cửa, nhân với sáu cửa. Đổi luật cho một cửa
+# là phải sửa đúng ba chỗ và không sót — mà sót một chỗ thì cửa vẫn chạy, chỉ là chạy sai.
+#
+# CHỦ TỊCH CHỐT 11/10/2026, sau khi được liệt kê ĐỦ sáu cửa đang đòi hai chữ ký:
+#
+#   MỘT chữ ký, Chủ tịch     : tham số chính sách · đơn giá HDV theo tuyến · giá xe theo tuyến
+#   HAI chữ ký, CT + TGĐ     : quy tắc hạch toán · chế tài sự vụ mức 3
+#   HAI chữ ký, P.TGĐ + TGĐ  : dự toán chuyến dưới biên 10%
+#   Bước bộ phận + cấp duyệt : chi ngoài dự toán (cổng 15)
+#
+# LUẬT "NGƯỜI TRÌNH KHÔNG TỰ KÝ" GIỮ NGUYÊN cho cả sáu — Chủ tịch chốt cùng ngày. Nên ba cửa một
+# chữ ký VẪN LÀ HAI NGƯỜI: một người trình con số, Chủ tịch ký là hiệu lực ngay. Bỏ luật ấy đi
+# thì ba cửa kia còn đúng một người làm trọn từ đầu đến cuối, và không còn lớp kiểm soát nào.
+#
+# HỆ QUẢ ĐÃ ĐO VÀ ĐÃ NÊU TRƯỚC KHI CHỐT: ô `nguong_chu_tich_duyet_chi` nằm trong nhóm một chữ ký,
+# mà chính nó là con số định ra AI ĐƯỢC DUYỆT KHOẢN NÀO. Hạ nó về 0 thì mọi khoản thành Chủ tịch
+# duyệt; nâng rất cao thì mọi khoản thành TGĐ duyệt. Chữ ký thứ hai ở đây từng là cái chặn không
+# cho một người tự dời ranh giới ấy; từ nay cái chặn là "người trình phải là người khác".
+#
+# MỘT CÂU TRÍCH DẪN SAI, SỬA Ở ĐỢT NÀY: lời nhắn của màn hình Tham số ghi "(Điều 1 MHQT)". Đó là
+# chỗ DUY NHẤT trong cả kho mã viện dẫn Điều 1 cho việc hai chữ ký, và Chủ tịch xác nhận 11/10/2026
+# rằng Điều 1 không quy định việc này. Căn cứ thật là Phụ lục đối chiếu 27/8/2026 mục 3.2 — chính
+# là câu đầu tệp này — và nó kể ba việc: sửa đổi mọi quy chế, duyệt chuyến dưới biên 10%, chế tài
+# sự vụ mức 3. Trích dẫn sai còn tệ hơn không trích dẫn: nó gửi người đọc đi tìm nhầm điều khoản.
+VAI_KY_CAN: dict[str, tuple[str, ...]] = {
+    "tham_so":           ("chutich",),
+    "don_gia_hdv":       ("chutich",),
+    "gia_xe":            ("chutich",),
+    "quy_tac_hach_toan": ("chutich", "tgd"),
+    "che_tai_muc_3":     ("chutich", "tgd"),
+    # CHUYẾN DƯỚI BIÊN 10% ĐỔI NGƯỜI KÝ, 11/10/2026: Chủ tịch RA KHỎI LUẬT, P.TGĐ tour đoàn VÀO.
+    # Chủ tịch vẫn ĐI QUA ĐƯỢC bằng toàn quyền 06/9/2026 — đi qua được khác với có tên trong luật,
+    # và bảng này khai LUẬT. Việc đổi người ký buộc phải thêm cột `signed_ptgd_doan` cho bảng
+    # `tours`: nhét chữ ký P.TGĐ vào cột tên là `signed_chutich` là để sổ nói dối sau ba tháng.
+    "du_toan_duoi_bien": ("ptgd_doan", "tgd"),
+}
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# CỔNG 15 — CHI NGOÀI DỰ TOÁN: HAI CHỮ KÝ Ở HAI BƯỚC KHÁC NHAU, nên KHÔNG ở bảng trên
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Chủ tịch chốt 11/10/2026: chi ngoài dự toán cần chữ ký TRƯỞNG PHÒNG và TGĐ. Và khi được hỏi
+# chữ ký trưởng phòng là bước nào, Chủ tịch chọn: CHÍNH bước xác nhận bộ phận đã có (`cho_tp`,
+# ghi tên vào ô `tp_by`) — không bắt ai bấm thêm một lần nữa.
+#
+# Nên cổng 15 KHÔNG nằm ở `VAI_KY_CAN`: hai chữ ký của nó không cùng một bước, và bảng trên nói
+# về MỘT bước ký. Đặt nó vào đấy là nói sai cấu trúc của chính nó.
+#
+# ĐIỀU ĐỢT NÀY ĐỔI TRONG MÃ, đúng một vế: trước đây cờ `two_signatures` CỘNG THÊM chữ ký Chủ tịch
+# cho mọi khoản ngoài dự toán, bất kể to nhỏ. Nay nó không cộng nữa; cấp duyệt thuần theo mốc F1.
+#
+# BẢNG SỰ THẬT SAU ĐỢT NÀY, và Chủ tịch đã xem đúng bảng này trước khi chốt:
+#
+#     trong dự toán, dưới mốc : TGĐ
+#     trong dự toán, từ mốc   : Chủ tịch
+#     NGOÀI dự toán, dưới mốc : trưởng phòng (bước `cho_tp`) + TGĐ
+#     NGOÀI dự toán, TỪ MỐC   : trưởng phòng (bước `cho_tp`) + TGĐ + CHỦ TỊCH   ← ba chữ ký
+#
+# Dòng cuối là chỗ Chủ tịch chọn SIẾT chứ không nới: hỏi "khoản 300 triệu ngoài dự toán ai ký",
+# ba lựa chọn đưa ra là (theo mốc → Chủ tịch) / (luôn là TGĐ) / (cả hai), và Chủ tịch chọn CẢ HAI.
+# Nếu không có dòng ấy thì một khoản ngoài dự toán 300 triệu lại nhẹ hơn cùng khoản ấy TRONG dự
+# toán — ngoại lệ dễ hơn lệ thường là chỗ người ta sẽ đi vòng qua.
+
+CAN_CU_VAI_KY = ("Chủ tịch chốt 11/10/2026 – ba cửa chính sách (tham số, đơn giá HDV, giá xe) "
+                 "đi MỘT chữ ký Chủ tịch; quy tắc hạch toán, chế tài mức 3 và dự toán dưới biên "
+                 "giữ HAI chữ ký; luật người trình không tự ký giữ nguyên cho cả sáu")
+
+
+def can_ky(loai: str) -> tuple[str, ...]:
+    """Vai trò phải ký loại hồ sơ này. Gõ sai tên loại là KeyError ngay — cố ý.
+
+    Trả về mặc định (`.get(loai, ("chutich", "tgd"))`) nghe có vẻ an toàn hơn, nhưng nó biến một
+    lỗi gõ phím thành một cửa chạy ÂM THẦM bằng luật không ai khai. Vỡ to còn hơn sai lặng.
+    """
+    return VAI_KY_CAN[loai]
+
+
+# HAI CỘT CHỮ KÝ mà các bảng hồ sơ chính sách đang có. Đây là TRẠNG THÁI của hồ sơ, không phải
+# LUẬT — `VAI_KY_CAN` ở trên mới là luật. Trộn hai thứ làm một chính là cách sáu cửa trước đợt
+# này viết tay `("chutich", "tgd")` vào cả ba chỗ rồi không ai phân biệt được chỗ nào là luật.
+VAI_CO_O_KY = ("chutich", "tgd", "ptgd_doan")
+
+
+def da_ky_cua(ho_so) -> dict[str, str]:
+    """Đọc trạng thái chữ ký từ một hồ sơ, không cần nơi gọi viết tay tên vai nào.
+
+    Không phải bảng nào cũng có đủ ba cột: `tours` có thêm `signed_ptgd_doan` từ Đợt LG2, còn
+    `params`, `guide_rates`, `vehicle_rates` thì không. `getattr(..., False)` đọc cột không có
+    thành RỖNG, và rỗng là đúng: bảng ấy không có chữ ký loại đó thật.
+
+    Trả ĐỦ mọi cột là nói đúng hiện trạng; còn CẦN mấy chữ ký là việc của `can_ky`.
+    `kiem_tra_nguoi_ky` đọc các GIÁ TRỊ của bảng này để bắt một người ký thay hai vai, nên bỏ
+    bớt cột là bỏ luôn phép bắt ấy.
+    """
+    return {v: ("x" if getattr(ho_so, f"signed_{v}", False) else "")
+            for v in VAI_CO_O_KY}
+
+
+def kiem_tra_mot_nguoi_hai_vai(u, da_ky: dict[str, str]) -> None:
+    """CHỈ phép chặn "một người không ký thay cả hai vai" — không kiểm vai, không kiểm người trình.
+
+    VÌ SAO TÁCH RA KHỎI `kiem_tra_nguoi_ky`. Hàm kia kiểm BA thứ cùng lúc, trong đó có "vai này
+    có nằm trong danh sách được ký không". Cửa duyệt đề nghị chi không dùng được vế ấy: vai được
+    ký của nó tính theo TỪNG HỒ SƠ (mốc tiền, ngoài dự toán hay không — xem `ops.cap_duyet`), và
+    Chủ tịch đi qua bằng toàn quyền 06/9/2026 để ký thay cấp TGĐ, lúc ấy vai ông không nằm trong
+    danh sách mà vẫn đúng luật. Gọi hàm kia ở đó là chặn nhầm ông.
+
+    Nên cửa chi gọi hàm này, và vẫn tự giữ phép chặn người-lập-không-tự-ký của riêng nó với lời
+    nhắn nói rõ ai đã lập. Tách một phép kiểm ra khỏi ba phép kiểm thì mỗi chỗ dùng đúng phần nó
+    cần, còn hơn nới lỏng hàm chung cho vừa một chỗ.
+    """
+    ten = getattr(u, "username", "")
+    if ten and ten in da_ky.values():
+        vai_cu = next(v for v, n in da_ky.items() if n == ten)
+        raise HTTPException(422, f"{ten} đã ký hồ sơ này ở vai {ROLES.get(vai_cu, vai_cu)} – "
+                                 "một người không ký thay cả hai vai")
+
+
+def doc_nguoi_da_ky(o: str) -> dict[str, str]:
+    """Đọc ô `nguoi_da_ky` dạng "vai:tên,vai:tên" thành bảng {vai: tên}.
+
+    Một chỗ đọc, một chỗ ghi, để không nơi nào tự tách chuỗi theo kiểu của riêng nó. Ô rỗng —
+    mọi hồ sơ lập trước Đợt LG2 — trả về bảng rỗng, và bảng rỗng nghĩa là KHÔNG BIẾT ai đã ký,
+    chứ không phải chưa ai ký. Phép chặn một-người-hai-vai vì thế không bắt được hồ sơ cũ; nó
+    chỉ bảo vệ từ nay. Nói ra để không ai tưởng hồ sơ cũ cũng đã được soi.
+    """
+    ra: dict[str, str] = {}
+    for phan in (o or "").split(","):
+        phan = phan.strip()
+        if not phan or ":" not in phan:
+            continue
+        vai, ten = phan.split(":", 1)
+        if vai.strip() and ten.strip():
+            ra[vai.strip()] = ten.strip()
+    return ra
+
+
+def ghi_nguoi_da_ky(da_ky: dict[str, str]) -> str:
+    """Ngược của `doc_nguoi_da_ky`. Bỏ ô trống, sắp theo vai để chuỗi ổn định giữa hai lần ghi."""
+    return ",".join(f"{v}:{da_ky[v]}" for v in sorted(da_ky) if da_ky.get(v))
+
+
+def du_chu_ky_cua(loai: str, da_ky: dict[str, str]) -> bool:
+    return du_chu_ky(da_ky, can_ky(loai))
+
+
+def con_thieu_cua(loai: str, da_ky: dict[str, str]) -> list[str]:
+    return con_thieu(da_ky, can_ky(loai))
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# CỬA KÝ KHÔNG GỌI `kiem_tra_nguoi_ky` — KHAI CÓ TÊN, CÓ NGÀY, CÓ NGƯỜI QUYẾT
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Phép thử `test_lg2` quét mọi hàm có ĐẶT chữ ký (`signed_chutich` / `signed_tgd`) và đòi hàm ấy
+# gọi `kiem_tra_nguoi_ky`. Cửa nào cố ý không gọi thì phải có tên ở đây — không có tên là ĐỎ.
+# Nhờ vậy cửa ký thứ bảy mai sau không lặng lẽ mọc ra thiếu lớp kiểm soát.
+KHONG_GOI_KIEM_TRA = {
+    "tours.approve": (
+        "CHUYẾN DƯỚI BIÊN 10%. Chủ tịch quyết 11/10/2026: BIẾT VÀ CHẤP NHẬN, không bịt ở đợt này. "
+        "Lỗ đo được: cửa này chỉ chặn 'vai này đã ký rồi', nên một người giữ CẢ hai tài khoản "
+        "`chutich` và `tgd` ký được cả hai chữ ký cho cùng một chuyến, và người lập dự toán ký "
+        "được chuyến của chính mình. Đo 19/9/2026: 220 tài khoản, SÁU người giữ từ hai tài khoản "
+        "trở lên — nên đây không phải lỗ lý thuyết. Hệ quả: `du_toan_duoi_bien` ở bảng trên ghi "
+        "HAI chữ ký, nhưng hai chữ ký ấy hôm nay chưa chắc là hai NGƯỜI. Bịt lại mất đúng một "
+        "dòng gọi `kiem_tra_nguoi_ky`; để mở là một lựa chọn, không phải một chỗ bỏ sót."),
+    "vietrip.apply_receipts": (
+        "KHÔNG PHẢI CỬA KÝ — là cửa NẠP dữ liệu từ hệ Vietrip, Chủ tịch được nêu 11/10/2026. Nó "
+        "đặt `signed_tgd = True` cho hồ sơ nhập về cùng với `approved_by = \"vietrip\"`, nghĩa là "
+        "chữ ký ấy KHÔNG do ai trong hệ này bấm, và ô `approved_by` nói đúng điều đó cho người "
+        "đọc sổ. Khai ở đây vì phép quét soi theo HÀNH VI — có đặt chữ ký hay không — chứ không "
+        "soi theo ý định; soi theo hành vi là đúng, vì ý định thì không đo được."),
+}
+
+
 def kiem_tra_nguoi_ky(u: User, vai_tro_can: tuple[str, ...], nguoi_trinh: str = "", da_ky: dict[str, str] | None = None) -> None:
     """Ném HTTPException nếu người này không được ký bước hiện tại."""
     da_ky = da_ky or {}

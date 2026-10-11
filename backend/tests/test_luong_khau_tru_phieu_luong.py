@@ -166,27 +166,44 @@ def test_bang_luong_tach_theo_phap_nhan():
 
 # ---------------------------------------------------------------- 4. hai chữ ký
 def test_nguoi_trinh_khong_duoc_ky_de_xuat_cua_chinh_minh():
-    """Chữ ký thứ hai chỉ là một lớp kiểm soát khi nó là một người KHÁC."""
+    """ĐỔI Ở ĐỢT LG2, và đổi vì LUẬT đổi chứ không vì phép thử sai.
+
+    Tham số chính sách đi MỘT chữ ký Chủ tịch từ 11/10/2026, nên TGĐ không còn nằm trong vai ký:
+    bấm ký là 403, không còn là 422 "tự ký hồ sơ mình trình".
+
+    CÂU HỎI CÂU NÀY CANH THÌ KHÔNG ĐỔI — người trình và người ký phải là hai người — nhưng nó
+    hiện ra ở CHỖ KHÁC: Chủ tịch là người ký duy nhất, nên cửa TRÌNH chặn ông ngay, với lời nhắn
+    nhờ người khác trình. Chặn ở cửa trình thay vì để hồ sơ lập ra rồi mới kẹt.
+    """
     r = client.post("/api/v1/params", json={"key": "nguong_bien", "value": "0.12",
                                             "effective_from": str(date.today()), "source": "kiểm thử"},
                     headers=login("tgd"))
     assert r.status_code in (200, 201), r.text
     pid = r.json()["param"]["id"]
-    tu_ky = client.post(f"/api/v1/params/{pid}/sign", headers=login("tgd"))
-    assert tu_ky.status_code == 422 and "không được ký duyệt chính hồ sơ mình trình" in tu_ky.json()["detail"]
+    tgd_ky = client.post(f"/api/v1/params/{pid}/sign", headers=login("tgd"))
+    assert tgd_ky.status_code == 403, "TGD khong con trong vai ky tham so tu 11/10/2026"
     ok = client.post(f"/api/v1/params/{pid}/sign", headers=login("chutich"))
     assert ok.status_code == 200, ok.text
-    assert ok.json()["param"]["status"] == "pending", "mới một chữ ký thì chưa hiệu lực"
-    lap = client.post(f"/api/v1/params/{pid}/sign", headers=login("chutich"))
-    assert lap.status_code == 422 and "đã ký" in lap.json()["detail"]
+    assert ok.json()["param"]["status"] == "active", "mot chu ky Chu tich la du hieu luc"
+    tu_trinh = client.post("/api/v1/params", json={"key": "nguong_bien", "value": "0.13",
+                                                   "effective_from": str(date.today()), "source": "x"},
+                           headers=login("chutich"))
+    assert tu_trinh.status_code == 422, "Chu tich la nguoi ky DUY NHAT nen khong tu trinh duoc"
+    assert "không tự trình được" in tu_trinh.text
 
 
-def test_du_hai_chu_ky_thi_tham_so_moi_hieu_luc():
+def test_mot_chu_ky_chu_tich_thi_tham_so_hieu_luc():
+    """ĐỔI Ở ĐỢT LG2 — tên cũ là `test_du_hai_chu_ky_thi_tham_so_moi_hieu_luc`.
+
+    Đổi tên vì cái tên cũ nói sai luật hiện hành, và người ta tìm luật bằng cách grep tên phép
+    thử. Điều câu này canh vẫn y nguyên: HCNS trình, người KHÁC ký, và chỉ khi đủ chữ ký theo
+    bảng `chu_ky.VAI_KY_CAN` thì tham số mới có hiệu lực.
+    """
     r = client.post("/api/v1/params", json={"key": "sla_booking_phut", "value": "150",
                                             "effective_from": str(date.today()), "source": "kiểm thử 2"},
                     headers=login("hcns"))
     assert r.status_code in (200, 201), r.text
     pid = r.json()["param"]["id"]
-    assert client.post(f"/api/v1/params/{pid}/sign", headers=login("chutich")).json()["param"]["status"] == "pending"
-    cuoi = client.post(f"/api/v1/params/{pid}/sign", headers=login("tgd"))
+    assert client.post(f"/api/v1/params/{pid}/sign", headers=login("tgd")).status_code == 403
+    cuoi = client.post(f"/api/v1/params/{pid}/sign", headers=login("chutich"))
     assert cuoi.json()["param"]["status"] == "active"

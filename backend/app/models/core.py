@@ -1,6 +1,7 @@
 """Mô hình dữ liệu VTOS (SQLAlchemy 2.0)."""
 from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, Text, ForeignKey, JSON
+from sqlalchemy import false as _false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 from app.models.kieu_tien import TIEN
@@ -499,6 +500,19 @@ class Tour(Base):
     approved_by: Mapped[str] = mapped_column(String(50), default="")      # TGĐ / PTGĐ
     signed_chutich: Mapped[bool] = mapped_column(Boolean, default=False)
     signed_tgd: Mapped[bool] = mapped_column(Boolean, default=False)
+    # CHỮ KÝ P.TGĐ TOUR ĐOÀN — Đợt LG2, Chủ tịch chốt 11/10/2026.
+    #
+    # Chuyến dưới biên 10% đổi người ký: Chủ tịch RA KHỎI LUẬT, P.TGĐ tour đoàn VÀO. Luật nằm ở
+    # `chu_ky.VAI_KY_CAN["du_toan_duoi_bien"]`; cột này chỉ là chỗ GHI chữ ký ấy.
+    #
+    # VÌ SAO KHÔNG DÙNG LẠI CỘT `signed_chutich`: nhét chữ ký P.TGĐ vào một cột tên là
+    # `signed_chutich` thì mọi bản kết xuất, mọi báo cáo và mọi lần đọc sổ sau này đều nói sai
+    # tên người ký — và nói sai thì không ai rà ra được, vì nhìn vào thấy hợp lý.
+    #
+    # CỘT CŨ Ở LẠI VÀ VẪN CÓ Ý NGHĨA: chuyến đã ký TRƯỚC 11/10/2026 mang chữ ký Chủ tịch thật,
+    # và bản nâng cấp này KHÔNG dời dữ liệu cũ sang cột mới. Dời là viết lại lịch sử: hôm ấy
+    # Chủ tịch ký, không phải P.TGĐ.
+    signed_ptgd_doan: Mapped[bool] = mapped_column(Boolean, default=False, server_default=_false())
     chairman_run_decision: Mapped[str] = mapped_column(String(200), default="")  # quyết định D-7
     # Quyết toán
     actual_revenue: Mapped[float | None] = mapped_column(TIEN, nullable=True)

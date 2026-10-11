@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta, time
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.core import Tour, Booking, User, Alert
+from app.services import chu_ky as _CK   # bang chu ky, Dot LG2 - nhap o DAU TEP vi require_roles doc no luc nap mo-dun
 from app.models.hr import Employee
 from app.models.ops import DailyReport, PageShift, PaymentRequest
 from app.models.payments import Receipt
@@ -308,11 +309,26 @@ def cap_duyet(db: Session, r: PaymentRequest) -> dict:
                 "can_tgd": False, "can_chutich": False, "ai": "", "ly_do": CHUA_CHOT_NGUONG}
     nguong = float(nguong)
     tren_moc = float(r.amount or 0) >= nguong
-    # `two_signatures` = NGOÀI DỰ TOÁN (cổng 15). Lý do KHÁC với mốc tiền, và CỘNG THÊM vào chứ
-    # không thay thế: một khoản 50 triệu ngoài dự toán vẫn cần cả hai chữ ký, một khoản 300 triệu
-    # trong dự toán chỉ cần Chủ tịch. Trộn hai lý do vào một cờ là mất một trong hai.
+    # `two_signatures` = NGOÀI DỰ TOÁN (cổng 15). Lý do KHÁC với mốc tiền.
+    #
+    # ĐỔI Ở ĐỢT LG2, Chủ tịch chốt 11/10/2026: chi ngoài dự toán cần chữ ký TRƯỞNG PHÒNG và TGĐ,
+    # và chữ ký trưởng phòng CHÍNH LÀ bước xác nhận bộ phận đã có (`cho_tp`, ghi vào ô `tp_by`) —
+    # không bắt ai bấm thêm lần nữa. Nên cờ này KHÔNG còn cộng thêm chữ ký Chủ tịch; nó chỉ còn
+    # giữ TGĐ ở lại kể cả khi khoản nằm trên mốc.
+    #
+    # BẢNG SỰ THẬT SAU ĐỢT NÀY — Chủ tịch đã xem đúng bảng này trước khi chốt:
+    #
+    #     trong dự toán, dưới mốc : TGĐ
+    #     trong dự toán, từ mốc   : Chủ tịch
+    #     NGOÀI dự toán, dưới mốc : trưởng phòng (bước `cho_tp`) + TGĐ
+    #     NGOÀI dự toán, TỪ MỐC   : trưởng phòng + TGĐ + CHỦ TỊCH      ← ba chữ ký
+    #
+    # DÒNG CUỐI LÀ CHỖ CHỦ TỊCH CHỌN SIẾT, KHÔNG NỚI. Câu hỏi đặt ra là "khoản 300 triệu ngoài dự
+    # toán ai ký", ba lựa chọn là (theo mốc → Chủ tịch) / (luôn là TGĐ) / (cả hai), và Chủ tịch
+    # chọn CẢ HAI. Thiếu dòng ấy thì một khoản ngoài dự toán 300 triệu lại NHẸ HƠN cùng khoản ấy
+    # trong dự toán — ngoại lệ dễ hơn lệ thường là chỗ người ta sẽ đi vòng qua.
     can_tgd = bool(r.two_signatures) or not tren_moc
-    can_chutich = bool(r.two_signatures) or tren_moc
+    can_chutich = tren_moc
     ai = " + ".join(t for t in (("Chủ tịch" if can_chutich else ""), ("TGĐ" if can_tgd else "")) if t)
     return {"nguong": nguong, "nguon": nguon, "chua_chot": False, "tren_moc": tren_moc,
             "can_tgd": can_tgd, "can_chutich": can_chutich, "ai": ai, "ly_do": ""}
@@ -557,17 +573,39 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         if (r.created_by or "") == u.username:
             raise ValueError("Người lập không tự ký lệnh chi của chính mình. Hồ sơ này do "
                              f"`{r.created_by}` lập — phải người khác ở cấp duyệt bấm.")
+        # MỘT NGƯỜI KHÔNG KÝ THAY CẢ HAI VAI — Đợt LG2, Chủ tịch chốt 11/10/2026.
+        #
+        # Khoản NGOÀI DỰ TOÁN từ mốc trở lên cần cả TGĐ và Chủ tịch. Trước bản này không chỗ nào
+        # kiểm hai chữ ký ấy có phải hai NGƯỜI: hồ sơ chỉ ghi cờ đã-ký, không ghi tên. Đo
+        # 19/9/2026: 220 tài khoản, SÁU người giữ từ hai tài khoản trở lên — nên một người đăng
+        # nhập lần lượt hai tài khoản là ký đủ. Hàng rào `test_lg2_8` của chính đợt này tìm ra
+        # chỗ hở, sau khi em đã trình Chủ tịch một danh sách SÁU cửa còn thiếu nó.
+        #
+        # Chủ tịch chọn BỊT, với lý do nêu nguyên văn: đây là tiền ra thật.
+        #
+        # Gọi `kiem_tra_mot_nguoi_hai_vai` chứ không gọi `kiem_tra_nguoi_ky`: hàm sau kiểm CẢ vai,
+        # mà vai được ký ở cửa này tính theo từng hồ sơ (`cap_duyet`) và Chủ tịch đi qua bằng
+        # toàn quyền để ký thay cấp TGĐ — lúc ấy vai ông không nằm trong danh sách mà vẫn đúng
+        # luật, nên gọi hàm kia là chặn nhầm ông.
+        _da_ky = _CK.doc_nguoi_da_ky(r.nguoi_da_ky)
+        _CK.kiem_tra_mot_nguoi_hai_vai(u, _da_ky)
         if r.nguong_duyet_ap_dung is None:
             # Hồ sơ cũ: ghi mốc đang áp xuống hồ sơ NGAY LÚC DUYỆT, để lần đọc sau không đổi nữa.
             r.nguong_duyet_ap_dung = cd["nguong"]
+        _vai_ky = ""
         if u.role == "tgd" and cd["can_tgd"]:
+            _vai_ky = "tgd"
             r.signed_tgd = True
         elif toan_quyen(u):
             # Chủ tịch. Trên mốc thì đây LÀ cấp duyệt của khoản; dưới mốc thì ông ký thay cấp TGĐ
             # theo luật toàn quyền 06/9/2026 — ghi vào ô TGĐ vì đó là cấp duyệt của khoản này, còn
             # AI BẤM thì nhật ký kiểm toán ghi tên, nên vẫn truy được trách nhiệm.
-            if cd["can_chutich"]: r.signed_chutich = True
-            else: r.signed_tgd = True
+            if cd["can_chutich"]:
+                _vai_ky = "chutich"
+                r.signed_chutich = True
+            else:
+                _vai_ky = "tgd"
+                r.signed_tgd = True
         else:
             raise ValueError(
                 f"Khoản {float(r.amount or 0):,.0f}đ "
@@ -575,6 +613,12 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
                 + f" {cd['nguong']:,.0f}đ → {cd['ai']} duyệt."
                 + (" Khoản NGOÀI DỰ TOÁN cần cả hai chữ ký (cổng 15)." if r.two_signatures else "")
                 + " Vai của anh/chị không ở cấp duyệt của khoản này.")
+        # Ghi TÊN người vừa ký vào ô `nguoi_da_ky`. Ghi sau khi đặt cờ, và ghi theo vai mà chữ
+        # ký vừa rơi vào — chứ không theo `u.role`: Chủ tịch ký thay cấp TGĐ thì chữ ký nằm ở ô
+        # TGĐ (tiền lệ Đợt F1), và ô này phải nói đúng ô nào đã có tên ai.
+        if _vai_ky:
+            _da_ky[_vai_ky] = u.username
+            r.nguoi_da_ky = _CK.ghi_nguoi_da_ky(_da_ky)
         done = (r.signed_tgd or not cd["can_tgd"]) and (r.signed_chutich or not cd["can_chutich"])
         if done:
             r.status, r.approved_by, r.approved_at = "cho_chi", u.username, datetime.now()
