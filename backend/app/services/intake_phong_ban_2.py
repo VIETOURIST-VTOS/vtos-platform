@@ -224,6 +224,133 @@ def _dk_nap(db: Session, r, boi):
     return f"{v.plate} · hạn {het:%d/%m/%Y}" if het else f"{v.plate} · chưa có hạn"
 
 
+# ====================== ĐỘI XE – HỒ SƠ XE (HX-1, 11/10/2026) ======================
+def _hsx_kiem(db: Session, r):
+    """Hồ sơ xe: biển số phải CÓ SẴN trong danh mục, cửa này KHÔNG tạo xe mới.
+
+    Vì sao không cho tạo xe: một dòng gõ sai biển số sẽ sinh ra chiếc xe thứ 24 trong đội, và từ đó
+    mọi báo cáo công suất chia cho một mẫu số sai mà không ai thấy. Mở xe mới là việc có người ký
+    trên màn hình Hồ sơ xe.
+    """
+    from app.models.hr import Employee
+    from app.services.intake import _so
+    loi, cb = [], []
+    bien = str(r.get("bien_so") or "").strip()
+    v = _xe(db, bien)
+    if v is None:
+        loi.append(f"Không tìm thấy xe của biển '{bien}' trong danh mục – cửa này KHÔNG tạo xe mới")
+        return loi, cb, None
+    ghe = r.get("so_ghe")
+    if ghe not in (None, ""):
+        n = int(_so(ghe))
+        if n <= 0 or n > 100:
+            loi.append(f"Số ghế {n} không hợp lý")
+        elif v.seats and n != v.seats:
+            # Đổi số ghế của một chiếc xe là đổi mẫu số của mọi phép "đủ xe cho tour" đã tính trước
+            # đó. Cho đổi, nhưng nói ra con số cũ – người nạp phải thấy mình đang sửa cái gì.
+            cb.append(f"Số ghế đổi {v.seats} → {n}. Mọi phép tính 'đủ xe cho tour' dùng con số này")
+    else:
+        cb.append("Không ghi số ghế – giữ số đang có, và xe vẫn ở trạng thái CHƯA AI XÁC NHẬN số ghế")
+    khung = str(r.get("so_khung") or "").strip()
+    if khung and v.vin and khung.upper() != v.vin.upper():
+        cb.append(f"Số khung khác số đang có ({v.vin}) – số khung là thứ nhận ra xe cũ khi đổi biển, "
+                  "sửa nó thì phải chắc")
+    the = str(r.get("the_dau_4so") or "").strip()
+    if the:
+        if not the.isdigit() or len(the) != 4:
+            loi.append(f"Bốn số cuối thẻ dầu '{the}' phải là đúng 4 chữ số")
+        elif v.driver_id is None:
+            # Thẻ gắn với TÀI XẾ (quyết định Đợt 2, Chủ tịch giữ nguyên 11/10/2026). Xe chưa gán tài
+            # xế thì KHÔNG có chỗ nào để ghi thẻ – nói ra chứ không lặng lẽ bỏ số ấy đi.
+            cb.append("Xe chưa gán tài xế nên KHÔNG ghi được thẻ dầu: thẻ gắn với người, không gắn "
+                      "với xe. Gán tài xế cho xe rồi nạp lại dòng này")
+        else:
+            e = db.get(Employee, v.driver_id)
+            khac = db.execute(select(Employee).where(Employee.fuel_card_last4 == the,
+                                                     Employee.id != v.driver_id)).scalars().first()
+            if khac is not None:
+                loi.append(f"Bốn số cuối thẻ '{the}' đã gắn cho một người khác – một thẻ một người, "
+                           "nếu không thì tiền dầu gán sang người không dùng thẻ ấy")
+            elif e is not None and e.fuel_card_last4 and e.fuel_card_last4 != the:
+                cb.append(f"Thẻ của tài xế xe này đổi {e.fuel_card_last4} → {the}")
+    return loi, cb, None
+
+
+def _hsx_nap(db: Session, r, boi):
+    from app.models.hr import Employee
+    from app.services.intake import _so
+    v = _xe(db, str(r.get("bien_so") or "").strip())
+    da = []
+    khung = str(r.get("so_khung") or "").strip()
+    if khung:
+        v.vin = khung[:40]; da.append("số khung")
+    may = str(r.get("so_may") or "").strip()
+    if may:
+        v.engine_no = may[:40]; da.append("số máy")
+    ghe = r.get("so_ghe")
+    if ghe not in (None, ""):
+        v.seats = int(_so(ghe))
+        # Ghi NGƯỜI và LÚC cùng lúc với con số: con số không có người xác nhận thì không khác gì
+        # giá trị mặc định, và đó đúng là chỗ hở HX-1 sinh ra để chữa.
+        v.seats_xac_nhan_boi = boi[:50]
+        v.seats_xac_nhan_luc = datetime.now()
+        da.append(f"{v.seats} ghế (xác nhận)")
+    the = str(r.get("the_dau_4so") or "").strip()
+    if the and v.driver_id is not None:
+        e = db.get(Employee, v.driver_id)
+        if e is not None:
+            e.fuel_card_last4 = the[:8]; da.append(f"thẻ dầu …{the} (ghi cho tài xế {e.full_name})")
+    db.flush()
+    return f"{v.plate} · " + (", ".join(da) if da else "không có trường nào để ghi")
+
+
+# ====================== ĐỘI XE – BẢO HIỂM XE (HX-1) ======================
+def _bhx_kiem(db: Session, r):
+    """Cùng khuôn với cửa đăng kiểm: rỗng ngày hết hạn nghĩa là CHƯA BIẾT, không phải còn hạn."""
+    from app.models.fleet import VehicleDocument
+    from app.services.intake import _ngay
+    loi, cb = [], []
+    bien = str(r.get("bien_so") or "").strip()
+    v = _xe(db, bien)
+    if v is None:
+        loi.append(f"Không tìm thấy xe của biển '{bien}'")
+    het = _ngay(r.get("ngay_het_han"))
+    cap = _ngay(r.get("ngay_cap"))
+    if het and cap and het < cap:
+        loi.append("Ngày hết hạn trước ngày cấp")
+    if het is None:
+        cb.append("Chưa có ngày hết hạn – bản ghi này sẽ hiện là 'chưa đủ dữ liệu', không hiện màu xanh")
+    elif het < date.today():
+        cb.append(f"Bảo hiểm đã hết hạn từ {het:%d/%m/%Y}")
+    so = str(r.get("so_giay") or "").strip()
+    trung = None
+    if v is not None and so:
+        trung = db.execute(select(VehicleDocument).where(
+            VehicleDocument.vehicle_id == v.id, VehicleDocument.kind == "bao_hiem",
+            func.upper(VehicleDocument.number) == so.upper())).scalars().first()
+    return loi, cb, (f"{v.plate} · {so}" if trung is not None else None)
+
+
+def _bhx_nap(db: Session, r, boi):
+    from app.models.fleet import VehicleDocument
+    from app.services.intake import _ngay
+    v = _xe(db, str(r.get("bien_so") or "").strip())
+    het = _ngay(r.get("ngay_het_han"))
+    if het is not None:
+        for cu in db.execute(select(VehicleDocument).where(
+                VehicleDocument.vehicle_id == v.id, VehicleDocument.kind == "bao_hiem",
+                VehicleDocument.active == True)).scalars():          # noqa: E712
+            if cu.expires_on is None or cu.expires_on <= het:
+                cu.active = False
+    g = VehicleDocument(vehicle_id=v.id, kind="bao_hiem", number=str(r.get("so_giay") or "").strip()[:60],
+                        issued_on=_ngay(r.get("ngay_cap")), expires_on=het,
+                        source=str(r.get("nguon_giay") or "nạp tệp bảo hiểm xe")[:120],
+                        verify="nguon_ghi", note=str(r.get("ghi_chu") or "").strip()[:300],
+                        created_by=boi)
+    db.add(g); db.flush()
+    return f"{v.plate} · hạn {het:%d/%m/%Y}" if het else f"{v.plate} · chưa có hạn"
+
+
 # ====================== ĐỘI XE – CHI PHÍ CỦA KỲ ======================
 def _cpk_kiem(db: Session, r):
     from app.models.fleet import FleetPeriodCost, NHOM_CHI_PHI_KY
@@ -1012,6 +1139,44 @@ def bo_nap(_c) -> dict:
                     _c("chung_tu", "Chứng từ")],
             "kiem": _bd_kiem, "nap": _bd_nap,
         },
+        "ho_so_xe": {
+            "bang_dich": "vehicles", "phong_ban": "doi_xe",
+            "ten": "Hồ sơ xe – số khung, số máy, số ghế",
+            "mo_ta": "CẬP NHẬT hồ sơ của xe ĐÃ CÓ trong danh mục; cửa này KHÔNG tạo xe mới, vì một "
+                     "dòng gõ sai biển số sẽ sinh ra chiếc xe thứ 24 và từ đó mọi báo cáo công suất "
+                     "chia cho một mẫu số sai. Ghi SỐ GHẾ ở đây là XÁC NHẬN nó: hệ thống lưu luôn ai "
+                     "xác nhận và lúc nào, vì cột số ghế mặc định 45 nên một chiếc chưa ai nhập đọc "
+                     "ra đúng y một chiếc 45 chỗ thật. Bốn số cuối thẻ dầu đọc từ dòng xe nhưng ghi "
+                     "cho TÀI XẾ đang đứng tên xe — thẻ gắn với người, không gắn với xe; xe chưa gán "
+                     "tài xế thì thẻ không có chỗ để và cửa sẽ nói ra.",
+            "khoa_chong_trung": "không có – mỗi lần nạp là một lần cập nhật hồ sơ",
+            "cot": [_c("bien_so", "Biển số xe", True, vi_du="50F-034.71"),
+                    _c("so_khung", "Số khung", vi_du="RLUK88DPKB000334"),
+                    _c("so_may", "Số máy", vi_du="D6CK41E4KCO10133"),
+                    _c("so_ghe", "Số ghế", kieu="so", min=1, vi_du="45",
+                       ghi_chu="ghi vào đây là XÁC NHẬN; để trống thì giữ số cũ và vẫn là chưa xác nhận"),
+                    _c("the_dau_4so", "Bốn số cuối thẻ dầu", vi_du="1753",
+                       ghi_chu="ghi cho TÀI XẾ của xe, không gắn vào xe")],
+            "kiem": _hsx_kiem, "nap": _hsx_nap,
+        },
+        "bao_hiem_xe": {
+            "bang_dich": "vehicle_documents", "phong_ban": "doi_xe",
+            "ten": "Bảo hiểm xe",
+            "mo_ta": "Giấy bảo hiểm xe và hạn của nó. Cùng khuôn với cửa đăng kiểm: ngày hết hạn để "
+                     "rỗng KHÔNG có nghĩa là còn hạn – nó có nghĩa là chưa biết. Nạp giấy mới thì "
+                     "giấy cũ của chính xe đó thôi hiệu lực nhưng KHÔNG bị xóa. GIÁ bảo hiểm không "
+                     "nạp ở đây: nó là TIỀN, đi qua cửa Chi phí kỳ của đội xe, nhóm 'Bảo hiểm xe' – "
+                     "một khoản một cửa, ghi ở hai nơi là có ngày hai nơi nói khác nhau.",
+            "khoa_chong_trung": "Xe + số giấy bảo hiểm",
+            "cot": [_c("bien_so", "Biển số xe", True, vi_du="50F-034.71"),
+                    _c("so_giay", "Số giấy bảo hiểm", True, vi_du="BH-2026-00123"),
+                    _c("ngay_cap", "Ngày cấp", kieu="ngay", vi_du="28/02/2026"),
+                    _c("ngay_het_han", "Ngày hết hạn", kieu="ngay", vi_du="28/02/2027",
+                       ghi_chu="để trống = CHƯA BIẾT, không phải còn hạn"),
+                    _c("nguon_giay", "Nguồn dữ liệu", vi_du="Sheet THEO DÕI CP tháng 6"),
+                    _c("ghi_chu", "Ghi chú")],
+            "kiem": _bhx_kiem, "nap": _bhx_nap,
+        },
         "dang_kiem": {
             "bang_dich": "vehicle_documents", "phong_ban": "doi_xe",
             "ten": "Đăng kiểm xe",
@@ -1329,6 +1494,8 @@ def vai_tro(QUAN_TRI: tuple) -> dict:
         "nhien_lieu":           QUAN_TRI + ("gd_doi_xe", "tp_dh", "nv_dh", "ketoan"),
         "phi_cau_duong":        QUAN_TRI + ("gd_doi_xe", "tp_dh", "nv_dh", "ketoan"),
         "bao_duong":            QUAN_TRI + ("gd_doi_xe", "ketoan"),
+        "ho_so_xe":             QUAN_TRI + ("gd_doi_xe",),
+        "bao_hiem_xe":          QUAN_TRI + ("gd_doi_xe", "ketoan"),
         "dang_kiem":            QUAN_TRI + ("gd_doi_xe",),
         "chi_phi_ky_doi_xe":    QUAN_TRI + ("gd_doi_xe", "ketoan"),
         "bang_lai_xe":          QUAN_TRI + ("gd_doi_xe", "hcns"),
