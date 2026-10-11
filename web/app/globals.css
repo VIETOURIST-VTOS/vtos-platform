@@ -1565,3 +1565,27 @@ html{font-size:var(--vtos-co-chu,16px)}
 /* Một cột khi màn hẹp. Hai ô cạnh nhau dưới 820px thì cột phải của dòng mẫu bị bóp tới mức số
    tiền và hạn xuống dòng giữa chữ — lúc ấy đọc còn chậm hơn một cột. */
 @media (max-width:820px){.blv-luoi{grid-template-columns:1fr}}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   Menu cá nhân trên thanh ngang (components/Shell.tsx) — sửa 12/10/2026.
+
+   CHUYỆN GÌ: `.top .right a{color:#fff}` ở trên tô mọi liên kết góc phải thành trắng, đúng cho
+   thanh điều hướng tối. Nhưng hộp menu xổ xuống đặt nền `--vtos-card`, tức TRẮNG — nên bốn mục
+   trong nó là chữ trắng trên nền trắng. Chữ vẫn ở đó, bấm vẫn chạy, chỉ là không ai nhìn thấy.
+   Chủ tịch bấm nhầm vào khoảng trắng mới phát hiện ra.
+
+   KHÔNG SỬA DÒNG GỐC: nó đang đúng cho mọi liên kết khác đứng trên nền tối. Chỗ sai là cái hộp
+   NỀN SÁNG nằm lọt trong vùng chữ trắng, nên chỗ sửa cũng phải là cái hộp ấy.
+
+   `margin-left:0` để gỡ nốt lề 10px của dòng gốc: lề ấy sinh ra cho các mục nằm NGANG cạnh nhau,
+   rơi vào một danh sách DỌC thì thành bốn dòng thụt vào vô cớ.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.top .right .menu-toi a{color:var(--ink);margin-left:0;display:block;font-weight:600;
+  padding:7px 10px;border-radius:5px;line-height:1.35}
+.top .right .menu-toi a:hover,
+.top .right .menu-toi a:focus-visible{background:var(--panel2);color:var(--ink)}
+/* Mục ĐANG MỞ đánh dấu bằng NỀN, không bằng màu chữ. Bản đầu dùng `color:var(--navy2)` và chính
+   phép đo bắt được: trên nền tối mặc định, xanh #1E63C8 trên thẻ #122C45 chỉ đạt 2,50 : 1 — tức
+   là vừa sửa một chỗ chữ khó đọc vừa đẻ ra một chỗ khác. Nền `--panel2` đổi theo cả hai nền nên
+   nó đúng ở cả hai, và chữ giữ nguyên `--ink` đã đo là đọc được. */
+.top .right .menu-toi a.on{background:var(--panel2);color:var(--ink)}

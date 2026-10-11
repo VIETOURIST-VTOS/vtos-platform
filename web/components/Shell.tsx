@@ -789,7 +789,12 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               <span className="who-ten">{tenVaChuc(user)}</span> ▾
             </button>
             {menuToi && (
-              <span role="menu" onClick={() => setMenuToi(false)}
+              {/* `menu-toi` KHÔNG phải lớp trang trí — nó là thứ duy nhất cứu bốn mục này khỏi vô
+                  hình. Hộp xổ xuống nằm trong `.top .right`, mà `globals.css` tô MỌI liên kết ở
+                  góc ấy thành `color:#fff` cho hợp thanh điều hướng tối; hộp này thì nền sáng
+                  (`--vtos-card`), nên không có lớp riêng là chữ trắng trên nền trắng. Bỏ lớp đi
+                  thì menu vẫn bấm được, vẫn không báo lỗi gì — chỉ là không ai đọc được nó. */}
+              <span role="menu" className="menu-toi" onClick={() => setMenuToi(false)}
                 style={{ position: "absolute", right: 0, top: "100%", zIndex: 40, minWidth: 220,
                          display: "flex", flexDirection: "column", gap: 2,
                          background: "var(--vtos-card)", color: "var(--vtos-text)",
