@@ -29,6 +29,11 @@ CAY = os.path.join(ROOT, "web", "lib", "cay_phan_he.ts")
 SHELL = os.path.join(ROOT, "web", "components", "Shell.tsx")
 CSS = os.path.join(ROOT, "web", "app", "globals.css")
 TRANG = os.path.join(ROOT, "web", "app", "phan-he", "[khoa]", "page.tsx")
+# 11/10/2026 — phần VẼ MỤC LỤC rời khỏi tệp trang, sang components/MucLucPhanHe.tsx: từ hôm nay
+# `/phan-he/<khoa>` mở ra bảng chỉ tiêu của phòng, còn mục lục lùi về `?xem=muc-luc`. Dãy chip
+# chuyển nhanh và cờ "dùng chung" là của MỤC LỤC, nên hai phép thử dưới đây đi theo nó. Luật
+# không đổi một chữ; chỉ đổi chỗ soi, vì soi nhầm chỗ mà vẫn xanh là kiểu hỏng nguy hiểm nhất.
+MUC_LUC = os.path.join(ROOT, "web", "components", "MucLucPhanHe.tsx")
 
 NAM_KHOA = ["kdle", "kddoan", "dhtour", "dhxe", "hdv"]
 
@@ -260,7 +265,7 @@ def test_chip_chuyen_nhanh_thay_cha_bang_con():
     Nếu chip vẫn liệt kê hai phân hệ cha thì người đang đứng ở "Điều hành xe" nhìn xuống không
     thấy chip nào sáng, và bấm chip "Điều hành" lại rơi về mục lục gộp mà menu đã bỏ lối vào.
     """
-    src = _doc(TRANG)
+    src = _doc(MUC_LUC)
     assert "CHIP_PHAN_HE" in src, "phải dựng danh sách chip riêng, không map thẳng CAY_PHAN_HE"
     assert "PHAN_HE_CON" in src, "danh sách chip phải đọc PHAN_HE_CON để thay cha bằng con"
     assert "CHIP_PHAN_HE.map(" in src, "phần vẽ chip phải dùng danh sách đã thay, không dùng cây gốc"
@@ -274,8 +279,8 @@ def test_muc_dung_chung_duoc_noi_ra():
     Không nói thì người sửa tưởng màn hình ấy của riêng phòng mình, sửa xong mới biết phòng bên
     cạnh cũng đổi theo.
     """
-    trang = _doc(TRANG)
-    assert "m.chung" in trang, "trang phải vẽ cờ dùng chung"
+    trang = _doc(MUC_LUC)
+    assert "m.chung" in trang, "mục lục phải vẽ cờ dùng chung"
     assert "dùng chung" in trang, "cờ phải ghi bằng chữ người đọc hiểu được"
     css = _khong_ghi_chu(_doc(CSS))
     assert ".cay-co.chung{" in css, "cờ dùng chung phải có định dạng riêng"

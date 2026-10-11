@@ -304,12 +304,29 @@ def test_muc_tong_quan_dieu_hanh_mang_theo_pham_vi():
 
 
 def test_man_hinh_bao_cao_doc_pham_vi_tu_duong_dan():
-    ma = open(os.path.join(GOC, "web", "app", "bao-cao", "page.tsx"), encoding="utf-8").read()
+    """11/10/2026 — ĐỌC CẢ TỆP TRANG LẪN THÀNH PHẦN, vì mã đã dọn chỗ.
+
+    Luật không đổi một chữ: màn hình báo cáo phải đọc `?pham_vi=` từ đường dẫn, và phạm vi lạ thì
+    rơi về mặc định chứ không để màn hình trống. Đổi là CHỖ Ở của mã: từ hôm nay bảng chỉ tiêu
+    nằm ở `components/BangChiTieuPhong.tsx`, dùng chung cho hai cửa `/bao-cao` và
+    `/phan-he/<khoa>`, nên tệp trang chỉ còn là một cái vỏ.
+
+    Ghép hai tệp lại rồi mới soi, thay vì chỉ đổi sang tệp thành phần: như thế phép thử đúng dù
+    mã nằm ở trang hay ở thành phần, và lần dọn mã sau nó không đỏ oan một lần nữa.
+    """
+    ma = "\n".join(
+        open(os.path.join(GOC, *q), encoding="utf-8").read()
+        for q in (("web", "app", "bao-cao", "page.tsx"),
+                  ("web", "components", "BangChiTieuPhong.tsx")))
     khong_chu_thich = re.sub(r"/\*.*?\*/|//[^\n]*", "", ma, flags=re.S)
     assert 'get("pham_vi")' in khong_chu_thich, "màn hình báo cáo chưa đọc tham số pham_vi"
-    assert not re.search(r"if \(m\.pham_vi\.length\) setPv\(m\.pham_vi\[0\]\.ma\);", khong_chu_thich), \
+    # KHÔNG ghim TÊN BIẾN. Bản đầu của hai dòng dưới đòi đúng chữ `m.pham_vi[...]`, nên hôm
+    # 11/10/2026 đổi tên biến từ `m` sang `meta` lúc dọn mã là phép thử đỏ — trong khi luật nó
+    # canh vẫn đúng nguyên. Một hàng rào đỏ vì tên biến là hàng rào dạy người ta sửa phép thử cho
+    # hết đỏ; nên nó soi PHÉP TÍNH (`pham_vi[0].ma`), không soi cách đặt tên.
+    assert not re.search(r"if \(\w+\.pham_vi\.length\)\s*setPv\(\w+\.pham_vi\[0\]\.ma\);", khong_chu_thich), \
         "vẫn còn dòng luôn kéo phạm vi về Toàn công ty"
-    assert "m.pham_vi[0].ma" in khong_chu_thich, \
+    assert "pham_vi[0].ma" in khong_chu_thich, \
         "phạm vi lạ trong đường dẫn phải rơi về mặc định, không để màn hình trống"
 
 
