@@ -144,6 +144,17 @@ MO_THEO_CONG_TAC: dict[tuple[str, str], str] = {
 GIU_DONG: dict[tuple[str, str], str] = {
 
     # ---- ĐÓNG VĨNH VIỄN – không công tắc nào mở, và lý do không phải là phân quyền ----
+    ("api/v1/routes.py", "propose_param"):
+        "Đợt LG2, Chủ tịch chốt 11/10/2026: tham số chính sách đi MỘT chữ ký Chủ tịch, và luật "
+        "NGƯỜI TRÌNH KHÔNG TỰ KÝ giữ nguyên. Hai điều ấy cộng lại nghĩa là Chủ tịch tự trình một "
+        "tham số thì KHÔNG AI KÝ ĐƯỢC nữa — nên cửa trình chặn ông ngay, kèm lời nhắn nhờ Kế "
+        "toán / HCNS / CNTT trình. Đây là TÁCH BẠCH TRÁCH NHIỆM chứ không phải phân quyền: việc "
+        "trình và việc ký phải là hai người, bất kể hai người ấy to đến đâu, và chính Chủ tịch "
+        "chọn giữ luật ấy khi được hỏi. Mở ra thì một người làm trọn từ đầu đến cuối và ba cửa "
+        "chính sách không còn lớp kiểm soát nào. Chặn này KHÔNG làm ông mất quyền quyết: ông vẫn "
+        "ký, chỉ là không tự trình — và nó TỰ BIẾN MẤT nếu bảng chữ ký đổi lại thành hai vai, vì "
+        "điều kiện có vế `len(can_ky_tham_so) == 1`.",
+
     ("services/chu_ky.py", "kiem_tra_nguoi_ky"):
         "Bộ kiểm chữ ký nhiều vai dùng chung (Phụ lục 27/8/2026 mục 3.2). Ở cửa này Chủ tịch VỐN ĐÃ "
         "nằm trong danh sách được ký – nó không chặn ai vì vai trò. Thứ nó chặn là MỘT NGƯỜI KÝ THAY "

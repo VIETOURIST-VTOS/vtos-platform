@@ -70,9 +70,12 @@ def test_gate1_2_below_margin_needs_justification_then_two_signatures():
     assert post("dh.lan", f"/api/v1/tours/{t['id']}/submit").status_code == 200
     assert post("tgd", f"/api/v1/tours/{t['id']}/approve").status_code == 422          # chưa TP xác nhận
     assert post("tp.dieuhanh", f"/api/v1/tours/{t['id']}/confirm").status_code == 200
-    assert post("ptgd.doan", f"/api/v1/tours/{t['id']}/approve").json()["detail"]["gate"] == "CONG_1"
-    assert "Chờ chữ ký" in post("tgd", f"/api/v1/tours/{t['id']}/approve").json()["message"]
-    assert "Đủ 2 chữ ký" in post("chutich", f"/api/v1/tours/{t['id']}/approve").json()["message"]
+    # ĐỔI Ở ĐỢT LG2: chuyến dưới biên 10% đổi người ký — Chủ tịch RA KHỎI LUẬT, P.TGĐ tour đoàn
+    # VÀO (Chủ tịch chốt 11/10/2026). Câu cũ đòi `ptgd.doan` bị CHẶN ở cổng 1; nay chính ông là
+    # một trong hai người ký. Điều phép thử canh KHÔNG đổi: chuyến dưới biên cần ĐỦ HAI chữ ký
+    # của hai vai khác nhau, và một mình ai cũng không duyệt nổi.
+    assert "Chờ chữ ký" in post("ptgd.doan", f"/api/v1/tours/{t['id']}/approve").json()["message"]
+    assert "Đủ 2 chữ ký" in post("tgd", f"/api/v1/tours/{t['id']}/approve").json()["message"]
     assert tour_by_code("SG-CT-1020")["below_margin"] is True
 
 
@@ -109,11 +112,21 @@ def test_gate6_settlement_one_door_and_flow():
     assert v["status"] == "khoa" and v["settlement"]["eligible"] is False   # quá hạn → không quỹ
 
 
-def test_params_two_signatures():
+def test_params_mot_chu_ky_chu_tich():
+    """ĐỔI Ở ĐỢT LG2 — tên cũ là `test_params_two_signatures`.
+
+    Tham số chính sách đi MỘT chữ ký Chủ tịch từ 11/10/2026. Đổi tên hàm vì cái tên cũ nói sai
+    luật hiện hành, và người ta tìm luật bằng cách `grep` tên phép thử chứ không đọc hết thân hàm.
+
+    HAI ĐIỀU CÂU NÀY VẪN CANH, và chúng là phần không đổi: vai KHÔNG được ký thì nhận 403, và
+    người trình KHÁC người ký — `tp.dieuhanh` trình, Chủ tịch ký.
+    """
     r = post("tp.dieuhanh", "/api/v1/params", {"key": "han_qt_le", "value": "4", "effective_from": "2026-10-01"})
     pid = r.json()["param"]["id"]
     assert post("ketoan", f"/api/v1/params/{pid}/sign").status_code == 403
-    assert "chờ" in post("tgd", f"/api/v1/params/{pid}/sign").json()["message"]
+    assert post("tgd", f"/api/v1/params/{pid}/sign").status_code == 403, (
+        "TGD khong con nam trong luat ky tham so tu 11/10/2026"
+    )
     assert "hiệu lực" in post("chutich", f"/api/v1/params/{pid}/sign").json()["message"]
 
 

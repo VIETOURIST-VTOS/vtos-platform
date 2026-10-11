@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select, desc
 from sqlalchemy.orm import Session
 from app.db.session import get_db
+from app.services import chu_ky as _CK   # bang chu ky, Dot LG2 - nhap o DAU TEP vi require_roles doc no luc nap mo-dun
 from app.api.deps import current_user, require_roles, cong_chan_quyen, loc_theo_nguoi_dung, toan_quyen_ke_ca_tach_bach
 from app.models.core import ROLES, Tour, User, Company
 from app.models.hdv import CHU_TIEN, LOAI_DE_XUAT, QUYET_DINH, TRANG_THAI as YC_TRANG_THAI, TRANG_THAI_BC, TRANG_THAI_DX, TRANG_THAI_UNG, BaoCaoSauTour, BuocDuyetHdv, CauHinhDuyetHdv, DeXuatHdv, TamUngHdv, YeuCauHdv
@@ -1489,19 +1490,23 @@ class GuideRateIn(BaseModel):
 def guide_rate_propose(data: GuideRateIn, u: User = Depends(require_roles("cntt", "hcns", "tp_dh", "tp_hd")), db: Session = Depends(get_db)):
     r = GuideRate(**data.model_dump(), proposed_by=u.username); db.add(r); db.flush()
     R.audit(db, u.username, u.role, "de_xuat_gia_hdv", f"grate:{r.id}", after=data.model_dump(mode="json")); db.commit()
-    return {"message": f"Đã trình đơn giá HDV tuyến {r.route} – chờ Chủ tịch + TGĐ ký"}
+    _ai = " và ".join(ROLES.get(v, v) for v in _CK.can_ky("don_gia_hdv"))
+    return {"message": f"Đã trình đơn giá HDV tuyến {r.route} – chờ {_ai} ký"}
 
 
 @router.post("/guide-rates/{rid}/sign")
-def guide_rate_sign(rid: int, u: User = Depends(require_roles("chutich", "tgd")), db: Session = Depends(get_db)):
-    from app.services import chu_ky as CK
+def guide_rate_sign(rid: int, u: User = Depends(require_roles(*_CK.can_ky("don_gia_hdv"))), db: Session = Depends(get_db)):
+    """ĐỢT LG2: đơn giá HDV đi MỘT chữ ký Chủ tịch (Chủ tịch chốt 11/10/2026). Cửa trình vẫn là
+    CNTT / HCNS / TP Điều hành / TP Hướng dẫn, nên không có chuyện người ký tự trình."""
+    CK = _CK
     r = db.get(GuideRate, rid)
     if not r or r.status != "pending": raise HTTPException(404, "Không có đề xuất chờ ký")
-    CK.kiem_tra_nguoi_ky(u, ("chutich", "tgd"), nguoi_trinh=r.proposed_by,
-                         da_ky={"chutich": "x" if r.signed_chutich else "", "tgd": "x" if r.signed_tgd else ""})
-    if u.role == "chutich": r.signed_chutich = True
-    else: r.signed_tgd = True
-    if r.signed_chutich and r.signed_tgd:
+    can = CK.can_ky("don_gia_hdv")
+    da_ky = CK.da_ky_cua(r)
+    CK.kiem_tra_nguoi_ky(u, can, nguoi_trinh=r.proposed_by, da_ky=da_ky)
+    setattr(r, f"signed_{u.role}", True)
+    da_ky[u.role] = "x"
+    if CK.du_chu_ky(da_ky, can):
         # Chỉ thay bản cũ CÙNG TUYẾN VÀ CÙNG LOẠI TOUR. Thiếu vế loại tour thì một bản giá mới cho
         # đoàn nước ngoài sẽ hạ luôn bản giá khách lẻ cùng tuyến – hai con số khác nhau bị coi là một.
         for old in db.execute(select(GuideRate).where(GuideRate.route == r.route, GuideRate.loai_tour == r.loai_tour, GuideRate.status == "active", GuideRate.id != r.id)).scalars():
@@ -1529,19 +1534,22 @@ class RateIn(BaseModel):
 def rate_propose(data: RateIn, u: User = Depends(require_roles("cntt", "hcns", "tp_dh")), db: Session = Depends(get_db)):
     r = VehicleRate(**data.model_dump(), proposed_by=u.username); db.add(r); db.flush()
     R.audit(db, u.username, u.role, "de_xuat_gia_xe", f"rate:{r.id}", after=data.model_dump(mode="json")); db.commit()
-    return {"message": f"Đã trình giá tuyến {r.route} – chờ Chủ tịch + TGĐ ký"}
+    _ai = " và ".join(ROLES.get(v, v) for v in _CK.can_ky("gia_xe"))
+    return {"message": f"Đã trình giá tuyến {r.route} – chờ {_ai} ký"}
 
 
 @router.post("/vehicle-rates/{rid}/sign")
-def rate_sign(rid: int, u: User = Depends(require_roles("chutich", "tgd")), db: Session = Depends(get_db)):
-    from app.services import chu_ky as CK
+def rate_sign(rid: int, u: User = Depends(require_roles(*_CK.can_ky("gia_xe"))), db: Session = Depends(get_db)):
+    """ĐỢT LG2: giá xe theo tuyến đi MỘT chữ ký Chủ tịch (Chủ tịch chốt 11/10/2026)."""
+    CK = _CK
     r = db.get(VehicleRate, rid)
     if not r or r.status != "pending": raise HTTPException(404, "Không có đề xuất chờ ký")
-    CK.kiem_tra_nguoi_ky(u, ("chutich", "tgd"), nguoi_trinh=r.proposed_by,
-                         da_ky={"chutich": "x" if r.signed_chutich else "", "tgd": "x" if r.signed_tgd else ""})
-    if u.role == "chutich": r.signed_chutich = True
-    else: r.signed_tgd = True
-    if r.signed_chutich and r.signed_tgd:
+    can = CK.can_ky("gia_xe")
+    da_ky = CK.da_ky_cua(r)
+    CK.kiem_tra_nguoi_ky(u, can, nguoi_trinh=r.proposed_by, da_ky=da_ky)
+    setattr(r, f"signed_{u.role}", True)
+    da_ky[u.role] = "x"
+    if CK.du_chu_ky(da_ky, can):
         for old in db.execute(select(VehicleRate).where(VehicleRate.route == r.route, VehicleRate.status == "active", VehicleRate.id != r.id)).scalars():
             if old.effective_from <= r.effective_from: old.status = "rejected"; old.note = (old.note + f" | thay bởi #{r.id}")[:200]
         r.status = "active"

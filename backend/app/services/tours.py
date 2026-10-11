@@ -3,6 +3,7 @@ from datetime import date, datetime
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.core import Tour, User, ServiceRequest, Booking, Alert, AuditLog, ROLES
+from app.services import chu_ky as _CK   # bang chu ky, Dot LG2 - nhap o DAU TEP vi require_roles doc no luc nap mo-dun
 from app.services import rules as R
 from app.services import ghi_mot_lan as GML
 from app.services import accounting as ACC
@@ -349,14 +350,28 @@ def confirm(db: Session, u: User, t: Tour, note: str = "") -> str:
 def approve(db: Session, u: User, t: Tour, note: str = "") -> str:
     if t.status != "cho_duyet": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
     if t.below_margin:
-        if u.role not in ("chutich", "tgd"):
-            raise Gate("CONG_1", "Chuyến dưới biên 10% chỉ Chủ tịch và Tổng giám đốc được ký")
-        if getattr(t, f"signed_{u.role}"): raise Gate("DA_KY", "Đã ký rồi")
-        setattr(t, f"signed_{u.role}", True)
+        # NGƯỜI KÝ ĐỔI, Chủ tịch chốt 11/10/2026: P.TGĐ tour đoàn + TGĐ. Chủ tịch RA KHỎI LUẬT.
+        # Luật nằm ở `chu_ky.VAI_KY_CAN["du_toan_duoi_bien"]`, đọc từ đó chứ không viết tay.
+        #
+        # CHỦ TỊCH VẪN ĐI QUA ĐƯỢC, và đó là một câu khác với "có tên trong luật": toàn quyền
+        # 06/9/2026 cho ông bấm, nhưng bảng chữ ký không kể tên ông nữa. Khi ông bấm, chữ ký ghi
+        # vào ô của vai CÒN THIẾU — đúng tiền lệ Đợt F1 ở `ops.py`: ghi vào ô của CẤP DUYỆT, còn
+        # AI BẤM thì nhật ký kiểm toán ghi tên, nên vẫn truy được trách nhiệm.
+        #
+        # CỬA NÀY VẪN KHÔNG GỌI `chu_ky.kiem_tra_nguoi_ky` — Chủ tịch quyết 11/10/2026 biết và
+        # chấp nhận; xem `chu_ky.KHONG_GOI_KIEM_TRA["tours.approve"]` để biết lỗ ấy là gì.
+        _can = _CK.can_ky("du_toan_duoi_bien")
+        if u.role not in _can and not toan_quyen(u):
+            raise Gate("CONG_1", "Chuyến dưới biên 10% chỉ "
+                       + " và ".join(ROLES.get(v, v) for v in _can) + " được ký")
+        _vai = u.role if u.role in _can else next((v for v in _can if not getattr(t, f"signed_{v}", False)), "")
+        if not _vai: raise Gate("DA_KY", "Đã đủ chữ ký")
+        if getattr(t, f"signed_{_vai}"): raise Gate("DA_KY", "Đã ký rồi")
+        setattr(t, f"signed_{_vai}", True)
         EV(db, t, "ky", u.username, note, title=f"Ký duyệt chuyến dưới biên ({ROLES[u.role]})")
         R.audit(db, u.username, u.role, "ky_duyet_duoi_bien", f"tour:{t.code}", after=snap(t))
-        if t.signed_chutich and t.signed_tgd:
-            t.status, t.approved_by = "da_duyet", "chutich+tgd"
+        if all(getattr(t, f"signed_{v}", False) for v in _can):
+            t.status, t.approved_by = "da_duyet", "+".join(_can)
             R.audit(db, u.username, u.role, "duyet_du_toan_2_chu_ky", f"tour:{t.code}", after=snap(t)); db.commit()
             return "Đủ 2 chữ ký – chuyến được duyệt với cờ 'dưới biên' (không thưởng lẻ, không tính chỉ tiêu)"
         db.commit(); return f"Đã ký ({ROLES[u.role]}). Chờ chữ ký còn lại"
