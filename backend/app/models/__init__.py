@@ -1,4 +1,5 @@
 from app.models.core import *  # noqa
+from app.models.chuong_trinh import *  # noqa
 from app.models.payments import *  # noqa
 from app.models.accounting import *  # noqa
 from app.models.assets import *  # noqa

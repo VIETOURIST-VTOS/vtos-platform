@@ -237,10 +237,10 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       { ma: "4.4", ten: "Điều hành tour", href: "/tours",
         con: [
           { ma: "4.4.1", ten: "Tổng quan chuyến — tab «Thông tin & quy trình»", tab: true },
-          // CHỈ XEM: khối "Chương trình tour (từ sản phẩm)" trên tab Thông tin in nguyên văn chương
-          // trình của SẢN PHẨM. Chưa có lịch trình từng ngày của riêng chuyến, và chưa sửa được theo
-          // chuyến — nên không gọi là xong, cũng không gọi là chưa có gì.
-          { ma: "4.4.2", ten: "Chương trình — chỉ XEM, lấy từ sản phẩm; chưa sửa được theo chuyến",
+          // CT-1 (11/10/2026): chương trình của RIÊNG chuyến, tách khỏi chương trình sản phẩm. Mở một
+          // lần từ sản phẩm rồi sống đời của nó: sản phẩm sửa về sau KHÔNG tự chảy vào chuyến đã mở —
+          // chương trình ấy đã gửi khách rồi. Máy chỉ ĐO lệch và nói ra, không tự vá.
+          { ma: "4.4.2", ten: "Chương trình từng chuyến — tab «Chương trình», sửa theo ngày, có lý do sau khởi hành",
             tab: true },
           { ma: "4.4.3", ten: "Danh sách khách — tab «Booking & thu tiền»", tab: true },
           { ma: "4.4.4", ten: "Dịch vụ — tab «Chi NCC & quyết toán»", tab: true },
