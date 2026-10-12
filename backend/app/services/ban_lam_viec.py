@@ -198,6 +198,24 @@ def _quyet_toan_cho(db: Session) -> dict:
     Gộp hai con số thành một là nói với trưởng phòng rằng anh đang nợ chín bộ hồ sơ trong khi ba
     bộ đã nằm trên bàn người khác.
 
+    VÀ BẢN ĐẦU (BD-1) ĐÃ GỘP ĐÚNG NHƯ THẾ — sửa 12/10/2026, giữ lại vết. Đoạn chú thích ngay
+    trên viết ra điều cấm, rồi dòng `return` ngay dưới lại trả `len(cho_dong) + len(cho_kt)`.
+    Hai dòng mẫu thì tách đúng, nhưng CON SỐ TO — thứ người ta liếc một cái là thấy, và thứ cộng
+    vào tổng "đang chờ" của cả bàn — thì gộp. Đo trên dữ liệu thật ngày 12/10: ô hiện **1663**
+    trong khi việc của riêng Điều hành là **638**; 1025 chuyến còn lại đã nằm trên bàn Kế toán và
+    phòng này không làm gì thêm được. Trưởng phòng mở máy buổi sáng thấy một núi việc gấp hai
+    lần rưỡi sự thật.
+
+    Nay con số của ô là `len(cho_dong)` — ĐÚNG việc của phòng này. Chặng Kế toán vẫn hiện, vì bỏ
+    đi là mất chỗ duy nhất phòng này theo dõi hồ sơ của mình sau khi giao đi; nó hiện thành một
+    DÒNG có ghi rõ "không tính vào ô này". Tên ô đổi theo cho khớp: "Chuyến chờ Điều hành đóng
+    số", không còn là "Quyết toán tour đang chờ" — một cái tên rộng hơn con số nó mang cũng là
+    một cách nói sai, chỉ êm hơn.
+
+    BÀI HỌC GHI LẠI: chú thích nói một đằng, mã làm một nẻo, và không hàng rào nào kêu suốt từ
+    12/10 tới 12/10 vì mọi phép thử đều soi hai DÒNG MẪU chứ không soi CON SỐ của ô. Phép thử
+    `test_bd1_o_quyet_toan_dem_dung_viec_cua_phong_nay` nay soi đúng con số ấy.
+
     MỘT ĐIỀU CÒN THIẾU, GHI RA CHỨ KHÔNG BỊA: bản dựng thử ngày 12/10 có dòng "Kế toán trả lại,
     cần sửa". VTOS hôm nay KHÔNG có trạng thái ấy — `TOUR_STATUS` đi một chiều
     ket_thuc → da_dong_so → kt_xac_nhan → khoa, không có đường lùi nào mang tên "trả lại". Nên ô
@@ -213,17 +231,20 @@ def _quyet_toan_cho(db: Session) -> dict:
     qua_han = [t for t in cho_dong if hom_nay > R.settlement_deadline(db, t)]
     dong = [_dong("Chờ Điều hành đóng số", "", str(len(cho_dong)), "chuyến",
                   "do" if qua_han else ""),
-            _dong("Đã đóng số, chờ Kế toán", "", str(len(cho_kt)), "chuyến")]
+            # KHÔNG tính vào con số của ô, và nói ra bằng CHỮ chứ không để người đọc tự suy.
+            _dong("Đã đóng số, đang ở bàn Kế toán", "không tính vào ô này",
+                  str(len(cho_kt)), "chuyến")]
     if qua_han:
         dong.append(_dong("Trong đó đã quá hạn quyết toán", "", str(len(qua_han)), "chuyến", "do"))
-    return _o("quyet_toan", "Quyết toán tour đang chờ", len(cho_dong) + len(cho_kt), "chuyến",
+    return _o("quyet_toan", "Chuyến chờ Điều hành đóng số", len(cho_dong), "chuyến",
               "/so-con-no",
-              "tours.status = ket_thuc (chờ Điều hành) và da_dong_so (chờ Kế toán); "
-              "hạn quyết toán từ tham số chính sách",
+              "tours.status = ket_thuc — CHỈ chuyến chờ chính phòng này đóng số. "
+              "da_dong_so là dòng theo dõi, KHÔNG cộng vào con số của ô. "
+              "Hạn quyết toán từ tham số chính sách",
               muc="do" if qua_han else ("vang" if cho_dong else "xanh"),
               nhan_muc=("Có chuyến quá hạn" if qua_han
                         else "Cần hoàn thiện hồ sơ" if cho_dong else "Không còn chuyến chờ"),
-              ghi_chu="Theo dõi đến khi hoàn thiện hồ sơ", dong=dong)
+              ghi_chu="Đếm chuyến chờ CHÍNH phòng này đóng số", dong=dong)
 
 
 def _bao_cao_ngay_chua_cham(db: Session, phong_ks: tuple[str, ...]) -> dict:
