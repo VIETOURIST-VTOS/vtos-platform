@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
 import { api, pct, vnd, fmtD, fmtDT, getToken, soTien } from "@/lib/api";
 import { ROLES, TOUR_TYPES, TOUR_STATUS } from "@/lib/meta";
-import { Tag, Gate, errMsg } from "@/components/ui";
+import { Tag, Gate, errMsg, KyO } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
 import QuyetToanForm from "@/components/QuyetToanForm";
 import ChuongTrinhChuyen from "@/components/ChuongTrinhChuyen";
@@ -174,7 +174,10 @@ function TourDetail() {
         {t.status === "nhap" && can("submit") && <><NoteBox /><button className="act teal" onClick={() => run("submit")}>Trình Trưởng phòng Điều hành</button></>}
         {t.status === "cho_xac_nhan" && <><p>Chờ Trưởng phòng Điều hành xác nhận.</p>{can("confirm") && <><NoteBox /><button className="act teal" onClick={() => run("confirm")}>Xác nhận dự toán</button></>}</>}
         {t.status === "cho_duyet" && (t.below_margin ? <>
-          <p>Chuyến dưới biên – cần đủ 2 chữ ký: Chủ tịch {t.signed_chutich ? "✔" : "…"} · TGĐ {t.signed_tgd ? "✔" : "…"}</p>
+          {/* Trước Đợt VA-WEB4 dòng này viết cứng "Chủ tịch · TGĐ" và đếm cứng "2 chữ ký".
+              Cả hai đều sai từ 11/10/2026: luật `du_toan_duoi_bien` là (P.TGĐ tour đoàn, TGĐ).
+              Nay cả người ký lẫn số chữ ký đều đọc từ danh sách máy chủ gửi về. */}
+          <p>Chuyến dưới biên – cần đủ chữ ký theo luật: <KyO ky={t.chu_ky_duoi_bien} /></p>
           <div className="gate"><b>Giải trình:</b> {t.justification}</div>
           {can("sign") && <><NoteBox /><button className="act orange" onClick={() => run("approve")}>Ký duyệt ({user?.role_name})</button></>}
         </> : <><p>Chờ <b>{ROLES[t.approver_role]}</b> duyệt.</p>{can("approve") && <><NoteBox /><button className="act teal" onClick={() => run("approve")}>Duyệt dự toán</button></>}</>)}

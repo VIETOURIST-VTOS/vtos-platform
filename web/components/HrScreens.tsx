@@ -12,7 +12,7 @@ import { BangChamDiem } from "@/components/DanhGiaNhanSu";
 import BienDongNhanSu from "@/components/BienDongNhanSu";
 import DinhKem from "@/components/DinhKem";
 import { api, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
-import { Tag, errMsg } from "@/components/ui";
+import { Tag, errMsg, KyO, tenKy } from "@/components/ui";
 
 /** Visa, HDV & phân chuyến, Đội xe là nghiệp vụ của Điều hành (Đề xuất 06/9/2026 mục 2) nên nằm ở trang
  *  /ops với quyền của Điều hành; Nhân sự giữ hồ sơ lao động, lương và sự vụ. Cùng một màn hình, hai lối vào. */
@@ -545,17 +545,17 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         <tbody>{asg.map((a) => <tr key={a.id}><td><b>{a.tour_code}</b><div className="muted">{a.tour_name}</div></td><td>{a.guide}</td><td>{a.days} × {vnd(a.rate_per_day)}{a.holiday && " ×2"}</td><td style={{ textAlign: "right" }}>{vnd(a.amount)}</td>
           <td>{a.status === "da_xac_nhan" ? <Tag cls="ok">HDV đã xác nhận</Tag> : a.status === "huy" ? <Tag cls="red">Hủy</Tag> : <Tag cls="warn">Chờ xác nhận 24h</Tag>}</td><td>{a.report_submitted ? "✔" : <Tag cls="warn">thiếu → treo</Tag>}</td><td>{a.advance_settled ? "✔" : <Tag cls="warn">chưa → treo</Tag>}</td><td className="muted">{a.assigned_by} {fmtDT(a.assigned_at)}</td>
           {canDH && <td>{a.status === "cho_xac_nhan" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/guide-assignments/${a.id}/update`, { confirm: true })}>HDV xác nhận</button>}{!a.report_submitted && <button className="act grey" style={{ margin: "0 0 0 4px" }} onClick={() => post(`/guide-assignments/${a.id}/update`, { report_submitted: true })}>Đã nộp báo cáo</button>}</td>}</tr>)}</tbody></table></div>
-      <h2>Bảng giá thù lao HDV theo tuyến (đồng/ngày, lễ Tết ×2) – Chủ tịch + TGĐ ký, hiệu lực theo ngày</h2>
+      <h2>Bảng giá thù lao HDV theo tuyến (đồng/ngày, lễ Tết ×2) – {tenKy(grates[0]?.ten_vai_ky) || "người ký theo luật"} ký, hiệu lực theo ngày</h2>
       {["hcns", "cntt", "tp_dh"].includes(role) && <div className="panel"><div className="grid">
         <label>Tuyến<input value={fGrate.route} onChange={(e) => setFGrate({ ...fGrate, route: e.target.value })} /></label>
         <label>Số ngày<input type="number" step="0.5" value={fGrate.days} onChange={(e) => setFGrate({ ...fGrate, days: e.target.value })} /></label>
         <label>Đơn giá mới/ngày<input type="number" value={fGrate.rate_per_day} onChange={(e) => setFGrate({ ...fGrate, rate_per_day: e.target.value })} /></label>
         <label>Đơn giá cũ (đối chiếu)<input type="number" value={fGrate.old_rate_per_day} onChange={(e) => setFGrate({ ...fGrate, old_rate_per_day: e.target.value })} /></label>
         <label>Hiệu lực từ<input type="date" value={fGrate.effective_from} onChange={(e) => setFGrate({ ...fGrate, effective_from: e.target.value })} /></label>
-      </div><button className="act orange" disabled={!fGrate.route || !fGrate.rate_per_day} onClick={() => post("/guide-rates", { ...fGrate, days: Number(fGrate.days) || 0, rate_per_day: Number(fGrate.rate_per_day), old_rate_per_day: Number(fGrate.old_rate_per_day) || 0 }).then((r) => r && setFGrate({ ...fGrate, route: "", days: "", rate_per_day: "", old_rate_per_day: "" }))}>Trình Chủ tịch + TGĐ</button></div>}
+      </div><button className="act orange" disabled={!fGrate.route || !fGrate.rate_per_day} onClick={() => post("/guide-rates", { ...fGrate, days: Number(fGrate.days) || 0, rate_per_day: Number(fGrate.rate_per_day), old_rate_per_day: Number(fGrate.old_rate_per_day) || 0 }).then((r) => r && setFGrate({ ...fGrate, route: "", days: "", rate_per_day: "", old_rate_per_day: "" }))}>Trình {tenKy(grates[0]?.ten_vai_ky) || "người ký theo luật"}</button></div>}
       <div className="panel wrap"><table><thead><tr><th>Tuyến</th><th>Số ngày</th><th style={{ textAlign: "right" }}>Giá cũ</th><th style={{ textAlign: "right" }}>Giá mới/ngày</th><th style={{ textAlign: "right" }}>Chênh lệch</th><th>Hiệu lực</th><th>Trạng thái</th><th>Ghi chú</th>{["chutich", "tgd"].includes(role) && <th></th>}</tr></thead>
         <tbody>{grates.map((r) => <tr key={r.id} style={{ opacity: r.status === "rejected" ? 0.5 : 1 }}><td><b>{r.route}</b></td><td>{r.days}</td><td style={{ textAlign: "right" }}>{vnd(r.old_rate_per_day)}</td><td style={{ textAlign: "right" }}><b>{vnd(r.rate_per_day)}</b></td><td style={{ textAlign: "right" }}>{vnd(r.rate_per_day - r.old_rate_per_day)}</td><td>{fmtD(r.effective_from)}</td>
-          <td>{r.status === "active" ? <Tag cls="ok">Hiệu lực</Tag> : r.status === "pending" ? <Tag cls="warn">{r.signed_chutich ? "CT ✔ " : ""}{r.signed_tgd ? "TGĐ ✔ " : ""}chờ ký</Tag> : <Tag>Hết hiệu lực</Tag>}</td><td className="muted">{r.note}</td>
+          <td>{r.status === "active" ? <Tag cls="ok">Hiệu lực</Tag> : r.status === "pending" ? <KyO ky={r.chu_ky} /> : <Tag>Hết hiệu lực</Tag>}</td><td className="muted">{r.note}</td>
           {["chutich", "tgd"].includes(role) && <td>{r.status === "pending" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/guide-rates/${r.id}/sign`)}>Ký</button>}</td>}</tr>)}</tbody></table></div>
     </>}
 
@@ -599,17 +599,17 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
               <button className={v.active ? "act red" : "act"} style={{ margin: "0 0 0 6px" }} onClick={() => { if (!v.active || confirm(`Ngưng khai thác xe ${v.plate}? Xe vẫn được giữ để tra cứu lệnh điều xe cũ.`)) post(`/vehicles/${v.id}`, { active: !v.active }, "PUT"); }}>{v.active ? "Ngưng" : "Mở lại"}</button>
             </td>}</tr>)}</tbody></table>
         <p className="muted">Pháp nhân sở hữu lấy theo <b>giấy đăng ký xe</b>, không suy từ việc xe là xe nội bộ hay thuê ngoài: hiện phần lớn đội xe đứng tên Công ty CP Vietourist Holdings, chỉ một xe đứng tên Vận tải Vietrip. <b>Tài xế hưởng lương ở công ty mẹ</b> dù xe đứng tên pháp nhân nào. Xe thuộc pháp nhân trong phạm vi hợp nhất (mẹ, con, chi nhánh) thì lệnh điều xe là <b>giao dịch nội bộ</b> – phải nhận diện để loại trừ khi lập báo cáo hợp nhất. Xe hợp tác là xe thuê ngoài, không gán pháp nhân trong tập đoàn.</p></div>
-      <h2>Bảng giá xe nội bộ theo tuyến (Chủ tịch + TGĐ duyệt, hiệu lực theo ngày)</h2>
+      <h2>Bảng giá xe nội bộ theo tuyến ({tenKy(rates[0]?.ten_vai_ky) || "người ký theo luật"} duyệt, hiệu lực theo ngày)</h2>
       {["cntt", "hcns", "tp_dh"].includes(role) && <div className="panel"><div className="grid">
         <label>Tuyến<input value={fRate.route} onChange={(e) => setFRate({ ...fRate, route: e.target.value })} /></label>
         <label>Số ngày<input type="number" value={fRate.days} onChange={(e) => setFRate({ ...fRate, days: e.target.value })} /></label>
         <label>Giá xe Vietrip – VTD<input type="number" value={fRate.internal_price} onChange={(e) => setFRate({ ...fRate, internal_price: e.target.value })} /></label>
         <label>Giá xe hợp tác<input type="number" value={fRate.partner_price} onChange={(e) => setFRate({ ...fRate, partner_price: e.target.value })} /></label>
         <label>Hiệu lực từ<input type="date" value={fRate.effective_from} onChange={(e) => setFRate({ ...fRate, effective_from: e.target.value })} /></label>
-      </div><button className="act orange" disabled={!fRate.route || !fRate.internal_price} onClick={() => post("/vehicle-rates", { ...fRate, days: Number(fRate.days) || 0, internal_price: Number(fRate.internal_price), partner_price: Number(fRate.partner_price) || 0 }).then((r) => r && setFRate({ ...fRate, route: "", days: "", internal_price: "", partner_price: "" }))}>Trình Chủ tịch + TGĐ</button></div>}
+      </div><button className="act orange" disabled={!fRate.route || !fRate.internal_price} onClick={() => post("/vehicle-rates", { ...fRate, days: Number(fRate.days) || 0, internal_price: Number(fRate.internal_price), partner_price: Number(fRate.partner_price) || 0 }).then((r) => r && setFRate({ ...fRate, route: "", days: "", internal_price: "", partner_price: "" }))}>Trình {tenKy(rates[0]?.ten_vai_ky) || "người ký theo luật"}</button></div>}
       <div className="panel wrap"><table><thead><tr><th>Tuyến</th><th>Ngày</th><th style={{ textAlign: "right" }}>Xe Vietrip – VTD</th><th style={{ textAlign: "right" }}>Xe hợp tác</th><th>Hiệu lực</th><th>Trạng thái</th><th>Chữ ký</th>{["chutich", "tgd"].includes(role) && <th></th>}</tr></thead>
         <tbody>{rates.map((r) => <tr key={r.id} style={{ opacity: r.status === "rejected" ? 0.5 : 1 }}><td><b>{r.route}</b></td><td>{r.days || "–"}</td><td style={{ textAlign: "right" }}>{vnd(r.internal_price)}</td><td style={{ textAlign: "right" }}>{r.partner_price ? vnd(r.partner_price) : "–"}</td><td>{fmtD(r.effective_from)}</td>
-          <td><Tag cls={r.status === "active" ? "ok" : r.status === "pending" ? "warn" : ""}>{r.status === "active" ? "Hiệu lực" : r.status === "pending" ? "Chờ ký" : "Hết hiệu lực"}</Tag></td><td>CT {r.signed_chutich ? "✔" : "…"} · TGĐ {r.signed_tgd ? "✔" : "…"}</td>
+          <td><Tag cls={r.status === "active" ? "ok" : r.status === "pending" ? "warn" : ""}>{r.status === "active" ? "Hiệu lực" : r.status === "pending" ? "Chờ ký" : "Hết hiệu lực"}</Tag></td><td><KyO ky={r.chu_ky} /></td>
           {["chutich", "tgd"].includes(role) && <td>{r.status === "pending" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/vehicle-rates/${r.id}/sign`)}>Ký</button>}</td>}</tr>)}</tbody></table></div>
       <p className="muted">Bảng giá 6/5/2026 (anh Tuấn cung cấp 05/9/2026); cột xe hợp tác áp dụng từ 5/8/2026 cho 50E-955.31, 50H-496.23. Đội xe Vietrip hạch toán riêng như trung tâm lợi nhuận; lệnh điều xe lấy giá theo tuyến và loại xe; tuyến không có trong bảng → giá theo ngày ở hồ sơ xe. Quyết toán tháng do CNTT/AI.</p>
     </>}

@@ -719,7 +719,11 @@ def cancel_retention(rid: int, data: S.ActionNote, u: User = Depends(current_use
 # ---------- params ----------
 def param_out(p: Param) -> dict:
     return {"id": p.id, "key": p.key, "value": p.value, "label": p.label, "unit": p.unit, "effective_from": p.effective_from, "source": p.source,
-            "status": p.status, "signed_chutich": p.signed_chutich, "signed_tgd": p.signed_tgd, "proposed_by": p.proposed_by, "created_at": p.created_at}
+            "status": p.status, "signed_chutich": p.signed_chutich, "signed_tgd": p.signed_tgd, "proposed_by": p.proposed_by, "created_at": p.created_at,
+            # Đợt VA-WEB4 12/10/2026 — MÀN HÌNH ĐỌC LUẬT Ở ĐÂY. Hai cột `signed_*` ở trên là
+            # TRẠNG THÁI thô và vẫn giữ (nơi khác đang đọc); `chu_ky` là trạng thái ĐÃ LỌC theo
+            # luật, nên màn hình không còn phải tự biết tham số cần mấy chữ ký của ai.
+            "chu_ky": _CK.chu_ky_de_hien("tham_so", p), "ten_vai_ky": _CK.ten_vai_ky("tham_so")}
 
 
 @router.get("/params", tags=["params"])

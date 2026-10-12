@@ -1467,16 +1467,21 @@ def vehicle_update(vid: int, data: VehicleUpdate, u: User = Depends(require_role
     return {"message": f"Đã cập nhật xe {v.plate}"}
 
 
-# ---------- Bảng giá xe nội bộ (master data, Chủ tịch + TGĐ duyệt) ----------
+# ---------- Bảng giá xe nội bộ (master data, người ký đọc từ `VAI_KY_CAN["gia_xe"]`) ----------
+# Dòng trên trước Đợt VA-WEB4 viết "Chủ tịch + TGĐ duyệt" — đã sai từ 11/10/2026 mà không ai
+# thấy, vì một chú thích không có phép thử nào canh. Nay nó trỏ về bảng luật thay vì chép lại.
 def rate_out(r: VehicleRate) -> dict:
     return {"id": r.id, "route": r.route, "days": r.days, "internal_price": r.internal_price, "partner_price": r.partner_price, "effective_from": r.effective_from,
-            "status": r.status, "signed_chutich": r.signed_chutich, "signed_tgd": r.signed_tgd, "note": r.note, "proposed_by": r.proposed_by}
+            "status": r.status, "signed_chutich": r.signed_chutich, "signed_tgd": r.signed_tgd, "note": r.note, "proposed_by": r.proposed_by,
+            "chu_ky": _CK.chu_ky_de_hien("gia_xe", r), "ten_vai_ky": _CK.ten_vai_ky("gia_xe")}
 
 
 # ---------- Bảng giá HDV theo tuyến ----------
 def grate_out(r: GuideRate) -> dict:
     return {"id": r.id, "route": r.route, "loai_tour": r.loai_tour, "days": r.days, "rate_per_day": r.rate_per_day, "old_rate_per_day": r.old_rate_per_day, "effective_from": r.effective_from,
-            "status": r.status, "signed_chutich": r.signed_chutich, "signed_tgd": r.signed_tgd, "note": r.note, "proposed_by": r.proposed_by}
+            "status": r.status, "signed_chutich": r.signed_chutich, "signed_tgd": r.signed_tgd, "note": r.note, "proposed_by": r.proposed_by,
+            # Đợt VA-WEB4 12/10/2026 — xem chú thích ở `chu_ky.chu_ky_de_hien`.
+            "chu_ky": _CK.chu_ky_de_hien("don_gia_hdv", r), "ten_vai_ky": _CK.ten_vai_ky("don_gia_hdv")}
 
 
 @router.get("/guide-rates")

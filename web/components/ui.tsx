@@ -13,3 +13,28 @@ export const MangTag = ({ mang }: { mang: string }) => {
   return <p className="muted">Đang lọc theo mảng <b>{ten}</b>. Tour đoàn nhận theo loại chuyến hoặc mã bắt đầu
     bằng MICE; bỏ tham số <code>mang</code> trên đường dẫn để xem tất cả.</p>;
 };
+
+/** CỘT CHỮ KÝ — Đợt VA-WEB4, 12/10/2026. MỘT thành phần cho cả bốn màn hình chính sách.
+ *
+ *  Nó KHÔNG nhận tên vai từ nơi gọi, và đó là cả nội dung của đợt này. Trước hôm nay bốn màn
+ *  hình gõ tay `"CT … · TGĐ …"`; Đợt LG2 (11/10/2026) đổi ba cửa sang một chữ ký Chủ tịch và
+ *  đổi `VAI_KY_CAN` theo, nhưng bốn chỗ gõ tay ấy không ai đổi. Hậu quả đo được trên
+ *  production ngày 12/10: một dòng tham số đã đủ ký, đang có hiệu lực, hiện ra là "TGĐ …".
+ *
+ *  Danh sách truyền vào do `chu_ky.chu_ky_de_hien` dựng từ bảng luật. Thêm hay bớt người ký
+ *  thì sửa đúng một chỗ trong mã nghiệp vụ, bốn màn hình tự đúng theo.
+ *
+ *  RỖNG KHÔNG PHẢI "KHÔNG CẦN KÝ" (luật K2): danh sách rỗng là MÁY CHỦ CHƯA GỬI — bản web mới
+ *  gặp bản máy chủ cũ. Hiện "—" chứ không hiện "đủ ký", vì nói "đủ ký" lúc không biết gì là
+ *  đúng loại lỗi mà đợt này đi sửa.
+ */
+export type ChuKyMot = { vai: string; ten: string; da_ky: boolean };
+export const KyO = ({ ky }: { ky?: ChuKyMot[] | null }) => {
+  if (!ky || !ky.length) return <span className="muted">—</span>;
+  const thieu = ky.filter((k) => !k.da_ky).length;
+  return <>{ky.map((k, i) => <span key={k.vai}>{i ? " · " : ""}{k.ten} {k.da_ky ? "✔" : "…"}</span>)}
+    {thieu > 0 && <> <Tag cls="warn">chờ {thieu} chữ ký</Tag></>}</>;
+};
+
+/** Tên người ký cho tiêu đề và nút Trình. Rỗng trả về chuỗi rỗng để nơi gọi tự chọn câu thay. */
+export const tenKy = (ky?: string[] | null) => (ky && ky.length ? ky.join(" + ") : "");
