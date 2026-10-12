@@ -90,19 +90,65 @@ export default function BanLamViecPhong({ phong }: { phong: string }) {
   const { toast } = useShell();
   const [d, setD] = useState<Ban | null>(null);
   const [xong, setXong] = useState(false);
+  // HỎNG PHẢI NÓI RA ĐƯỢC — 12/10/2026. Xem khối giải thích ở nhánh dựng hình bên dưới.
+  const [loi, setLoi] = useState("");
+  const [lan, setLan] = useState(0);
 
   useEffect(() => {
     let song = true;
+    setXong(false);
+    setLoi("");
     api<Ban>(`/bao-cao/ban-lam-viec?phong=${encodeURIComponent(phong)}`)
       .then((r) => { if (song) { setD(r); setXong(true); } })
       // Bàn hỏng KHÔNG được chặn bảng chỉ tiêu bên dưới: trang vẫn dựng tiếp, chỉ mất phần bàn.
-      .catch((e) => { if (song) { setXong(true); toast(errMsg(e), true); } });
+      // Nhưng "mất phần bàn" phải THẤY ĐƯỢC, nên lỗi vào `loi` chứ không chỉ vào một lời nhắc
+      // thoáng qua: lời nhắc tắt sau vài giây, còn người mở trang sau đó thì không thấy gì cả.
+      .catch((e) => { if (song) { setXong(true); setLoi(errMsg(e)); toast(errMsg(e), true); } });
     return () => { song = false; };
-  }, [phong, toast]);
+  }, [phong, toast, lan]);
 
   if (!xong) return <p className="muted">Đang gom việc cần làm…</p>;
+
+  /* HỎNG KHÁC VỚI CHƯA KHAI, VÀ HAI THỨ ẤY TỪNG TRÔNG Y HỆT NHAU.
+   *
+   * Bản đầu (BD-1) trả `null` cho CẢ HAI trường hợp: đọc cửa hỏng, và phòng chưa ai dựng hàng
+   * đợi. Trường hợp thứ hai trả `null` là ĐÚNG và giữ nguyên — vẽ một cái bàn trống thì trông y
+   * hệt "hôm nay không có việc gì", mà sự thật là chưa ai dựng hàng đợi cho phòng ấy.
+   *
+   * Trường hợp thứ nhất trả `null` là SAI, và sai đúng theo kiểu điều 1 của tệp này đã cấm ở
+   * cấp độ MỘT Ô: số 0 không được lẫn với lỗi. Ở cấp độ CẢ BÀN thì luật ấy bị quên — một lần đọc
+   * hỏng làm cả khối biến mất, trưởng phòng mở trang thấy thẳng bảng chỉ tiêu và không có cách
+   * nào biết là hôm nay hệ thống không đọc được việc của mình. Lời nhắc có bắn, nhưng nó tắt sau
+   * vài giây và không bắn lại cho người mở trang muộn hơn.
+   *
+   * NHÁNH NÀY PHẢI ĐỨNG TRƯỚC nhánh `co_ban` ngay dưới: lúc đọc hỏng thì `d` là null, nên nếu
+   * `if (!d || !d.co_ban) return null` chạy trước thì nó nuốt mất cả trường hợp hỏng và khối này
+   * không bao giờ hiện. `test_bd1_ban_hong_phai_noi_ra_chu_khong_bien_mat` canh đúng thứ tự ấy.
+   */
+  if (loi) {
+    return (
+      <section className="blv blv-khong-doc-duoc" aria-label="Không đọc được việc cần làm">
+        <div className="blv-tieu-de">
+          <div>
+            <h2>Việc cần làm</h2>
+            <p className="muted">Không đọc được hàng đợi của phòng lúc này.</p>
+          </div>
+          <button className="act grey" style={{ margin: 0 }} onClick={() => setLan((n) => n + 1)}>
+            Thử lại
+          </button>
+        </div>
+        <p className="muted blv-ghi">
+          Màn hình <b>không hiện con số nào</b> thay vì hiện 0 — một bàn trống trông y hệt “hôm nay
+          không có việc gì”, và đó là điều duy nhất chắc chắn sai lúc này. Lý do: {loi}. Bảng chỉ
+          tiêu bên dưới <b>không bị ảnh hưởng</b>, nó đọc một cửa khác.
+        </p>
+      </section>
+    );
+  }
+
   // Phòng chưa khai bàn thì KHÔNG vẽ một cái bàn trống: bàn trống trông y hệt "hôm nay không có
-  // việc gì", mà sự thật là chưa ai dựng hàng đợi cho phòng ấy.
+  // việc gì", mà sự thật là chưa ai dựng hàng đợi cho phòng ấy. Đây là VẮNG MẶT CÓ CHỦ Ý, khác
+  // hẳn với đọc hỏng ở trên — im lặng ở đây là đúng, im lặng ở trên là giấu một cái hỏng.
   if (!d || !d.co_ban) return null;
 
   return (
