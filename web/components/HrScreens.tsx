@@ -105,6 +105,14 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const [rates, setRates] = useState<any[]>([]);
   const [fRate, setFRate] = useState<any>({ route: "", days: "", internal_price: "", partner_price: "", effective_from: new Date().toISOString().slice(0, 10) });
   const [fInc, setFInc] = useState<any>({ employee_id: "", level: "2", description: "", occurred_on: new Date().toISOString().slice(0, 10) });
+  // SỬA HỒ SƠ — 12/10/2026. Cửa `PUT /employees/{id}` đã có đủ từ lâu (nhận mọi trường, kiểm
+  // phiên bản, tự ghi lịch sử điều chuyển), nhưng màn hình chỉ gọi nó đúng một kiểu — gửi
+  // {họ tên, phòng, active} để bấm Ngưng / Mở lại. Có biểu TẠO, không có biểu SỬA. Hệ quả: một
+  // số điện thoại gõ sai hay một chức danh sai thì không màn hình nào chữa được, phải nhờ người
+  // gọi thẳng vào máy chủ. Đúng cái ranh giới 09/9 cấm: con số mà người phụ trách không tự nhập
+  // được là con số sẽ sai và ở yên đó.
+  const [sua, setSua] = useState<any>(null);
+  const [dc, setDc] = useState<any>({ tu_ngay: "", ly_do: "" });
   const canHR = ["hcns", "cntt"].includes(role), canDH = ["nv_dh", "tp_dh", "hcns", "cntt"].includes(role);
 
   const load = useCallback(async () => {
@@ -469,6 +477,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         <table><thead><tr><th>Tài khoản</th><th>Họ tên</th><th>Mã NV</th><th>Vai trò</th><th></th></tr></thead>
           <tbody>{khoa.map((k) => <tr key={k.id}><td className="mono">{k.username}</td><td>{k.full_name}</td><td className="mono">{k.staff_code}</td><td>{k.role_name}</td>
             <td><button className="act" style={{ margin: 0 }} onClick={() => post(`/users/${k.id}`, { active: true }, "PUT").then(() => api("/users/khoa").then(setKhoa))}>Mở lại</button></td></tr>)}</tbody></table></div>}
+      {sua && <SuaHoSo sua={sua} setSua={setSua} dc={dc} setDc={setDc} meta={meta} post={post} />}
       <div className="panel wrap"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Phòng</th><th>Nhóm</th><th>Chức vụ</th><th>VP</th><th>HĐ</th><th>Pháp nhân</th><th style={{ textAlign: "right" }}>Lương CV</th><th>Công việc chính</th><th>Ngày sinh</th><th>Điện thoại</th><th>Thẻ HDV</th><th>Trạng thái</th>{canHR && <th></th>}</tr></thead>
         <tbody>{emps.map((e) => <tr key={e.id} style={{ opacity: e.active ? 1 : 0.55 }}><td className="mono">{e.code}</td><td><b>{e.full_name}</b></td><td>{e.department_name}</td><td>{e.sales_group}</td><td>{e.title || e.position_name}</td><td>{e.office_name}</td><td>{e.contract_type === "hdld" ? "HĐLĐ" : e.contract_type === "ctv" ? "CTV" : "Đối tác"}</td>
           {/* Pháp nhân chủ quản của TỪNG nhân sự. Trước 09/9/2026 ô này chỉ có ở bảng hướng dẫn viên và
@@ -489,7 +498,9 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
           {canHR && <td>{e.active
             ? <button className="act red" style={{ margin: 0 }} title="Ngưng hồ sơ (không xóa) – dùng khi trùng hồ sơ hoặc nghỉ việc" onClick={() => { if (confirm(`Ngưng hồ sơ ${e.code} – ${e.full_name}? Hồ sơ vẫn được giữ để tra cứu lịch sử.`)) post(`/employees/${e.id}`, { full_name: e.full_name, department: e.department, active: false }, "PUT"); }}>Ngưng</button>
             : <button className="act" style={{ margin: 0 }} onClick={() => post(`/employees/${e.id}`, { full_name: e.full_name, department: e.department, active: true }, "PUT")}>Mở lại</button>}
-            {" "}<button className="act grey" style={{ margin: 0 }} title="Hồ sơ giấy tờ của người này" onClick={() => setTepNV(e.code)}>Giấy tờ</button></td>}</tr>)}</tbody></table></div>
+            {" "}<button className="act grey" style={{ margin: 0 }} title="Hồ sơ giấy tờ của người này" onClick={() => setTepNV(e.code)}>Giấy tờ</button>
+            {" "}<button className="act" style={{ margin: 0 }} title="Sửa thông tin hồ sơ"
+              onClick={() => { setDc({ tu_ngay: "", ly_do: "" }); setSua({ ...e, _goc: { department: e.department, position: e.position, office: e.office } }); }}>Sửa</button></td>}</tr>)}</tbody></table></div>
       {tepNV && <DinhKem doiTuong="nhan_su" doiTuongId={tepNV} loai="hop_dong"
         tieuDe={`Hồ sơ giấy tờ – ${tepNV}`}
         goi={"Hợp đồng lao động, phụ lục, quyết định bổ nhiệm, bằng cấp, thẻ HDV. Lưu theo mã nhân viên " +
@@ -630,4 +641,102 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
       {["hcns", "cntt"].includes(role) && <button className="act grey" onClick={() => post("/incidents/finalize-expired")}>Chốt hiệu lực sự vụ hết hạn khiếu nại</button>}
     </>}
   </>);
+}
+
+
+/** BIỂU SỬA HỒ SƠ NHÂN SỰ — 12/10/2026.
+ *
+ *  BA ĐIỀU ĐÁNG GHI, vì cả ba đều là chỗ dễ làm sai mà không lộ ra:
+ *
+ *  (1) GỬI PHIÊN BẢN. `update_employee` gọi `kiem_phien_ban` từ đợt VPM-8, nhưng cửa đọc trước
+ *      nay không trả số phiên bản ra, nên không màn hình nào gửi lại được và phép kiểm luôn rơi
+ *      vào nhánh "chưa gửi thì cho qua" — hàng rào chống hai người sửa đè nhau có mà chưa chạy
+ *      ngày nào. Biểu này gửi, nên hai người HCNS mở cùng một hồ sơ thì người lưu sau bị chặn và
+ *      đọc được bản của người kia, thay vì lặng lẽ xoá công của họ.
+ *
+ *  (2) ĐIỀU CHUYỂN PHẢI CÓ NGÀY VÀ LÝ DO. Máy chủ coi đổi phòng / chức danh / văn phòng là một
+ *      lần ĐIỀU CHUYỂN và tự ghi vào lịch sử tổ chức; để trống ngày thì nó lấy HÔM NAY. Một điều
+ *      chuyển có hiệu lực lùi mà ghi ngày hôm nay là ghi sai lịch sử, và cái sai ấy không bao giờ
+ *      tự lộ. Nên biểu hiện hai ô ấy ra NGAY KHI phát hiện một trong ba trường đổi, và không cho
+ *      lưu khi thiếu lý do.
+ *
+ *  (3) Ô NGÀY RỖNG GỬI LÀ `null`, KHÔNG PHẢI CHUỖI RỖNG — máy chủ nhận `date | None`, chuỗi rỗng
+ *      là 422. Và trường nào không gửi thì máy chủ giữ nguyên (`exclude_unset`), nên biểu thiếu
+ *      một trường sẽ không xoá mất dữ liệu đã nạp.
+ */
+function SuaHoSo({ sua, setSua, dc, setDc, meta, post }: any) {
+  const d = (k: string, v: any) => setSua({ ...sua, [k]: v });
+  const doiToChuc = !!sua._goc && (sua.department !== sua._goc.department
+    || sua.position !== sua._goc.position || sua.office !== sua._goc.office);
+  const thieuLyDo = doiToChuc && !String(dc.ly_do || "").trim();
+
+  const luu = () => {
+    const g: any = {
+      phien_ban: sua.phien_ban,
+      full_name: sua.full_name, department: sua.department, position: sua.position,
+      office: sua.office, contract_type: sua.contract_type,
+      title: sua.title || "", duties: sua.duties || "", sales_group: sua.sales_group || "",
+      phone: sua.phone || "", probation: !!sua.probation,
+      card_no: sua.card_no || "", card_type: sua.card_type || "",
+      base_salary: sua.base_salary === "" || sua.base_salary === null || sua.base_salary === undefined
+        ? null : Number(sua.base_salary),
+    };
+    if (sua.birth_date) g.birth_date = sua.birth_date;
+    if (sua.card_expiry) g.card_expiry = sua.card_expiry;
+    if (doiToChuc) { g.dieu_chuyen_tu_ngay = dc.tu_ngay || null; g.dieu_chuyen_ly_do = dc.ly_do; }
+    post(`/employees/${sua.id}`, g, "PUT").then((r: any) => { if (r) setSua(null); });
+  };
+
+  return (
+    <div className="panel">
+      <h2>Sửa hồ sơ {sua.code} – {sua.full_name}</h2>
+      <p className="muted">Trường nào để trống thì giữ nguyên giá trị đang có. Mã nhân viên không
+        sửa được ở đây: nó là khoá của mọi chứng từ cũ.</p>
+      <div className="grid">
+        <label>Họ tên<input value={sua.full_name || ""} onChange={(e) => d("full_name", e.target.value)} /></label>
+        <label>Phòng<select value={sua.department || ""} onChange={(e) => d("department", e.target.value)}>
+          {Object.entries(meta.departments).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <label>Chức danh<select value={sua.position || ""} onChange={(e) => d("position", e.target.value)}>
+          {Object.entries(meta.positions).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <label>Văn phòng<select value={sua.office || ""} onChange={(e) => d("office", e.target.value)}>
+          {Object.entries(meta.offices).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <label>Hợp đồng<select value={sua.contract_type || "hdld"} onChange={(e) => d("contract_type", e.target.value)}>
+          <option value="hdld">HĐLĐ</option><option value="ctv">Cộng tác viên</option><option value="doi_tac">Đối tác</option></select></label>
+        <label>Chức vụ hiển thị<input value={sua.title || ""} onChange={(e) => d("title", e.target.value)} /></label>
+        <label>Nhóm kinh doanh<input value={sua.sales_group || ""} onChange={(e) => d("sales_group", e.target.value)} /></label>
+        <label>Lương công việc (đ)<input type="number" value={sua.base_salary ?? ""} onChange={(e) => d("base_salary", e.target.value)} /></label>
+        <label>Ngày sinh<input type="date" value={sua.birth_date || ""} onChange={(e) => d("birth_date", e.target.value)} /></label>
+        <label>Điện thoại<input value={sua.phone || ""} onChange={(e) => d("phone", e.target.value)} /></label>
+        {sua.department === "huong_dan" && <>
+          <label>Số thẻ HDV<input value={sua.card_no || ""} onChange={(e) => d("card_no", e.target.value)} /></label>
+          <label>Hạn thẻ<input type="date" value={sua.card_expiry || ""} onChange={(e) => d("card_expiry", e.target.value)} /></label>
+        </>}
+      </div>
+      <label style={{ display: "block", marginTop: 8 }}>Công việc chính
+        <textarea rows={2} style={{ width: "100%" }} value={sua.duties || ""} onChange={(e) => d("duties", e.target.value)} /></label>
+      <label style={{ display: "block", marginTop: 6 }}>
+        <input type="checkbox" checked={!!sua.probation} onChange={(e) => d("probation", e.target.checked)} /> Đang thử việc (85%)
+      </label>
+
+      {doiToChuc && <div className="gate" style={{ marginTop: 10 }}>
+        <b>Lần sửa này là một ĐIỀU CHUYỂN</b> — phòng, chức danh hoặc văn phòng đã đổi, nên hệ
+        thống sẽ ghi một chặng mới vào lịch sử tổ chức của người này.
+        <div className="grid" style={{ marginTop: 6 }}>
+          <label>Có hiệu lực từ ngày<input type="date" value={dc.tu_ngay}
+            onChange={(e) => setDc({ ...dc, tu_ngay: e.target.value })} /></label>
+          <label>Lý do điều chuyển<input value={dc.ly_do}
+            onChange={(e) => setDc({ ...dc, ly_do: e.target.value })} /></label>
+        </div>
+        <p className="muted" style={{ marginTop: 4 }}>Để trống ngày thì hệ thống ghi là <b>hôm
+          nay</b>. Quyết định có hiệu lực lùi mà ghi hôm nay là ghi sai lịch sử, và cái sai ấy
+          không bao giờ tự lộ ra — nên nếu điều chuyển đã có hiệu lực từ trước, nhập đúng ngày.</p>
+      </div>}
+
+      <div style={{ marginTop: 10 }}>
+        <button className="act" disabled={!sua.full_name || thieuLyDo} onClick={luu}>Lưu hồ sơ</button>
+        <button className="act grey" onClick={() => setSua(null)}>Hủy</button>
+        {thieuLyDo && <span className="muted" style={{ marginLeft: 8 }}>Điều chuyển phải ghi lý do.</span>}
+      </div>
+    </div>
+  );
 }

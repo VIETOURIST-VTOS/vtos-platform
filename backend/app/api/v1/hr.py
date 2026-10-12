@@ -41,6 +41,11 @@ def emp_out(e: Employee) -> dict:
             "card_no": e.card_no, "card_type": e.card_type, "card_expiry": e.card_expiry, "member_org": e.member_org, "ctv_contract": e.ctv_contract,
             "advance_limit": e.advance_limit, "active": e.active, "company_id": e.company_id, "birth_date": e.birth_date, "phone": e.phone,
             "bhxh_base": e.bhxh_base, "member_org": e.member_org,
+            # PHIÊN BẢN ra tới màn hình — thêm 12/10/2026 cùng biểu sửa hồ sơ. `update_employee` đã
+            # gọi `kiem_phien_ban` từ đợt VPM-8, nhưng cửa đọc KHÔNG trả về số phiên bản, nên không
+            # màn hình nào gửi lại được và phép kiểm luôn rơi vào nhánh "chưa gửi thì cho qua". Tức
+            # là hàng rào chống hai người sửa đè nhau có mà chưa bao giờ chạy. Một trường.
+            "phien_ban": e.phien_ban,
             "guide_ok": H.guide_eligible(e, date.today())[0] if e.department == "huong_dan" else None}
 
 
