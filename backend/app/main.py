@@ -86,6 +86,7 @@ from app.api.v1.tai_xe import router as tai_xe_router
 from app.api.v1.khao_sat_cong_khai import router as khao_sat_cong_khai_router
 from app.api.v1.sales_admin import router as sales_admin_router
 from app.api.v1.chuong_trinh import router as chuong_trinh_router
+from app.api.v1.de_nghi_xe import router as de_nghi_xe_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
@@ -370,6 +371,7 @@ app.include_router(cong_no_vietrip_router)
 # thích này để ai đọc app/main.py cũng nhìn thấy nó, thay vì phát hiện ra khi đọc tệp thứ tám.
 app.include_router(khao_sat_cong_khai_router)
 app.include_router(chuong_trinh_router)
+app.include_router(de_nghi_xe_router)
 
 
 @app.get("/", include_in_schema=False)
