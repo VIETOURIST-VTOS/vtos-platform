@@ -421,9 +421,16 @@ def _doi_xe(db: Session, tu: date, den: date) -> list[dict]:
     da_do = [c for c in chuyen if c.km_dau is not None and c.km_cuoi is not None]
     km = sum((c.km_cuoi - c.km_dau) for c in da_do) if da_do else None
     han = date.today() + timedelta(days=30)
-    sap_het = db.execute(select(VehicleDocument)
-                         .where(VehicleDocument.expires_on != None,                  # noqa: E711
-                                VehicleDocument.expires_on <= han)).scalars().all()
+    moi = db.execute(select(VehicleDocument)
+                     .where(VehicleDocument.expires_on != None,                  # noqa: E711
+                            VehicleDocument.expires_on <= han)).scalars().all()
+    # SM-1 (12/10/2026) — TÁCH SIM RA DÒNG RIÊNG, Chủ tịch chọn. Hai loại giấy này có HAI HẬU QUẢ
+    # khác nhau: xe hết đăng kiểm hay hết bảo hiểm thì KHÔNG CHẠY ĐƯỢC; sim hết hạn thì xe vẫn
+    # chạy, chỉ là cổng GPS tắt và km của chuyến mất nguồn để đối chiếu với km đồng hồ. Gộp vào
+    # một con số thì người đọc không biết phải làm gì trước — và lời khuyên của dòng cũ ("xe hết
+    # đăng kiểm là không chạy được") nói sai hẳn cho một nửa số đếm.
+    sap_het = [x for x in moi if x.kind != "sim"]
+    sim_het = [x for x in moi if x.kind == "sim"]
     return [
         ct("chuyen", "Chuyến xe trong kỳ", len(chuyen), "chuyến",
            "Đếm nhật trình có ngày đi trong kỳ", "fleet_trips.ngay_di"),
@@ -441,8 +448,15 @@ def _doi_xe(db: Session, tu: date, den: date) -> list[dict]:
            "Đếm giấy tờ có ngày hết hạn trong vòng 30 ngày tới",
            "vehicle_documents.expires_on", muc=_muc(len(sap_het) > 0, "do"),
            viec="Gia hạn trước ngày hết hạn – xe hết đăng kiểm là không chạy được, "
-                "và lệnh điều xe đã lên rồi thì phải đổi xe gấp",
+                "và lệnh điều xe đã lên rồi thì phải đổi xe gấp. Sim xe đếm riêng ở dòng dưới",
            chi_tiet=[f"{x.kind} {x.number} – hết hạn {x.expires_on}" for x in sap_het[:20]]),
+        ct("sim_xe", "Sim xe hết hạn trong 30 ngày", len(sim_het), "sim",
+           "Đếm sim của xe có ngày hết hạn gói cước trong vòng 30 ngày tới",
+           "vehicle_documents.expires_on, kind='sim'", muc=_muc(len(sim_het) > 0),
+           viec="Gia hạn gói cước. Sim hết hạn thì XE VẪN CHẠY nhưng cổng GPS tắt – km của chuyến "
+                "mất nguồn để đối chiếu với km đồng hồ, và tháng sau không ai dựng lại được",
+           chi_tiet=[f"{x.number} · {x.cong_gps or 'chưa rõ cổng'} – hết hạn {x.expires_on}"
+                     for x in sim_het[:20]]),
     ]
 
 

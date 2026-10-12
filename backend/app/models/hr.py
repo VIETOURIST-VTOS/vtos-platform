@@ -173,6 +173,25 @@ class Vehicle(Base):
     # "cảnh báo khi đúng bằng 45" sai, và là lý do Chủ tịch chọn khác.
     seats_xac_nhan_boi: Mapped[str] = mapped_column(String(50), default="")
     seats_xac_nhan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # HQ-1 (13/10/2026) — NGÀY VÀO ĐỘI và NGÀY RỜI ĐỘI.
+    #
+    # Vì sao phải có hai cột này, đo được trên hệ thật: màn hình lãi lỗ kỳ 2026-01 in "14/12 xe có
+    # chạy trong kỳ" — TỬ SỐ LỚN HƠN MẪU SỐ. Tử là số xe có ngày khai thác TRONG KỲ ẤY; mẫu là
+    # `len([v for v in veh if v.active])`, tức số xe còn hoạt động HÔM NAY. Ba chiếc chạy suốt tháng
+    # 1 rồi bán đi vẫn nằm ở tử nhưng đã rơi khỏi mẫu, nên công suất 60,8% là một phép chia cho mẫu
+    # sai — và sai theo hướng ĐẸP LÊN, nên không ai nghi.
+    #
+    # Ý định trong chú thích cũ của `fleet_lai_lo` là ĐÚNG ("mẫu là xe CÓ trong đội, không phải xe có
+    # chạy"). Cái sai là lấy TRẠNG THÁI HÔM NAY áp cho quá khứ. Đây đúng cái bẫy mà `xe_theo_bien()`
+    # đã xử đúng từ lâu: "tra xe TẠI THỜI ĐIỂM giao dịch, không theo biển hiện tại". `lifecycle` chỉ
+    # trả lời "chiếc này giờ ra sao", không trả lời "tháng 1 nó còn trong đội không" — và không cột
+    # nào khác trong bảng trả lời được, nên phải mở cột mới chứ không suy ra.
+    #
+    # Rỗng nghĩa là CHƯA AI KHAI, không phải "chưa từng rời đội". Hệ quả có chủ đích: chừng nào Đội
+    # xe chưa khai đủ thì ô công suất ghi "chưa đủ dữ liệu" kèm tên xe còn thiếu, chứ KHÔNG hiện một
+    # con số sai (Chủ tịch chọn 13/10/2026). Cửa khai: bộ nạp `ho_so_xe`.
+    ngay_vao_doi: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ngay_roi_doi: Mapped[date | None] = mapped_column(Date, nullable=True)
     odo_km: Mapped[int] = mapped_column(Integer, default=0)                   # số km đồng hồ đã xác nhận
     odo_at: Mapped[date | None] = mapped_column(Date, nullable=True)          # thời điểm của số km đó
     source_note: Mapped[str] = mapped_column(String(200), default="")
