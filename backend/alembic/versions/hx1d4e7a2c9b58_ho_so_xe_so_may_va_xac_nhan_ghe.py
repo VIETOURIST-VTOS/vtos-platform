@@ -28,7 +28,14 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "hx1d4e7a2c9b58"
-down_revision = "lg3b2c3d4e5f6a"
+# NỐI SAU CT-1, sửa 12/10/2026 — bản này và `ct1f6b2d8a4e93` cùng khai gốc
+# `lg3b2c3d4e5f6a`, nên mạch có HAI ĐẦU và `alembic upgrade head` từ chối chạy: container
+# không khởi động, mọi lần deploy hỏng. Hai làn viết song song, người viết sau không thấy
+# bản của người viết trước.
+# THỨ TỰ KHÔNG TÙY Ý: CT-1 gộp trước (PR #287) và ĐÃ chạy thật trên máy chủ — bản 5e07dbd
+# deploy xanh — nên nó đã được ghi là đã áp dụng. Cho CT-1 nối sau bản này là nói với
+# alembic rằng một bước đã chạy lại chưa chạy. Chiều đúng chỉ có một.
+down_revision = "ct1f6b2d8a4e93"
 branch_labels = None
 depends_on = None
 
