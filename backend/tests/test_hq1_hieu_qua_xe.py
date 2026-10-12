@@ -235,10 +235,66 @@ def test_theo_ky_tra_du_ba_khoa_thang_quy_nam(db):
     _xe(db, "50F-017.37", vao=date(2025, 1, 1))
     db.flush()
     tk = HQ.theo_ky(db, date(2026, 2, 15))
-    assert set(tk) == {"thang", "quy", "nam"}
-    for v in tk.values():
-        assert set(("ngay_xe_hoat_dong", "cong_suat_khai_thac", "km_chay_rong",
-                    "chi_phi_moi_km", "da_chot")) <= set(v)
+    assert {"thang", "quy", "nam"} <= set(tk)
+    for t in ("thang", "quy", "nam"):
+        assert set(("nhan", "ngay_xe_hoat_dong", "cong_suat_khai_thac", "km_chay_rong",
+                    "chi_phi_moi_km", "da_chot", "trong_vi_sao")) <= set(tk[t])
+
+
+# ═══════════════════ 6 · KỲ MỞ SẴN VÀ LÝ DO KỲ TRỐNG (HQ-1c) ═══════════════════
+#
+# Đo trên hệ thật 13/10/2026 sau khi HQ-1b lên: máy chủ CÓ số (năm: 2.127 ngày · 56.927 km ·
+# 10.064 đ/km) nhưng khối mở sẵn ở kỳ THÁNG, mà tháng 10 chưa ai nạp chuyến nào — nên Chủ tịch
+# thấy bốn dấu gạch và kết luận "đội xe chưa lên màn hình". Sổ quyết toán xe chỉ chốt sau khi hết
+# tháng, nên tháng đang chạy sẽ trống gần như suốt. Con số có thật mà vẫn bằng không có.
+def test_mo_san_o_ky_HEP_NHAT_con_co_so(db):
+    a = _xe(db, "50F-017.37", vao=date(2025, 1, 1))
+    _chuyen(db, a, "A1", date(2026, 1, 5), date(2026, 1, 7), 1000, 1500, 9_000_000)
+    db.flush()
+    # mốc 15/02: tháng 2 rỗng, quý I có tháng 1 → mở ở quý, không nhảy thẳng lên năm
+    assert HQ.theo_ky(db, date(2026, 2, 15))["mac_dinh"] == "quy"
+    # mốc 15/01: chính tháng ấy có chuyến → mở ở tháng
+    assert HQ.theo_ky(db, date(2026, 1, 15))["mac_dinh"] == "thang"
+    # mốc 15/04: quý II rỗng, cả năm vẫn còn tháng 1 → mở ở năm
+    assert HQ.theo_ky(db, date(2026, 4, 15))["mac_dinh"] == "nam"
+
+
+def test_khong_ky_nao_co_so_thi_van_mo_o_thang(db):
+    _xe(db, "50F-017.37", vao=date(2025, 1, 1))
+    db.flush()
+    tk = HQ.theo_ky(db, date(2026, 4, 15))
+    assert tk["mac_dinh"] == "thang"
+    assert tk["thang"]["trong_vi_sao"]
+
+
+def test_ky_trong_noi_RO_vi_sao_va_chi_ra_ky_con_so(db):
+    a = _xe(db, "50F-017.37", vao=date(2025, 1, 1))
+    _chuyen(db, a, "A1", date(2026, 1, 5), date(2026, 1, 7), 1000, 1500, 9_000_000)
+    db.flush()
+    tk = HQ.theo_ky(db, date(2026, 4, 15))
+    vs = tk["thang"]["trong_vi_sao"]
+    assert "Tháng 04/2026" in vs and "chưa nạp chuyến nào" in vs
+    assert "tháng 01/2026" in vs, f"phải chỉ ra kỳ mới nhất còn số, nhận: {vs}"
+    assert tk["ky_moi_nhat_co_chuyen"] == "2026-01"
+
+
+def test_ky_CO_so_thi_khong_co_ly_do_trong(db):
+    a = _xe(db, "50F-017.37", vao=date(2025, 1, 1))
+    _chuyen(db, a, "A1", date(2026, 1, 5), date(2026, 1, 7), 1000, 1500, 9_000_000)
+    db.flush()
+    tk = HQ.theo_ky(db, date(2026, 1, 15))
+    assert tk["thang"]["trong_vi_sao"] is None
+    assert tk["thang"]["nhan"] == "Tháng 01/2026"
+
+
+def test_nhan_ky_noi_RO_dang_xem_khoang_nao(db):
+    """Nhãn là chỗ chống đọc nhầm: "Năm" mà thật ra mới tới tháng 10 thì phải nói ra."""
+    _xe(db, "50F-017.37", vao=date(2025, 1, 1))
+    db.flush()
+    tk = HQ.theo_ky(db, date(2026, 10, 13))
+    assert tk["nam"]["nhan"] == "Năm 2026 (T01–T10)"
+    assert tk["quy"]["nhan"] == "Quý 4/2026 (đến hết tháng 10)"
+    assert tk["thang"]["nhan"] == "Tháng 10/2026"
 
 
 # ═══════════════════ 4 · CỬA NHẬP CHO HAI CỘT NGÀY ═══════════════════
