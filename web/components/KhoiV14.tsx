@@ -57,6 +57,18 @@ export type HieuQuaXe = {
   cong_suat_khai_thac?: number | null;   // phần trăm, 0–100
   km_chay_rong?: number | null;
   chi_phi_moi_km?: number | null;        // đồng
+  /** HQ-1b (13/10/2026) — VÌ SAO công suất trống, và AI phải làm gì.
+   *
+   *  Công suất là ô duy nhất trong bốn ô có thể trống trong khi ba ô kia có số: nó cần MẪU SỐ
+   *  (đội hình xe tại kỳ), mà mẫu số ấy do người khai chứ không suy ra được. Một ô gạch ngang
+   *  nằm giữa ba ô có số đọc ra như ô hỏng, chứ không đọc ra là "đang chờ ai đó nhập".
+   *
+   *  Máy chủ đã tính sẵn ô này từ vòng HQ-1; chỗ này chỉ in ra. Rỗng nghĩa là KHÔNG thiếu gì. */
+  cong_suat_thieu?: {
+    bo_phan: string;                     // bộ phận phải khai
+    cua_nhap: string;                    // đường tới cửa nhập
+    thieu: { xe: string; thieu: string }[];
+  } | null;
   da_chot?: boolean;                      // kỳ đã khoá sổ hay chưa
 };
 
@@ -205,6 +217,10 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
     ["Km chạy rỗng", so(o.km_chay_rong)],
     ["Chi phí / km", so(o.chi_phi_moi_km, " đ")],
   ];
+  /* Chỉ thay dấu gạch của ô CÔNG SUẤT, và chỉ khi máy chủ nói được vì sao. Ba ô kia trống vì kỳ
+     chưa có chuyến nào — đó là chuyện khác, và câu trả lời của nó nằm ở dòng "Chưa có số cho kỳ…"
+     bên dưới. Trộn hai lý do vào một chỗ thì cả hai cùng mất nghĩa. */
+  const thieuCS = o.cong_suat_khai_thac == null ? o.cong_suat_thieu : null;
   return (
     <section className="panel" id="hieu-qua-doi-xe">
       <div className="mh01-dau">
@@ -223,7 +239,15 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
         {cot.map(([nhan, gt]) => (
           <div key={nhan} className={"v14-o" + (gt === null ? " rong" : "")}>
             <div className="v14-o-nhan">{nhan}</div>
-            <div className="v14-o-so">{gt ?? "—"}</div>
+            {gt === null && nhan === "Công suất khai thác" && thieuCS ? (
+              <Link className="v14-o-so v14-o-chu" href={thieuCS.cua_nhap}
+                title={thieuCS.thieu.slice(0, 8).map((x) => `${x.xe}: thiếu ${x.thieu}`).join("\n")}>
+                chờ {thieuCS.bo_phan}
+                <span className="muted"> · {thieuCS.thieu.length} xe chưa khai ngày vào đội</span>
+              </Link>
+            ) : (
+              <div className="v14-o-so">{gt ?? "—"}</div>
+            )}
           </div>
         ))}
         {/* Ô này là TRẠNG THÁI, không phải con số – nên không dùng phông chữ số. Phông số sinh ra

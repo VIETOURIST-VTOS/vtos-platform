@@ -205,7 +205,7 @@ def test_chi_so_de_trong_cong_suat_khi_chua_du_doi_hinh_nhung_van_tra_ba_o_kia(d
     o = HQ.chi_so(db, KY)
     assert o["cong_suat_khai_thac"] is None
     assert o["ngay_xe_hoat_dong"] == 6 and o["km_chay_rong"] == 40
-    assert o["_cong_suat_thieu"]["bo_phan"] == "Đội xe"
+    assert o["cong_suat_thieu"]["bo_phan"] == "Đội xe"
 
 
 def test_ky_khong_co_chuyen_nao_thi_BO_TRONG_chu_khong_tra_0(db):
@@ -285,3 +285,61 @@ def test_cua_noi_ra_khi_xe_da_ban_chua_co_ngay_roi(db):
     _xe(db, "50F-034.37", lifecycle="da_ban"); db.flush()
     loi, cb, _ = BO_NAP["ho_so_xe"]["kiem"](db, {"bien_so": "50F-034.37"})
     assert any("KHÔNG tính" in x for x in cb)
+
+
+# ═══════════════════ 5 · Ô TRỐNG PHẢI NÓI AI LÀM (HQ-1b) ═══════════════════
+#
+# Vòng HQ-1 TÍNH ĐÚNG lý do rồi giấu nó sau một dấu gạch dưới (`_cong_suat_thieu`) với lý lẽ "màn
+# hình bỏ qua". Đo trên hệ thật ngay sau khi lên: khối Chủ tịch in ba ô có số và MỘT DẤU GẠCH NGANG
+# ở ô công suất, không một chữ nào nói vì sao. Tính sẵn một câu trả lời rồi giấu đi thì cũng bằng
+# không tính — nên nhóm phép thử này canh đúng chỗ ấy.
+def test_chi_so_GUI_LY_DO_ra_ngoai_hop_dong_chu_khong_giau(db):
+    a = _xe(db, "50F-017.37")                      # chưa khai ngày vào đội
+    _chuyen(db, a, "A1", date(2026, 1, 5), date(2026, 1, 7), 1000, 1500, 9_000_000)
+    db.flush()
+    o = HQ.chi_so(db, KY)
+    assert o["cong_suat_khai_thac"] is None
+    g = o["cong_suat_thieu"]
+    assert g["bo_phan"] == "Đội xe" and g["cua_nhap"]
+    assert [x["xe"] for x in g["thieu"]] == ["50F-017.37"]
+
+
+def test_du_du_lieu_thi_KHONG_con_ly_do_nao(db):
+    """Có lý do trong khi ô đã có số thì màn hình hiện 'chờ Đội xe' cạnh một con số thật."""
+    a = _xe(db, "50F-017.37", vao=date(2025, 1, 1))
+    _chuyen(db, a, "A1", date(2026, 1, 5), date(2026, 1, 7), 1000, 1500, 9_000_000)
+    db.flush()
+    o = HQ.chi_so(db, KY)
+    assert o["cong_suat_khai_thac"] is not None and o["cong_suat_thieu"] is None
+
+
+def test_theo_ky_quy_nam_cung_mang_ly_do(db):
+    a = _xe(db, "50F-017.37")
+    _chuyen(db, a, "A1", date(2026, 1, 5), date(2026, 1, 7), 1000, 1500, 9_000_000)
+    db.flush()
+    tk = HQ.theo_ky(db, date(2026, 2, 15))
+    for ten in ("thang", "quy", "nam"):
+        assert tk[ten]["cong_suat_khai_thac"] is None, ten
+        assert tk[ten]["cong_suat_thieu"]["bo_phan"] == "Đội xe", ten
+
+
+def test_ly_do_cua_quy_TRUNG_ly_do_cua_thang(db):
+    """Phép thử này thay cho một phép thử TRANG TRÍ, và lý do đáng ghi lại.
+
+    Bản đầu em viết một phần "gộp danh sách xe của các kỳ con, mỗi xe một lần" và một phép thử canh
+    nó. Kiểm ngược: phá phần gộp (chỉ lấy lý do của kỳ cuối) thì phép thử VẪN XANH. Vì `doi_hinh`
+    liệt kê xe thiếu theo DANH MỤC XE chứ không theo kỳ, nên danh sách của mọi tháng luôn bằng nhau
+    và không bộ dữ liệu nào làm chúng khác nhau được.
+
+    Phép thử không thể đỏ là phép thử chưa được thử. Bỏ cả phần gộp lẫn phép thử ấy; giữ lại đúng
+    cái bất biến có thật — và nếu ngày nào `doi_hinh` đổi sang lọc theo kỳ thì chính phép thử này đỏ.
+    """
+    a = _xe(db, "50F-017.37")
+    b = _xe(db, "50H-944.58")
+    _chuyen(db, a, "A1", date(2026, 1, 5), date(2026, 1, 7), 1000, 1500, 9_000_000)
+    _chuyen(db, b, "B1", date(2026, 2, 5), date(2026, 2, 7), 2000, 2500, 9_000_000)
+    db.flush()
+    tk = HQ.theo_ky(db, date(2026, 2, 15))
+    xe_thang = sorted(x["xe"] for x in tk["thang"]["cong_suat_thieu"]["thieu"])
+    xe_quy = sorted(x["xe"] for x in tk["quy"]["cong_suat_thieu"]["thieu"])
+    assert xe_thang == xe_quy == ["50F-017.37", "50H-944.58"]

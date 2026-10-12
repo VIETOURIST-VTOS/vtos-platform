@@ -152,10 +152,15 @@ def chi_so(db: Session, ky: str) -> dict:
         "km_chay_rong": rong["km"] or None,
         "chi_phi_moi_km": chi_phi_moi_km,
         "da_chot": db.get(PeriodLock, ky) is not None,
-        # Phần dưới KHÔNG nằm trong hợp đồng `HieuQuaXe` — màn hình bỏ qua. Để lại vì khi một ô trống
-        # thì câu hỏi tiếp theo luôn là "vì sao trống, ai phải làm gì", và câu trả lời phải đi kèm
-        # con số chứ không nằm trong đầu người viết mã.
-        "_cong_suat_thieu": None if dh["du_du_lieu"] else dh,
+        # HQ-1b (13/10/2026) — Ô NÀY NẰM TRONG hợp đồng `HieuQuaXe`, không còn là ghi chú nội bộ.
+        #
+        # Vòng HQ-1 để nó dưới tên `_cong_suat_thieu` với lý lẽ "màn hình bỏ qua". Đo trên hệ thật
+        # ngay sau khi lên: khối Chủ tịch in ba ô có số và MỘT DẤU GẠCH NGANG ở ô công suất, không
+        # một chữ nào nói vì sao. Người đọc không có cách nào biết nó đang chờ Đội xe khai 16 chiếc.
+        #
+        # Tính sẵn một câu trả lời rồi giấu nó sau dấu gạch dưới thì cũng bằng không tính.
+        "cong_suat_thieu": None if dh["du_du_lieu"] else {
+            "bo_phan": dh["bo_phan"], "cua_nhap": dh["cua_nhap"], "thieu": dh["thieu"]},
         "_gia_von": tong["gia_von"],
         "_km_chuyen": km_chuyen,
         "_km_rong_lech": rong["so_lech"],
@@ -201,11 +206,23 @@ def theo_ky(db: Session, moc: date) -> dict:
         # Cộng GIÁ VỐN gốc, không nhân ngược từ `chi_phi_moi_km`: con số ấy đã làm tròn về đồng, và
         # nhân ngược một số đã tròn với quãng đường hàng chục nghìn km thì sai số đi theo cấp triệu.
         gia_von = sum(x["_gia_von"] for x in ds)
+        # Lý do thiếu của quý/năm LẤY NGUYÊN của một kỳ con, không gộp. Viết ra vì "gộp" nghe cẩn
+        # thận hơn và em đã viết phần gộp ấy trước khi đo:
+        #
+        #   `doi_hinh` liệt kê xe thiếu ngày vào đội theo DANH MỤC XE, không theo kỳ — một chiếc
+        #   chưa ai khai thì thiếu ở mọi kỳ như nhau. Nên danh sách của tháng 1 và tháng 2 LUÔN
+        #   bằng nhau, và phần gộp không bao giờ gộp được gì.
+        #
+        # Phép thử canh phần gộp ấy VẪN XANH khi em cố tình phá nó — vì bộ dữ liệu không thể làm
+        # hai tháng khác nhau. Đó là phép thử trang trí, và mã nó canh là mã trang trí. Bỏ cả hai,
+        # giữ lại một phép thử canh đúng cái bất biến thật: lý do của quý trùng lý do của tháng.
+        goc = next((x["cong_suat_thieu"] for x in ds if x["cong_suat_thieu"]), None)
         out[ten] = {
             "ngay_xe_hoat_dong": ngay or None,
             "cong_suat_khai_thac": round(ngay * 100 / cho_ngay, 1) if du and cho_ngay else None,
             "km_chay_rong": rong or None,
             "chi_phi_moi_km": round(gia_von / km) if km else None,
             "da_chot": all(x["da_chot"] for x in ds),
+            "cong_suat_thieu": None if du else goc,
         }
     return out
