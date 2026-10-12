@@ -25,6 +25,21 @@ def snap(t: Tour) -> dict:
             "hoa_hong_khach_tien": getattr(t, "hoa_hong_khach_tien", 0)}
 
 
+def _chu_ky_duoi_bien(t: Tour) -> dict:
+    """Hai ô chữ ký dưới biên cho màn hình: danh sách vai, và câu VƯỚNG khi không suy được.
+
+    Chuyến không thuộc mảng nào (dịch vụ lẻ) thì `can_ky_duoi_bien` NÉM LỖI thay vì chọn bừa
+    một phòng — xem `chu_ky.CHUYEN_KHONG_THUOC_MANG`. Màn hình phải nói ra chỗ hệ thống không
+    biết. Trả danh sách RỖNG kèm câu vướng, chứ không trả một danh sách đoán: một dòng chữ ký
+    đoán sai còn tệ hơn một dòng nói "chưa biết", vì không ai đi kiểm lại nó.
+    """
+    try:
+        return {"chu_ky_duoi_bien": _CK.chu_ky_duoi_bien_de_hien(SEG.mang_of(t), t),
+                "chu_ky_duoi_bien_vuong": ""}
+    except ValueError as ex:
+        return {"chu_ky_duoi_bien": [], "chu_ky_duoi_bien_vuong": str(ex)}
+
+
 def tour_view(db: Session, t: Tour, user: User | None = None, kem_bookings: bool = True) -> dict:
     thr = R.get_param(db, "nguong_bien", t.start_date)
     c = R.calc_db(db, t, thr)
@@ -50,7 +65,11 @@ def tour_view(db: Session, t: Tour, user: User | None = None, kem_bookings: bool
         # ký của vai không còn trong luật và che mất vai đang trong luật. Cột `signed_ptgd_doan`
         # đã có trên bảng `tours` từ Đợt LG2; thiếu đúng một dòng gửi nó ra cho màn hình.
         "signed_ptgd_doan": getattr(t, "signed_ptgd_doan", False),
-        "chu_ky_duoi_bien": _CK.chu_ky_de_hien("du_toan_duoi_bien", t),
+        # Đợt VA-WEB5 13/10/2026 — SỬA CHÍNH ĐỢT TRƯỚC. VA-WEB4 đọc bảng tĩnh
+        # `VAI_KY_CAN["du_toan_duoi_bien"]` = (ptgd_doan, tgd), nên chuyến mảng LẺ hiện ra "Phó
+        # TGĐ tour đoàn" trong khi luật LG3 bắt Giám đốc Kinh doanh ký. Đo được trên chuyến
+        # TL-BKK-1005. Nay đọc ĐÚNG hàm mà cửa ký đọc: `can_ky_duoi_bien(mảng của chuyến)`.
+        **_chu_ky_duoi_bien(t),
         "actual_revenue": t.actual_revenue, "actual_cost": t.actual_cost, "promo_value": t.promo_value,
         "closed_at": t.closed_at, "kt_confirmed_at": t.kt_confirmed_at, "cntt_checked_at": t.cntt_checked_at,
         "calc": c, "booked_pax": bk, "days_left": days_left, "settlement_deadline": R.settlement_deadline(db, t),
@@ -385,12 +404,14 @@ def approve(db: Session, u: User, t: Tour, note: str = "") -> str:
                        + " và ".join(ROLES.get(v, v) for v in _can) + " được ký")
 
         def _da_ky(v):
-            """Đã có chữ ký của vai này chưa — đọc CẢ cột cũ lẫn ô tên mới.
+            """Đã có chữ ký của vai này chưa. Đợt VA-WEB5 chuyển phép đọc vào `chu_ky`.
 
-            Chuyến ký dở giữa hai đợt không được mất chữ ký đã có: cột boolean là sự thật của
-            bản trước, ô `nguoi_da_ky` là sự thật từ LG3. Bỏ một trong hai là xoá một chữ ký.
+            Bản cũ của mấy dòng này đọc đúng CẢ hai nguồn (cột boolean cũ và ô `nguoi_da_ky` của
+            LG3) — nhưng nó nằm TRONG thân hàm, nên chỗ HIỆN chữ ký không dùng lại được và đã
+            viết một phép đọc riêng thiếu mất nguồn thứ hai. Một phép suy nằm trong thân hàm là
+            một phép suy không ai đọc lại được: nay nó có tên, ở `chu_ky.da_ky_mot_vai`.
             """
-            return bool(getattr(t, f"signed_{v}", False)) or v in _CK.doc_nguoi_da_ky(t.nguoi_da_ky)
+            return _CK.da_ky_mot_vai(t, v)
 
         _vai = u.role if u.role in _can else next((v for v in _can if not _da_ky(v)), "")
         if not _vai: raise Gate("DA_KY", "Đã đủ chữ ký")

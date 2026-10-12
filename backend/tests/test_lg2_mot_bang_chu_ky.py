@@ -23,7 +23,12 @@ from app.services import chu_ky as CK  # noqa: E402
 
 GOC_APP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
 
-MOT_CHU_KY = ("tham_so", "don_gia_hdv", "gia_xe")
+# `dieu_khoan_thanh_toan` vào bảng ngày 12/10/2026 theo Đợt E4a, Chủ tịch chốt: điều khoản
+# thanh toán đi MỘT chữ ký Chủ tịch, y như bảng tham số chính sách. Đợt E4a thêm dòng vào
+# `VAI_KY_CAN` mà KHÔNG khai lại ở đây, nên phép thử này đỏ trên main từ 12/10 đến 13/10 —
+# đúng việc nó sinh ra để làm ("có người thêm một cửa mà không ai ký lại bảng này"), chỉ là
+# người thêm cửa đã không đọc chỗ đỏ. Đợt VA-WEB5 khai nốt, không nới phép thử.
+MOT_CHU_KY = ("tham_so", "don_gia_hdv", "gia_xe", "dieu_khoan_thanh_toan")
 HAI_CT_TGD = ("quy_tac_hach_toan", "che_tai_muc_3")
 HAI_PTGD_TGD = ("du_toan_duoi_bien",)
 HAI_CHU_KY = HAI_CT_TGD + HAI_PTGD_TGD
