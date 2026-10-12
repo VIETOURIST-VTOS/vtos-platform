@@ -77,6 +77,13 @@ class VehicleDocument(Base):
     issued_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     expires_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     source: Mapped[str] = mapped_column(String(120), default="")
+    # SM-1 (12/10/2026) — chỉ dùng cho kind="sim": cổng GPS mà chiếc sim này nuôi, khóa của
+    # CONG_GPS ở đầu tệp.
+    #
+    # VÌ SAO MỘT CỘT CHỨ KHÔNG PHẢI MỘT CÂU TRONG Ô GHI CHÚ (Chủ tịch chọn 12/10): sim chết thì
+    # cổng ấy TẮT, và câu hỏi ngay sau đó luôn là "cổng nào, mất mấy xe". Chữ tự do trong ô ghi chú
+    # thì ba người gõ ba kiểu và không lọc được — đúng chỗ `km_nguon` đã hỏng một lần và phải sửa.
+    cong_gps: Mapped[str] = mapped_column(String(20), default="")
     verify: Mapped[str] = mapped_column(String(20), default="nguon_ghi")
     note: Mapped[str] = mapped_column(String(300), default="")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -151,6 +158,13 @@ KM_NGUON = {
     "gps_tcd": "GPS – cổng TCD",
     "gps_vietmap": "GPS – cổng Vietmap",
 }
+
+# CỔNG GPS mà một chiếc sim nuôi. SUY TỪ `KM_NGUON` chứ không gõ lại ba chữ ấy lần thứ hai: ngày nào
+# đội xe thêm cổng thứ tư, thêm một dòng ở trên là cả hai nơi cùng biết. Gõ lại là dựng chỗ để hai
+# bảng lệch nhau — đúng cái bẫy `km_nguon` đã mắc một lần (chuỗi tự do, ba người gõ ba kiểu).
+#
+# Bỏ "gps" cũ: nó là cách ghi CŨ cho số km đã lỡ ghi, không phải một cổng có thật để gắn sim vào.
+CONG_GPS = {k: v for k, v in KM_NGUON.items() if k.startswith("gps_")}
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════

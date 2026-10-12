@@ -192,8 +192,38 @@ def test_go_mot_khoan_phai_ghi_ly_do(_startup):
 
 
 # ---------------------------------------------------------------- Công suất
-def test_cong_suat_tinh_tren_so_xe_trong_doi_khong_phai_so_xe_co_chay(_startup):
+#
+# HQ-1 (13/10/2026) — PHÉP THỬ CŨ ĐÚNG MÀ VẪN KHÔNG BẮT ĐƯỢC LỖI THẬT.
+#
+# Bản cũ chỉ có một phép thử ở đây, khẳng định đúng cái bất biến cần giữ
+# (`so_xe_trong_doi >= so_xe_khai_thac`) — nhưng bộ dữ liệu dựng cho nó chỉ có MỘT chiếc xe, đang
+# hoạt động, nên mẫu số cũ (`v.active`) không thể nào nhỏ hơn tử. Phép thử xanh suốt, trong khi
+# trên hệ thật kỳ 2026-01 màn hình in "14/12 xe có chạy trong kỳ".
+#
+# Bài học ghi lại ở đây: một phép thử chỉ chạy với bộ dữ liệu KHÔNG THỂ vi phạm luật của nó là một
+# phép thử chưa được thử. Bộ dữ liệu phải chứa đúng tình huống đời thật — ở đây là chiếc xe đã rời
+# đội mà kỳ ấy vẫn còn chạy. Tình huống ấy nay nằm ở tests/test_hq1_hieu_qua_xe.py.
+def test_chua_khai_ngay_vao_doi_thi_cong_suat_DE_TRONG(_startup):
+    """Xe do cửa nhập chuyến tự tạo thì chưa ai khai ngày vào đội – và đó là trạng thái thật.
+
+    Chủ tịch chọn 13/10/2026: ẩn còn hơn hiện số sai. Ô trống phải kèm bộ phận và cửa nhập.
+    """
+    t = bc()["tong"]
+    assert t["cong_suat"] is None and t["so_xe_trong_doi"] is None
+    assert t["cong_suat_thieu"]["bo_phan"] == "Đội xe"
+    assert t["cong_suat_thieu"]["cua_nhap"]
+
+
+def test_khai_xong_ngay_vao_doi_thi_cong_suat_tinh_tren_doi_hinh_TAI_KY(_startup):
     """Mẫu số bằng số xe có chạy thì chiếc nằm bãi cả tháng biến mất, và công suất luôn đẹp."""
+    from datetime import date
+    from app.db.session import SessionLocal
+    from app.models.hr import Vehicle
+    from sqlalchemy import select
+    with SessionLocal() as s:
+        for v in s.execute(select(Vehicle)).scalars():
+            v.ngay_vao_doi = date(2025, 1, 1)
+        s.commit()
     d = bc()
     t = d["tong"]
     assert t["so_xe_trong_doi"] >= t["so_xe_khai_thac"]

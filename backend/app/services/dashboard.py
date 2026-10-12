@@ -295,6 +295,28 @@ def build(db: Session, u: User) -> dict:
         # nhật trình chuyến — xem chú thích đầu services/xe_hom_nay.py để biết vì sao khác nhau.
         from app.services import xe_hom_nay as XE
         sec["xe_hom_nay"] = XE.dem(db, hom_nay=today)
+        # ── HQ-1 (13/10/2026) · khối 04b Hiệu quả đội xe ────────────────────────────────────
+        # Bốn ô này nằm trên bản vẽ từ lâu và giao diện đã dựng xong (KhoiV14.tsx), nhưng máy chủ
+        # chưa bao giờ trả trường nào — rà cả kho mã ngày 12/10 thì `ngay_xe_hoat_dong`,
+        # `cong_suat_khai_thac`, `km_chay_rong`, `chi_phi_moi_km` xuất hiện ở ĐÚNG 0 tệp backend.
+        # Nên khối hiện "Chưa kết nối" không phải vì thiếu số, mà vì không ai gửi số.
+        #
+        # Nối được từ hôm nay vì lượt nạp 676 chuyến (13/10) mang đủ km đầu/km cuối cho CẢ 676 —
+        # không có km thì ba trong bốn ô vẫn phải để trống.
+        #
+        # Bọc try cùng lý lẽ với các khối khác: một ô hỏng không được kéo sập bảng điều hành. Và khi
+        # hỏng thì để KHUYẾT trường chứ không trả 0 — màn hình tự hiện "Chưa kết nối", còn số 0 đọc
+        # ra là "đội xe chạy 0 ngày".
+        try:
+            from app.services import hieu_qua_xe as HQ
+            tk = HQ.theo_ky(db, today)
+            sec["hieu_qua_xe"] = tk["thang"]
+            sec["hieu_qua_xe_theo_ky"] = tk
+        except Exception as ex:
+            sec["hieu_qua_xe"] = None
+            sec["hieu_qua_xe_theo_ky"] = None
+            R.audit(db, "robot", "robot", "hieu_qua_xe_loi", "dashboard",
+                    after={"ly_do": str(ex)[:200]})
         # Quá hạn quyết toán. Hạn = ngày kết thúc + số ngày theo tham số (đoàn và lẻ khác nhau), nên
         # lọc luôn bằng ngày kết thúc: chuyến kết thúc SAU today − hạn dài nhất thì chắc chắn chưa quá
         # hạn, không cần nạp về. Bản cũ nạp 400 chuyến gần nhất rồi bỏ đi phần lớn.

@@ -150,6 +150,8 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
     d1, d2 = QT.ky_range(ky)
     so_ngay_ky = (d2 - d1).days + 1
     veh = {v.id: v for v in db.execute(select(Vehicle)).scalars()}
+    from app.services import hieu_qua_xe as HQ
+    _dh = HQ.doi_hinh(db, d1, d2)
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
     rows: dict[int, dict] = {}
 
@@ -247,9 +249,20 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
             "ngay_khai_thac": tong_ngay,
             # Công suất tính trên số xe CÓ trong đội, không phải số xe có chạy: mẫu số bằng số xe chạy
             # thì một chiếc nằm bãi cả tháng biến mất khỏi phép tính, và công suất luôn đẹp.
-            "so_xe_trong_doi": len([v for v in veh.values() if v.active]),
-            "cong_suat": (round(tong_ngay / (len([v for v in veh.values() if v.active]) * so_ngay_ky), 4)
-                          if veh and so_ngay_ky else None),
+            # HQ-1 (13/10/2026) — Ý ĐỊNH TRÊN ĐÚNG, PHÉP TÍNH CŨ SAI. Bản cũ lấy mẫu là
+            # `len([v for v in veh.values() if v.active])`, tức số xe hoạt động HÔM NAY, trong khi tử
+            # đếm theo KỲ. Đo trên hệ thật kỳ 2026-01: màn hình in "14/12 xe có chạy trong kỳ" — tử
+            # LỚN HƠN mẫu, vì ba chiếc chạy suốt tháng 1 rồi bán đi vẫn ở tử mà đã rơi khỏi mẫu.
+            # Công suất khi ấy sai theo hướng ĐẸP LÊN, nên không ai nghi.
+            #
+            # Luật "xe nào có trong đội tại kỳ nào" khai MỘT CHỖ ở `hieu_qua_xe.doi_hinh`, vì khối
+            # Chủ tịch cũng cần đúng luật ấy — hai nơi tự tính là dựng chỗ cho hai màn hình nói hai
+            # con số công suất khác nhau.
+            "so_xe_trong_doi": _dh["so_xe"],
+            "cong_suat": (round(tong_ngay / (_dh["so_xe"] * so_ngay_ky), 4)
+                          if _dh["du_du_lieu"] and _dh["so_xe"] and so_ngay_ky else None),
+            # Trống công suất thì phải nói VÌ SAO và AI phải làm gì, nếu không ô ấy nằm đó mãi.
+            "cong_suat_thieu": None if _dh["du_du_lieu"] else _dh,
         },
         "chi_tiet_chi_phi_doi": [{"nhom": k, "ten": NHOM_CHI_PHI_KY.get(k, (k,))[0], "so_tien": v}
                                  for k, v in sorted(chi_tiet_doi.items(), key=lambda kv: -kv[1])],
