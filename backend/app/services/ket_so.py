@@ -275,7 +275,7 @@ def ket_chuyen(db: Session, u: User, ky: str, buoc_chon: list[int] | None = None
         try:
             e = ACC.post_entry(db, u.username, u.role, d,
                                f"{info['ten']} – kỳ {ky}", lines,
-                               NGUON_KET_CHUYEN, f"kc:{ky}:{b}")
+                               NGUON_KET_CHUYEN, f"kc:{ky}:{b}", nghiep_vu="ket_chuyen_cuoi_ky")
         except ValueError as ex:
             raise KhongGhiDuoc(f"Bước {b} ({info['ten']}): {ex}")
         ra.append({"buoc": b, "chung_tu": e.code, "so_tien": abs(info["tong"])})
@@ -460,7 +460,7 @@ def ghi_so_sao_ke(db: Session, u: User, ky: str, chi_dinh: list[int] | None = No
         try:
             e = ACC.post_entry(db, u.username, u.role,
                                x["ngay"] or date.today(), x["dien_giai"], x["lines"],
-                               NGUON_SAO_KE, f"bank:{x['id']}")
+                               NGUON_SAO_KE, f"bank:{x['id']}", nghiep_vu="but_toan_sao_ke")
             ra.append({"id": x["id"], "chung_tu": e.code, "so_tien": x["so_tien"],
                        "quy_tac": x["quy_tac"]})
         except ValueError as ex:
@@ -592,7 +592,7 @@ def tach_ty_gia(db: Session, u: User, ky: str) -> dict:
     try:
         e = ACC.post_entry(db, u.username, u.role, d,
                            f"Tách chênh lệch tỷ giá ra 635/515 – kỳ {ky}", list(xt["but_toan"]),
-                           NGUON_TACH_TY_GIA, f"tgia:{ky}")
+                           NGUON_TACH_TY_GIA, f"tgia:{ky}", nghiep_vu="tach_ty_gia")
     except ValueError as ex:
         raise KhongGhiDuoc(f"Tách chênh lệch tỷ giá kỳ {ky}: {ex}")
     return {**xt, "da_ghi": True, "chung_tu": e.code,

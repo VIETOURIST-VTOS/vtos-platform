@@ -16,6 +16,7 @@ from app.models.core import User
 from app.services import hach_toan as HT
 from app.services import cong_chan as CC
 from app.services import accounting as ACC
+from app.services import chung_tu_loai as CTL   # Đợt E3 – ba bảng phân loại chứng từ
 from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1/hach-toan", tags=["hach-toan"])
@@ -125,7 +126,7 @@ def ghi_so(data: GhiSoIn, u: User = Depends(require_roles(*GHI_SO)), db: Session
     try:
         e = ACC.post_entry(db, u.username, u.role, data.ngay, bt["dien_giai"], bt["lines"],
                            source_type="quy_tac", source_ref=data.nguon_chung_tu or f"quy_tac:{bt['quy_tac']}",
-                           tour_id=data.tour_id)
+                           tour_id=data.tour_id, nghiep_vu="theo_quy_tac")
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     db.commit()
@@ -482,3 +483,17 @@ def xem_hai_vai_trung_nguoi(
             "so_tai_khoan_thieu_ma_nv": len(mu),
             "vai_can_ma": list(_KTN.vai_can_ma_de_phep_do_thay()),
             "tai_khoan_lam_mu": mu}
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT E3 – BA BẢNG PHÂN LOẠI CHỨNG TỪ, CHỈ ĐỌC
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# KHÔNG NỚI MỘT QUYỀN NÀO, và đó là chủ ý: cửa này nằm dưới đúng tiền tố `/api/v1/hach-toan` mà
+# màn hình `/ket-so` đã khai trong `MAN_HINH_API`, nên `PHAM_VI_DA_CHOT` không đổi một số nào.
+# Dựng một tiền tố thứ hai cho cùng một tập người là hai hàng rào phải canh cho một cánh cửa.
+#
+# CHỈ ĐỌC: ba bảng này khai trong mã (Chủ tịch chọn 12/10/2026), nên không có cửa ghi. Thêm một
+# loại chứng từ là một lần sửa mã có người ký và có lịch sử git.
+@router.get("/danh-muc-chung-tu", tags=["hach-toan"])
+def danh_muc_chung_tu(u: User = Depends(require_roles(*XEM))):
+    return CTL.danh_muc()

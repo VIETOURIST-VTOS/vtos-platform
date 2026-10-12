@@ -560,23 +560,23 @@ def post_payroll_entries(db: Session, run: PayrollRun) -> list[int]:
             if hdld > 0:
                 ids.append(ACC.post_entry(db, "robot", "robot", d, f"Lương tháng {run.period} – {ten}",
                                           [{"account": "642", "debit": hdld}, {"account": "334", "credit": hdld}],
-                                          "luong", f"payroll:{run.period}:{ten}").id)
+                                          "luong", f"payroll:{run.period}:{ten}", nghiep_vu="luong_hdld").id)
             if ctv > 0:
                 ids.append(ACC.post_entry(db, "robot", "robot", d, f"Thù lao HDV/CTV tháng {run.period} – {ten}",
                                           [{"account": "632", "debit": ctv}, {"account": "338", "credit": ctv}],
-                                          "luong", f"payroll:{run.period}:{ten}").id)
+                                          "luong", f"payroll:{run.period}:{ten}", nghiep_vu="thu_lao_ctv").id)
             if tncn > 0:
                 ids.append(ACC.post_entry(db, "robot", "robot", d, f"Khấu trừ TNCN 10% thù lao CTV tháng {run.period} – {ten}",
                                           [{"account": "338", "debit": tncn}, {"account": "3335", "credit": tncn}],
-                                          "luong", f"payroll:{run.period}:{ten}").id)
+                                          "luong", f"payroll:{run.period}:{ten}", nghiep_vu="khau_tru_tncn").id)
             if bhxh > 0:
                 ids.append(ACC.post_entry(db, "robot", "robot", d, f"BHXH phần người lao động tháng {run.period} – {ten}",
                                           [{"account": "334", "debit": bhxh}, {"account": "3383", "credit": bhxh}],
-                                          "luong", f"payroll:{run.period}:{ten}").id)
+                                          "luong", f"payroll:{run.period}:{ten}", nghiep_vu="bhxh_nld").id)
             if doan_phi > 0:
                 ids.append(ACC.post_entry(db, "robot", "robot", d, f"Đoàn phí công đoàn tháng {run.period} – {ten}",
                                           [{"account": "334", "debit": doan_phi}, {"account": "3382", "credit": doan_phi}],
-                                          "luong", f"payroll:{run.period}:{ten}").id)
+                                          "luong", f"payroll:{run.period}:{ten}", nghiep_vu="doan_phi").id)
         except ValueError as ex:
             R.audit(db, "robot", "robot", "ghi_so_that_bai", f"payroll:{run.period}:{ten}", after={"ly_do": str(ex)})
     return ids

@@ -74,7 +74,7 @@ class EntryIn(BaseModel):
 @router.post("/journal", status_code=201)
 def create_entry(data: EntryIn, u: User = Depends(require_roles("ketoan")), db: Session = Depends(get_db)):
     try:
-        e = ACC.post_entry(db, u.username, u.role, data.entry_date, data.description, [l.model_dump() for l in data.lines], "thu_cong", "", data.tour_id, post=data.post)
+        e = ACC.post_entry(db, u.username, u.role, data.entry_date, data.description, [l.model_dump() for l in data.lines], "thu_cong", "", data.tour_id, post=data.post, nghiep_vu="but_toan_tay")
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     db.commit(); db.refresh(e)

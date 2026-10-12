@@ -301,12 +301,12 @@ def closing_entries_draft(db: Session, u: User, period: str) -> list[JournalEntr
         v = m.get(c, {}).get("debit", 0.0) - m.get(c, {}).get("credit", 0.0)
         if v: lines_exp.append({"account": c, "credit": v})
     tr = sum((l["debit"] or 0) for l in lines_rev); te = sum((l["credit"] or 0) for l in lines_exp)
-    if tr: out.append(ACC.post_entry(db, u.username, u.role, d, f"Kết chuyển doanh thu kỳ {period} sang 911", lines_rev + [{"account": "911", "credit": tr}], "ket_chuyen", f"period:{period}", post=False))
-    if te: out.append(ACC.post_entry(db, u.username, u.role, d, f"Kết chuyển chi phí kỳ {period} sang 911", [{"account": "911", "debit": te}] + lines_exp, "ket_chuyen", f"period:{period}", post=False))
+    if tr: out.append(ACC.post_entry(db, u.username, u.role, d, f"Kết chuyển doanh thu kỳ {period} sang 911", lines_rev + [{"account": "911", "credit": tr}], "ket_chuyen", f"period:{period}", post=False, nghiep_vu="ket_chuyen_doanh_thu"))
+    if te: out.append(ACC.post_entry(db, u.username, u.role, d, f"Kết chuyển chi phí kỳ {period} sang 911", [{"account": "911", "debit": te}] + lines_exp, "ket_chuyen", f"period:{period}", post=False, nghiep_vu="ket_chuyen_chi_phi"))
     net = tr - te
     if abs(net) >= 1:
         ln = [{"account": "911", "debit": net}, {"account": "421", "credit": net}] if net > 0 else [{"account": "421", "debit": -net}, {"account": "911", "credit": -net}]
-        out.append(ACC.post_entry(db, u.username, u.role, d, f"Kết chuyển lãi/lỗ kỳ {period}: {net:,.0f}", ln, "ket_chuyen", f"period:{period}", post=False))
+        out.append(ACC.post_entry(db, u.username, u.role, d, f"Kết chuyển lãi/lỗ kỳ {period}: {net:,.0f}", ln, "ket_chuyen", f"period:{period}", post=False, nghiep_vu="ket_chuyen_lai_lo"))
     db.commit()
     return out
 

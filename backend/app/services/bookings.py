@@ -196,7 +196,7 @@ def apply_retention(db: Session, u: User, rt: Retention, nb: Booking, amount: fl
     try:
         ACC.post_entry(db, "robot", "robot", date.today(), f"Chuyển tiền bảo lưu {rt.code} sang booking {nb.code}",
                        [{"account": "131", "debit": amt, "partner": rt.customer_name, "booking_id": rt.booking_id, "note": "giảm ứng trước booking cũ"},
-                        {"account": "131", "credit": amt, "partner": nb.customer_name, "booking_id": nb.id, "note": "ứng trước booking mới"}], "thu_tien", f"receipt:{rc.code}", nb.tour_id)
+                        {"account": "131", "credit": amt, "partner": nb.customer_name, "booking_id": nb.id, "note": "ứng trước booking mới"}], "thu_tien", f"receipt:{rc.code}", nb.tour_id, nghiep_vu="thu_tien_khach")
     except ValueError as ex:
         R.audit(db, "robot", "robot", "ghi_so_that_bai", f"receipt:{rc.code}", after={"ly_do": str(ex)})
     rt.remaining = round((rt.remaining or 0) - amt); rt.applied_booking_id = nb.id
@@ -241,7 +241,7 @@ def cancel_retention(db: Session, u: User, rt: Retention, note: str) -> str:
         try:
             ACC.post_entry(db, u.username, u.role, date.today(), f"Hủy bảo lưu {rt.code} – {rt.customer_name}: {note[:80]}",
                            [{"account": "131", "debit": amt, "partner": rt.customer_name, "booking_id": rt.booking_id}, {"account": "711", "credit": amt, "partner": rt.customer_name, "booking_id": rt.booking_id}],
-                           "bao_luu", f"baoluu:{rt.code}")
+                           "bao_luu", f"baoluu:{rt.code}", nghiep_vu="huy_bao_luu")
         except ValueError as ex:
             R.audit(db, u.username, u.role, "ghi_so_that_bai", f"baoluu:{rt.code}", after={"ly_do": str(ex)})
     rt.status, rt.resolved_by, rt.resolved_at, rt.resolve_note, rt.remaining = "huy", u.username, datetime.now(), note[:300], 0
