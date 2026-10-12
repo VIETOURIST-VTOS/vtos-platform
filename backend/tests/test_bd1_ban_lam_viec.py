@@ -21,6 +21,7 @@ for _x in (_DB, _DB + "-journal"):
     except OSError:
         pass
 import inspect
+from datetime import date
 import re
 import pytest
 from sqlalchemy import select
@@ -210,6 +211,108 @@ def test_bd1_o_quyet_toan_chi_dung_trang_thai_tour_co_that():
     if o["trang_thai"] != BLV.SAN_SANG: pytest.skip("ô quyết toán chưa đọc được")
     bia = [d for d in o["dong"] if "trả lại" in d["chinh"].lower()]
     assert not bia, f"ô quyết toán bày dòng {bia} trong khi VTOS không có trạng thái trả lại"
+
+
+class _DbGia:
+    """Phiên giả cho `_quyet_toan_cho`: trả về đúng số chuyến mình muốn cho mỗi trạng thái.
+
+    VÌ SAO PHẢI GIẢ, và đây là lần tự ngã thứ BẢY trong hai ngày — lần này của chính phép thử
+    dưới đây. Bản đầu của nó đọc cơ sở dữ liệu mẫu rồi so con số của ô với số chuyến `ket_thuc`.
+    Nó XANH cả khi em cố tình trả lại phép cộng sai, vì kho mẫu KHÔNG có chuyến nào ở trạng thái
+    `da_dong_so`: 638 + 0 bằng 638, nên hai công thức cho cùng một kết quả và phép thử không
+    phân biệt được. Trên dữ liệu thật thì chênh nhau 1025 chuyến.
+
+    Một phép thử chỉ đỏ khi dữ liệu mẫu tình cờ có đúng thứ nó cần là một phép thử xanh vì may.
+    Nên chỗ này không đọc kho mẫu nữa: dựng hai trạng thái bằng tay, với số khác nhau rõ rệt.
+    Nhận biết câu hỏi bằng chuỗi SQL đã dịch chứ không bằng THỨ TỰ gọi — thứ tự đổi thì phép thử
+    vẫn đúng, còn đoán theo thứ tự thì ngày ai hoán hai dòng là nó lặng lẽ kiểm ngược.
+    """
+    def __init__(self, so: dict):
+        self.so = so
+
+    def execute(self, stmt):
+        cau = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+        for trang_thai, n in self.so.items():
+            if f"'{trang_thai}'" in cau:
+                return _KetQua([object() for _ in range(n)])
+        raise AssertionError(f"phiên giả không nhận ra câu hỏi: {cau}")
+
+
+class _KetQua:
+    def __init__(self, rows): self._r = rows
+    def scalars(self): return self
+    def all(self): return list(self._r)
+    def __iter__(self): return iter(self._r)
+
+
+def test_bd1_o_quyet_toan_dem_dung_viec_cua_phong_nay(monkeypatch):
+    """CON SỐ CỦA Ô, không phải hai dòng mẫu — và đây là chỗ bản đầu nói sai từ lúc dựng.
+
+    `_quyet_toan_cho` có sẵn một đoạn chú thích cấm gộp hai chặng, rồi chính nó trả về
+    `len(cho_dong) + len(cho_kt)`. Hai dòng mẫu tách đúng nên mọi phép thử cũ đều xanh — chúng
+    soi DÒNG, không soi CON SỐ. Đo trên dữ liệu thật 12/10/2026: ô hiện 1663 trong khi việc của
+    riêng Điều hành là 638.
+
+    Con số của ô còn đi tiếp vào `tong_dang_cho` của cả bàn, nên một ô nói quá kéo theo cả tổng
+    nói quá.
+    """
+    from app.services import rules as R
+    monkeypatch.setattr(R, "settlement_deadline", lambda db, t: date(2099, 1, 1))
+    db = _DbGia({"ket_thuc": 7, "da_dong_so": 11})
+    o = BLV._quyet_toan_cho(db)
+    assert o["so_luong"] == 7, (
+        f"ô quyết toán đếm {o['so_luong']} với 7 chuyến chờ Điều hành đóng số và 11 chuyến đã "
+        f"giao cho Kế toán. Cộng chặng đã giao đi vào là nói với trưởng phòng rằng anh đang nợ "
+        f"một núi hồ sơ mà phần lớn đã nằm trên bàn người khác — trên dữ liệu thật 12/10/2026 "
+        f"chênh nhau 1663 so với 638.")
+    assert o["so_luong"] != 18, "ô quyết toán lại gộp cả chặng Kế toán vào con số của mình"
+
+
+def test_bd1_tong_dang_cho_cua_ban_khong_mang_theo_chang_ke_toan(monkeypatch):
+    """Con số của ô đi thẳng vào `tong_dang_cho`, nên một ô nói quá kéo cả tổng nói quá theo.
+
+    Canh ở đây chứ không chỉ ở ô, vì đó mới là con số to nhất trên bàn — thứ trưởng phòng liếc
+    một cái là thấy trước khi đọc bất kỳ ô nào.
+    """
+    from app.services import rules as R
+    monkeypatch.setattr(R, "settlement_deadline", lambda db, t: date(2099, 1, 1))
+    it = BLV._quyet_toan_cho(_DbGia({"ket_thuc": 7, "da_dong_so": 0}))
+    nhieu = BLV._quyet_toan_cho(_DbGia({"ket_thuc": 7, "da_dong_so": 11}))
+    assert it["so_luong"] == nhieu["so_luong"], (
+        "số chuyến đã giao cho Kế toán làm đổi con số của ô — tức nó vẫn được cộng vào. Chặng ấy "
+        "không phải việc của phòng này, nên nó không được làm con số của phòng này nhúc nhích.")
+
+
+def test_bd1_chang_ke_toan_van_hien_va_noi_ro_la_khong_tinh_vao():
+    """Bỏ chặng Kế toán đi thì chữa một cái sai bằng cách tạo một cái thiếu.
+
+    Sau khi đóng số, phòng Điều hành vẫn cần biết hồ sơ của mình đang nằm đâu — đây là chỗ duy
+    nhất thấy điều đó. Nên nó PHẢI còn, nhưng phải nói bằng chữ rằng nó không nằm trong con số,
+    chứ không để người đọc tự suy từ phép cộng không khớp.
+    """
+    from app.db.session import SessionLocal
+    with SessionLocal() as s_:
+        o = [x for x in BLV.ban(s_, "dieu_hanh")["o"] if x["khoa"] == "quyet_toan"][0]
+    if o["trang_thai"] != BLV.SAN_SANG: pytest.skip("ô quyết toán chưa đọc được")
+    ke_toan = [d for d in o["dong"] if "kế toán" in d["chinh"].lower()]
+    assert ke_toan, "mất dòng theo dõi chặng Kế toán — phòng này không còn chỗ nào thấy hồ sơ đã giao đi"
+    assert "không tính" in (ke_toan[0]["phu"] or "").lower(), (
+        "dòng chặng Kế toán không nói ra rằng nó KHÔNG nằm trong con số của ô. Một con số và một "
+        "dòng không cộng vào nó, đứng cạnh nhau mà không ai nói gì, thì người đọc sẽ tự cộng.")
+
+
+def test_bd1_ten_o_khong_rong_hon_con_so_no_mang():
+    """Một cái tên rộng hơn con số nó mang cũng là nói sai, chỉ êm hơn.
+
+    Ô đếm chuyến chờ CHÍNH phòng này đóng số, nên tên phải nói đúng chừng ấy. Tên cũ "Quyết toán
+    tour đang chờ" bao cả chặng Kế toán — đúng với con số cũ (đã sai), sai với con số mới.
+    """
+    from app.db.session import SessionLocal
+    with SessionLocal() as s_:
+        o = [x for x in BLV.ban(s_, "dieu_hanh")["o"] if x["khoa"] == "quyet_toan"][0]
+    ten = o["ten"].lower()
+    assert "điều hành" in ten or "đóng số" in ten, (
+        f"tên ô là “{o['ten']}” — rộng hơn thứ nó đếm. Nó chỉ đếm chặng chờ phòng này đóng số.")
 
 
 def test_bd1_hang_doi_bao_cao_ngay_cat_theo_phong_chu_khong_dem_ca_cong_ty():

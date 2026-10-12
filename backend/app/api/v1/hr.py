@@ -43,6 +43,14 @@ def emp_out(e: Employee) -> dict:
             "card_no": e.card_no, "card_type": e.card_type, "card_expiry": e.card_expiry, "member_org": e.member_org, "ctv_contract": e.ctv_contract,
             "advance_limit": e.advance_limit, "active": e.active, "company_id": e.company_id, "birth_date": e.birth_date, "phone": e.phone,
             "bhxh_base": e.bhxh_base, "member_org": e.member_org,
+            # NỬA CÒN LẠI CỦA PHÉP KIỂM LỆCH PHIÊN BẢN — trả nợ 12/10/2026.
+            # `update_employee` gọi `kiem_phien_ban` từ đợt VPM-8, nhưng phép ấy CHỈ chạy khi màn
+            # hình GỬI phiên bản lên, và màn hình chỉ gửi được khi cửa đọc TRẢ RA. Thiếu đúng một
+            # khoá này nên hàng rào chống hai người sửa đè nhau chưa chạy ngày nào kể từ VPM-8:
+            # hai người mở cùng một hồ sơ, người lưu sau ghi đè người lưu trước, không ai biết.
+            # Vòng TK-1 (12/10) đã dựng đầu màn hình nhưng KHÔNG thêm được khoá này vì tệp đang
+            # bị làn Phân quyền giữ; ghi nợ rồi trả ở đây khi dòng ấy đóng.
+            "phien_ban": e.phien_ban,
             "guide_ok": H.guide_eligible(e, date.today())[0] if e.department == "huong_dan" else None}
 
 
