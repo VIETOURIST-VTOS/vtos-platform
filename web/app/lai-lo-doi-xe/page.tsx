@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -113,10 +114,27 @@ function LaiLo() {
           nên dòng <b>kết quả sau lãi vay</b> đang bằng lợi nhuận đội xe. Đó là THIẾU SỐ, không phải
           bằng 0.</p>}
         <div className="kpis" style={{ marginTop: 10 }}>
-          <div className="kpi"><b>{t.so_xe_khai_thac}/{t.so_xe_trong_doi}</b><span>xe có chạy trong kỳ</span></div>
+          {/* HQ-1b (13/10/2026) — MẪU SỐ RỖNG THÌ ĐỪNG IN DẤU GẠCH CHÉO.
+              Bản trước in thẳng `{so_xe_khai_thac}/{so_xe_trong_doi}`, nên khi đội hình chưa khai
+              đủ thì ô đọc ra "14/" — một mẫu số cụt, trông như màn hình hỏng. Mẫu rỗng thì chỉ in
+              tử số; cái thiếu nói ở dòng dưới, bằng chữ. */}
+          <div className="kpi"><b>{t.so_xe_trong_doi == null ? t.so_xe_khai_thac
+            : `${t.so_xe_khai_thac}/${t.so_xe_trong_doi}`}</b><span>xe có chạy trong kỳ</span></div>
           <div className="kpi"><b>{pc(t.cong_suat)}</b><span>công suất (ngày chạy / xe × ngày)</span></div>
           <div className="kpi"><b>{t.ngay_khai_thac}</b><span>ngày khai thác</span></div>
         </div>
+        {/* Ô TRỐNG PHẢI NÓI AI LÀM. Máy chủ đã gửi đủ `cong_suat_thieu` (bộ phận, cửa nhập, danh
+            sách xe còn thiếu) từ vòng HQ-1, nhưng màn hình chưa in ra — nên người đọc chỉ thấy một
+            dấu gạch ngang và không có cách nào biết nó đang chờ ai. Đây đúng điều bản vẽ KhoiV14 đã
+            cảnh báo: một ô trống không nói ai chịu trách nhiệm thì nó nằm đó mãi.
+            Vòng này KHÔNG đổi phép tính nào — chỉ in cái đã có. */}
+        {t.cong_suat_thieu && <p className="muted" style={{ marginTop: 8 }}>
+          <Tag cls="warn">chưa tính được</Tag> <b>Công suất</b> — còn <b>{t.cong_suat_thieu.thieu.length} xe</b> chưa
+          khai ngày vào đội, nên chưa biết kỳ này đội có bao nhiêu chiếc.{" "}
+          {t.cong_suat_thieu.thieu.slice(0, 4).map((x: any) => x.xe).join(" · ")}
+          {t.cong_suat_thieu.thieu.length > 4 && ` …và ${t.cong_suat_thieu.thieu.length - 4} chiếc nữa`}.
+          {" "}Việc của <b>{t.cong_suat_thieu.bo_phan}</b>.{" "}
+          <Link href={t.cong_suat_thieu.cua_nhap}>Mở cửa Hồ sơ xe →</Link></p>}
       </div>
 
       {/* TIỀN NẰM NGOÀI BA TẦNG. Đo trên hệ thật 07/10/2026: bảng giao dịch nguồn ngoài giữ
