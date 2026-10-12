@@ -256,6 +256,19 @@ class DispatchOrder(Base):
     phuong_an_da_chon: Mapped[str] = mapped_column(String(60), default="")
     ly_do_khac_goi_y: Mapped[str] = mapped_column(String(300), default="")
 
+    # ─── DL-1b (12/10/2026) — MẮT THỨ BA: TÀI XẾ NHẬN LỆNH.
+    #
+    # BA CỘT RIÊNG, KHÔNG MƯỢN LẠI `status`. Cột `status` đang mang nghĩa "GIÁM ĐỐC ĐỘI XE đã chốt
+    # lệnh" (`da_xac_nhan` chỉ đặt được bởi người duy nhất được lập lệnh — xem `dispatch_update`).
+    # Nhét thêm nghĩa "tài xế đã nhận" vào cùng một ô là đúng cái bẫy `two_signatures` đã ghi trong
+    # sổ: một ô mang hai lý do thì về sau không ai tách lại được ai đã bấm.
+    nhan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    nhan_boi: Mapped[str] = mapped_column(String(50), default="")
+    # Từ chối KHÔNG huỷ lệnh (Chủ tịch chốt 12/10/2026): lệnh vẫn hiệu lực, hệ thống chỉ báo Giám đốc
+    # đội xe. Từ chối là một tiếng nói, không phải một cái nút huỷ việc của cấp trên. Lý do BẮT BUỘC
+    # — nó là thứ duy nhất trả lời được câu hỏi tháng sau: vì sao chuyến ấy phải đổi xe hoặc thuê ngoài.
+    tu_choi_nhan_ly_do: Mapped[str] = mapped_column(String(300), default="")
+
 
 INCIDENT_LEVELS = {
     1: {"ten": "Mức 1 – Sai sót nội bộ", "mo_ta": "Khách chưa bị ảnh hưởng hoặc đã xử lý xong trong ngày: nhập thiếu thông tin booking rồi tự sửa, sai sót giấy tờ sửa được trước khởi hành không phát sinh chi phí, thiếu báo cáo một ngày, trả lời khách trễ trong ca trực",

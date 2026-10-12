@@ -239,6 +239,20 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # XEM rộng bằng đúng thẻ ấy; GHI (ngày nghỉ việc) hẹp bằng HR_ADMIN — ghi ngày nghỉ là đóng một
 # người khỏi bảng lương, không phải một ô ghi chú, và có phép thử gọi sai vai để chắc nó trả 403.
 PHAM_VI_DA_CHOT = {
+    # DL-1b (12/10/2026) — +1 cho MƯỜI MỘT vai: tiền tố "/api/v1/nhan-lenh", ba cửa của mắt thứ ba
+    # trong chuỗi điều xe (Điều hành đề nghị → Giám đốc đội xe lập lệnh → TÀI XẾ NHẬN).
+    #
+    # VÌ SAO MỘT TIỀN TỐ RIÊNG, không mở "/api/v1/dispatch" cho tài xế: mở cả cụm ấy là cho tài xế
+    # đọc GIÁ THUÊ NỘI BỘ của mọi lệnh trong công ty — nới hàng rào rộng hơn nhiều lần việc cần làm,
+    # đúng lý lẽ đã ghi cho "/fleet/de-lap-lenh". Tiền tố mới chỉ có ba cửa, và hai cửa ghi còn chặn
+    # thêm một lớp: tài xế chỉ chạm được lệnh ghi TÊN MÌNH (hr._lenh_cua_toi).
+    #
+    # MỘT VAI ĐƯỢC CỘNG MÀ KHÔNG BẤM ĐƯỢC NÚT NÀO: `hdv`. Phạm vi suy từ MAN_HINH_API, mà hướng dẫn
+    # viên và tài xế DÙNG CHUNG màn hình "/xe-hdv" — bảng vai ghi rõ "hai dòng này giống nhau, và
+    # giống nhau ở đây là đúng". Nên hdv được cộng tiền tố, còn cửa ghi thì `require_roles` vẫn từ
+    # chối (_NHAN không có hdv), và hdv cũng không có lệnh điều xe nào để mà nhận. Ghi ra đây để ba
+    # tháng nữa không ai đọc con số 23 này thành "hướng dẫn viên nhận được lệnh điều xe".
+
     # ĐÁNH GIÁ SAU TOUR (25/9/2026) – +1 cho MƯỜI BA vai: nhóm "/api/v1/danh-gia" gắn vào màn
     # hình mới /danh-gia (bảng điểm khách chấm cho chuyến, HDV, tài xế; ba con số đã gửi / đã
     # trả lời / không gửi được).
@@ -607,8 +621,8 @@ PHAM_VI_DA_CHOT = {
     # GHI ở đây hẹp hơn XEM, và chia làm HAI nhóm khác nhau đúng chỗ phải khác: ĐỀ NGHỊ là Điều
     # hành (người cần xe), TỪ CHỐI là Giám đốc đội xe (người có xe). Người đề nghị không từ chối
     # việc của chính mình.
-    "chutich": 133, "tgd": 133, "bks": 133, "cntt": 130, "ir_phapche": 20,
-    "ketoan": 109, "tp_dh": 99, "ptgd_doan": 80, "nv_dh": 70, "hcns": 70, "gd_kd": 73,
+    "chutich": 134, "tgd": 134, "bks": 134, "cntt": 131, "ir_phapche": 20,
+    "ketoan": 109, "tp_dh": 100, "ptgd_doan": 80, "nv_dh": 71, "hcns": 71, "gd_kd": 73,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -649,7 +663,7 @@ PHAM_VI_DA_CHOT = {
     # hư hỏng xe). Đây là một NHÁNH CON, không phải cả phân hệ đội xe — xem phép thử bản đồ màn
     # hình ở trên, nay so bằng đường đầy đủ nên bản đồ nói được "màn hình này chỉ chạm nhánh ấy".
     # Mười vai cùng +1 vì cả mười đều thấy màn hình /xe-hdv; không vai nào nhận thêm gì khác.
-    "gd_doi_xe": 33, "hanh_chinh": 33, "tp_hd": 29, "tai_xe": 22, "hdv": 22, "nv_visa": 22,
+    "gd_doi_xe": 34, "hanh_chinh": 33, "tp_hd": 29, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
@@ -691,7 +705,7 @@ PHAM_VI_DA_CHOT = {
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
     "ketoan_truong": 109, "ketoan_tt": 31, "thu_quy": 27,
-    "robot_pq": 18, "robot_ks": 133, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 134, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

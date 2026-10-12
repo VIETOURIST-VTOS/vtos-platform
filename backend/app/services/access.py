@@ -226,8 +226,13 @@ RESTRICTED_API_PREFIXES = {
     # gọi tới – tức là một bảng được khai "có cửa nhập tay" trong khi người phải dùng nó không với
     # tới cửa ấy. Mở tiền tố không mở sổ đơn công ty: `GET /leaves` lọc ba tầng theo người ký
     # (hrm.py::phong_minh_ky), và tài xế không nằm trong tầng nào ngoài tầng "đơn của chính mình".
+    # DL-1b (12/10/2026): MỘT tiền tố hẹp cho mắt thứ ba, KHÔNG mở `/api/v1/dispatch`.
+    # Mở cả cụm dispatch là cho tài xế đọc giá thuê nội bộ của mọi lệnh trong công ty –
+    # nới hàng rào rộng hơn nhiều lần việc cần làm. `/nhan-lenh` chỉ có ba cửa, và hai cửa
+    # ghi còn chặn thêm một lớp: tài xế chỉ chạm được lệnh ghi TÊN MÌNH (hr._lenh_cua_toi).
     "tai_xe": ("/api/v1/incidents", "/api/v1/payment-requests", "/api/v1/fleet/bao-hong",
-               "/api/v1/leaves", "/api/v1/leave-balance"),
+               "/api/v1/leaves", "/api/v1/leave-balance",
+               "/api/v1/nhan-lenh"),
     # HDV cũng nộp được đơn: cùng màn hình /xe-hdv, và người ký của phòng Hướng dẫn đã khai trong
     # hrm.TUYEN_KY_DON. Không mở /fleet/bao-hong cho vai này – hướng dẫn viên không đứng tên xe.
     "hdv": ("/api/v1/incidents", "/api/v1/leaves", "/api/v1/leave-balance"),
@@ -450,7 +455,8 @@ MAN_HINH_API = {
                       # DL-1 (11/10/2026): đề nghị xe là mắt đầu của chuỗi điều xe, và nó ở CÙNG
                       # màn hình với lệnh — đề nghị và lệnh là hai mặt của một việc. Dựng màn hình
                       # thứ hai cho đề nghị là bắt Giám đốc đội xe mở hai trang để làm một việc.
-                      "/api/v1/de-nghi-xe"),
+                      "/api/v1/de-nghi-xe",
+                      "/api/v1/nhan-lenh"),
     # 18/9/2026 – THÊM "/api/v1/leads" VÀ "/api/v1/noi-dung", anh Tuấn chốt cùng ngày.
     #
     # Màn hình /marketing nay là KHÔNG GIAN LÀM VIỆC bảy màn hình theo bản vẽ V3.0, nên nó đọc cả
@@ -588,8 +594,12 @@ MAN_HINH_API = {
                "/api/v1/chuong-trinh"),
     "/vietrip": ("/api/v1/import",),
     "/visa": ("/api/v1/visa",),
+    # DL-1b: hai nút "nhận / không nhận được" nằm ngay trên màn hình này, nên tiền tố của
+    # chúng phải có mặt ở đây — nếu không thì nút hiện ra mà bấm vào là 403: đúng hình "cửa
+    # mở, biển đề đóng" đã ghi ba lần trong sổ.
     "/xe-hdv": ("/api/v1/xe-hdv", "/api/v1/incidents", "/api/v1/payment-requests",
-                "/api/v1/fleet/bao-hong", "/api/v1/leaves", "/api/v1/leave-balance"),
+                "/api/v1/fleet/bao-hong", "/api/v1/leaves", "/api/v1/leave-balance",
+                "/api/v1/nhan-lenh"),
 }
 
 

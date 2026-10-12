@@ -275,11 +275,105 @@ def _bao_cao_ngay_chua_cham(db: Session, phong_ks: tuple[str, ...]) -> dict:
 # `phong_ks` nối khoá phòng của `bao_cao_phong` sang tên phòng của `ks_robot.PHONG_CUA_VAI_TRO`:
 # hai bảng đã có sẵn, mỗi bảng có chủ, và đây là chỗ DUY NHẤT nối chúng. Visa đi cùng Điều hành vì
 # `bao_cao_phong.PHONG["visa"]["thuoc"] == "dieu_hanh"`.
+def _de_nghi_xe_cho_lap_lenh(db: Session) -> dict:
+    """Đề nghị xe Điều hành đã gửi mà Giám đốc đội xe chưa lập lệnh (mắt 1 → mắt 2)."""
+    from app.models.core import Tour
+    from app.models.de_nghi_xe import DeNghiXe
+    rows = list(db.execute(select(DeNghiXe).where(DeNghiXe.trang_thai == "cho_lap_lenh")
+                           .order_by(DeNghiXe.ngay_di)).scalars())
+    dong = []
+    for d in rows[:SO_DONG_MAU]:
+        t = db.get(Tour, d.tour_id)
+        con = (d.ngay_di - date.today()).days
+        dong.append(_dong(t.code if t else f"#{d.id}", f"{d.so_khach} khách · cần {d.so_xe_can} xe",
+                          f"Đi sau {con} ngày" if con > 0 else "Đi hôm nay",
+                          "", "do" if con <= 1 else ("vang" if con <= 3 else "")))
+    return _o("de_nghi_xe_cho_lap_lenh", "Đề nghị xe chờ lập lệnh", len(rows), "đề nghị",
+              "/lenh-dieu-xe",
+              "fleet_vehicle_requests đang ở trạng thái cho_lap_lenh (de_nghi_xe.danh_sach)",
+              muc="do" if rows else "xanh",
+              nhan_muc="Có đề nghị đang chờ" if rows else "Không còn đề nghị nào chờ",
+              ghi_chu="Điều hành đề nghị → Giám đốc đội xe lập lệnh → tài xế nhận", dong=dong)
+
+
+def _lenh_tai_xe_chua_nhan(db: Session) -> dict:
+    """Lệnh QUÁ HẠN mà tài xế chưa bấm nhận, cộng lệnh tài xế đã báo không nhận được (mắt 3).
+
+    Gộp hai nhóm vào MỘT ô chứ không hai: với Giám đốc đội xe cả hai là một việc — "chuyến này
+    chưa chắc có người lái". Tách ra là bắt ông mở hai chỗ để trả lời một câu hỏi.
+
+    Dùng lại `nhan_lenh.can_giam_doc_xe_biet()` — đúng hàm màn hình lệnh điều xe gọi. Gõ lại phép
+    so sánh quá hạn ở đây là dựng chỗ thứ hai có thể lệch, đúng lý do đã ghi ở `_su_co_qua_han`.
+    """
+    from app.services import nhan_lenh as NL
+    kq = NL.can_giam_doc_xe_biet(db)
+    rows = kq["qua_han"] + kq["tu_choi"]
+    dong = []
+    for r in rows[:SO_DONG_MAU]:
+        dong.append(_dong(f"{r['xe']} · {r['tai_xe']}",
+                          f"đi {r['ngay_di']}",
+                          ("Báo không nhận được" if r["trang_thai_nhan"] == NL.TU_CHOI
+                           else "Quá hạn, chưa bấm"), "", "do"))
+    return _o("lenh_tai_xe_chua_nhan", "Lệnh tài xế chưa nhận", len(rows), "lệnh",
+              "/lenh-dieu-xe",
+              "dispatch_orders còn hiệu lực, quá hạn nhận hoặc tài xế đã từ chối "
+              "(nhan_lenh.can_giam_doc_xe_biet)",
+              muc="do" if rows else "xanh",
+              nhan_muc="Cần đổi người hoặc đổi xe" if rows else "Mọi lệnh đều có người nhận",
+              ghi_chu=f"Hạn nhận {kq['han_gio']} giờ trước ngày đi. Quá hạn KHÔNG huỷ lệnh – "
+                      "lệnh vẫn hiệu lực, đây chỉ là chỗ thấy sớm.", dong=dong)
+
+
+def _lenh_da_nhan_trong_tuan(db: Session) -> dict:
+    """Mẫu số cho ô trên.
+
+    Có mặt vì một lý do: "2 lệnh quá hạn" đứng một mình không nói được gì. 2 trên 13 là chuyện
+    thường; 2 trên 3 là đội xe đang có vấn đề. Ô này KHÔNG phải việc phải làm — nó là con số để
+    đọc ô kia, nên `muc` luôn xanh và không có dòng mẫu nào.
+    """
+    from app.services import nhan_lenh as NL
+    n = NL.da_nhan_trong_tuan(db)
+    return _o("lenh_da_nhan_trong_tuan", "Lệnh tài xế đã nhận (7 ngày)", n, "lệnh",
+              "/lenh-dieu-xe",
+              "dispatch_orders có nhan_luc trong 7 ngày gần nhất (nhan_lenh.da_nhan_trong_tuan)",
+              muc="xanh", nhan_muc="Để đọc con số ở ô trên",
+              ghi_chu="Không phải việc phải làm – đây là mẫu số")
+
+
+# Ô nào dựng bằng hàm nào. Một bảng, một nơi khai — để thêm bàn là thêm một dòng trong `BAN`
+# chứ không phải sửa thân hàm `ban()`.
+O_HAM = {
+    "yeu_cau_booking": lambda db, cfg: _yeu_cau_cho_booking(db),
+    "su_co_qua_han": lambda db, cfg: _su_co_qua_han(db),
+    "de_nghi_chi": lambda db, cfg: _de_nghi_chi_cho_xac_nhan(db, cfg["vai_xac_nhan"]),
+    "quyet_toan": lambda db, cfg: _quyet_toan_cho(db),
+    "bao_cao_ngay": lambda db, cfg: _bao_cao_ngay_chua_cham(db, cfg["phong_ks"]),
+    "de_nghi_xe_cho_lap_lenh": lambda db, cfg: _de_nghi_xe_cho_lap_lenh(db),
+    "lenh_tai_xe_chua_nhan": lambda db, cfg: _lenh_tai_xe_chua_nhan(db),
+    "lenh_da_nhan_trong_tuan": lambda db, cfg: _lenh_da_nhan_trong_tuan(db),
+}
+
+# Ô là MẪU SỐ để đọc ô khác, không phải việc phải làm. Không cộng vào tổng đang chờ.
+MAU_SO = ("lenh_da_nhan_trong_tuan",)
+
 BAN = {
     "dieu_hanh": {
         "ten": "Bàn làm việc Điều hành",
         "vai_xac_nhan": ("tp_dh",),
         "phong_ks": ("Điều hành", "Visa"),
+        "o": ("yeu_cau_booking", "su_co_qua_han", "de_nghi_chi", "quyet_toan", "bao_cao_ngay"),
+    },
+    # DL-1b (12/10/2026) — BÀN ĐỘI XE. Chủ tịch chốt: Giám đốc đội xe thấy "ai đã nhận, ai chưa"
+    # ngay trên bàn làm việc của ông, không phải tự đi tìm trong bảng lệnh.
+    #
+    # KHÔNG dựng cơ chế mới: `PHONG["doi_xe"]` đã có sẵn trong `bao_cao_phong` với `xem:
+    # ("gd_doi_xe",)`, và cửa `/bao-cao/ban-lam-viec` đã chặn theo `pham_vi_cho_nguoi`. Khai thêm
+    # một dòng ở đây là đủ — khai lại danh sách phòng hay dựng cửa riêng là dựng chỗ thứ hai để
+    # hai bảng lệch nhau.
+    "doi_xe": {
+        "ten": "Bàn làm việc Đội xe",
+        "o": ("de_nghi_xe_cho_lap_lenh", "lenh_tai_xe_chua_nhan",
+              "lenh_da_nhan_trong_tuan"),
     },
 }
 
@@ -303,16 +397,17 @@ def ban(db: Session, phong: str) -> dict:
         except Exception as ex:                                   # noqa: BLE001 – xem trên
             return _o(ten_o, ten_o, None, "", "", "", trang_thai=LOI, ly_do=str(ex)[:200])
 
-    o = [
-        _chay("yeu_cau_booking", lambda: _yeu_cau_cho_booking(db)),
-        _chay("su_co_qua_han", lambda: _su_co_qua_han(db)),
-        _chay("de_nghi_chi", lambda: _de_nghi_chi_cho_xac_nhan(db, cfg["vai_xac_nhan"])),
-        _chay("quyet_toan", lambda: _quyet_toan_cho(db)),
-        _chay("bao_cao_ngay", lambda: _bao_cao_ngay_chua_cham(db, cfg["phong_ks"])),
-    ]
-    du = all(x["trang_thai"] == SAN_SANG for x in o)
+    # MỘT ĐƯỜNG CHẠY CHO MỌI PHÒNG. Bản đầu (BD-1) gọi thẳng năm ô của Điều hành ở đây, nên bàn
+    # thứ hai không thể có ô khác. DL-1b (12/10/2026) đổi sang: mỗi bàn KHAI danh sách ô của mình
+    # trong `BAN`, và vòng lặp dưới đây dựng đúng những ô ấy. Thêm bàn thứ ba sau này là thêm một
+    # dòng khai, không phải sửa hàm này nữa.
+    o = [_chay(k, (lambda f=O_HAM[k]: f(db, cfg))) for k in cfg["o"] if k in O_HAM]
+    # Ô "mẫu số" không phải việc phải làm, nên không cộng vào tổng đang chờ — cộng vào thì con số
+    # trên bàn nói sai, và một con số nói sai thì lần sau không ai tin con số trên bàn mình nữa.
+    dem = [x for x in o if x["khoa"] not in MAU_SO]
+    du = all(x["trang_thai"] == SAN_SANG for x in dem)
     return {"phong": phong, "co_ban": True, "ten": cfg["ten"], "o": o,
             # Điều (c) ở đầu tệp: thiếu một ô thì KHÔNG có tổng. `None` để màn hình nói
             # "chưa đủ dữ liệu", chứ không in một con số thiếu mà trông như đủ.
-            "tong_dang_cho": sum(x["so_luong"] for x in o) if du else None,
+            "tong_dang_cho": sum(x["so_luong"] for x in dem) if du else None,
             "doc_luc": datetime.now()}

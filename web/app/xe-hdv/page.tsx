@@ -62,6 +62,28 @@ function XeHdv() {
     } catch (e) { toast(errMsg(e), true); }
   };
 
+  // ─── DL-1b: MẮT THỨ BA của chuỗi điều xe — tài xế NHẬN lệnh.
+  // Hai nút nằm NGAY TRÊN khối "Lệnh điều xe của tôi" đã có, không dựng màn hình mới: tài xế mở
+  // đúng một trang để xem lệnh và để trả lời về lệnh ấy.
+  const [tuChoi, setTuChoi] = useState<any>(null);
+  const [lyDoTuChoi, setLyDoTuChoi] = useState("");
+
+  const nhanLenh = async (id: number) => {
+    try {
+      const r = await api<any>(`/nhan-lenh/${id}/nhan`, { method: "POST" });
+      toast(r.message); tai();
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
+  const guiTuChoi = async () => {
+    if (!tuChoi || !lyDoTuChoi.trim()) return;
+    try {
+      const r = await api<any>(`/nhan-lenh/${tuChoi.id}/tu-choi`,
+        { method: "POST", json: { ly_do: lyDoTuChoi.trim() } });
+      toast(r.message); setTuChoi(null); setLyDoTuChoi(""); tai();
+    } catch (e) { toast(errMsg(e), true); }
+  };
+
   const guiBaoCao = async (aid: number, pb: number | null) => {
     try {
       const r = await api<any>(`/xe-hdv/bao-cao/${aid}/gui`,
@@ -145,9 +167,42 @@ function XeHdv() {
           <td>{v.active ? <Tag cls="ok">Đang khai thác</Tag> : <Tag cls="red">Ngưng khai thác</Tag>}</td></tr>)}</tbody></table></div>}
 
     {d.lenh_dieu_xe.length > 0 && <div className="panel wrap"><h2>Lệnh điều xe của tôi</h2>
-      <table><thead><tr><th>Tour</th><th>Xe</th><th>Thời gian</th><th className="num">Số ngày</th><th>Trạng thái</th><th>Xác nhận lúc</th><th>Sự cố</th></tr></thead>
+      <p className="muted">Lệnh nào còn chờ thì anh bấm <b>Tôi nhận lệnh này</b>. Không nhận được thì bấm nút bên cạnh và ghi lý do — <b>lệnh vẫn còn hiệu lực</b> cho tới khi Giám đốc đội xe quyết, anh đừng tự bỏ chuyến.</p>
+      <table><thead><tr><th>Tour</th><th>Xe</th><th>Thời gian</th><th className="num">Số ngày</th><th>Trạng thái</th><th>Tôi nhận</th><th>Sự cố</th></tr></thead>
         <tbody>{d.lenh_dieu_xe.map((x: any) => <tr key={x.id}><td><b>{x.tour_code}</b><div className="muted">{x.tour_name}</div></td><td className="mono">{x.vehicle}</td>
-          <td>{fmtD(x.date_from)} → {fmtD(x.date_to)}</td><td className="num">{x.days}</td><td>{st(x.status)}</td><td>{fmtDT(x.confirmed_at)}</td><td className="muted">{x.incident_note}</td></tr>)}</tbody></table></div>}
+          <td>{fmtD(x.date_from)} → {fmtD(x.date_to)}</td><td className="num">{x.days}</td><td>{st(x.status)}</td>
+          <td>
+            {/* Cột này KHÔNG phải cột "Trạng thái" bên cạnh. Bên cạnh là GIÁM ĐỐC ĐỘI XE đã chốt
+                lệnh chưa; cột này là TÔI đã nhận chưa. Hai câu hỏi khác nhau, hai cột. */}
+            {x.trang_thai_nhan === "da_nhan"
+              ? <><Tag cls="ok">đã nhận</Tag> <div className="muted">{fmtDT(x.nhan_luc)}</div></>
+              : x.trang_thai_nhan === "tu_choi"
+              ? <><Tag cls="red">tôi báo không nhận được</Tag> <div className="muted">{x.tu_choi_nhan_ly_do}</div></>
+              : x.con_cho_nhan
+              ? <>
+                  {x.trang_thai_nhan === "qua_han"
+                    ? <div className="muted"><Tag cls="warn">quá hạn</Tag> hạn là {fmtDT(x.han_nhan)}</div>
+                    : <div className="muted">hạn {fmtDT(x.han_nhan)}</div>}
+                  <button className="act teal" style={{ margin: "6px 6px 0 0" }}
+                    onClick={() => nhanLenh(x.id)}>Tôi nhận lệnh này</button>
+                  <button className="act grey" style={{ margin: "6px 0 0 0" }}
+                    onClick={() => { setTuChoi(x); setLyDoTuChoi(""); }}>Tôi không nhận được</button>
+                </>
+              : <span className="muted">—</span>}
+          </td>
+          <td className="muted">{x.incident_note}</td></tr>)}</tbody></table></div>}
+
+    {/* Ô lý do. BẮT BUỘC: đây là thứ duy nhất trả lời được câu hỏi của tháng sau — vì sao chuyến ấy
+        phải đổi xe, hoặc phải thuê xe ngoài. */}
+    {tuChoi && <div className="panel"><h2>Vì sao anh không nhận được lệnh này?</h2>
+      <p className="muted">Lệnh <b>{tuChoi.tour_code}</b> · xe {tuChoi.vehicle} · {fmtD(tuChoi.date_from)} → {fmtD(tuChoi.date_to)}</p>
+      <div><label>Lý do</label><textarea rows={2} value={lyDoTuChoi}
+        onChange={(e) => setLyDoTuChoi(e.target.value)}
+        placeholder="Ví dụ: xe đang nằm xưởng · tôi đang chạy chuyến khác · tôi nghỉ phép ngày đó" /></div>
+      <p className="muted">Giám đốc đội xe thấy lý do này ngay. <b>Lệnh vẫn còn hiệu lực</b> cho tới khi ông quyết đổi xe hay đổi người.</p>
+      <button className="act orange" disabled={!lyDoTuChoi.trim()} onClick={guiTuChoi}>Gửi lý do</button>{" "}
+      <button className="act grey" onClick={() => { setTuChoi(null); setLyDoTuChoi(""); }}>Thôi, để tôi nhận</button>
+    </div>}
 
     {d.phan_chuyen.length > 0 && <div className="panel wrap"><h2>Chuyến được chào cho tôi</h2>
       <p className="muted">Mỗi dòng là một <b>lời chào</b>: nhận hoặc từ chối đều được. Từ chối không kèm
