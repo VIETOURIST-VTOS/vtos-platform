@@ -57,6 +57,10 @@ CUA_TAY = (
     # Đợt E1 (09/10/2026). CỬA TAY trên màn hình /ket-so. Bảng bắt đầu rỗng và PHẢI rỗng: mỗi
     # dòng là một mức chặn có người ký, nên máy nạp sẵn một dòng là máy tự đặt mức hộ người.
     "muc_do_chan",
+    # DL-1 (11/10/2026). CUA TAY tren man hinh Lenh dieu xe. Bang bat dau RONG va phai rong: mot
+    # de nghi xe la mot cau cua nguoi Dieu hanh noi "chuyen nay can xe". May nap san mot dong la may
+    # tu de nghi ho - va roi Giam doc doi xe lap lenh cho mot chuyen chua ai hoi.
+    "fleet_vehicle_requests",
     # CT-1 (4.4.2, 11/10/2026). CUA TAY tren man hinh Tour > the "Chuong trinh". Bang bat dau RONG
     # va phai rong: chuong trinh cua mot chuyen chi sinh ra khi Dieu hanh bam "mo tu san pham". May
     # nap san mot dong la may tu viet chuong trinh ho nguoi ban cho khach.

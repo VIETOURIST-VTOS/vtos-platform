@@ -30,10 +30,30 @@ function LenhDieuXe() {
   const [lyDo, setLyDo] = useState("");
   const [hoi, setHoi] = useState<any>(null);          // máy chủ đòi lý do: giữ nhận xét của máy để người ký đọc
 
+  // ĐỀ NGHỊ XE – mắt đầu của chuỗi Chủ tịch đặc tả 11/10/2026:
+  //   Điều hành ĐỀ NGHỊ  →  Giám đốc đội xe LẬP LỆNH  →  Tài xế NHẬN
+  // Đặt cùng màn hình này chứ không dựng trang thứ hai: đề nghị và lệnh là hai mặt của một việc,
+  // tách ra là bắt Giám đốc đội xe mở hai trang để làm một việc.
+  const [dn, setDn] = useState<any>(null);            // danh sách đề nghị + số đếm theo trạng thái
+  const [dnQ, setDnQ] = useState<any>(null);           // hai câu trả lời về quyền, LẤY TỪ MÁY CHỦ
+  const [dnChon, setDnChon] = useState<any>(null);     // đề nghị đang lập lệnh cho – đi kèm lệnh
+  const [ho, setHo] = useState<any>(null);             // đếm lệnh lập KHÔNG qua cửa đề nghị
+  const [tourDN, setTourDN] = useState<any[]>([]);     // chuyến ĐỀ NGHỊ ĐƯỢC (đã duyệt dự toán)
+  const [dnTour, setDnTour] = useState("");
+  const [dnKhach, setDnKhach] = useState(0);
+  const [dnKm, setDnKm] = useState(0);
+  const [dnSoXe, setDnSoXe] = useState(1);
+  const [dnYeuCau, setDnYeuCau] = useState("");
+  const [goLyDo, setGoLyDo] = useState<any>(null);     // {id, viec:"tu_choi"|"huy"} đang đòi lý do
+  const [lyDoGo, setLyDoGo] = useState("");
+
   const load = useCallback(async () => {
     try { setDs(await api("/fleet/lenh-dieu-xe")); } catch (e) { toast(errMsg(e), true); }
     // Tên của từng mức kiểm tra lấy từ máy chủ (MUC_TEN), để màn hình không gõ lại thang mức.
     try { setDm(await api("/fleet/danh-muc")); } catch { /* thiếu danh mục thì in mã mức, vẫn đúng */ }
+    try { setDn(await api("/de-nghi-xe")); } catch (e) { toast(errMsg(e), true); }
+    try { setDnQ(await api("/de-nghi-xe/meta")); } catch { /* thiếu meta thì ẩn nút, không đoán quyền */ }
+    try { setHo(await api("/de-nghi-xe/lenh-khong-qua-de-nghi")); } catch { /* chỉ là số đo */ }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
 
@@ -46,6 +66,10 @@ function LenhDieuXe() {
   const nenRef = useCallback(async (a: string, b: string) => {
     try { setNen(await api(`/fleet/de-lap-lenh?tu=${a}&den=${b}`)); }
     catch (e) { toast(errMsg(e), true); }
+    // Danh sách cho mẫu đề nghị đi đường RIÊNG, vì nó phải lọc theo dự toán đã duyệt. Dùng lại
+    // `nen.tour` thì mẫu bày ra chuyến chưa duyệt, người điều hành bấm gửi và nhận một câu 422.
+    try { setTourDN(await api(`/de-nghi-xe/tour-cho-de-nghi?tu=${a}&den=${b}`)); }
+    catch { setTourDN([]); }
   }, [toast]);
   useEffect(() => { if (tu && den && den >= tu) nenRef(tu, den); }, [tu, den, nenRef]);
 
@@ -72,15 +96,56 @@ function LenhDieuXe() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken() || ""}` },
         body: JSON.stringify({ tour_id: Number(tour), vehicle_id: p.vehicle_id, date_from: tu, date_to: den,
           rate_id: rate ? Number(rate) : null, so_khach: khach, km_du_kien: km,
+          de_nghi_id: dnChon ? dnChon.id : null,
           ly_do_khac_goi_y: lyDoGui.trim() }) });
       const d = await r.json().catch(() => null);
       if (r.ok) {
-        toast(d?.message || "Đã lập lệnh"); setHoi(null); setLyDo(""); setChon(null); load();
+        toast(d?.message || "Đã lập lệnh"); setHoi(null); setLyDo(""); setChon(null);
+        setDnChon(null); load();
       } else if (r.status === 422 && d?.detail?.he_thong_nhan_xet !== undefined) {
         setChon(p); setHoi(d.detail);       // giữ nguyên mẫu, mở ô lý do kèm nhận xét của máy
       } else {
         toast(typeof d?.detail === "string" ? d.detail : d?.detail?.message || `Lỗi ${r.status}`, true);
       }
+    } catch (e) { toast(errMsg(e), true); }
+    setBusy(false);
+  };
+
+  /** Điều hành gửi đề nghị. KHÔNG chọn xe ở đây – chọn xe là việc của Giám đốc đội xe. */
+  const guiDeNghi = async () => {
+    if (!dnTour) { toast("Chọn chuyến cần xe", true); return; }
+    setBusy(true);
+    try {
+      const r = await api("/de-nghi-xe", { method: "POST", json: {
+        tour_id: Number(dnTour), so_khach: dnKhach, km_du_kien: dnKm, so_xe_can: dnSoXe,
+        yeu_cau: dnYeuCau.trim() } });
+      toast(r?.message || "Đã gửi đề nghị"); setDnYeuCau(""); load();
+    } catch (e) { toast(errMsg(e), true); }
+    setBusy(false);
+  };
+
+  /** Từ chối hoặc huỷ. Lý do BẮT BUỘC – đó chính là câu trả lời cho báo cáo đối chiếu tour/lượt xe
+   *  tháng sau: vì sao chuyến này phải thuê xe ngoài. */
+  const goDeNghi = async () => {
+    if (!goLyDo || !lyDoGo.trim()) return;
+    setBusy(true);
+    try {
+      const r = await api(`/de-nghi-xe/${goLyDo.id}/${goLyDo.viec === "tu_choi" ? "tu-choi" : "huy"}`,
+        { method: "POST", json: { ly_do: lyDoGo.trim() } });
+      toast(r?.message || "Đã ghi"); setGoLyDo(null); setLyDoGo(""); load();
+    } catch (e) { toast(errMsg(e), true); }
+    setBusy(false);
+  };
+
+  /** Lấy một đề nghị vào mẫu lập lệnh: điền sẵn ngày, số khách, km, chuyến – rồi tính phương án.
+   *  Lệnh chốt sau đó mang `de_nghi_id`, nên chuỗi ba mắt nối liền chứ không đứt ở giữa. */
+  const layVaoMau = async (d: any) => {
+    setDnChon(d); setTu(d.ngay_di); setDen(d.ngay_ve); setKhach(d.so_khach); setKm(d.km_du_kien);
+    setTour(String(d.tour_id)); setGy(null); setChon(null); setHoi(null); setLyDo("");
+    setBusy(true);
+    try {
+      setGy(await api(`/fleet/goi-y-dieu-xe?date_from=${d.ngay_di}&date_to=${d.ngay_ve}` +
+                      `&so_khach=${d.so_khach}&km_du_kien=${d.km_du_kien}`));
     } catch (e) { toast(errMsg(e), true); }
     setBusy(false);
   };
@@ -92,6 +157,72 @@ function LenhDieuXe() {
     <h1>Lệnh điều xe</h1>
     <p className="muted">Đây là nơi <b>lập và chốt lệnh điều xe</b>: chọn tour bên dưới, đặt khoảng ngày và số khách, xem phương án, rồi bấm <b>Chốt lệnh</b> ngay trên dòng xe đã chọn.</p>
     <p className="muted">Hệ thống <b>lọc cứng trước, xếp hạng sau</b>: xe vi phạm điều kiện không xuất hiện trong gợi ý dù điểm có cao đến đâu. Đây là gợi ý — người chốt lệnh vẫn quyết, và chọn khác gợi ý thì phải ghi lý do.</p>
+
+    {dn && <div className="panel wrap"><h2>Đề nghị xe đang chờ lập lệnh ({dn.dem?.cho_lap_lenh || 0})</h2>
+      <p className="muted">Chuỗi Chủ tịch đặc tả 11/10/2026: <b>Điều hành đề nghị</b> → <b>Giám đốc đội xe lập lệnh</b> → <b>tài xế nhận</b>. Bấm <b>Lấy vào mẫu</b> thì ngày, số khách, km và chuyến được điền sẵn xuống dưới, và lệnh chốt sau đó mang theo số đề nghị — để tháng sau còn truy được ai hỏi xe cho chuyến này.</p>
+      <table><thead><tr><th>#</th><th>Chuyến</th><th>Từ → đến</th><th>Khách</th><th>Km</th><th>Xe cần</th><th>Yêu cầu</th><th>Người đề nghị</th><th>Việc</th></tr></thead>
+        <tbody>{(dn.rows || []).filter((d: any) => d.trang_thai === "cho_lap_lenh").length
+          ? dn.rows.filter((d: any) => d.trang_thai === "cho_lap_lenh").map((d: any) => <tr key={d.id}>
+            <td>{d.id}</td><td>{d.ma_tour} · {d.ten_tour}</td>
+            <td>{fmtD(d.ngay_di)} → {fmtD(d.ngay_ve)} <span className="muted">({d.so_ngay} ngày)</span></td>
+            <td className="num">{d.so_khach}</td><td className="num">{d.km_du_kien || ""}</td>
+            <td className="num">{d.so_xe_can}</td><td>{d.yeu_cau}</td>
+            <td>{d.nguoi_de_nghi} <span className="muted">{fmtDT(d.luc)}</span></td>
+            <td>
+              {coQuyen && <><button className="act teal" style={{ margin: 0 }} disabled={busy}
+                onClick={() => layVaoMau(d)}>Lấy vào mẫu</button>{" "}</>}
+              {/* Hiện nút nào do MÁY CHỦ trả lời (meta.toi_duoc_*), không gõ lại danh sách vai ở đây:
+                  gõ lại thì ngày nào bảng vai đổi, người ĐƯỢC phép lại không thấy nút — và cái không
+                  thấy thì không ai báo lỗi. */}
+              {dnQ?.toi_duoc_tu_choi && <><button className="act orange" style={{ margin: 0 }} disabled={busy}
+                onClick={() => { setGoLyDo({ id: d.id, viec: "tu_choi" }); setLyDoGo(""); }}>Không còn xe</button>{" "}</>}
+              {dnQ?.toi_duoc_de_nghi && <button className="act grey" style={{ margin: 0 }} disabled={busy}
+                onClick={() => { setGoLyDo({ id: d.id, viec: "huy" }); setLyDoGo(""); }}>Huỷ đề nghị</button>}
+            </td>
+          </tr>) : <tr><td colSpan={9} className="muted">Không có đề nghị nào đang chờ. Điều hành gửi đề nghị ở khối dưới sau khi dự toán chuyến được duyệt.</td></tr>}</tbody></table>
+      {dnChon && <p className="muted"><Tag cls="ok">đang lập lệnh</Tag> Mẫu dưới đang lập lệnh cho đề nghị <b>#{dnChon.id}</b> – chuyến {dnChon.ma_tour}, {dnChon.so_khach} khách, cần {dnChon.so_xe_can} xe.{" "}
+        <button className="act grey" style={{ margin: 0 }} onClick={() => setDnChon(null)}>Bỏ liên kết</button></p>}
+      {dn.dem && (dn.dem.tu_choi > 0 || dn.dem.huy > 0) &&
+        <p className="muted">Đã từ chối {dn.dem.tu_choi || 0} · đã huỷ {dn.dem.huy || 0} · đã lập lệnh {dn.dem.da_lap_lenh || 0}. Lý do từ chối xem ở bảng cuối trang.</p>}
+    </div>}
+
+    {goLyDo && <div className="panel"><h2>{goLyDo.viec === "tu_choi" ? "Vì sao đội xe không nhận đề nghị này" : "Vì sao huỷ đề nghị này"}</h2>
+      <p className="muted">{goLyDo.viec === "tu_choi"
+        ? <>Lý do này là câu trả lời cho báo cáo đối chiếu tour/lượt xe tháng sau: <b>vì sao chuyến ấy phải thuê xe ngoài</b>. Không ghi lý do thì tháng sau không ai trả lời được.</>
+        : <>Khách huỷ, dời ngày, hay ghép chuyến — ghi lại để Điều hành không gửi lại đề nghị đã bỏ.</>}</p>
+      <div><label>Lý do</label><textarea rows={2} value={lyDoGo} onChange={(e) => setLyDoGo(e.target.value)}
+        placeholder={goLyDo.viec === "tu_choi" ? "Ví dụ: cả 11 xe nhà đều có lệnh trong khoảng ngày đó" : "Ví dụ: khách dời sang tuần sau"} /></div>
+      <button className="act orange" disabled={busy || !lyDoGo.trim()} onClick={goDeNghi}>
+        {goLyDo.viec === "tu_choi" ? "Ghi từ chối" : "Ghi huỷ"}</button>{" "}
+      <button className="act grey" onClick={() => { setGoLyDo(null); setLyDoGo(""); }}>Bỏ</button>
+    </div>}
+
+    {dnQ?.toi_duoc_de_nghi && <div className="panel"><h2>Điều hành đề nghị xe</h2>
+      <p className="muted">Chỉ chuyến <b>đã duyệt dự toán</b> mới hiện ở đây — chi phí xe nằm trong dự toán ấy, nên không cần thêm chữ ký nào nữa (Chủ tịch quyết 11/10/2026). Đổi khoảng ngày ở khối trên thì danh sách này đổi theo.</p>
+      <div className="grid">
+        <div><label>Chuyến cần xe</label>
+          <select value={dnTour} onChange={(e) => {
+            setDnTour(e.target.value);
+            const t = tourDN.find((x: any) => String(x.id) === e.target.value);
+            if (t?.planned_pax) setDnKhach(t.planned_pax);   // số khách dự kiến của chuyến, sửa được
+          }}>
+            <option value="">– chọn chuyến –</option>
+            {tourDN.map((t: any) => <option key={t.id} value={t.id}>
+              {t.code} · {t.name} · {fmtD(t.start_date)}→{fmtD(t.end_date)}{t.planned_pax ? ` · ${t.planned_pax} khách` : ""}{t.da_co_de_nghi ? ` · đã có ${t.da_co_de_nghi} đề nghị` : ""}
+            </option>)}
+          </select></div>
+        <div><label>Số khách</label><input type="number" value={dnKhach} onChange={(e) => setDnKhach(Number(e.target.value))} /></div>
+        <div><label>Km dự kiến (gồm chạy rỗng)</label><input type="number" value={dnKm} onChange={(e) => setDnKm(Number(e.target.value))} /></div>
+        <div><label>Số xe cần</label><input type="number" min={1} value={dnSoXe} onChange={(e) => setDnSoXe(Number(e.target.value))} /></div>
+      </div>
+      <div><label>Yêu cầu riêng (nếu có)</label><textarea rows={2} value={dnYeuCau} onChange={(e) => setDnYeuCau(e.target.value)}
+        placeholder="Ví dụ: khách yêu cầu xe đời 2022 trở lên; cần xe có khoang hành lý rộng" /></div>
+      <p className="muted">Đề nghị <b>không chọn xe</b>: chọn xe là việc của Giám đốc đội xe, vì chỉ người có xe mới biết xe nào rảnh ngày ấy.</p>
+      {!tourDN.length && <p className="muted"><Tag cls="warn">chưa có chuyến</Tag> Không có chuyến nào đã duyệt dự toán trong khoảng ngày này. Đổi khoảng ngày, hoặc chờ dự toán được duyệt.</p>}
+      <button className="act teal" disabled={busy || !dnTour || dnKhach <= 0} onClick={guiDeNghi}>
+        {busy ? "Đang gửi…" : "Gửi đề nghị xe"}</button>
+      {dnTour && dnKhach <= 0 && <p className="muted">Phải ghi số khách — bộ gợi ý điều xe lọc theo số ghế, thiếu số khách thì nó đề xuất một chiếc 29 chỗ cho đoàn 40 người.</p>}
+    </div>}
 
     <div className="panel"><h2>Tìm phương án cho một khoảng ngày</h2>
       <div className="grid">
@@ -174,6 +305,13 @@ function LenhDieuXe() {
 
     <div className="panel wrap"><h2>Lệnh đã lập ({ds.length})</h2>
       <p className="muted">Cột cuối ghi vết: lệnh theo gợi ý hay chọn khác, và lý do khi chọn khác. Đây là dữ liệu để mỗi quý đánh giá lại chất lượng thuật toán gợi ý.</p>
+      {/* CHỖ HỞ CỐ Ý, ĐO ĐƯỢC: cửa lập lệnh vẫn nhận lệnh không kèm đề nghị. Bắt buộc ngay thì
+          Điều hành đứng việc. Nhưng một chỗ hở không đếm được là một chỗ hở sẽ ở lại mãi — nên nó
+          hiện ra ở đây, và khi con số về 0 thì siết thành bắt buộc không còn làm ai đứng việc. */}
+      {ho && ho.tong_lenh > 0 && <p className="muted">
+        {ho.khong_qua_de_nghi > 0
+          ? <><Tag cls="warn">chuỗi chưa liền</Tag> {ho.khong_qua_de_nghi}/{ho.tong_lenh} lệnh lập <b>không qua cửa đề nghị</b>. Khi con số này về 0 và giữ 0 một thời gian thì bắt buộc đề nghị được, mà không làm ai đứng việc.</>
+          : <><Tag cls="ok">chuỗi liền</Tag> Cả {ho.tong_lenh} lệnh đều đi qua cửa đề nghị xe.</>}</p>}
       <table><thead><tr><th>#</th><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Từ → đến</th><th>Giá nội bộ</th><th>Trạng thái</th><th>Ghi vết gợi ý</th></tr></thead>
         <tbody>{ds.length ? ds.map((d) => <tr key={d.id}>
           <td>{d.id}</td><td>{d.tour}</td><td>{d.ma_xe} · {d.xe}</td><td>{d.tai_xe}</td>

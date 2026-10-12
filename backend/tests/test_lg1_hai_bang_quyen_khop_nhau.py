@@ -88,7 +88,11 @@ DA_BIET = (
     ("/lai-lo-doi-xe", "robot_ks"),
     ("/lai-lo-tour", "robot_ks"),
     ("/lai-lo-tour", "sales_admin"),
-    ("/lenh-dieu-xe", "robot_ks"),
+    # ("/lenh-dieu-xe", "robot_ks") — MÓN NỢ ĐÃ TRẢ ngày 11/10/2026, DL-1.
+    #
+    # Trả được KHÔNG phải vì làn Phân quyền đi sửa quyền của làn Kiểm soát, mà vì cửa đề nghị xe
+    # mới suy `XEM` TỪ `MENU_ROLES["/lenh-dieu-xe"]` thay vì gõ lại danh sách — và `robot_ks` có
+    # trong bảng menu nên nó vào thẳng nhóm xem. Một phép suy có tên trả luôn một cặp lệch.
     ("/nap-du-lieu", "robot_ks"),
     ("/nap-du-lieu", "sales_admin"),
     ("/nguoi-ban-hang", "sales_admin"),

@@ -1593,6 +1593,9 @@ class DispatchIn(BaseModel):
     ly_do_khac_goi_y: str = ""
     km_du_kien: int = 0
     so_khach: int = 0
+    # DL-1 (11/10/2026): lệnh này ra từ đề nghị nào. Để rỗng ĐƯỢC — xem chú thích ở cột
+    # `DispatchOrder.de_nghi_id` và `de_nghi_xe.lenh_khong_qua_de_nghi()`.
+    de_nghi_id: int | None = None
 
 
 @router.post("/dispatch", status_code=201)
@@ -1658,10 +1661,27 @@ def dispatch_create(data: DispatchIn,
                                   # chốt lệnh cần biết mình đang bác lại nhận xét nào để viết lý do cho đúng.
                                   "he_thong_nhan_xet": pa_chon["ly_do"] if pa_chon else [],
                                   "goi_y": gy["phuong_an"]})
-    d = DispatchOrder(tour_id=t.id, vehicle_id=v.id, driver_id=driver_id, date_from=data.date_from, date_to=data.date_to, rate_id=rt.id if rt else None, internal_price=price, created_by=u.username,
+    # DL-1: nếu lệnh đi theo một đề nghị thì đề nghị ấy phải thuộc đúng chuyến này và còn đang chờ.
+    # Kiểm TRƯỚC khi tạo lệnh: tạo rồi mới phát hiện đề nghị sai chuyến là đã có một lệnh mồ côi.
+    if data.de_nghi_id:
+        from app.models.de_nghi_xe import DeNghiXe
+        dn = db.get(DeNghiXe, data.de_nghi_id)
+        if dn is None:
+            raise HTTPException(404, f"Không có đề nghị xe #{data.de_nghi_id}")
+        if dn.tour_id != t.id:
+            raise HTTPException(422, f"Đề nghị #{dn.id} là của chuyến khác – lệnh và đề nghị phải "
+                                     "cùng một chuyến, nếu không thì chuỗi đề nghị → lệnh đứt mà "
+                                     "bảng vẫn trông đầy đủ")
+    d = DispatchOrder(tour_id=t.id, vehicle_id=v.id, driver_id=driver_id, de_nghi_id=data.de_nghi_id, date_from=data.date_from, date_to=data.date_to, rate_id=rt.id if rt else None, internal_price=price, created_by=u.username,
                       phuong_an_ai_goi_y=json.dumps(gy["phuong_an"], ensure_ascii=False, default=str)[:8000],
                       phuong_an_da_chon=v.code or v.plate, ly_do_khac_goi_y=data.ly_do_khac_goi_y.strip())
     db.add(d); db.flush()
+    if data.de_nghi_id:
+        from app.services import de_nghi_xe as DN
+        try:
+            DN.danh_dau_da_lap_lenh(db, data.de_nghi_id, d.id)
+        except ValueError as ex:
+            raise HTTPException(422, str(ex))
     R.audit(db, u.username, u.role, "lenh_dieu_xe", f"tour:{t.code}", after={"xe": v.plate, "tuyen": rt.route if rt else "", "tu": str(data.date_from), "den": str(data.date_to), "gia_noi_bo": price, "kiem_tra": kt["muc"]})
     db.commit()
     canh_bao = [i["msg"] for i in kt["items"]]
