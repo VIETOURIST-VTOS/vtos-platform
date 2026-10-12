@@ -44,7 +44,7 @@ K2: CỘT TIỀN RỖNG KHÁC 0
 """
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -204,6 +204,12 @@ class NghiaVuThanhToan(Base):
     nghi_trung_voi: Mapped[str] = mapped_column(String(40), default="")
     ghi_chu: Mapped[str] = mapped_column(Text, default="")
 
+    # ---------- điều khoản thanh toán (Đợt E4a) ----------
+    # Nghĩa vụ này dùng điều khoản nào. RỖNG ĐƯỢC, và rỗng là trạng thái bình thường của sổ cũ:
+    # trước đợt này không có bảng điều khoản nào cả, nên đặt một điều khoản mặc định cho chúng là
+    # bịa ra một thoả thuận chưa ai ký. Nghĩa vụ không có điều khoản vẫn đọc được y như trước.
+    dieu_khoan_id: Mapped[int | None] = mapped_column(ForeignKey("dieu_khoan_thanh_toan.id"), nullable=True)
+
     # ---------- khoá ghi đè (VPM-8) ----------
     phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
 
@@ -217,3 +223,105 @@ class NghiaVuThanhToan(Base):
         khoản PHẢI TRẢ LẠI, thuộc nhóm khác, không phải một nghĩa vụ âm làm nhẹ bớt cột tổng.
         """
         return max(0.0, float(self.tong_nghia_vu or 0) - float(self.da_tra or 0))
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT E4a · 12/10/2026 – ĐIỀU KHOẢN THANH TOÁN và ĐỢT THANH TOÁN
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# HAI BẢNG NÀY Ở CÙNG TỆP VỚI `nghia_vu_thanh_toan`, CÓ CHỦ Ý.
+#
+# `app/models/__init__.py` đã có dòng nhập cho tệp này, và đầu tệp ấy có một lời nhắc đã lặp lại
+# MƯỜI BA lần: một bảng khai dưới `app/models` mà thiếu dòng nhập thì `import app.models` không
+# thấy nó, `create_all` không tạo, mọi phép thử soi metadata mù đúng bảng ấy mà vẫn báo xanh, và
+# `alembic autogenerate` đòi XOÁ bảng. Viết hai bảng này vào đây là không phải thêm dòng nhập nào,
+# nên cái bẫy ấy không có cơ hội mở ra lần thứ mười bốn.
+#
+# Và chúng thuộc về đây về nghiệp vụ: `dot_thanh_toan` là dòng CON của nghĩa vụ, còn
+# `dieu_khoan_thanh_toan` là thứ sinh ra các đợt ấy.
+
+
+class DieuKhoanThanhToan(Base):
+    """Một thoả thuận trả tiền, khai một lần, dùng cho nhiều hợp đồng.
+
+    KHAI TRONG CSDL CHỨ KHÔNG TRONG MÃ – khác `chung_tu_loai` của Đợt E3, và khác có lý do: loại
+    chứng từ là danh mục của chế độ kế toán, mấy năm mới đổi; điều khoản thanh toán là thoả thuận
+    thương mại, mỗi nhà cung cấp một kiểu, và Kế toán phải thêm được mà không chờ ai sửa phần mềm.
+
+    ĐỔI LẠI NÓ PHẢI CÓ CHỮ KÝ. Chủ tịch chốt 12/10/2026: điều khoản do CHỦ TỊCH ký, y như bảng
+    tham số chính sách. Luật ấy khai ở `services/chu_ky.VAI_KY_CAN["dieu_khoan_thanh_toan"]`,
+    KHÔNG khai lại ở đây – một bảng luật, nhiều nơi đọc (bài học LG1, LG2, LG3).
+    """
+
+    __tablename__ = "dieu_khoan_thanh_toan"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ma: Mapped[str] = mapped_column(String(40), unique=True, index=True)       # NET30, COC50-KH7
+    ten: Mapped[str] = mapped_column(String(200))
+    moc: Mapped[str] = mapped_column(String(20))                              # xem dieu_khoan.MOC
+
+    # Các đợt, dạng JSON: [{"ty_le": 50, "lech_ngay": -30, "dien_giai": "Đặt cọc"}, …]
+    #
+    # VÌ SAO JSON CHỨ KHÔNG PHẢI MỘT BẢNG CON THỨ HAI: các đợt của một điều khoản không bao giờ
+    # được tra riêng lẻ, không mang tiền, không có trạng thái – chúng là một KHUÔN, đọc trọn gói
+    # mỗi lần dựng đợt thật. Dựng một bảng cho chúng là thêm một chỗ phải canh toàn vẹn mà không
+    # trả lời thêm câu hỏi nào. Bảng con THẬT là `dot_thanh_toan` bên dưới, vì nó mang tiền.
+    dot: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+    ghi_chu: Mapped[str] = mapped_column(Text, default="")
+
+    # ---------- hiệu lực và chữ ký ----------
+    effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)  # pending/active/ngung
+    # Ô GHI TÊN NGƯỜI KÝ, không phải một cột boolean mỗi vai – khuôn của Đợt LG3 (`tours.nguoi_da_ky`).
+    # Đổi luật ký sau này thì bảng không mọc thêm cột, và `chu_ky.doc_nguoi_da_ky` đọc chung một kiểu.
+    nguoi_da_ky: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    proposed_by: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class DotThanhToan(Base):
+    """Một đợt của một nghĩa vụ: một hạn, một số tiền, một phần đã trả.
+
+    NGHĨA VỤ VẪN LÀ NƠI GIỮ TỔNG. Bảng này KHÔNG thay `tong_nghia_vu` – nó chia nó ra theo thời
+    gian. Hai con số phải khớp, và khi lệch thì màn hình NÓI RA chứ không im: một phần tiền không
+    đợt nào gánh là một phần tiền không hiện ở tháng nào trên bảng dòng tiền.
+
+    K2 áp ở đây y như ở nghĩa vụ: `so_tien` và `da_tra` đều rỗng được, và rỗng nghĩa là CHƯA AI
+    NHẬP, không phải "không đồng nào".
+    """
+
+    __tablename__ = "dot_thanh_toan"
+    __table_args__ = (
+        # Một nghĩa vụ không thể có hai đợt cùng số thứ tự. Không có ràng buộc này thì một lần
+        # dựng lại đợt mà quên xoá đợt cũ sẽ nhân đôi tiền của cả nghĩa vụ, và tổng vẫn trông hợp lý.
+        Index("ux_dot_nghia_vu_stt", "nghia_vu_id", "so_thu_tu", unique=True),
+        Index("ix_dot_han", "ngay_han"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nghia_vu_id: Mapped[int] = mapped_column(ForeignKey("nghia_vu_thanh_toan.id"), index=True)
+    so_thu_tu: Mapped[int] = mapped_column(Integer)
+    dien_giai: Mapped[str] = mapped_column(String(200), default="")
+
+    so_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    da_tra: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+
+    # HẠN, và CĂN CỨ của hạn ấy.
+    #
+    # `ngay_han` là hạn đang có hiệu lực. `ngay_han_suy` là hạn MÁY suy ra từ điều khoản. Hai cột
+    # vì Kế toán được sửa tay: khi sửa, hạn máy suy vẫn còn đó để đối chiếu, và người sau đọc được
+    # "điều khoản nói ngày này, người sửa thành ngày kia". Một cột thì lần sửa tay nào cũng xoá
+    # mất căn cứ, và màn hình còn lại một con số không ai kiểm được.
+    ngay_han: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ngay_han_suy: Mapped[date | None] = mapped_column(Date, nullable=True)
+    can_cu_han: Mapped[str] = mapped_column(String(120), default="")   # "Ngày khởi hành −7 ngày"
+
+    boi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    def con_lai(self) -> float:
+        """Phần còn phải trả của ĐỢT này. Cùng luật với `NghiaVuThanhToan.con_lai`."""
+        return max(0.0, float(self.so_tien or 0) - float(self.da_tra or 0))
+
+    def da_tra_du(self) -> bool:
+        return (self.so_tien or 0) > 0 and self.con_lai() <= 0

@@ -6,7 +6,14 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select, desc, func, text
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.services import chu_ky as _CK   # bang chu ky, Dot LG2 - nhap o DAU TEP vi require_roles doc no luc nap mo-dun
+from app.services import chu_ky as _CK
+from app.services import dieu_khoan as _DKH   # Dot E4a
+# Ai XEM / ai TRINH dieu khoan. Lay dung tap vai da mo man hinh `/params` trong
+# access.PARAM_ROLES, khong rong hon mot vai nao: dieu khoan la chinh sach, cung mot
+# man hinh thi cung mot tap nguoi. Ai KY thi doc tu `chu_ky.VAI_KY_CAN`, khong khai o day.
+_DK_XEM = ("chutich", "tgd", "bks", "ketoan", "ketoan_truong", "cntt", "hcns",
+           "ptgd_doan", "ptgd_mkt", "tp_dh", "gd_kd", "robot_pq", "robot_ks")
+_DK_TRINH = ("ketoan", "ketoan_truong", "hcns", "cntt", "tgd", "chutich")   # bang chu ky, Dot LG2 - nhap o DAU TEP vi require_roles doc no luc nap mo-dun
 from app.api.deps import current_user, require_roles, robot_auth, Gate, loc_theo_nguoi_dung, toan_quyen
 from app.api import schemas as S
 from pydantic import BaseModel
@@ -1303,3 +1310,171 @@ def dung_luong(u: User = Depends(require_roles("cntt", "chutich", "tgd", "bks", 
     rows.sort(key=lambda r: (-r["bytes"], -r["so_dong"]))
     return {"tong_so_dong": sum(r["so_dong"] for r in rows), "tong_bytes": sum(r["bytes"] for r in rows),
             "so_bang": len(rows), "bang": rows}
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT E4a · ĐIỀU KHOẢN THANH TOÁN — cửa nhập, cửa ký, và cửa xem trước khi tính lại
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# KHÔNG MỞ NHÓM API MỚI, và đó là chủ ý. Năm cửa dưới đây nằm dưới tiền tố `/api/v1/params` mà màn
+# hình `/params` đã khai trong `MAN_HINH_API`, nên `PHAM_VI_DA_CHOT` không đổi một số nào. Mở
+# `/api/v1/dieu-khoan` là xin thêm quyền cho một loạt vai mà chưa ai ký — cùng lý do đã viết ở
+# `finance.py` cho sổ nghĩa vụ VPM-11.
+#
+# Điều khoản là CHÍNH SÁCH, nên nó thuộc về màn hình chính sách, không phải một màn hình thứ hai.
+
+class DieuKhoanIn(BaseModel):
+    ma: str
+    ten: str
+    moc: str
+    dot: list[dict]
+    ghi_chu: str = ""
+    effective_from: date | None = None
+
+
+@router.get("/params/dieu-khoan", tags=["params"])
+def ds_dieu_khoan(u: User = Depends(require_roles(*_DK_XEM)), db: Session = Depends(get_db)):
+    from app.models.nghia_vu import DieuKhoanThanhToan, NghiaVuThanhToan
+    ra = []
+    for d in db.execute(select(DieuKhoanThanhToan).order_by(DieuKhoanThanhToan.ma)).scalars():
+        # "Đang dùng ở bao nhiêu hợp đồng" — ĐẾM SỐNG, không nuôi một cột đếm sẵn. Một cột đếm là
+        # một con số thứ hai phải giữ cho khớp, và lúc nó lệch thì không ai biết bên nào đúng.
+        dung_o = db.execute(select(func.count()).select_from(NghiaVuThanhToan)
+                            .where(NghiaVuThanhToan.dieu_khoan_id == d.id)).scalar() or 0
+        ra.append({"id": d.id, "ma": d.ma, "ten": d.ten, "moc": d.moc,
+                   "ten_moc": _DKH.ten_moc(d.moc), "dot": d.dot or [], "so_dot": len(d.dot or []),
+                   "ghi_chu": d.ghi_chu, "status": d.status,
+                   "effective_from": d.effective_from, "dung_o": dung_o,
+                   "nguoi_da_ky": _CK.doc_nguoi_da_ky(d.nguoi_da_ky),
+                   "con_thieu": _CK.con_thieu_cua(_DKH.LOAI_CHU_KY, _CK.doc_nguoi_da_ky(d.nguoi_da_ky)),
+                   "proposed_by": d.proposed_by})
+    return {"rows": ra, "moc": [{"ma": k, "ten": v[0]} for k, v in _DKH.MOC.items()],
+            "ai_ky": [ROLES.get(v, v) for v in _CK.can_ky(_DKH.LOAI_CHU_KY)]}
+
+
+@router.post("/params/dieu-khoan", tags=["params"], status_code=201)
+def trinh_dieu_khoan(data: DieuKhoanIn, u: User = Depends(require_roles(*_DK_TRINH)),
+                     db: Session = Depends(get_db)):
+    from app.models.nghia_vu import DieuKhoanThanhToan
+    # CHẶN TRƯỚC, y như `propose_param`: Chủ tịch là người ký duy nhất của điều khoản, nên Chủ tịch
+    # tự trình là một hồ sơ KHÔNG AI KÝ ĐƯỢC. Nói ngay ở cửa trình thay vì để nó nằm chờ.
+    can = _CK.can_ky(_DKH.LOAI_CHU_KY)
+    if u.role in can and len(can) == 1:
+        raise Gate("DIEU_KHOAN",
+                   f"{ROLES.get(u.role, u.role)} là người ký DUY NHẤT của điều khoản thanh toán, "
+                   "nên không tự trình được đề xuất của chính mình – chữ ký ấy khi đó không còn là "
+                   "một lớp kiểm soát. Nhờ Kế toán, HCNS hoặc CNTT trình, rồi ký.")
+    try:
+        _DKH.kiem_moc(data.moc)
+        _DKH.kiem_dot(data.dot)
+    except _DKH.SaiDieuKhoan as ex:
+        raise Gate("DIEU_KHOAN", str(ex))
+    if db.execute(select(DieuKhoanThanhToan).where(DieuKhoanThanhToan.ma == data.ma)).scalars().first():
+        raise Gate("DIEU_KHOAN", f"Mã `{data.ma}` đã có rồi – mỗi điều khoản một mã.")
+    d = DieuKhoanThanhToan(ma=data.ma.strip()[:40], ten=data.ten.strip()[:200], moc=data.moc,
+                           dot=data.dot, ghi_chu=data.ghi_chu, effective_from=data.effective_from,
+                           status="pending", proposed_by=u.username)
+    db.add(d); db.flush()
+    R.audit(db, u.username, u.role, "trinh_dieu_khoan", f"dieu_khoan:{d.ma}",
+            after={"moc": d.moc, "so_dot": len(data.dot)})
+    db.commit()
+    ai = " và ".join(ROLES.get(v, v) for v in can)
+    return {"id": d.id, "message": f"Đã trình điều khoản `{d.ma}` – chờ {ai} ký."}
+
+
+@router.post("/params/dieu-khoan/{did}/ky", tags=["params"])
+def ky_dieu_khoan(did: int, u: User = Depends(require_roles(*_CK.can_ky("dieu_khoan_thanh_toan"))),
+                  db: Session = Depends(get_db)):
+    from app.models.nghia_vu import DieuKhoanThanhToan
+    d = db.get(DieuKhoanThanhToan, did)
+    if not d:
+        raise HTTPException(404, "Không có điều khoản này")
+    if d.status != "pending":
+        raise Gate("DIEU_KHOAN", f"Điều khoản đang ở trạng thái `{d.status}`, không phải chờ ký.")
+    da_ky = _CK.doc_nguoi_da_ky(d.nguoi_da_ky)
+    _CK.kiem_tra_mot_nguoi_hai_vai(u, da_ky)
+    da_ky[u.role] = u.username
+    d.nguoi_da_ky = _CK.ghi_nguoi_da_ky(da_ky)
+    R.audit(db, u.username, u.role, "ky_dieu_khoan", f"dieu_khoan:{d.ma}")
+    con = _CK.con_thieu_cua(_DKH.LOAI_CHU_KY, da_ky)
+    if not con:
+        d.status = "active"
+        R.audit(db, u.username, u.role, "dieu_khoan_hieu_luc", f"dieu_khoan:{d.ma}")
+    db.commit()
+    return {"ok": True, "status": d.status,
+            "message": (f"Điều khoản `{d.ma}` đã có hiệu lực." if not con
+                        else "Đã ký, còn chờ: " + ", ".join(ROLES.get(v, v) for v in con))}
+
+
+@router.get("/params/dieu-khoan/{did}/xem-truoc-tinh-lai", tags=["params"])
+def xem_truoc_tinh_lai(did: int, u: User = Depends(require_roles(*_DK_XEM)),
+                       db: Session = Depends(get_db)):
+    """Những đợt SẼ đổi hạn nếu áp điều khoản này — xem trước, chưa đổi gì.
+
+    Chủ tịch chốt 12/10/2026: sửa điều khoản thì tính lại cả hợp đồng đang gắn. Nhưng một lần bấm
+    có thể dời hạn của hàng chục khoản tiền, nên người bấm phải THẤY TRƯỚC danh sách ấy.
+
+    Hai loại đợt KHÔNG bị dời, và cửa này liệt kê chúng kèm lý do thay vì giấu đi: đợt đã trả, và
+    đợt đang quá hạn (luật sổ nghĩa vụ 11/9/2026 – thay lịch trả không tự xoá quá hạn)."""
+    return _tinh_lai(db, did, u, ap=False)
+
+
+@router.post("/params/dieu-khoan/{did}/ap-tinh-lai", tags=["params"])
+def ap_tinh_lai(did: int, u: User = Depends(require_roles(*_DK_TRINH)),
+                db: Session = Depends(get_db)):
+    ra = _tinh_lai(db, did, u, ap=True)
+    db.commit()
+    return ra
+
+
+def _tinh_lai(db: Session, did: int, u: User, ap: bool) -> dict:
+    from app.models.nghia_vu import DieuKhoanThanhToan, DotThanhToan, NghiaVuThanhToan
+    d = db.get(DieuKhoanThanhToan, did)
+    if not d:
+        raise HTTPException(404, "Không có điều khoản này")
+    if d.status != "active":
+        raise Gate("DIEU_KHOAN", "Chỉ áp được điều khoản đã có hiệu lực – điều khoản này đang "
+                                 f"`{d.status}`.")
+    hom_nay = date.today()
+    doi, giu = [], []
+    nvs = db.execute(select(NghiaVuThanhToan)
+                     .where(NghiaVuThanhToan.dieu_khoan_id == d.id)).scalars().all()
+    for nv in nvs:
+        dot = db.execute(select(DotThanhToan).where(DotThanhToan.nghia_vu_id == nv.id)
+                         .order_by(DotThanhToan.so_thu_tu)).scalars().all()
+        khuon = d.dot or []
+        moi = _DKH.dung_dot(nv.tong_nghia_vu, khuon, d.moc, _moc_cua(db, nv, d.moc))
+        for cu in dot:
+            m = next((x for x in moi if x["so_thu_tu"] == cu.so_thu_tu), None)
+            if m is None:
+                continue
+            ly_do = _DKH.vi_sao_khong_tinh_lai(cu.ngay_han, cu.so_tien, cu.da_tra, hom_nay)
+            muc = {"nghia_vu": nv.ma_goc, "doi_tuong": nv.doi_tuong, "dot": cu.so_thu_tu,
+                   "so_tien": float(cu.so_tien or 0), "han_cu": cu.ngay_han, "han_moi": m["ngay_han"]}
+            if ly_do:
+                giu.append({**muc, "ly_do": ly_do})
+                continue
+            if cu.ngay_han == m["ngay_han"]:
+                continue
+            doi.append(muc)
+            if ap:
+                cu.ngay_han = m["ngay_han"]
+                cu.ngay_han_suy = m["ngay_han"]
+                cu.can_cu_han = m["can_cu_han"]
+                cu.boi, cu.luc = u.username, datetime.now()
+    if ap:
+        R.audit(db, u.username, u.role, "ap_tinh_lai_dieu_khoan", f"dieu_khoan:{d.ma}",
+                after={"so_dot_doi": len(doi), "so_dot_giu": len(giu)})
+    return {"dieu_khoan": d.ma, "da_ap": ap, "so_nghia_vu": len(nvs), "doi": doi, "giu_nguyen": giu,
+            "message": (f"{'Đã đổi' if ap else 'Sẽ đổi'} hạn của {len(doi)} đợt; "
+                        f"{len(giu)} đợt giữ nguyên vì đã trả hoặc đang quá hạn.")}
+
+
+def _moc_cua(db: Session, nv, moc: str):
+    """Ngày mốc của một nghĩa vụ. KHÔNG tìm thấy thì trả None – và hạn sẽ rỗng, không bịa."""
+    ten_truong = _DKH.MOC.get(moc, ("", ""))[1]
+    if not ten_truong:
+        return None
+    if moc == "khoi_hanh" and nv.tour_id:
+        t = db.get(Tour, nv.tour_id)
+        return getattr(t, "start_date", None) if t else None
+    return getattr(nv, ten_truong, None) or nv.ngay_cam_ket
