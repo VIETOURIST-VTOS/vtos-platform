@@ -106,7 +106,7 @@ def settle(db: Session, u: User, s: FinSchedule, done_on: date, bank_ref: str, a
     # NGUYÊN – chúng chưa có quy ước trong bảng hạch toán, và tự đặt quy ước cho chúng là việc của
     # Kế toán, không phải của bản sửa này.
     try:
-        e = ACC.post_entry(db, u.username, u.role, done_on, f"{c.code} {c.partner}: {s.kind.replace('_', ' ')} {amt:,.0f}" + (f" (GD {bank_ref})" if bank_ref else ""), lines, "tai_chinh", f"fin:{c.code}")
+        e = ACC.post_entry(db, u.username, u.role, done_on, f"{c.code} {c.partner}: {s.kind.replace('_', ' ')} {amt:,.0f}" + (f" (GD {bank_ref})" if bank_ref else ""), lines, "tai_chinh", f"fin:{c.code}:ky{s.id}", nghiep_vu="khe_uoc_tai_chinh")
         s.entry_id = e.id
     except ValueError as ex:
         R.audit(db, u.username, u.role, "ghi_so_that_bai", f"fin:{c.code}", after={"ly_do": str(ex)})

@@ -1,6 +1,6 @@
 """Kế toán theo Thông tư 99/2025/TT-BTC: hệ thống tài khoản, chứng từ ghi sổ, hóa đơn điện tử, khóa kỳ."""
 from datetime import datetime, date
-from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON
+from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON, event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 from app.models.kieu_tien import TIEN
@@ -52,8 +52,26 @@ class JournalEntry(Base):
     entry_date: Mapped[date] = mapped_column(Date)   # CỐ Ý không đánh chỉ mục – xem migration d0e1f2a3b4c5
     period: Mapped[str] = mapped_column(String(7), index=True)            # 2026-09
     description: Mapped[str] = mapped_column(String(300))
-    source_type: Mapped[str] = mapped_column(String(30), default="thu_cong")  # thu_tien / hoa_don / quyet_toan / thu_cong / dao
+    # Đợt E3 12/10/2026 – chú thích cũ khai NĂM giá trị; đo bằng cây cú pháp của 32 chỗ gọi
+    # `post_entry` thì mã thật dùng 17 giá trị hằng. Danh sách thật nay ở `chung_tu_loai.NGUON`,
+    # và `test_e3_4` đỏ nếu mã dùng một giá trị chưa khai ở đó. Không chép danh sách vào đây:
+    # một danh sách chép hai chỗ là hai chỗ để lệch nhau.
+    source_type: Mapped[str] = mapped_column(String(30), default="thu_cong")
     source_ref: Mapped[str] = mapped_column(String(60), default="")       # receipt:PT…, invoice:…, tour:…
+    # ĐỢT E3 – BA CỘT PHÂN LOẠI VÀ MỘT KHOÁ CHỐNG GHI SỔ HAI LẦN.
+    #
+    # `ngay_chung_tu` tách khỏi `entry_date`: trước đợt này MỘT ngày gánh hai việc – ngày trên tờ
+    # chứng từ và ngày ghi vào sổ. Hóa đơn đề ngày 28/9 mà Kế toán nhận ngày 3/10 thì hai ngày ấy
+    # khác nhau thật, và báo cáo thuế đọc ngày chứng từ còn sổ cái đọc ngày ghi sổ.
+    #
+    # `khoa_su_kien` do `services/accounting.py::post_entry` GHÉP, không phải ô người gọi điền:
+    # nguồn, mã nguồn và loại nghiệp vụ nối lại. NULL nghĩa là sự kiện không định danh được – hai
+    # trường hợp ấy khai ở `chung_tu_loai.KHONG_KHOA_SU_KIEN` kèm lý do. NULL không va nhau trong
+    # chỉ mục duy nhất, nên chứng từ lập tay vẫn lập được nhiều tờ giống nhau trong một ngày.
+    ngay_chung_tu: Mapped[date] = mapped_column(Date)
+    loai_chung_tu: Mapped[str] = mapped_column(String(10), default="")    # xem chung_tu_loai.LOAI_CHUNG_TU
+    loai_nghiep_vu: Mapped[str] = mapped_column(String(40), default="")   # xem chung_tu_loai.NGHIEP_VU
+    khoa_su_kien: Mapped[str | None] = mapped_column(String(200), nullable=True, unique=True, index=True)
     tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="nhap")       # nhap / da_ghi_so / huy
     created_by: Mapped[str] = mapped_column(String(50), default="robot")
@@ -63,6 +81,21 @@ class JournalEntry(Base):
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)  # pháp nhân chủ quản – rỗng là CHƯA XÁC ĐỊNH, không mặc định về công ty mẹ
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     lines: Mapped[list["JournalLine"]] = relationship(back_populates="entry", cascade="all, delete-orphan", order_by="JournalLine.id")
+
+
+# ĐỢT E3 – "NGÀY CHỨNG TỪ RỖNG THÌ BẰNG NGÀY GHI SỔ" LÀ LUẬT CỦA BẢNG, KHÔNG PHẢI CỦA MỘT HÀM.
+#
+# Đặt mặc định trong `post_entry` thôi là chưa đủ: bốn tệp phép thử và bất cứ mã nào về sau cũng
+# có thể dựng `JournalEntry(...)` thẳng, và lúc ấy cột NOT NULL ném lỗi ở tầng cơ sở dữ liệu —
+# một lời báo không nói được gì về nghiệp vụ. Đo 12/10/2026: `test_ks_hau_kiem_nhap_tay` đỏ đúng
+# vì thế, 17 lỗi, và nó đỏ vì CÁCH KHAI của em chứ không vì bài toán nó đang canh.
+#
+# Móc `before_insert` đặt luật ở chỗ KHÔNG ai đi vòng được. Cột vẫn NOT NULL – ngày chứng từ rỗng
+# là một chứng từ không báo cáo thuế được, nên nó phải là lỗi chứ không phải một ô trống.
+@event.listens_for(JournalEntry, "before_insert")
+def _ngay_chung_tu_mac_dinh(_mapper, _ket_noi, e: JournalEntry) -> None:
+    if e.ngay_chung_tu is None:
+        e.ngay_chung_tu = e.entry_date
 
 
 class JournalLine(Base):

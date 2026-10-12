@@ -116,7 +116,7 @@ def ghi_so(db: Session, s: FinSchedule, boi: str, vai: str, ngay: date | None = 
                       entry_id=s.entry_id)
     xt = xem_truoc(db, s)
     e = ACC.post_entry(db, boi, vai, ngay or xt["ngay"], xt["dien_giai"], xt["dong"],
-                       source_type="khe_uoc_vay", source_ref=xt["source_ref"])
+                       source_type="khe_uoc_vay", source_ref=xt["source_ref"], nghiep_vu="khe_uoc_vay")
     s.entry_id = e.id
     s.status = "da_thuc_hien"
     s.done_on = s.done_on or (ngay or xt["ngay"])

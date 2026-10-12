@@ -15,6 +15,7 @@ from app.models.core import Tour, User, TOUR_TRON_GOI
 from app.models.accounting import Account, JournalEntry, JournalLine, Partner, Project
 from app.models.ops import PaymentRequest
 from app.services import accounting as ACC
+from app.services import chung_tu_loai as CTL   # Đợt E3
 from app.services import rules as R
 from app.services import so_lo_nap as SLN
 from app.services.bctc import BY_PARTNER
@@ -208,7 +209,7 @@ def import_opening_balance(db: Session, u: User, tb: bytes, as_of: date, column:
         raise ValueError(f"Đã có số dư đầu kỳ ngày {as_of:%d/%m/%Y} ({old[0].code}) – chọn 'thay thế' để nhập lại")
     for e in old:   # đảo đúng ngày số dư (không phải hôm nay) để số dư tại as_of không bị nhân đôi
         rl = [{"account": l.account_code, "debit": l.credit, "credit": l.debit, "partner": l.partner, "partner_code": l.partner_code, "note": f"Đảo {e.code} – nhập lại số dư"} for l in e.lines]
-        r = ACC.post_entry(db, u.username, u.role, as_of, f"Đảo {e.code}: nhập lại số dư đầu kỳ", rl, "dao", f"entry:{e.code}")
+        r = ACC.post_entry(db, u.username, u.role, as_of, f"Đảo {e.code}: nhập lại số dư đầu kỳ", rl, "dao", f"entry:{e.code}", nghiep_vu="but_toan_dao")
         e.reversed_by_id = r.id; e.source_ref = f"{ref}:old"
     obj = {}
     if objects:
@@ -237,7 +238,7 @@ def import_opening_balance(db: Session, u: User, tb: bytes, as_of: date, column:
     td = sum((l["debit"] or 0) for l in lines); tc = sum((l["credit"] or 0) for l in lines)
     if abs(td - tc) >= 1:
         raise ValueError(f"Bảng cân đối MISA không cân ở tài khoản chi tiết: Nợ {td:,.0f} ≠ Có {tc:,.0f}")
-    e = ACC.post_entry(db, u.username, u.role, as_of, f"Số dư đầu kỳ {as_of:%d/%m/%Y} nhập từ MISA ({parsed['period']})", lines, "so_du_dau_ky", ref)
+    e = ACC.post_entry(db, u.username, u.role, as_of, f"Số dư đầu kỳ {as_of:%d/%m/%Y} nhập từ MISA ({parsed['period']})", lines, "so_du_dau_ky", ref, nghiep_vu="so_du_dau_ky")
     # Đơn vị đếm ở đây là DÒNG SỐ DƯ đã dựng, không phải dòng excel: bảng cân đối MISA có dòng tổng
     # và dòng tài khoản cha, và bộ nạp cố ý chỉ lấy tài khoản chi tiết.
     SLN.ghi_lo(db, loai="misa_so_du_dau_ky", so_dong=len(lines), da_nap=len(lines),
@@ -289,7 +290,7 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
     old_close = db.execute(select(JournalEntry).where(JournalEntry.source_ref == ref_close, JournalEntry.status == "da_ghi_so")).scalars().all()
     for e in (*old_close, *old_adj):
         rl = [{"account": l.account_code, "debit": l.credit, "credit": l.debit, "partner": l.partner, "partner_code": l.partner_code, "note": f"Đảo {e.code} – nạp lại mốc kiểm toán"} for l in e.lines]
-        r = ACC.post_entry(db, u.username, u.role, as_of, f"Đảo {e.code}: nạp lại mốc kiểm toán", rl, "dao", f"entry:{e.code}")
+        r = ACC.post_entry(db, u.username, u.role, as_of, f"Đảo {e.code}: nạp lại mốc kiểm toán", rl, "dao", f"entry:{e.code}", nghiep_vu="but_toan_dao")
         e.reversed_by_id = r.id; e.source_ref = f"{e.source_ref}:old"
     db.flush()
 
@@ -305,7 +306,7 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
         # Đóng thẳng phần doanh thu/chi phí còn treo vào 421 (không cần qua 911 vì đây là 1 bút toán):
         # tổng các dòng xóa số dư P&L ở trên có (Nợ − Có) = −kq, nên dòng 421 cần (Nợ − Có) = +kq để tự cân.
         close_lines.append({"account": "421", "debit": max(kq, 0), "credit": max(-kq, 0), "note": "Kết chuyển KQKD còn treo vào lợi nhuận sau thuế chưa phân phối (chốt sổ kiểm toán)"})
-        ACC.post_entry(db, u.username, u.role, as_of, f"Kết chuyển KQKD để chốt sổ kiểm toán {as_of:%d/%m/%Y}", close_lines, "ket_chuyen", ref_close)
+        ACC.post_entry(db, u.username, u.role, as_of, f"Kết chuyển KQKD để chốt sổ kiểm toán {as_of:%d/%m/%Y}", close_lines, "ket_chuyen", ref_close, nghiep_vu="ket_chuyen_chot_so")
         db.flush()
 
     current = _account_net_balances(db, as_of)
@@ -373,7 +374,7 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
     if not lines:
         db.commit()
         return {"entry": None, "as_of": as_of, "total": 0, "lines": 0, "source": data["nguon"], "message_extra": "Sổ VTOS đã khớp đúng số kiểm toán, không cần điều chỉnh", **stat}
-    e = ACC.post_entry(db, u.username, u.role, as_of, f"Điều chỉnh chốt sổ theo BCTC kiểm toán/soát xét tại {as_of:%d/%m/%Y} ({data['nguon']})", lines, "kiem_toan", ref_adj)
+    e = ACC.post_entry(db, u.username, u.role, as_of, f"Điều chỉnh chốt sổ theo BCTC kiểm toán/soát xét tại {as_of:%d/%m/%Y} ({data['nguon']})", lines, "kiem_toan", ref_adj, nghiep_vu="dieu_chinh_kiem_toan")
     db.commit()
     SLN.ghi_lo(db, loai="misa_moc_kiem_toan", so_dong=len(lines), da_nap=len(lines),
                tong_tien_tep=td, tong_tien_da_nap=td, tong_tien_bo_qua=0, tong_tien_loi=0,
@@ -436,7 +437,12 @@ def import_journal(db: Session, u: User, data: bytes, date_from: date | None = N
         while code in used:
             k2 += 1; code = f"MISA-{no}"[:22] + f"-{d:%m%d}" + (str(k2) if k2 > 1 else "")
         used.add(code)
+        # Đợt E3: chỗ này dựng JournalEntry THẲNG, không qua `post_entry`, nên bốn ô mới phải
+        # điền tại đây. `khoa_su_kien` ghép bằng chính hàm chung để hai đường không lệch luật.
         e = JournalEntry(code=code, entry_date=d, period=ACC.period_of(d), description=doc["desc"] or f"Chứng từ MISA {no}", source_type="misa", source_ref=ref,
+                         ngay_chung_tu=d, loai_nghiep_vu="chung_tu_misa",
+                         loai_chung_tu=CTL.chung_tu_cua("chung_tu_misa"),
+                         khoa_su_kien=CTL.khoa("misa", ref, "chung_tu_misa"),
                          status="da_ghi_so", created_by="misa", posted_by=u.username, posted_at=datetime.now())
         for l in doc["lines"]:
             e.lines.append(JournalLine(account_code=l["account"], debit=l["debit"], credit=l["credit"], partner=l["partner"][:160], partner_code=l["partner_code"][:60], project_code=l["project_code"][:40], note=l["note"]))

@@ -666,7 +666,7 @@ def _post_liability(db: Session, r: PaymentRequest):
     try:
         e = ACC.post_entry(db, "robot", "robot", date.today(), f"Đề nghị chi {r.code} – {r.supplier_name}: {r.description[:80]}",
                            [{"account": acc, "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id, "note": "" if r.has_invoice else "Không hóa đơn – không được trừ TNDN"},
-                            {"account": "331", "credit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}], "de_nghi_chi", f"dc:{r.code}", r.tour_id)
+                            {"account": "331", "credit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}], "de_nghi_chi", f"dc:{r.code}", r.tour_id, nghiep_vu="de_nghi_chi")
         r.entry_ids = list(r.entry_ids or []) + [e.id]
     except ValueError as ex:
         R.audit(db, "robot", "robot", "ghi_so_that_bai", f"dc:{r.code}", after={"ly_do": str(ex)})
@@ -681,7 +681,7 @@ def _post_payment(db: Session, r: PaymentRequest):
     else:
         lines = [{"account": "331", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
     try:
-        e = ACC.post_entry(db, "robot", "robot", date.today(), f"Chi {r.code} – {r.supplier_name}" + (f" (GD {r.paid_ref})" if r.paid_ref else ""), lines, "lenh_chi", f"dc:{r.code}", r.tour_id)
+        e = ACC.post_entry(db, "robot", "robot", date.today(), f"Chi {r.code} – {r.supplier_name}" + (f" (GD {r.paid_ref})" if r.paid_ref else ""), lines, "lenh_chi", f"dc:{r.code}", r.tour_id, nghiep_vu="chi_tien")
         r.entry_ids = list(r.entry_ids or []) + [e.id]
     except ValueError as ex:
         R.audit(db, "robot", "robot", "ghi_so_that_bai", f"dc:{r.code}", after={"ly_do": str(ex)})

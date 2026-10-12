@@ -12,6 +12,7 @@ from app.models.core import Tour, Booking, User
 from app.models.payments import Receipt
 from app.models.accounting import Account, JournalEntry, JournalLine, Invoice, PeriodLock
 from app.services import rules as R
+from app.services import chung_tu_loai as CTL   # Đợt E3 – loại chứng từ, loại nghiệp vụ, khoá sự kiện
 
 # Hệ thống tài khoản rút gọn cho công ty lữ hành (TT 99/2025/TT-BTC, Phụ lục I) – bổ sung dần.
 #
@@ -111,8 +112,23 @@ def _next_code(db: Session, prefix: str, d: date) -> str:
 
 
 def post_entry(db: Session, actor: str, role: str, entry_date: date, description: str, lines: list[dict],
-               source_type: str = "thu_cong", source_ref: str = "", tour_id: int | None = None, post: bool = True) -> JournalEntry:
-    """lines: [{account, debit, credit, partner?, booking_id?, tour_id?, note?}]. Kiểm tra cân đối và kỳ khóa."""
+               source_type: str = "thu_cong", source_ref: str = "", tour_id: int | None = None, post: bool = True,
+               nghiep_vu: str = "but_toan_tay", ngay_chung_tu: date | None = None) -> JournalEntry:
+    """lines: [{account, debit, credit, partner?, booking_id?, tour_id?, note?}]. Kiểm tra cân đối và kỳ khóa.
+
+    ĐỢT E3 12/10/2026 – hai tham số mới:
+
+    · `nghiep_vu` – VIỆC GÌ đã xảy ra, lấy trong `chung_tu_loai.NGHIEP_VU`. Loại chứng từ suy ra
+      từ đó, nên người gọi khai MỘT thứ chứ không khai hai thứ có thể lệch nhau. Mặc định
+      `but_toan_tay` CHỈ đúng cho cửa lập tay; `test_e3_1` đọc cây cú pháp của mọi chỗ gọi và đỏ
+      nếu một chỗ nào đó không khai rõ.
+
+    · `ngay_chung_tu` – ngày trên tờ chứng từ. Bỏ trống thì bằng `entry_date`, đúng như mọi chứng
+      từ đang có trước đợt này.
+
+    CHẶN GHI SỔ HAI LẦN: khoá sự kiện ghép từ nguồn, mã nguồn và nghiệp vụ. Trùng thì NÉM LỖI và
+    nói ra mã chứng từ đã ghi – một trong bốn luật cứng Chủ tịch chốt (nguồn trùng thật luôn
+    chặn), nên nó KHÔNG đi qua bảng mức độ chặn."""
     period = period_of(entry_date)
     if is_locked(db, period):
         raise ValueError(f"Kỳ {period} đã khóa – không ghi sổ được")
@@ -131,7 +147,19 @@ def post_entry(db: Session, actor: str, role: str, entry_date: date, description
         if not acc:
             raise ValueError(f"Tài khoản {l['account']} không có trong danh mục")
         account_rule_check(db, acc.code, l, source_type)
+    khoa = CTL.khoa(source_type, source_ref, nghiep_vu)
+    if khoa is not None:
+        cu = db.execute(select(JournalEntry).where(JournalEntry.khoa_su_kien == khoa)).scalars().first()
+        if cu is not None:
+            raise ValueError(
+                f"Sự kiện này đã ghi sổ ở chứng từ {cu.code} ngày {cu.entry_date:%d/%m/%Y} – "
+                f"{CTL.ten_nghiep_vu(nghiep_vu)}, nguồn {source_type}, mã nguồn {source_ref}. "
+                f"Ghi lần nữa là nhân đôi số tiền mà sổ vẫn cân, nên không ai thấy. "
+                f"Muốn sửa thì lập bút toán đảo cho {cu.code}, đừng ghi thêm một tờ nữa.")
     e = JournalEntry(code=_next_code(db, "CT", entry_date), entry_date=entry_date, period=period, description=description[:300],
+                     ngay_chung_tu=ngay_chung_tu or entry_date,
+                     loai_nghiep_vu=CTL.nghiep_vu_hop_le(nghiep_vu), loai_chung_tu=CTL.chung_tu_cua(nghiep_vu),
+                     khoa_su_kien=khoa,
                      source_type=source_type, source_ref=source_ref, tour_id=tour_id, created_by=actor,
                      status="da_ghi_so" if post else "nhap", posted_by=actor if post else "", posted_at=datetime.now() if post else None,
                      company_id=_company_of_tour(db, tour_id))
@@ -165,7 +193,7 @@ def reverse_entry(db: Session, u: User, e: JournalEntry, reason: str) -> Journal
         raise ValueError("Chứng từ đã được đảo")
     lines = [{"account": l.account_code, "debit": l.credit, "credit": l.debit, "partner": l.partner, "partner_code": l.partner_code, "project_code": l.project_code,
               "item_code": l.item_code, "doc_no": l.doc_no, "booking_id": l.booking_id, "tour_id": l.tour_id, "note": f"Đảo {e.code}"} for l in e.lines]
-    r = post_entry(db, u.username, u.role, date.today(), f"Đảo {e.code}: {reason}", lines, "dao", f"entry:{e.code}", e.tour_id)
+    r = post_entry(db, u.username, u.role, date.today(), f"Đảo {e.code}: {reason}", lines, "dao", f"entry:{e.code}", e.tour_id, nghiep_vu="but_toan_dao")
     e.reversed_by_id = r.id
     db.commit()
     return r
@@ -184,7 +212,7 @@ def on_receipt_confirmed(db: Session, r: Receipt, actor: str, role: str) -> Jour
         return post_entry(db, "robot", "robot", d, f"Thu tiền {b.code if b else ''} – {r.payer}",
                           [{"account": cash, "debit": r.amount, "partner": r.payer, "booking_id": r.booking_id, "project_code": pc},
                            {"account": "131", "credit": r.amount, "partner": b.customer_name if b else r.payer, "partner_code": (b.customer_phone if b and getattr(b, "customer_phone", "") else ""), "booking_id": r.booking_id, "project_code": pc}],
-                          "thu_tien", f"receipt:{r.code}", b.tour_id if b else None)
+                          "thu_tien", f"receipt:{r.code}", b.tour_id if b else None, nghiep_vu="thu_tien_khach")
     except ValueError as ex:  # kỳ khóa → cảnh báo, không chặn nghiệp vụ thu tiền
         R.audit(db, actor, role, "ghi_so_that_bai", f"receipt:{r.code}", after={"ly_do": str(ex)})
         return None
@@ -197,7 +225,7 @@ def on_invoice_issued(db: Session, inv: Invoice) -> JournalEntry:
     if (inv.vat or 0) > 0:
         lines.append({"account": "3331", "credit": inv.vat, "partner": inv.customer_name})
     return post_entry(db, "robot", "robot", inv.issue_date, f"Hóa đơn {inv.series}-{inv.number:07d} – {inv.customer_name}", lines,
-                      "hoa_don", f"invoice:{inv.series}-{inv.number}", inv.tour_id)
+                      "hoa_don", f"invoice:{inv.series}-{inv.number}", inv.tour_id, nghiep_vu="phat_hanh_hoa_don")
 
 
 def on_settlement_confirmed(db: Session, t: Tour, actor: str, role: str) -> list[JournalEntry]:
@@ -216,17 +244,17 @@ def on_settlement_confirmed(db: Session, t: Tour, actor: str, role: str) -> list
             adv = sum((r.amount or 0) for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.category == "tam_ung", PaymentRequest.status == "da_chi")).scalars())
             if adv > 0:   # hoàn ứng: tạm ứng đã chi trở thành chi phí tour
                 out.append(post_entry(db, "robot", "robot", d, f"Hoàn ứng tour {t.code} theo quyết toán",
-                                      [{"account": "154", "debit": adv, "tour_id": t.id}, {"account": "141", "credit": adv, "partner": "Tạm ứng tour", "tour_id": t.id}], "quyet_toan", f"tour:{t.code}", t.id))
+                                      [{"account": "154", "debit": adv, "tour_id": t.id}, {"account": "141", "credit": adv, "partner": "Tạm ứng tour", "tour_id": t.id}], "quyet_toan", f"tour:{t.code}", t.id, nghiep_vu="quyet_toan_hoan_ung"))
             diff = (t.actual_cost or 0) - posted_tour_cost(db, t.id)
             if diff > 0:
                 out.append(post_entry(db, "robot", "robot", d, f"Chi phí tour {t.code} chưa có hóa đơn NCC theo quyết toán (trích trước)",
                                       [{"account": "154", "debit": diff, "tour_id": t.id}, {"account": "335", "credit": diff, "partner": "NCC dịch vụ tour", "tour_id": t.id}],
-                                      "quyet_toan", f"tour:{t.code}", t.id))
+                                      "quyet_toan", f"tour:{t.code}", t.id, nghiep_vu="quyet_toan_trich_truoc"))
             elif diff < 0:
                 R.audit(db, actor, role, "canh_bao_quyet_toan", f"tour:{t.code}", after={"ly_do": f"Chi phí quyết toán {(t.actual_cost or 0):,.0f} nhỏ hơn đề nghị chi đã duyệt {(t.actual_cost or 0) - diff:,.0f} – Kế toán rà soát"})
             out.append(post_entry(db, "robot", "robot", d, f"Kết chuyển giá vốn tour {t.code}",
                                   [{"account": "632", "debit": t.actual_cost, "tour_id": t.id}, {"account": "154", "credit": t.actual_cost, "tour_id": t.id}],
-                                  "quyet_toan", f"tour:{t.code}", t.id))
+                                  "quyet_toan", f"tour:{t.code}", t.id, nghiep_vu="quyet_toan_gia_von"))
         except ValueError as ex:
             R.audit(db, actor, role, "ghi_so_that_bai", f"tour:{t.code}", after={"ly_do": str(ex)})
     return out
