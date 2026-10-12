@@ -28,6 +28,11 @@ có bảng chưa gộp về (chuỗi bán hàng V6), và bảng đã bỏ thì d
 from sqlalchemy.orm import Session
 
 CUA_TAY = (
+    # Dot E4a 12/10/2026. Ca hai bang nhap tay tren man hinh `/params`: nguoi dung khai
+    # dieu khoan (ma, moc, cac dot), con cac dot THAT cua mot nghia vu do dieu khoan sinh ra
+    # va Ke toan sua han duoc. KHONG khai la may sinh: may dung khuon, nguoi dat ra khuon ay.
+    "dieu_khoan_thanh_toan",
+    "dot_thanh_toan",
     "van_ban_phap_che",
     # Đợt E2a — cặp xung đột tách bạch trách nhiệm. Người dùng tự khai qua màn hình /ket-so;
     # hệ thống KHÔNG nạp sẵn dòng nào, vì mỗi dòng là một quy chế kiểm soát nội bộ có người ký.

@@ -55,6 +55,9 @@ VAI_KY_CAN: dict[str, tuple[str, ...]] = {
     # và bảng này khai LUẬT. Việc đổi người ký buộc phải thêm cột `signed_ptgd_doan` cho bảng
     # `tours`: nhét chữ ký P.TGĐ vào cột tên là `signed_chutich` là để sổ nói dối sau ba tháng.
     "du_toan_duoi_bien": ("ptgd_doan", "tgd"),
+    # Dot E4a 12/10/2026 - DIEU KHOAN THANH TOAN. Chu tich chot: Chu tich ky mot minh,
+    # y nhu bang tham so chinh sach. Khai O DAY chu khong o `dieu_khoan.py`: mot luat, mot cho.
+    "dieu_khoan_thanh_toan": ("chutich",),
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
