@@ -134,6 +134,41 @@ def _goi(d: dict) -> str:
     return f"{d['lan']} ({mv}, từ {d['bat_dau']}, {d['nguon']} dòng {d['so_dong']})"
 
 
+def test_khong_dong_nao_bi_bo_qua_vi_sai_so_cot():
+    """Mọi dòng bắt đầu bằng `|` phải đọc được — 2 cột (bảng hướng dẫn) hoặc 5 cột (sổ).
+
+    CHUYỆN ĐÃ XẢY RA 12/10/2026, và nó là kiểu hỏng tệ nhất của cả bộ hàng rào này: một dòng sổ
+    có ký tự `|` LỌT VÀO phần mô tả — `_doc_mot_tep` tách cột bằng `|` nên dòng ấy ra 6 cột, không
+    khớp 5, và bị `continue` BỎ QUA. Người đọc sổ vẫn thấy dòng ấy nằm đó, đủ cột, đẹp đẽ. Máy thì
+    không thấy gì cả.
+
+    Hệ quả: vòng ấy tưởng đã giữ chỗ bốn tệp mã, thực tế không giữ tệp nào — và nếu một làn khác
+    cùng lúc chạm vào bốn tệp đó thì `test_hai_lan_KHONG_duoc_cung_giu_mot_tep` cũng im lặng, vì
+    với nó dòng kia không tồn tại. Tức là một ký tự trong câu văn tắt được cả hai hàng rào cùng
+    lúc, mà không hàng rào nào kêu. `test_gn3` có bắt được, nhưng chỉ bắt trên pull request và chỉ
+    nói "tệp này không ai giữ" — không nói vì sao, nên người sửa sẽ đi thêm một dòng nữa vào sổ và
+    nó lại biến mất y như vậy.
+
+    Chữ `|` trong mô tả không cách nào thoát được: bộ đọc tách theo ký tự thô, nên `\|` của
+    markdown cũng tách. Cách duy nhất là ĐỪNG viết nó — dùng chữ "hoặc", hoặc viết `date or None`.
+    """
+    hong = []
+    for duong in _nguon():
+        for so, raw in enumerate(open(duong, encoding="utf-8").read().splitlines(), start=1):
+            t = raw.strip()
+            if not t.startswith("|"):
+                continue
+            n = len([x for x in t.strip("|").split("|")])
+            if n not in (2, len(COT)):
+                hong.append(f"{os.path.relpath(duong, ROOT)} dòng {so}: {n} cột "
+                            f"(cần {len(COT)}) — có `|` lọt vào phần mô tả?")
+    assert not hong, (
+        "DÒNG SỔ BỊ BỎ QUA VÌ SAI SỐ CỘT — nó nằm trong tệp nhưng KHÔNG tồn tại với hàng rào:\n"
+        + "\n".join("  · " + h for h in hong)
+        + "\n\nCách xử: bỏ ký tự `|` khỏi phần mô tả của dòng ấy. Không thoát được bằng dấu gạch "
+          "chéo — bộ đọc tách theo ký tự thô.")
+
+
 def test_bang_giu_cho_doc_duoc_va_khai_du():
     """Một dòng khai thiếu cột là một dòng không giữ chỗ được cho ai."""
     ds = _doc_bang()

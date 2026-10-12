@@ -788,12 +788,20 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               <span className="anh-dai-dien" aria-hidden="true">{chuDau(user?.full_name)}</span>
               <span className="who-ten">{tenVaChuc(user)}</span> ▾
             </button>
+            {/* `menu-toi` KHÔNG phải lớp trang trí — nó là thứ duy nhất cứu bốn mục trong hộp
+                dưới đây khỏi vô hình. Hộp xổ xuống nằm trong `.top .right`, mà `globals.css` tô
+                MỌI liên kết ở góc ấy thành `color:#fff` cho hợp thanh điều hướng tối; hộp này thì
+                nền sáng (`--vtos-card`), nên không có lớp riêng là chữ trắng trên nền trắng. Bỏ
+                lớp đi thì menu vẫn bấm được, vẫn không báo lỗi gì — chỉ là không ai đọc được nó.
+
+                CHÚ THÍCH NÀY PHẢI ĐỨNG Ở ĐÂY, ngoài cặp ngoặc — và hai lần sửa mới ra được chỗ
+                đứng ấy, nên ghi lại cả hai. Lần một: đặt nó NGAY SAU dấu mở ngoặc của
+                `{menuToi && (`. Trong cặp ngoặc đó chỉ được MỘT biểu thức, nên một khối bọc trong
+                ngoặc nhọn ở vị trí ấy là object literal chứ không phải chú thích JSX; chú thích
+                kiểu này chỉ hợp lệ ở vị trí CON của một thẻ. Lần hai: chuyển ra đúng chỗ rồi,
+                nhưng trong lời giải thích lại VIẾT RA chuỗi đóng chú thích, và nó đóng khối sớm
+                ngay giữa câu. Cả hai lần đều làm `npm run build` hỏng, và lần một đã kịp vào main. */}
             {menuToi && (
-              {/* `menu-toi` KHÔNG phải lớp trang trí — nó là thứ duy nhất cứu bốn mục này khỏi vô
-                  hình. Hộp xổ xuống nằm trong `.top .right`, mà `globals.css` tô MỌI liên kết ở
-                  góc ấy thành `color:#fff` cho hợp thanh điều hướng tối; hộp này thì nền sáng
-                  (`--vtos-card`), nên không có lớp riêng là chữ trắng trên nền trắng. Bỏ lớp đi
-                  thì menu vẫn bấm được, vẫn không báo lỗi gì — chỉ là không ai đọc được nó. */}
               <span role="menu" className="menu-toi" onClick={() => setMenuToi(false)}
                 style={{ position: "absolute", right: 0, top: "100%", zIndex: 40, minWidth: 220,
                          display: "flex", flexDirection: "column", gap: 2,
