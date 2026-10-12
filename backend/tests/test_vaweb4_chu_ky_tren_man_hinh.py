@@ -158,7 +158,10 @@ def test_vaweb4_10_ba_cua_con_lai_doc_dung_ten_loai():
     can = {os.path.join("app", "api", "v1", "hr.py"):
            ('_CK.chu_ky_de_hien("don_gia_hdv"', '_CK.chu_ky_de_hien("gia_xe"'),
            os.path.join("app", "services", "tours.py"):
-           ('_CK.chu_ky_de_hien("du_toan_duoi_bien"', '"signed_ptgd_doan"')}
+           # Đợt VA-WEB5 13/10/2026 sửa đúng dòng này: VA-WEB4 đòi cửa chuyến dưới biên đọc BẢNG
+           # TĨNH, mà bảng tĩnh chỉ đúng cho mảng Đoàn. Luật thật là `can_ky_duoi_bien(mảng)`.
+           # Phép thử đòi sai thì nó canh cho cái sai đứng yên — nên nó phải đổi theo luật.
+           ('_CK.chu_ky_duoi_bien_de_hien(', '"signed_ptgd_doan"')}
     for rel, phai_co in can.items():
         t = open(os.path.join(GOC, "backend", rel), encoding="utf-8").read()
         for c in phai_co:

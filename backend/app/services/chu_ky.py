@@ -242,6 +242,46 @@ def da_ky_cua(ho_so) -> dict[str, str]:
             for v in VAI_CO_O_KY}
 
 
+def da_ky_mot_vai(ho_so, vai: str) -> bool:
+    """Vai này đã ký hồ sơ ấy chưa — MỘT chỗ đọc cho cả hệ thống (Đợt VA-WEB5, 13/10/2026).
+
+    Phải đọc HAI nguồn, và đó là cả lý do hàm này tồn tại:
+
+        cột `signed_<vai>`   sự thật của các bản trước Đợt LG3, và là nơi DUY NHẤT có chữ ký của
+                             ba vai `chutich`, `tgd`, `ptgd_doan` trên những hồ sơ cũ
+        ô `nguoi_da_ky`      sự thật từ Đợt LG3 trở đi, và là nơi DUY NHẤT có chữ ký của những
+                             vai KHÔNG có cột riêng — `gd_kd` chẳng hạn: bảng `tours` không có
+                             cột `signed_gd_kd` và sẽ không bao giờ có, vì LG3 cố ý không dựng
+                             thêm cột cho mỗi vai mới
+
+    Bỏ nguồn thứ hai là xoá chữ ký của mọi vai không có cột — đúng lỗi màn hình chi tiết chuyến
+    mắc ngày 13/10/2026: Giám đốc Kinh doanh ký rồi mà màn hình vẫn hiện "…". `tours.approve`
+    đọc đủ hai nguồn từ LG3; chỗ HIỆN thì chỉ đọc một. Nay cả hai gọi chung hàm này.
+    """
+    if bool(getattr(ho_so, f"signed_{vai}", False)):
+        return True
+    return vai in doc_nguoi_da_ky(getattr(ho_so, "nguoi_da_ky", "") or "")
+
+
+def _ghep_chu_ky(vai: tuple[str, ...], ho_so) -> list[dict]:
+    """Ghép LUẬT (danh sách vai) với TRẠNG THÁI. Chỗ dựng dòng chữ ký duy nhất của hệ thống."""
+    return [{"vai": v, "ten": ROLES.get(v, v), "da_ky": da_ky_mot_vai(ho_so, v)} for v in vai]
+
+
+def chu_ky_duoi_bien_de_hien(mang: str, ho_so) -> list[dict]:
+    """Chữ ký của một chuyến dưới biên — luật THEO MẢNG, không phải bảng tĩnh.
+
+    `VAI_KY_CAN["du_toan_duoi_bien"]` ghi (ptgd_doan, tgd) và dòng ấy ĐÚNG cho mảng Đoàn, SAI
+    cho mảng Lẻ: Đợt LG3 đã thay nó bằng `can_ky_duoi_bien(mang)` ở cửa ký, nhưng Đợt VA-WEB4
+    lại cho màn hình đọc bảng tĩnh — nên một chuyến LẺ dưới biên hiện ra "Phó TGĐ tour đoàn"
+    trong khi người phải ký là Giám đốc Kinh doanh. Đo được trên TL-BKK-1005 ngày 13/10/2026.
+
+    Mảng rỗng thì NÉM `ValueError` y như `can_ky_duoi_bien` — nơi gọi phải nói ra chỗ hệ thống
+    không biết, không được hiện một phòng đoán bừa.
+    """
+    return _ghep_chu_ky(can_ky_duoi_bien(mang), ho_so)
+
+
 def chu_ky_de_hien(loai: str, ho_so) -> list[dict]:
     """MỘT CHỖ cho mọi màn hình ĐỌC chữ ký — Đợt VA-WEB4, 12/10/2026.
 
@@ -259,8 +299,7 @@ def chu_ky_de_hien(loai: str, ho_so) -> list[dict]:
     `da_ky_cua` một mình trả đủ ba cột kể cả cột luật không đòi, và chính nó là chỗ sinh ra
     "TGĐ …" của hôm nay.
     """
-    da = da_ky_cua(ho_so)
-    return [{"vai": v, "ten": ROLES.get(v, v), "da_ky": da.get(v, "") == "x"} for v in can_ky(loai)]
+    return _ghep_chu_ky(can_ky(loai), ho_so)
 
 
 def ten_vai_ky(loai: str) -> list[str]:

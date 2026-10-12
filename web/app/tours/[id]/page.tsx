@@ -177,7 +177,12 @@ function TourDetail() {
           {/* Trước Đợt VA-WEB4 dòng này viết cứng "Chủ tịch · TGĐ" và đếm cứng "2 chữ ký".
               Cả hai đều sai từ 11/10/2026: luật `du_toan_duoi_bien` là (P.TGĐ tour đoàn, TGĐ).
               Nay cả người ký lẫn số chữ ký đều đọc từ danh sách máy chủ gửi về. */}
-          <p>Chuyến dưới biên – cần đủ chữ ký theo luật: <KyO ky={t.chu_ky_duoi_bien} /></p>
+          {/* VƯỚNG đứng TRƯỚC danh sách: khi hệ thống không suy được phòng bán chuyến thì
+              không có chữ ký nào để hiện, và câu nói ra chỗ không biết mới là thứ người đọc
+              cần. Im lặng ở đây nghĩa là một chuyến nằm chờ mà không ai biết chờ ai. */}
+          {t.chu_ky_duoi_bien_vuong
+            ? <div className="gate fail"><b>Chưa biết ai phải ký:</b> {t.chu_ky_duoi_bien_vuong}</div>
+            : <p>Chuyến dưới biên – cần đủ chữ ký theo luật: <KyO ky={t.chu_ky_duoi_bien} /></p>}
           <div className="gate"><b>Giải trình:</b> {t.justification}</div>
           {can("sign") && <><NoteBox /><button className="act orange" onClick={() => run("approve")}>Ký duyệt ({user?.role_name})</button></>}
         </> : <><p>Chờ <b>{ROLES[t.approver_role]}</b> duyệt.</p>{can("approve") && <><NoteBox /><button className="act teal" onClick={() => run("approve")}>Duyệt dự toán</button></>}</>)}
