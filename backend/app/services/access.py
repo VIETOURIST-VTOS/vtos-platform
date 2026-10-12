@@ -446,7 +446,11 @@ MAN_HINH_API = {
     "/ke-hoach-thang": ("/api/v1/ke-hoach",),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo", "/api/v1/dau-quang-cao"),
-    "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers"),
+    "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers",
+                      # DL-1 (11/10/2026): đề nghị xe là mắt đầu của chuỗi điều xe, và nó ở CÙNG
+                      # màn hình với lệnh — đề nghị và lệnh là hai mặt của một việc. Dựng màn hình
+                      # thứ hai cho đề nghị là bắt Giám đốc đội xe mở hai trang để làm một việc.
+                      "/api/v1/de-nghi-xe"),
     # 18/9/2026 – THÊM "/api/v1/leads" VÀ "/api/v1/noi-dung", anh Tuấn chốt cùng ngày.
     #
     # Màn hình /marketing nay là KHÔNG GIAN LÀM VIỆC bảy màn hình theo bản vẽ V3.0, nên nó đọc cả

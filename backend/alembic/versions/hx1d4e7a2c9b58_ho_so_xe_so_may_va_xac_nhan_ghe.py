@@ -1,7 +1,7 @@
 """HX-1: so may va ai xac nhan so ghe
 
 Revision ID: hx1d4e7a2c9b58
-Revises: lg3b2c3d4e5f6a
+Revises: ct1f6b2d8a4e93
 Create Date: 2026-10-11
 
 Ba cot tren bang `vehicles`:
@@ -28,7 +28,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "hx1d4e7a2c9b58"
-down_revision = "lg3b2c3d4e5f6a"
+down_revision = "ct1f6b2d8a4e93"
 branch_labels = None
 depends_on = None
 

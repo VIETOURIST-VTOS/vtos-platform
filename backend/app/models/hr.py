@@ -231,6 +231,15 @@ class DispatchOrder(Base):
     tour_id: Mapped[int] = mapped_column(ForeignKey("tours.id"))
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
     driver_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
+    # DL-1 (11/10/2026) — lệnh này ra từ ĐỀ NGHỊ nào. Chuỗi Chủ tịch đặc tả: Điều hành đề nghị →
+    # Giám đốc đội xe lập lệnh → tài xế nhận.
+    #
+    # Để RỖNG ĐƯỢC, và đó là cố ý: bắt buộc ngay thì mười tệp phép kiểm của các làn khác đỏ, và
+    # quan trọng hơn là Điều hành chưa kịp chuyển sang dùng cửa đề nghị. Nhưng chỗ hở không đếm
+    # được là chỗ hở sẽ ở lại mãi — nên `de_nghi_xe.lenh_khong_qua_de_nghi()` đếm nó, cùng khuôn
+    # với `misa.thieu_tai_khoan()`. Con số về 0 thì siết thành bắt buộc là một dòng.
+    de_nghi_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_vehicle_requests.id"),
+                                                   nullable=True, index=True)
     date_from: Mapped[date] = mapped_column(Date)
     date_to: Mapped[date] = mapped_column(Date)
     rate_id: Mapped[int | None] = mapped_column(ForeignKey("vehicle_rates.id"), nullable=True)   # tuyến trong bảng giá
