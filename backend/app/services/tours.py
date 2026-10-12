@@ -43,6 +43,14 @@ def tour_view(db: Session, t: Tour, user: User | None = None, kem_bookings: bool
         "rest_stops": t.rest_stops, "strategic": t.strategic, "below_margin": t.below_margin, "justification": t.justification,
         "status": t.status, "confirmed_by": t.confirmed_by, "approved_by": t.approved_by,
         "signed_chutich": t.signed_chutich, "signed_tgd": t.signed_tgd, "chairman_run_decision": t.chairman_run_decision,
+        # Đợt VA-WEB4 12/10/2026 — CỬA NẶNG NHẤT trong bốn cửa. Màn hình chi tiết chuyến đọc hai
+        # cột trên rồi viết "cần đủ 2 chữ ký: Chủ tịch ✔ · TGĐ ✔", trong khi luật
+        # `VAI_KY_CAN["du_toan_duoi_bien"]` từ 11/10/2026 là (ptgd_doan, tgd): Chủ tịch RA KHỎI
+        # luật. Nó không nói THỪA một chữ ký như ba cửa chính sách, nó nói SAI NGƯỜI — hiện chữ
+        # ký của vai không còn trong luật và che mất vai đang trong luật. Cột `signed_ptgd_doan`
+        # đã có trên bảng `tours` từ Đợt LG2; thiếu đúng một dòng gửi nó ra cho màn hình.
+        "signed_ptgd_doan": getattr(t, "signed_ptgd_doan", False),
+        "chu_ky_duoi_bien": _CK.chu_ky_de_hien("du_toan_duoi_bien", t),
         "actual_revenue": t.actual_revenue, "actual_cost": t.actual_cost, "promo_value": t.promo_value,
         "closed_at": t.closed_at, "kt_confirmed_at": t.kt_confirmed_at, "cntt_checked_at": t.cntt_checked_at,
         "calc": c, "booked_pax": bk, "days_left": days_left, "settlement_deadline": R.settlement_deadline(db, t),

@@ -242,6 +242,37 @@ def da_ky_cua(ho_so) -> dict[str, str]:
             for v in VAI_CO_O_KY}
 
 
+def chu_ky_de_hien(loai: str, ho_so) -> list[dict]:
+    """MỘT CHỖ cho mọi màn hình ĐỌC chữ ký — Đợt VA-WEB4, 12/10/2026.
+
+    Trước đợt này bốn màn hình gõ tay tên vai vào mã web: `"CT … · TGĐ …"`. Đợt LG2 đổi ba cửa
+    chính sách sang MỘT chữ ký Chủ tịch và đổi `VAI_KY_CAN` theo, nhưng chữ trên màn hình thì
+    không đổi — nên dòng `nguong_chu_tich_duyet_chi` = 100.000.000, ĐÃ đủ ký và ĐANG có hiệu
+    lực, vẫn hiện ra là "TGĐ …", tức là còn thiếu. Đo được trên production ngày 12/10/2026.
+
+    Màn hình nói sai về chữ ký nặng hơn sai chính tả: người đọc sẽ đi tìm một chữ ký không ai
+    cần, hoặc tưởng hồ sơ chưa xong và không dám tiêu tiền theo nó.
+
+    Hàm này ghép LUẬT (`can_ky`) với TRẠNG THÁI (`da_ky_cua`) và CHỈ trả về những vai mà luật
+    đòi cho loại hồ sơ ấy. Vai không có trong luật thì không xuất hiện — nên không còn dấu "…"
+    nào là giả. Thiếu vế nào cũng không dùng được: `can_ky` một mình không biết ai đã ký,
+    `da_ky_cua` một mình trả đủ ba cột kể cả cột luật không đòi, và chính nó là chỗ sinh ra
+    "TGĐ …" của hôm nay.
+    """
+    da = da_ky_cua(ho_so)
+    return [{"vai": v, "ten": ROLES.get(v, v), "da_ky": da.get(v, "") == "x"} for v in can_ky(loai)]
+
+
+def ten_vai_ky(loai: str) -> list[str]:
+    """Tên các vai phải ký, cho tiêu đề và nút Trình — cũng đọc từ bảng luật, không gõ tay.
+
+    Trả TÊN (`Chủ tịch HĐQT`) chứ không trả MÃ (`chutich`): nút bấm là chỗ người đọc, và `ROLES`
+    đã là nơi duy nhất khai tên vai từ trước. Dựng thêm một bảng tên nữa trong mã web là dựng
+    thêm một chỗ để hai bảng lệch nhau.
+    """
+    return [ROLES.get(v, v) for v in can_ky(loai)]
+
+
 def kiem_tra_mot_nguoi_hai_vai(u, da_ky: dict[str, str]) -> None:
     """CHỈ phép chặn "một người không ký thay cả hai vai" — không kiểm vai, không kiểm người trình.
 
