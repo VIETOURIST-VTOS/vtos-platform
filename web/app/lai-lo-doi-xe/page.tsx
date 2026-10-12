@@ -91,12 +91,27 @@ function LaiLo() {
               <td className="num muted">{vnd(t.chi_phi_xe)}</td></tr>
             <tr><td><b>= Kết quả sau chi phí xe</b></td>
               <td className="num"><b>{vnd(t.ket_qua_sau_chi_phi_xe)}</b></td></tr>
-            <tr><td className="muted">− Chi phí của đội (bãi xe, lãi vay, BHXH, quản lý)</td>
+            <tr><td className="muted">− Chi phí của đội (bãi xe, điện nước, BHXH, quản lý)</td>
               <td className="num muted">{vnd(t.chi_phi_doi)}</td></tr>
-            <tr><td><b>= LỢI NHUẬN ĐỘI XE</b></td>
+            <tr><td><b>= LỢI NHUẬN ĐỘI XE</b> <span className="muted">(theo giá vốn vận tải)</span></td>
               <td className="num"><b style={{ color: t.loi_nhuan < 0 ? "var(--red)" : undefined }}>
                 {vnd(t.loi_nhuan)}</b> <span className="muted">({pc(t.ty_le_loi_nhuan)})</span></td></tr>
+            {/* HAI DÒNG TÁCH BẠCH. Chủ tịch quyết 11/10/2026: lãi vay không tính vào giá vốn. Trộn nó
+                vào dòng trên thì tháng 5/2026 đội xe hiện 123.889.302 thay vì 445.504.964 — lệch 3,6
+                lần, và người đọc kết luận sai rằng đội xe gần như không sinh lời. Nhưng BỎ HẲN dòng
+                lãi vay khỏi màn hình cũng sai: khi ấy không ai nhìn đội xe mà biết nó đang gánh bao
+                nhiêu lãi. Nên giữ cả hai, và ghi rõ dòng nào là giá vốn dòng nào không. */}
+            <tr><td className="muted">− Lãi vay xe <span className="muted">— chi phí tài chính (TK 635),
+              <b> không thuộc giá vốn</b></span></td>
+              <td className="num muted">{vnd(t.chi_phi_tai_chinh)}</td></tr>
+            <tr><td><b>= Kết quả sau lãi vay</b></td>
+              <td className="num"><b style={{ color: t.ket_qua_sau_tai_chinh < 0 ? "var(--red)" : undefined }}>
+                {vnd(t.ket_qua_sau_tai_chinh)}</b></td></tr>
           </tbody></table></div>
+        {d.nhom_tai_chinh_chua_nhap?.length > 0 && <p className="muted">
+          <Tag cls="warn">chưa nhập</Tag> {d.nhom_tai_chinh_chua_nhap.join(" · ")} — kỳ này chưa có số,
+          nên dòng <b>kết quả sau lãi vay</b> đang bằng lợi nhuận đội xe. Đó là THIẾU SỐ, không phải
+          bằng 0.</p>}
         <div className="kpis" style={{ marginTop: 10 }}>
           <div className="kpi"><b>{t.so_xe_khai_thac}/{t.so_xe_trong_doi}</b><span>xe có chạy trong kỳ</span></div>
           <div className="kpi"><b>{pc(t.cong_suat)}</b><span>công suất (ngày chạy / xe × ngày)</span></div>
@@ -142,6 +157,16 @@ function LaiLo() {
         {d.nhom_chi_phi_doi_chua_nhap?.length > 0 && <p className="muted">
           <Tag cls="warn">chưa nhập</Tag> {d.nhom_chi_phi_doi_chua_nhap.join(" · ")} — lợi nhuận ở trên
           <b> chưa trừ</b> những khoản này, nên đang cao hơn thực tế.</p>}
+        {d.chi_tiet_chi_phi_tai_chinh?.length > 0 && <>
+          <h2 style={{ marginTop: 14 }}>Ngoài giá vốn — chi phí tài chính</h2>
+          <table><thead><tr><th>Nhóm</th><th className="num">Số tiền</th></tr></thead>
+            <tbody>{d.chi_tiet_chi_phi_tai_chinh.map((c: any) => <tr key={c.nhom}>
+              <td>{c.ten} <Tag cls="warn">ngoài giá vốn</Tag></td>
+              <td className="num">{vnd(c.so_tien)}</td></tr>)}</tbody></table>
+          <p className="muted">Chủ tịch quyết 11/10/2026: lãi vay là chi phí tài chính (TK 635), không
+            tính vào giá vốn vận tải. Khối này <b>không</b> nằm trong lợi nhuận đội xe ở trên và
+            <b> không</b> phân bổ về xe nào ở tab Theo xe.</p>
+        </>}
       </div>
     </>}
 

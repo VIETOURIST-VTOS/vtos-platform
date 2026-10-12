@@ -11,19 +11,30 @@ Ba tầng:
           dùng để so tuyến với tuyến và để biết một chuyến có đáng chạy không.
   Tầng 2 – CHI PHÍ CỦA XE trong kỳ: bảo hiểm, đăng kiểm, bảo dưỡng, lương tài xế, wifi, phân bổ chi
           phí trả trước. Quy được về từng chiếc, nên trừ thẳng vào kết quả chiếc đó.
-  Tầng 3 – CHI PHÍ CỦA ĐỘI: bãi xe, điện nước, phí quản lý, BHXH, và lãi vay. KHÔNG quy về xe nào.
+  Tầng 3 – CHI PHÍ CỦA ĐỘI: bãi xe, điện nước, phí quản lý, BHXH. KHÔNG quy về xe nào.
 
-Vì sao tầng 3 mặc định KHÔNG chia về từng xe: chia 327 triệu lãi vay cho 21 chiếc theo doanh thu, theo
-ngày chạy hay chia đều đều ra những con số khác nhau và đều "có lý". Người đọc bảng lại nhớ con số cuối
-cùng như kết quả thật của chiếc xe, rồi lấy nó ra quyết định bán xe hay đổi tài xế. Nên mặc định để
-riêng một khối – đúng như bảng Excel đang làm – và ai muốn xem thử khi phân bổ thì phải CHỌN tiêu thức,
-và bảng ghi rõ đó là số phân bổ.
+Và một nhóm thứ tư nằm NGOÀI cả ba tầng:
+
+  NGOÀI GIÁ VỐN – lãi vay xe. Chủ tịch quyết 11/10/2026: lãi vay không tính vào giá vốn. Nó là chi phí
+          tài chính (TK 635), không phải giá vốn vận tải. Báo cáo cho ra HAI con số tách bạch: "lợi
+          nhuận đội xe theo giá vốn vận tải", rồi dưới nó "trừ lãi vay" và "kết quả sau lãi vay".
+          Danh sách nhóm nào ngoài giá vốn do `NGOAI_GIA_VON` trong mô hình khai, không rải trong mã.
+
+Vì sao tầng 3 mặc định KHÔNG chia về từng xe: chia chi phí đội cho 21 chiếc theo doanh thu, theo ngày
+chạy hay chia đều đều ra những con số khác nhau và đều "có lý". Người đọc bảng lại nhớ con số cuối cùng
+như kết quả thật của chiếc xe, rồi lấy nó ra quyết định bán xe hay đổi tài xế. Nên mặc định để riêng
+một khối – đúng như bảng Excel đang làm – và ai muốn xem thử khi phân bổ thì phải CHỌN tiêu thức, và
+bảng ghi rõ đó là số phân bổ.
+
+Phần ngoài giá vốn thì KHÔNG phân bổ về xe trong bất kỳ tiêu thức nào. Gán lãi vay lên đầu một chiếc xe
+là nói rằng chiếc ấy lỗ vì nó chạy kém, trong khi nó lỗ vì công ty vay tiền mua nó – hai việc khác nhau
+và chỉ một trong hai là việc của người điều hành đội xe.
 """
 from datetime import date, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models.fleet import (Trip, TripCost, Maintenance, FleetPeriodCost, ExternalTxn,
-                              NHOM_CHI_PHI_KY, NGA_CHI_PHI, NGA_CUA_DOI_XE)
+                              NHOM_CHI_PHI_KY, NGOAI_GIA_VON, NGA_CHI_PHI, NGA_CUA_DOI_XE)
 from app.models.hr import Vehicle, Employee
 from app.services import fleet_settlement as QT
 
@@ -161,8 +172,15 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
         r["chi_tiet_cp_xe"]["bao_duong"] = r["chi_tiet_cp_xe"].get("bao_duong", 0) + (m.so_tien or 0)
 
     cp_doi, chi_tiet_doi = 0.0, {}
+    cp_tai_chinh, chi_tiet_tai_chinh = 0.0, {}
     for k in db.execute(select(FleetPeriodCost).where(FleetPeriodCost.ky == ky)).scalars():
-        if k.pham_vi == "xe" and k.vehicle_id:
+        # Nhóm ngoài giá vốn đi lối riêng TRƯỚC khi xét phạm vi. Xét phạm vi trước thì một dòng lãi vay
+        # nhập nhầm phạm vi "xe" (cửa nhập cho phép, vì phạm vi là ô người chọn) sẽ chui vào giá vốn
+        # của đúng một chiếc xe và không ai thấy. Quy ước của công ty phải thắng ô người gõ.
+        if k.nhom in NGOAI_GIA_VON:
+            cp_tai_chinh += (k.so_tien or 0)
+            chi_tiet_tai_chinh[k.nhom] = chi_tiet_tai_chinh.get(k.nhom, 0) + (k.so_tien or 0)
+        elif k.pham_vi == "xe" and k.vehicle_id:
             r = rows.setdefault(k.vehicle_id, _rong(veh.get(k.vehicle_id), k.vehicle_id))
             r["chi_phi_xe"] += (k.so_tien or 0)
             r["chi_tiet_cp_xe"][k.nhom] = r["chi_tiet_cp_xe"].get(k.nhom, 0) + (k.so_tien or 0)
@@ -202,7 +220,10 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
 
     thieu = [NHOM_CHI_PHI_KY[n][0] for n, (_, pv) in
              ((n, NHOM_CHI_PHI_KY[n]) for n in NHOM_CHI_PHI_KY)
-             if pv == "doi" and n not in chi_tiet_doi]
+             if pv == "doi" and n not in NGOAI_GIA_VON and n not in chi_tiet_doi]
+    # Nhóm ngoài giá vốn chưa nhập được đếm RIÊNG. Gộp vào `thieu` thì màn hình hiện "thiếu lãi vay"
+    # ngay dưới khối giá vốn, và người đọc lại tưởng giá vốn còn thiếu khoản ấy.
+    thieu_tai_chinh = [NHOM_CHI_PHI_KY[n][0] for n in NGOAI_GIA_VON if n not in chi_tiet_tai_chinh]
 
     return {
         "ky": ky, "so_ngay_ky": so_ngay_ky, "phan_bo": phan_bo, "tieu_thuc": TIEU_THUC,
@@ -214,9 +235,14 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
             "chi_phi_xe": tong_cp_xe,
             "ket_qua_sau_chi_phi_xe": tong_dt - tong_cp_chuyen - tong_cp_xe,
             "chi_phi_doi": cp_doi,
+            # GIÁ VỐN vận tải = ba tầng, KHÔNG có lãi vay. Chủ tịch quyết 11/10/2026.
+            "gia_von": tong_cp_chuyen + tong_cp_xe + cp_doi,
             "loi_nhuan": tong_dt - tong_cp_chuyen - tong_cp_xe - cp_doi,
             "ty_le_loi_nhuan": (round((tong_dt - tong_cp_chuyen - tong_cp_xe - cp_doi) / tong_dt, 4)
                                 if tong_dt else None),
+            # Ngoài giá vốn — in thành dòng riêng bên dưới lợi nhuận, không trộn vào trên.
+            "chi_phi_tai_chinh": cp_tai_chinh,
+            "ket_qua_sau_tai_chinh": tong_dt - tong_cp_chuyen - tong_cp_xe - cp_doi - cp_tai_chinh,
             "so_xe_khai_thac": len([x for x in ds if x["ngay_khai_thac"]]),
             "ngay_khai_thac": tong_ngay,
             # Công suất tính trên số xe CÓ trong đội, không phải số xe có chạy: mẫu số bằng số xe chạy
@@ -227,10 +253,16 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
         },
         "chi_tiet_chi_phi_doi": [{"nhom": k, "ten": NHOM_CHI_PHI_KY.get(k, (k,))[0], "so_tien": v}
                                  for k, v in sorted(chi_tiet_doi.items(), key=lambda kv: -kv[1])],
+        "chi_tiet_chi_phi_tai_chinh": [{"nhom": k, "ten": NHOM_CHI_PHI_KY.get(k, (k,))[0], "so_tien": v}
+                                       for k, v in sorted(chi_tiet_tai_chinh.items(), key=lambda kv: -kv[1])],
+        "nhom_ngoai_gia_von": list(NGOAI_GIA_VON),
+        "nhom_tai_chinh_chua_nhap": thieu_tai_chinh,
         # Phần nằm NGOÀI ba tầng – xem ngoai_so(). In ra ngay cạnh lợi nhuận, không để ở cuối.
         "ngoai_so": ngoai_so(db, d1, d2),
         "nhom_chi_phi_doi_chua_nhap": thieu,
         "ghi_chu": ("Ba tầng chi phí để riêng: chi phí chuyến, chi phí của xe, chi phí của đội. "
                     "Chi phí đội mặc định KHÔNG chia về từng xe – chia theo tiêu thức nào cũng ra một "
-                    "con số khác, mà người đọc lại nhớ nó như kết quả thật của chiếc xe."),
+                    "con số khác, mà người đọc lại nhớ nó như kết quả thật của chiếc xe. "
+                    "Lãi vay KHÔNG nằm trong giá vốn (Chủ tịch quyết 11/10/2026) – nó là chi phí tài "
+                    "chính, hiện thành dòng riêng dưới lợi nhuận và không phân bổ về xe nào."),
     }
