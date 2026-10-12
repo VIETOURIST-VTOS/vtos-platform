@@ -137,22 +137,94 @@ def test_ci3_khong_goi_thua_tep_ngoai_danh_sach():
     )
 
 
+def _dieu_kien_cua_viec(ten: str) -> list[str]:
+    """`if:` CỦA VIỆC (thụt lề 4), không gồm `if:` của một BƯỚC (thụt lề 8).
+
+    Hai thứ khác hẳn nhau: `if:` của việc quyết việc có chạy hay không, `if:` của bước chỉ bỏ qua
+    một bước. `test_ci7` đã học bài này một lần — bản đầu của nó gom cả hai nên tự đỏ ngay lần
+    chạy đầu trong khi ci.yml không sai. Gom về một hàm để lần sau không ai học lại.
+    """
+    khoi = _khoi_viec()
+    assert ten in khoi, (
+        f"Không cắt ra được việc `{ten}` từ khối `jobs:` của ci.yml. Hoặc việc ấy đã bị xoá, hoặc "
+        f"hình thụt lề của tệp đã đổi và `_khoi_viec` cắt sai — cả hai đều phải sửa bằng tay, "
+        f"đừng sửa phép thử cho hết đỏ."
+    )
+    return [d.strip() for d in khoi[ten] if re.fullmatch(r"    if:\s.*", d.rstrip())]
+
+
 def test_ci4_bo_do_du_khong_chay_lai_tren_main():
-    """Chỗ rò tiền: nếu ai bỏ hai điều kiện này thì bộ 24 phút lại chạy hai lần cho một việc.
+    """Chỗ rò tiền: bộ đủ chạy hai lần cho một việc.
 
     Ngày 19/9/2026 trần chi tiêu Actions chạm đáy lúc 13 giờ và GitHub dừng hẳn mọi việc của bốn
     làn. Nguyên nhân là bộ đủ chạy cả trên PR lẫn trên main — lần thứ hai không chặn được gì vì mã
     đã vào kho rồi. Phép thử này để lần sau không ai lặng lẽ bật lại.
+
+    ─────────────────────────────────────────────────────────────────────────────────────────────
+    SIẾT LẠI 12/10/2026, VÀ LÝ DO ĐÁNG GHI
+    ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    Bản cũ hỏi `"if: github.event_name != 'push'" in lenh` trên CẢ khối lệnh gộp lại. Lúc viết,
+    ba việc `backend`, `web`, `docker` cùng khai câu ấy, nên chuỗi có mặt là đủ. Nhưng câu phép
+    thử ĐỊNH hỏi là "việc `backend` còn điều kiện không", mà câu nó THẬT SỰ hỏi là "trong cả tệp
+    còn chỗ nào mang chuỗi ấy không" — hai câu khác nhau, và chúng trùng kết quả chỉ vì hoàn cảnh.
+    Chính `_khoi_viec` ở trên đã ghi ra cái bẫy này từ 09/10 mà phép thử vẫn để nguyên.
+
+    Vòng CI-2 (12/10/2026) bỏ `if:` của việc `web`, và lúc ấy hoàn cảnh hết trùng: nếu mai ai gỡ
+    nốt điều kiện của `backend`, chuỗi vẫn còn ở `docker` và phép thử cũ VẪN XANH trong khi bộ 28
+    phút đã chạy lại trên mọi lần gộp. Nên nay hỏi THEO TỪNG VIỆC.
+
+    Đây là lần thứ năm trong hai ngày một hàng rào quét chuỗi trả lời nhầm câu hỏi. Bài học đã
+    ghi ở sổ làn Vòng: neo vào CÚ PHÁP và neo vào ĐÚNG PHẠM VI.
     """
-    lenh = "\n".join(_dong_lenh())
-    assert "if: github.event_name != 'push'" in lenh, (
-        "Việc `backend` (bộ đủ ~24 phút) phải có `if: github.event_name != 'push'` — không có thì "
-        "nó chạy lại trên main sau mỗi lần gộp, tốn gấp đôi mà không chặn được gì."
-    )
+    for ten, vi_sao in (("backend", "bộ đủ ~28 phút"), ("docker", "dựng ảnh, cần cả backend lẫn web")):
+        assert _dieu_kien_cua_viec(ten) == ["if: github.event_name != 'push'"], (
+            f"Việc `{ten}` ({vi_sao}) phải có ĐÚNG `if: github.event_name != 'push'` — thấy "
+            f"{_dieu_kien_cua_viec(ten) or 'không có điều kiện nào'}. Mất nó thì việc này chạy lại "
+            f"trên main sau mỗi lần gộp, tốn gấp đôi mà không chặn được gì vì mã đã vào kho rồi."
+        )
     assert "hang-rao-gop" in _khoi_viec(), (
         "Phải còn cửa hẹp `hang-rao-gop`. Bỏ hẳn nó thì hai PR cùng xanh riêng lẻ mà gộp lại hỏng "
         "sẽ không ai biết — đúng chuyện suýt xảy ra hai lần ngày 19/9/2026. Việc nó chạy trên những "
         "sự kiện nào thì `test_ci7` canh."
+    )
+
+
+def test_ci8_viec_web_phai_chay_ca_tren_pr_va_tren_main():
+    """LUẬT MỚI 12/10/2026: phía GIAO DIỆN cũng cần một cửa canh chuyện hai nhánh gộp lại.
+
+    ─────────────────────────────────────────────────────────────────────────────────────────────
+    ĐO ĐƯỢC, VÀ PHÉP ĐO LẬT NGƯỢC CHẨN ĐOÁN BAN ĐẦU
+    ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    Lượt CI #750 của PR #290 (MT-1): `backend` ĐỎ sau 28 phút, `web` ĐỎ sau 35 GIÂY,
+    `hang-rao-gop` ĐỎ sau 49 giây. Việc `web` ĐÃ chạy trên PR và ĐÃ bắt được lỗi `Shell.tsx` —
+    rồi PR vẫn được gộp với cả ba dấu đỏ. Nên lý do "lỗi lọt vào main vì `web` không chạy trên
+    push" là SAI; nó lọt vào vì một PR đỏ được gộp, và không một dòng YAML nào chữa được điều đó.
+
+    ─────────────────────────────────────────────────────────────────────────────────────────────
+    VẬY LUẬT NÀY CANH GÌ
+    ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    Đúng một thứ, và là thứ PR không thể bắt: hai nhánh mỗi nhánh DỰNG ĐƯỢC riêng lẻ, gộp lại thì
+    hỏng. Một nhánh đổi tên một thành phần dùng chung, nhánh kia thêm chỗ gọi theo tên cũ — cả hai
+    xanh trên PR của mình. `hang-rao-gop` canh đúng hình ấy ở phía máy chủ từ 19/9; phía giao diện
+    tới 12/10/2026 vẫn chưa có ai canh. 35 giây là giá rẻ cho chỗ trống ấy.
+
+    NÓ KHÔNG CHẶN ĐƯỢC GÌ và phép thử này không giả vờ ngược lại: trên main mã đã vào kho, đỏ ở
+    đây chỉ là BÁO. Chặn thật đòi "Require status checks", mà GitHub từ chối ô ấy cho kho riêng
+    của tài khoản cá nhân cho tới khi chuyển sang tổ chức GitHub Team — đo ngày 12/10/2026, nguyên
+    văn trang Rulesets. Thứ ấy không nằm trong mã nên không canh được từ đây.
+    """
+    dieu_kien = _dieu_kien_cua_viec("web")
+    assert not dieu_kien, (
+        "Việc `web` lại có điều kiện: " + "; ".join(dieu_kien) + "\n\n"
+        "Nó phải chạy trên CẢ pull_request VÀ push, nên không khai `if:` nào cả. Khai lại "
+        "`!= 'push'` là bỏ lại chỗ trống phía giao diện: hai nhánh cùng dựng được riêng lẻ mà gộp "
+        "lại hỏng sẽ không ai biết, và bản hỏng nằm trên main cho tới khi có người tình cờ mở ra "
+        "xem — đúng cái đã xảy ra ngày 12/10/2026 và mất mấy tiếng mới ai đó thấy.\n\n"
+        "Nếu muốn cắt tiền Actions thì cắt ở chỗ khác: việc này tốn 35 giây một lượt, còn "
+        "`backend` tốn 28 phút và vẫn đang được miễn trên push."
     )
 
 
