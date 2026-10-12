@@ -788,12 +788,21 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               <span className="anh-dai-dien" aria-hidden="true">{chuDau(user?.full_name)}</span>
               <span className="who-ten">{tenVaChuc(user)}</span> ▾
             </button>
+            {/* `menu-toi` KHÔNG phải lớp trang trí — nó là thứ duy nhất cứu bốn mục này khỏi vô
+                hình. Hộp xổ xuống nằm trong `.top .right`, mà `globals.css` tô MỌI liên kết ở
+                góc ấy thành `color:#fff` cho hợp thanh điều hướng tối; hộp này thì nền sáng
+                (`--vtos-card`), nên không có lớp riêng là chữ trắng trên nền trắng. Bỏ lớp đi
+                thì menu vẫn bấm được, vẫn không báo lỗi gì — chỉ là không ai đọc được nó.
+
+                CHÚ THÍCH NÀY ĐỨNG TRÊN DÒNG `menuToi &&`, KHÔNG ĐỨNG DƯỚI — và đó là cả nội dung
+                của đợt VA-WEB3 ngày 12/10/2026. Nằm ngay sau dấu mở ngoặc thì một khối chú thích JSX không còn là
+                chú thích JSX: JavaScript đọc nó là một OBJECT LITERAL, và cả tệp thôi phân tích
+                được. `tsc` báo "JSX expressions must have one parent element" rồi kéo theo tám
+                lỗi cú pháp nữa; `next build` chết, nên Vercel không ra bản mới.
+                Lọt vào kho được vì việc `web` của CI CHỈ chạy trên PR, không chạy khi đẩy vào
+                main — đúng lỗ hổng Đợt LE2e đã ghi ngày 10/10: đợt nào chạm `web/` thì phải chạy
+                `npm run build` trước khi đẩy. */}
             {menuToi && (
-              {/* `menu-toi` KHÔNG phải lớp trang trí — nó là thứ duy nhất cứu bốn mục này khỏi vô
-                  hình. Hộp xổ xuống nằm trong `.top .right`, mà `globals.css` tô MỌI liên kết ở
-                  góc ấy thành `color:#fff` cho hợp thanh điều hướng tối; hộp này thì nền sáng
-                  (`--vtos-card`), nên không có lớp riêng là chữ trắng trên nền trắng. Bỏ lớp đi
-                  thì menu vẫn bấm được, vẫn không báo lỗi gì — chỉ là không ai đọc được nó. */}
               <span role="menu" className="menu-toi" onClick={() => setMenuToi(false)}
                 style={{ position: "absolute", right: 0, top: "100%", zIndex: 40, minWidth: 220,
                          display: "flex", flexDirection: "column", gap: 2,
