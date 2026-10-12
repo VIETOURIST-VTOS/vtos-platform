@@ -331,6 +331,65 @@ def _bhx_kiem(db: Session, r):
     return loi, cb, (f"{v.plate} · {so}" if trung is not None else None)
 
 
+def _sim_kiem(db: Session, r):
+    """Sim của xe. Cùng khuôn với cửa bảo hiểm, cộng MỘT phép kiểm riêng: cổng GPS phải là một
+    trong ba cổng đã khai, không phải chữ người nạp tự nghĩ ra.
+
+    Vì sao chặt ở chỗ này: sim chết thì cổng ấy TẮT, và câu hỏi ngay sau đó là "cổng nào, mất mấy
+    xe". Một ô gõ tự do thì ba người gõ ba kiểu ("TTC", "ttc", "Thanh Thành Công") và không lọc
+    được — đúng chỗ `km_nguon` đã hỏng một lần và phải sửa.
+    """
+    from app.models.fleet import VehicleDocument, CONG_GPS
+    from app.services.intake import _ngay
+    loi, cb = [], []
+    bien = str(r.get("bien_so") or "").strip()
+    v = _xe(db, bien)
+    if v is None:
+        loi.append(f"Không tìm thấy xe của biển '{bien}'")
+    cong = str(r.get("cong_gps") or "").strip().lower()
+    if cong and cong not in CONG_GPS:
+        loi.append(f"Cổng GPS '{cong}' không có trong danh mục – chỉ nhận: "
+                   + ", ".join(CONG_GPS))
+    if not cong:
+        cb.append("Chưa ghi cổng GPS – sim này hết hạn thì không ai biết cổng nào tắt")
+    het = _ngay(r.get("ngay_het_han"))
+    if het is None:
+        cb.append("Chưa có ngày hết hạn – bản ghi này hiện là 'chưa đủ dữ liệu', không hiện màu xanh")
+    elif het < date.today():
+        cb.append(f"Sim đã hết hạn từ {het:%d/%m/%Y} – cổng GPS của xe này có thể đang tắt")
+    so = str(r.get("so_thue_bao") or "").strip()
+    trung = None
+    if v is not None and so:
+        trung = db.execute(select(VehicleDocument).where(
+            VehicleDocument.vehicle_id == v.id, VehicleDocument.kind == "sim",
+            func.upper(VehicleDocument.number) == so.upper())).scalars().first()
+    return loi, cb, (f"{v.plate} · {so}" if trung is not None else None)
+
+
+def _sim_nap(db: Session, r, boi):
+    from app.models.fleet import VehicleDocument
+    from app.services.intake import _ngay
+    v = _xe(db, str(r.get("bien_so") or "").strip())
+    het = _ngay(r.get("ngay_het_han"))
+    # Gia hạn sim cũ thì bản cũ THÔI HIỆU LỰC nhưng KHÔNG bị xoá — cùng lý lẽ đã ghi ở cửa bảo
+    # hiểm: một chiếc xe từng mất GPS hai tháng là một dữ kiện có thật của quá khứ.
+    if het is not None:
+        for cu in db.execute(select(VehicleDocument).where(
+                VehicleDocument.vehicle_id == v.id, VehicleDocument.kind == "sim",
+                VehicleDocument.active == True)).scalars():          # noqa: E712
+            if cu.expires_on is None or cu.expires_on <= het:
+                cu.active = False
+    g = VehicleDocument(vehicle_id=v.id, kind="sim",
+                        number=str(r.get("so_thue_bao") or "").strip()[:60],
+                        cong_gps=str(r.get("cong_gps") or "").strip().lower()[:20],
+                        issued_on=_ngay(r.get("ngay_kich_hoat")), expires_on=het,
+                        source=str(r.get("nguon_giay") or "nạp tệp sim xe")[:120],
+                        verify="nguon_ghi", note=str(r.get("ghi_chu") or "").strip()[:300],
+                        created_by=boi)
+    db.add(g); db.flush()
+    return f"{v.plate} · hạn {het:%d/%m/%Y}" if het else f"{v.plate} · chưa có hạn"
+
+
 def _bhx_nap(db: Session, r, boi):
     from app.models.fleet import VehicleDocument
     from app.services.intake import _ngay
@@ -1177,6 +1236,28 @@ def bo_nap(_c) -> dict:
                     _c("ghi_chu", "Ghi chú")],
             "kiem": _bhx_kiem, "nap": _bhx_nap,
         },
+        "sim_xe": {
+            "bang_dich": "vehicle_documents", "phong_ban": "doi_xe",
+            "ten": "Sim của xe (nuôi cổng GPS)",
+            "mo_ta": "Sim gắn trên xe và hạn gói cước của nó. ĐÂY KHÔNG PHẢI việc giấy tờ: sim hết "
+                     "hạn thì xe VẪN CHẠY, nhưng cổng GPS tắt và `km_nguon` của chuyến mất đúng cái "
+                     "nguồn dùng để đối chiếu với km đồng hồ. Vì thế cột 'Cổng GPS' là bắt buộc "
+                     "đúng danh mục, không nhận chữ tự nghĩ: lúc sim chết, câu hỏi ngay sau đó là "
+                     "cổng nào và mất mấy xe. Ngày hết hạn để rỗng KHÔNG có nghĩa là còn hạn – nó "
+                     "có nghĩa là chưa biết. TIỀN cước sim không nạp ở đây: nó đi qua cửa Chi phí "
+                     "kỳ của đội xe – một khoản một cửa.",
+            "khoa_chong_trung": "Xe + số thuê bao",
+            "cot": [_c("bien_so", "Biển số xe", True, vi_du="50F-034.71"),
+                    _c("so_thue_bao", "Số thuê bao", True, vi_du="0901234567"),
+                    _c("cong_gps", "Cổng GPS sim này nuôi", True, vi_du="gps_ttc",
+                       ghi_chu="chỉ nhận gps_ttc / gps_tcd / gps_vietmap"),
+                    _c("ngay_kich_hoat", "Ngày kích hoạt", kieu="ngay", vi_du="01/03/2026"),
+                    _c("ngay_het_han", "Ngày hết hạn gói cước", kieu="ngay", vi_du="01/03/2027",
+                       ghi_chu="để trống = CHƯA BIẾT, không phải còn hạn"),
+                    _c("nguon_giay", "Nguồn dữ liệu", vi_du="Hợp đồng dịch vụ GPS"),
+                    _c("ghi_chu", "Ghi chú")],
+            "kiem": _sim_kiem, "nap": _sim_nap,
+        },
         "dang_kiem": {
             "bang_dich": "vehicle_documents", "phong_ban": "doi_xe",
             "ten": "Đăng kiểm xe",
@@ -1498,6 +1579,7 @@ def vai_tro(QUAN_TRI: tuple) -> dict:
         "bao_duong":            QUAN_TRI + ("gd_doi_xe", "ketoan"),
         "ho_so_xe":             QUAN_TRI + ("gd_doi_xe",),
         "bao_hiem_xe":          QUAN_TRI + ("gd_doi_xe", "ketoan"),
+        "sim_xe":               QUAN_TRI + ("gd_doi_xe",),
         "dang_kiem":            QUAN_TRI + ("gd_doi_xe",),
         "chi_phi_ky_doi_xe":    QUAN_TRI + ("gd_doi_xe", "ketoan"),
         "bang_lai_xe":          QUAN_TRI + ("gd_doi_xe", "hcns"),
