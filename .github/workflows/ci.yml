@@ -104,8 +104,37 @@ jobs:
           echo "--- nhanh nay doi $(wc -l < "$GITHUB_WORKSPACE/_tep_doi.txt") tep ---"
           cat "$GITHUB_WORKSPACE/_tep_doi.txt"
       - run: bash tests/run_all.sh
+  # DỰNG GIAO DIỆN — chạy CẢ trên main từ 12/10/2026, và đây KHÔNG phải vì nó thiếu trên PR.
+  #
+  # ĐO TRƯỚC KHI SỬA, vì lần đầu em chẩn sai. Lượt CI #750 của PR #290 (MT-1) hiện rõ: `backend`
+  # ĐỎ sau 28 phút, `web` ĐỎ sau 35 GIÂY, `hang-rao-gop` ĐỎ sau 49 giây. Tức là việc `web` ĐÃ
+  # chạy trên PR và ĐÃ bắt được lỗi `Shell.tsx` trong 35 giây — rồi PR vẫn được gộp với cả ba
+  # dấu đỏ. Nên câu "lỗi lọt vào main vì `web` không chạy trên push" là SAI, và nó đã kịp vào sổ
+  # làn Vòng ở dòng VA-MAIN10 trước khi có người đi đo; dòng ấy nay đã sửa.
+  #
+  # VẬY VÌ SAO VẪN CHO NÓ CHẠY TRÊN MAIN. Không phải để bắt lại thứ PR đã bắt — mà để bắt thứ
+  # PR KHÔNG THỂ bắt: hai nhánh mỗi nhánh dựng được riêng lẻ, gộp lại thì hỏng. Một nhánh đổi
+  # tên một thành phần dùng chung, nhánh kia thêm một chỗ gọi nó theo tên cũ; cả hai đều xanh
+  # trên PR của mình. Đúng lý do `hang-rao-gop` đang chạy trên main, chỉ khác là nó canh phía
+  # máy chủ còn việc này canh phía giao diện — và tới 12/10/2026 phía giao diện chưa có ai canh.
+  #
+  # GIÁ PHẢI TRẢ, đo thật chứ không ước: 35 giây mỗi lần gộp. Đây là lý do việc này được chọn mà
+  # `backend` (28 phút) và `docker` thì không — cả hai GIỮ NGUYÊN `if:` của chúng.
+  #
+  # ĐIỀU NÀY KHÔNG CHẶN ĐƯỢC GÌ, nói thẳng để không ai yên tâm nhầm. Trên main, mã đã vào kho
+  # rồi; đỏ ở đây chỉ là BÁO. Thứ duy nhất chặn được một lần gộp là ô "Require status checks"
+  # trong Settings, và ngày 12/10/2026 GitHub từ chối nó cho kho riêng của tài khoản cá nhân —
+  # nguyên văn trang Rulesets: luật "won't be enforced on this private repository until you move
+  # to GitHub Team organization account". Chừng nào chưa chuyển, kỷ luật chờ phép kiểm chạy xong
+  # vẫn nằm ở NGƯỜI BẤM GỘP, không ở máy.
+  #
+  # MỘT CHỖ HỞ CÒN LẠI, của khối `concurrency` phía trên chứ không của việc này: hai lần gộp sát
+  # nhau vào main dùng chung một nhóm (`github.ref`), nên lượt trước bị HUỶ. Lượt bị huỷ không
+  # cho tín hiệu nào. Chỗ ấy đã đúng như thế với `hang-rao-gop` từ 09/10; sửa nó là một quyết
+  # định riêng về tiền Actions, không gộp vào đây.
+  #
+  # KHÔNG khai `if:` ở việc này — `test_ci8` đỏ nếu ai khai lại.
   web:
-    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: web } }
     steps:
