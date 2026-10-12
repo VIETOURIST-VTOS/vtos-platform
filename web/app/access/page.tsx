@@ -45,6 +45,12 @@ function AccessPage() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const canWrite = ["cntt", "hcns", "chutich", "tgd"].includes(role);
+  // HẸP HƠN `canWrite`, và cố ý. Cửa máy chủ `POST /users/{id}/reset-password` khai
+  // `require_roles(*HR_WRITE)` mà HR_WRITE chỉ có hcns và cntt — Chủ tịch và TGĐ gọi vào sẽ nhận
+  // 403. Hiện một cái nút chắc chắn hỏng còn tệ hơn không hiện: người bấm không biết mình thiếu
+  // quyền hay hệ thống lỗi. Muốn mở cho lãnh đạo thì sửa HR_WRITE ở máy chủ, một dòng, có người
+  // quyết — không phải nới ở màn hình.
+  const canDatLaiMK = ["cntt", "hcns"].includes(role);
   const laLanhDao = ["chutich", "tgd"].includes(role);
   const [tab, setTab] = useState("accounts");
   const [acc, setAcc] = useState<any>(null);
@@ -201,8 +207,28 @@ function AccessPage() {
           <td style={{ whiteSpace: "nowrap" }}>
             <button className="act grey" style={{ margin: 0, marginRight: 4 }}
               onClick={() => { setTcUid(r.id); setTab("tracuu"); }}>Xem quyền</button>
-            {canWrite && <button className="act" style={{ margin: 0 }}
+            {canWrite && <button className="act" style={{ margin: 0, marginRight: 4 }}
               onClick={() => send(`/users/${r.id}`, { active: !r.active }, "PUT")}>{r.active ? "Khóa" : "Mở lại"}</button>}
+            {/* ĐẶT LẠI MẬT KHẨU — 12/10/2026. Cửa máy chủ đã có từ lâu và mở cho đúng hcns + cntt,
+                nhưng KHÔNG một màn hình nào gọi tới nó, nên trên thực tế nó chưa tồn tại: CNTT muốn
+                giúp một người quên mật khẩu thì chỉ có nút "Nạp + đặt lại = mã NV" ở màn hình Nhân
+                sự, mà nút ấy đặt lại cho CẢ danh sách. Không ai dám bấm, nên không ai được giúp. */}
+            {canDatLaiMK && <button className="act grey" style={{ margin: 0 }}
+              title="Đặt lại mật khẩu = mã nhân viên; người dùng phải đổi ở lần đăng nhập kế tiếp"
+              onClick={() => {
+                // Chặn ở màn hình trước khi máy chủ phải trả 422: không có mã NV thì không có mật
+                // khẩu tạm, và lời báo ở đây nói rõ phải làm gì chứ không chỉ nói là hỏng.
+                if (!r.staff_code) {
+                  toast(`${r.full_name} chưa có mã nhân viên, nên không đặt được mật khẩu tạm. `
+                        + `Gán mã NV ở màn hình Nhân sự trước.`, true);
+                  return;
+                }
+                if (!confirm(`Đặt lại mật khẩu của ${r.full_name} (${r.username}) thành mã nhân `
+                           + `viên ${r.staff_code}?\n\nNgười này sẽ buộc phải đổi mật khẩu ngay ở `
+                           + `lần đăng nhập kế tiếp. Mã NV đang hiện trên chính bảng này, nên hãy `
+                           + `báo họ đăng nhập và đổi càng sớm càng tốt.`)) return;
+                send(`/users/${r.id}/reset-password`, { new_password: "" }, "POST");
+              }}>Đặt lại MK</button>}
           </td>
         </tr>)}</tbody></table></div>
 
