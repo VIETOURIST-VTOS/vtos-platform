@@ -38,6 +38,9 @@ function LenhDieuXe() {
   const [dnQ, setDnQ] = useState<any>(null);           // hai câu trả lời về quyền, LẤY TỪ MÁY CHỦ
   const [dnChon, setDnChon] = useState<any>(null);     // đề nghị đang lập lệnh cho – đi kèm lệnh
   const [ho, setHo] = useState<any>(null);             // đếm lệnh lập KHÔNG qua cửa đề nghị
+  // DL-1b: mắt thứ ba. Quá hạn chưa nhận và tài xế báo không nhận được gộp vào MỘT cửa —
+  // với Giám đốc đội xe cả hai là một việc: "chuyến này chưa chắc có người lái".
+  const [nhan, setNhan] = useState<any>(null);
   const [tourDN, setTourDN] = useState<any[]>([]);     // chuyến ĐỀ NGHỊ ĐƯỢC (đã duyệt dự toán)
   const [dnTour, setDnTour] = useState("");
   const [dnKhach, setDnKhach] = useState(0);
@@ -54,6 +57,7 @@ function LenhDieuXe() {
     try { setDn(await api("/de-nghi-xe")); } catch (e) { toast(errMsg(e), true); }
     try { setDnQ(await api("/de-nghi-xe/meta")); } catch { /* thiếu meta thì ẩn nút, không đoán quyền */ }
     try { setHo(await api("/de-nghi-xe/lenh-khong-qua-de-nghi")); } catch { /* chỉ là số đo */ }
+    try { setNhan(await api("/nhan-lenh/can-biet")); } catch { /* thiếu thì ẩn khối, không đoán */ }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
 
@@ -224,6 +228,22 @@ function LenhDieuXe() {
       {dnTour && dnKhach <= 0 && <p className="muted">Phải ghi số khách — bộ gợi ý điều xe lọc theo số ghế, thiếu số khách thì nó đề xuất một chiếc 29 chỗ cho đoàn 40 người.</p>}
     </div>}
 
+    {/* DL-1b — KHỐI CHỈ HIỆN KHI CÓ VIỆC. Hết việc thì nó biến mất, không để lại một bảng rỗng
+        mà người ta phải cuộn qua mỗi ngày. */}
+    {nhan && (nhan.dem?.qua_han > 0 || nhan.dem?.tu_choi > 0) &&
+      <div className="panel wrap"><h2>Lệnh tài xế chưa nhận ({(nhan.dem.qua_han || 0) + (nhan.dem.tu_choi || 0)})</h2>
+        <p className="muted">{nhan.ghi_chu}</p>
+        <table><thead><tr><th>Chuyến</th><th>Xe · tài xế</th><th>Tình hình</th></tr></thead>
+          <tbody>{[...(nhan.tu_choi || []), ...(nhan.qua_han || [])].map((r: any) => <tr key={r.id}>
+            <td><b>#{r.id}</b><div className="muted">đi {fmtD(r.ngay_di)}</div></td>
+            <td>{r.xe}<div className="muted">{r.tai_xe}</div></td>
+            <td>{r.trang_thai_nhan === "tu_choi"
+              ? <><Tag cls="red">báo không nhận được</Tag><div className="muted">{r.tu_choi_nhan_ly_do}</div></>
+              : <><Tag cls="warn">quá hạn, chưa bấm</Tag><div className="muted">hạn {fmtDT(r.han_nhan)}</div></>}</td>
+          </tr>)}</tbody></table>
+        <p className="muted">Đã nhận: {nhan.dem.da_nhan} / {nhan.dem.dang_cho} lệnh còn hiệu lực — con số này để đọc con số ở trên: 2 trên 13 là chuyện thường, 2 trên 3 là đội xe đang có vấn đề.</p>
+      </div>}
+
     <div className="panel"><h2>Tìm phương án cho một khoảng ngày</h2>
       <div className="grid">
         <div><label>Từ ngày</label><input type="date" value={tu} onChange={(e) => setTu(e.target.value)} /></div>
@@ -312,15 +332,22 @@ function LenhDieuXe() {
         {ho.khong_qua_de_nghi > 0
           ? <><Tag cls="warn">chuỗi chưa liền</Tag> {ho.khong_qua_de_nghi}/{ho.tong_lenh} lệnh lập <b>không qua cửa đề nghị</b>. Khi con số này về 0 và giữ 0 một thời gian thì bắt buộc đề nghị được, mà không làm ai đứng việc.</>
           : <><Tag cls="ok">chuỗi liền</Tag> Cả {ho.tong_lenh} lệnh đều đi qua cửa đề nghị xe.</>}</p>}
-      <table><thead><tr><th>#</th><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Từ → đến</th><th>Giá nội bộ</th><th>Trạng thái</th><th>Ghi vết gợi ý</th></tr></thead>
+      <table><thead><tr><th>#</th><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Từ → đến</th><th>Giá nội bộ</th><th>Trạng thái</th><th>Tài xế nhận</th><th>Ghi vết gợi ý</th></tr></thead>
         <tbody>{ds.length ? ds.map((d) => <tr key={d.id}>
           <td>{d.id}</td><td>{d.tour}</td><td>{d.ma_xe} · {d.xe}</td><td>{d.tai_xe}</td>
           <td>{fmtD(d.date_from)} → {fmtD(d.date_to)} <span className="muted">({d.so_ngay} ngày)</span></td>
           <td className="num">{d.internal_price?.toLocaleString("vi-VN")}</td>
           <td>{d.status === "hoan_thanh" ? <Tag cls="ok">hoàn thành</Tag> : d.status === "da_xac_nhan" ? <Tag cls="ok">đã xác nhận</Tag> : d.status === "huy" ? <Tag cls="red">hủy</Tag> : <Tag cls="warn">chờ xác nhận</Tag>}</td>
+          {/* Cột này đứng CẠNH cột trạng thái, không thay nó: "đã xác nhận" là GĐ đội xe đã chốt
+              lệnh — nghĩa có từ trước — còn cột này là tài xế đã nhận chưa. */}
+          <td>{d.trang_thai_nhan === "da_nhan" ? <><Tag cls="ok">đã nhận</Tag> <div className="muted">{fmtDT(d.nhan_luc)}</div></>
+            : d.trang_thai_nhan === "tu_choi" ? <><Tag cls="red">không nhận được</Tag> <div className="muted">{d.tu_choi_nhan_ly_do}</div></>
+            : d.trang_thai_nhan === "qua_han" ? <><Tag cls="warn">quá hạn</Tag> <div className="muted">hạn {fmtDT(d.han_nhan)}</div></>
+            : d.trang_thai_nhan === "chua_nhan" ? <><Tag cls="warn">chưa nhận</Tag> <div className="muted">hạn {fmtDT(d.han_nhan)}</div></>
+            : <span className="muted">—</span>}</td>
           <td>{d.ly_do_khac_goi_y ? <><Tag cls="warn">chọn khác gợi ý</Tag> <div className="muted">{d.ly_do_khac_goi_y}</div></>
             : d.phuong_an_da_chon ? <Tag cls="ok">theo gợi ý</Tag> : <span className="muted">lệnh cũ, chưa có ghi vết</span>}</td>
-        </tr>) : <tr><td colSpan={8} className="muted">Chưa có lệnh điều xe nào.</td></tr>}</tbody></table>
+        </tr>) : <tr><td colSpan={9} className="muted">Chưa có lệnh điều xe nào.</td></tr>}</tbody></table>
     </div>
   </>);
 }

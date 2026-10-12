@@ -15,6 +15,8 @@ from app.models.chi_luong import (ChiKyLuong, KET_LUAN as CL_KET_LUAN,
                                   TRA_TRANG_THAI as CL_TRA_TRANG_THAI)
 from app.services import hr as H
 from app.services import rules as R
+from app.services import nhan_lenh as _NL
+from app.services.access import FULL_VIEW
 from app.services import hdv as HDV
 from app.services import pham_vi_phap_nhan as PV
 from app.services import ghi_mot_lan as GML
@@ -343,7 +345,14 @@ def xe_hdv_cua_toi(u: User = Depends(require_roles("tai_xe", "hdv", "nv_dh", "tp
         lenh.append({"id": d.id, "tour_code": t.code if t else "", "tour_name": t.name if t else "",
                      "vehicle": v.plate if v else "", "date_from": d.date_from, "date_to": d.date_to,
                      "days": (d.date_to - d.date_from).days + 1, "status": d.status,
-                     "confirmed_at": d.confirmed_at, "incident_note": d.incident_note})
+                     "confirmed_at": d.confirmed_at, "incident_note": d.incident_note,
+                     # DL-1b: mắt thứ ba. `trang_thai_nhan` tính TẠI CHỖ (xem nhan_lenh.py) nên "quá hạn"
+                     # luôn đúng với đồng hồ lúc mở màn hình, không cần ai chạy nền cập nhật.
+                     "trang_thai_nhan": _NL.trang_thai_nhan(d),
+                     "han_nhan": (_NL.han_nhan(d).isoformat() if _NL.han_nhan(d) else None),
+                     "nhan_luc": d.nhan_luc, "nhan_boi": d.nhan_boi,
+                     "tu_choi_nhan_ly_do": d.tu_choi_nhan_ly_do,
+                     "con_cho_nhan": d.status not in _NL.KHONG_CHO_NHAN})
 
     chuyen = []
     for a in db.execute(select(GuideAssignment).where(GuideAssignment.guide_id == e.id).order_by(desc(GuideAssignment.id)).limit(50)).scalars():
@@ -1577,6 +1586,11 @@ def dispatch_list(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Sessi
         rt = db.get(VehicleRate, d.rate_id) if d.rate_id else None
         out.append({"id": d.id, "tour_code": t.code if t else "", "vehicle": veh.get(d.vehicle_id, ""), "driver": emps.get(d.driver_id, ""), "date_from": d.date_from, "date_to": d.date_to, "route": rt.route if rt else "",
                     "days": (d.date_to - d.date_from).days + 1, "internal_price": (d.internal_price or 0), "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at, "incident_note": d.incident_note,
+                    # DL-1b: cột mới đứng CẠNH `status`, không thay nó. `da_xac_nhan` nghĩa là GIÁM ĐỐC
+                    # ĐỘI XE đã chốt lệnh; cột dưới đây là TÀI XẾ đã nhận chưa. Hai câu hỏi khác nhau.
+                    "trang_thai_nhan": _NL.trang_thai_nhan(d),
+                    "han_nhan": (_NL.han_nhan(d).isoformat() if _NL.han_nhan(d) else None),
+                    "nhan_luc": d.nhan_luc, "tu_choi_nhan_ly_do": d.tu_choi_nhan_ly_do,
                     **_owner(vobj.get(d.vehicle_id), cos)})
     return out
 
@@ -1711,9 +1725,86 @@ def dispatch_update(did: int, data: DispatchUpdate,
             ten = ", ".join(f"{x.full_name} ({x.username})" for x in ai)
             raise HTTPException(403, f"Chỉ {ten} được chốt lệnh điều xe (chỉ đạo 07/9/2026)")
     if data.status == "da_xac_nhan": d.confirmed_at = datetime.now()
+    cu = d.status
     d.status = data.status; d.incident_note = data.incident_note or d.incident_note
+    # LUẬT 3 (Chủ tịch chốt 12/10/2026): lệnh ĐỔI NỘI DUNG thì dấu nhận của tài xế hết hiệu
+    # lực. Huỷ và hoàn thành KHÔNG xoá dấu: một lệnh đã chạy xong mà xoá mất dấu "tài xế đã
+    # nhận" là xoá một dữ kiện có thật của quá khứ.
+    da_xoa = False
+    if data.status == "da_xac_nhan" and cu != "da_xac_nhan":
+        da_xoa = _NL.xoa_dau_nhan(db, d, "lệnh được chốt lại", u.username)
     R.audit(db, u.username, u.role, "cap_nhat_lenh_dieu_xe", f"dispatch:{d.id}", after=data.model_dump(mode="json")); db.commit()
-    return {"message": "Đã cập nhật lệnh điều xe"}
+    # Nói RA việc đã xoá dấu nhận. Xoá âm thầm là bắt tài xế bấm lại mà không ai báo, còn
+    # người sửa lệnh thì tưởng chuyến ấy vẫn có người đã nhận.
+    return {"message": ("Đã cập nhật lệnh điều xe. Dấu nhận của tài xế đã được xoá – lệnh "
+                        "cần tài xế nhận lại." if da_xoa else "Đã cập nhật lệnh điều xe")}
+
+
+# ══════════════════ DL-1b · TÀI XẾ NHẬN LỆNH (Chủ tịch đặc tả 11/10, chốt luật 12/10/2026)
+#
+# BA CỬA HẸP, KHÔNG MỞ CẢ CỤM `/dispatch` CHO TÀI XẾ. Phạm vi vai `tai_xe` đo trên main hôm nay chỉ
+# có `/incidents`, `/payment-requests`, `/fleet/bao-hong`, `/leaves`, `/leave-balance` — không có
+# `/dispatch`. Mở cả tiền tố ấy là cho tài xế đọc GIÁ THUÊ NỘI BỘ của mọi lệnh trong công ty, tức
+# nới hàng rào rộng hơn nhiều lần việc cần làm — đúng lý lẽ đã ghi cho `/fleet/de-lap-lenh`.
+#
+# Nên ba cửa dưới đây đứng trên tiền tố RIÊNG `/nhan-lenh`, và mỗi cửa chỉ chạm ĐÚNG một lệnh.
+_NHAN = FULL_VIEW + ("tai_xe", "cntt")
+_XEM_NHAN = FULL_VIEW + ("gd_doi_xe", "tp_dh", "nv_dh", "cntt")
+
+
+class LyDoNhanIn(BaseModel):
+    ly_do: str
+
+
+def _lenh_cua_toi(db: Session, u: User, did: int):
+    """Lấy lệnh và chặn người lạ.
+
+    Vai nền (Chủ tịch, TGĐ) và CNTT bấm hộ được — có thật: tài xế mất điện thoại giữa chuyến thì
+    vẫn phải có đường ghi nhận. Nhưng `nhan_boi` ghi ĐÚNG người bấm, nên bấm hộ không biến thành
+    một dấu nhận không ai chịu trách nhiệm.
+    """
+    from app.services import nhan_lenh as NL
+    d = db.get(DispatchOrder, did)
+    if d is None:
+        raise HTTPException(404, "Không có lệnh điều xe này")
+    if u.role == "tai_xe" and not NL._la_tai_xe_cua_lenh(db, u, d):
+        raise HTTPException(403, "Lệnh này không phải của anh – chỉ tài xế ghi trên lệnh mới nhận được")
+    return d
+
+
+@router.post("/nhan-lenh/{did}/nhan")
+def nhan_lenh(did: int, u: User = Depends(require_roles(*_NHAN)), db: Session = Depends(get_db)):
+    from app.services import nhan_lenh as NL
+    d = _lenh_cua_toi(db, u, did)
+    try:
+        NL.nhan(db, u, d.id)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return {"message": "Đã ghi nhận. Giám đốc đội xe thấy lệnh này đã có người nhận."}
+
+
+@router.post("/nhan-lenh/{did}/tu-choi")
+def tu_choi_nhan_lenh(did: int, data: LyDoNhanIn, u: User = Depends(require_roles(*_NHAN)),
+                      db: Session = Depends(get_db)):
+    from app.services import nhan_lenh as NL
+    d = _lenh_cua_toi(db, u, did)
+    try:
+        NL.tu_choi(db, u, d.id, data.ly_do)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    # Nói rõ lệnh VẪN CÒN HIỆU LỰC. Không nói thì tài xế tưởng mình vừa huỷ xong chuyến, và sáng
+    # hôm sau không ra bến.
+    return {"message": ("Đã gửi lý do cho Giám đốc đội xe. Lệnh VẪN CÒN HIỆU LỰC cho tới khi ông "
+                        "quyết – anh đừng tự bỏ chuyến.")}
+
+
+@router.get("/nhan-lenh/can-biet")
+def nhan_lenh_can_biet(u: User = Depends(require_roles(*_XEM_NHAN)), db: Session = Depends(get_db)):
+    """Lệnh quá hạn chưa nhận và lệnh tài xế đã báo không nhận được — cho Giám đốc đội xe."""
+    from app.services import nhan_lenh as NL
+    return NL.can_giam_doc_xe_biet(db)
 
 
 @router.get("/fleet/summary")
