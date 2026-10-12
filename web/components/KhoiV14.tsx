@@ -69,6 +69,10 @@ export type HieuQuaXe = {
     cua_nhap: string;                    // đường tới cửa nhập
     thieu: { xe: string; thieu: string }[];
   } | null;
+  /** HQ-1c (13/10/2026) — nhãn kỳ ("Tháng 10/2026", "Năm 2026 (T01–T10)") và VÌ SAO kỳ ấy trống.
+   *  "Năm" mà thật ra mới tới tháng 10 là chỗ rất dễ đọc nhầm, nên nhãn nói thẳng khoảng. */
+  nhan?: string;
+  trong_vi_sao?: string | null;
   da_chot?: boolean;                      // kỳ đã khoá sổ hay chưa
 };
 
@@ -200,10 +204,18 @@ const KY_XE: { ma: "thang" | "quy" | "nam"; ten: string }[] = [
 
 export function KhoiHieuQuaXe({ d, theo_ky }: {
   d?: HieuQuaXe | null;
-  /** Khi máy chủ trả số theo từng kỳ thì truyền vào đây: { thang: {...}, quy: {...}, nam: {...} } */
-  theo_ky?: Partial<Record<"thang" | "quy" | "nam", HieuQuaXe>> | null;
+  /** Khi máy chủ trả số theo từng kỳ thì truyền vào đây: { thang: {...}, quy: {...}, nam: {...} },
+   *  kèm `mac_dinh` — kỳ HẸP NHẤT còn có số. */
+  theo_ky?: (Partial<Record<"thang" | "quy" | "nam", HieuQuaXe>>
+    & { mac_dinh?: "thang" | "quy" | "nam" }) | null;
 }) {
-  const [ky, setKy] = useState<"thang" | "quy" | "nam">("thang");
+  /* HQ-1c — MỞ SẴN Ở KỲ CÒN CÓ SỐ, không cứng ở "thang".
+     Sổ quyết toán xe chỉ chốt sau khi hết tháng, nên tháng đang chạy trống gần như suốt. Đo trên
+     hệ thật 13/10/2026: máy chủ có số ở kỳ năm nhưng khối mở ở kỳ tháng và in bốn dấu gạch — Chủ
+     tịch kết luận "đội xe chưa lên màn hình". Con số có thật mà vẫn bằng không có.
+     Máy chủ chọn kỳ mở sẵn (`mac_dinh`) vì chỉ nó biết kỳ nào còn chuyến; chỗ này chỉ nghe theo,
+     và người đọc vẫn bấm sang kỳ khác được bất cứ lúc nào. */
+  const [ky, setKy] = useState<"thang" | "quy" | "nam">(theo_ky?.mac_dinh || "thang");
   /* Kỳ THÁNG lấy `d` làm lối lui, vì đó là bộ số máy chủ đang trả hôm nay. Quý và năm KHÔNG lấy
      lối lui ấy — lấy là bày số tháng dưới nhãn quý. */
   const o: HieuQuaXe = (theo_ky?.[ky]) || (ky === "thang" ? (d || {}) : {});
@@ -227,6 +239,7 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
         <h2>Hiệu quả đội xe</h2>
         {/* Nút chọn kỳ nằm ngay đầu khối, cạnh tên — không giấu dưới đáy: nó đổi ý nghĩa của MỌI
             con số trong khối, nên người đọc phải thấy mình đang xem kỳ nào trước khi đọc số. */}
+        {o.nhan && <span className="muted" style={{ fontSize: ".85em", marginRight: 8 }}>{o.nhan}</span>}
         <div className="v14-ky" role="group" aria-label="Kỳ xem của khối đội xe">
           {KY_XE.map((k) => (
             <button key={k.ma} type="button"
@@ -264,7 +277,20 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
           <Link className="the-cua" href="/doi-xe">Cửa nhập đội xe →</Link>
         </p>
       )}
-      {coNguonKy && cot.every(([, g]) => g === null) &&
+      {/* Kỳ trống thì nói VÌ SAO trống và chỉ sang kỳ còn số — "Chưa có số" một mình đọc ra như
+          màn hình hỏng. Nút nhảy đưa thẳng sang kỳ máy chủ bảo là còn số. */}
+      {coNguonKy && o.trong_vi_sao && (
+        <p className="v14-ghi">
+          <span className="tag">{o.trong_vi_sao}</span>
+          {theo_ky?.mac_dinh && theo_ky.mac_dinh !== ky && (
+            <button type="button" className="v14-ky-nut" style={{ marginLeft: 8 }}
+              onClick={() => setKy(theo_ky.mac_dinh!)}>
+              Xem {KY_XE.find((k) => k.ma === theo_ky.mac_dinh)!.ten.toLowerCase()} →
+            </button>
+          )}
+        </p>
+      )}
+      {coNguonKy && !o.trong_vi_sao && cot.every(([, g]) => g === null) &&
         <p className="v14-ghi"><ChuaNoi ai="Đội xe" cua="/doi-xe" cua_ten="Cửa nhập đội xe" /></p>}
       {/* Hai câu cảnh báo nghiệp vụ của bản vẽ. Giữ nguyên vì cả hai đều là chỗ dễ đọc sai con số. */}
       <p className="muted v14-ghi">

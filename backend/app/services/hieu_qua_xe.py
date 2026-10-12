@@ -43,7 +43,7 @@ Khoảng hở được tính vào kỳ của CHUYẾN SAU: quãng chạy rỗng 
 hành. Nhờ vậy quãng rỗng ngay trước chuyến đầu tiên của kỳ cũng được đếm, thay vì rơi mất.
 """
 from datetime import date
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.models.fleet import Trip
@@ -194,6 +194,20 @@ def theo_ky(db: Session, moc: date) -> dict:
     nhom = {"thang": [f"{moc.year:04d}-{moc.month:02d}"],
             "quy": [f"{moc.year:04d}-{m:02d}" for m in range(quy_dau, moc.month + 1)],
             "nam": [f"{moc.year:04d}-{m:02d}" for m in range(1, moc.month + 1)]}
+    nhan = {"thang": f"Tháng {moc.month:02d}/{moc.year}",
+            "quy": f"Quý {(moc.month - 1) // 3 + 1}/{moc.year}"
+                   + (f" (đến hết tháng {moc.month:02d})" if moc.month % 3 else ""),
+            "nam": f"Năm {moc.year} (T01–T{moc.month:02d})"}
+
+    # HQ-1c (13/10/2026) — KỲ MỚI NHẤT CÒN CÓ CHUYẾN.
+    #
+    # Vì sao cần: khối mở sẵn ở kỳ THÁNG, mà tháng đang chạy gần như luôn trống — sổ quyết toán xe
+    # chỉ chốt sau khi hết tháng, nên suốt gần cả tháng khối in bốn dấu gạch. Đo trên hệ thật
+    # 13/10/2026: tháng và quý đều rỗng, chỉ kỳ NĂM có số (2.127 ngày · 56.927 km · 10.064 đ/km) —
+    # và không có gì trên màn hình chỉ cho người đọc biết điều đó. Chủ tịch mở ra, thấy trống, kết
+    # luận "đội xe chưa lên màn hình". Con số có thật mà vẫn bằng không có.
+    ngay_cuoi = db.execute(select(func.max(Trip.ngay_di))).scalar()
+    ky_cuoi = f"{ngay_cuoi:%Y-%m}" if ngay_cuoi else None
 
     out = {}
     for ten, kys in nhom.items():
@@ -218,11 +232,26 @@ def theo_ky(db: Session, moc: date) -> dict:
         # giữ lại một phép thử canh đúng cái bất biến thật: lý do của quý trùng lý do của tháng.
         goc = next((x["cong_suat_thieu"] for x in ds if x["cong_suat_thieu"]), None)
         out[ten] = {
+            "nhan": nhan[ten],
             "ngay_xe_hoat_dong": ngay or None,
             "cong_suat_khai_thac": round(ngay * 100 / cho_ngay, 1) if du and cho_ngay else None,
             "km_chay_rong": rong or None,
             "chi_phi_moi_km": round(gia_von / km) if km else None,
             "da_chot": all(x["da_chot"] for x in ds),
             "cong_suat_thieu": None if du else goc,
+            # Kỳ rỗng thì nói VÌ SAO rỗng, ngay tại kỳ ấy. "Chưa có số" một mình đọc ra như hỏng;
+            # "chưa nạp chuyến nào, số mới nhất là tháng 9" đọc ra là một việc có người làm được.
+            "trong_vi_sao": (None if ngay else
+                             (f"{nhan[ten]} chưa nạp chuyến nào"
+                              + (f" — số mới nhất là tháng {ky_cuoi[5:]}/{ky_cuoi[:4]}"
+                                 if ky_cuoi and ky_cuoi not in kys else "") + "."
+                              if ky_cuoi else f"{nhan[ten]} chưa nạp chuyến nào.")),
         }
+
+    # Kỳ mở sẵn: kỳ HẸP NHẤT còn có số. Tháng trước, rồi quý, rồi năm — mở ra là thấy số, và là
+    # con số gần hiện tại nhất có thể. Không kỳ nào có số thì giữ "thang" như cũ: lúc ấy ba nút đều
+    # trống như nhau, và `trong_vi_sao` của kỳ tháng nói đúng việc phải làm.
+    out["mac_dinh"] = next((t for t in ("thang", "quy", "nam")
+                            if out[t]["ngay_xe_hoat_dong"]), "thang")
+    out["ky_moi_nhat_co_chuyen"] = ky_cuoi
     return out
