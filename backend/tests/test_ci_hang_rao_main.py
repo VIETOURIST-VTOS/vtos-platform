@@ -209,7 +209,13 @@ def test_ci8_viec_web_phai_chay_ca_tren_pr_va_tren_main():
     Đúng một thứ, và là thứ PR không thể bắt: hai nhánh mỗi nhánh DỰNG ĐƯỢC riêng lẻ, gộp lại thì
     hỏng. Một nhánh đổi tên một thành phần dùng chung, nhánh kia thêm chỗ gọi theo tên cũ — cả hai
     xanh trên PR của mình. `hang-rao-gop` canh đúng hình ấy ở phía máy chủ từ 19/9; phía giao diện
-    tới 12/10/2026 vẫn chưa có ai canh. 35 giây là giá rẻ cho chỗ trống ấy.
+    tới 12/10/2026 vẫn chưa có ai canh. 1 phút 28 giây là giá rẻ cho chỗ trống ấy.
+
+    CON SỐ NÀY ĐÃ SAI MỘT LẦN, giữ lại vết. Bản đầu viết "35 giây", lấy từ lượt `web` ĐỎ
+    của PR #290 — một bản dựng HỎNG chết sớm, nên đó là thời gian của một lần THẤT BẠI.
+    Lượt CI #771 (lần gộp đầu tiên theo luật mới) đo bản dựng THÀNH CÔNG: 1 phút 28 giây,
+    cả lượt 1 phút 31 giây, so với 52 giây của lần gộp trước khi chỉ có cửa hẹp. Sai gấp
+    hai lần rưỡi, và đó là con số đã dùng để xin quyết định.
 
     NÓ KHÔNG CHẶN ĐƯỢC GÌ và phép thử này không giả vờ ngược lại: trên main mã đã vào kho, đỏ ở
     đây chỉ là BÁO. Chặn thật đòi "Require status checks", mà GitHub từ chối ô ấy cho kho riêng
@@ -223,7 +229,7 @@ def test_ci8_viec_web_phai_chay_ca_tren_pr_va_tren_main():
         "`!= 'push'` là bỏ lại chỗ trống phía giao diện: hai nhánh cùng dựng được riêng lẻ mà gộp "
         "lại hỏng sẽ không ai biết, và bản hỏng nằm trên main cho tới khi có người tình cờ mở ra "
         "xem — đúng cái đã xảy ra ngày 12/10/2026 và mất mấy tiếng mới ai đó thấy.\n\n"
-        "Nếu muốn cắt tiền Actions thì cắt ở chỗ khác: việc này tốn 35 giây một lượt, còn "
+        "Nếu muốn cắt tiền Actions thì cắt ở chỗ khác: việc này tốn 1 phút 28 giây một lượt, còn "
         "`backend` tốn 28 phút và vẫn đang được miễn trên push."
     )
 

@@ -118,8 +118,21 @@ jobs:
   # trên PR của mình. Đúng lý do `hang-rao-gop` đang chạy trên main, chỉ khác là nó canh phía
   # máy chủ còn việc này canh phía giao diện — và tới 12/10/2026 phía giao diện chưa có ai canh.
   #
-  # GIÁ PHẢI TRẢ, đo thật chứ không ước: 35 giây mỗi lần gộp. Đây là lý do việc này được chọn mà
-  # `backend` (28 phút) và `docker` thì không — cả hai GIỮ NGUYÊN `if:` của chúng.
+  # GIÁ PHẢI TRẢ: 1 PHÚT 28 GIÂY mỗi lần gộp — số này đã SỬA một lần, và lần sai đáng ghi lại.
+  #
+  # Bản đầu của khối chú thích này viết "35 giây", lấy từ lượt `web` ĐỎ của PR #290. Một bản dựng
+  # HỎNG chết sớm: `next build` dừng ngay ở tệp không phân tích được, nên 35 giây là thời gian
+  # của một lần THẤT BẠI, không phải của một lần chạy xong. Lượt CI #771 — lần gộp đầu tiên theo
+  # luật mới, trên main — đo được bản dựng THÀNH CÔNG mất 1 phút 28 giây, cả lượt 1 phút 31 giây
+  # (lần gộp ngay trước đó, #769, chỉ 52 giây vì mới có cửa hẹp).
+  #
+  # Con số sai gấp hai lần rưỡi, và nó là con số dùng để xin quyết định. Kết luận KHÔNG đổi —
+  # 1,5 phút vẫn rẻ so với 28 phút của `backend` — nhưng người quyết đã quyết trên một con số
+  # trích từ một lượt hỏng. Cùng một tật với ba bài học *cách đo* ở dòng VA-MAIN10: không mở phép
+  # đo ra nhìn kỹ xem nó đang đo cái gì.
+  #
+  # Đây là lý do việc này được chọn mà `backend` (28 phút) và `docker` thì không — cả hai GIỮ
+  # NGUYÊN `if:` của chúng.
   #
   # ĐIỀU NÀY KHÔNG CHẶN ĐƯỢC GÌ, nói thẳng để không ai yên tâm nhầm. Trên main, mã đã vào kho
   # rồi; đỏ ở đây chỉ là BÁO. Thứ duy nhất chặn được một lần gộp là ô "Require status checks"

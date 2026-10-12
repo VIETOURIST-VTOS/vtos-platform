@@ -21,6 +21,7 @@ for _x in (_DB, _DB + "-journal"):
     except OSError:
         pass
 import inspect
+import re
 import pytest
 from sqlalchemy import select
 from fastapi.testclient import TestClient
@@ -236,3 +237,97 @@ def test_bd1_so_yeu_cau_cho_booking_khop_dung_phep_loc_cua_chi_tieu():
         o = [x for x in BLV.ban(s, "dieu_hanh")["o"] if x["khoa"] == "yeu_cau_booking"][0]
     if o["trang_thai"] != BLV.SAN_SANG: pytest.skip("ô này chưa đọc được")
     assert o["so_luong"] == len(that)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# BÀN HỎNG PHẢI NÓI RA ĐƯỢC — thêm 12/10/2026, và nó là ĐIỀU 1 của chính tệp này ở cấp độ CẢ BÀN
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Điều 1 của vòng BD-1 viết cho MỘT Ô: số 0 không được lẫn với lỗi, ô đọc hỏng để trống chứ không
+# in 0, vì "0 việc" là nói với trưởng phòng rằng hôm nay không có gì phải làm. Luật ấy được canh
+# cẩn thận ở phía máy chủ và ở từng ô của màn hình.
+#
+# Ở cấp độ CẢ BÀN thì nó bị quên. Màn hình trả `null` cho hai trường hợp khác hẳn nhau: (a) đọc
+# cửa hỏng, (b) phòng chưa ai dựng hàng đợi. Trường hợp (b) trả `null` là đúng. Trường hợp (a)
+# trả `null` là đúng cái điều 1 cấm, chỉ to hơn: cả khối biến mất, trưởng phòng mở trang thấy
+# thẳng bảng chỉ tiêu và không có cách nào biết hệ thống hôm nay không đọc được việc của mình.
+#
+# Lời nhắc (toast) KHÔNG đủ và đó là lý do bộ kiểm này tồn tại: nó tắt sau vài giây, nó không bắn
+# lại cho người mở trang muộn hơn, và trên điện thoại thì thường chẳng ai kịp đọc.
+_TSX = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                    "web", "components", "BanLamViecPhong.tsx")
+
+
+def _man_hinh() -> str:
+    with open(_TSX, encoding="utf-8") as f:
+        return f.read()
+
+
+def _man_hinh_lenh() -> str:
+    """Màn hình, BỎ HẾT CHÚ THÍCH — và cái hàm này sinh ra từ một lần tự ngã.
+
+    Bản đầu của `test_bd1_ban_hong_phai_noi_ra_chu_khong_bien_mat` dò `s.find(...)` trên cả tệp
+    và ĐỎ NGAY LẦN CHẠY ĐẦU, trong khi mã hoàn toàn đúng: đoạn chú thích GIẢI THÍCH vì sao nhánh
+    báo lỗi phải đứng trước có nhắc nguyên văn câu lệnh `if (!d || !d.co_ban) return null`, nên
+    `find` vớ phải lời giải thích ở trên trước khi tới câu lệnh thật ở dưới — và kết luận ngược
+    hẳn sự thật.
+
+    Đây là lần thứ SÁU trong hai ngày một hàng rào quét chuỗi trả lời nhầm câu hỏi, và là lần thứ
+    ba nó bắt đúng vào lời giải thích. Một phép thử bắt được chú thích thay vì bắt được hành vi
+    thì nó dạy người ta XOÁ CHÚ THÍCH — thứ đắt nhất trong tệp. `test_ci_hang_rao_main._dong_lenh`
+    đã dựng đúng hàm này cho `ci.yml` từ 19/9/2026 vì cùng một lý do; đây là bản cho tệp .tsx.
+    """
+    ra = []
+    for d in _man_hinh().splitlines():
+        t = d.strip()
+        if t.startswith("//") or t.startswith("/*") or t.startswith("*"):
+            continue
+        ra.append(d.split("//")[0] if "//" in d else d)
+    return "\n".join(ra)
+
+
+def test_bd1_doc_hong_thi_ghi_lai_ly_do_chu_khong_chi_ban_mot_loi_nhac():
+    """Nhánh `catch` phải GIỮ lý do lại, không chỉ bắn một lời nhắc rồi quên."""
+    s = _man_hinh_lenh()
+    m = re.search(r"\.catch\(\(e\)\s*=>\s*\{([^}]*)\}", s)
+    assert m, "không tìm thấy nhánh `.catch` của lời gọi cửa bàn làm việc"
+    than = m.group(1)
+    assert "setLoi(" in than, (
+        "nhánh `catch` không ghi lý do vào một ô nhớ — nó chỉ bắn lời nhắc rồi quên. Lời nhắc tắt "
+        "sau vài giây và không bắn lại cho người mở trang muộn hơn, nên cái hỏng trở lại vô hình.")
+
+
+def test_bd1_ban_hong_phai_noi_ra_chu_khong_bien_mat():
+    """LUẬT CHÍNH, và THỨ TỰ hai nhánh là nửa quan trọng nhất của nó.
+
+    Lúc đọc hỏng thì `d` là null. Nên nếu `if (!d || !d.co_ban) return null` chạy TRƯỚC, nó nuốt
+    luôn trường hợp hỏng và khối báo lỗi không bao giờ hiện — mã trông như đã sửa, màn hình thì y
+    như cũ. Một phép thử chỉ hỏi "có khối báo lỗi không" sẽ xanh trong khi người dùng vẫn thấy
+    trang trống; nên phép thử này hỏi cả VỊ TRÍ, và hỏi trên bản ĐÃ BỎ CHÚ THÍCH (xem `_man_hinh_lenh`).
+    """
+    s = _man_hinh_lenh()
+    i_loi = s.find("if (loi)")
+    assert i_loi > 0, (
+        "màn hình không có nhánh nào dựng hình khi đọc cửa hỏng — đọc hỏng và `phòng chưa khai "
+        "bàn` lại trông y hệt nhau, cả hai là một khoảng trống.")
+    i_co_ban = s.find("if (!d || !d.co_ban) return null")
+    assert i_co_ban > 0, (
+        "mất nhánh `co_ban` — phòng chưa khai hàng đợi sẽ bị vẽ ra một cái bàn trống, mà bàn trống "
+        "trông y hệt `hôm nay không có việc gì`.")
+    assert i_loi < i_co_ban, (
+        "nhánh báo lỗi đứng SAU nhánh `co_ban`. Lúc đọc hỏng thì `d` là null nên nhánh `co_ban` "
+        "trả null trước, và khối báo lỗi không bao giờ chạy — sửa mà như không sửa.")
+
+
+def test_bd1_khoi_bao_hong_phai_cho_thu_lai():
+    """Một cái hỏng nói ra mà không cho làm gì thì mới đi được nửa đường.
+
+    Phần lớn lần hỏng ở đây là một nhịp mạng hoặc một lần máy chủ bận. Bắt người dùng tải lại cả
+    trang để thử lại là bắt họ trả giá cho một việc máy làm được trong một giây.
+    """
+    s = _man_hinh_lenh()
+    i = s.find("if (loi)")
+    khoi = s[i:i + 1600]
+    assert "setLan(" in khoi, "khối báo hỏng không có nút thử lại"
+    assert re.search(r"\}, \[phong, toast, lan\]\)", s), (
+        "nút thử lại có mà `useEffect` không nghe `lan` — bấm vào không gọi lại cửa, nút chết.")
