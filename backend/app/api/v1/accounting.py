@@ -18,7 +18,11 @@ READ = ("ketoan", "cntt", "tgd", "chutich", "bks", "ptgd_doan", "hcns")
 
 
 def entry_out(e: JournalEntry) -> dict:
+    from app.services import dieu_chinh as _DC
     return {"id": e.id, "code": e.code, "entry_date": e.entry_date, "period": e.period, "description": e.description, "source_type": e.source_type,
+            # Đợt E14: hai mốc, cộng con số kiểm toán hỏi — TÍNH LẠI lúc đọc chứ không lưu, vì
+            # lưu thì nó đóng băng trong khi hai ngày kia còn sửa được lúc chứng từ chưa ghi sổ.
+            "ky_goc": e.ky_goc, "ngay_phat_hien": e.ngay_phat_hien, "so_ngay_de_sua": _DC.so_ngay_de_sua(e),
             "source_ref": e.source_ref, "tour_id": e.tour_id, "status": e.status, "created_by": e.created_by, "posted_by": e.posted_by, "posted_at": e.posted_at,
             "reversed_by_id": e.reversed_by_id, "amount": sum((l.debit or 0) for l in e.lines),
             "lines": [{"id": l.id, "account": l.account_code, "debit": l.debit, "credit": l.credit, "partner": l.partner, "partner_code": l.partner_code, "project_code": l.project_code, "item_code": l.item_code, "doc_no": l.doc_no, "booking_id": l.booking_id, "note": l.note} for l in e.lines]}
@@ -43,11 +47,14 @@ def accounts(u: User = Depends(current_user), db: Session = Depends(get_db)):
 
 # ---------- Chứng từ ----------
 @router.get("/journal")
-def journal(period: str | None = None, status: str | None = None, limit: int = 300, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+def journal(period: str | None = None, status: str | None = None, ky_goc: str | None = None, limit: int = 300, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     q = select(JournalEntry).order_by(desc(JournalEntry.entry_date), desc(JournalEntry.id))
     q = PV.loc(q, JournalEntry, u)           # P6: phạm vi pháp nhân của phiên đăng nhập
     if period: q = q.where(JournalEntry.period == period)
     if status: q = q.where(JournalEntry.status == status)
+    # Đợt E14: câu thuyết minh BCTC hỏi mỗi lần lập báo cáo — "kỳ 09 bị sửa bởi những bút toán
+    # nào". Không có bộ lọc này thì người lập phải đọc từng diễn giải để đoán.
+    if ky_goc: q = q.where(JournalEntry.ky_goc == ky_goc)
     return [entry_out(e) for e in db.execute(q.limit(limit)).scalars()]
 
 
@@ -71,12 +78,34 @@ class EntryIn(BaseModel):
     lines: list[LineIn]
     tour_id: int | None = None
     post: bool = False
+    # ĐỢT E14 13/10/2026 — Kế toán chọn ĐÂY LÀ BÚT TOÁN GÌ, và nếu là điều chỉnh thì khai hai mốc.
+    # Danh sách cho phép hẹp đúng hai giá trị: cửa này là cửa lập tay, nó không được dùng để khai
+    # một nghiệp vụ mà hệ thống tự sinh (thu tiền, hóa đơn, lương…) — khai tay một nghiệp vụ máy
+    # sinh là dựng một chứng từ không có nghiệp vụ thật nào đứng sau.
+    nghiep_vu: str = "but_toan_tay"
+    ky_goc: str = ""
+    ngay_phat_hien: date | None = None
+
+
+# BẢNG, không phải bộ: khóa là thứ màn hình gửi lên, giá trị là tên nghiệp vụ được GHI VÀO SỔ.
+# Hai thứ ấy hôm nay trùng nhau tứng chữ, nhưng chúng là HAI thứ: một cái là tên ô chọn trên
+# màn hình, một cái là mã nằm trong sổ cái. Viết thành bảng thì phép thử `test_e3_3c` đọc được
+# giá trị và đối chiếu vỉa `chung_tu_loai.NGHIEP_VU` — một bộ thì nó không đọc được, và cửa này
+# truyền BIẾN vào `nghiep_vu=` nên nó phải để người khác đọc được.
+NGHIEP_VU_LAP_TAY = {
+    "but_toan_tay": "but_toan_tay",
+    "dieu_chinh_ky_truoc": "dieu_chinh_ky_truoc",
+}
 
 
 @router.post("/journal", status_code=201)
 def create_entry(data: EntryIn, u: User = Depends(require_roles("ketoan")), db: Session = Depends(get_db)):
+    if data.nghiep_vu not in NGHIEP_VU_LAP_TAY:
+        raise HTTPException(422, f"Cửa lập tay chỉ nhận {' hoặc '.join(NGHIEP_VU_LAP_TAY)}. "
+                                 f"Nghiệp vụ máy sinh phải đi đúng cửa của nó.")
     try:
-        e = ACC.post_entry(db, u.username, u.role, data.entry_date, data.description, [l.model_dump() for l in data.lines], "thu_cong", "", data.tour_id, post=data.post, nghiep_vu="but_toan_tay")
+        e = ACC.post_entry(db, u.username, u.role, data.entry_date, data.description, [l.model_dump() for l in data.lines], "thu_cong", "", data.tour_id, post=data.post, nghiep_vu=NGHIEP_VU_LAP_TAY[data.nghiep_vu],
+                           ky_goc=data.ky_goc or None, ngay_phat_hien=data.ngay_phat_hien)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     db.commit(); db.refresh(e)

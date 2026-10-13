@@ -141,7 +141,8 @@ def cho_ve_huu(db: Session, e, hau_to: str = ":old") -> None:
 
 def post_entry(db: Session, actor: str, role: str, entry_date: date, description: str, lines: list[dict],
                source_type: str = "thu_cong", source_ref: str = "", tour_id: int | None = None, post: bool = True,
-               nghiep_vu: str = "but_toan_tay", ngay_chung_tu: date | None = None) -> JournalEntry:
+               nghiep_vu: str = "but_toan_tay", ngay_chung_tu: date | None = None,
+               ky_goc: str | None = None, ngay_phat_hien: date | None = None) -> JournalEntry:
     """lines: [{account, debit, credit, partner?, booking_id?, tour_id?, note?}]. Kiểm tra cân đối và kỳ khóa.
 
     ĐỢT E3 12/10/2026 – hai tham số mới:
@@ -184,8 +185,14 @@ def post_entry(db: Session, actor: str, role: str, entry_date: date, description
                 f"{CTL.ten_nghiep_vu(nghiep_vu)}, nguồn {source_type}, mã nguồn {source_ref}. "
                 f"Ghi lần nữa là nhân đôi số tiền mà sổ vẫn cân, nên không ai thấy. "
                 f"Muốn sửa thì lập bút toán đảo cho {cu.code}, đừng ghi thêm một tờ nữa.")
+    # ĐỢT E14 — kiểm hai mốc TRƯỚC khi dựng chứng từ. Kiểm sau khi dựng thì một bút toán sai đã
+    # chiếm mất một số chứng từ (`_next_code`) và số ấy không trả lại được.
+    from app.services import dieu_chinh as _DC
+    _DC.kiem(nghiep_vu, ky_goc, ngay_phat_hien, entry_date, period)
+
     e = JournalEntry(code=_next_code(db, "CT", entry_date), entry_date=entry_date, period=period, description=description[:300],
                      ngay_chung_tu=ngay_chung_tu or entry_date,
+                     ky_goc=ky_goc or None, ngay_phat_hien=ngay_phat_hien,
                      loai_nghiep_vu=CTL.nghiep_vu_hop_le(nghiep_vu), loai_chung_tu=CTL.chung_tu_cua(nghiep_vu),
                      khoa_su_kien=khoa,
                      source_type=source_type, source_ref=source_ref, tour_id=tour_id, created_by=actor,

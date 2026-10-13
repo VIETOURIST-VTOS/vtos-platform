@@ -88,6 +88,11 @@ NGHIEP_VU: dict[str, tuple[str, str]] = {
     "chung_tu_misa":            ("Chứng từ nạp từ MISA",                               "PKT"),
     "but_toan_dao":             ("Bút toán đảo",                                       "PKT"),
     "but_toan_tay":             ("Bút toán Kế toán lập tay",                           "PKT"),
+    # Đợt E14 13/10/2026. TÁCH KHỎI `but_toan_tay`, và tách là có lý do: một bút toán sửa sai sót
+    # kỳ trước và một bút toán lập tay bình thường đi cùng một mã thì không đếm được cái thứ nhất,
+    # mà thuyết minh BCTC hỏi đúng cái thứ nhất. Khai riêng thì `services/dieu_chinh` đòi hai mốc
+    # ở đúng loại này và KHÔNG đòi ở loại kia.
+    "dieu_chinh_ky_truoc":      ("Điều chỉnh sai sót kỳ trước",                        "PKT"),
     "theo_quy_tac":             ("Ghi sổ theo quy tắc hạch toán",                      "PKT"),
     "khe_uoc_vay":              ("Khế ước vay – nhận vay / trả gốc / trả lãi",         "PKT"),
     # ĐÁO HẠN LÀ HAI BÚT TOÁN, nên nó là HAI nghiệp vụ — Đợt DỌN-1, 13/10/2026.
