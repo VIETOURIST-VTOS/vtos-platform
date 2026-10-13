@@ -88,6 +88,13 @@ CUA_TAY = (
     # chính tài xế, và khung tương tự trên tab Báo hỏng của /doi-xe cho đội xe ghi hộ khi tài xế
     # gọi điện. CỐ Ý không có bộ nạp tệp: báo hỏng là việc xảy ra từng lần một, ngay lúc nó xảy ra.
     "fleet_faults",
+    # HQ-2c (13/10/2026) · ĐỊNH MỨC TIÊU HAO DẦU theo số chỗ. Cửa: khối «Định mức tiêu hao dầu» trên
+    # tab Hồ sơ xe của /doi-xe, ghi qua PUT /fleet/dinh-muc-dau (Đội xe · Trưởng phòng ĐH · CNTT).
+    # CỐ Ý không có bộ nạp tệp và CỐ Ý không để máy tự sinh: Chủ tịch quyết 13/10/2026 rằng ngưỡng
+    # do người khai. Phương án bị loại là lấy trung bình 6 tháng của chính chiếc xe làm mốc — một
+    # chiếc hao nhiều SUỐT sáu tháng thì máy coi đó là bình thường, và chiếc hao nhất đội thành
+    # chiếc không bao giờ bị cảnh báo. Ngưỡng tự sinh từ chính số liệu nó canh thì không canh gì.
+    "fleet_fuel_norms",
     "fleet_maintenance", "fleet_offset_applications", "fleet_partners",
     "fleet_period_costs", "fleet_repayment_installments", "fleet_repayment_plans",
     "fleet_sale_cases", "fleet_settlement_lines", "fleet_settlements", "fleet_shared_invoice_lines",
