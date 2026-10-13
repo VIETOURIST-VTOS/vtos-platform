@@ -70,6 +70,11 @@ CUA_TAY = (
     # va phai rong: chuong trinh cua mot chuyen chi sinh ra khi Dieu hanh bam "mo tu san pham". May
     # nap san mot dong la may tu viet chuong trinh ho nguoi ban cho khach.
     "chuong_trinh_tour", "chuong_trinh_ngay",
+    # Đợt E6 13/10/2026. CỬA TAY trên màn hình /accounting, tab "Khóa kỳ": ô kỳ + ô lý do + nút
+    # "Trình Chủ tịch HĐQT". Bảng bắt đầu RỖNG và phải rỗng — mỗi dòng là một câu NGƯỜI nói
+    # ("xin mở lại kỳ 09, vì..."), nên máy nạp sẵn một dòng là máy tự xin hộ. KHÔNG khai MAY_SINH:
+    # hai cột `khoa_lai_*` do máy điền lúc khóa lại, nhưng DÒNG thì luôn do người mở.
+    "mo_lai_ky",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
     "auto_reports", "ban_doc_chung_tu", "bang_gia", "bang_gia_dong", "bank_accounts_cat",
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",

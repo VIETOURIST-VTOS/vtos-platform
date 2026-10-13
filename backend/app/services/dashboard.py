@@ -125,6 +125,22 @@ def build(db: Session, u: User) -> dict:
                           "href": "/params"})
         n = sum(1 for t in db.execute(select(Tour).where(Tour.status == "cho_duyet")).scalars())
         if n: ap.append({"label": f"{n} dự toán tour chờ duyệt", "href": "/tours"})
+        # ĐỢT E6 13/10/2026 — hai dòng, và chúng nói hai việc KHÁC NHAU.
+        #
+        # Dòng thứ nhất là việc chờ anh bấm. Dòng thứ hai KHÔNG chờ ai bấm — nó là một kỳ đang
+        # mở mà chưa ai khóa lại, và nó phải nằm đây cho tới lúc có người khóa. Một kỳ mở mà ai
+        # cũng quên là chỗ số liệu lặng lẽ đổi sau lưng; để nó im lặng thì đúng ba tuần sau không
+        # ai nhớ vì sao sổ tháng ấy khác bản đã in.
+        from app.services import mo_lai_ky as _MLK
+        _cho = _MLK.dang_cho_ky(db)
+        if _cho:
+            ap.append({"label": f"{len(_cho)} kỳ kế toán chờ CHỦ TỊCH ký mở lại — kỳ "
+                                + ", ".join(d.period for d in _cho), "href": "/accounting?tab=periods"})
+        _mo = _MLK.dang_mo_lai(db)
+        if _mo:
+            ap.append({"label": "ĐANG MỞ LẠI, chưa khóa lại: kỳ "
+                                + ", ".join(d.period for d in _mo)
+                                + " — ghi xong thì khóa lại", "href": "/accounting?tab=periods"})
     if role == "tgd":
         r = db.execute(select(PayrollRun).where(PayrollRun.status == "hcns_lap")).scalars().first()
         if r: ap.append({"label": f"Bảng lương {r.period} chờ TGĐ ký lô", "href": "/hr"})

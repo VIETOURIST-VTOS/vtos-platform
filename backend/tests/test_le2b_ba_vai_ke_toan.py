@@ -79,6 +79,12 @@ CHO_DA_KHAI_BA_VAI = [
     # như nó được thiết kế, vì soi theo cú pháp thì luôn có một cách viết khác lọt qua — nên
     # một dòng khai NGƯỜI KÝ cũng hiện ra ở đây và phải khai.
     "services/chu_ky.py: ketoan_truong",
+    # ── Đợt E6, 13/10/2026 ────────────────────────────────────────────────────────────────
+    # Cửa TRÌNH đề nghị mở lại một kỳ kế toán đã khóa: `POST /periods/{period}/mo-lai`, vai
+    # `ketoan_truong` + `cntt`. Đây là MỘT cửa mới, và nó mở cho Kế toán trưởng chứ không cho
+    # `ketoan`: người trình phải là người đứng đầu phòng, vì hồ sơ này đi lên Chủ tịch ký.
+    # Cửa KÝ (`chutich`) không hiện ở đây vì phép thử chỉ soi ba vai mới của Đợt E2b.
+    "api/v1/accounting.py: ketoan_truong",
 ]
 GOC_APP = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app")
 

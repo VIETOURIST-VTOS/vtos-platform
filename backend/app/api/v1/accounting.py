@@ -205,8 +205,70 @@ def lock(period: str, data: LockIn, u: User = Depends(require_roles("ketoan")), 
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     _KTN_E2.ghi_buoc(db, f"ky:{period}", "khoa_so_ky", u)
+    # Đợt E6: đóng vòng cho mọi đề nghị mở lại đang treo của kỳ này. Gọi Ở ĐÂY chứ không trong
+    # `lock_period`: hàm kia là phép khóa kỳ chung, nó không phải biết gì về việc mở lại.
+    from app.services import mo_lai_ky as _MLK
+    _MLK.danh_dau_da_khoa_lai(db, period, u.username)
     db.commit()
     return {"message": f"Đã khóa kỳ {period}"}
+
+
+# ── ĐỢT E6 13/10/2026 — MỞ LẠI KỲ ĐÃ KHÓA ────────────────────────────────────────────────────
+# Ba cửa nằm DƯỚI tiền tố `/periods` đã khai, không xin tiền tố mới. Vai ở cửa TRÌNH là Kế toán
+# trưởng và CNTT; vai ở cửa KÝ không viết tay ở đây mà do `mo_lai_ky.ky` hỏi bảng luật — cửa cho
+# vào phòng, trong phòng còn một lần chặn nữa.
+class MoLaiIn(BaseModel):
+    ly_do: str = ""
+
+
+@router.get("/periods/mo-lai")
+def mo_lai_danh_sach(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Hồ sơ mở lại kỳ: đang chờ ký, đang mở lại, và những lần đã xong."""
+    from app.models.mo_lai_ky import MoLaiKy
+    from app.services import mo_lai_ky as _MLK
+    ds = db.execute(select(MoLaiKy).order_by(MoLaiKy.id.desc())).scalars()
+    return [_MLK.dong(d) for d in ds]
+
+
+@router.post("/periods/{period}/mo-lai")
+def de_nghi_mo_lai(period: str, data: MoLaiIn,
+                   u: User = Depends(require_roles("ketoan_truong", "cntt")),
+                   db: Session = Depends(get_db)):
+    """Kế toán trưởng TRÌNH đề nghị mở lại. Cửa này KHÔNG mở gì cả — chỉ lập hồ sơ."""
+    from app.services import mo_lai_ky as _MLK
+    try:
+        d = _MLK.de_nghi(db, u, period, data.ly_do)
+    except _MLK.SaiMoLaiKy as ex:
+        raise HTTPException(422, str(ex))
+    return {"message": f"Đã trình Chủ tịch đề nghị mở lại kỳ {period}.", **_MLK.dong(d)}
+
+
+@router.post("/periods/mo-lai/{mid}/ky")
+def ky_mo_lai(mid: int, u: User = Depends(require_roles("chutich", "cntt")),
+              db: Session = Depends(get_db)):
+    """Chủ tịch KÝ — và đúng lúc này kỳ mới thật sự mở ra."""
+    from app.models.mo_lai_ky import MoLaiKy
+    from app.services import mo_lai_ky as _MLK
+    d = db.get(MoLaiKy, mid)
+    if not d: raise HTTPException(404, "Không có đề nghị này")
+    try:
+        return _MLK.ky(db, u, d)
+    except _MLK.SaiMoLaiKy as ex:
+        raise HTTPException(422, str(ex))
+
+
+@router.post("/periods/mo-lai/{mid}/tu-choi")
+def tu_choi_mo_lai(mid: int, data: MoLaiIn, u: User = Depends(require_roles("chutich", "cntt")),
+                   db: Session = Depends(get_db)):
+    """Từ chối cũng phải có lý do: người trình cần biết sửa gì để trình lại."""
+    from app.models.mo_lai_ky import MoLaiKy
+    from app.services import mo_lai_ky as _MLK
+    d = db.get(MoLaiKy, mid)
+    if not d: raise HTTPException(404, "Không có đề nghị này")
+    try:
+        return _MLK.tu_choi(db, u, d, data.ly_do)
+    except _MLK.SaiMoLaiKy as ex:
+        raise HTTPException(422, str(ex))
 
 
 # ---------- BCTC & tờ khai thuế (robot R5/R7) ----------
