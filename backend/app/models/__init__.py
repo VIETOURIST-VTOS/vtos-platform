@@ -143,3 +143,4 @@ from app.models.quang_cao import *  # noqa
 # Base.metadata, create_all không tạo, và alembic autogenerate đòi XOÁ nó.
 from app.models.muc_do_chan import *  # noqa
 from app.models.tach_nhiem import *  # noqa
+from app.models.mo_lai_ky import *  # noqa  # Đợt E6 13/10/2026 — hồ sơ mở lại kỳ kế toán

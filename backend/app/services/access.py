@@ -366,7 +366,17 @@ MAN_HINH_API = {
     # người ký cùng có /xe-hdv, nên hàng đợi nằm ở đó, cạnh chính những người làm đơn.
     "/doi-xe": ("/api/v1/fleet", "/api/v1/vehicles", "/api/v1/drivers"),
     "/expenses": ("/api/v1/cashflow", "/api/v1/payment-requests", "/api/v1/tours"),
-    "/finance": ("/api/v1/fin", "/api/v1/cashflow"),
+    # `/api/v1/bank-transactions` vào đây ngày 13/10/2026 theo Đợt E6, và nó SỬA MỘT CHỖ ĐỎ DO
+    # ĐỢT E5 ĐỂ LẠI TRÊN MAIN cùng ngày: E5 thêm khối phân bổ tiền RA vào `web/app/finance/
+    # page.tsx`, khối ấy gọi bốn lần `/bank-transactions`, và `test_p2` đỏ đúng một dòng. Bản ghi
+    # của E5 viết "cửa nằm dưới `/bank-transactions` đã khai nên phạm vi không đổi" — đúng về CỬA
+    # và SAI về MÀN HÌNH. Hậu quả không phải một phép thử đỏ: hàng rào NGOÀI chặn chính người đang
+    # dùng màn hình ấy, tức một tính năng của E5 KHÔNG CHẠY.
+    #
+    # DÒNG NÀY KHÔNG MỞ THÊM MỘT CẶP QUYỀN NÀO, và con số là thứ đếm được: mọi vai mở được
+    # `/finance` đều đã mở được `/collections`, nơi `/api/v1/bank-transactions` đã khai từ trước.
+    # Hàng rào TRONG của bốn cửa phân bổ vẫn là `require_roles("ketoan", "cntt")`, không đổi.
+    "/finance": ("/api/v1/fin", "/api/v1/cashflow", "/api/v1/bank-transactions"),
     "/hach-toan": ("/api/v1/hach-toan",),
     # V7 Đợt 3 (10/9/2026). Sự cố tour đọc thêm /tours, /bookings, /suppliers và /payment-requests: màn
     # hình phải chọn chuyến, chọn nhà cung cấp gây sự cố, và gắn số hiệu đề nghị chi lúc kết luận.

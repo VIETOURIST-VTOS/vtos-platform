@@ -92,9 +92,56 @@ def test_e3_2_co_du_32_cho_goi_khong_sot_tep_nao():
     assert len(_cho_goi()) >= 32
 
 
+# ĐỢT E6 13/10/2026 — MỘT CHỖ GỌI KHAI NGHIỆP VỤ QUA BẢNG, KHÔNG VIẾT THẲNG MỘT HÀNG CHỮ.
+#
+# Bộ quét dưới đây đọc CÂY CÚ PHÁP và chỉ hiểu một hằng chữ; gặp một biểu thức nó ghi "<biến>".
+# Đợt DỌN-2 (13/10/2026) đổi `vay_but_toan.ghi_so` sang `NGHIEP_VU_THEO_KY.get(s.kind, ...)` vì
+# đáo hạn là HAI chân cùng một khế ước và hai chân phải mang hai tên nghiệp vụ khác nhau — không
+# viết thẳng được một hằng chữ ở đó. Kết quả: `test_e3_3` đỏ trên main từ lúc gộp DỌN-2, với đúng
+# một dòng "<biến>", trong khi cả ba tên DỌN-2 dùng đều đã khai đúng.
+#
+# KHÔNG BỎ "<biến>" KHỎI PHÉP THỬ — làm thế là tắt hàng rào đúng chỗ nó còn việc: từ đó ai truyền
+# một biến bừa vào `nghiep_vu=` cũng lọt. Đổi lại: chỗ gọi qua một BẢNG KHAI SẴN thì phải KHAI RA
+# ở đây, và phép thử đi kiểm GIÁ TRỊ của bảng ấy. Thêm một chỗ gọi truyền biến mà không khai vẫn
+# đỏ; thêm một tên chưa khai vào bảng ấy cũng đỏ.
+GOI_QUA_BANG = {
+    "services/vay_but_toan.py": ("NGHIEP_VU_THEO_KY",
+                                 "Đáo hạn là HAI chân cùng một khế ước, hai chân hai tên nghiệp "
+                                 "vụ — Đợt DỌN-2 13/10/2026"),
+}
+
+
 def test_e3_3_nghiep_vu_khai_o_cho_goi_deu_co_trong_bang():
-    la = sorted({nv for _f, _d, _st, nv in _cho_goi() if nv and nv not in CTL.NGHIEP_VU})
+    la = sorted({f"app/{f}:{d} → {nv}" for f, d, _st, nv in _cho_goi()
+                 if nv and nv != "<biến>" and nv not in CTL.NGHIEP_VU})
     assert not la, f"Nghiệp vụ chưa khai trong `chung_tu_loai.NGHIEP_VU`: {la}"
+
+
+def test_e3_3b_cho_goi_truyen_bien_phai_khai_la_goi_qua_bang():
+    """Một chỗ gọi truyền biến vào `nghiep_vu=` mà KHÔNG khai ở `GOI_QUA_BANG` thì đỏ.
+
+    Đây là vế giữ cho sửa của Đợt E6 không thành một lỗ: bỏ "<biến>" khỏi phép thử trên mà không
+    có phép thử này là tắt hàng rào, chứ không phải nới nó đúng chỗ.
+    """
+    la = sorted({f for f, _d, _st, nv in _cho_goi() if nv == "<biến>" and f not in GOI_QUA_BANG})
+    assert not la, (
+        f"Những chỗ gọi `post_entry` sau truyền BIẾN vào `nghiep_vu=` mà chưa khai: {la}. "
+        "Khai vào `GOI_QUA_BANG` KÈM LÝ DO và tên bảng, rồi phép thử dưới sẽ kiểm giá trị của "
+        "bảng ấy — hoặc viết thẳng một hằng chữ nếu chỗ ấy chỉ có một tên.")
+
+
+def test_e3_3c_moi_gia_tri_trong_bang_duoc_khai_deu_co_trong_NGHIEP_VU():
+    """Khai "gọi qua bảng" không miễn kiểm — nó chuyển phép kiểm từ chỗ gọi sang bảng."""
+    import importlib
+    xau = []
+    for rel, (ten_bang, _ly_do) in GOI_QUA_BANG.items():
+        m = importlib.import_module("app." + rel[:-3].replace("/", "."))
+        bang = getattr(m, ten_bang, None)
+        assert isinstance(bang, dict), f"app/{rel} không có bảng `{ten_bang}` kiểu dict"
+        assert bang, f"app/{rel}::{ten_bang} RỖNG — một bảng rỗng không khai gì cả"
+        xau += [f"{rel}::{ten_bang}[{k!r}] = {v!r}" for k, v in bang.items()
+                if v not in CTL.NGHIEP_VU]
+    assert not xau, f"Nghiệp vụ chưa khai trong `chung_tu_loai.NGHIEP_VU`: {sorted(xau)}"
 
 
 def test_e3_4_moi_nguon_dung_trong_ma_deu_co_trong_bang_NGUON():

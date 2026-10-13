@@ -58,6 +58,11 @@ VAI_KY_CAN: dict[str, tuple[str, ...]] = {
     # Dot E4a 12/10/2026 - DIEU KHOAN THANH TOAN. Chu tich chot: Chu tich ky mot minh,
     # y nhu bang tham so chinh sach. Khai O DAY chu khong o `dieu_khoan.py`: mot luat, mot cho.
     "dieu_khoan_thanh_toan": ("chutich",),
+    # Đợt E6 13/10/2026 — MỞ LẠI KỲ KẾ TOÁN ĐÃ KHÓA. Chủ tịch chốt: Kế toán trưởng trình, Chủ
+    # tịch ký. Khai ở ĐÂY chứ không ở `mo_lai_ky.py`: một luật, một chỗ — cùng lẽ với điều khoản
+    # thanh toán ở dòng trên. Người TRÌNH không khai trong bảng này vì bảng này nói về MỘT bước
+    # ký; ai được trình là việc của `require_roles` ở cửa trình.
+    "mo_lai_ky":         ("chutich",),
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════

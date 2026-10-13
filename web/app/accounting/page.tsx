@@ -13,6 +13,62 @@ const TABS = [["journal", "Chứng từ ghi sổ"], ["ledger", "Sổ cái"], ["t
 const SRC2: Record<string, string> = { misa: "Sổ MISA", so_du_dau_ky: "Số dư đầu kỳ", kiem_toan: "Điều chỉnh kiểm toán" };
 const dl = (path: string, name: string) => fetch(`/api/v1${path}`, { headers: { Authorization: `Bearer ${localStorage.getItem("vtos_token")}` } }).then((r) => r.blob()).then((b) => { const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = name; a.click(); });
 
+// ── ĐỢT E6 13/10/2026 — MỞ LẠI KỲ KẾ TOÁN ĐÃ KHÓA ────────────────────────────────────────────
+// Khối này nằm DƯỚI bảng khóa kỳ, trong cùng tab "Khóa kỳ": mở lại là mặt sau của chính việc
+// khóa, tách sang màn hình khác thì người làm phải nhớ đi hai nơi.
+const MLST: Record<string, [string, string]> = {
+  cho_ky: ["Chờ Chủ tịch ký", "warn"], da_ky: ["ĐANG MỞ LẠI – chưa khóa lại", "warn"],
+  tu_choi: ["Chủ tịch từ chối", "red"], da_khoa_lai: ["Đã khóa lại", "ok"],
+};
+
+function MoLaiPanel({ toast, isKTT, isKy }: { toast: (m: string, e?: boolean) => void; isKTT: boolean; isKy: boolean }) {
+  const [ds, setDs] = useState<any[]>([]);
+  const [ky, setKy] = useState("");
+  const [lyDo, setLyDo] = useState("");
+  const tai = useCallback(() => { api("/periods/mo-lai").then(setDs).catch(() => setDs([])); }, []);
+  useEffect(() => { tai(); }, [tai]);
+  const post = async (path: string, json?: any) => {
+    try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); tai(); }
+    catch (x) { toast(errMsg(x), true); }
+  };
+  const mo = ds.filter((d) => d.trang_thai === "da_ky");
+  const cho = ds.filter((d) => d.trang_thai === "cho_ky");
+
+  return (<div className="panel" style={{ marginTop: 12 }}>
+    <h3 style={{ margin: "0 0 4px" }}>Mở lại kỳ đã khóa</h3>
+    <p className="muted">Kế toán trưởng trình, Chủ tịch HĐQT ký — hai người, không phải một. Lý do
+      bắt buộc tối thiểu 30 ký tự và hiện cho người ký đọc trước khi ký. Kỳ đã chốt theo bản kiểm
+      toán KHÔNG mở bằng cửa này: sửa số đã được kiểm toán xác nhận đi đường bút toán điều chỉnh
+      ghi vào kỳ sau.</p>
+
+    {mo.length > 0 && <p className="muted" style={{ fontWeight: 600 }}>⚠ Đang mở lại, chưa khóa
+      lại: kỳ {mo.map((d) => d.period).join(", ")} — ghi xong thì khóa lại ở bảng trên.</p>}
+
+    {isKTT && <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap", margin: "8px 0" }}>
+      <label>Kỳ <input type="month" value={ky} onChange={(e) => setKy(e.target.value)} /></label>
+      <textarea rows={2} style={{ flex: 1, minWidth: 320 }} value={lyDo} placeholder="Lý do mở lại kỳ (tối thiểu 30 ký tự) — người ký đọc đúng dòng này trước khi quyết"
+        onChange={(e) => setLyDo(e.target.value)} />
+      <button className="act orange" style={{ margin: 0 }} disabled={!ky || lyDo.trim().length < 30}
+        onClick={() => post(`/periods/${ky}/mo-lai`, { ly_do: lyDo }).then(() => setLyDo(""))}>Trình Chủ tịch HĐQT</button>
+    </div>}
+
+    {ds.length === 0 ? <p className="muted">Chưa có đề nghị mở lại kỳ nào.</p> :
+      <div className="wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Lý do</th><th>Người trình</th><th>Người ký</th>{isKy && <th></th>}</tr></thead>
+        <tbody>{ds.map((d) => <tr key={d.id} style={d.trang_thai === "da_ky" ? { fontWeight: 600 } : undefined}>
+          <td><b>{d.period}</b></td>
+          <td><Tag cls={(MLST[d.trang_thai] || ["", ""])[1]}>{(MLST[d.trang_thai] || [d.trang_thai])[0]}</Tag></td>
+          <td className="muted">{d.trang_thai === "tu_choi" ? <>{d.ly_do}<br /><b>Từ chối:</b> {d.tu_choi_ly_do}</> : d.ly_do}</td>
+          <td>{d.trinh_vai} {d.trinh_boi}<br /><span className="muted">{fmtDT(d.trinh_luc)}</span></td>
+          <td>{d.ky_boi ? <>{d.ky_vai} {d.ky_boi}<br /><span className="muted">{fmtDT(d.ky_luc)}</span></> : <span className="muted">—</span>}</td>
+          {isKy && <td>{d.trang_thai === "cho_ky" && <>
+            <button className="act orange" style={{ margin: 0 }} onClick={() => post(`/periods/mo-lai/${d.id}/ky`)}>Ký mở lại kỳ</button>
+            <button className="act grey" style={{ margin: "0 0 0 6px" }} onClick={() => { const n = prompt("Lý do từ chối — người trình cần biết sửa gì để trình lại:"); if (n) post(`/periods/mo-lai/${d.id}/tu-choi`, { ly_do: n }); }}>Từ chối</button>
+          </>}</td>}
+        </tr>)}</tbody></table></div>}
+    {cho.length > 0 && !isKy && <p className="muted">{cho.length} đề nghị đang chờ Chủ tịch HĐQT ký.</p>}
+  </div>);
+}
+
 function MisaPanel({ toast, isKT }: { toast: (m: string, e?: boolean) => void; isKT: boolean }) {
   const [stats, setStats] = useState<any>(null);
   const [res, setRes] = useState<any>(null);
@@ -99,6 +155,10 @@ function BctcPanel({ toast, period }: { toast: (m: string, e?: boolean) => void;
 function Accounting() {
   const { user, toast } = useShell();
   const isKT = user?.role === "ketoan";
+  // Đợt E6 13/10/2026 — hai vai KHÁC `isKT`: người TRÌNH đề nghị mở lại kỳ và người KÝ.
+  // Giao diện chỉ ẨN nút; chặn thật ở `require_roles` của cửa và ở `mo_lai_ky.ky`.
+  const isKTT = user?.role === "ketoan_truong" || user?.role === "cntt";
+  const isKy = user?.role === "chutich" || user?.role === "cntt";
   const [tab, setTab] = useState("journal");
   // mở đúng tab khi vào từ menu bên trái (?tab=...)
   useEffect(() => { const q = new URLSearchParams(window.location.search).get("tab"); if (q) setTab(q); }, []);
@@ -237,6 +297,7 @@ function Accounting() {
     {tab === "periods" && <div className="panel wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Khóa bởi</th><th>Lúc</th><th>Ghi chú</th>{isKT && <th></th>}</tr></thead>
       <tbody>{periods.map((p) => <tr key={p.period}><td><b>{p.period}</b></td><td>{p.locked ? <Tag cls="navy">Đã khóa</Tag> : <Tag cls="ok">Mở</Tag>}</td><td>{p.locked_by}</td><td>{fmtDT(p.locked_at)}</td><td className="muted">{p.note}</td>
         {isKT && <td>{!p.locked && <button className="act orange" style={{ margin: 0 }} onClick={() => { const n = prompt(`Khóa kỳ ${p.period}? Ghi chú:`); if (n !== null) post(`/periods/${p.period}/lock`, { note: n }); }}>Khóa kỳ</button>}</td>}</tr>)}</tbody></table></div>}
+    {tab === "periods" && <MoLaiPanel toast={toast} isKTT={isKTT} isKy={isKy} />}
   </>);
 }
 export default function Page() { return <Shell><Accounting /></Shell>; }
