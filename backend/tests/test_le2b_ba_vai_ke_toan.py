@@ -85,6 +85,12 @@ CHO_DA_KHAI_BA_VAI = [
     # `ketoan`: người trình phải là người đứng đầu phòng, vì hồ sơ này đi lên Chủ tịch ký.
     # Cửa KÝ (`chutich`) không hiện ở đây vì phép thử chỉ soi ba vai mới của Đợt E2b.
     "api/v1/accounting.py: ketoan_truong",
+    # ── Đợt E12, 13/10/2026 ───────────────────────────────────────────────────────────────
+    # `services/bang_ky_cua.py` KHÔNG mở một cửa nào — nó ĐẾM. Tên vai xuất hiện ở đây vì nó là
+    # vai mà quyết định 11/10/2026 nói tới, và bảng ký phải gọi đúng tên quyết định ấy. Phép thử
+    # này soi theo TÊN VAI chứ không theo loại việc, đúng như nó được thiết kế, nên một dòng chỉ
+    # ĐỌC cũng hiện ra và cũng phải khai.
+    "services/bang_ky_cua.py: ketoan_truong",
 ]
 GOC_APP = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app")
 
