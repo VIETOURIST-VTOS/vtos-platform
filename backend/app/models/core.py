@@ -221,6 +221,15 @@ CAPABILITIES = {
     # sau, kể cả người kế nhiệm mà chưa ai quyết định gì. Đây là quyền cấp cho MỘT NGƯỜI vì việc của
     # người đó, nên nó phải hết hạn và phải nhìn thấy được ở màn hình ngoại lệ – y hệt bảng lương.
     "bao_cao_moi_phong": "Xem báo cáo tự động của MỌI phòng ban và toàn công ty",
+    # Đợt HD-10, Chủ tịch chốt 13/10/2026 (câu D3 = phương án A): "CNTT không mặc nhiên có quyền
+    # xác nhận nghiệp vụ. Chỉ kiểm thay khi được giao quyền cụ thể; quyền quản trị kỹ thuật không
+    # tự sinh quyền duyệt."
+    #
+    # Cấp bằng NĂNG LỰC THEO NGƯỜI chứ không bằng vai, đúng lý do đã viết cho `bang_luong`: sửa
+    # vai là mở cho mọi người mang vai ấy từ nay về sau, kể cả người kế nhiệm mà chưa ai quyết
+    # định gì. Đi qua cửa ngoại lệ sẵn có nên tự động có hạn (tối đa 90 ngày), BẮT BUỘC ghi lý do,
+    # có người phê, và hiện trên màn hình tra cứu quyền — đúng ba điều Chủ tịch đòi.
+    "kiem_bao_cao_tour": "Xác nhận báo cáo sau tour thay Trưởng phòng Hướng dẫn",
 }
 GRANT_MAX_DAYS = 90
 
