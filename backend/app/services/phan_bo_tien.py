@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.models.core import Booking, User
 from app.models.payments import BankTransaction, Receipt
 from app.models.phan_bo_tien import PhanBoTien
+from app.models.nghia_vu import NghiaVuThanhToan, DotThanhToan, TRANG_THAI_DONG
 from app.services import payments as PAY
 from app.services import rules as R
 
@@ -55,14 +56,131 @@ def _cap_nhat_giao_dich(db: Session, txn: BankTransaction) -> float:
         txn.match_note = "Đã huỷ toàn bộ phân bổ – chờ Kế toán phân bổ lại"
     elif du > 0.5:
         txn.match_status = "cho_ke_toan"
-        txn.booking_id = dong[0].booking_id if len(dong) == 1 else None
-        txn.match_note = f"Phân bổ {len(dong)} booking, còn {du:,.0f} đ chưa phân bổ"
+        txn.booking_id = _booking_neu_duy_nhat(dong)
+        txn.match_note = f"Phân bổ {len(dong)} dòng, còn {du:,.0f} đ chưa phân bổ"
     else:
         txn.match_status = "da_khop"
-        txn.booking_id = dong[0].booking_id if len(dong) == 1 else None
-        txn.match_note = (f"Phân bổ đủ cho {len(dong)} booking" if len(dong) > 1
-                          else f"Phân bổ đủ cho 1 booking")
+        txn.booking_id = _booking_neu_duy_nhat(dong)
+        txn.match_note = f"Phân bổ đủ cho {len(dong)} dòng"
     return du
+
+
+def _booking_neu_duy_nhat(dong: list[PhanBoTien]) -> int | None:
+    """Gắn giao dịch về MỘT booking chỉ khi nó có đúng một dòng, và dòng ấy là nhánh booking.
+
+    Đợt E5 13/10/2026: trước đợt này chỗ gọi viết thẳng `dong[0].booking_id`, mà từ nay một dòng
+    có thể là nhánh NGHĨA VỤ với `booking_id` rỗng. Gán rỗng vào `txn.booking_id` thì không sai số
+    liệu, nhưng gán NHẦM thì sai — nên hỏi đúng một câu: có đúng một dòng, và nó có booking không.
+    """
+    if len(dong) == 1 and dong[0].booking_id is not None:
+        return dong[0].booking_id
+    return None
+
+
+def _kiem_nhanh_ra(db: Session, txn: BankTransaction, d: dict, i: int) -> tuple:
+    """Kiểm MỘT dòng phân bổ tiền ra. Trả về (nghĩa vụ, đợt, số tiền, ghi chú) hoặc ném lỗi.
+
+    BỐN CHỖ CHẶN CỨNG, và chỉ bốn: sai pháp nhân · nghĩa vụ đã đóng · nghĩa vụ hướng THU · đợt
+    không thuộc nghĩa vụ đã chọn. (Chỗ chặn thứ năm — vượt số dư chưa phân bổ — kiểm trên cả lô,
+    không kiểm từng dòng được.) Trả dư thì CẢNH BÁO, xem `phan_bo_ra`.
+    """
+    try:
+        tien = round(float(d.get("so_tien") or 0), 2)
+    except (TypeError, ValueError):
+        raise ValueError(f"Dòng {i}: số tiền không đọc được")
+    if tien <= 0:
+        raise ValueError(f"Dòng {i}: số tiền phải lớn hơn 0")
+
+    nv = db.get(NghiaVuThanhToan, int(d.get("nghia_vu_id") or 0))
+    if not nv:
+        raise ValueError(f"Dòng {i}: không có nghĩa vụ")
+    if nv.huong != "chi":
+        raise ValueError(f"Dòng {i}: nghĩa vụ {nv.ma_goc} là nghĩa vụ THU, không trả tiền ra vào "
+                         f"nó được. Tiền ra chỉ phân bổ cho nghĩa vụ hướng chi.")
+    if nv.trang_thai in TRANG_THAI_DONG:
+        raise ValueError(f"Dòng {i}: nghĩa vụ {nv.ma_goc} đã đóng ({nv.trang_thai})")
+    # PHÁP NHÂN: tiền của pháp nhân này không mặc định dùng được cho pháp nhân khác. Nghĩa vụ CHƯA
+    # XÁC ĐỊNH pháp nhân (rỗng) thì KHÔNG đoán — chặn và nói ra, đúng luật K2.
+    cty_txn = getattr(txn, "company_id", None)
+    if nv.company_id is None:
+        raise ValueError(f"Dòng {i}: nghĩa vụ {nv.ma_goc} chưa xác định pháp nhân – gán pháp nhân "
+                         f"cho nó trước, hệ thống không đoán thay.")
+    if cty_txn is not None and nv.company_id != cty_txn:
+        raise ValueError(f"Dòng {i}: nghĩa vụ {nv.ma_goc} thuộc pháp nhân khác với tài khoản ngân "
+                         f"hàng của giao dịch. Tiền của pháp nhân này không trả hộ pháp nhân kia.")
+
+    dot = None
+    if d.get("dot_id"):
+        dot = db.get(DotThanhToan, int(d["dot_id"]))
+        if not dot:
+            raise ValueError(f"Dòng {i}: không có đợt thanh toán")
+        if dot.nghia_vu_id != nv.id:
+            raise ValueError(f"Dòng {i}: đợt {dot.so_thu_tu} không thuộc nghĩa vụ {nv.ma_goc}")
+    return nv, dot, tien, str(d.get("ghi_chu") or "")[:300]
+
+
+def phan_bo_ra(db: Session, u: User, txn: BankTransaction, dong_moi: list[dict]) -> dict:
+    """Phân bổ một khoản tiền RA cho một hoặc nhiều nghĩa vụ (và đợt của chúng).
+
+    Đợt E5, 13/10/2026. Cùng khuôn với `phan_bo` của tiền vào: kiểm CẢ LÔ trước khi ghi dòng đầu,
+    huỷ chứ không xoá, số dư tính lại từ các dòng. Khác đúng một điều và đó là điều cố ý:
+    KHÔNG SINH PHIẾU THU. Phiếu thu là chứng từ của tiền vào; tiền ra đã có lệnh chi của nó, và
+    dựng thêm một chứng từ cho cùng một khoản là tạo chứng từ ma.
+    """
+    if (txn.transfer_type or "") != "out":
+        raise ValueError("Cửa này chỉ phân bổ tiền RA. Tiền vào phân bổ cho booking ở cửa kia.")
+    if not dong_moi:
+        raise ValueError("Chưa có dòng phân bổ nào")
+
+    du = con_lai(db, txn)
+    tong_moi, da_kiem, canh_bao = 0.0, [], []
+    for i, d in enumerate(dong_moi, start=1):
+        nv, dot, tien, ghi_chu = _kiem_nhanh_ra(db, txn, d, i)
+        tong_moi += tien
+        # TRẢ DƯ: CẢNH BÁO, KHÔNG CHẶN — y như luật 3 của tiền vào. Trả dư là chuyện có thật (làm
+        # tròn, trả trước đợt sau); chặn ở đây chỉ đẩy Kế toán sang ghi chú tay, và lúc ấy hệ
+        # thống mất dấu vết thay vì có thêm.
+        con = dot.con_lai() if dot is not None else nv.con_lai()
+        ten = f"{nv.ma_goc} đợt {dot.so_thu_tu}" if dot is not None else nv.ma_goc
+        if tien > con + 0.5:
+            canh_bao.append(f"{ten}: phân bổ {tien:,.0f} đ nhiều hơn số còn phải trả {con:,.0f} đ "
+                            f"– phần dư thành trả trước")
+        da_kiem.append((nv, dot, tien, ghi_chu))
+
+    if round(tong_moi, 2) > round(du, 2) + 0.5:
+        raise ValueError(f"Tổng phân bổ {tong_moi:,.0f} đ vượt số dư chưa phân bổ {du:,.0f} đ "
+                         f"của giao dịch (số tiền {abs(float(txn.amount or 0)):,.0f} đ)")
+
+    ket = []
+    for nv, dot, tien, ghi_chu in da_kiem:
+        pb = PhanBoTien(bank_txn_id=txn.id, nghia_vu_id=nv.id,
+                        dot_id=dot.id if dot is not None else None,
+                        so_tien=tien, ghi_chu=ghi_chu, boi=u.username)
+        db.add(pb)
+        _cong_da_tra(nv, dot, tien)
+        db.flush()
+        ket.append(pb)
+        R.audit(db, u.username, u.role, "phan_bo_tien_ra", f"bank:{txn.sepay_id}",
+                after={"nghia_vu": nv.ma_goc, "dot": dot.so_thu_tu if dot is not None else None,
+                       "so_tien": tien, "ghi_chu": ghi_chu})
+
+    du_moi = _cap_nhat_giao_dich(db, txn)
+    db.commit()
+    return {"da_them": len(ket), "chua_phan_bo": du_moi, "canh_bao": canh_bao,
+            "message": (f"Đã phân bổ {len(ket)} dòng. "
+                        + (f"Còn {du_moi:,.0f} đ chưa phân bổ." if du_moi > 0.5 else "Đã phân bổ hết."))}
+
+
+def _cong_da_tra(nv: NghiaVuThanhToan, dot, tien: float) -> None:
+    """Cộng tiền đã trả vào ĐỢT và vào NGHĨA VỤ. Dấu trừ để trả lại khi huỷ.
+
+    Cộng cả hai chỗ, không chỉ cộng vào đợt rồi tính tổng khi cần: `NghiaVuThanhToan.da_tra` là
+    cột mà bảng dòng tiền và sổ công nợ đang đọc từ trước Đợt E4, và một nghĩa vụ KHÔNG chia đợt
+    thì không có đợt nào để cộng. Phép thử canh hai con số khớp nhau khi có đợt.
+    """
+    nv.da_tra = round(float(nv.da_tra or 0) + tien, 2)
+    if dot is not None:
+        dot.da_tra = round(float(dot.da_tra or 0) + tien, 2)
 
 
 def phan_bo(db: Session, u: User, txn: BankTransaction, dong_moi: list[dict]) -> dict:
@@ -135,6 +253,13 @@ def huy_dong(db: Session, u: User, pb: PhanBoTien, ly_do: str) -> dict:
         raise ValueError("Phải ghi lý do huỷ – dòng đã huỷ vẫn nằm lại trong sổ để tra cứu")
 
     txn = db.get(BankTransaction, pb.bank_txn_id)
+    # Đợt E5: dòng nhánh NGHĨA VỤ không có phiếu thu, và trả tiền lại cho đợt / nghĩa vụ thay vì
+    # cho booking. Đặt TRƯỚC phần phiếu thu để không ai đọc nhầm là hai việc nối nhau.
+    if pb.nhanh() == "nghia_vu":
+        _nv = db.get(NghiaVuThanhToan, pb.nghia_vu_id)
+        _dot = db.get(DotThanhToan, pb.dot_id) if pb.dot_id else None
+        if _nv is not None:
+            _cong_da_tra(_nv, _dot, -round(float(pb.so_tien or 0), 2))
     rc = db.get(Receipt, pb.receipt_id) if pb.receipt_id else None
     pb.huy, pb.huy_boi, pb.huy_luc, pb.huy_ly_do = True, u.username, datetime.now(), ly_do.strip()[:300]
     if rc is not None:
@@ -163,9 +288,15 @@ def bang(db: Session, txn: BankTransaction) -> dict:
     """Toàn cảnh một khoản tiền: đã chia cho ai, còn lại bao nhiêu, và những dòng đã huỷ."""
     ds = []
     for pb in cac_dong(db, txn.id, ca_da_huy=True):
-        b = db.get(Booking, pb.booking_id)
+        b = db.get(Booking, pb.booking_id) if pb.booking_id else None
         rc = db.get(Receipt, pb.receipt_id) if pb.receipt_id else None
-        ds.append({"id": pb.id, "booking_id": pb.booking_id, "booking_code": b.code if b else "",
+        _nv = db.get(NghiaVuThanhToan, pb.nghia_vu_id) if pb.nghia_vu_id else None
+        _dot = db.get(DotThanhToan, pb.dot_id) if pb.dot_id else None
+        ds.append({"nhanh": pb.nhanh(),
+                   "nghia_vu_id": pb.nghia_vu_id, "nghia_vu_ma": _nv.ma_goc if _nv else "",
+                   "doi_tuong": _nv.doi_tuong if _nv else "",
+                   "dot_id": pb.dot_id, "dot_stt": _dot.so_thu_tu if _dot else None,
+                   "id": pb.id, "booking_id": pb.booking_id, "booking_code": b.code if b else "",
                    "khach": b.customer_name if b else "", "tour_code": b.tour.code if b and b.tour else "",
                    "so_tien": float(pb.so_tien or 0), "ghi_chu": pb.ghi_chu,
                    "phieu_thu": rc.code if rc else "", "boi": pb.boi, "luc": pb.luc,

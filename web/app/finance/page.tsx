@@ -213,4 +213,87 @@ function Finance() {
     </>}
   </>);
 }
-export default function Page() { return <Shell><Finance /></Shell>; }
+/** PHÂN BỔ TIỀN RA — Đợt E5, 13/10/2026. Chủ tịch duyệt hình dáng qua bản dựng thử.
+ *
+ *  Màn hình này là CỬA của một con số: từ đợt này `nghia_vu.da_tra` tăng lên nhờ người bấm ở đây,
+ *  không nhờ ai nhập tay vào cơ sở dữ liệu. Không có cửa thì con số ấy là việc còn thiếu.
+ *
+ *  Ô "đợt" để TRỐNG là hợp lệ, không phải là chưa điền xong: một nghĩa vụ không chia đợt vẫn trả
+ *  được. Nói ra ngay dưới ô, vì một ô trống không giải thích thì người dùng tưởng mình làm thiếu.
+ */
+function PhanBoRa() {
+  const { toast } = useShell();
+  const [gd, setGd] = useState<any[]>([]);
+  const [nv, setNv] = useState<any[]>([]);
+  const [chon, setChon] = useState<number | null>(null);
+  const [bang, setBang] = useState<any>(null);
+  const [dot, setDot] = useState<any[]>([]);
+  const [f, setF] = useState<any>({ nghia_vu_id: "", dot_id: "", so_tien: "", ghi_chu: "" });
+  const nap = useCallback(() => {
+    api("/bank-transactions?limit=200").then((ds: any[]) =>
+      setGd(ds.filter((t) => t.transfer_type === "out")));
+    api("/fin/nghia-vu/chi-tiet").then((r: any) =>
+      setNv((r.chi_tiet || []).filter((x: any) => x.huong === "chi")));
+  }, []);
+  useEffect(() => { nap(); }, [nap]);
+  useEffect(() => { if (chon) api(`/bank-transactions/${chon}/phan-bo`).then(setBang); }, [chon]);
+  useEffect(() => {
+    if (f.nghia_vu_id) api(`/fin/nghia-vu/${f.nghia_vu_id}/dot`).then(setDot); else setDot([]);
+  }, [f.nghia_vu_id]);
+
+  async function ghi() {
+    try {
+      const r = await api(`/bank-transactions/${chon}/phan-bo-ra`, {
+        method: "POST",
+        json: { dong: [{ nghia_vu_id: Number(f.nghia_vu_id), dot_id: f.dot_id ? Number(f.dot_id) : null,
+                         so_tien: Number(String(f.so_tien).replace(/[^\d.-]/g, "")), ghi_chu: f.ghi_chu }] },
+      });
+      toast(r.message);
+      (r.canh_bao || []).forEach((c: string) => toast(c, true));
+      setF({ nghia_vu_id: "", dot_id: "", so_tien: "", ghi_chu: "" });
+      api(`/bank-transactions/${chon}/phan-bo`).then(setBang); nap();
+    } catch (x) { toast(errMsg(x), true); }
+  }
+
+  return (<>
+    <h1>Phân bổ tiền ra — khoản chi này trả cho nghĩa vụ nào</h1>
+    <p className="muted">Một khoản chi chia được cho nhiều nghĩa vụ, và một đợt trả được bằng nhiều
+      khoản. Trả dư thì màn hình <b>cảnh báo</b> chứ không chặn — phần dư thành trả trước.</p>
+    <div className="panel wrap"><table><thead><tr><th>Ngày</th><th>Nội dung</th><th className="num">Số tiền</th><th className="num">Chưa phân bổ</th><th></th></tr></thead>
+      <tbody>{gd.map((t) => <tr key={t.id}><td>{fmtD(t.transaction_date)}</td><td>{t.content}</td>
+        <td className="num">{vnd(Math.abs(Number(t.amount || 0)))}</td>
+        <td className="num">{t.chua_phan_bo === null || t.chua_phan_bo === undefined
+          ? <span className="muted">—</span> : <b>{vnd(t.chua_phan_bo)}</b>}</td>
+        <td><button className="act" style={{ margin: 0 }} onClick={() => setChon(t.id)}>Phân bổ</button></td></tr>)}
+      </tbody></table></div>
+
+    {bang && <div className="panel">
+      <h2>Giao dịch {bang.sepay_id} · {vnd(Math.abs(bang.so_tien))} · chưa phân bổ <b>{vnd(bang.chua_phan_bo)}</b></h2>
+      <table><thead><tr><th>Nghĩa vụ</th><th>Đối tượng</th><th>Đợt</th><th className="num">Số tiền</th><th>Ghi chú</th><th>Trạng thái</th></tr></thead>
+        <tbody>{(bang.dong || []).map((d: any) => <tr key={d.id} style={{ opacity: d.huy ? 0.5 : 1 }}>
+          <td className="mono">{d.nghia_vu_ma || d.booking_code}</td><td>{d.doi_tuong || d.khach}</td>
+          <td>{d.dot_stt ?? <span className="muted">—</span>}</td>
+          <td className="num">{vnd(d.so_tien)}</td><td className="muted">{d.ghi_chu}</td>
+          <td>{d.huy ? <Tag cls="warn">huỷ: {d.huy_ly_do}</Tag> : <Tag cls="ok">đã ghi</Tag>}</td></tr>)}
+        </tbody></table>
+      <div className="grid" style={{ marginTop: 10 }}>
+        <div><label>Nghĩa vụ</label><select value={f.nghia_vu_id}
+          onChange={(e) => setF({ ...f, nghia_vu_id: e.target.value, dot_id: "" })}>
+          <option value="">— chọn —</option>
+          {nv.map((x: any) => <option key={x.id} value={x.id}>{x.ma_goc} · {x.doi_tuong} · còn {vnd(x.con_lai)}</option>)}
+        </select></div>
+        <div><label>Đợt (để trống nếu nghĩa vụ không chia đợt)</label>
+          <select value={f.dot_id} onChange={(e) => setF({ ...f, dot_id: e.target.value })}>
+            <option value="">— không chia đợt —</option>
+            {dot.filter((d: any) => !d.da_tra_du).map((d: any) =>
+              <option key={d.id} value={d.id}>Đợt {d.so_thu_tu} · hạn {fmtD(d.ngay_han)} · còn {vnd(d.con_lai)}</option>)}
+          </select></div>
+        <div><label>Số tiền</label><input value={f.so_tien} onChange={(e) => setF({ ...f, so_tien: e.target.value })} /></div>
+        <div><label>Ghi chú</label><input value={f.ghi_chu} onChange={(e) => setF({ ...f, ghi_chu: e.target.value })} /></div>
+      </div>
+      <button className="act orange" disabled={!f.nghia_vu_id || !f.so_tien} onClick={ghi}>Ghi phân bổ</button>
+    </div>}
+  </>);
+}
+
+export default function Page() { return <Shell><Finance /><PhanBoRa /></Shell>; }

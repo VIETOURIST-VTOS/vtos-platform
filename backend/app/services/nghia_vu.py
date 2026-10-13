@@ -659,6 +659,9 @@ def ba_ro(db: Session, den: date, *, co_so_ngay: str = "cam_ket",
 def dong(nv: NghiaVuThanhToan) -> dict:
     """Một dòng cho màn hình chi tiết (mục IV.2 của đề xuất – đủ 11 cột nó liệt kê)."""
     return {
+        # `id` thêm ở Đợt E5 13/10/2026: màn hình phân bổ tiền ra phải gọi cửa theo id, mà bảng
+        # này trước đó chỉ gửi `ma_goc`. Mã gốc là DANH TÍNH để người đọc, id là thứ cửa API nhận.
+        "id": nv.id,
         "ma_goc": nv.ma_goc, "nhom": nv.nhom, "nhom_ten": NHOM[nv.nhom][1], "huong": nv.huong,
         "doi_tuong": nv.doi_tuong, "noi_dung": nv.noi_dung, "tour_id": nv.tour_id,
         "tong_nghia_vu": nv.tong_nghia_vu, "da_tra": nv.da_tra, "con_lai": nv.con_lai(),
