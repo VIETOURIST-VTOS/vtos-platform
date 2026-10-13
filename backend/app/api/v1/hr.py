@@ -20,6 +20,7 @@ from app.services.access import FULL_VIEW
 from app.services import hdv as HDV
 from app.services import pham_vi_phap_nhan as PV
 from app.services import ghi_mot_lan as GML
+from app.services import quyen_ho_so as QHS
 
 router = APIRouter(prefix="/api/v1", tags=["nhan-su"])
 HR_WRITE = ("hcns", "cntt")
@@ -724,6 +725,21 @@ def assign_gio(aid: int, data: GioIn, u: User = Depends(require_roles(*DIEU_DONG
 # Vai trò lấy từ danh sách ĐÃ CÓ, không nghĩ ra vai mới.
 BC_KIEM = ("tp_hd", "hcns", "cntt")
 
+# AI ĐỌC ĐƯỢC báo cáo sau tour — Chủ tịch chốt 13/10/2026: Chủ tịch, TGĐ, Trưởng phòng Hướng dẫn và
+# Ban Kiểm soát. Cộng người KIỂM, vì người kiểm mà không đọc được thì không kiểm được gì; quyền kiểm
+# của `cntt` còn đang chờ Chủ tịch siết lại, và khi nó co thì quyền đọc ở đây co theo.
+#
+# VÌ SAO PHẢI VIẾT RA MỘT DANH SÁCH RIÊNG. Trước bản này cửa đọc khai 13 vai qua `HR_READ` nhưng
+# `_phan_cong_cua_toi` chỉ miễn kiểm sở hữu cho ba vai `BC_KIEM`, nên TÁM vai được khai tên vẫn bị
+# 403 — trong đó có Chủ tịch, TGĐ và Ban Kiểm soát. Đo được 13/10/2026 bằng cách đăng nhập thật
+# từng vai trên cây dựng từ `git archive origin/main`. Đó là một cánh cửa khóa IM LẶNG: cửa nói
+# "vai này vào được" còn thân hàm nói không, và không ai thấy cho tới khi có người thử.
+#
+# ĐỌC và SỬA là HAI CÂU HỎI, không phải một. Bốn cửa báo cáo trước đây dùng chung một cổng viết cho
+# việc GHI, nên luật của việc ghi đè lên cả việc đọc. Cổng `quyen_ho_so` tách sáu thao tác ra đúng
+# để chỗ này hỏi được riêng.
+XEM_BC = ("chutich", "tgd", "tp_hd", "bks") + tuple(v for v in BC_KIEM if v not in ("tp_hd",))
+
 
 def bc_out(db: Session, b: BaoCaoSauTour) -> dict:
     t = db.get(Tour, b.tour_id)
@@ -756,6 +772,20 @@ def _phan_cong_cua_toi(db: Session, u: User, aid: int) -> GuideAssignment:
     return a
 
 
+def _phan_cong_doc_duoc(db: Session, u: User, aid: int) -> GuideAssignment:
+    """Ai ĐỌC được báo cáo của phân công này. Khác `_phan_cong_cua_toi`, vốn trả lời câu hỏi của
+    việc GHI: ai được nộp báo cáo này.
+
+    Hướng dẫn viên vẫn chỉ đọc được của chính mình — cổng so theo HỒ SƠ NHÂN SỰ chứ không theo tên,
+    và không tra ra người thì TỪ CHỐI chứ không bỏ qua phép so.
+    """
+    a = db.get(GuideAssignment, aid)
+    if not a:
+        raise HTTPException(404, "Không có phân công")
+    QHS.kiem(db, u, "xem", a.guide_id, XEM_BC)
+    return a
+
+
 class BaoCaoIn(BaseModel):
     chuong_trinh_thuc_hien: str = ""
     so_khach_thuc_te: int | None = None
@@ -766,8 +796,8 @@ class BaoCaoIn(BaseModel):
 
 
 @router.get("/guide-assignments/{aid}/bao-cao")
-def bc_doc(aid: int, u: User = Depends(require_roles(*HR_READ, "nv_dh", "tp_hd", "hdv")), db: Session = Depends(get_db)):
-    a = _phan_cong_cua_toi(db, u, aid)
+def bc_doc(aid: int, u: User = Depends(require_roles(*XEM_BC, "hdv")), db: Session = Depends(get_db)):
+    a = _phan_cong_doc_duoc(db, u, aid)
     # P6 – hàng rào phạm vi pháp nhân, khai ở PHAI_LOC. Khai mà không nối thì hàng rào chưa bật.
     q = PV.loc(select(BaoCaoSauTour).where(BaoCaoSauTour.assignment_id == a.id)
                .order_by(BaoCaoSauTour.ban_so), BaoCaoSauTour, u)
