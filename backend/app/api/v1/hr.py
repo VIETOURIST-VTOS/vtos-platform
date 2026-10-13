@@ -21,6 +21,7 @@ from app.services import hdv as HDV
 from app.services import pham_vi_phap_nhan as PV
 from app.services import ghi_mot_lan as GML
 from app.services import quyen_ho_so as QHS
+from app.services import ks_tach_nhiem as KTN
 
 router = APIRouter(prefix="/api/v1", tags=["nhan-su"])
 HR_WRITE = ("hcns", "cntt")
@@ -758,6 +759,20 @@ XEM_BC = ("chutich", "tgd", "tp_hd", "bks") + tuple(v for v in BC_KIEM if v not 
 # tra ra người là TỪ CHỐI, không phải bỏ qua phép so.
 KIEM_PHAI_DINH_DANH = ("tp_hd",)
 
+# PHẠM VI của cặp xung đột «người nộp ≠ người xác nhận» — Đợt HD-8, 13/10/2026.
+#
+# Khai thành hàm chứ không gõ chuỗi tại hai nơi gọi: gõ tay thì một ngày nào đó có người viết
+# "pc: " thừa dấu cách, hai dấu chân rơi vào hai phạm vi khác nhau, cặp không bao giờ khớp — và
+# hàng rào trông như đang chạy mà thật ra đã tắt. Đúng lý do `models/tach_nhiem.py` gom mã bước
+# vào một bảng thay vì rải chuỗi.
+#
+# Khoá theo PHÂN CÔNG chứ không theo bản báo cáo: nộp bản 2 sau khi bị trả lại vẫn là cùng một
+# việc, và người xác nhận vẫn phải khác người nộp.
+
+
+def _pv_bao_cao(a: GuideAssignment) -> str:
+    return f"pc:{a.id}"
+
 # `hcns` và `cntt` — kiểm thay được, NHƯNG KHÔNG ĐƯỢC MIỄN ĐỊNH DANH (Chủ tịch, 13/10/2026). Hai vai
 # ấy hôm nay thường chưa có hồ sơ nhân sự, nên bắt buộc ngay hôm nay là khóa luôn họ ra khỏi cửa
 # kiểm và phòng Hướng dẫn mất người xác nhận lúc Trưởng phòng vắng.
@@ -914,6 +929,9 @@ def bc_gui(aid: int, data: BcGui, u: User = Depends(require_roles(*HR_READ, "nv_
     b.trang_thai, b.nop_luc, b.nguoi_nop = "da_gui", datetime.now(), u.username
     GML.tang_phien_ban(b)
     HDV.dong_bo_co_bao_cao(db, a)
+    # Dấu chân để lại SAU khi bước đã xong, đúng quy ước của `ks_tach_nhiem`: ghi trước rồi mới
+    # kiểm là tự tạo dấu chân cho một bước chưa xảy ra.
+    KTN.ghi_buoc(db, _pv_bao_cao(a), "nop_bao_cao_tour", u)
     R.audit(db, u.username, u.role, "gui_bao_cao_tour", f"assign:{a.id}", after={"ban_so": b.ban_so})
     db.commit()
     return {"message": f"Đã gửi bản {b.ban_so}. Nội dung khoá lại; muốn sửa thì gửi bản mới.",
@@ -965,6 +983,22 @@ def bc_kiem(aid: int, data: BcKiem, u: User = Depends(require_roles(*BC_KIEM)), 
     if b is None or b.trang_thai != "da_gui":
         raise HTTPException(422, "Không có bản nào đang chờ kiểm")
     dinh_danh = _khong_tu_kiem(db, u, a)
+
+    # LỚP THỨ HAI, và nó trả lời một câu KHÁC với lớp trên. `_khong_tu_kiem` hỏi "tài khoản đang
+    # bấm có phải hồ sơ của hướng dẫn viên chuyến này không" — một tài khoản, một hồ sơ. Lớp dưới
+    # đây hỏi "NGƯỜI này đã nộp chính bản báo cáo ấy chưa", và nó nhận ra người qua MÃ NHÂN VIÊN,
+    # nên nó thấy được cả hai tài khoản của cùng một người.
+    #
+    # CHƯA CHẶN, và đó là chỗ Chủ tịch chốt 13/10/2026 (phương án A của câu D2): mức của cặp để
+    # trống, nên `muc_do()` trả về `canh_bao_cho_qua` và `cap_chua_dat_muc()` đếm cặp ấy lên. Khi
+    # Chủ tịch đặt mức `canh_bao_va_chan` thì chỗ này chặn thật mà không phải sửa một dòng nào —
+    # `kq["chan"]` tự thành True.
+    kq_tn = KTN.kiem(db, _pv_bao_cao(a), "kiem_bao_cao_tour", u)
+    if kq_tn["chan"]:
+        raise HTTPException(403, {"gate": "TACH_NHIEM",
+                                  "message": kq_tn["vi_pham"][0]["thong_diep"] if kq_tn["vi_pham"]
+                                             else kq_tn["thong_diep_thieu_ma"],
+                                  "vi_pham": kq_tn["vi_pham"]})
     GML.kiem_phien_ban(b, data.phien_ban, f"Báo cáo tour bản {b.ban_so}", lambda: bc_out(db, b))
     if not data.xac_nhan and not (data.y_kien or "").strip():
         raise HTTPException(422, "Trả lại phải ghi rõ thiếu gì – không ghi thì người nộp phải đoán")
@@ -972,15 +1006,23 @@ def bc_kiem(aid: int, data: BcKiem, u: User = Depends(require_roles(*BC_KIEM)), 
     b.nguoi_kiem, b.kiem_luc, b.y_kien_kiem = u.username, datetime.now(), (data.y_kien or "")[:2000]
     GML.tang_phien_ban(b)
     HDV.dong_bo_co_bao_cao(db, a)
+    KTN.ghi_buoc(db, _pv_bao_cao(a), "kiem_bao_cao_tour", u)
     R.audit(db, u.username, u.role, "kiem_bao_cao_tour", f"assign:{a.id}",
             # `dinh_danh` là mã hồ sơ của người kiểm, hoặc `khong_tra_duoc` khi vai kiểm thay chưa
             # nối hồ sơ. Đếm được số lần thứ hai xảy ra chính là thứ Chủ tịch cần để đặt ngày bắt
             # buộc — và nó phải nằm trong nhật ký chứ không phải trong một con số đếm rời, vì nhật
             # ký là chỗ duy nhất nói được AI đã kiểm chuyến NÀO mà chưa ai biết là ai.
-            after={"ban_so": b.ban_so, "ket_qua": b.trang_thai, "dinh_danh": dinh_danh})
+            # `tach_nhiem` ghi lại CẢ KHI KHÔNG CHẶN. Một vi phạm cho qua mà không ai đếm thì
+            # bằng không có hàng rào; đếm được chính là thứ Chủ tịch cần để đặt mức sau này.
+            after={"ban_so": b.ban_so, "ket_qua": b.trang_thai, "dinh_danh": dinh_danh,
+                   "tach_nhiem": [v["ma_cap"] for v in kq_tn["vi_pham"]] or None})
     db.commit()
     return {"message": "Đã xác nhận – gỡ treo chào chuyến và treo thù lao cho phân công này"
-                       if data.xac_nhan else "Đã trả lại kèm lý do – phân công vẫn còn nợ báo cáo"}
+                       if data.xac_nhan else "Đã trả lại kèm lý do – phân công vẫn còn nợ báo cáo",
+            # Nói ra vi phạm NGAY TRÊN MÀN HÌNH, không chỉ chôn trong nhật ký. Một cảnh báo mà
+            # người bấm không thấy thì nó chỉ cảnh báo cho tương lai, không cảnh báo cho ai đang ở
+            # đây.
+            "tach_nhiem": kq_tn["vi_pham"] or None}
 
 
 @router.post("/guide-assignments/{aid}/bao-cao/ban-moi", status_code=201)

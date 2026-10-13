@@ -58,6 +58,10 @@ BUOC = {
     "lap_but_toan": "Lập bút toán",
     "ghi_so": "Ghi sổ bút toán",
     "khoa_so_ky": "Khóa sổ kỳ kế toán",
+    # Báo cáo sau tour (api/v1/hr.py) — Đợt HD-8, 13/10/2026. Phạm vi khoá theo PHÂN CÔNG
+    # (`pc:<id>`), vì cả hai bước đều xảy ra trên đúng một phân công.
+    "nop_bao_cao_tour": "Nộp báo cáo sau tour",
+    "kiem_bao_cao_tour": "Xác nhận báo cáo sau tour",
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════
@@ -96,6 +100,20 @@ CAP_DA_KY = (
                  "vào kỳ mà tự khóa kỳ ấy là tự niêm phong việc của chính mình.",
         "nguoi_ky": "chutich",
         "can_cu": "Chủ tịch ký 09/10/2026 — cặp xung đột thứ hai.",
+    },
+    {
+        "ma_cap": "nop-bao-cao-tour-vs-kiem",
+        "buoc_a": "nop_bao_cao_tour",
+        "buoc_b": "kiem_bao_cao_tour",
+        "ten": "Người nộp báo cáo sau tour ≠ người xác nhận",
+        "mo_ta": "Trưởng phòng Hướng dẫn vừa quản lý vừa đi dẫn tour — có thật ở Vietourist. Tự "
+                 "nộp rồi tự xác nhận thì cái kiểm ấy không kiểm gì cả. Cửa `bc_kiem` đã có một "
+                 "phép chặn theo HỒ SƠ từ Đợt HD-7, nhưng phép ấy chỉ thấy MỘT tài khoản; cặp này "
+                 "thấy cả hai tài khoản của cùng một người, vì nó so theo mã nhân viên.",
+        "nguoi_ky": "chutich",
+        "can_cu": "Chủ tịch chốt 13/10/2026 — cặp xung đột thứ ba, phương án (a). MỨC ĐỂ TRỐNG "
+                  "như hai cặp ký 09/10: chạy ở 'cảnh báo nhưng cho qua' và BỊ ĐẾM LÊN, tới khi "
+                  "Chủ tịch đặt mức.",
     },
 )
 

@@ -80,16 +80,19 @@ def test_a1_hai_bang_bat_dau_rong():
         db.close()
 
 
-def test_a2_nap_cap_da_ky_dung_hai_dong_va_chay_lai_duoc():
+def test_a2_nap_cap_da_ky_du_so_dong_va_chay_lai_duoc():
     from app.models.tach_nhiem import CAP_DA_KY
     db = _db()
     try:
         _dọn(db)
         them = KTN.nap_cap_da_ky(db)
         assert sorted(them) == sorted(d["ma_cap"] for d in CAP_DA_KY)
-        assert db.query(CapTachNhiem).count() == len(CAP_DA_KY) == 2
+        # Đếm theo CAP_DA_KY, không theo một con số viết cứng: con số ấy đúng hôm 09/10 khi
+        # bảng có hai cặp, và sai ngay hôm Chủ tịch ký cặp thứ ba. Đếm theo nguồn thì phép
+        # thử vẫn bắt được đúng cái nó sinh ra để bắt — hàm nạp bỏ sót hoặc dựng trùng.
+        assert db.query(CapTachNhiem).count() == len(CAP_DA_KY)
         assert KTN.nap_cap_da_ky(db) == [], "Nạp lần hai không được dựng thêm dòng nào."
-        assert db.query(CapTachNhiem).count() == 2
+        assert db.query(CapTachNhiem).count() == len(CAP_DA_KY)
     finally:
         db.close()
 
@@ -107,7 +110,7 @@ def test_a3_khong_dong_nao_duoc_thieu_chu_ky():
         db.close()
 
 
-def test_a4_hai_cap_da_ky_de_TRONG_muc_do():
+def test_a4_moi_cap_da_ky_deu_de_TRONG_muc_do():
     """Chủ tịch ký SỰ TỒN TẠI của cặp, chưa ký MỨC. Tự đặt 'chặn' hộ là đúng lỗi đã phải sửa."""
     db = _db()
     try:
@@ -117,12 +120,14 @@ def test_a4_hai_cap_da_ky_de_TRONG_muc_do():
             assert c.muc_do is None, (
                 f"Cặp {c.ma_cap} bị đặt sẵn mức `{c.muc_do}` — không ai ký mức ấy.")
             assert KTN.muc_do(c) == MUC_DO_KHI_CHUA_KHAI
-        assert len(KTN.cap_chua_dat_muc(db)) == 2, "Chưa đặt mức thì phải bị đếm lên."
+        from app.models.tach_nhiem import CAP_DA_KY
+        assert len(KTN.cap_chua_dat_muc(db)) == len(CAP_DA_KY), \
+            "Chưa đặt mức thì phải bị đếm lên — mọi cặp, không riêng hai cặp đầu."
     finally:
         db.close()
 
 
-def test_a5_hai_cap_da_ky_tro_dung_ma_buoc_co_that():
+def test_a5_moi_cap_da_ky_tro_dung_ma_buoc_co_that():
     from app.models.tach_nhiem import BUOC, CAP_DA_KY
     for d in CAP_DA_KY:
         for k in ("buoc_a", "buoc_b"):
