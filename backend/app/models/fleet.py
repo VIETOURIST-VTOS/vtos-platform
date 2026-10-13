@@ -121,6 +121,36 @@ class FleetVerification(Base):
 # phí, không phải suy ra từ loại chi phí lúc quyết toán: cùng một loại chi phí có thể do hai bên chịu tùy
 # hợp đồng, và suy ra lúc quyết toán là lúc không còn ai nhớ để cãi.
 BEN_CHIU = {"vietourist_tam_ung": "Vietourist tạm ứng", "chu_xe": "Chủ xe tự chịu"}
+
+# QT-1 (13/10/2026) — AI BỎ TIỀN RA TẠI CHỖ. Trục KHÁC HẲN `ben_chiu` ở trên.
+#
+# `ben_chiu` trả lời "Vietourist hay CHỦ XE hợp tác gánh khoản này" — dùng để cấn trừ công nợ chủ
+# xe ngoài. Tờ quyết toán chuyến của tài xế hỏi một câu khác: tiền ấy LÚC ẤY ai móc túi ra. Hai câu
+# trùng nhau ở phần lớn trường hợp nên rất dễ gộp, và gộp là hỏng: một khoản Vietourist chịu
+# (`ben_chiu`) vẫn có thể do TÀI XẾ ứng tiền mặt rồi công ty hoàn lại.
+#
+# Đo trên hai bộ hồ sơ thật 13/10/2026: dầu trả bằng thẻ NAPAS mang tên "HOLDINGS/VIETOURIST",
+# ePass trừ thẳng tài khoản công ty, còn vé gửi xe là giấy thu tiền mặt tài xế tự trả. Đó đúng là
+# hai tổng "TỔNG TÀI XẾ CHI" và "TỔNG CÔNG TY CHI" trên Mẫu 2.
+#
+# KHÔNG suy trục này từ `kind`. Lý lẽ ở ngay chú thích `ben_chiu` phía trên và áp y nguyên: cùng
+# một loại chi phí có thể do hai bên trả tùy chuyến, và suy ra lúc quyết toán là lúc không còn ai
+# nhớ để cãi. Rỗng nghĩa là CHƯA AI KHAI — không mặc định về bên nào.
+TRA_BANG = {"tai_xe_tien_mat": "Tài xế ứng tiền mặt",
+            "the_cong_ty": "Thẻ của công ty",
+            "tai_khoan_cong_ty": "Trừ tài khoản công ty (ePass, chuyển khoản)"}
+# Hai tổng của Mẫu 2 suy từ bảng này, không phải từ hai ô người gõ. Ô cộng ra mà cho gõ là ô có thể
+# gõ sai: tờ quyết toán 50F-034.71 ngày 07–11/10/2026 ghi "TỔNG TÀI XẾ CHI 1.360.000" trong khi
+# công thức in ngay cạnh nó cho 360.000 — người viết cộng nhầm cả công tác phí, mà công tác phí đã
+# nằm ở tổng bên dưới. Tổng cuối vẫn đúng, chỉ ô giữa sai, nên không ai thấy.
+TRA_BANG_TAI_XE = ("tai_xe_tien_mat",)
+
+# Tuyến ký của tờ quyết toán chuyến — Mẫu 2, Chủ tịch chọn 13/10/2026. Tài xế ký trên giấy rồi Đội
+# xe nhập hộ, nên bước đầu của tuyến điện tử là ĐIỀU HÀNH.
+QT_BUOC = ("dieu_hanh", "ke_toan", "tgd")
+QT_TRANG_THAI = {"nhap": "Đội xe đang nhập", "cho_dieu_hanh": "Chờ Điều hành ký",
+                 "cho_ke_toan": "Chờ Kế toán ký", "cho_tgd": "Chờ Tổng giám đốc ký",
+                 "da_duyet": "Đã duyệt đủ chữ ký", "tra_lai": "Trả lại để sửa"}
 COST_KINDS = {"dau": "Nhiên liệu", "cong_tac_phi": "Công tác phí tài xế", "giu_xe": "Phí giữ/bãi xe",
               "cau_duong": "Phí cầu đường", "sua_chua": "Sửa chữa, bảo dưỡng", "khac": "Khác"}
 # Mặc định dự phòng khi chưa có tham số trong cơ sở dữ liệu. Nguồn thật là `xe_sua_chua_ben_chiu`.
@@ -251,6 +281,29 @@ class Trip(Base):
     # một báo cáo hai lần không sinh ra 92 chuyến thứ hai – và để mỗi dòng còn truy ngược được về phiếu gốc.
     ma_phieu: Mapped[str | None] = mapped_column(String(60), nullable=True, unique=True)
     nguon: Mapped[str] = mapped_column(String(40), default="nhap_tay")
+    # ── QT-1 (13/10/2026): bảy ô của Mẫu 2 mà bảng chuyến chưa có chỗ giữ ──────────────────────
+    # Tạm ứng / hoàn trả / chi thêm là tiền ĐI QUA TAY tài xế, không phải chi phí của chuyến: cộng
+    # chúng vào giá vốn là đếm hai lần. Giữ riêng, và chúng chỉ dùng để tính tài xế còn nợ hay còn
+    # được nhận. Phụ thu là khoản khách trả thêm tại chỗ — cũng không phải chi phí.
+    tam_ung: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    hoan_tra: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    chi_them: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    phu_thu: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    hdv: Mapped[str] = mapped_column(String(80), default="")
+    hanh_trinh: Mapped[str] = mapped_column(String(200), default="")
+    bc_tinh_trang_xe: Mapped[str] = mapped_column(Text, default="")
+    # Tuyến ký bốn bước của Mẫu 2. Ghi AI ký và LÚC NÀO cho từng bước, không chỉ một trạng thái:
+    # một trạng thái "đã duyệt" không trả lời được câu "ai duyệt" vào đúng lúc cần hỏi.
+    qt_trang_thai: Mapped[str] = mapped_column(String(20), default="nhap", index=True)
+    qt_nhap_boi: Mapped[str] = mapped_column(String(50), default="")
+    qt_nhap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    qt_dieu_hanh: Mapped[str] = mapped_column(String(50), default="")
+    qt_dieu_hanh_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    qt_ke_toan: Mapped[str] = mapped_column(String(50), default="")
+    qt_ke_toan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    qt_tgd: Mapped[str] = mapped_column(String(50), default="")
+    qt_tgd_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    qt_tra_lai_ly_do: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     created_by: Mapped[str] = mapped_column(String(50), default="")
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -268,6 +321,9 @@ class TripCost(Base):
     lit: Mapped[float] = mapped_column(Float, default=0)               # chỉ dùng cho nhiên liệu
     chung_tu: Mapped[str] = mapped_column(String(200), default="")     # mã/đường dẫn chứng từ gốc
     nguon: Mapped[str] = mapped_column(String(40), default="nhap_tay")  # nhap_tay / the_dau / epass / ocr
+    # QT-1: khóa của TRA_BANG. Rỗng = chưa ai khai, KHÔNG mặc định về bên nào — xem chú thích ở
+    # TRA_BANG để biết vì sao không suy từ `kind`.
+    tra_bang: Mapped[str] = mapped_column(String(24), default="")
     ref_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # id giao dịch nguồn nếu khớp tự động
     note: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

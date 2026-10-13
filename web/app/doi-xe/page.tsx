@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import DinhKem from "@/components/DinhKem";
+import QuyetToanChuyen from "@/components/QuyetToanChuyen";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -236,6 +237,10 @@ function DoiXe() {
         tieuDe={`Chứng từ của phiếu chuyến #${form.id}`}
         goi={"Ảnh hóa đơn dầu, vé cầu đường, phiếu gửi xe, ảnh đồng hồ km. Chứng từ nằm cùng phiếu thì " +
              "đến kỳ quyết toán không phải đi tìm, và người duyệt nhìn thấy đúng thứ họ đang duyệt."} />}
+      {/* QT-1 · tờ quyết toán Mẫu 2 đặt NGAY SAU khối đính kèm và NGAY TRÊN biểu phiếu chuyến: người
+          nhập cầm tờ giấy trong tay, đính ảnh rồi khai luôn ai trả, không phải đi tìm sang tab khác.
+          Chỉ hiện với phiếu ĐÃ CÓ số: chưa lưu phiếu thì chưa có gì để quyết toán. */}
+      {form?.id && <QuyetToanChuyen tripId={form.id} toast={toast} />}
       {form && <div className="panel">
         <h2>{form.id ? `Sửa phiếu chuyến #${form.id}` : "Phiếu chi phí xe – nhập mới"}</h2>
         <p className="muted">Đúng bộ trường của phiếu trên Vietrip. Ô để trống nghĩa là <b>chưa có số</b>, không phải bằng 0 –
