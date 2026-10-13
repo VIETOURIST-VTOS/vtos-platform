@@ -307,7 +307,7 @@ def ket_luan(xid: int, data: KetLuanIn, u: User = Depends(require_roles(*WRITE))
 # ====================== ĐỢT 2: NHẬT TRÌNH, BẢO DƯỠNG, NGUỒN NGOÀI ======================
 from app.models.fleet import (Trip, TripCost, Maintenance, ExternalTxn, BEN_CHIU, COST_KINDS, NGUON_NGOAI,
                               BEN_CHIU_MAC_DINH, TRIP_STATUS, CO, MAINT_KINDS, VI_EPASS, KM_NGUON,
-                              NGA_CHI_PHI, NGA_CUA_DOI_XE)
+                              NGA_CHI_PHI, NGA_CUA_DOI_XE, TRA_BANG)
 
 KETOAN = ("ketoan",)
 
@@ -369,6 +369,13 @@ def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict) -> dict:
             "chi_phi": [{"id": c.id, "kind": c.kind, "kind_ten": COST_KINDS.get(c.kind, c.kind),
                          "amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu,
                          "ben_chiu_ten": BEN_CHIU.get(c.ben_chiu, c.ben_chiu), "chung_tu": c.chung_tu,
+                         # `ben_chiu` tra loi AI GANH khoan nay khi quyet toan voi chu xe hop tac.
+                         # `tra_bang` tra loi AI BO TIEN RA TAI CHO. Hai cau hoi khac nhau: xe cua
+                         # Vietourist thi ben_chiu luon la Vietourist, nhung tien dau co the la tai
+                         # xe ung tien mat, the cong ty, hay tru thang tai khoan (ePass). Mau 2 tach
+                         # "TONG TAI XE CHI" voi "TONG CONG TY CHI" theo cau hoi THU HAI.
+                         "tra_bang": c.tra_bang or "",
+                         "tra_bang_ten": TRA_BANG.get(c.tra_bang or "", ""),
                          "nguon": c.nguon} for c in cps],
             "tong_chi_vietourist": sum((c.amount or 0) for c in cps if c.ben_chiu == "vietourist_tam_ung"),
             "tong_chi_chu_xe": sum((c.amount or 0) for c in cps if c.ben_chiu == "chu_xe")}
@@ -419,6 +426,7 @@ class ChiPhiIn(BaseModel):
     kind: str
     amount: float
     ben_chiu: str | None = None
+    tra_bang: str | None = None       # ai bo tien ra tai cho - de trong nghia la CHUA KHAI
     lit: float = 0
     chung_tu: str = ""
     nguon: str = "nhap_tay"
@@ -435,10 +443,13 @@ def them_chi_phi(tid: int, data: ChiPhiIn, u: User = Depends(require_roles(*WRIT
     if data.kind not in COST_KINDS: raise HTTPException(422, f"Loại chi phí không hợp lệ. Chỉ nhận {', '.join(COST_KINDS)}")
     bc = data.ben_chiu or _mac_dinh_ben_chiu(db, data.kind)
     if bc not in BEN_CHIU: raise HTTPException(422, f"Bên chịu không hợp lệ. Chỉ nhận {', '.join(BEN_CHIU)}")
+    if (data.tra_bang or "") and data.tra_bang not in TRA_BANG:
+        raise HTTPException(422, f"Trả bằng không hợp lệ. Chỉ nhận {', '.join(TRA_BANG)}")
     nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
     if (data.amount or 0) >= nguong and not (data.chung_tu or "").strip():
         raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc có chứng từ gốc đính kèm (chặn cứng B6)")
-    c = TripCost(trip_id=tid, **{**data.model_dump(exclude={"ben_chiu"}), "ben_chiu": bc}, created_by=u.username)
+    c = TripCost(trip_id=tid, **{**data.model_dump(exclude={"ben_chiu"}), "ben_chiu": bc,
+                                 "tra_bang": data.tra_bang or ""}, created_by=u.username)
     db.add(c); db.flush()
     kt = FL.kiem_chuyen(db, t); t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
     R.audit(db, u.username, u.role, "chi_phi_chuyen", f"trip:{tid}", after={**data.model_dump(mode="json"), "ben_chiu": bc})
@@ -533,6 +544,7 @@ class SuaChiPhiIn(BaseModel):
     amount: float | None = None
     lit: float | None = None
     ben_chiu: str | None = None
+    tra_bang: str | None = None
     chung_tu: str | None = None
     note: str | None = None
 
@@ -544,10 +556,12 @@ def sua_chi_phi(tid: int, cid: int, data: SuaChiPhiIn,
     t = db.get(Trip, tid); c = db.get(TripCost, cid)
     if not t or not c or c.trip_id != tid: raise HTTPException(404, "Không có dòng chi phí này trong chuyến")
     if t.status == "da_xac_nhan": raise HTTPException(422, "Chuyến đã xác nhận – mở lại rồi mới sửa được")
-    truoc = {"amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu}
+    truoc = {"amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu, "tra_bang": c.tra_bang}
     d = data.model_dump(exclude_none=True)
     if "ben_chiu" in d and d["ben_chiu"] not in BEN_CHIU:
         raise HTTPException(422, f"Bên chịu không hợp lệ. Chỉ nhận {', '.join(BEN_CHIU)}")
+    if d.get("tra_bang") and d["tra_bang"] not in TRA_BANG:
+        raise HTTPException(422, f"Trả bằng không hợp lệ. Chỉ nhận {', '.join(TRA_BANG)}")
     for k, v in d.items(): setattr(c, k, v)
     nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
     if (c.amount or 0) >= nguong and not (c.chung_tu or "").strip():
@@ -1902,3 +1916,126 @@ def tao_de_xuat_chi(data: DeXuatChiIn, u: User = Depends(require_roles(*WRITE, *
     R.audit(db, u.username, u.role, "de_xuat_chi_xe", f"de_xuat:{ma}", after=data.model_dump(mode="json"))
     db.commit()
     return {"ma_gd": ma, "message": f"Đã lập đề xuất chi {ma} – {data.so_tien:,.0f} đ"}
+
+
+# ══════════════════ QT-1 · QUYẾT TOÁN CHUYẾN THEO MẪU 2 (13/10/2026) ══════════════════
+#
+# Tài xế ký trên GIẤY rồi gửi Zalo về Đội xe; Đội xe nhập hộ (Chủ tịch chọn 13/10/2026). Nên cửa
+# ghi mở cho Đội xe, còn ba cửa KÝ mở theo đúng vai của từng bước — khai một chỗ ở
+# `quyet_toan_chuyen.VAI_KY`, không khai lại ở đây.
+QT_GHI = ("cntt", "gd_doi_xe", "tp_dh", "nv_dh")
+QT_XEM = READ
+# Mọi vai ký được BẤT KỲ bước nào — bước nào của ai thì `quyet_toan_chuyen.co_the_ky` xét, và nó
+# xét cả thứ tự nữa. Hàng rào vai ở đây chỉ chặn người hoàn toàn ngoài tuyến; khai lại từng bước ở
+# đây là dựng chỗ cho hai bảng vai nói khác nhau.
+from app.services.quyet_toan_chuyen import VAI_KY as _VAI_KY   # noqa: E402
+QT_KY = tuple(sorted({v for ds in _VAI_KY.values() for v in ds}))
+
+
+class QuyetToanIn(BaseModel):
+    hdv: str | None = None
+    hanh_trinh: str | None = None
+    km_dau: int | None = None
+    km_cuoi: int | None = None
+    km_tour_tren_giay: int | None = None     # con số VIẾT TAY trên tờ giấy – nguồn thứ hai để đối chiếu
+    tam_ung: float | None = None
+    hoan_tra: float | None = None
+    chi_them: float | None = None
+    phu_thu: float | None = None
+    bc_tinh_trang_xe: str | None = None
+
+
+class KyIn(BaseModel):
+    buoc: str
+
+
+class TraLaiIn(BaseModel):
+    ly_do: str
+
+
+def _chuyen(db: Session, tid: int):
+    from app.models.fleet import Trip
+    t = db.get(Trip, tid)
+    if t is None:
+        raise HTTPException(404, "Không có chuyến này")
+    return t
+
+
+@router.get("/quyet-toan-chuyen/{tid}")
+def qt_xem(tid: int, km_tour_tren_giay: int | None = None,
+           u: User = Depends(require_roles(*QT_XEM)), db: Session = Depends(get_db)):
+    from app.services import quyet_toan_chuyen as QT
+    t = _chuyen(db, tid)
+    o = QT.xem(db, t)
+    if km_tour_tren_giay is not None:
+        o["diem_lech"] = QT.kiem(db, t, km_tour_tren_giay=km_tour_tren_giay)
+    # Man hinh KHONG chep lai bang vai. Chep lai la dung hai bang vai, va hai bang vai thi som muon
+    # cung noi khac nhau: nut hien ra roi bam vao an 403, hoac nut an di trong khi nguoi ay ky duoc.
+    # `buoc_ky_duoc` do chinh `co_the_ky` sinh ra - cung ham ma cua ky goi khi ghi that.
+    o["quyen"] = {
+        "ghi": u.role in QT_GHI and (t.qt_trang_thai or "nhap") in ("nhap", "tra_lai"),
+        "ky": u.role in QT_KY,
+        "buoc_ky_duoc": [b for b in QT.QT_BUOC if QT.co_the_ky(t, b, u.role) == ""],
+        "vi_sao_chua_ky": {b: QT.co_the_ky(t, b, u.role) for b in QT.QT_BUOC
+                           if QT.co_the_ky(t, b, u.role)},
+    }
+    return o
+
+
+@router.put("/quyet-toan-chuyen/{tid}")
+def qt_ghi(tid: int, data: QuyetToanIn, u: User = Depends(require_roles(*QT_GHI)),
+           db: Session = Depends(get_db)):
+    from app.services import quyet_toan_chuyen as QT
+    t = _chuyen(db, tid)
+    if t.qt_trang_thai not in ("nhap", "tra_lai"):
+        raise HTTPException(422, f"Tờ này đang ở '{QT.QT_TRANG_THAI.get(t.qt_trang_thai, '?')}' – "
+                                 f"trả lại trước thì mới sửa được")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        if k == "km_tour_tren_giay":
+            continue
+        setattr(t, k, v)
+    R.audit(db, u.username, u.role, "qt_chuyen_ghi", f"chuyen:{tid}",
+            after=data.model_dump(mode="json", exclude_unset=True))
+    db.commit()
+    return qt_xem(tid, data.km_tour_tren_giay, u, db)
+
+
+@router.post("/quyet-toan-chuyen/{tid}/gui")
+def qt_gui(tid: int, u: User = Depends(require_roles(*QT_GHI)), db: Session = Depends(get_db)):
+    from app.services import quyet_toan_chuyen as QT
+    t = _chuyen(db, tid)
+    try:
+        kq = QT.gui_di(db, t, u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    R.audit(db, u.username, u.role, "qt_chuyen_gui", f"chuyen:{tid}", after=kq)
+    db.commit()
+    return kq
+
+
+@router.post("/quyet-toan-chuyen/{tid}/ky")
+def qt_ky(tid: int, data: KyIn, u: User = Depends(require_roles(*QT_KY)),
+          db: Session = Depends(get_db)):
+    from app.services import quyet_toan_chuyen as QT
+    t = _chuyen(db, tid)
+    try:
+        kq = QT.ky(db, t, data.buoc, u.username, u.role)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    R.audit(db, u.username, u.role, "qt_chuyen_ky", f"chuyen:{tid}", after={"buoc": data.buoc, **kq})
+    db.commit()
+    return kq
+
+
+@router.post("/quyet-toan-chuyen/{tid}/tra-lai")
+def qt_tra_lai(tid: int, data: TraLaiIn, u: User = Depends(require_roles(*QT_KY)),
+               db: Session = Depends(get_db)):
+    from app.services import quyet_toan_chuyen as QT
+    t = _chuyen(db, tid)
+    try:
+        kq = QT.tra_lai(db, t, data.ly_do, u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    R.audit(db, u.username, u.role, "qt_chuyen_tra_lai", f"chuyen:{tid}", after=kq)
+    db.commit()
+    return kq
