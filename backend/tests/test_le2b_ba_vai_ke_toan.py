@@ -62,6 +62,10 @@ CHO_DA_KHAI_BA_VAI = [
     #   của cửa điều khoản thanh toán, cùng bộ vai với Kế toán. Đợt E4a thêm mà quên khai, nên
     #   phép thử f1 đỏ trên main từ 12/10 — lại đúng việc nó sinh ra để làm. Khai nốt ở Đợt DỌN-1.
     "api/v1/routes.py: ketoan_truong",
+    # `api/v1/routes.py` — Đợt E4a 12/10/2026: Kế toán trưởng nằm trong hai bộ vai XEM và TRÌNH
+    #   của cửa điều khoản thanh toán, cùng bộ vai với Kế toán. Đợt E4a thêm mà quên khai, nên
+    #   phép thử f1 đỏ trên main từ 12/10 — lại đúng việc nó sinh ra để làm. Khai nốt ở Đợt DỌN-1.
+    "api/v1/routes.py: ketoan_truong",
     # ── Đợt LG1, 11/10/2026 ───────────────────────────────────────────────────────────────
     # Hai cửa ĐỌC công nợ mở cho Kế toán thanh toán. Đây là cặp lệch thứ 29 của Đợt E2b:
     # `/cong-no` mở trên bảng MÀN HÌNH mà `debts.READ` và `cong_no_vietrip.XEM` không có

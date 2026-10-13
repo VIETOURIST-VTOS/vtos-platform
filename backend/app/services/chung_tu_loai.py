@@ -100,6 +100,16 @@ NGHIEP_VU: dict[str, tuple[str, str]] = {
     # Đặt tên riêng cho từng chân vừa cho khoá phân biệt được, vừa làm sổ đọc ra đúng việc đã làm.
     "tra_goc_vay":              ("Trả gốc khoản vay (chân trả của đáo hạn)",           "PKT"),
     "nhan_giai_ngan_vay":       ("Nhận giải ngân khoản vay (chân nhận của đáo hạn)",   "PKT"),
+    # ĐÁO HẠN LÀ HAI BÚT TOÁN, nên nó là HAI nghiệp vụ — Đợt DỌN-1, 13/10/2026.
+    #
+    # Trả gốc khoản cũ và nhận giải ngân khoản mới cùng thuộc MỘT khế ước, cùng một mã nguồn, nên
+    # dưới một tên nghiệp vụ chung thì khoá ba phần coi chân thứ hai là bản sao của chân thứ nhất
+    # và chặn. Bù trừ hai chân thành một dòng thì dư nợ vay không bao giờ đứng ở đỉnh và dòng tiền
+    # mất hẳn một vòng ra–vào — cả hai đều là số công bố của công ty đại chúng, nên gộp là sai sổ.
+    #
+    # Đặt tên riêng cho từng chân vừa cho khoá phân biệt được, vừa làm sổ đọc ra đúng việc đã làm.
+    "tra_goc_vay":              ("Trả gốc khoản vay (chân trả của đáo hạn)",           "PKT"),
+    "nhan_giai_ngan_vay":       ("Nhận giải ngân khoản vay (chân nhận của đáo hạn)",   "PKT"),
     "khe_uoc_tai_chinh":        ("Khế ước tài chính khác – đầu tư, ký quỹ, đặt cọc",   "PKT"),
 }
 
