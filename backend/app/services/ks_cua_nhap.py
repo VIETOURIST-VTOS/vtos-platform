@@ -249,6 +249,13 @@ MAY_SINH = {
     "su_kien_thu_nhap": "Sổ ghi khoản thu nhập đã KÝ, do services/luong_khoa.khoa ghi đúng lúc có chữ ký. Không có cửa là TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: gõ tay được vào sổ này thì xoá được dấu vết một lần đã trả, mà đó đúng là thứ nó sinh ra để giữ.",
     "buoc_da_lam": "Dấu chân tách bạch trách nhiệm — hệ thống tự ghi đúng lúc một bước nghiệp vụ hoàn thành. KHÔNG có cửa nhập tay là TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: gõ tay được vào sổ này thì dựng được một dấu chân cho một bước chưa ai làm, mà đó đúng là thứ nó sinh ra để chống.",
     "ai_runs": "Nhật ký robot chạy – hệ thống tự ghi, không ai nhập tay.",
+    # Đợt E7 13/10/2026. KHÔNG CÓ CỬA NHẬP TAY LÀ MỘT TÍNH CHẤT AN TOÀN, không phải việc còn
+    # thiếu — đúng hình với `bang_luong_khoa` ở dưới. Gõ tay được số cuối của một ký hiệu thì lùi
+    # được bộ cấp số, và lùi bộ cấp số là cấp lại một số đã in ra giấy, tức làm ra hai tờ hóa đơn
+    # mang một số. Đó đúng là thứ bảng này sinh ra để chống.
+    "so_nhay_hoa_don": "Số cuối đã CẤP của từng ký hiệu hóa đơn, do services/hoa_don_so.cap_so "
+                       "tăng đúng lúc cấp số. Gõ tay được vào đây là lùi được bộ cấp số, tức cấp "
+                       "lại một số đã in ra giấy — hai tờ hóa đơn mang một số.",
     "ks_bao_cao": "Báo cáo robot Kiểm soát tự lập.",
     "ks_cot_tien": "Cột tiền robot Kiểm soát tự dựng từ sổ.",
     "ks_diem": "Điểm chấm tự tính, không nhập tay.",

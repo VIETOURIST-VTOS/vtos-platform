@@ -30,7 +30,9 @@ def invoice_out(i: Invoice, db: Session) -> dict:
             "booking_id": i.booking_id, "booking_code": b.code if b else "", "tour_code": b.tour.code if b and b.tour else "",
             "customer_name": i.customer_name, "customer_tax_code": i.customer_tax_code, "customer_address": i.customer_address, "description": i.description,
             "pre_tax": i.pre_tax, "vat_rate": i.vat_rate, "vat": i.vat, "total": i.total, "status": i.status, "provider": i.provider, "provider_ref": i.provider_ref,
-            "entry_id": i.entry_id, "created_by": i.created_by, "issued_by": i.issued_by, "issued_at": i.issued_at}
+            "entry_id": i.entry_id, "created_by": i.created_by, "issued_by": i.issued_by, "issued_at": i.issued_at,
+            # Đợt E7: màn hình cần biết tờ nào đang treo và treo từ lúc nào, để hiện màu vàng.
+            "issue_sent_at": i.issue_sent_at}
 
 
 @router.get("/accounts")
@@ -158,15 +160,56 @@ def create_invoice(data: InvoiceIn, u: User = Depends(require_roles("ketoan")), 
     return {"invoice": invoice_out(inv, db), "message": "Đã lập hóa đơn nháp – kiểm tra rồi phát hành"}
 
 
+# ĐỢT E7 13/10/2026 — mã việc của MỘT lần bấm. Màn hình sinh một mã cho một lần bấm và gửi kèm;
+# bấm hai lần gửi CÙNG một mã, và lần hai nhận lại ĐÚNG kết quả lần một.
+class IssueIn(BaseModel):
+    ma_viec: str = ""
+
+
 @router.post("/invoices/{iid}/issue")
-def issue(iid: int, u: User = Depends(require_roles("ketoan")), db: Session = Depends(get_db)):
+def issue(iid: int, data: IssueIn = IssueIn(), u: User = Depends(require_roles("ketoan")),
+          db: Session = Depends(get_db)):
+    from app.services import hoa_don_so as _HDS
+    # CHỐNG GỌI HAI LẦN, vế thứ nhất: mã việc này phát hành rồi thì trả lại ĐÚNG kết quả lần ấy —
+    # không phát hành lại, và cũng KHÔNG báo lỗi. Người bấm hai lần không làm gì sai và không cần
+    # nhận một câu báo lỗi; họ cần thấy tờ hóa đơn của mình.
+    cu = _HDS.tim_theo_ma_viec(db, data.ma_viec)
+    if cu:
+        return {"invoice": invoice_out(cu, db), "lap_lai": True,
+                "message": f"Lần bấm này đã được xử lý rồi — hóa đơn {cu.series}-{cu.number:07d}. "
+                           f"Không phát hành thêm tờ nào."}
     inv = db.get(Invoice, iid)
     if not inv: raise HTTPException(404, "Không có hóa đơn")
     try:
-        ACC.issue_invoice(db, u, inv)
+        ACC.issue_invoice(db, u, inv, data.ma_viec)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"invoice": invoice_out(inv, db), "message": f"Đã phát hành {inv.series}-{inv.number:07d}, mã tra cứu {inv.provider_ref}"}
+
+
+@router.post("/invoices/{iid}/do-lai")
+def do_lai_hoa_don(iid: int, u: User = Depends(require_roles("ketoan")),
+                   db: Session = Depends(get_db)):
+    """Hỏi nhà cung cấp xem tờ đang treo đã ra chưa. KHÔNG gửi lại, chỉ HỎI.
+
+    Cùng vai với cửa phát hành: người phát hành là người đi hỏi. Nằm DƯỚI tiền tố `/invoices` đã
+    khai nên PHẠM_VI_ĐÃ_CHỐT không đổi một số nào.
+    """
+    from app.services import hoa_don_so as _HDS
+    inv = db.get(Invoice, iid)
+    if not inv: raise HTTPException(404, "Không có hóa đơn")
+    try:
+        kq = _HDS.do_lai(db, u, inv)
+    except _HDS.SaiPhatHanh as ex:
+        raise HTTPException(422, str(ex))
+    return {"invoice": invoice_out(inv, db), **kq}
+
+
+@router.get("/invoices/so-nhay")
+def so_nhay(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Sổ số hóa đơn: số cuối đã cấp của từng ký hiệu, và DÃY SỐ CÓ LIÊN TỤC KHÔNG."""
+    from app.services import hoa_don_so as _HDS
+    return _HDS.bang_so_nhay(db)
 
 
 @router.post("/invoices/{iid}/cancel")

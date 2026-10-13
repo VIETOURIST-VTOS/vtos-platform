@@ -1,6 +1,6 @@
 """Kế toán theo Thông tư 99/2025/TT-BTC: hệ thống tài khoản, chứng từ ghi sổ, hóa đơn điện tử, khóa kỳ."""
 from datetime import datetime, date
-from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON, event
+from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, Text, ForeignKey, JSON, Index, event, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 from app.models.kieu_tien import TIEN
@@ -120,6 +120,21 @@ class JournalLine(Base):
 class Invoice(Base):
     """Hóa đơn điện tử GTGT (mẫu 01/GTGT). Phát hành qua nhà cung cấp HĐĐT – bản pilot dùng adapter nội bộ."""
     __tablename__ = "invoices"
+    # ĐỢT E7 13/10/2026 — HAI CHỈ MỤC DUY NHẤT, và chúng là HÀNG RÀO THỨ HAI của việc chống phát
+    # hành hai lần. Hàng rào thứ nhất là mã việc do màn hình sinh; nhưng một hàng rào chỉ ở màn
+    # hình là không có hàng rào nào — robot gọi thẳng API, một bản vá sau này viết sai, hay hai
+    # người cùng phát hành hai hóa đơn khác nhau trong một giây đều không đi qua nó. Hai dòng dưới
+    # đây đổ ở tầng thấp nhất, chỗ không đường nào lách được.
+    #
+    # ĐIỀU KIỆN `number > 0` LÀ BẮT BUỘC, không phải tối ưu: mọi hóa đơn NHÁP mang `number = 0`
+    # theo giá trị mặc định của cột, nên một chỉ mục duy nhất KHÔNG điều kiện sẽ đổ ngay ở tờ nháp
+    # thứ hai. Khai cả hai phương ngữ vì máy chủ chạy Postgres còn phép thử chạy SQLite, và một
+    # hàng rào chỉ có ở một trong hai nơi là hàng rào không ai đo được.
+    __table_args__ = (
+        Index("ux_invoices_issue_request_id", "issue_request_id", unique=True),
+        Index("ux_invoices_series_number", "series", "number", unique=True,
+              postgresql_where=text("number > 0"), sqlite_where=text("number > 0")),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     series: Mapped[str] = mapped_column(String(20), default="1C26TVT")    # ký hiệu
     number: Mapped[int] = mapped_column(Integer, default=0)                # số hóa đơn (cấp khi phát hành)
@@ -134,7 +149,14 @@ class Invoice(Base):
     vat_rate: Mapped[float] = mapped_column(Float, default=0.1)
     vat: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     total: Mapped[float | None] = mapped_column(TIEN, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="nhap")       # nhap / da_phat_hanh / huy
+    # ĐỢT E7 13/10/2026 — TRẠNG THÁI THỨ TƯ `dang_phat_hanh`, nằm GIỮA nháp và đã phát hành.
+    # Nó là trạng thái "KHÔNG BIẾT", không phải "thất bại": hệ thống biết mình đã gửi và không
+    # biết bên kia đã nhận. Coi cái thứ nhất là cái thứ hai rồi phát hành lại chính là cách làm
+    # ra hóa đơn trùng, nên tờ ở trạng thái này chỉ ra khỏi đó qua cửa DÒ LẠI.
+    status: Mapped[str] = mapped_column(String(20), default="nhap")       # nhap / dang_phat_hanh / da_phat_hanh / huy
+    # Mã việc của MỘT lần bấm, do màn hình sinh. Chỉ mục duy nhất ở trên là thứ làm nó có tác dụng.
+    issue_request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    issue_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     provider: Mapped[str] = mapped_column(String(30), default="noi_bo")   # noi_bo / viettel / vnpt / misa…
     provider_ref: Mapped[str] = mapped_column(String(80), default="")     # mã tra cứu / mã CQT
     entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

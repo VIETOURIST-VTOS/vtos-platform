@@ -7,6 +7,7 @@ import json
 from datetime import date, datetime
 from pathlib import Path
 from sqlalchemy import select, func, desc
+from sqlalchemy.exc import IntegrityError          # Đợt E7 – hàng rào thứ hai của cửa phát hành
 from sqlalchemy.orm import Session
 from app.models.core import Tour, Booking, User
 from app.models.payments import Receipt
@@ -289,13 +290,37 @@ def on_settlement_confirmed(db: Session, t: Tour, actor: str, role: str) -> list
 
 # ---------- Hóa đơn điện tử ----------
 class LocalInvoiceProvider:
-    """Adapter mặc định: cấp số nội bộ. Khi ký hợp đồng HĐĐT (Viettel/VNPT/MISA meInvoice…) thay bằng adapter gọi API nhà cung cấp."""
+    """Adapter mặc định: cấp số nội bộ. Khi ký hợp đồng HĐĐT (Viettel/VNPT/MISA meInvoice…) thay bằng adapter gọi API nhà cung cấp.
+
+    ĐỢT E7 13/10/2026 — HAI THAY ĐỔI TRONG GIAO ƯỚC CỦA Ô CẮM NÀY.
+
+    1. `issue` KHÔNG CÒN CẤP SỐ. Bản cũ cấp số bằng `max(Invoice.number) + 1`, và phép ấy sai hai
+       cách: hai lần gọi cùng lúc cùng đọc một số lớn nhất nên cùng ra một số, và một tờ đã hủy
+       mang số cuối thì số ấy được cấp lại — hai tờ khác nhau, một số, tờ trước đã trong tay
+       khách. Số nay do `services/hoa_don_so.cap_so` cấp từ một bảng CHỈ TĂNG, và `issue` nhận số
+       ấy vào. Nhà cung cấp thật nào tự cấp số thì adapter của họ trả về số của họ.
+    2. `tra_cuu` LÀ PHÉP MỚI VÀ BẮT BUỘC. Ngày cắm adapter thật, một lần gọi có thể đứt giữa
+       đường: hệ thống biết mình đã gửi và không biết bên kia đã nhận. `tra_cuu` là cửa ĐI HỎI,
+       và nó phải trả về được cả câu "CHƯA BIẾT" — coi "không biết" là "thất bại" rồi phát hành
+       lại chính là cách làm ra hóa đơn trùng.
+    """
     name = "noi_bo"
 
-    def issue(self, db: Session, inv: Invoice) -> tuple[int, str]:
-        last = db.execute(select(func.max(Invoice.number)).where(Invoice.series == inv.series)).scalar() or 0
-        n = last + 1
-        return n, f"LOCAL-{inv.series}-{n:07d}"
+    def issue(self, db: Session, inv: Invoice, so: int) -> str:
+        """Nhận số đã cấp, trả về mã tra cứu. Bộ nội bộ không gọi ra ngoài nên không bao giờ treo."""
+        return f"LOCAL-{inv.series}-{so:07d}"
+
+    def tra_cuu(self, db: Session, inv: Invoice) -> tuple[str, int, str]:
+        """(kết quả, số, mã tra cứu). Bộ nội bộ LUÔN biết: số đã cấp thì tờ ấy đã ra.
+
+        Bộ này không gọi ra ngoài nên trạng thái "đang phát hành" thực tế không xảy ra với nó.
+        Trả về `da_ra` chứ không trả `chua_biet`: nói "chưa biết" khi mình biết là nói sai, và
+        một tờ treo vĩnh viễn vì bộ cấp số nội bộ giả vờ không biết là một tờ không ai gỡ được.
+        """
+        from app.services.hoa_don_so import CHUA_RA, DA_RA
+        if (inv.number or 0) > 0:
+            return DA_RA, inv.number, inv.provider_ref or f"LOCAL-{inv.series}-{inv.number:07d}"
+        return CHUA_RA, 0, ""
 
 
 PROVIDER = LocalInvoiceProvider()
@@ -316,18 +341,76 @@ def create_invoice(db: Session, u: User, b: Booking, vat_rate: float | None, tax
     return inv
 
 
-def issue_invoice(db: Session, u: User, inv: Invoice) -> Invoice:
+def issue_invoice(db: Session, u: User, inv: Invoice, ma_viec: str = "") -> Invoice:
+    """Phát hành hóa đơn — ĐỢT E7 13/10/2026, viết lại theo bốn điều Chủ tịch chốt.
+
+    BA BƯỚC, VÀ THỨ TỰ BA BƯỚC LÀ TOÀN BỘ ĐỢT NÀY.
+
+    Bản cũ làm mọi việc trong MỘT giao dịch rồi `commit` một lần ở cuối. Nghe thì an toàn, và nó
+    an toàn đúng tới dòng gọi nhà cung cấp: lời gọi ấy đi RA KHỎI cơ sở dữ liệu, nên `rollback`
+    không gỡ được nó. Gọi xong mà máy chủ chết thì sổ không có một dấu vết nào của lần gọi ấy —
+    và lần bấm sau là tờ thứ hai, trên một hóa đơn vẫn đang là "nháp".
+
+    Nên: GHI DẤU VẾT TRƯỚC, GỌI SAU. Mỗi bước `commit` một lần, và mỗi lần `commit` là một điều
+    hệ thống sẽ còn biết nếu nó chết ngay sau đó.
+    """
+    from app.services import hoa_don_so as _HDS
+
+    if inv.status == "dang_phat_hanh":
+        raise ValueError(
+            f"Hóa đơn này đã gửi lúc {inv.issue_sent_at:%d/%m/%Y %H:%M} và CHƯA biết kết quả. "
+            f"Đừng phát hành lại — bấm DÒ LẠI để hỏi nhà cung cấp xem tờ ấy đã ra chưa. Phát hành "
+            f"lại một tờ có thể đã ra là cách làm ra hai hóa đơn cho một lần bán.")
     if inv.status != "nhap":
         raise ValueError("Hóa đơn không ở trạng thái nháp")
     if is_locked(db, period_of(date.today())):
         raise ValueError("Kỳ hiện tại đã khóa")
-    inv.number, inv.provider_ref = PROVIDER.issue(db, inv)
-    inv.provider, inv.issue_date, inv.status = PROVIDER.name, date.today(), "da_phat_hanh"
-    inv.issued_by, inv.issued_at = u.username, datetime.now()
+
+    # ── BƯỚC 1: MÃ VIỆC, SỐ, VÀ TRẠNG THÁI "ĐANG PHÁT HÀNH" — commit TRƯỚC khi gọi ra ngoài ──
+    #
+    # Số cấp ở ĐÂY, trước lời gọi, chứ không sau: một tờ đang treo mà không có số thì khoảng
+    # trống nó để lại trong dãy số không quy được về tờ nào, và đúng câu kiểm toán hỏi — *số nào
+    # nhảy mất, vì sao* — lại thành câu không trả lời được. Số đã cấp là số đã tiêu.
+    ma_viec = (ma_viec or "").strip() or _HDS.ma_viec_moi()
+    so = _HDS.cap_so(db, inv.series, u.username)
+    inv.issue_request_id = ma_viec
+    inv.issue_sent_at = datetime.now()
+    inv.number, inv.status = so, "dang_phat_hanh"
+    inv.provider, inv.issued_by, inv.issued_at = PROVIDER.name, u.username, datetime.now()
+    try:
+        db.commit()
+    except IntegrityError:
+        # HÀNG RÀO THỨ HAI VỪA BẮT. Hai lần gọi cùng một mã việc, hoặc hai hóa đơn cùng một số:
+        # chỉ mục duy nhất ở cơ sở dữ liệu đổ, và nó đổ ở tầng mà không đường nào lách được.
+        db.rollback()
+        cu = _HDS.tim_theo_ma_viec(db, ma_viec)
+        if cu:
+            return cu
+        raise ValueError(
+            "Hai lần phát hành va nhau ở cơ sở dữ liệu (một số hóa đơn đã có chủ). Không tờ nào "
+            "được cấp sai số. Tải lại danh sách rồi bấm phát hành lần nữa.")
+
+    # ── BƯỚC 2: GỌI NHÀ CUNG CẤP ───────────────────────────────────────────────────────────────
+    try:
+        ref = PROVIDER.issue(db, inv, so)
+    except Exception as ex:
+        # KHÔNG TỰ GỌI LẠI, và KHÔNG trả hóa đơn về nháp: lời gọi đã đi ra, nên "thất bại" ở đây
+        # chỉ nghĩa là KHÔNG BIẾT. Tờ nằm lại ở "đang phát hành", màu vàng trên màn hình, chờ
+        # người bấm DÒ LẠI.
+        R.audit(db, u.username, u.role, "phat_hanh_hoa_don_chua_biet_ket_qua",
+                f"invoice:{inv.series}-{so}", after={"loi": str(ex)[:300], "ma_viec": ma_viec})
+        db.commit()
+        raise ValueError(
+            f"Đã gửi hóa đơn số {so} sang nhà cung cấp nhưng KHÔNG nhận được trả lời ({ex}). "
+            f"Hóa đơn đang ở trạng thái ĐANG PHÁT HÀNH — bấm DÒ LẠI để hỏi xem tờ ấy đã ra chưa. "
+            f"Hệ thống cố ý không tự gửi lại.")
+
+    # ── BƯỚC 3: NHẬN KẾT QUẢ, GHI SỔ ──────────────────────────────────────────────────────────
+    inv.provider_ref, inv.issue_date, inv.status = ref, date.today(), "da_phat_hanh"
     db.flush()
     e = on_invoice_issued(db, inv)
     inv.entry_id = e.id
-    R.audit(db, u.username, u.role, "phat_hanh_hoa_don", f"invoice:{inv.series}-{inv.number}", after={"tong": (inv.total or 0), "ma_tra_cuu": inv.provider_ref, "chung_tu": e.code})
+    R.audit(db, u.username, u.role, "phat_hanh_hoa_don", f"invoice:{inv.series}-{inv.number}", after={"tong": (inv.total or 0), "ma_tra_cuu": inv.provider_ref, "chung_tu": e.code, "ma_viec": ma_viec})
     db.commit(); db.refresh(inv)
     return inv
 
