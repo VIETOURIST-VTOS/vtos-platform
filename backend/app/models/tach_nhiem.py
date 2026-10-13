@@ -126,6 +126,28 @@ CAP_DA_KY = (
 # ══════════════════════════════════════════════════════════════════════════════════════════
 VAI_TIEN = ("ketoan", "ketoan_truong", "ketoan_tt", "thu_quy", "chutich", "tgd")
 
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# VAI NGOÀI TIỀN CŨNG PHẢI CÓ MÃ — Đợt HD-9, Chủ tịch chốt 13/10/2026 (câu D1 = phương án A).
+#
+# `VAI_TIEN` là danh sách vai BỊ CHẶN khi thiếu mã. Đợt E2a cố ý KHÔNG nới nó, và lý do còn
+# nguyên giá trị: nới ra là chặn `hcns` ở những bước họ không hề làm — xem
+# `vai_can_ma_de_phep_do_thay`.
+#
+# `tp_hd` KHÁC `hcns` ở đúng một điểm, và điểm ấy quyết định: Trưởng phòng Hướng dẫn LÀM CẢ HAI
+# BƯỚC của một cặp xung đột có thật — vừa dẫn tour nên nộp báo cáo, vừa là người xác nhận báo
+# cáo (cặp `nop-bao-cao-tour-vs-kiem`, Chủ tịch ký 13/10/2026). Thiếu mã thì hai tài khoản của
+# cùng một người thành hai người, và cặp ấy không bắt được gì. Chặn đúng người làm cả hai bước
+# không phải là chặn oan — đó chính là việc của luật này.
+#
+# KHÔNG KHÓA AI HÔM NAY. Danh sách này đi qua cùng một công tắc theo ngày
+# (`KHOA_BAT_BUOC_MA_NV`) như vai tiền: tham số rỗng thì chỉ ĐẾM và liệt kê cho HCNS đi điền,
+# chưa chặn. Chủ tịch đặt ngày khi dữ liệu đã đủ.
+VAI_BAO_CAO_TOUR = ("tp_hd",)
+
+# Danh sách CHẶN đầy đủ. Giữ `VAI_TIEN` nguyên nghĩa thay vì nhét `tp_hd` vào đó: tên biến ấy
+# được nhắc trong năm tệp khác, và một cái tên nói sai là một cái bẫy cho người đọc sau.
+VAI_PHAI_CO_MA_NV = VAI_TIEN + VAI_BAO_CAO_TOUR
+
 # Tên tham số bật ngày hiệu lực của luật "vai tiền phải có mã nhân viên".
 # RỖNG = CHƯA TỚI NGÀY: đếm và liệt kê, chưa chặn ai. Lý do phải có tham số chứ không bật
 # thẳng: đo trên bộ dữ liệu mẫu, KHÔNG tài khoản nào có mã nhân viên — bật thẳng hôm nay là
