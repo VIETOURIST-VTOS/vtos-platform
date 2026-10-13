@@ -155,6 +155,16 @@ GIU_DONG: dict[tuple[str, str], str] = {
         "ký, chỉ là không tự trình — và nó TỰ BIẾN MẤT nếu bảng chữ ký đổi lại thành hai vai, vì "
         "điều kiện có vế `len(can_ky_tham_so) == 1`.",
 
+    ("api/v1/routes.py", "trinh_dieu_khoan"):
+        "Đợt E4a, Chủ tịch chốt 12/10/2026: điều khoản thanh toán đi MỘT chữ ký Chủ tịch. Cộng với "
+        "luật NGƯỜI TRÌNH KHÔNG TỰ KÝ, Chủ tịch tự trình một điều khoản là hồ sơ KHÔNG AI KÝ ĐƯỢC "
+        "— nên cửa trình chặn ngay, kèm lời nhắn nhờ Kế toán / HCNS / CNTT trình. Cùng một lẽ và "
+        "cùng một hình với `propose_param` ở trên: đây là TÁCH BẠCH TRÁCH NHIỆM, không phải phân "
+        "quyền, và chính Chủ tịch chọn giữ luật ấy. Chặn này KHÔNG làm ông mất quyền quyết — ông "
+        "vẫn ký — và nó TỰ BIẾN MẤT nếu bảng chữ ký đổi thành hai vai, vì điều kiện có vế "
+        "`len(can) == 1`. Đợt E4a dựng cửa này mà quên khai vào đây, nên bộ kiểm toàn quyền đỏ "
+        "trên main từ 12/10 đến 13/10; Đợt DỌN-1 khai nốt.",
+
     ("services/chu_ky.py", "kiem_tra_nguoi_ky"):
         "Bộ kiểm chữ ký nhiều vai dùng chung (Phụ lục 27/8/2026 mục 3.2). Ở cửa này Chủ tịch VỐN ĐÃ "
         "nằm trong danh sách được ký – nó không chặn ai vì vai trò. Thứ nó chặn là MỘT NGƯỜI KÝ THAY "

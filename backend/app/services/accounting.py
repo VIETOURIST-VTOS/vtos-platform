@@ -111,6 +111,33 @@ def _next_code(db: Session, prefix: str, d: date) -> str:
     return tiep_theo(db, JournalEntry, f"{prefix}{d:%y%m}-", 4)
 
 
+def cho_ve_huu(db: Session, e, hau_to: str = ":old") -> None:
+    """Cho một chứng từ VỀ HƯU: đổi mã nguồn, và THU HỒI luôn khoá sự kiện của nó.
+
+    Đợt DỌN-1, 13/10/2026 — vá một chỗ hỏng của Đợt E3.
+
+    `khoa_su_kien` là một cột GHI MỘT LẦN lúc lập chứng từ, không phải một phép tính đọc lại từ
+    `source_ref`. Nên khi một nơi đổi tên mã nguồn để cho chứng từ cũ về hưu — `misa.py` làm đúng
+    thế ở hai chỗ, khi nạp lại dữ liệu và khi nạp lại mốc kiểm toán — thì cột khoá KHÔNG đổi
+    theo. Chứng từ đã về hưu vẫn giữ chỗ khoá, và lần ghi mới đâm vào chính nó: `replace=true`
+    của cửa chốt sổ kiểm toán trả về 422 kể từ Đợt E3 (12/10/2026).
+
+    Khoá của một chứng từ đã về hưu phải là RỖNG chứ không phải một giá trị khác: NULL không va
+    nhau trong chỉ mục duy nhất, còn một chuỗi `...:old` thì vẫn chiếm chỗ và sẽ va với lần về
+    hưu thứ hai của cùng sự kiện ấy.
+
+    Gom BA việc vào MỘT hàm có tên, vì rời ra thì nơi thứ ba sẽ quên một vế — y như hai nơi hiện
+    có đã quên vế thứ hai. Việc thứ ba là `flush`: phiên làm việc của hệ thống đặt
+    `autoflush=False`, nên một thay đổi chưa đẩy xuống thì câu truy vấn ngay sau đó KHÔNG THẤY.
+    Thiếu đúng dòng ấy, `import_opening_balance` vẫn trả 422 dù khoá đã được thu hồi trong bộ nhớ
+    — đo được 13/10/2026, và `import_audited_checkpoint` thoát nạn chỉ vì tình cờ có sẵn một
+    `db.flush()` ở dòng sau. Một hàm đúng nhờ tình cờ là một hàm sẽ sai ở nơi gọi thứ ba.
+    """
+    e.source_ref = f"{e.source_ref}{hau_to}"
+    e.khoa_su_kien = None
+    db.flush()
+
+
 def post_entry(db: Session, actor: str, role: str, entry_date: date, description: str, lines: list[dict],
                source_type: str = "thu_cong", source_ref: str = "", tour_id: int | None = None, post: bool = True,
                nghiep_vu: str = "but_toan_tay", ngay_chung_tu: date | None = None) -> JournalEntry:

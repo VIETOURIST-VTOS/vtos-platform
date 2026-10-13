@@ -210,7 +210,7 @@ def import_opening_balance(db: Session, u: User, tb: bytes, as_of: date, column:
     for e in old:   # đảo đúng ngày số dư (không phải hôm nay) để số dư tại as_of không bị nhân đôi
         rl = [{"account": l.account_code, "debit": l.credit, "credit": l.debit, "partner": l.partner, "partner_code": l.partner_code, "note": f"Đảo {e.code} – nhập lại số dư"} for l in e.lines]
         r = ACC.post_entry(db, u.username, u.role, as_of, f"Đảo {e.code}: nhập lại số dư đầu kỳ", rl, "dao", f"entry:{e.code}", nghiep_vu="but_toan_dao")
-        e.reversed_by_id = r.id; e.source_ref = f"{ref}:old"
+        e.reversed_by_id = r.id; ACC.cho_ve_huu(db, e)
     obj = {}
     if objects:
         for o in parse_object_balances(objects):
@@ -291,7 +291,7 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
     for e in (*old_close, *old_adj):
         rl = [{"account": l.account_code, "debit": l.credit, "credit": l.debit, "partner": l.partner, "partner_code": l.partner_code, "note": f"Đảo {e.code} – nạp lại mốc kiểm toán"} for l in e.lines]
         r = ACC.post_entry(db, u.username, u.role, as_of, f"Đảo {e.code}: nạp lại mốc kiểm toán", rl, "dao", f"entry:{e.code}", nghiep_vu="but_toan_dao")
-        e.reversed_by_id = r.id; e.source_ref = f"{e.source_ref}:old"
+        e.reversed_by_id = r.id; ACC.cho_ve_huu(db, e)
     db.flush()
 
     # 1) Kết chuyển doanh thu/chi phí còn dư (chưa kết chuyển 911) đến as_of, để 420 (LNST chưa PP)
