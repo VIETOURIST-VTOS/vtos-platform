@@ -1,7 +1,7 @@
 """Đợt E5 13/10/2026 — phân bổ tiền RA: nới `phan_bo_tien` sang nghĩa vụ và đợt.
 
 Revision ID: e5b1c2d3e4f5
-Revises: e4a1b2c3d4e5
+Revises: qt1f3a8c6e2b94 (Đợt E5b 13/10/2026 nối lại mạch; bản đầu khai e4a1b2c3d4e5)
 Create Date: 2026-10-13
 
 BA VIỆC, VÀ KHÔNG VIỆC NÀO ĐỘNG VÀO DỮ LIỆU ĐANG CÓ:
