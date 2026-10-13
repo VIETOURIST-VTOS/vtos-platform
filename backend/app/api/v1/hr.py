@@ -741,6 +741,61 @@ BC_KIEM = ("tp_hd", "hcns", "cntt")
 XEM_BC = ("chutich", "tgd", "tp_hd", "bks") + tuple(v for v in BC_KIEM if v not in ("tp_hd",))
 
 
+# AI KIỂM ĐƯỢC BÁO CÁO, VÀ ĐIỀU KIỆN KÈM THEO — Chủ tịch chốt 13/10/2026, phương án (a).
+#
+# TRƯỚC NGÀY NÀY CỬA KIỂM TỰ TẮT KHI KHÔNG TRA RA NGƯỜI. Nguyên văn dòng cũ:
+#
+#     e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+#     if e is not None and e.id == a.guide_id:
+#         raise HTTPException(403, "Không tự kiểm báo cáo của chính mình")
+#
+# Tài khoản người kiểm chưa nối hồ sơ thì vế đầu sai, và CẢ phép kiểm biến mất — không lỗi, không
+# dòng nhật ký, chỉ là một hàng rào không chạy. Cách đó 129 dòng, `_phan_cong_cua_toi` làm ngược
+# lại là từ chối. Hai mặc định ngược nhau trong cùng một tệp, và cái sai là cái im lặng.
+#
+# `tp_hd` — BẮT BUỘC ĐỊNH DANH. Trưởng phòng Hướng dẫn là người thật, có hồ sơ nhân sự, và CŨNG ĐI
+# DẪN TOUR. Đó đúng là người mà phép "không tự kiểm báo cáo của chính mình" sinh ra để chặn. Không
+# tra ra người là TỪ CHỐI, không phải bỏ qua phép so.
+KIEM_PHAI_DINH_DANH = ("tp_hd",)
+
+# `hcns` và `cntt` — kiểm thay được, NHƯNG KHÔNG ĐƯỢC MIỄN ĐỊNH DANH (Chủ tịch, 13/10/2026). Hai vai
+# ấy hôm nay thường chưa có hồ sơ nhân sự, nên bắt buộc ngay hôm nay là khóa luôn họ ra khỏi cửa
+# kiểm và phòng Hướng dẫn mất người xác nhận lúc Trưởng phòng vắng.
+#
+# Đây đúng cái bẫy `tach_nhiem.py` đã gặp ở Đợt E2a và đã có lời giải: khai luật, ĐẾM vi phạm, chưa
+# chặn ai, cho tới khi dữ liệu HCNS đủ và Chủ tịch đặt ngày (`tach_nhiem_bat_buoc_ma_nv_tu`). Ở đây
+# làm y như vậy: kiểm thay mà không tra ra người thì ĐI QUA nhưng để lại dấu
+# `dinh_danh: "khong_tra_duoc"` trong nhật ký. Cho qua mà có người đếm thì được; cho qua trong im
+# lặng thì không.
+#
+# CÒN NỢ, ghi ra để người sau không tưởng đã xong: (1) quyền kiểm thay của `cntt` phải là quyền CẤP
+# RIÊNG (`UserGrant`) chứ không phải suy từ vai — "quyền quản trị kỹ thuật không tự sinh quyền
+# duyệt"; (2) hai tài khoản của CÙNG MỘT NGƯỜI vẫn là tự duyệt, và phép ấy phải mượn lớp tách bạch
+# trách nhiệm đã có (`ks_tach_nhiem`) chứ không dựng lại. Cả hai chờ Chủ tịch chốt cách định danh
+# người và ký cặp xung đột — bảng `cap_tach_nhiem` có luật mỗi dòng phải có người ký, nên không ai
+# được ghi hộ.
+
+
+def _khong_tu_kiem(db: Session, u: User, a: GuideAssignment) -> str:
+    """Người đang kiểm có phải chính hướng dẫn viên của chuyến không. Trả về MÃ HỒ SƠ đã định danh,
+    hoặc chuỗi `khong_tra_duoc` khi là vai kiểm thay chưa nối hồ sơ — chỗ gọi ghi nó vào nhật ký.
+
+    Ném khi là chính người ấy. Không có đường trả về "có vẻ không phải".
+    """
+    if u.role in KIEM_PHAI_DINH_DANH:
+        e = QHS.ho_so_cua(db, u)          # không tra ra người là NÉM, không phải bỏ qua phép so
+        if e.id == a.guide_id:
+            raise HTTPException(403, "Không tự kiểm báo cáo của chính mình")
+        return e.code
+    e = QHS.ho_so_cua_hoac_rong(db, u)    # vẫn ném khi hai đường nối trỏ hai người
+    if e is None:
+        return "khong_tra_duoc"
+    if e.id == a.guide_id:
+        # Đổi sang vai kiểm thay KHÔNG vượt được chặn này: phép so đi theo HỒ SƠ, không theo vai.
+        raise HTTPException(403, "Không tự kiểm báo cáo của chính mình")
+    return e.code
+
+
 def bc_out(db: Session, b: BaoCaoSauTour) -> dict:
     t = db.get(Tour, b.tour_id)
     return {"id": b.id, "phien_ban": b.phien_ban, "assignment_id": b.assignment_id,
@@ -909,9 +964,7 @@ def bc_kiem(aid: int, data: BcKiem, u: User = Depends(require_roles(*BC_KIEM)), 
     b = HDV.ban_dang_xet(db, a.id)
     if b is None or b.trang_thai != "da_gui":
         raise HTTPException(422, "Không có bản nào đang chờ kiểm")
-    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
-    if e is not None and e.id == a.guide_id:
-        raise HTTPException(403, "Không tự kiểm báo cáo của chính mình")
+    dinh_danh = _khong_tu_kiem(db, u, a)
     GML.kiem_phien_ban(b, data.phien_ban, f"Báo cáo tour bản {b.ban_so}", lambda: bc_out(db, b))
     if not data.xac_nhan and not (data.y_kien or "").strip():
         raise HTTPException(422, "Trả lại phải ghi rõ thiếu gì – không ghi thì người nộp phải đoán")
@@ -920,7 +973,11 @@ def bc_kiem(aid: int, data: BcKiem, u: User = Depends(require_roles(*BC_KIEM)), 
     GML.tang_phien_ban(b)
     HDV.dong_bo_co_bao_cao(db, a)
     R.audit(db, u.username, u.role, "kiem_bao_cao_tour", f"assign:{a.id}",
-            after={"ban_so": b.ban_so, "ket_qua": b.trang_thai})
+            # `dinh_danh` là mã hồ sơ của người kiểm, hoặc `khong_tra_duoc` khi vai kiểm thay chưa
+            # nối hồ sơ. Đếm được số lần thứ hai xảy ra chính là thứ Chủ tịch cần để đặt ngày bắt
+            # buộc — và nó phải nằm trong nhật ký chứ không phải trong một con số đếm rời, vì nhật
+            # ký là chỗ duy nhất nói được AI đã kiểm chuyến NÀO mà chưa ai biết là ai.
+            after={"ban_so": b.ban_so, "ket_qua": b.trang_thai, "dinh_danh": dinh_danh})
     db.commit()
     return {"message": "Đã xác nhận – gỡ treo chào chuyến và treo thù lao cho phân công này"
                        if data.xac_nhan else "Đã trả lại kèm lý do – phân công vẫn còn nợ báo cáo"}
