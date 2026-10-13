@@ -51,6 +51,21 @@ HANG_RAO = (
     "tests/test_ks2_khai_quyen_may_doc_duoc.py",
     "tests/test_ks_cua_nhap.py",
     "tests/test_man_hinh_co_cua_nhap.py",
+    # ── NĂM TỆP THÊM NGÀY 13/10/2026, Chủ tịch chốt ───────────────────────────────────────────
+    # Cả năm tệp này vừa bắt được lỗi thật do hai Đợt E3 và E4 để lại trên main, mà cửa hẹp cũ
+    # không gọi nên không ai thấy: khoá chống ghi sổ hai lần chặn nhầm đường nạp lại mốc kiểm
+    # toán, một cửa chặn Chủ tịch chưa khai, một vai mới xuất hiện ở chỗ chưa khai, và bảng luật
+    # chữ ký thêm cửa thứ bảy mà sổ phép thử không biết.
+    #
+    # Chúng KHÔNG phải hàng rào "hai làn đụng nhau" như tám tệp trên — chúng là hàng rào KHAI
+    # BÁO: mỗi tệp canh một bảng mà người phải khai tay, và bảng khai tay là thứ hỏng lặng lẽ
+    # nhất khi ai đó thêm một dòng mã mà quên dòng khai. Cửa hẹp là chỗ duy nhất chạy đủ nhanh
+    # để bắt chúng trước khi gộp.
+    "tests/test_lg2_mot_bang_chu_ky.py",
+    "tests/test_ks_toan_quyen.py",
+    "tests/test_le2b_ba_vai_ke_toan.py",
+    "tests/test_hach_toan.py",
+    "tests/test_misa.py",
 )
 
 

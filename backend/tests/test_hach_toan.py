@@ -426,10 +426,13 @@ def test_dao_han_ghi_mot_chan_thi_mo_ngoai_le():
     db = db_()
     u = db.execute(select(User).where(User.username == "ht_ketoan")).scalars().first()
     # chỉ ghi chân trả gốc
+    # Hai chân đáo hạn khai HAI nghiệp vụ khác nhau (Đợt DỌN-1, 13/10/2026). Cùng một mã nguồn
+    # mà cùng một tên nghiệp vụ thì khoá chống ghi sổ hai lần của Đợt E3 coi chân sau là bản sao
+    # của chân trước — đúng, vì nó không có cách nào biết đấy là hai việc.
     ACC.post_entry(db, u.username, u.role, date.today(), "Trả gốc đáo hạn",
                    [{"account": "3411", "debit": 5_000_000_000, "partner": "TPBank", "partner_code": "TPB"},
                     {"account": "1121", "credit": 5_000_000_000}],
-                   source_type="quy_tac", source_ref="dao_han:DH0826")
+                   source_type="quy_tac", source_ref="dao_han:DH0826", nghiep_vu="tra_goc_vay")
     db.commit()
     ra = {x["ma"] for x in CC.dao_han_thieu_chan(db)}
     assert "dao_han_thieu_chan#DH0826" in ra
@@ -437,7 +440,7 @@ def test_dao_han_ghi_mot_chan_thi_mo_ngoai_le():
     ACC.post_entry(db, u.username, u.role, date.today(), "Nhận giải ngân khoản mới",
                    [{"account": "1121", "debit": 5_000_000_000},
                     {"account": "3411", "credit": 5_000_000_000, "partner": "TPBank", "partner_code": "TPB"}],
-                   source_type="quy_tac", source_ref="dao_han:DH0826")
+                   source_type="quy_tac", source_ref="dao_han:DH0826", nghiep_vu="nhan_giai_ngan_vay")
     db.commit()
     assert "dao_han_thieu_chan#DH0826" not in {x["ma"] for x in CC.dao_han_thieu_chan(db)}
     db.close()
