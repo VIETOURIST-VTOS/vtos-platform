@@ -55,6 +55,31 @@ ID: dict[str, int] = {}
 D = datetime(2026, 11, 20, 6, 0)
 
 
+def _cap_quyen_kiem_thay(db, *ten_tai_khoan):
+    """Cấp năng lực `kiem_bao_cao_tour` cho vai kiểm thay — Đợt HD-10, 13/10/2026.
+
+    Từ HD-10, `hcns` và `cntt` không mặc nhiên xác nhận được báo cáo sau tour (Chủ tịch: *quyền
+    quản trị kỹ thuật không tự sinh quyền duyệt*). Cảnh dựng ở đây đi qua ĐÚNG bảng ngoại lệ mà
+    đời thật đi qua, kèm lý do và hạn, chứ không nhét một cờ vào mã — cảnh giả thì phép thử xanh
+    mà hệ thống thật vẫn chặn.
+    """
+    from datetime import date as _d
+    from datetime import timedelta as _td
+
+    from sqlalchemy import select as _sel
+
+    from app.models.core import User as _U
+    from app.models.core import UserGrant as _G
+    for un in ten_tai_khoan:
+        t = db.execute(_sel(_U).where(_U.username == un)).scalars().first()
+        assert t is not None, f"không có tài khoản {un} để cấp quyền"
+        db.add(_G(user_id=t.id, kind="capability", value="kiem_bao_cao_tour",
+                  from_date=_d.today(), to_date=_d.today() + _td(days=90),
+                  reason="Phép thử: vai kiểm thay cần năng lực cấp riêng từ Đợt HD-10.",
+                  granted_by="chutich", approved_by="chutich"))
+    db.commit()
+
+
 def login(ten):
     r = client.post("/api/v1/auth/login", data={"username": ten, "password": MK})
     assert r.status_code == 200, f"{ten}: {r.text}"
@@ -120,6 +145,7 @@ def _dung_canh():
             ID[k] = _pc(hdv1.id)
         ID["cua_tp"] = _pc(tp.id)
         ID["tp_emp"] = tp.id
+        _cap_quyen_kiem_thay(db, "h7.cntt.chua_noi", "h7.tp_doi_vai")
         db.close()
         yield
 

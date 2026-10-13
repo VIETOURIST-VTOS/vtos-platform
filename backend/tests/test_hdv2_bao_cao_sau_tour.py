@@ -70,6 +70,20 @@ def _startup():
                   operator_id=op_id, start_date=date(2026, 11, 20), end_date=date(2026, 11, 23))
         db.add_all([e1, e2, t1, t2])
         db.commit()
+
+        # Đợt HD-10 (13/10/2026): `cntt` không còn mặc nhiên xác nhận được báo cáo sau tour. Bộ
+        # này dùng `cntt` làm người kiểm từ Đợt HDV-2, nên cảnh phải cấp đúng cái quyền mà đời
+        # thật cũng phải cấp — và cấp qua CỬA NGOẠI LỆ chứ không nhét thẳng một cờ vào mã, để
+        # cảnh dựng ở đây giống đời thật ở cả cách cấp lẫn cách thu.
+        from datetime import timedelta as _td
+
+        from app.models.core import UserGrant
+        _ai = db.execute(select(User).where(User.username == AI)).scalars().first()
+        db.add(UserGrant(user_id=_ai.id, kind="capability", value="kiem_bao_cao_tour",
+                         from_date=date.today(), to_date=date.today() + _td(days=90),
+                         reason="Phép thử Đợt HDV-2 dùng CNTT làm người kiểm thay.",
+                         granted_by="chutich", approved_by="chutich"))
+        db.commit()
         a1 = GuideAssignment(tour_id=t1.id, guide_id=e1.id, days=4, rate_per_day=800_000,
                              bat_dau=D, ket_thuc=D + timedelta(days=4), status="da_xac_nhan")
         a2 = GuideAssignment(tour_id=t1.id, guide_id=e2.id, days=4, rate_per_day=700_000,

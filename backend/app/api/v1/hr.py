@@ -759,6 +759,23 @@ XEM_BC = ("chutich", "tgd", "tp_hd", "bks") + tuple(v for v in BC_KIEM if v not 
 # tra ra người là TỪ CHỐI, không phải bỏ qua phép so.
 KIEM_PHAI_DINH_DANH = ("tp_hd",)
 
+# AI KIỂM BẰNG VAI, AI KIỂM BẰNG QUYỀN CẤP RIÊNG — Đợt HD-10, Chủ tịch chốt 13/10/2026 (D3 = A).
+#
+# `tp_hd` kiểm bằng VAI: xác nhận báo cáo sau tour là việc của Trưởng phòng Hướng dẫn, không phải
+# một ngoại lệ.
+#
+# `hcns` và `cntt` KHÔNG. Nguyên văn chỉ đạo: *"CNTT không mặc nhiên có quyền xác nhận nghiệp vụ.
+# Chỉ kiểm thay khi được giao quyền cụ thể; quyền quản trị kỹ thuật không tự sinh quyền duyệt."*
+# Hai vai ấy vẫn qua được chữ ký cửa (`BC_KIEM`) để màn hình còn mở ra được, nhưng muốn BẤM xác
+# nhận thì phải có năng lực `kiem_bao_cao_tour` cấp riêng cho đúng người.
+#
+# KHÔNG DỰNG CỬA CẤP QUYỀN MỚI. Cửa ngoại lệ đã có sẵn và đã đủ ba điều Chủ tịch đòi: bắt buộc
+# ghi lý do, có người phê, có hạn (tối đa 90 ngày, vô hạn thì chỉ Chủ tịch cấp). Nó cũng đã ghi
+# nhật ký `cap_ngoai_le_quyen`. Thêm một cửa thứ hai là thêm một chỗ để hai bảng quyền nói khác
+# nhau.
+KIEM_BANG_VAI = ("tp_hd",)
+NANG_LUC_KIEM_THAY = "kiem_bao_cao_tour"
+
 # PHẠM VI của cặp xung đột «người nộp ≠ người xác nhận» — Đợt HD-8, 13/10/2026.
 #
 # Khai thành hàm chứ không gõ chuỗi tại hai nơi gọi: gõ tay thì một ngày nào đó có người viết
@@ -789,6 +806,27 @@ def _pv_bao_cao(a: GuideAssignment) -> str:
 # trách nhiệm đã có (`ks_tach_nhiem`) chứ không dựng lại. Cả hai chờ Chủ tịch chốt cách định danh
 # người và ký cặp xung đột — bảng `cap_tach_nhiem` có luật mỗi dòng phải có người ký, nên không ai
 # được ghi hộ.
+
+
+def _duoc_kiem_thay(db: Session, u: User) -> None:
+    """Vai không kiểm bằng vai thì phải có năng lực cấp riêng. Ném khi không có.
+
+    `AC.co_quyen` cho Chủ tịch, TGĐ và Ban Kiểm soát đi qua sẵn (BASE_VIEW); hai vai sau bị chặn
+    ghi ở lớp khác nên thực tế chỉ Chủ tịch và TGĐ mặc nhiên có. Đó là đúng ý: người đứng đầu
+    không phải tự cấp quyền cho mình để làm việc của mình.
+    """
+    if u.role in KIEM_BANG_VAI:
+        return
+    from app.services import access as AC
+    if AC.co_quyen(db, u, NANG_LUC_KIEM_THAY):
+        return
+    raise HTTPException(403, {
+        "gate": "KIEM_THAY_CHUA_CAP",
+        "message": f"Vai trò {u.role} không mặc nhiên xác nhận được báo cáo sau tour. Việc này là "
+                   "của Trưởng phòng Hướng dẫn; kiểm thay phải được cấp riêng năng lực "
+                   f"«{NANG_LUC_KIEM_THAY}» cho đúng người, có lý do và có hạn, ở màn hình ngoại "
+                   "lệ quyền.",
+        "nang_luc": NANG_LUC_KIEM_THAY})
 
 
 def _khong_tu_kiem(db: Session, u: User, a: GuideAssignment) -> str:
@@ -982,6 +1020,7 @@ def bc_kiem(aid: int, data: BcKiem, u: User = Depends(require_roles(*BC_KIEM)), 
     b = HDV.ban_dang_xet(db, a.id)
     if b is None or b.trang_thai != "da_gui":
         raise HTTPException(422, "Không có bản nào đang chờ kiểm")
+    _duoc_kiem_thay(db, u)
     dinh_danh = _khong_tu_kiem(db, u, a)
 
     # LỚP THỨ HAI, và nó trả lời một câu KHÁC với lớp trên. `_khong_tu_kiem` hỏi "tài khoản đang
@@ -1014,7 +1053,10 @@ def bc_kiem(aid: int, data: BcKiem, u: User = Depends(require_roles(*BC_KIEM)), 
             # ký là chỗ duy nhất nói được AI đã kiểm chuyến NÀO mà chưa ai biết là ai.
             # `tach_nhiem` ghi lại CẢ KHI KHÔNG CHẶN. Một vi phạm cho qua mà không ai đếm thì
             # bằng không có hàng rào; đếm được chính là thứ Chủ tịch cần để đặt mức sau này.
+            # Ghi rõ người kiểm đi bằng VAI hay bằng QUYỀN CẤP RIÊNG. Một lần kiểm thay phải tra
+            # lại được là ai cho phép, chứ không chỉ là ai đã bấm.
             after={"ban_so": b.ban_so, "ket_qua": b.trang_thai, "dinh_danh": dinh_danh,
+                   "duong_quyen": "vai" if u.role in KIEM_BANG_VAI else "cap_rieng",
                    "tach_nhiem": [v["ma_cap"] for v in kq_tn["vi_pham"]] or None})
     db.commit()
     return {"message": "Đã xác nhận – gỡ treo chào chuyến và treo thù lao cho phân công này"
