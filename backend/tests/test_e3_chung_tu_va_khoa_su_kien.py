@@ -108,6 +108,11 @@ GOI_QUA_BANG = {
     "services/vay_but_toan.py": ("NGHIEP_VU_THEO_KY",
                                  "Đáo hạn là HAI chân cùng một khế ước, hai chân hai tên nghiệp "
                                  "vụ — Đợt DỌN-2 13/10/2026"),
+    "api/v1/accounting.py": ("NGHIEP_VU_LAP_TAY",
+                             "Cửa lập tay nhận HAI loại bút toán — bút toán thường và bút toán sửa "
+                             "sai sót kỳ trước — nên Kế toán phải CHỌN, và cái chọn ấy thành một "
+                             "biến. Danh sách hợp lệ hẹp đúng hai giá trị ảy, khóa là thứ màn hình gửi "
+                             "lên — Đợt E14 13/10/2026"),
 }
 
 

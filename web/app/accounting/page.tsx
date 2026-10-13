@@ -187,6 +187,12 @@ function Accounting() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [lines, setLines] = useState([{ account: "642", debit: "", credit: "" }, { account: "111", debit: "", credit: "" }]);
   const [desc, setDesc] = useState("");
+  // ĐỢT E14 13/10/2026 — Kế toán chọn ĐÂY LÀ BÚT TOÁN GÌ. Hai ô mốc chỉ hiện khi chọn "điều
+  // chỉnh": bắt mọi bút toán khai "sửa cho kỳ nào" là bắt gõ một ô vô nghĩa 300 lần một tháng,
+  // rồi lần thứ 301 có nghĩa cũng bị gõ cho xong.
+  const [nvLap, setNvLap] = useState("but_toan_tay");
+  const [kyGoc, setKyGoc] = useState("");
+  const [ngayPH, setNgayPH] = useState("");
   const [inv, setInv] = useState({ booking_id: "", customer_tax_code: "", customer_address: "", vat_rate: "" });
 
   const load = useCallback(async () => {
@@ -224,7 +230,22 @@ function Accounting() {
           <tr><td><b>Tổng</b></td><td><b>{vnd(td)}</b></td><td><b>{vnd(tc)}</b></td><td>{Math.abs(td - tc) >= 1 && <Tag cls="red">Chưa cân</Tag>}</td></tr>
         </tbody></table>
         <button className="act grey" onClick={() => setLines([...lines, { account: "111", debit: "", credit: "" }])}>+ dòng</button>
-        <button className="act" disabled={!desc || td <= 0 || Math.abs(td - tc) >= 1} onClick={() => post("/journal", { entry_date: new Date().toISOString().slice(0, 10), description: desc, post: false, lines: lines.map((l) => ({ account: l.account, debit: num(l.debit), credit: num(l.credit) })) }).then((r) => { if (r) { setDesc(""); setLines([{ account: "642", debit: "", credit: "" }, { account: "111", debit: "", credit: "" }]); } })}>Lưu nháp</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "8px 0" }}>
+          <label>Loại bút toán <select value={nvLap} onChange={(e) => { setNvLap(e.target.value); if (e.target.value === "but_toan_tay") { setKyGoc(""); setNgayPH(""); } }}>
+            <option value="but_toan_tay">Bút toán Kế toán lập tay</option>
+            <option value="dieu_chinh_ky_truoc">Điều chỉnh sai sót kỳ trước</option>
+          </select></label>
+          {nvLap === "dieu_chinh_ky_truoc" && <>
+            {/* Hai ô này CHỈ hiện với bút toán điều chỉnh, và máy chủ chặn cả hai chiều: điều
+                chỉnh mà thiếu thì không ghi được, nghiệp vụ thường mà điền vào cũng không ghi
+                được — điền hai mốc cho một bút toán bình thường là khai nó thành bút toán sửa sai. */}
+            <label title="Kỳ GỐC mà bút toán này đi sửa. Đây là một NHÃN — nó không mở kỳ đã khóa; muốn ghi thẳng vào kỳ cũ thì đi cửa mở lại kỳ, hai người ký.">
+              Sửa cho kỳ <input type="month" value={kyGoc} onChange={(e) => setKyGoc(e.target.value)} /></label>
+            <label title="Ngày NGƯỜI nhận ra sai sót. Kiểm toán hỏi: biết từ bao giờ, sửa sau bao lâu.">
+              Phát hiện ngày <input type="date" value={ngayPH} onChange={(e) => setNgayPH(e.target.value)} /></label>
+          </>}
+        </div>
+        <button className="act" disabled={!desc || td <= 0 || Math.abs(td - tc) >= 1} onClick={() => post("/journal", { entry_date: new Date().toISOString().slice(0, 10), description: desc, post: false, nghiep_vu: nvLap, ky_goc: kyGoc, ngay_phat_hien: ngayPH || null, lines: lines.map((l) => ({ account: l.account, debit: num(l.debit), credit: num(l.credit) })) }).then((r) => { if (r) { setDesc(""); setLines([{ account: "642", debit: "", credit: "" }, { account: "111", debit: "", credit: "" }]); } })}>Lưu nháp</button>
       </div>}
       <div className="panel wrap"><table><thead><tr><th>Số CT</th><th>Ngày</th><th>Diễn giải</th><th>Nguồn</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Trạng thái</th><th>Người ghi</th><th></th></tr></thead>
         <tbody>{entries.length ? entries.map((e) => <>

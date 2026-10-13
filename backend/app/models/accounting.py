@@ -69,6 +69,20 @@ class JournalEntry(Base):
     # trường hợp ấy khai ở `chung_tu_loai.KHONG_KHOA_SU_KIEN` kèm lý do. NULL không va nhau trong
     # chỉ mục duy nhất, nên chứng từ lập tay vẫn lập được nhiều tờ giống nhau trong một ngày.
     ngay_chung_tu: Mapped[date] = mapped_column(Date)
+    # ĐỢT E14 13/10/2026 — HAI MỐC CỦA BÚT TOÁN ĐIỀU CHỈNH, và cả hai CỐ Ý để rỗng được.
+    #
+    # Rỗng ở đây đọc đúng là "không phải bút toán điều chỉnh" — khác hẳn 0 hay một ngày mặc định.
+    # Hai mốc này chỉ có nghĩa với bút toán sửa sai sót kỳ trước, và `services/dieu_chinh.kiem`
+    # chặn CẢ HAI CHIỀU: điều chỉnh mà thiếu thì không ghi được, nghiệp vụ thường mà điền vào
+    # cũng không ghi được — điền hai mốc cho một bút toán bình thường là khai nó thành bút toán
+    # sửa sai, tức một lời nói dối nhỏ nằm ngay trong sổ.
+    #
+    # `ky_goc` KHÔNG MỞ ĐƯỢC KỲ ĐÃ KHÓA. Nó là một NHÃN nói bút toán thuộc câu chuyện của kỳ nào;
+    # bút toán vẫn ghi vào kỳ đang mở theo `entry_date`. Muốn ghi THẲNG vào kỳ cũ thì đi cửa mở
+    # lại kỳ của Đợt E6 — hai người ký. Nếu `ky_goc` tự ghi vào kỳ cũ thì nó là đường vòng qua
+    # chính cửa ấy, và cửa ấy mất nghĩa ngay ngày có đường vòng.
+    ky_goc: Mapped[str | None] = mapped_column(String(7), nullable=True, index=True)
+    ngay_phat_hien: Mapped[date | None] = mapped_column(Date, nullable=True)
     loai_chung_tu: Mapped[str] = mapped_column(String(10), default="")    # xem chung_tu_loai.LOAI_CHUNG_TU
     loai_nghiep_vu: Mapped[str] = mapped_column(String(40), default="")   # xem chung_tu_loai.NGHIEP_VU
     khoa_su_kien: Mapped[str | None] = mapped_column(String(200), nullable=True, unique=True, index=True)
