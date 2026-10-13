@@ -395,6 +395,19 @@ def nghia_vu_chi_tiet(nhom: str | None = None, co_so_ngay: str = "cam_ket",
             "co_so_ngay": co_so_ngay, "chi_tiet": [NV.dong(x) for x in ds[:500]]}
 
 
+# ĐỢT E5 13/10/2026 — các đợt của MỘT nghĩa vụ, cho ô chọn đợt trên màn hình phân bổ tiền ra.
+# Nằm dưới tiền tố `/fin` đã khai, và dùng đúng bộ vai READ của màn hình Ngân quỹ.
+@router.get("/fin/nghia-vu/{nv_id}/dot")
+def dot_cua_nghia_vu(nv_id: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Đợt nào còn phải trả. Trả cả đợt đã trả đủ, có cờ, để người xem biết đợt ấy đã xong."""
+    from app.models.nghia_vu import DotThanhToan
+    ds = db.execute(select(DotThanhToan).where(DotThanhToan.nghia_vu_id == nv_id)
+                    .order_by(DotThanhToan.so_thu_tu)).scalars().all()
+    return [{"id": d.id, "so_thu_tu": d.so_thu_tu, "so_tien": d.so_tien, "da_tra": d.da_tra,
+             "con_lai": d.con_lai(), "da_tra_du": d.da_tra_du(),
+             "ngay_han": d.ngay_han_suy or d.ngay_han, "can_cu_han": d.can_cu_han} for d in ds]
+
+
 @router.post("/fin/nghia-vu/dong-bo")
 def dong_bo_nghia_vu(u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
     """Dựng lại sổ từ sáu bảng chứng từ gốc. Chạy lại được – gọi nhiều lần không sinh dòng thừa."""

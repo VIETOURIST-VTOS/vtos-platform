@@ -287,6 +287,34 @@ def them_phan_bo(tid: int, data: PhanBoIn, u: User = Depends(require_roles("keto
         raise HTTPException(422, str(e))
 
 
+class DongPhanBoRaIn(BaseModel):
+    nghia_vu_id: int
+    dot_id: int | None = None
+    so_tien: float
+    ghi_chu: str = ""
+
+
+class PhanBoRaIn(BaseModel):
+    dong: list[DongPhanBoRaIn]
+
+
+# ĐỢT E5 13/10/2026 — cửa phân bổ tiền RA. Nằm DƯỚI tiền tố `/bank-transactions` y như cửa tiền
+# vào, và vì đúng lý do đã ghi ở cửa huỷ bên dưới: mở một tiền tố mới là xin thêm một nhóm API
+# cho mọi vai đang xem màn hình này — nới quyền chỉ vì đặt tên đường dẫn cho gọn. Danh sách vai
+# cũng chép đúng cửa tiền vào, không rộng hơn một vai nào.
+@router.post("/bank-transactions/{tid}/phan-bo-ra")
+def them_phan_bo_ra(tid: int, data: PhanBoRaIn, u: User = Depends(require_roles("ketoan", "cntt")),
+                    db: Session = Depends(get_db)):
+    """Chia một khoản tiền RA cho nhiều nghĩa vụ. Cả lô được kiểm TRƯỚC khi ghi dòng đầu tiên."""
+    from app.services import phan_bo_tien as PB
+    t = db.get(BankTransaction, tid)
+    if not t: raise HTTPException(404, "Không có giao dịch")
+    try:
+        return PB.phan_bo_ra(db, u, t, [d.model_dump() for d in data.dong])
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
 class HuyPhanBoIn(BaseModel):
     ly_do: str = ""
 

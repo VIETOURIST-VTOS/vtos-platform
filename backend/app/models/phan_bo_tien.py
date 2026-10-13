@@ -40,7 +40,22 @@ class PhanBoTien(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     bank_txn_id: Mapped[int] = mapped_column(ForeignKey("bank_transactions.id"), index=True)
-    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id"), index=True)
+    # ĐỢT E5 13/10/2026 — HAI NHÁNH, ĐÚNG MỘT NHÁNH ĐƯỢC ĐIỀN.
+    #
+    # Trước đợt này `booking_id` là cột BẮT BUỘC, nên bảng chỉ nhận được tiền VÀO: chi nhà cung
+    # cấp, lương, thuế, trả gốc vay không có chỗ nào nói khoản tiền ấy trả cho nghĩa vụ nào —
+    # trong khi sổ nghĩa vụ đã khai đủ 13 nhóm, có cả bốn nhóm ấy.
+    #
+    # VÌ SAO NỚI BẢNG NÀY MÀ KHÔNG DỰNG BẢNG THỨ HAI: "một khoản tiền chia cho nhiều chỗ" là MỘT
+    # ý niệm. Dựng bảng thứ hai cho cùng ý niệm là tạo hai câu trả lời cho câu hỏi "khoản tiền
+    # này đã phân bổ bao nhiêu" — và hai câu trả lời thì sớm muộn lệch nhau.
+    #
+    # Luật đúng-một-nhánh KHÔNG đặt bằng CHECK ở cơ sở dữ liệu mà đặt ở `_nhanh_cua` trong
+    # services, vì nó phải nói ra được bằng tiếng người lúc sai; phép thử canh cả hai chiều.
+    booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True, index=True)
+    nghia_vu_id: Mapped[int | None] = mapped_column(ForeignKey("nghia_vu_thanh_toan.id"), nullable=True, index=True)
+    # Đợt là tuỳ chọn NGAY CẢ khi đã chọn nghĩa vụ: một nghĩa vụ không chia đợt vẫn trả được.
+    dot_id: Mapped[int | None] = mapped_column(ForeignKey("dot_thanh_toan.id"), nullable=True, index=True)
     # Phiếu thu do chính dòng này sinh ra. Để RỖNG chỉ xảy ra khi lập phiếu thu hỏng – và khi ấy dòng
     # phân bổ cũng không được ghi, nên rỗng ở đây là dấu hiệu dữ liệu cũ, không phải trạng thái bình thường.
     receipt_id: Mapped[int | None] = mapped_column(ForeignKey("receipts.id"), nullable=True)
@@ -58,3 +73,15 @@ class PhanBoTien(Base):
 
     def con_hieu_luc(self) -> bool:
         return not self.huy
+
+    def nhanh(self) -> str:
+        """`booking` hay `nghia_vu` — đọc từ chính dữ liệu, không từ một cột cờ riêng.
+
+        Một cột cờ nói nhánh nào là một chỗ nữa để sai: nó có thể nói `booking` trong khi
+        `booking_id` rỗng. Suy từ dữ liệu thì không lệch được.
+        """
+        if self.booking_id is not None:
+            return "booking"
+        if self.nghia_vu_id is not None:
+            return "nghia_vu"
+        return ""
