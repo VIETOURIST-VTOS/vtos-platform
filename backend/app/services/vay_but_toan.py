@@ -47,6 +47,24 @@ QUY_UOC_THEO_KY = {
     "tra_goc": "VAY_TRA_GOC",
     "tra_lai": "VAY_LAI",
 }
+
+# TÊN NGHIỆP VỤ THEO LOẠI KỲ — Đợt DỌN-2, 13/10/2026.
+#
+# Đáo hạn là HAI bút toán cùng một khế ước nên cùng một `source_ref` (cố ý: cổng đáo hạn nhìn
+# thấy hai chân là một cặp nhờ đúng điều đó). Trước đợt này cả hai chân cùng khai
+# `nghiep_vu="khe_uoc_vay"`, nên khoá chống ghi sổ hai lần của Đợt E3 coi chân thứ hai là bản sao
+# của chân thứ nhất và CHẶN NÓ LẠI — cửa `POST /api/v1/fin/dao-han` hỏng từ 12/10/2026.
+#
+# Chủ tịch chốt 13/10/2026: sửa bằng cách GỌI ĐÚNG TÊN, không bằng cách mở ngoại lệ. Hai tên dưới
+# đây do Đợt DỌN-1 khai vào `chung_tu_loai.NGHIEP_VU`.
+#
+# Loại kỳ không có trong bảng này giữ tên cũ `khe_uoc_vay` — trả lãi và các kỳ khác không đi
+# thành cặp, nên không cần tách tên.
+NGHIEP_VU_THEO_KY = {
+    "tra_goc": "tra_goc_vay",
+    "nhan_vay": "nhan_giai_ngan_vay",
+    "giai_ngan": "nhan_giai_ngan_vay",
+}
 # Kỳ thu hồi (cho vay ra) không thuộc V12 – V12 nói về khoản đi vay.
 KY_KHONG_GHI = ("thu_hoi",)
 
@@ -116,7 +134,8 @@ def ghi_so(db: Session, s: FinSchedule, boi: str, vai: str, ngay: date | None = 
                       entry_id=s.entry_id)
     xt = xem_truoc(db, s)
     e = ACC.post_entry(db, boi, vai, ngay or xt["ngay"], xt["dien_giai"], xt["dong"],
-                       source_type="khe_uoc_vay", source_ref=xt["source_ref"], nghiep_vu="khe_uoc_vay")
+                       source_type="khe_uoc_vay", source_ref=xt["source_ref"],
+                       nghiep_vu=NGHIEP_VU_THEO_KY.get(s.kind, "khe_uoc_vay"))
     s.entry_id = e.id
     s.status = "da_thuc_hien"
     s.done_on = s.done_on or (ngay or xt["ngay"])
