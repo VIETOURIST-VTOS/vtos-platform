@@ -24,6 +24,7 @@ from sqlalchemy import select
 
 from app.models.muc_do_chan import MUC_DO, MUC_DO_KHI_CHUA_KHAI
 from app.models.tach_nhiem import (BUOC, CAP_DA_KY, KHOA_BAT_BUOC_MA_NV, VAI_TIEN,
+                                   VAI_PHAI_CO_MA_NV,
                                    BuocDaLam, CapTachNhiem, ma_nguoi)
 
 # Mức nào là THẮT (ai cũng dựng được), mức nào là NỚI (phải ký).
@@ -32,13 +33,17 @@ NOI = ("khong_canh_bao",)
 
 
 def thieu_ma_nhan_vien(u) -> bool:
-    """Tài khoản này làm việc với tiền mà chưa có mã nhân viên?
+    """Tài khoản này làm một bước PHẢI SO ĐƯỢC NGƯỜI mà chưa có mã nhân viên?
 
     Không có mã thì bộ kiểm coi nó là một người riêng, nên hai tài khoản của cùng một người
     đi được cả hai bước mà không ai thấy. Đây là lỗ CÒN LẠI sau khi so theo người, và nó chỉ
     bịt được bằng dữ liệu HCNS, không bịt được bằng mã.
+
+    Từ Đợt HD-9 (13/10/2026) danh sách rộng hơn `VAI_TIEN`: thêm `tp_hd`, vì Trưởng phòng Hướng
+    dẫn làm cả hai bước của cặp «người nộp báo cáo sau tour ≠ người xác nhận». Xem
+    `VAI_PHAI_CO_MA_NV` trong `models/tach_nhiem.py`.
     """
-    return (getattr(u, "role", "") in VAI_TIEN
+    return (getattr(u, "role", "") in VAI_PHAI_CO_MA_NV
             and not (getattr(u, "staff_code", "") or "").strip())
 
 
@@ -162,14 +167,14 @@ def kiem(db, pham_vi: str, ma_buoc: str, u, luc: datetime | None = None) -> dict
         "thieu_ma_nhan_vien": thieu_ma,
         "chan_vi_thieu_ma_nhan_vien": chan_vi_thieu_ma,
         "thong_diep_thieu_ma": (
-            f"Tài khoản {getattr(u, 'username', '')} làm bước có tiền nhưng chưa có mã nhân "
+            f"Tài khoản {getattr(u, 'username', '')} làm bước phải so được người nhưng chưa có mã nhân "
             f"viên, nên hệ thống không đối chiếu được đây có phải cùng một người với bước kia "
             f"hay không. HCNS điền mã nhân viên cho tài khoản này." if thieu_ma else ""),
     }
 
 
 def tai_khoan_thieu_ma_nv(db) -> list[dict]:
-    """Danh sách tài khoản vai tiền chưa có mã nhân viên — để HCNS đi điền, và để đếm được.
+    """Tài khoản thuộc vai PHẢI CÓ MÃ mà chưa có — để HCNS đi điền, và để đếm được.
 
     Trả về danh sách chứ không chỉ một con số: một con số thì không ai biết phải đi tìm ai.
     """
@@ -223,7 +228,7 @@ def vai_can_ma_de_phep_do_thay(db=None) -> tuple[str, ...]:
     Mở rộng danh sách CHẶN thì sẽ chặn HCNS ở những bước họ không làm, nên không mở; thay vào
     đó đếm riêng, bằng hàm riêng, đặt tên theo đúng việc của nó.
     """
-    ra = set(VAI_TIEN)
+    ra = set(VAI_PHAI_CO_MA_NV)
     for c in CAP_VAI_KHONG_KIEM:
         ra.add(c["vai_a"])
         ra.add(c["vai_b"])
