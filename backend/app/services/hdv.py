@@ -91,16 +91,31 @@ def dang_chiem_lich(db: Session, guide_id: int, bat_dau: datetime, ket_thuc: dat
     return ds
 
 
+# Máy chủ nào KHÔNG có khoá hàng. Hỏi thẳng tên phương ngữ thay vì bắt lỗi — Đợt HD-11, 13/10/2026.
+#
+# Bản trước viết `except Exception: pass`, với chú thích nói nhánh ấy dành cho SQLite. Chú thích
+# đúng ý nhưng câu lệnh rộng hơn ý: `Exception` nuốt luôn LOCK TIMEOUT, DEADLOCK và SERIALIZATION
+# FAILURE trên PostgreSQL — đúng ba thứ mà khoá hàng sinh ra để báo. Khi một trong ba xảy ra, lớp 1
+# coi như không tồn tại và cả hệ thống dựa hết vào lớp 2 mà không ai biết.
+#
+# Hỏi `dialect.name` thì nhánh bỏ qua chỉ mở đúng cho máy chủ thật sự không có khoá hàng, và mọi
+# lỗi khác BAY LÊN để người gọi thấy. Một công tắc an toàn hỏng phải hỏng về phía kêu to.
+KHONG_CO_KHOA_HANG = ("sqlite",)
+
+
 def khoa_hdv(db: Session, guide_id: int) -> None:
     """Lớp 1 – xếp hàng hai phiên cùng xếp một người. Trên Postgres là khoá hàng thật; trên SQLite
-    câu này chạy không lỗi và không làm gì, vì SQLite đã khoá ở mức tệp."""
+    không có khoá hàng nên bỏ qua, và lớp 2 gánh phần bảo đảm."""
     from app.models.hr import Employee
     try:
-        db.execute(select(Employee).where(Employee.id == guide_id).with_for_update())
+        ten = db.get_bind().dialect.name
     except Exception:
-        # Máy chủ không hỗ trợ FOR UPDATE (SQLite). KHÔNG phải lý do để dừng, và cũng KHÔNG được
-        # nuốt im lặng thành "đã khoá": lớp 2 mới là lớp bảo đảm, và nó chạy ở mọi máy chủ.
-        pass
+        ten = ""
+    if ten in KHONG_CO_KHOA_HANG:
+        return
+    # KHÔNG bọc try ở đây. Lỗi khoá trên máy chủ có khoá hàng là tin phải báo, không phải tin để
+    # nuốt: nuốt rồi thì người xếp lịch tưởng đã giữ chỗ trong khi chưa giữ được gì.
+    db.execute(select(Employee).where(Employee.id == guide_id).with_for_update())
 
 
 def canh_trung_sau_khi_ghi(db: Session, a: GuideAssignment) -> None:
@@ -109,8 +124,19 @@ def canh_trung_sau_khi_ghi(db: Session, a: GuideAssignment) -> None:
     Nếu giữa lúc kiểm và lúc ghi có người chen vào thì đến đây sẽ thấy. Ném 422 kèm TÊN CHUYẾN đang
     chồng, không chỉ ném chữ 'trùng lịch': người xếp lịch cần biết phải gỡ chuyến nào.
     """
+    # THIẾU MỐC GIỜ THÌ KÊU, KHÔNG TRẢ VỀ ÊM — Đợt HD-11, 13/10/2026.
+    #
+    # Mọi nơi gọi hàm này đều đã tự hỏi `khong_so_duoc` trước (hr.py ở hai chỗ), nên tới được đây
+    # mà thiếu mốc là LỖI CỦA NGƯỜI VIẾT MÃ, không phải một ca dữ liệu. Bản trước `return` êm, và
+    # một hàm canh trùng lặng lẽ không canh gì trông y hệt một hàm canh xong không thấy gì.
+    #
+    # Ném `ValueError` chứ không `HTTPException`: đây không phải lỗi của người dùng, và nó phải nổ
+    # ở nhật ký máy chủ để người viết mã thấy, không phải hiện lên màn hình của Điều hành.
     if khong_so_duoc(a.bat_dau, a.ket_thuc):
-        return
+        raise ValueError(
+            f"canh_trung_sau_khi_ghi gọi trên phân công #{a.id} thiếu mốc giờ — chưa đủ dữ liệu "
+            "kiểm lịch. Nơi gọi phải hỏi `khong_so_duoc` trước và nói ra với người dùng, chứ "
+            "không gọi vào đây rồi coi như đã kiểm.")
     trung = dang_chiem_lich(db, a.guide_id, a.bat_dau, a.ket_thuc, bo_qua_id=a.id)
     if not trung:
         return
