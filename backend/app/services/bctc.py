@@ -9,7 +9,7 @@
 import io, json
 from datetime import date, timedelta
 from pathlib import Path
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
@@ -21,41 +21,120 @@ BY_PARTNER = ("131", "331", "1388", "3388", "141", "1281", "1283", "136")   # x�
 PL_PREFIX = ("5", "6", "7", "8", "9")
 
 
-def _lines(db: Session, upto: date, since: date | None = None, exclude_closing: bool = False, exclude_kiem_toan: bool = False):
-    q = select(JournalLine, JournalEntry.entry_date, JournalEntry.source_type, JournalEntry.id, JournalEntry.source_ref, JournalEntry.description).join(JournalEntry).where(JournalEntry.status == "da_ghi_so", JournalEntry.entry_date <= upto)
-    if since: q = q.where(JournalEntry.entry_date >= since)
-    rows = db.execute(q).all()
-    if exclude_closing:
-        closing_ids = {eid for l, d, st, eid, ref, desc in rows if l.account_code.startswith("911") or st == "ket_chuyen"}
-        rows = [r for r in rows if r[3] not in closing_ids]
-    if exclude_kiem_toan:
-        # Bút toán "chốt sổ theo BCTC kiểm toán" (điều chỉnh CHÊNH LỆCH một lần, nguồn 'kiem_toan') và bút
-        # toán kết chuyển KQKD còn treo đi kèm (source_ref bắt đầu "kt-close:") KHÔNG phải dòng tiền phát
-        # sinh thật trong kỳ – đây là bút toán RESTATEMENT một lần để khớp sổ với BCTC đã kiểm toán/soát xét,
-        # nếu tính vào biến động số dư sẽ làm LCTT hiểu nhầm thành phát sinh/thu chi khổng lồ trong kỳ. Loại
-        # các bút toán này (và các bút toán "dao" đảo lại chúng khi nạp lại mốc chốt sổ) khỏi LCTT.
-        kt_ids = {eid for l, d, st, eid, ref, desc in rows
-                  if st == "kiem_toan" or (ref or "").startswith(("kt:", "kt-close:")) or (st == "dao" and "nạp lại mốc kiểm toán" in (desc or ""))}
-        rows = [r for r in rows if r[3] not in kt_ids]
-    return rows
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỂ CƠ SỞ DỮ LIỆU CỘNG, ĐỪNG KÉO CẢ SỔ VỀ BỘ NHỚ — Đợt E18, 15/10/2026
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# CHỖ HỎNG, đo được 15/10/2026 trên máy chủ thật: cửa `GET /reports/bctc` trả 502 liên tục trong
+# khi mọi cửa khác chạy bình thường. Sáng cùng ngày nó còn trả 200.
+#
+# Nguyên nhân đo được bằng cách đọc chính đường đi: MỘT lần lập BCTC gọi `account_balances` SÁU lần
+# (bảng cân đối kỳ này + đầu năm, rồi lưu chuyển tiền tệ gọi thêm bốn lần) và `income_statement`
+# HAI lần. Bản cũ của hai hàm ấy đều đi qua `_lines`, mà `_lines` kéo TOÀN BỘ dòng bút toán từ đầu
+# sổ đến ngày báo cáo về bộ nhớ dưới dạng đối tượng ORM. Với 25.715 chứng từ đã nạp từ MISA thì mỗi
+# lượt là vài chục nghìn dòng, nhân tám lượt — máy chủ 512 MB hết bộ nhớ trước khi tính xong.
+#
+# Và nó NẶNG THÊM theo thời gian, không phải một sự cố nhất thời: mỗi lần chốt lại mốc kiểm toán
+# ghi thêm bốn chứng từ lớn vào đúng một ngày (hai đảo + hai mới), nên sổ dày lên thì cửa này hỏng
+# sớm hơn. Ngày quyết toán năm, sổ còn dày hơn nhiều.
+#
+# ĐỔI CHỖ CỘNG, KHÔNG ĐỔI PHÉP CỘNG. Phép tính và ánh xạ chỉ tiêu giữ nguyên từng dòng; chỉ có việc
+# cộng dồn chuyển xuống cho cơ sở dữ liệu làm, rồi kéo về đúng kết quả đã cộng theo tài khoản (và
+# theo đối tượng cho 131/331…). Số dòng kéo về giảm từ hàng chục nghìn xuống khoảng một trăm.
+#
+# BỐN CHỖ PHẢI GIỮ CHO BẰNG BẢN CŨ, và cả bốn đều là chỗ dễ trượt:
+#
+#   1. KHÓA ĐỐI TƯỢNG LÀ `partner_code`, THIẾU THÌ LẤY `partner` (tên), thiếu nữa thì rỗng — đúng
+#      thứ tự của bản cũ. Gộp thẳng theo `partner_code` sẽ dồn mọi dòng chỉ có TÊN đối tượng vào
+#      cùng một ô rỗng, và chỉ tiêu 130/311 phồng lên theo đúng kiểu đã gặp một lần rồi.
+#   2. BỎ BÚT TOÁN KẾT CHUYỂN khỏi KQKD là bỏ CẢ CHỨNG TỪ, không phải bỏ từng dòng 911: một chứng
+#      từ kết chuyển có cả dòng 911 lẫn dòng doanh thu/chi phí, bỏ sót vế kia là KQKD đếm đôi.
+#   3. BỎ BÚT TOÁN CHỐT SỔ KIỂM TOÁN khỏi LCTT cũng là bỏ CẢ CHỨNG TỪ, và nhận diện theo đúng ba
+#      dấu cũ: nguồn `kiem_toan`, mã nguồn bắt đầu `kt:`/`kt-close:`, hoặc bút toán đảo chúng.
+#   4. ĐIỀU KIỆN LOẠI PHẢI LÀ TRUY VẤN CON, KHÔNG PHẢI MỘT DANH SÁCH MÃ KÉO VỀ. Lấy danh sách mã
+#      chứng từ rồi ghép `IN (...)` là đổi một chỗ ngốn bộ nhớ thành một chỗ khác: SQLite chặn ở
+#      999 tham số và vỡ khi sổ dày, còn Postgres thì nhận một câu truy vấn dài vài trăm nghìn ký
+#      tự. Để điều kiện ở TRONG câu truy vấn thì không có con số nào đi qua bộ nhớ của máy chủ.
+#
+# ĐÃ ĐỐI CHIẾU MỘT LẦN rồi mới xoá bản cũ (Chủ tịch chốt 15/10/2026): dựng sổ thử, chạy CẢ HAI bản
+# trên cùng dữ liệu, đòi khớp tới từng đồng — chi tiết trong lời nhắn của đợt. Từ nay thứ canh phép
+# tính là `test_e18`, với sổ tự dựng và đáp án viết tay.
+#
+# KHÔNG THÊM CHỈ MỤC cho `entry_date` trong đợt này: việc ấy đã được cân một lần rồi và cố ý bỏ
+# (xem chú thích ở `models/accounting.py` và bản di trú d0e1f2a3b4c5). Đợt này không bàn lại.
+def _dieu_kien(upto: date, since: date | None = None) -> list:
+    """Dòng bút toán ĐÃ GHI SỔ tới ngày `upto` (và từ `since` nếu có) — dùng chung cho mọi phép cộng."""
+    dk = [JournalEntry.status == "da_ghi_so", JournalEntry.entry_date <= upto]
+    if since:
+        dk.append(JournalEntry.entry_date >= since)
+    return dk
+
+
+# Nợ − Có của một nhóm dòng. Dùng chung cho mọi phép cộng dưới đây để không có hai cách cộng.
+_RONG = func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0))
+
+# Khóa đối tượng: `partner_code`, thiếu thì `partner`, thiếu nữa thì rỗng — xem chú thích (1) ở trên.
+_KHOA_DOI_TUONG = func.coalesce(func.nullif(JournalLine.partner_code, ""),
+                                func.nullif(JournalLine.partner, ""), "")
+
+
+def khong_phai_ket_chuyen():
+    """Điều kiện SQL loại TRỌN VẸN mọi chứng từ kết chuyển cuối kỳ — xem chú thích (2) ở trên.
+
+    HAI dấu, và phải có cả hai: nguồn `ket_chuyen` bắt chứng từ do robot lập theo mẫu; chạm tài
+    khoản 911 bắt chứng từ ai đó lập TAY không gắn nguồn — mà 911 chỉ dùng để xác định kết quả
+    kinh doanh, không nghiệp vụ nào khác đi qua nó.
+
+    ĐÂY LÀ MỘT CHỖ DUY NHẤT KHAI LUẬT NÀY. `services/reports.py::_khong_phai_ket_chuyen` gọi về
+    đây thay vì tự viết lại: trước Đợt E18 cùng một luật nằm ở hai chỗ, và hai chỗ là hai chỗ để
+    lệch nhau — `test_e18` đỏ nếu ai viết lại điều kiện này lần nữa.
+    """
+    kc = select(JournalLine.entry_id).where(JournalLine.account_code.like("911%")).scalar_subquery()
+    return and_(JournalEntry.source_type != "ket_chuyen", JournalEntry.id.notin_(kc))
+
+
+def khong_phai_chot_so_kiem_toan():
+    """Điều kiện SQL loại TRỌN VẸN bút toán chốt sổ theo BCTC kiểm toán và các bút toán đảo chúng.
+
+    Đây là bút toán RESTATEMENT một lần để khớp sổ với bản đã kiểm toán/soát xét, KHÔNG phải dòng
+    tiền phát sinh thật trong kỳ; tính vào biến động số dư thì LCTT hiểu nhầm thành thu chi khổng
+    lồ trong kỳ. Dùng riêng cho LCTT gián tiếp — KHÔNG dùng cho báo cáo THTC chính thức, báo cáo
+    ấy phải phản ánh đúng số dư sổ sách tại ngày báo cáo.
+    """
+    return ~or_(JournalEntry.source_type == "kiem_toan",
+                JournalEntry.source_ref.like("kt:%"),
+                JournalEntry.source_ref.like("kt-close:%"),
+                and_(JournalEntry.source_type == "dao",
+                     JournalEntry.description.like("%nạp lại mốc kiểm toán%")))
 
 
 def account_balances(db: Session, upto: date, exclude_kiem_toan: bool = False) -> dict:
-    """{account: {"net": Nợ−Có, "by_partner": {code: net}}} cho tài khoản chi tiết đã ghi sổ."""
+    """{account: {"net": Nợ−Có, "by_partner": {code: net}}} cho tài khoản chi tiết đã ghi sổ.
+
+    HAI truy vấn, cả hai cộng ở cơ sở dữ liệu: một theo tài khoản, một theo (tài khoản, đối tượng)
+    và CHỈ cho các tài khoản xét theo đối tượng. Không kéo một dòng bút toán nào về bộ nhớ.
+    """
+    dk = _dieu_kien(upto)
+    if exclude_kiem_toan:
+        dk = dk + [khong_phai_chot_so_kiem_toan()]
+
     out: dict[str, dict] = {}
-    for l, d, st, eid, ref, desc in _lines(db, upto, exclude_kiem_toan=exclude_kiem_toan):
-        a = out.setdefault(l.account_code, {"net": 0.0, "by_partner": {}})
-        a["net"] += (l.debit or 0) - (l.credit or 0)
-        if l.account_code.startswith(BY_PARTNER):
-            k = l.partner_code or l.partner or ""
-            a["by_partner"][k] = a["by_partner"].get(k, 0.0) + (l.debit or 0) - (l.credit or 0)
+    for code, rong in db.execute(select(JournalLine.account_code, _RONG).join(JournalEntry)
+                                 .where(*dk).group_by(JournalLine.account_code)):
+        out[code] = {"net": float(rong or 0), "by_partner": {}}
+
+    q = (select(JournalLine.account_code, _KHOA_DOI_TUONG, _RONG).join(JournalEntry).where(*dk)
+         .where(or_(*[JournalLine.account_code.like(p + "%") for p in BY_PARTNER]))
+         .group_by(JournalLine.account_code, _KHOA_DOI_TUONG))
+    for code, khoa, rong in db.execute(q):
+        out.setdefault(code, {"net": 0.0, "by_partner": {}})["by_partner"][khoa or ""] = float(rong or 0)
     return out
 
 
 def balance_sheet_tt99(db: Session, upto: date, exclude_kiem_toan: bool = False) -> dict:
     """Trả về {code: value} cho mọi chỉ tiêu THTC + chi tiết tài khoản → chỉ tiêu (để thuyết minh).
 
-    exclude_kiem_toan=True bỏ qua bút toán chốt sổ theo BCTC kiểm toán (xem _lines) – dùng riêng cho LCTT
+    exclude_kiem_toan=True bỏ qua bút toán chốt sổ theo BCTC kiểm toán (xem `khong_phai_chot_so_kiem_toan`) – dùng riêng cho LCTT
     gián tiếp (cash_flow_indirect_tt99) để không hiểu nhầm bút toán restatement một lần thành dòng tiền
     trong kỳ; KHÔNG dùng cho báo cáo THTC chính thức (phải phản ánh đúng số dư sổ sách tại ngày báo cáo)."""
     accs = {a.code: a for a in db.execute(select(Account)).scalars()}
@@ -96,18 +175,27 @@ def balance_sheet_tt99(db: Session, upto: date, exclude_kiem_toan: bool = False)
 
 
 def income_statement_tt99(db: Session, since: date, upto: date) -> dict:
+    """KQKD kỳ [since, upto]. CỘNG Ở CƠ SỞ DỮ LIỆU — xem chú thích đầu tệp (Đợt E18).
+
+    Phép tính giữ nguyên từng dòng của bản cũ: dấu xét theo `Account.kind` của TỪNG TÀI KHOẢN (nên
+    cộng dồn theo tài khoản trước rồi mới xét dấu mới ra đúng con số cũ), ánh xạ chỉ tiêu leo cây
+    cha theo `pl_code`, và 6351 cộng thêm vào chỉ tiêu 24.
+    """
     accs = {a.code: a for a in db.execute(select(Account)).scalars()}
     v: dict[str, float] = {}
-    for l, d, st, eid, ref, desc in _lines(db, upto, since, exclude_closing=True):
-        a = accs.get(l.account_code)
-        if not a or not l.account_code.startswith(PL_PREFIX) or l.account_code.startswith("911"): continue
+    q = (select(JournalLine.account_code, _RONG).join(JournalEntry)
+         .where(*_dieu_kien(upto, since)).where(khong_phai_ket_chuyen())
+         .group_by(JournalLine.account_code))
+    for ma, rong in db.execute(q):
+        a = accs.get(ma)
+        if not a or not ma.startswith(PL_PREFIX) or ma.startswith("911"): continue
         code = a.pl_code; p = a
         while not code and p and p.parent:
             p = accs.get(p.parent); code = p.pl_code if p else ""
         if not code: continue
-        amt = ((l.credit or 0) - (l.debit or 0)) if a.kind == "DT" else ((l.debit or 0) - (l.credit or 0))
+        amt = -float(rong or 0) if a.kind == "DT" else float(rong or 0)
         v[code] = v.get(code, 0.0) + amt
-        if l.account_code.startswith("6351"): v["24"] = v.get("24", 0.0) + amt
+        if ma.startswith("6351"): v["24"] = v.get("24", 0.0) + amt
     for c, f in {m["code"]: m["formula"] for m in MAU["kqkd"] if m["formula"]}.items():
         tot, sign, tok = 0.0, 1, ""
         for ch in f + "+":

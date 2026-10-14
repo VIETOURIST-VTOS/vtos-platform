@@ -78,9 +78,14 @@ def _khong_phai_ket_chuyen():
     """Điều kiện loại TRỌN VẸN mọi chứng từ kết chuyển cuối kỳ.
 
     ══ LUẬT NÀY KHÔNG PHẢI EM NGHĨ RA — nó đã chạy trong services/bctc.py từ trước ═════════════
-    `bctc._lines(exclude_closing=True)` gom `closing_ids` bằng đúng hai điều kiện dưới đây rồi bỏ
-    CẢ chứng từ. Báo cáo BCTC TT99 vì thế đọc đúng; `income_statement` — cái mà màn hình Chủ tịch
-    đang đọc — thì không. Hai công thức cho cùng một câu hỏi, và chúng đã lệch nhau thật.
+    Báo cáo BCTC TT99 loại trọn vẹn chứng từ kết chuyển bằng đúng hai điều kiện dưới đây từ
+    trước; `income_statement` — cái mà màn hình Chủ tịch đang đọc — thì không. Hai công thức cho
+    cùng một câu hỏi, và chúng đã lệch nhau thật.
+
+    ĐỢT E18 (15/10/2026) DỌN NỐT: luật nay khai ở ĐÚNG MỘT CHỖ,
+    `services/bctc.py::khong_phai_ket_chuyen`, và hàm này gọi về đó thay vì viết lại. Trước đợt ấy
+    cùng một luật nằm ở hai tệp, và hai chỗ là hai chỗ để lệch nhau. `test_e18_4` đỏ nếu ai viết
+    lại điều kiện 911 ở đây lần nữa.
 
     ĐO ĐƯỢC TRÊN SỔ THẬT 18/9/2026, kỳ 2026-06 của cả tập đoàn:
         doanh thu (01) = −45.216.354.515      giá vốn (11) = −36.373.329.530
@@ -97,8 +102,8 @@ def _khong_phai_ket_chuyen():
     LOẠI CẢ CHỨNG TỪ chứ không chỉ loại dòng 911: một bút toán kết chuyển có hai vế — Nợ 511 và
     Có 911. Bỏ mỗi vế 911 thì vế Nợ 511 ở lại, và đó đúng là vế đang phá con số doanh thu.
     """
-    kc = select(JournalLine.entry_id).where(JournalLine.account_code.like("911%")).scalar_subquery()
-    return (JournalEntry.source_type != "ket_chuyen") & (JournalEntry.id.notin_(kc))
+    from app.services import bctc as BCTC   # nhập tại chỗ: bctc không nhập gì từ services, không vòng
+    return BCTC.khong_phai_ket_chuyen()
 
 
 def so_but_toan(db: Session, period: str, company_id: int | None = None) -> int:
