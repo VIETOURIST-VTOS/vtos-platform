@@ -232,13 +232,35 @@ def test_doi_xe_co_ba_ky_xem():
 def test_ky_chua_co_nguon_thi_KHONG_bay_so_cua_ky_khac():
     """CHỖ RẤT DỄ LÀM SAI: dựng ba nút rồi để cả ba hiện CÙNG một bộ số là nói dối bằng giao diện.
     Người đọc bấm "Quý" thấy số không đổi sẽ kết luận quý bằng tháng, chứ không kết luận là chưa
-    có số cho quý."""
-    t = _bo_chu_thich_tsx(_doc(V14))
-    assert 'ky === "thang" ? (d || {}) : {}' in t, (
-        "Kỳ Quý và Năm KHÔNG được lấy bộ số của kỳ Tháng làm lối lui."
-    )
-    assert "coNguonKy" in t, "Phải nói ra khi kỳ đang chọn chưa có nguồn số."
+    có số cho quý.
 
+    SỬA 14/10/2026 (Đợt E17) — VÀ ĐÂY LÀ MỘT PHÉP THỬ ĐÃ BÁO SAI, nên ghi lại cho rõ:
+
+    Bản cũ so ĐÚNG TỪNG KÝ TỰ chuỗi `ky === "thang" ? (d || {}) : {}`. Sau đó có người SIẾT mã chặt
+    hơn — thêm điều kiện `&& !moc`, tức là khi đang chọn một mốc thời gian thì kỳ Tháng cũng không
+    mượn số mặc định nữa. Luật được giữ chặt hơn, còn phép thử thì đỏ, như thể việc siết là một lỗi.
+
+    Nó đứng đỏ trên main nhiều ngày, và cái giá không phải là chỗ đỏ ấy: một phép thử đỏ mà ai cũng
+    biết "đỏ sẵn, kệ nó" là một phép thử đã chết — ngày nó đỏ vì lý do THẬT thì không còn ai nhìn.
+
+    Nay nó canh LUẬT chứ không canh chuỗi ký tự: lối lui (`d`, bộ số kỳ mặc định) chỉ được dùng
+    DƯỚI điều kiện có `ky === "thang"`. Thêm điều kiện khác vào vế ấy thì vẫn xanh (siết chặt hơn
+    là chuyện tốt); bỏ `ky === "thang"` đi, hoặc đem `d` ra ngoài điều kiện, thì ĐỎ.
+    """
+    t = _bo_chu_thich_tsx(_doc(V14))
+    assert "coNguonKy" in t, "Phải nói ra khi kỳ đang chọn chưa có nguồn số."
+    # Mọi chỗ dùng bộ số mặc định `d` làm lối lui, kèm phần điều kiện đứng ngay trước nó.
+    loi_lui = list(re.finditer(r"\(\s*d\s*\|\|\s*\{\}\s*\)", t))
+    assert loi_lui, (
+        "Không còn chỗ nào dùng bộ số kỳ mặc định làm lối lui cho kỳ Tháng. Nếu đã bỏ hẳn lối lui "
+        "thì sửa phép thử này cho đúng điều mới — đừng để nó canh một luật không còn ai theo.")
+    for m in loi_lui:
+        truoc = t[max(0, m.start() - 400):m.start()]
+        dieu_kien = truoc.rsplit("?", 1)[0] if "?" in truoc else ""
+        assert 'ky === "thang"' in dieu_kien[-200:], (
+            "Kỳ Quý và Năm KHÔNG được lấy bộ số của kỳ Tháng làm lối lui: chỗ dùng `d || {}` phải "
+            "nằm dưới một điều kiện có `ky === \"thang\"`. Thêm điều kiện khác vào vế ấy thì được, "
+            "bỏ điều kiện ấy đi thì không.")
 
 def test_nut_ky_dang_chon_khac_han_hai_nut_kia():
     """Ba nút gần giống nhau thì người đọc không chắc mình đang xem kỳ nào — và đó là lúc con số

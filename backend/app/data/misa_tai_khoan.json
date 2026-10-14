@@ -72,6 +72,16 @@
    "pl_code": null
   },
   {
+   "code": "12811",
+   "name": "Tiền gửi có kỳ hạn gốc không quá 3 tháng (tương đương tiền)",
+   "kind": "TS",
+   "parent": "1281",
+   "level": 3,
+   "bs_debit": "112",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
    "code": "1283",
    "name": "Cho vay",
    "kind": "TS",

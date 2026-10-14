@@ -55,6 +55,42 @@ CHART = [
 
 
 MISA_CHART = Path(__file__).resolve().parent.parent / "data" / "misa_tai_khoan.json"
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# CHỈ TIÊU 112 — TƯƠNG ĐƯƠNG TIỀN. Chủ tịch chốt 14/10/2026 (Đợt E17)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# CHỖ HỎNG, đo được 14/10/2026 khi đối chiếu BCTC từ sổ VTOS với bản soát xét Baker Tilly: trong
+# cả danh mục 125 tài khoản KHÔNG có một mã nào ánh xạ chỉ tiêu 112. Nghĩa là chỉ tiêu "Các khoản
+# tương đương tiền" của VTOS luôn bằng 0 dù Kế toán điền thế nào — bản đã ký ghi 4.203.801.096 ở
+# dòng ấy, còn VTOS dồn hết vào 123. Tổng 100/280 vẫn đúng, nhưng HAI DÒNG nói sai, và đó là hai
+# dòng người đọc báo cáo nhìn đầu tiên khi hỏi "công ty còn bao nhiêu tiền tiêu ngay được".
+#
+# LUẬT PHÂN LOẠI, Chủ tịch chốt nguyên văn 14/10/2026:
+#
+#   · 12811 — tiền gửi có KỲ HẠN GỐC không quá 3 tháng, đủ điều kiện tương đương tiền → chỉ tiêu 112.
+#   · phần còn lại của 1281 → chỉ tiêu 123 (đầu tư nắm giữ đến ngày đáo hạn ngắn hạn).
+#     KHÔNG cộng lại phần đã đưa vào 112.
+#
+# ĐIỀU KIỆN LÀ KỲ HẠN GỐC, KHÔNG PHẢI THỜI GIAN CÒN LẠI đến ngày đáo hạn. Đây là chỗ dễ làm sai
+# nhất và làm sai thì sai theo hướng thổi phồng tiền: một khoản gửi 12 tháng còn 2 tháng nữa đáo
+# hạn KHÔNG phải tương đương tiền, dù nhìn thì "sắp rút được". `test_e17` canh đúng câu này và đỏ
+# nếu ai sửa luật thành thời gian còn lại.
+#
+# 12811 LÀ MÃ CHI TIẾT DOANH NGHIỆP TỰ MỞ, không phải mã của Thông tư — nên nó khai ở danh mục
+# `misa_tai_khoan.json` như mọi tiểu khoản khác, và 1281 từ nay là tài khoản cha (is_detail=False),
+# đúng lệ mà `banks.py` đã dùng khi mở tiểu khoản 112 theo từng ngân hàng.
+#
+# ĐỢT NÀY KHÔNG CHUYỂN MỘT ĐỒNG NÀO. Thêm tài khoản chỉ mở CHỖ cho con số; số dư 1281 đang có vẫn
+# nằm nguyên ở 1281 cho tới khi Kế toán tải lên một bộ số BCTC tách hai dòng (1281 và 12811), Chủ
+# tịch ký, rồi chốt sổ lại — đúng đường của Đợt E16. Máy KHÔNG tự suy phần nào ≤ 3 tháng: kỳ hạn
+# gốc nằm ở hợp đồng tiền gửi, không nằm trong sổ, nên tự suy là bịa.
+TK_TUONG_DUONG_TIEN = "12811"
+CHI_TIEU_TUONG_DUONG_TIEN = "112"
+QUY_TAC_TUONG_DUONG_TIEN = (
+    "Tiền gửi có KỲ HẠN GỐC không quá 3 tháng mới là tương đương tiền (chỉ tiêu 112); xét theo kỳ "
+    "hạn gốc của hợp đồng, KHÔNG phải thời gian còn lại đến ngày đáo hạn. Phần còn lại của 1281 "
+    "đi chỉ tiêu 123 và không cộng lại phần đã đưa vào 112.")
 # Tài khoản bắt buộc có đối tượng / công trình (định hướng 06/9/2026 – 4 chiều đối tượng)
 NEED_PARTNER = ("131", "331", "1388", "141", "3388", "341", "1281", "1283", "136", "222", "221", "244")
 NEED_PROJECT = ("154", "5113", "632")
