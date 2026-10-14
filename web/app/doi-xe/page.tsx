@@ -672,7 +672,11 @@ function DoiXe() {
           Hai bước chứ không một: BẤM SOÁT trước, máy nói chiếc này vướng gì; nút xoá chỉ hiện khi
           máy đã trả lời là xoá được. Không dùng hộp thoại xác nhận của trình duyệt — một hộp thoại
           bấm quen tay thì không còn là một lần cân nhắc. */}
-      <XoaXe xe={chon} xong={() => { setChon(null); load(); }} />
+      {/* `key` theo id xe là BẮT BUỘC, không phải cho gọn: đo 14/10/2026 trên bản chạy thật —
+          soát xe A rồi bấm sang xe B thì khối vẫn in câu trả lời của xe A, vì React giữ
+          nguyên trạng thái khi chỉ đổi prop. Một người đọc nhanh sẽ tin câu của xe A là của
+          xe B, và đây là khối quyết định có xoá hẳn một dòng hay không. */}
+      <XoaXe key={chon.id} xe={chon} xong={() => { setChon(null); load(); }} />
       <button className="act grey" onClick={() => setChon(null)}>Đóng</button>
     </div>}
 
@@ -942,7 +946,10 @@ function XoaXe({ xe, xong }: { xe: any; xong: () => void }) {
   const [s, setS] = useState<any>(null);
   const [ly, setLy] = useState("");
   const [dang, setDang] = useState(false);
-  const xoaDuocQuyen = user?.role === "cntt";
+  // PHẢI khớp với XOA_XE trong backend/app/api/v1/fleet.py — lệch nhau thì hoặc nút hiện rồi
+  // bấm vào báo 403, hoặc có vai bấm được mà màn hình không cho thấy nút. Có phép thử canh.
+  const XOA_XE_VAI = ["cntt", "chutich"];
+  const xoaDuocQuyen = XOA_XE_VAI.includes(user?.role || "");
 
   const soat = async () => {
     setDang(true);
@@ -980,7 +987,7 @@ function XoaXe({ xe, xong }: { xe: any; xong: () => void }) {
               <button className="act orange" style={{ margin: "8px 0 0" }}
                 disabled={dang || !ly.trim()} onClick={xoa}>Xoá xe {xe.plate} khỏi danh mục</button>
             </>
-            : <p className="muted">Xoá được, nhưng chỉ <b>CNTT</b> bấm được nút xoá.</p>)}
+            : <p className="muted">Xoá được, nhưng chỉ <b>CNTT</b> hoặc <b>Chủ tịch</b> bấm được nút xoá.</p>)}
           <p><button className="act grey" style={{ margin: "8px 0 0" }}
             onClick={() => { setS(null); setLy(""); }}>Thôi</button></p>
         </>}
