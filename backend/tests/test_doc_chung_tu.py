@@ -75,11 +75,28 @@ def _hd_tho(**kw):
 
 # ====================== ĐIỀU CẤM ======================
 def test_khong_doc_bang_luong_va_bang_bao_hiem_bang_may(db):
+    """CỬA PHẢI CHẬN, VÀ CÂU CHẬN PHẢI NÓI ĐÚNG CÁI LUẬT ĐÃ KHAI Ở MỘT CHỖ.
+
+    ĐỢT DỌN-3 14/10/2026 — phép thử này từng ghim thẳng chuỗi "Nghị định 13/2023" vào đây, và
+    nó Đỏ trên main: mã đã chuyển sang Luật Bảo vệ dữ liệu cá nhân 2025 + NĐ 356/2025 (NĐ 356/2025
+    thay NĐ 13/2023 từ 01/01/2026), mà phép thử thì không ai sửa theo. Cửa vẫn chặn đúng suốt thời
+    gian đó — chỉ có lời dẫn luật trong phép thử là cũ.
+
+    Sửa bằng cách thay một con số là chép lại đúng cái lỗi ấy: số hiệu luật nằm ở HAI chỗ, và lần
+    đổi luật sau nó lại lệch. Nên phép thử đọc THẮNG từ `CAM_DOC_BANG_MAY` — đúng cái bảng mà dịch
+    vụ dùng để dựng câu báo lỗi. Luật khai MỘT CHỖ; phép thử hỏi "câu chặn có nói đúng cái đã khai
+    ở chỗ ấy không", chứ không hỏi "có trùng chuỗi tôi gõ tay ở đây không".
+    """
+    from app.models.doc_chung_tu import CAM_DOC_BANG_MAY
     from app.services import doc_chung_tu as D
     for loai in ("bang_luong", "bang_bao_hiem"):
         with pytest.raises(D.KhongDocDuoc) as ex:
             D.doc(db, loai, "bl.png", anh(1), "image/png", "hcns", "hcns")
-        assert "Nghị định 13/2023" in str(ex.value)
+        ly_do = CAM_DOC_BANG_MAY[loai]
+        assert ly_do, f"`CAM_DOC_BANG_MAY[{loai!r}]` rỗng — một điều cấm không nói lý do là một điều cấm sẽ bị gỡ"
+        assert ly_do in str(ex.value), (
+            f"Câu chặn không mang theo lý do đã khai ở `CAM_DOC_BANG_MAY[{loai!r}]`. "
+            "Người dùng bị chặn mà không được biết vì sao thì lần sau họ đi tìm đường vòng.")
 
 
 def test_dieu_cam_nam_trong_ma_chu_khong_phai_trong_cau_hinh():
