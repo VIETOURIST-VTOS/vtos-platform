@@ -240,6 +240,12 @@ PHAI_LOC = {
     # trách pháp nhân B là tiền của A đi trả nợ cho B ngay trên màn hình.
     "ChotSoDu":       "bản chốt số dư đã đối soát của ĐÚNG MỘT pháp nhân – nền của hàm tiền khả "
                       "dụng; lọt sang pháp nhân khác là bù trừ tiền giữa hai pháp nhân",
+    # Đợt E15 14/10/2026. Cùng một lý do với `ChotSoDu`, và chặt hơn một bậc: một lời giải thích
+    # chênh lệch nói ra chính chỗ sổ của một pháp nhân đang hụt hoặc dư so với tiền thật — đó là thứ
+    # kế toán của pháp nhân khác không có việc gì phải đọc, và cộng nhầm sang pháp nhân khác thì
+    # bảng đối chiếu báo "đã giải thích hết" trong khi thực ra chưa.
+    "GiaiThichLech":  "lời giải thích chênh lệch tiền của ĐÚNG MỘT pháp nhân; cộng nhầm sang pháp "
+                      "nhân khác là báo đã đối chiếu xong trong khi chưa",
     "ContentItem":    "nội dung đăng dưới thương hiệu của một pháp nhân",
     # Sổ hoạt động PR (18/9/2026). Cùng lý do với ContentItem: một bài báo, một sự kiện, một vụ
     # khủng hoảng đều xảy ra DƯỚI THƯƠNG HIỆU của một pháp nhân cụ thể, và người chỉ phụ trách một

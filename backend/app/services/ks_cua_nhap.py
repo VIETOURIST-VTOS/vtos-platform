@@ -75,6 +75,11 @@ CUA_TAY = (
     # ("xin mở lại kỳ 09, vì..."), nên máy nạp sẵn một dòng là máy tự xin hộ. KHÔNG khai MAY_SINH:
     # hai cột `khoa_lai_*` do máy điền lúc khóa lại, nhưng DÒNG thì luôn do người mở.
     "mo_lai_ky",
+    # Đợt E15 14/10/2026. CỬA TAY trên màn hình /dong-tien, khung "Đối chiếu tiền" → nút "Giải
+    # thích" của từng dòng: ô số tiền (có dấu) + ô "khoản này là khoản gì". Bảng bắt đầu RỖNG và
+    # phải rỗng — mỗi dòng là một câu NGƯỜI nói, nên máy nạp sẵn một dòng là máy giải thích hộ
+    # chính cái chênh lệch mà đợt này dựng ra để bắt người phải nói. KHÔNG khai MAY_SINH.
+    "giai_thich_lech",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
     "auto_reports", "ban_doc_chung_tu", "bang_gia", "bang_gia_dong", "bank_accounts_cat",
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",
