@@ -426,7 +426,7 @@ function LenhDieuXe() {
         {ho.khong_qua_de_nghi > 0
           ? <><Tag cls="warn">chuỗi chưa liền</Tag> {ho.khong_qua_de_nghi}/{ho.tong_lenh} lệnh lập <b>không qua cửa đề nghị</b>. Khi con số này về 0 và giữ 0 một thời gian thì bắt buộc đề nghị được, mà không làm ai đứng việc.</>
           : <><Tag cls="ok">chuỗi liền</Tag> Cả {ho.tong_lenh} lệnh đều đi qua cửa đề nghị xe.</>}</p>}
-      <table><thead><tr><th>#</th><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Từ → đến</th><th>Giá nội bộ</th><th>Trạng thái</th><th>Tài xế nhận</th><th>Ghi vết gợi ý</th></tr></thead>
+      <table><thead><tr><th>#</th><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Từ → đến</th><th>Giá nội bộ</th><th>Trạng thái</th><th>Tài xế nhận</th><th>Ghi vết gợi ý</th><th>Dọn</th></tr></thead>
         <tbody>{ds.length ? ds.map((d) => <tr key={d.id}>
           <td>{d.id}</td><td>{d.tour}</td><td>{d.ma_xe} · {d.xe}</td><td>{d.tai_xe}</td>
           <td>{fmtD(d.date_from)} → {fmtD(d.date_to)} <span className="muted">({d.so_ngay} ngày)</span></td>
@@ -441,9 +441,64 @@ function LenhDieuXe() {
             : <span className="muted">—</span>}</td>
           <td>{d.ly_do_khac_goi_y ? <><Tag cls="warn">chọn khác gợi ý</Tag> <div className="muted">{d.ly_do_khac_goi_y}</div></>
             : d.phuong_an_da_chon ? <Tag cls="ok">theo gợi ý</Tag> : <span className="muted">lệnh cũ, chưa có ghi vết</span>}</td>
-        </tr>) : <tr><td colSpan={9} className="muted">Chưa có lệnh điều xe nào.</td></tr>}</tbody></table>
+          {/* `key` theo id lệnh là BẮT BUỘC: không có nó thì soát lệnh này rồi bấm sang lệnh khác
+              sẽ thấy câu trả lời của lệnh trước — đã xảy ra thật ở cửa xoá xe ngày 14/10/2026,
+              và đây là khối quyết định có làm mất hẳn một chứng từ hay không. */}
+          <td><XoaLenh key={d.id} lenh={d} xong={load} /></td>
+        </tr>) : <tr><td colSpan={10} className="muted">Chưa có lệnh điều xe nào.</td></tr>}</tbody></table>
     </div>
   </>);
+}
+
+/** DL-4 · Xoá một lệnh điều xe CHƯA TỪNG CHẠY (Chủ tịch chọn 14/10/2026).
+ *
+ *  Hai bước chứ không một: bấm SOÁT trước, máy in ra nội dung lệnh và nói vướng gì; nút xoá chỉ
+ *  hiện khi máy đã trả lời là xoá được. KHÔNG dùng hộp thoại xác nhận của trình duyệt — một hộp
+ *  thoại bấm quen tay thì không còn là một lần cân nhắc.
+ *
+ *  Máy in cả nội dung lệnh ra trước khi xoá, vì `status` không chứng minh được gì: `DL-0825` mang
+ *  chữ "hoàn thành" mà không có lấy một chuyến nào. Người bấm phải nhìn tận mắt tour, xe, tài xế,
+ *  ngày và giá rồi mới quyết. */
+function XoaLenh({ lenh, xong }: { lenh: any; xong: () => void }) {
+  const { user, toast } = useShell();
+  const [s, setS] = useState<any>(null);
+  const [ly, setLy] = useState("");
+  const [dang, setDang] = useState(false);
+  // PHẢI khớp với XOA_LENH trong backend/app/api/v1/hr.py — có phép thử canh.
+  const XOA_LENH_VAI = ["cntt", "chutich"];
+  const quyen = XOA_LENH_VAI.includes(user?.role || "");
+
+  const soat = async () => {
+    setDang(true);
+    try { setS(await api(`/dispatch/${lenh.id}/xoa-duoc`)); }
+    catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+  const xoa = async () => {
+    setDang(true);
+    try {
+      const r: any = await api(`/dispatch/${lenh.id}?ly_do=${encodeURIComponent(ly)}`, { method: "DELETE" });
+      toast(r.message); setS(null); setLy(""); xong();
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+
+  if (!s) return <button className="act grey" style={{ margin: 0 }} disabled={dang}
+    onClick={soat}>Xoá được không?</button>;
+  return (<div>
+    <div className={"gate " + (s.xoa_duoc ? "pass" : "fail")}>{s.noi}</div>
+    {s.vuong?.length > 0 && <div className="muted">Đang vướng: {s.vuong.map((x: any) => `${x.so_dong} ${x.ten}`).join(" · ")}.</div>}
+    {s.xoa_duoc && (quyen
+      ? <>
+        <label>Lý do xoá <span className="muted">(bắt buộc — tháng sau còn trả lời được vì sao
+          chứng từ này biến mất)</span>
+          <input value={ly} onChange={(e) => setLy(e.target.value)}
+            placeholder="ví dụ: lệnh dữ liệu mẫu, chưa từng chạy" /></label>
+        <button className="act orange" style={{ margin: "8px 0 0" }}
+          disabled={dang || !ly.trim()} onClick={xoa}>Xoá lệnh #{lenh.id}</button>
+      </>
+      : <p className="muted">Xoá được, nhưng chỉ <b>CNTT</b> hoặc <b>Chủ tịch</b> bấm được nút xoá.</p>)}
+    <p><button className="act grey" style={{ margin: "8px 0 0" }}
+      onClick={() => { setS(null); setLy(""); }}>Thôi</button></p>
+  </div>);
 }
 
 export default function Page() { return <Shell><LenhDieuXe /></Shell>; }
