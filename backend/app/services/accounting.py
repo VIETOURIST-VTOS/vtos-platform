@@ -486,6 +486,23 @@ def lock_period(db: Session, u: User, period: str, note: str) -> PeriodLock:
     drafts = db.execute(select(func.count()).select_from(JournalEntry).where(JournalEntry.period == period, JournalEntry.status == "nhap")).scalar()
     if drafts:
         raise ValueError(f"Còn {drafts} chứng từ nháp trong kỳ {period} – ghi sổ hoặc hủy trước khi khóa")
+    # ĐỢT E15 14/10/2026 — CHƯA ĐỐI CHIẾU HẾT TIỀN THÌ CHƯA KHÓA ĐƯỢC KỲ.
+    #
+    # Chỗ chặn nằm Ở ĐÂY chứ không ở màn hình: khóa kỳ là lúc cuối cùng còn sửa được, và một hàng rào
+    # chỉ dựng trên giao diện thì mọi cửa khác đi vòng qua được. Đặt sau phép đếm chứng từ nháp là có chủ
+    # ý: hai câu từ chối khác nhau, và người dùng cần nghe câu dễ sửa trước.
+    #
+    # Chênh lệch ở đây là SỔ KẾ TOÁN trừ SỐ ĐÃ CHỐT — tức hạch toán thiếu hoặc thừa, đi thẳng vào
+    # Bảng cân đối kế toán. Khóa một kỳ còn chênh lệch chưa ai giải thích là đóng sổ trên một con số
+    # chưa ai dám nhận.
+    from app.services import doi_chieu_tien as _DC
+    thieu = _DC.ly_do_chua_khoa_duoc(db, period)
+    if thieu:
+        raise ValueError(
+            f"Kỳ {period} còn chênh lệch tiền chưa giải thích hết nên chưa khóa được: "
+            + "; ".join(thieu[:5])
+            + (f" (và {len(thieu) - 5} chỗ nữa)" if len(thieu) > 5 else "")
+            + ". Vào màn hình Dòng tiền → Đối chiếu tiền để ghi từng khoản giải thích.")
     pl = PeriodLock(period=period, locked_by=u.username, note=note)
     db.add(pl)
     R.audit(db, u.username, u.role, "khoa_ky_ke_toan", f"period:{period}", after={"ghi_chu": note})

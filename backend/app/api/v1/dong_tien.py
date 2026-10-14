@@ -369,3 +369,100 @@ def robot_dong_bo_nghia_vu(db: Session = Depends(get_db)):
     db.commit()
     KHO_KHUNG.xoa()
     return {**ra, "message": f"Robot đã dựng lại sổ nghĩa vụ — {ra['tong_dong']} dòng"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT E15 14/10/2026 · ĐỐI CHIẾU TIỀN — sổ kế toán ↔ số đã chốt ↔ số máy cộng
+#
+# BA CỬA, ĐẶT DƯỚI ĐÚNG TIỀN TỐ `/api/v1/dong-tien` ĐÃ KHAI. Không xin tiền tố mới: màn hình
+# `/dong-tien` đã được khai cho đúng nhóm vai này, và một tiền tố mới là một lần phải mở lại bảng
+# phân quyền cho một việc vốn thuộc về đúng màn hình ấy.
+#
+# KHÔNG tự thêm một phép lọc phạm vi pháp nhân ở từng cửa này. Các cửa nhận `company_id` sẵn có ở
+# cùng tệp — `/tien-kha-dung/{id}`, `/bang/{id}` — đều KHÔNG lọc, vì theo bản khai đầu tệp việc lọc
+# theo từng dòng thuộc SEC-02 của làn Phân quyền. Thêm một phép lọc chỉ ở ba cửa mới là dựng hai
+# luật khác nhau trong cùng một tệp, và chỗ nào đúng thì không ai biết nữa.
+#
+# AI ĐỌC dùng lại `XEM` (Chủ tịch, TGĐ, Kế toán, Ban Kiểm soát…), AI GHI dùng lại `CHOT` — người
+# giải thích chênh lệch chính là người đã ký bản chốt. Không khai nhóm vai thứ ba cho một việc nằm
+# trong cùng một mạch.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+class GiaiThichIn(BaseModel):
+    company_id: int
+    nguon: str
+    tai_khoan_id: int | None = None
+    den_ngay: date
+    so_tien: float
+    ly_do: str
+    ghi_chu: str = ""
+
+
+class HuyGiaiThichIn(BaseModel):
+    ly_do: str
+
+
+@router.get("/doi-chieu/{company_id}")
+def xem_doi_chieu(company_id: int, den_ngay: date | None = None,
+                  u: User = Depends(require_roles(*XEM, mo_ta="xem đối chiếu tiền")),
+                  db: Session = Depends(get_db)):
+    """Bảng đối chiếu tiền. Mỗi ô RỖNG đi kèm `vi_sao` — màn hình hiện "—", không hiện "0 đ"."""
+    from app.services import doi_chieu_tien as DC
+    return DC.bang(db, company_id, den_ngay or date.today())
+
+
+@router.get("/doi-chieu/{company_id}/giai-thich")
+def danh_sach_giai_thich(company_id: int, den_ngay: date, nguon: str,
+                         tai_khoan_id: int | None = None,
+                         u: User = Depends(require_roles(*XEM, mo_ta="xem giải thích chênh lệch")),
+                         db: Session = Depends(get_db)):
+    """Các khoản giải thích của đúng một ô trong bảng. Trả CẢ dòng đã gỡ, có đánh dấu.
+
+    Trả cả dòng đã gỡ là có chủ ý: một lời giải thích bị gỡ là một lần ai đó nghĩ lại, và đó là thứ
+    kiểm toán muốn nhìn — giấu nó đi thì bảng trông như chưa từng sai bao giờ.
+    """
+    from app.models.doi_chieu_tien import GiaiThichLech
+    dong = db.execute(select(GiaiThichLech).where(
+        GiaiThichLech.company_id == company_id,
+        GiaiThichLech.nguon == nguon,
+        GiaiThichLech.tai_khoan_id == tai_khoan_id,
+        GiaiThichLech.den_ngay == den_ngay)
+        .order_by(GiaiThichLech.id.desc())).scalars().all()
+    return {"rows": [{"id": g.id, "so_tien": float(g.so_tien), "ly_do": g.ly_do,
+                      "trang_thai": g.trang_thai, "boi": g.boi, "luc": g.luc,
+                      "huy_boi": g.huy_boi, "huy_luc": g.huy_luc, "huy_ly_do": g.huy_ly_do,
+                      "ghi_chu": g.ghi_chu} for g in dong]}
+
+
+@router.post("/doi-chieu/giai-thich", status_code=201)
+def them_giai_thich(data: GiaiThichIn,
+                    u: User = Depends(require_roles(*CHOT, mo_ta="giải thích chênh lệch tiền")),
+                    db: Session = Depends(get_db)):
+    """Ghi MỘT khoản giải thích. Không sinh bút toán nào — sửa số là việc của bút toán điều chỉnh."""
+    from app.services import doi_chieu_tien as DC
+    try:
+        g = DC.them_giai_thich(db, u.username, data.company_id, data.nguon, data.tai_khoan_id,
+                               data.den_ngay, data.so_tien, data.ly_do, data.ghi_chu)
+    except DC.LoiDoiChieu as e:
+        raise HTTPException(422, str(e))
+    R.audit(db, u.username, u.role, "giai_thich_lech_tien", f"giai_thich_lech:{g.id}",
+            after={"company_id": g.company_id, "nguon": g.nguon,
+                   "den_ngay": str(g.den_ngay), "so_tien": float(g.so_tien), "ly_do": g.ly_do})
+    db.commit()
+    return {"id": g.id, "message": f"Đã ghi khoản giải thích {float(g.so_tien):,.0f} đ"}
+
+
+@router.post("/doi-chieu/giai-thich/{gid}/huy")
+def huy_giai_thich(gid: int, data: HuyGiaiThichIn,
+                   u: User = Depends(require_roles(*CHOT, mo_ta="gỡ giải thích chênh lệch")),
+                   db: Session = Depends(get_db)):
+    """Gỡ một lời giải thích. Dòng KHÔNG bị xoá, chỉ chuyển sang `da_huy` kèm người gỡ và lý do."""
+    from app.models.doi_chieu_tien import GiaiThichLech
+    from app.services import doi_chieu_tien as DC
+    try:
+        g = DC.huy_giai_thich(db, u.username, gid, data.ly_do)
+    except DC.LoiDoiChieu as e:
+        raise HTTPException(422, str(e))
+    R.audit(db, u.username, u.role, "huy_giai_thich_lech", f"giai_thich_lech:{g.id}",
+            after={"ly_do": g.huy_ly_do})
+    db.commit()
+    return {"id": g.id, "message": "Đã gỡ khoản giải thích"}
