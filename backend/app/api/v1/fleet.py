@@ -2120,3 +2120,50 @@ def hq_dat_dinh_muc(data: DinhMucDauIn, u: User = Depends(require_roles(*HQ_NGUO
     return {"seats": data.seats, "l_100km": data.l_100km,
             "message": ("Đã xoá định mức" if data.l_100km is None
                         else f"Đã đặt {data.l_100km} L/100km cho xe {data.seats} chỗ")}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# XE-1 (14/10/2026) — XOÁ MỘT DÒNG XE TẠO NHẦM.
+#
+# Chủ tịch chọn 14/10/2026 sau khi đo trên hệ thật: danh mục 16 xe, hai dòng là dữ liệu mẫu
+# (51B-123.45, 51B-678.90) không bán được, không ngừng khai thác được, và không có cách nào bỏ đi.
+#
+# CHỈ CNTT. Không phải vì Đội xe kém tin cậy hơn, mà vì đây là thao tác DUY NHẤT trong phân hệ xe
+# làm mất hẳn một dòng — mọi thao tác khác đều chỉ đổi trạng thái. Để một vai dùng hằng ngày giữ
+# nút ấy là sớm muộn có người bấm nhầm thay vì ghi "ngừng khai thác".
+#
+# Hai cửa chứ không một: cửa SOÁT đọc được bằng vai READ, để Đội xe tự thấy chiếc nào xoá được và
+# chiếc nào vướng gì — không phải hỏi CNTT rồi chờ.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+XOA_XE = ("cntt",)
+
+
+@router.get("/xe/{vid}/xoa-duoc")
+def xe_xoa_duoc(vid: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    from app.services import xoa_xe as XX
+    v = db.get(Vehicle, vid)
+    if v is None:
+        raise HTTPException(404, "Không có xe này")
+    return XX.soat(db, v)
+
+
+@router.delete("/xe/{vid}")
+def xe_xoa(vid: int, ly_do: str, u: User = Depends(require_roles(*XOA_XE)),
+           db: Session = Depends(get_db)):
+    from app.services import xoa_xe as XX
+    v = db.get(Vehicle, vid)
+    if v is None:
+        raise HTTPException(404, "Không có xe này")
+    bien = v.plate
+    try:
+        kq = XX.xoa(db, v, ly_do)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    # Nhật ký giữ NGUYÊN nội dung dòng đã xoá: xoá nhầm thì còn dựng lại được bằng tay.
+    R.audit(db, u.username, u.role, "xoa_xe", f"vehicle:{kq['da_xoa'].get('code') or bien}",
+            before={k: (x.isoformat() if hasattr(x, "isoformat") else x)
+                    for k, x in kq["da_xoa"].items()},
+            after={"ly_do": kq["ly_do"], "lich_su_bien": len(kq["lich_su_bien"])})
+    db.commit()
+    return {"message": f"Đã xoá xe {bien} khỏi danh mục", "ly_do": kq["ly_do"]}
