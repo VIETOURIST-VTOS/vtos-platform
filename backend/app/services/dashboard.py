@@ -325,7 +325,10 @@ def build(db: Session, u: User) -> dict:
         # ra là "đội xe chạy 0 ngày".
         try:
             from app.services import hieu_qua_xe as HQ
-            tk = HQ.theo_ky(db, today)
+            tk = HQ.theo_ky(db, today, hom_nay=today)
+            # HQ-2 — danh sách kỳ CÓ CHUYẾN đi kèm ngay lần vẽ đầu. Thiếu nó thì ô chọn kỳ không
+            # hiện ra cho tới khi người đọc đổi kỳ một lần — tức là không bao giờ.
+            tk["ky_co_chuyen"] = HQ.ky_co_chuyen(db)
             sec["hieu_qua_xe"] = tk["thang"]
             sec["hieu_qua_xe_theo_ky"] = tk
         except Exception as ex:

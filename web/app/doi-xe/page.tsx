@@ -683,6 +683,16 @@ function DoiXe() {
           không theo biển – biển đổi mà hồ sơ đi theo biển thì giấy tờ của một chiếc xe nằm rải ở hai chỗ.
           Đặt mã cho xe ở bảng trên rồi quay lại.</p></div>)}
 
+    {/* ── HQ-2c · ĐỊNH MỨC TIÊU HAO DẦU ──────────────────────────────────────────────────────
+        Chủ tịch quyết 13/10/2026: ngưỡng do ĐỘI XE khai, không để máy tự đoán. Lý do nằm ngay
+        trong phương án bị loại — lấy trung bình 6 tháng của chính chiếc xe làm mốc nghe thì gọn,
+        nhưng một chiếc hao nhiều SUỐT sáu tháng thì máy coi đó là bình thường, và chiếc hao nhất
+        đội thành chiếc không bao giờ bị cảnh báo.
+
+        Khai theo SỐ CHỖ chứ không theo từng xe: số chỗ là thuộc tính đã có trong danh mục và chính
+        nó quyết định mức hao. Khai theo từng xe thì mỗi lần mua xe mới lại thêm một ô trống nữa. */}
+    {tab === "xe" && <DinhMucDau />}
+
     {/* ── 4.9.6 · BẢO DƯỠNG & SỬA CHỮA ────────────────────────────────────────────────────────
         Bảng `fleet_maintenance`, hai cửa API và thuật toán `moc_bao_duong()` có từ Đợt 1; tới
         29/9/2026 KHÔNG màn hình nào gọi tới, nên mục 4.9.6 của cây phân hệ vẫn trống và đội xe
@@ -839,3 +849,71 @@ function DoiXe() {
 }
 
 export default function Page() { return <Shell><DoiXe /></Shell>; }
+
+/* ════════════════════════════════════════════════════════════════════════════════════════════
+   HQ-2c · ĐỊNH MỨC TIÊU HAO DẦU — cửa nhập của Đội xe.
+
+   Khối «Hiệu quả đội xe» trên màn hình Chủ tịch in con số L/100km ngay từ khi có số lít và số km.
+   Nhưng một con số trần trụi không nói được điều gì: 18 L/100km là cao hay thấp còn tuỳ xe 45 chỗ
+   hay 16 chỗ. Ngưỡng là thứ biến con số thành một lời cảnh báo, và ngưỡng ấy KHÔNG suy ra được từ
+   chính số liệu nó canh.
+
+   Ô để trống nghĩa là CHƯA KHAI, không phải bằng 0 — khối Chủ tịch vẫn in con số thật, chỉ không
+   bật cảnh báo, và nói rõ đang chờ Đội xe.
+   ════════════════════════════════════════════════════════════════════════════════════════════ */
+function DinhMucDau() {
+  const { user, toast } = useShell();
+  const [d, setD] = useState<any>(null);
+  const [sua, setSua] = useState<Record<number, string>>({});
+  const [dang, setDang] = useState(false);
+  const ghi = ["cntt", "gd_doi_xe", "tp_dh"].includes(user?.role || "");
+
+  const tai = useCallback(async () => {
+    try { setD(await api("/fleet/dinh-muc-dau")); } catch (e) { toast(errMsg(e), true); }
+  }, [toast]);
+  useEffect(() => { tai(); }, [tai]);
+
+  const luu = async (seats: number) => {
+    setDang(true);
+    try {
+      const v = soTien(sua[seats]);
+      const r: any = await api("/fleet/dinh-muc-dau", { method: "PUT", json: { seats, l_100km: v } });
+      toast(r.message); await tai();
+      setSua((x) => { const y = { ...x }; delete y[seats]; return y; });
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+
+  if (!d) return null;
+  const chua = d.rows.filter((r: any) => r.l_100km == null).length;
+  return (
+    <div className="panel">
+      <h2>Định mức tiêu hao dầu <span className="muted">(L/100km theo số chỗ)</span></h2>
+      <p className="muted">Khối <b>Hiệu quả đội xe</b> của Chủ tịch in con số tiêu hao thật ngay từ
+        bây giờ, nhưng chưa biết cao hay thấp cho tới khi có định mức ở đây. Ô để trống nghĩa là
+        <b> chưa khai</b>, không phải bằng 0 — khai xong thì cảnh báo <b>xe vượt định mức</b> tự bật.</p>
+      {chua > 0 && <div className="gate">Còn <b>{chua}</b> loại xe chưa có định mức.</div>}
+      <div className="wrap"><table>
+        <thead><tr><th>Số chỗ</th><th className="num">Số xe đang có</th>
+          <th>Định mức (L/100km)</th><th>Ghi chú</th><th>Ai khai · lúc nào</th><th></th></tr></thead>
+        <tbody>{d.rows.map((r: any) => (
+          <tr key={r.seats}>
+            <td><b>{r.seats} chỗ</b></td>
+            <td className="num">{d.so_xe_theo_cho?.[r.seats] ?? 0}</td>
+            <td style={{ minWidth: 140 }}>
+              {ghi ? <input type="number" step="0.1" disabled={dang}
+                placeholder="chưa khai"
+                value={sua[r.seats] ?? (r.l_100km ?? "")}
+                onChange={(e) => setSua({ ...sua, [r.seats]: e.target.value })} />
+                : (r.l_100km ?? <Tag cls="warn">chưa khai</Tag>)}
+            </td>
+            <td className="muted">{r.ghi_chu}</td>
+            <td className="muted">{r.boi ? `${r.boi} · ${fmtDT(r.luc)}` : "—"}</td>
+            <td>{ghi && sua[r.seats] !== undefined &&
+              <button className="act teal" style={{ margin: 0 }} disabled={dang}
+                onClick={() => luu(r.seats)}>Lưu</button>}</td>
+          </tr>))}</tbody>
+      </table></div>
+      {!ghi && <p className="muted">Anh/chị chỉ xem được — {d.bo_phan} khai ô này.</p>}
+    </div>
+  );
+}

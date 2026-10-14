@@ -67,3 +67,33 @@ class DeNghiXe(Base):
     luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     xu_ly_boi: Mapped[str] = mapped_column(String(50), default="")
     xu_ly_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # DL-2 (13/10/2026) — LẦN CUỐI CÓ NGƯỜI NGÓ TỚI SỐ KHÁCH.
+    #
+    # Chủ tịch nói rõ 13/10/2026: "số khách sẽ do nhân viên điều hành nhập tay và điều chỉnh đến
+    # ngày đi". Nghĩa là con số này SỐNG, không phải khai một lần rồi thôi. Mà Giám đốc đội xe
+    # quyết điều mấy chiếc DỰA TRÊN nó — nên một con số đứng yên từ ngày lập đề nghị tới ngày đi
+    # là một con số không ai dám chắc còn đúng.
+    #
+    # Rỗng nghĩa là CHƯA AI SỬA LẦN NÀO kể từ lúc lập, không phải "vừa xác nhận xong". Hàng rào
+    # đếm ngược đọc ô này, và nó phải phân biệt được hai thứ ấy.
+    so_khach_sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    so_khach_sua_boi: Mapped[str] = mapped_column(String(50), default="")
+
+
+class DeNghiXeSuaKhach(Base):
+    """Mỗi lần số khách đổi là một dòng ở đây — số cũ KHÔNG mất.
+
+    Vì sao phải giữ lịch sử chứ không ghi đè: khi một đoàn thiếu chỗ ở bãi xe lúc 5 giờ sáng, câu
+    hỏi đầu tiên là "lúc lập lệnh thì đề nghị ghi bao nhiêu khách". Ghi đè thì câu ấy không có câu
+    trả lời, và cuộc họp sau đó là một cuộc họp đoán.
+    """
+    __tablename__ = "fleet_vehicle_request_pax_log"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    de_nghi_id: Mapped[int] = mapped_column(ForeignKey("fleet_vehicle_requests.id"), index=True)
+    so_khach_cu: Mapped[int] = mapped_column(Integer)
+    so_khach_moi: Mapped[int] = mapped_column(Integer)
+    so_xe_can_cu: Mapped[int] = mapped_column(Integer)
+    so_xe_can_moi: Mapped[int] = mapped_column(Integer)
+    ly_do: Mapped[str] = mapped_column(String(300), default="")
+    boi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
