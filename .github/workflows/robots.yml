@@ -2,15 +2,23 @@ name: VTOS robots (lịch tự động)
 # Lịch chạy robot trên web thật – không tốn hạ tầng: GitHub Actions gọi API VTOS bằng ROBOT_TOKEN (Settings → Secrets → ROBOT_TOKEN, cùng giá trị Render).
 on:
   schedule:
-    # Chủ tịch chốt 26/9/2026: kéo Vietrip HAI LẦN MỖI NGÀY, 11 giờ và 18 giờ VN — thay cho một
-    # lượt 3 giờ sáng. Giờ VN là UTC+7 và không đổi theo mùa, nên 11:00 VN = 04:00 UTC, 18:00 VN =
-    # 11:00 UTC.
+    # Chủ tịch chốt 26/9/2026: kéo Vietrip HAI LẦN MỖI NGÀY, thay cho một lượt 3 giờ sáng.
+    # Chủ tịch đổi giờ 09/10/2026: *"đặt lịch hàng ngày 7 giờ sáng và 6 giờ chiều nạp dữ liệu
+    # doanh thu, quyết toán, lợi nhuận từ vietrip qua vtos"*. Lượt chiều GIỮ NGUYÊN — nó đã là
+    # 18:10 VN từ 26/9; chỉ lượt sáng dời 11:10 → 07:10.
     #
-    # Vì sao lệch 10 phút chứ không đúng phút 0: lịch SePay ở dòng dưới chạy mỗi 30 phút, tức là
-    # nó cũng nổ đúng 04:00 và 11:00 UTC. Máy chủ chỉ có 512 MB và tự khởi động lại khi quá bộ
-    # nhớ (xem chú thích ở bước đánh thức API bên dưới), nên cho hai việc nặng cùng bấm một giây
-    # là tự chuốc 502. Dịch 10 phút là đủ tránh mà vẫn đúng ý "11 giờ và 6 giờ chiều".
-    - cron: "10 4 * * *"      # 11:10 giờ VN: đồng bộ Vietrip + quyết toán tour kết thúc 10 ngày
+    # Giờ VN là UTC+7 và không đổi theo mùa: 07:00 VN = 00:00 UTC, 18:00 VN = 11:00 UTC.
+    #
+    # Vì sao lệch 10 phút chứ không đúng phút 0, và vì sao giờ mới VẪN phải lệch: lịch SePay ở
+    # dòng dưới chạy mỗi 30 phút trong khung 0-15 UTC, nên nó nổ đúng cả 00:00 lẫn 11:00 UTC. Máy
+    # chủ chỉ có 512 MB và tự khởi động lại khi quá bộ nhớ (xem chú thích ở bước đánh thức API bên
+    # dưới), nên cho hai việc nặng cùng bấm một giây là tự chuốc 502. Dịch 10 phút là đủ tránh mà
+    # vẫn đúng ý "7 giờ sáng và 6 giờ chiều".
+    #
+    # MỘT LƯỢT NÀY KÉO ĐỦ BA THỨ Chủ tịch nêu: `robot/vietrip/sync` lấy tour, booking, phiếu thu
+    # và bảng quyết toán (`settlements_days: 10`); lợi nhuận KHÔNG kéo riêng vì nó là số TÍNH RA
+    # từ doanh thu trừ giá vốn (`services/ket_qua_that`), không phải số Vietrip có sẵn để chép.
+    - cron: "10 0 * * *"      # 07:10 giờ VN: đồng bộ Vietrip + quyết toán tour kết thúc 10 ngày
     - cron: "10 11 * * *"     # 18:10 giờ VN: lượt thứ hai trong ngày
     - cron: "*/30 0-15 * * *" # mỗi 30 phút giờ hành chính VN (07:00–22:00): kéo bù SePay, chốt sự vụ hết hạn
     - cron: "30 13 * * *"     # 20:30 giờ VN: robot R7 báo cáo ngày
@@ -46,7 +54,7 @@ jobs:
           J="${{ github.event.inputs.job }}"
           if [ -z "$J" ]; then
             case "${{ github.event.schedule }}" in
-              "10 4 * * *") J=vietrip ;;
+              "10 0 * * *") J=vietrip ;;
               "10 11 * * *") J=vietrip ;;
               "*/30 0-15 * * *") J=sepay ;;
               "30 13 * * *") J=ngay ;;
