@@ -1924,6 +1924,47 @@ def dispatch_update(did: int, data: DispatchUpdate,
                         "cần tài xế nhận lại." if da_xoa else "Đã cập nhật lệnh điều xe")}
 
 
+# ══════════════════ DL-4 · XOÁ MỘT LỆNH ĐIỀU XE CHƯA TỪNG CHẠY (Chủ tịch chọn 14/10/2026)
+#
+# HAI CỬA CHỨ KHÔNG MỘT, đúng hình với XE-1. Cửa SOÁT đọc được bằng vai đọc lệnh — Điều hành và
+# Đội xe tự thấy lệnh nào xoá được, lệnh nào vướng gì, không phải hỏi CNTT rồi chờ. Nút XOÁ hẹp
+# hơn hẳn: đây là thao tác duy nhất trong phân hệ điều hành làm mất hẳn một chứng từ, mọi thao
+# tác khác chỉ đổi trạng thái.
+#
+# Vai xoá KHỚP với cửa xoá xe (`fleet.XOA_XE`) và có phép thử canh: hai cửa cùng làm mất một dòng
+# mà một bên rộng hơn bên kia thì hàng rào chặt nằm cạnh một đường vòng.
+XOA_LENH = ("cntt", "chutich")
+
+
+@router.get("/dispatch/{did}/xoa-duoc")
+def dispatch_xoa_duoc(did: int, u: User = Depends(require_roles(*HR_READ, "nv_dh")),
+                      db: Session = Depends(get_db)):
+    """Cửa ĐỌC: lệnh này xoá được không, và nếu không thì vướng gì."""
+    from app.services import xoa_lenh as XL
+    d = db.get(DispatchOrder, did)
+    if not d:
+        raise HTTPException(404, "Không có lệnh này")
+    return XL.soat(db, d)
+
+
+@router.delete("/dispatch/{did}")
+def dispatch_xoa(did: int, ly_do: str, u: User = Depends(require_roles(*XOA_LENH)),
+                 db: Session = Depends(get_db)):
+    """Cửa GHI: xoá hẳn một lệnh chưa từng chạy. Bắt buộc lý do, và nhật ký giữ NGUYÊN nội dung."""
+    from app.services import xoa_lenh as XL
+    d = db.get(DispatchOrder, did)
+    if not d:
+        raise HTTPException(404, "Không có lệnh này")
+    try:
+        kq = XL.xoa(db, d, ly_do)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    R.audit(db, u.username, u.role, "xoa_lenh_dieu_xe", f"dispatch:{did}", before=kq["da_xoa"],
+            after={"ly_do": kq["ly_do"]})
+    db.commit()
+    return {"message": f"Đã xoá lệnh điều xe #{did}. Lý do đã ghi vào nhật ký."}
+
+
 # ══════════════════ DL-1b · TÀI XẾ NHẬN LỆNH (Chủ tịch đặc tả 11/10, chốt luật 12/10/2026)
 #
 # BA CỬA HẸP, KHÔNG MỞ CẢ CỤM `/dispatch` CHO TÀI XẾ. Phạm vi vai `tai_xe` đo trên main hôm nay chỉ
