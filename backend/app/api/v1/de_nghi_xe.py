@@ -122,3 +122,52 @@ def huy(did: int, data: LyDoIn, u: User = Depends(require_roles(*DE_NGHI)),
         raise HTTPException(422, str(ex))
     db.commit()
     return {"message": f"Đã huỷ đề nghị #{d.id}."}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# DL-2 (13/10/2026) — SỐ KHÁCH SỐNG ĐẾN NGÀY ĐI.
+#
+# Chủ tịch 13/10/2026: "số khách sẽ do nhân viên điều hành nhập tay và điều chỉnh đến ngày đi".
+# Cửa này xưa nay chỉ có TẠO / TỪ CHỐI / HUỶ — không có đường nào sửa. Nên con số mà Giám đốc đội
+# xe dùng để quyết điều mấy chiếc là con số của NGÀY LẬP ĐỀ NGHỊ, không phải của ngày đi.
+#
+# Vai được sửa = vai được đề nghị: người khai số khách và người sửa số khách là một người, và đó
+# là Điều hành. Giám đốc đội xe KHÔNG sửa số khách của người khác — việc của ông ấy là điều thêm
+# xe khi con số đổi, chứ không phải sửa con số cho vừa số xe đang có.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+
+class SoKhachIn(BaseModel):
+    so_khach: int
+    so_xe_can: int | None = None
+    ly_do: str = ""
+
+
+@router.put("/{did}/so-khach")
+def sua_so_khach(did: int, data: SoKhachIn, u: User = Depends(require_roles(*DE_NGHI)),
+                 db: Session = Depends(get_db)):
+    try:
+        kq = DN.sua_so_khach(db, u, did, data.so_khach, data.so_xe_can, data.ly_do)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    c = kq.get("canh_bao_ghe") or {}
+    return {**kq, "message": (c.get("noi") or f"Đã sửa số khách của đề nghị #{did}.")}
+
+
+@router.get("/{did}/lich-su-so-khach")
+def lich_su_so_khach(did: int, u: User = Depends(require_roles(*XEM)),
+                     db: Session = Depends(get_db)):
+    return {"rows": DN.lich_su_so_khach(db, did)}
+
+
+@router.get("/thieu-ghe")
+def thieu_ghe(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Đề nghị đã có lệnh mà số khách vượt tổng ghế đã điều — máy không tự thêm xe, chỉ nói ra."""
+    return DN.thieu_ghe(db)
+
+
+@router.get("/can-xac-nhan-lai")
+def can_xac_nhan_lai(gio: int = DN.GIO_NHAC_XAC_NHAN, u: User = Depends(require_roles(*XEM)),
+                     db: Session = Depends(get_db)):
+    return DN.can_xac_nhan_lai(db, gio)

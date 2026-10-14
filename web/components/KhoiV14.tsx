@@ -42,10 +42,11 @@
  *  ấy trong /api/v1/dashboard; khối nào chưa có thì để thiếu, màn hình tự hiện "Chưa kết nối" chứ
  *  không vỡ.
  */
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Tag } from "@/components/ui";
 import { gonSo } from "@/components/BieuDo";
+import { api } from "@/lib/api";
 
 /* ─────────────────────────────── HỢP ĐỒNG DỮ LIỆU ─────────────────────────────── */
 
@@ -74,6 +75,30 @@ export type HieuQuaXe = {
   nhan?: string;
   trong_vi_sao?: string | null;
   da_chot?: boolean;                      // kỳ đã khoá sổ hay chưa
+  /** HQ-2 (13/10/2026) — ba chỉ số Chủ tịch chọn thêm.
+   *
+   *  `doanh_thu` cộng thẳng từ dòng chuyến: Chủ tịch quyết 13/10/2026 rằng con số trên mỗi dòng là
+   *  giá của MỖI XE, nên một đoàn ba xe cộng cả ba là đúng. Đo trước khi hỏi: 59 đoàn dùng nhiều
+   *  hơn một xe, 40 đoàn trong đó ghi số tiền giống hệt nhau — 573.460.000 đ treo trên đúng câu
+   *  hỏi ấy.
+   *
+   *  `tieu_hao_l100` chia cho KM CHUYẾN, không cộng km rỗng. `tieu_hao_nguong_thieu` rỗng nghĩa là
+   *  Đội xe đã khai ngưỡng; có giá trị nghĩa là con số vẫn in ra nhưng chưa ai bật được cảnh báo. */
+  doanh_thu?: number | null;
+  loi_nhuan?: number | null;
+  ty_le_loi_nhuan?: number | null;        // phân số, 0–1
+  tieu_hao_l100?: number | null;
+  tieu_hao_nguong_thieu?: { bo_phan: string; cua_nhap: string } | null;
+  tieu_hao_vuot?: { xe: string; so_cho: number; tieu_hao: number; nguong: number }[] | null;
+  /** So với kỳ liền trước, CÙNG SỐ THÁNG. Rỗng khi kỳ chưa hết — lúc ấy `chua_so_sanh_vi` nói vì
+   *  sao: 13 ngày đầu tháng 10 so với trọn tháng 9 là so lệch, và mũi tên đỏ ấy nói về tờ lịch
+   *  chứ không nói về đội xe. */
+  so_sanh?: {
+    nhan: string;
+    lech: Record<string, number | null>;
+    truoc: Record<string, number | null>;
+  } | null;
+  chua_so_sanh_vi?: string | null;
 };
 
 /** 04c · Tồn đọng theo bộ phận. MỖI HỒ SƠ CHỈ TÍNH MỘT LẦN (bản vẽ nhấn mạnh): một hồ sơ phát ba
@@ -202,12 +227,17 @@ const KY_XE: { ma: "thang" | "quy" | "nam"; ten: string }[] = [
   { ma: "thang", ten: "Tháng" }, { ma: "quy", ten: "Quý" }, { ma: "nam", ten: "Năm" },
 ];
 
+type BoKy = Partial<Record<"thang" | "quy" | "nam", HieuQuaXe>> & {
+  mac_dinh?: "thang" | "quy" | "nam";
+  ky_co_chuyen?: string[];
+  moc?: string;
+};
+
 export function KhoiHieuQuaXe({ d, theo_ky }: {
   d?: HieuQuaXe | null;
   /** Khi máy chủ trả số theo từng kỳ thì truyền vào đây: { thang: {...}, quy: {...}, nam: {...} },
    *  kèm `mac_dinh` — kỳ HẸP NHẤT còn có số. */
-  theo_ky?: (Partial<Record<"thang" | "quy" | "nam", HieuQuaXe>>
-    & { mac_dinh?: "thang" | "quy" | "nam" }) | null;
+  theo_ky?: BoKy | null;
 }) {
   /* HQ-1c — MỞ SẴN Ở KỲ CÒN CÓ SỐ, không cứng ở "thang".
      Sổ quyết toán xe chỉ chốt sau khi hết tháng, nên tháng đang chạy trống gần như suốt. Đo trên
@@ -216,19 +246,67 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
      Máy chủ chọn kỳ mở sẵn (`mac_dinh`) vì chỉ nó biết kỳ nào còn chuyến; chỗ này chỉ nghe theo,
      và người đọc vẫn bấm sang kỳ khác được bất cứ lúc nào. */
   const [ky, setKy] = useState<"thang" | "quy" | "nam">(theo_ky?.mac_dinh || "thang");
+
+  /* HQ-2 (13/10/2026) — Ô CHỌN KỲ, và vì sao nó KHÔNG phải ô "Thời điểm" của màn hình Điều hành xe.
+     Ô bên ấy mở BẢN CHỤP, vì những con số ấy đếm hàng đợi TẠI MỘT THỜI ĐIỂM — qua rồi thì không
+     tính lại được. Bốn chỉ số đội xe thì ngược lại: mỗi chuyến thuộc về một kỳ theo NGÀY ĐI của
+     nó, nên tháng 9 lúc nào cũng tính lại được từ sổ sách hiện có. Chỗ này TÍNH LẠI, không đọc
+     bản chụp — và hệ quả phải nói ra ngay dưới ô chọn, không giấu trong mã.
+
+     Vì sao cần: trước vòng này khối chỉ tính được tháng này / quý này / năm nay theo HÔM NAY. Đo
+     13/10/2026: tháng 10 chưa nạp chuyến nào nên kỳ Tháng rỗng, quý 4 chỉ có tháng 10 nên Quý
+     cũng rỗng — chín tháng số liệu nằm sẵn mà không có đường nào mở ra. */
+  const [moc, setMoc] = useState<string>("");
+  const [napLai, setNapLai] = useState<BoKy | null>(null);
+  const [dangNap, setDangNap] = useState(false);
+  const tai = useCallback(async () => {
+    if (!moc) { setNapLai(null); return; }
+    setDangNap(true);
+    try { setNapLai(await api(`/fleet/hieu-qua-doi-xe?moc=${moc}`)); }
+    catch { setNapLai(null); }
+    finally { setDangNap(false); }
+  }, [moc]);
+  useEffect(() => { tai(); }, [tai]);
+  const bo: BoKy | null | undefined = napLai || theo_ky;
+  /* Ô chọn chỉ liệt kê kỳ THẬT SỰ có chuyến — máy chủ trả danh sách ấy. Liệt kê đủ 12 tháng cho
+     đẹp thì người đọc bấm vào một tháng rỗng, thấy bốn dấu gạch, rồi lại kết luận màn hình hỏng. */
+  const dsKy = theo_ky?.ky_co_chuyen || napLai?.ky_co_chuyen || [];
   /* Kỳ THÁNG lấy `d` làm lối lui, vì đó là bộ số máy chủ đang trả hôm nay. Quý và năm KHÔNG lấy
      lối lui ấy — lấy là bày số tháng dưới nhãn quý. */
-  const o: HieuQuaXe = (theo_ky?.[ky]) || (ky === "thang" ? (d || {}) : {});
-  const coNguonKy = !!theo_ky?.[ky] || (ky === "thang" && !!d);
+  const o: HieuQuaXe = (bo?.[ky]) || (ky === "thang" && !moc ? (d || {}) : {});
+  const coNguonKy = !!bo?.[ky] || (ky === "thang" && !moc && !!d);
 
   const so = (x: any, duoi = "") =>
     x === null || x === undefined || x === "" ? null : `${x}${duoi}`;
-  const cot: [string, string | null][] = [
-    ["Ngày xe hoạt động", so(o.ngay_xe_hoat_dong)],
-    ["Công suất khai thác", so(o.cong_suat_khai_thac, "%")],
-    ["Km chạy rỗng", so(o.km_chay_rong)],
-    ["Chi phí / km", so(o.chi_phi_moi_km, " đ")],
+  const tien = (x: any) => (x === null || x === undefined ? null : gonSo(Number(x)));
+  const cot: [string, string | null, string][] = [
+    ["Ngày xe hoạt động", so(o.ngay_xe_hoat_dong), "ngay_xe_hoat_dong"],
+    ["Công suất khai thác", so(o.cong_suat_khai_thac, "%"), "cong_suat_khai_thac"],
+    ["Km chạy rỗng", so(o.km_chay_rong), "km_chay_rong"],
+    ["Chi phí / km", so(o.chi_phi_moi_km, " đ"), "chi_phi_moi_km"],
+    ["Doanh thu", tien(o.doanh_thu), "doanh_thu"],
+    ["Lợi nhuận", tien(o.loi_nhuan), "loi_nhuan"],
+    ["Tiêu hao", so(o.tieu_hao_l100, " L/100km"), "tieu_hao_l100"],
   ];
+  /* Mũi tên so với kỳ trước. CHIỀU TỐT của mỗi chỉ số khác nhau: km chạy rỗng tăng là XẤU, doanh
+     thu tăng là TỐT, chi phí mỗi km tăng là XẤU. Tô một màu cho mọi mũi tên tăng là dạy người đọc
+     rằng tăng luôn tốt — và họ sẽ đọc "km rỗng tăng 412" thành một tin vui. */
+  const TANG_LA_TOT: Record<string, boolean> = {
+    ngay_xe_hoat_dong: true, cong_suat_khai_thac: true, km_chay_rong: false,
+    chi_phi_moi_km: false, doanh_thu: true, loi_nhuan: true, tieu_hao_l100: false,
+  };
+  const muiTen = (khoa: string) => {
+    const v = o.so_sanh?.lech?.[khoa];
+    if (v === null || v === undefined || v === 0) return null;
+    const tot = (v > 0) === TANG_LA_TOT[khoa];
+    const con = khoa === "doanh_thu" || khoa === "loi_nhuan"
+      ? gonSo(Math.abs(v)) : Math.abs(v).toLocaleString("vi-VN");
+    // Kiểu đặt thẳng tại chỗ, KHÔNG thêm lớp vào globals.css: tệp ấy bốn làn cùng sửa, và cửa đẩy
+    // thay nguyên tệp — thêm một dòng vào đó là đổi lấy nguy cơ xoá mất dòng của làn khác.
+    return <span style={{ display: "block", marginTop: 2, fontWeight: 600,
+                          fontSize: "calc(11.5/14*1rem)", color: tot ? "var(--teal)" : "var(--red)" }}>
+      {v > 0 ? "▲" : "▼"} {con}</span>;
+  };
   /* Chỉ thay dấu gạch của ô CÔNG SUẤT, và chỉ khi máy chủ nói được vì sao. Ba ô kia trống vì kỳ
      chưa có chuyến nào — đó là chuyện khác, và câu trả lời của nó nằm ở dòng "Chưa có số cho kỳ…"
      bên dưới. Trộn hai lý do vào một chỗ thì cả hai cùng mất nghĩa. */
@@ -247,9 +325,20 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
               aria-pressed={ky === k.ma} onClick={() => setKy(k.ma)}>{k.ten}</button>
           ))}
         </div>
+        {dsKy.length > 0 && (
+          <select aria-label="Thời điểm" value={moc} disabled={dangNap}
+            style={{ width: "auto", marginLeft: 8, maxWidth: 230 }}
+            onChange={(e) => setMoc(e.target.value)}>
+            <option value="">Kỳ gần nhất còn có số</option>
+            {dsKy.map((k) => {
+              const [y, m] = k.split("-");
+              return <option key={k} value={`${k}-01`}>Tính đến tháng {m}/{y}</option>;
+            })}
+          </select>
+        )}
       </div>
       <div className="v14-o-ds">
-        {cot.map(([nhan, gt]) => (
+        {cot.map(([nhan, gt, khoa]) => (
           <div key={nhan} className={"v14-o" + (gt === null ? " rong" : "")}>
             <div className="v14-o-nhan">{nhan}</div>
             {gt === null && nhan === "Công suất khai thác" && thieuCS ? (
@@ -259,7 +348,10 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
                 <span className="muted"> · {thieuCS.thieu.length} xe chưa khai ngày vào đội</span>
               </Link>
             ) : (
-              <div className="v14-o-so">{gt ?? "—"}</div>
+              <>
+                <div className="v14-o-so">{gt ?? "—"}</div>
+                {gt !== null && muiTen(khoa)}
+              </>
             )}
           </div>
         ))}
@@ -288,6 +380,32 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
               Xem {KY_XE.find((k) => k.ma === theo_ky.mac_dinh)!.ten.toLowerCase()} →
             </button>
           )}
+        </p>
+      )}
+      {/* Hai câu phải nằm TRÊN màn hình, không nằm trong mã: người đọc so con số này với màn hình
+          Điều hành xe và cần biết hai ô «thời điểm» ấy làm hai việc khác nhau. */}
+      {moc && <p className="v14-ghi muted">
+        Số của kỳ đã chọn được <b>tính lại</b> từ sổ sách hiện có, không phải bản chụp. Đội xe nạp
+        bù chuyến của kỳ ấy thì con số ở đây <b>sẽ đổi</b> — đó là đúng.
+      </p>}
+      {o.so_sanh && <p className="v14-ghi muted">Mũi tên {o.so_sanh.nhan}.</p>}
+      {coNguonKy && !o.so_sanh && o.chua_so_sanh_vi && !o.trong_vi_sao &&
+        <p className="v14-ghi"><span className="tag">{o.chua_so_sanh_vi}</span></p>}
+      {/* Tiêu hao: con số LUÔN in ra, ngưỡng thì chờ người khai. Giấu con số đi vì chưa có ngưỡng
+          là lặp lại đúng lỗi vòng HQ-1 đã sửa — tính sẵn một câu trả lời rồi không in nó ra. */}
+      {o.tieu_hao_l100 != null && o.tieu_hao_nguong_thieu && (
+        <p className="v14-ghi">
+          <span className="tag warn">chưa có định mức dầu</span>{" "}
+          <span className="muted">Chưa biết {o.tieu_hao_l100} L/100km là cao hay thấp ·{" "}
+          {o.tieu_hao_nguong_thieu.bo_phan} khai theo số chỗ</span>{" "}
+          <Link className="the-cua" href={o.tieu_hao_nguong_thieu.cua_nhap}>Cửa nhập định mức →</Link>
+        </p>
+      )}
+      {o.tieu_hao_vuot && o.tieu_hao_vuot.length > 0 && (
+        <p className="v14-ghi">
+          <span className="tag red">{o.tieu_hao_vuot.length} xe vượt định mức dầu</span>{" "}
+          <span className="muted">{o.tieu_hao_vuot.slice(0, 4).map(
+            (x) => `${x.xe} ${x.tieu_hao}/${x.nguong}`).join(" · ")}</span>
         </p>
       )}
       {coNguonKy && !o.trong_vi_sao && cot.every(([, g]) => g === null) &&

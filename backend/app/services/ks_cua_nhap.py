@@ -93,6 +93,13 @@ CUA_TAY = (
     # chính tài xế, và khung tương tự trên tab Báo hỏng của /doi-xe cho đội xe ghi hộ khi tài xế
     # gọi điện. CỐ Ý không có bộ nạp tệp: báo hỏng là việc xảy ra từng lần một, ngay lúc nó xảy ra.
     "fleet_faults",
+    # HQ-2c (13/10/2026) · ĐỊNH MỨC TIÊU HAO DẦU theo số chỗ. Cửa: khối «Định mức tiêu hao dầu» trên
+    # tab Hồ sơ xe của /doi-xe, ghi qua PUT /fleet/dinh-muc-dau (Đội xe · Trưởng phòng ĐH · CNTT).
+    # CỐ Ý không có bộ nạp tệp và CỐ Ý không để máy tự sinh: Chủ tịch quyết 13/10/2026 rằng ngưỡng
+    # do người khai. Phương án bị loại là lấy trung bình 6 tháng của chính chiếc xe làm mốc — một
+    # chiếc hao nhiều SUỐT sáu tháng thì máy coi đó là bình thường, và chiếc hao nhất đội thành
+    # chiếc không bao giờ bị cảnh báo. Ngưỡng tự sinh từ chính số liệu nó canh thì không canh gì.
+    "fleet_fuel_norms",
     "fleet_maintenance", "fleet_offset_applications", "fleet_partners",
     "fleet_period_costs", "fleet_repayment_installments", "fleet_repayment_plans",
     "fleet_sale_cases", "fleet_settlement_lines", "fleet_settlements", "fleet_shared_invoice_lines",
@@ -249,6 +256,13 @@ MAY_SINH = {
     "su_kien_thu_nhap": "Sổ ghi khoản thu nhập đã KÝ, do services/luong_khoa.khoa ghi đúng lúc có chữ ký. Không có cửa là TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: gõ tay được vào sổ này thì xoá được dấu vết một lần đã trả, mà đó đúng là thứ nó sinh ra để giữ.",
     "buoc_da_lam": "Dấu chân tách bạch trách nhiệm — hệ thống tự ghi đúng lúc một bước nghiệp vụ hoàn thành. KHÔNG có cửa nhập tay là TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: gõ tay được vào sổ này thì dựng được một dấu chân cho một bước chưa ai làm, mà đó đúng là thứ nó sinh ra để chống.",
     "ai_runs": "Nhật ký robot chạy – hệ thống tự ghi, không ai nhập tay.",
+    # DL-2 (13/10/2026) · SỔ GHI TỪNG LẦN SỐ KHÁCH ĐỔI. Hệ thống tự ghi một dòng mỗi lần ai đó sửa
+    # qua cửa thật (PUT /de-nghi-xe/{id}/so-khach, màn hình Lệnh điều xe). KHÔNG có cửa nhập tay là
+    # TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: gõ tay được vào sổ này thì dựng được một lịch
+    # sử nói rằng số khách đã đổi từ lâu — mà câu hỏi sổ này sinh ra để trả lời là "lúc lập lệnh
+    # thì đề nghị ghi bao nhiêu khách", và một câu trả lời sửa được thì không trả lời gì cả.
+    "fleet_vehicle_request_pax_log": "Sổ ghi từng lần số khách của đề nghị xe đổi – hệ thống tự ghi "
+                                     "khi người dùng sửa qua cửa, không gõ tay được. Xem DL-2.",
     # Đợt E7 13/10/2026. KHÔNG CÓ CỬA NHẬP TAY LÀ MỘT TÍNH CHẤT AN TOÀN, không phải việc còn
     # thiếu — đúng hình với `bang_luong_khoa` ở dưới. Gõ tay được số cuối của một ký hiệu thì lùi
     # được bộ cấp số, và lùi bộ cấp số là cấp lại một số đã in ra giấy, tức làm ra hai tờ hóa đơn

@@ -771,3 +771,32 @@ class FleetPeriodCost(Base):
     nguon: Mapped[str] = mapped_column(String(20), default="nhap_tay")     # nhap_tay / nap_tep / ai
     boi: Mapped[str] = mapped_column(String(50), default="")
     luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# HQ-2c (13/10/2026) — ĐỊNH MỨC TIÊU HAO DẦU, KHAI THEO SỐ CHỖ.
+#
+# Chủ tịch quyết 13/10/2026: ngưỡng do ĐỘI XE khai, không để máy tự đoán. Lý do của quyết định ấy
+# nằm ngay trong phương án bị loại: lấy trung bình 6 tháng của chính chiếc xe làm mốc nghe thì gọn,
+# nhưng một chiếc hao nhiều SUỐT sáu tháng thì máy coi đó là bình thường — và chiếc hao nhất đội
+# trở thành chiếc không bao giờ bị cảnh báo. Một cái ngưỡng tự sinh từ chính số liệu nó canh thì
+# không canh được gì.
+#
+# VÌ SAO KHOÁ THEO `seats` CHỨ KHÔNG THEO TỪNG XE. Số chỗ là thuộc tính đã có sẵn trong danh mục,
+# và nó chính là thứ quyết định mức hao: xe 45 chỗ với xe 16 chỗ khác hẳn nhau. Khai theo từng xe
+# thì mỗi lần mua xe mới lại thêm một ô trống nữa, và Đội xe phải khai lại con số họ vừa khai cho
+# chiếc y hệt. Khai theo số chỗ thì xe mới cùng loại dùng ngay ngưỡng đã có.
+#
+# `l_100km` là ngưỡng TRẦN: vượt quá thì báo. Để trống (chưa có dòng) nghĩa là CHƯA AI KHAI —
+# màn hình vẫn in con số tiêu hao thật, chỉ không bật cảnh báo, và nói rõ đang chờ ai.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+class FuelNorm(Base):
+    """Định mức tiêu hao dầu theo số chỗ — một dòng cho mỗi loại xe."""
+    __tablename__ = "fleet_fuel_norms"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    seats: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    l_100km: Mapped[float] = mapped_column(Float)
+    ghi_chu: Mapped[str] = mapped_column(String(200), default="")
+    boi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

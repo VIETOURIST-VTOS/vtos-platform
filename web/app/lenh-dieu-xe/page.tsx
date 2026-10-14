@@ -49,6 +49,13 @@ function LenhDieuXe() {
   const [dnYeuCau, setDnYeuCau] = useState("");
   const [goLyDo, setGoLyDo] = useState<any>(null);     // {id, viec:"tu_choi"|"huy"} đang đòi lý do
   const [lyDoGo, setLyDoGo] = useState("");
+  /* DL-2 (13/10/2026) — SỐ KHÁCH SỐNG ĐẾN NGÀY ĐI. Chủ tịch: "số khách sẽ do nhân viên điều hành
+     nhập tay và điều chỉnh đến ngày đi". Trước vòng này cửa đề nghị chỉ có tạo/từ chối/huỷ, nên
+     con số Giám đốc đội xe dùng để quyết điều mấy chiếc là con số của NGÀY LẬP ĐỀ NGHỊ. */
+  const [thieuGhe, setThieuGhe] = useState<any>(null);
+  const [xacNhanLai, setXacNhanLai] = useState<any>(null);
+  const [suaKhach, setSuaKhach] = useState<any>(null);   // {id, so_khach, so_xe_can, ly_do}
+  const [lichSu, setLichSu] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     try { setDs(await api("/fleet/lenh-dieu-xe")); } catch (e) { toast(errMsg(e), true); }
@@ -58,6 +65,9 @@ function LenhDieuXe() {
     try { setDnQ(await api("/de-nghi-xe/meta")); } catch { /* thiếu meta thì ẩn nút, không đoán quyền */ }
     try { setHo(await api("/de-nghi-xe/lenh-khong-qua-de-nghi")); } catch { /* chỉ là số đo */ }
     try { setNhan(await api("/nhan-lenh/can-biet")); } catch { /* thiếu thì ẩn khối, không đoán */ }
+    // DL-2 — hai số đo, cùng khuôn với `lenh-khong-qua-de-nghi`: đếm được, hiện lên, về 0 thì thôi.
+    try { setThieuGhe(await api("/de-nghi-xe/thieu-ghe")); } catch { /* chỉ là số đo */ }
+    try { setXacNhanLai(await api("/de-nghi-xe/can-xac-nhan-lai")); } catch { /* chỉ là số đo */ }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
 
@@ -157,6 +167,25 @@ function LenhDieuXe() {
   const matTour = nen?.tour?.find((t: any) => String(t.id) === tour);
   const coQuyen = nen ? nen.toi_duoc_lap : false;
 
+  const moSuaKhach = async (d: any) => {
+    setSuaKhach({ id: d.id, so_khach: String(d.so_khach ?? ""), so_xe_can: String(d.so_xe_can ?? ""), ly_do: "" });
+    try { const r: any = await api(`/de-nghi-xe/${d.id}/lich-su-so-khach`); setLichSu(r.rows || []); }
+    catch { setLichSu([]); }
+  };
+  const luuSoKhach = async () => {
+    if (!suaKhach) return;
+    setBusy(true);
+    try {
+      const r: any = await api(`/de-nghi-xe/${suaKhach.id}/so-khach`, { method: "PUT", json: {
+        so_khach: Number(suaKhach.so_khach), so_xe_can: Number(suaKhach.so_xe_can),
+        ly_do: suaKhach.ly_do } });
+      // Lời của máy chủ, in nguyên: nó đã nói đủ chỗ hay thiếu mấy chỗ. Gõ lại ở đây là dựng chỗ
+      // cho hai câu khác nhau về cùng một con số.
+      toast(r.message, !!(r.canh_bao_ghe && !r.canh_bao_ghe.du_cho));
+      setSuaKhach(null); setLichSu([]); await load();
+    } catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
+  };
+
   return (<>
     <h1>Lệnh điều xe</h1>
     <p className="muted">Đây là nơi <b>lập và chốt lệnh điều xe</b>: chọn tour bên dưới, đặt khoảng ngày và số khách, xem phương án, rồi bấm <b>Chốt lệnh</b> ngay trên dòng xe đã chọn.</p>
@@ -180,14 +209,79 @@ function LenhDieuXe() {
                   thấy thì không ai báo lỗi. */}
               {dnQ?.toi_duoc_tu_choi && <><button className="act orange" style={{ margin: 0 }} disabled={busy}
                 onClick={() => { setGoLyDo({ id: d.id, viec: "tu_choi" }); setLyDoGo(""); }}>Không còn xe</button>{" "}</>}
-              {dnQ?.toi_duoc_de_nghi && <button className="act grey" style={{ margin: 0 }} disabled={busy}
-                onClick={() => { setGoLyDo({ id: d.id, viec: "huy" }); setLyDoGo(""); }}>Huỷ đề nghị</button>}
+              {dnQ?.toi_duoc_de_nghi && <><button className="act grey" style={{ margin: 0 }} disabled={busy}
+                onClick={() => { setGoLyDo({ id: d.id, viec: "huy" }); setLyDoGo(""); }}>Huỷ đề nghị</button>{" "}</>}
+              {/* DL-2 — sửa được đến HẾT ngày đi, kể cả sau khi đã lập lệnh. Khoá lại sau khi lập
+                  lệnh là đẩy Điều hành về đúng hai lối cũ: huỷ cả đề nghị, hoặc im lặng. */}
+              {dnQ?.toi_duoc_de_nghi && <button className="act" style={{ margin: 0 }} disabled={busy}
+                onClick={() => moSuaKhach(d)}>Sửa số khách</button>}
             </td>
           </tr>) : <tr><td colSpan={9} className="muted">Không có đề nghị nào đang chờ. Điều hành gửi đề nghị ở khối dưới sau khi dự toán chuyến được duyệt.</td></tr>}</tbody></table>
       {dnChon && <p className="muted"><Tag cls="ok">đang lập lệnh</Tag> Mẫu dưới đang lập lệnh cho đề nghị <b>#{dnChon.id}</b> – chuyến {dnChon.ma_tour}, {dnChon.so_khach} khách, cần {dnChon.so_xe_can} xe.{" "}
         <button className="act grey" style={{ margin: 0 }} onClick={() => setDnChon(null)}>Bỏ liên kết</button></p>}
       {dn.dem && (dn.dem.tu_choi > 0 || dn.dem.huy > 0) &&
         <p className="muted">Đã từ chối {dn.dem.tu_choi || 0} · đã huỷ {dn.dem.huy || 0} · đã lập lệnh {dn.dem.da_lap_lenh || 0}. Lý do từ chối xem ở bảng cuối trang.</p>}
+    </div>}
+
+    {/* ── DL-2 · Ô SỬA SỐ KHÁCH, và số cũ không mất ───────────────────────────────────────── */}
+    {suaKhach && <div className="panel"><h2>Sửa số khách · đề nghị #{suaKhach.id}</h2>
+      <p className="muted">Số khách <b>sống đến ngày đi</b> — Chủ tịch chốt 13/10/2026. Sửa xong máy
+        soát lại ngay với tổng ghế của các xe <b>đã điều</b>. <b>Máy không tự thêm xe</b>: thêm xe là
+        việc của Giám đốc đội xe, máy chỉ không để chuyện thiếu chỗ đi qua im lặng.</p>
+      <div className="grid2">
+        <label>Số khách<input type="number" value={suaKhach.so_khach}
+          onChange={(e) => setSuaKhach({ ...suaKhach, so_khach: e.target.value })} /></label>
+        <label>Số xe cần<input type="number" value={suaKhach.so_xe_can}
+          onChange={(e) => setSuaKhach({ ...suaKhach, so_xe_can: e.target.value })} /></label>
+        <label>Lý do đổi<input value={suaKhach.ly_do} placeholder="khách báo thêm / huỷ bớt / ghép đoàn"
+          onChange={(e) => setSuaKhach({ ...suaKhach, ly_do: e.target.value })} /></label>
+        <div />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <button className="act teal" style={{ margin: 0 }} disabled={busy} onClick={luuSoKhach}>Lưu số khách</button>
+        <button className="act grey" style={{ margin: 0 }} disabled={busy}
+          onClick={() => { setSuaKhach(null); setLichSu([]); }}>Thôi</button>
+      </div>
+      {lichSu.length > 0 && <>
+        <h3>Số cũ không mất</h3>
+        <p className="muted">Khi một đoàn thiếu chỗ ở bãi xe, câu hỏi đầu tiên là <i>lúc lập lệnh thì
+          đề nghị ghi bao nhiêu khách</i>. Ghi đè thì câu ấy không có câu trả lời.</p>
+        <table><thead><tr><th>Lúc</th><th>Ai sửa</th><th className="num">Khách</th>
+          <th className="num">Xe cần</th><th>Lý do</th></tr></thead>
+          <tbody>{lichSu.map((x: any, i: number) => <tr key={i}>
+            <td>{fmtDT(x.luc)}</td><td>{x.boi}</td>
+            <td className="num">{x.so_khach_cu} → <b>{x.so_khach_moi}</b></td>
+            <td className="num">{x.so_xe_can_cu} → {x.so_xe_can_moi}</td>
+            <td className="muted">{x.ly_do}</td></tr>)}</tbody></table>
+      </>}
+    </div>}
+
+    {/* ── DL-2 · ĐOÀN THIẾU CHỖ ───────────────────────────────────────────────────────────── */}
+    {thieuGhe && thieuGhe.so > 0 && <div className="panel wrap" style={{ borderColor: "var(--red)" }}>
+      <h2>Đoàn thiếu chỗ <Tag cls="red">{thieuGhe.so}</Tag></h2>
+      <p className="muted">Số khách đã vượt tổng ghế của các xe đã điều. Chỉ đếm đề nghị <b>đã có
+        lệnh</b> — chưa có lệnh thì chưa tới lượt soát.</p>
+      <table><thead><tr><th>Ngày đi</th><th>Chuyến</th><th className="num">Khách</th>
+        <th className="num">Ghế đã điều</th><th>Xe</th><th></th></tr></thead>
+        <tbody>{thieuGhe.rows.map((r: any) => <tr key={r.de_nghi}>
+          <td>{fmtD(r.ngay_di)}</td><td>{r.tour} · {r.ten_tour}</td>
+          <td className="num">{r.so_khach}</td><td className="num">{r.tong_ghe}</td>
+          <td className="muted">{r.xe.map((x: any) => `${x.bien_so} (${x.so_cho})`).join(" · ")}</td>
+          <td><Tag cls="red">thiếu {r.thieu_ghe}</Tag></td></tr>)}</tbody></table>
+    </div>}
+
+    {/* ── DL-2 · CẦN XÁC NHẬN LẠI ─────────────────────────────────────────────────────────── */}
+    {xacNhanLai && xacNhanLai.so > 0 && <div className="panel wrap">
+      <h2>Cần xác nhận lại số khách <Tag cls="warn">{xacNhanLai.so}</Tag></h2>
+      <p className="muted">Khởi hành trong <b>{xacNhanLai.gio} giờ</b> mà số khách <b>chưa ai đụng
+        vào</b> kể từ lúc lập đề nghị. Không phải sai — máy không biết đúng hay sai. Chỉ là chưa ai
+        xác nhận lại, trong khi con số này còn đổi đến ngày đi.</p>
+      <table><thead><tr><th>Ngày đi</th><th>Chuyến</th><th className="num">Khách</th>
+        <th className="num">Xe cần</th><th>Khai lúc</th><th>Người đề nghị</th></tr></thead>
+        <tbody>{xacNhanLai.rows.map((r: any) => <tr key={r.de_nghi}>
+          <td>{fmtD(r.ngay_di)}</td><td>{r.tour} · {r.ten_tour}</td>
+          <td className="num">{r.so_khach}</td><td className="num">{r.so_xe_can}</td>
+          <td className="muted">{fmtDT(r.lap_luc)}</td><td>{r.nguoi_de_nghi}</td></tr>)}</tbody></table>
     </div>}
 
     {goLyDo && <div className="panel"><h2>{goLyDo.viec === "tu_choi" ? "Vì sao đội xe không nhận đề nghị này" : "Vì sao huỷ đề nghị này"}</h2>

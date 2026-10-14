@@ -2039,3 +2039,131 @@ def qt_tra_lai(tid: int, data: TraLaiIn, u: User = Depends(require_roles(*QT_KY)
     R.audit(db, u.username, u.role, "qt_chuyen_tra_lai", f"chuyen:{tid}", after=kq)
     db.commit()
     return kq
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# HQ-2 (13/10/2026) — Ô CHỌN KỲ CHO KHỐI «HIỆU QUẢ ĐỘI XE», VÀ ĐỊNH MỨC DẦU.
+#
+# Vì sao cần một đường riêng: khối Chủ tịch xưa nay đọc số kèm trong `/dashboard`, mà `/dashboard`
+# chỉ tính được MỘT mốc — hôm nay. Muốn xem tháng 9 thì phải có chỗ để hỏi.
+#
+# MỘT CHỖ KHÁC VỚI Ô «THỜI ĐIỂM» CỦA MÀN HÌNH ĐIỀU HÀNH XE, viết ra để sau không ai nhầm hai cơ
+# chế: ô bên ấy mở BẢN CHỤP, vì những con số ấy đếm hàng đợi TẠI MỘT THỜI ĐIỂM — qua rồi thì không
+# tính lại được. Bốn chỉ số đội xe thì ngược lại: mỗi chuyến thuộc về một kỳ theo NGÀY ĐI của nó,
+# nên tháng 9 lúc nào cũng tính lại được và luôn ra đúng con số của sổ sách hiện có. Đường này
+# TÍNH LẠI, không đọc bản chụp — và hệ quả phải nói ra: Đội xe nạp bù chuyến tháng 9 tuần sau thì
+# số tháng 9 ở đây SẼ ĐỔI. Đó là đúng.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+HQ_NGUONG_GHI = ("cntt", "gd_doi_xe", "tp_dh")
+
+
+@router.get("/hieu-qua-doi-xe")
+def hq_theo_ky(moc: date | None = None, u: User = Depends(require_roles(*READ)),
+               db: Session = Depends(get_db)):
+    from app.services import hieu_qua_xe as HQ
+    hom_nay = date.today()
+    o = HQ.theo_ky(db, moc or hom_nay, hom_nay=hom_nay)
+    o["ky_co_chuyen"] = HQ.ky_co_chuyen(db)
+    return o
+
+
+@router.get("/dinh-muc-dau")
+def hq_dinh_muc(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Ngưỡng tiêu hao theo số chỗ, KÈM các số chỗ đang có xe mà chưa ai khai.
+
+    Trả cả phần CHƯA khai chứ không chỉ phần đã khai: màn hình phải in ra được ô trống có tên, nếu
+    không thì Đội xe không biết mình còn thiếu loại nào.
+    """
+    from app.models.fleet import FuelNorm
+    da = {n.seats: {"seats": n.seats, "l_100km": n.l_100km, "ghi_chu": n.ghi_chu,
+                    "boi": n.boi, "luc": n.luc} for n in db.execute(select(FuelNorm)).scalars()}
+    dem: dict[int, int] = {}
+    for v in db.execute(select(Vehicle).where(Vehicle.active.is_(True))).scalars():
+        dem[v.seats] = dem.get(v.seats, 0) + 1
+    return {"rows": [da.get(s) or {"seats": s, "l_100km": None, "ghi_chu": "", "boi": "", "luc": None}
+                     for s in sorted(set(da) | set(dem))],
+            "so_xe_theo_cho": dem,
+            "bo_phan": "Đội xe"}
+
+
+class DinhMucDauIn(BaseModel):
+    seats: int
+    l_100km: float | None = None      # None = xoá ngưỡng của loại xe này
+    ghi_chu: str = ""
+
+
+@router.put("/dinh-muc-dau")
+def hq_dat_dinh_muc(data: DinhMucDauIn, u: User = Depends(require_roles(*HQ_NGUONG_GHI)),
+                    db: Session = Depends(get_db)):
+    from app.models.fleet import FuelNorm
+    if data.seats <= 0:
+        raise HTTPException(422, "Số chỗ phải lớn hơn 0")
+    if data.l_100km is not None and data.l_100km <= 0:
+        raise HTTPException(422, "Định mức phải lớn hơn 0 — để trống nghĩa là CHƯA KHAI, "
+                                 "không phải bằng 0")
+    n = db.execute(select(FuelNorm).where(FuelNorm.seats == data.seats)).scalars().first()
+    truoc = n.l_100km if n else None
+    if data.l_100km is None:
+        if n is not None:
+            db.delete(n)
+    elif n is None:
+        db.add(FuelNorm(seats=data.seats, l_100km=data.l_100km, ghi_chu=data.ghi_chu,
+                        boi=u.username))
+    else:
+        from datetime import datetime as _dtn
+        n.l_100km, n.ghi_chu, n.boi = data.l_100km, data.ghi_chu, u.username
+        n.luc = _dtn.now()
+    R.audit(db, u.username, u.role, "dinh_muc_dau", f"seats:{data.seats}",
+            before={"l_100km": truoc}, after=data.model_dump(mode="json"))
+    db.commit()
+    return {"seats": data.seats, "l_100km": data.l_100km,
+            "message": ("Đã xoá định mức" if data.l_100km is None
+                        else f"Đã đặt {data.l_100km} L/100km cho xe {data.seats} chỗ")}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# XE-1 (14/10/2026) — XOÁ MỘT DÒNG XE TẠO NHẦM.
+#
+# Chủ tịch chọn 14/10/2026 sau khi đo trên hệ thật: danh mục 16 xe, hai dòng là dữ liệu mẫu
+# (51B-123.45, 51B-678.90) không bán được, không ngừng khai thác được, và không có cách nào bỏ đi.
+#
+# CHỈ CNTT. Không phải vì Đội xe kém tin cậy hơn, mà vì đây là thao tác DUY NHẤT trong phân hệ xe
+# làm mất hẳn một dòng — mọi thao tác khác đều chỉ đổi trạng thái. Để một vai dùng hằng ngày giữ
+# nút ấy là sớm muộn có người bấm nhầm thay vì ghi "ngừng khai thác".
+#
+# Hai cửa chứ không một: cửa SOÁT đọc được bằng vai READ, để Đội xe tự thấy chiếc nào xoá được và
+# chiếc nào vướng gì — không phải hỏi CNTT rồi chờ.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+XOA_XE = ("cntt",)
+
+
+@router.get("/xe/{vid}/xoa-duoc")
+def xe_xoa_duoc(vid: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    from app.services import xoa_xe as XX
+    v = db.get(Vehicle, vid)
+    if v is None:
+        raise HTTPException(404, "Không có xe này")
+    return XX.soat(db, v)
+
+
+@router.delete("/xe/{vid}")
+def xe_xoa(vid: int, ly_do: str, u: User = Depends(require_roles(*XOA_XE)),
+           db: Session = Depends(get_db)):
+    from app.services import xoa_xe as XX
+    v = db.get(Vehicle, vid)
+    if v is None:
+        raise HTTPException(404, "Không có xe này")
+    bien = v.plate
+    try:
+        kq = XX.xoa(db, v, ly_do)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    # Nhật ký giữ NGUYÊN nội dung dòng đã xoá: xoá nhầm thì còn dựng lại được bằng tay.
+    R.audit(db, u.username, u.role, "xoa_xe", f"vehicle:{kq['da_xoa'].get('code') or bien}",
+            before={k: (x.isoformat() if hasattr(x, "isoformat") else x)
+                    for k, x in kq["da_xoa"].items()},
+            after={"ly_do": kq["ly_do"], "lich_su_bien": len(kq["lich_su_bien"])})
+    db.commit()
+    return {"message": f"Đã xoá xe {bien} khỏi danh mục", "ly_do": kq["ly_do"]}
