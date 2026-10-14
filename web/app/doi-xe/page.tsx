@@ -664,6 +664,15 @@ function DoiXe() {
         </div>
       </div>
       {chon.san_sang?.ly_do?.length > 0 && <p><Tag cls={MUC_CLS[chon.san_sang.muc]}>{MUC_TEN[chon.san_sang.muc]}</Tag> {chon.san_sang.ly_do.join(" · ")}</p>}
+      {/* XE-1 (14/10/2026) · XOÁ MỘT DÒNG XE TẠO NHẦM.
+          Danh mục dựng trên nguyên tắc "mã xe theo chiếc xe suốt vòng đời": xe bán đi thì ghi vòng
+          đời và ngày rời đội, KHÔNG xoá. Nguyên tắc ấy đúng, nhưng không phủ một dòng TẠO NHẦM —
+          chưa từng là xe thật, nên không bán được, không ngừng khai thác được, và cứ nằm lại trong
+          mẫu số của mọi phép tính đội hình.
+          Hai bước chứ không một: BẤM SOÁT trước, máy nói chiếc này vướng gì; nút xoá chỉ hiện khi
+          máy đã trả lời là xoá được. Không dùng hộp thoại xác nhận của trình duyệt — một hộp thoại
+          bấm quen tay thì không còn là một lần cân nhắc. */}
+      <XoaXe xe={chon} xong={() => { setChon(null); load(); }} />
       <button className="act grey" onClick={() => setChon(null)}>Đóng</button>
     </div>}
 
@@ -914,6 +923,67 @@ function DinhMucDau() {
           </tr>))}</tbody>
       </table></div>
       {!ghi && <p className="muted">Anh/chị chỉ xem được — {d.bo_phan} khai ô này.</p>}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════════════════
+   XE-1 · XOÁ MỘT DÒNG XE TẠO NHẦM — và chỉ dòng tạo nhầm.
+
+   Chỉ CNTT thấy nút xoá. Không phải vì Đội xe kém tin cậy hơn, mà vì đây là thao tác DUY NHẤT
+   trong phân hệ xe làm mất hẳn một dòng — mọi thao tác khác chỉ đổi trạng thái. Để một vai dùng
+   hằng ngày giữ nút ấy là sớm muộn có người bấm nhầm thay vì ghi "ngừng khai thác".
+
+   Nhưng cửa SOÁT thì ai đọc được hồ sơ xe cũng gọi được: Đội xe tự thấy chiếc nào xoá được, chiếc
+   nào vướng gì, không phải hỏi CNTT rồi ngồi chờ.
+   ════════════════════════════════════════════════════════════════════════════════════════════ */
+function XoaXe({ xe, xong }: { xe: any; xong: () => void }) {
+  const { user, toast } = useShell();
+  const [s, setS] = useState<any>(null);
+  const [ly, setLy] = useState("");
+  const [dang, setDang] = useState(false);
+  const xoaDuocQuyen = user?.role === "cntt";
+
+  const soat = async () => {
+    setDang(true);
+    try { setS(await api(`/fleet/xe/${xe.id}/xoa-duoc`)); }
+    catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+  const xoa = async () => {
+    setDang(true);
+    try {
+      const r: any = await api(`/fleet/xe/${xe.id}?ly_do=${encodeURIComponent(ly)}`, { method: "DELETE" });
+      toast(r.message); xong();
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+      {!s
+        ? <><button className="act grey" style={{ margin: 0 }} disabled={dang} onClick={soat}>
+            Xe này có xoá được không?</button>{" "}
+          <span className="muted">Xe đã có lịch sử thì <b>ghi ngừng khai thác</b>, không xoá.</span></>
+        : <>
+          <div className={"gate " + (s.xoa_duoc ? "pass" : "fail")}>{s.noi}</div>
+          {s.vuong?.length > 0 && <table><thead><tr><th>Đang vướng</th><th className="num">Số dòng</th></tr></thead>
+            <tbody>{s.vuong.map((x: any) => <tr key={x.bang}>
+              <td>{x.ten} <span className="muted">({x.bang})</span></td>
+              <td className="num">{x.so_dong}</td></tr>)}</tbody></table>}
+          {s.xoa_duoc && s.se_xoa_theo?.length > 0 && <p className="muted">
+            Xoá cùng: {s.se_xoa_theo.map((x: any) => `${x.so_dong} ${x.ten}`).join(" · ")}.</p>}
+          {s.xoa_duoc && (xoaDuocQuyen
+            ? <>
+              <label>Lý do xoá <span className="muted">(bắt buộc — tháng sau còn trả lời được
+                vì sao dòng này biến mất)</span>
+                <input value={ly} onChange={(e) => setLy(e.target.value)}
+                  placeholder="ví dụ: dòng dữ liệu mẫu, chưa từng là xe thật" /></label>
+              <button className="act orange" style={{ margin: "8px 0 0" }}
+                disabled={dang || !ly.trim()} onClick={xoa}>Xoá xe {xe.plate} khỏi danh mục</button>
+            </>
+            : <p className="muted">Xoá được, nhưng chỉ <b>CNTT</b> bấm được nút xoá.</p>)}
+          <p><button className="act grey" style={{ margin: "8px 0 0" }}
+            onClick={() => { setS(null); setLy(""); }}>Thôi</button></p>
+        </>}
     </div>
   );
 }
