@@ -72,7 +72,17 @@ def tong(db: Session, t: Trip) -> dict:
         # vào là đếm hai lần, và đếm hai lần vào đúng chỗ tính giá vốn.
         "tong_chi_phi_tour": tai_xe + cong_ty + chua_khai,
         # Tài xế còn được nhận (dương) hay còn nợ công ty (âm).
-        "tai_xe_con_nhan": tai_xe + _s(t.chi_them) - _s(t.tam_ung) - _s(t.hoan_tra),
+        #
+        # ĐỢT DỌN-4 14/10/2026 — ba ô tiền này đều đi qua `_s()`, mà `_s(x)` chính là `float(x or 0)`,
+        # nên dòng này ĐÃ chịu được giá trị rỗng. Máy quét K2 chỉ nhận ra chuỗi `or 0` viết ngay sau
+        # chỗ đọc nên nó bắt nhầm — miễn Ở ĐÂY, một dòng một lý do, chứ không dạy máy quét một
+        # danh sách "hàm này an toàn": làm thế thì ngày ai đó sửa thân `_s`, hàng rào tắt im lặng ở
+        # MỌI chỗ gọi mà không đỏ một dòng nào.
+        #
+        # RỖNG Ở ĐÂY TÍNH BẮNG KHÔNG LÀ ĐÚNG, và đó là quyết định chứ không phải mặc định: chưa ai
+        # nhập tạm ứng nghĩa là chưa ứng đồng nào, nên khoản tài xế còn nhận không bị trừ gì — khác
+        # hẳn những chỗ mà rỗng nghĩa là "chưa biết số" và kết quả cũng phải rỗng theo.
+        "tai_xe_con_nhan": tai_xe + _s(t.chi_them) - _s(t.tam_ung) - _s(t.hoan_tra),  # k2-doc-an-toan: ba o tien deu qua `_s()` = `float(x or 0)`
         "so_khoan": len(cs),
     }
 
