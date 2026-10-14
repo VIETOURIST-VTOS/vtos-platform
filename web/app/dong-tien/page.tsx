@@ -152,8 +152,160 @@ function DongTien() {
         </>}
     </div>}
 
+    <BangDoiChieu pn={pn} />
+
     {mo && <CuaChot pn={pn} dsTk={dsTk} dong={() => setMo(false)} xong={() => { setMo(false); load(); }} />}
   </>);
+}
+
+/** ĐỢT E15 14/10/2026 — ĐỐI CHIẾU TIỀN: sổ kế toán ↔ số đã chốt ↔ số máy cộng.
+ *
+ *  BA CỘT SỐ, VÀ MỖI CỘT LÀ MỘT NGƯỜI KHÁC NÓI. Sổ kế toán nói một con số (dư Nợ 112x/111), Kế toán
+ *  đã ký một con số, máy cộng từ sao kê ra một con số. Chúng LẼ RA bằng nhau; khi không bằng thì
+ *  mỗi cặp lệch kể một câu chuyện khác — sổ ≠ chốt là hạch toán thiếu/thừa, chốt ≠ máy là sao kê về
+ *  chậm. Bày cả ba để người đọc biết đi tìm ở đâu, thay vì bày một con số "lệch" rồi phải đoán.
+ *
+ *  Ô "—" LÀ RỖNG, KHÔNG PHẢI 0, và màn hình không bao giờ thay "—" bằng "0 đ": chưa ai chốt khác
+ *  hẳn đã chốt và bằng không. Mỗi "—" đi kèm một câu nói vì sao, lấy thẳng từ máy chủ.
+ */
+function BangDoiChieu({ pn }: { pn: number | null }) {
+  const [d, setD] = useState<any>(null);
+  const [mo, setMo] = useState<any>(null);     // dòng đang mở cửa giải thích
+  const { toast } = useShell();
+  const load = useCallback(async () => {
+    if (!pn) { setD(null); return; }
+    try { setD(await api(`/dong-tien/doi-chieu/${pn}`)); }
+    catch (e) { toast(errMsg(e), true); }
+  }, [pn, toast]);
+  useEffect(() => { load(); }, [load]);
+  if (!pn || !d) return null;
+
+  return (<div className="panel wrap">
+    <h2>Đối chiếu tiền — sổ kế toán so với số đã chốt</h2>
+    {d.xong
+      ? <div className="gate ok"><b>Đã đối chiếu xong tính đến {fmtD(d.den_ngay)}</b>
+        <div>{d.so_dong_xong}/{d.so_dong} nguồn tiền khớp hoặc đã giải thích hết chênh lệch.</div></div>
+      : <div className="gate fail">
+        <b>Chưa đối chiếu xong — kỳ có ngày này sẽ KHÔNG khóa sổ được</b>
+        <div>{d.so_dong_xong}/{d.so_dong} nguồn tiền đã xong.</div>
+        <ul style={{ margin: "6px 0 0 18px" }}>
+          {d.vi_sao_chua_xong.map((s: string, i: number) => <li key={i}>{s}</li>)}
+        </ul></div>}
+    <table><thead><tr>
+      <th>Nguồn tiền</th>
+      <th className="num">Số sổ kế toán</th>
+      <th className="num">Số đã chốt</th>
+      <th className="num">Số máy cộng</th>
+      <th className="num">Lệch (sổ − chốt)</th>
+      <th className="num">Đã giải thích</th>
+      <th className="num">Còn lại</th>
+      <th></th>
+    </tr></thead><tbody>
+      {d.rows.map((r: any, i: number) => (<tr key={i}>
+        <td>{r.ten}{r.ma_tk_so && <span className="muted"> · TK {r.ma_tk_so}</span>}
+          {r.ngay_chot && <div className="muted" style={{ fontSize: 12 }}>
+            chốt đến {fmtD(r.ngay_chot)} · {r.chot_boi}</div>}</td>
+        <td className="num">{r.so_so === null ? <span className="muted">—</span> : vnd(r.so_so)}</td>
+        <td className="num">{r.so_da_chot === null ? <span className="muted">—</span> : vnd(r.so_da_chot)}</td>
+        <td className="num">{r.so_may_cong === null ? <span className="muted">—</span> : vnd(r.so_may_cong)}</td>
+        <td className="num">{r.lech === null ? <span className="muted">—</span>
+          : (Math.abs(r.lech) < 1 ? <span className="muted">0</span> : <Tag cls="amber">{vnd(r.lech)}</Tag>)}</td>
+        <td className="num">{r.lech === null ? <span className="muted">—</span> : vnd(r.da_giai_thich)}</td>
+        <td className="num">{r.con_lai_chua_giai_thich === null ? <span className="muted">—</span>
+          : (r.xong ? <Tag cls="green">0</Tag> : <Tag cls="red">{vnd(r.con_lai_chua_giai_thich)}</Tag>)}</td>
+        <td>{r.ngay_chot && <button className="act grey" onClick={() => setMo(r)}>Giải thích</button>}</td>
+      </tr>))}
+    </tbody></table>
+    {d.rows.some((r: any) => r.vi_sao) && <ul className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+      {d.rows.filter((r: any) => r.vi_sao).map((r: any, i: number) =>
+        <li key={i}><b>{r.ten}</b>: {r.vi_sao}</li>)}
+    </ul>}
+    <p className="muted" style={{ fontSize: 12 }}>
+      Cố ý KHÔNG có dòng tổng chênh lệch: một tài khoản lệch +100 và một tài khoản lệch −100 cộng
+      lại bằng 0, và con số 0 ấy nói dối to hơn cả hai con số nó che đi.
+    </p>
+    {mo && <CuaGiaiThich pn={pn} dong_bang={mo} dong={() => setMo(null)}
+      xong={() => { setMo(null); load(); }} />}
+  </div>);
+}
+
+/** Cửa ghi MỘT khoản giải thích chênh lệch.
+ *
+ *  Số tiền CÓ DẤU, và dấu mang nghĩa: dương là "sổ đang cao hơn số đã chốt vì khoản này", âm là
+ *  ngược lại. Bắt người dùng nhập trị tuyệt đối rồi chọn chiều ở một ô khác là thêm một ô để gõ sai.
+ *
+ *  Cửa này KHÔNG sinh bút toán nào. Giải thích chênh lệch và SỬA chênh lệch là hai việc khác nhau:
+ *  cái sau là một bút toán điều chỉnh, đi cửa riêng của nó (Đợt E14) và có hai mốc thời gian riêng.
+ */
+function CuaGiaiThich({ pn, dong_bang, dong, xong }:
+  { pn: number; dong_bang: any; dong: () => void; xong: () => void }) {
+  const [dang, setDang] = useState(false);
+  const [ds, setDs] = useState<any[]>([]);
+  const { toast } = useShell();
+  const q = `den_ngay=${String(dong_bang.ngay_chot).slice(0, 10)}&nguon=${dong_bang.nguon}`
+    + (dong_bang.tai_khoan_id ? `&tai_khoan_id=${dong_bang.tai_khoan_id}` : "");
+  const load = useCallback(async () => {
+    try { setDs((await api(`/dong-tien/doi-chieu/${pn}/giai-thich?${q}`)).rows || []); }
+    catch (e) { toast(errMsg(e), true); }
+  }, [pn, q, toast]);
+  useEffect(() => { load(); }, [load]);
+
+  async function gui(e: any) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setDang(true);
+    try {
+      const r = await api("/dong-tien/doi-chieu/giai-thich", { method: "POST", json: {
+        company_id: pn, nguon: dong_bang.nguon, tai_khoan_id: dong_bang.tai_khoan_id,
+        den_ngay: String(dong_bang.ngay_chot).slice(0, 10),
+        so_tien: Number(String(f.get("so_tien")).replace(/[^\d.-]/g, "")),
+        ly_do: String(f.get("ly_do") || ""), ghi_chu: String(f.get("ghi_chu") || ""),
+      } });
+      toast(r.message); (e.target as HTMLFormElement).reset(); await load(); xong();
+    } catch (err) { toast(errMsg(err), true); } finally { setDang(false); }
+  }
+
+  async function go(id: number) {
+    const ly_do = window.prompt("Vì sao gỡ khoản giải thích này?");
+    if (!ly_do) return;      // bỏ trống là huỷ thao tác — máy chủ cũng chặn lý do rỗng
+    try {
+      const r = await api(`/dong-tien/doi-chieu/giai-thich/${id}/huy`,
+        { method: "POST", json: { ly_do } });
+      toast(r.message); await load(); xong();
+    } catch (err) { toast(errMsg(err), true); }
+  }
+
+  return (<form className="panel wrap" onSubmit={gui}>
+    <h3>Giải thích chênh lệch — {dong_bang.ten}, chốt đến {fmtD(dong_bang.ngay_chot)}</h3>
+    <p className="muted">
+      Chênh lệch giữa sổ và số đã chốt: <b>{dong_bang.lech === null ? "—" : vnd(dong_bang.lech)}</b>
+      {" · "}còn chưa giải thích: <b>{dong_bang.con_lai_chua_giai_thich === null ? "—"
+        : vnd(dong_bang.con_lai_chua_giai_thich)}</b>
+    </p>
+    {!!ds.length && <table><thead><tr><th className="num">Số tiền</th><th>Lý do</th>
+      <th>Người ghi</th><th></th></tr></thead><tbody>
+      {ds.map((g) => (<tr key={g.id} className={g.trang_thai === "da_huy" ? "muted" : ""}>
+        <td className="num">{vnd(g.so_tien)}</td>
+        <td>{g.ly_do}{g.trang_thai === "da_huy" &&
+          <div style={{ fontSize: 12 }}>đã gỡ · {g.huy_boi}: {g.huy_ly_do}</div>}</td>
+        <td>{g.boi}</td>
+        <td>{g.trang_thai === "hieu_luc" &&
+          <button type="button" className="act grey" onClick={() => go(g.id)}>Gỡ</button>}</td>
+      </tr>))}</tbody></table>}
+    <div className="grid">
+      <div><label>Số tiền (đ, có dấu)</label>
+        <input name="so_tien" required placeholder="VD: -12.000.000" /></div>
+      <div><label>Khoản này là khoản gì</label>
+        <input name="ly_do" required placeholder="VD: phí ngân hàng tháng 9 chưa hạch toán" /></div>
+    </div>
+    <label>Ghi chú</label><input name="ghi_chu" />
+    <p className="muted" style={{ fontSize: 12 }}>
+      Dương = sổ đang CAO hơn số đã chốt vì khoản này; âm = sổ đang THẤP hơn. Ghi giải thích KHÔNG
+      sinh bút toán nào — muốn sửa số thì lập bút toán điều chỉnh ở màn hình hạch toán.
+    </p>
+    <button className="act teal" type="submit" disabled={dang}>Ghi khoản giải thích</button>{" "}
+    <button type="button" className="act grey" onClick={dong}>Đóng</button>
+  </form>);
 }
 
 /** Cửa Kế toán chốt số dư đã đối soát (DT-2).
