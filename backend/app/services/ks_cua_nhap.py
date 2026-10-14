@@ -80,6 +80,12 @@ CUA_TAY = (
     # phải rỗng — mỗi dòng là một câu NGƯỜI nói, nên máy nạp sẵn một dòng là máy giải thích hộ
     # chính cái chênh lệch mà đợt này dựng ra để bắt người phải nói. KHÔNG khai MAY_SINH.
     "giai_thich_lech",
+    # Đợt E16 14/10/2026. CỬA TAY trên màn hình /accounting, thẻ "Nạp từ MISA", khung 7: ô chọn
+    # tệp Excel + bảy ô khai nguồn + nút "Tải lên". Bảng DÒNG cũng khai CỬA TAY chứ KHÔNG khai
+    # MAY_SINH, dù máy là thứ dựng từng dòng: mỗi dòng là một con số NGƯỜI điền vào tệp Excel và
+    # ký tên chịu trách nhiệm. Khai nó là máy sinh thì ngày không ai tải lên, bảng rỗng mà không
+    # bộ đếm nào kêu — mà rỗng ở bảng này nghĩa là không chốt sổ kiểm toán được nữa.
+    "bo_so_kiem_toan", "bo_so_kiem_toan_dong",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
     "auto_reports", "ban_doc_chung_tu", "bang_gia", "bang_gia_dong", "bank_accounts_cat",
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",

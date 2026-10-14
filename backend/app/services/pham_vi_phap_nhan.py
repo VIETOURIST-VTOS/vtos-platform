@@ -238,6 +238,13 @@ PHAI_LOC = {
     # KHÔNG phải chuyện riêng tư mà là chuyện ĐÚNG–SAI: luật gốc của cả phân hệ dòng tiền là "không
     # bù trừ giữa hai pháp nhân". Một bản chốt số dư của pháp nhân A lọt sang truy vấn của người phụ
     # trách pháp nhân B là tiền của A đi trả nợ cho B ngay trên màn hình.
+    # Đợt E16 14/10/2026. Cùng lẽ với `ChotSoDu` ngay dưới: đây không phải chuyện riêng tư mà
+    # là chuyện ĐÚNG–SAI. Bộ số BCTC của công ty mẹ và của Vietrip là hai bộ số khác nhau, không
+    # cộng vào nhau; một bản của pháp nhân này lọt sang truy vấn của người phụ trách pháp nhân kia
+    # là mở đường chốt sổ pháp nhân A bằng đáp án của pháp nhân B.
+    "BoSoKiemToan":   "bộ số BCTC đã kiểm toán của ĐÚNG MỘT pháp nhân – đáp án mà cửa chốt sổ kéo "
+                      "cả sổ về theo, nên lẫn pháp nhân ở đây là viết lại bảng cân đối bằng số "
+                      "của người khác",
     "ChotSoDu":       "bản chốt số dư đã đối soát của ĐÚNG MỘT pháp nhân – nền của hàm tiền khả "
                       "dụng; lọt sang pháp nhân khác là bù trừ tiền giữa hai pháp nhân",
     # Đợt E15 14/10/2026. Cùng một lý do với `ChotSoDu`, và chặt hơn một bậc: một lời giải thích

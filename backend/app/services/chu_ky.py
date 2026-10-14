@@ -63,6 +63,13 @@ VAI_KY_CAN: dict[str, tuple[str, ...]] = {
     # thanh toán ở dòng trên. Người TRÌNH không khai trong bảng này vì bảng này nói về MỘT bước
     # ký; ai được trình là việc của `require_roles` ở cửa trình.
     "mo_lai_ky":         ("chutich",),
+    # Đợt E16 14/10/2026 — BỘ SỐ BCTC ĐÃ KIỂM TOÁN. Chủ tịch chốt: Kế toán tải lên, Chủ tịch ký.
+    # Khai ở ĐÂY chứ không ở `bo_so_kiem_toan.py`: một luật, một chỗ — cùng lẽ với `mo_lai_ky` ở
+    # dòng trên. Vì sao bộ số phải có chữ ký trong khi mọi bộ nạp MISA khác thì không: các bộ nạp
+    # kia nạp SỐ PHÁT SINH, sai một dòng thì lệch một dòng và đối chiếu sẽ tìm ra. Bộ số này là
+    # ĐÁP ÁN — `misa.import_audited_checkpoint` lấy nó làm chuẩn rồi kéo cả sổ về bằng chênh lệch,
+    # nên một con số sai ở đây viết lại cả bảng cân đối của một công ty đại chúng.
+    "bo_so_kiem_toan":   ("chutich",),
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════

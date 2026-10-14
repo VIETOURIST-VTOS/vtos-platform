@@ -137,19 +137,101 @@ def test_dimension_rules_and_exports():
     assert client.post("/api/v1/misa/partners", files={"file": ("a.xlsx", b"x")}, headers=login("kd.hoa")).status_code == 403
 
 
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# ĐỢT E16 14/10/2026 — PHÉP THỬ NÀY ĐỔI NGUỒN BỘ SỐ, KHÔNG ĐỔI PHÉP TÍNH.
+#
+# Bản cũ gọi thẳng `/misa/kiem-toan-checkpoint` và đối chiếu với BA MƯƠI con số thật nằm trong
+# `app/data/kiem_toan_2026h1.json` — 348.712.228.082 ở chỉ tiêu 280, và tám con số khác. Tệp ấy bị
+# XOÁ ở đợt này: ba mươi con số của một bản BCTC đã soát xét do robot gõ vào kho mã là đúng cái mà
+# ranh giới 09/9/2026 cấm, và chép chúng sang tệp phép thử là giữ nguyên chuyện cũ ở một thư mục khác.
+#
+# Bản mới TỰ DỰNG một bộ số nhỏ, tự cân, rồi đi đủ ba bước thật: Kế toán tải lên → Chủ tịch ký →
+# chốt sổ. Và nó MẠNH HƠN bản cũ ở một điểm: mọi con số nó đối chiếu đều do chính nó khai ở ngay
+# trên, nên khi đỏ thì đọc được vì sao đỏ — chín hằng số cũ không ai trong tổ còn dựng lại được
+# chúng từ đâu mà ra.
+#
+# GIỮ NGUYÊN mọi phép đối chiếu CẤU TRÚC của bản cũ, vì chúng bắt lỗi thật:
+#   · Bảng cân đối phải cân sau khi chốt sổ (280 = 440).
+#   · TK xét theo đối tượng không được CỘNG DỒN hai chiều — số dư cũ mang mã đối tượng khác phải
+#     bị đảo hết trước khi ghi số kiểm toán. Đây là lỗi đã gặp THẬT trên dữ liệu production, nên
+#     phép thử cố ý tạo trước một số dư 131 mang mã đối tượng KHÁC bộ số kiểm toán.
+#   · LCTT dòng 70 phải khớp tiền cuối kỳ, và hai đẳng thức cộng dồn của nó.
+#   · Tổng vay 341 phải khớp đúng các tiểu khoản.
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+
+# BỘ SỐ MẪU — tự cân ở CẢ hai cột. Tài sản = Nguồn vốn, cuối kỳ 25 tỷ, đầu kỳ 26 tỷ.
+# Mọi phép đối chiếu bên dưới đọc từ đúng bảng này, không có một hằng số nào gõ rời.
+KT_TK = [
+    ("1111", "Tiền mặt",                    "", "", 3_000_000_000, 0, 2_000_000_000, 0),
+    ("1121", "Tiền gửi ngân hàng",          "", "", 5_000_000_000, 0, 5_000_000_000, 0),
+    ("131",  "Phải thu khách hàng",          "", "", 10_000_000_000, 0, 10_000_000_000, 0),
+    ("131",  "",  "KH_E16_A", "Khách A",          6_000_000_000, 0, 6_000_000_000, 0),
+    ("131",  "",  "KH_E16_B", "Khách B",          4_000_000_000, 0, 4_000_000_000, 0),
+    ("2111", "Tài sản cố định hữu hình",     "", "", 8_000_000_000, 0, 8_000_000_000, 0),
+    ("331",  "Phải trả người bán",           "", "", 0, 3_000_000_000, 0, 3_000_000_000),
+    ("331",  "",  "NCC_E16_X", "Nhà cung cấp X",  0, 3_000_000_000, 0, 3_000_000_000),
+    ("34111", "Vay ngân hàng ngắn hạn",      "", "", 0, 4_000_000_000, 0, 4_000_000_000),
+    ("34112", "Vay ngân hàng dài hạn",       "", "", 0, 2_000_000_000, 0, 2_000_000_000),
+    ("411",  "Vốn góp của chủ sở hữu",       "", "", 0, 15_000_000_000, 0, 15_000_000_000),
+    ("421",  "LNST chưa phân phối",          "", "", 0, 2_000_000_000, 0, 1_000_000_000),
+]
+KT_TIEN_CUOI = 2_000_000_000 + 5_000_000_000      # 1111 + 1121
+KT_PHAI_THU = 10_000_000_000                       # 131, và CHỈ 131 — không có 1388/136 trong bộ số
+KT_PHAI_TRA = 3_000_000_000                        # 331
+KT_VON = 15_000_000_000                            # 411
+KT_VAY = 4_000_000_000 + 2_000_000_000             # 34111 + 34112
+KT_TONG = KT_TIEN_CUOI + KT_PHAI_THU + 8_000_000_000
+
+
+def _bo_so_mau(dong=None):
+    """Tệp Excel đúng mẫu VTOS xuất ra. Dòng tiêu đề lấy từ `COT` của chính bộ đọc."""
+    from app.services.bo_so_kiem_toan import COT
+    return xlsx([[nhan for _, nhan in COT]] + [list(r) for r in (dong or KT_TK)])
+
+
+def _tai_len_va_ky(h, dong=None, as_of="2026-06-30"):
+    """Ba bước thật: Kế toán tải lên → Chủ tịch ký. Trả về id của bản đã ký."""
+    r = client.post("/api/v1/misa/bo-so-kiem-toan",
+                    files={"file": ("bo_so.xlsx", _bo_so_mau(dong))},
+                    data={"as_of": as_of, "ky": "H1/2026", "don_vi_kiem_toan": "Baker Tilly A&C",
+                          "so_bao_cao": "TEST/26", "ngay_bao_cao": "2026-08-28",
+                          "loai_bao_cao": "soat_xet"}, headers=h)
+    assert r.status_code == 200, r.text
+    bid = r.json()["id"]
+    assert r.json()["trang_thai"] == "cho_ky"
+    k = client.post(f"/api/v1/misa/bo-so-kiem-toan/{bid}/ky", headers=login("chutich"))
+    assert k.status_code == 200, k.text
+    return bid
+
+
+def test_e16_chua_ky_thi_khong_chot_so_duoc():
+    """Cửa chốt sổ KHÔNG còn bộ số nào trong kho mã để phát lại — chưa ai ký thì nó phải NÓI RA.
+
+    Phép thử này đứng TRƯỚC `test_kiem_toan_checkpoint` có chủ ý: nó canh đúng cái trạng thái mà
+    kho mã rơi vào ngay sau khi gộp đợt E16 — chưa ai tải gì lên cả.
+    """
+    h = login("ketoan")
+    r = client.post("/api/v1/misa/kiem-toan-checkpoint", data={"column": "close"}, headers=h)
+    assert r.status_code == 422, r.text
+    assert "ĐÃ KÝ" in r.text, "câu từ chối phải chỉ ra việc còn thiếu là CHỮ KÝ, không phải lỗi máy"
+
+
 def test_kiem_toan_checkpoint():
     h = login("ketoan")
     # có doanh thu/chi phí thật còn treo trong kỳ (chưa kết chuyển 911) trước khi chốt sổ – mô phỏng
-    # đúng tình huống production (bug cộng dồn cũ chỉ lộ ra khi có số dư P&L thật ở kỳ chốt sổ)
+    # đúng tình huống production (bug cộng dồn cũ chỉ lộ ra khi có số dư P&L thật ở kỳ chốt sổ).
+    # Mã đối tượng 0301234567 KHÁC hai mã trong bộ số kiểm toán: đó chính là bẫy cộng dồn hai chiều.
     ok = client.post("/api/v1/journal", json={"entry_date": "2026-03-15", "description": "DT test", "lines": [
         {"account": "131", "debit": 500000, "partner_code": "0301234567"}, {"account": "51131", "credit": 500000, "project_code": "EU0014.09.170626"}]}, headers=h)
     assert ok.status_code == 201, ok.text
     ok2 = client.post("/api/v1/journal", json={"entry_date": "2026-03-16", "description": "CP test", "lines": [
         {"account": "6421", "debit": 120000}, {"account": "1111", "credit": 120000}]}, headers=h)
     assert ok2.status_code == 201, ok2.text
+
+    _tai_len_va_ky(h)
     r = client.post("/api/v1/misa/kiem-toan-checkpoint", data={"column": "close"}, headers=h)
     assert r.status_code == 200, r.text
-    js = r.json(); assert js["total"] > 0 and js["accounts"] > 0
+    js = r.json(); assert js["total"] > 0 and js["accounts"] > 0 and js["bo_so_id"]
     # trùng lần 2 không replace → lỗi
     assert client.post("/api/v1/misa/kiem-toan-checkpoint", data={"column": "close"}, headers=h).status_code == 422
     # replace=True → ghi lại được
@@ -159,16 +241,14 @@ def test_kiem_toan_checkpoint():
     rep = client.get("/api/v1/reports/bctc?upto=2026-06-30&since=2026-01-01", headers=h).json()
     assert rep["balanced"]
     v = {x["code"]: x["now"] for x in rep["thtc"]}
-    # điều chỉnh theo CHÊNH LỆCH nên phải khớp tuyệt đối số kiểm toán dù sổ đã có bút toán khác từ trước
-    # cho phép sai số nhỏ do các bút toán thử nghiệm khác trong cùng phiên test (không liên quan chốt sổ)
-    assert abs(v["280"] - 348712228082) < 10000 and abs(v["440"] - 348712228082) < 10000
-    assert abs(v["411"] - 240000000000) < 1
-    assert abs(v["420"] - 14037369907) < 10000
-    # TK xét theo đối tượng (131 có số dư cũ từ "DT test" ở trên, mã đối tượng khác mã kiểm toán) không được
-    # cộng dồn hai chiều: 130/311/312 phải khớp sát số kiểm toán, không phồng lên do đối tượng cũ + mới
-    assert abs(v["130"] - 168818037699) < 10000
-    assert abs(v["311"] - 13459932467) < 10000
-    assert abs(v["132"] - 73783036624) < 10000
+    # điều chỉnh theo CHÊNH LỆCH nên phải khớp tuyệt đối bộ số đã ký dù sổ đã có bút toán khác từ trước
+    assert abs(v["280"] - KT_TONG) < 10000 and abs(v["440"] - KT_TONG) < 10000
+    assert abs(v["411"] - KT_VON) < 1
+    # TK xét theo đối tượng (131 có số dư cũ từ "DT test" ở trên, mã đối tượng KHÁC mã kiểm toán)
+    # không được cộng dồn hai chiều: 130 phải khớp đúng bộ số, không phồng thêm 500.000 của dòng cũ
+    assert abs(v["130"] - KT_PHAI_THU) < 10000, "số dư 131 mang mã đối tượng cũ bị cộng dồn thêm"
+    assert abs(v["311"] - KT_PHAI_TRA) < 10000
+    assert abs(v["110"] - KT_TIEN_CUOI) < 10000
     # ---- LCTT gián tiếp: dòng 70 (tiền cuối kỳ) phải khớp đúng tiền mặt+tiền gửi thực tế 30/06/2026 ----
     assert "lctt" in rep and rep["lctt"]
     lv = {x["code"]: x["now"] for x in rep["lctt"]}
@@ -176,12 +256,6 @@ def test_kiem_toan_checkpoint():
     assert abs(lv["70"] - cash_end) < 10000, f"LCTT dòng 70 ({lv['70']:,.0f}) phải khớp tiền cuối kỳ THTC ({cash_end:,.0f})"
     assert abs(lv["50"] - (lv["20"] + lv["30"] + lv["40"])) < 1
     assert abs(lv["70"] - (lv["50"] + lv["60"] + lv["61"])) < 1
-    # residual_plug trừ đi phần TÁC ĐỘNG TIỀN đã biết trước của bút toán chốt sổ kiểm toán (bình thường, vì
-    # LCTT loại bút toán này khỏi các chỉ tiêu HĐKD/đầu tư/tài chính – xem cash_flow_indirect_tt99) phải nhỏ;
-    # nếu còn lớn bất thường nghĩa là có nhóm tài khoản khác chưa phân loại đúng theo chỉ tiêu BCTC (như lỗi
-    # 3411→34111/34112/34113 đã gặp trên dữ liệu thật)
-    unexplained = rep["lctt_residual_plug"] - rep["lctt_kiem_toan_restatement_cash_effect"]
-    assert abs(unexplained) < 5_000_000_000, f"LCTT residual chưa lý giải được bất thường lớn ({unexplained:,.0f})"
-    # ---- Chi tiết vay 341 theo ngân hàng: tổng dư cuối kỳ phải khớp đúng tổng 3 tiểu khoản kiểm toán ----
+    # ---- Chi tiết vay 341 theo ngân hàng: tổng dư cuối kỳ phải khớp đúng tổng tiểu khoản đã ký ----
     vay = client.get("/api/v1/reports/vay-341?upto=2026-06-30&since=2026-01-01", headers=h).json()
-    assert abs(vay["total"]["close"] - (57378198822 + 11833359977 + 5203246120)) < 10000
+    assert abs(vay["total"]["close"] - KT_VAY) < 10000

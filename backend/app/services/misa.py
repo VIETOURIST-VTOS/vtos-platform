@@ -5,8 +5,7 @@
 - Nạp số dư đầu kỳ (chứng từ SDDK, nguồn so_du_dau_ky), nạp chứng từ lịch sử (nguồn misa), đối chiếu số dư VTOS – MISA.
 - Xuất ngược sang MISA theo đúng mẫu Import (Mua dịch vụ 57 cột, Bút toán tổng hợp, Danh mục công trình).
 """
-import io, re, unicodedata, json
-from pathlib import Path
+import io, re, unicodedata
 from datetime import date, datetime
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -19,6 +18,7 @@ from app.services import chung_tu_loai as CTL   # Đợt E3
 from app.services import rules as R
 from app.services import so_lo_nap as SLN
 from app.services.bctc import BY_PARTNER
+from app.services import bo_so_kiem_toan as BSKT
 
 TECHNICAL_PROJECTS = ("0000", "CHUA RO", "CHUARO", "CPXD", "CPCD", "CPBH", "CPQL", "CHOTHUEMATBANG", "DLPTLUHANH")
 PROJECT_STD = re.compile(r"^[A-Z]{2,8}\d{3,4}\.\d{2}\.?\d{6}$")   # mã công trình chuẩn SP.NHÓM.DDMMYY (vd EU0014.09.170626)
@@ -253,7 +253,9 @@ def ACC_KIND(code: str) -> str:
     return {"1": "TS", "2": "TS", "3": "NV", "4": "NV", "5": "DT", "6": "CP", "7": "DT", "8": "CP", "9": "XD"}[code[0]]
 
 
-KIEM_TOAN_FILE = Path(__file__).resolve().parent.parent / "data" / "kiem_toan_2026h1.json"
+# BỘ SỐ KIỂM TOÁN KHÔNG CÒN NẰM TRONG KHO MÃ (Đợt E16, 14/10/2026). Tệp `data/kiem_toan_2026h1.json`
+# đã bị XOÁ: ba mươi con số của một bản BCTC đã soát xét do robot gõ vào kho mã là đúng cái mà ranh
+# giới 09/9/2026 cấm. Nay bộ số đến từ `services/bo_so_kiem_toan.py` — Kế toán tải lên, Chủ tịch ký.
 
 
 def _account_net_balances(db: Session, upto: date, exclude_refs: tuple = ()) -> dict:
@@ -268,7 +270,7 @@ def _account_net_balances(db: Session, upto: date, exclude_refs: tuple = ()) -> 
     return {code: float(net or 0) for code, net in db.execute(q.group_by(JournalLine.account_code)).all()}
 
 
-def import_audited_checkpoint(db: Session, u: User, column: str = "close", replace: bool = False, path=None) -> dict:
+def import_audited_checkpoint(db: Session, u: User, column: str = "close", replace: bool = False, bo_id: int | None = None) -> dict:
     """Chốt sổ theo BCTC ĐÃ KIỂM TOÁN/SOÁT XÉT (không phải số MISA thô) – dùng khi số liệu MISA chưa chuẩn
     (thiếu phân loại vay ngắn/dài hạn đúng khế ước, thiếu trích trước, sai lệch do gộp nhiều lần export…).
 
@@ -279,9 +281,18 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
     Vì tổng số dư ròng toàn bộ tài khoản trước và sau khi kết chuyển đều bằng 0 (mọi bút toán tự cân Nợ=Có)
     và bộ số liệu kiểm toán cũng cân (Tài sản = Nguồn vốn), nên bút toán điều chỉnh luôn tự cân — không phá
     vỡ BCTC hiện có, và không cần đảo toàn bộ dữ liệu MISA gốc. Gọi lại với replace=True khi kiểm toán có
-    số liệu mới hoặc phải nạp lại (đảo đúng 2 chứng từ 'kết chuyển' + 'điều chỉnh kiểm toán' lần trước)."""
-    data = json.loads(Path(path or KIEM_TOAN_FILE).read_text(encoding="utf-8"))
-    as_of = _date(data["as_of"]) or datetime.strptime(data["as_of"], "%Y-%m-%d").date()
+    số liệu mới hoặc phải nạp lại (đảo đúng 2 chứng từ 'kết chuyển' + 'điều chỉnh kiểm toán' lần trước).
+
+    ĐỢT E16 14/10/2026 — BỘ SỐ ĐẾN TỪ ĐÂU. Trước đợt này hàm đọc thẳng `app/data/kiem_toan_2026h1.json`,
+    ba mươi tài khoản do robot gõ vào kho mã, không có ai ký. Nay nó đọc một bản bộ số do Kế toán TẢI LÊN
+    và Chủ tịch ĐÃ KÝ (`services/bo_so_kiem_toan.py`). Chưa có bản nào đã ký thì hàm NÉM, kèm câu chỉ đúng
+    việc phải làm — chứ không chốt sổ bằng một bộ số rỗng.
+
+    PHẦN TÍNH TOÁN BÊN DƯỚI KHÔNG ĐỔI MỘT DÒNG NÀO, và `du_lieu()` trả về đúng hình dáng của tệp JSON cũ.
+    Có chủ ý: nếu con số sau đợt này khác trước, nguyên nhân nằm ở BỘ SỐ chứ không ở phép tính."""
+    bo = BSKT.ban_de_chot(db, bo_id)
+    data = BSKT.du_lieu(bo)
+    as_of = data["as_of"]
     key_d, key_c = ("close_d", "close_c") if column == "close" else ("open_d", "open_c")
     ref_close, ref_adj = f"kt-close:{as_of:%Y%m%d}", f"kt:{as_of:%Y%m%d}"
     old_adj = db.execute(select(JournalEntry).where(JournalEntry.source_ref == ref_adj, JournalEntry.status == "da_ghi_so")).scalars().all()
@@ -373,14 +384,14 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
         raise ValueError(f"Bút toán điều chỉnh kiểm toán không cân: Nợ {td:,.0f} ≠ Có {tc:,.0f}")
     if not lines:
         db.commit()
-        return {"entry": None, "as_of": as_of, "total": 0, "lines": 0, "source": data["nguon"], "message_extra": "Sổ VTOS đã khớp đúng số kiểm toán, không cần điều chỉnh", **stat}
+        return {"entry": None, "as_of": as_of, "total": 0, "lines": 0, "source": data["nguon"], "bo_so_id": bo.id, "message_extra": "Sổ VTOS đã khớp đúng số kiểm toán, không cần điều chỉnh", **stat}
     e = ACC.post_entry(db, u.username, u.role, as_of, f"Điều chỉnh chốt sổ theo BCTC kiểm toán/soát xét tại {as_of:%d/%m/%Y} ({data['nguon']})", lines, "kiem_toan", ref_adj, nghiep_vu="dieu_chinh_kiem_toan")
     db.commit()
     SLN.ghi_lo(db, loai="misa_moc_kiem_toan", so_dong=len(lines), da_nap=len(lines),
                tong_tien_tep=td, tong_tien_da_nap=td, tong_tien_bo_qua=0, tong_tien_loi=0,
                cot_tien=["dư nợ"], boi=u.username, nguon="he_thong", dau_vao=lines,
                ket_qua={"chung_tu": e.code, "as_of": str(as_of), "nguon": data["nguon"], **stat})
-    return {"entry": e.code, "as_of": as_of, "total": td, "lines": len(lines), "source": data["nguon"], **stat}
+    return {"entry": e.code, "as_of": as_of, "total": td, "lines": len(lines), "source": data["nguon"], "bo_so_id": bo.id, **stat}
 
 
 # ---------- 5. Sổ nhật ký chung ----------

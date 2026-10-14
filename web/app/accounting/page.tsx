@@ -72,7 +72,89 @@ function MoLaiPanel({ toast, isKTT, isKy }: { toast: (m: string, e?: boolean) =>
   </div>);
 }
 
-function MisaPanel({ toast, isKT }: { toast: (m: string, e?: boolean) => void; isKT: boolean }) {
+// ══ ĐỢT E16 14/10/2026 — BỘ SỐ BCTC KIỂM TOÁN: KẾ TOÁN TẢI LÊN, CHỦ TỊCH KÝ ═══════════════════
+//
+// Khung 7 cũ có đúng MỘT nút và không có ô tải tệp nào: nó phát lại ba mươi con số nằm sẵn trong
+// kho mã (`app/data/kiem_toan_2026h1.json`), do robot gõ, không ai ký. Khung mới đi đủ ba bước —
+// tải lên → ký → chốt sổ — và ba bước ấy là BA NÚT, không gộp.
+const BSKT_ST: Record<string, string> = {
+  cho_ky: "Chờ Chủ tịch HĐQT ký", da_ky: "Đã ký — dùng được để chốt sổ",
+  tu_choi: "Chủ tịch từ chối", da_thay_the: "Đã bị một bản sau thay thế",
+};
+
+function BoSoKiemToanPanel({ toast, isKT, isKy, onKetQua }: { toast: (m: string, e?: boolean) => void; isKT: boolean; isKy: boolean; onKetQua: (r: any) => void }) {
+  const [rows, setRows] = useState<any[]>([]);
+  const [dangDung, setDangDung] = useState<any>(null);
+  const [busy, setBusy] = useState("");
+  const [tep, setTep] = useState<File | null>(null);
+  const [replace, setReplace] = useState(false);
+  const [col, setCol] = useState("close");
+  const [k, setK] = useState({ as_of: "2026-06-30", ky: "H1/2026", don_vi_kiem_toan: "", so_bao_cao: "", ngay_bao_cao: "", loai_bao_cao: "soat_xet", ghi_chu: "" });
+  const load = () => api("/misa/bo-so-kiem-toan").then((r: any) => { setRows(r.rows || []); setDangDung(r.dang_dung || null); }).catch(() => { });
+  useEffect(() => { load(); }, []);
+  const o = (t: string, v: string) => <input value={(k as any)[t]} onChange={(e) => setK({ ...k, [t]: e.target.value })} placeholder={v} />;
+
+  const taiLen = async () => {
+    if (!tep) { toast("Chọn tệp Excel trước", true); return; }
+    const fd = new FormData(); fd.append("file", tep);
+    Object.entries(k).forEach(([a, b]) => { if (b) fd.append(a, b); });
+    setBusy("tai");
+    try { const r = await api("/misa/bo-so-kiem-toan", { method: "POST", body: fd }); toast(r.message); load(); } catch (x) { toast(errMsg(x), true); }
+    setBusy("");
+  };
+  const bam = async (path: string, json?: any) => {
+    setBusy(path);
+    try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); } catch (x) { toast(errMsg(x), true); }
+    setBusy("");
+  };
+  const chotSo = async () => {
+    const fd = new FormData(); fd.append("column", col); fd.append("replace", String(replace));
+    setBusy("chot");
+    try { const r = await api("/misa/kiem-toan-checkpoint", { method: "POST", body: fd }); onKetQua(r); toast(r.message || "Xong"); } catch (x) { toast(errMsg(x), true); }
+    setBusy("");
+  };
+
+  return <div className="panel"><h3>7. BCTC kiểm toán / soát xét — bộ số đã ký</h3>
+    <p className="muted">Bộ số của bản BCTC đã kiểm toán hoặc soát xét — KHÁC số MISA thô, đó chính là lý do có cửa này. Chốt sổ chỉ chạy được trên một bộ số <b>đã có chữ ký Chủ tịch HĐQT</b>. Nguồn “Điều chỉnh kiểm toán” trên Chứng từ ghi sổ.</p>
+    <button className="act grey" onClick={() => dl("/misa/bo-so-kiem-toan/mau.xlsx", "Mau_bo_so_BCTC_kiem_toan.xlsx")}>Tải mẫu Excel</button>
+    <span className="muted"> TK · Tên · Mã đối tượng · Tên đối tượng · Dư Nợ/Có đầu kỳ · Dư Nợ/Có cuối kỳ</span>
+
+    {isKT && <><hr /><b>Tải lên một bản mới</b>
+      <div><input type="file" accept=".xlsx" onChange={(e) => setTep(e.target.files?.[0] || null)} /></div>
+      <label>Ngày số liệu <input type="date" value={k.as_of} onChange={(e) => setK({ ...k, as_of: e.target.value })} /></label>{" "}
+      <label>Kỳ {o("ky", "H1/2026")}</label>{" "}
+      <label>Loại <select value={k.loai_bao_cao} onChange={(e) => setK({ ...k, loai_bao_cao: e.target.value })}><option value="soat_xet">Soát xét bán niên</option><option value="kiem_toan_nam">Kiểm toán BCTC năm</option></select></label><br />
+      <label>Đơn vị kiểm toán {o("don_vi_kiem_toan", "Baker Tilly A&C")}</label>{" "}
+      <label>Số báo cáo {o("so_bao_cao", "4.0299/26/TC-AC")}</label>{" "}
+      <label>Ngày báo cáo <input type="date" value={k.ngay_bao_cao} onChange={(e) => setK({ ...k, ngay_bao_cao: e.target.value })} /></label><br />
+      <button className="act orange" disabled={!!busy} onClick={taiLen}>Tải lên — chuyển Chủ tịch ký</button>
+      <p className="muted">Ba ô khai nguồn là bắt buộc. Máy kiểm trước khi nhận: tổng Nợ phải bằng tổng Có ở cả hai cột, và các dòng đối tượng của một tài khoản cộng lại phải bằng đúng dòng tài khoản ấy — sai một phép là trả cả tệp, chưa ghi gì.</p></>}
+
+    {rows.length > 0 && <><hr /><table><thead><tr><th>Ngày số liệu</th><th>Nguồn</th><th>Dòng</th><th>Trạng thái</th><th>Tải lên</th><th>Ký</th></tr></thead>
+      <tbody>{rows.map((d) => <tr key={d.id} style={d.trang_thai === "da_ky" ? { fontWeight: 600 } : undefined}>
+        <td className="mono">{fmtD(d.as_of)}<br /><span className="muted">{d.ky}</span></td>
+        <td>{d.nguon}{d.trang_thai === "tu_choi" && d.tu_choi_ly_do ? <><br /><span className="muted"><b>Từ chối:</b> {d.tu_choi_ly_do}</span></> : null}</td>
+        <td>{d.so_tai_khoan} TK{d.so_doi_tuong ? ` + ${d.so_doi_tuong} đối tượng` : ""}</td>
+        <td>{BSKT_ST[d.trang_thai] || d.trang_thai}</td>
+        <td className="muted">{d.tai_len_boi}<br />{fmtDT(d.tai_len_luc)}</td>
+        <td>{d.trang_thai === "cho_ky" && isKy ? <>
+          <button className="act orange" style={{ margin: 0 }} disabled={!!busy} onClick={() => bam(`/misa/bo-so-kiem-toan/${d.id}/ky`)}>Ký</button>
+          <button className="act grey" style={{ margin: "0 0 0 6px" }} disabled={!!busy} onClick={() => { const n = prompt("Lý do từ chối — người tải lên cần biết sửa gì để tải lại:"); if (n) bam(`/misa/bo-so-kiem-toan/${d.id}/tu-choi`, { ly_do: n }); }}>Từ chối</button>
+        </> : d.ky_boi ? <span className="muted">{d.ky_boi}<br />{fmtDT(d.ky_luc)}</span> : <span className="muted">—</span>}</td>
+      </tr>)}</tbody></table></>}
+
+    <hr /><b>Chốt sổ theo bộ số đã ký</b>
+    {dangDung
+      ? <p className="muted">Đang dùng: bộ số <b>{fmtD(dangDung.as_of)}</b> — {dangDung.nguon}. Ký bởi {dangDung.ky_boi} {fmtDT(dangDung.ky_luc)}.</p>
+      : <p className="muted"><b>Chưa có bộ số nào đã ký.</b> Tải tệp lên và nhờ Chủ tịch HĐQT ký trước — trước 14/10/2026 chỗ này phát lại một bộ số nằm trong kho mã mà không ai ký, và đó là chỗ đợt này sửa.</p>}
+    <label>Lấy cột <select value={col} onChange={(e) => setCol(e.target.value)}><option value="close">Cuối kỳ</option><option value="open">Đầu kỳ</option></select></label>{" "}
+    <label><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Thay thế nếu đã chốt</label><br />
+    {isKT && <button className="act orange" disabled={!!busy || !dangDung} onClick={chotSo}>Chốt sổ theo BCTC kiểm toán</button>}
+    <p className="muted">Ký là xác nhận <b>bộ số đúng</b>; chốt sổ là việc riêng, bấm riêng, ghi một chứng từ riêng. Gộp hai việc thì không ai lùi lại được một bước.</p>
+  </div>;
+}
+
+function MisaPanel({ toast, isKT, isKy }: { toast: (m: string, e?: boolean) => void; isKT: boolean; isKy: boolean }) {
   const [stats, setStats] = useState<any>(null);
   const [res, setRes] = useState<any>(null);
   const [busy, setBusy] = useState("");
@@ -110,9 +192,7 @@ function MisaPanel({ toast, isKT }: { toast: (m: string, e?: boolean) => void; i
         <button className="act grey" onClick={() => dl(`/misa/export/purchases.xlsx?date_from=${range.from}&date_to=${range.to}`, "Import_MISA_MuaDichVu.xlsx")}>Mua dịch vụ (57 cột)</button>
         <button className="act grey" onClick={() => dl(`/misa/export/entries.xlsx?date_from=${range.from}&date_to=${range.to}`, "Import_MISA_ButToan.xlsx")}>Bút toán tổng hợp</button>
         <button className="act grey" onClick={() => dl(`/misa/export/projects.xlsx?date_from=${range.from}`, "Import_DanhMuc_CongTrinh.xlsx")}>Danh mục công trình</button></div>
-      <div className="panel"><h3>7. Chốt sổ theo BCTC kiểm toán/soát xét</h3><p className="muted">Dùng khi số MISA thô chưa chuẩn (thiếu phân loại vay ngắn/dài hạn, thiếu trích trước…). Ghi đè mốc 30/06/2026 bằng đúng số trên BCTC riêng đã soát xét (Baker Tilly A&C). Nguồn “Điều chỉnh kiểm toán” trên Chứng từ ghi sổ.</p>
-        <label><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Thay thế nếu đã chốt</label><br />
-        {isKT && <button className="act orange" disabled={!!busy} onClick={async () => { const fd = new FormData(); fd.append("column", col); fd.append("replace", String(replace)); setBusy("kt"); try { const r = await api("/misa/kiem-toan-checkpoint", { method: "POST", body: fd }); setRes(r); toast(r.message || "Xong"); reload(); } catch (x) { toast(errMsg(x), true); } setBusy(""); }}>Chốt sổ theo BCTC kiểm toán</button>}</div>
+      <BoSoKiemToanPanel toast={toast} isKT={isKT} isKy={isKy} onKetQua={setRes} />
     </div>
     {busy && <p className="muted">Đang xử lý {busy}… (sổ nhật ký lớn có thể mất vài phút)</p>}
     {res && <div className="panel wrap"><h3>Kết quả</h3>
@@ -349,7 +429,7 @@ function Accounting() {
       <p className="muted">Robot R5 chỉ lập tờ khai từ sổ và xuất XML; Kế toán trưởng kiểm tra, ký số bằng token công ty và nộp trên eTax; lưu biên nhận vào kho chứng từ. Cấu trúc XML cần đối chiếu với phiên bản HTKK hiện hành trước lần nộp đầu.</p>
     </>}
 
-    {tab === "misa" && <MisaPanel toast={toast} isKT={isKT || user?.role === "cntt"} />}
+    {tab === "misa" && <MisaPanel toast={toast} isKT={isKT || user?.role === "cntt"} isKy={isKy} />}
     {tab === "bctc" && <BctcPanel toast={toast} period={period} />}
 
     {tab === "periods" && <div className="panel wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Khóa bởi</th><th>Lúc</th><th>Ghi chú</th>{isKT && <th></th>}</tr></thead>
