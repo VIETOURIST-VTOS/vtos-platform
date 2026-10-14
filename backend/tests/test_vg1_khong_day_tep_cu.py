@@ -31,7 +31,19 @@ def test_vg1_0_kich_ban_con_do():
     assert KICH_BAN.exists(), (
         "Mất `scripts/kiem-tep-cu.sh`. Đây là phần LUẬT của hàng rào chặn đẩy tệp cũ; "
         "`VONG_DAY.bat` gọi vào nó. Mất tệp này là cửa mở lại.")
-    assert os.access(KICH_BAN, os.X_OK), "kiem-tep-cu.sh phải chạy được (chmod +x)."
+    # KHÔNG đòi bit thực thi, và lý do đáng ghi (sửa 14/10/2026, ngay sau khi chính dòng cũ
+    # làm bộ 45 phút đỏ): bản cũ viết `assert os.access(KICH_BAN, os.X_OK)`. Nó xanh trên máy
+    # Linux nhưng KHÔNG THỂ xanh trên CI, vì cây làm việc nằm trên ổ Windows — ổ ấy không giữ
+    # bit thực thi, nên git ghi tệp ở mode 100644 và runner nhận một tệp không chạy trực tiếp
+    # được. Một phép thử không bao giờ xanh nổi ở chỗ nó phải xanh là một phép thử hỏng.
+    #
+    # Và bit ấy KHÔNG CẦN: không chỗ nào gọi `./kiem-tep-cu.sh`. Cả sáu phép thử dưới đây lẫn
+    # `VONG_DAY.bat` đều gọi `bash <đường dẫn>`, chạy được bất kể quyền. Nên nay đòi thứ thật
+    # sự cần: tệp có nội dung và là một kịch bản shell.
+    dau = KICH_BAN.read_text(encoding="utf-8")[:64]
+    assert dau.startswith("#!"), (
+        f"scripts/kiem-tep-cu.sh phải là kịch bản shell (dòng đầu là #!...), thấy: {dau[:40]!r}")
+    assert "bash" in dau, "Dòng #! phải gọi bash – phần dưới dùng mapfile và process substitution."
 
 
 def _kho(tmp: Path):
