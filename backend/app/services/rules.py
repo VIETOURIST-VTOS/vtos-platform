@@ -323,6 +323,13 @@ DEFAULT_PARAMS = [
     # hết hiệu lực và chuyến được chào cho người khác. Toàn bộ HDV là cộng tác viên (07/9/2026), nên một
     # mốc thời gian mang nghĩa "bắt buộc phải trả lời" là dấu hiệu quản lý, điều hành – thứ mà luật nhìn
     # vào để xác định lại quan hệ lao động bất kể hợp đồng mang tên gì.
+    # Đợt HD-12, 14/10/2026. MẶC ĐỊNH TẮT là lựa chọn, không phải quên: bật lên là đổi hành vi
+    # trên hệ thống đang chạy – người hôm qua còn bận hôm nay bỗng rảnh. Đếm trước, nhả sau, đúng
+    # khuôn Đợt HD-9. Cửa GET /huong-dan/chao-chuyen/qua-han đếm được ngay cả khi công tắc tắt.
+    ("hdv_tu_dong_nha_lich_khi_loi_chao_qua_han", "0",
+     "Lời chào quá hạn trả lời có THÔI chiếm lịch của hướng dẫn viên không (1 = có). Không đổi "
+     "trạng thái bản ghi – hết hiệu lực không phải là từ chối", "0/1",
+     "Dựng Đợt HD-12 14/10/2026, để TẮT chờ Chủ tịch quyết"),
     ("hdv_han_tra_loi_gio", "24", "Lời chào chuyến hết hiệu lực sau bao nhiêu giờ", "giờ",
      "Chính sách Phòng Hướng dẫn"),
     ("moc_luong_doan", "30000000", "Mốc bình quân LN quyết toán 3 tháng để hưởng đủ lương NV kinh doanh đoàn", "đồng", "Đoàn Điều 5"),

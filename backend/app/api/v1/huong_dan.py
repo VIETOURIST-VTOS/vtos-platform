@@ -22,6 +22,7 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.core import User, Tour
 from app.models.hr import Employee, GuideAssignment, GuideRate
+from app.services import hdv as HDV
 from app.services import hr as H, rules as R
 
 router = APIRouter(prefix="/api/v1/huong-dan", tags=["huong-dan"])
@@ -106,8 +107,9 @@ def chao_chuyen(u: User = Depends(require_roles(*READ)), db: Session = Depends(g
     out = []
     for a in db.execute(select(GuideAssignment).order_by(desc(GuideAssignment.id)).limit(200)).scalars():
         t = db.get(Tour, a.tour_id)
-        qua_han = (a.status == "cho_xac_nhan" and a.han_tra_loi is not None
-                   and datetime.now() > a.han_tra_loi)
+        # Đợt HD-12: hỏi lớp giữ lịch, không tự tính lại ở đây. Hai chỗ cùng tính một câu hỏi
+        # là hai chỗ sẽ lệch nhau, và lệch lặng lẽ.
+        qua_han = HDV.loi_chao_het_hieu_luc(a)
         tre_bao_cao = (a.status == "da_xac_nhan" and t is not None and t.end_date < hom_nay
                        and not a.report_submitted and (hom_nay - t.end_date).days > 3)
         out.append({"id": a.id, "tour_code": t.code if t else "", "tour_name": t.name if t else "",
@@ -202,6 +204,41 @@ def _dang_treo(db: Session, guide_id: int) -> str:
 
 class DongIn(BaseModel):
     ly_do: str = ""
+
+
+@router.get("/chao-chuyen/qua-han")
+def chao_chuyen_qua_han(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """MỌI lời chào đã hết hiệu lực, và người nào đang bị chúng khoá lịch — Đợt HD-12, 14/10/2026.
+
+    Vì sao cần một cửa riêng khi `chao-chuyen` đã có cờ `loi_chao_qua_han`: cửa ấy lấy 200 bản ghi
+    mới nhất theo id giảm dần. Lời chào càng cũ càng chắc chắn không ai trả lời nữa — và càng cũ
+    càng rơi khỏi danh sách. Cửa này không cắt.
+
+    Cửa ĐỌC, không ghi. Đóng một lời chào vẫn là việc của người, ở `POST .../dong`.
+    """
+    nha = HDV.nha_lich_khi_het_hieu_luc(db)
+    ten = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
+    ds = []
+    for a in HDV.loi_chao_qua_han(db):
+        t = db.get(Tour, a.tour_id)
+        ds.append({"id": a.id, "tour_code": t.code if t else "", "hdv": ten.get(a.guide_id, ""),
+                   "guide_id": a.guide_id, "chao_luc": a.assigned_at,
+                   "han_tra_loi": a.han_tra_loi,
+                   "qua_han_gio": round((datetime.now() - a.han_tra_loi).total_seconds() / 3600, 1),
+                   "bat_dau": a.bat_dau, "ket_thuc": a.ket_thuc,
+                   "con_chiem_lich": not nha})
+    return {
+        "so_luong": len(ds),
+        "dang_nha_lich": nha,
+        "cong_tac": HDV.TU_DONG_NHA_LICH,
+        "rows": ds,
+        "ghi_chu": (
+            "Lời chào hết hiệu lực nghĩa là chuyến nên chào người khác – KHÔNG phải hướng dẫn viên "
+            "vi phạm. Công tắc ĐANG TẮT: những lời chào này VẪN chiếm lịch, nên người trong danh "
+            "sách vẫn bị coi là bận cho tới khi có người bấm đóng."
+            if not nha else
+            "Công tắc ĐANG BẬT: những lời chào này thôi chiếm lịch. Bản ghi vẫn còn nguyên và trạng "
+            "thái vẫn là chờ xác nhận – hết hiệu lực không phải là từ chối.")}
 
 
 @router.post("/chao-chuyen/{aid}/dong")
