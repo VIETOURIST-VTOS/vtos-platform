@@ -2136,7 +2136,10 @@ def hq_dat_dinh_muc(data: DinhMucDauIn, u: User = Depends(require_roles(*HQ_NGUO
 # chiếc nào vướng gì — không phải hỏi CNTT rồi chờ.
 # ═══════════════════════════════════════════════════════════════════════════════════════════════
 
-XOA_XE = ("cntt",)
+# Chủ tịch chốt 14/10/2026: thêm vai Chủ tịch vào nút xoá. Em dựng ban đầu CHỈ cntt, và
+# chính điều đó chặn Chủ tịch lúc cần xoá — ông là người quyết, không phải người đi xin.
+# Danh sách này PHẢI khớp với XOA_XE_VAI trong web/app/doi-xe/page.tsx; có phép thử canh.
+XOA_XE = ("cntt", "chutich")
 
 
 @router.get("/xe/{vid}/xoa-duoc")
