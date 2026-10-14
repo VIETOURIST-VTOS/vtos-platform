@@ -424,10 +424,14 @@ async def misa_opening(file: UploadFile = File(...), objects: UploadFile | None 
 
 @router.post("/misa/kiem-toan-checkpoint")
 async def misa_kiem_toan(column: str = Form("close"), replace: bool = Form(False),
+                          bo_id: int | None = Form(None),
                           u: User = Depends(require_roles(*MISA_WRITE)), db: Session = Depends(get_db)):
-    """Chốt sổ theo BCTC đã kiểm toán/soát xét (thay vì số MISA thô) – dùng khi phát hiện số MISA chưa chuẩn."""
+    """Chốt sổ theo BCTC đã kiểm toán/soát xét (thay vì số MISA thô) – dùng khi phát hiện số MISA chưa chuẩn.
+
+    Đợt E16: bộ số đến từ một bản ĐÃ KÝ (`/misa/bo-so-kiem-toan`), không còn từ tệp trong kho mã.
+    `bo_id` rỗng thì lấy bản đã ký có ngày số liệu mới nhất."""
     try:
-        return {"message": "Đã chốt sổ theo BCTC kiểm toán/soát xét", **MISA.import_audited_checkpoint(db, u, column, replace)}
+        return {"message": "Đã chốt sổ theo BCTC kiểm toán/soát xét", **MISA.import_audited_checkpoint(db, u, column, replace, bo_id)}
     except ValueError as ex: raise HTTPException(422, str(ex))
 
 
@@ -517,3 +521,86 @@ def vay_341_xlsx(upto: date, since: date | None = None, u: User = Depends(requir
     r = BCTC.loan_bank_detail_341(db, since, upto)
     R_.audit(db, u.username, u.role, "xuat_chi_tiet_vay_341", f"vay341:{upto}", after={"since": str(since)}); db.commit()
     return _xlsx(BCTC.loan_bank_detail_xlsx(r), f"CHI_TIET_VAY_341_{since:%d%m}_{upto:%d%m%Y}.xlsx")
+
+
+# ══ ĐỢT E16 14/10/2026 — BỘ SỐ BCTC KIỂM TOÁN: KẾ TOÁN TẢI LÊN, CHỦ TỊCH KÝ ═══════════════════
+#
+# Năm cửa, TẤT CẢ dưới tiền tố `/misa` ĐÃ khai trong `MAN_HINH_API["/accounting"]` — không xin
+# tiền tố mới, nên PHẠM_VI_ĐÃ_CHỐT không đổi một số nào.
+#
+# Vai: cửa TẢI LÊN dùng đúng `MISA_WRITE` của chính tệp này (Kế toán + CNTT), như mọi cửa nạp MISA
+# khác. Cửa KÝ và TỪ CHỐI cho Chủ tịch + CNTT vào phòng, còn AI ĐƯỢC KÝ thì `bo_so_kiem_toan.ky`
+# hỏi bảng luật `chu_ky.VAI_KY_CAN` — hai lần chặn, và lần thứ hai mới là luật.
+class BoSoTuChoiIn(BaseModel):
+    ly_do: str = ""
+
+
+@router.get("/misa/bo-so-kiem-toan/mau.xlsx")
+def bskt_mau(u: User = Depends(require_roles(*READ))):
+    """Mẫu Excel TRỐNG để Kế toán điền theo bản BCTC đã ký."""
+    from app.services import bo_so_kiem_toan as BSKT
+    return _xlsx(BSKT.mau_excel(), "Mau_bo_so_BCTC_kiem_toan.xlsx")
+
+
+@router.get("/misa/bo-so-kiem-toan")
+def bskt_danh_sach(company_id: int | None = None, u: User = Depends(require_roles(*READ)),
+                   db: Session = Depends(get_db)):
+    from app.services import bo_so_kiem_toan as BSKT
+    ds = BSKT.danh_sach(db, u, company_id)
+    dang_dung = BSKT.ban_da_ky(db)
+    return {"rows": ds, "dang_dung": BSKT.mot_dong(dang_dung) if dang_dung else None}
+
+
+@router.get("/misa/bo-so-kiem-toan/{bid}")
+def bskt_chi_tiet(bid: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    from app.models.bo_so_kiem_toan import BoSoKiemToan
+    from app.services import bo_so_kiem_toan as BSKT
+    b = db.get(BoSoKiemToan, bid)
+    if not b: raise HTTPException(404, "Không có bộ số này")
+    return BSKT.mot_dong(b, day_du=True)
+
+
+@router.post("/misa/bo-so-kiem-toan")
+async def bskt_tai_len(file: UploadFile = File(...), as_of: date = Form(...), ky: str = Form(""),
+                       don_vi_kiem_toan: str = Form(""), so_bao_cao: str = Form(""),
+                       ngay_bao_cao: date | None = Form(None), loai_bao_cao: str = Form("soat_xet"),
+                       company_id: int | None = Form(None), ghi_chu: str = Form(""),
+                       u: User = Depends(require_roles(*MISA_WRITE)), db: Session = Depends(get_db)):
+    """Kế toán tải một bản bộ số lên. KHÔNG chốt sổ gì cả — chỉ lập hồ sơ, chờ Chủ tịch ký."""
+    from app.services import bo_so_kiem_toan as BSKT
+    try:
+        b = BSKT.tai_len(db, u, await file.read(), file.filename or "", as_of, ky,
+                         don_vi_kiem_toan, so_bao_cao, ngay_bao_cao, loai_bao_cao,
+                         company_id, ghi_chu)
+    except BSKT.SaiBoSo as ex:
+        raise HTTPException(422, str(ex))
+    return {"message": "Đã nhận bộ số — chờ Chủ tịch HĐQT ký. Chưa chốt sổ gì cả.",
+            **BSKT.mot_dong(b)}
+
+
+@router.post("/misa/bo-so-kiem-toan/{bid}/ky")
+def bskt_ky(bid: int, u: User = Depends(require_roles("chutich", "cntt")),
+            db: Session = Depends(get_db)):
+    """Chủ tịch KÝ. Bộ số thành dùng được để chốt sổ — nhưng cửa này KHÔNG chốt sổ."""
+    from app.models.bo_so_kiem_toan import BoSoKiemToan
+    from app.services import bo_so_kiem_toan as BSKT
+    b = db.get(BoSoKiemToan, bid)
+    if not b: raise HTTPException(404, "Không có bộ số này")
+    try:
+        return BSKT.ky(db, u, b)
+    except BSKT.SaiBoSo as ex:
+        raise HTTPException(422, str(ex))
+
+
+@router.post("/misa/bo-so-kiem-toan/{bid}/tu-choi")
+def bskt_tu_choi(bid: int, data: BoSoTuChoiIn, u: User = Depends(require_roles("chutich", "cntt")),
+                 db: Session = Depends(get_db)):
+    """Từ chối cũng phải có lý do: người tải lên cần biết sửa gì để tải lại."""
+    from app.models.bo_so_kiem_toan import BoSoKiemToan
+    from app.services import bo_so_kiem_toan as BSKT
+    b = db.get(BoSoKiemToan, bid)
+    if not b: raise HTTPException(404, "Không có bộ số này")
+    try:
+        return BSKT.tu_choi(db, u, b, data.ly_do)
+    except BSKT.SaiBoSo as ex:
+        raise HTTPException(422, str(ex))

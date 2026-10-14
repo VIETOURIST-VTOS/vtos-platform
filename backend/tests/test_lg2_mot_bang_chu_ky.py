@@ -31,7 +31,11 @@ GOC_APP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # `mo_lai_ky` vào bảng ngày 13/10/2026 theo Đợt E6, Chủ tịch chốt: mở lại một kỳ kế toán đã khóa
 # đi MỘT chữ ký Chủ tịch, và Kế toán trưởng là người trình. Khai nốt ở đây để sổ phép thử không
 # lệch với bảng luật — đúng việc Đợt DỌN-1 phải đi dọn vì Đợt E4a quên.
-MOT_CHU_KY = ("tham_so", "don_gia_hdv", "gia_xe", "dieu_khoan_thanh_toan", "mo_lai_ky")
+# `bo_so_kiem_toan` vào bảng ngày 14/10/2026 theo Đợt E16, Chủ tịch chốt: bộ số BCTC đã kiểm
+# toán do Kế toán tải lên và Chủ tịch ký — MỘT chữ ký, cùng hình dáng với `mo_lai_ky`. Khai nốt ở
+# đây để sổ phép thử không lệch với bảng luật.
+MOT_CHU_KY = ("tham_so", "don_gia_hdv", "gia_xe", "dieu_khoan_thanh_toan", "mo_lai_ky",
+              "bo_so_kiem_toan")
 HAI_CT_TGD = ("quy_tac_hach_toan", "che_tai_muc_3")
 HAI_PTGD_TGD = ("du_toan_duoi_bien",)
 HAI_CHU_KY = HAI_CT_TGD + HAI_PTGD_TGD

@@ -81,6 +81,11 @@ CUA_NAP = (
      "Nạp danh sách nhân sự gốc, kèm mở/đóng tài khoản đăng nhập"),
     ("visa_finance.import_portal", "app.services.visa_finance", True,
      "Nạp hồ sơ từ Visa Portal"),
+    # Đợt E16 14/10/2026. Tên hàm là `tai_len` nên phép soi NL7 (bắt `import_*`, `*_hang_loat`,
+    # `nap_lo*`) KHÔNG tự tìm ra nó. Khai tay vào đây là đúng việc bảng này sinh ra để làm: một bộ
+    # đối chiếu chỉ kiểm những lô tự giác đăng ký là một bộ đối chiếu đi vòng được.
+    ("bo_so_kiem_toan.tai_len", "app.services.bo_so_kiem_toan", True,
+     "Nạp bộ số BCTC đã kiểm toán (Excel) – đáp án để chốt sổ, Chủ tịch ký mới dùng được"),
 )
 
 
