@@ -55,6 +55,59 @@ from app.models.hr import GuideAssignment
 # Nhưng bản ghi vẫn còn — giữ dấu vết là điều kiện để sau này trả lời được "ai đã từ chối chuyến nào".
 KHONG_CHIEM_LICH = ("tu_choi", "huy", "het_han")
 
+# ─────────────────── LỜI CHÀO HẾT HIỆU LỰC — Đợt HD-12, 14/10/2026 ───────────────────
+#
+# Trước đợt này, câu hỏi "lời chào còn hiệu lực không" được trả lời ở ĐÚNG MỘT chỗ: thân vòng lặp
+# của `api/v1/huong_dan.py::chao_chuyen`. Lớp này — lớp quyết định AI ĐANG CHIẾM LỊCH — không biết
+# câu hỏi ấy tồn tại. Hai lớp, một câu hỏi, và chỉ một lớp biết câu trả lời.
+#
+# Đo được hậu quả: một lời chào quá hạn 30 ngày vẫn khoá hướng dẫn viên ấy cho đúng khoảng giờ đó,
+# và không robot nào gỡ. Toàn hệ thống chỉ có một cửa người bấm.
+#
+# Nay phép hỏi nằm ở đây, và cả hai lớp gọi cùng một hàm.
+TU_DONG_NHA_LICH = "hdv_tu_dong_nha_lich_khi_loi_chao_qua_han"
+
+
+def loi_chao_het_hieu_luc(a: GuideAssignment, bay_gio: datetime | None = None) -> bool:
+    """Lời chào đang chờ mà đã quá hạn trả lời.
+
+    KHÔNG có hạn thì KHÔNG hết hiệu lực — giống hệt lý do `khong_so_duoc` tồn tại ở trên: thiếu mốc
+    là chưa đủ dữ liệu để kết luận, không phải là một kết luận. Hàng trăm lời chào cũ không có hạn
+    sẽ bị coi là chết hết nếu đoán bừa, và như thế là nhả lịch của những người đang thật sự bận.
+    """
+    if a.status != "cho_xac_nhan" or a.han_tra_loi is None:
+        return False
+    return (bay_gio or datetime.now()) > a.han_tra_loi
+
+
+def nha_lich_khi_het_hieu_luc(db: Session) -> bool:
+    """Công tắc: lời chào hết hiệu lực có thôi chiếm lịch hay không.
+
+    MẶC ĐỊNH TẮT, và đó là lựa chọn chứ không phải quên. Bật nó lên là đổi hành vi trên hệ thống
+    đang chạy: những người hôm qua còn bận hôm nay bỗng rảnh, và Điều hành sẽ xếp họ vào chuyến
+    khác. Đúng khuôn Đợt HD-9 Chủ tịch đã duyệt — đếm trước, khoá sau, và người bật là người quyết
+    định, không phải người viết mã.
+    """
+    # SO BẰNG SỐ, KHÔNG SO BẰNG CHUỖI. `get_param` ép giá trị về float, nên `str(...) == "1"` sẽ
+    # nhận về "1.0" và công tắc IM LẶNG không bao giờ bật. Sổ Đợt HD-9 đã ghi đúng cái bẫy này một
+    # lần rồi — một công tắc hỏng về phía "không bật" là công tắc không ai biết là đã hỏng.
+    from app.services import rules as _R
+    try:
+        return float(_R.get_param(db, TU_DONG_NHA_LICH) or 0) >= 1
+    except (KeyError, ValueError, TypeError):
+        return False
+
+
+def loi_chao_qua_han(db: Session, bay_gio: datetime | None = None) -> list[GuideAssignment]:
+    """MỌI lời chào đã hết hiệu lực, không cắt bớt.
+
+    Cửa `chao-chuyen` lấy 200 bản ghi mới nhất theo id giảm dần, nên lời chào cũ rơi khỏi danh sách
+    đúng lúc nó nguy hiểm nhất: càng cũ càng chắc chắn không ai trả lời, mà càng cũ càng không ai
+    thấy. Hàm này không cắt.
+    """
+    return [a for a in db.execute(select(GuideAssignment)).scalars()
+            if loi_chao_het_hieu_luc(a, bay_gio)]
+
 
 def chong_gio(a1: datetime | None, a2: datetime | None,
               b1: datetime | None, b2: datetime | None) -> bool:
@@ -82,9 +135,16 @@ def dang_chiem_lich(db: Session, guide_id: int, bat_dau: datetime, ket_thuc: dat
     q = select(GuideAssignment).where(GuideAssignment.guide_id == guide_id)
     if bo_qua_id is not None:
         q = q.where(GuideAssignment.id != bo_qua_id)
+    nha = nha_lich_khi_het_hieu_luc(db)
     ds = []
     for a in db.execute(q).scalars():
         if a.status in KHONG_CHIEM_LICH:
+            continue
+        # CÔNG TẮC TẮT thì giữ nguyên hành vi cũ: lời chào quá hạn VẪN chiếm lịch cho tới khi có
+        # người bấm đóng. Bật lên thì nó thôi chiếm — nhưng KHÔNG đổi `status` và không ghi gì vào
+        # bản ghi. Hết hiệu lực nghĩa là "chỗ này thôi giữ nữa", không nghĩa là người ta đã từ
+        # chối; `cho_xac_nhan` vẫn đúng sự thật, vì không ai trả lời cả.
+        if nha and loi_chao_het_hieu_luc(a):
             continue
         if chong_gio(bat_dau, ket_thuc, a.bat_dau, a.ket_thuc):
             ds.append(a)
