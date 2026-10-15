@@ -1631,7 +1631,11 @@ def ds_lenh(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_d
                     "so_ngay": (d.date_to - d.date_from).days + 1, "internal_price": (d.internal_price or 0),
                     "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at,
                     "theo_goi_y": bool(d.phuong_an_da_chon) and not d.ly_do_khac_goi_y,
-                    "phuong_an_da_chon": d.phuong_an_da_chon, "ly_do_khac_goi_y": d.ly_do_khac_goi_y})
+                    "phuong_an_da_chon": d.phuong_an_da_chon, "ly_do_khac_goi_y": d.ly_do_khac_goi_y,
+                    # DL-5 · 15/10/2026: màn hình gửi lại con số này khi đổi xe. Thiếu nó thì màn
+                    # hình gửi `undefined`, `kiem_phien_ban` cho qua theo đúng luật "chưa gửi thì
+                    # không chặn", và khoá chống ghi đè tắt lặng lẽ – đúng kiểu báo an toàn giả.
+                    "phien_ban": d.phien_ban})
     return out
 
 
@@ -2066,6 +2070,41 @@ def hq_theo_ky(moc: date | None = None, u: User = Depends(require_roles(*READ)),
     o = HQ.theo_ky(db, moc or hom_nay, hom_nay=hom_nay)
     o["ky_co_chuyen"] = HQ.ky_co_chuyen(db)
     return o
+
+
+# ══════════════════ DX-2 · BÁO CÁO NHÌN LẠI: thuê xe ngoài trong khi xe nhà đậu
+#
+# Chủ tịch chọn việc này trước năm việc còn lại của đội xe (16/10/2026): nó là thứ đã bắt được
+# 51.348.800 đ nhóm A tháng 9/2026.
+#
+# CỬA ĐỌC THUẦN, không có cửa ghi đi kèm — có chủ đích. Báo cáo này nêu ra chỗ nghi, người có sổ
+# mới biết chặng ấy thật sự chạy bằng xe nào. Dựng thêm một nút «gắn xe vào chặng» ngay đây là mời
+# người ta sửa sổ quyết toán từ một màn hình không hiển thị tờ quyết toán — đúng lẽ Chủ tịch đã
+# chốt 18/9 với sổ chuyến còn nợ: danh sách và đường dẫn, không làm hàng loạt từ màn hình tổng.
+@router.get("/doi-chieu-xe-ngoai")
+def doi_chieu_xe_ngoai(tu: str = "", den: str = "", nam: int = 0, thang: int = 0,
+                       u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Đối chiếu chặng ô tô thuê ngoài với xe nhà rảnh cùng ngày, theo kỳ.
+
+    Nhận kỳ theo hai cách: `nam`+`thang`, hoặc `tu`+`den`. Thiếu cả hai thì lấy tháng trước —
+    báo cáo nhìn lại mà mặc định là tháng này thì nửa tháng đầu nó luôn gần rỗng.
+    """
+    from datetime import date as _date
+    from app.services import doi_chieu_xe_ngoai as DX
+    if nam and thang:
+        d1, d2 = DX.ky_thang(nam, thang)
+    elif tu and den:
+        try:
+            d1, d2 = _date.fromisoformat(tu), _date.fromisoformat(den)
+        except ValueError:
+            raise HTTPException(422, "Ngày phải ở dạng YYYY-MM-DD")
+    else:
+        h = _date.today()
+        d1, d2 = DX.ky_thang(h.year - (h.month == 1), 12 if h.month == 1 else h.month - 1)
+    try:
+        return DX.soat(db, d1, d2)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
 
 
 @router.get("/dinh-muc-dau")
