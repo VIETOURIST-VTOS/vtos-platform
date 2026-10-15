@@ -56,6 +56,7 @@ function LenhDieuXe() {
   const [xacNhanLai, setXacNhanLai] = useState<any>(null);
   const [suaKhach, setSuaKhach] = useState<any>(null);   // {id, so_khach, so_xe_can, ly_do}
   const [lichSu, setLichSu] = useState<any[]>([]);
+  const [chuoi, setChuoi] = useState<any>(null);   // DL-3: hai số đo chỗ lệnh và chuyến chưa gặp nhau
 
   const load = useCallback(async () => {
     try { setDs(await api("/fleet/lenh-dieu-xe")); } catch (e) { toast(errMsg(e), true); }
@@ -68,6 +69,8 @@ function LenhDieuXe() {
     // DL-2 — hai số đo, cùng khuôn với `lenh-khong-qua-de-nghi`: đếm được, hiện lên, về 0 thì thôi.
     try { setThieuGhe(await api("/de-nghi-xe/thieu-ghe")); } catch { /* chỉ là số đo */ }
     try { setXacNhanLai(await api("/de-nghi-xe/can-xac-nhan-lai")); } catch { /* chỉ là số đo */ }
+    // DL-3 — hai số đo chỗ chuỗi chưa liền giữa LỆNH và CHUYẾN. Cùng khuôn: đếm, không chặn.
+    try { setChuoi(await api("/dispatch/chuoi-lenh-chuyen")); } catch { /* chỉ là số đo */ }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
 
@@ -426,6 +429,16 @@ function LenhDieuXe() {
         {ho.khong_qua_de_nghi > 0
           ? <><Tag cls="warn">chuỗi chưa liền</Tag> {ho.khong_qua_de_nghi}/{ho.tong_lenh} lệnh lập <b>không qua cửa đề nghị</b>. Khi con số này về 0 và giữ 0 một thời gian thì bắt buộc đề nghị được, mà không làm ai đứng việc.</>
           : <><Tag cls="ok">chuỗi liền</Tag> Cả {ho.tong_lenh} lệnh đều đi qua cửa đề nghị xe.</>}</p>}
+      {/* DL-3: hai chỗ hở giữa lệnh và chuyến. Số bên phải đo được 15/10/2026 là 756 — toàn bộ
+          chuyến đang không gắn lệnh nào, vì tới hôm ấy chưa có đường nào ghi `dispatch_id`. */}
+      {chuoi && <p className="muted">
+        {chuoi.lenh_xong_chua_co_chuyen?.so > 0
+          ? <><Tag cls="warn">lệnh xong, chưa có chuyến</Tag> {chuoi.lenh_xong_chua_co_chuyen.so}/{chuoi.lenh_xong_chua_co_chuyen.tong_lenh_hoan_thanh} lệnh đã hoàn thành mà <b>chưa sinh ra chuyến nào</b> — đóng lệnh lại một lần nữa thì máy sinh, hoặc gắn tay vào chuyến đã nạp.</>
+          : <><Tag cls="ok">lệnh nào xong cũng có chuyến</Tag> </>}
+        {" · "}
+        {chuoi.chuyen_chua_gan_lenh?.so > 0
+          ? <><Tag cls="warn">chuyến chưa gắn lệnh</Tag> {chuoi.chuyen_chua_gan_lenh.so}/{chuoi.chuyen_chua_gan_lenh.tong_chuyen} chuyến <b>không gắn lệnh nào</b> — phần lớn là sổ cũ nạp bằng tệp trước khi có mối nối này.</>
+          : <><Tag cls="ok">chuyến nào cũng có lệnh</Tag></>}</p>}
       <table><thead><tr><th>#</th><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Từ → đến</th><th>Giá nội bộ</th><th>Trạng thái</th><th>Tài xế nhận</th><th>Ghi vết gợi ý</th><th>Dọn</th></tr></thead>
         <tbody>{ds.length ? ds.map((d) => <tr key={d.id}>
           <td>{d.id}</td><td>{d.tour}</td><td>{d.ma_xe} · {d.xe}</td><td>{d.tai_xe}</td>

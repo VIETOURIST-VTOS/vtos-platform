@@ -18,7 +18,7 @@ Giấy tờ và hàng đợi xác minh nằm ở đây thay vì rải trong bả
 ngày, có nguồn và có mức độ đã xác minh – không phải một ô ngày trên hồ sơ xe.
 """
 from datetime import date, datetime
-from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, ForeignKey, Text, Index
+from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, ForeignKey, Text, Index, text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 from app.models.kieu_tien import TIEN
@@ -256,6 +256,14 @@ class Trip(Base):
     `km_dau`/`km_cuoi` để rỗng nghĩa là chưa đo, không phải bằng 0. Dùng 0 làm "chưa có" là cách chắc chắn
     nhất để một ngày nào đó hệ thống báo xe chạy âm mấy trăm nghìn km."""
     __tablename__ = "fleet_trips"
+    # DL-3: MỘT lệnh điều xe chỉ được có MỘT chuyến. Hàng rào thứ hai, ở cơ sở dữ liệu — lớp dịch
+    # vụ đã soát trước khi tạo, nhưng phép soát ấy ĐỌC RỒI GHI nên hai lần bấm gần nhau cùng lọt.
+    # Điều kiện `IS NOT NULL` bắt buộc: 756 chuyến nạp bằng Excel đều để trống cột này.
+    __table_args__ = (
+        Index("uq_fleet_trips_dispatch_id", "dispatch_id", unique=True,
+              postgresql_where=text("dispatch_id IS NOT NULL"),
+              sqlite_where=text("dispatch_id IS NOT NULL")),
+    )
     # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
     phien_ban: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     id: Mapped[int] = mapped_column(primary_key=True)
