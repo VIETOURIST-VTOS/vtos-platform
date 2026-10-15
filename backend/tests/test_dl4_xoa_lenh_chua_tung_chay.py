@@ -13,6 +13,7 @@ LUẬT KHÓ NHẤT, và là lý do tệp này dài hơn vẻ ngoài:
   Chặn theo chữ thì cửa vô dụng đúng ở trường hợp duy nhất cần nó. Nên chỉ hai thứ chặn xoá:
   CÓ CHUYẾN móc vào, hoặc TÀI XẾ ĐÃ NHẬN — hai dấu vết của việc đã xảy ra ngoài đời.
 """
+import json
 import os
 import re
 import tempfile
@@ -116,6 +117,22 @@ def test_xoa_tra_ve_NGUYEN_noi_dung_de_dung_lai_duoc(db):
     assert kq["da_xoa"]["internal_price"] == 10_500_000
     assert kq["ly_do"] == "lệnh dữ liệu mẫu, chưa từng chạy"
     assert db.get(DispatchOrder, did) is None
+
+
+def test_ban_ghi_DA_XOA_phai_ghi_duoc_vao_NHAT_KY(db):
+    """CHỖ HỎNG THẬT, 15/10/2026, lần bấm đầu tiên của Chủ tịch trên bản chạy thật: cửa xoá trả
+    về 500. Nguyên nhân là `da_xoa` mang các ô `date`/`datetime` thô, mà nhật ký kiểm toán băm
+    nội dung qua JSON — gặp kiểu ngày là nổ.
+
+    Phép thử cũ 11/11 xanh mà cửa vẫn hỏng, vì nó chỉ đo lớp dịch vụ chứ không đo thứ chỗ gọi
+    sẽ làm với kết quả ấy. Nên phép thử này chạy ĐÚNG phép biến đổi mà nhật ký chạy.
+    """
+    d = _lenh(db, trang_thai="hoan_thanh")
+    kq = XL.xoa(db, d, "lệnh dữ liệu mẫu")
+    json.dumps(kq["da_xoa"])          # nổ ở đây là cửa xoá sẽ trả về 500
+    from app.services.rules import _canon
+    _canon({"before": kq["da_xoa"], "after": {"ly_do": kq["ly_do"]}})
+    assert kq["da_xoa"]["date_from"] == "2026-08-16"
 
 
 # ═════════════════ 3 · CỬA SOÁT PHẢI IN RA ĐỦ ĐỂ NGƯỜI BẤM NHÌN TẬN MẮT ═════════════════

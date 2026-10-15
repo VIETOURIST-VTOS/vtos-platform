@@ -120,7 +120,12 @@ def xoa(db: Session, d: DispatchOrder, ly_do: str) -> dict:
     s = soat(db, d)
     if not s["xoa_duoc"]:
         raise ValueError(s["noi"])
-    truoc = {c.name: getattr(d, c.name) for c in DispatchOrder.__table__.columns}
+    # ĐỔI NGÀY SANG CHUỖI NGAY TẠI ĐÂY, không để chỗ gọi tự nhớ. Nhật ký kiểm toán băm nội dung
+    # qua JSON, và một ô `date`/`datetime` lọt vào đó thì cửa xoá trả về 500 — đã xảy ra thật
+    # 15/10/2026 trên bản chạy thật, lần bấm đầu tiên của Chủ tịch. Cửa xoá xe không dính vì chỗ
+    # GỌI ở đó tự đổi; đặt phép đổi ở chỗ gọi là đặt nó vào nơi người sau sẽ quên.
+    truoc = {c.name: (lambda x: x.isoformat() if hasattr(x, "isoformat") else x)(getattr(d, c.name))
+             for c in DispatchOrder.__table__.columns}
     db.delete(d)
     db.flush()
     return {"da_xoa": truoc, "ly_do": ly_do.strip()[:300]}
