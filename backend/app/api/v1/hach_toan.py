@@ -581,3 +581,30 @@ def khoan_muc_sua(kid: int, data: KhoanMucSuaIn,
     R.audit(db, u.username, u.role, "sua_khoan_muc_chi_phi", f"khoan_muc:{k.ma}", after=truyen)
     db.commit()
     return {"id": k.id, "ma": k.ma, "dung": k.dung, "message": f"Đã cập nhật khoản mục {k.ma}"}
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT R4a 15/10/2026 — MA TRẬN CẶP ĐỊNH KHOẢN
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# Cùng tiền tố `/api/v1/hach-toan` đã khai, nên KHÔNG nới một quyền nào. Đặt ở đây chứ không ở
+# `books.py` là có chủ ý: báo cáo này đọc sổ để ĐỐI CHIẾU VỚI BẢNG QUY ƯỚC, nên nó thuộc về màn
+# hình quy ước — người mở nó đang hỏi "bảng quy ước của tôi có khớp với sổ không", không phải
+# "cho tôi xem sổ".
+#
+# CHỈ ĐỌC, cả hai cửa. Không có cửa nào tự thêm một dòng quy ước cho khớp sổ: khớp bằng cách nới
+# luật cho vừa thực tế là bỏ mất đúng thứ báo cáo này sinh ra để giữ.
+@router.get("/cap-dinh-khoan")
+def cap_dinh_khoan(den_ngay: date, tu_ngay: date | None = None,
+                   u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Mọi cặp (Nợ X / Có Y) có thật trong sổ, kèm số tiền và số chứng từ."""
+    from app.services import cap_dinh_khoan as CDK
+    return CDK.ma_tran(db, den_ngay, tu_ngay)
+
+
+@router.get("/cap-dinh-khoan/ngoai-luat")
+def cap_dinh_khoan_ngoai_luat(den_ngay: date, tu_ngay: date | None = None,
+                              u: User = Depends(require_roles(*XEM)),
+                              db: Session = Depends(get_db)):
+    """Cặp có trong SỔ mà KHÔNG có trong bảng quy ước — chỗ phải nhìn, không phải kết luận."""
+    from app.services import cap_dinh_khoan as CDK
+    return CDK.ngoai_luat(db, den_ngay, tu_ngay)
