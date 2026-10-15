@@ -1917,11 +1917,52 @@ def dispatch_update(did: int, data: DispatchUpdate,
     da_xoa = False
     if data.status == "da_xac_nhan" and cu != "da_xac_nhan":
         da_xoa = _NL.xoa_dau_nhan(db, d, "lệnh được chốt lại", u.username)
-    R.audit(db, u.username, u.role, "cap_nhat_lenh_dieu_xe", f"dispatch:{d.id}", after=data.model_dump(mode="json")); db.commit()
+    # DL-3 (Chủ tịch chốt 15/10/2026): ĐÓNG LỆNH THÌ SINH CHUYẾN. Gọi TRƯỚC `commit` để chuyến
+    # và lệnh đi cùng một giao dịch — sinh được chuyến mà lệnh không đóng, hay ngược lại, đều là
+    # một nửa sự thật nằm lại trong sổ.
+    sinh = None
+    if data.status == "hoan_thanh" and cu != "hoan_thanh":
+        from app.services import dong_lenh as DL
+        sinh = DL.dong(db, d, u.username)
+    R.audit(db, u.username, u.role, "cap_nhat_lenh_dieu_xe", f"dispatch:{d.id}",
+            after={**data.model_dump(mode="json"), **({"sinh_chuyen": sinh} if sinh else {})}); db.commit()
     # Nói RA việc đã xoá dấu nhận. Xoá âm thầm là bắt tài xế bấm lại mà không ai báo, còn
     # người sửa lệnh thì tưởng chuyến ấy vẫn có người đã nhận.
-    return {"message": ("Đã cập nhật lệnh điều xe. Dấu nhận của tài xế đã được xoá – lệnh "
-                        "cần tài xế nhận lại." if da_xoa else "Đã cập nhật lệnh điều xe")}
+    msg = ("Đã cập nhật lệnh điều xe. Dấu nhận của tài xế đã được xoá – lệnh "
+           "cần tài xế nhận lại." if da_xoa else "Đã cập nhật lệnh điều xe")
+    if sinh:
+        msg = msg + " " + sinh["noi"]
+    return {"message": msg, "sinh_chuyen": sinh}
+
+
+# ══════════════════ DL-3 · HAI CON SỐ ĐẾM CHỖ CHUỖI CHƯA LIỀN, và một cửa GẮN TAY
+#
+# Hai ô đếm cùng hình dáng với ô «lệnh lập không qua cửa đề nghị» đã có: chúng ĐẾM chỗ hở chứ
+# không chặn ai. Cửa gắn tay là chỗ người xác nhận một chuyến NGHI KHỚP — máy không tự nối, vì
+# nối nhầm hai chuyến khác nhau thì không có dấu vết nào để lần ngược.
+@router.get("/dispatch/chuoi-lenh-chuyen")
+def dispatch_chuoi(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
+    from app.services import dong_lenh as DL
+    return {"lenh_xong_chua_co_chuyen": DL.lenh_xong_chua_co_chuyen(db),
+            "chuyen_chua_gan_lenh": DL.chuyen_chua_gan_lenh(db)}
+
+
+@router.post("/dispatch/{did}/gan-chuyen/{tid}")
+def dispatch_gan_chuyen(did: int, tid: int,
+                        u: User = Depends(require_roles("cntt", "gd_doi_xe", "tp_dh", "nv_dh")),
+                        db: Session = Depends(get_db)):
+    from app.models.fleet import Trip
+    from app.services import dong_lenh as DL
+    d = db.get(DispatchOrder, did); t = db.get(Trip, tid)
+    if not d or not t:
+        raise HTTPException(404, "Không có lệnh hoặc chuyến")
+    try:
+        kq = DL.gan_tay(db, d, t)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    R.audit(db, u.username, u.role, "gan_chuyen_vao_lenh", f"dispatch:{did}", after=kq)
+    db.commit()
+    return {"message": f"Đã gắn chuyến #{tid} vào lệnh #{did}"}
 
 
 # ══════════════════ DL-4 · XOÁ MỘT LỆNH ĐIỀU XE CHƯA TỪNG CHẠY (Chủ tịch chọn 14/10/2026)
