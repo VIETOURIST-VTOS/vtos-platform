@@ -110,19 +110,32 @@ CO, CHE, KHONG, PHAM_VI, CAP_RIENG = "co", "che", "khong", "pham_vi", "cap_rieng
 HCNS_VA_TREN = ("chutich", "hcns")
 QUAN_TRI_TK = ("chutich", "hcns", "cntt")
 
+# VAI ĐỨNG ĐẦU MỘT BỘ PHẬN — đo từ `ROLES` ngày 15/10/2026, và KHÔNG có vai nào tên là
+# `truong_phong`. Bản đầu của tệp này khai một khoá mang tên ấy; nó không bao giờ khớp một
+# `User.role` thật. Luật mặc-định-từ-chối làm nó vô hại, nhưng một dòng trong bảng quyền mà
+# không bao giờ chạy là một dòng NÓI SAI về chính hệ thống, và người đọc sau sẽ tin nó.
+#
+# NĂM PHÒNG KHÔNG CÓ VAI ĐỨNG ĐẦU: Visa, Marketing, HCNS, CNTT, Pháp chế. Với các phòng ấy
+# câu hỏi "trưởng phòng thấy gì" chưa đặt ra được — không có ai mang vai ấy để mà hỏi.
+#
+# `ketoan_truong` CỐ Ý KHÔNG nằm ở đây. Kế toán trưởng đứng đầu phòng Kế toán, nhưng cho vai
+# ấy mở hồ sơ nhân sự là một lần MỞ QUYỀN mới — Chủ tịch 15/10/2026 chốt nhóm 4 và 5 chỉ Chủ
+# tịch và HCNS. Muốn mở thì mở bằng một quyết định, không bằng một dòng suy ra.
+VAI_DUNG_DAU = ("tp_dh", "tp_kd", "tp_hd", "gd_kd", "gd_doi_xe")
+
 # 17 nhóm. Chủ tịch `co` ở CẢ 17 — "quyền của Chủ tịch là toàn diện" (15/10/2026).
 NHOM_TRUONG: list[dict] = [
     {"ma": "1",  "ten": "Nhận dạng công việc",
      "truong": ["staff_code", "full_name", "department", "title", "position",
                 "sales_group", "office", "company_id", "contract_type",
                 "start_date", "tham_nien", "active", "ended_on"],
-     "quyen": {"chutich": CO, "hcns": CO, "cntt": CO, "truong_phong": PHAM_VI}},
+     "quyen": {"chutich": CO, "hcns": CO, "cntt": CO, **{v: PHAM_VI for v in VAI_DUNG_DAU}}},
     {"ma": "1b", "ten": "Lý do nghỉ việc chi tiết", "che_kieu": None,
      "truong": ["end_kind", "end_reason"],
      "quyen": {"chutich": CO, "hcns": CO}},
     {"ma": "2",  "ten": "Liên hệ công việc",
      "truong": ["email", "zalo_noi"],
-     "quyen": {"chutich": CO, "hcns": CO, "cntt": CO, "truong_phong": PHAM_VI}},
+     "quyen": {"chutich": CO, "hcns": CO, "cntt": CO, **{v: PHAM_VI for v in VAI_DUNG_DAU}}},
     {"ma": "2b", "ten": "Điện thoại cá nhân", "che_kieu": "dien_thoai",
      "truong": ["phone"],
      "quyen": {"chutich": CO, "hcns": CO}},
@@ -141,22 +154,22 @@ NHOM_TRUONG: list[dict] = [
      "quyen": {"chutich": CO, "hcns": CHE}},
     {"ma": "6",  "ten": "Việc đang gánh",
      "truong": ["so_tour", "so_booking", "so_lenh_xe", "so_visa", "so_phan_cong_kd"],
-     "quyen": {"chutich": CO, "hcns": CO, "cntt": CO, "truong_phong": PHAM_VI}},
+     "quyen": {"chutich": CO, "hcns": CO, "cntt": CO, **{v: PHAM_VI for v in VAI_DUNG_DAU}}},
     {"ma": "7a", "ten": "Xem ngày công",
      "truong": ["ngay_cong_ky_nay"],
-     "quyen": {"chutich": CO, "hcns": CO, "truong_phong": PHAM_VI}},
+     "quyen": {"chutich": CO, "hcns": CO, **{v: PHAM_VI for v in VAI_DUNG_DAU}}},
     {"ma": "7b", "ten": "Xác nhận công",
      "truong": ["duoc_xac_nhan_cong"],
-     "quyen": {"chutich": CO, "hcns": CO, "truong_phong": CAP_RIENG}},
+     "quyen": {"chutich": CO, "hcns": CO, **{v: CAP_RIENG for v in VAI_DUNG_DAU}}},
     {"ma": "7c", "ten": "Duyệt đơn nghỉ",
      "truong": ["duoc_duyet_nghi", "so_don_cho_duyet"],
-     "quyen": {"chutich": CO, "hcns": CO, "truong_phong": CAP_RIENG}},
+     "quyen": {"chutich": CO, "hcns": CO, **{v: CAP_RIENG for v in VAI_DUNG_DAU}}},
     {"ma": "7d", "ten": "Lý do nghỉ liên quan sức khoẻ", "che_kieu": None,
      "truong": ["ly_do_nghi"],
      "quyen": {"chutich": CO, "hcns": CO}},
     {"ma": "8a", "ten": "Vận hành theo vai",
      "truong": ["card_no", "card_type", "card_expiry", "xe_dang_gan"],
-     "quyen": {"chutich": CO, "hcns": CO, "cntt": CO, "truong_phong": PHAM_VI}},
+     "quyen": {"chutich": CO, "hcns": CO, "cntt": CO, **{v: PHAM_VI for v in VAI_DUNG_DAU}}},
     {"ma": "8b", "ten": "Tạm ứng, thẻ nhiên liệu, hợp đồng CTV, chi tiết sự cố",
      "che_kieu": "tien",
      "truong": ["advance_limit", "fuel_card_last4", "ctv_contract", "su_co"],

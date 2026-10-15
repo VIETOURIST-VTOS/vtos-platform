@@ -8,7 +8,7 @@ Cả hai kiểu hỏng đều im lặng, nên chúng phải có phép thử ch�
 import pytest
 
 from app.services.ho_so_nhan_vien import (
-    CAP_BAC, CAP_CHUA_KHAI, NHOM_TRUONG, PHONG_TRONG, THU_TU_PHONG,
+    CAP_BAC, CAP_CHUA_KHAI, NHOM_TRUONG, PHONG_TRONG, THU_TU_PHONG, VAI_DUNG_DAU,
     cap_cua_vai, cat_ho_so_theo_vai, che_gia_tri, quyen_nhom, xep_bang_tai_khoan,
 )
 
@@ -66,16 +66,16 @@ def test_hs1_3_hcns_thay_nhung_la_ban_da_che():
             "trả thật rồi để màn hình giấu nghĩa là ai mở tab Network cũng đọc được.")
 
 
-def test_hs1_4_truong_phong_chi_trong_pham_vi():
+def test_hs1_4_vai_dung_dau_chi_thay_trong_pham_vi():
     """Phạm vi là một hàng rào THẬT, không phải một nhãn: ngoài phạm vi thì không có khoá."""
-    trong = cat_ho_so_theo_vai(HO_SO_DAY_DU, "truong_phong", trong_pham_vi=True)
-    ngoai = cat_ho_so_theo_vai(HO_SO_DAY_DU, "truong_phong", trong_pham_vi=False)
+    trong = cat_ho_so_theo_vai(HO_SO_DAY_DU, "tp_kd", trong_pham_vi=True)
+    ngoai = cat_ho_so_theo_vai(HO_SO_DAY_DU, "tp_kd", trong_pham_vi=False)
 
     assert trong.get("full_name") and trong.get("so_tour") == 14
     assert "username" not in trong, "Trưởng phòng không xem tài khoản và quyền (nhóm 3)."
     assert "id_number" not in trong and "base_salary" not in trong
     assert "phone" not in trong, "Điện thoại cá nhân (2b) cần quyền riêng."
-    assert "ly_do_nghi" not in trong, "Lý do nghỉ liên quan sức khoẻ không mở cho trưởng phòng."
+    assert "ly_do_nghi" not in trong, "Lý do nghỉ liên quan sức khoẻ không mở cho vai đứng đầu."
     assert ngoai == {}, (
         "Ngoài phạm vi mà vẫn trả về trường nào là hàng rào hỏng — đổi mã nhân viên "
         "trên đường dẫn là xem được người phòng khác.")
@@ -181,3 +181,39 @@ def test_hs1_12_ba_vai_ke_toan_khong_nam_trong_bang_quyen():
         + ". Đây là một lần MỞ QUYỀN, phải có chữ ký Chủ tịch — không phải một dòng thêm vào.")
     for v in BA_VAI:
         assert v in CAP_BAC, f"'{v}' phải vẫn có trong CAP_BAC — xếp thứ bậc là việc khác."
+
+
+def test_hs1_13_moi_khoa_trong_bang_quyen_phai_la_mot_vai_co_that():
+    """Hàng rào bắt đúng lỗi làn này đã mắc ngày 15/10/2026.
+
+    Bản đầu của bảng quyền khai một khoá `"truong_phong"`. Không có vai nào tên như thế trong
+    `ROLES` — các vai đứng đầu thật là `tp_dh`, `tp_kd`, `tp_hd`, `gd_kd`, `gd_doi_xe`. Dòng ấy
+    KHÔNG BAO GIỜ khớp một `User.role`, nên nó không mở nhầm cho ai; nhưng nó cũng không đóng
+    cho ai, và người đọc bảng sau này sẽ tin rằng trưởng phòng đã được xử lý.
+
+    Một dòng quyền không bao giờ chạy là tệ hơn một dòng thiếu: dòng thiếu thì thấy ngay, dòng
+    chết thì trông như đã xong.
+    """
+    from app.models.core import ROLES
+    gia = sorted({v for n in NHOM_TRUONG for v in n["quyen"] if v not in ROLES})
+    assert not gia, (
+        f"Bảng quyền khai vai không có trong ROLES: {gia}. "
+        "Vai viết sai tên thì không mở nhầm cho ai, nhưng cũng không đóng cho ai — "
+        "và bảng sẽ nói dối về chính nó.")
+
+
+def test_hs1_14_vai_dung_dau_la_vai_that_va_ke_toan_truong_khong_nam_trong_do():
+    from app.models.core import ROLES
+    thieu = [v for v in VAI_DUNG_DAU if v not in ROLES]
+    assert not thieu, f"VAI_DUNG_DAU có vai không tồn tại: {thieu}"
+    assert "ketoan_truong" not in VAI_DUNG_DAU, (
+        "Kế toán trưởng đứng đầu phòng Kế toán, nhưng cho vai ấy mở hồ sơ nhân sự là một lần "
+        "MỞ QUYỀN mới. Chủ tịch 15/10/2026 chốt nhóm 4 và 5 chỉ Chủ tịch và HCNS. "
+        "Mở thì mở bằng một quyết định, không bằng một dòng suy ra.")
+    # Năm phòng dưới đây KHÔNG có vai đứng đầu nào trong ROLES, nên câu hỏi "trưởng phòng thấy
+    # gì" chưa đặt ra được ở đó. Phép thử ghim sự thật ấy: ngày nào có vai mới thì nó đỏ, và
+    # người thêm vai sẽ phải quyết luôn phạm vi của vai đó thay vì để trống.
+    for phong in ("visa", "marketing", "hcns", "cntt", "phap_che"):
+        assert not [v for v in ROLES if v.startswith(("tp_", "gd_")) and phong in v], (
+            f"Phòng {phong} nay đã có vai đứng đầu — phải quyết phạm vi của vai ấy, "
+            "và thêm vào VAI_DUNG_DAU nếu Chủ tịch đồng ý.")
