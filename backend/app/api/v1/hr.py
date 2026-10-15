@@ -1805,11 +1805,14 @@ def dispatch_create(data: DispatchIn,
     if data.date_to < data.date_from: raise HTTPException(422, "Ngày không hợp lệ")
     rt = db.get(VehicleRate, data.rate_id) if data.rate_id else None
     if rt and rt.status != "active": raise HTTPException(422, "Tuyến trong bảng giá chưa được Chủ tịch + TGĐ duyệt")
-    if rt:
-        price = rt.partner_price if v.kind == "hop_tac" else rt.internal_price
-        if price <= 0: raise HTTPException(422, f"Tuyến {rt.route} không có giá cho loại xe {v.kind}")
-    else:
-        price = (data.internal_price or 0) or (v.internal_rate_per_day or 0) * ((data.date_to - data.date_from).days + 1)
+    # DL-5 (15/10/2026): phép tính giá nội bộ RÚT RA một chỗ, vì cửa đổi xe cũng phải tính lại
+    # đúng công thức này. Hai bản chép tay của cùng một công thức là cách chắc chắn để tháng sau
+    # sửa một bên quên bên kia – đúng hình đã làm hỏng cửa xoá lệnh hôm 15/10.
+    from app.services import doi_xe_lenh as DX
+    try:
+        price = DX.tinh_gia(v, rt, data.date_from, data.date_to, data.internal_price)
+    except DX.KhongDoiDuoc as ex:
+        raise HTTPException(422, str(ex))
     if v.kind != "hop_tac" and not v.driver_id: raise HTTPException(422, "Xe chưa gán tài xế")
     driver_id = v.driver_id
     if not driver_id:   # xe hợp tác: tài xế của đối tác – ghi vào hồ sơ xe khi có; tạm gắn người lập lệnh để theo dõi
@@ -1963,6 +1966,120 @@ def dispatch_gan_chuyen(did: int, tid: int,
     R.audit(db, u.username, u.role, "gan_chuyen_vao_lenh", f"dispatch:{did}", after=kq)
     db.commit()
     return {"message": f"Đã gắn chuyến #{tid} vào lệnh #{did}"}
+
+
+# ══════════════════ DL-5 · ĐỔI XE / ĐỔI TÀI XẾ TRÊN LỆNH ĐÃ LẬP (Chủ tịch chốt 15/10/2026)
+#
+# Trước vòng này, cửa sửa lệnh chỉ nhận `status` và `incident_note`. Xe hỏng trước giờ chạy thì
+# Điều hành phải XOÁ lệnh rồi LẬP LẠI — mất dấu lệnh cũ, mất dấu ai đã nhận.
+#
+# QUYỀN ĐỔI = QUYỀN LẬP VÀ CHỐT, không phải một danh sách vai riêng. Siết cửa vào bằng
+# `nguoi_duoc_lap_lenh` mà để cửa đổi rộng hơn thì hàng rào chặt nằm cạnh một đường vòng: ai muốn
+# lách chỉ cần nhờ người khác lập lệnh rồi tự đổi.
+#
+# Ba cửa ĐỌC đứng riêng khỏi hai cửa GHI, đúng hình XE-1 và DL-4: Điều hành tự xem được xe nào
+# thay được, tài xế nào thay được, và bảng «cũ → mới» trước khi bấm — không phải hỏi CNTT rồi chờ.
+
+
+def _lenh_de_doi(db: Session, did: int, u: User) -> DispatchOrder:
+    """Lấy lệnh và soát quyền đổi. Dùng chung cho cả hai cửa ghi."""
+    d = db.get(DispatchOrder, did)
+    if not d:
+        raise HTTPException(404, "Không có lệnh này")
+    from app.services import fleet as FL
+    ai, _ = FL.nguoi_duoc_lap_lenh(db)
+    if ai and u.id not in {x.id for x in ai}:
+        ten = ", ".join(f"{x.full_name} ({x.username})" for x in ai)
+        raise HTTPException(403, f"Chỉ {ten} được đổi xe hay đổi tài xế của lệnh điều xe – "
+                                 "cùng người được lập và chốt lệnh (chỉ đạo 07/9/2026)")
+    return d
+
+
+@router.get("/dispatch/{did}/thay-the-duoc")
+def dispatch_thay_the_duoc(did: int, u: User = Depends(require_roles(*HR_READ, "nv_dh")),
+                           db: Session = Depends(get_db)):
+    """Cửa ĐỌC: xe nào và tài xế nào thay được cho lệnh này, kèm lý do khi không thay được."""
+    from app.services import doi_xe_lenh as DX
+    d = db.get(DispatchOrder, did)
+    if not d:
+        raise HTTPException(404, "Không có lệnh này")
+    return {"doi_duoc": d.status in DX.TRANG_THAI_DOI_DUOC,
+            "trang_thai": d.status,
+            "trang_thai_ten": DX.TRANG_THAI_TEN.get(d.status, d.status),
+            "xe": DX.xe_thay_the_duoc(db, d), "tai_xe": DX.tai_xe_thay_the_duoc(db, d)}
+
+
+@router.get("/dispatch/{did}/soat-doi-xe/{xid}")
+def dispatch_soat_doi_xe(did: int, xid: int, u: User = Depends(require_roles(*HR_READ, "nv_dh")),
+                         db: Session = Depends(get_db)):
+    """Cửa ĐỌC: bảng «cũ → mới» cho màn hình xác nhận. Không ghi gì."""
+    from app.services import doi_xe_lenh as DX
+    d = db.get(DispatchOrder, did); xe = db.get(Vehicle, xid)
+    if not d or not xe:
+        raise HTTPException(404, "Không có lệnh hoặc xe")
+    return DX.soat_doi_xe(db, d, xe)
+
+
+class DoiXeIn(BaseModel):
+    xe_id: int
+    ly_do: str = ""
+    phien_ban: int | None = None
+
+
+class DoiTaiXeIn(BaseModel):
+    tai_xe_id: int
+    ly_do: str = ""
+    phien_ban: int | None = None
+
+
+def _doi(db: Session, d: DispatchOrder, phien_ban, lam) -> dict:
+    """KHOÁ SỬA của `dispatch_orders` – khai trong `ghi_mot_lan.CUA_SUA_CO_KHOA` chính tên này.
+
+    Cả hai cửa ghi đi qua đây, nên khoá phiên bản chỉ có MỘT bản, không hai bản chép tay lệch
+    nhau. `kiem_phien_ban` phải đứng NGOÀI `try`: nó tự ném ra 409 mang sẵn nội dung bản mới, và
+    bọc nó trong một `except` rồi dựng lại một 409 khác là vứt mất đúng phần người dùng cần —
+    họ đang cầm bản nào, bản thật đang là gì.
+    """
+    from app.services import doi_xe_lenh as DX
+    from app.services import ghi_mot_lan as GML
+    GML.kiem_phien_ban(d, phien_ban, f"Lệnh điều xe #{d.id}",
+                       lambda: {"phien_ban": d.phien_ban, "xe_id": d.vehicle_id,
+                                "tai_xe_id": d.driver_id, "trang_thai": d.status})
+    try:
+        kq = lam()
+    except DX.ViPhamDieuKien as ex:
+        raise HTTPException(422, {"message": str(ex), "vi_pham": ex.vi_pham})
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    kq["phien_ban"] = GML.tang_phien_ban(d)
+    db.commit()
+    return kq
+
+
+@router.post("/dispatch/{did}/doi-xe")
+def dispatch_doi_xe(did: int, data: DoiXeIn, u: User = Depends(require_roles(
+        "cntt", "gd_doi_xe", "tp_dh", "nv_dh")), db: Session = Depends(get_db)):
+    """Cửa GHI: đổi xe. Tài xế đi theo xe – kết quả nói rõ ai thay ai và giá cũ → giá mới."""
+    from app.services import doi_xe_lenh as DX
+    d = _lenh_de_doi(db, did, u)
+    xe = db.get(Vehicle, data.xe_id)
+    if not xe:
+        raise HTTPException(404, "Không có xe này")
+    kq = _doi(db, d, data.phien_ban, lambda: DX.doi_xe(db, d, xe, data.ly_do, u.username))
+    return {"message": "Đã đổi xe của lệnh. " + kq["noi"], **kq}
+
+
+@router.post("/dispatch/{did}/doi-tai-xe")
+def dispatch_doi_tai_xe(did: int, data: DoiTaiXeIn, u: User = Depends(require_roles(
+        "cntt", "gd_doi_xe", "tp_dh", "nv_dh")), db: Session = Depends(get_db)):
+    """Cửa GHI: đổi tài xế, giữ nguyên xe. Giá không đổi – giá theo xe và tuyến, không theo người."""
+    from app.services import doi_xe_lenh as DX
+    d = _lenh_de_doi(db, did, u)
+    nv = db.get(Employee, data.tai_xe_id)
+    if not nv:
+        raise HTTPException(404, "Không có nhân sự này")
+    kq = _doi(db, d, data.phien_ban, lambda: DX.doi_tai_xe(db, d, nv, data.ly_do, u.username))
+    return {"message": "Đã đổi tài xế của lệnh. " + kq["noi"], **kq}
 
 
 # ══════════════════ DL-4 · XOÁ MỘT LỆNH ĐIỀU XE CHƯA TỪNG CHẠY (Chủ tịch chọn 14/10/2026)

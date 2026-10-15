@@ -1631,7 +1631,11 @@ def ds_lenh(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_d
                     "so_ngay": (d.date_to - d.date_from).days + 1, "internal_price": (d.internal_price or 0),
                     "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at,
                     "theo_goi_y": bool(d.phuong_an_da_chon) and not d.ly_do_khac_goi_y,
-                    "phuong_an_da_chon": d.phuong_an_da_chon, "ly_do_khac_goi_y": d.ly_do_khac_goi_y})
+                    "phuong_an_da_chon": d.phuong_an_da_chon, "ly_do_khac_goi_y": d.ly_do_khac_goi_y,
+                    # DL-5 · 15/10/2026: màn hình gửi lại con số này khi đổi xe. Thiếu nó thì màn
+                    # hình gửi `undefined`, `kiem_phien_ban` cho qua theo đúng luật "chưa gửi thì
+                    # không chặn", và khoá chống ghi đè tắt lặng lẽ – đúng kiểu báo an toàn giả.
+                    "phien_ban": d.phien_ban})
     return out
 
 
