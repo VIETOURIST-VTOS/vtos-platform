@@ -52,6 +52,16 @@
    "pl_code": null
   },
   {
+   "code": "1124",
+   "name": "Tiền gửi khác (tiền gửi hạn mức)",
+   "kind": "TS",
+   "parent": "112",
+   "level": 2,
+   "bs_debit": "111",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
    "code": "128",
    "name": "Đầu tư nắm giữ đến ngày đáo hạn",
    "kind": "TS",
@@ -78,6 +88,16 @@
    "parent": "1281",
    "level": 3,
    "bs_debit": "112",
+   "bs_credit": null,
+   "pl_code": null
+  },
+  {
+   "code": "12812",
+   "name": "Tiền gửi có kỳ hạn trên 3 tháng",
+   "kind": "TS",
+   "parent": "1281",
+   "level": 3,
+   "bs_debit": "123",
    "bs_credit": null,
    "pl_code": null
   },
@@ -1192,6 +1212,16 @@
    "pl_code": "26"
   },
   {
+   "code": "6426",
+   "name": "Chi phí dự phòng",
+   "kind": "CP",
+   "parent": "642",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "26"
+  },
+  {
    "code": "6427",
    "name": "Chi phí dịch vụ mua ngoài",
    "kind": "CP",
@@ -1247,6 +1277,16 @@
    "kind": "CP",
    "parent": "821",
    "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "51"
+  },
+  {
+   "code": "82111",
+   "name": "Chi phí thuế TNDN hiện hành theo Luật",
+   "kind": "CP",
+   "parent": "8211",
+   "level": 3,
    "bs_debit": null,
    "bs_credit": null,
    "pl_code": "51"
