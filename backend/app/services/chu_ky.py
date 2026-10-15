@@ -70,6 +70,11 @@ VAI_KY_CAN: dict[str, tuple[str, ...]] = {
     # ĐÁP ÁN — `misa.import_audited_checkpoint` lấy nó làm chuẩn rồi kéo cả sổ về bằng chênh lệch,
     # nên một con số sai ở đây viết lại cả bảng cân đối của một công ty đại chúng.
     "bo_so_kiem_toan":   ("chutich",),
+    # Đợt R1 15/10/2026 — BẢN BÁO CÁO ĐÃ LẬP. Chủ tịch chốt: Kế toán lập và trình, Chủ tịch ký.
+    # Khai ở ĐÂY chứ không ở `bao_cao_da_lap.py`: một luật, một chỗ — cùng lẽ với `bo_so_kiem_toan`
+    # ở dòng trên. Vì sao một bản báo cáo phải có chữ ký: từ lúc ký, màn hình đọc SỐ CỦA BẢN chứ
+    # không tính lại từ sổ, nên chữ ký ấy quyết định con số mà người ngoài nhìn thấy.
+    "ban_bao_cao":       ("chutich",),
 }
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════

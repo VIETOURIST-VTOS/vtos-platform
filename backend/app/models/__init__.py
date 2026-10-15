@@ -147,3 +147,6 @@ from app.models.mo_lai_ky import *  # noqa  # Đợt E6 13/10/2026 — hồ sơ 
 from app.models.so_hoa_don import *  # noqa  # Đợt E7 13/10/2026 — sổ số nhảy hóa đơn
 from app.models.doi_chieu_tien import *  # noqa  # Đợt E15 14/10/2026 — giải thích chênh lệch tiền
 from app.models.bo_so_kiem_toan import *  # noqa  # Đợt E16 14/10/2026 — bộ số BCTC kiểm toán do người tải lên và ký
+# Đợt R1 15/10/2026 — bản báo cáo đã lập. Thiếu dòng này thì bảng không vào Base.metadata,
+# create_all không tạo, và alembic autogenerate đòi XOÁ nó.
+from app.models.bao_cao_da_lap import *  # noqa
