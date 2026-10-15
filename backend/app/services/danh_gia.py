@@ -21,7 +21,7 @@ import secrets
 from datetime import date, datetime, timedelta
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.models.core import Booking, Tour, User
@@ -165,6 +165,44 @@ def mo_phieu(db: Session, ma: str, ghi_lan_mo: bool = True) -> dict:
 # 3 · GHI ĐÁNH GIÁ
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 
+# Dòng gộp của những lượt chấm loại CÓ khoá mà khoá bỏ trống. KHÔNG dùng nhãn loại
+# (`DG_DOI_TUONG["hdv"]` là "Hướng dẫn viên") làm tên cho nhóm ấy: trên màn hình nó trông y hệt
+# một người tên vậy, đứng lẫn giữa những người thật, mang một điểm trung bình của không ai cả.
+CHUA_RO_NGUOI = "Chưa xác định được người"
+
+
+def doi_chieu_khoa(doi_tuong: str, doi_tuong_id) -> None:
+    """Loại CÓ khoá thì bắt buộc chấm cho một người cụ thể — Đợt HD-DG2, 15/10/2026.
+
+    MỘT chỗ, hai cửa ghi cùng gọi. Trước đợt này luật chỉ nằm trong `ghi_danh_gia`; `ghi_ho` thì
+    không hỏi, nên nhân viên ghi hộ tạo được một lượt chấm "hướng dẫn viên" mà không nói là ai —
+    đo thật, ghi được. Những dòng ấy rơi vào một nhóm không người, và một điểm thấp nằm trong đó
+    là một điểm không ai chịu trách nhiệm, cũng không ai cãi được.
+    """
+    if doi_tuong in DG_CO_KHOA and not doi_tuong_id:
+        raise Gate("KHAO_SAT_NHAP", f"Mục {DG_DOI_TUONG[doi_tuong]} phải chấm cho một người cụ thể")
+
+
+def ten_doi_tuong(db: Session, doi_tuong: str, doi_tuong_id, ten_goi_y: str = "") -> str:
+    """Tên hiện lên của một mục được chấm — Đợt HD-DG2, 15/10/2026.
+
+    MỘT CHỖ DUY NHẤT, và cả hai cửa ghi đều phải đi qua đây. Trước đợt này `ghi_danh_gia` tra tên
+    từ hồ sơ nhân sự còn `ghi_ho` thì không, nên cùng một hướng dẫn viên có lượt mang tên thật và
+    lượt mang nhãn chung "Hướng dẫn viên" — rồi bảng điểm gộp theo tên và tách người ấy làm hai
+    dòng, mỗi dòng một điểm trung bình, không dòng nào đúng. Hai bản sao của một luật thì bản nào
+    rồi cũng lệch.
+
+    Loại CÓ khoá (`DG_CO_KHOA`) thì tên luôn lấy từ hồ sơ, KHÔNG nhận tên người gọi đưa vào: tên
+    do màn hình gửi lên là thứ sửa được ở phía trình duyệt, và một bảng điểm nhận tên từ bên ngoài
+    là một bảng điểm ai cũng gắn điểm cho ai được.
+    """
+    if doi_tuong in DG_CO_KHOA and doi_tuong_id:
+        e = db.get(Employee, int(doi_tuong_id))
+        if e:
+            return e.full_name[:120]
+    return ((ten_goi_y or "").strip() or DG_DOI_TUONG.get(doi_tuong, ""))[:120]
+
+
 def ghi_danh_gia(db: Session, ma: str, data: dict) -> dict:
     """Khách bấm gửi. Một mã một lần.
 
@@ -197,8 +235,7 @@ def ghi_danh_gia(db: Session, ma: str, data: dict) -> dict:
         dt = (d.get("doi_tuong") or "").strip()
         if dt not in DG_DOI_TUONG: raise Gate("KHAO_SAT_NHAP", f"Mục không hợp lệ: {dt}")
         did = d.get("doi_tuong_id")
-        if dt in DG_CO_KHOA and not did:
-            raise Gate("KHAO_SAT_NHAP", f"Mục {DG_DOI_TUONG[dt]} phải chấm cho một người cụ thể")
+        doi_chieu_khoa(dt, did)
         if dt not in DG_CO_KHOA: did = None
         sao = d.get("diem")
         if sao in (None, ""):        # khách bỏ qua mục này — RỖNG, không phải 0
@@ -207,10 +244,7 @@ def ghi_danh_gia(db: Session, ma: str, data: dict) -> dict:
         else:
             sao = int(sao)
             if sao < 1 or sao > 5: raise Gate("KHAO_SAT_NHAP", "Điểm chỉ từ 1 đến 5 sao")
-        ten = (d.get("doi_tuong_ten") or DG_DOI_TUONG[dt])[:120]
-        if dt in DG_CO_KHOA and did:
-            e = db.get(Employee, int(did))
-            if e: ten = e.full_name
+        ten = ten_doi_tuong(db, dt, did, d.get("doi_tuong_ten") or "")
         ghi.append(DanhGiaSauTour(care_id=care.id, booking_id=care.booking_id, tour_id=care.tour_id,
                                   doi_tuong=dt, doi_tuong_id=did, doi_tuong_ten=ten,
                                   diem=sao, nhan_xet=(d.get("nhan_xet") or "").strip()[:2000],
@@ -286,7 +320,8 @@ def ghi_ho(db: Session, u: User, care: CareTicket, data: dict) -> dict:
         if sao is not None and (sao < 1 or sao > 5):
             raise Gate("KHAO_SAT_NHAP", "Điểm chỉ từ 1 đến 5 sao")
         did = d.get("doi_tuong_id") if dt in DG_CO_KHOA else None
-        ten = (d.get("doi_tuong_ten") or DG_DOI_TUONG[dt])[:120]
+        doi_chieu_khoa(dt, did)
+        ten = ten_doi_tuong(db, dt, did, d.get("doi_tuong_ten") or "")
         x = DanhGiaSauTour(care_id=care.id, booking_id=care.booking_id, tour_id=care.tour_id,
                            doi_tuong=dt, doi_tuong_id=did, doi_tuong_ten=ten, diem=sao,
                            nhan_xet=(d.get("nhan_xet") or "").strip()[:2000],
@@ -352,27 +387,54 @@ def bang_diem(db: Session, doi_tuong: str, tu: date, den: date, chi_khach: bool 
     """
     if doi_tuong not in DG_DOI_TUONG:
         raise Gate("BANG_DIEM", f"Không có loại đối tượng {doi_tuong}")
-    q = select(DanhGiaSauTour.doi_tuong_id, DanhGiaSauTour.doi_tuong_ten,
-               func.count(DanhGiaSauTour.id), func.avg(DanhGiaSauTour.diem),
-               func.sum(func.coalesce(DanhGiaSauTour.diem, 0))).where(
+    # KHOÁ GỘP LÀ NGƯỜI, KHÔNG PHẢI TÊN — Đợt HD-DG2, 15/10/2026.
+    #
+    # Tên là ảnh chụp lúc ghi: hướng dẫn viên đổi tên trong hồ sơ thì mọi lượt chấm cũ vẫn mang
+    # tên cũ, và gộp theo tên là tách một người làm hai dòng. Loại KHÔNG có khoá (`tour`,
+    # `khach_san`, `an_uong`) thì `doi_tuong_id` luôn rỗng, nên chúng PHẢI gộp theo tên — gộp
+    # theo id sẽ dồn mọi chuyến vào đúng một dòng.
+    co_khoa = doi_tuong in DG_CO_KHOA
+    khoa = DanhGiaSauTour.doi_tuong_id if co_khoa else DanhGiaSauTour.doi_tuong_ten
+    # BA CON SỐ TRONG MỘT CÂU TRUY VẤN. Trước đợt này `so_luot_thap` chạy một câu RIÊNG lọc theo
+    # một mình `doi_tuong_id`, trong khi `so_luot` gộp theo cặp (id, tên) — nên cùng một dòng nói
+    # "2 lượt, trong đó 2 lượt thấp" khi nó chỉ có một lượt thấp. Gộp vào một câu không phải để
+    # chạy nhanh hơn: để hai con số KHÔNG THỂ đếm theo hai khoá khác nhau được nữa.
+    q = select(khoa, func.max(DanhGiaSauTour.tao_luc), func.count(DanhGiaSauTour.id),
+               func.avg(DanhGiaSauTour.diem),
+               func.sum(case((DanhGiaSauTour.diem <= 3, 1), else_=0))).where(
         DanhGiaSauTour.doi_tuong == doi_tuong,
         DanhGiaSauTour.diem.is_not(None),
         func.date(DanhGiaSauTour.tao_luc) >= tu,
         func.date(DanhGiaSauTour.tao_luc) <= den)
     if chi_khach: q = q.where(DanhGiaSauTour.nguon == "khach")
     rows = []
-    for did, ten, so, tb, _ in db.execute(q.group_by(DanhGiaSauTour.doi_tuong_id,
-                                                     DanhGiaSauTour.doi_tuong_ten)).all():
-        thap = db.execute(select(func.count()).select_from(DanhGiaSauTour).where(
-            DanhGiaSauTour.doi_tuong == doi_tuong,
-            DanhGiaSauTour.doi_tuong_id.is_(None) if did is None else DanhGiaSauTour.doi_tuong_id == did,
-            DanhGiaSauTour.diem.is_not(None), DanhGiaSauTour.diem <= 3,
-            *( [DanhGiaSauTour.nguon == "khach"] if chi_khach else [] ),
-            func.date(DanhGiaSauTour.tao_luc) >= tu,
-            func.date(DanhGiaSauTour.tao_luc) <= den)).scalar() or 0
-        rows.append({"id": did, "ten": ten, "so_luot": so,
+    for gt, _moi_nhat, so, tb, thap in db.execute(q.group_by(khoa)).all():
+        did = gt if co_khoa else None
+        # TÊN LẤY LÚC ĐỌC. Nhờ vậy những lượt chấm CŨ đã lỡ ghi nhãn chung tự hiện đúng tên người,
+        # không cần một lệnh vá dữ liệu nào. Hồ sơ đã xoá thì lùi về tên ghi trong lượt gần nhất
+        # chứ không bỏ trống — một dòng điểm không tên là một dòng không ai đối chiếu được.
+        ma_nv = ""
+        if co_khoa and did is None:
+            # Nhóm KHÔNG CÓ KHOÁ. Không đoán người, và cũng không đội nhãn loại lên — xem
+            # `CHUA_RO_NGUOI`. Từ đợt này hai cửa ghi đều chặn, nên nhóm này chỉ còn là dữ liệu cũ
+            # và nó phải nhìn ra ngay là việc phải ĐI TRA, không phải một người có điểm.
+            ten = CHUA_RO_NGUOI
+        elif co_khoa:
+            lui = db.execute(select(DanhGiaSauTour.doi_tuong_ten).where(
+                DanhGiaSauTour.doi_tuong == doi_tuong,
+                DanhGiaSauTour.doi_tuong_id == did).order_by(
+                DanhGiaSauTour.tao_luc.desc())).scalars().first() or ""
+            ten = ten_doi_tuong(db, doi_tuong, did, lui)
+            # MÃ NHÂN VIÊN đứng cạnh tên. Hai hướng dẫn viên trùng tên là chuyện có thật, và khi
+            # ấy hai dòng in ra chữ y hệt nhau: bảng gộp đúng theo người nhưng người đọc không
+            # biết dòng nào là ai, nên nó đúng mà vẫn không dùng được.
+            e = db.get(Employee, int(did))
+            ma_nv = e.code if e else ""
+        else:
+            ten = gt or DG_DOI_TUONG[doi_tuong]
+        rows.append({"id": did, "ma_nv": ma_nv, "ten": ten, "so_luot": so,
                      "diem_tb": round(float(tb), 2) if tb is not None else None,
-                     "so_luot_thap": thap})
+                     "so_luot_thap": int(thap or 0)})
     rows.sort(key=lambda r: (-(r["diem_tb"] or 0), -r["so_luot"]))
     return {"doi_tuong": doi_tuong, "ten_loai": DG_DOI_TUONG[doi_tuong],
             "tu": tu.isoformat(), "den": den.isoformat(), "chi_khach": chi_khach, "rows": rows,
