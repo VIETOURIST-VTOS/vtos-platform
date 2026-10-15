@@ -25,6 +25,53 @@ from app.services import danh_gia as DG
 XEM = ("chutich", "tgd", "bks", "robot_ks", "ptgd_doan", "ptgd_mkt",
        "tp_dh", "nv_dh", "gd_kd", "tp_kd", "nv_mkt", "hcns", "cntt")
 
+# ═══════════ PHẠM VI XEM BẢNG ĐIỂM — Đợt HD-Q1, Chủ tịch chốt 15/10/2026 ═══════════
+#
+# Trước đợt này: nhân viên Marketing và nhân viên Điều hành đọc được bảng điểm hướng dẫn viên lẫn
+# bảng điểm tài xế, còn Trưởng phòng Hướng dẫn và Giám đốc Đội xe — trưởng bộ phận của chính những
+# người bị chấm — bị chặn 403. Đo được bằng cách đăng nhập thật từng vai.
+#
+# Mỗi dòng dưới đây khai ĐỦ BA điều Chủ tịch nêu: vai nào, xem được LOẠI ĐỐI TƯỢNG nào, trong
+# PHẠM VI phòng nào. Phòng lấy đúng khoá của `bao_cao_phong.PHONG`, cũng là giá trị cột
+# `department` của hồ sơ nhân sự — không dựng khái niệm phạm vi thứ hai.
+PV_THEO_PHONG = {
+    "tp_hd":     {"doi_tuong": ("hdv",),    "phong": "huong_dan"},
+    "gd_doi_xe": {"doi_tuong": ("tai_xe",), "phong": "doi_xe"},
+}
+
+# Ai xem được BẢNG ĐIỂM. Rộng hơn `XEM` đúng hai vai, và hai vai ấy bị `PV_THEO_PHONG` bó lại.
+#
+# KHÔNG nhập hai vai này vào `XEM`: `XEM` còn gác `/chi-so` (việc gửi tin khảo sát qua Zalo, việc
+# của chăm sóc khách hàng) và `/chua-tra-loi` (trả về TÊN KHÁCH và tên người bán — đúng loại dữ
+# liệu Chủ tịch dặn không mở mặc nhiên). Trưởng bộ phận cần điểm của người mình, không cần hai
+# thứ đó.
+XEM_BANG_DIEM = XEM + tuple(PV_THEO_PHONG)
+
+
+def _pham_vi(u: User, doi_tuong: str) -> str | None:
+    """Ba lớp cổng: vai trò → loại đối tượng → phạm vi. Trả về khoá phòng, hoặc None = toàn công ty.
+
+    CHẶN Ở MÁY CHỦ, không ở màn hình. Đổi tham số trên đường dẫn, gọi thẳng API, xuất tệp hay mở
+    chi tiết đều đi qua đúng hàm này — nguyên văn điều Chủ tịch dặn ngày 15/10/2026.
+
+    KHÔNG CÓ LOẠI HỢP LỆ THÌ TỪ CHỐI, tuyệt đối không lùi về "xem tất cả". Một cổng mà lúc không
+    khớp thì mở toang là một cổng chỉ tồn tại khi mọi thứ đã đúng.
+    """
+    from app.services.vai_ke_thua import vai_va_cha
+    for v in vai_va_cha(u.role):
+        d = PV_THEO_PHONG.get(v)
+        if d is None:
+            continue
+        if doi_tuong not in d["doi_tuong"]:
+            raise HTTPException(403, {
+                "gate": "PHAM_VI_BANG_DIEM",
+                "message": f"Vai «{v}» chỉ xem được bảng điểm "
+                           f"{', '.join(DG_DOI_TUONG.get(x, x) for x in d['doi_tuong'])}, "
+                           f"không xem được «{DG_DOI_TUONG.get(doi_tuong, doi_tuong)}»."})
+        return d["phong"]
+    return None
+
+
 # Ai GHI HỘ khi khách không dùng Zalo. Đây là khối Kinh doanh và Marketing — người còn gọi khách.
 GHI_HO = ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_mkt", "ptgd_mkt", "nv_dh", "tp_dh")
 
@@ -53,18 +100,24 @@ def _ky(tu: str, den: str) -> tuple[date, date]:
 
 
 @router.get("/meta")
-def meta(u: User = Depends(require_roles(*XEM, mo_ta="đánh giá sau tour")), db: Session = Depends(get_db)):
+def meta(u: User = Depends(require_roles(*XEM_BANG_DIEM, mo_ta="đánh giá sau tour")),
+         db: Session = Depends(get_db)):
     return {"doi_tuong": DG_DOI_TUONG}
 
 
 @router.get("/bang-diem/{doi_tuong}")
 def bang_diem(doi_tuong: str, tu: str = "", den: str = "", chi_khach: bool = True,
-              u: User = Depends(require_roles(*XEM, mo_ta="bảng điểm đánh giá")),
+              u: User = Depends(require_roles(*XEM_BANG_DIEM, mo_ta="bảng điểm đánh giá")),
               db: Session = Depends(get_db)):
     """`chi_khach` mặc định BẬT: chỉ cộng điểm khách tự chấm. Tắt đi thì cộng cả phần nhân viên ghi
-    hộ — mở được để so hai con số, nhưng phải bấm, vì đó không phải cách đọc mặc định."""
+    hộ — mở được để so hai con số, nhưng phải bấm, vì đó không phải cách đọc mặc định.
+
+    PHẠM VI: trưởng bộ phận chỉ thấy người của phòng mình — xem `_pham_vi`. Phép kiểm chạy TRƯỚC
+    khi đọc dữ liệu, và cổng đó là cổng duy nhất, nên đổi tham số trên đường dẫn không vượt được.
+    """
+    phong = _pham_vi(u, doi_tuong)
     d1, d2 = _ky(tu, den)
-    return DG.bang_diem(db, doi_tuong, d1, d2, chi_khach)
+    return DG.bang_diem(db, doi_tuong, d1, d2, chi_khach, chi_phong=phong)
 
 
 @router.get("/chi-so")
