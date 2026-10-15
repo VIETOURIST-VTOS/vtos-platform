@@ -111,7 +111,14 @@ class GhiSoIn(BaseModel):
 @router.post("/ghi-so")
 def ghi_so(data: GhiSoIn, u: User = Depends(require_roles(*GHI_SO)), db: Session = Depends(get_db)):
     """Ghi sổ đúng bút toán vừa xem trước. Máy định khoản, người bấm nút – và người bấm nút đứng tên."""
-    bt = HT.xem_truoc(db, data.nguon, data.so_tien, data.boi_canh, data.ngay)
+    # Đợt R2 15/10/2026 — BẮT ValueError Ở ĐÂY. `dung_but_toan` nay ném khi quy tắc bắt buộc mã
+    # khoản mục mà bối cảnh không có. Không bắt thì người dùng nhận một mã 500 trắng thay vì câu
+    # "chọn một mã ở danh mục Khoản mục chi phí rồi ghi lại" — mà câu ấy mới là cả giá trị của
+    # phép chặn. Cửa `/xem-truoc` ngay trên đã bắt từ trước; cửa này thì chưa, và đây là cửa GHI.
+    try:
+        bt = HT.xem_truoc(db, data.nguon, data.so_tien, data.boi_canh, data.ngay)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
     if not bt.get("khop"):
         raise HTTPException(422, bt.get("ly_do") or "Không có quy tắc khớp")
     # Cổng chặn giá vốn: quy tắc doanh thu không được chạy cho đơn chưa có giá vốn.
@@ -497,3 +504,80 @@ def xem_hai_vai_trung_nguoi(
 @router.get("/danh-muc-chung-tu", tags=["hach-toan"])
 def danh_muc_chung_tu(u: User = Depends(require_roles(*XEM))):
     return CTL.danh_muc()
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT R2 15/10/2026 — DANH MỤC KHOẢN MỤC CHI PHÍ
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# Cùng tiền tố `/api/v1/hach-toan` đã khai, nên KHÔNG nới một quyền nào và không đụng bảng phân
+# quyền — cùng lẽ với ba cửa danh mục chứng từ ở trên.
+#
+# KHÁC ba cửa ấy ở một điểm có chủ ý: danh mục này CÓ CỬA GHI. Loại chứng từ là luật kế toán, đổi
+# nó phải sửa mã có người ký; còn khoản mục chi phí là CHIỀU PHÂN TÍCH của chính Vietourist —
+# ngày mở dòng sản phẩm mới, Kế toán phải thêm được một khoản mục mà không chờ một đợt phần mềm.
+# Đúng ranh giới 09/9/2026: máy dựng khuôn và phép tính, người khai nội dung.
+#
+# Vai ghi là `TRINH` (Kế toán; Chủ tịch/TGĐ vẫn qua được qua FULL_ACCESS) — KHÔNG mở cho `tp_dh`,
+# dù họ đọc được bảng quy ước: Điều hành nhập giá vốn theo khoản mục, nhưng DANH SÁCH khoản mục
+# là bộ xương của báo cáo tài chính và thuộc về Kế toán.
+@router.get("/khoan-muc")
+def khoan_muc_danh_sach(ca_ngung: bool = False,
+                        u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    from app.models.khoan_muc_chi_phi import NHOM_KHOAN_MUC
+    from app.services import khoan_muc_chi_phi as KM
+    return {"nhom": NHOM_KHOAN_MUC, "rows": KM.danh_sach(db, ca_ngung=ca_ngung)}
+
+
+@router.post("/khoan-muc/nap-mac-dinh")
+def khoan_muc_nap_mac_dinh(u: User = Depends(require_roles(*TRINH)), db: Session = Depends(get_db)):
+    """Gieo mười dòng khuôn ngành tour. Mã nào đã có thì GIỮ NGUYÊN, không đè lên bản đã sửa."""
+    from app.services import khoan_muc_chi_phi as KM
+    n = KM.nap_mac_dinh(db)
+    R.audit(db, u.username, u.role, "nap_khoan_muc_chi_phi", "khoan_muc:mac_dinh", after={"them": n})
+    db.commit()
+    return {"them": n, "message": f"Đã thêm {n} khoản mục" if n else "Danh mục đã đủ, không thêm gì"}
+
+
+class KhoanMucIn(BaseModel):
+    ma: str
+    ten: str
+    nhom: str = "gia_von"
+    thu_tu: int = 100
+    ghi_chu: str = ""
+
+
+class KhoanMucSuaIn(BaseModel):
+    ten: str | None = None
+    nhom: str | None = None
+    thu_tu: int | None = None
+    ghi_chu: str | None = None
+    dung: bool | None = None
+
+
+@router.post("/khoan-muc")
+def khoan_muc_them(data: KhoanMucIn,
+                   u: User = Depends(require_roles(*TRINH)), db: Session = Depends(get_db)):
+    from app.services import khoan_muc_chi_phi as KM
+    try:
+        k = KM.them(db, data.model_dump())
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    R.audit(db, u.username, u.role, "them_khoan_muc_chi_phi", f"khoan_muc:{k.ma}",
+            after={"ten": k.ten, "nhom": k.nhom})
+    db.commit()
+    return {"id": k.id, "ma": k.ma, "message": f"Đã thêm khoản mục {k.ma}"}
+
+
+@router.patch("/khoan-muc/{kid}")
+def khoan_muc_sua(kid: int, data: KhoanMucSuaIn,
+                  u: User = Depends(require_roles(*TRINH)), db: Session = Depends(get_db)):
+    """Sửa tên / nhóm / thứ tự / ghi chú, và BẬT-TẮT dùng. MÃ KHÔNG ĐỔI ĐƯỢC — xem dịch vụ."""
+    from app.services import khoan_muc_chi_phi as KM
+    truyen = {k: v for k, v in data.model_dump().items() if v is not None}
+    try:
+        k = KM.sua(db, kid, truyen)
+    except ValueError as ex:
+        raise HTTPException(404 if "Không có" in str(ex) else 422, str(ex))
+    R.audit(db, u.username, u.role, "sua_khoan_muc_chi_phi", f"khoan_muc:{k.ma}", after=truyen)
+    db.commit()
+    return {"id": k.id, "ma": k.ma, "dung": k.dung, "message": f"Đã cập nhật khoản mục {k.ma}"}

@@ -226,6 +226,8 @@ CHI_DOC_TRANG_THAI = {
                                "đủ ở `KHONG_GOI_KIEM_TRA`.",
     "hach_toan.nap_mac_dinh":  "Gieo quy tắc hạch toán mặc định lúc dựng kho dữ liệu trống; "
                                "không phải cửa chạy thật.",
+    "khoan_muc_chi_phi.nap_mac_dinh": "Đợt R2 15/10/2026 — gieo mười khoản mục chi phí khuôn "
+                               "ngành tour lúc dựng kho dữ liệu trống; không phải cửa chạy thật.",
 }
 
 
