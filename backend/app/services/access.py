@@ -866,7 +866,10 @@ MENU_ROLES = {
     #   · BẢNG XẾP HẠNG HDV / tài xế            → không có nv_kd, tn_kd (xem api/v1/danh_gia.XEM)
     # Nhân viên mở màn hình này thì cửa bảng điểm trả 403 và màn hình không vẽ khối ấy. Che ở
     # màn hình là một tiện nghi; hàng rào thật nằm ở chữ ký của cửa.
-    "/danh-gia": BASE_VIEW + OPERATIONS + SALES + ("ptgd_doan", "ptgd_mkt", "nv_mkt", "hcns", "cntt"),
+    # HD-Q1 (15/10/2026): thêm `tp_hd` và `gd_doi_xe`. Màn hình mở, nhưng cửa `bang-diem` bó
+    # hai vai này theo PV_THEO_PHONG — mỗi người chỉ thấy loại đối tượng và phòng ban của mình.
+    "/danh-gia": BASE_VIEW + OPERATIONS + SALES + ("ptgd_doan", "ptgd_mkt", "nv_mkt", "hcns",
+                                                  "cntt", "tp_hd", "gd_doi_xe"),
     "/lai-lo-tour": BASE_VIEW + OPERATIONS + SALES_ADMIN + ("ptgd_doan", "ketoan", "cntt"),
     # TC-71 · Sổ chuyến còn nợ — anh Tuấn 18/9/2026 chọn ba nhóm: Chủ tịch/TGĐ, Điều hành, Kế toán.
     # ĐÚNG BẰNG `/lai-lo-tour` và cùng một lý do: cả hai màn hình nói về sổ quyết toán của chuyến,
