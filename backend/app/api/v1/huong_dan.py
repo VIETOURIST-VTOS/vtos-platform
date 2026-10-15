@@ -241,6 +241,50 @@ def chao_chuyen_qua_han(u: User = Depends(require_roles(*READ)), db: Session = D
             "thái vẫn là chờ xác nhận – hết hiệu lực không phải là từ chối.")}
 
 
+@router.get("/pham-vi-the/lech")
+def pham_vi_the_lech(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Những phân công mà LOẠI THẺ của hướng dẫn viên không nhận được LOẠI CHUYẾN — Đợt HD-PV1.
+
+    CỬA ĐỌC, KHÔNG CHẶN. Vòng này cố ý không gắn phép hỏi vào cổng 13, vì `card_type` mặc định
+    rỗng: nếu phần lớn hồ sơ chưa khai loại thẻ thì chặn ngay hôm nay là dừng việc xếp chuyến của
+    cả phòng. Đếm trước, khoá sau — đúng khuôn Đợt HD-9 và HD-12.
+
+    Trả về BA nhóm tách bạch, không gộp:
+      · `khong_dat`          – thẻ không nhận được loại chuyến ấy. Đây là việc phải xử.
+      · `chua_ket_luan_duoc` – thiếu dữ liệu để kết luận. Đây là việc phải NHẬP, không phải vi phạm.
+      · `so_dat`             – đếm cho biết mẫu lớn bao nhiêu, để hai số trên có chỗ mà so.
+    """
+    from app.services.hr import PV_CHUA_KET_LUAN, PV_DAT, PV_KHONG_DAT, pham_vi_the
+    ten = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
+    khong_dat, chua_ket_luan, so_dat = [], [], 0
+    for a in db.execute(select(GuideAssignment)).scalars():
+        if a.status in ("tu_choi", "huy", "het_han"):
+            continue
+        e = db.get(Employee, a.guide_id)
+        t = db.get(Tour, a.tour_id)
+        if e is None:
+            continue
+        kq, vi_sao = pham_vi_the(e, t.tour_type if t else None)
+        if kq == PV_DAT:
+            so_dat += 1
+            continue
+        dong = {"phan_cong_id": a.id, "hdv": ten.get(a.guide_id, ""), "guide_id": a.guide_id,
+                "the_loai": e.card_type or "", "tour_code": t.code if t else "",
+                "loai_chuyen": t.tour_type if t else "", "trang_thai": a.status,
+                "vi_sao": vi_sao}
+        (khong_dat if kq == PV_KHONG_DAT else chua_ket_luan).append(dong)
+    return {
+        "so_khong_dat": len(khong_dat),
+        "so_chua_ket_luan_duoc": len(chua_ket_luan),
+        "so_dat": so_dat,
+        "dang_chan": False,
+        "khong_dat": khong_dat,
+        "chua_ket_luan_duoc": chua_ket_luan,
+        "ghi_chu": "Cửa này ĐẾM, không chặn: cổng 13 hiện vẫn cho qua mọi tổ hợp loại thẻ và loại "
+                   "chuyến. Hai nhóm trên là hai việc khác nhau — «không đạt» là việc phải xử, "
+                   "«chưa kết luận được» là việc phải NHẬP dữ liệu, không phải vi phạm."}
+
+
 @router.post("/chao-chuyen/{aid}/dong")
 def dong_loi_chao(aid: int, data: DongIn, u: User = Depends(require_roles(*DIEU_PHOI)),
                   db: Session = Depends(get_db)):
