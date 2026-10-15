@@ -663,7 +663,15 @@ PHAM_VI_DA_CHOT = {
     # hư hỏng xe). Đây là một NHÁNH CON, không phải cả phân hệ đội xe — xem phép thử bản đồ màn
     # hình ở trên, nay so bằng đường đầy đủ nên bản đồ nói được "màn hình này chỉ chạm nhánh ấy".
     # Mười vai cùng +1 vì cả mười đều thấy màn hình /xe-hdv; không vai nào nhận thêm gì khác.
-    "gd_doi_xe": 34, "hanh_chinh": 33, "tp_hd": 29, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
+    # +1 cho ĐÚNG HAI VAI ngày 15/10/2026 (Đợt HD-Q1, Chủ tịch chốt): màn hình /danh-gia mở
+    # cho `tp_hd` và `gd_doi_xe`. Đo được trước đó: nhân viên Marketing và nhân viên Điều
+    # hành đọc được bảng điểm hướng dẫn viên lẫn tài xế, còn hai trưởng bộ phận của chính
+    # những người bị chấm thì bị chặn 403. Hai vai này nhận MỘT tiền tố `/api/v1/danh-gia`,
+    # và bên trong nó cửa `bang-diem` còn bó tiếp theo `PV_THEO_PHONG`: mỗi người chỉ xem
+    # được loại đối tượng và phòng ban của mình, hai cửa dữ liệu khách thì không mở. Bảng
+    # này đếm MÀN HÌNH chạm tới đâu, nên nó không thấy phần bó ấy — xem
+    # `test_q1_bang_diem_theo_pham_vi` để biết cửa thật hẹp tới đâu.
+    "gd_doi_xe": 35, "hanh_chinh": 33, "tp_hd": 30, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
