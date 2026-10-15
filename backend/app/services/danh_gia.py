@@ -378,7 +378,8 @@ def chua_tra_loi(db: Session, tu: date, den: date, vis: set | None = None) -> li
     return ra
 
 
-def bang_diem(db: Session, doi_tuong: str, tu: date, den: date, chi_khach: bool = True) -> dict:
+def bang_diem(db: Session, doi_tuong: str, tu: date, den: date, chi_khach: bool = True,
+              chi_phong: str | None = None) -> dict:
     """Cộng điểm theo từng đối tượng trong khoảng ngày.
 
     `chi_khach = True` (mặc định) chỉ cộng phần khách TỰ chấm. Đây là mặc định có chủ ý: khi không
@@ -394,6 +395,25 @@ def bang_diem(db: Session, doi_tuong: str, tu: date, den: date, chi_khach: bool 
     # `khach_san`, `an_uong`) thì `doi_tuong_id` luôn rỗng, nên chúng PHẢI gộp theo tên — gộp
     # theo id sẽ dồn mọi chuyến vào đúng một dòng.
     co_khoa = doi_tuong in DG_CO_KHOA
+    # PHẠM VI QUẢN LÝ — Đợt HD-Q1, 15/10/2026. `chi_phong` rỗng nghĩa là KHÔNG giới hạn (người
+    # xem toàn công ty); có giá trị thì chỉ cộng điểm của người thuộc phòng ấy.
+    #
+    # Lọc ở LỚP DỊCH VỤ chứ không ở lớp cửa, vì cửa chỉ thấy danh sách đã cộng xong — lọc sau khi
+    # cộng là vẫn cộng điểm của người ngoài phạm vi rồi mới giấu đi, và một con số trung bình đã
+    # trộn người ngoài vào thì giấu dòng cũng không chữa được.
+    trong_pham_vi = None
+    if chi_phong:
+        if not co_khoa:
+            # Loại không có khoá (`tour`, `khach_san`, `an_uong`) không thuộc phòng nào. Trả bảng
+            # RỖNG chứ không trả tất cả: im lặng bỏ qua phạm vi là cách một cổng mở toang.
+            return {"doi_tuong": doi_tuong, "ten_loai": DG_DOI_TUONG[doi_tuong],
+                    "tu": tu.isoformat(), "den": den.isoformat(), "chi_khach": chi_khach,
+                    "rows": [], "chi_phong": chi_phong,
+                    "luu_y": f"Loại «{DG_DOI_TUONG[doi_tuong]}» không thuộc phòng ban nào, nên "
+                             f"không nằm trong phạm vi quản lý của phòng {chi_phong}."}
+        from app.models.hr import Employee as _E
+        trong_pham_vi = {e.id for e in db.execute(
+            select(_E).where(_E.department == chi_phong)).scalars()}
     khoa = DanhGiaSauTour.doi_tuong_id if co_khoa else DanhGiaSauTour.doi_tuong_ten
     # BA CON SỐ TRONG MỘT CÂU TRUY VẤN. Trước đợt này `so_luot_thap` chạy một câu RIÊNG lọc theo
     # một mình `doi_tuong_id`, trong khi `so_luot` gộp theo cặp (id, tên) — nên cùng một dòng nói
@@ -410,6 +430,11 @@ def bang_diem(db: Session, doi_tuong: str, tu: date, den: date, chi_khach: bool 
     rows = []
     for gt, _moi_nhat, so, tb, thap in db.execute(q.group_by(khoa)).all():
         did = gt if co_khoa else None
+        if trong_pham_vi is not None and did not in trong_pham_vi:
+            # Ngoài phạm vi thì BỎ HẲN, kể cả nhóm không có khoá người: không quy được về ai thì
+            # cũng không quy được về phòng nào, và đưa nó vào bảng của một trưởng phòng là đưa
+            # điểm của người phòng khác.
+            continue
         # TÊN LẤY LÚC ĐỌC. Nhờ vậy những lượt chấm CŨ đã lỡ ghi nhãn chung tự hiện đúng tên người,
         # không cần một lệnh vá dữ liệu nào. Hồ sơ đã xoá thì lùi về tên ghi trong lượt gần nhất
         # chứ không bỏ trống — một dòng điểm không tên là một dòng không ai đối chiếu được.
@@ -438,6 +463,7 @@ def bang_diem(db: Session, doi_tuong: str, tu: date, den: date, chi_khach: bool 
     rows.sort(key=lambda r: (-(r["diem_tb"] or 0), -r["so_luot"]))
     return {"doi_tuong": doi_tuong, "ten_loai": DG_DOI_TUONG[doi_tuong],
             "tu": tu.isoformat(), "den": den.isoformat(), "chi_khach": chi_khach, "rows": rows,
+            "chi_phong": chi_phong,
             # In ra ngay cạnh bảng, không giấu trong mã: một bảng xếp hạng dựng trên mười lượt chấm
             # không phải là một bảng xếp hạng.
             "luu_y": "Điểm trung bình chỉ có nghĩa khi số lượt đủ lớn. Cột 'số lượt' đứng cạnh cột "
