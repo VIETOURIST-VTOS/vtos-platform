@@ -86,6 +86,13 @@ CUA_TAY = (
     # ký tên chịu trách nhiệm. Khai nó là máy sinh thì ngày không ai tải lên, bảng rỗng mà không
     # bộ đếm nào kêu — mà rỗng ở bảng này nghĩa là không chốt sổ kiểm toán được nữa.
     "bo_so_kiem_toan", "bo_so_kiem_toan_dong",
+    # Đợt R1 15/10/2026. CỬA TAY trên màn hình /accounting, thẻ "BCTC TT99", khung "Bản báo cáo đã
+    # lập": ô tên kỳ + ô người đại diện + nút "Lập bản". Bảng DÒNG cũng khai CỬA TAY chứ KHÔNG
+    # khai MAY_SINH, dù máy là thứ tính ra từng con số: NGƯỜI quyết định lập bản ấy và NGƯỜI ký
+    # chịu trách nhiệm về nó. Khai máy sinh thì ngày không ai lập, bảng rỗng mà không bộ đếm nào
+    # kêu — mà rỗng ở bảng này nghĩa là mọi kỳ đều đang đọc số tính lại từ sổ, đúng cái bệnh đợt
+    # này chữa.
+    "bao_cao_da_lap", "bao_cao_da_lap_dong",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
     "auto_reports", "ban_doc_chung_tu", "bang_gia", "bang_gia_dong", "bank_accounts_cat",
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",

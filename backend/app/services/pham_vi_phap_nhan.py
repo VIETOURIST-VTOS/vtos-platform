@@ -242,6 +242,10 @@ PHAI_LOC = {
     # là chuyện ĐÚNG–SAI. Bộ số BCTC của công ty mẹ và của Vietrip là hai bộ số khác nhau, không
     # cộng vào nhau; một bản của pháp nhân này lọt sang truy vấn của người phụ trách pháp nhân kia
     # là mở đường chốt sổ pháp nhân A bằng đáp án của pháp nhân B.
+    # Đợt R1 15/10/2026. Bản báo cáo của công ty mẹ và của Vietrip là hai bản khác nhau, không
+    # cộng vào nhau và không ai được nhìn chéo.
+    "BanBaoCao":      "bản báo cáo tài chính đã lập của ĐÚNG MỘT pháp nhân – con số mà người "
+                      "ngoài nhìn thấy khi màn hình đọc bản đã ký",
     "BoSoKiemToan":   "bộ số BCTC đã kiểm toán của ĐÚNG MỘT pháp nhân – đáp án mà cửa chốt sổ kéo "
                       "cả sổ về theo, nên lẫn pháp nhân ở đây là viết lại bảng cân đối bằng số "
                       "của người khác",

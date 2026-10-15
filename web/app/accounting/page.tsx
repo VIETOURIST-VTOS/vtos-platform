@@ -210,7 +210,85 @@ function rangeOfPeriod(period: string) {
   return { since: `${y}-01-01`, upto: last };
 }
 
-function BctcPanel({ toast, period }: { toast: (m: string, e?: boolean) => void; period: string }) {
+// ĐỢT R1 15/10/2026 — BẢN BÁO CÁO ĐÃ LẬP.
+//
+// Khung này đứng TRÊN bảng số, vì câu hỏi đầu tiên khi mở màn hình BCTC là "tôi đang nhìn số
+// nào": số tính lại từ sổ ngay lúc này, hay số của bản Chủ tịch đã ký. Trước Đợt R1 màn hình
+// chỉ có một câu trả lời và không nói ra.
+//
+// LẬP và KÝ là hai nút ở hai chỗ, cố ý: lập là tính, ký là chịu trách nhiệm. Gộp lại thì không
+// ai lùi được một bước.
+const BBC_ST: Record<string, string> = {
+  nhap: "Kế toán đã lập, chưa trình", cho_ky: "Đã trình, chờ Chủ tịch ký",
+  da_ky: "Chủ tịch đã ký — bản chính thức của kỳ", tu_choi: "Chủ tịch từ chối",
+  da_thay_the: "Đã bị một bản lập sau thay thế",
+};
+
+function BanDaLapPanel({ toast, isKT, isKy, since, upto, onXem }: {
+  toast: (m: string, e?: boolean) => void; isKT: boolean; isKy: boolean;
+  since: string; upto: string; onXem: (d: any) => void;
+}) {
+  const [rows, setRows] = useState<any[]>([]);
+  const [busy, setBusy] = useState("");
+  const [k, setK] = useState({ ky: "", nguoi_dai_dien: "", ghi_chu: "" });
+  const load = () => api("/reports/ban-da-lap").then((r) => setRows(r.rows || [])).catch(() => setRows([]));
+  useEffect(() => { load(); }, []); // eslint-disable-line
+
+  const lap = async () => {
+    if (!k.ky.trim()) { toast("Phải đặt tên kỳ — một bản không nói được nó của kỳ nào thì không ai tìm lại được nó.", true); return; }
+    setBusy("lap");
+    try {
+      const r = await api("/reports/ban-da-lap", { method: "POST", json: { loai: "bctc", loai_ky: "tuy_chon", ky: k.ky, tu_ngay: since, den_ngay: upto, nguoi_dai_dien: k.nguoi_dai_dien, ghi_chu: k.ghi_chu } });
+      toast(r.message); load();
+    } catch (x) { toast(errMsg(x), true); }
+    setBusy("");
+  };
+  const bam = async (path: string, json?: any) => {
+    setBusy(path);
+    try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); }
+    catch (x) { toast(errMsg(x), true); }
+    setBusy("");
+  };
+  const xem = async (id: number) => {
+    try { const r = await api(`/reports/ban-da-lap/${id}`); onXem(r.du_lieu); toast(`Đang xem bản đã lập kỳ ${r.ky}.`); }
+    catch (x) { toast(errMsg(x), true); }
+  };
+
+  const daKy = rows.find((d) => d.trang_thai === "da_ky");
+  return <div className="panel"><h3>Bản báo cáo đã lập</h3>
+    <p className="muted">Bảng số bên dưới <b>tính lại từ sổ mỗi lần mở</b>, nên con số của một kỳ đã qua đổi theo sổ: một bút toán đề ngày cũ là báo cáo kỳ ấy khác đi. Một BẢN ĐÃ LẬP là lát cắt của sổ tại ngày lập, đóng băng từng chỉ tiêu, có chữ ký — và đó mới là con số đã phát hành. <b>Lập</b> là tính; <b>Ký</b> là chịu trách nhiệm; hai việc, hai nút.</p>
+
+    {isKT && <><hr /><b>Lập một bản cho khoảng ngày đang chọn ({fmtD(since)} – {fmtD(upto)})</b>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+        <label>Tên kỳ <input value={k.ky} placeholder="2026-H1" onChange={(e) => setK({ ...k, ky: e.target.value })} /></label>
+        <label>Người đại diện theo pháp luật <input value={k.nguoi_dai_dien} onChange={(e) => setK({ ...k, nguoi_dai_dien: e.target.value })} /></label>
+        <label>Ghi chú <input value={k.ghi_chu} onChange={(e) => setK({ ...k, ghi_chu: e.target.value })} /></label>
+        <button className="act orange" disabled={!!busy} onClick={lap}>Lập bản</button>
+      </div>
+      <p className="muted">Lập ra một bản <b>nháp</b>. Bấm “Trình” khi muốn chuyển Chủ tịch ký — người lập không tự ký được.</p></>}
+
+    {rows.length > 0 && <><hr /><table><thead><tr><th>Kỳ</th><th>Khoảng ngày</th><th>Chỉ tiêu</th><th>Trạng thái</th><th>Lập</th><th>Ký</th><th>Việc</th></tr></thead>
+      <tbody>{rows.map((d) => <tr key={d.id} style={d.trang_thai === "da_ky" ? { fontWeight: 600 } : undefined}>
+        <td className="mono">{d.ky}</td>
+        <td className="muted">{fmtD(d.tu_ngay)} – {fmtD(d.den_ngay)}</td>
+        <td>{d.so_dong}</td>
+        <td>{BBC_ST[d.trang_thai] || d.trang_thai}{d.trang_thai === "tu_choi" && d.tu_choi_ly_do ? <><br /><span className="muted"><b>Từ chối:</b> {d.tu_choi_ly_do}</span></> : null}</td>
+        <td className="muted">{d.lap_boi}<br />{fmtDT(d.lap_luc)}</td>
+        <td className="muted">{d.ky_boi ? <>{d.ky_boi}<br />{fmtDT(d.ky_luc)}</> : "—"}</td>
+        <td>
+          <button className="act grey" style={{ margin: 0 }} onClick={() => xem(d.id)}>Xem số của bản</button>
+          {d.trang_thai === "nhap" && isKT && <button className="act" style={{ margin: "0 0 0 6px" }} disabled={!!busy} onClick={() => bam(`/reports/ban-da-lap/${d.id}/trinh`)}>Trình</button>}
+          {d.trang_thai === "cho_ky" && isKy && <>
+            <button className="act orange" style={{ margin: "0 0 0 6px" }} disabled={!!busy} onClick={() => bam(`/reports/ban-da-lap/${d.id}/ky`)}>Ký</button>
+            <button className="act grey" style={{ margin: "0 0 0 6px" }} disabled={!!busy} onClick={() => { const n = prompt("Lý do từ chối — người lập cần biết sửa gì để lập lại:"); if (n) bam(`/reports/ban-da-lap/${d.id}/tu-choi`, { ly_do: n }); }}>Từ chối</button>
+          </>}
+        </td>
+      </tr>)}</tbody></table></>}
+    {!daKy && <p className="muted"><b>Chưa có bản nào đã ký.</b> Bảng số bên dưới đang là số tính lại từ sổ ngay lúc này — không phải một bản đã phát hành.</p>}
+  </div>;
+}
+
+function BctcPanel({ toast, period, isKT, isKy }: { toast: (m: string, e?: boolean) => void; period: string; isKT: boolean; isKy: boolean }) {
   const def = rangeOfPeriod(period);
   const [upto, setUpto] = useState(def.upto);
   const [since, setSince] = useState(def.since);
@@ -222,6 +300,8 @@ function BctcPanel({ toast, period }: { toast: (m: string, e?: boolean) => void;
   const row = (r: any) => <tr key={r.code + r.name} style={{ fontWeight: r.group ? 700 : 400 }}><td>{r.name}</td><td className="mono">{r.code}</td><td className="muted">{r.note}</td><td style={{ textAlign: "right" }}>{r.now === null ? "" : vnd(r.now)}</td><td style={{ textAlign: "right" }}>{r.prev === null ? "" : vnd(r.prev)}</td></tr>;
   return <>
     <p className="muted">Mẫu Thông tư 99/2025 đúng cấu trúc bộ đã nộp UBCK: mỗi tài khoản chi tiết ánh xạ mã chỉ tiêu (dư Nợ / dư Có); 131, 331, 1388, 3388, 141 xét theo từng đối tượng; lãi/lỗ chưa kết chuyển cộng vào 420.</p>
+    <BanDaLapPanel toast={toast} isKT={isKT} isKy={isKy} since={since} upto={upto} onXem={setRep} />
+    {rep?.tu_ban && <p><Tag cls="ok">Đang xem BẢN ĐÃ LẬP kỳ {rep.ky}</Tag> <span className="muted">Số đóng băng lúc lập, ký bởi {rep.ky_boi} {fmtDT(rep.ky_luc)}. Bấm “Lập báo cáo” để quay về số tính lại từ sổ.</span></p>}
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><label>Từ <input type="date" value={since} onChange={(e) => setSince(e.target.value)} /></label><label>đến <input type="date" value={upto} onChange={(e) => setUpto(e.target.value)} /></label><button className="act" onClick={load}>Lập báo cáo</button><button className="act grey" onClick={() => dl(`/reports/bctc.xlsx?upto=${upto}&since=${since}`, `BCTC_TT99_${upto}.xlsx`)}>Xuất Excel (bố cục UBCK)</button>{rep && (rep.balanced ? <Tag cls="ok">Cân: 280 = 440</Tag> : <Tag cls="red">LỆCH 280 ≠ 440</Tag>)}
       {lech ? <Tag cls="warn">Khoảng ngày khác kỳ {period} đang chọn ({fmtD(def.since)}–{fmtD(def.upto)})</Tag> : <Tag>Theo kỳ {period}</Tag>}
       {lech && <button className="act grey" style={{ margin: 0 }} onClick={() => { setSince(def.since); setUpto(def.upto); }}>Về đúng kỳ</button>}</div>
@@ -430,7 +510,7 @@ function Accounting() {
     </>}
 
     {tab === "misa" && <MisaPanel toast={toast} isKT={isKT || user?.role === "cntt"} isKy={isKy} />}
-    {tab === "bctc" && <BctcPanel toast={toast} period={period} />}
+    {tab === "bctc" && <BctcPanel toast={toast} period={period} isKT={isKT || isKTT} isKy={isKy} />}
 
     {tab === "periods" && <div className="panel wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Khóa bởi</th><th>Lúc</th><th>Ghi chú</th>{isKT && <th></th>}</tr></thead>
       <tbody>{periods.map((p) => <tr key={p.period}><td><b>{p.period}</b></td><td>{p.locked ? <Tag cls="navy">Đã khóa</Tag> : <Tag cls="ok">Mở</Tag>}</td><td>{p.locked_by}</td><td>{fmtDT(p.locked_at)}</td><td className="muted">{p.note}</td>

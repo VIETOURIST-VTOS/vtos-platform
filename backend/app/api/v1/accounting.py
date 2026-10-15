@@ -498,7 +498,30 @@ def projects(q: str = "", limit: int = 50, u: User = Depends(current_user), db: 
 
 
 @router.get("/reports/bctc")
-def bctc_report(upto: date, since: date | None = None, compare_upto: date | None = None, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+def bctc_report(upto: date, since: date | None = None, compare_upto: date | None = None,
+                tu_ban_da_ky: bool = False, ky: str | None = None, company_id: int | None = None,
+                u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Bộ BCTC TT99.
+
+    ĐỢT R1 15/10/2026 — `tu_ban_da_ky=true` đọc BẢN ĐÃ KÝ của kỳ thay vì tính lại từ sổ.
+
+    Vì sao cần cờ này: cửa chốt sổ kiểm toán ghi bút toán theo CHÊNH LỆCH, nên một bút toán đề
+    ngày cũ chảy xuôi vào số dư của mọi ngày sau nó. Đo được 15/10/2026: sau khi nạp thêm mốc
+    31/12/2025, chỉ tiêu 111 tại 30/06/2026 tụt 500 triệu. Bản đã ký là lát cắt của sổ tại ngày
+    lập, và đó mới là con số đã phát hành.
+
+    CHƯA CÓ BẢN NÀO ĐÃ KÝ thì NÉM, không lặng lẽ tính lại từ sổ: người bật cờ này đang hỏi "bản
+    đã ký ghi gì", và trả lời bằng một con số tính lại là trả lời sai câu hỏi.
+    """
+    if tu_ban_da_ky:
+        from app.services import bao_cao_da_lap as BBC
+        b = BBC.ban_da_ky(db, "bctc", ky, company_id)
+        if not b:
+            raise HTTPException(404, "Chưa có bản báo cáo nào ĐÃ KÝ"
+                                     + (f" cho kỳ {ky}" if ky else "")
+                                     + ". Vào thẻ “BCTC TT99” → khung “Bản báo cáo đã lập”, bấm "
+                                       "“Lập bản”, rồi “Trình”, rồi nhờ Chủ tịch HĐQT ký.")
+        return BBC.du_lieu(b)
     r = BCTC.bctc(db, upto, since, compare_upto); r.pop("detail", None); return r
 
 
@@ -603,4 +626,110 @@ def bskt_tu_choi(bid: int, data: BoSoTuChoiIn, u: User = Depends(require_roles("
     try:
         return BSKT.tu_choi(db, u, b, data.ly_do)
     except BSKT.SaiBoSo as ex:
+        raise HTTPException(422, str(ex))
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT R1 15/10/2026 — BẢN BÁO CÁO ĐÃ LẬP
+#
+# Sáu cửa, đặt dưới tiền tố `/reports/` ĐÃ KHAI nên không đụng tới bảng phân quyền. Vai đọc dùng
+# đúng `READ` của chính tệp này; vai lập/trình dùng đúng vai đang được phép xem màn hình Kế toán.
+#
+# LẬP và LƯU là MỘT bước ở đây (nút "Lập bản" sinh ra một bản `nhap`), còn TRÌNH và KÝ là hai
+# bước riêng — đúng hình dáng Đợt E16. Màn hình không có nút nào gộp hai việc ấy lại.
+#
+# KHÔNG CÓ `ketoan_tt` Ở ĐÂY, và đó là một quyết định chứ không phải một chỗ quên: Đợt E2 chốt
+# kế toán thanh toán làm chứng từ thanh toán, công nợ nhà cung cấp, sao kê và phân bổ tiền —
+# "không khóa kỳ, không kết chuyển, không đảo bút toán". Lập bộ BCTC của cả pháp nhân là việc
+# của Kế toán trưởng. `test_le2b` canh đúng điều này và đã ĐỎ khi em để lọt `ketoan_tt` vào đây.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+class BanBaoCaoLapIn(BaseModel):
+    loai: str = "bctc"
+    loai_ky: str = "tuy_chon"
+    ky: str
+    tu_ngay: date
+    den_ngay: date
+    so_sanh_den: date | None = None
+    nguoi_dai_dien: str = ""
+    ghi_chu: str = ""
+    company_id: int | None = None
+
+
+class BanBaoCaoTuChoiIn(BaseModel):
+    ly_do: str
+
+
+@router.get("/reports/ban-da-lap")
+def bbc_danh_sach(loai: str = "bctc", company_id: int | None = None,
+                  u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Danh sách bản đã lập, đã lọc theo phạm vi pháp nhân của người đang xem."""
+    from app.services import bao_cao_da_lap as BBC
+    return {"rows": BBC.danh_sach(db, u, loai, company_id)}
+
+
+@router.get("/reports/ban-da-lap/{bid}")
+def bbc_mot_ban(bid: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    from app.models.bao_cao_da_lap import BanBaoCao
+    from app.services import bao_cao_da_lap as BBC
+    b = db.get(BanBaoCao, bid)
+    if not b: raise HTTPException(404, "Không có bản báo cáo này")
+    return BBC.mot_ban(b, day_du=True)
+
+
+@router.post("/reports/ban-da-lap")
+def bbc_lap(data: BanBaoCaoLapIn,
+            u: User = Depends(require_roles("ketoan", "ketoan_truong", "cntt")),
+            db: Session = Depends(get_db)):
+    """LẬP = tính bộ báo cáo tại THỜI ĐIỂM NÀY rồi đóng băng. Chưa phải lời khai: bản ở `nhap`."""
+    from app.services import bao_cao_da_lap as BBC
+    try:
+        b = BBC.lap(db, u, loai=data.loai, loai_ky=data.loai_ky, ky=data.ky,
+                    tu_ngay=data.tu_ngay, den_ngay=data.den_ngay, so_sanh_den=data.so_sanh_den,
+                    nguoi_dai_dien=data.nguoi_dai_dien, ghi_chu=data.ghi_chu,
+                    company_id=data.company_id)
+    except BBC.SaiBanBaoCao as ex:
+        raise HTTPException(422, str(ex))
+    return {"message": f"Đã lập bản {b.ky} — {len(b.dong)} chỉ tiêu đã đóng băng. "
+                       f"Bấm “Trình” khi muốn chuyển Chủ tịch ký.", "id": b.id}
+
+
+@router.post("/reports/ban-da-lap/{bid}/trinh")
+def bbc_trinh(bid: int,
+              u: User = Depends(require_roles("ketoan", "ketoan_truong", "cntt")),
+              db: Session = Depends(get_db)):
+    from app.models.bao_cao_da_lap import BanBaoCao
+    from app.services import bao_cao_da_lap as BBC
+    b = db.get(BanBaoCao, bid)
+    if not b: raise HTTPException(404, "Không có bản báo cáo này")
+    try:
+        return BBC.trinh(db, u, b)
+    except BBC.SaiBanBaoCao as ex:
+        raise HTTPException(422, str(ex))
+
+
+@router.post("/reports/ban-da-lap/{bid}/ky")
+def bbc_ky(bid: int, u: User = Depends(require_roles("chutich", "cntt")),
+           db: Session = Depends(get_db)):
+    """Chủ tịch KÝ. Từ đây màn hình đọc được SỐ CỦA BẢN thay vì tính lại từ sổ."""
+    from app.models.bao_cao_da_lap import BanBaoCao
+    from app.services import bao_cao_da_lap as BBC
+    b = db.get(BanBaoCao, bid)
+    if not b: raise HTTPException(404, "Không có bản báo cáo này")
+    try:
+        return BBC.ky(db, u, b)
+    except BBC.SaiBanBaoCao as ex:
+        raise HTTPException(422, str(ex))
+
+
+@router.post("/reports/ban-da-lap/{bid}/tu-choi")
+def bbc_tu_choi(bid: int, data: BanBaoCaoTuChoiIn,
+                u: User = Depends(require_roles("chutich", "cntt")),
+                db: Session = Depends(get_db)):
+    from app.models.bao_cao_da_lap import BanBaoCao
+    from app.services import bao_cao_da_lap as BBC
+    b = db.get(BanBaoCao, bid)
+    if not b: raise HTTPException(404, "Không có bản báo cáo này")
+    try:
+        return BBC.tu_choi(db, u, b, data.ly_do)
+    except BBC.SaiBanBaoCao as ex:
         raise HTTPException(422, str(ex))

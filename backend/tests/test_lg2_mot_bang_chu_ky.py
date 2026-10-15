@@ -35,6 +35,9 @@ GOC_APP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # toán do Kế toán tải lên và Chủ tịch ký — MỘT chữ ký, cùng hình dáng với `mo_lai_ky`. Khai nốt ở
 # đây để sổ phép thử không lệch với bảng luật.
 MOT_CHU_KY = ("tham_so", "don_gia_hdv", "gia_xe", "dieu_khoan_thanh_toan", "mo_lai_ky",
+              # Đợt R1 15/10/2026 — bản báo cáo tài chính đã lập. Kế toán lập và trình, Chủ tịch
+              # ký một mình, cùng hình dáng với `bo_so_kiem_toan` ngay dưới.
+              "ban_bao_cao",
               "bo_so_kiem_toan")
 HAI_CT_TGD = ("quy_tac_hach_toan", "che_tai_muc_3")
 HAI_PTGD_TGD = ("du_toan_duoi_bien",)
