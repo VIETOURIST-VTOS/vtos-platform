@@ -14,6 +14,35 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.services import hr as H
 
+
+# ══════════════ DL-7 · 16/10/2026 — TỆP NÀY TẮT LUẬT «LỆNH PHẢI RA TỪ ĐỀ NGHỊ»
+#
+# Từ 16/10/2026 cửa lập lệnh từ chối lệnh không kèm đề nghị xe (tham số
+# `xe_bat_buoc_qua_de_nghi`, bật sẵn). Các phép thử trong tệp này có trước luật ấy và đo một việc
+# KHÁC — không đo chuỗi đề nghị → lệnh. Dựng một đề nghị hợp lệ cho mỗi phép thử ở đây đòi duyệt
+# dự toán chuyến, tức kéo cả một phân hệ khác vào một tệp không nói về nó.
+#
+# Nên tệp này TẮT luật bằng tham số, và khai thẳng ra việc tắt. Hàng rào thật được đo riêng ở
+# `test_dl7_lenh_phai_ra_tu_de_nghi.py` — chỗ duy nhất nói về chuỗi.
+def _tat_luat_chuoi_de_nghi():
+    from datetime import date as _date
+    from app.db.session import SessionLocal as _S
+    from app.models.core import Param as _Param
+    from app.services import rules as _R
+    # effective_from phải là HÔM NAY: `seed_params` đã nạp bản mặc định với ngày 01/9/2026, và
+    # `_param_value` lấy bản có ngày hiệu lực MỚI NHẤT còn ≤ hôm nay. Đặt một ngày cũ hơn thì bản
+    # của phép thử thua bản mặc định và luật vẫn bật — phép thử đỏ mà không hiểu vì sao.
+    db = _S()
+    try:
+        db.add(_Param(key="xe_bat_buoc_qua_de_nghi", value="0", label="xe_bat_buoc_qua_de_nghi",
+                      unit="", effective_from=_date.today(), source="test", status="active",
+                      signed_chutich=True, signed_tgd=True, proposed_by="test"))
+        db.commit()
+    finally:
+        db.close()
+    _R.clear_param_cache()
+
+
 client = TestClient(app)
 TOK = {}
 P = f"{date.today() - timedelta(days=14):%Y-%m}"   # tháng Kế toán xác nhận tour Đà Lạt mẫu
@@ -30,6 +59,7 @@ def _startup():
     with TestClient(app) as c:
         global client
         client = c
+        _tat_luat_chuoi_de_nghi()     # DL-7: xem ghi chú ở đầu tệp
         yield
 
 

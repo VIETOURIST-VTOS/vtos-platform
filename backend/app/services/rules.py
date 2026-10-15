@@ -17,6 +17,22 @@ DEFAULT_PARAMS = [
     # Đội xe Đợt 1: bật thành 1 khi hồ sơ giấy tờ 14 xe đã nhập đủ. Để 0 trong giai đoạn nhập liệu, vì chặn
     # theo giấy tờ khi chưa có giấy tờ nào trong hệ thống thì mọi lệnh điều xe đều dừng.
     ("xe_chan_khi_thieu_giay", "0", "Chặn phát lệnh khi thiếu dữ liệu giấy tờ xe/tài xế", "0 hoặc 1", "Đội xe Vietrip v1.3 §7"),
+    # DL-7 · 16/10/2026 — SIẾT CHUỖI, và vì sao bật sẵn thành 1 chứ không phải 0.
+    #
+    # DL-1 (11/10) để `de_nghi_id` rỗng được, có chủ ý, và ghi sẵn luật thoát: «con số về 0 thì
+    # siết thành bắt buộc là một dòng». Đo trên hệ thật 16/10/2026, đọc thẳng màn hình Lệnh điều
+    # xe: «Lệnh đã lập (0)» và «Đề nghị xe đang chờ lập lệnh (0)». KHÔNG CÓ LỆNH NÀO trong hệ
+    # thống. Nên siết lúc này không làm ai đứng việc — và đây là lúc RẺ NHẤT để siết, vì chưa ai
+    # có thói quen cũ phải bỏ.
+    #
+    # Khác với `xe_chan_khi_thieu_giay` để 0: cái kia chặn theo DỮ LIỆU chưa nhập xong (giấy tờ 14
+    # xe), bật sớm thì chặn người vì việc của người khác. Cái này chặn theo QUY TRÌNH Chủ tịch đã
+    # đặc tả 11/10, và quy trình ấy đã có đủ cửa để đi.
+    #
+    # Đây là CÔNG TẮC CHÍNH SÁCH, không phải đường vòng từng lần: không có nút «vượt kèm lý do»
+    # trên từng lệnh — thứ ấy thành đường chính sau vài tuần, đúng như đã xảy ra với ô lý do chọn
+    # khác gợi ý. Muốn mở thì Chủ tịch đổi tham số này, một lần, và việc đổi có ghi nhật ký.
+    ("xe_bat_buoc_qua_de_nghi", "1", "Lệnh điều xe phải ra từ một đề nghị xe", "0 hoặc 1", "Chủ tịch đặc tả chuỗi 11/10/2026; siết 16/10/2026"),
     ("han_muc_mkt", "5000000", "Hạn mức chi Marketing cần 2 chữ ký", "đồng", "MKT Điều 8"),
     # ═══════════════════════════════════════════════════════════════════════════════════════
     # NGƯỠNG DUYỆT CHI — ĐỂ TRỐNG, VÀ PHẢI ĐỂ TRỐNG (Đợt F1)

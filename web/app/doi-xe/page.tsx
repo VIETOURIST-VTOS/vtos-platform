@@ -51,6 +51,10 @@ function DoiXe() {
       const t = new URLSearchParams(window.location.search).get("tab");
       if (t === "bao-duong") setTab("baoduong");
       if (t === "bao-hong") setTab("baohong");
+      // DL-6 · 16/10/2026: ô đếm «chuyến sinh từ lệnh còn thiếu số thật» trên màn hình Lệnh điều
+      // xe trỏ sang đây. Không trỏ tới từng chuyến mà tới đúng tab chứa nhật trình: trỏ sâu hơn
+      // đòi một mã mở sẵn một dòng, và một đường dẫn hứa nhiều hơn nó làm được thì tệ hơn.
+      if (t === "chuyen") setTab("chuyen");
     } catch { /* không có địa chỉ thì giữ tab mặc định */ }
   }, []);
 
