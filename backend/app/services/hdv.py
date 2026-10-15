@@ -41,7 +41,7 @@ cả hai cùng thấy trống, cả hai cùng ghi. Nên ở đây làm hai lớp
 Lớp 2 là lớp thật sự bảo đảm, và nó chạy đúng trên cả hai loại máy chủ. Lớp 1 chỉ để hai phiên không
 phải cùng làm rồi cùng hỏng.
 """
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -107,6 +107,102 @@ def loi_chao_qua_han(db: Session, bay_gio: datetime | None = None) -> list[Guide
     """
     return [a for a in db.execute(select(GuideAssignment)).scalars()
             if loi_chao_het_hieu_luc(a, bay_gio)]
+
+
+# ════════════════ BỐN HÀNG ĐỢI CỦA PHÒNG HƯỚNG DẪN — Đợt HD-BH1, 15/10/2026 ════════════════
+#
+# Bốn hàm dưới đây KHÔNG phải phép lọc mới. Chúng là phép lọc ĐANG CHẠY ở các cửa API, rút về một
+# chỗ có tên để bàn làm việc và cửa API cùng gọi một bản. Luật đầu tệp `ban_lam_viec.py`: hai chỗ
+# cùng đếm một thứ thì sẽ lệch, và người dùng tin con số dễ đọc chứ không tin con số đúng.
+
+SAP_HET_HAN_NGAY = 60        # thẻ hành nghề: báo trước bao nhiêu ngày. Bằng `SAP_HET_HAN` ở
+                             # `api/v1/huong_dan.py`, nay cửa ấy đọc từ đây.
+
+
+def chuyen_chua_co_nguoi(db: Session, so_ngay: int = 30) -> list:
+    """Chuyến sắp khởi hành mà CHƯA CÓ một lượt chào nào còn sống.
+
+    Rút nguyên từ cửa `GET /huong-dan/chuyen-can-hdv`. Giữ nguyên phép lọc của nó, kể cả chi tiết
+    dễ bỏ sót: lượt chào đã HUỶ không tính là đã có người, còn `tu_choi` và `het_han` thì VẪN
+    tính — đó là hành vi đang chạy, và đổi nó là đổi một con số người ta đang đọc hằng ngày, phải
+    có người quyết chứ không lặng lẽ sửa nhân một đợt dựng bàn làm việc.
+    """
+    from datetime import timedelta
+
+    from app.models.core import Tour as _T
+    hom_nay = date.today()
+    den = hom_nay + timedelta(days=max(1, so_ngay))
+    da_co = {a.tour_id for a in db.execute(
+        select(GuideAssignment).where(GuideAssignment.status != "huy")).scalars()}
+    return [t for t in db.execute(
+        select(_T).where(_T.start_date >= hom_nay, _T.start_date <= den)
+        .order_by(_T.start_date)).scalars() if t.id not in da_co]
+
+
+def the_sap_het_han(db: Session, so_ngay: int = SAP_HET_HAN_NGAY) -> list:
+    """Hướng dẫn viên đang làm mà thẻ hành nghề đã hết hạn HOẶC sắp hết trong `so_ngay` ngày.
+
+    GỘP «đã hết hạn» và «sắp hết hạn» vào MỘT danh sách là cố ý: với người điều phối cả hai là
+    cùng một việc — đi giục người ta gia hạn. Mỗi dòng vẫn nói rõ nó thuộc loại nào, vì người đã
+    hết hạn thì hôm nay không chào chuyến được nữa, còn người sắp hết thì vẫn chào được.
+
+    KHÁC CON SỐ `the_sap_het_han` CỦA MÀN HÌNH `/huong-dan`, VÀ KHÁC CÓ CHỦ Ý — nói ra ở đây để
+    người đọc hai con số không tưởng một trong hai sai. Con số trên màn hình ấy lọc
+    `0 <= con_lai_ngay <= 60`, tức CHỈ người CHƯA hết hạn; ai đã quá hạn thì rơi ra khỏi nó và chỉ
+    còn hiện ở cột «đủ điều kiện: không». Hàm này đếm CẢ hai, vì nó trả lời câu khác: không phải
+    «ai sắp hết hạn» mà «còn bao nhiêu người phải đi gia hạn». Hai câu, hai tên, hai con số.
+    """
+    from datetime import timedelta
+
+    from app.models.hr import Employee as _E
+    hom_nay = date.today()
+    moc = hom_nay + timedelta(days=max(0, so_ngay))
+    ra = [e for e in db.execute(
+        select(_E).where(_E.department == "huong_dan")).scalars()
+        if e.card_expiry and e.card_expiry <= moc and e.active]
+    return sorted(ra, key=lambda e: e.card_expiry)
+
+
+def phan_cong_thieu_gio(db: Session) -> list:
+    """Phân công còn chiếm lịch mà CHƯA CÓ mốc giờ — nên không kiểm trùng lịch được.
+
+    Đây là việc còn THIẾU DỮ LIỆU, không phải «đã kiểm và không trùng» — nguyên văn lời cửa
+    `/guide-assignments/yeu-cau/thieu` đang trả về.
+
+    CÒN NỢ, ĐỌC KỸ TRƯỚC KHI SỬA: cửa ấy nằm ở `api/v1/hr.py` và HIỆN VẪN có vòng lặp riêng của
+    nó, vì lúc dựng hàm này tệp ấy đang bị dòng 61 của làn Phân quyền giữ. Vòng nào đụng được
+    `hr.py` thì đổi chỗ ấy sang gọi hàm này, rồi xoá dòng nợ này đi. Để hai bản là để hai con số
+    có ngày lệch nhau.
+    """
+    return [a for a in db.execute(select(GuideAssignment)).scalars()
+            if a.status not in KHONG_CHIEM_LICH and khong_so_duoc(a.bat_dau, a.ket_thuc)]
+
+
+def pham_vi_lech(db: Session) -> list[dict]:
+    """Phân công mà LOẠI THẺ của hướng dẫn viên không nhận được LOẠI CHUYẾN — Đợt HD-PV1.
+
+    CHỈ trả nhóm «không đạt». Nhóm «chưa kết luận được» cố ý KHÔNG nằm ở đây: hồ sơ chưa khai
+    loại thẻ là việc phải NHẬP, giao cho HCNS, chứ không phải việc phải xử của người điều phối —
+    trộn hai nhóm vào một ô trên bàn là biến một ô hồ sơ còn trống thành một lời buộc tội, đúng
+    cái Đợt HD-PV1 dựng ra để tránh. Cửa `/huong-dan/pham-vi-the/lech` vẫn trả đủ cả ba nhóm.
+    """
+    from app.models.core import Tour as _T
+    from app.models.hr import Employee as _E
+    from app.services.hr import PV_KHONG_DAT, pham_vi_the
+    ra = []
+    for a in db.execute(select(GuideAssignment)).scalars():
+        if a.status in KHONG_CHIEM_LICH:
+            continue
+        e = db.get(_E, a.guide_id)
+        if e is None:
+            continue
+        t = db.get(_T, a.tour_id)
+        kq, vi_sao = pham_vi_the(e, t.tour_type if t else None)
+        if kq == PV_KHONG_DAT:
+            ra.append({"phan_cong_id": a.id, "hdv": e.full_name, "ma_nv": e.code,
+                       "tour_code": t.code if t else "", "loai_chuyen": t.tour_type if t else "",
+                       "the_loai": e.card_type or "", "vi_sao": vi_sao})
+    return ra
 
 
 def chong_gio(a1: datetime | None, a2: datetime | None,

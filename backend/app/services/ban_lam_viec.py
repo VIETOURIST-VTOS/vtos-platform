@@ -361,6 +361,146 @@ def _lenh_da_nhan_trong_tuan(db: Session) -> dict:
               ghi_chu="Không phải việc phải làm – đây là mẫu số")
 
 
+# ══════════════════════════ HÀNG ĐỢI CỦA PHÒNG HƯỚNG DẪN — Đợt HD-BH1 ══════════════════════════
+#
+# Năm ô việc và một mẫu số. KHÔNG ô nào tự nghĩ ra phép lọc: cả năm gọi hàm trong
+# `services/hdv.py`, nơi phép lọc của các cửa API đã được rút về. Xem chú thích ở đó.
+
+def _hdv_chao_qua_han(db: Session) -> dict:
+    """Lời chào đã quá hạn trả lời mà VẪN đang giữ lịch của người ta — Đợt HD-12.
+
+    Quá hạn KHÔNG phải là từ chối: bản ghi vẫn `cho_xac_nhan`, vì không ai trả lời cả. Ô này là
+    chỗ người điều phối thấy chúng để đi chào người khác, chứ không phải chỗ máy tự đóng.
+    """
+    from app.services import hdv as HDV
+    rows = HDV.loi_chao_qua_han(db)
+    dong = []
+    for a in sorted(rows, key=lambda x: x.han_tra_loi)[:SO_DONG_MAU]:
+        from app.models.core import Tour
+        from app.models.hr import Employee
+        t = db.get(Tour, a.tour_id); e = db.get(Employee, a.guide_id)
+        qua = (datetime.now() - a.han_tra_loi).days
+        dong.append(_dong(t.code if t else f"#{a.tour_id}", e.full_name if e else "",
+                          f"Quá {qua} ngày" if qua >= 1 else "Vừa quá hạn", "Hạn trả lời", "do"))
+    return _o("hdv_chao_qua_han", "Lời chào quá hạn trả lời", len(rows), "lời chào",
+              "/huong-dan",
+              "guide_assignments còn cho_xac_nhan và đã quá han_tra_loi (hdv.loi_chao_qua_han)",
+              muc="do" if rows else "xanh",
+              nhan_muc="Cần chào người khác" if rows else "Không có lời chào nào quá hạn",
+              ghi_chu="Quá hạn KHÔNG phải là từ chối, và KHÔNG tự nhả lịch – công tắc nhả lịch "
+                      "mặc định TẮT, chờ Chủ tịch bật.", dong=dong)
+
+
+def _hdv_chuyen_chua_co_nguoi(db: Session) -> dict:
+    """Chuyến khởi hành trong 30 ngày tới mà chưa ai nhận."""
+    from app.services import hdv as HDV
+    rows = HDV.chuyen_chua_co_nguoi(db, 30)
+    hom_nay = date.today()
+    dong, gap = [], 0
+    for t in rows:
+        con = (t.start_date - hom_nay).days
+        if con <= 7:
+            gap += 1
+        if len(dong) < SO_DONG_MAU:
+            dong.append(_dong(t.code, t.name or "",
+                              f"Đi sau {con} ngày" if con > 0 else "Đi hôm nay", "",
+                              "do" if con <= 3 else ("vang" if con <= 7 else "")))
+    return _o("hdv_chuyen_chua_co_nguoi", "Chuyến chưa có hướng dẫn viên", len(rows), "chuyến",
+              "/huong-dan",
+              "tours khởi hành trong 30 ngày, chưa có lượt chào nào ngoài huỷ "
+              "(hdv.chuyen_chua_co_nguoi)",
+              muc="do" if gap else ("vang" if rows else "xanh"),
+              nhan_muc=(f"{gap} chuyến đi trong 7 ngày tới" if gap
+                        else ("Còn thời gian xếp người" if rows else "Mọi chuyến đều có người")),
+              ghi_chu="Lượt chào đã HUỶ không tính là đã có người; từ chối và hết hạn thì vẫn "
+                      "tính – đây là hành vi đang chạy của màn hình nguồn, không đổi ở đây.",
+              dong=dong)
+
+
+def _hdv_the_sap_het_han(db: Session) -> dict:
+    """Thẻ hành nghề đã hết hạn hoặc sắp hết trong 60 ngày."""
+    from app.services import hdv as HDV
+    rows = HDV.the_sap_het_han(db)
+    hom_nay = date.today()
+    het, dong = 0, []
+    for e in rows:
+        con = (e.card_expiry - hom_nay).days
+        if con < 0:
+            het += 1
+        if len(dong) < SO_DONG_MAU:
+            dong.append(_dong(e.full_name, e.code,
+                              f"Hết hạn {-con} ngày trước" if con < 0 else f"Còn {con} ngày",
+                              "Thẻ hành nghề", "do" if con < 0 else "vang"))
+    return _o("hdv_the_sap_het_han", "Thẻ hành nghề hết hạn hoặc sắp hết", len(rows), "người",
+              "/huong-dan",
+              f"employees phòng hướng dẫn, card_expiry trong {HDV.SAP_HET_HAN_NGAY} ngày "
+              "(hdv.the_sap_het_han)",
+              muc="do" if het else ("vang" if rows else "xanh"),
+              nhan_muc=(f"{het} người ĐÃ hết hạn, không chào chuyến được" if het
+                        else ("Cần giục gia hạn" if rows else "Mọi thẻ đều còn hạn")),
+              ghi_chu="Đã hết hạn thì cổng 13 chặn chào chuyến ngay hôm nay; sắp hết hạn thì vẫn "
+                      "chào được – mỗi dòng nói rõ nó thuộc loại nào. Con số này LỚN HƠN ô "
+                      "«thẻ sắp hết hạn» trên màn hình /huong-dan, vì ô ấy chỉ đếm người CHƯA "
+                      "hết hạn. Hai câu hỏi khác nhau, không phải một trong hai sai.",
+              dong=dong)
+
+
+def _hdv_phan_cong_thieu_gio(db: Session) -> dict:
+    """Phân công chưa có mốc giờ – chưa kiểm trùng lịch được."""
+    from app.models.core import Tour
+    from app.models.hr import Employee
+    from app.services import hdv as HDV
+    rows = HDV.phan_cong_thieu_gio(db)
+    dong = []
+    for a in rows[:SO_DONG_MAU]:
+        t = db.get(Tour, a.tour_id); e = db.get(Employee, a.guide_id)
+        dong.append(_dong(t.code if t else f"#{a.tour_id}", e.full_name if e else "",
+                          "Chưa có giờ", "Không kiểm được trùng", "vang"))
+    return _o("hdv_phan_cong_thieu_gio", "Phân công chưa có mốc giờ", len(rows), "phân công",
+              "/huong-dan",
+              "guide_assignments còn chiếm lịch mà thiếu bat_dau hoặc ket_thuc "
+              "(hdv.phan_cong_thieu_gio)",
+              muc="vang" if rows else "xanh",
+              nhan_muc="Cần nhập giờ đón và giờ trả" if rows else "Mọi phân công đều có giờ",
+              ghi_chu="Thiếu giờ thì KHÔNG kiểm được trùng lịch – đây là việc còn THIẾU DỮ LIỆU, "
+                      "không phải đã kiểm và không trùng.", dong=dong)
+
+
+def _hdv_pham_vi_lech(db: Session) -> dict:
+    """Loại thẻ không nhận được loại chuyến – Đợt HD-PV1."""
+    from app.services import hdv as HDV
+    rows = HDV.pham_vi_lech(db)
+    dong = []
+    for r in rows[:SO_DONG_MAU]:
+        dong.append(_dong(r["hdv"], f"{r['ma_nv']} · thẻ {r['the_loai'] or 'chưa khai'}",
+                          r["tour_code"], r["loai_chuyen"], "do"))
+    return _o("hdv_pham_vi_lech", "Phạm vi hành nghề không đạt", len(rows), "phân công",
+              "/huong-dan",
+              "guide_assignments còn chiếm lịch mà loại thẻ không nhận loại chuyến "
+              "(hdv.pham_vi_lech, bảng PHAM_VI_THE theo Điều 58 Luật Du lịch 2017)",
+              muc="do" if rows else "xanh",
+              nhan_muc="Sai phạm vi hành nghề" if rows else "Không có phân công nào sai phạm vi",
+              ghi_chu="Ô này CHỈ đếm nhóm «không đạt». Hồ sơ chưa khai loại thẻ là việc phải NHẬP "
+                      "của HCNS, nằm ở cửa /huong-dan/pham-vi-the/lech, không đưa lên bàn này.",
+              dong=dong)
+
+
+def _hdv_du_dieu_kien(db: Session) -> dict:
+    """Mẫu số. «3 thẻ sắp hết hạn» đứng một mình không nói được gì: 3 trên 40 là chuyện thường,
+    3 trên 5 là cả phòng sắp không ai chào chuyến được. Ô này KHÔNG phải việc phải làm."""
+    from app.models.hr import Employee
+    from app.services.hr import guide_eligible
+    hom_nay = date.today()
+    ds = [e for e in db.execute(
+        select(Employee).where(Employee.department == "huong_dan")).scalars() if e.active]
+    du = sum(1 for e in ds if guide_eligible(e, hom_nay)[0])
+    return _o("hdv_du_dieu_kien", "Hướng dẫn viên đủ điều kiện hành nghề", du, "người",
+              "/huong-dan",
+              "employees phòng hướng dẫn còn active, qua guide_eligible (cổng 13)",
+              muc="xanh", nhan_muc=f"Trên tổng {len(ds)} người của phòng",
+              ghi_chu="Không phải việc phải làm – đây là mẫu số để đọc bốn ô trên.")
+
+
 # Ô nào dựng bằng hàm nào. Một bảng, một nơi khai — để thêm bàn là thêm một dòng trong `BAN`
 # chứ không phải sửa thân hàm `ban()`.
 O_HAM = {
@@ -372,10 +512,16 @@ O_HAM = {
     "de_nghi_xe_cho_lap_lenh": lambda db, cfg: _de_nghi_xe_cho_lap_lenh(db),
     "lenh_tai_xe_chua_nhan": lambda db, cfg: _lenh_tai_xe_chua_nhan(db),
     "lenh_da_nhan_trong_tuan": lambda db, cfg: _lenh_da_nhan_trong_tuan(db),
+    "hdv_chao_qua_han": lambda db, cfg: _hdv_chao_qua_han(db),
+    "hdv_chuyen_chua_co_nguoi": lambda db, cfg: _hdv_chuyen_chua_co_nguoi(db),
+    "hdv_the_sap_het_han": lambda db, cfg: _hdv_the_sap_het_han(db),
+    "hdv_phan_cong_thieu_gio": lambda db, cfg: _hdv_phan_cong_thieu_gio(db),
+    "hdv_pham_vi_lech": lambda db, cfg: _hdv_pham_vi_lech(db),
+    "hdv_du_dieu_kien": lambda db, cfg: _hdv_du_dieu_kien(db),
 }
 
 # Ô là MẪU SỐ để đọc ô khác, không phải việc phải làm. Không cộng vào tổng đang chờ.
-MAU_SO = ("lenh_da_nhan_trong_tuan",)
+MAU_SO = ("lenh_da_nhan_trong_tuan", "hdv_du_dieu_kien")
 
 BAN = {
     "dieu_hanh": {
@@ -395,6 +541,18 @@ BAN = {
         "ten": "Bàn làm việc Đội xe",
         "o": ("de_nghi_xe_cho_lap_lenh", "lenh_tai_xe_chua_nhan",
               "lenh_da_nhan_trong_tuan"),
+    },
+    # HD-BH1 (15/10/2026) — BÀN PHÒNG HƯỚNG DẪN. Chủ tịch chốt sau khi đo được rằng Trưởng phòng
+    # Hướng dẫn mở màn hình ra chỉ nhận đúng câu "Phòng này chưa khai bàn làm việc".
+    #
+    # KHÔNG dựng cơ chế mới, đúng như dòng `doi_xe` đã làm: `PHONG["huong_dan"]` có sẵn trong
+    # `bao_cao_phong` với `xem: ("tp_hd",)`, và cửa `/bao-cao/ban-lam-viec` đã chặn theo
+    # `pham_vi_cho_nguoi`. Đo thật: `tp_hd` vào được `phong=huong_dan`, bị chặn 403 ở
+    # `phong=doi_xe`, và `gd_doi_xe` bị chặn ngược lại. Khai thêm một dòng ở đây là đủ.
+    "huong_dan": {
+        "ten": "Bàn làm việc Hướng dẫn",
+        "o": ("hdv_chao_qua_han", "hdv_chuyen_chua_co_nguoi", "hdv_the_sap_het_han",
+              "hdv_phan_cong_thieu_gio", "hdv_pham_vi_lech", "hdv_du_dieu_kien"),
     },
 }
 
