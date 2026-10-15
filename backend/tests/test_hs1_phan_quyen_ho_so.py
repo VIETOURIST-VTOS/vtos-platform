@@ -159,3 +159,25 @@ def test_hs1_11_phong_la_va_phong_trong_khong_bien_mat():
         "Phòng lạ phải được KHAI RA. Gộp im lặng vào 'chưa gán phòng' thì một phòng thật "
         "biến mất khỏi chỗ nó phải đứng mà không ai thấy.")
     assert sum(g["so"] for g in ra["nhom"]) == 3, "Không được rơi mất một dòng nào."
+
+
+def test_hs1_12_ba_vai_ke_toan_khong_nam_trong_bang_quyen():
+    """Dựng lại phần canh mà `test_le2b::f1` mất đi khi tệp này được khai vào danh sách của nó.
+
+    f1 ghi MỘT dòng cho mỗi cặp (tệp, vai), nên sau khi khai `ho_so_nhan_vien.py` ở đó, một lần
+    MỞ QUYỀN thật cho ba vai kế toán trong chính tệp này sẽ không làm f1 đỏ nữa. Phép thử này
+    canh đúng chỗ ấy, và hẹp hơn: ba vai được phép có mặt trong CAP_BAC (xếp thứ bậc) nhưng
+    KHÔNG được có mặt trong bảng `quyen` của bất kỳ nhóm trường nào.
+
+    Mở quyền đọc hồ sơ nhân sự cho Kế toán trưởng, Kế toán thanh toán hay Thủ quỹ là một quyết
+    định của Chủ tịch, không phải một dòng thêm vào lúc nửa đêm. Chủ tịch 15/10/2026 đã chốt
+    kế toán thanh toán nhận số tài khoản qua DANH SÁCH CHI LƯƠNG ĐÃ DUYỆT — quyền trên hồ sơ
+    thanh toán, không phải quyền đọc hồ sơ nhân sự.
+    """
+    BA_VAI = ("ketoan_truong", "ketoan_tt", "thu_quy")
+    thua = [f"nhóm {n['ma']}: {v}" for n in NHOM_TRUONG for v in BA_VAI if v in n["quyen"]]
+    assert not thua, (
+        "Ba vai kế toán xuất hiện trong bảng quyền của hồ sơ nhân sự: " + ", ".join(thua)
+        + ". Đây là một lần MỞ QUYỀN, phải có chữ ký Chủ tịch — không phải một dòng thêm vào.")
+    for v in BA_VAI:
+        assert v in CAP_BAC, f"'{v}' phải vẫn có trong CAP_BAC — xếp thứ bậc là việc khác."
