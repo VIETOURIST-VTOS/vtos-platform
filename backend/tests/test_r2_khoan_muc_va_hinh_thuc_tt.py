@@ -79,7 +79,9 @@ def _quy_tac(db, ma):
 def test_r2_1_nap_lai_khong_de_len_dong_da_sua():
     db = _rieng()
     ds = KM.danh_sach(db)
-    assert len(ds) == 10, f"Phải có đúng 10 khoản mục khuôn, đang có {len(ds)}"
+    # ĐỢT R3a 16/10/2026 — đếm TỪ NGUỒN thay vì ghim con số 10. Việc phép thử này thật sự
+    # canh là "nạp lại không thêm dòng nào", và điều ấy vẫn nguyên ở `them == 0` bên dưới.
+    assert len(ds) == len(KM.MAC_DINH), f"Danh mục nạp thiếu/thừa: {len(ds)} vs {len(KM.MAC_DINH)}"
     assert {d["ma"] for d in ds} >= {"KM_LAND", "KM_VEMB", "KM_KS", "KM_HDV", KM.KM_KHAC}
 
     xe = next(d for d in ds if d["ma"] == "KM_XE")

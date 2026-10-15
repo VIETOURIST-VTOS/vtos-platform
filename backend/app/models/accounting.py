@@ -123,7 +123,16 @@ class JournalLine(Base):
     partner: Mapped[str] = mapped_column(String(160), default="")         # tên đối tượng: khách / NCC
     partner_code: Mapped[str] = mapped_column(String(60), default="", index=True)   # mã đối tượng MISA (MST/CCCD/mã NV/mã ngân hàng)
     project_code: Mapped[str] = mapped_column(String(40), default="", index=True)   # mã công trình MISA = mã tour
-    item_code: Mapped[str] = mapped_column(String(40), default="")        # mã khoản mục chi phí / mã hàng hóa dịch vụ
+    # ĐỢT R3a 16/10/2026 — `index=True` KHÔNG phải tối ưu, nó là điều kiện để chiều khoản mục
+    # có báo cáo được: hai chiều kia (partner_code, project_code) đều có chỉ mục và đều đã có
+    # báo cáo; chiều này không có chỉ mục nên mọi phép gom theo nó quét toàn bảng. Trên SQLite
+    # của phép thử không ai thấy; trên Postgres với sổ thật thì thấy.
+    item_code: Mapped[str] = mapped_column(String(40), default="", index=True)   # mã khoản mục chi phí (KM_*)
+    # ĐỢT R3a — TÁCH BỘ PHẬN RA KHỎI `item_code`. Trước bản này `assets.py` ghi mã BỘ PHẬN vào
+    # `item_code` cho khấu hao TSCĐ và phân bổ chi phí trả trước, nên một cột chở HAI nghĩa.
+    # Báo cáo "chi phí theo khoản mục" dựng trên cột ấy sẽ có vài dòng mang tên bộ phận, mà
+    # TỔNG VẪN ĐÚNG — không phép thử số học nào bắt được, chỉ người đọc báo cáo mới thấy lạ.
+    bo_phan: Mapped[str] = mapped_column(String(20), default="", index=True)     # mã bộ phận sử dụng
     doc_no: Mapped[str] = mapped_column(String(40), default="")           # số hóa đơn / số chứng từ gốc
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True)
     tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True)
