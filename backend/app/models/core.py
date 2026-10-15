@@ -1,6 +1,7 @@
 """Mô hình dữ liệu VTOS (SQLAlchemy 2.0)."""
 from datetime import datetime, date
 from sqlalchemy import String, Integer, Float, Date, DateTime, Boolean, Text, ForeignKey, JSON
+from sqlalchemy import UniqueConstraint
 from sqlalchemy import false as _false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
@@ -894,3 +895,28 @@ class AiPause(Base):
     ly_do: Mapped[str] = mapped_column(String(300), default="")
     boi: Mapped[str] = mapped_column(String(50), default="")
     luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ---------- Đếm lượt mở cửa đọc (Đợt HD-Q2a, 16/10/2026) ----------
+class LuotDocCua(Base):
+    """Mỗi người × mỗi cửa đọc × mỗi ngày một dòng. KHÔNG ghi gì về khách.
+
+    Dựng ra vì trước đợt này hệ thống không có nhật ký đọc: `audit_log` chỉ ghi thao tác GHI, nên
+    câu hỏi «mỗi ngày mỗi vai mở bao nhiêu phiếu» — câu Chủ tịch cần để bấm ngày siết quyền — không
+    có dữ liệu nào trả lời được. Xem `services/dem_luot.py` để biết vì sao có cột `so_phut` bên
+    cạnh `so_luot`.
+    """
+
+    __tablename__ = "luot_doc_cua"
+    __table_args__ = (UniqueConstraint("ngay", "username", "cua", name="uq_luot_doc_cua"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ngay: Mapped[date] = mapped_column(Date, index=True)
+    username: Mapped[str] = mapped_column(String(50), index=True)
+    role: Mapped[str] = mapped_column(String(30), index=True)
+    cua: Mapped[str] = mapped_column(String(40), index=True)
+    so_luot: Mapped[int] = mapped_column(Integer, default=0)
+    # Số PHÚT KHÁC NHAU trong ngày có ít nhất một lượt — chống màn hình tự nạp lại làm phồng số lượt.
+    so_phut: Mapped[int] = mapped_column(Integer, default=0)
+    phut_cuoi: Mapped[str] = mapped_column(String(5), default="")
+    so_dong: Mapped[int] = mapped_column(Integer, default=0)

@@ -15,6 +15,7 @@ from app.models.core import User
 from app.models.cskh import CareTicket
 from app.models.danh_gia import DG_DOI_TUONG
 from app.services import danh_gia as DG
+from app.services import dem_luot as DEM
 
 # Ai XEM bảng điểm. Hẹp đúng bằng dòng "/danh-gia" của MENU_ROLES.
 #
@@ -117,7 +118,9 @@ def bang_diem(doi_tuong: str, tu: str = "", den: str = "", chi_khach: bool = Tru
     """
     phong = _pham_vi(u, doi_tuong)
     d1, d2 = _ky(tu, den)
-    return DG.bang_diem(db, doi_tuong, d1, d2, chi_khach, chi_phong=phong)
+    kq = DG.bang_diem(db, doi_tuong, d1, d2, chi_khach, chi_phong=phong)
+    DEM.ghi(u, "bang_diem", len(kq.get("rows") or []))
+    return kq
 
 
 @router.get("/chi-so")
@@ -126,7 +129,9 @@ def chi_so(tu: str = "", den: str = "",
            db: Session = Depends(get_db)):
     """Ba con số đứng cạnh nhau: đã gửi · đã trả lời · không gửi được."""
     d1, d2 = _ky(tu, den)
-    return DG.chi_so(db, d1, d2)
+    kq = DG.chi_so(db, d1, d2)
+    DEM.ghi(u, "chi_so", 0)
+    return kq
 
 
 @router.get("/chua-tra-loi")
@@ -141,7 +146,9 @@ def chua_tra_loi(tu: str = "", den: str = "",
     from app.services import access as AC
     d1, d2 = _ky(tu, den)
     vis = AC.sales_ids_visible(db, u)
-    return {"rows": DG.chua_tra_loi(db, d1, d2, vis)}
+    rows = DG.chua_tra_loi(db, d1, d2, vis)
+    DEM.ghi(u, "chua_tra_loi", len(rows or []))
+    return {"rows": rows}
 
 
 @router.post("/ghi-ho/{care_id}")
@@ -153,3 +160,28 @@ def ghi_ho(care_id: int, data: GhiHo,
     c = db.get(CareTicket, care_id)
     if not c: raise HTTPException(404, "Không có phiếu chăm sóc")
     return DG.ghi_ho(db, u, c, data.model_dump())
+
+
+# ═══════════ CỬA ĐẾM — Đợt HD-Q2a, Chủ tịch chốt 16/10/2026 ═══════════
+#
+# Chủ tịch duyệt khuôn «đếm được trước, chặn sau» ở HD-9 và HD-12, và nhắc lại ở HD-Q1: siết một
+# quyền người ta dùng hằng ngày mà không đếm trước là sáng hôm sau một phòng mở máy không thấy
+# việc của mình. Cửa này là phần ĐẾM. Nó KHÔNG đổi quyền của ai.
+#
+# Danh sách vai hẹp hơn mọi cửa khác trong tệp, và cố ý: đây là bảng nói ai đang mở màn hình nào
+# bao nhiêu lần — một dạng theo dõi người lao động. Chỉ Chủ tịch, Tổng giám đốc, Ban Kiểm soát và
+# Công nghệ thông tin đọc được, và chỉ ở mức ĐẾM, không có nội dung họ đã xem.
+#
+# Cửa này KHÔNG tự đếm chính nó: nếu đếm, thì mỗi lần Chủ tịch mở bảng lại tự cộng thêm một lượt
+# vào chính bảng ấy, và con số sẽ nói về người đi đo chứ không nói về người bị đo.
+DEM_XEM = ("chutich", "tgd", "bks", "cntt")
+
+
+@router.get("/dem-luot")
+def dem_luot(tu: str = "", den: str = "",
+             u: User = Depends(require_roles(*DEM_XEM, mo_ta="đếm lượt mở cửa đánh giá")),
+             db: Session = Depends(get_db)):
+    """Mỗi người × mỗi cửa một dòng: bao nhiêu lượt, bao nhiêu phút khác nhau, bao nhiêu ngày,
+    bao nhiêu dòng dữ liệu đã trả về. Xem `services/dem_luot.py` để biết vì sao có cột số phút."""
+    d1, d2 = _ky(tu, den)
+    return DEM.bang(db, d1, d2)
