@@ -31,7 +31,9 @@ router = APIRouter(prefix="/api/v1/huong-dan", tags=["huong-dan"])
 # giám sát. Kế toán có mặt vì thù lao HDV là giá vốn của tour và phải đối chiếu được.
 READ = ("chutich", "tgd", "ptgd_doan", "tp_hd", "tp_dh", "nv_dh", "hcns", "ketoan", "bks", "cntt")
 
-SAP_HET_HAN = 60          # ngày: báo trước khi thẻ hành nghề hết hạn
+SAP_HET_HAN = HDV.SAP_HET_HAN_NGAY   # ngày: báo trước khi thẻ hành nghề hết hạn — MỘT chỗ
+                                     # khai, ở `services/hdv.py`, để bàn làm việc và cửa này
+                                     # không bao giờ báo trước theo hai mốc khác nhau.
 DIEU_PHOI = ("tp_hd", "tp_dh", "nv_dh", "hcns", "cntt")     # người được chào chuyến
 
 
@@ -81,13 +83,10 @@ def chuyen_can_hdv(so_ngay: int = 30, u: User = Depends(require_roles(*READ)), d
     Không trả danh sách khách: người điều phối cần biết tuyến, ngày và quy mô để chọn người, không cần
     biết ai đi tour đó."""
     hom_nay = date.today()
-    den = hom_nay + timedelta(days=max(1, so_ngay))
-    da_co = {a.tour_id for a in db.execute(select(GuideAssignment).where(
-        GuideAssignment.status != "huy")).scalars()}
     out = []
-    for t in db.execute(select(Tour).where(Tour.start_date >= hom_nay, Tour.start_date <= den)
-                        .order_by(Tour.start_date)).scalars():
-        if t.id in da_co: continue
+    # Phép lọc nằm ở `services/hdv.py::chuyen_chua_co_nguoi` — Đợt HD-BH1. Bàn làm việc của phòng
+    # Hướng dẫn đếm cùng một hàm, nên hai chỗ không thể ra hai con số.
+    for t in HDV.chuyen_chua_co_nguoi(db, so_ngay):
         out.append({"tour_id": t.id, "code": t.code, "name": t.name, "start_date": t.start_date,
                     "end_date": t.end_date, "so_ngay": (t.end_date - t.start_date).days + 1,
                     "so_khach_du_kien": t.planned_pax, "trang_thai": t.status,
@@ -254,6 +253,9 @@ def pham_vi_the_lech(u: User = Depends(require_roles(*READ)), db: Session = Depe
       · `chua_ket_luan_duoc` – thiếu dữ liệu để kết luận. Đây là việc phải NHẬP, không phải vi phạm.
       · `so_dat`             – đếm cho biết mẫu lớn bao nhiêu, để hai số trên có chỗ mà so.
     """
+    # Cửa này trả ĐỦ BA nhóm. Bàn làm việc của phòng Hướng dẫn chỉ lấy nhóm «không đạt», qua
+    # `HDV.pham_vi_lech` — xem chú thích hàm ấy về lý do không đưa nhóm «chưa kết luận được» lên
+    # bàn.
     from app.services.hr import PV_CHUA_KET_LUAN, PV_DAT, PV_KHONG_DAT, pham_vi_the
     ten = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
     khong_dat, chua_ket_luan, so_dat = [], [], 0
