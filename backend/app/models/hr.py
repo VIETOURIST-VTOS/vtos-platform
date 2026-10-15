@@ -345,3 +345,42 @@ class PayrollRun(Base):
     inputs: Mapped[dict] = mapped_column(JSON, default=dict)     # đầu vào do HCNS nhập: công chuẩn, công thực tế theo mã NV
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+# ═════════════ PHẠM VI HÀNH NGHỀ THEO LOẠI THẺ — Đợt HD-PV1, 14/10/2026 ═════════════
+#
+# Khai thành DỮ LIỆU CÓ CĂN CỨ, không viết cứng trong thân hàm. Mỗi dòng phải nói ra nó dựa vào
+# đâu, đúng khuôn `CAP_DA_KY` của lớp tách bạch trách nhiệm (Đợt E2a): một luật không nói căn cứ
+# là một luật người sau gỡ mà không biết mình đang gỡ cái gì.
+#
+# Điều 58 Luật Du lịch 2017, khoản 1 — ba loại hướng dẫn viên và phạm vi của từng loại:
+#   · quốc tế  – hướng dẫn khách nội địa và khách quốc tế đến Việt Nam trong phạm vi toàn quốc,
+#                VÀ đưa khách Việt Nam ra nước ngoài.
+#   · nội địa  – hướng dẫn khách nội địa là công dân Việt Nam trong phạm vi toàn quốc.
+#   · tại điểm – hướng dẫn khách trong phạm vi khu du lịch, điểm du lịch.
+#
+# VTOS HIỆN KHÔNG CÓ LOẠI "TẠI ĐIỂM". Cửa nhập hồ sơ hành nghề chỉ nhận `noi_dia` hoặc `quoc_te`.
+# Đợt này KHÔNG tự thêm giá trị thứ ba: thêm một giá trị vào danh mục kéo theo cửa nhập, dữ liệu
+# cũ và báo cáo. Ghi ra đây để Chủ tịch quyết.
+PHAM_VI_THE = (
+    {
+        "loai_the": "quoc_te",
+        "nhan": ("le_noi_dia", "le_nuoc_ngoai", "doan_noi_dia", "doan_nuoc_ngoai"),
+        "can_cu": "Điều 58 khoản 1 Luật Du lịch 2017 — hướng dẫn viên quốc tế hướng dẫn khách nội "
+                  "địa và khách quốc tế đến Việt Nam trong phạm vi toàn quốc, và đưa khách Việt "
+                  "Nam ra nước ngoài.",
+    },
+    {
+        "loai_the": "noi_dia",
+        "nhan": ("le_noi_dia", "doan_noi_dia"),
+        "can_cu": "Điều 58 khoản 1 Luật Du lịch 2017 — hướng dẫn viên nội địa hướng dẫn khách nội "
+                  "địa là công dân Việt Nam trong phạm vi toàn quốc. KHÔNG bao gồm đưa khách ra "
+                  "nước ngoài.",
+    },
+)
+
+# Loại chuyến CỐ Ý không khai trong bảng trên. Mọi loại thẻ gặp chúng đều ra "chưa kết luận được".
+# Điều 58 nói về phạm vi hướng dẫn khách du lịch; còn một hợp đồng thuê xe riêng hay một dịch vụ
+# lẻ có cần hướng dẫn viên hay không, và loại nào, là việc nghiệp vụ chưa ai chốt. Đoán hộ ở đây
+# là tự đặt ra luật.
+CHUYEN_CHUA_KHAI_PHAM_VI = ("non_package", "thue_xe")

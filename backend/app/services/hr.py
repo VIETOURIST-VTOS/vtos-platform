@@ -601,6 +601,45 @@ def but_toan_theo_phap_nhan(db: Session, run: PayrollRun) -> list[dict]:
 
 
 # ---------- Cổng 13: điều kiện hành nghề HDV ----------
+# Ba giá trị của phép hỏi phạm vi. KHÔNG phải hai.
+PV_DAT = "dat"
+PV_KHONG_DAT = "khong_dat"
+PV_CHUA_KET_LUAN = "chua_ket_luan_duoc"
+
+
+def pham_vi_the(e: Employee, tour_type: str | None) -> tuple[str, str]:
+    """Loại thẻ của người này có nhận được loại chuyến ấy không — Đợt HD-PV1, 14/10/2026.
+
+    HÀM RIÊNG, KHÔNG NHÉT VÀO `guide_eligible`. Hai lý do. Một: `guide_eligible` trả lời câu "người
+    này đủ điều kiện hành nghề nói chung chưa", còn câu này là "người này nhận được CHUYẾN NÀY
+    không" — hai câu khác nhau, và một hàm trả lời hai câu là hàm mà nơi gọi phải đoán. Hai: nó có
+    sáu nơi gọi, bốn trong số đó không cầm chuyến nào trong tay; đổi chữ ký là bắt bốn chỗ ấy bịa
+    ra một tham số.
+
+    BA GIÁ TRỊ. `chua_ket_luan_duoc` không phải giá trị cho đủ bộ: thẻ chưa khai thì CHƯA ĐỦ DỮ
+    LIỆU để kết luận, và gộp nó vào "không đạt" là biến một ô còn thiếu thành một lời buộc tội.
+    Cùng một lẽ với `khong_so_duoc` trong `services/hdv.py`.
+    """
+    from app.models.hr import CHUYEN_CHUA_KHAI_PHAM_VI, PHAM_VI_THE
+    the = (e.card_type or "").strip()
+    if not the:
+        return PV_CHUA_KET_LUAN, "Hồ sơ chưa khai loại thẻ hành nghề"
+    lt = (tour_type or "").strip()
+    if not lt:
+        return PV_CHUA_KET_LUAN, "Chuyến chưa khai loại"
+    if lt in CHUYEN_CHUA_KHAI_PHAM_VI:
+        return PV_CHUA_KET_LUAN, (
+            f"Loại chuyến «{lt}» chưa khai phạm vi cho loại thẻ nào — chưa ai chốt chuyến loại này "
+            "có cần hướng dẫn viên hay không và loại thẻ nào nhận được")
+    dong = next((d for d in PHAM_VI_THE if d["loai_the"] == the), None)
+    if dong is None:
+        return PV_CHUA_KET_LUAN, f"Loại thẻ «{the}» chưa khai trong bảng phạm vi hành nghề"
+    if lt in dong["nhan"]:
+        return PV_DAT, ""
+    return PV_KHONG_DAT, (
+        f"Thẻ «{the}» không nhận chuyến loại «{lt}». Căn cứ: {dong['can_cu']}")
+
+
 def guide_eligible(e: Employee, on: date) -> tuple[bool, str]:
     if e.department != "huong_dan": return False, "Không phải HDV"
     if not e.card_no or not e.card_expiry or e.card_expiry < on: return False, "Thẻ HDV hết hạn hoặc chưa có"
