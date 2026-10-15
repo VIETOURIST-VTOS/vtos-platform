@@ -57,7 +57,11 @@ def db_():
 def test_nap_mac_dinh_du_va_chay_lai_khong_nhan_doi():
     db = db_()
     n1 = len(db.execute(select(QuyTacHachToan)).scalars().all())
-    assert n1 == len(HT.MAC_DINH), f"khởi động phải nạp đủ {len(HT.MAC_DINH)} quy tắc, đang có {n1}"
+    # Đợt R2 15/10/2026: bộ quy ước nay có HAI phần — `MAC_DINH` (Quyết định 08/9/2026) và
+    # `MAC_DINH_TIEN_MAT` (sáu đường tiền mặt). Đếm cả hai chứ không đếm một: đếm một thì ngày ai
+    # đó thêm một danh sách thứ ba, phép thử này vẫn xanh trong lúc bảng nạp thiếu.
+    du = len(HT.MAC_DINH) + len(HT.MAC_DINH_TIEN_MAT)
+    assert n1 == du, f"khởi động phải nạp đủ {du} quy tắc, đang có {n1}"
     HT.nap_mac_dinh(db); HT.nap_mac_dinh(db)
     assert len(db.execute(select(QuyTacHachToan)).scalars().all()) == n1
     db.close()
@@ -92,7 +96,14 @@ def test_uu_tien_khong_trung_trong_cung_mot_nguon():
     db = db_()
     thay: dict[tuple, list] = {}
     for q in db.execute(select(QuyTacHachToan).where(QuyTacHachToan.status == "active")).scalars():
-        thay.setdefault((q.nguon, q.uu_tien), []).append(q.ma)
+        # Đợt R2 15/10/2026 — khóa thêm HÌNH THỨC THANH TOÁN, và đây là một phép SIẾT chứ không
+        # phải một chỗ nới. Lý do phép thử này tồn tại: hai quy tắc cùng nguồn cùng ưu tiên thì
+        # thứ tự xét rơi xuống so mã, tức là may rủi. Từ đợt R2, `dang_hieu_luc` xếp theo
+        # (có khai hình thức, ưu tiên, mã) — nên `THU_KHACH` (để trống) và `THU_KHACH_TM`
+        # ("tien_mat") cùng ưu tiên 10 KHÔNG còn là may rủi: dòng khai đích danh luôn được xét
+        # trước, theo một luật đọc được. Còn hai dòng CÙNG hình thức mà cùng ưu tiên thì vẫn đúng
+        # là may rủi, và vẫn phải đỏ.
+        thay.setdefault((q.nguon, q.hinh_thuc_tt, q.uu_tien), []).append(q.ma)
     trung = {k: v for k, v in thay.items() if len(v) > 1}
     assert not trung, f"trùng ưu tiên trong cùng nguồn: {trung}"
     db.close()
@@ -136,7 +147,11 @@ def test_doanh_thu_tach_thue_dau_ra():
 def test_mua_vao_tach_thue_dau_vao_ben_no():
     db = db_()
     q = HT.chon(db, "mua_vao", {"co_hoa_don": True})
-    bt = HT.dung_but_toan(q, 54_000_000, {"ma": "KLE010826", "ncc": "Resort Vĩnh Hy"})
+    # Đợt R2 15/10/2026: MUA_CO_HD nay bắt buộc mã khoản mục chi phí (đây là một trong bốn đường
+    # tiền trở thành giá vốn của một chuyến). Thêm mã vào bối cảnh; chủ đề phép thử — tách thuế
+    # đầu vào bên Nợ — không đổi.
+    bt = HT.dung_but_toan(q, 54_000_000, {"ma": "KLE010826", "ncc": "Resort Vĩnh Hy",
+                                          "khoan_muc": "KM_KS"})
     tk = {l["account"]: (l.get("debit", 0), l.get("credit", 0)) for l in bt["lines"]}
     assert tk["154"][0] == 50_000_000 and tk["133"][0] == 4_000_000 and tk["331"][1] == 54_000_000
     db.close()

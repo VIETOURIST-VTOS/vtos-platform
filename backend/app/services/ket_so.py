@@ -315,6 +315,14 @@ def _boi_canh(db: Session, t: BankTransaction, phan_loai: dict | None = None) ->
             "so_chung_tu": t.reference_code or "", "ngan_hang": t.gateway or "",
             "ma_ngan_hang": t.account_number or "", "booking_id": t.booking_id,
             "khop_don": bool(t.booking_id), "khach": kh, "ma_khach": ma_kh,
+            # ĐỢT R2 15/10/2026 — bối cảnh này dựng từ MỘT DÒNG SAO KÊ NGÂN HÀNG, nên hình thức
+            # thanh toán của nó là chuyển khoản, biết chắc chứ không phải đoán. Khai ra để sáu
+            # quy tắc tiền mặt của đợt R2 KHÔNG bao giờ khớp đường sao kê — nếu để trống thì luật
+            # "cụ thể thắng chung chung" sẽ không có gì để so, và `THU_KHACH_TM` (ghi Nợ 1111)
+            # vẫn thua `THU_KHACH` như cũ, nhưng vì một lẽ tình cờ chứ không vì một luật.
+            # Kế toán ghi đè được qua `phan_loai` ở cuối hàm, cho dòng sao kê thật ra là nộp quỹ.
+            "hinh_thuc_tt": "chuyen_khoan",
+            "ky": f"{t.transaction_date:%Y-%m}" if t.transaction_date else "",
             "ky": f"{t.transaction_date:%Y-%m}" if t.transaction_date else "",
             **{k: v for k, v in (phan_loai or {}).items() if v not in (None, "")}}
 

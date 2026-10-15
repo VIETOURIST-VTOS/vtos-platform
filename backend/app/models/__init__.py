@@ -150,3 +150,4 @@ from app.models.bo_so_kiem_toan import *  # noqa  # Đợt E16 14/10/2026 — b�
 # Đợt R1 15/10/2026 — bản báo cáo đã lập. Thiếu dòng này thì bảng không vào Base.metadata,
 # create_all không tạo, và alembic autogenerate đòi XOÁ nó.
 from app.models.bao_cao_da_lap import *  # noqa
+from app.models.khoan_muc_chi_phi import *  # noqa  # Đợt R2 15/10/2026 — danh mục khoản mục chi phí

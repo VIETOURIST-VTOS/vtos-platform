@@ -93,6 +93,11 @@ CUA_TAY = (
     # kêu — mà rỗng ở bảng này nghĩa là mọi kỳ đều đang đọc số tính lại từ sổ, đúng cái bệnh đợt
     # này chữa.
     "bao_cao_da_lap", "bao_cao_da_lap_dong",
+    # Đợt R2 15/10/2026. Danh mục khoản mục chi phí — CỬA TAY trên màn hình quy ước hạch toán.
+    # Mười dòng `nap_mac_dinh` gieo là KHUÔN ngành tour, không phải số liệu: Kế toán sửa tên, thêm
+    # dòng, hoặc ngừng dùng qua /api/v1/hach-toan/khoan-muc. Khai MAY_SINH thì ngày Kế toán cần một
+    # khoản mục thứ mười một sẽ không có chỗ nào thêm, và họ sẽ dồn hết vào "Chi phí tour khác".
+    "khoan_muc_chi_phi",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
     "auto_reports", "ban_doc_chung_tu", "bang_gia", "bang_gia_dong", "bank_accounts_cat",
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",

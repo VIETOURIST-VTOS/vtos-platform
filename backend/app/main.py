@@ -202,6 +202,11 @@ async def lifespan(app: FastAPI):
         # vào "không có quy tắc khớp" và kế toán lại định khoản tay – đúng cái việc bảng này thay thế.
         from app.services.hach_toan import nap_mac_dinh as nap_quy_tac
         nap_quy_tac(db)
+        # Đợt R2 15/10/2026 — danh mục khoản mục chi phí. Cùng lẽ với bộ quy ước ngay trên: bốn
+        # quy tắc BẮT BUỘC mã khoản mục, nên danh mục rỗng nghĩa là bốn đường ấy ném lỗi và Kế
+        # toán không có mã nào để chọn. Chỉ thêm mã còn thiếu, không đè lên dòng đã sửa.
+        from app.services.khoan_muc_chi_phi import nap_mac_dinh as nap_khoan_muc
+        nap_khoan_muc(db)
         # Các việc chạy theo lịch bên trong VTOS tự khai vào bảng tác vụ V11, để chúng hiện trên màn
         # hình Lịch tự động hóa cùng chỗ với việc chạy ở hệ thống ngoài – một chỗ nhìn, không phải hai.
         # Chỉ thêm dòng còn thiếu và cập nhật mô tả; KHÔNG bật lại việc mà người đã tắt.
