@@ -123,6 +123,17 @@ CUA_TAY = (
     # chiếc hao nhiều SUỐT sáu tháng thì máy coi đó là bình thường, và chiếc hao nhất đội thành
     # chiếc không bao giờ bị cảnh báo. Ngưỡng tự sinh từ chính số liệu nó canh thì không canh gì.
     "fleet_fuel_norms",
+    # DX-3 · 16/10/2026 — hai bảng mới, cả hai đều có màn hình nhập tay trên /doi-xe.
+    #
+    # `fleet_driver_penalties`: Giám đốc đội xe ghi (POST /fleet/phat-tai-xe), HCNS đánh dấu đã
+    # đối chiếu khi chốt lương. CỐ Ý không có bộ nạp tệp: một khoản trừ vào lương của một con
+    # người thì phải có người gõ và người ấy chịu trách nhiệm, chứ không nạp cả tệp một lần.
+    #
+    # `fleet_fuel_prices`: Kế toán khai giá dầu từng ngày (POST /fleet/gia-dau). Chưa có bộ nạp
+    # tệp vì nguồn giá hiện là tra tay theo ngày; khi nào có sao kê giá dạng tệp thì chuyển sang
+    # intake.BO_NAP và bỏ dòng này — ghi ra đây để người sau biết đó là việc còn nợ, không phải
+    # một lựa chọn đã chốt.
+    "fleet_driver_penalties", "fleet_fuel_prices",
     "fleet_maintenance", "fleet_offset_applications", "fleet_partners",
     "fleet_period_costs", "fleet_repayment_installments", "fleet_repayment_plans",
     "fleet_sale_cases", "fleet_settlement_lines", "fleet_settlements", "fleet_shared_invoice_lines",
