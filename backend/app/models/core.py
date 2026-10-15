@@ -407,6 +407,15 @@ class Product(Base):
     length_text: Mapped[str] = mapped_column(String(20), default="")            # 3N2Đ
     days: Mapped[int] = mapped_column(Integer, default=1)
     reference_price: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    # DX-3 · 16/10/2026 — KM ĐỊNH MỨC của tuyến, để đối chiếu với km thật của chuyến.
+    #
+    # Nằm ở DANH MỤC TOUR chứ không ở từng chuyến: một tuyến có quãng đường cố định, khai theo
+    # từng chuyến là bắt người điều hành gõ lại cùng một con số mỗi lần mở tour — và gõ lại thì
+    # lệch, rồi «vượt định mức» trở thành câu hỏi không ai trả lời được.
+    #
+    # ĐỂ RỖNG ĐƯỢC, và rỗng nghĩa là CHƯA AI KHAI, không phải 0 km: đặt 0 thì mọi chuyến của
+    # tuyến ấy đều «vượt định mức», và một cảnh báo luôn bật là một cảnh báo không ai đọc.
+    km_dinh_muc: Mapped[int | None] = mapped_column(Integer, nullable=True)
     deposit_pct: Mapped[float] = mapped_column(Float, default=30)
     days_to_close: Mapped[int] = mapped_column(Integer, default=3)
     requires_confirmation: Mapped[bool] = mapped_column(Boolean, default=False)

@@ -338,6 +338,23 @@ DEFAULT_PARAMS = [
     # BHXH tính trên MỨC LƯƠNG HỢP ĐỒNG (tiền lương làm căn cứ đóng), không tính trên mức lương của kỳ:
     # mức của kỳ thay đổi theo doanh thu, lấy nó làm căn cứ đóng là sai bản chất và sai cả số phải nộp.
     ("bhxh_nld", "0.105", "Bảo hiểm xã hội phần người lao động", "tỷ lệ trên lương hợp đồng", "Bộ tính lương 01/9/2026"),
+    # ═══════════════════════════════════════════════════════════════════════════════════════
+    # BHXH PHẦN CÔNG TY ĐÓNG — ĐỂ TRỐNG, VÀ PHẢI ĐỂ TRỐNG (DX-4 · 16/10/2026)
+    # ═══════════════════════════════════════════════════════════════════════════════════════
+    #
+    # Cùng lẽ với NGƯỠNG DUYỆT CHI ở dưới. Tỷ lệ công ty đóng là một con số có hệ quả tiền
+    # thật trên toàn bộ bảng lương; điền sẵn «0.215» vào đây là KÝ THAY CHỦ TỊCH BẰNG MỘT DÒNG
+    # MÃ — `seed_params` nạp mọi khóa trong bộ này với `status="active"` và CẢ HAI chữ ký mang
+    # tên "seed".
+    #
+    # Con số 21,5% ĐÃ CÓ trong bảng lương tháng 8/2026, nhưng «có trong một tệp» khác «đã được
+    # ký»: Kế toán đề, Chủ tịch ký, rồi mới thành tham số.
+    #
+    # RỖNG THÌ NÓI CHƯA CHỐT, KHÔNG PHẢI COI LÀ 0. `bhxh_cong_ty.ty_le()` đọc rỗng ra None và
+    # cửa đối chiếu trả lời «chưa chốt tỷ lệ» kèm chỗ phải ký. Coi rỗng là 0 thì màn hình hiện
+    # ra «máy tính được 0 đ, đã nhập tay 180 triệu, lệch 180 triệu» — một con số lệch do chính
+    # hệ thống bịa ra, và người đọc sẽ đi tìm lỗi ở chỗ không có lỗi.
+    ("bhxh_cty", "", "Bảo hiểm xã hội phần công ty đóng", "tỷ lệ trên mức đóng BHXH", "Kế toán đề – Chủ tịch ký; để TRỐNG tới khi có chữ ký"),
     ("doan_phi_ty_le", "0.005", "Đoàn phí công đoàn – tỷ lệ trên tiền lương làm căn cứ đóng BHXH",
      "tỷ lệ", "Thỏa thuận khấu trừ đoàn phí: mức theo quy định Tổng LĐLĐ, tính trên tiền lương đóng BHXH bắt buộc"),
     ("visa_lien_minh", "300000", "Đơn giá hồ sơ visa khách liên minh", "đồng/hồ sơ", "ĐH Điều 7"),
