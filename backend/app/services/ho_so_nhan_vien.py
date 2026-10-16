@@ -461,7 +461,14 @@ def doc_ho_so(db, nguoi_xem, muc_tieu) -> dict:
         q = quyen_nhom(n["ma"], vai, trong)
         if q == KHONG:
             continue
-        nhom_thay.append({"ma": n["ma"], "ten": n["ten"], "quyen": q})
+        # KÈM LUÔN TÊN TRƯỜNG CỦA NHÓM — để màn hình KHÔNG phải giữ một bản sao của bảng quyền.
+        # Màn hình tự gom trường vào nhóm nghĩa là bảng nhóm có hai bản, và hai bản thì tháng sau
+        # lệch nhau: thêm một trường ở đây mà quên bên kia thì trường ấy biến mất khỏi màn hình
+        # trong im lặng. Chỉ kê những trường THỰC SỰ có trong bản đã cắt, nên màn hình vẽ đúng
+        # phần nó cầm, không vẽ ra ô rỗng cho trường bị bỏ.
+        nhom_thay.append({"ma": n["ma"], "ten": n["ten"], "quyen": q,
+                          "truong": [t for t in n["truong"] if t in cat],
+                          "nhay_cam": n["ma"] in NHOM_NHAY_CAM})
         if q == CO and n["ma"] in NHOM_NHAY_CAM and any(c in cat for c in n["truong"]):
             nhay_da_doc.append(n["ma"])
 

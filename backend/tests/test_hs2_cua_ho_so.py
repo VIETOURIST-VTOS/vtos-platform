@@ -260,3 +260,22 @@ def test_hs2_11_cua_nay_phai_nam_sau_mot_tien_to_ca_tam_vai_deu_voi_toi():
         assert any(d.startswith(p) for p in pham_vi_day_du(vai)), (
             f"Vai {vai} không có tiền tố nào phủ {d} — hàng rào đường dẫn sẽ chặn trước khi "
             "bảng quyền hồ sơ kịp chạy, và lỗi ấy im lặng.")
+
+
+def test_hs2_12_moi_truong_tra_ve_deu_thuoc_dung_mot_nhom():
+    """Màn hình vẽ theo `nhom_thay[].truong`. Nếu một trường có trong `ho_so` mà không nhóm nào
+    kê nó, màn hình KHÔNG vẽ nó — trường ấy biến mất trong im lặng, và im lặng là kiểu hỏng tệ
+    nhất ở đây: người xem tưởng người kia chưa khai. Hai nhóm cùng kê một trường thì nó hiện hai
+    lần, và hai ô cùng tên cạnh nhau làm người đọc tưởng có hai giá trị."""
+    for vai in ("chutich", "hcns", "cntt"):
+        d = doc(vai).json()
+        dem: dict[str, int] = {}
+        for n in d["nhom_thay"]:
+            for t in n["truong"]:
+                dem[t] = dem.get(t, 0) + 1
+        for k in d["ho_so"]:
+            assert dem.get(k) == 1, (
+                f"Vai {vai}: trường {k!r} thuộc {dem.get(k, 0)} nhóm, phải đúng 1 — "
+                "0 thì màn hình nuốt mất nó, 2 thì nó hiện hai lần.")
+        for t in dem:
+            assert t in d["ho_so"], f"Vai {vai}: nhóm kê trường {t!r} mà cửa không trả về"
