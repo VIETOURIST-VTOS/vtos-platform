@@ -86,8 +86,8 @@ def mo_rong(vai_tro) -> tuple[str, ...]:
 # Quyết định 11/10 đảo lại chốt ấy.
 #
 # VÌ SAO KHAI THÀNH DANH SÁCH THAY VÌ ĐỂ PHÉP SUY TỰ LO: một quyền mở ra do hệ quả của một dòng
-# suy là một quyền không ai rà được. Khai ra thì Pháp chế đọc được đúng 18 dòng, `test_lg1` đếm
-# được, và thêm một cửa lương thứ 19 là phép thử ĐỎ — phải có người ký lại chứ không lọt vào im
+# suy là một quyền không ai rà được. Khai ra thì Pháp chế đọc được đúng danh sách ấy, từng dòng
+# một, và thêm một cửa lương mới mà không khai là phép thử ĐỎ — phải có người ký lại chứ không lọt vào im
 # lặng. Đảo lại quyết định: xoá `"ketoan_truong"` khỏi `VAI_KE_THUA`, đúng một dòng.
 #
 # CON SỐ NÀY TỪNG LÀ 17, VÀ HÀNG RÀO SỬA NÓ. Lượt quét đầu của em dùng một mẫu tìm hẹp hơn và bỏ
@@ -115,4 +115,8 @@ CUA_LUONG_DA_KY = (
     ("GET", "/api/v1/cap-phat/dang-giu/{employee_id}"),
     ("GET", "/api/v1/doc-chung-tu/chat-luong"),
     ("GET", "/api/v1/he-thong/dung-luong"),
+    # Lan doi xe mo 16/10/2026 (PR #370): doi chieu BHXH phan cong ty dong cua doi xe.
+    # `test_lg5` do ngay va chi dung ten cua nay — dung viec danh sach sinh ra de lam.
+    # Anh Tuan quyet 16/10/2026: khai ra, theo dung chot 11/10 cua Chu tich.
+    ("GET", "/api/v1/fleet/bhxh-doi-xe"),
 )
