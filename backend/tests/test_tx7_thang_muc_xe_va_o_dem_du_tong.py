@@ -141,7 +141,8 @@ def test_man_hinh_in_du_va_noi_ra_khi_lech():
 
 def test_man_hinh_lenh_dieu_xe_khong_go_lai_thang_muc():
     """Một xe BỊ CHẶN không được hiện là 'cần xem lại' — nhẹ hơn sự thật, đúng chỗ không được nhẹ."""
-    nguon = _doc("web", "app", "lenh-dieu-xe", "page.tsx")
+    # Tách màn 17/10/2026: bảng phương án đề xuất nay ở trang con /lenh-dieu-xe/lap-lenh.
+    nguon = _doc("web", "app", "lenh-dieu-xe", "lap-lenh", "page.tsx")
     assert "dm?.muc_kiem_tra?.[p.muc_kiem_tra]" in nguon, (
         "Màn hình lệnh điều xe phải lấy tên mức từ danh mục máy chủ. Bản cũ gõ ba nhánh và dồn mọi "
         "mức khác OK/UNKNOWN vào 'Cần xem lại', nên một xe BỊ CHẶN cũng hiện là cần xem lại.")

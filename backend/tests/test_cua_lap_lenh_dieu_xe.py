@@ -42,11 +42,15 @@ def _man_hinh_co_mau_lap_lenh() -> set:
     comp = WEB.parent / "components"
     mang_mau = {c.stem for c in comp.glob("*.tsx")
                 if GOI_LAP_LENH.search(_ma(c.read_text(encoding="utf-8")))} if comp.exists() else set()
-    for p in sorted(WEB.glob("*/page.tsx")):
+    # Quét CẢ trang con (17/10/2026, tách màn /lenh-dieu-xe): mẫu lập lệnh nay nằm ở trang con
+    # /lenh-dieu-xe/lap-lenh. Trang con được tính cho MÀN CẤP MỘT chứa nó, vì trang con không có mục
+    # menu và không có quyền riêng — ai vào được màn cấp một thì vào được trang con. Chỉ quét cấp một
+    # như trước thì phép thử này đỏ oan, hoặc tệ hơn: ai đó dời mẫu về lại một trang 13 khối cho xanh.
+    for p in sorted(WEB.glob("**/page.tsx")):
         src = _ma(p.read_text(encoding="utf-8"))
         nhap = set(re.findall(r'from "@/components/(\w+)"', src))
         if GOI_LAP_LENH.search(src) or (nhap & mang_mau):
-            ra.add("/" + p.parent.name)
+            ra.add("/" + p.relative_to(WEB).parts[0])
     return ra
 
 
@@ -69,15 +73,14 @@ def _nguon_cua(ten: str) -> list:
     thiếu ở tệp kia.
     """
     ra = []
-    p = WEB / ten.lstrip("/") / "page.tsx"
-    if not p.exists():
-        return ra
-    src = p.read_text(encoding="utf-8")
-    ra.append(_ma(src))
-    for m in re.findall(r'from "@/components/(\w+)"', src):
-        q = WEB.parent / "components" / (m + ".tsx")
-        if q.exists():
-            ra.append(_ma(q.read_text(encoding="utf-8")))
+    # Trang của màn cấp một và mọi trang con của nó — cùng lẽ với `_man_hinh_co_mau_lap_lenh`.
+    for p in sorted((WEB / ten.lstrip("/")).glob("**/page.tsx")):
+        src = p.read_text(encoding="utf-8")
+        ra.append(_ma(src))
+        for m in re.findall(r'from "@/components/(\w+)"', src):
+            q = WEB.parent / "components" / (m + ".tsx")
+            if q.exists():
+                ra.append(_ma(q.read_text(encoding="utf-8")))
     return ra
 
 
@@ -87,9 +90,14 @@ def test_vai_tro_duoc_lap_lenh_phai_co_man_hinh_de_lap():
     Phép thử này KHÔNG kiểm tra ông có quyền gọi API (chỗ ấy đã đúng từ 07/9). Nó kiểm tra chỗ còn lại:
     quyền mà không có cửa thì bằng không có quyền.
     """
-    co_mau = _man_hinh_co_mau_lap_lenh()
-    if not co_mau:
+    if not WEB.exists():
         return          # chỉ chạy khi có mã giao diện cạnh mã máy chủ
+    co_mau = _man_hinh_co_mau_lap_lenh()
+    # 17/10/2026: trước đây dòng trên là `if not co_mau: return` — tức là MẤT HẲN mẫu lập lệnh
+    # thì phép thử này XANH. Đo được khi tách màn: đổi đường gửi của mẫu sang chỗ khác, cả tệp vẫn
+    # 5/5 xanh. Có mã giao diện mà không màn nào có mẫu thì đó chính là chỗ hỏng phải bắt.
+    assert co_mau, ("Có mã giao diện nhưng không màn hình nào có mẫu lập lệnh (lời gọi ghi tới "
+                    "/dispatch). Người được chốt lệnh không còn chỗ nào để chốt.")
     thay = set(AC.menus_for(_nguoi("gd_doi_xe")))
     assert co_mau & thay, (
         f"Vai trò gd_doi_xe được máy chủ cho phép POST /api/v1/dispatch, nhưng không màn hình nào ông "
@@ -162,7 +170,8 @@ def test_mau_lap_lenh_hien_ngay_khi_mo_trang():
     """
     if not WEB.exists():
         return
-    p = WEB / "lenh-dieu-xe" / "page.tsx"
+    # Tách màn 17/10/2026: mẫu lập lệnh nay là trang con /lenh-dieu-xe/lap-lenh.
+    p = WEB / "lenh-dieu-xe" / "lap-lenh" / "page.tsx"
     src = _ma(p.read_text(encoding="utf-8"))
 
     ten = re.findall(r'const\s+(\w+)\s*=\s*useCallback\([^;]{0,400}?de-lap-lenh', src, re.S)
@@ -184,6 +193,7 @@ def test_man_hinh_noi_bang_chu_rang_lenh_duoc_chot_o_day():
     """
     if not WEB.exists():
         return
-    src = _ma((WEB / "lenh-dieu-xe" / "page.tsx").read_text(encoding="utf-8"))
+    # Tách màn 17/10/2026: câu ấy phải nằm ở màn có mẫu — trang con /lenh-dieu-xe/lap-lenh.
+    src = _ma((WEB / "lenh-dieu-xe" / "lap-lenh" / "page.tsx").read_text(encoding="utf-8"))
     assert re.search(r"lập và chốt lệnh|nơi lập lệnh|chốt lệnh điều xe", src), (
         "Màn hình không có câu nào nói rằng lệnh được lập và chốt ở đây.")

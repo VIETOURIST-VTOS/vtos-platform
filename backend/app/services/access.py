@@ -1268,9 +1268,19 @@ MATRIX = {
 #     403 và trang nói thẳng là không được xem — hàng rào nằm ở MÁY CHỦ, không nằm ở đường dẫn.
 # Có tên ở đây thì vai trò bị giới hạn (tài xế, HDV, chuyên viên visa) vẫn được quyết định có thấy
 # hay không, thay vì mặc nhiên thấy vì chưa ai khai.
+# Bốn trang con của "/lenh-dieu-xe" thêm 17/10/2026 (TÁCH MÀN, Chủ tịch duyệt bản xem thử 16/10):
+# đề nghị xe, lập lệnh, Điều hành đề nghị xe mới, tài xế chưa nhận. Màn MỘT LỆNH là `?ma=` trên chính
+# "/lenh-dieu-xe" nên không có dòng riêng. Khai ở đây chứ KHÔNG ở MENU_ROLES,
+# đúng như "/dong-tien/nguon" ở trên và cùng hai lý do ấy: chúng là TRANG CON đi tới bằng thanh việc
+# của màn "/lenh-dieu-xe", không có mục menu riêng; và quyền của chúng KHÔNG cần khai riêng — cả bốn
+# chỉ gọi đúng những nhóm API mà "/lenh-dieu-xe" đã gọi (MAN_HINH_API), nên hàng rào vẫn nằm ở MÁY
+# CHỦ. Vai gd_doi_xe (danh sách CHO PHÉP, ngay dưới) được thêm đủ bốn trang, để danh sách ẩn của ông
+# không gọi tên chính những màn ông dùng để lập lệnh.
+MAN_CON_LENH_DIEU_XE = ("/lenh-dieu-xe/de-nghi", "/lenh-dieu-xe/de-nghi/moi",
+                        "/lenh-dieu-xe/lap-lenh", "/lenh-dieu-xe/chua-nhan")
 ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/phieu-luong",
                                       "/doi-mat-khau", "/phan-he/[khoa]", "/offline",
-                                      "/dong-tien/nguon")
+                                      "/dong-tien/nguon") + MAN_CON_LENH_DIEU_XE
 
 
 # Vai trò bị giới hạn: chỉ được thấy đúng những trang liệt kê ở đây.
@@ -1292,7 +1302,7 @@ RESTRICTED_ROLE_MENUS = {
     # Màn hình không mang theo dữ liệu khách: xem ghi chú ở dòng "/su-co-tour" của MENU_ROLES.
     "gd_doi_xe": ("/doi-xe", "/tai-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe",
                   "/xe-hdv", "/nap-du-lieu", "/tep", "/doc-chung-tu", "/su-co-tour",
-                  "/doi-mat-khau"),
+                  "/doi-mat-khau") + MAN_CON_LENH_DIEU_XE,
     "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/su-co-tour", "/doi-mat-khau"),
     # Ba vai trò máy: danh sách CHO PHÉP, giống bốn vai trò hẹp ở trên. Robot không có menu để bấm,
     # nhưng khai ở đây thì màn hình tra cứu ngược (P10) nói được nó chạm tới đâu, và bộ quét vai trò
