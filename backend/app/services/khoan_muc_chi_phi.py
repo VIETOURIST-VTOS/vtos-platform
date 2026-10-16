@@ -27,6 +27,13 @@ MAC_DINH = [
     ("KM_BH",    "Bảo hiểm du lịch",                              "gia_von", 70),
     ("KM_VISA",  "Visa / thủ tục xuất nhập cảnh",                 "gia_von", 80),
     ("KM_XE",    "Vận chuyển đường bộ",                           "gia_von", 90),
+    # ĐỢT R3a 16/10/2026 — ba mã mở thêm vì 55 mã của danh mục quyết toán tour không ghép hết
+    # được vào mười mã cũ. Mở mã mới chứ KHÔNG đổ vào KM_KHAC: đổ vào đó thì tiền vận chuyển
+    # đường thuỷ, tiền quà tặng và phí ngân hàng nằm lẫn trong một dòng "khác", và báo cáo theo
+    # khoản mục mất đúng phần người đọc muốn nhìn. Chủ tịch chốt 16/10/2026.
+    ("KM_VCK",   "Vận chuyển khác (tàu hoả, tàu thuỷ, ca nô)",     "gia_von", 95),
+    ("KM_QUA",   "Quà tặng và vật phẩm cho khách",                "gia_von", 100),
+    ("KM_PHI",   "Phí và lệ phí khác của chuyến",                 "gia_von", 110),
     (KM_KHAC,    "Chi phí tour khác",                             "gia_von", 999),
 ]
 

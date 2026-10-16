@@ -65,7 +65,11 @@ def test_khau_hao_tscd():
     lines = ent[0]["lines"]
     assert round(sum(l["debit"] for l in lines)) == 26_666_667
     assert {l["account"] for l in lines} == {"6424", "2141"}
-    assert sorted(l["item_code"] for l in lines if l["debit"] > 0) == ["cntt", "doi_xe"]
+    # ĐỢT R3a 16/10/2026 — bộ phận chuyển sang cột `bo_phan`; `item_code` nay chỉ còn chở mã
+    # khoản mục chi phí. Bản này SIẾT hơn bản cũ: nó đòi thêm `item_code` phải RỖNG, tức
+    # chứng minh bộ phận không còn rò sang cột khoản mục nữa.
+    assert sorted(l["bo_phan"] for l in lines if l["debit"] > 0) == ["cntt", "doi_xe"]
+    assert all(l["item_code"] == "" for l in lines), "bộ phận còn rò sang cột khoản mục"
 
     # Ghi sổ lần hai phải bị chặn
     assert client.post("/api/v1/fixed-assets/depreciation/2026-07/post", headers=h).status_code == 422

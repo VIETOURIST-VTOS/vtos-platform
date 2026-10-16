@@ -439,7 +439,29 @@ function LenhDieuXe() {
         {chuoi.chuyen_chua_gan_lenh?.so > 0
           ? <><Tag cls="warn">chuyến chưa gắn lệnh</Tag> {chuoi.chuyen_chua_gan_lenh.so}/{chuoi.chuyen_chua_gan_lenh.tong_chuyen} chuyến <b>không gắn lệnh nào</b> — phần lớn là sổ cũ nạp bằng tệp trước khi có mối nối này.</>
           : <><Tag cls="ok">chuyến nào cũng có lệnh</Tag></>}</p>}
-      <table><thead><tr><th>#</th><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Từ → đến</th><th>Giá nội bộ</th><th>Trạng thái</th><th>Tài xế nhận</th><th>Ghi vết gợi ý</th><th>Dọn</th></tr></thead>
+
+      {/* DL-6 · 16/10/2026: ô đếm thứ ba, KÈM DANH SÁCH. Chuyến máy sinh ra từ lệnh đến lặng lẽ —
+          cờ vàng không có lý do, không ai được báo, và không có chỗ nào để làm theo. Cửa nhập km
+          và bảng chi phí chuyến đã có sẵn từ lâu; thiếu là lời nhắc và đường đi tới đó.
+          CHỈ ĐẾM CHUYẾN SINH TỪ LỆNH. Sổ cũ nạp bằng Excel cũng thiếu km, nhưng gộp vào thì con số
+          này không bao giờ về 0 — và một con số không bao giờ về 0 thì chẳng mấy ai còn nhìn. */}
+      {chuoi?.chuyen_tu_lenh_thieu_so && (chuoi.chuyen_tu_lenh_thieu_so.so > 0
+        ? <div className="muted">
+          <Tag cls="warn">chuyến sinh từ lệnh còn thiếu số thật</Tag>{" "}
+          {chuoi.chuyen_tu_lenh_thieu_so.so}/{chuoi.chuyen_tu_lenh_thieu_so.tong_chuyen_tu_lenh} chuyến —
+          giá vốn đội xe của những chuyến này còn thiếu một nửa cho tới khi Đội xe nhập km và chi phí.
+          <table><thead><tr><th>Chuyến</th><th>Lệnh</th><th>Tour</th><th>Ngày đi</th><th>Còn thiếu</th><th></th></tr></thead>
+            <tbody>{chuoi.chuyen_tu_lenh_thieu_so.danh_sach.map((c: any) => <tr key={c.chuyen_id}>
+              <td><b>#{c.chuyen_id}</b></td><td>{c.lenh_id ? "#" + c.lenh_id : ""}</td>
+              <td>{c.tour}</td><td>{fmtD(c.ngay_di)}</td>
+              <td>{c.thieu.map((x: string, i: number) => <div key={i}><Tag cls="warn">thiếu</Tag> {x}</div>)}</td>
+              <td><a className="act grey" style={{ margin: 0 }}
+                href="/doi-xe?tab=chuyen">Nhập số</a></td>
+            </tr>)}</tbody></table>
+        </div>
+        : <p className="muted"><Tag cls="ok">chuyến sinh từ lệnh đều có số thật</Tag></p>)}
+
+      <table><thead><tr><th>#</th><th>Tour</th><th>Xe</th><th>Tài xế</th><th>Từ → đến</th><th>Giá nội bộ</th><th>Trạng thái</th><th>Tài xế nhận</th><th>Ghi vết gợi ý</th><th>Đổi</th><th>Dọn</th></tr></thead>
         <tbody>{ds.length ? ds.map((d) => <tr key={d.id}>
           <td>{d.id}</td><td>{d.tour}</td><td>{d.ma_xe} · {d.xe}</td><td>{d.tai_xe}</td>
           <td>{fmtD(d.date_from)} → {fmtD(d.date_to)} <span className="muted">({d.so_ngay} ngày)</span></td>
@@ -457,8 +479,9 @@ function LenhDieuXe() {
           {/* `key` theo id lệnh là BẮT BUỘC: không có nó thì soát lệnh này rồi bấm sang lệnh khác
               sẽ thấy câu trả lời của lệnh trước — đã xảy ra thật ở cửa xoá xe ngày 14/10/2026,
               và đây là khối quyết định có làm mất hẳn một chứng từ hay không. */}
+          <td><DoiXe key={"doi" + d.id} lenh={d} xong={load} /></td>
           <td><XoaLenh key={d.id} lenh={d} xong={load} /></td>
-        </tr>) : <tr><td colSpan={10} className="muted">Chưa có lệnh điều xe nào.</td></tr>}</tbody></table>
+        </tr>) : <tr><td colSpan={11} className="muted">Chưa có lệnh điều xe nào.</td></tr>}</tbody></table>
     </div>
   </>);
 }
@@ -472,6 +495,124 @@ function LenhDieuXe() {
  *  Máy in cả nội dung lệnh ra trước khi xoá, vì `status` không chứng minh được gì: `DL-0825` mang
  *  chữ "hoàn thành" mà không có lấy một chuyến nào. Người bấm phải nhìn tận mắt tour, xe, tài xế,
  *  ngày và giá rồi mới quyết. */
+/** DL-5 · ĐỔI XE / ĐỔI TÀI XẾ trên một lệnh đã lập (Chủ tịch chốt 15/10/2026).
+ *
+ *  Trước vòng này, xe hỏng trước giờ chạy thì Điều hành phải XOÁ lệnh rồi LẬP LẠI — mất dấu lệnh
+ *  cũ, mất dấu ai đã nhận, và tháng sau không ai trả lời được vì sao đổi.
+ *
+ *  HAI BƯỚC, KHÔNG MỘT. Bước chọn xe và bước xác nhận tách rời nhau vì giá nội bộ ĐỔI THEO XE:
+ *  xe hợp tác ăn giá đối tác, xe nhà ăn giá nội bộ. Người bấm phải nhìn thấy «2.400.000 →
+ *  3.100.000» trước khi quyết, chứ không phát hiện ra vào cuối tháng.
+ *
+ *  Màn hình KHÔNG tự quyết thay máy chủ: nút vẫn bấm được khi vai sai hoặc xe vướng điều kiện, và
+ *  máy chủ trả lời vì sao. Giấu nút đi thì người dùng chỉ thấy một màn hình thiếu, không biết
+ *  thiếu gì. */
+function DoiXe({ lenh, xong }: { lenh: any; xong: () => void }) {
+  const { toast } = useShell();
+  const [mo, setMo] = useState<"" | "xe" | "tx">("");
+  const [ds, setDs] = useState<any>(null);
+  const [chonXe, setChonXe] = useState<any>(null);     // bảng cũ → mới của xe đang chọn
+  const [chonTx, setChonTx] = useState<number | null>(null);
+  const [ly, setLy] = useState("");
+  const [dang, setDang] = useState(false);
+
+  const dong = () => { setMo(""); setDs(null); setChonXe(null); setChonTx(null); setLy(""); };
+  const nap = async (che: "xe" | "tx") => {
+    setDang(true);
+    try { setDs(await api(`/dispatch/${lenh.id}/thay-the-duoc`)); setMo(che); }
+    catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+  const soatXe = async (xid: number) => {
+    setDang(true);
+    try { setChonXe(await api(`/dispatch/${lenh.id}/soat-doi-xe/${xid}`)); }
+    catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+  const gui = async (duong: string, than: any) => {
+    setDang(true);
+    try {
+      const r: any = await api(`/dispatch/${lenh.id}/${duong}`,
+        { method: "POST", body: JSON.stringify({ ...than, ly_do: ly, phien_ban: lenh.phien_ban }) });
+      toast(r.message); dong(); xong();
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+
+  const doiDuoc = lenh.status === "cho_xac_nhan" || lenh.status === "da_xac_nhan";
+  if (!mo) return (<div>
+    <button className="act grey" style={{ margin: 0 }} disabled={dang || !doiDuoc}
+      onClick={() => nap("xe")}>Đổi xe</button>
+    <button className="act grey" style={{ margin: "4px 0 0" }} disabled={dang || !doiDuoc}
+      onClick={() => nap("tx")}>Đổi tài xế</button>
+    {!doiDuoc && <div className="muted">{lenh.status === "hoan_thanh"
+      ? "Lệnh đã hoàn thành — đã sinh chuyến trong nhật trình, đổi xe lúc này là sửa lịch sử."
+      : "Lệnh đã huỷ."}</div>}
+  </div>);
+
+  const ly_do_o = (<label>Lý do đổi <span className="muted">(bắt buộc — không có ô này thì đổi xe
+    chỉ là một cách xoá dấu vết êm hơn xoá lệnh)</span>
+    <input value={ly} onChange={(e) => setLy(e.target.value)}
+      placeholder="ví dụ: xe hỏng hộp số sáng 17/10, gara báo 3 ngày" /></label>);
+  const thoi = <p><button className="act grey" style={{ margin: "8px 0 0" }}
+    onClick={dong}>Thôi</button></p>;
+
+  if (mo === "xe" && chonXe) return (<div>
+    <table><tbody>
+      <tr><td>Xe</td><td><s className="muted">{chonXe.xe_cu}</s> → <b>{chonXe.xe_moi}</b></td></tr>
+      <tr><td>Tài xế</td><td><s className="muted">{chonXe.tai_xe_cu}</s> → <b>{chonXe.tai_xe_moi || chonXe.tai_xe_cu}</b>
+        {chonXe.tai_xe_doi_theo && <div className="muted">Tài xế đi theo xe. Muốn giữ người thì dùng nút Đổi tài xế.</div>}</td></tr>
+      <tr><td>Giá nội bộ</td><td><s className="muted">{chonXe.gia_cu?.toLocaleString("vi-VN")}</s> → <b>{chonXe.gia_moi?.toLocaleString("vi-VN")}</b>
+        {chonXe.gia_cu !== chonXe.gia_moi && <div className="muted">Giá đổi vì loại xe khác — xe hợp tác ăn giá đối tác, xe nhà ăn giá nội bộ.</div>}
+        {chonXe.loi_gia && <div><Tag cls="red">chặn</Tag> {chonXe.loi_gia}</div>}</td></tr>
+    </tbody></table>
+    {chonXe.vi_pham?.length > 0
+      ? <div className="gate fail">{chonXe.vi_pham.map((v: any) => v.msg).join(" · ")}</div>
+      : <div className="gate pass">Xe mới đủ điều kiện nhận lệnh này.</div>}
+    {chonXe.canh_bao?.map((c: string, i: number) => <div key={i} className="muted"><Tag cls="warn">lưu ý</Tag> {c}</div>)}
+    {chonXe.se_xoa_dau_nhan && <div className="muted"><Tag cls="warn">lưu ý</Tag> Dấu nhận của tài xế
+      sẽ bị xoá — lệnh cần tài xế mới nhận lại.</div>}
+    {ly_do_o}
+    <button className="act teal" style={{ margin: "8px 0 0" }} disabled={dang || !ly.trim()}
+      onClick={() => gui("doi-xe", { xe_id: ds.xe.find((x: any) => x.bien === chonXe.xe_moi)?.id })}>
+      Xác nhận đổi</button>
+    <button className="act grey" style={{ margin: "8px 0 0 6px" }}
+      onClick={() => setChonXe(null)}>Chọn xe khác</button>
+    {thoi}
+  </div>);
+
+  if (mo === "xe") return (<div>
+    <div className="muted">Lệnh #{lenh.id} đang là <b>{lenh.xe}</b>. Chọn xe thay thế:</div>
+    <table><thead><tr><th>Xe</th><th>Chỗ</th><th>Tài xế</th><th>Giá</th><th>Điều kiện</th><th></th></tr></thead>
+      <tbody>{(ds?.xe || []).map((x: any) => <tr key={x.id}>
+        <td>{x.ma} · {x.bien} {x.loai === "hop_tac" && <Tag cls="warn">hợp tác</Tag>}</td>
+        <td className="num">{x.ghe}</td><td>{x.tai_xe}</td>
+        <td className="num">{x.gia?.toLocaleString("vi-VN")}</td>
+        <td><Tag cls={x.nhan_duoc ? "ok" : "red"}>{x.muc_ten}</Tag>
+          {!x.nhan_duoc && <div className="muted">{x.ly_do.join(" · ")}</div>}</td>
+        <td><button className="act grey" style={{ margin: 0 }} disabled={dang}
+          onClick={() => soatXe(x.id)}>Xem cũ → mới</button></td>
+      </tr>)}</tbody></table>
+    {thoi}
+  </div>);
+
+  return (<div>
+    <div className="muted">Lệnh #{lenh.id} · xe <b>{lenh.xe}</b> không đổi. Tài xế đang là <b>{lenh.tai_xe}</b>.</div>
+    <table><thead><tr><th></th><th>Tài xế</th><th>Điều kiện</th></tr></thead>
+      <tbody>{(ds?.tai_xe || []).map((t: any) => <tr key={t.id}>
+        <td><input type="radio" name={"tx" + lenh.id} checked={chonTx === t.id}
+          onChange={() => setChonTx(t.id)} /></td>
+        <td>{t.ma} · {t.ten}</td>
+        <td><Tag cls={t.nhan_duoc ? "ok" : "red"}>{t.nhan_duoc ? "nhận được" : "vướng"}</Tag>
+          {t.ly_do.length > 0 && <div className="muted">{t.ly_do.join(" · ")}</div>}</td>
+      </tr>)}</tbody></table>
+    <div className="muted">Giá nội bộ <b>không đổi</b> — giá tính theo xe và tuyến, không theo người lái.</div>
+    {ly_do_o}
+    <button className="act teal" style={{ margin: "8px 0 0" }}
+      disabled={dang || !ly.trim() || !chonTx}
+      onClick={() => gui("doi-tai-xe", { tai_xe_id: chonTx })}>Xác nhận đổi tài xế</button>
+    {thoi}
+  </div>);
+}
+
+
 function XoaLenh({ lenh, xong }: { lenh: any; xong: () => void }) {
   const { user, toast } = useShell();
   const [s, setS] = useState<any>(null);
