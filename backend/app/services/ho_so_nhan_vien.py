@@ -483,3 +483,79 @@ def doc_ho_so(db, nguoi_xem, muc_tieu) -> dict:
         "nhom_nhay_cam_da_doc": nhay_da_doc,
         "thieu_nguon": thieu,
     }
+
+
+# =============================================================================================
+# HS-3 · HIỆN MỘT TRƯỜNG ĐANG BỊ CHE
+#
+# Che không phải là cấm. HCNS làm hợp đồng thì phải đọc được số CCCD thật; cái họ không được có
+# là đọc nó mà không ai biết. Cửa này đổi MỘT lượt đọc lấy MỘT dòng nhật ký mang tên người đọc
+# và mục đích họ tự khai.
+#
+# BỐN LUẬT, mỗi luật vá một cách hỏng khác nhau:
+#
+#   1. MỘT TRƯỜNG MỘT LẦN. Không có đường "hiện cả nhóm" hay "hiện cả hồ sơ": một dòng nhật ký
+#      ghi "đã mở nhóm 4" không nói được người ấy cần số CCCD hay cần địa chỉ, nên nó không trả
+#      lời được câu hỏi duy nhất mà nhật ký sinh ra để trả lời.
+#   2. CHỈ HIỆN THỨ ĐANG BỊ CHE. Trường vai ấy vốn không được xem thì cửa TỪ CHỐI — không phải
+#      vì che, mà vì nó chưa bao giờ thuộc về họ. Trường vai ấy vốn thấy thẳng cũng từ chối: mở
+#      lối thứ hai tới cùng một giá trị là hai chỗ phải rào.
+#   3. PHẢI KHAI MỤC ĐÍCH, và mục đích phải là một câu. Ô trống hoặc một chữ cái thì không phải
+#      mục đích, và một nhật ký đầy dòng "x" là một nhật ký không ai đọc.
+#   4. NHẬT KÝ KHÔNG BAO GIỜ CHỨA GIÁ TRỊ. Ghi cả CCCD vào bản ghi kiểm toán là tạo chỗ rò thứ
+#      hai, và chỗ ấy rộng hơn: ai đọc được nhật ký cũng đọc được, kể cả người không được xem
+#      nhóm 4. Nhật ký ghi TÊN TRƯỜNG và MỤC ĐÍCH, hết.
+# =============================================================================================
+
+MUC_DICH_TOI_THIEU = 5
+
+# VAI NÀO CÓ THỂ CẦN NÚT «HIỆN» — SUY RA TỪ CHÍNH BẢNG QUYỀN, không chép tay.
+#
+# Cửa `hien-truong` là đường GHI, và `test_ks2_khai_quyen_may_doc_duoc` đòi mọi đường ghi khai
+# vai trò ở chỗ MÁY ĐỌC ĐƯỢC — đòi đúng, vì chặn nằm trong thân hàm là chặn mà bộ rà quyền hằng
+# tháng không nhìn thấy. Nhưng gõ tay `require_roles("hcns")` là dựng bảng quyền lần thứ hai:
+# ngày nào nhóm 4 mở dạng CHE cho một vai nữa, bảng ở trên đổi mà dòng khai ở cửa thì không, và
+# người vai ấy bấm «Hiện» sẽ nhận 403 không ai giải thích được.
+#
+# Suy ra từ NHOM_TRUONG thì hai thứ luôn khớp vì chỉ có một thứ. Hàng rào thật vẫn là
+# `hien_truong` ở dưới — danh sách này chỉ lọc sớm, và nó KHÔNG BAO GIỜ hẹp hơn hàng rào ấy.
+VAI_CO_NHOM_CHE: tuple[str, ...] = tuple(sorted(
+    {v for n in NHOM_TRUONG for v, q in n["quyen"].items() if q == CHE}))
+
+def nhom_cua_truong(truong: str) -> dict | None:
+    for n in NHOM_TRUONG:
+        if truong in n["truong"]:
+            return n
+    return None
+
+def hien_truong(db, nguoi_xem, muc_tieu, truong: str) -> dict:
+    """Giá trị thật của ĐÚNG MỘT trường đang bị che, kèm lý do khi không cho.
+
+    KHÔNG ghi nhật ký ở đây — cửa HTTP ghi, vì chỉ nó biết việc có đi tới cùng hay không. Tách
+    ra cũng để phép thử gọi thẳng hàm mà không dựng máy chủ.
+    """
+    vai = (getattr(nguoi_xem, "role", "") or "").strip()
+    n = nhom_cua_truong(truong)
+    if n is None:
+        return {"duoc": False, "ma_loi": "khong_co_truong",
+                "ly_do": f"Không có trường {truong!r} trong hồ sơ nhân viên"}
+
+    trong, luat = trong_pham_vi(db, nguoi_xem, muc_tieu)
+    q = quyen_nhom(n["ma"], vai, trong)
+    if q == KHONG:
+        # CÂU TỪ CHỐI KHÔNG ĐƯỢC NÓI TRƯỜNG ẤY CÓ GIÁ TRỊ HAY KHÔNG. "Chưa khai" và "không được
+        # xem" mà trả lời khác nhau thì chính cặp câu trả lời ấy là một kênh rò.
+        return {"duoc": False, "ma_loi": "khong_duoc_xem",
+                "ly_do": f"Vai của bạn không đọc được nhóm {n['ma']} · {n['ten']}"}
+    if q == CO:
+        return {"duoc": False, "ma_loi": "khong_bi_che",
+                "ly_do": f"Nhóm {n['ma']} không bị che với vai của bạn — giá trị đã có sẵn "
+                         f"trong hồ sơ, không cần hiện"}
+
+    day_du, _ = thu_thap(db, muc_tieu)
+    if truong not in day_du:
+        return {"duoc": False, "ma_loi": "chua_co_so_lieu",
+                "ly_do": f"Hồ sơ này chưa có số liệu cho {truong!r}"}
+
+    return {"duoc": True, "ma_nhom": n["ma"], "ten_nhom": n["ten"],
+            "truong": truong, "gia_tri": day_du[truong], "luat_pham_vi": luat}

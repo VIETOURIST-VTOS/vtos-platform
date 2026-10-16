@@ -72,6 +72,29 @@ export default function HoSoNhanVien({ uid, hoTen, onClose }:
   { uid: number; hoTen: string; onClose: () => void }) {
   const [d, setD] = useState<any>(null);
   const [loi, setLoi] = useState("");
+  // GIÁ TRỊ ĐÃ HIỆN chỉ sống trong bộ nhớ của lần mở này: đóng hồ sơ là mất, mở lại là một lượt
+  // đọc mới và một dòng nhật ký mới. Nhớ lại qua các lần mở thì con số lượt đọc trong nhật ký
+  // thấp hơn số lần người ta thực sự nhìn thấy, và nhật ký ấy nói sai.
+  const [hien, setHien] = useState<Record<string, any>>({});
+  const [dangHien, setDangHien] = useState("");
+
+  async function xinHien(truong: string, ten: string) {
+    // MỤC ĐÍCH DO NGƯỜI GÕ, không có danh sách chọn sẵn. Một ô chọn "làm hợp đồng / khai BHXH /
+    // khác" thì ai cũng bấm cái đầu tiên, và cột mục đích trong nhật ký thành một cột vô nghĩa.
+    const md = prompt(`Xem giá trị thật của «${ten}» để làm gì?\n\n`
+      + `Lượt xem này vào nhật ký hồ sơ mang tên bạn, kèm câu bạn ghi ở đây.`);
+    if (md === null) return;
+    setDangHien(truong);
+    try {
+      const r = await api<any>(`/employees/tai-khoan/${uid}/hien-truong`,
+        { method: "POST", json: { truong, muc_dich: md } });
+      setHien((cu) => ({ ...cu, [truong]: r.gia_tri }));
+    } catch (e) {
+      setLoi(errMsg(e));
+    } finally {
+      setDangHien("");
+    }
+  }
 
   useEffect(() => {
     setD(null); setLoi("");
@@ -113,7 +136,19 @@ export default function HoSoNhanVien({ uid, hoTen, onClose }:
           : <div className="scroll"><table><tbody>
               {n.truong.map((t: string) => <tr key={t}>
                 <td style={{ width: 240 }}>{TEN_TRUONG[t] || t}</td>
-                <td>{oGiaTri(d.ho_so[t])}</td>
+                <td>
+                  {t in hien ? <>{oGiaTri(hien[t])} <Tag cls="warn">đã vào nhật ký</Tag></>
+                             : oGiaTri(d.ho_so[t])}
+                  {/* Nút chỉ có ở nhóm máy chủ trả về dạng ĐÃ CHE. Nhóm bị từ chối không có
+                      dòng nào ở đây để mà bấm, nhóm thấy thẳng thì không có gì để hiện. */}
+                  {n.quyen === "che" && !(t in hien) && d.ho_so[t] !== null && d.ho_so[t] !== "" &&
+                    <button className="act grey" style={{ margin: 0, marginLeft: 8, padding: "1px 8px" }}
+                      disabled={dangHien === t}
+                      title="Xem giá trị thật — lượt xem này vào nhật ký hồ sơ"
+                      onClick={() => xinHien(t, TEN_TRUONG[t] || t)}>
+                      {dangHien === t ? "…" : "Hiện"}
+                    </button>}
+                </td>
               </tr>)}
             </tbody></table></div>}
       </div>)}

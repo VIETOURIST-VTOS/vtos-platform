@@ -12,6 +12,7 @@ from app.models.hrm import (EmployeeProfile, LaborContract, Dependent, LeaveRequ
                             CONTRACT_KINDS, CONTRACT_STATUS, RELATIONS, LEAVE_KINDS, LEAVE_STATUS, ATT_KINDS)
 from app.services import hrm as H
 from app.services import rules as R
+from app.services.ho_so_nhan_vien import VAI_CO_NHOM_CHE as _HSNV_VAI_HIEN
 
 router = APIRouter(prefix="/api/v1", tags=["nhan-su-ho-so"])
 HR_ADMIN = ("hcns", "cntt", "tgd", "chutich")
@@ -485,3 +486,53 @@ def ho_so_theo_vai(uid: int, u: User = Depends(current_user), db: Session = Depe
                 after={"nhom": kq["nhom_nhay_cam_da_doc"], "luat_pham_vi": kq["luat_pham_vi"]})
         db.commit()
     return kq
+
+
+class HienTruongIn(BaseModel):
+    truong: str
+    muc_dich: str
+
+
+# DANH SÁCH VAI Ở CHỮ KÝ, nhưng SUY RA TỪ BẢNG QUYỀN chứ không gõ tay — xem `VAI_CO_NHOM_CHE`.
+# Đường GHI phải khai quyền ở chỗ máy đọc được (`test_ks2_khai_quyen_may_doc_duoc`), và lời khai
+# ấy không được là bản sao thứ hai của bảng quyền, vì hai bản sẽ lệch nhau. Nó lọc sớm; hàng rào
+# thật vẫn là `HSNV.hien_truong`, chặt hơn — nó còn kiểm từng NHÓM và phạm vi quản lý.
+@router.post("/employees/tai-khoan/{uid}/hien-truong")
+def hien_truong_ho_so(uid: int, data: HienTruongIn,
+                      u: User = Depends(require_roles(*_HSNV_VAI_HIEN,
+                                                      mo_ta="hiện trường hồ sơ nhân viên")),
+                      db: Session = Depends(get_db)):
+    """HS-3 · Hiện giá trị thật của MỘT trường đang bị che, đổi lấy MỘT dòng nhật ký.
+
+    Che không phải là cấm: HCNS làm hợp đồng thì phải đọc được số CCCD thật. Cái họ không được
+    có là đọc nó mà không ai biết. Cửa này ghi vết TRƯỚC khi trả giá trị — ghi sau thì một lỗi
+    giữa chừng để lại lượt đọc không có vết, mà đó đúng là lượt đọc đáng ngờ nhất.
+
+    Nhật ký ghi TÊN TRƯỜNG và MỤC ĐÍCH, KHÔNG BAO GIỜ ghi giá trị: một bản ghi kiểm toán chứa
+    CCCD là chỗ rò thứ hai, và nó rộng hơn chỗ thứ nhất — ai đọc được nhật ký cũng đọc được,
+    kể cả người không được xem nhóm 4.
+    """
+    from app.services import ho_so_nhan_vien as HSNV
+    t = db.get(User, uid)
+    if not t:
+        raise HTTPException(404, "Không có tài khoản")
+
+    muc_dich = (data.muc_dich or "").strip()
+    if len(muc_dich) < HSNV.MUC_DICH_TOI_THIEU:
+        raise HTTPException(422, "Phải ghi mục đích bằng một câu — ví dụ «làm hợp đồng lao "
+                                 "động», «khai báo BHXH». Một nhật ký đầy dòng «x» là một nhật "
+                                 "ký không ai đọc.")
+
+    kq = HSNV.hien_truong(db, u, t, (data.truong or "").strip())
+    if not kq["duoc"]:
+        ma = {"khong_co_truong": 404, "khong_duoc_xem": 403,
+              "khong_bi_che": 422, "chua_co_so_lieu": 404}
+        raise HTTPException(ma.get(kq["ma_loi"], 422), kq["ly_do"])
+
+    R.audit(db, u.username, u.role, "hien_truong_ho_so", f"user:{t.username}",
+            after={"truong": kq["truong"], "nhom": kq["ma_nhom"], "muc_dich": muc_dich[:300],
+                   "luat_pham_vi": kq["luat_pham_vi"]})
+    db.commit()
+    return {"truong": kq["truong"], "gia_tri": kq["gia_tri"],
+            "nhom": kq["ma_nhom"], "ten_nhom": kq["ten_nhom"],
+            "message": f"Lượt xem này đã vào nhật ký hồ sơ mang tên {u.username}."}

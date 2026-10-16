@@ -279,3 +279,118 @@ def test_hs2_12_moi_truong_tra_ve_deu_thuoc_dung_mot_nhom():
                 "0 thì màn hình nuốt mất nó, 2 thì nó hiện hai lần.")
         for t in dem:
             assert t in d["ho_so"], f"Vai {vai}: nhóm kê trường {t!r} mà cửa không trả về"
+
+
+# =============================================================================================
+# HS-3 · cửa HIỆN một trường đang bị che
+# =============================================================================================
+HIEN = "/api/v1/employees/tai-khoan"
+
+
+def hien(vai, truong, muc_dich="lam hop dong lao dong"):
+    return client.post(f"{HIEN}/{DICH}/hien-truong",
+                       json={"truong": truong, "muc_dich": muc_dich},
+                       headers=dang_nhap(vai))
+
+
+def test_hs3_1_hcns_hien_duoc_va_nhan_dung_gia_tri_that():
+    """Che không phải là cấm. HCNS làm hợp đồng thì phải đọc được số CCCD thật — cái họ không
+    được có là đọc nó mà không ai biết."""
+    r = hien("hcns", "id_number"); assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["gia_tri"] == CCCD and d["nhom"] == "4"
+    r2 = hien("hcns", "base_salary", "tinh luong thang 10")
+    assert r2.status_code == 200 and r2.json()["gia_tri"] == LUONG
+
+
+def test_hs3_2_khong_khai_muc_dich_thi_khong_hien():
+    """Ô trống hoặc một chữ cái không phải mục đích. Một nhật ký đầy dòng «x» là nhật ký không
+    ai đọc — tức là vết có mà tác dụng thì không."""
+    for md in ("", "   ", "x", "abc"):
+        r = client.post(f"{HIEN}/{DICH}/hien-truong",
+                        json={"truong": "id_number", "muc_dich": md},
+                        headers=dang_nhap("hcns"))
+        assert r.status_code == 422, f"mục đích {md!r} phải bị từ chối, nhận {r.status_code}"
+
+
+def test_hs3_3_vai_khong_duoc_xem_nhom_ay_thi_cua_tu_choi():
+    """CNTT không thấy nhóm 4. Cửa hiện KHÔNG được thành đường vòng quanh bảng quyền — nếu nó
+    hiện được thì cả lớp che ở trên thành vô nghĩa, chỉ cần thêm một lần bấm."""
+    r = hien("cntt", "id_number")
+    assert r.status_code == 403, r.text
+    assert CCCD not in r.text
+
+
+def test_hs3_4_truong_von_thay_thang_thi_khong_di_qua_cua_nay():
+    """Chủ tịch thấy nhóm 4 thẳng. Cho cửa này trả về nữa là mở lối thứ hai tới cùng một giá
+    trị — hai lối thì phải rào hai chỗ, và quên một chỗ là hở."""
+    r = hien("chutich", "id_number")
+    assert r.status_code == 422 and "không bị che" in r.json()["detail"]
+
+
+def test_hs3_5_truong_khong_co_that_thi_404_chu_khong_phai_500():
+    r = hien("hcns", "khong_ton_tai_dau")
+    assert r.status_code == 404
+
+
+def test_hs3_6_vet_hien_truong_khong_mang_theo_gia_tri():
+    """Nhật ký ghi TÊN TRƯỜNG và MỤC ĐÍCH. Bản ghi kiểm toán chứa CCCD là chỗ rò thứ hai, và nó
+    RỘNG HƠN chỗ thứ nhất: ai đọc được nhật ký cũng đọc được, kể cả người không xem được nhóm 4."""
+    import json
+    from app.db.session import SessionLocal
+    from app.models.core import AuditLog
+    assert hien("hcns", "bank_account", "doi chieu tai khoan tra luong").status_code == 200
+    db = SessionLocal()
+    try:
+        dong = list(db.execute(select(AuditLog)
+                               .where(AuditLog.action == "hien_truong_ho_so")).scalars())
+        assert dong, "Hiện một trường mà không có dòng nhật ký nào"
+        than = json.dumps([{"b": r.before, "a": r.after, "e": r.entity} for r in dong],
+                          ensure_ascii=False, default=str)
+        for bi_mat in (CCCD, MST, SO_BHXH, TK_NH, str(int(LUONG))):
+            assert bi_mat not in than, f"{bi_mat!r} nằm trong nhật ký hiện-trường"
+        assert "muc_dich" in than and "truong" in than
+    finally:
+        db.close()
+
+
+def test_hs3_7_cua_hien_khong_rong_hon_cua_doc():
+    """Phép thử bắc cầu: với MỌI vai và MỌI trường, cửa hiện chỉ mở được đúng những trường mà
+    cửa đọc đã trả về ở dạng ĐÃ CHE. Rộng hơn một trường thôi là lớp che thủng mà không ai thấy,
+    vì màn hình vẫn vẽ ra dấu chấm."""
+    from app.db.session import SessionLocal
+    from app.services import ho_so_nhan_vien as HSNV
+    db = SessionLocal()
+    try:
+        dich = db.get(User, DICH)
+        for vai in ("chutich", "hcns", "cntt", "tp_dh", "nv_visa"):
+            xem = db.execute(select(User).where(User.username == f"hs2_{vai}")).scalars().one()
+            d = HSNV.doc_ho_so(db, xem, dich)
+            che = {t for n in d["nhom_thay"] if n["quyen"] == "che" for t in n["truong"]}
+            for n in HSNV.NHOM_TRUONG:
+                for t in n["truong"]:
+                    kq = HSNV.hien_truong(db, xem, dich, t)
+                    if kq["duoc"]:
+                        assert t in che, (
+                            f"Vai {vai}: cửa hiện mở được {t!r} mà cửa đọc không hề che nó — "
+                            "cửa hiện đang rộng hơn cửa đọc.")
+    finally:
+        db.close()
+
+
+def test_hs3_8_danh_sach_vai_o_cua_hien_phai_suy_tu_bang_va_khong_duoc_rong():
+    """`VAI_CO_NHOM_CHE` khai ở chữ ký cửa `hien-truong` để MÁY đọc được — đường GHI nào cũng
+    phải khai ở đó. Phép thử ghim hai chuyện.
+
+    Một: nó phải SUY ra từ `NHOM_TRUONG`, không gõ tay. Gõ tay là bảng quyền có bản sao thứ hai,
+    và ngày một nhóm mở dạng CHE cho vai nữa thì bảng đổi mà dòng khai ở cửa không — người vai
+    ấy bấm «Hiện» nhận 403 không ai giải thích được.
+
+    Hai: nó KHÔNG ĐƯỢC RỖNG. `require_roles()` không tham số không chặn ai, nên một bảng quyền
+    lỡ không còn nhóm CHE nào sẽ lặng lẽ mở cửa này cho mọi người đăng nhập.
+    """
+    from app.services.ho_so_nhan_vien import CHE, NHOM_TRUONG, VAI_CO_NHOM_CHE
+    mong = tuple(sorted({v for n in NHOM_TRUONG for v, q in n["quyen"].items() if q == CHE}))
+    assert VAI_CO_NHOM_CHE == mong
+    assert VAI_CO_NHOM_CHE, ("Không vai nào có nhóm CHE — require_roles() rỗng không chặn ai. "
+                             "Bỏ hẳn cửa hiện-trường, đừng để nó mở toang.")
