@@ -96,7 +96,8 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const [fleet, setFleet] = useState<any>(null);
   const [inc, setInc] = useState<any[]>([]);
   const [tours, setTours] = useState<any[]>([]);
-  const [fEmp, setFEmp] = useState<any>({ full_name: "", department: "kd_le", position: "nv", office: "hcm", contract_type: "hdld", base_salary: "" });
+  const [fEmp, setFEmp] = useState<any>({ code: "", full_name: "", department: "kd_le", position: "nv", office: "hcm",
+    contract_type: "hdld", base_salary: "", start_date: "", title: "", sales_group: "", phone: "", probation: false });
   const [fVisa, setFVisa] = useState<any>({ customer_name: "", market: "", method: "tu_xu_ly", handler_id: "", office: "hcm", alliance: false, revenue: "" });
   const [fAsg, setFAsg] = useState<any>({ tour_id: "", guide_id: "", days: "", rate_per_day: "", rate_id: "", holiday: false });
   const [grates, setGrates] = useState<any[]>([]);
@@ -471,7 +472,28 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         <label>Văn phòng<select value={fEmp.office} onChange={(e) => setFEmp({ ...fEmp, office: e.target.value })}>{Object.entries(meta.offices).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label>Hợp đồng<select value={fEmp.contract_type} onChange={(e) => setFEmp({ ...fEmp, contract_type: e.target.value })}><option value="hdld">HĐLĐ</option><option value="ctv">Cộng tác viên</option><option value="doi_tac">Đối tác</option></select></label>
         <label>Lương công việc (đ)<input type="number" value={fEmp.base_salary} onChange={(e) => setFEmp({ ...fEmp, base_salary: e.target.value })} /></label>
-      </div><button className="act" disabled={!fEmp.full_name} onClick={() => post("/employees", { ...fEmp, base_salary: Number(fEmp.base_salary) || 0 }).then((r) => r && setFEmp({ ...fEmp, full_name: "", base_salary: "" }))}>Tạo hồ sơ</button></div>}
+        {/* HS-9 · 17/10/2026 — SÁU Ô THÊM VÀO BIỂU TẠO. Trước vòng này biểu tạo có 6 ô còn biểu
+            sửa có 14: HCNS tạo xong là phải bấm Sửa ngay để nhập tiếp, và bước thứ hai ấy thì ai
+            cũng quên. Hai biểu cho cùng một hồ sơ thì phải hỏi cùng một bộ câu hỏi. */}
+        <label>Mã nhân viên<input value={fEmp.code} placeholder="số trên bảng lương HCNS, vd 276"
+          onChange={(e) => setFEmp({ ...fEmp, code: e.target.value })} /></label>
+        <label>Ngày vào làm<input type="date" value={fEmp.start_date}
+          onChange={(e) => setFEmp({ ...fEmp, start_date: e.target.value })} /></label>
+        <label>Chức vụ bảng lương<input value={fEmp.title}
+          onChange={(e) => setFEmp({ ...fEmp, title: e.target.value })} /></label>
+        <label>Nhóm kinh doanh<input value={fEmp.sales_group}
+          onChange={(e) => setFEmp({ ...fEmp, sales_group: e.target.value })} /></label>
+        <label>Điện thoại<input value={fEmp.phone}
+          onChange={(e) => setFEmp({ ...fEmp, phone: e.target.value })} /></label>
+        <label>Thử việc<input type="checkbox" checked={!!fEmp.probation}
+          onChange={(e) => setFEmp({ ...fEmp, probation: e.target.checked })} /></label>
+      </div>
+      {/* Mã để trống thì máy tự sinh NS### — nói thẳng ra, vì mã tự sinh KHÔNG khớp bảng lương
+          HCNS và người nhập cần biết điều đó trước khi bấm, không phải sau. */}
+      <p className="muted" style={{ fontSize: 12 }}>Để trống mã nhân viên thì hệ thống tự sinh mã
+        dạng <b>NS001</b> — mã ấy <b>không khớp bảng lương HCNS</b>, nên nếu đã biết số trên bảng
+        lương thì nhập vào đây.</p>
+      <button className="act" disabled={!fEmp.full_name} onClick={() => post("/employees", { ...fEmp, base_salary: Number(fEmp.base_salary) || 0, start_date: fEmp.start_date || null }).then((r) => r && setFEmp({ ...fEmp, code: "", full_name: "", base_salary: "", start_date: "", title: "", phone: "" }))}>Tạo hồ sơ</button></div>}
       {canHR && khoa.length > 0 && <div className="panel wrap"><h2>Tài khoản đang bị khóa ({khoa.length})</h2>
         <p className="muted">Người không còn trên bảng lương thì không đăng nhập được nữa. Hồ sơ và tài khoản vẫn giữ để nhật ký nghiệp vụ và chứng từ cũ truy ra được người thực hiện. Khóa nhầm thì mở lại ở đây.</p>
         <table><thead><tr><th>Tài khoản</th><th>Họ tên</th><th>Mã NV</th><th>Vai trò</th><th></th></tr></thead>
@@ -707,6 +729,15 @@ function SuaHoSo({ sua, setSua, dc, setDc, meta, post }: any) {
         <label>Lương công việc (đ)<input type="number" value={sua.base_salary ?? ""} onChange={(e) => d("base_salary", e.target.value)} /></label>
         <label>Ngày sinh<input type="date" value={sua.birth_date || ""} onChange={(e) => d("birth_date", e.target.value)} /></label>
         <label>Điện thoại<input value={sua.phone || ""} onChange={(e) => d("phone", e.target.value)} /></label>
+        {/* HS-9 · 17/10/2026 — NGÀY VÀO LÀM: trường này trước nay KHÔNG CÓ Ô NÀO, cả ở biểu tạo
+            lẫn biểu sửa, nên chỉ nạp được qua tệp bảng lương. Mà thâm niên, phép năm, BHXH và
+            thuế đều đọc đúng nó. Một người tuyển giữa kỳ thì không ai gõ được ngày vào của họ. */}
+        
+        <label>Ngày vào làm<input type="date" value={sua.start_date || ""} onChange={(e) => d("start_date", e.target.value)} /></label>
+        <label>Hạn mức tạm ứng (đ)<input type="number" value={sua.advance_limit ?? ""} onChange={(e) => d("advance_limit", e.target.value)} /></label>
+        <label>Thử việc<input type="checkbox" checked={!!sua.probation} onChange={(e) => d("probation", e.target.checked)} /></label>
+        <label>Đoàn viên tổ chức<input type="checkbox" checked={!!sua.member_org} onChange={(e) => d("member_org", e.target.checked)} /></label>
+        <label>Có hợp đồng CTV<input type="checkbox" checked={!!sua.ctv_contract} onChange={(e) => d("ctv_contract", e.target.checked)} /></label>
         {sua.department === "huong_dan" && <>
           <label>Số thẻ HDV<input value={sua.card_no || ""} onChange={(e) => d("card_no", e.target.value)} /></label>
           <label>Hạn thẻ<input type="date" value={sua.card_expiry || ""} onChange={(e) => d("card_expiry", e.target.value)} /></label>
