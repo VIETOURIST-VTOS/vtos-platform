@@ -74,6 +74,19 @@ CUA_TAY = (
     # "Trình Chủ tịch HĐQT". Bảng bắt đầu RỖNG và phải rỗng — mỗi dòng là một câu NGƯỜI nói
     # ("xin mở lại kỳ 09, vì..."), nên máy nạp sẵn một dòng là máy tự xin hộ. KHÔNG khai MAY_SINH:
     # hai cột `khoa_lai_*` do máy điền lúc khóa lại, nhưng DÒNG thì luôn do người mở.
+    # HD-DG3 · 16/10/2026 — ĐỒNG Ý CÔNG KHAI NHẬN XÉT. CỬA TAY, và cửa ấy là TRANG KHẢO SÁT:
+    # dòng sinh ra khi KHÁCH trả lời câu «anh/chị có đồng ý đăng công khai nhận xét này trên hồ sơ
+    # hướng dẫn viên tại VTOS, không kèm tên và thông tin liên hệ không».
+    #
+    # KHÔNG khai MAY_SINH, dù máy là thứ chèn dòng. Phân biệt của bảng này là AI QUYẾT con số, chứ
+    # không phải tay ai gõ: người quyết ở đây là khách, và khách bấm trên một cái form. Khai máy
+    # sinh thì ngày không ai trả lời, bảng rỗng mà không bộ đếm nào kêu — mà rỗng ở bảng này nghĩa
+    # là không một nhận xét nào đăng được, và sẽ không ai biết vì sao.
+    #
+    # Cửa khách đi KHÔNG CẦN ĐĂNG NHẬP, nên nó còn được khai ở hai chỗ nữa, mỗi chỗ một việc:
+    # `test_p2.CONG_KHAI` (nhóm API không có hàng rào quyền) và `tools/ks2_khai_quyen.CONG_KHAI`
+    # (đường GHI không khai quyền theo vai). Ba chỗ khai ba câu hỏi khác nhau, không phải chép ba lần.
+    "dong_y_cong_khai",
     "mo_lai_ky",
     # Đợt E15 14/10/2026. CỬA TAY trên màn hình /dong-tien, khung "Đối chiếu tiền" → nút "Giải
     # thích" của từng dòng: ô số tiền (có dấu) + ô "khoản này là khoản gì". Bảng bắt đầu RỖNG và

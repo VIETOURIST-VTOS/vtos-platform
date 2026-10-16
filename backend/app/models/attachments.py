@@ -36,6 +36,11 @@ NHOM_HO_SO = {
     # không nhét vào nhóm nào sẵn có – nhét bừa là làm hỏng thời hạn lưu của cả nhóm đó. Năm năm là đề
     # xuất của em, Chủ tịch lật được.
     "10_Marketing":      ("Marketing & nội dung", "5 năm"),
+    # Thêm 16/10/2026, Đợt HD-DG3. Cùng lý do đã viết cho nhóm 10 ngay trên, và đây là lần thứ
+    # hai lý do ấy đúng: phản hồi của khách không phải hồ sơ pháp lý, không phải chứng từ ghi
+    # sổ, nên nhét vào một nhóm sẵn có là làm hỏng thời hạn lưu của cả nhóm đó. Chủ tịch chốt
+    # 16/10/2026: nhóm riêng, năm năm — bằng nhóm Marketing, vì cả hai là nội dung đối ngoại.
+    "11_Phan_hoi_khach": ("Phản hồi khách hàng", "5 năm"),
 }
 
 # Đối tượng gắn tệp: mã → (tên hiển thị, phòng ban chủ quản, nhóm hồ sơ, lưu theo đối tượng?).
