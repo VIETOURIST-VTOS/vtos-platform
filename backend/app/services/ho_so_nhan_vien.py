@@ -311,7 +311,6 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
     from datetime import date
     from sqlalchemy import func, select
     from app.models.core import AuditLog
-    from app.models.hr import Employee
     from app.models.hrm import (AttendanceDay, Dependent, EmployeeProfile, LaborContract,
                                 LeaveRequest)
     from app.models.nhan_su_danh_gia import CapPhatTaiSan, DanhGiaNhanSu
@@ -333,9 +332,16 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
     hs["sales_group"] = t.sales_group or ""
     hs["company_id"] = t.company_id
 
-    e = db.execute(select(Employee).where(Employee.user_id == t.id)).scalars().first()
-    if e is None and (t.staff_code or "").strip():
-        e = db.execute(select(Employee).where(Employee.code == t.staff_code.strip())).scalars().first()
+    # NỐI TÀI KHOẢN → HỒ SƠ bằng CỔNG CHUNG, không tự viết lại.
+    #
+    # `quyen_ho_so.ho_so_cua_hoac_rong` ra đời 13/10/2026 vì cùng câu hỏi này đang được hỏi ở 25
+    # chỗ bằng BỐN cách khác nhau, và bốn cách trả lời khác nhau ở bốn ca biên. Viết ở đây một
+    # vòng `user_id` rồi lùi về `staff_code` là đẻ ra cách thứ NĂM — đúng cái tệp ấy sinh ra để
+    # dẹp. Cổng chung còn ném khi dữ liệu MÂU THUẪN (hai hồ sơ cùng trỏ một tài khoản, hoặc hai
+    # đường nối trỏ hai người), và ném ở đây là đúng: một màn hình hồ sơ vẽ ra người sai thì tệ
+    # hơn hẳn một màn hình báo lỗi.
+    from app.services import quyen_ho_so as QHS
+    e = QHS.ho_so_cua_hoac_rong(db, t)
 
     if e is not None:
         hs["title"] = e.title or ""

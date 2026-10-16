@@ -430,3 +430,58 @@ def tncn_con_thieu(period: str, u: User = Depends(require_roles(*HR_READ)), db: 
     kq = H.tncn_chua_tinh(db, period, (run.rows or []) if run is not None else [])
     kq["co_bang_luong"] = run is not None
     return kq
+
+
+# =================================================================================================
+# HS-2 · HỒ SƠ MỘT NGƯỜI, CẮT VÀ CHE THEO VAI CỦA NGƯỜI ĐANG XEM
+# =================================================================================================
+# VÌ SAO CỬA NÀY NẰM Ở ĐÂY — `hrm.py` — chứ không ở `access.py` cùng các cửa quản trị tài khoản.
+#
+# ĐÚNG CHỖ VỀ NỘI DUNG: nhóm 4 (hồ sơ cá nhân), nhóm 5 (hợp đồng và lương) và nhóm 7 (chấm công,
+# đơn nghỉ) đọc thẳng từ `employee_profiles`, `labor_contracts`, `dependents`, `leave_requests`,
+# `attendance_days` — đúng bộ bảng tệp này giữ.
+#
+# ĐÚNG CHỖ VỀ HÀNG RÀO: `check_restricted_scope` chạy trong `current_user` cho MỌI đường dẫn và
+# chỉ cho một vai chạm nhóm API nằm sau MÀN HÌNH của vai ấy. Đo 15/10/2026: `/api/v1/access` có
+# trong bản đồ màn hình của `chutich`, `hcns`, `cntt` và KHÔNG có ở một vai đứng đầu nào;
+# `/api/v1/employees` thì có ở cả tám vai. Chủ tịch chốt 15/10: mở "Hồ sơ nhân viên" cho trưởng
+# phòng, KHÔNG mở cả màn quản trị Tài khoản. Hai điều ấy gặp nhau đúng ở tiền tố này — nên cửa về
+# đây, không nới bản đồ màn hình, không thêm ngoại lệ, không đụng `main.py`.
+#
+# `tai-khoan/{uid}` chứ không phải `{eid}`: các cửa `/employees/{eid}/...` quanh đây nhận MÃ HỒ SƠ,
+# cửa này nhận MÃ TÀI KHOẢN — con số màn hình Tài khoản đang cầm khi người dùng bấm vào một dòng.
+# Hai loại số đi chung một khuôn đường dẫn là chỗ sớm muộn có người truyền nhầm, và truyền nhầm ở
+# đây nghĩa là mở hồ sơ của người khác.
+@router.get("/employees/tai-khoan/{uid}/ho-so-theo-vai")
+def ho_so_theo_vai(uid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Hồ sơ một người, ĐÃ CẮT và ĐÃ CHE ở máy chủ theo vai của người đang xem.
+
+    KHÔNG dùng `require_roles`: hàng rào thật là bảng quyền trong `ho_so_nhan_vien`, nơi mặc định
+    là TỪ CHỐI, và cửa trả 403 khi vai ấy không thấy một nhóm nào. Thêm một danh sách vai ở đây
+    nữa là hai chỗ phải sửa cùng lúc, và quên một chỗ là hở.
+
+    Giá trị thật của nhóm che KHÔNG BAO GIỜ đi ra khỏi cửa này. Cửa trả bản đã che; màn hình không
+    bao giờ cầm giá trị thật rồi tự giấu — giấu ở màn hình thì giá trị thật đã nằm trong phản hồi
+    mạng, và ai mở tab Network cũng đọc được.
+
+    `thieu_nguon` kê những trường đã khai mà hệ thống chưa có cửa nhập. Đó là việc còn thiếu, không
+    phải người này không có số liệu — hai câu khác nhau, và chỉ câu đầu dẫn tới một việc phải làm.
+    """
+    from app.models.core import ROLES
+    from app.services import ho_so_nhan_vien as HSNV
+    t = db.get(User, uid)
+    if not t:
+        raise HTTPException(404, "Không có tài khoản")
+    kq = HSNV.doc_ho_so(db, u, t)
+    if not kq["nhom_thay"]:
+        raise HTTPException(403, f"Vai {ROLES.get(u.role, u.role)} không đọc được hồ sơ nhân viên này")
+
+    # VẾT CHO MỌI LƯỢT ĐỌC THẬT MỘT NHÓM NHẠY CẢM — kể cả khi người đọc là Chủ tịch. Quyền toàn
+    # diện nghĩa là không có gì chặn, không nghĩa là không để lại dấu; vết bảo vệ chính người có
+    # quyền. Nhật ký ghi TÊN NHÓM, không ghi một giá trị nào: một bản ghi kiểm toán chứa CCCD thì
+    # chính nó thành chỗ rò thứ hai, và chỗ ấy ai đọc được nhật ký cũng đọc được.
+    if kq["nhom_nhay_cam_da_doc"]:
+        R.audit(db, u.username, u.role, "doc_ho_so_nhan_vien", f"user:{t.username}",
+                after={"nhom": kq["nhom_nhay_cam_da_doc"], "luat_pham_vi": kq["luat_pham_vi"]})
+        db.commit()
+    return kq

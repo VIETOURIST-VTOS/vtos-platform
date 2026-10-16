@@ -17,7 +17,6 @@ from app.services import access as AC
 from app.services import access_admin as AA
 from app.services import mat_khau_yeu as MKY
 from app.services import rules as R
-from app.services import ho_so_nhan_vien as HSNV
 from app.services import luong_viec_bao_cao as LVBC   # PQ-2 – trình bày bảng luồng việc
 
 router = APIRouter(prefix="/api/v1/access", tags=["phan-quyen"])
@@ -271,60 +270,18 @@ def danh_dau_bien_che(uid: int, data: BienCheIn,
 
 
 # ---------------------------------------------------------------------------------------------
-# HS-2 · CỬA ĐỌC HỒ SƠ NHÂN VIÊN — bấm vào số hồ sơ trên bảng Tài khoản thì mở ra cái này
+# CỬA ĐỌC HỒ SƠ NHÂN VIÊN KHÔNG NẰM Ở ĐÂY — và đó là một quyết định, không phải một chỗ bỏ sót.
 # ---------------------------------------------------------------------------------------------
-# KHÔNG dùng `require_roles(*XEM)`. Ba lý do, và cả ba đều là lý do an toàn chứ không phải tiện:
+# Nó ở `api/v1/hrm.py`, đường `GET /api/v1/employees/tai-khoan/{uid}/ho-so-theo-vai`.
 #
-# 1. XEM quá RỘNG cho hồ sơ nhân sự. Nó mở màn hình phân quyền cho bảy vai, trong đó có `tgd`,
-#    `bks`, `robot_pq`, `robot_ks` — không vai nào trong bốn vai ấy được Chủ tịch chốt cho đọc
-#    CCCD hay lương ngày 15/10. Mượn một danh sách vai đã có cho một việc khác là cách hở quyền
-#    lặng lẽ nhất: không ai sửa gì cả, chỉ là dùng lại.
+# Lý do: `check_restricted_scope` (chạy trong `current_user` cho MỌI đường) chỉ cho một vai chạm
+# nhóm API nằm sau MÀN HÌNH của vai ấy. Đo 15/10/2026: `/api/v1/access` có trong bản đồ của
+# `chutich`, `hcns`, `cntt` và KHÔNG có ở một vai đứng đầu nào; `/api/v1/employees` thì có ở cả
+# tám vai. Đặt cửa ở đây là trưởng phòng không bao giờ với tới, mà nới bản đồ để họ với tới thì
+# mở luôn cho họ cả màn quản trị Tài khoản — đúng điều Chủ tịch bác ngày 15/10.
 #
-# 2. XEM quá HẸP cho trưởng phòng. `tp_dh`, `tp_kd`, `tp_hd`, `gd_kd`, `gd_doi_xe` phải mở được
-#    hồ sơ nhân viên phòng mình, và không vai nào trong năm vai ấy có tên trong XEM — cho vào
-#    XEM thì họ mở luôn cả màn hình quản trị Tài khoản, đúng điều Chủ tịch bác ngày 15/10.
-#
-# 3. HÀNG RÀO CẮT TRƯỜNG nằm ở bảng quyền trong `ho_so_nhan_vien`, nơi mặc định là TỪ CHỐI. Vai
-#    không có tên ở đó không thấy một nhóm nào, và cửa này trả 403 khi danh sách nhóm rỗng. Thêm
-#    một danh sách vai ở đây nữa là hai chỗ phải sửa cùng lúc, và quên một chỗ là lệch.
-#
-# ĐO 15/10/2026, VÀ NÓ ĐỔI KẾT LUẬN Ở TRÊN: vẫn CÒN một hàng rào thứ ba, trước cả hai cái này —
-# `services/access.check_restricted_scope`, chạy trong `current_user` cho MỌI đường dẫn. Nó chỉ
-# cho một vai chạm những nhóm API nằm sau MÀN HÌNH của vai ấy, và không vai đứng đầu nào có
-# `/api/v1/access` trong bản đồ màn hình. Nên hôm nay cửa này chạy cho `chutich`, `hcns`, `cntt`,
-# còn năm vai đứng đầu bị chặn Ở NGOÀI, trước khi phép tính phạm vi kịp chạy.
-#
-# KHÔNG VÁ BẰNG CÁCH NỚI BẢN ĐỒ. Cho `/api/v1/access` vào bản đồ của năm vai ấy là mở cho họ cả
-# màn quản trị Tài khoản — đúng điều Chủ tịch bác ngày 15/10. Lối ra đúng là một TIỀN TỐ RIÊNG
-# cho màn Hồ sơ nhân viên, và việc ấy phải sửa `app/main.py` cùng `app/services/access.py` — hai
-# tệp làn Phân quyền đang giữ chỗ. `test_hs2_6b` ghi lại nguyên trạng ấy để nó không im lặng.
-@router.get("/users/{uid}/ho-so-theo-vai")
-def doc_ho_so_theo_vai(uid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
-    """Hồ sơ một người, ĐÃ CẮT và ĐÃ CHE ở máy chủ theo vai của người đang xem.
-
-    Giá trị thật của nhóm che KHÔNG BAO GIỜ đi ra khỏi cửa này. Nếu cửa trả giá trị thật rồi màn
-    hình tự giấu, thì giá trị thật đã nằm trong phản hồi mạng và ai mở tab Network cũng đọc được.
-
-    `thieu_nguon` liệt kê những trường đã khai mà hệ thống chưa có cửa nhập — đó là việc còn
-    thiếu, không phải người này không có số liệu. Hai câu ấy khác nhau và chỉ câu đầu dẫn tới
-    một việc phải làm.
-    """
-    t = db.get(User, uid)
-    if not t:
-        raise HTTPException(404, "Không có tài khoản")
-    kq = HSNV.doc_ho_so(db, u, t)
-    if not kq["nhom_thay"]:
-        raise HTTPException(403, f"Vai {ROLES.get(u.role, u.role)} không đọc được hồ sơ nhân viên này")
-
-    # VẾT CHO MỌI LƯỢT ĐỌC THẬT MỘT NHÓM NHẠY CẢM — kể cả khi người đọc là Chủ tịch.
-    # Quyền toàn diện nghĩa là không có gì chặn, không nghĩa là không để lại dấu. Nhật ký ghi
-    # TÊN NHÓM, không ghi một giá trị nào: một bản ghi kiểm toán chứa CCCD thì chính nó thành
-    # chỗ rò thứ hai, và chỗ ấy ai đọc được nhật ký cũng đọc được.
-    if kq["nhom_nhay_cam_da_doc"]:
-        R.audit(db, u.username, u.role, "doc_ho_so_nhan_vien", f"user:{t.username}",
-                after={"nhom": kq["nhom_nhay_cam_da_doc"], "luat_pham_vi": kq["luat_pham_vi"]})
-        db.commit()
-    return kq
+# Đừng thêm bản thứ hai của cửa ấy vào tệp này cho tiện: hai cửa cùng một việc là hai hàng rào
+# phải sửa cùng lúc, và quên một chỗ là hở. `test_hs2_11` canh đúng chuyện đó.
 
 
 # ---------- P10: tra cứu ngược – chọn một người, hiện họ làm được gì và VÌ SAO ----------

@@ -88,8 +88,11 @@ def dang_nhap(vai):
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
+DUONG = "/api/v1/employees/tai-khoan"
+
+
 def doc(vai):
-    return client.get(f"/api/v1/access/users/{DICH}/ho-so-theo-vai", headers=dang_nhap(vai))
+    return client.get(f"{DUONG}/{DICH}/ho-so-theo-vai", headers=dang_nhap(vai))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -142,51 +145,37 @@ def test_hs2_5_cntt_khong_co_khoa_chu_khong_phai_rong():
 
 
 def test_hs2_6_truong_phong_cung_phong_va_luat_yeu_phai_noi_ra():
-    """Phép tính phạm vi: trưởng phòng Điều hành đọc được người CÙNG PHÒNG, và kết quả phải NÓI
-    nó dựa vào luật nào. Gọi thẳng hàm, không qua HTTP — vì sao thì xem `test_hs2_6b`."""
+    """Trưởng phòng Điều hành đọc được người CÙNG PHÒNG — qua HTTP thật, không phải gọi hàm —
+    và cửa phải NÓI nó dựa vào luật nào."""
+    r = doc("tp_dh"); assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["trong_pham_vi"] is True
+    assert d["luat_pham_vi"] == "cung_phong_luat_yeu"
+    hs = d["ho_so"]
+    assert hs["title"] == "CV Dieu hanh 2"                  # nhóm 1
+    for k in ("id_number", "base_salary", "username", "advance_limit", "phone"):
+        assert k not in hs, f"Trưởng phòng không được thấy {k}"
+
+
+def test_hs2_6b_khac_phong_thi_rong_han_chu_khong_phai_ho_so_trang():
+    """Ngoài phạm vi thì không thấy GÌ, và cửa trả 403 — không phải 200 với một hồ sơ đủ ô mà
+    rỗng giá trị. Một hồ sơ trắng đọc giống 'người này chưa khai', tức là nói sai về người khác."""
     from app.db.session import SessionLocal
     from app.services import ho_so_nhan_vien as HSNV
     db = SessionLocal()
     try:
         xem = db.execute(select(User).where(User.username == "hs2_tp_dh")).scalars().one()
-        dich = db.get(User, DICH)
-        d = HSNV.doc_ho_so(db, xem, dich)
-        assert d["trong_pham_vi"] is True
-        assert d["luat_pham_vi"] == "cung_phong_luat_yeu"
-        hs = d["ho_so"]
-        assert hs["title"] == "CV Dieu hanh 2"                  # nhóm 1
-        for k in ("id_number", "base_salary", "username", "advance_limit", "phone"):
-            assert k not in hs, f"Trưởng phòng không được thấy {k}"
-
-        # Khác phòng thì không thấy GÌ — và "không thấy gì" phải là từ điển rỗng, không phải
-        # một hồ sơ đủ ô mà rỗng giá trị.
         la = db.execute(select(User).where(User.username == "hs2_cntt")).scalars().one()
-        d2 = HSNV.doc_ho_so(db, xem, la)
-        assert d2["trong_pham_vi"] is False and d2["luat_pham_vi"] == "khac_phong"
-        assert d2["ho_so"] == {} and d2["nhom_thay"] == []
+        d = HSNV.doc_ho_so(db, xem, la)
+        assert d["trong_pham_vi"] is False and d["luat_pham_vi"] == "khac_phong"
+        assert d["ho_so"] == {} and d["nhom_thay"] == []
     finally:
         db.close()
-
-
-def test_hs2_6b_cua_nay_chua_mo_cho_truong_phong_va_phai_noi_that():
-    """HÔM NAY TRƯỞNG PHÒNG CHƯA VÀO ĐƯỢC CỬA NÀY, và phép thử ghi lại đúng như thế.
-
-    Không phải lỗi của bảng quyền hồ sơ — phép thử ngay trên đã chứng minh phép tính đúng. Chặn
-    nằm ở HÀNG RÀO ĐƯỜNG DẪN trong `services/access.check_restricted_scope`: một vai chỉ chạm
-    được những nhóm API nằm sau MÀN HÌNH của mình, và không vai đứng đầu nào có `/api/v1/access`
-    trong bản đồ màn hình. Đó là hàng rào ĐÚNG — Chủ tịch chốt 15/10: mở "Hồ sơ nhân viên" cho
-    trưởng phòng, KHÔNG mở cả màn quản trị Tài khoản. Cho `/api/v1/access` vào bản đồ của năm vai
-    ấy là mở đúng cái Chủ tịch bác.
-
-    Lối ra đúng là một TIỀN TỐ RIÊNG cho màn Hồ sơ nhân viên. Việc ấy phải sửa `app/main.py` và
-    `app/services/access.py` — hai tệp làn Phân quyền đang giữ chỗ, nên làn Kiểm soát không đụng.
-
-    PHÉP THỬ NÀY PHẢI ĐỔI khi tiền tố ấy mở ra. Nó ở đây để cái còn thiếu không im lặng: một cửa
-    viết xong mà không ai gọi tới được trông y hệt một cửa đang chạy.
-    """
-    r = doc("tp_dh")
+    la_id = None
+    with SessionLocal() as db2:
+        la_id = db2.execute(select(User).where(User.username == "hs2_cntt")).scalars().one().id
+    r = client.get(f"{DUONG}/{la_id}/ho-so-theo-vai", headers=dang_nhap("tp_dh"))
     assert r.status_code == 403
-    assert "màn hình" in r.json()["detail"]
 
 
 def test_hs2_7_vai_khong_khai_thi_403_chu_khong_phai_ho_so_rong():
@@ -242,3 +231,32 @@ def test_hs2_9_thieu_nguon_phai_tu_to_cao():
 def test_hs2_10_khong_co_tai_khoan_thi_404():
     r = client.get("/api/v1/access/users/99999999/ho-so-theo-vai", headers=dang_nhap("chutich"))
     assert r.status_code == 404
+
+
+def test_hs2_11_cua_nay_phai_nam_sau_mot_tien_to_ca_tam_vai_deu_voi_toi():
+    """HÀNG RÀO THỨ BA — cái đã chặn vòng trước, và là cái dễ hỏng lại nhất.
+
+    `check_restricted_scope` chạy trong `current_user` cho MỌI đường dẫn: một vai chỉ chạm được
+    nhóm API nằm sau MÀN HÌNH của vai ấy. Nó không biết gì về bảng quyền hồ sơ, nên bảng ấy đúng
+    hết mà cửa vẫn 403 — và 403 ấy trông y hệt một quyết định có chủ.
+
+    Phép thử ghim hai điều. Một: đường của cửa phải nằm sau một tiền tố mà CẢ TÁM vai đều có —
+    ngày ai đó rút `/api/v1/employees` khỏi bản đồ của một vai đứng đầu thì đỏ ở đây, chứ không
+    phải đỏ ở một trưởng phòng ngồi nhìn màn hình trắng. Hai: cửa KHÔNG được có bản thứ hai dưới
+    `/api/v1/access` — hai cửa cùng một việc là hai hàng rào phải sửa cùng lúc.
+    """
+    from app.main import app as _app
+    from app.services.access import pham_vi_day_du
+
+    duong = [r.path for r in _app.routes
+             if str(getattr(r, "path", "")).endswith("/ho-so-theo-vai")]
+    assert len(duong) == 1, f"Phải có ĐÚNG MỘT cửa đọc hồ sơ theo vai, đang có: {duong}"
+    d = duong[0]
+    assert not d.startswith("/api/v1/access"), (
+        "Cửa đọc hồ sơ không được nằm dưới /api/v1/access — không vai đứng đầu nào có tiền tố ấy "
+        "trong bản đồ màn hình, và nới bản đồ là mở luôn màn quản trị Tài khoản.")
+
+    for vai in ("chutich", "hcns", "cntt", "tp_dh", "tp_kd", "tp_hd", "gd_kd", "gd_doi_xe"):
+        assert any(d.startswith(p) for p in pham_vi_day_du(vai)), (
+            f"Vai {vai} không có tiền tố nào phủ {d} — hàng rào đường dẫn sẽ chặn trước khi "
+            "bảng quyền hồ sơ kịp chạy, và lỗi ấy im lặng.")
