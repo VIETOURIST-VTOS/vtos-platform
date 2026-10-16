@@ -42,6 +42,17 @@ CONG_KHAI = {
                         "nhập. Hàng rào của nó là: mã sinh ngẫu nhiên không đoán được, một mã một "
                         "lần ghi, có hạn, có phanh số lần thử theo địa chỉ mạng, và trang chỉ in "
                         "ra những gì khách đã biết.",
+    # Đợt HD-DG3, 16/10/2026. CỬA RA ĐƯỜNG THỨ HAI CỦA VTOS, và Chủ tịch ký cho mở nó sau khi
+    # nghe đánh đổi: khách rút đồng ý được ngay mà không phiền ai, đổi lại là thêm một cửa không
+    # cần đăng nhập. Ghi ra đây để người sau biết đây là quyết định có người ký.
+    "/api/v1/rut-dong-y": "Khách tự rút đồng ý đăng nhận xét lên hồ sơ hướng dẫn viên công khai "
+                          "(Chủ tịch chốt 16/10/2026). Khách không có tài khoản VTOS nên cửa mở "
+                          "bằng một mã sinh ngẫu nhiên gửi trong chính email khảo sát. Hàng rào "
+                          "của nó: mã chỉ đổi được trạng thái MỘT lần, không có một chữ nào về "
+                          "khách trong đường dẫn, cửa CHỈ RÚT chứ không trả về nhận xét hay tên "
+                          "hướng dẫn viên hay bất cứ trường dữ liệu nào, có hạn, có phanh số lần "
+                          "thử, và mã sai cùng mã đã dùng trả về ĐÚNG MỘT câu giống nhau để nó "
+                          "không thành máy dò.",
 }
 
 
@@ -85,11 +96,31 @@ def test_nhom_cong_khai_dung_la_khong_co_hang_rao_quyen():
 def test_cua_cong_khai_co_phanh_so_lan_thu():
     """Cửa ra đường không có phanh là cửa người ta dội vào được. Phép thử này khoá cái phanh, vì
     nó là thứ dễ bị gỡ nhất khi ai đó sửa cho "chạy nhanh hơn lúc thử"."""
-    from app.api.v1 import khao_sat_cong_khai as KS
-    nguon = open(KS.__file__, encoding="utf-8").read()
-    assert "_phanh(request)" in nguon, "cửa công khai không còn gọi phanh số lần thử"
-    assert nguon.count("_phanh(request)") >= 2, "có đường không qua phanh"
-    assert KS.TOI_DA_TRONG_CUA_SO <= 60, "phanh nới quá rộng – xem lại vì sao cần nới"
+    import importlib
+    import inspect
+
+    # 16/10/2026 — NỚI PHÉP THỬ NÀY THÀNH VÒNG LẶP, và đó là một lần SIẾT chứ không phải nới.
+    # Bản cũ viết cứng tên mô-đun `khao_sat_cong_khai`, nên nó khoá cái phanh của CỬA THỨ NHẤT và
+    # không biết gì về cửa thứ hai. Ngày Đợt HD-DG3 mở cửa rút, phép thử vẫn xanh trong khi một
+    # cửa ra đường mới đã đứng đó — một hàng rào canh đúng một chỗ trong hai chỗ thì nó nói sai
+    # về chính việc nó đang làm. Nay nó đi theo danh sách CONG_KHAI: thêm cửa nào là cửa ấy bị
+    # canh, không phải nhớ sửa thêm chỗ này.
+    assert CONG_KHAI, "không còn cửa công khai nào — nếu đúng thì xoá cả phép thử này"
+    for nhom in CONG_KHAI:
+        duong = [r for r in app.routes if getattr(r, "path", "").startswith(nhom + "/")
+                 or getattr(r, "path", "") == nhom]
+        assert duong, f"{nhom}: không có đường nào"
+        tep = {inspect.getsourcefile(r.endpoint) for r in duong}
+        assert len(tep) == 1, (
+            f"{nhom} trải trên nhiều tệp {sorted(tep)} — một cửa ra đường phải nằm gọn một tệp "
+            f"để người đọc thấy hết hàng rào của nó trong một lần mở")
+        duong_tep = tep.pop()
+        nguon = open(duong_tep, encoding="utf-8").read()
+        assert "_phanh(request)" in nguon, f"{nhom}: cửa công khai không còn gọi phanh số lần thử"
+        assert nguon.count("_phanh(request)") >= len(duong), f"{nhom}: có đường không qua phanh"
+        mod = importlib.import_module(duong[0].endpoint.__module__)
+        assert getattr(mod, "TOI_DA_TRONG_CUA_SO", 999) <= 60, (
+            f"{nhom}: phanh nới quá rộng – xem lại vì sao cần nới")
 
 
 def test_ban_do_man_hinh_api_khong_lech_voi_giao_dien():
@@ -621,7 +652,7 @@ PHAM_VI_DA_CHOT = {
     # GHI ở đây hẹp hơn XEM, và chia làm HAI nhóm khác nhau đúng chỗ phải khác: ĐỀ NGHỊ là Điều
     # hành (người cần xe), TỪ CHỐI là Giám đốc đội xe (người có xe). Người đề nghị không từ chối
     # việc của chính mình.
-    "chutich": 134, "tgd": 134, "bks": 134, "cntt": 131, "ir_phapche": 20,
+    "chutich": 135, "tgd": 135, "bks": 135, "cntt": 132, "ir_phapche": 20,
     "ketoan": 109, "tp_dh": 100, "ptgd_doan": 80, "nv_dh": 71, "hcns": 71, "gd_kd": 73,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
@@ -671,7 +702,30 @@ PHAM_VI_DA_CHOT = {
     # được loại đối tượng và phòng ban của mình, hai cửa dữ liệu khách thì không mở. Bảng
     # này đếm MÀN HÌNH chạm tới đâu, nên nó không thấy phần bó ấy — xem
     # `test_q1_bang_diem_theo_pham_vi` để biết cửa thật hẹp tới đâu.
-    "gd_doi_xe": 35, "hanh_chinh": 33, "tp_hd": 30, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
+    # ── ĐỢT HD-DG3, 16/10/2026 (Chủ tịch chốt) — +1 cho SÁU VAI ───────────────────────────
+    # Màn hình `/duyet-cong-bo` nhận MỘT tiền tố riêng `/api/v1/cong-bo`. Riêng chứ không gắn
+    # nhờ vào `/api/v1/danh-gia`: đây là việc CÔNG BỐ, và Chủ tịch chốt cùng ngày rằng quyền
+    # xem, xử lý khiếu nại, công bố và gỡ nội dung phải tách riêng — gắn nhờ là mọi vai đọc
+    # được bảng điểm cũng chạm được cửa đăng.
+    #
+    # `tp_hd` 30 → 31 LÀ CHỖ CẦN ĐỌC KỸ. Chủ tịch muốn thêm ĐÚNG MỘT NGƯỜI duyệt (anh Nguyễn
+    # Tất Thắng), không phải cả vai. Nhưng `pham_vi_api()` suy quyền gọi API thuần từ VAI TRÒ và
+    # không đọc `user_grants`, nên quyền cấp đích danh KHÔNG mở được một màn hình mới — đo được:
+    # cấp đủ cả dòng `menu` lẫn dòng `capability` mà vẫn 403. Nên vai `tp_hd` phải có tên, và
+    # hệ quả là MỌI Trưởng phòng Hướng dẫn THẤY hàng đợi.
+    #
+    # Chịu được, vì bảng này đếm MÀN HÌNH chạm tới đâu chứ không đếm NÚT bấm được gì: Đợt HD-Q1
+    # đã cho `tp_hd` đọc đúng những nhận xét ấy trên bảng điểm, nên +1 này không mở thêm một dữ
+    # liệu nào. Cái KHÔNG nới là nút: hai cửa ghi hỏi `dong_y.ai_duyet_duoc`, và chỉ người có
+    # năng lực `duyet_cong_bo_nhan_xet` còn hạn mới qua — xem `test_dg3_dong_y_cong_khai`.
+    #
+    # `bks` và `robot_ks` +1 theo bất biến BASE_VIEW, nhưng `dong_y` chặn đích danh hai vai ấy ở
+    # nút bấm: cơ quan kiểm soát mà tự công bố nội dung thì không còn kiểm soát được việc công
+    # bố, và một con robot bấm nút đăng là nội dung ra ngoài không ai ký.
+    #
+    # SÁU CON SỐ NÀY ĐO ĐƯỢC, KHÔNG ĐOÁN: chạy `len(AC.pham_vi_day_du(vai))` trên chính cây này
+    # sau khi vá, trước khi viết vào đây.
+    "gd_doi_xe": 35, "hanh_chinh": 33, "tp_hd": 31, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
@@ -713,7 +767,7 @@ PHAM_VI_DA_CHOT = {
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
     "ketoan_truong": 109, "ketoan_tt": 31, "thu_quy": 27,
-    "robot_pq": 18, "robot_ks": 134, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 135, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

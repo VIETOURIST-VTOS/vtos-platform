@@ -513,7 +513,10 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "8.4.5", ten: "Rà soát cột tiền", href: "/ra-soat-cot-tien", them: true },
           // Đợt HD-Q2mh 16/10/2026. Đứng trong "Giám sát" cạnh Nhật ký hệ thống vì cùng một việc:
           // nhìn lại hệ thống đã làm gì. Khác ở chỗ nhật ký ghi thao tác GHI, mục này đếm lượt ĐỌC.
-          { ma: "8.4.6", ten: "Đếm lượt mở cửa đọc", href: "/dem-luot-doc", them: true }
+          { ma: "8.4.6", ten: "Đếm lượt mở cửa đọc", href: "/dem-luot-doc", them: true },
+          // Đợt HD-DG3 16/10/2026. Trong "Giám sát" cùng hai mục trên, nhưng đây là mục DUY
+          // NHẤT của nhóm có nút ghi: nó quyết một lời của khách có lên hồ sơ công khai không.
+          { ma: "8.4.7", ten: "Duyệt công bố nhận xét", href: "/duyet-cong-bo", them: true }
         ] }
     ] },
 ];

@@ -78,6 +78,15 @@ CONG_KHAI: dict[str, str] = {
     "POST /api/v1/facebook/webhook": (
         "Facebook gọi vào, xác thực bằng chữ ký X-Hub-Signature-256 kiểm trong IB.fb_verify_signature. "
         "Không có người dùng ở đầu kia nên không có vai trò để khai."),
+    # Đợt HD-DG3, 16/10/2026. CỬA RA ĐƯỜNG THỨ HAI có người thật ở đầu kia, cùng hình với cửa
+    # khảo sát ngay trên và khác hẳn các dòng webhook: đầu kia là KHÁCH HÀNG, không có tài khoản.
+    "POST /api/v1/rut-dong-y/{ma}": (
+        "Khách TỰ RÚT đồng ý đăng nhận xét lên hồ sơ hướng dẫn viên công khai (Chủ tịch chốt "
+        "16/10/2026). Thay cho đăng nhập: một mã sinh bằng secrets.token_urlsafe(24) gửi trong "
+        "chính email khảo sát, chỉ ĐỔI ĐƯỢC TRẠNG THÁI MỘT LẦN, có hạn, kèm phanh số lần thử "
+        "theo địa chỉ mạng. Cửa CHỈ RÚT: nó không trả về nhận xét, không trả về tên hướng dẫn "
+        "viên, không trả về một trường dữ liệu nào — nên dù ai cầm được đường dẫn cũng không đọc "
+        "được gì. Mã sai và mã đã dùng trả về ĐÚNG MỘT câu giống nhau, để cửa không thành máy dò."),
     "POST /api/v1/tong-dai/cuoc-goi/{ma}": (
         "Tổng đài gọi vào khi có cuộc gọi tới, xác thực bằng mã đường dẫn bí mật cấp riêng cho nhà "
         "cung cấp tổng đài. Không có người dùng ở đầu kia nên không có vai trò để khai."),
@@ -98,6 +107,14 @@ TOKEN_VIET_TAY: dict[str, str] = {
 # {đường dẫn: "tệp_dịch_vụ:tên_hàm"} — hàm ấy PHẢI có chặn vai trò hoặc cổng một cửa. Phép thử mở
 # đúng hàm ấy ra đọc; khai sai hoặc ai đó gỡ chặn đi thì đỏ.
 CHAN_TANG_DICH_VU: dict[str, str] = {
+    # Đợt HD-DG3, 16/10/2026. HAI CỬA NÀY CHẶN THEO NGƯỜI, KHÔNG THEO VAI, và đó là lý do chúng
+    # không khai được bằng `require_roles`. Hai vai duyệt được theo vai trò (Chủ tịch, TGĐ); người
+    # thứ ba duyệt bằng năng lực `duyet_cong_bo_nhan_xet` cấp đích danh có hạn trong `user_grants`.
+    # Một danh sách vai cố định ở chữ ký hàm sẽ nói SAI về cửa này: nó sẽ hoặc bỏ sót người thứ ba,
+    # hoặc mở cho cả vai `tp_hd` — mà mở cả vai đúng là điều Chủ tịch không chọn.
+    # `dong_y.ai_duyet_duoc` là chỗ chặn thật, và nó còn trả về BẤM BẰNG QUYỀN NÀO để ghi vào sổ.
+    "POST /api/v1/cong-bo/{danh_gia_id}/duyet": "dong_y:duyet",
+    "POST /api/v1/cong-bo/{danh_gia_id}/go": "dong_y:go",
     "POST /api/v1/tours": "tours:create",
     "PUT /api/v1/tours/{tid}": "tours:edit",
     "POST /api/v1/tours/{tid}/submit": "tours:submit",
@@ -138,6 +155,14 @@ CHAN_TANG_DICH_VU: dict[str, str] = {
 DAU_HIEU_CHAN = (
     "u.role not in", "u.role in", "role not in", "AC.require", "require_roles",
     "u.id != ", "u.id not in", "_assert", "HTTPException(403", 'Gate("CONG_6"',
+    # Đợt HD-DG3, 16/10/2026 — HÌNH CHẶN THỨ MƯỜI MỘT: một hàm trả về (được hay không, bằng
+    # quyền nào). Thêm vào đây vì hai cửa duyệt công bố chặn THEO NGƯỜI chứ không theo vai —
+    # quyền của người thứ ba nằm ở `user_grants`, nên không có danh sách vai nào viết ra được.
+    #
+    # Dấu hiệu này HẸP, cố ý: `ai_duyet_duoc` là một cái tên có đúng một nơi định nghĩa, không
+    # phải một mẫu chung như "role" mà bất cứ dòng nào nhắc tới vai trò cũng khớp. Thêm một dấu
+    # hiệu rộng vào danh sách này là làm cả bộ kiểm im lặng ở những chỗ nó đang nói.
+    "ai_duyet_duoc",
 )
 
 # --------------------------------------------------------------------------- chặn viết ngay tại chỗ
