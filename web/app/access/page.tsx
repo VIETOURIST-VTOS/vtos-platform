@@ -6,11 +6,16 @@ import { Tag, errMsg } from "@/components/ui";
 
 import MatKhauCongKhai from "@/components/MatKhauCongKhai";
 import HoSoNhanVien from "@/components/HoSoNhanVien";
+import SuaTaiKhoan from "@/components/SuaTaiKhoan";
 /** Tài khoản & phân quyền (đặc tả 07/9/2026, phần B).
  *
  *  Màn hình này CÔNG BỐ ma trận quyền chứ không sửa nó: ma trận nằm trong mã nguồn, có phép thử tự động
- *  canh và có lịch sử thay đổi trong git. Thứ sửa được ở đây chỉ có ba – ai ở vai trò nào, tài khoản mở
- *  hay khóa, và pháp nhân chủ quản. */
+ *  canh và có lịch sử thay đổi trong git.
+ *
+ *  HS-6 · 16/10/2026 — nút «Sửa» mở hộp gom sáu việc trên cùng một con người: sửa mã NV · họ tên ·
+ *  phòng, gán pháp nhân, đánh dấu ngoài biên chế, khoá đăng nhập, đặt lại mật khẩu, ghi nhận nghỉ
+ *  việc, xoá bản ghi. Trước vòng này ba việc cuối nằm ở hai màn hình khác. Không cửa máy chủ nào
+ *  được viết thêm — chỉ nối màn hình vào cửa đã có. */
 const TABS: [string, string][] = [
   ["accounts", "Tài khoản"], ["matrix", "Ma trận quyền"],
   ["luongviec", "Luồng công việc"],
@@ -52,6 +57,12 @@ function AccessPage() {
   // quyền hay hệ thống lỗi. Muốn mở cho lãnh đạo thì sửa HR_WRITE ở máy chủ, một dòng, có người
   // quyết — không phải nới ở màn hình.
   const canDatLaiMK = ["cntt", "hcns"].includes(role);
+  // HS-6 · 16/10/2026 — ĐÚNG CÁI BỆNH TRÊN, Ở NÚT BÊN CẠNH, mà chú thích trên bỏ sót suốt.
+  // `PUT /users/{id}` (khoá/mở đăng nhập) cũng khai `require_roles(*HR_WRITE)` = hcns + cntt.
+  // Màn hình cũ gác nút «Khoá» bằng `canWrite` (bốn vai), nên Chủ tịch và TGĐ bấm vào nhận 403.
+  // Cùng một danh sách với `canDatLaiMK`, nhưng để riêng một tên: hai nút gọi hai cửa khác nhau,
+  // ngày nào một cửa đổi vai thì sửa đúng một dòng chứ không phải đi tìm chỗ dùng chung.
+  const canKhoa = ["cntt", "hcns"].includes(role);
   const laLanhDao = ["chutich", "tgd"].includes(role);
   const [tab, setTab] = useState("accounts");
   const [acc, setAcc] = useState<any>(null);
@@ -63,6 +74,7 @@ function AccessPage() {
   const [grants, setGrants] = useState<any>(null);
   const [tcUid, setTcUid] = useState<number | null>(null);
   const [hsUid, setHsUid] = useState<number | null>(null);      // HS-2: hồ sơ đang mở
+  const [suaUid, setSuaUid] = useState<number | null>(null);    // HS-6: hộp Sửa đang mở
   const [hsTen, setHsTen] = useState("");
   const [tc, setTc] = useState<any>(null);
   const [tcVai, setTcVai] = useState("");
@@ -222,8 +234,10 @@ function AccessPage() {
           <td style={{ whiteSpace: "nowrap" }}>
             <button className="act grey" style={{ margin: 0, marginRight: 4 }}
               onClick={() => { setTcUid(r.id); setTab("tracuu"); }}>Xem quyền</button>
-            {canWrite && <button className="act" style={{ margin: 0, marginRight: 4 }}
+            {canKhoa && <button className="act" style={{ margin: 0, marginRight: 4 }}
               onClick={() => send(`/users/${r.id}`, { active: !r.active }, "PUT")}>{r.active ? "Khóa" : "Mở lại"}</button>}
+            <button className="act grey" style={{ margin: 0, marginRight: 4 }}
+              onClick={() => { setSuaUid(suaUid === r.id ? null : r.id); setHsUid(null); }}>Sửa</button>
             {/* ĐẶT LẠI MẬT KHẨU — 12/10/2026. Cửa máy chủ đã có từ lâu và mở cho đúng hcns + cntt,
                 nhưng KHÔNG một màn hình nào gọi tới nó, nên trên thực tế nó chưa tồn tại: CNTT muốn
                 giúp một người quên mật khẩu thì chỉ có nút "Nạp + đặt lại = mã NV" ở màn hình Nhân
@@ -248,6 +262,12 @@ function AccessPage() {
         </tr>)}</tbody></table></div>
 
       {hsUid !== null && <HoSoNhanVien uid={hsUid} hoTen={hsTen} onClose={() => setHsUid(null)} />}
+
+      {suaUid !== null && acc && <SuaTaiKhoan
+        r={acc.rows.find((x: any) => x.id === suaUid)}
+        acc={acc} vaiNguoiDung={role}
+        onClose={() => setSuaUid(null)}
+        onDone={(m: string) => { toast(m); loadAcc(); loadGaps(); }} />}
 
       {grants?.rows?.length > 0 && <>
         <h3 style={{ marginTop: 18 }}>Ngoại lệ quyền có thời hạn</h3>

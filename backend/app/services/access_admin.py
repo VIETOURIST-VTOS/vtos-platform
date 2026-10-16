@@ -68,6 +68,11 @@ def danh_sach_tai_khoan(db: Session) -> list[dict]:
             "chua_dang_nhap": u.last_login is None,
             "role_changed_at": u.role_changed_at, "role_changed_by": u.role_changed_by,
             "ho_so": e.code if e else "", "ho_so_active": bool(e.active) if e else None,
+            # HS-6 · 16/10/2026 — ID hồ sơ, không chỉ mã. Cửa ghi nghỉ việc
+            # (`POST /bien-dong-ns/nghi-viec`) làm việc theo `employee_id`, nên màn hình
+            # Tài khoản chỉ có mã thì phải tra thêm một lượt — và lượt tra ấy là chỗ sinh ra
+            # cách nối thứ hai giữa tài khoản và hồ sơ. Trả thẳng ID ở đây để chỉ còn một cách.
+            "ho_so_id": e.id if e else None,
         })
     return ra
 
