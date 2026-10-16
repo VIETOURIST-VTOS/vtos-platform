@@ -72,9 +72,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ĐỦ BỘ — chỉ trên PR (và khi bấm tay). Đây là cửa CHẶN.
+  # ĐỦ BỘ — trên PR (cửa CHẶN) VÀ trên main (cửa ĐO).
+  #
+  # CHẠY CẢ TRÊN PUSH TỪ 16/10/2026 — Chủ tịch quyết, sau một ngày mất vì đúng chỗ hở này.
+  #
+  # Trước đó việc này khai `if: github.event_name != 'push'`, với lý do nghe rất hợp: mã đã vào
+  # kho rồi, chạy lại trên main thì chặn được gì nữa. Lý do ấy BỎ SÓT một chuyện: cửa chặn trên
+  # PR đo nhánh gộp với main TẠI LÚC CHẠY. Hai PR cùng xanh riêng lẻ, gộp lần lượt, cái thứ hai
+  # có thể làm đỏ — và vì backend không chạy trên main, KHÔNG AI THẤY.
+  #
+  # Chuyện đã xảy ra thật, ngày 16/10/2026: PR #370 mở `GET /api/v1/fleet/bhxh-doi-xe` mà chưa
+  # khai vào bảng cửa lương đã ký. `test_lg5` đỏ. Nó nằm im trên main cho đến khi PR #367 gộp
+  # main vào và ĂN NGUYÊN cái đỏ ấy — làn R3a mất một vòng cho một lỗi không phải của họ.
+  #
+  # GIÁ PHẢI TRẢ, nói thẳng: mỗi lần gộp tốn thêm ~45 phút máy chạy. Đổi lại, main đỏ thì biết
+  # NGAY và biết ĐÍCH DANH lần gộp nào làm đỏ, thay vì để làn sau phát hiện hộ.
+  #
+  # `docker` GIỮ NGUYÊN điều kiện: nó `needs: [backend, web]` nên trên main nó sẽ chờ thêm 45
+  # phút chỉ để dựng một ảnh không ai dùng tới. Hai việc khác nhau, không gộp một quyết định.
   backend:
-    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: backend } }
     steps:

@@ -5,6 +5,7 @@ import { api, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 import MatKhauCongKhai from "@/components/MatKhauCongKhai";
+import HoSoNhanVien from "@/components/HoSoNhanVien";
 /** Tài khoản & phân quyền (đặc tả 07/9/2026, phần B).
  *
  *  Màn hình này CÔNG BỐ ma trận quyền chứ không sửa nó: ma trận nằm trong mã nguồn, có phép thử tự động
@@ -61,6 +62,8 @@ function AccessPage() {
   const [loc, setLoc] = useState("");          // bộ lọc nhanh
   const [grants, setGrants] = useState<any>(null);
   const [tcUid, setTcUid] = useState<number | null>(null);
+  const [hsUid, setHsUid] = useState<number | null>(null);      // HS-2: hồ sơ đang mở
+  const [hsTen, setHsTen] = useState("");
   const [tc, setTc] = useState<any>(null);
   const [tcVai, setTcVai] = useState("");
   const [suy, setSuy] = useState<any>(null);
@@ -203,7 +206,19 @@ function AccessPage() {
           <td>{r.active ? <Tag cls="ok">hoạt động</Tag> : <Tag cls="warn">đã khóa</Tag>}</td>
           <td>{r.last_login ? fmtDT(r.last_login) : <Tag cls="warn">chưa bao giờ</Tag>}</td>
           <td>{r.must_change_password ? <Tag cls="warn">tạm – phải đổi</Tag> : "đã đổi"}</td>
-          <td>{r.ho_so || <Tag cls="warn">không có</Tag>}</td>
+          {/* HS-2 · 16/10/2026 — Chủ tịch đặc tả 15/10: bấm vào SỐ HỒ SƠ thì mở chi tiết nhân
+              viên. Nút chỉ hiện khi có mã hồ sơ: không có mã thì không có hồ sơ để mở, và một nút
+              bấm vào báo lỗi tệ hơn không có nút.
+
+              Màn hình KHÔNG tự quyết ai xem được gì. Nó gọi cửa rồi vẽ đúng phần cửa trả về; vai
+              không đủ quyền thì cửa trả 403 và chỗ này in ra câu từ chối của máy chủ. */}
+          <td>{r.ho_so
+            ? <button className="act grey" style={{ margin: 0, padding: "2px 8px" }}
+                title="Mở hồ sơ nhân viên — chỉ hiện những phần vai của bạn được xem"
+                onClick={() => { setHsUid(hsUid === r.id ? null : r.id); setHsTen(r.full_name); }}>
+                {r.ho_so}
+              </button>
+            : <Tag cls="warn">không có</Tag>}</td>
           <td style={{ whiteSpace: "nowrap" }}>
             <button className="act grey" style={{ margin: 0, marginRight: 4 }}
               onClick={() => { setTcUid(r.id); setTab("tracuu"); }}>Xem quyền</button>
@@ -231,6 +246,8 @@ function AccessPage() {
               }}>Đặt lại MK</button>}
           </td>
         </tr>)}</tbody></table></div>
+
+      {hsUid !== null && <HoSoNhanVien uid={hsUid} hoTen={hsTen} onClose={() => setHsUid(null)} />}
 
       {grants?.rows?.length > 0 && <>
         <h3 style={{ marginTop: 18 }}>Ngoại lệ quyền có thời hạn</h3>
