@@ -20,7 +20,13 @@ function DoiXe() {
   const [xe, setXe] = useState<any[]>([]);
   const [chon, setChon] = useState<any>(null);
   const [xm, setXm] = useState<any[]>([]);
-  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan" | "congno" | "baoduong" | "baohong">("xe");
+  const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan" | "congno" | "baoduong" | "baohong" | "nhinlai">("xe");
+  // DX-2 · 16/10/2026 — báo cáo NHÌN LẠI. Nạp RIÊNG, không nhét vào `load()` chung: nó quét toàn
+  // bộ chặng phương tiện và đối chiếu từng ngày với nhật trình xe, nên nặng hơn hẳn các khối kia.
+  // Nhét chung thì mở màn hình Hồ sơ xe cũng phải chờ một phép quét không ai hỏi tới.
+  const [nl, setNl] = useState<any>(null);
+  const [nlKy, setNlKy] = useState("");             // YYYY-MM, rỗng = để máy chủ lấy tháng trước
+  const [nlDang, setNlDang] = useState(false);
   const [bh, setBh] = useState<any>(null);          // sổ báo hư hỏng của cả đội
   const [bd, setBd] = useState<any>(null);          // tình trạng bảo dưỡng của cả đội
   const [bdLs, setBdLs] = useState<any[]>([]);      // lịch sử phiếu bảo dưỡng
@@ -51,6 +57,11 @@ function DoiXe() {
       const t = new URLSearchParams(window.location.search).get("tab");
       if (t === "bao-duong") setTab("baoduong");
       if (t === "bao-hong") setTab("baohong");
+      // DL-6 · 16/10/2026: ô đếm «chuyến sinh từ lệnh còn thiếu số thật» trên màn hình Lệnh điều
+      // xe trỏ sang đây. Không trỏ tới từng chuyến mà tới đúng tab chứa nhật trình: trỏ sâu hơn
+      // đòi một mã mở sẵn một dòng, và một đường dẫn hứa nhiều hơn nó làm được thì tệ hơn.
+      if (t === "chuyen") setTab("chuyen");
+      if (t === "nhin-lai") setTab("nhinlai");
     } catch { /* không có địa chỉ thì giữ tab mặc định */ }
   }, []);
 
@@ -228,7 +239,8 @@ function DoiXe() {
     <p className="muted">{tq.ghi_chu}{tq.chan_khi_thieu_giay ? " Đang BẬT chế độ chặn khi thiếu giấy tờ." : " Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo, chưa dừng lệnh điều xe."}</p>
 
     <div style={{ display: "flex", gap: 8, margin: "10px 0" }}>
-      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`], ["congno", "Công nợ đội xe"], ["baoduong", bd ? `Bảo dưỡng (${(bd.theo_muc?.BLOCK || 0) + (bd.theo_muc?.REVIEW || 0)} cần xếp lịch)` : "Bảo dưỡng"], ["baohong", bh ? `Báo hỏng (${bh.dem?.dang_mo || 0} đang mở)` : "Báo hỏng"]] as const)
+      {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`], ["congno", "Công nợ đội xe"], ["baoduong", bd ? `Bảo dưỡng (${(bd.theo_muc?.BLOCK || 0) + (bd.theo_muc?.REVIEW || 0)} cần xếp lịch)` : "Bảo dưỡng"], ["baohong", bh ? `Báo hỏng (${bh.dem?.dang_mo || 0} đang mở)` : "Báo hỏng"],
+        ["nhinlai", "Nhìn lại"]] as const)
         .map(([k, ten]) => <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} onClick={() => setTab(k as any)}>{ten}</button>)}
     </div>
 
@@ -826,6 +838,89 @@ function DoiXe() {
 
     {/* BÁO HƯ HỎNG — hàng đợi của đội xe. Sổ này KHÔNG có cột tiền, và đó là chủ ý: tiền xuất hiện
         ở bước sau, bằng một đề nghị chi loại `sua_chua_xe` do chính đội xe lập khi có báo giá. */}
+    {/* ═══════════ DX-2 · NHÌN LẠI: đã trả tiền thuê xe ngoài trong khi xe nhà đậu ═══════════
+        Gợi ý điều xe nhìn VỀ TRƯỚC — giúp người sắp lập lệnh chọn xe rảnh. Khối này nhìn LẠI, và
+        trả lời câu khác: tháng vừa rồi đã trả bao nhiêu ra ngoài một cách không cần thiết. Đó là
+        câu làm người ta đổi cách làm; con số đã bắt được là 51.348.800 đ nhóm A tháng 9/2026.
+
+        BA NHÓM, KHÔNG MỘT CON SỐ — gộp lại thành «đã phí bao nhiêu» là cách chắc chắn để không ai
+        tin bảng này sau lần thứ hai. Và KHÔNG có nút «gắn xe vào chặng» ở đây: báo cáo nêu chỗ
+        nghi, người có sổ mới biết chặng ấy thật sự chạy bằng xe nào — đúng lẽ Chủ tịch chốt 18/9
+        với sổ chuyến còn nợ: danh sách và đường dẫn, không sửa hàng loạt từ màn hình tổng. */}
+    {tab === "nhinlai" && <div className="panel wrap"><h2>Nhìn lại — thuê xe ngoài trong khi xe nhà đậu</h2>
+      <p className="muted">Khối này đối chiếu từng chặng ô tô thuê ngoài với nhật trình xe nhà cùng
+        ngày. Xe nhà «rảnh» đọc <b>nhật trình chuyến</b>, không đọc lệnh điều xe — hệ thống đang có
+        rất ít lệnh trong khi nhật trình đầy, nên đếm theo lệnh thì mọi xe trông như rảnh suốt.</p>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "8px 0" }}>
+        <label style={{ margin: 0 }}>Kỳ
+          <input type="month" value={nlKy} onChange={(e) => setNlKy(e.target.value)} /></label>
+        <button className="act teal" disabled={nlDang} onClick={async () => {
+          setNlDang(true);
+          try {
+            const q = nlKy ? `?nam=${nlKy.slice(0, 4)}&thang=${Number(nlKy.slice(5, 7))}` : "";
+            setNl(await api(`/fleet/doi-chieu-xe-ngoai${q}`));
+          } catch (e) { toast(errMsg(e), true); } finally { setNlDang(false); }
+        }}>Soát lại</button>
+        <span className="muted">Để trống thì máy lấy <b>tháng trước</b> — báo cáo nhìn lại mà mặc
+          định tháng này thì nửa tháng đầu luôn gần rỗng.</span>
+      </div>
+
+      {!nl ? <p className="muted">Bấm <b>Soát lại</b> để chạy đối chiếu.</p> : <>
+        <p className="muted">Kỳ {fmtD(nl.tu)} → {fmtD(nl.den)}</p>
+        <div className="kpis">
+          <div className="kpi"><b>{(nl.a_dang_le_khong_can_thue?.tien || 0).toLocaleString("vi-VN")}</b>
+            <span>A · đáng lẽ không cần thuê · {nl.a_dang_le_khong_can_thue?.so_chang || 0} chặng</span></div>
+          <div className="kpi"><b>{nl.b_nghi_khai_nham?.so_chang || 0}</b><span>B · nghi khai nhầm là thuê ngoài</span></div>
+          <div className="kpi"><b>{nl.c_khong_doi_chieu_duoc?.so_chang || 0}</b><span>C · chặng không có ngày</span></div>
+        </div>
+
+        <h3>A · Đáng lẽ không cần thuê</h3>
+        <p className="muted">{nl.a_dang_le_khong_can_thue?.ghi_chu}</p>
+        {nl.a_dang_le_khong_can_thue?.so_chang_chua_co_tien > 0 && <p className="muted">
+          <Tag cls="warn">lưu ý</Tag> {nl.a_dang_le_khong_can_thue.so_chang_chua_co_tien} chặng
+          chưa có thành tiền nên không nằm trong con số trên.</p>}
+        <table><thead><tr><th>Ngày</th><th>Chuyến · chặng</th><th>Nhà xe</th>
+          <th className="num">Tiền</th><th>Xe nhà rảnh hôm ấy</th><th></th></tr></thead>
+          <tbody>{(nl.a_dang_le_khong_can_thue?.danh_sach || []).map((c: any) => <tr key={c.chang_id}>
+            <td>{fmtD(c.ngay)}</td>
+            <td><b>{c.ma_tour}</b><div className="muted">{c.chang} · {c.so_cho_can || "?"} chỗ</div></td>
+            <td>{c.nha_cung_cap}</td>
+            <td className="num">{c.thanh_tien === null ? <span className="muted">chưa có</span>
+              : c.thanh_tien.toLocaleString("vi-VN")}</td>
+            <td>{c.xe_nha_ranh.map((v: any) => <Tag key={v.id} cls="ok">{v.ma} · {v.bien} · {v.ghe} chỗ</Tag>)}
+              {c.so_xe_ranh > c.xe_nha_ranh.length && <span className="muted"> và {c.so_xe_ranh - c.xe_nha_ranh.length} xe nữa</span>}</td>
+            <td><a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}`}>Mở tờ quyết toán</a></td>
+          </tr>)}{!(nl.a_dang_le_khong_can_thue?.danh_sach || []).length
+            && <tr><td colSpan={6} className="muted">Kỳ này không có chặng nào đáng lẽ không cần thuê.</td></tr>}</tbody></table>
+
+        <h3>B · Nghi khai nhầm là thuê ngoài</h3>
+        <p className="muted">{nl.b_nghi_khai_nham?.ghi_chu}</p>
+        <table><thead><tr><th>Chuyến · chặng</th><th>Biển trên chặng</th><th>Trùng xe</th>
+          <th className="num">Tiền</th><th></th></tr></thead>
+          <tbody>{(nl.b_nghi_khai_nham?.danh_sach || []).map((c: any) => <tr key={c.chang_id}>
+            <td><b>{c.ma_tour}</b><div className="muted">{c.chang}</div></td>
+            <td>{c.so_hieu}</td>
+            <td><Tag cls="warn">{c.ma_xe} · {c.xe_trong_danh_muc}</Tag></td>
+            <td className="num">{c.thanh_tien === null ? <span className="muted">chưa có</span>
+              : c.thanh_tien.toLocaleString("vi-VN")}</td>
+            <td><a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}`}>Mở tờ quyết toán</a></td>
+          </tr>)}{!(nl.b_nghi_khai_nham?.danh_sach || []).length
+            && <tr><td colSpan={5} className="muted">Không có chặng nào nghi khai nhầm.</td></tr>}</tbody></table>
+
+        <h3>C · Không đối chiếu được</h3>
+        <p className="muted">{nl.c_khong_doi_chieu_duoc?.ghi_chu}</p>
+        <table><thead><tr><th>Chuyến · chặng</th><th>Nhà xe</th><th className="num">Tiền</th><th></th></tr></thead>
+          <tbody>{(nl.c_khong_doi_chieu_duoc?.danh_sach || []).map((c: any) => <tr key={c.chang_id}>
+            <td><b>{c.ma_tour}</b><div className="muted">{c.chang}</div></td>
+            <td>{c.nha_cung_cap}</td>
+            <td className="num">{c.thanh_tien === null ? <span className="muted">chưa có</span>
+              : c.thanh_tien.toLocaleString("vi-VN")}</td>
+            <td><a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}`}>Mở tờ quyết toán</a></td>
+          </tr>)}{!(nl.c_khong_doi_chieu_duoc?.danh_sach || []).length
+            && <tr><td colSpan={4} className="muted">Mọi chặng thuê ngoài đều đã có ngày.</td></tr>}</tbody></table>
+      </>}
+    </div>}
+
     {tab === "baohong" && <>
       <div className="panel"><h2>Báo hư hỏng</h2>
         <p className="muted">Tài xế báo xe nào hỏng gì, <b>không kèm tiền</b>. Xe có báo hỏng mức

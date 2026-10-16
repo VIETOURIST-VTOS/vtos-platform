@@ -1631,7 +1631,11 @@ def ds_lenh(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_d
                     "so_ngay": (d.date_to - d.date_from).days + 1, "internal_price": (d.internal_price or 0),
                     "status": d.status, "created_by": d.created_by, "confirmed_at": d.confirmed_at,
                     "theo_goi_y": bool(d.phuong_an_da_chon) and not d.ly_do_khac_goi_y,
-                    "phuong_an_da_chon": d.phuong_an_da_chon, "ly_do_khac_goi_y": d.ly_do_khac_goi_y})
+                    "phuong_an_da_chon": d.phuong_an_da_chon, "ly_do_khac_goi_y": d.ly_do_khac_goi_y,
+                    # DL-5 · 15/10/2026: màn hình gửi lại con số này khi đổi xe. Thiếu nó thì màn
+                    # hình gửi `undefined`, `kiem_phien_ban` cho qua theo đúng luật "chưa gửi thì
+                    # không chặn", và khoá chống ghi đè tắt lặng lẽ – đúng kiểu báo an toàn giả.
+                    "phien_ban": d.phien_ban})
     return out
 
 
@@ -2066,6 +2070,159 @@ def hq_theo_ky(moc: date | None = None, u: User = Depends(require_roles(*READ)),
     o = HQ.theo_ky(db, moc or hom_nay, hom_nay=hom_nay)
     o["ky_co_chuyen"] = HQ.ky_co_chuyen(db)
     return o
+
+
+# ══════════════════ DX-4 · BHXH phần công ty đóng — CỬA ĐỐI CHIẾU, không phải cửa ghi
+#
+# Phía đội xe ĐÃ CÓ cửa nhập (nhóm `bhxh` của chi phí kỳ). Cái thiếu là một phép soi lại: con số
+# nhập tay không có gì đối chiếu, gõ nhầm một chữ số hay quên một kỳ thì giá vốn đội xe lệch mà
+# không ai biết. Cửa này đặt số máy tính cạnh số nhập tay rồi DỪNG — ranh giới Chủ tịch đặt
+# 09/9/2026: hệ thống viết phép tính, người của bộ phận nhập số liệu.
+@router.get("/bhxh-doi-xe")
+def bhxh_doi_xe(ky: str = "", u: User = Depends(require_roles(*READ)),
+                db: Session = Depends(get_db)):
+    """Đối chiếu BHXH phần công ty đóng của đội xe một kỳ (YYYY-MM)."""
+    from app.services import bhxh_cong_ty as BH
+    ky = (ky or "").strip()
+    if not ky:
+        raise HTTPException(422, "Phải chọn kỳ, dạng YYYY-MM")
+    return BH.doi_chieu(db, ky)
+
+
+# ══════════════════ DX-3 · PHẠT TÀI XẾ (vào lương) và GIÁ DẦU THEO NGÀY
+#
+# VAI GHI PHẠT HẸP HƠN `WRITE`: Chủ tịch chốt 16/10/2026 là Giám đốc đội xe ghi. Để nguyên `WRITE`
+# thì Điều hành cũng trừ được lương tài xế — một quyền chưa ai trao.
+#
+# VAI ĐỐI CHIẾU LÀ HCNS, và đó là người KHÁC. Cùng một người vừa ghi vừa đánh dấu đã đối chiếu thì
+# dấu ấy không nói thêm được gì.
+GHI_PHAT = ("cntt", "gd_doi_xe")
+DOI_CHIEU_PHAT = ("cntt", "hcns")
+GHI_GIA_DAU = ("cntt", "ketoan", "gd_doi_xe")
+
+
+class PhatVao(BaseModel):
+    driver_id: int
+    ky: str
+    ngay: date
+    so_tien: float
+    ly_do: str = ""
+    trip_id: int | None = None
+    vehicle_id: int | None = None
+
+
+@router.get("/phat-tai-xe")
+def ds_phat(ky: str = "", driver_id: int = 0, u: User = Depends(require_roles(*READ)),
+            db: Session = Depends(get_db)):
+    """Sổ phạt tài xế. `chua_doi_chieu` là con số HCNS cần nhìn trước khi chốt lương kỳ ấy."""
+    from app.services import phat_va_gia_dau as PG
+    return PG.so_phat(db, ky, driver_id or None)
+
+
+@router.post("/phat-tai-xe", status_code=201)
+def them_phat(v: PhatVao, u: User = Depends(require_roles(*GHI_PHAT)),
+              db: Session = Depends(get_db)):
+    from app.services import phat_va_gia_dau as PG
+    try:
+        p = PG.ghi_phat(db, v.driver_id, v.ky, v.ngay, v.so_tien, v.ly_do, u.username,
+                        v.trip_id, v.vehicle_id)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    R.audit(db, u.username, u.role, "phat_tai_xe", f"employee:{v.driver_id}",
+            after={"ky": p.ky, "ngay": p.ngay.isoformat(), "so_tien": float(p.so_tien),
+                   "ly_do": p.ly_do})
+    db.commit()
+    return {"id": p.id, "message": f"Đã ghi khoản phạt kỳ {p.ky}. Khoản này trừ vào LƯƠNG, "
+                                   "không cộng vào chi phí của xe."}
+
+
+@router.post("/phat-tai-xe/{pid}/doi-chieu")
+def doi_chieu_phat(pid: int, u: User = Depends(require_roles(*DOI_CHIEU_PHAT)),
+                   db: Session = Depends(get_db)):
+    """HCNS đánh dấu đã nhìn khoản này khi chốt lương. KHÔNG phải phê duyệt."""
+    from app.models.fleet import PhatTaiXe
+    from app.services import phat_va_gia_dau as PG
+    p = db.get(PhatTaiXe, pid)
+    if not p:
+        raise HTTPException(404, "Không có khoản phạt này")
+    try:
+        PG.hcns_doi_chieu(db, p, u.username)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    R.audit(db, u.username, u.role, "doi_chieu_phat_tai_xe", f"phat:{pid}", after={"ky": p.ky})
+    db.commit()
+    return {"message": f"Đã đối chiếu khoản phạt #{pid}"}
+
+
+class GiaDauVao(BaseModel):
+    ngay: date
+    loai: str = "do"
+    gia_lit: float
+    nguon: str = ""
+
+
+@router.get("/gia-dau")
+def ds_gia_dau(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    from app.models.fleet import GiaDauNgay, LOAI_DAU
+    rows = db.execute(select(GiaDauNgay).order_by(GiaDauNgay.ngay.desc())).scalars()
+    return {"loai": [{"ma": k, "ten": v} for k, v in LOAI_DAU.items()],
+            "rows": [{"id": g.id, "ngay": g.ngay.isoformat(), "loai": g.loai,
+                      "loai_ten": LOAI_DAU.get(g.loai, g.loai), "gia_lit": float(g.gia_lit),
+                      "nguon": g.nguon, "boi": g.boi} for g in rows],
+            "ghi_chu": ("Sao kê thẻ dầu cho TIỀN, không cho lít. Khai giá từng ngày thì ô Tiêu hao "
+                        "mới có số lít để tính. Máy KHÔNG lấy giá gần nhất khi thiếu ngày – giá "
+                        "dầu đổi mười ngày một lần, lấy giá cách đó ba tuần ra số lít sai mà "
+                        "trông vẫn hợp lý.")}
+
+
+@router.post("/gia-dau", status_code=201)
+def them_gia_dau(v: GiaDauVao, u: User = Depends(require_roles(*GHI_GIA_DAU)),
+                 db: Session = Depends(get_db)):
+    """Một giá cho một (ngày, loại). Ghi lại cùng ngày thì ĐÈ giá cũ, không thêm dòng thứ hai."""
+    from app.services import phat_va_gia_dau as PG
+    try:
+        g = PG.ghi_gia(db, v.ngay, v.loai, v.gia_lit, v.nguon, u.username)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    R.audit(db, u.username, u.role, "gia_dau_ngay", f"ngay:{v.ngay.isoformat()}",
+            after={"loai": g.loai, "gia_lit": float(g.gia_lit), "nguon": g.nguon})
+    db.commit()
+    return {"id": g.id, "message": f"Đã khai giá {g.loai} ngày {g.ngay.isoformat()}"}
+
+
+# ══════════════════ DX-2 · BÁO CÁO NHÌN LẠI: thuê xe ngoài trong khi xe nhà đậu
+#
+# Chủ tịch chọn việc này trước năm việc còn lại của đội xe (16/10/2026): nó là thứ đã bắt được
+# 51.348.800 đ nhóm A tháng 9/2026.
+#
+# CỬA ĐỌC THUẦN, không có cửa ghi đi kèm — có chủ đích. Báo cáo này nêu ra chỗ nghi, người có sổ
+# mới biết chặng ấy thật sự chạy bằng xe nào. Dựng thêm một nút «gắn xe vào chặng» ngay đây là mời
+# người ta sửa sổ quyết toán từ một màn hình không hiển thị tờ quyết toán — đúng lẽ Chủ tịch đã
+# chốt 18/9 với sổ chuyến còn nợ: danh sách và đường dẫn, không làm hàng loạt từ màn hình tổng.
+@router.get("/doi-chieu-xe-ngoai")
+def doi_chieu_xe_ngoai(tu: str = "", den: str = "", nam: int = 0, thang: int = 0,
+                       u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Đối chiếu chặng ô tô thuê ngoài với xe nhà rảnh cùng ngày, theo kỳ.
+
+    Nhận kỳ theo hai cách: `nam`+`thang`, hoặc `tu`+`den`. Thiếu cả hai thì lấy tháng trước —
+    báo cáo nhìn lại mà mặc định là tháng này thì nửa tháng đầu nó luôn gần rỗng.
+    """
+    from datetime import date as _date
+    from app.services import doi_chieu_xe_ngoai as DX
+    if nam and thang:
+        d1, d2 = DX.ky_thang(nam, thang)
+    elif tu and den:
+        try:
+            d1, d2 = _date.fromisoformat(tu), _date.fromisoformat(den)
+        except ValueError:
+            raise HTTPException(422, "Ngày phải ở dạng YYYY-MM-DD")
+    else:
+        h = _date.today()
+        d1, d2 = DX.ky_thang(h.year - (h.month == 1), 12 if h.month == 1 else h.month - 1)
+    try:
+        return DX.soat(db, d1, d2)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
 
 
 @router.get("/dinh-muc-dau")
