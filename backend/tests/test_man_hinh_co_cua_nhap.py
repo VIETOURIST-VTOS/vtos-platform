@@ -46,8 +46,6 @@ CHI_XEM = {
     "/hieu-qua-doi-xe": ("Chi phí & hiệu quả đội xe: tính từ nhật trình chuyến, nhiên liệu, phí cầu "
                          "đường, bảo dưỡng – tất cả đều có bộ nạp riêng ở màn hình Nạp dữ liệu.",
                          ("/fleet/ban-tin-sang", "/fleet/hieu-qua")),
-    "/audit": ("Nhật ký nghiệp vụ: mọi thao tác ghi ở màn hình khác đều để lại một dòng ở đây. Màn "
-               "hình này mà ghi được thì nhật ký thôi là nhật ký.", ("/audit",)),
     "/phieu-luong": ("Phiếu lương của tôi: kỳ lương do HCNS chốt ở màn hình Lương, thưởng & hoa "
                      "hồng. Người xem phiếu không sửa được phiếu của chính mình.",
                      ("/phieu-luong/ky-cua-toi",)),
@@ -120,10 +118,44 @@ BAN_LAM_VIEC = {
                      "POST /api/v1/requests"),
 }
 
-# Hai nhóm gộp lại mới là toàn bộ màn hình không có cửa ghi. Khoá tên riêng để không nhóm nào lặng
+# ── NHẬT KÝ MÁY GHI — nhóm ĐẾM RIÊNG, mở ngày 16/10/2026 ───────────────────────────────────────
+#
+# TÁCH NHÓM CHỨ KHÔNG NÂNG TRẦN, đúng điều tệp này đã tự dặn ở `test_danh_sach_chi_xem_co_tran`:
+# "Tới dòng thứ MƯỜI thì dừng nâng và tách nhóm, đúng cách vòng 3/3 đã làm với bàn làm việc."
+# Đợt HD-Q2mh tới đúng dòng thứ mười. Nâng trần lần thứ tư là làm đúng cái đã tự dặn đừng làm.
+#
+# VÀ CÂU HỎI CỦA NHÓM NÀY KHÁC HẲN CÂU HỎI CỦA CHI_XEM. CHI_XEM hỏi "con số này vào hệ thống bằng
+# cửa nào", và mốc nó đặt ra cho lần sau là "chỉ RA ĐƯỢC từng cửa nhập thật của từng con số".
+# Nhóm này KHÔNG trả lời được câu ấy, và đó không phải vì thiếu sót: số trong các bảng này do MÁY
+# ghi, không người nào gõ, và VIỆC KHÔNG CÓ CỬA GHI LÀ MỘT TÍNH CHẤT AN TOÀN. Nhét chúng vào
+# CHI_XEM là làm hỏng câu hỏi của CHI_XEM — một danh sách trả lời hai câu khác nhau thì không
+# canh được câu nào.
+#
+# Câu nhóm này phải trả lời thay vào đó: VÌ SAO một cửa ghi ở đây sẽ phá đúng thứ bảng ấy sinh ra
+# để giữ. Phần tử thứ ba của mỗi dòng là câu trả lời ấy, và có ca canh nó không được để trống.
+NHAT_KY_MAY_GHI = {
+    "/audit": ("Nhật ký nghiệp vụ: mọi thao tác ghi ở màn hình khác đều để lại một dòng ở đây. "
+               "Không màn hình nào nhập vào bảng này — máy chủ tự ghi đúng lúc có thao tác.",
+               ("/audit",),
+               "Nhật ký này là chuỗi bất biến, mỗi bản ghi băm nối vào bản ghi trước. Gõ tay được "
+               "vào đây thì dựng được một dòng cho việc chưa ai làm, hoặc sửa được một dòng đã có "
+               "— mà chống đúng hai chuyện ấy là lý do nhật ký tồn tại."),
+    "/dem-luot-doc": ("Đếm lượt mở cửa đọc: mỗi người × mỗi cửa × mỗi ngày một dòng, do bộ đếm ở "
+                      "`services/dem_luot.py` tự ghi mỗi lần ai mở một cửa đọc đã khai. Màn hình "
+                      "chỉ đọc lại con số máy chủ đã cộng, kể cả lượt trung bình mỗi ngày.",
+                      ("/danh-gia/dem-luot",),
+                      "Bảng này dùng để Chủ tịch quyết thu hẹp quyền đọc của một phòng. Gõ tay "
+                      "được vào nó thì sửa được chính con số dùng để quyết — và người có động cơ "
+                      "sửa đúng là người sắp bị siết. Không có cửa ghi là tính chất an toàn, "
+                      "không phải cửa còn thiếu."),
+}
+
+# Ba nhóm gộp lại mới là toàn bộ màn hình không có cửa ghi. Khoá tên riêng để không nhóm nào lặng
 # lẽ nuốt nhóm kia.
-KHONG_CUA_GHI = {**{k: v[:2] for k, v in BAN_LAM_VIEC.items()}, **CHI_XEM}
-assert len(KHONG_CUA_GHI) == len(CHI_XEM) + len(BAN_LAM_VIEC), "hai nhóm không được trùng tên màn hình"
+KHONG_CUA_GHI = {**{k: v[:2] for k, v in BAN_LAM_VIEC.items()},
+                 **{k: v[:2] for k, v in NHAT_KY_MAY_GHI.items()}, **CHI_XEM}
+assert len(KHONG_CUA_GHI) == len(CHI_XEM) + len(BAN_LAM_VIEC) + len(NHAT_KY_MAY_GHI), \
+    "ba nhóm không được trùng tên màn hình"
 
 
 def _ma(src: str) -> str:
@@ -320,3 +352,24 @@ def test_ban_lam_viec_co_tran_rieng_va_chi_duoc_cua_ghi_cua_minh():
     assert not thieu, (
         f"Bàn làm việc khai thiếu CỬA GHI của vai: {thieu}. Phải ghi rõ cửa ghi nằm ở đâu, và chú "
         "thích ngay trên dòng ấy phải nói vì sao nó không nằm trên màn hình này.")
+
+
+def test_nhat_ky_may_ghi_co_tran_rieng_va_phai_noi_vi_sao_khong_co_cua_ghi():
+    """Nhóm nhật ký máy ghi có trần RIÊNG và phải trả lời thêm MỘT CÂU nữa.
+
+    Câu ấy KHÔNG phải câu của CHI_XEM. CHI_XEM hỏi "con số này vào hệ thống bằng cửa nào"; nhóm này
+    không có cửa nào để chỉ, nên nó phải trả lời: vì sao một cửa ghi ở đây sẽ phá đúng thứ bảng ấy
+    sinh ra để giữ. Thiếu câu đó thì nhóm này thành chỗ trốn: bất kỳ màn hình nào thiếu cửa cũng
+    tự gọi mình là «nhật ký máy ghi» rồi đi qua.
+
+    Trần 2: hôm nay đúng hai sổ máy tự ghi có màn hình — nhật ký nghiệp vụ (ghi thao tác GHI) và
+    đếm lượt mở cửa (ghi thao tác ĐỌC). Dòng thứ ba phải dừng lại giải thích, thay vì trôi qua.
+    """
+    assert len(NHAT_KY_MAY_GHI) <= 2, (
+        f"Đang khai {len(NHAT_KY_MAY_GHI)} màn hình nhật ký máy ghi. Mỗi dòng thêm vào đây là một "
+        "bảng nữa không ai nhập được — hỏi lại xem con số ấy có thật do máy sinh không, hay đó là "
+        "một cửa nhập còn thiếu đang mượn tên nhật ký.")
+    thieu = [d for d, x in NHAT_KY_MAY_GHI.items() if len(x) < 3 or len(str(x[2]).strip()) < 60]
+    assert not thieu, (
+        f"Nhật ký máy ghi khai thiếu LÝ DO AN TOÀN: {thieu}. Phải nói rõ một cửa ghi ở đây sẽ phá "
+        "cái gì — không nói được thì đây là cửa còn thiếu, không phải nhật ký.")
