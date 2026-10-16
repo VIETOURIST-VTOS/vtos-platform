@@ -162,3 +162,72 @@ def la_khoan_khac(ma: str | None) -> bool:
     người nhập; đó là việc phải bổ sung danh mục.
     """
     return bool(ma) and ma.endswith("_khac")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ĐỢT R3a 16/10/2026 — BẢNG NỐI SANG KHOẢN MỤC SỔ CÁI
+#
+# VÌ SAO PHẢI CÓ. Hệ thống có HAI danh mục khoản mục, mã khác nhau hoàn toàn:
+#   · danh mục này (55 mã) — dùng khi quyết toán tour: vc_xe_du_lich, lt_khach_san, au_an_trua…
+#   · `khoan_muc_chi_phi.py` (13 mã) — dùng trên SỔ CÁI, ghi vào `JournalLine.item_code`: KM_XE…
+# Hai danh mục tả CÙNG một thứ ngoài đời. Không có bảng nối thì báo cáo "chi phí theo khoản mục"
+# đọc từ sổ cái sẽ KHÔNG BAO GIỜ khớp với bảng quyết toán tour — hai nguồn sự thật cho một câu hỏi,
+# và người đọc không có cách nào biết số nào đúng.
+#
+# KHAI Ở ĐÂY, KHÔNG Ở MỘT BẢNG THỨ BA. Phép cộng khai ngay cạnh danh mục mà nó cộng, đúng khuôn
+# tài khoản cha/con của luật V8. Một bảng ánh xạ rời thì thêm mã mới mà quên khai là nó im lặng
+# rơi ra ngoài; ở đây `test_r3a_6` đòi MỌI mã của `_D` phải có mặt, nên quên là đỏ ngay.
+#
+# BA MÃ SỔ CÁI MỞ THÊM TRONG ĐỢT NÀY, và lý do không đổ vào KM_KHAC:
+#   KM_VCK  tàu hoả, tàu thuỷ, ca nô — KM_XE khai là "đường bộ" nên không nhận được
+#   KM_QUA  nón, bao hộ chiếu, quà khách, banner, vật phẩm gala
+#   KM_PHI  phí chuyển khoản, thuế nộp hộ, sim/wifi, phát sinh
+# Đổ cả ba vào KM_KHAC thì 11 trong 55 mã nằm chung một dòng "khác", và đó đúng là phần người đọc
+# báo cáo muốn nhìn nhất.
+# ─────────────────────────────────────────────────────────────────────────────
+
+KM_CUA: dict[str, str] = {
+    # vận chuyển
+    "vc_xe_du_lich": "KM_XE", "vc_xe_trung_chuyen": "KM_XE", "vc_khac": "KM_XE",
+    "vc_ve_may_bay": "KM_VEMB", "vc_ve_may_bay_nd": "KM_VEMB", "vc_phu_thu_ve": "KM_VEMB",
+    "vc_tau_hoa": "KM_VCK", "vc_tau_thuy": "KM_VCK",
+    # lưu trú — city tax là thuế CỦA việc lưu trú, nên về cùng khách sạn
+    "lt_khach_san": "KM_KS", "lt_khach_san_te": "KM_KS", "lt_phu_thu_phong_don": "KM_KS",
+    "lt_city_tax": "KM_KS", "lt_khac": "KM_KS",
+    # ăn uống
+    "au_an_sang": "KM_AN", "au_an_trua": "KM_AN", "au_an_toi": "KM_AN",
+    "au_an_sang_te": "KM_AN", "au_an_trua_te": "KM_AN", "au_an_toi_te": "KM_AN",
+    "au_tiec_gala": "KM_AN", "au_nuoc_uong": "KM_AN", "au_banh_trai_cay": "KM_AN",
+    "au_khac": "KM_AN",
+    # tham quan
+    "tq_ve_tham_quan": "KM_VETQ", "tq_ve_tham_quan_te": "KM_VETQ", "tq_combo_ve": "KM_VETQ",
+    "tq_ve_show": "KM_VETQ", "tq_khac": "KM_VETQ",
+    # hướng dẫn — CẢ NHÓM về KM_HDV, kể cả vé máy bay và lưu trú CỦA hướng dẫn viên: đó là chi phí
+    # của người dẫn đoàn, không phải vé của khách. Tách ra thì tiền vé của khách và của HDV nằm
+    # chung một dòng, và câu hỏi "một chuyến tốn bao nhiêu cho hướng dẫn" không còn trả lời được.
+    "hd_ctp_hdv": "KM_HDV", "hd_ctp_tl": "KM_HDV", "hd_luu_tru_hdv": "KM_HDV",
+    "hd_ve_may_bay_hdv": "KM_HDV", "hd_an_noi_bo": "KM_HDV", "hd_tip": "KM_HDV",
+    "hd_phi_dieu_hanh": "KM_HDV", "hd_khac": "KM_HDV",
+    # visa
+    "vs_phi_lsq": "KM_VISA", "vs_phi_dich_vu_visa": "KM_VISA", "vs_dich_thuat": "KM_VISA",
+    "vs_nhan_visa": "KM_VISA", "vs_khac": "KM_VISA",
+    # bảo hiểm
+    "bh_du_lich": "KM_BH", "bh_hdv": "KM_BH",
+    # quà tặng
+    "qt_non": "KM_QUA", "qt_bao_ho_chieu": "KM_QUA", "qt_qua_khach": "KM_QUA",
+    "qt_qua_truong_doan": "KM_QUA", "qt_banner": "KM_QUA", "qt_vat_pham_gala": "KM_QUA",
+    "qt_khac": "KM_QUA",
+    # phí khác
+    "pk_phi_chuyen_khoan": "KM_PHI", "pk_thue_nop_ho": "KM_PHI", "pk_sim_wifi": "KM_PHI",
+    "pk_phat_sinh": "KM_PHI", "pk_khac": "KM_PHI",
+}
+
+
+def km_cua(ma: str | None) -> str:
+    """Mã khoản mục SỔ CÁI của một mã khoản mục quyết toán. Không biết thì trả RỖNG.
+
+    RỖNG chứ không phải KM_KHAC: rỗng nói "chưa ai nối mã này", còn KM_KHAC nói "đã xét và nó
+    thuộc nhóm khác" — hai câu khác nhau, và gộp lại thì một mã bị bỏ quên trông y hệt một mã đã
+    được quyết định. Hàng rào `test_r3a_6` canh để chuyện ấy không vào được main.
+    """
+    return KM_CUA.get((ma or "").strip(), "")

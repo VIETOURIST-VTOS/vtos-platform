@@ -25,7 +25,7 @@ def entry_out(e: JournalEntry) -> dict:
             "ky_goc": e.ky_goc, "ngay_phat_hien": e.ngay_phat_hien, "so_ngay_de_sua": _DC.so_ngay_de_sua(e),
             "source_ref": e.source_ref, "tour_id": e.tour_id, "status": e.status, "created_by": e.created_by, "posted_by": e.posted_by, "posted_at": e.posted_at,
             "reversed_by_id": e.reversed_by_id, "amount": sum((l.debit or 0) for l in e.lines),
-            "lines": [{"id": l.id, "account": l.account_code, "debit": l.debit, "credit": l.credit, "partner": l.partner, "partner_code": l.partner_code, "project_code": l.project_code, "item_code": l.item_code, "doc_no": l.doc_no, "booking_id": l.booking_id, "note": l.note} for l in e.lines]}
+            "lines": [{"id": l.id, "account": l.account_code, "debit": l.debit, "credit": l.credit, "partner": l.partner, "partner_code": l.partner_code, "project_code": l.project_code, "item_code": l.item_code, "bo_phan": l.bo_phan, "doc_no": l.doc_no, "booking_id": l.booking_id, "note": l.note} for l in e.lines]}
 
 
 def invoice_out(i: Invoice, db: Session) -> dict:
@@ -66,6 +66,7 @@ class LineIn(BaseModel):
     partner_code: str = ""
     project_code: str = ""
     item_code: str = ""
+    bo_phan: str = ""
     doc_no: str = ""
     note: str = ""
     booking_id: int | None = None

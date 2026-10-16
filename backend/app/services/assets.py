@@ -149,8 +149,8 @@ def post_depreciation(db: Session, u: User, period: str) -> dict:
     lines = []
     for (exp, depr, proj, dept), amt in sorted(groups.items()):
         amt = round(amt, 0)
-        lines.append({"account": exp, "debit": amt, "credit": 0, "project_code": proj, "item_code": dept, "note": f"Khấu hao TSCĐ kỳ {period}"})
-        lines.append({"account": depr, "debit": 0, "credit": amt, "project_code": proj, "item_code": dept, "note": f"Khấu hao TSCĐ kỳ {period}"})
+        lines.append({"account": exp, "debit": amt, "credit": 0, "project_code": proj, "bo_phan": dept, "note": f"Khấu hao TSCĐ kỳ {period}"})
+        lines.append({"account": depr, "debit": 0, "credit": amt, "project_code": proj, "bo_phan": dept, "note": f"Khấu hao TSCĐ kỳ {period}"})
     e = ACC.post_entry(db, u.username, u.role, period_last_day(period), f"Trích khấu hao TSCĐ kỳ {period}", lines,
                        source_type="khau_hao", source_ref=f"kh:{period}", nghiep_vu="khau_hao_tscd")
     for r in rows:
@@ -231,8 +231,8 @@ def post_allocation(db: Session, u: User, period: str) -> dict:
     lines = []
     for (exp, src, proj, dept), amt in sorted(groups.items()):
         amt = round(amt, 0)
-        lines.append({"account": exp, "debit": amt, "credit": 0, "project_code": proj, "item_code": dept, "note": f"Phân bổ CP trả trước kỳ {period}"})
-        lines.append({"account": src, "debit": 0, "credit": amt, "project_code": proj, "item_code": dept, "note": f"Phân bổ CP trả trước kỳ {period}"})
+        lines.append({"account": exp, "debit": amt, "credit": 0, "project_code": proj, "bo_phan": dept, "note": f"Phân bổ CP trả trước kỳ {period}"})
+        lines.append({"account": src, "debit": 0, "credit": amt, "project_code": proj, "bo_phan": dept, "note": f"Phân bổ CP trả trước kỳ {period}"})
     e = ACC.post_entry(db, u.username, u.role, period_last_day(period), f"Phân bổ chi phí trả trước / CCDC kỳ {period}", lines,
                        source_type="phan_bo", source_ref=f"pb:{period}", nghiep_vu="phan_bo_tra_truoc")
     for r in rows:

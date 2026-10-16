@@ -237,7 +237,7 @@ def post_entry(db: Session, actor: str, role: str, entry_date: date, description
     for l in lines:
         e.lines.append(JournalLine(account_code=str(l["account"]), debit=float(l.get("debit") or 0), credit=float(l.get("credit") or 0),
                                    partner=(l.get("partner") or "")[:160], partner_code=(l.get("partner_code") or "")[:60], project_code=(l.get("project_code") or "")[:40],
-                                   item_code=(l.get("item_code") or "")[:40], doc_no=(l.get("doc_no") or "")[:40],
+                                   item_code=(l.get("item_code") or "")[:40], bo_phan=(l.get("bo_phan") or "")[:20], doc_no=(l.get("doc_no") or "")[:40],
                                    booking_id=l.get("booking_id"), tour_id=l.get("tour_id") or tour_id, note=(l.get("note") or "")[:200]))
     db.add(e); db.flush()
     R.audit(db, actor, role, "ghi_so" if post else "lap_chung_tu", f"entry:{e.code}",
@@ -263,7 +263,7 @@ def reverse_entry(db: Session, u: User, e: JournalEntry, reason: str) -> Journal
     if e.reversed_by_id:
         raise ValueError("Chứng từ đã được đảo")
     lines = [{"account": l.account_code, "debit": l.credit, "credit": l.debit, "partner": l.partner, "partner_code": l.partner_code, "project_code": l.project_code,
-              "item_code": l.item_code, "doc_no": l.doc_no, "booking_id": l.booking_id, "tour_id": l.tour_id, "note": f"Đảo {e.code}"} for l in e.lines]
+              "item_code": l.item_code, "bo_phan": l.bo_phan, "doc_no": l.doc_no, "booking_id": l.booking_id, "tour_id": l.tour_id, "note": f"Đảo {e.code}"} for l in e.lines]
     r = post_entry(db, u.username, u.role, date.today(), f"Đảo {e.code}: {reason}", lines, "dao", f"entry:{e.code}", e.tour_id, nghiep_vu="but_toan_dao")
     e.reversed_by_id = r.id
     db.commit()
