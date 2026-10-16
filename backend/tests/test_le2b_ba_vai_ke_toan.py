@@ -85,6 +85,20 @@ CHO_DA_KHAI_BA_VAI = [
     # `ketoan`: người trình phải là người đứng đầu phòng, vì hồ sơ này đi lên Chủ tịch ký.
     # Cửa KÝ (`chutich`) không hiện ở đây vì phép thử chỉ soi ba vai mới của Đợt E2b.
     "api/v1/accounting.py: ketoan_truong",
+    # ── Vòng HS-1, 15/10/2026 (làn Kiểm soát) ─────────────────────────────────────────────
+    # `services/ho_so_nhan_vien.py: CAP_BAC` xếp THỨ BẬC cho cả 29 vai trong `ROLES`, nên ba
+    # tên này hiện ra ở đó. Nó KHÔNG mở một cửa nào: cấp bậc chỉ quyết định dòng nào đứng trên
+    # dòng nào trong bảng 121 tài khoản. Cùng loại với `services/chu_ky.py` khai NGƯỜI KÝ ở
+    # trên — phép thử soi theo TÊN VAI chứ không theo loại việc, và đó là chủ ý của nó.
+    #
+    # CHỖ PHÉP THỬ NÀY MẤT KHI KHAI THÊM MỘT TỆP, nói ra để không ai yên tâm nhầm: danh sách
+    # ghi MỘT dòng cho mỗi cặp (tệp, vai), nên từ nay nếu ai đó thật sự MỞ QUYỀN cho ba vai ấy
+    # trong chính `ho_so_nhan_vien.py` thì f1 sẽ im. Phần canh ấy đã dựng lại ở nơi hẹp hơn:
+    # `test_hs1_phan_quyen_ho_so.py::test_hs1_12_ba_vai_ke_toan_khong_nam_trong_bang_quyen`
+    # đòi ba vai này không được xuất hiện trong bất kỳ bảng `quyen` nào của 17 nhóm trường.
+    "services/ho_so_nhan_vien.py: ketoan_truong",
+    "services/ho_so_nhan_vien.py: ketoan_tt",
+    "services/ho_so_nhan_vien.py: thu_quy",
 ]
 GOC_APP = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app")
 

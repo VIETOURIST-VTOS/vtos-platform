@@ -269,6 +269,21 @@ def danh_dau_bien_che(uid: int, data: BienCheIn,
     return {"message": "Đã đánh dấu ngoài biên chế" if data.ngoai_bien_che else "Đã bỏ đánh dấu ngoài biên chế"}
 
 
+# ---------------------------------------------------------------------------------------------
+# CỬA ĐỌC HỒ SƠ NHÂN VIÊN KHÔNG NẰM Ở ĐÂY — và đó là một quyết định, không phải một chỗ bỏ sót.
+# ---------------------------------------------------------------------------------------------
+# Nó ở `api/v1/hrm.py`, đường `GET /api/v1/employees/tai-khoan/{uid}/ho-so-theo-vai`.
+#
+# Lý do: `check_restricted_scope` (chạy trong `current_user` cho MỌI đường) chỉ cho một vai chạm
+# nhóm API nằm sau MÀN HÌNH của vai ấy. Đo 15/10/2026: `/api/v1/access` có trong bản đồ của
+# `chutich`, `hcns`, `cntt` và KHÔNG có ở một vai đứng đầu nào; `/api/v1/employees` thì có ở cả
+# tám vai. Đặt cửa ở đây là trưởng phòng không bao giờ với tới, mà nới bản đồ để họ với tới thì
+# mở luôn cho họ cả màn quản trị Tài khoản — đúng điều Chủ tịch bác ngày 15/10.
+#
+# Đừng thêm bản thứ hai của cửa ấy vào tệp này cho tiện: hai cửa cùng một việc là hai hàng rào
+# phải sửa cùng lúc, và quên một chỗ là hở. `test_hs2_11` canh đúng chuyện đó.
+
+
 # ---------- P10: tra cứu ngược – chọn một người, hiện họ làm được gì và VÌ SAO ----------
 @router.get("/tra-cuu/{uid}")
 def tra_cuu_quyen_mot_nguoi(uid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
