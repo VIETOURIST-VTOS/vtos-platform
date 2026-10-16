@@ -573,7 +573,12 @@ export const GROUPS: Group[] = [
     // nhìn lại hệ thống đã làm gì và chỗ nào lệch.
     { label: "Kiểm soát & nhật ký", items: [
       ["Cảnh báo nghiệp vụ", "/alerts"], ["Ngoại lệ cần xử lý", "/ngoai-le"],
-      ["Kiểm soát (robot)", "/kiem-soat"], ["Nhật ký nghiệp vụ", "/audit"]] },
+      ["Kiểm soát (robot)", "/kiem-soat"], ["Nhật ký nghiệp vụ", "/audit"],
+      // Đếm lượt mở cửa đọc — Đợt HD-Q2mh. Đứng cạnh "Nhật ký nghiệp vụ" vì cùng một việc: nhìn
+      // lại hệ thống đã làm gì. Khác ở chỗ nhật ký ghi thao tác GHI, còn mục này đếm lượt ĐỌC —
+      // và trước Đợt HD-Q2a hệ thống không có chỗ nào ghi lượt đọc, nên câu "mỗi ngày mỗi vai mở
+      // bao nhiêu phiếu" không trả lời được. Chỉ bốn vai thấy mục này (MENU_ROLES).
+      ["Đếm lượt mở cửa đọc", "/dem-luot-doc"]] },
   ] },
 ];
 
