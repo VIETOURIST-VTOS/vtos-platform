@@ -106,6 +106,14 @@ CUA_SUA_CO_KHOA = {
     # Đợt 4 · đề xuất của phòng HDV. Cửa sửa là cửa QUYẾT ĐỊNH: hai cấp cùng mở một hồ sơ, một người
     # bấm đồng ý trong khi người kia đang bấm trả lại.
     "de_xuat_hdv":       ("app/api/v1/hr.py",         "dx_quyet"),
+    # DL-5 · 15/10/2026. Lệnh điều xe có cửa SỬA thật từ hôm nay: đổi xe và đổi tài xế. Trước đó
+    # dòng này nằm ở CHUA_CO_CUA_SUA với lý do "mới có tạo và huỷ". Đây đúng là chỗ hai người dễ
+    # chạm nhau nhất của phân hệ điều hành: Điều hành đang đổi xe vì xe hỏng, trong khi Giám đốc
+    # đội xe đang chốt lệnh ở màn hình bên cạnh.
+    # Khai `_doi` chứ không khai `dispatch_doi_xe`: cả hai cửa ghi (đổi xe, đổi tài xế) đều đi
+    # qua `_doi`, và khoá nằm ở đó. Khai một trong hai cửa thì phép thử A3 đọc nhầm một hàm không
+    # mang khoá, rồi hoặc báo thiếu oan, hoặc tệ hơn là xanh nhờ một lần chép tay thứ hai.
+    "dispatch_orders":  ("app/api/v1/hr.py",         "_doi"),
     "bao_gia":          ("app/api/v1/ban_hang.py",   "sua_bao_gia"),
     "hop_dong_khach":   ("app/api/v1/ban_hang.py",   "dat_lich"),
     "booking_khach":    ("app/api/v1/quyet_toan_lop3.py", "sua_khach"),
@@ -119,7 +127,6 @@ KHOA_TEN_KHAC = {"visa_cases": ("row_version", "app/api/v1/visa.py", "edit_case"
 
 CHUA_CO_CUA_SUA = {
     "tour_settlements": "sửa qua nhiều đường, chưa có một cửa sửa tờ quyết toán duy nhất",
-    "dispatch_orders": "mới có tạo và huỷ, chưa có sửa",
     "bang_gia": "sửa qua dòng giá, không sửa thẳng đầu bảng",
     # Lớp 3 quyết toán tour. Bốn bảng này mới có cửa THÊM và cửa ĐỌC, chưa có cửa sửa từng dòng: quy
     # trình hiện tại là xoá dòng sai rồi nhập lại, vì tờ quyết toán còn đang lập thì chưa ai cầm bản

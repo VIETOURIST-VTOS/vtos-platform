@@ -710,6 +710,67 @@ class DebtPayment(Base):
 
 # Nhóm chi phí kỳ. Cột thứ hai là phạm vi MẶC ĐỊNH: "xe" là chi phí quy được về từng chiếc, "doi" là chi
 # phí của cả đội mà chia về từng xe chỉ là ước lệ. Phân biệt này là cốt lõi của báo cáo lãi lỗ đội xe.
+class PhatTaiXe(Base):
+    """DX-3 · Khoản phạt của một tài xế. VÀO LƯƠNG, KHÔNG VÀO GIÁ VỐN XE.
+
+    Chủ tịch chốt 16/10/2026: Giám đốc đội xe ghi, HCNS đối chiếu khi chốt lương.
+
+    VÌ SAO LÀ BẢNG RIÊNG, không phải một dòng `fleet_period_costs`. Khoản phạt là tiền của NGƯỜI
+    LÁI, không phải chi phí của CHIẾC XE. Nhét vào chi phí kỳ thì chiếc xe gánh lỗi của người, và
+    báo cáo lãi lỗ từng xe sai — đúng hình đã ghi trong chính tệp này khi tách `fleet_faults` khỏi
+    `fleet_maintenance`: gộp hai thứ khác bản chất thì mọi báo cáo sau đó phải NHỚ lọc bỏ, và cái
+    «phải nhớ» ấy là chỗ mọi con số đội xe bắt đầu sai.
+
+    `ky` là kỳ lương sẽ trừ, dạng YYYY-MM — không suy từ `ngay`: một lỗi ngày 29 có thể được chốt
+    vào kỳ sau nếu bảng lương kỳ này đã khoá, và suy hộ là trừ nhầm tháng của một con người.
+
+    `trip_id` và `vehicle_id` ĐỂ RỖNG ĐƯỢC: không phải lỗi nào cũng gắn vào một chuyến (đi muộn,
+    không mặc đồng phục). Bắt buộc gắn chuyến là bắt người ghi chọn đại một chuyến.
+    """
+    __tablename__ = "fleet_driver_penalties"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    driver_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
+    ky: Mapped[str] = mapped_column(String(7), index=True)
+    ngay: Mapped[date] = mapped_column(Date)
+    so_tien: Mapped[float] = mapped_column(TIEN)
+    ly_do: Mapped[str] = mapped_column(String(300))
+    trip_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_trips.id"), nullable=True)
+    vehicle_id: Mapped[int | None] = mapped_column(ForeignKey("vehicles.id"), nullable=True)
+    # HCNS ĐỐI CHIẾU, không phải DUYỆT. Chủ tịch chọn 16/10/2026: người quản xe ghi, HCNS nhìn
+    # thấy khi chốt lương. Dấu này nói «đã có người thứ hai nhìn», không phải «đã được phê».
+    hcns_doi_chieu_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    hcns_doi_chieu_boi: Mapped[str] = mapped_column(String(50), default="")
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class GiaDauNgay(Base):
+    """DX-3 · Giá dầu một ngày, để QUY TIỀN RA SỐ LÍT.
+
+    Sao kê thẻ dầu cho TIỀN, không cho lít. Không có giá ngày thì không tính được tiêu hao, và ô
+    «Tiêu hao» trên màn hình đội xe đọc ra một con số không ai kiểm được — đúng chỗ đã đọc 7,6
+    L/100km hồi 14/10 vì cả 80 dòng đều trống số lít.
+
+    MỘT GIÁ cho một (ngày, loại), canh bằng chỉ mục duy nhất: hai dòng cùng ngày cùng loại thì
+    phép quy lít ra hai kết quả khác nhau tuỳ dòng nào đọc trước.
+    """
+    __tablename__ = "fleet_fuel_prices"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ngay: Mapped[date] = mapped_column(Date)
+    loai: Mapped[str] = mapped_column(String(20), default="do")      # do / xang
+    gia_lit: Mapped[float] = mapped_column(TIEN)
+    nguon: Mapped[str] = mapped_column(String(120), default="")      # Petrolimex, hoá đơn, ...
+    boi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    __table_args__ = (
+        Index("uq_fleet_fuel_prices_ngay_loai", "ngay", "loai", unique=True),
+    )
+
+
+LOAI_DAU = {"do": "Dầu DO", "xang": "Xăng"}
+
+
 NHOM_CHI_PHI_KY = {
     "bao_hiem":    ("Bảo hiểm xe", "xe"),
     "dang_kiem":   ("Đăng kiểm", "xe"),

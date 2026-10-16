@@ -109,8 +109,77 @@ def dong(db: Session, d: DispatchOrder, boi: str = "") -> dict:
         nguon=NGUON_LENH, created_by=(boi or d.created_by or "")[:50],
     )
     db.add(t); db.flush()
-    return {"viec": "da_sinh", "chuyen_id": t.id,
-            "noi": f"Đã sinh chuyến #{t.id} từ lệnh. Km và chi phí còn trống — việc của Đội xe."}
+    thieu = cham_co(db, t)
+    return {"viec": "da_sinh", "chuyen_id": t.id, "thieu": thieu,
+            "noi": f"Đã sinh chuyến #{t.id} từ lệnh. Còn thiếu: {' · '.join(thieu)}."
+                   if thieu else f"Đã sinh chuyến #{t.id} từ lệnh."}
+
+
+# ═════════════════ DL-6 · CHUYẾN MÁY SINH PHẢI NÓI RA NÓ CÒN THIẾU GÌ ═════════════════
+#
+# Chủ tịch chốt 16/10/2026, sau một lần em báo sai và phải đính chính: cửa nhập km VÀ bảng chi phí
+# chuyến ĐÃ CÓ ĐỦ từ lâu — km đầu, km cuối, km GPS, nguồn số km; chi phí có loại, số tiền, số lít,
+# chứng từ, bên chịu. Chỗ hỏng không phải thiếu cửa.
+#
+# Chỗ hỏng là chuyến máy sinh ra ĐẾN LẶNG LẼ. Ba việc, mỗi việc một dòng trong mã:
+#
+#   1. CỜ KHÔNG ĐƯỢC CHẤM. `Trip.co` mặc định là "vang" và `co_ly_do` rỗng. Một chuyến vàng mà
+#      không nói vì sao thì người xem hoặc bỏ qua, hoặc đoán — và đoán sai thì tệ hơn không có cờ.
+#      `kiem_chuyen` đã biết chấm; chỉ là chưa ai gọi nó cho chuyến sinh từ lệnh.
+#   2. LỜI ĐÓNG LỆNH nói "km và chi phí còn trống" cho MỌI chuyến, kể cả chuyến đã đủ số. Một câu
+#      luôn đúng là một câu không ai đọc.
+#   3. KHÔNG CÓ DANH SÁCH để làm theo. Biết "còn 12 chuyến thiếu số" mà phải tự đi tìm 12 chuyến ấy
+#      trong sổ thì con số đếm chỉ làm người ta thấy có lỗi, không giúp sửa.
+#
+# KHÔNG CHẶN. Chủ tịch chọn «báo và đếm», không chọn «chặn xác nhận chuyến» — và đúng: 756 chuyến
+# nạp bằng Excel đều không có km, một hàng rào chặn ở đây sẽ chặn nhầm cả sổ cũ.
+
+THIEU_KM = "km thật (đầu/cuối)"
+THIEU_CHI_PHI = "chưa có dòng chi phí nào"
+
+
+def _con_thieu(db: Session, t: Trip) -> list[str]:
+    """Một chuyến còn thiếu những số THẬT nào. Chỉ đọc, không ghi."""
+    from app.models.fleet import TripCost
+    ra = []
+    if t.km_dau is None or t.km_cuoi is None:
+        ra.append(THIEU_KM)
+    n = db.execute(select(func.count()).select_from(TripCost).where(
+        TripCost.trip_id == t.id)).scalar() or 0
+    if not n:
+        ra.append(THIEU_CHI_PHI)
+    return ra
+
+
+def cham_co(db: Session, t: Trip) -> list[str]:
+    """Chấm cờ cho chuyến bằng CHÍNH bộ chấm cờ của Đội xe, không dựng bộ thứ hai.
+
+    Dựng một bộ chấm riêng cho chuyến sinh từ lệnh thì hai bộ sẽ lệch nhau sau vài tháng, và lúc
+    ấy không ai biết bộ nào đúng. Trả về danh sách còn thiếu để nơi gọi nói lại cho người bấm.
+    """
+    from app.services import fleet as FL
+    kt = FL.kiem_chuyen(db, t)
+    t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
+    db.flush()
+    return _con_thieu(db, t)
+
+
+def chuyen_tu_lenh_thieu_so(db: Session, gioi_han: int = 50) -> dict:
+    """Ô đếm thứ ba, kèm DANH SÁCH để bấm vào nhập — không chỉ một con số.
+
+    Chỉ đếm chuyến SINH TỪ LỆNH (`nguon = lenh_dieu_xe`). Sổ cũ nạp bằng Excel cũng thiếu km, nhưng
+    đó là việc nạp bù của Đội xe, không phải chỗ hở của chuỗi lệnh — gộp chung thì con số này không
+    bao giờ về 0 và sẽ bị bỏ qua như mọi con số không bao giờ về 0.
+    """
+    ds = list(db.execute(select(Trip).where(Trip.nguon == NGUON_LENH)
+                         .order_by(Trip.ngay_di.desc(), Trip.id.desc())).scalars())
+    thieu = [(t, _con_thieu(db, t)) for t in ds]
+    thieu = [(t, c) for t, c in thieu if c]
+    return {"so": len(thieu), "tong_chuyen_tu_lenh": len(ds),
+            "danh_sach": [{"chuyen_id": t.id, "lenh_id": t.dispatch_id, "tour": t.ten_tour,
+                           "ngay_di": t.ngay_di.isoformat(), "ngay_ve": t.ngay_ve.isoformat(),
+                           "co": t.co, "thieu": c}
+                          for t, c in thieu[:gioi_han]]}
 
 
 def _ten_tour(db: Session, d: DispatchOrder) -> str:
@@ -128,7 +197,10 @@ def gan_tay(db: Session, d: DispatchOrder, t: Trip) -> dict:
         raise ValueError(f"Lệnh này đã có chuyến #{co.id}.")
     t.dispatch_id = d.id
     db.flush()
-    return {"viec": "da_gan_tay", "chuyen_id": t.id, "lenh_id": d.id}
+    # DL-6: gắn tay cũng là một chuyến vào chuỗi lệnh, nên cũng phải chấm cờ và nói còn thiếu gì.
+    # Bỏ sót ở đây thì ô đếm mới đúng với chuyến máy sinh mà sai với chuyến người gắn.
+    thieu = cham_co(db, t)
+    return {"viec": "da_gan_tay", "chuyen_id": t.id, "lenh_id": d.id, "thieu": thieu}
 
 
 # ═════════════════ HAI CON SỐ ĐẾM CHỖ CHUỖI CHƯA LIỀN ═════════════════
