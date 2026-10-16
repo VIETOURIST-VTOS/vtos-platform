@@ -61,6 +61,11 @@ HANG_RAO = (
     # BÁO: mỗi tệp canh một bảng mà người phải khai tay, và bảng khai tay là thứ hỏng lặng lẽ
     # nhất khi ai đó thêm một dòng mã mà quên dòng khai. Cửa hẹp là chỗ duy nhất chạy đủ nhanh
     # để bắt chúng trước khi gộp.
+    # 16/10/2026. Cua luong mo cho Ke toan truong ma chua ai ky (PR #370) nam im tren
+    # main ca buoi: `test_lg5` bat duoc no, nhung tep nay khong co trong cua hep nen
+    # khong ai chay. Mot dot khac gop main vao moi an du. Dung loai hong cua hep sinh ra
+    # de bat — hai lan deu xanh rieng, gop lai moi hong — nen no thuoc ve day.
+    "tests/test_lg1_hai_bang_quyen_khop_nhau.py",
     "tests/test_lg2_mot_bang_chu_ky.py",
     "tests/test_ks_toan_quyen.py",
     "tests/test_le2b_ba_vai_ke_toan.py",
