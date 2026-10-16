@@ -125,3 +125,61 @@ class LuotDocCua(Base):
     so_phut: Mapped[int] = mapped_column(Integer, default=0)
     phut_cuoi: Mapped[str] = mapped_column(String(5), default="")
     so_dong: Mapped[int] = mapped_column(Integer, default=0)
+
+
+# ---------- Đồng ý công khai nhận xét (Đợt HD-DG3, 16/10/2026) ----------
+class DongYCongKhai(Base):
+    """Một nhận xét = một bản ghi. Hai việc KHÁC NHAU nằm chung một dòng, cố ý — đọc chú thích.
+
+    VIỆC THỨ NHẤT, CỦA KHÁCH: đồng ý hay không, và rút lúc nào. Cột `cau_hoi` chép NGUYÊN VĂN câu
+    đã hỏi, không trỏ sang một hằng số — ngày câu hỏi đổi thì các bản ghi cũ vẫn giữ câu đã hỏi
+    lúc ấy. Một bản ghi đồng ý mà không nói được «đồng ý với điều gì» thì nó không chứng minh
+    được gì cả.
+
+    VIỆC THỨ HAI, CỦA CÔNG TY: ai duyệt, lúc nào, bằng quyền nào, và ai gỡ. `duyet_bang_quyen`
+    ghi "vai" hay "cap_dich_danh" — vì quyền duyệt của anh Nguyễn Tất Thắng là ngoại lệ có hạn
+    cấp qua `user_grants`, và sáu tháng sau câu «ai quyết cái này, bằng quyền gì» phải trả lời
+    được mà không phải đi tra chéo hai bảng.
+
+    HAI VIỆC CHUNG MỘT DÒNG vì chúng 1:1 với một nhận xét và luôn được đọc cùng nhau: câu hỏi duy
+    nhất mọi cửa công khai đặt ra là «nhận xét này hiện được không», và câu ấy cần cả hai vế.
+    Tách đôi bảng thì mỗi lần hỏi phải nối hai bảng, và ngày ai đó quên nối là một lời khách đã
+    rút vẫn nằm trên mạng.
+
+    KHÔNG CÓ CỬA XOÁ, và không có cửa nhập tay. Rút là NGỪNG CÔNG KHAI, không phải xoá: lời nhận
+    xét vẫn ở sổ nội bộ theo thời hạn lưu nhóm «11 · Phản hồi khách hàng». Cùng một lẽ với luật
+    giữ chỗ Chủ tịch chốt 11/9/2026 — hết hạn không phải là huỷ.
+    """
+
+    __tablename__ = "dong_y_cong_khai"
+    __table_args__ = (UniqueConstraint("danh_gia_id", name="uq_dong_y_cong_khai_danh_gia"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    danh_gia_id: Mapped[int] = mapped_column(ForeignKey("danh_gia_sau_tour.id"), index=True)
+    care_id: Mapped[int] = mapped_column(Integer, index=True)
+    tour_id: Mapped[int] = mapped_column(Integer, index=True)
+
+    # ── Việc của khách ────────────────────────────────────────────────────────────────────────
+    pham_vi: Mapped[str] = mapped_column(String(32), default="ho_so_hdv_cong_khai", index=True)
+    cau_hoi: Mapped[str] = mapped_column(Text, default="")       # nguyên văn, xem docstring
+    tra_loi: Mapped[str] = mapped_column(String(6), index=True)  # "co" | "khong" — không có mặc định
+    hoi_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    nguon: Mapped[str] = mapped_column(String(12), default="khao_sat")
+
+    # Mã rút dùng MỘT lần. Rỗng nghĩa là không còn rút được bằng đường dẫn: hoặc khách trả lời
+    # "khong" (không có gì để rút), hoặc đã rút rồi.
+    ma_rut: Mapped[str] = mapped_column(String(64), default="", index=True)
+    ma_rut_het_han: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rut_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    rut_ly_do: Mapped[str] = mapped_column(String(500), default="")
+
+    # ── Việc của công ty ──────────────────────────────────────────────────────────────────────
+    duyet_boi: Mapped[str] = mapped_column(String(50), default="")
+    duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    duyet_bang_quyen: Mapped[str] = mapped_column(String(16), default="")   # vai | cap_dich_danh
+    duyet_ket_qua: Mapped[str] = mapped_column(String(12), default="", index=True)  # dang | khong_dang
+    duyet_ly_do: Mapped[str] = mapped_column(String(1000), default="")
+
+    go_boi: Mapped[str] = mapped_column(String(50), default="")
+    go_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    go_ly_do: Mapped[str] = mapped_column(String(1000), default="")

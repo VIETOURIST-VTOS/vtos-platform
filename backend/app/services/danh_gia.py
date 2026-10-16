@@ -253,6 +253,21 @@ def ghi_danh_gia(db: Session, ma: str, data: dict) -> dict:
 
     if not ghi: raise Gate("KHAO_SAT_NHAP", "Xin anh/chị chấm ít nhất một mục.")
     for x in ghi: db.add(x)
+    db.flush()
+
+    # ── Đợt HD-DG3: GHI ĐỒNG Ý CÔNG KHAI, một bản ghi cho MỖI nhận xét ───────────────────────
+    #
+    # `dong_y_cong_khai` hỏi MỘT CÂU KHÁC với ô `dong_y_dung_danh_gia` ngay trên: ô cũ hỏi
+    # «có cho công ty DÙNG lời này không», câu mới hỏi «có đăng công khai TRÊN HỒ SƠ HƯỚNG DẪN
+    # VIÊN TẠI VTOS, KHÔNG KÈM TÊN không». Hai câu khác nhau thật, nên ghi riêng và KHÔNG suy
+    # câu này ra từ câu kia — xem đầu `services/dong_y.py`.
+    #
+    # Hôm nay cả hai lấy cùng một câu trả lời của khách, vì phiếu khảo sát mới có một ô. Ngày
+    # phiếu tách thành hai ô thì sửa ĐÚNG chỗ này; cấu trúc đã tách sẵn nên không phải đổi bảng.
+    # Ghi ra đây để người sau không tưởng hai ô là một.
+    from app.services import dong_y as DY
+    for x in ghi:
+        DY.ghi_tra_loi(db, x, data["dong_y_dung_danh_gia"])
 
     # Điểm chung của phiếu = điểm chuyến nếu có; không có thì trung bình các mục đã chấm, LÀM TRÒN
     # XUỐNG. Làm tròn lên thì 2,5 thành 3 và vượt ngưỡng mở khiếu nại — một khách không hài lòng

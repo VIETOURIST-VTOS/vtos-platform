@@ -540,6 +540,10 @@ MAN_HINH_API = {
     # `dem-luot` nằm trong chính nhóm ấy, và bốn vai mở được màn hình này đều đã có nhóm ấy sẵn
     # qua /danh-gia — nên dòng này KHÔNG nới thêm một nhóm API nào cho ai.
     "/dem-luot-doc": ("/api/v1/danh-gia",),
+    # Đợt HD-DG3. Nhóm API RIÊNG `/api/v1/cong-bo`, không gắn nhờ vào nhóm đánh giá: đây là
+    # việc CÔNG BỐ, và Chủ tịch chốt 16/10 rằng quyền xem, xử lý khiếu nại, công bố và gỡ nội
+    # dung phải tách riêng. Gắn nhờ là mọi vai đọc được bảng điểm cũng chạm được cửa đăng.
+    "/duyet-cong-bo": ("/api/v1/cong-bo",),
     "/requests": ("/api/v1/requests", "/api/v1/bookings", "/api/v1/tours", "/api/v1/meta",
                   "/api/v1/mang"),
     "/lai-lo-tour": ("/api/v1/lai-lo-tour",),
@@ -893,6 +897,21 @@ MENU_ROLES = {
     # không phải khoét một ngoại lệ cho màn hình của mình. Nó chỉ đọc, và nó đã đọc được /audit —
     # một sổ cùng loại.
     "/dem-luot-doc": ("chutich", "tgd", "bks", "robot_ks", "cntt"),
+    # Đợt HD-DG3. THẤY ≠ BẤM, và chỗ này cố ý.
+    #
+    # `tp_hd` có mặt vì `pham_vi_api()` suy quyền gọi API thuần từ VAI TRÒ — nó không đọc
+    # `user_grants`, nên quyền cấp đích danh KHÔNG mở được một màn hình mới. Đo được: cấp đủ
+    # cả dòng `menu` lẫn dòng `capability` cho anh Thắng mà vẫn 403. Muốn anh ấy vào được thì
+    # vai `tp_hd` phải có tên ở đây, và thế là MỌI Trưởng phòng Hướng dẫn thấy hàng đợi.
+    #
+    # Chịu được, vì nó gần như không nới gì: Đợt HD-Q1 đã cho `tp_hd` đọc đúng những nhận xét
+    # ấy trên bảng điểm. Cái KHÔNG nới là nút bấm — hai cửa ghi ở `api/v1/cong_bo.py` hỏi
+    # `dong_y.ai_duyet_duoc`, và chỉ người có năng lực `duyet_cong_bo_nhan_xet` còn hạn mới
+    # qua. Quyền hết hạn là nút tắt thật, vì chính nút hỏi quyền ấy chứ không hỏi vai.
+    #
+    # `bks` và `robot_ks` có mặt theo bất biến BASE_VIEW của kho, nhưng `dong_y` chặn đích
+    # danh hai vai ấy ở nút bấm — xem `KHONG_DUYET_DU_LA_BASE_VIEW`.
+    "/duyet-cong-bo": ("chutich", "tgd", "bks", "robot_ks", "cntt", "tp_hd"),
     "/lai-lo-tour": BASE_VIEW + OPERATIONS + SALES_ADMIN + ("ptgd_doan", "ketoan", "cntt"),
     # TC-71 · Sổ chuyến còn nợ — anh Tuấn 18/9/2026 chọn ba nhóm: Chủ tịch/TGĐ, Điều hành, Kế toán.
     # ĐÚNG BẰNG `/lai-lo-tour` và cùng một lý do: cả hai màn hình nói về sổ quyết toán của chuyến,
