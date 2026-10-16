@@ -168,7 +168,7 @@ def _dieu_kien_cua_viec(ten: str) -> list[str]:
     return [d.strip() for d in khoi[ten] if re.fullmatch(r"    if:\s.*", d.rstrip())]
 
 
-def test_ci4_bo_do_du_khong_chay_lai_tren_main():
+def test_ci4_bo_do_du_chay_ca_tren_main_con_docker_thi_khong():
     """Chỗ rò tiền: bộ đủ chạy hai lần cho một việc.
 
     Ngày 19/9/2026 trần chi tiêu Actions chạm đáy lúc 13 giờ và GitHub dừng hẳn mọi việc của bốn
@@ -192,12 +192,29 @@ def test_ci4_bo_do_du_khong_chay_lai_tren_main():
     Đây là lần thứ năm trong hai ngày một hàng rào quét chuỗi trả lời nhầm câu hỏi. Bài học đã
     ghi ở sổ làn Vòng: neo vào CÚ PHÁP và neo vào ĐÚNG PHẠM VI.
     """
-    for ten, vi_sao in (("backend", "bộ đủ ~28 phút"), ("docker", "dựng ảnh, cần cả backend lẫn web")):
-        assert _dieu_kien_cua_viec(ten) == ["if: github.event_name != 'push'"], (
-            f"Việc `{ten}` ({vi_sao}) phải có ĐÚNG `if: github.event_name != 'push'` — thấy "
-            f"{_dieu_kien_cua_viec(ten) or 'không có điều kiện nào'}. Mất nó thì việc này chạy lại "
-            f"trên main sau mỗi lần gộp, tốn gấp đôi mà không chặn được gì vì mã đã vào kho rồi."
-        )
+    # ĐẢO CHIỀU CHO `backend` — 16/10/2026, Chủ tịch quyết.
+    #
+    # Phép thử này trước đây ghim `backend` PHẢI có `if: != 'push'`, và lý do ghi ở trên vẫn đọc
+    # rất xuôi: mã đã vào kho rồi, chạy lại trên main chặn được gì. Lý do ấy bỏ sót một chuyện,
+    # và chuyện ấy xảy ra thật trong ngày: cửa chặn trên PR đo nhánh gộp với main TẠI LÚC CHẠY,
+    # nên hai PR cùng xanh riêng lẻ mà gộp lần lượt thì cái thứ hai có thể làm đỏ — và backend
+    # không chạy trên main nên KHÔNG AI THẤY. PR #370 làm `test_lg5` đỏ; cái đỏ ấy nằm im cho
+    # đến khi PR #367 gộp main vào và ăn nguyên nó.
+    #
+    # Nay `backend` KHÔNG được khai `if:` nào, và phép thử ghim chiều mới — để lần sau không ai
+    # lặng lẽ tắt nó đi với đúng cái lý do nghe-xuôi ở trên.
+    assert _dieu_kien_cua_viec("backend") == [], (
+        "Việc `backend` phải chạy trên CẢ pull_request VÀ push, nên không khai `if:` nào. Khai "
+        "lại `!= 'push'` là trả main về chỗ ĐỎ ÂM THẦM: bộ đủ chỉ đo nhánh gộp với main tại lúc "
+        "chạy, nên hai PR xanh riêng lẻ gộp lần lượt vẫn làm main đỏ mà không ai thấy — đúng "
+        "chuyện ngày 16/10/2026, và làn gộp sau là người lãnh. Nếu muốn tắt vì tốn máy thì phải "
+        "có một quyết định mới, không phải một dòng YAML."
+    )
+    assert _dieu_kien_cua_viec("docker") == ["if: github.event_name != 'push'"], (
+        "Việc `docker` (dựng ảnh, `needs: [backend, web]`) VẪN phải có `if: != 'push'`. Nó khác "
+        "`backend`: trên main nó chỉ chờ thêm 45 phút để dựng một ảnh không ai dùng tới. Hai việc "
+        f"khác nhau, không gộp một quyết định — thấy {_dieu_kien_cua_viec('docker') or 'không có'}."
+    )
     assert "hang-rao-gop" in _khoi_viec(), (
         "Phải còn cửa hẹp `hang-rao-gop`. Bỏ hẳn nó thì hai PR cùng xanh riêng lẻ mà gộp lại hỏng "
         "sẽ không ai biết — đúng chuyện suýt xảy ra hai lần ngày 19/9/2026. Việc nó chạy trên những "
