@@ -141,6 +141,18 @@ def build(db: Session, u: User) -> dict:
             ap.append({"label": "ĐANG MỞ LẠI, chưa khóa lại: kỳ "
                                 + ", ".join(d.period for d in _mo)
                                 + " — ghi xong thì khóa lại", "href": "/accounting?tab=periods"})
+        # ĐỢT E12 13/10/2026 — BẢNG KÝ QUYỀN. Chủ tịch chốt chỗ đặt: nối vào hàng việc chờ quyết,
+        # bấm vào XỔ RA chi tiết ngay tại chỗ.
+        #
+        # Dòng này KHÔNG phải một việc chờ bấm, và đó là lý do nó mang theo `chi_tiet` thay vì một
+        # đường dẫn: nó là một điều cần ĐỌC LẠI. Dẫn sang một màn hình riêng thì phải mở một khoá
+        # menu mới — tức xin thêm quyền cho một loạt vai mà chưa ai ký, đúng cái việc bảng này
+        # sinh ra để canh.
+        #
+        # ĐẾM LẠI mỗi lần đọc, không chép con số đã đo: chép thì con số đóng băng ở ngày đo còn
+        # cửa thì mỗi đợt lại thêm, và một con số cũ trông y hệt một con số đúng.
+        from app.services import bang_ky_cua as _BKC
+        ap += _BKC.dong_ban_lam_viec()
     if role == "tgd":
         r = db.execute(select(PayrollRun).where(PayrollRun.status == "hcns_lap")).scalars().first()
         if r: ap.append({"label": f"Bảng lương {r.period} chờ TGĐ ký lô", "href": "/hr"})

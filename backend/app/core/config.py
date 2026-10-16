@@ -33,7 +33,12 @@ class Settings(BaseSettings):
     SEPAY_ACCOUNT_NUMBER: str = ""
     VIETRIP_PHONE: str = ""                # tài khoản robot Vietrip (chỉ đọc – Kế toán/Giám đốc) để đồng bộ tự động
     VIETRIP_PASSWORD: str = ""         # số TK ngân hàng mặc định khi kéo (trống = mọi TK trong SePay)
-    COMPANY_NAME: str = "CÔNG TY CỔ PHẦN DU LỊCH VIETOURIST"
+    # ĐỢT E13 13/10/2026 — TÊN PHÁP LÝ HIỆN HÀNH. Trước đợt này dòng này còn tên CŨ, và nó đi
+    # thẳng lên TỜ KHAI THUẾ XML qua `reports.to_xml(company=settings.COMPANY_NAME)` trong khi sáu
+    # chỗ khác của hệ thống đã ghi tên hiện hành — tức hệ thống nói HAI tên công ty tuỳ người dùng
+    # đi cửa nào, và cái tên sai nằm đúng trên tờ giấy gửi cơ quan thuế. Chủ tịch chốt 13/10/2026.
+    # `test_e13_10` quét cả `app/` và ĐỎ nếu tên cũ còn sót ở bất kỳ đâu.
+    COMPANY_NAME: str = "CÔNG TY CỔ PHẦN VIETOURIST HOLDINGS"
     COMPANY_TAX_CODE: str = ""
     ANTHROPIC_API_KEY: str = ""            # robot R7 viết nhận xét báo cáo (không có → nhận xét theo quy tắc)
     ANTHROPIC_MODEL: str = "claude-sonnet-4-5"

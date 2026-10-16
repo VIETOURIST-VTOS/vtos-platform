@@ -347,7 +347,7 @@ def pit_return(db: Session, period: str) -> dict:
             "note": "Thuế TNCN của người lao động theo biểu lũy tiến chưa tính tự động – HCNS/Kế toán bổ sung trước khi nộp."}
 
 
-def to_xml(ret: dict, tax_code: str = "", company: str = "CÔNG TY CỔ PHẦN DU LỊCH VIETOURIST") -> str:
+def to_xml(ret: dict, tax_code: str = "", company: str = "CÔNG TY CỔ PHẦN VIETOURIST HOLDINGS") -> str:
     """XML cấu trúc đơn giản (mã chỉ tiêu → giá trị) để nhập HTKK/eTax; KTT kiểm tra cấu trúc theo phiên bản HTKK hiện hành trước khi nộp."""
     y, m = ret["period"].split("-")
     rows = "".join(f'    <ChiTieu ma="{escape(code.strip("[]"))}" ten="{escape(name)}">{round(val)}</ChiTieu>\n' for code, name, val in ret["rows"])
