@@ -84,6 +84,8 @@ from app.api.v1.ban_tour_le import router as ban_tour_le_router
 from app.api.v1.danh_gia import router as danh_gia_router
 from app.api.v1.tai_xe import router as tai_xe_router
 from app.api.v1.khao_sat_cong_khai import router as khao_sat_cong_khai_router
+from app.api.v1.cong_bo import router as cong_bo_router
+from app.api.v1.rut_dong_y import router as rut_dong_y_router
 from app.api.v1.sales_admin import router as sales_admin_router
 from app.api.v1.chuong_trinh import router as chuong_trinh_router
 from app.api.v1.de_nghi_xe import router as de_nghi_xe_router
@@ -375,6 +377,8 @@ app.include_router(cong_no_vietrip_router)
 # CỬA CÔNG KHAI — cửa DUY NHẤT của VTOS không cần đăng nhập. Để cuối danh sách và có dòng chú
 # thích này để ai đọc app/main.py cũng nhìn thấy nó, thay vì phát hiện ra khi đọc tệp thứ tám.
 app.include_router(khao_sat_cong_khai_router)
+app.include_router(cong_bo_router)
+app.include_router(rut_dong_y_router)
 app.include_router(chuong_trinh_router)
 app.include_router(de_nghi_xe_router)
 
