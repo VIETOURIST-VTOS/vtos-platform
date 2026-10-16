@@ -107,6 +107,7 @@ function HopDong() {
         signed_on: f.signed_on || null, effective_from: f.effective_from,
         effective_to: f.effective_to || null, salary: soTien(f.salary),
         si_salary: soTien(f.si_salary), allowance: soTien(f.allowance),
+        annual_leave_days: Number(f.annual_leave_days) || 12,
         note: f.note || "" } });
       toast("Đã lưu hợp đồng. Nhớ đính kèm bản scan ở dòng của người này.");
       setF(null); await load();
@@ -157,7 +158,7 @@ function HopDong() {
       <h2>Ghi một hợp đồng</h2>
       {!f && <button className="act" onClick={() => setF({ employee_id: "", code: "", kind: "xac_dinh",
         signed_on: "", effective_from: "", effective_to: "", salary: "", si_salary: "", allowance: "",
-        note: "" })}>+ Thêm hợp đồng</button>}
+        annual_leave_days: 12, note: "" })}>+ Thêm hợp đồng</button>}
       {f && <>
         <div className="grid2">
           <label>Nhân viên
@@ -188,6 +189,19 @@ function HopDong() {
           <label>Mức đóng BHXH
             <input type="number" step={100000} value={f.si_salary}
                    onChange={(e) => setF({ ...f, si_salary: e.target.value })} /></label>
+          {/* HS-9 · 17/10/2026 — HAI Ô LÂU NAY GỬI LÊN MÀ KHÔNG AI NHẬP ĐƯỢC.
+              `allowance` nằm trong gói gửi đi từ đầu nhưng chưa bao giờ có ô, nên mọi hợp đồng
+              đã ghi đều có phụ cấp rỗng. `annual_leave_days` thì cửa máy chủ mặc định 12 — một
+              con số mặc định mà người ký không đổi được không phải là một thoả thuận, nó là một
+              giả định nằm im trong mã. */}
+          <label>Phụ cấp (đ)
+            <input type="number" step={100000} value={f.allowance}
+                   onChange={(e) => setF({ ...f, allowance: e.target.value })} /></label>
+          <label>Số ngày phép năm
+            <input type="number" step={0.5} value={f.annual_leave_days}
+                   onChange={(e) => setF({ ...f, annual_leave_days: e.target.value })} /></label>
+          <label>Ghi chú
+            <input value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></label>
         </div>
         <p className="muted">Mức đóng BHXH khác lương hợp đồng — ghi đúng mức đang đóng, đừng chép lại
           lương, vì bảng lương và hồ sơ bảo hiểm đối chiếu bằng chính ô này.</p>
@@ -258,14 +272,33 @@ function HopDong() {
 
       {chon > 0 && hs && <>
         <div className="wrap" style={{ marginTop: 8 }}>
-          {([["id_number", "Số CCCD"], ["dob", "Ngày sinh"], ["permanent_address", "Địa chỉ thường trú"],
-             ["phone", "Điện thoại"], ["tax_code", "Mã số thuế"], ["bank_account", "Số tài khoản"],
-             ["bank_name", "Ngân hàng"], ["social_insurance_no", "Số sổ BHXH"]] as [string, string][])
+          {/* HS-9 · 17/10/2026 — ĐỦ 17 TRƯỜNG, không phải 8.
+              Cửa `PUT /employees/{id}/profile` nhận 17 trường; biểu này dựng 8. Chín trường còn
+              lại — trong đó có NGÀY CẤP và NƠI CẤP căn cước, hai thứ hợp đồng lao động và hồ sơ
+              BHXH đều cần — không màn hình nào nhập được.
+              Nặng hơn: màn «Hồ sơ nhân viên» HIỆN RA đúng những trường ấy, nên chúng trống vĩnh
+              viễn và trông y hệt «người này chưa khai». Một ô dữ liệu bày ra mà không có cửa nhập
+              thì không phải thiếu dữ liệu, là thiếu phần mềm. `test_hs9_1` canh đúng chỗ này:
+              thêm một trường vào `ProfileIn` mà quên dựng ô là đỏ. */}
+          {([["id_number", "Số CCCD"], ["id_issued_on", "Ngày cấp"], ["id_issued_by", "Nơi cấp"],  
+             ["dob", "Ngày sinh"], ["gender", "Giới tính"],
+             ["permanent_address", "Địa chỉ thường trú"], ["current_address", "Chỗ ở hiện tại"],
+             ["phone", "Điện thoại"], ["email", "Email"],
+             ["tax_code", "Mã số thuế"], ["social_insurance_no", "Số sổ BHXH"],
+             ["bank_account", "Số tài khoản"], ["bank_name", "Ngân hàng"],
+             ["marital_status", "Tình trạng hôn nhân"], ["education", "Học vấn"],
+             ["emergency_contact", "Liên hệ khẩn cấp"], ["note", "Ghi chú"]] as [string, string][])
             .map(([k, l]) => <label key={k}>{l}
               {(hs.completeness?.missing || []).includes(k) && <Tag cls="warn">thiếu</Tag>}<br />
-              <input type={k === "dob" ? "date" : "text"} value={(fHs as any)[k] || ""}
-                     disabled={!canGhi}
-                     onChange={(e) => setFHs({ ...fHs, [k]: e.target.value })} /></label>)}
+              {k === "gender"
+                ? <select value={(fHs as any)[k] || ""} disabled={!canGhi}
+                          onChange={(e) => setFHs({ ...fHs, [k]: e.target.value })}>
+                    <option value="">— chưa khai —</option>
+                    <option value="nam">Nam</option><option value="nu">Nữ</option>
+                    <option value="khac">Khác</option></select>
+                : <input type={(k === "dob" || k === "id_issued_on") ? "date" : "text"}
+                         value={(fHs as any)[k] || ""} disabled={!canGhi}
+                         onChange={(e) => setFHs({ ...fHs, [k]: e.target.value })} />}</label>)}
           {canGhi && <div style={{ alignSelf: "end" }}><button className="act teal" onClick={luuHoSo}>Lưu hồ sơ</button></div>}
         </div>
 

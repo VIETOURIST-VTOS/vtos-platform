@@ -78,6 +78,14 @@ class EmployeeIn(BaseModel):
     """Sửa hồ sơ chỉ ghi đè những trường được gửi lên (exclude_unset), nên màn hình cũ gửi thiếu
     trường mới sẽ không xóa mất dữ liệu đã nạp (ngày sinh, điện thoại, pháp nhân, chức danh)."""
     phien_ban: int | None = None      # VPM-8 – bản màn hình đang cầm
+    # HS-9 · 17/10/2026 — MÃ NHÂN VIÊN NHẬN TỪ NGƯỜI DÙNG khi tạo. Trước vòng này cửa tạo luôn tự
+    # sinh `NS001`, `NS002`… trong khi mã thật của công ty là SỐ TRÊN BẢNG LƯƠNG HCNS (114, 276,
+    # 62). Mã ấy là khoá nối `Employee.code` ↔ `User.staff_code`; người tạo qua biểu mẫu mang mã
+    # khác hệ thì không khớp bảng lương, và lần nạp `import-master` sau sẽ coi họ là người mới.
+    # Để trống thì vẫn tự sinh như cũ — không bắt buộc, vì có lúc chưa biết mã.
+    # KHÔNG nhận ở cửa SỬA: đổi mã của một hồ sơ đã chạy là cắt đứt mối nối với tài khoản và với
+    # mọi dòng lương đã tính dưới mã cũ. Sửa mã là một việc riêng, cần quyết định riêng.
+    code: str | None = None
     full_name: str
     department: str
     position: str = "nv"
@@ -179,8 +187,12 @@ def reset_password(uid: int, data: ResetPwIn, u: User = Depends(require_roles(*H
 def create_employee(data: EmployeeIn, u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
     if data.department not in DEPARTMENTS or data.position not in POSITIONS: raise HTTPException(422, "Phòng/chức danh không hợp lệ")
     tao = {k: v for k, v in data.model_dump(exclude_none=True).items()
-           if k not in ("dieu_chuyen_tu_ngay", "dieu_chuyen_ly_do")}
-    e = Employee(code=H.next_code(db, Employee, "NS"), **tao)
+           if k not in ("dieu_chuyen_tu_ngay", "dieu_chuyen_ly_do", "code")}
+    ma = (data.code or "").strip()
+    if ma:
+        if db.execute(select(Employee).where(Employee.code == ma)).scalars().first():
+            raise HTTPException(422, f"Mã nhân viên {ma} đã thuộc một hồ sơ khác")
+    e = Employee(code=ma or H.next_code(db, Employee, "NS"), **tao)
     db.add(e); db.flush()
     R.audit(db, u.username, u.role, "tao_ho_so_nhan_su", f"emp:{e.code}", after={"ten": e.full_name, "phong": e.department, "luong": e.base_salary})
     db.commit(); db.refresh(e)
