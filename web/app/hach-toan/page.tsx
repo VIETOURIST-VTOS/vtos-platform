@@ -449,7 +449,7 @@ function DanhMuc() {
             <tr key={r.id}>
               <td><code>{r.ma}</code></td><td>{r.ten}</td>
               <td className="phu">{km?.nhom?.[r.nhom] || r.nhom}</td>
-              <td><Tag kind={r.dung ? "ok" : "warn"}>{r.dung ? "đang dùng" : "ngừng dùng"}</Tag></td>
+              <td><Tag cls={r.dung ? "ok" : "warn"}>{r.dung ? "đang dùng" : "ngừng dùng"}</Tag></td>
               <td>{laKeToan && (
                 <button className="nho" disabled={!!ban}
                   onClick={() => goi(`/hach-toan/khoan-muc/${r.id}`, { dung: !r.dung }, "PATCH")}>
@@ -497,7 +497,7 @@ function DanhMuc() {
                   </span>
                 )) : "–"}
               </td>
-              <td><Tag kind={r.dung ? "ok" : "warn"}>{r.dung ? "đang dùng" : "ngừng dùng"}</Tag></td>
+              <td><Tag cls={r.dung ? "ok" : "warn"}>{r.dung ? "đang dùng" : "ngừng dùng"}</Tag></td>
               <td>{laHcns && (
                 <button className="nho" disabled={!!ban}
                   onClick={() => goi(`/hach-toan/bo-phan/${r.id}`, { dung: !r.dung }, "PATCH")}>

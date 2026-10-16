@@ -622,7 +622,13 @@ PHAM_VI_DA_CHOT = {
     # hành (người cần xe), TỪ CHỐI là Giám đốc đội xe (người có xe). Người đề nghị không từ chối
     # việc của chính mình.
     "chutich": 134, "tgd": 134, "bks": 134, "cntt": 131, "ir_phapche": 20,
-    "ketoan": 109, "tp_dh": 100, "ptgd_doan": 80, "nv_dh": 71, "hcns": 71, "gd_kd": 73,
+        # ── 17/10/2026 · hcns 71 → 72, DOT R3b ───────────────────────────────────────────
+    # Nhom duy nhat them la "/api/v1/hach-toan", va chi vi mot le: danh muc BO PHAN nam o
+    # man ay. Co cau phong ban la viec cua Hanh chinh – Nhan su, khong phai Ke toan; cho
+    # ho quyen ghi (`GHI_BO_PHAN`) ma khong cho vao man la dung mot cua khong ai voi toi.
+    # HCNS thay them bang quy uoc hach toan o che do XEM — quy uoc noi bo, khong phai tien.
+    # Anh Tuan quyet 17/10/2026.
+    "ketoan": 109, "tp_dh": 100, "ptgd_doan": 80, "nv_dh": 71, "hcns": 72, "gd_kd": 73,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
