@@ -510,7 +510,10 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "8.4.2", ten: "Tình trạng kết nối", href: "/kiem-soat" },
           { ma: "8.4.3", ten: "Cảnh báo nghiệp vụ", href: "/alerts", them: true },
           { ma: "8.4.4", ten: "Ngoại lệ cần xử lý", href: "/ngoai-le", them: true },
-          { ma: "8.4.5", ten: "Rà soát cột tiền", href: "/ra-soat-cot-tien", them: true }
+          { ma: "8.4.5", ten: "Rà soát cột tiền", href: "/ra-soat-cot-tien", them: true },
+          // Đợt HD-Q2mh 16/10/2026. Đứng trong "Giám sát" cạnh Nhật ký hệ thống vì cùng một việc:
+          // nhìn lại hệ thống đã làm gì. Khác ở chỗ nhật ký ghi thao tác GHI, mục này đếm lượt ĐỌC.
+          { ma: "8.4.6", ten: "Đếm lượt mở cửa đọc", href: "/dem-luot-doc", them: true }
         ] }
     ] },
 ];

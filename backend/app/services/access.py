@@ -536,6 +536,10 @@ MAN_HINH_API = {
     "/sales-admin": ("/api/v1/sales-admin",),
     "/ban-tour-le": ("/api/v1/ban-tour-le",),
     "/danh-gia": ("/api/v1/danh-gia",),
+    # Đếm lượt mở cửa đọc (Đợt HD-Q2mh). CÙNG nhóm API với /danh-gia chứ không mở nhóm mới: cửa
+    # `dem-luot` nằm trong chính nhóm ấy, và bốn vai mở được màn hình này đều đã có nhóm ấy sẵn
+    # qua /danh-gia — nên dòng này KHÔNG nới thêm một nhóm API nào cho ai.
+    "/dem-luot-doc": ("/api/v1/danh-gia",),
     "/requests": ("/api/v1/requests", "/api/v1/bookings", "/api/v1/tours", "/api/v1/meta",
                   "/api/v1/mang"),
     "/lai-lo-tour": ("/api/v1/lai-lo-tour",),
@@ -870,6 +874,25 @@ MENU_ROLES = {
     # hai vai này theo PV_THEO_PHONG — mỗi người chỉ thấy loại đối tượng và phòng ban của mình.
     "/danh-gia": BASE_VIEW + OPERATIONS + SALES + ("ptgd_doan", "ptgd_mkt", "nv_mkt", "hcns",
                                                   "cntt", "tp_hd", "gd_doi_xe"),
+    # Đếm lượt mở cửa đọc — Đợt HD-Q2mh, Chủ tịch duyệt bố cục 16/10/2026.
+    #
+    # HẸP HƠN MỌI MÀN HÌNH KHÁC CỦA NHÓM ĐÁNH GIÁ, và cố ý: đây là bảng nói ai mở màn hình nào
+    # bao nhiêu lần — một dạng theo dõi người lao động. Nó tồn tại để Chủ tịch quyết phạm vi
+    # quyền trước khi siết (khuôn «đếm được trước, chặn sau» đã duyệt ở HD-9 và HD-12), chứ
+    # không phải để trưởng bộ phận xem nhân viên mình hôm nay bấm bao nhiêu lần.
+    #
+    # KHÔNG dùng BASE_VIEW: bảng này liệt kê ĐÍCH DANH người, nên mỗi vai thêm vào đây là một
+    # người nữa đọc được nhật ký làm việc của đồng nghiệp. Bốn vai viết thẳng ra, đọc được bằng
+    # mắt, và trùng đúng danh sách `DEM_XEM` ở `api/v1/danh_gia.py` — có ca canh hai bảng không
+    # lệch nhau, vì mở menu mà quên mở cửa là «cửa mở, biển đề đóng», còn ngược lại là một màn
+    # hình không ai thấy nhưng gọi thẳng API vẫn vào được.
+    # `robot_ks` có mặt KHÔNG phải vì em muốn nới, mà vì `test_ma_tran_quyen` giữ một bất biến của
+    # kho: MỌI màn hình phải mở cho `BASE_VIEW` — Chủ tịch, TGĐ, Ban Kiểm soát và robot Kiểm soát.
+    # Robot ấy làm việc của Ban Kiểm soát nên phải nhìn được thứ Ban Kiểm soát nhìn. Em đã định
+    # khai bốn vai và để robot ra ngoài; hàng rào bắt đúng, và cách sửa đúng là theo bất biến chứ
+    # không phải khoét một ngoại lệ cho màn hình của mình. Nó chỉ đọc, và nó đã đọc được /audit —
+    # một sổ cùng loại.
+    "/dem-luot-doc": ("chutich", "tgd", "bks", "robot_ks", "cntt"),
     "/lai-lo-tour": BASE_VIEW + OPERATIONS + SALES_ADMIN + ("ptgd_doan", "ketoan", "cntt"),
     # TC-71 · Sổ chuyến còn nợ — anh Tuấn 18/9/2026 chọn ba nhóm: Chủ tịch/TGĐ, Điều hành, Kế toán.
     # ĐÚNG BẰNG `/lai-lo-tour` và cùng một lý do: cả hai màn hình nói về sổ quyết toán của chuyến,
