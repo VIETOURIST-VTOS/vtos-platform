@@ -230,6 +230,20 @@ CAPABILITIES = {
     # định gì. Đi qua cửa ngoại lệ sẵn có nên tự động có hạn (tối đa 90 ngày), BẮT BUỘC ghi lý do,
     # có người phê, và hiện trên màn hình tra cứu quyền — đúng ba điều Chủ tịch đòi.
     "kiem_bao_cao_tour": "Xác nhận báo cáo sau tour thay Trưởng phòng Hướng dẫn",
+    # Đợt HD-DG3, Chủ tịch chốt 16/10/2026. Hai vai duyệt được theo vai trò (Chủ tịch,
+    # TGĐ); người thứ ba — anh Nguyễn Tất Thắng, TP Hướng dẫn — duyệt bằng năng lực này.
+    #
+    # CẤP THEO NGƯỜI CHỨ KHÔNG SỬA VAI, đúng lý do đã viết cho `bang_luong`: mở cho vai
+    # `tp_hd` là mở cho mọi Trưởng phòng Hướng dẫn từ nay về sau, kể cả người kế nhiệm mà
+    # chưa ai quyết định gì. Năng lực này đi qua cửa ngoại lệ sẵn có nên tự có hạn (tối đa
+    # 90 ngày), bắt buộc ghi lý do, và chỉ Chủ tịch hoặc TGĐ cấp được.
+    #
+    # NÓ MỞ CÁI NÚT, KHÔNG MỞ MÀN HÌNH — `pham_vi_api()` suy quyền gọi API thuần từ vai
+    # trò và không đọc `user_grants`, nên màn hình `/duyet-cong-bo` khai cho `tp_hd` ở
+    # `access.MENU_ROLES`. Hệ quả: mọi TP Hướng dẫn THẤY hàng đợi, chỉ người được cấp
+    # năng lực này mới BẤM được. Thấy thì họ đã thấy sẵn những nhận xét ấy trên bảng điểm
+    # từ Đợt HD-Q1, nên dòng này không nới thêm dữ liệu cho ai.
+    "duyet_cong_bo_nhan_xet": "Duyệt đăng nhận xét của khách lên hồ sơ hướng dẫn viên công khai",
 }
 GRANT_MAX_DAYS = 90
 

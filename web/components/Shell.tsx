@@ -578,7 +578,11 @@ export const GROUPS: Group[] = [
       // lại hệ thống đã làm gì. Khác ở chỗ nhật ký ghi thao tác GHI, còn mục này đếm lượt ĐỌC —
       // và trước Đợt HD-Q2a hệ thống không có chỗ nào ghi lượt đọc, nên câu "mỗi ngày mỗi vai mở
       // bao nhiêu phiếu" không trả lời được. Chỉ bốn vai thấy mục này (MENU_ROLES).
-      ["Đếm lượt mở cửa đọc", "/dem-luot-doc"]] },
+      ["Đếm lượt mở cửa đọc", "/dem-luot-doc"],
+      // Đợt HD-DG3. Đứng cạnh hai mục trên vì cùng một họ: nhìn lại hệ thống đã làm gì. Khác ở
+      // chỗ hai mục kia chỉ ĐỌC, còn mục này có nút BẤM — và nút ấy quyết một lời của khách có
+      // lên mạng hay không. Sáu vai thấy mục (MENU_ROLES), ba người bấm được.
+      ["Duyệt công bố nhận xét", "/duyet-cong-bo"]] },
   ] },
 ];
 
