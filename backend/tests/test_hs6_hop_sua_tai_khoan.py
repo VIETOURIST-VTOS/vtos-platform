@@ -153,34 +153,42 @@ def test_hs6_3_moi_duong_hop_goi_deu_co_that(hop):
 # ---------------------------------------------------------------------------------------------
 # 4. Bàn giao chưa có cửa thì phải KHAI RA, không được vẽ một ô không làm gì
 # ---------------------------------------------------------------------------------------------
-def test_hs6_4_ban_giao_chua_co_cua_thi_khong_duoc_gia_vo_co(hop):
-    """Bản vẽ Chủ tịch duyệt có ô «Bàn giao việc đang gánh sang <người nhận>». Máy chủ CHƯA CÓ:
-    `ghi_nghi_viec` nhận đúng bốn thứ và không chuyển một tour, booking hay phân công nào.
+def test_hs6_4_ghi_nghi_viec_khong_tu_ban_giao_va_ban_giao_la_nut_rieng(hop):
+    """16/10/2026 — phép thử này ĐÃ ĐỔI ĐIỀU NÓ CANH, và chỗ đổi đáng ghi lại.
 
-    Vẽ ô chọn người nhận bây giờ là vẽ một ô bấm vào không có việc gì xảy ra — và người dùng TIN
-    là đã bàn giao. Đó là kiểu hỏng tệ nhất, vì nó chỉ lộ ra khi có người đi tìm việc của người
-    đã nghỉ và không thấy ai nhận.
+    Bản đầu đòi màn hình KHAI RA rằng bàn giao chưa có cửa. Nay cửa đã có (HS-7,
+    `POST /bien-dong-ns/ban-giao-viec`), nên đòi như cũ là đòi màn hình nói dối. Chính phép thử
+    ấy đã đỏ đúng lúc cửa ra đời — đó là việc nó sinh ra để làm.
+
+    Điều cần canh BÂY GIỜ vẫn là chỗ hỏng cũ, chỉ đổi hình: `ghi_nghi_viec` vẫn KHÔNG chuyển một
+    tour, booking hay phân công nào. Nếu một ngày ai đó gộp bàn giao vào cửa ghi nghỉ việc cho
+    tiện thì một lần bấm làm hai việc không hoàn lại được như nhau, mà người bấm chỉ đọc một câu
+    xác nhận. Hai nút, hai lần xác nhận.
     """
     import inspect
     from app.services import bien_dong_ns as BD
 
     tham_so = set(inspect.signature(BD.ghi_nghi_viec).parameters)
     assert not (tham_so & {"nguoi_nhan", "nguoi_nhan_id", "ban_giao", "ban_giao_cho"}), (
-        "`ghi_nghi_viec` nay ĐÃ nhận tham số bàn giao — sửa lại hộp Sửa để dựng ô chọn người "
-        "nhận, và xoá phép thử này cùng dòng khai 'CHƯA CÓ cửa' trên màn hình.")
+        "`ghi_nghi_viec` nhận tham số bàn giao — hai việc không hoàn lại được bị gộp vào một lần "
+        "bấm. Bàn giao có cửa riêng: `POST /bien-dong-ns/ban-giao-viec`.")
 
-    # Màn hình không được gửi lên trường mà cửa không nhận.
     goi = re.search(r"/bien-dong-ns/nghi-viec\"[^;]*?\{(.*?)\}", hop, re.S)
     assert goi, "Không tìm thấy lời gọi `/bien-dong-ns/nghi-viec` trong hộp Sửa."
-    for cam in ("nguoi_nhan", "ban_giao"):
+    for cam in ("nguoi_nhan", "ban_giao", "den_user_id"):
         assert cam not in goi.group(1), (
-            f"Hộp Sửa gửi `{cam}` lên cửa ghi nghỉ việc, mà cửa ấy không nhận — "
-            "trường gửi thừa bị bỏ im lặng, và người dùng tưởng đã bàn giao.")
+            f"Hộp Sửa gửi `{cam}` lên cửa ghi nghỉ việc, mà cửa ấy không nhận — trường gửi thừa "
+            "bị bỏ im lặng, và người dùng tưởng đã bàn giao.")
 
-    # Và phải NÓI RA chỗ còn thiếu, không im lặng bỏ qua.
-    assert "CHƯA CÓ cửa" in hop and "Bàn giao" in hop, (
-        "Hộp Sửa không khai ra rằng bàn giao chưa có cửa. Theo ranh giới 09/9/2026, thiếu cửa là "
-        "việc còn thiếu PHẢI hiện ra, không phải chỗ để im lặng.")
+    assert "/bien-dong-ns/ban-giao-viec" in hop, (
+        "Hộp Sửa không có nút bàn giao. Cửa đã có từ HS-7; không nối vào thì người dùng vẫn phải "
+        "đi chuyển tay từng thứ ở màn của nó.")
+    assert "banGiao(false)" in hop and "banGiao(true)" in hop, (
+        "Bàn giao phải đi HAI bước: xem trước (`xac_nhan=false`, máy chủ KHÔNG ghi gì) rồi mới "
+        "bàn giao thật. Nó dịch chuyển doanh số giữa hai người.")
+    assert "o_lai" in hop, (
+        "Bản xem trước không in phần Ở LẠI. Chỉ kê thứ sắp chuyển sẽ khiến người bấm tin rằng "
+        "mọi thứ khác không tồn tại.")
 
 
 # ---------------------------------------------------------------------------------------------

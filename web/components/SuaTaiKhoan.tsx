@@ -64,6 +64,9 @@ export default function SuaTaiKhoan(
   const [nvNgay, setNvNgay] = useState("");
   const [nvLoai, setNvLoai] = useState("tu_xin");
   const [nvLyDo, setNvLyDo] = useState("");
+  const [bgDen, setBgDen] = useState("");               // người nhận bàn giao
+  const [bgLyDo, setBgLyDo] = useState("");
+  const [bgXem, setBgXem] = useState<any>(null);        // bản xem trước máy chủ trả về
   const [xoaDuoc, setXoaDuoc] = useState<any>(null);
   const [loi, setLoi] = useState("");
 
@@ -109,6 +112,20 @@ export default function SuaTaiKhoan(
     goi("/bien-dong-ns/nghi-viec",
         { employee_id: r.ho_so_id, ngay: nvNgay, ly_do_loai: nvLoai, ly_do: nvLyDo.trim() },
         "POST", "Đã ghi nhận nghỉ việc");
+  };
+
+  // HAI BƯỚC, cùng nếp với nút Xoá: `xac_nhan=false` chỉ lấy bản xem trước và KHÔNG ghi gì.
+  // Bàn giao dịch chuyển doanh số giữa hai người, nên bước mặc định phải là bước không làm gì.
+  const banGiao = async (that: boolean) => {
+    if (!bgDen) { setLoi("Chưa chọn người nhận"); return; }
+    if (!bgLyDo.trim()) { setLoi("Chưa ghi lý do bàn giao"); return; }
+    setBan(true); setLoi("");
+    try {
+      const kq = await api<any>("/bien-dong-ns/ban-giao-viec", { method: "POST", json: {
+        tu_user_id: r.id, den_user_id: Number(bgDen), ly_do: bgLyDo.trim(), xac_nhan: that } });
+      if (that) { onDone(kq?.message || "Đã bàn giao"); } else { setBgXem(kq); }
+    } catch (e) { setLoi(errMsg(e)); }
+    finally { setBan(false); }
   };
 
   const xoaBanGhi = async () => {
@@ -251,19 +268,51 @@ export default function SuaTaiKhoan(
             </div>
           </>}
 
-        {/* CÁI CÒN THIẾU PHẢI HIỆN RA — không vẽ một ô bàn giao rồi để nó không làm gì.
-            Bản vẽ Chủ tịch duyệt có ô «Bàn giao việc đang gánh sang <người nhận>». Máy chủ CHƯA
-            CÓ cửa ấy: `ghi_nghi_viec` nhận đúng bốn thứ — hồ sơ, ngày, loại lý do, ghi chú — và
-            không chuyển một tour, booking hay phân công nào sang ai. Dựng ô chọn người nhận bây
-            giờ là dựng một ô bấm vào không có việc gì xảy ra, và đó là kiểu hỏng tệ nhất: người
-            dùng tin là đã bàn giao. */}
-        <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px dashed var(--line, #2a3b55)" }}>
-          <b style={{ fontSize: 12.5 }}>Bàn giao việc đang gánh — hệ thống CHƯA CÓ cửa</b>
+        {/* BÀN GIAO LÀ MỘT NÚT RIÊNG, không phải hệ quả của nút trên — HS-7, 16/10/2026.
+            `ghi_nghi_viec` KHÔNG chuyển một tour, booking hay phân công nào; nó chỉ đóng hồ sơ.
+            Gộp hai việc vào một lần bấm thì người bấm đọc một câu xác nhận mà làm hai thứ không
+            hoàn lại được như nhau. Và bàn giao còn cần dùng khi người ta KHÔNG nghỉ: chuyển
+            vùng, nghỉ thai sản, đi học. */}
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px dashed var(--line, #2a3b55)" }}>
+          <b style={{ fontSize: 12.5 }}>Bàn giao việc đang mở</b>
           <p className="muted" style={{ fontSize: 11.5, margin: "4px 0 0" }}>
-            Ghi nghỉ việc KHÔNG chuyển tour, booking, lệnh điều xe, hồ sơ visa hay phân công kinh
-            doanh sang người khác. Hôm nay phải chuyển tay từng thứ ở màn của nó. Đây là việc còn
-            thiếu của phần mềm, không phải thao tác người dùng bỏ sót.
+            Chỉ VIỆC ĐANG MỞ đổi người. Lịch sử đã phát sinh — tour đã kết thúc, booking đã huỷ,
+            báo cáo, quyết toán, chỉ tiêu — giữ nguyên tên người cũ. Báo cáo kỳ ĐÃ CHỐT không đổi
+            số; kỳ sau tính cho người nhận.
           </p>
+          <div className="row" style={{ gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+            <label style={{ flex: "1 1 220px" }}><span className="muted" style={{ fontSize: 11.5 }}>Người nhận</span>
+              <select style={o} value={bgDen} disabled={!duocNghi}
+                onChange={(e) => { setBgDen(e.target.value); setBgXem(null); }}>
+                <option value="">— chọn người nhận —</option>
+                {(acc?.rows || []).filter((x: any) => x.id !== r.id && x.active)
+                  .map((x: any) => <option key={x.id} value={x.id}>{x.full_name} ({x.username})</option>)}
+              </select></label>
+            <label style={{ flex: "2 1 240px" }}><span className="muted" style={{ fontSize: 11.5 }}>Lý do bàn giao</span>
+              <input style={o} value={bgLyDo} disabled={!duocNghi}
+                onChange={(e) => setBgLyDo(e.target.value)} /></label>
+          </div>
+
+          {/* Bản xem trước phải kê CẢ PHẦN Ở LẠI. Chỉ liệt kê thứ sắp chuyển sẽ khiến người bấm
+              tin rằng mọi thứ khác không tồn tại. */}
+          {bgXem && <div style={{ marginTop: 8, fontSize: 12, background: "var(--panel2, #0b1829)",
+                                  border: "1px solid var(--line, #2a3b55)", borderRadius: 6, padding: "9px 11px" }}>
+            <div><b>Sẽ chuyển sang {bgXem.den?.ho_ten}:</b>{" "}
+              {bgXem.se_chuyen?.length
+                ? bgXem.se_chuyen.map((x: any) => `${x.ten} (${x.so_dong})`).join(" · ")
+                : "không có việc nào đang mở"}</div>
+            {bgXem.o_lai?.length > 0 && <div style={{ marginTop: 5 }} className="muted">
+              Ở lại với tên {bgXem.tu?.ho_ten}:{" "}
+              {bgXem.o_lai.map((x: any) => `${x.bang} (${x.so_dong})`).join(" · ")}</div>}
+          </div>}
+
+          <div className="row" style={{ gap: 8, marginTop: 8 }}>
+            <button className="act grey" style={{ margin: 0 }} disabled={!duocNghi || ban}
+              onClick={() => banGiao(false)}>Xem trước</button>
+            <button className="act orange" style={{ margin: 0 }}
+              disabled={!duocNghi || ban || !bgXem}
+              onClick={() => banGiao(true)}>Bàn giao</button>
+          </div>
         </div>
       </Khoa>
     </div>
