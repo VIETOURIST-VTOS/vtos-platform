@@ -14,6 +14,7 @@ import { Tag, errMsg } from "@/components/ui";
  *     và lãi gộp toàn công ty bị thổi lên mà không ai nhìn thấy. */
 const TABS: [string, string][] = [
   ["quy_tac", "Bảng quy ước"], ["thieu_gia_von", "Đơn bị giữ vì thiếu giá vốn"], ["thu", "Định khoản thử"],
+  ["danh_muc", "Danh mục"],
 ];
 
 function HachToanPage() {
@@ -309,6 +310,7 @@ function HachToanPage() {
       )}
 
       {tab === "thu" && <DinhKhoanThu nguon={d?.nguon || {}} />}
+      {tab === "danh_muc" && <DanhMuc />}
     </main>
   );
 }
@@ -382,6 +384,176 @@ function DinhKhoanThu({ nguon }: { nguon: Record<string, string> }) {
     </>
   );
 }
+
+
+
+// ── ĐỢT R3b 17/10/2026 — DANH MỤC KHOẢN MỤC & BỘ PHẬN ──────────────────────────────────────────
+//
+// VÌ SAO CẢ HAI NẰM CHUNG MỘT THẺ. Đợt R2 dựng danh mục khoản mục với đầy đủ cửa máy chủ nhưng
+// KHÔNG dựng màn hình — đo được 17/10/2026: `/api/v1/hach-toan/khoan-muc` có, mà trang này không
+// có một chữ "khoản mục" nào. Hệ quả: Kế toán muốn thêm một mã phải nhờ IT. Đó đúng là kiểu hỏng
+// kho mã đã khai và đặt hàng rào để bắt — "cửa có tồn tại nhưng người phải dùng nó không với tới"
+// — và nó lọt vì hàng rào chỉ quét các mục CÓ TRONG MENU, còn danh mục thì không có mục riêng.
+// Đợt này trả nợ ấy cùng lúc với dựng danh mục bộ phận: hai chiều phân tích của cùng một bộ sổ,
+// người mở màn để sửa một cái thường sửa luôn cái kia.
+function DanhMuc() {
+  const { user, toast } = useShell();
+  const vai = user?.role || "";
+  const laKeToan = ["chutich", "tgd", "ketoan"].includes(vai);     // sửa khoản mục
+  const laHcns = ["chutich", "tgd", "hcns"].includes(vai);          // sửa bộ phận — cơ cấu là việc HCNS
+  const [km, setKm] = useState<any>(null);
+  const [bp, setBp] = useState<any>(null);
+  const [la, setLa] = useState<any>(null);
+  const [loi, setLoi] = useState("");
+  const [ban, setBan] = useState("");
+  const [bpMoi, setBpMoi] = useState({ ma: "", ten: "" });
+  const [chon, setChon] = useState<Record<string, string>>({});
+
+  const load = useCallback(() => {
+    api("/hach-toan/khoan-muc?ca_ngung=true").then(setKm).catch((e) => setLoi(errMsg(e)));
+    api("/hach-toan/bo-phan?ca_ngung=true").then(setBp).catch((e) => setLoi(errMsg(e)));
+    api("/hach-toan/bo-phan/chua-gan").then(setLa).catch(() => setLa(null));
+  }, []);
+  useEffect(load, [load]);
+
+  const goi = async (path: string, json?: any, ph: string = "POST") => {
+    setBan(path); setLoi("");
+    try {
+      const ra: any = await api(path, json ? { method: ph, json } : { method: ph });
+      if (ra?.message) toast(ra.message);
+      load();
+    } catch (e) { setLoi(errMsg(e)); } finally { setBan(""); }
+  };
+
+  return (
+    <>
+      {loi && <div className="loi" style={{ margin: "10px 0" }}>{loi}</div>}
+
+      {/* ---- Khoản mục chi phí ---- */}
+      <h3 style={{ margin: "14px 0 6px" }}>Khoản mục chi phí</h3>
+      <p className="phu" style={{ marginTop: 0 }}>
+        Chiều phân tích trả lời câu “một tour lỗ thì lỗ ở đâu”. Mã không đổi được — ngừng dùng rồi
+        thêm dòng mới, vì bút toán cũ đang trỏ vào mã này và kỳ đã khoá thì không sửa lại được.
+      </p>
+      {laKeToan && (
+        <div style={{ margin: "8px 0" }}>
+          <button onClick={() => goi("/hach-toan/khoan-muc/nap-mac-dinh")} disabled={!!ban}>
+            Nạp khuôn ngành tour
+          </button>
+        </div>
+      )}
+      <table>
+        <thead><tr><th>Mã</th><th>Tên</th><th>Nhóm</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody>
+          {(km?.rows || []).map((r: any) => (
+            <tr key={r.id}>
+              <td><code>{r.ma}</code></td><td>{r.ten}</td>
+              <td className="phu">{km?.nhom?.[r.nhom] || r.nhom}</td>
+              <td><Tag kind={r.dung ? "ok" : "warn"}>{r.dung ? "đang dùng" : "ngừng dùng"}</Tag></td>
+              <td>{laKeToan && (
+                <button className="nho" disabled={!!ban}
+                  onClick={() => goi(`/hach-toan/khoan-muc/${r.id}`, { dung: !r.dung }, "PATCH")}>
+                  {r.dung ? "Ngừng dùng" : "Dùng lại"}
+                </button>)}</td>
+            </tr>
+          ))}
+          {!km?.rows?.length && <tr><td colSpan={5} className="phu">Chưa có khoản mục nào.</td></tr>}
+        </tbody>
+      </table>
+
+      {/* ---- Bộ phận ---- */}
+      <h3 style={{ margin: "22px 0 6px" }}>Bộ phận</h3>
+      <p className="phu" style={{ marginTop: 0 }}>
+        Cơ cấu phòng ban do Hành chính – Nhân sự giữ, không phải Kế toán.
+      </p>
+      {laHcns && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-end", margin: "8px 0" }}>
+          <button onClick={() => goi("/hach-toan/bo-phan/nap-mac-dinh")} disabled={!!ban}>
+            Nạp khuôn cơ cấu
+          </button>
+          <input placeholder="Mã (BP_…)" value={bpMoi.ma}
+            onChange={(e) => setBpMoi({ ...bpMoi, ma: e.target.value })} style={{ width: 130 }} />
+          <input placeholder="Tên bộ phận" value={bpMoi.ten}
+            onChange={(e) => setBpMoi({ ...bpMoi, ten: e.target.value })} style={{ width: 220 }} />
+          <button disabled={!!ban || !bpMoi.ma.trim() || !bpMoi.ten.trim()}
+            onClick={async () => { await goi("/hach-toan/bo-phan", { ...bpMoi }); setBpMoi({ ma: "", ten: "" }); }}>
+            Thêm bộ phận
+          </button>
+        </div>
+      )}
+      <table>
+        <thead><tr><th>Mã</th><th>Tên</th><th>Bút danh (chữ cũ trong sổ)</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody>
+          {(bp?.rows || []).map((r: any) => (
+            <tr key={r.id}>
+              <td><code>{r.ma}</code></td><td>{r.ten}</td>
+              <td className="phu">
+                {r.but_danh?.length ? r.but_danh.map((x: string) => (
+                  <span key={x} style={{ marginRight: 6 }}>
+                    <code>{x}</code>
+                    {laHcns && <button className="nho" style={{ marginLeft: 3 }} disabled={!!ban}
+                      onClick={() => goi(`/hach-toan/bo-phan/${r.ma}/but-danh/${encodeURIComponent(x)}`, undefined, "DELETE")}>
+                      gỡ</button>}
+                  </span>
+                )) : "–"}
+              </td>
+              <td><Tag kind={r.dung ? "ok" : "warn"}>{r.dung ? "đang dùng" : "ngừng dùng"}</Tag></td>
+              <td>{laHcns && (
+                <button className="nho" disabled={!!ban}
+                  onClick={() => goi(`/hach-toan/bo-phan/${r.id}`, { dung: !r.dung }, "PATCH")}>
+                  {r.dung ? "Ngừng dùng" : "Dùng lại"}
+                </button>)}</td>
+            </tr>
+          ))}
+          {!bp?.rows?.length && <tr><td colSpan={5} className="phu">Chưa có bộ phận nào — bấm “Nạp khuôn cơ cấu”.</td></tr>}
+        </tbody>
+      </table>
+
+      {/* ---- Gộp chữ cũ ---- */}
+      <h3 style={{ margin: "22px 0 6px" }}>Chữ cũ trong sổ chưa ai nhận</h3>
+      <p className="phu" style={{ marginTop: 0 }}>
+        Máy chỉ LIỆT KÊ và đếm; người chọn mã. Nhận một chữ về KHÔNG sửa một dòng sổ nào — chữ cũ
+        thành bút danh, sổ giữ nguyên chữ nó đã ghi. Gán nhầm thì gỡ bút danh, không phải dựng lại sổ.
+      </p>
+      {la?.de_trong ? (
+        <p className="phu">
+          Còn <b>{la.de_trong}</b> dòng sổ <b>để trống</b> bộ phận. Để trống nghĩa là chưa ai khai —
+          không gán hộ về một bộ phận nào, vì gán đại cho đủ là bịa ra một con số rồi in lên báo cáo.
+        </p>
+      ) : null}
+      <table>
+        <thead><tr><th>Chữ trong sổ</th><th>Số dòng</th><th>Nhận về bộ phận</th></tr></thead>
+        <tbody>
+          {(la?.chua_gan || []).map((x: any) => (
+            <tr key={x.chu}>
+              <td><code>{x.chu}</code></td><td>{x.so_dong}</td>
+              <td>
+                <select value={chon[x.chu] || ""} disabled={!laHcns || !!ban}
+                  onChange={(e) => setChon({ ...chon, [x.chu]: e.target.value })}>
+                  <option value="">— chưa chọn —</option>
+                  {(bp?.rows || []).filter((r: any) => r.dung).map((r: any) => (
+                    <option key={r.ma} value={r.ma}>{r.ma} — {r.ten}</option>
+                  ))}
+                </select>
+                {laHcns && (
+                  <button className="nho" style={{ marginLeft: 6 }}
+                    disabled={!!ban || !chon[x.chu]}
+                    onClick={() => goi("/hach-toan/bo-phan/gan", { chu: x.chu, ma: chon[x.chu] })}>
+                    Nhận
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+          {!la?.chua_gan?.length && (
+            <tr><td colSpan={3} className="phu">Không còn chữ nào chưa nhận.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
 
 // Bọc trong Shell: không bọc thì trang chạy NGOÀI khung – mất thanh điều hướng, và tệ hơn là
 // useShell() trả user rỗng nên mọi nút theo vai trò lặng lẽ biến mất mà không báo lỗi gì.

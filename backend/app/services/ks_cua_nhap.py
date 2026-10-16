@@ -98,6 +98,11 @@ CUA_TAY = (
     # dòng, hoặc ngừng dùng qua /api/v1/hach-toan/khoan-muc. Khai MAY_SINH thì ngày Kế toán cần một
     # khoản mục thứ mười một sẽ không có chỗ nào thêm, và họ sẽ dồn hết vào "Chi phí tour khác".
     "khoan_muc_chi_phi",
+    # ĐỢT R3b 17/10/2026. Tám dòng `nap_mac_dinh` gieo là KHUÔN cơ cấu, không phải số
+    # liệu: HCNS sửa tên, thêm, hoặc ngừng dùng qua /api/v1/hach-toan/bo-phan. Khai
+    # MAY_SINH thì ngày tách một phòng mới sẽ không có chỗ nào thêm, và người ta quay lại
+    # gõ chữ tự do — đúng cái mà đợt này đi chữa.
+    "bo_phan",
     "accounts", "ai_pause", "ai_positions", "alerts", "attachments", "attendance_days", "audit_log",
     "auto_reports", "ban_doc_chung_tu", "bang_gia", "bang_gia_dong", "bank_accounts_cat",
     "bank_doc_map", "bank_transactions", "bao_gia", "bao_gia_ban", "bao_gia_dong", "bookings",
