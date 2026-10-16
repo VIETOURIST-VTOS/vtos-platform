@@ -74,6 +74,40 @@ def nghi_viec(body: NghiViecIn, u: User = Depends(require_roles(*GHI)),
         raise HTTPException(400, str(e))
 
 
+class BanGiaoIn(BaseModel):
+    tu_user_id: int
+    den_user_id: int
+    ly_do: str = ""
+    xac_nhan: bool = False
+
+
+@router.post("/ban-giao-viec")
+def ban_giao_viec(body: BanGiaoIn, u: User = Depends(require_roles(*GHI)),
+                  db: Session = Depends(get_db)):
+    """HS-7 — chuyển VIỆC ĐANG MỞ của một người sang người khác. Chủ tịch chốt 16/10/2026.
+
+    `xac_nhan=false` chỉ trả bản xem trước và KHÔNG ghi gì — mặc định, cố ý, cùng nếp với nút gộp
+    và nút xoá: một thao tác dịch chuyển doanh số giữa hai người thì bước mặc định phải là bước
+    không làm gì.
+
+    CỬA RIÊNG, không gộp vào `/nghi-viec`. Hai lý do. Một: bàn giao cần dùng được cả khi người ta
+    KHÔNG nghỉ — chuyển vùng, nghỉ thai sản, đi học. Hai: gộp vào thì một lần bấm làm hai việc
+    không hoàn lại được như nhau, mà người bấm chỉ đọc một câu xác nhận.
+
+    Vai trò đúng bằng `GHI` của cửa ghi nghỉ việc: ai đóng được một người khỏi bảng lương thì cũng
+    là người quyết việc của họ về tay ai.
+    """
+    from app.services import ban_giao_viec as BG
+    try:
+        kq = BG.ban_giao(db, u, body.tu_user_id, body.den_user_id, body.ly_do, body.xac_nhan)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(422, str(e))
+    if body.xac_nhan:
+        db.commit()
+    return kq
+
+
 @router.post("/huy-nghi-viec")
 def huy_nghi_viec(body: HuyIn, u: User = Depends(require_roles(*GHI)),
                   db: Session = Depends(get_db)):
