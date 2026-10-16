@@ -99,6 +99,12 @@ CHO_DA_KHAI_BA_VAI = [
     "services/ho_so_nhan_vien.py: ketoan_truong",
     "services/ho_so_nhan_vien.py: ketoan_tt",
     "services/ho_so_nhan_vien.py: thu_quy",
+    # ── Đợt E12, 13/10/2026 ───────────────────────────────────────────────────────────────
+    # `services/bang_ky_cua.py` KHÔNG mở một cửa nào — nó ĐẾM. Tên vai xuất hiện ở đây vì nó là
+    # vai mà quyết định 11/10/2026 nói tới, và bảng ký phải gọi đúng tên quyết định ấy. Phép thử
+    # này soi theo TÊN VAI chứ không theo loại việc, đúng như nó được thiết kế, nên một dòng chỉ
+    # ĐỌC cũng hiện ra và cũng phải khai.
+    "services/bang_ky_cua.py: ketoan_truong",
 ]
 GOC_APP = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app")
 

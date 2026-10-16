@@ -213,14 +213,20 @@ export function tenThang(): string {
 export function TieuDe({ vai, ten_vai, quyet_dinh }: {
   vai?: string; ten_vai?: string;
   /** TC-65 · Hồ sơ đang chờ chính người đang xem quyết. Xem chú thích dài ngay trên. */
-  quyet_dinh?: { href: string; label: string }[];
+  /** ĐỢT E12 13/10/2026 — một dòng có thể mang theo `chi_tiet` thay vì một đường dẫn. Dòng như
+   *  thế KHÔNG phải việc chờ bấm mà là điều cần ĐỌC LẠI: bấm vào xổ ra ngay tại chỗ, không đi
+   *  trang khác. Dẫn sang màn hình riêng thì phải mở một khoá menu mới, tức xin thêm quyền cho
+   *  một loạt vai mà chưa ai ký — đúng cái việc bảng ấy sinh ra để canh. */
+  quyet_dinh?: { href: string; label: string; chi_tiet?: any }[];
 }) {
   const ten = TEN_TRANG[vai || ""] || `Bảng điều hành · ${ten_vai || ""}`;
   const cho = quyet_dinh || [];
   const homNay = useHomNay();
   const [thang, setThang] = useState("");
+  // ĐỢT E12 — dòng nào đang xổ ra. `null` là không dòng nào; bấm lại chính nó thì đóng.
+  const [xo, setXo] = useState<number | null>(null);
   useEffect(() => setThang(tenThang()), []);
-  return (
+  return (<>
     <div className="mh01-thanh">
       {/* TC-65 · PHẠM VI XUỐNG CHỖ RÊ CHUỘT — anh Tuấn: "bỏ Vietourist công ty mẹ".
           Câu trả lời KHÔNG mất, nó đi theo tên trang: rê chuột lên "Bảng điều hành Chủ tịch" là
@@ -252,7 +258,11 @@ export function TieuDe({ vai, ten_vai, quyet_dinh }: {
           VIỆC. Danh sách việc rỗng thì đúng nghĩa là không có việc — in thêm câu "không có hồ sơ
           nào đang chờ" mỗi ngày chỉ dạy người ta thôi đọc chỗ này. */}
       {cho.map((a, i) => (
-        <Link key={i} href={a.href} className="mh01-qd-nut">{a.label}</Link>
+        a.chi_tiet
+          ? <button key={i} type="button" className="mh01-qd-nut" onClick={() => setXo(xo === i ? null : i)}>
+              {a.label} {xo === i ? "▴" : "▾"}
+            </button>
+          : <Link key={i} href={a.href} className="mh01-qd-nut">{a.label}</Link>
       ))}
       {/* TC-35 · Nút In là một THAO TÁC TRÊN KỲ ĐANG CHỌN — in đúng cái kỳ ghi bên trái — nên nó
           đứng cùng thanh với kỳ; đứng riêng cạnh tiêu đề thì nó chỉ là một nút trôi nổi. */}
@@ -260,6 +270,40 @@ export function TieuDe({ vai, ten_vai, quyet_dinh }: {
         In / Lưu PDF
       </button>
     </div>
+
+    {/* ĐỢT E12 13/10/2026 — khối xổ ra của dòng đang mở. Nằm NGOÀI thanh ngang vì nó là một BẢNG,
+        không phải một nút: nhét vào trong thanh thì thanh vỡ dòng trên màn hẹp. */}
+    {xo !== null && cho[xo]?.chi_tiet && (() => {
+      const d: any = cho[xo].chi_tiet;
+      return (<div className="panel" style={{ margin: "8px 0 14px" }}>
+        <h3 style={{ margin: "0 0 2px" }}>{d.ten}</h3>
+        <p className="muted" style={{ margin: "0 0 10px" }}>{d.can_cu}</p>
+        <div className="wrap"><table><tbody>
+          <tr><td style={{ width: 230 }} className="muted">Vai được nới</td>
+              <td><b>{d.ten_vai}</b> <span className="muted">({d.vai})</span></td></tr>
+          <tr><td className="muted">Thấy mọi cửa của</td><td>{d.ten_vai_cha || "—"}</td></tr>
+          <tr><td className="muted">Tổng cửa mở được</td>
+              <td><b>{d.cua_tong}</b> <span className="muted">= {d.cua_dich_danh} cửa khai đích danh
+              + {d.cua_mo_het} cửa mở cho mọi người đã đăng nhập</span></td></tr>
+          <tr><td className="muted">Trong đó, nhờ MỘT dòng ký</td>
+              <td><b>{d.cua_nho_ke_thua}</b> cửa <span className="muted">— khai ở {d.khai_o}</span></td></tr>
+          <tr><td className="muted">Đảo lại quyết định</td><td className="muted">{d.dao_lai}</td></tr>
+          <tr><td className="muted">Người ký · ngày</td><td>{d.nguoi_ky} · {d.ngay_ky}</td></tr>
+        </tbody></table></div>
+        <p className="muted" style={{ margin: "12px 0 4px" }}><b>{d.cua_luong_da_ky.length} cửa chạm
+          DỮ LIỆU CÁ NHÂN</b> — bảng lương, hồ sơ nhân sự, BHXH, giảm trừ gia cảnh. {d.can_cu_cua_luong}.
+          Khai thành danh sách chứ không để phép suy tự lo: một quyền mở ra do hệ quả của một dòng suy
+          là một quyền không ai rà được, còn khai ra thì thêm một cửa lương nữa là phép thử ĐỎ chứ
+          không lọt vào im lặng.</p>
+        <div className="wrap"><table>
+          <thead><tr><th style={{ width: 100 }}>Phương thức</th><th>Đường dẫn</th></tr></thead>
+          <tbody>{d.cua_luong_da_ky.map((c: any, k: number) => (
+            <tr key={k}><td className="mono">{c.phuong_thuc}</td><td className="mono">{c.duong_dan}</td></tr>
+          ))}</tbody>
+        </table></div>
+      </div>);
+    })()}
+  </>
   );
 }
 

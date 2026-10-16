@@ -419,6 +419,18 @@ MAY_SINH = {
     # cái lỗ mà bảng này sinh ra để vá.
     "tai_khoan_da_xoa": "Bia mộ do chính thao tác xoá tài khoản ghi ra, ngay trước khi hàng ở users "
                         "biến mất – nhập tay là khai một lần xoá chưa từng xảy ra.",
+    # HD-Q2a · 16/10/2026 — SỔ ĐẾM LƯỢT MỞ CỬA ĐỌC. `services/dem_luot.ghi` viết một dòng mỗi khi
+    # có người mở một trong năm cửa đọc của phân hệ Đánh giá và Chăm sóc khách. KHÔNG CÓ CỬA NHẬP
+    # TAY LÀ MỘT TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: bảng này sinh ra để trả lời đúng
+    # một câu — AI THẬT SỰ ĐANG ĐỌC — và Chủ tịch sẽ dựa vào chính con số ấy để thu hẹp quyền đọc
+    # của Marketing và Điều hành (Đợt HD-Q2b). Gõ tay được vào đây thì một phòng sắp bị siết quyền
+    # tự ghi thêm lượt đọc cho mình, và phép đếm mất đúng công dụng duy nhất của nó.
+    #
+    # Cùng lý lẽ ấy nên cũng KHÔNG có cửa XOÁ. Bảng không ghi một chữ nào về khách — chỉ tên đăng
+    # nhập, vai trò, tên cửa và số đếm; xem đầu tệp `services/dem_luot.py`.
+    "luot_doc_cua": "Sổ đếm lượt mở cửa đọc do services/dem_luot.ghi viết khi người dùng mở cửa — "
+                    "nhập tay được là tự ghi thêm lượt đọc cho chính mình, đúng lúc trước khi con "
+                    "số ấy được dùng để quyết phạm vi quyền đọc.",
 }
 
 

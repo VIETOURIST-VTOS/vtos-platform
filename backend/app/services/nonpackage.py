@@ -219,7 +219,7 @@ def close_month(db: Session, u: User, month: str) -> dict:
     return {"month": month, "closed": done, "skipped": skipped, "message": f"Đã chốt {len(done)} dịch vụ lẻ tháng {month}" + (f"; để lại {len(skipped)} dịch vụ còn nợ" if skipped else "")}
 
 
-def print_html(b: Booking, company: str = "CÔNG TY CỔ PHẦN DU LỊCH VIETOURIST") -> str:
+def print_html(b: Booking, company: str = "CÔNG TY CỔ PHẦN VIETOURIST HOLDINGS") -> str:
     t = b.tour
     rows = [("Mã dịch vụ", t.code), ("Loại dịch vụ", SERVICE_KINDS.get(b.service_type, b.service_type)), ("Nội dung", b.services_note or t.name), ("Quốc gia", b.country or "–"), ("Ngày sử dụng", f"{b.service_date:%d/%m/%Y}" if b.service_date else "–"),
             ("Khách hàng", f"{b.customer_name} – {b.customer_phone}" + (f" – {b.customer_email}" if b.customer_email else "")), ("Số khách", str(b.pax)), ("Giá dịch vụ", f"{(b.amount or 0) - (b.discount or 0):,.0f} đ"),

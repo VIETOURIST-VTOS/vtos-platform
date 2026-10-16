@@ -15,6 +15,7 @@ from app.models.ops import PaymentRequest
 from app.models.cskh import (Complaint, CareTicket, KN_NGUON, KN_NHOM, KN_MUC, KN_TRANG_THAI,
                              KN_NGUYEN_NHAN, KN_HUONG, CS_HINH_THUC, CS_DIEM, CS_TRANG_THAI)
 from app.services import cskh as CS
+from app.services import dem_luot as DEM
 from app.services import rules as R
 from app.services import ai_log as AL
 
@@ -307,7 +308,9 @@ def cs_out(db: Session, t: CareTicket, ctx: dict | None = None) -> dict:
 
 @router.get("/cham-soc/chi-so")
 def cs_chi_so(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
-    return CS.chi_so_cham_soc(db)
+    kq = CS.chi_so_cham_soc(db)
+    DEM.ghi(u, "cham_soc_chi_so", 0)
+    return kq
 
 
 @router.get("/cham-soc")
@@ -324,6 +327,9 @@ def cs_ds(status: str = "", cua_toi: int = 0, qua_han: int = 0,
     ctx = cs_ctx(db, phieu)
     ra = [cs_out(db, t, ctx) for t in phieu]
     if qua_han: ra = [x for x in ra if x["qua_han"]]
+    # Đợt HD-Q2a: đếm lượt mở cửa này. Đếm SAU khi lọc, vì con số cần đo là «người này thực sự đọc
+    # được bao nhiêu phiếu», không phải «câu truy vấn trả về bao nhiêu dòng trước khi lọc».
+    DEM.ghi(u, "cham_soc", len(ra))
     return ra
 
 

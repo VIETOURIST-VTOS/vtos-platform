@@ -13,9 +13,9 @@ một cột nữa, trong khi bảng điểm vẫn không cộng được theo t�
 Một dòng một đối tượng thì cộng được theo người, theo chuyến, theo tháng, và thêm loại đối tượng
 mới không phải đổi bảng.
 """
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -93,3 +93,35 @@ class MaKhaoSat(Base):
     so_lan_mo: Mapped[int] = mapped_column(Integer, default=0)
     mo_lan_dau: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+# ---------- Đếm lượt mở cửa đọc (Đợt HD-Q2a, 16/10/2026) ----------
+class LuotDocCua(Base):
+    """Mỗi người × mỗi cửa đọc × mỗi ngày một dòng. KHÔNG ghi gì về khách.
+
+    Dựng ra vì trước đợt này hệ thống không có nhật ký đọc: `audit_log` chỉ ghi thao tác GHI, nên
+    câu hỏi «mỗi ngày mỗi vai mở bao nhiêu phiếu» — câu Chủ tịch cần để bấm ngày siết quyền — không
+    có dữ liệu nào trả lời được. Xem `services/dem_luot.py` để biết vì sao có cột `so_phut` bên
+    cạnh `so_luot`.
+
+    ĐỂ Ở TỆP NÀY CHỨ KHÔNG Ở `models/core.py`, và đó là một lựa chọn chứ không phải chỗ tiện tay.
+    Hai lẽ. Một: bảng này đếm lượt mở các cửa của chính phân hệ đánh giá và chăm sóc, nên nó thuộc
+    về đây. Hai: `core.py` hôm nay đang được làn Phân quyền sửa cho Đợt DX-3, và vòng này commit
+    NGUYÊN TỆP — đặt bảng vào `core.py` là hai làn cùng ghi một tệp, đúng thứ hàng rào giữ chỗ dựng
+    ra để chặn. Tệp này đã có sẵn dòng nhập trong `models/__init__.py`, nên không phải chạm tới tệp
+    ấy — mà tệp ấy cũng đang bị bốn dòng khác giữ.
+    """
+
+    __tablename__ = "luot_doc_cua"
+    __table_args__ = (UniqueConstraint("ngay", "username", "cua", name="uq_luot_doc_cua"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ngay: Mapped[date] = mapped_column(Date, index=True)
+    username: Mapped[str] = mapped_column(String(50), index=True)
+    role: Mapped[str] = mapped_column(String(30), index=True)
+    cua: Mapped[str] = mapped_column(String(40), index=True)
+    so_luot: Mapped[int] = mapped_column(Integer, default=0)
+    # Số PHÚT KHÁC NHAU trong ngày có ít nhất một lượt — chống màn hình tự nạp lại làm phồng số lượt.
+    so_phut: Mapped[int] = mapped_column(Integer, default=0)
+    phut_cuoi: Mapped[str] = mapped_column(String(5), default="")
+    so_dong: Mapped[int] = mapped_column(Integer, default=0)
