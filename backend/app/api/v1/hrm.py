@@ -12,7 +12,9 @@ from app.models.hrm import (EmployeeProfile, LaborContract, Dependent, LeaveRequ
                             CONTRACT_KINDS, CONTRACT_STATUS, RELATIONS, LEAVE_KINDS, LEAVE_STATUS, ATT_KINDS)
 from app.services import hrm as H
 from app.services import rules as R
-from app.services.ho_so_nhan_vien import VAI_CO_NHOM_CHE as _HSNV_VAI_HIEN
+from app.services.ho_so_nhan_vien import (VAI_CO_NHOM_CHE as _HSNV_VAI_HIEN,
+                                          VAI_CO_TRONG_BANG as _HSNV_VAI_XEM,
+                                          VAI_DUNG_DAU as _HSNV_VAI_QUAN_LY)
 
 router = APIRouter(prefix="/api/v1", tags=["nhan-su-ho-so"])
 HR_ADMIN = ("hcns", "cntt", "tgd", "chutich")
@@ -454,7 +456,10 @@ def tncn_con_thieu(period: str, u: User = Depends(require_roles(*HR_READ)), db: 
 # Hai loại số đi chung một khuôn đường dẫn là chỗ sớm muộn có người truyền nhầm, và truyền nhầm ở
 # đây nghĩa là mở hồ sơ của người khác.
 @router.get("/employees/tai-khoan/{uid}/ho-so-theo-vai")
-def ho_so_theo_vai(uid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
+def ho_so_theo_vai(uid: int,
+                   u: User = Depends(require_roles(*_HSNV_VAI_XEM,
+                                                   mo_ta="hồ sơ nhân viên")),
+                   db: Session = Depends(get_db)):
     """Hồ sơ một người, ĐÃ CẮT và ĐÃ CHE ở máy chủ theo vai của người đang xem.
 
     KHÔNG dùng `require_roles`: hàng rào thật là bảng quyền trong `ho_so_nhan_vien`, nơi mặc định
@@ -536,3 +541,24 @@ def hien_truong_ho_so(uid: int, data: HienTruongIn,
     return {"truong": kq["truong"], "gia_tri": kq["gia_tri"],
             "nhom": kq["ma_nhom"], "ten_nhom": kq["ten_nhom"],
             "message": f"Lượt xem này đã vào nhật ký hồ sơ mang tên {u.username}."}
+
+
+@router.get("/employees/phong-toi")
+def nhan_vien_phong_toi(u: User = Depends(require_roles(*_HSNV_VAI_QUAN_LY,
+                                                        mo_ta="nhân viên phòng tôi")),
+                        db: Session = Depends(get_db)):
+    """HS-4 · Những người tôi quản lý — câu đứng TRƯỚC câu "người này tôi xem được gì".
+
+    Thiếu cửa này thì trưởng phòng chỉ mở được hồ sơ khi đã biết sẵn mã tài khoản, tức là trên
+    thực tế họ không mở được. Mỗi dòng chỉ mang phần nhóm 1 mà vai ấy được thấy, cắt qua đúng
+    `cat_ho_so_theo_vai` như mọi chỗ khác — danh sách KHÔNG có bảng cột riêng, vì bảng riêng bao
+    giờ cũng là bảng rộng hơn.
+
+    Phản hồi mang `luat_pham_vi` để màn hình nói thẳng danh sách này dựa vào đâu: cây tổ chức
+    Kinh doanh (có ngày hiệu lực) hay chỉ so tên phòng (luật yếu).
+    """
+    from app.services import ho_so_nhan_vien as HSNV
+    kq = HSNV.nhan_vien_trong_pham_vi(db, u)
+    if not kq["duoc"]:
+        raise HTTPException(403, kq["ly_do"])
+    return kq

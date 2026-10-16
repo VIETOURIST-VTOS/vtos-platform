@@ -522,6 +522,20 @@ MUC_DICH_TOI_THIEU = 5
 VAI_CO_NHOM_CHE: tuple[str, ...] = tuple(sorted(
     {v for n in NHOM_TRUONG for v, q in n["quyen"].items() if q == CHE}))
 
+# MỌI VAI CÓ TÊN Ở BẤT KỲ NHÓM NÀO — cũng suy từ bảng, cùng một lý do.
+#
+# Vòng HS-2 em đặt cửa đọc dưới `current_user` và để hàng rào nằm trong `doc_ho_so`, nghĩ rằng
+# luật "khai quyền ở chỗ máy đọc được" chỉ áp cho đường GHI. SAI: `test_p1` và `test_p1b` áp cho
+# MỌI đường, và bắt đúng cửa ấy. Lý do của luật nặng hơn lý do của em: bộ rà quyền phải đọc được
+# vai trò từ CHỮ KÝ, không phải bằng cách phân tích thân hàm — ngày 07/9/2026 nó báo oan 26 việc
+# chỉ vì có hai kiểu khai song song, và một robot kêu oan 26 lần thì lần sau không ai đọc nó nữa.
+#
+# Suy ra từ bảng nên vẫn KHÔNG có bản sao thứ hai: thêm một vai vào bất kỳ nhóm nào thì nó tự có
+# mặt ở đây. Đây là lọc THÔ ở cửa; cắt thật vẫn là `cat_ho_so_theo_vai`, và vai lọt qua lọc thô
+# mà không thấy nhóm nào vẫn nhận 403.
+VAI_CO_TRONG_BANG: tuple[str, ...] = tuple(sorted(
+    {v for n in NHOM_TRUONG for v in n["quyen"]}))
+
 def nhom_cua_truong(truong: str) -> dict | None:
     for n in NHOM_TRUONG:
         if truong in n["truong"]:
@@ -559,3 +573,84 @@ def hien_truong(db, nguoi_xem, muc_tieu, truong: str) -> dict:
 
     return {"duoc": True, "ma_nhom": n["ma"], "ten_nhom": n["ten"],
             "truong": truong, "gia_tri": day_du[truong], "luat_pham_vi": luat}
+
+
+# =============================================================================================
+# HS-4 · DANH SÁCH NHÂN VIÊN TRONG PHẠM VI MỘT NGƯỜI QUẢN LÝ
+#
+# Cửa đọc hồ sơ (HS-2) trả lời "người NÀY tôi xem được gì". Nó không trả lời được câu đứng trước:
+# "tôi quản những AI". Thiếu câu ấy thì trưởng phòng chỉ mở được hồ sơ khi đã biết sẵn mã tài
+# khoản — tức là trên thực tế họ không mở được.
+#
+# CHỈ TRẢ VỀ PHẦN NHÓM 1 mà vai ấy được thấy, và cắt qua đúng `cat_ho_so_theo_vai` như mọi chỗ
+# khác. Dựng riêng một danh sách cột cho màn hình danh sách là bảng quyền có bản sao thứ hai, và
+# bản sao ấy sẽ là bản rộng hơn — danh sách bao giờ cũng bị thêm cột cho tiện.
+# =============================================================================================
+
+def nhan_vien_trong_pham_vi(db, nguoi_xem, ngay=None) -> dict:
+    """Những người `nguoi_xem` quản lý, kèm phần hồ sơ nhóm 1 mà vai ấy được thấy."""
+    from sqlalchemy import select
+    from app.models.core import User
+
+    vai = (getattr(nguoi_xem, "role", "") or "").strip()
+    if vai not in VAI_DUNG_DAU:
+        return {"duoc": False, "ly_do": "Vai này không quản lý ai", "nguoi": [], "so_nguoi": 0}
+
+    ung_vien: list = []
+    luat = ""
+    if vai in PHAM_VI_THEO_CAY:
+        from app.services import to_chuc_kd as TCKD
+        thay: dict[int, str] = {}
+        for mang in ("le", "doan"):
+            ds = TCKD.pham_vi_xem(db, nguoi_xem, ngay, mang)
+            if ds is None or not ds:
+                continue
+            for x in TCKD.nguoi_trong(db, ds, ngay):
+                thay.setdefault(x["user_id"], f"cay_{mang}")
+        for uid, l in thay.items():
+            u = db.get(User, uid)
+            if u is not None:
+                ung_vien.append(u); luat = luat or l
+        luat = luat or "ngoai_cay"
+    else:
+        # LUẬT YẾU: chỉ so chuỗi `User.department`. Không ngày hiệu lực, không cấp trên cấp dưới,
+        # một chữ viết hoa lệch là hai người khác phòng. Trả ra tên luật để màn hình nói thẳng.
+        p = (getattr(nguoi_xem, "department", "") or "").strip().lower()
+        luat = "cung_phong_luat_yeu" if p else "chua_gan_phong"
+        if p:
+            ung_vien = [u for u in db.execute(select(User).where(User.active == True)).scalars()  # noqa: E712
+                        if (u.department or "").strip().lower() == p]
+
+    ra = []
+    for u in ung_vien:
+        if u.id == getattr(nguoi_xem, "id", None):
+            continue                     # không liệt kê chính mình trong danh sách nhân viên
+        cat = cat_ho_so_theo_vai(_dong_danh_sach(db, u), vai, trong_pham_vi=True)
+        if not cat:
+            continue                     # vai này không thấy một trường nào — không in dòng rỗng
+        cat["user_id"] = u.id
+        ra.append(cat)
+    ra.sort(key=lambda r: (cap_cua_vai(r.get("role", "")), (r.get("full_name") or "").lower()))
+    return {"duoc": True, "luat_pham_vi": luat, "so_nguoi": len(ra), "nguoi": ra}
+
+
+def _dong_danh_sach(db, u) -> dict:
+    """Hồ sơ RÚT GỌN cho một dòng danh sách — không gọi `thu_thap`.
+
+    `thu_thap` đếm dòng dữ liệu trỏ tới tài khoản trên mọi bảng có khoá ngoại; chạy nó cho từng
+    người trong một danh sách hai mươi người là hai mươi lần quét. Dòng danh sách chỉ cần phần
+    nhận dạng, và phần ấy vẫn đi qua `cat_ho_so_theo_vai` nên bảng quyền vẫn là người quyết.
+    """
+    from app.services import quyen_ho_so as QHS
+    hs = {"full_name": u.full_name, "staff_code": u.staff_code or "",
+          "department": u.department or "", "role": u.role, "username": u.username,
+          "active": bool(u.active)}
+    e = QHS.ho_so_cua_hoac_rong(db, u)
+    if e is not None:
+        hs["title"] = e.title or ""
+        hs["position"] = e.position or ""
+        hs["office"] = e.office or ""
+        hs["contract_type"] = e.contract_type or ""
+        hs["start_date"] = e.start_date.isoformat() if e.start_date else None
+        hs["ended_on"] = e.ended_on.isoformat() if e.ended_on else None
+    return hs

@@ -394,3 +394,82 @@ def test_hs3_8_danh_sach_vai_o_cua_hien_phai_suy_tu_bang_va_khong_duoc_rong():
     assert VAI_CO_NHOM_CHE == mong
     assert VAI_CO_NHOM_CHE, ("Không vai nào có nhóm CHE — require_roles() rỗng không chặn ai. "
                              "Bỏ hẳn cửa hiện-trường, đừng để nó mở toang.")
+
+
+# =============================================================================================
+# HS-4 · danh sách nhân viên trong phạm vi
+# =============================================================================================
+def test_hs4_1_truong_phong_thay_nguoi_cung_phong_va_biet_luat_nao():
+    r = client.get("/api/v1/employees/phong-toi", headers=dang_nhap("tp_dh"))
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["luat_pham_vi"] == "cung_phong_luat_yeu"
+    ten = {x["full_name"] for x in d["nguoi"]}
+    assert "Nguyen Thi Thu" in ten, "Người cùng phòng dieu_hanh phải có trong danh sách"
+    assert "Thử tp_dh" not in ten, "Không liệt kê chính mình trong danh sách nhân viên"
+
+
+def test_hs4_2_danh_sach_khong_rong_hon_cua_doc():
+    """Dòng danh sách phải đi qua cùng bảng quyền. Một cột lọt thêm ở đây là một cột lọt ra mà
+    màn hình hồ sơ vẫn che đúng — chỗ hở ở bảng danh sách khó thấy hơn hẳn."""
+    r = client.get("/api/v1/employees/phong-toi", headers=dang_nhap("tp_dh"))
+    for x in r.json()["nguoi"]:
+        for cam in ("id_number", "base_salary", "bank_account", "phone", "username",
+                    "advance_limit", "diem_danh_gia", "nhat_ky"):
+            assert cam not in x, f"Trưởng phòng không được thấy {cam} trên dòng danh sách"
+
+
+def test_hs4_3_vai_khong_quan_ly_ai_thi_403():
+    """Chủ tịch và HCNS nhìn toàn công ty — họ không có 'phòng của tôi'. Trả một danh sách rỗng
+    sẽ đọc giống 'phòng bạn không có ai', mà đó là một câu sai."""
+    for vai in ("chutich", "hcns", "cntt", "nv_visa"):
+        r = client.get("/api/v1/employees/phong-toi", headers=dang_nhap(vai))
+        assert r.status_code == 403, f"{vai} nhận {r.status_code}"
+
+
+def test_hs4_4_moi_nguoi_trong_danh_sach_deu_mo_duoc_ho_so():
+    """Phép thử bắc cầu giữa hai cửa: ai có tên trong danh sách thì bấm vào PHẢI mở được. Danh
+    sách rộng hơn cửa đọc nghĩa là màn hình bày ra những dòng bấm vào chỉ nhận 403."""
+    r = client.get("/api/v1/employees/phong-toi", headers=dang_nhap("tp_dh"))
+    for x in r.json()["nguoi"]:
+        h = client.get(f"{DUONG}/{x['user_id']}/ho-so-theo-vai", headers=dang_nhap("tp_dh"))
+        assert h.status_code == 200, (
+            f"{x['full_name']} có trong danh sách nhưng mở hồ sơ nhận {h.status_code}")
+
+
+def test_hs5_moi_cua_ho_so_deu_khai_quyen_o_chu_ky_va_suy_tu_bang():
+    """BÀI HỌC 16/10/2026 — và là lỗi của chính làn này.
+
+    Vòng HS-2 đặt cửa ĐỌC dưới `current_user`, để hàng rào nằm trong thân hàm dịch vụ, vì nghĩ
+    luật "khai quyền ở chỗ máy đọc được" chỉ áp cho đường GHI. Sai: `test_p1` và `test_p1b` áp
+    cho MỌI đường và bắt đúng cửa ấy — nhưng hai phép thử đó nằm ở bộ `backend` 45 phút, không
+    nằm trong bộ cổng 16 tệp, nên bốn vòng liền không ai thấy.
+
+    Phép thử này nằm NGAY TRONG bộ của làn, để lần sau đỏ trong 20 giây chứ không đỏ sau 45 phút:
+    mọi cửa hồ sơ phải khai vai ở chữ ký, và danh sách ấy phải SUY RA từ bảng quyền chứ không gõ
+    tay — gõ tay là bảng quyền có bản sao thứ hai, và hai bản sẽ lệch.
+    """
+    from app.main import app as _app
+    from app.services import ks_robot as KS
+    from app.services.ho_so_nhan_vien import (CHE, NHOM_TRUONG, VAI_CO_NHOM_CHE,
+                                              VAI_CO_TRONG_BANG, VAI_DUNG_DAU)
+
+    assert VAI_CO_TRONG_BANG == tuple(sorted({v for n in NHOM_TRUONG for v in n["quyen"]}))
+    assert VAI_CO_NHOM_CHE == tuple(sorted(
+        {v for n in NHOM_TRUONG for v, q in n["quyen"].items() if q == CHE}))
+    for ten, ds in (("VAI_CO_TRONG_BANG", VAI_CO_TRONG_BANG),
+                    ("VAI_CO_NHOM_CHE", VAI_CO_NHOM_CHE),
+                    ("VAI_DUNG_DAU", VAI_DUNG_DAU)):
+        assert ds, f"{ten} rỗng — require_roles() không tham số thì không chặn ai"
+
+    cua_ho_so = [r for r in _app.routes
+                 if "/employees/tai-khoan" in str(getattr(r, "path", ""))
+                 or str(getattr(r, "path", "")).endswith("/employees/phong-toi")]
+    assert len(cua_ho_so) == 3, f"Phải có đúng ba cửa hồ sơ, đang có: {cua_ho_so}"
+    for r in cua_ho_so:
+        assert KS.chan_o_chu_ky(r), (
+            f"{r.path} không khai vai ở chữ ký — bộ rà quyền sẽ phải đọc mã nguồn mới thấy, "
+            "và đó đúng là thứ P1 cấm.")
+
+    assert not [x for x in KS.endpoint_phai_doc_ma_nguon(_app)
+                if "/employees/" in x], "Còn cửa hồ sơ phải đọc mã nguồn mới nhận ra quyền"
