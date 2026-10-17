@@ -243,6 +243,15 @@ function DoiXe() {
         ["nhinlai", "Nhìn lại"]] as const)
         .map(([k, ten]) => <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} onClick={() => setTab(k as any)}>{ten}</button>)}
     </div>
+    {/* LỐI VÀO HAI SỔ CON (17/10/2026). Hai màn ghi phạt tài xế và giá dầu là TRANG CON của /doi-xe,
+        cố ý không có mục menu riêng — nên lối vào DUY NHẤT của chúng là hàng nút này. Vòng DX-5 lên
+        hệ thật mà thiếu hàng này: cửa có, màn có, nhưng không ai tới được trừ khi gõ tay địa chỉ.
+        Mở tab mới để không mất chỗ đang xem ở màn đội xe. */}
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 10px" }}>
+      <span className="muted" style={{ alignSelf: "center" }}>Sổ con:</span>
+      <a className="act grey" style={{ margin: 0 }} href="/doi-xe/phat-tai-xe" target="_blank" rel="noopener">Phạt tài xế ↗</a>
+      <a className="act grey" style={{ margin: 0 }} href="/doi-xe/gia-dau" target="_blank" rel="noopener">Giá dầu & định mức ↗</a>
+    </div>
 
     {tab === "chuyen" && <>
       {form?.id && <DinhKem doiTuong="chuyen_xe" doiTuongId={form.id}
