@@ -355,7 +355,7 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
         hs["ended_on"] = e.ended_on.isoformat() if e.ended_on else None
         hs["end_kind"] = e.end_kind or ""
         hs["end_reason"] = e.end_reason or ""
-        hs["phone"] = e.phone or ""
+        hs["phone"] = ""              # điền ở dưới, sau khi đã đọc hồ sơ cá nhân
         hs["probation"] = bool(e.probation)
         hs["bhxh_base"] = e.bhxh_base
         hs["base_salary"] = e.base_salary
@@ -368,8 +368,15 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
 
         pf = db.execute(select(EmployeeProfile)
                         .where(EmployeeProfile.employee_id == e.id)).scalars().first()
+        # HS-11 — ngày sinh và điện thoại đi qua MỘT luật có tên, không còn luật ngầm.
+        # Bản cũ ghi `hs["phone"] = e.phone` rồi ở cuối khối lại đè bằng `pf.phone` nếu có; luật
+        # "hồ sơ thắng cột cũ" ấy không khai ở đâu và không phép thử nào canh, nên nó quyết định
+        # số điện thoại hiện trên màn hồ sơ mà không ai đọc được quyết định ấy ở đâu cả.
+        from app.services import gop_ho_so_nv as _GOP
+        hs["phone"] = _GOP.doc(e, pf, "phone", "phone") or ""
+        hs["dob"] = (lambda v: v.isoformat() if hasattr(v, "isoformat") else v)(
+            _GOP.doc(e, pf, "birth_date", "dob"))
         if pf is not None:
-            hs["dob"] = pf.dob.isoformat() if pf.dob else None
             hs["gender"] = pf.gender or ""
             hs["id_number"] = pf.id_number or ""
             hs["id_issued_on"] = pf.id_issued_on.isoformat() if pf.id_issued_on else None
@@ -381,8 +388,6 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
             hs["bank_account"] = pf.bank_account or ""
             if pf.email:
                 hs["email"] = pf.email
-            if pf.phone:
-                hs["phone"] = pf.phone
 
         hd = db.execute(select(LaborContract)
                         .where(LaborContract.employee_id == e.id)

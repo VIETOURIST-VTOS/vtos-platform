@@ -143,6 +143,39 @@ def profile_gaps(u: User = Depends(require_roles(*HR_READ)), db: Session = Depen
     return {"count": len(out), "rows": out, "required_fields": list(H.PROFILE_REQUIRED)}
 
 
+# ---------- HS-11 · Một người, một ngày sinh ----------
+# Hai cửa dưới đây đứng cạnh `profile-gaps` là có chủ ý: cùng một việc của HCNS — đi dọn hồ sơ —
+# nên chúng nằm cùng một chỗ trên màn hình và cùng một chỗ trong mã.
+
+@router.get("/hrm/lech-ho-so")
+def lech_ho_so(gom_ca_khop: bool = False, u: User = Depends(require_roles(*HR_READ)),
+               db: Session = Depends(get_db)):
+    """CHỈ ĐỌC — kê những người đang mang hai giá trị khác nhau cho cùng một thông tin.
+
+    Vai đọc rộng hơn vai sửa (`HR_READ` chứ không `HR_ADMIN`): Ban kiểm soát và Kế toán cần nhìn
+    thấy chỗ lệch để biết con số họ đang đọc đến từ đâu, nhưng không ai trong hai vai ấy được
+    sửa hồ sơ nhân sự.
+    """
+    from app.services import gop_ho_so_nv as GOP
+    return GOP.soat_lech(db, gom_ca_khop)
+
+
+class ChepOTrongIn(BaseModel):
+    xac_nhan: bool = False
+
+
+@router.post("/hrm/lech-ho-so/chep-o-trong")
+def chep_o_trong(data: ChepOTrongIn, u: User = Depends(require_roles(*HR_ADMIN)),
+                 db: Session = Depends(get_db)):
+    """Chép sang hồ sơ CHỈ ở ô còn trống. `xac_nhan=false` là bản xem trước, không ghi gì.
+
+    Cửa này KHÔNG giải quyết được dòng «hai bên khác nhau», và cố ý không giải quyết: chọn hộ
+    một ngày sinh là xoá mất ngày kia mà không còn dấu vết nào để lần lại.
+    """
+    from app.services import gop_ho_so_nv as GOP
+    return GOP.chuyen_cho_trong(db, u, data.xac_nhan)
+
+
 # ---------- Hợp đồng lao động ----------
 
 class ContractIn(BaseModel):
