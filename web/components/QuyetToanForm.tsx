@@ -125,6 +125,64 @@ function ONcc({ onChon }: { onChon: (s: any | null) => void }) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// CỜ «THUÊ XE NGOÀI» CỦA CHUYẾN BÁN, và chỗ nó lệch với các chặng (Chủ tịch chốt 17/10/2026)
+// ---------------------------------------------------------------------------------------------
+//
+// Hai lời khai về cùng một chuyện, giữ CẢ HAI vì khác tầng: cờ ở chuyến có LÝ DO mà không có chặng;
+// các chặng ở bảng dưới có xe, có tiền mà không có lý do. Nói ngược nhau thì máy nói ra ngay tại
+// đây — không chọn hộ bên nào, không tự sửa bên nào. Lý do là mã chọn do máy chủ trả về.
+function ThueXeNgoai({ tourId, toast, doi }: {
+  tourId: number; toast: (m: string, err?: boolean) => void; doi: number;
+}) {
+  const [d, setD] = useState<any>(null);
+  const [co, setCo] = useState(false);
+  const [ly, setLy] = useState("");
+  const [lyDoSua, setLyDoSua] = useState("");
+  const [dang, setDang] = useState(false);
+  const nap = useCallback(() => {
+    api(`/quyet-toan-lop3/${tourId}/thue-xe-ngoai`).then((r: any) => {
+      setD(r); setCo(!!r.thue_xe_ngoai); setLy(r.ly_do_thue_ngoai || "");
+    }).catch(() => setD(null));
+  }, [tourId]);
+  useEffect(() => { nap(); }, [nap, doi]);
+  if (!d) return null;
+  const doiGi = co !== !!d.thue_xe_ngoai || (co ? ly : "") !== (d.ly_do_thue_ngoai || "");
+  const luu = async () => {
+    setDang(true);
+    try {
+      const r: any = await api(`/quyet-toan-lop3/${tourId}/thue-xe-ngoai`, { method: "PUT",
+        json: { thue_xe_ngoai: co, ly_do_thue_ngoai: co ? ly : "", ly_do_sua: lyDoSua } });
+      setD(r); setLyDoSua(""); toast("Đã ghi cờ thuê xe ngoài của chuyến");
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+  return (
+    <div className="panel" style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <label>Chuyến này thuê xe ngoài?
+          <select value={co ? "1" : "0"} onChange={(e) => setCo(e.target.value === "1")}>
+            <option value="0">Không — chạy xe nhà</option>
+            <option value="1">Có thuê xe ngoài</option>
+          </select>
+        </label>
+        {co && <label>Lý do
+          <select value={ly} onChange={(e) => setLy(e.target.value)}>
+            <option value="">— chưa chọn —</option>
+            {Object.entries(d.ly_do_chon || {}).map(([k, l]) => <option key={k} value={k}>{String(l)}</option>)}
+          </select>
+        </label>}
+        {d.da_ky && doiGi && <label>Lý do sửa tờ đã ký
+          <input value={lyDoSua} onChange={(e) => setLyDoSua(e.target.value)} style={{ minWidth: 200 }} /></label>}
+        <button className="act" style={{ margin: 0 }} disabled={dang || !doiGi} onClick={luu}>
+          {dang ? "Đang ghi…" : "Ghi"}</button>
+        <span className="muted" style={{ fontSize: 12 }}>
+          {d.so_chang_o_to} chặng ô tô · {d.so_chang_thue_ngoai} thuê ngoài</span>
+      </div>
+      {d.lech && <div className="gate warn" style={{ marginTop: 8 }}>{d.lech}</div>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
 // Ô «xe nhà» ở dòng phương tiện ĐÃ GHI — khoá, hoặc CỬA GẮN TAY (Chủ tịch chốt 17/10/2026)
 // ---------------------------------------------------------------------------------------------
 //
@@ -763,6 +821,7 @@ export default function QuyetToanForm({ tourId, toast }: {
       )}
 
       {/* ---------------------------------------------------------------- 5. phương tiện */}
+      <ThueXeNgoai tourId={tourId} toast={toast} doi={(pt?.so_dong ?? 0) * 1000 + (pt?.dong || []).filter((r: any) => r.vehicle_id).length} />
       <BangNhap
         tieuDe={`${nn ? "5" : "4"}. Phương tiện`} nn={nn} dangGhi={ghi} dong={pt?.dong || []}
         giaiThich="Một chiều riêng, không phải một dòng chi: tour đoàn Phú Quốc là tour trong nước nhưng đi máy bay."

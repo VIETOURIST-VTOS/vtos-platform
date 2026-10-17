@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles, toan_quyen
 from app.db.session import get_db
-from app.models.core import Booking, Tour, User
+from app.models.core import LY_DO_THUE_XE_NGOAI, Booking, Tour, User
 from app.models.lop3_tour import (BookingKhach, DeNghiLanhSu, DeNghiLanhSuDong,
                                   KhachChiPhi, SuaSauKy, TourBenBan,
                                   TourBenBanDong, TourDoanhThuDong,
@@ -860,6 +860,44 @@ def _goi_y_gan(x: TourPhuongTien, xe_theo_bien: dict) -> dict | None:
         return None
     xe = xe_theo_bien.get(XN.bien_chuan(x.so_hieu))
     return {"vehicle_id": xe.id, "plate": xe.plate, "code": xe.code or ""} if xe else None
+
+
+class ThueXeNgoaiVao(BaseModel):
+    thue_xe_ngoai: bool
+    ly_do_thue_ngoai: str = ""
+    ly_do_sua: str = ""
+
+
+@router.get("/{tid}/thue-xe-ngoai")
+def xem_thue_xe_ngoai(tid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Cờ «thuê xe ngoài» của CHUYẾN BÁN, danh sách lý do để chọn, và chỗ lệch với các chặng."""
+    t = _tour(db, tid, u)
+    return {**XN.lech_khai_thue_ngoai(db, t), "ly_do_chon": LY_DO_THUE_XE_NGOAI, "da_ky": _da_ky(t)}
+
+
+@router.put("/{tid}/thue-xe-ngoai")
+def khai_thue_xe_ngoai(tid: int, v: ThueXeNgoaiVao, u: User = Depends(require_roles(*NHAP)),
+                       db: Session = Depends(get_db)):
+    """CỬA NHẬP cho hai cột `tours.thue_xe_ngoai` / `ly_do_thue_ngoai` (Chủ tịch chốt 17/10/2026).
+
+    Hai cột sinh ra ở vòng R1 mà không có cửa nào ghi — một con số không có cửa nhập là việc còn
+    thiếu. Lý do là MÃ CHỌN trong `LY_DO_THUE_XE_NGOAI`; không thuê ngoài thì lý do bị xoá trắng,
+    để «không thuê» không mang theo một lý do cũ. Có thuê mà chưa chọn lý do thì VẪN GHI ĐƯỢC
+    (đó là trạng thái thật: biết là thuê, chưa rõ vì sao) — chỗ ấy hiện ở ô lệch, không chặn.
+    """
+    t = _tour(db, tid, u)
+    _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
+    ly = (v.ly_do_thue_ngoai or "").strip() if v.thue_xe_ngoai else ""
+    if ly and ly not in LY_DO_THUE_XE_NGOAI:
+        raise HTTPException(422, f"Lý do phải là một trong {sorted(LY_DO_THUE_XE_NGOAI)}")
+    for truong, gt in (("thue_xe_ngoai", bool(v.thue_xe_ngoai)), ("ly_do_thue_ngoai", ly)):
+        cu = getattr(t, truong)
+        if gt != cu:
+            if _da_ky(t):
+                ghi_dau_vet(db, t, u, "tours", t.id, truong, cu, gt, v.ly_do_sua)
+            setattr(t, truong, gt)
+    db.commit()
+    return {**XN.lech_khai_thue_ngoai(db, t), "ly_do_chon": LY_DO_THUE_XE_NGOAI, "da_ky": _da_ky(t)}
 
 
 class GanXeVao(BaseModel):

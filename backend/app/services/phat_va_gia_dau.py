@@ -162,3 +162,24 @@ def ngay_thieu_gia(db: Session, ngay_can: list[date], loai: str = "do") -> list[
     """Những ngày đã có chi phí dầu mà chưa khai giá. Đếm được thì mới sửa được."""
     co = {g.ngay for g in db.execute(select(GiaDauNgay).where(GiaDauNgay.loai == loai)).scalars()}
     return sorted({d.isoformat() for d in ngay_can if d not in co})
+
+
+def tai_xe_chon(db: Session) -> dict:
+    """Danh sách tài xế để CHỌN trên ô nhập phiếu phạt. Không trả trường lương nào.
+
+    VÌ SAO KHÔNG GỌI `/api/v1/tai-xe` ĐÃ CÓ. Màn "/doi-xe/phat-tai-xe" là TRANG CON của "/doi-xe",
+    và `MAN_HINH_API["/doi-xe"]` chỉ mở ba nhóm fleet / vehicles / drivers. Gọi nhóm
+    "/api/v1/tai-xe" từ màn ấy là vỡ hàng rào quyền của chính nó — và cách chữa kia, nới quyền của
+    một màn đang chạy, đắt hơn hẳn một cửa mỏng trong nhóm fleet.
+
+    `la_tai_xe` dùng lại của `services/tai_xe.py`: MỘT định nghĩa "ai là tài xế", không hai. Ngày
+    định nghĩa ấy đổi thì cả hai nơi đổi theo, chứ không lệch nhau trong im lặng — cùng lẽ với ghi
+    chú ở chính `tai_xe.py` dòng 33 về `services/drivers.py`.
+
+    Không trả `department` hay `position`: màn hình chỉ cần tên để chọn. Trả thêm là mở rộng mặt
+    dữ liệu của một cửa mà không ai cần.
+    """
+    from app.services.tai_xe import la_tai_xe
+    nguoi = [e for e in db.execute(select(Employee).order_by(Employee.code)).scalars()
+             if la_tai_xe(e)]
+    return {"rows": [{"id": e.id, "ho_ten": e.full_name, "code": e.code} for e in nguoi]}

@@ -465,6 +465,25 @@ class TourEvent(Base):
     at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
+# Năm lý do thuê xe ngoài, Chủ tịch chốt 17/10/2026.
+#
+# VÌ SAO LÀ MÃ CHỌN, KHÔNG PHẢI CHỮ TỰ DO. Báo cáo nhìn lại phải cộng được theo nhóm, và phải phân
+# biệt khoản ĐÁNG TIẾC với khoản BÌNH THƯỜNG: "xe nhà kín lịch" là chuyện thường, "khách chỉ định
+# nhà xe" cũng vậy; "xe nhà đang bảo dưỡng" trong một tháng mà xe đậu nhiều mới là chỗ phải hỏi.
+# Chữ tự do thì cùng một lý do được gõ bốn cách và không nhóm được cái nào — đúng bài học của cột
+# khoản mục trong tờ quyết toán.
+#
+# Thứ tự giữ nguyên trên màn hình: hai lý do đầu là hai lý do thường gặp nhất, lý do cuối là lý do
+# đáng hỏi nhất.
+LY_DO_THUE_XE_NGOAI = {
+    "xe_nha_kin_lich": "Xe nhà kín lịch",
+    "khong_co_loai_xe": "Không có loại xe phù hợp",
+    "ngoai_vung_xe_nha": "Điểm đi ngoài vùng xe nhà",
+    "khach_chi_dinh": "Khách chỉ định nhà xe",
+    "xe_nha_dang_bao_duong": "Xe nhà đang bảo dưỡng",
+}
+
+
 class Tour(Base):
     __tablename__ = "tours"
     # V10 – kiểm phiên bản: tăng sau mỗi lần sửa, người gọi gửi kèm bản mình đang cầm.
@@ -596,6 +615,23 @@ class Tour(Base):
     # Dòng "dịch vụ tiêu dùng ngoài Việt Nam" của hoá đơn tour nước ngoài. Mặc định 0%, nhưng là 0%
     # ĐỌC TỪ THAM SỐ chứ không phải số 0 viết cứng trong mã: chính sách thuế đổi thì đổi tham số.
     thue_suat_ngoai_vn_pt: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # R1 17/10/2026 — Chủ tịch chốt khai "thuê xe ngoài" Ở CHUYẾN BÁN, không ở danh mục tour.
+    # Cùng một chương trình "Đà Lạt 3N3D": chuyến tuần này dùng xe nhà, chuyến tuần sau thuê ngoài
+    # vì xe nhà kín lịch. Khai ở `products` thì một chương trình chỉ có MỘT câu trả lời, và báo cáo
+    # nhìn lại (`services/doi_chieu_xe_ngoai.py`) mất đúng cái nó cần biết: chuyến NÀO thuê ngoài.
+    #
+    # HAI CỘT, KHÔNG MỘT. `ly_do_thue_ngoai` có chữ đã hàm ý thuê ngoài, nhưng cờ riêng mới trả lời
+    # được "có thuê ngoài, chưa ai chọn lý do" — khác hẳn "không thuê ngoài". Gộp lại là để trống
+    # mang hai nghĩa, và một ô mang hai nghĩa là chỗ mọi báo cáo sau đó bắt đầu sai.
+    #
+    # `server_default` cho cả hai: bảng `tours` đang có dữ liệu thật, và cột mới không được để mọi
+    # chuyến cũ thành NULL — NULL ở đây đọc như "chưa biết", còn sự thật là "chưa ai khai", mà mặc
+    # định đúng cho chuyến cũ là KHÔNG thuê ngoài (xe nhà là đường mặc định của đội xe).
+    thue_xe_ngoai: Mapped[bool] = mapped_column(Boolean, default=False,
+                                                server_default=_false(), nullable=False)
+    # MÃ CHỌN, KHÔNG CHỮ TỰ DO — xem LY_DO_THUE_XE_NGOAI ngay trên lớp này.
+    ly_do_thue_ngoai: Mapped[str] = mapped_column(String(40), default="",
+                                                  server_default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     # Bổ sung theo cấu trúc Vietrip (05/9/2026)
     vietrip_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)

@@ -1302,9 +1302,23 @@ MATRIX = {
 # không gọi tên chính những màn ông dùng để lập lệnh.
 MAN_CON_LENH_DIEU_XE = ("/lenh-dieu-xe/de-nghi", "/lenh-dieu-xe/de-nghi/moi",
                         "/lenh-dieu-xe/lap-lenh", "/lenh-dieu-xe/chua-nhan")
+# Bốn trang con của "/doi-xe" thêm 17/10/2026 — HAI CỬA NHẬP CÒN THIẾU của đội xe (phạt tài xế,
+# giá dầu ngày), Chủ tịch duyệt bản xem thử 16/10. Bảng và cửa API đã có từ đợt DX-3; thiếu đúng
+# màn hình, nên không ai nhập được — `services/ks_cua_nhap.py` đã ghi đúng điều đó ở hai dòng
+# trong `CUA_TAY`.
+#
+# Khai ở đây chứ KHÔNG ở MENU_ROLES, cùng hai lý do với bốn trang con của "/lenh-dieu-xe" ngay
+# trên: chúng là TRANG CON đi tới bằng thanh việc của màn "/doi-xe", không có mục menu riêng; và
+# quyền KHÔNG cần khai riêng — cả bốn chỉ gọi nhóm "/api/v1/fleet" mà "/doi-xe" đã gọi, nên hàng
+# rào thật vẫn nằm ở MÁY CHỦ: `GHI_PHAT` và `GHI_GIA_DAU` trong `api/v1/fleet.py`.
+#
+# Đó cũng là vì sao cửa `/fleet/tai-xe-chon` phải tồn tại: ô chọn tài xế KHÔNG được gọi nhóm
+# "/api/v1/tai-xe", nhóm ấy không có trong MAN_HINH_API["/doi-xe"].
+MAN_CON_DOI_XE = ("/doi-xe/phat-tai-xe", "/doi-xe/phat-tai-xe/moi",
+                  "/doi-xe/gia-dau", "/doi-xe/gia-dau/moi")
 ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/phieu-luong",
                                       "/doi-mat-khau", "/phan-he/[khoa]", "/offline",
-                                      "/dong-tien/nguon") + MAN_CON_LENH_DIEU_XE
+                                      "/dong-tien/nguon") + MAN_CON_LENH_DIEU_XE + MAN_CON_DOI_XE
 
 
 # Vai trò bị giới hạn: chỉ được thấy đúng những trang liệt kê ở đây.
@@ -1326,7 +1340,7 @@ RESTRICTED_ROLE_MENUS = {
     # Màn hình không mang theo dữ liệu khách: xem ghi chú ở dòng "/su-co-tour" của MENU_ROLES.
     "gd_doi_xe": ("/doi-xe", "/tai-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe",
                   "/xe-hdv", "/nap-du-lieu", "/tep", "/doc-chung-tu", "/su-co-tour",
-                  "/doi-mat-khau") + MAN_CON_LENH_DIEU_XE,
+                  "/doi-mat-khau") + MAN_CON_LENH_DIEU_XE + MAN_CON_DOI_XE,
     "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/su-co-tour", "/doi-mat-khau"),
     # Ba vai trò máy: danh sách CHO PHÉP, giống bốn vai trò hẹp ở trên. Robot không có menu để bấm,
     # nhưng khai ở đây thì màn hình tra cứu ngược (P10) nói được nó chạm tới đâu, và bộ quét vai trò

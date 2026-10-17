@@ -141,7 +141,15 @@ CUA_TAY = (
     # chiếc hao nhiều SUỐT sáu tháng thì máy coi đó là bình thường, và chiếc hao nhất đội thành
     # chiếc không bao giờ bị cảnh báo. Ngưỡng tự sinh từ chính số liệu nó canh thì không canh gì.
     "fleet_fuel_norms",
-    # DX-3 · 16/10/2026 — hai bảng mới, cả hai đều có màn hình nhập tay trên /doi-xe.
+    # DX-3 · 16/10/2026 — hai bảng mới.
+    #
+    # R1 · 17/10/2026 — SỬA LỜI KHAI Ở ĐÂY. Dòng cũ ghi "cả hai đều có màn hình nhập tay trên
+    # /doi-xe". Khi viết thì câu ấy KHÔNG ĐÚNG: bảng và cửa API có, nhưng không màn nào gọi hai
+    # cửa ghi, nên không ai nhập được. Và không phép thử nào bắt được — `test_man_hinh_co_cua_nhap`
+    # đọc màn hình từ GROUPS trong Shell.tsx, nên một cửa ghi không có màn thì nó không thấy.
+    # Nay hai màn đã có, và đường dẫn đúng là:
+    #   fleet_driver_penalties → /doi-xe/phat-tai-xe  (+ /moi để ghi)
+    #   fleet_fuel_prices      → /doi-xe/gia-dau      (+ /moi để ghi)
     #
     # `fleet_driver_penalties`: Giám đốc đội xe ghi (POST /fleet/phat-tai-xe), HCNS đánh dấu đã
     # đối chiếu khi chốt lương. CỐ Ý không có bộ nạp tệp: một khoản trừ vào lương của một con
