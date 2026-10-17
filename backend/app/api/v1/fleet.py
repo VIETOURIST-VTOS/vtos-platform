@@ -2119,6 +2119,21 @@ def ds_phat(ky: str = "", driver_id: int = 0, u: User = Depends(require_roles(*R
     return PG.so_phat(db, ky, driver_id or None)
 
 
+@router.get("/tai-xe-chon")
+def ds_tai_xe_chon(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Tài xế để chọn trên ô nhập phiếu phạt — id, họ tên, mã. Không có trường lương nào.
+
+    Ở TRONG NHÓM FLEET LÀ CỐ Ý. Nhóm "/api/v1/tai-xe" đã có một cửa danh sách tài xế, nhưng nhóm ấy
+    không nằm trong `MAN_HINH_API["/doi-xe"]`; trang con "/doi-xe/phat-tai-xe" gọi nó là vỡ hàng rào
+    quyền của chính trang ấy. Xem ghi chú đầy đủ ở `services/phat_va_gia_dau.tai_xe_chon`.
+
+    Chỉ `READ`, KHÔNG phải `GHI_PHAT`: ai xem được sổ phạt thì xem được tên tài xế. Quyền GHI vẫn
+    nằm nguyên ở `POST /phat-tai-xe`.
+    """
+    from app.services import phat_va_gia_dau as PG
+    return PG.tai_xe_chon(db)
+
+
 @router.post("/phat-tai-xe", status_code=201)
 def them_phat(v: PhatVao, u: User = Depends(require_roles(*GHI_PHAT)),
               db: Session = Depends(get_db)):

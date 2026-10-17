@@ -52,3 +52,33 @@ def xe_nha_theo_bien(db: Session) -> dict:
         if b and la_xe_nha(v):
             ra[b] = v
     return ra
+
+
+def lech_khai_thue_ngoai(db: Session, t) -> dict:
+    """Đối chiếu HAI LỜI KHAI về cùng một chuyện (Chủ tịch chốt 17/10/2026: giữ cả hai).
+
+      - Cờ «thuê xe ngoài» trên CHUYẾN BÁN (`tours.thue_xe_ngoai` + lý do) — khai cả chuyến.
+      - Các chặng ô tô trên tờ quyết toán — chặng nào nối hồ sơ xe nhà là xe nhà, còn lại thuê ngoài.
+
+    Hai tầng khác nhau nên không gộp được: chặng không có LÝ DO, cờ không có CHẶNG. Nhưng hai lời
+    khai nói ngược nhau thì ít nhất một lời sai, và máy phải nói ra chứ không chọn hộ bên nào.
+    CHỈ ĐỌC — không sửa cờ, không sửa chặng.
+    """
+    from app.models.lop3_tour import TourPhuongTien
+    from app.services.doi_chieu_xe_ngoai import LOAI_XE, _thue_ngoai
+
+    chang = list(db.execute(select(TourPhuongTien).where(
+        TourPhuongTien.tour_id == t.id, TourPhuongTien.loai == LOAI_XE)).scalars())
+    ngoai = [x for x in chang if _thue_ngoai(x)]
+    co = bool(t.thue_xe_ngoai)
+    ra = {"thue_xe_ngoai": co, "ly_do_thue_ngoai": t.ly_do_thue_ngoai or "",
+          "so_chang_o_to": len(chang), "so_chang_thue_ngoai": len(ngoai), "lech": None}
+    if not co and ngoai:
+        ra["lech"] = (f"Chuyến khai KHÔNG thuê xe ngoài, nhưng tờ quyết toán có {len(ngoai)} chặng ô tô "
+                      "thuê ngoài. Hoặc khai lại cờ ở chuyến, hoặc gắn các chặng ấy vào xe nhà.")
+    elif co and chang and not ngoai:
+        ra["lech"] = ("Chuyến khai CÓ thuê xe ngoài, nhưng mọi chặng ô tô trên tờ quyết toán đều là "
+                      "xe nhà. Một trong hai lời khai sai.")
+    elif co and not (t.ly_do_thue_ngoai or ""):
+        ra["lech"] = "Chuyến khai có thuê xe ngoài nhưng chưa chọn lý do."
+    return ra
