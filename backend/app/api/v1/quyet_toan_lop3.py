@@ -55,6 +55,8 @@ from app.services import thu_ho_chi_ho as THC
 from app.services import thue_gtgt_chuyen as THUE
 from app.services import tip_tour as TIP
 from app.services import ve_may_bay as VMB
+from app.services import xe_nha as XN
+from app.models.hr import Vehicle
 
 router = APIRouter(prefix="/api/v1/quyet-toan-lop3", tags=["quyet-toan-lop3"])
 
@@ -145,6 +147,30 @@ def danh_muc(hinh_thuc: str = "", u: User = Depends(require_roles(*XEM))):
             "quy_tac_phan_bo": G.BANG_PHAN_BO,
             "nhom_khoan_muc": KM.NHOM,
             "khoan_muc": KM.danh_sach(hinh_thuc or None)}
+
+
+@router.get("/xe-nha")
+def xe_nha_chon_duoc(u: User = Depends(require_roles(*NHAP)), db: Session = Depends(get_db)):
+    """Ô CHỌN XE NHÀ ở mục «Phương tiện» (Chủ tịch chốt 17/10/2026).
+
+    Chỉ xe nhà còn khai thác. Xe thuê ngoài không có ở đây — thuê thì người nhập gõ biển số. Xe
+    ngừng khai thác, đã bán cũng không có: màn hình không hiện thứ không chọn được.
+    """
+    return {"xe": [{"id": v.id, "plate": v.plate, "code": v.code or "", "seats": v.seats}
+                   for v in XN.ds_chon_duoc(db)]}
+
+
+def _xe_cua_chang(db: Session, vehicle_id: int, chi_dang_khai_thac: bool) -> Vehicle:
+    """Lấy xe để nối vào một chặng. Không phải xe nhà thì CHẶN — màn hình không phải chỗ canh luật."""
+    xe = db.get(Vehicle, vehicle_id)
+    if xe is None:
+        raise HTTPException(422, "Không có xe này trong danh mục đội xe")
+    if not XN.la_xe_nha(xe):
+        raise HTTPException(422, f"Xe {xe.plate} không phải xe nhà (xe hợp tác hoặc xe thuê) — "
+                                 "chặng thuê ngoài thì gõ biển số, không chọn xe")
+    if chi_dang_khai_thac and not XN.chon_duoc(xe):
+        raise HTTPException(422, f"Xe {xe.plate} đã ngừng khai thác hoặc đã bán — không chọn được")
+    return xe
 
 
 @router.get("/tra-ncc")
@@ -805,6 +831,14 @@ def them_phuong_tien(tid: int, v: PhuongTienVao, u: User = Depends(require_roles
     if dg is not None and v.so_luong is not None:
         tt = round(dg * v.so_luong, 2)
 
+    # XE NHÀ: đã chọn một chiếc thì biển số, số chỗ và dấu «xe nhà» lấy từ HỒ SƠ XE, đè lên mọi thứ
+    # màn hình gửi — khoá ở máy chủ, không phải khoá ở ô nhập (Chủ tịch chốt 17/10/2026).
+    if v.vehicle_id is not None:
+        if v.loai != "o_to":
+            raise HTTPException(422, "Chỉ chặng ô tô mới chọn được xe nhà")
+        xe = _xe_cua_chang(db, v.vehicle_id, chi_dang_khai_thac=True)
+        v.so_hieu, v.so_cho, v.xe_nha = xe.plate, xe.seats, 1
+
     x = TourPhuongTien(tour_id=tid, loai=v.loai, chang=v.chang, ngay=v.ngay, gio_di=v.gio_di,
                        gio_den=v.gio_den, so_hieu=v.so_hieu, ma_dat_cho=v.ma_dat_cho,
                        nha_cung_cap=v.nha_cung_cap, mst_ncc=v.mst_ncc, xe_nha=v.xe_nha,
@@ -820,13 +854,67 @@ def them_phuong_tien(tid: int, v: PhuongTienVao, u: User = Depends(require_roles
     return {"id": x.id, "thanh_tien": x.thanh_tien}
 
 
+def _goi_y_gan(x: TourPhuongTien, xe_theo_bien: dict) -> dict | None:
+    """Chặng ô tô chưa nối xe mà biển trùng một xe nhà → xe để gắn tay. Ngoài ra rỗng."""
+    if x.loai != "o_to" or x.vehicle_id is not None:
+        return None
+    xe = xe_theo_bien.get(XN.bien_chuan(x.so_hieu))
+    return {"vehicle_id": xe.id, "plate": xe.plate, "code": xe.code or ""} if xe else None
+
+
+class GanXeVao(BaseModel):
+    vehicle_id: int | None = None       # rỗng = gỡ chặng khỏi xe đã gắn nhầm
+    phien_ban: int | None = None
+    ly_do_sua: str = ""
+
+
+@router.post("/{tid}/phuong-tien/{pid}/gan-xe")
+def gan_xe_chang(tid: int, pid: int, v: GanXeVao, u: User = Depends(require_roles(*NHAP)),
+                 db: Session = Depends(get_db)):
+    """CỬA GẮN TAY: nối một chặng ĐÃ NHẬP vào hồ sơ xe nhà (điều 4, Chủ tịch chốt 17/10/2026).
+
+    Chặng nạp từ mẫu Excel, hay gõ biển trước khi có ô chọn, chỉ mang biển số chữ — đối chiếu xe
+    thuê ngoài (DX-2) xếp chúng vào nhóm B «nghi khai nhầm» mãi mãi nếu không có cửa này.
+
+    Gắn được cả xe NAY đã bán: chặng là chuyện đã xảy ra, chiếc xe khi ấy là xe nhà. Chỉ chặn xe
+    hợp tác và xe thuê. Gỡ (vehicle_id rỗng) giữ nguyên biển số đã ghi, bỏ dấu «xe nhà».
+    """
+    t = _tour(db, tid, u)
+    _kiem_sua_sau_ky(db, t, u, v.ly_do_sua)
+    x = db.get(TourPhuongTien, pid)
+    if not x or x.tour_id != tid:
+        raise HTTPException(404, "Không có chặng này trong chuyến")
+    if x.loai != "o_to":
+        raise HTTPException(422, "Chỉ chặng ô tô mới gắn được xe nhà")
+    GML.kiem_phien_ban(x, v.phien_ban, f"Chặng {x.chang or pid}",
+                       lambda: {"id": x.id, "vehicle_id": x.vehicle_id, "so_hieu": x.so_hieu})
+    if v.vehicle_id is None:
+        moi = {"vehicle_id": None, "xe_nha": 0}
+    else:
+        xe = _xe_cua_chang(db, v.vehicle_id, chi_dang_khai_thac=False)
+        moi = {"vehicle_id": xe.id, "so_hieu": xe.plate, "so_cho": xe.seats, "xe_nha": 1}
+    for truong, gt in moi.items():
+        cu = getattr(x, truong)
+        if gt != cu:
+            if _da_ky(t):
+                ghi_dau_vet(db, t, u, "tour_phuong_tien", x.id, truong, cu, gt, v.ly_do_sua)
+            setattr(x, truong, gt)
+    GML.tang_phien_ban(x)
+    db.commit()
+    return {"id": x.id, "vehicle_id": x.vehicle_id, "so_hieu": x.so_hieu, "so_cho": x.so_cho,
+            "xe_nha": x.xe_nha, "phien_ban": x.phien_ban}
+
+
 @router.get("/{tid}/phuong-tien")
 def ds_phuong_tien(tid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
-    _tour(db, tid, u)
+    t = _tour(db, tid, u)
     ds = list(db.scalars(select(TourPhuongTien).where(TourPhuongTien.tour_id == tid)
                          .order_by(TourPhuongTien.ngay, TourPhuongTien.id)))
+    xe_theo_bien = XN.xe_nha_theo_bien(db)
     co = [x.thanh_tien for x in ds if x.thanh_tien is not None]
     return {"so_dong": len(ds),
+            # Tờ đã ký thì cửa gắn tay đòi lý do — màn hình hỏi trước, không đợi bị từ chối.
+            "da_ky": _da_ky(t),
             # MÁY CỘNG TỪ DÒNG. Rỗng khác không: chưa chặng nào khai tiền thì trả None, không trả 0
             # – bảng hiện "0 đ" cho một chuyến chưa nhập gì là nói dối người đọc.
             "tong": round(sum(co), 2) if co else None,
@@ -842,7 +930,11 @@ def ds_phuong_tien(tid: int, u: User = Depends(require_roles(*XEM)), db: Session
                       "so_cho": x.so_cho, "so_khach_su_dung": x.so_khach_su_dung,
                       "don_gia": x.don_gia, "so_luong": x.so_luong,
                       "thanh_tien": x.thanh_tien, "tien_te": x.tien_te,
-                      "dong_chi_phi_id": x.dong_chi_phi_id} for x in ds]}
+                      "dong_chi_phi_id": x.dong_chi_phi_id,
+                      # Ô chọn xe nhà: dòng đã nối hồ sơ xe thì màn hình hiện khoá; dòng chỉ có biển
+                      # trùng một xe nhà thì hiện nút gắn tay, máy chủ chỉ đúng chiếc xe ấy.
+                      "vehicle_id": x.vehicle_id, "phien_ban": x.phien_ban,
+                      "goi_y_gan": _goi_y_gan(x, xe_theo_bien)} for x in ds]}
 
 
 # ---------------------------------------------------------------------------------------------

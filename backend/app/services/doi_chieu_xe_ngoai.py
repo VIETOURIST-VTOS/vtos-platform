@@ -49,6 +49,7 @@ from sqlalchemy.orm import Session
 
 from app.models.core import Tour
 from app.models.hr import Vehicle
+from app.services import xe_nha as XN
 from app.models.lop3_tour import TourPhuongTien
 from app.services import fleet as FL
 
@@ -97,11 +98,10 @@ def soat(db: Session, tu: date, den: date, gioi_han: int = 200) -> dict:
     if den < tu:
         raise ValueError("Ngày cuối kỳ trước ngày đầu kỳ")
 
-    bien_cua_xe = {}
-    for v in db.execute(select(Vehicle)).scalars():
-        b = _bien_chuan(v.plate)
-        if b:
-            bien_cua_xe[b] = v
+    # Chỉ XE NHÀ (17/10/2026): biển trùng một xe hợp tác hay xe thuê thì chặng ấy đúng là thuê
+    # ngoài — bản cũ so với cả danh mục nên gọi nhầm chúng là «nghi khai nhầm». Cùng một luật với
+    # ô chọn xe và cửa gắn tay trên tờ quyết toán: app/services/xe_nha.py.
+    bien_cua_xe = XN.xe_nha_theo_bien(db)
 
     chang = list(db.execute(select(TourPhuongTien).where(TourPhuongTien.loai == LOAI_XE)).scalars())
     ma_tour = {t.id: t for t in db.execute(select(Tour)).scalars()}
@@ -123,7 +123,7 @@ def soat(db: Session, tu: date, den: date, gioi_han: int = 200) -> dict:
         trung = bien_cua_xe.get(_bien_chuan(x.so_hieu))
         if trung is not None:
             nhom_b.append({**goc, "xe_trong_danh_muc": trung.plate, "ma_xe": trung.code,
-                           "vi_sao": "Biển số trên chặng trùng một chiếc xe trong danh mục – "
+                           "vi_sao": "Biển số trên chặng trùng một chiếc xe nhà trong danh mục – "
                                      "nếu đúng là xe nhà thì đây là công nợ nội bộ, không phải "
                                      "tiền trả bên thứ ba"})
             continue
@@ -157,8 +157,9 @@ def soat(db: Session, tu: date, den: date, gioi_han: int = 200) -> dict:
         },
         "b_nghi_khai_nham": {
             "so_chang": len(nhom_b), "danh_sach": nhom_b[:gioi_han],
-            "ghi_chu": ("Khai là thuê ngoài nhưng biển số trùng xe trong danh mục. Hệ thống KHÔNG "
-                        "tự sửa: chỉ người có sổ mới biết chặng ấy thật sự chạy bằng xe nào."),
+            "ghi_chu": ("Khai là thuê ngoài nhưng biển số trùng một xe nhà trong danh mục. Hệ thống "
+                        "KHÔNG tự sửa: chỉ người có sổ mới biết chặng ấy thật sự chạy bằng xe nào. "
+                        "Đúng là xe nhà thì bấm «Gắn tay» ở mục Phương tiện của tờ quyết toán."),
         },
         "c_khong_doi_chieu_duoc": {
             "so_chang": len(nhom_c), "danh_sach": nhom_c[:gioi_han],

@@ -903,7 +903,9 @@ function DoiXe() {
             <td><Tag cls="warn">{c.ma_xe} · {c.xe_trong_danh_muc}</Tag></td>
             <td className="num">{c.thanh_tien === null ? <span className="muted">chưa có</span>
               : c.thanh_tien.toLocaleString("vi-VN")}</td>
-            <td><a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}`}>Mở tờ quyết toán</a></td>
+            {/* Cửa sửa nằm trên TỜ QUYẾT TOÁN (mục Phương tiện, nút «Gắn tay»), không ở đây: người
+                giữ màn đội xe không có quyền ghi tờ quyết toán. Mở thẳng đúng tab. */}
+            <td><a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}?tab=lop3`}>Mở tờ quyết toán để gắn ↗</a></td>
           </tr>)}{!(nl.b_nghi_khai_nham?.danh_sach || []).length
             && <tr><td colSpan={5} className="muted">Không có chặng nào nghi khai nhầm.</td></tr>}</tbody></table>
 
