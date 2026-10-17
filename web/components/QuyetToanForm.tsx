@@ -32,7 +32,7 @@ import { api, vnd, soTien, fmtDT } from "@/lib/api";
 import { errMsg } from "@/components/ui";
 
 import ThueSuatChuyen from "@/components/ThueSuatChuyen";
-type Kieu = "chu" | "so" | "tien" | "ngay" | "gio" | "chon" | "ncc" | "co";
+type Kieu = "chu" | "so" | "tien" | "ngay" | "gio" | "chon" | "ncc" | "co" | "xe";
 
 export type Cot = {
   khoa: string;
@@ -44,7 +44,15 @@ export type Cot = {
   chuThich?: string;
   chiNN?: boolean;        // chỉ hiện ở tour nước ngoài
   chiMay?: boolean;       // máy tính ra – chỉ hiện ở bảng đã ghi, không có ô nhập
+  // Ô CHỌN XE NHÀ (Chủ tịch chốt 17/10/2026): đã chọn xe nhà thì ô này KHOÁ theo hồ sơ xe. Máy chủ
+  // cũng ghi đè đúng các trường ấy — khoá ở đây là để người nhập thấy, không phải để canh luật.
+  theoXe?: "plate" | "seats" | "co" | "o_to";
 };
+
+/** Giá trị một ô bị khoá theo xe nhà đã chọn. */
+function giaTheoXe(t: Cot["theoXe"], xe: any): string {
+  return t === "plate" ? xe.plate : t === "seats" ? String(xe.seats ?? "") : t === "co" ? "on" : "o_to";
+}
 
 const TIEN_TE: [string, string][] = [["", "VND"], ["USD", "USD"], ["EUR", "EUR"], ["GBP", "GBP"],
                                      ["SGD", "SGD"], ["THB", "THB"], ["JPY", "JPY"], ["CNY", "CNY"]];
@@ -117,15 +125,59 @@ function ONcc({ onChon }: { onChon: (s: any | null) => void }) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Ô «xe nhà» ở dòng phương tiện ĐÃ GHI — khoá, hoặc CỬA GẮN TAY (Chủ tịch chốt 17/10/2026)
+// ---------------------------------------------------------------------------------------------
+//
+// Chặng nạp từ mẫu Excel, hay gõ biển trước khi có ô chọn, chỉ mang biển số chữ. Biển ấy trùng một
+// xe nhà thì máy chủ trả `goi_y_gan` — đúng một chiếc — và người nhập bấm gắn. Máy KHÔNG tự gắn:
+// biển trùng là nghi vấn, người biết chuyến ấy chạy xe nào mới là người xác nhận.
+function OXeDong({ r, daKy, gan }: {
+  r: any; daKy: boolean; gan: (r: any, vehicleId: number | null, lyDo: string) => Promise<boolean>;
+}) {
+  const [mo, setMo] = useState<null | "gan" | "go">(null);
+  const [ly, setLy] = useState("");
+  if (r.loai !== "o_to") return null;
+  const dong = () => { setMo(null); setLy(""); };
+  if (mo) return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", minWidth: 220 }}>
+      {daKy && <input value={ly} onChange={(e) => setLy(e.target.value)} placeholder="lý do sửa tờ đã ký"
+                      style={{ minWidth: 160 }} />}
+      <button type="button" className="act teal" style={{ margin: 0, padding: "2px 8px" }}
+              onClick={async () => {
+                if (await gan(r, mo === "gan" ? r.goi_y_gan.vehicle_id : null, ly)) dong();
+              }}>
+        {mo === "gan" ? `Gắn ${r.goi_y_gan.plate}` : "Gỡ xe"}</button>
+      <button type="button" className="act grey" style={{ margin: 0, padding: "2px 8px" }} onClick={dong}>thôi</button>
+    </div>
+  );
+  if (r.vehicle_id) return (
+    <span style={{ whiteSpace: "nowrap" }} title="Đã nối hồ sơ xe nhà — biển và số chỗ khoá theo xe">
+      🔒 xe nhà{" "}
+      <button type="button" className="act grey" style={{ margin: 0, padding: "0 6px", fontSize: 11 }}
+              onClick={() => setMo("go")}>gỡ</button>
+    </span>
+  );
+  if (r.goi_y_gan) return (
+    <button type="button" className="act" style={{ margin: 0, padding: "2px 8px", whiteSpace: "nowrap" }}
+            title={`Biển trên chặng trùng xe nhà ${r.goi_y_gan.plate}${r.goi_y_gan.code ? " (" + r.goi_y_gan.code + ")" : ""} nhưng chưa nối hồ sơ xe`}
+            onClick={() => setMo("gan")}>Gắn tay → {r.goi_y_gan.plate}</button>
+  );
+  return <span className="muted">thuê ngoài</span>;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Bảng nhập dùng chung: danh sách dòng đã ghi + MỘT dòng để thêm
 // ---------------------------------------------------------------------------------------------
 
-function BangNhap({ tieuDe, giaiThich, cot, dong, nn, them, dangGhi, tong }: {
+function BangNhap({ tieuDe, giaiThich, cot, dong, nn, them, dangGhi, tong, xeNha, oXe }: {
   tieuDe: string; giaiThich?: string; cot: Cot[]; dong: any[]; nn: boolean;
   them: (d: Record<string, any>) => Promise<void>; dangGhi: boolean;
   tong?: { nhan: string; gia: any }[];
+  xeNha?: any[];                            // danh sách CHỌN ĐƯỢC từ máy chủ — xe thuê không có ở đây
+  oXe?: (r: any) => React.ReactNode;        // ô «xe nhà» ở dòng đã ghi: khoá hoặc nút gắn tay
 }) {
   const [ncc, setNcc] = useState<any | null>(null);
+  const [xe, setXe] = useState<any | null>(null);
   const hien = cot.filter((c) => !c.chiNN || nn);
   const nhap = hien.filter((c) => !c.chiMay);
 
@@ -134,11 +186,13 @@ function BangNhap({ tieuDe, giaiThich, cot, dong, nn, them, dangGhi, tong }: {
     const f = e.currentTarget;
     const fd = new FormData(f);
     const d: Record<string, any> = {};
-    nhap.forEach((c) => { d[c.khoa] = docO(c.kieu, fd.get(c.khoa)); });
+    nhap.forEach((c) => { if (c.kieu !== "xe") d[c.khoa] = docO(c.kieu, fd.get(c.khoa)); });
     if (ncc) d.supplier_id = ncc.supplier_id;
+    if (nhap.some((c) => c.kieu === "xe")) d.vehicle_id = xe ? xe.id : null;
     await them(d);
     f.reset();
     setNcc(null);
+    setXe(null);
   };
 
   return (
@@ -155,7 +209,8 @@ function BangNhap({ tieuDe, giaiThich, cot, dong, nn, them, dangGhi, tong }: {
                 <tr key={r.id ?? i}>
                   {hien.map((c) => (
                     <td key={c.khoa} style={{ textAlign: c.kieu === "tien" ? "right" : undefined }}>
-                      {c.kieu === "tien"
+                      {c.kieu === "xe" ? (oXe ? oXe(r) : "")
+                        : c.kieu === "tien"
                         ? (r[c.khoa] === null || r[c.khoa] === undefined ? "—" : vnd(r[c.khoa]))
                         : c.kieu === "co" ? (r[c.khoa] ? "x" : "")
                         : (r[c.khoa] ?? "")}
@@ -188,7 +243,24 @@ function BangNhap({ tieuDe, giaiThich, cot, dong, nn, them, dangGhi, tong }: {
                 {c.nhan}{c.batBuoc ? " *" : ""}
                 {c.chuThich && <span className="muted"> ⓘ</span>}
               </label>
-              {c.kieu === "ncc" ? <ONcc onChon={setNcc} />
+              {xe && c.theoXe ? (
+                  // Khoá theo xe nhà: một ô chỉ đọc mang đúng giá trị của hồ sơ xe.
+                  c.kieu === "co" || c.theoXe === "o_to"
+                    ? <><input type="hidden" name={c.khoa} value={giaTheoXe(c.theoXe, xe)} />
+                        <div title="Khoá theo xe nhà đã chọn">🔒 {c.theoXe === "o_to" ? "Ô tô" : "x"}</div></>
+                  : <input name={c.khoa} value={giaTheoXe(c.theoXe, xe)} readOnly title="Khoá theo xe nhà đã chọn"
+                           style={{ width: "100%", background: "var(--soft, #f3f4f6)" }} />
+                )
+                : c.kieu === "xe" ? (
+                  <select value={xe ? String(xe.id) : ""}
+                          onChange={(e) => setXe((xeNha || []).find((v: any) => String(v.id) === e.target.value) || null)}>
+                    <option value="">— không (thuê ngoài: gõ biển) —</option>
+                    {(xeNha || []).map((v: any) => (
+                      <option key={v.id} value={v.id}>{v.plate}{v.code ? ` · ${v.code}` : ""} · {v.seats} chỗ</option>
+                    ))}
+                  </select>
+                )
+                : c.kieu === "ncc" ? <ONcc onChon={setNcc} />
                 : c.kieu === "chon" ? (
                   <select name={c.khoa} required={c.batBuoc} defaultValue="">
                     <option value="">—</option>
@@ -448,6 +520,7 @@ export default function QuyetToanForm({ tourId, toast }: {
   const [bbDm, setBbDm] = useState<any>(null);
   const [ls, setLs] = useState<any>(null);
   const [ghi, setGhi] = useState(false);
+  const [xeNha, setXeNha] = useState<any[]>([]);
 
   const nap = useCallback(async () => {
     const g = (p: string) => api(`/quyet-toan-lop3/${p}`).catch(() => null);
@@ -458,6 +531,7 @@ export default function QuyetToanForm({ tourId, toast }: {
     ]);
     setKh(a); setDt(b); setChi(c); setPt(d); setHdv(e); setCk(f); setSg(s);
     g(`${tourId}/dau-vet`).then(setDv);
+    g("xe-nha").then((r: any) => setXeNha(r?.xe || []));
     if (nn) {
       g(`${tourId}/ve`).then(setVe);
       g(`${tourId}/tl-cong-no`).then(setTl);
@@ -541,6 +615,17 @@ export default function QuyetToanForm({ tourId, toast }: {
     (x: any) => [String(x.id), `${x.ma_khoan_muc ?? ""} – ${x.mo_ta ?? ""}`.trim()] as [string, string]);
   const dsKhach: [string, string][] = (kh?.dong || []).map(
     (k: any) => [String(k.id), `${k.stt ?? ""} ${k.ho_ten ?? ""}`.trim()] as [string, string]);
+
+  const ganXe = async (r: any, vehicleId: number | null, lyDo: string) => {
+    setGhi(true);
+    try {
+      await api(`/quyet-toan-lop3/${tourId}/phuong-tien/${r.id}/gan-xe`, { method: "POST",
+        json: { vehicle_id: vehicleId, phien_ban: r.phien_ban, ly_do_sua: lyDo } });
+      toast(vehicleId ? "Đã gắn chặng vào xe nhà" : "Đã gỡ chặng khỏi xe nhà");
+      await nap();
+      return true;
+    } catch (e) { toast(errMsg(e), true); return false; } finally { setGhi(false); }
+  };
 
   const gui = async (p: string, d: any, ten: string) => {
     setGhi(true);
@@ -683,17 +768,21 @@ export default function QuyetToanForm({ tourId, toast }: {
         giaiThich="Một chiều riêng, không phải một dòng chi: tour đoàn Phú Quốc là tour trong nước nhưng đi máy bay."
         them={(d) => gui("phuong-tien", d, "chặng phương tiện")}
         tong={[{ nhan: "Tổng", gia: pt?.tong }]}
+        xeNha={xeNha}
+        oXe={(r) => <OXeDong r={r} daKy={!!pt?.da_ky} gan={ganXe} />}
         cot={[
-          { khoa: "loai", nhan: "Loại", kieu: "chon", chon: chonTu(dm.loai_phuong_tien), batBuoc: true, rong: 150 },
+          { khoa: "loai", nhan: "Loại", kieu: "chon", chon: chonTu(dm.loai_phuong_tien), batBuoc: true, rong: 150, theoXe: "o_to" },
           { khoa: "chang", nhan: "Chặng", rong: 180 },
           { khoa: "ngay", nhan: "Ngày", kieu: "ngay", rong: 140 },
           { khoa: "gio_di", nhan: "Giờ đi", kieu: "gio", rong: 100 },
           { khoa: "gio_den", nhan: "Giờ đến", kieu: "gio", rong: 100 },
-          { khoa: "so_hieu", nhan: "Số hiệu / biển số", rong: 150 },
+          { khoa: "vehicle_id", nhan: "Xe nhà", kieu: "xe", rong: 200,
+            chuThich: "Chỉ xe nhà đang khai thác. Thuê ngoài thì để «không» và gõ biển số. Chọn xe nhà thì biển, số chỗ và dấu xe nhà khoá theo hồ sơ xe." },
+          { khoa: "so_hieu", nhan: "Số hiệu / biển số", rong: 150, theoXe: "plate" },
           { khoa: "ma_dat_cho", nhan: "Mã đặt chỗ", rong: 130 },
           { khoa: "nha_cung_cap", nhan: "Nhà cung cấp", rong: 180 },
-          { khoa: "xe_nha", nhan: "Xe nhà?", kieu: "co", rong: 80 },
-          { khoa: "so_cho", nhan: "Số chỗ", kieu: "so", rong: 90 },
+          { khoa: "xe_nha", nhan: "Xe nhà?", kieu: "co", rong: 80, theoXe: "co" },
+          { khoa: "so_cho", nhan: "Số chỗ", kieu: "so", rong: 90, theoXe: "seats" },
           { khoa: "so_khach_su_dung", nhan: "Số khách dùng", kieu: "so", rong: 120 },
           { khoa: "don_gia", nhan: "Đơn giá (VND)", kieu: "tien", rong: 130,
             chuThich: "Để TRỐNG khi dòng là ngoại tệ — lúc ấy đơn giá lấy từ ô Số tiền gốc × tỷ giá. Gõ cả hai thì ô này bị bỏ qua." },
