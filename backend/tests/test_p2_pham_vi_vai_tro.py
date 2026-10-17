@@ -662,7 +662,12 @@ PHAM_VI_DA_CHOT = {
     # Vòng HD-DG3 đầu (PR #378) KHÔNG cập nhật bảng này. Không ai thấy, vì PR ấy chết ở bước
     # ruff chạy TRƯỚC mọi phép thử — bảng chốt chưa từng được hỏi. Ghép lại 17/10 mới lộ ra.
     "chutich": 135, "tgd": 135, "bks": 135, "cntt": 132, "ir_phapche": 20,
-    "ketoan": 109, "tp_dh": 100, "ptgd_doan": 80, "nv_dh": 71, "hcns": 71, "gd_kd": 73,
+    # ── 17/10/2026 · hcns 71 → 72, ĐỢT R3b ───────────────────────────────────────────
+    # Nhóm duy nhất thêm là "/api/v1/hach-toan", và chỉ vì một lẽ: danh mục BỘ PHẬN nằm ở
+    # màn ấy. Cơ cấu phòng ban là việc của Hành chính – Nhân sự, không phải Kế toán; cho
+    # họ quyền ghi (`GHI_BO_PHAN`) mà không cho vào màn là dựng một cửa không ai với tới.
+    # Anh Tuấn quyết 17/10/2026.
+    "ketoan": 109, "tp_dh": 100, "ptgd_doan": 80, "nv_dh": 71, "hcns": 72, "gd_kd": 73,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,

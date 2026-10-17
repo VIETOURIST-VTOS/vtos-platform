@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/v1/hach-toan", tags=["hach-toan"])
 # tp_dh có mặt vì hàng đợi thiếu giá vốn đứng tên phòng Điều hành. Bảng quy ước cũng mở cho họ đọc:
 # đây là chính sách nội bộ, không phải số tiền – và phòng phải nhập giá vốn thì nên biết dòng họ nhập
 # sẽ chạy vào tài khoản nào. Ma trận quyền và tuple này phải khớp nhau, lệch một cái là menu mở mà API chặn.
-XEM = ("chutich", "tgd", "bks", "ketoan", "ketoan_truong", "cntt", "tp_dh")
+XEM = ("chutich", "tgd", "bks", "ketoan", "ketoan_truong", "cntt", "tp_dh", "hcns")
 TRINH = ("ketoan",)                 # Chủ tịch/TGĐ vẫn qua được (FULL_ACCESS trong deps)
 KY = ("chutich", "tgd")
 QUET = ("ketoan", "cntt", "bks")
@@ -581,6 +581,124 @@ def khoan_muc_sua(kid: int, data: KhoanMucSuaIn,
     R.audit(db, u.username, u.role, "sua_khoan_muc_chi_phi", f"khoan_muc:{k.ma}", after=truyen)
     db.commit()
     return {"id": k.id, "ma": k.ma, "dung": k.dung, "message": f"Đã cập nhật khoản mục {k.ma}"}
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT R3b 17/10/2026 — DANH MỤC BỘ PHẬN
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+# Cùng tiền tố `/api/v1/hach-toan` đã khai nên KHÔNG nới một quyền nào ở ma trận. Đặt cạnh danh
+# mục khoản mục là có chủ ý: hai danh mục này là hai CHIỀU PHÂN TÍCH của cùng một bộ sổ, và người
+# mở màn hình để sửa một cái thường sửa luôn cái kia.
+#
+# VAI GHI LÀ `GHI_BO_PHAN`, KHÁC `TRINH` của khoản mục — và đây là chỗ dễ làm sai nhất.
+# Khoản mục chi phí là bộ xương của báo cáo tài chính nên thuộc về Kế toán. Cơ cấu bộ phận thì
+# KHÔNG: ai còn, ai tách, ai nhập vào đâu là việc của Hành chính – Nhân sự. Mở cho Kế toán sửa cơ
+# cấu phòng ban là trao cho họ một quyền chẳng ai ký, và ngược lại bắt HCNS đi nhờ Kế toán mỗi lần
+# lập một phòng mới là dựng một cửa không ai dùng.
+GHI_BO_PHAN = ("hcns",)             # Chủ tịch/TGĐ vẫn qua được (FULL_ACCESS trong deps)
+
+
+@router.get("/bo-phan")
+def bo_phan_danh_sach(ca_ngung: bool = False,
+                      u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    from app.services import bo_phan as BP
+    return {"rows": BP.danh_sach(db, ca_ngung=ca_ngung)}
+
+
+@router.post("/bo-phan/nap-mac-dinh")
+def bo_phan_nap_mac_dinh(u: User = Depends(require_roles(*GHI_BO_PHAN)),
+                         db: Session = Depends(get_db)):
+    """Gieo tám dòng khuôn cơ cấu. Mã nào đã có thì GIỮ NGUYÊN, không đè lên bản đã sửa."""
+    from app.services import bo_phan as BP
+    n = BP.nap_mac_dinh(db)
+    R.audit(db, u.username, u.role, "nap_bo_phan", "bo_phan:mac_dinh", after={"them": n})
+    db.commit()
+    return {"them": n, "message": f"Đã thêm {n} bộ phận" if n else "Danh mục đã đủ, không thêm gì"}
+
+
+class BoPhanIn(BaseModel):
+    ma: str
+    ten: str
+    thu_tu: int = 100
+    ghi_chu: str = ""
+
+
+class BoPhanSuaIn(BaseModel):
+    ten: str | None = None
+    thu_tu: int | None = None
+    ghi_chu: str | None = None
+    dung: bool | None = None
+
+
+@router.post("/bo-phan")
+def bo_phan_them(data: BoPhanIn,
+                 u: User = Depends(require_roles(*GHI_BO_PHAN)), db: Session = Depends(get_db)):
+    from app.services import bo_phan as BP
+    try:
+        b = BP.them(db, data.model_dump())
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    R.audit(db, u.username, u.role, "them_bo_phan", f"bo_phan:{b.ma}", after={"ten": b.ten})
+    db.commit()
+    return {"id": b.id, "ma": b.ma, "message": f"Đã thêm bộ phận {b.ma}"}
+
+
+@router.patch("/bo-phan/{bid}")
+def bo_phan_sua(bid: int, data: BoPhanSuaIn,
+                u: User = Depends(require_roles(*GHI_BO_PHAN)), db: Session = Depends(get_db)):
+    """Sửa tên / thứ tự / ghi chú, và BẬT-TẮT dùng. MÃ KHÔNG ĐỔI ĐƯỢC — xem dịch vụ."""
+    from app.services import bo_phan as BP
+    truyen = {k: v for k, v in data.model_dump().items() if v is not None}
+    try:
+        b = BP.sua(db, bid, truyen)
+    except ValueError as ex:
+        raise HTTPException(404 if "Không có" in str(ex) else 422, str(ex))
+    R.audit(db, u.username, u.role, "sua_bo_phan", f"bo_phan:{b.ma}", after=truyen)
+    db.commit()
+    return {"id": b.id, "ma": b.ma, "dung": b.dung, "message": f"Đã cập nhật bộ phận {b.ma}"}
+
+
+@router.get("/bo-phan/chua-gan")
+def bo_phan_chua_gan(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """Những chữ đang nằm trong sổ mà chưa bộ phận nào nhận. Máy LIỆT KÊ, người CHỌN."""
+    from app.services import bo_phan as BP
+    return BP.chua_gan(db)
+
+
+class GanIn(BaseModel):
+    chu: str
+    ma: str
+
+
+@router.post("/bo-phan/gan")
+def bo_phan_gan(data: GanIn,
+                u: User = Depends(require_roles(*GHI_BO_PHAN)), db: Session = Depends(get_db)):
+    """Nhận một chữ cũ về làm bút danh. KHÔNG sửa một dòng sổ nào — xem dịch vụ."""
+    from app.services import bo_phan as BP
+    try:
+        ra = BP.gan(db, data.chu, data.ma)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    R.audit(db, u.username, u.role, "gan_but_danh_bo_phan", f"bo_phan:{ra['ma']}",
+            after={"chu": data.chu})
+    db.commit()
+    return {**ra, "message": f"Đã nhận '{data.chu}' về {ra['ma']}"}
+
+
+@router.delete("/bo-phan/{ma}/but-danh/{chu}")
+def bo_phan_bo_but_danh(ma: str, chu: str,
+                        u: User = Depends(require_roles(*GHI_BO_PHAN)),
+                        db: Session = Depends(get_db)):
+    """Gỡ một bút danh. Gán nhầm phải sửa được, nếu không người ta sẽ ngại gán."""
+    from app.services import bo_phan as BP
+    try:
+        ra = BP.bo_but_danh(db, ma, chu)
+    except ValueError as ex:
+        raise HTTPException(404, str(ex))
+    R.audit(db, u.username, u.role, "bo_but_danh_bo_phan", f"bo_phan:{ra['ma']}",
+            after={"chu": chu})
+    db.commit()
+    return {**ra, "message": f"Đã gỡ bút danh '{chu}'"}
 
 
 # ════════════════════════════════════════════════════════════════════════════════════════════════

@@ -52,6 +52,12 @@ from app.models.ky_thuat import *  # noqa
 from app.models.ngoai_le import *  # noqa
 from app.models.kiem_soat import *  # noqa
 from app.models.hach_toan import *  # noqa
+# ĐỢT R3b 17/10/2026. Danh mục bộ phận. Đứng ngay sau hach_toan vì cùng một màn `/hach-toan`
+# và cùng một nhóm danh mục. Thiếu dòng này thì `bo_phan` không nằm trong Base.metadata sau
+# `import app.models`: create_all không tạo, mọi phép thử soi mô hình MÙ đúng phần ấy, và
+# alembic autogenerate sẽ đòi XOÁ bảng. Đúng lỗi đội xe (09/9) và VPM-5 (11/9) đã mắc, và
+# KS-7 bắt lại lần thứ ba ngày 17/10/2026.
+from app.models.bo_phan import *  # noqa
 from app.models.quyet_toan import *  # noqa
 from app.models.lop3_tour import *  # noqa
 from app.models.nap_bo_sung import *  # noqa

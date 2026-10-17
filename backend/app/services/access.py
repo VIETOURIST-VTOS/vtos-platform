@@ -1181,7 +1181,12 @@ MENU_ROLES = {
     # ban "gd_doi_xe" và người phụ trách ghi tên – Kế toán vẫn đòi được đúng người, chỉ là đòi qua
     # kênh ngoài hệ thống.
     "/ho-so-kiem-toan": BASE_VIEW + ("ketoan", "cntt", "hcns", "hanh_chinh", "tp_dh", "ptgd_doan"),
-    "/hach-toan": BASE_VIEW + ("ketoan", "cntt", "tp_dh"),
+    # ĐỢT R3b 17/10/2026 — thêm "hcns": cơ cấu phòng ban do Hành chính – Nhân sự giữ,
+    # không phải Kế toán, nên danh mục bộ phận nằm ở màn này thì HCNS phải vào được.
+    # Cho quyền ghi mà không cho vào màn là dựng một cửa không ai với tới — đúng kiểu
+    # hỏng `test_man_hinh_co_cua_nhap` sinh ra để bắt. HCNS thấy thêm bảng quy ước hạch
+    # toán ở chế độ xem; đó là quy ước nội bộ, không phải bảng lương.
+    "/hach-toan": BASE_VIEW + ("ketoan", "cntt", "tp_dh", "hcns"),
     # Ngoại lệ cần xử lý: nơi gom mọi lần một quy tắc bị bẻ. Mở cho những vai trò CÓ THỂ trả lời được
     # câu "vì sao lúc đó phải bẻ": Kế toán (tiền), Điều hành (chuyến), hai Phó TGĐ (duyệt), CNTT (tham số
     # và AI). Khối Kinh doanh không có mặt – họ là bên xin ngoại lệ, không phải bên rà.
