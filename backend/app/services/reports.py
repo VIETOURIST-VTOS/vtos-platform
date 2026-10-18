@@ -20,13 +20,19 @@ PL_EXPENSE = ("632", "635", "641", "642", "811", "821")
 
 
 def _lines(db: Session, upto_period: str | None = None, period: str | None = None):
+    """Dòng bút toán đã ghi sổ của MỘT kỳ (hoặc tới hết một kỳ) — LỌC KỲ TRONG SQL.
+
+    CF-1 · 19/10/2026: bản cũ nạp TOÀN BỘ sổ cái thành đối tượng Python rồi mới lọc kỳ bằng vòng
+    lặp. Đúng cái lỗi `_cong_theo_tk` đã sửa cho B01/B02 (512 MB, tiến trình bị kết liễu), nhưng
+    `cash_flow` vẫn đi đường cũ: đo trên hệ thật 19/10/2026, mỗi lần mở báo cáo lưu chuyển tiền tệ
+    tháng là máy chủ sập 1–2 phút cho mọi người. `test_cf1` canh câu SQL phải mang điều kiện kỳ.
+    """
     q = select(JournalLine, JournalEntry).join(JournalEntry).where(JournalEntry.status == "da_ghi_so")
-    rows = db.execute(q).all()
     if period:
-        rows = [(l, e) for l, e in rows if e.period == period]
+        q = q.where(JournalEntry.period == period)
     elif upto_period:
-        rows = [(l, e) for l, e in rows if e.period <= upto_period]
-    return rows
+        q = q.where(JournalEntry.period <= upto_period)
+    return db.execute(q).all()
 
 
 def _cong_theo_tk(db: Session, upto_period: str | None = None, period: str | None = None,
