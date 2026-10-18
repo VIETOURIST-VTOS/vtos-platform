@@ -38,12 +38,20 @@ def bang_luong(u: User = Depends(current_user), db: Session = Depends(get_db)) -
 HR_READ = ("hcns", "cntt", "ketoan", "tgd", "chutich", "bks", "tp_dh", "gd_kd", "tp_kd", "ptgd_doan")
 
 
-def emp_out(e: Employee) -> dict:
+def emp_out(e: Employee, pf=None) -> dict:
+    """`pf` là hồ sơ cá nhân của chính người này, nếu người gọi đã có sẵn.
+
+    HS-11: ngày sinh và điện thoại nay chỉ GHI vào hồ sơ cá nhân, nên đọc phải đi qua
+    `gop_ho_so_nv.doc` — hồ sơ trước, cột cũ sau. Truyền `pf=None` thì `doc` trả về cột cũ, tức
+    đúng hành vi trước HS-11; chỗ nào đọc được hồ sơ thì truyền vào để trả số ĐANG DÙNG.
+    """
+    from app.services import gop_ho_so_nv as GOP
     return {"id": e.id, "code": e.code, "user_id": e.user_id, "full_name": e.full_name, "department": e.department, "department_name": DEPARTMENTS.get(e.department, e.department),
             "position": e.position, "position_name": POSITIONS.get(e.position, e.position), "title": e.title, "duties": e.duties, "sales_group": e.sales_group, "office": e.office, "office_name": OFFICES.get(e.office, e.office),
             "contract_type": e.contract_type, "base_salary": e.base_salary, "start_date": e.start_date, "probation": e.probation, "transition_list": e.transition_list,
             "card_no": e.card_no, "card_type": e.card_type, "card_expiry": e.card_expiry, "member_org": e.member_org, "ctv_contract": e.ctv_contract,
-            "advance_limit": e.advance_limit, "active": e.active, "company_id": e.company_id, "birth_date": e.birth_date, "phone": e.phone,
+            "advance_limit": e.advance_limit, "active": e.active, "company_id": e.company_id,
+            "birth_date": GOP.doc(e, pf, "birth_date", "dob"), "phone": GOP.doc(e, pf, "phone", "phone"),
             "bhxh_base": e.bhxh_base, "member_org": e.member_org,
             # NỬA CÒN LẠI CỦA PHÉP KIỂM LỆCH PHIÊN BẢN — trả nợ 12/10/2026.
             # `update_employee` gọi `kiem_phien_ban` từ đợt VPM-8, nhưng phép ấy CHỈ chạy khi màn
@@ -66,7 +74,10 @@ def hr_meta(u: User = Depends(current_user)):
 def employees(department: str | None = None, u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
     q = select(Employee).order_by(Employee.department, Employee.code)
     if department: q = q.where(Employee.department == department)
-    return [emp_out(e) for e in db.execute(q).scalars()]
+    from app.services import gop_ho_so_nv as GOP
+    ds = list(db.execute(q).scalars())
+    hs = GOP.ban_do_ho_so(db, [e.id for e in ds])      # một lượt hỏi, không phải 121 lượt
+    return [emp_out(e, hs.get(e.id)) for e in ds]
 
 
 class EmployeeIn(BaseModel):
@@ -186,8 +197,12 @@ def reset_password(uid: int, data: ResetPwIn, u: User = Depends(require_roles(*H
 @router.post("/employees", status_code=201)
 def create_employee(data: EmployeeIn, u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
     if data.department not in DEPARTMENTS or data.position not in POSITIONS: raise HTTPException(422, "Phòng/chức danh không hợp lệ")
+    from app.services import gop_ho_so_nv as GOP
     tao = {k: v for k, v in data.model_dump(exclude_none=True).items()
            if k not in ("dieu_chuyen_tu_ngay", "dieu_chuyen_ly_do", "code")}
+    # HS-11 — ngày sinh và điện thoại KHÔNG còn ghi vào bảng nhân sự. Tách ra ở đây chứ không bỏ
+    # khỏi `EmployeeIn`: màn hình vẫn có đúng một ô cho mỗi thứ, chỉ là nó rơi vào đúng bảng.
+    sang_ho_so = {h: tao.pop(nv) for nv, h, _ in GOP.CAP_TRUNG if nv in tao}
     ma = (data.code or "").strip()
     if ma:
         if db.execute(select(Employee).where(Employee.code == ma)).scalars().first():
@@ -196,7 +211,9 @@ def create_employee(data: EmployeeIn, u: User = Depends(require_roles(*HR_WRITE)
     db.add(e); db.flush()
     R.audit(db, u.username, u.role, "tao_ho_so_nhan_su", f"emp:{e.code}", after={"ten": e.full_name, "phong": e.department, "luong": e.base_salary})
     db.commit(); db.refresh(e)
-    return {"employee": emp_out(e), "message": f"Đã tạo hồ sơ {e.code}"}
+    GOP.ghi(db, u, e.id, sang_ho_so)                   # sau commit: hồ sơ cần `e.id` đã có thật
+    return {"employee": emp_out(e, GOP.ban_do_ho_so(db, [e.id]).get(e.id)),
+            "message": f"Đã tạo hồ sơ {e.code}"}
 
 
 @router.put("/employees/{eid}")
@@ -204,6 +221,8 @@ def update_employee(eid: int, data: EmployeeIn, u: User = Depends(require_roles(
     e = db.get(Employee, eid)
     if not e: raise HTTPException(404, "Không có hồ sơ")
     fields = data.model_dump(exclude_unset=True)
+    from app.services import gop_ho_so_nv as GOP
+    sang_ho_so = {h: fields.pop(nv) for nv, h, _ in GOP.CAP_TRUNG if nv in fields}
     from app.services import to_chuc_lich_su as LS
     dc_tu = fields.pop("dieu_chuyen_tu_ngay", None)
     dc_ly_do = fields.pop("dieu_chuyen_ly_do", "")
@@ -230,9 +249,10 @@ def update_employee(eid: int, data: EmployeeIn, u: User = Depends(require_roles(
     R.audit(db, u.username, u.role, "sua_ho_so_nhan_su", f"emp:{e.code}", before=before,
             after={"luong": e.base_salary, "chuc_vu": e.position, "phong": e.department, "dang_lam": e.active})
     db.commit()
+    GOP.ghi(db, u, e.id, sang_ho_so)
     ngung = " – hồ sơ đã chuyển sang Ngưng làm việc" if e.active is False else ""
     dc = (f" – đã ghi một chặng lịch sử tổ chức từ {dc_tu or date.today():%d/%m/%Y}" if dieu_chuyen else "")
-    return {"employee": emp_out(e), "message": "Đã cập nhật (tăng lương/điều chỉnh nhân sự cần Chủ tịch duyệt theo Điều 9 – ghi nhật ký)" + ngung + dc}
+    return {"employee": emp_out(e, GOP.ban_do_ho_so(db, [e.id]).get(e.id)), "message": "Đã cập nhật (tăng lương/điều chỉnh nhân sự cần Chủ tịch duyệt theo Điều 9 – ghi nhật ký)" + ngung + dc}
 
 
 @router.get("/employees/{eid}/lich-su-to-chuc")
@@ -351,10 +371,14 @@ def xe_hdv_cua_toi(u: User = Depends(require_roles("tai_xe", "hdv", "nv_dh", "tp
     if e is None:
         raise HTTPException(404, "Tài khoản này chưa gắn với hồ sơ nhân sự – báo HCNS ghép mã nhân viên")
 
+    from app.services import gop_ho_so_nv as _GOP
+    _pf = _GOP.ban_do_ho_so(db, [e.id]).get(e.id)
     cos = {c.id: c for c in db.execute(select(Company)).scalars()}
     ho_so = {"code": e.code, "full_name": e.full_name, "department": e.department,
              "department_name": DEPARTMENTS.get(e.department, e.department),
-             "position_name": POSITIONS.get(e.position, e.position), "phone": e.phone, "birth_date": e.birth_date}
+             "position_name": POSITIONS.get(e.position, e.position),
+             "phone": _GOP.doc(e, _pf, "phone", "phone"),
+             "birth_date": _GOP.doc(e, _pf, "birth_date", "dob")}
 
     xe = [{"id": v.id, "plate": v.plate, "seats": v.seats, "active": v.active,
            "company": (cos[v.company_id].name if v.company_id in cos else ""),

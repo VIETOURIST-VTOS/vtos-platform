@@ -64,11 +64,17 @@ def _ns_nap(db: Session, r, boi):
                  sales_group=str(r.get("nhom_kd") or "").strip(),
                  contract_type=str(r.get("loai_hop_dong") or "hdld").strip(),
                  base_salary=_so(r.get("luong_cong_viec")), bhxh_base=_so(r.get("muc_dong_bhxh")),
-                 start_date=_ngay(r.get("ngay_vao")), birth_date=_ngay(r.get("ngay_sinh")),
-                 phone=str(r.get("dien_thoai") or "")[:30],
+                 start_date=_ngay(r.get("ngay_vao")),
                  probation=str(r.get("thu_viec") or "").strip().lower() in ("1", "x", "co", "có", "true"),
                  duties=str(r.get("cong_viec_chinh") or ""))
     db.add(e); db.flush()
+    # HS-11 — ngày sinh và điện thoại vào HỒ SƠ CÁ NHÂN, không vào bảng nhân sự. Ghi thẳng chứ
+    # không gọi `save_profile`: cửa nạp chạy cả lô và `save_profile` commit từng người một.
+    from app.models.hrm import EmployeeProfile
+    ns, dt = _ngay(r.get("ngay_sinh")), str(r.get("dien_thoai") or "").strip()[:30]
+    if ns or dt:
+        db.add(EmployeeProfile(employee_id=e.id, dob=ns, phone=dt, updated_by=boi or ""))
+        db.flush()
     return f"{e.code} – {e.full_name}"
 
 
@@ -307,7 +313,6 @@ def _hdv_nap(db: Session, r, boi):
     co = str(r.get("hop_dong_cong_tac") or "").strip().lower() in ("1", "x", "co", "có", "true", "roi", "rồi")
     e = Employee(code=ma, full_name=str(r["ho_ten"]).strip()[:120], department="huong_dan",
                  position="hdv", contract_type="ctv",     # toàn bộ HDV là cộng tác viên (chốt 07/9/2026)
-                 phone=str(r.get("dien_thoai") or "")[:30],
                  card_no=str(r["the_so"]).strip()[:30], card_type=str(r.get("the_loai") or "")[:20],
                  card_expiry=_ngay(r.get("the_het_han")),
                  member_org=str(r.get("hoi_vien") or "").strip().lower() in
@@ -315,6 +320,14 @@ def _hdv_nap(db: Session, r, boi):
                  ctv_contract=co, advance_limit=_so(r.get("han_muc_tam_ung")),
                  duties=str(r.get("tuyen_phu_trach") or ""))
     db.add(e); db.flush()
+    # HS-11 — điện thoại vào HỒ SƠ CÁ NHÂN. Cửa nạp HDV này là chỗ `test_hs11_6` bắt được khi
+    # vòng HS-11 mới chỉ sửa cửa nạp nhân sự phòng ban: cùng một tệp, hai hàm, và hàm thứ hai
+    # lặng lẽ dựng lại nguồn thứ hai sau mỗi lần nạp thẻ HDV.
+    from app.models.hrm import EmployeeProfile
+    dt = str(r.get("dien_thoai") or "").strip()[:30]
+    if dt:
+        db.add(EmployeeProfile(employee_id=e.id, phone=dt, updated_by=boi or ""))
+        db.flush()
     return f"{e.code} – {e.full_name} · thẻ {e.card_no}"
 
 
