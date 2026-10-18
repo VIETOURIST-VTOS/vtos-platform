@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.core import User, ROLES, AuditLog, Company
 from app.models.hr import Employee
 from app.services import access as AC
+from app.services import ho_so_nhan_vien as HSNV
 
 NGAY_BO_HOANG = 60          # quá số ngày này không đăng nhập thì coi là tài khoản bỏ hoang
 
@@ -74,7 +75,16 @@ def danh_sach_tai_khoan(db: Session) -> list[dict]:
             # cách nối thứ hai giữa tài khoản và hồ sơ. Trả thẳng ID ở đây để chỉ còn một cách.
             "ho_so_id": e.id if e else None,
         })
-    return ra
+    # HS-8 · 17/10/2026 — XẾP THEO SƠ ĐỒ TỔ CHỨC, không theo tên đăng nhập.
+    #
+    # Chủ tịch duyệt thứ tự này ngày 15/10 (bản vẽ số 1: «gom theo phòng, xếp theo cấp bậc»), và
+    # `ho_so_nhan_vien.xep_bang_tai_khoan` được viết đúng hôm ấy — rồi KHÔNG AI GỌI NÓ. Bảng 121
+    # dòng vẫn xếp theo `username`, nên Chủ tịch mở màn hình ra thấy thứ tự chữ cái và báo lại.
+    #
+    # Bài học ghi thẳng ở đây: một lớp tính không có ai gọi thì CHƯA PHẢI việc đã xong. Phép thử
+    # của vòng ấy xanh hết — vì nó thử đúng hàm ấy, không thử xem màn hình có dùng hàm ấy không.
+    xep = HSNV.xep_bang_tai_khoan(ra)
+    return [ng for n in xep["nhom"] for ng in n["nguoi"]]
 
 
 def chenh_lech(db: Session) -> dict:

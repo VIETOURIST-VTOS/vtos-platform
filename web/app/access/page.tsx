@@ -200,6 +200,23 @@ function AccessPage() {
         <span className="muted">{rows.length} tài khoản</span>
         {canWrite && <button className="act" style={{ margin: 0 }} onClick={taoTaiKhoan}>+ Tạo tài khoản</button>}
       </div>
+
+      {/* HS-8 · 17/10/2026 — HAI HỘP NÀY MỞ Ở TRÊN BẢNG, không phải dưới đáy.
+
+          Chủ tịch báo 17/10: «click chuột vào nút Sửa không ăn». Bấm CÓ ăn — hộp mở ra thật,
+          nhưng nó nằm sau </table> của một bảng 121 dòng, tức cách chỗ bấm vài nghìn điểm ảnh.
+          Người bấm nút ở dòng đầu không thấy gì xảy ra, và kết luận nút hỏng.
+
+          Một ô mở ra ngoài tầm nhìn thì về mặt người dùng là KHÔNG MỞ. Đặt trên bảng thì dù bấm
+          ở dòng nào, hộp cũng hiện ngay chỗ mắt đang nhìn sau khi cuộn lên — và `test_hs8_2`
+          ghim thứ tự ấy trong mã, vì lần sau ai thêm một khối vào giữa là nó trôi xuống lại. */}
+      {hsUid !== null && <HoSoNhanVien uid={hsUid} hoTen={hsTen} onClose={() => setHsUid(null)} />}
+      {suaUid !== null && acc && <SuaTaiKhoan
+        r={acc.rows.find((x: any) => x.id === suaUid)}
+        acc={acc} vaiNguoiDung={role}
+        onClose={() => setSuaUid(null)}
+        onDone={(m: string) => { toast(m); loadAcc(); loadGaps(); }} />}
+
       <div className="scroll"><table><thead><tr>
         <th>Mã NV</th><th>Họ tên</th><th>Tài khoản</th><th>Vai trò</th><th>Phòng</th><th>Pháp nhân</th>
         <th>Trạng thái</th><th>Đăng nhập lần cuối</th><th>Mật khẩu</th><th>Hồ sơ</th><th></th></tr></thead>
@@ -260,14 +277,6 @@ function AccessPage() {
               }}>Đặt lại MK</button>}
           </td>
         </tr>)}</tbody></table></div>
-
-      {hsUid !== null && <HoSoNhanVien uid={hsUid} hoTen={hsTen} onClose={() => setHsUid(null)} />}
-
-      {suaUid !== null && acc && <SuaTaiKhoan
-        r={acc.rows.find((x: any) => x.id === suaUid)}
-        acc={acc} vaiNguoiDung={role}
-        onClose={() => setSuaUid(null)}
-        onDone={(m: string) => { toast(m); loadAcc(); loadGaps(); }} />}
 
       {grants?.rows?.length > 0 && <>
         <h3 style={{ marginTop: 18 }}>Ngoại lệ quyền có thời hạn</h3>
