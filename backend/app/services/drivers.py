@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models.core import Company
 from app.models.hr import Employee, Vehicle
+from app.models.hrm import EmployeeProfile
 from app.services import rules as R
 
 
@@ -90,9 +91,18 @@ def apply(db: Session, rows: list[dict], actor: str, role: str, tao_xe_thieu: bo
             bo_qua.append({"ten": ten, "ly_do": ly_do})
             continue
         e = cand[0]
+        # HS-11 — ngày sinh và điện thoại vào HỒ SƠ CÁ NHÂN. Ghi thẳng, không `save_profile`:
+        # cửa này chạy cả lô, mà `save_profile` commit và ghi nhật ký cho từng người.
         d = _dob(r.get("birth_date") or r.get("ngay_sinh"))
-        if d: e.birth_date = d
-        if r.get("phone") or r.get("dien_thoai"): e.phone = str(r.get("phone") or r.get("dien_thoai")).strip()[:30]
+        dt = str(r.get("phone") or r.get("dien_thoai") or "").strip()[:30]
+        if d or dt:
+            pf = db.execute(select(EmployeeProfile)
+                            .where(EmployeeProfile.employee_id == e.id)).scalars().first()
+            if pf is None:
+                pf = EmployeeProfile(employee_id=e.id); db.add(pf); db.flush()
+            if d: pf.dob = d
+            if dt: pf.phone = dt
+            pf.updated_by = actor or ""
         e.department, e.position = "doi_xe", "tai_xe"
         if me: e.company_id = me.id            # tài xế hưởng lương ở công ty mẹ
         ns += 1

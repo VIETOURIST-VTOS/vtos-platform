@@ -19,6 +19,10 @@ from app.services.ho_so_nhan_vien import (VAI_CO_NHOM_CHE as _HSNV_VAI_HIEN,
 router = APIRouter(prefix="/api/v1", tags=["nhan-su-ho-so"])
 HR_ADMIN = ("hcns", "cntt", "tgd", "chutich")
 HR_READ = ("hcns", "cntt", "tgd", "chutich", "bks", "ketoan")
+# Danh sách LỆCH HỒ SƠ (HS-11) là việc của HCNS — KHÔNG mở cho Kế toán. Bỏ `ketoan` ra khỏi HR_READ
+# ở riêng cửa này vì Kế toán trưởng kế thừa Kế toán, và cửa nào mở cho KTT trong nhóm /hrm phải nằm
+# trong `CUA_LUONG_DA_KY` (test_lg5). Chủ tịch chốt 18/10/2026: đóng, không ghi thêm vào danh sách ký.
+HR_LECH_READ = ("hcns", "cntt", "tgd", "chutich", "bks")
 # Chữ ký cửa duyệt đơn: HỢP của mọi vai ký được, SUY RA từ bảng luật chứ không khai tay lần thứ hai.
 # Khai tay hai chỗ thì sớm muộn cũng lệch, và lúc lệch thì hoặc một người ký được thứ không phải của
 # mình, hoặc một người đúng luật lại bị cửa chặn mà không ai hiểu vì sao.
@@ -141,6 +145,39 @@ def profile_gaps(u: User = Depends(require_roles(*HR_READ)), db: Session = Depen
             out.append({"employee_id": e.id, "code": e.code, "full_name": e.full_name, "department": e.department,
                         "percent": c["percent"], "missing": c["missing"]})
     return {"count": len(out), "rows": out, "required_fields": list(H.PROFILE_REQUIRED)}
+
+
+# ---------- HS-11 · Một người, một ngày sinh ----------
+# Hai cửa dưới đây đứng cạnh `profile-gaps` là có chủ ý: cùng một việc của HCNS — đi dọn hồ sơ —
+# nên chúng nằm cùng một chỗ trên màn hình và cùng một chỗ trong mã.
+
+@router.get("/hrm/lech-ho-so")
+def lech_ho_so(gom_ca_khop: bool = False, u: User = Depends(require_roles(*HR_LECH_READ)),
+               db: Session = Depends(get_db)):
+    """CHỈ ĐỌC — kê những người đang mang hai giá trị khác nhau cho cùng một thông tin.
+
+    Vai đọc rộng hơn vai sửa (`HR_READ` chứ không `HR_ADMIN`): Ban kiểm soát và Kế toán cần nhìn
+    thấy chỗ lệch để biết con số họ đang đọc đến từ đâu, nhưng không ai trong hai vai ấy được
+    sửa hồ sơ nhân sự.
+    """
+    from app.services import gop_ho_so_nv as GOP
+    return GOP.soat_lech(db, gom_ca_khop)
+
+
+class ChepOTrongIn(BaseModel):
+    xac_nhan: bool = False
+
+
+@router.post("/hrm/lech-ho-so/chep-o-trong")
+def chep_o_trong(data: ChepOTrongIn, u: User = Depends(require_roles(*HR_ADMIN)),
+                 db: Session = Depends(get_db)):
+    """Chép sang hồ sơ CHỈ ở ô còn trống. `xac_nhan=false` là bản xem trước, không ghi gì.
+
+    Cửa này KHÔNG giải quyết được dòng «hai bên khác nhau», và cố ý không giải quyết: chọn hộ
+    một ngày sinh là xoá mất ngày kia mà không còn dấu vết nào để lần lại.
+    """
+    from app.services import gop_ho_so_nv as GOP
+    return GOP.chuyen_cho_trong(db, u, data.xac_nhan)
 
 
 # ---------- Hợp đồng lao động ----------

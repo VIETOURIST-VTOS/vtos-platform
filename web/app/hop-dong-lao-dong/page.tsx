@@ -41,6 +41,12 @@ function HopDong() {
    *  một quyền nào. Phạm vi vai trò sau vòng này KHÔNG đổi một đơn vị.
    */
   const [thieuHoSo, setThieuHoSo] = useState<any>(null);
+  /** HS-11 · 17/10/2026 — MỘT NGƯỜI, MỘT NGÀY SINH.
+   *  Cùng một thông tin nằm ở hai bảng và hai màn hình ghi vào hai nơi; bảng dưới kê ra ai đang
+   *  mang hai giá trị khác nhau. Máy KHÔNG tự chọn bên nào thắng — nút chép chỉ đụng vào ô CÒN
+   *  TRỐNG bên hồ sơ, dòng lệch thật thì HCNS mở hồ sơ người ấy và gõ lại. */
+  const [lech, setLech] = useState<any>(null);
+  const [xemChep, setXemChep] = useState<any>(null);
   const [chon, setChon] = useState<number>(0);          // nhân viên đang mở hồ sơ
   const [hs, setHs] = useState<any>(null);              // /employees/{id}/profile
   const [fHs, setFHs] = useState<any>({});              // ô đang sửa
@@ -60,7 +66,21 @@ function HopDong() {
     api("/hrm/meta").then(setMeta).catch(() => {});
     api("/employees").then((r: any) => setEmps(r.rows || r)).catch(() => {});
     api("/hrm/profile-gaps").then(setThieuHoSo).catch(() => setThieuHoSo(null));
+    api("/hrm/lech-ho-so").then(setLech).catch(() => setLech(null));
   }, []);
+
+  /** Hai bước, như cửa bàn giao: bấm lần một chỉ XEM, bấm lần hai mới ghi. */
+  const chepOTrong = async (xac_nhan: boolean) => {
+    try {
+      const r: any = await api("/hrm/lech-ho-so/chep-o-trong", { method: "POST", json: { xac_nhan } });
+      setXemChep(r);
+      if (r.da_chep) {
+        toast(r.message);
+        api("/hrm/lech-ho-so").then(setLech).catch(() => {});
+        api("/hrm/profile-gaps").then(setThieuHoSo).catch(() => {});
+      }
+    } catch (e) { toast(errMsg(e), true); }
+  };
 
   /** Mở hồ sơ một người: ba lời gọi, và KHÔNG lời gọi nào tính lại cái máy chủ đã tính. Mức giảm trừ
    *  gia cảnh lấy nguyên từ `/pit-deduction` — tính ở màn hình là tính lần thứ hai, và lần thứ hai bao
@@ -258,6 +278,38 @@ function HopDong() {
       {thieuHoSo && thieuHoSo.count > 0 && <p>
         <Tag cls="warn">{thieuHoSo.count}</Tag> người còn thiếu thông tin hồ sơ bắt buộc
         <span className="muted"> ({(thieuHoSo.required_fields || []).join(" · ")})</span></p>}
+
+      {lech && lech.count > 0 && <div style={{ margin: "12px 0" }}>
+        <p><Tag cls="warn">{lech.count}</Tag> ô đang có <b>hai giá trị cho cùng một thông tin</b>
+          <span className="muted"> — cùng một người, ngày sinh (hoặc điện thoại) ghi ở bảng nhân sự
+            một đằng, ở hồ sơ cá nhân một nẻo. Từ 17/10/2026 chỉ hồ sơ cá nhân được ghi; bảng dưới
+            là phần tồn lại từ trước đó.</span></p>
+        <table className="tbl"><thead><tr>
+          <th>Mã NV</th><th>Họ tên</th><th>Trường</th>
+          <th>Ở bảng nhân sự</th><th>Ở hồ sơ cá nhân</th><th>Tình trạng</th><th></th>
+        </tr></thead><tbody>
+          {lech.rows.map((r: any, i: number) => <tr key={i}>
+            <td className="mono">{r.code}</td><td>{r.full_name}</td><td>{r.ten_truong}</td>
+            <td className="mono">{r.o_bang_nhan_su || "—"}</td>
+            <td className="mono">{r.o_ho_so || "—"}</td>
+            <td>{r.trang_thai === "lech"
+              ? <Tag cls="warn">{r.noi}</Tag>
+              : <span className="muted">{r.noi}</span>}</td>
+            <td>{canGhi && <button className="act" onClick={() => moHoSo(r.employee_id)}>Mở hồ sơ</button>}</td>
+          </tr>)}
+        </tbody></table>
+        <p className="muted">{lech.ghi_chu}</p>
+        {canGhi && <div className="wrap">
+          <button className="act" onClick={() => chepOTrong(false)}>Xem trước: chép ô còn trống</button>
+          {xemChep && !xemChep.da_chep && xemChep.se_chep?.length > 0 &&
+            <button className="act" onClick={() => chepOTrong(true)}>
+              Chép {xemChep.se_chep.length} ô còn trống sang hồ sơ</button>}
+        </div>}
+        {xemChep && <p className="muted">{xemChep.message}
+          {xemChep.o_lai?.length ? <> · giữ nguyên: {xemChep.o_lai.length} ô
+            ({xemChep.o_lai.filter((x: any) => x.ly_do?.includes("KHÁC")).length} ô vì hai bên
+            khác nhau — những ô ấy phải do HCNS tự chọn)</> : null}</p>}
+      </div>}
 
       <div className="wrap">
         <label>Chọn người<br />

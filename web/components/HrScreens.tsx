@@ -727,8 +727,14 @@ function SuaHoSo({ sua, setSua, dc, setDc, meta, post }: any) {
         <label>Chức vụ hiển thị<input value={sua.title || ""} onChange={(e) => d("title", e.target.value)} /></label>
         <label>Nhóm kinh doanh<input value={sua.sales_group || ""} onChange={(e) => d("sales_group", e.target.value)} /></label>
         <label>Lương công việc (đ)<input type="number" value={sua.base_salary ?? ""} onChange={(e) => d("base_salary", e.target.value)} /></label>
+        {/* HS-11 · 17/10/2026 — hai ô này vẫn ở đây, nhưng nay rơi vào HỒ SƠ CÁ NHÂN. Trước đó
+            cùng một người có thể mang hai ngày sinh: một ở bảng nhân sự, một ở màn Hợp đồng lao
+            động, và không ai thấy vì cả hai ô đều mang nhãn «Ngày sinh». */}
         <label>Ngày sinh<input type="date" value={sua.birth_date || ""} onChange={(e) => d("birth_date", e.target.value)} /></label>
         <label>Điện thoại<input value={sua.phone || ""} onChange={(e) => d("phone", e.target.value)} /></label>
+        <p className="muted" style={{ gridColumn: "1 / -1", margin: 0 }}>Ngày sinh và điện thoại
+          lưu vào <b>hồ sơ cá nhân</b> (màn Hợp đồng lao động), không lưu riêng ở bảng nhân sự —
+          một người chỉ có một ngày sinh.</p>
         {/* HS-9 · 17/10/2026 — NGÀY VÀO LÀM: trường này trước nay KHÔNG CÓ Ô NÀO, cả ở biểu tạo
             lẫn biểu sửa, nên chỉ nạp được qua tệp bảng lương. Mà thâm niên, phép năm, BHXH và
             thuế đều đọc đúng nó. Một người tuyển giữa kỳ thì không ai gõ được ngày vào của họ. */}
