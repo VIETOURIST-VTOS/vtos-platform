@@ -216,11 +216,10 @@ def _quyet_toan_cho(db: Session) -> dict:
     12/10 tới 12/10 vì mọi phép thử đều soi hai DÒNG MẪU chứ không soi CON SỐ của ô. Phép thử
     `test_bd1_o_quyet_toan_dem_dung_viec_cua_phong_nay` nay soi đúng con số ấy.
 
-    MỘT ĐIỀU CÒN THIẾU, GHI RA CHỨ KHÔNG BỊA: bản dựng thử ngày 12/10 có dòng "Kế toán trả lại,
-    cần sửa". VTOS hôm nay KHÔNG có trạng thái ấy — `TOUR_STATUS` đi một chiều
-    ket_thuc → da_dong_so → kt_xac_nhan → khoa, không có đường lùi nào mang tên "trả lại". Nên ô
-    này chỉ có hai dòng thật, và việc dựng cửa trả lại là một việc còn thiếu của hệ thống, không
-    phải một dòng để màn hình này vẽ ra cho đủ hình.
+    DÒNG "KẾ TOÁN TRẢ LẠI, CẦN SỬA" (bản dựng thử 12/10) có từ 19/10/2026. Không có trạng thái
+    riêng — `TOUR_STATUS` vẫn đi ket_thuc → da_dong_so → kt_xac_nhan → khoa, và nút trả lại
+    (`settlement.kt_return`) đưa chuyến về ket_thuc. Máy nhận ra chuyến bị trả lại bằng lịch sử
+    chuyến (`services/tra_lai_quyet_toan.py`), và dòng ấy là MỘT PHẦN của con số ô.
     """
     from app.models.core import Tour
     from app.services import rules as R
@@ -234,6 +233,13 @@ def _quyet_toan_cho(db: Session) -> dict:
             # KHÔNG tính vào con số của ô, và nói ra bằng CHỮ chứ không để người đọc tự suy.
             _dong("Đã đóng số, đang ở bàn Kế toán", "không tính vào ô này",
                   str(len(cho_kt)), "chuyến")]
+    # 19/10/2026 — dòng "Kế toán trả lại, cần sửa" mà bản dựng thử 12/10 đã vẽ. Nhận ra bằng lịch
+    # sử chuyến (`tra_lai_quyet_toan`), không bằng một trạng thái mới; là MỘT PHẦN của con số ô.
+    from app.services import tra_lai_quyet_toan as TLQ
+    ids = [i for i in (getattr(t, "id", None) for t in cho_dong) if i is not None]
+    tra_lai = TLQ.dang_bi_tra_lai(db, ids) if ids else {}
+    if tra_lai:
+        dong.append(_dong("Trong đó Kế toán trả lại, cần sửa", "", str(len(tra_lai)), "chuyến", "vang"))
     if qua_han:
         dong.append(_dong("Trong đó đã quá hạn quyết toán", "", str(len(qua_han)), "chuyến", "do"))
     return _o("quyet_toan", "Chuyến chờ Điều hành đóng số", len(cho_dong), "chuyến",

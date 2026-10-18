@@ -190,27 +190,29 @@ def test_bd1_tep_dich_vu_khong_ghi_mot_dong_nao_vao_co_so_du_lieu():
 
 # ══════════════════════════ B4 – KHÔNG BỊA DÒNG ══════════════════════════
 def test_bd1_o_quyet_toan_chi_dung_trang_thai_tour_co_that():
-    """Bản dựng thử ngày 12/10 có dòng 'Kế toán trả lại, cần sửa'. VTOS KHÔNG có trạng thái ấy —
-    `TOUR_STATUS` đi một chiều, không có đường lùi nào mang tên 'trả lại'. Vẽ dòng ấy ra là dựng
-    một hàng đợi không có hồ sơ nào chảy vào, và nó sẽ mãi mãi bằng 0 mà không ai biết vì sao.
+    """Bản dựng thử ngày 12/10 có dòng 'Kế toán trả lại, cần sửa'. Đến 18/10 VTOS không có nguồn
+    nào cho dòng ấy, nên phép thử này cấm vẽ nó — một hàng đợi không có hồ sơ nào chảy vào thì mãi
+    bằng 0 mà không ai biết vì sao.
 
-    Phép thử này đỏ vào đúng ngày ai đó thêm trạng thái trả lại thật — lúc ấy mở lại dòng ấy là
-    đúng, và dòng chú thích trong `_quyet_toan_cho` phải sửa theo.
+    Từ 19/10/2026 dòng ấy CÓ NGUỒN THẬT: lịch sử chuyến (`services/tra_lai_quyet_toan.py`) — vẫn
+    không thêm trạng thái mới. Luật «không bịa dòng» giữ nguyên, chỉ đổi cách soi: dòng ấy chỉ được
+    hiện khi có chuyến bị trả lại THẬT, và con số phải bằng đúng số chuyến nguồn ấy trả về.
     """
     from app.models.core import TOUR_STATUS
     assert "ket_thuc" in TOUR_STATUS and "da_dong_so" in TOUR_STATUS
     assert not [k for k in TOUR_STATUS if "tra_lai" in k], \
-        "đã có trạng thái trả lại quyết toán — mở lại dòng thứ ba của ô quyết toán"
-    # SOI DÒNG THẬT, KHÔNG SOI MÃ NGUỒN. Bản đầu của phép thử này quét `inspect.getsource` tìm
-    # chữ "Kế toán trả lại" và tự đỏ ngay lần chạy đầu — vì chính đoạn chú thích GIẢI THÍCH vì sao
-    # không có dòng ấy cũng chứa chữ ấy. Một phép thử bắt được lời giải thích thay vì bắt được
-    # hành vi thì nó dạy người ta xoá lời giải thích. Nay soi đúng thứ hiện lên màn hình.
+        "có trạng thái trả lại riêng thì nguồn ở tra_lai_quyet_toan phải đổi theo"
     from app.db.session import SessionLocal
+    from app.services import tra_lai_quyet_toan as TLQ
     with SessionLocal() as s:
         o = [x for x in BLV.ban(s, "dieu_hanh")["o"] if x["khoa"] == "quyet_toan"][0]
+        that = len(TLQ.dang_bi_tra_lai(s))
     if o["trang_thai"] != BLV.SAN_SANG: pytest.skip("ô quyết toán chưa đọc được")
-    bia = [d for d in o["dong"] if "trả lại" in d["chinh"].lower()]
-    assert not bia, f"ô quyết toán bày dòng {bia} trong khi VTOS không có trạng thái trả lại"
+    dong = [d for d in o["dong"] if "trả lại" in d["chinh"].lower()]
+    if that == 0:
+        assert not dong, f"ô quyết toán bày dòng {dong} trong khi không có chuyến nào bị trả lại"
+    else:
+        assert len(dong) == 1 and dong[0]["phai"] == str(that)
 
 
 class _DbGia:

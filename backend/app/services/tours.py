@@ -87,6 +87,12 @@ def tour_view(db: Session, t: Tour, user: User | None = None, kem_bookings: bool
     # chuyến và 12.697 booking trên hệ thật, đó là hàng nghìn từ điển dựng ra để vứt, trên một máy
     # chủ có nửa lõi CPU. `booked_pax(t)` vẫn đọc `t.bookings` để đếm khách nên quan hệ ấy vẫn phải
     # nạp sẵn — thứ bỏ đi ở đây là việc DỰNG TỪ ĐIỂN, không phải việc đọc cơ sở dữ liệu.
+    # Chuyến bị Kế toán trả lại quyết toán: chỉ ở trang MỘT chuyến (kem_bookings), không ở danh sách
+    # — danh sách dựng hàng trăm chuyến và đây là một lượt đọc lịch sử cho mỗi chuyến.
+    if kem_bookings:
+        from app.services import tra_lai_quyet_toan as TLQ
+        out["kt_tra_lai"] = TLQ.mo_ta(TLQ.dang_bi_tra_lai(db, [t.id]).get(t.id),
+                                      getattr(t, "settlement_version", None))
     if kem_bookings:
         out["bookings"] = [{"id": b.id, "code": b.code, "sales_id": b.sales_id, "customer_name": b.customer_name, "customer_phone": b.customer_phone, "source": b.source,
                             "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code, "sales_name": b.sales.full_name if b.sales else "",

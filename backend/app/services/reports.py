@@ -244,13 +244,24 @@ def income_statement(db: Session, period: str, company_id: int | None = None) ->
                        "note": "Lợi nhuận Công ty dùng tính thưởng GĐ KD = sau lãi vay, trước khấu hao (BCKQKD tháng TGĐ duyệt)"}}
 
 
+CONG_THUC_B03 = {"ngay": "2026-10-19", "duyet": "Chủ tịch HĐQT",
+                 "ghi_chu": "Công thức B03 đổi ngày 19/10/2026 (Chủ tịch duyệt): vốn góp (TK 411) và cổ tức đã trả "
+                            "(TK 421) xếp vào hoạt động tài chính, theo cách trình bày của BCTC đã kiểm toán. "
+                            "Số các kỳ cũ có góp vốn hoặc trả cổ tức có thể khác bản đã in trước ngày này."}
+
+
 def cash_flow(db: Session, period: str) -> dict:
     """B03-DN phương pháp trực tiếp: phân loại dòng tiền theo tài khoản đối ứng của 111/112 trong từng chứng từ."""
     rows = _lines(db, period=period)
     by_entry: dict[int, list] = {}
     for l, e in rows:
         by_entry.setdefault(e.id, []).append(l)
-    buckets = {"thu_khach": 0.0, "chi_ncc": 0.0, "chi_nld": 0.0, "chi_thue": 0.0, "chi_khac": 0.0, "thu_khac": 0.0, "dau_tu": 0.0, "vay": 0.0, "tra_no": 0.0}
+    # E13 · 19/10/2026, Chủ tịch duyệt: "làm theo báo cáo tài chính đã kiểm toán". BCTC đã kiểm toán
+    # (A&C) xếp vốn góp chủ sở hữu và cổ tức đã trả vào HOẠT ĐỘNG TÀI CHÍNH (dòng 31/32/36), không
+    # để rơi vào "thu/chi khác" của HĐKD. Trước ngày ấy bảng này không có nhánh cho 411 và 421.
+    # Cổ tức trả qua 3388 KHÔNG tự đoán: 3388 còn nhiều khoản khác, chỉ đối ứng thẳng 421 mới chắc.
+    buckets = {"thu_khach": 0.0, "chi_ncc": 0.0, "chi_nld": 0.0, "chi_thue": 0.0, "chi_khac": 0.0, "thu_khac": 0.0, "dau_tu": 0.0, "vay": 0.0, "tra_no": 0.0,
+               "von_gop_thu": 0.0, "von_gop_tra": 0.0, "co_tuc": 0.0}
     for lines in by_entry.values():
         cash_net = sum((l.debit or 0) - (l.credit or 0) for l in lines if l.account_code[:3] in CASH)
         if abs(cash_net) < 1: continue
@@ -260,6 +271,7 @@ def cash_flow(db: Session, period: str) -> dict:
             if a == "131": buckets["thu_khach"] += cash_net
             elif a == "341": buckets["vay"] += cash_net
             elif a in ("211", "222", "128"): buckets["dau_tu"] += cash_net
+            elif a == "411": buckets["von_gop_thu"] += cash_net
             else: buckets["thu_khac"] += cash_net
         else:
             v = -cash_net
@@ -268,19 +280,24 @@ def cash_flow(db: Session, period: str) -> dict:
             elif a == "333": buckets["chi_thue"] += v
             elif a == "341": buckets["tra_no"] += v
             elif a in ("211", "222", "128"): buckets["dau_tu"] += v
+            elif a == "411": buckets["von_gop_tra"] += v
+            elif a == "421": buckets["co_tuc"] += v
             else: buckets["chi_khac"] += v
     op = buckets["thu_khach"] + buckets["thu_khac"] - buckets["chi_ncc"] - buckets["chi_nld"] - buckets["chi_thue"] - buckets["chi_khac"]
     inv = -buckets["dau_tu"]
-    fin = buckets["vay"] - buckets["tra_no"]
+    fin = buckets["von_gop_thu"] - buckets["von_gop_tra"] + buckets["vay"] - buckets["tra_no"] - buckets["co_tuc"]
     b_prev = balances(db, prev_period(period)); b_now = balances(db, period)
     open_cash = sum(b_prev.get(c, 0.0) for c in CASH); close_cash = sum(b_now.get(c, 0.0) for c in CASH)
     return {"period": period, "rows": [
         ("01", "Tiền thu từ bán hàng, cung cấp dịch vụ", buckets["thu_khach"]), ("02", "Tiền chi trả cho người cung cấp", -buckets["chi_ncc"]),
         ("03", "Tiền chi trả cho người lao động", -buckets["chi_nld"]), ("05", "Thuế đã nộp", -buckets["chi_thue"]), ("06", "Tiền thu khác", buckets["thu_khac"]),
         ("07", "Tiền chi khác", -buckets["chi_khac"]), ("20", "Lưu chuyển tiền thuần từ HĐKD", op), ("30", "Lưu chuyển tiền thuần từ hoạt động đầu tư", inv),
-        ("33", "Tiền thu từ đi vay", buckets["vay"]), ("34", "Tiền trả nợ gốc vay", -buckets["tra_no"]), ("40", "Lưu chuyển tiền thuần từ hoạt động tài chính", fin),
+        ("31", "Tiền thu từ phát hành cổ phiếu, nhận vốn góp của chủ sở hữu", buckets["von_gop_thu"]),
+        ("32", "Tiền trả lại vốn góp cho các chủ sở hữu, mua lại cổ phiếu", -buckets["von_gop_tra"]),
+        ("33", "Tiền thu từ đi vay", buckets["vay"]), ("34", "Tiền trả nợ gốc vay", -buckets["tra_no"]),
+        ("36", "Cổ tức, lợi nhuận đã trả cho chủ sở hữu", -buckets["co_tuc"]), ("40", "Lưu chuyển tiền thuần từ hoạt động tài chính", fin),
         ("50", "Lưu chuyển tiền thuần trong kỳ", op + inv + fin), ("60", "Tiền đầu kỳ", open_cash), ("70", "Tiền cuối kỳ", close_cash)],
-        "reconciled": abs(open_cash + op + inv + fin - close_cash) < 1}
+        "reconciled": abs(open_cash + op + inv + fin - close_cash) < 1, "cong_thuc": CONG_THUC_B03}
 
 
 def prev_period(p: str) -> str:
