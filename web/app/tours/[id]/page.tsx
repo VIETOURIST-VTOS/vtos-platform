@@ -228,6 +228,12 @@ function TourDetail() {
           {can("d7") && <><NoteBox /><button className="act grey" onClick={() => run("d7", { decision: "ghep" })}>Ghép</button><button className="act grey" onClick={() => run("d7", { decision: "doi" })}>Dời</button><button className="act red" onClick={() => run("d7", { decision: "huy" })}>Hủy</button>{user?.role === "chutich" && <button className="act orange" onClick={() => run("d7", { decision: "chay" })}>Chủ tịch duyệt chạy</button>}</>}
         </>}
         {t.status === "huy" && <p>{t.chairman_run_decision}</p>}
+        {/* TL-1 · 19/10/2026: chuyến bị Kế toán trả lại trông y hệt chuyến chưa đóng số — nói ra lý do. */}
+        {t.kt_tra_lai && <div className="panel" style={{ border: "1px solid var(--warn, #d9a03a)", padding: "8px 10px", margin: "8px 0" }}>
+          <b>Kế toán trả lại quyết toán</b> · {fmtDT(t.kt_tra_lai.luc)} · {t.kt_tra_lai.ai}<br />
+          Lý do: «{t.kt_tra_lai.ly_do || "không ghi"}»<br />
+          <span className="muted">Đang soạn lại{t.kt_tra_lai.phien_ban ? ` phiên bản V.${String(t.kt_tra_lai.phien_ban).padStart(2, "0")}` : ""}. Dải này mất khi đóng số lại.</span>
+        </div>}
         {can("close") && <><h3>Đóng số quyết toán · một cửa · hạn {fmtD(t.settlement_deadline)} {new Date().toISOString().slice(0, 10) > t.settlement_deadline && <Tag cls="red">ĐÃ QUÁ HẠN</Tag>}</h3>
           <form onSubmit={closeTour}><div className="grid">
             <div><label>Doanh thu thực tế (đ)</label><input type="number" name="actual_revenue" step="1000" defaultValue={Math.round(t.actual_revenue || bookedAmount)} required /></div>

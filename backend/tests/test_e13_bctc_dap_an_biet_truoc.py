@@ -187,16 +187,9 @@ def test_e13_7_b03_phan_loai_dung_tien_thu_khach_va_tien_chi_NCC(_so):
     assert cf["02"] == -600_000, "tiền chi trả người cung cấp — chứng từ Nợ 331 / Có 112"
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "CHỖ SAI ĐO ĐƯỢC 13/10/2026, CHƯA SỬA VÌ CHƯA CÓ NGƯỜI KÝ. Góp vốn chủ sở hữu (Nợ 112 / Có "
-    "411) đang rơi vào 'Tiền thu khác' của HOẠT ĐỘNG KINH DOANH, nên dòng 20 phồng lên đúng bằng "
-    "số vốn góp còn dòng 40 — hoạt động tài chính — bằng 0. Theo TT99 đây là luồng tiền từ hoạt "
-    "động TÀI CHÍNH. `cash_flow` phân loại theo tài khoản đối ứng và bảng ấy không có nhánh cho "
-    "411, nên mọi thứ không khớp nhánh nào đều rơi vào 'khác'. Sửa là ĐỔI MỘT CÔNG THỨC ĐÃ CHỐT "
-    "và nó làm đổi số trên một báo cáo đã phát hành — phải có chữ ký. Phép thử để XFAIL STRICT: "
-    "nó đỏ-có-chủ-ý hôm nay, và ngày ai đó sửa mà quên tệp này thì bộ phép thử ĐỎ, buộc người ấy "
-    "phải tới đây đọc và xoá dòng xfail. Một chỗ sai đã biết mà không có dấu vết nào trong mã là "
-    "một chỗ sai sẽ được phát hiện lại từ đầu sau sáu tháng."))
+# E13-8 · Chỗ sai đo được 13/10/2026 (góp vốn rơi vào "thu khác" của HĐKD) được SỬA ngày 19/10/2026
+# sau khi Chủ tịch duyệt "làm theo báo cáo tài chính đã kiểm toán". Dòng xfail strict đã gỡ — đúng
+# việc nó sinh ra để buộc người sửa phải làm.
 def test_e13_8_b03_gop_von_chu_so_huu_phai_nam_o_hoat_dong_TAI_CHINH(_so):
     cf = {ma: so for ma, _t, so in RP.cash_flow(_so, KY)["rows"]}
     assert cf["40"] == 1_000_000_000, "góp vốn chủ sở hữu thuộc luồng tiền hoạt động tài chính"
