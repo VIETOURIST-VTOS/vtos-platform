@@ -1065,7 +1065,12 @@ def grants_list(con_hieu_luc: bool = False, u: User = Depends(require_roles("chu
                       "from_date": g.from_date, "to_date": g.to_date, "vo_han": g.vo_han(), "reason": g.reason,
                       "granted_by": g.granted_by, "approved_by": g.approved_by,
                       "active": g.active, "hieu_luc": g.hieu_luc()} for g in rows],
-            "kinds": GRANT_KINDS, "capabilities": CAPABILITIES, "max_days": GRANT_MAX_DAYS}
+            "kinds": GRANT_KINDS, "capabilities": CAPABILITIES, "max_days": GRANT_MAX_DAYS,
+            # QL-1 (17/10/2026): danh sách màn hình CẤP ĐƯỢC cho loại `menu`, lấy từ CHÍNH bảng mà
+            # `grant_create` dùng để kiểm (`AC.ALL_MENU_PATHS`). Màn hình gõ lại danh sách này thì
+            # ngày thêm một màn mới, ô chọn thiếu nó mà máy chủ vẫn nhận — hai nơi nói hai điều.
+            # Bỏ đường dẫn có `[...]`: đó là khuôn trang động, không phải một màn hình cấp được.
+            "man_hinh": sorted(p for p in AC.ALL_MENU_PATHS if "[" not in p)}
 
 
 @router.post("/access/grants", status_code=201, tags=["access"])

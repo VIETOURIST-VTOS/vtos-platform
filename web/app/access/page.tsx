@@ -7,6 +7,7 @@ import { Tag, errMsg } from "@/components/ui";
 import MatKhauCongKhai from "@/components/MatKhauCongKhai";
 import HoSoNhanVien from "@/components/HoSoNhanVien";
 import SuaTaiKhoan from "@/components/SuaTaiKhoan";
+import CapNgoaiLe from "@/components/CapNgoaiLe";
 /** Tài khoản & phân quyền (đặc tả 07/9/2026, phần B).
  *
  *  Màn hình này CÔNG BỐ ma trận quyền chứ không sửa nó: ma trận nằm trong mã nguồn, có phép thử tự động
@@ -75,6 +76,9 @@ function AccessPage() {
   const [tcUid, setTcUid] = useState<number | null>(null);
   const [hsUid, setHsUid] = useState<number | null>(null);      // HS-2: hồ sơ đang mở
   const [suaUid, setSuaUid] = useState<number | null>(null);    // HS-6: hộp Sửa đang mở
+  // QL-1: ô cấp ngoại lệ. `capMo` mở hay đóng; `capUid` là người điền sẵn khi mở từ một dòng.
+  const [capMo, setCapMo] = useState(false);
+  const [capUid, setCapUid] = useState<number | null>(null);
   const [hsTen, setHsTen] = useState("");
   const [tc, setTc] = useState<any>(null);
   const [tcVai, setTcVai] = useState("");
@@ -216,6 +220,12 @@ function AccessPage() {
         acc={acc} vaiNguoiDung={role}
         onClose={() => setSuaUid(null)}
         onDone={(m: string) => { toast(m); loadAcc(); loadGaps(); }} />}
+      {/* QL-1 · Ô cấp ngoại lệ đứng CÙNG CHỖ với hai hộp trên — cùng lẽ HS-8: nút cấp nằm trên
+          từng dòng của bảng 121 dòng, nên mẫu phải mở ở trên bảng chứ không ở khối dưới đáy. */}
+      {capMo && laLanhDao && acc && grants && <CapNgoaiLe uidDau={capUid} dsNguoi={acc.rows}
+        meta={grants} onClose={() => { setCapMo(false); setCapUid(null); }}
+        onDone={(m: string) => { toast(m); setCapMo(false); setCapUid(null);
+          api("/access/grants").then(setGrants).catch(() => {}); }} />}
 
       <div className="scroll"><table><thead><tr>
         <th>Mã NV</th><th>Họ tên</th><th>Tài khoản</th><th>Vai trò</th><th>Phòng</th><th>Pháp nhân</th>
@@ -255,6 +265,9 @@ function AccessPage() {
               onClick={() => send(`/users/${r.id}`, { active: !r.active }, "PUT")}>{r.active ? "Khóa" : "Mở lại"}</button>}
             <button className="act grey" style={{ margin: 0, marginRight: 4 }}
               onClick={() => { setSuaUid(suaUid === r.id ? null : r.id); setHsUid(null); }}>Sửa</button>
+            {laLanhDao && <button className="act grey" style={{ margin: 0, marginRight: 4 }}
+              title="Cấp một quyền có thời hạn cho riêng người này"
+              onClick={() => { setCapUid(r.id); setCapMo(true); setSuaUid(null); setHsUid(null); }}>Cấp ngoại lệ</button>}
             {/* ĐẶT LẠI MẬT KHẨU — 12/10/2026. Cửa máy chủ đã có từ lâu và mở cho đúng hcns + cntt,
                 nhưng KHÔNG một màn hình nào gọi tới nó, nên trên thực tế nó chưa tồn tại: CNTT muốn
                 giúp một người quên mật khẩu thì chỉ có nút "Nạp + đặt lại = mã NV" ở màn hình Nhân
@@ -278,9 +291,16 @@ function AccessPage() {
           </td>
         </tr>)}</tbody></table></div>
 
-      {grants?.rows?.length > 0 && <>
-        <h3 style={{ marginTop: 18 }}>Ngoại lệ quyền có thời hạn</h3>
+      {/* QL-1: khối LUÔN hiện cho Chủ tịch và TGĐ, kể cả khi chưa có dòng nào — trước đây nó
+          ẩn khi rỗng, và chỗ cấp quyền đầu tiên vì thế không có lối vào. */}
+      {grants && (laLanhDao || grants.rows?.length > 0) && <>
+        <div className="row" style={{ gap: 8, marginTop: 18, alignItems: "center" }}>
+          <h3 style={{ margin: 0 }}>Ngoại lệ quyền có thời hạn</h3>
+          {laLanhDao && <button className="act" style={{ margin: 0 }}
+            onClick={() => { setCapUid(null); setCapMo(true); setSuaUid(null); setHsUid(null); }}>+ Cấp ngoại lệ</button>}
+        </div>
         <p className="muted">Quyền cấp cho MỘT người, không cho cả vai trò. Hết hạn là tự mất hiệu lực, không chờ ai nhớ thu.</p>
+        {!grants.rows?.length && <p className="muted">Chưa có ngoại lệ nào.</p>}
         <div className="scroll"><table><thead><tr>
           <th>Người</th><th>Quyền</th><th>Từ</th><th>Đến</th><th>Lý do</th><th>Người duyệt</th><th>Hiệu lực</th><th></th></tr></thead>
           <tbody>{grants.rows.map((g: any) => <tr key={g.id}>
