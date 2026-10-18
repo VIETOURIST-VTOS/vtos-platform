@@ -76,6 +76,9 @@ function AccessPage() {
   const [tcUid, setTcUid] = useState<number | null>(null);
   const [hsUid, setHsUid] = useState<number | null>(null);      // HS-2: hồ sơ đang mở
   const [suaUid, setSuaUid] = useState<number | null>(null);    // HS-6: hộp Sửa đang mở
+  // AC-NHE 18/10/2026: dòng đang «đổi» vai trò / pháp nhân. Chỉ dòng này dựng hai ô chọn — dựng sẵn
+  // trên cả 121 dòng là ≈ 4.700 <option> lúc mở màn, đủ làm trình duyệt ì (đo trên hệ thật 18/10).
+  const [doiUid, setDoiUid] = useState<number | null>(null);
   // QL-1: ô cấp ngoại lệ. `capMo` mở hay đóng; `capUid` là người điền sẵn khi mở từ một dòng.
   const [capMo, setCapMo] = useState(false);
   const [capUid, setCapUid] = useState<number | null>(null);
@@ -234,14 +237,21 @@ function AccessPage() {
           <td>{r.staff_code || "—"}</td>
           <td>{r.full_name}{r.ngoai_bien_che && <> <Tag cls="warn">ngoài biên chế</Tag></>}</td>
           <td>{r.username}</td>
-          <td>{canWrite ? <select value={r.role} onChange={(e) => doiVaiTro(r, e.target.value)} style={{ minWidth: 150 }}>
-            {Object.entries(acc.roles).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
-          </select> : r.role_name}</td>
+          <td>{canWrite && doiUid === r.id
+            ? <select value={r.role} onChange={(e) => doiVaiTro(r, e.target.value)} style={{ minWidth: 150 }}>
+                {Object.entries(acc.roles).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            : <>{r.role_name || acc.roles?.[r.role] || r.role}
+                {canWrite && <button className="act grey" style={{ margin: "0 0 0 6px", padding: "0 6px", fontSize: 11 }}
+                  title="Đổi vai trò hoặc pháp nhân của dòng này" onClick={() => setDoiUid(r.id)}>đổi</button>}</>}</td>
           <td>{r.department || "—"}</td>
-          <td>{canWrite ? <select value={r.company_id || ""} onChange={(e) => send(`/access/users/${r.id}/company`, { company_id: e.target.value ? Number(e.target.value) : null }, "PUT")}>
-            <option value="">— chưa xác định —</option>
-            {(acc.companies || []).map((c: any) => <option key={c.id} value={c.id}>{c.code}</option>)}
-          </select> : (r.company || "—")}</td>
+          <td>{canWrite && doiUid === r.id
+            ? <><select value={r.company_id || ""} onChange={(e) => send(`/access/users/${r.id}/company`, { company_id: e.target.value ? Number(e.target.value) : null }, "PUT")}>
+                <option value="">— chưa xác định —</option>
+                {(acc.companies || []).map((c: any) => <option key={c.id} value={c.id}>{c.code}</option>)}
+              </select>
+              <button className="act" style={{ margin: "0 0 0 6px", padding: "2px 8px" }} onClick={() => setDoiUid(null)}>Xong</button></>
+            : (r.company || (acc.companies || []).find((c: any) => c.id === r.company_id)?.code || "—")}</td>
           <td>{r.active ? <Tag cls="ok">hoạt động</Tag> : <Tag cls="warn">đã khóa</Tag>}</td>
           <td>{r.last_login ? fmtDT(r.last_login) : <Tag cls="warn">chưa bao giờ</Tag>}</td>
           <td>{r.must_change_password ? <Tag cls="warn">tạm – phải đổi</Tag> : "đã đổi"}</td>
