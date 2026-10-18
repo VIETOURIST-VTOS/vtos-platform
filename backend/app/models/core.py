@@ -156,6 +156,9 @@ class User(Base):
     department: Mapped[str] = mapped_column(String(60), default="")
     sales_group: Mapped[str] = mapped_column(String(20), default="")   # nhóm kinh doanh KD1–KD5 / VPCT / VPHN / VPBD / DOAN_OB / DOAN_ND
     staff_code: Mapped[str] = mapped_column(String(20), default="")    # mã nhân viên HCNS (bảng lương), vd 114
+    # EM-1 (Chủ tịch duyệt 18/10/2026): email CÔNG VIỆC, tách khỏi email cá nhân trong hồ sơ nhân
+    # sự. Bắt buộc đuôi @vietourist.com.vn — kiểm ở `services/email_cong_viec.py`. Rỗng = chưa có.
+    email_cong_viec: Mapped[str] = mapped_column(String(120), default="", server_default="")
     password_hash: Mapped[str] = mapped_column(String(200))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Bổ sung 07/9/2026 (đặc tả Tài khoản & phân quyền, mục B3)

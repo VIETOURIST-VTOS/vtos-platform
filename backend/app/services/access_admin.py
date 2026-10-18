@@ -62,7 +62,7 @@ def danh_sach_tai_khoan(db: Session) -> list[dict]:
             "id": u.id, "username": u.username, "full_name": u.full_name,
             "role": u.role, "role_name": ROLES.get(u.role, u.role),
             "department": u.department, "sales_group": u.sales_group, "staff_code": u.staff_code,
-            "company_id": u.company_id, "company": cos.get(u.company_id, ""),
+            "company_id": u.company_id, "company": cos.get(u.company_id, ""), "email_cong_viec": u.email_cong_viec or "",
             "active": bool(u.active), "ngoai_bien_che": bool(u.ngoai_bien_che),
             "must_change_password": bool(u.must_change_password),
             "last_login": u.last_login,

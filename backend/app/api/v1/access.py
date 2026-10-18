@@ -212,6 +212,36 @@ def gan_phap_nhan(uid: int, data: PhapNhanIn,
     return {"message": "Đã cập nhật pháp nhân chủ quản", "company_id": t.company_id}
 
 
+class EmailCongViecIn(BaseModel):
+    email_cong_viec: str = ""
+
+
+@router.put("/users/{uid}/email-cong-viec")
+def sua_email_cong_viec(uid: int, data: EmailCongViecIn,
+                        u: User = Depends(require_roles(*THAO_TAC, "chutich", "tgd")),
+                        db: Session = Depends(get_db)):
+    """EM-1 · Email công việc. Cùng bộ vai với cửa pháp nhân; luật nằm ở services/email_cong_viec."""
+    from app.services import email_cong_viec as EM
+    t = db.get(User, uid)
+    if not t: raise HTTPException(404, "Không có tài khoản")
+    try:
+        moi = EM.chuan(data.email_cong_viec)
+    except EM.EmailSai as e:
+        raise HTTPException(422, str(e))
+    if moi:
+        khac = db.execute(select(User).where(User.email_cong_viec == moi, User.id != uid,
+                                             User.active == True)).scalars().first()  # noqa: E712
+        if khac: raise HTTPException(422, f"{moi} đang là email công việc của {khac.username} ({khac.full_name})")
+    cu = t.email_cong_viec or ""
+    if moi == cu:
+        return {"message": "Email công việc không thay đổi", "email_cong_viec": cu}
+    t.email_cong_viec = moi
+    R.audit(db, u.username, u.role, "sua_tai_khoan", f"user:{t.username}",
+            before={"email_cong_viec": cu}, after={"email_cong_viec": moi})
+    db.commit()
+    return {"message": f"Đã cập nhật email công việc của {t.full_name}", "email_cong_viec": moi}
+
+
 class HoSoIn(BaseModel):
     ma_nv: str | None = None
     ho_ten: str | None = None

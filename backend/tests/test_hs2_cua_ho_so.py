@@ -220,9 +220,11 @@ def test_hs2_9_thieu_nguon_phai_tu_to_cao():
     một ô trống trên màn hình trông y hệt một người chưa khai số liệu."""
     r = doc("chutich"); assert r.status_code == 200
     thieu = r.json()["thieu_nguon"]
-    for k in ("so_tour", "so_booking", "so_lenh_xe", "so_visa", "so_phan_cong_kd"):
-        assert k in thieu, f"{k} chưa có nguồn mà không được kê vào thieu_nguon"
     hs = r.json()["ho_so"]
+    # HS-12 (18/10/2026) dựng nguồn cho sáu con số việc đang gánh: từ nay chúng PHẢI có mặt và
+    # KHÔNG được nằm trong thieu_nguon. Phép canh chiều ngược lại ở test_hs12.
+    for k in ("so_tour", "so_quyet_toan_giu", "so_booking", "so_visa", "so_phan_cong_kd"):
+        assert k in hs and k not in thieu, f"{k} đã có nguồn (HS-12) mà vẫn báo thiếu"
     assert "so_dong_tro_toi" in hs and isinstance(hs["viec_dang_ganh"], list)
     for k in thieu:
         assert k not in hs, f"{k} vừa kê là thiếu nguồn vừa có mặt trong hồ sơ"

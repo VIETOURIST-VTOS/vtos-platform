@@ -153,13 +153,12 @@ NHOM_TRUONG: list[dict] = [
                 "probation", "so_nguoi_phu_thuoc", "bank_account"],
      "quyen": {"chutich": CO, "hcns": CHE}},
     {"ma": "6",  "ten": "Việc đang gánh",
-     # Hai khoá đầu là thứ MÁY ĐẾM ĐƯỢC HÔM NAY, đọc từ siêu dữ liệu SQLAlchemy nên cột khoá
-     # ngoại ai thêm tuần sau cũng tự vào. Năm khoá sau là năm con số Chủ tịch muốn thấy tách
-     # ra theo loại việc; chưa có nguồn nào sinh ra chúng, nên cửa đọc KHÔNG trả về và NÓI RA
-     # trong `thieu_nguon`. Một khoá khai mà không bao giờ có giá trị là một lời nói sai về hệ
-     # thống — bài học `truong_phong`, 15/10/2026 — nên nó phải tự tố cáo ở mỗi lần gọi.
+     # Hai khoá đầu đọc từ siêu dữ liệu SQLAlchemy nên cột khoá ngoại ai thêm tuần sau cũng tự
+     # vào. Sáu khoá sau là các con số Chủ tịch muốn thấy tách theo loại việc — HS-12 (18/10/2026)
+     # dựng nguồn cho chúng ở `dem_viec_dang_ganh`; trước đó chúng nằm trong `thieu_nguon`.
      "truong": ["so_dong_tro_toi", "viec_dang_ganh",
-                "so_tour", "so_booking", "so_lenh_xe", "so_visa", "so_phan_cong_kd"],
+                "so_tour", "so_quyet_toan_giu", "so_booking", "so_lenh_xe", "so_visa",
+                "so_phan_cong_kd"],
      "quyen": {"chutich": CO, "hcns": CO, "cntt": CO, **{v: PHAM_VI for v in VAI_DUNG_DAU}}},
     {"ma": "7a", "ten": "Xem ngày công",
      "truong": ["ngay_cong_ky_nay"],
@@ -302,6 +301,85 @@ def trong_pham_vi(db, nguoi_xem, muc_tieu, ngay=None) -> tuple[bool, str]:
     return False, "khac_phong"
 
 
+# =============================================================================================
+# HS-12 · VIỆC ĐANG GÁNH, TÁCH THEO LOẠI (Chủ tịch duyệt bản xem thử 18/10/2026)
+#
+# Mỗi loại trả HAI số: `dang_mo` (việc còn trên tay hôm nay) và `tong` (từ trước tới nay). Anh
+# chọn "đếm cả việc đã xong". Việc đã HUỶ không vào số nào — một tour huỷ không phải việc người
+# ấy đã làm.
+#
+# HAI DÒNG CỦA TOUR, KHÔNG CỘNG VÀO NHAU:
+#   · `so_tour` — tour người này là ĐIỀU HÀNH (`operator_id`). Thưởng chuyến đi theo dòng này.
+#   · `so_quyet_toan_giu` — hồ sơ quyết toán người này đang GIỮ, theo đúng cổng `chu_ho_so`:
+#     chỉ đích danh / bàn giao trước, rồi tour đoàn về Sale Admin, còn lại về Điều hành. Chủ tịch
+#     chọn GIỮ luật bàn giao (18/10/2026), nên ở đây gọi chính hàm ấy chứ không tự viết luật thứ
+#     hai — hai luật thì có ngày màn hình hồ sơ nói một người, màn hình quyết toán nói người khác.
+#     "Đang mở" = tờ quyết toán chưa đóng số.
+#
+# `so_lenh_xe` là None khi tài khoản chưa nối hồ sơ nhân sự: lệnh điều xe gắn vào hồ sơ nhân sự
+# (tài xế), không gắn vào tài khoản. None hiện «—», khác hẳn số 0.
+# =============================================================================================
+TOUR_DA_HUY = ("huy",)
+QUYET_TOAN_DA_DONG = ("da_dong_so", "kt_xac_nhan", "khoa")
+TOUR_DA_XONG = ("ket_thuc",) + QUYET_TOAN_DA_DONG
+VISA_DANG_MO = ("ACTIVE", "ON_HOLD")
+VISA_DA_HUY = ("CANCELLED",)
+LENH_DANG_MO = ("cho_xac_nhan", "da_xac_nhan")
+
+
+def _hai_so(db, q_tong, q_mo) -> dict:
+    return {"dang_mo": int(db.execute(q_mo).scalar_one()), "tong": int(db.execute(q_tong).scalar_one())}
+
+
+def dem_viec_dang_ganh(db, t, e) -> dict:
+    from datetime import date
+    from sqlalchemy import func, or_, select
+    from app.models.core import Booking, Tour
+    from app.models.hr import DispatchOrder
+    from app.models.to_chuc_kd import PhanCongKD
+    from app.models.visa import VisaCase
+    from app.services import chu_ho_so as CHS
+    from app.services import segments as SEG
+
+    dem = lambda m: select(func.count()).select_from(m)  # noqa: E731
+    ra: dict = {}
+
+    q = dem(Tour).where(Tour.operator_id == t.id, Tour.status.notin_(TOUR_DA_HUY))
+    ra["so_tour"] = _hai_so(db, q, q.where(Tour.status.notin_(QUYET_TOAN_DA_DONG)))
+
+    # Ứng viên: mọi tour mà cổng CÓ THỂ trả về người này, rồi lọc lại bằng chính cổng.
+    dk = [Tour.chu_ho_so_id == t.id, (Tour.chu_ho_so_id.is_(None)) & (Tour.operator_id == t.id)]
+    u_doan, _ = CHS.nguoi_giu_ho_so_doan(db)
+    if u_doan is not None and u_doan.id == t.id:
+        dk.append(Tour.chu_ho_so_id.is_(None) & or_(Tour.tour_type.in_(SEG.DOAN_TYPES),
+                                                   Tour.code.ilike(f"{SEG.MICE_PREFIX}%")))
+    ung = db.execute(select(Tour).where(or_(*dk), Tour.status.notin_(TOUR_DA_HUY))).scalars()
+    giu = [x for x in ung if CHS.chu_ho_so(db, x) == t.id]
+    ra["so_quyet_toan_giu"] = {"dang_mo": sum(1 for x in giu if x.status not in QUYET_TOAN_DA_DONG),
+                               "tong": len(giu)}
+
+    q = (dem(Booking).join(Tour, Tour.id == Booking.tour_id)
+         .where(Booking.sales_id == t.id, Booking.cancelled == False))  # noqa: E712
+    ra["so_booking"] = _hai_so(db, q, q.where(Tour.status.notin_(TOUR_DA_XONG + TOUR_DA_HUY)))
+
+    if e is None:
+        ra["so_lenh_xe"] = None
+    else:
+        q = dem(DispatchOrder).where(DispatchOrder.driver_id == e.id, DispatchOrder.status != "huy")
+        ra["so_lenh_xe"] = _hai_so(db, q, q.where(DispatchOrder.status.in_(LENH_DANG_MO)))
+
+    q = dem(VisaCase).where(VisaCase.visa_owner_user_id == t.id,
+                            VisaCase.lifecycle_status.notin_(VISA_DA_HUY))
+    ra["so_visa"] = _hai_so(db, q, q.where(VisaCase.lifecycle_status.in_(VISA_DANG_MO)))
+
+    hom_nay = date.today()
+    q = dem(PhanCongKD).where(PhanCongKD.user_id == t.id)
+    ra["so_phan_cong_kd"] = _hai_so(db, q, q.where(
+        PhanCongKD.tu_ngay <= hom_nay,
+        or_(PhanCongKD.den_ngay.is_(None), PhanCongKD.den_ngay >= hom_nay)))
+    return ra
+
+
 def thu_thap(db, t) -> tuple[dict, list[str]]:
     """Gom hồ sơ ĐẦY ĐỦ của một tài khoản. Chưa cắt, chưa che — hàm gọi phải cắt ngay sau đó.
 
@@ -432,6 +510,7 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
     dong = SX.dem_dong_tro_toi(db, t.id)
     hs["viec_dang_ganh"] = dong
     hs["so_dong_tro_toi"] = sum(x["so_dong"] for x in dong)
+    hs.update(dem_viec_dang_ganh(db, t, e))
 
     # ---- nhóm 10 / 10b: nhật ký. 10 chỉ TÊN TRƯỜNG, 10b mới có giá trị trước/sau.
     nk = list(db.execute(select(AuditLog)

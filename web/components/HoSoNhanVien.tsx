@@ -30,6 +30,9 @@ const TEN_TRUONG: Record<string, string> = {
   bhxh_base: "Căn cứ đóng BHXH", probation: "Thử việc", so_nguoi_phu_thuoc: "Người phụ thuộc",
   bank_account: "Tài khoản ngân hàng",
   so_dong_tro_toi: "Tổng số dòng dữ liệu đang trỏ tới", viec_dang_ganh: "Việc đang gánh",
+  so_tour: "Tour đang điều hành", so_quyet_toan_giu: "Quyết toán đang giữ",
+  so_booking: "Booking đang bán", so_lenh_xe: "Lệnh điều xe", so_visa: "Hồ sơ visa phụ trách",
+  so_phan_cong_kd: "Phân công kinh doanh",
   ngay_cong_ky_nay: "Ngày công kỳ này", duoc_xac_nhan_cong: "Được xác nhận công",
   duoc_duyet_nghi: "Được duyệt nghỉ", so_don_cho_duyet: "Đơn nghỉ chờ duyệt",
   ly_do_nghi: "Lý do nghỉ",
@@ -64,6 +67,10 @@ function oGiaTri(v: any) {
           : String(x)}
       </div>)}</>;
   }
+  // HS-12: hai số của một loại việc — đang mở hôm nay, và từ trước tới nay.
+  if (typeof v === "object" && "dang_mo" in v && "tong" in v)
+    return <span style={{ fontVariantNumeric: "tabular-nums" }}>
+      đang mở <b>{v.dang_mo}</b> <span className="muted">· từ trước tới nay {v.tong}</span></span>;
   if (typeof v === "object") return <code style={{ fontSize: 12 }}>{JSON.stringify(v)}</code>;
   return String(v);
 }
