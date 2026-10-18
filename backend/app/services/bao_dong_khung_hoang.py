@@ -147,23 +147,43 @@ def _kenh_zalo(db: Session, a: Alert, u: User, uid: str) -> tuple[bool, str, str
 
 
 def _kenh_zns(db: Session, a: Alert, u: User, uid: str) -> tuple[bool, str, str]:
-    """ZNS cần HAI thứ mà hệ CHƯA CÓ, và cả hai đều không phải việc của mã.
+    """ZNS cần HAI thứ: một mẫu tin Zalo đã duyệt (ZALO_ZNS_TEMPLATES, mục `bao_dong_khung_hoang`)
+    và SỐ ĐIỆN THOẠI người nhận.
 
-    1. Một mẫu tin được Zalo duyệt trước, khai trong ZALO_ZNS_TEMPLATES dưới mục đích
-       `bao_dong_khung_hoang`.
-    2. SỐ ĐIỆN THOẠI của từng người nhận — `users` không có cột nào giữ nó.
-
-    Nên hôm nay kênh này luôn trả THẤT BẠI kèm lý do, và đó là trạng thái ĐÚNG: nó nói ra rằng
-    kênh chưa dùng được, thay vì lặng lẽ không gửi rồi để bảng điều khiển hiện 100% thành công.
+    EM-1 (18/10/2026) nối nguồn số điện thoại: hồ sơ nhân sự, qua đúng luật đọc chung
+    (`gop_ho_so_nv.doc`, hồ sơ cá nhân thắng cột cũ). Bộ gửi ZNS thì CHƯA viết — nên đủ cả hai thứ
+    vẫn trả thất bại có lý do `chua_noi_bo_gui_zns`, không bao giờ báo thành công giả.
     """
     if not ZL.configured(db)["zns_templates"].get("bao_dong_khung_hoang"):
         return False, "chua_cau_hinh_mau_zns", ""
-    return False, "chua_co_o_nhap_sdt", ""
+    try:
+        sdt = sdt_ho_so(db, u)
+    except Exception as e:                                    # noqa: BLE001 - kênh không được ném
+        # Cổng nối tài khoản → hồ sơ ném khi dữ liệu MÂU THUẪN (hai hồ sơ cùng trỏ một người).
+        return False, f"ho_so_mau_thuan: {str(e)[:120]}", ""
+    if not sdt:
+        return False, "thieu_sdt_ho_so", ""
+    return False, "chua_noi_bo_gui_zns", ""
+
+
+def sdt_ho_so(db: Session, u: User) -> str:
+    from sqlalchemy import select
+    from app.models.hrm import EmployeeProfile
+    from app.services import gop_ho_so_nv as GOP
+    from app.services import quyen_ho_so as QHS
+    e = QHS.ho_so_cua_hoac_rong(db, u)
+    if e is None:
+        return ""
+    pf = db.execute(select(EmployeeProfile).where(EmployeeProfile.employee_id == e.id)).scalars().first()
+    return (GOP.doc(e, pf, "phone", "phone") or "").strip()
 
 
 def _kenh_email(db: Session, a: Alert, u: User, uid: str) -> tuple[bool, str, str]:
-    """Email cần một ô nhập địa chỉ cho từng người — `users` không có cột email. Vòng sau dựng."""
-    return False, "chua_co_o_nhap_email", ""
+    """EM-1 (18/10/2026): địa chỉ là `users.email_cong_viec` (CNTT nhập ở /access). Hộp thư gửi đi
+    của công ty là một cấu hình riêng chưa khai, nên có địa chỉ vẫn là thất bại CÓ LÝ DO."""
+    if not (u.email_cong_viec or "").strip():
+        return False, "thieu_email_cong_viec", ""
+    return False, "chua_co_hop_thu_gui", ""
 
 
 BO_KENH = {

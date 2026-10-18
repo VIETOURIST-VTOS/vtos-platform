@@ -168,7 +168,8 @@ def test_B4_zns_va_email_bao_dung_ly_do_chua_dung_duoc(db, monkeypatch):
     a = canh_bao(db)
     hang = BD.gui_vong(db, a, ("chutich",), 0)
     ly = sorted(g.ly_do for g in hang)
-    assert ly == ["chua_cau_hinh_mau_zns", "chua_co_o_nhap_email"]
+    # EM-1 (18/10/2026): email nay đọc `users.email_cong_viec`; người chưa có địa chỉ báo đúng thế.
+    assert ly == ["chua_cau_hinh_mau_zns", "thieu_email_cong_viec"]
     assert all(not g.thanh_cong for g in hang)
 
 

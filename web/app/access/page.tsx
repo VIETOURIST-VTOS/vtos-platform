@@ -79,6 +79,9 @@ function AccessPage() {
   // AC-NHE 18/10/2026: dòng đang «đổi» vai trò / pháp nhân. Chỉ dòng này dựng hai ô chọn — dựng sẵn
   // trên cả 121 dòng là ≈ 4.700 <option> lúc mở màn, đủ làm trình duyệt ì (đo trên hệ thật 18/10).
   const [doiUid, setDoiUid] = useState<number | null>(null);
+  // EM-1 · email công việc: cùng cách «đổi» của bảng nhẹ — chỉ dòng đang sửa mới có ô nhập.
+  const [emUid, setEmUid] = useState<number | null>(null);
+  const [emVal, setEmVal] = useState("");
   // QL-1: ô cấp ngoại lệ. `capMo` mở hay đóng; `capUid` là người điền sẵn khi mở từ một dòng.
   const [capMo, setCapMo] = useState(false);
   const [capUid, setCapUid] = useState<number | null>(null);
@@ -113,7 +116,8 @@ function AccessPage() {
     try {
       const r = await api<any>(path, { method, json });
       toast(r.message || "Đã cập nhật"); loadAcc(); loadGaps();
-    } catch (e) { toast(errMsg(e), true); }
+      return true;
+    } catch (e) { toast(errMsg(e), true); return false; }
   };
 
   const doiVaiTro = (r: any, moi: string) => {
@@ -231,7 +235,7 @@ function AccessPage() {
           api("/access/grants").then(setGrants).catch(() => {}); }} />}
 
       <div className="scroll"><table><thead><tr>
-        <th>Mã NV</th><th>Họ tên</th><th>Tài khoản</th><th>Vai trò</th><th>Phòng</th><th>Pháp nhân</th>
+        <th>Mã NV</th><th>Họ tên</th><th>Tài khoản</th><th>Vai trò</th><th>Phòng</th><th>Pháp nhân</th><th>Email công việc</th>
         <th>Trạng thái</th><th>Đăng nhập lần cuối</th><th>Mật khẩu</th><th>Hồ sơ</th><th></th></tr></thead>
         <tbody>{rows.map((r: any) => <tr key={r.id}>
           <td>{r.staff_code || "—"}</td>
@@ -252,6 +256,16 @@ function AccessPage() {
               </select>
               <button className="act" style={{ margin: "0 0 0 6px", padding: "2px 8px" }} onClick={() => setDoiUid(null)}>Xong</button></>
             : (r.company || (acc.companies || []).find((c: any) => c.id === r.company_id)?.code || "—")}</td>
+          <td>{canWrite && emUid === r.id
+            ? <><input id={`em-${r.id}`} aria-label="Email công việc" value={emVal} placeholder="ten@vietourist.com.vn"
+                onChange={(e) => setEmVal(e.target.value)} style={{ width: 200 }} />
+              <button className="act" style={{ margin: "0 0 0 6px", padding: "2px 8px" }}
+                onClick={() => send(`/access/users/${r.id}/email-cong-viec`, { email_cong_viec: emVal }, "PUT")
+                  .then((ok) => { if (ok) setEmUid(null); })}>Lưu</button>
+              <button className="act grey" style={{ margin: "0 0 0 6px", padding: "2px 8px" }} onClick={() => setEmUid(null)}>Huỷ</button></>
+            : <>{r.email_cong_viec || <span className="muted">chưa có</span>}
+                {canWrite && <button className="act grey" style={{ margin: "0 0 0 6px", padding: "0 6px", fontSize: 11 }}
+                  title="Sửa email công việc của dòng này" onClick={() => { setEmUid(r.id); setEmVal(r.email_cong_viec || ""); }}>đổi</button>}</>}</td>
           <td>{r.active ? <Tag cls="ok">hoạt động</Tag> : <Tag cls="warn">đã khóa</Tag>}</td>
           <td>{r.last_login ? fmtDT(r.last_login) : <Tag cls="warn">chưa bao giờ</Tag>}</td>
           <td>{r.must_change_password ? <Tag cls="warn">tạm – phải đổi</Tag> : "đã đổi"}</td>
