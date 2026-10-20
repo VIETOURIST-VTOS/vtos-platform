@@ -90,6 +90,37 @@ def doi_hinh(db: Session, d1: date, d2: date) -> dict:
             "du_du_lieu": True, "thieu": [], "vi_sao": "", "cua_nhap": "", "bo_phan": ""}
 
 
+def _hom_nay() -> date:
+    """Hôm nay.
+
+    Tách thành một hàm chứ không gọi thẳng `date.today()` ở chỗ dùng, vì hai lẽ: phép thử ghim được
+    ngày (mẫu số của công suất phụ thuộc vào hôm nay, nên không ghim được thì phép thử đổi kết quả
+    theo lịch), và chỗ gọi đọc ra Ý — "tới hôm nay" — chứ không ra một lời gọi thư viện.
+    """
+    return date.today()
+
+
+def ngay_xe_trong_doi(db: Session, d1: date, d2: date) -> int:
+    """Tổng số NGÀY-XE của đội trong [d1, d2] — mẫu số của công suất khai thác.
+
+    ĐẾM TỪNG XE MỘT, không lấy `số xe × số ngày kỳ`. Phép nhân phẳng ấy cho một chiếc mua ngày 20
+    cùng số ngày với một chiếc chạy suốt tháng, nên mẫu phồng lên và công suất đọc ra THẤP hơn sự
+    thật. Chiếc bán giữa tháng cũng vậy, theo chiều ngược lại.
+
+    `ngay_vao_doi` rỗng thì tính cả kỳ: `doi_hinh` đã chặn trước — hồ sơ còn thiếu thì nó trả
+    `du_du_lieu=False` và `chi_so` không gọi tới đây. Guard ở đây chỉ để hàm này tự đứng được.
+    """
+    if d2 < d1:
+        return 0                                   # kỳ chưa tới một ngày nào: không có mẫu số
+    tong = 0
+    for v in db.execute(select(Vehicle)).scalars():
+        vao = max(d1, v.ngay_vao_doi) if v.ngay_vao_doi else d1
+        roi = min(d2, v.ngay_roi_doi) if v.ngay_roi_doi else d2
+        if roi >= vao:
+            tong += (roi - vao).days + 1
+    return tong
+
+
 def km_chay_rong(db: Session, d1: date, d2: date) -> dict:
     """Km xe lăn bánh ngoài chuyến, trong kỳ [d1, d2].
 
@@ -135,7 +166,21 @@ def chi_so(db: Session, ky: str) -> dict:
     dh = doi_hinh(db, d1, d2)
     rong = km_chay_rong(db, d1, d2)
 
-    mau = (dh["so_xe"] or 0) * so_ngay_ky
+    # MỤC 3 (21/10/2026, anh Tuấn chốt) — MẪU SỐ DỪNG Ở HÔM NAY, VÀ ĐẾM TỪNG XE MỘT.
+    #
+    # Trước vòng này mẫu là `số xe × số ngày của cả kỳ`. Đo trên hệ thật kỳ 2026-10 sáng 21/10:
+    # 115 ngày khai thác chia cho 11 xe × 31 ngày = 33,7%. Nhưng 11 ngày cuối tháng CHƯA TỚI — đội
+    # xe bị chia cho những ngày chưa ai có cơ hội chạy. Con số ấy sai theo hướng XẤU ĐI, và nó là
+    # con số Chủ tịch đọc để kết luận đội xe đang nhàn.
+    #
+    # Nên mẫu dừng ở `min(hết kỳ, hôm nay)`: kỳ 2026-10 đo trên 1→20/10, ra 115 / (11 × 20) = 52,3%.
+    # Kỳ ĐÃ QUA không đổi một chữ — `min` không cắt gì khi cả kỳ nằm sau lưng.
+    # Kỳ CHƯA TỚI (T11, T12 trên hình diễn biến) có mẫu bằng 0, nên trả None thay vì 0,0% — một
+    # tháng chưa tới mà in "0,0%" đọc ra như một tháng đội xe nằm bãi.
+    #
+    # Và đếm NGÀY-XE từng chiếc (`ngay_xe_trong_doi`) chứ không nhân phẳng: xem hàm ấy.
+    d2_mau = min(d2, _hom_nay())
+    mau = ngay_xe_trong_doi(db, d1, d2_mau) if dh["du_du_lieu"] else 0
     cong_suat = round(ngay * 100 / mau, 1) if dh["du_du_lieu"] and mau else None
 
     # Chi phí / km: GIÁ VỐN vận tải chia cho TẤT CẢ km xe lăn bánh — km chuyến cộng km chạy rỗng.
@@ -167,6 +212,10 @@ def chi_so(db: Session, ky: str) -> dict:
     return {
         "ngay_xe_hoat_dong": ngay or None,
         "cong_suat_khai_thac": cong_suat,
+        # Ngày cuối mà mẫu số đếm tới, CHỈ khi nó sớm hơn hết kỳ — tức kỳ đang chạy dở. Màn hình in
+        # nó cạnh nhãn. Không có dòng ấy thì «52,3%» của tháng 10 đọc ra như công suất CẢ THÁNG, và
+        # người đọc lại mang một con số nửa tháng đi so với tháng 9 đã trọn.
+        "cong_suat_den_ngay": d2_mau.isoformat() if (cong_suat is not None and d2_mau < d2) else None,
         "km_chay_rong": rong["km"] or None,
         "chi_phi_moi_km": chi_phi_moi_km,
         "da_chot": db.get(PeriodLock, ky) is not None,
@@ -200,6 +249,10 @@ def chi_so(db: Session, ky: str) -> dict:
         "_km_rong_lech": rong["so_lech"],
         "_so_xe_trong_doi": dh["so_xe"],
         "_so_ngay_ky": so_ngay_ky,
+        # Mẫu số THẬT của công suất kỳ này (ngày-xe, đã dừng ở hôm nay). `_gop` cộng chính con số
+        # này chứ không nhân lại `số xe × số ngày kỳ` — nhân lại là dựng chỗ cho quý/năm nói một
+        # công suất khác tháng, và lúc ấy không ai biết màn nào đúng.
+        "_ngay_xe_mau": mau,
     }
 
 
@@ -272,7 +325,7 @@ def _gop(db: Session, kys: list[str], nho: dict | None = None) -> dict:
     km_chuyen = sum(x["_km_chuyen"] for x in ds)
     km = km_chuyen + rong
     du = all(x["_so_xe_trong_doi"] is not None for x in ds)
-    cho_ngay = sum((x["_so_xe_trong_doi"] or 0) * x["_so_ngay_ky"] for x in ds)
+    cho_ngay = sum(x["_ngay_xe_mau"] for x in ds)
     # Cộng GIÁ VỐN gốc, không nhân ngược từ `chi_phi_moi_km`: con số ấy đã làm tròn về đồng, và
     # nhân ngược một số đã tròn với quãng đường hàng chục nghìn km thì sai số đi theo cấp triệu.
     gia_von = sum(x["_gia_von"] for x in ds)
@@ -283,6 +336,10 @@ def _gop(db: Session, kys: list[str], nho: dict | None = None) -> dict:
     return {
         "ngay_xe_hoat_dong": ngay or None,
         "cong_suat_khai_thac": round(ngay * 100 / cho_ngay, 1) if du and cho_ngay else None,
+        # Quý/năm lấy ngày cắt MUỘN NHẤT trong các tháng con: quý 4 gồm T10 (cắt ở 20/10), T11 và
+        # T12 (chưa tới, không cắt gì vì không có mẫu). Chuỗi ISO so sánh đúng thứ tự ngày.
+        "cong_suat_den_ngay": max((x["cong_suat_den_ngay"] for x in ds
+                                   if x["cong_suat_den_ngay"]), default=None),
         "km_chay_rong": rong or None,
         "chi_phi_moi_km": round(gia_von / km) if km else None,
         "doanh_thu": dt or None,

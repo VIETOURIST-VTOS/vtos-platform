@@ -56,6 +56,14 @@ import { api } from "@/lib/api";
 export type HieuQuaXe = {
   ngay_xe_hoat_dong?: number | null;
   cong_suat_khai_thac?: number | null;   // phần trăm, 0–100
+  /** Mục 3 (21/10/2026) — ngày cuối mà MẪU SỐ của công suất đếm tới, dạng YYYY-MM-DD.
+   *
+   *  Máy chủ chỉ đặt trường này khi kỳ ĐANG CHẠY DỞ: mẫu dừng ở hôm nay chứ không chia cho những
+   *  ngày chưa tới. Kỳ đã trọn thì rỗng, và màn hình không in gì thêm.
+   *
+   *  Vì sao phải in ra: «52,3%» của tháng 10 đọc giữa tháng trông y hệt một con số cả tháng, và
+   *  người đọc mang nó đi so với tháng 9 đã trọn. Hai con số ấy không cùng một phép đo. */
+  cong_suat_den_ngay?: string | null;
   km_chay_rong?: number | null;
   chi_phi_moi_km?: number | null;        // đồng
   /** HQ-1b (13/10/2026) — VÌ SAO công suất trống, và AI phải làm gì.
@@ -296,6 +304,13 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
   const so = (x: any, duoi = "") =>
     x === null || x === undefined || x === "" ? null : `${x}${duoi}`;
   const tien = (x: any) => (x === null || x === undefined ? null : gonSo(Number(x)));
+  /* «2026-10-20» → «20/10». Cắt bằng chuỗi chứ không qua `new Date`: chuỗi ngày trần được trình
+     duyệt đọc là UTC rồi in lại theo múi giờ máy, nên ở múi âm nó lùi một ngày — và một con số
+     ngày lùi một ngày trên màn hình Chủ tịch là một con số sai, dù chỉ sai một chữ. */
+  const ngayNgan = (iso: string) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    return m ? `${m[3]}/${m[2]}` : iso;
+  };
   const cot: [string, string | null, string][] = [
     ["Ngày xe hoạt động", so(o.ngay_xe_hoat_dong), "ngay_xe_hoat_dong"],
     ["Công suất khai thác", so(o.cong_suat_khai_thac, "%"), "cong_suat_khai_thac"],
@@ -454,7 +469,11 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
             dấu gạch của nó được thay bằng tên bộ phận — ba ô kia trống vì kỳ chưa có chuyến, đó là
             chuyện khác và câu trả lời của nó nằm ở dòng "Chưa có số cho kỳ…" bên dưới. */}
         <div className={"v14-o" + (o.cong_suat_khai_thac == null ? " rong" : "")}>
-          <div className="v14-o-nhan">Công suất khai thác</div>
+          <div className="v14-o-nhan">Công suất khai thác
+            {o.cong_suat_den_ngay && (
+              <span className="muted"> · tới {ngayNgan(o.cong_suat_den_ngay)}</span>
+            )}
+          </div>
           {o.cong_suat_khai_thac == null && thieuCS ? (
             <Link className="v14-o-so v14-o-chu" href={thieuCS.cua_nhap}
               title={thieuCS.thieu.slice(0, 8).map((x) => `${x.xe}: thiếu ${x.thieu}`).join("\n")}>
