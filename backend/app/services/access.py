@@ -140,10 +140,11 @@ GIU_CHO_ROLES = ("nv_dh", "tp_dh", "gd_kd", "tp_kd", "cntt", "tgd")
 CANH_BAO_ROLES = BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + (
     "ketoan", "cntt", "hcns", "ptgd_doan", "ptgd_mkt", "hanh_chinh")
 # PC-1 · 19/10/2026: ai được TỰ GỬI yêu cầu Pháp chế (Chủ tịch chốt: trưởng phòng trở lên + HCNS, CNTT).
-# CHƯA có `ketoan_truong`: bất biến đã ký của Đợt E2b (test_le2b_b1) là Kế toán trưởng nhìn ĐÚNG BẰNG
-# Kế toán — thêm riêng KTT là phá bất biến ấy, thêm cả `ketoan` là nới cho kế toán viên. Chờ Chủ tịch chọn.
+# KTT-PC (20/10/2026, Chủ tịch chốt «kế toán trưởng gửi Pháp chế được»): thêm `ketoan_truong`, KHÔNG
+# thêm `ketoan`. Đây là NGOẠI LỆ DUY NHẤT của bất biến E2b «Kế toán trưởng nhìn đúng bằng Kế toán» —
+# test_le2b_b1 khai đích danh một màn hình này, thêm màn thứ hai là đỏ.
 GUI_PHAP_CHE_ROLES = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "gd_kd", "gd_doi_xe", "tp_dh", "tp_kd",
-                      "tp_hd", "hcns", "cntt")
+                      "tp_hd", "ketoan_truong", "hcns", "cntt")
 REQUEST_CREATE_ROLES = OPERATIONS + SALES               # được GỬI yêu cầu đặt dịch vụ: Điều hành + toàn khối Kinh doanh
                                                         # (nguồn duy nhất – máy chủ và giao diện dùng chung, tránh lệch vai trò)
 # Thủ quỹ vào đây để bấm ĐÃ CHI — cửa ấy nằm sau màn hình /expenses. Cấp cửa mà khoá
