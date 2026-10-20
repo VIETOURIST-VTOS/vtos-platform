@@ -495,6 +495,7 @@ export const GROUPS: Group[] = [
     ["Báo cáo công việc", "/reports"],
     ["Chính sách & quy trình", "/params"],
     ["IR – Pháp chế", "/ir-phap-che"],
+    ["Gửi yêu cầu Pháp chế", "/gui-phap-che"],
     ["Tài sản & cấp phát", "/tai-san"],
     // 5.9.2 · 09/10/2026 — MỤC RIÊNG, không nhập vào "/tai-san". Mục trên mở cho sáu vai (Kế toán,
     // CNTT, hành chính, HCNS và hai vai nền); mục này mở cho MỌI người làm việc ở đây, vì người đề

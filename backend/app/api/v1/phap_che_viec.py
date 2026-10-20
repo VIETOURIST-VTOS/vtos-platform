@@ -4,10 +4,9 @@ CÙNG MỘT TIỀN TỐ `/api/v1/ir-phap-che` với Đợt D1, và đó là ch�
 `access.MAN_HINH_API` và đã có trong bảng phạm vi đã chốt của test_p2. Đặt các cửa mới vào đúng
 nhóm cũ nghĩa là đợt này KHÔNG tự khai thêm một lát quyền nào.
 
-CHƯA MỞ CỬA GỬI YÊU CẦU CHO CÁC PHÒNG BAN, và đây là một việc còn thiếu chứ không phải một việc đã
-xong. Hôm nay chỉ năm vai của D1 ghi được, nên một trưởng phòng muốn hỏi Pháp chế thì Pháp chế ghi
-hộ, có cột `phong_gui`/`nguoi_gui` để biết việc của ai. Mở cửa cho mọi vai là NỚI QUYỀN trên tiền
-tố này cho toàn bộ tài khoản – một lần nới phải có người ký, làn viết phần mềm không tự khai.
+CỬA GỬI YÊU CẦU CHO CÁC PHÒNG BAN có từ 19/10/2026 (PC-1, Chủ tịch ký): trưởng phòng trở lên tự gửi
+qua tiền tố RIÊNG `/api/v1/gui-phap-che` (api/v1/gui_phap_che.py) — KHÔNG nới tiền tố này. Pháp chế
+vẫn ghi hộ được ở đây như trước, với cột `phong_gui`/`nguoi_gui` để biết việc của ai.
 """
 from datetime import date, datetime
 
@@ -94,8 +93,7 @@ def meta_viec(u: User = Depends(require_roles(*XEM))):
             "ket_luan_ra_soat": KET_LUAN_RS, "muc_rui_ro": MUC_RUI_RO,
             "loai_chu_ky": LOAI_CHU_KY, "trang_thai_xac_nhan": TRANG_THAI_XN,
             "ngay_coi_la_ton": PV.NGAY_COI_LA_TON, "ghi_duoc": GHI,
-            "con_thieu": ("Chưa có cửa cho phòng ban tự gửi yêu cầu – mở cửa ấy là nới quyền trên "
-                          "nhóm API này cho mọi vai, phải có người ký.")}
+            "con_thieu": ""}
 
 
 # ─────────────── yêu cầu ───────────────
@@ -134,6 +132,7 @@ def yeu_cau_nhan(yid: int, u: User = Depends(require_roles(*GHI)), db: Session =
         PV.nhan_viec(db, yc, u.username)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
+    PV.tat_chuong_yc(db, yc, f"{u.username} đã nhận việc #{yc.id}")
     R.audit(db, u.username, u.role, "nhan_yeu_cau_phap_che", f"yeu_cau:{yc.id}")
     db.commit()
     return {"message": f"{u.username} đã nhận việc #{yc.id}", "yeu_cau": PV.ra_yc(db, yc)}
@@ -161,11 +160,32 @@ def yeu_cau_dong(yid: int, body: DongIn, u: User = Depends(require_roles(*GHI)),
         PV.dong_yeu_cau(db, yc, body.trang_thai, body.ket_qua, u.username)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
+    PV.tat_chuong_yc(db, yc, f"{u.username} đã đóng #{yc.id}")
     R.audit(db, u.username, u.role, f"dong_yeu_cau_{yc.trang_thai}", f"yeu_cau:{yc.id}",
             after={"ket_qua": yc.ket_qua[:200]})
     db.commit()
     return {"message": f"Đã đóng #{yc.id} – {TRANG_THAI_YC[yc.trang_thai]}",
             "yeu_cau": PV.ra_yc(db, yc)}
+
+
+@router.get("/yeu-cau/{yid}/tep")
+def yeu_cau_tep(yid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    """PC-1 · 19/10/2026: tệp phòng ban gửi kèm yêu cầu. Cửa đọc ở ĐÚNG tiền tố của Pháp chế, để
+    màn Pháp chế không phải khai thêm tiền tố `/api/v1/gui-phap-che` (test_ld2_a1 canh điều ấy)."""
+    from fastapi.responses import Response
+    from app.models.attachments import Attachment
+    from app.services import attachments as AT
+    from app.services.storage import StorageError
+    yc = _lay_yc(db, yid)
+    a = db.get(Attachment, yc.attachment_id) if yc.attachment_id else None
+    if a is None:
+        raise HTTPException(404, "Yêu cầu này chưa có tệp đính kèm")
+    try:
+        data = AT.doc(db, a)
+    except StorageError as ex:
+        raise HTTPException(503, str(ex))
+    return Response(content=data, media_type=a.kieu_noi_dung or "application/octet-stream",
+                    headers={"Content-Disposition": f'inline; filename="{a.id}-{a.ten_tep}"'})
 
 
 # ─────────────── rà soát hợp đồng ───────────────

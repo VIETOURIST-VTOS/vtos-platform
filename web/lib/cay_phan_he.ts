@@ -366,6 +366,9 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           // ai biết nó đang bỏ qua cái nào. Bản vẽ v1.3 đánh 5.9.1 Văn bản, 5.9.2 Mua sắm, 5.9.3
           // Tài sản & cấp phát; IR – Pháp chế mở sau (08/10/2026) nên nhận số tiếp theo là 5.9.4.
           { ma: "5.9.4", ten: "IR – Pháp chế", href: "/ir-phap-che" },
+          // PC-1 · 19/10/2026: trưởng phòng tự gửi yêu cầu Pháp chế. Mã 5.9.4a — cùng việc Pháp chế,
+          // không lấy số kế tiếp vì 5.9.5 trở đi đã có chủ.
+          { ma: "5.9.4a", ten: "Gửi yêu cầu Pháp chế", href: "/gui-phap-che" },
           // 08/10/2026 — cùng một dạng với 5.6: hai mục, một trang. /tai-san có bốn tab — tài sản cố
           // định, khấu hao kỳ, chi phí trả trước, phân bổ kỳ — và không tab nào là ĐỀ NGHỊ MUA hay
           // BIÊN BẢN CẤP PHÁT. Đã mở `models/assets.py` ra đọc: `FixedAsset` có cột `department`

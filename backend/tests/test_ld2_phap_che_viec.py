@@ -71,11 +71,15 @@ def test_a2_bks_va_cntt_doc_ma_khong_ghi():
     assert r.status_code == 403
 
 
-def test_a3_vai_phong_ban_chua_co_cua_gui_va_viec_ay_duoc_noi_ra():
-    """Chưa mở cửa cho phòng ban tự gửi — và đó là việc CÒN THIẾU, có ghi ra ở /meta-viec."""
+def test_a3_cua_phong_ban_tu_gui_da_mo_va_khong_con_ghi_la_thieu():
+    """Đến 18/10 chưa có cửa cho phòng ban tự gửi, và /meta-viec ghi ra việc còn thiếu ấy. PC-1
+    (19/10/2026, Chủ tịch ký) mở cửa trên tiền tố RIÊNG `/api/v1/gui-phap-che` — nên dòng «còn
+    thiếu» phải rỗng, và cửa ấy phải thật sự được gắn vào máy chủ chứ không chỉ được nói tới."""
     r = client.get(f"{P}/meta-viec", headers=login("chutich"))
     assert r.status_code == 200
-    assert "con_thieu" in r.json() and r.json()["con_thieu"]
+    assert r.json().get("con_thieu") == ""
+    from app.main import app as _app
+    assert any(getattr(x, "path", "").startswith("/api/v1/gui-phap-che") for x in _app.routes)
 
 
 # ───────────────── B · bốn bảng bắt đầu rỗng ─────────────────

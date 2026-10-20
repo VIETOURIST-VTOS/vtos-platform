@@ -139,6 +139,11 @@ GIU_CHO_ROLES = ("nv_dh", "tp_dh", "gd_kd", "tp_kd", "cntt", "tgd")
 # nằm trong BASE_VIEW nhưng bị chặn ghi ở lớp READ_ONLY_ROLES, nên có mặt ở đây là vô hại).
 CANH_BAO_ROLES = BASE_VIEW + OPERATIONS + SALES + FLEET_MGR + GUIDE_MGR + (
     "ketoan", "cntt", "hcns", "ptgd_doan", "ptgd_mkt", "hanh_chinh")
+# PC-1 · 19/10/2026: ai được TỰ GỬI yêu cầu Pháp chế (Chủ tịch chốt: trưởng phòng trở lên + HCNS, CNTT).
+# CHƯA có `ketoan_truong`: bất biến đã ký của Đợt E2b (test_le2b_b1) là Kế toán trưởng nhìn ĐÚNG BẰNG
+# Kế toán — thêm riêng KTT là phá bất biến ấy, thêm cả `ketoan` là nới cho kế toán viên. Chờ Chủ tịch chọn.
+GUI_PHAP_CHE_ROLES = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "gd_kd", "gd_doi_xe", "tp_dh", "tp_kd",
+                      "tp_hd", "hcns", "cntt")
 REQUEST_CREATE_ROLES = OPERATIONS + SALES               # được GỬI yêu cầu đặt dịch vụ: Điều hành + toàn khối Kinh doanh
                                                         # (nguồn duy nhất – máy chủ và giao diện dùng chung, tránh lệch vai trò)
 # Thủ quỹ vào đây để bấm ĐÃ CHI — cửa ấy nằm sau màn hình /expenses. Cấp cửa mà khoá
@@ -518,6 +523,10 @@ MAN_HINH_API = {
              "/api/v1/companies", "/api/v1/users"),
     "/params": ("/api/v1/params",),
     "/ir-phap-che": ("/api/v1/ir-phap-che",),
+    # PC-1 (19/10/2026): cửa TỰ GỬI yêu cầu Pháp chế của trưởng phòng trở lên. Tiền tố RIÊNG, không
+    # nới "/api/v1/ir-phap-che" — tiền tố ấy chứa cả sổ công bố thông tin, sổ chữ ký và bàn làm việc
+    # Pháp chế; mở nó cho mười hai vai là cho họ đọc toàn bộ việc của Pháp chế.
+    "/gui-phap-che": ("/api/v1/gui-phap-che",),
     "/products": ("/api/v1/products",),
     "/reports": ("/api/v1/daily-reports", "/api/v1/page-shifts", "/api/v1/employees"),
     # Phiếu lương CỦA CHÍNH MÌNH – tiền tố riêng, chỉ chứa endpoint tự lọc về đúng người.
@@ -1078,6 +1087,9 @@ MENU_ROLES = {
     # (chutich, tgd, bks, robot_ks), tức đúng danh sách cũ cộng robot Kiểm soát, vai chỉ-đọc mà lớp
     # `READ_ONLY_ROLES` chặn mọi thao tác ghi. Robot Kiểm soát không soi được màn hình nó không thấy.
     "/ir-phap-che": BASE_VIEW + ("ir_phapche", "cntt"),
+    # PC-1 · 19/10/2026, Chủ tịch duyệt: trưởng phòng trở lên tự gửi yêu cầu Pháp chế, cộng HCNS và
+    # CNTT (hai phòng chưa có vai trưởng phòng riêng). Cửa đọc chỉ trả yêu cầu CỦA CHÍNH NGƯỜI GỬI.
+    "/gui-phap-che": BASE_VIEW + GUI_PHAP_CHE_ROLES,
     "/audit": AUDIT_ROLES,
     # Bàn làm việc của robot Kiểm soát. Nguyên tắc 07/9 giữ nguyên và không bị nới ở đây: PHÒNG BAN
     # KHÔNG ĐỌC KẾT QUẢ GIÁM SÁT CHÍNH MÌNH – việc phải làm thì hiện ở màn hình Ngoại lệ của họ.

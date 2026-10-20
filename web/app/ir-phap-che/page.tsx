@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
-import { api, fmtD, fmtDT } from "@/lib/api";
+import { api, fmtD, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 /** IR – Pháp chế (Đợt D1, 08/10/2026).
@@ -265,7 +265,10 @@ function IrPhapCheScreen() {
         {!viec.rows.length ? <p className="muted">Chưa có việc nào.</p> :
           <table><thead><tr><th>#</th><th>Loại</th><th>Tiêu đề</th><th>Bên gửi</th><th>Mức</th><th className="num">Treo</th><th>Trạng thái</th><th>Người nhận</th><th></th></tr></thead>
             <tbody>{viec.rows.map((y: any) => <tr key={y.id}>
-              <td className="mono">{y.id}</td><td>{y.loai_ten}</td><td>{y.tieu_de}</td>
+              <td className="mono">{y.id}</td><td>{y.loai_ten}</td><td>{y.tieu_de}
+                {/* PC-1 · 19/10/2026: tệp do phòng ban tự gửi kèm yêu cầu. */}
+                {y.attachment_id && <button className="act grey" style={{ marginLeft: 6, padding: "0 6px", fontSize: 11 }}
+                  onClick={() => moTepYeuCau(y.id)}>Tệp</button>}</td>
               <td className="muted">{y.phong_gui}{y.nguoi_gui ? ` · ${y.nguoi_gui}` : ""}</td>
               <td>{y.muc_do === "gap" ? <Tag cls="red">Gấp</Tag> : <span className="muted">Thường</span>}</td>
               <td className="num">{y.so_ngay_treo === null ? "" : y.so_ngay_treo}</td>
@@ -458,4 +461,11 @@ function IrPhapCheScreen() {
    Bản D1 xuất thẳng `IrPhapCheScreen` làm trang, nên `useShell()` gọi ở ngoài khung: thanh điều
    hướng biến mất, `user` trả về rỗng, và mọi nút gài theo vai trò lặng lẽ không hiện. Kiểu hỏng
    này không ném lỗi — người dùng chỉ thấy một màn hình trống nút và tưởng mình thiếu quyền. */
+// PC-1 · mở tệp kèm yêu cầu Pháp chế (cửa đọc cần mã đăng nhập nên không dùng liên kết thẳng).
+async function moTepYeuCau(id: number) {
+  const r = await fetch(`/api/v1/ir-phap-che/yeu-cau/${id}/tep`, { headers: { Authorization: `Bearer ${getToken() || ""}` } });
+  if (!r.ok) return;
+  window.open(URL.createObjectURL(await r.blob()), "_blank");
+}
+
 export default function Page() { return <Shell><IrPhapCheScreen /></Shell>; }

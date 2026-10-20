@@ -47,6 +47,8 @@ NHOM_HO_SO = {
 # Cột cuối theo mục 7.2: tour và nhân sự lưu THEO ĐỐI TƯỢNG (mã tour, mã NV), các nhóm còn lại theo tháng.
 DOI_TUONG_DAY_DU = {
     "chuyen_xe":     ("Chuyến xe", "doi_xe", "05_Tour", True),
+    # PC-1 · 19/10/2026: tệp kèm yêu cầu Pháp chế do trưởng phòng tự gửi.
+    "yeu_cau_phap_che": ("Yêu cầu Pháp chế", "phap_che", "07_Hop_dong", True),
     "xe":            ("Hồ sơ xe", "doi_xe", "01_Phap_ly", True),
     "nha_cung_cap":  ("Nhà cung cấp", "dieu_hanh", "07_Hop_dong", True),
     "don_dich_vu":   ("Đơn đặt dịch vụ", "dieu_hanh", "05_Tour", True),
