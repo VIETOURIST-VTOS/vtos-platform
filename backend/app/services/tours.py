@@ -594,6 +594,8 @@ def close(db: Session, u: User, t: Tour, data, note: str = "") -> str:
     t.actual_revenue, t.promo_value = data.actual_revenue, data.promo_value
     t.actual_cost = sm["actual"] if sm["lines"] else data.actual_cost   # có bảng dòng NCC → tổng dòng là giá vốn thực tế (không nhập tay)
     t.closed_at, t.status = datetime.now(), "da_dong_so"
+    from app.services import tra_lai_quyet_toan as _TLQ          # PC-1: đóng số lại thì tắt chuông trả lại
+    _TLQ.tat_chuong_tra_lai(db, t, f"{u.username} đã đóng số lại")
     tag = f"Quyết toán V.{t.settlement_version:02d}: {sm['lines']} dòng NCC, thực chi {(t.actual_cost or 0):,.0f} đ, đã trả {(sm['paid'] or 0):,.0f} đ, dự toán {(sm['budget'] or 0):,.0f} đ ({sm['variance_pct'] * 100:+.0f}%), {sm['with_doc']}/{sm['lines']} dòng có chứng từ"
     EV(db, t, "dong_so", u.username, (note + " | " if note else "") + tag)
     R.audit(db, u.username, u.role, "dong_so_quyet_toan", f"tour:{t.code}", before=before, after=snap(t)); db.commit()

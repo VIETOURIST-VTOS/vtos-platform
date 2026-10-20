@@ -36,6 +36,15 @@ CHUA_CO_CUA = {
 }
 
 
+# Loại có CỬA GẮN RIÊNG thay cho thẻ <DinhKem> — và phép thử ĐỌC tệp màn hình ấy để chắc cửa có thật,
+# không tin lời khai. PC-1 (19/10/2026): trưởng phòng tự gửi yêu cầu Pháp chế; <DinhKem> đi qua
+# /api/v1/tep mà cửa ghi ấy không mở cho TP Kinh doanh, TP Hướng dẫn, Kế toán trưởng… nên màn này
+# gắn tệp qua cửa riêng `POST /api/v1/gui-phap-che/{id}/tep`, chỉ cho chính người gửi.
+CUA_GAN_RIENG = {
+    "yeu_cau_phap_che": ("app/gui-phap-che/page.tsx", "/tep`"),
+}
+
+
 def _ma(src: str) -> str:
     """Bỏ chú thích, chỉ giữ mã chạy – chú thích có nhắc tên đối tượng cũng không tính là có cửa."""
     src = re.sub(r"/\*.*?\*/", " ", src, flags=re.S)
@@ -53,6 +62,10 @@ def _loai_co_o_gan() -> set:
             continue                                  # chính thành phần ấy, không phải nơi dùng
         for m in re.findall(r'<DinhKem[^>]*?doiTuong=\{?"([a-z_0-9]+)"', _ma(p.read_text(encoding="utf-8"))):
             ra.add(m)
+    for loai, (tep, dau) in CUA_GAN_RIENG.items():
+        f = WEB / tep
+        if f.exists() and "FormData" in (m := _ma(f.read_text(encoding="utf-8"))) and dau in m:
+            ra.add(loai)
     return ra
 
 

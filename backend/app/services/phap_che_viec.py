@@ -99,6 +99,7 @@ def ra_yc(db: Session, yc: YeuCauPhapChe, hom_nay: date | None = None) -> dict:
         "so_ngay_treo": treo,
         "ton": treo is not None and treo >= NGAY_COI_LA_TON,
         "ra_soat_id": rs.id if rs else None,
+        "attachment_id": yc.attachment_id,
         "boi": yc.boi, "luc": yc.luc,
     }
 
@@ -272,3 +273,33 @@ def ban_lam_viec(db: Session, hom_nay: date | None = None) -> dict:
         "ghi_chu": ("Tuổi việc tính từ lúc nhận yêu cầu tới hôm nay, tính lúc đọc chứ không lưu "
                     "thành cột: một con số không ai cập nhật là một con số sai một cách im lặng."),
     }
+
+
+# ─────────────── PC-1 · chuông «yêu cầu Pháp chế mới» (19/10/2026) ───────────────
+CHUONG_YC_MOI = "phap_che_yc_moi"
+
+
+def _ref_yc(yc: YeuCauPhapChe) -> str:
+    return f"yeu_cau_phap_che:{yc.id}"
+
+
+def bao_chuong_yc_moi(db: Session, yc: YeuCauPhapChe) -> None:
+    """Một chuông cho Pháp chế khi trưởng phòng TỰ GỬI. Chưa ai nhận nên không có chủ — đúng."""
+    from app.services import cskh as CS
+    muc = "red" if yc.muc_do == "gap" else "warn"
+    CS.giao_viec(db, CHUONG_YC_MOI, _ref_yc(yc),
+                 f"Yêu cầu Pháp chế mới #{yc.id} · {yc.phong_gui or '—'} · «{yc.tieu_de[:120]}»"
+                 + (" · GẤP" if yc.muc_do == "gap" else ""),
+                 nguoi_id=None, han_gio=None, roles="ir_phapche", level=muc)
+
+
+def tat_chuong_yc(db: Session, yc: YeuCauPhapChe, vi_sao: str) -> int:
+    """Tự tắt chuông khi Pháp chế nhận việc hoặc đóng yêu cầu. Trả số chuông đã tắt."""
+    from app.models.core import Alert
+    n = 0
+    for a in db.execute(select(Alert).where(Alert.kind == CHUONG_YC_MOI, Alert.ref == _ref_yc(yc),
+                                            Alert.resolved == False)).scalars():  # noqa: E712
+        a.resolved, a.trang_thai = True, "dong"
+        a.dong_luc, a.bang_chung = datetime.now(), f"Tự đóng: {vi_sao}"
+        n += 1
+    return n

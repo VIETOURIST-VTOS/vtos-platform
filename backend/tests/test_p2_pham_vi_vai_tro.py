@@ -270,6 +270,14 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # XEM rộng bằng đúng thẻ ấy; GHI (ngày nghỉ việc) hẹp bằng HR_ADMIN — ghi ngày nghỉ là đóng một
 # người khỏi bảng lương, không phải một ô ghi chú, và có phép thử gọi sai vai để chắc nó trả 403.
 PHAM_VI_DA_CHOT = {
+    # PC-1 (19/10/2026, Chủ tịch ký) — +1 cho MƯỜI BA vai: tiền tố RIÊNG "/api/v1/gui-phap-che" cho
+    # màn mới /gui-phap-che (trưởng phòng trở lên + HCNS, CNTT tự gửi yêu cầu Pháp chế). Mười một vai
+    # gửi (access.GUI_PHAP_CHE_ROLES) cộng hai vai đọc nền (bks, robot_ks). KHÔNG nới
+    # "/api/v1/ir-phap-che": tiền tố ấy chứa sổ công bố, sổ chữ ký và bàn làm việc Pháp chế; Pháp chế
+    # mở tệp kèm qua cửa của chính tiền tố mình. Cửa đọc chỉ trả yêu cầu của CHÍNH người gửi (lọc
+    # theo `boi` ở máy chủ), và test_pc1 gọi chéo để chắc điều ấy. Kế toán trưởng CHƯA có: bất biến
+    # E2b «Kế toán trưởng nhìn đúng bằng Kế toán» (test_le2b_b1) — chờ Chủ tịch chọn.
+
     # DL-1b (12/10/2026) — +1 cho MƯỜI MỘT vai: tiền tố "/api/v1/nhan-lenh", ba cửa của mắt thứ ba
     # trong chuỗi điều xe (Điều hành đề nghị → Giám đốc đội xe lập lệnh → TÀI XẾ NHẬN).
     #
@@ -661,13 +669,13 @@ PHAM_VI_DA_CHOT = {
     #
     # Vòng HD-DG3 đầu (PR #378) KHÔNG cập nhật bảng này. Không ai thấy, vì PR ấy chết ở bước
     # ruff chạy TRƯỚC mọi phép thử — bảng chốt chưa từng được hỏi. Ghép lại 17/10 mới lộ ra.
-    "chutich": 135, "tgd": 135, "bks": 135, "cntt": 132, "ir_phapche": 20,
+    "chutich": 136, "tgd": 136, "bks": 136, "cntt": 133, "ir_phapche": 20,
     # ── 17/10/2026 · hcns 71 → 72, ĐỢT R3b ───────────────────────────────────────────
     # Nhóm duy nhất thêm là "/api/v1/hach-toan", và chỉ vì một lẽ: danh mục BỘ PHẬN nằm ở
     # màn ấy. Cơ cấu phòng ban là việc của Hành chính – Nhân sự, không phải Kế toán; cho
     # họ quyền ghi (`GHI_BO_PHAN`) mà không cho vào màn là dựng một cửa không ai với tới.
     # Anh Tuấn quyết 17/10/2026.
-    "ketoan": 109, "tp_dh": 100, "ptgd_doan": 80, "nv_dh": 71, "hcns": 72, "gd_kd": 73,
+    "ketoan": 109, "tp_dh": 101, "ptgd_doan": 81, "nv_dh": 71, "hcns": 73, "gd_kd": 74,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -688,7 +696,7 @@ PHAM_VI_DA_CHOT = {
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 55, "nv_kd": 54, "tn_kd": 54, "tp_kd": 56, "nv_mkt": 41,
+    "ptgd_mkt": 56, "nv_kd": 54, "tn_kd": 54, "tp_kd": 57, "nv_mkt": 41,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -716,7 +724,7 @@ PHAM_VI_DA_CHOT = {
     # được loại đối tượng và phòng ban của mình, hai cửa dữ liệu khách thì không mở. Bảng
     # này đếm MÀN HÌNH chạm tới đâu, nên nó không thấy phần bó ấy — xem
     # `test_q1_bang_diem_theo_pham_vi` để biết cửa thật hẹp tới đâu.
-    "gd_doi_xe": 35, "hanh_chinh": 33, "tp_hd": 31, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
+    "gd_doi_xe": 36, "hanh_chinh": 33, "tp_hd": 32, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
@@ -758,7 +766,7 @@ PHAM_VI_DA_CHOT = {
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
     "ketoan_truong": 109, "ketoan_tt": 31, "thu_quy": 27,
-    "robot_pq": 18, "robot_ks": 135, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 136, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

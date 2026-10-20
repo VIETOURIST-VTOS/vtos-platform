@@ -402,5 +402,7 @@ def kt_return(db: Session, u: User, t: Tour, note: str) -> str:
     if not (note or "").strip(): raise Gate("QT_NHAP", "Trả lại phải ghi rõ lý do")
     t.status, t.closed_at, t.settlement_version = "ket_thuc", None, t.settlement_version + 1
     EV(db, t, "kt_tra_lai", u.username, note, title=f"Kế toán trả lại quyết toán → soạn lại V.{t.settlement_version:02d}")
+    from app.services import tra_lai_quyet_toan as TLQ
+    TLQ.bao_chuong_tra_lai(db, t, note)
     R.audit(db, u.username, u.role, "ke_toan_tra_lai_quyet_toan", f"tour:{t.code}", after={"v": t.settlement_version, "ly_do": note[:200]}); db.commit()
     return f"Đã trả lại – Điều hành soạn lại quyết toán V.{t.settlement_version:02d}"
