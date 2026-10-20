@@ -109,6 +109,9 @@ CHO_DA_KHAI_BA_VAI = [
 GOC_APP = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app")
 
 
+NGOAI_LE_KTT = {"/gui-phap-che"}
+
+
 def man_hinh(vai: str) -> set:
     return {m for m, v in AC.MENU_ROLES.items() if vai in v}
 
@@ -135,7 +138,9 @@ def test_b1_ke_toan_truong_nhin_dung_bang_ke_toan():
     trông đúng. Phép thử này làm chuyện ấy không xảy ra được.
     """
     thieu = man_hinh("ketoan") - man_hinh("ketoan_truong")
-    thua = man_hinh("ketoan_truong") - man_hinh("ketoan")
+    # NGOẠI LỆ DUY NHẤT, Chủ tịch chốt 20/10/2026: Kế toán trưởng tự gửi yêu cầu Pháp chế (việc của
+    # trưởng phòng trở lên), kế toán viên thì không. Thêm màn thứ hai vào đây phải có chữ ký riêng.
+    thua = man_hinh("ketoan_truong") - man_hinh("ketoan") - NGOAI_LE_KTT
     assert not thieu, f"Kế toán xem được mà Kế toán trưởng thì không: {sorted(thieu)}"
     assert not thua, f"Kế toán trưởng xem được mà Kế toán thì không: {sorted(thua)}"
 
@@ -211,7 +216,8 @@ def test_d3_hai_cua_tien_la_hang_so_co_ten_de_may_doc_duoc():
 # ─────────────────────────── E ───────────────────────────
 def test_e1_pham_vi_do_duoc():
     pv = {v: len(AC.pham_vi_day_du(v)) for v in ("ketoan",) + BA_VAI}
-    assert pv["ketoan_truong"] == pv["ketoan"], "Kế toán trưởng phải bằng đúng Kế toán"
+    assert pv["ketoan_truong"] == pv["ketoan"] + len(NGOAI_LE_KTT), \
+        "Kế toán trưởng phải bằng Kế toán, cộng đúng các ngoại lệ đã ký (NGOAI_LE_KTT)"
     assert pv["ketoan_tt"] < pv["ketoan"], "Kế toán thanh toán phải hẹp hơn vai nền"
     assert pv["thu_quy"] < pv["ketoan_tt"], "Thủ quỹ phải là vai hẹp nhất trong ba"
     assert pv["thu_quy"] < pv["chutich"] if "chutich" in pv else True
