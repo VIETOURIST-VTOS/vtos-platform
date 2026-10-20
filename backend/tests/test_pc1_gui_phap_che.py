@@ -34,6 +34,8 @@ NGUOI = (("pc1_tpkd", "tp_kd", "kinh_doanh", "TP Kinh doanh A"),
          ("pc1_gdkd", "gd_kd", "kinh_doanh", "GĐ Kinh doanh C"),
          ("pc1_hcns", "hcns", "hcns", "HCNS D"),
          ("pc1_nvkd", "nv_kd", "kinh_doanh", "NV KD E"),
+         ("pc1_ktt", "ketoan_truong", "ke_toan", "Kế toán trưởng G"),
+         ("pc1_kt", "ketoan", "ke_toan", "Kế toán H"),
          ("pc1_pc", "ir_phapche", "phap_che", "Pháp chế F"))
 
 
@@ -73,6 +75,9 @@ def test_pc1_1_truong_phong_gui_duoc_nhan_vien_bi_chan():
     for un in ("pc1_tpkd", "pc1_gdkd", "pc1_hcns"):
         assert _gui(un).status_code == 201, un
     assert _gui("pc1_nvkd").status_code == 403
+    # 20/10/2026, Chủ tịch chốt: Kế toán trưởng gửi được, kế toán viên thì không.
+    assert _gui("pc1_ktt").status_code == 201
+    assert _gui("pc1_kt").status_code == 403
 
 
 def test_pc1_2_phong_va_nguoi_gui_lay_tu_tai_khoan():

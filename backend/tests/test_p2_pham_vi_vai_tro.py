@@ -275,8 +275,9 @@ PHAM_VI_DA_CHOT = {
     # gửi (access.GUI_PHAP_CHE_ROLES) cộng hai vai đọc nền (bks, robot_ks). KHÔNG nới
     # "/api/v1/ir-phap-che": tiền tố ấy chứa sổ công bố, sổ chữ ký và bàn làm việc Pháp chế; Pháp chế
     # mở tệp kèm qua cửa của chính tiền tố mình. Cửa đọc chỉ trả yêu cầu của CHÍNH người gửi (lọc
-    # theo `boi` ở máy chủ), và test_pc1 gọi chéo để chắc điều ấy. Kế toán trưởng CHƯA có: bất biến
-    # E2b «Kế toán trưởng nhìn đúng bằng Kế toán» (test_le2b_b1) — chờ Chủ tịch chọn.
+    # theo `boi` ở máy chủ), và test_pc1 gọi chéo để chắc điều ấy.
+    # KTT-PC (20/10/2026, Chủ tịch chốt) — +1 cho ketoan_truong: Kế toán trưởng cũng tự gửi được;
+    # `ketoan` KHÔNG được (kế toán viên nhờ Kế toán trưởng gửi).
 
     # DL-1b (12/10/2026) — +1 cho MƯỜI MỘT vai: tiền tố "/api/v1/nhan-lenh", ba cửa của mắt thứ ba
     # trong chuỗi điều xe (Điều hành đề nghị → Giám đốc đội xe lập lệnh → TÀI XẾ NHẬN).
@@ -765,7 +766,7 @@ PHAM_VI_DA_CHOT = {
     #
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
-    "ketoan_truong": 109, "ketoan_tt": 31, "thu_quy": 27,
+    "ketoan_truong": 110, "ketoan_tt": 31, "thu_quy": 27,
     "robot_pq": 18, "robot_ks": 136, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
