@@ -45,7 +45,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Tag } from "@/components/ui";
-import { gonSo } from "@/components/BieuDo";
+import { gonSo, BieuDoDuong, type Duong } from "@/components/BieuDo";
 import { api } from "@/lib/api";
 
 /* ─────────────────────────────── HỢP ĐỒNG DỮ LIỆU ─────────────────────────────── */
@@ -294,6 +294,7 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
   const TANG_LA_TOT: Record<string, boolean> = {
     ngay_xe_hoat_dong: true, cong_suat_khai_thac: true, km_chay_rong: false,
     chi_phi_moi_km: false, doanh_thu: true, loi_nhuan: true, tieu_hao_l100: false,
+    ty_le_loi_nhuan: true,
   };
   const muiTen = (khoa: string) => {
     const v = o.so_sanh?.lech?.[khoa];
@@ -311,6 +312,62 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
      chưa có chuyến nào — đó là chuyện khác, và câu trả lời của nó nằm ở dòng "Chưa có số cho kỳ…"
      bên dưới. Trộn hai lý do vào một chỗ thì cả hai cùng mất nghĩa. */
   const thieuCS = o.cong_suat_khai_thac == null ? o.cong_suat_thieu : null;
+
+  /* ─────────────────────── TC-71 · BẢN VẼ 20/10/2026 (anh Tuấn gửi) ───────────────────────
+     Bản vẽ xếp lại khối này thành ba tầng thay vì một dãy bảy ô ngang hàng: TẦNG CHỦ (ba con số
+     Chủ tịch đọc trước), TẦNG VẬN HÀNH (bốn chỉ số nghề), rồi CÔNG SUẤT đứng riêng vì nó là ô
+     duy nhất còn đang chờ người khai.
+
+     Vì sao xếp lại: bảy ô cùng cỡ chữ, cùng màu, cùng hàng thì không ô nào nổi lên. Chủ tịch mở
+     màn hình này để biết "đội xe lãi bao nhiêu", mà con số ấy nằm lẫn giữa "Km chạy rỗng" và
+     "Tiêu hao" — hai chỉ số của người điều hành, không phải của người quyết.
+
+     THÊM MỘT Ô, KHÔNG THÊM MỘT SỐ: `ty_le_loi_nhuan` đã nằm trong hợp đồng dữ liệu từ đầu và máy
+     chủ đã trả nó (0.3729 ở tháng 10/2026), nhưng khối chưa bao giờ in ra. Biên lợi nhuận là con
+     số trả lời "lãi ấy có mỏng hay dày", và nó đọc được mà không cần nhớ doanh thu kỳ trước.
+
+     BA KHỐI CỦA BẢN VẼ KHÔNG DỰNG Ở ĐÂY, và phải nói rõ vì sao:
+       · "Diễn biến 30 ngày" — máy chủ chỉ trả MỘT kỳ mỗi lần, chưa có chuỗi theo ngày. Dựng bằng
+         `BieuDoDuong` với chuỗi rỗng: nó tự rơi về `BieuDoRong` kèm bộ phận và cửa nhập, đúng
+         luật của tệp này. Khi máy chủ trả chuỗi thì chỉ việc đổ số vào `dienBien`.
+       · "Doanh thu & lợi nhuận từng xe" — ĐÃ CÓ RỒI, là trang riêng `/lai-lo-doi-xe` dựng trên
+         `fleet_lai_lo`. Dựng lại ở đây là hai màn hình cùng một con số, rồi lệch nhau. Nên chỉ
+         mở một cửa sang đó.
+       · "Xe đang đi hôm nay" — nằm ở `app/page.tsx` (`sec.xe_hom_nay`), không thuộc tệp này. Bản
+         vẽ ghép hai khối cạnh nhau là việc xếp TRANG, không phải việc của khối này; gộp vào đây
+         là bê một khối của trang khác vào, rồi trang kia in lần nữa.
+
+     Số minh họa trong bản vẽ (sáu "Xe A–F", đường 30 ngày của tháng 9) KHÔNG lấy một con nào —
+     xem RANH GIỚI 09/9 ở đầu tệp. */
+  const pt = (x: any) =>
+    x === null || x === undefined ? null : `${(Number(x) * 100).toFixed(1)}%`;
+  /* Ô to: kiểu đặt thẳng tại chỗ, không thêm lớp vào globals.css — bốn làn cùng sửa tệp ấy và cửa
+     đẩy thay nguyên tệp, thêm một dòng vào đó là đổi lấy nguy cơ xoá mất dòng của làn khác. */
+  const O_CHU: React.CSSProperties = {
+    border: "1px solid var(--vien)", borderRadius: 10, padding: "12px 14px",
+    background: "var(--nen-2, transparent)",
+  };
+  const chu: [string, string | null, string][] = [
+    ["Doanh thu", tien(o.doanh_thu), "doanh_thu"],
+    ["Lợi nhuận", tien(o.loi_nhuan), "loi_nhuan"],
+    ["Biên lợi nhuận", pt(o.ty_le_loi_nhuan), "ty_le_loi_nhuan"],
+  ];
+  const vanHanh: [string, string | null, string][] = [
+    ["Ngày xe hoạt động", so(o.ngay_xe_hoat_dong), "ngay_xe_hoat_dong"],
+    ["Chi phí / km", so(o.chi_phi_moi_km, " đ"), "chi_phi_moi_km"],
+    ["Tiêu hao", so(o.tieu_hao_l100, " L/100km"), "tieu_hao_l100"],
+    ["Km chạy rỗng", so(o.km_chay_rong), "km_chay_rong"],
+  ];
+  /* Nhãn kỳ cho hình diễn biến: lấy ĐÚNG những kỳ máy chủ bảo là có chuyến, cũ → mới. Bày đủ 12
+     tháng cho cân hình thì người đọc đếm được 12 chỗ trống và kết luận mất số. */
+  const nhanKy = [...dsKy].slice(0, 12).reverse().map((k) => {
+    const [y, m] = k.split("-");
+    return `T${Number(m)}/${y.slice(2)}`;
+  });
+  const dienBien: Duong[] = [
+    { ten: "Doanh thu", lop: "d1", diem: nhanKy.map((n) => ({ nhan: n, gt: null })) },
+    { ten: "Lợi nhuận", lop: "d2", diem: nhanKy.map((n) => ({ nhan: n, gt: null })) },
+  ];
   return (
     <section className="panel" id="hieu-qua-doi-xe">
       <div className="mh01-dau">
@@ -337,24 +394,47 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
           </select>
         )}
       </div>
-      <div className="v14-o-ds">
-        {cot.map(([nhan, gt, khoa]) => (
-          <div key={nhan} className={"v14-o" + (gt === null ? " rong" : "")}>
+
+      {/* ── TẦNG CHỦ ── */}
+      <div style={{ display: "grid", gap: 10, marginBottom: 12,
+                    gridTemplateColumns: "repeat(auto-fit, minmax(168px, 1fr))" }}>
+        {chu.map(([nhan, gt, khoa]) => (
+          <div key={nhan} style={O_CHU}>
             <div className="v14-o-nhan">{nhan}</div>
-            {gt === null && nhan === "Công suất khai thác" && thieuCS ? (
-              <Link className="v14-o-so v14-o-chu" href={thieuCS.cua_nhap}
-                title={thieuCS.thieu.slice(0, 8).map((x) => `${x.xe}: thiếu ${x.thieu}`).join("\n")}>
-                chờ {thieuCS.bo_phan}
-                <span className="muted"> · {thieuCS.thieu.length} xe chưa khai ngày vào đội</span>
-              </Link>
-            ) : (
-              <>
-                <div className="v14-o-so">{gt ?? "—"}</div>
-                {gt !== null && muiTen(khoa)}
-              </>
-            )}
+            <div className="v14-o-so" style={{ fontSize: "calc(26/14*1rem)", lineHeight: 1.15 }}>
+              {gt ?? "—"}</div>
+            {gt !== null && muiTen(khoa)}
           </div>
         ))}
+      </div>
+
+      {/* ── TẦNG VẬN HÀNH ── */}
+      <div className="v14-o-ds">
+        {vanHanh.map(([nhan, gt, khoa]) => (
+          <div key={nhan} className={"v14-o" + (gt === null ? " rong" : "")}>
+            <div className="v14-o-nhan">{nhan}</div>
+            <div className="v14-o-so">{gt ?? "—"}</div>
+            {gt !== null && muiTen(khoa)}
+          </div>
+        ))}
+        {/* Ô CÔNG SUẤT đứng cùng tầng vận hành nhưng là ô duy nhất có thể đang chờ người khai, nên
+            dấu gạch của nó được thay bằng tên bộ phận — ba ô kia trống vì kỳ chưa có chuyến, đó là
+            chuyện khác và câu trả lời của nó nằm ở dòng "Chưa có số cho kỳ…" bên dưới. */}
+        <div className={"v14-o" + (o.cong_suat_khai_thac == null ? " rong" : "")}>
+          <div className="v14-o-nhan">Công suất khai thác</div>
+          {o.cong_suat_khai_thac == null && thieuCS ? (
+            <Link className="v14-o-so v14-o-chu" href={thieuCS.cua_nhap}
+              title={thieuCS.thieu.slice(0, 8).map((x) => `${x.xe}: thiếu ${x.thieu}`).join("\n")}>
+              chờ {thieuCS.bo_phan}
+              <span className="muted"> · {thieuCS.thieu.length} xe chưa khai ngày vào đội</span>
+            </Link>
+          ) : (
+            <>
+              <div className="v14-o-so">{so(o.cong_suat_khai_thac, "%") ?? "—"}</div>
+              {o.cong_suat_khai_thac != null && muiTen("cong_suat_khai_thac")}
+            </>
+          )}
+        </div>
         {/* Ô này là TRẠNG THÁI, không phải con số – nên không dùng phông chữ số. Phông số sinh ra
             để cột số dóng thẳng hàng; đặt một chữ tiếng Việt vào đó thì chữ giãn ra trông như lỗi. */}
         <div className="v14-o rong">
@@ -362,6 +442,24 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
           <div className="v14-o-so v14-o-chu">{o.da_chot ? "Đã chốt" : "Chưa chốt"}</div>
         </div>
       </div>
+
+      {/* ── DIỄN BIẾN ── Hình của bản vẽ. Chuỗi còn rỗng nên `BieuDoDuong` tự rơi về khối rỗng
+           kèm bộ phận và cửa nhập; không vẽ một đường bịa để lấp chỗ. */}
+      <div style={{ marginTop: 14 }}>
+        <BieuDoDuong ten="Diễn biến hiệu quả đội xe" phu={o.nhan || undefined}
+          ds={dienBien} nhan={nhanKy} dinh_dang="tien"
+          ai="Đội xe" cua="/doi-xe" cua_ten="Cửa nhập đội xe"
+          chan={<span className="muted">Máy chủ chưa trả chuỗi theo kỳ cho khối này — mỗi lần gọi
+            chỉ có số của một kỳ. Doanh thu và lợi nhuận của kỳ đang chọn vẫn đọc ở ba ô trên.</span>} />
+      </div>
+
+      {/* Cửa sang bảng từng xe. Bản vẽ xếp nó thành một khối trong khối này, nhưng bảng ấy đã có
+          trang riêng dựng trên `fleet_lai_lo`; in lại ở đây là hai chỗ cùng một con số. */}
+      <p className="v14-ghi">
+        <span className="muted">Doanh thu, chi phí và lợi nhuận của TỪNG xe ·{" "}</span>
+        <Link className="the-cua" href="/lai-lo-doi-xe">Bảng lãi lỗ từng xe →</Link>
+      </p>
+
       {!coNguonKy && (
         <p className="v14-ghi">
           <span className="tag">Chưa có số cho kỳ {KY_XE.find((k) => k.ma === ky)!.ten.toLowerCase()}</span>{" "}
