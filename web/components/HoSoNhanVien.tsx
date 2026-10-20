@@ -160,6 +160,17 @@ export default function HoSoNhanVien({ uid, hoTen, onClose }:
             </tbody></table></div>}
       </div>)}
 
+      {/* HS-13 (Chủ tịch duyệt 20/10/2026): trường CÓ cửa nhập mà người này chưa có số — gom theo
+          cửa, mỗi cửa một đường mở. Đây là việc của người nhập (HCNS…), không phải của phần mềm. */}
+      {d.chua_co_so_lieu?.length > 0 && <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--line, #2a3b55)" }}>
+        <b style={{ fontSize: 13 }}>Người này chưa có số ở {d.chua_co_so_lieu.reduce((s: number, c: any) => s + c.truong.length, 0)} trường</b>
+        <span className="muted" style={{ fontSize: 12 }}> — cửa nhập đã có:</span>
+        {d.chua_co_so_lieu.map((c: any) => <p key={c.cua} className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>
+          <b>{c.cua}</b> ({c.bo_phan}): {c.truong.map((t: string) => TEN_TRUONG[t] || t).join(", ")}{" · "}
+          <a href={c.duong}>Mở {c.cua.toLowerCase()} →</a>
+        </p>)}
+      </div>}
+
       {/* CÁI CÒN THIẾU PHẢI HIỆN RA. Một ô trống trên màn hình trông y hệt một người chưa khai số
           liệu; danh sách này nói thẳng rằng hệ thống chưa có cửa nhập cho những trường ấy. */}
       {d.thieu_nguon?.length > 0 && <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--line, #2a3b55)" }}>

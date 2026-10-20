@@ -409,6 +409,11 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
     hs["department"] = t.department or ""
     hs["sales_group"] = t.sales_group or ""
     hs["company_id"] = t.company_id
+    # HS-13 — số quyền: số màn hình tài khoản mở được (theo vai, đã cộng ngoại lệ) và số ngoại lệ
+    # còn hạn. Cùng hàm mà thanh menu dùng, để hồ sơ không nói một con số khác với cái người ấy thấy.
+    from app.services import access as _AC
+    _ngoai_le = len(_AC._grants(db, t))
+    hs["so_quyen"] = f"{len(_AC.menus_for(t, db))} màn hình · {_ngoai_le} ngoại lệ còn hạn"
 
     # NỐI TÀI KHOẢN → HỒ SƠ bằng CỔNG CHUNG, không tự viết lại.
     #
@@ -494,6 +499,19 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
         if dg is not None:
             hs["danh_gia_gan_nhat"] = f"{dg.ky_loai} {dg.ky}"
             hs["diem_danh_gia"] = dg.diem_tong
+        # HS-13 (Chủ tịch duyệt 20/10/2026) — ba trường trước đây không có nguồn, nay máy tự tính.
+        hs["duoc_duyet_nghi"] = float(db.execute(
+            select(func.coalesce(func.sum(LeaveRequest.days), 0))
+            .where(LeaveRequest.employee_id == e.id, LeaveRequest.status == "duyet",
+                   LeaveRequest.date_from >= dau_thang)).scalar_one())
+        don = db.execute(select(LeaveRequest)
+                         .where(LeaveRequest.employee_id == e.id, LeaveRequest.status == "duyet")
+                         .order_by(LeaveRequest.date_from.desc(), LeaveRequest.id.desc())).scalars().first()
+        hs["ly_do_nghi"] = (don.reason or "") if don is not None else ""
+        from app.models.hr import Vehicle as _Xe
+        hs["xe_dang_gan"] = ", ".join(x.plate for x in db.execute(
+            select(_Xe).where(_Xe.driver_id == e.id, _Xe.active == True)  # noqa: E712
+            .order_by(_Xe.plate)).scalars())
         hs["tai_san_da_cap"] = db.execute(
             select(func.count()).select_from(CapPhatTaiSan)
             .where(CapPhatTaiSan.employee_id == e.id,
@@ -526,7 +544,50 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
 
     da_khai = [c for n in NHOM_TRUONG for c in n["truong"]]
     thieu = [c for c in da_khai if c not in hs]
+    hs["_khong_ho_so"] = e is None
     return hs, thieu
+
+
+# =============================================================================================
+# HS-13 · «CHƯA CÓ CỬA NHẬP» KHÁC «NGƯỜI NÀY CHƯA CÓ SỐ» (Chủ tịch duyệt 20/10/2026)
+#
+# Đo trên hệ thật 20/10: hồ sơ một TP Điều hành báo «Hệ thống chưa có cửa nhập cho 20 trường» —
+# trong đó 15 trường ĐÃ CÓ cửa (HCNS nhập hồ sơ nhân sự, hợp đồng, đánh giá), chỉ người này chưa có
+# số. Gộp hai câu là nói sai về hệ thống, và chỉ sai người đi làm: câu thứ nhất là việc của làn viết
+# phần mềm, câu thứ hai là việc của HCNS.
+#
+# `KHONG_CO_CUA` là danh sách đóng các trường THẬT SỰ chưa có nguồn. Trường thiếu số mà không nằm ở
+# đây và cũng không khai cửa ở `CUA_NHAP` thì VẪN báo «chưa có cửa» — đoán là có cửa thì giấu mất việc.
+# =============================================================================================
+KHONG_CO_CUA = ("duoc_xac_nhan_cong",)       # VTOS chưa có bước trưởng phòng xác nhận bảng công tháng
+
+_CUA_HO_SO = ("Hồ sơ nhân sự", "/hr?tab=employees", "HCNS")
+_CUA_HD = ("Hợp đồng lao động", "/hop-dong-lao-dong", "HCNS")
+_CUA_DG = ("Đánh giá & sự vụ", "/hr?tab=incidents", "HCNS")
+_CUA_NOI = ("Nối tài khoản với hồ sơ nhân sự (mã nhân viên)", "/access", "CNTT · HCNS")
+CUA_NHAP = {
+    **{k: _CUA_HO_SO for k in ("tham_nien", "email", "gender", "id_number", "id_issued_on",
+                               "id_issued_by", "permanent_address", "current_address", "tax_code",
+                               "social_insurance_no", "bank_account")},
+    "contract_type_hd": _CUA_HD, "contract_end": _CUA_HD,
+    "danh_gia_gan_nhat": _CUA_DG, "diem_danh_gia": _CUA_DG,
+}
+
+
+def phan_loai_thieu(thieu: list[str], khong_ho_so: bool) -> tuple[list[str], list[dict]]:
+    """Tách (chưa có cửa, chưa có số theo từng cửa)."""
+    chua_cua, theo_cua = [], {}
+    for k in thieu:
+        if k in KHONG_CO_CUA:
+            chua_cua.append(k)
+            continue
+        cua = _CUA_NOI if khong_ho_so else CUA_NHAP.get(k)
+        if cua is None:
+            chua_cua.append(k)
+            continue
+        theo_cua.setdefault(cua, []).append(k)
+    return chua_cua, [{"cua": c[0], "duong": c[1], "bo_phan": c[2], "truong": ts}
+                      for c, ts in theo_cua.items()]
 
 
 def doc_ho_so(db, nguoi_xem, muc_tieu) -> dict:
@@ -536,7 +597,8 @@ def doc_ho_so(db, nguoi_xem, muc_tieu) -> dict:
     gọi thẳng hàm mà không cần dựng máy chủ.
     """
     trong, luat = trong_pham_vi(db, nguoi_xem, muc_tieu)
-    day_du, thieu = thu_thap(db, muc_tieu)
+    day_du, thieu_tat = thu_thap(db, muc_tieu)
+    thieu, chua_co_so = phan_loai_thieu(thieu_tat, day_du.pop("_khong_ho_so", False))
     vai = (getattr(nguoi_xem, "role", "") or "").strip()
     cat = cat_ho_so_theo_vai(day_du, vai, trong_pham_vi=trong)
 
@@ -556,6 +618,10 @@ def doc_ho_so(db, nguoi_xem, muc_tieu) -> dict:
         if q == CO and n["ma"] in NHOM_NHAY_CAM and any(c in cat for c in n["truong"]):
             nhay_da_doc.append(n["ma"])
 
+    # Trường của các nhóm người xem ĐƯỢC thấy, lấy từ bảng nhóm (không từ bản đã cắt: trường thiếu
+    # số vốn không có trong bản cắt, lọc theo bản cắt thì danh sách «chưa có số» luôn rỗng).
+    _ma_thay = {n["ma"] for n in nhom_thay}
+    _truong_thay = {t for n in NHOM_TRUONG if n["ma"] in _ma_thay for t in n["truong"]}
     return {
         "user_id": muc_tieu.id,
         "ho_ten": muc_tieu.full_name,
@@ -566,6 +632,10 @@ def doc_ho_so(db, nguoi_xem, muc_tieu) -> dict:
         "nhom_thay": nhom_thay,
         "nhom_nhay_cam_da_doc": nhay_da_doc,
         "thieu_nguon": thieu,
+        # HS-13: trường CÓ cửa mà người này chưa có số — gom theo cửa, để chỉ đúng người đi nhập.
+        # Chỉ kê trường thuộc nhóm người xem được: kê tên trường của nhóm bị cắt là lộ cấu trúc hồ sơ.
+        "chua_co_so_lieu": [{**c, "truong": [t for t in c["truong"] if t in _truong_thay]}
+                            for c in chua_co_so if any(t in _truong_thay for t in c["truong"])],
     }
 
 
