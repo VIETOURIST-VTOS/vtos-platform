@@ -227,10 +227,18 @@ const KY_XE: { ma: "thang" | "quy" | "nam"; ten: string }[] = [
   { ma: "thang", ten: "Tháng" }, { ma: "quy", ten: "Quý" }, { ma: "nam", ten: "Năm" },
 ];
 
+/** HQ-3 · một cột của hình diễn biến. `null` = kỳ ấy chưa nạp chuyến nào — KHÁC 0. */
+type DiemChuoi = {
+  ky: string; nhan: string;
+  doanh_thu?: number | null; loi_nhuan?: number | null; cong_suat_khai_thac?: number | null;
+};
+
 type BoKy = Partial<Record<"thang" | "quy" | "nam", HieuQuaXe>> & {
   mac_dinh?: "thang" | "quy" | "nam";
   ky_co_chuyen?: string[];
   moc?: string;
+  /** 12 kỳ gần nhất tính đến `moc`, cũ → mới. Máy chủ chưa trả thì hình tự hiện khối rỗng. */
+  chuoi?: DiemChuoi[] | null;
 };
 
 export function KhoiHieuQuaXe({ d, theo_ky }: {
@@ -358,15 +366,21 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
     ["Tiêu hao", so(o.tieu_hao_l100, " L/100km"), "tieu_hao_l100"],
     ["Km chạy rỗng", so(o.km_chay_rong), "km_chay_rong"],
   ];
-  /* Nhãn kỳ cho hình diễn biến: lấy ĐÚNG những kỳ máy chủ bảo là có chuyến, cũ → mới. Bày đủ 12
-     tháng cho cân hình thì người đọc đếm được 12 chỗ trống và kết luận mất số. */
-  const nhanKy = [...dsKy].slice(0, 12).reverse().map((k) => {
-    const [y, m] = k.split("-");
-    return `T${Number(m)}/${y.slice(2)}`;
-  });
+  /* HQ-3 (20/10/2026) — HÌNH DIỄN BIẾN ĐỌC CHUỖI THẬT CỦA MÁY CHỦ.
+     Trước vòng này chỗ đây dựng chuỗi RỖNG, nên hình luôn rơi về khối "chờ Đội xe nạp số" — đọc ra
+     như Đội xe còn thiếu số, trong khi số của từng tháng vẫn nằm sẵn trong máy và lấy được. Thiếu
+     là MỘT ĐOẠN MÃ ĐI LẤY, không phải thiếu dữ liệu; nói sai chỗ thiếu thì người ta đi đòi nhầm chỗ.
+
+     Trục giữ ĐỦ 12 CỘT, kể cả tháng chưa nạp chuyến nào: tháng rỗng mang `null`, và `BieuDoDuong`
+     cắt đường tại đó thay vì nối qua. Lọc tháng rỗng ra cho hình "đẹp" là bóp hai tháng cách nhau
+     một quãng nghỉ thành hai cột liền nhau. */
+  const chuoi: DiemChuoi[] = bo?.chuoi || [];
+  const nhanKy = chuoi.map((c) => c.nhan);
+  const diem = (lay: (c: DiemChuoi) => number | null | undefined) =>
+    chuoi.map((c) => ({ nhan: c.nhan, gt: lay(c) ?? null }));
   const dienBien: Duong[] = [
-    { ten: "Doanh thu", lop: "d1", diem: nhanKy.map((n) => ({ nhan: n, gt: null })) },
-    { ten: "Lợi nhuận", lop: "d2", diem: nhanKy.map((n) => ({ nhan: n, gt: null })) },
+    { ten: "Doanh thu", lop: "d1", diem: diem((c) => c.doanh_thu) },
+    { ten: "Lợi nhuận", lop: "d2", diem: diem((c) => c.loi_nhuan) },
   ];
   return (
     <section className="panel" id="hieu-qua-doi-xe">
@@ -449,8 +463,9 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
         <BieuDoDuong ten="Diễn biến hiệu quả đội xe" phu={o.nhan || undefined}
           ds={dienBien} nhan={nhanKy} dinh_dang="tien"
           ai="Đội xe" cua="/doi-xe" cua_ten="Cửa nhập đội xe"
-          chan={<span className="muted">Máy chủ chưa trả chuỗi theo kỳ cho khối này — mỗi lần gọi
-            chỉ có số của một kỳ. Doanh thu và lợi nhuận của kỳ đang chọn vẫn đọc ở ba ô trên.</span>} />
+          chan={<span className="muted">12 kỳ gần nhất tính đến kỳ đang chọn. Tháng không có cột
+            là tháng <b>chưa nạp chuyến nào</b> — đường cắt tại đó chứ không nối qua, vì nối là vẽ ra
+            một con số không ai nhập.</span>} />
       </div>
 
       {/* Cửa sang bảng từng xe. Bản vẽ xếp nó thành một khối trong khối này, nhưng bảng ấy đã có

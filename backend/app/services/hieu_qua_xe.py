@@ -308,6 +308,42 @@ def _gop(db: Session, kys: list[str], nho: dict | None = None) -> dict:
     }
 
 
+def _chuoi(db: Session, moc: date, nho: dict | None = None, so_ky: int = 12) -> list[dict]:
+    """`so_ky` kỳ THÁNG gần nhất tính đến `moc`, xếp CŨ → MỚI, cho hình diễn biến.
+
+    VÌ SAO ĐỦ 12 CỘT, kể cả tháng không có chuyến nào: hình này trả lời "đội xe đang đi lên hay đi
+    xuống", và một tháng không chạy chuyến nào LÀ một câu trả lời — thường là câu quan trọng nhất.
+    Cắt tháng rỗng khỏi trục là bóp hai tháng cách nhau một quãng nghỉ thành hai cột liền nhau, và
+    đường nối giữa chúng đọc ra như một đà liên tục chưa từng có.
+
+    Tháng rỗng trả `None`, KHÔNG phải 0, và `BieuDoDuong` cắt đường tại đó. Vẽ 0 là nói rằng tháng
+    ấy đội xe có chạy mà không thu được đồng nào — khác hẳn "tháng ấy chưa nạp chuyến".
+
+    `nho` dùng chung với `theo_ky`: kỳ NĂM đã tính sẵn các tháng trong năm, nên 12 cột này phần lớn
+    lấy lại từ bộ nhớ tạm chứ không quét lại sổ chuyến.
+    """
+    if nho is None:
+        nho = {}
+    kys: list[str] = []
+    y, m = moc.year, moc.month
+    for _ in range(so_ky):
+        kys.append(f"{y:04d}-{m:02d}")
+        m -= 1
+        if m == 0:
+            m, y = 12, y - 1
+    ds = []
+    for k in reversed(kys):
+        o = _gop(db, [k], nho)
+        ds.append({
+            "ky": k,
+            "nhan": f"T{int(k[5:])}/{k[2:4]}",
+            "doanh_thu": o["doanh_thu"],
+            "loi_nhuan": o["loi_nhuan"],
+            "cong_suat_khai_thac": o["cong_suat_khai_thac"],
+        })
+    return ds
+
+
 SO_SANH = ("ngay_xe_hoat_dong", "cong_suat_khai_thac", "km_chay_rong", "chi_phi_moi_km",
            "doanh_thu", "loi_nhuan", "tieu_hao_l100")
 
@@ -378,5 +414,7 @@ def theo_ky(db: Session, moc: date, hom_nay: date | None = None) -> dict:
     out["mac_dinh"] = next((t for t in ("thang", "quy", "nam")
                             if out[t]["ngay_xe_hoat_dong"]), "thang")
     out["ky_moi_nhat_co_chuyen"] = ky_cuoi
+    # HQ-3 (20/10/2026) — chuỗi 12 kỳ cho hình diễn biến. Xem `_chuoi`.
+    out["chuoi"] = _chuoi(db, moc, nho)
     out["moc"] = moc.isoformat()
     return out
