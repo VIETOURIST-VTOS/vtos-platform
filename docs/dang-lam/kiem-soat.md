@@ -5,3 +5,4 @@ Mọi dòng trong tệp này PHẢI có cột `Làn` là `Kiểm soát` — hàn
 
 | Làn | Mã việc | Tệp sẽ đụng | Bắt đầu | Trạng thái |
 |---|---|---|---|---|
+| Kiểm soát | TC-71 | web/components/KhoiV14.tsx | 20-10-2026 19:34 | đang làm |
