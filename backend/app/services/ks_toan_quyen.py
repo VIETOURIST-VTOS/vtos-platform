@@ -165,6 +165,14 @@ GIU_DONG: dict[tuple[str, str], str] = {
         "`len(can) == 1`. Đợt E4a dựng cửa này mà quên khai vào đây, nên bộ kiểm toàn quyền đỏ "
         "trên main từ 12/10 đến 13/10; Đợt DỌN-1 khai nốt.",
 
+    ("services/xac_nhan_cong.py", "hcns_xac_nhan"):
+        "CN-1, Chủ tịch chốt 21/10/2026: công tháng đi HAI bước — HCNS lập và xác nhận, TGĐ duyệt "
+        "(Chủ tịch duyệt được). Bước HCNS chặn mọi vai khác, kể cả Chủ tịch, vì đây là TÁCH BẠCH "
+        "TRÁCH NHIỆM chứ không phải phân quyền: người lập bảng công và người duyệt nó phải là hai "
+        "người. Mở bước lập cho Chủ tịch thì một người tự lập rồi tự duyệt, và chữ «đã duyệt» trên "
+        "bảng lương không còn mang nghĩa có người thứ hai đã nhìn. Chặn này KHÔNG làm ông mất quyền "
+        "quyết: ông vẫn duyệt ở bước hai (`tgd_duyet`, VAI_DUYET có chutich).",
+
     ("services/chu_ky.py", "kiem_tra_nguoi_ky"):
         "Bộ kiểm chữ ký nhiều vai dùng chung (Phụ lục 27/8/2026 mục 3.2). Ở cửa này Chủ tịch VỐN ĐÃ "
         "nằm trong danh sách được ký – nó không chặn ai vì vai trò. Thứ nó chặn là MỘT NGƯỜI KÝ THAY "

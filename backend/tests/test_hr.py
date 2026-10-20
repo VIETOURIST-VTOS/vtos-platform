@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 if os.path.exists("test_hr.db"):
     os.remove("test_hr.db")
 import pytest
+from tests.cong_da_duyet import duyet_cong
 from fastapi.testclient import TestClient
 from app.main import app
 from app.services import hr as H
@@ -185,6 +186,7 @@ def test_payroll_flow_roles_and_journal():
     # Kế toán không còn đứng đầu chuỗi: thứ họ xác nhận ở đó là sự thật máy tự kiểm được.
     client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("hcns"))
     assert client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("hcns")).status_code == 422   # chưa kiểm cơ sở
+    duyet_cong(client, P, login)   # CN-1: công chưa duyệt thì kiểm cơ sở chặn
     kq = client.post(f"/api/v1/payroll-runs/{P}/kiem-co-so", headers=login("hcns")).json()
     assert kq["dat"] is True, kq["co"]
     assert kq["trang_thai"] == "da_kiem_co_so"

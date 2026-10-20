@@ -153,6 +153,15 @@ def kiem_co_so(db: Session, run: PayrollRun) -> list[dict]:
                        "thong_diep": f"{r.get('ma')} – thực nhận âm {tn:,.0f}; cần người xác nhận trước khi trình",
                        "bang_chung": {"ma_nv": r.get("ma"), "thuc_nhan": tn}})
 
+    # 6 · CN-1 (Chủ tịch chốt 21/10/2026): phòng có người trong bảng mà công kỳ này chưa được TGĐ
+    #     duyệt — hoặc đã duyệt rồi số bị sửa — thì CHẶN. Vòng CN-2 sẽ đổi thành giữ lương riêng
+    #     phòng ấy; tới lúc đó chặn cả kỳ, vì để lương đi khi công chưa duyệt là không đảo ngược được.
+    from app.services import xac_nhan_cong as XNC
+    for t in XNC.phong_chua_duyet(db, run.period, [r.get("ma") for r in run.rows or [] if r.get("ma")]):
+        co.append({"ma": "CONG_CHUA_DUYET", "muc": "chan",
+                   "thong_diep": f"Phòng {t['phong']} – công kỳ {run.period}: {t['trang_thai_ten']}",
+                   "bang_chung": {"phong": t["phong"], "trang_thai": t["trang_thai"]}})
+
     # 5 · Chống trùng thu nhập liên phòng, liên kỳ. Ba phép, xem services/thu_nhap_su_kien.py.
     from app.services import thu_nhap_su_kien as TN
     co.extend(TN.kiem_trung(db, run.period, run.rows or []))

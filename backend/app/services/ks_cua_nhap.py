@@ -28,6 +28,9 @@ có bảng chưa gộp về (chuỗi bán hàng V6), và bảng đã bỏ thì d
 from sqlalchemy.orm import Session
 
 CUA_TAY = (
+    # CN-1 21/10/2026. Bang xac nhan cong thang: HCNS bam «Xac nhan cong», TGD bam «Duyet cong» o
+    # the «Cham cong & nghi phep» man /hr. May chi chup so lieu luc nguoi bam, khong tu sinh dong nao.
+    "xac_nhan_cong",
     # Dot E4a 12/10/2026. Ca hai bang nhap tay tren man hinh `/params`: nguoi dung khai
     # dieu khoan (ma, moc, cac dot), con cac dot THAT cua mot nghia vu do dieu khoan sinh ra
     # va Ke toan sua han duoc. KHONG khai la may sinh: may dung khuon, nguoi dat ra khuon ay.

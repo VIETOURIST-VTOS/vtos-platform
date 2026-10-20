@@ -5,7 +5,7 @@ Các bảng ở đây bổ sung phần HỒ SƠ và HỢP ĐỒNG mà MISA tách
 theo từng lần ký, người phụ thuộc giảm trừ gia cảnh, đơn từ và bảng chấm công.
 """
 from datetime import datetime, date
-from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Integer, Float, DateTime, Date, Boolean, ForeignKey, UniqueConstraint, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 from app.models.kieu_tien import TIEN
@@ -132,3 +132,28 @@ class AttendanceDay(Base):
     note: Mapped[str] = mapped_column(String(200), default="")
     updated_by: Mapped[str] = mapped_column(String(50), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class XacNhanCong(Base):
+    """CN-1 · Xác nhận công tháng của MỘT phòng (Chủ tịch chốt 21/10/2026).
+
+    Hai bước: HCNS lập và xác nhận → TGĐ duyệt (Chủ tịch cũng duyệt được — quyền của Chủ tịch là
+    toàn diện). Đơn nghỉ KHÔNG đổi: trưởng phòng vẫn ký đơn của phòng mình.
+
+    `so_lieu` là ẢNH CHỤP các con số lúc HCNS bấm, `van_tay` là dấu của ảnh ấy. Không lưu cờ «hết
+    hiệu lực»: hiệu lực TÍNH LẠI mỗi lần đọc bằng cách so dấu của số hôm nay với dấu đã chụp. Lưu
+    cờ thì phải nhớ bật nó ở MỌI chỗ sửa công (cửa chấm công, duyệt đơn nghỉ, nộp báo cáo ngày…),
+    và chỗ quên bật là chỗ một bảng công đã đổi vẫn mang chữ «đã duyệt».
+    """
+    __tablename__ = "xac_nhan_cong"
+    __table_args__ = (UniqueConstraint("period", "phong", name="uq_xac_nhan_cong_ky_phong"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    period: Mapped[str] = mapped_column(String(7), index=True)          # YYYY-MM
+    phong: Mapped[str] = mapped_column(String(20))
+    so_lieu: Mapped[list] = mapped_column(JSON, default=list)
+    van_tay: Mapped[str] = mapped_column(String(64), default="")
+    hcns_by: Mapped[str] = mapped_column(String(50), default="")
+    hcns_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    tgd_by: Mapped[str] = mapped_column(String(50), default="")
+    tgd_vai: Mapped[str] = mapped_column(String(20), default="")
+    tgd_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
