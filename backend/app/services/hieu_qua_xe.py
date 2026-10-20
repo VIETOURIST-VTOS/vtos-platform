@@ -308,35 +308,31 @@ def _gop(db: Session, kys: list[str], nho: dict | None = None) -> dict:
     }
 
 
-def _chuoi(db: Session, moc: date, nho: dict | None = None, so_ky: int = 12) -> list[dict]:
-    """`so_ky` kỳ THÁNG gần nhất tính đến `moc`, xếp CŨ → MỚI, cho hình diễn biến.
+def _chuoi(db: Session, moc: date, nho: dict | None = None) -> list[dict]:
+    """12 tháng của NĂM chứa `moc` — T01 → T12 — cho hình diễn biến.
 
-    VÌ SAO ĐỦ 12 CỘT, kể cả tháng không có chuyến nào: hình này trả lời "đội xe đang đi lên hay đi
-    xuống", và một tháng không chạy chuyến nào LÀ một câu trả lời — thường là câu quan trọng nhất.
-    Cắt tháng rỗng khỏi trục là bóp hai tháng cách nhau một quãng nghỉ thành hai cột liền nhau, và
-    đường nối giữa chúng đọc ra như một đà liên tục chưa từng có.
+    VÌ SAO CẢ NĂM chứ không phải 12 tháng gần nhất tính lùi: hình này đọc cùng một câu hỏi với mọi
+    báo cáo khác của công ty — "năm nay đội xe đi thế nào". Trục chạy lùi qua ranh giới năm thì
+    tháng 1 và tháng 12 của CÙNG một năm nằm hai đầu hình, và không ai cộng nhẩm được một năm trên
+    một trục như thế. Anh Tuấn soát trên bản chạy thật 20/10/2026 và chốt: đủ 12 cột T1–T12.
 
-    Tháng rỗng trả `None`, KHÔNG phải 0, và `BieuDoDuong` cắt đường tại đó. Vẽ 0 là nói rằng tháng
-    ấy đội xe có chạy mà không thu được đồng nào — khác hẳn "tháng ấy chưa nạp chuyến".
+    THÁNG CHƯA TỚI VẪN CÓ CỘT, mang `None`. Bỏ chúng đi thì hình co lại dần theo từng tháng trong
+    năm, và một hình đổi bề ngang mỗi lần mở là một hình không so được với lần mở trước. `None`
+    khác 0: `BieuDoDuong` cắt đường tại `None`, còn 0 thì nối — vẽ 0 cho tháng 11 là nói rằng
+    tháng ấy đội xe chạy mà không thu được đồng nào.
 
-    `nho` dùng chung với `theo_ky`: kỳ NĂM đã tính sẵn các tháng trong năm, nên 12 cột này phần lớn
-    lấy lại từ bộ nhớ tạm chứ không quét lại sổ chuyến.
+    `nho` dùng chung với `theo_ky`: kỳ NĂM đã tính sẵn các tháng đã qua, nên phần lớn cột lấy lại
+    từ bộ nhớ tạm chứ không quét lại sổ chuyến.
     """
     if nho is None:
         nho = {}
-    kys: list[str] = []
-    y, m = moc.year, moc.month
-    for _ in range(so_ky):
-        kys.append(f"{y:04d}-{m:02d}")
-        m -= 1
-        if m == 0:
-            m, y = 12, y - 1
     ds = []
-    for k in reversed(kys):
+    for m in range(1, 13):
+        k = f"{moc.year:04d}-{m:02d}"
         o = _gop(db, [k], nho)
         ds.append({
             "ky": k,
-            "nhan": f"T{int(k[5:])}/{k[2:4]}",
+            "nhan": f"T{m}/{moc.year % 100:02d}",
             "doanh_thu": o["doanh_thu"],
             "loi_nhuan": o["loi_nhuan"],
             "cong_suat_khai_thac": o["cong_suat_khai_thac"],
