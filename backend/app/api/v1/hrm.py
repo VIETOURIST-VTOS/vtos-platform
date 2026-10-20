@@ -599,3 +599,48 @@ def nhan_vien_phong_toi(u: User = Depends(require_roles(*_HSNV_VAI_QUAN_LY,
     if not kq["duoc"]:
         raise HTTPException(403, kq["ly_do"])
     return kq
+
+
+# ---------- CN-1 · Xác nhận công tháng (Chủ tịch chốt 21/10/2026) ----------
+# Dưới `/api/v1/attendance` — tiền tố màn hình Nhân sự đã khai sẵn, không nới phạm vi vai nào.
+# Đọc: cùng bộ vai đọc bảng chấm công. Ghi: HCNS xác nhận, TGĐ hoặc Chủ tịch duyệt — hàng rào thật
+# nằm trong services/xac_nhan_cong.py, require_roles ở đây chỉ là lớp ngoài.
+from app.services import xac_nhan_cong as XNC  # noqa: E402
+
+
+def _xnc_loi(ex: Exception):
+    if isinstance(ex, PermissionError):
+        raise HTTPException(403, str(ex))
+    if "đã đổi" in str(ex):
+        raise HTTPException(409, str(ex))
+    raise HTTPException(422, str(ex))
+
+
+@router.get("/attendance/xac-nhan-cong")
+def xac_nhan_cong_ky(period: str, u: User = Depends(require_roles(*HR_READ)), db: Session = Depends(get_db)):
+    try:
+        return XNC.bang_ky(db, period)
+    except XNC.LoiXacNhan as ex:
+        _xnc_loi(ex)
+
+
+@router.post("/attendance/xac-nhan-cong/{period}/{phong}/hcns")
+def xac_nhan_cong_hcns(period: str, phong: str, u: User = Depends(require_roles(*XNC.VAI_XAC_NHAN)),
+                       db: Session = Depends(get_db)):
+    try:
+        XNC.hcns_xac_nhan(db, u, period, phong)
+    except (XNC.LoiXacNhan, PermissionError) as ex:
+        _xnc_loi(ex)
+    return {"message": f"HCNS đã xác nhận công phòng {phong} kỳ {period} – chờ TGĐ duyệt",
+            "trang_thai": XNC.trang_thai(db, period, phong)}
+
+
+@router.post("/attendance/xac-nhan-cong/{period}/{phong}/duyet")
+def xac_nhan_cong_duyet(period: str, phong: str, u: User = Depends(require_roles(*XNC.VAI_DUYET)),
+                        db: Session = Depends(get_db)):
+    try:
+        XNC.tgd_duyet(db, u, period, phong)
+    except (XNC.LoiXacNhan, PermissionError) as ex:
+        _xnc_loi(ex)
+    return {"message": f"Đã duyệt công phòng {phong} kỳ {period}",
+            "trang_thai": XNC.trang_thai(db, period, phong)}

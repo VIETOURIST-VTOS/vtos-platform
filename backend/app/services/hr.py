@@ -512,6 +512,10 @@ def advance(db: Session, u: User, run: PayrollRun) -> str:
         run.status, run.hcns_by, run.hcns_at = "hcns_kiem", u.username, now
         msg = "HCNS đã kiểm bảng lương – chờ Chủ tịch hoặc TGĐ ký"
     elif run.status in DA_HCNS and u.role in VAI_KY_LUONG:
+        # CN-1: kiểm LẠI ngay trước chữ ký. Kiểm cơ sở chạy từ trước; nếu từ lúc ấy HCNS sửa công
+        # thì xác nhận cũ đã hết hiệu lực, và người ký phải biết trước khi khoá bản.
+        from app.services import xac_nhan_cong as XNC
+        XNC.chan_ky_luong(db, run)
         # Khóa TRƯỚC khi ghi sổ, và trong cùng một giao dịch với việc đổi trạng thái: bản chụp phải
         # là thứ người ký vừa nhìn, không phải thứ còn lại sau khi ghi sổ xong.
         ban = LK.khoa(db, run, u)

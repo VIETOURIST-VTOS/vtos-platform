@@ -512,6 +512,9 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
         hs["xe_dang_gan"] = ", ".join(x.plate for x in db.execute(
             select(_Xe).where(_Xe.driver_id == e.id, _Xe.active == True)  # noqa: E712
             .order_by(_Xe.plate)).scalars())
+        # CN-1 (21/10/2026): bước xác nhận công đã có — ô này đọc trạng thái kỳ vừa qua của phòng.
+        from app.services import xac_nhan_cong as _XNC
+        hs["duoc_xac_nhan_cong"] = _XNC.cho_ho_so(db, e)
         hs["tai_san_da_cap"] = db.execute(
             select(func.count()).select_from(CapPhatTaiSan)
             .where(CapPhatTaiSan.employee_id == e.id,
@@ -559,7 +562,9 @@ def thu_thap(db, t) -> tuple[dict, list[str]]:
 # `KHONG_CO_CUA` là danh sách đóng các trường THẬT SỰ chưa có nguồn. Trường thiếu số mà không nằm ở
 # đây và cũng không khai cửa ở `CUA_NHAP` thì VẪN báo «chưa có cửa» — đoán là có cửa thì giấu mất việc.
 # =============================================================================================
-KHONG_CO_CUA = ("duoc_xac_nhan_cong",)       # VTOS chưa có bước trưởng phòng xác nhận bảng công tháng
+# CN-1 (21/10/2026) dựng bước xác nhận công, nên danh sách này rỗng. Giữ lại chỗ khai: trường mới
+# thêm vào NHOM_TRUONG mà chưa có nguồn thì phải vào đây hoặc CUA_NHAP, không thì vẫn báo «chưa có cửa».
+KHONG_CO_CUA: tuple[str, ...] = ()
 
 _CUA_HO_SO = ("Hồ sơ nhân sự", "/hr?tab=employees", "HCNS")
 _CUA_HD = ("Hợp đồng lao động", "/hop-dong-lao-dong", "HCNS")

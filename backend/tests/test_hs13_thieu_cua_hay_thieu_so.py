@@ -4,8 +4,8 @@
 Canh ba điều:
   · bốn trường trước đây không nguồn (số quyền, xe đang gắn, được duyệt nghỉ, lý do nghỉ) nay máy
     tự tính, và tính ĐÚNG — đếm nghỉ chỉ đơn đã duyệt trong tháng, xe chỉ xe đang chạy;
-  · trường có cửa mà thiếu số thì đi vào `chua_co_so_lieu` theo đúng cửa; chỉ «được xác nhận công»
-    còn ở `thieu_nguon`;
+  · trường có cửa mà thiếu số thì đi vào `chua_co_so_lieu` theo đúng cửa; từ CN-1 (21/10/2026)
+    `thieu_nguon` rỗng;
   · phép canh ngược: ai bỏ một trường khỏi `CUA_NHAP` thì trường ấy QUAY VỀ «chưa có cửa» — không
     bao giờ lặng lẽ biến mất.
 """
@@ -68,11 +68,14 @@ def test_hs13_1_bon_truong_may_tu_tinh(db):
         assert k not in thieu
 
 
-def test_hs13_2_chi_xac_nhan_cong_con_chua_co_cua(db):
+def test_hs13_2_khong_con_truong_nao_chua_co_cua(db):
+    # CN-1 (21/10/2026) dựng bước xác nhận công: «được xác nhận công» nay có nguồn, danh sách
+    # «chưa có cửa» rỗng. Trước CN-1 phép thử này ghim đúng một trường ấy.
     u, _ = _nguoi(db)
     hs, thieu_tat = HS.thu_thap(db, u)
+    assert "duoc_xac_nhan_cong" in hs
     chua_cua, theo_cua = HS.phan_loai_thieu(thieu_tat, hs.pop("_khong_ho_so"))
-    assert chua_cua == ["duoc_xac_nhan_cong"], chua_cua
+    assert chua_cua == [], chua_cua
     cua = {c["cua"]: c for c in theo_cua}
     assert "contract_type_hd" in cua["Hợp đồng lao động"]["truong"]
     assert cua["Hợp đồng lao động"]["duong"] == "/hop-dong-lao-dong"
@@ -87,8 +90,9 @@ def test_hs13_3_chua_noi_ho_so_thi_chi_ve_cua_noi_tai_khoan(db):
     u, _ = _nguoi(db, voi_ho_so=False)
     hs, thieu_tat = HS.thu_thap(db, u)
     chua_cua, theo_cua = HS.phan_loai_thieu(thieu_tat, hs.pop("_khong_ho_so"))
-    assert chua_cua == ["duoc_xac_nhan_cong"]
+    assert chua_cua == []
     assert [c["duong"] for c in theo_cua] == ["/access"]
+    assert "duoc_xac_nhan_cong" in theo_cua[0]["truong"]
 
 
 def test_hs13_4_bo_cua_thi_truong_quay_ve_chua_co_cua(monkeypatch):

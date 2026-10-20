@@ -19,6 +19,7 @@ if os.path.exists("test_la2.db"):
     os.remove("test_la2.db")
 
 import pytest
+from tests.cong_da_duyet import duyet_cong
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -47,6 +48,7 @@ def _startup():
 def _ky_xong():
     """Đưa kỳ P qua hết chuỗi A1 để có một bản khóa thật mà đối chiếu."""
     client.get(f"/api/v1/payroll-runs/{P}", params={"refresh": True}, headers=login("hcns"))
+    duyet_cong(client, P, login)   # CN-1: công chưa duyệt thì kiểm cơ sở chặn
     client.post(f"/api/v1/payroll-runs/{P}/kiem-co-so", headers=login("hcns"))
     client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("hcns"))
     client.post(f"/api/v1/payroll-runs/{P}/advance", headers=login("chutich"))
