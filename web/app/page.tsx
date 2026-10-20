@@ -66,7 +66,6 @@ function Dash() {
      hành chưa bấm kết thúc thì tiền của chuyến ấy chưa vào hàng đợi quyết toán). Bỏ nó đi thì hai
      con số đầu cộng lại không bằng tổng đã duyệt, và chỗ chênh biến mất lặng lẽ. */
   const gd = sec.tour_giai_doan || {};
-  const xe = sec.xe_hom_nay || {};
   const chuaDongSo = gd.da_ve_chua_dong_so;
 
   const the: The[] = [
@@ -81,17 +80,11 @@ function Dash() {
         + (typeof chuaDongSo === "number" && chuaDongSo > 0
            ? ` · ${chuaDongSo} chuyến đã qua ngày về mà chưa đóng sổ (Điều hành)` : ""),
       do: (sec.qua_han_qt?.length ?? 0) > 0 || (chuaDongSo ?? 0) > 0, chi_tiet: "/so-con-no" },
-    /* XE ĐANG ĐI — cùng luật với tour: lịch hôm nay trùng lịch điều xe. `co_nguon` phân biệt
-       "hôm nay không điều xe nào" (số THẬT, bằng 0) với "chưa ai nhập bảng xe" (chưa có nguồn);
-       không có nó thì hai việc khác hẳn nhau hiện ra y hệt một con số 0. */
-    { nhan: "Xe đang đi", so: xe.co_nguon ? dem(xe.dang_chay) : null,
-      ai: "Đội xe", cua: "/doi-xe", chi_tiet: "/doi-xe",
-      duoi: xe.co_nguon
-        ? `${xe.o_bai} xe nằm bãi trên ${xe.dieu_duoc} xe điều được`
-          + (xe.bat_thuong > 0 ? ` · ${xe.bat_thuong} xe có bất thường` : "")
-          + (xe.lech > 0 ? ` · ${xe.lech} lệnh điều xe trỏ tới xe không còn điều được (Đội xe)` : "")
-        : undefined,
-      do: (xe.bat_thuong ?? 0) > 0 || (xe.lech ?? 0) > 0 },
+    /* XE ĐANG ĐI đã CHUYỂN XUỐNG khối «Hiệu quả đội xe» (TC-72, 20/10/2026) — anh Tuấn chốt.
+       Vì sao chuyển: hàng tám thẻ trên cùng trả lời "hôm nay có gì cần bấm", còn số xe đang lăn
+       bánh là một chỉ số của ĐỘI XE, đọc cùng công suất và tiêu hao thì mới có nghĩa. Để nó trên
+       ấy là bắt người đọc nhớ một con số rồi cuộn xuống nửa màn hình mới gặp thứ so được với nó.
+       Dữ liệu vẫn là `sec.xe_hom_nay`, nay truyền thẳng xuống khối qua thuộc tính `xe`. */
     { nhan: "Khách tiềm năng mới", so: null,
       ai: "Marketing", cua: "/leads?tab=leads", chi_tiet: "/leads?tab=leads" },
   ];
@@ -180,7 +173,7 @@ function Dash() {
 
     <HangThe ds={the} />
 
-    <KhoiHieuQuaXe d={sec.hieu_qua_xe} theo_ky={sec.hieu_qua_xe_theo_ky} />
+    <KhoiHieuQuaXe d={sec.hieu_qua_xe} theo_ky={sec.hieu_qua_xe_theo_ky} xe={sec.xe_hom_nay} />
 
     {/* Ba khối kinh doanh & nội bộ xếp một hàng: cả ba đều ngắn sau khi bỏ bảng, và đọc cạnh nhau
         thì thấy được bức tranh "bán hàng · lợi nhuận · kỷ luật nội bộ" trong một cái nhìn. */}

@@ -241,8 +241,17 @@ type BoKy = Partial<Record<"thang" | "quy" | "nam", HieuQuaXe>> & {
   chuoi?: DiemChuoi[] | null;
 };
 
-export function KhoiHieuQuaXe({ d, theo_ky }: {
+/** TC-72 · «Xe đang đi» chuyển từ hàng tám thẻ xuống khối này (anh Tuấn chốt 20/10/2026).
+ *  `co_nguon` phân biệt "hôm nay không điều xe nào" (số THẬT, bằng 0) với "chưa ai nhập bảng xe". */
+type XeHomNay = {
+  dang_chay?: number | null; o_bai?: number | null; dieu_duoc?: number | null;
+  bat_thuong?: number | null; lech?: number | null; co_nguon?: boolean | null;
+};
+
+export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
   d?: HieuQuaXe | null;
+  /** `sections.xe_hom_nay` — xem `XeHomNay`. */
+  xe?: XeHomNay | null;
   /** Khi máy chủ trả số theo từng kỳ thì truyền vào đây: { thang: {...}, quy: {...}, nam: {...} },
    *  kèm `mac_dinh` — kỳ HẸP NHẤT còn có số. */
   theo_ky?: BoKy | null;
@@ -374,13 +383,23 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
      Trục giữ ĐỦ 12 CỘT, kể cả tháng chưa nạp chuyến nào: tháng rỗng mang `null`, và `BieuDoDuong`
      cắt đường tại đó thay vì nối qua. Lọc tháng rỗng ra cho hình "đẹp" là bóp hai tháng cách nhau
      một quãng nghỉ thành hai cột liền nhau. */
+  /* Cỡ số của TẦNG VẬN HÀNH nhỏ hơn tầng chủ một bậc, và KHÔNG xuống dòng: «27.1 L/100km» ở cỡ cũ
+     vắt thành hai dòng, làm ô ấy cao hơn năm ô bên cạnh và cả hàng gãy. */
+  const SO_NHO: React.CSSProperties = { fontSize: "calc(16/14*1rem)", whiteSpace: "nowrap" };
+  const xeCoNguon = !!xe?.co_nguon;
   const chuoi: DiemChuoi[] = bo?.chuoi || [];
   const nhanKy = chuoi.map((c) => c.nhan);
   const diem = (lay: (c: DiemChuoi) => number | null | undefined) =>
     chuoi.map((c) => ({ nhan: c.nhan, gt: lay(c) ?? null }));
+  /* MÀU THEO NGHĨA, không theo thứ tự chuỗi (anh Tuấn chốt 20/10/2026):
+       doanh thu — VÀNG (d1) · lợi nhuận — XANH (d4) · lợi nhuận có kỳ ÂM — ĐỎ (d2)
+     Đổi màu cả đường khi CÓ MỘT kỳ lỗ, chứ không tô đỏ riêng đoạn ấy: một đường hai màu đọc ra
+     như hai chuỗi khác nhau, còn người đọc cần thấy ngay "năm nay có tháng lỗ" rồi mới tìm tháng nào. */
+  const coLo = chuoi.some((c) => typeof c.loi_nhuan === "number" && c.loi_nhuan < 0);
   const dienBien: Duong[] = [
     { ten: "Doanh thu", lop: "d1", diem: diem((c) => c.doanh_thu) },
-    { ten: "Lợi nhuận", lop: "d2", diem: diem((c) => c.loi_nhuan) },
+    { ten: coLo ? "Lợi nhuận (có kỳ lỗ)" : "Lợi nhuận", lop: coLo ? "d2" : "d4",
+      diem: diem((c) => c.loi_nhuan) },
   ];
   return (
     <section className="panel" id="hieu-qua-doi-xe">
@@ -427,7 +446,7 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
         {vanHanh.map(([nhan, gt, khoa]) => (
           <div key={nhan} className={"v14-o" + (gt === null ? " rong" : "")}>
             <div className="v14-o-nhan">{nhan}</div>
-            <div className="v14-o-so">{gt ?? "—"}</div>
+            <div className="v14-o-so" style={SO_NHO}>{gt ?? "—"}</div>
             {gt !== null && muiTen(khoa)}
           </div>
         ))}
@@ -444,27 +463,56 @@ export function KhoiHieuQuaXe({ d, theo_ky }: {
             </Link>
           ) : (
             <>
-              <div className="v14-o-so">{so(o.cong_suat_khai_thac, "%") ?? "—"}</div>
+              <div className="v14-o-so" style={SO_NHO}>{so(o.cong_suat_khai_thac, "%") ?? "—"}</div>
               {o.cong_suat_khai_thac != null && muiTen("cong_suat_khai_thac")}
             </>
           )}
         </div>
-        {/* Ô này là TRẠNG THÁI, không phải con số – nên không dùng phông chữ số. Phông số sinh ra
-            để cột số dóng thẳng hàng; đặt một chữ tiếng Việt vào đó thì chữ giãn ra trông như lỗi. */}
-        <div className="v14-o rong">
-          <div className="v14-o-nhan">Kết quả đã chốt</div>
-          <div className="v14-o-so v14-o-chu">{o.da_chot ? "Đã chốt" : "Chưa chốt"}</div>
+        {/* XE ĐANG ĐI — ô cuối của tầng vận hành, thay chỗ ô «Kết quả đã chốt» (TC-72).
+            Ô «đã chốt / chưa chốt» đã GỠ theo yêu cầu của anh Tuấn: nó là trạng thái sổ sách, không
+            phải một chỉ số để đọc cạnh công suất và tiêu hao. Trường `da_chot` GIỮ NGUYÊN trong hợp
+            đồng dữ liệu ở đầu tệp — xoá đi là mất bản mô tả thứ máy chủ đang trả.
+
+            Con số này là của HÔM NAY, không theo kỳ đang chọn — nên nói rõ ngay dưới nhãn, không để
+            người đọc tưởng nó đổi theo nút Tháng/Quý/Năm. */}
+        <div className={"v14-o" + (xeCoNguon ? "" : " rong")}>
+          <div className="v14-o-nhan">Xe đang đi <span className="muted">· hôm nay</span></div>
+          {xeCoNguon ? (
+            <>
+              <div className="v14-o-so" style={SO_NHO}>{xe!.dang_chay ?? 0}</div>
+              <div className="muted" style={{ fontSize: "calc(11/14*1rem)", marginTop: 2 }}>
+                {xe!.o_bai} xe nằm bãi trên {xe!.dieu_duoc} xe điều được
+                {(xe!.bat_thuong ?? 0) > 0 && <> · <b className="tag red">{xe!.bat_thuong} xe bất thường</b></>}
+                {(xe!.lech ?? 0) > 0 && <> · <b className="tag red">{xe!.lech} lệnh trỏ xe không điều được</b></>}
+              </div>
+              <Link className="the-cua" href="/doi-xe" style={{ marginTop: 4, display: "inline-block" }}>
+                Xem chi tiết →</Link>
+            </>
+          ) : (
+            <Link className="v14-o-so v14-o-chu" href="/doi-xe">chờ Đội xe
+              <span className="muted"> · chưa ai nhập bảng xe hôm nay</span></Link>
+          )}
         </div>
       </div>
 
       {/* ── DIỄN BIẾN ── Hình của bản vẽ. Chuỗi còn rỗng nên `BieuDoDuong` tự rơi về khối rỗng
            kèm bộ phận và cửa nhập; không vẽ một đường bịa để lấp chỗ. */}
-      <div style={{ marginTop: 14 }}>
+      {/* MÀU ĐẶT NGAY TẠI KHỐI, KHÔNG SỬA `globals.css`.
+          Thư viện biểu đồ chỉ có ba lớp màu d1/d2/d3 (THU · CHI · TỒN) — không lớp nào là "tốt".
+          Khối này cần một màu XANH cho lợi nhuận. Thêm `.bd-net.d4` vào globals.css thì đụng làn
+          Vòng: sổ giữ chỗ cho thấy hai dòng NS-1 và NS-2 của làn ấy ĐANG LÀM chính tệp ấy, chính
+          phần nhãn số trên biểu đồ. Nên lớp d4 khai ở đây, bọc trong `.v14-dx-bd` để không rò ra
+          hình nào khác của màn hình. Khi làn Vòng xong, gộp bốn dòng này vào globals.css. */}
+      <div style={{ marginTop: 14 }} className="v14-dx-bd">
+        <style>{`.v14-dx-bd .bd-net.d4{stroke:var(--vtos-success)}
+.v14-dx-bd .bd-cham.d4{background:var(--vtos-success)}
+.v14-dx-bd .bd-cg-cham.d4{background:var(--vtos-success)}
+.v14-dx-bd .bd-duong-nhan.d4{color:var(--vtos-success)}`}</style>
         <BieuDoDuong ten="Diễn biến hiệu quả đội xe" phu={o.nhan || undefined}
           ds={dienBien} nhan={nhanKy} dinh_dang="tien"
           ai="Đội xe" cua="/doi-xe" cua_ten="Cửa nhập đội xe"
-          chan={<span className="muted">12 kỳ gần nhất tính đến kỳ đang chọn. Tháng không có cột
-            là tháng <b>chưa nạp chuyến nào</b> — đường cắt tại đó chứ không nối qua, vì nối là vẽ ra
+          chan={<span className="muted">12 tháng của năm. Tháng không có điểm là tháng <b>chưa nạp
+            chuyến nào</b> hoặc <b>chưa tới</b> — đường cắt tại đó chứ không nối qua, vì nối là vẽ ra
             một con số không ai nhập.</span>} />
       </div>
 

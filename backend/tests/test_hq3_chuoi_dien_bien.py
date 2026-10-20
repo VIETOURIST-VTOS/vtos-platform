@@ -52,15 +52,15 @@ def _chuyen(db, v, ma, di, ve, kd, kc, dt=0.0):
     return t
 
 
-def test_chuoi_luon_du_12_cot_va_xep_cu_truoc_moi_sau(db):
+def test_chuoi_la_12_thang_cua_NAM_T1_den_T12(db):
     v = _xe(db)
     _chuyen(db, v, "A1", date(2026, 10, 1), date(2026, 10, 2), 1000, 1300, dt=9_000_000)
 
     ds = HQ._chuoi(db, date(2026, 10, 20))
 
     assert len(ds) == 12, "Trục phải đủ 12 cột dù chỉ một tháng có chuyến"
-    assert ds[0]["ky"] == "2025-11", "Cột đầu là kỳ CŨ nhất"
-    assert ds[-1]["ky"] == "2026-10", "Cột cuối là kỳ của chính `moc`"
+    assert ds[0]["ky"] == "2026-01", "Cột đầu là THÁNG 1 của năm chứa `moc`"
+    assert ds[-1]["ky"] == "2026-12", "Cột cuối là THÁNG 12 — kể cả khi tháng ấy chưa tới"
     assert [d["ky"] for d in ds] == sorted(d["ky"] for d in ds), "Phải xếp cũ → mới"
 
 
@@ -75,6 +75,9 @@ def test_thang_khong_co_chuyen_tra_None_chu_khong_phai_0(db):
     # ĐƯỢC ĐỒNG NÀO. Hình vẽ hai thứ ấy khác hẳn nhau, nên sổ phải phân biệt được.
     assert ds["2026-09"]["doanh_thu"] is None
     assert ds["2026-09"]["loi_nhuan"] is None
+    # Tháng CHƯA TỚI cũng vậy: có cột, mang None. Bỏ cột đi thì hình co lại dần theo từng tháng
+    # trong năm, và một hình đổi bề ngang mỗi lần mở là một hình không so được với lần mở trước.
+    assert ds["2026-12"]["doanh_thu"] is None
 
 
 def test_theo_ky_tra_kem_chuoi_de_man_hinh_khong_phai_goi_12_lan(db):
@@ -85,12 +88,12 @@ def test_theo_ky_tra_kem_chuoi_de_man_hinh_khong_phai_goi_12_lan(db):
 
     assert "chuoi" in out, "Màn hình phải lấy được cả chuỗi trong MỘT lượt gọi"
     assert len(out["chuoi"]) == 12
-    assert out["chuoi"][-1]["ky"] == "2026-10"
+    assert out["chuoi"][-1]["ky"] == "2026-12"
 
 
 def test_nhan_cot_doc_duoc_tren_truc_hep(db):
     _xe(db)
     ds = HQ._chuoi(db, date(2026, 10, 20))
     # 12 nhãn phải nằm vừa một trục ngang trên màn hình hẹp, nên dùng "T9/26" chứ không "09/2026".
-    assert ds[-1]["nhan"] == "T10/26"
-    assert ds[0]["nhan"] == "T11/25"
+    assert ds[-1]["nhan"] == "T12/26"
+    assert ds[0]["nhan"] == "T1/26"
