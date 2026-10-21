@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write      # ĐỢT DỌN-8: mở PR thay vì đẩy thẳng vào main
 
 # Hai lần gộp sát nhau không được cùng ghi sổ một lúc. KHÔNG huỷ cái đang chạy: huỷ giữa chừng là
 # bỏ sót một dòng đáng đóng.
@@ -75,6 +76,8 @@ jobs:
 
       - name: Ghi lại sổ
         if: steps.loc.outputs.chay == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
           if git diff --quiet; then echo "so khong doi — khong commit"; exit 0; fi
@@ -83,22 +86,24 @@ jobs:
           if [ -n "$ngoai" ]; then
             echo "DUNG — co tep doi NGOAI so: $ngoai"; exit 1
           fi
+          # ĐỢT DỌN-8 22/10/2026 — ĐI QUA PR, KHÔNG ĐẨY THẲNG.
+          #
+          # Hai lần trước đều đóng ĐÚNG dòng rồi bị `main` từ chối: GH006, rồi GH013 (Ruleset).
+          # Cho `github-actions[bot]` vượt rào thì GitHub không có bot ấy trong danh sách bypass
+          # — đã thử, "No suggestions". Nên nay đi đúng cửa mà người vẫn đi.
+          nh="so/dong-$(git rev-parse --short HEAD)"
           git config user.name "VTOS đóng sổ"
           git config user.email "noreply@anthropic.com"
+          git checkout -b "$nh"
           git add docs/dang-lam
           git commit -m "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp [skip ci]"
-          # ĐẨY — Đợt DỌN-7, 21/10/2026. HỎNG THÌ ĐỎ, không nuốt.
-          #
-          # Lần đầu việc này chạy (ngay sau khi PR #405 gộp) nó đóng ĐÚNG dòng DỌN-6, rồi `main`
-          # từ chối đẩy bằng GH006 — mà việc CI vẫn báo Success, vì dòng cũ kết thúc bằng
-          # `|| echo "day khong duoc"`. Sổ không đổi một chữ, và không ai biết. `test_ds2_1`
-          # canh đúng chỗ ấy.
-          if git push 2>day_loi.txt; then cat day_loi.txt; exit 0; fi
-          cat day_loi.txt
-          if grep -q 'GH006' day_loi.txt; then
-            echo "::error::main dang chan day thang (GH006). Day KHONG phai loi ma: cho github-actions[bot] vao danh sach vuot rao (bypass) cua nhanh main trong Settings, khong thi viec nay khong bao gio ghi duoc so."
-            exit 1
-          fi
-          # Lần gộp khác vừa hạ cánh trước: rebase rồi thử lại ĐÚNG MỘT lần. Hỏng nữa thì đỏ.
-          git pull --rebase origin main
-          git push
+          git push origin "$nh"
+          gh pr create --base main --head "$nh" \
+            --title "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp" \
+            --body "Việc CI *Đóng sổ khi gộp* đóng dòng giữ chỗ của lần gộp vừa hạ cánh. Chỉ đổi ô trạng thái trong docs/dang-lam/ — một ký tự đổi ngoài đó thì việc CI đã dừng trước khi commit."
+          # PR do GITHUB_TOKEN mở ra thì GitHub KHÔNG sinh vòng CI (luật chống workflow tự kích
+          # nhau). `workflow_dispatch` là ngoại lệ duy nhất, nên gọi tay một lượt để `hang-rao-gop`
+          # có kết quả gắn vào đúng commit — không có nó thì tự gộp chờ mãi.
+          gh workflow run ci.yml --ref "$nh"
+          gh pr merge "$nh" --auto --squash \
+            --subject "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp [skip ci]" --body ""
