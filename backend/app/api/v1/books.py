@@ -32,7 +32,8 @@ def catalog(u: User = Depends(require_roles(*READ))):
         {"key": "so-tien-gui", "ten": "Sổ tiền gửi ngân hàng", "mau": "S08-DN", "path": "/api/v1/books/so-tien-gui", "tham_so": ["partner_code"]},
         {"key": "cong-no", "ten": "Sổ chi tiết công nợ theo đối tượng", "mau": "S31-DN / S51-DN", "path": "/api/v1/books/cong-no", "tham_so": ["account", "partner_code"]},
         {"key": "cong-no-tong-hop", "ten": "Sổ tổng hợp công nợ theo đối tượng", "mau": "Tổng hợp", "path": "/api/v1/books/cong-no-tong-hop", "tham_so": ["account"]},
-        {"key": "can-doi-tai-khoan", "ten": "Bảng cân đối tài khoản", "mau": "S06-DN", "path": "/api/v1/books/can-doi-tai-khoan", "tham_so": ["level"]},
+        {"key": "can-doi-tai-khoan", "ten": "Bảng cân đối tài khoản", "mau": "S06-DN", "path": "/api/v1/books/can-doi-tai-khoan", "tham_so": ["level", "bu_tru", "luy_ke_tu"]},
+        {"key": "chung-tu-goc", "ten": "Bảng tổng hợp chứng từ gốc cùng loại", "mau": "Tổng hợp", "path": "/api/v1/books/chung-tu-goc"},
         {"key": "nhat-ky-tien", "ten": "Sổ nhật ký thu tiền / chi tiền", "mau": "S03a1-DN / S03a2-DN", "path": "/api/v1/books/nhat-ky-tien", "tham_so": ["direction"]},
         {"key": "cong-trinh", "ten": "Sổ chi tiết theo công trình (tour)", "mau": "Chi tiết công trình", "path": "/api/v1/books/cong-trinh", "tham_so": ["project_code"]},
         {"key": "cong-trinh-tong-hop", "ten": "Tổng hợp doanh thu – chi phí – lãi lỗ theo công trình", "mau": "Tổng hợp", "path": "/api/v1/books/cong-trinh-tong-hop"},
@@ -182,14 +183,17 @@ def partner_summary_xlsx(account: str, since: date, upto: date, min_amount: floa
 
 @router.get("/can-doi-tai-khoan")
 def trial_balance(since: date, upto: date, level: int = 0, non_zero: bool = True,
+                  bu_tru: bool = True, luy_ke_tu: date | None = None,
                   u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
-    return BK.trial_balance_range(db, since, upto, level, non_zero)
+    """ĐỢT R4b: `bu_tru=false` cộng riêng từng đối tượng; `luy_ke_tu` thêm hai cột luỹ kế."""
+    return BK.trial_balance_range(db, since, upto, level, non_zero, bu_tru, luy_ke_tu)
 
 
 @router.get("/can-doi-tai-khoan.xlsx")
 def trial_balance_xlsx(since: date, upto: date, level: int = 0, non_zero: bool = True,
+                       bu_tru: bool = True, luy_ke_tu: date | None = None,
                        u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
-    rep = BK.trial_balance_range(db, since, upto, level, non_zero)
+    rep = BK.trial_balance_range(db, since, upto, level, non_zero, bu_tru, luy_ke_tu)
     R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"cdtk:{since}:{upto}", after={"can_doi": rep["balanced"]}); db.commit()
     return _xlsx(BK.trial_balance_xlsx(rep), f"BANG_CAN_DOI_TAI_KHOAN_{_tag(since, upto)}.xlsx")
 
@@ -236,3 +240,16 @@ def project_summary_xlsx(since: date, upto: date, min_amount: float = 0,
     rep = BK.project_summary(db, since, upto, min_amount)
     R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"congtrinh:{since}:{upto}", after={"so_cong_trinh": len(rep["rows"])}); db.commit()
     return _xlsx(BK.project_summary_xlsx(rep), f"TONG_HOP_CONG_TRINH_{_tag(since, upto)}.xlsx")
+# ---------- Bảng tổng hợp chứng từ gốc cùng loại — ĐỢT R4b 21/10/2026 ----------
+
+@router.get("/chung-tu-goc")
+def chung_tu_goc(since: date, upto: date, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return BK.chung_tu_goc(db, since, upto)
+
+
+@router.get("/chung-tu-goc.xlsx")
+def chung_tu_goc_xlsx(since: date, upto: date, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    rep = BK.chung_tu_goc(db, since, upto)
+    R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"ctgoc:{since}:{upto}",
+             after={"so_loai": len(rep["rows"]), "chua_khai": rep["so_chua_khai"]}); db.commit()
+    return _xlsx(BK.chung_tu_goc_xlsx(rep), f"TONG_HOP_CHUNG_TU_GOC_{_tag(since, upto)}.xlsx")

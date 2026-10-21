@@ -31,6 +31,7 @@ from openpyxl.styles import Font, Alignment
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models.accounting import Account, JournalEntry, JournalLine, Partner
+from app.services import chung_tu_loai as CTL
 from app.core.config import settings
 
 CASH_ACCOUNT, BANK_ACCOUNT = "111", "112"
@@ -250,6 +251,13 @@ def account_book(db: Session, account: str, since: date, upto: date, partner_cod
         bal += (r.debit or 0) - (r.credit or 0)
         d = _row_out(r, contra)
         d["balance"] = round(bal, 0)
+        # ĐỢT R4b 21/10/2026 — TÁCH DƯ NỢ / DƯ CÓ.
+        # Trước đây chỉ có MỘT cột `balance` mang dấu. Mẫu S38-DN in hai cột, và hai cột ấy đọc
+        # khác nhau: bên không có số thì BỎ TRỐNG, không ghi 0. Số 0 đọc là "đã tính và bằng
+        # không"; bỏ trống đọc là "dư không nằm ở bên này". Nên hai khoá dưới đây dùng None chứ
+        # không dùng 0.0, và `balance` giữ nguyên để màn hình cũ không hỏng.
+        d["balance_debit"] = round(bal, 0) if bal > 0 else None
+        d["balance_credit"] = round(-bal, 0) if bal < 0 else None
         rows.append(d)
     rep = {"account": account, "name": acc.name, "kind": acc.kind, "accounts": codes,
            "since": since, "upto": upto, "partner_code": partner_code, "project_code": project_code,
@@ -270,14 +278,19 @@ def account_book_xlsx(rep: dict) -> bytes:
     head = _head(title, rep["since"], rep["upto"], extra)
     if rep["detail"]:
         cols = ["Ngày hạch toán", "Số chứng từ", "Số CT gốc", "Diễn giải", "TK", "TK đối ứng",
-                "Đối tượng", "Công trình", "Phát sinh Nợ", "Phát sinh Có", "Số dư"]
-        widths = [15, 16, 14, 44, 10, 14, 30, 16, 16, 16, 18]
-        data = [["", "", "", "Số dư đầu kỳ", "", "", "", "", "", "", rep["opening"]]]
+                "Đối tượng", "Công trình", "Phát sinh Nợ", "Phát sinh Có", "Dư Nợ", "Dư Có"]
+        widths = [15, 16, 14, 42, 10, 14, 28, 16, 16, 16, 16, 16]
+        op = rep["opening"]
+        data = [["", "", "", "Số dư đầu kỳ", "", "", "", "", "", "",
+                 op if op > 0 else None, -op if op < 0 else None]]
         for r in rep["rows"]:
             data.append([r["date"], r["code"], r["doc_no"], r["description"], r["account"], r["contra"],
-                         r["partner"], r["project_code"], r["debit"], r["credit"], r["balance"]])
+                         r["partner"], r["project_code"], r["debit"], r["credit"],
+                         r.get("balance_debit"), r.get("balance_credit")])
+        cl = rep["closing"]
         total = ["", "", "", "Cộng phát sinh / Số dư cuối kỳ", "", "", "", "",
-                 rep["total"]["debit"], rep["total"]["credit"], rep["closing"]]
+                 rep["total"]["debit"], rep["total"]["credit"],
+                 cl if cl > 0 else None, -cl if cl < 0 else None]
     else:
         cols = ["Ngày hạch toán", "Số chứng từ", "Diễn giải", "TK", "TK đối ứng",
                 "Phát sinh Nợ", "Phát sinh Có", "Số dư"]
@@ -408,16 +421,67 @@ def partner_summary_xlsx(rep: dict) -> bytes:
 
 # ---------- S06: Bảng cân đối tài khoản ----------
 
-def trial_balance_range(db: Session, since: date, upto: date, level: int = 0, non_zero: bool = True) -> dict:
+def _open_by_account(db: Session, since: date) -> dict[str, float]:
+    """Số dư đầu kỳ của từng tài khoản, ĐÃ BÙ TRỪ trong nội bộ tài khoản ấy."""
+    q = _filtered(select(JournalLine.account_code,
+                         func.coalesce(func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)), 0.0)),
+                  since, None).where(JournalEntry.entry_date < since).group_by(JournalLine.account_code)
+    return {k: float(v or 0) for k, v in db.execute(q).all()}
+
+
+def _open_hai_ben(db: Session, since: date) -> dict[str, tuple[float, float]]:
+    """ĐỢT R4b 21/10/2026 — SỐ DƯ ĐẦU KỲ KHÔNG BÙ TRỪ, cộng riêng TỪNG ĐỐI TƯỢNG.
+
+    VÌ SAO KHÔNG PHẢI MỘT THAM SỐ HIỂN THỊ. Bù trừ hay không là HAI PHÉP TÍNH khác nhau, không
+    phải hai cách bày cùng một con số:
+
+        131 có khách A nợ ta 79,96 tỷ và khách B ta đang giữ thừa 9,86 tỷ.
+        Bù trừ   -> MỘT số:  dư Nợ 70,10 tỷ.
+        Không bù -> HAI số:  dư Nợ 79,96 tỷ VÀ dư Có 9,86 tỷ.
+
+    Con số 9,86 tỷ ấy KHÔNG đọc ra được từ bảng đã bù trừ — nó đã biến mất trong phép trừ. Mà nó
+    chính là con số kế toán cần khi đối chiếu công nợ: tiền khách nộp thừa là một khoản PHẢI TRẢ,
+    không phải một khoản phải thu âm.
+
+    Gom theo cặp (tài khoản, đối tượng) ở CƠ SỞ DỮ LIỆU, không kéo dòng sổ về — bài học Đợt E18.
+    Dòng không có mã đối tượng gom vào một khoá rỗng và vẫn được tính, không bỏ ra.
+    """
+    q = _filtered(select(JournalLine.account_code, JournalLine.partner_code,
+                         func.coalesce(func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)), 0.0)),
+                  since, None).where(JournalEntry.entry_date < since).group_by(JournalLine.account_code, JournalLine.partner_code)
+    out: dict[str, tuple[float, float]] = {}
+    for acc, _dt, v in db.execute(q).all():
+        n = float(v or 0)
+        d, c = out.get(acc, (0.0, 0.0))
+        out[acc] = (d + n, c) if n > 0 else (d, c - n)
+    return out
+
+
+def _luy_ke(db: Session, tu: date, upto: date) -> dict[str, tuple[float, float]]:
+    """Phát sinh luỹ kế từ một mốc do người xem chọn tới ngày cuối kỳ xem."""
+    q = _filtered(select(JournalLine.account_code,
+                         func.coalesce(func.sum(JournalLine.debit), 0.0),
+                         func.coalesce(func.sum(JournalLine.credit), 0.0)),
+                  upto, tu).group_by(JournalLine.account_code)
+    return {k: (float(d or 0), float(c or 0)) for k, d, c in db.execute(q).all()}
+
+
+def trial_balance_range(db: Session, since: date, upto: date, level: int = 0, non_zero: bool = True,
+                        bu_tru: bool = True, luy_ke_tu: date | None = None) -> dict:
     """Bảng cân đối tài khoản (S06-DN) theo KHOẢNG NGÀY bất kỳ.
     Tài khoản cha cộng dồn số của tài khoản con nên xem ở bậc nào tổng Nợ vẫn bằng tổng Có; tổng cộng chỉ lấy
-    tài khoản bậc 1 để không cộng trùng cha với con. Số liệu lấy bằng hai câu GROUP BY, không nạp dòng sổ."""
+    tài khoản bậc 1 để không cộng trùng cha với con. Số liệu lấy bằng hai câu GROUP BY, không nạp dòng sổ.
+
+    ĐỢT R4b 21/10/2026 — hai tham số mới:
+      · `bu_tru=False` : số dư đầu/cuối cộng riêng từng đối tượng rồi mới gộp (xem `_open_hai_ben`).
+      · `luy_ke_tu`    : thêm hai cột phát sinh luỹ kế kể từ một mốc do người xem chọn.
+    Cả hai là THAM SỐ chứ không phải luật cứng — đúng bài học 2 đọc từ MISA ngày 15/10.
+    """
     accs = _accounts(db)
     children = _children_map(accs)
-    q_open = _filtered(select(JournalLine.account_code,
-                              func.coalesce(func.sum(func.coalesce(JournalLine.debit, 0) - func.coalesce(JournalLine.credit, 0)), 0.0)),
-                       since, None).where(JournalEntry.entry_date < since).group_by(JournalLine.account_code)
-    open_by = {k: float(v or 0) for k, v in db.execute(q_open).all()}
+    hai_ben = None if bu_tru else _open_hai_ben(db, since)
+    lk = _luy_ke(db, luy_ke_tu, upto) if luy_ke_tu else {}
+    open_by = _open_by_account(db, since)
     q_move = _filtered(select(JournalLine.account_code,
                               func.coalesce(func.sum(JournalLine.debit), 0.0),
                               func.coalesce(func.sum(JournalLine.credit), 0.0)),
@@ -428,36 +492,70 @@ def trial_balance_range(db: Session, since: date, upto: date, level: int = 0, no
     for code, a in sorted(accs.items()):
         if level and a.level > level:
             continue
-        op = mv_d = mv_c = 0.0
+        op = mv_d = mv_c = op_d = op_c = lk_d = lk_c = 0.0
         for c in _subtree(code, children):                  # cây dựng MỘT lần, không tra lại danh mục
             op += open_by.get(c, 0.0)
             d, cr = move_by.get(c, (0.0, 0.0))
             mv_d += d; mv_c += cr
+            if hai_ben is not None:
+                hd, hc = hai_ben.get(c, (0.0, 0.0))
+                op_d += hd; op_c += hc
+            if lk:
+                ld, lc = lk.get(c, (0.0, 0.0))
+                lk_d += ld; lk_c += lc
         open_net, close_net = round(op, 0), round(op + mv_d - mv_c, 0)
+        if hai_ben is None:
+            o_d, o_c = max(open_net, 0.0), max(-open_net, 0.0)
+            # Dư cuối KHÔNG bù trừ không suy ra được từ dư đầu không bù trừ cộng phát sinh: một
+            # đối tượng có thể đổi bên trong kỳ. Nên khi bù trừ thì dùng số đã bù trừ như cũ.
+            c_d, c_c = max(close_net, 0.0), max(-close_net, 0.0)
+        else:
+            o_d, o_c = round(op_d, 0), round(op_c, 0)
+            c_d, c_c = max(close_net, 0.0), max(-close_net, 0.0)
         r = {"account": code, "name": a.name, "kind": a.kind, "level": a.level, "parent": a.parent,
-             "open_debit": max(open_net, 0.0), "open_credit": max(-open_net, 0.0),
+             "open_debit": o_d, "open_credit": o_c,
              "debit": round(mv_d, 0), "credit": round(mv_c, 0),
-             "close_debit": max(close_net, 0.0), "close_credit": max(-close_net, 0.0)}
+             "close_debit": c_d, "close_credit": c_c}
+        if lk:
+            r["luy_ke_debit"] = round(lk_d, 0); r["luy_ke_credit"] = round(lk_c, 0)
         if non_zero and not any(abs(r[k]) > 0 for k in ("open_debit", "open_credit", "debit", "credit", "close_debit", "close_credit")):
             continue
         rows.append(r)
     tops = [r for r in rows if not r["parent"]]
-    total = {k: round(sum(r[k] for r in tops), 0)
-             for k in ("open_debit", "open_credit", "debit", "credit", "close_debit", "close_credit")}
+    khoa = ["open_debit", "open_credit", "debit", "credit", "close_debit", "close_credit"]
+    if lk:
+        khoa += ["luy_ke_debit", "luy_ke_credit"]
+    total = {k: round(sum(r.get(k, 0.0) for r in tops), 0) for k in khoa}
+    # KHÔNG BÙ TRỪ THÌ TỔNG NỢ KHÔNG CÒN BẰNG TỔNG CÓ Ở CỘT DƯ ĐẦU, và đó không phải lỗi: hai cột
+    # ấy nay là hai con số khác nhau chứ không phải hai nửa của một con số. Nên phép "cân" chỉ xét
+    # PHÁT SINH và DƯ CUỐI — hai thứ vẫn phải cân dù xem kiểu nào.
     return {"since": since, "upto": upto, "level": level, "rows": rows, "total": total,
+            "bu_tru": bu_tru, "luy_ke_tu": luy_ke_tu,
             "balanced": abs((total["debit"] or 0) - (total["credit"] or 0)) < 1 and abs(total["close_debit"] - total["close_credit"]) < 1}
 
 
 def trial_balance_xlsx(rep: dict) -> bytes:
+    lk = "luy_ke_debit" in rep["total"]                          # ĐỢT R4b: hai cột chỉ in khi có hỏi
+    cols = ["Số hiệu TK", "Tên tài khoản", "Dư đầu Nợ", "Dư đầu Có", "Phát sinh Nợ", "Phát sinh Có",
+            "Dư cuối Nợ", "Dư cuối Có"] + (["Luỹ kế Nợ", "Luỹ kế Có"] if lk else [])
+    widths = [12, 46, 18, 18, 18, 18, 18, 18] + ([18, 18] if lk else [])
     data = [[r["account"], r["name"], r["open_debit"], r["open_credit"], r["debit"], r["credit"],
-             r["close_debit"], r["close_credit"]] for r in rep["rows"]]
+             r["close_debit"], r["close_credit"]] + ([r.get("luy_ke_debit", 0.0), r.get("luy_ke_credit", 0.0)] if lk else [])
+            for r in rep["rows"]]
     t = rep["total"]
-    total = ["", "TỔNG CỘNG", t["open_debit"], t["open_credit"], t["debit"], t["credit"], t["close_debit"], t["close_credit"]]
+    total = ["", "TỔNG CỘNG", t["open_debit"], t["open_credit"], t["debit"], t["credit"],
+             t["close_debit"], t["close_credit"]] + ([t["luy_ke_debit"], t["luy_ke_credit"]] if lk else [])
+    # Tệp in ra PHẢI tự nói mình được tính kiểu nào. Hai bản in cùng một kỳ mà ra hai con số khác
+    # nhau, không bản nào ghi lý do, là cách chắc chắn nhất để người đọc nghĩ có bản sai.
+    chu = ""
+    if not rep.get("bu_tru", True):
+        chu = ("* Số dư đầu/cuối KHÔNG bù trừ: cộng riêng từng đối tượng rồi mới gộp, nên một tài khoản "
+               "có thể có số ở cả hai bên. Cột Dư đầu Nợ và Dư đầu Có vì vậy KHÔNG còn phải bằng nhau.")
+    if rep.get("luy_ke_tu"):
+        chu += ("\n" if chu else "") + f"* Luỹ kế phát sinh tính từ {rep['luy_ke_tu']:%d/%m/%Y}."
     return _book("BANG CAN DOI TAI KHOAN",
                  _head("BẢNG CÂN ĐỐI TÀI KHOẢN (Mẫu số S06-DN)", rep["since"], rep["upto"]),
-                 ["Số hiệu TK", "Tên tài khoản", "Dư đầu Nợ", "Dư đầu Có", "Phát sinh Nợ", "Phát sinh Có",
-                  "Dư cuối Nợ", "Dư cuối Có"],
-                 [12, 46, 18, 18, 18, 18, 18, 18], data, total)
+                 cols, widths, data, total, chu)
 
 
 # ---------- S03a1 / S03a2: Nhật ký thu tiền, chi tiền ----------
@@ -565,3 +663,74 @@ def project_summary_xlsx(rep: dict) -> bytes:
                  _head("TỔNG HỢP DOANH THU – CHI PHÍ – LÃI LỖ THEO CÔNG TRÌNH (TOUR)", rep["since"], rep["upto"]),
                  ["STT", "Mã công trình", "Doanh thu", "Chi phí", "Lãi/lỗ", "Tỷ suất %"],
                  [6, 28, 20, 20, 20, 12], data, total)
+# ---------- Bảng tổng hợp chứng từ gốc cùng loại — ĐỢT R4b 21/10/2026 ----------
+
+CHUA_KHAI = "(chưa khai loại)"
+
+# Bảy mã loại chứng từ VTOS đang có — ĐO ĐƯỢC, không ước: `chung_tu_loai.LOAI_CHUNG_TU` ngày
+# 21/10/2026 có đúng bảy dòng (PT · PC · BC · BN · HDB · HDM · PKT). MISA có 36. Khoảng cách ấy là
+# phần còn dang dở của Đợt R2, và chính nó bảo đảm bảng này sẽ CÓ dòng "chưa khai loại" — nên dòng
+# ấy không phải trường hợp hiếm để bỏ qua.
+CT_TEN = dict(CTL.LOAI_CHUNG_TU)
+
+
+def chung_tu_goc(db: Session, since: date, upto: date) -> dict:
+    """Gom chứng từ theo `loai_chung_tu`: mỗi loại bao nhiêu chứng từ, ghi Nợ bao nhiêu, ghi Có bao nhiêu.
+
+    VÌ SAO GOM THEO LOẠI CHỨNG TỪ chứ không theo cặp định khoản: cặp định khoản đã có ma trận
+    riêng ở Đợt R4a, và hai bảng trả lời gần cùng một câu thì sớm muộn lệch nhau. Bảng này trả lời
+    câu khác: "tháng này phòng kế toán đã lập bao nhiêu phiếu thu, bao nhiêu ủy nhiệm chi".
+
+    DÒNG "CHƯA KHAI LOẠI" LÀ CHỦ Ý, KHÔNG PHẢI RÁC. VTOS đang có 17 mã loại chứng từ, MISA có 36,
+    nên chắc chắn còn bút toán không rơi vào mã nào. Bỏ chúng ra ngoài thì tổng của bảng không
+    bằng sổ, và một bảng tổng hợp không khớp sổ thì không dùng để đối chiếu được. Đếm riêng, nói
+    ra — cùng lối nghĩ với dòng "không chia được" của ma trận cặp định khoản.
+
+    Gom ở CƠ SỞ DỮ LIỆU, qua CHÍNH `_filtered` mà mọi sổ khác dùng — nhờ vậy điều kiện "chỉ lấy
+    chứng từ đã ghi sổ" không phải chép lại lần thứ hai, và không có chỗ cho hai nơi lệch nhau.
+    Không nối chuỗi trong SQL: `concat` khác phương ngữ giữa SQLite (phép thử) và Postgres (máy chủ).
+    """
+    q = _filtered(select(JournalEntry.loai_chung_tu,
+                         func.count(func.distinct(JournalLine.entry_id)),
+                         func.coalesce(func.sum(JournalLine.debit), 0.0),
+                         func.coalesce(func.sum(JournalLine.credit), 0.0)),
+                  upto, since).group_by(JournalEntry.loai_chung_tu)
+
+    # Tài khoản hay gặp của mỗi loại — một câu gom nữa, vẫn ở cơ sở dữ liệu.
+    q_tk = _filtered(select(JournalEntry.loai_chung_tu, JournalLine.account_code,
+                            func.coalesce(func.sum(JournalLine.debit), 0.0),
+                            func.coalesce(func.sum(JournalLine.credit), 0.0)),
+                     upto, since).group_by(JournalEntry.loai_chung_tu, JournalLine.account_code)
+    hay_gap: dict[str, list[str]] = {}
+    gom: dict[str, list[tuple[str, float, float]]] = {}
+    for loai, acc, d, c in db.execute(q_tk).all():
+        gom.setdefault(loai or "", []).append((acc, float(d or 0), float(c or 0)))
+    for loai, ds in gom.items():
+        no = sorted((x for x in ds if x[1] > 0), key=lambda x: -x[1])[:2]
+        co = sorted((x for x in ds if x[2] > 0), key=lambda x: -x[2])[:2]
+        hay_gap[loai] = [f"{a}" for a, _, _ in no] + ["/"] + [f"{a}" for a, _, _ in co] if (no and co) \
+            else [a for a, _, _ in (no or co)]
+
+    rows = []
+    for loai, so_ct, d, c in db.execute(q).all():
+        ma = (loai or "").strip()
+        rows.append({"ma": ma, "ten": CT_TEN.get(ma, "") if ma else CHUA_KHAI,
+                     "chua_khai": not ma, "so_chung_tu": int(so_ct or 0),
+                     "debit": round(float(d or 0), 0), "credit": round(float(c or 0), 0),
+                     "tk_hay_gap": " ".join(hay_gap.get(loai or "", []))})
+    rows.sort(key=lambda r: (r["chua_khai"], -r["so_chung_tu"]))
+    total = {k: round(sum(r[k] for r in rows), 0) for k in ("debit", "credit")}
+    total["so_chung_tu"] = sum(r["so_chung_tu"] for r in rows)
+    return {"since": since, "upto": upto, "rows": rows, "total": total,
+            "so_chua_khai": sum(r["so_chung_tu"] for r in rows if r["chua_khai"])}
+
+
+def chung_tu_goc_xlsx(rep: dict) -> bytes:
+    data = [[r["ma"] or "—", r["ten"], r["so_chung_tu"], r["debit"], r["credit"], r["tk_hay_gap"]]
+            for r in rep["rows"]]
+    t = rep["total"]
+    total = ["", "TỔNG CỘNG", t["so_chung_tu"], t["debit"], t["credit"], ""]
+    return _book("TONG HOP CHUNG TU GOC",
+                 _head("BẢNG TỔNG HỢP CHỨNG TỪ GỐC CÙNG LOẠI", rep["since"], rep["upto"]),
+                 ["Mã loại", "Tên loại chứng từ", "Số chứng từ", "Ghi Nợ", "Ghi Có", "TK hay gặp"],
+                 [14, 42, 14, 20, 20, 24], data, total)
