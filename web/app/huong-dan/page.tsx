@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
 import DinhKem from "@/components/DinhKem";
 import { api, vnd, fmtD, fmtDT, soTien } from "@/lib/api";
@@ -11,14 +12,30 @@ import { Tag, errMsg } from "@/components/ui";
  *  DUNG quan hệ chứ không xét tên hợp đồng, và màn hình này cùng dữ liệu của nó chính là nơi lưu bằng
  *  chứng về nội dung đó. Hạn 24 giờ vẫn còn, nhưng là hạn hiệu lực của LỜI CHÀO – quá hạn thì chuyến
  *  chào người khác, không phải hướng dẫn viên vi phạm. */
-const TABS: [string, string][] = [["viec", "Việc cần làm"], ["hdv", "Đội ngũ HDV"], ["chao", "Chào chuyến"],
+const TABS: [string, string][] = [["viec", "Việc cần làm"], ["hdv", "Đội ngũ HDV"],
+  ["ho-so", "Hồ sơ HDV"], ["chao", "Chào chuyến"],
   ["yeucau", "Yêu cầu HDV"], ["baocao", "Báo cáo sau tour"], ["tien", "Tiền HDV"], ["dexuat", "Đề xuất"]];
 
 function HuongDan() {
   const { user, toast } = useShell();
-  const [tab, setTab] = useState("viec");
+  // Đợt HD-14 đọc hai tham số đường dẫn: `?tab=ho-so` mở tab hồ sơ, `?hdv=<id>` mở thẳng hồ sơ một
+  // người. Đường dẫn mang số hiệu người là CỐ Ý — nó gửi cho nhau được. Trang này vì thế PHẢI bọc
+  // `Suspense` ở dưới cùng tệp.
+  const sp = useSearchParams();
+  const [tab, setTab] = useState(sp.get("tab") || "viec");
   const [tq, setTq] = useState<any>(null);
   const [hdv, setHdv] = useState<any>(null);
+  // ── Đợt HD-14 · hồ sơ hướng dẫn viên, CHỈ ĐỌC ──────────────────────────────────────────────
+  // Hồ sơ nằm TRONG màn hình này chứ không phải một trang `/ho-so-hdv/[id]` riêng (Chủ tịch chốt
+  // 21/10/2026). Lý do là một va chạm thật, không phải sở thích: trang riêng phải khai vào
+  // `access.ALL_MENU_PATHS`, mà `services/access.py` đang do làn Phân quyền giữ cho đợt KTT-PC
+  // chưa gộp. Vòng commit NGUYÊN TỆP, nên hai làn cùng sửa một tệp thì ai gộp sau âm thầm xoá
+  // phần của người kia — đúng thứ `test_giu_cho_lan` sinh ra để chặn. Dồn vào đây thì không đụng
+  // tệp nào của làn khác, và đường dẫn `?hdv=<id>` vẫn gửi cho nhau được.
+  const [hoSo, setHoSo] = useState<any>(null);          // danh sách
+  const [xem, setXem] = useState<number>(Number(sp.get("hdv")) || 0);
+  const [mot, setMot] = useState<any>(null);            // hồ sơ đang mở
+  const [loiMot, setLoiMot] = useState("");
   const [can, setCan] = useState<any[]>([]);
   const [chao, setChao] = useState<any[]>([]);
   const [tepHdv, setTepHdv] = useState("");
@@ -49,9 +66,27 @@ function HuongDan() {
       api<any[]>("/guide-assignments/yeu-cau").then(setYc).catch(() => setYc([]));
       api<any>("/guide-assignments/yeu-cau/thieu").then(setThieu).catch(() => setThieu(null));
       api<any[]>("/guide-assignments/de-xuat").then(setDx).catch(() => setDx([]));
+      api<any>("/huong-dan/ho-so").then(setHoSo).catch(() => setHoSo(null));
     } catch (e) { toast(errMsg(e), true); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
+
+  // Mở hồ sơ một người. Lỗi giữ riêng `loiMot` chứ không dùng toast: 404 ở đây là một câu trả lời
+  // của màn hình («không có người này»), không phải một sự cố thoáng qua rồi biến mất.
+  useEffect(() => {
+    if (!xem) { setMot(null); setLoiMot(""); return; }
+    setMot(null); setLoiMot("");
+    api<any>(`/huong-dan/ho-so/${xem}`).then(setMot).catch((e) => setLoiMot(errMsg(e)));
+  }, [xem]);
+
+  // Đổi đường dẫn mà KHÔNG nạp lại trang: người xem gửi được đường dẫn này cho người khác.
+  const moHoSo = (id: number) => {
+    setTab("ho-so"); setXem(id);
+    try {
+      window.history.replaceState(null, "",
+        id ? `/huong-dan?tab=ho-so&hdv=${id}` : "/huong-dan?tab=ho-so");
+    } catch { /* trình duyệt chặn thì thôi — màn hình vẫn đúng, chỉ mất cái đường dẫn gửi được */ }
+  };
 
   const chaoChuyen = async () => {
     setLuu(true);
@@ -285,8 +320,10 @@ function HuongDan() {
           han_muc_tam_ung: "" })}>+ Thêm hướng dẫn viên</button></p>}
         {hdv.du_dieu_kien === 0 && hdv.tong > 0 && <p className="muted">
           <Tag cls="red">chưa ai đủ điều kiện</Tag> Chưa hồ sơ nào có số thẻ trong hệ thống, nên cổng 13
-          đang chặn mọi lời chào chuyến. Bấm <b>Sửa hồ sơ</b> ở từng dòng để nhập thẻ, hoặc tải cả danh
-          sách lên ở màn hình Nạp dữ liệu (bộ nạp &quot;Hướng dẫn viên cộng tác&quot;).</p>}
+          đang chặn mọi lời chào chuyến. Bấm <b>Sửa hồ sơ</b> ở từng dòng để nhập thẻ.
+          KHÔNG dùng bộ nạp &quot;Hướng dẫn viên cộng tác&quot; ở màn hình Nạp dữ liệu cho những người
+          ĐÃ CÓ trong bảng này: bộ nạp ấy luôn TẠO MỚI một hồ sơ, nên nó sinh ra bản trùng chứ không
+          điền vào hồ sơ cũ.</p>}
         <table><thead><tr><th>Mã</th><th>Họ tên</th><th>Thẻ HDV</th><th>Hạn thẻ</th><th>Hội viên</th>
           <th>Hợp đồng cộng tác</th><th>Hạn mức ứng</th><th>Hành nghề</th><th></th></tr></thead>
           <tbody>{hdv.rows.map((h: any) => <tr key={h.id} style={{ opacity: h.dang_lam ? 1 : 0.55 }}>
@@ -313,6 +350,81 @@ function HuongDan() {
         goi={"Thẻ hướng dẫn viên (hai mặt), hợp đồng cộng tác và phụ lục đơn giá, thẻ hội viên tổ chức " +
              "xã hội – nghề nghiệp, chứng nhận bảo hiểm tai nạn. Đây là bộ hồ sơ trả lời cơ quan quản lý " +
              "khi bị hỏi về một chuyến dẫn cụ thể."} />}
+    </>}
+
+    {tab === "ho-so" && !xem && <div className="panel wrap">
+      <h2>Hồ sơ hướng dẫn viên</h2>
+      <p className="muted">Màn hình CHỈ ĐỌC. Sửa hồ sơ hành nghề ở tab &quot;Đội ngũ HDV&quot;; duyệt
+        đăng nhận xét ở màn hình Duyệt công bố. Một việc một chỗ.</p>
+      {!hoSo ? <p className="muted">Chưa đọc được danh sách hồ sơ.</p> : <>
+        <p className="muted">Điểm trung bình chỉ hiện khi đã đủ {hoSo.nguong} lượt chấm. Dưới ngưỡng
+          thì số lượt VẪN hiện thật — giấu cả hai thì người đọc không biết còn thiếu bao nhiêu. Cột
+          &quot;Nhận xét đã đăng&quot; đếm đúng những nhận xét khách còn cho phép hiện: khách rút thì
+          con số tụt ngay.</p>
+        <table><thead><tr><th>Mã</th><th>Họ tên</th><th>Thẻ hành nghề</th><th className="num">Điểm</th>
+          <th className="num">Lượt chấm</th><th className="num">Nhận xét đã đăng</th><th></th></tr></thead>
+          <tbody>{hoSo.rows.length ? hoSo.rows.map((h: any) => <tr key={h.id}>
+            <td className="mono">{h.ma}</td>
+            <td><b>{h.ho_ten}</b></td>
+            <td><Tag cls={h.the.trang_thai === "con_han" ? "ok"
+                        : h.the.trang_thai === "chua_co" ? "red" : "warn"}>{h.the.chu}</Tag></td>
+            <td className="num">{h.du_nguong ? <b>{h.diem}</b>
+              : <span className="muted">chưa đủ lượt</span>}</td>
+            <td className="num">{h.so_luot}</td>
+            <td className="num">{h.so_nhan_xet}</td>
+            <td><button className="act grey" style={{ margin: 0 }}
+                        onClick={() => moHoSo(h.id)}>Xem hồ sơ →</button></td>
+          </tr>) : <tr><td colSpan={7} className="muted">Chưa có hướng dẫn viên nào đang cộng tác.</td></tr>}
+        </tbody></table>
+      </>}
+    </div>}
+
+    {tab === "ho-so" && !!xem && <>
+      <p><button className="act grey" style={{ margin: 0 }}
+                 onClick={() => moHoSo(0)}>← Danh sách hướng dẫn viên</button></p>
+      {loiMot ? <div className="panel"><h2>Không mở được hồ sơ</h2>
+        <p className="muted">{loiMot}</p></div>
+      : !mot ? <div className="panel muted">Đang tải…</div>
+      : <>
+        <div className="panel">
+          <h2>{mot.ho_ten}</h2>
+          <p className="muted mono">{mot.ma}</p>
+          <div className="kpis">
+            <div className="kpi"><b>{mot.diem.du_nguong ? mot.diem.diem : "—"}</b>
+              <span>{mot.diem.du_nguong ? "điểm trung bình"
+                : `chưa đủ ${mot.diem.nguong} lượt để hiện điểm`}</span></div>
+            <div className="kpi"><b>{mot.diem.so_luot}</b><span>lượt khách chấm</span></div>
+            <div className="kpi"><b>{mot.nhan_xet.length}</b><span>nhận xét đang hiện</span></div>
+          </div>
+          {!mot.diem.du_nguong && <p className="muted">Ngưỡng {mot.diem.nguong} lượt không giấu điểm
+            thấp — nó chặn việc kết luận quá sớm. Một người 2,8 điểm từ ba phiếu thì ba phiếu ấy chưa
+            nói được gì, mà con số thì cả phòng đã đọc trước khi Trưởng phòng kịp nói chuyện với họ.</p>}
+        </div>
+
+        <div className="panel">
+          <h2>Thẻ hành nghề</h2>
+          <p><Tag cls={mot.the.trang_thai === "con_han" ? "ok"
+                     : mot.the.trang_thai === "chua_co" ? "red" : "warn"}>{mot.the.chu}</Tag></p>
+          <p>Số thẻ: <span className="mono">{mot.the.so || "—"}</span>
+            {"  ·  "}Loại: {mot.the.loai === "quoc_te" ? "Quốc tế"
+              : mot.the.loai === "noi_dia" ? "Nội địa" : "—"}</p>
+          <p className="muted">Ba điều kiện của Điều 58 Luật Du lịch 2017 quyết định người này được
+            dẫn loại khách nào. Nhập và sửa ở tab &quot;Đội ngũ HDV&quot; — chỗ này chỉ đọc.</p>
+        </div>
+
+        <div className="panel wrap">
+          <h2>Nhận xét của khách</h2>
+          <p className="muted">Chỉ hiện nhận xét khách đã đồng ý đăng VÀ đã được duyệt, và chỉ những
+            cái khách chưa rút lại. Nhãn người viết không bao giờ mang tên khách — đó là điều đã hứa
+            khi hỏi xin phép, không phải một lựa chọn trình bày.</p>
+          {mot.nhan_xet.length ? mot.nhan_xet.map((n: any, i: number) => <div key={i} className="panel">
+            <p>{n.nhan_xet}</p>
+            <p className="muted">{n.nhan}{n.diem !== null && ` · ${n.diem}/5`} · {fmtDT(n.luc)}</p>
+          </div>) : <p className="muted">Chưa có nhận xét nào được đăng. Đây có thể là chưa ai chấm,
+            hoặc đã chấm mà chưa ai duyệt đăng — hai chuyện khác nhau, xem hàng đợi ở màn hình
+            Duyệt công bố.</p>}
+        </div>
+      </>}
     </>}
 
     {tab === "chao" && <div className="panel wrap">
@@ -505,4 +617,11 @@ function HuongDan() {
   </>);
 }
 
-export default function Page() { return <Shell><HuongDan /></Shell>; }
+export default function Page() {
+  // `Suspense` bắt buộc vì HuongDan gọi `useSearchParams` để đọc `?tab=` và `?hdv=`. Thiếu nó thì
+  // `npm run build` CHẾT ở đúng trang này — luật 11/10/2026, canh ở
+  // tests/test_web_suspense_cho_search_params.py.
+  return <Shell><Suspense fallback={<div className="panel muted">Đang tải…</div>}>
+    <HuongDan />
+  </Suspense></Shell>;
+}

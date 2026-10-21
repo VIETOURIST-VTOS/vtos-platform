@@ -23,6 +23,7 @@ from app.db.session import get_db
 from app.models.core import User, Tour
 from app.models.hr import Employee, GuideAssignment, GuideRate
 from app.services import hdv as HDV
+from app.services import ho_so_hdv as HS
 from app.services import hr as H, rules as R
 
 router = APIRouter(prefix="/api/v1/huong-dan", tags=["huong-dan"])
@@ -391,3 +392,36 @@ def them_hdv(data: HdvMoiIn, u: User = Depends(require_roles(*DIEU_PHOI)), db: S
             after={"ho_ten": e.full_name, "the_so": e.card_no})
     db.commit()
     return {**_hdv_ra(e, date.today()), "message": f"Đã tạo hồ sơ {e.code} – {e.full_name}."}
+# ── ĐỢT HD-14 · HỒ SƠ HƯỚNG DẪN VIÊN — CHỈ ĐỌC ───────────────────────────────────────────────
+# VÌ SAO GẮN VÀO ĐÂY chứ không dựng nhóm API riêng `/api/v1/ho-so-hdv`. Chủ tịch chốt 17/10/2026:
+# phòng Hướng dẫn và Ban lãnh đạo đọc. `MENU_ROLES["/huong-dan"]` đã đúng tập ấy, và `MAN_HINH_API`
+# đã mở sẵn tiền tố `/api/v1/huong-dan` cho các vai ấy — nên gắn vào đây KHÔNG đổi một con số nào
+# trong `PHAM_VI_DA_CHOT`. Dựng nhóm mới thì đổi con số của MỌI vai và phải đếm lại bằng cách chạy.
+#
+# Kèm theo đó, nói thẳng: Điều hành, P.TGĐ Đoàn, HCNS, Kế toán, CNTT cũng đọc được vì họ đã mở màn
+# hình `/huong-dan` từ trước. Tập ấy rộng hơn hai chữ «HDV và BLĐ», nhưng KHÔNG nới thêm dữ liệu cho
+# ai: cùng những nhận xét ấy họ đã đọc trên bảng điểm từ Đợt HD-Q1. Muốn hẹp đúng hai nhóm thì phải
+# dựng nhóm API riêng — ghi ra đây để người sau không tưởng đây là sơ suất.
+#
+# KHÔNG CÓ CỬA GHI Ở ĐÂY, cố ý. Sửa hồ sơ hành nghề vẫn ở `PUT /hdv/{eid}` (tab «Đội ngũ HDV»);
+# duyệt đăng nhận xét vẫn ở `/duyet-cong-bo`. Một việc một chỗ.
+@router.get("/ho-so")
+def danh_sach_ho_so(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Danh sách hướng dẫn viên đang cộng tác, kèm thẻ – điểm – số lượt – số nhận xét đã đăng.
+
+    Trả kèm `nguong` để màn hình nói được «còn thiếu bao nhiêu lượt nữa» thay vì chỉ nói «chưa đủ».
+    """
+    return {"rows": HS.danh_sach(db), "nguong": HS.NGUONG_HIEN_DIEM}
+
+
+@router.get("/ho-so/{eid}")
+def mot_ho_so(eid: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Một hồ sơ. KHÔNG có người ấy, hoặc người ấy không phải hướng dẫn viên → 404.
+
+    404 chứ không phải một trang rỗng: trang rỗng nói «người này chưa có gì», còn sự thật là không
+    có người này. Hai câu ấy khác nhau, và người đọc không có cách nào phân biệt nếu máy trả giống.
+    """
+    h = HS.ho_so(db, eid)
+    if h is None:
+        raise HTTPException(404, "Không có hồ sơ hướng dẫn viên này")
+    return h
