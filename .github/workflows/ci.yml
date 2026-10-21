@@ -67,9 +67,22 @@ on:
 # Nhóm theo SỐ PR chứ không theo `github.ref`: cùng một PR đẩy tiếp thì huỷ lượt cũ, còn hai PR
 # khác nhau thì không đụng nhau. `github.ref` trên sự kiện pull_request là `refs/pull/N/merge` nên
 # cũng tách được, nhưng để số PR lên trước thì đọc log biết ngay đang nói về PR nào.
+#
+# NHƯNG KHÔNG HUỶ TRÊN MAIN — Chủ tịch chốt 21/10/2026.
+#
+# Chỗ hở ghi ở việc `hang-rao-gop` phía dưới từ 09/10 đã thành chuyện thật. Đo ngày 21/10: trong
+# TÁM lượt gần nhất trên main, NĂM lượt bị huỷ. Lượt bị huỷ không cho tín hiệu nào, nên main
+# không được đo — và đúng lúc ấy nó đang đỏ mà không ai biết: lượt #977 của PR #402 đỏ, lượt
+# #978 trên main bị huỷ, PR gộp, ba phép thử đỏ sống BỐN NGÀY qua bốn lần gộp nữa, tới lượt #983
+# chạy hết mới lộ ra. Sửa ở Đợt TC-72b (#418).
+#
+# Trên PR, huỷ là đúng: đẩy lần hai thì bản cũ không ai còn quan tâm. Trên main thì ngược hẳn —
+# mã đã vào kho, lượt chạy ấy là THỨ DUY NHẤT nói main còn xanh hay không, và huỷ nó là tự bịt
+# mắt để tiết kiệm vài phút. Giá phải trả: hai lần gộp sát nhau thì chạy cả hai, mỗi lượt ~55
+# phút. Chủ tịch chốt trả giá ấy.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ĐỦ BỘ — trên PR (cửa CHẶN) VÀ trên main (cửa ĐO).
@@ -157,10 +170,10 @@ jobs:
   # to GitHub Team organization account". Chừng nào chưa chuyển, kỷ luật chờ phép kiểm chạy xong
   # vẫn nằm ở NGƯỜI BẤM GỘP, không ở máy.
   #
-  # MỘT CHỖ HỞ CÒN LẠI, của khối `concurrency` phía trên chứ không của việc này: hai lần gộp sát
-  # nhau vào main dùng chung một nhóm (`github.ref`), nên lượt trước bị HUỶ. Lượt bị huỷ không
-  # cho tín hiệu nào. Chỗ ấy đã đúng như thế với `hang-rao-gop` từ 09/10; sửa nó là một quyết
-  # định riêng về tiền Actions, không gộp vào đây.
+  # CHỖ HỞ ẤY ĐÃ ĐÓNG ngày 22/10/2026: `cancel-in-progress` nay chỉ bật trên sự kiện
+  # `pull_request`, nên hai lần gộp sát nhau vào main đều chạy hết và đều cho tín hiệu. Lý do và
+  # số đo ghi ở khối `concurrency` đầu tệp. Ghi lại ở đây vì đây là nơi chỗ hở được phát hiện
+  # trước tiên, và người đọc đoạn này cần biết nó không còn nữa.
   #
   # KHÔNG khai `if:` ở việc này — `test_ci8` đỏ nếu ai khai lại.
   web:
