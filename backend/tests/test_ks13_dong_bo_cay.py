@@ -51,10 +51,18 @@ def kho():
         _git(d, "init", "-q", "-b", "main")
         _git(d, "config", "user.email", "ks@vtos.test")
         _git(d, "config", "user.name", "KS")
+        # HAI LẦN SỬA, cố ý (Đợt KS-19). `app/cu.py` phải THẬT SỰ là nội dung của một commit cũ
+        # thì mới chứng minh được nó là bản cũ. Bản đầu của chỗ dựng này chỉ ghi một chuỗi bất kỳ
+        # lên đĩa rồi gọi nó là "bản cũ" — và vì thế nó cũng nghiệm đúng cho một tệp ĐANG VIẾT DỞ.
         _ghi(d, "app/moi.py", "# tệp MỚI của làn khác\nx = 1\n")
+        _ghi(d, "app/cu.py", "# bản CŨ trên đĩa\n")
+        _ghi(d, "app/dang_viet.py", "# bản CŨ trên đĩa\n")
+        _ghi(d, "docs/dang-lam/vong.md", SO)
+        _git(d, "add", "-A")
+        _git(d, "commit", "-qm", "ban cu")
         _ghi(d, "app/cu.py", "# bản MAIN\ny = 2\n")
         _ghi(d, "app/dang_viet.py", "# bản MAIN\nz = 3\n")
-        _ghi(d, "docs/dang-lam/vong.md", SO)
+        _ghi(d, "app/dang_sua.py", "# bản MAIN\nw = 4\n")
         _git(d, "add", "-A")
         _git(d, "commit", "-qm", "nen")
         sha = _git(d, "rev-parse", "HEAD").strip()
@@ -64,6 +72,7 @@ def kho():
         _ghi(d, "app/cu.py", "# bản CŨ trên đĩa\n")                    # CŨ, không ai giữ
         _ghi(d, "app/dang_viet.py", "# ĐANG VIẾT DỞ, đừng đụng\n")     # CŨ nhưng ĐANG GIỮ
         _ghi(d, "app/chua_day.py", "# tệp làn khác vừa tạo, chưa đẩy\n")  # THỪA
+        _ghi(d, "app/dang_sua.py", "# KHÁC main mà KHÔNG phải bản cũ nào\n")  # CHƯA RÕ
         yield d
 
 
@@ -287,3 +296,34 @@ def test_ks13_12_dong_giu_cho_chi_co_TREN_MAIN_cung_phai_duoc_ton_trong(kho_so_c
         os.chdir(cwd)
     assert "app/da_gop.py" in giu, (
         f"Dòng giữ chỗ chỉ có trên main bị bỏ qua — việc của làn ấy sẽ bị ghi đè.\n{giu}")
+# ── KS-19: "khác main" KHÔNG đủ để ghi đè ───────────────────────────────────────────────────
+def test_ks13_13_khac_main_ma_KHONG_phai_ban_cu_thi_de_nguyen(kho):
+    """Lỗ của chính tệp này, đo được bằng cách nó ăn mất việc của người viết ra nó.
+
+    Chiều 21/10/2026: `backend/Dockerfile` và `backend/app/api/v1/routes.py` vừa sửa xong cho đợt
+    KS-18, chưa kịp khai vào sổ. Một lần bấm lấy main là cả hai bị ghi đè về bản main — vì luật
+    cũ chỉ hỏi "khác main không?". "Khác main" có HAI nghĩa trái ngược: bản cũ chưa cập nhật, và
+    việc đang làm dở chưa đẩy. Hỏi thêm một câu nữa mới phân biệt được: có trùng từng byte với
+    một bản cũ của chính nó không.
+    """
+    kq = _chay(kho)
+    assert "app/dang_sua.py" in kq["chua_ro"], kq
+    assert "app/dang_sua.py" not in kq["cu"], "việc đang làm bị xếp nhầm vào nhóm bản cũ"
+    assert _doc(kho, "app/dang_sua.py") == "# KHÁC main mà KHÔNG phải bản cũ nào\n", \
+        "việc đang làm dở bị ghi đè"
+
+
+def test_ks13_14_ban_cu_CHUNG_MINH_DUOC_thi_van_keo_ve_binh_thuong(kho):
+    """Siết chặt không được làm công cụ ngừng hoạt động: bản cũ thật vẫn phải về."""
+    kq = _chay(kho)
+    assert "app/cu.py" in kq["cu"], kq
+    assert _doc(kho, "app/cu.py") == "# bản MAIN\ny = 2\n"
+
+
+def test_ks13_15_tep_chua_ro_duoc_BAO_RA_chu_khong_im_lang(kho):
+    """Im lặng là chỗ nguy nhất: tệp lùi về mà không ai biết, rồi mọi phép đo chạy trên bản lùi."""
+    import importlib
+    m = importlib.import_module("dong_bo_cay")
+    assert "chua_ro" in m.dong_bo(kho, chi_xem=True)
+    ma = __import__("inspect").getsource(m)
+    assert "chưa rõ" in ma, "kết quả không in nhóm `chưa rõ` ra cho người đọc"

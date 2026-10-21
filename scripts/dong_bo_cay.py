@@ -185,7 +185,25 @@ def bam_tep(duong: str) -> str:
 
 
 def soat(goc: str, ref: str = "origin/main"):
-    """Trả về (thiếu, cũ, đang_giữ) — ba danh sách rời nhau."""
+    """Trả về (thiếu, cũ, đang_giữ, chưa_rõ) — bốn danh sách rời nhau.
+
+    `chưa_rõ` SINH RA Ở ĐỢT KS-19 (21/10/2026), VÌ MỘT LỖ CỦA CHÍNH TỆP NÀY, đo được bằng cách nó
+    ăn mất việc của người viết ra nó. Bản trước hỏi đúng MỘT câu cho tệp thường: "khác main
+    không?" — khác là xếp vào `cũ` và ghi đè. Nhưng "khác main" có HAI nghĩa trái ngược: bản cũ
+    chưa cập nhật, VÀ việc đang làm dở chưa đẩy.
+
+    Đo được chiều 21/10: `backend/Dockerfile` và `backend/app/api/v1/routes.py` vừa sửa xong cho
+    đợt KS-18, chưa kịp khai vào sổ, nên không nằm trong `giu`. Một lần bấm lấy main là cả hai bị
+    ghi đè về bản main. Luật cất bản cũ cứu được số chữ, nhưng người viết KHÔNG được báo gì: tệp
+    lặng lẽ lùi về, và mọi phép đo sau đó chạy trên bản đã lùi.
+
+    Câu hỏi đúng là câu `dong_bo_so` vẫn hỏi cho quyển sổ: tệp này có TRÙNG TỪNG BYTE với một bản
+    cũ của chính nó không. Trùng thì chắc chắn không chứa dòng nào mới — kéo về an toàn. Không
+    trùng thì KHÔNG ĐỤNG, chỉ BÁO: có thể là việc đang làm chưa khai.
+
+    Giá phải trả: một tệp cũ thật mà từng bị sửa tay sẽ không được kéo về, chỉ được báo. Đúng
+    chiều — trượt an toàn, y như luật của DỌN-6.
+    """
     main = tep_cua_main(ref)
     giu = tep_dang_giu(goc)
     # SỔ GIỮ CHỖ KHÔNG BAO GIỜ ĐI QUA ĐƯỜNG CHUNG. Một quyển sổ thường không được dòng nào khai
@@ -195,7 +213,7 @@ def soat(goc: str, ref: str = "origin/main"):
     # Sổ chỉ đi qua `dong_bo_so`, nơi đòi CHỨNG MINH là bản cũ trước khi đụng. Sổ THIẾU HẲN thì
     # vẫn kéo về bình thường: không có gì để mất.
     la_so = set(tep_so(goc)) | {d for d in main if d.startswith("docs/dang-lam/") or d == "docs/DANG-LAM.md"}
-    thieu, cu, dang_giu = [], [], []
+    thieu, cu, dang_giu, chua_ro = [], [], [], []
     for duong, sha in main.items():
         that = os.path.join(goc, duong)
         if not os.path.exists(that):
@@ -203,13 +221,18 @@ def soat(goc: str, ref: str = "origin/main"):
         elif bam_tep(that) != sha:
             if duong in la_so:
                 continue                      # sổ: để `dong_bo_so` quyết, không đụng ở đây
-            (dang_giu if duong in giu else cu).append(duong)
-    return sorted(thieu), sorted(cu), sorted(dang_giu), giu
+            if duong in giu:
+                dang_giu.append(duong)
+            elif la_ban_cu_nguyen_si(goc, duong, ref):
+                cu.append(duong)
+            else:
+                chua_ro.append(duong)
+    return sorted(thieu), sorted(cu), sorted(dang_giu), sorted(chua_ro), giu
 
 
 def dong_bo(goc: str, ref: str = "origin/main", chi_xem: bool = False) -> dict:
     so_da_keo = [] if chi_xem else dong_bo_so(goc, ref)   # SỔ TRƯỚC, rồi mới xét ai giữ gì
-    thieu, cu, dang_giu, giu = soat(goc, ref)
+    thieu, cu, dang_giu, chua_ro, giu = soat(goc, ref)
     kho = os.path.join(goc, f"_cu-truoc-khi-dong-bo-{date.today():%Y-%m-%d}")
 
     if not chi_xem:
@@ -223,7 +246,8 @@ def dong_bo(goc: str, ref: str = "origin/main", chi_xem: bool = False) -> dict:
             with open(that, "wb") as f:
                 f.write(_git("show", f"{ref}:{duong}", nhi_phan=True))
 
-    return {"thieu": thieu, "cu": cu, "dang_giu": dang_giu, "giu": giu, "so_da_keo": so_da_keo,
+    return {"thieu": thieu, "cu": cu, "dang_giu": dang_giu, "chua_ro": chua_ro, "giu": giu,
+            "so_da_keo": so_da_keo,
             "kho_cat": kho if (cu and not chi_xem) else None, "chi_xem": chi_xem}
 
 
@@ -259,6 +283,13 @@ def main(argv: list[str]) -> int:
     print(f"KHÔNG ĐỤNG   đang giữ  : {len(kq['dang_giu'])} tệp (việc đang làm của các làn)")
     for d in kq["dang_giu"]:
         print(f"               · {d}  ←  {kq['giu'].get(d, '?')}")
+    if kq["chua_ro"]:
+        print(f"KHÔNG ĐỤNG   chưa rõ   : {len(kq['chua_ro'])} tệp (khác main, KHÔNG chứng minh được "
+              f"là bản cũ)")
+        for d in kq["chua_ro"]:
+            print(f"               ? {d}")
+        print("               ↑ nhiều khả năng là VIỆC ĐANG LÀM chưa khai vào sổ. Công cụ này")
+        print("                 không đụng tới. Nếu đúng là bản cũ thì tự lấy main về cho tệp ấy.")
     if kq["kho_cat"]:
         print(f"\nBản cũ cất ở: {os.path.basename(kq['kho_cat'])}/  (không nằm trong git, không xoá gì)")
     if kq["dang_giu"]:
