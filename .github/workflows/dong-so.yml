@@ -16,9 +16,41 @@
 # chứ không bắt ngay. Chấp nhận, vì `test_giu_cho_lan` và `test_ds1` đã canh đúng chỗ ấy.
 name: Đóng sổ khi gộp
 
+# TẮT KÍCH HOẠT TỰ ĐỘNG — Đợt SO-1, 22/10/2026. ĐỌC TRƯỚC KHI BẬT LẠI.
+#
+# VIỆC NÀY KHÔNG HỎNG. Nó tính đúng rồi không ghi được. Lượt #5 (`4b939df`) và #6 (`3a73454`) đều
+# đỏ cùng một chỗ: `main` từ chối commit ghi sổ bằng GH006, vì rào đòi `hang-rao-gop` mà một commit
+# vừa sinh ra thì chưa có lượt kiểm nào chạy cho nó. Sau Đợt DỌN-7 nó thôi nuốt lỗi, nên màu đỏ ấy
+# là thật — và nó sẽ lặp lại ở MỌI lần gộp, mãi mãi, cho tới khi cửa vượt rào mở ra.
+#
+# ĐÃ THỬ MỞ CỬA ẤY, KHÔNG MỞ ĐƯỢC. Ngày 22/10/2026 rào `main` kiểu cũ đã chuyển thành hai ruleset
+# (`main-1` giữ chặn xoá nhánh và chặn force push, `main-2` giữ bắt buộc `hang-rao-gop`). Bảng
+# Bypass list của `main-2` mở ra đủ ba nhóm, và KHÔNG nhóm nào chào con bot Actions:
+#     Roles  : Organization admin, Repository admin, Maintain, Write
+#     Apps   : Copilot code review, Copilot cloud agent, GitHub Agentic Autofix,
+#              GitHub Code Quality Agent, Render, Vercel
+#     Others : chỉ Deploy keys
+# Nghĩa là lời khuyên ở bước `Ghi lại sổ` phía dưới — «cho github-actions[bot] vào danh sách vượt
+# rào» — hiện KHÔNG thực hiện được ở kho này. Lời khuyên ấy vẫn để nguyên, vì nó đúng về nguyên
+# tắc và `test_ds2_3` canh nó; chỗ sai là ở chỗ GitHub chưa cho, không phải ở chỗ viết.
+#
+# VIỆC ẤY NAY CHẠY Ở ĐÂU. Tại làn, trước mỗi lần đẩy. `DONG_SO_LAN.py` — tệp của làn, KHÔNG nằm
+# trong kho — gọi THẲNG `backend/tools/dong_so.py`, tức cùng một tệp luật mà việc này gọi và cùng
+# một tệp mà `test_ds1` canh. Nó đi qua những lần gộp chưa xử lý trên `origin/main`, đóng dòng, rồi
+# để kết quả đi cùng vòng kế tiếp qua PR như mọi thay đổi khác. Chậm hơn đúng một vòng, nhưng ghi
+# được — mà một ô trạng thái ghi muộn một vòng vẫn hơn hẳn một ô không bao giờ ghi.
+#
+# BẬT LẠI KHI NÀO. Khi `github-actions` xuất hiện trong Bypass list của `main-2`, hoặc khi kho có
+# một deploy key quyền ghi nằm trong danh sách ấy. Lúc đó đổi `on:` bên dưới về
+#     on:
+#       push:
+#         branches: [main]
+# là xong — phần còn lại của tệp không phải sửa một chữ, và năm phép thử `test_ds2` không đụng tới
+# khối `on:` nên chúng xanh ở cả hai trạng thái.
+#
+# ĐỂ LẠI `workflow_dispatch` để còn chạy tay mà đọc nhật ký khi muốn thử lại cửa vượt rào.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
