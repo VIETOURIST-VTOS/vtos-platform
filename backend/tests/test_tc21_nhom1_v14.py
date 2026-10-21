@@ -152,8 +152,15 @@ def test_dong_phu_khong_bia_so_so_sanh():
 def test_the_tour_dang_ban_khong_con_ghi_chu():
     """SỬA 29/9/2026 (TC-97): anh Tuấn "trên màn hình chủ tịch em xoá hết các ghi chú". Dòng phụ
     giải thích "chưa có sức chứa… chỗ còn" là ghi chú nên bỏ; thẻ chỉ còn con số."""
-    the = _the(_doc(TRANG), "Tour đang bán")
-    assert "sức chứa" not in the and "duoi:" not in the, the
+    # SỬA 22/10/2026 (TQ-1): ô «Tour đang bán» chuyển vào mục Vận hành (components/KhoiVanHanh.tsx).
+    # Bản vẽ Tổng quan Vận hành v1.1 anh Tuấn duyệt 22/10 có MỘT dòng định nghĩa ngắn dưới mỗi ô
+    # tour («Đã duyệt, chưa tới ngày đi») — quyết định mới hơn TC-97 cho riêng mục này. Câu giải
+    # thích «sức chứa… chỗ còn» mà TC-97 bỏ thì vẫn không được quay lại.
+    vh = (GOC / "web" / "components" / "KhoiVanHanh.tsx").read_text(encoding="utf-8")
+    i = vh.index("Tour đang bán")
+    the = vh[i:vh.index("</div>", vh.index("Xem tour đang bán", i))]
+    assert "sức chứa" not in the and "chỗ còn" not in the, the
+    assert "const the: The[]" not in _doc(TRANG)
 
 
 def test_khoi_ton_dong_noi_ro_hai_chi_so_con_thieu():
