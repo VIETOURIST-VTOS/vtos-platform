@@ -1,0 +1,93 @@
+# ĐÓNG SỔ KHI GỘP — Đợt DỌN-6, 21/10/2026
+#
+# VÌ SAO CÓ VIỆC NÀY. Đo trên main `06369d2` ngày 20/10/2026: 6 trên 7 dòng `đang làm` là dòng đã
+# chết — việc đã nằm trên main, chỉ là chưa ai đóng dòng. Sổ nói sai sáu lần trên bảy. Và trong 36
+# giờ ngày 16–17/10, 27 dòng chết phải nhờ làn đi sau dọn hộ (DỌN-5 đóng 20, TM-1 đóng 4, R3b đóng 3).
+#
+# Gốc: dòng được GHI lúc làn bắt đầu, nhưng chỗ duy nhất đúng để ĐÓNG là lúc PR gộp — mà lúc ấy mọi
+# script của làn đã chạy xong, việc gộp diễn ra trên GitHub. Không có gì gắn vào sự kiện gộp.
+#
+# ĐÃ CHẠY THỬ trên 185 lần gộp thật của main trước khi viết tệp này. Luật và phép đo dùng CHUNG một
+# tệp `backend/tools/dong_so.py`, nên hai thứ không thể lệch nhau.
+#
+# VÌ SAO `[skip ci]`. Commit ghi sổ chỉ đổi đúng một ô trạng thái. Để ci.yml chạy lại trên nó thì
+# tốn thêm một vòng `web` + `docker` cho mỗi lần gộp — kho này đã chạm trần chi tiêu Actions ngày
+# 19/9 và 17/10. Đổi lại: nếu commit này làm hỏng sổ thì cửa hẹp của LẦN GỘP KẾ TIẾP mới bắt được,
+# chứ không bắt ngay. Chấp nhận, vì `test_giu_cho_lan` và `test_ds1` đã canh đúng chỗ ấy.
+name: Đóng sổ khi gộp
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+# Hai lần gộp sát nhau không được cùng ghi sổ một lúc. KHÔNG huỷ cái đang chạy: huỷ giữa chừng là
+# bỏ sót một dòng đáng đóng.
+concurrency:
+  group: dong-so-main
+  cancel-in-progress: false
+
+jobs:
+  dong-so:
+    # CHỐT 5: bỏ qua commit của chính việc này. Không có dòng này thì nó tự kích vòng lặp.
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Chỉ chạy trên commit gộp
+        id: loc
+        run: |
+          set -eu
+          if ! git rev-parse --verify -q HEAD^2 >/dev/null; then
+            echo "khong phai commit gop — bo qua"
+            echo "chay=0" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          git fetch --deepen=5 origin main >/dev/null 2>&1 || true
+          tieu="$(git log -1 --format=%s)"
+          nhanh="$(printf '%s' "$tieu" | sed -n 's|.*from [^/]*/\([^ ]*\).*|\1|p')"
+          if [ -z "$nhanh" ]; then
+            echo "khong doc duoc ten nhanh tu: $tieu"
+            echo "chay=0" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          git diff --name-only HEAD^1 HEAD > doi_tep.txt
+          echo "nhanh=$nhanh" >> "$GITHUB_OUTPUT"
+          echo "chay=1" >> "$GITHUB_OUTPUT"
+          echo "nhanh: $nhanh"
+          echo "tep doi: $(wc -l < doi_tep.txt)"
+
+      - name: Đóng dòng
+        if: steps.loc.outputs.chay == '1'
+        run: |
+          set -eu
+          python backend/tools/dong_so.py \
+            --goc . --nhanh "${{ steps.loc.outputs.nhanh }}" \
+            --doi-tep "$(cat doi_tep.txt)" --that
+          rm -f doi_tep.txt
+
+      - name: Ghi lại sổ
+        if: steps.loc.outputs.chay == '1'
+        run: |
+          set -eu
+          if git diff --quiet; then echo "so khong doi — khong commit"; exit 0; fi
+          # CHỐT 1: một ký tự đổi ngoài docs/dang-lam/ là dừng hẳn, không commit gì.
+          ngoai="$(git diff --name-only | grep -v '^docs/dang-lam/' || true)"
+          if [ -n "$ngoai" ]; then
+            echo "DUNG — co tep doi NGOAI so: $ngoai"; exit 1
+          fi
+          git config user.name "VTOS đóng sổ"
+          git config user.email "noreply@anthropic.com"
+          git add docs/dang-lam
+          git commit -m "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp [skip ci]"
+          # Lần gộp khác vừa hạ cánh thì đẩy sẽ bị từ chối. Thử lại MỘT lần sau khi rebase;
+          # vẫn hỏng thì thôi, lần gộp kế tiếp sẽ đóng nốt — không ép.
+          git push || { git pull --rebase origin main && git push; } || \
+            echo "day khong duoc — de lan gop sau dong not"
