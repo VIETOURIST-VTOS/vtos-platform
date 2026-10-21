@@ -20,6 +20,7 @@ if os.path.exists("test_lb1.db"):
     os.remove("test_lb1.db")
 
 import pytest
+from tests.cong_da_duyet import duyet_cong
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -47,6 +48,7 @@ def _startup():
 
 def _ky_xong(period=P):
     client.get(f"/api/v1/payroll-runs/{period}", params={"refresh": True}, headers=login("hcns"))
+    duyet_cong(client, period, login)   # CN-1: công chưa duyệt thì kiểm cơ sở chặn
     client.post(f"/api/v1/payroll-runs/{period}/kiem-co-so", headers=login("hcns"))
     client.post(f"/api/v1/payroll-runs/{period}/advance", headers=login("hcns"))
     return client.post(f"/api/v1/payroll-runs/{period}/advance", headers=login("chutich"))

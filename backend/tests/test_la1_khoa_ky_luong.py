@@ -19,6 +19,7 @@ if os.path.exists("test_la1.db"):
     os.remove("test_la1.db")
 
 import pytest
+from tests.cong_da_duyet import duyet_cong
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -45,6 +46,7 @@ def _startup():
 
 
 def _kiem(ai="hcns"):
+    duyet_cong(client, P, login)   # CN-1: công chưa duyệt thì kiểm cơ sở chặn
     return client.post(f"/api/v1/payroll-runs/{P}/kiem-co-so", headers=login(ai))
 
 
@@ -67,6 +69,14 @@ def test_a2_ke_toan_khong_con_dung_dau_chuoi():
         "Kế toán chuyển về cuối chuỗi – thứ họ xác nhận ở đầu là sự thật máy tự kiểm được"
 
 
+def test_a2b_cong_chua_duyet_thi_kiem_co_so_chan():
+    """CN-1 (21/10/2026): phòng có người trong bảng mà công chưa duyệt thì kiểm cơ sở CHẶN."""
+    d = client.post(f"/api/v1/payroll-runs/{P}/kiem-co-so", headers=login("hcns")).json()
+    co = [c for c in d["co"] if c["ma"] == "CONG_CHUA_DUYET"]
+    assert co and all(c["muc"] == "chan" for c in co), d["co"]
+    assert d["dat"] is False and d["trang_thai"] == "nhap"
+
+
 def test_a3_kiem_co_so_chay_duoc_va_doi_trang_thai():
     d = _kiem().json()
     assert d["dat"] is True, d["co"]
@@ -84,6 +94,22 @@ def test_a4_moi_co_deu_co_muc_va_bang_chung():
 
 def test_a5_hcns_kiem_roi_moi_den_chu_ky():
     assert _tien("hcns").json()["run"]["status"] == "hcns_kiem"
+
+
+def test_a6_sua_cong_sau_khi_duyet_thi_chu_ky_dung_lai():
+    """CN-1: kiểm cơ sở đã qua, nhưng HCNS sửa công trước lúc ký thì xác nhận hết hiệu lực và chữ ký
+    phải dừng — kiểm lại ngay trong bước ký, không tin kết quả kiểm từ trước."""
+    bang = client.get("/api/v1/attendance", params={"period": P, "department": "ketoan"},
+                      headers=login("hcns")).json()
+    if not bang["rows"]:
+        pytest.skip("bản demo không có người phòng Kế toán")
+    eid = bang["rows"][0]["employee_id"]
+    r = client.post("/api/v1/attendance", json={"employee_id": eid, "day": f"{P}-02", "kind": "khong_luong",
+                                                "work": 0, "ot_hours": 0, "note": "CN-1"}, headers=login("hcns"))
+    assert r.status_code == 200, r.text
+    r = _tien("chutich")
+    assert r.status_code == 422 and "công chưa duyệt" in r.json()["detail"], r.text
+    duyet_cong(client, P, login)
 
 
 # ───────────────────── F · Chủ tịch ký được ─────────────────────

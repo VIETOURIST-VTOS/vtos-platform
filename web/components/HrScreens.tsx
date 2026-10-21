@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useShell } from "@/components/Shell";
 import LuoiChamCong from "@/components/LuoiChamCong";
+import XacNhanCong from "@/components/XacNhanCong";
 // 5.6 Danh gia nhan su · 09/10/2026. The nay ten la "Danh gia & su vu" ma truoc ban nay chi co SU
 // VU — khong ky danh gia, khong tieu chi, khong nguoi cham. Bang cham dung o DAU the, tren so su
 // vu, vi danh gia la viec lam moi ky con bien ban su vu la viec chi lam khi co chuyen.
@@ -244,6 +245,8 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
               nên cột Công in RỖNG cho mọi dòng. Một cột trống trên bảng chấm công đọc ra là "chưa
               chấm ngày nào", không phải "màn hình đọc sai tên trường". */}
       <LuoiChamCong period={period} />
+      {/* CN-1 (21/10/2026): HCNS xác nhận → TGĐ duyệt công tháng; chưa duyệt thì bảng lương chặn. */}
+      <XacNhanCong period={period} />
       <div className="panel wrap"><h2>Đơn nghỉ · {donNghi.length}</h2>
         {!donNghi.length ? <p className="muted">Không có đơn nào.</p> :
           <table><thead><tr><th>Người</th><th>Loại</th><th>Từ</th><th>Đến</th><th className="num">Số ngày</th><th>Trạng thái</th><th>Lý do</th></tr></thead>

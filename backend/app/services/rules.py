@@ -1033,6 +1033,12 @@ def run_robots(db: Session) -> int:
         created += HDT.quet(db)
     except Exception as ex:
         audit(db, "robot", "robot", "robot_han_dong_tien_loi", "robot", after={"ly_do": str(ex)[:200]})
+    # CN-1 · chuông xác nhận công tháng, hạn ngày 3 tháng sau. Try riêng như dòng tiền ở trên.
+    try:
+        from app.services import xac_nhan_cong as XNC
+        created += XNC.quet(db)
+    except Exception as ex:
+        audit(db, "robot", "robot", "robot_xac_nhan_cong_loi", "robot", after={"ly_do": str(ex)[:200]})
     sla = int(get_param(db, "sla_booking_phut"))
     for r in db.execute(select(ServiceRequest).where(ServiceRequest.booking_id == None)).scalars():
         mins = (datetime.now() - r.created_at).total_seconds() / 60
