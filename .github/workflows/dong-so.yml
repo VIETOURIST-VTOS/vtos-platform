@@ -87,7 +87,18 @@ jobs:
           git config user.email "noreply@anthropic.com"
           git add docs/dang-lam
           git commit -m "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp [skip ci]"
-          # Lần gộp khác vừa hạ cánh thì đẩy sẽ bị từ chối. Thử lại MỘT lần sau khi rebase;
-          # vẫn hỏng thì thôi, lần gộp kế tiếp sẽ đóng nốt — không ép.
-          git push || { git pull --rebase origin main && git push; } || \
-            echo "day khong duoc — de lan gop sau dong not"
+          # ĐẨY — Đợt DỌN-7, 21/10/2026. HỎNG THÌ ĐỎ, không nuốt.
+          #
+          # Lần đầu việc này chạy (ngay sau khi PR #405 gộp) nó đóng ĐÚNG dòng DỌN-6, rồi `main`
+          # từ chối đẩy bằng GH006 — mà việc CI vẫn báo Success, vì dòng cũ kết thúc bằng
+          # `|| echo "day khong duoc"`. Sổ không đổi một chữ, và không ai biết. `test_ds2_1`
+          # canh đúng chỗ ấy.
+          if git push 2>day_loi.txt; then cat day_loi.txt; exit 0; fi
+          cat day_loi.txt
+          if grep -q 'GH006' day_loi.txt; then
+            echo "::error::main dang chan day thang (GH006). Day KHONG phai loi ma: cho github-actions[bot] vao danh sach vuot rao (bypass) cua nhanh main trong Settings, khong thi viec nay khong bao gio ghi duoc so."
+            exit 1
+          fi
+          # Lần gộp khác vừa hạ cánh trước: rebase rồi thử lại ĐÚNG MỘT lần. Hỏng nữa thì đỏ.
+          git pull --rebase origin main
+          git push
