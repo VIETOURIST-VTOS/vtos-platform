@@ -288,11 +288,13 @@ def test_ba_khoi_chuyen_len_khong_de_lai_ban_sao_o_duoi():
 
 
 def test_the_nho_khong_mang_bieu_do():
-    """SỬA 16/9/2026 (TC-46): năm thẻ thành SÁU theo bản vẽ v3.0. Luật thì y nguyên, và nó nằm ở
-    phép soát thứ hai: hàng thẻ là những con số để LIẾC, không thẻ nào được mang biểu đồ."""
+    """SỬA 22/10/2026 (TC-72): sáu thẻ còn NĂM — «Xe đang đi» xuống khối Hiệu quả đội xe. Luật
+    thì y nguyên, và nó nằm ở phép soát thứ hai: hàng thẻ là những con số để LIẾC, không thẻ nào
+    được mang biểu đồ. Chỗ MỚI của con số ấy canh ở
+    `test_tc18_man_hinh_01_v12.test_xe_dang_di_nam_o_khoi_hieu_qua_doi_xe`."""
     ma = _ma(_doc(TRANG))
     khoi = ma[ma.index("const the: The[] = ["): ma.index("];", ma.index("const the: The[] = ["))]
-    assert len(re.findall(r'nhan: "', khoi)) == 6
+    assert len(re.findall(r'nhan: "', khoi)) == 5
     assert "xu_huong" not in khoi, (
         "Hàng thẻ nhỏ là con số để LIẾC. Thêm hình vào chúng là kéo mắt khỏi sáu ô lớn phía trên — "
         "đúng điều anh Tuấn chốt khi chọn 'thẻ số nhỏ, một hàng, không biểu đồ'."
