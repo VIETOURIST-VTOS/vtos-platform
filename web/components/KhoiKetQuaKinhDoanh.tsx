@@ -205,12 +205,37 @@ function diemTu(ct: any, cot2?: any): Diem[] {
  *  chúng thành `title` trên chính con số: rê chuột lên "45,06 tỷ" là đọc được kỳ ấy so với kế
  *  hoạch thế nào, còn màn hình thì chỉ còn con số và cái hình.
  */
-function OSo({ gt, nhan, chu }: { gt: number | null; nhan: string; chu: string }) {
+/** LN-1 (21/10/2026) — Ô RỖNG NÓI NGAY TRONG Ô VÌ SAO, thay cho một dấu gạch trần.
+ *
+ *  Đo trên hệ thật sáng 21/10: ô «Lợi nhuận trước thuế» in «—» đứng cạnh 26,7 tỷ, không một chữ
+ *  nào nói vì sao. Lý do THẬT có sẵn trong dữ liệu (`con_thieu.thang_chua_ghi_so`) và ĐÃ được in
+ *  ra — nhưng in ở dòng ghi chú `.kqkd-thieu`, mà màn hình Chủ tịch ẩn hết ghi chú theo đúng lệnh
+ *  anh Tuấn chốt 29/9/2026 ("trên màn hình chủ tịch em xoá hết các ghi chú"). Nên câu trả lời bị
+ *  ẩn cùng mọi thứ khác, và còn lại một dấu gạch đọc ra như ô hỏng.
+ *
+ *  Đây đúng vòng HQ-1b đã chữa cho ô Công suất khai thác hôm 13/10: câu trả lời phải nằm TRONG
+ *  chính ô ấy, không nằm ở một dòng chữ bên cạnh — dòng chữ thì ẩn được, ô thì không.
+ *
+ *  `thieu` rỗng thì ô vẫn in dấu gạch như cũ: rỗng-vì-lý-do-khác là chuyện khác, và bịa một câu
+ *  giải thích cho nó còn tệ hơn dấu gạch. */
+type ThieuOSo = { ai: string; vi_sao: string; cua: string };
+
+function OSo({ gt, nhan, chu, thieu }: {
+  gt: number | null; nhan: string; chu: string; thieu?: ThieuOSo | null;
+}) {
   return (
     <div className="o6-so" title={chu}>
-      <b className={"o6-lon" + (gt === null ? " rong" : "")}>
-        {gt === null ? "—" : gonSo(gt, "tien")}
-      </b>
+      {gt === null && thieu ? (
+        // Cỡ chữ đặt tại chỗ, KHÔNG thêm lớp vào globals.css: tệp ấy đang có làn khác giữ, và
+        // một dòng CSS cho đúng một ô thì ở ngay cạnh ô ấy dễ đọc hơn là ở cuối một tệp 1.500 dòng.
+        <Link className="the-cua" href={thieu.cua} style={{ fontSize: "calc(15/14*1rem)" }}>
+          chờ {thieu.ai}<span className="muted"> · {thieu.vi_sao}</span>
+        </Link>
+      ) : (
+        <b className={"o6-lon" + (gt === null ? " rong" : "")}>
+          {gt === null ? "—" : gonSo(gt, "tien")}
+        </b>
+      )}
       <span className="muted o6-nhan">{nhan}</span>
     </div>
   );
@@ -366,6 +391,16 @@ export default function KhoiKetQuaKinhDoanh() {
   // TC-68 · Tháng chưa có một bút toán nào. Đây là lý do THẬT của ô "Lợi nhuận trước thuế" rỗng;
   // nói ra ở đây chứ không để người đọc tự đoán từ một dấu gạch.
   const chua_ghi: string[] = Array.isArray(th.thang_chua_ghi_so) ? th.thang_chua_ghi_so : [];
+  // LN-1 · Cùng một sự thật, nói ở HAI chỗ cho hai loại người đọc: `cau_thieu` bên dưới là câu
+  // đầy đủ cho màn hình có ghi chú; `ln_thieu` là bản rút gọn nhét vừa trong ô, cho màn hình Chủ
+  // tịch đã ẩn ghi chú. KHÔNG bỏ câu dài đi: ở màn hình khác nó vẫn là chỗ nói đủ đầu đuôi.
+  const ln_thieu = so_ln === null && chua_ghi.length ? {
+    ai: String(th.ai_ghi_so || "Kế toán"),
+    vi_sao: (chua_ghi.length > 1 ? "các tháng " : "tháng ")
+      + chua_ghi.map((t) => soTrongNam(t)).join(", ")
+      + "/" + String(chua_ghi[0]).slice(0, 4) + " chưa có bút toán",
+    cua: "/accounting",
+  } : null;
   // ══ TC-71 · 19/9/2026 — NHÃN CƠ SỞ CỦA CON SỐ GỘP ═══════════════════════════════════════════
   // Anh Tuấn chốt 18/9: doanh thu GỘP cả chuyến chưa đóng sổ. Hệ quả em đã nói trước với anh và
   // ghi lại ở đây để không ai phải hỏi lại: con số ấy KHÔNG còn khớp sổ kế toán và không khớp
@@ -507,7 +542,8 @@ export default function KhoiKetQuaKinhDoanh() {
         <div className="kqkd-hai-so">
           <OSo gt={so_lt} nhan={`Lợi nhuận tour · ${nhan_ky}`}
             chu="Thu trừ chi của chính những chuyến đã đóng số — chưa gánh chi phí chung." />
-          <OSo gt={so_ln} nhan={`Lợi nhuận trước thuế · ${nhan_ky}`} chu={cau_bien} />
+          <OSo gt={so_ln} nhan={`Lợi nhuận trước thuế · ${nhan_ky}`} chu={cau_bien}
+            thieu={ln_thieu} />
         </div>
       </div>
       {/* THEO DẤU, không theo mức: người đọc tìm ở hình này đúng một điều — tháng nào lỗ. Còn
