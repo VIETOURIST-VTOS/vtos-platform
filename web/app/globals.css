@@ -1263,6 +1263,7 @@ table.bang-doc{width:100%}
 .bd-cg-cham.d1{background:var(--vtos-warning)}   /* THU */
 .bd-cg-cham.d2{background:var(--vtos-danger)}    /* CHI */
 .bd-cg-cham.d3{background:var(--vtos-navy)}      /* TỒN */
+.bd-cg-cham.d4{background:var(--vtos-success)}   /* TỐT — xem khối đo bên dưới */
 
 /* Lưới HAI HÀNG: hàng trên là cột mốc trái · vùng vẽ · cột mốc phải; hàng dưới CHỈ có nhãn
    trục ngang, và nó nằm đúng cột của vùng vẽ. `align-items:stretch` để hai cột mốc cao đúng
@@ -1278,16 +1279,45 @@ table.bang-doc{width:100%}
 .bd-duong-nhanx>span{font-size:calc(10.5/14*1rem);color:var(--vtos-text-mute);text-align:center;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bd-duong-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+
+/* ── MÀU THỨ TƯ: d4 = XANH «TỐT» ─────────────────────────────────────────────────────────────
+   Thêm 21/10/2026 cho hình «Diễn biến hiệu quả đội xe». Ba màu cũ là THU · CHI · TỒN — không
+   màu nào mang nghĩa "tốt". Khối đội xe cần một đường LỢI NHUẬN xanh khi dương, đỏ khi có kỳ âm
+   (anh Tuấn chốt 20/10/2026). Dùng biến có sẵn `--vtos-success`, KHÔNG gõ mã màu mới.
+
+   ĐÃ ĐO LẠI BẰNG BỘ KIỂM MÙ MÀU, và kết quả có một chỗ phải nói thẳng (CAM02-UCS, ΔE):
+
+                             thường   mù lục   mù đỏ   mù lam
+     d1 vàng  ↔ d4 xanh       34,5     21,9     14,2     44,2     (bản tối)
+     d1 vàng  ↔ d4 xanh       30,9     16,0     13,8     41,2     (bản sáng)
+     d2 đỏ    ↔ d4 xanh       54,7      3,8     21,7     60,7     (bản tối)
+     d2 đỏ    ↔ d4 xanh       54,9      5,8     31,1     57,9     (bản sáng)
+
+   HAI ĐIỀU RÚT RA:
+
+   1. d2 ↔ d4 chỉ cách ΔE 3,8 với mắt mù lục — tức ĐỎ và XANH LÀ MỘT MÀU với khoảng 6% đàn ông.
+      Chỗ này KHÔNG chữa được bằng màu, vì đỏ-lỗ xanh-lãi là cặp nghĩa người dùng yêu cầu. Nó
+      chữa được vì hai màu ẤY KHÔNG BAO GIỜ CÙNG XUẤT HIỆN: cùng một đường lợi nhuận, xanh hay
+      đỏ tuỳ trạng thái. Dấu hiệu thứ hai là CHỮ trong phần chú giải — «Lợi nhuận» đổi thành
+      «Lợi nhuận (có kỳ lỗ)». Ai gỡ dòng chữ ấy đi là gỡ luôn tín hiệu, không chỉ gỡ một lời
+      giải thích. Xem `KhoiHieuQuaXe` trong components/KhoiV14.tsx.
+
+   2. d1 ↔ d4 xuống thấp nhất 13,8 (mù đỏ, bản sáng) — DƯỚI mức 14,7 mà bộ ba cũ đạt được. Ghi
+      đúng con số chứ không làm tròn lên: hai đường này CÓ cùng xuất hiện. Thứ bù lại là chúng
+      không bao giờ cắt nhau (doanh thu luôn nằm trên lợi nhuận) và mỗi đường có nhãn số riêng ở
+      hai đầu. Nếu sau này có hình nào vẽ d1 và d4 cắt nhau thì phải đo lại, không mặc nhiên dùng. */
 .bd-net{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
 .bd-net.d1{stroke:var(--vtos-warning)}
 .bd-net.d2{stroke:var(--vtos-danger)}
 .bd-net.d3{stroke:var(--vtos-navy)}
+.bd-net.d4{stroke:var(--vtos-success)}
 /* Chấm: ÍT NHẤT 8px, và có viền cùng màu nền để hai đường cắt nhau vẫn tách ra được. */
 .bd-cham{position:absolute;width:9px;height:9px;margin:0 0 -4.5px -4.5px;border-radius:50%;
   box-shadow:0 0 0 2px var(--vtos-card);z-index:2}
 .bd-cham.d1{background:var(--vtos-warning)}
 .bd-cham.d2{background:var(--vtos-danger)}
 .bd-cham.d3{background:var(--vtos-navy)}
+.bd-cham.d4{background:var(--vtos-success)}
 /* Nhãn số hai đầu mỗi chuỗi. Chữ mang MÀU CHỮ, không mang màu chuỗi — màu nằm ở cái chấm cạnh
    nó. Bóng chữ trùng màu nền để con số không bị lưới cắt ngang. */
 .bd-duong-nhan{position:absolute;transform:translate(2px,50%);font-size:calc(10.5/14*1rem);font-weight:700;
