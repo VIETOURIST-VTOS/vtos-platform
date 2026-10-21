@@ -12,8 +12,8 @@ LUẬT, mỗi dòng một quyết định của Chủ tịch:
     chuyến) và Đội xe (lương + công tác phí) KHÔNG áp dụng — tập phòng lấy từ `luong.CHE_DO_CONG`,
     không gõ lại danh sách.
   · Hạn xác nhận: ngày 3 tháng sau; quá hạn thì chuông đỏ.
-  · Phòng chưa được duyệt công thì bảng lương CHẶN. Vòng CN-2 sẽ đổi thành «giữ lương riêng phòng
-    ấy»; tới lúc đó chặn cả kỳ (Chủ tịch chọn an toàn hơn để lương trôi qua).
+  · Phòng chưa được duyệt công thì lương phòng ấy BỊ GIỮ lúc ký bảng chính và trả bằng bảng bổ
+    sung (CN-2, services/giu_luong.py). CN-1 từng chặn cả kỳ — luật tạm, đã thay.
 
 HIỆU LỰC TÍNH LẠI MỖI LẦN ĐỌC. Lúc HCNS bấm, máy chụp các con số và lấy dấu. Đọc lại thì so dấu của
 số HÔM NAY với dấu đã chụp; khác nhau là «số đã đổi sau khi xác nhận» và cả hai bước phải làm lại.
@@ -221,14 +221,6 @@ def phong_chua_duyet(db: Session, period: str, ma_nv: list[str]) -> list[dict]:
         if t["trang_thai"] != "da_duyet":
             ra.append(t)
     return ra
-
-
-def chan_ky_luong(db: Session, run) -> None:
-    """Gọi NGAY TRƯỚC chữ ký bảng lương. Không phân vai: ai ký cũng dừng như nhau."""
-    chua = phong_chua_duyet(db, run.period, [r.get("ma") for r in run.rows or [] if r.get("ma")])
-    if chua:
-        raise ValueError("Chưa ký được: công chưa duyệt ở " +
-                         "; ".join(f"{t['phong']} ({t['trang_thai_ten']})" for t in chua))
 
 
 # ------------------------------------------------------------------ chuông
