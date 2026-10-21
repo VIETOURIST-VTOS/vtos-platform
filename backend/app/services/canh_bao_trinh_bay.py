@@ -94,6 +94,8 @@ NHAN = {
                           nguon_khai="xac_nhan_cong.CHUONG_HCNS (CN-1)"),
     "cong_cho_tgd": Loai("TGĐ chưa duyệt công tháng của phòng",
                          nguon_khai="xac_nhan_cong.CHUONG_TGD (CN-1)"),
+    "luong_dang_giu": Loai("Lương của phòng đang bị giữ – công tháng chưa duyệt",
+                           nguon_khai="giu_luong.CHUONG_GIU (CN-2)"),
     "het_han_giu_cho": Loai("Hết hạn giữ chỗ – hệ thống đã trả chỗ về chuyến",
                             robot_tu_xu_ly=True,
                             nguon_khai="Alert(kind='het_han_giu_cho'); giữ chỗ có thời hạn (VPM-7)"),
