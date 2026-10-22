@@ -77,6 +77,29 @@ def _xe_dieu_duoc(db: Session) -> int:
             Vehicle.op_right.not_in(QUYEN_KHONG_DIEU_DUOC))).scalar() or 0)
 
 
+def _co_lenh_bao_gio(db: Session) -> bool:
+    """Bảng LỆNH ĐIỀU XE đã có lấy một dòng chưa (lệnh đã huỷ không tính).
+
+    HQ-5 (23/10/2026) — vì sao cần một cờ thứ hai, bên cạnh `co_nguon`.
+
+    `co_nguon` soi bảng XE: có 11 xe điều được thì nó bằng True, và màn hình in «0 xe đang đi».
+    Nhưng đo trên hệ thật 23/10/2026: `dispatch_orders` RỖNG HOÀN TOÀN — chưa ai lập một lệnh điều
+    xe nào, bao giờ. Lúc ấy con số 0 trên màn hình Chủ tịch nói «đã đếm và hôm nay không điều xe
+    nào», trong khi sự thật là «chưa ai nhập cái bảng mà con số này đếm».
+
+    Hai câu ấy dẫn tới hai việc khác hẳn nhau: câu thứ nhất là một ngày đội xe nghỉ, câu thứ hai là
+    một cửa nhập chưa ai dùng. Màn hình nói câu thứ nhất thì không ai đi mở cửa thứ hai — và ô ấy
+    sẽ in 0 mỗi ngày, mãi mãi, mà không ai biết nó đang đếm một cái bảng trống.
+
+    Đây đúng là ranh giới 09/9 áp cho một bảng thứ hai: `co_nguon` đã phân biệt «0 thật» với «chưa
+    có nguồn» cho bảng XE; cờ này làm cùng việc ấy cho bảng LỆNH. Có lệnh từ tháng trước mà hôm nay
+    không có lệnh nào thì cờ vẫn True — và lúc ấy số 0 là số thật, đúng như cũ.
+    """
+    return bool(db.execute(
+        select(DispatchOrder.id).where(
+            DispatchOrder.status.not_in(LENH_KHONG_TINH)).limit(1)).first())
+
+
 def _lenh_phu_ngay(hom_nay: date):
     """Điều kiện: lệnh phủ ngày ấy và chưa bị huỷ. Viết một lần, hai câu truy vấn dùng chung —
     hai bản chép thì ngày một bản đổi là ngày "đang chạy" và "bất thường" nói về hai tập xe."""
@@ -116,4 +139,7 @@ def dem(db: Session, hom_nay: date) -> dict:
         "lech": max(0, dang_chay - dieu_duoc),
         # Có bảng xe chưa? Không có xe nào thì 0 là "chưa có nguồn", không phải "đội xe trống".
         "co_nguon": dieu_duoc > 0,
+        # Có LỆNH chưa? Xem `_co_lenh_bao_gio`. Bảng lệnh trống thì 0 không phải một phép đếm, nó
+        # là một cửa nhập chưa ai dùng — và màn hình phải nói ra chuyện ấy, không in con số 0.
+        "co_lenh": _co_lenh_bao_gio(db),
     }
