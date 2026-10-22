@@ -138,3 +138,34 @@ def test_ds1_14_cua_so_ghep_toi_ba_doan():
 def test_ds1_15_ma_cua_dong_doc_dung_cot():
     assert ma_cua_dong(_dong("XN-1")) == "XN-1"
     assert ma_cua_dong("| Vòng | **R3b — ABC** | a.py | 1 | đang làm |") == "R3b"
+# ── 16–18. KS-16: vòng DỌN SỔ phải đóng được ĐÚNG dòng của chính nó ─────────────────────────
+# Đo trên lần gộp thật #413 ngày 21/10/2026: vòng KS-15 chỉ đụng ba tệp sổ, nên chốt 4 bỏ qua
+# cả lần gộp — dòng KS-15 ở lại `đang làm` dù việc đã xong. Mọi vòng dọn sổ đều tự để lại rác
+# của mình. Khe mới chỉ mở cho dòng mà MỌI tệp khai đều nằm trong sổ, và lần gộp phải thật sự
+# đụng một tệp nó khai. Hai phép thử 17 và 18 canh đúng hai mép của khe ấy.
+SO = ["docs/dang-lam/kiem-soat.md", "docs/dang-lam/robot-a.md"]
+
+
+def test_ds1_16_vong_don_so_dong_duoc_dong_cua_chinh_no():
+    d = doc_dong_dang_lam(_dong("KS-15", tep="docs/dang-lam/kiem-soat.md"))
+    ra, ly_do = chon(d, "ks-ks15-dong-chin-o-da-gop-21-10", SO)
+    assert [x["ma"] for x in ra] == ["KS-15"], ly_do
+
+
+def test_ds1_17_vong_don_so_KHONG_dong_dong_co_tep_viec_that():
+    """Mép thứ nhất: dòng khai một tệp mã thì vẫn là việc thật — nhánh dọn sổ chưa làm gì cho nó.
+
+    Đây chính là điều chốt 4 sinh ra để chặn. Đỏ ở đây nghĩa là khe đã mở quá rộng.
+    """
+    d = doc_dong_dang_lam(_dong("PD-1"))  # khai thêm backend/app/x.py
+    ra, ly_do = chon(d, "va-main7-dong-pd1-ve-xong-09-10", ["docs/dang-lam/vong.md"])
+    assert ra == [], "nhánh dọn sổ đóng nhầm dòng của việc thật"
+    assert "nhánh dọn sổ" in ly_do
+
+
+def test_ds1_18_vong_don_so_KHONG_dong_dong_ma_no_khong_he_dung_toi():
+    """Mép thứ hai: khai toàn tệp sổ, nhưng lần gộp này không đụng tệp nào trong số đó."""
+    d = doc_dong_dang_lam(_dong("KS-15", tep="docs/dang-lam/vong.md"))
+    ra, ly_do = chon(d, "ks-ks15-dong-chin-o-da-gop-21-10", ["docs/dang-lam/robot-a.md"])
+    assert ra == [], "đóng một dòng mà lần gộp không hề đụng tệp nó khai"
+    assert "nhánh dọn sổ" in ly_do
