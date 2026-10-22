@@ -40,6 +40,7 @@ from app.services import dem_tour as DT
 
 GOC = Path(__file__).resolve().parents[2]
 TRANG = GOC / "web" / "app" / "page.tsx"
+VH = GOC / "web" / "components" / "KhoiVanHanh.tsx"
 BANG_DIEU_KHIEN = GOC / "backend" / "app" / "services" / "dashboard.py"
 
 HOM_NAY = dt.date(2026, 9, 16)
@@ -266,16 +267,20 @@ def test_may_chu_gui_ba_giai_doan_xuong_man_hinh():
 
 
 def test_man_hinh_khong_tu_chia_giai_doan():
-    """Màn hình chỉ được ĐỌC ba con số ấy, không tự so ngày."""
-    ma = _ma(TRANG.read_text(encoding="utf-8"))
-    khoi = ma[ma.index("const the: The[] = ["): ma.index("];", ma.index("const the: The[] = ["))]
+    """Màn hình chỉ được ĐỌC ba con số ấy, không tự so ngày.
+
+    SỬA 22/10/2026 (TQ-1): các ô tour chuyển vào mục Vận hành (components/KhoiVanHanh.tsx) — soát
+    đúng hàng «Hoạt động tour». (Phần đầu tệp ấy có so giờ để báo «số cũ» của MỐC dữ liệu; đó
+    không phải phép chia giai đoạn chuyến nên nằm ngoài vùng soát.)"""
+    ma = _ma(VH.read_text(encoding="utf-8"))
+    khoi = ma[ma.index("Hoạt động tour"): ma.index("Tồn đọng công việc")]
     for cam in ("start_date", "end_date", "new Date(", "Date.now"):
         assert cam not in khoi, f"Hàng thẻ đang tự so ngày ({cam}) — phép ấy thuộc về máy chủ."
 
 
 def test_the_chua_dong_so_co_cho_hien_va_co_bo_phan():
     """Nhóm thứ ba không có thẻ riêng, nhưng phải đọc được từ màn hình kèm bộ phận phải xử lý."""
-    ma = _ma(TRANG.read_text(encoding="utf-8"))
+    ma = _ma(VH.read_text(encoding="utf-8"))   # TQ-1: ô Chờ quyết toán nay ở mục Vận hành
     assert "da_ve_chua_dong_so" in ma, "Máy chủ đếm rồi mà màn hình không hiện là việc tồn vô hình."
     assert "chưa đóng sổ" in ma and "Điều hành" in ma, (
         "Phải nói rõ việc gì và ai phải làm — ranh giới 09/9."
@@ -283,9 +288,10 @@ def test_the_chua_dong_so_co_cho_hien_va_co_bo_phan():
 
 
 def test_hai_the_khong_lay_cung_mot_con_so():
-    """Chỗ hỏng số 1, canh ở phía màn hình: hai thẻ phải đọc hai trường khác nhau."""
-    ma = _ma(TRANG.read_text(encoding="utf-8"))
-    khoi = ma[ma.index("const the: The[] = ["): ma.index("];", ma.index("const the: The[] = ["))]
+    """Chỗ hỏng số 1, canh ở phía màn hình: hai thẻ phải đọc hai trường khác nhau.
+    SỬA 22/10/2026 (TQ-1): hai ô nay ở hàng «Hoạt động tour» của mục Vận hành."""
+    ma = _ma(VH.read_text(encoding="utf-8"))
+    khoi = ma[ma.index("Hoạt động tour"): ma.index("Tồn đọng công việc")]
     assert "gd.dang_ban" in khoi and "gd.dang_chay" in khoi
     assert "c.da_duyet" not in khoi, (
         "Thẻ 'Tour đang bán' còn đọc tổng đã duyệt — tức nó vẫn gồm cả những chuyến đang chạy, và "
