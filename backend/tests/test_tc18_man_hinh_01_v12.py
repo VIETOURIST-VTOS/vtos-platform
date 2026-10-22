@@ -79,10 +79,20 @@ def test_sau_o_lon_va_nam_the_nho():
     # SỬA 16/9/2026 lần hai (TC-46): anh Tuấn chốt SÁU thẻ theo bản vẽ v3.0 — thêm "Tour đang
     # chạy" và đổi "Đội xe hôm nay" thành "Xe đang đi". Luật không đổi một chữ: hàng thẻ là những
     # con số để LIẾC, nên không thẻ nào được mang biểu đồ.
-    assert len(nhan) == 6, f"hàng thẻ nhỏ phải đúng SÁU mục, đang có {len(nhan)}: {nhan}"
+    # SỬA 22/10/2026 (TC-72): còn NĂM. «Xe đang đi» chuyển xuống khối Hiệu quả đội xe — anh Tuấn
+    # chốt 20/10, chú thích ghi ngay trong page.tsx. Luật không đổi một chữ: hàng thẻ là những con
+    # số để LIẾC, nên không thẻ nào được mang biểu đồ.
+    #
+    # CON SỐ KHÔNG MẤT, NÓ ĐỔI CHỖ — và chỗ mới được canh ở phép thử ngay dưới. Hạ sáu xuống năm
+    # mà không canh chỗ mới thì lần sau ai xoá hẳn con số ấy, phép thử này vẫn xanh: nó chỉ còn
+    # nói «hàng thẻ không có Xe đang đi», đúng cả khi màn hình không còn con số ấy ở đâu cả.
+    assert len(nhan) == 5, f"hàng thẻ nhỏ phải đúng NĂM mục, đang có {len(nhan)}: {nhan}"
     for can in ("Tour đang bán", "Tour đang chạy", "Tour chờ quyết toán", "Tour sắp khởi hành",
-                "Xe đang đi", "Khách tiềm năng mới"):
+                "Khách tiềm năng mới"):
         assert can in nhan, f"thiếu thẻ “{can}” trong hàng thẻ nhỏ"
+    assert "Xe đang đi" not in nhan, (
+        "«Xe đang đi» đã chuyển xuống khối Hiệu quả đội xe (TC-72). Để lại trên hàng thẻ nhỏ là "
+        "cùng một con số hiện ở hai chỗ, và hai chỗ thì sớm muộn lệch.")
     assert "xu_huong:" not in khoi, (
         "Năm thẻ nhỏ KHÔNG được mang biểu đồ — chúng là con số để liếc, và hình trên chúng kéo "
         "mắt khỏi sáu ô lớn phía trên."
@@ -91,6 +101,22 @@ def test_sau_o_lon_va_nam_the_nho():
     for o in ("<KhoiKetQuaKinhDoanh", "<KhoiDongTien",
               "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiTonDongMuc"):
         assert o in s, f"thiếu ô lớn {o} — anh Tuấn chốt đúng sáu ô."
+
+
+def test_xe_dang_di_nam_o_khoi_hieu_qua_doi_xe():
+    """Chỗ MỚI của «Xe đang đi» sau TC-72 (20/10/2026) — phép thử này canh đúng chỗ ấy.
+
+    Bỏ một con số khỏi chỗ cũ và đặt nó vào chỗ mới là HAI việc. Chỉ canh việc thứ nhất — tức là
+    chỉ hạ số thẻ từ sáu xuống năm — là hạ cổng cho vừa dữ liệu: ngày nào ai đó gỡ hẳn ô ấy khỏi
+    khối đội xe, cả bộ phép thử vẫn xanh và không ai biết màn hình đã mất một con số.
+    """
+    s = _ma(TRANG)
+    assert "xe={sec.xe_hom_nay}" in s, (
+        "page.tsx không còn truyền `xe` xuống KhoiHieuQuaXe — ô «Xe đang đi» mất nguồn.")
+    khoi = _ma(os.path.join(ROOT, "web", "components", "KhoiV14.tsx"))
+    assert "Xe đang đi" in khoi, (
+        "Ô «Xe đang đi» không còn trong khối Hiệu quả đội xe. TC-72 chuyển nó xuống đây; mất ở "
+        "đây là mất hẳn khỏi màn hình.")
 
 
 def test_the_chua_co_nguon_phai_co_cua_nhap():
