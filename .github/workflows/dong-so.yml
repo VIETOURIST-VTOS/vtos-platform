@@ -77,7 +77,19 @@ jobs:
       - name: Ghi lại sổ
         if: steps.loc.outputs.chay == '1'
         env:
-          GH_TOKEN: ${{ github.token }}
+          # ĐỢT DỌN-10 22/10/2026 — MỞ PR BẰNG TOKEN RIÊNG.
+          #
+          # GitHub KHÔNG sinh vòng CI cho việc gì do `GITHUB_TOKEN` làm — PR hay push đều vậy.
+          # Đã va ba lần: DỌN-7 (GH006), DỌN-8 (workflow_dispatch gắn vào nhánh chứ không vào PR),
+          # DỌN-9 (`--admin` bị Ruleset chặn vì bot không có quyền vượt rào). Ba cách gỡ, ba lần
+          # chệch cùng một gốc.
+          #
+          # Token này do Chủ tịch tự tạo 22/10/2026: fine-grained, CHỈ kho vtos-platform, CHỈ hai
+          # quyền Contents + Pull requests, hạn 20/01/2027. PR mở bằng nó được coi là do NGƯỜI mở,
+          # nên vòng CI chạy thật trong ngữ cảnh PR và `hang-rao-gop` báo thẳng lên PR.
+          #
+          # HẾT HẠN THÌ VIỆC NÀY ĐỎ, không lặng lẽ hỏng: `gh pr create` trả mã lỗi và bước này dừng.
+          GH_TOKEN: ${{ secrets.TOKEN_DONG_SO }}
         run: |
           set -eu
           if git diff --quiet; then echo "so khong doi — khong commit"; exit 0; fi
@@ -96,7 +108,13 @@ jobs:
           git config user.email "noreply@anthropic.com"
           git checkout -b "$nh"
           git add docs/dang-lam
-          git commit -m "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp [skip ci]"
+          # BỎ `[skip ci]` Ở ĐÂY — và GIỮ nó ở dòng `--subject` phía dưới. Hai chỗ khác nhau:
+          #
+          #   · commit của NHÁNH sổ  → có `[skip ci]` thì vòng CI của PR bị bỏ qua, mà đó đúng là
+          #     vòng ta cần. Bỏ đi nay rẻ: việc `loc` của Đợt DỌN-8 làm vòng chỉ-chạm-sổ còn ~1m20.
+          #   · commit GỘP vào main  → GIỮ, vì trên push thì `loc` trả 0 vô điều kiện (quyết định
+          #     16/10) nên không có `[skip ci]` là kéo nguyên ~55 phút `backend` cho một ô chữ.
+          git commit -m "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp"
           git push origin "$nh"
           gh pr create --base main --head "$nh" \
             --title "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp" \
@@ -108,7 +126,14 @@ jobs:
           # vẫn đứng với "hang-rao-gop: Expected", và tab Checks của PR chỉ thấy Vercel. Vì lượt
           # workflow_dispatch gắn vào NHÁNH, không gắn vào PR. Nên cách ấy không gỡ được gì.
           #
-          # Chủ tịch chốt 22/10/2026: robot TỰ GỘP bằng --admin. Nhưng vượt rào trần trụi nghĩa
+          # ĐỢT DỌN-10 SỬA MỘT CÂU SAI Ở ĐÂY: `--admin` KHÔNG phải quyền vượt rào, nó chỉ là một
+          # lời gọi gộp. Rulesets vẫn chặn trừ khi NGƯỜI GỌI có quyền vượt rào, mà người gọi là
+          # github-actions[bot] — và ta đã đo rằng bot ấy không thêm vào danh sách ấy được. Lần
+          # chạy #9 ngày 22/10/2026 nói đúng câu ấy: "Required status check hang-rao-gop is
+          # expected (mergePullRequest)". Nay dùng `--auto`: chờ cửa hẹp xanh rồi mới gộp.
+          #
+          # HAI PHÉP THỬ SỔ DƯỚI ĐÂY VẪN GIỮ, và nay chúng đổi vai: không còn là thứ THAY cho hàng
+          # rào, mà là tín hiệu SỚM — đỏ ngay tại đây trong 15 giây thay vì để PR treo chờ người đọc.
           # là commit đóng sổ KHÔNG được phép thử nào soi — nên hai phép thử mà hàng rào ấy sẽ
           # chạy được gọi NGAY TẠI ĐÂY, trước khi gộp. Đỏ thì việc này đỏ và KHÔNG gộp.
           #
@@ -117,5 +142,5 @@ jobs:
           # `backend` không có conftest.py và không có pytest.ini, nên chỉ cần pytest.
           pip install -q pytest
           ( cd backend && python -m pytest -q tests/test_giu_cho_lan.py tests/test_giu_cho_nhanh.py )
-          gh pr merge "$nh" --squash --admin \
+          gh pr merge "$nh" --auto --squash \
             --subject "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp [skip ci]" --body ""
