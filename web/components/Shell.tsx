@@ -476,7 +476,7 @@ export const GROUPS: Group[] = [
       ["Lệnh điều xe", "/lenh-dieu-xe"], ["Chi phí & hiệu quả", "/hieu-qua-doi-xe"],
       ["Lãi lỗ đội xe", "/lai-lo-doi-xe"], ["Việc của tài xế & HDV", "/xe-hdv"]] },
     { label: "Hướng dẫn viên", items: [
-      ["Phòng Hướng dẫn", "/huong-dan"], ["HDV & phân chuyến (cũ)", "/ops?tab=guides"]] },
+      ["Phòng Hướng dẫn", "/huong-dan"], ["Nhân viên phòng tôi", "/nhan-vien-phong-toi"], ["HDV & phân chuyến (cũ)", "/ops?tab=guides"]] },
   ] },
 
   { key: "nhansu", label: "Nhân sự – Hành chính", label_ngan: "HC – NS", icon: "nhansu",
