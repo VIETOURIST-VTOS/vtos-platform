@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { errMsg } from "@/components/ui";
@@ -8,15 +9,21 @@ import { KhoiHieuQuaXe, KhoiPhaiThu, KhoiPhaiTra } from "@/components/KhoiV14";
 import {
   KhoiKinhDoanhLe, KhoiKinhDoanhDoan, KhoiBaoCaoNgay,
 } from "@/components/KhoiKinhDoanh";
+import { TieuDe } from "@/components/DauManHinh01";
 import {
-  HangThe, TieuDe, dem, type The,
-} from "@/components/DauManHinh01";
-import { KhoiTonDongMuc } from "@/components/KhoiSauO";
+  KhoiVanHanh, DanhSachViec, DanhSachQuaHan, docDuLieuVanHanh,
+} from "@/components/KhoiVanHanh";
 import KhoiKetQuaKinhDoanh from "@/components/KhoiKetQuaKinhDoanh";
 import { bieuDoCua } from "@/components/BaKhuBieuDo";
 
 function Dash() {
   const { user } = useShell();
+  /* TQ-1 · Hai danh sách của mục «Vận hành & công việc» mở NGAY TRÊN trang này (`?xem=viec`,
+     `?xem=qua-han`) — không thêm màn hình, không thêm quyền. Đổi tham số thì `d` vẫn giữ, nên dải
+     «Số đã cập nhật» so được số ô vừa đọc với số danh sách vừa tính lại. */
+  const q = useSearchParams();
+  const xem = q.get("xem") || "";
+  const trangDs = Math.max(1, Number(q.get("trang") || 1) || 1);
   const [d, setD] = useState<any>(null);
   // Trước đây lỗi bị nuốt bằng .catch(() => {}) nên máy chủ trả 500 mà người dùng chỉ thấy
   // "Đang tải…" đứng im vĩnh viễn – lỗi PostgreSQL ngày 07/9 sống sót nhiều ngày vì đúng chỗ này.
@@ -30,12 +37,11 @@ function Dash() {
     <button className="act" onClick={tai}>Thử lại</button>
   </div>;
   if (!d) return <p className="muted">Đang tải…</p>;
-  const c = d.counts || {};
   const sec = d.sections || {};   // `d.kpis` không còn ai đọc từ TC-44 — xem ghi chú bên dưới.
   /* Cửa sổ ngày khởi hành do MÁY CHỦ khai (services/dashboard.py · SO_NGAY_SAP_KHOI_HANH). Màn
      hình chỉ đọc — gõ lại con số ở đây là mở đường cho hai nơi nói khác nhau, đúng lỗi vừa sửa ở
-     đầu cột bảng dòng tiền. Lối lui 14 chỉ dùng khi máy chủ cũ chưa trả trường này. */
-  const soNgayKH = sec.sap_khoi_hanh_so_ngay ?? 14;
+     đầu cột bảng dòng tiền. Lối lui 14 chỉ dùng khi máy chủ cũ chưa trả trường này — nay đọc trong
+     `docDuLieuVanHanh` (components/KhoiVanHanh.tsx). */
 
   /* KỲ BÁO CÁO — SỬA 16/9/2026 (TC-42), rồi sửa lần nữa cùng ngày (TC-44).
      Bản 13/9 chốt "màn hình 01 chỉ theo THÁNG". TC-42 mở ra ba kỳ vì máy chủ đã cộng được quý và
@@ -49,45 +55,22 @@ function Dash() {
      vào chỗ nó không thuộc về. Muốn có lại thì máy chủ phải đếm chuyến THEO KỲ — ghi ra đây để
      việc còn thiếu nằm trong mã, không nằm trong trí nhớ. */
 
-  /* SÁU THẺ SỐ NHỎ — anh Tuấn chốt 16/9/2026 theo bản vẽ v3.0 (trước đó là năm).
+  /* TQ-1 · 22/10/2026 — HÀNG THẺ NHỎ VÀ KHỐI TỒN ĐỌNG ĐÃ GỘP THÀNH MỤC «VẬN HÀNH & CÔNG VIỆC».
+     Anh Tuấn duyệt bản vẽ Tổng quan Vận hành v1.1. Các thẻ cũ nói sai bốn chỗ (tồn đọng đếm cảnh
+     báo chứ không đếm việc; quá hạn quyết toán bị trần 100; chờ quyết toán trộn nhóm phụ vào câu
+     chính; nhãn mức giữa). Cả bốn sửa ở MÁY CHỦ (services/tong_quan_viec, tong_quan_tour) — ở đây
+     chỉ đọc trường. Ghi chú về ba nhóm tour (đang bán · đang chạy · đã về chưa đóng sổ, TC-42)
+     chuyển theo vào components/KhoiVanHanh.tsx.
 
-     KHÔNG có biểu đồ trên sáu thẻ này, và đó là lựa chọn chứ không phải thiếu sót. Đây là những
-     con số chỉ để LIẾC — đọc xong là xong, không phải đặt cạnh kỳ trước hay cạnh kế hoạch mới
-     hiểu. Thêm hình vào chúng là kéo mắt khỏi những con số thật sự cần nghĩ ở phía trên.
+     KHÁCH TIỀM NĂNG MỚI vẫn «Chưa có nguồn · Marketing» với cửa nhập /leads?tab=leads — không
+     thay bằng 0. «Xe đang đi» đã ở khối đội xe từ TC-72. */
+  const vh = docDuLieuVanHanh(sec);
 
-     "ĐANG BÁN" VÀ "ĐANG CHẠY" LÀ HAI CÂU HỎI KHÁC NHAU, và tách chúng ra làm lộ một điều: hệ
-     thống KHÔNG có trạng thái "đang chạy" — một chuyến giữ trạng thái `da_duyet` suốt từ lúc mở
-     bán qua cả hành trình. Nên phép chia là theo NGÀY, làm ở máy chủ
-     (`services/dem_tour.theo_giai_doan`), và hệ quả phải nói trước: con số "Tour đang bán" NHỎ ĐI
-     so với bản hôm qua, vì những đoàn đang trên đường đã tách sang thẻ bên cạnh.
-
-     NHÓM THỨ BA — chuyến đã qua ngày về mà trạng thái vẫn là "đã duyệt" — không có thẻ riêng,
-     nhưng CÓ CHỖ HIỆN: nó là dòng phụ của thẻ Chờ quyết toán, vì đó chính là việc còn thiếu (Điều
-     hành chưa bấm kết thúc thì tiền của chuyến ấy chưa vào hàng đợi quyết toán). Bỏ nó đi thì hai
-     con số đầu cộng lại không bằng tổng đã duyệt, và chỗ chênh biến mất lặng lẽ. */
-  const gd = sec.tour_giai_doan || {};
-  const chuaDongSo = gd.da_ve_chua_dong_so;
-
-  const the: The[] = [
-    { nhan: "Tour đang bán", so: dem(gd.dang_ban),
-      ai: "Điều hành", cua: "/tours", chi_tiet: "/tours" },
-    { nhan: "Tour đang chạy", so: dem(gd.dang_chay),
-      ai: "Điều hành", cua: "/tours", chi_tiet: "/tours" },
-    { nhan: "Tour sắp khởi hành", so: dem(sec.sap_khoi_hanh?.length),
-      duoi: `${soNgayKH} ngày tới`, ai: "Điều hành", cua: "/tours", chi_tiet: "/tours" },
-    { nhan: "Tour chờ quyết toán", so: dem((c.ket_thuc || 0) + (c.da_dong_so || 0)),
-      duoi: `${sec.qua_han_qt?.length ?? 0} chuyến quá hạn quyết toán`
-        + (typeof chuaDongSo === "number" && chuaDongSo > 0
-           ? ` · ${chuaDongSo} chuyến đã qua ngày về mà chưa đóng sổ (Điều hành)` : ""),
-      do: (sec.qua_han_qt?.length ?? 0) > 0 || (chuaDongSo ?? 0) > 0, chi_tiet: "/so-con-no" },
-    /* XE ĐANG ĐI đã CHUYỂN XUỐNG khối «Hiệu quả đội xe» (TC-72, 20/10/2026) — anh Tuấn chốt.
-       Vì sao chuyển: hàng tám thẻ trên cùng trả lời "hôm nay có gì cần bấm", còn số xe đang lăn
-       bánh là một chỉ số của ĐỘI XE, đọc cùng công suất và tiêu hao thì mới có nghĩa. Để nó trên
-       ấy là bắt người đọc nhớ một con số rồi cuộn xuống nửa màn hình mới gặp thứ so được với nó.
-       Dữ liệu vẫn là `sec.xe_hom_nay`, nay truyền thẳng xuống khối qua thuộc tính `xe`. */
-    { nhan: "Khách tiềm năng mới", so: null,
-      ai: "Marketing", cua: "/leads?tab=leads", chi_tiet: "/leads?tab=leads" },
-  ];
+  if (xem === "viec" || xem === "qua-han") return (<div className="mh01-khong-ghi-chu">
+    {xem === "viec"
+      ? <DanhSachViec muc={q.get("muc") || ""} trang={trangDs} o={vh.viec} />
+      : <DanhSachQuaHan trang={trangDs} o={vh.qua_han} lucO={vh.viec?.luc} />}
+  </div>);
 
   /* Biểu đồ dựng một lần, giao cho từng khối tự bày. Khối nào chưa đủ số thì nhận `null` và chỉ
      hiện ô số của nó — ô số vốn đã ghi "Chưa kết nối" kèm bộ phận và cửa nhập. */
@@ -169,9 +152,8 @@ function Dash() {
     <KhoiDongTien day={d.kpis?.so_du_thap_nhat} du_bao={sec.du_bao_13_tuan}
       phap_nhan={d.dong_tien_phap_nhan} />
 
-    <KhoiTonDongMuc d={sec.ton_dong_theo_muc} />
-
-    <HangThe ds={the} />
+    {/* TQ-1 · Thay ĐÚNG chỗ hai khối cũ (Tồn đọng · hàng thẻ tour), giữa tiền và đội xe. */}
+    <KhoiVanHanh d={vh} onThuLai={tai} luu_dem={d.cached === true} />
 
     <KhoiHieuQuaXe d={sec.hieu_qua_xe} theo_ky={sec.hieu_qua_xe_theo_ky} xe={sec.xe_hom_nay} />
 
@@ -185,4 +167,4 @@ function Dash() {
 
   </div>);
 }
-export default function Page() { return <Shell><Dash /></Shell>; }
+export default function Page() { return <Shell><Suspense><Dash /></Suspense></Shell>; }

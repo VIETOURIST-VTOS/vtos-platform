@@ -68,8 +68,12 @@ def test_may_chu_tra_so_ngay_ra_cho_man_hinh():
 def test_man_hinh_doc_chu_khong_go_lai():
     ma = _bo_chu_thich_tsx(_doc(TRANG))
     assert "21 ngày" not in ma, "Màn hình vẫn còn con số 21 gõ tay."
-    assert "sap_khoi_hanh_so_ngay" in ma, "Màn hình chưa đọc số ngày từ máy chủ."
-    assert "{soNgayKH} ngày tới" in ma, "Tiêu đề khối Điều hành phải in số ngày lấy từ máy chủ."
+    # SỬA 22/10/2026 (TQ-1): ô «Sắp khởi hành» chuyển vào mục Vận hành — trường máy chủ đọc trong
+    # `docDuLieuVanHanh`, in ra ở ô. Luật y nguyên: số ngày lấy từ máy chủ, không gõ tay.
+    vh = _bo_chu_thich_tsx(_doc(GOC / "web" / "components" / "KhoiVanHanh.tsx"))
+    assert "21 ngày" not in vh, "Mục Vận hành còn con số 21 gõ tay."
+    assert "sap_khoi_hanh_so_ngay" in vh, "Màn hình chưa đọc số ngày từ máy chủ."
+    assert "{d.so_ngay_kh} ngày tới" in vh, "Ô Sắp khởi hành phải in số ngày lấy từ máy chủ."
 
 
 def test_bo_cau_in_ca_hai_con_so():

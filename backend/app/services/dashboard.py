@@ -318,6 +318,16 @@ def build(db: Session, u: User) -> dict:
         # lần — xem chú thích TC-46 ở đó.
         from app.services import dem_tour as DT
         sec["tour_giai_doan"] = DT.theo_giai_doan(db, hom_nay=today)
+        # TQ-1 (Chủ tịch chốt v1.1, 22/10/2026): số ĐẦY ĐỦ cho mục «Vận hành & công việc».
+        # Bọc try riêng: một ô hỏng không kéo sập cả bảng điều hành.
+        try:
+            from app.services import tong_quan_tour as TQT
+            sec["qua_han_qt_tong"] = TQT.qua_han_quyet_toan(db, today, trang=1, co=1)["tong"]
+            sec["cho_quyet_toan"] = TQT.cho_quyet_toan(db, today)
+            sec["thieu_lich"] = TQT.thieu_lich(db, today)
+        except Exception as ex:
+            sec["qua_han_qt_tong"] = sec["cho_quyet_toan"] = sec["thieu_lich"] = None
+            R.audit(db, "robot", "robot", "tq1_tour_loi", "dashboard", after={"ly_do": str(ex)[:200]})
         # XE HÔM NAY — cùng MỘT luật với tour, áp cho xe: lịch hôm nay trùng lịch điều xe thì xe ấy
         # đang chạy, còn lại là nằm bãi (anh Tuấn 16/9/2026). Nguồn là LỆNH ĐIỀU XE, không phải
         # nhật trình chuyến — xem chú thích đầu services/xe_hom_nay.py để biết vì sao khác nhau.
@@ -437,6 +447,15 @@ def build(db: Session, u: User) -> dict:
         sec["ton_dong_theo_muc"] = None
         R.audit(db, "robot", "robot", "ton_dong_muc_loi", "dashboard",
                 after={"ly_do": str(ex)[:200]})
+    # TQ-1: VIỆC đang mở — lọc theo quyền người xem TRƯỚC, gộp theo hồ sơ SAU (tong_quan_viec).
+    # `ton_dong_theo_muc` ở trên đếm LƯỢT CẢNH BÁO và không lọc theo quyền; giữ tới khi màn hình
+    # chuyển hẳn sang khối mới rồi bỏ.
+    try:
+        from app.services import tong_quan_viec as TQV
+        sec["viec_van_hanh"] = TQV.tong(db, u)
+    except Exception as ex:
+        sec["viec_van_hanh"] = None
+        R.audit(db, "robot", "robot", "tq1_viec_loi", "dashboard", after={"ly_do": str(ex)[:200]})
 
     # ── TC-33 · khối 08 Tiến độ báo cáo & kết luận chỉ đạo ───────────────────────────────────
     # Cũng không thêm bảng nào: danh sách phòng phải nộp đã khai ở `bao_cao_phong.PHONG`, bản đã
