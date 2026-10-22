@@ -436,3 +436,89 @@ def test_bd1_khoi_bao_hong_phai_cho_thu_lai():
     assert "setLan(" in khoi, "khối báo hỏng không có nút thử lại"
     assert re.search(r"\}, \[phong, toast, lan\]\)", s), (
         "nút thử lại có mà `useEffect` không nghe `lan` — bấm vào không gọi lại cửa, nút chết.")
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# DH-1 (22/10/2026) — HAI Ô CHƯA AI GHIM VÀO NGUỒN CỦA NÓ
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# Đo trước khi gõ: thay CON SỐ của từng ô bằng hằng số 4321 rồi chạy cả tệp này. Ba ô đỏ đúng chỗ
+# (yêu cầu booking, quyết toán, báo cáo ngày); HAI Ô VẪN XANH — sự cố quá hạn và đề nghị chi. Tức
+# là hai ô ấy có thể in một con số bất kỳ mà không phép thử nào kêu. Hai phép dưới đây ghim từng ô
+# vào đúng nguồn của nó: ô sự cố vào CHÍNH cửa danh sách mà nút «bấm sang» dẫn tới
+# (`/su-co-tour?qua_han=1`), ô đề nghị chi vào bảng `ops.CATEGORY_CONFIRMER` mà bước xác nhận dùng.
+# Dữ liệu tự gieo cả hồ sơ PHẢI đếm lẫn hồ sơ KHÔNG được đếm, để con số không thể khớp nhờ trùng 0.
+def _gieo_su_co():
+    from datetime import datetime, timedelta
+    from app.db.session import SessionLocal
+    from app.models.core import Tour
+    from app.models.su_co_tour import SuCoTour
+    with SessionLocal() as s:
+        t = s.execute(select(Tour)).scalars().first()
+        if t is None: pytest.skip("dữ liệu mẫu không có tour")
+        qua = datetime.now() - timedelta(hours=5)
+        ids = []
+        for i, (tt, han, nhan) in enumerate((("moi", qua, None),             # quá hạn, chưa nhận → ĐẾM
+                                              ("moi", qua, None),             # quá hạn, chưa nhận → ĐẾM
+                                              ("moi", qua, datetime.now()),   # đã có người nhận → không
+                                              ("dong", qua, None),            # đã đóng → không
+                                              ("moi", datetime.now() + timedelta(days=1), None))):  # chưa tới hạn
+            sc = SuCoTour(code=f"SCDH1-{i}", tour_id=t.id, nhom="khac", muc=2, mo_ta="DH-1",
+                          trang_thai=tt, han_xu_ly=han, nhan_luc=nhan)
+            s.add(sc); s.flush(); ids.append(sc.id)
+        s.commit()
+    return ids
+
+
+def _xoa(model, ids):
+    from app.db.session import SessionLocal
+    with SessionLocal() as s:
+        for i in ids:
+            x = s.get(model, i)
+            if x is not None: s.delete(x)
+        s.commit()
+
+
+def test_dh1_o_su_co_khop_dung_cua_danh_sach_ma_no_dan_sang():
+    from app.models.su_co_tour import SuCoTour
+    ids = _gieo_su_co()
+    try:
+        nguon = client.get("/api/v1/su-co-tour", params={"qua_han": 1}, headers=login("tp_dh"))
+        assert nguon.status_code == 200, nguon.text
+        o = [x for x in _ban()["o"] if x["khoa"] == "su_co_qua_han"][0]
+        assert o["trang_thai"] == BLV.SAN_SANG, o
+        assert o["den"] == "/su-co-tour?qua_han=1"
+        assert o["so_luong"] == len(nguon.json()) >= 2, (
+            f"ô «Sự cố tour quá hạn» in {o['so_luong']} nhưng màn hình nó dẫn sang liệt kê "
+            f"{len(nguon.json())} hồ sơ. Bấm vào một con số mà thấy danh sách dài khác là người ta "
+            f"thôi tin con số trên bàn.")
+    finally:
+        _xoa(SuCoTour, ids)
+
+
+def test_dh1_o_de_nghi_chi_khop_dung_bang_bo_phan_xac_nhan():
+    from app.db.session import SessionLocal
+    from app.models.ops import PaymentRequest
+    from app.services import ops as OPS
+    cua_dh = [k for k, v in OPS.CATEGORY_CONFIRMER.items() if "tp_dh" in v]
+    khac = [k for k, v in OPS.CATEGORY_CONFIRMER.items() if "tp_dh" not in v]
+    assert cua_dh and khac
+    ids = []
+    with SessionLocal() as s:
+        for i, (loai, tt) in enumerate(((cua_dh[0], "cho_tp"), (cua_dh[-1], "cho_tp"),   # ĐẾM
+                                         (khac[0], "cho_tp"),                            # phòng khác
+                                         (cua_dh[0], "cho_kt"))):                        # đã qua bước
+            p = PaymentRequest(code=f"DCDH1-{i}", category=loai, supplier_name="DH-1",
+                               amount=1_000_000, description="DH-1", status=tt,
+                               created_by="dh1")
+            s.add(p); s.flush(); ids.append(p.id)
+        s.commit()
+        that = s.execute(select(PaymentRequest).where(PaymentRequest.status == "cho_tp",
+                                                       PaymentRequest.category.in_(cua_dh))).scalars().all()
+    try:
+        o = [x for x in _ban()["o"] if x["khoa"] == "de_nghi_chi"][0]
+        assert o["trang_thai"] == BLV.SAN_SANG, o
+        assert o["so_luong"] == len(that) >= 2, (
+            f"ô «Đề nghị chi chờ xác nhận» in {o['so_luong']}, nhưng bảng bộ phận xác nhận "
+            f"(ops.CATEGORY_CONFIRMER) cho Điều hành {len(that)} đề nghị đang chờ.")
+    finally:
+        _xoa(PaymentRequest, ids)
