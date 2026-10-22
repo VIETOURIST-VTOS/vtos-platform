@@ -1326,6 +1326,7 @@ def gio_may_chu(u: User = Depends(require_roles("cntt", "chutich", "tgd", "bks",
 
     KHÔNG gắn vào `/health`: cửa ấy Render gọi 5 giây một lần và đã từng làm sập máy chủ vì nặng.
     """
+    from app.core.config import settings
     from app.services import gio_may_chu as GMC
     return GMC.soat(settings.TZ)
 
