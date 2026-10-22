@@ -121,7 +121,7 @@ jobs:
           echo "--- $(printf '%s\n' "$doi" | wc -l) tep doi ---"
           ngoai="$(printf '%s\n' "$doi" | grep -v '^docs/dang-lam/' || true)"
           if [ -z "$ngoai" ]; then
-            echo "CHI CHAM SO GIU CHO — bo qua bo du; cua hep `hang-rao-gop` van chay"
+            echo "CHI CHAM SO GIU CHO — bo qua bo du; cua hep hang-rao-gop van chay"
             echo "chi_so=1" >> "$GITHUB_OUTPUT"
           else
             echo "co tep ngoai so:"; printf '%s\n' "$ngoai"

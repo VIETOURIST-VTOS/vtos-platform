@@ -95,12 +95,25 @@ def test_ds3_5_dong_so_KHONG_con_day_thang_vao_main():
     assert "git push origin \"$nh\"" in than, "Phải đẩy lên NHÁNH riêng rồi mở PR."
 
 
-def test_ds3_6_co_goi_workflow_dispatch():
-    """PR do GITHUB_TOKEN mở ra thì GitHub không sinh vòng CI. Thiếu dòng này, tự gộp chờ mãi."""
+def test_ds3_6_KHONG_con_trong_cho_workflow_dispatch():
+    """ĐỔI Ở ĐỢT DỌN-9 22/10/2026 — và chỗ đổi này đáng đọc kỹ.
+
+    Luật cũ ở đây BẮT BUỘC phải có `gh workflow run ci.yml`, với lý do: PR do GITHUB_TOKEN mở
+    ra thì GitHub không sinh vòng CI, nên phải gọi tay một lượt. Lý do ấy đúng. Cách gỡ thì SAI.
+
+    Đo được, lượt #1023 ngày 22/10/2026 trên nhánh `so/dong-bbece3d`: vòng ấy CHẠY và XANH —
+    loc 5s, backend bỏ qua, hang-rao-gop xanh 1m11s, tổng 1m21s. Mà PR #426 vẫn đứng với
+    "hang-rao-gop: Expected — Waiting for status to be reported", và tab Checks của PR chỉ thấy
+    Vercel. Vì lượt `workflow_dispatch` gắn vào NHÁNH, không gắn vào PR.
+
+    Nên luật này nay lật ngược: KHÔNG được dựa vào workflow_dispatch nữa. Chỗ canh thật nằm ở
+    `test_ds4`, nơi bắt robot tự chạy hai phép thử sổ trước khi gộp.
+    """
     than = _doc(DS)
-    assert "gh workflow run ci.yml" in than, (
-        "Thiếu lệnh gọi `workflow_dispatch`. Đây là ngoại lệ DUY NHẤT GitHub cho phép, và không "
-        "có nó thì `hang-rao-gop` không bao giờ chạy trên PR của robot.")
+    assert "gh workflow run ci.yml" not in than, (
+        "Còn `gh workflow run ci.yml` trong dong-so.yml. Nó tạo một vòng CI xanh KHÔNG gắn vào "
+        "PR — tức một màu xanh không ai dùng được, và tệ hơn: nó làm người đọc tưởng PR đã được "
+        "kiểm. Chỗ kiểm thật là hai phép thử sổ chạy ngay trong việc đóng sổ (test_ds4).")
 
 
 def test_ds3_7_van_giu_chot_khong_cham_tep_ngoai_so():

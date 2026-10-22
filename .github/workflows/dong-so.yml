@@ -101,9 +101,21 @@ jobs:
           gh pr create --base main --head "$nh" \
             --title "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp" \
             --body "Việc CI *Đóng sổ khi gộp* đóng dòng giữ chỗ của lần gộp vừa hạ cánh. Chỉ đổi ô trạng thái trong docs/dang-lam/ — một ký tự đổi ngoài đó thì việc CI đã dừng trước khi commit."
-          # PR do GITHUB_TOKEN mở ra thì GitHub KHÔNG sinh vòng CI (luật chống workflow tự kích
-          # nhau). `workflow_dispatch` là ngoại lệ duy nhất, nên gọi tay một lượt để `hang-rao-gop`
-          # có kết quả gắn vào đúng commit — không có nó thì tự gộp chờ mãi.
-          gh workflow run ci.yml --ref "$nh"
-          gh pr merge "$nh" --auto --squash \
+          # ĐỢT DỌN-9 22/10/2026 — TỰ GỘP, NHƯNG CANH LẠI ĐÚNG CHỖ BỊ VƯỢT.
+          #
+          # Cách cũ (DỌN-8) gọi `workflow_dispatch` để PR của robot có vòng CI. Vòng ấy CHẠY và
+          # XANH thật — lượt #1023, loc 5s, backend bỏ qua, hang-rao-gop xanh 1m11s — nhưng PR
+          # vẫn đứng với "hang-rao-gop: Expected", và tab Checks của PR chỉ thấy Vercel. Vì lượt
+          # workflow_dispatch gắn vào NHÁNH, không gắn vào PR. Nên cách ấy không gỡ được gì.
+          #
+          # Chủ tịch chốt 22/10/2026: robot TỰ GỘP bằng --admin. Nhưng vượt rào trần trụi nghĩa
+          # là commit đóng sổ KHÔNG được phép thử nào soi — nên hai phép thử mà hàng rào ấy sẽ
+          # chạy được gọi NGAY TẠI ĐÂY, trước khi gộp. Đỏ thì việc này đỏ và KHÔNG gộp.
+          #
+          # Vì sao đúng HAI tệp ấy là đủ: thay đổi chỉ-chạm-`docs/dang-lam/` thì thứ duy nhất có
+          # thể hỏng là hai làn cùng giữ một tệp, hoặc ô bảng vỡ. Cả hai nằm trong hai tệp này.
+          # `backend` không có conftest.py và không có pytest.ini, nên chỉ cần pytest.
+          pip install -q pytest
+          ( cd backend && python -m pytest -q tests/test_giu_cho_lan.py tests/test_giu_cho_nhanh.py )
+          gh pr merge "$nh" --squash --admin \
             --subject "Đóng sổ: ${{ steps.loc.outputs.nhanh }} đã gộp [skip ci]" --body ""
