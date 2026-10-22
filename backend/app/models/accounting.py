@@ -133,7 +133,38 @@ class JournalLine(Base):
     # Báo cáo "chi phí theo khoản mục" dựng trên cột ấy sẽ có vài dòng mang tên bộ phận, mà
     # TỔNG VẪN ĐÚNG — không phép thử số học nào bắt được, chỉ người đọc báo cáo mới thấy lạ.
     bo_phan: Mapped[str] = mapped_column(String(20), default="", index=True)     # mã bộ phận sử dụng
-    doc_no: Mapped[str] = mapped_column(String(40), default="")           # số hóa đơn / số chứng từ gốc
+    # ĐỢT R4b-2a 22/10/2026 — SỬA CHÚ THÍCH SAI CỦA CHÍNH CỘT NÀY.
+    #
+    # Chú thích cũ ghi "số hóa đơn / số chứng từ gốc" — MỘT cột hai nghĩa. Đo trên main hôm nay:
+    # chỗ DUY NHẤT ghi vào nó trong bộ quy tắc là `services/hach_toan.py` dòng 399, và nó ghi
+    # `boi_canh["so_chung_tu"]`, tức SỐ CHỨNG TỪ. Sáu chỗ trong `services/books.py` chỉ ĐỌC để in
+    # ra cột "Số CT gốc". Giao diện web không dùng. Phép thử: KHÔNG CÓ CHỖ NÀO — nghĩa của cột này
+    # chưa từng được ghim.
+    #
+    # Nên dùng lại nó làm số hóa đơn là để bộ quy tắc đè mất số hóa đơn mỗi lần tự ghi sổ: sổ vẫn
+    # cân, báo cáo vẫn ra số, không phép thử nào đỏ. Đúng hình dạng lỗi `item_code` chở hai nghĩa
+    # mà Đợt R3a phải đi gỡ. Nên: cột này giữ NGUYÊN nghĩa số chứng từ, hóa đơn đi cột riêng.
+    doc_no: Mapped[str] = mapped_column(String(40), default="")           # số chứng từ gốc — KHÔNG phải hóa đơn (xem Đợt R4b-2a)
+    # ĐỢT R4b-2a — HAI CỘT HÓA ĐƠN, GẮN TRÊN TỪNG DÒNG chứ không trên chứng từ.
+    #
+    # Chủ tịch chốt 22/10/2026. Lý do: một ủy nhiệm chi trả gộp ba hóa đơn của cùng một nhà cung
+    # cấp là chuyện thường; đặt trên chứng từ thì chỉ ghi được một số, hai hóa đơn kia biến mất
+    # khỏi sổ — mà đó đúng là thứ đối chiếu thuế sẽ hỏi tới. MISA cũng đặt trên dòng sổ chi tiết.
+    #
+    # `ngay_hoa_don` KHÔNG đổi `entry_date` và KHÔNG đổi kỳ của bút toán. Nó là mốc thứ ba, đứng
+    # cạnh `ngay_chung_tu` của Đợt E3 — ba câu hỏi khác nhau, ba cột khác nhau.
+    ngay_hoa_don: Mapped[date | None] = mapped_column(Date, nullable=True)
+    so_hoa_don: Mapped[str] = mapped_column(String(40), default="")
+    # BA TRẠNG THÁI, và ô rỗng là một trong ba chứ không phải "chưa khai":
+    #   ""                 chưa nhận được  (mặc định — dòng nằm trong danh sách việc cần làm)
+    #   "da_nhap"          đã nhập         (có ngày và số)
+    #   "khong_phat_sinh"  không phát sinh hóa đơn (bắt buộc có lý do)
+    hoa_don_trang_thai: Mapped[str] = mapped_column(String(20), default="", index=True)
+    hoa_don_ly_do: Mapped[str] = mapped_column(String(200), default="")
+    # Không cần ai duyệt (Chủ tịch chốt), nhưng VẪN ghi ai và lúc nào: một khoản được miễn hóa đơn
+    # là một quyết định thuế, và quyết định thì phải có tên người.
+    hoa_don_nguoi_ghi: Mapped[str] = mapped_column(String(50), default="")
+    hoa_don_ghi_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True)
     tour_id: Mapped[int | None] = mapped_column(ForeignKey("tours.id"), nullable=True)
     note: Mapped[str] = mapped_column(String(200), default="")

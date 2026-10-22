@@ -125,7 +125,93 @@ def kiem(db: Session, t: Trip, km_tour_tren_giay: int | None = None) -> list[dic
                           f"'tài xế chi' với 'công ty chi'."})
     if t.ngay_ve and t.ngay_di and t.ngay_ve < t.ngay_di:
         ra.append({"muc": "do", "o": "ngay", "noi": "Ngày về trước ngày đi."})
+    ra += kiem_tieu_hao(db, t)
     return ra
+
+
+# ── QT-1b · TIÊU HAO L/100KM KHI QUYẾT TOÁN (Chủ tịch chốt 22/10/2026) ─────────────────────────
+# QT-1 (13/10) để lại có chủ ý: chưa có phép kiểm tiêu hao, nên một chuyến khai dầu bất thường
+# vẫn qua được quyết toán. Phép kiểm này CẢNH BÁO, KHÔNG CHẶN — mức "vang" chứ không phải "do":
+# có chuyến đi đường xấu thật, chặn là chặn nhầm người làm đúng. Người ký đọc rồi tự quyết.
+#
+# KHÔNG DỰNG BẢNG ĐỊNH MỨC MỚI. `FuelNorm` (L/100km theo số chỗ) đã có cửa nhập ở màn Đội xe và
+# đang được khối Hiệu quả đội xe đọc (HQ-2c). Hai bảng định mức là hai con số sẽ có ngày lệch nhau.
+#
+# BIÊN 15% — Chủ tịch chọn 22/10/2026. Vượt QUÁ biên mới cảnh báo; đúng bằng biên là chưa vượt.
+# Biên đọc từ bảng tham số (`rules.DEFAULT_PARAMS` · `qt_tieu_hao_bien`), nên Kế toán chỉnh ở màn
+# tham số mà không cần sửa mã. Bản đầu để hằng số vì `rules.py` khi ấy đang có làn khác giữ chỗ;
+# SO-2 (#431) nhả chỗ ấy cùng ngày nên chuyển ngay. `BIEN_TIEU_HAO` chỉ còn là giá trị mặc định
+# để phép thử đọc ra luật Chủ tịch chốt.
+BIEN_TIEU_HAO = 0.15
+
+
+def bien_tieu_hao(db: Session, ngay=None) -> float:
+    from app.services import rules as R
+    return float(R.get_param(db, "qt_tieu_hao_bien", ngay))
+
+
+def tieu_hao(db: Session, t: Trip) -> dict | None:
+    """Tiêu hao L/100km của MỘT chuyến, cùng chỗ thiếu nếu chưa đo được. Không có khoản dầu → None.
+
+    SỐ LÍT (Chủ tịch chốt 22/10/2026): lít khai trên khoản dầu; khoản không ghi lít thì quy tiền ÷
+    giá dầu ĐÚNG ngày đi (`phat_va_gia_dau.lit_tu_tien`, DX-3); không có giá ngày ấy thì nói ra là
+    chưa đo được — KHÔNG đoán bằng giá gần nhất.
+    """
+    from app.models.fleet import FuelNorm
+    from app.models.hr import Vehicle
+    from app.services import phat_va_gia_dau as GD
+
+    dau = [c for c in db.execute(select(TripCost).where(TripCost.trip_id == t.id,
+                                                        TripCost.kind == "dau")).scalars()]
+    if not dau:
+        return None
+    lit, thieu = 0.0, []
+    for c in dau:
+        if (c.lit or 0) > 0:
+            lit += float(c.lit)
+            continue
+        q = GD.lit_tu_tien(db, t.ngay_di, _s(c.amount))
+        if q["lit"] is None:
+            thieu.append(q["vi_sao"])
+        else:
+            lit += q["lit"]
+    km = km_tour(t)
+    v = db.get(Vehicle, t.vehicle_id) if t.vehicle_id else None
+    so_cho = v.seats if v else None
+    dm = None
+    if so_cho is not None:
+        n = db.execute(select(FuelNorm).where(FuelNorm.seats == so_cho)).scalars().first()
+        dm = float(n.l_100km) if n and n.l_100km else None
+    return {"lit": round(lit, 2), "km": km, "so_cho": so_cho,
+            "ghe_da_xac_nhan": bool(v and (v.seats_xac_nhan_boi or "").strip()),
+            "l_100km": round(lit * 100 / km, 1) if (km and km > 0 and lit and not thieu) else None,
+            "dinh_muc": dm, "thieu": thieu}
+
+
+def kiem_tieu_hao(db: Session, t: Trip) -> list[dict]:
+    th = tieu_hao(db, t)
+    if th is None or not th["km"] or th["km"] <= 0:
+        return []                       # không có dầu, hoặc km đã có dòng báo riêng ở trên
+    if th["thieu"]:
+        return [{"muc": "vang", "o": "tieu_hao",
+                 "noi": "Chưa đo được tiêu hao: " + "; ".join(dict.fromkeys(th["thieu"])) + "."}]
+    ghe = "" if th["ghe_da_xac_nhan"] else " (số ghế của xe chưa ai xác nhận)"
+    if th["dinh_muc"] is None:
+        return [{"muc": "vang", "o": "tieu_hao",
+                 "noi": f"Chưa có định mức tiêu hao cho xe {th['so_cho']} chỗ{ghe} — Đội xe khai ở "
+                        f"cửa định mức dầu thì phép kiểm này tự chạy."}]
+    # Biên làm tròn tới 0,1 như chính con số L/100km: so hai số cùng độ chính xác, không để 20 × 1,15
+    # = 22,999… của dấu phẩy động làm một chuyến đúng bằng biên bị báo vượt.
+    tl = bien_tieu_hao(db, t.ngay_di)
+    bien = round(th["dinh_muc"] * (1 + tl), 1)
+    if th["l_100km"] > bien:
+        vuot = (th["l_100km"] / th["dinh_muc"] - 1) * 100
+        return [{"muc": "vang", "o": "tieu_hao",
+                 "noi": f"Tiêu hao {th['l_100km']:.1f} L/100km ({th['lit']:,.1f} lít / {th['km']:,} km), "
+                        f"vượt định mức {th['dinh_muc']:.1f} L/100km của xe {th['so_cho']} chỗ{ghe} "
+                        f"{vuot:.0f}% (biên {tl * 100:.0f}%). Đối chiếu hoá đơn dầu và "
+                        f"ảnh đồng hồ trước khi ký — không chặn: đường xấu có thể vượt thật."}]
+    return []
 
 
 def co_the_ky(t: Trip, buoc: str, vai: str) -> str:
