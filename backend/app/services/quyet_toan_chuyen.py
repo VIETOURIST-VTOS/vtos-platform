@@ -137,10 +137,17 @@ def kiem(db: Session, t: Trip, km_tour_tren_giay: int | None = None) -> list[dic
 # KHÔNG DỰNG BẢNG ĐỊNH MỨC MỚI. `FuelNorm` (L/100km theo số chỗ) đã có cửa nhập ở màn Đội xe và
 # đang được khối Hiệu quả đội xe đọc (HQ-2c). Hai bảng định mức là hai con số sẽ có ngày lệch nhau.
 #
-# BIÊN 15% — Chủ tịch chọn 22/10/2026. Vượt QUÁ 15% mới cảnh báo; đúng bằng 15% là chưa vượt.
-# Để hằng số ở đây chứ không vào bảng tham số `rules.py`: tệp ấy đang có làn khác giữ chỗ. Khi
-# chỗ ấy nhả thì chuyển vào bảng tham số để Kế toán chỉnh được mà không cần sửa mã.
+# BIÊN 15% — Chủ tịch chọn 22/10/2026. Vượt QUÁ biên mới cảnh báo; đúng bằng biên là chưa vượt.
+# Biên đọc từ bảng tham số (`rules.DEFAULT_PARAMS` · `qt_tieu_hao_bien`), nên Kế toán chỉnh ở màn
+# tham số mà không cần sửa mã. Bản đầu để hằng số vì `rules.py` khi ấy đang có làn khác giữ chỗ;
+# SO-2 (#431) nhả chỗ ấy cùng ngày nên chuyển ngay. `BIEN_TIEU_HAO` chỉ còn là giá trị mặc định
+# để phép thử đọc ra luật Chủ tịch chốt.
 BIEN_TIEU_HAO = 0.15
+
+
+def bien_tieu_hao(db: Session, ngay=None) -> float:
+    from app.services import rules as R
+    return float(R.get_param(db, "qt_tieu_hao_bien", ngay))
 
 
 def tieu_hao(db: Session, t: Trip) -> dict | None:
@@ -195,13 +202,14 @@ def kiem_tieu_hao(db: Session, t: Trip) -> list[dict]:
                         f"cửa định mức dầu thì phép kiểm này tự chạy."}]
     # Biên làm tròn tới 0,1 như chính con số L/100km: so hai số cùng độ chính xác, không để 20 × 1,15
     # = 22,999… của dấu phẩy động làm một chuyến đúng bằng biên bị báo vượt.
-    bien = round(th["dinh_muc"] * (1 + BIEN_TIEU_HAO), 1)
+    tl = bien_tieu_hao(db, t.ngay_di)
+    bien = round(th["dinh_muc"] * (1 + tl), 1)
     if th["l_100km"] > bien:
         vuot = (th["l_100km"] / th["dinh_muc"] - 1) * 100
         return [{"muc": "vang", "o": "tieu_hao",
                  "noi": f"Tiêu hao {th['l_100km']:.1f} L/100km ({th['lit']:,.1f} lít / {th['km']:,} km), "
                         f"vượt định mức {th['dinh_muc']:.1f} L/100km của xe {th['so_cho']} chỗ{ghe} "
-                        f"{vuot:.0f}% (biên {BIEN_TIEU_HAO * 100:.0f}%). Đối chiếu hoá đơn dầu và "
+                        f"{vuot:.0f}% (biên {tl * 100:.0f}%). Đối chiếu hoá đơn dầu và "
                         f"ảnh đồng hồ trước khi ký — không chặn: đường xấu có thể vượt thật."}]
     return []
 
