@@ -384,6 +384,8 @@ MAN_HINH_API = {
     # Hàng rào TRONG của bốn cửa phân bổ vẫn là `require_roles("ketoan", "cntt")`, không đổi.
     "/finance": ("/api/v1/fin", "/api/v1/cashflow", "/api/v1/bank-transactions"),
     "/hach-toan": ("/api/v1/hach-toan",),
+    # ĐỢT R4b-2b 23/10/2026 — màn hình chỉ gọi một nhóm cửa: /api/v1/books.
+    "/hoa-don-thieu": ("/api/v1/books",),
     # V7 Đợt 3 (10/9/2026). Sự cố tour đọc thêm /tours, /bookings, /suppliers và /payment-requests: màn
     # hình phải chọn chuyến, chọn nhà cung cấp gây sự cố, và gắn số hiệu đề nghị chi lúc kết luận.
     # Màn hình này chỉ chạm ĐÚNG HAI nhóm API, và đó là chủ ý.
@@ -1180,6 +1182,24 @@ MENU_ROLES = {
     # Kết sổ một kỳ: sao kê vào sổ hàng loạt, kết chuyển, và trạng thái cả kỳ. Chỉ Kế toán GHI –
     # Chủ tịch, TGĐ và Ban Kiểm soát xem chứ không ghi thay (chặn nằm ở API, không ở menu).
     "/ket-so": BASE_VIEW + ("ketoan", "cntt"),
+    # ĐỢT R4b-2b 23/10/2026 — SAO ĐÚNG DANH SÁCH VAI CỦA `/ket-so`, không rộng hơn một vai.
+    #
+    # Cùng họ màn hình "Sổ & kỳ kế toán", nên không phát minh quyền mới. Bài học đêm 22/10:
+    # Đợt R4b-2a tự mở cửa ghi cho `ketoan_tt` và `ketoan_truong`, và `test_le2b_ba_vai_ke_toan`
+    # đỏ ngay vì hai vai ấy có bảng ký đã chốt. `test_r4b2b_2` ghim rằng dòng này KHÔNG BAO GIỜ
+    # rộng hơn `/ket-so` — muốn rộng hơn thì sửa bảng ký trước, bằng một quyết định có chữ ký.
+    #
+    # Và ĐỪNG BỎ TRỐNG: `ks_ma_tran` ghi rõ quy ước "trang không liệt kê trong MENU_ROLES = ai
+    # đăng nhập cũng thấy". Quên khai không phải là an toàn, nó là mở cho tất cả.
+    #
+    # BỎ `robot_ks` RA, và đây là chiều TRỪ chứ không phải chiều nới. `BASE_VIEW` có `robot_ks`,
+    # nhưng `books.READ` thì không — nên vai ấy THẤY MENU MÀ KHÔNG GỌI ĐƯỢC CỬA NÀO.
+    # `test_lg4_mon_no_khong_duoc_DAI_THEM` đỏ đúng chỗ ấy trên PR #442 (23/10/2026).
+    #
+    # Hai chiều sửa đều có: nới `books.READ` cho `robot_ks`, hoặc bỏ nó khỏi menu. Chọn chiều
+    # TRỪ vì nó không cấp thêm quyền cho ai; nới một danh sách vai là một quyết định cấp quyền,
+    # và đêm qua đợt R4b-2a đã sai đúng vì tự quyết một chuyện như thế.
+    "/hoa-don-thieu": FULL_VIEW + ("bks", "ketoan", "cntt"),
     # Sổ tỷ giá. Kế toán giữ sổ; Điều hành nhập tỷ giá của chuyến mình chi; Visa nhập tỷ giá phí
     # lãnh sự. Rộng hơn thế thì một con số NHÂN vào tiền có quá nhiều người sửa được.
     "/ty-gia": BASE_VIEW + OPERATIONS + ("ketoan", "nv_visa", "cntt"),
