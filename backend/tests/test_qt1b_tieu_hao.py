@@ -102,5 +102,18 @@ def test_qt1b_7_khong_co_khoan_dau_thi_khong_kiem(db):
     assert QT.tieu_hao(db, t) is None and _th(db, t) == []
 
 
-def test_qt1b_8_bien_la_15_phan_tram_dung_luat_chu_tich_chot():
-    assert QT.BIEN_TIEU_HAO == 0.15
+def test_qt1b_8_bien_la_15_phan_tram_dung_luat_chu_tich_chot(db):
+    from app.services import rules as R
+    mac_dinh = {k: v for k, v, *_ in R.DEFAULT_PARAMS}
+    assert float(mac_dinh["qt_tieu_hao_bien"]) == QT.BIEN_TIEU_HAO == 0.15
+    assert QT.bien_tieu_hao(db) == 0.15
+
+
+def test_qt1b_9_bien_doc_tu_bang_tham_so_chu_khong_go_cung(db, monkeypatch):
+    """Kế toán nới biên ở màn tham số thì phép kiểm đổi theo — không phải sửa mã."""
+    from app.services import rules as R
+    goc = R.get_param
+    monkeypatch.setattr(R, "get_param",
+                        lambda db, k, on=None: 0.30 if k == "qt_tieu_hao_bien" else goc(db, k, on))
+    t = _chuyen(db, dinh_muc=20.0)                     # 25,7 ≤ 20 × 1,30 = 26,0
+    assert _th(db, t) == []
