@@ -17,6 +17,7 @@ git không có gì để xung đột.
 | VPM | `docs/dang-lam/vpm.md` |
 | Kiểm soát | `docs/dang-lam/kiem-soat.md` |
 | Quyết toán | `docs/dang-lam/quyet-toan.md` |
+| R2 | `docs/dang-lam/r2.md` |
 
 ## Luật
 

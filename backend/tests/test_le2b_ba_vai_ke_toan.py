@@ -85,6 +85,12 @@ CHO_DA_KHAI_BA_VAI = [
     # `ketoan`: người trình phải là người đứng đầu phòng, vì hồ sơ này đi lên Chủ tịch ký.
     # Cửa KÝ (`chutich`) không hiện ở đây vì phép thử chỉ soi ba vai mới của Đợt E2b.
     "api/v1/accounting.py: ketoan_truong",
+    # `api/v1/books.py` — Đợt R4b-2b 23/10/2026, Chủ tịch ký: Kế toán trưởng ĐỌC được Sổ kế
+    # toán (nhật ký chung, sổ cái, sổ chi tiết, bảng cân đối, hóa đơn còn thiếu). Không phải
+    # quyền mới: phép suy `ketoan` → `ketoan_truong` của Đợt LG1 đã cho vai ấy thấy menu, cửa
+    # này viết trước LG1 nên chặn — món nợ chỉ lộ khi `/api/v1/books` lần đầu gắn vào màn hình.
+    # CỬA ĐỌC, không có cửa ghi nào mở thêm: `GHI_HOA_DON` vẫn chỉ `ketoan`.
+    "api/v1/books.py: ketoan_truong",
     # ── Vòng HS-1, 15/10/2026 (làn Kiểm soát) ─────────────────────────────────────────────
     # `services/ho_so_nhan_vien.py: CAP_BAC` xếp THỨ BẬC cho cả 29 vai trong `ROLES`, nên ba
     # tên này hiện ra ở đó. Nó KHÔNG mở một cửa nào: cấp bậc chỉ quyết định dòng nào đứng trên
