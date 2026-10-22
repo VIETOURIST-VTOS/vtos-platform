@@ -64,13 +64,16 @@ def _bo_chu_thich_css(s: str) -> str:
 # SỬA 18/9/2026 (TC-65): `<KhoiQuyetDinh` rời danh sách GIỮ vì nó không còn là một khối — hàng
 # nút chờ quyết nhập vào thanh ngang `<TieuDe`. Nó KHÔNG sang danh sách BỎ: việc chờ quyết vẫn
 # trên màn hình, chỉ là không còn khung riêng. test_tc18 canh cả hai vế.
-GIU = ["<HangThe", "<KhoiHieuQuaXe", "<KhoiDongTien",
-       "<KhoiKetQuaKinhDoanh", "<KhoiTonDongMuc",
+# SỬA 22/10/2026 (TQ-1): `<HangThe` + `<KhoiTonDongMuc` → `<KhoiVanHanh` (anh Tuấn duyệt bản vẽ
+# Tổng quan Vận hành v1.1). Hai tên cũ sang danh sách BỎ: dựng lại một trong hai bên cạnh mục mới
+# là để một con số nằm hai chỗ — đúng bệnh luật "một con số, một chỗ" sinh ra để chặn.
+GIU = ["<KhoiVanHanh", "<KhoiHieuQuaXe", "<KhoiDongTien",
+       "<KhoiKetQuaKinhDoanh",
        "<KhoiPhaiThu", "<KhoiPhaiTra",
        "<KhoiKinhDoanhLe", "<KhoiKinhDoanhDoan", "<KhoiBaoCaoNgay"]
 
 BO = ['id="dieu-hanh"', "<KhoiTonDongBoPhan", "<KhoiRuiRo", "<KhoiTienDoBaoCao",
-      "<KhoiTonDong ", 'id="viec-cua-toi"']
+      "<KhoiTonDong ", 'id="viec-cua-toi"', "<HangThe", "<KhoiTonDongMuc"]
 
 
 def test_dung_danh_sach_khoi_anh_Tuan_chot():
