@@ -19,6 +19,7 @@ import re
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DAU = os.path.join(ROOT, "web", "components", "DauManHinh01.tsx")
 TRANG = os.path.join(ROOT, "web", "app", "page.tsx")
+VH = os.path.join(ROOT, "web", "components", "KhoiVanHanh.tsx")
 
 
 def _doc(p):
@@ -45,9 +46,13 @@ def test_viec_can_quyet_dinh_dung_truoc_cac_con_so():
     # ngang", hàng nút chờ quyết nhập thẳng vào `<TieuDe`. LUẬT VẪN NGUYÊN MỘT CHỮ: việc chờ mình
     # quyết phải đứng TRƯỚC mọi con số. Nay nó đứng trước theo nghĩa mạnh hơn — nó nằm trong chính
     # dòng đầu tiên của trang. Vế canh ngược ("không dựng lại khối riêng") ở ngay dưới.
-    vt = {t: s.index(t) for t in ("<TieuDe", "<KhoiDongTien", "<HangThe")}
+    #
+    # TQ-1 (22/10/2026): `<HangThe` → `<KhoiVanHanh`. Anh Tuấn duyệt bản vẽ Tổng quan Vận hành v1.1
+    # — hàng thẻ tour và khối tồn đọng gộp thành MỘT mục, đứng đúng chỗ hàng thẻ cũ. Luật giữ
+    # nguyên: đầu trang trước, con số sau.
+    vt = {t: s.index(t) for t in ("<TieuDe", "<KhoiDongTien", "<KhoiVanHanh")}
     thu_tu = sorted(vt, key=lambda t: vt[t])
-    assert thu_tu == ["<TieuDe", "<KhoiDongTien", "<HangThe"], \
+    assert thu_tu == ["<TieuDe", "<KhoiDongTien", "<KhoiVanHanh"], \
         f"thứ tự khối trên màn hình 01 lệch bản vẽ V1.2: {thu_tu}"
     assert "<KhoiQuyetDinh" not in s, (
         "`<KhoiQuyetDinh` sống lại thành khối riêng — hàng nút chờ quyết phải nằm trên thanh "
@@ -62,45 +67,34 @@ def test_viec_can_quyet_dinh_dung_truoc_cac_con_so():
     )
 
 
-def test_sau_o_lon_va_nam_the_nho():
-    """TÁM THẺ → SÁU Ô LỚN + NĂM THẺ NHỎ (anh Tuấn chốt 16/9/2026, TC-42).
+def test_sau_o_lon_va_muc_van_hanh():
+    """TÁM THẺ → SÁU Ô LỚN + HÀNG THẺ NHỎ (TC-42, 16/9/2026) → MỤC «VẬN HÀNH & CÔNG VIỆC» (TQ-1).
 
-    Bản V1.2 chốt tám thẻ ngang hàng nhau. Trên bản chạy thật, tám thẻ ngang hàng hoá ra là tám
-    con số ngang hàng — mà chúng không ngang hàng: "doanh thu 4,3 tỷ" chỉ có nghĩa khi đặt cạnh kế
-    hoạch và kỳ trước, còn "93 tour sắp khởi hành" thì đọc xong là xong.
+    SỬA 22/10/2026 (TQ-1) — anh Tuấn duyệt bản vẽ Tổng quan Vận hành v1.1: hàng thẻ nhỏ và khối
+    Tồn đọng gộp thành một mục, vì hai thứ ấy trả lời CÙNG một câu hỏi ("hôm nay vận hành có gì
+    phải xử lý"). Mảng `const the: The[]` không còn — phép thử cũ đếm sáu nhãn trong mảng ấy nay
+    canh thẳng mục mới.
 
-    Nên phép thử này canh HAI nhóm, và canh rằng chúng không lẫn vào nhau. Sáu mục phải nghĩ thì
-    phải có biểu đồ; năm mục chỉ để liếc thì KHÔNG được có, vì hình trên chúng kéo mắt khỏi sáu ô
-    trên — đúng điều anh Tuấn chốt khi chọn "thẻ số nhỏ, một hàng, không biểu đồ".
+    LUẬT CỦA TC-42 GIỮ NGUYÊN MỘT CHỮ: những con số để LIẾC thì không mang biểu đồ. Mục mới chỉ có
+    một thanh cơ cấu mức độ (không trục, không kỳ) — không nhập bộ vẽ biểu đồ nào. «Xe đang đi» đã
+    chuyển xuống khối đội xe từ TC-72 nên không còn trong danh sách.
     """
     s = _ma(TRANG)
-    khoi = s[s.index("const the: The[] = ["): s.index("];", s.index("const the: The[] = ["))]
-    nhan = re.findall(r'nhan: "([^"]+)"', khoi)
-    # SỬA 16/9/2026 lần hai (TC-46): anh Tuấn chốt SÁU thẻ theo bản vẽ v3.0 — thêm "Tour đang
-    # chạy" và đổi "Đội xe hôm nay" thành "Xe đang đi". Luật không đổi một chữ: hàng thẻ là những
-    # con số để LIẾC, nên không thẻ nào được mang biểu đồ.
-    # SỬA 22/10/2026 (TC-72): còn NĂM. «Xe đang đi» chuyển xuống khối Hiệu quả đội xe — anh Tuấn
-    # chốt 20/10, chú thích ghi ngay trong page.tsx. Luật không đổi một chữ: hàng thẻ là những con
-    # số để LIẾC, nên không thẻ nào được mang biểu đồ.
-    #
-    # CON SỐ KHÔNG MẤT, NÓ ĐỔI CHỖ — và chỗ mới được canh ở phép thử ngay dưới. Hạ sáu xuống năm
-    # mà không canh chỗ mới thì lần sau ai xoá hẳn con số ấy, phép thử này vẫn xanh: nó chỉ còn
-    # nói «hàng thẻ không có Xe đang đi», đúng cả khi màn hình không còn con số ấy ở đâu cả.
-    assert len(nhan) == 5, f"hàng thẻ nhỏ phải đúng NĂM mục, đang có {len(nhan)}: {nhan}"
-    for can in ("Tour đang bán", "Tour đang chạy", "Tour chờ quyết toán", "Tour sắp khởi hành",
-                "Khách tiềm năng mới"):
-        assert can in nhan, f"thiếu thẻ “{can}” trong hàng thẻ nhỏ"
-    assert "Xe đang đi" not in nhan, (
-        "«Xe đang đi» đã chuyển xuống khối Hiệu quả đội xe (TC-72). Để lại trên hàng thẻ nhỏ là "
-        "cùng một con số hiện ở hai chỗ, và hai chỗ thì sớm muộn lệch.")
-    assert "xu_huong:" not in khoi, (
-        "Năm thẻ nhỏ KHÔNG được mang biểu đồ — chúng là con số để liếc, và hình trên chúng kéo "
-        "mắt khỏi sáu ô lớn phía trên."
+    vh = _ma(VH)
+    assert "const the: The[]" not in s, "hàng thẻ cũ sống lại bên cạnh mục mới — một số hai chỗ (TC-40)"
+    for can in ("Việc nghiêm trọng", "Quá hạn quyết toán", "Tour đang bán", "Tour đang đi",
+                "Sắp khởi hành", "Chờ quyết toán", "Tồn đọng công việc", "Khách tiềm năng mới"):
+        assert can in vh, f"mục Vận hành & công việc thiếu ô “{can}”"
+    assert "Xe đang đi" not in vh, (
+        "«Xe đang đi» đã chuyển xuống khối Hiệu quả đội xe (TC-72). Để lại ở mục Vận hành là cùng "
+        "một con số hiện ở hai chỗ — chỗ mới canh ở test_xe_dang_di_nam_o_khoi_hieu_qua_doi_xe.")
+    assert "BieuDo" not in vh and "xu_huong" not in vh, (
+        "Ô trong mục Vận hành KHÔNG mang biểu đồ — chúng là con số để liếc (TC-42)."
     )
-    # SỬA 16/9/2026 (TC-44): hai ô đầu gộp vào <KhoiKetQuaKinhDoanh — vẫn sáu con số.
+    # Năm ô lớn còn lại + mục Vận hành giữ chỗ của ô thứ sáu (Tồn đọng).
     for o in ("<KhoiKetQuaKinhDoanh", "<KhoiDongTien",
-              "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiTonDongMuc"):
-        assert o in s, f"thiếu ô lớn {o} — anh Tuấn chốt đúng sáu ô."
+              "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiVanHanh"):
+        assert o in s, f"thiếu khối {o} trên màn hình 01."
 
 
 def test_xe_dang_di_nam_o_khoi_hieu_qua_doi_xe():
@@ -124,13 +118,15 @@ def test_the_chua_co_nguon_phai_co_cua_nhap():
 
     Một ô trống không kèm cửa là việc còn thiếu, không phải một ô trống bình thường – và nếu không
     ghi ra thì không ai biết phải đi hỏi bộ phận nào.
+
+    SỬA 22/10/2026 (TQ-1): ô «Khách tiềm năng mới» chuyển vào mục Vận hành; nó vẫn rỗng, vẫn phải
+    ghi bộ phận (Marketing) và cửa nhập — và vẫn KHÔNG được thay bằng 0.
     """
-    s = _ma(TRANG)
-    khoi = s[s.index("const the: The[] = ["): s.index("];", s.index("const the: The[] = ["))]
-    for the in re.findall(r'\{ nhan: "[^"]+".*?\},\n', khoi, re.S):
-        if re.search(r'so: null', the):
-            assert "cua:" in the and "ai:" in the, \
-                f"thẻ chưa có nguồn mà không chỉ ra cửa nhập và bộ phận:\n{the.strip()[:160]}"
+    vh = _ma(VH)
+    k = vh[vh.index("Khách tiềm năng mới"):]
+    k = k[:k.index("</section>")]
+    assert "Chưa có nguồn" in k and "Marketing" in k, "ô rỗng phải ghi «Chưa có nguồn» và bộ phận"
+    assert 'href="/leads?tab=leads"' in k, "ô rỗng phải chỉ ra cửa nhập"
     assert "the-cua" in _ma(DAU), "thẻ rỗng phải vẽ được đường dẫn cửa nhập"
 
 
