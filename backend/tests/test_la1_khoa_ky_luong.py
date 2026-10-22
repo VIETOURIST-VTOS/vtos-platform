@@ -69,12 +69,13 @@ def test_a2_ke_toan_khong_con_dung_dau_chuoi():
         "Kế toán chuyển về cuối chuỗi – thứ họ xác nhận ở đầu là sự thật máy tự kiểm được"
 
 
-def test_a2b_cong_chua_duyet_thi_kiem_co_so_chan():
-    """CN-1 (21/10/2026): phòng có người trong bảng mà công chưa duyệt thì kiểm cơ sở CHẶN."""
+def test_a2b_cong_chua_duyet_thi_kiem_co_so_bao_giu_luong():
+    """CN-1 → CN-2 (21/10/2026): công chưa duyệt KHÔNG còn chặn cả kỳ — kiểm cơ sở báo trước, mức
+    cảnh báo, rằng phòng ấy sẽ bị giữ lương nếu tới lúc ký vẫn chưa duyệt."""
     d = client.post(f"/api/v1/payroll-runs/{P}/kiem-co-so", headers=login("hcns")).json()
-    co = [c for c in d["co"] if c["ma"] == "CONG_CHUA_DUYET"]
-    assert co and all(c["muc"] == "chan" for c in co), d["co"]
-    assert d["dat"] is False and d["trang_thai"] == "nhap"
+    co = [c for c in d["co"] if c["ma"] == "GIU_LUONG"]
+    assert co and all(c["muc"] == "canh_bao" for c in co), d["co"]
+    assert not [c for c in d["co"] if c["ma"] == "CONG_CHUA_DUYET"], "CN-2 bỏ cờ chặn cả kỳ"
 
 
 def test_a3_kiem_co_so_chay_duoc_va_doi_trang_thai():
@@ -96,9 +97,9 @@ def test_a5_hcns_kiem_roi_moi_den_chu_ky():
     assert _tien("hcns").json()["run"]["status"] == "hcns_kiem"
 
 
-def test_a6_sua_cong_sau_khi_duyet_thi_chu_ky_dung_lai():
-    """CN-1: kiểm cơ sở đã qua, nhưng HCNS sửa công trước lúc ký thì xác nhận hết hiệu lực và chữ ký
-    phải dừng — kiểm lại ngay trong bước ký, không tin kết quả kiểm từ trước."""
+def test_a6_sua_cong_sau_khi_duyet_thi_xac_nhan_het_hieu_luc():
+    """CN-1: HCNS sửa công sau khi TGĐ duyệt thì xác nhận của phòng ấy hết hiệu lực ngay — và nếu
+    ký lúc này thì phòng ấy bị giữ lương (CN-2, canh ở test_cn2). Ở đây duyệt lại để F1 ký đủ."""
     bang = client.get("/api/v1/attendance", params={"period": P, "department": "ketoan"},
                       headers=login("hcns")).json()
     if not bang["rows"]:
@@ -107,8 +108,8 @@ def test_a6_sua_cong_sau_khi_duyet_thi_chu_ky_dung_lai():
     r = client.post("/api/v1/attendance", json={"employee_id": eid, "day": f"{P}-02", "kind": "khong_luong",
                                                 "work": 0, "ot_hours": 0, "note": "CN-1"}, headers=login("hcns"))
     assert r.status_code == 200, r.text
-    r = _tien("chutich")
-    assert r.status_code == 422 and "công chưa duyệt" in r.json()["detail"], r.text
+    xn = client.get("/api/v1/attendance/xac-nhan-cong", params={"period": P}, headers=login("hcns")).json()
+    assert next(k for k in xn["phong"] if k["phong"] == "ketoan")["trang_thai"] == "het_hieu_luc"
     duyet_cong(client, P, login)
 
 

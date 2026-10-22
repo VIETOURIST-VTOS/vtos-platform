@@ -63,6 +63,43 @@ class BangLuongKhoa(Base):
     ghi_chu_mo: Mapped[str] = mapped_column(Text, default="")
     mo_boi: Mapped[str] = mapped_column(String(50), default="")
     mo_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # CN-2 (Chủ tịch chốt 21/10/2026). RỖNG = bản khoá của BẢNG CHÍNH; có số = bản khoá của bảng
+    # lương bổ sung số ấy. Hai loại dùng chung dãy `ban_so` của kỳ, nhưng «bản đang hiệu lực» của
+    # bảng chính chỉ tìm trong các bản rỗng cột này — không thì ký một bảng bổ sung là thay mất
+    # bảng chính.
+    bo_sung_so: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 Index("ix_bang_luong_khoa_ky_ban", BangLuongKhoa.period, BangLuongKhoa.ban_so, unique=True)
+
+
+class BangLuongBoSung(Base):
+    """CN-2 · Bảng lương BỔ SUNG của một kỳ — trả cho phòng đã bị GIỮ LƯƠNG ở bảng chính.
+
+    Chủ tịch chốt 21/10/2026: phòng chưa được duyệt công thì lương của phòng ấy bị giữ lại khi ký
+    bảng chính; công được duyệt rồi thì máy lập bảng bổ sung chỉ gồm những người bị giữ, tính lại
+    theo công đã duyệt, và bảng ấy đi CÙNG CHUỖI như bảng chính: máy kiểm cơ sở → HCNS kiểm →
+    Chủ tịch hoặc TGĐ ký → khoá bản riêng → bút toán riêng → chi riêng.
+    """
+
+    __tablename__ = "bang_luong_bo_sung"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    period: Mapped[str] = mapped_column(String(7), index=True)
+    so: Mapped[int] = mapped_column(Integer, default=1)
+    phong: Mapped[list] = mapped_column(JSON, default=list)
+    rows: Mapped[list] = mapped_column(JSON, default=list)
+    totals: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(20), default="nhap")    # nhap / da_kiem_co_so / hcns_kiem / da_ky
+    lap_boi: Mapped[str] = mapped_column(String(50), default="")
+    lap_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    hcns_by: Mapped[str] = mapped_column(String(50), default="")
+    hcns_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ky_boi: Mapped[str] = mapped_column(String(50), default="")
+    ky_vai: Mapped[str] = mapped_column(String(20), default="")
+    ky_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ban_khoa_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    entry_ids: Mapped[list] = mapped_column(JSON, default=list)
+
+
+Index("ix_bang_luong_bo_sung_ky_so", BangLuongBoSung.period, BangLuongBoSung.so, unique=True)
