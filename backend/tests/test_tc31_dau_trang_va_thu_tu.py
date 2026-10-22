@@ -80,8 +80,10 @@ THU_TU_BAN_VE = [
     "<KhoiPhaiThu",              # Ô 4 · Phải thu theo hạn  — hai khối này dùng CHUNG bảy mốc hạn,
     "<KhoiPhaiTra",              # Ô 5 · Phải trả theo hạn  — nên đứng cạnh nhau để so hàng ngang
     "<KhoiDongTien",             # Ô 3 · Dòng tiền — nay nằm ngang hết bề ngang, mang biểu đồ 13 tuần
-    "<KhoiTonDongMuc",           # Ô 6 · Tồn đọng theo mức độ
-    "<HangThe",                  # hàng năm thẻ số nhỏ
+    # SỬA 22/10/2026 (TQ-1): `<KhoiTonDongMuc` + `<HangThe` gộp thành MỘT mục `<KhoiVanHanh`
+    # («Vận hành & công việc») — anh Tuấn duyệt bản vẽ Tổng quan Vận hành v1.1. Đứng ĐÚNG chỗ hai
+    # khối cũ, giữa tiền và đội xe; thứ tự đọc không đổi.
+    "<KhoiVanHanh",              # Ô 6 + hàng thẻ · Vận hành & công việc
     "<KhoiHieuQuaXe",            # 04b · Hiệu quả đội xe
 ]
 
