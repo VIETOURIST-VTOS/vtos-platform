@@ -10,7 +10,21 @@ from app.services import books as BK
 from app.services import rules as R_
 
 router = APIRouter(prefix="/api/v1/books", tags=["so-ke-toan"])
-READ = ("ketoan", "cntt", "tgd", "chutich", "bks", "ptgd_doan")
+# ĐỢT R4b-2b 23/10/2026 — THÊM `ketoan_truong`, CHỦ TỊCH KÝ.
+#
+# ĐÂY KHÔNG PHẢI MỘT QUYỀN MỚI, nó là một luật đã ký va vào một cửa viết trước nó. Đợt LG1
+# chốt phép suy `ketoan` → `ketoan_truong` ở `services/vai_ke_thua.py`, và `access.py` áp
+# phép suy ấy cho MỌI màn hình qua `_mo_cho_ba_vai`. Nên Kế toán trưởng thấy menu Sổ kế
+# toán, mà cửa này — viết trước LG1 — lại chặn.
+#
+# Đo 23/10/2026: `/ket-so`, `/hach-toan` và màn hình mới đều có `ketoan_truong` trong
+# MENU_ROLES; `books.READ` thì không. Món nợ ấy chỉ lộ ra bây giờ vì đây là lần đầu
+# `/api/v1/books` được gắn vào một màn hình.
+#
+# Đây là CỬA ĐỌC (nhật ký chung, sổ cái, sổ chi tiết, bảng cân đối). Ban kiểm soát và CNTT
+# đã đọc được, nên Kế toán trưởng không đọc được là một chỗ hụt chứ không phải một hàng rào.
+# Bảng ký của Đợt E2b được cập nhật CÙNG LẦN này — xem `test_le2b_ba_vai_ke_toan`.
+READ = ("ketoan", "ketoan_truong", "cntt", "tgd", "chutich", "bks", "ptgd_doan")
 # ĐỢT R4b-2a 22/10/2026 — VAI ĐƯỢC GHI HÓA ĐƠN VÀO DÒNG BÚT TOÁN.
 #
 # CHỈ vai nền `ketoan`. Bản đầu của đợt này khai thêm `ketoan_tt` và `ketoan_truong`, và
