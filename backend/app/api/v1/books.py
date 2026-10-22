@@ -1,6 +1,7 @@
 """API Sổ kế toán chuẩn: Nhật ký chung, Sổ Cái, Sổ chi tiết TK, Sổ quỹ tiền mặt, Sổ tiền gửi, Sổ công nợ."""
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import require_roles
@@ -10,6 +11,17 @@ from app.services import rules as R_
 
 router = APIRouter(prefix="/api/v1/books", tags=["so-ke-toan"])
 READ = ("ketoan", "cntt", "tgd", "chutich", "bks", "ptgd_doan")
+# ĐỢT R4b-2a 22/10/2026 — VAI ĐƯỢC GHI HÓA ĐƠN VÀO DÒNG BÚT TOÁN.
+#
+# CHỈ vai nền `ketoan`. Bản đầu của đợt này khai thêm `ketoan_tt` và `ketoan_truong`, và
+# `hang-rao-gop` ĐỎ ngay ở `test_le2b_ba_vai_ke_toan`: hai vai ấy có BẢNG KÝ đã chốt từ Đợt
+# E2b và bảng ấy được ghim vào CI. Thêm một cửa cho chúng là NỚI MỘT QUYỀN CHƯA AI KÝ —
+# đúng cái Lỗi 3 mà bản rà soát v1.0 đã bắt một lần: tự đặt một luật rồi khoá vào CI.
+#
+# Vai `ketoan` đã có sẵn quyền ghi sổ, nên mở cửa này cho nó không nới gì thêm. Muốn hai vai
+# hẹp cùng ghi được thì sửa BẢNG KÝ trước, bằng một quyết định có chữ ký — không phải bằng
+# một dòng thêm vào đây.
+GHI_HOA_DON = ("ketoan",)
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -34,6 +46,7 @@ def catalog(u: User = Depends(require_roles(*READ))):
         {"key": "cong-no-tong-hop", "ten": "Sổ tổng hợp công nợ theo đối tượng", "mau": "Tổng hợp", "path": "/api/v1/books/cong-no-tong-hop", "tham_so": ["account"]},
         {"key": "can-doi-tai-khoan", "ten": "Bảng cân đối tài khoản", "mau": "S06-DN", "path": "/api/v1/books/can-doi-tai-khoan", "tham_so": ["level", "bu_tru", "luy_ke_tu"]},
         {"key": "chung-tu-goc", "ten": "Bảng tổng hợp chứng từ gốc cùng loại", "mau": "Tổng hợp", "path": "/api/v1/books/chung-tu-goc"},
+        {"key": "hoa-don-thieu", "ten": "Hóa đơn còn thiếu", "mau": "Việc cần làm", "path": "/api/v1/books/hoa-don-thieu", "tham_so": ["trang_thai", "partner_code", "qua_ngay"]},
         {"key": "nhat-ky-tien", "ten": "Sổ nhật ký thu tiền / chi tiền", "mau": "S03a1-DN / S03a2-DN", "path": "/api/v1/books/nhat-ky-tien", "tham_so": ["direction"]},
         {"key": "cong-trinh", "ten": "Sổ chi tiết theo công trình (tour)", "mau": "Chi tiết công trình", "path": "/api/v1/books/cong-trinh", "tham_so": ["project_code"]},
         {"key": "cong-trinh-tong-hop", "ten": "Tổng hợp doanh thu – chi phí – lãi lỗ theo công trình", "mau": "Tổng hợp", "path": "/api/v1/books/cong-trinh-tong-hop"},
@@ -253,3 +266,37 @@ def chung_tu_goc_xlsx(since: date, upto: date, u: User = Depends(require_roles(*
     R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"ctgoc:{since}:{upto}",
              after={"so_loai": len(rep["rows"]), "chua_khai": rep["so_chua_khai"]}); db.commit()
     return _xlsx(BK.chung_tu_goc_xlsx(rep), f"TONG_HOP_CHUNG_TU_GOC_{_tag(since, upto)}.xlsx")
+# ---------- Hóa đơn còn thiếu (Đợt R4b-2a) ----------
+#
+# Cửa ĐỌC mở cho cả nhóm READ — ai xem được sổ thì xem được danh sách này. Cửa GHI hẹp hơn.
+
+
+class GhiHoaDon(BaseModel):
+    line_id: int
+    trang_thai: str                      # "" | "da_nhap" | "khong_phat_sinh"
+    ngay_hoa_don: date | None = None
+    so_hoa_don: str = ""
+    ly_do: str = ""
+
+
+@router.get("/hoa-don-thieu")
+def hoa_don_thieu(since: date, upto: date, trang_thai: str = "", partner_code: str = "",
+                  qua_ngay: int = 0, limit: int = BK.PAGE_LIMIT,
+                  u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    try:
+        return BK.hoa_don_thieu(db, since, upto, trang_thai, partner_code, qua_ngay, limit)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/hoa-don-thieu/ghi")
+def hoa_don_ghi(body: GhiHoaDon, u: User = Depends(require_roles(*GHI_HOA_DON)),
+                db: Session = Depends(get_db)):
+    try:
+        kq = BK.ghi_hoa_don(db, body.line_id, body.trang_thai, u.username,
+                            body.ngay_hoa_don, body.so_hoa_don, body.ly_do)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    R_.audit(db, u.username, u.role, "ghi_hoa_don_dong_but_toan", str(body.line_id), after=kq)
+    db.commit()
+    return kq
