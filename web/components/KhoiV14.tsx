@@ -384,9 +384,24 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
     ["Lợi nhuận", tien(o.loi_nhuan), "loi_nhuan"],
     ["Biên lợi nhuận", pt(o.ty_le_loi_nhuan), "ty_le_loi_nhuan"],
   ];
+  /* HQ-4 (23/10/2026) — «Chi phí / km» GỠ KHỎI MÀN HÌNH CHỦ TỊCH, anh Tuấn chốt.
+     Lý do xếp chỗ: tầng vận hành đang có SÁU ô (bốn ô của `vanHanh` + Công suất + Xe đang đi) trong một
+     lưới `auto-fit minmax(150px)` — trên màn của anh lưới ấy xếp năm ô một hàng, nên ô thứ sáu
+     «Xe đang đi» rơi xuống hàng riêng và đứng một mình dưới một hàng trống. Bỏ một ô là cả tầng
+     về đúng MỘT hàng năm ô, không cần đụng tới lưới chung.
+
+     Vì sao ô bị bỏ là «Chi phí / km» chứ không phải ô khác: trong sáu ô thì năm ô kia trả lời
+     một câu Chủ tịch hỏi hằng ngày (đội xe chạy bao nhiêu ngày · ăn bao nhiêu dầu · chạy rỗng
+     bao nhiêu · dùng hết bao nhiêu phần công suất · hôm nay mấy xe đang trên đường), còn
+     «chi phí mỗi km» là chỉ số để Đội xe so giữa các xe với nhau — nó chỉ có nghĩa khi đặt cạnh
+     chi phí/km của TỪNG xe, và chỗ ấy là trang `/lai-lo-doi-xe`.
+
+     CON SỐ KHÔNG BỊ XOÁ, NÓ CHỈ KHÔNG LÊN MÀN NÀY: `chi_phi_moi_km` giữ nguyên trong hợp đồng dữ
+     liệu ở đầu tệp, máy chủ vẫn trả, và nó vẫn nằm trong `cot` bên dưới — mảng ấy là phép đo
+     "kỳ này có số hay không", không phải danh sách ô để vẽ. Xoá nó khỏi `cot` là làm khối tưởng
+     mình rỗng trong khi máy chủ có số. */
   const vanHanh: [string, string | null, string][] = [
     ["Ngày xe hoạt động", so(o.ngay_xe_hoat_dong), "ngay_xe_hoat_dong"],
-    ["Chi phí / km", so(o.chi_phi_moi_km, " đ"), "chi_phi_moi_km"],
     ["Tiêu hao", so(o.tieu_hao_l100, " L/100km"), "tieu_hao_l100"],
     ["Km chạy rỗng", so(o.km_chay_rong), "km_chay_rong"],
   ];
