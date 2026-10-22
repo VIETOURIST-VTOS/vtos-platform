@@ -1,6 +1,7 @@
 """API Sổ kế toán chuẩn: Nhật ký chung, Sổ Cái, Sổ chi tiết TK, Sổ quỹ tiền mặt, Sổ tiền gửi, Sổ công nợ."""
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import require_roles
@@ -9,7 +10,32 @@ from app.services import books as BK
 from app.services import rules as R_
 
 router = APIRouter(prefix="/api/v1/books", tags=["so-ke-toan"])
-READ = ("ketoan", "cntt", "tgd", "chutich", "bks", "ptgd_doan")
+# ĐỢT R4b-2b 23/10/2026 — THÊM `ketoan_truong`, CHỦ TỊCH KÝ.
+#
+# ĐÂY KHÔNG PHẢI MỘT QUYỀN MỚI, nó là một luật đã ký va vào một cửa viết trước nó. Đợt LG1
+# chốt phép suy `ketoan` → `ketoan_truong` ở `services/vai_ke_thua.py`, và `access.py` áp
+# phép suy ấy cho MỌI màn hình qua `_mo_cho_ba_vai`. Nên Kế toán trưởng thấy menu Sổ kế
+# toán, mà cửa này — viết trước LG1 — lại chặn.
+#
+# Đo 23/10/2026: `/ket-so`, `/hach-toan` và màn hình mới đều có `ketoan_truong` trong
+# MENU_ROLES; `books.READ` thì không. Món nợ ấy chỉ lộ ra bây giờ vì đây là lần đầu
+# `/api/v1/books` được gắn vào một màn hình.
+#
+# Đây là CỬA ĐỌC (nhật ký chung, sổ cái, sổ chi tiết, bảng cân đối). Ban kiểm soát và CNTT
+# đã đọc được, nên Kế toán trưởng không đọc được là một chỗ hụt chứ không phải một hàng rào.
+# Bảng ký của Đợt E2b được cập nhật CÙNG LẦN này — xem `test_le2b_ba_vai_ke_toan`.
+READ = ("ketoan", "ketoan_truong", "cntt", "tgd", "chutich", "bks", "ptgd_doan")
+# ĐỢT R4b-2a 22/10/2026 — VAI ĐƯỢC GHI HÓA ĐƠN VÀO DÒNG BÚT TOÁN.
+#
+# CHỈ vai nền `ketoan`. Bản đầu của đợt này khai thêm `ketoan_tt` và `ketoan_truong`, và
+# `hang-rao-gop` ĐỎ ngay ở `test_le2b_ba_vai_ke_toan`: hai vai ấy có BẢNG KÝ đã chốt từ Đợt
+# E2b và bảng ấy được ghim vào CI. Thêm một cửa cho chúng là NỚI MỘT QUYỀN CHƯA AI KÝ —
+# đúng cái Lỗi 3 mà bản rà soát v1.0 đã bắt một lần: tự đặt một luật rồi khoá vào CI.
+#
+# Vai `ketoan` đã có sẵn quyền ghi sổ, nên mở cửa này cho nó không nới gì thêm. Muốn hai vai
+# hẹp cùng ghi được thì sửa BẢNG KÝ trước, bằng một quyết định có chữ ký — không phải bằng
+# một dòng thêm vào đây.
+GHI_HOA_DON = ("ketoan",)
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -32,7 +58,9 @@ def catalog(u: User = Depends(require_roles(*READ))):
         {"key": "so-tien-gui", "ten": "Sổ tiền gửi ngân hàng", "mau": "S08-DN", "path": "/api/v1/books/so-tien-gui", "tham_so": ["partner_code"]},
         {"key": "cong-no", "ten": "Sổ chi tiết công nợ theo đối tượng", "mau": "S31-DN / S51-DN", "path": "/api/v1/books/cong-no", "tham_so": ["account", "partner_code"]},
         {"key": "cong-no-tong-hop", "ten": "Sổ tổng hợp công nợ theo đối tượng", "mau": "Tổng hợp", "path": "/api/v1/books/cong-no-tong-hop", "tham_so": ["account"]},
-        {"key": "can-doi-tai-khoan", "ten": "Bảng cân đối tài khoản", "mau": "S06-DN", "path": "/api/v1/books/can-doi-tai-khoan", "tham_so": ["level"]},
+        {"key": "can-doi-tai-khoan", "ten": "Bảng cân đối tài khoản", "mau": "S06-DN", "path": "/api/v1/books/can-doi-tai-khoan", "tham_so": ["level", "bu_tru", "luy_ke_tu"]},
+        {"key": "chung-tu-goc", "ten": "Bảng tổng hợp chứng từ gốc cùng loại", "mau": "Tổng hợp", "path": "/api/v1/books/chung-tu-goc"},
+        {"key": "hoa-don-thieu", "ten": "Hóa đơn còn thiếu", "mau": "Việc cần làm", "path": "/api/v1/books/hoa-don-thieu", "tham_so": ["trang_thai", "partner_code", "qua_ngay"]},
         {"key": "nhat-ky-tien", "ten": "Sổ nhật ký thu tiền / chi tiền", "mau": "S03a1-DN / S03a2-DN", "path": "/api/v1/books/nhat-ky-tien", "tham_so": ["direction"]},
         {"key": "cong-trinh", "ten": "Sổ chi tiết theo công trình (tour)", "mau": "Chi tiết công trình", "path": "/api/v1/books/cong-trinh", "tham_so": ["project_code"]},
         {"key": "cong-trinh-tong-hop", "ten": "Tổng hợp doanh thu – chi phí – lãi lỗ theo công trình", "mau": "Tổng hợp", "path": "/api/v1/books/cong-trinh-tong-hop"},
@@ -182,14 +210,17 @@ def partner_summary_xlsx(account: str, since: date, upto: date, min_amount: floa
 
 @router.get("/can-doi-tai-khoan")
 def trial_balance(since: date, upto: date, level: int = 0, non_zero: bool = True,
+                  bu_tru: bool = True, luy_ke_tu: date | None = None,
                   u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
-    return BK.trial_balance_range(db, since, upto, level, non_zero)
+    """ĐỢT R4b: `bu_tru=false` cộng riêng từng đối tượng; `luy_ke_tu` thêm hai cột luỹ kế."""
+    return BK.trial_balance_range(db, since, upto, level, non_zero, bu_tru, luy_ke_tu)
 
 
 @router.get("/can-doi-tai-khoan.xlsx")
 def trial_balance_xlsx(since: date, upto: date, level: int = 0, non_zero: bool = True,
+                       bu_tru: bool = True, luy_ke_tu: date | None = None,
                        u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
-    rep = BK.trial_balance_range(db, since, upto, level, non_zero)
+    rep = BK.trial_balance_range(db, since, upto, level, non_zero, bu_tru, luy_ke_tu)
     R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"cdtk:{since}:{upto}", after={"can_doi": rep["balanced"]}); db.commit()
     return _xlsx(BK.trial_balance_xlsx(rep), f"BANG_CAN_DOI_TAI_KHOAN_{_tag(since, upto)}.xlsx")
 
@@ -236,3 +267,50 @@ def project_summary_xlsx(since: date, upto: date, min_amount: float = 0,
     rep = BK.project_summary(db, since, upto, min_amount)
     R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"congtrinh:{since}:{upto}", after={"so_cong_trinh": len(rep["rows"])}); db.commit()
     return _xlsx(BK.project_summary_xlsx(rep), f"TONG_HOP_CONG_TRINH_{_tag(since, upto)}.xlsx")
+# ---------- Bảng tổng hợp chứng từ gốc cùng loại — ĐỢT R4b 21/10/2026 ----------
+
+@router.get("/chung-tu-goc")
+def chung_tu_goc(since: date, upto: date, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return BK.chung_tu_goc(db, since, upto)
+
+
+@router.get("/chung-tu-goc.xlsx")
+def chung_tu_goc_xlsx(since: date, upto: date, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    rep = BK.chung_tu_goc(db, since, upto)
+    R_.audit(db, u.username, u.role, "xuat_so_ke_toan", f"ctgoc:{since}:{upto}",
+             after={"so_loai": len(rep["rows"]), "chua_khai": rep["so_chua_khai"]}); db.commit()
+    return _xlsx(BK.chung_tu_goc_xlsx(rep), f"TONG_HOP_CHUNG_TU_GOC_{_tag(since, upto)}.xlsx")
+# ---------- Hóa đơn còn thiếu (Đợt R4b-2a) ----------
+#
+# Cửa ĐỌC mở cho cả nhóm READ — ai xem được sổ thì xem được danh sách này. Cửa GHI hẹp hơn.
+
+
+class GhiHoaDon(BaseModel):
+    line_id: int
+    trang_thai: str                      # "" | "da_nhap" | "khong_phat_sinh"
+    ngay_hoa_don: date | None = None
+    so_hoa_don: str = ""
+    ly_do: str = ""
+
+
+@router.get("/hoa-don-thieu")
+def hoa_don_thieu(since: date, upto: date, trang_thai: str = "", partner_code: str = "",
+                  qua_ngay: int = 0, limit: int = BK.PAGE_LIMIT,
+                  u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    try:
+        return BK.hoa_don_thieu(db, since, upto, trang_thai, partner_code, qua_ngay, limit)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/hoa-don-thieu/ghi")
+def hoa_don_ghi(body: GhiHoaDon, u: User = Depends(require_roles(*GHI_HOA_DON)),
+                db: Session = Depends(get_db)):
+    try:
+        kq = BK.ghi_hoa_don(db, body.line_id, body.trang_thai, u.username,
+                            body.ngay_hoa_don, body.so_hoa_don, body.ly_do)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    R_.audit(db, u.username, u.role, "ghi_hoa_don_dong_but_toan", str(body.line_id), after=kq)
+    db.commit()
+    return kq

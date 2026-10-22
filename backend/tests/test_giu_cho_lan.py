@@ -61,6 +61,9 @@ LAN_TEP = {
     "VPM": "vpm",
     "Kiểm soát": "kiem-soat",
     "Quyết toán": "quyet-toan",
+    # Làn R2 — phân hệ Hướng dẫn. Khai ở ĐÂY trước, rồi mới tạo `docs/dang-lam/r2.md`:
+    # `test_moi_lan_deu_co_mot_tep_va_khong_tep_nao_thua` đỏ nếu tạo tệp trước khi khai.
+    "R2": "r2",
 }
 LAN_HOP_LE = tuple(LAN_TEP)
 

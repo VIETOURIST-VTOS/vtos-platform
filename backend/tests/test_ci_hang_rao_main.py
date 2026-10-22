@@ -208,8 +208,25 @@ def test_ci4_bo_do_du_chay_ca_tren_main_con_docker_thi_khong():
     #
     # Nay `backend` KHÔNG được khai `if:` nào, và phép thử ghim chiều mới — để lần sau không ai
     # lặng lẽ tắt nó đi với đúng cái lý do nghe-xuôi ở trên.
-    assert _dieu_kien_cua_viec("backend") == [], (
-        "Việc `backend` phải chạy trên CẢ pull_request VÀ push, nên không khai `if:` nào. Khai "
+    # NỚI ĐÚNG MỘT LỖ — 22/10/2026, Chủ tịch quyết.
+    #
+    # Bản trước ghim `== []`, tức `backend` không được khai `if:` nào. Lời nhắn của chính phép
+    # thử ấy viết: "Nếu muốn tắt vì tốn máy thì phải có một quyết định mới, không phải một dòng
+    # YAML." Đây là quyết định ấy, và nó hẹp:
+    #
+    #   `backend` CHỈ được bỏ qua khi `loc` nói lần chạy này chỉ chạm `docs/dang-lam/`.
+    #
+    # Vì sao an toàn — đo được, không phải nghe xuôi: một diff chỉ-chạm-sổ thì thứ duy nhất có
+    # thể hỏng là `test_giu_cho_lan` và `test_giu_cho_nhanh`, mà CẢ HAI nằm trong 17 tệp của cửa
+    # hẹp `hang-rao-gop` — và cửa hẹp không khai `if:` nên vẫn chạy (test_ci7 canh).
+    #
+    # Và quyết định 16/10 KHÔNG bị đụng: việc `loc` trả 0 vô điều kiện khi `event_name == push`,
+    # nên trên main bộ đủ vẫn chạy như cũ. Lỗ này chỉ mở ở PR chỉ-chạm-sổ.
+    #
+    # BẤT KỲ `if:` NÀO KHÁC VẪN ĐỎ: phép thử so BẰNG ĐÚNG một phần tử, không so "có chứa".
+    assert _dieu_kien_cua_viec("backend") == ["if: needs.loc.outputs.chi_so != '1'"], (
+        "Việc `backend` chỉ được khai ĐÚNG MỘT điều kiện: bỏ qua khi lần chạy chỉ chạm sổ giữ "
+        "chỗ. Khai thêm hay khai khác là một quyết định mới, không phải một dòng YAML. Khai "
         "lại `!= 'push'` là trả main về chỗ ĐỎ ÂM THẦM: bộ đủ chỉ đo nhánh gộp với main tại lúc "
         "chạy, nên hai PR xanh riêng lẻ gộp lần lượt vẫn làm main đỏ mà không ai thấy — đúng "
         "chuyện ngày 16/10/2026, và làn gộp sau là người lãnh. Nếu muốn tắt vì tốn máy thì phải "
