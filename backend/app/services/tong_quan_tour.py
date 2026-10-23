@@ -25,7 +25,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from types import SimpleNamespace
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.core import Tour
@@ -62,14 +62,40 @@ def qua_han_quyet_toan(db: Session, hom_nay: date, trang: int = 1, co: int = 50)
     return {"tong": len(ds), "trang": trang, "co": co, "dong": ds[(trang - 1) * co: trang * co]}
 
 
-def cho_quyet_toan(db: Session, hom_nay: date) -> dict:
+def cho_quyet_toan(db: Session, hom_nay: date, qua_han: int | None = None) -> dict:
+    """Tổng chờ quyết toán, VÀ bóc nhóm A ra ba phần để màn hình vẽ được một khối lồng.
+
+    QT-1 (Chủ tịch hỏi 23/10/2026: «hai ô này có trùng nhau không?»). Đo ra: KHÔNG trùng,
+    nhưng ô «Quá hạn quyết toán» là MỘT LÁT nằm trọn trong nhóm A của ô này
+    (681 ⊂ 709 ⊂ 1.742 hôm đo). Hai ô đứng cách nhau một hàng, không chỗ nào nói cái nhỏ
+    nằm trong cái lớn, nên đọc lướt thành hai cách đếm một việc. Sửa ở đây: trả luôn ba
+    con số con, để màn hình không phải tự trừ và không tự đặt ra một nhóm nào.
+
+    `qua_han` để người gọi truyền VÀO số đã đếm sẵn. `dashboard.build` đếm nó ngay dòng
+    trước; thiếu tham số này là mỗi lần dựng bảng điều hành quét bảng tour HAI lượt thay vì một.
+    Để trống thì tự đếm, vì phép thử và người gọi lẻ gọi hàm này một mình.
+
+    `chua_co_ngay_ve` ĐẾM THẬT chứ không ghi cứng 0, dù đo 23/10/2026 nó luôn là 0:
+    `tours.end_date` là NOT NULL ở cả mô hình lẫn bản nâng cấp gốc, và không bản nâng cấp nào
+    đổi. Nhưng điều kiện quá hạn đòi `end_date` khác rỗng, nên NẾU cột ấy có ngày thành
+    cho phép rỗng, những chuyến đó sẽ không bao giờ hiện ở ô quá hạn. Lấy hiệu `a - qua_han`
+    là lặng lẽ gộp chúng vào «còn trong hạn» — một câu sai mà không ai thấy. Đếm riêng thì
+    hôm nay là 0 (màn hình ẩn dòng ấy) và ngày nào khác 0 thì nó tự hiện ra có tên.
+    """
     from app.services import dem_tour as DT
     dem = DT.theo_trang_thai(db)
     a, b = dem.get("ket_thuc", 0), dem.get("da_dong_so", 0)
     c = DT.theo_giai_doan(db, hom_nay=hom_nay)["da_ve_chua_dong_so"]
+    qh = qua_han_quyet_toan(db, hom_nay, trang=1, co=1)["tong"] if qua_han is None else int(qua_han)
+    chua_co_ngay_ve = db.execute(
+        select(func.count()).select_from(Tour)
+        .where(Tour.status == "ket_thuc", Tour.end_date.is_(None))).scalar_one()
     return {"tong": a + b, "ket_thuc": a, "da_dong_so": b, "da_ve_chua_dong_so": c,
+            "qua_han": qh, "con_trong_han": a - qh - chua_co_ngay_ve,
+            "chua_co_ngay_ve": chua_co_ngay_ve,
             "cong_thuc": "Tổng = kết thúc chờ quyết toán + đã đóng sổ chờ Kế toán; «đã về chưa đóng sổ» "
-                         "là dòng phụ, không cộng vào tổng (Chủ tịch chốt 22/10/2026)"}
+                         "là dòng phụ, không cộng vào tổng (Chủ tịch chốt 22/10/2026). "
+                         "Kết thúc = quá hạn + còn trong hạn + chưa có ngày về (QT-1, 23/10/2026)"}
 
 
 def dem_thieu_lich(cap_ngay, hom_nay: date) -> int:
