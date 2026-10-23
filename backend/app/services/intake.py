@@ -384,6 +384,13 @@ BO_NAP.update(_th.bo_nap(_c))
 from app.services import intake_pr as _pr   # noqa: E402
 BO_NAP.update(_pr.bo_nap(_c))
 
+# CUA THU MUOI MOT (23/10/2026) -- SO DU DAU KY. Tam cua: mot cua chot theo tai khoan,
+# va bay so phu theo doi tuong. Bo nap rieng chu khong noi vao tep tren: tam cua nay dung
+# CHUNG mot nha may dung cot, va viet tay tam lan la tam cho de hai cua noi hai dieu khac
+# nhau ve cung mot con so.
+from app.services import intake_so_du_dau_ky as _sddk   # noqa: E402
+BO_NAP.update(_sddk.bo_nap(_c))
+
 
 # Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
 # không có nghĩa là nạp được mọi thứ. Kinh doanh nạp danh sách khách của mình, HCNS nạp hồ sơ nhân sự và
@@ -410,6 +417,7 @@ VAI_TRO.update(_bth.vai_tro(QUAN_TRI))
 VAI_TRO.update(_mkt.vai_tro(QUAN_TRI))
 VAI_TRO.update(_th.vai_tro(QUAN_TRI))
 VAI_TRO.update(_pr.vai_tro(QUAN_TRI))
+VAI_TRO.update(_sddk.vai_tro(QUAN_TRI))
 
 
 # P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.
@@ -429,7 +437,7 @@ VAI_TRO.update(_pr.vai_tro(QUAN_TRI))
 # mục nhà cung cấp, danh sách hướng dẫn viên thì không.
 BO_NAP_CHAM_TIEN = ("doi_chieu_h1_2026",
                     "don_dich_vu", "chuyen_xe", "quyet_toan_tour", "sao_ke_ngan_hang", "cham_cong"
-                    ) + _pb2.CHAM_TIEN + _pb3.CHAM_TIEN + _kho.CHAM_TIEN
+                    ) + _pb2.CHAM_TIEN + _pb3.CHAM_TIEN + _kho.CHAM_TIEN + _sddk.CHAM_TIEN
 NHAN_VIEN = ("nv_dh", "nv_kd", "tn_kd", "nv_mkt", "nv_visa", "tai_xe", "hdv", "hanh_chinh")
 # Suy ra từ VAI_TRO chứ không khai tay lần thứ hai: hai bảng khai tay thì sớm muộn cũng lệch, và lúc
 # lệch thì không ai biết bảng nào đúng.
@@ -471,6 +479,7 @@ PHONG_BAN = {"nha_cung_cap": "dieu_hanh", "don_dich_vu": "dieu_hanh", "chuyen_xe
              "bao_hiem_ky": "hcns", "bang_luong": "hcns", "hop_dong_lao_dong": "hcns",
              "tai_san_co_dinh": "ketoan", "cong_cu_dung_cu": "ketoan", "khau_hao_ky": "ketoan"}
 PHONG_BAN.update(_pb3.PHONG_BAN)
+PHONG_BAN.update(_sddk.PHONG_BAN)
 
 
 def danh_sach_bo_nap() -> list[dict]:

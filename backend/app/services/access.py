@@ -1063,11 +1063,15 @@ MENU_ROLES = {
     # Phòng Hướng dẫn: màn hình riêng của người điều phối. KHÔNG mở /ops cho vai trò này – màn hình đó
     # lấy danh sách người từ /employees, tức là kèm luôn lương của mọi phòng.
     "/huong-dan": BASE_VIEW + OPERATIONS + GUIDE_MGR + ("ptgd_doan", "hcns", "ketoan", "cntt"),
-    # CUA-1 · 22/10/2026.
-    # `/nhan-vien-phong-toi` khai ĐÚNG BẰNG `VAI_DUNG_DAU` của services/ho_so_nhan_vien.py:
-    # cửa `GET /employees/phong-toi` chỉ mở cho năm vai ấy, và một mục menu dẫn tới 403 là
-    # một lời hứa hỏng — tệ hơn là không có mục nào.
-    "/nhan-vien-phong-toi": ("tp_dh", "tp_kd", "tp_hd", "gd_kd", "gd_doi_xe"),
+    # CUA-1 · 22/10/2026, SỬA LẠI Ở ĐỢT DỌN-MT 24/10/2026.
+    # CUA-1 khai màn này đúng bằng `VAI_DUNG_DAU`, và lý do ấy ĐÚNG: một mục menu dẫn
+    # tới 403 là món nợ `test_lg4` cấm. Nhưng `test_ma_tran_quyen` đòi bốn vai nền xem
+    # được MỌI màn hình, nên main đỏ ba phép thử. HAI LUẬT CHỈ NGƯỢC NHAU KHI THIẾU MỘT
+    # CỬA — nên DỌN-MT cho nó một cửa thay vì bỏ vai ra khỏi menu: Chủ tịch ký 24/10/2026
+    # mở `GET /employees/phong-toi` cho bốn vai nền ở ĐÚNG MỨC NHÓM 1 (tên, phòng, chức
+    # danh). Nhóm 4 và 5 vẫn chỉ Chủ tịch và HCNS — quyết định 15/10/2026 không bị đụng.
+    # Khai bằng `BASE_VIEW` chứ không gõ tay bốn tên: gõ tay chính là chỗ đánh rơi một vai.
+    "/nhan-vien-phong-toi": BASE_VIEW + ("tp_dh", "tp_kd", "tp_hd", "gd_kd", "gd_doi_xe"),
 
     # Hợp đồng lao động: hồ sơ cá nhân của từng người, kèm bản scan trong nhóm 06_Nhan_su. HCNS giữ hồ
     # sơ, Ban TGĐ và Chủ tịch điều hành, Ban Kiểm soát rà soát. Kế toán KHÔNG xem – lương lấy từ bảng
