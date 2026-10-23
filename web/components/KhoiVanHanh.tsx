@@ -112,18 +112,27 @@ export function KhoiVanHanh({ d, onThuLai, luu_dem }: {
         <div className="vh-khoi do">
           <div className="vh-nhan">Việc nghiêm trọng</div>
           <So v={do_} dv="việc đang mở ở mức đỏ" onThuLai={onThuLai} />
-          {v && tong > 0 && coSo(do_) && <div className="vh-thanh" aria-hidden="true">
-            <i className="c-qh" style={{ width: `${((do_ as number) / tong) * 100}%` }} /></div>}
+          {v && tong > 0 && <div className="vh-thanh" aria-hidden="true">
+            {thanh.map((m: any) => <i key={m.ma} className={MAU_MUC[m.ma] || "c-la"}
+              style={{ width: `${(m.viec / tong) * 100}%` }} />)}</div>}
           {v && <>
-            <div className="vh-dong qh"><span className="v">{so(do_)}</span>
-              <span className="t"><b>Nghiêm trọng · mức đỏ</b>
-                <small>gồm {so((v.theo_muc || []).find((m: any) => m.ma === "red")?.canh_bao)} cảnh báo</small></span></div>
-            <div className="vh-dong"><span className="v">{so(v.viec)}</span>
-              <span className="t"><b>Tổng việc đang mở</b></span></div>
+            {(v.theo_muc || []).map((m: any) => (
+              <div key={m.ma} className={"vh-dong" + (m.ma === "red" ? " qh" : "")}>
+                <span className="v">{so(m.viec)}</span>
+                <span className="t"><b>{TEN_MUC[m.ma] || m.ten}</b>
+                  {tong > 0 && m.viec > 0 && <small>{Math.round((m.viec / tong) * 100)}% · {so(m.canh_bao)} cảnh báo</small>}</span></div>))}
+            {v.chua_anh_xa > 0 && <div className="vh-dong"><span className="v">{so(v.chua_anh_xa)}</span>
+              <span className="t">Cảnh báo chưa xác định được hồ sơ
+                <small>mỗi cảnh báo tính một việc · CNTT</small></span></div>}
           </>}
-          <div className="vh-day"><div className="vh-cuoi">
-            {v && <Link className="vh-nut" href="/?xem=viec&muc=red">Xem việc nghiêm trọng →</Link>}
-          </div></div>
+          <div className="vh-day">
+            {v && <div className="vh-ghi">{so(v.viec)} việc đang mở · gồm {so(v.canh_bao)} cảnh báo · mốc {gio(luc)}</div>}
+            <div className="vh-cuoi">
+              {v && <Link className="vh-nut" href="/?xem=viec&muc=red">Xem việc nghiêm trọng →</Link>}
+              <Link className="vh-nut phu" href={v ? "/?xem=viec" : "/alerts"}>
+                {v ? "Xem toàn bộ công việc →" : "Trang cảnh báo →"}</Link>
+            </div>
+          </div>
         </div>
 
         <div className="vh-khoi do">
@@ -163,7 +172,7 @@ export function KhoiVanHanh({ d, onThuLai, luu_dem }: {
 
       <div className="vh-nhom"><h3>Hoạt động tour</h3>
         <span className="vh-phu">Theo trạng thái · các nhóm có thể giao nhau</span></div>
-      <div className="vh-hang h3">
+      <div className="vh-hang h4">
         <div className="vh-o"><div className="vh-nhan">Tour đang bán</div><So v={gd ? gd.dang_ban : gd} />
           <div className="vh-phu">Đã duyệt, chưa tới ngày đi</div>
           <Link className="vh-lk" href="/tours">Xem tour đang bán →</Link></div>
@@ -175,38 +184,11 @@ export function KhoiVanHanh({ d, onThuLai, luu_dem }: {
         <div className="vh-o"><div className="vh-nhan">Sắp khởi hành</div><So v={d.sap_kh} />
           <div className="vh-phu">{d.so_ngay_kh} ngày tới</div>
           <Link className="vh-lk" href="/tours">Xem lịch khởi hành →</Link></div>
-      </div>
+        <div className="vh-o"><div className="vh-nhan">Khách tiềm năng mới</div>
+          <div className="vh-so rong">—</div>
+          <div className="vh-phu">Chưa có nguồn · chưa xác định được, không thay bằng 0 (Marketing)</div>
+          <Link className="vh-lk" href="/leads?tab=leads">Cửa nhập →</Link></div>
 
-      <div className="vh-hang h2b">
-        <div className="vh-o">
-          <div className="vh-nhom"><h3>Tồn đọng công việc</h3><span className="tag">Chưa xử lý</span></div>
-          <div className="vh-so">{v ? so(v.viec) : <So v={v} onThuLai={onThuLai} />}
-            {v && <span className="dv">việc đang mở · gồm {so(v.canh_bao)} cảnh báo</span>}</div>
-          {v && tong > 0 && <div className="vh-thanh" aria-hidden="true">
-            {thanh.map((m: any) => <i key={m.ma} className={MAU_MUC[m.ma] || "c-la"}
-              style={{ width: `${(m.viec / tong) * 100}%` }} />)}</div>}
-          {v && <div className="vh-chu">{(v.theo_muc || []).map((m: any) => (
-            <span key={m.ma}><span className={"vh-cham " + (MAU_MUC[m.ma] || "c-la")} />
-              {TEN_MUC[m.ma] || m.ten} <b>{so(m.viec)}</b>
-              {tong > 0 && m.viec > 0 ? ` · ${Math.round((m.viec / tong) * 100)}%` : ""}</span>))}</div>}
-          {v && v.chua_anh_xa > 0 && <div className="vh-phu">
-            {so(v.chua_anh_xa)} cảnh báo chưa xác định được hồ sơ — mỗi cảnh báo tính một việc. (CNTT)</div>}
-          <div className="vh-chan">
-            <span className="vh-phu">{v ? `Mốc dữ liệu: ${gio(luc)}` : ""}</span>
-            {v ? <Link className="vh-lk" href="/?xem=viec">Xem toàn bộ công việc →</Link>
-              : <Link className="vh-lk" href="/alerts">Trang cảnh báo →</Link>}
-          </div>
-        </div>
-        <div className="vh-o">
-          <div className="vh-nhom"><h3>Khách tiềm năng mới</h3><span className="tag">Chưa có nguồn</span></div>
-          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-            <span className="vh-so rong">—</span>
-            <div><b>Chờ cập nhật dữ liệu</b><div className="vh-phu">Bộ phận phụ trách: Marketing</div></div>
-          </div>
-          <div className="vh-phu">Số khách mới chưa được xác định — không thay bằng 0.</div>
-          <div className="vh-chan"><span className="vh-phu">Nguồn khách hàng</span>
-            <Link className="vh-lk" href="/leads?tab=leads">Cửa nhập →</Link></div>
-        </div>
       </div>
     </section>
   );

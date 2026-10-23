@@ -35,12 +35,8 @@
 .vh-nut:disabled{opacity:.45;cursor:default}
 .vh-nut.phu{background:transparent;color:var(--vtos-navy);border:1px solid var(--vtos-line)}
 .vh-lk{font-size:calc(12.5/14*1rem);font-weight:600;color:var(--vtos-navy);text-decoration:none;margin-top:auto}
-.vh-hang.h2b{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
 .vh-thanh{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--vtos-surface)}
 .vh-thanh i{display:block;height:100%}
-.vh-chu{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:calc(12.5/14*1rem);color:var(--vtos-text-mute)}
-.vh-cham{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
-.vh-chan{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:auto}
 .c-do{background:var(--vtos-danger)}.c-vang{background:var(--vtos-info)}.c-xam{background:var(--vtos-text-mute)}
 .c-la{background:var(--vtos-warning)}
 
@@ -70,7 +66,8 @@
    Đo: KHÔNG trùng — 681 ⊂ 709 ⊂ 1.742. Ẩn ô lớn là mất 1.033 tour đang nằm ở Kế toán mà không
    ô nào khác đếm. Nên lồng vào nhau thay vì ẩn: một khối, các lát thụt vào trong lát cha.
    `.vh-khoi` là cột, KHÁC `.vh-o.uu` (hàng ngang) — không dùng lại lớp cũ để khỏi đè nhau.
-   `.vh-ghi` riêng chứ không dùng `.vh-chan`: `.vh-chan` đang là flex space-between của khối khác. */
+   `.vh-ghi` riêng chứ không dùng lại luật cũ: luật ấy là flex space-between, đã xoá ở đợt QT-2
+   cùng khối Tồn đọng. */
 .vh-khoi{background:var(--vtos-card);border:1px solid var(--vtos-line);
   border-radius:var(--vtos-radius-md,10px);border-left-width:4px;padding:12px 14px;
   display:flex;flex-direction:column;gap:8px;min-width:0;height:100%}
