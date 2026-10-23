@@ -344,7 +344,9 @@ def build(db: Session, u: User) -> dict:
         try:
             from app.services import tong_quan_tour as TQT
             sec["qua_han_qt_tong"] = TQT.qua_han_quyet_toan(db, today, trang=1, co=1)["tong"]
-            sec["cho_quyet_toan"] = TQT.cho_quyet_toan(db, today)
+            # Truyền lại số vừa đếm ở dòng trên. Thiếu thì `cho_quyet_toan` tự đếm, tức quét
+            # bảng tour HAI lượt mỗi lần dựng bảng điều hành — máy chủ 512 MB.
+            sec["cho_quyet_toan"] = TQT.cho_quyet_toan(db, today, qua_han=sec["qua_han_qt_tong"])
             sec["thieu_lich"] = TQT.thieu_lich(db, today)
         except Exception as ex:
             sec["qua_han_qt_tong"] = sec["cho_quyet_toan"] = sec["thieu_lich"] = None
