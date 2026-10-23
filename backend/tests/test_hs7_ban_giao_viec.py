@@ -232,3 +232,55 @@ def test_hs7_6_phan_cong_kd_dong_chang_cu_mo_chang_moi():
             "Chặng mới bắt đầu từ hôm nay hoặc sớm hơn — chồng lên chặng cũ, một ngày hai chủ.")
     finally:
         db.close()
+
+
+# ── ĐỢT NS-1 (làn R3) nhịp 1 — hai câu nghiệm thu CHƯA ai canh ──────────────────────────────
+def test_hs7_7_BO_TRONG_xac_nhan_thi_KHONG_duoc_ghi_gi():
+    """Mặc định phải là bước KHÔNG LÀM GÌ — và trước vòng này KHÔNG phép thử nào canh điều ấy.
+
+    ĐO ĐƯỢC 22/10/2026: đổi `xac_nhan: bool = False` thành `= True` trong `BanGiaoIn` rồi chạy
+    lại cả sáu phép thử HS-7 — **cả sáu vẫn xanh**. Lý do: hàm `goi()` của bộ thử LUÔN gửi
+    `xac_nhan` tường minh, nên giá trị MẶC ĐỊNH không bao giờ được chạy tới.
+
+    Người gọi thật thì khác: một màn hình mới, một kịch bản, một lần gọi curl quên trường ấy —
+    tất cả đều rơi vào mặc định. Mặc định `True` nghĩa là một lần gọi thiếu trường cũng dịch
+    chuyển doanh số giữa hai người mà không ai kịp xem trước.
+
+    Phép thử này gửi thân yêu cầu KHÔNG CÓ `xac_nhan`. Đổi mặc định thành `True` là nó ĐỎ.
+    """
+    from app.db.session import SessionLocal
+    db = SessionLocal(); truoc = db.get(Tour, TOUR_MO).operator_id; db.close()
+    r = client.post(DUONG, headers=dang_nhap("hs7_hcns"),
+                    json={"tu_user_id": NGHI, "den_user_id": NHAN, "ly_do": "Thu bo trong"})
+    assert r.status_code == 200, r.text
+    assert r.json()["da_chuyen"] is False, (
+        "Bỏ trống `xac_nhan` mà cửa vẫn CHUYỂN — mặc định phải là bước không làm gì.")
+    db = SessionLocal()
+    try:
+        assert db.get(Tour, TOUR_MO).operator_id == truoc, "Bỏ trống `xac_nhan` mà dữ liệu đã đổi chủ."
+    finally:
+        db.close()
+
+
+def test_hs7_8_ban_giao_xong_thi_nguoi_di_KHONG_con_viec_treo():
+    """Câu nghiệm thu của NS-1: bàn giao xong thì hồ sơ người nghỉ không còn việc treo.
+
+    PHÉP THỬ NÀY CANH ĐƯỢC GÌ — và KHÔNG canh được gì. Cả hai đều đo bằng bẻ ngược, 22/10/2026,
+    vì bản đầu của chính nó nhận nhầm công.
+
+    CANH ĐƯỢC: cửa KỂ RA là đã chuyển nhưng KHÔNG ghi. Bỏ dòng `setattr(r, cot, den_id)` trong
+    `ban_giao` — cửa vẫn trả `da_chuyen: true` và vẫn kê đủ số dòng — thì phép thử này ĐỎ. Đây là
+    kiểu hỏng khó thấy nhất: màn hình báo xong, người bấm tin, mà dữ liệu không nhúc nhích.
+
+    KHÔNG CANH ĐƯỢC: ai đó quên khai một bảng vào `CHUYEN`. Bản đầu của phép thử này nhận là canh
+    được — SAI, và bẻ ngược chỉ ra ngay: bỏ hàng `bookings/sales_id` khỏi `CHUYEN` thì `hs7_1` và
+    `hs7_2` đỏ, còn phép thử này VẪN XANH. Lý do là nó hỏi bản xem trước, mà bản xem trước lại
+    tính từ chính `CHUYEN` — tức nó đang lấy danh sách ra đo chính danh sách ấy. Chỗ canh việc
+    quên bảng là `hs7_1`, không phải ở đây.
+    """
+    r = goi(NGHI, NHAN, xac_nhan=True)
+    assert r.status_code == 200, r.text
+    con = goi(NGHI, NHAN, ly_do="Soat lai", xac_nhan=False).json()
+    assert con["tong_chuyen"] == 0, (
+        f"Bàn giao xong mà hồ sơ người đi còn {con['tong_chuyen']} việc treo: "
+        f"{[x for x in con['se_chuyen'] if x['so_dong']]}")

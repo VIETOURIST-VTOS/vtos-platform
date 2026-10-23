@@ -321,7 +321,16 @@ def cap_nhat_theo_sao_ke(data: CapNhatSauDoiChieuIn, u: User = Depends(require_r
         c = loans.get(d.ke_uoc.strip())
         if c is None: bo_qua.append(d.ke_uoc); continue
         thay_doi = {}
-        if d.du_no and abs((c.outstanding or 0) - d.du_no) >= 1:
+        # DOT R6b-1 24/10/2026 - dung LOI THOAT CO Y PHIEN cua `test_k2_doc_an_toan`, khong
+        # rac `or 0` vao day. Vi sao dong nay bong bi soi: bo quet doi chieu theo TEN COT, ma
+        # dot nay vua them cot tien `du_no` CHO RONG vao tam bang so du dau ky - nen tu nay
+        # moi cho doc `.du_no` trong ca kho deu bi soi.
+        #
+        # Nhung `d` o day KHONG phai mot dong CSDL: no la mo hinh Pydantic khai ngay tren,
+        # `du_no: float = 0`, nen o nay khong bao gio rong. Boc `or 0` vao mot cho von khong
+        # the rong la them nhieu vao ma cua lan khac ma khong mua duoc gi - dung thu `or 0`
+        # dat sai cho ma chinh dau tep phep thu ay canh.
+        if d.du_no and abs((c.outstanding or 0) - d.du_no) >= 1:  # k2-doc-an-toan: `d` la mo hinh Pydantic (du_no: float = 0), khong phai cot CSDL
             thay_doi["du_no"] = [c.outstanding, d.du_no]; c.outstanding = d.du_no
         if d.lai_suat is not None and abs(c.interest_rate - d.lai_suat) >= 0.01:
             thay_doi["lai_suat"] = [c.interest_rate, d.lai_suat]; c.interest_rate = d.lai_suat
