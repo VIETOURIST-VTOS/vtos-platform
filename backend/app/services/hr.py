@@ -512,18 +512,26 @@ def advance(db: Session, u: User, run: PayrollRun) -> str:
         run.status, run.hcns_by, run.hcns_at = "hcns_kiem", u.username, now
         msg = "HCNS đã kiểm bảng lương – chờ Chủ tịch hoặc TGĐ ký"
     elif run.status in DA_HCNS and u.role in VAI_KY_LUONG:
-        # CN-1: kiểm LẠI ngay trước chữ ký. Kiểm cơ sở chạy từ trước; nếu từ lúc ấy HCNS sửa công
-        # thì xác nhận cũ đã hết hiệu lực, và người ký phải biết trước khi khoá bản.
-        from app.services import xac_nhan_cong as XNC
-        XNC.chan_ky_luong(db, run)
+        # CN-2 (21/10/2026): phòng chưa được duyệt công lúc này thì lương phòng ấy BỊ GIỮ — không vào
+        # bản khoá, không vào bút toán, không vào lệnh chi. Chụp ngay trước khi khoá.
+        from types import SimpleNamespace
+        from app.services import giu_luong as GL
+        GL.chup_khi_ky(db, run)
+        chinh, tong_chinh = GL.phan_chinh(run)
         # Khóa TRƯỚC khi ghi sổ, và trong cùng một giao dịch với việc đổi trạng thái: bản chụp phải
         # là thứ người ký vừa nhìn, không phải thứ còn lại sau khi ghi sổ xong.
-        ban = LK.khoa(db, run, u)
+        ban = LK.khoa(db, run, u, rows=chinh, totals=tong_chinh)
         run.status, run.tgd_by, run.tgd_at = "da_ky", u.username, now
-        ids = post_payroll_entries(db, run)
+        ids = post_payroll_entries(db, SimpleNamespace(period=run.period, rows=chinh))
         run.entry_ids = ids
         msg = (f"{'Chủ tịch' if u.role == 'chutich' else 'TGĐ'} đã ký bảng lương {run.period} – "
                f"đã khóa bản {ban.ban_so}" + (f", ghi sổ {len(ids)} chứng từ" if ids else ""))
+        if run.giu_lai:
+            bao = GL.bao_giu(db, run)
+            so = sum(len(g["ma"]) for g in run.giu_lai.values())
+            msg += (f". GIỮ LẠI lương {so} người ({', '.join(sorted(run.giu_lai))}) vì công chưa duyệt – "
+                    f"trả bằng bảng bổ sung; đã xếp {bao['tin_da_xep']} tin Zalo"
+                    + (f", {len(bao['chua_noi_zalo'])} người chưa nối Zalo" if bao["chua_noi_zalo"] else ""))
     else:
         raise ValueError(f"Vai trò {u.role} không thực hiện được bước này ở trạng thái {run.status}")
     R.audit(db, u.username, u.role, f"bang_luong_{run.status}", f"payroll:{run.period}", after={"tong_thuc_nhan": run.totals.get("thuc_nhan")})
@@ -531,7 +539,7 @@ def advance(db: Session, u: User, run: PayrollRun) -> str:
     return msg
 
 
-def post_payroll_entries(db: Session, run: PayrollRun) -> list[int]:
+def post_payroll_entries(db: Session, run: PayrollRun, bo_sung_so: int | None = None) -> list[int]:
     """Bút toán lương, LẬP RIÊNG CHO TỪNG PHÁP NHÂN TRẢ LƯƠNG.
 
     Nợ 642 – Có 334 (HĐLĐ); Nợ 632 – Có 338 thù lao CTV/HDV; Nợ 338 – Có 3335 TNCN khấu trừ 10%;
@@ -555,6 +563,9 @@ def post_payroll_entries(db: Session, run: PayrollRun) -> list[int]:
     for cid, rows_ in sorted(nhom.items(), key=lambda x: (x[0] is None, x[0] or 0)):
         c = cos.get(cid)
         ten = c.code if c else "CHƯA XÁC ĐỊNH PHÁP NHÂN"
+        # CN-2: bảng bổ sung ghi chứng từ riêng, diễn giải và mã tham chiếu riêng.
+        bs = f" (bổ sung số {bo_sung_so})" if bo_sung_so else ""
+        tc = f"payroll:{run.period}:bs{bo_sung_so}:{ten}" if bo_sung_so else f"payroll:{run.period}:{ten}"
         hdld = sum(r["luong_cb"] + r["bien_doi"] for r in rows_ if r["hop_dong"] == "hdld")
         ctv = sum(r["bien_doi"] for r in rows_ if r["hop_dong"] != "hdld")
         tncn = sum(r.get("tncn", 0) for r in rows_)
@@ -562,27 +573,27 @@ def post_payroll_entries(db: Session, run: PayrollRun) -> list[int]:
         doan_phi = sum(r.get("doan_phi", 0) for r in rows_)
         try:
             if hdld > 0:
-                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Lương tháng {run.period} – {ten}",
+                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Lương tháng {run.period} – {ten}{bs}",
                                           [{"account": "642", "debit": hdld}, {"account": "334", "credit": hdld}],
-                                          "luong", f"payroll:{run.period}:{ten}", nghiep_vu="luong_hdld").id)
+                                          "luong", tc, nghiep_vu="luong_hdld").id)
             if ctv > 0:
-                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Thù lao HDV/CTV tháng {run.period} – {ten}",
+                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Thù lao HDV/CTV tháng {run.period} – {ten}{bs}",
                                           [{"account": "632", "debit": ctv}, {"account": "338", "credit": ctv}],
-                                          "luong", f"payroll:{run.period}:{ten}", nghiep_vu="thu_lao_ctv").id)
+                                          "luong", tc, nghiep_vu="thu_lao_ctv").id)
             if tncn > 0:
-                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Khấu trừ TNCN 10% thù lao CTV tháng {run.period} – {ten}",
+                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Khấu trừ TNCN 10% thù lao CTV tháng {run.period} – {ten}{bs}",
                                           [{"account": "338", "debit": tncn}, {"account": "3335", "credit": tncn}],
-                                          "luong", f"payroll:{run.period}:{ten}", nghiep_vu="khau_tru_tncn").id)
+                                          "luong", tc, nghiep_vu="khau_tru_tncn").id)
             if bhxh > 0:
-                ids.append(ACC.post_entry(db, "robot", "robot", d, f"BHXH phần người lao động tháng {run.period} – {ten}",
+                ids.append(ACC.post_entry(db, "robot", "robot", d, f"BHXH phần người lao động tháng {run.period} – {ten}{bs}",
                                           [{"account": "334", "debit": bhxh}, {"account": "3383", "credit": bhxh}],
-                                          "luong", f"payroll:{run.period}:{ten}", nghiep_vu="bhxh_nld").id)
+                                          "luong", tc, nghiep_vu="bhxh_nld").id)
             if doan_phi > 0:
-                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Đoàn phí công đoàn tháng {run.period} – {ten}",
+                ids.append(ACC.post_entry(db, "robot", "robot", d, f"Đoàn phí công đoàn tháng {run.period} – {ten}{bs}",
                                           [{"account": "334", "debit": doan_phi}, {"account": "3382", "credit": doan_phi}],
-                                          "luong", f"payroll:{run.period}:{ten}", nghiep_vu="doan_phi").id)
+                                          "luong", tc, nghiep_vu="doan_phi").id)
         except ValueError as ex:
-            R.audit(db, "robot", "robot", "ghi_so_that_bai", f"payroll:{run.period}:{ten}", after={"ly_do": str(ex)})
+            R.audit(db, "robot", "robot", "ghi_so_that_bai", tc, after={"ly_do": str(ex)})
     return ids
 
 

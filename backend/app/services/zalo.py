@@ -287,6 +287,20 @@ def send_pending(db: Session, limit: int = 100) -> dict:
         if m.kind == "zns" and not m.template_id: m.template_id = cfg["zns_templates"].get(m.purpose, "")
         if m.kind == "zns" and not m.template_id: continue
         _send(db, m); n += 1
+        # GHI NGAY SAU MỖI TIN, KHÔNG DỒN TỚI CUỐI — Đợt KS-17, 21/10/2026.
+        #
+        # Đo được: lịch `robots.yml` gọi đường này bằng `curl -m 60 --retry 3 --retry-all-errors`.
+        # Phép thử thật ngày 21/10: một lần gọi theo lịch mà việc chạy lâu hơn hạn thì MÁY CHỦ
+        # NHẬN BỐN YÊU CẦU và làm xong CẢ BỐN — curl báo hỏng bốn lần nhưng việc vẫn chạy bốn lần.
+        #
+        # Bản cũ ghi sổ MỘT LẦN ở cuối, sau tối đa 100 lần gọi thật sang Zalo. Nên lượt thứ hai
+        # khởi động 15 giây sau đọc `status` vẫn là `cho_gui` — vì lượt đầu chưa ghi — và GỬI LẠI
+        # ĐÚNG NHỮNG TIN ẤY cho khách. Tin đã bay sang Zalo thì không rút về được.
+        #
+        # Ghi từng tin: mỗi lần gọi sang Zalo xong là trạng thái nằm trong cơ sở dữ liệu ngay, nên
+        # không lượt nào nhìn thấy tin người khác vừa gửi là còn chờ. Giá phải trả là nhiều lần ghi
+        # hơn — rẻ hơn một tin gửi trùng cho khách.
+        db.commit()
     db.commit(); return {"sent": n, "het_han": het}
 
 

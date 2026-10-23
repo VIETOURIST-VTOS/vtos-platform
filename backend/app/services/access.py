@@ -384,6 +384,8 @@ MAN_HINH_API = {
     # Hàng rào TRONG của bốn cửa phân bổ vẫn là `require_roles("ketoan", "cntt")`, không đổi.
     "/finance": ("/api/v1/fin", "/api/v1/cashflow", "/api/v1/bank-transactions"),
     "/hach-toan": ("/api/v1/hach-toan",),
+    # ĐỢT R4b-2b 23/10/2026 — màn hình chỉ gọi một nhóm cửa: /api/v1/books.
+    "/hoa-don-thieu": ("/api/v1/books",),
     # V7 Đợt 3 (10/9/2026). Sự cố tour đọc thêm /tours, /bookings, /suppliers và /payment-requests: màn
     # hình phải chọn chuyến, chọn nhà cung cấp gây sự cố, và gắn số hiệu đề nghị chi lúc kết luận.
     # Màn hình này chỉ chạm ĐÚNG HAI nhóm API, và đó là chủ ý.
@@ -427,6 +429,10 @@ MAN_HINH_API = {
             # tôi" KHÔNG ở đây: nó mở cho cả công ty, xem /cham-cong ngay dưới.
             "/api/v1/danh-gia-ns"),
     "/huong-dan": ("/api/v1/huong-dan", "/api/v1/guide-rates", "/api/v1/guide-assignments"),
+    # CUA-1 · 22/10/2026 — hai màn CHỈ XEM, mỗi màn đúng MỘT nhóm API nó thật sự gọi.
+    # Khai rộng hơn là mở cho màn một nhóm nó không dùng, và hàng rào mất nghĩa.
+    "/nhan-vien-phong-toi": ("/api/v1/employees",),
+    "/ho-so-hdv/[id]": ("/api/v1/huong-dan",),
     "/inbox": ("/api/v1/inbox", "/api/v1/facebook", "/api/v1/zalo"),
     "/khieu-nai": ("/api/v1/khieu-nai", "/api/v1/cskh", "/api/v1/bookings", "/api/v1/payment-requests"),
     # Nhật ký NGUYÊN VĂN sự kiện tổng đài về đây chứ không về /inbox, dù cuộc gọi rồi sẽ hiện ở hộp thư.
@@ -1057,6 +1063,11 @@ MENU_ROLES = {
     # Phòng Hướng dẫn: màn hình riêng của người điều phối. KHÔNG mở /ops cho vai trò này – màn hình đó
     # lấy danh sách người từ /employees, tức là kèm luôn lương của mọi phòng.
     "/huong-dan": BASE_VIEW + OPERATIONS + GUIDE_MGR + ("ptgd_doan", "hcns", "ketoan", "cntt"),
+    # CUA-1 · 22/10/2026.
+    # `/nhan-vien-phong-toi` khai ĐÚNG BẰNG `VAI_DUNG_DAU` của services/ho_so_nhan_vien.py:
+    # cửa `GET /employees/phong-toi` chỉ mở cho năm vai ấy, và một mục menu dẫn tới 403 là
+    # một lời hứa hỏng — tệ hơn là không có mục nào.
+    "/nhan-vien-phong-toi": ("tp_dh", "tp_kd", "tp_hd", "gd_kd", "gd_doi_xe"),
 
     # Hợp đồng lao động: hồ sơ cá nhân của từng người, kèm bản scan trong nhóm 06_Nhan_su. HCNS giữ hồ
     # sơ, Ban TGĐ và Chủ tịch điều hành, Ban Kiểm soát rà soát. Kế toán KHÔNG xem – lương lấy từ bảng
@@ -1180,6 +1191,27 @@ MENU_ROLES = {
     # Kết sổ một kỳ: sao kê vào sổ hàng loạt, kết chuyển, và trạng thái cả kỳ. Chỉ Kế toán GHI –
     # Chủ tịch, TGĐ và Ban Kiểm soát xem chứ không ghi thay (chặn nằm ở API, không ở menu).
     "/ket-so": BASE_VIEW + ("ketoan", "cntt"),
+    # ĐỢT R4b-2b 23/10/2026 — SAO ĐÚNG DANH SÁCH VAI CỦA `/ket-so`, không rộng hơn một vai.
+    #
+    # Cùng họ màn hình "Sổ & kỳ kế toán", nên không phát minh quyền mới. Bài học đêm 22/10:
+    # Đợt R4b-2a tự mở cửa ghi cho `ketoan_tt` và `ketoan_truong`, và `test_le2b_ba_vai_ke_toan`
+    # đỏ ngay vì hai vai ấy có bảng ký đã chốt. `test_r4b2b_2` ghim rằng dòng này KHÔNG BAO GIỜ
+    # rộng hơn `/ket-so` — muốn rộng hơn thì sửa bảng ký trước, bằng một quyết định có chữ ký.
+    #
+    # Và ĐỪNG BỎ TRỐNG: `ks_ma_tran` ghi rõ quy ước "trang không liệt kê trong MENU_ROLES = ai
+    # đăng nhập cũng thấy". Quên khai không phải là an toàn, nó là mở cho tất cả.
+    #
+    # BỎ `robot_ks` RA, và đây là chiều TRỪ chứ không phải chiều nới. `BASE_VIEW` có `robot_ks`,
+    # nhưng `books.READ` thì không — nên vai ấy THẤY MENU MÀ KHÔNG GỌI ĐƯỢC CỬA NÀO.
+    # `test_lg4_mon_no_khong_duoc_DAI_THEM` đỏ đúng chỗ ấy trên PR #442 (23/10/2026).
+    #
+    # Hai chiều sửa đều có: nới `books.READ` cho `robot_ks`, hoặc bỏ nó khỏi menu. Chọn chiều
+    # TRỪ vì nó không cấp thêm quyền cho ai; nới một danh sách vai là một quyết định cấp quyền,
+    # và đêm qua đợt R4b-2a đã sai đúng vì tự quyết một chuyện như thế.
+    # BASE_VIEW chứ không gõ tay "bks": BASE_VIEW là ĐÚNG bốn vai xem được mọi màn hình
+    # (Chủ tịch · TGĐ · Ban Kiểm soát · robot Kiểm soát) mà `test_ma_tran_quyen` canh. Đợt
+    # R4b-2b gõ tay và thiếu mất `robot_ks` — main đỏ hai phép thử vì đúng chỗ ấy.
+    "/hoa-don-thieu": BASE_VIEW + ("ketoan", "cntt"),
     # Sổ tỷ giá. Kế toán giữ sổ; Điều hành nhập tỷ giá của chuyến mình chi; Visa nhập tỷ giá phí
     # lãnh sự. Rộng hơn thế thì một con số NHÂN vào tiền có quá nhiều người sửa được.
     "/ty-gia": BASE_VIEW + OPERATIONS + ("ketoan", "nv_visa", "cntt"),
@@ -1329,9 +1361,19 @@ MAN_CON_LENH_DIEU_XE = ("/lenh-dieu-xe/de-nghi", "/lenh-dieu-xe/de-nghi/moi",
 # "/api/v1/tai-xe", nhóm ấy không có trong MAN_HINH_API["/doi-xe"].
 MAN_CON_DOI_XE = ("/doi-xe/phat-tai-xe", "/doi-xe/phat-tai-xe/moi",
                   "/doi-xe/gia-dau", "/doi-xe/gia-dau/moi")
+# CUA-1 · 23/10/2026 — hồ sơ MỘT hướng dẫn viên. Trang con, KHÔNG vào MENU_ROLES.
+#
+# Vì sao không vào MENU_ROLES: `test_menu.test_moi_man_hinh_deu_co_loi_vao` đòi mọi đường
+# trong MENU_ROLES phải có một LỐI VÀO trong menu, mà đường này mang `[id]` — không ai bấm
+# được vào một mã chưa biết. Lối vào thật là danh sách ở `/huong-dan` (mục 4.10.2) và cột
+# «Hồ sơ HDV →» trên màn `/nhan-vien-phong-toi`.
+#
+# Quyền KHÔNG khai riêng: trang chỉ gọi nhóm `/api/v1/huong-dan` mà `/huong-dan` đã gọi,
+# nên hàng rào thật nằm ở MÁY CHỦ — `READ` trong api/v1/huong_dan.py.
+MAN_CON_HO_SO = ("/ho-so-hdv/[id]",)
 ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/phieu-luong",
                                       "/doi-mat-khau", "/phan-he/[khoa]", "/offline",
-                                      "/dong-tien/nguon") + MAN_CON_LENH_DIEU_XE + MAN_CON_DOI_XE
+                                      "/dong-tien/nguon") + MAN_CON_LENH_DIEU_XE + MAN_CON_DOI_XE + MAN_CON_HO_SO
 
 
 # Vai trò bị giới hạn: chỉ được thấy đúng những trang liệt kê ở đây.
@@ -1353,8 +1395,11 @@ RESTRICTED_ROLE_MENUS = {
     # Màn hình không mang theo dữ liệu khách: xem ghi chú ở dòng "/su-co-tour" của MENU_ROLES.
     "gd_doi_xe": ("/doi-xe", "/tai-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe",
                   "/xe-hdv", "/nap-du-lieu", "/tep", "/doc-chung-tu", "/su-co-tour",
-                  "/doi-mat-khau") + MAN_CON_LENH_DIEU_XE + MAN_CON_DOI_XE,
-    "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/su-co-tour", "/doi-mat-khau"),
+                  "/doi-mat-khau", "/nhan-vien-phong-toi") + MAN_CON_LENH_DIEU_XE + MAN_CON_DOI_XE,
+    # CUA-1 22/10/2026: Trưởng phòng Hướng dẫn là một trong năm VAI_DUNG_DAU, và đây là
+    # danh sách CHO PHÉP — thiếu hai dòng dưới thì chính ông không thấy hai màn của mình.
+    "tp_hd": ("/huong-dan", "/xe-hdv", "/tep", "/nap-du-lieu", "/su-co-tour", "/doi-mat-khau",
+              "/nhan-vien-phong-toi") + MAN_CON_HO_SO,
     # Ba vai trò máy: danh sách CHO PHÉP, giống bốn vai trò hẹp ở trên. Robot không có menu để bấm,
     # nhưng khai ở đây thì màn hình tra cứu ngược (P10) nói được nó chạm tới đâu, và bộ quét vai trò
     # đọc được phạm vi của nó mà không phải suy từ mã.

@@ -476,7 +476,7 @@ export const GROUPS: Group[] = [
       ["Lệnh điều xe", "/lenh-dieu-xe"], ["Chi phí & hiệu quả", "/hieu-qua-doi-xe"],
       ["Lãi lỗ đội xe", "/lai-lo-doi-xe"], ["Việc của tài xế & HDV", "/xe-hdv"]] },
     { label: "Hướng dẫn viên", items: [
-      ["Phòng Hướng dẫn", "/huong-dan"], ["HDV & phân chuyến (cũ)", "/ops?tab=guides"]] },
+      ["Phòng Hướng dẫn", "/huong-dan"], ["Nhân viên phòng tôi", "/nhan-vien-phong-toi"], ["HDV & phân chuyến (cũ)", "/ops?tab=guides"]] },
   ] },
 
   { key: "nhansu", label: "Nhân sự – Hành chính", label_ngan: "HC – NS", icon: "nhansu",
@@ -529,6 +529,9 @@ export const GROUPS: Group[] = [
       // Kết sổ đứng NGAY TRƯỚC Khóa kỳ vì đó là thứ tự thật của việc: đưa sao kê vào sổ, kết chuyển
       // bốn bước, rồi mới khóa. Xếp ngược lại thì người dùng gặp nút khóa trước khi gặp việc phải làm.
       ["Kết sổ kỳ", "/ket-so"], ["Khóa kỳ", "/accounting?tab=periods"],
+      // ĐỢT R4b-2b 23/10/2026 — đứng NGAY SAU "Khóa kỳ" và trước "Quy ước hạch toán":
+      // nó là việc phải làm TRƯỚC khi khóa kỳ cho sạch, nhưng KHÔNG chặn khóa kỳ.
+      ["Hóa đơn còn thiếu", "/hoa-don-thieu"],
       ["Quy ước hạch toán", "/hach-toan"], ["Hồ sơ kiểm toán", "/ho-so-kiem-toan"],
       // Sổ tỷ giá (16/9/2026). Đứng trong nhóm Sổ & kỳ kế toán chứ không đứng riêng một mục: tỷ giá
       // là một QUY ƯỚC GHI SỔ – cùng họ với "Quy ước hạch toán" – chứ không phải một nghiệp vụ.

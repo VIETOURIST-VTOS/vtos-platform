@@ -299,6 +299,10 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
         con: [
           { ma: "4.10.1", ten: "Tổng quan hướng dẫn", href: "/huong-dan" },
           { ma: "4.10.2", ten: "Hồ sơ hướng dẫn viên", href: "/huong-dan" },
+  // CUA-1 22/10/2026: trang hồ sơ MỘT hướng dẫn viên là /ho-so-hdv/[id], đi tới từ danh
+  // sách này. Không khai thành mục cây riêng: cây là chỗ bấm được, mà không ai bấm được
+  // vào một mã chưa biết.
+  { ma: "4.10.6", ten: "Nhân viên phòng tôi", href: "/nhan-vien-phong-toi" },
           { ma: "4.10.3", ten: "Lịch & bố trí hướng dẫn", href: "/ops?tab=guides" },
           // 08/10/2026 — khai "chưa dựng" là SAI: bảng `BaoCaoSauTour`, cửa máy chủ và form soạn báo cáo
           // trên /xe-hdv đã gộp 06/10, và /huong-dan có cột "Sau tour" để Điều hành đọc.
@@ -434,6 +438,7 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "6.4.4", ten: "Thuế", href: "/accounting?tab=invoices" },
           { ma: "6.4.5", ten: "Tài sản & phân bổ", href: "/tai-san" },
           { ma: "6.4.6", ten: "Kết sổ & khóa kỳ", href: "/ket-so" },
+          { ma: "06.4.6b", ten: "Hóa đơn còn thiếu", href: "/hoa-don-thieu" },
           { ma: "6.4.7", ten: "Báo cáo tài chính", href: "/accounting?tab=bctc" },
           { ma: "6.4.8", ten: "Hồ sơ kiểm toán", href: "/ho-so-kiem-toan" },
           { ma: "6.4.9", ten: "Khóa kỳ", href: "/accounting?tab=periods", them: true }

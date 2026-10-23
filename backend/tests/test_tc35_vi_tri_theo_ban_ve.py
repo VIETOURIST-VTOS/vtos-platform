@@ -207,7 +207,8 @@ def test_thu_tu_doc_chin_khoi_van_giu_nguyen():
     # ngang đầu trang. Xem THU_TU_BAN_VE ở test_tc31, nơi ghi lý do đầy đủ.
     thu_tu = ["<KhoiKetQuaKinhDoanh",
               "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiDongTien",
-              "<KhoiTonDongMuc", "<HangThe", "<KhoiHieuQuaXe"]
+              # SỬA 22/10/2026 (TQ-1): hai khối gộp thành <KhoiVanHanh, cùng chỗ — xem test_tc31.
+              "<KhoiVanHanh", "<KhoiHieuQuaXe"]
     vi = [(m, ma.index(m)) for m in thu_tu if m in ma]
     assert len(vi) == len(thu_tu), f"Thiếu khối: {set(thu_tu) - {m for m, _ in vi}}"
     sai = [(a[0], b[0]) for a, b in zip(vi, vi[1:]) if a[1] > b[1]]

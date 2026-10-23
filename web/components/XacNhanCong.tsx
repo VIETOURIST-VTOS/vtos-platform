@@ -53,17 +53,20 @@ export default function XacNhanCong({ period }: { period: string }) {
           </td>
         </tr>
         {mo === k.phong && <tr><td colSpan={6}>
+          {/* CN-3 (21/10/2026): báo cáo ngày chưa đi qua VTOS nên tạm không đếm — nói ra, không để cột trống. */}
+          {k.che_do !== "cham_cong" && !k.dem_bao_cao &&
+            <p className="muted" style={{ fontSize: 12 }}>Tạm chưa đếm báo cáo ngày (Chủ tịch chốt 21/10/2026) — bảng này chỉ có ngày nghỉ đã duyệt.</p>}
           {!k.dong.length ? <p className="muted">Phòng này không có nhân viên đang làm.</p> :
             <table><thead><tr><th>Nhân viên</th>
               {k.che_do === "cham_cong"
                 ? <><th className="num">Công</th><th className="num">Phép</th><th className="num">Không lương</th></>
-                : <><th className="num">Ngày có báo cáo</th><th className="num">Đúng giờ</th><th className="num">TP đã chấm</th></>}
+                : k.dem_bao_cao && <><th className="num">Ngày có báo cáo</th><th className="num">Đúng giờ</th><th className="num">TP đã chấm</th></>}
               <th className="num">Nghỉ đã duyệt</th><th>Cần xem</th></tr></thead>
               <tbody>{k.dong.map((r: any) => <tr key={r.employee_id}>
                 <td>{r.ho_ten} <span className="muted mono">{r.ma}</span></td>
                 {k.che_do === "cham_cong"
                   ? <><td className="num">{r.cong}</td><td className="num">{r.ngay_phep}</td><td className="num">{r.ngay_khong_luong}</td></>
-                  : <><td className="num">{r.ngay_bao_cao}</td><td className="num">{r.dung_gio}</td><td className="num">{r.tp_da_cham}</td></>}
+                  : k.dem_bao_cao && <><td className="num">{r.ngay_bao_cao}</td><td className="num">{r.dung_gio}</td><td className="num">{r.tp_da_cham}</td></>}
                 <td className="num">{r.nghi_da_duyet}</td>
                 <td className="warn">{r.can_xem}</td></tr>)}</tbody></table>}
         </td></tr>}

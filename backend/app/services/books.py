@@ -24,11 +24,11 @@ GIỚI HẠN BỘ NHỚ – bắt buộc tôn trọng: máy chủ chỉ có 512 
   - danh sách dòng luôn có trần (limit) và trả kèm total_rows / truncated để giao diện biết còn dữ liệu;
   - chỉ chọn đúng các CỘT cần dùng, không nạp đối tượng ORM đầy đủ.
 """
-from datetime import date
+from datetime import date, datetime
 from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
 from app.models.accounting import Account, JournalEntry, JournalLine, Partner
 from app.services import chung_tu_loai as CTL
@@ -75,6 +75,8 @@ def account_subtree(db: Session, code: str) -> list[str]:
 # Chỉ lấy đúng cột cần dùng – nạp đối tượng ORM đầy đủ sẽ vỡ bộ nhớ với sổ hơn 100.000 dòng.
 _COLS = (JournalLine.entry_id, JournalLine.account_code, JournalLine.debit, JournalLine.credit,
          JournalLine.partner, JournalLine.partner_code, JournalLine.project_code, JournalLine.doc_no,
+         JournalLine.ngay_hoa_don, JournalLine.so_hoa_don, JournalLine.hoa_don_trang_thai,
+         JournalLine.id.label('line_id'),
          JournalEntry.entry_date, JournalEntry.code.label("entry_code"), JournalEntry.description,
          JournalEntry.source_type)
 
@@ -154,7 +156,11 @@ def _row_out(r, contra: dict) -> dict:
     return {"date": r.entry_date, "code": r.entry_code, "doc_no": r.doc_no, "description": r.description,
             "account": r.account_code, "contra": _contra_of(contra, r.entry_id, r.account_code, (r.debit or 0) > 0),
             "partner": r.partner, "partner_code": r.partner_code, "project_code": r.project_code,
-            "debit": r.debit or 0, "credit": r.credit or 0, "entry_id": r.entry_id}
+            "debit": r.debit or 0, "credit": r.credit or 0, "entry_id": r.entry_id,
+            # ĐỢT R4b-2a — ba khoá này đi theo MỌI sổ, không riêng sổ chi tiết: một dòng
+            # thiếu hóa đơn thì nhật ký chung cũng nên nói ra, chứ không chỉ sổ chi tiết.
+            "line_id": r.line_id, "ngay_hoa_don": r.ngay_hoa_don, "so_hoa_don": r.so_hoa_don,
+            "hoa_don_trang_thai": r.hoa_don_trang_thai or ""}
 
 
 def _page(rows_raw, total: dict, limit: int) -> dict:
@@ -277,18 +283,22 @@ def account_book_xlsx(rep: dict) -> bytes:
         extra += f" | Công trình: {rep['project_code']}"
     head = _head(title, rep["since"], rep["upto"], extra)
     if rep["detail"]:
-        cols = ["Ngày hạch toán", "Số chứng từ", "Số CT gốc", "Diễn giải", "TK", "TK đối ứng",
+        # ĐỢT R4b-2a — HAI CỘT HÓA ĐƠN. Xong hai cột này là Sổ chi tiết của VTOS đủ cả bốn
+        # thứ MISA có mà mình thiếu (TK đối ứng và Dư Nợ/Dư Có đã xong ở R4b-1).
+        cols = ["Ngày hạch toán", "Số chứng từ", "Số CT gốc", "Ngày hóa đơn", "Số hóa đơn",
+                "Diễn giải", "TK", "TK đối ứng",
                 "Đối tượng", "Công trình", "Phát sinh Nợ", "Phát sinh Có", "Dư Nợ", "Dư Có"]
-        widths = [15, 16, 14, 42, 10, 14, 28, 16, 16, 16, 16, 16]
+        widths = [15, 16, 14, 15, 18, 42, 10, 14, 28, 16, 16, 16, 16, 16]
         op = rep["opening"]
-        data = [["", "", "", "Số dư đầu kỳ", "", "", "", "", "", "",
+        data = [["", "", "", "", "", "Số dư đầu kỳ", "", "", "", "", "", "",
                  op if op > 0 else None, -op if op < 0 else None]]
         for r in rep["rows"]:
-            data.append([r["date"], r["code"], r["doc_no"], r["description"], r["account"], r["contra"],
+            data.append([r["date"], r["code"], r["doc_no"], r.get("ngay_hoa_don"), r.get("so_hoa_don") or "",
+                         r["description"], r["account"], r["contra"],
                          r["partner"], r["project_code"], r["debit"], r["credit"],
                          r.get("balance_debit"), r.get("balance_credit")])
         cl = rep["closing"]
-        total = ["", "", "", "Cộng phát sinh / Số dư cuối kỳ", "", "", "", "",
+        total = ["", "", "", "", "", "Cộng phát sinh / Số dư cuối kỳ", "", "", "", "",
                  rep["total"]["debit"], rep["total"]["credit"],
                  cl if cl > 0 else None, -cl if cl < 0 else None]
     else:
@@ -734,3 +744,168 @@ def chung_tu_goc_xlsx(rep: dict) -> bytes:
                  _head("BẢNG TỔNG HỢP CHỨNG TỪ GỐC CÙNG LOẠI", rep["since"], rep["upto"]),
                  ["Mã loại", "Tên loại chứng từ", "Số chứng từ", "Ghi Nợ", "Ghi Có", "TK hay gặp"],
                  [14, 42, 14, 20, 20, 24], data, total)
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT R4b-2a 22/10/2026 — HÓA ĐƠN CÒN THIẾU
+#
+# LUẬT ĐẾM, Chủ tịch chốt: một dòng bị coi là CẦN HÓA ĐƠN khi chứng từ của nó có **chạm thuế
+# GTGT** — tức trong cùng bút toán có ít nhất một dòng thuộc nhánh 133 hoặc 3331. Có thuế thì
+# phải có hóa đơn; luật này không do VTOS đặt ra nên không ai phải ký nó.
+#
+# CHỖ HỞ ĐÃ BIẾT, nói ra chứ không giấu: dòng nhà cung cấp hạch toán GỘP cả thuế vào giá (không
+# tách 133) sẽ KHÔNG nằm trong danh sách, dù hóa đơn có thật. Nên con số đếm được là SÀN, không
+# phải trần. Nới luật đếm lúc này sẽ kéo vào cả những dòng thật sự không cần hóa đơn, nên đo lại
+# sau một tháng rồi mới quyết — ghi ở đây để lần sau ai đọc cũng thấy đây là chủ ý.
+#
+# KHÔNG CHẶN KHÓA KỲ. Thiếu hóa đơn chỉ ĐẾM; `accounting.lock_period` không đọc gì ở đây.
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+
+HD_CHUA = ""                 # chưa nhận được (mặc định của cột)
+HD_DA_NHAP = "da_nhap"
+HD_KHONG = "khong_phat_sinh"
+HD_TRANG_THAI = (HD_CHUA, HD_DA_NHAP, HD_KHONG)
+TK_THUE = ("133", "3331")    # nhánh tài khoản làm cho một bút toán "cần hóa đơn"
+
+
+def _entry_co_thue(db: Session, upto: date, since: date | None) -> set[int]:
+    """Mã bút toán có ít nhất một dòng thuộc nhánh thuế GTGT. Lọc bằng SQL, không lọc bằng Python."""
+    dk = or_(*[JournalLine.account_code.like(f"{t}%") for t in TK_THUE])
+    q = _filtered(select(JournalLine.entry_id).distinct(), upto, since).where(dk)
+    return {int(x) for (x,) in db.execute(q).all()}
+
+
+def hoa_don_thieu(db: Session, since: date, upto: date, trang_thai: str = HD_CHUA,
+                  partner_code: str = "", qua_ngay: int = 0, limit: int = PAGE_LIMIT) -> dict:
+    """Danh sách việc cần làm: dòng CẦN hóa đơn, lọc theo trạng thái.
+
+    `qua_ngay > 0` chỉ giữ dòng đã quá ngần ấy ngày tính từ ngày hạch toán.
+    """
+    if trang_thai not in HD_TRANG_THAI:
+        raise ValueError(f"Trạng thái không hợp lệ: {trang_thai!r}")
+    co_thue = _entry_co_thue(db, upto, since)
+    if not co_thue:
+        return {"since": since, "upto": upto, "trang_thai": trang_thai, "rows": [],
+                "dem": {"chua_nhan": 0, "da_nhap": 0, "khong_phat_sinh": 0},
+                "tien": 0.0, "thue": 0.0, "tuoi": {"duoi_30": 0, "tu_31_60": 0, "qua_60": 0},
+                "cu_nhat": None, "total_rows": 0, "shown_rows": 0, "truncated": False, "limit": limit}
+    raw = _rows(db, upto, since, partner_code=partner_code, limit=XLSX_LIMIT)
+    contra = _contra_map(db, {r.entry_id for r in raw})
+    dem = {"chua_nhan": 0, "da_nhap": 0, "khong_phat_sinh": 0}
+    rows, tien, cu_nhat = [], 0.0, None
+    tuoi = {"duoi_30": 0, "tu_31_60": 0, "qua_60": 0}
+    for r in raw:
+        if r.entry_id not in co_thue:
+            continue
+        # Chính dòng thuế không cần hóa đơn của riêng nó — nó LÀ phần thuế của dòng kia.
+        if any(r.account_code.startswith(t) for t in TK_THUE):
+            continue
+        tt = r.hoa_don_trang_thai or HD_CHUA
+        dem["da_nhap" if tt == HD_DA_NHAP else ("khong_phat_sinh" if tt == HD_KHONG else "chua_nhan")] += 1
+        if tt != trang_thai:
+            continue
+        so_ngay = (upto - r.entry_date).days
+        if qua_ngay and so_ngay <= qua_ngay:
+            continue
+        if tt == HD_CHUA:
+            tien += float(r.debit or 0) + float(r.credit or 0)
+            tuoi["duoi_30" if so_ngay <= 30 else ("tu_31_60" if so_ngay <= 60 else "qua_60")] += 1
+            if cu_nhat is None or r.entry_date < cu_nhat:
+                cu_nhat = r.entry_date
+        d = _row_out(r, contra)
+        d["so_ngay"] = so_ngay
+        rows.append(d)
+    thue = 0.0
+    if rows:
+        ids = {d["entry_id"] for d in rows}
+        dk = or_(*[JournalLine.account_code.like(f"{t}%") for t in TK_THUE])
+        q = _filtered(select(func.coalesce(func.sum(JournalLine.debit), 0.0)
+                             + func.coalesce(func.sum(JournalLine.credit), 0.0)),
+                      upto, since).where(dk, JournalLine.entry_id.in_(list(ids)))
+        thue = round(float(db.execute(q).scalar() or 0), 0)
+    return {"since": since, "upto": upto, "trang_thai": trang_thai, "rows": rows[:limit],
+            "dem": dem, "tien": round(tien, 0), "thue": thue, "tuoi": tuoi, "cu_nhat": cu_nhat,
+            "total_rows": len(rows), "shown_rows": len(rows[:limit]),
+            "truncated": len(rows) > limit, "limit": limit}
+
+
+def kiem_hoa_don(trang_thai: str, ngay_hoa_don: date | None, so_hoa_don: str, ly_do: str) -> None:
+    """LUẬT CỦA BA TRẠNG THÁI, tách thành hàm THUẦN — không cơ sở dữ liệu, không phiên.
+
+    Tách ra vì luật này là thứ đáng canh nhất của đợt, mà một phép thử phải dựng phiên và bảng
+    mới chạm tới được thì sớm muộn sẽ bị bỏ. Hàm thuần thì phép thử gọi thẳng, và `ghi_hoa_don`
+    gọi đúng hàm này nên hai bên không thể lệch nhau.
+    """
+    if trang_thai not in HD_TRANG_THAI:
+        raise ValueError(f"Trạng thái không hợp lệ: {trang_thai!r}")
+    if trang_thai == HD_DA_NHAP and (not ngay_hoa_don or not (so_hoa_don or "").strip()):
+        raise ValueError("Trạng thái 'đã nhập' phải có CẢ ngày hóa đơn và số hóa đơn")
+    if trang_thai == HD_KHONG and not (ly_do or "").strip():
+        raise ValueError("Trạng thái 'không phát sinh hóa đơn' BẮT BUỘC có lý do")
+
+
+def ghi_hoa_don(db: Session, line_id: int, trang_thai: str, nguoi: str,
+                ngay_hoa_don: date | None = None, so_hoa_don: str = "", ly_do: str = "") -> dict:
+    """CỬA GHI. Ba trạng thái, và mỗi trạng thái đòi đúng thứ nó cần.
+
+    Không duyệt (Chủ tịch chốt 22/10/2026), nhưng VẪN ghi người và giờ: miễn hóa đơn là một
+    quyết định thuế, và quyết định thì phải có tên người đứng.
+    """
+    kiem_hoa_don(trang_thai, ngay_hoa_don, so_hoa_don, ly_do)
+    d = db.get(JournalLine, line_id)
+    if d is None:
+        raise ValueError(f"Không có dòng bút toán {line_id}")
+    if trang_thai == HD_DA_NHAP:
+        d.ngay_hoa_don, d.so_hoa_don, d.hoa_don_ly_do = ngay_hoa_don, so_hoa_don.strip()[:40], ""
+    elif trang_thai == HD_KHONG:
+        d.ngay_hoa_don, d.so_hoa_don, d.hoa_don_ly_do = None, "", ly_do.strip()[:200]
+    else:
+        d.ngay_hoa_don, d.so_hoa_don, d.hoa_don_ly_do = None, "", ""
+    d.hoa_don_trang_thai = trang_thai
+    d.hoa_don_nguoi_ghi = (nguoi or "")[:50]
+    d.hoa_don_ghi_luc = datetime.now()
+    db.flush()
+    return {"line_id": d.id, "trang_thai": d.hoa_don_trang_thai, "ngay_hoa_don": d.ngay_hoa_don,
+            "so_hoa_don": d.so_hoa_don, "ly_do": d.hoa_don_ly_do,
+            "nguoi_ghi": d.hoa_don_nguoi_ghi, "ghi_luc": d.hoa_don_ghi_luc}
+def dem_hoa_don_thieu(db: Session, since: date, upto: date) -> dict:
+    """CHỈ ĐẾM, không dựng danh sách.
+
+    Bàn làm việc mở ra là gọi hàm này, nên nó phải rẻ. `hoa_don_thieu()` nạp tới `XLSX_LIMIT`
+    dòng rồi đọc thêm `_contra_map` cho từng bút toán — đúng cho một màn hình việc cần làm, quá
+    đắt cho một ô đếm mở mỗi lần ai đó vào trang chủ.
+
+    BA CÂU TỔNG HỢP, KHÔNG NẠP DÒNG NÀO VỀ PYTHON. Tập trung gian duy nhất đi về bộ nhớ là danh
+    sách MÃ BÚT TOÁN, không phải danh sách dòng — và nó đi qua `_entry_co_thue`, đúng hàm mà
+    `hoa_don_thieu()` dùng, nên luật "bút toán nào cần hóa đơn" chỉ có MỘT bản khai.
+
+    Vì sao không viết gọn thành một câu bằng truy vấn con: `_filtered` tự nối sang `JournalEntry`,
+    nên một câu `select` đã lọc đem nhét vào `IN (...)` của câu ngoài là chỗ SQLAlchemy có thể
+    tự tương quan hai bảng đã nối ở ngoài — ra một con số trông hợp lý mà sai. `_entry_co_thue`
+    đã chọn đường vật hóa vì lý do ấy từ Đợt R4b-2a; đây đi theo.
+
+    HAI HÀM ĐẾM CÙNG MỘT THỨ LÀ CHỖ DỄ LỆCH NHẤT, nên `test_r4b2c_3` chạy cả hai trên cùng một
+    cuốn sổ rồi bắt chúng ra một con số — đối chiếu bằng cách CHẠY, không bằng cách đọc mã.
+    """
+    co_thue = _entry_co_thue(db, upto, since)
+    if not co_thue:
+        return {"chua_nhan": 0, "thue": 0.0, "since": since, "upto": upto}
+    ids = list(co_thue)
+    dk_thue = or_(*[JournalLine.account_code.like(f"{t}%") for t in TK_THUE])
+    # Dòng thuế không cần hóa đơn của riêng nó — nó LÀ phần thuế của dòng kia. Cùng phép loại
+    # trừ mà `hoa_don_thieu()` làm bằng `startswith` khi duyệt từng dòng.
+    chua = (JournalLine.entry_id.in_(ids), ~dk_thue,
+            or_(JournalLine.hoa_don_trang_thai.is_(None),
+                JournalLine.hoa_don_trang_thai == HD_CHUA))
+    n = int(db.execute(_filtered(select(func.count(JournalLine.id)), upto, since)
+                       .where(*chua)).scalar() or 0)
+    # Phần thuế cộng trên ĐÚNG những bút toán CÒN dòng chưa nhận hóa đơn, không trên mọi bút
+    # toán có thuế trong kỳ: bút toán đã nhập đủ hóa đơn thì phần thuế của nó không còn là việc
+    # đang tồn. `hoa_don_thieu()` cộng đúng tập ấy, nên hai hàm mới ra một con số.
+    ct = [int(x) for (x,) in db.execute(
+        _filtered(select(JournalLine.entry_id).distinct(), upto, since).where(*chua)).all()]
+    thue = 0.0
+    if ct:
+        thue = round(float(db.execute(
+            _filtered(select(func.coalesce(func.sum(JournalLine.debit), 0.0)
+                             + func.coalesce(func.sum(JournalLine.credit), 0.0)), upto, since)
+            .where(JournalLine.entry_id.in_(ct), dk_thue)).scalar() or 0), 0)
+    return {"chua_nhan": n, "thue": thue, "since": since, "upto": upto}
