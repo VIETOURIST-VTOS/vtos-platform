@@ -18,6 +18,28 @@ from app.core.security import hash_password
 from app.services import rules as R
 
 ENTITIES = ("tour", "booking", "receipt", "supplier_payment", "user", "vehicle", "proposal", "settlement", "product")
+
+# KS-12 · 21/10/2026 — LOẠI KÉO VỀ MÀ CỐ Ý CHƯA CÓ LỚP ÁP DỤNG, khai Ở ĐÂY kèm lý do.
+#
+# VÌ SAO CÓ BẢNG NÀY. `proposal` nằm trong `ENTITIES` nên robot kéo về đều — 24 dòng tính tới
+# 17/10/2026 — nhưng KHÔNG hàm nào đọc `VtRecord.entity == "proposal"`, tức là không ai áp.
+# Tự nó đã tệ; chỗ tệ hơn là con số đáng lẽ phải kêu lên thì được viết để loại nó ra:
+#
+#     out["remaining"] = ...where(applied == False, VtRecord.entity != "proposal", ...)
+#
+# Một chữ `!= "proposal"` giấu trong câu truy vấn, và ô «còn tồn» báo 0 trong khi 24 dòng nằm im.
+# Đó là kiểu hỏng tệ nhất của cả hệ: nó trông y hệt lúc không có gì để làm.
+#
+# Từ nay chỗ loại trừ DUY NHẤT là bảng này, và nó phải mang LÝ DO đọc được. `apply_all` kê thẳng
+# số dòng của từng loại ở đây ra cạnh `remaining`, nên loại nào chưa có lớp áp thì hiện lên bàn
+# giám sát chứ không biến mất. `test_ks12` canh: mỗi loại trong `ENTITIES` phải HOẶC có lớp áp,
+# HOẶC đứng tên ở đây.
+KHONG_AP_DUNG: dict[str, str] = {
+    "proposal": ("Đề nghị chi đang chờ duyệt bên Vietrip. CHƯA dựng lớp áp vì `supplier_payment` "
+                 "đã tạo `PaymentRequest` rồi — nếu hai loại này là cùng một đề nghị ở hai giai "
+                 "đoạn thì áp cả hai sẽ ĐẾM ĐÔI tiền ra. Phải đối chiếu trên hệ thật trước, và "
+                 "đó là một vòng riêng có người quyết, không phải việc đoán."),
+}
 DEPT_MAP = {"Kế toán": ("ketoan", "ketoan"), "Điều hành": ("dieu_hanh", "nv_dh"), "Tour": ("kd_le", "nv_kd"), "Tour MICE": ("kd_doan", "nv_kd"), "Hướng dẫn": ("huong_dan", "nv_kd"),
             "CSKH": ("marketing", "nv_kd"), "IT": ("cntt", "cntt"), "Giám đốc": ("ban_tgd", "tgd"), "Kinh doanh": ("kd_le", "nv_kd"), "Marketing": ("marketing", "nv_kd"), "ĐỐI TÁC": ("kd_le", "nv_kd")}
 STATUS_TEXT = {"KC": "đã xác nhận", "QQ": "chờ duyệt", "XX": "từ chối/hủy", "GD": "GĐ duyệt"}
@@ -564,7 +586,15 @@ def apply_all(db: Session, actor: str, limit: int = 400) -> dict:
     """Ánh xạ theo lô (mỗi lần tối đa `limit` bản ghi mỗi loại) để không quá thời gian request; gọi lặp tới khi remaining = 0."""
     out = {"users": apply_users(db, limit), "vehicles": apply_vehicles(db, limit), "products": apply_products(db, limit), "tours": apply_tours(db, limit=limit), "settlements": apply_settlements(db, limit),
            "bookings": apply_bookings(db, limit), "receipts": apply_receipts(db, limit), "supplier_payments": apply_supplier_payments(db, limit)}
-    out["remaining"] = db.execute(select(func.count()).select_from(VtRecord).where(VtRecord.applied == False, VtRecord.entity != "proposal",
+    # KS-12 — loại chưa có lớp áp dụng KHÔNG bị trừ lặng lẽ nữa: vẫn nằm ngoài `remaining` (đúng,
+    # vì không lớp nào áp được chúng) nhưng ĐỨNG NGAY CẠNH nó, có số dòng và có lý do.
+    out["chua_co_lop_ap_dung"] = {
+        e: {"so_dong": db.execute(select(func.count()).select_from(VtRecord)
+                                  .where(VtRecord.applied == False, VtRecord.entity == e)).scalar(),
+            "ly_do": ly_do}
+        for e, ly_do in KHONG_AP_DUNG.items()}
+    out["remaining"] = db.execute(select(func.count()).select_from(VtRecord).where(VtRecord.applied == False,
+                                                                                  ~VtRecord.entity.in_(tuple(KHONG_AP_DUNG)),
                                                                                   ~VtRecord.apply_note.in_(["chưa có tour", "chưa có booking"]))).scalar()
     out["blocked"] = db.execute(select(func.count()).select_from(VtRecord).where(VtRecord.applied == False, VtRecord.apply_note.in_(["chưa có tour", "chưa có booking"]))).scalar()
     R.audit(db, actor, "cntt", "dong_bo_vietrip_ap_dung", "vietrip", after=out); db.commit()
