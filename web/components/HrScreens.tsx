@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useShell } from "@/components/Shell";
 import LuoiChamCong from "@/components/LuoiChamCong";
 import XacNhanCong from "@/components/XacNhanCong";
+import BangLuongBoSung from "@/components/BangLuongBoSung";
 // 5.6 Danh gia nhan su · 09/10/2026. The nay ten la "Danh gia & su vu" ma truoc ban nay chi co SU
 // VU — khong ky danh gia, khong tieu chi, khong nguoi cham. Bang cham dung o DAU the, tren so su
 // vu, vi danh gia la viec lam moi ky con bien ban su vu la viec chi lam khi co chuyen.
@@ -341,6 +342,8 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
             <td className="num">{d.so_tien === null || d.so_tien === undefined ? <Tag cls="warn">rỗng</Tag> : vnd(d.so_tien)}</td>
             <td className="muted mono" style={{ maxWidth: 320 }}>{(d.nguon || []).join(", ")}</td></tr>)}
           </tbody></table></div>}
+      {/* CN-2 (21/10/2026): phòng bị giữ lương lúc ký và bảng bổ sung của kỳ. */}
+      <BangLuongBoSung period={period} onChi={chiDanhSach} />
       {["da_ky", "tgd_ky"].includes(run.status) && chi && <div className="panel wrap">
         <h2>Kế toán chi · {TRA[chi.tra_trang_thai]?.[0] || "Chưa chi"}</h2>
         <p className="muted">Khúc cuối của chuỗi: kế toán chuyển tiền, tải <b>Ủy nhiệm chi</b> lên, máy đọc rồi

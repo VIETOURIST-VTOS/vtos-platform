@@ -18,7 +18,7 @@ import { Tag, errMsg } from "@/components/ui";
  *
  *  Chỉ hiển thị, không sửa: phiếu lương sửa được trên màn hình là phiếu không còn đối chiếu được với sổ. */
 
-type Ky = { period: string; trang_thai: string; da_ky: boolean; thuc_nhan: number };
+type Ky = { period: string; trang_thai: string; da_ky: boolean; thuc_nhan: number | null; dang_giu?: boolean };
 
 const TRANG_THAI: Record<string, [string, string]> = {
   nhap: ["Bản nháp robot – chưa ai xác nhận", "warn"],
@@ -66,7 +66,7 @@ function PhieuLuongPage() {
         <span className="muted">Kỳ lương:</span>
         <select value={ky} onChange={(e) => setKy(e.target.value)} style={{ minWidth: 260 }}>
           {ds.rows.map((r: Ky) => <option key={r.period} value={r.period}>
-            {r.period} — {vnd(r.thuc_nhan)}{r.da_ky ? " (đã ký)" : ""}
+            {r.period} — {r.dang_giu ? "đang giữ" : vnd(r.thuc_nhan ?? 0)}{r.da_ky ? " (đã ký)" : ""}
           </option>)}
         </select>
         <span className="muted">{ds.rows.length} kỳ</span>
@@ -74,7 +74,13 @@ function PhieuLuongPage() {
 
       {loi && <p><Tag cls="warn">Không mở được</Tag> {loi}</p>}
 
-      {p && <div className="panel wrap">
+      {/* CN-2 (Chủ tịch chốt 21/10/2026): lương bị giữ thì phiếu chỉ ghi «đang giữ», không số dự kiến. */}
+      {p?.dang_giu && <div className="panel wrap">
+        <h2 style={{ margin: 0 }}>{p.nhan_su.ten}</h2>
+        <p className="muted">Kỳ {p.period} · {p.nhan_su.phong}</p>
+        <p><Tag cls="warn">Đang giữ</Tag> {p.thong_bao}</p>
+      </div>}
+      {p && !p.dang_giu && <div className="panel wrap">
         <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "baseline" }}>
           <h2 style={{ margin: 0 }}>{p.nhan_su.ten}</h2>
           <Tag cls={TRANG_THAI[p.trang_thai_bang_luong]?.[1] || "warn"}>
@@ -112,6 +118,7 @@ function PhieuLuongPage() {
         <p style={{ fontSize: 18, marginTop: 14 }}>
           <b>Thực nhận: {vnd(p.thuc_nhan)}</b>{" "}
           {p.da_ky ? <Tag cls="ok">TGĐ đã ký lô</Tag> : <Tag cls="warn">Chưa ký lô</Tag>}
+          {p.bo_sung_so && <> <Tag cls="navy">trả qua bảng bổ sung số {p.bo_sung_so}</Tag></>}
         </p>
         {p.ghi_chu && <p className="muted">{p.ghi_chu}</p>}
 

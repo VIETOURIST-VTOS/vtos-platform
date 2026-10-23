@@ -93,7 +93,8 @@ def test_cn1_3_sua_cong_sau_khi_duyet_thi_het_hieu_luc(db):
         X.tgd_duyet(db, _u(db, "tgd1"), KY, "ketoan")
 
 
-def test_cn1_4_bao_cao_ngay_dem_dung(db):
+def test_cn1_4_bao_cao_ngay_dem_dung(db, monkeypatch):
+    monkeypatch.setattr(X, "DEM_BAO_CAO_NGAY", True)   # công tắc đang tắt (CN-3); phép đếm vẫn phải đúng
     nv = _u(db, "nvdh")
     db.add_all([DailyReport(user_id=nv.id, report_date=date(2026, 9, 1), on_time=True, manager_score=8),
                 DailyReport(user_id=nv.id, report_date=date(2026, 9, 2), on_time=False)])
@@ -158,3 +159,14 @@ def test_cn1_9_be_nguoc_bo_so_dau_thi_do(db, monkeypatch):
     H.set_attendance(db, _u(db, "hcns1"), _e(db, "KT1").id, date(2026, 9, 8), "khong_luong", 0, 0, "")
     assert X.trang_thai(db, KY, "ketoan")["trang_thai"] == "da_duyet", \
         "không so dấu thì sửa công không bị phát hiện — đúng cái phép 3 canh"
+
+
+def test_cn3_tam_khong_dem_bao_cao_ngay(db):
+    """CN-3 (21/10/2026): công tắc tắt thì phòng báo cáo ngày chỉ còn ngày nghỉ đã duyệt — không
+    cột báo cáo, không lời nhắc «N ngày không báo cáo». Bật lại là quyết định của Chủ tịch."""
+    assert X.DEM_BAO_CAO_NGAY is False
+    nv = _u(db, "nvdh")
+    db.add(DailyReport(user_id=nv.id, report_date=date(2026, 9, 1), on_time=True)); db.commit()
+    d = X.so_lieu(db, KY, "dieu_hanh")[0]
+    assert "ngay_bao_cao" not in d and d["can_xem"] == "" and "nghi_da_duyet" in d
+    assert X.so_lieu(db, KY, "ketoan")[0]["cong"] > 0, "phòng chấm công ngày không bị công tắc này đụng tới"
