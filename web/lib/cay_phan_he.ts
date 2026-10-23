@@ -434,6 +434,7 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "6.4.4", ten: "Thuế", href: "/accounting?tab=invoices" },
           { ma: "6.4.5", ten: "Tài sản & phân bổ", href: "/tai-san" },
           { ma: "6.4.6", ten: "Kết sổ & khóa kỳ", href: "/ket-so" },
+          { ma: "06.4.6b", ten: "Hóa đơn còn thiếu", href: "/hoa-don-thieu" },
           { ma: "6.4.7", ten: "Báo cáo tài chính", href: "/accounting?tab=bctc" },
           { ma: "6.4.8", ten: "Hồ sơ kiểm toán", href: "/ho-so-kiem-toan" },
           { ma: "6.4.9", ten: "Khóa kỳ", href: "/accounting?tab=periods", them: true }

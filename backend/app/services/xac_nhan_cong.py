@@ -12,8 +12,8 @@ LUẬT, mỗi dòng một quyết định của Chủ tịch:
     chuyến) và Đội xe (lương + công tác phí) KHÔNG áp dụng — tập phòng lấy từ `luong.CHE_DO_CONG`,
     không gõ lại danh sách.
   · Hạn xác nhận: ngày 3 tháng sau; quá hạn thì chuông đỏ.
-  · Phòng chưa được duyệt công thì bảng lương CHẶN. Vòng CN-2 sẽ đổi thành «giữ lương riêng phòng
-    ấy»; tới lúc đó chặn cả kỳ (Chủ tịch chọn an toàn hơn để lương trôi qua).
+  · Phòng chưa được duyệt công thì lương phòng ấy BỊ GIỮ lúc ký bảng chính và trả bằng bảng bổ
+    sung (CN-2, services/giu_luong.py). CN-1 từng chặn cả kỳ — luật tạm, đã thay.
 
 HIỆU LỰC TÍNH LẠI MỖI LẦN ĐỌC. Lúc HCNS bấm, máy chụp các con số và lấy dấu. Đọc lại thì so dấu của
 số HÔM NAY với dấu đã chụp; khác nhau là «số đã đổi sau khi xác nhận» và cả hai bước phải làm lại.
@@ -37,6 +37,13 @@ VAI_XAC_NHAN = ("hcns",)
 VAI_DUYET = ("tgd", "chutich")
 HAN_NGAY = 3                       # ngày 3 tháng sau
 CHUONG_HCNS, CHUONG_TGD = "cong_cho_hcns", "cong_cho_tgd"
+
+# CN-3 (Chủ tịch chốt 21/10/2026): TẠM KHÔNG ĐẾM BÁO CÁO NGÀY. Đo trên hệ thật 21/10, kỳ 09/2026:
+# 74 người của bảy phòng báo cáo trước 20 giờ có KHÔNG một báo cáo nào trên VTOS — báo cáo chưa đi
+# qua hệ thống. Đếm lúc này thì HCNS phải xác nhận «mỗi người 22 ngày không báo cáo», một con số
+# sai về người chứ không sai về phần mềm. Tắt công tắc này thì bảy phòng ấy chỉ còn NGÀY NGHỈ ĐÃ
+# DUYỆT trong bảng xác nhận; bật lại là một quyết định của Chủ tịch, không phải một lần chỉnh mã.
+DEM_BAO_CAO_NGAY = False
 
 TRANG_THAI = {
     "chua": "Chưa xác nhận",
@@ -102,6 +109,9 @@ def so_lieu(db: Session, period: str, phong: str) -> list[dict]:
     # Báo cáo công việc trước 20 giờ. Chỉ đếm ngày làm việc đã qua: giữa tháng, ngày mai chưa tới
     # thì chưa phải ngày «không báo cáo».
     lam_viec = [d for d in ngay if d.weekday() < 5 and d <= date.today()]
+    if not DEM_BAO_CAO_NGAY:
+        return [{"employee_id": e.id, "ma": e.code, "ho_ten": e.full_name,
+                 "nghi_da_duyet": float(nghi.get(e.id, 0)), "can_xem": ""} for e in emps]
     for e in emps:
         if e.user_id is None:
             ra.append({"employee_id": e.id, "ma": e.code, "ho_ten": e.full_name, "ngay_bao_cao": 0,
@@ -161,7 +171,8 @@ def bang_ky(db: Session, period: str) -> dict:
     for p, cd in phong_ap_dung().items():
         dong_so = so_lieu(db, period, p)
         khoi.append({**trang_thai(db, period, p, dong_so), "phong_ten": DEPARTMENTS.get(p, p),
-                     "che_do": cd, "che_do_ten": L.CHE_DO_LABEL.get(cd, cd), "dong": dong_so})
+                     "che_do": cd, "che_do_ten": L.CHE_DO_LABEL.get(cd, cd), "dong": dong_so,
+                     "dem_bao_cao": cd != L.BAO_CAO_NGAY or DEM_BAO_CAO_NGAY})
     return {"period": period, "han": han_cua_ky(period), "phong": khoi, "trang_thai": TRANG_THAI}
 
 
@@ -221,14 +232,6 @@ def phong_chua_duyet(db: Session, period: str, ma_nv: list[str]) -> list[dict]:
         if t["trang_thai"] != "da_duyet":
             ra.append(t)
     return ra
-
-
-def chan_ky_luong(db: Session, run) -> None:
-    """Gọi NGAY TRƯỚC chữ ký bảng lương. Không phân vai: ai ký cũng dừng như nhau."""
-    chua = phong_chua_duyet(db, run.period, [r.get("ma") for r in run.rows or [] if r.get("ma")])
-    if chua:
-        raise ValueError("Chưa ký được: công chưa duyệt ở " +
-                         "; ".join(f"{t['phong']} ({t['trang_thai_ten']})" for t in chua))
 
 
 # ------------------------------------------------------------------ chuông
