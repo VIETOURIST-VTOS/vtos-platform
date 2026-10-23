@@ -2408,7 +2408,9 @@ def incidents_finalize(u: User = Depends(require_roles("hcns", "cntt")), db: Ses
 def run_out(r: PayrollRun) -> dict:
     return {"id": r.id, "period": r.period, "status": r.status, "rows": r.rows, "totals": r.totals, "inputs": r.inputs or {},
             "kt_confirmed_by": r.kt_confirmed_by, "kt_confirmed_at": r.kt_confirmed_at,
-            "hcns_by": r.hcns_by, "hcns_at": r.hcns_at, "tgd_by": r.tgd_by, "tgd_at": r.tgd_at, "entry_ids": r.entry_ids, "updated_at": r.updated_at}
+            "hcns_by": r.hcns_by, "hcns_at": r.hcns_at, "tgd_by": r.tgd_by, "tgd_at": r.tgd_at, "entry_ids": r.entry_ids, "updated_at": r.updated_at,
+            # CN-2: phòng bị giữ lương lúc ký bảng chính (rỗng = không giữ ai).
+            "giu_lai": r.giu_lai or {}}
 
 
 @router.get("/payroll-runs/{period}")
@@ -2607,8 +2609,13 @@ def ky_luong_cua_toi(u: User = Depends(loc_theo_nguoi_dung("danh sách kỳ lư�
         if run.status == "nhap" and not quan_tri: continue
         dong = next((r for r in (run.rows or []) if r.get("ma") == ma), None)
         if dong is None: continue
+        from app.services import giu_luong as GL
+        gl = GL.tinh_trang_nguoi(db, run, ma)
+        if gl.get("dong"):
+            dong = gl["dong"]
         ra.append({"period": run.period, "trang_thai": run.status, "da_ky": bool(run.tgd_by),
-                   "thuc_nhan": dong.get("thuc_nhan", 0)})
+                   "dang_giu": gl["dang_giu"],
+                   "thuc_nhan": None if gl["dang_giu"] else dong.get("thuc_nhan", 0)})
     return {"ma_nv": ma, "co_ho_so": True, "ho_ten": e.full_name, "rows": ra,
             "message": "" if ra else "Chưa có kỳ lương nào đã lập cho mã nhân viên này."}
 
@@ -2660,6 +2667,16 @@ def _phieu_luong(period: str, ma: str, u: User, db: Session):
         raise HTTPException(422, "Bảng lương kỳ này còn là bản nháp của robot – chờ Kế toán xác nhận cơ sở tính")
     row = next((r for r in run.rows if r["ma"] == ma_can), None)
     if row is None: raise HTTPException(404, f"Không có dòng lương của mã {ma_can} trong kỳ {period}")
+    # CN-2 (Chủ tịch chốt 21/10/2026): người bị giữ lương thì phiếu CHỈ ghi «đang giữ», không số dự
+    # kiến. Đã trả qua bảng bổ sung thì phiếu đọc dòng của bảng bổ sung — số đã ký là số đó.
+    from app.services import giu_luong as GL
+    gl = GL.tinh_trang_nguoi(db, run, ma_can)
+    if gl["dang_giu"]:
+        return {"period": period, "trang_thai_bang_luong": run.status, "da_ky": bool(run.tgd_by),
+                "dang_giu": True, "thong_bao": gl["thong_bao"],
+                "nhan_su": {"ma": ma_can, "ten": row["ten"], "phong": DEPARTMENTS.get(row["phong"], row["phong"])}}
+    if gl.get("dong"):
+        row = gl["dong"]
 
     emp = db.execute(select(Employee).where(Employee.code == ma_can)).scalars().first()
     cty = db.get(Company, emp.company_id) if emp and emp.company_id else None
@@ -2677,6 +2694,7 @@ def _phieu_luong(period: str, ma: str, u: User, db: Session):
                           "tncn_khau_tru": row.get("tncn", 0), "tong": row.get("khoan_tru", 0)},
             "thuc_nhan": row["thuc_nhan"], "ghi_chu": row.get("ghi_chu", ""),
             "khoan_dang_treo": treo,
+            "dang_giu": False, "bo_sung_so": gl.get("bo_sung_so"),
             "luu_y": ("Khoản treo là hoa hồng và thưởng chuyến CHƯA phát sinh vì chuyến chưa chốt quyết toán. "
                       "Đây là cơ chế hoãn, không phải cắt: chốt quyết toán xong thì kỳ lương tương ứng trả đủ.")
             if treo else ""}
@@ -2762,6 +2780,59 @@ def payroll_advance(period: str, u: User = Depends(require_roles("hcns", "tgd", 
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"message": msg, "run": run_out(run)}
+
+
+# ====================== CN-2 · GIỮ LƯƠNG VÀ BẢNG LƯƠNG BỔ SUNG ======================
+# Chủ tịch chốt 21/10/2026. Bảng bổ sung đi CÙNG CHUỖI với bảng chính. Hàng rào thật nằm trong
+# services/giu_luong.py; require_roles ở đây chỉ là lớp ngoài, cùng bộ vai với cửa của bảng chính.
+def _gl_loi(ex: Exception):
+    if isinstance(ex, PermissionError):
+        raise HTTPException(403, str(ex))
+    raise HTTPException(422, str(ex))
+
+
+@router.get("/payroll-runs/{period}/bo-sung")
+def bo_sung_ds(period: str, u: User = Depends(bang_luong), db: Session = Depends(get_db)):
+    from app.services import giu_luong as GL
+    run = db.execute(select(PayrollRun).where(PayrollRun.period == period)).scalars().first()
+    return {"period": period, "giu_lai": (run.giu_lai or {}) if run else {},
+            "phong_lap_duoc": GL.phong_lap_duoc(db, run) if run is not None and run.status in H.DA_KY else [],
+            "bang": [GL.ra(b) for b in GL.danh_sach(db, period)], "trang_thai": GL.TRANG_THAI_BS}
+
+
+@router.post("/payroll-runs/{period}/bo-sung", status_code=201)
+def bo_sung_lap(period: str, u: User = Depends(require_roles("hcns")), db: Session = Depends(get_db)):
+    from app.services import giu_luong as GL
+    try:
+        b = GL.lap(db, u, period)
+    except (GL.LoiGiuLuong, PermissionError, ValueError) as ex:
+        _gl_loi(ex)
+    return {"message": f"Đã lập bảng bổ sung số {b.so} kỳ {period} – {len(b.rows)} người, chờ kiểm cơ sở",
+            "bang": GL.ra(b)}
+
+
+@router.post("/payroll-runs/{period}/bo-sung/{so}/kiem-co-so")
+def bo_sung_kiem(period: str, so: int, u: User = Depends(require_roles("hcns", "cntt")),
+                 db: Session = Depends(get_db)):
+    from app.services import giu_luong as GL
+    try:
+        kq = GL.chay_kiem(db, u, GL.lay(db, period, so))
+    except GL.LoiGiuLuong as ex:
+        _gl_loi(ex)
+    return {"period": period, "so": so, **kq,
+            "message": "Đủ điều kiện trình" if kq["dat"] else "Còn điều kiện chặn – chưa trình được"}
+
+
+@router.post("/payroll-runs/{period}/bo-sung/{so}/advance")
+def bo_sung_tien(period: str, so: int, u: User = Depends(require_roles("hcns", "tgd", "chutich")),
+                 db: Session = Depends(get_db)):
+    from app.services import giu_luong as GL
+    try:
+        b = GL.lay(db, period, so)
+        msg = GL.tien(db, u, b)
+    except (GL.LoiGiuLuong, PermissionError) as ex:
+        _gl_loi(ex)
+    return {"message": msg, "bang": GL.ra(b)}
 
 
 # ====================== ĐỢT A2 · KẾ TOÁN CHI – UNC – ĐỐI CHIẾU ======================
@@ -2879,7 +2950,7 @@ def chi_danh_sach(period: str, u: User = Depends(cong_xem_chi_luong),
 
 
 @router.post("/payroll-runs/{period}/chi", status_code=201)
-def chi_mo_lan(period: str, u: User = Depends(require_roles(*CHI_LUONG_ROLES)),
+def chi_mo_lan(period: str, bo_sung: int = 0, u: User = Depends(require_roles(*CHI_LUONG_ROLES)),
                db: Session = Depends(get_db)):
     """Mở một lần chi mới cho kỳ. Gắn vào BẢN KHÓA đang hiệu lực, không gắn vào kỳ.
 
@@ -2889,14 +2960,27 @@ def chi_mo_lan(period: str, u: User = Depends(require_roles(*CHI_LUONG_ROLES)),
     run = H.get_or_draft(db, period)
     if run.status not in H.DA_KY:
         raise HTTPException(422, f"Kỳ {period} chưa được ký (đang ở '{run.status}') – chưa chi được")
-    b = _ban_da_ky(db, period)
+    if bo_sung:
+        # CN-2: lần chi cho bảng bổ sung gắn vào BẢN KHOÁ CỦA BẢNG ẤY, không gắn vào bảng chính —
+        # đối chiếu UNC với đúng danh sách người được trả trong lần ấy.
+        from app.models.luong_khoa import BangLuongKhoa
+        from app.services import giu_luong as GL
+        try:
+            bs = GL.lay(db, period, bo_sung)
+        except GL.LoiGiuLuong as ex:
+            raise HTTPException(404, str(ex))
+        if bs.status != GL.DA_KY_BS or not bs.ban_khoa_id:
+            raise HTTPException(422, f"Bảng bổ sung số {bo_sung} chưa được ký – chưa chi được")
+        b = db.get(BangLuongKhoa, bs.ban_khoa_id)
+    else:
+        b = _ban_da_ky(db, period)
     cu = db.execute(select(ChiKyLuong).where(ChiKyLuong.period == period)
                     .order_by(ChiKyLuong.lan.desc())).scalars().first()
     c = ChiKyLuong(period=period, ban_khoa_id=b.id, lan=(cu.lan + 1) if cu else 1,
                    chi_boi=u.username, chi_vai=u.role)
     db.add(c)
     R.audit(db, u.username, u.role, "mo_lan_chi_luong", f"payroll:{period}",
-            after={"lan": c.lan, "ban_khoa_id": b.id})
+            after={"lan": c.lan, "ban_khoa_id": b.id, "bo_sung": bo_sung or None})
     db.commit()
     return {"message": f"Đã mở lần chi {c.lan} cho kỳ {period} – tải Ủy nhiệm chi lên để máy đọc",
             "chi": _chi_out(c)}

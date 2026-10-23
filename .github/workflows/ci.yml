@@ -67,11 +67,67 @@ on:
 # Nhóm theo SỐ PR chứ không theo `github.ref`: cùng một PR đẩy tiếp thì huỷ lượt cũ, còn hai PR
 # khác nhau thì không đụng nhau. `github.ref` trên sự kiện pull_request là `refs/pull/N/merge` nên
 # cũng tách được, nhưng để số PR lên trước thì đọc log biết ngay đang nói về PR nào.
+#
+# NHƯNG KHÔNG HUỶ TRÊN MAIN — Chủ tịch chốt 21/10/2026.
+#
+# Chỗ hở ghi ở việc `hang-rao-gop` phía dưới từ 09/10 đã thành chuyện thật. Đo ngày 21/10: trong
+# TÁM lượt gần nhất trên main, NĂM lượt bị huỷ. Lượt bị huỷ không cho tín hiệu nào, nên main
+# không được đo — và đúng lúc ấy nó đang đỏ mà không ai biết: lượt #977 của PR #402 đỏ, lượt
+# #978 trên main bị huỷ, PR gộp, ba phép thử đỏ sống BỐN NGÀY qua bốn lần gộp nữa, tới lượt #983
+# chạy hết mới lộ ra. Sửa ở Đợt TC-72b (#418).
+#
+# Trên PR, huỷ là đúng: đẩy lần hai thì bản cũ không ai còn quan tâm. Trên main thì ngược hẳn —
+# mã đã vào kho, lượt chạy ấy là THỨ DUY NHẤT nói main còn xanh hay không, và huỷ nó là tự bịt
+# mắt để tiết kiệm vài phút. Giá phải trả: hai lần gộp sát nhau thì chạy cả hai, mỗi lượt ~55
+# phút. Chủ tịch chốt trả giá ấy.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # ĐỢT DỌN-8 22/10/2026 — LẦN CHẠY NÀY CÓ CHỈ CHẠM SỔ GIỮ CHỖ KHÔNG?
+  #
+  # Chỉ sinh ra để trả lời một câu, cho một việc: PR do robot đóng sổ mở ra chỉ đổi ĐÚNG MỘT Ô
+  # CHỮ trong `docs/dang-lam/`, mà nếu nó kéo cả `backend` ~55 phút thì nhịp gộp ~10 lần/ngày
+  # thành ~9 giờ máy mỗi ngày. Trần chi tiêu Actions đã chạm đáy ba lần: 19/9, 17/10, 21/10.
+  #
+  # TRƯỢT VỀ PHÍA CHẠY ĐỦ. Mọi chỗ còn ngờ — không đọc được danh sách tệp, diff rỗng, chạy trên
+  # push — đều trả 0, tức là CHẠY ĐỦ BỘ. Bỏ qua nhầm thì mất một lớp canh mà không ai biết; chạy
+  # thừa thì chỉ tốn máy, và tốn máy là thứ đo được.
+  loc:
+    runs-on: ubuntu-latest
+    outputs:
+      chi_so: ${{ steps.do.outputs.chi_so }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: do
+        run: |
+          set -eu
+          # TRÊN MAIN THÌ KHÔNG BAO GIỜ BỎ QUA. Quyết định 16/10 (bộ đủ chạy cả trên push, để
+          # bắt chuyện hai PR xanh riêng lẻ gộp lại thành đỏ) KHÔNG bị đợt này đụng tới.
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "chay tren main — khong bao gio bo qua"
+            echo "chi_so=0" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          nen="${{ github.base_ref }}"
+          [ -n "$nen" ] || nen="main"
+          git fetch --no-tags origin "$nen" >/dev/null 2>&1 || true
+          doi="$(git diff --name-only "origin/$nen...HEAD" || true)"
+          if [ -z "$doi" ]; then
+            echo "khong doc duoc danh sach tep doi — chay du bo cho chac"
+            echo "chi_so=0" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "--- $(printf '%s\n' "$doi" | wc -l) tep doi ---"
+          ngoai="$(printf '%s\n' "$doi" | grep -v '^docs/dang-lam/' || true)"
+          if [ -z "$ngoai" ]; then
+            echo "CHI CHAM SO GIU CHO — bo qua bo du; cua hep hang-rao-gop van chay"
+            echo "chi_so=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "co tep ngoai so:"; printf '%s\n' "$ngoai"
+            echo "chi_so=0" >> "$GITHUB_OUTPUT"
+          fi
+
   # ĐỦ BỘ — trên PR (cửa CHẶN) VÀ trên main (cửa ĐO).
   #
   # CHẠY CẢ TRÊN PUSH TỪ 16/10/2026 — Chủ tịch quyết, sau một ngày mất vì đúng chỗ hở này.
@@ -91,6 +147,8 @@ jobs:
   # `docker` GIỮ NGUYÊN điều kiện: nó `needs: [backend, web]` nên trên main nó sẽ chờ thêm 45
   # phút chỉ để dựng một ảnh không ai dùng tới. Hai việc khác nhau, không gộp một quyết định.
   backend:
+    needs: loc
+    if: needs.loc.outputs.chi_so != '1'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: backend } }
     steps:
@@ -157,10 +215,10 @@ jobs:
   # to GitHub Team organization account". Chừng nào chưa chuyển, kỷ luật chờ phép kiểm chạy xong
   # vẫn nằm ở NGƯỜI BẤM GỘP, không ở máy.
   #
-  # MỘT CHỖ HỞ CÒN LẠI, của khối `concurrency` phía trên chứ không của việc này: hai lần gộp sát
-  # nhau vào main dùng chung một nhóm (`github.ref`), nên lượt trước bị HUỶ. Lượt bị huỷ không
-  # cho tín hiệu nào. Chỗ ấy đã đúng như thế với `hang-rao-gop` từ 09/10; sửa nó là một quyết
-  # định riêng về tiền Actions, không gộp vào đây.
+  # CHỖ HỞ ẤY ĐÃ ĐÓNG ngày 22/10/2026: `cancel-in-progress` nay chỉ bật trên sự kiện
+  # `pull_request`, nên hai lần gộp sát nhau vào main đều chạy hết và đều cho tín hiệu. Lý do và
+  # số đo ghi ở khối `concurrency` đầu tệp. Ghi lại ở đây vì đây là nơi chỗ hở được phát hiện
+  # trước tiên, và người đọc đoạn này cần biết nó không còn nữa.
   #
   # KHÔNG khai `if:` ở việc này — `test_ci8` đỏ nếu ai khai lại.
   web:

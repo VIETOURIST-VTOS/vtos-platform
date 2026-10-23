@@ -498,11 +498,20 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
           <div className="v14-o-nhan">Xe đang đi <span className="muted">· hôm nay</span></div>
           {xeCoNguon ? (
             <>
-              <div className="v14-o-so" style={SO_NHO}>{xe!.dang_chay ?? 0}</div>
+              {/* `?? 0` GỠ 22/10/2026 (ca đỏ test_tc23). Khối này ĐÃ có cửa «chưa có nguồn» ở
+                  tầng trên — `xeCoNguon` — nhưng BÊN TRONG nhánh có nguồn thì `dang_chay` vẫn có
+                  thể rỗng: hợp đồng dữ liệu đầu tệp khai `number | null`. Lúc ấy in 0 là nói với
+                  người đọc «đã đếm và bằng không», trong khi sự thật là nguồn có mà số chưa về.
+                  Hai chuyện khác nhau, và màn hình không được trộn chúng. */}
+              <div className="v14-o-so" style={SO_NHO}>
+                {xe!.dang_chay === null || xe!.dang_chay === undefined
+                  ? <span className="muted" style={{ fontSize: "calc(13/14*1rem)" }}>chưa có số</span>
+                  : xe!.dang_chay}
+              </div>
               <div className="muted" style={{ fontSize: "calc(11/14*1rem)", marginTop: 2 }}>
                 {xe!.o_bai} xe nằm bãi trên {xe!.dieu_duoc} xe điều được
-                {(xe!.bat_thuong ?? 0) > 0 && <> · <b className="tag red">{xe!.bat_thuong} xe bất thường</b></>}
-                {(xe!.lech ?? 0) > 0 && <> · <b className="tag red">{xe!.lech} lệnh trỏ xe không điều được</b></>}
+                {!!xe!.bat_thuong && <> · <b className="tag red">{xe!.bat_thuong} xe bất thường</b></>}
+                {!!xe!.lech && <> · <b className="tag red">{xe!.lech} lệnh trỏ xe không điều được</b></>}
               </div>
               <Link className="the-cua" href="/doi-xe" style={{ marginTop: 4, display: "inline-block" }}>
                 Xem chi tiết →</Link>

@@ -71,8 +71,9 @@ def _khoi_luoi(ma: str) -> str:
 def test_ton_dong_khong_con_nam_trong_luoi_ba_khoi_tien():
     """Chỗ hỏng số 1."""
     ma = _ma_tsx(_doc(TRANG))
-    assert "KhoiTonDongMuc" in ma, "Khối Tồn đọng phải còn trên màn hình, chỉ là ở hàng riêng."
-    assert "KhoiTonDongMuc" not in _khoi_luoi(ma), (
+    # SỬA 22/10/2026 (TQ-1): Tồn đọng nay là một ô của mục `<KhoiVanHanh` — vẫn hàng riêng, ngoài lưới.
+    assert "<KhoiVanHanh" in ma, "Khối Tồn đọng phải còn trên màn hình, chỉ là ở hàng riêng."
+    assert "KhoiVanHanh" not in _khoi_luoi(ma), (
         "Bốn khối trong lưới ba cột thì khối thứ tư tụt xuống một mình và Phải thu / Phải trả lại "
         "lệch hàng. Tồn đọng là loại khác — ba dòng theo mức độ, không có trục nào để so với hai "
         "bảng hạn — nên nó đứng hàng riêng."

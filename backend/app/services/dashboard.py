@@ -156,7 +156,12 @@ def build(db: Session, u: User) -> dict:
     if role == "tgd":
         r = db.execute(select(PayrollRun).where(PayrollRun.status == "hcns_lap")).scalars().first()
         if r: ap.append({"label": f"Bảng lương {r.period} chờ TGĐ ký lô", "href": "/hr"})
-    if role == "ketoan":
+    # ĐỢT R4b-2c — `ketoan_truong` ĐƯỢC THÊM VÀO ĐÚNG MỘT CHỖ: khối này.
+    #
+    # Vai ấy đã có `books.READ` (Chủ tịch ký 23/10/2026) và đã có màn hình `/hoa-don-thieu`
+    # qua phép suy `ketoan` → `ketoan_truong` của Đợt LG1. Đây chỉ là CHỖ ĐỌC con số, không
+    # mở thêm cửa nào. Các dòng khác trong khối vẫn trỏ tới màn hình mà vai ấy vốn đã mở được.
+    if role in ("ketoan", "ketoan_truong"):
         n = db.execute(select(func.count()).select_from(BankTransaction).where(BankTransaction.match_status == "cho_ke_toan")).scalar()
         if n: ap.append({"label": f"{n} giao dịch SePay chờ khớp", "href": "/collections"})
         n = db.execute(select(func.count()).select_from(Receipt).where(Receipt.status == "tu_dong")).scalar()
@@ -169,6 +174,22 @@ def build(db: Session, u: User) -> dict:
         if n: ap.append({"label": f"{n} quyết toán tour chờ Kế toán xác nhận (3 ngày)", "href": "/tours"})
         r = db.execute(select(PayrollRun).where(PayrollRun.status == "nhap")).scalars().first()
         if r: ap.append({"label": f"Bảng lương {r.period} chờ xác nhận cơ sở", "href": "/hr"})
+        # ĐỢT R4b-2c 23/10/2026 — HÓA ĐƠN CÒN THIẾU.
+        #
+        # Dòng này KHÔNG phải một việc chờ ai bấm duyệt — nó là một đống việc đang tồn. Đặt ở đây
+        # vì bàn làm việc là chỗ duy nhất người ta mở mỗi ngày; để nó chỉ nằm trong màn hình riêng
+        # thì ai không mở màn hình ấy sẽ không bao giờ biết còn bao nhiêu hóa đơn chưa về.
+        #
+        # KHÔNG CHẶN KHÓA KỲ — Chủ tịch chốt 22/10/2026. Thiếu hóa đơn chỉ ĐẾM.
+        #
+        # Gọi `dem_hoa_don_thieu` chứ KHÔNG gọi `hoa_don_thieu`: hàm kia dựng cả danh sách và đọc
+        # tài khoản đối ứng, quá đắt cho một ô mở mỗi lần vào trang chủ.
+        from app.services import books as _BK
+        _hd = _BK.dem_hoa_don_thieu(db, date(today.year, today.month, 1), today)
+        if _hd["chua_nhan"]:
+            ap.append({"label": f"{_hd['chua_nhan']} dòng chưa nhận được hóa đơn "
+                                 f"(thuế GTGT {_fmt(_hd['thue'])} đ) — KHÔNG CHẶN KHÓA KỲ",
+                       "href": "/hoa-don-thieu"})
     if role == "hcns":
         r = db.execute(select(PayrollRun).where(PayrollRun.status == "kt_xac_nhan")).scalars().first()
         if r: ap.append({"label": f"Bảng lương {r.period} chờ HCNS lập", "href": "/hr"})
@@ -318,6 +339,16 @@ def build(db: Session, u: User) -> dict:
         # lần — xem chú thích TC-46 ở đó.
         from app.services import dem_tour as DT
         sec["tour_giai_doan"] = DT.theo_giai_doan(db, hom_nay=today)
+        # TQ-1 (Chủ tịch chốt v1.1, 22/10/2026): số ĐẦY ĐỦ cho mục «Vận hành & công việc».
+        # Bọc try riêng: một ô hỏng không kéo sập cả bảng điều hành.
+        try:
+            from app.services import tong_quan_tour as TQT
+            sec["qua_han_qt_tong"] = TQT.qua_han_quyet_toan(db, today, trang=1, co=1)["tong"]
+            sec["cho_quyet_toan"] = TQT.cho_quyet_toan(db, today)
+            sec["thieu_lich"] = TQT.thieu_lich(db, today)
+        except Exception as ex:
+            sec["qua_han_qt_tong"] = sec["cho_quyet_toan"] = sec["thieu_lich"] = None
+            R.audit(db, "robot", "robot", "tq1_tour_loi", "dashboard", after={"ly_do": str(ex)[:200]})
         # XE HÔM NAY — cùng MỘT luật với tour, áp cho xe: lịch hôm nay trùng lịch điều xe thì xe ấy
         # đang chạy, còn lại là nằm bãi (anh Tuấn 16/9/2026). Nguồn là LỆNH ĐIỀU XE, không phải
         # nhật trình chuyến — xem chú thích đầu services/xe_hom_nay.py để biết vì sao khác nhau.
@@ -437,6 +468,15 @@ def build(db: Session, u: User) -> dict:
         sec["ton_dong_theo_muc"] = None
         R.audit(db, "robot", "robot", "ton_dong_muc_loi", "dashboard",
                 after={"ly_do": str(ex)[:200]})
+    # TQ-1: VIỆC đang mở — lọc theo quyền người xem TRƯỚC, gộp theo hồ sơ SAU (tong_quan_viec).
+    # `ton_dong_theo_muc` ở trên đếm LƯỢT CẢNH BÁO và không lọc theo quyền; giữ tới khi màn hình
+    # chuyển hẳn sang khối mới rồi bỏ.
+    try:
+        from app.services import tong_quan_viec as TQV
+        sec["viec_van_hanh"] = TQV.tong(db, u)
+    except Exception as ex:
+        sec["viec_van_hanh"] = None
+        R.audit(db, "robot", "robot", "tq1_viec_loi", "dashboard", after={"ly_do": str(ex)[:200]})
 
     # ── TC-33 · khối 08 Tiến độ báo cáo & kết luận chỉ đạo ───────────────────────────────────
     # Cũng không thêm bảng nào: danh sách phòng phải nộp đã khai ở `bao_cao_phong.PHONG`, bản đã

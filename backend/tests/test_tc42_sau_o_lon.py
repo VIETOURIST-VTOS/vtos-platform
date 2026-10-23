@@ -263,8 +263,10 @@ def test_khong_co_viec_nao_thi_ba_muc_deu_bang_khong(db):
 # Đổi CÁCH BÀY, không đổi danh sách — nên phép thử vẫn canh đúng điều cũ: đủ mặt và đúng thứ tự.
 # SỬA 17/9/2026 (TC-57): Dòng tiền xuống SAU hai khối công nợ và nằm ngang hết bề ngang — anh Tuấn
 # chốt. Danh sách vẫn đủ sáu con số, chỉ đổi thứ tự; xem THU_TU_BAN_VE ở test_tc31 cho cả hai vế.
+# SỬA 22/10/2026 (TQ-1): ô Tồn đọng nay nằm trong mục `<KhoiVanHanh` («Vận hành & công việc»),
+# cùng chỗ cũ — anh Tuấn duyệt bản vẽ Tổng quan Vận hành v1.1. Vẫn sáu con số, đúng thứ tự.
 SAU_O_KHOI = ["<KhoiKetQuaKinhDoanh",
-              "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiDongTien", "<KhoiTonDongMuc"]
+              "<KhoiPhaiThu", "<KhoiPhaiTra", "<KhoiDongTien", "<KhoiVanHanh"]
 
 
 def test_du_sau_o_lon_va_dung_thu_tu_anh_Tuan_ke():
@@ -288,11 +290,17 @@ def test_ba_khoi_chuyen_len_khong_de_lai_ban_sao_o_duoi():
 
 
 def test_the_nho_khong_mang_bieu_do():
-    """SỬA 16/9/2026 (TC-46): năm thẻ thành SÁU theo bản vẽ v3.0. Luật thì y nguyên, và nó nằm ở
-    phép soát thứ hai: hàng thẻ là những con số để LIẾC, không thẻ nào được mang biểu đồ."""
-    ma = _ma(_doc(TRANG))
-    khoi = ma[ma.index("const the: The[] = ["): ma.index("];", ma.index("const the: The[] = ["))]
-    assert len(re.findall(r'nhan: "', khoi)) == 6
+    """SỬA 22/10/2026 (TC-72): sáu thẻ còn NĂM — «Xe đang đi» xuống khối Hiệu quả đội xe. Luật
+    thì y nguyên, và nó nằm ở phép soát thứ hai: hàng thẻ là những con số để LIẾC, không thẻ nào
+    được mang biểu đồ. Chỗ MỚI của con số ấy canh ở
+    `test_tc18_man_hinh_01_v12.test_xe_dang_di_nam_o_khoi_hieu_qua_doi_xe`.
+
+    SỬA 22/10/2026 (TQ-1): hàng thẻ gộp vào mục `<KhoiVanHanh` (components/KhoiVanHanh.tsx) — đếm
+    «sáu nhãn trong mảng `the`» không còn chỗ để đếm (danh sách ô nay canh ở test_tc18). Luật y
+    nguyên: không ô nào trong mục ấy mang biểu đồ."""
+    khoi = _ma(_doc(GOC / "web" / "components" / "KhoiVanHanh.tsx"))
+    assert "const the: The[]" not in _ma(_doc(TRANG))
+    assert "BieuDo" not in khoi
     assert "xu_huong" not in khoi, (
         "Hàng thẻ nhỏ là con số để LIẾC. Thêm hình vào chúng là kéo mắt khỏi sáu ô lớn phía trên — "
         "đúng điều anh Tuấn chốt khi chọn 'thẻ số nhỏ, một hàng, không biểu đồ'."
