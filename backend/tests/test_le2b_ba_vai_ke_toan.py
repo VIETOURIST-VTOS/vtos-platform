@@ -103,6 +103,12 @@ CHO_DA_KHAI_BA_VAI = [
     # `test_hs1_phan_quyen_ho_so.py::test_hs1_12_ba_vai_ke_toan_khong_nam_trong_bang_quyen`
     # đòi ba vai này không được xuất hiện trong bất kỳ bảng `quyen` nào của 17 nhóm trường.
     "services/ho_so_nhan_vien.py: ketoan_truong",
+    # ĐỢT R4b-2c — CHỦ TỊCH KÝ 23/10/2026: thẻ “Hóa đơn còn thiếu” hiện trên bàn làm việc của
+    # Kế toán trưởng. KHÔNG phải một cửa mới — `dashboard.py` không mở cửa nào, nó chỉ chọn dòng
+    # nào bày ra. Vai ấy đã có `books.READ` (ký 23/10) và đã thấy màn hình qua phép suy LG1.
+    # `test_r4b2c_5` đi từng đường dẫn trong khối ấy và đòi vai ấy vốn đã mở được màn hình đó —
+    # nên dòng này mở ra một CHỖ ĐỌC con số, không mở ra quyền.
+    "services/dashboard.py: ketoan_truong",
     "services/ho_so_nhan_vien.py: ketoan_tt",
     "services/ho_so_nhan_vien.py: thu_quy",
     # ── Đợt E12, 13/10/2026 ───────────────────────────────────────────────────────────────

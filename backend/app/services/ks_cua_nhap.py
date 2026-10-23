@@ -316,6 +316,11 @@ CUA_TAY = (
 # Máy sinh – bảng KHÔNG cần cửa nhập, kèm lý do. Xem ghi chú đầu tệp: không viết được lý do nghĩa là
 # chưa chắc nó máy sinh.
 MAY_SINH = {
+    # CN-2 (21/10/2026) · BẢNG LƯƠNG BỔ SUNG. Máy lập từ đúng bộ tính lương (`hr.compute_draft`) cho
+    # những người bị giữ lúc ký bảng chính; HCNS chỉ bấm «Lập», rồi kiểm và trình như bảng chính.
+    # KHÔNG có cửa gõ dòng lương là TÍNH CHẤT AN TOÀN: gõ tay được vào bảng này thì trả được một
+    # khoản lương không qua bộ tính nào, mà bảng chính cũng không có cửa ấy.
+    "bang_luong_bo_sung": "Bảng lương bổ sung do máy lập từ bộ tính lương cho người bị giữ lương (CN-2) – HCNS bấm lập, kiểm, trình; không có cửa gõ dòng lương, cùng luật với bảng chính.",
     "su_kien_thu_nhap": "Sổ ghi khoản thu nhập đã KÝ, do services/luong_khoa.khoa ghi đúng lúc có chữ ký. Không có cửa là TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: gõ tay được vào sổ này thì xoá được dấu vết một lần đã trả, mà đó đúng là thứ nó sinh ra để giữ.",
     "buoc_da_lam": "Dấu chân tách bạch trách nhiệm — hệ thống tự ghi đúng lúc một bước nghiệp vụ hoàn thành. KHÔNG có cửa nhập tay là TÍNH CHẤT AN TOÀN, không phải việc còn thiếu: gõ tay được vào sổ này thì dựng được một dấu chân cho một bước chưa ai làm, mà đó đúng là thứ nó sinh ra để chống.",
     "ai_runs": "Nhật ký robot chạy – hệ thống tự ghi, không ai nhập tay.",

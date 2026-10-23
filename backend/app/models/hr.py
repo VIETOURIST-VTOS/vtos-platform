@@ -343,6 +343,9 @@ class PayrollRun(Base):
     tra_trang_thai: Mapped[str] = mapped_column(String(16), default="")   # dang_chi/da_tra_du/loi_chi
     tra_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     inputs: Mapped[dict] = mapped_column(JSON, default=dict)     # đầu vào do HCNS nhập: công chuẩn, công thực tế theo mã NV
+    # CN-2 (21/10/2026): phòng bị GIỮ LƯƠNG lúc ký bảng chính vì công chưa được duyệt.
+    # {phong: {"ma": [mã NV], "ly_do": "...", "luc": "...", "bo_sung_so": None|số}}. Rỗng = không giữ ai.
+    giu_lai: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
