@@ -209,6 +209,32 @@ def lam_moi_cache_nen(db: Session) -> int:
     return n
 
 
+@router.get("/dashboard/viec", tags=["dashboard"])
+def dashboard_viec(muc: str = "", trang: int = 1, co: int = 50,
+                   u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """TQ-1 · Danh sách VIỆC sau khi lọc quyền và gộp theo hồ sơ — cùng phép tính với ô.
+
+    Tính lại ngay lúc mở (Chủ tịch chốt TT02): kèm `tong` và `luc` mới để màn hình so với số trên
+    ô và báo «số đã cập nhật» nếu khác. Ai cũng gọi được: phép lọc nằm trong truy vấn, mỗi người
+    chỉ ra đúng phần cảnh báo gửi tới vai mình.
+    """
+    from app.services import tong_quan_viec as TQV
+    return TQV.danh_sach(db, u, muc=muc, trang=trang, co=co)
+
+
+@router.get("/dashboard/qua-han-quyet-toan", tags=["dashboard"])
+def dashboard_qua_han_qt(trang: int = 1, co: int = 50,
+                         u: User = Depends(require_roles("tp_dh", "nv_dh", "chutich", "tgd",
+                                                         mo_ta="tour quá hạn quyết toán")),
+                         db: Session = Depends(get_db)):
+    """TQ-1 · Tour quá hạn quyết toán, ĐẾM ĐỦ và chia trang. Cùng bộ vai với khối tour của
+    bảng điều hành (dashboard.build) — ai thấy ô thì mở được danh sách, không rộng hơn."""
+    from app.services import tong_quan_tour as TQT
+    from datetime import datetime as _dt
+    kq = TQT.qua_han_quyet_toan(db, date.today(), trang=trang, co=co)
+    return {**kq, "luc": _dt.now().isoformat(timespec="seconds")}
+
+
 @router.get("/dashboard", tags=["dashboard"])
 def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Session = Depends(get_db)):
     import time
@@ -860,7 +886,7 @@ def list_alerts(trang_thai: str = "", nguon: str = "", cua_toi: bool = False,
     Trần phải đặt SAU bộ lọc vai trò, không phải trước: cắt trước khi lọc thì người chỉ thấy cảnh
     báo của mình có thể nhận về một trang rỗng trong khi việc của họ nằm ở dòng thứ 400.
     """
-    from sqlalchemy import func as _f, or_ as _or
+    from sqlalchemy import func as _f
     qs = select(Alert).order_by(Alert.resolved, desc(Alert.created_at))
     if trang_thai:
         qs = qs.where(Alert.trang_thai.in_(trang_thai.split(",")))
@@ -892,12 +918,10 @@ def list_alerts(trang_thai: str = "", nguon: str = "", cua_toi: bool = False,
     # tìm chuỗi con thì vai "kt" trúng luôn mọi dòng gửi cho "ketoan", tức nới quyền mà không ai
     # thấy. Bốn nhánh dưới đây phủ đúng bốn vị trí một mẩu có thể đứng trong chuỗi: một mình, đầu,
     # cuối, giữa. Phép thử test_tc66 canh rằng nó cho ra ĐÚNG tập mà luật Python cũ cho ra.
-    if u.role not in AC.BASE_VIEW + ("ketoan", "cntt"):
-        vai = u.role
-        qs = qs.where(_or(Alert.to_roles == vai,
-                          Alert.to_roles.like(f"{vai},%"),
-                          Alert.to_roles.like(f"%,{vai}"),
-                          Alert.to_roles.like(f"%,{vai},%")))
+    # TQ-1 (22/10/2026): luật này nay sống MỘT chỗ — `tong_quan_viec.loc_theo_vai` — để ô «Việc
+    # nghiêm trọng» trên màn hình Chủ tịch và danh sách này không bao giờ lọc khác nhau.
+    from app.services import tong_quan_viec as _TQV
+    qs = _TQV.loc_theo_vai(qs, u)
 
     tran = max(1, min(limit, 500))
     # Đếm bằng COUNT chứ không bằng len() của danh sách đã đọc: `tong` là con số nói "còn bao nhiêu

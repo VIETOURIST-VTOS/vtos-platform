@@ -77,6 +77,23 @@ def danh_sach_hdv(u: User = Depends(require_roles(*READ)), db: Session = Depends
                         "hội viên tổ chức xã hội – nghề nghiệp, hợp đồng cộng tác đã ký.")}
 
 
+@router.get("/dia-ban/do-nen")
+def do_nen_dia_ban(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """ĐỢT HDV-1 nhịp 1 — ĐO nền địa bàn. CHỈ ĐỌC, không sửa một dòng dữ liệu nào.
+
+    VÌ SAO CÓ CỬA NÀY, dù danh sách tệp của đợt không có nó. Nghiệm thu đòi "phép đo chạy trên
+    dữ liệu thật, in ra hai con số CÓ NGÀY". Máy làm việc không gọi được cơ sở dữ liệu thật, và
+    trình duyệt trên máy Chủ tịch chưa có phiên đăng nhập. Không có cửa thì con số thật không bao
+    giờ đo được — mà một phép đo không chạy trên dữ liệu thật thì chưa nói gì cả.
+
+    MỞ RIÊNG MỘT CỬA chứ không gắn vào `/health`: cửa ấy Render gọi 5 giây một lần và đã từng làm
+    sập máy chủ vì nặng (xem `routes.py:/health`). Cửa này quét bảng chuyến, nên nó phải đứng
+    riêng và chỉ chạy khi có người bấm.
+    """
+    from app.services import dia_ban_hdv as DBH
+    return DBH.do_nen(db)
+
+
 @router.get("/chuyen-can-hdv")
 def chuyen_can_hdv(so_ngay: int = 30, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     """Tour sắp khởi hành mà chưa có HDV nhận – việc phải làm của người điều phối, xếp theo ngày gần nhất.

@@ -30,7 +30,9 @@ NĂM CHỐT
   3. Mã phải là duy nhất trong các dòng `đang làm`. Sổ CÓ mã trùng (`qt1`, `dl` — đo 20/10), nên
      chốt này không phải phòng xa.
   4. Lần gộp không đụng tệp nào ngoài `docs/dang-lam/` thì bỏ qua: đó là nhánh dọn sổ, không phải
-     nhánh làm việc.
+     nhánh làm việc. HẸP LẠI ở đợt KS-16 (21/10/2026): một dòng mà MỌI tệp khai đều nằm trong sổ
+     thì việc của nó chính là quyển sổ, nên lần gộp ấy ĐƯỢC đóng đúng dòng ấy — và chỉ dòng ấy.
+     Không có khe này thì mọi vòng dọn sổ đều tự để lại rác của chính mình (đo trên lần gộp #413).
   5. Bỏ qua commit của chính việc này (làm ở tầng workflow).
 
 ĐÃ CHẠY THỬ trên 185 lần gộp thật của main: đóng đúng 94, trượt 88, ĐÓNG NHẦM 0.
@@ -95,13 +97,35 @@ def ma_cua_dong(dong: str) -> str:
     return dau
 
 
+def tep_khai(dong: str) -> list[str]:
+    """Các tệp dòng ấy khai ở cột `Tệp sẽ đụng`. Đọc không được thì trả rỗng.
+
+    Rỗng nghĩa là dòng KHÔNG BAO GIỜ được đóng bởi nhánh chỉ dọn sổ — trượt an toàn.
+    """
+    o = dong.split("|")
+    if len(o) < 6:
+        return []
+    return [t.strip() for t in o[3].split(",") if t.strip()]
+
+
+def chi_khai_tep_trong_so(tep: list[str]) -> bool:
+    """Dòng mà MỌI tệp khai đều nằm trong `docs/dang-lam/` — tức việc của nó CHÍNH LÀ quyển sổ."""
+    return bool(tep) and all(t.startswith(THU_MUC_SO + "/") for t in tep)
+
+
 def doc_dong_dang_lam(noi_dung: str) -> list[dict]:
     ra = []
     for i, l in enumerate(noi_dung.splitlines(), 1):
         if l.rstrip().endswith(DANG_LAM):
             ma = ma_cua_dong(l)
             if ma:
-                ra.append({"dong": i, "ma": ma, "ma_chuan": chuan(ma), "noi_dung": l})
+                ra.append({
+                    "dong": i,
+                    "ma": ma,
+                    "ma_chuan": chuan(ma),
+                    "tep": tep_khai(l),
+                    "noi_dung": l,
+                })
     return ra
 
 
@@ -110,14 +134,32 @@ def chon(dong_dang_lam: list[dict], nhanh: str, doi_tep: list[str]) -> tuple[lis
 
     Đây là toàn bộ phần quyết định. Nó KHÔNG đọc đĩa, KHÔNG gọi git — nên phép thử gọi thẳng được.
     """
-    ngoai_so = [t for t in doi_tep if not t.startswith(THU_MUC_SO + "/")]
-    if not ngoai_so:
-        return [], "lần gộp không đụng tệp nào ngoài sổ — nhánh dọn sổ, bỏ qua"
+    chi_don_so = not [t for t in doi_tep if not t.startswith(THU_MUC_SO + "/")]
 
     cs = cua_so(nhanh)
     khop = [d for d in dong_dang_lam if d["ma_chuan"] in cs]
     if not khop:
         return [], f"không mã nào của sổ khớp tên nhánh `{nhanh}`"
+
+    if chi_don_so:
+        # CHỐT 4 (hẹp lại ở đợt KS-16, 21/10/2026). Bản đầu BỎ QUA HẲN mọi lần gộp chỉ đụng sổ.
+        # Đo được trên lần gộp thật #413 ngày 21/10: vòng KS-15 là một vòng DỌN SỔ, nên chính
+        # dòng KS-15 không bao giờ được đóng — một vòng dọn sổ luôn tự để lại rác của mình.
+        #
+        # Chỗ chốt 4 bảo vệ là: nhánh chỉ sửa sổ thì KHÔNG được đóng dòng của việc THẬT, vì nó
+        # chưa làm gì cho việc ấy. Chỗ ấy giữ nguyên. Chỉ nới đúng một khe: dòng mà MỌI tệp khai
+        # đều nằm trong sổ thì việc của nó CHÍNH LÀ quyển sổ — lần gộp này đã làm xong việc ấy.
+        # Thêm một điều kiện nữa để khỏi đóng vu vơ: lần gộp phải thật sự đụng một tệp nó khai.
+        da_doi = set(doi_tep)
+        khop = [
+            d for d in khop
+            if chi_khai_tep_trong_so(d["tep"]) and any(t in da_doi for t in d["tep"])
+        ]
+        if not khop:
+            return [], (
+                "lần gộp không đụng tệp nào ngoài sổ — nhánh dọn sổ, và không dòng nào vừa khớp "
+                "tên nhánh vừa chỉ khai tệp trong sổ, bỏ qua"
+            )
 
     dem: dict[str, int] = {}
     for d in dong_dang_lam:
