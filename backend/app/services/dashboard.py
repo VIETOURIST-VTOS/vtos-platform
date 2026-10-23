@@ -156,7 +156,12 @@ def build(db: Session, u: User) -> dict:
     if role == "tgd":
         r = db.execute(select(PayrollRun).where(PayrollRun.status == "hcns_lap")).scalars().first()
         if r: ap.append({"label": f"Bảng lương {r.period} chờ TGĐ ký lô", "href": "/hr"})
-    if role == "ketoan":
+    # ĐỢT R4b-2c — `ketoan_truong` ĐƯỢC THÊM VÀO ĐÚNG MỘT CHỖ: khối này.
+    #
+    # Vai ấy đã có `books.READ` (Chủ tịch ký 23/10/2026) và đã có màn hình `/hoa-don-thieu`
+    # qua phép suy `ketoan` → `ketoan_truong` của Đợt LG1. Đây chỉ là CHỖ ĐỌC con số, không
+    # mở thêm cửa nào. Các dòng khác trong khối vẫn trỏ tới màn hình mà vai ấy vốn đã mở được.
+    if role in ("ketoan", "ketoan_truong"):
         n = db.execute(select(func.count()).select_from(BankTransaction).where(BankTransaction.match_status == "cho_ke_toan")).scalar()
         if n: ap.append({"label": f"{n} giao dịch SePay chờ khớp", "href": "/collections"})
         n = db.execute(select(func.count()).select_from(Receipt).where(Receipt.status == "tu_dong")).scalar()
@@ -169,6 +174,22 @@ def build(db: Session, u: User) -> dict:
         if n: ap.append({"label": f"{n} quyết toán tour chờ Kế toán xác nhận (3 ngày)", "href": "/tours"})
         r = db.execute(select(PayrollRun).where(PayrollRun.status == "nhap")).scalars().first()
         if r: ap.append({"label": f"Bảng lương {r.period} chờ xác nhận cơ sở", "href": "/hr"})
+        # ĐỢT R4b-2c 23/10/2026 — HÓA ĐƠN CÒN THIẾU.
+        #
+        # Dòng này KHÔNG phải một việc chờ ai bấm duyệt — nó là một đống việc đang tồn. Đặt ở đây
+        # vì bàn làm việc là chỗ duy nhất người ta mở mỗi ngày; để nó chỉ nằm trong màn hình riêng
+        # thì ai không mở màn hình ấy sẽ không bao giờ biết còn bao nhiêu hóa đơn chưa về.
+        #
+        # KHÔNG CHẶN KHÓA KỲ — Chủ tịch chốt 22/10/2026. Thiếu hóa đơn chỉ ĐẾM.
+        #
+        # Gọi `dem_hoa_don_thieu` chứ KHÔNG gọi `hoa_don_thieu`: hàm kia dựng cả danh sách và đọc
+        # tài khoản đối ứng, quá đắt cho một ô mở mỗi lần vào trang chủ.
+        from app.services import books as _BK
+        _hd = _BK.dem_hoa_don_thieu(db, date(today.year, today.month, 1), today)
+        if _hd["chua_nhan"]:
+            ap.append({"label": f"{_hd['chua_nhan']} dòng chưa nhận được hóa đơn "
+                                 f"(thuế GTGT {_fmt(_hd['thue'])} đ) — KHÔNG CHẶN KHÓA KỲ",
+                       "href": "/hoa-don-thieu"})
     if role == "hcns":
         r = db.execute(select(PayrollRun).where(PayrollRun.status == "kt_xac_nhan")).scalars().first()
         if r: ap.append({"label": f"Bảng lương {r.period} chờ HCNS lập", "href": "/hr"})
