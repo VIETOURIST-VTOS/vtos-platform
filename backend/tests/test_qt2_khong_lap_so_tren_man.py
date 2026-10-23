@@ -95,14 +95,31 @@ def test_qt2_4_moi_con_so_canh_bao_phai_noi_ro_muc_nao():
     rào sớm muộn bị tắt, nên thu hẹp lại thay vì nới cổng.
     """
     s = _bo_chu_thich(_doc(TSX))
-    NGUON_CO_MUC = ("m.canh_bao", "v.canh_bao", "v.chua_anh_xa")
+    # SỬA 24/10/2026 (soát chéo làn Phân quyền). Bản đầu nhận `v.canh_bao` vào «nguồn có mức»,
+    # mà `v.canh_bao` CHÍNH LÀ con số MỌI MỨC — nó không mang mức nào. Nghĩa là đặt lại
+    # `{so(v.canh_bao)} cảnh báo` ngay cạnh con số mức đỏ thì phép thử vẫn xanh, và đúng chuyện
+    # 4.854 đá 10.087 lặp lại y nguyên. Hàng rào canh TÊN BIẾN chứ không canh ĐIỀU NÓ HỨA.
+    CO_MUC = ("m.canh_bao", "v.chua_anh_xa")        # tự mang mức
+    MOI_MUC = ("v.canh_bao",)                       # tổng mọi mức — phải CÓ CHỮ NÓI RÕ LÀ TỔNG
+    CHU_TONG = ("việc đang mở", "mọi mức", "tổng")
     tim = list(re.finditer(r"\{so\(([^)]*)\)\}[^<{]{0,40}cảnh báo", s))
     assert tim, "không còn chỗ nào bày số cảnh báo — phép thử này mất việc, xem lại"
     for m in tim:
         bieu_thuc = m.group(1).strip()
-        assert any(n in bieu_thuc for n in NGUON_CO_MUC), (
-            f"con số cảnh báo `{bieu_thuc}` không đi từ nguồn có mức. "
+        if any(n in bieu_thuc for n in CO_MUC):
+            continue
+        assert any(n in bieu_thuc for n in MOI_MUC), (
+            f"con số cảnh báo `{bieu_thuc}` không đi từ nguồn nào biết mức. "
             f"Một con số cảnh báo không nói mức sẽ đá với con số cảnh báo của mức khác.")
+        # Chữ dẫn phải nằm TRONG CÙNG MỘT THẺ với con số: cắt từ dấu `<` gần nhất phía trước.
+        # Nhìn lui một số ký tự cố định thì vắt sang thẻ khác và nhặt nhầm chữ của dòng trên —
+        # chính bản đầu của lần vá này mắc thế, kho giả bắt được.
+        dau = s.rfind("<", 0, m.start())
+        trong_the = s[dau if dau >= 0 else 0:m.start()].lower()
+        assert any(c in trong_the for c in CHU_TONG), (
+            f"`{bieu_thuc}` là cảnh báo của MỌI MỨC mà trong cùng thẻ không có chữ nào nói đó là "
+            f"tổng (cần một trong {CHU_TONG}). Đặt nó cạnh một con số mức đỏ thì người đọc thấy "
+            f"hai con số cảnh báo đá nhau — đúng chuyện 4.854 với 10.087.")
 
 
 def test_qt2_5_luoi_cu_bien_mat_va_khach_tiem_nang_ve_hang_bon_o():
@@ -118,6 +135,14 @@ def test_qt2_6_khong_luat_css_nao_chet():
     """Xoá khối mà để luật CSS của nó nằm lại thì lần sau có người dựng lại khối từ chính luật ấy.
     «Mã chết vẫn là mã» — bài học đã ghi ở các vòng trước."""
     tsx, css = _doc(TSX), _doc(CSS)
+    # SỬA 24/10/2026 (soát chéo làn Phân quyền). Bản đầu so CHUỖI CON (`c not in tsx`), nên một
+    # lớp đã chết tên `vh-nhan` vẫn được coi là còn sống chỉ vì TSX có `vh-nhan2`. Nay cắt TSX
+    # thành TỪ rồi so cả từ.
+    # CHỖ CỐ Ý KHÔNG NỚI: biểu thức dưới vẫn dừng ở dấu chấm thứ hai, nên biến thể kiểu `h2b`
+    # trong `.vh-hang.h2b` không được rút ra. Nới ra sẽ kéo theo mọi lớp một chữ (`.v`, `.t`,
+    # `.qh`…) mà nhiều cái dùng ở tệp khác — hàng rào đỏ oan là hàng rào sớm muộn bị tắt.
+    # `qt2_5` đã canh riêng `h2b` bằng tên.
     lop = sorted(set(re.findall(r"\.(vh-[a-z0-9-]+|c-[a-z0-9-]+)", css)))
-    chet = [c for c in lop if c not in tsx]
+    dung = set(re.findall(r"[A-Za-z0-9_-]+", tsx))
+    chet = [c for c in lop if c not in dung]
     assert not chet, f"luật CSS không còn ai dùng: {chet}"
