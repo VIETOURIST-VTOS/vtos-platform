@@ -150,12 +150,51 @@ NHAT_KY_MAY_GHI = {
                       "không phải cửa còn thiếu."),
 }
 
-# Ba nhóm gộp lại mới là toàn bộ màn hình không có cửa ghi. Khoá tên riêng để không nhóm nào lặng
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# NHÓM THỨ TƯ — HỒ SƠ MỘT CON NGƯỜI (CUA-1, Chủ tịch chốt 22/10/2026)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# VÌ SAO TÁCH NHÓM, KHÔNG NÂNG TRẦN `CHI_XEM`. `CHI_XEM` còn đúng một chỗ trống, và dùng chỗ ấy
+# thì rẻ hôm nay. Nhưng `CHI_XEM` hỏi «con số này vào hệ thống bằng cửa nào», còn hai màn dưới
+# đây trả lời một câu khác: «số trên hồ sơ CỦA MỘT CON NGƯỜI vào hệ thống qua cửa nào của HCNS».
+# Ghi chú của nhóm `NHAT_KY_MAY_GHI` ngay trên đã nói ra cái giá: một danh sách trả lời hai câu
+# khác nhau thì không canh được câu nào.
+#
+# Và đây đúng khuôn hai nhóm trước: cả `BAN_LAM_VIEC` lẫn `NHAT_KY_MAY_GHI` đều ra đời bằng TÁCH
+# NHÓM khi `CHI_XEM` chật, không bằng nâng trần.
+#
+# TRẦN 2, VÀ CHỈ 2. Đợt này có đúng hai màn hồ sơ người. Màn thứ ba muốn vào đây thì phải trả lời
+# được câu hỏi của nhóm, và phải có một quyết định mới — không phải một dòng sửa trần.
+#
+# PHẦN TỬ THỨ BA của mỗi dòng là CỬA NHẬP THẬT: người dùng đi đâu để sửa con số ấy. Có một ca canh
+# nó không được để trống, vì một nhóm «chỉ xem» mà không chỉ được chỗ sửa thì nó chỉ là một lời
+# khai, không phải một câu trả lời.
+HO_SO_NGUOI = {
+    "/nhan-vien-phong-toi": (
+        "Nhân viên phòng tôi: lối vào hồ sơ cho người đứng đầu một phòng. Cửa đọc đã có từ đợt "
+        "HS-4 nhưng nút bấm duy nhất lại nằm trên màn quản trị Tài khoản mà trưởng phòng không "
+        "mở được — quyền có, lối vào không. Màn này KHÔNG có bảng cột riêng: cột dựng từ chính "
+        "những khoá máy chủ trả về sau khi cắt qua `cat_ho_so_theo_vai`.",
+        ("/employees/phong-toi",),
+        "Mọi trường nhập ở Nhân sự → Hồ sơ nhân viên; phòng ban và cấp trên gắn ở Tổ chức Kinh "
+        "doanh. Thêm cửa ghi ở đây là thêm một chỗ để hai bên ghi lệch nhau."),
+    "/ho-so-hdv/[id]": (
+        "Hồ sơ một hướng dẫn viên: thẻ hành nghề, điểm sau tour, nhận xét đã duyệt công khai. "
+        "Phần máy chủ xong từ đợt HD-14; đợt CUA-1 chỉ thêm màn hình.",
+        ("/huong-dan/ho-so",),
+        "Họ tên, mã, phòng ban và thẻ hành nghề nhập ở Nhân sự → Hồ sơ nhân viên. Điểm và nhận "
+        "xét KHÔNG ai gõ tay được: khách gửi sau tour, Phòng Hướng dẫn duyệt ở Duyệt công bố, và "
+        "điểm là số máy tính từ các lượt đã duyệt."),
+}
+
+# Bốn nhóm gộp lại mới là toàn bộ màn hình không có cửa ghi. Khoá tên riêng để không nhóm nào lặng
 # lẽ nuốt nhóm kia.
 KHONG_CUA_GHI = {**{k: v[:2] for k, v in BAN_LAM_VIEC.items()},
-                 **{k: v[:2] for k, v in NHAT_KY_MAY_GHI.items()}, **CHI_XEM}
-assert len(KHONG_CUA_GHI) == len(CHI_XEM) + len(BAN_LAM_VIEC) + len(NHAT_KY_MAY_GHI), \
-    "ba nhóm không được trùng tên màn hình"
+                 **{k: v[:2] for k, v in NHAT_KY_MAY_GHI.items()},
+                 **{k: v[:2] for k, v in HO_SO_NGUOI.items()}, **CHI_XEM}
+assert len(KHONG_CUA_GHI) == (len(CHI_XEM) + len(BAN_LAM_VIEC) + len(NHAT_KY_MAY_GHI)
+                              + len(HO_SO_NGUOI)), \
+    "bốn nhóm không được trùng tên màn hình"
 
 
 def _ma(src: str) -> str:
@@ -373,3 +412,32 @@ def test_nhat_ky_may_ghi_co_tran_rieng_va_phai_noi_vi_sao_khong_co_cua_ghi():
     assert not thieu, (
         f"Nhật ký máy ghi khai thiếu LÝ DO AN TOÀN: {thieu}. Phải nói rõ một cửa ghi ở đây sẽ phá "
         "cái gì — không nói được thì đây là cửa còn thiếu, không phải nhật ký.")
+
+
+def test_ho_so_nguoi_co_tran_rieng():
+    """Nhóm thứ tư có trần RIÊNG, và trần ấy là 2 (CUA-1, Chủ tịch chốt 22/10/2026).
+
+    Danh sách ngoại lệ không trần là cách một phép thử tự tắt mình — cùng lẽ với ba trần đã có.
+
+    Trần này đi XUỐNG từ con số của `CHI_XEM` chứ không thêm vào: đợt CUA-1 có đúng hai màn hồ sơ
+    người, và chỗ trống của `CHI_XEM` được giữ nguyên chứ không tiêu. Màn thứ ba muốn vào đây thì
+    phải có một QUYẾT ĐỊNH MỚI, không phải một dòng sửa số 2 thành 3 — đúng điều mà lời nhắn của
+    `test_danh_sach_chi_xem_co_tran` đã dặn và hai nhóm trước đã làm theo.
+    """
+    assert len(HO_SO_NGUOI) <= 2, (
+        f"Đang khai {len(HO_SO_NGUOI)} màn hồ sơ người. Trần là 2 (22/10/2026). Muốn thêm thì "
+        "trả lời trước: màn mới có thật trả lời câu «số trên hồ sơ này vào hệ thống qua cửa nào "
+        "của HCNS» không, và vì sao nó không thuộc một nhóm đã có?")
+
+
+def test_ho_so_nguoi_phai_chi_ra_cua_nhap_that():
+    """Phần tử thứ ba KHÔNG được để trống — đó là cả lý do nhóm này tồn tại.
+
+    Một màn khai «chỉ xem» mà không chỉ được chỗ sửa thì nó là một lời khai, không phải một câu
+    trả lời: người đọc thấy một con số sai vẫn không biết đi đâu. Cùng hình với ca canh phần tử
+    thứ ba của `NHAT_KY_MAY_GHI`.
+    """
+    thieu = [d for d, v in HO_SO_NGUOI.items() if len(v) < 3 or not (v[2] or "").strip()]
+    assert not thieu, (
+        f"Màn khai trong HO_SO_NGUOI mà không nói cửa nhập thật nằm ở đâu: {thieu}. "
+        "Viết ra chỗ người dùng phải đi để sửa con số ấy.")

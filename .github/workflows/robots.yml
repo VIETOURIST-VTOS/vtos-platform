@@ -77,6 +77,23 @@ jobs:
               echo "::error::✘ $ten thất bại"; FAIL=1
             fi
           }
+          # GỌI MỘT LẦN — KHÔNG THỬ LẠI. Dùng cho đường có tác động RA NGOÀI công ty.
+          #
+          # ĐO ĐƯỢC, không suy (Đợt KS-17, 21/10/2026). Dựng một máy chủ làm việc lâu hơn hạn rồi
+          # gọi bằng ĐÚNG dòng `call` ở trên: curl báo hỏng BỐN lần, nhưng máy chủ NHẬN BỐN yêu cầu
+          # và LÀM XONG CẢ BỐN. `--retry-all-errors` thử lại cả khi hết hạn chờ (mã 28), mà hết hạn
+          # chờ KHÔNG có nghĩa là việc chưa chạy — máy chủ vẫn chạy tiếp sau khi curl bỏ đi.
+          #
+          # Với hai đường dưới đây, mỗi lần chạy là một TIN NHẮN GỬI CHO KHÁCH. Tin đã bay đi thì
+          # không rút về được, nên thà bỏ một lượt 30 phút còn hơn gửi trùng.
+          goi_mot_lan() {
+            ten="$1"; shift
+            if curl -sS --fail-with-body "$@"; then
+              echo "✔ $ten"
+            else
+              echo "::error::✘ $ten thất bại — KHÔNG gọi lại, lượt sau sẽ làm nốt"; FAIL=1
+            fi
+          }
           case "$J" in
             vietrip)
               call "đồng bộ Vietrip" -m 120 -X POST "$API/robot/vietrip/sync" -H "$H" -H "$C" -d '{"settlements_days":10}'
@@ -92,8 +109,8 @@ jobs:
             sepay)
               call "kéo giao dịch SePay" -m 120 -X POST "$API/robot/sepay/pull" -H "$H" -H "$C" -d '{}'
               call "chốt sự vụ hết hạn" -m 60 -X POST "$API/robot/incidents/finalize" -H "$H"
-              call "soát hộp thư" -m 60 -X POST "$API/robot/inbox/check" -H "$H"
-              call "gửi Zalo còn treo" -m 60 -X POST "$API/robot/zalo/send-pending" -H "$H" ;;
+              goi_mot_lan "soát hộp thư" -m 170 -X POST "$API/robot/inbox/check" -H "$H"
+              goi_mot_lan "gửi Zalo còn treo" -m 170 -X POST "$API/robot/zalo/send-pending" -H "$H" ;;
             ngay|tuan|thang)
               # 30/9/2026: vòng quét Kiểm soát đi TRƯỚC báo cáo, và đi ở đây vì tới ngày này nó chưa
               # có lịch nào cả. Hậu quả đo được trên hệ thật: lần quét cuối là 10/9, nên suốt 19 ngày
