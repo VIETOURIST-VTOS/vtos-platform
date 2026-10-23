@@ -1208,7 +1208,10 @@ MENU_ROLES = {
     # Hai chiều sửa đều có: nới `books.READ` cho `robot_ks`, hoặc bỏ nó khỏi menu. Chọn chiều
     # TRỪ vì nó không cấp thêm quyền cho ai; nới một danh sách vai là một quyết định cấp quyền,
     # và đêm qua đợt R4b-2a đã sai đúng vì tự quyết một chuyện như thế.
-    "/hoa-don-thieu": FULL_VIEW + ("bks", "ketoan", "cntt"),
+    # BASE_VIEW chứ không gõ tay "bks": BASE_VIEW là ĐÚNG bốn vai xem được mọi màn hình
+    # (Chủ tịch · TGĐ · Ban Kiểm soát · robot Kiểm soát) mà `test_ma_tran_quyen` canh. Đợt
+    # R4b-2b gõ tay và thiếu mất `robot_ks` — main đỏ hai phép thử vì đúng chỗ ấy.
+    "/hoa-don-thieu": BASE_VIEW + ("ketoan", "cntt"),
     # Sổ tỷ giá. Kế toán giữ sổ; Điều hành nhập tỷ giá của chuyến mình chi; Visa nhập tỷ giá phí
     # lãnh sự. Rộng hơn thế thì một con số NHÂN vào tiền có quá nhiều người sửa được.
     "/ty-gia": BASE_VIEW + OPERATIONS + ("ketoan", "nv_visa", "cntt"),

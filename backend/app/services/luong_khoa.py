@@ -153,13 +153,15 @@ def kiem_co_so(db: Session, run: PayrollRun) -> list[dict]:
                        "thong_diep": f"{r.get('ma')} – thực nhận âm {tn:,.0f}; cần người xác nhận trước khi trình",
                        "bang_chung": {"ma_nv": r.get("ma"), "thuc_nhan": tn}})
 
-    # 6 · CN-1 (Chủ tịch chốt 21/10/2026): phòng có người trong bảng mà công kỳ này chưa được TGĐ
-    #     duyệt — hoặc đã duyệt rồi số bị sửa — thì CHẶN. Vòng CN-2 sẽ đổi thành giữ lương riêng
-    #     phòng ấy; tới lúc đó chặn cả kỳ, vì để lương đi khi công chưa duyệt là không đảo ngược được.
+    # 6 · CN-1 + CN-2 (Chủ tịch chốt 21/10/2026): phòng có người trong bảng mà công kỳ này chưa được
+    #     TGĐ duyệt thì lương phòng ấy SẼ BỊ GIỮ lúc ký — không chặn cả kỳ nữa. Cờ ở mức cảnh báo để
+    #     người ký biết trước ai sẽ bị giữ; quyết định giữ chụp đúng lúc ký (`giu_luong.chup_khi_ky`).
     from app.services import xac_nhan_cong as XNC
     for t in XNC.phong_chua_duyet(db, run.period, [r.get("ma") for r in run.rows or [] if r.get("ma")]):
-        co.append({"ma": "CONG_CHUA_DUYET", "muc": "chan",
-                   "thong_diep": f"Phòng {t['phong']} – công kỳ {run.period}: {t['trang_thai_ten']}",
+        co.append({"ma": "GIU_LUONG", "muc": "canh_bao",
+                   "thong_diep": (f"Phòng {t['phong']} – công kỳ {run.period}: {t['trang_thai_ten']}. "
+                                  "Nếu tới lúc ký vẫn chưa duyệt, lương phòng này sẽ bị giữ lại và trả "
+                                  "bằng bảng bổ sung"),
                    "bang_chung": {"phong": t["phong"], "trang_thai": t["trang_thai"]}})
 
     # 5 · Chống trùng thu nhập liên phòng, liên kỳ. Ba phép, xem services/thu_nhap_su_kien.py.
@@ -174,29 +176,39 @@ def co_chan(co: list[dict]) -> list[dict]:
 
 
 def ban_dang_hieu_luc(db: Session, period: str) -> BangLuongKhoa | None:
-    for b in db.execute(select(BangLuongKhoa).where(BangLuongKhoa.period == period)
+    """Bản khoá đang hiệu lực của BẢNG CHÍNH. Bản khoá của bảng bổ sung (CN-2) không bao giờ thay
+    bảng chính, nên không nằm trong phép tìm này."""
+    for b in db.execute(select(BangLuongKhoa).where(BangLuongKhoa.period == period,
+                                                    BangLuongKhoa.bo_sung_so.is_(None))
                         .order_by(BangLuongKhoa.ban_so.desc())).scalars():
         if b.bi_thay_boi is None:
             return b
     return None
 
 
-def khoa(db: Session, run: PayrollRun, u: User) -> BangLuongKhoa:
-    """Chụp bản khóa tại lúc ký. Gọi TRONG cùng giao dịch với việc đổi trạng thái, không gọi sau."""
+def khoa(db: Session, run: PayrollRun, u: User, rows: list[dict] | None = None,
+         totals: dict | None = None, bo_sung_so: int | None = None) -> BangLuongKhoa:
+    """Chụp bản khóa tại lúc ký. Gọi TRONG cùng giao dịch với việc đổi trạng thái, không gọi sau.
+
+    CN-2: `rows`/`totals` cho phép khoá MỘT PHẦN của kỳ — bảng chính bỏ phòng bị giữ, bảng bổ sung
+    chỉ có phòng ấy. Không truyền thì khoá nguyên `run.rows` như trước.
+    """
     cu = db.execute(select(BangLuongKhoa).where(BangLuongKhoa.period == run.period)
                     .order_by(BangLuongKhoa.ban_so.desc())).scalars().first()
     ban_so = (cu.ban_so + 1) if cu else 1
-    noi_dung = {"rows": run.rows or [], "totals": run.totals or {}}
+    rows = (run.rows or []) if rows is None else rows
+    noi_dung = {"rows": rows, "totals": (run.totals or {}) if totals is None else totals}
     quy_tac = chup_tham_so(db, run.period)
     b = BangLuongKhoa(period=run.period, ban_so=ban_so, noi_dung=noi_dung, quy_tac=quy_tac,
                       dau_van_tay=van_tay(noi_dung, quy_tac),
-                      khoa_boi=u.username, khoa_vai=u.role, khoa_luc=datetime.now())
+                      khoa_boi=u.username, khoa_vai=u.role, khoa_luc=datetime.now(),
+                      bo_sung_so=bo_sung_so)
     db.add(b)
     db.flush()
     # Ghi sổ sự kiện thu nhập TRONG CÙNG GIAO DỊCH với bản khóa. Tách ra một bước sau nghĩa là có
     # một khoảnh khắc kỳ đã ký mà sổ chưa ghi, và mọi lần hỏng đều rơi đúng vào khoảnh khắc ấy.
     from app.services import thu_nhap_su_kien as TN
-    TN.ghi_so(db, run.period, run.rows or [], ban_khoa_id=b.id)
+    TN.ghi_so(db, run.period, rows, ban_khoa_id=b.id)
     return b
 
 
@@ -211,7 +223,14 @@ def doi_chieu_voi_ban_khoa(db: Session, run: PayrollRun) -> dict:
     if b is None:
         return {"co_ban_khoa": False, "thong_diep": "Kỳ này chưa có bản khóa nào"}
     from app.services.hr import compute_draft
+    from app.services import giu_luong as GL
     rows, totals = compute_draft(db, run.period, run.inputs or {})
+    # CN-2: bản khoá bảng chính KHÔNG có phòng bị giữ — so với đúng phần ấy, không thì kỳ nào có giữ
+    # lương cũng báo «LỆCH» dù không có gì đổi.
+    giu = GL.ma_bi_giu(run)
+    if giu:
+        rows = [r for r in rows if r.get("ma") not in giu]
+        totals = GL.tong_cua(rows, totals)
     nay = van_tay({"rows": rows, "totals": totals}, chup_tham_so(db, run.period))
     khop = nay == b.dau_van_tay
     return {"co_ban_khoa": True, "ban_so": b.ban_so, "khoa_luc": b.khoa_luc,
