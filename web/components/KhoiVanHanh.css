@@ -64,3 +64,38 @@
 .vh-loai{font-size:calc(12/14*1rem);color:var(--vtos-text-mute)}
 .vh-trang{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;
   font-size:calc(13/14*1rem);color:var(--vtos-text-mute)}
+
+/* ── QT-1 · KHỐI QUYẾT TOÁN LỒNG (Chủ tịch duyệt bản xem thử 23/10/2026) ───────────────────────
+   Chủ tịch hỏi «hai ô Quá hạn quyết toán và Chờ quyết toán khác nhau gì? trùng thì ẩn bớt».
+   Đo: KHÔNG trùng — 681 ⊂ 709 ⊂ 1.742. Ẩn ô lớn là mất 1.033 tour đang nằm ở Kế toán mà không
+   ô nào khác đếm. Nên lồng vào nhau thay vì ẩn: một khối, các lát thụt vào trong lát cha.
+   `.vh-khoi` là cột, KHÁC `.vh-o.uu` (hàng ngang) — không dùng lại lớp cũ để khỏi đè nhau.
+   `.vh-ghi` riêng chứ không dùng `.vh-chan`: `.vh-chan` đang là flex space-between của khối khác. */
+.vh-khoi{background:var(--vtos-card);border:1px solid var(--vtos-line);
+  border-radius:var(--vtos-radius-md,10px);border-left-width:4px;padding:12px 14px;
+  display:flex;flex-direction:column;gap:8px;min-width:0;height:100%}
+.vh-khoi.do{border-left-color:var(--vtos-danger)}
+.vh-khoi .vh-so{color:var(--vtos-danger)}
+.vh-dong{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:baseline;min-width:0}
+.vh-dong .v{font-family:var(--vtos-font-mono);font-variant-numeric:tabular-nums;font-weight:700;
+  font-size:calc(16/14*1rem);text-align:right;min-width:4ch;color:var(--vtos-text-mute)}
+.vh-dong .t{font-size:calc(13/14*1rem);min-width:0}
+.vh-dong .t small{display:block;font-size:calc(12/14*1rem);color:var(--vtos-text-mute)}
+.vh-dong.qh .v,.vh-dong.qh .t b{color:var(--vtos-danger)}
+.vh-dong.ch .v{color:var(--vtos-warning)}
+.vh-dong.kt .v{color:var(--vtos-navy)}
+.vh-trong{margin-left:14px;padding-left:12px;border-left:2px solid var(--vtos-line);
+  display:flex;flex-direction:column;gap:6px;min-width:0}
+.vh-ghi{border-top:1px solid var(--vtos-line);padding-top:7px;
+  font-size:calc(12/14*1rem);color:var(--vtos-text-mute)}
+/* Hai nut cua khoi Quyet toan nam canh nhau o DAY khoi (Chu tich 23/10). `.vh-day` giu
+   `margin-top:auto` thay cho `.vh-ghi`: de auto tren CA HAI thi khoang trong bi chia doi va
+   hien ra mot khe giua ghi chu voi nut. Mot vo, mot auto. */
+.vh-day{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.vh-cuoi{display:flex;flex-wrap:wrap;gap:8px}
+.c-qh{background:var(--vtos-danger)}
+.c-ch{background:var(--vtos-warning)}
+.c-nn{background:var(--vtos-text-mute)}
+.c-kt{background:var(--vtos-navy)}
+.vh-hang.h3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+@media (min-width:900px){.vh-hang.h3{grid-template-columns:repeat(3,1fr)}}
