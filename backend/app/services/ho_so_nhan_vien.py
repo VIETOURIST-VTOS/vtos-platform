@@ -123,13 +123,39 @@ QUAN_TRI_TK = ("chutich", "hcns", "cntt")
 # tịch và HCNS. Muốn mở thì mở bằng một quyết định, không bằng một dòng suy ra.
 VAI_DUNG_DAU = ("tp_dh", "tp_kd", "tp_hd", "gd_kd", "gd_doi_xe")
 
+# ĐỢT DỌN-MT 24/10/2026 — CHỦ TỊCH KÝ, VÀ KÝ CÓ GIỚI HẠN.
+#
+# Bốn vai giám sát toàn hệ thấy DANH SÁCH nhân sự toàn công ty ở ĐÚNG MỨC NHÓM 1 — mã nhân
+# viên, họ tên, phòng, chức danh, ngày vào, thâm niên. KHÔNG một nhóm nào khác:
+#   · nhóm 1b (lý do nghỉ việc chi tiết)  vẫn chỉ Chủ tịch và HCNS
+#   · nhóm 2b (điện thoại cá nhân)        vẫn chỉ Chủ tịch và HCNS
+#   · nhóm 3  (tài khoản và quyền)        vẫn chỉ Chủ tịch, HCNS, CNTT
+#   · nhóm 4 và 5 (hồ sơ cá nhân, lương)  vẫn chỉ Chủ tịch và HCNS
+#
+# QUYẾT ĐỊNH 15/10/2026 KHÔNG BỊ ĐỤNG TỚI, và `test_donmt_3` là chỗ giữ câu ấy: nó đi hết 17
+# nhóm và đòi ba vai mới KHÔNG có mặt ở nhóm nào ngoài nhóm 1. Đi hết 17 nhóm chứ không kiểm
+# vài nhóm đã biết — nhóm thứ mười tám thêm vào tháng sau sẽ không có ai rà lại.
+#
+# VÌ SAO PHẢI MỞ: Đợt CUA-1 khai màn `/nhan-vien-phong-toi` đúng bằng `VAI_DUNG_DAU` và lý do
+# ấy ĐÚNG — một mục menu dẫn tới 403 là món nợ `test_lg4` cấm. Nhưng `test_ma_tran_quyen` đòi
+# bốn vai nền xem được MỌI màn hình, nên main đỏ. Hai luật chỉ ngược nhau KHI THIẾU MỘT CỬA;
+# có cửa thì cả hai cùng đúng. Cùng cách gỡ Chủ tịch duyệt 23/10 cho `/hoa-don-thieu`.
+#
+# PHẢI TRÙNG KHỚP `access.BASE_VIEW`. Không nhập thẳng `access` vào đây được vì vòng nhập
+# mô-đun, nên chỗ nối hai bảng là `test_donmt_2` — hai bảng khai cùng một danh sách mà lệch
+# thì một vai xem được màn hình trong khi cửa API từ chối, đúng món nợ vừa đi trả.
+VAI_GIAM_SAT_TOAN_HE = ("chutich", "tgd", "bks", "robot_ks")
+
 # 17 nhóm. Chủ tịch `co` ở CẢ 17 — "quyền của Chủ tịch là toàn diện" (15/10/2026).
 NHOM_TRUONG: list[dict] = [
     {"ma": "1",  "ten": "Nhận dạng công việc",
      "truong": ["staff_code", "full_name", "department", "title", "position",
                 "sales_group", "office", "company_id", "contract_type",
                 "start_date", "tham_nien", "active", "ended_on"],
-     "quyen": {"chutich": CO, "hcns": CO, "cntt": CO, **{v: PHAM_VI for v in VAI_DUNG_DAU}}},
+     # DON-MT 24/10/2026: bon vai giam sat toan he thay DUNG nhom nay.
+     "quyen": {"chutich": CO, "hcns": CO, "cntt": CO,
+               **{v: CO for v in VAI_GIAM_SAT_TOAN_HE},
+               **{v: PHAM_VI for v in VAI_DUNG_DAU}}},
     {"ma": "1b", "ten": "Lý do nghỉ việc chi tiết", "che_kieu": None,
      "truong": ["end_kind", "end_reason"],
      "quyen": {"chutich": CO, "hcns": CO}},
@@ -278,6 +304,11 @@ PHAM_VI_THEO_PHONG = ("tp_dh", "tp_hd", "gd_doi_xe")
 def trong_pham_vi(db, nguoi_xem, muc_tieu, ngay=None) -> tuple[bool, str]:
     """Người xem có quản lý mục tiêu không. Trả (có/không, TÊN LUẬT đã dùng)."""
     vai = (getattr(nguoi_xem, "role", "") or "").strip()
+    # DỌN-MT 24/10/2026. Bốn vai giám sát toàn hệ xem được MỌI người — nhưng chỉ
+    # thấy nhóm 1, vì `cat_ho_so_theo_vai` vẫn là bộ cắt duy nhất và nó đọc đúng
+    # ma trận trường ở trên. Phạm vi mở KHÔNG phải là trường mở.
+    if vai in VAI_GIAM_SAT_TOAN_HE:
+        return True, "giam_sat_toan_he"
     if vai not in VAI_DUNG_DAU:
         return False, "khong_phai_vai_dung_dau"
     if nguoi_xem.id == muc_tieu.id:
@@ -752,12 +783,19 @@ def nhan_vien_trong_pham_vi(db, nguoi_xem, ngay=None) -> dict:
     from app.models.core import User
 
     vai = (getattr(nguoi_xem, "role", "") or "").strip()
-    if vai not in VAI_DUNG_DAU:
+    if vai not in VAI_DUNG_DAU and vai not in VAI_GIAM_SAT_TOAN_HE:
         return {"duoc": False, "ly_do": "Vai này không quản lý ai", "nguoi": [], "so_nguoi": 0}
 
     ung_vien: list = []
     luat = ""
-    if vai in PHAM_VI_THEO_CAY:
+    if vai in VAI_GIAM_SAT_TOAN_HE:
+        # DỌN-MT 24/10/2026. Toàn công ty, KHÔNG theo phòng: với Chủ tịch, TGĐ,
+        # Ban Kiểm soát và robot Kiểm soát thì "phòng tôi" là cả công ty. Mỗi
+        # dòng vẫn đi qua `cat_ho_so_theo_vai` như mọi vai khác, nên họ thấy
+        # danh sách dài hơn chứ KHÔNG thấy trường nào sâu hơn.
+        ung_vien = list(db.execute(select(User).where(User.active == True)).scalars())  # noqa: E712
+        luat = "giam_sat_toan_he"
+    elif vai in PHAM_VI_THEO_CAY:
         from app.services import to_chuc_kd as TCKD
         thay: dict[int, str] = {}
         for mang in ("le", "doan"):
