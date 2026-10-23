@@ -24,6 +24,7 @@ from app.main import app
 from app.models.core import User
 from app.services.ho_so_nhan_vien import (
     NHOM_NHAY_CAM, NHOM_THEO_MA, PHAM_VI_THEO_CAY, PHAM_VI_THEO_PHONG, VAI_DUNG_DAU,
+    VAI_GIAM_SAT_TOAN_HE,
 )
 
 client = TestClient(app)
@@ -34,7 +35,10 @@ SO_BHXH = "7912345456"
 TK_NH = "19001234567841"
 LUONG = 18_000_000.0
 
-VAI_THU = ("chutich", "hcns", "cntt", "tp_dh", "nv_visa", "tgd")
+# DON-MT 24/10/2026: them `bks` va `robot_ks` vao bo tai khoan thu. Dot nay mo
+# NHOM 1 cho ca ba vai giam sat, nen phep thu phai do duoc ca ba - thieu tai
+# khoan thi dong do la 401 chu khong phai mot cau tra loi ve quyen.
+VAI_THU = ("chutich", "hcns", "cntt", "tp_dh", "nv_visa", "tgd", "bks", "robot_ks")
 DICH = None          # id tài khoản bị xem
 
 
@@ -181,9 +185,22 @@ def test_hs2_6b_khac_phong_thi_rong_han_chu_khong_phai_ho_so_trang():
 def test_hs2_7_vai_khong_khai_thi_403_chu_khong_phai_ho_so_rong():
     """Mặc định là từ chối, và từ chối phải nói thành 403. Trả 200 với hồ sơ rỗng thì màn hình
     vẽ một hồ sơ trắng, và người dùng tưởng hệ thống chưa có dữ liệu."""
-    for vai in ("nv_visa", "tgd"):
+    for vai in ("nv_visa",):
         r = doc(vai)
         assert r.status_code == 403, f"{vai} phải bị chặn, nhận {r.status_code}"
+    # ĐỢT DỌN-MT 24/10/2026 — `tgd` RỜI khỏi danh sách trên vì Chủ tịch ký 24/10 mở NHÓM 1
+    # cho ba vai giám sát toàn hệ. KHÔNG bỏ trắng chỗ này: thay bằng một phép đo CHẶT HƠN —
+    # mở được, và mở ra thì không được thấy một trường nào của nhóm đã khóa.
+    #
+    # `chutich` ĐỨNG RIÊNG và KHÔNG bị soi trường: ông vốn có `CO` ở cả 17 nhóm từ trước
+    # đợt này — gộp ông vào phép soi dưới là phép thử tự nói sai về quyết định 15/10/2026.
+    assert doc("chutich").status_code == 200, "Chủ tịch vốn đã xem được toàn bộ hồ sơ"
+    for vai in ("tgd", "bks", "robot_ks"):
+        r = doc(vai)
+        assert r.status_code == 200, f"{vai} phải mở được hồ sơ, nhận {r.status_code}"
+        for cam in ("id_number", "base_salary", "phone", "end_reason", "username"):
+            assert f'"{cam}"' not in r.text, (
+                f"{vai} thấy `{cam}` — trường của nhóm 1b/2b/3/4/5, vẫn chỉ Chủ tịch và HCNS")
 
 
 def test_hs2_8_vet_doc_khong_mang_theo_mot_gia_tri_nao():
@@ -424,9 +441,19 @@ def test_hs4_2_danh_sach_khong_rong_hon_cua_doc():
 def test_hs4_3_vai_khong_quan_ly_ai_thi_403():
     """Chủ tịch và HCNS nhìn toàn công ty — họ không có 'phòng của tôi'. Trả một danh sách rỗng
     sẽ đọc giống 'phòng bạn không có ai', mà đó là một câu sai."""
-    for vai in ("chutich", "hcns", "cntt", "nv_visa"):
+    for vai in ("hcns", "cntt", "nv_visa"):
         r = client.get("/api/v1/employees/phong-toi", headers=dang_nhap(vai))
         assert r.status_code == 403, f"{vai} nhận {r.status_code}"
+    # ĐỢT DỌN-MT 24/10/2026 — `chutich` RỜI khỏi danh sách trên. Luật đã ký đòi bốn vai nền
+    # xem được MỌI màn hình, và một mục menu dẫn tới 403 là món nợ `test_lg4` cấm; nên cửa
+    # này mở cho bốn vai ấy. NHƯNG CÂU "PHÒNG CỦA TÔI" VẪN LÀ MỘT CÂU SAI VỚI HỌ — lý lẽ của
+    # phép thử cũ không mất đi, nó chỉ đổi chỗ: cửa phải NÓI RA nó đang trả về toàn công ty.
+    for vai in VAI_GIAM_SAT_TOAN_HE:
+        r = client.get("/api/v1/employees/phong-toi", headers=dang_nhap(vai))
+        assert r.status_code == 200, f"{vai} nhận {r.status_code}"
+        assert r.json()["luat_pham_vi"] == "giam_sat_toan_he", (
+            f"{vai} nhận một danh sách mà cửa không nói rõ đó là TOÀN CÔNG TY — "
+            f"màn hình sẽ bày nó dưới nhãn phòng của tôi, và đó là một câu sai")
 
 
 def test_hs4_4_moi_nguoi_trong_danh_sach_deu_mo_duoc_ho_so():

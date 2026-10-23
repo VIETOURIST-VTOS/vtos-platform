@@ -14,7 +14,8 @@ from app.services import hrm as H
 from app.services import rules as R
 from app.services.ho_so_nhan_vien import (VAI_CO_NHOM_CHE as _HSNV_VAI_HIEN,
                                           VAI_CO_TRONG_BANG as _HSNV_VAI_XEM,
-                                          VAI_DUNG_DAU as _HSNV_VAI_QUAN_LY)
+                                          VAI_DUNG_DAU as _HSNV_VAI_QUAN_LY,
+                                          VAI_GIAM_SAT_TOAN_HE as _HSNV_VAI_GIAM_SAT)
 
 router = APIRouter(prefix="/api/v1", tags=["nhan-su-ho-so"])
 HR_ADMIN = ("hcns", "cntt", "tgd", "chutich")
@@ -582,6 +583,7 @@ def hien_truong_ho_so(uid: int, data: HienTruongIn,
 
 @router.get("/employees/phong-toi")
 def nhan_vien_phong_toi(u: User = Depends(require_roles(*_HSNV_VAI_QUAN_LY,
+                                                        *_HSNV_VAI_GIAM_SAT,
                                                         mo_ta="nhân viên phòng tôi")),
                         db: Session = Depends(get_db)):
     """HS-4 · Những người tôi quản lý — câu đứng TRƯỚC câu "người này tôi xem được gì".
