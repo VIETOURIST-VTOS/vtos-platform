@@ -866,3 +866,46 @@ def ghi_hoa_don(db: Session, line_id: int, trang_thai: str, nguoi: str,
     return {"line_id": d.id, "trang_thai": d.hoa_don_trang_thai, "ngay_hoa_don": d.ngay_hoa_don,
             "so_hoa_don": d.so_hoa_don, "ly_do": d.hoa_don_ly_do,
             "nguoi_ghi": d.hoa_don_nguoi_ghi, "ghi_luc": d.hoa_don_ghi_luc}
+def dem_hoa_don_thieu(db: Session, since: date, upto: date) -> dict:
+    """CHỈ ĐẾM, không dựng danh sách.
+
+    Bàn làm việc mở ra là gọi hàm này, nên nó phải rẻ. `hoa_don_thieu()` nạp tới `XLSX_LIMIT`
+    dòng rồi đọc thêm `_contra_map` cho từng bút toán — đúng cho một màn hình việc cần làm, quá
+    đắt cho một ô đếm mở mỗi lần ai đó vào trang chủ.
+
+    BA CÂU TỔNG HỢP, KHÔNG NẠP DÒNG NÀO VỀ PYTHON. Tập trung gian duy nhất đi về bộ nhớ là danh
+    sách MÃ BÚT TOÁN, không phải danh sách dòng — và nó đi qua `_entry_co_thue`, đúng hàm mà
+    `hoa_don_thieu()` dùng, nên luật "bút toán nào cần hóa đơn" chỉ có MỘT bản khai.
+
+    Vì sao không viết gọn thành một câu bằng truy vấn con: `_filtered` tự nối sang `JournalEntry`,
+    nên một câu `select` đã lọc đem nhét vào `IN (...)` của câu ngoài là chỗ SQLAlchemy có thể
+    tự tương quan hai bảng đã nối ở ngoài — ra một con số trông hợp lý mà sai. `_entry_co_thue`
+    đã chọn đường vật hóa vì lý do ấy từ Đợt R4b-2a; đây đi theo.
+
+    HAI HÀM ĐẾM CÙNG MỘT THỨ LÀ CHỖ DỄ LỆCH NHẤT, nên `test_r4b2c_3` chạy cả hai trên cùng một
+    cuốn sổ rồi bắt chúng ra một con số — đối chiếu bằng cách CHẠY, không bằng cách đọc mã.
+    """
+    co_thue = _entry_co_thue(db, upto, since)
+    if not co_thue:
+        return {"chua_nhan": 0, "thue": 0.0, "since": since, "upto": upto}
+    ids = list(co_thue)
+    dk_thue = or_(*[JournalLine.account_code.like(f"{t}%") for t in TK_THUE])
+    # Dòng thuế không cần hóa đơn của riêng nó — nó LÀ phần thuế của dòng kia. Cùng phép loại
+    # trừ mà `hoa_don_thieu()` làm bằng `startswith` khi duyệt từng dòng.
+    chua = (JournalLine.entry_id.in_(ids), ~dk_thue,
+            or_(JournalLine.hoa_don_trang_thai.is_(None),
+                JournalLine.hoa_don_trang_thai == HD_CHUA))
+    n = int(db.execute(_filtered(select(func.count(JournalLine.id)), upto, since)
+                       .where(*chua)).scalar() or 0)
+    # Phần thuế cộng trên ĐÚNG những bút toán CÒN dòng chưa nhận hóa đơn, không trên mọi bút
+    # toán có thuế trong kỳ: bút toán đã nhập đủ hóa đơn thì phần thuế của nó không còn là việc
+    # đang tồn. `hoa_don_thieu()` cộng đúng tập ấy, nên hai hàm mới ra một con số.
+    ct = [int(x) for (x,) in db.execute(
+        _filtered(select(JournalLine.entry_id).distinct(), upto, since).where(*chua)).all()]
+    thue = 0.0
+    if ct:
+        thue = round(float(db.execute(
+            _filtered(select(func.coalesce(func.sum(JournalLine.debit), 0.0)
+                             + func.coalesce(func.sum(JournalLine.credit), 0.0)), upto, since)
+            .where(JournalLine.entry_id.in_(ct), dk_thue)).scalar() or 0), 0)
+    return {"chua_nhan": n, "thue": thue, "since": since, "upto": upto}

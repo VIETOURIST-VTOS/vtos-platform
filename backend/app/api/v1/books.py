@@ -24,7 +24,10 @@ router = APIRouter(prefix="/api/v1/books", tags=["so-ke-toan"])
 # Đây là CỬA ĐỌC (nhật ký chung, sổ cái, sổ chi tiết, bảng cân đối). Ban kiểm soát và CNTT
 # đã đọc được, nên Kế toán trưởng không đọc được là một chỗ hụt chứ không phải một hàng rào.
 # Bảng ký của Đợt E2b được cập nhật CÙNG LẦN này — xem `test_le2b_ba_vai_ke_toan`.
-READ = ("ketoan", "ketoan_truong", "cntt", "tgd", "chutich", "bks", "ptgd_doan")
+# `robot_ks` thêm 23/10/2026 (Chủ tịch duyệt): robot Kiểm soát phải xem được MỌI màn hình —
+# `test_ma_tran_quyen` là luật ấy, và Đợt R4b-2b đã làm nó đỏ khi bỏ vai này khỏi menu thay
+# vì mở cho nó một cửa. Chỉ ĐỌC. `GHI_HOA_DON` vẫn chỉ `ketoan`.
+READ = ("ketoan", "ketoan_truong", "cntt", "tgd", "chutich", "bks", "robot_ks", "ptgd_doan")
 # ĐỢT R4b-2a 22/10/2026 — VAI ĐƯỢC GHI HÓA ĐƠN VÀO DÒNG BÚT TOÁN.
 #
 # CHỈ vai nền `ketoan`. Bản đầu của đợt này khai thêm `ketoan_tt` và `ketoan_truong`, và
