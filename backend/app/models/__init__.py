@@ -157,3 +157,7 @@ from app.models.bo_so_kiem_toan import *  # noqa  # Đợt E16 14/10/2026 — b�
 # create_all không tạo, và alembic autogenerate đòi XOÁ nó.
 from app.models.bao_cao_da_lap import *  # noqa
 from app.models.khoan_muc_chi_phi import *  # noqa  # Đợt R2 15/10/2026 — danh mục khoản mục chi phí
+# Dot R6b-1 23/10/2026 -- tam bang so du dau ky (mot cua chot, bay so phu).
+# Thieu dong nay thi tam bang KHONG vao Base.metadata: create_all khong tao, moi phep thu
+# soi metadata mu dung phan nay ma VAN BAO XANH, va alembic autogenerate doi XOA chung.
+from app.models.so_du_dau_ky import *  # noqa
