@@ -109,26 +109,61 @@ export function KhoiVanHanh({ d, onThuLai, luu_dem }: {
 
       <div className="vh-nhom"><h3>Ưu tiên cần xử lý</h3></div>
       <div className="vh-hang h2">
-        <div className="vh-o uu do">
-          <div><div className="vh-nhan">Việc nghiêm trọng</div>
-            <So v={do_} dv="việc" onThuLai={onThuLai} />
-            {v && <div className="vh-phu">
-              gồm {so((v.theo_muc || []).find((m: any) => m.ma === "red")?.canh_bao)} cảnh báo · trong {so(v.viec)} việc đang mở</div>}
-          </div>
-          {v && <Link className="vh-nut" href="/?xem=viec&muc=red">Xem việc nghiêm trọng →</Link>}
+        <div className="vh-khoi do">
+          <div className="vh-nhan">Việc nghiêm trọng</div>
+          <So v={do_} dv="việc đang mở ở mức đỏ" onThuLai={onThuLai} />
+          {v && tong > 0 && coSo(do_) && <div className="vh-thanh" aria-hidden="true">
+            <i className="c-qh" style={{ width: `${((do_ as number) / tong) * 100}%` }} /></div>}
+          {v && <>
+            <div className="vh-dong qh"><span className="v">{so(do_)}</span>
+              <span className="t"><b>Nghiêm trọng · mức đỏ</b>
+                <small>gồm {so((v.theo_muc || []).find((m: any) => m.ma === "red")?.canh_bao)} cảnh báo</small></span></div>
+            <div className="vh-dong"><span className="v">{so(v.viec)}</span>
+              <span className="t"><b>Tổng việc đang mở</b></span></div>
+          </>}
+          <div className="vh-day"><div className="vh-cuoi">
+            {v && <Link className="vh-nut" href="/?xem=viec&muc=red">Xem việc nghiêm trọng →</Link>}
+          </div></div>
         </div>
-        <div className="vh-o uu vang">
-          <div><div className="vh-nhan">Quá hạn quyết toán</div>
-            <So v={d.qua_han} dv="tour" onThuLai={onThuLai} />
-            {cq && <div className="vh-phu">trong {so(cq.ket_thuc)} tour kết thúc chờ quyết toán</div>}
+
+        <div className="vh-khoi do">
+          <div className="vh-nhan">Quyết toán</div>
+          <So v={cq ? cq.tong : cq} dv="tour chưa quyết toán xong" onThuLai={onThuLai} />
+          {cq && cq.tong > 0 && <div className="vh-thanh"
+               role="img" aria-label={`${so(cq.qua_han)} quá hạn, ${so(cq.con_trong_han)} còn trong hạn, ${so(cq.da_dong_so)} chờ Kế toán`}>
+            <i className="c-qh" style={{ width: `${(cq.qua_han / cq.tong) * 100}%` }} />
+            <i className="c-ch" style={{ width: `${(cq.con_trong_han / cq.tong) * 100}%` }} />
+            <i className="c-nn" style={{ width: `${(cq.chua_co_ngay_ve / cq.tong) * 100}%` }} />
+            <i className="c-kt" style={{ width: `${(cq.da_dong_so / cq.tong) * 100}%` }} /></div>}
+          {cq && <>
+            <div className="vh-dong ch"><span className="v">{so(cq.ket_thuc)}</span>
+              <span className="t"><b>Kết thúc · chờ ĐIỀU HÀNH</b></span></div>
+            <div className="vh-trong">
+              <div className="vh-dong qh"><span className="v">{so(cq.qua_han)}</span>
+                <span className="t"><b>QUÁ HẠN</b></span></div>
+              <div className="vh-dong ch"><span className="v">{so(cq.con_trong_han)}</span>
+                <span className="t">Còn trong hạn</span></div>
+              {cq.chua_co_ngay_ve > 0 && <div className="vh-dong qh">
+                <span className="v">{so(cq.chua_co_ngay_ve)}</span>
+                <span className="t"><b>Chưa có ngày về</b>
+                  <small>không bao giờ hiện ở ô quá hạn — phải soát tay</small></span></div>}
+            </div>
+            <div className="vh-dong kt"><span className="v">{so(cq.da_dong_so)}</span>
+              <span className="t"><b>Đã đóng sổ · chờ KẾ TOÁN</b></span></div>
+          </>}
+          <div className="vh-day">
+            {cq && <div className="vh-ghi">{so(cq.da_ve_chua_dong_so)} · đã về chưa đóng sổ — không cộng vào tổng</div>}
+            <div className="vh-cuoi">
+              {coSo(d.qua_han) && <Link className="vh-nut" href="/?xem=qua-han">Xem tour quá hạn →</Link>}
+              <Link className="vh-nut phu" href="/so-con-no">Xem quyết toán →</Link>
+            </div>
           </div>
-          {coSo(d.qua_han) && <Link className="vh-nut" href="/?xem=qua-han">Xem tour quá hạn →</Link>}
         </div>
       </div>
 
       <div className="vh-nhom"><h3>Hoạt động tour</h3>
         <span className="vh-phu">Theo trạng thái · các nhóm có thể giao nhau</span></div>
-      <div className="vh-hang h4">
+      <div className="vh-hang h3">
         <div className="vh-o"><div className="vh-nhan">Tour đang bán</div><So v={gd ? gd.dang_ban : gd} />
           <div className="vh-phu">Đã duyệt, chưa tới ngày đi</div>
           <Link className="vh-lk" href="/tours">Xem tour đang bán →</Link></div>
@@ -140,13 +175,6 @@ export function KhoiVanHanh({ d, onThuLai, luu_dem }: {
         <div className="vh-o"><div className="vh-nhan">Sắp khởi hành</div><So v={d.sap_kh} />
           <div className="vh-phu">{d.so_ngay_kh} ngày tới</div>
           <Link className="vh-lk" href="/tours">Xem lịch khởi hành →</Link></div>
-        <div className="vh-o"><div className="vh-nhan">Chờ quyết toán</div>
-          <So v={cq ? cq.tong : cq} onThuLai={onThuLai} />
-          {cq && <div className="vh-phu">
-            Kết thúc chờ quyết toán: {so(cq.ket_thuc)}<br />
-            Đã đóng sổ chờ Kế toán: {so(cq.da_dong_so)}<br />
-            Đã về chưa đóng sổ (Điều hành): {so(cq.da_ve_chua_dong_so)} · không cộng vào tổng</div>}
-          <Link className="vh-lk" href="/so-con-no">Xem quyết toán →</Link></div>
       </div>
 
       <div className="vh-hang h2b">
