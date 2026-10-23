@@ -10,4 +10,3 @@ Mọi dòng trong tệp này PHẢI có cột `Làn` là `Kiểm soát` — hàn
 | Kiểm soát | TC-72 | web/components/KhoiV14.tsx, web/app/page.tsx, backend/app/services/hieu_qua_xe.py, backend/tests/test_hq3_chuoi_dien_bien.py | 20-10-2026 21:15 | xong |
 | Kiểm soát | M3-1 | backend/app/services/hieu_qua_xe.py, backend/tests/test_m3_cong_suat_dung_o_hom_nay.py, web/components/KhoiV14.tsx | 21-10-2026 06:20 | xong |
 | Kiểm soát | LN-1 | web/components/KhoiKetQuaKinhDoanh.tsx | 21-10-2026 09:50 | xong |
-| Kiểm soát | KS-17 | .github/workflows/robots.yml, backend/app/services/zalo.py, backend/tests/test_ks17_khong_goi_lai_duong_gui_tin.py | 23-10-2026 06:37 | đang làm |
