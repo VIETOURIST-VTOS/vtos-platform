@@ -391,3 +391,54 @@ def tom_tat(db: Session, hom_nay_: date) -> dict | None:
         return {"loi": b["loi"], "doc_luc": b.get("doc_luc")}
     return {k: b[k] for k in ("doc_luc", "ban_cu", "dieu_duoc", "dang_di", "khong_khop", "o_bai")} | {
         "so_can_sua": len(b["can_sua"]), "loi": None}
+
+
+# ---------------------------------------------------------------------------------------------
+# Cửa dán link — XS-1b (Chủ tịch 25/10/2026: «Giữ ký duyệt Chủ tịch»)
+# ---------------------------------------------------------------------------------------------
+# ĐO RA 25/10/2026, sau khi XS-1 đã lên: cửa Chính sách & định mức (`POST /params`) ép mọi giá trị
+# không phải ngày về số (`float(value)`), nên dán link vào đó là bị trả «Giá trị phải là số»; và
+# vai Giám đốc điều hành đội xe không vào được màn ấy. Tức là XS-1 lên hệ mà KHÔNG AI dán được link
+# — trong khi bản xem thử Chủ tịch duyệt có ô dán ngay ở màn Đội xe.
+#
+# Cửa này đặt ô dán ở màn Đội xe, nhưng KHÔNG ghi thẳng: nó lập một bản ghi tham số CHỜ KÝ, và
+# Chủ tịch ký ở màn Chính sách & định mức như mọi tham số khác (`POST /params/{id}/sign`). Link
+# chưa ký thì robot chưa đọc.
+
+def nhan_xet_link(url: str) -> str | None:
+    """Câu báo lỗi cho người dán, hoặc None nếu link đúng khuôn. Nói ĐÚNG chỗ sai, không nói chung chung."""
+    if not url:
+        return "Chưa dán link."
+    if url.startswith(TIEN_TO_HOP_LE) and "/edit" in url and "output=csv" not in url:
+        return ("Đây là link MỞ sheet, robot không đọc được. Trong sheet bấm Tệp → Chia sẻ → Công bố "
+                "lên web, chọn trang «Quyết Toán dữ liệu xe», định dạng CSV, rồi dán link nó cho "
+                "(có chữ output=csv).")
+    if not link_hop_le(url):
+        return ("Link phải là link CSV «Công bố lên web» của Google Sheet: bắt đầu bằng "
+                "https://docs.google.com/spreadsheets/ và có output=csv.")
+    return None
+
+
+def doc_thu(url: str, nguong_km_noi: float = 50, tai=_tai) -> dict:
+    """Đọc thử một link CHƯA ký: tải thẳng (không qua đệm, không ghi đệm), dò cột, đếm."""
+    loi = nhan_xet_link(url)
+    if loi:
+        return {"ok": False, "loi": loi}
+    try:
+        nd = tai(url)
+    except Exception as ex:
+        return {"ok": False, "loi": f"Không tải được: {str(ex)[:160]}. Link đã được công bố chưa?"}
+    b = doc_bang(nd, nguong_km_noi)
+    if b["loi"]:
+        return {"ok": False, "loi": b["loi"]}
+    return {"ok": True, "so_xe": len(b["khoi"]), "so_chuyen": len(b["chuyen"]),
+            "so_can_sua": len(b["can_sua"])}
+
+
+def cho_ky(db: Session) -> dict | None:
+    """Bản link mới nhất đang chờ Chủ tịch ký, nếu có."""
+    from app.models.core import Param
+    p = db.execute(select(Param).where(Param.key == KHOA_LINK, Param.status == "pending")
+                   .order_by(Param.id.desc())).scalars().first()
+    return None if p is None else {"id": p.id, "boi": p.proposed_by, "link": p.value,
+                                   "hieu_luc": p.effective_from.isoformat()}
