@@ -199,5 +199,71 @@ def test_tham_so_cua_link_va_man_con():
     assert "/doi-xe/xe-hom-nay" in AC.MAN_CON_DOI_XE
     trang = (GOC / "web/app/doi-xe/xe-hom-nay/page.tsx").read_text(encoding="utf-8")
     assert "/fleet/xe-theo-sheet" in trang
-    assert not re.search(r'method:\s*"(POST|PUT|DELETE|PATCH)"', trang), "màn này chỉ đọc"
+    # XS-1b: đúng MỘT cửa ghi — trình link chờ ký. Không cửa nào ghi vào sheet hay vào chuyến.
+    assert re.findall(r'api<any>\("([^"]+)",\s*\{\s*method:\s*"(?:POST|PUT|DELETE|PATCH)"', trang) == \
+        ["/fleet/xe-theo-sheet/link"]
     assert '"/doi-xe/xe-hom-nay"' in (GOC / "web/app/doi-xe/page.tsx").read_text(encoding="utf-8")
+
+
+# ── XS-1b · cửa dán link ở màn Đội xe, giữ chữ ký Chủ tịch (25/10/2026) ───────────────────────────
+
+def test_link_mo_sheet_bi_bao_dung_cho_sai():
+    """Đo thật 25/10: Chủ tịch dán link /edit — phải được bảo đúng là link mở sheet, và cách lấy link CSV."""
+    loi = XS.nhan_xet_link("https://docs.google.com/spreadsheets/d/1jaD/edit?gid=0#gid=0")
+    assert loi and "Công bố lên web" in loi and "output=csv" in loi
+    assert XS.nhan_xet_link(LINK) is None
+    assert XS.nhan_xet_link("https://evil.example/x?output=csv")
+
+
+def test_doc_thu_khong_dung_dem():
+    XS._DEM.clear()
+    r = XS.doc_thu(LINK, tai=lambda u: MAU)
+    assert r == {"ok": True, "so_xe": 4, "so_chuyen": 6, "so_can_sua": len(XS.doc_bang(MAU)["can_sua"])}
+    assert XS._DEM == {}, "link chưa ký không được lọt vào đệm mà robot dùng"
+    def hong(u):
+        raise OSError("HTTP 404")
+    assert XS.doc_thu(LINK, tai=hong)["ok"] is False
+
+
+class _U:
+    def __init__(self, username, role):
+        self.username, self.role = username, role
+
+
+def _db_trinh():
+    db = _db()
+    from app.models.core import Param
+    # dòng gieo của tham số, như seed_params tạo trên hệ thật
+    db.add(Param(key=XS.KHOA_LINK, value="", label="Link CSV", unit="link",
+                 effective_from=dt.date(2026, 9, 1), status="active"))
+    db.commit()
+    return db
+
+
+def test_trinh_link_lap_ban_cho_ky_khong_ghi_thang(monkeypatch):
+    from app.api.v1 import fleet as F
+    from app.services import rules as R
+    monkeypatch.setattr(R, "audit", lambda *a, **k: None)
+    monkeypatch.setattr(XS, "_tai", lambda u: MAU)
+    monkeypatch.setattr(XS.doc_thu, "__defaults__", (50, lambda u: MAU))
+    db = _db_trinh()
+    r = F.dan_link_sheet(F.LinkSheetVao(url=LINK), _U("nguyenhonghuan", "gd_doi_xe"), db)
+    assert r["da_trinh"] is True
+    assert XS.link(db) == "", "chưa ký thì robot vẫn chưa có link"
+    ck = XS.cho_ky(db)
+    assert ck and ck["boi"] == "nguyenhonghuan" and ck["link"] == LINK
+
+
+def test_link_doc_khong_duoc_thi_khong_trinh(monkeypatch):
+    from app.api.v1 import fleet as F
+    db = _db_trinh()
+    r = F.dan_link_sheet(F.LinkSheetVao(url="https://docs.google.com/spreadsheets/d/1/edit"),
+                         _U("nguyenhonghuan", "gd_doi_xe"), db)
+    assert r["da_trinh"] is False and "Công bố lên web" in r["doc_thu"]["loi"]
+    assert XS.cho_ky(db) is None
+
+
+def test_chu_tich_khong_nam_trong_vai_dan_link():
+    """Chủ tịch là người ký duy nhất của tham số; người trình không tự ký."""
+    from app.api.v1 import fleet as F
+    assert "chutich" not in F.GHI_LINK_SHEET and "gd_doi_xe" in F.GHI_LINK_SHEET

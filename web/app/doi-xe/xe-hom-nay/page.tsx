@@ -14,8 +14,10 @@ import { Tag, errMsg } from "@/components/ui";
  *  «Dòng sheet cần sửa» là để anh Huân biết sửa chỗ nào. VTOS tự cộng lại từ các cột chi tiết, không
  *  lấy ô Tổng chi và Lợi nhuận của sheet.
  *
- *  Link dán ở màn Chính sách & định mức, tham số `xe_sheet_csv_url` — đổi phải có chữ ký như mọi
- *  tham số khác, nên không có ô nhập link riêng ở đây.
+ *  XS-1b (Chủ tịch 25/10/2026, «Giữ ký duyệt Chủ tịch»): ô dán link nằm Ở ĐÂY (đúng bản xem thử),
+ *  cho Giám đốc đội xe / TP Điều hành / CNTT. Dán xong máy ĐỌC THỬ trước; đọc được mới trình, và link
+ *  chỉ có hiệu lực khi Chủ tịch ký ở màn Chính sách & định mức. Cửa `/params` không dùng được cho
+ *  việc này: nó chỉ nhận số.
  */
 
 const DUONG = <><a href="/">VTOS</a> · <a href="/doi-xe">Đội xe</a> · Xe hôm nay theo sheet</>;
@@ -29,6 +31,19 @@ function XeHomNay() {
   const { toast } = useShell();
   const [d, setD] = useState<any>(undefined);
   const [dang, setDang] = useState(false);
+  const [link, setLink] = useState("");
+  const [thu, setThu] = useState<any>(null);
+  const [gui, setGui] = useState(false);
+
+  async function danLink(chiDocThu: boolean) {
+    setGui(true); setThu(null);
+    try {
+      const r = await api<any>("/fleet/xe-theo-sheet/link", { method: "POST", json: { url: link, chi_doc_thu: chiDocThu } });
+      setThu(r.doc_thu);
+      if (r.da_trinh) { toast(r.message); setLink(""); await load(); }
+    } catch (e) { toast(errMsg(e), true); }
+    finally { setGui(false); }
+  }
 
   const load = useCallback(async (lai = false) => {
     setDang(true);
@@ -48,8 +63,8 @@ function XeHomNay() {
 
     {d === null ? <p className="muted">Không mở được màn này.</p>
       : !d.co_link ? (
-        <div className="panel"><b>Chưa nối sheet.</b> <span className="muted">{d.ghi_chu}</span>{" "}
-          <a href="/params">Mở Chính sách &amp; định mức →</a></div>
+        <div className="panel"><b>Chưa nối sheet.</b>{" "}
+          <span className="muted">Dán link CSV ở ô dưới; Chủ tịch ký xong robot mới đọc.</span></div>
       ) : d.loi ? (
         <div className="panel"><Tag cls="red">Không đọc được</Tag> {d.loi}
           {d.doc_luc && <span className="muted"> · lần đọc được gần nhất {d.doc_luc}</span>}
@@ -95,6 +110,28 @@ function XeHomNay() {
               </tbody></table>)}
         </div>
       </>)}
+
+    {d && (d.duoc_dan || d.cho_ky) && (
+      <div className="panel">
+        <h2>Link sheet Đội xe</h2>
+        {d.cho_ky && <p><Tag cls="warn">Chờ Chủ tịch ký</Tag> link do {d.cho_ky.boi} trình, hiệu lực từ {fmtD(d.cho_ky.hieu_luc)}.
+          {" "}<a href="/params">Màn Chính sách &amp; định mức →</a></p>}
+        {d.duoc_dan && <>
+          <label htmlFor="xs-link">Link CSV «Công bố lên web» của trang «Quyết Toán dữ liệu xe»</label>
+          <input id="xs-link" type="url" value={link} onChange={(e) => setLink(e.target.value)}
+            placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?gid=0&single=true&output=csv" style={{ width: "100%" }} />
+          <p className="muted">Trong sheet: Tệp → Chia sẻ → Công bố lên web → chọn trang, định dạng CSV → Công bố.
+            Ai có link này đều xem được số của sheet.</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="act grey" style={{ margin: 0 }} disabled={gui || !link} onClick={() => danLink(true)}>Đọc thử</button>
+            <button className="act" style={{ margin: 0 }} disabled={gui || !link} onClick={() => danLink(false)}>Trình Chủ tịch ký</button>
+          </div>
+          {thu && (thu.ok
+            ? <p className="ok">Đọc được {thu.so_xe} xe, {thu.so_chuyen} chuyến · {thu.so_can_sua} dòng cần sửa.</p>
+            : <p className="err">{thu.loi}</p>)}
+        </>}
+      </div>
+    )}
   </>);
 }
 
