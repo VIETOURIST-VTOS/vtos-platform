@@ -42,6 +42,11 @@ function Dau({ ten, phu }: { ten: string; phu?: string }) {
  *  Trả về chuỗi rỗng khi không có gì đáng nói: một câu "có 0 người" không giúp ai cả. */
 /** TC-98 · Doanh thu của phòng (anh Tuấn 29/9/2026): tháng này và lũy kế năm, do máy chủ tính
  *  (`sections.doanh_thu_phong`, services/dashboard.doanh_thu_phong). Màn hình chỉ bày. */
+/* QT-3 24/10/2026 — số chuyến đi qua chuẩn Việt. Trước đây nối thẳng nên lũy kế năm hiện
+   `1250 chuyến`, cạnh ô tiền `135,8 tỷ` của chính nó — hai cách viết số trong một khối. */
+const dem = (x: any) =>
+  typeof x === "number" ? x.toLocaleString("vi-VN") : (x ?? "");
+
 function DoanhThuPhong({ p, ky, nam }: { p?: any; ky?: string; nam?: number }) {
   if (!p) return null;
   const thang = ky ? `${ky.slice(5, 7)}/${ky.slice(0, 4)}` : "tháng này";
@@ -50,12 +55,12 @@ function DoanhThuPhong({ p, ky, nam }: { p?: any; ky?: string; nam?: number }) {
       <div className="kd-dt-o">
         <div className="kd-dt-nhan">Doanh thu tháng {thang}</div>
         <div className="kd-dt-so">{gonSo(Number(p.thang) || 0, "tien")}</div>
-        <div className="kd-dt-phu">{p.chuyen_thang} chuyến</div>
+        <div className="kd-dt-phu">{dem(p.chuyen_thang)} chuyến</div>
       </div>
       <div className="kd-dt-o">
         <div className="kd-dt-nhan">Lũy kế năm {nam ?? ""}</div>
         <div className="kd-dt-so">{gonSo(Number(p.nam) || 0, "tien")}</div>
-        <div className="kd-dt-phu">{p.chuyen_nam} chuyến</div>
+        <div className="kd-dt-phu">{dem(p.chuyen_nam)} chuyến</div>
       </div>
     </div>
   );
