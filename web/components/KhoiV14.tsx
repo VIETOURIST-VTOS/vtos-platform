@@ -301,8 +301,17 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
   const o: HieuQuaXe = (bo?.[ky]) || (ky === "thang" && !moc ? (d || {}) : {});
   const coNguonKy = !!bo?.[ky] || (ky === "thang" && !moc && !!d);
 
+  /* QT-3 24/10/2026 — ĐI QUA `toLocaleString("vi-VN")`, ĐỪNG NỐI THẬNG SỐ VÀO CHUỖI.
+     Bản cũ viết `${x}${duoi}` nên JS in theo chuẩn Mỹ: màn Chủ tịch hiện `37.3%`, `43.6%`,
+     `27.1 L/100km`, `10799 đ` — trong khi 19 chỗ khác của cùng màn dùng chuẩn Việt (`176,3 tỷ`,
+     `8.030.563.416`). Hai cách viết số trên một màn tiền là người đọc phải tự đoán dấu nào là gì.
+     `10799 đ` là chỗ nặng nhất: thiếu dấu phân nhóm thì đọc lướt dễ thành 107,99.
+     `maximumFractionDigits: 1` để phần trăm và tiêu hao giữ đúng một số lẻ như cũ. */
   const so = (x: any, duoi = "") =>
-    x === null || x === undefined || x === "" ? null : `${x}${duoi}`;
+    x === null || x === undefined || x === "" ? null
+      : `${typeof x === "number"
+            ? x.toLocaleString("vi-VN", { maximumFractionDigits: 1 })
+            : x}${duoi}`;
   const tien = (x: any) => (x === null || x === undefined ? null : gonSo(Number(x)));
   /* «2026-10-20» → «20/10». Cắt bằng chuỗi chứ không qua `new Date`: chuỗi ngày trần được trình
      duyệt đọc là UTC rồi in lại theo múi giờ máy, nên ở múi âm nó lùi một ngày — và một con số
