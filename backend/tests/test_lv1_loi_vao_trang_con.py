@@ -31,16 +31,57 @@ def _trang_con() -> list[str]:
                    for p in getattr(AC, ten) if isinstance(p, str)})
 
 
+def _co_lien_ket(ma: str, p: str) -> bool:
+    """Mã của một màn có thật sự dẫn sang trang con `p` hay không.
+
+    Ba dạng viết đều tính, và cả ba đều là một nút bấm được trên màn hình:
+        "/a/b"              đường dẫn tĩnh
+        "/a/b?ky=…"         đường dẫn tĩnh kèm tham số
+        `/a/{id}` thay số    trang con nhận tham số TRÊN đường dẫn
+
+    DẠNG THỨ BA thêm 24/10/2026. `/ho-so-hdv/[id]` là trang con đầu tiên mang `[id]`, và liên kết
+    thật của nó viết là `` href={`/ho-so-hdv/${r.id}`} `` — chuỗi `"[id]"` KHÔNG BAO GIỜ có trong
+    mã, vì chỗ ấy đã thay số vào rồi. Phép thử cũ đi tìm đúng chuỗi `"[id]"` nên mọi trang con
+    mang tham số đều sẽ đỏ, và đỏ mãi mãi dù lối vào có thật. Đó là phép thử canh chính nó.
+    """
+    if f'"{p}"' in ma or f'"{p}?' in ma:
+        return True
+    if "[" not in p:
+        return False
+    # "/ho-so-hdv/[id]" -> tiền tố "/ho-so-hdv/" phải đứng ngay sau một dấu nháy hoặc dấu `
+    tien_to = p[:p.index("[")]
+    return any(d + tien_to in ma for d in ('"', "'", "`"))
+
+
 def _thieu_loi_vao(doc=None) -> list[str]:
     doc = doc or (lambda d: _ma((WEB / d.strip("/") / "page.tsx").read_text(encoding="utf-8")))
+    khai = getattr(AC, "LOI_VAO_KHAI_RIENG", {})
     thieu = []
     for p in _trang_con():
         cha = p.rsplit("/", 1)[0]
         if not (WEB / cha.strip("/") / "page.tsx").exists():
-            thieu.append(f"{p} (không có màn cha {cha})")
+            # Màn cha theo đường dẫn cố ý không tồn tại → phải ĐỨNG TÊN màn nào dẫn tới.
+            # Lời khai KHÔNG được tin: ba điều kiện dưới đây kiểm lại từng cái một.
+            man = khai.get(p)
+            if not man:
+                thieu.append(f"{p} (không có màn cha {cha}, và không khai lối vào nào ở "
+                             f"access.LOI_VAO_KHAI_RIENG)")
+                continue
+            ok = []
+            for m in man:
+                if not (WEB / m.strip("/") / "page.tsx").exists():
+                    thieu.append(f"{p} (khai lối vào {m} nhưng màn ấy không có thật)")
+                elif m not in AC.MENU_ROLES:
+                    thieu.append(f"{p} (khai lối vào {m} nhưng màn ấy không có trong menu — "
+                                 f"tự nó cũng không ai tới được)")
+                elif not _co_lien_ket(doc(m), p):
+                    thieu.append(f"{p} (khai lối vào {m} nhưng mã màn ấy không dẫn sang)")
+                else:
+                    ok.append(m)
+            if not ok:
+                continue
             continue
-        # `"/a/b"` hoặc `"/a/b?ky=" + …` — trang con nhận tham số trên đường dẫn vẫn là một lối vào.
-        if f'"{p}"' not in doc(cha) and f'"{p}?' not in doc(cha):
+        if not _co_lien_ket(doc(cha), p):
             thieu.append(p)
     return thieu
 
