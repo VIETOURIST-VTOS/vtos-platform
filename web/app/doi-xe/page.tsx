@@ -251,6 +251,7 @@ function DoiXe() {
       <span className="muted" style={{ alignSelf: "center" }}>Sổ con:</span>
       <a className="act grey" style={{ margin: 0 }} href="/doi-xe/phat-tai-xe" target="_blank" rel="noopener">Phạt tài xế ↗</a>
       <a className="act grey" style={{ margin: 0 }} href="/doi-xe/gia-dau" target="_blank" rel="noopener">Giá dầu & định mức ↗</a>
+      <a className="act grey" style={{ margin: 0 }} href="/doi-xe/xe-hom-nay" target="_blank" rel="noopener">Xe hôm nay theo sheet ↗</a>
     </div>
 
     {tab === "chuyen" && <>
