@@ -13,8 +13,12 @@
 .vh-nhom h3{margin:0}
 .vh-hang{display:grid;gap:12px}
 .vh-hang.h2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.vh-hang.h4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-@media (min-width:1100px){.vh-hang.h4{grid-template-columns:repeat(4,1fr)}}
+/* QT-3 · Chủ tịch 24/10/2026: BỐN Ô MỘT HÀNG NGANG. Bản cũ dùng `auto-fit` với ô tối thiểu
+   200px và chỉ ép bốn cột từ 1100px, nên ở bề ngang quanh 900–1100px nó rớt thành 3 + 1 — một
+   ô lẻ loài ở hàng dưới. Nấc cố định: 1 cột điện thoại, 2 cột máy bảng, 4 cột từ 860px. */
+.vh-hang.h4{grid-template-columns:1fr}
+@media (min-width:560px){.vh-hang.h4{grid-template-columns:repeat(2,1fr)}}
+@media (min-width:860px){.vh-hang.h4{grid-template-columns:repeat(4,1fr)}}
 .vh-o{background:var(--vtos-card);border:1px solid var(--vtos-line);border-radius:var(--vtos-radius-md,10px);
   padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}
 .vh-o.uu{flex-direction:row;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;
@@ -94,5 +98,3 @@
 .c-ch{background:var(--vtos-warning)}
 .c-nn{background:var(--vtos-text-mute)}
 .c-kt{background:var(--vtos-navy)}
-.vh-hang.h3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-@media (min-width:900px){.vh-hang.h3{grid-template-columns:repeat(3,1fr)}}

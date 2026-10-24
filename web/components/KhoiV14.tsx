@@ -254,6 +254,9 @@ type BoKy = Partial<Record<"thang" | "quy" | "nam", HieuQuaXe>> & {
 type XeHomNay = {
   dang_chay?: number | null; o_bai?: number | null; dieu_duoc?: number | null;
   bat_thuong?: number | null; lech?: number | null; co_nguon?: boolean | null;
+  /** HQ-5 — bảng LỆNH ĐIỀU XE đã có lấy một dòng chưa. Khác `co_nguon`, vốn soi bảng XE.
+   *  Xem `services/xe_hom_nay._co_lenh_bao_gio` để biết vì sao cần hai cờ, không phải một. */
+  co_lenh?: boolean | null;
 };
 
 export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
@@ -301,8 +304,17 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
   const o: HieuQuaXe = (bo?.[ky]) || (ky === "thang" && !moc ? (d || {}) : {});
   const coNguonKy = !!bo?.[ky] || (ky === "thang" && !moc && !!d);
 
+  /* QT-3 24/10/2026 — ĐI QUA `toLocaleString("vi-VN")`, ĐỪNG NỐI THẬNG SỐ VÀO CHUỖI.
+     Bản cũ viết `${x}${duoi}` nên JS in theo chuẩn Mỹ: màn Chủ tịch hiện `37.3%`, `43.6%`,
+     `27.1 L/100km`, `10799 đ` — trong khi 19 chỗ khác của cùng màn dùng chuẩn Việt (`176,3 tỷ`,
+     `8.030.563.416`). Hai cách viết số trên một màn tiền là người đọc phải tự đoán dấu nào là gì.
+     `10799 đ` là chỗ nặng nhất: thiếu dấu phân nhóm thì đọc lướt dễ thành 107,99.
+     `maximumFractionDigits: 1` để phần trăm và tiêu hao giữ đúng một số lẻ như cũ. */
   const so = (x: any, duoi = "") =>
-    x === null || x === undefined || x === "" ? null : `${x}${duoi}`;
+    x === null || x === undefined || x === "" ? null
+      : `${typeof x === "number"
+            ? x.toLocaleString("vi-VN", { maximumFractionDigits: 1 })
+            : x}${duoi}`;
   const tien = (x: any) => (x === null || x === undefined ? null : gonSo(Number(x)));
   /* «2026-10-20» → «20/10». Cắt bằng chuỗi chứ không qua `new Date`: chuỗi ngày trần được trình
      duyệt đọc là UTC rồi in lại theo múi giờ máy, nên ở múi âm nó lùi một ngày — và một con số
@@ -384,9 +396,24 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
     ["Lợi nhuận", tien(o.loi_nhuan), "loi_nhuan"],
     ["Biên lợi nhuận", pt(o.ty_le_loi_nhuan), "ty_le_loi_nhuan"],
   ];
+  /* HQ-4 (23/10/2026) — «Chi phí / km» GỠ KHỎI MÀN HÌNH CHỦ TỊCH, anh Tuấn chốt.
+     Lý do xếp chỗ: tầng vận hành đang có SÁU ô (bốn ô của `vanHanh` + Công suất + Xe đang đi) trong một
+     lưới `auto-fit minmax(150px)` — trên màn của anh lưới ấy xếp năm ô một hàng, nên ô thứ sáu
+     «Xe đang đi» rơi xuống hàng riêng và đứng một mình dưới một hàng trống. Bỏ một ô là cả tầng
+     về đúng MỘT hàng năm ô, không cần đụng tới lưới chung.
+
+     Vì sao ô bị bỏ là «Chi phí / km» chứ không phải ô khác: trong sáu ô thì năm ô kia trả lời
+     một câu Chủ tịch hỏi hằng ngày (đội xe chạy bao nhiêu ngày · ăn bao nhiêu dầu · chạy rỗng
+     bao nhiêu · dùng hết bao nhiêu phần công suất · hôm nay mấy xe đang trên đường), còn
+     «chi phí mỗi km» là chỉ số để Đội xe so giữa các xe với nhau — nó chỉ có nghĩa khi đặt cạnh
+     chi phí/km của TỪNG xe, và chỗ ấy là trang `/lai-lo-doi-xe`.
+
+     CON SỐ KHÔNG BỊ XOÁ, NÓ CHỈ KHÔNG LÊN MÀN NÀY: `chi_phi_moi_km` giữ nguyên trong hợp đồng dữ
+     liệu ở đầu tệp, máy chủ vẫn trả, và nó vẫn nằm trong `cot` bên dưới — mảng ấy là phép đo
+     "kỳ này có số hay không", không phải danh sách ô để vẽ. Xoá nó khỏi `cot` là làm khối tưởng
+     mình rỗng trong khi máy chủ có số. */
   const vanHanh: [string, string | null, string][] = [
     ["Ngày xe hoạt động", so(o.ngay_xe_hoat_dong), "ngay_xe_hoat_dong"],
-    ["Chi phí / km", so(o.chi_phi_moi_km, " đ"), "chi_phi_moi_km"],
     ["Tiêu hao", so(o.tieu_hao_l100, " L/100km"), "tieu_hao_l100"],
     ["Km chạy rỗng", so(o.km_chay_rong), "km_chay_rong"],
   ];
@@ -402,6 +429,16 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
      vắt thành hai dòng, làm ô ấy cao hơn năm ô bên cạnh và cả hàng gãy. */
   const SO_NHO: React.CSSProperties = { fontSize: "calc(16/14*1rem)", whiteSpace: "nowrap" };
   const xeCoNguon = !!xe?.co_nguon;
+  /* HQ-5 (23/10/2026) — BẢNG LỆNH TRỐNG THÌ KHÔNG IN SỐ 0.
+     Đo trên hệ thật 23/10/2026: `/fleet/lenh-dieu-xe` trả MẢNG RỖNG — chưa ai lập một lệnh điều
+     xe nào, bao giờ. Mà `co_nguon` soi bảng XE (11 xe → true), nên ô này in «0» kèm «11 xe nằm
+     bãi trên 11 xe điều được»: đọc ra là đã đếm xong và hôm nay đội xe nghỉ.
+     Sự thật khác hẳn: cái bảng mà con số này đếm chưa có ai nhập. Và vì nó chưa có ai nhập nên ô
+     ấy sẽ in 0 mỗi ngày — một con số không bao giờ sai, không bao giờ đổi, và không bao giờ cho
+     ai biết là cửa nhập đang bỏ không.
+     `co_lenh === false` mới là «chưa ai lập lệnh». `undefined` thì giữ nguyên lối cũ: máy chủ
+     bản trước chưa trả cờ này, và đoán hộ một màn hình Chủ tịch thì thà đừng đoán. */
+  const chuaLapLenh = xe?.co_lenh === false;
   const chuoi: DiemChuoi[] = bo?.chuoi || [];
   const nhanKy = chuoi.map((c) => c.nhan);
   const diem = (lay: (c: DiemChuoi) => number | null | undefined) =>
@@ -494,9 +531,21 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
 
             Con số này là của HÔM NAY, không theo kỳ đang chọn — nên nói rõ ngay dưới nhãn, không để
             người đọc tưởng nó đổi theo nút Tháng/Quý/Năm. */}
-        <div className={"v14-o" + (xeCoNguon ? "" : " rong")}>
+        <div className={"v14-o" + (xeCoNguon && !chuaLapLenh ? "" : " rong")}>
           <div className="v14-o-nhan">Xe đang đi <span className="muted">· hôm nay</span></div>
-          {xeCoNguon ? (
+          {xeCoNguon && chuaLapLenh ? (
+            /* Có xe, chưa có lệnh. Cửa trỏ thẳng sang chỗ lập lệnh, và câu dưới nói rõ con số này
+               đếm LỆNH chứ không đếm chuyến — vì sổ chuyến thì đang có số, nên người đọc dễ kết
+               luận màn hình hỏng trong khi nó đang đếm đúng một cái bảng còn trống. */
+            <>
+              <Link className="v14-o-so v14-o-chu" href="/doi-xe">chờ Đội xe
+                <span className="muted"> · chưa lập lệnh điều xe nào</span></Link>
+              <div className="muted" style={{ fontSize: "calc(11/14*1rem)", marginTop: 2 }}>
+                {xe!.dieu_duoc} xe điều được. Ô này đếm <b>lệnh điều xe</b>, không đếm chuyến đã
+                ghi trong sổ quyết toán.
+              </div>
+            </>
+          ) : xeCoNguon ? (
             <>
               {/* `?? 0` GỠ 22/10/2026 (ca đỏ test_tc23). Khối này ĐÃ có cửa «chưa có nguồn» ở
                   tầng trên — `xeCoNguon` — nhưng BÊN TRONG nhánh có nguồn thì `dang_chay` vẫn có
