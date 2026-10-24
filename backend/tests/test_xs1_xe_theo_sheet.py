@@ -267,3 +267,14 @@ def test_chu_tich_khong_nam_trong_vai_dan_link():
     """Chủ tịch là người ký duy nhất của tham số; người trình không tự ký."""
     from app.api.v1 import fleet as F
     assert "chutich" not in F.GHI_LINK_SHEET and "gd_doi_xe" in F.GHI_LINK_SHEET
+
+
+def test_o_chu_tich_doc_sheet_khi_chua_co_lenh():
+    """XS-1c: ô «Xe đang đi» trên màn Chủ tịch hiện số theo sheet khi chưa có lệnh, và nói ra nguồn."""
+    trang = (GOC / "web/app/page.tsx").read_text(encoding="utf-8")
+    assert "sheet={sec.xe_theo_sheet}" in trang
+    khoi = (GOC / "web/components/KhoiV14.tsx").read_text(encoding="utf-8")
+    m = re.search(r"\{xeCoNguon && chuaLapLenh && sheet && !sheet\.loi \? \((.*?)\) : xeCoNguon && chuaLapLenh \?",
+                  khoi, re.S)
+    assert m, "nhánh sheet phải đứng TRƯỚC nhánh «chờ Đội xe», và chỉ khi chưa có lệnh"
+    assert "theo sheet Đội xe" in m.group(1) and "/doi-xe/xe-hom-nay" in m.group(1)
