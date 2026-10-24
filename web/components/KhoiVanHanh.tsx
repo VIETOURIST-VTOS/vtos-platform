@@ -106,7 +106,8 @@ export function KhoiVanHanh({ d, onThuLai, luu_dem }: {
   return (
     <section className="panel vh" id="van-hanh" aria-labelledby="vh-tieu-de">
       <div className="vh-dau">
-        <div><div className="vh-eb">Tổng quan</div><h2 id="vh-tieu-de">Vận hành &amp; công việc</h2></div>
+        {/* 24/10/2026 — anh Tuấn bỏ nhãn «Tổng quan» phía trên tiêu đề (ghi chú trên màn hình Chủ tịch). */}
+        <div><h2 id="vh-tieu-de">Vận hành &amp; công việc</h2></div>
         {canhBao && <span className={"vh-moc cu"}>{canhBao}</span>}
       </div>
 
@@ -173,8 +174,8 @@ export function KhoiVanHanh({ d, onThuLai, luu_dem }: {
         </div>
       </div>
 
-      <div className="vh-nhom"><h3>Hoạt động tour</h3>
-        <span className="vh-phu">Theo trạng thái · các nhóm có thể giao nhau</span></div>
+      {/* 24/10/2026 — anh Tuấn bỏ dòng «Theo trạng thái · các nhóm có thể giao nhau». */}
+      <div className="vh-nhom"><h3>Hoạt động tour</h3></div>
       <div className="vh-hang h4">
         <div className="vh-o"><div className="vh-nhan">Tour đang bán</div><So v={gd ? gd.dang_ban : gd} />
           <div className="vh-phu">Đã duyệt, chưa tới ngày đi</div>

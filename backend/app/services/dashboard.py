@@ -356,6 +356,17 @@ def build(db: Session, u: User) -> dict:
         # nhật trình chuyến — xem chú thích đầu services/xe_hom_nay.py để biết vì sao khác nhau.
         from app.services import xe_hom_nay as XE
         sec["xe_hom_nay"] = XE.dem(db, hom_nay=today)
+        # XS-1 (Chủ tịch 25/10/2026): CHƯA có lệnh điều xe nào thì đọc sheet quyết toán của Đội xe.
+        # Có lệnh rồi thì LỆNH THAY SHEET — không tính, để màn hình không có hai con số «xe đang đi».
+        # Trường riêng, không trộn vào `xe_hom_nay`: số ấy đếm LỆNH, số này đếm DÒNG SHEET.
+        # Bọc try riêng: sheet ngừng công bố hay mạng hỏng không được kéo sập bảng điều hành.
+        sec["xe_theo_sheet"] = None
+        if not sec["xe_hom_nay"].get("co_lenh"):
+            try:
+                from app.services import xe_theo_sheet as XS
+                sec["xe_theo_sheet"] = XS.tom_tat(db, today)
+            except Exception as ex:
+                R.audit(db, "robot", "robot", "xs1_sheet_loi", "dashboard", after={"ly_do": str(ex)[:200]})
         # ── HQ-1 (13/10/2026) · khối 04b Hiệu quả đội xe ────────────────────────────────────
         # Bốn ô này nằm trên bản vẽ từ lâu và giao diện đã dựng xong (KhoiV14.tsx), nhưng máy chủ
         # chưa bao giờ trả trường nào — rà cả kho mã ngày 12/10 thì `ngay_xe_hoat_dong`,

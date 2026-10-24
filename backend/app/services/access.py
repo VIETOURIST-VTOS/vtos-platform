@@ -1364,7 +1364,9 @@ MAN_CON_LENH_DIEU_XE = ("/lenh-dieu-xe/de-nghi", "/lenh-dieu-xe/de-nghi/moi",
 # Đó cũng là vì sao cửa `/fleet/tai-xe-chon` phải tồn tại: ô chọn tài xế KHÔNG được gọi nhóm
 # "/api/v1/tai-xe", nhóm ấy không có trong MAN_HINH_API["/doi-xe"].
 MAN_CON_DOI_XE = ("/doi-xe/phat-tai-xe", "/doi-xe/phat-tai-xe/moi",
-                  "/doi-xe/gia-dau", "/doi-xe/gia-dau/moi")
+                  "/doi-xe/gia-dau", "/doi-xe/gia-dau/moi",
+                  # XS-1 (25/10/2026): xe đang đi theo sheet Đội xe — chỉ gọi GET /fleet/xe-theo-sheet.
+                  "/doi-xe/xe-hom-nay")
 # CUA-1 · 23/10/2026 — hồ sơ MỘT hướng dẫn viên. Trang con, KHÔNG vào MENU_ROLES.
 #
 # Vì sao không vào MENU_ROLES: `test_menu.test_moi_man_hinh_deu_co_loi_vao` đòi mọi đường
