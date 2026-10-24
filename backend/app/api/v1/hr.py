@@ -175,23 +175,83 @@ def update_user(uid: int, data: TaiKhoanIn, u: User = Depends(require_roles(*HR_
 
 
 class ResetPwIn(BaseModel):
-    new_password: str = ""      # trống = mã NV
+    new_password: str = ""      # người bấm tự gõ; để trống thì MÁY SINH
+    dung_ma_nv: bool = False    # dùng mã nhân viên làm mật khẩu tạm — lối CŨ, xem chú thích dưới
+
+
+# Bảng chữ cái của mật khẩu tạm: BỎ HẲN những ký tự đọc nhầm được khi chép tay hoặc đọc qua điện
+# thoại — 0/O, 1/l/I, 5/S, 2/Z. Người nhận mật khẩu tạm thường phải gõ lại từ một tin nhắn hoặc
+# nghe đọc, và một ký tự đọc nhầm thành một lần «đăng nhập không được» mà không ai tìm ra vì sao.
+CHU_MAT_KHAU_TAM = "abcdefghijkmnpqrstuvwxyzACDEFGHJKLMNPQRTUVWXY346789"
+
+
+def _sinh_mat_khau_tam(n: int = 12) -> str:
+    """Mật khẩu tạm ngẫu nhiên: đủ dài để không dò được, đủ ngắn để chép tay.
+
+    `secrets` chứ không phải `random`: `random` sinh theo một bộ đếm đoán được, và mật khẩu đoán
+    được thì bằng không có mật khẩu.
+    """
+    import secrets
+    return "".join(secrets.choice(CHU_MAT_KHAU_TAM) for _ in range(n))
 
 
 @router.post("/users/{uid}/reset-password")
 def reset_password(uid: int, data: ResetPwIn, u: User = Depends(require_roles(*HR_WRITE)), db: Session = Depends(get_db)):
-    """HCNS/CNTT đặt lại mật khẩu cho một tài khoản (mặc định = mã NV)."""
+    """HCNS/CNTT đặt lại mật khẩu cho một tài khoản. MẶC ĐỊNH: máy sinh mật khẩu tạm.
+
+    VÌ SAO ĐỔI MẶC ĐỊNH — đo trên hệ thật ngày 25/10/2026, hai chỗ hỏng chồng lên nhau.
+
+    (1) QUY ƯỚC «MẬT KHẨU TẠM = MÃ NV» VỐN ĐÃ YẾU Ở CÔNG TY NÀY. Mã nhân viên Vietourist là SỐ
+        ĐẾM: 1, 2, 15, 17, 231, 307 — bảng lương 09/2026 có 109 người, mã lớn nhất dưới 400. Dò
+        hết dãy ấy mất vài phút, và mã hiện công khai ngay trên bảng Phân quyền. Cờ `buộc đổi` chỉ
+        cứu được nếu NGƯỜI THẬT đăng nhập trước kẻ dò; những tài khoản cần đặt lại thường là tài
+        khoản chưa ai từng đăng nhập, nên ai gõ trước thì người ấy vào.
+
+    (2) CHỐT `len < 3` CHẶN ĐÚNG 31/109 NGƯỜI, VÀ BÁO SAI LÝ DO. Mã 1–2 chữ số rơi vào chốt ấy và
+        cửa trả «Chưa có mã NV» — trong khi mã có đủ, chỉ là ngắn. Người quản trị đi tìm một cái
+        mã không thiếu. Chốt KHÔNG gỡ (mật khẩu `15` thì thà đừng đặt), nhưng lời báo phải nói
+        đúng chuyện gì đang xảy ra, và phải có đường đi tiếp.
+
+    BA ĐƯỜNG, theo thứ tự: mật khẩu người bấm tự gõ · `dung_ma_nv` · MÁY SINH (mặc định).
+
+    MẬT KHẨU TRẢ VỀ ĐÚNG MỘT LẦN và không lưu ở dạng đọc được — cùng cách tài khoản vai trò máy đã
+    làm trong `access.py`. Mất thì đặt lại, không tra lại được.
+
+    NHẬT KÝ KHÔNG BAO GIỜ GHI MẬT KHẨU. Nhật ký để truy AI làm gì, không phải chỗ cất chìa khoá:
+    ghi vào đấy là biến một quyển sổ nhiều người đọc được thành một kho mật khẩu.
+    """
     from app.core.security import hash_password
     t = db.get(User, uid)
     if not t: raise HTTPException(404, "Không có tài khoản")
     if t.role in ("chutich", "tgd") and u.role != "cntt" and not toan_quyen_ke_ca_tach_bach(u, db): raise HTTPException(403, "Chỉ CNTT đặt lại mật khẩu lãnh đạo")
-    pw = data.new_password.strip() or t.staff_code
-    if not pw or len(pw) < 3: raise HTTPException(422, "Chưa có mã NV – nhập mật khẩu mới")
+    go_tay = data.new_password.strip()
+    if go_tay:
+        pw, cach = go_tay, "go_tay"
+    elif data.dung_ma_nv:
+        ma = (t.staff_code or "").strip()
+        if not ma:
+            raise HTTPException(422, f"{t.full_name} chưa có mã nhân viên. Bỏ chọn «dùng mã NV» để "
+                                     f"máy sinh mật khẩu tạm, hoặc gán mã ở màn hình Nhân sự.")
+        if len(ma) < 3:
+            raise HTTPException(422, f"Mã nhân viên «{ma}» chỉ có {len(ma)} ký tự — quá ngắn để làm "
+                                     f"mật khẩu, dò ra trong vài giây và mã đang hiện công khai trên "
+                                     f"bảng này. Bỏ chọn «dùng mã NV» để máy sinh mật khẩu tạm.")
+        pw, cach = ma, "ma_nv"
+    else:
+        pw, cach = _sinh_mat_khau_tam(), "tu_sinh"
     t.password_hash = hash_password(pw)
     t.must_change_password = True      # mật khẩu do người khác đặt là mật khẩu TẠM, phải đổi ở lần đăng nhập đầu
-    R.audit(db, u.username, u.role, "dat_lai_mat_khau", f"user:{t.username}", after={"buoc_doi": True}); db.commit()
-    return {"message": f"Đã đặt lại mật khẩu cho {t.full_name} ({t.username})" + (" = mã NV" if not data.new_password.strip() else "")
-                       + " – người dùng phải đổi mật khẩu ở lần đăng nhập kế tiếp"}
+    R.audit(db, u.username, u.role, "dat_lai_mat_khau", f"user:{t.username}",
+            after={"buoc_doi": True, "cach": cach}); db.commit()
+    kq = {"message": f"Đã đặt lại mật khẩu cho {t.full_name} ({t.username})"
+                     + (" = mã NV" if cach == "ma_nv" else "")
+                     + " – người dùng phải đổi mật khẩu ở lần đăng nhập kế tiếp",
+          "cach": cach}
+    if cach == "tu_sinh":
+        kq["mat_khau"] = pw
+        kq["luu_y"] = ("Chép ngay và gửi cho người dùng – màn hình này là nơi DUY NHẤT mật khẩu hiện "
+                       "ra. Không lưu ở dạng đọc được, mất thì đặt lại chứ không tra lại được.")
+    return kq
 
 
 @router.post("/employees", status_code=201)

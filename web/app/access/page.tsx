@@ -85,6 +85,9 @@ function AccessPage() {
   // QL-1: ô cấp ngoại lệ. `capMo` mở hay đóng; `capUid` là người điền sẵn khi mở từ một dòng.
   const [capMo, setCapMo] = useState(false);
   const [capUid, setCapUid] = useState<number | null>(null);
+  // MK-1 · 25/10/2026 — mật khẩu tạm vừa sinh, hiện ĐÚNG MỘT LẦN. Giữ trong trạng thái màn hình
+  // chứ KHÔNG đưa vào toast: toast tự tắt sau vài giây, mà mất chuỗi này thì phải đặt lại từ đầu.
+  const [mkTam, setMkTam] = useState<{ ten: string; username: string; mat_khau: string } | null>(null);
   const [hsTen, setHsTen] = useState("");
   const [tc, setTc] = useState<any>(null);
   const [tcVai, setTcVai] = useState("");
@@ -234,6 +237,27 @@ function AccessPage() {
         onDone={(m: string) => { toast(m); setCapMo(false); setCapUid(null);
           api("/access/grants").then(setGrants).catch(() => {}); }} />}
 
+      {/* MK-1 — MẬT KHẨU TẠM HIỆN ĐÚNG MỘT LẦN. Không lưu ở dạng đọc được; đóng khối này là mất,
+          phải sinh lại. Cố ý KHÔNG dùng toast: toast tắt sau vài giây và người bấm chưa kịp chép. */}
+      {mkTam && <div className="panel" style={{ borderColor: "var(--ok, #1d6f4c)" }}>
+        <h2>Mật khẩu tạm của {mkTam.ten}</h2>
+        <p className="muted">Tài khoản <b>{mkTam.username}</b></p>
+        <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap", margin: "8px 0" }}>
+          <code style={{ fontSize: "1.15rem", letterSpacing: ".06em", padding: "8px 13px",
+                         borderRadius: 7, border: "1px solid var(--line, #444)", userSelect: "all",
+                         overflowWrap: "anywhere" }}>{mkTam.mat_khau}</code>
+          <button className="act" style={{ margin: 0 }} onClick={() => {
+            navigator.clipboard?.writeText(mkTam.mat_khau)
+              .then(() => toast("Đã chép mật khẩu tạm"))
+              .catch(() => toast("Không chép được — bôi đen rồi chép tay", true));
+          }}>Chép</button>
+          <button className="act grey" style={{ margin: 0 }} onClick={() => setMkTam(null)}>Đóng</button>
+        </div>
+        <p className="muted"><b>Chép ngay và gửi cho người dùng.</b> Đây là nơi DUY NHẤT mật khẩu
+          hiện ra — không lưu ở dạng đọc được, mất thì sinh lại chứ không tra lại được. Người này
+          buộc phải đổi mật khẩu ở lần đăng nhập kế tiếp.</p>
+      </div>}
+
       <div className="scroll"><table><thead><tr>
         <th>Mã NV</th><th>Họ tên</th><th>Tài khoản</th><th>Vai trò</th><th>Phòng</th><th>Pháp nhân</th><th>Email công việc</th>
         <th>Trạng thái</th><th>Đăng nhập lần cuối</th><th>Mật khẩu</th><th>Hồ sơ</th><th></th></tr></thead>
@@ -292,26 +316,29 @@ function AccessPage() {
             {laLanhDao && <button className="act grey" style={{ margin: 0, marginRight: 4 }}
               title="Cấp một quyền có thời hạn cho riêng người này"
               onClick={() => { setCapUid(r.id); setCapMo(true); setSuaUid(null); setHsUid(null); }}>Cấp ngoại lệ</button>}
-            {/* ĐẶT LẠI MẬT KHẨU — 12/10/2026. Cửa máy chủ đã có từ lâu và mở cho đúng hcns + cntt,
-                nhưng KHÔNG một màn hình nào gọi tới nó, nên trên thực tế nó chưa tồn tại: CNTT muốn
-                giúp một người quên mật khẩu thì chỉ có nút "Nạp + đặt lại = mã NV" ở màn hình Nhân
-                sự, mà nút ấy đặt lại cho CẢ danh sách. Không ai dám bấm, nên không ai được giúp. */}
+            {/* ĐẶT LẠI MẬT KHẨU — 12/10/2026, sửa lại ở MK-1 ngày 25/10/2026.
+                Cửa máy chủ đã có từ lâu và mở cho đúng hcns + cntt, nhưng KHÔNG một màn hình nào
+                gọi tới nó, nên trên thực tế nó chưa tồn tại.
+
+                MK-1 — vì sao nút này không còn đặt mật khẩu = mã NV nữa. Chủ tịch báo CNTT cũng
+                không đặt lại được: máy chủ trả «Chưa có mã NV – nhập mật khẩu mới». Đo ra mã CÓ
+                đủ, chỉ là NGẮN — mã nhân viên Vietourist là số đếm, và 31/109 người ở bảng lương
+                09/2026 mang mã 1–2 chữ số, kể cả mã `1` của chính Chủ tịch. Lời báo ấy lại mời
+                nhập một mật khẩu mà màn hình KHÔNG có ô nào để nhập. Sâu hơn: quy ước «mật khẩu
+                tạm = mã NV» vốn đã yếu ở công ty này — mã là số dưới 400 và hiện công khai ngay
+                trên bảng này. Nay nút sinh MẬT KHẨU NGẪU NHIÊN và hiện đúng một lần. */}
             {canDatLaiMK && <button className="act grey" style={{ margin: 0 }}
-              title="Đặt lại mật khẩu = mã nhân viên; người dùng phải đổi ở lần đăng nhập kế tiếp"
-              onClick={() => {
-                // Chặn ở màn hình trước khi máy chủ phải trả 422: không có mã NV thì không có mật
-                // khẩu tạm, và lời báo ở đây nói rõ phải làm gì chứ không chỉ nói là hỏng.
-                if (!r.staff_code) {
-                  toast(`${r.full_name} chưa có mã nhân viên, nên không đặt được mật khẩu tạm. `
-                        + `Gán mã NV ở màn hình Nhân sự trước.`, true);
-                  return;
-                }
-                if (!confirm(`Đặt lại mật khẩu của ${r.full_name} (${r.username}) thành mã nhân `
-                           + `viên ${r.staff_code}?\n\nNgười này sẽ buộc phải đổi mật khẩu ngay ở `
-                           + `lần đăng nhập kế tiếp. Mã NV đang hiện trên chính bảng này, nên hãy `
-                           + `báo họ đăng nhập và đổi càng sớm càng tốt.`)) return;
-                send(`/users/${r.id}/reset-password`, { new_password: "" }, "POST");
-              }}>Đặt lại MK</button>}
+              title="Máy sinh mật khẩu tạm, hiện đúng một lần; người dùng phải đổi ở lần đăng nhập kế tiếp"
+              onClick={async () => {
+                if (!confirm(`Sinh mật khẩu tạm cho ${r.full_name} (${r.username})?\n\n`
+                           + `Mật khẩu hiện ra ĐÚNG MỘT LẦN để anh chép gửi cho họ — không tra lại `
+                           + `được. Người này buộc phải đổi ngay ở lần đăng nhập kế tiếp.`)) return;
+                try {
+                  const kq = await api<any>(`/users/${r.id}/reset-password`, { method: "POST", json: {} });
+                  setMkTam({ ten: r.full_name, username: r.username, mat_khau: kq.mat_khau });
+                  loadAcc(); loadGaps();
+                } catch (e) { toast(errMsg(e), true); }
+              }}>Sinh MK tạm</button>}
           </td>
         </tr>)}</tbody></table></div>
 
