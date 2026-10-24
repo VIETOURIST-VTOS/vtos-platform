@@ -90,9 +90,13 @@ export function KhoiVanHanh({ d, onThuLai, luu_dem }: {
   const v = d.viec;
   const luc = v?.luc;
   const soCu = !!luu_dem;
-  const phamVi = v ? (v.pham_vi === "toan_bo" ? "Toàn bộ" : "Theo quyền của anh/chị") : "";
-  const moc = v === undefined ? "Chưa kết nối" : v === null ? "Lỗi tải"
-    : `${soCu ? "Số lưu đệm · " : ""}Cập nhật ${gio(luc)} · ${phamVi}`;
+  /* QT-3 · Chủ tịch 24/10/2026: bỏ dòng «Cập nhật … · Toàn bộ» ở góc phải.
+     NHƯNG KHÔNG BỎ IM BA TRẠNG THÁI BẤT THƯỜNG. Dòng cũ làm hai việc trong một chỗ: nói giờ
+     cập nhật (việc bình thường, Chủ tịch bảo bỏ) và báo khi số KHÔNG ĐÁNG TIN — chưa kết nối,
+     tải hỏng, hoặc là số lưu đệm cũ tới 5 phút. Bỏ cả hai là màn hình im lặng bày số cũ hoặc số
+     hỏng trông y hệt số đúng. Nay chỉ hiện khi có chuyện; lúc bình thường góc phải trống hẳn. */
+  const canhBao = v === undefined ? "Chưa kết nối" : v === null ? "Lỗi tải"
+    : soCu ? `Số lưu đệm · ${gio(luc)}` : null;
   const do_ = v ? soMuc(v, "red") : v;
   const cq = d.cho_qt;
   const gd = d.giai_doan;
@@ -102,9 +106,8 @@ export function KhoiVanHanh({ d, onThuLai, luu_dem }: {
   return (
     <section className="panel vh" id="van-hanh" aria-labelledby="vh-tieu-de">
       <div className="vh-dau">
-        <div><div className="vh-eb">Tổng quan</div><h2 id="vh-tieu-de">Vận hành &amp; công việc</h2>
-          <div className="vh-phu">Ưu tiên cần xử lý, tình trạng tour và nguồn khách.</div></div>
-        <span className={"vh-moc" + (v === null ? " cu" : "")}>{moc}</span>
+        <div><div className="vh-eb">Tổng quan</div><h2 id="vh-tieu-de">Vận hành &amp; công việc</h2></div>
+        {canhBao && <span className={"vh-moc cu"}>{canhBao}</span>}
       </div>
 
       <div className="vh-nhom"><h3>Ưu tiên cần xử lý</h3></div>
