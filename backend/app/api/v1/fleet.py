@@ -2342,3 +2342,13 @@ def xe_xoa(vid: int, ly_do: str, u: User = Depends(require_roles(*XOA_XE)),
             after={"ly_do": kq["ly_do"], "lich_su_bien": len(kq["lich_su_bien"])})
     db.commit()
     return {"message": f"Đã xoá xe {bien} khỏi danh mục", "ly_do": kq["ly_do"]}
+
+
+# ── XS-1 (Chủ tịch duyệt bản xem thử 25/10/2026) · xe đang đi theo sheet quyết toán của Đội xe ──
+# CHỈ ĐỌC: không ghi gì vào sheet, không nạp chuyến nào vào VTOS. Xem `services/xe_theo_sheet.py`.
+@router.get("/xe-theo-sheet")
+def xe_theo_sheet(doc_lai: int = Query(0, ge=0, le=1), u: User = Depends(require_roles(*READ)),
+                  db: Session = Depends(get_db)):
+    """`doc_lai=1` bỏ qua đệm 15 phút — nút «Đọc lại ngay» trên màn chi tiết."""
+    from app.services import xe_theo_sheet as XS
+    return XS.bao_cao(db, date.today(), doc_lai=bool(doc_lai))
