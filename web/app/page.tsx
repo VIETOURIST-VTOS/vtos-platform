@@ -155,7 +155,7 @@ function Dash() {
     {/* TQ-1 · Thay ĐÚNG chỗ hai khối cũ (Tồn đọng · hàng thẻ tour), giữa tiền và đội xe. */}
     <KhoiVanHanh d={vh} onThuLai={tai} luu_dem={d.cached === true} />
 
-    <KhoiHieuQuaXe d={sec.hieu_qua_xe} theo_ky={sec.hieu_qua_xe_theo_ky} xe={sec.xe_hom_nay} />
+    <KhoiHieuQuaXe d={sec.hieu_qua_xe} theo_ky={sec.hieu_qua_xe_theo_ky} xe={sec.xe_hom_nay} sheet={sec.xe_theo_sheet} />
 
     {/* Ba khối kinh doanh & nội bộ xếp một hàng: cả ba đều ngắn sau khi bỏ bảng, và đọc cạnh nhau
         thì thấy được bức tranh "bán hàng · lợi nhuận · kỷ luật nội bộ" trong một cái nhìn. */}

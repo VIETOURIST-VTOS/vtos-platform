@@ -259,10 +259,20 @@ type XeHomNay = {
   co_lenh?: boolean | null;
 };
 
-export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
+/** XS-1 (Chủ tịch duyệt bản xem thử 25/10/2026) — `sections.xe_theo_sheet`: xe đang đi đọc từ sheet
+ *  quyết toán của Đội xe. Máy chủ CHỈ gửi khi chưa có lệnh điều xe nào (lệnh VTOS thay sheet), và
+ *  `null` khi chưa nối link. Xem `services/xe_theo_sheet.tom_tat`. */
+type XeTheoSheet = {
+  loi?: string | null; doc_luc?: string | null; ban_cu?: boolean; dieu_duoc?: number;
+  dang_di?: number; o_bai?: number; khong_khop?: number; so_can_sua?: number;
+};
+
+export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
   d?: HieuQuaXe | null;
   /** `sections.xe_hom_nay` — xem `XeHomNay`. */
   xe?: XeHomNay | null;
+  /** `sections.xe_theo_sheet` — xem `XeTheoSheet`. */
+  sheet?: XeTheoSheet | null;
   /** Khi máy chủ trả số theo từng kỳ thì truyền vào đây: { thang: {...}, quy: {...}, nam: {...} },
    *  kèm `mac_dinh` — kỳ HẸP NHẤT còn có số. */
   theo_ky?: BoKy | null;
@@ -531,9 +541,23 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
 
             Con số này là của HÔM NAY, không theo kỳ đang chọn — nên nói rõ ngay dưới nhãn, không để
             người đọc tưởng nó đổi theo nút Tháng/Quý/Năm. */}
-        <div className={"v14-o" + (xeCoNguon && !chuaLapLenh ? "" : " rong")}>
+        <div className={"v14-o" + (xeCoNguon && (!chuaLapLenh || (!!sheet && !sheet.loi)) ? "" : " rong")}>
           <div className="v14-o-nhan">Xe đang đi <span className="muted">· hôm nay</span></div>
-          {xeCoNguon && chuaLapLenh ? (
+          {xeCoNguon && chuaLapLenh && sheet && !sheet.loi ? (
+            /* XS-1 (25/10/2026, ô sửa riêng theo lệnh Chủ tịch dù tệp đang do làn Kiểm soát giữ):
+               chưa có lệnh điều xe thì đếm theo sheet quyết toán của Đội xe, và NÓI RA nguồn — người
+               đọc phải biết số này đếm DÒNG SHEET chứ không đếm lệnh. */
+            <>
+              <div className="v14-o-so" style={SO_NHO}>{sheet.dang_di ?? "—"}</div>
+              <div className="muted" style={{ fontSize: "calc(11/14*1rem)", marginTop: 2 }}>
+                {sheet.o_bai} xe nằm bãi trên {sheet.dieu_duoc} xe điều được · theo sheet Đội xe, đọc {sheet.doc_luc}
+                {sheet.ban_cu && <> · <b className="tag warn">bản cũ</b></>}
+                {!!sheet.so_can_sua && <> · <b className="tag warn">{sheet.so_can_sua} dòng sheet cần sửa</b></>}
+              </div>
+              <Link className="the-cua" href="/doi-xe/xe-hom-nay" style={{ marginTop: 4, display: "inline-block" }}>
+                Xem chi tiết →</Link>
+            </>
+          ) : xeCoNguon && chuaLapLenh ? (
             /* Có xe, chưa có lệnh. Cửa trỏ thẳng sang chỗ lập lệnh, và câu dưới nói rõ con số này
                đếm LỆNH chứ không đếm chuyến — vì sổ chuyến thì đang có số, nên người đọc dễ kết
                luận màn hình hỏng trong khi nó đang đếm đúng một cái bảng còn trống. */
