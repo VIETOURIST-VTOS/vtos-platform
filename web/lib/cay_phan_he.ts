@@ -302,7 +302,6 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
   // CUA-1 22/10/2026: trang hồ sơ MỘT hướng dẫn viên là /ho-so-hdv/[id], đi tới từ danh
   // sách này. Không khai thành mục cây riêng: cây là chỗ bấm được, mà không ai bấm được
   // vào một mã chưa biết.
-  { ma: "4.10.6", ten: "Nhân viên phòng tôi", href: "/nhan-vien-phong-toi" },
           { ma: "4.10.3", ten: "Lịch & bố trí hướng dẫn", href: "/ops?tab=guides" },
           // 08/10/2026 — khai "chưa dựng" là SAI: bảng `BaoCaoSauTour`, cửa máy chủ và form soạn báo cáo
           // trên /xe-hdv đã gộp 06/10, và /huong-dan có cột "Sau tour" để Điều hành đọc.
@@ -310,7 +309,13 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           // Một nửa, và tên phải nói đúng chỗ đang đứng: /huong-dan có cột Thù lao và loại đề xuất
           // "Đối soát thù lao kỳ", nhưng chưa có bảng đối soát theo kỳ đứng riêng.
           { ma: "4.10.5", ten: "Đối soát thù lao — hiện là đề xuất theo kỳ, chưa có bảng đối soát", href: "/huong-dan" },
-          { ma: "4.10.6", ten: "Việc của tài xế & hướng dẫn viên", href: "/xe-hdv", them: true }
+          { ma: "4.10.6", ten: "Việc của tài xế & hướng dẫn viên", href: "/xe-hdv", them: true },
+          // Mã 4.10.7, KHÔNG phải 4.10.6. Đợt CUA-1 (22/10/2026) thêm mục này và trùng mã với
+          // «Việc của tài xế & hướng dẫn viên» ngay bên trên, làm `test_ns5::test_ma_tren_cay_
+          // khong_trung_nhau` đỏ trên main từ hôm ấy. Hai mục cùng mã trong cùng một phân hệ thì
+          // mọi thứ tra theo mã chỉ thấy MỘT trong hai, và không ai biết nó bỏ qua cái nào.
+          // Mục cũ giữ nguyên mã — mục thêm sau nhận mã mới, vì mã cũ có thể đã có chỗ khác trỏ tới.
+          { ma: "4.10.7", ten: "Nhân viên phòng tôi", href: "/nhan-vien-phong-toi" }
         ] }
     ] },
   { khoa: "nhansu", ma: "05", ten: "Nhân sự – Hành chính",
