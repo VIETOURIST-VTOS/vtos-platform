@@ -143,11 +143,25 @@ def test_tra_theo_vai_tro_dem_dung_so_nguoi_dang_o_do():
 
 def test_vai_tro_khong_co_ai_van_tra_cuu_duoc_va_bi_bao():
     """Vai trò trống vẫn mở sẵn một bộ quyền. Trả 404 ở đây là giấu mất đúng thứ cần nhìn."""
-    trong = [v for v in ROLES if not (v in ("nv_kd", "tai_xe", "hcns", "ketoan", "nv_visa", "cntt"))]
+    # ĐỢT DỌN-NO 24/10/2026 — ĐẾM NGƯỜI rồi lấy vai nào bằng không, thay vì một danh sách loại
+    # trừ gõ tay. Danh sách ấy đúng ở ngày viết, và sai từ lúc bộ nạp dữ liệu thử cấp người cho
+    # một vai nữa: đo trên main 24/10/2026 thì `trong[0]` đã có 2 người. Gõ thêm một tên vào
+    # danh sách loại trừ thì chỉ đúng tới lần sau, và lần sau không ai nhớ vì sao có tên ấy.
+    from app.db.session import SessionLocal as _SL
+    _db = _SL()
+    try:
+        co_nguoi = {v for (v,) in _db.execute(select(User.role).distinct()).all()}
+    finally:
+        _db.close()
+    trong = [v for v in ROLES if v not in co_nguoi]
+    assert trong, (
+        "Mọi vai trò trong ROLES đều đã có người mang. Phép thử này cần một vai TRỐNG để đo rằng "
+        "tra cứu một vai chưa ai mang vẫn trả về bộ quyền kèm cảnh báo — thêm một vai chưa cấp "
+        "cho ai, chứ đừng bỏ phép thử.")
     r = client.get(f"/api/v1/access/tra-cuu-vai-tro/{trong[0]}", headers=login("cntt"))
     assert r.status_code == 200, r.text
     d = r.json()
-    assert d["so_nguoi"] == 0
+    assert d["so_nguoi"] == 0, f"vai {trong[0]} đáng ra không ai mang, đang có {d['so_nguoi']}"
     assert any("chưa có ai" in c for c in d["canh_bao"])
     assert d["man_hinh"], "vai trò trống vẫn phải hiện bộ quyền đang mở cho chỗ trống ấy"
 

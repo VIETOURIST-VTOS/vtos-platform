@@ -190,8 +190,55 @@ def _dung_doi_xe():
 def test_xe_dem_dung_bon_con_so():
     from app.services import xe_hom_nay as XE
     r = XE.dem(_dung_doi_xe(), hom_nay=HOM_NAY)
+    # SỬA 23/10/2026 (HQ-5): thêm `co_lenh`. Phép so khớp NGUYÊN BỘ giữ nguyên chứ không đổi thành
+    # so từng khoá — bộ bốn con số này là thứ màn hình Chủ tịch đọc, và một khoá lặng lẽ thêm vào
+    # hay mất đi mà phép thử không kêu là đúng cách một con số trên bảng ấy đổi nghĩa mà không ai biết.
     assert r == {"dieu_duoc": 3, "dang_chay": 2, "o_bai": 1,
-                 "bat_thuong": 1, "lech": 0, "co_nguon": True}, r
+                 "bat_thuong": 1, "lech": 0, "co_nguon": True, "co_lenh": True}, r
+
+
+def test_xe_bang_lenh_trong_thi_khong_phai_so_0():
+    """HQ-5 (23/10/2026) — đo trên hệ thật: `dispatch_orders` RỖNG, màn hình in «0 xe đang đi».
+
+    Số 0 ấy đọc là «đã đếm và hôm nay không điều xe nào», trong khi sự thật là chưa ai lập một lệnh
+    nào bao giờ. Hai câu dẫn tới hai việc khác nhau: một bên là ngày đội xe nghỉ, một bên là cửa
+    nhập chưa ai dùng. `co_nguon` không bắt được chuyện này vì nó soi bảng XE, không soi bảng LỆNH.
+    """
+    from sqlalchemy import insert as _insert
+    from app.services import xe_hom_nay as XE
+    db, Vehicle, _ = _db_xe()
+    db.execute(_insert(Vehicle.__table__), [
+        dict(plate="51A-001", active=True, lifecycle="dang_khai_thac", op_right="so_huu"),
+    ])
+    db.commit()
+    r = XE.dem(db, hom_nay=HOM_NAY)
+    assert r["co_nguon"] is True, "có xe thì bảng XE là có nguồn — chỗ này không đổi"
+    assert r["co_lenh"] is False, (
+        "Bảng lệnh trống mà `co_lenh` vẫn True thì màn hình in 0 như một phép đếm đã xong.")
+    assert r["dang_chay"] == 0 and r["o_bai"] == 1
+
+
+def test_xe_co_lenh_cu_thi_so_0_cua_hom_nay_van_la_so_that():
+    """Mặt kia của HQ-5: có lệnh từ hôm trước mà hôm nay không lệnh nào — 0 ấy LÀ số thật.
+
+    Không có phép thử này thì cờ mới dễ bị siết thành «có lệnh HÔM NAY», và mọi ngày đội xe nghỉ
+    đều hiện ra như một cửa nhập hỏng.
+    """
+    import datetime as _dt
+    from sqlalchemy import insert as _insert
+    from app.services import xe_hom_nay as XE
+    db, Vehicle, DispatchOrder = _db_xe()
+    db.execute(_insert(Vehicle.__table__), [
+        dict(plate="51A-001", active=True, lifecycle="dang_khai_thac", op_right="so_huu"),
+    ])
+    db.execute(_insert(DispatchOrder.__table__), [
+        dict(tour_id=1, vehicle_id=1, driver_id=1, date_from=_dt.date(2026, 9, 1),
+             date_to=_dt.date(2026, 9, 3), status="hoan_thanh", incident_note=""),
+    ])
+    db.commit()
+    r = XE.dem(db, hom_nay=HOM_NAY)
+    assert r["co_lenh"] is True, "có lệnh cũ thì bảng lệnh ĐÃ có người dùng — 0 hôm nay là số thật"
+    assert r["dang_chay"] == 0
 
 
 def test_xe_dem_XE_khong_dem_LENH():

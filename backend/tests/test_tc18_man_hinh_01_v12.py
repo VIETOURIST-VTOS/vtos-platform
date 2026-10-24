@@ -68,23 +68,58 @@ def test_viec_can_quyet_dinh_dung_truoc_cac_con_so():
 
 
 def test_sau_o_lon_va_muc_van_hanh():
-    """TÁM THẺ → SÁU Ô LỚN + HÀNG THẺ NHỎ (TC-42, 16/9/2026) → MỤC «VẬN HÀNH & CÔNG VIỆC» (TQ-1).
+    """TÁM THẺ → SÁU Ô LỚN + HÀNG THẺ NHỎ (TC-42, 16/9) → MỤC «VẬN HÀNH & CÔNG VIỆC» (TQ-1, 22/10)
+    → KHỐI LỒNG + MỘT KHỐI VIỆC (QT-1 và QT-2, Chủ tịch chốt 23–24/10/2026).
 
-    SỬA 22/10/2026 (TQ-1) — anh Tuấn duyệt bản vẽ Tổng quan Vận hành v1.1: hàng thẻ nhỏ và khối
-    Tồn đọng gộp thành một mục, vì hai thứ ấy trả lời CÙNG một câu hỏi ("hôm nay vận hành có gì
-    phải xử lý"). Mảng `const the: The[]` không còn — phép thử cũ đếm sáu nhãn trong mảng ấy nay
-    canh thẳng mục mới.
+    HAI NHÃN RỜI DANH SÁCH VÌ CHỦ TỊCH BẢO GỘP, KHÔNG PHẢI VÌ CHÚNG BIẾN MẤT.
+      · «Quá hạn quyết toán» (QT-1) — Chủ tịch nhìn màn hình và hỏi hai ô «Quá hạn quyết toán»
+        và «Chờ quyết toán» khác nhau chỗ nào. Đo ra: ô nhỏ là MỘT LÁT nằm trọn trong nhóm A của
+        ô lớn (681 ⊂ 709 ⊂ 1.742 hôm đo), mà hai ô đứng cách nhau một hàng và không chỗ nào nói
+        thế — đọc lướt thành hai cách đếm một việc. Nay nó là một dòng LỒNG trong khối «Quyết toán».
+      · «Tồn đọng công việc» (QT-2) — gộp vào khối «Việc nghiêm trọng», vì hai khối trả lời cùng
+        một câu hỏi và cùng đếm trên một tập hồ sơ.
 
-    LUẬT CỦA TC-42 GIỮ NGUYÊN MỘT CHỮ: những con số để LIẾC thì không mang biểu đồ. Mục mới chỉ có
-    một thanh cơ cấu mức độ (không trục, không kỳ) — không nhập bộ vẽ biểu đồ nào. «Xe đang đi» đã
-    chuyển xuống khối đội xe từ TC-72 nên không còn trong danh sách.
+    VÌ SAO KHÔNG CHỈ XOÁ HAI NHÃN KHỎI DANH SÁCH NÀY. Xoá là hạ cổng: ngày nào ai đó gỡ hẳn con
+    số quá hạn, hoặc gỡ nhóm mức độ, khỏi màn hình thì bộ phép thử vẫn xanh và không ai biết màn
+    hình vừa mất một con số. Đúng cái bẫy `test_xe_dang_di...` dựng ra để tránh khi TC-72 chuyển
+    «Xe đang đi» đi chỗ khác. Nên phép thử ĐI THEO hai con số ấy tới CHỖ MỚI và canh ở đó.
+
+    LUẬT CỦA TC-42 GIỮ NGUYÊN MỘT CHỮ: những con số để LIẾC thì không mang biểu đồ. Hai khối ưu
+    tiên chỉ có một thanh cơ cấu (không trục, không kỳ) — không nhập bộ vẽ biểu đồ nào.
     """
     s = _ma(TRANG)
     vh = _ma(VH)
     assert "const the: The[]" not in s, "hàng thẻ cũ sống lại bên cạnh mục mới — một số hai chỗ (TC-40)"
-    for can in ("Việc nghiêm trọng", "Quá hạn quyết toán", "Tour đang bán", "Tour đang đi",
-                "Sắp khởi hành", "Chờ quyết toán", "Tồn đọng công việc", "Khách tiềm năng mới"):
+    for can in ("Việc nghiêm trọng", "Quyết toán", "Tour đang bán", "Tour đang đi",
+                "Sắp khởi hành", "Khách tiềm năng mới"):
         assert can in vh, f"mục Vận hành & công việc thiếu ô “{can}”"
+
+    # ── «Quá hạn quyết toán» ở CHỖ MỚI: một dòng lồng trong khối Quyết toán ──────────────────
+    assert "vh-trong" in vh, (
+        "nhóm lồng (`vh-trong`) biến mất — khối Quyết toán trở lại kiểu danh sách phẳng, và lúc "
+        "ấy không chỗ nào nói con số quá hạn nằm TRONG nhóm «Kết thúc · chờ ĐIỀU HÀNH».")
+    # Canh Ô ĐỌC ĐƯỢC, không canh chuỗi `{so(cq.qua_han)}` chung chung: chuỗi ấy CÒN nằm trong
+    # `aria-label` của thanh cơ cấu, nên gỡ hẳn dòng hiện số mà phép thử vẫn xanh. Chính bản đầu
+    # của phép thử này mắc đúng lỗi ấy và lượt kiểm ngược bắt được — cùng hình dạng với lỗ `qt2_2`
+    # mà làn R1 tìm ra hôm 24/10. Một phép thử canh chuỗi có mặt ở hai chỗ thì nó canh chỗ dễ hơn.
+    assert '<span className="v">{so(cq.qua_han)}</span>' in vh, (
+        "dòng HIỆN con số tour quá hạn không còn trên mục Vận hành (chuỗi trong aria-label không "
+        "tính — người đọc không nhìn thấy nó). QT-1 chuyển con số này vào khối Quyết toán; mất ở "
+        "đây là mất hẳn khỏi màn hình.")
+    assert "<b>QUÁ HẠN</b>" in vh, "dòng quá hạn mất nhãn — còn số mà không ai biết số ấy đếm gì."
+    assert 'href="/?xem=qua-han"' in vh, (
+        "mất lối sang danh sách tour quá hạn. Con số còn trên màn mà không mở ra xem được thì "
+        "Điều hành không biết phải đi đòi chuyến nào.")
+
+    # ── «Tồn đọng công việc» ở CHỖ MỚI: gộp vào khối Việc nghiêm trọng ───────────────────────
+    assert "(v.theo_muc || [])" in vh, (
+        "cơ cấu theo mức độ — phần việc của khối Tồn đọng cũ — không còn được vẽ. QT-2 gộp nó "
+        "vào khối Việc nghiêm trọng; gỡ ở đây là mất hẳn.")
+    assert "{so(v.chua_anh_xa)}" in vh, (
+        "số cảnh báo CHƯA xác định được hồ sơ biến mất. Đây là số KHÔNG nằm trong bất kỳ mức độ "
+        "nào, nên bỏ nó đi là phần còn lại cộng không đủ mà màn hình vẫn trông bình thường.")
+    assert '"/?xem=viec"' in vh, "mất lối sang danh sách toàn bộ công việc."
+
     assert "Xe đang đi" not in vh, (
         "«Xe đang đi» đã chuyển xuống khối Hiệu quả đội xe (TC-72). Để lại ở mục Vận hành là cùng "
         "một con số hiện ở hai chỗ — chỗ mới canh ở test_xe_dang_di_nam_o_khoi_hieu_qua_doi_xe.")
