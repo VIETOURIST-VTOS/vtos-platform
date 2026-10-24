@@ -574,17 +574,15 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
 
       {/* ── DIỄN BIẾN ── Hình của bản vẽ. Chuỗi còn rỗng nên `BieuDoDuong` tự rơi về khối rỗng
            kèm bộ phận và cửa nhập; không vẽ một đường bịa để lấp chỗ. */}
-      {/* MÀU ĐẶT NGAY TẠI KHỐI, KHÔNG SỬA `globals.css`.
-          Thư viện biểu đồ chỉ có ba lớp màu d1/d2/d3 (THU · CHI · TỒN) — không lớp nào là "tốt".
-          Khối này cần một màu XANH cho lợi nhuận. Thêm `.bd-net.d4` vào globals.css thì đụng làn
-          Vòng: sổ giữ chỗ cho thấy hai dòng NS-1 và NS-2 của làn ấy ĐANG LÀM chính tệp ấy, chính
-          phần nhãn số trên biểu đồ. Nên lớp d4 khai ở đây, bọc trong `.v14-dx-bd` để không rò ra
-          hình nào khác của màn hình. Khi làn Vòng xong, gộp bốn dòng này vào globals.css. */}
-      <div style={{ marginTop: 14 }} className="v14-dx-bd">
-        <style>{`.v14-dx-bd .bd-net.d4{stroke:var(--vtos-success)}
-.v14-dx-bd .bd-cham.d4{background:var(--vtos-success)}
-.v14-dx-bd .bd-cg-cham.d4{background:var(--vtos-success)}
-.v14-dx-bd .bd-duong-nhan.d4{color:var(--vtos-success)}`}</style>
+      {/* Lớp màu `d4` (xanh «tốt») nay nằm trong `globals.css` cạnh d1/d2/d3 — vòng 20/10 phải
+          khai tạm bằng một thẻ <style> tại đây vì làn Vòng đang giữ tệp ấy; làn ấy xong rồi nên
+          21/10 gộp về chỗ đúng. Khối đo mù màu đi kèm nằm trong globals.css, ngay trên nhóm
+          `.bd-net`. Một dòng của nó nói về chính chỗ này, nên chép lại cho khỏi lạc:
+
+            d2 (đỏ) và d4 (xanh) chỉ cách ΔE 3,8 với mắt mù lục — với người ấy, đường lợi nhuận
+            lúc lãi và lúc có kỳ lỗ là CÙNG MỘT MÀU. Dấu hiệu thứ hai là CHỮ «(có kỳ lỗ)» thêm
+            vào tên chuỗi ngay bên dưới. Gỡ chữ ấy đi là gỡ tín hiệu, không phải gỡ lời giải thích. */}
+      <div style={{ marginTop: 14 }}>
         <BieuDoDuong ten="Diễn biến hiệu quả đội xe" phu={o.nhan || undefined}
           ds={dienBien} nhan={nhanKy} dinh_dang="tien"
           ai="Đội xe" cua="/doi-xe" cua_ten="Cửa nhập đội xe"
