@@ -26,13 +26,33 @@ def an_employee(h):
     return client.get("/api/v1/employees", headers=h).json()[0]
 
 
+def nguoi_chua_co_ho_so(h, toi_da=60):
+    """ĐI TÌM một người chưa có hồ sơ, thay vì giả định người đầu danh sách là thế.
+
+    ĐỢT DỌN-NO 24/10/2026. Phép thử này vốn lấy `an_employee(h)` — người ĐẦU danh sách — rồi
+    đòi hồ sơ của người ấy phải trống. Đúng ở ngày viết nó, sai từ lúc bộ nạp dữ liệu thử lớn
+    lên và người đầu danh sách có sẵn hồ sơ. Đo trên main 24/10/2026: đỏ, và đỏ vì cách CHỌN
+    NGƯỜI THỬ chứ không vì phép tính nào sai.
+
+    Sửa bằng cách HỎI thay vì giả định thì còn đúng sau khi bộ nạp lớn thêm lần nữa.
+
+    KHÔNG TÌM THẤY THÌ ĐỎ, KHÔNG BỎ QUA: một phép thử tự bỏ qua mình khi thiếu chủ thể là một
+    phép thử im lặng, và im lặng đọc giống hệt đã chạy mà không thấy gì.
+    """
+    for e in client.get("/api/v1/employees", headers=h).json()[:toi_da]:
+        r = client.get(f"/api/v1/employees/{e['id']}/profile", headers=h).json()
+        if r["profile"] is None:
+            return e["id"], r
+    raise AssertionError(
+        f"Trong {toi_da} người đầu danh sách không còn ai CHƯA có hồ sơ. Phép thử này cần một "
+        f"người trống để đo phép đếm trường còn thiếu — bộ nạp dữ liệu thử đã đổi, hãy thêm một "
+        f"người không hồ sơ vào bộ nạp chứ đừng nới con số ở đây.")
+
+
 def test_ho_so_va_hop_dong():
     h = login("hcns")
-    e = an_employee(h)
-    eid = e["id"]
-
     # Hồ sơ trống → liệt kê đúng trường còn thiếu
-    r = client.get(f"/api/v1/employees/{eid}/profile", headers=h).json()
+    eid, r = nguoi_chua_co_ho_so(h)
     assert r["profile"] is None and r["completeness"]["percent"] == 0
     assert "id_number" in r["completeness"]["missing"]
 
@@ -146,10 +166,19 @@ def test_phep_nam_va_don_tu():
 
 def test_bang_cham_cong_sua_tay():
     h = login("hcns")
-    eid = an_employee(h)["id"]
     sheet = client.get("/api/v1/attendance?period=2026-09", headers=h).json()
     assert sheet["standard_days"] == 22                       # tháng 9/2026 có 22 ngày làm việc (T2–T6)
-    row = [x for x in sheet["rows"] if x["employee_id"] == eid][0]
+    # ĐỢT DỌN-NO 24/10/2026 — ĐI TÌM một dòng ĐỦ CÔNG thay vì giả định người đầu danh sách là
+    # thế. Phần dưới đo phép CỘNG TRỪ của bảng chấm công (+1 ngày trực, −0,5 ngày không lương),
+    # nên nó cần một mốc xuất phát SẠCH; ai là người ấy thì không quan trọng. Đo trên main
+    # 24/10/2026: người đầu danh sách còn 19 công vì bộ nạp dữ liệu thử đã chấm sẵn cho người ấy.
+    du_cong = [x for x in sheet["rows"] if x["work_days"] == sheet["standard_days"]]
+    assert du_cong, (
+        "Không còn ai đủ 22 công trong kỳ 09/2026 — phép thử này cần một mốc xuất phát sạch để "
+        "đo phép cộng trừ. Bộ nạp dữ liệu thử đã đổi; thêm một người chưa chấm công vào bộ nạp "
+        "chứ đừng đổi con số ở đây.")
+    eid = du_cong[0]["employee_id"]
+    row = du_cong[0]
     assert row["work_days"] == 22
 
     # Chấm công cuối tuần đi trực + nửa ngày nghỉ
