@@ -1,29 +1,36 @@
 name: VTOS robots (lịch tự động)
 # Lịch chạy robot trên web thật – không tốn hạ tầng: GitHub Actions gọi API VTOS bằng ROBOT_TOKEN (Settings → Secrets → ROBOT_TOKEN, cùng giá trị Render).
+# LỊCH ĐÃ GỠ 25/10/2026 — ROBOT CHẠY TRÊN MÁY CHỦ TỊCH
+#
+# 24/10 ngân sách Actions chạm trần lần thứ tư (19/9 · 17/10 · 21/10 · 24/10) và mọi lượt
+# chạy bị chặn: «The job was not started because recent account payments have failed or
+# your spending limit needs to be increased». Robot chết theo.
+#
+# 25/10 lịch chuyển sang máy Chủ tịch: sáu việc trong Task Scheduler gọi
+# `0-BAM-R1/ROBOT-MAY-NHA.py`, đúng giờ cũ.
+#
+# VÌ SAO GỠ HẲN CHỨ KHÔNG ĐỂ ĐÓ: 01/11 sang kỳ mới, trần đầy lại, lịch này TỰ SỐNG LẠI.
+# Khi ấy hai lịch cùng chạy, mà hai đường `/robot/inbox/check` và
+# `/robot/zalo/send-pending` mỗi lượt là MỘT TIN NHẮN GỬI CHO KHÁCH — hai lịch là khách
+# nhận hai lần, và tin đã bay sang Zalo thì không rút về được. Chính tệp này đã ghi điều
+# ấy ở hàm `goi_mot_lan` bên dưới.
+#
+# Dựa vào việc NHỚ tắt trước 01/11 là một cách canh tồi. Gỡ hẳn thì không thể trùng.
+#
+# Sáu dòng cũ giữ nguyên văn ở đây — giờ giấc do Chủ tịch chốt qua nhiều vòng (26/9,
+# 09/10), xoá hẳn thì ngày muốn bật lại phải dựng lại từ trí nhớ:
+#
+#   - cron: "10 0 * * *"      # 07:10 giờ VN: đồng bộ Vietrip + quyết toán tour kết thúc 10 ngày
+#   - cron: "10 11 * * *"     # 18:10 giờ VN: lượt thứ hai trong ngày
+#   - cron: "*/30 0-15 * * *" # mỗi 30 phút giờ hành chính VN (07:00–22:00): kéo bù SePay, chốt sự vụ hết hạn
+#   - cron: "30 13 * * *"     # 20:30 giờ VN: robot R7 báo cáo ngày
+#   - cron: "0 2 * * 6"       # Thứ Bảy 09:00 VN: báo cáo tuần
+#   - cron: "0 2 10 * *"      # ngày 10 hằng tháng 09:00 VN: báo cáo tháng
+#
+# BẤM TAY VẪN CHẠY: `workflow_dispatch` giữ nguyên. Không có lịch thì
+# `github.event.schedule` rỗng, việc «Chọn việc theo lịch» lấy `inputs.job` với mặc định
+# `vietrip` — nên Actions → VTOS robots → Run workflow vẫn dùng được như cũ.
 on:
-  schedule:
-    # Chủ tịch chốt 26/9/2026: kéo Vietrip HAI LẦN MỖI NGÀY, thay cho một lượt 3 giờ sáng.
-    # Chủ tịch đổi giờ 09/10/2026: *"đặt lịch hàng ngày 7 giờ sáng và 6 giờ chiều nạp dữ liệu
-    # doanh thu, quyết toán, lợi nhuận từ vietrip qua vtos"*. Lượt chiều GIỮ NGUYÊN — nó đã là
-    # 18:10 VN từ 26/9; chỉ lượt sáng dời 11:10 → 07:10.
-    #
-    # Giờ VN là UTC+7 và không đổi theo mùa: 07:00 VN = 00:00 UTC, 18:00 VN = 11:00 UTC.
-    #
-    # Vì sao lệch 10 phút chứ không đúng phút 0, và vì sao giờ mới VẪN phải lệch: lịch SePay ở
-    # dòng dưới chạy mỗi 30 phút trong khung 0-15 UTC, nên nó nổ đúng cả 00:00 lẫn 11:00 UTC. Máy
-    # chủ chỉ có 512 MB và tự khởi động lại khi quá bộ nhớ (xem chú thích ở bước đánh thức API bên
-    # dưới), nên cho hai việc nặng cùng bấm một giây là tự chuốc 502. Dịch 10 phút là đủ tránh mà
-    # vẫn đúng ý "7 giờ sáng và 6 giờ chiều".
-    #
-    # MỘT LƯỢT NÀY KÉO ĐỦ BA THỨ Chủ tịch nêu: `robot/vietrip/sync` lấy tour, booking, phiếu thu
-    # và bảng quyết toán (`settlements_days: 10`); lợi nhuận KHÔNG kéo riêng vì nó là số TÍNH RA
-    # từ doanh thu trừ giá vốn (`services/ket_qua_that`), không phải số Vietrip có sẵn để chép.
-    - cron: "10 0 * * *"      # 07:10 giờ VN: đồng bộ Vietrip + quyết toán tour kết thúc 10 ngày
-    - cron: "10 11 * * *"     # 18:10 giờ VN: lượt thứ hai trong ngày
-    - cron: "*/30 0-15 * * *" # mỗi 30 phút giờ hành chính VN (07:00–22:00): kéo bù SePay, chốt sự vụ hết hạn
-    - cron: "30 13 * * *"     # 20:30 giờ VN: robot R7 báo cáo ngày
-    - cron: "0 2 * * 6"       # Thứ Bảy 09:00 VN: báo cáo tuần
-    - cron: "0 2 10 * *"      # ngày 10 hằng tháng 09:00 VN: báo cáo tháng
   workflow_dispatch:
     inputs:
       job:
@@ -32,6 +39,11 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    # Hạn giờ. Thiếu dòng này GitHub lấy mặc định 360 phút MỘT VIỆC, nên một việc treo ăn hết ngân sách
+    # mà không ai thấy nó đến — trần đã bị chạm bốn lần: 19/9 · 17/10 · 21/10 · 24/10. Số để RỘNG hơn
+    # số đo được nhiều lần, vì hạn giờ chật biến một lượt chậm-nhưng-đúng thành đỏ, và đỏ-vì-hạ-tầng
+    # là thứ dạy người ta tắt hàng rào. Đợt CI-1, 25/10/2026.
+    timeout-minutes: 45
     env:
       API: https://vtos-api.onrender.com/api/v1
       TOKEN: ${{ secrets.ROBOT_TOKEN }}

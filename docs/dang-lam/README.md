@@ -41,3 +41,16 @@ git không có gì để xung đột.
 Vì nó đã reo đúng. Ngày 06/10/2026 chính hàng rào này chỉ ra ba tệp mà hai làn cùng giữ —
 `ks_robot.py`, `misa.py`, `staff.py` — trước khi ai mất gì. Thứ hỏng không phải cái bảng, mà là
 chỗ cất nó.
+
+## Soi nhánh trước khi đẩy, khi CI không chạy
+
+Ngân sách Actions chạm trần ngày 24/10/2026 (lần thứ tư) và bị chặn tới 01/11. Trong lúc ấy mọi
+lượt CI đỏ sau 4 giây vì *không khởi động được*, nên **PR không có màu nào để đọc**.
+
+Chạy hàng rào ngay trên máy, một đến hai phút:
+
+    scripts\!CUA-HEP.bat          (bấm rồi gõ tên nhánh)
+
+Nó chạy ĐÚNG 17 tệp phép thử của việc `hang-rao-gop` — trong đó có `test_giu_cho_lan` và
+`test_giu_cho_nhanh`, tức đúng hai hàng rào canh quyển sổ này. Chi tiết và những chỗ nó KHÔNG
+thay được: [scripts/README-cua-hep.md](../../scripts/README-cua-hep.md).

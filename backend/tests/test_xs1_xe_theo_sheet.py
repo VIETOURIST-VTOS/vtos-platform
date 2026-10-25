@@ -65,8 +65,9 @@ def test_doc_bang_khoi_bien_va_dong_khong_tour():
     assert [k["khoi"] for k in b["khoi"]] == ["XE 1", "XE 2", "XE 3", "XE 9"]
     assert b["khoi"][0]["bien"] == "50F01783", "giữ bản biển có nhiều chữ số hơn"
     assert len(b["chuyen"]) == 6
-    khong_tour = [c for c in b["can_sua"] if c["loai"] == "dong_khong_tour"]
-    assert len(khong_tour) == 1 and khong_tour[0]["khoi"] == "XE 1"
+    # XS-2: dòng CTP 200.000 không tên tour là công tác phí THẬT (Chủ tịch 25/10) — thiếu ngày thì báo.
+    thieu = [c for c in b["can_sua"] if c["loai"] == "ctp_thieu_ngay"]
+    assert len(thieu) == 1 and thieu[0]["khoi"] == "XE 1" and "200.000" in thieu[0]["noi_dung"]
 
 
 def test_tin_dong_khong_tin_tong():
@@ -199,5 +200,149 @@ def test_tham_so_cua_link_va_man_con():
     assert "/doi-xe/xe-hom-nay" in AC.MAN_CON_DOI_XE
     trang = (GOC / "web/app/doi-xe/xe-hom-nay/page.tsx").read_text(encoding="utf-8")
     assert "/fleet/xe-theo-sheet" in trang
-    assert not re.search(r'method:\s*"(POST|PUT|DELETE|PATCH)"', trang), "màn này chỉ đọc"
+    # XS-1b: đúng MỘT cửa ghi — trình link chờ ký. Không cửa nào ghi vào sheet hay vào chuyến.
+    assert re.findall(r'api<any>\("([^"]+)",\s*\{\s*method:\s*"(?:POST|PUT|DELETE|PATCH)"', trang) == \
+        ["/fleet/xe-theo-sheet/link"]
     assert '"/doi-xe/xe-hom-nay"' in (GOC / "web/app/doi-xe/page.tsx").read_text(encoding="utf-8")
+
+
+# ── XS-1b · cửa dán link ở màn Đội xe, giữ chữ ký Chủ tịch (25/10/2026) ───────────────────────────
+
+def test_link_mo_sheet_bi_bao_dung_cho_sai():
+    """Đo thật 25/10: Chủ tịch dán link /edit — phải được bảo đúng là link mở sheet, và cách lấy link CSV."""
+    loi = XS.nhan_xet_link("https://docs.google.com/spreadsheets/d/1jaD/edit?gid=0#gid=0")
+    assert loi and "Công bố lên web" in loi and "output=csv" in loi
+    assert XS.nhan_xet_link(LINK) is None
+    assert XS.nhan_xet_link("https://evil.example/x?output=csv")
+
+
+def test_doc_thu_khong_dung_dem():
+    XS._DEM.clear()
+    r = XS.doc_thu(LINK, tai=lambda u: MAU)
+    assert r == {"ok": True, "so_xe": 4, "so_chuyen": 6, "so_can_sua": len(XS.doc_bang(MAU)["can_sua"])}
+    assert XS._DEM == {}, "link chưa ký không được lọt vào đệm mà robot dùng"
+    def hong(u):
+        raise OSError("HTTP 404")
+    assert XS.doc_thu(LINK, tai=hong)["ok"] is False
+
+
+class _U:
+    def __init__(self, username, role):
+        self.username, self.role = username, role
+
+
+def _db_trinh():
+    db = _db()
+    from app.models.core import Param
+    # dòng gieo của tham số, như seed_params tạo trên hệ thật
+    db.add(Param(key=XS.KHOA_LINK, value="", label="Link CSV", unit="link",
+                 effective_from=dt.date(2026, 9, 1), status="active"))
+    db.commit()
+    return db
+
+
+def test_trinh_link_lap_ban_cho_ky_khong_ghi_thang(monkeypatch):
+    from app.api.v1 import fleet as F
+    from app.services import rules as R
+    monkeypatch.setattr(R, "audit", lambda *a, **k: None)
+    monkeypatch.setattr(XS, "_tai", lambda u: MAU)
+    monkeypatch.setattr(XS.doc_thu, "__defaults__", (50, lambda u: MAU))
+    db = _db_trinh()
+    r = F.dan_link_sheet(F.LinkSheetVao(url=LINK), _U("nguyenhonghuan", "gd_doi_xe"), db)
+    assert r["da_trinh"] is True
+    assert XS.link(db) == "", "chưa ký thì robot vẫn chưa có link"
+    ck = XS.cho_ky(db)
+    assert ck and ck["boi"] == "nguyenhonghuan" and ck["link"] == LINK
+
+
+def test_link_doc_khong_duoc_thi_khong_trinh(monkeypatch):
+    from app.api.v1 import fleet as F
+    db = _db_trinh()
+    r = F.dan_link_sheet(F.LinkSheetVao(url="https://docs.google.com/spreadsheets/d/1/edit"),
+                         _U("nguyenhonghuan", "gd_doi_xe"), db)
+    assert r["da_trinh"] is False and "Công bố lên web" in r["doc_thu"]["loi"]
+    assert XS.cho_ky(db) is None
+
+
+def test_chu_tich_khong_nam_trong_vai_dan_link():
+    """Chủ tịch là người ký duy nhất của tham số; người trình không tự ký."""
+    from app.api.v1 import fleet as F
+    assert "chutich" not in F.GHI_LINK_SHEET and "gd_doi_xe" in F.GHI_LINK_SHEET
+
+
+def test_o_chu_tich_doc_sheet_khi_chua_co_lenh():
+    """XS-1c: ô «Xe đang đi» trên màn Chủ tịch hiện số theo sheet khi chưa có lệnh, và nói ra nguồn."""
+    trang = (GOC / "web/app/page.tsx").read_text(encoding="utf-8")
+    assert "sheet={sec.xe_theo_sheet}" in trang
+    khoi = (GOC / "web/components/KhoiV14.tsx").read_text(encoding="utf-8")
+    m = re.search(r"\{xeCoNguon && chuaLapLenh && sheet && !sheet\.loi \? \((.*?)\) : xeCoNguon && chuaLapLenh \?",
+                  khoi, re.S)
+    assert m, "nhánh sheet phải đứng TRƯỚC nhánh «chờ Đội xe», và chỉ khi chưa có lệnh"
+    # XS-3 (bản gọn): nguồn và giờ đọc chuyển vào màn chi tiết; ô giữ con số, số dòng cần sửa và lối vào.
+    assert "dòng sửa" in m.group(1) and "/doi-xe/xe-hom-nay" in m.group(1)
+
+
+def test_nam_o_van_hanh_bang_nhau_va_co_nut_xem_chi_tiet():
+    """XS-3 (Chủ tịch duyệt bản xem thử 25/10/2026): mỗi ô một dòng phụ ngắn + «Xem chi tiết» ở đáy."""
+    khoi = (GOC / "web/components/KhoiV14.tsx").read_text(encoding="utf-8")
+    i, j = khoi.index("── TẦNG VẬN HÀNH ──"), khoi.index("── DIỄN BIẾN ──")
+    tang = khoi[i:j]
+    assert tang.count("style={O_VH}") >= 3 and "style={XEM}" in tang
+    # mỗi nhánh hiển thị của ô công suất và ô xe đang đi đều có nút; ba ô vanHanh dùng chung một nút
+    assert tang.count(">Xem chi tiết →</Link>") >= 7
+    assert 'marginTop: "auto"' in khoi, "nút phải bị đẩy xuống đáy để năm ô thẳng hàng"
+
+
+# ── XS-2 · công tác phí tài xế ngoài chuyến (Chủ tịch 25/10/2026: «là chi phí công tác phí của tài xế thật») ──
+
+def test_nhan_ra_dong_truc_cho_tour_khong_nham_cho_noi():
+    for t in ("Trực", "trực bãi", "Chờ tour", "Chờ", "chờ khách"):
+        assert XS.LA_NGOAI_CHUYEN.match(XS._khong_dau(t)), t
+    for t in ("Chợ nổi Cái Răng", "Chơn Thành", "Dalat", "Trường Sơn"):
+        assert not XS.LA_NGOAI_CHUYEN.match(XS._khong_dau(t)), t
+
+
+MAU_CTP = DAU + (
+    'XE 1,01783,Tú\n'
+    ',50F01783,TÚ,Dalat,20/10/2026,22/10/2026,3,  600.000 ,,,,  10.000.000 ,,,,,,,,\n'
+    ',,,Trực,25/10/2026,25/10/2026,1,  200.000 ,,,,,  200.000 ,,,,,,,\n'
+    ',,,,12/10/2026,,1,  200.000 ,,,,,  200.000 ,,,,,,,\n'
+    ',,,,,,1,  200.000 ,,,,,  200.000 ,,,,,,,\n'
+)
+
+
+def test_dong_truc_co_ngay_la_ctp_khong_phai_chuyen():
+    b = XS.doc_bang(MAU_CTP)
+    assert [t["tour"] for t in b["chuyen"]] == ["Dalat"], "ngày trực không được thành một chuyến"
+    assert [(c["ngay"].isoformat(), c["so_tien"]) for c in b["ctp_ngoai"]] == \
+        [("2026-10-25", 200000), ("2026-10-12", 200000)]
+    assert [c["loai"] for c in b["can_sua"]].count("ctp_thieu_ngay") == 1
+    h = XS.hom_nay(b, HOM_NAY, XE_VTOS)
+    assert h["dang_di"] == 0, "xe trực ở bãi ngày 25/10 không phải xe đang đi"
+
+
+def _db_ctp(da_nhap):
+    db = _db()
+    from app.models.fleet import FleetPeriodCost
+    from app.models.hr import Vehicle
+    FleetPeriodCost.__table__.create(db.get_bind())
+    vid = db.execute(__import__("sqlalchemy").select(Vehicle.id).where(Vehicle.plate == "50F01783")).scalar()
+    for i, st in enumerate(da_nhap):
+        db.add(FleetPeriodCost(ky="2026-10", pham_vi="xe", vehicle_id=vid, nhom=XS.NHOM_CTP_NGOAI,
+                               mo_ta=f"truc {i}", so_tien=st))
+    db.commit()
+    return db
+
+
+def test_doi_chieu_ctp_ngoai_bao_phan_thieu():
+    b = XS.doc_bang(MAU_CTP)
+    ra = XS.doi_chieu_ctp_ngoai(_db_ctp([200000]), b)
+    assert len(ra) == 1 and ra[0]["loai"] == "ctp_chua_vao_vtos"
+    assert "sheet 400.000" in ra[0]["noi_dung"] and "Nhập 200.000" in ra[0]["noi_dung"]
+    assert XS.doi_chieu_ctp_ngoai(_db_ctp([200000, 200000]), b) == [], "nhập đủ thì thôi báo"
+
+
+def test_nhom_ctp_ngoai_chuyen_la_chi_phi_cua_xe():
+    from app.models.fleet import NHOM_CHI_PHI_KY, NGOAI_GIA_VON
+    assert NHOM_CHI_PHI_KY[XS.NHOM_CTP_NGOAI][1] == "xe"
+    assert XS.NHOM_CTP_NGOAI not in NGOAI_GIA_VON, "công tác phí là giá vốn vận tải, phải trừ vào lợi nhuận"

@@ -219,12 +219,15 @@ export default function SuaTaiKhoan(
             onClick={() => goi(`/users/${r.id}`, { active: !r.active }, "PUT",
               r.active ? "Đã khoá đăng nhập" : "Đã mở lại")}>
             {r.active ? "Khoá đăng nhập" : "Mở lại"}</button>
-          <button className="act grey" style={{ margin: 0 }} disabled={!duocKhoa || ban}
-            onClick={() => {
-              if (!window.confirm(`Đặt lại mật khẩu của ${r.full_name} về mã nhân viên?\n\n`
-                + `Người này sẽ phải đổi mật khẩu ở lần đăng nhập tới — báo họ đăng nhập và đổi càng sớm càng tốt.`)) return;
-              goi(`/users/${r.id}/reset-password`, { new_password: "" }, "POST", "Đã đặt lại mật khẩu");
-            }}>Đặt lại mật khẩu = mã NV</button>
+          {/* MK-1 · 25/10/2026 — không đặt mật khẩu = mã NV nữa.
+              Mã nhân viên Vietourist là số đếm dưới 400 và hiện công khai ngay trên bảng Phân
+              quyền, nên dùng nó làm mật khẩu tạm là dò ra trong vài giây. Chỗ HIỆN mật khẩu vừa
+              sinh nằm trên màn Phân quyền (khối «Mật khẩu tạm»), vì nó phải đứng yên cho người
+              bấm chép — nút ở đây chỉ dẫn sang đó chứ không tự sinh, để mật khẩu không bao giờ
+              hiện ra ở hai chỗ. */}
+          <span className="muted" style={{ fontSize: 11.5 }}>
+            Quên mật khẩu? Bấm <b>Sinh MK tạm</b> ở cột cuối dòng của người này trên bảng Phân quyền.
+          </span>
           <span className="muted" style={{ fontSize: 11.5 }}>
             Khoá chứ không xoá — nhật ký và chứng từ cũ vẫn truy ra được người thực hiện. Mở lại được bất cứ lúc nào.
           </span>
