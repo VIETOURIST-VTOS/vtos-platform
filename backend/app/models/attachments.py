@@ -111,6 +111,10 @@ DOI_TUONG_DAY_DU = {
     # tỷ giá ngân hàng ngày 04/04 nằm đúng chỗ khi xếp vào thư mục tháng 4. Xếp theo id dòng thì
     # mỗi ngày một thư mục, và không ai tìm ra ảnh của cả tháng để đối chiếu một lượt.
     "ty_gia":        ("Tỷ giá ngoại tệ", "ketoan", "02_Ke_toan", False),
+    # BC-1 (26/10/2026) — Phần 5 của báo cáo ngày. Báo cáo công việc của một người là hồ sơ NHÂN SỰ
+    # của người ấy: nhóm 06 (dữ liệu cá nhân, phân quyền riêng), nên cửa /tep chung không liệt kê tệp
+    # này cho người ngoài; tác giả và người quản lý đọc qua cửa riêng /daily-reports/{id}/tep.
+    "bao_cao_ngay":  ("Báo cáo ngày", "hcns", "06_Nhan_su", True),
 }
 DOI_TUONG = {k: (v[0], v[1]) for k, v in DOI_TUONG_DAY_DU.items()}
 

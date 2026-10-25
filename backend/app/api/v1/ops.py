@@ -1,6 +1,7 @@
 """API vận hành: báo cáo ngày (Điều 12), ca trực page, đề nghị chi – lệnh chi (R3), bảng dòng tiền tour."""
 from datetime import date, datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
@@ -8,7 +9,7 @@ from app.db.session import get_db
 from app.api.deps import current_user, require_roles
 from app.models.core import Tour, User, ROLES
 from app.models.hr import Employee
-from app.models.ops import DailyReport, PageShift, PaymentRequest
+from app.models.ops import DailyReport, PageShift, PaymentRequest, DailyReportVersion, ReportExtraForm
 from app.services import ops as O
 from app.services import access as AC
 from app.services import pham_vi_phap_nhan as PV
@@ -27,7 +28,10 @@ def report_out(r: DailyReport, users: dict) -> dict:
             "department_name": O.DEPT_FORMS.get(u.department, {}).get("name", u.department) if u else "",
             "report_date": r.report_date, "part1_done": r.part1_done, "part2_numbers": r.part2_numbers, "part2": p2, "part3_issues": r.part3_issues, "part4_plan": r.part4_plan,
             "submitted_at": r.submitted_at, "on_time": r.on_time, "robot_score": r.robot_score, "robot_note": r.robot_note, "manager_score": r.manager_score,
-            "manager_note": r.manager_note, "reviewed_by": r.reviewed_by, "reviewed_at": r.reviewed_at}
+            "manager_note": r.manager_note, "reviewed_by": r.reviewed_by, "reviewed_at": r.reviewed_at,
+            # BC-1
+            "first_submitted_at": r.first_submitted_at or r.submitted_at, "so_lan_nop": r.so_lan_nop or 1,
+            "vuong_mac_cho": r.vuong_mac_cho or "", "vuong_mac_han": r.vuong_mac_han}
 
 
 class ReportIn(BaseModel):
@@ -37,19 +41,44 @@ class ReportIn(BaseModel):
     part3_issues: str = ""              # vướng mắc – đề xuất (Phần 4 của form)
     part4_plan: str                      # việc ngày mai (Phần 3 của form)
     department: str | None = None        # phòng của mẫu (mặc định theo hồ sơ)
+    vuong_mac_cho: str = ""              # BC-1: phòng nhận vướng mắc
+    vuong_mac_han: date | None = None    # BC-1: cần xong trước ngày
+
+
+def _ngay_bao_cao(db: Session, u: User, d: date | None) -> date:
+    """Ngày báo cáo mặc định: hôm nay giờ VN."""
+    return d or O.gio_vn().date()
 
 
 @router.get("/daily-reports/form")
-def report_form(u: User = Depends(current_user), db: Session = Depends(get_db)):
-    """Mẫu báo cáo của người đăng nhập: phòng, mã NV, các trường Phần 2, hạn 20h, báo cáo hôm nay (nếu đã nộp)."""
-    dept = O.dept_of_user(db, u)
-    from datetime import datetime as _dt
-    now = _dt.now(); deadline = _dt.combine(now.date(), O.REPORT_DEADLINE)
-    today = db.execute(select(DailyReport).where(DailyReport.user_id == u.id, DailyReport.report_date == date.today())).scalars().first()
+def report_form(ngay: date | None = None, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Mẫu báo cáo của người đăng nhập (BC-1): mẫu chính + kiêm nhiệm, ô số đã giải ra (ngân hàng đọc
+    danh mục tài khoản), hạn nộp và số giây còn lại theo GIỜ VIỆT NAM, báo cáo của ngày ấy, các lần
+    nộp, và 7 ngày gần nhất."""
+    import json
+    from datetime import timedelta
+    now = O.gio_vn()
+    d = _ngay_bao_cao(db, u, ngay)
+    mau = O.mau_cua(db, u)
+    dept = mau[0]
+    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    r = db.execute(select(DailyReport).where(DailyReport.user_id == u.id, DailyReport.report_date == d)).scalars().first()
     users = {u.id: u}
-    return {"department": dept, "forms": {k: {"name": v["name"], "fields": v["fields"], "hint": v["hint"]} for k, v in O.DEPT_FORMS.items()},
-            "full_name": u.full_name, "staff_code": u.staff_code, "deadline": "20:00", "seconds_left": max(0, int((deadline - now).total_seconds())),
-            "today": report_out(today, users) if today else None, "titles": O.PART_TITLES}
+    han = O.han_nop(db, d)
+    lan = [] if r is None else [{"lan": v.lan, "luc": v.luc} for v in db.execute(
+        select(DailyReportVersion).where(DailyReportVersion.report_id == r.id).order_by(DailyReportVersion.lan)).scalars()]
+    return {"department": dept, "mau": mau,
+            "forms": {k: {"name": v["name"], "fields": O.truong_cua(db, k), "hint": v["hint"],
+                          "kiem_nhiem": k in O.MAU_KIEM_NHIEM} for k, v in O.DEPT_FORMS.items()},
+            "khoa": {m: {f: O.khoa_o(m, dept, f) for f in O.truong_cua(db, m)} for m in mau},
+            "khong_phat_sinh": O.KHONG_PHAT_SINH,
+            "full_name": u.full_name, "staff_code": u.staff_code, "ngay": d,
+            "deadline": O.han_chu(db, d), "han_luc": han, "bay_gio": now,
+            "seconds_left": max(0, int((han - now).total_seconds())),
+            "phai_nop": bool(e and O.phai_nop(e)),
+            "today": report_out(r, users) if r else None, "lan_nop": lan,
+            "bay_ngay": [O.trang_thai_ngay(db, e, u.id, d - timedelta(days=i), now) for i in range(1, 8)],
+            "titles": O.PART_TITLES, "gioi_han_tep_mb": GIOI_HAN_TEP_MB}
 
 
 @router.post("/daily-reports", status_code=201)
@@ -59,11 +88,16 @@ def submit(data: ReportIn, u: User = Depends(current_user), db: Session = Depend
     p2 = data.part2_numbers if isinstance(data.part2_numbers, dict) else O.parse_part2(data.part2_numbers)
     p2 = {k: str(v or "").strip() for k, v in p2.items()}
     try:
-        r = O.submit_report(db, u, data.report_date, data.part1_done, json.dumps(p2, ensure_ascii=False), data.part3_issues, data.part4_plan)
+        r = O.submit_report(db, u, data.report_date, data.part1_done, json.dumps(p2, ensure_ascii=False), data.part3_issues, data.part4_plan,
+                            vuong_mac_cho=data.vuong_mac_cho, vuong_mac_han=data.vuong_mac_han)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     subject, body = O.mail_text(u, dept, r.report_date, r.part1_done, p2, r.part4_plan, r.part3_issues, u.staff_code)
-    return {"message": f"Đã nộp báo cáo {r.report_date:%d/%m} – điểm nháp robot {r.robot_score:.0f}/10 ({r.robot_note})", "report": report_out(r, {u.id: u}), "mail_subject": subject, "mail_body": body}
+    dau = r.first_submitted_at or r.submitted_at
+    trang = "đúng hạn" if r.on_time else "muộn"
+    return {"message": f"Đã nộp báo cáo {r.report_date:%d/%m} lần {r.so_lan_nop or 1} lúc {r.submitted_at:%H:%M:%S} (giờ máy chủ) — "
+                       f"lần đầu {dau:%H:%M %d/%m}, {trang}. Điểm nháp robot {r.robot_score:.0f}/10 ({r.robot_note})",
+            "report": report_out(r, {u.id: u}), "mail_subject": subject, "mail_body": body}
 
 
 class PreviewIn(ReportIn):
@@ -112,7 +146,7 @@ def summary(period: str, u: User = Depends(require_roles(*MANAGERS)), db: Sessio
     today = date.today()
     days = O.work_days_in(y, m, until=today if (y, m) == (today.year, today.month) else None)
     users = {x.id: x for x in db.execute(select(User)).scalars()}
-    emps = db.execute(select(Employee).where(Employee.active == True, Employee.department.in_(O.NO_TIMESHEET_DEPTS), Employee.user_id != None)).scalars().all()
+    emps = O.nhan_vien_phai_nop(db)   # BC-1: mọi nhân viên văn phòng trừ HDV, tài xế, Ban TGĐ
     reports = [r for r in db.execute(select(DailyReport)).scalars() if f"{r.report_date:%Y-%m}" == period]
     out = []
     for e in emps:
@@ -128,6 +162,111 @@ def summary(period: str, u: User = Depends(require_roles(*MANAGERS)), db: Sessio
 def check_missing(u: User = Depends(require_roles("cntt", "hcns", "tgd")), db: Session = Depends(get_db)):
     n = O.check_missing_reports(db)
     return {"message": f"Robot đã rà: {n} cảnh báo thiếu báo cáo ngày", "new_alerts": n}
+
+
+# ---------- BC-1 · Kiêm nhiệm (Chủ tịch giao) ----------
+GIOI_HAN_TEP_MB = 8
+DOI_TUONG_TEP = "bao_cao_ngay"
+
+
+@router.get("/daily-reports/kiem-nhiem")
+def kiem_nhiem(u: User = Depends(require_roles("chutich")), db: Session = Depends(get_db)):
+    """Danh sách nhân viên phải nộp và phần việc kiêm nhiệm đang giao. Chủ tịch giao (26/10/2026)."""
+    dang = {}
+    for x in db.execute(select(ReportExtraForm).where(ReportExtraForm.active == True)).scalars():   # noqa: E712
+        dang.setdefault(x.employee_id, []).append(x.mau)
+    return {"mau": [{"ma": k, "ten": v["name"]} for k, v in O.DEPT_FORMS.items()],
+            "rows": [{"employee_id": e.id, "code": e.code, "name": e.full_name, "department": e.department,
+                      "kiem_nhiem": sorted(dang.get(e.id, []))} for e in sorted(O.nhan_vien_phai_nop(db), key=lambda e: (e.department, e.full_name))]}
+
+
+class KiemNhiemIn(BaseModel):
+    employee_id: int
+    mau: str
+    bat: bool = True
+
+
+@router.post("/daily-reports/kiem-nhiem")
+def giao_kiem_nhiem(v: KiemNhiemIn, u: User = Depends(require_roles("chutich")), db: Session = Depends(get_db)):
+    if v.mau not in O.DEPT_FORMS:
+        raise HTTPException(422, "Mẫu không hợp lệ")
+    e = db.get(Employee, v.employee_id)
+    if e is None:
+        raise HTTPException(404, "Không có nhân viên")
+    x = db.execute(select(ReportExtraForm).where(ReportExtraForm.employee_id == e.id,
+                                                 ReportExtraForm.mau == v.mau)).scalars().first()
+    if x is None and v.bat:
+        db.add(ReportExtraForm(employee_id=e.id, mau=v.mau, active=True, boi=u.username, luc=datetime.now()))
+    elif x is not None:
+        x.active, x.boi, x.luc = v.bat, u.username, datetime.now()
+    R.audit(db, u.username, u.role, "giao_kiem_nhiem_bao_cao", f"employee:{e.code}", after={"mau": v.mau, "bat": v.bat})
+    db.commit()
+    return {"message": f"{'Đã giao' if v.bat else 'Đã bỏ'} phần «{O.DEPT_FORMS[v.mau]['name']}» cho {e.full_name}"}
+
+
+# ---------- BC-1 · Phần 5 — Đính kèm ----------
+# Quyền theo HỒ SƠ, không theo vai: tác giả và người quản lý xem được; chỉ tác giả gắn tệp. Kho tệp
+# chung xếp các tệp này vào nhóm Nhân sự (dữ liệu cá nhân), nên cửa /tep chung không liệt kê chúng
+# ra cho người ngoài.
+def _bao_cao_duoc_xem(db: Session, u: User, rid: int) -> DailyReport:
+    r = db.get(DailyReport, rid)
+    if r is None:
+        raise HTTPException(404, "Không có báo cáo")
+    if r.user_id != u.id and u.role not in MANAGERS:
+        raise HTTPException(403, "Chỉ người nộp và người quản lý xem được tệp của báo cáo này")
+    return r
+
+
+@router.get("/daily-reports/{rid}/tep")
+def tep_bao_cao(rid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    from app.services import attachments as AT
+    _bao_cao_duoc_xem(db, u, rid)
+    return AT.danh_sach(db, DOI_TUONG_TEP, str(rid))
+
+
+@router.post("/daily-reports/{rid}/tep", status_code=201)
+async def gan_tep_bao_cao(rid: int, tep: UploadFile = File(...), u: User = Depends(current_user),
+                          db: Session = Depends(get_db)):
+    from app.services import attachments as AT
+    from app.services.storage import StorageError
+    r = db.get(DailyReport, rid)
+    if r is None:
+        raise HTTPException(404, "Không có báo cáo")
+    if r.user_id != u.id:
+        raise HTTPException(403, "Chỉ người nộp gắn tệp vào báo cáo của mình")
+    if r.reviewed_by:
+        raise HTTPException(422, "Báo cáo đã được trưởng phòng chấm – không gắn thêm tệp")
+    data = await tep.read()
+    if len(data) > GIOI_HAN_TEP_MB * 1024 * 1024:
+        raise HTTPException(422, f"Tệp nặng {len(data)/1024/1024:.1f} MB — báo cáo ngày nhận tối đa {GIOI_HAN_TEP_MB} MB mỗi tệp.")
+    try:
+        a, moi = AT.dinh_kem(db, DOI_TUONG_TEP, str(rid), tep.filename or "tep", data, tep.content_type or "",
+                             "chung_tu", "", u.username)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    except StorageError as ex:
+        raise HTTPException(503, str(ex))
+    if moi:
+        R.audit(db, u.username, u.role, "dinh_kem_bao_cao_ngay", f"report:{rid}", after={"ten_tep": a.ten_tep, "kich_thuoc": a.kich_thuoc})
+    db.commit()
+    return {**AT.ra(a), "moi": moi, "message": "Đã gắn tệp" if moi else "Tệp này đã có trong báo cáo"}
+
+
+@router.get("/daily-reports/{rid}/tep/{aid}")
+def tai_tep_bao_cao(rid: int, aid: int, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    from app.models.attachments import Attachment
+    from app.services import attachments as AT
+    from app.services.storage import StorageError
+    _bao_cao_duoc_xem(db, u, rid)
+    a = db.get(Attachment, aid)
+    if a is None or a.doi_tuong != DOI_TUONG_TEP or a.doi_tuong_id != str(rid) or a.thu_hoi:
+        raise HTTPException(404, "Không có tệp này trong báo cáo")
+    try:
+        data = AT.doc(db, a)
+    except StorageError as ex:
+        raise HTTPException(503, str(ex))
+    return Response(content=data, media_type=a.kieu_noi_dung or "application/octet-stream",
+                    headers={"Content-Disposition": f'inline; filename="{a.id}-{a.ten_tep}"'})
 
 
 # ---------- Ca trực page ----------

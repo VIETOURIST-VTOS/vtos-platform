@@ -266,6 +266,9 @@ def du_lieu_khach(db: Session) -> list[dict]:
 
 # ───────────────────────────── bàn làm việc ─────────────────────────────
 
+from app.services import ops as OPS_BC  # noqa: E402
+
+
 def ban_lam_viec(db: Session) -> dict:
     chuyen = cho_toi_chuyen(db)
     gv = soat_gia_von(db)
@@ -282,7 +285,8 @@ def ban_lam_viec(db: Session) -> dict:
         "du_lieu_khach": kh,
         "bao_cao_ngay": {
             "man_hinh": "/bao-cao-ngay",
-            "han": "20:00",
+            # BC-1: hạn đọc từ luật báo cáo ngày, không gõ lại ở đây.
+            "han": OPS_BC.han_chu(db, OPS_BC.gio_vn().date()),
             "ghi_chu": ("Báo cáo ngày nộp trên VTOS (Điều 12), không gửi thư — Chủ tịch quyết "
                         "09/9/2026: báo cáo lập tự động trên màn hình."),
         },

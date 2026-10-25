@@ -25,6 +25,38 @@ class DailyReport(Base):
     manager_note: Mapped[str] = mapped_column(String(300), default="")
     reviewed_by: Mapped[str] = mapped_column(String(50), default="")
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # BC-1 (Chủ tịch duyệt bản xem thử 26/10/2026) — đúng hạn tính theo LẦN NỘP ĐẦU, không theo lần
+    # nộp sau cùng: nộp lại để bổ sung số không được biến một báo cáo muộn thành đúng hạn, và cũng
+    # không được biến một báo cáo đúng hạn thành muộn. `submitted_at` vẫn là lần nộp gần nhất.
+    first_submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    so_lan_nop: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # Phần 4 — vướng mắc có NGƯỜI NHẬN và HẠN, để nó không chết theo việc «trưởng phòng đã xem».
+    vuong_mac_cho: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    vuong_mac_han: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class DailyReportVersion(Base):
+    """BC-1 — mỗi lần nộp một bản chụp. Nộp lại không ghi đè: người xem thấy được lần đầu đã ghi gì."""
+    __tablename__ = "daily_report_versions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    report_id: Mapped[int] = mapped_column(ForeignKey("daily_reports.id"), index=True)
+    lan: Mapped[int] = mapped_column(Integer)
+    luc: Mapped[datetime] = mapped_column(DateTime)
+    du_lieu: Mapped[str] = mapped_column(Text, default="")        # JSON năm phần lúc nộp
+
+
+class ReportExtraForm(Base):
+    """BC-1 — phần việc KIÊM NHIỆM của một nhân viên (Chủ tịch giao, 26/10/2026).
+
+    Một người một báo cáo mỗi ngày; người kiêm nhiệm thêm các mục số của mẫu kia vào CÙNG báo cáo
+    ấy — không nộp hai báo cáo, nên tỷ lệ nộp không đếm người ấy hai lần."""
+    __tablename__ = "report_extra_forms"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
+    mau: Mapped[str] = mapped_column(String(20))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    boi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class PageShift(Base):

@@ -291,6 +291,7 @@ DEFAULT_PARAMS = [
     ("xe_lech_dau_vang", "0.10", "Định mức dầu đ/km lệch quá mức này so với trung bình 6 tháng của CHÍNH xe đó → vàng", "tỷ lệ", "Đội xe v1.3 – A3"),
     ("xe_lech_dau_do", "0.20", "Lệch quá mức này → đỏ", "tỷ lệ", "Đội xe v1.3 – A3"),
     ("qt_tieu_hao_bien", "0.15", "Quyết toán chuyến: tiêu hao L/100km vượt định mức theo số chỗ QUÁ tỷ lệ này → cảnh báo vàng (không chặn ký)", "tỷ lệ", "QT-1b, Chủ tịch chốt 22/10/2026"),
+    ("bao_cao_ngay_han_0h_tu", "26-10-2026", "Báo cáo ngày: từ ngày này hạn nộp là trước 0 giờ ngày kế tiếp (trước đó 20 giờ, không tính lại)", "ngày DD-MM-YYYY", "BC-1, Chủ tịch chốt 26/10/2026"),
     ("xe_sheet_csv_url", "", "Link CSV «Công bố lên web» của sheet Quyết Toán dữ liệu xe – robot đọc để đếm xe đang đi khi chưa có lệnh điều xe (trống = chưa nối)", "link", "XS-1, Chủ tịch chốt 25/10/2026"),
     ("xe_lech_km_gps", "0.05", "Km đọc từ ảnh lệch km GPS quá mức này → đỏ", "tỷ lệ", "Đội xe v1.3 – A2"),
     ("xe_lech_km_noi_chuyen", "50", "Km cuối chuyến trước lệch km đầu chuyến sau quá mức này → vàng (nghi có chuyến chưa khai)", "km", "Đội xe v1.3 – A2"),
@@ -543,7 +544,7 @@ DEFAULT_PARAMS = [
 # GHÉP LẠI 11/9/2026: khối này từng được commit rồi BIẾN MẤT – một phiên khác lưu đè tệp này bằng
 # bản mở từ trước. Thiếu nó thì routes.py vẫn gọi getattr(R, "THAM_SO_NGAY", ()) và nhận về rỗng,
 # nên cửa nhập ngày im lặng không bao giờ chạy: mã trông đủ, hàng rào thì không có.
-THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip")
+THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip", "bao_cao_ngay_han_0h_tu")
 
 
 # Bộ nhớ đệm tham số. get_param bị gọi hàng nghìn lần trong một lần dựng bảng điều khiển –

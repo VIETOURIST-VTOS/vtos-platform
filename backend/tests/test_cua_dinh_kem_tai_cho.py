@@ -42,6 +42,9 @@ CHUA_CO_CUA = {
 # gắn tệp qua cửa riêng `POST /api/v1/gui-phap-che/{id}/tep`, chỉ cho chính người gửi.
 CUA_GAN_RIENG = {
     "yeu_cau_phap_che": ("app/gui-phap-che/page.tsx", "/tep`"),
+    # BC-1 (26/10/2026): Phần 5 của báo cáo ngày gắn tệp qua cửa riêng /daily-reports/{id}/tep, vì quyền
+    # theo HỒ SƠ (tác giả + người quản lý), không theo vai như cửa /tep chung.
+    "bao_cao_ngay": ("app/reports/page.tsx", "/tep`"),
 }
 
 
