@@ -1,5 +1,5 @@
 """API vận hành: báo cáo ngày (Điều 12), ca trực page, đề nghị chi – lệnh chi (R3), bảng dòng tiền tour."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ from app.models.core import Tour, User, ROLES
 from app.models.hr import Employee
 from app.models.ops import DailyReport, PageShift, PaymentRequest, DailyReportVersion, ReportExtraForm
 from app.services import ops as O
+from app.services import bao_cao_ngay_xem as XEM
 from app.services import access as AC
 from app.services import pham_vi_phap_nhan as PV
 from app.services import rules as R
@@ -31,7 +32,10 @@ def report_out(r: DailyReport, users: dict) -> dict:
             "manager_note": r.manager_note, "reviewed_by": r.reviewed_by, "reviewed_at": r.reviewed_at,
             # BC-1
             "first_submitted_at": r.first_submitted_at or r.submitted_at, "so_lan_nop": r.so_lan_nop or 1,
-            "vuong_mac_cho": r.vuong_mac_cho or "", "vuong_mac_han": r.vuong_mac_han}
+            "vuong_mac_cho": r.vuong_mac_cho or "", "vuong_mac_han": r.vuong_mac_han,
+            # BC-2: trục xem xét — nhân viên thấy báo cáo của mình đang chờ xem, đã xem hay cần bổ sung
+            "xem": XEM.trang_thai_xem(r), "xem_ten": XEM.TEN_XEM.get(XEM.trang_thai_xem(r), ""),
+            "bo_sung_ly_do": r.bo_sung_ly_do or ""}
 
 
 class ReportIn(BaseModel):
@@ -120,6 +124,10 @@ def list_reports(period: str | None = None, mine: bool = False, u: User = Depend
     if mine or u.role not in MANAGERS:
         q = q.where(DailyReport.user_id == u.id)
     rows = [r for r in db.execute(q.limit(1000)).scalars() if not period or f"{r.report_date:%Y-%m}" == period]
+    # BC-2: người quản lý chỉ đọc NỘI DUNG báo cáo của phòng thuộc phạm vi (bao_cao_phong.PHONG);
+    # Chủ tịch, TGĐ, Ban Kiểm soát cả công ty. Trước đây mọi vai quản lý đọc được cả công ty.
+    if not mine and u.role in MANAGERS:
+        rows = [r for r in rows if XEM.co_quyen_noi_dung(db, u, r)]
     return [report_out(r, users) for r in rows]
 
 
@@ -130,13 +138,102 @@ class ReviewIn(BaseModel):
 
 @router.post("/daily-reports/{rid}/review")
 def review(rid: int, data: ReviewIn, u: User = Depends(require_roles(*MANAGERS)), db: Session = Depends(get_db)):
+    # Cửa cũ (chấm điểm) giữ nguyên địa chỉ, nay đi qua cùng hàng rào BC-2: đúng phạm vi phòng,
+    # không tự chấm mình. Chấm = «Đã xem» kèm điểm.
     r = db.get(DailyReport, rid)
     if not r: raise HTTPException(404, "Không có báo cáo")
     try:
-        O.review_report(db, u, r, data.score, data.note)
+        XEM.xem_xet(db, u, r, "da_xem", data.score, data.note)
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"message": f"Đã chấm {data.score:g}/10"}
+
+
+# ---------- BC-2 · Tổng hợp cho người xem xét (Chủ tịch duyệt bản xem thử 26/10/2026) ----------
+VAI_XEM_XET = tuple(dict.fromkeys(MANAGERS + XEM.VAI_CO_PHONG))
+
+
+@router.get("/daily-reports/tong-hop")
+def tong_hop_ngay(ngay: date | None = None, phong: str = "", u: User = Depends(require_roles(*VAI_XEM_XET)),
+                  db: Session = Depends(get_db)):
+    d = ngay
+    if d is None:                  # mặc định: ngày làm việc VỪA HẾT HẠN (bỏ Chủ nhật)
+        d = O.gio_vn().date() - timedelta(days=1)
+        while d.weekday() == 6:
+            d -= timedelta(days=1)
+    try:
+        return XEM.tong_hop(db, u, d, phong)
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
+
+
+class XemIn(BaseModel):
+    hanh_dong: str                 # da_xem / bo_sung
+    diem: float | None = None
+    ly_do: str = ""
+    lan: int | None = None         # lần nộp người xem đang mở — nhân viên nộp lại giữa chừng thì 409
+
+
+@router.post("/daily-reports/{rid}/xem")
+def xem_xet(rid: int, data: XemIn, u: User = Depends(require_roles(*VAI_XEM_XET)), db: Session = Depends(get_db)):
+    r = db.get(DailyReport, rid)
+    if not r: raise HTTPException(404, "Không có báo cáo")
+    try:
+        XEM.xem_xet(db, u, r, data.hanh_dong, data.diem, data.ly_do, data.lan)
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
+    except LookupError as ex:
+        raise HTTPException(409, str(ex))
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"message": "Đã ghi «đã xem»" if data.hanh_dong == "da_xem" else "Đã trả bổ sung — nhân viên sẽ thấy lý do khi mở báo cáo",
+            "xem": XEM.trang_thai_xem(r)}
+
+
+class GiaoIn(BaseModel):
+    nguoi: int                     # user_id người nhận, trong phòng người giao phụ trách
+    noi_dung: str
+    han: date | None = None
+
+
+@router.post("/daily-reports/{rid}/giao-ho-tro", status_code=201)
+def giao_ho_tro(rid: int, data: GiaoIn, u: User = Depends(require_roles(*VAI_XEM_XET)), db: Session = Depends(get_db)):
+    r = db.get(DailyReport, rid)
+    if not r: raise HTTPException(404, "Không có báo cáo")
+    try:
+        f = XEM.giao_ho_tro(db, u, r, data.nguoi, data.noi_dung, data.han)
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"message": "Đã giao hỗ trợ", "id": f.id}
+
+
+@router.get("/daily-reports/viec")
+def viec_bao_cao(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Việc phát sinh từ báo cáo ngày: chuyển đến phòng mình phụ trách, và giao đích danh cho mình."""
+    return XEM.viec_cua(db, u)
+
+
+class ViecIn(BaseModel):
+    trang_thai: str                # dang_xu_ly / da_xong
+    ghi_chu: str = ""
+
+
+@router.post("/daily-reports/viec/{vid}")
+def cap_nhat_viec(vid: int, data: ViecIn, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    from app.models.ops import DailyReportFollowUp
+    f = db.get(DailyReportFollowUp, vid)
+    if not f: raise HTTPException(404, "Không có việc này")
+    try:
+        XEM.cap_nhat_viec(db, u, f, data.trang_thai, data.ghi_chu)
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"message": f"Đã chuyển sang «{XEM.TRANG_THAI_VIEC[f.trang_thai]}»"}
 
 
 @router.get("/daily-reports/summary")
@@ -147,6 +244,8 @@ def summary(period: str, u: User = Depends(require_roles(*MANAGERS)), db: Sessio
     days = O.work_days_in(y, m, until=today if (y, m) == (today.year, today.month) else None)
     users = {x.id: x for x in db.execute(select(User)).scalars()}
     emps = O.nhan_vien_phai_nop(db)   # BC-1: mọi nhân viên văn phòng trừ HDV, tài xế, Ban TGĐ
+    pv = XEM.pham_vi_trang_thai(db, u)   # BC-2: xếp loại tháng theo phạm vi phòng; HCNS, CT, TGĐ, BKS cả công ty
+    emps = [e for e in emps if XEM.trong(pv, e.department)]
     reports = [r for r in db.execute(select(DailyReport)).scalars() if f"{r.report_date:%Y-%m}" == period]
     out = []
     for e in emps:
@@ -212,8 +311,8 @@ def _bao_cao_duoc_xem(db: Session, u: User, rid: int) -> DailyReport:
     r = db.get(DailyReport, rid)
     if r is None:
         raise HTTPException(404, "Không có báo cáo")
-    if r.user_id != u.id and u.role not in MANAGERS:
-        raise HTTPException(403, "Chỉ người nộp và người quản lý xem được tệp của báo cáo này")
+    if r.user_id != u.id and not XEM.co_quyen_noi_dung(db, u, r):   # BC-2: theo phạm vi phòng
+        raise HTTPException(403, "Chỉ người nộp và người xem xét của phòng ấy xem được tệp của báo cáo này")
     return r
 
 

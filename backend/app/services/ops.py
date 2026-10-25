@@ -275,6 +275,8 @@ def submit_report(db: Session, u: User, d: date, p1: str, p2: str, p3: str, p4: 
     r.so_lan_nop = (r.so_lan_nop or 0) + 1
     r.robot_score, r.robot_note = robot_score(r)
     db.flush()
+    from app.services import bao_cao_ngay_xem as _XEM   # BC-2: nộp lại sau «cần bổ sung» về chờ xem; vướng mắc có phòng nhận thành việc theo dõi
+    _XEM.sau_khi_nop(db, u, r, dept_of_user(db, u))
     db.add(DailyReportVersion(report_id=r.id, lan=r.so_lan_nop, luc=now, du_lieu=json.dumps(
         {"p1": p1, "p2": parse_part2(p2), "p3": p4, "p4": p3, "vuong_mac_cho": r.vuong_mac_cho,
          "vuong_mac_han": vuong_mac_han.isoformat() if vuong_mac_han else None}, ensure_ascii=False)))

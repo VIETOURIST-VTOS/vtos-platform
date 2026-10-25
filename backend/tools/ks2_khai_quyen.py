@@ -187,6 +187,12 @@ CHAN_TAI_CHO: dict[str, str] = {
     "POST /api/v1/ra-soat-cot-tien/nan-ngoai-te": (
         "Cùng một hàm với đường /kiem-soat ở trên, khác địa chỉ để hàng rào phạm vi ngoài tách được "
         "màn hình Kế toán khỏi màn hình Kiểm soát. Chặn giống hệt: chủ hồ sơ của chuyến."),
+    # BC-2 · 26/10/2026 — việc phát sinh từ báo cáo ngày (vướng mắc chuyển phòng, giao hỗ trợ).
+    "POST /api/v1/daily-reports/viec/{vid}": (
+        "Chặn theo NGƯỜI và PHÒNG của việc, không theo vai: chỉ người được giao đích danh, hoặc người "
+        "xem xét của phòng nhận (bao_cao_phong.PHONG), đổi được trạng thái — kiểm trong "
+        "bao_cao_ngay_xem.cap_nhat_viec, sai thì 403. Khai vai ở đây sẽ NỚI: nhân viên được giao "
+        "hỗ trợ có vai thường, và một vai trưởng phòng không được đóng việc của phòng khác."),
     "POST /api/v1/leaves": (
         "Hai đường trong một cửa: HCNS nhập hộ cho người khác, còn lại chỉ nhập cho chính mình. "
         "Nhánh rẽ nằm trong thân hàm nên máy không đọc được từ chữ ký."),

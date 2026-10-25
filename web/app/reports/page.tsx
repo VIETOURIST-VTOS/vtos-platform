@@ -5,6 +5,9 @@ import { api, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 const MANAGERS = ["tp_dh", "gd_kd", "tp_kd", "tn_kd", "ptgd_doan", "ptgd_mkt", "tgd", "chutich", "hcns", "cntt", "bks"];
+// BC-2: người xem xét của từng phòng trong bảng phòng (TP Hướng dẫn, GĐ đội xe, Kế toán) cũng mở tab
+// Tổng hợp. Phạm vi thật do máy chủ cắt; danh sách này chỉ quyết định có hiện nút tab hay không.
+const NGUOI_XEM = [...MANAGERS, "tp_hd", "gd_doi_xe", "ketoan", "ketoan_truong", "ketoan_tt"];
 const today = () => new Date().toISOString().slice(0, 10);   // chỉ cho ô ngày phân ca trực page
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -32,12 +35,15 @@ function DailyForm({ onDone, rows }: { onDone: () => void; rows: any[] }) {
   const [sent, setSent] = useState<any>(null);
   const [teps, setTeps] = useState<any[]>([]);
   const [dangTai, setDangTai] = useState(false);
+  const [ngayMo, setNgayMo] = useState("");          // BC-2: mở lại một ngày cũ được trả bổ sung
+  const [viecToi, setViecToi] = useState<any[]>([]);
   const KPS = form?.khong_phat_sinh || "Không phát sinh";
   const ngay: string = form?.ngay || "";
   // Nháp chỉ giữ trong trình duyệt của chính người viết — không phải bằng chứng đã nộp.
   const khoaNhap = ngay ? `vtos_bc_nhap_${user?.username}_${ngay}` : "";
-  const taiLai = useCallback(() => api("/daily-reports/form").then((r) => {
-    setForm(r);
+  const taiLai = useCallback(() => api(`/daily-reports/form${ngayMo ? `?ngay=${ngayMo}` : ""}`).then((r) => {
+    setForm(r); setTeps([]);
+    api("/daily-reports/viec").then((v) => setViecToi(v.cua_toi || [])).catch(() => {});
     if (r.today) {
       setF({ part1_done: r.today.part1_done, part3_issues: r.today.part3_issues, part4_plan: r.today.part4_plan,
              vuong_mac_cho: r.today.vuong_mac_cho || "", vuong_mac_han: r.today.vuong_mac_han || "" });
@@ -46,7 +52,7 @@ function DailyForm({ onDone, rows }: { onDone: () => void; rows: any[] }) {
     } else {
       try { const n = JSON.parse(localStorage.getItem(`vtos_bc_nhap_${user?.username}_${r.ngay}`) || "null"); if (n) { setF(n.f); setP2(n.p2 || {}); } } catch { /* trình duyệt chặn lưu */ }
     }
-  }).catch((e) => toast(errMsg(e), true)), [toast, user?.username]);
+  }).catch((e) => toast(errMsg(e), true)), [toast, user?.username, ngayMo]);
   useEffect(() => { taiLai(); }, [taiLai]);
   const dept = form?.department || "";
   const mau: string[] = form?.mau || [];
@@ -100,7 +106,7 @@ function DailyForm({ onDone, rows }: { onDone: () => void; rows: any[] }) {
         <span className="muted">Nộp trước <b>{form.deadline}</b> · {form.deadline.startsWith("0:00") ? `đúng 0:00 tính là muộn cho ngày ${fmtD(ngay)}` : "luật cũ cho ngày trước mốc"}</span></div>
       <Countdown seconds={form.seconds_left} han={form.deadline} />
     </div>
-    {!form.phai_nop && <div className="gate warn">Hồ sơ của anh/chị hiện không thuộc diện phải nộp báo cáo ngày (HDV, tài xế, Ban TGĐ hoặc chưa nối hồ sơ nhân sự). Vẫn nộp được nếu cần.</div>}
+    {!form.phai_nop && <div className="gate">Hồ sơ của anh/chị hiện không thuộc diện phải nộp báo cáo ngày (HDV, tài xế, Ban TGĐ hoặc chưa nối hồ sơ nhân sự). Vẫn nộp được nếu cần.</div>}
     <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1.5fr) minmax(260px, 1fr)" }}>
       <div className="panel">
         <div className="grid" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
@@ -144,7 +150,10 @@ function DailyForm({ onDone, rows }: { onDone: () => void; rows: any[] }) {
         {sent && <div className="gate pass" style={{ marginTop: 10 }}>{sent.message}</div>}
       </div>
       <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
-        <div className="panel"><h3 style={{ marginTop: 0 }}>Trạng thái hôm nay</h3>
+        {ngayMo && <div className="gate">Đang mở báo cáo ngày {fmtD(ngayMo)} để bổ sung. <button className="act grey" style={{ margin: 0 }} onClick={() => setNgayMo("")}>Về hôm nay</button></div>}
+        {r0?.xem === "can_bo_sung" && <div className="gate"><b>Trưởng phòng yêu cầu bổ sung:</b> {r0.bo_sung_ly_do}. Sửa rồi bấm Nộp lại — giờ nộp lần đầu giữ nguyên.</div>}
+        {viecToi.length > 0 && <ViecPanel title="Việc giao cho bạn" ds={viecToi} onDone={taiLai} />}
+        <div className="panel"><h3 style={{ marginTop: 0 }}>Trạng thái {ngayMo ? `ngày ${fmtD(ngayMo)}` : "hôm nay"}</h3>
           <table><tbody>
             <tr><td>Tình trạng</td><td>{r0 ? <Tag cls={r0.on_time ? "ok" : "warn"}>{r0.on_time ? "Đã nộp · đúng hạn" : "Đã nộp · muộn"}</Tag> : <Tag cls={form.seconds_left > 0 ? "warn" : "red"}>{form.seconds_left > 0 ? "Chưa nộp · chưa đến hạn" : "Quá hạn chưa nộp"}</Tag>}</td></tr>
             <tr><td>Hạn nộp</td><td className="mono">{fmtDT(form.han_luc)}</td></tr>
@@ -163,8 +172,8 @@ function DailyForm({ onDone, rows }: { onDone: () => void; rows: any[] }) {
         </div>
       </div>
     </div>
-    <div className="panel wrap"><h2>Báo cáo của tôi trong tháng</h2><table><thead><tr><th>Ngày</th><th>Nộp lần đầu</th><th>Số lần</th><th>Đúng hạn</th><th>Điểm robot</th><th>Điểm TP</th><th>Nhận xét</th></tr></thead>
-      <tbody>{rows.length ? rows.map((r) => <tr key={r.id}><td>{fmtD(r.report_date)}</td><td>{fmtDT(r.first_submitted_at)}</td><td>{r.so_lan_nop}</td><td>{r.on_time ? <Tag cls="ok">✔</Tag> : <Tag cls="warn">muộn</Tag>}</td><td>{r.robot_score}/10 <span className="muted">{r.robot_note}</span></td><td>{r.manager_score ?? "–"}</td><td className="muted">{r.manager_note}</td></tr>) : <tr><td colSpan={7} className="muted">Chưa có báo cáo trong tháng.</td></tr>}</tbody></table></div>
+    <div className="panel wrap"><h2>Báo cáo của tôi trong tháng</h2><table><thead><tr><th>Ngày</th><th>Nộp lần đầu</th><th>Số lần</th><th>Đúng hạn</th><th>Xem xét</th><th>Điểm robot</th><th>Điểm TP</th><th>Nhận xét</th></tr></thead>
+      <tbody>{rows.length ? rows.map((r) => <tr key={r.id}><td>{fmtD(r.report_date)}</td><td>{fmtDT(r.first_submitted_at)}</td><td>{r.so_lan_nop}</td><td>{r.on_time ? <Tag cls="ok">✔</Tag> : <Tag cls="warn">muộn</Tag>}</td><td><Tag cls={XEM_TAG[r.xem] || "grey"}>{r.xem_ten}</Tag>{r.xem === "can_bo_sung" && <div style={{ color: "var(--orange)" }}>Cần bổ sung: {r.bo_sung_ly_do} <button className="act grey" style={{ margin: 0 }} onClick={() => { setNgayMo(String(r.report_date).slice(0, 10)); window.scrollTo(0, 0); }}>Mở để bổ sung</button></div>}</td><td>{r.robot_score}/10 <span className="muted">{r.robot_note}</span></td><td>{r.manager_score ?? "–"}</td><td className="muted">{r.manager_note}</td></tr>) : <tr><td colSpan={8} className="muted">Chưa có báo cáo trong tháng.</td></tr>}</tbody></table></div>
   </>);
 }
 
@@ -187,32 +196,168 @@ function KiemNhiem() {
           : <input type="checkbox" aria-label={`${r.name} kiêm ${m.ten}`} checked={r.kiem_nhiem.includes(m.ma)} onChange={(e) => doi(r.employee_id, m.ma, e.target.checked)} />}</td>)}</tr>)}</tbody></table></div>);
 }
 
+/* BC-2 (Chủ tịch duyệt bản xem thử 26/10/2026) — TỔNG HỢP CHO NGƯỜI XEM XÉT.
+   Số cần xử lý trước, bảng sau. Phạm vi do MÁY CHỦ cắt theo bảng phòng (bao_cao_phong.PHONG): HCNS
+   nhận trạng thái cả công ty nhưng không nhận nội dung phòng khác — màn hình không giấu gì, vì không
+   có gì để giấu. Trả bổ sung bắt buộc lý do; «Đã xem» không chốt công; không tự xem báo cáo mình. */
+const HAN_TAG: Record<string, string> = { dung_han: "ok", muon: "warn", chua_den_han: "grey", qua_han: "red", khong_nghia_vu: "grey" };
+const XEM_TAG: Record<string, string> = { cho_xem: "grey", can_bo_sung: "warn", da_xem: "ok" };
+const homQua = () => { const d = new Date(Date.now() + 7 * 3600e3 - 864e5); if (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
+
+function ViecPanel({ title, ds, onDone, note }: { title: string; ds: any[]; onDone: () => void; note?: string }) {
+  const { toast } = useShell();
+  const doi = async (v: any, trang_thai: string) => {
+    try { const r = await api<any>(`/daily-reports/viec/${v.id}`, { method: "POST", json: { trang_thai } }); toast(r.message); onDone(); }
+    catch (x) { toast(errMsg(x), true); }
+  };
+  return (<div className="panel"><h3 style={{ marginTop: 0 }}>{title}</h3>
+    {note && <p className="muted" style={{ marginTop: 0 }}>{note}</p>}
+    {ds.length ? ds.map((v) => <div key={v.id} style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", marginBottom: 8, opacity: ["da_xong"].includes(v.trang_thai) ? 0.6 : 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <b>{v.loai === "ho_tro" ? `Hỗ trợ · giao cho ${v.nguoi_nhan}` : `${v.tu_phong_ten} → ${v.den_phong_ten}`}</b>
+        {v.trang_thai === "da_xong" ? <Tag cls="ok">Đã xong</Tag> : v.qua_han ? <Tag cls="red">quá hạn {-v.con_ngay} ngày</Tag>
+          : v.con_ngay != null ? <Tag cls="warn">còn {v.con_ngay} ngày</Tag> : <Tag cls="grey">{v.trang_thai_ten}</Tag>}
+      </div>
+      <div style={{ whiteSpace: "pre-wrap" }}>{v.noi_dung}</div>
+      <div className="muted">{v.han ? `Hạn ${fmtD(v.han)} · ` : ""}từ báo cáo {fmtD(v.ngay_bao_cao)} của {v.nguoi_nop} · {v.trang_thai_ten}{v.ghi_chu ? ` · ${v.ghi_chu}` : ""}</div>
+      {v.trang_thai !== "da_xong" && <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+        {v.trang_thai === "mo" && <button className="act grey" style={{ margin: 0 }} onClick={() => doi(v, "dang_xu_ly")}>Nhận xử lý</button>}
+        <button className="act grey" style={{ margin: 0 }} onClick={() => doi(v, "da_xong")}>Đã xong</button></div>}
+    </div>) : <p className="muted">Không có việc nào.</p>}
+  </div>);
+}
+
+function TongHop() {
+  const { toast } = useShell();
+  const [ngay, setNgay] = useState(homQua());
+  const [phong, setPhong] = useState("");
+  const [loc, setLoc] = useState("");
+  const [d, setD] = useState<any>(null);
+  const [viec, setViec] = useState<any>({ den_phong: [], cua_toi: [] });
+  const [mo, setMo] = useState<number | null>(null);
+  const [ly, setLy] = useState("");
+  const [diem, setDiem] = useState("");
+  const [giao, setGiao] = useState({ nguoi: "", noi_dung: "", han: "" });
+  const [err, setErr] = useState("");
+  const load = useCallback(() => {
+    api(`/daily-reports/tong-hop?ngay=${ngay}${phong ? `&phong=${phong}` : ""}`).then((x) => { setD(x); setErr(""); }).catch((x) => setErr(errMsg(x)));
+    api("/daily-reports/viec").then(setViec).catch(() => {});
+  }, [ngay, phong]);
+  useEffect(() => { load(); }, [load]);
+  const moDong = (r: any) => { setMo(mo === r.user_id ? null : r.user_id); setLy(""); setDiem(""); setGiao({ nguoi: "", noi_dung: "", han: "" }); };
+  const xem = async (r: any, hanh_dong: string) => {
+    try {
+      const x = await api<any>(`/daily-reports/${r.report_id}/xem`, { method: "POST",
+        json: { hanh_dong, ly_do: ly, diem: diem === "" ? null : Number(diem), lan: r.so_lan } });
+      toast(x.message); setMo(null); load();
+    } catch (x) { toast(errMsg(x), true); load(); }
+  };
+  const giaoHoTro = async (r: any) => {
+    try {
+      const x = await api<any>(`/daily-reports/${r.report_id}/giao-ho-tro`, { method: "POST",
+        json: { nguoi: Number(giao.nguoi), noi_dung: giao.noi_dung, han: giao.han || null } });
+      toast(x.message); setGiao({ nguoi: "", noi_dung: "", han: "" }); load();
+    } catch (x) { toast(errMsg(x), true); }
+  };
+  if (err) return <div className="panel"><p className="muted">{err}</p></div>;
+  if (!d) return <div className="panel"><p className="muted">Đang tải…</p></div>;
+  const dong = d.dong.filter((r: any) => !loc || (loc === "qua_han" ? r.thoi_han === "qua_han" : r.report_id && r.xem === loc && r.doc_duoc && !r.tu_minh));
+  const dem = d.dem, tong = Math.max(d.dong.length - dem.khong_nghia_vu, 1);
+  const BA: [string, string, string, string][] = [["cho_xem", "Chờ xem", "đã nộp, chưa ai xem", "var(--navy)"],
+    ["can_bo_sung", "Cần bổ sung", "đã trả, chờ nhân viên nộp lại", "var(--orange)"], ["qua_han", "Quá hạn chưa nộp", `đã qua hạn ${d.han}`, "var(--red)"]];
+  return (<>
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "end" }}>
+      <label>Ngày<input type="date" value={ngay} onChange={(e) => setNgay(e.target.value)} /></label>
+      <label>Phòng<select value={phong} onChange={(e) => setPhong(e.target.value)}><option value="">Tất cả trong phạm vi</option>
+        {d.cac_phong.map((p: any) => <option key={p.ma} value={p.ma}>{p.ten}</option>)}</select></label>
+      <label>Trạng thái<select value={loc} onChange={(e) => setLoc(e.target.value)}><option value="">Tất cả</option>
+        {BA.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+      <span className="muted" style={{ marginLeft: "auto" }}>Mốc dữ liệu {fmtDT(d.as_of)} (giờ VN){d.chi_trang_thai ? " · bạn xem trạng thái cả công ty, nội dung chỉ phòng mình" : ""}</span>
+    </div>
+    <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", marginTop: 10 }}>
+      {BA.map(([k, l, g, c]) => <button key={k} className="panel" aria-pressed={loc === k} onClick={() => setLoc(loc === k ? "" : k)}
+        style={{ textAlign: "left", cursor: "pointer", outline: loc === k ? "2px solid var(--navy)" : undefined }}>
+        <div className="mono" style={{ fontSize: 28, fontWeight: 700, color: c }}>{d.xu_ly[k]}</div><b>{l}</b><div className="muted">{g}</div></button>)}
+    </div>
+    <div className="panel">
+      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <b>Ngày {fmtD(d.ngay)}</b><span><b className="mono">{d.da_nop}/{d.phai_nop}</b> <span className="muted">đã nộp{d.ty_le != null ? ` · ${d.ty_le}%` : ""} (người có nghĩa vụ)</span></span></div>
+      <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: "var(--panel2)", marginTop: 6 }}>
+        {[["dung_han", "var(--teal)"], ["muon", "var(--orange)"], ["chua_den_han", "var(--line)"], ["qua_han", "var(--red)"]].map(([k, c]) =>
+          <i key={k} style={{ width: `${(dem[k] * 100) / tong}%`, background: c }} />)}</div>
+      <div className="muted" style={{ marginTop: 4 }}>Đúng hạn {dem.dung_han} · Muộn {dem.muon} · Chưa đến hạn {dem.chua_den_han} · Quá hạn chưa nộp {dem.qua_han} · Không có nghĩa vụ {dem.khong_nghia_vu} (đếm riêng, không vào mẫu số)</div>
+    </div>
+    <div className="grid" style={{ gridTemplateColumns: "minmax(0,1.7fr) minmax(260px,1fr)", alignItems: "start" }}>
+      <div className="panel wrap"><h3 style={{ marginTop: 0 }}>Từng người · bấm một dòng để mở năm phần</h3>
+        <table><thead><tr><th>Người</th><th>Phòng</th><th>Nộp lần đầu</th><th>Số lần</th><th>Thời hạn</th><th>Xem xét</th><th>Robot</th><th>TP</th></tr></thead>
+          <tbody>{dong.length ? dong.map((r: any) => <>
+            <tr key={r.user_id} style={{ cursor: r.doc_duoc && r.report_id ? "pointer" : "default" }} onClick={() => r.doc_duoc && r.report_id && moDong(r)}>
+              <td><b>{r.ten}</b> <span className="muted mono">{r.code}</span>{r.tu_minh && <span className="muted"> · bạn</span>}</td><td>{r.phong_ten}</td>
+              <td className="mono">{r.lan_dau ? fmtDT(r.lan_dau) : "—"}</td><td className="mono">{r.so_lan || "—"}</td>
+              <td><Tag cls={HAN_TAG[r.thoi_han] || "grey"}>{r.thoi_han_ten}</Tag></td>
+              <td>{r.report_id ? <Tag cls={XEM_TAG[r.xem] || "grey"}>{r.xem_ten}</Tag> : "—"}</td>
+              <td className="mono">{r.diem_robot ?? "—"}</td><td className="mono">{r.diem_tp ?? "—"}</td></tr>
+            {mo === r.user_id && r.noi_dung && <tr key={r.user_id + "d"}><td colSpan={8}><div style={{ background: "var(--panel2)", borderRadius: 8, padding: "10px 12px", display: "grid", gap: 6 }}>
+              <div><b>1 · Việc đã làm:</b> <span style={{ whiteSpace: "pre-wrap" }}>{r.noi_dung.p1}</span></div>
+              <div><b>2 · Số liệu:</b> {Object.entries(r.noi_dung.p2 || {}).map(([k, v]: any) => <span key={k}> · {k}: {v ? <b>{v}</b> : <span style={{ color: "var(--orange)" }}>chưa nhập</span>}</span>)}</div>
+              <div><b>3 · Ngày mai:</b> <span style={{ whiteSpace: "pre-wrap" }}>{r.noi_dung.p3}</span></div>
+              <div><b>4 · Vướng mắc:</b> {r.noi_dung.p4 || <span className="muted">không có</span>}{r.noi_dung.vuong_mac_cho && <span className="muted"> → {r.noi_dung.vuong_mac_cho_ten}{r.noi_dung.vuong_mac_han && `, trước ${fmtD(r.noi_dung.vuong_mac_han)}`}</span>}</div>
+              <div><b>5 · Đính kèm:</b> {r.noi_dung.so_tep ? `${r.noi_dung.so_tep} tệp` : <span className="muted">không có</span>}</div>
+              <div className="muted">Robot: {r.ghi_chu_robot}{r.so_lan > 1 ? ` · đã nộp ${r.so_lan} lần, giờ nộp lần đầu giữ nguyên` : ""}
+                {r.noi_dung.lich_su_xem.map((h: any, i: number) => <span key={i}> · {h.hanh_dong === "bo_sung" ? `trả bổ sung (lần ${h.lan_nop}): ${h.ly_do}` : `đã xem${h.diem != null ? ` · ${h.diem}đ` : ""}`} — {h.boi}</span>)}</div>
+              {r.xem_xet_duoc && <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, display: "grid", gap: 6 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}>
+                  <label>Điểm (không bắt buộc)<input type="number" min={0} max={10} step={0.5} value={diem} placeholder={String(r.diem_robot ?? "")} onChange={(e) => setDiem(e.target.value)} style={{ width: 90 }} /></label>
+                  <label style={{ flex: 1, minWidth: 220 }}>Nhận xét / lý do trả bổ sung<input value={ly} onChange={(e) => setLy(e.target.value)} placeholder="Bắt buộc khi trả bổ sung" /></label></div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <button className="act teal" style={{ margin: 0 }} onClick={() => xem(r, "da_xem")}>Đã xem</button>
+                  <button className="act orange" style={{ margin: 0 }} disabled={!ly.trim()} onClick={() => xem(r, "bo_sung")}>Yêu cầu bổ sung</button>
+                  <span className="muted">Duyệt nội dung không chốt công.</span></div>
+                <details><summary className="muted" style={{ cursor: "pointer" }}>Giao hỗ trợ cho một người trong phòng…</summary>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end", marginTop: 6 }}>
+                    <label>Người nhận<select value={giao.nguoi} onChange={(e) => setGiao({ ...giao, nguoi: e.target.value })}><option value="">— chọn —</option>
+                      {d.nguoi_giao_duoc.filter((n: any) => n.user_id !== r.user_id).map((n: any) => <option key={n.user_id} value={n.user_id}>{n.ten} · {n.phong_ten}</option>)}</select></label>
+                    <label style={{ flex: 1, minWidth: 200 }}>Việc cần hỗ trợ<input value={giao.noi_dung} onChange={(e) => setGiao({ ...giao, noi_dung: e.target.value })} /></label>
+                    <label>Hạn<input type="date" value={giao.han} onChange={(e) => setGiao({ ...giao, han: e.target.value })} /></label>
+                    <button className="act grey" style={{ margin: 0 }} disabled={!giao.nguoi || !giao.noi_dung.trim()} onClick={() => giaoHoTro(r)}>Giao hỗ trợ</button></div></details>
+              </div>}
+              {r.tu_minh && <div className="muted">Báo cáo của chính bạn — cấp trên xem xét.</div>}
+            </div></td></tr>}
+          </>) : <tr><td colSpan={8} className="muted">Không có dòng nào khớp bộ lọc.</td></tr>}</tbody></table></div>
+      <div style={{ display: "grid", gap: 12 }}>
+        <ViecPanel title="Vướng mắc chuyển đến phòng bạn" ds={viec.den_phong} onDone={load}
+          note="Từ Phần 4 báo cáo của phòng khác và việc hỗ trợ đã giao. Có hạn và trạng thái riêng; không tự đóng khi báo cáo được xem." />
+        {viec.cua_toi.length > 0 && <ViecPanel title="Việc giao cho bạn" ds={viec.cua_toi} onDone={load} />}
+      </div>
+    </div>
+  </>);
+}
+
 function Reports() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const isMgr = MANAGERS.includes(role);
-  const [tab, setTab] = useState(isMgr ? "all" : "mine");
+  const xemXet = NGUOI_XEM.includes(role);
+  const [tab, setTab] = useState(xemXet ? "all" : "mine");
   const [period, setPeriod] = useState(thisMonth());
   const [rows, setRows] = useState<any[]>([]);
   const [sum, setSum] = useState<any>(null);
   const [shifts, setShifts] = useState<any[]>([]);
   const [emps, setEmps] = useState<any[]>([]);
-  const [open, setOpen] = useState<number | null>(null);
   const [fs, setFs] = useState({ shift_date: today(), slot: "toi", employee_id: "" });
   const load = useCallback(() => {
     if (tab === "mine") api(`/daily-reports?mine=1&period=${period}`).then(setRows);
-    if (tab === "all") { api(`/daily-reports?period=${period}`).then(setRows); api(`/daily-reports/summary?period=${period}`).then(setSum).catch(() => {}); }
+    if (tab === "all" && isMgr) api(`/daily-reports/summary?period=${period}`).then(setSum).catch(() => {});
     if (tab === "shifts") { api(`/page-shifts?period=${period}`).then(setShifts); if (isMgr) api("/employees?department=kd_le").then(setEmps).catch(() => {}); }
   }, [tab, period, isMgr]);
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
-  const score = (r: any) => r.manager_score ?? r.robot_score;
 
   return (<>
     <h1>Báo cáo công việc (Điều 12) &amp; ca trực page</h1>
     <p className="muted">Mọi nhân viên văn phòng (trừ HDV, tài xế, Ban TGĐ) nộp báo cáo 5 phần <b>trước 0 giờ ngày kế tiếp</b> mỗi ngày làm việc (Thứ Hai – Thứ Bảy); nghỉ cả ngày đã duyệt thì không phải nộp. Robot chấm điểm nháp, trưởng phòng chấm chính thức; thiếu 1 ngày → nhắc nhở, 2 ngày liên tiếp → chuyển HCNS. Xếp loại tháng A/B/C/D là cảnh báo sớm, căn cứ đánh giá 3 tháng.</p>
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      {[["mine", "Báo cáo của tôi"], ...(isMgr ? [["all", "Tổng hợp phòng"]] : []), ...(role === "chutich" ? [["kiem", "Kiêm nhiệm"]] : []), ["shifts", "Ca trực page"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
+      {[["mine", "Báo cáo của tôi"], ...(xemXet ? [["all", "Tổng hợp phòng"]] : []), ...(role === "chutich" ? [["kiem", "Kiêm nhiệm"]] : []), ["shifts", "Ca trực page"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
       <label style={{ marginLeft: "auto" }}>Tháng <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></label>
     </div>
 
@@ -220,17 +365,11 @@ function Reports() {
     {tab === "kiem" && role === "chutich" && <KiemNhiem />}
 
     {tab === "all" && <>
+      <TongHop />
       {sum && <><h2>Xếp loại tháng {period} ({sum.work_days} ngày làm việc tính đến nay)</h2>
         <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Họ tên</th><th>Phòng</th><th>Đã nộp</th><th>Đúng giờ</th><th>TP đã chấm</th><th>Thiếu</th><th>Điểm BQ</th><th>Xếp loại</th></tr></thead>
           <tbody>{sum.rows.map((r: any) => <tr key={r.code}><td className="mono">{r.code}</td><td><b>{r.name}</b></td><td>{r.department}</td><td>{r.submitted}/{r.work_days}</td><td>{r.on_time}</td><td>{r.reviewed}</td><td>{r.missing ? <Tag cls={r.missing >= 2 ? "red" : "warn"}>{r.missing}</Tag> : "0"}</td><td>{r.avg}</td><td><Tag cls={r.grade === "A" ? "ok" : r.grade === "B" ? "navy" : r.grade === "C" ? "warn" : "red"}>{r.grade}</Tag></td></tr>)}</tbody></table></div>
         {["cntt", "hcns", "tgd"].includes(role) && <button className="act orange" onClick={() => post("/daily-reports/check-missing")}>Robot rà thiếu báo cáo</button>}</>}
-      <h2>Báo cáo chi tiết – bấm để xem và chấm</h2>
-      <div className="panel wrap"><table><thead><tr><th>Ngày</th><th>Người</th><th>Phòng</th><th>Đúng giờ</th><th>Robot</th><th>TP</th><th></th></tr></thead>
-        <tbody>{rows.map((r) => <>
-          <tr key={r.id} style={{ cursor: "pointer" }} onClick={() => setOpen(open === r.id ? null : r.id)}><td>{fmtD(r.report_date)}</td><td><b>{r.user}</b> <span className="muted mono">{r.staff_code}</span></td><td>{r.department_name || r.department}</td><td>{r.on_time ? "✔" : <Tag cls="warn">muộn</Tag>}{r.so_lan_nop > 1 && <span className="muted"> · {r.so_lan_nop} lần</span>}</td><td>{r.robot_score}</td><td>{r.manager_score ?? "–"}</td>
-            <td onClick={(e) => e.stopPropagation()}>{!r.reviewed_by && <button className="act teal" style={{ margin: 0 }} onClick={() => { const s = prompt(`Điểm cho ${r.user} (0–10), gợi ý robot ${r.robot_score}:`, String(r.robot_score)); if (s !== null) { const n = prompt("Nhận xét:") || ""; post(`/daily-reports/${r.id}/review`, { score: Number(s), note: n }); } }}>Chấm</button>}</td></tr>
-          {open === r.id && <tr key={r.id + "d"}><td colSpan={7}><div style={{ margin: "4px 0 8px 16px" }}><b>1. Đã làm:</b> <span style={{ whiteSpace: "pre-wrap" }}>{r.part1_done}</span><br /><b>2. Số liệu ({r.department_name}):</b> {Object.entries(r.part2 || {}).map(([k, v]: any) => <span key={k}> · {k}: <b>{v || "chưa nhập"}</b></span>)}<br /><b>3. Ngày mai:</b> {r.part4_plan}<br /><b>4. Vướng mắc:</b> {r.part3_issues}{r.vuong_mac_cho && <span className="muted"> → {r.vuong_mac_cho}{r.vuong_mac_han && `, trước ${fmtD(r.vuong_mac_han)}`}</span>}<br /><span className="muted">Robot: {r.robot_note}{r.manager_note && ` · TP: ${r.manager_note}`}</span></div></td></tr>}
-        </>)}</tbody></table></div>
     </>}
 
     {tab === "shifts" && <>
