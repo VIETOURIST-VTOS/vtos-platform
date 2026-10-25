@@ -33,6 +33,50 @@ class DailyReport(Base):
     # Phần 4 — vướng mắc có NGƯỜI NHẬN và HẠN, để nó không chết theo việc «trưởng phòng đã xem».
     vuong_mac_cho: Mapped[str] = mapped_column(String(20), default="", server_default="")
     vuong_mac_han: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # BC-2 (Chủ tịch duyệt bản xem thử 26/10/2026) — trục XEM XÉT tách khỏi trục thời hạn:
+    # "" = chờ xem · "da_xem" · "can_bo_sung". Báo cáo cũ có `reviewed_by` mà cột này trống vẫn
+    # đọc là đã xem (`ops.trang_thai_xem`), nên không phải chạy lại dữ liệu cũ.
+    xem_trang_thai: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    bo_sung_ly_do: Mapped[str] = mapped_column(String(300), default="", server_default="")
+
+
+class DailyReportReview(Base):
+    """BC-2 — sổ các lần xem xét một báo cáo ngày: ai, làm gì, lý do, ở lần nộp thứ mấy.
+
+    Cột `reviewed_by` trên báo cáo chỉ giữ lần sau cùng; trả bổ sung rồi xem lại thì lần trả bổ sung
+    phải còn dấu để đối chiếu, nên mỗi thao tác là một dòng ở đây."""
+    __tablename__ = "daily_report_reviews"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    report_id: Mapped[int] = mapped_column(ForeignKey("daily_reports.id"), index=True)
+    hanh_dong: Mapped[str] = mapped_column(String(20))          # da_xem / bo_sung
+    ly_do: Mapped[str] = mapped_column(String(300), default="")
+    diem: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lan_nop: Mapped[int] = mapped_column(Integer, default=1)
+    boi: Mapped[str] = mapped_column(String(50), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class DailyReportFollowUp(Base):
+    """BC-2 — việc phát sinh từ báo cáo ngày, có NGƯỜI/PHÒNG NHẬN, HẠN và TRẠNG THÁI RIÊNG.
+
+    Hai loại: `vuong_mac` (Phần 4 chuyển cho phòng khác, sinh khi nộp) và `ho_tro` (người xem giao
+    cho một người trong phòng). Không đóng theo việc báo cáo đã được xem — đóng khi bên nhận bấm
+    «Đã xong». Trạng thái: mo → dang_xu_ly → da_xong; `rut` khi người nộp bỏ vướng mắc ở lần nộp lại."""
+    __tablename__ = "daily_report_follow_ups"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    report_id: Mapped[int] = mapped_column(ForeignKey("daily_reports.id"), index=True)
+    loai: Mapped[str] = mapped_column(String(20))               # vuong_mac / ho_tro
+    tu_phong: Mapped[str] = mapped_column(String(20), default="")
+    den_phong: Mapped[str] = mapped_column(String(20), default="", index=True)
+    nguoi_nhan_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    noi_dung: Mapped[str] = mapped_column(Text, default="")
+    han: Mapped[date | None] = mapped_column(Date, nullable=True)
+    trang_thai: Mapped[str] = mapped_column(String(20), default="mo")
+    ghi_chu: Mapped[str] = mapped_column(String(300), default="")
+    tao_boi: Mapped[str] = mapped_column(String(50), default="")
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    cap_nhat_boi: Mapped[str] = mapped_column(String(50), default="")
+    cap_nhat_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class DailyReportVersion(Base):

@@ -128,6 +128,9 @@ CUA_TAY = (
     # BC-1 26/10/2026. Kiêm nhiệm báo cáo ngày: Chủ tịch tick ở tab «Kiêm nhiệm» màn /reports
     # (POST /daily-reports/kiem-nhiem).
     "report_extra_forms",
+    # BC-2 (26/10/2026): việc phát sinh từ báo cáo ngày — người xem xét giao hỗ trợ ở tab «Tổng hợp
+    # phòng» (POST /daily-reports/{rid}/giao-ho-tro); vướng mắc Phần 4 sinh khi nhân viên nộp.
+    "daily_report_follow_ups",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
@@ -322,6 +325,7 @@ MAY_SINH = {
     # BC-1 26/10/2026. Bản chụp mỗi lần nộp báo cáo ngày — hệ thống tự ghi đúng lúc người nộp bấm
     # «Nộp». Không có cửa sửa là TÍNH CHẤT AN TOÀN: sửa được bản lần đầu thì đổi được câu trả lời cho
     # «lần đầu nộp đã ghi gì, lúc nào».
+    "daily_report_reviews": "Sổ xem xét báo cáo ngày (BC-2) – hệ thống ghi một dòng mỗi lần người xem bấm «Đã xem» hoặc «Yêu cầu bổ sung»; không có cửa sửa để dấu trả bổ sung không bị xoá.",
     "daily_report_versions": "Bản chụp mỗi lần nộp báo cáo ngày (BC-1) – hệ thống ghi lúc người nộp bấm Nộp; không có cửa sửa để lần nộp đầu không bị viết lại.",
     # CN-2 (21/10/2026) · BẢNG LƯƠNG BỔ SUNG. Máy lập từ đúng bộ tính lương (`hr.compute_draft`) cho
     # những người bị giữ lúc ký bảng chính; HCNS chỉ bấm «Lập», rồi kiểm và trình như bảng chính.
