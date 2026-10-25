@@ -1315,6 +1315,22 @@ def robot_report(kind: str, db: Session = Depends(get_db)):
 
 
 # ---------- dung lượng dữ liệu ----------
+@router.get("/he-thong/gio-may-chu", tags=["he-thong"])
+def gio_may_chu(u: User = Depends(require_roles("cntt", "chutich", "tgd", "bks", "ketoan"))):
+    """Máy chủ đang đứng ở múi giờ nào, và có đúng múi đã khai không. CHỈ ĐỌC.
+
+    CỬA NÀY ĐỂ TỰ XEM, không phải để tin lời ai. `render.yaml` khai `TZ: Asia/Ho_Chi_Minh`, nhưng
+    một biến môi trường được KHAI không có nghĩa là nó có HIỆU LỰC: ảnh `python:3.12-slim` không
+    mang gói `tzdata`, và thiếu nó thì thư viện C đọc `Asia/Ho_Chi_Minh` thành lệch 0 giờ mà không
+    báo một lỗi nào. Xem `services/gio_may_chu` để biết phép đo.
+
+    KHÔNG gắn vào `/health`: cửa ấy Render gọi 5 giây một lần và đã từng làm sập máy chủ vì nặng.
+    """
+    from app.core.config import settings
+    from app.services import gio_may_chu as GMC
+    return GMC.soat(settings.TZ)
+
+
 @router.get("/he-thong/dung-luong", tags=["he-thong"])
 def dung_luong(u: User = Depends(require_roles("cntt", "chutich", "tgd", "bks", "ketoan")), db: Session = Depends(get_db)):
     """Số dòng và dung lượng từng bảng, để biết chỗ nào đang phình trước khi nghĩ tới nâng cấu hình.

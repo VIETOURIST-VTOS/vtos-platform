@@ -122,8 +122,20 @@ def ly_do_lui_nhan(db: Session, dg: DanhGiaSauTour) -> str:
     ai đó gỡ hàng rào đi mà không ai nhận ra.
     """
     if not CO_TRUONG_TUYEN:
-        return ("Chưa in tên tuyến: VTOS chưa có trường tuyến (Đợt HD-13 dựng). Gom theo tên "
-                "chuyến là chữ tự do nên ngưỡng 30 khách sẽ đếm nhầm tập.")
+        # ĐỢT HDV-2 (22/10/2026) — CÂU CŨ NÓI SAI CHUYỆN, và người duyệt đọc nó mỗi ngày.
+        #
+        # Câu cũ: «VTOS chưa có trường tuyến». SAI. VTOS CÓ trường: `models/core.py:419` khai
+        # `products.region`, `models/hr.py:204` và `:230` khai `guide_rates.route`. Thứ còn
+        # thiếu là chỗ NỐI chuyến về một địa bàn — hai chuyện khác hẳn nhau.
+        #
+        # Vì sao đáng sửa chứ không phải bắt bẻ chữ: người duyệt đọc «chưa có trường» sẽ kết luận
+        # phải dựng thêm cột, rồi đi đặt một việc không ai cần làm. Đọc đúng chuyện thì việc phải
+        # làm là nối chuyến về địa bàn — đúng thứ Đợt HDV-1 đang đo nền cho.
+        return ("Chưa in tên tuyến: VTOS CÓ trường địa bàn (`products.region`) và trường tuyến "
+                "của bảng giá (`guide_rates.route`), nhưng CHƯA nối chuyến về một địa bàn — nên "
+                "gom theo tên chuyến, vốn là chữ tự do, thì ngưỡng 30 khách sẽ đếm nhầm tập. "
+                "Đợt HDV-1 đang đo nền: mở `GET /api/v1/huong-dan/dia-ban/do-nen` để xem độ phủ. "
+                "Nối xong và qua cổng 95% thì bật `CO_TRUONG_TUYEN` (Đợt HD-13).")
     return ""
 
 
