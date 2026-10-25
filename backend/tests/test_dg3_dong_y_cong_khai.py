@@ -475,3 +475,35 @@ def test_f4_nhan_nguoi_viet_KHONG_in_ten_tuyen_khi_chua_co_truong_tuyen():
     assert DY.CO_TRUONG_TUYEN is False
     assert "HD-13" in DY.ly_do_lui_nhan(db, dg), "máy che mà không nói đang che vì sao"
     db.close()
+
+
+# ── ĐỢT HDV-2 (làn R2) — câu lý do phải nói ĐÚNG CHUYỆN ─────────────────────────────────────
+def test_hdv2_1_ly_do_lui_nhan_KHONG_duoc_noi_la_VTOS_thieu_truong():
+    """Câu cũ in cho người duyệt: «VTOS chưa có trường tuyến». SAI, và sai theo hướng tốn việc.
+
+    VTOS CÓ trường: `models/core.py:419` khai `products.region`; `models/hr.py:204` và `:230`
+    khai `guide_rates.route`. Thứ còn thiếu là chỗ NỐI chuyến về một địa bàn — hai chuyện khác
+    hẳn nhau. Người duyệt đọc «chưa có trường» sẽ đi đặt một việc dựng cột mà không ai cần.
+
+    Trả câu cũ về là phép thử này ĐỎ.
+    """
+    from app.models.danh_gia import DanhGiaSauTour
+    db = _db()
+    dg = db.get(DanhGiaSauTour, ID["dg0"])
+    ly_do = DY.ly_do_lui_nhan(db, dg)
+    assert "chưa có trường tuyến" not in ly_do, (
+        "câu cũ đã quay lại — nó nói VTOS thiếu trường, trong khi `products.region` và "
+        "`guide_rates.route` đều đang có")
+    assert "CHƯA nối chuyến về một địa bàn" in ly_do, "câu mới không nói đúng chuyện còn thiếu"
+    db.close()
+
+
+def test_hdv2_2_cau_moi_van_phai_chi_duoc_viec_phai_lam():
+    """Một câu đúng mà không chỉ được việc thì người duyệt vẫn đứng im."""
+    from app.models.danh_gia import DanhGiaSauTour
+    db = _db()
+    ly_do = DY.ly_do_lui_nhan(db, db.get(DanhGiaSauTour, ID["dg0"]))
+    assert "products.region" in ly_do and "guide_rates.route" in ly_do, "không nêu trường đang có"
+    assert "dia-ban/do-nen" in ly_do, "không chỉ chỗ xem độ phủ"
+    assert "HD-13" in ly_do, "mất mã đợt — `test_f4` cũ canh chỗ này"
+    db.close()
