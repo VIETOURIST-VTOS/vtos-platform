@@ -24,7 +24,7 @@ const DUONG = <><a href="/">VTOS</a> · <a href="/doi-xe">Đội xe</a> · Xe h�
 
 const TEN_LOAI: Record<string, string> = {
   tong_chi: "Tổng chi", loi_nhuan: "Lợi nhuận", tong_km: "Tổng km", km_noi: "Km nối chuyến",
-  chong_ngay: "Chồng ngày", thieu_ngay: "Ngày đi/về", ve_truoc_di: "Ngày về", dong_khong_tour: "Dòng không tên tour",
+  chong_ngay: "Chồng ngày", thieu_ngay: "Ngày đi/về", ve_truoc_di: "Ngày về", dong_khong_tour: "Dòng không tên tour", ctp_thieu_ngay: "CTP thiếu ngày", ctp_chua_vao_vtos: "CTP chưa vào VTOS",
 };
 
 function XeHomNay() {
