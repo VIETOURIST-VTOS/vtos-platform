@@ -220,6 +220,10 @@ TU_PHUC_VU: dict[str, str] = {
     "POST /api/v1/daily-reports": (
         "Người nộp báo cáo ngày của chính mình; phòng ban suy từ hồ sơ nhân sự của tài khoản đang "
         "đăng nhập chứ không nhận từ người gọi."),
+    # BC-1 · 26/10/2026 — Phần 5 của báo cáo ngày.
+    "POST /api/v1/daily-reports/{rid}/tep": (
+        "Người nộp gắn tệp vào báo cáo ngày CỦA CHÍNH MÌNH: thân hàm kiểm `r.user_id != u.id` → 403, "
+        "báo cáo đã chấm thì chặn, tệp quá 8 MB thì chặn. Quyền theo HỒ SƠ, không theo vai trò."),
     "POST /api/v1/daily-reports/preview": (
         "Chỉ tính thử điểm cho nội dung người dùng vừa gõ, không ghi gì vào cơ sở dữ liệu. Là POST "
         "vì nội dung dài, không phải vì nó ghi."),

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.core import Tour, Booking, User, Alert
 from app.services import chu_ky as _CK   # bang chu ky, Dot LG2 - nhap o DAU TEP vi require_roles doc no luc nap mo-dun
 from app.models.hr import Employee
-from app.models.ops import DailyReport, PageShift, PaymentRequest
+from app.models.ops import DailyReport, PageShift, PaymentRequest, DailyReportVersion, ReportExtraForm
 from app.models.payments import Receipt
 from app.services import ngoai_te_chi as NT
 from app.services import rules as R
@@ -34,9 +34,41 @@ DEPT_FORMS = {
     "ketoan": {"name": "Kế toán", "fields": ["Phiếu thu đã xác nhận trong ngày", "Lệnh chi / thanh toán NCC đã thực hiện", "Quyết toán tour đã xác nhận", "Hóa đơn đã xuất trong ngày", "Công nợ khách hàng và NCC cần đôn đốc", "Thuế, BHXH, ngân hàng", "Tồn quỹ tiền mặt cuối ngày"],
                "hint": "Ghi mã booking / mã tour / số hóa đơn để đối chiếu."},
     "hcns": {"name": "Nhân sự Hành chính", "fields": ["Tuyển dụng", "Hồ sơ lao động đã xử lý", "Chấm công, phép và bảng lương", "Bảo hiểm xã hội và việc với cơ quan nhà nước", "Hành chính, văn thư và con dấu", "Sự vụ nhân sự cần báo cáo", "Thu chi tiền mặt và tồn quỹ cuối ngày"],
-             "hint": "Không có phát sinh thì ghi 'không'."},
+             "hint": "Không có phát sinh thì bấm «Không phát sinh» — ô bỏ trống là chưa nhập."},
+    # BC-1 (Chủ tịch 26/10/2026): sáu mẫu thêm. Ba mẫu đầu theo PHÒNG; ba mẫu sau là PHẦN VIỆC —
+    # không phòng nào tên «Ngân hàng» hay «CSKH», người làm việc ấy được Chủ tịch giao kiêm nhiệm.
+    "visa": {"name": "Ban Visa", "fields": ["Hồ sơ nhận trong ngày", "Hồ sơ đã nộp đại sứ quán / lãnh sự", "Hồ sơ có kết quả", "Đậu", "Rớt", "Hồ sơ thiếu giấy tờ cần khách bổ sung", "Lịch hẹn sinh trắc / phỏng vấn sắp tới"],
+             "hint": "Ghi mã hồ sơ visa và nước cho từng việc."},
+    "huong_dan": {"name": "Hướng dẫn (Trưởng phòng)", "fields": ["Đoàn đang có HDV", "Đoàn chưa phân HDV", "HDV đang đi tour", "Nhận xét / khiếu nại về HDV", "Hồ sơ HDV cần bổ sung"],
+                  "hint": "Ghi mã tour và tên HDV."},
+    "doi_xe": {"name": "Đội xe (quản lý)", "fields": ["Xe đang đi", "Xe nằm bãi", "Lệnh điều xe đã lập", "Chuyến đã nhập quyết toán", "Bảo dưỡng / sửa chữa", "Giấy tờ xe sắp hết hạn", "Sự cố"],
+               "hint": "Ghi biển số xe cho từng việc."},
+    "ngan_hang": {"name": "Ngân hàng", "fields": [], "dong": "tai_khoan",
+                  "hint": "Số dư theo từng tài khoản và đồng tiền, cùng một mốc chốt. Không cộng tiền khác đồng tiền."},
+    "cskh": {"name": "Chăm sóc khách hàng", "fields": ["Khách đã chăm sóc", "Đánh giá hợp lệ nhận được", "Khiếu nại mới", "Khiếu nại đã xử lý xong", "Cuộc gọi hotline", "Khách giới thiệu"],
+             "hint": "Không ghi số điện thoại khách vào báo cáo."},
+    "ir_phap_che": {"name": "IR – Pháp chế", "fields": ["Lịch công bố thông tin sắp đến hạn", "Hợp đồng / văn bản đã rà soát", "Vụ việc pháp lý đang theo dõi", "Ý kiến rà soát đã gửi"],
+                    "hint": "Tài liệu hạn chế không chép vào báo cáo — chỉ ghi mã hồ sơ."},
 }
-PART_TITLES = {1: "VIỆC ĐÃ LÀM HÔM NAY", 2: "SỐ LIỆU TRONG NGÀY", 3: "VIỆC NGÀY MAI", 4: "VƯỚNG MẮC – ĐỀ XUẤT"}
+PART_TITLES = {1: "VIỆC ĐÃ LÀM HÔM NAY", 2: "SỐ LIỆU TRONG NGÀY", 3: "VIỆC NGÀY MAI", 4: "VƯỚNG MẮC – ĐỀ XUẤT", 5: "ĐÍNH KÈM"}
+# Mẫu chỉ mở bằng KIÊM NHIỆM (không phòng nào mang tên ấy).
+MAU_KIEM_NHIEM = ("ngan_hang", "cskh", "ir_phap_che")
+# Giá trị ô số «Không phát sinh»: khác ô trống (CHƯA NHẬP). Ô trống không bao giờ được đọc thành 0.
+KHONG_PHAT_SINH = "Không phát sinh"
+
+# ── BC-1 · AI PHẢI NỘP (Chủ tịch 26/10/2026) ────────────────────────────────────────────────────
+# «Tất cả văn phòng trừ HDV và tài xế; TP Hướng dẫn và quản lý xe vẫn phải báo cáo; Ban TGĐ không
+# nộp.» Loại theo VỊ TRÍ chứ không theo phòng: phòng Hướng dẫn có trưởng phòng phải nộp và HDV
+# không nộp — loại cả phòng là bỏ sót người phải nộp.
+KHONG_NOP_VI_TRI = ("hdv", "tai_xe")
+KHONG_NOP_PHONG = ("ban_tgd",)
+# Nghỉ CẢ NGÀY đã duyệt thì không có nghĩa vụ. Công tác và tăng ca KHÔNG miễn (tài liệu bàn giao IT).
+NGHI_MIEN_BAO_CAO = ("phep_nam", "khong_luong", "om_dau", "thai_san")
+
+# ── BC-1 · HẠN NỘP ─────────────────────────────────────────────────────────────────────────────
+# Trước 0 giờ ngày kế tiếp, giờ Việt Nam; đúng 00:00 là muộn cho ngày trước. Áp từ ngày ghi ở tham
+# số — ngày cũ giữ hạn 20 giờ, không tính lại (Chủ tịch: «ngay khi lên hệ», không hồi tố).
+KHOA_HAN_0H = "bao_cao_ngay_han_0h_tu"
 
 
 def dept_of_user(db: Session, u: User) -> str:
@@ -45,7 +77,83 @@ def dept_of_user(db: Session, u: User) -> str:
     if e and e.department in DEPT_FORMS: return e.department
     if u.department in DEPT_FORMS: return u.department
     return {"nv_kd": "kd_le", "tn_kd": "kd_le", "tp_kd": "kd_le", "gd_kd": "kd_le", "ptgd_doan": "kd_doan", "nv_dh": "dieu_hanh", "tp_dh": "dieu_hanh", "nv_mkt": "marketing", "ptgd_mkt": "marketing",
-            "cntt": "cntt", "ketoan": "ketoan", "hcns": "hcns"}.get(u.role, "kd_le")
+            "cntt": "cntt", "ketoan": "ketoan", "hcns": "hcns", "gd_doi_xe": "doi_xe", "visa": "visa"}.get(u.role, "kd_le")
+
+
+def gio_vn() -> datetime:
+    """Giờ Việt Nam, KHÔNG phụ thuộc múi giờ máy chủ (KS-18: máy chủ từng chạy sai múi giờ)."""
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).replace(tzinfo=None)
+
+
+def moc_han_0h(db: Session) -> date:
+    from app.services import moi_truong_du_lieu as MT
+    try:
+        d = MT.doc_ngay(str(R.get_param_chu(db, KHOA_HAN_0H)).strip())
+    except KeyError:
+        d = None
+    return d or date(2026, 10, 26)
+
+
+def han_nop(db: Session, d: date) -> datetime:
+    """Thời điểm HẾT HẠN của báo cáo ngày d (giờ VN, naive). Nộp LÚC hoặc SAU mốc này là muộn."""
+    if d >= moc_han_0h(db):
+        return datetime.combine(d + timedelta(days=1), time(0, 0))
+    return datetime.combine(d, REPORT_DEADLINE) + timedelta(minutes=1)   # luật cũ: tới hết 20:00
+
+
+def han_chu(db: Session, d: date) -> str:
+    return "0:00 ngày kế tiếp" if d >= moc_han_0h(db) else "20:00"
+
+
+def phai_nop(e: Employee) -> bool:
+    return bool(e.active and e.user_id and e.department not in KHONG_NOP_PHONG
+                and (e.position or "") not in KHONG_NOP_VI_TRI)
+
+
+def nhan_vien_phai_nop(db: Session) -> list[Employee]:
+    return [e for e in db.execute(select(Employee).where(Employee.active == True,   # noqa: E712
+                                                         Employee.user_id != None)).scalars()  # noqa: E711
+            if phai_nop(e)]
+
+
+def nghi_ca_ngay(db: Session, employee_id: int, d: date) -> str | None:
+    """Tên loại nghỉ nếu ngày d là ngày nghỉ CẢ NGÀY đã duyệt; nửa ngày không miễn."""
+    from app.models.hrm import LeaveRequest, LEAVE_KINDS
+    for lr in db.execute(select(LeaveRequest).where(
+            LeaveRequest.employee_id == employee_id, LeaveRequest.status == "duyet",
+            LeaveRequest.kind.in_(NGHI_MIEN_BAO_CAO),
+            LeaveRequest.date_from <= d, LeaveRequest.date_to >= d)).scalars():
+        if (lr.date_to - lr.date_from).days + 1 <= (lr.days or 0) + 1e-9:
+            return LEAVE_KINDS.get(lr.kind, {}).get("ten", lr.kind)
+    return None
+
+
+def mau_cua(db: Session, u: User) -> list[str]:
+    """Mẫu của người nộp: mẫu chính theo phòng, rồi các phần việc kiêm nhiệm Chủ tịch đã giao."""
+    chinh = dept_of_user(db, u)
+    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    them = [] if e is None else [x.mau for x in db.execute(select(ReportExtraForm).where(
+        ReportExtraForm.employee_id == e.id, ReportExtraForm.active == True)).scalars()   # noqa: E712
+        if x.mau in DEPT_FORMS and x.mau != chinh]
+    return [chinh] + sorted(set(them), key=list(DEPT_FORMS).index)
+
+
+def truong_cua(db: Session, mau: str) -> list[str]:
+    """Các ô số của một mẫu. Ngân hàng đọc DANH MỤC TÀI KHOẢN đang dùng — không viết cứng số tài khoản."""
+    f = DEPT_FORMS.get(mau, {})
+    if f.get("dong") == "tai_khoan":
+        from app.models.banks import BankAccount
+        tk = [f"{a.code} · {a.bank_name} ({a.currency}) · số dư cuối ngày"
+              for a in db.execute(select(BankAccount).where(BankAccount.active == True)   # noqa: E712
+                                  .order_by(BankAccount.code)).scalars()]
+        return tk + ["Giao dịch chưa rõ nội dung", "Mốc chốt sao kê"]
+    return list(f.get("fields", []))
+
+
+def khoa_o(mau: str, chinh: str, ten: str) -> str:
+    """Khoá lưu của một ô Phần 2: mẫu chính giữ nhãn trơn (như dữ liệu cũ), mẫu kiêm nhiệm có tiền tố."""
+    return ten if mau == chinh else f"{DEPT_FORMS[mau]['name']} · {ten}"
 
 
 def parse_part2(raw: str) -> dict:
@@ -64,8 +172,10 @@ def mail_text(u: User, dept: str, d: date, p1: str, p2: dict, p3: str, p4: str, 
     name = DEPT_FORMS.get(dept, {}).get("name", dept)
     subject = f"Báo cáo ngày · {u.full_name} · {name} · {d:%d/%m/%Y}"
     lines = [f"PHẦN 1 — {PART_TITLES[1]}", p1.strip() or "(trống)", "", f"PHẦN 2 — {PART_TITLES[2]}"]
-    for k in DEPT_FORMS.get(dept, {}).get("fields", []) or list(p2.keys()):
-        lines.append(f"{k}: {str(p2.get(k, '')).strip() or 'không'}")
+    # BC-1: in ĐÚNG các khoá đã lưu (gồm cả mục kiêm nhiệm và tài khoản ngân hàng đọc từ danh mục);
+    # ô trống in «chưa nhập» — không in «không», vì «không» đọc ra là đã xác nhận không phát sinh.
+    for k in (list(p2.keys()) or DEPT_FORMS.get(dept, {}).get("fields", [])):
+        lines.append(f"{k}: {str(p2.get(k, '')).strip() or 'chưa nhập'}")
     lines += ["", f"PHẦN 3 — {PART_TITLES[3]}", p3.strip() or "(trống)", "", f"PHẦN 4 — {PART_TITLES[4]}", p4.strip() or "không", "",
               f"— {u.full_name}" + (f" · Mã NV {staff_code}" if staff_code else "") + f" · {name}"]
     return subject, "\n".join(lines)
@@ -120,7 +230,9 @@ def ai_duyet_duoc_mkt(db: Session) -> list[str]:
 
 # ====================== BÁO CÁO NGÀY ======================
 def robot_score(r: DailyReport) -> tuple[float, str]:
-    """Điểm nháp 0–10: Phần 1 ≥ 20 ký tự = 3; Phần 2 điền ≥ 2/3 số trường = 2 (điền hết = 3); Phần 3 ≥ 20 ký tự = 2; nộp trước 20h = 2."""
+    """Điểm nháp 0–10: Phần 1 ≥ 20 ký tự = 3; Phần 2 điền ≥ 2/3 số trường = 2 (điền hết = 3); Phần 3 ≥ 20 ký tự = 2; nộp đúng hạn = 2.
+
+    «Không phát sinh» là ô ĐÃ ĐIỀN (người nộp xác nhận không có), khác ô trống."""
     p2 = parse_part2(r.part2_numbers)
     filled2 = sum(1 for v in p2.values() if str(v or "").strip())
     n2 = max(len(p2), 1)
@@ -132,27 +244,63 @@ def robot_score(r: DailyReport) -> tuple[float, str]:
     if not s1: notes.append("Phần 1 quá ngắn")
     if s2 < 3: notes.append(f"Phần 2 điền {filled2}/{n2} mục")
     if not s3: notes.append("Việc ngày mai quá ngắn")
-    if not r.on_time: notes.append("nộp sau 20:00")
-    return float(min(score, 10)), "; ".join(notes) or "Đủ 4 phần, đúng giờ"
+    if not r.on_time: notes.append("nộp muộn")
+    return float(min(score, 10)), "; ".join(notes) or "Đủ các phần, đúng hạn"
 
 
-def submit_report(db: Session, u: User, d: date, p1: str, p2: str, p3: str, p4: str) -> DailyReport:
-    if d > date.today():
+def submit_report(db: Session, u: User, d: date, p1: str, p2: str, p3: str, p4: str,
+                  vuong_mac_cho: str = "", vuong_mac_han: date | None = None,
+                  now: datetime | None = None) -> DailyReport:
+    """Nộp hoặc nộp lại. BC-1: giờ là GIỜ VIỆT NAM; đúng hạn tính theo LẦN NỘP ĐẦU; mỗi lần nộp một
+    bản chụp trong `daily_report_versions`. `now` chỉ để phép thử đặt đồng hồ — chỗ gọi thật bỏ trống."""
+    import json
+    now = now or gio_vn()
+    if d > now.date():
         raise ValueError("Không nộp báo cáo cho ngày tương lai")
     r = db.execute(select(DailyReport).where(DailyReport.user_id == u.id, DailyReport.report_date == d)).scalars().first()
     if r and r.reviewed_by:
         raise ValueError("Báo cáo đã được trưởng phòng chấm – không sửa")
-    now = datetime.now()
+    if vuong_mac_cho and vuong_mac_cho not in DEPT_FORMS:
+        raise ValueError("Phòng nhận vướng mắc không hợp lệ")
     if r is None:
-        r = DailyReport(user_id=u.id, report_date=d); db.add(r)
+        r = DailyReport(user_id=u.id, report_date=d, so_lan_nop=0); db.add(r)
+    lan_dau = r.first_submitted_at is None and not r.id
     r.part1_done, r.part2_numbers, r.part3_issues, r.part4_plan = p1, p2, p3, p4
+    r.vuong_mac_cho, r.vuong_mac_han = vuong_mac_cho or "", vuong_mac_han
     r.submitted_at = now
-    r.on_time = d == now.date() and now.time() <= REPORT_DEADLINE   # nộp bù ngày trước = trễ
+    if lan_dau:
+        r.first_submitted_at = now
+        r.on_time = now < han_nop(db, d)
+    # Báo cáo CŨ (trước BC-1) không có lần nộp đầu: giữ nguyên cờ `on_time` đã ghi, không tính lại.
+    r.so_lan_nop = (r.so_lan_nop or 0) + 1
     r.robot_score, r.robot_note = robot_score(r)
     db.flush()
-    R.audit(db, u.username, u.role, "nop_bao_cao_ngay", f"report:{u.username}:{d}", after={"diem_robot": r.robot_score, "dung_gio": r.on_time})
+    db.add(DailyReportVersion(report_id=r.id, lan=r.so_lan_nop, luc=now, du_lieu=json.dumps(
+        {"p1": p1, "p2": parse_part2(p2), "p3": p4, "p4": p3, "vuong_mac_cho": r.vuong_mac_cho,
+         "vuong_mac_han": vuong_mac_han.isoformat() if vuong_mac_han else None}, ensure_ascii=False)))
+    R.audit(db, u.username, u.role, "nop_bao_cao_ngay", f"report:{u.username}:{d}",
+            after={"diem_robot": r.robot_score, "dung_gio": r.on_time, "lan": r.so_lan_nop})
     db.commit(); db.refresh(r)
     return r
+
+
+def trang_thai_ngay(db: Session, e: Employee | None, user_id: int, d: date, now: datetime | None = None) -> dict:
+    """Một ngày của một người: không có nghĩa vụ / chưa đến hạn / quá hạn chưa nộp / đúng hạn / muộn."""
+    now = now or gio_vn()
+    if d.weekday() == 6:
+        return {"ngay": d.isoformat(), "ma": "khong_nghia_vu", "ten": "Chủ nhật"}
+    if e is not None:
+        nghi = nghi_ca_ngay(db, e.id, d)
+        if nghi:
+            return {"ngay": d.isoformat(), "ma": "khong_nghia_vu", "ten": f"{nghi} đã duyệt"}
+    r = db.execute(select(DailyReport).where(DailyReport.user_id == user_id, DailyReport.report_date == d)).scalars().first()
+    if r is None:
+        qua = now >= han_nop(db, d)
+        return {"ngay": d.isoformat(), "ma": "qua_han" if qua else "chua_den_han",
+                "ten": "Quá hạn chưa nộp" if qua else "Chưa nộp · chưa đến hạn"}
+    dau = r.first_submitted_at or r.submitted_at
+    return {"ngay": d.isoformat(), "ma": "dung_han" if r.on_time else "muon",
+            "ten": "Đúng hạn" if r.on_time else f"Muộn · {dau:%H:%M}", "lan": r.so_lan_nop or 1}
 
 
 def review_report(db: Session, u: User, r: DailyReport, score: float, note: str) -> DailyReport:
@@ -182,15 +330,19 @@ def work_days_in(y: int, m: int, until: date | None = None) -> list[date]:
 
 
 def check_missing_reports(db: Session) -> int:
-    """Robot: thiếu 1 ngày → nhắc nhở; 2 ngày liên tiếp → chuyển HCNS (cảnh báo đỏ). Chạy sau 20h hoặc sáng hôm sau."""
-    today = date.today()
-    now = datetime.now()
-    last = today if now.time() > REPORT_DEADLINE else today - timedelta(days=1)
-    days = [d for d in (last - timedelta(days=1), last) if d.weekday() != 6]
+    """Robot: thiếu 1 ngày → nhắc nhở; 2 ngày liên tiếp → chuyển HCNS (cảnh báo đỏ). Chạy sau hạn nộp."""
+    # BC-1: ngày được xét là ngày ĐÃ HẾT HẠN (hạn 0 giờ ngày kế tiếp từ mốc tham số), giờ Việt Nam;
+    # người phải nộp là mọi nhân viên văn phòng theo `phai_nop`; nghỉ cả ngày đã duyệt không tính thiếu.
+    now = gio_vn()
+    today = now.date()
+    het_han = [d for d in (today - timedelta(days=3), today - timedelta(days=2), today - timedelta(days=1), today)
+               if d.weekday() != 6 and han_nop(db, d) <= now]
+    days = het_han[-2:]
+    last = days[-1] if days else today
     created = 0
-    emps = db.execute(select(Employee).where(Employee.active == True, Employee.department.in_(NO_TIMESHEET_DEPTS), Employee.user_id != None)).scalars().all()
+    emps = nhan_vien_phai_nop(db)
     for e in emps:
-        missing = [d for d in days if not db.execute(select(DailyReport).where(DailyReport.user_id == e.user_id, DailyReport.report_date == d)).scalars().first()]
+        missing = [d for d in days if not nghi_ca_ngay(db, e.id, d) and not db.execute(select(DailyReport).where(DailyReport.user_id == e.user_id, DailyReport.report_date == d)).scalars().first()]
         if not missing: continue
         kind, level, roles, msg = ("bc_ngay_2", "red", "hcns,tgd", f"{e.full_name} thiếu báo cáo ngày 2 ngày liên tiếp ({', '.join(f'{d:%d/%m}' for d in missing)}) – chuyển HCNS") \
             if len(missing) >= 2 else ("bc_ngay_1", "warn", "tp_dh,gd_kd,ptgd_doan,ptgd_mkt,hcns", f"{e.full_name} chưa nộp báo cáo ngày {missing[0]:%d/%m} – nhắc nhở")

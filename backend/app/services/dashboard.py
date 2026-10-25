@@ -510,7 +510,7 @@ def build(db: Session, u: User) -> dict:
     sec["tien_do_chi_dao_vi_sao"] = _bc["chi_dao_vi_sao"]
     if role in ("hcns", "chutich", "tgd"):
         s = OPS.work_days_in(today.year, today.month, until=today)
-        emps = db.execute(select(Employee).where(Employee.active == True, Employee.department.in_(OPS.NO_TIMESHEET_DEPTS), Employee.user_id != None)).scalars().all()
+        emps = OPS.nhan_vien_phai_nop(db)   # BC-1: mọi nhân viên văn phòng trừ HDV, tài xế, Ban TGĐ
         # Chỉ cần ĐẾM báo cáo trong tháng – đếm bằng SQL thay vì nạp toàn bộ bảng báo cáo ngày rồi lọc.
         so_bao_cao = db.execute(select(func.count()).select_from(DailyReport)
                                 .where(DailyReport.report_date >= date(today.year, today.month, 1),

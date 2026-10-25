@@ -79,13 +79,15 @@ def test_daily_report_score_review_and_summary():
     assert r["report"]["robot_score"] in (5.0, 7.0)          # P1 3 + P3 2 + (đúng giờ 2), Phần 2 trống
     assert "Phần 2" in r["report"]["robot_note"]
     form = client.get("/api/v1/daily-reports/form", headers=login("kd.hoa")).json()
-    assert form["department"] == "kd_le" and "Lead nhận trong ngày" in form["forms"]["kd_le"]["fields"] and len(form["forms"]) == 7
+    assert form["department"] == "kd_le" and "Lead nhận trong ngày" in form["forms"]["kd_le"]["fields"] and len(form["forms"]) == 13   # BC-1 (26/10/2026): 7 mẫu cũ + Visa, Hướng dẫn, Đội xe, Ngân hàng, CSKH, IR–Pháp chế
     p2 = {k: "3" for k in form["forms"]["kd_le"]["fields"]}
     pv = client.post("/api/v1/daily-reports/preview", json={"report_date": str(TODAY), "part1_done": LONG, "part2_numbers": p2, "part3_issues": LONG, "part4_plan": LONG}, headers=login("kd.hoa")).json()
     assert pv["subject"].startswith("Báo cáo ngày · Lê Thị Hoa") and "PHẦN 2 — SỐ LIỆU TRONG NGÀY" in pv["body"] and "Lead nhận trong ngày: 3" in pv["body"]
     r2 = client.post("/api/v1/daily-reports", json={"report_date": str(TODAY), "part1_done": LONG, "part2_numbers": p2, "part3_issues": LONG, "part4_plan": LONG}, headers=login("kd.hoa")).json()
     assert r2["report"]["robot_score"] >= 8 and r2["report"]["part2"]["Lead nhận trong ngày"] == "3" and "mail_body" in r2
-    assert client.post("/api/v1/daily-reports", json={"report_date": str(TODAY + timedelta(days=1)), "part1_done": LONG, "part4_plan": LONG}, headers=login("kd.hoa")).status_code == 422
+    # BC-1: «ngày tương lai» tính theo GIỜ VIỆT NAM, không theo đồng hồ máy chạy thử (máy CI chạy UTC).
+    from app.services import ops as _O
+    assert client.post("/api/v1/daily-reports", json={"report_date": str(_O.gio_vn().date() + timedelta(days=1)), "part1_done": LONG, "part4_plan": LONG}, headers=login("kd.hoa")).status_code == 422
     mine = client.get("/api/v1/daily-reports", headers=login("kd.hoa")).json()
     assert len(mine) == 1
     assert client.post(f"/api/v1/daily-reports/{mine[0]['id']}/review", json={"score": 9, "note": "Tốt"}, headers=login("kd.tuan")).status_code == 403

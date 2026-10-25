@@ -190,7 +190,8 @@ def test_sa2k_khong_dung_hop_thu_thu_hai():
         assert cam not in nguon, f"{cam} trong bàn làm việc — Chủ tịch đã quyết không gửi thư"
     db = _db()
     bc = SA.ban_lam_viec(db)["bao_cao_ngay"]
-    assert bc["han"] == "20:00" and bc["man_hinh"].startswith("/")
+    # BC-1 (Chủ tịch 26/10/2026): hạn báo cáo ngày đổi thành trước 0 giờ ngày kế tiếp, đọc từ luật gốc.
+    assert bc["han"] in ("0:00 ngày kế tiếp", "20:00") and bc["man_hinh"].startswith("/")
 
 
 # ───────────────────────── gọi lại luật gốc ─────────────────────────
