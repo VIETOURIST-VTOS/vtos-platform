@@ -241,6 +241,13 @@ def chi_so(db: Session, ky: str) -> dict:
         # Tính sẵn một câu trả lời rồi giấu nó sau dấu gạch dưới thì cũng bằng không tính.
         "cong_suat_thieu": None if dh["du_du_lieu"] else {
             "bo_phan": dh["bo_phan"], "cua_nhap": dh["cua_nhap"], "thieu": dh["thieu"]},
+        # XS-3 (Chủ tịch duyệt bản xem thử 25/10/2026) — dòng phụ dưới mỗi ô «4–5 chữ + con số cụ
+        # thể». Máy chủ gửi SỐ, màn hình chỉ ghép chữ: tự tính lại ở màn hình là hai nơi một phép tính.
+        "so_xe_chay": sum(1 for x in bc["xe"] if x.get("so_chuyen")) or None,
+        "so_chuyen": sum((x.get("so_chuyen") or 0) for x in bc["xe"]) or None,
+        "so_lit": so_lit or None,
+        "km_chuyen": km_chuyen or None,
+        "ngay_xe_mau": mau or None,
         "_gia_von": tong["gia_von"],
         "_doanh_thu": tong["doanh_thu"] or 0,
         "_loi_nhuan": tong["loi_nhuan"] if tong["doanh_thu"] else 0,
@@ -342,6 +349,13 @@ def _gop(db: Session, kys: list[str], nho: dict | None = None) -> dict:
                                    if x["cong_suat_den_ngay"]), default=None),
         "km_chay_rong": rong or None,
         "chi_phi_moi_km": round(gia_von / km) if km else None,
+        # XS-3: dòng phụ của ô. `so_xe_chay` của quý/năm KHÔNG cộng các tháng (một xe chạy cả ba tháng
+        # là một xe, không phải ba) — lấy tháng đông xe nhất, đủ cho câu «N xe» mà không thổi phồng.
+        "so_xe_chay": max((x["so_xe_chay"] or 0) for x in ds) or None,
+        "so_chuyen": sum((x["so_chuyen"] or 0) for x in ds) or None,
+        "so_lit": lit or None,
+        "km_chuyen": km_chuyen or None,
+        "ngay_xe_mau": cho_ngay or None,
         "doanh_thu": dt or None,
         "loi_nhuan": ln if dt else None,
         "ty_le_loi_nhuan": round(ln / dt, 4) if dt else None,

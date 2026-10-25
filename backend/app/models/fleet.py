@@ -779,6 +779,10 @@ NHOM_CHI_PHI_KY = {
     "wifi_xe":     ("Wifi trên xe", "xe"),
     "tra_truoc":   ("Phân bổ chi phí trả trước (vỏ xe, ắc quy, thiết bị)", "xe"),
     "khac_xe":     ("Chi phí khác của xe", "xe"),
+    # XS-2 (Chủ tịch 25/10/2026): công tác phí tài xế những ngày KHÔNG có chuyến (trực, chờ tour). Đo sheet
+    # quyết toán của Đội xe: 10 dòng CTP 200.000 không tên tour — Chủ tịch xác nhận là chi phí thật —
+    # và VTOS chưa có chỗ nào ghi được, nên lợi nhuận đội xe đang cao hơn thực tế đúng ngần ấy.
+    "ctp_ngoai_chuyen": ("Công tác phí tài xế ngoài chuyến (trực, chờ tour)", "xe"),
     "bai_xe":      ("Phí bãi xe", "doi"),
     "dien_nuoc":   ("Điện, nước, wifi tại bãi", "doi"),
     "quan_ly":     ("Phí dịch vụ quản lý xe, GSHT, camera", "doi"),

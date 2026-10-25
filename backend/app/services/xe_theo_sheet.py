@@ -71,6 +71,10 @@ NHAN_COT = {
 }
 COT_BAT_BUOC = ("khoi", "tour", "di", "ve")
 COT_CHI = ("ctp", "gui_xe", "dau", "epass")
+# Tên tour (đã bỏ dấu, chữ thường) cho biết dòng ấy KHÔNG phải chuyến mà là ngày trực / chờ tour.
+# «chợ …» bỏ dấu cũng ra «cho …» (Chợ nổi Cái Răng) — nên «chờ» chỉ nhận khi đứng một mình hoặc đi với tour/khách/lịch.
+LA_NGOAI_CHUYEN = re.compile(r"^(truc\b|cho$|cho (tour|khach|lich)\b)")
+NHOM_CTP_NGOAI = "ctp_ngoai_chuyen"
 
 _DEM: dict[str, tuple[float, str | None, str | None]] = {}
 
@@ -157,13 +161,13 @@ def doc_bang(noi_dung: str, nguong_km_noi: float = 50) -> dict:
     if i_td < 0 or thieu:
         return {"loi": "Không thấy dòng tiêu đề có đủ cột Xe số, Tên tour, Ngày đi, Ngày về"
                        + (f" (thiếu: {', '.join(thieu)})" if i_td >= 0 else ""),
-                "chuyen": [], "can_sua": [], "khoi": []}
+                "chuyen": [], "can_sua": [], "khoi": [], "ctp_ngoai": []}
 
     def o(r, ten):
         j = cot.get(ten)
         return r[j].strip() if j is not None and j < len(r) else ""
 
-    chuyen, can_sua, khoi = [], [], []
+    chuyen, can_sua, khoi, ctp_ngoai = [], [], [], []
     hien = None
     for i in range(i_td + 1, len(rows)):
         r, dong = rows[i], i + 1
@@ -182,8 +186,20 @@ def doc_bang(noi_dung: str, nguong_km_noi: float = 50) -> dict:
         if o(r, "lai_xe") and not hien["lai_xe"]:
             hien["lai_xe"] = o(r, "lai_xe")
         tour = o(r, "tour")
-        if not tour:
-            if any(so(o(r, c)) for c in COT_CHI + ("doanh_thu",)):
+        # XS-2: dòng CTP KHÔNG phải chuyến — để trống tên tour, hoặc ghi «Trực» / «Chờ tour». Chủ tịch
+        # xác nhận 25/10/2026 đó là công tác phí thật của tài xế. Ghi «Trực» mà vẫn coi là chuyến thì
+        # ngày trực sẽ đếm thành một xe «đang đi» — nên tách ra TRƯỚC khi thành chuyến.
+        if not tour or LA_NGOAI_CHUYEN.match(_khong_dau(tour)):
+            ctp = so(o(r, "ctp"))
+            ngay_ctp = ngay(o(r, "di")) or ngay(o(r, "ve"))
+            if ctp and ngay_ctp:
+                ctp_ngoai.append({"khoi": hien["khoi"], "dong": dong, "ngay": ngay_ctp, "so_tien": ctp,
+                                  "ly_do": tour or ""})
+            elif ctp:
+                can_sua.append({"loai": "ctp_thieu_ngay", "khoi": hien["khoi"], "dong": dong,
+                                "noi_dung": f"Công tác phí {_vnd(ctp)} không có ngày — chưa biết thuộc tháng nào. "
+                                            "Ghi ngày vào cột Ngày đi và ghi «Trực» hoặc «Chờ tour» vào cột Tên tour."})
+            elif any(so(o(r, c)) for c in COT_CHI + ("doanh_thu",)):
                 can_sua.append({"loai": "dong_khong_tour", "khoi": hien["khoi"], "dong": dong,
                                 "noi_dung": "Có số tiền mà không có tên tour — VTOS bỏ qua dòng này."})
             continue
@@ -203,7 +219,7 @@ def doc_bang(noi_dung: str, nguong_km_noi: float = 50) -> dict:
     _kiem_chong_ngay(chuyen, can_sua)
     for k in khoi:
         k["khoa"] = nam_so_cuoi(k["bien"])
-    return {"loi": None, "chuyen": chuyen, "can_sua": can_sua, "khoi": khoi}
+    return {"loi": None, "chuyen": chuyen, "can_sua": can_sua, "khoi": khoi, "ctp_ngoai": ctp_ngoai}
 
 
 def _vnd(x: float) -> str:
@@ -374,6 +390,7 @@ def bao_cao(db: Session, hom_nay_: date, doc_lai: bool = False, tai=_tai) -> dic
         return {"co_link": True, "loi": bang["loi"], "doc_luc": d["doc_luc"]}
     xe = _xe_dieu_duoc(db)
     hn = hom_nay(bang, hom_nay_, xe)
+    bang["can_sua"] += doi_chieu_ctp_ngoai(db, bang)
     return {"co_link": True, "loi": None, "doc_luc": d["doc_luc"], "loi_tai": d["loi_tai"],
             "ban_cu": d["ban_cu"], "ngay": hom_nay_.isoformat(), "dieu_duoc": len(xe),
             "so_xe_sheet": len(bang["khoi"]), "so_chuyen": len(bang["chuyen"]),
@@ -442,3 +459,39 @@ def cho_ky(db: Session) -> dict | None:
                    .order_by(Param.id.desc())).scalars().first()
     return None if p is None else {"id": p.id, "boi": p.proposed_by, "link": p.value,
                                    "hieu_luc": p.effective_from.isoformat()}
+
+
+# ---------------------------------------------------------------------------------------------
+# XS-2 · Công tác phí ngoài chuyến: sheet có mà VTOS chưa có (Chủ tịch 25/10/2026)
+# ---------------------------------------------------------------------------------------------
+# Robot KHÔNG tự ghi khoản này vào VTOS (ranh giới 09/9: số do người nhập). Nó so tổng CTP ngoài
+# chuyến của từng xe, từng tháng trên sheet với nhóm chi phí kỳ «ctp_ngoai_chuyen» đã nhập ở màn
+# Lãi lỗ đội xe, và báo vàng phần còn thiếu — đủ để Đội xe biết nhập bao nhiêu, cho xe nào, tháng nào.
+
+def doi_chieu_ctp_ngoai(db: Session, bang: dict) -> list[dict]:
+    from app.models.fleet import FleetPeriodCost
+    from app.models.hr import Vehicle
+    khoi = {k["khoi"]: k for k in bang["khoi"]}
+    sheet: dict[tuple[str, str], dict] = {}
+    for c in bang.get("ctp_ngoai", []):
+        k = khoi.get(c["khoi"], {})
+        key = (k.get("khoa", ""), f"{c['ngay']:%Y-%m}")
+        o = sheet.setdefault(key, {"khoi": c["khoi"], "so_tien": 0.0, "dong": []})
+        o["so_tien"] += c["so_tien"]; o["dong"].append(c["dong"])
+    if not sheet:
+        return []
+    khoa_xe = {v.id: nam_so_cuoi(v.plate) for v in db.execute(select(Vehicle)).scalars()}
+    vtos: dict[tuple[str, str], float] = {}
+    for r in db.execute(select(FleetPeriodCost).where(FleetPeriodCost.nhom == NHOM_CTP_NGOAI)).scalars():
+        key = (khoa_xe.get(r.vehicle_id, ""), r.ky)
+        vtos[key] = vtos.get(key, 0.0) + (r.so_tien or 0)
+    ra = []
+    for (khoa, ky), o in sorted(sheet.items(), key=lambda z: (z[0][1], z[1]["khoi"])):
+        da = vtos.get((khoa, ky), 0.0)
+        if o["so_tien"] - da > 1:
+            ra.append({"loai": "ctp_chua_vao_vtos", "khoi": o["khoi"], "dong": o["dong"][0],
+                       "noi_dung": f"Công tác phí ngoài chuyến tháng {ky[5:]}/{ky[:4]}: sheet {_vnd(o['so_tien'])} "
+                                   f"(dòng {', '.join(map(str, o['dong']))}), VTOS mới có {_vnd(da)}. "
+                                   f"Nhập {_vnd(o['so_tien'] - da)} ở Lãi lỗ đội xe → Chi phí kỳ → "
+                                   "«Công tác phí tài xế ngoài chuyến»."})
+    return ra
