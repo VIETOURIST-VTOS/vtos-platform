@@ -1364,7 +1364,9 @@ MAN_CON_LENH_DIEU_XE = ("/lenh-dieu-xe/de-nghi", "/lenh-dieu-xe/de-nghi/moi",
 # Đó cũng là vì sao cửa `/fleet/tai-xe-chon` phải tồn tại: ô chọn tài xế KHÔNG được gọi nhóm
 # "/api/v1/tai-xe", nhóm ấy không có trong MAN_HINH_API["/doi-xe"].
 MAN_CON_DOI_XE = ("/doi-xe/phat-tai-xe", "/doi-xe/phat-tai-xe/moi",
-                  "/doi-xe/gia-dau", "/doi-xe/gia-dau/moi")
+                  "/doi-xe/gia-dau", "/doi-xe/gia-dau/moi",
+                  # XS-1 (25/10/2026): xe đang đi theo sheet Đội xe — chỉ gọi GET /fleet/xe-theo-sheet.
+                  "/doi-xe/xe-hom-nay")
 # CUA-1 · 23/10/2026 — hồ sơ MỘT hướng dẫn viên. Trang con, KHÔNG vào MENU_ROLES.
 #
 # Vì sao không vào MENU_ROLES: `test_menu.test_moi_man_hinh_deu_co_loi_vao` đòi mọi đường
@@ -1375,6 +1377,24 @@ MAN_CON_DOI_XE = ("/doi-xe/phat-tai-xe", "/doi-xe/phat-tai-xe/moi",
 # Quyền KHÔNG khai riêng: trang chỉ gọi nhóm `/api/v1/huong-dan` mà `/huong-dan` đã gọi,
 # nên hàng rào thật nằm ở MÁY CHỦ — `READ` trong api/v1/huong_dan.py.
 MAN_CON_HO_SO = ("/ho-so-hdv/[id]",)
+
+# LỐI VÀO KHAI RIÊNG — chỉ cho trang con mà màn cha THEO ĐƯỜNG DẪN cố ý không tồn tại.
+#
+# LV-1 đòi mỗi trang con phải có nút dẫn tới từ màn ngay trên nó một cấp. Luật ấy đúng cho
+# `/doi-xe/phat-tai-xe` (cha `/doi-xe` có thật), nhưng không diễn tả được `/ho-so-hdv/[id]`:
+# Chủ tịch chốt 17/10/2026 là hồ sơ hướng dẫn viên nằm TRONG `/huong-dan` chứ không dựng một
+# nhóm `/ho-so-hdv` riêng — nên màn cha ấy không tồn tại, và sẽ không bao giờ tồn tại.
+#
+# Khai ở đây KHÔNG phải một lời xin miễn. `test_lv1_loi_vao_trang_con` không tin lời khai: nó
+# bắt màn được khai phải CÓ THẬT, phải nằm trong menu (tức tự nó tới được), và mã của nó phải
+# THẬT SỰ mang liên kết sang trang con — kể cả dạng `` `/ho-so-hdv/${id}` `` thay số vào đường
+# dẫn. Khai một màn không dẫn đi đâu thì vẫn đỏ, y như không khai.
+#
+# Trang con nào KHÔNG có tên ở đây thì luật cũ giữ nguyên một chữ: phải có nút trên màn cha.
+LOI_VAO_KHAI_RIENG = {
+    # Cột «Hồ sơ HDV →» trên màn Nhân viên phòng tôi (đợt CUA-1, 22/10/2026).
+    "/ho-so-hdv/[id]": ("/nhan-vien-phong-toi",),
+}
 ALL_MENU_PATHS = tuple(MENU_ROLES) + ("/", "/alerts", "/reports", "/payroll", "/phieu-luong",
                                       "/doi-mat-khau", "/phan-he/[khoa]", "/offline",
                                       "/dong-tien/nguon") + MAN_CON_LENH_DIEU_XE + MAN_CON_DOI_XE + MAN_CON_HO_SO

@@ -255,8 +255,11 @@ def test_mo_san_o_ky_HEP_NHAT_con_co_so(db):
     assert HQ.theo_ky(db, date(2026, 2, 15))["mac_dinh"] == "quy"
     # mốc 15/01: chính tháng ấy có chuyến → mở ở tháng
     assert HQ.theo_ky(db, date(2026, 1, 15))["mac_dinh"] == "thang"
-    # mốc 15/04: quý II rỗng, cả năm vẫn còn tháng 1 → mở ở năm
-    assert HQ.theo_ky(db, date(2026, 4, 15))["mac_dinh"] == "nam"
+    # mốc 15/05: quý II (T4–T5) rỗng, cả năm vẫn còn tháng 1 → mở ở năm
+    # SỬA 24/10/2026 (HQ-6): mốc cũ 15/04 là THÁNG ĐẦU QUÝ — nay nút Quý ở tháng ấy mở quý I đã đủ
+    # (có tháng 1) nên kỳ mở sẵn là «quy». Dời mốc sang tháng thứ hai của quý để giữ đúng ý ca này.
+    assert HQ.theo_ky(db, date(2026, 5, 15))["mac_dinh"] == "nam"
+    assert HQ.theo_ky(db, date(2026, 4, 15))["mac_dinh"] == "quy", "HQ-6: tháng đầu quý mở quý trước"
 
 
 def test_khong_ky_nao_co_so_thi_van_mo_o_thang(db):
@@ -293,8 +296,11 @@ def test_nhan_ky_noi_RO_dang_xem_khoang_nao(db):
     db.flush()
     tk = HQ.theo_ky(db, date(2026, 10, 13))
     assert tk["nam"]["nhan"] == "Năm 2026 (T01–T10)"
-    assert tk["quy"]["nhan"] == "Quý 4/2026 (đến hết tháng 10)"
+    # SỬA 24/10/2026 (HQ-6): tháng 10 là tháng đầu quý nên nút Quý mở quý 3 đã đủ ba tháng. Nhãn
+    # «đến hết tháng N» vẫn giữ cho quý đang chạy — kiểm ở mốc tháng 11 ngay dưới.
+    assert tk["quy"]["nhan"] == "Quý 3/2026"
     assert tk["thang"]["nhan"] == "Tháng 10/2026"
+    assert HQ.theo_ky(db, date(2026, 11, 13))["quy"]["nhan"] == "Quý 4/2026 (đến hết tháng 11)"
 
 
 # ═══════════════════ 4 · CỬA NHẬP CHO HAI CỘT NGÀY ═══════════════════

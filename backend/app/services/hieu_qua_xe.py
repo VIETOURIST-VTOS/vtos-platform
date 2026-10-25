@@ -42,7 +42,7 @@ vào tổng là biến một lỗi nhập liệu thành một chỉ số điều
 Khoảng hở được tính vào kỳ của CHUYẾN SAU: quãng chạy rỗng xảy ra ngay trước khi chuyến ấy khởi
 hành. Nhờ vậy quãng rỗng ngay trước chuyến đầu tiên của kỳ cũng được đếm, thay vì rơi mất.
 """
-from datetime import date
+from datetime import date, timedelta
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
@@ -241,6 +241,13 @@ def chi_so(db: Session, ky: str) -> dict:
         # Tính sẵn một câu trả lời rồi giấu nó sau dấu gạch dưới thì cũng bằng không tính.
         "cong_suat_thieu": None if dh["du_du_lieu"] else {
             "bo_phan": dh["bo_phan"], "cua_nhap": dh["cua_nhap"], "thieu": dh["thieu"]},
+        # XS-3 (Chủ tịch duyệt bản xem thử 25/10/2026) — dòng phụ dưới mỗi ô «4–5 chữ + con số cụ
+        # thể». Máy chủ gửi SỐ, màn hình chỉ ghép chữ: tự tính lại ở màn hình là hai nơi một phép tính.
+        "so_xe_chay": sum(1 for x in bc["xe"] if x.get("so_chuyen")) or None,
+        "so_chuyen": sum((x.get("so_chuyen") or 0) for x in bc["xe"]) or None,
+        "so_lit": so_lit or None,
+        "km_chuyen": km_chuyen or None,
+        "ngay_xe_mau": mau or None,
         "_gia_von": tong["gia_von"],
         "_doanh_thu": tong["doanh_thu"] or 0,
         "_loi_nhuan": tong["loi_nhuan"] if tong["doanh_thu"] else 0,
@@ -342,6 +349,13 @@ def _gop(db: Session, kys: list[str], nho: dict | None = None) -> dict:
                                    if x["cong_suat_den_ngay"]), default=None),
         "km_chay_rong": rong or None,
         "chi_phi_moi_km": round(gia_von / km) if km else None,
+        # XS-3: dòng phụ của ô. `so_xe_chay` của quý/năm KHÔNG cộng các tháng (một xe chạy cả ba tháng
+        # là một xe, không phải ba) — lấy tháng đông xe nhất, đủ cho câu «N xe» mà không thổi phồng.
+        "so_xe_chay": max((x["so_xe_chay"] or 0) for x in ds) or None,
+        "so_chuyen": sum((x["so_chuyen"] or 0) for x in ds) or None,
+        "so_lit": lit or None,
+        "km_chuyen": km_chuyen or None,
+        "ngay_xe_mau": cho_ngay or None,
         "doanh_thu": dt or None,
         "loi_nhuan": ln if dt else None,
         "ty_le_loi_nhuan": round(ln / dt, 4) if dt else None,
@@ -426,6 +440,18 @@ def theo_ky(db: Session, moc: date, hom_nay: date | None = None) -> dict:
     ngay_cuoi = db.execute(select(func.max(Trip.ngay_di))).scalar()
     ky_cuoi = f"{ngay_cuoi:%Y-%m}" if ngay_cuoi else None
 
+    # 24/10/2026 — Chủ tịch chốt: THÁNG ĐẦU QUÝ thì nút «Quý» mở QUÝ LIỀN TRƯỚC đã đủ ba tháng.
+    # Đo trên hệ thật 24/10: quý 4 mới có tháng 10 nên Tháng và Quý in đúng một bộ số — phép tính
+    # đúng, nhưng người đọc kết luận màn hình hỏng, và nút Quý không cho xem thêm được điều gì.
+    # Chỉ đổi kỳ QUÝ; Năm vẫn tính đến `moc`. Từ tháng thứ hai của quý trở đi, quý đang chạy đã
+    # khác tháng nên giữ nguyên như cũ.
+    moc_ky = {"thang": moc, "quy": moc, "nam": moc}
+    if moc.month % 3 == 1:
+        mq = date(moc.year, moc.month, 1) - timedelta(days=1)
+        moc_ky["quy"] = mq
+        nhom["quy"] = _nhom_ky(mq)["quy"]
+        nhan["quy"] = f"Quý {(mq.month - 1) // 3 + 1}/{mq.year}"
+
     nho: dict = {}
     out: dict = {}
     for ten, kys in nhom.items():
@@ -449,7 +475,7 @@ def theo_ky(db: Session, moc: date, hom_nay: date | None = None) -> dict:
             o["so_sanh"] = None
             o["chua_so_sanh_vi"] = f"{nhan[ten]} chưa hết — so với kỳ trước khi chưa đủ ngày là so lệch."
         else:
-            kt = _ky_truoc(ten, moc, len(kys))
+            kt = _ky_truoc(ten, moc_ky[ten], len(kys))
             t = _gop(db, kt, nho)
             o["so_sanh"] = {
                 "nhan": f"so với {len(kt)} tháng liền trước ({kt[0]} → {kt[-1]})"

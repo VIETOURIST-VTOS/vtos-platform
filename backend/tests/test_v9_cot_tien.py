@@ -149,6 +149,8 @@ def cot_tien_trong_moi_ban_nang_cap() -> set[tuple[str, str]]:
         for ten, kieu in DANH_SACH: op.add_column("t", sa.Column(ten, kieu))   <- w1a2b3c4d5e6
         COT = [("t", "c", ...), ...]                                            <- các bản V9/K1
         with op.batch_alter_table("t") as b: b.add_column(sa.Column("c", TIEN))  <- nt1c4f7b2e8a
+        SO_PHU = {"t": [sa.Column("c", TIEN)] }; for ten, cot in SO_PHU.items():  <- r6b1a4c7e2f9d5
+            op.create_table(ten, *(_chung() + cot))
 
     Kiểu được coi là TIỀN khi nó viết là `TIEN` hoặc `sa.Numeric(18, 2)` / `Numeric(18, 2)`. Đây là
     quy ước đã dùng suốt kho, xem app/models/kieu_tien.py.
@@ -184,9 +186,12 @@ def cot_tien_trong_moi_ban_nang_cap() -> set[tuple[str, str]]:
 
         # Hằng số cấp mô-đun, để giải được vòng lặp `for ten, kieu in DANH_SACH`.
         hang: dict[str, ast.AST] = {}
+        ham: dict[str, ast.AST] = {}
         for n in cay.body:
             if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
                 hang[n.targets[0].id] = n.value
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                ham[n.name] = n
 
         def ten_tu_danh_sach_chuoi(nut):
             """("a", "b", ...) -> ["a", "b", ...]. Rỗng nếu không phải danh sách chuỗi thuần."""
@@ -196,6 +201,37 @@ def cot_tien_trong_moi_ban_nang_cap() -> set[tuple[str, str]]:
                 return []
             ten = [chu(x) for x in nut.elts]
             return ten if ten and all(ten) else []
+
+        def cot_tien_trong_danh_sach(nut, sau=0):
+            """[sa.Column("c", TIEN), ...] -> ["c", ...]; giải được tên hằng, lời gọi hàm trả về
+            danh sách, và phép cộng hai danh sách. Dùng cho HÌNH 6."""
+            if sau > 4 or nut is None:
+                return []
+            if isinstance(nut, ast.Name):
+                return cot_tien_trong_danh_sach(hang.get(nut.id), sau + 1)
+            if isinstance(nut, ast.BinOp) and isinstance(nut.op, ast.Add):
+                return (cot_tien_trong_danh_sach(nut.left, sau + 1)
+                        + cot_tien_trong_danh_sach(nut.right, sau + 1))
+            if isinstance(nut, ast.Call):
+                f = nut.func
+                than = ham.get(f.id if isinstance(f, ast.Name) else getattr(f, "attr", ""))
+                if than is None:
+                    return []
+                ra = []
+                for con in ast.walk(than):
+                    if isinstance(con, ast.Return) and con.value is not None:
+                        ra += cot_tien_trong_danh_sach(con.value, sau + 1)
+                return ra
+            if isinstance(nut, (ast.List, ast.Tuple)):
+                ra = []
+                for pt in nut.elts:
+                    if isinstance(pt, ast.Call) and getattr(pt.func, "attr", "") == "Column" \
+                            and len(pt.args) >= 2:
+                        ten = chu(pt.args[0])
+                        if ten and la_tien(pt.args[1]):
+                            ra.append(ten)
+                return ra
+            return []
 
         def cap_tu_danh_sach(nut):
             """[(ten, kieu), ...] -> những tên cột mang kiểu tiền."""
@@ -210,6 +246,45 @@ def cot_tien_trong_moi_ban_nang_cap() -> set[tuple[str, str]]:
                     if ten and la_tien(phan_tu.elts[1]):
                         ra.append(ten)
             return ra
+
+        # ── HÌNH 6: TỪ ĐIỂN {bảng: [cột]} cấp mô-đun, đem đi tạo bảng bằng một vòng `.items()`.
+        #
+        # Thêm 24/10/2026, khi hàng rào này báo đỏ cho bản nâng cấp `r6b1a4c7e2f9d5` (tám bảng số
+        # dư đầu kỳ, đợt R6b-1). Bản ấy KHÔNG sai: nó khai `TIEN = sa.Numeric(18, 2)` đúng chuẩn,
+        # chỉ là nó gom cột vào một TỪ ĐIỂN ở đầu tệp rồi tạo bảng bằng
+        # `for ten, rieng in SO_PHU.items(): op.create_table(ten, *(_chung() + rieng))`.
+        # Năm hình trước đều đọc tên bảng từ `nut.args[0]` của chính lời gọi, mà ở đây tên bảng là
+        # một BIẾN — nên không hình nào bắt được, và máy dò kết luận «mô hình đã đổi mà không có
+        # bản nâng cấp». Đây là lần THỨ NĂM phép thử này đỏ, và cả năm lần đều cùng một gốc: nó
+        # canh chính nó chứ không canh thứ nó sinh ra để canh.
+        #
+        # DẠY MÁY DÒ ĐỌC THÊM MỘT HÌNH KHÔNG PHẢI LÀ NỚI: nó nhìn thấy NHIỀU hơn trước, không phải
+        # ít hơn. Cách sửa SAI mà người sau dễ chọn là viết lại bản nâng cấp cho hàng rào im —
+        # làm thế là để nguyên cái lỗ, và bản sau dùng từ điển sẽ lại đỏ.
+        #
+        # CHỈ ĐẾM TỪ ĐIỂN THẬT SỰ ĐEM ĐI TẠO BẢNG. Một từ điển cột nằm im trong tệp mà không vòng
+        # nào dùng thì nó KHÔNG tạo ra cột nào trong cơ sở dữ liệu; đếm nó vào là máy dò tự nói dối
+        # rằng bản nâng cấp có một cột mà thật ra không có.
+        dung_de_tao_bang = set()
+        for nut in ast.walk(cay):
+            if not isinstance(nut, ast.For):
+                continue
+            ng = nut.iter
+            if isinstance(ng, ast.Call) and getattr(ng.func, "attr", "") == "items" \
+                    and isinstance(getattr(ng.func, "value", None), ast.Name) \
+                    and any(isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)
+                            and c.func.attr in ("create_table", "add_column")
+                            for c in ast.walk(nut)):
+                dung_de_tao_bang.add(ng.func.value.id)
+        for ten_td in dung_de_tao_bang:
+            tu_dien = hang.get(ten_td)
+            if not isinstance(tu_dien, ast.Dict):
+                continue
+            for khoa, gia_tri in zip(tu_dien.keys, tu_dien.values):
+                bang = chu(khoa)
+                if not bang:
+                    continue
+                kq.update((bang, c) for c in cot_tien_trong_danh_sach(gia_tri))
 
         for nut in ast.walk(cay):
             # Hình 1 và 2: gọi thẳng op.create_table / op.add_column với tên bảng là chuỗi.

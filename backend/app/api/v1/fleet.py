@@ -2342,3 +2342,55 @@ def xe_xoa(vid: int, ly_do: str, u: User = Depends(require_roles(*XOA_XE)),
             after={"ly_do": kq["ly_do"], "lich_su_bien": len(kq["lich_su_bien"])})
     db.commit()
     return {"message": f"Đã xoá xe {bien} khỏi danh mục", "ly_do": kq["ly_do"]}
+
+
+# ── XS-1 (Chủ tịch duyệt bản xem thử 25/10/2026) · xe đang đi theo sheet quyết toán của Đội xe ──
+# CHỈ ĐỌC: không ghi gì vào sheet, không nạp chuyến nào vào VTOS. Xem `services/xe_theo_sheet.py`.
+@router.get("/xe-theo-sheet")
+def xe_theo_sheet(doc_lai: int = Query(0, ge=0, le=1), u: User = Depends(require_roles(*READ)),
+                  db: Session = Depends(get_db)):
+    """`doc_lai=1` bỏ qua đệm 15 phút — nút «Đọc lại ngay» trên màn chi tiết."""
+    from app.services import xe_theo_sheet as XS
+    return XS.bao_cao(db, date.today(), doc_lai=bool(doc_lai)) | {
+        "cho_ky": XS.cho_ky(db), "duoc_dan": u.role in GHI_LINK_SHEET}
+
+
+# XS-1b (Chủ tịch 25/10/2026, «Giữ ký duyệt Chủ tịch»): ai được DÁN link. Chủ tịch không nằm đây vì
+# Chủ tịch là người ký duy nhất của tham số, và người trình không tự ký (`sign_param`).
+GHI_LINK_SHEET = ("gd_doi_xe", "tp_dh", "cntt")
+
+
+class LinkSheetVao(BaseModel):
+    url: str
+    chi_doc_thu: bool = False
+
+
+@router.post("/xe-theo-sheet/link")
+def dan_link_sheet(v: LinkSheetVao, u: User = Depends(require_roles(*GHI_LINK_SHEET)),
+                   db: Session = Depends(get_db)):
+    """Đọc thử, rồi (nếu không phải chỉ đọc thử) TRÌNH link chờ Chủ tịch ký — không ghi thẳng.
+
+    Đọc thử trước khi trình là bắt buộc: một link không đọc được mà vẫn trình thì Chủ tịch ký xong
+    robot vẫn không có số, và lỗi lộ ra ở màn hình Chủ tịch chứ không ở chỗ người dán.
+    """
+    from app.models.core import Param
+    from app.services import xe_theo_sheet as XS
+    url = (v.url or "").strip()
+    try:
+        nguong = R.get_param(db, "xe_lech_km_noi_chuyen")
+    except KeyError:
+        nguong = 50
+    thu = XS.doc_thu(url, nguong)
+    if not thu["ok"] or v.chi_doc_thu:
+        return {"doc_thu": thu, "da_trinh": False}
+    ref = db.execute(select(Param).where(Param.key == XS.KHOA_LINK).order_by(Param.id.desc())).scalars().first()
+    if ref is None:
+        raise HTTPException(409, "Hệ chưa có tham số xe_sheet_csv_url — báo CNTT.")
+    p = Param(key=XS.KHOA_LINK, value=url, label=ref.label, unit=ref.unit, effective_from=date.today(),
+              source=f"Dán ở màn Đội xe bởi {u.username}", status="pending", proposed_by=u.username)
+    db.add(p); db.flush()
+    R.audit(db, u.username, u.role, "de_xuat_tham_so", f"param:{XS.KHOA_LINK}",
+            before={"value": ref.value}, after={"value": url, "hieu_luc": str(p.effective_from)})
+    db.commit()
+    return {"doc_thu": thu, "da_trinh": True, "id": p.id,
+            "message": "Đã trình link — chờ Chủ tịch ký ở màn Chính sách & định mức. Ký xong robot mới đọc."}

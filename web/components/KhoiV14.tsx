@@ -55,6 +55,9 @@ import { api } from "@/lib/api";
  *  suất tính trên thời gian xe CÓ THỂ khai thác chứ không phải trên số ngày trong kỳ. */
 export type HieuQuaXe = {
   ngay_xe_hoat_dong?: number | null;
+  /** XS-3 — số cho dòng phụ dưới mỗi ô (máy chủ tính, màn hình chỉ ghép chữ). */
+  so_xe_chay?: number | null; so_chuyen?: number | null; so_lit?: number | null;
+  km_chuyen?: number | null; ngay_xe_mau?: number | null;
   cong_suat_khai_thac?: number | null;   // phần trăm, 0–100
   /** Mục 3 (21/10/2026) — ngày cuối mà MẪU SỐ của công suất đếm tới, dạng YYYY-MM-DD.
    *
@@ -259,10 +262,20 @@ type XeHomNay = {
   co_lenh?: boolean | null;
 };
 
-export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
+/** XS-1 (Chủ tịch duyệt bản xem thử 25/10/2026) — `sections.xe_theo_sheet`: xe đang đi đọc từ sheet
+ *  quyết toán của Đội xe. Máy chủ CHỈ gửi khi chưa có lệnh điều xe nào (lệnh VTOS thay sheet), và
+ *  `null` khi chưa nối link. Xem `services/xe_theo_sheet.tom_tat`. */
+type XeTheoSheet = {
+  loi?: string | null; doc_luc?: string | null; ban_cu?: boolean; dieu_duoc?: number;
+  dang_di?: number; o_bai?: number; khong_khop?: number; so_can_sua?: number;
+};
+
+export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
   d?: HieuQuaXe | null;
   /** `sections.xe_hom_nay` — xem `XeHomNay`. */
   xe?: XeHomNay | null;
+  /** `sections.xe_theo_sheet` — xem `XeTheoSheet`. */
+  sheet?: XeTheoSheet | null;
   /** Khi máy chủ trả số theo từng kỳ thì truyền vào đây: { thang: {...}, quy: {...}, nam: {...} },
    *  kèm `mac_dinh` — kỳ HẸP NHẤT còn có số. */
   theo_ky?: BoKy | null;
@@ -428,6 +441,23 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
   /* Cỡ số của TẦNG VẬN HÀNH nhỏ hơn tầng chủ một bậc, và KHÔNG xuống dòng: «27.1 L/100km» ở cỡ cũ
      vắt thành hai dòng, làm ô ấy cao hơn năm ô bên cạnh và cả hàng gãy. */
   const SO_NHO: React.CSSProperties = { fontSize: "calc(16/14*1rem)", whiteSpace: "nowrap" };
+  /* XS-3 — năm ô bằng nhau: cột dọc, cao tối thiểu như nhau, nút «Xem chi tiết» đẩy xuống đáy. */
+  const O_VH: React.CSSProperties = { display: "flex", flexDirection: "column", minHeight: 128, minWidth: 0 };
+  const PHU: React.CSSProperties = { fontSize: "calc(11.5/14*1rem)", marginTop: 2, whiteSpace: "nowrap",
+                                     overflow: "hidden", textOverflow: "ellipsis" };
+  const XEM: React.CSSProperties = { marginTop: "auto", paddingTop: 6, fontSize: "calc(12/14*1rem)" };
+  const DV: React.CSSProperties = { fontSize: "calc(12/14*1rem)", fontWeight: 600 };
+  const vnd = (x?: number | null) => (x == null ? null : Math.round(x).toLocaleString("vi-VN"));
+  const PHU_VH: Record<string, string> = {
+    ngay_xe_hoat_dong: [o.so_xe_chay && `${o.so_xe_chay} xe`, o.so_chuyen && `${o.so_chuyen} chuyến`]
+      .filter(Boolean).join(" · "),
+    tieu_hao_l100: [o.so_lit && `${vnd(o.so_lit)} lít`, o.km_chuyen && `${vnd(o.km_chuyen)} km`]
+      .filter(Boolean).join(" · "),
+    km_chay_rong: o.km_chuyen ? `trên ${vnd(o.km_chuyen)} km chuyến` : "",
+  };
+  const CHI_TIET_VH: Record<string, string> = {
+    ngay_xe_hoat_dong: "/lai-lo-doi-xe", tieu_hao_l100: "/doi-xe/gia-dau", km_chay_rong: "/doi-xe",
+  };
   const xeCoNguon = !!xe?.co_nguon;
   /* HQ-5 (23/10/2026) — BẢNG LỆNH TRỐNG THÌ KHÔNG IN SỐ 0.
      Đo trên hệ thật 23/10/2026: `/fleet/lenh-dieu-xe` trả MẢNG RỖNG — chưa ai lập một lệnh điều
@@ -493,81 +523,81 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe }: {
         ))}
       </div>
 
-      {/* ── TẦNG VẬN HÀNH ── */}
-      <div className="v14-o-ds">
+      {/* ── TẦNG VẬN HÀNH ── XS-3 (anh Tuấn duyệt bản xem thử 25/10/2026): năm ô BẰNG NHAU — mỗi ô
+          tên · con số · MỘT dòng 4–5 chữ kèm số cụ thể · nút «Xem chi tiết» nằm ở đáy, thẳng hàng
+          giữa năm ô. Lời giải thích dài chuyển vào màn chi tiết, không nằm trên màn Chủ tịch.
+          Kiểu đặt thẳng tại chỗ (O_VH, PHU, XEM) — không thêm lớp vào globals.css (tệp làn khác giữ). */}
+      <div className="v14-o-ds" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
         {vanHanh.map(([nhan, gt, khoa]) => (
-          <div key={nhan} className={"v14-o" + (gt === null ? " rong" : "")}>
+          <div key={nhan} className={"v14-o" + (gt === null ? " rong" : "")} style={O_VH}>
             <div className="v14-o-nhan">{nhan}</div>
             <div className="v14-o-so" style={SO_NHO}>{gt ?? "—"}</div>
             {gt !== null && muiTen(khoa)}
+            <div className="muted" style={PHU}>{PHU_VH[khoa] ?? ""}</div>
+            <Link className="the-cua" href={CHI_TIET_VH[khoa]} style={XEM}>Xem chi tiết →</Link>
           </div>
         ))}
-        {/* Ô CÔNG SUẤT đứng cùng tầng vận hành nhưng là ô duy nhất có thể đang chờ người khai, nên
-            dấu gạch của nó được thay bằng tên bộ phận — ba ô kia trống vì kỳ chưa có chuyến, đó là
-            chuyện khác và câu trả lời của nó nằm ở dòng "Chưa có số cho kỳ…" bên dưới. */}
-        <div className={"v14-o" + (o.cong_suat_khai_thac == null ? " rong" : "")}>
-          <div className="v14-o-nhan">Công suất khai thác
-            {o.cong_suat_den_ngay && (
-              <span className="muted"> · tới {ngayNgan(o.cong_suat_den_ngay)}</span>
-            )}
-          </div>
+        {/* Ô CÔNG SUẤT là ô duy nhất có thể đang chờ người khai, nên dấu gạch của nó được thay bằng
+            tên bộ phận và lối vào cửa nhập. */}
+        <div className={"v14-o" + (o.cong_suat_khai_thac == null ? " rong" : "")} style={O_VH}>
+          <div className="v14-o-nhan">Công suất khai thác</div>
           {o.cong_suat_khai_thac == null && thieuCS ? (
-            <Link className="v14-o-so v14-o-chu" href={thieuCS.cua_nhap}
-              title={thieuCS.thieu.slice(0, 8).map((x) => `${x.xe}: thiếu ${x.thieu}`).join("\n")}>
-              chờ {thieuCS.bo_phan}
-              <span className="muted"> · {thieuCS.thieu.length} xe chưa khai ngày vào đội</span>
-            </Link>
+            <>
+              <div className="v14-o-so v14-o-chu" style={SO_NHO}>chờ {thieuCS.bo_phan}</div>
+              <div className="muted" style={PHU}>{thieuCS.thieu.length} xe chưa khai ngày vào đội</div>
+              <Link className="the-cua" href={thieuCS.cua_nhap} style={XEM}>Xem chi tiết →</Link>
+            </>
           ) : (
             <>
               <div className="v14-o-so" style={SO_NHO}>{so(o.cong_suat_khai_thac, "%") ?? "—"}</div>
               {o.cong_suat_khai_thac != null && muiTen("cong_suat_khai_thac")}
+              <div className="muted" style={PHU}>
+                {o.ngay_xe_mau ? `${so(o.ngay_xe_hoat_dong) ?? "—"} / ${so(o.ngay_xe_mau)} ngày-xe` : ""}
+                {o.cong_suat_den_ngay ? ` · tới ${ngayNgan(o.cong_suat_den_ngay)}` : ""}</div>
+              <Link className="the-cua" href="/lai-lo-doi-xe" style={XEM}>Xem chi tiết →</Link>
             </>
           )}
         </div>
-        {/* XE ĐANG ĐI — ô cuối của tầng vận hành, thay chỗ ô «Kết quả đã chốt» (TC-72).
-            Ô «đã chốt / chưa chốt» đã GỠ theo yêu cầu của anh Tuấn: nó là trạng thái sổ sách, không
-            phải một chỉ số để đọc cạnh công suất và tiêu hao. Trường `da_chot` GIỮ NGUYÊN trong hợp
-            đồng dữ liệu ở đầu tệp — xoá đi là mất bản mô tả thứ máy chủ đang trả.
-
-            Con số này là của HÔM NAY, không theo kỳ đang chọn — nên nói rõ ngay dưới nhãn, không để
-            người đọc tưởng nó đổi theo nút Tháng/Quý/Năm. */}
-        <div className={"v14-o" + (xeCoNguon && !chuaLapLenh ? "" : " rong")}>
-          <div className="v14-o-nhan">Xe đang đi <span className="muted">· hôm nay</span></div>
-          {xeCoNguon && chuaLapLenh ? (
-            /* Có xe, chưa có lệnh. Cửa trỏ thẳng sang chỗ lập lệnh, và câu dưới nói rõ con số này
-               đếm LỆNH chứ không đếm chuyến — vì sổ chuyến thì đang có số, nên người đọc dễ kết
-               luận màn hình hỏng trong khi nó đang đếm đúng một cái bảng còn trống. */
+        {/* XE ĐANG ĐI — số của HÔM NAY, không theo kỳ đang chọn, nên nhãn nói «hôm nay». */}
+        <div className={"v14-o" + (xeCoNguon && (!chuaLapLenh || (!!sheet && !sheet.loi)) ? "" : " rong")}
+             style={O_VH}>
+          <div className="v14-o-nhan">Xe đang đi · hôm nay</div>
+          {xeCoNguon && chuaLapLenh && sheet && !sheet.loi ? (
+            /* XS-1 (25/10/2026): chưa có lệnh điều xe thì đếm theo sheet quyết toán của Đội xe. Nguồn
+               và giờ đọc nằm ở màn chi tiết; ô chỉ giữ con số và việc cần làm. */
             <>
-              <Link className="v14-o-so v14-o-chu" href="/doi-xe">chờ Đội xe
-                <span className="muted"> · chưa lập lệnh điều xe nào</span></Link>
-              <div className="muted" style={{ fontSize: "calc(11/14*1rem)", marginTop: 2 }}>
-                {xe!.dieu_duoc} xe điều được. Ô này đếm <b>lệnh điều xe</b>, không đếm chuyến đã
-                ghi trong sổ quyết toán.
-              </div>
+              <div className="v14-o-so" style={SO_NHO}>{sheet.dang_di ?? "—"}
+                <span className="muted" style={DV}> / {sheet.dieu_duoc} xe</span></div>
+              <div className="muted" style={PHU}>{sheet.o_bai} nằm bãi
+                {!!sheet.so_can_sua && <> · <b style={{ color: "var(--orange)" }}>{sheet.so_can_sua} dòng sửa</b></>}
+                {sheet.ban_cu && " · bản cũ"}</div>
+              <Link className="the-cua" href="/doi-xe/xe-hom-nay" style={XEM}>Xem chi tiết →</Link>
+            </>
+          ) : xeCoNguon && chuaLapLenh ? (
+            <>
+              <div className="v14-o-so v14-o-chu" style={SO_NHO}>chờ Đội xe</div>
+              <div className="muted" style={PHU}>chưa lập lệnh · {xe!.dieu_duoc} xe</div>
+              <Link className="the-cua" href="/doi-xe" style={XEM}>Xem chi tiết →</Link>
             </>
           ) : xeCoNguon ? (
             <>
-              {/* `?? 0` GỠ 22/10/2026 (ca đỏ test_tc23). Khối này ĐÃ có cửa «chưa có nguồn» ở
-                  tầng trên — `xeCoNguon` — nhưng BÊN TRONG nhánh có nguồn thì `dang_chay` vẫn có
-                  thể rỗng: hợp đồng dữ liệu đầu tệp khai `number | null`. Lúc ấy in 0 là nói với
-                  người đọc «đã đếm và bằng không», trong khi sự thật là nguồn có mà số chưa về.
-                  Hai chuyện khác nhau, và màn hình không được trộn chúng. */}
+              {/* `dang_chay` rỗng là «nguồn có mà số chưa về» — không in 0 (ca đỏ test_tc23). */}
               <div className="v14-o-so" style={SO_NHO}>
                 {xe!.dang_chay === null || xe!.dang_chay === undefined
                   ? <span className="muted" style={{ fontSize: "calc(13/14*1rem)" }}>chưa có số</span>
-                  : xe!.dang_chay}
+                  : <>{xe!.dang_chay}<span className="muted" style={DV}> / {xe!.dieu_duoc} xe</span></>}
               </div>
-              <div className="muted" style={{ fontSize: "calc(11/14*1rem)", marginTop: 2 }}>
-                {xe!.o_bai} xe nằm bãi trên {xe!.dieu_duoc} xe điều được
-                {!!xe!.bat_thuong && <> · <b className="tag red">{xe!.bat_thuong} xe bất thường</b></>}
-                {!!xe!.lech && <> · <b className="tag red">{xe!.lech} lệnh trỏ xe không điều được</b></>}
-              </div>
-              <Link className="the-cua" href="/doi-xe" style={{ marginTop: 4, display: "inline-block" }}>
-                Xem chi tiết →</Link>
+              <div className="muted" style={PHU}>{xe!.o_bai} nằm bãi
+                {!!xe!.bat_thuong && <> · <b style={{ color: "var(--red)" }}>{xe!.bat_thuong} bất thường</b></>}
+                {!!xe!.lech && <> · <b style={{ color: "var(--red)" }}>{xe!.lech} lệnh lệch</b></>}</div>
+              <Link className="the-cua" href="/doi-xe" style={XEM}>Xem chi tiết →</Link>
             </>
           ) : (
-            <Link className="v14-o-so v14-o-chu" href="/doi-xe">chờ Đội xe
-              <span className="muted"> · chưa ai nhập bảng xe hôm nay</span></Link>
+            <>
+              <div className="v14-o-so v14-o-chu" style={SO_NHO}>chờ Đội xe</div>
+              <div className="muted" style={PHU}>chưa nhập bảng xe</div>
+              <Link className="the-cua" href="/doi-xe" style={XEM}>Xem chi tiết →</Link>
+            </>
           )}
         </div>
       </div>
