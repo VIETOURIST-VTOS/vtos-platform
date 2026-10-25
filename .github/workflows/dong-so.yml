@@ -35,6 +35,11 @@ jobs:
     # CHỐT 5: bỏ qua commit của chính việc này. Không có dòng này thì nó tự kích vòng lặp.
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
+    # Hạn giờ. Thiếu dòng này GitHub lấy mặc định 360 phút MỘT VIỆC, nên một việc treo ăn hết ngân sách
+    # mà không ai thấy nó đến — trần đã bị chạm bốn lần: 19/9 · 17/10 · 21/10 · 24/10. Số để RỘNG hơn
+    # số đo được nhiều lần, vì hạn giờ chật biến một lượt chậm-nhưng-đúng thành đỏ, và đỏ-vì-hạ-tầng
+    # là thứ dạy người ta tắt hàng rào. Đợt CI-1, 25/10/2026.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:

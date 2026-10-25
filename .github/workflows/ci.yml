@@ -96,6 +96,11 @@ jobs:
   # thừa thì chỉ tốn máy, và tốn máy là thứ đo được.
   loc:
     runs-on: ubuntu-latest
+    # Hạn giờ. Thiếu dòng này GitHub lấy mặc định 360 phút MỘT VIỆC, nên một việc treo ăn hết ngân sách
+    # mà không ai thấy nó đến — trần đã bị chạm bốn lần: 19/9 · 17/10 · 21/10 · 24/10. Số để RỘNG hơn
+    # số đo được nhiều lần, vì hạn giờ chật biến một lượt chậm-nhưng-đúng thành đỏ, và đỏ-vì-hạ-tầng
+    # là thứ dạy người ta tắt hàng rào. Đợt CI-1, 25/10/2026.
+    timeout-minutes: 10
     outputs:
       chi_so: ${{ steps.do.outputs.chi_so }}
     steps:
@@ -150,6 +155,11 @@ jobs:
     needs: loc
     if: needs.loc.outputs.chi_so != '1'
     runs-on: ubuntu-latest
+    # Hạn giờ. Thiếu dòng này GitHub lấy mặc định 360 phút MỘT VIỆC, nên một việc treo ăn hết ngân sách
+    # mà không ai thấy nó đến — trần đã bị chạm bốn lần: 19/9 · 17/10 · 21/10 · 24/10. Số để RỘNG hơn
+    # số đo được nhiều lần, vì hạn giờ chật biến một lượt chậm-nhưng-đúng thành đỏ, và đỏ-vì-hạ-tầng
+    # là thứ dạy người ta tắt hàng rào. Đợt CI-1, 25/10/2026.
+    timeout-minutes: 90
     defaults: { run: { working-directory: backend } }
     steps:
       - uses: actions/checkout@v4
@@ -223,6 +233,11 @@ jobs:
   # KHÔNG khai `if:` ở việc này — `test_ci8` đỏ nếu ai khai lại.
   web:
     runs-on: ubuntu-latest
+    # Hạn giờ. Thiếu dòng này GitHub lấy mặc định 360 phút MỘT VIỆC, nên một việc treo ăn hết ngân sách
+    # mà không ai thấy nó đến — trần đã bị chạm bốn lần: 19/9 · 17/10 · 21/10 · 24/10. Số để RỘNG hơn
+    # số đo được nhiều lần, vì hạn giờ chật biến một lượt chậm-nhưng-đúng thành đỏ, và đỏ-vì-hạ-tầng
+    # là thứ dạy người ta tắt hàng rào. Đợt CI-1, 25/10/2026.
+    timeout-minutes: 20
     defaults: { run: { working-directory: web } }
     steps:
       - uses: actions/checkout@v4
@@ -234,6 +249,11 @@ jobs:
   docker:
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
+    # Hạn giờ. Thiếu dòng này GitHub lấy mặc định 360 phút MỘT VIỆC, nên một việc treo ăn hết ngân sách
+    # mà không ai thấy nó đến — trần đã bị chạm bốn lần: 19/9 · 17/10 · 21/10 · 24/10. Số để RỘNG hơn
+    # số đo được nhiều lần, vì hạn giờ chật biến một lượt chậm-nhưng-đúng thành đỏ, và đỏ-vì-hạ-tầng
+    # là thứ dạy người ta tắt hàng rào. Đợt CI-1, 25/10/2026.
+    timeout-minutes: 30
     needs: [backend, web]
     steps:
       - uses: actions/checkout@v4
@@ -260,6 +280,11 @@ jobs:
   # Giữ NGUYÊN TÊN TỆP ở dòng `pytest` bên dưới: test_ci_hang_rao_main.py đọc đúng dòng ấy.
   hang-rao-gop:
     runs-on: ubuntu-latest
+    # Hạn giờ. Thiếu dòng này GitHub lấy mặc định 360 phút MỘT VIỆC, nên một việc treo ăn hết ngân sách
+    # mà không ai thấy nó đến — trần đã bị chạm bốn lần: 19/9 · 17/10 · 21/10 · 24/10. Số để RỘNG hơn
+    # số đo được nhiều lần, vì hạn giờ chật biến một lượt chậm-nhưng-đúng thành đỏ, và đỏ-vì-hạ-tầng
+    # là thứ dạy người ta tắt hàng rào. Đợt CI-1, 25/10/2026.
+    timeout-minutes: 20
     defaults: { run: { working-directory: backend } }
     steps:
       - uses: actions/checkout@v4
