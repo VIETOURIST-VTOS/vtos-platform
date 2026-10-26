@@ -47,6 +47,14 @@ def mot_tour(tour_id: int, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Ses
         raise HTTPException(404, str(ex))
 
 
+class NhaHangYcIn(BaseModel):
+    nha_hang_id: int
+    thuc_don_id: int
+    gio: str = ""
+    nguoi_lon: int = 0
+    tre_em: int = 0
+
+
 class YeuCauIn(BaseModel):
     loai: str = "tour"
     tour_id: int | None = None
@@ -55,6 +63,7 @@ class YeuCauIn(BaseModel):
     ngay_mong_muon: date | None = None
     ghi_chu: str = ""
     dong_y: bool = False
+    nha_hang: NhaHangYcIn | None = None
 
 
 @router.post("/yeu-cau")
@@ -62,7 +71,7 @@ def gui_yeu_cau(data: YeuCauIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db
     _khach(tk)
     try:
         yc = K.gui_yeu_cau(db, tk, data.loai, data.tour_id, data.so_khach, data.dien_thoai, data.ngay_mong_muon,
-                           data.ghi_chu, data.dong_y)
+                           data.ghi_chu, data.dong_y, nha_hang=data.nha_hang.model_dump() if data.nha_hang else None)
     except K.LoiKhach as ex:
         _loi(ex)
     return {"message": "Đã gửi yêu cầu. Sales Vietourist sẽ gọi lại cho bạn; yêu cầu chưa giữ chỗ và chưa thu tiền.",
@@ -104,3 +113,32 @@ def sua_ho_so(data: HoSoKhachIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), d
     except K.LoiKhach as ex:
         _loi(ex)
     return {**C.toi_out(tk), "so_thich": tk.so_thich, "so_thich_chon": list(K.SO_THICH)}
+
+
+# ── KH-2 ──────────────────────────────────────────────────────────────────────────────────────
+
+@router.get("/nha-hang")
+def ds_nha_hang(tinh: str = "", am_thuc: str = "", gia_toi_da: int = 0,
+                tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import nha_hang as NH
+    return NH.danh_sach_cong(db, tinh, am_thuc, gia_toi_da)
+
+
+@router.get("/nha-hang/{nid}")
+def mot_nha_hang(nid: int, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import nha_hang as NH
+    try:
+        return NH.mot_nha_hang_cong(db, nid)[1]
+    except NH.LoiNhaHang as ex:
+        raise HTTPException(404, str(ex))
+
+
+@router.get("/don/{ma}/qr")
+def qr(ma: str, muc: str = "", tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    try:
+        return K.qr_don(db, tk, ma, muc)
+    except K.LoiKhach as ex:
+        _loi(ex)

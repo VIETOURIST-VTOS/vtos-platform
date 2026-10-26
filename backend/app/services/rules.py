@@ -293,6 +293,10 @@ DEFAULT_PARAMS = [
     ("qt_tieu_hao_bien", "0.15", "Quyết toán chuyến: tiêu hao L/100km vượt định mức theo số chỗ QUÁ tỷ lệ này → cảnh báo vàng (không chặn ký)", "tỷ lệ", "QT-1b, Chủ tịch chốt 22/10/2026"),
     # DH-1 (26/10/2026): D06 đã chốt bậc nhưng CHƯA bật. Rỗng = chưa ai ký ngày hiệu lực = màn hoa hồng chỉ
     # tính thử, không chốt kỳ, không lập đề nghị chi. Chủ tịch ký một ngày 01-MM-YYYY là bật từ tháng ấy.
+    # KH-2 (26/10/2026): tài khoản nhận tiền QR trên cổng khách = SỐ TÀI KHOẢN đã có trong danh mục ngân hàng
+    # (Kế toán trình, Chủ tịch ký). Ghi bằng SỐ để đi qua cửa trình tham số hiện có (cửa ấy chỉ nhận số và
+    # ngày). Rỗng / không khớp một TK đang dùng = chưa mở QR — cổng khách chỉ hiện «liên hệ Sales».
+    ("cong_qr_tai_khoan", "", "Số tài khoản ngân hàng nhận tiền QR trên cổng khách hàng (phải có trong danh mục ngân hàng). Rỗng = chưa mở QR", "số tài khoản", "KH-2, Chủ tịch duyệt 26/10/2026"),
     ("d06_hieu_luc_tu", "", "Hoa hồng D06 đại lý / CTV: có hiệu lực từ ngày này (đầu tháng). Rỗng = chưa bật, chỉ tính thử", "ngày DD-MM-YYYY", "DH-1, Chủ tịch chốt D06 26/10/2026"),
     ("bao_cao_ngay_han_0h_tu", "26-10-2026", "Báo cáo ngày: từ ngày này hạn nộp là trước 0 giờ ngày kế tiếp (trước đó 20 giờ, không tính lại)", "ngày DD-MM-YYYY", "BC-1, Chủ tịch chốt 26/10/2026"),
     ("xe_sheet_csv_url", "", "Link CSV «Công bố lên web» của sheet Quyết Toán dữ liệu xe – robot đọc để đếm xe đang đi khi chưa có lệnh điều xe (trống = chưa nối)", "link", "XS-1, Chủ tịch chốt 25/10/2026"),
@@ -548,6 +552,7 @@ DEFAULT_PARAMS = [
 # bản mở từ trước. Thiếu nó thì routes.py vẫn gọi getattr(R, "THAM_SO_NGAY", ()) và nhận về rỗng,
 # nên cửa nhập ngày im lặng không bao giờ chạy: mã trông đủ, hàng rào thì không có.
 THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip", "bao_cao_ngay_han_0h_tu", "d06_hieu_luc_tu")
+
 
 
 # Bộ nhớ đệm tham số. get_param bị gọi hàng nghìn lần trong một lần dựng bảng điều khiển –

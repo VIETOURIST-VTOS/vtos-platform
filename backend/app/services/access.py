@@ -579,6 +579,7 @@ MAN_HINH_API = {
     "/tai-khoan-ngoai": ("/api/v1/tai-khoan-ngoai",),
     # DH-1 (26/10/2026) — hoa hồng đối tác D06. Nhóm API RIÊNG, không gắn nhờ nhóm kế toán.
     "/hoa-hong-d06": ("/api/v1/hoa-hong-d06",),
+    "/nha-hang": ("/api/v1/nha-hang",),
     "/gop-tai-khoan": ("/api/v1/gop-tai-khoan",),
     # TC-81 - Bao chi, KOL & su kien (muc 2.2.2). HAI tien to, va da kiem ky truoc khi khai cai
     # thu hai: danh sach vai cua man hinh nay nam GON trong danh sach vai cua "/marketing", nen
@@ -953,6 +954,7 @@ MENU_ROLES = {
     "/tai-khoan-ngoai": BASE_VIEW + ("gd_kd", "tp_dh", "ir_phapche"),
     # DH-1: Kế toán tính / chốt / lập đề nghị chi; GĐ KD xem và chọn hình thức hưởng của đối tác.
     "/hoa-hong-d06": BASE_VIEW + ("ketoan", "gd_kd"),
+    "/nha-hang": BASE_VIEW + ("tp_dh", "nv_dh", "tp_kd", "gd_kd"),
     # TC-75 - gop tai khoan trung. HEP: khong co vai Kinh doanh nao. Doc bang cap trung thi HCNS
     # va Ke toan can (ho la nguoi phat hien ra trung), nhung nut gop thi chi cntt va Ban TGD -
     # khai rieng o api/v1/gop_tai_khoan.py. Gop la viec mot chieu: chuyen 290 booking sang nham
