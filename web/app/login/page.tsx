@@ -16,6 +16,13 @@ import { goiCong as goi, luuPhienCong } from "@/lib/cong";
    khẩu tạm, lần đăng nhập kế tiếp buộc đổi. */
 
 type Man = "cong" | "noi" | "kh" | "dt" | "cd";
+
+/* CG-2 · Bốn tên miền (Chủ tịch chốt 27/10/2026): mở tên miền nào thì vào thẳng cổng ấy, không qua
+   trang bốn ô. Địa chỉ khác (vtos.infinitytours.org, vercel.app, máy dựng) giữ trang bốn ô như cũ.
+   `?cong=` trên đường dẫn vẫn thắng. Nút «← Bốn cổng truy cập» vẫn còn để đổi cổng. */
+const CONG_THEO_TEN_MIEN: Record<string, Man> = {
+  "crm.vietourist.vn": "noi", "kh.vietourist.vn": "kh", "dt.vietourist.vn": "dt", "ir.vietourist.vn": "cd",
+};
 const VAI: Record<Exclude<Man, "cong">, { role: string; loai: string; ten: string; h2: string; p: string }> = {
   noi: { role: "nhan-vien", loai: "", ten: "Nội bộ Vietourist", h2: "Đăng nhập VTOS", p: "Dành cho Ban lãnh đạo, quản lý và nhân viên." },
   kh: { role: "khach-hang", loai: "khach_hang", ten: "Khách hàng", h2: "Đăng nhập khách hàng", p: "Sử dụng liên hệ đã xác minh để vào không gian của bạn." },
@@ -107,6 +114,7 @@ export default function Login() {
     if (getUser()) { location.replace("/"); return; }
     const q = new URLSearchParams(location.search).get("cong") as Man | null;
     if (q && (q === "cong" || q in VAI)) setMan(q);
+    else { const m = CONG_THEO_TEN_MIEN[location.hostname.toLowerCase()]; if (m) setMan(m); }
   }, []);
   const di = useCallback((m: Man) => { setMan(m); setHoTro(false); try { history.replaceState(null, "", m === "cong" ? "/login" : `/login?cong=${m}`); } catch { /* bỏ qua */ } window.scrollTo(0, 0); }, []);
   // Bấm vào mảnh tĩnh (thẻ vai, logo, nút Hỗ trợ): bắt bằng một chỗ, đọc data-* có sẵn trong bản v3.2.
