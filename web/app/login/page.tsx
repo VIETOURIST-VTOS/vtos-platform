@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { login, getUser } from "@/lib/api";
-import { THANH_TREN, TRANG_MO_DAU, CAU_CHUYEN } from "@/components/cong/manh";
+import { THANH_TREN, TRANG_MO_DAU, KHUNG_HO_TRO, CAU_CHUYEN } from "@/components/cong/manh";
 import { goiCong as goi, luuPhienCong } from "@/lib/cong";
 
 /* CG-1 · CỔNG KẾT NỐI VTD thay màn đăng nhập VTOS — Chủ tịch duyệt bản xem thử 26/10/2026, dựng từ đúng
@@ -111,6 +111,16 @@ export default function Login() {
   const di = useCallback((m: Man) => { setMan(m); setHoTro(false); try { history.replaceState(null, "", m === "cong" ? "/login" : `/login?cong=${m}`); } catch { /* bỏ qua */ } window.scrollTo(0, 0); }, []);
   // Bấm vào mảnh tĩnh (thẻ vai, logo, nút Hỗ trợ): bắt bằng một chỗ, đọc data-* có sẵn trong bản v3.2.
   const bam = (e: React.MouseEvent) => {
+    const nutBay = (e.target as HTMLElement).closest("[data-hero-motion]") as HTMLElement | null;
+    if (nutBay) {   // v3.4: dừng / tiếp tục máy bay bay quanh Trái Đất
+      e.preventDefault();
+      const vung = nutBay.closest(".v5-earth-area"); const dung = !vung?.classList.contains("is-paused");
+      vung?.classList.toggle("is-paused", dung);
+      nutBay.setAttribute("aria-pressed", String(dung));
+      nutBay.setAttribute("aria-label", dung ? "Tiếp tục hiệu ứng máy bay" : "Dừng hiệu ứng máy bay");
+      const chu = nutBay.querySelector("span"); if (chu) chu.textContent = dung ? "Tiếp tục hiệu ứng" : "Dừng hiệu ứng";
+      return;
+    }
     const el = (e.target as HTMLElement).closest("[data-go-role],[data-action]") as HTMLElement | null;
     if (!el) return;
     e.preventDefault();
@@ -119,9 +129,10 @@ export default function Login() {
     else if (el.dataset.goRole !== undefined) di(el.dataset.goRole ? TU_VAI[el.dataset.goRole] || "cong" : "cong");
   };
   const vai = man === "cong" ? null : VAI[man];
-  const thanh = hoTro ? THANH_TREN.replace(' hidden=""', "") : THANH_TREN;
+  const goc = man === "cong" ? KHUNG_HO_TRO : THANH_TREN;   // trang mở đầu v3.4 không có thanh trên riêng
+  const thanh = hoTro ? goc.replace(' hidden=""', "") : goc;
   return (<>
-    <link rel="stylesheet" href="/cong/vtd.css?v=33" />
+    <link rel="stylesheet" href="/cong/vtd.css?v=34b" />
     <div style={{ background: "#081826", minHeight: "100vh" }}>
       <div id="vtd-access" data-mode="inline" data-page={man === "cong" ? "home" : "login"} data-role={vai?.role || "khach-hang"} data-preview="off" data-vtos-screen="off" data-vtos-menu="closed">
         <div id="vtd-screen" onClick={bam}>
