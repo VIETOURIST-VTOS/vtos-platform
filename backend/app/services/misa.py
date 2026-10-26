@@ -528,7 +528,9 @@ MISA_PURCHASE_COLS = ["Phương thức thanh toán", "Nhận kèm hóa đơn", "
 #
 # Cuối kỳ 627 kết chuyển về 154 – bước 0 trong `services/ket_so.py`, trước ba bước đóng về 911.
 CATEGORY_ACCOUNT = {"chi_tour": "1541", "marketing": "6417", "hanh_chinh": "6428", "hoan_tien": "131",
-                    "tam_ung": "141", "tam_ung_tai_xe": "141", "sua_chua_xe": "627"}
+                    "tam_ung": "141", "tam_ung_tai_xe": "141", "sua_chua_xe": "627",
+                    # Hoa hồng D06 trả đại lý / CTV bán hàng – Chủ tịch chốt 26/10/2026: 6417 dịch vụ mua ngoài.
+                    "hoa_hong": "6417"}
 
 
 def thieu_tai_khoan() -> list[str]:

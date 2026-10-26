@@ -670,13 +670,13 @@ PHAM_VI_DA_CHOT = {
     #
     # Vòng HD-DG3 đầu (PR #378) KHÔNG cập nhật bảng này. Không ai thấy, vì PR ấy chết ở bước
     # ruff chạy TRƯỚC mọi phép thử — bảng chốt chưa từng được hỏi. Ghép lại 17/10 mới lộ ra.
-    "chutich": 137, "tgd": 137, "bks": 137, "cntt": 133, "ir_phapche": 21,   # +1 CG-1 26/10/2026: /api/v1/tai-khoan-ngoai (hàng chờ duyệt tài khoản bên ngoài)
+    "chutich": 138, "tgd": 138, "bks": 138, "cntt": 133, "ir_phapche": 21,   # +1 CG-1 26/10/2026: /api/v1/tai-khoan-ngoai; +1 DH-1 26/10/2026: /api/v1/hoa-hong-d06
     # ── 17/10/2026 · hcns 71 → 72, ĐỢT R3b ───────────────────────────────────────────
     # Nhóm duy nhất thêm là "/api/v1/hach-toan", và chỉ vì một lẽ: danh mục BỘ PHẬN nằm ở
     # màn ấy. Cơ cấu phòng ban là việc của Hành chính – Nhân sự, không phải Kế toán; cho
     # họ quyền ghi (`GHI_BO_PHAN`) mà không cho vào màn là dựng một cửa không ai với tới.
     # Anh Tuấn quyết 17/10/2026.
-    "ketoan": 109, "tp_dh": 102, "ptgd_doan": 81, "nv_dh": 71, "hcns": 73, "gd_kd": 75,
+    "ketoan": 110, "tp_dh": 102, "ptgd_doan": 81, "nv_dh": 71, "hcns": 73, "gd_kd": 76,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -766,8 +766,8 @@ PHAM_VI_DA_CHOT = {
     #
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
-    "ketoan_truong": 110, "ketoan_tt": 31, "thu_quy": 27,
-    "robot_pq": 18, "robot_ks": 137, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "ketoan_truong": 111, "ketoan_tt": 31, "thu_quy": 27,
+    "robot_pq": 18, "robot_ks": 138, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

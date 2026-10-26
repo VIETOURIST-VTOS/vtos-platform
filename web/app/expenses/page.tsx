@@ -9,9 +9,9 @@ import { Tag, errMsg } from "@/components/ui";
 // là TGĐ / Chủ tịch như mọi loại khác. Bảng này phải khớp CATEGORY_CONFIRMER ở máy chủ – có hàng rào
 // canh (test_tx2), vì hai bảng khai tay thì sớm muộn cũng lệch và lúc lệch thì màn hình nói sai
 // tên người phụ trách.
-const CAT: Record<string, string> = { chi_tour: "Chi phí tour", marketing: "Marketing", hanh_chinh: "Hành chính", hoan_tien: "Hoàn tiền khách", tam_ung: "Tạm ứng HDV/NCC trước tour", sua_chua_xe: "Sửa chữa xe", tam_ung_tai_xe: "Tạm ứng tài xế" };
+const CAT: Record<string, string> = { chi_tour: "Chi phí tour", marketing: "Marketing", hanh_chinh: "Hành chính", hoan_tien: "Hoàn tiền khách", tam_ung: "Tạm ứng HDV/NCC trước tour", sua_chua_xe: "Sửa chữa xe", tam_ung_tai_xe: "Tạm ứng tài xế", hoa_hong: "Hoa hồng đối tác (D06)" };
 const ST: Record<string, [string, string]> = { cho_tp: ["Chờ bộ phận", "warn"], cho_kt: ["Chờ Kế toán", "warn"], cho_duyet: ["Chờ duyệt", "warn"], cho_chi: ["Lệnh chi chờ", "navy"], da_chi: ["Đã chi", "ok"], tu_choi: ["Từ chối", "red"] };
-const CONFIRMER: Record<string, string[]> = { chi_tour: ["tp_dh", "tgd"], marketing: ["ptgd_mkt", "tgd"], hanh_chinh: ["hcns", "tgd"], hoan_tien: ["gd_kd", "tp_dh", "tgd"], tam_ung: ["tp_dh", "tgd"], sua_chua_xe: ["gd_doi_xe", "tgd"], tam_ung_tai_xe: ["gd_doi_xe", "tgd"] };
+const CONFIRMER: Record<string, string[]> = { chi_tour: ["tp_dh", "tgd"], marketing: ["ptgd_mkt", "tgd"], hanh_chinh: ["hcns", "tgd"], hoan_tien: ["gd_kd", "tp_dh", "tgd"], tam_ung: ["tp_dh", "tgd"], sua_chua_xe: ["gd_doi_xe", "tgd"], tam_ung_tai_xe: ["gd_doi_xe", "tgd"], hoa_hong: ["gd_kd", "tgd"] };
 
 function Expenses() {
   const { user, toast } = useShell();

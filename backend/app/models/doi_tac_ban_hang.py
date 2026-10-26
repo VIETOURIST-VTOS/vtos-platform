@@ -42,12 +42,15 @@ from app.db.session import Base
 
 # Kiểu hợp tác. Cố ý ngắn và mở rộng được: mỗi kiểu thêm vào đây phải trả lời được câu "cách tính
 # tiền với họ khác gì nhau", nếu không thì nó chỉ là một cái nhãn.
-LOAI = ("ghep_le", "dai_ly", "san_ve", "khac")
+LOAI = ("ghep_le", "dai_ly", "san_ve", "ctv_ban_hang", "khac")
 
 NHAN_LOAI = {
     "ghep_le": "Đối tác ghép lẻ",
     "dai_ly": "Đại lý",
     "san_ve": "Sàn bán vé",
+    # DH-1 26/10/2026 — cá nhân giới thiệu / bán tour hưởng hoa hồng D06 (2% / 2,5% / 3%). KHÁC «CTV»
+    # hướng dẫn viên tự do ở phòng HDV: hai nghĩa của cùng một chữ, nên tên đầy đủ là «CTV bán hàng».
+    "ctv_ban_hang": "CTV bán hàng",
     "khac": "Khác",
 }
 

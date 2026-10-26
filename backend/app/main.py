@@ -85,6 +85,7 @@ from app.api.v1.ban_tour_le import router as ban_tour_le_router
 from app.api.v1.danh_gia import router as danh_gia_router
 from app.api.v1.tai_xe import router as tai_xe_router
 from app.api.v1.khao_sat_cong_khai import router as khao_sat_cong_khai_router
+from app.api.v1.hoa_hong_d06 import router as hoa_hong_d06_router   # DH-1 hoa hồng D06
 from app.api.v1.cong_ngoai import router as cong_ngoai_router, router_vtos as tai_khoan_ngoai_router   # CG-1 cổng kết nối VTD
 from app.api.v1.cong_bo import router as cong_bo_router
 from app.api.v1.rut_dong_y import router as rut_dong_y_router
@@ -382,6 +383,7 @@ app.include_router(cong_no_vietrip_router)
 app.include_router(khao_sat_cong_khai_router)
 app.include_router(cong_ngoai_router)
 app.include_router(tai_khoan_ngoai_router)
+app.include_router(hoa_hong_d06_router)
 app.include_router(cong_bo_router)
 app.include_router(rut_dong_y_router)
 app.include_router(chuong_trinh_router)
