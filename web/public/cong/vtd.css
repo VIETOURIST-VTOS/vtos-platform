@@ -537,3 +537,7 @@ CG-1 — phần thêm vào bản v3.2: chọn kênh nhận mã, đồng ý đi�
 #vtd-access .v5-earth{animation:v5-earth-float 6s ease-in-out infinite}
 #vtd-access .v5-earth-area.is-paused .v5-earth{animation-play-state:paused}
 @media(prefers-reduced-motion:reduce){#vtd-access .v5-earth{animation:none}}
+/* KH-1: bảng của cổng khách hàng không ăn kiểu `th` chung của VTOS (chữ hoa, màu chữ nền tối) */
+#vtd-access .v3-app th{text-transform:none;letter-spacing:normal;border-bottom:1px solid var(--v3-line)}
+#vtd-access .v3-app tbody th{color:#264058}
+#vtd-access .v3-app thead th{letter-spacing:.25px}

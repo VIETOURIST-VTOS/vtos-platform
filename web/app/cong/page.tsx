@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { THANH_TREN } from "@/components/cong/manh";
 import { goiCong, phienCong, xoaPhienCong } from "@/lib/cong";
+import KhachHang from "@/components/cong/khach/KhachHang";
 
 /* CG-1 · KHÔNG GIAN SAU ĐĂNG NHẬP của cổng ngoài (khách hàng, đối tác, cổ đông).
    Đợt này làm cổng và tài khoản. Các phân hệ (đặt dịch vụ, đơn, điểm, ưu đãi cổ đông…) là đợt sau —
@@ -35,10 +36,11 @@ export default function Cong() {
   const role = toi?.loai === "doi_tac" ? "doi-tac" : toi?.loai === "co_dong" ? "co-dong" : "khach-hang";
   const canHoSo = toi && toi.loai !== "khach_hang" && ["ho_so", "bo_sung"].includes(toi.trang_thai);
   return (<>
-    <link rel="stylesheet" href="/cong/vtd.css?v=34b" />
+    <link rel="stylesheet" href="/cong/vtd.css?v=35" />
     <div style={{ background: "#081826", minHeight: "100vh" }}>
       <div id="vtd-access" data-mode="inline" data-page="login" data-role={role} data-preview="off" data-vtos-screen="off" data-vtos-menu="closed">
         <div id="vtd-screen">
+          {toi?.loai === "khach_hang" && toi.trang_thai !== "khoa" ? <KhachHang toi={toi} thoat={thoat} /> : <>
           <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: THANH_TREN }} />
           {!toi ? <p style={{ color: "#a9b9ce", padding: 24 }}>Đang tải…</p> : <div data-role={role}><div className="v4-auth">
             <nav className="vtd-breadcrumb"><span>{toi.loai_ten}</span><span>·</span><span>{toi.dien_thoai || toi.email}</span>
@@ -76,6 +78,7 @@ export default function Cong() {
                 <p className="vtd-form-notice">Liên hệ đăng nhập: {toi.dien_thoai || toi.email}. Đổi liên hệ cần xác thực lại — liên hệ Vietourist.</p>
               </section>
             </main></div></div>}
+          </>}
         </div>
       </div>
     </div>

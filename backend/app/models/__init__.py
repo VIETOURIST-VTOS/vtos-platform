@@ -167,3 +167,4 @@ from app.models.cong_ngoai import *  # noqa
 # DH-1 26/10/2026 — hoa hong D06: hinh thuc, ky, so chi ghi them, chi. Thieu dong nay thi bon bang
 # khong vao Base.metadata: create_all khong tao va alembic autogenerate doi XOA chung.
 from app.models.hoa_hong_d06 import *  # noqa
+from app.models.cong_khach import *  # noqa

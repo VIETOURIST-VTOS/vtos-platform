@@ -1,0 +1,106 @@
+"""KH-1 · Cổng khách hàng VTD — mọi cửa đòi PHIÊN CỔNG NGOÀI (không phải phiên VTOS) và loại khách hàng."""
+from datetime import date
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.models.cong_ngoai import TaiKhoanNgoai
+from app.api.v1.cong_ngoai import tai_khoan_ngoai
+from app.services import cong_khach as K
+from app.services import cong_ngoai as C
+
+router = APIRouter(prefix="/api/v1/cong/khach", tags=["cong-khach-hang"])
+
+
+def _khach(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai)) -> TaiKhoanNgoai:
+    try:
+        K.la_khach(tk)
+    except K.LoiKhach as ex:
+        raise HTTPException(403, str(ex))
+    return tk
+
+
+def _loi(ex: K.LoiKhach):
+    raise HTTPException(400, str(ex))
+
+
+@router.get("/trang-chu")
+def trang_chu(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    return K.trang_chu(db, tk)
+
+
+@router.get("/tour")
+def ds_tour(q: str = "", tu_ngay: date | None = None, noi: str = "", ngan_sach: int = 0, nhom: str = "",
+            tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    return {"tour": K.tours(db, q, tu_ngay, noi, ngan_sach, nhom), "noi_khoi_hanh": K.noi_khoi_hanh(db)}
+
+
+@router.get("/tour/{tour_id}")
+def mot_tour(tour_id: int, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    try:
+        return K.tour(db, tour_id)
+    except K.LoiKhach as ex:
+        raise HTTPException(404, str(ex))
+
+
+class YeuCauIn(BaseModel):
+    loai: str = "tour"
+    tour_id: int | None = None
+    so_khach: int = 1
+    dien_thoai: str = ""
+    ngay_mong_muon: date | None = None
+    ghi_chu: str = ""
+    dong_y: bool = False
+
+
+@router.post("/yeu-cau")
+def gui_yeu_cau(data: YeuCauIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    try:
+        yc = K.gui_yeu_cau(db, tk, data.loai, data.tour_id, data.so_khach, data.dien_thoai, data.ngay_mong_muon,
+                           data.ghi_chu, data.dong_y)
+    except K.LoiKhach as ex:
+        _loi(ex)
+    return {"message": "Đã gửi yêu cầu. Sales Vietourist sẽ gọi lại cho bạn; yêu cầu chưa giữ chỗ và chưa thu tiền.",
+            "id": yc.id}
+
+
+@router.get("/don")
+def don_cua_toi(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    return {"don": K.don_cua_toi(db, tk), "yeu_cau": K.yeu_cau_cua(db, tk)}
+
+
+@router.get("/don/{ma}")
+def mot_don(ma: str, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    try:
+        return K.don(db, tk, ma)
+    except K.LoiKhach as ex:
+        raise HTTPException(404, str(ex))
+
+
+class HoSoKhachIn(BaseModel):
+    ho_ten: str | None = None
+    so_thich: str | None = None
+    nhan_tin_quang_cao: bool | None = None
+
+
+@router.get("/ho-so")
+def ho_so(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai)):
+    _khach(tk)
+    return {**C.toi_out(tk), "so_thich": tk.so_thich, "so_thich_chon": list(K.SO_THICH)}
+
+
+@router.post("/ho-so")
+def sua_ho_so(data: HoSoKhachIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    try:
+        tk = K.cap_nhat_ho_so(db, tk, data.ho_ten, data.so_thich, data.nhan_tin_quang_cao)
+    except K.LoiKhach as ex:
+        _loi(ex)
+    return {**C.toi_out(tk), "so_thich": tk.so_thich, "so_thich_chon": list(K.SO_THICH)}
