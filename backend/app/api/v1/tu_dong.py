@@ -152,3 +152,58 @@ def quet_im_lang(db: Session = Depends(get_db)):
     return {"so_tac_vu_im": n,
             "message": f"{n} tác vụ đang quá hạn – đã ghi vào sổ sự kiện kỹ thuật" if n
                        else "Không có tác vụ nào quá hạn"}
+
+
+# ── BG-1 · Cửa nhận báo cáo ngày từ hệ Google ─────────────────────────────────────────────────
+# Đậu ở phân hệ này chứ không ở `ops.py` vì hai lý do, và lý do thứ hai mới là lý do thật:
+#   · đây đúng là một cửa ROBOT báo số về — cùng kiểu xác thực ROBOT_TOKEN với cửa n8n ngay trên;
+#   · `api/v1/ops.py` và `services/ops.py` đang được làn Phân quyền giữ cho BC-1 và BC-2, và hai
+#     làn cùng viết một tệp là đúng thứ hàng rào giữ chỗ sinh ra để chặn.
+# Toàn bộ phép tính nằm ở `services/bao_cao_google.py`; ở đây chỉ có hình của lời gọi.
+from datetime import date as _date   # noqa: E402
+from app.services import bao_cao_google as BG   # noqa: E402
+
+
+class GoogleItemIn(BaseModel):
+    maNV: str = ""
+    ngay: _date | None = None
+    hoTen: str = ""
+    chucDanh: str = ""
+    phong: str = ""
+    phongGoogle: str = ""
+    nopLuc: str = ""
+    lanGui: int = 1
+    email: str = ""
+    nghiPhep: str = ""
+    phan1: str = ""
+    phan3: str = ""
+    phan4: str = ""
+    soLieu: list[list[str]] = []
+    fileDinhKem: str = ""
+    diemRobot: float | None = None
+    xepLoaiRobot: str = ""
+    canhBao: list[str] = []
+    nguonDiem: str = ""
+
+
+class GoogleBatchIn(BaseModel):
+    nguon: str = ""
+    phienBan: int = 1
+    loai: str = "baocao"
+    guiLuc: str = ""
+    baoCao: list[GoogleItemIn] = []
+
+
+@router.post("/bao-cao-ngay/nhan-tu-google", dependencies=[Depends(robot_auth)])
+def nhan_bao_cao_ngay_tu_google(data: GoogleBatchIn, db: Session = Depends(get_db)):
+    """Nhận báo cáo ngày hệ Google đẩy sang. Khoá (mã nhân viên, ngày) – gửi lại là ĐÈ.
+
+    `loai`: `baocao` nội dung năm phần · `diem` điểm robot của hệ Google · `thu` gọi thử, không ghi gì.
+    """
+    if data.loai == "thu":
+        return {"ok": True, "nhan": 0, "loi": [], "ghi_chu": "gọi thử – không ghi gì"}
+    if data.loai not in ("baocao", "diem"):
+        raise HTTPException(422, "loai phải là baocao, diem hoặc thu")
+    if len(data.baoCao) > 100:
+        raise HTTPException(413, "Mỗi lần gửi tối đa 100 bản ghi")
+    return BG.nhan(db, [x.model_dump() for x in data.baoCao], data.loai)
