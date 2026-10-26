@@ -134,6 +134,8 @@ CUA_TAY = (
     # CG-1 (26/10/2026): tài khoản bên ngoài — người ngoài tự tạo ở cổng kết nối (/login, bước xác thực
     # mã) và tự khai hồ sơ; VTOS duyệt ở màn /tai-khoan-ngoai.
     "tai_khoan_ngoai",
+    # DH-1 (26/10/2026): hình thức hưởng hoa hồng của đối tác — GĐ KD / Kế toán chọn ở màn /hoa-hong-d06.
+    "hinh_thuc_hoa_hong",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
@@ -328,6 +330,9 @@ MAY_SINH = {
     # BC-1 26/10/2026. Bản chụp mỗi lần nộp báo cáo ngày — hệ thống tự ghi đúng lúc người nộp bấm
     # «Nộp». Không có cửa sửa là TÍNH CHẤT AN TOÀN: sửa được bản lần đầu thì đổi được câu trả lời cho
     # «lần đầu nộp đã ghi gì, lúc nào».
+    "ky_hoa_hong": "Kỳ hoa hồng D06 (DH-1) – máy dựng khi Kế toán bấm Tính lại, từ booking đủ điều kiện; số trên kỳ là bản đọc nhanh của sổ, không có cửa gõ số.",
+    "so_hoa_hong": "Sổ hoa hồng D06 (DH-1) – chỉ ghi thêm phần chênh mỗi lần tính lại; không có cửa sửa hay xoá để quyền hưởng đã ghi không bị viết lại.",
+    "chi_hoa_hong": "Liên kết kỳ hoa hồng với đề nghị chi (DH-1) – hệ thống ghi khi Kế toán bấm Lập đề nghị chi; số tiền do máy tính từ sổ.",
     "ma_xac_thuc_ngoai": "Mã một lần của cổng kết nối (CG-1) – hệ thống sinh khi người dùng bấm Nhận mã; lưu dạng băm, không ai nhập tay.",
     "daily_report_reviews": "Sổ xem xét báo cáo ngày (BC-2) – hệ thống ghi một dòng mỗi lần người xem bấm «Đã xem» hoặc «Yêu cầu bổ sung»; không có cửa sửa để dấu trả bổ sung không bị xoá.",
     "daily_report_versions": "Bản chụp mỗi lần nộp báo cáo ngày (BC-1) – hệ thống ghi lúc người nộp bấm Nộp; không có cửa sửa để lần nộp đầu không bị viết lại.",

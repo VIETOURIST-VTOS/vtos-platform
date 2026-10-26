@@ -164,3 +164,6 @@ from app.models.so_du_dau_ky import *  # noqa
 # CG-1 26/10/2026 — cong ket noi VTD: tai khoan ben ngoai + ma xac thuc. Thieu dong nay thi hai bang
 # khong vao Base.metadata: create_all khong tao va alembic autogenerate doi XOA chung.
 from app.models.cong_ngoai import *  # noqa
+# DH-1 26/10/2026 — hoa hong D06: hinh thuc, ky, so chi ghi them, chi. Thieu dong nay thi bon bang
+# khong vao Base.metadata: create_all khong tao va alembic autogenerate doi XOA chung.
+from app.models.hoa_hong_d06 import *  # noqa
