@@ -141,6 +141,9 @@ CUA_TAY = (
     # KH-2 (26/10/2026): danh mục nhà hàng + thực đơn cho cổng khách — Điều hành nhập ở màn /nha-hang.
     "nha_hang",
     "thuc_don_nha_hang",
+    # KH-3 (26/10/2026): khách tự đổi điểm lấy voucher và tự lưu tour yêu thích ở cổng khách.
+    "voucher_rewards",
+    "yeu_thich_khach",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
@@ -335,6 +338,7 @@ MAY_SINH = {
     # BC-1 26/10/2026. Bản chụp mỗi lần nộp báo cáo ngày — hệ thống tự ghi đúng lúc người nộp bấm
     # «Nộp». Không có cửa sửa là TÍNH CHẤT AN TOÀN: sửa được bản lần đầu thì đổi được câu trả lời cho
     # «lần đầu nộp đã ghi gì, lúc nào».
+    "so_diem_rewards": "Sổ điểm VTD Rewards (KH-3) – chỉ ghi thêm; máy đối chiếu booking đủ điều kiện và ghi phần chênh, voucher giữ / trả điểm; không có cửa sửa số dư.",
     "ky_hoa_hong": "Kỳ hoa hồng D06 (DH-1) – máy dựng khi Kế toán bấm Tính lại, từ booking đủ điều kiện; số trên kỳ là bản đọc nhanh của sổ, không có cửa gõ số.",
     "so_hoa_hong": "Sổ hoa hồng D06 (DH-1) – chỉ ghi thêm phần chênh mỗi lần tính lại; không có cửa sửa hay xoá để quyền hưởng đã ghi không bị viết lại.",
     "chi_hoa_hong": "Liên kết kỳ hoa hồng với đề nghị chi (DH-1) – hệ thống ghi khi Kế toán bấm Lập đề nghị chi; số tiền do máy tính từ sổ.",

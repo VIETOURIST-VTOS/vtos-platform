@@ -404,6 +404,8 @@ export const GROUPS: Group[] = [
     ["Đánh giá sau tour", "/danh-gia"],
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
+    // KH-3 · 26/10/2026: VTD Rewards — tra điểm khách, áp voucher khách đổi ở cổng vào booking.
+    ["VTD Rewards", "/vtd-rewards"],
     // TC-73 · 19/9/2026. Sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
     //
     // ĐỨNG NGOÀI hai khối "Lẻ" và "MICE", vì nó là của CẢ HAI phòng: một người có thể ở cây Lẻ,

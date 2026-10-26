@@ -297,6 +297,9 @@ DEFAULT_PARAMS = [
     # (Kế toán trình, Chủ tịch ký). Ghi bằng SỐ để đi qua cửa trình tham số hiện có (cửa ấy chỉ nhận số và
     # ngày). Rỗng / không khớp một TK đang dùng = chưa mở QR — cổng khách chỉ hiện «liên hệ Sales».
     ("cong_qr_tai_khoan", "", "Số tài khoản ngân hàng nhận tiền QR trên cổng khách hàng (phải có trong danh mục ngân hàng). Rỗng = chưa mở QR", "số tài khoản", "KH-2, Chủ tịch duyệt 26/10/2026"),
+    # KH-3 (26/10/2026): VTD Rewards — Chủ tịch chốt số; CHƯA bật cho tới khi ký ngày. Rỗng = cổng khách chỉ hiện hạng
+    # và chi tiêu, chưa cộng và chưa đổi điểm. Không hồi tố: chỉ chuyến đủ điều kiện từ ngày này mới được cộng.
+    ("rewards_hieu_luc_tu", "", "VTD Rewards: cộng / đổi điểm từ ngày này (chuyến đủ điều kiện từ ngày này). Rỗng = chưa bật", "ngày DD-MM-YYYY", "KH-3, Chủ tịch chốt 26/10/2026"),
     ("d06_hieu_luc_tu", "", "Hoa hồng D06 đại lý / CTV: có hiệu lực từ ngày này (đầu tháng). Rỗng = chưa bật, chỉ tính thử", "ngày DD-MM-YYYY", "DH-1, Chủ tịch chốt D06 26/10/2026"),
     ("bao_cao_ngay_han_0h_tu", "26-10-2026", "Báo cáo ngày: từ ngày này hạn nộp là trước 0 giờ ngày kế tiếp (trước đó 20 giờ, không tính lại)", "ngày DD-MM-YYYY", "BC-1, Chủ tịch chốt 26/10/2026"),
     ("xe_sheet_csv_url", "", "Link CSV «Công bố lên web» của sheet Quyết Toán dữ liệu xe – robot đọc để đếm xe đang đi khi chưa có lệnh điều xe (trống = chưa nối)", "link", "XS-1, Chủ tịch chốt 25/10/2026"),
@@ -551,7 +554,7 @@ DEFAULT_PARAMS = [
 # GHÉP LẠI 11/9/2026: khối này từng được commit rồi BIẾN MẤT – một phiên khác lưu đè tệp này bằng
 # bản mở từ trước. Thiếu nó thì routes.py vẫn gọi getattr(R, "THAM_SO_NGAY", ()) và nhận về rỗng,
 # nên cửa nhập ngày im lặng không bao giờ chạy: mã trông đủ, hàng rào thì không có.
-THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip", "bao_cao_ngay_han_0h_tu", "d06_hieu_luc_tu")
+THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip", "bao_cao_ngay_han_0h_tu", "d06_hieu_luc_tu", "rewards_hieu_luc_tu")
 
 
 

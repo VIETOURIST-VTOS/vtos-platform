@@ -670,14 +670,14 @@ PHAM_VI_DA_CHOT = {
     #
     # Vòng HD-DG3 đầu (PR #378) KHÔNG cập nhật bảng này. Không ai thấy, vì PR ấy chết ở bước
     # ruff chạy TRƯỚC mọi phép thử — bảng chốt chưa từng được hỏi. Ghép lại 17/10 mới lộ ra.
-    "chutich": 139, "tgd": 139, "bks": 139, "cntt": 133, "ir_phapche": 21,   # +1 CG-1 26/10/2026: /api/v1/tai-khoan-ngoai; +1 DH-1 26/10/2026: /api/v1/hoa-hong-d06; +1 KH-2 26/10/2026: /api/v1/nha-hang
+    "chutich": 140, "tgd": 140, "bks": 140, "cntt": 133, "ir_phapche": 21,   # +1 CG-1 26/10/2026: /api/v1/tai-khoan-ngoai; +1 DH-1 26/10/2026: /api/v1/hoa-hong-d06; +1 KH-2 26/10/2026: /api/v1/nha-hang; +1 KH-3 26/10/2026: /api/v1/rewards (Kinh doanh, Sale Admin, Kế toán, Marketing)
     # ── 17/10/2026 · hcns 71 → 72, ĐỢT R3b ───────────────────────────────────────────
     # Nhóm duy nhất thêm là "/api/v1/hach-toan", và chỉ vì một lẽ: danh mục BỘ PHẬN nằm ở
     # màn ấy. Cơ cấu phòng ban là việc của Hành chính – Nhân sự, không phải Kế toán; cho
     # họ quyền ghi (`GHI_BO_PHAN`) mà không cho vào màn là dựng một cửa không ai với tới.
     # Anh Tuấn quyết 17/10/2026.
     # KH-2 26/10/2026: +1 /api/v1/nha-hang cho tp_dh, nv_dh (nhập nhà hàng), tp_kd, gd_kd (bật hiện cổng khách).
-    "ketoan": 110, "tp_dh": 103, "ptgd_doan": 81, "nv_dh": 72, "hcns": 73, "gd_kd": 77,
+    "ketoan": 111, "tp_dh": 103, "ptgd_doan": 81, "nv_dh": 72, "hcns": 73, "gd_kd": 78,
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -692,13 +692,13 @@ PHAM_VI_DA_CHOT = {
     # không mở màn hình nhà cung cấp. Hàng rào canh ba điều ấy là test_sa2, test_sa3, test_sa5.
     #
     # 34 → 35 ngày 24/9/2026: +1 cho chính bàn làm việc của mình ("/api/v1/sales-admin").
-    "sales_admin": 41,
+    "sales_admin": 42,
     # ptgd_mkt 38 → 39 ngày 09/9/2026: Chủ tịch chốt hai Phó TGĐ quản lý phòng của mình, nên màn hình
     # Nạp dữ liệu mở cho cả hai. Đúng MỘT tiền tố dôi ra – "/api/v1/nap-du-lieu"; tiền tố thứ hai của
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 56, "nv_kd": 54, "tn_kd": 54, "tp_kd": 58, "nv_mkt": 41,
+    "ptgd_mkt": 57, "nv_kd": 55, "tn_kd": 55, "tp_kd": 59, "nv_mkt": 42,
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -767,8 +767,8 @@ PHAM_VI_DA_CHOT = {
     #
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
-    "ketoan_truong": 111, "ketoan_tt": 31, "thu_quy": 27,
-    "robot_pq": 18, "robot_ks": 139, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "ketoan_truong": 112, "ketoan_tt": 31, "thu_quy": 27,
+    "robot_pq": 18, "robot_ks": 140, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 
