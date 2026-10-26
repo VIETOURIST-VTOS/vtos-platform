@@ -9,7 +9,7 @@ from sqlalchemy import String, Integer, Date, DateTime, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 
-LOAI_YEU_CAU = {"tour": "Tour có lịch", "tour_doan": "Tour đoàn theo yêu cầu"}
+LOAI_YEU_CAU = {"tour": "Tour có lịch", "tour_doan": "Tour đoàn theo yêu cầu", "nha_hang": "Đặt bàn nhà hàng"}
 
 
 class YeuCauKhach(Base):
@@ -24,4 +24,10 @@ class YeuCauKhach(Base):
     dien_thoai: Mapped[str] = mapped_column(String(20), default="")     # số Sales gọi lại
     ghi_chu: Mapped[str] = mapped_column(Text, default="")
     lead_id: Mapped[int | None] = mapped_column(ForeignKey("leads.id"), nullable=True)
+    # KH-2 · đặt bàn nhà hàng (ngày đến = ngay_mong_muon)
+    nha_hang_id: Mapped[int | None] = mapped_column(ForeignKey("nha_hang.id"), nullable=True)
+    thuc_don_id: Mapped[int | None] = mapped_column(ForeignKey("thuc_don_nha_hang.id"), nullable=True)
+    gio_den: Mapped[str] = mapped_column(String(5), default="")
+    tre_em: Mapped[int] = mapped_column(Integer, default=0)
+    tam_tinh: Mapped[int | None] = mapped_column(Integer, nullable=True)   # máy tính từ giá đã lưu, KHÔNG phải báo giá
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

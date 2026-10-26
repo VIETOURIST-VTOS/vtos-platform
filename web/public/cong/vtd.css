@@ -541,3 +541,9 @@ CG-1 — phần thêm vào bản v3.2: chọn kênh nhận mã, đồng ý đi�
 #vtd-access .v3-app th{text-transform:none;letter-spacing:normal;border-bottom:1px solid var(--v3-line)}
 #vtd-access .v3-app tbody th{color:#264058}
 #vtd-access .v3-app thead th{letter-spacing:.25px}
+/* KH-2: khung QR thanh toán trong chi tiết đơn */
+#vtd-access .kh-qr{display:grid;gap:12px}
+#vtd-access .kh-qr-than{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+#vtd-access .kh-qr-than img{border:1px solid var(--v3-line);border-radius:10px;background:#fff;padding:6px;max-width:100%}
+#vtd-access .kh-qr-than dl{flex:1;min-width:220px}
+#vtd-access .kh-qr-muc{margin:0}

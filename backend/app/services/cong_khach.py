@@ -135,15 +135,19 @@ def tour(db: Session, tour_id: int) -> dict:
 # ── yêu cầu ─────────────────────────────────────────────────────────────────────────────────────
 
 def gui_yeu_cau(db: Session, tk: TaiKhoanNgoai, loai: str, tour_id: int | None, so_khach: int, dien_thoai: str,
-                ngay_mong_muon: date | None, ghi_chu: str, dong_y: bool, now: datetime | None = None) -> YeuCauKhach:
+                ngay_mong_muon: date | None, ghi_chu: str, dong_y: bool, now: datetime | None = None,
+                nha_hang: dict | None = None) -> YeuCauKhach:
     la_khach(tk)
     now = now or datetime.now()
     if loai not in LOAI_YEU_CAU:
         raise LoiKhach("Loại yêu cầu không hợp lệ")
     if not dong_y:
         raise LoiKhach("Đánh dấu ô xác nhận: gửi yêu cầu chưa giữ chỗ và chưa thu tiền")
-    if not 1 <= int(so_khach or 0) <= 200:
-        raise LoiKhach("Số khách từ 1 đến 200")
+    nh = nha_hang or {}
+    if loai == "nha_hang":   # KH-2: số khách = người lớn + trẻ em, máy tự cộng
+        so_khach = int(nh.get("nguoi_lon") or 0) + int(nh.get("tre_em") or 0)
+    if not 1 <= int(so_khach or 0) <= 500:
+        raise LoiKhach("Số khách từ 1 đến 500")
     sdt = norm_phone(dien_thoai or tk.dien_thoai)
     if len(sdt) != 10 or not sdt.startswith("0"):
         raise LoiKhach("Ghi số điện thoại để Sales gọi lại (10 số)")
@@ -152,7 +156,17 @@ def gui_yeu_cau(db: Session, tk: TaiKhoanNgoai, loai: str, tour_id: int | None, 
     if trong_ngay >= YEU_CAU_TOI_DA_NGAY:
         raise LoiKhach("Bạn đã gửi nhiều yêu cầu trong 24 giờ — Sales sẽ liên hệ, vui lòng chờ")
     ten_tour = ""
-    if loai == "tour":
+    them = {}
+    if loai == "nha_hang":
+        from app.services import nha_hang as NH
+        try:
+            o, td, tam = NH.kiem_dat_ban(db, int(nh.get("nha_hang_id") or 0), int(nh.get("thuc_don_id") or 0), ngay_mong_muon,
+                                         str(nh.get("gio") or ""), int(nh.get("nguoi_lon") or 0), int(nh.get("tre_em") or 0), now.date())
+        except NH.LoiNhaHang as ex:
+            raise LoiKhach(str(ex))
+        ten_tour = f"{o['ten']} · {td['ten']} · {ngay_mong_muon:%d/%m/%Y} {nh['gio']} · {nh.get('nguoi_lon')} NL + {nh.get('tre_em') or 0} TE"
+        them = {"nha_hang_id": o["id"], "thuc_don_id": td["id"], "gio_den": nh["gio"], "tre_em": int(nh.get("tre_em") or 0), "tam_tinh": tam}
+    elif loai == "tour":
         o = tour(db, int(tour_id or 0))
         ten_tour = f"{o['ma']} · {o['ten']} · {date.fromisoformat(o['khoi_hanh']):%d/%m/%Y}"
     else:
@@ -166,13 +180,15 @@ def gui_yeu_cau(db: Session, tk: TaiKhoanNgoai, loai: str, tour_id: int | None, 
     lead, _moi = upsert_lead(db, "cong_khach", {"phone": sdt, "name": tk.ho_ten or "", "channel": KENH_LEAD,
                                                 "received_at": now.isoformat(), "interest": ten_tour[:200]})
     dong = (f"[Cổng khách hàng {now:%d/%m %H:%M}] {LOAI_YEU_CAU[loai]}: {ten_tour} · {so_khach} khách"
-            + (f" · ngày mong muốn {ngay_mong_muon:%d/%m/%Y}" if ngay_mong_muon else "") + (f" · {ghi}" if ghi else ""))
+            + (f" · ngày mong muốn {ngay_mong_muon:%d/%m/%Y}" if ngay_mong_muon and loai != "nha_hang" else "")
+            + (f" · tạm tính {them['tam_tinh']:,} đ".replace(",", ".") if them else "") + (f" · {ghi}" if ghi else ""))
     cu = (lead.note or "").strip()
     lead.note = ((cu + "\n") if cu else "") + dong
     lead.note = lead.note[-2000:]
+    ten_tour = ten_tour[:200]
     yc = YeuCauKhach(tai_khoan_id=tk.id, loai=loai, tour_id=tour_id if loai == "tour" else None, ten_tour=ten_tour,
                      so_khach=int(so_khach), ngay_mong_muon=ngay_mong_muon, dien_thoai=sdt, ghi_chu=ghi,
-                     lead_id=lead.id, tao_luc=now)
+                     lead_id=lead.id, tao_luc=now, **them)
     db.add(yc)
     db.commit(); db.refresh(yc)
     return yc
@@ -284,3 +300,61 @@ def cap_nhat_ho_so(db: Session, tk: TaiKhoanNgoai, ho_ten: str | None, so_thich:
         tk.nhan_tin_quang_cao = bool(nhan_tin)
     db.commit(); db.refresh(tk)
     return tk
+
+
+# ── KH-2 · thanh toán QR ────────────────────────────────────────────────────────────────────────
+
+def _so(s: str) -> str:
+    return "".join(ch for ch in str(s or "") if ch.isdigit())
+
+
+def tai_khoan_qr(db: Session):
+    """TK nhận tiền QR: tham số `cong_qr_tai_khoan` (số TK) khớp một TK ĐANG DÙNG trong danh mục ngân hàng.
+    Không khớp thì trả None — đóng QR, không đoán tài khoản."""
+    from app.models.banks import BankAccount
+    from app.services import rules as R
+    so = _so(R.get_param_text(db, "cong_qr_tai_khoan"))
+    if not so:
+        return None
+    for ba in db.execute(select(BankAccount).where(BankAccount.active.is_(True))).scalars():
+        if _so(ba.account_number) == so:
+            return ba
+    return None
+
+
+def qr_don(db: Session, tk: TaiKhoanNgoai, ma: str, muc: str = "") -> dict:
+    """Mã QR chuyển khoản cho một đơn CỦA KHÁCH. `muc`: «coc» (đủ % cọc) hoặc «du» (toàn bộ còn lại).
+
+    Số tiền do MÁY tính từ booking và phiếu thu (cùng phép cộng robot dùng để khớp) — không nhận số
+    tiền từ trình duyệt. Tài khoản nhận là tham số `cong_qr_tai_khoan` Chủ tịch đã ký; chưa ký thì đóng.
+    """
+    import math
+    from app.services.payments import paid_amount
+    from app.services import vietqr as Q
+    la_khach(tk)
+    b = next((x for x in _booking_cua(db, tk) if x.code == ma), None)
+    if b is None:
+        raise LoiKhach("Không tìm thấy đơn này trong tài khoản của bạn")
+    if b.cancelled:
+        raise LoiKhach("Đơn đã hủy — không thanh toán")
+    gia_tri = int(round(float(b.amount or 0) - float(b.discount or 0)))
+    da_nop = int(round(float(paid_amount(db, b.id))))
+    con = gia_tri - da_nop
+    if gia_tri <= 0 or con <= 0:
+        raise LoiKhach("Đơn đã thanh toán đủ hoặc chưa có giá trị — không cần chuyển thêm")
+    coc = int(math.ceil(gia_tri * float(b.deposit_pct or 0) / 100)) - da_nop
+    coc = coc if 0 < coc < con else 0
+    muc = muc if muc in ("coc", "du") else ("coc" if coc else "du")
+    if muc == "coc" and not coc:
+        raise LoiKhach("Đơn đã đủ tiền cọc — chọn thanh toán toàn bộ phần còn lại")
+    so_tien = coc if muc == "coc" else con
+    ba = tai_khoan_qr(db)
+    if ba is None or not ba.account_number:
+        raise LoiKhach("Thanh toán QR chưa mở — vui lòng liên hệ Sales phụ trách để nhận thông tin chuyển khoản")
+    bin_ = Q.bin_cua(ba.bank_name)
+    if bin_ is None:
+        raise LoiKhach("Thanh toán QR chưa mở cho ngân hàng này — vui lòng liên hệ Sales phụ trách")
+    return {"ma": b.code, "muc": muc, "so_tien": so_tien, "coc": coc, "con_lai": con, "da_nop": da_nop,
+            "payload": Q.payload(bin_, ba.account_number, so_tien, b.code), "noi_dung": Q.noi_dung_sach(b.code),
+            "ngan_hang": ba.bank_name, "so_tk": ba.account_number, "chu_tk": ba.account_name,
+            "tu_khop": muc == "du"}

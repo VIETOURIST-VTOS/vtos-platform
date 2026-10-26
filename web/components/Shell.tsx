@@ -464,7 +464,9 @@ export const GROUPS: Group[] = [
     // rỗng trước khi gặp việc phải làm để nó có số.
     ["Lãi lỗ theo tour", "/lai-lo-tour"],
     { label: "Dịch vụ & NCC", items: [
-      ["Nhà cung cấp & đặt dịch vụ", "/nha-cung-cap"], ["Hồ sơ visa", "/visa"]] },
+      ["Nhà cung cấp & đặt dịch vụ", "/nha-cung-cap"], ["Hồ sơ visa", "/visa"],
+      // KH-2 · 26/10/2026: Điều hành nhập nhà hàng cho cổng khách; Kinh doanh bật hiện cổng.
+      ["Nhà hàng (cổng khách)", "/nha-hang"]] },
     // Xe và hướng dẫn viên tách khỏi Điều hành thành đơn vị riêng (chỉ đạo 07/9/2026). Xe nội bộ
     // thuộc pháp nhân Công ty TNHH Vận tải Vietrip, còn hướng dẫn viên hưởng lương ở công ty mẹ.
     { label: "Xe & tài xế", items: [
