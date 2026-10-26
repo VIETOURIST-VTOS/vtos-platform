@@ -239,8 +239,8 @@ def test_vai_xem_khop_bang_man_hinh():
 
 def test_giao_dien_dung_ban_v32_da_sua():
     manh = (GOC / "web/components/cong/manh.ts").read_text(encoding="utf-8").replace('\\"', '"')
-    assert "CÔNG TY CỔ PHẦN<br>VIETOURIST HOLDINGS" in manh
-    assert "Kết nối cùng<br><span>Vietourist Holdings.</span>" in manh
+    assert "CÔNG TY CỔ PHẦN VIETOURIST HOLDINGS" in manh          # v3.3: một hàng (Chủ tịch duyệt 26/10/2026)
+    assert "Kết nối cùng <span>Vietourist Holdings.</span>" in manh
     for bo in ("HỆ SINH THÁI VIETOURIST HOLDINGS", "Không gian dành cho đội ngũ", "Truy cập theo tài khoản và quyền của bạn",
                "Bản thiết kế v3.2", "VTD / CỔNG KẾT NỐI"):
         assert bo not in manh, bo

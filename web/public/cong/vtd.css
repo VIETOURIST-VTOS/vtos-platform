@@ -478,3 +478,27 @@ html,body{margin:0;padding:0}body{font-family:Arial,sans-serif}
 #vtd-access .vtd-form h2{margin-bottom:6px}
 #vtd-access .vtd-form h3{font-size:16px;font-weight:600}
 #vtd-access .kenh-otp label{color:#142a43}
+
+/* v3.3 — gọn khoảng trống, chữ lớn, một hàng */
+#vtd-access .vtd-top{min-height:104px!important;padding-top:14px!important;padding-bottom:14px!important}
+#vtd-access .vh-header-label{display:block!important;flex:1;white-space:nowrap;font-size:29px!important;line-height:1.2!important;letter-spacing:2px!important;font-weight:700!important;color:#eef8fd!important;padding-left:28px!important;text-shadow:0 2px 12px #03162455}
+#vtd-access .vh-hero{min-height:0!important;padding:30px 40px!important;align-items:center}
+#vtd-access .vh-hero-copy{max-width:none!important;flex:1}
+#vtd-access .vh-hero h1{font-size:46px!important;line-height:1.15!important;white-space:nowrap;letter-spacing:-1px!important;font-weight:700!important}
+#vtd-access .vh-art{height:150px!important;width:220px!important;transform:scale(.86);transform-origin:right center}
+#vtd-access .vh-section-heading{margin:24px 2px 14px!important}
+#vtd-access .vh-section-heading h2{font-size:19px!important}
+#vtd-access .vtd-roles{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:18px!important}
+#vtd-access .vtd-role{min-height:0!important;padding:22px 22px 18px!important}
+#vtd-access .vh-role-top{margin-bottom:16px!important}
+#vtd-access .vtd-role-name{font-size:24px!important;line-height:1.25!important}
+#vtd-access .vtd-role-desc{font-size:15px!important;line-height:1.55!important;margin:8px 0 18px!important;flex:1}
+#vtd-access .vtd-role-link{font-size:14px!important}
+@media(max-width:1180px){#vtd-access .vtd-roles{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ #vtd-access .vh-header-label{font-size:21px!important;letter-spacing:1.4px!important}
+ #vtd-access .vh-hero h1{font-size:36px!important}}
+@media(max-width:760px){#vtd-access .vh-header-label{white-space:normal;font-size:16px!important;letter-spacing:1px!important;padding-left:14px!important}
+ #vtd-access .vh-hero{padding:24px 22px!important}
+ #vtd-access .vh-hero h1{white-space:normal;font-size:30px!important}
+ #vtd-access .vtd-roles{grid-template-columns:1fr!important}
+ #vtd-access .vtd-role-name{font-size:21px!important}}
