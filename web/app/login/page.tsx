@@ -121,7 +121,7 @@ export default function Login() {
   const vai = man === "cong" ? null : VAI[man];
   const thanh = hoTro ? THANH_TREN.replace(' hidden=""', "") : THANH_TREN;
   return (<>
-    <link rel="stylesheet" href="/cong/vtd.css" />
+    <link rel="stylesheet" href="/cong/vtd.css?v=33" />
     <div style={{ background: "#081826", minHeight: "100vh" }}>
       <div id="vtd-access" data-mode="inline" data-page={man === "cong" ? "home" : "login"} data-role={vai?.role || "khach-hang"} data-preview="off" data-vtos-screen="off" data-vtos-menu="closed">
         <div id="vtd-screen" onClick={bam}>
