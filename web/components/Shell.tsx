@@ -563,7 +563,9 @@ export const GROUPS: Group[] = [
     ["Tài khoản trùng", "/gop-tai-khoan"],
     ["Tổ chức & đơn vị", "/companies"],
     { label: "Quyền", items: [
-      ["Tài khoản & phân quyền", "/access"], ["Vị trí AI & quyền hạn", "/ai-roles"]] },
+      ["Tài khoản & phân quyền", "/access"], ["Vị trí AI & quyền hạn", "/ai-roles"],
+      // CG-1 26/10/2026 — hàng chờ duyệt đối tác / cổ đông đăng ký từ cổng kết nối VTD.
+      ["Tài khoản bên ngoài", "/tai-khoan-ngoai"]] },
     { label: "Tích hợp", items: [
       ["Đồng bộ Vietrip", "/vietrip"], ["Kết nối MISA và các kênh", "/accounting?tab=misa"],
       ["Đọc chứng từ ảnh", "/doc-chung-tu"], ["Tệp & hình ảnh", "/tep"]] },

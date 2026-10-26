@@ -23,6 +23,8 @@ from app.services import access as AC
 # Màn hình KHÔNG cần khai quyền, kèm lý do. Danh sách này phải ngắn và mỗi dòng phải tự bảo vệ được.
 NGOAI_LE = {
     "login": "Trang đăng nhập – bắt buộc mở cho người chưa có phiên.",
+    # CG-1 26/10/2026 — không gian của khách hàng / đối tác / cổ đông sau khi đăng nhập ở cổng kết nối.
+    "cong": "Trang của người ở cổng NGOÀI – không có tài khoản VTOS nên không có vai trò; dữ liệu đi qua phiên cổng ngoài (khoá ký riêng), không qua MENU_ROLES.",
     "doi-mat-khau": "Tự đổi mật khẩu của chính mình – mọi tài khoản đều phải vào được.",
     "payroll": "Chỉ chuyển hướng sang /hr, không hiển thị dữ liệu; quyền nằm ở /hr.",
 }

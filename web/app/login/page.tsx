@@ -1,38 +1,140 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import { login, getUser } from "@/lib/api";
+import { THANH_TREN, TRANG_MO_DAU, CAU_CHUYEN } from "@/components/cong/manh";
+import { goiCong as goi, luuPhienCong } from "@/lib/cong";
 
-export default function Login() {
-  const [u, setU] = useState("dh.lan"); const [p, setP] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
-  const router = useRouter();
-  useEffect(() => { if (getUser()) router.replace("/"); }, [router]);
+/* CG-1 · CỔNG KẾT NỐI VTD thay màn đăng nhập VTOS — Chủ tịch duyệt bản xem thử 26/10/2026, dựng từ đúng
+   bộ giao diện v3.2 (logo, biểu tượng, địa cầu có máy bay bay quanh). Bốn ô:
+     · Nội bộ Vietourist → tài khoản + mật khẩu VTOS như cũ, vào thẳng VTOS cùng tab.
+     · Khách hàng / Đối tác / Cổ đông → mã một lần qua Zalo hoặc Email (người dùng chọn kênh).
+   Phiên cổng ngoài cất ở khoá RIÊNG `vtd_cong_phien`, không bao giờ ở `vtos_token`: lib/api.ts không gửi
+   nó lên cửa nội bộ nào, và máy chủ cũng không nhận nó ở cửa nội bộ (ký bằng khoá khác).
+
+   KHÔNG in tên tài khoản và mật khẩu lên trang này — `tests/test_mat_khau_cong_khai.py` đọc thẳng tệp
+   này để canh. Quên mật khẩu nội bộ thì liên hệ HCNS hoặc CNTT để đặt lại; mật khẩu đặt lại là mật
+   khẩu tạm, lần đăng nhập kế tiếp buộc đổi. */
+
+type Man = "cong" | "noi" | "kh" | "dt" | "cd";
+const VAI: Record<Exclude<Man, "cong">, { role: string; loai: string; ten: string; h2: string; p: string }> = {
+  noi: { role: "nhan-vien", loai: "", ten: "Nội bộ Vietourist", h2: "Đăng nhập VTOS", p: "Dành cho Ban lãnh đạo, quản lý và nhân viên." },
+  kh: { role: "khach-hang", loai: "khach_hang", ten: "Khách hàng", h2: "Đăng nhập khách hàng", p: "Sử dụng liên hệ đã xác minh để vào không gian của bạn." },
+  dt: { role: "doi-tac", loai: "doi_tac", ten: "Đối tác", h2: "Đăng nhập đối tác", p: "Liên hệ của người đại diện. Lần đầu: xác thực liên hệ rồi gửi hồ sơ để Vietourist duyệt." },
+  cd: { role: "co-dong", loai: "co_dong", ten: "Cổ đông", h2: "Đăng nhập cổ đông", p: "Sử dụng liên hệ đã đăng ký trong hồ sơ cổ đông. Lần đầu: xác thực rồi gửi hồ sơ xác minh." },
+};
+const TU_VAI: Record<string, Man> = { "nhan-vien": "noi", "khach-hang": "kh", "doi-tac": "dt", "co-dong": "cd" };
+function NoiBo() {
+  const [u, setU] = useState(""); const [p, setP] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setErr("");
-    try { await login(u.trim(), p); router.replace("/"); } catch (x: any) { setErr(x.message); } finally { setBusy(false); }
+    // Vào VTOS bằng nạp lại trang, không đi bằng router: trang cổng nạp bảng kiểu riêng của v3.2,
+    // nạp lại thì VTOS mở ra sạch, đúng giao diện của nó.
+    try { await login(u.trim(), p); location.replace("/"); } catch (x: any) { setErr(x.message); setBusy(false); }
   }
-  return (
-    <main style={{ maxWidth: 420, margin: "40px auto" }}>
-      <div className="panel">
-        <h1>Đăng nhập VTOS</h1>
-        <form onSubmit={submit}>
-          <label>Tài khoản</label><input value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" />
-          <label>Mật khẩu</label><input type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" />
-          {err && <div className="gate fail">{err}</div>}
-          <button className="act teal" disabled={busy} style={{ marginTop: 12 }}>{busy ? "Đang vào…" : "Vào hệ thống"}</button>
-        </form>
-{/* KHÔNG in tên tài khoản và mật khẩu lên trang này.
-            Đến 14/9/2026 chỗ này còn liệt kê mười hai tài khoản mẫu — trong đó có cả tài khoản
-            quản trị cao nhất — dùng chung MỘT mật khẩu, và in luôn mật khẩu ấy ra, trên một trang
-            ai trên internet cũng mở được. Khi hệ chỉ có dữ liệu chạy thử thì chưa mất gì; từ lúc
-            nhận số thật (doanh thu, giá vốn, danh sách khách, doanh số từng người) thì một dòng chữ
-            ở đây là một cánh cửa mở. Mật khẩu tạm đưa cho người dùng bằng đường riêng, không dán
-            lên cửa — và `tests/test_mat_khau_cong_khai.py` đọc thẳng tệp này để canh. */}
-        <p className="muted">
-          Quên mật khẩu thì liên hệ HCNS hoặc phòng CNTT để được đặt lại. Mật khẩu đặt lại là mật
-          khẩu <b>tạm</b> – lần đăng nhập kế tiếp hệ thống buộc đổi trước khi vào được màn hình nào.
-        </p>
+  return (<form className="vtd-form" onSubmit={submit}>
+    <h2>{VAI.noi.h2}</h2><p>{VAI.noi.p}</p>
+    <label className="v3-field">Tài khoản<input value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" required /></label>
+    <label className="v3-field">Mật khẩu<input type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" required /></label>
+    {err && <div className="cong-loi">{err}</div>}
+    <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy}>{busy ? "Đang vào…" : "Đăng nhập VTOS"}</button></div>
+    <p className="vtd-form-notice">Quên mật khẩu thì liên hệ HCNS hoặc phòng CNTT để được đặt lại. Đăng nhập xong vào thẳng VTOS trong cùng tab.</p>
+  </form>);
+}
+
+function Ngoai({ man }: { man: Exclude<Man, "cong" | "noi"> }) {
+  const v = VAI[man];
+  const [kenh, setKenh] = useState<any>(null);
+  const [chon, setChon] = useState<"zalo" | "email">("zalo");
+  const [lh, setLh] = useState(""); const [ma, setMa] = useState("");
+  const [gui, setGui] = useState<any>(null);
+  const [dongY, setDongY] = useState(false); const [canDongY, setCanDongY] = useState(false);
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const [con, setCon] = useState(0);
+  useEffect(() => { goi("/kenh").then((k) => { setKenh(k); if (!k.zalo.ok && k.email.ok) setChon("email"); }).catch(() => setKenh({})); }, []);
+  useEffect(() => { if (!gui) return; const t = setInterval(() => setCon((c) => Math.max(0, c - 1)), 1000); return () => clearInterval(t); }, [gui]);
+  const guiMa = async () => {
+    setBusy(true); setErr("");
+    try { const r = await goi("/ma", { loai: v.loai, lien_he: lh, kenh: chon }); setGui(r); setCon(r.het_han_giay); setMa(""); setCanDongY(false); }
+    catch (x: any) { setErr(x.message); } finally { setBusy(false); }
+  };
+  const xacThuc = async () => {
+    setBusy(true); setErr("");
+    try {
+      const r = await goi("/xac-thuc", { khoa: gui.khoa, ma, dong_y_dieu_khoan: dongY });
+      luuPhienCong(r.phien);
+      location.replace("/cong");
+    } catch (x: any) {
+      if (x.ma === "can_dong_y") setCanDongY(true);
+      if (x.ma === "ma_het") setGui(null);
+      setErr(x.message); setBusy(false);
+    }
+  };
+  const k = kenh || {};
+  if (!gui) return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); guiMa(); }}>
+    <h2>{v.h2}</h2><p>{v.p}</p>
+    <fieldset className="kenh-otp"><legend>Nhận mã qua</legend>
+      {(["zalo", "email"] as const).map((c) => <label key={c} className={k[c] && !k[c].ok ? "tat" : ""} title={k[c]?.ly_do || ""}>
+        <input type="radio" name="kenh" checked={chon === c} disabled={!!k[c] && !k[c].ok} onChange={() => setChon(c)} />
+        {c === "zalo" ? "Zalo" : "Email"} <small>{k[c] && !k[c].ok ? "chưa mở" : c === "zalo" ? "tới số điện thoại" : "tới hộp thư"}</small></label>)}
+    </fieldset>
+    {k[chon] && !k[chon].ok && <div className="cong-loi">Kênh {k[chon].ten} chưa mở: {k[chon].ly_do}.</div>}
+    <label className="v3-field">{chon === "zalo" ? "Số điện thoại" : "Email"}
+      <input value={lh} onChange={(e) => setLh(e.target.value)} inputMode={chon === "zalo" ? "tel" : "email"} autoComplete={chon === "zalo" ? "tel" : "email"}
+        placeholder={chon === "zalo" ? "0912 345 678" : "ten@email.com"} required /></label>
+    {err && <div className="cong-loi">{err}</div>}
+    <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy || !lh.trim() || (!!k[chon] && !k[chon].ok)}>{busy ? "Đang gửi…" : "Nhận mã xác thực"}</button></div>
+    <p className="vtd-form-notice">Mã 6 số, dùng một lần, hết hạn sau 5 phút. Lần đầu dùng liên hệ này thì hệ thống tạo tài khoản sau khi bạn đồng ý điều khoản dịch vụ{man !== "kh" ? "; đối tác và cổ đông gửi hồ sơ để Vietourist duyệt" : ""}.</p>
+  </form>);
+  return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); xacThuc(); }}>
+    <h2>Xác thực liên hệ</h2>
+    <ol className="v3-steps"><li className="done"><span>✓</span><div>Thông tin</div></li><li className="active"><span>2</span><div>Xác thực</div></li><li className=""><span>3</span><div>Truy cập</div></li></ol>
+    <p>{gui.message} {con > 0 ? <>Còn <b>{Math.floor(con / 60)}:{String(con % 60).padStart(2, "0")}</b>.</> : <b>Mã đã hết hạn.</b>}</p>
+    <label className="v3-field">Mã xác thực<input value={ma} onChange={(e) => setMa(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="••••••" required autoFocus /></label>
+    {canDongY && <label className="cong-dong-y"><input type="checkbox" checked={dongY} onChange={(e) => setDongY(e.target.checked)} />
+      <span>Tôi đồng ý điều khoản dịch vụ và chính sách bảo vệ dữ liệu cá nhân của Vietourist. (Không bao gồm nhận tin quảng cáo.)</span></label>}
+    {err && <div className="cong-loi">{err}</div>}
+    <div className="v4-actions">
+      <button className="v3-button v3-primary cursor-interaction" disabled={busy || ma.length !== 6 || con <= 0 || (canDongY && !dongY)}>{busy ? "Đang xác thực…" : "Xác thực"}</button>
+      <button type="button" className="v3-button v3-secondary cursor-interaction" disabled={busy} onClick={guiMa}>Gửi lại mã</button></div>
+    <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => { setGui(null); setErr(""); }}>Đổi liên hệ / đổi kênh</button>
+    <p className="vtd-form-notice">Vietourist không bao giờ hỏi mã này qua điện thoại. Sai 5 lần thì phải gửi lại mã mới.</p>
+  </form>);
+}
+
+export default function Login() {
+  const [man, setMan] = useState<Man>("cong");
+  const [hoTro, setHoTro] = useState(false);
+  useEffect(() => {
+    if (getUser()) { location.replace("/"); return; }
+    const q = new URLSearchParams(location.search).get("cong") as Man | null;
+    if (q && (q === "cong" || q in VAI)) setMan(q);
+  }, []);
+  const di = useCallback((m: Man) => { setMan(m); setHoTro(false); try { history.replaceState(null, "", m === "cong" ? "/login" : `/login?cong=${m}`); } catch { /* bỏ qua */ } window.scrollTo(0, 0); }, []);
+  // Bấm vào mảnh tĩnh (thẻ vai, logo, nút Hỗ trợ): bắt bằng một chỗ, đọc data-* có sẵn trong bản v3.2.
+  const bam = (e: React.MouseEvent) => {
+    const el = (e.target as HTMLElement).closest("[data-go-role],[data-action]") as HTMLElement | null;
+    if (!el) return;
+    e.preventDefault();
+    if (el.dataset.action === "support") setHoTro(true);
+    else if (el.dataset.action === "close-support") setHoTro(false);
+    else if (el.dataset.goRole !== undefined) di(el.dataset.goRole ? TU_VAI[el.dataset.goRole] || "cong" : "cong");
+  };
+  const vai = man === "cong" ? null : VAI[man];
+  const thanh = hoTro ? THANH_TREN.replace(' hidden=""', "") : THANH_TREN;
+  return (<>
+    <link rel="stylesheet" href="/cong/vtd.css" />
+    <div style={{ background: "#081826", minHeight: "100vh" }}>
+      <div id="vtd-access" data-mode="inline" data-page={man === "cong" ? "home" : "login"} data-role={vai?.role || "khach-hang"} data-preview="off" data-vtos-screen="off" data-vtos-menu="closed">
+        <div id="vtd-screen" onClick={bam}>
+          <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: thanh }} />
+          {man === "cong" ? <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: TRANG_MO_DAU }} />
+            : <div data-role={vai!.role}><div className="v4-auth">
+              <nav className="vtd-breadcrumb"><button type="button" className="v3-button v3-secondary cursor-interaction" data-go-role="">← Bốn cổng truy cập</button><span>{vai!.ten}</span></nav>
+              <main className="vtd-login">
+                <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: CAU_CHUYEN[vai!.role] }} />
+                {man === "noi" ? <NoiBo /> : <Ngoai key={man} man={man} />}
+              </main></div></div>}
+        </div>
       </div>
-    </main>
-  );
+    </div>
+  </>);
 }

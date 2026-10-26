@@ -46,6 +46,13 @@ CUA_KHONG_THEO_VAI_TRO: dict[str, str] = {
         "Không mang danh sách vai trò vì luật là 'mở được thẻ payroll' HOẶC 'thuộc nhóm vai "
         "được chi', mà vế đầu phụ thuộc ngoại lệ theo TỪNG NGƯỜI trong cơ sở dữ liệu. Máy vẫn "
         "đọc được: cổng nằm ở chữ ký và mang dấu la_cong_chan_quyen."),
+    # CG-1 · 26/10/2026 — cổng kết nối VTD. Ba cửa ghi của người ở cổng NGOÀI (POST /cong/toi,
+    # /cong/ho-so, /cong/dang-xuat) đòi PHIÊN CỔNG NGOÀI qua Depends(tai_khoan_ngoai).
+    "tai_khoan_ngoai": (
+        "Cửa phiên cổng ngoài (khách hàng, đối tác, cổ đông) · 26/10/2026. Không mang vai trò vì người "
+        "dùng không có tài khoản VTOS. Phiên ký bằng khoá RIÊNG (services/cong_ngoai._khoa_ky), kiểm "
+        "số phiên và trạng thái tài khoản mỗi lần gọi; phạm vi ghi khoá vào chính tài khoản của phiên. "
+        "Máy đọc được: cổng nằm ở chữ ký và mang dấu la_cong_chan_quyen."),
     "cong_xem_tong_quan_hcns": (
         "Cổng xem Tổng quan HCNS (GET /hr/tong-quan) · 08/10/2026. Cùng một ca với cổng chi "
         "lương ở trên: luật là 'mở được thẻ tong_quan', mà tập thẻ ấy do access tính theo TỪNG "
@@ -87,6 +94,16 @@ CONG_KHAI: dict[str, str] = {
         "theo địa chỉ mạng. Cửa CHỈ RÚT: nó không trả về nhận xét, không trả về tên hướng dẫn "
         "viên, không trả về một trường dữ liệu nào — nên dù ai cầm được đường dẫn cũng không đọc "
         "được gì. Mã sai và mã đã dùng trả về ĐÚNG MỘT câu giống nhau, để cửa không thành máy dò."),
+    # CG-1 · 26/10/2026 — cổng kết nối VTD. Hai cửa ĐĂNG NHẬP của khách hàng, đối tác, cổ đông: họ
+    # không có tài khoản VTOS nên không có vai trò để khai — cùng lý do với POST /auth/login.
+    "POST /api/v1/cong/ma": (
+        "Gửi MÃ MỘT LẦN qua Zalo hoặc Email cho người ở cổng ngoài. Thay cho đăng nhập: phanh theo địa "
+        "chỉ mạng (30 lượt/10 phút), tối đa 5 mã mỗi liên hệ mỗi giờ, trả CÙNG một câu dù liên hệ đã có "
+        "tài khoản hay chưa nên cửa không thành máy dò. Không đọc ra dữ liệu nào."),
+    "POST /api/v1/cong/xac-thuc": (
+        "Đổi mã một lần lấy PHIÊN CỔNG NGOÀI. Mã lưu dạng băm HMAC, sống 5 phút, sai 5 lần là chết, "
+        "dùng một lần; kèm phanh theo địa chỉ mạng. Phiên cấp ra ký bằng khoá RIÊNG nên không mở được "
+        "bất kỳ cửa nội bộ nào (deps.current_user giải mã bằng SECRET_KEY → 401)."),
     "POST /api/v1/tong-dai/cuoc-goi/{ma}": (
         "Tổng đài gọi vào khi có cuộc gọi tới, xác thực bằng mã đường dẫn bí mật cấp riêng cho nhà "
         "cung cấp tổng đài. Không có người dùng ở đầu kia nên không có vai trò để khai."),
@@ -275,7 +292,10 @@ DA_DONG: dict[str, str] = {
 # Trần cho từng bảng. Quá trần nghĩa là cái được coi là ngoại lệ đã thành quy tắc, và quy tắc thì
 # phải nói ra chứ không lớn dần trong một bảng ngoại lệ.
 TRAN = {
-    "CONG_KHAI": 8,
+    # 8 → 9 ngày 26/10/2026 (CG-1): cổng kết nối VTD mở đăng nhập cho người KHÔNG có tài khoản VTOS —
+    # khách hàng, đối tác, cổ đông — bằng mã một lần. Đó là quy tắc mới được nói ra ở đây, không phải
+    # ngoại lệ lén lớn lên: hai cửa gửi mã + xác thực, cùng hình với POST /auth/login.
+    "CONG_KHAI": 9,
     "TOKEN_VIET_TAY": 6,
     "CHAN_TAI_CHO": 10,
     "TU_PHUC_VU": 10,
