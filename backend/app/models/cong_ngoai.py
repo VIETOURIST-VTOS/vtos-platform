@@ -46,6 +46,7 @@ class TaiKhoanNgoai(Base):
     dong_y_dieu_khoan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     nhan_tin_quang_cao: Mapped[bool] = mapped_column(default=False)   # không bao giờ tự bật
     kenh_ua_thich: Mapped[str] = mapped_column(String(10), default="")
+    so_thich: Mapped[str] = mapped_column(String(40), default="")        # KH-1: sở thích khách tự chọn (cá nhân hoá gợi ý)
     # Tăng lên là mọi phiên đã cấp mất hiệu lực ngay (đăng xuất mọi nơi, khoá tài khoản).
     phien: Mapped[int] = mapped_column(Integer, default=1)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
