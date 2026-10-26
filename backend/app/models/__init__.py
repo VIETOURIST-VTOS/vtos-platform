@@ -161,3 +161,6 @@ from app.models.khoan_muc_chi_phi import *  # noqa  # Đợt R2 15/10/2026 — d
 # Thieu dong nay thi tam bang KHONG vao Base.metadata: create_all khong tao, moi phep thu
 # soi metadata mu dung phan nay ma VAN BAO XANH, va alembic autogenerate doi XOA chung.
 from app.models.so_du_dau_ky import *  # noqa
+# CG-1 26/10/2026 — cong ket noi VTD: tai khoan ben ngoai + ma xac thuc. Thieu dong nay thi hai bang
+# khong vao Base.metadata: create_all khong tao va alembic autogenerate doi XOA chung.
+from app.models.cong_ngoai import *  # noqa

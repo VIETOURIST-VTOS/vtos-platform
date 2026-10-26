@@ -88,8 +88,15 @@ def test_mt4_khai_quyen_cho_man_hinh_khong_co_that_thi_bat_duoc():
 def test_mt5_moi_ngoai_le_phai_tu_bao_ve_duoc():
     """Danh sách ngoại lệ là chỗ dễ biến thành nơi giấu việc nhất, nên nó bị soi kỹ nhất."""
     web = MT.thu_muc_web()
-    assert set(MT.NGOAI_LE) == {"login", "doi-mat-khau", "payroll"}, \
+    # "cong" thêm ngày 26/10/2026 (CG-1) — Chủ tịch duyệt bản xem thử cổng kết nối VTD: trang của khách
+    # hàng / đối tác / cổ đông sau khi đăng nhập bằng mã một lần. Người quyết: Chủ tịch.
+    assert set(MT.NGOAI_LE) == {"login", "doi-mat-khau", "payroll", "cong"}, \
         "thêm ngoại lệ là mở một màn hình cho mọi tài khoản – phải có người quyết, không thêm âm thầm"
+    # Trang cổng ngoài được miễn vì nó KHÔNG gọi cửa nội bộ nào — kiểm lại điều đó, đừng tin ghi chú:
+    # nó không được dùng bộ gọi API nội bộ (lib/api) mà chỉ đi qua lib/cong (phiên cổng ngoài).
+    cong = (web / "cong" / "page.tsx").read_text(encoding="utf-8")
+    assert '"@/lib/api"' not in cong and '"@/lib/cong"' in cong, \
+        "trang cổng ngoài gọi cửa nội bộ VTOS – không còn được miễn khai quyền"
     for ten, ly_do in MT.NGOAI_LE.items():
         assert len(ly_do) > 30, f"ngoại lệ {ten} không ghi lý do đủ để người sau đọc lại còn hiểu"
         assert (web / ten / "page.tsx").exists(), f"ngoại lệ {ten} trỏ tới màn hình không tồn tại"

@@ -574,6 +574,9 @@ MAN_HINH_API = {
     "/so-con-no": ("/api/v1/so-con-no",),
     "/to-chuc-kd": ("/api/v1/to-chuc-kd",),
     "/nguoi-ban-hang": ("/api/v1/nguoi-ban-hang",),
+    # CG-1 (26/10/2026) — hàng chờ duyệt tài khoản bên ngoài. Nhóm API RIÊNG; phía ngoài
+    # (/api/v1/cong) không thuộc màn hình nào vì người dùng của nó không có tài khoản VTOS.
+    "/tai-khoan-ngoai": ("/api/v1/tai-khoan-ngoai",),
     "/gop-tai-khoan": ("/api/v1/gop-tai-khoan",),
     # TC-81 - Bao chi, KOL & su kien (muc 2.2.2). HAI tien to, va da kiem ky truoc khi khai cai
     # thu hai: danh sach vai cua man hinh nay nam GON trong danh sach vai cua "/marketing", nen
@@ -943,6 +946,9 @@ MENU_ROLES = {
     # TC-74 - ai duoc ban hang. Ke toan co o day ma khong co o /to-chuc-kd: doi tac la ben thu ba
     # co cong no va hoa don nen Ke toan phai biet danh muc ay; so do to chuc noi bo thi khong.
     "/nguoi-ban-hang": BASE_VIEW + SALES + SALES_ADMIN + ("hcns", "hanh_chinh", "ptgd_doan", "ketoan", "cntt"),
+    # CG-1: ai duyệt hồ sơ nào nằm ở services/cong_ngoai.NGUOI_DUYET — NCC: TP Điều hành / GĐ KD;
+    # đại lý, CTV bán hàng: GĐ KD; cổ đông: IR – Pháp chế. Chủ tịch, TGĐ tất cả; BKS chỉ xem.
+    "/tai-khoan-ngoai": BASE_VIEW + ("gd_kd", "tp_dh", "ir_phapche"),
     # TC-75 - gop tai khoan trung. HEP: khong co vai Kinh doanh nao. Doc bang cap trung thi HCNS
     # va Ke toan can (ho la nguoi phat hien ra trung), nhung nut gop thi chi cntt va Ban TGD -
     # khai rieng o api/v1/gop_tai_khoan.py. Gop la viec mot chieu: chuyen 290 booking sang nham

@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     ZALO_APP_SECRET: str = ""
     ZALO_OA_SECRET_KEY: str = ""           # khóa xác thực webhook OA (X-ZEvent-Signature)
     ZALO_ZNS_TEMPLATES: str = ""
+    # CG-1 (26/10/2026) — hộp thư gửi MÃ XÁC THỰC cho cổng khách hàng / đối tác / cổ đông. Trống thì kênh
+    # Email ở cổng bị khoá và ghi rõ lý do — không giả vờ đã gửi. Mật khẩu hộp thư chỉ đặt trên máy chủ.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""                    # ví dụ: "Vietourist <no-reply@vietourist.com.vn>"
+    SMTP_SSL: bool = False                 # True: cổng 465 (SSL ngay), False: STARTTLS
     FB_PAGE_ACCESS_TOKEN: str = ""         # Facebook Page (Messenger Platform) – token trang, anh tự dán vào Render
     FB_PAGE_ID: str = ""
     FB_APP_SECRET: str = ""

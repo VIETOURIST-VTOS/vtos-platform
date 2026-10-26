@@ -35,6 +35,7 @@ CHUA_CO_TRANG: dict[str, str] = {
 # Trang có thật nhưng cố ý không khai quyền, kèm lý do.
 KHONG_KHAI_QUYEN = {
     "login": "màn hình đăng nhập – chưa có phiên thì chưa có quyền",
+    "cong": "không gian cổng ngoài (CG-1) – người dùng không có tài khoản VTOS; dữ liệu qua phiên cổng ngoài",
     "payroll": "chỉ chuyển hướng sang /hr, không vẽ gì",
     "doi-mat-khau": "ai cũng vào được, kể cả tài khoản còn mật khẩu tạm",
     "alerts": "cảnh báo nghiệp vụ – mở cho mọi vai trò",
