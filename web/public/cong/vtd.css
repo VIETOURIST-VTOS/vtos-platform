@@ -547,3 +547,11 @@ CG-1 — phần thêm vào bản v3.2: chọn kênh nhận mã, đồng ý đi�
 #vtd-access .kh-qr-than img{border:1px solid var(--v3-line);border-radius:10px;background:#fff;padding:6px;max-width:100%}
 #vtd-access .kh-qr-than dl{flex:1;min-width:220px}
 #vtd-access .kh-qr-muc{margin:0}
+/* KH-3: hạng thành viên */
+#vtd-access .kh-thanh{height:10px;border-radius:99px;background:var(--v3-line);overflow:hidden}
+#vtd-access .kh-thanh i{display:block;height:100%;background:#c99a3d}
+#vtd-access .kh-bac{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#vtd-access .kh-bac-o{border:1px solid var(--v3-line);border-radius:12px;padding:12px;display:grid;gap:4px}
+#vtd-access .kh-bac-o.on{border-color:#c99a3d;box-shadow:inset 0 0 0 1px #c99a3d}
+#vtd-access .kh-bac-o small{color:#697d90}
+@media(max-width:700px){#vtd-access .kh-bac{grid-template-columns:1fr}}

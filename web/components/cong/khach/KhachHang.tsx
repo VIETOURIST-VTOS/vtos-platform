@@ -12,6 +12,7 @@ import { goiCong } from "@/lib/cong";
 import { svg } from "./icons";
 import NhaHangKhach from "./NhaHangKhach";
 import QrThanhToan from "./QrThanhToan";
+import { useDiem, DiemUuDai, HangThanhVien, YeuThich } from "./RewardsKhach";
 
 type Tab = "home" | "deals" | "tour" | "request" | "bookings" | "booking" | "rewards" | "tier" | "favorites" | "reviews" | "feedback" | "support" | "profile";
 const MENU: [Tab, string, string][] = [
@@ -22,9 +23,6 @@ const MENU: [Tab, string, string][] = [
 ];
 const TIEU_DE: Partial<Record<Tab, string>> = { tour: "Chi tiết dịch vụ", request: "Gửi yêu cầu", booking: "Chi tiết đơn" };
 const SAP_RA_MAT: Partial<Record<Tab, [string, string]>> = {
-  rewards: ["VTD Rewards", "Tích điểm từ chuyến đi đã hoàn tất, đổi ưu đãi cho lần sau. Mở ở đợt tiếp theo."],
-  tier: ["Hạng thành viên", "Member · Plus · Premium theo chi tiêu 12 tháng. Mở cùng VTD Rewards."],
-  favorites: ["Yêu thích & nhắc giá", "Lưu tour, nhận nhắc khi giá thay đổi."],
   reviews: ["Đánh giá trải nghiệm", "Chấm điểm và nhận xét sau mỗi chuyến đi đã hoàn tất."],
   feedback: ["Góp ý riêng Ban lãnh đạo", "Gửi góp ý thẳng tới Ban lãnh đạo Vietourist."],
   support: ["Hỗ trợ đổi · hủy · hóa đơn", "Gửi yêu cầu đổi lịch, hủy, xuất hóa đơn và theo dõi tiến độ."],
@@ -42,11 +40,24 @@ function Nut({ i, children, kieu = "secondary", ...p }: any) {
   return <button type="button" className={`v3-button v3-${kieu} cursor-interaction`} {...p}>{i && <I n={i} />}<span>{children}</span></button>;
 }
 
+// Bộ nhớ yêu thích dùng chung cho mọi thẻ tour trong một lần mở cổng (KH-3).
+let _ytIds: number[] = []; const _ytNghe = new Set<(ids: number[]) => void>();
+const datYt = (ids: number[]) => { _ytIds = ids; _ytNghe.forEach((f) => f(ids)); };
+function useYt() {
+  const [ids, setIds] = useState<number[]>(_ytIds);
+  useEffect(() => { _ytNghe.add(setIds); return () => { _ytNghe.delete(setIds); }; }, []);
+  return ids;
+}
+
 function TheTour({ t, mo }: { t: any; mo: (t: any) => void }) {
+  const ids = useYt(); const da = ids.includes(t.id);
+  const doi = (e: React.MouseEvent) => { e.stopPropagation(); goiCong("/khach/yeu-thich", { tour_id: t.id, luu: !da }).then((r) => datYt(r.ids)).catch(() => null); };
   const [c, icon] = canh(t);
   return (<article className="v3-product">
     <div className={`v3-scene ${c}`}><span className="v3-scene-orb" /><span className="v3-scene-icon"><I n={icon} /></span>
-      <span className="v3-badge neutral">{t.nhan}</span><span className="v3-scene-title">{t.ten}</span></div>
+      <span className="v3-badge neutral">{t.nhan}</span>
+      <button type="button" className="v3-favorite cursor-interaction" aria-pressed={da} aria-label={da ? `Bỏ lưu ${t.ten}` : `Lưu ${t.ten}`} onClick={doi}><I n="heart" /></button>
+      <span className="v3-scene-title">{t.ten}</span></div>
     <div className="v3-product-body"><small>{t.thoi_gian} · {ngay(t.khoi_hanh)}{t.noi_khoi_hanh ? ` · từ ${t.noi_khoi_hanh}` : ""}</small>
       <h3>{t.ma}{t.it_cho ? " · sắp hết chỗ" : ""}</h3>
       <div className="v3-price">{t.gia_goc && <del>{tien(t.gia_goc)}</del>}<strong>{tien(t.gia)}</strong><small>/khách · giá bán hiện hành</small></div>
@@ -80,6 +91,8 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
     try { setDs(await goiCong(`/khach/tour${q ? `?${q}` : ""}`)); } catch (x: any) { setErr(x.message); }
   }, [loc]);
   useEffect(() => { goiCong("/khach/trang-chu").then(setHome).catch((x) => setErr(x.message)); }, []);
+  useEffect(() => { goiCong("/khach/yeu-thich").then((r) => datYt(r.ids)).catch(() => null); }, []);
+  const diem = useDiem();
   useEffect(() => {
     if (tab === "deals" && !ds) timTour();
     if ((tab === "bookings" || tab === "booking") && !don) goiCong("/khach/don").then(setDon).catch((x) => setErr(x.message));
@@ -133,8 +146,8 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
             <Nut kieu="primary" i="compass" onClick={() => di("deals")}>Tìm chuyến đi tiếp theo</Nut></div>
             <div className="v3-hero-art" aria-hidden="true"><I n="plane" /><span>EXPLORE<br />VIETNAM</span></div></section>
           <div className="v3-metrics">
-            <section><span><I n="gift" />Điểm khả dụng</span><strong>—</strong><small>VTD Rewards · sắp ra mắt</small></section>
-            <section><span><I n="badge-check" />Hạng thành viên</span><strong>Member</strong><small>Xét hạng mở cùng VTD Rewards</small></section>
+            <section><span><I n="gift" />Điểm khả dụng</span><strong>{diem.x ? (diem.x.dang_bat ? Math.round(diem.x.kha_dung).toLocaleString("vi-VN") : "—") : "…"}</strong><small>{diem.x?.dang_bat ? `= ${Math.round(diem.x.kha_dung * 100).toLocaleString("vi-VN")} đ ưu đãi` : "VTD Rewards sắp bắt đầu"}</small></section>
+            <section><span><I n="badge-check" />Hạng thành viên</span><strong>{diem.x ? diem.x.hang.hang : "…"}</strong><small>Chi tiêu xét hạng tách khỏi điểm</small></section>
             <section><span><I n="luggage" />Đơn sắp đi</span><strong>{home ? home.sap_di : "…"}</strong><small>Theo dõi phục vụ và thanh toán riêng</small></section>
           </div>
           <section className="v3-panel"><div className="v3-section-title"><h3>Chuyến đi đang chờ bạn</h3></div>
@@ -283,6 +296,9 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
             </section></>}
         </>}
 
+        {tab === "rewards" && <DiemUuDai x={diem.x} tai={diem.tai} bao={(m) => setMsg(m)} />}
+        {tab === "tier" && <HangThanhVien x={diem.x} />}
+        {tab === "favorites" && <YeuThich mo={moTour} />}
         {SAP_RA_MAT[tab] && <SapRaMat tab={tab} />}
 
         <footer className="v3-bottom"><I n="shield-check" />Dữ liệu và yêu cầu được quản lý tập trung trong VTOS · Vietourist Holdings</footer>

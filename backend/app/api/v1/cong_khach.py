@@ -142,3 +142,55 @@ def qr(ma: str, muc: str = "", tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db:
         return K.qr_don(db, tk, ma, muc)
     except K.LoiKhach as ex:
         _loi(ex)
+
+
+# ── KH-3 · VTD Rewards & yêu thích ─────────────────────────────────────────────────────────────
+
+@router.get("/diem")
+def diem(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import rewards as RW
+    return RW.tong_quan(db, RW.chu_cua_tai_khoan(tk))
+
+
+class DoiIn(BaseModel):
+    so_diem: int
+
+
+@router.post("/diem/doi")
+def doi_diem(data: DoiIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import rewards as RW
+    chu = RW.chu_cua_tai_khoan(tk)
+    if not chu:
+        raise HTTPException(400, "Tài khoản chưa có liên hệ xác thực")
+    try:
+        v = RW.doi_voucher(db, chu[0], data.so_diem)
+    except RW.LoiDiem as ex:
+        raise HTTPException(400, str(ex))
+    n = lambda x: f"{x:,}".replace(",", ".")  # noqa: E731
+    return {"message": f"Đã đổi {n(v.so_diem)} điểm lấy voucher {v.ma} trị giá {n(v.gia_tri)} đ, dùng đến {v.han_dung:%d/%m/%Y}. Đọc mã cho Sales khi đặt dịch vụ.",
+            "ma": v.ma}
+
+
+@router.get("/yeu-thich")
+def yeu_thich(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import rewards as RW
+    return {"yeu_thich": RW.ds_yeu_thich(db, tk), "ids": RW.id_yeu_thich(db, tk)}
+
+
+class YeuThichIn(BaseModel):
+    tour_id: int
+    luu: bool = True
+
+
+@router.post("/yeu-thich")
+def luu_yeu_thich(data: YeuThichIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import rewards as RW
+    try:
+        RW.luu_yeu_thich(db, tk, data.tour_id, data.luu)
+    except RW.LoiDiem as ex:
+        raise HTTPException(400, str(ex))
+    return {"ids": RW.id_yeu_thich(db, tk)}
