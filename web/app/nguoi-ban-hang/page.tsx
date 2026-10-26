@@ -14,7 +14,7 @@ import { Tag, errMsg } from "@/components/ui";
  *  quyền BÁN khác nghĩa vụ ĐẠT CHỈ TIÊU.
  */
 const LOAI: [string, string][] = [["ghep_le", "Đối tác ghép lẻ"], ["dai_ly", "Đại lý"],
-                                  ["san_ve", "Sàn bán vé"], ["khac", "Khác"]];
+                                  ["san_ve", "Sàn bán vé"], ["ctv_ban_hang", "CTV bán hàng"], ["khac", "Khác"]];
 
 function NguoiBanHang() {
   const { user, toast } = useShell();
