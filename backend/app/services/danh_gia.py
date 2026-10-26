@@ -319,6 +319,26 @@ def ghi_danh_gia(db: Session, ma: str, data: dict) -> dict:
     return ra
 
 
+def ghi_dong_khach_tu_cham(db: Session, care: CareTicket, doi_tuong: str, doi_tuong_id, ten: str,
+                           diem, nhan_xet: str, dong_y: str, nguon_dong_y: str) -> DanhGiaSauTour:
+    """KH-4 (27/10/2026): MỘT dòng khách TỰ chấm từ cổng khách hàng đã đăng nhập.
+
+    Đứng ở tệp này — tệp của «khách tự chấm» — chứ không ở cổng: lời đồng ý công khai chỉ được ghi
+    từ đúng những cửa khách tự bấm (`test_f2` của DG3 canh danh sách tệp ấy). Cổng khách là một cửa
+    như thế: khách đăng nhập bằng mã một lần và tự chọn có / không; không có giá trị mặc định.
+    """
+    doi_chieu_khoa(doi_tuong, doi_tuong_id)
+    x = DanhGiaSauTour(care_id=care.id, booking_id=care.booking_id, tour_id=care.tour_id,
+                       doi_tuong=doi_tuong, doi_tuong_id=doi_tuong_id if doi_tuong in DG_CO_KHOA else None,
+                       doi_tuong_ten=ten_doi_tuong(db, doi_tuong, doi_tuong_id, ten),
+                       diem=diem, nhan_xet=(nhan_xet or "")[:2000], nguon="khach", nguoi_ghi="")
+    db.add(x)
+    db.flush()
+    from app.services import dong_y as DY
+    DY.ghi_tra_loi(db, x, dong_y, nguon=nguon_dong_y)
+    return x
+
+
 def ghi_ho(db: Session, u: User, care: CareTicket, data: dict) -> dict:
     """Nhân viên ghi hộ — khách không dùng Zalo, hoặc gọi điện xin sửa.
 

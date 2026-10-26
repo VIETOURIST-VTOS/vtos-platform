@@ -170,3 +170,4 @@ from app.models.hoa_hong_d06 import *  # noqa
 from app.models.nha_hang import *  # noqa
 from app.models.cong_khach import *  # noqa
 from app.models.rewards import *  # noqa
+from app.models.cham_soc_khach import *  # noqa

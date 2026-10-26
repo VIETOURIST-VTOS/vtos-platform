@@ -194,3 +194,82 @@ def luu_yeu_thich(data: YeuThichIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai)
     except RW.LoiDiem as ex:
         raise HTTPException(400, str(ex))
     return {"ids": RW.id_yeu_thich(db, tk)}
+
+
+# ── KH-4 · Đánh giá · Góp ý riêng lãnh đạo · Hỗ trợ ────────────────────────────────────────────
+
+@router.get("/danh-gia")
+def danh_gia(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import cham_soc_khach as CK
+    return {"chuyen": CK.chuyen_danh_gia(db, tk), "mo_cham_ngay": CK.MO_CHAM_NGAY, "sua_ngay": CK.SUA_NGAY}
+
+
+class DanhGiaIn(BaseModel):
+    ma_don: str
+    diem: list[dict]
+    nhu_cau_tiep: str = ""
+    cong_khai: str = ""
+    gop_y: str = ""
+
+
+@router.post("/danh-gia")
+def gui_danh_gia(data: DanhGiaIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import cham_soc_khach as CK
+    try:
+        return CK.gui_danh_gia(db, tk, data.ma_don, data.model_dump())
+    except (CK.LoiCham, K.LoiKhach) as ex:
+        raise HTTPException(400, str(ex))
+
+
+@router.get("/gop-y")
+def gop_y(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import cham_soc_khach as CK
+    return {"gop_y": CK.gop_y_cua(db, tk), "muc": CK.MUC_GOP_Y, "lien_he": CK.LIEN_HE_LAI}
+
+
+class GopYKhachIn(BaseModel):
+    tieu_de: str
+    noi_dung: str
+    muc: str = "thuong"
+    lien_he_qua: str = "email"
+    ma_don: str = ""
+
+
+@router.post("/gop-y")
+def gui_gop_y(data: GopYKhachIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import cham_soc_khach as CK
+    try:
+        g = CK.gui_gop_y(db, tk, data.model_dump())
+    except (CK.LoiCham, K.LoiKhach) as ex:
+        raise HTTPException(400, str(ex))
+    return {"ma": g.ma, "message": f"Đã gửi góp ý {g.ma}. Chỉ Chủ tịch HĐQT và Tổng Giám đốc đọc góp ý này."}
+
+
+@router.get("/ho-tro")
+def ho_tro(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import cham_soc_khach as CK
+    return {"yeu_cau": CK.ho_tro_cua(db, tk), "loai": CK.LOAI_HO_TRO}
+
+
+class HoTroIn(BaseModel):
+    loai: str
+    ma_don: str = ""
+    noi_dung: str = ""
+    hoa_don: dict | None = None
+
+
+@router.post("/ho-tro")
+def gui_ho_tro(data: HoTroIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import cham_soc_khach as CK
+    try:
+        y = CK.gui_ho_tro(db, tk, data.model_dump())
+    except (CK.LoiCham, K.LoiKhach) as ex:
+        raise HTTPException(400, str(ex))
+    return {"ma": y.ma, "bo_phan": CK.BO_PHAN[y.bo_phan], "loai": CK.LOAI_HO_TRO[y.loai],
+            "message": f"Đã gửi yêu cầu {y.ma} tới {CK.BO_PHAN[y.bo_phan]}. Người phụ trách sẽ trả lời tại đây."}

@@ -29,6 +29,12 @@ DG_DOI_TUONG = {
     "tai_xe": "Tài xế",
     "khach_san": "Khách sạn",
     "an_uong": "Ăn uống",
+    # KH-4 (Chủ tịch duyệt 27/10/2026): khách chấm trên cổng thêm bốn mảng. Không có khoá người —
+    # chấm theo mảng như khách sạn / ăn uống; tên chụp lại lúc chấm (tên Sales với «tu_van»).
+    "hanh_trinh": "Hành trình / lịch trình",
+    "xe": "Chất lượng xe",
+    "tham_quan": "Điểm tham quan",
+    "tu_van": "Tư vấn & đặt chỗ",
 }
 DG_CO_KHOA = ("hdv", "tai_xe")          # hai loại này BẮT BUỘC có doi_tuong_id (employees.id)
 
