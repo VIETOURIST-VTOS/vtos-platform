@@ -581,6 +581,8 @@ MAN_HINH_API = {
     "/hoa-hong-d06": ("/api/v1/hoa-hong-d06",),
     "/nha-hang": ("/api/v1/nha-hang",),
     "/vtd-rewards": ("/api/v1/rewards",),
+    "/yeu-cau-khach": ("/api/v1/yeu-cau-khach",),
+    "/gop-y-lanh-dao": ("/api/v1/gop-y-lanh-dao",),
     "/gop-tai-khoan": ("/api/v1/gop-tai-khoan",),
     # TC-81 - Bao chi, KOL & su kien (muc 2.2.2). HAI tien to, va da kiem ky truoc khi khai cai
     # thu hai: danh sach vai cua man hinh nay nam GON trong danh sach vai cua "/marketing", nen
@@ -957,6 +959,12 @@ MENU_ROLES = {
     "/hoa-hong-d06": BASE_VIEW + ("ketoan", "gd_kd"),
     "/nha-hang": BASE_VIEW + ("tp_dh", "nv_dh", "tp_kd", "gd_kd"),
     "/vtd-rewards": BASE_VIEW + ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "sales_admin", "ketoan", "nv_mkt", "ptgd_mkt"),
+    # KH-4 (Chủ tịch duyệt 27/10/2026). Yêu cầu khách: Sales chỉ thấy việc giao cho mình (lọc ở
+    # services/cham_soc_khach), TP/GĐ KD + Sale Admin thấy việc Kinh doanh, Kế toán thấy hóa đơn.
+    "/yeu-cau-khach": BASE_VIEW + ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "sales_admin", "ketoan"),
+    # Góp ý riêng lãnh đạo: CHỈ Chủ tịch + TGĐ trả lời. BKS / robot Kiểm soát đọc theo bất biến
+    # BASE_VIEW (Chủ tịch chọn 27/10/2026 «BKS đọc được, không trả lời»). Không vai nào khác.
+    "/gop-y-lanh-dao": BASE_VIEW,
     # TC-75 - gop tai khoan trung. HEP: khong co vai Kinh doanh nao. Doc bang cap trung thi HCNS
     # va Ke toan can (ho la nguoi phat hien ra trung), nhung nut gop thi chi cntt va Ban TGD -
     # khai rieng o api/v1/gop_tai_khoan.py. Gop la viec mot chieu: chuyen 290 booking sang nham

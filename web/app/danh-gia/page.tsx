@@ -23,6 +23,8 @@ import { Tag, errMsg } from "@/components/ui";
 const LOAI: [string, string][] = [
   ["hdv", "Hướng dẫn viên"], ["tai_xe", "Tài xế"], ["tour", "Chuyến đi"],
   ["khach_san", "Khách sạn"], ["an_uong", "Ăn uống"],
+  // KH-4 · 27/10/2026: bốn mảng khách chấm thêm trên cổng khách hàng.
+  ["hanh_trinh", "Hành trình"], ["xe", "Chất lượng xe"], ["tham_quan", "Điểm tham quan"], ["tu_van", "Tư vấn & đặt chỗ"],
 ];
 
 const so = (v: any) => (v === null || v === undefined ? "—" : String(v));

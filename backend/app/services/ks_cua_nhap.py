@@ -144,6 +144,10 @@ CUA_TAY = (
     # KH-3 (26/10/2026): khách tự đổi điểm lấy voucher và tự lưu tour yêu thích ở cổng khách.
     "voucher_rewards",
     "yeu_thich_khach",
+    # KH-4: khách gửi từ cổng (đánh giá, góp ý lãnh đạo, yêu cầu hỗ trợ) — cửa là chính form cổng khách
+    "phieu_danh_gia_khach",
+    "gop_y_lanh_dao",
+    "ho_tro_khach",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

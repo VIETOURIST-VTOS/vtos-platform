@@ -555,3 +555,16 @@ CG-1 — phần thêm vào bản v3.2: chọn kênh nhận mã, đồng ý đi�
 #vtd-access .kh-bac-o.on{border-color:#c99a3d;box-shadow:inset 0 0 0 1px #c99a3d}
 #vtd-access .kh-bac-o small{color:#697d90}
 @media(max-width:700px){#vtd-access .kh-bac{grid-template-columns:1fr}}
+/* KH-4: đánh giá chuyến đi, góp ý, hỗ trợ */
+#vtd-access .kh-dg-luoi{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+#vtd-access .kh-dg-o{border:1px solid var(--v3-line);border-radius:12px;padding:12px;display:grid;gap:6px;align-content:start}
+#vtd-access .kh-dg-o small{color:#697d90}
+#vtd-access .kh-dg-o input{font:inherit;font-size:13px;border:1px solid var(--v3-line);border-radius:8px;padding:6px 8px;min-width:0;background:#fff;color:#142a43}
+#vtd-access .kh-sao{display:flex;gap:2px}
+#vtd-access .kh-sao button{font-size:24px;line-height:1;background:none;border:0;padding:2px;color:#cfd8e2;cursor:pointer}
+#vtd-access .kh-sao button.on{color:#c99a3d}
+#vtd-access .kh-sao button:focus-visible{outline:2px solid #c99a3d;outline-offset:1px;border-radius:4px}
+#vtd-access .kh-dg-hoi{border:0;padding:0;margin:0;display:grid;gap:6px}
+#vtd-access .kh-dg-hoi legend{font-weight:600;margin-bottom:4px}
+#vtd-access .kh-dg-hoi .v3-check{min-height:0;padding:4px 0;margin:0}
+#vtd-access .v3-link{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;font-weight:600;cursor:pointer}

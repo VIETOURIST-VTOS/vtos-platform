@@ -406,6 +406,10 @@ export const GROUPS: Group[] = [
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
     // KH-3 · 26/10/2026: VTD Rewards — tra điểm khách, áp voucher khách đổi ở cổng vào booking.
     ["VTD Rewards", "/vtd-rewards"],
+    // KH-4 · 27/10/2026: việc khách gửi từ cổng — đổi / hủy / hóa đơn (Sales, Kế toán, Sale Admin)
+    // và góp ý riêng lãnh đạo (chỉ Chủ tịch + TGĐ trả lời; menu chỉ hiện cho BASE_VIEW).
+    ["Yêu cầu khách (cổng)", "/yeu-cau-khach"],
+    ["Góp ý riêng lãnh đạo", "/gop-y-lanh-dao"],
     // TC-73 · 19/9/2026. Sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
     //
     // ĐỨNG NGOÀI hai khối "Lẻ" và "MICE", vì nó là của CẢ HAI phòng: một người có thể ở cây Lẻ,

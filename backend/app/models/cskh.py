@@ -80,7 +80,8 @@ class Complaint(Base):
 
 
 # ---------- Đợt 4: CHĂM SÓC SAU BÁN ----------
-CS_HINH_THUC = {"goi": "Gọi điện", "zalo": "Zalo", "email": "Email", "truc_tiep": "Gặp trực tiếp"}
+CS_HINH_THUC = {"goi": "Gọi điện", "zalo": "Zalo", "email": "Email", "truc_tiep": "Gặp trực tiếp",
+                "cong": "Khách tự chấm trên cổng"}   # KH-4: đánh giá gửi từ cổng khách hàng
 CS_DIEM = {"hdv": "Hướng dẫn viên", "xe": "Xe", "khach_san": "Khách sạn", "an_uong": "Ăn uống",
            "lich_trinh": "Lịch trình", "dieu_hanh": "Điều hành", "gia": "Giá"}
 CS_TRANG_THAI = {"moi": "Chưa liên hệ", "hen_lai": "Hẹn liên hệ lại", "xong": "Đã ghi kết quả",

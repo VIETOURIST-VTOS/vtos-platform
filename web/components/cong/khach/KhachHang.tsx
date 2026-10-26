@@ -5,7 +5,7 @@
    Khác bản vẽ, có chủ ý:
    · Không có thanh «Bản xem thử», không có nút đổi sang cổng Đối tác / Cổ đông (đó là công cụ duyệt mẫu).
    · Mọi số là số THẬT từ VTOS. Phần chưa làm (khách sạn, nhà hàng, thanh toán, điểm, hạng, yêu thích,
-     đánh giá, góp ý, hỗ trợ) hiện «Sắp ra mắt» — KHÔNG hiện số mẫu như thật.
+     …) hiện «Sắp ra mắt» — KHÔNG hiện số mẫu như thật. KH-4 mở đánh giá, góp ý, hỗ trợ.
    · «Gửi yêu cầu» thay «Đặt thử»: chưa giữ chỗ, chưa thu tiền; Sales gọi lại và báo giá cuối. */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { goiCong } from "@/lib/cong";
@@ -13,6 +13,7 @@ import { svg } from "./icons";
 import NhaHangKhach from "./NhaHangKhach";
 import QrThanhToan from "./QrThanhToan";
 import { useDiem, DiemUuDai, HangThanhVien, YeuThich } from "./RewardsKhach";
+import { DanhGiaKhach, GopYKhach, HoTroKhach } from "./ChamSocKhach";
 
 type Tab = "home" | "deals" | "tour" | "request" | "bookings" | "booking" | "rewards" | "tier" | "favorites" | "reviews" | "feedback" | "support" | "profile";
 const MENU: [Tab, string, string][] = [
@@ -22,11 +23,8 @@ const MENU: [Tab, string, string][] = [
   ["profile", "Hồ sơ & riêng tư", "user-round"],
 ];
 const TIEU_DE: Partial<Record<Tab, string>> = { tour: "Chi tiết dịch vụ", request: "Gửi yêu cầu", booking: "Chi tiết đơn" };
-const SAP_RA_MAT: Partial<Record<Tab, [string, string]>> = {
-  reviews: ["Đánh giá trải nghiệm", "Chấm điểm và nhận xét sau mỗi chuyến đi đã hoàn tất."],
-  feedback: ["Góp ý riêng Ban lãnh đạo", "Gửi góp ý thẳng tới Ban lãnh đạo Vietourist."],
-  support: ["Hỗ trợ đổi · hủy · hóa đơn", "Gửi yêu cầu đổi lịch, hủy, xuất hóa đơn và theo dõi tiến độ."],
-};
+// KH-4 (27/10/2026): đánh giá, góp ý lãnh đạo, hỗ trợ đã mở — không còn mục «Sắp ra mắt».
+const SAP_RA_MAT: Partial<Record<Tab, [string, string]>> = {};
 
 const I = ({ n, s }: { n: string; s?: number }) => <span style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: svg(n, s) }} />;
 const tien = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString("vi-VN")} đ` : "—");
@@ -83,6 +81,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
   const [don, setDon] = useState<any>(null);
   const [donMo, setDonMo] = useState<any>(null);
   const [hs, setHs] = useState<any>(null);
+  const [htDon, setHtDon] = useState("");
   const [msg, setMsg] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
 
   const di = useCallback((t: Tab) => { setTab(t); setMenuMo(false); setMsg(""); setErr(""); window.scrollTo(0, 0); }, []);
@@ -95,7 +94,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
   const diem = useDiem();
   useEffect(() => {
     if (tab === "deals" && !ds) timTour();
-    if ((tab === "bookings" || tab === "booking") && !don) goiCong("/khach/don").then(setDon).catch((x) => setErr(x.message));
+    if ((tab === "bookings" || tab === "booking" || tab === "feedback" || tab === "support") && !don) goiCong("/khach/don").then(setDon).catch((x) => setErr(x.message));
     if (tab === "profile" && !hs) goiCong("/khach/ho-so").then(setHs).catch((x) => setErr(x.message));
   }, [tab, ds, don, hs, timTour]);
 
@@ -268,7 +267,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
               <dl className="v3-stat-rows"><div><dt>Mã đơn</dt><dd>{donMo.ma}</dd></div>
                 <div><dt>Ngày đi</dt><dd>{ngay(donMo.khoi_hanh)}{donMo.ket_thuc ? ` – ${ngay(donMo.ket_thuc)}` : ""}</dd></div>
                 <div><dt>Số khách</dt><dd>{donMo.so_khach}</dd></div></dl>
-              <div className="v3-notice warn"><I n="info" /><span>Cần đổi, hủy hoặc xuất hóa đơn: liên hệ Sales phụ trách hoặc hotline Vietourist. Gửi yêu cầu trên cổng mở ở đợt sau.</span></div>
+              <Nut i="messages-square" onClick={() => { setHtDon(donMo.ma); di("support"); }}>Yêu cầu đổi · hủy · hóa đơn</Nut>
             </section>
             <section className="v3-panel v3-quote"><div className="v3-section-title"><h3>Thanh toán</h3><Badge c={donMo.thanh_toan === "Đã thu đủ" ? "good" : "warn"}>{donMo.thanh_toan}</Badge></div>
               <dl className="v3-stat-rows"><div><dt>Giá trị đơn</dt><dd>{tien(donMo.gia_tri)}</dd></div>
@@ -299,6 +298,9 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
         {tab === "rewards" && <DiemUuDai x={diem.x} tai={diem.tai} bao={(m) => setMsg(m)} />}
         {tab === "tier" && <HangThanhVien x={diem.x} />}
         {tab === "favorites" && <YeuThich mo={moTour} />}
+        {tab === "reviews" && <DanhGiaKhach diHoTro={() => di("support")} />}
+        {tab === "feedback" && <GopYKhach don={don?.don || []} bao={(m) => setMsg(m)} />}
+        {tab === "support" && (don ? <HoTroKhach key={htDon} don={don.don} maDon={htDon} /> : <section className="v3-panel"><p>Đang tải…</p></section>)}
         {SAP_RA_MAT[tab] && <SapRaMat tab={tab} />}
 
         <footer className="v3-bottom"><I n="shield-check" />Dữ liệu và yêu cầu được quản lý tập trung trong VTOS · Vietourist Holdings</footer>
