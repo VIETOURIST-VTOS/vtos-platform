@@ -239,12 +239,17 @@ def test_vai_xem_khop_bang_man_hinh():
 
 def test_giao_dien_dung_ban_v32_da_sua():
     manh = (GOC / "web/components/cong/manh.ts").read_text(encoding="utf-8").replace('\\"', '"')
-    assert "CÔNG TY CỔ PHẦN VIETOURIST HOLDINGS" in manh          # v3.3: một hàng (Chủ tịch duyệt 26/10/2026)
-    assert "Kết nối cùng <span>Vietourist Holdings.</span>" in manh
+    # v3.4 (Chủ tịch chỉ định 26/10/2026): nhận diện gộp vào banner, Trái Đất + máy bay chuyển động có nút dừng
+    for co in ("CÔNG TY CỔ PHẦN", "VIETOURIST<span>HOLDINGS</span>", "Khám phá · Kết nối · Đồng hành",
+               "Chào mừng đến với hệ sinh thái số Vietourist.", "v5-earth", "v5-plane", "data-hero-motion", "/cong/earth.webp"):
+        assert co in manh, co
+    assert (GOC / "web/public/cong/earth.webp").exists()
+    css = (GOC / "web/public/cong/vtd.css").read_text(encoding="utf-8")
+    assert "is-paused .v5-plane{animation-play-state:paused}" in css and "prefers-reduced-motion" in css
     for bo in ("HỆ SINH THÁI VIETOURIST HOLDINGS", "Không gian dành cho đội ngũ", "Truy cập theo tài khoản và quyền của bạn",
                "Bản thiết kế v3.2", "VTD / CỔNG KẾT NỐI"):
         assert bo not in manh, bo
-    for co in ("vh-plane", "vh-globe", "vh-orbit", 'data-go-role="nhan-vien"', 'data-go-role="khach-hang"',
+    for co in ('data-go-role="nhan-vien"', 'data-go-role="khach-hang"',
                'data-go-role="doi-tac"', 'data-go-role="co-dong"', "/cong/logo.png"):
         assert co in manh, co
     assert (GOC / "web/public/cong/vtd.css").exists() and (GOC / "web/public/cong/logo.png").exists()
