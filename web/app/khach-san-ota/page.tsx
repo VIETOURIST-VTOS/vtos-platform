@@ -8,6 +8,8 @@ import { Tag, errMsg } from "@/components/ui";
  *  thanh toán trên OTA; VTOS chỉ ghi LƯỢT CHUYỂN (không phải đặt phòng). Chủ tịch nhập link và bật.
  *  Bật chỉ được khi đủ bốn điều — máy chủ kiểm, nút ở đây chỉ để đỡ bấm vào cửa đóng. Đổi link = phiên
  *  bản mới, OTA tự tắt và phải kiểm lại. */
+const CHK: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, marginTop: 4, fontSize: 14, color: "var(--ink)", cursor: "pointer" };
+const O_TICK: React.CSSProperties = { width: 18, height: 18, flex: "none", margin: 0, padding: 0, accentColor: "var(--teal)" };
 const TT_TAG: Record<string, string> = { da_duyet: "ok", cho_duyet: "warn", chua_dang_ky: "", tam_dung: "red" };
 
 function SuaOta({ o, tt, xong }: { o: any; tt: Record<string, string>; xong: (d: any) => void }) {
@@ -33,10 +35,11 @@ function SuaOta({ o, tt, xong }: { o: any; tt: Record<string, string>; xong: (d:
       {o2("ghi_chu", "Ghi chú")}
     </div>
     {doiLink && o.link && <div className="muted">Đổi link / tên miền / đường dẫn = phiên bản mới: OTA tự tắt, phải kiểm lại link.</div>}
-    <label style={{ display: "flex", gap: 8 }}><input type="checkbox" checked={f.da_kiem_link} onChange={(e) => setF({ ...f, da_kiem_link: e.target.checked })} />
-      Đã mở thử link — đúng tài khoản Affiliate của pháp nhân hợp đồng</label>
-    <label style={{ display: "flex", gap: 8 }}><input type="checkbox" checked={f.duoc_dung_web} onChange={(e) => setF({ ...f, duoc_dung_web: e.target.checked })} />
-      OTA cho phép dùng link trên vietourist.vn</label>
+    {/* Ô tick phải tự đặt rộng: globals.css cho mọi input width:100%, ô tick sẽ chiếm hết dòng và đẩy chữ đi. */}
+    <label style={CHK}><input type="checkbox" style={O_TICK} checked={f.da_kiem_link} onChange={(e) => setF({ ...f, da_kiem_link: e.target.checked })} />
+      <span>Đã mở thử link — đúng tài khoản Affiliate của pháp nhân hợp đồng</span></label>
+    <label style={CHK}><input type="checkbox" style={O_TICK} checked={f.duoc_dung_web} onChange={(e) => setF({ ...f, duoc_dung_web: e.target.checked })} />
+      <span>OTA cho phép dùng link trên vietourist.vn</span></label>
     <button className="act teal" style={{ margin: 0, justifySelf: "start" }} onClick={luu}>Lưu</button>
   </div>);
 }
