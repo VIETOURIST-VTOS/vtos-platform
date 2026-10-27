@@ -14,6 +14,46 @@ import { Tag, errMsg } from "@/components/ui";
 const TT_TAG: Record<string, string> = { cho_duyet: "warn", bo_sung: "warn", hoat_dong: "ok", tu_choi: "red", khoa: "red", ho_so: "" };
 const TABS: [string, string][] = [["cho_duyet", "Chờ duyệt"], ["bo_sung", "Cần bổ sung"], ["hoat_dong", "Đang hoạt động"], ["khoa", "Đã khoá"], ["", "Tất cả"]];
 
+/** DT-1 (Chủ tịch duyệt 27/10/2026) — NỐI tài khoản đại lý / CTV với một đối tác bán hàng. Máy chỉ GỢI Ý
+ *  (khớp MST trước, rồi SĐT; nhiều đối tác khớp thì không tự chọn); người duyệt bấm nối. Chưa nối thì
+ *  cổng đối tác chỉ hiện «Đang chờ nối hồ sơ», không có số liệu. */
+function NoiDoiTac({ t, xong }: { t: any; xong: () => void }) {
+  const { toast } = useShell();
+  const [n, setN] = useState<any>(null);
+  const [q, setQ] = useState("");
+  const [kq, setKq] = useState<any[] | null>(null);
+  const tai = useCallback(() => { api<any>(`/tai-khoan-ngoai/${t.id}/doi-tac`).then(setN).catch((e) => toast(errMsg(e), true)); }, [t.id, toast]);
+  useEffect(() => { tai(); }, [tai]);
+  const lam = async (hanh_dong: string, doi_tac_id?: number) => {
+    try {
+      const r = await api<any>(`/tai-khoan-ngoai/${t.id}/doi-tac`, { method: "POST", json: { hanh_dong, doi_tac_id, duyet: t.trang_thai === "cho_duyet" && hanh_dong !== "go" } });
+      toast(r.message); setN(r.noi); setKq(null); xong();
+    } catch (e) { toast(errMsg(e), true); }
+  };
+  const tim = () => api<any>(`/tai-khoan-ngoai/doi-tac-ban-hang?q=${encodeURIComponent(q)}`).then((r) => setKq(r.doi_tac)).catch((e) => toast(errMsg(e), true));
+  if (!n) return <div className="muted">Đang tải hồ sơ đối tác…</div>;
+  if (!n.co_cong) return <div className="muted">Cổng nhà cung cấp làm ở đợt sau — không cần nối.</div>;
+  const nhanNoi = t.trang_thai === "cho_duyet" ? "Duyệt & nối" : "Nối";
+  return (<div style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", display: "grid", gap: 6 }}>
+    {n.doi_tac ? <div>Đã nối: <b>{n.doi_tac.ten}</b> <span className="mono">({n.doi_tac.ma})</span> · {n.doi_tac.loai_ten} · {n.doi_tac.so_booking} booking
+      {t.xu_ly_duoc && <button className="act grey" style={{ margin: "0 0 0 8px" }} onClick={() => lam("go")}>Gỡ nối</button>}</div>
+    : <>
+      {n.goi_y.khop.length ? <div>Máy gợi ý (trùng {n.goi_y.theo}){n.goi_y.khop.length > 1 ? " — nhiều đối tác khớp, máy không tự chọn" : ""}:
+        {n.goi_y.khop.map((d: any) => <div key={d.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+          <b>{d.ten}</b><span className="mono">{d.ma}</span><span className="muted">{d.loai_ten} · {d.so_booking} booking{d.con_hop_tac ? "" : " · đã dừng hợp tác"}</span>
+          {t.xu_ly_duoc && d.con_hop_tac && <button className="act teal" style={{ margin: 0 }} onClick={() => lam("noi", d.id)}>{nhanNoi} {d.ten}</button>}</div>)}</div>
+        : <div className="muted">Máy không tìm thấy đối tác trùng mã số thuế hay số điện thoại.</div>}
+      {t.xu_ly_duoc && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nối đối tác khác: tên, mã, MST" onKeyDown={(e) => e.key === "Enter" && tim()} style={{ maxWidth: 280 }} />
+        <button className="act grey" style={{ margin: 0 }} onClick={tim}>Tìm</button>
+        <button className="act grey" style={{ margin: 0 }} onClick={() => lam("tao_moi")}>{t.trang_thai === "cho_duyet" ? "Duyệt & tạo" : "Tạo"} đối tác mới từ hồ sơ</button></div>}
+      {kq && (kq.length ? kq.map((d: any) => <div key={d.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <b>{d.ten}</b><span className="mono">{d.ma}</span><span className="muted">{d.loai_ten}{d.ma_so_thue ? ` · MST ${d.ma_so_thue}` : ""}</span>
+        <button className="act teal" style={{ margin: 0 }} onClick={() => lam("noi", d.id)}>{nhanNoi}</button></div>) : <div className="muted">Không tìm thấy.</div>)}
+      <div className="muted">Chưa nối thì cổng đối tác chỉ hiện «Đang chờ nối hồ sơ», không có số liệu.</div></>}
+  </div>);
+}
+
 function Trang() {
   const { toast } = useShell();
   const [tab, setTab] = useState("cho_duyet");
@@ -53,6 +93,7 @@ function Trang() {
             {t.giay_to && <span>CCCD / MSDN <b className="mono">{t.giay_to}</b> · </span>}
             {t.tk_luu_ky && <span>TK lưu ký <b className="mono">{t.tk_luu_ky}</b> · </span>}
             {t.ghi_chu_ho_so && <div style={{ whiteSpace: "pre-wrap" }}>{t.ghi_chu_ho_so}</div>}</div>}
+          {t.loai === "doi_tac" && t.trang_thai !== "tu_choi" && <NoiDoiTac t={t} xong={load} />}
           <div className="muted">Tạo {fmtDT(t.tao_luc)} · đăng nhập cuối {t.dang_nhap_cuoi ? fmtDT(t.dang_nhap_cuoi) : "—"}{t.duyet_boi && ` · duyệt bởi ${t.duyet_boi} lúc ${fmtDT(t.duyet_luc)}`}{t.ly_do && ` · lý do: ${t.ly_do}`}</div>
           {t.xu_ly_duoc ? <>
             <input value={ly} onChange={(e) => setLy(e.target.value)} placeholder="Lý do (bắt buộc khi trả bổ sung, từ chối, khoá)" />

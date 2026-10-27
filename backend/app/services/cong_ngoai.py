@@ -243,7 +243,7 @@ def toi_out(tk: TaiKhoanNgoai) -> dict:
             "tk_luu_ky": tk.tk_luu_ky, "ghi_chu_ho_so": tk.ghi_chu_ho_so, "ly_do": tk.ly_do,
             "nhan_tin_quang_cao": tk.nhan_tin_quang_cao, "kenh_ua_thich": tk.kenh_ua_thich,
             "gui_ho_so_luc": tk.gui_ho_so_luc, "dang_nhap_cuoi": tk.dang_nhap_cuoi,
-            "loai_doi_tac_chon": LOAI_DOI_TAC}
+            "loai_doi_tac_chon": LOAI_DOI_TAC, "da_noi": bool(tk.doi_tac_id)}
 
 
 def cap_nhat_toi(db: Session, tk: TaiKhoanNgoai, ho_ten: str | None, nhan_tin: bool | None) -> TaiKhoanNgoai:
@@ -312,7 +312,7 @@ def quan_tri_out(tk: TaiKhoanNgoai, u: User) -> dict:
     d.update({"dien_thoai": tk.dien_thoai, "email": tk.email, "giay_to": tk.giay_to, "duyet_boi": tk.duyet_boi,
               "duyet_luc": tk.duyet_luc, "tao_luc": tk.tao_luc,
               "nguoi_duyet": [ROLES.get(x, x) for x in nguoi_duyet_cua(tk)],
-              "xu_ly_duoc": xu_ly_duoc(u, tk),
+              "xu_ly_duoc": xu_ly_duoc(u, tk), "doi_tac_id": tk.doi_tac_id,
               "loai_doi_tac_ten": LOAI_DOI_TAC.get(tk.loai_doi_tac, "")})
     return d
 

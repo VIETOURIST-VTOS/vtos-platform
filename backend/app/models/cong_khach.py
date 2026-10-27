@@ -30,4 +30,6 @@ class YeuCauKhach(Base):
     gio_den: Mapped[str] = mapped_column(String(5), default="")
     tre_em: Mapped[int] = mapped_column(Integer, default=0)
     tam_tinh: Mapped[int | None] = mapped_column(Integer, nullable=True)   # máy tính từ giá đã lưu, KHÔNG phải báo giá
+    # DT-1 · CTV giới thiệu khách (loai «gioi_thieu»): tên khách CTV khai; tai_khoan_id là CTV.
+    ten_khach: Mapped[str] = mapped_column(String(120), default="")
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

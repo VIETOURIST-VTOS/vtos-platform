@@ -654,10 +654,9 @@ def create_request(db: Session, u: User, data) -> ServiceRequest:
     return r
 
 
-def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, str]:
-    if u.role not in ("nv_dh", "tp_dh") and not toan_quyen(u): raise Gate("CONG_12", "Chỉ Phòng Điều hành tạo booking")
-    if r.booking_id: raise Gate("TRANG_THAI", "Yêu cầu đã có booking")
-    t = db.get(Tour, r.tour_id)
+def cong_tao_booking(db: Session, t: Tour, pax: int, discount: float = 0) -> None:
+    """Các cổng của lúc CHIẾM CHỖ — dùng chung cho Điều hành tạo booking và đại lý giữ chỗ trên cổng
+    đối tác (DT-1). Một hàm, hai cửa: thêm cổng ở đây là cả hai cửa cùng chặn, không lệch nhau."""
     if t.status != "da_duyet": raise Gate("CONG_1", "Tour chưa được duyệt dự toán, không thể tạo booking")
     thr = R.get_param(db, "nguong_bien", t.start_date)
     cb = R.calc_db(db, t, thr)
@@ -670,12 +669,12 @@ def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, st
             db.add(Alert(kind="thieu_du_toan", level="warn", ref=t.code,
                          message=f"{t.code} đang bán nhưng chưa có dự toán ({R.BUDGET_SOURCES['chua_co']}) – không đánh giá được biên, cần Điều hành bổ sung",
                          to_roles="tp_dh,nv_dh,gd_kd,tgd"))
-    if (r.discount or 0) > 0:
+    if discount > 0:
         c = cb
-        nr = (c["revenue"] or 0) - (r.discount or 0)
+        nr = (c["revenue"] or 0) - discount
         nm = (nr - (c["cost"] or 0)) / nr if nr > 0 else 0
         if nm < thr:
-            raise Gate("CONG_3", f"Mã KM/giảm giá {(r.discount or 0):,.0f} đ làm biên chuyến tụt còn {nm*100:.1f}% (< {thr*100:.0f}%): treo, cần TGĐ duyệt")
+            raise Gate("CONG_3", f"Mã KM/giảm giá {discount:,.0f} đ làm biên chuyến tụt còn {nm*100:.1f}% (< {thr*100:.0f}%): treo, cần TGĐ duyệt")
     # CỔNG SỨC CHỨA — chặn cứng. Chủ tịch quyết 25/9/2026: số khách Điều hành nhập, duyệt dự toán
     # xong thì con số ấy thành TRẦN BÁN.
     #
@@ -683,9 +682,16 @@ def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, st
     # bán gọi `giu_cho.con_trong()` — một tour 45 chỗ nhận booking thứ 46 bình thường, không cần ai
     # bấm trùng giây. Chuyến chưa khai số chỗ thì cổng cho qua và nói ra (xem `_tran_ban`): chưa
     # khai khác với không còn chỗ.
-    qua, loi_suc_chua = kiem_suc_chua(db, t, int(r.pax or 0))
+    qua, loi_suc_chua = kiem_suc_chua(db, t, pax)
     if not qua:
         raise Gate("SUC_CHUA", loi_suc_chua)
+
+
+def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, str]:
+    if u.role not in ("nv_dh", "tp_dh") and not toan_quyen(u): raise Gate("CONG_12", "Chỉ Phòng Điều hành tạo booking")
+    if r.booking_id: raise Gate("TRANG_THAI", "Yêu cầu đã có booking")
+    t = db.get(Tour, r.tour_id)
+    cong_tao_booking(db, t, int(r.pax or 0), float(r.discount or 0))
     mins = int((datetime.now() - r.created_at).total_seconds() / 60)
     sla = int(R.get_param(db, "sla_booking_phut"))
     n = db.execute(select(func.count()).select_from(Booking)).scalar() + 1
