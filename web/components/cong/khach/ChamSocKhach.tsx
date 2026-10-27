@@ -139,7 +139,7 @@ export function HoTroKhach({ don, maDon }: { don: any[]; maDon?: string }) {
       setXong(r); setF({ ...f, noi_dung: "" }); tai();
     } catch (e: any) { setLoi(e.message); } finally { setBusy(false); }
   };
-  const canDon = f.loai !== "khac";
+  const canDon = f.loai !== "khac" && f.loai !== "ks_ota";
   const duHd = f.loai !== "hoa_don" || (hd.ten_don_vi.trim() && hd.mst.trim() && hd.dia_chi.trim());
   return (<>
     {xong && <div className="v3-notice info"><I n="check" /><span>Đã gửi yêu cầu <b>{xong.ma}</b> ({xong.loai}) tới <b>{xong.bo_phan}</b>. Người phụ trách trả lời tại đây; yêu cầu chưa được duyệt cho tới khi có trả lời.</span></div>}
@@ -154,7 +154,7 @@ export function HoTroKhach({ don, maDon }: { don: any[]; maDon?: string }) {
           <label className="v3-field">Mã số thuế<input value={hd.mst} inputMode="numeric" onChange={(e) => setHd({ ...hd, mst: e.target.value })} /></label>
           <label className="v3-field">Địa chỉ<input value={hd.dia_chi} onChange={(e) => setHd({ ...hd, dia_chi: e.target.value })} /></label>
           <label className="v3-field">Email nhận hóa đơn<input type="email" value={hd.email} onChange={(e) => setHd({ ...hd, email: e.target.value })} /></label></div>}
-        <label className="v3-field">{f.loai === "doi" ? "Muốn đổi gì (ngày đi, người đi…)" : f.loai === "huy" ? "Lý do hủy" : "Ghi chú"}
+        <label className="v3-field">{f.loai === "doi" ? "Muốn đổi gì (ngày đi, người đi…)" : f.loai === "huy" ? "Lý do hủy" : f.loai === "ks_ota" ? "Mã đặt phòng OTA, tên OTA và việc cần hỗ trợ" : "Ghi chú"}
           <textarea rows={3} value={f.noi_dung} maxLength={3000} onChange={(e) => setF({ ...f, noi_dung: e.target.value })} /></label>
         <div className="v3-notice warn"><I n="info" /><span>Gửi yêu cầu <b>không tự hủy đơn, không tự hoàn tiền, không tự xuất hóa đơn</b>. Phí đổi / hủy tính theo hợp đồng và người phụ trách báo lại trước khi làm; bạn đồng ý thì mới thực hiện.</span></div>
         <Loi m={loi} />

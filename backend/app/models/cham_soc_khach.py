@@ -14,7 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 
 TRANG_THAI_VIEC = {"moi": "Mới", "dang_xu_ly": "Đang xử lý", "da_tra_loi": "Đã trả lời", "dong": "Đã đóng"}
-LOAI_HO_TRO = {"doi": "Đổi ngày / người đi", "huy": "Hủy đơn", "hoa_don": "Xuất hóa đơn", "khac": "Khác"}
+LOAI_HO_TRO = {"doi": "Đổi ngày / người đi", "huy": "Hủy đơn", "hoa_don": "Xuất hóa đơn", "ks_ota": "Khách sạn qua OTA", "khac": "Khác"}
 BO_PHAN = {"kinh_doanh": "Kinh doanh", "ke_toan": "Kế toán", "sales_admin": "Sale Admin"}
 MUC_GOP_Y = {"thuong": "Bình thường", "khan": "Khẩn"}
 LIEN_HE_LAI = {"email": "Email đã xác minh", "zalo": "Zalo", "khong": "Không cần liên hệ"}

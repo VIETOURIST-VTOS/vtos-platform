@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { goiCong } from "@/lib/cong";
 import { svg } from "../khach/icons";
 import QrThanhToan from "../khach/QrThanhToan";
+import KhachSanOta from "../KhachSanOta";
 
 type Tab = "home" | "tour" | "hold" | "bookings" | "booking" | "d06" | "debt" | "refer" | "referrals";
 const MENU_DL: [Tab, string, string][] = [["home", "Bàn làm việc", "house"], ["tour", "Tour & giữ chỗ", "plane"], ["bookings", "Đã giữ chỗ", "luggage"],
@@ -46,6 +47,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
   const [cho, setCho] = useState<string>("");
   const [ds, setDs] = useState<any>(null);
   const [q, setQ] = useState("");
+  const [dv, setDv] = useState<"tour" | "khach_san">("tour");
   const [tourMo, setTourMo] = useState<any>(null);
   const [f, setF] = useState({ ten_khach: "", dien_thoai: "", nguoi_lon: 2, tre_em: 0, ghi_chu: "" });
   const [bk, setBk] = useState<any>(null);
@@ -147,9 +149,10 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
 
         {blv && tab === "tour" && <>
           <nav className="v31-service-tabs" aria-label="Loại dịch vụ">
-            <button type="button" className="cursor-interaction" aria-pressed="true"><I n="plane" /><span>Tour du lịch</span></button>
-            <button type="button" className="cursor-interaction" aria-pressed="false" disabled><I n="hotel" /><span>Khách sạn · sắp ra mắt</span></button>
+            <button type="button" className="cursor-interaction" aria-pressed={dv === "tour"} onClick={() => setDv("tour")}><I n="plane" /><span>Tour du lịch</span></button>
+            <button type="button" className="cursor-interaction" aria-pressed={dv === "khach_san"} onClick={() => setDv("khach_san")}><I n="hotel" /><span>Khách sạn</span></button>
             <button type="button" className="cursor-interaction" aria-pressed="false" disabled><I n="utensils" /><span>Nhà hàng · sắp ra mắt</span></button></nav>
+          {dv === "khach_san" ? <KhachSanOta ghiChu="Phòng đặt qua OTA chưa tính hoa hồng D06 cho đại lý / CTV — cơ sở tính cần duyệt riêng. Lượt chuyển vẫn ghi nguồn là đối tác của bạn." /> : <>
           <section className="v3-panel"><div className="v3-search"><label className="v3-field">Điểm đến hoặc tên tour<input type="search" value={q} placeholder="Phú Quốc, Huế…"
             onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && timTour()} /></label><Nut kieu="primary" i="search" onClick={() => timTour()}>Tìm tour</Nut></div></section>
           <section className="v3-panel">{!ds ? <p>Đang tải…</p> : ds.tour.length ? <div className="v3-table-wrap"><table>
@@ -159,6 +162,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
               <td><Nut kieu="primary" i="tickets" onClick={() => moGiu(t)}>Giữ chỗ</Nut></td></tr>)}</tbody></table></div>
             : <p>Không có tour đang mở bán khớp tìm kiếm.</p>}
             <small>Giá bán công bố (như khách lẻ). Hoa hồng D06 tính theo tháng, chi sau khi chuyến xong và thu đủ.</small></section>
+          </>}
         </>}
 
         {blv && tab === "hold" && tourMo && <div className="v3-two">
@@ -175,7 +179,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
             <dl className="v3-stat-rows"><div><dt>Người lớn</dt><dd>{f.nguoi_lon} × {tien(tourMo.gia)}</dd></div>
               {Number(f.tre_em) > 0 && <div><dt>Trẻ em</dt><dd>{f.tre_em} × {tien(tourMo.gia_tre_em || tourMo.gia)}</dd></div>}</dl>
             <div className="v3-total"><span>Tạm tính</span><strong>{tien(tamTinh)}</strong></div>
-            <p>Giữ chỗ đến theo tham số hiện hành, không muộn hơn hạn hủy chỗ của tour. Máy chủ kiểm như Điều hành tạo booking: tour đã duyệt, dự toán, còn chỗ. Không giảm giá trên cổng. Người tiếp nhận: Sale Admin.</p>
+            <p>Giữ chỗ đến theo tham số hiện hành, không muộn hơn hạn hủy chỗ của tour. Máy chủ kiểm như Điều hành tạo booking: tour đã duyệt, dự toán, còn chỗ. Không giảm giá trên cổng. Người tiếp nhận: bàn Sales Admin lẻ.</p>
             <Nut kieu="primary" i="tickets" disabled={busy} onClick={giu}>{busy ? "Đang giữ…" : "Xác nhận giữ chỗ"}</Nut></section></div>}
 
         {blv && tab === "bookings" && <section className="v3-panel">
@@ -185,7 +189,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
               <td><Badge c={b.muc}>{b.phuc_vu}</Badge>{b.dang_giu && <small> {conGio(b.con_gio)}</small>}</td><td>{b.thanh_toan}</td>
               <td><Nut kieu="quiet" i="chevron-right" onClick={() => { setBkMo(b); di("booking"); }}>Chi tiết</Nut></td></tr>)}</tbody></table></div>
             : <p>Chưa có booking nào của {ten}.</p>}
-          <small>Đổi / hủy: gửi yêu cầu cho Sale Admin; phí hủy theo hợp đồng đại lý.</small></section>}
+          <small>Đổi / hủy: gửi yêu cầu cho bàn Sales Admin lẻ; phí hủy theo hợp đồng đại lý.</small></section>}
 
         {blv && tab === "booking" && bkMo && <>
           <Nut kieu="quiet" i="arrow-left" onClick={() => di("bookings")}>Quay lại danh sách</Nut>
