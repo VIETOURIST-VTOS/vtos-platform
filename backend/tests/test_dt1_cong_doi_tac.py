@@ -26,9 +26,10 @@ def db(monkeypatch):
     e = create_engine("sqlite://", future=True)
     Base.metadata.create_all(e)
     s = sessionmaker(bind=e, future=True)()
-    for ten, vai in (("dh", "nv_dh"), ("kd", "nv_kd"), ("sa", "sales_admin"), ("gdkd", "gd_kd"), ("tpdh", "tp_dh"),
-                     ("ct", "chutich"), ("bks", "bks"), ("kt", "ketoan")):
-        s.add(User(username=ten, full_name=ten.upper(), role=vai, password_hash="x"))
+    # «sadoan» là Sale Admin phòng Đoàn, tạo TRƯỚC (id nhỏ hơn) — máy không được chọn nhầm.
+    for ten, vai, phong in (("dh", "nv_dh", ""), ("kd", "nv_kd", ""), ("sadoan", "sales_admin", "kd_doan"), ("sa", "sales_admin", "kd_le"),
+                            ("gdkd", "gd_kd", ""), ("tpdh", "tp_dh", ""), ("ct", "chutich", ""), ("bks", "bks", ""), ("kt", "ketoan", "")):
+        s.add(User(username=ten, full_name=ten.upper(), role=vai, department=phong, password_hash="x"))
     s.commit()
     monkeypatch.setattr(K, "_hom_nay", lambda: NOW.date())
     yield s
@@ -182,6 +183,7 @@ def test_ctv_gioi_thieu_thanh_lead_co_nguon(db):
     D.gioi_thieu(db, tk, t.id, "Lê D", "0987654321", 2, "", dong_y=True, now=NOW)
     l = db.execute(select(Lead)).scalars().one()
     assert l.phone == "0987654321" and "DT-0011" in l.note and "27/10/2026 09:00" in l.note
+    assert l.sales_id == _u(db, "sa").id                               # giao thẳng bàn Sales Admin lẻ
     ds = D.gioi_thieu_ds(db, tk)
     assert ds[0]["khach"] == "Lê D" and ds[0]["trang_thai"].startswith("Đã gửi")
     j = _dt(db, "DT-0003", "J TRAVEL")
@@ -194,3 +196,13 @@ def test_cua_api_doi_phien_cong(db):
     paths = {r.path for r in app.routes}
     for p in ("/api/v1/cong/doi-tac/ban-lam-viec", "/api/v1/cong/doi-tac/giu-cho", "/api/v1/tai-khoan-ngoai/{tid}/doi-tac"):
         assert p in paths
+
+
+def test_sale_admin_le_nhan_qua_ho_so_nhan_su(db):
+    """Phòng ban ghi trên hồ sơ nhân sự (HCNS) cũng nhận ra bàn SA lẻ; SA phòng Đoàn không bao giờ được chọn."""
+    from app.services import doi_tac_cong as D
+    from app.models.hr import Employee
+    sa = _u(db, "sa"); sa.department = ""; db.commit()
+    assert D.sale_admin_le(db) is None
+    db.add(Employee(code="NS9001", user_id=sa.id, full_name="SA", department="kd_le")); db.commit()
+    assert D.sale_admin_le(db).id == sa.id
