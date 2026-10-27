@@ -568,3 +568,10 @@ CG-1 — phần thêm vào bản v3.2: chọn kênh nhận mã, đồng ý đi�
 #vtd-access .kh-dg-hoi legend{font-weight:600;margin-bottom:4px}
 #vtd-access .kh-dg-hoi .v3-check{min-height:0;padding:4px 0;margin:0}
 #vtd-access .v3-link{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;font-weight:600;cursor:pointer}
+/* KS-1 · khách sạn qua OTA */
+#vtd-access .ks-ota{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+#vtd-access .ks-the{border:1px solid #e0e7ee;border-radius:12px;padding:14px;display:grid;gap:8px;background:#fff}
+#vtd-access .ks-the strong{font-size:16px;color:#19344c}
+#vtd-access .ks-the small{color:#52677f}
+#vtd-access .ks-xac-nhan{max-width:560px}
+#vtd-access .ks-co-dong{display:grid;gap:0}

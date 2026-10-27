@@ -14,6 +14,7 @@ import NhaHangKhach from "./NhaHangKhach";
 import QrThanhToan from "./QrThanhToan";
 import { useDiem, DiemUuDai, HangThanhVien, YeuThich } from "./RewardsKhach";
 import { DanhGiaKhach, GopYKhach, HoTroKhach } from "./ChamSocKhach";
+import KhachSanOta from "../KhachSanOta";
 
 type Tab = "home" | "deals" | "tour" | "request" | "bookings" | "booking" | "rewards" | "tier" | "favorites" | "reviews" | "feedback" | "support" | "profile";
 const MENU: [Tab, string, string][] = [
@@ -73,7 +74,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
   const [menuMo, setMenuMo] = useState(false);
   const [home, setHome] = useState<any>(null);
   const [ds, setDs] = useState<any>(null);
-  const [dv, setDv] = useState<"tour" | "nha_hang">("tour");
+  const [dv, setDv] = useState<"tour" | "nha_hang" | "khach_san">("tour");
   const [loc, setLoc] = useState({ q: "", tu_ngay: "", noi: "", ngan_sach: "", nhom: "" });
   const [tourMo, setTourMo] = useState<any>(null);
   const [loaiYc, setLoaiYc] = useState<"tour" | "tour_doan">("tour");
@@ -162,15 +163,16 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
           {home && !home.tour.length && <section className="v3-panel"><p>Chưa có tour mở bán. Gửi yêu cầu tour đoàn để Sales thiết kế hành trình riêng.</p></section>}
           <div className="v3-shortcuts"><Nut i="users" onClick={() => moYeuCau("tour_doan")}>Tour đoàn theo yêu cầu</Nut><Nut i="luggage" onClick={() => di("bookings")}>Đơn của tôi</Nut><Nut i="user-round" onClick={() => di("profile")}>Hồ sơ & riêng tư</Nut></div>
           <section className="v3-panel"><div className="v3-section-title"><h3>Thưởng thức một điểm đến</h3><Nut kieu="quiet" i="utensils" onClick={() => { setDv("nha_hang"); di("deals"); }}>Khám phá ẩm thực</Nut></div>
-            <p>Chọn nhà hàng, xem thực đơn và gửi yêu cầu đặt bàn trong cùng tài khoản VTD. Đặt phòng khách sạn sắp ra mắt.</p></section>
+            <p>Chọn nhà hàng, xem thực đơn và gửi yêu cầu đặt bàn trong cùng tài khoản VTD. Đặt phòng khách sạn qua đối tác OTA của Vietourist.</p></section>
         </>}
 
         {tab === "deals" && <>
           <nav className="v31-service-tabs" aria-label="Loại dịch vụ">
             <button type="button" className="cursor-interaction" aria-pressed={dv === "tour"} onClick={() => setDv("tour")}><I n="plane" /><span>Tour du lịch</span></button>
-            <button type="button" className="cursor-interaction" aria-pressed="false" disabled title="Sắp ra mắt"><I n="hotel" /><span>Khách sạn · sắp ra mắt</span></button>
+            <button type="button" className="cursor-interaction" aria-pressed={dv === "khach_san"} onClick={() => setDv("khach_san")}><I n="hotel" /><span>Khách sạn</span></button>
             <button type="button" className="cursor-interaction" aria-pressed={dv === "nha_hang"} onClick={() => setDv("nha_hang")}><I n="utensils" /><span>Nhà hàng & ẩm thực</span></button></nav>
-          {dv === "nha_hang" ? <section className="v31-service-content" aria-label="Nhà hàng & ẩm thực">
+          {dv === "khach_san" ? <section className="v31-service-content" aria-label="Khách sạn"><KhachSanOta /></section>
+          : dv === "nha_hang" ? <section className="v31-service-content" aria-label="Nhà hàng & ẩm thực">
             <NhaHangKhach ten={ten} lienHe={lienHe} coSdt={coSdt} sdtCho={toi.dien_thoai} daGui={(m) => { setDon(null); di("bookings"); setMsg(m); }} /></section>
           : <section className="v31-service-content" aria-label="Tour du lịch">
             <section className="v3-panel">
