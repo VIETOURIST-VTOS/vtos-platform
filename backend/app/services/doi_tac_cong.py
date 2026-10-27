@@ -5,7 +5,7 @@ BỐN ĐIỀU ĐÃ CHỐT
      xác thực. Nhiều đối tác cùng khớp thì máy không tự chọn. Chưa nối = cổng không hiện số liệu nào —
      tài khoản ngoài chỉ thấy đúng những booking mang `doi_tac_id` của đối tác đã nối.
   2. ĐẠI LÝ GIỮ CHỖ QUA ĐỦ CỔNG như Điều hành tạo booking (`tours.cong_tao_booking`: tour đã duyệt,
-     dự toán, sức chứa). Không giảm giá trên cổng. Người tiếp nhận LUÔN là Sale Admin; doanh số không
+     dự toán, sức chứa). Không giảm giá trên cổng. Người tiếp nhận LUÔN là bàn Sales Admin LẺ; doanh số không
      vào chỉ tiêu nhân viên. Hết hạn giữ chỗ mà chưa cọc thì robot trả chỗ về tour như mọi booking.
   3. GIÁ = giá bán công bố (như khách lẻ) + hoa hồng D06. Cổng không bao giờ đưa giá vốn, lãi tour.
   4. CÔNG NỢ HAI CHIỀU HIỆN RIÊNG, KHÔNG BÙ TRỪ. «Đại lý còn phải trả» là tiền booking chưa được kế
@@ -304,10 +304,29 @@ def tours(db: Session, tk: TaiKhoanNgoai, q: str = "", tu_ngay: date | None = No
     return {"tour": K.tours(db, q, tu_ngay, gioi_han=80), "hoa_hong": hh["hinh_thuc_ten"], "bac_hien_tai": hh["bac_hien_tai"]}
 
 
+PHONG_LE = "kd_le"
+
+
+def sale_admin_le(db: Session) -> User | None:
+    """BÀN SALES ADMIN LẺ — một bàn chăm sóc mọi đại lý và CTV (Chủ tịch 27/10/2026). Nhận diện:
+    vai `sales_admin` ĐANG HOẠT ĐỘNG và phòng ban Kinh doanh Lẻ (trên tài khoản, hoặc trên hồ sơ nhân sự
+    nối với tài khoản). Cửa nhập là màn HCNS gán phòng ban — máy không đoán người."""
+    from app.models.hr import Employee, DEPARTMENTS
+    ten_le = DEPARTMENTS[PHONG_LE]
+    ds = db.execute(select(User).where(User.role == "sales_admin", User.active.is_(True)).order_by(User.id)).scalars().all()
+    for u in ds:
+        if (u.department or "").strip() in (PHONG_LE, ten_le):
+            return u
+        e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+        if e is not None and e.department == PHONG_LE:
+            return u
+    return None
+
+
 def _sale_admin(db: Session) -> User:
-    u = db.execute(select(User).where(User.role == "sales_admin", User.active.is_(True)).order_by(User.id)).scalars().first()
+    u = sale_admin_le(db)
     if u is None:
-        raise LoiDoiTac("Vietourist chưa có Sale Admin tiếp nhận — giữ chỗ tạm đóng, vui lòng gọi Sales", 409)
+        raise LoiDoiTac("Vietourist chưa có bàn Sales Admin lẻ tiếp nhận — giữ chỗ tạm đóng, vui lòng gọi Sales", 409)
     return u
 
 
@@ -332,7 +351,7 @@ def giu_cho(db: Session, tk: TaiKhoanNgoai, tour_id: int, ten_khach: str, sdt_kh
         Booking.doi_tac_id == dt.id, Booking.source == f"Đại lý cổng · {dt.ma}"[:60],
         Booking.created_at >= now - timedelta(days=1))).scalar_one()
     if trong_ngay >= GIU_CHO_TOI_DA_NGAY:
-        raise LoiDoiTac("Đã giữ nhiều chỗ trong 24 giờ — liên hệ Sale Admin để giữ thêm", 429)
+        raise LoiDoiTac("Đã giữ nhiều chỗ trong 24 giờ — liên hệ bàn Sales Admin lẻ để giữ thêm", 429)
     try:
         o = K.tour(db, int(tour_id or 0))          # đang mở bán, còn chỗ, chưa khởi hành, có giá
     except K.LoiKhach as ex:
@@ -361,7 +380,7 @@ def giu_cho(db: Session, tk: TaiKhoanNgoai, tour_id: int, ten_khach: str, sdt_kh
     db.add(b); db.flush(); r.booking_id = b.id
     BK.init_terms(db, b, t)
     db.add(Alert(kind="dai_ly_giu_cho", level="info", ref=b.code[:60],
-                 message=f"{dt.ten} giữ {nl + te} chỗ {t.code} qua cổng đối tác ({b.code}) — giữ đến {b.giu_cho_den:%d/%m %H:%M}",
+                 message=f"{dt.ten} giữ {nl + te} chỗ {t.code} qua cổng đối tác ({b.code}) — giữ đến {b.giu_cho_den:%d/%m %H:%M} · tiếp nhận: {sa.full_name}",
                  to_roles="nv_dh,tp_dh,sales_admin"))
     R.audit(db, f"cong:{tk.id}", "doi_tac", "dai_ly_giu_cho", f"booking:{b.code}",
             after={"doi_tac": dt.ma, "tour": t.code, "nguoi_lon": nl, "tre_em": te, "amount": b.amount, "giu_den": str(b.giu_cho_den)})
@@ -393,7 +412,7 @@ def qr(db: Session, tk: TaiKhoanNgoai, ma: str, muc: str = "") -> dict:
     ba = K.tai_khoan_qr(db)
     bin_ = Q.bin_cua(ba.bank_name) if ba is not None and ba.account_number else None
     if bin_ is None:
-        raise LoiDoiTac("Thanh toán QR chưa mở — liên hệ Sale Admin để nhận thông tin chuyển khoản")
+        raise LoiDoiTac("Thanh toán QR chưa mở — liên hệ bàn Sales Admin lẻ để nhận thông tin chuyển khoản")
     return {"ma": b.code, "muc": muc, "so_tien": so_tien, "coc": coc, "con_lai": con, "da_nop": da_nop,
             "payload": Q.payload(bin_, ba.account_number, so_tien, b.code), "noi_dung": Q.noi_dung_sach(b.code),
             "ngan_hang": ba.bank_name, "so_tk": ba.account_number, "chu_tk": ba.account_name, "tu_khop": muc == "du"}
@@ -434,6 +453,11 @@ def gioi_thieu(db: Session, tk: TaiKhoanNgoai, tour_id: int | None, ten_khach: s
     da_co = db.execute(select(Lead.id).where(Lead.phone == sdt, Lead.channel != kenh, Lead.sales_id.is_not(None))).first()
     lead, _moi = upsert_lead(db, "cong_doi_tac", {"phone": sdt, "name": ten_khach, "channel": KENH_CTV,
                                                   "received_at": now.isoformat(), "interest": ten_tour[:200]})
+    # Giao thẳng bàn Sales Admin lẻ (Chủ tịch 27/10/2026). Lead đã có người phụ trách thì giữ nguyên;
+    # chưa có bàn SA lẻ thì vẫn nhận giới thiệu (không làm mất nguồn của CTV), để trống người phụ trách.
+    sa = sale_admin_le(db)
+    if sa is not None and lead.sales_id is None:
+        lead.sales_id = sa.id
     dong = (f"[CTV giới thiệu {now:%d/%m/%Y %H:%M}] {dt.ten} ({dt.ma}, tài khoản #{tk.id}): {ten_tour} · {so_khach} khách"
             + " · khách đã đồng ý chuyển liên hệ" + (" · CẦN TP KD XÉT NGUỒN: khách đã có Sales chăm" if da_co else "")
             + (f" · {ghi}" if ghi else ""))

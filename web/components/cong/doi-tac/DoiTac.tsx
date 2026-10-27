@@ -175,7 +175,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
             <dl className="v3-stat-rows"><div><dt>Người lớn</dt><dd>{f.nguoi_lon} × {tien(tourMo.gia)}</dd></div>
               {Number(f.tre_em) > 0 && <div><dt>Trẻ em</dt><dd>{f.tre_em} × {tien(tourMo.gia_tre_em || tourMo.gia)}</dd></div>}</dl>
             <div className="v3-total"><span>Tạm tính</span><strong>{tien(tamTinh)}</strong></div>
-            <p>Giữ chỗ đến theo tham số hiện hành, không muộn hơn hạn hủy chỗ của tour. Máy chủ kiểm như Điều hành tạo booking: tour đã duyệt, dự toán, còn chỗ. Không giảm giá trên cổng. Người tiếp nhận: Sale Admin.</p>
+            <p>Giữ chỗ đến theo tham số hiện hành, không muộn hơn hạn hủy chỗ của tour. Máy chủ kiểm như Điều hành tạo booking: tour đã duyệt, dự toán, còn chỗ. Không giảm giá trên cổng. Người tiếp nhận: bàn Sales Admin lẻ.</p>
             <Nut kieu="primary" i="tickets" disabled={busy} onClick={giu}>{busy ? "Đang giữ…" : "Xác nhận giữ chỗ"}</Nut></section></div>}
 
         {blv && tab === "bookings" && <section className="v3-panel">
@@ -185,7 +185,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
               <td><Badge c={b.muc}>{b.phuc_vu}</Badge>{b.dang_giu && <small> {conGio(b.con_gio)}</small>}</td><td>{b.thanh_toan}</td>
               <td><Nut kieu="quiet" i="chevron-right" onClick={() => { setBkMo(b); di("booking"); }}>Chi tiết</Nut></td></tr>)}</tbody></table></div>
             : <p>Chưa có booking nào của {ten}.</p>}
-          <small>Đổi / hủy: gửi yêu cầu cho Sale Admin; phí hủy theo hợp đồng đại lý.</small></section>}
+          <small>Đổi / hủy: gửi yêu cầu cho bàn Sales Admin lẻ; phí hủy theo hợp đồng đại lý.</small></section>}
 
         {blv && tab === "booking" && bkMo && <>
           <Nut kieu="quiet" i="arrow-left" onClick={() => di("bookings")}>Quay lại danh sách</Nut>
