@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { THANH_TREN } from "@/components/cong/manh";
 import { goiCong, phienCong, xoaPhienCong } from "@/lib/cong";
 import KhachHang from "@/components/cong/khach/KhachHang";
+import DoiTac from "@/components/cong/doi-tac/DoiTac";
 
 /* CG-1 · KHÔNG GIAN SAU ĐĂNG NHẬP của cổng ngoài (khách hàng, đối tác, cổ đông).
    Đợt này làm cổng và tài khoản. Các phân hệ (đặt dịch vụ, đơn, điểm, ưu đãi cổ đông…) là đợt sau —
@@ -40,7 +41,8 @@ export default function Cong() {
     <div style={{ background: "#081826", minHeight: "100vh" }}>
       <div id="vtd-access" data-mode="inline" data-page="login" data-role={role} data-preview="off" data-vtos-screen="off" data-vtos-menu="closed">
         <div id="vtd-screen">
-          {toi?.loai === "khach_hang" && toi.trang_thai !== "khoa" ? <KhachHang toi={toi} thoat={thoat} /> : <>
+          {toi?.loai === "khach_hang" && toi.trang_thai !== "khoa" ? <KhachHang toi={toi} thoat={thoat} />
+            : toi?.loai === "doi_tac" && toi.trang_thai === "hoat_dong" ? <DoiTac toi={toi} thoat={thoat} /> : <>
           <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: THANH_TREN }} />
           {!toi ? <p style={{ color: "#a9b9ce", padding: 24 }}>Đang tải…</p> : <div data-role={role}><div className="v4-auth">
             <nav className="vtd-breadcrumb"><span>{toi.loai_ten}</span><span>·</span><span>{toi.dien_thoai || toi.email}</span>
