@@ -148,6 +148,10 @@ CUA_TAY = (
     "phieu_danh_gia_khach",
     "gop_y_lanh_dao",
     "ho_tro_khach",
+    # KS-1 (28/10/2026): Chủ tịch nhập link / bật OTA ở màn /khach-san-ota; lượt chuyển do khách bấm ở cổng.
+    "phap_nhan_hop_dong",
+    "doi_tac_ota",
+    "luot_chuyen_ota",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
