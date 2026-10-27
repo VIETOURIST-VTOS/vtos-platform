@@ -7,7 +7,7 @@ import { goiCong } from "@/lib/cong";
 
 const tien = (n: number) => `${Math.round(n).toLocaleString("vi-VN")} đ`;
 
-export default function QrThanhToan({ ma }: { ma: string }) {
+export default function QrThanhToan({ ma, duong = "/khach/don" }: { ma: string; duong?: string }) {
   const [muc, setMuc] = useState<string>("");
   const [q, setQ] = useState<any>(null);
   const [anh, setAnh] = useState("");
@@ -15,10 +15,10 @@ export default function QrThanhToan({ ma }: { ma: string }) {
   const [chep, setChep] = useState("");
   useEffect(() => {
     setLoi(""); setAnh("");
-    goiCong(`/khach/don/${encodeURIComponent(ma)}/qr${muc ? `?muc=${muc}` : ""}`)
+    goiCong(`${duong}/${encodeURIComponent(ma)}/qr${muc ? `?muc=${muc}` : ""}`)
       .then((r) => { setQ(r); return QRCode.toDataURL(r.payload, { margin: 1, width: 240, errorCorrectionLevel: "M" }); })
       .then(setAnh).catch((x) => { setQ(null); setLoi(x.message || "Chưa tạo được mã QR"); });
-  }, [ma, muc]);
+  }, [ma, muc, duong]);
   const chepChu = async (v: string, nhan: string) => {
     try { await navigator.clipboard.writeText(v); setChep(`Đã chép ${nhan}`); } catch { setChep("Trình duyệt chặn chép — hãy bôi đen để chép"); }
   };
