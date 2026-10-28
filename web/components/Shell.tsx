@@ -411,6 +411,7 @@ export const GROUPS: Group[] = [
     ["Yêu cầu khách (cổng)", "/yeu-cau-khach"],
     ["Góp ý riêng lãnh đạo", "/gop-y-lanh-dao"],
     ["Khách sạn OTA", "/khach-san-ota"],
+    ["Đối soát OTA", "/doi-soat-ota"],
     // TC-73 · 19/9/2026. Sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
     //
     // ĐỨNG NGOÀI hai khối "Lẻ" và "MICE", vì nó là của CẢ HAI phòng: một người có thể ở cây Lẻ,

@@ -117,7 +117,8 @@ def _quan_tri_out(db: Session, o: DoiTacOta, luot7: dict, u: User) -> dict:
             "phien_ban": o.phien_ban, "bang_chung": o.bang_chung, "ghi_chu": o.ghi_chu,
             "phap_nhan": {"ma": pn.ma, "ten": pn.ten, "quoc_gia": pn.quoc_gia} if pn else None,
             "sua_boi": o.sua_boi, "sua_luc": o.sua_luc.isoformat(timespec="minutes") if o.sua_luc else None,
-            "luot_7_ngay": luot7.get(o.id, 0), "sua_duoc": sua_duoc(u)}
+            "luot_7_ngay": luot7.get(o.id, 0), "sua_duoc": sua_duoc(u),
+            "subid_cho_phep": o.subid_cho_phep, "subid_tham_so": o.subid_tham_so}
 
 
 def ds_quan_tri(db: Session, u: User, now: datetime | None = None) -> dict:
@@ -140,7 +141,7 @@ def _lay(db: Session, ota_id: int) -> DoiTacOta:
 
 def _snap(o: DoiTacOta) -> dict:
     return {k: getattr(o, k) for k in ("trang_thai", "link", "ten_mien", "duong_dan", "da_kiem_link", "duoc_dung_web",
-                                       "bat", "phien_ban", "phap_nhan_id")}
+                                       "bat", "phien_ban", "phap_nhan_id", "subid_cho_phep", "subid_tham_so")}
 
 
 def sua(db: Session, u: User, ota_id: int, d: dict, now: datetime | None = None) -> DoiTacOta:
@@ -173,6 +174,18 @@ def sua(db: Session, u: User, ota_id: int, d: dict, now: datetime | None = None)
     for k in ("da_kiem_link", "duoc_dung_web"):
         if d.get(k) is not None:
             setattr(o, k, bool(d[k]))
+    # KS-2: SubID — chỉ khi OTA cho phép; tên tham số chỉ chữ / số / gạch dưới, không trùng tham số sẵn có của link.
+    if d.get("subid_tham_so") is not None:
+        ts = str(d["subid_tham_so"]).strip()
+        if ts and not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,29}", ts):
+            raise LoiOta("Tên tham số SubID chỉ gồm chữ, số, gạch dưới (vd sid, subid)")
+        o.subid_tham_so = ts
+    if d.get("subid_cho_phep") is not None:
+        o.subid_cho_phep = bool(d["subid_cho_phep"])
+    if o.subid_cho_phep and not o.subid_tham_so:
+        raise LoiOta("Bật SubID thì phải khai tên tham số")
+    if o.subid_tham_so and re.search(rf"[?&]{re.escape(o.subid_tham_so)}=", o.link or ""):
+        raise LoiOta("Link đã có sẵn tham số này — chọn tên khác")
     for k in ("bang_chung", "ghi_chu"):
         if d.get(k) is not None:
             setattr(o, k, str(d[k]).strip()[:2000])
@@ -281,6 +294,14 @@ def _nhac(o: DoiTacOta, l: LuotChuyenOta) -> str:
     return " · ".join(phan)
 
 
+def link_cua(o: DoiTacOta, l: LuotChuyenOta) -> str:
+    """Link trả cho trình duyệt. Gắn mã lượt (ngẫu nhiên, không chứa gì của khách) khi OTA cho phép SubID."""
+    if not (o.subid_cho_phep and o.subid_tham_so and l.ma_luot):
+        return o.link
+    from urllib.parse import quote
+    return o.link + ("&" if "?" in o.link else "?") + f"{o.subid_tham_so}={quote(l.ma_luot)}"
+
+
 def chuyen(db: Session, tk: TaiKhoanNgoai, ma_ota: str, request_id: str, lua_chon: dict | None = None,
            now: datetime | None = None) -> dict:
     cong = cong_cua(tk)
@@ -305,10 +326,20 @@ def chuyen(db: Session, tk: TaiKhoanNgoai, ma_ota: str, request_id: str, lua_cho
         if gio >= LUOT_TOI_DA_GIO:
             raise LoiOta("Bạn mở OTA quá nhiều lần trong một giờ — thử lại sau", 429)
         lc = _lua_chon(lua_chon or {}, now.date())
+        from app.services.doi_soat_ota import ma_luot_moi
         l = LuotChuyenOta(tai_khoan_id=tk.id, request_id=rid, doi_tac_ota_id=o.id, phien_ban_link=o.phien_ban, cong=cong,
+                          ma_luot=ma_luot_moi(db),
                           doi_tac_ban_hang_id=tk.doi_tac_id if cong == "doi_tac" else None, tao_luc=now, **lc)
         db.add(l); db.commit(); db.refresh(l)
-    return {"luot_id": l.id, "url": o.link, "ota": o.ten, "loi_nhac": LOI_NHAC.format(ota=o.ten), "chon_lai": _nhac(o, l)}
+    return {"luot_id": l.id, "url": link_cua(o, l), "ota": o.ten, "loi_nhac": LOI_NHAC.format(ota=o.ten), "chon_lai": _nhac(o, l)}
+
+
+def dat_phong_xac_minh(db: Session, tk: TaiKhoanNgoai) -> list[dict]:
+    """KS-2: đặt phòng OTA báo về nối được bằng mã lượt của CHÍNH tài khoản này."""
+    from app.services.doi_soat_ota import dat_phong_cua
+    cong_cua(tk)
+    ids = [i for (i,) in db.execute(select(LuotChuyenOta.id).where(LuotChuyenOta.tai_khoan_id == tk.id)).all()]
+    return dat_phong_cua(db, ids)
 
 
 def lich_su(db: Session, tk: TaiKhoanNgoai) -> list[dict]:

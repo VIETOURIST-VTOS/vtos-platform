@@ -584,6 +584,7 @@ MAN_HINH_API = {
     "/yeu-cau-khach": ("/api/v1/yeu-cau-khach",),
     "/gop-y-lanh-dao": ("/api/v1/gop-y-lanh-dao",),
     "/khach-san-ota": ("/api/v1/khach-san-ota",),
+    "/doi-soat-ota": ("/api/v1/doi-soat-ota",),
     "/gop-tai-khoan": ("/api/v1/gop-tai-khoan",),
     # TC-81 - Bao chi, KOL & su kien (muc 2.2.2). HAI tien to, va da kiem ky truoc khi khai cai
     # thu hai: danh sach vai cua man hinh nay nam GON trong danh sach vai cua "/marketing", nen
@@ -966,6 +967,7 @@ MENU_ROLES = {
     # Góp ý riêng lãnh đạo: CHỈ Chủ tịch + TGĐ trả lời. BKS / robot Kiểm soát đọc theo bất biến
     # BASE_VIEW (Chủ tịch chọn 27/10/2026 «BKS đọc được, không trả lời»). Không vai nào khác.
     "/gop-y-lanh-dao": BASE_VIEW,
+    "/doi-soat-ota": BASE_VIEW + ("ketoan",),   # KS-2: Kế toán nạp báo cáo OTA, Chủ tịch duyệt lô
     "/khach-san-ota": BASE_VIEW,     # KS-1: Chủ tịch nhập và bật; TGĐ, BKS, robot KS xem
     # TC-75 - gop tai khoan trung. HEP: khong co vai Kinh doanh nao. Doc bang cap trung thi HCNS
     # va Ke toan can (ho la nguoi phat hien ra trung), nhung nut gop thi chi cntt va Ban TGD -

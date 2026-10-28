@@ -51,7 +51,7 @@ def chuyen(data: ChuyenIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Ses
 
 @router.get("/lich-su")
 def lich_su(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
-    return {"luot": _goi(S.lich_su, db, tk)}
+    return {"luot": _goi(S.lich_su, db, tk), "dat_phong": _goi(S.dat_phong_xac_minh, db, tk)}
 
 
 # ---------------------------------------------------------------- phía VTOS
@@ -87,6 +87,8 @@ class SuaIn(BaseModel):
     duong_dan: str | None = None
     da_kiem_link: bool | None = None
     duoc_dung_web: bool | None = None
+    subid_cho_phep: bool | None = None
+    subid_tham_so: str | None = None
     bang_chung: str | None = None
     ghi_chu: str | None = None
 

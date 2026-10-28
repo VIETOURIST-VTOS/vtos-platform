@@ -13,13 +13,14 @@ const uuid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? cr
 export default function KhachSanOta({ ghiChu }: { ghiChu?: string }) {
   const [ds, setDs] = useState<any[] | null>(null);
   const [ls, setLs] = useState<any[]>([]);
+  const [dp, setDp] = useState<any[]>([]);
   const [f, setF] = useState({ diem_den: "", nhan_phong: "", tra_phong: "", so_phong: 1, nguoi_lon: 2, tre_em: 0 });
   const [chon, setChon] = useState<any>(null);
   const [rid, setRid] = useState("");
   const [loi, setLoi] = useState(""); const [busy, setBusy] = useState(false);
   const tai = useCallback(() => {
     goiCong("/khach-san/ota").then((r) => setDs(r.ota)).catch((x) => { setDs([]); setLoi(x.message); });
-    goiCong("/khach-san/lich-su").then((r) => setLs(r.luot)).catch(() => null);
+    goiCong("/khach-san/lich-su").then((r) => { setLs(r.luot); setDp(r.dat_phong || []); }).catch(() => null);
   }, []);
   useEffect(() => { tai(); }, [tai]);
   const tom = [f.diem_den, f.nhan_phong && `${ngay(f.nhan_phong)}${f.tra_phong ? ` – ${ngay(f.tra_phong)}` : ""}`,
@@ -65,6 +66,10 @@ export default function KhachSanOta({ ghiChu }: { ghiChu?: string }) {
       {loi && !chon && <div className="v3-notice warn"><span>{loi}</span></div>}
       <p className="v3-small">VTD chưa hiện giá và phòng trống — giá, phòng và thanh toán xem trên trang đối tác.</p>
       {ghiChu && <div className="v3-notice warn"><span>{ghiChu}</span></div>}</section>
+    {dp.length > 0 && <section className="v3-panel"><div className="v3-section-title"><h3>Đặt phòng OTA đã xác minh</h3><span className="v3-badge good">{dp.length}</span></div>
+      <div className="v3-table-wrap"><table><thead><tr><th scope="col">OTA</th><th scope="col">Thành phố</th><th scope="col">Ngày ở</th><th scope="col">Trạng thái</th></tr></thead>
+        <tbody>{dp.map((d, i) => <tr key={i}><th scope="row">{d.ota}</th><td>{d.thanh_pho || "—"}</td><td>{ngay(d.ngay_den)}{d.ngay_di ? ` – ${ngay(d.ngay_di)}` : ""}</td><td>{d.trang_thai}</td></tr>)}</tbody></table></div>
+      <p className="v3-small">Đặt phòng do OTA báo về, nối được với lượt bạn mở từ VTD. Đổi, hủy, hoàn tiền làm với OTA.</p></section>}
     {ls.length > 0 && <section className="v3-panel"><div className="v3-section-title"><h3>Đã mở OTA</h3><span className="v3-badge neutral">không phải đặt phòng</span></div>
       <div className="v3-table-wrap"><table><thead><tr><th scope="col">Lúc</th><th scope="col">OTA</th><th scope="col">Bạn đã chọn</th></tr></thead>
         <tbody>{ls.map((l, i) => <tr key={i}><td>{ngay(l.luc)} {l.luc.slice(11, 16)}</td><th scope="row">{l.ota}</th><td>{l.da_chon}</td></tr>)}</tbody></table></div>
