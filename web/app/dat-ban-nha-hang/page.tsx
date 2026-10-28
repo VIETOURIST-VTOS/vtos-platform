@@ -54,27 +54,28 @@ function Trang() {
           <td>{x.trang_thai_ten}<div className="muted" style={{ fontSize: 12 }}>đã trả {vnd(x.da_tra)} / phải trả trước {vnd(x.phai_tra_truoc)}</div></td>
           <td><input placeholder="Số txn" value={chon[x.id] || ""} onChange={(e) => setChon({ ...chon, [x.id]: e.target.value })} style={{ width: 90 }} />
             <button className="act grey" style={{ margin: "0 0 0 6px" }} disabled={busy || !Number(chon[x.id])} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/qr`, { txn_id: Number(chon[x.id]) })}>Gán</button></td></tr>)}</tbody></table></>}
-      <div className="muted">Tiền về khi đơn đã hết hạn / đã hủy / bị từ chối: máy tự chuyển thành khoản phải hoàn (tab Hủy & hoàn).</div></div>}
+      <div className="muted">Xác nhận là máy ghi sổ Nợ 1121 / Có 3388 phải trả nhà hàng (Vietourist thu hộ). Tiền về khi đơn đã hết hạn / đã hủy / bị từ chối: máy tự chuyển thành khoản phải hoàn (tab Hủy & hoàn).</div></div>}
 
     {tab === "the" && <div className="card"><h3>Giao dịch thẻ OnePay báo thành công — chờ đối soát</h3>
       {!d.the_cho_doi_soat.length ? <div className="muted">Không có giao dịch chờ.</div>
       : <table><thead><tr><th>Đơn</th><th>Số tiền</th><th>Mã GD OnePay</th><th>Lúc</th><th></th></tr></thead><tbody>{d.the_cho_doi_soat.map((t: any) => <tr key={t.id}>
         <td>{t.ma}<div className="muted" style={{ fontSize: 12 }}>{t.ma_gd}</div></td><td>{vnd(t.so_tien)}</td><td>{t.so_gd_cong}</td><td>{fmtDT(t.luc)}</td>
-        <td>{Q.ke_toan && <button className="act teal" style={{ margin: 0 }} disabled={busy} onClick={() => goi(`/dat-ban-nha-hang/the/${t.id}/doi-soat`)}>Khớp sao kê OnePay</button>}</td></tr>)}</tbody></table>}
-      <div className="muted">Bàn đã giữ ngay khi OnePay báo thành công (chữ ký kiểm được). Phí thẻ Vietourist chịu — ghi chi phí theo sao kê.</div></div>}
+        <td style={{ whiteSpace: "nowrap" }}>{Q.ke_toan && <><input type="number" placeholder="Phí thẻ (đ)" value={q[`p${t.id}`] ?? ""} onChange={(e) => setQ({ ...q, [`p${t.id}`]: e.target.value })} style={{ width: 110 }} />
+          <button className="act teal" style={{ margin: "0 0 0 6px" }} disabled={busy || q[`p${t.id}`] === undefined || q[`p${t.id}`] === ""} onClick={() => goi(`/dat-ban-nha-hang/the/${t.id}/doi-soat`, { phi: Number(q[`p${t.id}`]) })}>Khớp sao kê · ghi sổ</button></>}</td></tr>)}</tbody></table>}
+      <div className="muted">Bàn đã giữ ngay khi cổng thẻ báo thành công (chữ ký kiểm được). Ghi phí thẻ theo sao kê: máy ghi Nợ 1121 thực nhận + Nợ 6428 phí / Có 3388 phải trả nhà hàng (sổ CTCP Vietourist Holdings).</div></div>}
 
     {tab === "hoan" && <div className="card"><h3>Hủy & hoàn</h3>
       {!hoan.length ? <div className="muted">Không có khoản chờ hoàn.</div>
       : <table><thead><tr><th>Đơn</th><th>Lý do</th><th>Đã trả · giữ · hoàn</th><th>Bước</th><th></th></tr></thead><tbody>{hoan.map((x: any) => <tr key={x.id}>
         <td>{x.ma}<div className="muted" style={{ fontSize: 12 }}>{x.nguon} · {x.nha_hang} · {fmtD(x.ngay)} {x.gio}{x.la_doan ? " · đoàn" : ""}</div></td>
         <td style={{ fontSize: 12 }}>{x.trang_thai_ten}<div className="muted">{x.huy_ly_do}{x.mien_phat ? " · miễn phạt" : ""}</div></td>
-        <td>{vnd(x.da_tra)} · {vnd(x.so_giu || 0)} · <b>{vnd(x.so_hoan || 0)}</b><div className="muted" style={{ fontSize: 12 }}>{x.thanh_toan.map((t: any) => t.kenh).join(", ")}</div></td>
+        <td>{vnd(x.da_tra)} · {vnd(x.so_giu || 0)} · <b>{vnd((x.so_hoan || 0) - (x.da_hoan_tien || 0))}</b>{x.da_hoan_tien ? <div className="muted" style={{ fontSize: 12 }}>đã hoàn trước {vnd(x.da_hoan_tien)}</div> : null}<div className="muted" style={{ fontSize: 12 }}>{x.thanh_toan.map((t: any) => t.kenh).join(", ")}</div></td>
         <td><Tag cls="warn">{x.hoan_tt_ten}</Tag><div className="muted" style={{ fontSize: 12, whiteSpace: "pre-line" }}>{x.hoan_ghi_chu}</div></td>
         <td style={{ whiteSpace: "nowrap" }}>
           <input placeholder={x.hoan_tt === "cho_chi" ? "Mã hoàn OnePay / số UNC" : "Ghi chú"} value={q[`h${x.id}`] || ""} onChange={(e) => setQ({ ...q, [`h${x.id}`]: e.target.value })} style={{ width: 150 }} />
           {x.hoan_tt === "cho_sales" && Q.sales && <button className="act teal" style={{ margin: "0 0 0 6px" }} disabled={busy} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/xac-nhan-hoan`, { ghi_chu: q[`h${x.id}`] || "" })}>Xác nhận hoàn</button>}
           {x.hoan_tt === "cho_chi" && Q.ke_toan && <button className="act teal" style={{ margin: "0 0 0 6px" }} disabled={busy || (q[`h${x.id}`] || "").trim().length < 3} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/da-hoan`, { ghi_chu: q[`h${x.id}`] })}>Đã hoàn</button>}</td></tr>)}</tbody></table>}
-      <div className="muted">Hoàn thẻ: làm trên trang quản trị OnePay (tiền về thẻ khách). Hoàn QR: chuyển khoản lại. Phần giữ lại thuộc nhà hàng.</div></div>}
+      <div className="muted">Hoàn thẻ: làm trên trang quản trị cổng thẻ (tiền về thẻ khách). Hoàn QR: chuyển khoản lại. «Đã hoàn» là máy ghi sổ Nợ 3388 / Có 1121. Phần giữ lại thuộc nhà hàng. Bớt khách cũng sinh khoản hoàn (hoàn được nhiều lần).</div></div>}
 
     {tab === "chot" && <div className="card"><h3>Chốt doanh số đơn qua đại lý / CTV (vào D06)</h3>
       {!chot.length ? <div className="muted">Chưa có đơn qua đối tác đã dùng.</div>

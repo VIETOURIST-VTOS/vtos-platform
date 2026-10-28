@@ -130,6 +130,7 @@ NGUON: dict[str, str] = {
     "misa":         "Chứng từ nạp thẳng từ MISA",
     "quy_tac":      "Ghi sổ qua màn hình quy tắc hạch toán",
     "dao":          "Bút toán đảo của một chứng từ đã ghi sổ",
+    "dat_ban":      "Đặt bàn nhà hàng — tiền Vietourist thu hộ nhà hàng (DT-3)",
 }
 
 # ════════════════════════════════════════════════════════════════════════════════════════════════

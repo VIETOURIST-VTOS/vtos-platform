@@ -195,6 +195,12 @@ export default function CongNcc({ toi, thoat }: { toi: any; thoat: () => void })
               <Nut kieu="primary" disabled={busy} onClick={() => chay(() => goiCong(`/ncc/dat-ban/${x.id}`, { nhan: true, ghi_chu: f[`g${x.id}`] || "" }), (r) => setD((o2) => ({ ...o2, dat_ban: r })))}>Nhận bàn</Nut>
               <input placeholder="Lý do từ chối" value={f[`g${x.id}`] ?? ""} onChange={(e) => setF({ ...f, [`g${x.id}`]: e.target.value })} />
               <Nut disabled={busy || !(f[`g${x.id}`] || "").trim()} onClick={() => chay(() => goiCong(`/ncc/dat-ban/${x.id}`, { nhan: false, ghi_chu: f[`g${x.id}`] }), (r) => setD((o2) => ({ ...o2, dat_ban: r })))}>Từ chối</Nut></div>}
+              {x.thay_doi && <div style={{ display: "grid", gap: 4 }}>
+                <small><b>Khách đề nghị đổi:</b> {ngay(x.thay_doi.ngay)} {x.thay_doi.gio} · {x.thay_doi.nguoi_lon} NL{x.thay_doi.tre_em ? ` + ${x.thay_doi.tre_em} TE` : ""}</small>
+                <Nut kieu="primary" disabled={busy} onClick={() => chay(() => goiCong(`/ncc/dat-ban/${x.id}/thay-doi`, { nhan: true, ghi_chu: "" }), (r) => setD((o2) => ({ ...o2, dat_ban: r })))}>Nhận thay đổi</Nut>
+                <input placeholder="Lý do từ chối thay đổi" value={f[`d${x.id}`] ?? ""} onChange={(e) => setF({ ...f, [`d${x.id}`]: e.target.value })} />
+                <Nut disabled={busy || !(f[`d${x.id}`] || "").trim()} onClick={() => chay(() => goiCong(`/ncc/dat-ban/${x.id}/thay-doi`, { nhan: false, ghi_chu: f[`d${x.id}`] }), (r) => setD((o2) => ({ ...o2, dat_ban: r })))}>Từ chối thay đổi</Nut></div>}
+              {x.thay_doi_ghi_chu && <small>{x.thay_doi_ghi_chu}</small>}
               {x.bao_dung_duoc && <div style={{ display: "grid", gap: 4 }}>
                 <input type="number" placeholder="Bill thực tế (đ)" value={f[`b${x.id}`] ?? ""} onChange={(e) => setF({ ...f, [`b${x.id}`]: e.target.value })} />
                 <input type="number" placeholder="Đã thu tại bàn (đ)" value={f[`t${x.id}`] ?? ""} onChange={(e) => setF({ ...f, [`t${x.id}`]: e.target.value })} />
