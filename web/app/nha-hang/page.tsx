@@ -25,6 +25,8 @@ async function guiTep(path: string, fd: FormData) {
   if (!r.ok) throw { status: r.status, message: typeof d?.detail === "string" ? d.detail : `Lỗi ${r.status}` };
   return d;
 }
+// AT-2a: máy chủ cũ (chưa có album) không trả anh_ht — màn vẫn phải mở được.
+const HT0 = { da_duyet: 0, cho_duyet: 0, nhap: 0, an: 0, co_bia: false };
 const TD_TRONG = { ten: "", loai: "set", gia_nguoi_lon: "", gia_tre_em: "", so_khach_toi_thieu: 1, mo_ta: "", dieu_kien: "", dieu_kien_huy: "", tu_ngay: "", den_ngay: "", dang_ban: true };
 
 function Trang() {
@@ -93,7 +95,7 @@ function Trang() {
   if (!x) return <p className="muted">Đang tải…</p>;
   const k = (s: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase();
   // AT-2a: lọc theo mức hoàn thiện ảnh
-  const LOC_ANH: Record<string, (n: any) => boolean> = { thieu: (n) => !n.anh_ht.da_duyet, bia: (n) => !n.anh_ht.co_bia, cho: (n) => n.anh_ht.cho_duyet > 0 };
+  const LOC_ANH: Record<string, (n: any) => boolean> = { thieu: (n) => !(n.anh_ht || HT0).da_duyet, bia: (n) => !(n.anh_ht || HT0).co_bia, cho: (n) => (n.anh_ht || HT0).cho_duyet > 0 };
   const loc = x.nha_hang.filter((n: any) => (!locAnh || LOC_ANH[locAnh](n)) && (!locTinh || n.tinh_thanh === locTinh) && (!tim || k(`${n.ten} ${n.tinh_thanh} ${n.dia_danh_nguon} ${n.mon_noi_bat} ${n.ma}`).includes(k(tim))));
   const cacTinh = Array.from(new Set(x.nha_hang.map((n: any) => n.tinh_thanh).filter(Boolean))).sort() as string[];
   const dang = sua && sua !== "moi" ? x.nha_hang.find((n: any) => n.id === sua) : null;
@@ -112,7 +114,7 @@ function Trang() {
     <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
       <button className={`act ${tab === "nh" ? "teal" : "grey"}`} onClick={() => setTab("nh")}>Nhà hàng</button>
       <button className={`act ${tab === "nd" ? "teal" : "grey"}`} onClick={() => setTab("nd")}>Nội dung ẩm thực</button>
-      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Ảnh chờ duyệt ({x.so_anh_cho_duyet})</button></div>
+      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Ảnh chờ duyệt ({x.so_anh_cho_duyet ?? 0})</button></div>
     {tab === "cd" && <AnhChoDuyet toast={toast} onDoi={load} />}
 
     {tab === "nd" && <section className="panel">
@@ -202,8 +204,8 @@ function Trang() {
         <td><b>{n.ten}</b><div className="muted">{n.ma} · nhập bởi {n.tao_boi}{n.nguon ? ` · ${n.nguon}` : ""}</div></td>
         <td>{[n.tinh_thanh, n.khu_vuc].filter(Boolean).join(" · ")}{n.dia_danh_nguon && n.dia_danh_nguon !== n.tinh_thanh && <div className="muted">nguồn: {n.dia_danh_nguon}</div>}</td><td>{n.am_thuc}</td>
         <td>{n.so_dang_ban}{n.so_dang_ban ? ` (từ ${d(Math.min(...n.thuc_don.filter((t: any) => t.dang_ban).map((t: any) => t.gia_nguoi_lon)))})` : ""}</td>
-        <td>{n.anh_ht.da_duyet ? <Tag cls="ok">{n.anh_ht.da_duyet} đã duyệt</Tag> : <Tag cls="warn">Thiếu ảnh</Tag>}
-          {n.anh_ht.cho_duyet > 0 && <div className="muted">{n.anh_ht.cho_duyet} chờ duyệt</div>}<div className="muted">Bìa: {n.anh_ht.co_bia ? "✔" : "—"}</div></td>
+        <td>{(n.anh_ht || HT0).da_duyet ? <Tag cls="ok">{(n.anh_ht || HT0).da_duyet} đã duyệt</Tag> : <Tag cls="warn">Thiếu ảnh</Tag>}
+          {(n.anh_ht || HT0).cho_duyet > 0 && <div className="muted">{(n.anh_ht || HT0).cho_duyet} chờ duyệt</div>}<div className="muted">Bìa: {(n.anh_ht || HT0).co_bia ? "✔" : "—"}</div></td>
         <td>{n.ngung ? <Tag cls="red">Ngừng hợp tác</Tag> : n.hien_cong ? <><Tag cls="ok">Đang hiện</Tag><div className="muted">{n.hien_boi}</div></>
           : <><Tag cls="warn">Chưa hiện</Tag>{n.tat_ly_do && <div className="muted">{n.tat_ly_do}</div>}</>}</td>
         <td>{n.mo_dat ? <Tag cls="ok">Đang mở</Tag> : <><Tag>Chưa mở</Tag><div className="muted">{n.dieu_kien.filter((c: any) => c.ok).length}/5 điều kiện</div></>}</td>
@@ -220,7 +222,7 @@ function Trang() {
             <h2 style={{ margin: "2px 0" }}>{dang.ten}</h2><div className="muted">{[dang.tinh_thanh, dang.am_thuc ? `Ẩm thực ${dang.am_thuc}` : ""].filter(Boolean).join(" · ")}</div></div>
           <button className="act grey" onClick={() => setSua(null)}>Đóng</button></div>
         <div className="panel" style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", margin: "10px 0" }}>
-          <span><b>{dang.anh_ht.da_duyet + dang.anh_ht.cho_duyet + dang.anh_ht.nhap + dang.anh_ht.an}</b> ảnh / 60 · {dang.anh_ht.da_duyet} đã duyệt</span>
+          <span><b>{(dang.anh_ht || HT0).da_duyet + (dang.anh_ht || HT0).cho_duyet + (dang.anh_ht || HT0).nhap + (dang.anh_ht || HT0).an}</b> ảnh / 60 · {(dang.anh_ht || HT0).da_duyet} đã duyệt</span>
           <span><b>{dang.so_dang_ban}</b> gói đang bán</span>
           <span>Hợp đồng: <b>{dang.hop_dong.some((h: any) => h.con_dung) ? "đã ghi nhận" : "chưa xác nhận"}</b></span>
           <span style={{ flex: 1 }} />{dang.mo_dat ? <Tag cls="ok">Đang mở đặt bàn</Tag> : <Tag cls="warn">Chưa mở đặt bàn · {dang.dieu_kien.filter((c: any) => c.ok).length}/5</Tag>}</div>
