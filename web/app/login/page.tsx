@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { login, getUser, clearSession } from "@/lib/api";
 import { THANH_TREN, TRANG_MO_DAU, KHUNG_HO_TRO, CAU_CHUYEN } from "@/components/cong/manh";
 import { ThuVien } from "@/components/cong/co-dong/CoDong";
+import NhaHangKhach from "@/components/cong/khach/NhaHangKhach";
 import { goiCong as goi, luuPhienCong, laTenMienCong, VTOS_GOC } from "@/lib/cong";
 
 /* CG-1 · CỔNG KẾT NỐI VTD thay màn đăng nhập VTOS — Chủ tịch duyệt bản xem thử 26/10/2026, dựng từ đúng
@@ -92,6 +93,7 @@ function Ngoai({ man }: { man: Exclude<Man, "cong" | "noi"> }) {
     <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy || !lh.trim() || (!!k[chon] && !k[chon].ok)}>{busy ? "Đang gửi…" : "Nhận mã xác thực"}</button></div>
     <p className="vtd-form-notice">Mã 6 số, dùng một lần, hết hạn sau 5 phút. Lần đầu dùng liên hệ này thì hệ thống tạo tài khoản sau khi bạn đồng ý điều khoản dịch vụ{man !== "kh" ? "; đối tác và cổ đông gửi hồ sơ để Vietourist duyệt" : ""}.</p>
     {man === "cd" && <p className="vtd-form-notice"><a href="/login?cong=cd&xem=ir">Xem tài liệu công bố thông tin — không cần đăng nhập</a></p>}
+    {man === "kh" && <p className="vtd-form-notice"><a href="/login?cong=kh&xem=am-thuc">Khám phá ẩm thực Việt Nam — xem không cần đăng nhập</a></p>}
   </form>);
   return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); xacThuc(); }}>
     <h2>Xác thực liên hệ</h2>
@@ -113,11 +115,13 @@ export default function Login() {
   const [man, setMan] = useState<Man>("cong");
   const [hoTro, setHoTro] = useState(false);
   const [xemIr, setXemIr] = useState(false);   // CD-1 · màn A18: thư viện IR công khai, không cần đăng nhập
+  const [xemAt, setXemAt] = useState(false);   // AT-1 · Khám phá ẩm thực công khai, không cần đăng nhập
   useEffect(() => {
     // CG-3: trên kh./dt./ir. bỏ qua và xóa phiên VTOS — tên miền cổng ngoài không mở VTOS.
     if (laTenMienCong()) clearSession();
     else if (getUser()) { location.replace("/"); return; }
     setXemIr(new URLSearchParams(location.search).get("xem") === "ir");
+    setXemAt(new URLSearchParams(location.search).get("xem") === "am-thuc");
     const q = new URLSearchParams(location.search).get("cong") as Man | null;
     if (q === "noi" && laTenMienCong()) { location.replace(`${VTOS_GOC}/login`); return; }
     if (q && (q === "cong" || q in VAI)) setMan(q);
@@ -125,7 +129,7 @@ export default function Login() {
   }, []);
   const di = useCallback((m: Man) => {
     if (m === "noi" && laTenMienCong()) { location.href = `${VTOS_GOC}/login`; return; }   // CG-3: nội bộ chỉ ở crm.
-    setMan(m); setHoTro(false); setXemIr(false); try { history.replaceState(null, "", m === "cong" ? "/login" : `/login?cong=${m}`); } catch { /* bỏ qua */ } window.scrollTo(0, 0); }, []);
+    setMan(m); setHoTro(false); setXemIr(false); setXemAt(false); try { history.replaceState(null, "", m === "cong" ? "/login" : `/login?cong=${m}`); } catch { /* bỏ qua */ } window.scrollTo(0, 0); }, []);
   // Bấm vào mảnh tĩnh (thẻ vai, logo, nút Hỗ trợ): bắt bằng một chỗ, đọc data-* có sẵn trong bản v3.2.
   const bam = (e: React.MouseEvent) => {
     const nutBay = (e.target as HTMLElement).closest("[data-hero-motion]") as HTMLElement | null;
@@ -161,6 +165,10 @@ export default function Login() {
                 <div className="v3-page-head"><div><div className="v3-eyebrow">VTD • Quan hệ nhà đầu tư · công khai</div><h1>Công bố thông tin</h1></div>
                   <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => di("cd")}><span>Cổ đông đăng nhập</span></button></div>
                 <ThuVien coPhien={false} /></main></section>
+              : xemAt && man === "kh" ? <section className="v3-app" data-portal="khach-hang"><main className="v3-main" style={{ maxWidth: 1080, margin: "0 auto" }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                  <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => di("kh")}><span>Đăng nhập để đặt bàn, tích điểm</span></button></div>
+                <NhaHangKhach congKhai dangNhap={() => di("kh")} /></main></section>
               : <main className="vtd-login">
                 <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: CAU_CHUYEN[vai!.role] }} />
                 {man === "noi" ? <NoiBo /> : <Ngoai key={man} man={man} />}

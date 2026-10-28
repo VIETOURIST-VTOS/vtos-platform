@@ -29,7 +29,7 @@ function Trang() {
   if (!d) return <div className="card">Đang tải…</div>;
   const Q = d.quyen;
   const hoan = d.don.filter((x: any) => x.hoan_tt === "cho_sales" || x.hoan_tt === "cho_chi");
-  const chot = d.don.filter((x: any) => x.trang_thai === "da_dung" && x.doi_tac_id);
+  const chot = d.don.filter((x: any) => x.trang_thai === "da_dung");   // AT-1c: chốt cả đơn khách tự đặt để cộng điểm
   const cho_tien = d.don.filter((x: any) => ["cho_nhan", "cho_tra", "het_han", "huy", "tu_choi"].includes(x.trang_thai));
   const TABS: [Tab, string, number][] = [["tien", "Tiền QR chờ gán", d.giao_dich_cho.length], ["the", "Thẻ chờ đối soát", d.the_cho_doi_soat.length],
     ["hoan", "Hủy & hoàn", hoan.length], ["chot", "Chốt doanh số", chot.filter((x: any) => x.doanh_so == null).length], ["don", "Tất cả đơn", 0]];
@@ -77,8 +77,8 @@ function Trang() {
           {x.hoan_tt === "cho_chi" && Q.ke_toan && <button className="act teal" style={{ margin: "0 0 0 6px" }} disabled={busy || (q[`h${x.id}`] || "").trim().length < 3} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/da-hoan`, { ghi_chu: q[`h${x.id}`] })}>Đã hoàn</button>}</td></tr>)}</tbody></table>}
       <div className="muted">Hoàn thẻ: làm trên trang quản trị cổng thẻ (tiền về thẻ khách). Hoàn QR: chuyển khoản lại. «Đã hoàn» là máy ghi sổ Nợ 3388 / Có 1121. Phần giữ lại thuộc nhà hàng. Bớt khách cũng sinh khoản hoàn (hoàn được nhiều lần).</div></div>}
 
-    {tab === "chot" && <div className="card"><h3>Chốt doanh số đơn qua đại lý / CTV (vào D06)</h3>
-      {!chot.length ? <div className="muted">Chưa có đơn qua đối tác đã dùng.</div>
+    {tab === "chot" && <div className="card"><h3>Chốt doanh số đơn đã dùng</h3><div className="muted">Đơn qua đại lý / CTV → vào D06. Đơn khách / cổ đông tự đặt → cộng điểm thành viên trên số đã trả qua Vietourist.</div>
+      {!chot.length ? <div className="muted">Chưa có đơn đã dùng.</div>
       : <table><thead><tr><th>Đơn</th><th>Tiền</th><th>Nhà hàng báo</th><th>Doanh số</th></tr></thead><tbody>{chot.map((x: any) => <tr key={x.id}>
         <td>{x.ma}<div className="muted" style={{ fontSize: 12 }}>{x.nguon} · {x.nha_hang} · {fmtD(x.ngay)}</div></td>
         <td>Trả trước {vnd(x.da_tra)}<div className="muted" style={{ fontSize: 12 }}>{x.thanh_toan.map((t: any) => `${t.kenh}: ${t.trang_thai_ten}`).join("; ")}</div></td>

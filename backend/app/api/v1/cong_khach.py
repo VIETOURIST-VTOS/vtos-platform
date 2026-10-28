@@ -127,11 +127,11 @@ def sua_ho_so(data: HoSoKhachIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), d
 # ── KH-2 ──────────────────────────────────────────────────────────────────────────────────────
 
 @router.get("/nha-hang")
-def ds_nha_hang(tinh: str = "", am_thuc: str = "", gia_toi_da: int = 0,
+def ds_nha_hang(tinh: str = "", am_thuc: str = "", gia_toi_da: int = 0, q: str = "", chi_dat: bool = False, trang: int = 1,
                 tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach_cd(tk)
     from app.services import nha_hang as NH
-    return NH.danh_sach_cong(db, tinh, am_thuc, gia_toi_da)
+    return NH.danh_sach_cong(db, tinh, am_thuc, gia_toi_da, q, chi_dat, trang)
 
 
 @router.get("/nha-hang/{nid}")

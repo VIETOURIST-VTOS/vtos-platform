@@ -45,6 +45,9 @@ CUA_GAN_RIENG = {
     # BC-1 (26/10/2026): Phần 5 của báo cáo ngày gắn tệp qua cửa riêng /daily-reports/{id}/tep, vì quyền
     # theo HỒ SƠ (tác giả + người quản lý), không theo vai như cửa /tep chung.
     "bao_cao_ngay": ("app/reports/page.tsx", "/tep`"),
+    # AT-1c (28/10/2026): ảnh món / nhà hàng / thành phố gắn qua cửa riêng /nha-hang/anh/{doi}/{id} — bắt buộc
+    # ghi nguồn ảnh, và Marketing / Điều hành không cần quyền cửa /tep chung.
+    "am_thuc": ("app/nha-hang/page.tsx", "/nha-hang/anh/${doi}/${id}`"),
 }
 
 

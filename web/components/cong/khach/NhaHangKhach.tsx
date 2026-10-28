@@ -2,38 +2,37 @@
 /* KH-2 · Tab «Nhà hàng & ẩm thực» trên cổng khách (bộ giao diện v3.2, màn KH08–KH10), Chủ tịch duyệt
    26/10/2026. DT-2 (28/10/2026): đặt bàn CÓ THANH TOÁN, dùng chung cho khách, cổ đông, đại lý, CTV —
    chọn cọc hoặc trả đủ; nhà hàng nhận bàn rồi mới hiện QR / thẻ. Tạm tính và số phải trả hiển thị để người
-   đặt hình dung; máy chủ tự tính lại từ giá đã lưu và tham số, không nhận số tiền từ trình duyệt. */
-import { useCallback, useEffect, useMemo, useState } from "react";
+   đặt hình dung; máy chủ tự tính lại từ giá đã lưu và tham số, không nhận số tiền từ trình duyệt.
+   AT-1 (28/10/2026): «Khám phá ẩm thực» — mọi nhà hàng đang hiện giới thiệu; chỉ nơi đã ký hợp đồng (máy tính đủ
+   5 điều kiện) mới có thực đơn, giá và nút đặt bàn. Tìm, lọc tỉnh có số đếm, phân trang; xem được khi chưa đăng
+   nhập (congKhai → cửa /api/v1/am-thuc chỉ đọc). */
+import { useEffect, useMemo, useState } from "react";
 import { goiCong } from "@/lib/cong";
 import { svg } from "./icons";
+import KhamPhaAmThuc from "./KhamPhaAmThuc";
 
 const I = ({ n }: { n: string }) => <span style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: svg(n) }} />;
 const tien = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString("vi-VN")} đ` : "—");
-const canh = (a: string) => (a === "Hải sản" ? ["dining-sea", "fish"] : a === "Chay" ? ["dining-garden", "utensils"] : ["dining", "utensils"]);
 const mai = () => { const t = new Date(Date.now() + 7 * 3600e3 + 86400e3); return t.toISOString().slice(0, 10); };
 
 const nghin = (x: number) => Math.ceil(Math.round(x) / 1000) * 1000;
 
-export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui, doiTac = false }: { ten: string; lienHe: string; coSdt: boolean; sdtCho: string; daGui: (msg: string) => void; doiTac?: boolean }) {
+export default function NhaHangKhach({ ten = "", lienHe = "", coSdt = false, sdtCho = "", daGui = () => {}, doiTac = false, congKhai = false, dangNhap }:
+  { ten?: string; lienHe?: string; coSdt?: boolean; sdtCho?: string; daGui?: (msg: string) => void; doiTac?: boolean; congKhai?: boolean; dangNhap?: () => void }) {
   const [ts, setTs] = useState<any>(null);
-  useEffect(() => { goiCong("/dat-ban").then((r) => setTs(r.tham_so)).catch(() => {}); }, []);
-  const [ds, setDs] = useState<any>(null);
-  const [loc, setLoc] = useState({ tinh: "", am_thuc: "", gia_toi_da: "" });
+  useEffect(() => { if (!congKhai) goiCong("/dat-ban").then((r) => setTs(r.tham_so)).catch(() => {}); }, [congKhai]);
   const [mo, setMo] = useState<any>(null);
   const [f, setF] = useState<any>(null);
   const [loi, setLoi] = useState(""); const [busy, setBusy] = useState(false);
-  const tai = useCallback((l = loc) => {
-    const q = new URLSearchParams(Object.entries(l).filter(([, v]) => v) as any).toString();
-    goiCong(`/dat-ban/nha-hang${q ? `?${q}` : ""}`).then(setDs).catch((x) => setLoi(x.message));
-  }, [loc]);
-  useEffect(() => { tai(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
   const goi = useMemo(() => mo && f ? mo.thuc_don.find((t: any) => t.id === Number(f.thuc_don_id)) : null, [mo, f]);
   const tam = goi ? goi.gia_nguoi_lon * Number(f.nguoi_lon || 0) + (goi.gia_tre_em || 0) * Number(f.tre_em || 0) : 0;
   const soKhach = f ? Number(f.nguoi_lon || 0) + Number(f.tre_em || 0) : 0;
   const doan = !!(ts && goi && soKhach >= ts.doan_tu && goi.loai !== "goi_mon");
   const pctCoc = ts ? (doan ? ts.coc_doan : ts.coc_le) : 0;
   const traTruoc = f?.cach_tt === "du" ? tam : Math.min(tam, nghin(tam * pctCoc / 100));
-  const datBan = (n: any, tid?: number) => { setMo(n); setLoi(""); setF({ thuc_don_id: tid || n.thuc_don[0]?.id, ngay: mai(), gio: "18:30", nguoi_lon: 2, tre_em: 0, ghi_chu: "", dien_thoai: "", ten_khach: "", cach_tt: "coc", dong_y: false, dong_y_khach: false }); window.scrollTo(0, 0); };
+  const datBan = (n: any, tid?: number) => {
+    if (congKhai) { dangNhap?.(); return; }
+    setMo(n); setLoi(""); setF({ thuc_don_id: tid || n.thuc_don[0]?.id, ngay: mai(), gio: "18:30", nguoi_lon: 2, tre_em: 0, ghi_chu: "", dien_thoai: "", ten_khach: "", cach_tt: "coc", dong_y: false, dong_y_khach: false }); window.scrollTo(0, 0); };
   const gui = async () => {
     setBusy(true); setLoi("");
     try {
@@ -91,28 +90,5 @@ export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui, doiTac
     </div>
   </>);
 
-  return (<>
-    <section className="v3-panel"><div className="v3-form-grid">
-      <label className="v3-field">Tỉnh / thành<select value={loc.tinh} onChange={(e) => { const l = { ...loc, tinh: e.target.value }; setLoc(l); tai(l); }}>
-        <option value="">Tất cả</option>{(ds?.tinh_thanh || []).map((t: string) => <option key={t}>{t}</option>)}</select></label>
-      <label className="v3-field">Ẩm thực<select value={loc.am_thuc} onChange={(e) => { const l = { ...loc, am_thuc: e.target.value }; setLoc(l); tai(l); }}>
-        <option value="">Tất cả</option>{(ds?.am_thuc || []).map((t: string) => <option key={t}>{t}</option>)}</select></label>
-      <label className="v3-field">Giá / người tới<select value={loc.gia_toi_da} onChange={(e) => { const l = { ...loc, gia_toi_da: e.target.value }; setLoc(l); tai(l); }}>
-        <option value="">Tất cả</option><option value="300000">300.000 đ</option><option value="500000">500.000 đ</option><option value="1000000">1.000.000 đ</option></select></label>
-    </div></section>
-    {loi && <div className="v3-notice warn"><I n="info" /><span>{loi}</span></div>}
-    <div className="v3-section-title"><h2>Thưởng thức một điểm đến</h2><span className="v3-badge neutral">{ds ? `${ds.nha_hang.length} nhà hàng` : "Đang tải…"}</span></div>
-    <div className="v3-products v31-restaurants">{(ds?.nha_hang || []).map((n: any) => {
-      const [c, ic] = canh(n.am_thuc); const g = n.thuc_don[0];
-      return (<article key={n.id} className="v3-product">
-        <div className={`v3-scene ${c}`}><span className="v3-scene-orb" /><span className="v3-scene-icon"><I n={ic} /></span><span className="v3-badge neutral">{n.am_thuc}</span><span className="v3-scene-title">{n.ten}</span></div>
-        <div className="v3-product-body"><small><I n="map-pin" /> {[n.tinh_thanh, n.khu_vuc].filter(Boolean).join(" · ")}</small>
-          <h3>{g?.ten}{n.thuc_don.length > 1 ? ` · +${n.thuc_don.length - 1} gói` : ""}</h3>{n.tien_ich && <p>{n.tien_ich}</p>}
-          <div className="v3-price"><strong>từ {tien(n.gia_tu)}</strong><small>/người lớn</small></div>
-          <span className="v3-badge neutral">Nhà hàng nhận bàn · trả trước qua QR / thẻ</span>
-          <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => datBan(n)}><I n="arrow-up-right" /><span>Xem thực đơn & đặt bàn</span></button></div>
-      </article>);
-    })}</div>
-    {ds && !ds.nha_hang.length && <section className="v3-panel"><p>Chưa có nhà hàng mở đặt bàn{loc.tinh || loc.am_thuc || loc.gia_toi_da ? " khớp bộ lọc" : ""}. Vietourist đang bổ sung danh mục.</p></section>}
-  </>);
+  return <KhamPhaAmThuc congKhai={congKhai} onDat={datBan} />;
 }
