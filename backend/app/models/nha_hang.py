@@ -35,6 +35,8 @@ class NhaHang(Base):
     hien_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     tat_ly_do: Mapped[str] = mapped_column(String(200), default="")     # vì sao đang tắt (vừa sửa giá…)
     ngung: Mapped[bool] = mapped_column(Boolean, default=False)         # ngừng hợp tác — không bật lại được
+    # NCC-1: nhà hàng này thuộc NCC nào trong danh mục — để tài khoản NCC nhà hàng thấy đơn đặt bàn của mình.
+    supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True, index=True)
     tao_boi: Mapped[str] = mapped_column(String(50), default="")
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     sua_boi: Mapped[str] = mapped_column(String(50), default="")

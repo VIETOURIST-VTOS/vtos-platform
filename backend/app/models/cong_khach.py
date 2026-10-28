@@ -32,4 +32,8 @@ class YeuCauKhach(Base):
     tam_tinh: Mapped[int | None] = mapped_column(Integer, nullable=True)   # máy tính từ giá đã lưu, KHÔNG phải báo giá
     # DT-1 · CTV giới thiệu khách (loai «gioi_thieu»): tên khách CTV khai; tai_khoan_id là CTV.
     ten_khach: Mapped[str] = mapped_column(String(120), default="")
+    # NCC-1: nhà hàng nhận / từ chối đơn đặt bàn trên cổng NCC (chỉ loai = nha_hang).
+    nha_hang_tt: Mapped[str] = mapped_column(String(10), default="cho")
+    nha_hang_ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    nha_hang_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
