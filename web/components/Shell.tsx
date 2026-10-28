@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getUser, clearSession, type User } from "@/lib/api";
+import { laTenMienCong, phienCong } from "@/lib/cong";
 import ChonDonVi from "@/components/ChonDonVi";
 import ChonGiaoDien from "@/components/ChonGiaoDien";
 
@@ -657,6 +658,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    // CG-3: trên tên miền cổng ngoài, màn VTOS không bao giờ mở — xóa phiên VTOS lỡ lưu, đưa về cổng.
+    if (laTenMienCong()) { clearSession(); router.replace(phienCong() ? "/cong" : "/login"); return; }
     const u = getUser(); if (!u) { router.replace("/login"); return; }
     setUser(u); setReady(true);
     // Tài khoản còn mật khẩu tạm: đưa thẳng tới màn hình đổi mật khẩu. Máy chủ đã chặn mọi đường dẫn

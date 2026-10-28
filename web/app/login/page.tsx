@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { login, getUser } from "@/lib/api";
+import { login, getUser, clearSession } from "@/lib/api";
 import { THANH_TREN, TRANG_MO_DAU, KHUNG_HO_TRO, CAU_CHUYEN } from "@/components/cong/manh";
 import { ThuVien } from "@/components/cong/co-dong/CoDong";
-import { goiCong as goi, luuPhienCong } from "@/lib/cong";
+import { goiCong as goi, luuPhienCong, laTenMienCong, VTOS_GOC } from "@/lib/cong";
 
 /* CG-1 · CỔNG KẾT NỐI VTD thay màn đăng nhập VTOS — Chủ tịch duyệt bản xem thử 26/10/2026, dựng từ đúng
    bộ giao diện v3.2 (logo, biểu tượng, địa cầu có máy bay bay quanh). Bốn ô:
@@ -114,13 +114,18 @@ export default function Login() {
   const [hoTro, setHoTro] = useState(false);
   const [xemIr, setXemIr] = useState(false);   // CD-1 · màn A18: thư viện IR công khai, không cần đăng nhập
   useEffect(() => {
-    if (getUser()) { location.replace("/"); return; }
+    // CG-3: trên kh./dt./ir. bỏ qua và xóa phiên VTOS — tên miền cổng ngoài không mở VTOS.
+    if (laTenMienCong()) clearSession();
+    else if (getUser()) { location.replace("/"); return; }
     setXemIr(new URLSearchParams(location.search).get("xem") === "ir");
     const q = new URLSearchParams(location.search).get("cong") as Man | null;
+    if (q === "noi" && laTenMienCong()) { location.replace(`${VTOS_GOC}/login`); return; }
     if (q && (q === "cong" || q in VAI)) setMan(q);
     else { const m = CONG_THEO_TEN_MIEN[location.hostname.toLowerCase()]; if (m) setMan(m); }
   }, []);
-  const di = useCallback((m: Man) => { setMan(m); setHoTro(false); setXemIr(false); try { history.replaceState(null, "", m === "cong" ? "/login" : `/login?cong=${m}`); } catch { /* bỏ qua */ } window.scrollTo(0, 0); }, []);
+  const di = useCallback((m: Man) => {
+    if (m === "noi" && laTenMienCong()) { location.href = `${VTOS_GOC}/login`; return; }   // CG-3: nội bộ chỉ ở crm.
+    setMan(m); setHoTro(false); setXemIr(false); try { history.replaceState(null, "", m === "cong" ? "/login" : `/login?cong=${m}`); } catch { /* bỏ qua */ } window.scrollTo(0, 0); }, []);
   // Bấm vào mảnh tĩnh (thẻ vai, logo, nút Hỗ trợ): bắt bằng một chỗ, đọc data-* có sẵn trong bản v3.2.
   const bam = (e: React.MouseEvent) => {
     const nutBay = (e.target as HTMLElement).closest("[data-hero-motion]") as HTMLElement | null;
