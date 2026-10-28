@@ -9,10 +9,11 @@ import { useCallback, useEffect, useState } from "react";
 import { goiCong, phienCong } from "@/lib/cong";
 import { svg } from "../khach/icons";
 import KhachSanOta from "../KhachSanOta";
+import VeMayBayOta from "../VeMayBayOta";
 
-type Tab = "home" | "docs" | "events" | "ir" | "hotel";
+type Tab = "home" | "docs" | "events" | "ir" | "hotel" | "flight";
 const MENU: [Tab, string, string][] = [["home", "Tổng quan", "landmark"], ["docs", "Công bố thông tin", "file-text"],
-  ["events", "Đại hội & sự kiện", "calendar"], ["ir", "Liên hệ IR", "messages-square"], ["hotel", "Khách sạn", "hotel"]];
+  ["events", "Đại hội & sự kiện", "calendar"], ["ir", "Liên hệ IR", "messages-square"], ["hotel", "Khách sạn", "hotel"], ["flight", "Vé máy bay", "plane"]];
 const I = ({ n }: { n: string }) => <span style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: svg(n) }} />;
 const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
 const gio = (s?: string | null) => (s ? `${ngay(s)} ${s.slice(11, 16)}` : "");
@@ -198,6 +199,7 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
         </>}
 
         {tab === "hotel" && <KhachSanOta ghiChu="Chưa có ưu đãi cổ đông cho phòng đặt qua OTA." />}
+        {tab === "flight" && <VeMayBayOta />}
         <footer className="v3-bottom"><I n="shield-check" />Dữ liệu và yêu cầu được quản lý tập trung trong VTOS</footer>
       </main>
     </div>

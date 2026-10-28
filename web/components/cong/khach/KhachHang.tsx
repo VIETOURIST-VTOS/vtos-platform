@@ -15,6 +15,7 @@ import QrThanhToan from "./QrThanhToan";
 import { useDiem, DiemUuDai, HangThanhVien, YeuThich } from "./RewardsKhach";
 import { DanhGiaKhach, GopYKhach, HoTroKhach } from "./ChamSocKhach";
 import KhachSanOta from "../KhachSanOta";
+import VeMayBayOta from "../VeMayBayOta";
 
 type Tab = "home" | "deals" | "tour" | "request" | "bookings" | "booking" | "rewards" | "tier" | "favorites" | "reviews" | "feedback" | "support" | "profile";
 const MENU: [Tab, string, string][] = [
@@ -74,7 +75,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
   const [menuMo, setMenuMo] = useState(false);
   const [home, setHome] = useState<any>(null);
   const [ds, setDs] = useState<any>(null);
-  const [dv, setDv] = useState<"tour" | "nha_hang" | "khach_san">("tour");
+  const [dv, setDv] = useState<"tour" | "nha_hang" | "khach_san" | "ve_may_bay">("tour");
   const [loc, setLoc] = useState({ q: "", tu_ngay: "", noi: "", ngan_sach: "", nhom: "" });
   const [tourMo, setTourMo] = useState<any>(null);
   const [loaiYc, setLoaiYc] = useState<"tour" | "tour_doan">("tour");
@@ -170,8 +171,10 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
           <nav className="v31-service-tabs" aria-label="Loại dịch vụ">
             <button type="button" className="cursor-interaction" aria-pressed={dv === "tour"} onClick={() => setDv("tour")}><I n="plane" /><span>Tour du lịch</span></button>
             <button type="button" className="cursor-interaction" aria-pressed={dv === "khach_san"} onClick={() => setDv("khach_san")}><I n="hotel" /><span>Khách sạn</span></button>
+            <button type="button" className="cursor-interaction" aria-pressed={dv === "ve_may_bay"} onClick={() => setDv("ve_may_bay")}><I n="plane" /><span>Vé máy bay</span></button>
             <button type="button" className="cursor-interaction" aria-pressed={dv === "nha_hang"} onClick={() => setDv("nha_hang")}><I n="utensils" /><span>Nhà hàng & ẩm thực</span></button></nav>
           {dv === "khach_san" ? <section className="v31-service-content" aria-label="Khách sạn"><KhachSanOta /></section>
+          : dv === "ve_may_bay" ? <section className="v31-service-content" aria-label="Vé máy bay"><VeMayBayOta /></section>
           : dv === "nha_hang" ? <section className="v31-service-content" aria-label="Nhà hàng & ẩm thực">
             <NhaHangKhach ten={ten} lienHe={lienHe} coSdt={coSdt} sdtCho={toi.dien_thoai} daGui={(m) => { setDon(null); di("bookings"); setMsg(m); }} /></section>
           : <section className="v31-service-content" aria-label="Tour du lịch">

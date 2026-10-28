@@ -239,6 +239,8 @@ def _ota(db: Session, ota_id: int) -> DoiTacOta:
     o = db.get(DoiTacOta, int(ota_id or 0))
     if o is None:
         raise LoiDoiSoat("Không có OTA này", 404)
+    if getattr(o, "san_pham", "khach_san") != "khach_san":
+        raise LoiDoiSoat("Đối soát OTA hiện chỉ cho khách sạn", 422)
     return o
 
 
@@ -381,7 +383,8 @@ def lo_out(db: Session, lo: LoNapOta, u: User, chi_tiet: bool = False) -> dict:
 
 
 def tong_quan(db: Session, u: User) -> dict:
-    otas = db.execute(select(DoiTacOta).order_by(DoiTacOta.thu_tu, DoiTacOta.id)).scalars().all()
+    otas = db.execute(select(DoiTacOta).where(DoiTacOta.san_pham == "khach_san")
+                      .order_by(DoiTacOta.thu_tu, DoiTacOta.id)).scalars().all()
     ten = {o.id: o.ten for o in otas}
     so = {}
     for dp in db.execute(select(DatPhongOta)).scalars():

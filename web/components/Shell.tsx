@@ -410,7 +410,7 @@ export const GROUPS: Group[] = [
     // và góp ý riêng lãnh đạo (chỉ Chủ tịch + TGĐ trả lời; menu chỉ hiện cho BASE_VIEW).
     ["Yêu cầu khách (cổng)", "/yeu-cau-khach"],
     ["Góp ý riêng lãnh đạo", "/gop-y-lanh-dao"],
-    ["Khách sạn OTA", "/khach-san-ota"],
+    ["OTA: khách sạn & vé máy bay", "/khach-san-ota"],
     ["Đối soát OTA", "/doi-soat-ota"],
     // TC-73 · 19/9/2026. Sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
     //
