@@ -10,10 +10,19 @@ import { goiCong, phienCong } from "@/lib/cong";
 import { svg } from "../khach/icons";
 import KhachSanOta from "../KhachSanOta";
 import VeMayBayOta from "../VeMayBayOta";
+import NhaHangKhach from "../khach/NhaHangKhach";
+import TourCoDong from "./TourCoDong";
 
-type Tab = "home" | "docs" | "events" | "ir" | "hotel" | "flight";
-const MENU: [Tab, string, string][] = [["home", "Tổng quan", "landmark"], ["docs", "Công bố thông tin", "file-text"],
-  ["events", "Đại hội & sự kiện", "calendar"], ["ir", "Liên hệ IR", "messages-square"], ["hotel", "Khách sạn", "hotel"], ["flight", "Vé máy bay", "plane"]];
+type Tab = "home" | "perks" | "docs" | "events" | "rights" | "own" | "ir";
+type DV = "tour" | "khach_san" | "nha_hang" | "ve_may_bay";
+// CD-2 (Chủ tịch duyệt 28/10/2026): «Ưu đãi cổ đông» đứng thứ hai, ngay sau Tổng quan — làm nổi bật.
+const MENU: [Tab, string, string][] = [["home", "Tổng quan", "landmark"], ["perks", "Ưu đãi cổ đông", "gift"],
+  ["docs", "Công bố thông tin", "file-text"], ["events", "Đại hội & sự kiện", "calendar"], ["rights", "Cổ tức & quyền", "receipt"],
+  ["own", "Hồ sơ sở hữu", "user-round"], ["ir", "Liên hệ IR", "messages-square"]];
+const DICH_VU: [DV, string, string, string][] = [["tour", "Tour du lịch", "luggage", "Tour Vietourist đang mở bán — gửi yêu cầu, Sales liên hệ"],
+  ["khach_san", "Khách sạn", "hotel", "Đặt qua đối tác OTA của Vietourist"], ["nha_hang", "Nhà hàng & ẩm thực", "utensils", "Nhà hàng đối tác — gửi yêu cầu đặt bàn"],
+  ["ve_may_bay", "Vé máy bay", "plane", "So giá và đặt trên đối tác OTA"]];
+const VANG: React.CSSProperties = { background: "linear-gradient(120deg,#5a3d0a,#c99a2e)", color: "#fff" };
 const I = ({ n }: { n: string }) => <span style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: svg(n) }} />;
 const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
 const gio = (s?: string | null) => (s ? `${ngay(s)} ${s.slice(11, 16)}` : "");
@@ -96,15 +105,22 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
   const [sk, setSk] = useState<any[] | null>(null);
   const [ir, setIr] = useState<any>(null);
   const [f, setF] = useState({ chu_de: "tai_lieu", noi_dung: "" });
+  const [dv, setDv] = useState<DV>("tour");
+  const [sh, setSh] = useState<any>(null);
+  const [quyen, setQuyen] = useState<any[] | null>(null);
+  const [xm, setXm] = useState<{ noi_dung: string; tep: File | null }>({ noi_dung: "", tep: null });
   const [msg, setMsg] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   const loi = (x: any) => setErr(x.message || String(x));
   const taiTq = useCallback(() => goiCong("/co-dong/tong-quan").then(setTq).catch(loi), []);
   const taiSk = useCallback(() => goiCong("/co-dong/su-kien").then((r) => setSk(r.su_kien)).catch(loi), []);
   const taiIr = useCallback(() => goiCong("/co-dong/ir").then(setIr).catch(loi), []);
-  useEffect(() => { taiTq(); }, [taiTq]);
+  const taiSh = useCallback(() => goiCong("/co-dong/so-huu").then(setSh).catch(loi), []);
+  const taiQuyen = useCallback(() => goiCong("/co-dong/tai-lieu?nhom=quyen").then((r) => setQuyen(r.tai_lieu)).catch(loi), []);
+  useEffect(() => { taiTq(); taiSh(); }, [taiTq, taiSh]);
   const di = (t: Tab) => {
     setTab(t); setMenuMo(false); setMsg(""); setErr("");
-    if (t === "home") taiTq(); if (t === "events") taiSk(); if (t === "ir") taiIr();
+    if (t === "home") { taiTq(); taiSh(); } if (t === "events") taiSk(); if (t === "ir") taiIr();
+    if (t === "own") taiSh(); if (t === "rights") taiQuyen();
   };
   const quanTam = async (s: any, bat: boolean) => {
     setBusy(true); setErr("");
@@ -116,6 +132,27 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
     try { const r = await goiCong("/co-dong/ir", f); setMsg(r.message); setIr((o: any) => ({ ...o, yeu_cau: r.yeu_cau })); setF({ ...f, noi_dung: "" }); }
     catch (x) { loi(x); } finally { setBusy(false); }
   };
+  const moDv = (k: DV) => { setDv(k); di("perks"); };
+  const guiXm = async () => {
+    setBusy(true); setErr(""); setMsg("");
+    try {
+      const fd = new FormData(); fd.append("noi_dung", xm.noi_dung); if (xm.tep) fd.append("tep", xm.tep);
+      const r = await fetch("/api/v1/cong/co-dong/xac-minh", { method: "POST", headers: { Authorization: `Bearer ${phienCong()}` }, body: fd });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(typeof d?.detail === "string" ? d.detail : `Lỗi ${r.status}`);
+      setMsg(d.message); setXm({ noi_dung: "", tep: null });
+    } catch (x) { loi(x); } finally { setBusy(false); }
+  };
+  const UuDai = () => (<>
+    <section className="v3-hero shareholder" style={VANG}><div><span className="v3-eyebrow" style={{ color: "#fff3d6" }}>ĐẶC QUYỀN CỔ ĐÔNG</span>
+      <h2>Ưu đãi dành riêng cho cổ đông Vietourist</h2>
+      <p style={{ color: "#fff3d6" }}>Tour du lịch · Khách sạn · Nhà hàng & ẩm thực · Vé máy bay — trong cùng tài khoản cổ đông.</p></div>
+      <div className="v3-hero-art" aria-hidden="true"><I n="gift" /></div></section>
+    <div className="v3-metrics">{DICH_VU.map(([k, t, i, m]) => <section key={k} style={{ outline: tab === "perks" && dv === k ? "2px solid #c99a2e" : undefined }}>
+      <span><I n={i} />{t}</span><small>{m}</small>
+      <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => moDv(k)}><span>{tab === "perks" && dv === k ? "Đang xem" : "Xem"}</span></button></section>)}</div>
+    <div className="v3-notice warn"><I n="info" /><span>Mức ưu đãi riêng theo cổ phần: <b>Vietourist công bố sau</b>. Khi có chính sách, mức ưu đãi hiện trên từng dịch vụ.</span></div>
+  </>);
   const nhan = MENU.find(([k]) => k === tab)?.[1] || "";
   const ten = toi.ho_ten || "Cổ đông";
 
@@ -140,20 +177,56 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
         {err && <div className="v3-notice warn"><I n="info" /><span>{err}</span></div>}
 
         {tab === "home" && <>
-          <section className="v3-hero shareholder"><div><span className="v3-eyebrow">QUAN HỆ NHÀ ĐẦU TƯ</span><h2>Thông tin minh bạch.<br />Đồng hành dài hạn.</h2>
-            <p>Tài liệu đã công bố, đại hội và kênh hỏi IR trong một tài khoản.</p>
-            <Nut kieu="primary" i="file-text" onClick={() => di("docs")}>Tra cứu công bố thông tin</Nut></div>
-            <div className="v3-hero-art" aria-hidden="true"><I n="landmark" /></div></section>
+          <UuDai />
           {!tq ? <section className="v3-panel"><p>Đang tải…</p></section> : <div className="v3-metrics">
             <section><span><I n="file-text" />Tài liệu mới nhất</span><strong>{tq.tai_lieu_moi[0]?.tieu_de || "Chưa có"}</strong>
               <small>{tq.tai_lieu_moi[0] ? `Công bố ${ngay(tq.tai_lieu_moi[0].da_cong_bo_luc)}` : "IR đưa lên sau khi công bố"}</small></section>
             <section><span><I n="calendar" />Sự kiện sắp tới</span><strong>{tq.su_kien_sap_toi?.ten || "Chưa có"}</strong>
               <small>{tq.su_kien_sap_toi ? `${gio(tq.su_kien_sap_toi.bat_dau)}${tq.su_kien_sap_toi.dia_diem ? ` · ${tq.su_kien_sap_toi.dia_diem}` : ""}` : "Thông báo sẽ hiện tại đây"}</small></section>
+            <section><span><I n="user-round" />Sở hữu</span><strong>{sh?.trang_thai === "da_xac_minh" ? `${Number(sh.so_cp).toLocaleString("vi-VN")} CP` : "Chờ IR xác minh"}</strong>
+              <small>{sh?.trang_thai === "da_xac_minh" ? `ngày căn cứ ${ngay(sh.ngay_can_cu)}` : "Xem mục Hồ sơ sở hữu"}</small></section>
             <section><span><I n="messages-square" />Câu hỏi IR của tôi</span><strong>{tq.ir_cho ? `${tq.ir_cho} đang chờ trả lời` : "Không có câu chờ"}</strong>
               <small>{tq.ir_moi_nhat ? `${tq.ir_moi_nhat.ma} · ${tq.ir_moi_nhat.trang_thai_ten}` : "Gửi câu hỏi ở mục Liên hệ IR"}</small></section>
           </div>}
-          <section className="v3-panel"><div className="v3-section-title"><h3>Sở hữu & ưu đãi cổ đông</h3><Badge c="demo">Đợt sau</Badge></div>
-            <p>Số cổ phần, hạng ưu đãi và cổ tức chưa hiện trên cổng. IR đối chiếu sổ cổ đông ở đợt sau; VTOS không tự ghi số sở hữu.</p></section>
+        </>}
+
+        {tab === "perks" && <>
+          <UuDai />
+          {dv === "tour" ? <TourCoDong toi={toi} daGui={setMsg} />
+            : dv === "khach_san" ? <KhachSanOta ghiChu="Mức ưu đãi cổ đông cho phòng đặt qua OTA: Vietourist công bố sau." />
+            : dv === "nha_hang" ? <NhaHangKhach ten={ten} lienHe={toi.dien_thoai || toi.email} coSdt={!!toi.dien_thoai} sdtCho={toi.dien_thoai || ""} daGui={setMsg} />
+            : <VeMayBayOta />}
+        </>}
+
+        {tab === "rights" && <>
+          <section className="v3-panel"><div className="v3-section-title"><h3>Thông báo thực hiện quyền</h3></div>
+            {!quyen ? <p>Đang tải…</p> : quyen.length ? <div className="v3-table-wrap"><table>
+              <thead><tr><th scope="col">Thông báo</th><th scope="col">Ngày công bố</th><th scope="col"></th></tr></thead>
+              <tbody>{quyen.map((t: any) => <tr key={t.id}><th scope="row">{t.tieu_de}<small>{t.noi_cong_bo}</small></th><td>{ngay(t.da_cong_bo_luc)}</td>
+                <td><Nut kieu="quiet" i="file-text" onClick={() => moTep(`/api/v1/cong/co-dong/tai-lieu/${t.id}/tep`, t.ten_tep, true).catch(loi)}>Tải PDF</Nut></td></tr>)}</tbody></table></div>
+              : <p>Chưa có thông báo thực hiện quyền nào được công bố trên cổng.</p>}</section>
+          <section className="v3-panel"><div className="v3-section-title"><h3>Cổ tức của tôi</h3><Badge c="demo">Đợt sau</Badge></div>
+            <p>Chưa kết nối danh sách hưởng quyền và tình trạng thanh toán — không hiển thị là 0.</p>
+            <small>Ưu đãi dịch vụ tách hẳn khỏi cổ tức và quyền cổ đông.</small></section>
+        </>}
+
+        {tab === "own" && <>
+          <section className="v3-panel"><div className="v3-section-title"><h3>Hồ sơ cổ đông của tôi</h3>
+            {sh && <Badge c={sh.trang_thai === "da_xac_minh" ? "good" : "warn"}>{sh.trang_thai === "da_xac_minh" ? "Đã xác minh" : sh.trang_thai === "khong_co_ten" ? "Không có tên trong danh sách" : "Chờ IR xác minh"}</Badge>}</div>
+            {!sh ? <p>Đang tải…</p> : sh.trang_thai === "da_xac_minh" ? <div className="v3-table-wrap"><table><tbody>
+              <tr><th scope="row">Số cổ phần</th><td><b>{Number(sh.so_cp).toLocaleString("vi-VN")} cổ phần</b></td></tr>
+              <tr><th scope="row">Ngày căn cứ</th><td>{ngay(sh.ngay_can_cu)} — danh sách người sở hữu do VSD cung cấp</td></tr>
+              {sh.tk_luu_ky?.length > 0 && <tr><th scope="row">Tài khoản lưu ký</th><td>{sh.tk_luu_ky.join(", ")}</td></tr>}
+              <tr><th scope="row">Xác minh</th><td>IR – Pháp chế nối hồ sơ {ngay(sh.noi_luc)} · Chủ tịch duyệt danh sách {ngay(sh.duyet_luc)}</td></tr>
+            </tbody></table></div>
+              : sh.trang_thai === "khong_co_ten" ? <p>Không có tên trong danh sách ngày {ngay(sh.ngay_can_cu)} — liên hệ IR nếu có sai sót.</p>
+              : <p>IR đang đối chiếu danh sách người sở hữu. Bạn có thể gửi giấy tờ dưới đây để xác minh nhanh hơn.</p>}
+            <small>Số cổ phần không tự sửa được trên tài khoản và không phải số thời gian thực. Vietourist không hỏi mật khẩu tài khoản chứng khoán.</small></section>
+          <section className="v3-panel"><div className="v3-section-title"><h3>Gửi hồ sơ để IR xác minh</h3></div>
+            <label className="v3-field">Nội dung cần cập nhật<textarea rows={3} maxLength={2000} value={xm.noi_dung} onChange={(e) => setXm({ ...xm, noi_dung: e.target.value })} /></label>
+            <label className="v3-field">Giấy tờ kèm theo (PDF hoặc ảnh, tối đa 10 MB)<input type="file" accept=".pdf,image/*" onChange={(e) => setXm({ ...xm, tep: e.target.files?.[0] || null })} /></label>
+            <div className="v3-actions"><Nut kieu="primary" i="send" disabled={busy || xm.noi_dung.trim().length < 5} onClick={guiXm}>{busy ? "Đang gửi…" : "Gửi yêu cầu xác minh"}</Nut></div>
+            <small>Giấy tờ chỉ IR – Pháp chế, Chủ tịch, TGĐ, Ban Kiểm soát xem được. Không gửi mật khẩu, mã OTP tài khoản chứng khoán.</small></section>
         </>}
 
         {tab === "docs" && <ThuVien coPhien />}
@@ -198,8 +271,6 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
             <small>IR chỉ trả lời bằng thông tin đã hoặc được phép công bố, như nhau với mọi cổ đông.</small></section>
         </>}
 
-        {tab === "hotel" && <KhachSanOta ghiChu="Chưa có ưu đãi cổ đông cho phòng đặt qua OTA." />}
-        {tab === "flight" && <VeMayBayOta />}
         <footer className="v3-bottom"><I n="shield-check" />Dữ liệu và yêu cầu được quản lý tập trung trong VTOS</footer>
       </main>
     </div>

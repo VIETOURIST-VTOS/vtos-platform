@@ -162,6 +162,10 @@ CUA_TAY = (
     "su_kien_co_dong",
     "quan_tam_su_kien",
     "yeu_cau_ir",
+    # CD-2 (28/10/2026): IR – Pháp chế tải danh sách VSD ở màn /ir-cong-co-dong (Chủ tịch duyệt); IR nối tài khoản.
+    "lo_so_co_dong",
+    "dong_so_co_dong",
+    "noi_so_co_dong",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

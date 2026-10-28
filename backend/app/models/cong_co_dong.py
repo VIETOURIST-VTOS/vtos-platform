@@ -18,6 +18,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -128,4 +129,54 @@ class YeuCauIr(Base):
     tra_loi_boi: Mapped[str] = mapped_column(String(50), default="")
     tra_loi_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     ly_do_dong: Mapped[str] = mapped_column(Text, default="")
+    # CD-2: giấy tờ cổ đông gửi kèm khi xin xác minh sở hữu (kho tệp chung, dữ liệu cá nhân).
+    attachment_id: Mapped[int | None] = mapped_column(ForeignKey("attachments.id"), nullable=True)
     luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+# ---------------------------------------------------------------- CD-2 · sổ cổ đông (Chủ tịch duyệt 28/10/2026)
+# Số cổ phần CHỈ đến từ danh sách người sở hữu VSD do IR – Pháp chế tải lên và Chủ tịch duyệt — không có ô gõ
+# số. Lô duyệt mới nhất là danh sách đang dùng; lô cũ giữ để tra. Số giấy tờ là dữ liệu cá nhân (NĐ 13/2023).
+TRANG_THAI_LO_SCD = {"cho_duyet": "Chờ Chủ tịch duyệt", "da_duyet": "Đã duyệt", "tu_choi": "Từ chối"}
+
+
+class LoSoCoDong(Base):
+    __tablename__ = "lo_so_co_dong"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ma: Mapped[str] = mapped_column(String(12), unique=True, index=True)
+    ngay_can_cu: Mapped[date] = mapped_column(Date, index=True)
+    ten_tep: Mapped[str] = mapped_column(String(200), default="")
+    bam_tep: Mapped[str] = mapped_column(String(64), index=True)
+    trang_thai: Mapped[str] = mapped_column(String(10), default="cho_duyet", index=True)
+    so_dong: Mapped[int] = mapped_column(Integer, default=0)
+    tong_cp: Mapped[int] = mapped_column(BigInteger, default=0)
+    loi: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    nap_boi: Mapped[str] = mapped_column(String(50), default="")
+    nap_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    duyet_boi: Mapped[str] = mapped_column(String(50), default="")
+    duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ly_do: Mapped[str] = mapped_column(Text, default="")
+
+
+class DongSoCoDong(Base):
+    __tablename__ = "dong_so_co_dong"
+    __table_args__ = (Index("ix_dong_so_co_dong_lo_gt", "lo_id", "giay_to"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lo_id: Mapped[int] = mapped_column(ForeignKey("lo_so_co_dong.id"), index=True)
+    ho_ten: Mapped[str] = mapped_column(String(200), default="")
+    giay_to: Mapped[str] = mapped_column(String(40))          # CCCD / ĐKKD đã chuẩn hóa (bỏ dấu cách, chấm, gạch)
+    so_cp: Mapped[int] = mapped_column(BigInteger, default=0)
+    tk_luu_ky: Mapped[str] = mapped_column(String(40), default="")
+
+
+class NoiSoCoDong(Base):
+    """Tài khoản cổ đông ↔ số giấy tờ trong sổ. Một tài khoản một dòng nối đang hiệu lực; gỡ có lý do, không xoá."""
+    __tablename__ = "noi_so_co_dong"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tai_khoan_id: Mapped[int] = mapped_column(ForeignKey("tai_khoan_ngoai.id"), index=True)
+    giay_to: Mapped[str] = mapped_column(String(40), index=True)
+    noi_boi: Mapped[str] = mapped_column(String(50), default="")
+    noi_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    go_boi: Mapped[str] = mapped_column(String(50), default="")
+    go_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ly_do_go: Mapped[str] = mapped_column(Text, default="")
