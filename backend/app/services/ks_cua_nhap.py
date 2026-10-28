@@ -166,6 +166,15 @@ CUA_TAY = (
     "lo_so_co_dong",
     "dong_so_co_dong",
     "noi_so_co_dong",
+    # NCC-1 (28/10/2026): NCC phản hồi đơn, đề xuất giá, xác nhận bản kê, gửi đề nghị qua cổng dt. (phiên cổng);
+    # Điều hành duyệt giá, Kế toán lập bản kê / trả lời, Marketing đưa học liệu ở màn /cong-ncc.
+    "phan_hoi_don_ncc",
+    "gia_ncc",
+    "de_xuat_gia_ncc",
+    "ban_ke_ncc",
+    "dong_ban_ke_ncc",
+    "de_nghi_ncc",
+    "hoc_lieu_doi_tac",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

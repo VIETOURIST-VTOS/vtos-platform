@@ -50,6 +50,8 @@ class TaiKhoanNgoai(Base):
     # DT-1: tài khoản đối tác NỐI vào đúng một đối tác bán hàng trên VTOS — người duyệt xác nhận, máy
     # chỉ gợi ý (khớp MST trước, rồi SĐT). Rỗng = chưa nối: cổng không hiện số liệu nào.
     doi_tac_id: Mapped[int | None] = mapped_column(ForeignKey("doi_tac_ban_hang.id"), nullable=True, index=True)
+    # NCC-1: tài khoản nhà cung cấp NỐI vào đúng một NCC trong danh mục `suppliers` (gợi ý MST → SĐT, TP Điều hành nối).
+    ncc_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True, index=True)
     # Tăng lên là mọi phiên đã cấp mất hiệu lực ngay (đăng xuất mọi nơi, khoá tài khoản).
     phien: Mapped[int] = mapped_column(Integer, default=1)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
