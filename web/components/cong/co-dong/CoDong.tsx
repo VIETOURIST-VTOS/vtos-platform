@@ -12,6 +12,7 @@ import KhachSanOta from "../KhachSanOta";
 import VeMayBayOta from "../VeMayBayOta";
 import NhaHangKhach from "../khach/NhaHangKhach";
 import TourCoDong from "./TourCoDong";
+import DatBanCuaToi from "../DatBanCuaToi";
 
 type Tab = "home" | "perks" | "docs" | "events" | "rights" | "own" | "ir";
 type DV = "tour" | "khach_san" | "nha_hang" | "ve_may_bay";
@@ -106,6 +107,8 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
   const [ir, setIr] = useState<any>(null);
   const [f, setF] = useState({ chu_de: "tai_lieu", noi_dung: "" });
   const [dv, setDv] = useState<DV>("tour");
+  // DT-2: quay về từ trang thẻ OnePay (?dat_ban=…) → mở thẳng Ưu đãi · Nhà hàng, nơi có «Đặt bàn của tôi».
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get("dat_ban")) { setTab("perks"); setDv("nha_hang"); } } catch { /* bỏ qua */ } }, []);
   const [sh, setSh] = useState<any>(null);
   const [quyen, setQuyen] = useState<any[] | null>(null);
   const [xm, setXm] = useState<{ noi_dung: string; tep: File | null }>({ noi_dung: "", tep: null });
@@ -194,7 +197,7 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
           <UuDai />
           {dv === "tour" ? <TourCoDong toi={toi} daGui={setMsg} />
             : dv === "khach_san" ? <KhachSanOta ghiChu="Mức ưu đãi cổ đông cho phòng đặt qua OTA: Vietourist công bố sau." />
-            : dv === "nha_hang" ? <NhaHangKhach ten={ten} lienHe={toi.dien_thoai || toi.email} coSdt={!!toi.dien_thoai} sdtCho={toi.dien_thoai || ""} daGui={setMsg} />
+            : dv === "nha_hang" ? <><NhaHangKhach ten={ten} lienHe={toi.dien_thoai || toi.email} coSdt={!!toi.dien_thoai} sdtCho={toi.dien_thoai || ""} daGui={setMsg} /><DatBanCuaToi /></>
             : <VeMayBayOta />}
         </>}
 

@@ -11,11 +11,15 @@ import { goiCong } from "@/lib/cong";
 import { svg } from "../khach/icons";
 import QrThanhToan from "../khach/QrThanhToan";
 import KhachSanOta from "../KhachSanOta";
+import NhaHangKhach from "../khach/NhaHangKhach";
+import DatBanCuaToi from "../DatBanCuaToi";
 
-type Tab = "home" | "tour" | "hold" | "bookings" | "booking" | "d06" | "debt" | "refer" | "referrals";
+type Tab = "home" | "tour" | "hold" | "bookings" | "booking" | "d06" | "debt" | "refer" | "referrals" | "nha_hang" | "dat_ban";
 const MENU_DL: [Tab, string, string][] = [["home", "Bàn làm việc", "house"], ["tour", "Tour & giữ chỗ", "plane"], ["bookings", "Đã giữ chỗ", "luggage"],
+  ["nha_hang", "Đặt bàn nhà hàng", "utensils"], ["dat_ban", "Đặt bàn đã gửi", "receipt"],
   ["d06", "Hoa hồng D06", "gift"], ["debt", "Công nợ", "receipt"]];
 const MENU_CTV: [Tab, string, string][] = [["home", "Bàn làm việc", "house"], ["refer", "Giới thiệu khách", "user-plus"],
+  ["nha_hang", "Đặt bàn nhà hàng", "utensils"], ["dat_ban", "Đặt bàn đã gửi", "receipt"],
   ["referrals", "Nhu cầu đã gửi", "send"], ["d06", "Hoa hồng D06", "gift"]];
 
 const I = ({ n, s }: { n: string; s?: number }) => <span style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: svg(n, s) }} />;
@@ -44,6 +48,8 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
   const [tab, setTab] = useState<Tab>("home");
   const [menuMo, setMenuMo] = useState(false);
   const [blv, setBlv] = useState<any>(null);
+  // DT-2: quay về từ trang thẻ OnePay (?dat_ban=…) → mở thẳng «Đặt bàn đã gửi».
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get("dat_ban")) setTab("dat_ban"); } catch { /* bỏ qua */ } }, []);
   const [cho, setCho] = useState<string>("");
   const [ds, setDs] = useState<any>(null);
   const [q, setQ] = useState("");
@@ -151,7 +157,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
           <nav className="v31-service-tabs" aria-label="Loại dịch vụ">
             <button type="button" className="cursor-interaction" aria-pressed={dv === "tour"} onClick={() => setDv("tour")}><I n="plane" /><span>Tour du lịch</span></button>
             <button type="button" className="cursor-interaction" aria-pressed={dv === "khach_san"} onClick={() => setDv("khach_san")}><I n="hotel" /><span>Khách sạn</span></button>
-            <button type="button" className="cursor-interaction" aria-pressed="false" disabled><I n="utensils" /><span>Nhà hàng · sắp ra mắt</span></button></nav>
+            <button type="button" className="cursor-interaction" aria-pressed="false" onClick={() => di("nha_hang")}><I n="utensils" /><span>Nhà hàng & ẩm thực</span></button></nav>
           {dv === "khach_san" ? <KhachSanOta ghiChu="Phòng đặt qua OTA chưa tính hoa hồng D06 cho đại lý / CTV — cơ sở tính cần duyệt riêng. Lượt chuyển vẫn ghi nguồn là đối tác của bạn." /> : <>
           <section className="v3-panel"><div className="v3-search"><label className="v3-field">Điểm đến hoặc tên tour<input type="search" value={q} placeholder="Phú Quốc, Huế…"
             onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && timTour()} /></label><Nut kieu="primary" i="search" onClick={() => timTour()}>Tìm tour</Nut></div></section>
@@ -234,6 +240,9 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
               <tbody>{no.hoa_hong.map((m: any) => <tr key={m.ky}><th scope="row">{thang(m.ky)}</th><td>{tien(m.hoa_hong)}</td><td>{tien(m.da_tra)}</td><td>{tien(m.con_phai_tra)}</td></tr>)}</tbody></table></div></section>}
         </>)}
 
+        {blv && tab === "nha_hang" && <NhaHangKhach doiTac ten={blv.doi_tac?.ten || toi.ten_don_vi || ""} lienHe={toi.dien_thoai || toi.email} coSdt={false} sdtCho=""
+          daGui={(m) => { di("dat_ban"); setMsg(m); }} />}
+        {blv && tab === "dat_ban" && <DatBanCuaToi doiTac />}
         {blv && tab === "refer" && <div className="v3-two">
           <section className="v3-panel"><h2>Giới thiệu khách cho Vietourist</h2>
             <label className="v3-field">Tour quan tâm<select value={g.tour_id} onChange={(e) => setG({ ...g, tour_id: e.target.value })}>

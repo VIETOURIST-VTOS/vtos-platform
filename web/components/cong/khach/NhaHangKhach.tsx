@@ -1,7 +1,8 @@
 "use client";
 /* KH-2 · Tab «Nhà hàng & ẩm thực» trên cổng khách (bộ giao diện v3.2, màn KH08–KH10), Chủ tịch duyệt
-   26/10/2026. Gửi yêu cầu đặt bàn đi cùng đường với tour: lead cho Sales, chưa giữ bàn, chưa thu tiền.
-   Tạm tính hiển thị để khách hình dung; máy chủ tự tính lại từ giá đã lưu, không nhận số từ trình duyệt. */
+   26/10/2026. DT-2 (28/10/2026): đặt bàn CÓ THANH TOÁN, dùng chung cho khách, cổ đông, đại lý, CTV —
+   chọn cọc hoặc trả đủ; nhà hàng nhận bàn rồi mới hiện QR / thẻ. Tạm tính và số phải trả hiển thị để người
+   đặt hình dung; máy chủ tự tính lại từ giá đã lưu và tham số, không nhận số tiền từ trình duyệt. */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { goiCong } from "@/lib/cong";
 import { svg } from "./icons";
@@ -11,7 +12,11 @@ const tien = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleStr
 const canh = (a: string) => (a === "Hải sản" ? ["dining-sea", "fish"] : a === "Chay" ? ["dining-garden", "utensils"] : ["dining", "utensils"]);
 const mai = () => { const t = new Date(Date.now() + 7 * 3600e3 + 86400e3); return t.toISOString().slice(0, 10); };
 
-export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui }: { ten: string; lienHe: string; coSdt: boolean; sdtCho: string; daGui: (msg: string) => void }) {
+const nghin = (x: number) => Math.ceil(Math.round(x) / 1000) * 1000;
+
+export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui, doiTac = false }: { ten: string; lienHe: string; coSdt: boolean; sdtCho: string; daGui: (msg: string) => void; doiTac?: boolean }) {
+  const [ts, setTs] = useState<any>(null);
+  useEffect(() => { goiCong("/dat-ban").then((r) => setTs(r.tham_so)).catch(() => {}); }, []);
   const [ds, setDs] = useState<any>(null);
   const [loc, setLoc] = useState({ tinh: "", am_thuc: "", gia_toi_da: "" });
   const [mo, setMo] = useState<any>(null);
@@ -19,17 +24,22 @@ export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui }: { te
   const [loi, setLoi] = useState(""); const [busy, setBusy] = useState(false);
   const tai = useCallback((l = loc) => {
     const q = new URLSearchParams(Object.entries(l).filter(([, v]) => v) as any).toString();
-    goiCong(`/khach/nha-hang${q ? `?${q}` : ""}`).then(setDs).catch((x) => setLoi(x.message));
+    goiCong(`/dat-ban/nha-hang${q ? `?${q}` : ""}`).then(setDs).catch((x) => setLoi(x.message));
   }, [loc]);
   useEffect(() => { tai(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
   const goi = useMemo(() => mo && f ? mo.thuc_don.find((t: any) => t.id === Number(f.thuc_don_id)) : null, [mo, f]);
   const tam = goi ? goi.gia_nguoi_lon * Number(f.nguoi_lon || 0) + (goi.gia_tre_em || 0) * Number(f.tre_em || 0) : 0;
-  const datBan = (n: any, tid?: number) => { setMo(n); setLoi(""); setF({ thuc_don_id: tid || n.thuc_don[0]?.id, ngay: mai(), gio: "18:30", nguoi_lon: 2, tre_em: 0, ghi_chu: "", dien_thoai: "", dong_y: false }); window.scrollTo(0, 0); };
+  const soKhach = f ? Number(f.nguoi_lon || 0) + Number(f.tre_em || 0) : 0;
+  const doan = !!(ts && goi && soKhach >= ts.doan_tu && goi.loai !== "goi_mon");
+  const pctCoc = ts ? (doan ? ts.coc_doan : ts.coc_le) : 0;
+  const traTruoc = f?.cach_tt === "du" ? tam : Math.min(tam, nghin(tam * pctCoc / 100));
+  const datBan = (n: any, tid?: number) => { setMo(n); setLoi(""); setF({ thuc_don_id: tid || n.thuc_don[0]?.id, ngay: mai(), gio: "18:30", nguoi_lon: 2, tre_em: 0, ghi_chu: "", dien_thoai: "", ten_khach: "", cach_tt: "coc", dong_y: false, dong_y_khach: false }); window.scrollTo(0, 0); };
   const gui = async () => {
     setBusy(true); setLoi("");
     try {
-      const r = await goiCong("/khach/yeu-cau", { loai: "nha_hang", ngay_mong_muon: f.ngay, dien_thoai: f.dien_thoai, ghi_chu: f.ghi_chu, dong_y: f.dong_y,
-        nha_hang: { nha_hang_id: mo.id, thuc_don_id: Number(f.thuc_don_id), gio: f.gio, nguoi_lon: Number(f.nguoi_lon), tre_em: Number(f.tre_em || 0) } });
+      const r = await goiCong("/dat-ban", { nha_hang_id: mo.id, thuc_don_id: Number(f.thuc_don_id), ngay: f.ngay, gio: f.gio, nguoi_lon: Number(f.nguoi_lon),
+        tre_em: Number(f.tre_em || 0), cach_tt: f.cach_tt, ten_khach: f.ten_khach, dien_thoai: f.dien_thoai, ghi_chu: f.ghi_chu,
+        dong_y_chinh_sach: f.dong_y, dong_y_khach: f.dong_y_khach });
       setMo(null); setF(null); daGui(r.message);
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
@@ -45,7 +55,7 @@ export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui }: { te
           <td>{tien(t.gia_nguoi_lon)}</td><td>{t.gia_tre_em != null ? tien(t.gia_tre_em) : "—"}</td><td>{[t.dieu_kien, t.dieu_kien_huy].filter(Boolean).join(" · ") || "—"}</td></tr>)}</tbody></table></div>
     </section>
     <div className="v3-two">
-      <section className="v3-panel"><h2>Gửi yêu cầu đặt bàn</h2>
+      <section className="v3-panel"><h2>Đặt bàn</h2>
         <label className="v3-field">Gói<select value={f.thuc_don_id} onChange={(e) => setF({ ...f, thuc_don_id: e.target.value })}>{mo.thuc_don.map((t: any) => <option key={t.id} value={t.id}>{t.ten} · {tien(t.gia_nguoi_lon)}</option>)}</select></label>
         <div className="v3-form-grid">
           <label className="v3-field">Ngày đến<input type="date" min={mai()} value={f.ngay} onChange={(e) => setF({ ...f, ngay: e.target.value })} /></label>
@@ -53,18 +63,30 @@ export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui }: { te
           <label className="v3-field">Người lớn<input type="number" min={1} value={f.nguoi_lon} onChange={(e) => setF({ ...f, nguoi_lon: e.target.value })} /></label>
           <label className="v3-field">Trẻ em<input type="number" min={0} value={f.tre_em} onChange={(e) => setF({ ...f, tre_em: e.target.value })} /></label>
         </div>
-        <div className="v3-field">Người gửi<div className="v3-readonly">{ten || "Khách hàng"} · {lienHe}</div></div>
-        <label className="v3-field">Số điện thoại Sales gọi lại{coSdt ? " (để trống = số đã xác thực)" : ""}<input inputMode="tel" value={f.dien_thoai} placeholder={coSdt ? sdtCho : "09xx xxx xxx"} onChange={(e) => setF({ ...f, dien_thoai: e.target.value })} /></label>
+        {doiTac ? <div className="v3-form-grid">
+          <label className="v3-field">Tên khách<input value={f.ten_khach} onChange={(e) => setF({ ...f, ten_khach: e.target.value })} /></label>
+          <label className="v3-field">SĐT khách<input inputMode="tel" value={f.dien_thoai} placeholder="09xx xxx xxx" onChange={(e) => setF({ ...f, dien_thoai: e.target.value })} /></label></div>
+        : <><div className="v3-field">Người đặt<div className="v3-readonly">{ten || "Khách hàng"} · {lienHe}</div></div>
+          <label className="v3-field">Số điện thoại liên hệ{coSdt ? " (để trống = số đã xác thực)" : ""}<input inputMode="tel" value={f.dien_thoai} placeholder={coSdt ? sdtCho : "09xx xxx xxx"} onChange={(e) => setF({ ...f, dien_thoai: e.target.value })} /></label></>}
         <label className="v3-field">Ghi chú<textarea rows={2} value={f.ghi_chu} placeholder="Ăn chay, ghế trẻ em, dịp đặc biệt…" onChange={(e) => setF({ ...f, ghi_chu: e.target.value })} /></label>
+        <div className="v3-field">Thanh toán trước {doan ? `(đoàn từ ${ts?.doan_tu} khách đặt sẵn menu)` : ""}</div>
+        <div className="v31-service-tabs" role="group" aria-label="Cách thanh toán">
+          <button type="button" className="cursor-interaction" aria-pressed={f.cach_tt === "coc"} onClick={() => setF({ ...f, cach_tt: "coc" })}><span>Cọc {pctCoc}% · {tien(Math.min(tam, nghin(tam * pctCoc / 100)))}</span></button>
+          <button type="button" className="cursor-interaction" aria-pressed={f.cach_tt === "du"} onClick={() => setF({ ...f, cach_tt: "du" })}><span>Trả đủ · {tien(tam)}</span></button></div>
+        {ts && <small>Chính sách hủy: trước {ts.mien_phi_gio} giờ hoàn đủ · trong {ts.mien_phi_gio} giờ giữ {ts.phat}% bill · dưới {ts.gan_gio} giờ hoặc không đến: khách lẻ giữ {ts.phat}%, đoàn giữ {ts.phat_doan_gan}% bill. Không giữ quá số đã trả. Nhà hàng hủy hoặc bất khả kháng: hoàn đủ.</small>}
+        {doiTac && <div className="v3-check"><input id="nh-dong-y-khach" type="checkbox" checked={f.dong_y_khach} onChange={(e) => setF({ ...f, dong_y_khach: e.target.checked })} />
+          <label htmlFor="nh-dong-y-khach">Khách đã đồng ý để tôi chuyển thông tin cho Vietourist.</label></div>}
         <div className="v3-check"><input id="nh-dong-y" type="checkbox" checked={f.dong_y} onChange={(e) => setF({ ...f, dong_y: e.target.checked })} />
-          <label htmlFor="nh-dong-y">Tôi hiểu gửi yêu cầu chưa giữ bàn và chưa thu tiền; Sales hỏi nhà hàng rồi xác nhận.</label></div>
+          <label htmlFor="nh-dong-y">Tôi đồng ý chính sách thanh toán và hủy bàn. Nhà hàng nhận bàn xong mới hiện thanh toán; bàn chỉ giữ khi tiền đã vào.</label></div>
       </section>
       <section className="v3-panel v3-quote"><div className="v3-section-title"><h3>Tạm tính</h3><span className="v3-badge demo">Chưa phải báo giá</span></div>
         {goi && <dl className="v3-stat-rows"><div><dt>{f.nguoi_lon} người lớn × {tien(goi.gia_nguoi_lon)}</dt><dd>{tien(goi.gia_nguoi_lon * Number(f.nguoi_lon || 0))}</dd></div>
           {Number(f.tre_em) > 0 && <div><dt>{f.tre_em} trẻ em × {tien(goi.gia_tre_em || 0)}</dt><dd>{tien((goi.gia_tre_em || 0) * Number(f.tre_em))}</dd></div>}</dl>}
         <div className="v3-total"><span>Tạm tính</span><strong>{tien(tam)}</strong></div>
-        <p>Đồ uống, phụ thu và điều kiện hủy do Sales gửi kèm xác nhận.</p>
-        <button type="button" className="v3-button v3-primary cursor-interaction" disabled={busy || !f.dong_y} onClick={gui}><I n="send" /><span>{busy ? "Đang gửi…" : "Gửi yêu cầu"}</span></button>
+        <dl className="v3-stat-rows"><div><dt>Trả trước qua Vietourist</dt><dd>{tien(traTruoc)}</dd></div>
+          <div><dt>Trả tại nhà hàng sau khi ăn</dt><dd>{tien(Math.max(0, tam - traTruoc))}</dd></div></dl>
+        <p>Đồ uống, món gọi thêm và phụ thu trả tại nhà hàng.</p>
+        <button type="button" className="v3-button v3-primary cursor-interaction" disabled={busy || !f.dong_y || (doiTac && !f.dong_y_khach)} onClick={gui}><I n="send" /><span>{busy ? "Đang gửi…" : "Gửi đặt bàn"}</span></button>
       </section>
     </div>
   </>);
@@ -87,7 +109,7 @@ export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui }: { te
         <div className="v3-product-body"><small><I n="map-pin" /> {[n.tinh_thanh, n.khu_vuc].filter(Boolean).join(" · ")}</small>
           <h3>{g?.ten}{n.thuc_don.length > 1 ? ` · +${n.thuc_don.length - 1} gói` : ""}</h3>{n.tien_ich && <p>{n.tien_ich}</p>}
           <div className="v3-price"><strong>từ {tien(n.gia_tu)}</strong><small>/người lớn</small></div>
-          <span className="v3-badge neutral">Cần nhà hàng xác nhận bàn</span>
+          <span className="v3-badge neutral">Nhà hàng nhận bàn · trả trước qua QR / thẻ</span>
           <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => datBan(n)}><I n="arrow-up-right" /><span>Xem thực đơn & đặt bàn</span></button></div>
       </article>);
     })}</div>

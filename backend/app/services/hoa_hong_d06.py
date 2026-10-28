@@ -178,6 +178,11 @@ def nguon_thang(db: Session, ky: str, hom_nay: date | None = None) -> dict:
         nhom.setdefault((b.doi_tac_id, b.company_id or 0), []).append({
             "booking_id": b.id, "booking": b.code, "tour": t.code if t else "", "ten_tour": t.name if t else "",
             "ket_thuc": tt["ket_thuc"].isoformat(), "thu_du": tt["thu_du"].isoformat(), "doanh_so": tt["net"]})
+    # DT-2 (Chủ tịch 28/10/2026): đơn đặt bàn qua đối tác cộng vào doanh số D06 khi nhà hàng báo khách đã
+    # dùng VÀ Kế toán đã chốt doanh số — cùng bậc lũy tiến với tour.
+    from app.services import dat_ban as DB
+    for k, v in DB.nguon_d06(db, d0, d1).items():
+        nhom.setdefault(k, []).extend(v)
     return {"nhom": nhom, "chua_du": chua}
 
 

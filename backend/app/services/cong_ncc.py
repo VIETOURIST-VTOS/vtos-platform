@@ -397,7 +397,8 @@ def cong_no(db: Session, s: Supplier) -> dict:
         dong.append({"code": d.code, "noi_dung": d.noi_dung, "ngay_su_dung": d.ngay_su_dung, "gia_tri": d.thanh_tien,
                      "phieu_chi": pr.code if pr else "", "phieu_trang_thai": pr.status if pr else "",
                      "da_chi": da_chi, "con": con, "ngay_den_han": d.ngay_den_han})
-    return {"vtd_phai_tra": phai_tra, "ncc_phai_tra": None, "dong": dong,
+    from app.services import dat_ban as DB
+    return {"vtd_phai_tra": phai_tra, "ncc_phai_tra": None, "dong": dong, "dat_ban_thu_ho": DB.thu_ho_ncc(db, s),
             "ghi_chu": "Chỉ tính đơn đã xác nhận / đã dùng. «Đã chi» = đề nghị chi gắn đơn đã ở bước đã chi. "
                        "Chiều nhà cung cấp phải trả Vietourist chưa có nguồn số liệu. Hai chiều không tự bù trừ."}
 
@@ -683,11 +684,15 @@ def don_dat_ban(db: Session, s: Supplier) -> list[dict]:
     nh = {n.id: n for n in _nha_hang_cua(db, s)}
     if not nh:
         return []
+    from app.services import dat_ban as DB
     ra = []
-    for y in db.execute(select(YeuCauKhach).where(YeuCauKhach.loai == "nha_hang", YeuCauKhach.nha_hang_id.in_(list(nh)))
-                        .order_by(YeuCauKhach.ngay_mong_muon.desc().nullslast(), YeuCauKhach.id.desc()).limit(200)).scalars():
+    ys = db.execute(select(YeuCauKhach).where(YeuCauKhach.loai == "nha_hang", YeuCauKhach.nha_hang_id.in_(list(nh)))
+                    .order_by(YeuCauKhach.ngay_mong_muon.desc().nullslast(), YeuCauKhach.id.desc()).limit(200)).scalars().all()
+    dons = DB.don_cua_yeu_cau(db, [y.id for y in ys])
+    for y in ys:
         td = db.get(ThucDonNhaHang, y.thuc_don_id) if y.thuc_don_id else None
-        ra.append({"id": y.id, "ma": f"YC-{y.id:04d}", "nha_hang": nh[y.nha_hang_id].ten, "thuc_don": td.ten if td else "",
+        don = dons.get(y.id)
+        ra.append({**(DB.ra_ncc(db, don) if don else {}),"id": y.id, "ma": f"YC-{y.id:04d}", "nha_hang": nh[y.nha_hang_id].ten, "thuc_don": td.ten if td else "",
                    "ngay": y.ngay_mong_muon, "gio": y.gio_den, "nguoi_lon": max(0, (y.so_khach or 0) - (y.tre_em or 0)),
                    "tre_em": y.tre_em, "tam_tinh": y.tam_tinh, "ghi_chu": y.ghi_chu, "trang_thai": y.nha_hang_tt or "cho",
                    "trang_thai_ten": NHA_HANG_TT.get(y.nha_hang_tt or "cho"), "ghi_chu_nh": y.nha_hang_ghi_chu})
@@ -703,6 +708,12 @@ def xu_ly_dat_ban(db: Session, tk: TaiKhoanNgoai, s: Supplier, yid: int, nhan: b
         raise LoiNcc("Đơn đã được xử lý", 409)
     if not nhan and not (ghi_chu or "").strip():
         raise LoiNcc("Từ chối phải ghi lý do")
+    # DT-2: đơn đặt bàn có thanh toán đổi trạng thái theo (nhận → chờ khách trả; từ chối → không phải trả).
+    from app.services import dat_ban as DB
+    try:
+        DB.nha_hang_xu_ly(db, y, nhan)
+    except DB.LoiDatBan as ex:
+        raise LoiNcc(str(ex), ex.status)
     y.nha_hang_tt, y.nha_hang_ghi_chu, y.nha_hang_luc = ("nhan" if nhan else "tu_choi"), (ghi_chu or "").strip()[:1000], datetime.now()
     db.flush()
 

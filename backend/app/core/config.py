@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     SEPAY_WEBHOOK_KEY: str = ""            # khóa đặt trong SePay → Webhook → Authorization: Apikey <key>
     SEPAY_API_TOKEN: str = ""              # token User API (my.sepay.vn → Cấu hình → API Access) để VTOS kéo giao dịch
     SEPAY_ACCOUNT_NUMBER: str = ""
+    # DT-2 · cổng thẻ OnePay (Visa / Master / JCB) cho đặt bàn nhà hàng. Chủ tịch tự nhập sau khi ký hợp đồng.
+    # Thiếu một trong ba thì nút trả bằng thẻ KHÔNG hiện — chỉ còn QR. Khóa băm là chuỗi HEX OnePay cấp.
+    ONEPAY_MERCHANT: str = ""
+    ONEPAY_ACCESS_CODE: str = ""
+    ONEPAY_HASH_KEY: str = ""
+    ONEPAY_URL: str = "https://mtf.onepay.vn/paygate/vpcpay.op"   # môi trường thử của OnePay; chạy thật đổi sang onepay.vn
     VIETRIP_PHONE: str = ""                # tài khoản robot Vietrip (chỉ đọc – Kế toán/Giám đốc) để đồng bộ tự động
     VIETRIP_PASSWORD: str = ""         # số TK ngân hàng mặc định khi kéo (trống = mọi TK trong SePay)
     # ĐỢT E13 13/10/2026 — TÊN PHÁP LÝ HIỆN HÀNH. Trước đợt này dòng này còn tên CŨ, và nó đi

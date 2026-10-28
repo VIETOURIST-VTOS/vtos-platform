@@ -175,6 +175,10 @@ CUA_TAY = (
     "dong_ban_ke_ncc",
     "de_nghi_ncc",
     "hoc_lieu_doi_tac",
+    # DT-2 (28/10/2026): người đặt gửi đơn đặt bàn trên cổng (phiên cổng); tiền thẻ do OnePay báo có chữ ký;
+    # Kế toán xác nhận tiền QR / đối soát / chốt doanh số, Sales xác nhận hoàn ở màn /dat-ban-nha-hang.
+    "don_dat_ban",
+    "thanh_toan_dat_ban",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
