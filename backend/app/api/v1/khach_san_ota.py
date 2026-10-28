@@ -28,8 +28,9 @@ def _goi(f, *a, **k):
 # ---------------------------------------------------------------- phía ngoài
 
 @router.get("/ota")
-def ds_ota(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
-    return {"ota": _goi(S.ds_cong, db, tk)}
+def ds_ota(san_pham: str = "khach_san", tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    """VB-1: `san_pham=ve_may_bay` trả OTA vé máy bay (chỉ cổng Khách hàng, Cổ đông)."""
+    return {"ota": _goi(S.ds_cong, db, tk, san_pham)}
 
 
 class ChuyenIn(BaseModel):
@@ -41,6 +42,12 @@ class ChuyenIn(BaseModel):
     so_phong: int = 1
     nguoi_lon: int = 2
     tre_em: int = 0
+    # VB-1 · vé máy bay — máy chủ chọn bộ trường theo SẢN PHẨM của OTA, không theo trình duyệt
+    diem_di: str = ""
+    ngay_di: str | None = None
+    ngay_ve: str | None = None
+    em_be: int = 0
+    hang_ve: str = "pho_thong"
 
 
 @router.post("/chuyen")
@@ -50,7 +57,9 @@ def chuyen(data: ChuyenIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Ses
 
 
 @router.get("/lich-su")
-def lich_su(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+def lich_su(san_pham: str = "khach_san", tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    if san_pham == "ve_may_bay":
+        return {"luot": _goi(S.lich_su, db, tk, san_pham), "dat_phong": []}
     return {"luot": _goi(S.lich_su, db, tk), "dat_phong": _goi(S.dat_phong_xac_minh, db, tk)}
 
 
@@ -89,6 +98,7 @@ class SuaIn(BaseModel):
     duoc_dung_web: bool | None = None
     subid_cho_phep: bool | None = None
     subid_tham_so: str | None = None
+    loai_link: str | None = None   # VB-1: hoa_hong | cong_khai (chỉ vé máy bay)
     bang_chung: str | None = None
     ghi_chu: str | None = None
 

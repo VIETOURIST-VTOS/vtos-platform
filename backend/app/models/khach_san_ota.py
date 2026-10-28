@@ -24,6 +24,12 @@ from app.db.session import Base
 TRANG_THAI_HOP_TAC = {"chua_dang_ky": "Chưa đăng ký", "cho_duyet": "Chờ duyệt", "da_duyet": "Đã duyệt",
                       "tam_dung": "Tạm dừng"}
 CONG_NGOAI = {"khach_hang": "Khách hàng", "doi_tac": "Đối tác", "co_dong": "Cổ đông"}
+# VB-1 (Chủ tịch duyệt 28/10/2026): cùng khung cho VÉ MÁY BAY qua OTA. Hai loại link: «hoa_hong» (link
+# Affiliate, đủ bốn điều kiện) và «cong_khai» (trang công khai của OTA, CHƯA có hoa hồng — chỉ cần link đúng
+# tên miền + đã kiểm). Trang công khai chỉ dùng cho vé máy bay; khách sạn giữ nguyên bốn điều kiện.
+SAN_PHAM = {"khach_san": "Khách sạn", "ve_may_bay": "Vé máy bay"}
+LOAI_LINK = {"hoa_hong": "Link hoa hồng", "cong_khai": "Trang công khai (chưa có hoa hồng)"}
+HANG_VE = {"pho_thong": "Phổ thông", "pho_thong_dac_biet": "Phổ thông đặc biệt", "thuong_gia": "Thương gia"}
 
 
 class PhapNhanHopDong(Base):
@@ -40,6 +46,8 @@ class DoiTacOta(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     ma: Mapped[str] = mapped_column(String(30), unique=True)
     ten: Mapped[str] = mapped_column(String(80))
+    san_pham: Mapped[str] = mapped_column(String(12), default="khach_san", index=True)   # VB-1
+    loai_link: Mapped[str] = mapped_column(String(10), default="hoa_hong")              # VB-1
     phap_nhan_id: Mapped[int | None] = mapped_column(ForeignKey("phap_nhan_hop_dong.id"), nullable=True)
     trang_thai: Mapped[str] = mapped_column(String(16), default="chua_dang_ky")
     link: Mapped[str] = mapped_column(String(500), default="")
@@ -76,6 +84,12 @@ class LuotChuyenOta(Base):
     so_phong: Mapped[int] = mapped_column(Integer, default=1)
     nguoi_lon: Mapped[int] = mapped_column(Integer, default=2)
     tre_em: Mapped[int] = mapped_column(Integer, default=0)
+    # VB-1 · vé máy bay: ngày đi / ngày về dùng lại `nhan_phong` / `tra_phong`; điểm đến dùng `diem_den`.
+    san_pham: Mapped[str] = mapped_column(String(12), default="khach_san")
+    diem_di: Mapped[str] = mapped_column(String(120), default="")
+    em_be: Mapped[int] = mapped_column(Integer, default=0)
+    hang_ve: Mapped[str] = mapped_column(String(20), default="")
+    loai_link: Mapped[str] = mapped_column(String(10), default="hoa_hong")   # loại link LÚC chuyển
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
 
 
