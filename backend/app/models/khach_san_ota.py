@@ -16,7 +16,7 @@ BA BẢNG
 """
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -52,6 +52,9 @@ class DoiTacOta(Base):
     bang_chung: Mapped[str] = mapped_column(Text, default="")
     ghi_chu: Mapped[str] = mapped_column(Text, default="")
     thu_tu: Mapped[int] = mapped_column(Integer, default=0)
+    # KS-2: gắn mã lượt chuyển vào link (SubID) — CHỈ khi OTA cho phép. Tên tham số do Chủ tịch khai.
+    subid_cho_phep: Mapped[bool] = mapped_column(Boolean, default=False)
+    subid_tham_so: Mapped[str] = mapped_column(String(30), default="")
     sua_boi: Mapped[str] = mapped_column(String(50), default="")
     sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -63,6 +66,7 @@ class LuotChuyenOta(Base):
     tai_khoan_id: Mapped[int] = mapped_column(ForeignKey("tai_khoan_ngoai.id"), index=True)
     request_id: Mapped[str] = mapped_column(String(36))
     doi_tac_ota_id: Mapped[int] = mapped_column(ForeignKey("doi_tac_ota.id"), index=True)
+    ma_luot: Mapped[str | None] = mapped_column(String(16), nullable=True, unique=True)   # KS-2: mã ngẫu nhiên gắn vào link (SubID)
     phien_ban_link: Mapped[int] = mapped_column(Integer)
     cong: Mapped[str] = mapped_column(String(12))
     doi_tac_ban_hang_id: Mapped[int | None] = mapped_column(ForeignKey("doi_tac_ban_hang.id"), nullable=True)
@@ -73,3 +77,72 @@ class LuotChuyenOta(Base):
     nguoi_lon: Mapped[int] = mapped_column(Integer, default=2)
     tre_em: Mapped[int] = mapped_column(Integer, default=0)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+
+
+# ---------------------------------------------------------------- KS-2 · đối soát
+
+TRANG_THAI_LO = {"cho_duyet": "Chờ Chủ tịch duyệt", "da_duyet": "Đã duyệt · đã ghi sổ", "tu_choi": "Từ chối"}
+
+
+class LoNapOta(Base):
+    """Một lần Kế toán nạp tệp báo cáo OTA. Chưa duyệt thì KHÔNG chạm vào sổ."""
+    __tablename__ = "lo_nap_ota"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ma: Mapped[str] = mapped_column(String(30), unique=True)
+    doi_tac_ota_id: Mapped[int] = mapped_column(ForeignKey("doi_tac_ota.id"), index=True)
+    ky: Mapped[str] = mapped_column(String(7), default="")
+    ten_tep: Mapped[str] = mapped_column(String(200), default="")
+    bam_tep: Mapped[str] = mapped_column(String(64), index=True)
+    trang_thai: Mapped[str] = mapped_column(String(12), default="cho_duyet", index=True)
+    dong: Mapped[list] = mapped_column(JSON, default=list)            # các dòng đã đọc, chuẩn hoá
+    so_dong: Mapped[int] = mapped_column(Integer, default=0)
+    so_loi: Mapped[int] = mapped_column(Integer, default=0)
+    loi: Mapped[list] = mapped_column(JSON, default=list)
+    nap_boi: Mapped[str] = mapped_column(String(50), default="")
+    nap_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    duyet_boi: Mapped[str] = mapped_column(String(50), default="")
+    duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ly_do: Mapped[str] = mapped_column(String(300), default="")
+    ket_qua: Mapped[dict] = mapped_column(JSON, default=dict)          # số mới / cập nhật / trùng lúc duyệt
+
+
+class DatPhongOta(Base):
+    """Một đặt phòng OTA báo về — trạng thái HIỆN TẠI. Mỗi lần OTA báo khác đi: phiên bản +1, sổ ghi phần chênh."""
+    __tablename__ = "dat_phong_ota"
+    __table_args__ = (UniqueConstraint("doi_tac_ota_id", "khoa", name="uq_dat_phong_ota_khoa"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    doi_tac_ota_id: Mapped[int] = mapped_column(ForeignKey("doi_tac_ota.id"), index=True)
+    khoa: Mapped[str] = mapped_column(String(300))                    # mã đặt phòng OTA, hoặc khoá ghép khi báo cáo không có mã
+    co_ma_rieng: Mapped[bool] = mapped_column(Boolean, default=False)
+    ky: Mapped[str] = mapped_column(String(7), default="", index=True)  # tháng của ngày đặt
+    ngay_dat: Mapped[date | None] = mapped_column(Date, nullable=True)
+    san_pham: Mapped[str] = mapped_column(String(80), default="")
+    thanh_pho: Mapped[str] = mapped_column(String(120), default="")
+    quoc_gia: Mapped[str] = mapped_column(String(80), default="")
+    link: Mapped[str] = mapped_column(String(300), default="")
+    ngay_den: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ngay_di: Mapped[date | None] = mapped_column(Date, nullable=True)
+    so_khach: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tien_te: Mapped[str] = mapped_column(String(3), default="USD")
+    gia_tri_cent: Mapped[int] = mapped_column(BigInteger, default=0)   # đơn vị nhỏ nhất (cent)
+    hoa_hong_cent: Mapped[int] = mapped_column(BigInteger, default=0)
+    trang_thai_chuyen: Mapped[str] = mapped_column(String(40), default="")
+    trang_thai_tt: Mapped[str] = mapped_column(String(40), default="")
+    ma_luot: Mapped[str] = mapped_column(String(40), default="")       # SubID OTA báo lại (nếu có)
+    luot_id: Mapped[int | None] = mapped_column(ForeignKey("luot_chuyen_ota.id"), nullable=True, index=True)
+    phien_ban: Mapped[int] = mapped_column(Integer, default=1)
+    lo_id: Mapped[int] = mapped_column(ForeignKey("lo_nap_ota.id"))
+    cap_nhat_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class SoHoaHongOta(Base):
+    """Sổ CHỈ GHI THÊM: mỗi lần duyệt ghi phần chênh hoa hồng của từng đặt phòng (âm khi hủy / giảm)."""
+    __tablename__ = "so_hoa_hong_ota"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    dat_phong_id: Mapped[int] = mapped_column(ForeignKey("dat_phong_ota.id"), index=True)
+    lo_id: Mapped[int] = mapped_column(ForeignKey("lo_nap_ota.id"), index=True)
+    phien_ban: Mapped[int] = mapped_column(Integer)
+    tien_te: Mapped[str] = mapped_column(String(3), default="USD")
+    chenh_cent: Mapped[int] = mapped_column(BigInteger)
+    ly_do: Mapped[str] = mapped_column(String(120), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

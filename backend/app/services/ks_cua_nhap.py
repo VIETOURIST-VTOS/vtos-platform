@@ -152,6 +152,10 @@ CUA_TAY = (
     "phap_nhan_hop_dong",
     "doi_tac_ota",
     "luot_chuyen_ota",
+    # KS-2 (28/10/2026): Kế toán nạp tệp báo cáo OTA ở màn /doi-soat-ota; duyệt lô mới sinh đặt phòng + sổ.
+    "lo_nap_ota",
+    "dat_phong_ota",
+    "so_hoa_hong_ota",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

@@ -15,7 +15,8 @@ const TT_TAG: Record<string, string> = { da_duyet: "ok", cho_duyet: "warn", chua
 function SuaOta({ o, tt, xong }: { o: any; tt: Record<string, string>; xong: (d: any) => void }) {
   const { toast } = useShell();
   const [f, setF] = useState({ trang_thai: o.trang_thai, link: o.link, ten_mien: o.ten_mien, duong_dan: o.duong_dan,
-    da_kiem_link: o.da_kiem_link, duoc_dung_web: o.duoc_dung_web, bang_chung: o.bang_chung, ghi_chu: o.ghi_chu });
+    da_kiem_link: o.da_kiem_link, duoc_dung_web: o.duoc_dung_web, bang_chung: o.bang_chung, ghi_chu: o.ghi_chu,
+    subid_cho_phep: o.subid_cho_phep, subid_tham_so: o.subid_tham_so || "" });
   const doiLink = f.link !== o.link || f.ten_mien !== o.ten_mien || f.duong_dan !== o.duong_dan;
   const luu = async () => {
     try { const r = await api<any>(`/khach-san-ota/${o.id}`, { method: "POST", json: f }); toast(r.message); xong(r); }
@@ -40,6 +41,13 @@ function SuaOta({ o, tt, xong }: { o: any; tt: Record<string, string>; xong: (d:
       <span>Đã mở thử link — đúng tài khoản Affiliate của pháp nhân hợp đồng</span></label>
     <label style={CHK}><input type="checkbox" style={O_TICK} checked={f.duoc_dung_web} onChange={(e) => setF({ ...f, duoc_dung_web: e.target.checked })} />
       <span>OTA cho phép dùng link trên vietourist.vn</span></label>
+    <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, display: "grid", gap: 6 }}>
+      <b>Mã lượt chuyển (SubID) — đối soát về đúng khách / đại lý</b>
+      <label style={CHK}><input type="checkbox" style={O_TICK} checked={f.subid_cho_phep} onChange={(e) => setF({ ...f, subid_cho_phep: e.target.checked })} />
+        <span>OTA cho phép gắn SubID vào link và báo lại trong báo cáo</span></label>
+      {o2("subid_tham_so", "Tên tham số SubID trên link (vd sid, subid)", "sid")}
+      <div className="muted">Mã gắn vào là mã ngẫu nhiên của lượt chuyển — không chứa SĐT, email. Chỉ bật khi đã đọc tài liệu của OTA / mạng lưới.</div>
+    </div>
     <button className="act teal" style={{ margin: 0, justifySelf: "start" }} onClick={luu}>Lưu</button>
   </div>);
 }
@@ -65,12 +73,12 @@ function Trang() {
   };
   return (<>
     <h1>Khách sạn qua OTA</h1>
-    <p className="muted">Khách chọn khách sạn, xem giá, đặt và thanh toán trên OTA; VTD chuyển khách bằng link Affiliate chính thức. Một lượt chuyển KHÔNG phải đặt phòng, không phải doanh thu — đặt phòng và hoa hồng do OTA báo về đối soát ở đợt sau. OTA chỉ hiện cho khách khi đủ bốn điều: hợp tác đã duyệt · link hợp lệ · đã kiểm link · được dùng trên web.</p>
+    <p className="muted">Khách chọn khách sạn, xem giá, đặt và thanh toán trên OTA; VTD chuyển khách bằng link Affiliate chính thức. Một lượt chuyển KHÔNG phải đặt phòng, không phải doanh thu — đặt phòng và hoa hồng do OTA báo về được đối soát ở màn Đối soát OTA. OTA chỉ hiện cho khách khi đủ bốn điều: hợp tác đã duyệt · link hợp lệ · đã kiểm link · được dùng trên web.</p>
 
     <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))" }}>
       <div className="panel"><b>Lượt chuyển 7 ngày</b><div style={{ fontSize: 26, fontWeight: 700 }}>{luot ? luot.tong : "…"}</div><div className="muted">không phải đặt phòng</div></div>
       <div className="panel"><b>Theo cổng</b><div className="muted">{luot ? `Khách hàng ${luot.theo_cong.khach_hang || 0} · Đối tác ${luot.theo_cong.doi_tac || 0} · Cổ đông ${luot.theo_cong.co_dong || 0}` : "…"}</div></div>
-      <div className="panel"><b>Đặt phòng đã xác minh</b><div style={{ fontSize: 26, fontWeight: 700 }}>—</div><div className="muted">đối soát OTA làm ở đợt sau</div></div>
+      <div className="panel"><b>Đặt phòng đã xác minh</b><div style={{ fontSize: 26, fontWeight: 700 }}>—</div><div className="muted">Kế toán nạp báo cáo OTA ở màn <a href="/doi-soat-ota">Đối soát OTA</a></div></div>
     </div>
 
     <div className="panel wrap"><b>Đối tác OTA</b>
