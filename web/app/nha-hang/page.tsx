@@ -5,8 +5,9 @@ import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 
 /** KH-2 · NHÀ HÀNG (CỔNG KHÁCH) — Chủ tịch duyệt bản xem thử 26/10/2026.
- *  Điều hành nhập nhà hàng + thực đơn (chỉ GIÁ BÁN). TP / GĐ Kinh doanh bật «Hiện trên cổng».
- *  Sửa nội dung bán của nhà hàng đang hiện → máy chủ tự tắt và ghi lý do; Kinh doanh bật lại. */
+ *  Điều hành nhập nhà hàng + thực đơn (chỉ GIÁ BÁN). TP Điều hành bật «Hiện trên cổng» (DT-2b, Chủ tịch 28/10/2026);
+ *  người vừa nhập / sửa không tự bật.
+ *  Sửa nội dung bán của nhà hàng đang hiện → máy chủ tự tắt và ghi lý do; TP Điều hành bật lại. */
 const d = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("vi-VN") + " đ" : "—");
 const NH_TRONG = { ten: "", tinh_thanh: "", khu_vuc: "", am_thuc: "Việt Nam", gio_phuc_vu: "", tien_ich: "", mo_ta: "", ghi_chu_noi_bo: "" };
 const TD_TRONG = { ten: "", loai: "set", gia_nguoi_lon: "", gia_tre_em: "", so_khach_toi_thieu: 1, mo_ta: "", dieu_kien: "", dieu_kien_huy: "", tu_ngay: "", den_ngay: "", dang_ban: true };
@@ -15,7 +16,7 @@ function Trang() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const nhap = ["tp_dh", "nv_dh", "chutich", "tgd"].includes(role);
-  const bat = ["tp_kd", "gd_kd", "chutich", "tgd"].includes(role);
+  const bat = ["tp_dh", "chutich", "tgd"].includes(role);
   const [x, setX] = useState<any>(null);
   const [sua, setSua] = useState<any>(null);       // nhà hàng đang sửa (id hoặc "moi")
   const [f, setF] = useState<any>(NH_TRONG);
@@ -40,7 +41,7 @@ function Trang() {
   };
   return (<>
     <h1>Nhà hàng (cổng khách)</h1>
-    <p className="muted">Điều hành nhập và sửa. Chỉ TP / GĐ Kinh doanh bật «Hiện trên cổng». Sửa giá hoặc thực đơn của nhà hàng đang hiện → tự tắt, chờ Kinh doanh bật lại.
+    <p className="muted">Điều hành nhập và sửa. Chỉ TP Điều hành bật «Hiện trên cổng»; người vừa nhập / sửa không tự bật. Sửa giá hoặc thực đơn của nhà hàng đang hiện → tự tắt, chờ TP Điều hành bật lại.
       Chỉ nhập <b>giá bán cho khách</b>; giá vốn / phí NCC theo hợp đồng nhà cung cấp, không nhập ở đây.</p>
     {nhap && <button className="act teal" onClick={() => { setSua("moi"); setF(NH_TRONG); setTd(null); }}>+ Thêm nhà hàng</button>}
 

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """KH-2 · Nhà hàng trên cổng khách + thanh toán QR — Chủ tịch duyệt bản xem thử 26/10/2026.
 
-  1. Điều hành nhập, Kinh doanh bật; người nhập không tự bật; cần ≥1 gói đang bán mới bật được.
+  1. Điều hành nhập, TP Điều hành bật (DT-2b, Chủ tịch 28/10/2026 — Kinh doanh không bật nữa); người nhập không
+     tự bật; cần ≥1 gói đang bán mới bật được.
   2. Sửa nội dung bán khi đang hiện → tự tắt kèm lý do; sửa ghi chú nội bộ thì không.
   3. Cổng khách chỉ thấy nhà hàng đang hiện, gói đang bán; không lộ ghi chú nội bộ.
   4. Yêu cầu đặt bàn: kiểm ngày, giờ, gói, số khách tối thiểu; tạm tính do MÁY tính; ra lead cho Sales.
@@ -28,7 +29,7 @@ def db(monkeypatch):
     e = create_engine("sqlite://", future=True)
     Base.metadata.create_all(e)
     s = sessionmaker(bind=e, future=True)()
-    for ten, vai in (("dh", "nv_dh"), ("kd", "tp_kd"), ("nvkd", "nv_kd"), ("kt", "ketoan")):
+    for ten, vai in (("dh", "nv_dh"), ("kd", "tp_dh"), ("tpkd", "tp_kd"), ("nvkd", "nv_kd"), ("kt", "ketoan")):
         s.add(User(username=ten, full_name=ten.upper(), role=vai, password_hash="x"))
     s.commit()
     monkeypatch.setattr(N, "_hom_nay", lambda: HOM_NAY)
@@ -65,12 +66,17 @@ def test_vai_va_tu_tat_khi_sua(db):
     td = N.luu_thuc_don(db, _u(db, "dh"), n.id, {"ten": "Vị biển", "gia_nguoi_lon": 490000})
     with pytest.raises(N.LoiNhaHang):
         N.bat_hien(db, _u(db, "dh"), n.id, True)                       # người nhập không tự bật
+    with pytest.raises(N.LoiNhaHang):
+        N.bat_hien(db, _u(db, "tpkd"), n.id, True)                     # Kinh doanh không bật nữa
     N.bat_hien(db, _u(db, "kd"), n.id, True)
     assert n.hien_cong is True
     N.luu_nha_hang(db, _u(db, "dh"), {"ten": "Biển Xanh", "am_thuc": "Hải sản", "ghi_chu_noi_bo": "gọi chị Lan"}, n.id)
     assert n.hien_cong is True, "ghi chú nội bộ không tắt"
     N.luu_thuc_don(db, _u(db, "dh"), n.id, {"ten": "Vị biển", "gia_nguoi_lon": 520000}, td.id)
     assert n.hien_cong is False and "Vị biển" in n.tat_ly_do
+    N.luu_thuc_don(db, _u(db, "kd"), n.id, {"ten": "Vị biển", "gia_nguoi_lon": 530000}, td.id)
+    with pytest.raises(N.LoiNhaHang, match="không tự bật"):
+        N.bat_hien(db, _u(db, "kd"), n.id, True)                       # TP ĐH vừa sửa giá thì không tự bật
     with pytest.raises(N.LoiNhaHang):
         N.luu_thuc_don(db, _u(db, "dh"), n.id, {"ten": "Âm", "gia_nguoi_lon": 0})
     with pytest.raises(N.LoiNhaHang):

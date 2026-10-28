@@ -1,4 +1,4 @@
-"""KH-2 · Màn VTOS «Nhà hàng (cổng khách)» — Điều hành nhập, Kinh doanh bật hiện cổng."""
+"""KH-2 · Màn VTOS «Nhà hàng (cổng khách)» — Điều hành nhập, TP Điều hành bật hiện cổng (DT-2b, 28/10/2026)."""
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -47,7 +47,7 @@ def sua(nid: int, data: NhaHangIn, u: User = Depends(require_roles(*N.VAI_NHAP))
         nh = N.luu_nha_hang(db, u, data.model_dump(), nid)
     except N.LoiNhaHang as ex:
         _loi(ex)
-    return {"id": nh.id, "message": "Đã lưu" + ("" if nh.hien_cong or not nh.tat_ly_do else " — nhà hàng đang chờ Kinh doanh bật lại")}
+    return {"id": nh.id, "message": "Đã lưu" + ("" if nh.hien_cong or not nh.tat_ly_do else " — nhà hàng đang chờ TP Điều hành bật lại")}
 
 
 class ThucDonIn(BaseModel):

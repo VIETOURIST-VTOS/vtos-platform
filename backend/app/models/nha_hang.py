@@ -1,8 +1,9 @@
 """KH-2 · Danh mục NHÀ HÀNG cho cổng khách hàng (Chủ tịch duyệt bản xem thử 26/10/2026).
 
-Điều hành nhập nhà hàng và các gói thực đơn; chỉ TP / GĐ Kinh doanh bật «Hiện trên cổng».
-Sửa nội dung bán (giá, thực đơn, điều kiện) của một nhà hàng đang hiện thì nó TỰ TẮT và chờ Kinh doanh
-bật lại — giá lên cổng luôn là giá đã có người Kinh doanh nhìn qua.
+Điều hành nhập nhà hàng và các gói thực đơn; chỉ TP Điều hành bật «Hiện trên cổng» (DT-2b, Chủ tịch 28/10/2026 —
+trước đó là Kinh doanh); người vừa nhập / sửa không tự bật.
+Sửa nội dung bán (giá, thực đơn, điều kiện) của một nhà hàng đang hiện thì nó TỰ TẮT và chờ TP Điều hành
+bật lại — giá lên cổng luôn là giá đã có người thứ hai nhìn qua.
 
 Chỉ có GIÁ BÁN cho khách. Giá vốn / phí nhà cung cấp đi theo hợp đồng NCC ở chỗ khác, không nằm ở đây,
 nên không có đường nào để chúng lọt ra cổng.

@@ -16,8 +16,10 @@ from app.models.nha_hang import NhaHang, ThucDonNhaHang, AM_THUC, LOAI_GOI
 
 TOAN_QUYEN = ("chutich", "tgd")
 VAI_NHAP = ("tp_dh", "nv_dh") + TOAN_QUYEN
-VAI_BAT = ("tp_kd", "gd_kd") + TOAN_QUYEN
-VAI_XEM = tuple(dict.fromkeys(VAI_NHAP + VAI_BAT + ("bks", "robot_ks")))
+# DT-2b (Chủ tịch 28/10/2026): bật «Hiện trên cổng» chuyển về TP ĐIỀU HÀNH (Kinh doanh không bật nữa).
+# Vẫn hai người: người vừa nhập / sửa nhà hàng hay thực đơn không tự bật (trừ Chủ tịch, TGĐ).
+VAI_BAT = ("tp_dh",) + TOAN_QUYEN
+VAI_XEM = tuple(dict.fromkeys(VAI_NHAP + VAI_BAT + ("tp_kd", "gd_kd", "bks", "robot_ks")))
 
 TRUONG_NH = ("ten", "tinh_thanh", "khu_vuc", "am_thuc", "gio_phuc_vu", "tien_ich", "mo_ta")
 TRUONG_TD = ("ten", "loai", "gia_nguoi_lon", "gia_tre_em", "so_khach_toi_thieu", "mo_ta", "dieu_kien", "dieu_kien_huy",
@@ -144,7 +146,7 @@ def _con_ban(td: ThucDonNhaHang, hom_nay: date) -> bool:
 
 def bat_hien(db: Session, u: User, nha_hang_id: int, bat: bool, now: datetime | None = None) -> NhaHang:
     if not _co(u, VAI_BAT):
-        raise LoiNhaHang("Chỉ TP / GĐ Kinh doanh bật hoặc tắt hiện trên cổng")
+        raise LoiNhaHang("Chỉ TP Điều hành bật hoặc tắt hiện trên cổng")
     nh = db.get(NhaHang, nha_hang_id)
     if nh is None:
         raise LoiNhaHang("Không có nhà hàng này")
@@ -154,6 +156,8 @@ def bat_hien(db: Session, u: User, nha_hang_id: int, bat: bool, now: datetime | 
         tds = db.execute(select(ThucDonNhaHang).where(ThucDonNhaHang.nha_hang_id == nh.id)).scalars().all()
         if not any(_con_ban(t, _hom_nay()) for t in tds):
             raise LoiNhaHang("Chưa có thực đơn đang bán — Điều hành thêm thực đơn trước")
+        if u.role not in TOAN_QUYEN and u.username in ({nh.tao_boi, nh.sua_boi} | {t.sua_boi for t in tds}) - {""}:
+            raise LoiNhaHang("Người nhập / sửa nhà hàng hoặc thực đơn không tự bật — nhờ người thứ hai (TP Điều hành khác, Chủ tịch, TGĐ)")
         nh.hien_cong, nh.hien_boi, nh.hien_luc, nh.tat_ly_do = True, u.username, now or datetime.now(), ""
     else:
         nh.hien_cong, nh.tat_ly_do = False, f"Tắt bởi {u.username}"
@@ -163,7 +167,7 @@ def bat_hien(db: Session, u: User, nha_hang_id: int, bat: bool, now: datetime | 
 
 def ngung(db: Session, u: User, nha_hang_id: int, ngung_: bool) -> NhaHang:
     if not _co(u, VAI_BAT + ("tp_dh",)):
-        raise LoiNhaHang("Chỉ TP Điều hành / Kinh doanh đánh dấu ngừng hợp tác")
+        raise LoiNhaHang("Chỉ TP Điều hành / Chủ tịch / TGĐ đánh dấu ngừng hợp tác")
     nh = db.get(NhaHang, nha_hang_id)
     if nh is None:
         raise LoiNhaHang("Không có nhà hàng này")
