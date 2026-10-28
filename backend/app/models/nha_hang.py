@@ -157,3 +157,65 @@ class AnhNhaHang(Base):
     sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     duyet_boi: Mapped[str] = mapped_column(String(50), default="")
     duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ══ AT-2b · MÓN ĂN VÀ THỰC ĐƠN NHÀ HÀNG (Chủ tịch chốt 29/10/2026) ═══════════════════════════════════════════
+# Món KHÔNG có giá — giá chỉ nằm trên thực đơn nhà hàng; giá bán qua VTD vẫn chỉ ở gói đặt bàn (ThucDonNhaHang).
+# Thực đơn 4 loại, mỗi lần thay là một phiên bản mới; bản cũ giữ nguyên. Không tính vào 60 ảnh album.
+NHOM_MON_NH = {"khai_vi": "Khai vị", "mon_chinh": "Món chính", "mon_nuoc": "Món nước", "trang_mieng": "Tráng miệng",
+               "do_uong": "Đồ uống"}
+DI_UNG = {"dau_phong": "Đậu phộng", "hai_san_vo": "Hải sản có vỏ", "ca": "Cá", "gluten": "Gluten", "sua": "Sữa",
+          "trung": "Trứng", "dau_nanh": "Đậu nành"}
+LOAI_THUC_DON = {"goi_mon": "Gọi món", "set_menu": "Set menu", "buffet": "Buffet", "khach_doan": "Khách đoàn (set menu)"}
+
+
+class MonNhaHang(Base):
+    __tablename__ = "mon_nha_hang"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nha_hang_id: Mapped[int] = mapped_column(ForeignKey("nha_hang.id"), index=True)
+    ten: Mapped[str] = mapped_column(String(160))
+    ten_khac: Mapped[str] = mapped_column(String(160), default="")
+    nhom: Mapped[str] = mapped_column(String(20), default="mon_chinh")
+    mo_ta: Mapped[str] = mapped_column(String(500), default="")
+    di_ung: Mapped[list | None] = mapped_column(JSON, nullable=True)        # khóa trong DI_UNG — nhà hàng xác nhận
+    cay: Mapped[bool] = mapped_column(Boolean, default=False)
+    chay: Mapped[bool] = mapped_column(Boolean, default=False)
+    anh_id: Mapped[int | None] = mapped_column(ForeignKey("anh_nha_hang.id"), nullable=True)   # ảnh trong album
+    noi_bat: Mapped[bool] = mapped_column(Boolean, default=False)
+    thu_tu: Mapped[int] = mapped_column(Integer, default=0)
+    trang_thai: Mapped[str] = mapped_column(String(12), default="nhap")    # nhap | cho_duyet | da_duyet | an
+    ly_do_tra_lai: Mapped[str] = mapped_column(String(300), default="")
+    tao_boi: Mapped[str] = mapped_column(String(50), default="")
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    sua_boi: Mapped[str] = mapped_column(String(50), default="")
+    sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    duyet_boi: Mapped[str] = mapped_column(String(50), default="")
+    duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ThucDonBan(Base):
+    """Một PHIÊN BẢN thực đơn của nhà hàng (một loại). Bất biến: thay = tải bản mới, bản cũ giữ."""
+    __tablename__ = "thuc_don_ban"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nha_hang_id: Mapped[int] = mapped_column(ForeignKey("nha_hang.id"), index=True)
+    loai: Mapped[str] = mapped_column(String(20))
+    so: Mapped[int] = mapped_column(Integer, default=1)                    # 1 → v1.0, 2 → v1.1 …
+    hieu_luc_tu: Mapped[date] = mapped_column(Date)
+    can_cu: Mapped[str] = mapped_column(String(300), default="")
+    so_trang: Mapped[int] = mapped_column(Integer, default=0)
+    trang_thai: Mapped[str] = mapped_column(String(12), default="cho_duyet")   # cho_duyet | duyet | tra_lai
+    ly_do_tra_lai: Mapped[str] = mapped_column(String(300), default="")
+    tai_boi: Mapped[str] = mapped_column(String(50), default="")
+    tai_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    duyet_boi: Mapped[str] = mapped_column(String(50), default="")
+    duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ThucDonTrang(Base):
+    __tablename__ = "thuc_don_trang"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ban_id: Mapped[int] = mapped_column(ForeignKey("thuc_don_ban.id"), index=True)
+    thu_tu: Mapped[int] = mapped_column(Integer, default=1)
+    attachment_id: Mapped[int] = mapped_column(ForeignKey("attachments.id"))        # tệp gốc (ảnh / PDF)
+    hien_id: Mapped[int | None] = mapped_column(ForeignKey("attachments.id"), nullable=True)
+    nho_id: Mapped[int | None] = mapped_column(ForeignKey("attachments.id"), nullable=True)

@@ -80,7 +80,7 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
 
   if (nh) return (<div className="at"><style>{CSS}</style>
     <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => setNh(null)}><span>← Hương vị Việt Nam</span></button>
-    <AlbumKhach album={nh.album} ten={nh.ten} coTab
+    <AlbumKhach album={nh.album} ten={nh.ten} coTab mon={nh.mon} thucDon={nh.thuc_don_nh}
       dong2={[[nh.khu_vuc, nh.tinh_thanh].filter(Boolean).join(", ") || nh.dia_danh_nguon, nh.am_thuc ? `Ẩm thực ${nh.am_thuc}` : ""].filter(Boolean).join(" · ")}
       nhan={<div style={{ marginTop: 8 }}><span className="at-chua">Chưa mở đặt bàn qua Vietourist</span></div>}
       gioiThieu={<div className="at-mon-chu at-the-gt">

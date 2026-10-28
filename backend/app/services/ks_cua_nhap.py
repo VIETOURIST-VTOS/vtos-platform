@@ -184,6 +184,8 @@ CUA_TAY = (
     "noi_dung_am_thuc",
     # AT-2a (29/10/2026): Điều hành / Marketing tải ảnh album, TP Điều hành duyệt — màn /nha-hang › Album ảnh.
     "anh_nha_hang",
+    # AT-2b (29/10/2026): Điều hành / Marketing nhập món, tải thực đơn theo phiên bản — màn /nha-hang › Món ăn, Thực đơn.
+    "mon_nha_hang", "thuc_don_ban", "thuc_don_trang",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
