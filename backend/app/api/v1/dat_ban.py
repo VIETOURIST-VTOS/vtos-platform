@@ -84,12 +84,23 @@ def cua_toi(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(
 
 
 @router.get("/nha-hang")
-def ds_nha_hang(tinh: str = "", am_thuc: str = "", gia_toi_da: int = 0, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai),
+def ds_nha_hang(tinh: str = "", am_thuc: str = "", gia_toi_da: int = 0, q: str = "", chi_dat: bool = False, trang: int = 1, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai),
                 db: Session = Depends(get_db)):
     """Danh mục nhà hàng đang mở trên cổng — cho mọi người được đặt (khách, cổ đông, đại lý, CTV)."""
     from app.services import nha_hang as NH
     _goi(S._nguoi_dat, db, tk)
-    return NH.danh_sach_cong(db, tinh, am_thuc, gia_toi_da)
+    return NH.danh_sach_cong(db, tinh, am_thuc, gia_toi_da, q, chi_dat, trang)
+
+
+@router.get("/nha-hang/{nid}")
+def mot_nha_hang(nid: int, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    """AT-1: trang một nhà hàng (giới thiệu; nơi mở đặt có thực đơn) — sau khi nhận OTP."""
+    from app.services import nha_hang as NH
+    _goi(S._nguoi_dat, db, tk)
+    try:
+        return NH.mot_nha_hang_cong(db, nid)[1]
+    except NH.LoiNhaHang as ex:
+        raise HTTPException(404, str(ex))
 
 
 @router.post("")

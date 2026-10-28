@@ -29,6 +29,18 @@ class _Kho:
     def get(self, key): return self.d[key]
 
 
+def hop_dong_mau(s, n, bps=1000, tu=dt.date(2026, 1, 1), den=None):
+    """AT-1: hợp đồng đã ký + tệp (dữ liệu thử) để nhà hàng đủ điều kiện mở đặt bàn."""
+    from app.models.attachments import Attachment
+    from app.models.nha_hang import HopDongNhaHang
+    a = Attachment(doi_tuong="nha_cung_cap", doi_tuong_id=f"NCC{n.id}", ten_tep="hd.pdf", checksum=f"{n.id:064d}", khoa_luu=f"k{n.id}", loai="hop_dong")
+    s.add(a); s.flush()
+    h = HopDongNhaHang(nha_hang_id=n.id, so_hd=f"HD-{n.ma}", ngay_ky=tu, tu_ngay=tu, den_ngay=den, hoa_hong_bps=bps,
+                       attachment_id=a.id, con_dung=True, ghi_boi="nvdh")
+    s.add(h); s.flush()
+    return h
+
+
 @pytest.fixture()
 def db():
     import app.models  # noqa: F401
@@ -47,8 +59,10 @@ def db():
         s.add(User(username=ten, full_name=ten.upper(), role=vai, password_hash="x"))
     sup = Supplier(code="NCC0042", ten="Nhà hàng Hương Biển", loai="nha_hang", ma_so_thue="0311111111")
     s.add(sup); s.flush()
-    n = NhaHang(ma="NH001", ten="Hương Biển", tinh_thanh="Kiên Giang", hien_cong=True, supplier_id=sup.id)
+    n = NhaHang(ma="NH001", ten="Hương Biển", tinh_thanh="Kiên Giang", hien_cong=True, supplier_id=sup.id,
+                lien_he_xac_minh=True)
     s.add(n); s.flush()
+    hop_dong_mau(s, n)                                           # AT-1: chỉ nơi đã ký hợp đồng mới đặt được
     s.add_all([ThucDonNhaHang(nha_hang_id=n.id, ten="Set hải sản", loai="set", gia_nguoi_lon=450000, gia_tre_em=225000),
                ThucDonNhaHang(nha_hang_id=n.id, ten="Gọi món", loai="goi_mon", gia_nguoi_lon=300000)])
     dl = DoiTacBanHang(ma="DL012", ten="Đại lý Sao Mai", loai="dai_ly", hieu_luc_tu=dt.date(2026, 1, 1))

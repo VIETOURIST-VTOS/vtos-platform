@@ -25,6 +25,8 @@ class SoDiem(Base):
     loai: Mapped[str] = mapped_column(String(10))
     so_diem: Mapped[int] = mapped_column(BigInteger)                     # có dấu
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True, index=True)
+    # AT-1c (Chủ tịch 28/10/2026): điểm từ đơn đặt bàn nhà hàng qua Vietourist — tính như tour
+    dat_ban_id: Mapped[int | None] = mapped_column(ForeignKey("don_dat_ban.id"), nullable=True, index=True)
     voucher_id: Mapped[int | None] = mapped_column(ForeignKey("voucher_rewards.id"), nullable=True)
     het_han: Mapped[date | None] = mapped_column(Date, nullable=True)    # chỉ dòng cộng (CONG, TRA_GIU)
     co_so: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # B đủ điều kiện lúc tính
