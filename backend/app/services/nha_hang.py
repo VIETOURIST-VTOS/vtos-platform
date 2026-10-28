@@ -220,6 +220,7 @@ def danh_sach_vtos(db: Session) -> dict:
     for h in db.execute(select(HopDongNhaHang).order_by(HopDongNhaHang.id.desc())).scalars():
         hds.setdefault(h.nha_hang_id, []).append(h)
     hn = _hom_nay()
+    ht = hoan_thien_anh(db)
     ra = []
     for n in nhs:
         mine = [t for t in tds if t.nha_hang_id == n.id]
@@ -232,8 +233,10 @@ def danh_sach_vtos(db: Session) -> dict:
                    "nguon": n.nguon, "nguon_ref": n.nguon_ref, "dia_danh_nguon": n.dia_danh_nguon, "mon_noi_bat": n.mon_noi_bat,
                    "lien_he_xac_minh": n.lien_he_xac_minh, "xac_minh_boi": n.xac_minh_boi, "supplier_id": n.supplier_id,
                    "dieu_kien": dieu_kien_mo_dat(db, n, mine, hn), "mo_dat": mo_dat(db, n, mine, hn),
-                   "hop_dong": [_hd_out(h) for h in hds.get(n.id, [])], "anh_id": n.anh_id, "anh_nguon": n.anh_nguon})
+                   "hop_dong": [_hd_out(h) for h in hds.get(n.id, [])], "anh_id": n.anh_id, "anh_nguon": n.anh_nguon,
+                   "anh_ht": ht.get(n.id, {"da_duyet": 0, "cho_duyet": 0, "nhap": 0, "an": 0, "co_bia": False})})
     return {"nha_hang": ra, "am_thuc": list(AM_THUC), "loai_goi": LOAI_GOI, "noi_dung": ds_noi_dung(db), "loai_nd": LOAI_ND,
+            "nhom_anh": NHOM_ANH, "can_cu_anh": CAN_CU_ANH, "so_anh_cho_duyet": sum(o["cho_duyet"] for o in ht.values()),
             "thanh_pho": [{"ten": t, "mien": MIEN[m]} for t, (m, _k) in THANH_PHO.items()], "nhom_mon": list(NHOM_MON)}
 
 
@@ -266,13 +269,21 @@ def mo_dat(db: Session, n: NhaHang, tds: list[ThucDonNhaHang] | None = None, nga
     return bool(n.hien_cong and not n.ngung and all(x["ok"] for x in dieu_kien_mo_dat(db, n, tds, ngay)))
 
 
-def _nh_cong(db: Session, n: NhaHang, tds: list[ThucDonNhaHang], hn: date) -> dict:
+def _nh_cong(db: Session, n: NhaHang, tds: list[ThucDonNhaHang], hn: date, anh: list | None = None,
+             du_album: bool = False) -> dict:
+    """anh: ảnh ĐÃ DUYỆT của nhà hàng (album_cong). Danh sách chỉ cần ảnh bìa; trang chi tiết lấy cả album."""
     dat = mo_dat(db, n, tds, hn)
+    if anh is None:
+        anh = album_cong(db, [n.id]).get(n.id, [])
+    bia = _anh_cong_out(anh[0]) if anh else None
     ban = [t for t in tds if _con_ban(t, hn)] if dat else []
     return {"id": n.id, "ten": n.ten, "tinh_thanh": n.tinh_thanh, "khu_vuc": n.khu_vuc, "am_thuc": n.am_thuc,
             "gio_phuc_vu": n.gio_phuc_vu, "tien_ich": n.tien_ich, "mo_ta": n.mo_ta, "mon_noi_bat": n.mon_noi_bat,
             "dia_danh_nguon": n.dia_danh_nguon, "mo_dat": dat, "da_xac_minh": bool(n.lien_he_xac_minh),
-            "anh": _duong_anh(n.anh_id), "anh_nguon": n.anh_nguon if n.anh_id else "",
+            # AT-2a: ảnh chỉ từ album đã duyệt (ảnh đơn cũ nha_hang.anh_id không ra cổng nữa)
+            "anh": bia["hien"] if bia else None, "anh_nho": bia["nho"] if bia else None,
+            "anh_alt": bia["alt"] if bia else "", "anh_nguon": bia["credit"] if bia else "", "so_anh": len(anh),
+            **({"album": [_anh_cong_out(x) for x in anh]} if du_album else {}),
             "gia_tu": min(int(t.gia_nguoi_lon or 0) for t in ban) if ban else None, "thuc_don": [_td_out(t, False) for t in ban]}
 
 
@@ -289,7 +300,8 @@ def _duong_anh(aid: int | None) -> str | None:
 def _nh_hien(db: Session, hn: date) -> list[dict]:
     nhs = db.execute(select(NhaHang).where(NhaHang.hien_cong.is_(True), NhaHang.ngung.is_(False)).order_by(NhaHang.ten)).scalars().all()
     tds = db.execute(select(ThucDonNhaHang).where(ThucDonNhaHang.nha_hang_id.in_([n.id for n in nhs]))).scalars().all() if nhs else []
-    return [(n, _nh_cong(db, n, [t for t in tds if t.nha_hang_id == n.id], hn)) for n in nhs]
+    al = album_cong(db, [n.id for n in nhs])
+    return [(n, _nh_cong(db, n, [t for t in tds if t.nha_hang_id == n.id], hn, al.get(n.id, []))) for n in nhs]
 
 
 def danh_sach_cong(db: Session, tinh: str = "", am_thuc: str = "", gia_toi_da: int = 0, q: str = "", chi_dat: bool = False,
@@ -334,7 +346,7 @@ def mot_nha_hang_cong(db: Session, nha_hang_id: int) -> tuple[NhaHang, dict]:
     if n is None or not n.hien_cong or n.ngung:
         raise LoiNhaHang("Nhà hàng này không còn hiện trên VTD")
     tds = db.execute(select(ThucDonNhaHang).where(ThucDonNhaHang.nha_hang_id == n.id)).scalars().all()
-    return n, _nh_cong(db, n, tds, _hom_nay())
+    return n, _nh_cong(db, n, tds, _hom_nay(), du_album=True)
 
 
 GIO_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -711,10 +723,9 @@ def gan_anh(db: Session, u: User, doi: str, oid: int, ten_tep: str, kieu: str, d
     if len(nguon) < 3:
         raise LoiNhaHang("Ghi nguồn ảnh (VTD chụp, nhà hàng cấp quyền, Unsplash – tên tác giả…)")
     if doi == "nha_hang":
-        if not _co(u, VAI_ANH_NH):
-            raise LoiNhaHang("Chỉ Điều hành hoặc Marketing tải ảnh nhà hàng")
-        x = db.get(NhaHang, oid)
-    elif doi == "noi_dung":
+        # AT-2a: ảnh nhà hàng đi qua Album (căn cứ quyền dùng + TP Điều hành duyệt), không gắn ảnh đơn nữa.
+        raise LoiNhaHang("Ảnh nhà hàng: dùng mục «Album ảnh» của nhà hàng")
+    if doi == "noi_dung":
         if not _co(u, VAI_NOI_DUNG):
             raise LoiNhaHang("Chỉ Marketing / Điều hành tải ảnh nội dung ẩm thực")
         x = db.get(NoiDungAmThuc, oid)
@@ -741,8 +752,8 @@ def anh_cong(db: Session, aid: int):
     """Ảnh cho trang công khai: chỉ ảnh đang dùng của nhà hàng đang hiện hoặc nội dung đã bật."""
     from app.models.attachments import Attachment
     from app.services import attachments as AT
-    ok = db.execute(select(NhaHang.id).where(NhaHang.anh_id == aid, NhaHang.hien_cong.is_(True), NhaHang.ngung.is_(False))).first() \
-        or db.execute(select(NoiDungAmThuc.id).where(NoiDungAmThuc.anh_id == aid, NoiDungAmThuc.hien.is_(True))).first()
+    # AT-2a: ảnh đơn cũ của nhà hàng (nha_hang.anh_id) KHÔNG còn ra cổng — ảnh nhà hàng chỉ qua album đã duyệt.
+    ok = db.execute(select(NoiDungAmThuc.id).where(NoiDungAmThuc.anh_id == aid, NoiDungAmThuc.hien.is_(True))).first()
     if not ok:
         raise LoiNhaHang("Không có ảnh này")
     a = db.get(Attachment, aid)
@@ -758,5 +769,370 @@ def anh_noi_bo(db: Session, u: User, aid: int):
         db.execute(select(NoiDungAmThuc.id).where(NoiDungAmThuc.anh_id == aid)).first()
     if not ok:
         raise LoiNhaHang("Không có ảnh này")
+    a = db.get(Attachment, aid)
+    return AT.doc(db, a), a
+
+
+# ══ AT-2a · ALBUM ẢNH NHÀ HÀNG (Chủ tịch + Điều hành chốt 29/10/2026) ═══════════════════════════════════════
+from app.models.nha_hang import AnhNhaHang, NHOM_ANH, CAN_CU_ANH, TRANG_THAI_ANH  # noqa: E402
+
+VAI_DUYET_ANH = ("tp_dh",) + TOAN_QUYEN
+ANH_TOI_DA_MB = 10
+ANH_TOI_DA_SO = 60
+KIEU_ANH = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
+CANH_HIEN, CANH_NHO = 1600, 480
+# Đổi các trường này trên ảnh ĐÃ DUYỆT → ảnh về «Chờ duyệt» (thôi hiện) cho tới khi TP ĐH duyệt lại:
+# chúng là chữ / căn cứ ra trước khách. Đổi nhóm, thứ tự, ảnh bìa thì không.
+TRUONG_ANH_DUYET_LAI = ("chu_thich", "mo_ta_thay_the", "credit", "can_cu", "can_cu_ghi_chu")
+
+
+def _lam_nhe(data: bytes) -> tuple[bytes | None, bytes | None, int, int]:
+    """Bản hiển thị (≤1600px) và ảnh nhỏ (≤480px), WEBP, xoay theo EXIF rồi BỎ EXIF (vị trí GPS…).
+    Không có thư viện ảnh / ảnh lỗi → (None, None, 0, 0): giữ bản gốc, cổng dùng bản gốc."""
+    try:
+        from io import BytesIO
+        from PIL import Image, ImageOps
+    except Exception:
+        return None, None, 0, 0
+    try:
+        im = Image.open(BytesIO(data))
+        if (im.format or "").upper() == "JPEG":
+            im.draft("RGB", (CANH_HIEN * 2, CANH_HIEN * 2))        # giải mã thu nhỏ: đỡ bộ nhớ máy chủ 512 MB
+        im = ImageOps.exif_transpose(im)
+        if im.mode not in ("RGB", "RGBA"):
+            im = im.convert("RGBA" if "A" in im.getbands() else "RGB")
+        rong, cao = im.size
+        ra = []
+        for canh, q in ((CANH_HIEN, 82), (CANH_NHO, 76)):
+            b = im.copy()
+            b.thumbnail((canh, canh))
+            o = BytesIO()
+            b.save(o, "WEBP", quality=q, method=4)
+            ra.append(o.getvalue())
+        return ra[0], ra[1], rong, cao
+    except Exception:
+        return None, None, 0, 0
+
+
+def _anh_cua(db: Session, nid: int) -> list[AnhNhaHang]:
+    return db.execute(select(AnhNhaHang).where(AnhNhaHang.nha_hang_id == nid)
+                      .order_by(AnhNhaHang.thu_tu, AnhNhaHang.id)).scalars().all()
+
+
+def _anh_out(x: AnhNhaHang, a_goc=None) -> dict:
+    return {"id": x.id, "nha_hang_id": x.nha_hang_id, "nhom": x.nhom, "nhom_ten": NHOM_ANH.get(x.nhom, "Chưa phân nhóm"),
+            "chu_thich": x.chu_thich, "mo_ta_thay_the": x.mo_ta_thay_the, "thu_tu": x.thu_tu, "la_bia": x.la_bia,
+            "can_cu": x.can_cu, "can_cu_ten": CAN_CU_ANH.get(x.can_cu, x.can_cu), "can_cu_ghi_chu": x.can_cu_ghi_chu,
+            "credit": x.credit, "trang_thai": x.trang_thai, "trang_thai_ten": TRANG_THAI_ANH.get(x.trang_thai, x.trang_thai),
+            "ly_do_tra_lai": x.ly_do_tra_lai, "tai_boi": x.tai_boi, "tai_luc": x.tai_luc.isoformat(timespec="minutes") if x.tai_luc else None,
+            "duyet_boi": x.duyet_boi, "rong": x.rong, "cao": x.cao,
+            "ten_tep": a_goc.ten_tep if a_goc is not None else "", "kich_thuoc": a_goc.kich_thuoc if a_goc is not None else 0,
+            "nho": f"/api/v1/nha-hang/album/{x.id}/nho", "hien": f"/api/v1/nha-hang/album/{x.id}/hien",
+            "goc": f"/api/v1/nha-hang/album/{x.id}/goc"}
+
+
+def album(db: Session, u: User, nid: int) -> dict:
+    from app.models.attachments import Attachment
+    if not _co(u, VAI_XEM):
+        raise LoiNhaHang("Không có quyền")
+    nh = db.get(NhaHang, nid)
+    if nh is None:
+        raise LoiNhaHang("Không có nhà hàng này")
+    ds = _anh_cua(db, nid)
+    goc = {a.id: a for a in db.execute(select(Attachment).where(Attachment.id.in_([x.attachment_id for x in ds]))).scalars()} if ds else {}
+    dem = {k: sum(1 for x in ds if x.trang_thai == k) for k in TRANG_THAI_ANH}
+    return {"nha_hang": {"id": nh.id, "ten": nh.ten, "ma": nh.ma}, "anh": [_anh_out(x, goc.get(x.attachment_id)) for x in ds],
+            "dem": dem, "tong": len(ds), "toi_da": ANH_TOI_DA_SO, "toi_da_mb": ANH_TOI_DA_MB,
+            "nhom_anh": NHOM_ANH, "can_cu_anh": CAN_CU_ANH, "duoc_duyet": _co(u, VAI_DUYET_ANH),
+            "duoc_tai": _co(u, VAI_ANH_NH)}
+
+
+def _kiem_can_cu(can_cu: str, nhom: str) -> None:
+    if can_cu not in CAN_CU_ANH:
+        raise LoiNhaHang("Chọn căn cứ quyền dùng: Nhà hàng cấp quyền / VTD tự chụp / Bên thứ ba cấp phép / Chưa xác minh")
+    if nhom and nhom not in NHOM_ANH:
+        raise LoiNhaHang("Nhóm ảnh không hợp lệ")
+
+
+def _co_pil() -> bool:
+    try:
+        import PIL  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _kiem_tep_anh(ten_tep: str, data: bytes) -> str:
+    if not data:
+        raise LoiNhaHang("Chọn tệp ảnh")
+    duoi = (ten_tep or "").rsplit(".", 1)[-1].lower() if "." in (ten_tep or "") else ""
+    if duoi not in KIEU_ANH:
+        raise LoiNhaHang("Chỉ nhận ảnh JPG / PNG / WEBP (ảnh HEIC của iPhone: xuất lại JPG)")
+    mb = len(data) / 1024 / 1024
+    if mb > ANH_TOI_DA_MB:
+        raise LoiNhaHang(f"Ảnh nặng {mb:.1f} MB, quá {ANH_TOI_DA_MB} MB — xuất lại ảnh nhẹ hơn")
+    return duoi
+
+
+def _luu_tep(db: Session, u: User, nh: NhaHang, ten_tep: str, duoi: str, data: bytes, can_cu: str):
+    """Cất bản gốc + bản hiển thị + ảnh nhỏ vào kho. Trả (gốc, hiển thị, nhỏ, rộng, cao)."""
+    from app.services import attachments as AT
+    hien, nho, rong, cao = _lam_nhe(data)
+    if hien is None and _co_pil():
+        raise LoiNhaHang("Tệp không mở được như một ảnh — kiểm tra lại tệp")
+    ma = f"nh{nh.id}"
+    try:
+        a, _ = AT.dinh_kem(db, "am_thuc", ma, ten_tep, data, kieu=KIEU_ANH[duoi], loai="hinh_anh",
+                           mo_ta=f"Album {nh.ma} · căn cứ: {CAN_CU_ANH.get(can_cu, can_cu)}", boi=u.username)
+        ah = AT.dinh_kem(db, "am_thuc", ma, f"{ten_tep}.hien.webp", hien, kieu="image/webp", loai="hinh_anh",
+                         mo_ta=f"Bản hiển thị · album {nh.ma}", boi=u.username, nguon="he_thong")[0] if hien else a
+        an = AT.dinh_kem(db, "am_thuc", ma, f"{ten_tep}.nho.webp", nho, kieu="image/webp", loai="hinh_anh",
+                         mo_ta=f"Ảnh nhỏ · album {nh.ma}", boi=u.username, nguon="he_thong")[0] if nho else ah
+    except ValueError as ex:
+        raise LoiNhaHang(str(ex))
+    return a, ah, an, rong, cao
+
+
+def _trung(db: Session, ds: list, data: bytes):
+    from app.models.attachments import Attachment
+    from app.services import attachments as AT
+    cs = AT._sha(data)
+    for x in ds:
+        a = db.get(Attachment, x.attachment_id)
+        if a is not None and a.checksum == cs:
+            return x
+    return None
+
+
+def tai_anh_album(db: Session, u: User, nid: int, ten_tep: str, kieu: str, data: bytes, d: dict,
+                  now: datetime | None = None) -> tuple[AnhNhaHang, bool]:
+    """Tải MỘT ảnh vào album (giao diện gửi từng tệp để báo tiến độ / thử lại riêng). Trả (ảnh, có phải ảnh mới).
+    Cùng nội dung đã có trong album → trả đúng ảnh đó, không tạo bản trùng."""
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing tải ảnh nhà hàng")
+    now = now or datetime.now()
+    nh = db.get(NhaHang, nid)
+    if nh is None:
+        raise LoiNhaHang("Không có nhà hàng này")
+    duoi = _kiem_tep_anh(ten_tep, data)
+    nhom, can_cu = (d.get("nhom") or "").strip(), (d.get("can_cu") or "").strip()
+    if not nhom:
+        raise LoiNhaHang("Chọn nhóm ảnh cho lô này")
+    _kiem_can_cu(can_cu, nhom)
+    ds = _anh_cua(db, nid)
+    cu = _trung(db, ds, data)
+    if cu is not None:
+        return cu, False
+    if len(ds) >= ANH_TOI_DA_SO:
+        raise LoiNhaHang(f"Album đã đủ {ANH_TOI_DA_SO} ảnh — ẩn hoặc thay ảnh cũ thay vì tải thêm")
+    a, ah, an, rong, cao = _luu_tep(db, u, nh, ten_tep, duoi, data, can_cu)
+    x = AnhNhaHang(nha_hang_id=nid, attachment_id=a.id, hien_id=ah.id, nho_id=an.id, rong=rong, cao=cao, nhom=nhom,
+                   chu_thich=(d.get("chu_thich") or "").strip()[:200], mo_ta_thay_the="",
+                   thu_tu=(max([y.thu_tu for y in ds], default=0) + 1), la_bia=False, can_cu=can_cu,
+                   can_cu_ghi_chu=(d.get("can_cu_ghi_chu") or "").strip()[:300], credit=(d.get("credit") or "").strip()[:160],
+                   trang_thai="nhap", tai_boi=u.username, tai_luc=now)
+    db.add(x)
+    db.commit(); db.refresh(x)
+    return x, True
+
+
+def _lay_anh(db: Session, pid: int) -> AnhNhaHang:
+    x = db.get(AnhNhaHang, pid)
+    if x is None:
+        raise LoiNhaHang("Không có ảnh này")
+    return x
+
+
+def sua_anh(db: Session, u: User, pid: int, d: dict, now: datetime | None = None) -> AnhNhaHang:
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing sửa ảnh nhà hàng")
+    x = _lay_anh(db, pid)
+    moi = {"nhom": (d.get("nhom") if d.get("nhom") is not None else x.nhom).strip(),
+           "chu_thich": (d.get("chu_thich") if d.get("chu_thich") is not None else x.chu_thich).strip()[:200],
+           "mo_ta_thay_the": (d.get("mo_ta_thay_the") if d.get("mo_ta_thay_the") is not None else x.mo_ta_thay_the).strip()[:200],
+           "credit": (d.get("credit") if d.get("credit") is not None else x.credit).strip()[:160],
+           "can_cu": (d.get("can_cu") if d.get("can_cu") is not None else x.can_cu).strip(),
+           "can_cu_ghi_chu": (d.get("can_cu_ghi_chu") if d.get("can_cu_ghi_chu") is not None else x.can_cu_ghi_chu).strip()[:300]}
+    _kiem_can_cu(moi["can_cu"], moi["nhom"])
+    if not moi["nhom"] and x.nhom:
+        raise LoiNhaHang("Chọn nhóm ảnh")
+    duyet_lai = x.trang_thai == "da_duyet" and any(getattr(x, k) != moi[k] for k in TRUONG_ANH_DUYET_LAI)
+    for k, v in moi.items():
+        setattr(x, k, v)
+    if duyet_lai:
+        x.trang_thai, x.duyet_boi, x.duyet_luc = "cho_duyet", "", None
+    x.sua_boi, x.sua_luc = u.username, now or datetime.now()
+    db.commit(); db.refresh(x)
+    return x
+
+
+def thay_anh(db: Session, u: User, pid: int, ten_tep: str, kieu: str, data: bytes, now: datetime | None = None) -> AnhNhaHang:
+    """Thay TỆP của đúng một ảnh (giữ nhóm, chú thích, thứ tự, căn cứ). Tệp cũ vẫn trong kho. Ảnh về «Nháp»."""
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing thay ảnh nhà hàng")
+    x = _lay_anh(db, pid)
+    duoi = _kiem_tep_anh(ten_tep, data)
+    cu = _trung(db, _anh_cua(db, x.nha_hang_id), data)
+    if cu is not None:
+        if cu.id == x.id:
+            return x
+        raise LoiNhaHang("Ảnh này đã có trong album (ảnh khác) — không thay bằng ảnh trùng")
+    nh = db.get(NhaHang, x.nha_hang_id)
+    a, ah, an, rong, cao = _luu_tep(db, u, nh, ten_tep, duoi, data, x.can_cu)
+    x.attachment_id, x.hien_id, x.nho_id, x.rong, x.cao = a.id, ah.id, an.id, rong, cao
+    x.trang_thai, x.duyet_boi, x.duyet_luc, x.ly_do_tra_lai = "nhap", "", None, ""
+    x.sua_boi, x.sua_luc = u.username, now or datetime.now()
+    db.commit(); db.refresh(x)
+    return x
+
+
+def gui_duyet(db: Session, u: User, nid: int, ids: list[int] | None = None, now: datetime | None = None) -> int:
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing gửi duyệt ảnh")
+    n = 0
+    for x in _anh_cua(db, nid):
+        if x.trang_thai == "nhap" and (not ids or x.id in ids):
+            x.trang_thai, x.ly_do_tra_lai = "cho_duyet", ""
+            x.sua_boi, x.sua_luc = u.username, now or datetime.now()
+            n += 1
+    db.commit()
+    return n
+
+
+def _ly_do_khong_duyet(u: User, x: AnhNhaHang) -> str:
+    if x.trang_thai != "cho_duyet":
+        return "Ảnh không ở trạng thái chờ duyệt"
+    if x.can_cu == "chua_xac_minh":
+        return "Ảnh «Chưa xác minh» quyền dùng — Điều hành ghi căn cứ trước"
+    if x.can_cu in ("nha_hang", "ben_thu_ba") and len(x.can_cu_ghi_chu.strip()) < 5:
+        return "Ghi chú căn cứ (ai cấp quyền, ngày, qua kênh nào) còn trống"
+    if not x.nhom:
+        return "Chưa chọn nhóm ảnh"
+    if u.role not in TOAN_QUYEN and u.username in {x.tai_boi, x.sua_boi} - {""}:
+        return "Người tải / sửa ảnh không tự duyệt — nhờ TP Điều hành khác, Chủ tịch hoặc TGĐ"
+    return ""
+
+
+def duyet_anh(db: Session, u: User, ids: list[int], duyet: bool, ly_do: str = "", now: datetime | None = None) -> dict:
+    """TP Điều hành duyệt / trả lại nhiều ảnh. Ảnh không đủ điều kiện thì bỏ qua, nói rõ vì sao."""
+    if not _co(u, VAI_DUYET_ANH):
+        raise LoiNhaHang("Chỉ TP Điều hành (hoặc Chủ tịch, TGĐ) duyệt ảnh")
+    ly_do = (ly_do or "").strip()
+    if not duyet and len(ly_do) < 3:
+        raise LoiNhaHang("Trả lại phải ghi lý do")
+    now = now or datetime.now()
+    ok, bo = 0, []
+    for pid in ids[:300]:
+        x = db.get(AnhNhaHang, int(pid))
+        if x is None:
+            continue
+        if duyet:
+            loi = _ly_do_khong_duyet(u, x)
+            if loi:
+                bo.append({"id": x.id, "ly_do": loi}); continue
+            x.trang_thai, x.duyet_boi, x.duyet_luc, x.ly_do_tra_lai = "da_duyet", u.username, now, ""
+        else:
+            if x.trang_thai not in ("cho_duyet", "da_duyet"):
+                bo.append({"id": x.id, "ly_do": "Ảnh không ở trạng thái chờ duyệt / đã duyệt"}); continue
+            x.trang_thai, x.duyet_boi, x.duyet_luc, x.ly_do_tra_lai = "nhap", "", None, ly_do[:300]
+        ok += 1
+    db.commit()
+    return {"da_doi": ok, "bo_qua": bo}
+
+
+def an_anh(db: Session, u: User, pid: int, an: bool, now: datetime | None = None) -> AnhNhaHang:
+    """Ẩn: thôi hiện ở mọi nơi, tệp vẫn trong kho. Bỏ ẩn: về «Nháp» (phải gửi duyệt lại)."""
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing ẩn ảnh nhà hàng")
+    x = _lay_anh(db, pid)
+    if an:
+        x.trang_thai, x.la_bia = "an", False
+    elif x.trang_thai == "an":
+        x.trang_thai, x.duyet_boi, x.duyet_luc = "nhap", "", None
+    x.sua_boi, x.sua_luc = u.username, now or datetime.now()
+    db.commit(); db.refresh(x)
+    return x
+
+
+def dat_bia(db: Session, u: User, pid: int) -> AnhNhaHang:
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing chọn ảnh bìa")
+    x = _lay_anh(db, pid)
+    if x.trang_thai == "an":
+        raise LoiNhaHang("Ảnh đang ẩn — bỏ ẩn trước")
+    for y in _anh_cua(db, x.nha_hang_id):
+        y.la_bia = y.id == x.id
+    db.commit(); db.refresh(x)
+    return x
+
+
+def xep_anh(db: Session, u: User, nid: int, ids: list[int]) -> None:
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing đổi thứ tự ảnh")
+    ds = {x.id: x for x in _anh_cua(db, nid)}
+    if set(int(i) for i in ids) != set(ds):
+        raise LoiNhaHang("Danh sách ảnh không khớp album — tải lại trang rồi xếp lại")
+    for i, pid in enumerate(ids, 1):
+        ds[int(pid)].thu_tu = i
+    db.commit()
+
+
+def anh_cho_duyet(db: Session, u: User) -> dict:
+    from app.models.attachments import Attachment
+    if not _co(u, VAI_XEM):
+        raise LoiNhaHang("Không có quyền")
+    ds = db.execute(select(AnhNhaHang).where(AnhNhaHang.trang_thai == "cho_duyet").order_by(AnhNhaHang.nha_hang_id, AnhNhaHang.thu_tu)).scalars().all()
+    nh = {n.id: n for n in db.execute(select(NhaHang).where(NhaHang.id.in_({x.nha_hang_id for x in ds}))).scalars()} if ds else {}
+    goc = {a.id: a for a in db.execute(select(Attachment).where(Attachment.id.in_([x.attachment_id for x in ds]))).scalars()} if ds else {}
+    return {"anh": [{**_anh_out(x, goc.get(x.attachment_id)), "nha_hang_ten": nh[x.nha_hang_id].ten if x.nha_hang_id in nh else "",
+                     "khong_duyet": _ly_do_khong_duyet(u, x)} for x in ds],
+            "duoc_duyet": _co(u, VAI_DUYET_ANH)}
+
+
+def hoan_thien_anh(db: Session) -> dict[int, dict]:
+    """Mức hoàn thiện ảnh từng nhà hàng cho cột danh sách VTOS."""
+    ra: dict[int, dict] = {}
+    for x in db.execute(select(AnhNhaHang)).scalars():
+        o = ra.setdefault(x.nha_hang_id, {"da_duyet": 0, "cho_duyet": 0, "nhap": 0, "an": 0, "co_bia": False})
+        o[x.trang_thai] = o.get(x.trang_thai, 0) + 1
+        if x.la_bia and x.trang_thai == "da_duyet":
+            o["co_bia"] = True
+    return ra
+
+
+def album_cong(db: Session, nids: list[int]) -> dict[int, list[AnhNhaHang]]:
+    """Ảnh ĐÃ DUYỆT (căn cứ đã xác minh) theo nhà hàng — ảnh bìa đứng đầu, rồi theo thứ tự."""
+    if not nids:
+        return {}
+    ra: dict[int, list] = {}
+    for x in db.execute(select(AnhNhaHang).where(AnhNhaHang.nha_hang_id.in_(nids), AnhNhaHang.trang_thai == "da_duyet",
+                                                AnhNhaHang.can_cu != "chua_xac_minh")
+                        .order_by(AnhNhaHang.thu_tu, AnhNhaHang.id)).scalars():
+        ra.setdefault(x.nha_hang_id, []).append(x)
+    for v in ra.values():
+        v.sort(key=lambda x: not x.la_bia)
+    return ra
+
+
+def _anh_cong_out(x: AnhNhaHang) -> dict:
+    return {"id": x.id, "nhom": x.nhom, "nhom_ten": NHOM_ANH.get(x.nhom, ""), "chu_thich": x.chu_thich,
+            "alt": x.mo_ta_thay_the or x.chu_thich, "credit": x.credit, "rong": x.rong, "cao": x.cao,
+            "nho": f"/api/v1/am-thuc/anh/nh/{x.id}/nho", "hien": f"/api/v1/am-thuc/anh/nh/{x.id}/hien"}
+
+
+def tep_album(db: Session, u: User | None, pid: int, co: str):
+    """Tệp ảnh album. u=None: cổng công khai — chỉ ảnh đã duyệt của nhà hàng đang hiện, không bao giờ bản gốc."""
+    from app.models.attachments import Attachment
+    from app.services import attachments as AT
+    x = db.get(AnhNhaHang, pid)
+    if x is None or co not in ("nho", "hien", "goc"):
+        raise LoiNhaHang("Không có ảnh này")
+    if u is None:
+        nh = db.get(NhaHang, x.nha_hang_id)
+        if co == "goc" or x.trang_thai != "da_duyet" or x.can_cu == "chua_xac_minh" or nh is None or not nh.hien_cong or nh.ngung:
+            raise LoiNhaHang("Không có ảnh này")
+    elif not _co(u, VAI_XEM):
+        raise LoiNhaHang("Không có quyền")
+    aid = {"nho": x.nho_id or x.hien_id or x.attachment_id, "hien": x.hien_id or x.attachment_id, "goc": x.attachment_id}[co]
     a = db.get(Attachment, aid)
     return AT.doc(db, a), a

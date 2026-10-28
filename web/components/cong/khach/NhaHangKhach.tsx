@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { goiCong } from "@/lib/cong";
 import { svg } from "./icons";
 import KhamPhaAmThuc from "./KhamPhaAmThuc";
+import AlbumKhach from "./AlbumKhach";
 
 const I = ({ n }: { n: string }) => <span style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: svg(n) }} />;
 const tien = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString("vi-VN")} đ` : "—");
@@ -44,6 +45,7 @@ export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui, doiTac
   if (mo && f) return (<>
     <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => { setMo(null); setF(null); }}><I n="arrow-left" /><span>Quay lại nhà hàng</span></button>
     {loi && <div className="v3-notice warn"><I n="info" /><span>{loi}</span></div>}
+    <AlbumKhach album={mo.album} ten={mo.ten} />
     <section className="v3-panel"><div className="v3-section-title"><h2>{mo.ten}</h2><span className="v3-badge neutral">{mo.am_thuc}</span></div>
       <p>{[mo.tinh_thanh, mo.khu_vuc].filter(Boolean).join(" · ")}{mo.gio_phuc_vu ? ` · Giờ phục vụ ${mo.gio_phuc_vu}` : ""}</p>
       {mo.tien_ich && <p>{mo.tien_ich}</p>}{mo.mo_ta && <p>{mo.mo_ta}</p>}

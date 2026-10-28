@@ -256,3 +256,132 @@ def xem_anh(aid: int, u: User = Depends(require_roles(*N.VAI_XEM)), db: Session 
     except N.LoiNhaHang as ex:
         raise HTTPException(404, str(ex))
     return Response(content=data, media_type=a.kieu_noi_dung or "image/jpeg")
+
+
+# ══ AT-2a · album ảnh nhà hàng ═══════════════════════════════════════════════════════════════════
+@router.get("/{nid:int}/album")
+def album(nid: int, u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        return N.album(db, u, nid)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+@router.post("/{nid:int}/album")
+async def tai_album(nid: int, tep: UploadFile = File(...), nhom: str = Form(""), can_cu: str = Form(""),
+                    can_cu_ghi_chu: str = Form(""), credit: str = Form(""), chu_thich: str = Form(""),
+                    u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    """Một tệp mỗi lần — giao diện gửi lần lượt để báo tiến độ và thử lại đúng tệp lỗi."""
+    data = await _doc(tep)
+    try:
+        x, moi = N.tai_anh_album(db, u, nid, tep.filename or "anh", tep.content_type or "", data,
+                                 {"nhom": nhom, "can_cu": can_cu, "can_cu_ghi_chu": can_cu_ghi_chu, "credit": credit,
+                                  "chu_thich": chu_thich})
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"id": x.id, "moi": moi, "message": "Đã tải ảnh (Nháp)" if moi else "Ảnh này đã có trong album — không tạo bản trùng"}
+
+
+class AnhIn(BaseModel):
+    nhom: str | None = None
+    chu_thich: str | None = None
+    mo_ta_thay_the: str | None = None
+    credit: str | None = None
+    can_cu: str | None = None
+    can_cu_ghi_chu: str | None = None
+
+
+@router.post("/album/{pid:int}")
+def sua_anh(pid: int, data: AnhIn, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        x = N.sua_anh(db, u, pid, data.model_dump())
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"id": x.id, "trang_thai": x.trang_thai,
+            "message": "Đã lưu" + (" — ảnh về «Chờ duyệt», thôi hiện cho tới khi TP Điều hành duyệt lại" if x.trang_thai == "cho_duyet" and not x.duyet_boi else "")}
+
+
+@router.post("/album/{pid:int}/thay")
+async def thay_anh(pid: int, tep: UploadFile = File(...), u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    data = await _doc(tep)
+    try:
+        x = N.thay_anh(db, u, pid, tep.filename or "anh", tep.content_type or "", data)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"id": x.id, "message": "Đã thay ảnh — ảnh về «Nháp», gửi duyệt lại; tệp cũ vẫn trong kho"}
+
+
+class IdsIn(BaseModel):
+    ids: list[int] = []
+
+
+@router.post("/{nid:int}/album/gui-duyet")
+def gui_duyet(nid: int, data: IdsIn, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        n = N.gui_duyet(db, u, nid, data.ids)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"so": n, "message": f"Đã gửi duyệt {n} ảnh"}
+
+
+@router.post("/{nid:int}/album/thu-tu")
+def thu_tu(nid: int, data: IdsIn, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        N.xep_anh(db, u, nid, data.ids)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"message": "Đã lưu thứ tự"}
+
+
+class DuyetAnhIn(BaseModel):
+    ids: list[int]
+    duyet: bool
+    ly_do: str = ""
+
+
+@router.post("/album/duyet")
+def duyet_anh(data: DuyetAnhIn, u: User = Depends(require_roles(*N.VAI_DUYET_ANH)), db: Session = Depends(get_db)):
+    try:
+        r = N.duyet_anh(db, u, data.ids, data.duyet, data.ly_do)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {**r, "message": f"Đã {'duyệt' if data.duyet else 'trả lại'} {r['da_doi']} ảnh" + (f" · bỏ qua {len(r['bo_qua'])}" if r["bo_qua"] else "")}
+
+
+@router.get("/album/cho-duyet")
+def cho_duyet(u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        return N.anh_cho_duyet(db, u)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+class AnIn(BaseModel):
+    an: bool
+
+
+@router.post("/album/{pid:int}/an")
+def an_anh(pid: int, data: AnIn, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        x = N.an_anh(db, u, pid, data.an)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"message": "Đã ẩn ảnh" if x.trang_thai == "an" else "Đã bỏ ẩn — ảnh về «Nháp», gửi duyệt lại"}
+
+
+@router.post("/album/{pid:int}/bia")
+def dat_bia(pid: int, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        N.dat_bia(db, u, pid)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"message": "Đã đặt làm ảnh bìa"}
+
+
+@router.get("/album/{pid:int}/{co}")
+def tep_album(pid: int, co: str, u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        data, a = N.tep_album(db, u, pid, co)
+    except N.LoiNhaHang as ex:
+        raise HTTPException(404, str(ex))
+    return Response(content=data, media_type=a.kieu_noi_dung or "image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
