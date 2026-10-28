@@ -31,7 +31,7 @@ function Trang() {
   const role = user?.role || "";
   const nhap = ["tp_dh", "nv_dh", "chutich", "tgd"].includes(role);
   const bat = ["tp_dh", "chutich", "tgd"].includes(role);
-  const mkt = ["nv_mkt", "ptgd_mkt", "chutich", "tgd"].includes(role);
+  const mkt = ["nv_mkt", "ptgd_mkt", "nv_dh", "tp_dh", "chutich", "tgd"].includes(role);   // 29/10/2026: Điều hành cũng viết nội dung
   const xemHd = nhap || ["ketoan", "bks"].includes(role);
   const [tab, setTab] = useState<"nh" | "nd">(["nv_mkt", "ptgd_mkt"].includes(role) ? "nd" : "nh");
   const [tim, setTim] = useState(""); const [locTinh, setLocTinh] = useState("");
@@ -107,11 +107,11 @@ function Trang() {
       Chỉ nhập <b>giá bán cho khách</b>; giá vốn / phí NCC theo hợp đồng nhà cung cấp, không nhập ở đây.</p>
     <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
       <button className={`act ${tab === "nh" ? "teal" : "grey"}`} onClick={() => setTab("nh")}>Nhà hàng</button>
-      <button className={`act ${tab === "nd" ? "teal" : "grey"}`} onClick={() => setTab("nd")}>Nội dung ẩm thực (Marketing)</button></div>
+      <button className={`act ${tab === "nd" ? "teal" : "grey"}`} onClick={() => setTab("nd")}>Nội dung ẩm thực</button></div>
 
     {tab === "nd" && <section className="panel">
       <h2>Nội dung trang «Hương vị Việt Nam»</h2>
-      <p className="muted">Marketing viết bằng lời Vietourist — không chép chữ, ảnh, điểm hay nhận xét của trang ngoài. Ảnh phải ghi nguồn. Chỉ mục bật «Hiện» mới lên web VTD.
+      <p className="muted">Marketing / Điều hành viết bằng lời Vietourist — không chép chữ, ảnh, điểm hay nhận xét của trang ngoài. Ảnh phải ghi nguồn. Chỉ mục bật «Hiện» mới lên web VTD.
         Loại «Giới thiệu thành phố» gắn với một trong {x.thanh_pho.length} thành phố ẩm thực; «Ảnh bìa trang» là ảnh lớn đầu trang (chỉ cần một mục).</p>
       <div className="wrap"><table><thead><tr><th>Loại</th><th>Tên</th><th>Nhóm · thành phố</th><th>Ảnh</th><th>Trạng thái</th><th></th></tr></thead>
         <tbody>{x.noi_dung.map((c: any) => <tr key={c.id}><td>{c.loai_ten}</td><td><b>{c.ten}</b>{c.ten_khac && <div className="muted">{c.ten_khac}</div>}<div className="muted">{c.tom_tat}</div></td>
@@ -119,7 +119,7 @@ function Trang() {
           <td>{c.co_anh ? <Tag cls="ok">Có</Tag> : <Tag cls="warn">Chưa</Tag>}</td>
           <td>{c.hien ? <Tag cls="ok">Đang hiện</Tag> : <Tag>Nháp</Tag>}<div className="muted">{c.sua_boi}</div></td>
           <td>{mkt && <button className="act grey" onClick={() => { setNd({ ...ND_TRONG, ...c }); setAnh({ tep: null, nguon: "" }); }}>Sửa</button>}</td></tr>)}
-          {!x.noi_dung.length && <tr><td colSpan={6} className="muted">Chưa có nội dung. Marketing bấm «Thêm».</td></tr>}</tbody></table></div>
+          {!x.noi_dung.length && <tr><td colSpan={6} className="muted">Chưa có nội dung. Bấm «Thêm nội dung».</td></tr>}</tbody></table></div>
       {mkt && !nd && <button className="act teal" onClick={() => setNd({ ...ND_TRONG })}>+ Thêm nội dung</button>}
       {nd && <div className="panel" style={{ marginTop: 10 }}><div className="grid">
         <label>Loại<select value={nd.loai} onChange={(e) => setNd({ ...nd, loai: e.target.value })}>{Object.entries(x.loai_nd).map(([a, b]: any) => <option key={a} value={a}>{b}</option>)}</select></label>
@@ -242,7 +242,7 @@ function Trang() {
 
         {(nhap || mkt) && oAnh("nha_hang", dang.id, !!dang.anh_id, dang.anh_nguon, dang.anh_id)}
         {mkt && gt && <div className="panel" style={{ marginTop: 14 }}>
-          <h3>Giới thiệu trên web VTD (Marketing)</h3>
+          <h3>Giới thiệu trên web VTD</h3>
           <label>Món nổi bật<input value={gt.mon_noi_bat} onChange={(e) => setGt({ ...gt, mon_noi_bat: e.target.value })} /></label>
           <label>Giới thiệu do VTD viết<textarea rows={3} value={gt.mo_ta} onChange={(e) => setGt({ ...gt, mo_ta: e.target.value })} /></label>
           <button className="act teal" disabled={busy} onClick={() => goi(`/nha-hang/${dang.id}/gioi-thieu`, gt)}>Lưu giới thiệu</button></div>}

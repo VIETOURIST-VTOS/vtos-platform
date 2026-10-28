@@ -21,7 +21,8 @@ VAI_NHAP = ("tp_dh", "nv_dh") + TOAN_QUYEN
 VAI_BAT = ("tp_dh",) + TOAN_QUYEN
 VAI_XEM = tuple(dict.fromkeys(VAI_NHAP + VAI_BAT + ("tp_kd", "gd_kd", "bks", "robot_ks", "nv_mkt", "ptgd_mkt", "ketoan")))
 # AT-1 (Chủ tịch duyệt 28/10/2026)
-VAI_NOI_DUNG = ("nv_mkt", "ptgd_mkt") + TOAN_QUYEN                      # Marketing viết giới thiệu, món, điểm đến
+# Chủ tịch 29/10/2026: Điều hành (NV, TP) cũng viết nội dung ẩm thực + tải ảnh, cùng Marketing.
+VAI_NOI_DUNG = ("nv_mkt", "ptgd_mkt", "nv_dh", "tp_dh") + TOAN_QUYEN
 VAI_HOP_DONG_XEM = tuple(dict.fromkeys(VAI_NHAP + ("ketoan", "bks")))   # tệp hợp đồng là riêng tư
 LOAI_ND = {"mon": "Món ăn", "dac_san": "Đặc sản mang về", "danh_sach": "Danh sách gợi ý", "thanh_pho": "Giới thiệu thành phố",
            "bia": "Ảnh bìa trang"}
@@ -624,7 +625,7 @@ def _hd_out(h: HopDongNhaHang) -> dict:
 def luu_gioi_thieu(db: Session, u: User, nid: int, mo_ta: str, mon_noi_bat: str, now: datetime | None = None) -> NhaHang:
     """Marketing viết giới thiệu do VTD biên tập (không chép nội dung nguồn ngoài)."""
     if not _co(u, VAI_NOI_DUNG):
-        raise LoiNhaHang("Chỉ Marketing viết giới thiệu nhà hàng")
+        raise LoiNhaHang("Chỉ Marketing / Điều hành viết giới thiệu nhà hàng")
     nh = db.get(NhaHang, nid)
     if nh is None:
         raise LoiNhaHang("Không có nhà hàng này")
@@ -664,7 +665,7 @@ def ds_noi_dung(db: Session, cong: bool = False, nha_hang: dict | None = None) -
 
 def luu_noi_dung(db: Session, u: User, d: dict, nd_id: int | None = None, now: datetime | None = None) -> NoiDungAmThuc:
     if not _co(u, VAI_NOI_DUNG):
-        raise LoiNhaHang("Chỉ Marketing viết nội dung ẩm thực")
+        raise LoiNhaHang("Chỉ Marketing / Điều hành viết nội dung ẩm thực")
     if d.get("loai") not in LOAI_ND:
         raise LoiNhaHang("Chọn loại: món ăn, đặc sản, danh sách, giới thiệu thành phố hoặc ảnh bìa")
     ten = (d.get("ten") or "").strip()
@@ -715,7 +716,7 @@ def gan_anh(db: Session, u: User, doi: str, oid: int, ten_tep: str, kieu: str, d
         x = db.get(NhaHang, oid)
     elif doi == "noi_dung":
         if not _co(u, VAI_NOI_DUNG):
-            raise LoiNhaHang("Chỉ Marketing tải ảnh nội dung ẩm thực")
+            raise LoiNhaHang("Chỉ Marketing / Điều hành tải ảnh nội dung ẩm thực")
         x = db.get(NoiDungAmThuc, oid)
     else:
         raise LoiNhaHang("Đối tượng ảnh không hợp lệ")

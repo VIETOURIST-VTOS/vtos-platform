@@ -194,7 +194,7 @@ def test_bat_hang_loat_giu_luat_hai_nguoi(db):
 def test_noi_dung_marketing(db):
     from app.services import nha_hang as N
     with pytest.raises(N.LoiNhaHang):
-        N.luu_noi_dung(db, _u(db, "dh"), {"loai": "mon", "ten": "Phở"})                   # Điều hành không viết nội dung
+        N.luu_noi_dung(db, _u(db, "kd"), {"loai": "mon", "ten": "Phở"})                   # Kinh doanh không viết nội dung
     with pytest.raises(N.LoiNhaHang, match="loại"):
         N.luu_noi_dung(db, _u(db, "mkt"), {"loai": "x", "ten": "Phở"})
     a = N.luu_noi_dung(db, _u(db, "mkt"), {"loai": "mon", "ten": "Phở", "tom_tat": "Món nước", "hien": True})
@@ -324,3 +324,14 @@ def test_doc_tep_ban_giao_dung_cot(db):
     assert [m["tinh"] for m in r["mau"]] == ["Hà Nội", "Trà Vinh", "Nơi Lạ"]               # địa danh lạ → dùng điểm đến
     assert r["chua_khop_tp"] == [{"ten": "Quán Không Rõ", "dia_danh": "Nơi Lạ"}]
     assert r["mau"][0]["ref"].startswith("ta-1 · 1 · ")
+
+
+def test_dieu_hanh_viet_noi_dung(db):
+    """Chủ tịch 29/10/2026: Điều hành (NV, TP) viết nội dung ẩm thực và tải ảnh như Marketing."""
+    from app.services import nha_hang as N
+    for ai in ("dh", "tp"):
+        x = N.luu_noi_dung(db, _u(db, ai), {"loai": "mon", "ten": f"Món {ai}", "nhom": "Món nước"})
+        assert N.gan_anh(db, _u(db, ai), "noi_dung", x.id, "a.png", "image/png", PNG + ai.encode(), "VTD chụp")
+    for ai in ("kd", "kt"):
+        with pytest.raises(N.LoiNhaHang):
+            N.luu_noi_dung(db, _u(db, ai), {"loai": "mon", "ten": "X"})
