@@ -74,9 +74,27 @@ def _bao_hong(db: Session, ly_do: str) -> None:
 
 
 def configured(db: Session | None = None) -> dict:
+    """`oa` nghĩa là TOKEN CÒN DÙNG ĐƯỢC, không phải «có một chuỗi token».
+
+    28/10/2026: Zalo từ chối mọi tin với «Access token invalid», mà cửa công khai
+    `/api/v1/cong/kenh` vẫn trả `zalo: ok=true` — nên nút Zalo trên màn đăng nhập của khách
+    sáng đèn trong khi bấm vào không ra gì. Một màn hình nói sai còn tệ hơn một màn hình
+    không nói: nó làm người ta thôi đi tìm.
+
+    Đọc từ hai cột đã có sẵn, KHÔNG gọi sang Zalo: `/cong/kenh` là cửa công khai, gọi Zalo
+    mỗi lượt là mở sẵn một đường cho người lạ làm phiền Zalo thay mình.
+
+    Hướng sai của phép này là an toàn: nghi thì tắt nút Zalo và khách rơi về Email — kênh
+    đang chạy thật. Gửi được một tin thì `loi_cuoi` xoá, nên nó tự lành.
+    """
     tk = token(db) if db is not None else settings.ZALO_OA_ACCESS_TOKEN
     rf = (kho(db).refresh_token if db is not None else settings.ZALO_OA_REFRESH_TOKEN)
-    return {"oa": bool(tk), "zns_templates": dict(x.split(":", 1) for x in settings.ZALO_ZNS_TEMPLATES.split(",") if ":" in x), "webhook": bool(settings.ZALO_OA_SECRET_KEY),
+    song = bool(tk)
+    if song and db is not None:
+        k = kho(db)
+        het = k.het_han_luc is not None and k.het_han_luc < datetime.now()
+        song = not k.loi_cuoi and not (het and not k.refresh_token)
+    return {"oa": song, "zns_templates": dict(x.split(":", 1) for x in settings.ZALO_ZNS_TEMPLATES.split(",") if ":" in x), "webhook": bool(settings.ZALO_OA_SECRET_KEY),
             "refresh": bool(rf and settings.ZALO_APP_SECRET)}
 
 
@@ -152,12 +170,43 @@ def refresh_token(db: Session) -> str:
     return _luu(db, j, "tu_lam_moi")
 
 
+# ============================ MỌI ĐƯỜNG GỬI ĐI QUA ĐÂY ============================
+# Phép «token hết hạn → làm mới → gửi lại một lần» vốn nằm riêng trong `_send()`, tức chỉ
+# bảo vệ đường HÀNG CHỜ của CRM. Đợt ZL-1 (28/10/2026) đo được cái giá của chỗ đặt ấy:
+# `cong_ngoai._gui_zalo()` gọi thẳng `send_zns()` để gửi mã đăng nhập cho khách, nên nó
+# KHÔNG có phép cứu — Zalo trả «Access token invalid», khách đọc «thử lại sau ít phút»,
+# và không một dòng cảnh báo nào sinh ra.
+#
+# Nên phép ấy chuyển vào ĐÂY. Đường gửi nào viết sau này cũng được bảo vệ mà không ai
+# phải nhớ — và «nhớ» chính là thứ đã hỏng lần này.
+MA_TOKEN_HONG = (-216, -124)
+
+
+def _gui(db: Session, lam) -> dict:
+    """Gửi; token hết hạn thì làm mới và gửi LẠI MỘT LẦN; vẫn hỏng thì BÁO ĐỎ.
+
+    Làm mới đúng một lần, không vòng lặp: refresh token của Zalo dùng một lần là mất, nên
+    gọi lại nhiều lần là tự đốt chuỗi uỷ quyền.
+    """
+    r = lam(token(db))
+    if r.get("error") in MA_TOKEN_HONG and refresh_token(db):
+        r = lam(token(db))
+    if r.get("error") in MA_TOKEN_HONG:
+        _bao_hong(db, f"Zalo từ chối: {r.get('message') or r.get('error')}")
+    elif r.get("error") in (0, None):
+        k = kho(db)                      # gửi được thì xoá vết hỏng cũ — trạng thái tự lành
+        if k.loi_cuoi:
+            k.loi_cuoi = ""
+            db.commit()
+    return r
+
+
 def send_oa_text(db: Session, uid: str, text: str) -> dict:
-    return _post(f"{OA_API}/message/cs", {"recipient": {"user_id": uid}, "message": {"text": text[:2000]}}, token(db))
+    return _gui(db, lambda tk: _post(f"{OA_API}/message/cs", {"recipient": {"user_id": uid}, "message": {"text": text[:2000]}}, tk))
 
 
 def send_zns(db: Session, phone: str, template_id: str, params: dict) -> dict:
-    return _post(ZNS_API, {"phone": intl(phone), "template_id": str(template_id), "template_data": params, "tracking_id": f"vtos-{datetime.now():%Y%m%d%H%M%S}"}, token(db))
+    return _gui(db, lambda tk: _post(ZNS_API, {"phone": intl(phone), "template_id": str(template_id), "template_data": params, "tracking_id": f"vtos-{datetime.now():%Y%m%d%H%M%S}"}, tk))
 
 
 def uid_theo_sdt(db: Session, phone: str) -> str:
@@ -233,8 +282,9 @@ def _send(db: Session, m: ZaloMessage) -> None:
         r = gui()
         m.response = json.dumps(r, ensure_ascii=False)[:2000]
         ok = (r.get("error") in (0, None)) and not r.get("error_name")
-        if not ok and r.get("error") in (-216, -124) and refresh_token(db):   # token hết hạn → làm mới và gửi lại 1 lần
-            r = gui(); ok = (r.get("error") in (0, None)) and not r.get("error_name"); m.response = json.dumps(r, ensure_ascii=False)[:2000]
+        # Phép làm mới + gửi lại đã chuyển vào `_gui()` bên trên, nơi MỌI đường gửi đi qua.
+        # Giữ lại ở đây nữa là làm mới HAI lần trong một lượt — mà refresh token của Zalo
+        # dùng một lần là mất, nên lần thứ hai đốt mất chuỗi uỷ quyền vừa dựng lại.
         m.status, m.sent_at = ("da_gui" if ok else "loi"), datetime.now()
     except Exception as ex:
         m.status, m.response = "loi", str(ex)[:500]
