@@ -21,7 +21,8 @@ from sqlalchemy.orm import Session
 from app.models.core import User
 from app.models.cong_ngoai import TaiKhoanNgoai
 from app.models.doi_tac_ban_hang import DoiTacBanHang
-from app.models.khach_san_ota import (PhapNhanHopDong, DoiTacOta, LuotChuyenOta, TRANG_THAI_HOP_TAC, CONG_NGOAI)
+from app.models.khach_san_ota import (PhapNhanHopDong, DoiTacOta, LuotChuyenOta, TRANG_THAI_HOP_TAC, CONG_NGOAI,
+                                      SAN_PHAM, LOAI_LINK, HANG_VE)
 from app.services import rules as R
 
 VAI_SUA = ("chutich",)
@@ -30,6 +31,12 @@ LUOT_TOI_DA_GIO = 60
 LOI_NHAC = ("Bạn xem giá, đặt phòng và thanh toán trên {ota}, theo điều kiện của {ota}; đổi, hủy, hoàn tiền làm "
             "với {ota}. Vietourist có thể nhận hoa hồng từ đặt phòng hợp lệ — giá bạn trả không đổi. Vietourist "
             "không gửi số điện thoại, email của bạn cho {ota}.")
+# VB-1: vé máy bay. Câu hoa hồng CHỈ có khi đối tác dùng link hoa hồng — trang công khai thì không nói.
+LOI_NHAC_VE = ("Bạn xem giá, đặt vé và thanh toán trên {ota}, theo điều kiện của {ota}; đổi, hoàn vé, hành lý làm "
+               "với {ota}.{hh} Vietourist không gửi số điện thoại, email của bạn cho {ota}.")
+CAU_HOA_HONG_VE = " Vietourist có thể nhận hoa hồng từ đặt vé hợp lệ — giá bạn trả không đổi."
+# Cổng được dùng mục vé máy bay (Chủ tịch chọn 28/10/2026): Khách hàng và Cổ đông — KHÔNG có Đối tác.
+CONG_VE = ("khach_hang", "co_dong")
 
 
 class LoiOta(ValueError):
@@ -81,6 +88,17 @@ def loi_link(link: str, ten_mien: str, duong_dan: str) -> str:
 
 def thieu_de_bat(o: DoiTacOta) -> list[str]:
     t = []
+    if o.loai_link == "cong_khai":
+        # VB-1: trang công khai — không có hợp tác để duyệt, không có điều khoản Affiliate; chỉ cần link
+        # đúng tên miền đã khai và đã mở thử. Chỉ cho vé máy bay.
+        if o.san_pham != "ve_may_bay":
+            t.append("trang công khai chỉ dùng cho vé máy bay")
+        l = loi_link(o.link, o.ten_mien, o.duong_dan)
+        if l:
+            t.append(l[0].lower() + l[1:])
+        if not o.da_kiem_link:
+            t.append("chưa kiểm link")
+        return t
     if o.trang_thai != "da_duyet":
         t.append("hợp tác chưa được duyệt")
     l = loi_link(o.link, o.ten_mien, o.duong_dan)
@@ -118,7 +136,9 @@ def _quan_tri_out(db: Session, o: DoiTacOta, luot7: dict, u: User) -> dict:
             "phap_nhan": {"ma": pn.ma, "ten": pn.ten, "quoc_gia": pn.quoc_gia} if pn else None,
             "sua_boi": o.sua_boi, "sua_luc": o.sua_luc.isoformat(timespec="minutes") if o.sua_luc else None,
             "luot_7_ngay": luot7.get(o.id, 0), "sua_duoc": sua_duoc(u),
-            "subid_cho_phep": o.subid_cho_phep, "subid_tham_so": o.subid_tham_so}
+            "subid_cho_phep": o.subid_cho_phep, "subid_tham_so": o.subid_tham_so,
+            "san_pham": o.san_pham, "san_pham_ten": SAN_PHAM.get(o.san_pham, o.san_pham),
+            "loai_link": o.loai_link, "loai_link_ten": LOAI_LINK.get(o.loai_link, o.loai_link)}
 
 
 def ds_quan_tri(db: Session, u: User, now: datetime | None = None) -> dict:
@@ -129,7 +149,7 @@ def ds_quan_tri(db: Session, u: User, now: datetime | None = None) -> dict:
     return {"ota": [_quan_tri_out(db, o, luot7, u) for o in ds], "trang_thai": TRANG_THAI_HOP_TAC,
             "phap_nhan": [{"id": p.id, "ma": p.ma, "ten": p.ten, "quoc_gia": p.quoc_gia}
                           for p in db.execute(select(PhapNhanHopDong).order_by(PhapNhanHopDong.id)).scalars()],
-            "sua_duoc": sua_duoc(u)}
+            "sua_duoc": sua_duoc(u), "san_pham": SAN_PHAM, "loai_link": LOAI_LINK}
 
 
 def _lay(db: Session, ota_id: int) -> DoiTacOta:
@@ -141,7 +161,7 @@ def _lay(db: Session, ota_id: int) -> DoiTacOta:
 
 def _snap(o: DoiTacOta) -> dict:
     return {k: getattr(o, k) for k in ("trang_thai", "link", "ten_mien", "duong_dan", "da_kiem_link", "duoc_dung_web",
-                                       "bat", "phien_ban", "phap_nhan_id", "subid_cho_phep", "subid_tham_so")}
+                                       "bat", "phien_ban", "phap_nhan_id", "subid_cho_phep", "subid_tham_so", "loai_link")}
 
 
 def sua(db: Session, u: User, ota_id: int, d: dict, now: datetime | None = None) -> DoiTacOta:
@@ -158,6 +178,12 @@ def sua(db: Session, u: User, ota_id: int, d: dict, now: datetime | None = None)
             raise LoiOta("Không có pháp nhân này")
         o.phap_nhan_id = int(d["phap_nhan_id"])
     doi_link = False
+    if d.get("loai_link") is not None and d["loai_link"] != o.loai_link:
+        if d["loai_link"] not in LOAI_LINK:
+            raise LoiOta("Loại link không hợp lệ")
+        if d["loai_link"] == "cong_khai" and o.san_pham != "ve_may_bay":
+            raise LoiOta("Trang công khai chỉ dùng cho vé máy bay — khách sạn cần link hoa hồng")
+        o.loai_link = d["loai_link"]; doi_link = True   # đổi loại link = phiên bản mới, tự tắt, kiểm lại
     for k, n in (("link", 500), ("ten_mien", 120), ("duong_dan", 200)):
         if d.get(k) is not None:
             v = str(d[k]).strip()[:n]
@@ -233,7 +259,7 @@ def bat_tat(db: Session, u: User, ota_id: int, bat: bool, now: datetime | None =
 def thong_ke(db: Session, so_ngay: int = 7, now: datetime | None = None) -> dict:
     now = now or datetime.now()
     tu = now - timedelta(days=max(1, min(int(so_ngay or 7), 90)))
-    otas = {o.id: o.ten for o in db.execute(select(DoiTacOta)).scalars()}
+    otas = {o.id: o.ten + (" · vé máy bay" if o.san_pham == "ve_may_bay" else "") for o in db.execute(select(DoiTacOta)).scalars()}
     dts = {d.id: d.ten for d in db.execute(select(DoiTacBanHang)).scalars()}
     dem = Counter()
     for l in db.execute(select(LuotChuyenOta).where(LuotChuyenOta.tao_luc >= tu)).scalars():
@@ -248,18 +274,24 @@ def thong_ke(db: Session, so_ngay: int = 7, now: datetime | None = None) -> dict
 
 # ---------------------------------------------------------------- phía cổng ngoài
 
-def cong_cua(tk: TaiKhoanNgoai) -> str:
+def cong_cua(tk: TaiKhoanNgoai, san_pham: str = "khach_san") -> str:
+    cong = ""
     if tk.loai == "khach_hang" and tk.trang_thai != "khoa":
-        return "khach_hang"
-    if tk.loai in ("doi_tac", "co_dong") and tk.trang_thai == "hoat_dong":
-        return tk.loai
-    raise LoiOta("Tài khoản chưa dùng được mục Khách sạn", 403)
+        cong = "khach_hang"
+    elif tk.loai in ("doi_tac", "co_dong") and tk.trang_thai == "hoat_dong":
+        cong = tk.loai
+    if not cong or (san_pham == "ve_may_bay" and cong not in CONG_VE):
+        raise LoiOta(f"Tài khoản chưa dùng được mục {SAN_PHAM.get(san_pham, 'Khách sạn')}", 403)
+    return cong
 
 
-def ds_cong(db: Session, tk: TaiKhoanNgoai) -> list[dict]:
-    cong_cua(tk)
-    return [{"ma": o.ma, "ten": o.ten} for o in db.execute(select(DoiTacOta).order_by(DoiTacOta.thu_tu, DoiTacOta.id)).scalars()
-            if dang_mo(o)]
+def ds_cong(db: Session, tk: TaiKhoanNgoai, san_pham: str = "khach_san") -> list[dict]:
+    if san_pham not in SAN_PHAM:
+        raise LoiOta("Sản phẩm không hợp lệ")
+    cong_cua(tk, san_pham)
+    return [{"ma": o.ma, "ten": o.ten, "co_hoa_hong": o.loai_link == "hoa_hong"}
+            for o in db.execute(select(DoiTacOta).where(DoiTacOta.san_pham == san_pham)
+                                .order_by(DoiTacOta.thu_tu, DoiTacOta.id)).scalars() if dang_mo(o)]
 
 
 def _ngay(s) -> date | None:
@@ -286,7 +318,30 @@ def _lua_chon(d: dict, hn: date) -> dict:
             "so_phong": sp, "nguoi_lon": nl, "tre_em": te}
 
 
+def _lua_chon_ve(d: dict, hn: date) -> dict:
+    di, ve = _ngay(d.get("ngay_di")), _ngay(d.get("ngay_ve"))
+    if di and di < hn:
+        raise LoiOta("Ngày đi đã qua")
+    if di and ve and ve < di:
+        raise LoiOta("Ngày về phải từ ngày đi trở đi")
+    nl, te, eb = int(d.get("nguoi_lon") or 1), int(d.get("tre_em") or 0), int(d.get("em_be") or 0)
+    if not (1 <= nl <= 9 and 0 <= te <= 8 and 0 <= eb <= nl):
+        raise LoiOta("Người lớn 1–9, trẻ em 0–8, em bé không nhiều hơn người lớn")
+    hang = str(d.get("hang_ve") or "pho_thong")
+    if hang not in HANG_VE:
+        raise LoiOta("Hạng vé không hợp lệ")
+    return {"diem_di": str(d.get("diem_di") or "").strip()[:120], "diem_den": str(d.get("diem_den") or "").strip()[:120],
+            "nhan_phong": di, "tra_phong": ve, "so_phong": 1, "nguoi_lon": nl, "tre_em": te, "em_be": eb, "hang_ve": hang}
+
+
 def _nhac(o: DoiTacOta, l: LuotChuyenOta) -> str:
+    if l.san_pham == "ve_may_bay":
+        phan = [" → ".join(x for x in (l.diem_di, l.diem_den) if x)] if (l.diem_di or l.diem_den) else []
+        if l.nhan_phong:
+            phan.append(f"{l.nhan_phong:%d/%m}" + (f" – {l.tra_phong:%d/%m}" if l.tra_phong else " · một chiều"))
+        phan.append(f"{l.nguoi_lon} người lớn" + (f" · {l.tre_em} trẻ em" if l.tre_em else "") + (f" · {l.em_be} em bé" if l.em_be else ""))
+        phan.append(HANG_VE.get(l.hang_ve, l.hang_ve))
+        return " · ".join(p for p in phan if p)
     phan = [l.diem_den] if l.diem_den else []
     if l.nhan_phong:
         phan.append(f"{l.nhan_phong:%d/%m}" + (f" – {l.tra_phong:%d/%m}" if l.tra_phong else ""))
@@ -296,7 +351,7 @@ def _nhac(o: DoiTacOta, l: LuotChuyenOta) -> str:
 
 def link_cua(o: DoiTacOta, l: LuotChuyenOta) -> str:
     """Link trả cho trình duyệt. Gắn mã lượt (ngẫu nhiên, không chứa gì của khách) khi OTA cho phép SubID."""
-    if not (o.subid_cho_phep and o.subid_tham_so and l.ma_luot):
+    if not (o.loai_link == "hoa_hong" and o.subid_cho_phep and o.subid_tham_so and l.ma_luot):
         return o.link
     from urllib.parse import quote
     return o.link + ("&" if "?" in o.link else "?") + f"{o.subid_tham_so}={quote(l.ma_luot)}"
@@ -304,7 +359,6 @@ def link_cua(o: DoiTacOta, l: LuotChuyenOta) -> str:
 
 def chuyen(db: Session, tk: TaiKhoanNgoai, ma_ota: str, request_id: str, lua_chon: dict | None = None,
            now: datetime | None = None) -> dict:
-    cong = cong_cua(tk)
     now = now or datetime.now()
     try:
         rid = str(uuid.UUID(str(request_id or "")))
@@ -313,6 +367,7 @@ def chuyen(db: Session, tk: TaiKhoanNgoai, ma_ota: str, request_id: str, lua_cho
     o = db.execute(select(DoiTacOta).where(DoiTacOta.ma == str(ma_ota or ""))).scalars().first()
     if o is None or not dang_mo(o):
         raise LoiOta("OTA này chưa mở trên VTD", 404)
+    cong = cong_cua(tk, o.san_pham)
     cu = db.execute(select(LuotChuyenOta).where(LuotChuyenOta.tai_khoan_id == tk.id, LuotChuyenOta.request_id == rid)).scalars().first()
     if cu is not None:
         if cu.doi_tac_ota_id != o.id:
@@ -325,13 +380,15 @@ def chuyen(db: Session, tk: TaiKhoanNgoai, ma_ota: str, request_id: str, lua_cho
             LuotChuyenOta.tai_khoan_id == tk.id, LuotChuyenOta.tao_luc >= now - timedelta(hours=1))).scalar_one()
         if gio >= LUOT_TOI_DA_GIO:
             raise LoiOta("Bạn mở OTA quá nhiều lần trong một giờ — thử lại sau", 429)
-        lc = _lua_chon(lua_chon or {}, now.date())
+        lc = (_lua_chon_ve if o.san_pham == "ve_may_bay" else _lua_chon)(lua_chon or {}, now.date())
         from app.services.doi_soat_ota import ma_luot_moi
         l = LuotChuyenOta(tai_khoan_id=tk.id, request_id=rid, doi_tac_ota_id=o.id, phien_ban_link=o.phien_ban, cong=cong,
-                          ma_luot=ma_luot_moi(db),
+                          ma_luot=ma_luot_moi(db), san_pham=o.san_pham, loai_link=o.loai_link,
                           doi_tac_ban_hang_id=tk.doi_tac_id if cong == "doi_tac" else None, tao_luc=now, **lc)
         db.add(l); db.commit(); db.refresh(l)
-    return {"luot_id": l.id, "url": link_cua(o, l), "ota": o.ten, "loi_nhac": LOI_NHAC.format(ota=o.ten), "chon_lai": _nhac(o, l)}
+    nhac = (LOI_NHAC_VE.format(ota=o.ten, hh=CAU_HOA_HONG_VE if o.loai_link == "hoa_hong" else "")
+            if o.san_pham == "ve_may_bay" else LOI_NHAC.format(ota=o.ten))
+    return {"luot_id": l.id, "url": link_cua(o, l), "ota": o.ten, "loi_nhac": nhac, "chon_lai": _nhac(o, l)}
 
 
 def dat_phong_xac_minh(db: Session, tk: TaiKhoanNgoai) -> list[dict]:
@@ -342,11 +399,11 @@ def dat_phong_xac_minh(db: Session, tk: TaiKhoanNgoai) -> list[dict]:
     return dat_phong_cua(db, ids)
 
 
-def lich_su(db: Session, tk: TaiKhoanNgoai) -> list[dict]:
-    cong_cua(tk)
+def lich_su(db: Session, tk: TaiKhoanNgoai, san_pham: str = "khach_san") -> list[dict]:
+    cong_cua(tk, san_pham)
     otas = {o.id: o for o in db.execute(select(DoiTacOta)).scalars()}
     ra = []
-    for l in db.execute(select(LuotChuyenOta).where(LuotChuyenOta.tai_khoan_id == tk.id)
+    for l in db.execute(select(LuotChuyenOta).where(LuotChuyenOta.tai_khoan_id == tk.id, LuotChuyenOta.san_pham == san_pham)
                         .order_by(LuotChuyenOta.tao_luc.desc()).limit(30)).scalars():
         o = otas.get(l.doi_tac_ota_id)
         ra.append({"luc": l.tao_luc.isoformat(timespec="minutes"), "ota": o.ten if o else "", "da_chon": _nhac(o, l) if o else ""})
