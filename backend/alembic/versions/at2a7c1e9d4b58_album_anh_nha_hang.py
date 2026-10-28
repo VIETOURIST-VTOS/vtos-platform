@@ -5,14 +5,14 @@
 Không tắt nhà hàng nào. Cột nha_hang.anh_id giữ nguyên (không xóa) để quay lui được.
 
 Revision ID: at2a7c1e9d4b58
-Revises: at1d6f8b0c3e57
+Revises: ks6c4f8e2b1d73 (nối sau KS-6; trước đó trỏ at1d6f8b0c3e57 làm main có hai đầu)
 Create Date: 2026-10-29
 """
 import sqlalchemy as sa
 from alembic import op
 
 revision = "at2a7c1e9d4b58"
-down_revision = "at1d6f8b0c3e57"
+down_revision = "ks6c4f8e2b1d73"
 branch_labels = None
 depends_on = None
 
