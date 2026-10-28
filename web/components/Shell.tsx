@@ -525,6 +525,7 @@ export const GROUPS: Group[] = [
     ["Chi & thanh toán", "/expenses"],
     // DH-1 26/10/2026 — hoa hồng đại lý / CTV bán hàng theo D06 (Chủ tịch chốt).
     ["Hoa hồng đối tác (D06)", "/hoa-hong-d06"],
+    ["Đặt bàn nhà hàng: tiền & hoàn", "/dat-ban-nha-hang"],
     ["Công nợ", "/cong-no"],
     ["Bảo lưu & hoàn tiền", "/bookings"],
     // Robot A · 11/9/2026. Bảng bốn mốc lũy kế của v1.1 §III (DT-1…DT-4). Đặt NGAY TRÊN mục

@@ -194,6 +194,34 @@ def xu_ly_dat_ban(yid: int, data: DatBanIn, x=Depends(_ncc), db: Session = Depen
     return {"message": "Đã nhận bàn" if data.nhan else "Đã từ chối — Vietourist báo khách", "dat_ban": S.don_dat_ban(db, x[1])}
 
 
+# DT-2 · sau bữa ăn: nhà hàng báo khách đã dùng (bill thực tế, số thu tại bàn, ảnh bill) hoặc khách không đến.
+def _goi_db(f, *a, **k):
+    from app.services import dat_ban as DB
+    try:
+        return f(*a, **k)
+    except DB.LoiDatBan as ex:
+        raise HTTPException(ex.status, str(ex))
+
+
+@router.post("/dat-ban/{yid}/da-dung")
+async def dat_ban_da_dung(yid: int, bill: int = Form(...), thu_tai_ban: int = Form(...), ghi_chu: str = Form(""),
+                          tep: UploadFile | None = File(None), x=Depends(_ncc), db: Session = Depends(get_db)):
+    from app.services import dat_ban as DB
+    data = await tep.read() if tep else None
+    _goi_db(DB.ncc_da_dung, db, x[0], x[1], yid, bill, thu_tai_ban, ghi_chu,
+            (tep.filename or "") if tep else "", (tep.content_type or "") if tep else "", data)
+    db.commit()
+    return {"message": "Đã báo khách đã dùng", "dat_ban": S.don_dat_ban(db, x[1])}
+
+
+@router.post("/dat-ban/{yid}/khong-den")
+def dat_ban_khong_den(yid: int, x=Depends(_ncc), db: Session = Depends(get_db)):
+    from app.services import dat_ban as DB
+    _goi_db(DB.ncc_khong_den, db, x[0], x[1], yid)
+    db.commit()
+    return {"message": "Đã báo khách không đến — Vietourist xử lý tiền theo chính sách", "dat_ban": S.don_dat_ban(db, x[1])}
+
+
 # ---------------------------------------------------------------- phía VTOS
 @router_vtos.get("")
 def vt_tong(u: User = Depends(require_roles(*S.VAI_XEM)), db: Session = Depends(get_db)):

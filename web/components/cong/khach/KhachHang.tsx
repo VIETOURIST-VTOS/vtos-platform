@@ -12,6 +12,7 @@ import { goiCong } from "@/lib/cong";
 import { svg } from "./icons";
 import NhaHangKhach from "./NhaHangKhach";
 import QrThanhToan from "./QrThanhToan";
+import DatBanCuaToi from "../DatBanCuaToi";
 import { useDiem, DiemUuDai, HangThanhVien, YeuThich } from "./RewardsKhach";
 import { DanhGiaKhach, GopYKhach, HoTroKhach } from "./ChamSocKhach";
 import KhachSanOta from "../KhachSanOta";
@@ -72,6 +73,8 @@ function SapRaMat({ tab }: { tab: Tab }) {
 
 export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void }) {
   const [tab, setTab] = useState<Tab>("home");
+  // DT-2: quay về từ trang thẻ OnePay (?dat_ban=…) → mở thẳng «Đơn của tôi», nơi có «Đặt bàn của tôi».
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get("dat_ban")) setTab("bookings"); } catch { /* bỏ qua */ } }, []);
   const [menuMo, setMenuMo] = useState(false);
   const [home, setHome] = useState<any>(null);
   const [ds, setDs] = useState<any>(null);
@@ -256,6 +259,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
                 <td><Nut kieu="quiet" i="chevron-right" onClick={() => { setDonMo(d); di("booking"); }}>Chi tiết</Nut></td></tr>)}</tbody></table></div>
               : <p>Chưa có đơn nào gắn với {lienHe}. Đơn hiện ở đây khi số điện thoại hoặc email trên booking trùng liên hệ bạn đã xác thực.</p>}
           </section>
+          <DatBanCuaToi />
           <section className="v3-panel"><div className="v3-section-title"><h3>Yêu cầu đã gửi</h3></div>
             {don?.yeu_cau?.length ? <div className="v3-table-wrap"><table>
               <thead><tr><th scope="col">Yêu cầu</th><th scope="col">Số khách</th><th scope="col">Gửi lúc</th><th scope="col">Trạng thái</th></tr></thead>

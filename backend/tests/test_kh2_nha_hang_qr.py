@@ -171,7 +171,8 @@ def test_cua_va_man_hinh():
     assert {"/api/v1/cong/khach/nha-hang", "/api/v1/cong/khach/nha-hang/{nid}", "/api/v1/cong/khach/don/{ma}/qr"} <= {r.path for r in CK.router.routes}
     assert "/api/v1/nha-hang/{nid}/hien-cong" in {r.path for r in A.router.routes}
     for f, chu in (("web/app/nha-hang/page.tsx", ("Bật hiện cổng", "giá bán cho khách")),
-                   ("web/components/cong/khach/NhaHangKhach.tsx", ("chưa giữ bàn", "Tạm tính")),
+                   # DT-2 (Chủ tịch 28/10/2026): đặt bàn có thanh toán — bàn giữ khi tiền đã vào, không còn «chưa giữ bàn».
+                   ("web/components/cong/khach/NhaHangKhach.tsx", ("bàn chỉ giữ khi tiền đã vào", "Tạm tính")),
                    ("web/components/cong/khach/QrThanhToan.tsx", ("GIỮ NGUYÊN nội dung", "toDataURL"))):
         src = (GOC / f).read_text(encoding="utf-8")
         for c in chu:

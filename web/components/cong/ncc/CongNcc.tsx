@@ -18,6 +18,7 @@ function Nut({ i, children, kieu = "secondary", ...p }: any) {
 }
 const MAU: Record<string, string> = { da_gui: "warn", da_xac_nhan: "good", da_su_dung: "good", huy: "neutral", cho: "warn", duyet: "good", tu_choi: "warn",
   cho_ncc: "warn", co_chenh_lech: "warn", da_xac_nhan_bk: "good", moi: "warn", dang_xu_ly: "warn", xong: "good", nhan: "good" };
+// DT-2: nhà hàng nhận bàn → khách trả trước qua Vietourist → ăn xong nhà hàng báo «Khách đã dùng» kèm bill.
 
 /** Gửi form (có tệp) lên cổng — goiCong chỉ gửi JSON. */
 async function guiForm(path: string, f: Record<string, any>) {
@@ -184,16 +185,25 @@ export default function CongNcc({ toi, thoat }: { toi: any; thoat: () => void })
           <small>Xác nhận → đơn trong VTOS đổi ngay sang «NCC đã xác nhận». Từ chối → Điều hành xử lý, đơn giữ nguyên.</small></section>}
 
         {tab === "dat_ban" && d.dat_ban && <section className="v3-panel"><div className="v3-section-title"><h3>Đơn đặt bàn</h3></div>
-          {d.dat_ban.dat_ban.length ? <Bang cot={["Mã · thực đơn", "Ngày giờ", "Khách", "Trạng thái", ""]}>{d.dat_ban.dat_ban.map((x: any) => <tr key={x.id}>
-            <th scope="row">{x.ma}<small>{x.nha_hang} · {x.thuc_don}</small></th><td>{ngay(x.ngay)} {x.gio}</td>
+          {d.dat_ban.dat_ban.length ? <Bang cot={["Mã · thực đơn", "Ngày giờ", "Khách", "Thanh toán", "Trạng thái", ""]}>{d.dat_ban.dat_ban.map((x: any) => <tr key={x.id}>
+            <th scope="row">{x.ma_don || x.ma}<small>{x.nha_hang} · {x.thuc_don}{x.la_doan ? " · đoàn" : ""}</small></th><td>{ngay(x.ngay)} {x.gio}</td>
             <td>{x.nguoi_lon} NL{x.tre_em ? ` + ${x.tre_em} TE` : ""}{x.ghi_chu && <small>{x.ghi_chu}</small>}</td>
-            <td><Badge c={MAU[x.trang_thai]}>{x.trang_thai_ten}</Badge>{x.ghi_chu_nh && <small>{x.ghi_chu_nh}</small>}</td>
+            <td>{x.ma_don ? <>{x.cach_tt_ten} · {tien(x.phai_tra_truoc)}<small>Vietourist đã thu {tien(x.da_tra_vtd)} · thu tại bàn ~{tien(x.thu_tai_ban_du_kien)}</small>
+              {x.bill_thuc_te != null && <small>Bill {tien(x.bill_thuc_te)} · đã thu tại bàn {tien(x.thu_tai_ban)}</small>}</> : "Yêu cầu cũ · Sales xử lý"}</td>
+            <td><Badge c={MAU[x.trang_thai]}>{x.trang_thai_ten}</Badge>{x.tt_don_ten && <small>{x.tt_don_ten}</small>}{x.ghi_chu_nh && <small>{x.ghi_chu_nh}</small>}</td>
             <td>{x.trang_thai === "cho" && <div style={{ display: "grid", gap: 4 }}>
               <Nut kieu="primary" disabled={busy} onClick={() => chay(() => goiCong(`/ncc/dat-ban/${x.id}`, { nhan: true, ghi_chu: f[`g${x.id}`] || "" }), (r) => setD((o2) => ({ ...o2, dat_ban: r })))}>Nhận bàn</Nut>
               <input placeholder="Lý do từ chối" value={f[`g${x.id}`] ?? ""} onChange={(e) => setF({ ...f, [`g${x.id}`]: e.target.value })} />
-              <Nut disabled={busy || !(f[`g${x.id}`] || "").trim()} onClick={() => chay(() => goiCong(`/ncc/dat-ban/${x.id}`, { nhan: false, ghi_chu: f[`g${x.id}`] }), (r) => setD((o2) => ({ ...o2, dat_ban: r })))}>Từ chối</Nut></div>}</td></tr>)}</Bang>
+              <Nut disabled={busy || !(f[`g${x.id}`] || "").trim()} onClick={() => chay(() => goiCong(`/ncc/dat-ban/${x.id}`, { nhan: false, ghi_chu: f[`g${x.id}`] }), (r) => setD((o2) => ({ ...o2, dat_ban: r })))}>Từ chối</Nut></div>}
+              {x.bao_dung_duoc && <div style={{ display: "grid", gap: 4 }}>
+                <input type="number" placeholder="Bill thực tế (đ)" value={f[`b${x.id}`] ?? ""} onChange={(e) => setF({ ...f, [`b${x.id}`]: e.target.value })} />
+                <input type="number" placeholder="Đã thu tại bàn (đ)" value={f[`t${x.id}`] ?? ""} onChange={(e) => setF({ ...f, [`t${x.id}`]: e.target.value })} />
+                <input type="file" accept=".pdf,image/*" aria-label="Ảnh bill" onChange={(e) => setF({ ...f, [`f${x.id}`]: e.target.files?.[0] || null })} />
+                <Nut kieu="primary" disabled={busy || !Number(f[`b${x.id}`]) || f[`t${x.id}`] === undefined || f[`t${x.id}`] === ""} onClick={() => chay(() => guiForm(`/ncc/dat-ban/${x.id}/da-dung`,
+                  { bill: f[`b${x.id}`], thu_tai_ban: f[`t${x.id}`], tep: f[`f${x.id}`] }), (r) => setD((o2) => ({ ...o2, dat_ban: r })))}>Khách đã dùng</Nut>
+                {x.bao_khong_den_duoc && <Nut disabled={busy} onClick={() => chay(() => goiCong(`/ncc/dat-ban/${x.id}/khong-den`, {}), (r) => setD((o2) => ({ ...o2, dat_ban: r })))}>Khách không đến</Nut>}</div>}</td></tr>)}</Bang>
             : <p>Chưa có đơn đặt bàn nào.</p>}
-          <small>Bạn thấy số khách, giờ, thực đơn; không thấy số điện thoại khách. Vietourist liên hệ khách.</small></section>}
+          <small>Bạn thấy số khách, giờ, thực đơn; không thấy số điện thoại khách. Nhận bàn xong khách mới thanh toán trước qua Vietourist; ăn xong thu phần còn lại tại bàn rồi bấm «Khách đã dùng» kèm bill. Không đến quá 30 phút: bấm «Khách không đến» — tiền giữ theo chính sách thuộc nhà hàng.</small></section>}
 
         {tab === "no" && d.no && <>
           <div className="v3-metrics">
@@ -204,7 +214,11 @@ export default function CongNcc({ toi, thoat }: { toi: any; thoat: () => void })
               <th scope="row">{x.code}<small>{x.noi_dung}</small></th><td>{ngay(x.ngay_su_dung)}{x.ngay_den_han && <small>hạn trả {ngay(x.ngay_den_han)}</small>}</td>
               <td>{tien(x.gia_tri)}</td><td>{x.da_chi ? <Badge c="good">Đã chi · {x.phieu_chi}</Badge> : x.phieu_chi ? `${x.phieu_chi} (đang duyệt)` : "Chưa lập đề nghị chi"}</td>
               <td>{tien(x.con)}</td></tr>)}</Bang> : <p>Chưa có đơn đã xác nhận.</p>}
-            <small>{d.no.ghi_chu}</small></section></>}
+            <small>{d.no.ghi_chu}</small></section>
+          {d.no.dat_ban_thu_ho?.length > 0 && <section className="v3-panel"><div className="v3-section-title"><h3>Đặt bàn — Vietourist thu hộ</h3></div>
+            <Bang cot={["Đơn", "Ngày", "Đã thu hộ", "Hoàn khách", "Thuộc nhà hàng"]}>{d.no.dat_ban_thu_ho.map((x: any) => <tr key={x.ma}>
+              <th scope="row">{x.ma}<small>{x.nha_hang} · {x.trang_thai_ten}</small></th><td>{ngay(x.ngay)}</td><td>{tien(x.da_thu_ho)}</td><td>{tien(x.hoan_khach)}</td><td>{tien(x.thuoc_nha_hang)}</td></tr>)}</Bang>
+            <small>Tiền khách trả trước qua Vietourist. Vietourist chi cho nhà hàng theo đề nghị chi; trạng thái chi xem ở Đề nghị.</small></section>}</>}
 
         {tab === "bk" && d.bk && (d.bk.ban_ke.length ? d.bk.ban_ke.map((b: any) => <section key={b.id} className="v3-panel">
           <div className="v3-section-title"><h3>Bản kê {b.ma} · kỳ {b.ky.split("-").reverse().join("/")}</h3><Badge c={b.trang_thai === "da_xac_nhan" ? "good" : "warn"}>{b.trang_thai_ten}</Badge></div>

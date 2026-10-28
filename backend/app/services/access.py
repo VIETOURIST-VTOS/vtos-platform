@@ -590,6 +590,9 @@ MAN_HINH_API = {
     "/ir-cong-co-dong": ("/api/v1/ir-cong-co-dong",),
     # NCC-1 (28/10/2026) — VTOS quản lý cổng nhà cung cấp. Phía ngoài (/api/v1/cong/ncc) theo phiên cổng.
     "/cong-ncc": ("/api/v1/cong-ncc",),
+    # DT-2 (28/10/2026) — đặt bàn có thanh toán. Phía ngoài (/api/v1/cong/dat-ban) theo phiên cổng;
+    # /api/v1/onepay do OnePay gọi, tin bằng chữ ký.
+    "/dat-ban-nha-hang": ("/api/v1/dat-ban-nha-hang",),
     "/gop-tai-khoan": ("/api/v1/gop-tai-khoan",),
     # TC-81 - Bao chi, KOL & su kien (muc 2.2.2). HAI tien to, va da kiem ky truoc khi khai cai
     # thu hai: danh sach vai cua man hinh nay nam GON trong danh sach vai cua "/marketing", nen
@@ -974,6 +977,7 @@ MENU_ROLES = {
     "/gop-y-lanh-dao": BASE_VIEW,
     "/doi-soat-ota": BASE_VIEW + ("ketoan",),   # KS-2: Kế toán nạp báo cáo OTA, Chủ tịch duyệt lô
     "/cong-ncc": BASE_VIEW + ("tp_dh", "nv_dh", "gd_kd", "ketoan", "nv_mkt", "ptgd_mkt"),   # NCC-1: nối, duyệt giá, bản kê, đề nghị, học liệu
+    "/dat-ban-nha-hang": BASE_VIEW + ("ketoan", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "sales_admin"),   # DT-2: tiền vào, đối soát thẻ, hủy & hoàn, chốt doanh số
     "/ir-cong-co-dong": BASE_VIEW + ("ir_phapche",),   # CD-1: IR – Pháp chế đưa tài liệu, sự kiện, trả lời; Chủ tịch, TGĐ gỡ
     "/khach-san-ota": BASE_VIEW,     # KS-1: Chủ tịch nhập và bật; TGĐ, BKS, robot KS xem
     # TC-75 - gop tai khoan trung. HEP: khong co vai Kinh doanh nao. Doc bang cap trung thi HCNS
