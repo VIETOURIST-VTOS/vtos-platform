@@ -365,10 +365,14 @@ def kiem_dat_ban(db: Session, nha_hang_id: int, thuc_don_id: int, ngay: date | N
 
 
 # ══ AT-1 · nhập danh sách, xác minh, hợp đồng, nội dung (Chủ tịch duyệt 28/10/2026) ═══════════════════════════
-COT_NHAP = {"ten": ("source_name", "name", "ten nha hang", "ten", "nha hang", "restaurant"),
-            "dia_danh": ("source_city", "city", "dia danh", "thanh pho", "tinh", "dia diem", "location"),
-            "mon": ("source_dishes", "dishes", "mon noi bat", "mon", "dish"),
-            "thu_tu": ("source_order", "order", "stt", "thu tu"),
+# Bí danh cột, ƯU TIÊN theo thứ tự ghi. Gồm cột của tệp bàn giao «TasteAtlas-Viet-Nam-144-ho-so.csv» (29/10/2026):
+# Ma_nguon, Thu_tu_hien_thi_khong_phai_hang, Ten_nguon, Ten_hien_thi, Dia_danh_nguon, Diem_den_hien_thi, Mon_nguon_nhac, Nguon.
+COT_NHAP = {"ten": ("ten hien thi", "source_name", "ten nguon", "name", "ten nha hang", "ten", "nha hang", "restaurant"),
+            "dia_danh": ("dia danh nguon", "source_city", "city", "dia danh", "thanh pho", "tinh", "dia diem", "location"),
+            "diem_den": ("diem den hien thi", "diem den"),
+            "mon": ("mon nguon nhac", "source_dishes", "dishes", "mon noi bat", "mon", "dish"),
+            "ma": ("ma nguon", "source_id"),
+            "thu_tu": ("thu tu hien thi khong phai hang", "source_order", "order", "stt", "thu tu"),
             "link": ("source_link", "link", "url", "nguon")}
 TOI_DA_NHAP = 2000
 
@@ -438,8 +442,9 @@ def doc_tep_nhap(ten_tep: str, data: bytes) -> dict:
         nhan = [_chuan(x).replace("_", " ") for x in r]
         m = {}
         for k, al in COT_NHAP.items():
-            for j, h in enumerate(nhan):
-                if h and j not in m.values() and any(h == a.replace("_", " ") for a in al):
+            for a in al:                              # bí danh đứng trước thắng
+                j = next((j for j, h in enumerate(nhan) if h and h == a.replace("_", " ") and j not in m.values()), None)
+                if j is not None:
                     m[k] = j; break
         if {"ten", "dia_danh"} <= m.keys():
             dau, cot = i, m; break
@@ -455,8 +460,12 @@ def doc_tep_nhap(ten_tep: str, data: bytes) -> dict:
             loi.append({"dong": i, "loi": "thiếu tên hoặc địa danh"}); continue
         mon = g("mon")
         mon = ", ".join(str(x).strip() for x in mon) if isinstance(mon, list) else str(mon or "").strip()
-        dong.append({"ten": ten[:160], "dia_danh": dd[:120], "tinh": tinh_tu_nguon(dd)[:80], "mon": mon[:500],
-                     "ref": " · ".join(x for x in (str(g("thu_tu") or "").strip(), str(g("link") or "").strip()) if x)[:300]})
+        tp = tinh_tu_nguon(dd)
+        if tp not in THANH_PHO and g("diem_den"):            # địa danh gốc chưa khớp → thử điểm đến đã chuẩn hóa
+            tp2 = tinh_tu_nguon(str(g("diem_den")))
+            tp = tp2 if tp2 in THANH_PHO else tp
+        dong.append({"ten": ten[:160], "dia_danh": dd[:120], "tinh": tp[:80], "mon": mon[:500], "khop": tp in THANH_PHO,
+                     "ref": " · ".join(x for x in (str(g(k) or "").strip() for k in ("ma", "thu_tu", "link")) if x)[:300]})
     if len(dong) > TOI_DA_NHAP:
         raise LoiNhaHang(f"Tệp có {len(dong)} dòng — vượt {TOI_DA_NHAP}")
     return {"dong": dong, "loi": loi, "cot": {k: str(bang[dau][j]) for k, j in cot.items()}}
@@ -488,6 +497,7 @@ def nhap_tep(db: Session, u: User, ten_tep: str, data: bytes, nguon: str, thu: b
         R.audit(db, u.username, u.role, "nha_hang_nhap_tep", f"nha_hang:nhap:{nguon}", after={"moi": len(moi), "trung": len(trung)})
         db.commit()
     return {"moi": len(moi), "trung": len(trung), "loi": r["loi"], "cot": r["cot"], "mau": moi[:10],
+            "chua_khop_tp": [{"ten": d["ten"], "dia_danh": d["dia_danh"]} for d in moi if not d["khop"]],
             "trung_mau": trung[:10], "da_nhap": not thu}
 
 

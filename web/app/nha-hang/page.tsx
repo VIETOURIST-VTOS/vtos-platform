@@ -169,6 +169,7 @@ function Trang() {
         <div className="muted">Cột đọc được: {Object.entries(thu.cot).map(([a, b]: any) => `${a} ← ${b}`).join(" · ")}</div>
         {thu.mau.length > 0 && <div className="wrap"><table><thead><tr><th>Tên</th><th>Địa danh (nguồn)</th><th>Tỉnh / thành</th><th>Món nổi bật</th></tr></thead>
           <tbody>{thu.mau.map((m: any, i: number) => <tr key={i}><td>{m.ten}</td><td>{m.dia_danh}</td><td>{m.tinh}</td><td className="muted">{m.mon}</td></tr>)}</tbody></table></div>}
+        {thu.chua_khop_tp?.length > 0 && <div className="muted">Chưa khớp thành phố ({thu.chua_khop_tp.length}) — nhập xong chọn tay ở cột Thành phố: {thu.chua_khop_tp.map((x: any) => `${x.ten} (${x.dia_danh})`).join("; ")}</div>}
         {thu.loi.length > 0 && <div className="muted">Dòng lỗi: {thu.loi.map((l: any) => `${l.dong} (${l.loi})`).join(", ")}</div>}
         {thu.moi > 0 && <button className="act teal" disabled={busy} onClick={() => docTep(true)}>Nhập {thu.moi} hồ sơ</button>}
       </div>}

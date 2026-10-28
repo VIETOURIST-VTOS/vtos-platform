@@ -310,3 +310,17 @@ def test_dia_danh_nguon_quy_ve_thanh_pho():
         assert N.tinh_tu_nguon(nguon) == tp, nguon
     assert N.tinh_tu_nguon("Thanh Xuân") == "Thanh Xuân"                              # quận Hà Nội: không đoán bừa
     assert N.tinh_tu_nguon("South Central Coast") == "South Central Coast"           # vùng lạ: giữ để Điều hành sửa
+
+
+def test_doc_tep_ban_giao_dung_cot(db):
+    """Tệp bàn giao 06-Du-lieu (29/10/2026): cột Ten_hien_thi / Dia_danh_nguon / Diem_den_hien_thi / Mon_nguon_nhac / Ma_nguon."""
+    from app.services import nha_hang as N
+    tep = ("\ufeffMa_nguon,Thu_tu_hien_thi_khong_phai_hang,Ten_nguon,Ten_hien_thi,Dia_danh_nguon,Diem_den_hien_thi,Mon_nguon_nhac,Nguon,Hop_dong\n"
+           "ta-1,1,Chào Bạn ,Chào Bạn,Hanoi,Hà Nội,Chả giò,https://x/vn,Chưa ghi nhận\n"
+           "ta-2,2,Quán Lạ,Quán Lạ,Vùng Lạ,Trà Vinh,Bún,https://x/vn,Chưa ghi nhận\n"
+           "ta-3,3,Quán Không Rõ,Quán Không Rõ,Nơi Lạ,,Phở,https://x/vn,Chưa ghi nhận\n").encode()
+    r = N.nhap_tep(db, _u(db, "dh"), "TasteAtlas.csv", tep, "TasteAtlas 28/10/2026", thu=True)
+    assert r["moi"] == 3 and r["cot"]["ten"] == "Ten_hien_thi" and r["cot"]["dia_danh"] == "Dia_danh_nguon"
+    assert [m["tinh"] for m in r["mau"]] == ["Hà Nội", "Trà Vinh", "Nơi Lạ"]               # địa danh lạ → dùng điểm đến
+    assert r["chua_khop_tp"] == [{"ten": "Quán Không Rõ", "dia_danh": "Nơi Lạ"}]
+    assert r["mau"][0]["ref"].startswith("ta-1 · 1 · ")
