@@ -214,6 +214,19 @@ async def dat_ban_da_dung(yid: int, bill: int = Form(...), thu_tai_ban: int = Fo
     return {"message": "Đã báo khách đã dùng", "dat_ban": S.don_dat_ban(db, x[1])}
 
 
+class ThayDoiNhIn(BaseModel):
+    nhan: bool
+    ghi_chu: str = ""
+
+
+@router.post("/dat-ban/{yid}/thay-doi")
+def dat_ban_thay_doi(yid: int, data: ThayDoiNhIn, x=Depends(_ncc), db: Session = Depends(get_db)):
+    from app.services import dat_ban as DB
+    _goi_db(DB.ncc_thay_doi, db, x[0], x[1], yid, data.nhan, data.ghi_chu)
+    db.commit()
+    return {"message": "Đã nhận thay đổi" if data.nhan else "Đã từ chối thay đổi — khách giữ lịch cũ", "dat_ban": S.don_dat_ban(db, x[1])}
+
+
 @router.post("/dat-ban/{yid}/khong-den")
 def dat_ban_khong_den(yid: int, x=Depends(_ncc), db: Session = Depends(get_db)):
     from app.services import dat_ban as DB

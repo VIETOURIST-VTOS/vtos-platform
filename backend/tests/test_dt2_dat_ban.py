@@ -58,7 +58,11 @@ def db():
                TaiKhoanNgoai(loai="doi_tac", loai_doi_tac="dai_ly", dien_thoai="0901000003", trang_thai="hoat_dong", doi_tac_id=dl.id),
                TaiKhoanNgoai(loai="doi_tac", loai_doi_tac="ncc", dien_thoai="0901000004", trang_thai="hoat_dong", ncc_id=sup.id),
                TaiKhoanNgoai(loai="co_dong", dien_thoai="0901000005", trang_thai="cho_xac_minh")])
+    from app.models.core import Company
+    from app.services import accounting as ACC
+    s.add(Company(code="VTD", name="CTCP Vietourist Holdings", kind="me"))
     s.commit()
+    ACC.seed_accounts(s)                                         # DT-3: tiền đặt bàn ghi sổ thu hộ
     yield s
     s.close(); ST._CACHE.clear()
 

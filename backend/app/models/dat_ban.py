@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -83,6 +83,14 @@ class DonDatBan(Base):
     hoan_boi: Mapped[str] = mapped_column(String(50), default="")
     hoan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     hoan_ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    # DT-3 · thay đổi sau khi đặt (Chủ tịch duyệt 28/10/2026): đổi lịch miễn phí 1 lần (≥24 giờ, nhà hàng nhận lại),
+    # thêm khách chờ nhà hàng nhận, bớt khách áp ngay. `thay_doi` = yêu cầu đang chờ nhà hàng {ngay, gio, nguoi_lon, tre_em}.
+    so_lan_doi: Mapped[int] = mapped_column(Integer, default=0)
+    thay_doi: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    thay_doi_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    thay_doi_ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    huy_mien_phi: Mapped[bool] = mapped_column(Boolean, default=False)       # nhà hàng từ chối lịch mới → hủy hoàn đủ
+    da_hoan_tien: Mapped[float] = mapped_column(TIEN, default=0)              # tổng đã hoàn (hoàn được nhiều lần)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
@@ -102,3 +110,5 @@ class ThanhToanDatBan(Base):
     xac_nhan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     ghi_chu: Mapped[str] = mapped_column(String(300), default="")
     goc: Mapped[str] = mapped_column(String(80), default="")                   # tên miền cổng để đưa khách về sau thẻ
+    phi_the: Mapped[float | None] = mapped_column(TIEN, nullable=True)        # DT-3: Kế toán nhập theo sao kê khi đối soát
+    but_toan: Mapped[str] = mapped_column(String(30), default="")             # mã chứng từ máy lập

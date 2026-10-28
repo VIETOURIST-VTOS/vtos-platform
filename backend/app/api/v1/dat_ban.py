@@ -110,6 +110,22 @@ def the(ma: str, request: Request, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai),
     return {"url": _goi(S.onepay_bat_dau, db, tk, ma, _goc(request), ip)}
 
 
+class ThayDoiIn(BaseModel):
+    ngay: date | None = None
+    gio: str = ""
+    nguoi_lon: int | None = None
+    tre_em: int | None = None
+
+
+@router.post("/{ma}/thay-doi")
+def thay_doi(ma: str, data: ThayDoiIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    d = _goi(S.thay_doi, db, tk, ma, data.ngay, data.gio, data.nguoi_lon, data.tre_em)
+    msg = "Đã gửi thay đổi — chờ nhà hàng nhận" if d.thay_doi else "Đã cập nhật đơn"
+    if d.hoan_tt == "cho_sales" and int(d.so_hoan or 0) > int(d.da_hoan_tien or 0):
+        msg += f" · phần trả dư {int(d.so_hoan) - int(d.da_hoan_tien or 0):,} đ sẽ được hoàn".replace(",", ".")
+    return {"message": msg, "dat_ban": S.ds_cua(db, tk)}
+
+
 class HuyIn(BaseModel):
     ly_do: str = ""
 
@@ -161,9 +177,13 @@ def gan_qr(did: int, data: GanIn, u: User = Depends(require_roles(*S.VAI_KE_TOAN
     return {"message": f"Đã xác nhận tiền vào cho {d.ma}", **S.tong_vtos(db, u)}
 
 
+class DoiSoatIn(BaseModel):
+    phi: int | None = None
+
+
 @router_vtos.post("/the/{tid}/doi-soat")
-def doi_soat(tid: int, u: User = Depends(require_roles(*S.VAI_KE_TOAN)), db: Session = Depends(get_db)):
-    _goi(S.kt_doi_soat, db, u, tid)
+def doi_soat(tid: int, data: DoiSoatIn, u: User = Depends(require_roles(*S.VAI_KE_TOAN)), db: Session = Depends(get_db)):
+    _goi(S.kt_doi_soat, db, u, tid, data.phi)
     db.commit()
     return {"message": "Đã đối soát giao dịch thẻ", **S.tong_vtos(db, u)}
 

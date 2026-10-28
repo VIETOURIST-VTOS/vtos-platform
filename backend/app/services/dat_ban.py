@@ -34,6 +34,13 @@ VAI_XEM = tuple(dict.fromkeys(("chutich", "tgd", "bks", "robot_ks") + VAI_KE_TOA
 MA_RE = re.compile(r"NH\d{8}")
 DON_TOI_DA_NGAY = 10
 TRANG_THAI_HUY_DUOC = ("cho_nhan", "cho_tra", "da_giu", "het_han")
+DOI_DUOC = ("cho_nhan", "cho_tra", "da_giu")
+TK_TIEN, TK_THU_HO, TK_PHI = "1121", "3388", "6428"      # DT-3: đại lý thu hộ nhà hàng; phí thẻ như phí ngân hàng
+
+
+def _co_the_tra(d: DonDatBan, tra: int) -> bool:
+    """Trả trước khi nhà hàng đã nhận bàn; đã giữ bàn mà thêm khách thì trả được phần trả trước thêm."""
+    return d.trang_thai in ("cho_tra", "da_giu") and tra - int(d.so_hoan or 0) < int(d.phai_tra_truoc)
 
 
 class LoiDatBan(ValueError):
@@ -182,7 +189,7 @@ def cap_nhat(db: Session, d: DonDatBan, now: datetime | None = None) -> DonDatBa
     """Chuyển trạng thái theo thời gian / tiền: chờ trả quá hạn → hết hạn; đã trả đủ → giữ bàn."""
     now = now or datetime.now()
     if d.trang_thai == "cho_tra":
-        if da_tra(db, d) >= int(d.phai_tra_truoc):
+        if da_tra(db, d) - int(d.so_hoan or 0) >= int(d.phai_tra_truoc):
             d.trang_thai = "da_giu"
         elif d.han_tra and now > d.han_tra:
             d.trang_thai = "het_han"
@@ -196,7 +203,7 @@ def _sau_khi_tra(db: Session, d: DonDatBan, now: datetime) -> None:
         tra = da_tra(db, d)
         d.so_giu = min(int(d.so_giu or 0), tra)
         d.so_hoan = tra - int(d.so_giu or 0)
-        if d.so_hoan > 0 and d.hoan_tt in ("", "khong_hoan", "da_hoan"):
+        if d.so_hoan > int(d.da_hoan_tien or 0) and d.hoan_tt in ("", "khong_hoan", "da_hoan"):
             d.hoan_tt = "cho_sales"
 
 
@@ -240,14 +247,15 @@ def _huy(db: Session, d: DonDatBan, boi: str, ly_do: str, now: datetime, mien_ph
     cap_nhat(db, d, now)
     if d.trang_thai not in TRANG_THAI_HUY_DUOC:
         raise LoiDatBan(f"Đơn đang «{TRANG_THAI[d.trang_thai]}» — không hủy được", 409)
-    d.mien_phat = bool(mien_phat)
+    d.mien_phat = bool(mien_phat) or bool(d.huy_mien_phi)
     tra = da_tra(db, d)
-    giu = min(phat(db, d, now), tra)
+    giu = min(phat(db, d, now), tra - int(d.so_hoan or 0))      # phần đã phải hoàn trước đó (bớt khách) không giữ lại
     if d.trang_thai == "het_han":
         giu = 0                         # bàn đã trả lại vì quá hạn — không phạt người chưa giữ được bàn
     d.trang_thai, d.huy_luc, d.huy_boi, d.huy_ly_do = "huy", now, boi, (ly_do or "").strip()[:1000]
     d.so_giu, d.so_hoan = giu, tra - giu
-    d.hoan_tt = "cho_sales" if d.so_hoan > 0 else ("khong_hoan" if tra else "")
+    d.thay_doi = None
+    d.hoan_tt = "cho_sales" if d.so_hoan > int(d.da_hoan_tien or 0) else ("khong_hoan" if tra and not d.da_hoan_tien else d.hoan_tt or "")
     return d
 
 
@@ -270,14 +278,17 @@ def ra(db: Session, d: DonDatBan, now: datetime | None = None, doi_tac: bool = F
          "gio": d.gio, "nguoi_lon": d.nguoi_lon, "tre_em": d.tre_em, "la_doan": d.la_doan, "cach_tt": d.cach_tt,
          "cach_tt_ten": f"{CACH_TT[d.cach_tt]} {d.ty_le_coc}%" if d.cach_tt == "coc" else CACH_TT[d.cach_tt],
          "tam_tinh": int(d.tam_tinh), "phai_tra_truoc": int(d.phai_tra_truoc), "da_tra": tra,
-         "con_phai_tra_truoc": max(0, int(d.phai_tra_truoc) - tra), "tra_tai_ban_du_kien": max(0, int(d.tam_tinh) - tra),
+         "con_phai_tra_truoc": max(0, int(d.phai_tra_truoc) - (tra - int(d.so_hoan or 0))), "tra_tai_ban_du_kien": max(0, int(d.tam_tinh) - tra),
          "han_tra": d.han_tra.isoformat(timespec="minutes") if d.han_tra else None,
          "trang_thai": d.trang_thai, "trang_thai_ten": TRANG_THAI[d.trang_thai],
          "ly_do_tu_choi": (y.nha_hang_ghi_chu if y and d.trang_thai == "tu_choi" else ""),
-         "co_the_tra": d.trang_thai == "cho_tra" and tra < int(d.phai_tra_truoc), "co_the_huy": d.trang_thai in TRANG_THAI_HUY_DUOC,
+         "co_the_tra": _co_the_tra(d, tra), "co_the_huy": d.trang_thai in TRANG_THAI_HUY_DUOC,
+         "co_the_doi": d.trang_thai in DOI_DUOC and not d.thay_doi, "thay_doi": d.thay_doi, "so_lan_doi": d.so_lan_doi,
+         "thay_doi_ghi_chu": d.thay_doi_ghi_chu, "huy_mien_phi": d.huy_mien_phi, "da_hoan_tien": int(d.da_hoan_tien or 0),
          "the_bat": OP.bat(), "bill_thuc_te": d.bill_thuc_te, "so_giu": d.so_giu, "so_hoan": d.so_hoan,
          "hoan_tt": d.hoan_tt, "hoan_tt_ten": HOAN_TT.get(d.hoan_tt, ""), "huy_ly_do": d.huy_ly_do,
-         "phat_neu_huy_bay_gio": min(phat(db, d, now), tra) if d.trang_thai in ("da_giu", "cho_tra") else 0,
+         "phat_neu_huy_bay_gio": (0 if d.huy_mien_phi else min(phat(db, d, now), tra - int(d.so_hoan or 0)))
+                                 if d.trang_thai in ("da_giu", "cho_tra") else 0,
          "thanh_toan": [{"kenh": KENH[t.kenh], "so_tien": int(t.so_tien), "trang_thai": t.trang_thai,
                          "trang_thai_ten": TT_THANH_TOAN[t.trang_thai], "luc": t.luc.isoformat(timespec="minutes")} for t in tts]}
     if doi_tac or noi_bo:
@@ -289,7 +300,8 @@ def ra(db: Session, d: DonDatBan, now: datetime | None = None, doi_tac: bool = F
                   "huy_boi": d.huy_boi, "mien_phat": d.mien_phat, "hoan_ghi_chu": d.hoan_ghi_chu,
                   "thanh_toan_id": [t.id for t in tts]})
         for t, o in zip(tts, r["thanh_toan"]):
-            o.update({"id": t.id, "kenh_ma": t.kenh, "so_gd_cong": t.so_gd_cong, "ma_gd": t.ma_gd, "xac_nhan_boi": t.xac_nhan_boi})
+            o.update({"id": t.id, "kenh_ma": t.kenh, "so_gd_cong": t.so_gd_cong, "ma_gd": t.ma_gd, "xac_nhan_boi": t.xac_nhan_boi,
+                      "phi_the": t.phi_the, "but_toan": t.but_toan})
     return r
 
 
@@ -308,11 +320,9 @@ def qr(db: Session, tk: TaiKhoanNgoai, ma: str, now: datetime | None = None) -> 
     now = now or datetime.now()
     d = cap_nhat(db, _cua(db, tk, ma), now)
     db.commit()
-    if d.trang_thai != "cho_tra":
-        raise LoiDatBan(f"Đơn đang «{TRANG_THAI[d.trang_thai]}» — không thanh toán", 409)
-    con = int(d.phai_tra_truoc) - da_tra(db, d)
-    if con <= 0:
-        raise LoiDatBan("Đã đủ số phải trả trước", 409)
+    con = int(d.phai_tra_truoc) - (da_tra(db, d) - int(d.so_hoan or 0))
+    if not _co_the_tra(d, da_tra(db, d)):
+        raise LoiDatBan(f"Đơn đang «{TRANG_THAI[d.trang_thai]}» — không thanh toán" if con > 0 else "Đã đủ số phải trả trước", 409)
     ba = K.tai_khoan_qr(db)
     if ba is None or not ba.account_number:
         raise LoiDatBan("Thanh toán QR chưa mở — vui lòng liên hệ Sales", 409)
@@ -330,12 +340,10 @@ def onepay_bat_dau(db: Session, tk: TaiKhoanNgoai, ma: str, goc: str, ip: str, n
     if not OP.bat():
         raise LoiDatBan("Thanh toán thẻ chưa mở — dùng QR chuyển khoản", 409)
     d = cap_nhat(db, _cua(db, tk, ma), now)
-    if d.trang_thai != "cho_tra":
+    con = int(d.phai_tra_truoc) - (da_tra(db, d) - int(d.so_hoan or 0))
+    if not _co_the_tra(d, da_tra(db, d)):
         db.commit()
-        raise LoiDatBan(f"Đơn đang «{TRANG_THAI[d.trang_thai]}» — không thanh toán", 409)
-    con = int(d.phai_tra_truoc) - da_tra(db, d)
-    if con <= 0:
-        raise LoiDatBan("Đã đủ số phải trả trước", 409)
+        raise LoiDatBan(f"Đơn đang «{TRANG_THAI[d.trang_thai]}» — không thanh toán" if con > 0 else "Đã đủ số phải trả trước", 409)
     t = ThanhToanDatBan(don_id=d.id, kenh="onepay", so_tien=con, trang_thai="cho", luc=now, goc=goc[:80])
     db.add(t); db.flush()
     t.ma_gd = f"{d.ma}T{t.id}"
@@ -375,6 +383,108 @@ def huy_boi_nguoi_dat(db: Session, tk: TaiKhoanNgoai, ma: str, ly_do: str, now: 
     return d
 
 
+# ====================================================================== thay đổi sau khi đặt (DT-3)
+def _ap_dung(db: Session, d: DonDatBan, ngay: date, gio: str, nl: int, te: int, now: datetime) -> None:
+    """Áp lịch / số khách mới: tính lại tạm tính, đoàn, số phải trả trước; trả dư → khoản hoàn."""
+    from app.services import nha_hang as NH
+    ts = tham_so(db)
+    con_gio = (gio_an(d) - now).total_seconds() / 3600
+    doi_lich = (ngay, gio) != (d.ngay, d.gio)
+    hn = now.date() if ngay != d.ngay else min(now.date(), ngay - timedelta(days=1))   # giữ ngày cũ: không kiểm lại «sau hôm nay»
+    try:
+        _o, td, tam = NH.kiem_dat_ban(db, d.nha_hang_id, d.thuc_don_id, ngay, gio, nl, te, hn)
+    except NH.LoiNhaHang as ex:
+        raise LoiDatBan(str(ex))
+    tam = int(round(tam))
+    if tam < int(d.tam_tinh) and con_gio < ts["mien_phi_gio"]:
+        tam = max(tam, _nghin(float(d.tam_tinh) * 0.8))       # bớt khách trong 24 giờ: tính tối thiểu 80%
+    doan = la_doan(ts, td, nl + te)
+    pct, truoc = phai_tra(ts, tam, doan, d.cach_tt)
+    d.ngay, d.gio, d.nguoi_lon, d.tre_em = ngay, gio, nl, te
+    d.tam_tinh, d.la_doan, d.ty_le_coc, d.phai_tra_truoc = tam, doan, pct, truoc
+    if doi_lich:
+        d.so_lan_doi = int(d.so_lan_doi or 0) + 1
+        if d.trang_thai == "cho_tra":
+            ga = gio_an(d)
+            d.han_tra = max(ga - timedelta(hours=ts["han_tra_gio"]), min(now + timedelta(hours=2), ga - timedelta(minutes=30)))
+    tra = da_tra(db, d)
+    du = tra - int(d.so_hoan or 0) - truoc
+    if du > 0 and d.trang_thai in ("cho_tra", "da_giu"):
+        d.so_hoan = int(d.so_hoan or 0) + du
+        d.hoan_tt = "cho_sales"
+    y = db.get(YeuCauKhach, d.yeu_cau_id)
+    if y is not None:
+        y.ngay_mong_muon, y.gio_den, y.so_khach, y.tre_em, y.tam_tinh = ngay, gio, nl + te, te, tam
+    d.thay_doi, d.thay_doi_luc = None, None
+    cap_nhat(db, d, now)
+
+
+def thay_doi(db: Session, tk: TaiKhoanNgoai, ma: str, ngay, gio: str, nguoi_lon: int, tre_em: int,
+             now: datetime | None = None) -> DonDatBan:
+    """Người đặt đổi lịch và / hoặc số khách. Chưa nhận bàn: áp ngay. Đã nhận: bớt khách áp ngay; đổi lịch,
+    thêm khách chờ nhà hàng nhận lại."""
+    now = now or datetime.now()
+    d = cap_nhat(db, _cua(db, tk, ma), now)
+    if d.trang_thai not in DOI_DUOC:
+        raise LoiDatBan(f"Đơn đang «{TRANG_THAI[d.trang_thai]}» — không thay đổi được", 409)
+    if d.thay_doi:
+        raise LoiDatBan("Đang có một yêu cầu thay đổi chờ nhà hàng — chờ nhà hàng trả lời", 409)
+    ngay = ngay if isinstance(ngay, date) else (date.fromisoformat(ngay) if ngay else d.ngay)
+    gio = (gio or d.gio).strip()
+    nl = int(nguoi_lon if nguoi_lon is not None else d.nguoi_lon)
+    te = int(tre_em if tre_em is not None else d.tre_em)
+    doi_lich = (ngay, gio) != (d.ngay, d.gio)
+    if not doi_lich and (nl, te) == (d.nguoi_lon, d.tre_em):
+        raise LoiDatBan("Chưa có gì thay đổi")
+    ts = tham_so(db)
+    if doi_lich:
+        if (gio_an(d) - now).total_seconds() / 3600 < ts["mien_phi_gio"]:
+            raise LoiDatBan(f"Đổi ngày giờ phải báo trước {ts['mien_phi_gio']} giờ — muốn đổi thì hủy theo chính sách rồi đặt lại", 409)
+        if int(d.so_lan_doi or 0) >= 1:
+            raise LoiDatBan("Đã đổi lịch miễn phí 1 lần — muốn đổi nữa thì hủy theo chính sách rồi đặt lại", 409)
+    from app.services import nha_hang as NH
+    hn = now.date() if ngay != d.ngay else min(now.date(), ngay - timedelta(days=1))
+    try:
+        NH.kiem_dat_ban(db, d.nha_hang_id, d.thuc_don_id, ngay, gio, nl, te, hn)
+    except NH.LoiNhaHang as ex:
+        raise LoiDatBan(str(ex))
+    cu = d.nguoi_lon + d.tre_em
+    can_nha_hang = d.trang_thai != "cho_nhan" and (doi_lich or nl > d.nguoi_lon or te > d.tre_em)
+    if can_nha_hang:
+        d.thay_doi = {"ngay": ngay.isoformat(), "gio": gio, "nguoi_lon": nl, "tre_em": te}
+        d.thay_doi_luc, d.thay_doi_ghi_chu = now, ""
+    else:
+        _ap_dung(db, d, ngay, gio, nl, te, now)
+    R.audit(db, f"cong:{tk.id}", tk.loai, "dat_ban_thay_doi", f"dat_ban:{d.ma}",
+            after={"ngay": ngay.isoformat(), "gio": gio, "khach": f"{cu}→{nl + te}", "cho_nha_hang": can_nha_hang})
+    db.commit()
+    return d
+
+
+def ncc_thay_doi(db: Session, tk: TaiKhoanNgoai, s, yid: int, nhan: bool, ghi_chu: str = "",
+                 now: datetime | None = None) -> DonDatBan:
+    now = now or datetime.now()
+    d = cap_nhat(db, _don_ncc(db, s, yid), now)
+    if not d.thay_doi:
+        raise LoiDatBan("Đơn không có yêu cầu thay đổi đang chờ", 409)
+    if d.trang_thai not in DOI_DUOC:
+        d.thay_doi = None
+        raise LoiDatBan(f"Đơn đang «{TRANG_THAI[d.trang_thai]}»", 409)
+    td = d.thay_doi
+    if nhan:
+        _ap_dung(db, d, date.fromisoformat(td["ngay"]), td["gio"], int(td["nguoi_lon"]), int(td["tre_em"]), now)
+        d.thay_doi_ghi_chu = f"Nhà hàng đã nhận thay đổi {now:%d/%m %H:%M}" + (f" · {ghi_chu.strip()}" if (ghi_chu or "").strip() else "")
+    else:
+        if not (ghi_chu or "").strip():
+            raise LoiDatBan("Từ chối phải ghi lý do")
+        d.thay_doi, d.thay_doi_luc = None, None
+        d.huy_mien_phi = True                      # khách giữ lịch cũ, hoặc hủy được hoàn đủ
+        d.thay_doi_ghi_chu = f"Nhà hàng từ chối thay đổi: {ghi_chu.strip()[:300]} — bạn giữ lịch cũ hoặc hủy được hoàn đủ"
+    R.audit(db, f"cong:ncc-{tk.id}", "ncc", "dat_ban_thay_doi_nha_hang", f"dat_ban:{d.ma}", after={"nhan": nhan})
+    db.flush()
+    return d
+
+
 # ====================================================================== phía nhà hàng (cổng NCC)
 def don_cua_yeu_cau(db: Session, ids: list[int]) -> dict[int, DonDatBan]:
     if not ids:
@@ -390,6 +500,7 @@ def ra_ncc(db: Session, d: DonDatBan, now: datetime | None = None) -> dict:
             "cach_tt_ten": f"{CACH_TT[d.cach_tt]} {d.ty_le_coc}%" if d.cach_tt == "coc" else CACH_TT[d.cach_tt],
             "phai_tra_truoc": int(d.phai_tra_truoc), "da_tra_vtd": tra, "thu_tai_ban_du_kien": max(0, int(d.tam_tinh) - tra),
             "bill_thuc_te": d.bill_thuc_te, "thu_tai_ban": d.thu_tai_ban, "so_giu": d.so_giu,
+            "thay_doi": d.thay_doi, "thay_doi_ghi_chu": d.thay_doi_ghi_chu,
             "bao_dung_duoc": d.trang_thai == "da_giu", "bao_khong_den_duoc": d.trang_thai == "da_giu" and now >= gio_an(d) + timedelta(minutes=30)}
 
 
@@ -460,6 +571,36 @@ def thu_ho_ncc(db: Session, s) -> list[dict]:
     return ra_
 
 
+# ====================================================================== ghi sổ (DT-3: đại lý thu hộ nhà hàng)
+def _doi_tuong_nh(db: Session, d: DonDatBan) -> tuple[str, str]:
+    """(tên, mã) đối tượng công nợ 3388 — nhà cung cấp của nhà hàng; chưa gắn NCC thì tên nhà hàng."""
+    from app.models.suppliers import Supplier
+    nh = db.get(NhaHang, d.nha_hang_id)
+    s = db.get(Supplier, nh.supplier_id) if nh and nh.supplier_id else None
+    return (s.ten, s.code) if s else ((nh.ten if nh else "Nhà hàng"), (nh.ma if nh else ""))
+
+
+def _ghi_so(db: Session, u: User, d: DonDatBan, ngay: date, mo_ta: str, lines: list[dict], ma_nguon: str, nghiep_vu: str) -> str:
+    """Bút toán vào sổ CTCP Vietourist Holdings (công ty mẹ). Kỳ khóa / trùng sự kiện → lỗi, không ghi."""
+    from app.models.core import Company
+    from app.services import accounting as ACC
+    try:
+        if nghiep_vu == "thu_tien_khach":
+            e = ACC.post_entry(db, u.username, u.role, ngay, mo_ta, lines, source_type="dat_ban", source_ref=ma_nguon,
+                               nghiep_vu="thu_tien_khach")
+        elif nghiep_vu == "chi_tien":
+            e = ACC.post_entry(db, u.username, u.role, ngay, mo_ta, lines, source_type="dat_ban", source_ref=ma_nguon,
+                               nghiep_vu="chi_tien")
+        else:
+            raise ValueError(f"nghiệp vụ {nghiep_vu} không thuộc đặt bàn")
+    except ValueError as ex:
+        raise LoiDatBan(f"Chưa ghi sổ được: {ex}", 409)
+    me = db.execute(select(Company).where(Company.kind == "me").order_by(Company.id)).scalars().first()
+    if me is not None:
+        e.company_id = me.id
+    return e.code
+
+
 # ====================================================================== phía VTOS
 def _don(db: Session, did: int) -> DonDatBan:
     d = db.get(DonDatBan, did)
@@ -499,9 +640,15 @@ def kt_gan_qr(db: Session, u: User, did: int, txn_id: int, now: datetime | None 
         raise LoiDatBan("Giao dịch đã được xử lý ở nơi khác", 409)
     if db.execute(select(ThanhToanDatBan.id).where(ThanhToanDatBan.bank_txn_id == t.id)).first():
         raise LoiDatBan("Giao dịch đã gán cho một đơn đặt bàn", 409)
-    db.add(ThanhToanDatBan(don_id=d.id, kenh="qr", so_tien=int(round(float(t.amount or 0))), trang_thai="da_xac_nhan",
-                           bank_txn_id=t.id, luc=t.transaction_date or now, xac_nhan_boi=u.username, xac_nhan_luc=now))
-    t.match_status, t.match_note = "da_khop", f"Đặt bàn {d.ma} — Kế toán {u.username} xác nhận"
+    tt = ThanhToanDatBan(don_id=d.id, kenh="qr", so_tien=int(round(float(t.amount or 0))), trang_thai="da_xac_nhan",
+                         bank_txn_id=t.id, luc=t.transaction_date or now, xac_nhan_boi=u.username, xac_nhan_luc=now)
+    db.add(tt); db.flush()
+    ten, ma_dt = _doi_tuong_nh(db, d)
+    tt.but_toan = _ghi_so(db, u, d, (t.transaction_date or now).date(), f"Thu hộ nhà hàng — đặt bàn {d.ma} (QR)",
+                          [{"account": TK_TIEN, "debit": tt.so_tien, "note": d.ma},
+                           {"account": TK_THU_HO, "credit": tt.so_tien, "partner": ten, "partner_code": ma_dt, "note": d.ma}],
+                          f"{d.ma}:tt{tt.id}", "thu_tien_khach")
+    t.match_status, t.match_note = "da_khop", f"Đặt bàn {d.ma} — Kế toán {u.username} xác nhận · {tt.but_toan}"
     db.flush()
     _sau_khi_tra(db, d, now)
     R.audit(db, u.username, u.role, "dat_ban_xac_nhan_qr", f"dat_ban:{d.ma}", after={"so_tien": float(t.amount or 0), "txn": t.id})
@@ -509,7 +656,7 @@ def kt_gan_qr(db: Session, u: User, did: int, txn_id: int, now: datetime | None 
     return d
 
 
-def kt_doi_soat(db: Session, u: User, tt_id: int, now: datetime | None = None) -> ThanhToanDatBan:
+def kt_doi_soat(db: Session, u: User, tt_id: int, phi: int | None = None, now: datetime | None = None) -> ThanhToanDatBan:
     now = now or datetime.now()
     if u.role not in VAI_KE_TOAN:
         raise LoiDatBan("Chỉ Kế toán đối soát", 403)
@@ -518,8 +665,20 @@ def kt_doi_soat(db: Session, u: User, tt_id: int, now: datetime | None = None) -
         raise LoiDatBan("Không có giao dịch thẻ này", 404)
     if t.trang_thai != "thanh_cong":
         raise LoiDatBan("Chỉ đối soát giao dịch OnePay báo thành công", 409)
+    if phi is None or int(phi) < 0 or int(phi) >= int(t.so_tien):
+        raise LoiDatBan("Ghi phí thẻ theo sao kê OnePay / cổng thẻ (0 nếu không trừ phí)")
+    d = db.get(DonDatBan, t.don_id)
+    ten, ma_dt = _doi_tuong_nh(db, d)
+    dong = [{"account": TK_TIEN, "debit": int(t.so_tien) - int(phi), "note": t.so_gd_cong or d.ma}]
+    if int(phi):
+        dong.append({"account": TK_PHI, "debit": int(phi), "note": f"Phí thẻ {d.ma}"})
+    dong.append({"account": TK_THU_HO, "credit": int(t.so_tien), "partner": ten, "partner_code": ma_dt, "note": d.ma})
+    t.but_toan = _ghi_so(db, u, d, now.date(), f"Thu hộ nhà hàng — đặt bàn {d.ma} (thẻ, GD {t.so_gd_cong})", dong,
+                         f"{d.ma}:tt{t.id}", "thu_tien_khach")
+    t.phi_the = int(phi)
     t.trang_thai, t.xac_nhan_boi, t.xac_nhan_luc = "da_doi_soat", u.username, now
-    R.audit(db, u.username, u.role, "dat_ban_doi_soat_the", f"thanh_toan_dat_ban:{t.id}", after={"so_tien": int(t.so_tien)})
+    R.audit(db, u.username, u.role, "dat_ban_doi_soat_the", f"thanh_toan_dat_ban:{t.id}",
+            after={"so_tien": int(t.so_tien), "phi": int(phi), "but_toan": t.but_toan})
     db.flush()
     return t
 
@@ -545,7 +704,8 @@ def sales_xac_nhan_hoan(db: Session, u: User, did: int, ghi_chu: str, now: datet
     d = _don(db, did)
     if d.hoan_tt != "cho_sales":
         raise LoiDatBan("Đơn không chờ Sales xác nhận hoàn", 409)
-    d.hoan_tt, d.hoan_ghi_chu = "cho_chi", (f"Sales {u.username}: " + (ghi_chu or "").strip())[:1000]
+    d.hoan_tt = "cho_chi"
+    d.hoan_ghi_chu = (((d.hoan_ghi_chu + "\n") if d.hoan_ghi_chu else "") + f"Sales {u.username}: {(ghi_chu or '').strip()}")[-1000:]
     R.audit(db, u.username, u.role, "dat_ban_xac_nhan_hoan", f"dat_ban:{d.ma}", after={"so_hoan": d.so_hoan})
     db.flush()
     return d
@@ -560,9 +720,20 @@ def kt_da_hoan(db: Session, u: User, did: int, ghi_chu: str, now: datetime | Non
         raise LoiDatBan("Đơn chưa được Sales xác nhận hoàn", 409)
     if len((ghi_chu or "").strip()) < 3:
         raise LoiDatBan("Ghi chứng từ hoàn (mã hoàn OnePay / số UNC)")
+    lan = int(d.so_hoan or 0) - int(d.da_hoan_tien or 0)
+    if lan <= 0:
+        raise LoiDatBan("Không còn số phải hoàn", 409)
+    ten, ma_dt = _doi_tuong_nh(db, d)
+    from app.models.accounting import JournalEntry
+    n = (db.execute(select(func.count(JournalEntry.id)).where(JournalEntry.source_type == "dat_ban",
+                                                            JournalEntry.source_ref.like(f"{d.ma}:hoan%"))).scalar() or 0) + 1
+    ma_ct = _ghi_so(db, u, d, now.date(), f"Hoàn khách — đặt bàn {d.ma} ({ghi_chu.strip()[:60]})",
+                    [{"account": TK_THU_HO, "debit": lan, "partner": ten, "partner_code": ma_dt, "note": d.ma},
+                     {"account": TK_TIEN, "credit": lan, "note": ghi_chu.strip()[:200]}], f"{d.ma}:hoan{n}", "chi_tien")
+    d.da_hoan_tien = int(d.so_hoan)
     d.hoan_tt, d.hoan_boi, d.hoan_luc = "da_hoan", u.username, now
-    d.hoan_ghi_chu = ((d.hoan_ghi_chu + "\n") if d.hoan_ghi_chu else "") + f"Kế toán {u.username}: {ghi_chu.strip()}"[:500]
-    R.audit(db, u.username, u.role, "dat_ban_da_hoan", f"dat_ban:{d.ma}", after={"so_hoan": d.so_hoan})
+    d.hoan_ghi_chu = ((d.hoan_ghi_chu + "\n") if d.hoan_ghi_chu else "") + f"Kế toán {u.username}: hoàn {lan:,} đ · {ma_ct} · {ghi_chu.strip()}"[:500]
+    R.audit(db, u.username, u.role, "dat_ban_da_hoan", f"dat_ban:{d.ma}", after={"so_hoan": lan, "but_toan": ma_ct})
     db.flush()
     return d
 
