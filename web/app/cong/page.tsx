@@ -4,7 +4,7 @@ import { THANH_TREN } from "@/components/cong/manh";
 import { goiCong, phienCong, xoaPhienCong } from "@/lib/cong";
 import KhachHang from "@/components/cong/khach/KhachHang";
 import DoiTac from "@/components/cong/doi-tac/DoiTac";
-import KhachSanOta from "@/components/cong/KhachSanOta";
+import CoDong from "@/components/cong/co-dong/CoDong";
 
 /* CG-1 · KHÔNG GIAN SAU ĐĂNG NHẬP của cổng ngoài (khách hàng, đối tác, cổ đông).
    Đợt này làm cổng và tài khoản. Các phân hệ (đặt dịch vụ, đơn, điểm, ưu đãi cổ đông…) là đợt sau —
@@ -14,8 +14,6 @@ const PHAN_HE: Record<string, [string, string, string][]> = {
     ["Điểm & ưu đãi", "Chờ duyệt chính sách điểm", "cho"], ["Hỗ trợ", "Góp ý, khiếu nại tới Vietourist", "xay"]],
   doi_tac: [["Dịch vụ cung cấp / Báo giá & bán / Khách giới thiệu", "Tour du lịch · Khách sạn · Nhà hàng & ẩm thực", "xay"],
     ["Công nợ & đối soát", "Phải thu – phải trả theo hợp đồng", "xay"], ["Hoa hồng (D06)", "Lũy tiến theo tháng — chờ cấu hình phạm vi", "cho"]],
-  co_dong: [["Công bố thông tin & đại hội", "Tài liệu IR công khai", "xay"], ["Ưu đãi cổ đông", "Tour · Khách sạn · Nhà hàng — chờ duyệt chính sách", "cho"],
-    ["Quan hệ nhà đầu tư", "Gửi câu hỏi tới IR", "xay"]],
 };
 
 export default function Cong() {
@@ -43,7 +41,8 @@ export default function Cong() {
       <div id="vtd-access" data-mode="inline" data-page="login" data-role={role} data-preview="off" data-vtos-screen="off" data-vtos-menu="closed">
         <div id="vtd-screen">
           {toi?.loai === "khach_hang" && toi.trang_thai !== "khoa" ? <KhachHang toi={toi} thoat={thoat} />
-            : toi?.loai === "doi_tac" && toi.trang_thai === "hoat_dong" ? <DoiTac toi={toi} thoat={thoat} /> : <>
+            : toi?.loai === "doi_tac" && toi.trang_thai === "hoat_dong" ? <DoiTac toi={toi} thoat={thoat} />
+            : toi?.loai === "co_dong" && toi.trang_thai === "hoat_dong" ? <CoDong toi={toi} thoat={thoat} /> : <>
           <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: THANH_TREN }} />
           {!toi ? <p style={{ color: "#a9b9ce", padding: 24 }}>Đang tải…</p> : <div data-role={role}><div className="v4-auth">
             <nav className="vtd-breadcrumb"><span>{toi.loai_ten}</span><span>·</span><span>{toi.dien_thoai || toi.email}</span>
@@ -73,8 +72,6 @@ export default function Cong() {
                     <b>{t}</b><div style={{ fontSize: 13, color: "#52677f" }}>{m}</div>
                     <span style={{ fontSize: 12, fontWeight: 700, borderRadius: 6, padding: "2px 8px", background: s === "cho" ? "#fbf1dc" : "#eef3f8", color: s === "cho" ? "#8a5a00" : "#52677f" }}>{s === "cho" ? "Chờ duyệt chính sách" : "Đang xây dựng"}</span></div>)}
                 </div>}
-                {toi.loai === "co_dong" && toi.trang_thai === "hoat_dong" && <div className="ks-co-dong"><h3 style={{ margin: "10px 0 4px" }}>Khách sạn</h3>
-                  <KhachSanOta ghiChu="Chưa có ưu đãi cổ đông cho phòng đặt qua OTA." /></div>}
 
                 <h3 style={{ margin: "14px 0 4px" }}>Hồ sơ & riêng tư</h3>
                 {toi.loai === "khach_hang" && <label className="v3-field">Họ tên<input defaultValue={toi.ho_ten} onBlur={(e) => e.target.value !== toi.ho_ten && luuToi({ ho_ten: e.target.value })} /></label>}

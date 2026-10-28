@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { login, getUser } from "@/lib/api";
 import { THANH_TREN, TRANG_MO_DAU, KHUNG_HO_TRO, CAU_CHUYEN } from "@/components/cong/manh";
+import { ThuVien } from "@/components/cong/co-dong/CoDong";
 import { goiCong as goi, luuPhienCong } from "@/lib/cong";
 
 /* CG-1 · CỔNG KẾT NỐI VTD thay màn đăng nhập VTOS — Chủ tịch duyệt bản xem thử 26/10/2026, dựng từ đúng
@@ -90,6 +91,7 @@ function Ngoai({ man }: { man: Exclude<Man, "cong" | "noi"> }) {
     {err && <div className="cong-loi">{err}</div>}
     <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy || !lh.trim() || (!!k[chon] && !k[chon].ok)}>{busy ? "Đang gửi…" : "Nhận mã xác thực"}</button></div>
     <p className="vtd-form-notice">Mã 6 số, dùng một lần, hết hạn sau 5 phút. Lần đầu dùng liên hệ này thì hệ thống tạo tài khoản sau khi bạn đồng ý điều khoản dịch vụ{man !== "kh" ? "; đối tác và cổ đông gửi hồ sơ để Vietourist duyệt" : ""}.</p>
+    {man === "cd" && <p className="vtd-form-notice"><a href="/login?cong=cd&xem=ir">Xem tài liệu công bố thông tin — không cần đăng nhập</a></p>}
   </form>);
   return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); xacThuc(); }}>
     <h2>Xác thực liên hệ</h2>
@@ -110,13 +112,15 @@ function Ngoai({ man }: { man: Exclude<Man, "cong" | "noi"> }) {
 export default function Login() {
   const [man, setMan] = useState<Man>("cong");
   const [hoTro, setHoTro] = useState(false);
+  const [xemIr, setXemIr] = useState(false);   // CD-1 · màn A18: thư viện IR công khai, không cần đăng nhập
   useEffect(() => {
     if (getUser()) { location.replace("/"); return; }
+    setXemIr(new URLSearchParams(location.search).get("xem") === "ir");
     const q = new URLSearchParams(location.search).get("cong") as Man | null;
     if (q && (q === "cong" || q in VAI)) setMan(q);
     else { const m = CONG_THEO_TEN_MIEN[location.hostname.toLowerCase()]; if (m) setMan(m); }
   }, []);
-  const di = useCallback((m: Man) => { setMan(m); setHoTro(false); try { history.replaceState(null, "", m === "cong" ? "/login" : `/login?cong=${m}`); } catch { /* bỏ qua */ } window.scrollTo(0, 0); }, []);
+  const di = useCallback((m: Man) => { setMan(m); setHoTro(false); setXemIr(false); try { history.replaceState(null, "", m === "cong" ? "/login" : `/login?cong=${m}`); } catch { /* bỏ qua */ } window.scrollTo(0, 0); }, []);
   // Bấm vào mảnh tĩnh (thẻ vai, logo, nút Hỗ trợ): bắt bằng một chỗ, đọc data-* có sẵn trong bản v3.2.
   const bam = (e: React.MouseEvent) => {
     const nutBay = (e.target as HTMLElement).closest("[data-hero-motion]") as HTMLElement | null;
@@ -148,10 +152,14 @@ export default function Login() {
           {man === "cong" ? <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: TRANG_MO_DAU }} />
             : <div data-role={vai!.role}><div className="v4-auth">
               <nav className="vtd-breadcrumb"><button type="button" className="v3-button v3-secondary cursor-interaction" data-go-role="">← Bốn cổng truy cập</button><span>{vai!.ten}</span></nav>
-              <main className="vtd-login">
+              {xemIr && man === "cd" ? <section className="v3-app" data-portal="co-dong"><main className="v3-main" style={{ maxWidth: 920, margin: "0 auto" }}>
+                <div className="v3-page-head"><div><div className="v3-eyebrow">VTD • Quan hệ nhà đầu tư · công khai</div><h1>Công bố thông tin</h1></div>
+                  <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => di("cd")}><span>Cổ đông đăng nhập</span></button></div>
+                <ThuVien coPhien={false} /></main></section>
+              : <main className="vtd-login">
                 <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: CAU_CHUYEN[vai!.role] }} />
                 {man === "noi" ? <NoiBo /> : <Ngoai key={man} man={man} />}
-              </main></div></div>}
+              </main>}</div></div>}
         </div>
       </div>
     </div>

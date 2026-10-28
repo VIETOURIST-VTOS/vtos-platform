@@ -585,6 +585,9 @@ MAN_HINH_API = {
     "/gop-y-lanh-dao": ("/api/v1/gop-y-lanh-dao",),
     "/khach-san-ota": ("/api/v1/khach-san-ota",),
     "/doi-soat-ota": ("/api/v1/doi-soat-ota",),
+    # CD-1 (28/10/2026) — IR – Pháp chế quản lý cổng cổ đông. Phía ngoài (/api/v1/cong/co-dong,
+    # /api/v1/cong/ir-cong-khai) không thuộc màn hình nào — cùng lẽ với CG-1.
+    "/ir-cong-co-dong": ("/api/v1/ir-cong-co-dong",),
     "/gop-tai-khoan": ("/api/v1/gop-tai-khoan",),
     # TC-81 - Bao chi, KOL & su kien (muc 2.2.2). HAI tien to, va da kiem ky truoc khi khai cai
     # thu hai: danh sach vai cua man hinh nay nam GON trong danh sach vai cua "/marketing", nen
@@ -968,6 +971,7 @@ MENU_ROLES = {
     # BASE_VIEW (Chủ tịch chọn 27/10/2026 «BKS đọc được, không trả lời»). Không vai nào khác.
     "/gop-y-lanh-dao": BASE_VIEW,
     "/doi-soat-ota": BASE_VIEW + ("ketoan",),   # KS-2: Kế toán nạp báo cáo OTA, Chủ tịch duyệt lô
+    "/ir-cong-co-dong": BASE_VIEW + ("ir_phapche",),   # CD-1: IR – Pháp chế đưa tài liệu, sự kiện, trả lời; Chủ tịch, TGĐ gỡ
     "/khach-san-ota": BASE_VIEW,     # KS-1: Chủ tịch nhập và bật; TGĐ, BKS, robot KS xem
     # TC-75 - gop tai khoan trung. HEP: khong co vai Kinh doanh nao. Doc bang cap trung thi HCNS
     # va Ke toan can (ho la nguoi phat hien ra trung), nhung nut gop thi chi cntt va Ban TGD -
