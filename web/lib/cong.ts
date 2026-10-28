@@ -2,6 +2,14 @@
    lib/api.ts không gửi phiên này lên cửa nội bộ nào, và máy chủ cũng không nhận nó ở đó (ký khoá khác). */
 export const KHOA_PHIEN_CONG = "vtd_cong_phien";
 
+/* CG-3 (Chủ tịch chốt 28/10/2026): ba tên miền cổng ngoài KHÓA CỨNG — không bao giờ mở VTOS ở đó. Phiên VTOS
+   lỡ lưu trên kh./dt./ir. (vd từng đăng nhập nội bộ ở tên miền ấy) bị bỏ qua và xóa; VTOS chỉ mở ở crm. */
+export const TEN_MIEN_CONG = ["kh.vietourist.vn", "dt.vietourist.vn", "ir.vietourist.vn"];
+export const VTOS_GOC = "https://crm.vietourist.vn";
+export function laTenMienCong(): boolean {
+  try { return TEN_MIEN_CONG.includes(location.hostname.toLowerCase()); } catch { return false; }
+}
+
 export function phienCong(): string { try { return localStorage.getItem(KHOA_PHIEN_CONG) || ""; } catch { return ""; } }
 export function luuPhienCong(p: string) { try { localStorage.setItem(KHOA_PHIEN_CONG, p); } catch { /* trình duyệt chặn lưu */ } }
 export function xoaPhienCong() { try { localStorage.removeItem(KHOA_PHIEN_CONG); } catch { /* bỏ qua */ } }
