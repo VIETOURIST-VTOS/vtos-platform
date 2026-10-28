@@ -20,7 +20,7 @@ from app.api.deps import require_roles
 from app.api.v1.cong_ngoai import tai_khoan_ngoai
 from app.db.session import get_db
 from app.models.attachments import Attachment
-from app.models.cong_co_dong import TaiLieuCongCoDong
+from app.models.cong_co_dong import TaiLieuCongCoDong, YeuCauIr
 from app.models.cong_ngoai import TaiKhoanNgoai
 from app.models.core import User
 from app.services import attachments as AT
@@ -251,3 +251,104 @@ def vt_dong(yid: int, data: LyDoIn, u: User = Depends(require_roles(*S.VAI_GHI))
     y = _goi(S.dong_ir, db, u, yid, data.ly_do)
     db.commit()
     return {"message": f"Đã đóng {y.ma}", **vt_ir(u, db)}
+
+
+# ================================================================ CD-2 · sổ cổ đông và hồ sơ sở hữu
+from app.services import so_co_dong as SC  # noqa: E402
+
+
+def _goi_so(f, *a, **k):
+    try:
+        return f(*a, **k)
+    except SC.LoiSo as ex:
+        raise HTTPException(ex.status, str(ex))
+
+
+@router.get("/so-huu")
+def so_huu(tk: TaiKhoanNgoai = Depends(_co_dong), db: Session = Depends(get_db)):
+    return SC.so_huu_cua(db, tk)
+
+
+@router.post("/xac-minh")
+async def xac_minh(noi_dung: str = Form(...), tep: UploadFile | None = File(None),
+                   tk: TaiKhoanNgoai = Depends(_co_dong), db: Session = Depends(get_db)):
+    data = await tep.read() if tep is not None else None
+    y = _goi_so(SC.gui_xac_minh, db, tk, noi_dung, (tep.filename if tep else "") or "", (tep.content_type if tep else "") or "", data)
+    db.commit()
+    return {"message": f"Đã gửi {y.ma} — IR – Pháp chế tiếp nhận. Theo dõi ở mục Liên hệ IR.", "ma": y.ma}
+
+
+@router_vtos.get("/so-co-dong")
+def vt_so(u: User = Depends(require_roles(*SC.VAI_XEM)), db: Session = Depends(get_db)):
+    return SC.quan_tri(db, u)
+
+
+@router_vtos.post("/so-co-dong/doc-thu")
+async def vt_so_doc_thu(tep: UploadFile = File(...), u: User = Depends(require_roles(*SC.VAI_NAP))):
+    return _goi_so(SC.doc_thu, u, tep.filename or "", await tep.read())
+
+
+@router_vtos.post("/so-co-dong")
+async def vt_so_gui(ngay_can_cu: date = Form(...), tep: UploadFile = File(...),
+                    u: User = Depends(require_roles(*SC.VAI_NAP)), db: Session = Depends(get_db)):
+    lo = _goi_so(SC.gui_duyet, db, u, ngay_can_cu, tep.filename or "", await tep.read())
+    db.commit()
+    return {"message": f"Đã gửi lô {lo.ma} ({lo.so_dong} dòng) — chờ Chủ tịch duyệt", **SC.quan_tri(db, u)}
+
+
+class XuLyLoIn(BaseModel):
+    hanh_dong: str
+    ly_do: str = ""
+
+
+@router_vtos.post("/so-co-dong/{lo_id}")
+def vt_so_xu_ly(lo_id: int, data: XuLyLoIn, u: User = Depends(require_roles(*SC.VAI_DUYET)), db: Session = Depends(get_db)):
+    if data.hanh_dong == "duyet":
+        lo = _goi_so(SC.duyet, db, u, lo_id)
+    elif data.hanh_dong == "tu_choi":
+        lo = _goi_so(SC.tu_choi, db, u, lo_id, data.ly_do)
+    else:
+        raise HTTPException(422, "Hành động không hợp lệ")
+    db.commit()
+    return {"message": f"Lô {lo.ma}: {SC.TRANG_THAI_LO_SCD[lo.trang_thai]}", **SC.quan_tri(db, u)}
+
+
+@router_vtos.get("/so-co-dong/{lo_id}/dong")
+def vt_so_dong(lo_id: int, q: str = "", u: User = Depends(require_roles(*SC.VAI_XEM)), db: Session = Depends(get_db)):
+    return {"dong": SC.dong_cua_lo(db, lo_id, q)}
+
+
+@router_vtos.get("/noi")
+def vt_noi(u: User = Depends(require_roles(*SC.VAI_XEM)), db: Session = Depends(get_db)):
+    return {**SC.ds_noi(db), "duoc_noi": u.role in SC.VAI_NAP}
+
+
+class NoiIn(BaseModel):
+    giay_to: str = ""
+    ly_do: str = ""
+
+
+@router_vtos.post("/noi/{tk_id}")
+def vt_noi_tk(tk_id: int, data: NoiIn, u: User = Depends(require_roles(*SC.VAI_NAP)), db: Session = Depends(get_db)):
+    _goi_so(SC.noi, db, u, tk_id, data.giay_to)
+    db.commit()
+    return {"message": "Đã nối tài khoản với danh sách sở hữu", **SC.ds_noi(db), "duoc_noi": True}
+
+
+@router_vtos.post("/noi/{tk_id}/go")
+def vt_go_noi(tk_id: int, data: NoiIn, u: User = Depends(require_roles(*SC.VAI_NAP)), db: Session = Depends(get_db)):
+    _goi_so(SC.go_noi, db, u, tk_id, data.ly_do)
+    db.commit()
+    return {"message": "Đã gỡ nối", **SC.ds_noi(db), "duoc_noi": True}
+
+
+@router_vtos.get("/ir/{yid}/tep")
+def vt_ir_tep(yid: int, u: User = Depends(require_roles(*S.VAI_XEM)), db: Session = Depends(get_db)):
+    y = db.get(YeuCauIr, yid)
+    a = db.get(Attachment, y.attachment_id) if y and y.attachment_id else None
+    if a is None:
+        raise HTTPException(404, "Yêu cầu này không có tệp")
+    try:
+        return _tep(AT.doc(db, a), a)
+    except Exception as ex:
+        raise HTTPException(503, str(ex))

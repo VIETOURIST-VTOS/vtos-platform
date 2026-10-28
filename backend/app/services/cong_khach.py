@@ -46,6 +46,16 @@ def la_khach(tk: TaiKhoanNgoai) -> None:
         raise LoiKhach("Tài khoản đã bị khoá")
 
 
+def la_khach_hoac_co_dong(tk: TaiKhoanNgoai) -> None:
+    """CD-2 (Chủ tịch duyệt 28/10/2026): ưu đãi cổ đông — cổ đông ĐÃ XÁC MINH xem tour, nhà hàng và gửi yêu cầu
+    theo đúng luồng của khách hàng. Đơn, điểm, hạng thành viên… vẫn chỉ của khách hàng."""
+    if tk.loai == "co_dong":
+        if tk.trang_thai != "hoat_dong":
+            raise LoiKhach("Tài khoản cổ đông chưa được IR xác minh")
+        return
+    la_khach(tk)
+
+
 def _so_dem(t: Tour) -> tuple[int, int]:
     n = t.days or ((t.end_date - t.start_date).days + 1 if t.start_date and t.end_date else 1)
     return n, max(n - 1, 0)
@@ -137,7 +147,7 @@ def tour(db: Session, tour_id: int) -> dict:
 def gui_yeu_cau(db: Session, tk: TaiKhoanNgoai, loai: str, tour_id: int | None, so_khach: int, dien_thoai: str,
                 ngay_mong_muon: date | None, ghi_chu: str, dong_y: bool, now: datetime | None = None,
                 nha_hang: dict | None = None) -> YeuCauKhach:
-    la_khach(tk)
+    la_khach_hoac_co_dong(tk)
     now = now or datetime.now()
     if loai not in LOAI_YEU_CAU:
         raise LoiKhach("Loại yêu cầu không hợp lệ")
@@ -179,7 +189,8 @@ def gui_yeu_cau(db: Session, tk: TaiKhoanNgoai, loai: str, tour_id: int | None, 
     from app.services.leads import upsert_lead
     lead, _moi = upsert_lead(db, "cong_khach", {"phone": sdt, "name": tk.ho_ten or "", "channel": KENH_LEAD,
                                                 "received_at": now.isoformat(), "interest": ten_tour[:200]})
-    dong = (f"[Cổng khách hàng {now:%d/%m %H:%M}] {LOAI_YEU_CAU[loai]}: {ten_tour} · {so_khach} khách"
+    nguon = "Cổng cổ đông" if tk.loai == "co_dong" else "Cổng khách hàng"
+    dong = (f"[{nguon} {now:%d/%m %H:%M}] {LOAI_YEU_CAU[loai]}: {ten_tour} · {so_khach} khách"
             + (f" · ngày mong muốn {ngay_mong_muon:%d/%m/%Y}" if ngay_mong_muon and loai != "nha_hang" else "")
             + (f" · tạm tính {them['tam_tinh']:,} đ".replace(",", ".") if them else "") + (f" · {ghi}" if ghi else ""))
     cu = (lead.note or "").strip()

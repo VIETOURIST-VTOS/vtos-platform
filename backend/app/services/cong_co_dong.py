@@ -398,6 +398,7 @@ def _ra_ir(y: YeuCauIr, tk: TaiKhoanNgoai | None = None) -> dict:
     d = {"ma": y.ma, "chu_de": y.chu_de, "chu_de_ten": CHU_DE_IR.get(y.chu_de, y.chu_de), "noi_dung": y.noi_dung,
          "trang_thai": y.trang_thai, "trang_thai_ten": TRANG_THAI_IR.get(y.trang_thai, y.trang_thai),
          "tra_loi": y.tra_loi, "tra_loi_luc": y.tra_loi_luc, "ly_do_dong": y.ly_do_dong, "luc": y.luc}
+    d["co_tep"] = y.attachment_id is not None
     if tk is not None:
         d.update({"id": y.id, "ho_ten": tk.ho_ten, "lien_he": tk.dien_thoai or tk.email,
                   "tra_loi_boi": y.tra_loi_boi})

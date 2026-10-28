@@ -9,7 +9,7 @@ import { Tag, errMsg } from "@/components/ui";
  *  · IR – Pháp chế đưa lên (PDF, nhóm, phạm vi); Chủ tịch, TGĐ, IR – Pháp chế gỡ ngay, có lý do.
  *  · Sự kiện: nháp → Thông báo (hiện trên cổng) → Hủy (có lý do, cổ đông đọc được).
  *  · Câu hỏi IR: trả lời phải tick «không chứa thông tin chưa công bố». */
-type Tab = "tl" | "sk" | "ir";
+type Tab = "tl" | "sk" | "ir" | "so" | "noi";
 const TT_TL: Record<string, string> = { hien: "ok", thay_the: "", go: "red" };
 const TT_SK: Record<string, string> = { nhap: "", cong_bo: "ok", huy: "red" };
 const TT_IR: Record<string, string> = { cho: "warn", da_tra_loi: "ok", dong: "" };
@@ -64,8 +64,8 @@ function Trang() {
     <h1>Cổng cổ đông</h1>
     <p className="muted">Quản lý những gì cổ đông thấy tại ir.vietourist.vn. Tài liệu chỉ lấy từ bản ghi công bố ĐÃ công bố ở màn IR – Pháp chế. Ưu đãi, cổ tức và hồ sơ sở hữu làm ở đợt sau.</p>
     <div className="tabs" style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0" }}>
-      {([["tl", "Tài liệu trên cổng"], ["sk", "Sự kiện"], ["ir", `Yêu cầu IR${ir?.so_cho ? ` (${ir.so_cho} chờ)` : ""}`]] as [Tab, string][]).map(([k, t]) =>
-        <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} style={{ margin: 0 }} onClick={() => { setTab(k); (k === "tl" ? taiTl : k === "sk" ? taiSk : taiIr)(); }}>{t}</button>)}
+      {([["tl", "Tài liệu trên cổng"], ["sk", "Sự kiện"], ["ir", `Yêu cầu IR${ir?.so_cho ? ` (${ir.so_cho} chờ)` : ""}`], ["so", "Sổ cổ đông"], ["noi", "Nối tài khoản"]] as [Tab, string][]).map(([k, t]) =>
+        <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} style={{ margin: 0 }} onClick={() => { setTab(k); if (k === "tl") taiTl(); else if (k === "sk") taiSk(); else if (k === "ir") taiIr(); }}>{t}</button>)}
     </div>
 
     {tab === "tl" && tl && <>
@@ -167,7 +167,8 @@ function Trang() {
           <tbody>{ir.yeu_cau.map((y: any) => <tr key={y.id}>
             <td className="mono">{y.ma}<div className="muted" style={{ fontSize: 12 }}>{fmtDT(y.luc)}</div></td>
             <td>{y.ho_ten || "—"}<div className="muted mono" style={{ fontSize: 12 }}>{y.lien_he}</div></td>
-            <td style={{ maxWidth: 320 }}><b>{y.chu_de_ten}</b><div style={{ whiteSpace: "pre-wrap" }}>{y.noi_dung}</div></td>
+            <td style={{ maxWidth: 320 }}><b>{y.chu_de_ten}</b><div style={{ whiteSpace: "pre-wrap" }}>{y.noi_dung}</div>
+              {y.co_tep && <button className="act grey" style={{ margin: "4px 0 0" }} onClick={() => taiTep(`/ir-cong-co-dong/ir/${y.id}/tep`, "giay-to").catch((e) => toast(errMsg(e), true))}>Giấy tờ kèm</button>}</td>
             <td><Tag cls={TT_IR[y.trang_thai] || ""}>{y.trang_thai_ten}</Tag></td>
             <td style={{ minWidth: 260 }}>{y.trang_thai === "cho" ? (ir.duoc_ghi ? <div style={{ display: "grid", gap: 6 }}>
               <textarea rows={3} placeholder="Trả lời — hoặc lý do đóng" value={traLoi[y.id] || ""} onChange={(e) => setTraLoi({ ...traLoi, [y.id]: e.target.value })} />
@@ -179,7 +180,106 @@ function Trang() {
               : <span className="muted">Chờ IR – Pháp chế</span>)
               : <div><div style={{ whiteSpace: "pre-wrap" }}>{y.tra_loi || y.ly_do_dong}</div><div className="muted" style={{ fontSize: 12 }}>{y.tra_loi_boi} · {fmtDT(y.tra_loi_luc)}</div></div>}</td></tr>)}</tbody></table>}
     </div>}
+    {tab === "so" && <SoCoDong />}
+    {tab === "noi" && <NoiTaiKhoan />}
   </>);
+}
+
+/** CD-2 · SỔ CỔ ĐÔNG — IR tải danh sách người sở hữu VSD, Chủ tịch duyệt; người tải không tự duyệt.
+ *  Không có ô gõ số cổ phần. Số giấy tờ là dữ liệu cá nhân — chỉ IR, Chủ tịch, TGĐ, Ban Kiểm soát xem. */
+function SoCoDong() {
+  const { toast } = useShell();
+  const [d, setD] = useState<any>(null);
+  const [ngayCc, setNgayCc] = useState("");
+  const [tep, setTep] = useState<File | null>(null);
+  const [thu, setThu] = useState<any>(null);
+  const [lyDo, setLyDo] = useState("");
+  const [xem, setXem] = useState<any>(null);
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const tai = useCallback(() => api<any>("/ir-cong-co-dong/so-co-dong").then(setD).catch((e) => toast(errMsg(e), true)), [toast]);
+  useEffect(() => { tai(); }, [tai]);
+  const docThu = async () => {
+    setBusy(true); setThu(null);
+    try { const f = new FormData(); f.append("tep", tep as File); setThu(await api<any>("/ir-cong-co-dong/so-co-dong/doc-thu", { method: "POST", body: f })); }
+    catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
+  };
+  const gui = async () => {
+    setBusy(true);
+    try { const f = new FormData(); f.append("tep", tep as File); f.append("ngay_can_cu", ngayCc);
+      const r = await api<any>("/ir-cong-co-dong/so-co-dong", { method: "POST", body: f }); toast(r.message); setD(r); setThu(null); setTep(null); }
+    catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
+  };
+  const xuLy = async (id: number, hanh_dong: string) => {
+    try { const r = await api<any>(`/ir-cong-co-dong/so-co-dong/${id}`, { method: "POST", json: { hanh_dong, ly_do: lyDo } }); toast(r.message); setD(r); setLyDo(""); }
+    catch (e) { toast(errMsg(e), true); }
+  };
+  const moLo = (lo: any, tim = "") => api<any>(`/ir-cong-co-dong/so-co-dong/${lo.id}/dong?q=${encodeURIComponent(tim)}`).then((r) => setXem({ ...lo, dong: r.dong })).catch((e) => toast(errMsg(e), true));
+  if (!d) return <p className="muted">Đang tải…</p>;
+  return (<>
+    {d.duoc_nap && <div className="panel" style={{ display: "grid", gap: 8 }}><h2 style={{ margin: 0 }}>Tải danh sách người sở hữu (VSD)</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 8 }}>
+        <label>Ngày chốt / ngày căn cứ<input type="date" value={ngayCc} onChange={(e) => setNgayCc(e.target.value)} /></label>
+        <label>Tệp Excel / CSV<input type="file" accept=".xlsx,.csv" onChange={(e) => { setTep(e.target.files?.[0] || null); setThu(null); }} /></label></div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="act grey" style={{ margin: 0 }} disabled={busy || !tep} onClick={docThu}>Đọc thử</button>
+        <button className="act teal" style={{ margin: 0 }} disabled={busy || !tep || !ngayCc || !thu} onClick={gui}>Gửi Chủ tịch duyệt</button></div>
+      {thu && <div className="muted">Đọc thử: <b>{thu.so_dong.toLocaleString("vi-VN")}</b> dòng · <b>{thu.so_nguoi.toLocaleString("vi-VN")}</b> người · tổng <b>{thu.tong_cp.toLocaleString("vi-VN")}</b> cổ phần · {thu.loi.length} dòng lỗi · cột nhận ra: {Object.values(thu.cot).join(", ")}. Đọc thử chưa ghi gì.
+        {thu.loi.length > 0 && <div>Lỗi: {thu.loi.slice(0, 10).map((x: any) => `dòng ${x.dong} (${x.loi})`).join("; ")}</div>}</div>}
+      <div className="muted">Cần ba cột: Họ tên · Số giấy tờ (ĐKSH / CCCD / ĐKKD) · Số lượng cổ phần. Cột Tài khoản lưu ký nếu có.</div></div>}
+    <div className="panel wrap"><h2>Các lô danh sách sở hữu</h2>
+      {!d.lo.length ? <p className="muted">Chưa có lô nào. Cổ đông chưa thấy số cổ phần cho đến khi có lô được duyệt.</p> :
+        <table><thead><tr><th>Lô</th><th>Ngày căn cứ</th><th className="num">Dòng</th><th className="num">Tổng CP</th><th>Trạng thái</th><th></th></tr></thead>
+          <tbody>{d.lo.map((l: any) => <tr key={l.id}>
+            <td className="mono">{l.ma}<div className="muted" style={{ fontSize: 12 }}>{l.nap_boi} · {fmtDT(l.nap_luc)}</div></td>
+            <td className="mono">{fmtD(l.ngay_can_cu)}</td><td className="num mono">{l.so_dong.toLocaleString("vi-VN")}</td>
+            <td className="num mono">{Number(l.tong_cp).toLocaleString("vi-VN")}</td>
+            <td><Tag cls={l.trang_thai === "da_duyet" ? "ok" : l.trang_thai === "tu_choi" ? "red" : "warn"}>{l.trang_thai_ten}</Tag>{l.dang_dung && <> <Tag cls="ok">đang dùng</Tag></>}
+              {l.ly_do && <div className="muted" style={{ fontSize: 12 }}>{l.ly_do}</div>}</td>
+            <td style={{ whiteSpace: "nowrap" }}><button className="act grey" style={{ margin: 0 }} onClick={() => moLo(l)}>Xem</button>
+              {d.duoc_duyet && l.trang_thai === "cho_duyet" && <>
+                <button className="act teal" style={{ margin: "0 0 0 6px" }} onClick={() => xuLy(l.id, "duyet")}>Duyệt</button>
+                <button className="act red" style={{ margin: "0 0 0 6px" }} disabled={!lyDo.trim()} onClick={() => xuLy(l.id, "tu_choi")}>Từ chối</button></>}</td></tr>)}</tbody></table>}
+      {d.duoc_duyet && d.lo.some((l: any) => l.trang_thai === "cho_duyet") && <input style={{ marginTop: 8 }} placeholder="Lý do từ chối (bắt buộc khi từ chối)" value={lyDo} onChange={(e) => setLyDo(e.target.value)} />}
+      <div className="muted">Người tải không tự duyệt. Lô duyệt mới nhất là danh sách đang dùng; lô cũ giữ để tra.</div></div>
+    {xem && <div className="panel wrap"><div style={{ display: "flex", gap: 8, alignItems: "center" }}><h2 style={{ margin: 0 }}>Lô {xem.ma} · {fmtD(xem.ngay_can_cu)}</h2>
+      <input placeholder="Tìm tên / số giấy tờ" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && moLo(xem, q)} style={{ maxWidth: 240, marginLeft: "auto" }} />
+      <button className="act grey" style={{ margin: 0 }} onClick={() => setXem(null)}>Đóng</button></div>
+      <table><thead><tr><th>Họ tên</th><th>Số giấy tờ</th><th>TK lưu ký</th><th className="num">Số CP</th></tr></thead>
+        <tbody>{xem.dong.map((r: any, i: number) => <tr key={i}><td>{r.ho_ten}</td><td className="mono">{r.giay_to}</td><td className="mono">{r.tk_luu_ky}</td><td className="num mono">{Number(r.so_cp).toLocaleString("vi-VN")}</td></tr>)}</tbody></table>
+      <div className="muted">Hiện tối đa 200 dòng — tìm theo tên hoặc số giấy tờ để thu hẹp.</div></div>}
+  </>);
+}
+
+/** CD-2 · NỐI TÀI KHOẢN — gợi ý khi số giấy tờ khớp đúng; IR bấm nối. Tên giống nhau không tự nối. */
+function NoiTaiKhoan() {
+  const { toast } = useShell();
+  const [d, setD] = useState<any>(null);
+  const [tay, setTay] = useState<Record<number, string>>({});
+  const tai = useCallback(() => api<any>("/ir-cong-co-dong/noi").then(setD).catch((e) => toast(errMsg(e), true)), [toast]);
+  useEffect(() => { tai(); }, [tai]);
+  const goi = async (path: string, json: any) => {
+    try { const r = await api<any>(path, { method: "POST", json }); toast(r.message); setD(r); } catch (e) { toast(errMsg(e), true); }
+  };
+  if (!d) return <p className="muted">Đang tải…</p>;
+  return (<div className="panel wrap"><h2>Tài khoản cổ đông</h2>
+    <p className="muted">{d.lo_hien_hanh ? `Đối chiếu với danh sách đang dùng: lô ${d.lo_hien_hanh.ma}, ngày căn cứ ${fmtD(d.lo_hien_hanh.ngay_can_cu)}.` : "Chưa có danh sách sở hữu nào được duyệt — tải ở tab Sổ cổ đông."}</p>
+    {!d.tai_khoan.length ? <p className="muted">Chưa có tài khoản cổ đông nào.</p> :
+      <table><thead><tr><th>Tài khoản</th><th>Giấy tờ khai</th><th>Trong danh sách</th><th></th></tr></thead>
+        <tbody>{d.tai_khoan.map((t: any) => <tr key={t.tai_khoan_id}>
+          <td>{t.ho_ten || "—"}<div className="muted mono" style={{ fontSize: 12 }}>{t.lien_he} · {t.trang_thai}</div></td>
+          <td className="mono">{t.giay_to_khai || "—"}</td>
+          <td>{t.da_noi ? (t.so_huu ? <><Tag cls="ok">đã nối</Tag> {t.so_huu.ho_ten} · {Number(t.so_huu.so_cp).toLocaleString("vi-VN")} CP</> : <><Tag cls="warn">đã nối · không có tên ở lô đang dùng</Tag></>)
+            : t.goi_y ? <>{t.goi_y.ho_ten} · {Number(t.goi_y.so_cp).toLocaleString("vi-VN")} CP <Tag cls="ok">khớp số giấy tờ</Tag></>
+            : <Tag cls="warn">Không tìm thấy — kiểm lại giấy tờ</Tag>}</td>
+          <td style={{ whiteSpace: "nowrap" }}>{d.duoc_noi && (t.da_noi
+            ? <><input placeholder="Lý do gỡ" value={tay[t.tai_khoan_id] || ""} onChange={(e) => setTay({ ...tay, [t.tai_khoan_id]: e.target.value })} style={{ width: 140 }} />
+              <button className="act red" style={{ margin: "0 0 0 6px" }} disabled={!(tay[t.tai_khoan_id] || "").trim()} onClick={() => goi(`/ir-cong-co-dong/noi/${t.tai_khoan_id}/go`, { ly_do: tay[t.tai_khoan_id] })}>Gỡ nối</button></>
+            : t.goi_y ? <button className="act teal" style={{ margin: 0 }} onClick={() => goi(`/ir-cong-co-dong/noi/${t.tai_khoan_id}`, { giay_to: t.giay_to_khai })}>Nối</button>
+            : <><input placeholder="Số giấy tờ trong danh sách" value={tay[t.tai_khoan_id] || ""} onChange={(e) => setTay({ ...tay, [t.tai_khoan_id]: e.target.value })} style={{ width: 180 }} />
+              <button className="act grey" style={{ margin: "0 0 0 6px" }} disabled={!(tay[t.tai_khoan_id] || "").trim()} onClick={() => goi(`/ir-cong-co-dong/noi/${t.tai_khoan_id}`, { giay_to: tay[t.tai_khoan_id] })}>Nối tay</button></>)}</td></tr>)}</tbody></table>}
+    <div className="muted">Chỉ gợi ý khi số giấy tờ khớp đúng sau khi bỏ dấu cách / chấm / gạch. Nối tay vẫn phải đúng một số giấy tờ có trong danh sách. Gỡ nối phải ghi lý do.</div>
+  </div>);
 }
 
 export default function Page() { return <Shell><Trang /></Shell>; }

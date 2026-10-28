@@ -13,6 +13,15 @@ from app.services import cong_ngoai as C
 router = APIRouter(prefix="/api/v1/cong/khach", tags=["cong-khach-hang"])
 
 
+def _khach_cd(tk: TaiKhoanNgoai) -> TaiKhoanNgoai:
+    """CD-2: tour, nhà hàng, gửi yêu cầu — mở cho cổ đông đã xác minh (ưu đãi cổ đông)."""
+    try:
+        K.la_khach_hoac_co_dong(tk)
+    except K.LoiKhach as ex:
+        raise HTTPException(403, str(ex))
+    return tk
+
+
 def _khach(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai)) -> TaiKhoanNgoai:
     try:
         K.la_khach(tk)
@@ -34,13 +43,13 @@ def trang_chu(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depend
 @router.get("/tour")
 def ds_tour(q: str = "", tu_ngay: date | None = None, noi: str = "", ngan_sach: int = 0, nhom: str = "",
             tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
-    _khach(tk)
+    _khach_cd(tk)
     return {"tour": K.tours(db, q, tu_ngay, noi, ngan_sach, nhom), "noi_khoi_hanh": K.noi_khoi_hanh(db)}
 
 
 @router.get("/tour/{tour_id}")
 def mot_tour(tour_id: int, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
-    _khach(tk)
+    _khach_cd(tk)
     try:
         return K.tour(db, tour_id)
     except K.LoiKhach as ex:
@@ -68,7 +77,7 @@ class YeuCauIn(BaseModel):
 
 @router.post("/yeu-cau")
 def gui_yeu_cau(data: YeuCauIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
-    _khach(tk)
+    _khach_cd(tk)
     try:
         yc = K.gui_yeu_cau(db, tk, data.loai, data.tour_id, data.so_khach, data.dien_thoai, data.ngay_mong_muon,
                            data.ghi_chu, data.dong_y, nha_hang=data.nha_hang.model_dump() if data.nha_hang else None)
@@ -120,14 +129,14 @@ def sua_ho_so(data: HoSoKhachIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), d
 @router.get("/nha-hang")
 def ds_nha_hang(tinh: str = "", am_thuc: str = "", gia_toi_da: int = 0,
                 tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
-    _khach(tk)
+    _khach_cd(tk)
     from app.services import nha_hang as NH
     return NH.danh_sach_cong(db, tinh, am_thuc, gia_toi_da)
 
 
 @router.get("/nha-hang/{nid}")
 def mot_nha_hang(nid: int, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
-    _khach(tk)
+    _khach_cd(tk)
     from app.services import nha_hang as NH
     try:
         return NH.mot_nha_hang_cong(db, nid)[1]
