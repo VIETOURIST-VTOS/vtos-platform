@@ -41,8 +41,8 @@ THANH_PHO = {
     "Kon Tum": ("tay_nguyen", ("kontum",)), "Đà Lạt": ("tay_nguyen", ("dalat", "lam dong")),
     "TP. Hồ Chí Minh": ("nam", ("ho chi minh city", "ho chi minh", "saigon", "sai gon", "hcmc", "tp hcm", "hcm")),
     "Vũng Tàu": ("nam", ("vung tau", "ba ria vung tau")), "Phan Thiết – Mũi Né": ("nam", ("phan thiet", "mui ne", "binh thuan")),
-    "Cần Thơ": ("nam", ("cantho",)), "Châu Đốc": ("nam", ("chau doc", "an giang")), "Phú Quốc": ("nam", ("phu quoc island", "phuquoc")),
-    "Bến Tre": ("nam", ()), "Cà Mau": ("nam", ()), "Côn Đảo": ("nam", ("con dao", "con son"))}
+    "Cần Thơ": ("nam", ("cantho", "mekong delta", "mekong", "mien tay", "dong bang song cuu long")), "Châu Đốc": ("nam", ("chau doc", "an giang")), "Phú Quốc": ("nam", ("phu quoc island", "phuquoc")),
+    "Bến Tre": ("nam", ()), "Trà Vinh": ("nam", ("travinh",)), "Cà Mau": ("nam", ()), "Côn Đảo": ("nam", ("con dao", "con son"))}
 MIEN = {"bac": "Miền Bắc", "trung": "Miền Trung", "tay_nguyen": "Tây Nguyên", "nam": "Miền Nam"}
 
 TRUONG_NH = ("ten", "tinh_thanh", "khu_vuc", "am_thuc", "gio_phuc_vu", "tien_ich", "mo_ta")
@@ -390,8 +390,18 @@ def _bang_tp() -> dict:
     return b
 
 
+# Tên chỉ phân biệt được khi CÒN DẤU (bỏ dấu là trùng nơi khác): so trước khi bỏ dấu.
+CON_DAU = {"thạnh xuân": "TP. Hồ Chí Minh"}      # phường Thạnh Xuân, Q.12 — khác quận Thanh Xuân, Hà Nội
+
+
 def tinh_tu_nguon(dia_danh: str) -> str:
-    """Quy địa danh nguồn về thành phố ẩm thực (THANH_PHO). Không khớp thì giữ nguyên để Điều hành sửa tay."""
+    """Quy địa danh nguồn về thành phố ẩm thực (THANH_PHO). Không khớp thì giữ nguyên để Điều hành sửa tay.
+    «Mekong Delta» (vùng) quy về Cần Thơ — thủ phủ miền Tây (Chủ tịch 29/10/2026: nhận hết nhà hàng VN trên nguồn)."""
+    import unicodedata
+    tho = " ".join(unicodedata.normalize("NFC", str(dia_danh or "")).lower().replace(",", " ").split())
+    for a, b in CON_DAU.items():
+        if tho == a or tho.startswith(a + " "):
+            return b
     k = " ".join(_chuan(dia_danh).replace(".", " ").replace(",", " ").replace("-", " ").split())
     k = " ".join(w for w in k.split() if w not in ("vietnam", "city", "province", "tp", "tinh", "thanh", "pho")) or k
     k = k.replace("viet nam", "").strip()
