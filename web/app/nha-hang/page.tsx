@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, getToken, taiTep } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import AlbumNhaHang, { AnhChoDuyet } from "@/components/nha-hang/AlbumNhaHang";
+import { MonAnNhaHang, ThucDonNhaHangTab, NoiDungChoDuyet } from "@/components/nha-hang/MonThucDon";
 
 /** KH-2 · NHÀ HÀNG (CỔNG KHÁCH) — Chủ tịch duyệt bản xem thử 26/10/2026.
  *  Điều hành nhập nhà hàng + thực đơn (chỉ GIÁ BÁN). TP Điều hành bật «Hiện trên cổng» (DT-2b, Chủ tịch 28/10/2026);
@@ -26,7 +27,7 @@ async function guiTep(path: string, fd: FormData) {
   return d;
 }
 // AT-2a: máy chủ cũ (chưa có album) không trả anh_ht — màn vẫn phải mở được.
-const HT0 = { da_duyet: 0, cho_duyet: 0, nhap: 0, an: 0, co_bia: false };
+const HT0 = { da_duyet: 0, cho_duyet: 0, nhap: 0, an: 0, co_bia: false, mon: 0, td: 0, nd_cho: 0 };
 const TD_TRONG = { ten: "", loai: "set", gia_nguoi_lon: "", gia_tre_em: "", so_khach_toi_thieu: 1, mo_ta: "", dieu_kien: "", dieu_kien_huy: "", tu_ngay: "", den_ngay: "", dang_ban: true };
 
 function Trang() {
@@ -50,7 +51,7 @@ function Trang() {
   const [f, setF] = useState<any>(NH_TRONG);
   const [td, setTd] = useState<any>(null);         // {id?, ...} gói đang sửa
   const [busy, setBusy] = useState(false);
-  const [tabNh, setTabNh] = useState<"album" | "td" | "gt" | "hd" | "tt">("album");   // AT-2a: hồ sơ nội dung theo tab
+  const [tabNh, setTabNh] = useState<"album" | "mon" | "tdnh" | "td" | "gt" | "hd" | "tt">("album");   // AT-2a: hồ sơ nội dung theo tab
   const load = useCallback(() => { api("/nha-hang").then(setX).catch((e) => toast(errMsg(e), true)); }, [toast]);
   useEffect(() => { load(); }, [load]);
   const goi = async (path: string, json: any) => {
@@ -95,7 +96,7 @@ function Trang() {
   if (!x) return <p className="muted">Đang tải…</p>;
   const k = (s: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase();
   // AT-2a: lọc theo mức hoàn thiện ảnh
-  const LOC_ANH: Record<string, (n: any) => boolean> = { thieu: (n) => !(n.anh_ht || HT0).da_duyet, bia: (n) => !(n.anh_ht || HT0).co_bia, cho: (n) => (n.anh_ht || HT0).cho_duyet > 0 };
+  const LOC_ANH: Record<string, (n: any) => boolean> = { thieu: (n) => !(n.anh_ht || HT0).da_duyet, bia: (n) => !(n.anh_ht || HT0).co_bia, cho: (n) => (n.anh_ht || HT0).cho_duyet + ((n.anh_ht || HT0).nd_cho ?? 0) > 0 };
   const loc = x.nha_hang.filter((n: any) => (!locAnh || LOC_ANH[locAnh](n)) && (!locTinh || n.tinh_thanh === locTinh) && (!tim || k(`${n.ten} ${n.tinh_thanh} ${n.dia_danh_nguon} ${n.mon_noi_bat} ${n.ma}`).includes(k(tim))));
   const cacTinh = Array.from(new Set(x.nha_hang.map((n: any) => n.tinh_thanh).filter(Boolean))).sort() as string[];
   const dang = sua && sua !== "moi" ? x.nha_hang.find((n: any) => n.id === sua) : null;
@@ -114,8 +115,8 @@ function Trang() {
     <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
       <button className={`act ${tab === "nh" ? "teal" : "grey"}`} onClick={() => setTab("nh")}>Nhà hàng</button>
       <button className={`act ${tab === "nd" ? "teal" : "grey"}`} onClick={() => setTab("nd")}>Nội dung ẩm thực</button>
-      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Ảnh chờ duyệt ({x.so_anh_cho_duyet ?? 0})</button></div>
-    {tab === "cd" && <AnhChoDuyet toast={toast} onDoi={load} />}
+      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Chờ duyệt ({x.so_anh_cho_duyet ?? 0})</button></div>
+    {tab === "cd" && <><AnhChoDuyet toast={toast} onDoi={load} /><NoiDungChoDuyet toast={toast} onDoi={load} /></>}
 
     {tab === "nd" && <section className="panel">
       <h2>Nội dung trang «Hương vị Việt Nam»</h2>
@@ -191,7 +192,7 @@ function Trang() {
       <select aria-label="Lọc theo ảnh" value={locAnh} onChange={(e) => setLocAnh(e.target.value)}><option value="">Ảnh: tất cả</option>
         <option value="thieu">Thiếu ảnh ({x.nha_hang.filter(LOC_ANH.thieu).length})</option>
         <option value="bia">Chưa có ảnh bìa ({x.nha_hang.filter(LOC_ANH.bia).length})</option>
-        <option value="cho">Có ảnh chờ duyệt ({x.nha_hang.filter(LOC_ANH.cho).length})</option></select>
+        <option value="cho">Có ảnh / món / thực đơn chờ duyệt ({x.nha_hang.filter(LOC_ANH.cho).length})</option></select>
       {bat && chon.length > 0 && <>
         <button className="act teal" disabled={busy} onClick={async () => { const r = await goi("/nha-hang/hien-hang-loat", { ids: chon, bat: true }); if (r) setChon([]); }}>Bật hiện {chon.length} nơi</button>
         <button className="act grey" disabled={busy} onClick={async () => { const r = await goi("/nha-hang/hien-hang-loat", { ids: chon, bat: false }); if (r) setChon([]); }}>Tắt {chon.length} nơi</button></>}
@@ -205,7 +206,7 @@ function Trang() {
         <td>{[n.tinh_thanh, n.khu_vuc].filter(Boolean).join(" · ")}{n.dia_danh_nguon && n.dia_danh_nguon !== n.tinh_thanh && <div className="muted">nguồn: {n.dia_danh_nguon}</div>}</td><td>{n.am_thuc}</td>
         <td>{n.so_dang_ban}{n.so_dang_ban ? ` (từ ${d(Math.min(...n.thuc_don.filter((t: any) => t.dang_ban).map((t: any) => t.gia_nguoi_lon)))})` : ""}</td>
         <td>{(n.anh_ht || HT0).da_duyet ? <Tag cls="ok">{(n.anh_ht || HT0).da_duyet} đã duyệt</Tag> : <Tag cls="warn">Thiếu ảnh</Tag>}
-          {(n.anh_ht || HT0).cho_duyet > 0 && <div className="muted">{(n.anh_ht || HT0).cho_duyet} chờ duyệt</div>}<div className="muted">Bìa: {(n.anh_ht || HT0).co_bia ? "✔" : "—"}</div></td>
+          {(n.anh_ht || HT0).cho_duyet > 0 && <div className="muted">{(n.anh_ht || HT0).cho_duyet} chờ duyệt</div>}<div className="muted">Bìa: {(n.anh_ht || HT0).co_bia ? "✔" : "—"} · {(n.anh_ht || HT0).mon ?? 0} món · TĐ {(n.anh_ht || HT0).td ? "✔" : "—"}</div></td>
         <td>{n.ngung ? <Tag cls="red">Ngừng hợp tác</Tag> : n.hien_cong ? <><Tag cls="ok">Đang hiện</Tag><div className="muted">{n.hien_boi}</div></>
           : <><Tag cls="warn">Chưa hiện</Tag>{n.tat_ly_do && <div className="muted">{n.tat_ly_do}</div>}</>}</td>
         <td>{n.mo_dat ? <Tag cls="ok">Đang mở</Tag> : <><Tag>Chưa mở</Tag><div className="muted">{n.dieu_kien.filter((c: any) => c.ok).length}/5 điều kiện</div></>}</td>
@@ -223,11 +224,13 @@ function Trang() {
           <button className="act grey" onClick={() => setSua(null)}>Đóng</button></div>
         <div className="panel" style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", margin: "10px 0" }}>
           <span><b>{(dang.anh_ht || HT0).da_duyet + (dang.anh_ht || HT0).cho_duyet + (dang.anh_ht || HT0).nhap + (dang.anh_ht || HT0).an}</b> ảnh / 60 · {(dang.anh_ht || HT0).da_duyet} đã duyệt</span>
-          <span><b>{dang.so_dang_ban}</b> gói đang bán</span>
+          <span><b>{(dang.anh_ht || HT0).mon ?? 0}</b> món đã duyệt</span>
+          <span>Thực đơn: <b>{(dang.anh_ht || HT0).td ? "đã có" : "chưa có"}</b></span>
+          <span><b>{dang.so_dang_ban}</b> gói đặt bàn đang bán</span>
           <span>Hợp đồng: <b>{dang.hop_dong.some((h: any) => h.con_dung) ? "đã ghi nhận" : "chưa xác nhận"}</b></span>
           <span style={{ flex: 1 }} />{dang.mo_dat ? <Tag cls="ok">Đang mở đặt bàn</Tag> : <Tag cls="warn">Chưa mở đặt bàn · {dang.dieu_kien.filter((c: any) => c.ok).length}/5</Tag>}</div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--line, #2a3b4d)", marginBottom: 10 }}>
-          {([["album", "Album ảnh"], ["td", "Thực đơn / gói"], ["gt", "Giới thiệu"], ["hd", "Hợp đồng & đặt bàn"], ["tt", "Thông tin"]] as const).map(([k, t]) =>
+          {([["album", "Album ảnh"], ["mon", "Món ăn"], ["tdnh", "Thực đơn"], ["td", "Gói đặt bàn"], ["gt", "Giới thiệu"], ["hd", "Hợp đồng & đặt bàn"], ["tt", "Thông tin"]] as const).map(([k, t]) =>
             <button key={k} className={`act ${tabNh === k ? "teal" : "grey"}`} onClick={() => setTabNh(k)}>{t}</button>)}</div>
       </> : <h2>Thêm nhà hàng</h2>}
       {(!dang || tabNh === "tt") && <>
@@ -246,8 +249,11 @@ function Trang() {
 
       {dang && <>
         {tabNh === "album" && <AlbumNhaHang nid={dang.id} toast={toast} onDoi={load} />}
+        {tabNh === "mon" && <MonAnNhaHang nid={dang.id} toast={toast} onDoi={load} />}
+        {tabNh === "tdnh" && <ThucDonNhaHangTab nid={dang.id} toast={toast} onDoi={load} />}
         {tabNh === "td" && <>
-        <h3 style={{ marginTop: 14 }}>Thực đơn / gói</h3>
+        <h3 style={{ marginTop: 14 }}>Gói đặt bàn qua VTD</h3>
+        <p className="muted">Giá BÁN cho khách đặt qua Vietourist. Khác thực đơn nhà hàng (tab «Thực đơn», chỉ để tham khảo).</p>
         <div className="panel wrap"><table><thead><tr><th>Gói</th><th>Loại</th><th>Giá người lớn</th><th>Giá trẻ em</th><th>Áp dụng</th><th>Điều kiện / hủy</th><th>Đang bán</th><th></th></tr></thead>
           <tbody>{dang.thuc_don.map((g: any) => <tr key={g.id}><td><b>{g.ten}</b>{g.so_khach_toi_thieu > 1 && <div className="muted">tối thiểu {g.so_khach_toi_thieu} khách</div>}</td>
             <td>{g.loai_ten}</td><td>{d(g.gia_nguoi_lon)}</td><td>{d(g.gia_tre_em)}</td>

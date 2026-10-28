@@ -10,4 +10,5 @@ bcrypt==4.2.1
 anthropic>=0.40
 openpyxl==3.1.5
 Pillow==11.3.0          # AT-2a: bản hiển thị nhẹ cho album ảnh nhà hàng (giữ bản gốc)
+pypdfium2==4.30.0       # AT-2b: tách trang thực đơn PDF thành ảnh để khách lật
 boto3==1.35.99          # kho đối tượng S3/Cloudflare R2 cho tài liệu hồ sơ Visa

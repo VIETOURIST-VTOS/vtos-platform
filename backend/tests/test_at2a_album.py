@@ -189,7 +189,8 @@ def test_hoan_thien_trong_danh_sach(db):
     N.gui_duyet(db, _u(db, "dh"), nh.id)
     N.dat_bia(db, _u(db, "dh"), p)
     ds = {x["ten"]: x["anh_ht"] for x in N.danh_sach_vtos(db)["nha_hang"]}
-    assert ds["Phở Hòa"] == {"da_duyet": 1, "cho_duyet": 1, "nhap": 0, "an": 0, "co_bia": True}
+    assert {k: ds["Phở Hòa"][k] for k in ("da_duyet", "cho_duyet", "nhap", "an", "co_bia")} == \
+        {"da_duyet": 1, "cho_duyet": 1, "nhap": 0, "an": 0, "co_bia": True}
     assert ds["Bún Chả"]["da_duyet"] == 0 and N.danh_sach_vtos(db)["so_anh_cho_duyet"] == 1
 
 

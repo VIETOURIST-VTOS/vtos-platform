@@ -385,3 +385,135 @@ def tep_album(pid: int, co: str, u: User = Depends(require_roles(*N.VAI_XEM)), d
     except N.LoiNhaHang as ex:
         raise HTTPException(404, str(ex))
     return Response(content=data, media_type=a.kieu_noi_dung or "image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
+# ══ AT-2b · món ăn và thực đơn ═══════════════════════════════════════════════════════════════════
+@router.get("/{nid:int}/mon")
+def ds_mon(nid: int, u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        return N.ds_mon(db, u, nid)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+class MonIn(BaseModel):
+    ten: str
+    ten_khac: str = ""
+    nhom: str = "mon_chinh"
+    mo_ta: str = ""
+    di_ung: list[str] = []
+    cay: bool = False
+    chay: bool = False
+    anh_id: int | None = None
+
+
+@router.post("/{nid:int}/mon")
+def them_mon(nid: int, data: MonIn, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        x = N.luu_mon(db, u, nid, data.model_dump())
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"id": x.id, "message": f"Đã thêm món {x.ten} (Nháp)"}
+
+
+@router.post("/{nid:int}/mon/{mid:int}")
+def sua_mon(nid: int, mid: int, data: MonIn, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        x = N.luu_mon(db, u, nid, data.model_dump(), mid)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"id": x.id, "trang_thai": x.trang_thai, "message": "Đã lưu món" + (" — về «Chờ duyệt»" if x.trang_thai == "cho_duyet" else "")}
+
+
+class BatMonIn(BaseModel):
+    bat: bool
+
+
+@router.post("/mon/{mid:int}/noi-bat")
+def mon_noi_bat(mid: int, data: BatMonIn, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        x = N.mon_noi_bat(db, u, mid, data.bat)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"message": f"{x.ten}: " + ("gắn ★ nổi bật" if x.noi_bat else "bỏ ★")}
+
+
+@router.post("/mon/{mid:int}/an")
+def an_mon(mid: int, data: AnIn, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        x = N.an_mon(db, u, mid, data.an)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"message": f"{x.ten}: " + ("đã ẩn" if x.trang_thai == "an" else "bỏ ẩn — về «Nháp»")}
+
+
+@router.post("/{nid:int}/mon/gui-duyet")
+def gui_duyet_mon(nid: int, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        n = N.gui_duyet_mon(db, u, nid)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"so": n, "message": f"Đã gửi duyệt {n} món"}
+
+
+@router.post("/mon/duyet")
+def duyet_mon(data: DuyetAnhIn, u: User = Depends(require_roles(*N.VAI_DUYET_ANH)), db: Session = Depends(get_db)):
+    try:
+        r = N.duyet_mon(db, u, data.ids, data.duyet, data.ly_do)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {**r, "message": f"Đã {'duyệt' if data.duyet else 'trả lại'} {r['da_doi']} món" + (f" · bỏ qua {len(r['bo_qua'])}" if r["bo_qua"] else "")}
+
+
+@router.get("/{nid:int}/thuc-don-nh")
+def ds_thuc_don(nid: int, u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        return N.ds_thuc_don(db, u, nid)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+@router.post("/{nid:int}/thuc-don-nh")
+async def tai_thuc_don(nid: int, tep: list[UploadFile] = File(...), loai: str = Form(""), hieu_luc_tu: str = Form(""),
+                       can_cu: str = Form(""), u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    if len(tep) > N.TD_TOI_DA_TRANG:
+        raise HTTPException(400, f"Tối đa {N.TD_TOI_DA_TRANG} tệp mỗi bản")
+    ds = [(f.filename or "trang", await _doc(f)) for f in tep]
+    try:
+        b = N.tai_thuc_don(db, u, nid, loai, ds, hieu_luc_tu or None, can_cu)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    except ValueError:
+        raise HTTPException(400, "Ngày hiệu lực không hợp lệ")
+    return {"id": b.id, "message": f"Đã tải {N._ten_ban(b.so)} ({b.so_trang} trang) — chờ TP Điều hành duyệt"}
+
+
+class DuyetTdIn(BaseModel):
+    duyet: bool
+    ly_do: str = ""
+
+
+@router.post("/thuc-don-nh/{bid:int}/duyet")
+def duyet_thuc_don(bid: int, data: DuyetTdIn, u: User = Depends(require_roles(*N.VAI_DUYET_ANH)), db: Session = Depends(get_db)):
+    try:
+        b = N.duyet_thuc_don(db, u, bid, data.duyet, data.ly_do)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"message": f"{N._ten_ban(b.so)}: " + ("đã duyệt" if b.trang_thai == "duyet" else "đã trả lại")}
+
+
+@router.get("/thuc-don/trang/{tid:int}/{co}")
+def tep_trang(tid: int, co: str, u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        data, a = N.tep_trang(db, u, tid, co)
+    except N.LoiNhaHang as ex:
+        raise HTTPException(404, str(ex))
+    return Response(content=data, media_type=a.kieu_noi_dung or "image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
+@router.get("/noi-dung-cho-duyet")
+def noi_dung_cho_duyet(u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        return N.cho_duyet_noi_dung(db, u)
+    except N.LoiNhaHang as ex:
+        _loi(ex)

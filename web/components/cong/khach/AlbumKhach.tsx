@@ -9,13 +9,22 @@ type A = { id: number; nhom: string; nhom_ten: string; chu_thich: string; alt: s
 
 /** Bố cục theo bản xem thử Điều hành 29/10/2026 («Khách hàng xem»): đầu trang (tên, nơi, «Xem album»), khảm 5 ảnh,
  *  rồi các tab Album ảnh / Giới thiệu. Không in số liệu nội bộ (hợp đồng, số ảnh trên hạn mức) ra cho khách. */
-export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu, nhan }:
-  { album?: A[]; ten: string; dong2?: string; coTab?: boolean; gioiThieu?: ReactNode; nhan?: ReactNode }) {
+export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu, nhan, mon, thucDon }:
+  { album?: A[]; ten: string; dong2?: string; coTab?: boolean; gioiThieu?: ReactNode; nhan?: ReactNode; mon?: any[]; thucDon?: any[] }) {
   const ds = album || [];
   const [mo, setMo] = useState(false);
   const [nhom, setNhom] = useState("");          // nhóm trong hộp album
   const [nhomTr, setNhomTr] = useState("");      // nhóm ở tab Album ảnh trên trang
-  const [tab, setTab] = useState<"album" | "gt">(ds.length ? "album" : "gt");
+  const mons = mon || [];
+  const tds = thucDon || [];
+  const [tab, setTab] = useState<"album" | "mon" | "td" | "gt">(ds.length ? "album" : mons.length ? "mon" : tds.length ? "td" : "gt");
+  const [nhomMon, setNhomMon] = useState("");
+  const [loaiTd, setLoaiTd] = useState(tds[0]?.loai || "");
+  const [trang, setTrang] = useState(0);
+  const td = tds.find((t) => t.loai === loaiTd) || tds[0];
+  const soTrang = td?.trang?.length || 0;
+  const tr = soTrang ? td.trang[Math.min(trang, soTrang - 1)] : null;
+  const nhomMons = Array.from(new Map(mons.map((m) => [m.nhom, m.nhom_ten])).entries());
   const [i, setI] = useState<number | null>(null);
   const cham = useRef<number | null>(null);
   const loc = ds.filter((x) => !nhom || x.nhom === nhom);
@@ -52,6 +61,8 @@ export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu
     {coTab && <>
       <div className="ab-tab-trang" role="tablist" aria-label="Nội dung nhà hàng">
         {ds.length > 0 && <button type="button" role="tab" aria-selected={tab === "album"} className="cursor-interaction" onClick={() => setTab("album")}>Album ảnh</button>}
+        {mons.length > 0 && <button type="button" role="tab" aria-selected={tab === "mon"} className="cursor-interaction" onClick={() => setTab("mon")}>Món ăn</button>}
+        {tds.length > 0 && <button type="button" role="tab" aria-selected={tab === "td"} className="cursor-interaction" onClick={() => setTab("td")}>Thực đơn</button>}
         <button type="button" role="tab" aria-selected={tab === "gt"} className="cursor-interaction" onClick={() => setTab("gt")}>Giới thiệu</button></div>
       {tab === "album" && ds.length > 0 && <section className="ab-muc">
         <h3>Không gian &amp; hương vị</h3><div className="ab-phu">Khám phá không gian và những món ăn gợi ý.</div>
@@ -61,6 +72,32 @@ export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu
         <div className="ab-the-luoi">{locTr.map((a, k) => <button key={a.id} type="button" className="ab-the cursor-interaction" onClick={() => moAlbum(k, nhomTr)} aria-label={`Xem ảnh lớn: ${a.alt || a.nhom_ten}`}>
           <span className="ab-the-anh"><img src={a.hien} alt={a.alt || a.nhom_ten} loading="lazy" />{a.id === bia.id && <span className="ab-nhan">Ảnh bìa</span>}</span>
           <b>{a.chu_thich || a.nhom_ten}</b><small>{a.nhom_ten}{a.credit ? ` · ${a.credit}` : ""}</small></button>)}</div>
+      </section>}
+      {tab === "mon" && mons.length > 0 && <section className="ab-muc">
+        <h3>Món nên thử</h3><div className="ab-phu">Ảnh và thành phần do nhà hàng cung cấp{tds.length ? ", giá xem ở tab Thực đơn" : ""}.</div>
+        {nhomMons.length > 1 && <div className="ab-tabs" role="group" aria-label="Nhóm món">
+          <button type="button" className="ab-tab cursor-interaction" aria-pressed={!nhomMon} onClick={() => setNhomMon("")}>Tất cả {mons.length}</button>
+          {nhomMons.map(([k, t]) => <button key={k} type="button" className="ab-tab cursor-interaction" aria-pressed={nhomMon === k} onClick={() => setNhomMon(k)}>{t} {mons.filter((m) => m.nhom === k).length}</button>)}</div>}
+        <div className="ab-mon-luoi">{mons.filter((m) => !nhomMon || m.nhom === nhomMon).map((m) => <article key={m.id} className="ab-mon">
+          {m.anh_nho ? <img src={m.anh_nho} alt={m.ten} loading="lazy" /> : <div className="ab-mon-trong" aria-hidden="true">{m.ten}</div>}
+          <div className="ab-mon-chu"><small className="ab-kicker">{(m.nhom_ten || "").toUpperCase()}</small><b>{m.ten}</b>{m.ten_khac && <small className="ab-phu">{m.ten_khac}</small>}
+            {m.mo_ta && <p>{m.mo_ta}</p>}
+            {(m.di_ung_ten.length > 0 || m.cay || m.chay) && <small className="ab-phu">{[m.cay ? "Cay" : "", m.chay ? "Món chay" : "", m.di_ung_ten.length ? `Có: ${m.di_ung_ten.join(", ").toLowerCase()}` : ""].filter(Boolean).join(" · ")}</small>}
+            {tds.length > 0 && <button type="button" className="ab-lien cursor-interaction" onClick={() => setTab("td")}>Xem giá trong thực đơn</button>}</div></article>)}</div>
+        <small className="ab-phu">Bị dị ứng thực phẩm? Hỏi lại nhà hàng trước khi gọi món — thông tin thành phần chỉ để tham khảo.</small>
+      </section>}
+      {tab === "td" && td && <section className="ab-muc">
+        <h3>Thực đơn nhà hàng</h3><div className="ab-phu">Bản do nhà hàng gửi · {td.ban} · hiệu lực từ {td.hieu_luc_tu.split("-").reverse().join("/")}</div>
+        {tds.length > 1 && <div className="ab-tabs" role="group" aria-label="Loại thực đơn">{tds.map((t) =>
+          <button key={t.loai} type="button" className="ab-tab cursor-interaction" aria-pressed={td.loai === t.loai} onClick={() => { setLoaiTd(t.loai); setTrang(0); }}>{t.ten}</button>)}</div>}
+        {tr && <div className="ab-td" onTouchStart={(e) => { cham.current = e.touches[0].clientX; }}
+          onTouchEnd={(e) => { const d = cham.current === null ? 0 : e.changedTouches[0].clientX - cham.current; cham.current = null; if (d > 40) setTrang((v) => Math.max(0, v - 1)); else if (d < -40) setTrang((v) => Math.min(soTrang - 1, v + 1)); }}>
+          <button type="button" className="ab-mui-td cursor-interaction" aria-label="Trang trước" disabled={trang === 0} onClick={() => setTrang((v) => Math.max(0, v - 1))}>‹</button>
+          <a href={tr.hien} target="_blank" rel="noopener" className="ab-trang" aria-label="Mở trang thực đơn cỡ lớn"><img src={tr.hien} alt={`${td.ten} trang ${trang + 1}`} /></a>
+          <button type="button" className="ab-mui-td cursor-interaction" aria-label="Trang sau" disabled={trang >= soTrang - 1} onClick={() => setTrang((v) => Math.min(soTrang - 1, v + 1))}>›</button>
+        </div>}
+        <div className="ab-tabs" role="group" aria-label="Trang">{td.trang.map((_t: any, i: number) => <button key={i} type="button" className="ab-tab cursor-interaction" aria-pressed={i === trang} onClick={() => setTrang(i)}>{i + 1}</button>)}</div>
+        <small className="ab-phu">Trang {Math.min(trang, soTrang - 1) + 1} / {soTrang}. Giá, thuế, phí phục vụ theo nhà hàng và có thể thay đổi. Đặt bàn qua Vietourist dùng giá gói hiện ở bước đặt bàn.</small>
       </section>}
       {tab === "gt" && <section className="ab-muc">{gioiThieu}</section>}
     </>}
@@ -104,6 +141,20 @@ const CSS = `
 .ab-the{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;background:#fff;border:1px solid #d6dde4;border-radius:12px;overflow:hidden;padding-bottom:12px;min-width:0}
 .ab-the b,.ab-the small{padding:0 12px}.ab-the b{margin-top:10px;font-size:15px}.ab-the small{color:#5b6b7a}
 .ab-the-anh{position:relative;display:block;aspect-ratio:16/9;background:#e9eef2}.ab-the-anh img{width:100%;height:100%;object-fit:cover;display:block}
+.ab-mon-luoi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:900px){.ab-mon-luoi{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.ab-mon-luoi{grid-template-columns:1fr}}
+.ab-mon{background:#fff;border:1px solid #d6dde4;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.ab-mon img,.ab-mon-trong{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:#e9eef2}
+.ab-mon-trong{display:grid;place-items:center;color:#5b6b7a;font-size:13px}
+.ab-mon-chu{padding:12px 14px;display:flex;flex-direction:column;gap:4px}.ab-mon-chu b{font-size:16px}.ab-mon-chu p{margin:0;font-size:13px;color:#3d4b59}
+.ab-lien{all:unset;cursor:pointer;color:#14628c;font-weight:600;font-size:13px;margin-top:4px}
+.ab-td{display:flex;align-items:center;gap:12px;justify-content:center}
+.ab-trang{display:block;width:min(520px,100%);background:#fffdf8;border:1px solid #d6dde4;border-radius:10px;box-shadow:0 4px 14px rgba(20,30,40,.1);overflow:hidden}
+.ab-trang img{width:100%;display:block}
+.ab-mui-td{all:unset;cursor:pointer;flex:none;width:44px;height:44px;border-radius:50%;border:1px solid #d6dde4;background:#fff;display:grid;place-items:center;font-size:22px;color:#1d2b3a}
+.ab-mui-td:disabled{opacity:.35;cursor:default}
+@media (max-width:560px){.ab-mui-td{display:none}}
 .ab-nhan{position:absolute;left:10px;top:10px;background:rgba(22,34,46,.85);color:#fff;font-size:12px;padding:3px 8px;border-radius:6px}
 .ab-kham{display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:repeat(2,minmax(0,1fr));gap:6px;aspect-ratio:16/9;border-radius:12px;overflow:hidden}
 .ab-kham.mot{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr);aspect-ratio:4/3}

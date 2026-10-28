@@ -234,9 +234,9 @@ def danh_sach_vtos(db: Session) -> dict:
                    "lien_he_xac_minh": n.lien_he_xac_minh, "xac_minh_boi": n.xac_minh_boi, "supplier_id": n.supplier_id,
                    "dieu_kien": dieu_kien_mo_dat(db, n, mine, hn), "mo_dat": mo_dat(db, n, mine, hn),
                    "hop_dong": [_hd_out(h) for h in hds.get(n.id, [])], "anh_id": n.anh_id, "anh_nguon": n.anh_nguon,
-                   "anh_ht": ht.get(n.id, {"da_duyet": 0, "cho_duyet": 0, "nhap": 0, "an": 0, "co_bia": False})})
+                   "anh_ht": ht.get(n.id, {"da_duyet": 0, "cho_duyet": 0, "nhap": 0, "an": 0, "co_bia": False, "mon": 0, "td": 0, "nd_cho": 0})})
     return {"nha_hang": ra, "am_thuc": list(AM_THUC), "loai_goi": LOAI_GOI, "noi_dung": ds_noi_dung(db), "loai_nd": LOAI_ND,
-            "nhom_anh": NHOM_ANH, "can_cu_anh": CAN_CU_ANH, "so_anh_cho_duyet": sum(o["cho_duyet"] for o in ht.values()),
+            "nhom_anh": NHOM_ANH, "can_cu_anh": CAN_CU_ANH, "so_anh_cho_duyet": sum(o["cho_duyet"] + o.get("nd_cho", 0) for o in ht.values()),
             "thanh_pho": [{"ten": t, "mien": MIEN[m]} for t, (m, _k) in THANH_PHO.items()], "nhom_mon": list(NHOM_MON)}
 
 
@@ -283,7 +283,8 @@ def _nh_cong(db: Session, n: NhaHang, tds: list[ThucDonNhaHang], hn: date, anh: 
             # AT-2a: ảnh chỉ từ album đã duyệt (ảnh đơn cũ nha_hang.anh_id không ra cổng nữa)
             "anh": bia["hien"] if bia else None, "anh_nho": bia["nho"] if bia else None,
             "anh_alt": bia["alt"] if bia else "", "anh_nguon": bia["credit"] if bia else "", "so_anh": len(anh),
-            **({"album": [_anh_cong_out(x) for x in anh]} if du_album else {}),
+            **({"album": [_anh_cong_out(x) for x in anh], "mon": mon_cong(db, n.id), "thuc_don_nh": thuc_don_cong(db, n.id)}
+               if du_album else {}),
             "gia_tu": min(int(t.gia_nguoi_lon or 0) for t in ban) if ban else None, "thuc_don": [_td_out(t, False) for t in ban]}
 
 
@@ -1090,10 +1091,23 @@ def anh_cho_duyet(db: Session, u: User) -> dict:
 
 
 def hoan_thien_anh(db: Session) -> dict[int, dict]:
-    """Mức hoàn thiện ảnh từng nhà hàng cho cột danh sách VTOS."""
+    """Mức hoàn thiện ảnh từng nhà hàng cho cột danh sách VTOS (AT-2b: thêm số món đã duyệt, món / thực đơn chờ duyệt)."""
+    from app.models.nha_hang import MonNhaHang, ThucDonBan
     ra: dict[int, dict] = {}
+    goc = lambda nid: ra.setdefault(nid, {"da_duyet": 0, "cho_duyet": 0, "nhap": 0, "an": 0, "co_bia": False,  # noqa: E731
+                                          "mon": 0, "td": 0, "nd_cho": 0})
+    for m in db.execute(select(MonNhaHang)).scalars():
+        if m.trang_thai == "da_duyet":
+            goc(m.nha_hang_id)["mon"] += 1
+        elif m.trang_thai == "cho_duyet":
+            goc(m.nha_hang_id)["nd_cho"] += 1
+    for b in db.execute(select(ThucDonBan)).scalars():
+        if b.trang_thai == "duyet":
+            goc(b.nha_hang_id)["td"] += 1
+        elif b.trang_thai == "cho_duyet":
+            goc(b.nha_hang_id)["nd_cho"] += 1
     for x in db.execute(select(AnhNhaHang)).scalars():
-        o = ra.setdefault(x.nha_hang_id, {"da_duyet": 0, "cho_duyet": 0, "nhap": 0, "an": 0, "co_bia": False})
+        o = goc(x.nha_hang_id)
         o[x.trang_thai] = o.get(x.trang_thai, 0) + 1
         if x.la_bia and x.trang_thai == "da_duyet":
             o["co_bia"] = True
@@ -1136,3 +1150,364 @@ def tep_album(db: Session, u: User | None, pid: int, co: str):
     aid = {"nho": x.nho_id or x.hien_id or x.attachment_id, "hien": x.hien_id or x.attachment_id, "goc": x.attachment_id}[co]
     a = db.get(Attachment, aid)
     return AT.doc(db, a), a
+
+
+# ══ AT-2b · MÓN ĂN VÀ THỰC ĐƠN (Chủ tịch chốt 29/10/2026) ═══════════════════════════════════════════════════
+from app.models.nha_hang import (MonNhaHang, ThucDonBan, ThucDonTrang, NHOM_MON_NH, DI_UNG,  # noqa: E402
+                                 LOAI_THUC_DON)
+
+MON_TOI_DA, MON_NOI_BAT_TOI_DA = 40, 6
+TD_TOI_DA_TRANG = 20
+TRUONG_MON_DUYET_LAI = ("ten", "ten_khac", "mo_ta", "di_ung", "cay", "chay", "anh_id")
+
+
+def _mon_out(x: MonNhaHang, anh: AnhNhaHang | None, cong: bool = False) -> dict:
+    o = {"id": x.id, "ten": x.ten, "ten_khac": x.ten_khac, "nhom": x.nhom, "nhom_ten": NHOM_MON_NH.get(x.nhom, x.nhom),
+         "mo_ta": x.mo_ta, "di_ung": list(x.di_ung or []), "di_ung_ten": [DI_UNG[k] for k in (x.di_ung or []) if k in DI_UNG],
+         "cay": x.cay, "chay": x.chay, "noi_bat": x.noi_bat, "thu_tu": x.thu_tu}
+    if cong:
+        ok = anh is not None and anh.trang_thai == "da_duyet" and anh.can_cu != "chua_xac_minh"
+        o["anh"] = f"/api/v1/am-thuc/anh/nh/{anh.id}/hien" if ok else None
+        o["anh_nho"] = f"/api/v1/am-thuc/anh/nh/{anh.id}/nho" if ok else None
+    else:
+        o.update({"anh_id": x.anh_id, "anh_nho": f"/api/v1/nha-hang/album/{x.anh_id}/nho" if x.anh_id else None,
+                  "anh_da_duyet": bool(anh and anh.trang_thai == "da_duyet"),
+                  "trang_thai": x.trang_thai, "trang_thai_ten": TRANG_THAI_ANH.get(x.trang_thai, x.trang_thai),
+                  "ly_do_tra_lai": x.ly_do_tra_lai, "tao_boi": x.tao_boi, "sua_boi": x.sua_boi, "duyet_boi": x.duyet_boi})
+    return o
+
+
+def _mon_cua(db: Session, nid: int) -> list[MonNhaHang]:
+    return db.execute(select(MonNhaHang).where(MonNhaHang.nha_hang_id == nid)
+                      .order_by(MonNhaHang.noi_bat.desc(), MonNhaHang.thu_tu, MonNhaHang.id)).scalars().all()
+
+
+def ds_mon(db: Session, u: User, nid: int) -> dict:
+    if not _co(u, VAI_XEM):
+        raise LoiNhaHang("Không có quyền")
+    ds = _mon_cua(db, nid)
+    anh = {a.id: a for a in db.execute(select(AnhNhaHang).where(AnhNhaHang.id.in_([m.anh_id for m in ds if m.anh_id]))).scalars()}
+    return {"mon": [_mon_out(m, anh.get(m.anh_id)) for m in ds], "nhom_mon": NHOM_MON_NH, "di_ung": DI_UNG,
+            "toi_da": MON_TOI_DA, "noi_bat_toi_da": MON_NOI_BAT_TOI_DA, "duoc_sua": _co(u, VAI_ANH_NH),
+            "duoc_duyet": _co(u, VAI_DUYET_ANH)}
+
+
+def luu_mon(db: Session, u: User, nid: int, d: dict, mid: int | None = None, now: datetime | None = None) -> MonNhaHang:
+    """Thêm / sửa món. Không có trường giá (giá chỉ ở thực đơn). Sửa chữ / dị ứng / ảnh của món đã duyệt → «Chờ duyệt»."""
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing sửa món ăn")
+    now = now or datetime.now()
+    if db.get(NhaHang, nid) is None:
+        raise LoiNhaHang("Không có nhà hàng này")
+    ten = (d.get("ten") or "").strip()
+    if not ten:
+        raise LoiNhaHang("Ghi tên món")
+    nhom = d.get("nhom") or "mon_chinh"
+    if nhom not in NHOM_MON_NH:
+        raise LoiNhaHang("Nhóm món không hợp lệ")
+    di = [k for k in dict.fromkeys(d.get("di_ung") or [])]
+    if any(k not in DI_UNG for k in di):
+        raise LoiNhaHang("Thành phần dị ứng không hợp lệ")
+    aid = d.get("anh_id") or None
+    if aid is not None:
+        a = db.get(AnhNhaHang, int(aid))
+        if a is None or a.nha_hang_id != nid:
+            raise LoiNhaHang("Ảnh món phải là ảnh trong album của chính nhà hàng này")
+        aid = a.id
+    ds = _mon_cua(db, nid)
+    if mid:
+        x = db.get(MonNhaHang, mid)
+        if x is None or x.nha_hang_id != nid:
+            raise LoiNhaHang("Món không thuộc nhà hàng này")
+    else:
+        if len(ds) >= MON_TOI_DA:
+            raise LoiNhaHang(f"Đã đủ {MON_TOI_DA} món — ẩn bớt món cũ trước")
+        x = MonNhaHang(nha_hang_id=nid, ten=ten, tao_boi=u.username, tao_luc=now, trang_thai="nhap",
+                       thu_tu=max([m.thu_tu for m in ds], default=0) + 1, noi_bat=False, cay=False, chay=False, di_ung=[])
+        db.add(x)
+    moi = {"ten": ten[:160], "ten_khac": (d.get("ten_khac") or "").strip()[:160], "mo_ta": (d.get("mo_ta") or "").strip()[:500],
+           "di_ung": di, "cay": bool(d.get("cay")), "chay": bool(d.get("chay")), "anh_id": aid}
+    duyet_lai = bool(mid) and x.trang_thai == "da_duyet" and any(
+        (list(getattr(x, k) or []) if k == "di_ung" else getattr(x, k)) != moi[k] for k in TRUONG_MON_DUYET_LAI)
+    for k, v in moi.items():
+        setattr(x, k, v)
+    x.nhom = nhom
+    if duyet_lai:
+        x.trang_thai, x.duyet_boi, x.duyet_luc = "cho_duyet", "", None
+    x.sua_boi, x.sua_luc = u.username, now
+    db.commit(); db.refresh(x)
+    return x
+
+
+def mon_noi_bat(db: Session, u: User, mid: int, bat: bool) -> MonNhaHang:
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing chọn món nổi bật")
+    x = db.get(MonNhaHang, mid)
+    if x is None:
+        raise LoiNhaHang("Không có món này")
+    if bat and not x.noi_bat and sum(1 for m in _mon_cua(db, x.nha_hang_id) if m.noi_bat) >= MON_NOI_BAT_TOI_DA:
+        raise LoiNhaHang(f"Tối đa {MON_NOI_BAT_TOI_DA} món nổi bật — bỏ ★ một món khác trước")
+    x.noi_bat = bool(bat)
+    db.commit(); db.refresh(x)
+    return x
+
+
+def an_mon(db: Session, u: User, mid: int, an: bool) -> MonNhaHang:
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing ẩn món")
+    x = db.get(MonNhaHang, mid)
+    if x is None:
+        raise LoiNhaHang("Không có món này")
+    if an:
+        x.trang_thai, x.noi_bat = "an", False
+    elif x.trang_thai == "an":
+        x.trang_thai, x.duyet_boi, x.duyet_luc = "nhap", "", None
+    x.sua_boi, x.sua_luc = u.username, datetime.now()
+    db.commit(); db.refresh(x)
+    return x
+
+
+def gui_duyet_mon(db: Session, u: User, nid: int) -> int:
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing gửi duyệt món")
+    n = 0
+    for x in _mon_cua(db, nid):
+        if x.trang_thai == "nhap":
+            x.trang_thai, x.ly_do_tra_lai, x.sua_boi, x.sua_luc = "cho_duyet", "", u.username, datetime.now()
+            n += 1
+    db.commit()
+    return n
+
+
+def duyet_mon(db: Session, u: User, ids: list[int], duyet: bool, ly_do: str = "", now: datetime | None = None) -> dict:
+    if not _co(u, VAI_DUYET_ANH):
+        raise LoiNhaHang("Chỉ TP Điều hành (hoặc Chủ tịch, TGĐ) duyệt món")
+    ly_do = (ly_do or "").strip()
+    if not duyet and len(ly_do) < 3:
+        raise LoiNhaHang("Trả lại phải ghi lý do")
+    now = now or datetime.now()
+    ok, bo = 0, []
+    for mid in ids[:300]:
+        x = db.get(MonNhaHang, int(mid))
+        if x is None:
+            continue
+        if x.trang_thai != "cho_duyet" and not (not duyet and x.trang_thai == "da_duyet"):
+            bo.append({"id": x.id, "ly_do": "Món không ở trạng thái chờ duyệt"}); continue
+        if duyet and u.role not in TOAN_QUYEN and u.username in {x.tao_boi, x.sua_boi} - {""}:
+            bo.append({"id": x.id, "ly_do": "Người thêm / sửa món không tự duyệt — nhờ TP Điều hành khác, Chủ tịch hoặc TGĐ"}); continue
+        if duyet:
+            x.trang_thai, x.duyet_boi, x.duyet_luc, x.ly_do_tra_lai = "da_duyet", u.username, now, ""
+        else:
+            x.trang_thai, x.duyet_boi, x.duyet_luc, x.ly_do_tra_lai = "nhap", "", None, ly_do[:300]
+        ok += 1
+    db.commit()
+    return {"da_doi": ok, "bo_qua": bo}
+
+
+def mon_cong(db: Session, nid: int) -> list[dict]:
+    ds = [m for m in _mon_cua(db, nid) if m.trang_thai == "da_duyet"]
+    anh = {a.id: a for a in db.execute(select(AnhNhaHang).where(AnhNhaHang.id.in_([m.anh_id for m in ds if m.anh_id]))).scalars()}
+    return [_mon_out(m, anh.get(m.anh_id), cong=True) for m in ds]
+
+
+# ── thực đơn theo phiên bản ─────────────────────────────────────────────────────────────────────
+def _ten_ban(so: int) -> str:
+    return f"v1.{so - 1}"
+
+
+def _tach_pdf(data: bytes) -> list[bytes]:
+    """PDF → danh sách trang PNG (150 dpi). Lỗi / quá trang → LoiNhaHang."""
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        raise LoiNhaHang("Máy chủ chưa đọc được PDF — tải thực đơn dạng ảnh JPG / PNG")
+    from io import BytesIO
+    try:
+        pdf = pdfium.PdfDocument(data)
+    except Exception:
+        raise LoiNhaHang("Tệp PDF không mở được")
+    try:
+        if len(pdf) > TD_TOI_DA_TRANG:
+            raise LoiNhaHang(f"PDF có {len(pdf)} trang, quá {TD_TOI_DA_TRANG} trang mỗi bản")
+        ra = []
+        for i in range(len(pdf)):
+            im = pdf[i].render(scale=150 / 72).to_pil()
+            o = BytesIO(); im.convert("RGB").save(o, "JPEG", quality=88); ra.append(o.getvalue())
+        return ra
+    finally:
+        pdf.close()
+
+
+def _ban_hien_hanh(bans: list[ThucDonBan], hn: date) -> ThucDonBan | None:
+    ok = [b for b in bans if b.trang_thai == "duyet" and b.hieu_luc_tu <= hn]
+    return max(ok, key=lambda b: (b.hieu_luc_tu, b.so)) if ok else None
+
+
+def _trang_cua(db: Session, ban_ids: list[int]) -> dict[int, list[ThucDonTrang]]:
+    ra: dict[int, list] = {}
+    if ban_ids:
+        for t in db.execute(select(ThucDonTrang).where(ThucDonTrang.ban_id.in_(ban_ids)).order_by(ThucDonTrang.thu_tu)).scalars():
+            ra.setdefault(t.ban_id, []).append(t)
+    return ra
+
+
+def ds_thuc_don(db: Session, u: User, nid: int) -> dict:
+    if not _co(u, VAI_XEM):
+        raise LoiNhaHang("Không có quyền")
+    hn = _hom_nay()
+    bans = db.execute(select(ThucDonBan).where(ThucDonBan.nha_hang_id == nid).order_by(ThucDonBan.loai, ThucDonBan.so.desc())).scalars().all()
+    tr = _trang_cua(db, [b.id for b in bans])
+    ra = {}
+    for loai, ten in LOAI_THUC_DON.items():
+        bl = [b for b in bans if b.loai == loai]
+        hh = _ban_hien_hanh(bl, hn)
+        ra[loai] = {"ten": ten, "hien_hanh": hh.id if hh else None, "ban": [
+            {"id": b.id, "ten": _ten_ban(b.so), "hieu_luc_tu": b.hieu_luc_tu.isoformat(), "can_cu": b.can_cu, "so_trang": b.so_trang,
+             "trang_thai": ("dang_dung" if hh and b.id == hh.id else
+                            "cho_hieu_luc" if b.trang_thai == "duyet" and b.hieu_luc_tu > hn else
+                            "da_thay" if b.trang_thai == "duyet" else b.trang_thai),
+             "ly_do_tra_lai": b.ly_do_tra_lai, "tai_boi": b.tai_boi, "duyet_boi": b.duyet_boi,
+             "trang": [{"id": t.id, "nho": f"/api/v1/nha-hang/thuc-don/trang/{t.id}/nho", "hien": f"/api/v1/nha-hang/thuc-don/trang/{t.id}/hien",
+                        "goc": f"/api/v1/nha-hang/thuc-don/trang/{t.id}/goc"} for t in tr.get(b.id, [])]} for b in bl]}
+    return {"loai": ra, "toi_da_trang": TD_TOI_DA_TRANG, "toi_da_mb": ANH_TOI_DA_MB, "duoc_tai": _co(u, VAI_ANH_NH),
+            "duoc_duyet": _co(u, VAI_DUYET_ANH)}
+
+
+def tai_thuc_don(db: Session, u: User, nid: int, loai: str, tep: list[tuple[str, bytes]], hieu_luc_tu, can_cu: str,
+                 now: datetime | None = None) -> ThucDonBan:
+    """Tải MỘT phiên bản mới: nhiều ảnh (mỗi ảnh một trang) hoặc một PDF (máy tách trang). Vào «Chờ duyệt»."""
+    from app.services import attachments as AT
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành hoặc Marketing tải thực đơn")
+    now = now or datetime.now()
+    nh = db.get(NhaHang, nid)
+    if nh is None:
+        raise LoiNhaHang("Không có nhà hàng này")
+    if loai not in LOAI_THUC_DON:
+        raise LoiNhaHang("Chọn loại thực đơn: gọi món, set menu, buffet hoặc khách đoàn")
+    can_cu = (can_cu or "").strip()
+    if len(can_cu) < 5:
+        raise LoiNhaHang("Ghi căn cứ: ai gửi thực đơn, qua kênh nào, ngày nào")
+    hl = _ngay(hieu_luc_tu) or _hom_nay()
+    if not tep:
+        raise LoiNhaHang("Chọn tệp thực đơn (ảnh hoặc PDF)")
+    trang: list[tuple[str, bytes, bytes | None]] = []        # (tên, bytes gốc, bytes ảnh trang nếu tách từ PDF)
+    goc_pdf = None
+    for ten, data in tep:
+        mb = len(data) / 1024 / 1024
+        if mb > ANH_TOI_DA_MB:
+            raise LoiNhaHang(f"«{ten}» nặng {mb:.1f} MB, quá {ANH_TOI_DA_MB} MB")
+        duoi = (ten or "").rsplit(".", 1)[-1].lower() if "." in (ten or "") else ""
+        if duoi == "pdf":
+            if len(tep) > 1:
+                raise LoiNhaHang("Một bản thực đơn: hoặc MỘT tệp PDF, hoặc nhiều ảnh — không trộn")
+            goc_pdf = (ten, data)
+            for i, b in enumerate(_tach_pdf(data), 1):
+                trang.append((f"{ten}.trang{i}.jpg", b, None))
+        elif duoi in KIEU_ANH:
+            trang.append((ten, data, None))
+        else:
+            raise LoiNhaHang(f"«{ten}»: chỉ nhận PDF hoặc ảnh JPG / PNG / WEBP")
+    if len(trang) > TD_TOI_DA_TRANG:
+        raise LoiNhaHang(f"{len(trang)} trang, quá {TD_TOI_DA_TRANG} trang mỗi bản")
+    cu = db.execute(select(func.max(ThucDonBan.so)).where(ThucDonBan.nha_hang_id == nid, ThucDonBan.loai == loai)).scalar() or 0
+    b = ThucDonBan(nha_hang_id=nid, loai=loai, so=cu + 1, hieu_luc_tu=hl, can_cu=can_cu[:300], so_trang=len(trang),
+                   trang_thai="cho_duyet", tai_boi=u.username, tai_luc=now)
+    db.add(b); db.flush()
+    ma = f"td{nid}"
+    try:
+        a_pdf = AT.dinh_kem(db, "am_thuc", ma, goc_pdf[0], goc_pdf[1], kieu="application/pdf", loai="hinh_anh",
+                            mo_ta=f"Thực đơn {nh.ma} {LOAI_THUC_DON[loai]} {_ten_ban(b.so)} (PDF gốc)", boi=u.username)[0] if goc_pdf else None
+        for i, (ten, data, _x) in enumerate(trang, 1):
+            hien, nho, _r, _c = _lam_nhe(data)
+            if hien is None and _co_pil():
+                raise LoiNhaHang(f"«{ten}» không mở được như một ảnh")
+            duoi = ten.rsplit(".", 1)[-1].lower()
+            a = a_pdf or AT.dinh_kem(db, "am_thuc", ma, ten, data, kieu=KIEU_ANH.get(duoi, "image/jpeg"), loai="hinh_anh",
+                                     mo_ta=f"Thực đơn {nh.ma} {_ten_ban(b.so)} trang {i}", boi=u.username)[0]
+            ah = AT.dinh_kem(db, "am_thuc", ma, f"{ten}.hien.webp", hien, kieu="image/webp", loai="hinh_anh", boi=u.username,
+                             nguon="he_thong", mo_ta=f"Trang {i} · {_ten_ban(b.so)}")[0] if hien else None
+            an = AT.dinh_kem(db, "am_thuc", ma, f"{ten}.nho.webp", nho, kieu="image/webp", loai="hinh_anh", boi=u.username,
+                             nguon="he_thong", mo_ta=f"Trang {i} nhỏ · {_ten_ban(b.so)}")[0] if nho else None
+            if hien is None and a_pdf is not None:      # không có thư viện ảnh: lưu chính trang đã tách làm bản hiển thị
+                ah = AT.dinh_kem(db, "am_thuc", ma, ten, data, kieu="image/jpeg", loai="hinh_anh", boi=u.username, nguon="he_thong")[0]
+            db.add(ThucDonTrang(ban_id=b.id, thu_tu=i, attachment_id=a.id, hien_id=ah.id if ah else a.id,
+                                nho_id=an.id if an else (ah.id if ah else a.id)))
+    except ValueError as ex:
+        db.rollback()
+        raise LoiNhaHang(str(ex))
+    except LoiNhaHang:
+        db.rollback()
+        raise
+    db.commit(); db.refresh(b)
+    return b
+
+
+def duyet_thuc_don(db: Session, u: User, bid: int, duyet: bool, ly_do: str = "", now: datetime | None = None) -> ThucDonBan:
+    if not _co(u, VAI_DUYET_ANH):
+        raise LoiNhaHang("Chỉ TP Điều hành (hoặc Chủ tịch, TGĐ) duyệt thực đơn")
+    b = db.get(ThucDonBan, bid)
+    if b is None:
+        raise LoiNhaHang("Không có bản thực đơn này")
+    if b.trang_thai != "cho_duyet":
+        raise LoiNhaHang("Bản này không ở trạng thái chờ duyệt")
+    if duyet:
+        if u.role not in TOAN_QUYEN and u.username == b.tai_boi:
+            raise LoiNhaHang("Người tải thực đơn không tự duyệt — nhờ TP Điều hành khác, Chủ tịch hoặc TGĐ")
+        b.trang_thai, b.duyet_boi, b.duyet_luc = "duyet", u.username, now or datetime.now()
+    else:
+        if len((ly_do or "").strip()) < 3:
+            raise LoiNhaHang("Trả lại phải ghi lý do")
+        b.trang_thai, b.ly_do_tra_lai = "tra_lai", ly_do.strip()[:300]
+    db.commit(); db.refresh(b)
+    return b
+
+
+def thuc_don_cong(db: Session, nid: int) -> list[dict]:
+    hn = _hom_nay()
+    bans = db.execute(select(ThucDonBan).where(ThucDonBan.nha_hang_id == nid, ThucDonBan.trang_thai == "duyet")).scalars().all()
+    hh = {loai: _ban_hien_hanh([b for b in bans if b.loai == loai], hn) for loai in LOAI_THUC_DON}
+    tr = _trang_cua(db, [b.id for b in hh.values() if b])
+    return [{"loai": loai, "ten": LOAI_THUC_DON[loai], "ban": _ten_ban(b.so), "hieu_luc_tu": b.hieu_luc_tu.isoformat(),
+             "trang": [{"hien": f"/api/v1/am-thuc/anh/td/{t.id}/hien", "nho": f"/api/v1/am-thuc/anh/td/{t.id}/nho"} for t in tr.get(b.id, [])]}
+            for loai, b in hh.items() if b]
+
+
+def tep_trang(db: Session, u: User | None, tid: int, co: str):
+    """Trang thực đơn. u=None (cổng): chỉ trang của bản ĐANG DÙNG, nhà hàng đang hiện; không bao giờ tệp gốc."""
+    from app.models.attachments import Attachment
+    from app.services import attachments as AT
+    t = db.get(ThucDonTrang, tid)
+    if t is None or co not in ("nho", "hien", "goc"):
+        raise LoiNhaHang("Không có trang này")
+    b = db.get(ThucDonBan, t.ban_id)
+    if u is None:
+        nh = db.get(NhaHang, b.nha_hang_id)
+        hh = _ban_hien_hanh(db.execute(select(ThucDonBan).where(ThucDonBan.nha_hang_id == b.nha_hang_id, ThucDonBan.loai == b.loai))
+                            .scalars().all(), _hom_nay())
+        if co == "goc" or hh is None or hh.id != b.id or nh is None or not nh.hien_cong or nh.ngung:
+            raise LoiNhaHang("Không có trang này")
+    elif not _co(u, VAI_XEM):
+        raise LoiNhaHang("Không có quyền")
+    a = db.get(Attachment, {"nho": t.nho_id or t.hien_id or t.attachment_id, "hien": t.hien_id or t.attachment_id, "goc": t.attachment_id}[co])
+    return AT.doc(db, a), a
+
+
+def cho_duyet_noi_dung(db: Session, u: User) -> dict:
+    """Món và thực đơn chờ TP Điều hành duyệt (ảnh: anh_cho_duyet)."""
+    if not _co(u, VAI_XEM):
+        raise LoiNhaHang("Không có quyền")
+    mons = db.execute(select(MonNhaHang).where(MonNhaHang.trang_thai == "cho_duyet").order_by(MonNhaHang.nha_hang_id, MonNhaHang.thu_tu)).scalars().all()
+    bans = db.execute(select(ThucDonBan).where(ThucDonBan.trang_thai == "cho_duyet").order_by(ThucDonBan.nha_hang_id)).scalars().all()
+    nh = {n.id: n.ten for n in db.execute(select(NhaHang).where(NhaHang.id.in_({m.nha_hang_id for m in mons} | {b.nha_hang_id for b in bans}))).scalars()}
+    anh = {a.id: a for a in db.execute(select(AnhNhaHang).where(AnhNhaHang.id.in_([m.anh_id for m in mons if m.anh_id]))).scalars()}
+    tr = _trang_cua(db, [b.id for b in bans])
+    return {"mon": [{**_mon_out(m, anh.get(m.anh_id)), "nha_hang_ten": nh.get(m.nha_hang_id, ""),
+                     "khong_duyet": ("Người thêm / sửa món không tự duyệt" if u.role not in TOAN_QUYEN and u.username in {m.tao_boi, m.sua_boi} - {""} else "")}
+                    for m in mons],
+            "thuc_don": [{"id": b.id, "nha_hang_ten": nh.get(b.nha_hang_id, ""), "loai_ten": LOAI_THUC_DON.get(b.loai, b.loai),
+                          "ten": _ten_ban(b.so), "hieu_luc_tu": b.hieu_luc_tu.isoformat(), "can_cu": b.can_cu, "so_trang": b.so_trang,
+                          "tai_boi": b.tai_boi, "trang_dau": f"/api/v1/nha-hang/thuc-don/trang/{tr[b.id][0].id}/nho" if tr.get(b.id) else None,
+                          "khong_duyet": ("Người tải không tự duyệt" if u.role not in TOAN_QUYEN and u.username == b.tai_boi else "")}
+                         for b in bans],
+            "duoc_duyet": _co(u, VAI_DUYET_ANH)}

@@ -54,6 +54,17 @@ def anh_album(pid: int, co: str, request: Request, db: Session = Depends(get_db)
     return Response(content=data, media_type=a.kieu_noi_dung or "image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
+@router.get("/anh/td/{tid}/{co}")
+def anh_thuc_don(tid: int, co: str, request: Request, db: Session = Depends(get_db)):
+    """AT-2b: trang thực đơn của bản ĐANG DÙNG, nhà hàng đang hiện; không bao giờ tệp gốc."""
+    _phanh(request)
+    try:
+        data, a = NH.tep_trang(db, None, tid, co)
+    except NH.LoiNhaHang as ex:
+        raise HTTPException(404, str(ex))
+    return Response(content=data, media_type=a.kieu_noi_dung or "image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
+
+
 @router.get("/anh/{aid}")
 def anh(aid: int, request: Request, db: Session = Depends(get_db)):
     """Ảnh của nhà hàng đang hiện / nội dung đã bật. Ảnh khác (kể cả ảnh cũ đã thay) trả 404."""
