@@ -30,6 +30,13 @@ CONG_NGOAI = {"khach_hang": "Khách hàng", "doi_tac": "Đối tác", "co_dong":
 SAN_PHAM = {"khach_san": "Khách sạn", "ve_may_bay": "Vé máy bay"}
 LOAI_LINK = {"hoa_hong": "Link hoa hồng", "cong_khai": "Trang công khai"}
 HANG_VE = {"pho_thong": "Phổ thông", "pho_thong_dac_biet": "Phổ thông đặc biệt", "thuong_gia": "Thương gia"}
+# KS-5 · chính sách Agoda Fulfill Assisted. Quyền là thứ NGUỒN CẤP, không phải thứ mình bật:
+# có tài khoản Affiliate KHÔNG mặc nhiên cho quyền gọi API giá, đặt phòng, huỷ, hay dùng ảnh.
+QUYEN_OTA = {"AFFILIATE": "Chuyển khách qua link", "CONTENT": "Lấy nội dung và ảnh",
+             "SEARCH": "Hỏi giá trên API", "BOOK": "Đặt phòng trên VTD",
+             "CANCEL": "Huỷ qua API", "POSTBOOK": "Tra đơn, yêu cầu đặc biệt"}
+# «that» chỉ mở khi đã có hợp đồng ký, AVRF, tài khoản tài chính và certification của Agoda.
+MOI_TRUONG_OTA = {"tat": "Tắt", "thu": "Sandbox", "that": "Chạy thật"}
 
 
 class PhapNhanHopDong(Base):
@@ -56,6 +63,9 @@ class DoiTacOta(Base):
     da_kiem_link: Mapped[bool] = mapped_column(Boolean, default=False)  # đã mở thử, đúng tài khoản Affiliate
     duoc_dung_web: Mapped[bool] = mapped_column(Boolean, default=False)  # OTA cho phép dùng trên vietourist.vn
     bat: Mapped[bool] = mapped_column(Boolean, default=False)
+    # KS-5: quyền Agoda ĐÃ CẤP, danh sách ngăn bằng dấu phẩy. Rỗng = chưa cấp gì.
+    quyen: Mapped[str] = mapped_column(String(120), default="")
+    moi_truong: Mapped[str] = mapped_column(String(8), default="tat")
     phien_ban: Mapped[int] = mapped_column(Integer, default=1)
     bang_chung: Mapped[str] = mapped_column(Text, default="")
     ghi_chu: Mapped[str] = mapped_column(Text, default="")
