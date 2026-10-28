@@ -59,6 +59,10 @@ CONG_KHAI = {
                       "KÝ HMAC-SHA256 bằng khóa bí mật chỉ OnePay và VTOS biết: chữ ký sai thì không "
                       "đổi một trường nào; chỉ khớp được giao dịch VTOS đã tạo trước (mã tham chiếu), "
                       "đúng số tiền; chạy lại không ghi thêm; không trả về dữ liệu khách; có phanh.",
+    # AT-1, 28/10/2026 — Chủ tịch duyệt đưa «Khám phá ẩm thực» lên web VTD, xem được trước khi đăng nhập.
+    "/api/v1/am-thuc": "Chỉ một đường: ảnh của trang «Hương vị Việt Nam» cho thẻ <img> (không gửi được phiên "
+                       "cổng). Chỉ trả ảnh ĐANG DÙNG của nhà hàng TP Điều hành đã bật hiện hoặc nội dung Marketing đã "
+                       "bật, ảnh khác 404; danh sách và trang nhà hàng vẫn phải qua OTP; có phanh theo địa chỉ mạng.",
 }
 
 
@@ -683,7 +687,9 @@ PHAM_VI_DA_CHOT = {
     # họ quyền ghi (`GHI_BO_PHAN`) mà không cho vào màn là dựng một cửa không ai với tới.
     # Anh Tuấn quyết 17/10/2026.
     # KH-2 26/10/2026: +1 /api/v1/nha-hang cho tp_dh, nv_dh (nhập nhà hàng), tp_kd, gd_kd (bật hiện cổng khách).
-    "ketoan": 115, "tp_dh": 104, "ptgd_doan": 81, "nv_dh": 73, "hcns": 73, "gd_kd": 81,   # +1 KH-4: /api/v1/yeu-cau-khach
+    # AT-1 (28/10/2026, Chủ tịch duyệt «Hương vị Việt Nam») — +1 cho BỐN vai: màn /nha-hang mở thêm cho Marketing
+    # (nv_mkt, ptgd_mkt viết món / thành phố / ảnh) và Kế toán (ketoan, ketoan_truong xem tệp hợp đồng nhà hàng).
+    "ketoan": 116, "tp_dh": 104, "ptgd_doan": 81, "nv_dh": 73, "hcns": 73, "gd_kd": 81,   # +1 KH-4: /api/v1/yeu-cau-khach
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -704,7 +710,7 @@ PHAM_VI_DA_CHOT = {
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 58, "nv_kd": 57, "tn_kd": 57, "tp_kd": 61, "nv_mkt": 43,   # +1 KH-4: /api/v1/yeu-cau-khach
+    "ptgd_mkt": 59, "nv_kd": 57, "tn_kd": 57, "tp_kd": 61, "nv_mkt": 44,   # +1 KH-4: /api/v1/yeu-cau-khach
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -773,7 +779,7 @@ PHAM_VI_DA_CHOT = {
     #
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
-    "ketoan_truong": 116, "ketoan_tt": 31, "thu_quy": 27,
+    "ketoan_truong": 117, "ketoan_tt": 31, "thu_quy": 27,
     "robot_pq": 18, "robot_ks": 147, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 

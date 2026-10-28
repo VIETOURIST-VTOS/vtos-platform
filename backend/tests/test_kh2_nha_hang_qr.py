@@ -2,7 +2,7 @@
 """KH-2 · Nhà hàng trên cổng khách + thanh toán QR — Chủ tịch duyệt bản xem thử 26/10/2026.
 
   1. Điều hành nhập, TP Điều hành bật (DT-2b, Chủ tịch 28/10/2026 — Kinh doanh không bật nữa); người nhập không
-     tự bật; cần ≥1 gói đang bán mới bật được.
+     tự bật. AT-1 (28/10/2026): bật = hiện giới thiệu; đặt bàn còn cần đủ 5 điều kiện (xem test_at1).
   2. Sửa nội dung bán khi đang hiện → tự tắt kèm lý do; sửa ghi chú nội bộ thì không.
   3. Cổng khách chỉ thấy nhà hàng đang hiện, gói đang bán; không lộ ghi chú nội bộ.
   4. Yêu cầu đặt bàn: kiểm ngày, giờ, gói, số khách tối thiểu; tạm tính do MÁY tính; ra lead cho Sales.
@@ -49,6 +49,12 @@ def _nh(s, ten="Bếp Việt", hien=True):
                                        "ghi_chu_noi_bo": "NCC chiết khấu 15%"})
     td = N.luu_thuc_don(s, _u(s, "dh"), n.id, {"ten": "Set Hương Việt", "loai": "set", "gia_nguoi_lon": 350000, "gia_tre_em": 200000,
                                                "so_khach_toi_thieu": 2, "tu_ngay": "2026-11-01", "den_ngay": "2026-12-31"})
+    # AT-1: đặt được chỉ khi đã gắn NCC, xác minh liên hệ, có hợp đồng ký + hoa hồng
+    from app.models.suppliers import Supplier
+    from tests.test_dt2_dat_ban import hop_dong_mau
+    sup = Supplier(code=f"NCC{n.id:04d}", ten=ten, loai="nha_hang"); s.add(sup); s.flush()
+    n.supplier_id, n.lien_he_xac_minh = sup.id, True
+    hop_dong_mau(s, n); s.commit()
     if hien:
         N.bat_hien(s, _u(s, "kd"), n.id, True)
     return n, td
@@ -61,8 +67,6 @@ def test_vai_va_tu_tat_khi_sua(db):
     with pytest.raises(N.LoiNhaHang):
         N.luu_nha_hang(db, _u(db, "nvkd"), {"ten": "X"})
     n = N.luu_nha_hang(db, _u(db, "dh"), {"ten": "Biển Xanh", "am_thuc": "Hải sản"})
-    with pytest.raises(N.LoiNhaHang):
-        N.bat_hien(db, _u(db, "kd"), n.id, True)                       # chưa có gói đang bán
     td = N.luu_thuc_don(db, _u(db, "dh"), n.id, {"ten": "Vị biển", "gia_nguoi_lon": 490000})
     with pytest.raises(N.LoiNhaHang):
         N.bat_hien(db, _u(db, "dh"), n.id, True)                       # người nhập không tự bật

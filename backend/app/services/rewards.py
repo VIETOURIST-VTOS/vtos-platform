@@ -10,6 +10,10 @@
   Chỉ cộng cho chuyến đủ điều kiện TỪ ngày hiệu lực Chủ tịch ký (`rewards_hieu_luc_tu`), không hồi tố.
   Hạng thì xét trên mọi chuyến 12 tháng — khách thấy đúng chi tiêu thật của mình.
 
+  AT-1c (Chủ tịch 28/10/2026): đơn ĐẶT BÀN nhà hàng tích điểm như tour — đơn khách / cổ đông tự đặt trên cổng (không
+  qua đại lý / CTV), nhà hàng báo đã dùng VÀ Kế toán đã chốt; B = tiền đã trả qua Vietourist (cọc hoặc trả đủ) trừ
+  phần đã hoàn. Chi tiêu đặt bàn cũng vào chi tiêu 12 tháng xét hạng.
+
   Sổ chỉ ghi thêm và TỰ ĐỐI CHIẾU: mỗi lần tính, điểm đích của từng booking so với điểm đã ghi → ghi phần chênh.
   Hủy / hoàn / giảm giá sau khi đã cộng → dòng DAO. Chạy lại không ghi gì nếu không có gì đổi.
 """
@@ -95,8 +99,41 @@ def _bookings(db: Session, chu: str) -> list[Booking]:
     return [b for b in db.execute(cau.order_by(Booking.id)).scalars() if chu_cua_booking(b) == chu]
 
 
-def _du_dk(db: Session, chu: str, hom_nay: date) -> list[tuple[Booking, date, int]]:
-    """[(booking, ngày đủ điều kiện, B)] — booking trực tiếp, không hủy, tour xong, đã thu đủ."""
+class _Muc:
+    """Một khoản tích điểm: booking tour hoặc đơn đặt bàn. `khoa` phân biệt hai loại trong sổ."""
+    def __init__(self, khoa: tuple, ma: str, huy: bool):
+        self.khoa, self.code, self.cancelled = khoa, ma, huy
+
+    @property
+    def id(self):
+        return self.khoa
+
+
+def _don_dat_ban(db: Session, chu: str) -> list:
+    """Đơn đặt bàn TRỰC TIẾP của chủ điểm: người đặt là khách / cổ đông trên cổng, không qua đối tác."""
+    from app.models.dat_ban import DonDatBan
+    from app.models.cong_ngoai import TaiKhoanNgoai
+    kieu, gt = chu.split(":", 1)
+    cau = select(DonDatBan).join(TaiKhoanNgoai, TaiKhoanNgoai.id == DonDatBan.tai_khoan_id).where(
+        DonDatBan.doi_tac_id.is_(None), TaiKhoanNgoai.loai.in_(("khach_hang", "co_dong")))
+    cau = cau.where(TaiKhoanNgoai.dien_thoai == gt) if kieu == "sdt" else cau.where(func.lower(TaiKhoanNgoai.email) == gt)
+    return db.execute(cau.order_by(DonDatBan.id)).scalars().all()
+
+
+def _b_dat_ban(db: Session, d) -> int:
+    from app.services.dat_ban import da_tra
+    return max(0, da_tra(db, d) - int(round(float(d.da_hoan_tien or 0))))
+
+
+def _muc(db: Session, chu: str) -> list:
+    ra = [_Muc(("b", b.id), b.code, bool(b.cancelled)) for b in _bookings(db, chu)]
+    ra += [_Muc(("d", d.id), d.ma, d.trang_thai in ("huy", "khong_den", "tu_choi", "het_han")) for d in _don_dat_ban(db, chu)]
+    return ra
+
+
+def _du_dk(db: Session, chu: str, hom_nay: date) -> list[tuple["_Muc", date, int]]:
+    """[(khoản, ngày đủ điều kiện, B)] — booking tour trực tiếp (không hủy, tour xong, đã thu đủ) và đơn đặt bàn
+    trực tiếp (đã dùng, Kế toán đã chốt, ngày đủ điều kiện = ngày muộn hơn giữa ngày ăn và ngày chốt)."""
     from app.services.hoa_hong_d06 import tinh_trang_booking
     ra = []
     for b in _bookings(db, chu):
@@ -104,7 +141,14 @@ def _du_dk(db: Session, chu: str, hom_nay: date) -> list[tuple[Booking, date, in
             continue
         tt = tinh_trang_booking(db, b, db.get(Tour, b.tour_id) if b.tour_id else None, hom_nay)
         if tt["du"] and tt["net"] > 0:
-            ra.append((b, tt["ngay"], tt["net"]))
+            ra.append((_Muc(("b", b.id), b.code, False), tt["ngay"], tt["net"]))
+    for d in _don_dat_ban(db, chu):
+        if d.trang_thai != "da_dung" or d.chot_luc is None:
+            continue
+        ngay = max(d.ngay, d.chot_luc.date())
+        net = _b_dat_ban(db, d)
+        if ngay <= hom_nay and net > 0:
+            ra.append((_Muc(("d", d.id), d.ma, False), ngay, net))
     return ra
 
 
@@ -118,7 +162,7 @@ def hang_theo_chi_tieu(chi: int) -> tuple[str, Fraction, int]:
     return ten, he, nguong
 
 
-def _chi_tieu(ds: list[tuple[Booking, date, int]], ngay: date, tru_booking: int | None = None) -> int:
+def _chi_tieu(ds: list, ngay: date, tru_booking=None) -> int:
     return sum(net for b, d, net in ds if ngay - timedelta(days=HAN_DIEM_NGAY) < d <= ngay and b.id != tru_booking)
 
 
@@ -187,12 +231,13 @@ def tinh(db: Session, chu: str, hom_nay: date | None = None, now: datetime | Non
     du = {b.id: (d, net) for b, d, net in ds}
     da = {}
     for r in db.execute(select(SoDiem).where(SoDiem.chu == chu, SoDiem.loai.in_(("CONG", "DAO")))).scalars():
-        x = da.setdefault(r.booking_id, {"diem": 0, "he_so": ""})
+        x = da.setdefault(("d", r.dat_ban_id) if r.dat_ban_id else ("b", r.booking_id), {"diem": 0, "he_so": ""})
         x["diem"] += r.so_diem
         if r.loai == "CONG" and r.he_so and not x["he_so"]:
             x["he_so"] = r.he_so
-    for b in _bookings(db, chu):
+    for b in _muc(db, chu):
         x = da.get(b.id, {"diem": 0, "he_so": ""})
+        noi = {"booking_id": b.id[1]} if b.id[0] == "b" else {"dat_ban_id": b.id[1]}
         if b.id in du and du[b.id][0] >= h:
             ngay_du, net = du[b.id]
             if x["he_so"]:
@@ -205,11 +250,11 @@ def tinh(db: Session, chu: str, hom_nay: date | None = None, now: datetime | Non
             ngay_du, net, dich, he, ten = None, 0, 0, None, ""
         chenh = dich - x["diem"]
         if chenh > 0:
-            _ghi(db, chu, "CONG", chenh, now, booking_id=b.id, het_han=hn + timedelta(days=HAN_DIEM_NGAY), co_so=net,
+            _ghi(db, chu, "CONG", chenh, now, **noi, het_han=hn + timedelta(days=HAN_DIEM_NGAY), co_so=net,
                  he_so=str(he), hang=ten, ghi_chu=f"{b.code} · {net:,} đ × {float(he):g}".replace(",", "."))
             ghi += 1
         elif chenh < 0:
-            _ghi(db, chu, "DAO", chenh, now, booking_id=b.id, co_so=net,
+            _ghi(db, chu, "DAO", chenh, now, **noi, co_so=net,
                  ghi_chu=f"{b.code} · " + ("đã hủy" if b.cancelled else f"giá trị đủ điều kiện còn {net:,} đ".replace(",", ".")))
             ghi += 1
     # voucher hết hạn chưa dùng → trả điểm; voucher đã dùng mà booking bị hủy → hoàn điểm

@@ -967,7 +967,7 @@ MENU_ROLES = {
     "/tai-khoan-ngoai": BASE_VIEW + ("gd_kd", "tp_dh", "ir_phapche"),
     # DH-1: Kế toán tính / chốt / lập đề nghị chi; GĐ KD xem và chọn hình thức hưởng của đối tác.
     "/hoa-hong-d06": BASE_VIEW + ("ketoan", "gd_kd"),
-    "/nha-hang": BASE_VIEW + ("tp_dh", "nv_dh", "tp_kd", "gd_kd"),
+    "/nha-hang": BASE_VIEW + ("tp_dh", "nv_dh", "tp_kd", "gd_kd", "nv_mkt", "ptgd_mkt", "ketoan"),   # AT-1: Marketing viết nội dung, Kế toán xem hợp đồng
     "/vtd-rewards": BASE_VIEW + ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "sales_admin", "ketoan", "nv_mkt", "ptgd_mkt"),
     # KH-4 (Chủ tịch duyệt 27/10/2026). Yêu cầu khách: Sales chỉ thấy việc giao cho mình (lọc ở
     # services/cham_soc_khach), TP/GĐ KD + Sale Admin thấy việc Kinh doanh, Kế toán thấy hóa đơn.

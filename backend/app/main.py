@@ -88,6 +88,7 @@ from app.api.v1.khao_sat_cong_khai import router as khao_sat_cong_khai_router
 from app.api.v1.hoa_hong_d06 import router as hoa_hong_d06_router   # DH-1 hoa hồng D06
 from app.api.v1.cong_khach import router as cong_khach_router   # KH-1 cổng khách hàng
 from app.api.v1.nha_hang import router as nha_hang_router   # KH-2 danh mục nhà hàng
+from app.api.v1.am_thuc import router as am_thuc_router   # AT-1 khám phá ẩm thực công khai
 from app.api.v1.rewards import router as rewards_router   # KH-3 VTD Rewards
 from app.api.v1.cham_soc_khach import router as yeu_cau_khach_router, router_gop_y as gop_y_lanh_dao_router   # KH-4
 from app.api.v1.doi_soat_ota import router as doi_soat_ota_router   # KS-2 đối soát OTA
@@ -396,6 +397,7 @@ app.include_router(tai_khoan_ngoai_router)
 app.include_router(hoa_hong_d06_router)
 app.include_router(cong_khach_router)
 app.include_router(nha_hang_router)
+app.include_router(am_thuc_router)
 app.include_router(rewards_router)
 app.include_router(yeu_cau_khach_router)
 app.include_router(gop_y_lanh_dao_router)
