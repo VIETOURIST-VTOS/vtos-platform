@@ -25,6 +25,7 @@ class _Ota:
         self.link = "https://www.expedia.com/affiliate/cu"
         self.ten_mien, self.duong_dan = "www.expedia.com", "/affiliate"
         self.da_kiem_link, self.duoc_dung_web, self.bat = True, True, True
+        self.quyen, self.moi_truong = "AFFILIATE", "that"   # KS-5 thêm hai cột
         self.phien_ban, self.phap_nhan_id = 2, 1
         self.subid_cho_phep, self.subid_tham_so = False, ""
         self.bang_chung, self.ghi_chu = "", ""

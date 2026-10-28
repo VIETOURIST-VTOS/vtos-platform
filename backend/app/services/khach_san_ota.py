@@ -22,7 +22,7 @@ from app.models.core import User
 from app.models.cong_ngoai import TaiKhoanNgoai
 from app.models.doi_tac_ban_hang import DoiTacBanHang
 from app.models.khach_san_ota import (PhapNhanHopDong, DoiTacOta, LuotChuyenOta, TRANG_THAI_HOP_TAC, CONG_NGOAI,
-                                      SAN_PHAM, LOAI_LINK, HANG_VE)
+                                      SAN_PHAM, LOAI_LINK, HANG_VE, QUYEN_OTA, MOI_TRUONG_OTA)
 from app.services import rules as R
 
 VAI_SUA = ("chutich",)
@@ -86,6 +86,16 @@ def loi_link(link: str, ten_mien: str, duong_dan: str) -> str:
     return ""
 
 
+def ds_quyen(o: DoiTacOta) -> list[str]:
+    """Quyền Agoda đã cấp cho nguồn này. Thứ tự theo danh mục, không theo thứ tự người gõ."""
+    co = {q.strip().upper() for q in (o.quyen or "").split(",") if q.strip()}
+    return [q for q in QUYEN_OTA if q in co]
+
+
+def co_quyen(o: DoiTacOta, quyen: str) -> bool:
+    return quyen.upper() in ds_quyen(o)
+
+
 def thieu_de_bat(o: DoiTacOta) -> list[str]:
     t = []
     if o.loai_link == "cong_khai":
@@ -108,6 +118,12 @@ def thieu_de_bat(o: DoiTacOta) -> list[str]:
         t.append("chưa kiểm link")
     if not o.duoc_dung_web:
         t.append("chưa xác nhận được dùng trên web")
+    # KS-5: chuyển khách qua link hoa hồng LÀ dùng quyền Affiliate. Chưa ghi nhận Agoda cấp
+    # thì chưa bật — bộ v1.4: có tài khoản Affiliate không mặc nhiên cho quyền nào cả.
+    if not co_quyen(o, "AFFILIATE"):
+        t.append("chưa ghi nhận nguồn cấp quyền AFFILIATE")
+    if o.moi_truong == "tat":
+        t.append("môi trường đang Tắt")
     return t
 
 
@@ -133,6 +149,8 @@ def _quan_tri_out(db: Session, o: DoiTacOta, luot7: dict, u: User) -> dict:
             "duong_dan": o.duong_dan, "da_kiem_link": o.da_kiem_link, "duoc_dung_web": o.duoc_dung_web, "bat": o.bat,
             "dang_mo": dang_mo(o), "thieu": thieu_de_bat(o), "loi_link": loi_link(o.link, o.ten_mien, o.duong_dan) if o.link else "",
             "phien_ban": o.phien_ban, "bang_chung": o.bang_chung, "ghi_chu": o.ghi_chu,
+            "quyen": ds_quyen(o), "quyen_danh_muc": QUYEN_OTA,
+            "moi_truong": o.moi_truong, "moi_truong_ten": MOI_TRUONG_OTA.get(o.moi_truong, o.moi_truong),
             "phap_nhan": {"ma": pn.ma, "ten": pn.ten, "quoc_gia": pn.quoc_gia} if pn else None,
             "sua_boi": o.sua_boi, "sua_luc": o.sua_luc.isoformat(timespec="minutes") if o.sua_luc else None,
             "luot_7_ngay": luot7.get(o.id, 0), "sua_duoc": sua_duoc(u),
@@ -219,6 +237,23 @@ def sua(db: Session, u: User, ota_id: int, d: dict, now: datetime | None = None)
         raise LoiOta("Bật SubID thì phải khai tên tham số")
     if o.subid_tham_so and re.search(rf"[?&]{re.escape(o.subid_tham_so)}=", o.link or ""):
         raise LoiOta("Link đã có sẵn tham số này — chọn tên khác")
+    # KS-5 · quyền: chỉ nhận mã trong danh mục. Gõ sai một chữ mà im lặng bỏ qua thì màn hình
+    # nói đã cấp còn máy chủ nghĩ chưa — đúng kiểu hỏng mà vẫn xanh.
+    if d.get("quyen") is not None:
+        xin = [q.strip().upper() for q in str(d["quyen"]).split(",") if q.strip()]
+        la = [q for q in xin if q not in QUYEN_OTA]
+        if la:
+            raise LoiOta("Không có quyền này: " + ", ".join(la[:3]))
+        o.quyen = ",".join(q for q in QUYEN_OTA if q in set(xin))
+    if d.get("moi_truong") is not None:
+        mt = str(d["moi_truong"]).strip()
+        if mt not in MOI_TRUONG_OTA:
+            raise LoiOta("Môi trường không hợp lệ")
+        # «Chạy thật» đòi bằng chứng: thư duyệt, hợp đồng, kết quả certification. Không có
+        # bằng chứng thì không có cách nào soát lại về sau xem ai mở và dựa vào đâu.
+        if mt == "that" and not (d.get("bang_chung") or o.bang_chung or "").strip():
+            raise LoiOta("Mở Chạy thật thì phải ghi bằng chứng: thư duyệt / hợp đồng / certification")
+        o.moi_truong = mt
     for k in ("bang_chung", "ghi_chu"):
         if d.get(k) is not None:
             setattr(o, k, str(d[k]).strip()[:2000])

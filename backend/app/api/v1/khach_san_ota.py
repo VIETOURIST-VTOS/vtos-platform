@@ -90,6 +90,8 @@ def them_phap_nhan(data: PhapNhanIn, u: User = Depends(require_roles(*S.VAI_SUA)
 
 class SuaIn(BaseModel):
     trang_thai: str | None = None
+    quyen: str | None = None        # KS-5: danh sách quyền Agoda đã cấp, ngăn bằng dấu phẩy
+    moi_truong: str | None = None   # KS-5: tat | thu | that
     phap_nhan_id: int | None = None
     link: str | None = None
     ten_mien: str | None = None
