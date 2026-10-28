@@ -200,6 +200,13 @@ def sua(db: Session, u: User, ota_id: int, d: dict, now: datetime | None = None)
     for k in ("da_kiem_link", "duoc_dung_web"):
         if d.get(k) is not None:
             setattr(o, k, bool(d[k]))
+    if doi_link:
+        # Cờ «đã kiểm» của link CŨ không được theo sang link MỚI. Màn Sửa gửi cả năm ô —
+        # link, tên miền, đường dẫn, đã-kiểm, được-dùng-web — trong MỘT lượt, nên nhánh
+        # `doi_link` phía trên vừa xoá cờ thì vòng lặp ngay trên đây ghi đè lại: phép kiểm
+        # lại link bị xoá bởi đúng cái lượt đã đặt ra nó (đo 29/10/2026). Đặt lại ở ĐÂY,
+        # sau mọi phép gán, nên không còn đường nào ghi đè được nữa.
+        o.bat, o.da_kiem_link = False, False
     # KS-2: SubID — chỉ khi OTA cho phép; tên tham số chỉ chữ / số / gạch dưới, không trùng tham số sẵn có của link.
     if d.get("subid_tham_so") is not None:
         ts = str(d["subid_tham_so"]).strip()
