@@ -297,3 +297,16 @@ def test_thanh_pho_anh_va_an_o_dau(db):
     mon = [x for x in N.danh_sach_cong(db)["noi_dung"] if x["loai"] == "mon"][0]
     assert [a["ten"] for a in mon["an_o_dau"]] == ["Phở Hòa"] and mon["ten_khac"] == "Beef pho"
     assert "nha_hang_ids" not in mon and "sua_boi" not in mon
+
+
+def test_dia_danh_nguon_quy_ve_thanh_pho():
+    """29/10/2026: mọi địa danh trên danh mục nguồn đều quy về một thành phố ẩm thực; còn dấu mới phân biệt."""
+    from app.services import nha_hang as N
+    for nguon, tp in (("HO CHI MINH CITY", "TP. Hồ Chí Minh"), ("HANOI", "Hà Nội"), ("HUẾ", "Huế"), ("HỘI AN", "Hội An"),
+                      ("ĐÀ NẴNG", "Đà Nẵng"), ("CẦN THƠ", "Cần Thơ"), ("NHA TRANG", "Nha Trang"), ("ĐÀ LẠT", "Đà Lạt"),
+                      ("BUÔN MA THUỘT", "Buôn Ma Thuột"), ("HÀ GIANG", "Hà Giang"), ("PHAN THIẾT", "Phan Thiết – Mũi Né"),
+                      ("QUI NHƠN", "Quy Nhơn"), ("QUẢNG NAM PROVINCE", "Hội An"), ("TRÀ VINH", "Trà Vinh"),
+                      ("THẠNH XUÂN", "TP. Hồ Chí Minh"), ("MEKONG DELTA", "Cần Thơ"), ("Pleiku", "Pleiku"), ("Dong Hoi", "Đồng Hới")):
+        assert N.tinh_tu_nguon(nguon) == tp, nguon
+    assert N.tinh_tu_nguon("Thanh Xuân") == "Thanh Xuân"                              # quận Hà Nội: không đoán bừa
+    assert N.tinh_tu_nguon("South Central Coast") == "South Central Coast"           # vùng lạ: giữ để Điều hành sửa
