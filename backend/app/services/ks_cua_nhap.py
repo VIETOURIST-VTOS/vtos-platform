@@ -182,6 +182,8 @@ CUA_TAY = (
     # AT-1 (28/10/2026): Điều hành ghi nhận hợp đồng đã ký + tải tệp; Marketing viết món / điểm đến — màn /nha-hang.
     "hop_dong_nha_hang",
     "noi_dung_am_thuc",
+    # AT-2a (29/10/2026): Điều hành / Marketing tải ảnh album, TP Điều hành duyệt — màn /nha-hang › Album ảnh.
+    "anh_nha_hang",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

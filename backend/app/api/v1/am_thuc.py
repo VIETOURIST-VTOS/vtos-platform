@@ -42,6 +42,18 @@ def _phanh(req: Request) -> None:
             luot.pop(k, None)
 
 
+@router.get("/anh/nh/{pid}/{co}")
+def anh_album(pid: int, co: str, request: Request, db: Session = Depends(get_db)):
+    """AT-2a: ảnh album nhà hàng — chỉ ảnh ĐÃ DUYỆT, căn cứ đã xác minh, của nhà hàng đang hiện; chỉ bản hiển thị
+    / ảnh nhỏ (bản gốc không bao giờ ra cổng)."""
+    _phanh(request)
+    try:
+        data, a = NH.tep_album(db, None, pid, co)
+    except NH.LoiNhaHang as ex:
+        raise HTTPException(404, str(ex))
+    return Response(content=data, media_type=a.kieu_noi_dung or "image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+
+
 @router.get("/anh/{aid}")
 def anh(aid: int, request: Request, db: Session = Depends(get_db)):
     """Ảnh của nhà hàng đang hiện / nội dung đã bật. Ảnh khác (kể cả ảnh cũ đã thay) trả 404."""

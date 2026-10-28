@@ -7,6 +7,7 @@
    khoản, không mật khẩu) — dùng chung cho cổng khách / cổ đông / đối tác. Ảnh tải qua cửa /api/v1/am-thuc/anh. */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { goiCong } from "@/lib/cong";
+import AlbumKhach from "./AlbumKhach";
 import { BD_W, BD_H, BD_VN, BD_LANG_GIENG, BD_TP, BD_HOANG_SA, BD_TRUONG_SA, BD_NHAN_HS, BD_NHAN_TS } from "./banDoVN";
 
 const tien = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString("vi-VN")} đ` : "—");
@@ -79,19 +80,17 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
 
   if (nh) return (<div className="at"><style>{CSS}</style>
     <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => setNh(null)}><span>← Hương vị Việt Nam</span></button>
-    <section className="at-mon">
-      <Anh src={nh.anh} nguon={nh.anh_nguon} ten={nh.ten} tl="4/3" cls="at-bo" />
-      <div className="at-mon-chu">
-        <div className="at-loai"><span className="at-ghim"><Ghim /></span>{[nh.khu_vuc, nh.tinh_thanh].filter(Boolean).join(", ") || nh.dia_danh_nguon}</div>
-        <h2>{nh.ten}</h2>
+    <AlbumKhach album={nh.album} ten={nh.ten} coTab
+      dong2={[[nh.khu_vuc, nh.tinh_thanh].filter(Boolean).join(", ") || nh.dia_danh_nguon, nh.am_thuc ? `Ẩm thực ${nh.am_thuc}` : ""].filter(Boolean).join(" · ")}
+      nhan={<div style={{ marginTop: 8 }}><span className="at-chua">Chưa mở đặt bàn qua Vietourist</span></div>}
+      gioiThieu={<div className="at-mon-chu at-the-gt">
+        <h3>Câu chuyện nhà hàng</h3>
         {nh.mon_noi_bat && <p><b>Nổi tiếng với:</b> {nh.mon_noi_bat}</p>}
         <p>{nh.mo_ta || "Vietourist đang biên tập phần giới thiệu nhà hàng này."}</p>
         <dl className="at-facts"><dt>Giờ mở cửa</dt><dd>{nh.gio_phuc_vu || "Đang cập nhật"}</dd><dt>Giá, thực đơn</dt><dd>Đang cập nhật</dd>
           <dt>Thông tin liên hệ</dt><dd>{nh.da_xac_minh ? "Vietourist đã xác minh" : "Đang xác minh"}</dd></dl>
-        <span className="at-chua">Chưa mở đặt bàn qua Vietourist</span>
         <small className="at-phu">Nhà hàng chưa ký hợp tác với Vietourist. Thông tin có thể đã thay đổi — Vietourist đang cập nhật.</small>
-      </div>
-    </section>
+      </div>} />
   </div>);
 
   const muc = [["at-tp", "Thành phố ẩm thực"], ["at-mon", "Món ăn Việt Nam", mons.length || nd.some((x: any) => x.loai === "mon")],
@@ -160,12 +159,12 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
             <button type="button" className="at-tab cursor-interaction" aria-pressed={!loc.tinh} onClick={() => doi({ tinh: "" })}>Tất cả {tong}</button>
             {Object.entries(dem).sort((a, b) => b[1] - a[1]).map(([t, c]) => <button key={t} type="button" className="at-tab cursor-interaction" aria-pressed={loc.tinh === t} onClick={() => doi({ tinh: t })}>{t} {c}</button>)}</div>
           <div className="at-luoi">{ds.nha_hang.map((n: any) => <article key={n.id} className="at-the">
-            <button type="button" className="at-the-anh cursor-interaction" onClick={() => (n.mo_dat ? onDat(n) : (setNh(n), window.scrollTo(0, 0)))} aria-label={`Xem ${n.ten}`}><Anh src={n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /></button>
+            <button type="button" className="at-the-anh cursor-interaction" onClick={() => xemNh(n.id)} aria-label={`Xem ${n.ten}`}><Anh src={n.anh_nho || n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /></button>
             <h3>{n.ten}</h3><div className="at-noi-o"><span className="at-ghim"><Ghim /></span>{[n.khu_vuc, n.tinh_thanh].filter(Boolean).join(", ") || n.dia_danh_nguon}</div>
             {n.mon_noi_bat && <div className="at-phu">Nổi tiếng với: <b>{n.mon_noi_bat}</b></div>}
             {n.mo_dat ? <><span className="at-vtd">★ Đặt qua Vietourist · tích điểm</span><div className="at-phu">Thực đơn từ <b>{tien(n.gia_tu)}</b>/người</div>
-              <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => onDat(n)}><span>Đặt bàn qua Vietourist</span></button></>
-              : <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => { setNh(n); window.scrollTo(0, 0); }}><span>Xem nhà hàng</span></button>}
+              <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => xemNh(n.id)}><span>Đặt bàn qua Vietourist</span></button></>
+              : <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => xemNh(n.id)}><span>Xem nhà hàng</span></button>}
           </article>)}</div>
           {!ds.nha_hang.length && <p className="at-phu">Chưa có nhà hàng{loc.tinh || loc.q || loc.chi_dat ? " khớp bộ lọc" : ""}. Vietourist đang bổ sung danh mục.</p>}
           {soTrang > 1 && <div className="at-trang">
@@ -271,6 +270,7 @@ const CSS = `
 .at-mon-chu{display:flex;flex-direction:column;gap:12px;min-width:0}.at-mon-chu h2{font-size:30px}.at-mon-chu p{margin:0;max-width:62ch}
 .at-mon-chu h3{font-size:16px}
 .at-facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:14px;margin:0}.at-facts dt{color:var(--at-muted)}.at-facts dd{margin:0}
+.at-the-gt{background:#fff;border:1px solid var(--at-line);border-radius:12px;padding:18px}
 .at-an{display:flex;flex-direction:column;gap:8px}
 .at-an>div{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--at-line);border-radius:10px}
 .at button:focus-visible,.at a:focus-visible{outline:2px solid var(--at-teal);outline-offset:2px}

@@ -225,8 +225,9 @@ def test_xem_phai_qua_otp_anh_chi_mo_muc_dang_hien(db):
     nh = sorted(N.danh_sach_vtos(db)["nha_hang"], key=lambda x: x["ten"] != "Phở Hòa")
     N.luu_nha_hang(db, _u(db, "dh"), {"ten": nh[0]["ten"], "tinh_thanh": nh[0]["tinh_thanh"], "ghi_chu_noi_bo": "SĐT chủ 0909"}, nh[0]["id"])
     N.bat_hien(db, _u(db, "tp"), nh[0]["id"], True)
-    a1 = N.gan_anh(db, _u(db, "dh"), "nha_hang", nh[0]["id"], "a.png", "image/png", PNG, "VTD chụp")
-    a2 = N.gan_anh(db, _u(db, "dh"), "nha_hang", nh[1]["id"], "b.png", "image/png", PNG + b"x", "VTD chụp")
+    from tests.test_at2a_album import anh_da_duyet
+    a1 = f"nh/{anh_da_duyet(db, nh[0]['id'], 1)}/hien"               # AT-2a: ảnh nhà hàng qua album đã duyệt
+    a2 = f"nh/{anh_da_duyet(db, nh[1]['id'], 2)}/hien"
     tk = TaiKhoanNgoai(loai="khach_hang", dien_thoai="0901999999", trang_thai="hoat_dong"); db.add(tk); db.commit()
     phien = {"Authorization": f"Bearer {C.cap_phien(tk)}"}
     app.dependency_overrides[get_db] = lambda: db
@@ -261,22 +262,17 @@ def test_thanh_pho_anh_va_an_o_dau(db):
     nh = {x["ten"]: x for x in N.danh_sach_vtos(db)["nha_hang"]}
     pho = nh["Phở Hòa"]["id"]
     N.bat_hien(db, _u(db, "tp"), pho, True)
-    # ảnh: bắt buộc nguồn, chỉ nhận ảnh, đúng vai
-    with pytest.raises(N.LoiNhaHang, match="nguồn"):
-        N.gan_anh(db, _u(db, "dh"), "nha_hang", pho, "a.png", "image/png", PNG, "")
-    with pytest.raises(N.LoiNhaHang, match="ảnh"):
-        N.gan_anh(db, _u(db, "dh"), "nha_hang", pho, "a.pdf", "application/pdf", b"%PDF-1.4 x", "VTD chụp")
-    with pytest.raises(N.LoiNhaHang):
-        N.gan_anh(db, _u(db, "kd"), "nha_hang", pho, "a.png", "image/png", PNG, "VTD chụp")
-    aid = N.gan_anh(db, _u(db, "dh"), "nha_hang", pho, "a.png", "image/png", PNG, "Nhà hàng cấp quyền")
-    data, _a = N.anh_cong(db, aid)
-    assert data == PNG
+    # ảnh nhà hàng: AT-2a chỉ qua album (căn cứ quyền dùng + TP ĐH duyệt), không gắn ảnh đơn nữa
+    from tests.test_at2a_album import anh_da_duyet
+    with pytest.raises(N.LoiNhaHang, match="Album"):
+        N.gan_anh(db, _u(db, "dh"), "nha_hang", pho, "a.png", "image/png", PNG, "VTD chụp")
+    pid = anh_da_duyet(db, pho, 1, credit="Ảnh: Phở Hòa")
     o = N.danh_sach_cong(db)["nha_hang"][0]
-    assert o["anh"] == f"/api/v1/am-thuc/anh/{aid}" and o["anh_nguon"] == "Nhà hàng cấp quyền"
+    assert o["anh"] == f"/api/v1/am-thuc/anh/nh/{pid}/hien" and o["anh_nguon"] == "Ảnh: Phở Hòa"
     bun = nh["Bún Chả Hương Liên"]["id"]
-    aid2 = N.gan_anh(db, _u(db, "mkt"), "nha_hang", bun, "b.png", "image/png", PNG + b"2", "VTD chụp")
+    pid2 = anh_da_duyet(db, bun, 2)
     with pytest.raises(N.LoiNhaHang):
-        N.anh_cong(db, aid2)                                                          # nhà hàng chưa hiện → không ra ngoài
+        N.tep_album(db, None, pid2, "hien")                                           # nhà hàng chưa hiện → không ra ngoài
     # thành phố
     with pytest.raises(N.LoiNhaHang, match="thành phố"):
         N.luu_noi_dung(db, _u(db, "mkt"), {"loai": "thanh_pho", "ten": "Tỉnh Lạ"})

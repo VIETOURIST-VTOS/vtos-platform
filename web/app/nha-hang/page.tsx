@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, getToken, taiTep } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import AlbumNhaHang, { AnhChoDuyet } from "@/components/nha-hang/AlbumNhaHang";
 
 /** KH-2 · NHÀ HÀNG (CỔNG KHÁCH) — Chủ tịch duyệt bản xem thử 26/10/2026.
  *  Điều hành nhập nhà hàng + thực đơn (chỉ GIÁ BÁN). TP Điều hành bật «Hiện trên cổng» (DT-2b, Chủ tịch 28/10/2026);
@@ -33,8 +34,8 @@ function Trang() {
   const bat = ["tp_dh", "chutich", "tgd"].includes(role);
   const mkt = ["nv_mkt", "ptgd_mkt", "nv_dh", "tp_dh", "chutich", "tgd"].includes(role);   // 29/10/2026: Điều hành cũng viết nội dung
   const xemHd = nhap || ["ketoan", "bks"].includes(role);
-  const [tab, setTab] = useState<"nh" | "nd">(["nv_mkt", "ptgd_mkt"].includes(role) ? "nd" : "nh");
-  const [tim, setTim] = useState(""); const [locTinh, setLocTinh] = useState("");
+  const [tab, setTab] = useState<"nh" | "nd" | "cd">(["nv_mkt", "ptgd_mkt"].includes(role) ? "nd" : "nh");
+  const [tim, setTim] = useState(""); const [locTinh, setLocTinh] = useState(""); const [locAnh, setLocAnh] = useState("");
   const [chon, setChon] = useState<number[]>([]);
   const [tep, setTep] = useState<File | null>(null); const [nguon, setNguon] = useState(""); const [thu, setThu] = useState<any>(null);
   const [hd, setHd] = useState<any>(HD_TRONG); const [tepHd, setTepHd] = useState<File | null>(null);
@@ -47,6 +48,7 @@ function Trang() {
   const [f, setF] = useState<any>(NH_TRONG);
   const [td, setTd] = useState<any>(null);         // {id?, ...} gói đang sửa
   const [busy, setBusy] = useState(false);
+  const [tabNh, setTabNh] = useState<"album" | "td" | "gt" | "hd" | "tt">("album");   // AT-2a: hồ sơ nội dung theo tab
   const load = useCallback(() => { api("/nha-hang").then(setX).catch((e) => toast(errMsg(e), true)); }, [toast]);
   useEffect(() => { load(); }, [load]);
   const goi = async (path: string, json: any) => {
@@ -72,7 +74,7 @@ function Trang() {
       const r = await guiTep(`/nha-hang/${nid}/hop-dong`, fd); toast(r.message); setHd(HD_TRONG); setTepHd(null); load();
     } catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
   };
-  const taiAnh = async (doi: "nha_hang" | "noi_dung", id: number) => {
+  const taiAnh = async (doi: "noi_dung", id: number) => {
     if (!anh.tep) { toast("Chọn tệp ảnh", true); return; }
     setBusy(true);
     try {
@@ -81,7 +83,7 @@ function Trang() {
     } catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
   };
   const xemAnh = (aid: number) => taiTep(`/nha-hang/anh/${aid}`, `anh_${aid}.jpg`).catch((e) => toast(errMsg(e), true));
-  const oAnh = (doi: "nha_hang" | "noi_dung", id: number, co: boolean, nguonCu: string, aid?: number) => <div className="panel" style={{ marginTop: 8 }}>
+  const oAnh = (doi: "noi_dung", id: number, co: boolean, nguonCu: string, aid?: number) => <div className="panel" style={{ marginTop: 8 }}>
     <b>Ảnh trên web VTD</b> {co ? <><Tag cls="ok">Có ảnh</Tag><span className="muted"> nguồn: {nguonCu}</span>{aid && <button className="act grey" onClick={() => xemAnh(aid)}>Tải ảnh</button>}</> : <Tag cls="warn">Chưa có ảnh</Tag>}
     <div className="grid">
       <label>Tệp ảnh (JPG / PNG / WEBP)<input type="file" accept="image/*" onChange={(e) => setAnh({ ...anh, tep: e.target.files?.[0] || null })} /></label>
@@ -90,7 +92,9 @@ function Trang() {
   </div>;
   if (!x) return <p className="muted">Đang tải…</p>;
   const k = (s: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase();
-  const loc = x.nha_hang.filter((n: any) => (!locTinh || n.tinh_thanh === locTinh) && (!tim || k(`${n.ten} ${n.tinh_thanh} ${n.dia_danh_nguon} ${n.mon_noi_bat} ${n.ma}`).includes(k(tim))));
+  // AT-2a: lọc theo mức hoàn thiện ảnh
+  const LOC_ANH: Record<string, (n: any) => boolean> = { thieu: (n) => !n.anh_ht.da_duyet, bia: (n) => !n.anh_ht.co_bia, cho: (n) => n.anh_ht.cho_duyet > 0 };
+  const loc = x.nha_hang.filter((n: any) => (!locAnh || LOC_ANH[locAnh](n)) && (!locTinh || n.tinh_thanh === locTinh) && (!tim || k(`${n.ten} ${n.tinh_thanh} ${n.dia_danh_nguon} ${n.mon_noi_bat} ${n.ma}`).includes(k(tim))));
   const cacTinh = Array.from(new Set(x.nha_hang.map((n: any) => n.tinh_thanh).filter(Boolean))).sort() as string[];
   const dang = sua && sua !== "moi" ? x.nha_hang.find((n: any) => n.id === sua) : null;
   const o = (k: string, nhan: string, ph = "") => <label>{nhan}<input value={f[k]} placeholder={ph} disabled={!nhap} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></label>;
@@ -107,7 +111,9 @@ function Trang() {
       Chỉ nhập <b>giá bán cho khách</b>; giá vốn / phí NCC theo hợp đồng nhà cung cấp, không nhập ở đây.</p>
     <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
       <button className={`act ${tab === "nh" ? "teal" : "grey"}`} onClick={() => setTab("nh")}>Nhà hàng</button>
-      <button className={`act ${tab === "nd" ? "teal" : "grey"}`} onClick={() => setTab("nd")}>Nội dung ẩm thực</button></div>
+      <button className={`act ${tab === "nd" ? "teal" : "grey"}`} onClick={() => setTab("nd")}>Nội dung ẩm thực</button>
+      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Ảnh chờ duyệt ({x.so_anh_cho_duyet})</button></div>
+    {tab === "cd" && <AnhChoDuyet toast={toast} onDoi={load} />}
 
     {tab === "nd" && <section className="panel">
       <h2>Nội dung trang «Hương vị Việt Nam»</h2>
@@ -180,29 +186,49 @@ function Trang() {
       <input placeholder="Tìm tên, món, địa danh…" value={tim} onChange={(e) => setTim(e.target.value)} />
       <select value={locTinh} onChange={(e) => setLocTinh(e.target.value)}><option value="">Mọi tỉnh ({x.nha_hang.length})</option>
         {cacTinh.map((t) => <option key={t} value={t}>{t} ({x.nha_hang.filter((n: any) => n.tinh_thanh === t).length})</option>)}</select>
+      <select aria-label="Lọc theo ảnh" value={locAnh} onChange={(e) => setLocAnh(e.target.value)}><option value="">Ảnh: tất cả</option>
+        <option value="thieu">Thiếu ảnh ({x.nha_hang.filter(LOC_ANH.thieu).length})</option>
+        <option value="bia">Chưa có ảnh bìa ({x.nha_hang.filter(LOC_ANH.bia).length})</option>
+        <option value="cho">Có ảnh chờ duyệt ({x.nha_hang.filter(LOC_ANH.cho).length})</option></select>
       {bat && chon.length > 0 && <>
         <button className="act teal" disabled={busy} onClick={async () => { const r = await goi("/nha-hang/hien-hang-loat", { ids: chon, bat: true }); if (r) setChon([]); }}>Bật hiện {chon.length} nơi</button>
         <button className="act grey" disabled={busy} onClick={async () => { const r = await goi("/nha-hang/hien-hang-loat", { ids: chon, bat: false }); if (r) setChon([]); }}>Tắt {chon.length} nơi</button></>}
     </div>
 
     <div className="panel wrap"><table><thead><tr>{bat && <th><input type="checkbox" aria-label="Chọn tất cả" checked={loc.length > 0 && chon.length === loc.length} onChange={(e) => setChon(e.target.checked ? loc.map((n: any) => n.id) : [])} /></th>}
-        <th>Nhà hàng</th><th>Địa điểm</th><th>Ẩm thực</th><th>Thực đơn đang bán</th><th>Trên web VTD</th><th>Đặt bàn qua VTD</th><th></th></tr></thead>
+        <th>Nhà hàng</th><th>Địa điểm</th><th>Ẩm thực</th><th>Thực đơn đang bán</th><th>Ảnh</th><th>Trên web VTD</th><th>Đặt bàn qua VTD</th><th></th></tr></thead>
       <tbody>{loc.map((n: any) => <tr key={n.id}>
         {bat && <td><input type="checkbox" aria-label={`Chọn ${n.ten}`} checked={chon.includes(n.id)} onChange={(e) => setChon(e.target.checked ? [...chon, n.id] : chon.filter((i) => i !== n.id))} /></td>}
         <td><b>{n.ten}</b><div className="muted">{n.ma} · nhập bởi {n.tao_boi}{n.nguon ? ` · ${n.nguon}` : ""}</div></td>
         <td>{[n.tinh_thanh, n.khu_vuc].filter(Boolean).join(" · ")}{n.dia_danh_nguon && n.dia_danh_nguon !== n.tinh_thanh && <div className="muted">nguồn: {n.dia_danh_nguon}</div>}</td><td>{n.am_thuc}</td>
         <td>{n.so_dang_ban}{n.so_dang_ban ? ` (từ ${d(Math.min(...n.thuc_don.filter((t: any) => t.dang_ban).map((t: any) => t.gia_nguoi_lon)))})` : ""}</td>
+        <td>{n.anh_ht.da_duyet ? <Tag cls="ok">{n.anh_ht.da_duyet} đã duyệt</Tag> : <Tag cls="warn">Thiếu ảnh</Tag>}
+          {n.anh_ht.cho_duyet > 0 && <div className="muted">{n.anh_ht.cho_duyet} chờ duyệt</div>}<div className="muted">Bìa: {n.anh_ht.co_bia ? "✔" : "—"}</div></td>
         <td>{n.ngung ? <Tag cls="red">Ngừng hợp tác</Tag> : n.hien_cong ? <><Tag cls="ok">Đang hiện</Tag><div className="muted">{n.hien_boi}</div></>
           : <><Tag cls="warn">Chưa hiện</Tag>{n.tat_ly_do && <div className="muted">{n.tat_ly_do}</div>}</>}</td>
         <td>{n.mo_dat ? <Tag cls="ok">Đang mở</Tag> : <><Tag>Chưa mở</Tag><div className="muted">{n.dieu_kien.filter((c: any) => c.ok).length}/5 điều kiện</div></>}</td>
         <td style={{ whiteSpace: "nowrap" }}>
-          <button className="act grey" onClick={() => { setSua(n.id); setF({ ...NH_TRONG, ...n }); setTd(null); setHd(HD_TRONG); setTepHd(null); setGt({ mo_ta: n.mo_ta || "", mon_noi_bat: n.mon_noi_bat || "" }); }}>{nhap ? "Sửa" : "Xem"}</button>
+          <button className="act grey" onClick={() => { setSua(n.id); setTabNh("album"); setF({ ...NH_TRONG, ...n }); setTd(null); setHd(HD_TRONG); setTepHd(null); setGt({ mo_ta: n.mo_ta || "", mon_noi_bat: n.mon_noi_bat || "" }); }}>{nhap ? "Sửa" : "Xem"}</button>
           {bat && !n.ngung && <button className="act teal" disabled={busy} onClick={() => goi(`/nha-hang/${n.id}/hien-cong`, { bat: !n.hien_cong })}>{n.hien_cong ? "Tắt khỏi cổng" : "Bật hiện cổng"}</button>}
         </td></tr>)}
-        {!loc.length && <tr><td colSpan={8} className="muted">{x.nha_hang.length ? "Không có nhà hàng khớp bộ lọc." : "Chưa có nhà hàng nào. Điều hành nhập tệp hoặc bấm «Thêm nhà hàng»."}</td></tr>}</tbody></table></div>
+        {!loc.length && <tr><td colSpan={9} className="muted">{x.nha_hang.length ? "Không có nhà hàng khớp bộ lọc." : "Chưa có nhà hàng nào. Điều hành nhập tệp hoặc bấm «Thêm nhà hàng»."}</td></tr>}</tbody></table></div>
 
     {sua && <section className="panel" style={{ marginTop: 14 }}>
-      <h2>{sua === "moi" ? "Thêm nhà hàng" : `${dang?.ma} · ${dang?.ten}`}</h2>
+      {dang ? <>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
+          <div><div className="muted" style={{ fontSize: 12, letterSpacing: ".08em" }}>NHÀ HÀNG / HỒ SƠ NỘI DUNG · {dang.ma}</div>
+            <h2 style={{ margin: "2px 0" }}>{dang.ten}</h2><div className="muted">{[dang.tinh_thanh, dang.am_thuc ? `Ẩm thực ${dang.am_thuc}` : ""].filter(Boolean).join(" · ")}</div></div>
+          <button className="act grey" onClick={() => setSua(null)}>Đóng</button></div>
+        <div className="panel" style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", margin: "10px 0" }}>
+          <span><b>{dang.anh_ht.da_duyet + dang.anh_ht.cho_duyet + dang.anh_ht.nhap + dang.anh_ht.an}</b> ảnh / 60 · {dang.anh_ht.da_duyet} đã duyệt</span>
+          <span><b>{dang.so_dang_ban}</b> gói đang bán</span>
+          <span>Hợp đồng: <b>{dang.hop_dong.some((h: any) => h.con_dung) ? "đã ghi nhận" : "chưa xác nhận"}</b></span>
+          <span style={{ flex: 1 }} />{dang.mo_dat ? <Tag cls="ok">Đang mở đặt bàn</Tag> : <Tag cls="warn">Chưa mở đặt bàn · {dang.dieu_kien.filter((c: any) => c.ok).length}/5</Tag>}</div>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--line, #2a3b4d)", marginBottom: 10 }}>
+          {([["album", "Album ảnh"], ["td", "Thực đơn / gói"], ["gt", "Giới thiệu"], ["hd", "Hợp đồng & đặt bàn"], ["tt", "Thông tin"]] as const).map(([k, t]) =>
+            <button key={k} className={`act ${tabNh === k ? "teal" : "grey"}`} onClick={() => setTabNh(k)}>{t}</button>)}</div>
+      </> : <h2>Thêm nhà hàng</h2>}
+      {(!dang || tabNh === "tt") && <>
       <div className="grid">
         {o("ten", "Tên nhà hàng")}<label>Thành phố<select value={f.tinh_thanh} disabled={!nhap} onChange={(e) => setF({ ...f, tinh_thanh: e.target.value })}>
           <option value="">— chọn —</option>{f.tinh_thanh && !x.thanh_pho.some((t: any) => t.ten === f.tinh_thanh) && <option value={f.tinh_thanh}>{f.tinh_thanh} (chưa khớp danh sách)</option>}
@@ -212,10 +238,13 @@ function Trang() {
       </div>
       <label>Giới thiệu cho khách<textarea rows={2} value={f.mo_ta} disabled={!nhap} onChange={(e) => setF({ ...f, mo_ta: e.target.value })} /></label>
       <label>Ghi chú nội bộ (không lên cổng)<textarea rows={2} value={f.ghi_chu_noi_bo} disabled={!nhap} onChange={(e) => setF({ ...f, ghi_chu_noi_bo: e.target.value })} /></label>
-      {nhap && <button className="act teal" disabled={busy} onClick={async () => { const r = await goi(sua === "moi" ? "/nha-hang" : `/nha-hang/${sua}`, f); if (r && sua === "moi") setSua(r.id); }}>Lưu nhà hàng</button>}
-      <button className="act grey" onClick={() => setSua(null)}>Đóng</button>
+      {nhap && <button className="act teal" disabled={busy} onClick={async () => { const r = await goi(sua === "moi" ? "/nha-hang" : `/nha-hang/${sua}`, f); if (r && sua === "moi") { setSua(r.id); setTabNh("album"); } }}>Lưu nhà hàng</button>}
+      {!dang && <button className="act grey" onClick={() => setSua(null)}>Đóng</button>}
+      </>}
 
       {dang && <>
+        {tabNh === "album" && <AlbumNhaHang nid={dang.id} toast={toast} onDoi={load} />}
+        {tabNh === "td" && <>
         <h3 style={{ marginTop: 14 }}>Thực đơn / gói</h3>
         <div className="panel wrap"><table><thead><tr><th>Gói</th><th>Loại</th><th>Giá người lớn</th><th>Giá trẻ em</th><th>Áp dụng</th><th>Điều kiện / hủy</th><th>Đang bán</th><th></th></tr></thead>
           <tbody>{dang.thuc_don.map((g: any) => <tr key={g.id}><td><b>{g.ten}</b>{g.so_khach_toi_thieu > 1 && <div className="muted">tối thiểu {g.so_khach_toi_thieu} khách</div>}</td>
@@ -239,14 +268,17 @@ function Trang() {
           <label style={{ display: "flex", flexDirection: "row", justifyContent: "flex-start", gap: 6, alignItems: "center" }}><input type="checkbox" checked={!!td.dang_ban} onChange={(e) => setTd({ ...td, dang_ban: e.target.checked })} />Đang bán</label>
           <button className="act teal" disabled={busy} onClick={luuTd}>Lưu gói</button><button className="act grey" onClick={() => setTd(null)}>Bỏ</button>
         </div>}
+        </>}
 
-        {(nhap || mkt) && oAnh("nha_hang", dang.id, !!dang.anh_id, dang.anh_nguon, dang.anh_id)}
-        {mkt && gt && <div className="panel" style={{ marginTop: 14 }}>
+        {tabNh === "gt" && !mkt && <div className="panel"><h3>Câu chuyện nhà hàng</h3><p>{dang.mo_ta || <span className="muted">Chưa có giới thiệu.</span>}</p>
+          {dang.mon_noi_bat && <p><b>Món nổi bật:</b> {dang.mon_noi_bat}</p>}</div>}
+        {tabNh === "gt" && mkt && gt && <div className="panel" style={{ marginTop: 14 }}>
           <h3>Giới thiệu trên web VTD</h3>
           <label>Món nổi bật<input value={gt.mon_noi_bat} onChange={(e) => setGt({ ...gt, mon_noi_bat: e.target.value })} /></label>
           <label>Giới thiệu do VTD viết<textarea rows={3} value={gt.mo_ta} onChange={(e) => setGt({ ...gt, mo_ta: e.target.value })} /></label>
           <button className="act teal" disabled={busy} onClick={() => goi(`/nha-hang/${dang.id}/gioi-thieu`, gt)}>Lưu giới thiệu</button></div>}
 
+        {tabNh === "hd" && <>
         <h3 style={{ marginTop: 14 }}>B. Điều kiện mở đặt bàn qua VTD</h3>
         <ul>{dang.dieu_kien.map((c: any) => <li key={c.ma}>{c.ok ? "✅" : "⬜"} {c.ten}</li>)}</ul>
         <p className="muted">Đủ 5 điều kiện và đang hiện trên web thì máy tự mở «Đặt bàn qua VTD»; hết hạn hợp đồng thì tự đóng nhận đặt mới, đơn cũ giữ nguyên.
@@ -278,6 +310,7 @@ function Trang() {
             <button className="act teal" disabled={busy} onClick={() => luuHd(dang.id)}>Lưu ghi nhận hợp đồng</button>
             <div className="muted">Tệp lưu vào hồ sơ nhà cung cấp, chỉ Điều hành / Kế toán / BKS / lãnh đạo mở. Sửa hợp đồng = thêm bản mới kèm lý do, không xóa bản cũ.</div>
           </div>}
+        </>}
         </>}
       </>}
     </section>}

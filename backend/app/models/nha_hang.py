@@ -119,3 +119,41 @@ class ThucDonNhaHang(Base):
     dang_ban: Mapped[bool] = mapped_column(Boolean, default=True)
     sua_boi: Mapped[str] = mapped_column(String(50), default="")
     sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ══ AT-2a · ALBUM ẢNH NHÀ HÀNG (Chủ tịch + Điều hành chốt 29/10/2026) ═══════════════════════════════════════
+# Chỉ ảnh của chính nhà hàng. Mỗi ảnh ghi CĂN CỨ QUYỀN DÙNG; «Chưa xác minh» không duyệt được, không ra cổng.
+# TP Điều hành duyệt, người tải không tự duyệt (trừ Chủ tịch, TGĐ). Chỉ ảnh «Đã duyệt» ra cổng khách.
+# Bản gốc giữ trong kho (nội bộ); cổng khách chỉ nhận bản hiển thị nhẹ do máy tạo.
+NHOM_ANH = {"mat_tien": "Mặt tiền", "khong_gian": "Không gian", "phong_rieng": "Phòng riêng", "mon_an": "Món ăn",
+            "trai_nghiem": "Trải nghiệm"}
+CAN_CU_ANH = {"nha_hang": "Nhà hàng cấp quyền", "vtd_chup": "VTD tự chụp", "ben_thu_ba": "Bên thứ ba cấp phép",
+              "chua_xac_minh": "Chưa xác minh"}
+TRANG_THAI_ANH = {"nhap": "Nháp", "cho_duyet": "Chờ duyệt", "da_duyet": "Đã duyệt", "an": "Ẩn"}
+
+
+class AnhNhaHang(Base):
+    __tablename__ = "anh_nha_hang"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nha_hang_id: Mapped[int] = mapped_column(ForeignKey("nha_hang.id"), index=True)
+    attachment_id: Mapped[int] = mapped_column(ForeignKey("attachments.id"))            # bản gốc — chỉ nội bộ
+    hien_id: Mapped[int | None] = mapped_column(ForeignKey("attachments.id"), nullable=True)   # bản hiển thị (≤1600px)
+    nho_id: Mapped[int | None] = mapped_column(ForeignKey("attachments.id"), nullable=True)    # ảnh nhỏ (≤480px)
+    rong: Mapped[int] = mapped_column(Integer, default=0)
+    cao: Mapped[int] = mapped_column(Integer, default=0)
+    nhom: Mapped[str] = mapped_column(String(20), default="")          # NHOM_ANH; rỗng = ảnh chuyển từ ảnh đơn cũ
+    chu_thich: Mapped[str] = mapped_column(String(200), default="")
+    mo_ta_thay_the: Mapped[str] = mapped_column(String(200), default="")
+    thu_tu: Mapped[int] = mapped_column(Integer, default=0)
+    la_bia: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_cu: Mapped[str] = mapped_column(String(20), default="chua_xac_minh")
+    can_cu_ghi_chu: Mapped[str] = mapped_column(String(300), default="")
+    credit: Mapped[str] = mapped_column(String(160), default="")
+    trang_thai: Mapped[str] = mapped_column(String(12), default="nhap")
+    ly_do_tra_lai: Mapped[str] = mapped_column(String(300), default="")
+    tai_boi: Mapped[str] = mapped_column(String(50), default="")
+    tai_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    sua_boi: Mapped[str] = mapped_column(String(50), default="")
+    sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    duyet_boi: Mapped[str] = mapped_column(String(50), default="")
+    duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
