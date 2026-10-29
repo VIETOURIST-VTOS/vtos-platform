@@ -16,16 +16,28 @@ const MAU_TT: Record<string, string> = { nhap: "", cho_duyet: "warn", da_duyet: 
 /** Ảnh nội bộ cần mã đăng nhập → tải blob rồi hiện. */
 export function AnhNoiBo({ src, alt, style }: { src: string; alt: string; style?: React.CSSProperties }) {
   const [url, setUrl] = useState("");
+  // 30/10/2026: chỉ tải khi ảnh lọt vào màn hình — màn «Chờ duyệt» 890 ảnh từng bắn 890 yêu cầu một lúc,
+  // máy chủ 0,5 CPU nghẽn, kiểm tra sức khỏe quá hạn và Render khởi động lại giữa lúc đang duyệt.
+  const [thay, setThay] = useState(false);
+  const o = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
+    if (thay || !o.current) return;
+    if (typeof IntersectionObserver === "undefined") { setThay(true); return; }
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setThay(true); io.disconnect(); } }, { rootMargin: "200px" });
+    io.observe(o.current);
+    return () => io.disconnect();
+  }, [thay]);
+  useEffect(() => {
+    if (!thay) return;
     let u = "", huy = false;
     fetch(`/api/v1${src.replace(/^\/api\/v1/, "")}`, { headers: { Authorization: `Bearer ${getToken() || ""}` } })
       .then((r) => (r.ok ? r.blob() : Promise.reject()))
       .then((b) => { if (!huy) { u = URL.createObjectURL(b); setUrl(u); } })
       .catch(() => {});
     return () => { huy = true; if (u) URL.revokeObjectURL(u); };
-  }, [src]);
+  }, [src, thay]);
   return url ? <img src={url} alt={alt} style={{ objectFit: "cover", display: "block", ...style }} />
-    : <div style={{ background: "var(--line, #2a3b4d)", ...style }} aria-label={alt} />;
+    : <div ref={o} style={{ background: "var(--line, #2a3b4d)", ...style }} aria-label={alt} />;
 }
 
 type Dong = { k: string; file: File; tt: "cho" | "tai" | "xong" | "loi" | "bo"; pt: number; loi: string };
@@ -231,6 +243,9 @@ export function AnhChoDuyet({ toast, onDoi }: { toast: (m: string, loi?: boolean
   const [chon, setChon] = useState<number[]>([]);
   const [lyDo, setLyDo] = useState("");
   const [busy, setBusy] = useState(false);
+  const [trang, setTrang] = useState(0);
+  const [tienDo, setTienDo] = useState("");
+  const MOI_TRANG = 50, MOI_LO = 100;
   const load = useCallback(() => api("/nha-hang/album/cho-duyet").then((r: any) => { setX(r); setChon([]); }).catch((e) => toast(errMsg(e), true)), [toast]);
   useEffect(() => { load(); }, [load]);
   if (!x) return <p className="muted">Đang tải…</p>;
@@ -238,9 +253,17 @@ export function AnhChoDuyet({ toast, onDoi }: { toast: (m: string, loi?: boolean
   const lam = async (duyet: boolean) => {
     if (!duyet && lyDo.trim().length < 3) { toast("Trả lại phải ghi lý do", true); return; }
     setBusy(true);
-    try { const r = await api<any>("/nha-hang/album/duyet", { method: "POST", json: { ids: chon, duyet, ly_do: lyDo } });
-      toast(r.message + (r.bo_qua?.length ? ` — ${r.bo_qua[0].ly_do}` : "")); setLyDo(""); load(); onDoi?.(); }
-    catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
+    // Gửi từng lô 100 ảnh, lần lượt — không dồn một yêu cầu lớn làm máy chủ quá hạn.
+    let doi = 0, bo = 0, ly = "";
+    try {
+      for (let i = 0; i < chon.length; i += MOI_LO) {
+        setTienDo(`Đang ${duyet ? "duyệt" : "trả lại"} ${Math.min(i + MOI_LO, chon.length)} / ${chon.length}…`);
+        const r = await api<any>("/nha-hang/album/duyet", { method: "POST", json: { ids: chon.slice(i, i + MOI_LO), duyet, ly_do: lyDo } });
+        doi += r.da_doi || 0; bo += r.bo_qua?.length || 0; if (!ly && r.bo_qua?.length) ly = r.bo_qua[0].ly_do;
+      }
+      toast(`Đã ${duyet ? "duyệt" : "trả lại"} ${doi} ảnh` + (bo ? ` · bỏ qua ${bo} — ${ly}` : "")); setLyDo("");
+    } catch (e) { toast(`${errMsg(e)} — đã ${duyet ? "duyệt" : "trả lại"} ${doi} ảnh trước khi lỗi; bấm lại để làm tiếp`, true); }
+    finally { setBusy(false); setTienDo(""); setTrang(0); load(); onDoi?.(); }
   };
   return (<section className="panel">
     <h2>Ảnh chờ duyệt <Tag cls="warn">{x.anh.length}</Tag></h2>
@@ -249,9 +272,10 @@ export function AnhChoDuyet({ toast, onDoi }: { toast: (m: string, loi?: boolean
         checked={duocChon.length > 0 && chon.length === duocChon.length} onChange={(e) => setChon(e.target.checked ? duocChon : [])} />Chọn tất cả</label>
       <button className="act teal" disabled={busy || !chon.length} onClick={() => lam(true)}>Duyệt {chon.length} ảnh đã chọn</button>
       <input placeholder="Lý do trả lại" value={lyDo} onChange={(e) => setLyDo(e.target.value)} />
-      <button className="act grey" disabled={busy || !chon.length} onClick={() => lam(false)}>Trả lại</button></div>}
+      <button className="act grey" disabled={busy || !chon.length} onClick={() => lam(false)}>Trả lại</button>
+      {tienDo && <span className="muted">{tienDo}</span>}</div>}
     <div className="wrap"><table><thead><tr>{x.duoc_duyet && <th></th>}<th>Ảnh</th><th>Nhà hàng</th><th>Nhóm · chú thích</th><th>Căn cứ quyền dùng</th><th>Người tải</th></tr></thead>
-      <tbody>{x.anh.map((a: any) => <tr key={a.id}>
+      <tbody>{x.anh.slice(trang * MOI_TRANG, (trang + 1) * MOI_TRANG).map((a: any) => <tr key={a.id}>
         {x.duoc_duyet && <td><input type="checkbox" aria-label={`Chọn ảnh ${a.id}`} disabled={!!a.khong_duyet} checked={chon.includes(a.id)}
           onChange={(e) => setChon(e.target.checked ? [...chon, a.id] : chon.filter((i) => i !== a.id))} /></td>}
         <td><AnhNoiBo src={a.nho} alt={a.chu_thich || a.nhom_ten} style={{ width: 96, height: 72, borderRadius: 6 }} /></td>
@@ -261,6 +285,10 @@ export function AnhChoDuyet({ toast, onDoi }: { toast: (m: string, loi?: boolean
           {a.khong_duyet && <div style={{ color: "var(--red, #e5484d)" }}>{a.khong_duyet}</div>}</td>
         <td className="muted">{a.tai_boi}</td></tr>)}
         {!x.anh.length && <tr><td colSpan={6} className="muted">Không có ảnh chờ duyệt.</td></tr>}</tbody></table></div>
-    <p className="muted">Ảnh do chính TP ĐH tải / sửa thì TP ĐH khác hoặc Chủ tịch / TGĐ duyệt. Ảnh thiếu căn cứ quyền dùng không duyệt được. Chỉ ảnh «Đã duyệt» mới ra cổng khách.</p>
+    {x.anh.length > MOI_TRANG && <div style={{ display: "flex", gap: 6, alignItems: "center", margin: "8px 0" }}>
+      <button className="act grey" disabled={trang === 0} onClick={() => setTrang(trang - 1)}>‹ Trước</button>
+      <span className="muted">Trang {trang + 1} / {Math.ceil(x.anh.length / MOI_TRANG)} · «Chọn tất cả» chọn cả {duocChon.length} ảnh ở mọi trang</span>
+      <button className="act grey" disabled={(trang + 1) * MOI_TRANG >= x.anh.length} onClick={() => setTrang(trang + 1)}>Sau ›</button></div>}
+    <p className="muted">Ảnh do chính TP ĐH tải / sửa thì TP ĐH khác hoặc Chủ tịch / TGĐ duyệt. Nguồn / căn cứ chỉ lưu nội bộ. Chỉ ảnh «Đã duyệt» mới ra cổng khách.</p>
   </section>);
 }
