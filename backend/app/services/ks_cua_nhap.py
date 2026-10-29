@@ -188,6 +188,8 @@ CUA_TAY = (
     "mon_nha_hang", "thuc_don_ban", "thuc_don_trang",
     # AT-2c (29/10/2026): Chủ tịch giao người biên tập — màn /nha-hang › Hoàn thiện.
     "bien_tap_nha_hang",
+    # AT-3 (29/10/2026): khách tự viết qua cổng (Đơn của tôi › Đánh giá); nhà hàng trả lời qua cổng NCC.
+    "danh_gia_nha_hang",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

@@ -234,3 +234,47 @@ class BienTapNhaHang(Base):
     giao_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     da_xin_boi: Mapped[str] = mapped_column(String(50), default="")
     da_xin_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ══ AT-3 · ĐÁNH GIÁ SAO NHÀ HÀNG (Chủ tịch duyệt bản xem thử 29/10/2026) ═════════════════════════════════════
+# Chỉ NGƯỜI ĐẶT của một đơn đặt bàn nhà hàng đã báo «khách đã dùng» mới viết được; một bài / đơn; trong 30 ngày
+# sau bữa ăn; sửa được 7 ngày. Hiện NGAY. Không ai ẩn được vì bài chê: chỉ NV / PTGĐ Marketing ẩn vì vi phạm
+# (4 lý do, bắt buộc ghi), TP Điều hành xem lại. Nhà hàng trả lời công khai một lần, sửa trong 24 giờ.
+LY_DO_AN_DG = {"chui_boi": "Chửi bới, xúc phạm", "thong_tin_ca_nhan": "Lộ thông tin cá nhân",
+               "quang_cao": "Quảng cáo / spam", "anh_sai": "Ảnh không phải món ăn, không gian"}
+MUC_DG = {"diem_mon": "Món ăn", "diem_phuc_vu": "Phục vụ", "diem_khong_gian": "Không gian", "diem_gia": "Đáng giá tiền"}
+
+
+class DanhGiaNhaHang(Base):
+    __tablename__ = "danh_gia_nha_hang"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    don_id: Mapped[int] = mapped_column(ForeignKey("don_dat_ban.id"), unique=True)
+    nha_hang_id: Mapped[int] = mapped_column(ForeignKey("nha_hang.id"), index=True)
+    tai_khoan_id: Mapped[int] = mapped_column(ForeignKey("tai_khoan_ngoai.id"), index=True)
+    ten_hien: Mapped[str] = mapped_column(String(40), default="")        # đã che, chụp lúc viết
+    ngay_an: Mapped[date] = mapped_column(Date)
+    so_khach: Mapped[int] = mapped_column(Integer, default=1)
+    la_doan: Mapped[bool] = mapped_column(Boolean, default=False)
+    diem: Mapped[int] = mapped_column(Integer)                            # 1–5, bắt buộc
+    # Bốn mục phụ: RỖNG khác 0 — bỏ trống thì không tính vào điểm mục đó.
+    diem_mon: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    diem_phuc_vu: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    diem_khong_gian: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    diem_gia: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    nhan_xet: Mapped[str] = mapped_column(Text, default="")
+    anh: Mapped[list] = mapped_column(JSON, default=list)                 # [{goc, hien, nho, an, ly_do}]
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    an: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    an_ly_do: Mapped[str] = mapped_column(String(20), default="")
+    an_ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    an_boi: Mapped[str] = mapped_column(String(50), default="")
+    an_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    xem_lai: Mapped[str] = mapped_column(String(6), default="")          # "" chờ · "giu" · "hien"
+    xem_lai_boi: Mapped[str] = mapped_column(String(50), default="")
+    xem_lai_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    tra_loi: Mapped[str] = mapped_column(Text, default="")
+    tra_loi_boi: Mapped[str] = mapped_column(String(60), default="")
+    tra_loi_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    tra_loi_an: Mapped[bool] = mapped_column(Boolean, default=False)
+    tra_loi_an_ly_do: Mapped[str] = mapped_column(String(20), default="")

@@ -283,9 +283,15 @@ def _nh_cong(db: Session, n: NhaHang, tds: list[ThucDonNhaHang], hn: date, anh: 
             # AT-2a: ảnh chỉ từ album đã duyệt (ảnh đơn cũ nha_hang.anh_id không ra cổng nữa)
             "anh": bia["hien"] if bia else None, "anh_nho": bia["nho"] if bia else None,
             "anh_alt": bia["alt"] if bia else "", "anh_nguon": bia["credit"] if bia else "", "so_anh": len(anh),
-            **({"album": [_anh_cong_out(x) for x in anh], "mon": mon_cong(db, n.id), "thuc_don_nh": thuc_don_cong(db, n.id)}
+            **({"album": [_anh_cong_out(x) for x in anh], "mon": mon_cong(db, n.id), "thuc_don_nh": thuc_don_cong(db, n.id),
+                "danh_gia": _dg_cong(db, n.id)}
                if du_album else {}),
             "gia_tu": min(int(t.gia_nguoi_lon or 0) for t in ban) if ban else None, "thuc_don": [_td_out(t, False) for t in ban]}
+
+
+def _dg_cong(db: Session, nid: int) -> dict:
+    from app.services import danh_gia_nh as DG
+    return DG.cong(db, nid)
 
 
 def _khong_dau(s: str) -> str:
@@ -327,6 +333,11 @@ def danh_sach_cong(db: Session, tinh: str = "", am_thuc: str = "", gia_toi_da: i
         ra.append(o)
     # AT-2c (Chủ tịch 29/10/2026): nơi dưới 50% hoàn thiện xếp xuống cuối, không ẩn.
     dm = diem_hoan_thien(db, [o["id"] for o in ra])
+    from app.services import danh_gia_nh as DG          # AT-3: sao trên thẻ (dưới 3 bài: «Mới — chưa đủ đánh giá»)
+    sao = DG.tom_tat(db, [o["id"] for o in ra])
+    for o in ra:
+        t = sao.get(o["id"], {})
+        o["sao"] = {"so_bai": t.get("so_bai", 0), "diem_tb": t.get("diem_tb")}
     ra.sort(key=lambda o: (not o["mo_dat"], dm.get(o["id"], {"diem": 0})["diem"] < NGUONG_THIEU, o["ten"]))
     trang, so = max(1, int(trang or 1)), max(1, min(int(so or 24), 60))
     dem: dict = {}
@@ -1525,12 +1536,14 @@ VAI_GIAO_BIEN_TAP = ("chutich",)
 VAI_NHAN_BIEN_TAP = ("nv_dh", "nv_mkt")
 NGUONG_DU, NGUONG_THIEU = 80, 50
 ALBUM_TOI_THIEU, MON_TOI_THIEU, GIOI_THIEU_TOI_THIEU = 5, 3, 300
-MUC_HT = (("bia", "Ảnh bìa đã duyệt", 20, "album"), ("album", "Album ảnh", 20, "album"), ("mon", "Món ăn có ảnh", 15, "mon"),
-          ("thuc_don", "Thực đơn đang dùng", 15, "tdnh"), ("gioi_thieu", "Giới thiệu VTD viết", 15, "gt"),
-          ("lien_he", "Liên hệ, giờ mở cửa, khu vực", 15, "tt"))
+# AT-3 (Chủ tịch duyệt 29/10/2026): thêm «Đánh giá khách» 10 — album 20 → 15, giới thiệu 15 → 10; tổng vẫn 100.
+MUC_HT = (("bia", "Ảnh bìa đã duyệt", 20, "album"), ("album", "Album ảnh", 15, "album"), ("mon", "Món ăn có ảnh", 15, "mon"),
+          ("thuc_don", "Thực đơn đang dùng", 15, "tdnh"), ("gioi_thieu", "Giới thiệu VTD viết", 10, "gt"),
+          ("lien_he", "Liên hệ, giờ mở cửa, khu vực", 15, "tt"), ("danh_gia", "Đánh giá khách", 10, "dg"))
+DANH_GIA_TOI_THIEU = 3          # chấm theo SỐ bài đang hiện, không theo số sao
 
 
-def _cham(n: NhaHang, anh: list, mons: list, co_td: bool) -> dict:
+def _cham(n: NhaHang, anh: list, mons: list, co_td: bool, so_dg: int = 0) -> dict:
     """Chấm MỘT nhà hàng từ dữ liệu đã duyệt. Trả {"diem", "muc": [...]}."""
     duyet = [a for a in anh if a.trang_thai == "da_duyet" and a.can_cu != "chua_xac_minh"]
     nhom = {a.nhom for a in duyet if a.nhom}
@@ -1543,13 +1556,15 @@ def _cham(n: NhaHang, anh: list, mons: list, co_td: bool) -> dict:
           "mon": min(so_mon, MON_TOI_THIEU) / MON_TOI_THIEU,
           "thuc_don": 1.0 if co_td else 0.0,
           "gioi_thieu": (0.5 if gt_dai >= GIOI_THIEU_TOI_THIEU else min(gt_dai, GIOI_THIEU_TOI_THIEU) / GIOI_THIEU_TOI_THIEU * 0.5) + (0.5 if co_mnb else 0.0),
-          "lien_he": sum(lh) / 3}
+          "lien_he": sum(lh) / 3,
+          "danh_gia": min(so_dg, DANH_GIA_TOI_THIEU) / DANH_GIA_TOI_THIEU}
     chi_tiet = {"bia": "Có ảnh bìa đã duyệt" if co_bia else ("Ảnh bìa chưa duyệt / chưa xác minh" if any(a.la_bia for a in anh) else "Chưa chọn ảnh bìa"),
                 "album": f"{len(duyet)}/{ALBUM_TOI_THIEU} ảnh đã duyệt · {len(nhom)} nhóm",
                 "mon": f"{so_mon}/{MON_TOI_THIEU} món đã duyệt có ảnh",
                 "thuc_don": "Có thực đơn đang dùng" if co_td else "Chưa có thực đơn đang dùng",
                 "gioi_thieu": f"{gt_dai}/{GIOI_THIEU_TOI_THIEU} ký tự · " + ("có món nổi bật" if co_mnb else "chưa có món nổi bật"),
-                "lien_he": ", ".join(t for ok, t in zip(lh, ("liên hệ đã xác minh", "có giờ mở cửa", "có khu vực")) if ok) or "Chưa có"}
+                "lien_he": ", ".join(t for ok, t in zip(lh, ("liên hệ đã xác minh", "có giờ mở cửa", "có khu vực")) if ok) or "Chưa có",
+                "danh_gia": f"{so_dg}/{DANH_GIA_TOI_THIEU} bài khách đã đến ăn (không xét số sao)"}
     muc = [{"ma": ma, "ten": ten, "diem_toi_da": w, "diem": round(w * ty[ma], 1), "dat": ty[ma] >= 0.999, "chi_tiet": chi_tiet[ma], "tab": tab}
            for ma, ten, w, tab in MUC_HT]
     return {"diem": int(round(sum(m["diem"] for m in muc))), "muc": muc}
@@ -1583,7 +1598,11 @@ def diem_hoan_thien(db: Session, nids: list[int] | None = None) -> dict[int, dic
     for (nid, _l), bl in bans.items():
         if _ban_hien_hanh(bl, hn):
             td.add(nid)
-    return {n.id: _cham(n, anh.get(n.id, []), mons.get(n.id, []), n.id in td) for n in nhs}
+    from app.models.nha_hang import DanhGiaNhaHang
+    dg: dict[int, int] = {}
+    for x in db.execute(select(DanhGiaNhaHang.nha_hang_id).where(DanhGiaNhaHang.nha_hang_id.in_(ids), DanhGiaNhaHang.an.is_(False))).scalars():
+        dg[x] = dg.get(x, 0) + 1
+    return {n.id: _cham(n, anh.get(n.id, []), mons.get(n.id, []), n.id in td, dg.get(n.id, 0)) for n in nhs}
 
 
 def _cot(diem: int, bt: BienTapNhaHang | None, cho: int) -> str:
@@ -1735,7 +1754,7 @@ def xuat_thieu_xlsx(db: Session, u: User) -> bytes:
         if o["diem"] >= NGUONG_DU:
             continue
         ws.append([o["ma"], o["ten"], o["tinh_thanh"], o["diem"]] + ["✓" if m["dat"] else m["chi_tiet"] for m in o["muc"]] + [o["nguoi"], o["han"] or ""])
-    for col, w in zip("ABCDEFGHIJKL", (9, 32, 18, 8, 26, 26, 26, 26, 30, 30, 16, 12)):
+    for col, w in zip("ABCDEFGHIJKLM", (9, 32, 18, 8, 26, 26, 26, 26, 30, 30, 30, 16, 12)):
         ws.column_dimensions[col].width = w
     o = BytesIO(); wb.save(o)
     return o.getvalue()

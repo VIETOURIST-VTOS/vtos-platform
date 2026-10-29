@@ -311,7 +311,8 @@ def ds_cua(db: Session, tk: TaiKhoanNgoai, now: datetime | None = None) -> list[
     for d in ds:
         cap_nhat(db, d, now)
     db.commit()
-    return [ra(db, d, now, doi_tac=tk.loai == "doi_tac") for d in ds]
+    from app.services import danh_gia_nh as DG       # AT-3: được viết / sửa đánh giá không
+    return [{**ra(db, d, now, doi_tac=tk.loai == "doi_tac"), "danh_gia": DG.trang_thai_don(db, d, now)} for d in ds]
 
 
 def qr(db: Session, tk: TaiKhoanNgoai, ma: str, now: datetime | None = None) -> dict:

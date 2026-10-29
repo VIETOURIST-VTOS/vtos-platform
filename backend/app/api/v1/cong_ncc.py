@@ -227,6 +227,27 @@ def dat_ban_thay_doi(yid: int, data: ThayDoiNhIn, x=Depends(_ncc), db: Session =
     return {"message": "Đã nhận thay đổi" if data.nhan else "Đã từ chối thay đổi — khách giữ lịch cũ", "dat_ban": S.don_dat_ban(db, x[1])}
 
 
+class TraLoiIn(BaseModel):
+    noi_dung: str = ""
+
+
+@router.get("/danh-gia")
+def danh_gia(x=Depends(_ncc), db: Session = Depends(get_db)):
+    """AT-3: đánh giá đang hiện về các nhà hàng của NCC này (tên khách đã che)."""
+    from app.services import danh_gia_nh as DG
+    return DG.ds_ncc(db, x[1])
+
+
+@router.post("/danh-gia/{gid}/tra-loi")
+def tra_loi_danh_gia(gid: int, data: TraLoiIn, x=Depends(_ncc), db: Session = Depends(get_db)):
+    from app.services import danh_gia_nh as DG
+    try:
+        DG.tra_loi(db, x[0], x[1], gid, data.noi_dung)
+    except DG.LoiDanhGia as ex:
+        raise HTTPException(ex.status, str(ex))
+    return {"message": "Đã đăng trả lời", **DG.ds_ncc(db, x[1])}
+
+
 @router.post("/dat-ban/{yid}/khong-den")
 def dat_ban_khong_den(yid: int, x=Depends(_ncc), db: Session = Depends(get_db)):
     from app.services import dat_ban as DB

@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -147,6 +147,25 @@ def huy(ma: str, data: HuyIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: 
     msg = (f"Đã hủy {d.ma}. Hoàn {int(d.so_hoan):,} đ".replace(",", ".") + " — Sales xác nhận, Kế toán hoàn trong 7 ngày làm việc."
            if d.so_hoan else f"Đã hủy {d.ma}.")
     return {"message": msg, "dat_ban": S.ds_cua(db, tk)}
+
+
+# ---------------------------------------------------------------- AT-3 · đánh giá sao (người đặt, đơn «khách đã dùng»)
+@router.post("/{ma}/danh-gia")
+async def danh_gia(ma: str, diem: int = Form(0), diem_mon: int = Form(0), diem_phuc_vu: int = Form(0), diem_khong_gian: int = Form(0),
+                   diem_gia: int = Form(0), nhan_xet: str = Form(""), dong_y: bool = Form(False), giu_anh: str = Form(""),
+                   anh: list[UploadFile] = File(default=[]), tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    from app.services import danh_gia_nh as DG
+    if len(anh) > DG.ANH_TOI_DA:
+        raise HTTPException(400, f"Tối đa {DG.ANH_TOI_DA} ảnh")
+    tep = [((f.filename or ""), await f.read()) for f in anh]
+    giu = [int(x) for x in giu_anh.split(",") if x.strip().isdigit()]
+    try:
+        g = DG.viet(db, tk, ma, {"diem": diem, "diem_mon": diem_mon, "diem_phuc_vu": diem_phuc_vu, "diem_khong_gian": diem_khong_gian,
+                                 "diem_gia": diem_gia, "nhan_xet": nhan_xet, "dong_y": dong_y}, tep, giu)
+    except DG.LoiDanhGia as ex:
+        raise HTTPException(ex.status, str(ex))
+    return {"message": "Đã sửa đánh giá" if g.sua_luc else "Cảm ơn bạn — đánh giá đã hiện trên trang nhà hàng",
+            "dat_ban": S.ds_cua(db, tk)}
 
 
 # ---------------------------------------------------------------- OnePay gọi về

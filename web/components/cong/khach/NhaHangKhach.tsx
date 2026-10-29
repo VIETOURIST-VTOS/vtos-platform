@@ -45,7 +45,7 @@ export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui, doiTac
   if (mo && f) return (<>
     <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => { setMo(null); setF(null); }}><I n="arrow-left" /><span>Quay lại nhà hàng</span></button>
     {loi && <div className="v3-notice warn"><I n="info" /><span>{loi}</span></div>}
-    <AlbumKhach album={mo.album} ten={mo.ten} coTab mon={mo.mon} thucDon={mo.thuc_don_nh} gioiThieu={mo.mo_ta ? <p style={{ margin: 0 }}>{mo.mo_ta}</p> : <p style={{ margin: 0 }}>Vietourist đang biên tập phần giới thiệu nhà hàng này.</p>} />
+    <AlbumKhach album={mo.album} ten={mo.ten} coTab mon={mo.mon} thucDon={mo.thuc_don_nh} danhGia={mo.danh_gia} nhId={mo.id} gioiThieu={mo.mo_ta ? <p style={{ margin: 0 }}>{mo.mo_ta}</p> : <p style={{ margin: 0 }}>Vietourist đang biên tập phần giới thiệu nhà hàng này.</p>} />
     <section className="v3-panel"><div className="v3-section-title"><h2>{mo.ten}</h2><span className="v3-badge neutral">{mo.am_thuc}</span></div>
       <p>{[mo.tinh_thanh, mo.khu_vuc].filter(Boolean).join(" · ")}{mo.gio_phuc_vu ? ` · Giờ phục vụ ${mo.gio_phuc_vu}` : ""}</p>
       {mo.tien_ich && <p>{mo.tien_ich}</p>}{mo.mo_ta && <p>{mo.mo_ta}</p>}

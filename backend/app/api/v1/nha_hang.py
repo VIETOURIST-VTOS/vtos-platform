@@ -576,3 +576,51 @@ def da_xin(nid: int, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Sessio
     except N.LoiNhaHang as ex:
         _loi(ex)
     return {"message": "Đã ghi: đã xin nhà hàng bổ sung"}
+
+
+# ══ AT-3 · đánh giá sao — Marketing ẩn vi phạm, TP Điều hành xem lại ═══════════════════════════════════════
+def _dg(f, *a, **k):
+    from app.services import danh_gia_nh as DG
+    try:
+        return f(*a, **k)
+    except DG.LoiDanhGia as ex:
+        raise HTTPException(ex.status, str(ex))
+
+
+@router.get("/danh-gia")
+def ds_danh_gia(loc: str = "", u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    from app.services import danh_gia_nh as DG
+    return _dg(DG.ds_noi_bo, db, u, loc)
+
+
+@router.get("/danh-gia.xlsx")
+def xuat_danh_gia(u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    from app.services import danh_gia_nh as DG
+    data = _dg(DG.xuat_xlsx, db, u)
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="danh_gia_nha_hang_{date.today():%Y%m%d}.xlsx"'})
+
+
+class AnDgIn(BaseModel):
+    ly_do: str = ""
+    ghi_chu: str = ""
+    phan: str = "bai"
+
+
+@router.post("/danh-gia/{gid}/an")
+def an_danh_gia(gid: int, data: AnDgIn, u: User = Depends(require_roles("nv_mkt", "ptgd_mkt")), db: Session = Depends(get_db)):
+    from app.services import danh_gia_nh as DG
+    _dg(DG.an, db, u, gid, data.ly_do, data.ghi_chu, data.phan)
+    return {"message": "Đã ẩn — chờ TP Điều hành xem lại"}
+
+
+class XemLaiIn(BaseModel):
+    giu: bool = True
+    ghi_chu: str = ""
+
+
+@router.post("/danh-gia/{gid}/xem-lai")
+def xem_lai_danh_gia(gid: int, data: XemLaiIn, u: User = Depends(require_roles("tp_dh", "chutich", "tgd")), db: Session = Depends(get_db)):
+    from app.services import danh_gia_nh as DG
+    _dg(DG.xem_lai, db, u, gid, data.giu, data.ghi_chu)
+    return {"message": "Đã xem lại: giữ ẩn" if data.giu else "Đã xem lại: hiện lại bài"}
