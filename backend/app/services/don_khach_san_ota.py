@@ -186,4 +186,19 @@ def tom_tat(don) -> dict:
         "dang_xu_ly": bool(don.dang_xu_ly),
         "vao_bao_cao_tien": vao_bao_cao_tien(don),
         "buoc": BUOC_DON,
+        # ── KS-12 · những ô KHÁCH khai ────────────────────────────────────────────────
+        # `tom_tat` là thứ DUY NHẤT màn Điều hành đọc. KS-11 thêm bảy cột vào bảng mà không
+        # thêm vào đây, nên đơn khách gửi lên hiện ra trống — không lỗi, không đỏ, chỉ trống.
+        # Dùng getattr có mặc định: hàm này còn được gọi với vật giả trong phép thử KS-6.
+        "la_yeu_cau_khach": bool(getattr(don, "tai_khoan_ngoai_id", None)),
+        "cong": getattr(don, "cong", "") or "",
+        "noi_den": getattr(don, "noi_den", "") or "",
+        "nguoi_nhan_phong": getattr(don, "nguoi_nhan_phong", "") or "",
+        "lien_he": getattr(don, "lien_he", "") or "",
+        "yeu_cau_them": getattr(don, "yeu_cau_them", "") or "",
+        "gui_luc": (getattr(don, "gui_luc", None).isoformat()
+                    if getattr(don, "gui_luc", None) else None),
+        "so_phong": getattr(don, "so_phong", 1),
+        "nguoi_lon": getattr(don, "nguoi_lon", 1),
+        "tre_em": getattr(don, "tre_em", 0),
     }
