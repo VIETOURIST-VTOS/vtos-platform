@@ -25,6 +25,22 @@ function Anh({ src, nguon, ten, tl = "1/1", cls = "" }: { src?: string | null; n
   </div>);
 }
 
+/* Chủ tịch duyệt bản xem thử 29/10/2026: khi CHƯA có ảnh đã duyệt thì hiện ô màu theo miền / chữ cái đầu,
+   không ô xám, không ảnh mạng, không ảnh minh hoạ giả. Có ảnh thì ảnh thay ô. */
+const MAU_MIEN: Record<string, string> = { bac: "#1f4e5f", trung: "#7a4a22", tay_nguyen: "#5b4a2e", nam: "#2f5d3a" };
+const mauMien = (m?: string) => MAU_MIEN[m || ""] || "#3d4b59";
+function OThanhPho({ t }: { t: any }) {
+  return <span className="at-otp" style={{ background: mauMien(t.mien) }}><small style={{ color: "#fff" }}>{(t.mien_ten || "").toUpperCase()}</small>
+    <span><b>{t.ten}</b><small style={{ color: "#fff" }}>{t.so_nha_hang} nhà hàng</small></span></span>;
+}
+function OTrongNh({ n, mien, tl = "4/3" }: { n: any; mien?: string; tl?: string }) {
+  const chu = (n.ten || "?").trim().charAt(0).toUpperCase();
+  return <span className="at-otrong" style={{ aspectRatio: tl }} role="img" aria-label={`${n.ten} — ảnh đang cập nhật`}>
+    <b style={{ background: mauMien(mien) }} aria-hidden="true">{chu}</b>
+    {n.mon_noi_bat && <small aria-hidden="true">{String(n.mon_noi_bat).split(/[;,]/).slice(0, 2).join(" · ")}</small>}
+    <em aria-hidden="true">Ảnh đang cập nhật</em></span>;
+}
+
 const Ghim = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" /></svg>;
 
 type Loc = { tinh: string; q: string; chi_dat: string; trang: string };
@@ -54,7 +70,9 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
   const nhomCo = useMemo(() => Array.from(new Set(nd.filter((x: any) => x.loai === "mon").map((x: any) => x.nhom).filter(Boolean))) as string[], [nd]);
   const dacSan = nd.filter((x: any) => x.loai === "dac_san");
   const dsGoiY = nd.filter((x: any) => x.loai === "danh_sach");
-  const tps = (ds?.thanh_pho || []).filter((t: any) => !mien || t.mien_ten === mien);
+  const tps = (ds?.thanh_pho || []).filter((t: any) => !mien || t.mien_ten === mien)
+    .slice().sort((a: any, b: any) => (b.so_nha_hang || 0) - (a.so_nha_hang || 0));       // có nhà hàng lên trước
+  const mienCua: Record<string, string> = Object.fromEntries((ds?.thanh_pho || []).map((t: any) => [t.ten, t.mien]));
   const soTrang = ds ? Math.max(1, Math.ceil((ds.tong || 0) / (ds.so || 24))) : 1;
   const dem: Record<string, number> = ds?.dem_tinh || {};
 
@@ -82,6 +100,7 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
   if (nh) return (<div className="at"><style>{CSS}</style>
     <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => setNh(null)}><span>← Hương vị Việt Nam</span></button>
     <AlbumKhach album={nh.album} ten={nh.ten} coTab mon={nh.mon} thucDon={nh.thuc_don_nh} danhGia={nh.danh_gia} nhId={nh.id}
+      oTrong={<OTrongNh n={nh} mien={mienCua[nh.tinh_thanh]} tl="16/9" />}
       dong2={[[nh.khu_vuc, nh.tinh_thanh].filter(Boolean).join(", ") || nh.dia_danh_nguon, nh.am_thuc ? `Ẩm thực ${nh.am_thuc}` : ""].filter(Boolean).join(" · ")}
       nhan={<div style={{ marginTop: 8 }}><span className="at-chua">Chưa mở đặt bàn qua Vietourist</span></div>}
       gioiThieu={<div className="at-mon-chu at-the-gt">
@@ -123,8 +142,11 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
             {[["", `Tất cả ${(ds.thanh_pho || []).length}`], ...Object.values(ds.mien || {}).map((m: any) => [m, m])].map(([k, t]) =>
               <button key={k} type="button" className="at-tab cursor-interaction" aria-pressed={mien === k} onClick={() => setMien(k)}>{t}</button>)}
           </div>
-          <div className="at-luoi-tp">{tps.map((t: any) => <button key={t.ten} type="button" className="at-tp cursor-interaction" onClick={() => { doi({ tinh: t.ten }); document.getElementById("at-nh")?.scrollIntoView(); }}>
-            <Anh src={t.anh} ten={t.ten} tl="3/4" /><b>{t.ten}</b><small>{[t.so_nha_hang ? `${t.so_nha_hang} nhà hàng` : "", t.tom_tat].filter(Boolean).join(" · ") || " "}</small></button>)}</div>
+          <div className="at-luoi-tp">{tps.map((t: any) => t.so_nha_hang ? <button key={t.ten} type="button" className="at-tp cursor-interaction" onClick={() => { doi({ tinh: t.ten }); document.getElementById("at-nh")?.scrollIntoView(); }}>
+            {t.anh ? <Anh src={t.anh} ten={t.ten} tl="3/4" /> : <OThanhPho t={t} />}<b>{t.ten}</b><small>{[`${t.so_nha_hang} nhà hàng`, t.tom_tat].filter(Boolean).join(" · ")}</small></button>
+            : <div key={t.ten} className="at-tp at-tp-sap" aria-disabled="true">
+              {t.anh ? <Anh src={t.anh} ten={t.ten} tl="3/4" /> : <span className="at-otp at-otp-sap"><small>{(t.mien_ten || "").toUpperCase()}</small><span><b>{t.ten}</b><small>Sắp có</small></span></span>}
+              <b>{t.ten}</b><small>Chưa có nhà hàng</small></div>)}</div>
         </section>
 
         {muc.some(([id]) => id === "at-mon") && <section className="at-khoi" id="at-mon">
@@ -160,7 +182,7 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
             <button type="button" className="at-tab cursor-interaction" aria-pressed={!loc.tinh} onClick={() => doi({ tinh: "" })}>Tất cả {tong}</button>
             {Object.entries(dem).sort((a, b) => b[1] - a[1]).map(([t, c]) => <button key={t} type="button" className="at-tab cursor-interaction" aria-pressed={loc.tinh === t} onClick={() => doi({ tinh: t })}>{t} {c}</button>)}</div>
           <div className="at-luoi">{ds.nha_hang.map((n: any) => <article key={n.id} className="at-the">
-            <button type="button" className="at-the-anh cursor-interaction" onClick={() => xemNh(n.id)} aria-label={`Xem ${n.ten}`}><Anh src={n.anh_nho || n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /></button>
+            <button type="button" className="at-the-anh cursor-interaction" onClick={() => xemNh(n.id)} aria-label={`Xem ${n.ten}`}>{n.anh_nho || n.anh ? <Anh src={n.anh_nho || n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /> : <OTrongNh n={n} mien={mienCua[n.tinh_thanh]} />}</button>
             <h3>{n.ten}</h3><div className="at-noi-o"><span className="at-ghim"><Ghim /></span>{[n.khu_vuc, n.tinh_thanh].filter(Boolean).join(", ") || n.dia_danh_nguon}</div>
             {n.mon_noi_bat && <div className="at-phu">Nổi tiếng với: <b>{n.mon_noi_bat}</b></div>}
             <SaoThe sao={n.sao} />
@@ -234,6 +256,19 @@ const CSS = `
 .at-anh{position:relative;width:100%;max-width:100%;border-radius:10px;overflow:hidden;background:var(--at-slot);display:grid;place-items:center}
 .at-anh img{width:100%;height:100%;object-fit:cover;display:block}
 .at-anh-trong{font-size:12px;color:var(--at-muted);padding:8px;text-align:center}
+.at-otp{aspect-ratio:3/4;border-radius:10px;padding:12px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;color:#fff;min-width:0}
+.at-otp>small{font-size:11px;letter-spacing:.08em;opacity:.9}
+.at-otp>span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.at .at-otp b{font-family:Lora,Georgia,serif;font-size:20px;line-height:1.15;color:#fff;overflow-wrap:anywhere}
+.at .at-otp span small{font-size:12px;color:#fff;opacity:.92}
+.at-otp-sap{background:#e3e9ef;border:1px dashed #9aa8b5;color:#3d4b59}
+.at .at-otp-sap b,.at .at-otp-sap span small{color:#3d4b59}
+.at-tp-sap{cursor:default;opacity:.55}
+@media (max-width:560px){.at .at-otp b{font-size:15px}.at-otp{padding:8px}}
+.at-otrong{width:100%;border-radius:10px;background:#eef2f5;border:1px solid #d6dde4;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative;padding:30px 8px 8px;text-align:center}
+.at-otrong b{width:52px;height:52px;border-radius:50%;color:#fff;font-family:Lora,Georgia,serif;font-size:24px;display:flex;align-items:center;justify-content:center}
+.at-otrong small{font-size:12px;color:#3d4b59;max-width:90%}
+.at-otrong em{position:absolute;left:8px;top:8px;font-style:normal;font-size:11px;background:rgba(29,43,58,.78);color:#fff;padding:2px 8px;border-radius:6px}
 .at-luoi-tp{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px}
 @media (max-width:560px){.at-luoi-tp{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.at-tp b{font-size:13px}}
 .at-tp{all:unset;display:flex;flex-direction:column;gap:4px;cursor:pointer;min-width:0}

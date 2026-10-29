@@ -10,9 +10,9 @@ type A = { id: number; nhom: string; nhom_ten: string; chu_thich: string; alt: s
 
 /** Bố cục theo bản xem thử Điều hành 29/10/2026 («Khách hàng xem»): đầu trang (tên, nơi, «Xem album»), khảm 5 ảnh,
  *  rồi các tab Album ảnh / Giới thiệu. Không in số liệu nội bộ (hợp đồng, số ảnh trên hạn mức) ra cho khách. */
-export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu, nhan, mon, thucDon, danhGia, nhId }:
+export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu, nhan, mon, thucDon, danhGia, nhId, oTrong }:
   { album?: A[]; ten: string; dong2?: string; coTab?: boolean; gioiThieu?: ReactNode; nhan?: ReactNode; mon?: any[]; thucDon?: any[];
-    danhGia?: any; nhId?: number }) {
+    danhGia?: any; nhId?: number; oTrong?: ReactNode }) {
   const ds = album || [];
   const [mo, setMo] = useState(false);
   const [nhom, setNhom] = useState("");          // nhóm trong hộp album
@@ -58,7 +58,8 @@ export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu
       {nho.map((a, k) => <button key={a.id} type="button" className="ab-o cursor-interaction" onClick={() => moAlbum(k + 1)} aria-label={`Xem ảnh lớn: ${a.alt || a.nhom_ten}`}>
         <img src={a.nho} alt={a.alt || a.nhom_ten} loading="lazy" />
         <span className="ab-them">Xem {ds.length} ảnh</span></button>)}
-    </div> : <div className="ab-trong" role="img" aria-label={`Chưa có ảnh ${ten}`}><span>{ten}</span><small>Nhà hàng đang bổ sung ảnh</small></div>}
+    </div> : oTrong ? <div className="ab-o-trong">{oTrong}</div>
+      : <div className="ab-trong" role="img" aria-label={`Chưa có ảnh ${ten}`}><span>{ten}</span><small>Nhà hàng đang bổ sung ảnh</small></div>}
 
     {coTab && <>
       <div className="ab-tab-trang" role="tablist" aria-label="Nội dung nhà hàng">
@@ -170,6 +171,7 @@ const CSS = `
 .ab-cr{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.5);color:#fff;font-size:11px;padding:1px 6px;border-radius:4px}
 .ab-trong{aspect-ratio:4/3;border-radius:12px;background:#e9eef2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#5b6b7a;text-align:center;padding:8px}
 .ab-trong small{font-size:12px}
+.ab-o-trong{max-width:560px;width:100%}
 @media (max-width:560px){.ab-kham{grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,2fr) minmax(0,1fr);aspect-ratio:4/3}.ab-bia{grid-column:span 2;grid-row:auto}
   .ab-kham .ab-o:nth-child(n+4){display:none}.ab-kham .ab-o .ab-them{display:none}
   .ab-kham .ab-o:nth-child(3) .ab-them,.ab-kham .ab-o:nth-child(2):last-child .ab-them{display:grid}}
