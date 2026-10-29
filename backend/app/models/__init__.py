@@ -172,6 +172,7 @@ from app.models.cong_khach import *  # noqa
 from app.models.rewards import *  # noqa
 from app.models.cham_soc_khach import *  # noqa
 from app.models.khach_san_ota import *  # noqa
+from app.models.khach_san_vtd import *  # noqa   KS-13 danh mục khách sạn hợp tác VTD
 from app.models.cong_co_dong import *  # noqa
 from app.models.cong_ncc import *  # noqa
 from app.models.dat_ban import *  # noqa

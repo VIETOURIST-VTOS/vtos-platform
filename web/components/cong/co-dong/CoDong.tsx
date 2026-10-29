@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { goiCong, phienCong } from "@/lib/cong";
 import { svg } from "../khach/icons";
 import KhachSanOta from "../KhachSanOta";
+import KhachSanVtd from "../KhachSanVtd";
 import VeMayBayOta from "../VeMayBayOta";
 import NhaHangKhach from "../khach/NhaHangKhach";
 import TourCoDong from "./TourCoDong";
@@ -196,7 +197,7 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
         {tab === "perks" && <>
           <UuDai />
           {dv === "tour" ? <TourCoDong toi={toi} daGui={setMsg} />
-            : dv === "khach_san" ? <KhachSanOta ghiChu="Mức ưu đãi cổ đông cho phòng đặt qua OTA: Vietourist công bố sau." />
+            : dv === "khach_san" ? <><KhachSanVtd /><h3 className="ksv-ota-dau">Hoặc đặt qua đối tác OTA của Vietourist</h3><KhachSanOta ghiChu="Mức ưu đãi cổ đông cho phòng đặt qua OTA: Vietourist công bố sau." /></>
             : dv === "nha_hang" ? <><NhaHangKhach ten={ten} lienHe={toi.dien_thoai || toi.email} coSdt={!!toi.dien_thoai} sdtCho={toi.dien_thoai || ""} daGui={setMsg} /><DatBanCuaToi /></>
             : <VeMayBayOta />}
         </>}

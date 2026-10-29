@@ -11,6 +11,7 @@ import { goiCong } from "@/lib/cong";
 import { svg } from "../khach/icons";
 import QrThanhToan from "../khach/QrThanhToan";
 import KhachSanOta from "../KhachSanOta";
+import KhachSanVtd from "../KhachSanVtd";
 import NhaHangKhach from "../khach/NhaHangKhach";
 import DatBanCuaToi from "../DatBanCuaToi";
 
@@ -158,7 +159,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
             <button type="button" className="cursor-interaction" aria-pressed={dv === "tour"} onClick={() => setDv("tour")}><I n="plane" /><span>Tour du lịch</span></button>
             <button type="button" className="cursor-interaction" aria-pressed={dv === "khach_san"} onClick={() => setDv("khach_san")}><I n="hotel" /><span>Khách sạn</span></button>
             <button type="button" className="cursor-interaction" aria-pressed="false" onClick={() => di("nha_hang")}><I n="utensils" /><span>Nhà hàng & ẩm thực</span></button></nav>
-          {dv === "khach_san" ? <KhachSanOta ghiChu="Phòng đặt qua OTA chưa tính hoa hồng D06 cho đại lý / CTV — cơ sở tính cần duyệt riêng. Lượt chuyển vẫn ghi nguồn là đối tác của bạn." /> : <>
+          {dv === "khach_san" ? <><KhachSanVtd /><h3 className="ksv-ota-dau">Hoặc đặt qua đối tác OTA của Vietourist</h3><KhachSanOta ghiChu="Phòng đặt qua OTA chưa tính hoa hồng D06 cho đại lý / CTV — cơ sở tính cần duyệt riêng. Lượt chuyển vẫn ghi nguồn là đối tác của bạn." /></> : <>
           <section className="v3-panel"><div className="v3-search"><label className="v3-field">Điểm đến hoặc tên tour<input type="search" value={q} placeholder="Phú Quốc, Huế…"
             onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && timTour()} /></label><Nut kieu="primary" i="search" onClick={() => timTour()}>Tìm tour</Nut></div></section>
           <section className="v3-panel">{!ds ? <p>Đang tải…</p> : ds.tour.length ? <div className="v3-table-wrap"><table>

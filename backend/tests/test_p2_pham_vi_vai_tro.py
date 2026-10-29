@@ -63,6 +63,9 @@ CONG_KHAI = {
     "/api/v1/am-thuc": "Chỉ một đường: ảnh của trang «Hương vị Việt Nam» cho thẻ <img> (không gửi được phiên "
                        "cổng). Chỉ trả ảnh ĐANG DÙNG của nhà hàng TP Điều hành đã bật hiện hoặc nội dung Marketing đã "
                        "bật, ảnh khác 404; danh sách và trang nhà hàng vẫn phải qua OTP; có phanh theo địa chỉ mạng.",
+    "/api/v1/ks-vtd-anh": "KS-13: chỉ một đường, ảnh khách sạn hợp tác cho thẻ <img> trên cổng khách (thẻ ảnh không gửi được "
+                          "phiên cổng). Chỉ trả bản hiển thị / ảnh nhỏ của ảnh ĐÃ DUYỆT thuộc khách sạn đang hiện, không bao "
+                          "giờ bản gốc, ảnh khác 404; danh sách và trang khách sạn vẫn phải có phiên cổng; có phanh theo địa chỉ mạng.",
 }
 
 
@@ -280,6 +283,8 @@ def test_bon_vai_tro_hep_khong_mat_quyen_dang_dung():
 # XEM rộng bằng đúng thẻ ấy; GHI (ngày nghỉ việc) hẹp bằng HR_ADMIN — ghi ngày nghỉ là đóng một
 # người khỏi bảng lương, không phải một ô ghi chú, và có phép thử gọi sai vai để chắc nó trả 403.
 PHAM_VI_DA_CHOT = {
+    # KS-13 (30/10/2026, Chủ tịch duyệt bản demo) — +1 /api/v1/khach-san-vtd cho màn mới /khach-san-vtd: tp_dh, nv_dh nhập;
+    # tp_dh duyệt + bật; gd_kd, tp_kd, nv_mkt, ptgd_mkt xem; BASE_VIEW (chutich, tgd, bks, robot_ks) đọc nền.
     # PC-1 (19/10/2026, Chủ tịch ký) — +1 cho MƯỜI BA vai: tiền tố RIÊNG "/api/v1/gui-phap-che" cho
     # màn mới /gui-phap-che (trưởng phòng trở lên + HCNS, CNTT tự gửi yêu cầu Pháp chế). Mười một vai
     # gửi (access.GUI_PHAP_CHE_ROLES) cộng hai vai đọc nền (bks, robot_ks). KHÔNG nới
@@ -680,7 +685,7 @@ PHAM_VI_DA_CHOT = {
     #
     # Vòng HD-DG3 đầu (PR #378) KHÔNG cập nhật bảng này. Không ai thấy, vì PR ấy chết ở bước
     # ruff chạy TRƯỚC mọi phép thử — bảng chốt chưa từng được hỏi. Ghép lại 17/10 mới lộ ra.
-    "chutich": 148, "tgd": 148, "bks": 148, "cntt": 133, "ir_phapche": 22,   # +1 KS-10 29/10/2026: /api/v1/don-khach-san-ota (cả tp_dh, robot_ks) — màn Đơn phòng OTA của Điều hành   # +1 NCC-1 28/10/2026: /api/v1/cong-ncc (cả tp_dh, nv_dh, gd_kd, ketoan, ketoan_truong, nv_mkt, ptgd_mkt, robot_ks); +1 CD-1 28/10/2026: /api/v1/ir-cong-co-dong (cả ir_phapche, robot_ks); +1 KS-2 28/10/2026: /api/v1/doi-soat-ota (cả ketoan, ketoan_truong); +1 KS-1 28/10/2026: /api/v1/khach-san-ota; +2 KH-4 27/10/2026: /api/v1/yeu-cau-khach, /api/v1/gop-y-lanh-dao; +1 CG-1 26/10/2026: /api/v1/tai-khoan-ngoai; +1 DH-1 26/10/2026: /api/v1/hoa-hong-d06; +1 KH-2 26/10/2026: /api/v1/nha-hang; +1 KH-3 26/10/2026: /api/v1/rewards (Kinh doanh, Sale Admin, Kế toán, Marketing)
+    "chutich": 149, "tgd": 149, "bks": 149, "cntt": 133, "ir_phapche": 22,   # +1 KS-10 29/10/2026: /api/v1/don-khach-san-ota (cả tp_dh, robot_ks) — màn Đơn phòng OTA của Điều hành   # +1 NCC-1 28/10/2026: /api/v1/cong-ncc (cả tp_dh, nv_dh, gd_kd, ketoan, ketoan_truong, nv_mkt, ptgd_mkt, robot_ks); +1 CD-1 28/10/2026: /api/v1/ir-cong-co-dong (cả ir_phapche, robot_ks); +1 KS-2 28/10/2026: /api/v1/doi-soat-ota (cả ketoan, ketoan_truong); +1 KS-1 28/10/2026: /api/v1/khach-san-ota; +2 KH-4 27/10/2026: /api/v1/yeu-cau-khach, /api/v1/gop-y-lanh-dao; +1 CG-1 26/10/2026: /api/v1/tai-khoan-ngoai; +1 DH-1 26/10/2026: /api/v1/hoa-hong-d06; +1 KH-2 26/10/2026: /api/v1/nha-hang; +1 KH-3 26/10/2026: /api/v1/rewards (Kinh doanh, Sale Admin, Kế toán, Marketing)
     # ── 17/10/2026 · hcns 71 → 72, ĐỢT R3b ───────────────────────────────────────────
     # Nhóm duy nhất thêm là "/api/v1/hach-toan", và chỉ vì một lẽ: danh mục BỘ PHẬN nằm ở
     # màn ấy. Cơ cấu phòng ban là việc của Hành chính – Nhân sự, không phải Kế toán; cho
@@ -689,7 +694,7 @@ PHAM_VI_DA_CHOT = {
     # KH-2 26/10/2026: +1 /api/v1/nha-hang cho tp_dh, nv_dh (nhập nhà hàng), tp_kd, gd_kd (bật hiện cổng khách).
     # AT-1 (28/10/2026, Chủ tịch duyệt «Hương vị Việt Nam») — +1 cho BỐN vai: màn /nha-hang mở thêm cho Marketing
     # (nv_mkt, ptgd_mkt viết món / thành phố / ảnh) và Kế toán (ketoan, ketoan_truong xem tệp hợp đồng nhà hàng).
-    "ketoan": 116, "tp_dh": 105, "ptgd_doan": 81, "nv_dh": 73, "hcns": 73, "gd_kd": 81,   # +1 KH-4: /api/v1/yeu-cau-khach
+    "ketoan": 116, "tp_dh": 106, "ptgd_doan": 81, "nv_dh": 74, "hcns": 73, "gd_kd": 82,   # +1 KH-4: /api/v1/yeu-cau-khach
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -710,7 +715,7 @@ PHAM_VI_DA_CHOT = {
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 59, "nv_kd": 57, "tn_kd": 57, "tp_kd": 61, "nv_mkt": 44,   # +1 KH-4: /api/v1/yeu-cau-khach
+    "ptgd_mkt": 60, "nv_kd": 57, "tn_kd": 57, "tp_kd": 62, "nv_mkt": 45,   # +1 KH-4: /api/v1/yeu-cau-khach
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -780,7 +785,7 @@ PHAM_VI_DA_CHOT = {
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
     "ketoan_truong": 117, "ketoan_tt": 31, "thu_quy": 27,
-    "robot_pq": 18, "robot_ks": 148, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 149, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 
