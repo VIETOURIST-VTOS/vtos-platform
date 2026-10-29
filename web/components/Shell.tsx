@@ -412,6 +412,7 @@ export const GROUPS: Group[] = [
     ["Yêu cầu khách (cổng)", "/yeu-cau-khach"],
     ["Góp ý riêng lãnh đạo", "/gop-y-lanh-dao"],
     ["OTA: khách sạn & vé máy bay", "/khach-san-ota"],
+    ["Đơn phòng OTA (sáu bước Agoda)", "/don-khach-san-ota"],
     ["Đối soát OTA", "/doi-soat-ota"],
     // TC-73 · 19/9/2026. Sơ đồ chi nhánh → phòng → team → người, mỗi phân công có ngày hiệu lực.
     //

@@ -28,6 +28,10 @@ có bảng chưa gộp về (chuỗi bán hàng V6), và bảng đã bỏ thì d
 from sqlalchemy.orm import Session
 
 CUA_TAY = (
+# KS-10 29/10/2026. Đơn phòng OTA: Điều hành dựng đơn ở màn /don-khach-san-ota. Môi trường
+# «Chạy thật» thì Điều hành DÁN sáu con số tra từ Agoda; môi trường «Thử» máy sinh mã giả để
+# chạy thử sáu bước. Không có đường nối tự động sang Agoda, nên đây là cửa tay thật.
+"don_khach_san_ota",
     # CN-1 21/10/2026. Bang xac nhan cong thang: HCNS bam «Xac nhan cong», TGD bam «Duyet cong» o
     # the «Cham cong & nghi phep» man /hr. May chi chup so lieu luc nguoi bam, khong tu sinh dong nao.
     "xac_nhan_cong",
@@ -381,6 +385,7 @@ CUA_TAY = (
 # Máy sinh – bảng KHÔNG cần cửa nhập, kèm lý do. Xem ghi chú đầu tệp: không viết được lý do nghĩa là
 # chưa chắc nó máy sinh.
 MAY_SINH = {
+"buoc_don_ota": "Nhật ký từng bước của đơn phòng OTA (KS-10) – hệ thống ghi một dòng mỗi lần Điều hành gọi một bước, kể cả lần quá hạn. KHÔNG có cửa nhập tay là TÍNH CHẤT AN TOÀN: gõ tay được vào sổ này thì dựng được một lần gọi chưa ai làm, mà đó đúng là thứ nó sinh ra để chống — câu «Agoda đã nhận đơn chưa» chỉ có sổ này trả lời.",
     # BC-1 26/10/2026. Bản chụp mỗi lần nộp báo cáo ngày — hệ thống tự ghi đúng lúc người nộp bấm
     # «Nộp». Không có cửa sửa là TÍNH CHẤT AN TOÀN: sửa được bản lần đầu thì đổi được câu trả lời cho
     # «lần đầu nộp đã ghi gì, lúc nào».

@@ -96,6 +96,7 @@ from app.api.v1.cong_ncc import router as cong_ncc_router, router_vtos as cong_n
 from app.api.v1.dat_ban import router as dat_ban_router, router_onepay as onepay_router, router_vtos as dat_ban_vtos_router   # DT-2 đặt bàn có thanh toán
 from app.api.v1.cong_co_dong import router as cong_co_dong_router, router_cong_khai as ir_cong_khai_router, router_vtos as ir_cong_co_dong_router   # CD-1 cổng cổ đông
 from app.api.v1.khach_san_ota import router as cong_khach_san_router, router_vtos as khach_san_ota_router   # KS-1 khách sạn OTA
+from app.api.v1.don_khach_san_ota import router_vtos as don_khach_san_ota_router
 from app.api.v1.doi_tac_cong import router as cong_doi_tac_router, router_noi as noi_doi_tac_router   # DT-1 cổng đối tác
 from app.api.v1.cong_ngoai import router as cong_ngoai_router, router_vtos as tai_khoan_ngoai_router   # CG-1 cổng kết nối VTD
 from app.api.v1.cong_bo import router as cong_bo_router
@@ -405,6 +406,7 @@ app.include_router(cong_doi_tac_router)
 app.include_router(noi_doi_tac_router)
 app.include_router(cong_khach_san_router)
 app.include_router(khach_san_ota_router)
+app.include_router(don_khach_san_ota_router)
 app.include_router(doi_soat_ota_router)
 app.include_router(cong_co_dong_router)
 app.include_router(cong_ncc_router)
