@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { goiCong, phienCong } from "@/lib/cong";
 import { svg } from "../khach/icons";
 
-type Tab = "home" | "gia" | "don" | "dat_ban" | "no" | "bk" | "dn" | "hs" | "nh" | "hl";
+type Tab = "home" | "gia" | "don" | "dat_ban" | "dg" | "no" | "bk" | "dn" | "hs" | "nh" | "hl";
 const I = ({ n }: { n: string }) => <span style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: svg(n) }} />;
 const tien = (n?: number | null) => (n == null ? "—" : `${Math.round(n).toLocaleString("vi-VN")} đ`);
 const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
@@ -48,7 +48,7 @@ export default function CongNcc({ toi, thoat }: { toi: any; thoat: () => void })
   const loi = (x: any) => setErr(x.message || String(x));
   const taiBlv = useCallback(() => goiCong("/ncc/ban-lam-viec").then(setBlv).catch((x) => { if (x.status === 409 || x.status === 403) setCho(x.message); else loi(x); }), []);
   useEffect(() => { taiBlv(); }, [taiBlv]);
-  const NGUON: Record<string, string> = { gia: "/ncc/gia", don: "/ncc/don", dat_ban: "/ncc/dat-ban", no: "/ncc/cong-no", bk: "/ncc/ban-ke", dn: "/ncc/de-nghi", hs: "/ncc/ho-so", nh: "/ncc/ho-so", hl: "/ncc/hoc-lieu" };
+  const NGUON: Record<string, string> = { gia: "/ncc/gia", don: "/ncc/don", dat_ban: "/ncc/dat-ban", dg: "/ncc/danh-gia", no: "/ncc/cong-no", bk: "/ncc/ban-ke", dn: "/ncc/de-nghi", hs: "/ncc/ho-so", nh: "/ncc/ho-so", hl: "/ncc/hoc-lieu" };
   const tai = (t: Tab) => { const p = NGUON[t]; if (p) goiCong(p).then((r) => setD((o) => ({ ...o, [t]: r }))).catch(loi); };
   const di = (t: Tab) => { setTab(t); setMenuMo(false); setMsg(""); setErr(""); setDon(null); setF({}); if (t === "home") taiBlv(); else tai(t); window.scrollTo(0, 0); };
   const chay = async (fn: () => Promise<any>, sau?: (r: any) => void) => {
@@ -57,7 +57,7 @@ export default function CongNcc({ toi, thoat }: { toi: any; thoat: () => void })
   };
   const nhaHang = !!blv?.la_nha_hang;
   const MENU: [Tab, string, string][] = [["home", "Bàn làm việc", "house"], ["gia", nhaHang ? "Thực đơn & giá" : "Dịch vụ & giá", "tickets"],
-    ["don", "Đơn dịch vụ", "receipt"], ...(nhaHang ? [["dat_ban", "Đơn đặt bàn", "utensils"]] as [Tab, string, string][] : []),
+    ["don", "Đơn dịch vụ", "receipt"], ...(nhaHang ? [["dat_ban", "Đơn đặt bàn", "utensils"], ["dg", "Đánh giá của khách", "badge-check"]] as [Tab, string, string][] : []),
     ["no", "Công nợ", "badge-check"], ["bk", "Đối soát", "check"], ["dn", "Đề nghị", "send"], ["hs", "Hợp đồng & hồ sơ", "file-text"],
     ["nh", "Thành viên & ngân hàng", "users"], ["hl", "Học liệu", "info"]];
   const nhan = MENU.find(([k]) => k === tab)?.[1] || "";
@@ -210,6 +210,24 @@ export default function CongNcc({ toi, thoat }: { toi: any; thoat: () => void })
                 {x.bao_khong_den_duoc && <Nut disabled={busy} onClick={() => chay(() => goiCong(`/ncc/dat-ban/${x.id}/khong-den`, {}), (r) => setD((o2) => ({ ...o2, dat_ban: r })))}>Khách không đến</Nut>}</div>}</td></tr>)}</Bang>
             : <p>Chưa có đơn đặt bàn nào.</p>}
           <small>Bạn thấy số khách, giờ, thực đơn; không thấy số điện thoại khách. Nhận bàn xong khách mới thanh toán trước qua Vietourist; ăn xong thu phần còn lại tại bàn rồi bấm «Khách đã dùng» kèm bill. Không đến quá 30 phút: bấm «Khách không đến» — tiền giữ theo chính sách thuộc nhà hàng.</small></section>}
+
+        {tab === "dg" && d.dg && <section className="v3-panel">{/* AT-3 · nhà hàng trả lời công khai một lần, sửa trong 24 giờ */}
+          <div className="v3-section-title"><h3>Đánh giá của khách{d.dg.nha_hang.length === 1 && d.dg.nha_hang[0].diem_tb != null ? ` · ${String(d.dg.nha_hang[0].diem_tb).replace(".", ",")}★ (${d.dg.nha_hang[0].so_bai} bài)` : ""}</h3></div>
+          <p className="v3-small">Nhà hàng trả lời công khai, một lần mỗi bài (tối đa 600 ký tự), sửa được trong 24 giờ. Nhà hàng không ẩn, không sửa được bài của khách.</p>
+          {d.dg.bai.length ? d.dg.bai.map((b: any) => <div key={b.id} className="v3-panel" style={{ marginTop: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+              <b>{b.ten} · {b.la_doan ? "Đoàn" : "Bàn"} {b.so_khach} người · {ngay(b.ngay_an)}{d.dg.nha_hang.length > 1 ? ` · ${b.nha_hang}` : ""}</b>
+              <span style={{ color: b.diem <= 2 ? "#8a1f1f" : "#b07a10", letterSpacing: 2 }} aria-label={`${b.diem} sao`}>{"★★★★★".slice(0, b.diem)}<span style={{ color: "#c9d3dc" }}>{"★★★★★".slice(b.diem)}</span></span></div>
+            {b.nhan_xet && <p style={{ margin: "6px 0", whiteSpace: "pre-line" }}>{b.nhan_xet}</p>}
+            {b.anh.length > 0 && <div style={{ display: "flex", gap: 6 }}>{b.anh.map((a: any) => <img key={a.i} src={a.nho} alt="Ảnh khách" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 6 }} />)}</div>}
+            {b.tra_loi_bi_an && <small>Lời trả lời đã bị Vietourist ẩn vì vi phạm quy tắc.</small>}
+            {(b.duoc_tra_loi || b.duoc_sua_tra_loi) ? <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+              <label className="v3-field">{b.duoc_sua_tra_loi ? "Sửa trả lời (trong 24 giờ)" : "Trả lời công khai"}
+                <textarea rows={3} maxLength={600} value={f[`r${b.id}`] ?? b.tra_loi_cua_minh ?? ""} onChange={(e) => setF({ ...f, [`r${b.id}`]: e.target.value })} /></label>
+              <div><Nut kieu="primary" disabled={busy || !(f[`r${b.id}`] ?? b.tra_loi_cua_minh ?? "").trim()} onClick={() => chay(() => goiCong(`/ncc/danh-gia/${b.id}/tra-loi`, { noi_dung: f[`r${b.id}`] ?? b.tra_loi_cua_minh }), (r) => setD((o2) => ({ ...o2, dg: r })))}>{b.duoc_sua_tra_loi ? "Lưu trả lời" : "Gửi trả lời"}</Nut></div></div>
+              : b.tra_loi_cua_minh && !b.tra_loi_bi_an && <div style={{ background: "rgba(127,140,153,.12)", borderRadius: 8, padding: "8px 10px", marginTop: 6 }}><small><b>Nhà hàng đã trả lời:</b> {b.tra_loi_cua_minh}</small></div>}
+          </div>) : <p>Chưa có đánh giá. Khách đặt bàn qua Vietourist và được nhà hàng báo «Khách đã dùng» mới viết được đánh giá.</p>}
+          <small>Bạn thấy tên khách đã che như trên trang khách; không thấy số điện thoại hay mã đơn của người viết.</small></section>}
 
         {tab === "no" && d.no && <>
           <div className="v3-metrics">

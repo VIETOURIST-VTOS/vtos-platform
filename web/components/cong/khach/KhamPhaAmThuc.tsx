@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { goiCong } from "@/lib/cong";
 import AlbumKhach from "./AlbumKhach";
+import { SaoThe } from "./DanhGiaNhaHangKhach";
 import { BD_W, BD_H, BD_VN, BD_LANG_GIENG, BD_TP, BD_HOANG_SA, BD_TRUONG_SA, BD_NHAN_HS, BD_NHAN_TS } from "./banDoVN";
 
 const tien = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString("vi-VN")} đ` : "—");
@@ -80,7 +81,7 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
 
   if (nh) return (<div className="at"><style>{CSS}</style>
     <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => setNh(null)}><span>← Hương vị Việt Nam</span></button>
-    <AlbumKhach album={nh.album} ten={nh.ten} coTab mon={nh.mon} thucDon={nh.thuc_don_nh}
+    <AlbumKhach album={nh.album} ten={nh.ten} coTab mon={nh.mon} thucDon={nh.thuc_don_nh} danhGia={nh.danh_gia} nhId={nh.id}
       dong2={[[nh.khu_vuc, nh.tinh_thanh].filter(Boolean).join(", ") || nh.dia_danh_nguon, nh.am_thuc ? `Ẩm thực ${nh.am_thuc}` : ""].filter(Boolean).join(" · ")}
       nhan={<div style={{ marginTop: 8 }}><span className="at-chua">Chưa mở đặt bàn qua Vietourist</span></div>}
       gioiThieu={<div className="at-mon-chu at-the-gt">
@@ -162,6 +163,7 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
             <button type="button" className="at-the-anh cursor-interaction" onClick={() => xemNh(n.id)} aria-label={`Xem ${n.ten}`}><Anh src={n.anh_nho || n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /></button>
             <h3>{n.ten}</h3><div className="at-noi-o"><span className="at-ghim"><Ghim /></span>{[n.khu_vuc, n.tinh_thanh].filter(Boolean).join(", ") || n.dia_danh_nguon}</div>
             {n.mon_noi_bat && <div className="at-phu">Nổi tiếng với: <b>{n.mon_noi_bat}</b></div>}
+            <SaoThe sao={n.sao} />
             {n.mo_dat ? <><span className="at-vtd">★ Đặt qua Vietourist · tích điểm</span><div className="at-phu">Thực đơn từ <b>{tien(n.gia_tu)}</b>/người</div>
               <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => xemNh(n.id)}><span>Đặt bàn qua Vietourist</span></button></>
               : <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => xemNh(n.id)}><span>Xem nhà hàng</span></button>}

@@ -45,13 +45,15 @@ def test_cham_diem_tu_du_lieu_da_duyet(db):
     assert N.diem_hoan_thien(db, [nh.id])[nh.id]["diem"] == 0
     _du_het(db, nh.id)
     d = N.diem_hoan_thien(db, [nh.id])[nh.id]
-    assert d["diem"] == 100 and all(m["dat"] for m in d["muc"])
-    assert {m["ma"]: m["diem_toi_da"] for m in d["muc"]} == {"bia": 20, "album": 20, "mon": 15, "thuc_don": 15, "gioi_thieu": 15, "lien_he": 15}
-    # bỏ giới thiệu → mất 15 điểm, còn 85 vẫn «đủ»
+    # AT-3 (29/10/2026): thêm «Đánh giá khách» 10 (album 15, giới thiệu 10) — chưa có bài thì đủ 6 mục = 90
+    assert d["diem"] == 90 and all(m["dat"] for m in d["muc"] if m["ma"] != "danh_gia")
+    assert {m["ma"]: m["diem_toi_da"] for m in d["muc"]} == {"bia": 20, "album": 15, "mon": 15, "thuc_don": 15, "gioi_thieu": 10,
+                                                              "lien_he": 15, "danh_gia": 10}
+    # bỏ giới thiệu → mất 10 điểm, còn 80 vẫn «đủ»
     from app.models.nha_hang import NhaHang
     db.get(NhaHang, nh.id).mo_ta, db.get(NhaHang, nh.id).mon_noi_bat = "", ""
     db.commit()
-    assert N.diem_hoan_thien(db, [nh.id])[nh.id]["diem"] == 85
+    assert N.diem_hoan_thien(db, [nh.id])[nh.id]["diem"] == 80
     one = N.hoan_thien_mot(db, _u(db, "mkt"), nh.id)
     assert one["muc_do"] == "du" and one["tin_xin"] == "" and one["nhat_ky"]
 

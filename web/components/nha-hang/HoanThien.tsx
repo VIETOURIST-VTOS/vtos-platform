@@ -8,8 +8,8 @@ import { Tag, errMsg } from "@/components/ui";
  *  Chỉ Chủ tịch giao việc; người nhận là NV Điều hành / NV Marketing. Cột «Việc của tôi» do máy xếp, không kéo thả. */
 
 type Toast = (m: string, loi?: boolean) => void;
-const MA = ["bia", "album", "mon", "thuc_don", "gioi_thieu", "lien_he"] as const;
-const COT_NGAN: Record<string, string> = { bia: "BÌA", album: "ALBUM", mon: "MÓN", thuc_don: "THỰC ĐƠN", gioi_thieu: "GIỚI THIỆU", lien_he: "LIÊN HỆ" };
+const MA = ["bia", "album", "mon", "thuc_don", "gioi_thieu", "lien_he", "danh_gia"] as const;   // AT-3: + đánh giá khách
+const COT_NGAN: Record<string, string> = { bia: "BÌA", album: "ALBUM", mon: "MÓN", thuc_don: "THỰC ĐƠN", gioi_thieu: "GIỚI THIỆU", lien_he: "LIÊN HỆ", danh_gia: "ĐÁNH GIÁ" };
 const mau = (md: string) => (md === "du" ? "#1f7a50" : md === "dang" ? "#b07a10" : "#b33a3a");
 const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "—");
 
@@ -88,12 +88,12 @@ export function BangHoanThien({ toast, onMo }: { toast: Toast; onMo: (nid: numbe
         {MA.map((k) => <td key={k}><O m={o.muc.find((m: any) => m.ma === k)} /></td>)}
         <td>{o.nguoi || <span className="muted">— chưa giao —</span>}</td>
         <td>{o.han ? <span style={{ color: o.qua_han ? "#b33a3a" : undefined }}>{o.qua_han ? "quá hạn " : ""}{ngay(o.han)}</span> : <span className="muted">—</span>}</td></tr>)}
-        {!ds.length && <tr><td colSpan={12} className="muted">Không có nhà hàng khớp bộ lọc.</td></tr>}</tbody></table></div>
+        {!ds.length && <tr><td colSpan={13} className="muted">Không có nhà hàng khớp bộ lọc.</td></tr>}</tbody></table></div>
     <p className="muted" style={{ fontSize: 12 }}>Bấm tên nhà hàng → mở hồ sơ ở đúng tab còn thiếu. ✓ đạt · ½ một phần · ✗ thiếu; con số = số đã duyệt. Hợp đồng và đặt bàn không tính ở đây (đã có 5 điều kiện mở đặt bàn riêng).</p>
   </section>;
 }
 
-const TAB: Record<string, string> = { bia: "album", album: "album", mon: "mon", thuc_don: "tdnh", gioi_thieu: "gt", lien_he: "tt" };
+const TAB: Record<string, string> = { bia: "album", album: "album", mon: "mon", thuc_don: "tdnh", gioi_thieu: "gt", lien_he: "tt", danh_gia: "dg" };
 
 /** Tab «Việc của tôi» — 4 cột do máy xếp. */
 export function ViecCuaToi({ toast, onMo, ten }: { toast: Toast; onMo: (nid: number, tab: string) => void; ten: string }) {
@@ -132,7 +132,7 @@ export function HoSoHoanThien({ nid, toast, onTab, lamMoi }: { nid: number; toas
   if (!x) return null;
   const con = x.muc.filter((m: any) => !m.dat);
   const vien = (m: any) => (m.dat ? ["#cfe6da", "rgba(31,122,80,.08)"] : m.diem > 0 ? ["#f0dcb0", "rgba(176,122,16,.08)"] : ["#f0c9c9", "rgba(179,58,58,.08)"]);
-  const NUT: Record<string, string> = { album: "Mở Album →", mon: "Món ăn →", tdnh: "Thực đơn →", gt: "Giới thiệu →", tt: "Thông tin →" };
+  const NUT: Record<string, string> = { album: "Mở Album →", mon: "Món ăn →", tdnh: "Thực đơn →", gt: "Giới thiệu →", tt: "Thông tin →", dg: "Đánh giá →" };
   const ghi = async () => {
     setBusy(true);
     try { const r = await api<any>(`/nha-hang/${nid}/da-xin`, { method: "POST", json: {} }); toast(r.message); load(); }

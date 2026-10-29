@@ -74,3 +74,28 @@ def anh(aid: int, request: Request, db: Session = Depends(get_db)):
     except NH.LoiNhaHang as ex:
         raise HTTPException(404, str(ex))
     return Response(content=data, media_type=a.kieu_noi_dung or "image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@router.get("/anh/dg/{gid}/{i}/{co}")
+def anh_danh_gia(gid: int, i: int, co: str, request: Request, db: Session = Depends(get_db)):
+    """AT-3: ảnh khách đính kèm đánh giá — bài và ảnh đang hiện, nhà hàng đang hiện; chỉ bản làm nhẹ (đã bỏ EXIF).
+    Lưu đệm ngắn: Marketing ẩn ảnh vi phạm thì ảnh rút khỏi trang trong ít phút."""
+    from app.services import danh_gia_nh as DG
+    _phanh(request)
+    try:
+        data, a = DG.tep_anh(db, gid, i, co)
+    except DG.LoiDanhGia as ex:
+        raise HTTPException(404, str(ex))
+    return Response(content=data, media_type=a.kieu_noi_dung or "image/webp", headers={"Cache-Control": "public, max-age=600"})
+
+
+@router.get("/danh-gia/{nid}")
+def danh_gia(nid: int, request: Request, trang: int = 1, xep: str = "moi", db: Session = Depends(get_db)):
+    """AT-3: đánh giá đang hiện của một nhà hàng đang hiện — chỉ đọc; tên đã che, không SĐT, không mã đơn."""
+    from app.services import danh_gia_nh as DG
+    _phanh(request)
+    try:
+        NH.mot_nha_hang_cong(db, nid)
+    except NH.LoiNhaHang as ex:
+        raise HTTPException(404, str(ex))
+    return DG.cong(db, nid, trang, 20, xep)

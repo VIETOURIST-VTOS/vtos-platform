@@ -4,20 +4,22 @@
    Ảnh bìa lớn + 4 ảnh nhỏ; «Xem N ảnh» mở album theo nhóm; bấm ảnh để xem lớn, vuốt qua lại; chú thích dưới ảnh,
    credit chỉ hiện khi nhà hàng yêu cầu. */
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import DanhGiaNhaHangKhach from "./DanhGiaNhaHangKhach";
 
 type A = { id: number; nhom: string; nhom_ten: string; chu_thich: string; alt: string; credit: string; nho: string; hien: string };
 
 /** Bố cục theo bản xem thử Điều hành 29/10/2026 («Khách hàng xem»): đầu trang (tên, nơi, «Xem album»), khảm 5 ảnh,
  *  rồi các tab Album ảnh / Giới thiệu. Không in số liệu nội bộ (hợp đồng, số ảnh trên hạn mức) ra cho khách. */
-export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu, nhan, mon, thucDon }:
-  { album?: A[]; ten: string; dong2?: string; coTab?: boolean; gioiThieu?: ReactNode; nhan?: ReactNode; mon?: any[]; thucDon?: any[] }) {
+export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu, nhan, mon, thucDon, danhGia, nhId }:
+  { album?: A[]; ten: string; dong2?: string; coTab?: boolean; gioiThieu?: ReactNode; nhan?: ReactNode; mon?: any[]; thucDon?: any[];
+    danhGia?: any; nhId?: number }) {
   const ds = album || [];
   const [mo, setMo] = useState(false);
   const [nhom, setNhom] = useState("");          // nhóm trong hộp album
   const [nhomTr, setNhomTr] = useState("");      // nhóm ở tab Album ảnh trên trang
   const mons = mon || [];
   const tds = thucDon || [];
-  const [tab, setTab] = useState<"album" | "mon" | "td" | "gt">(ds.length ? "album" : mons.length ? "mon" : tds.length ? "td" : "gt");
+  const [tab, setTab] = useState<"album" | "mon" | "td" | "gt" | "dg">(ds.length ? "album" : mons.length ? "mon" : tds.length ? "td" : "gt");
   const [nhomMon, setNhomMon] = useState("");
   const [loaiTd, setLoaiTd] = useState(tds[0]?.loai || "");
   const [trang, setTrang] = useState(0);
@@ -63,7 +65,8 @@ export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu
         {ds.length > 0 && <button type="button" role="tab" aria-selected={tab === "album"} className="cursor-interaction" onClick={() => setTab("album")}>Album ảnh</button>}
         {mons.length > 0 && <button type="button" role="tab" aria-selected={tab === "mon"} className="cursor-interaction" onClick={() => setTab("mon")}>Món ăn</button>}
         {tds.length > 0 && <button type="button" role="tab" aria-selected={tab === "td"} className="cursor-interaction" onClick={() => setTab("td")}>Thực đơn</button>}
-        <button type="button" role="tab" aria-selected={tab === "gt"} className="cursor-interaction" onClick={() => setTab("gt")}>Giới thiệu</button></div>
+        <button type="button" role="tab" aria-selected={tab === "gt"} className="cursor-interaction" onClick={() => setTab("gt")}>Giới thiệu</button>
+        {danhGia && <button type="button" role="tab" aria-selected={tab === "dg"} className="cursor-interaction" onClick={() => setTab("dg")}>Đánh giá ({danhGia.tom_tat?.so_bai ?? 0})</button>}</div>
       {tab === "album" && ds.length > 0 && <section className="ab-muc">
         <h3>Không gian &amp; hương vị</h3><div className="ab-phu">Khám phá không gian và những món ăn gợi ý.</div>
         <div className="ab-tabs" role="group" aria-label="Nhóm ảnh">
@@ -100,6 +103,7 @@ export default function AlbumKhach({ album, ten, dong2, coTab = false, gioiThieu
         <small className="ab-phu">Trang {Math.min(trang, soTrang - 1) + 1} / {soTrang}. Giá, thuế, phí phục vụ theo nhà hàng và có thể thay đổi. Đặt bàn qua Vietourist dùng giá gói hiện ở bước đặt bàn.</small>
       </section>}
       {tab === "gt" && <section className="ab-muc">{gioiThieu}</section>}
+      {tab === "dg" && danhGia && <DanhGiaNhaHangKhach dau={danhGia} nhId={nhId} />}
     </>}
 
     {mo && <div className="ab-hop" role="dialog" aria-modal="true" aria-label={`Ảnh ${ten}`} onClick={(e) => { if (e.target === e.currentTarget) dong(); }}>
