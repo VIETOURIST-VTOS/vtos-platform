@@ -31,16 +31,16 @@ const MAU_MIEN: Record<string, string> = { bac: "#1f4e5f", trung: "#7a4a22", tay
 const mauMien = (m?: string) => MAU_MIEN[m || ""] || "#3d4b59";
 function OThanhPho({ t }: { t: any }) {
   return <span className="at-otp" style={{ background: mauMien(t.mien) }}><small style={{ color: "#fff" }}>{(t.mien_ten || "").toUpperCase()}</small>
-    <span><b>{t.ten}</b><small style={{ color: "#fff" }}>{t.so_nha_hang} nhà hàng</small></span></span>;
+    <span><b>{(t.ten || "").normalize("NFC")}</b><small style={{ color: "#fff" }}>{t.so_nha_hang} nhà hàng</small></span></span>;
 }
 export function OTrongNh({ n, mien, tl = "4/3" }: { n: any; mien?: string; tl?: string }) {
   // Kiểu viết thẳng (inline) để dùng được cả ở trang đặt bàn, nơi không nạp CSS của màn này.
-  const chu = (n.ten || "?").trim().charAt(0).toUpperCase();
+  const chu = (n.ten || "?").normalize("NFC").trim().charAt(0).toUpperCase();
   return <span role="img" aria-label={`${n.ten} — ảnh đang cập nhật`} style={{ aspectRatio: tl, width: "100%", borderRadius: 10, background: "#eef2f5",
     border: "1px solid #d6dde4", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
     gap: 6, position: "relative", padding: "30px 8px 8px", textAlign: "center" }}>
     <b aria-hidden="true" style={{ width: 52, height: 52, borderRadius: "50%", background: mauMien(mien || n.mien), color: "#fff",
-      fontFamily: "Lora, Georgia, serif", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>{chu}</b>
+      fontFamily: "inherit", fontWeight: 700, fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>{chu}</b>
     {n.mon_noi_bat && <small aria-hidden="true" style={{ fontSize: 12, color: "#3d4b59", maxWidth: "90%" }}>{String(n.mon_noi_bat).split(/[;,]/).slice(0, 2).join(" · ")}</small>}
     <em aria-hidden="true" style={{ position: "absolute", left: 8, top: 8, fontStyle: "normal", fontSize: 11, background: "rgba(29,43,58,.78)",
       color: "#fff", padding: "2px 8px", borderRadius: 6 }}>Ảnh đang cập nhật</em></span>;
@@ -150,7 +150,7 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
           <div className="at-luoi-tp">{tps.map((t: any) => t.so_nha_hang ? <button key={t.ten} type="button" className="at-tp cursor-interaction" onClick={() => { doi({ tinh: t.ten }); document.getElementById("at-nh")?.scrollIntoView(); }}>
             {t.anh ? <Anh src={t.anh} ten={t.ten} tl="3/4" /> : <OThanhPho t={t} />}<b>{t.ten}</b><small>{[`${t.so_nha_hang} nhà hàng`, t.tom_tat].filter(Boolean).join(" · ")}</small></button>
             : <div key={t.ten} className="at-tp at-tp-sap" aria-disabled="true">
-              {t.anh ? <Anh src={t.anh} ten={t.ten} tl="3/4" /> : <span className="at-otp at-otp-sap"><small>{(t.mien_ten || "").toUpperCase()}</small><span><b>{t.ten}</b><small>Sắp có</small></span></span>}
+              {t.anh ? <Anh src={t.anh} ten={t.ten} tl="3/4" /> : <span className="at-otp at-otp-sap"><small>{(t.mien_ten || "").toUpperCase()}</small><span><b>{(t.ten || "").normalize("NFC")}</b><small>Sắp có</small></span></span>}
               <b>{t.ten}</b><small>Chưa có nhà hàng</small></div>)}</div>
         </section>
 
@@ -264,7 +264,7 @@ const CSS = `
 .at-otp{aspect-ratio:3/4;border-radius:10px;padding:12px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;color:#fff;min-width:0}
 .at-otp>small{font-size:11px;letter-spacing:.08em;opacity:.9}
 .at-otp>span{display:flex;flex-direction:column;gap:2px;min-width:0}
-.at .at-otp b{font-family:Lora,Georgia,serif;font-size:20px;line-height:1.15;color:#fff;overflow-wrap:anywhere}
+.at .at-otp b{font-family:inherit;font-weight:700;font-size:19px;line-height:1.15;color:#fff;overflow-wrap:anywhere}
 .at .at-otp span small{font-size:12px;color:#fff;opacity:.92}
 .at-otp-sap{background:#e3e9ef;border:1px dashed #9aa8b5;color:#3d4b59}
 .at .at-otp-sap b,.at .at-otp-sap span small{color:#3d4b59}
