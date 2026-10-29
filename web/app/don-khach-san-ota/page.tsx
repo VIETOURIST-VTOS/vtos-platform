@@ -21,6 +21,68 @@ const VD: Record<string, string> = {
   ma_phong: "9001", ma_goi_gia: "11001", gia_gom_thue: "2400000",
 };
 
+// KS-12 · ba cổng ngoài gửi được yêu cầu. Chép đúng ba giá trị của `TaiKhoanNgoai.loai`.
+const CONG_TEN: Record<string, string> = {
+  khach_hang: "Khách hàng", doi_tac: "Đối tác", co_dong: "Cổ đông",
+};
+
+/** KS-12 — Điều hành ĐỌC ĐƯỢC yêu cầu khách gửi, rồi chạy bước 1 trên CHÍNH đơn ấy.
+ *  KS-11 đã mở cửa cho khách và đã có cửa máy chủ `/{id}/hoi-gia-yeu-cau`, nhưng màn này chưa
+ *  gọi và chưa bày nội dung khách khai — nên đơn khách gửi lên nằm trong danh sách mà người
+ *  trực không biết khách muốn đi đâu, cũng không có số để gọi lại. Vòng này nối nốt chỗ ấy.
+ *
+ *  KHÔNG dựng đơn mới: dựng đơn mới thì khách theo dõi một đơn, Điều hành chạy một đơn khác,
+ *  và hai cái ấy không bao giờ gặp nhau. */
+function YeuCauKhach({ d, ds, goi }: { d: any; ds: any; goi: (duong: string, json: any) => Promise<any> }) {
+  const ota = (ds?.ota || [])[0];
+  const mt = ota?.moi_truong || "tat";
+  const that = mt === "that";
+  const [f, setF] = useState<any>({
+    ma_tim: "", ma_khoi: "", ma_khach_san: "", ma_phong: "", ma_goi_gia: "", gia_gom_thue: "",
+    kieu_thanh_toan: "", the_chao: "", phu_thu: "", nuoc_khach: "VN", ngon_ngu: "vi-vn", tien_te: "VND",
+  });
+  const [ban, setBan] = useState(false);
+  if (!d.la_yeu_cau_khach) return null;
+  const nhan = async () => {
+    setBan(true);
+    const g: any = { ...f, ota_id: ota?.id };
+    for (const k of Object.keys(ds?.so_cua_nguon || {})) if (g[k] === "") g[k] = null;
+    await goi("hoi-gia-yeu-cau", g);
+    setBan(false);
+  };
+
+  return (<div className="panel" style={{ margin: 0 }}>
+    <b>Khách gửi yêu cầu</b>{" "}
+    <Tag cls="warn">{CONG_TEN[d.cong] || d.cong || "cổng ngoài"}</Tag>{" "}
+    <span className="muted mono">{(d.gui_luc || "").replace("T", " ").slice(0, 16)}</span>
+    <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 8, marginTop: 6 }}>
+      <div><div className="muted">Nơi đến</div><b>{d.noi_den || "—"}</b></div>
+      <div><div className="muted">Ngày ở</div><b>{d.ngay_nhan || "—"} → {d.ngay_tra || "—"}</b></div>
+      <div><div className="muted">Số khách</div><b>{d.so_phong} phòng · {d.nguoi_lon} người lớn{d.tre_em ? ` · ${d.tre_em} trẻ em` : ""}</b></div>
+      <div><div className="muted">Người nhận phòng</div><b>{d.nguoi_nhan_phong || "—"}</b></div>
+      <div><div className="muted">Liên hệ để báo giá</div><b className="mono">{d.lien_he || "—"}</b></div>
+    </div>
+    {d.yeu_cau_them && <div style={{ marginTop: 6 }}>
+      <div className="muted">Yêu cầu thêm</div>{d.yeu_cau_them}</div>}
+
+    {d.trang_thai === "moi" ? <div style={{ marginTop: 10 }}>
+      <b>Nhận yêu cầu này và hỏi giá</b>{" "}<Tag cls={MT_TAG[mt] || ""}>{ota?.moi_truong_ten || mt}</Tag>
+      <div className="muted">Bước 1 chạy trên CHÍNH đơn này, không dựng đơn mới — để khách và Điều hành cùng theo dõi một đơn.</div>
+      {that && <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: 8, marginTop: 6 }}>
+        {Object.entries(ds?.so_cua_nguon || {}).map(([k, ten]) => <label key={k} style={{ display: "grid", gap: 4 }}>
+          <span className="muted">{ten as string}</span>
+          <input className="mono" value={f[k]} placeholder={VD[k] || ""} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></label>)}
+      </div>}
+      <div style={{ marginTop: 8 }}>
+        <button className="act teal" style={{ margin: 0 }} disabled={ban || !ota || mt === "tat"} onClick={nhan}>Nhận và hỏi giá</button>{" "}
+        <span className="muted">{mt === "tat"
+          ? "Môi trường nguồn đang Tắt — bật Thử hoặc Chạy thật ở màn Khách sạn OTA trước."
+          : "Xong bước này, khách thấy «Vietourist đang tra giá» trên cổng của họ."}</span>
+      </div>
+    </div> : <div className="muted" style={{ marginTop: 8 }}>Đã qua bước hỏi giá — xem sáu bước bên dưới.</div>}
+  </div>);
+}
+
 function HoiGia({ ds, xong }: { ds: any; xong: (d: any) => void }) {
   const { toast } = useShell();
   const ota = (ds?.ota || [])[0];
@@ -98,6 +160,7 @@ function MotDon({ id, ds, xong }: { id: number; ds: any; xong: (d: any) => void 
   const dong = d.trang_thai === "da_huy" || d.trang_thai === "that_bai";
 
   return (<div style={{ background: "var(--panel2)", borderRadius: 8, padding: "10px 12px", display: "grid", gap: 10 }}>
+    <YeuCauKhach d={d} ds={ds} goi={goi} />
     <div>
       <b>Sáu bước của đơn này</b>
       <div className="muted">Số đối chiếu: <span className="mono">{d.so_doi_chieu || "—"}</span> · {d.kieu_thanh_toan || "chưa rõ kiểu thanh toán"} · vào báo cáo tiền: {d.vao_bao_cao_tien ? "Có" : "Không"}</div>
@@ -162,7 +225,7 @@ function Trang() {
 
   return (<>
     <h1>Đơn phòng OTA</h1>
-    <p className="muted">Đặt phòng đi theo đúng sáu bước của Agoda Demand API. Vietourist KHÔNG thu tiền khách — Agoda tính tiền thẳng cho khách (Fulfill Assisted), nên màn này không có ô nào nhận số thẻ. Đơn ở môi trường Thử và đơn Agoda đánh dấu BookingTest không bao giờ vào báo cáo tiền.</p>
+    <p className="muted">Đặt phòng đi theo đúng sáu bước của Agoda Demand API. Vietourist KHÔNG thu tiền khách — Agoda tính tiền thẳng cho khách (Fulfill Assisted), nên màn này không có ô nào nhận số thẻ. Đơn ở môi trường Thử và đơn Agoda đánh dấu BookingTest không bao giờ vào báo cáo tiền. Đơn có dấu «Khách gửi» là yêu cầu từ cổng khách: mở ra để đọc nơi đến, liên hệ và yêu cầu thêm, rồi bấm «Nhận và hỏi giá» — bước 1 chạy trên chính đơn ấy.</p>
 
     <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))" }}>
       {Object.entries(ds?.buoc || {}).map(([k, v], i) => <div className="panel" key={k}>
@@ -175,7 +238,11 @@ function Trang() {
       <table><thead><tr><th>Thẻ tham chiếu</th><th>Môi trường</th><th>Trạng thái bên mình</th><th>Trạng thái bên nguồn</th><th>Số đối chiếu</th><th>Nhận – Trả</th><th>Giá gồm thuế</th><th>Báo cáo tiền</th><th></th></tr></thead>
         <tbody>{ds?.don?.length ? ds.don.map((d: any) => <>
           <tr key={d.id}>
-            <td className="mono" style={{ overflowWrap: "anywhere" }}>{d.the_tham_chieu}</td>
+            <td style={{ overflowWrap: "anywhere" }}>
+              <span className="mono">{d.the_tham_chieu}</span>
+              {d.la_yeu_cau_khach && <div style={{ marginTop: 4 }}>
+                <Tag cls="warn">Khách gửi</Tag>{" "}
+                <span className="muted">{d.noi_den || "—"}</span></div>}</td>
             <td><Tag cls={MT_TAG[d.moi_truong] || ""}>{d.moi_truong}</Tag></td>
             <td><Tag cls={TT_TAG[d.trang_thai] || ""}>{d.trang_thai_ten}</Tag></td>
             <td className="mono muted">{d.trang_thai_nguon || "—"}</td>
