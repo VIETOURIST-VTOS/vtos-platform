@@ -66,6 +66,35 @@ TRANG_THAI_DON = {
 
 DON_DONG = ("da_huy", "that_bai")
 
+# ── KS-11 · BỐN ĐIỀU KHÁCH CẦN BIẾT ───────────────────────────────────────────────────────
+# Khách không cần biết sáu bước của Agoda, và càng không nên biết: dòng «Precheck 501» không
+# nói cho ai điều gì. Khách cần biết đúng mình đang ở đâu và có phải làm gì không. Bảng này
+# khai Ở ĐÂY chứ không gõ lại trong mã giao diện — gõ lại thì ngày đổi chữ, màn lệch mà không
+# ai biết.
+TRANG_THAI_KHACH = {
+    "da_gui": "Đã gửi yêu cầu",
+    "dang_tra_gia": "Vietourist đang tra giá",
+    "co_gia": "Đã có giá — chờ bạn xác nhận",
+    "da_dat": "Đã đặt",
+    "da_huy": "Đã huỷ",
+    "that_bai": "Không đặt được",
+}
+
+# Trạng thái BÊN MÌNH → điều khách nhìn thấy. Mọi khoá của TRANG_THAI_DON phải có mặt ở đây;
+# thiếu một khoá là một đơn hiện ra trống trên màn của khách, và phép thử bắt đúng chỗ đó.
+DON_SANG_KHACH = {
+    "moi": "da_gui",
+    "cho_tra_cuu": "dang_tra_gia",
+    "da_hoi_gia": "co_gia",
+    "da_dat": "da_dat",
+    "da_huy": "da_huy",
+    "that_bai": "that_bai",
+}
+
+# Cổng nào gửi được yêu cầu. Chép đúng ba giá trị của `TaiKhoanNgoai.loai`.
+CONG_GUI = ("khach_hang", "doi_tac", "co_dong")
+
+
 # Mã lý do huỷ của Agoda, chép nguyên. Gửi số ngoài bảng này là một lỗi 400 lúc huỷ — tức là
 # lúc khách đang chờ được huỷ, chỗ tệ nhất để phát hiện mình gõ sai một con số.
 LY_DO_HUY = {
@@ -107,7 +136,9 @@ class DonKhachSanOta(Base):
     # «đặt lại cho chắc» nghĩa là khách bị tính tiền hai lần.
     the_tham_chieu: Mapped[str] = mapped_column(String(50), unique=True, index=True)
 
-    ota_id: Mapped[int] = mapped_column(ForeignKey("doi_tac_ota.id"), index=True)
+    # KS-11 · nullable: yêu cầu của khách chưa có nguồn — Điều hành gắn vào ở bước hỏi giá.
+    ota_id: Mapped[int | None] = mapped_column(
+        ForeignKey("doi_tac_ota.id"), nullable=True, index=True)
     # Môi trường ĐÓNG DẤU lúc dựng đơn, không đọc lại từ nguồn về sau. Nguồn đổi từ Sandbox sang
     # Chạy thật thì những đơn thử cũ vẫn phải là đơn thử.
     moi_truong: Mapped[str] = mapped_column(String(8), default="tat")
@@ -157,6 +188,22 @@ class DonKhachSanOta(Base):
     ly_do_huy: Mapped[int] = mapped_column(Integer, default=0)
     hoan_gom_thue: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
     huy_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # ── KS-11 · CHỦ ĐƠN ────────────────────────────────────────────────────────────────────
+    # Cột này là lý do KS-10 chưa mở cửa cho khách. Thiếu nó, quyền đọc một đơn chỉ còn dựa
+    # vào việc BIẾT thẻ tham chiếu — mà thẻ tham chiếu được in ra, gửi qua tin nhắn, chụp màn
+    # hình. Nullable là CỐ Ý: đơn do Điều hành tự dựng (KS-10) không có chủ, và vẫn phải chạy.
+    tai_khoan_ngoai_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tai_khoan_ngoai.id"), nullable=True, index=True)
+    cong: Mapped[str] = mapped_column(String(20), default="")
+
+    # Người NHẬN PHÒNG có thể không phải người gửi yêu cầu — công ty đặt cho nhân viên, con
+    # đặt cho bố mẹ. Tách hai ô ra, đừng bắt một ô gánh hai nghĩa.
+    nguoi_nhan_phong: Mapped[str] = mapped_column(String(160), default="")
+    lien_he: Mapped[str] = mapped_column(String(160), default="")
+    noi_den: Mapped[str] = mapped_column(String(160), default="")
+    yeu_cau_them: Mapped[str] = mapped_column(Text, default="")
+    gui_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     ghi_chu: Mapped[str] = mapped_column(Text, default="")
     sua_boi: Mapped[str] = mapped_column(String(80), default="")

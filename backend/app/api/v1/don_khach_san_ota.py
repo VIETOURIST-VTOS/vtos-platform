@@ -17,6 +17,8 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.core import User
 from app.services import dat_phong_ota as S
+from app.api.v1.cong_ngoai import tai_khoan_ngoai
+from app.models.cong_ngoai import TaiKhoanNgoai
 
 router_vtos = APIRouter(prefix="/api/v1/don-khach-san-ota", tags=["khach-san-ota"])
 
@@ -186,3 +188,70 @@ def huy(don_id: int, data: HuyIn, u: User = Depends(require_roles(*S.VAI_LAM)),
     r = _goi(S.huy, db, _ten(u), don_id, data.xem.model_dump(), gui)
     r["message"] = "Đã huỷ"
     return r
+# ---------------------------------------------------------------- KS-11 · cửa cho khách
+# Gắn vào ĐÚNG tiền tố `/api/v1/cong/khach-san` đã có từ KS-1, nên KHÔNG thêm nhóm API mới:
+# bản đồ quyền và bảng phạm vi vai trò không đổi một con số nào.
+#
+# Mọi cửa dưới đây đi qua `tai_khoan_ngoai` — phiên cổng ngoài, KHÔNG phải phiên VTOS. Một tài
+# khoản cổng ngoài không bao giờ là một `User`, nên không có đường nào từ đây vào màn nội bộ.
+#
+# KHÔNG CÓ Ô SỐ THẺ ở bất kỳ cửa nào: Fulfill Assisted — Agoda thu tiền thẳng của khách.
+
+router_cong = APIRouter(prefix="/api/v1/cong/khach-san", tags=["khach-san-ota"])
+
+
+class YeuCauIn(BaseModel):
+    noi_den: str
+    ngay_nhan: str | None = None
+    ngay_tra: str | None = None
+    so_phong: int = 1
+    nguoi_lon: int = 2
+    tre_em: int = 0
+    nguoi_nhan_phong: str = ""
+    lien_he: str = ""
+    yeu_cau_them: str = ""
+
+
+@router_cong.post("/yeu-cau")
+def gui_yeu_cau(data: YeuCauIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai),
+                db: Session = Depends(get_db)):
+    don = _goi(S.gui_yeu_cau, db, tk, data.model_dump())
+    return {"message": "Đã nhận yêu cầu. Vietourist sẽ báo giá cho bạn.",
+            "don": S.tom_tat_khach(don), **S.tham_so_khach()}
+
+
+@router_cong.get("/don-cua-toi")
+def don_cua_toi(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    return {"don": _goi(S.don_cua_toi, db, tk), **S.tham_so_khach()}
+
+
+@router_cong.get("/don/{don_id}")
+def mot_don(don_id: int, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai),
+            db: Session = Depends(get_db)):
+    return {"don": _goi(S.mot_don_cua_toi, db, tk, don_id), **S.tham_so_khach()}
+
+
+# ------------------------------------------------- phía VTOS · nhận một yêu cầu của khách
+
+class HoiGiaYeuCauIn(BaseModel):
+    ota_id: int
+    ma_tim: int | None = None
+    ma_khoi: str | None = None
+    the_chao: str | None = None
+    ma_khach_san: int | None = None
+    ma_phong: int | None = None
+    ma_goi_gia: int | None = None
+    gia_gom_thue: float | None = None
+    kieu_thanh_toan: str | None = None
+    phu_thu: str | None = None
+    nuoc_khach: str | None = None
+    ngon_ngu: str | None = None
+    tien_te: str | None = None
+
+
+@router_vtos.post("/{don_id}/hoi-gia-yeu-cau")
+def hoi_gia_yeu_cau(don_id: int, data: HoiGiaYeuCauIn,
+                    u: User = Depends(require_roles(*S.VAI_LAM)),
+                    db: Session = Depends(get_db)):
+    don = _goi(S.hoi_gia_yeu_cau, db, u.username, don_id, data.model_dump())
+    return {"message": "Đã hỏi giá cho yêu cầu của khách", "don_id": don.id}

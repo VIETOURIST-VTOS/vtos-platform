@@ -10,6 +10,7 @@
    «xem trên trang đối tác» chứ không bỏ trống — ô trống làm khách tưởng đang tải. */
 import { useCallback, useEffect, useState } from "react";
 import { goiCong } from "@/lib/cong";
+import YeuCauKhachSan from "@/components/cong/YeuCauKhachSan";
 
 const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
 const uuid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID()
@@ -146,6 +147,9 @@ export default function KhachSanOta({ ghiChu }: { ghiChu?: string }) {
       {loi && !chon && <div className="v3-notice warn"><span>{loi}</span></div>}
       <p className="v3-small">VTD chưa hiện giá và phòng trống — giá, phòng và thanh toán xem trên trang đối tác.</p>
       {ghiChu && <div className="v3-notice warn"><span>{ghiChu}</span></div>}</section>
+
+    <YeuCauKhachSan />
+
 
     {dp.length > 0 && <section className="v3-panel"><div className="v3-section-title"><h3>Đặt phòng OTA đã xác minh</h3><span className="v3-badge good">{dp.length}</span></div>
       <div className="v3-table-wrap"><table><thead><tr><th scope="col">OTA</th><th scope="col">Thành phố</th><th scope="col">Ngày ở</th><th scope="col">Trạng thái</th></tr></thead>

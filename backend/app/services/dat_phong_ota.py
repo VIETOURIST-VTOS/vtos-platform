@@ -365,3 +365,183 @@ def tham_so() -> dict:
         "o_dieu_kien": list(O_DIEU_KIEN),
         "so_cua_nguon": {k: TEN_O[k] for k in SO_CUA_NGUON},
     }
+# ---------------------------------------------------------------- KS-11 · cửa cho khách
+# Chủ tịch chốt 29-10-2026: khách GỬI YÊU CẦU, Điều hành chạy sáu bước.
+#
+# Khách không tự chạy sáu bước, và lý do không phải là ngại: sáu con số của Agoda chỉ tra được
+# từ tài khoản đối tác của Vietourist, còn tiền thì theo Fulfill Assisted «Agoda will directly
+# charge your customers» — Vietourist không chạm vào. Nên khách khai NƠI ĐẾN và NGÀY; mọi con
+# số của nguồn vẫn vào hệ thống bằng đúng hai cách cũ, không có cách thứ ba.
+
+# Ô khách được khai. Danh sách này là MỘT HÀNG RÀO, không phải một ghi chú: `gui_yeu_cau` chỉ
+# đọc đúng những khoá ở đây, nên một trình duyệt bị sửa cũng không nhét được `ma_tim` hay
+# `gia_gom_thue` vào đơn.
+O_KHACH_KHAI = ("noi_den", "ngay_nhan", "ngay_tra", "so_phong", "nguoi_lon", "tre_em",
+                "nguoi_nhan_phong", "lien_he", "yeu_cau_them")
+
+# Tài khoản ở hai trạng thái này không gửi yêu cầu được.
+TK_KHONG_GUI = ("khoa", "tu_choi")
+
+GIOI_HAN_DON_KHACH = 50
+
+
+def trang_thai_khach(don) -> str:
+    """Trạng thái bên mình → điều khách nhìn thấy. Khoá lạ thì trả «da_gui», không nổ."""
+    return DON_SANG_KHACH.get(getattr(don, "trang_thai", "") or "", "da_gui")
+
+
+def la_chu_don(don, tk) -> bool:
+    """Một câu hỏi, một câu trả lời, và KHÔNG có đường vòng nào qua thẻ tham chiếu.
+
+    Đơn không có chủ (Điều hành tự dựng) thì KHÔNG ai ở cổng ngoài đọc được — trả False, chứ
+    không trả True vì «không có ai cấm».
+    """
+    chu = getattr(don, "tai_khoan_ngoai_id", None)
+    if chu is None or tk is None:
+        return False
+    return int(chu) == int(getattr(tk, "id", 0) or 0)
+
+
+def thieu_de_gui_yeu_cau(tk, d: dict) -> list[str]:
+    """Chưa đủ cái gì thì chưa nhận yêu cầu. Gọi đúng tên ô còn thiếu, đừng nói «dữ liệu sai»."""
+    t = []
+    if tk is None or getattr(tk, "id", None) is None:
+        t.append("chưa đăng nhập cổng")
+        return t
+    if str(getattr(tk, "trang_thai", "") or "") in TK_KHONG_GUI:
+        t.append("tài khoản đang bị khoá hoặc đã bị từ chối")
+    if str(getattr(tk, "loai", "") or "") not in CONG_GUI:
+        t.append("cổng này chưa mở đặt phòng")
+    if not str(d.get("noi_den") or "").strip():
+        t.append("chưa ghi nơi đến")
+    if not d.get("ngay_nhan") or not d.get("ngay_tra"):
+        t.append("chưa có ngày nhận / ngày trả phòng")
+    elif str(d["ngay_tra"]) <= str(d["ngay_nhan"]):
+        t.append("ngày trả phải sau ngày nhận")
+    if int(d.get("so_phong") or 0) < 1:
+        t.append("số phòng phải từ 1")
+    if int(d.get("nguoi_lon") or 0) < 1:
+        t.append("số người lớn phải từ 1")
+    if not str(d.get("nguoi_nhan_phong") or "").strip():
+        t.append("chưa ghi tên người nhận phòng")
+    if not str(d.get("lien_he") or "").strip():
+        t.append("chưa ghi số điện thoại hoặc email để Vietourist báo giá")
+    return t
+
+
+def tom_tat_khach(don) -> dict:
+    """Những gì khách được thấy — và CHỈ những gì khách được thấy.
+
+    Không có `ma_tim`, `ma_khoi`, `the_chao`, `ma_goi_gia`: đó là mã phiên tra giá của tài
+    khoản đối tác Vietourist, đưa ra ngoài là đưa chìa khoá kho giá cho người lạ. Phép thử
+    KS-11 đọc chính hàm này và bắt nếu có khoá nào trong số ấy lọt ra.
+    """
+    k = trang_thai_khach(don)
+    return {
+        "id": don.id,
+        "the_tham_chieu": don.the_tham_chieu,
+        "trang_thai": k,
+        "trang_thai_ten": TRANG_THAI_KHACH.get(k, k),
+        "noi_den": don.noi_den,
+        "ngay_nhan": don.ngay_nhan.isoformat() if don.ngay_nhan else None,
+        "ngay_tra": don.ngay_tra.isoformat() if don.ngay_tra else None,
+        "so_phong": don.so_phong,
+        "nguoi_lon": don.nguoi_lon,
+        "tre_em": don.tre_em,
+        "nguoi_nhan_phong": don.nguoi_nhan_phong,
+        "yeu_cau_them": don.yeu_cau_them,
+        # Giá chỉ hiện khi ĐÃ có giá. Hiện số 0 lúc chưa tra xong là nói dối khách một con số.
+        "gia_gom_thue": float(don.gia_gom_thue or 0) if k in ("co_gia", "da_dat") else None,
+        "tien_te": don.tien_te,
+        "so_xac_nhan_ks": don.so_xac_nhan_ks or "",
+        "gui_luc": don.gui_luc.isoformat() if don.gui_luc else None,
+    }
+
+
+def gui_yeu_cau(db: Session, tk, d: dict, now: datetime | None = None) -> DonKhachSanOta:
+    """Khách gửi yêu cầu. Dựng một đơn CHƯA CÓ NGUỒN và chưa có một con số nào của Agoda."""
+    thieu = thieu_de_gui_yeu_cau(tk, d)
+    if thieu:
+        raise LoiOta("Chưa gửi được yêu cầu: " + "; ".join(thieu))
+
+    don = DonKhachSanOta(the_tham_chieu=the_tham_chieu_moi(), ota_id=None,
+                         moi_truong="tat", trang_thai="moi", trang_thai_nguon="")
+    don.tai_khoan_ngoai_id = int(tk.id)
+    don.cong = str(getattr(tk, "loai", "") or "")[:20]
+    # CHỈ những khoá trong O_KHACH_KHAI. Đây là chỗ chặn, không phải chỗ tin.
+    don.noi_den = str(d.get("noi_den") or "").strip()[:160]
+    don.ngay_nhan = d.get("ngay_nhan")
+    don.ngay_tra = d.get("ngay_tra")
+    don.so_phong = int(d.get("so_phong") or 1)
+    don.nguoi_lon = int(d.get("nguoi_lon") or 1)
+    don.tre_em = int(d.get("tre_em") or 0)
+    don.nguoi_nhan_phong = str(d.get("nguoi_nhan_phong") or "").strip()[:160]
+    don.lien_he = str(d.get("lien_he") or "").strip()[:160]
+    don.yeu_cau_them = str(d.get("yeu_cau_them") or "")[:2000]
+    don.gui_luc = now or datetime.utcnow()
+    _dong_dau(don, "cổng:" + str(getattr(tk, "loai", "") or ""), now)
+    db.add(don)
+    db.flush()
+    db.commit()
+    return don
+
+
+def don_cua_toi(db: Session, tk) -> list[dict]:
+    """Đơn CỦA CHÍNH tài khoản ấy. Lọc ở câu truy vấn, không lọc ở màn hình."""
+    if tk is None or getattr(tk, "id", None) is None:
+        return []
+    q = (select(DonKhachSanOta)
+         .where(DonKhachSanOta.tai_khoan_ngoai_id == int(tk.id))
+         .order_by(DonKhachSanOta.id.desc()).limit(GIOI_HAN_DON_KHACH))
+    return [tom_tat_khach(x) for x in db.execute(q).scalars().all()]
+
+
+def mot_don_cua_toi(db: Session, tk, don_id: int) -> dict:
+    """Một đơn — và 404 nếu không phải của mình.
+
+    Trả 404 chứ không 403: 403 xác nhận «đơn này có thật», tức là đếm được đơn của người khác.
+    """
+    don = db.get(DonKhachSanOta, int(don_id or 0))
+    if don is None or not la_chu_don(don, tk):
+        raise LoiOta("Không thấy đơn này", 404)
+    return tom_tat_khach(don)
+
+
+def tham_so_khach() -> dict:
+    """Bảng chữ cho màn của khách — để màn không gõ lại một bảng nào."""
+    return {"trang_thai": TRANG_THAI_KHACH, "o_khach_khai": list(O_KHACH_KHAI)}
+
+
+def hoi_gia_yeu_cau(db: Session, boi: str, don_id: int, d: dict,
+                    now: datetime | None = None) -> DonKhachSanOta:
+    """Điều hành nhận một YÊU CẦU của khách: gắn nguồn vào và chạy bước 1 TRÊN CHÍNH ĐƠN ẤY.
+
+    Không dựng đơn mới. Dựng đơn mới thì khách theo dõi một đơn, Điều hành chạy một đơn khác,
+    và hai cái ấy không bao giờ gặp nhau.
+    """
+    don = lay_don(db, don_id)
+    if don.trang_thai != "moi":
+        raise LoiOta("Đơn này đã qua bước hỏi giá — xem nhật ký bước")
+    ota = _lay_ota(db, d.get("ota_id"))
+    dk = {k: getattr(don, k) for k in O_DIEU_KIEN}
+    dk.update({k: v for k, v in (d or {}).items() if k in O_DIEU_KIEN and v is not None})
+    thieu = thieu_de_hoi_gia(ota, dk)
+    if thieu:
+        raise LoiOta("Chưa hỏi giá được: " + "; ".join(thieu))
+    moi_truong = getattr(ota, "moi_truong", "tat")
+    thieu_so = thieu_so_nguon(moi_truong, d)
+    if thieu_so:
+        raise LoiOta("Chưa hỏi giá được: " + "; ".join(thieu_so))
+
+    don.ota_id = ota.id
+    don.moi_truong = moi_truong
+    for k in O_DIEU_KIEN:
+        if k in (d or {}) and d[k] is not None:
+            setattr(don, k, d[k])
+    nhan_so_nguon(don, sinh_so_thu() if moi_truong == "thu" else d, now)
+    _dong_dau(don, boi, now)
+    ghi_buoc(db, don, "tim", 200, False,
+             "yêu cầu của khách · môi trường %s · mã tìm %s" % (moi_truong, don.ma_tim),
+             boi, now)
+    db.commit()
+    return don
