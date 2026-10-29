@@ -5,6 +5,7 @@ import { api, getToken, taiTep } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import AlbumNhaHang, { AnhChoDuyet } from "@/components/nha-hang/AlbumNhaHang";
 import { MonAnNhaHang, ThucDonNhaHangTab, NoiDungChoDuyet } from "@/components/nha-hang/MonThucDon";
+import { BangHoanThien, ViecCuaToi, HoSoHoanThien } from "@/components/nha-hang/HoanThien";
 
 /** KH-2 · NHÀ HÀNG (CỔNG KHÁCH) — Chủ tịch duyệt bản xem thử 26/10/2026.
  *  Điều hành nhập nhà hàng + thực đơn (chỉ GIÁ BÁN). TP Điều hành bật «Hiện trên cổng» (DT-2b, Chủ tịch 28/10/2026);
@@ -37,7 +38,7 @@ function Trang() {
   const bat = ["tp_dh", "chutich", "tgd"].includes(role);
   const mkt = ["nv_mkt", "ptgd_mkt", "nv_dh", "tp_dh", "chutich", "tgd"].includes(role);   // 29/10/2026: Điều hành cũng viết nội dung
   const xemHd = nhap || ["ketoan", "bks"].includes(role);
-  const [tab, setTab] = useState<"nh" | "nd" | "cd">(["nv_mkt", "ptgd_mkt"].includes(role) ? "nd" : "nh");
+  const [tab, setTab] = useState<"nh" | "nd" | "cd" | "ht" | "vct">(["nv_mkt", "ptgd_mkt"].includes(role) ? "nd" : "nh");
   const [tim, setTim] = useState(""); const [locTinh, setLocTinh] = useState(""); const [locAnh, setLocAnh] = useState("");
   const [chon, setChon] = useState<number[]>([]);
   const [tep, setTep] = useState<File | null>(null); const [nguon, setNguon] = useState(""); const [thu, setThu] = useState<any>(null);
@@ -52,7 +53,8 @@ function Trang() {
   const [td, setTd] = useState<any>(null);         // {id?, ...} gói đang sửa
   const [busy, setBusy] = useState(false);
   const [tabNh, setTabNh] = useState<"album" | "mon" | "tdnh" | "td" | "gt" | "hd" | "tt">("album");   // AT-2a: hồ sơ nội dung theo tab
-  const load = useCallback(() => { api("/nha-hang").then(setX).catch((e) => toast(errMsg(e), true)); }, [toast]);
+  const [lan, setLan] = useState(0);   // AT-2c: làm mới danh mục kiểm sau mỗi lần dữ liệu đổi
+  const load = useCallback(() => { setLan((v) => v + 1); api("/nha-hang").then(setX).catch((e) => toast(errMsg(e), true)); }, [toast]);
   useEffect(() => { load(); }, [load]);
   const goi = async (path: string, json: any) => {
     setBusy(true);
@@ -100,6 +102,13 @@ function Trang() {
   const loc = x.nha_hang.filter((n: any) => (!locAnh || LOC_ANH[locAnh](n)) && (!locTinh || n.tinh_thanh === locTinh) && (!tim || k(`${n.ten} ${n.tinh_thanh} ${n.dia_danh_nguon} ${n.mon_noi_bat} ${n.ma}`).includes(k(tim))));
   const cacTinh = Array.from(new Set(x.nha_hang.map((n: any) => n.tinh_thanh).filter(Boolean))).sort() as string[];
   const dang = sua && sua !== "moi" ? x.nha_hang.find((n: any) => n.id === sua) : null;
+  // AT-2c: từ bảng hoàn thiện / việc của tôi → mở hồ sơ ở đúng tab còn thiếu
+  const moHoSo = (nid: number, t: string) => {
+    const n = x.nha_hang.find((v: any) => v.id === nid); if (!n) return;
+    setTab("nh"); setSua(n.id); setTabNh(t as any); setF({ ...NH_TRONG, ...n }); setTd(null); setHd(HD_TRONG); setTepHd(null);
+    setGt({ mo_ta: n.mo_ta || "", mon_noi_bat: n.mon_noi_bat || "" });
+    setTimeout(() => document.getElementById("at-hs-ht")?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+  };
   const o = (k: string, nhan: string, ph = "") => <label>{nhan}<input value={f[k]} placeholder={ph} disabled={!nhap} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></label>;
   const t = (k: string, nhan: string, type = "text") => <label>{nhan}<input type={type} value={td[k] ?? ""} onChange={(e) => setTd({ ...td, [k]: e.target.value })} /></label>;
   const luuTd = async () => {
@@ -115,7 +124,11 @@ function Trang() {
     <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
       <button className={`act ${tab === "nh" ? "teal" : "grey"}`} onClick={() => setTab("nh")}>Nhà hàng</button>
       <button className={`act ${tab === "nd" ? "teal" : "grey"}`} onClick={() => setTab("nd")}>Nội dung ẩm thực</button>
-      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Chờ duyệt ({x.so_anh_cho_duyet ?? 0})</button></div>
+      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Chờ duyệt ({x.so_anh_cho_duyet ?? 0})</button>
+      <button className={`act ${tab === "ht" ? "teal" : "grey"}`} onClick={() => setTab("ht")}>Hoàn thiện</button>
+      {["nv_dh", "nv_mkt"].includes(role) && <button className={`act ${tab === "vct" ? "teal" : "grey"}`} onClick={() => setTab("vct")}>Việc của tôi</button>}</div>
+    {tab === "ht" && <BangHoanThien toast={toast} onMo={moHoSo} />}
+    {tab === "vct" && <ViecCuaToi toast={toast} onMo={moHoSo} ten={user?.username || ""} />}
     {tab === "cd" && <><AnhChoDuyet toast={toast} onDoi={load} /><NoiDungChoDuyet toast={toast} onDoi={load} /></>}
 
     {tab === "nd" && <section className="panel">
@@ -229,6 +242,7 @@ function Trang() {
           <span><b>{dang.so_dang_ban}</b> gói đặt bàn đang bán</span>
           <span>Hợp đồng: <b>{dang.hop_dong.some((h: any) => h.con_dung) ? "đã ghi nhận" : "chưa xác nhận"}</b></span>
           <span style={{ flex: 1 }} />{dang.mo_dat ? <Tag cls="ok">Đang mở đặt bàn</Tag> : <Tag cls="warn">Chưa mở đặt bàn · {dang.dieu_kien.filter((c: any) => c.ok).length}/5</Tag>}</div>
+        <HoSoHoanThien nid={dang.id} toast={toast} onTab={(t) => setTabNh(t as any)} lamMoi={lan} />
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--line, #2a3b4d)", marginBottom: 10 }}>
           {([["album", "Album ảnh"], ["mon", "Món ăn"], ["tdnh", "Thực đơn"], ["td", "Gói đặt bàn"], ["gt", "Giới thiệu"], ["hd", "Hợp đồng & đặt bàn"], ["tt", "Thông tin"]] as const).map(([k, t]) =>
             <button key={k} className={`act ${tabNh === k ? "teal" : "grey"}`} onClick={() => setTabNh(k)}>{t}</button>)}</div>

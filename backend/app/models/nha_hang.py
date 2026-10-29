@@ -219,3 +219,18 @@ class ThucDonTrang(Base):
     attachment_id: Mapped[int] = mapped_column(ForeignKey("attachments.id"))        # tệp gốc (ảnh / PDF)
     hien_id: Mapped[int | None] = mapped_column(ForeignKey("attachments.id"), nullable=True)
     nho_id: Mapped[int | None] = mapped_column(ForeignKey("attachments.id"), nullable=True)
+
+
+# ══ AT-2c · BIÊN TẬP VÀ MỨC HOÀN THIỆN (Chủ tịch chốt 29/10/2026) ═══════════════════════════════════════════
+# Điểm hoàn thiện do MÁY tính từ dữ liệu đã duyệt — không lưu, không chấm tay. Bảng này chỉ giữ việc giao:
+# Chủ tịch giao nhà hàng cho một người biên tập (NV Điều hành / NV Marketing) kèm hạn.
+class BienTapNhaHang(Base):
+    __tablename__ = "bien_tap_nha_hang"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nha_hang_id: Mapped[int] = mapped_column(ForeignKey("nha_hang.id"), unique=True)
+    nguoi: Mapped[str] = mapped_column(String(50), default="")
+    han: Mapped[date | None] = mapped_column(Date, nullable=True)
+    giao_boi: Mapped[str] = mapped_column(String(50), default="")
+    giao_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    da_xin_boi: Mapped[str] = mapped_column(String(50), default="")
+    da_xin_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

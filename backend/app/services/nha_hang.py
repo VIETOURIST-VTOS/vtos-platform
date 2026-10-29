@@ -325,7 +325,9 @@ def danh_sach_cong(db: Session, tinh: str = "", am_thuc: str = "", gia_toi_da: i
         if gia_toi_da and (o["gia_tu"] is None or o["gia_tu"] > gia_toi_da):
             continue
         ra.append(o)
-    ra.sort(key=lambda o: (not o["mo_dat"], o["ten"]))
+    # AT-2c (Chủ tịch 29/10/2026): nơi dưới 50% hoàn thiện xếp xuống cuối, không ẩn.
+    dm = diem_hoan_thien(db, [o["id"] for o in ra])
+    ra.sort(key=lambda o: (not o["mo_dat"], dm.get(o["id"], {"diem": 0})["diem"] < NGUONG_THIEU, o["ten"]))
     trang, so = max(1, int(trang or 1)), max(1, min(int(so or 24), 60))
     dem: dict = {}
     for n, _o in tat_ca:
@@ -1511,3 +1513,229 @@ def cho_duyet_noi_dung(db: Session, u: User) -> dict:
                           "khong_duyet": ("Người tải không tự duyệt" if u.role not in TOAN_QUYEN and u.username == b.tai_boi else "")}
                          for b in bans],
             "duoc_duyet": _co(u, VAI_DUYET_ANH)}
+
+
+# ══ AT-2c · BIÊN TẬP VÀ MỨC HOÀN THIỆN (Chủ tịch chốt 29/10/2026) ═══════════════════════════════════════════
+# Trọng số Chủ tịch duyệt: bìa 20, album 20, món 15, thực đơn 15, giới thiệu 15, liên hệ 15. ≥ 80% = «đủ».
+# Chỉ tính thứ đã DUYỆT. Giao việc: CHỈ Chủ tịch; người nhận là NV Điều hành / NV Marketing.
+# Trang khách: nơi dưới 50% xếp xuống cuối (không ẩn).
+from app.models.nha_hang import BienTapNhaHang  # noqa: E402
+
+VAI_GIAO_BIEN_TAP = ("chutich",)
+VAI_NHAN_BIEN_TAP = ("nv_dh", "nv_mkt")
+NGUONG_DU, NGUONG_THIEU = 80, 50
+ALBUM_TOI_THIEU, MON_TOI_THIEU, GIOI_THIEU_TOI_THIEU = 5, 3, 300
+MUC_HT = (("bia", "Ảnh bìa đã duyệt", 20, "album"), ("album", "Album ảnh", 20, "album"), ("mon", "Món ăn có ảnh", 15, "mon"),
+          ("thuc_don", "Thực đơn đang dùng", 15, "tdnh"), ("gioi_thieu", "Giới thiệu VTD viết", 15, "gt"),
+          ("lien_he", "Liên hệ, giờ mở cửa, khu vực", 15, "tt"))
+
+
+def _cham(n: NhaHang, anh: list, mons: list, co_td: bool) -> dict:
+    """Chấm MỘT nhà hàng từ dữ liệu đã duyệt. Trả {"diem", "muc": [...]}."""
+    duyet = [a for a in anh if a.trang_thai == "da_duyet" and a.can_cu != "chua_xac_minh"]
+    nhom = {a.nhom for a in duyet if a.nhom}
+    co_bia = any(a.la_bia for a in duyet)
+    so_mon = sum(1 for m in mons if m["anh_ok"])
+    gt_dai, co_mnb = len((n.mo_ta or "").strip()), bool((n.mon_noi_bat or "").strip())
+    lh = [bool(n.lien_he_xac_minh), bool((n.gio_phuc_vu or "").strip()), bool((n.khu_vuc or "").strip())]
+    ty = {"bia": 1.0 if co_bia else 0.0,
+          "album": min(len(duyet), ALBUM_TOI_THIEU) / ALBUM_TOI_THIEU * (1.0 if len(nhom) >= 2 or len(duyet) == 0 else 0.75),
+          "mon": min(so_mon, MON_TOI_THIEU) / MON_TOI_THIEU,
+          "thuc_don": 1.0 if co_td else 0.0,
+          "gioi_thieu": (0.5 if gt_dai >= GIOI_THIEU_TOI_THIEU else min(gt_dai, GIOI_THIEU_TOI_THIEU) / GIOI_THIEU_TOI_THIEU * 0.5) + (0.5 if co_mnb else 0.0),
+          "lien_he": sum(lh) / 3}
+    chi_tiet = {"bia": "Có ảnh bìa đã duyệt" if co_bia else ("Ảnh bìa chưa duyệt / chưa xác minh" if any(a.la_bia for a in anh) else "Chưa chọn ảnh bìa"),
+                "album": f"{len(duyet)}/{ALBUM_TOI_THIEU} ảnh đã duyệt · {len(nhom)} nhóm",
+                "mon": f"{so_mon}/{MON_TOI_THIEU} món đã duyệt có ảnh",
+                "thuc_don": "Có thực đơn đang dùng" if co_td else "Chưa có thực đơn đang dùng",
+                "gioi_thieu": f"{gt_dai}/{GIOI_THIEU_TOI_THIEU} ký tự · " + ("có món nổi bật" if co_mnb else "chưa có món nổi bật"),
+                "lien_he": ", ".join(t for ok, t in zip(lh, ("liên hệ đã xác minh", "có giờ mở cửa", "có khu vực")) if ok) or "Chưa có"}
+    muc = [{"ma": ma, "ten": ten, "diem_toi_da": w, "diem": round(w * ty[ma], 1), "dat": ty[ma] >= 0.999, "chi_tiet": chi_tiet[ma], "tab": tab}
+           for ma, ten, w, tab in MUC_HT]
+    return {"diem": int(round(sum(m["diem"] for m in muc))), "muc": muc}
+
+
+def _muc_do(diem: int) -> str:
+    return "du" if diem >= NGUONG_DU else "dang" if diem >= NGUONG_THIEU else "thieu"
+
+
+def diem_hoan_thien(db: Session, nids: list[int] | None = None) -> dict[int, dict]:
+    """Điểm hoàn thiện mọi nhà hàng (hoặc các nid). Tính lại mỗi lần đọc."""
+    cau = select(NhaHang)
+    if nids is not None:
+        if not nids:
+            return {}
+        cau = cau.where(NhaHang.id.in_(nids))
+    nhs = db.execute(cau).scalars().all()
+    ids = [n.id for n in nhs]
+    anh: dict[int, list] = {}
+    for a in db.execute(select(AnhNhaHang).where(AnhNhaHang.nha_hang_id.in_(ids))).scalars():
+        anh.setdefault(a.nha_hang_id, []).append(a)
+    ok_anh = {a.id for v in anh.values() for a in v if a.trang_thai == "da_duyet" and a.can_cu != "chua_xac_minh"}
+    mons: dict[int, list] = {}
+    for m in db.execute(select(MonNhaHang).where(MonNhaHang.nha_hang_id.in_(ids), MonNhaHang.trang_thai == "da_duyet")).scalars():
+        mons.setdefault(m.nha_hang_id, []).append({"anh_ok": m.anh_id in ok_anh})
+    hn = _hom_nay()
+    td: set[int] = set()
+    bans: dict[tuple, list] = {}
+    for b in db.execute(select(ThucDonBan).where(ThucDonBan.nha_hang_id.in_(ids), ThucDonBan.trang_thai == "duyet")).scalars():
+        bans.setdefault((b.nha_hang_id, b.loai), []).append(b)
+    for (nid, _l), bl in bans.items():
+        if _ban_hien_hanh(bl, hn):
+            td.add(nid)
+    return {n.id: _cham(n, anh.get(n.id, []), mons.get(n.id, []), n.id in td) for n in nhs}
+
+
+def _cot(diem: int, bt: BienTapNhaHang | None, cho: int) -> str:
+    if diem >= NGUONG_DU:
+        return "du"
+    if cho:
+        return "cho_duyet"
+    if bt is not None and bt.da_xin_luc and (bt.giao_luc is None or bt.da_xin_luc >= bt.giao_luc):
+        return "dang_xin"
+    return "chua_lam"
+
+
+COT_HT = {"chua_lam": "Chưa làm", "dang_xin": "Đang xin nhà hàng", "cho_duyet": "Chờ TP ĐH duyệt", "du": "Đủ ≥ 80%"}
+
+
+def bang_hoan_thien(db: Session, u: User, chi_cua: str = "") -> dict:
+    if not _co(u, VAI_XEM):
+        raise LoiNhaHang("Không có quyền")
+    hn = _hom_nay()
+    nhs = db.execute(select(NhaHang).where(NhaHang.ngung.is_(False)).order_by(NhaHang.ten)).scalars().all()
+    dm = diem_hoan_thien(db, [n.id for n in nhs])
+    bt = {b.nha_hang_id: b for b in db.execute(select(BienTapNhaHang)).scalars()}
+    ht = hoan_thien_anh(db)
+    ra = []
+    for n in nhs:
+        b = bt.get(n.id)
+        if chi_cua and (b is None or b.nguoi != chi_cua):
+            continue
+        d = dm[n.id]
+        cho = ht.get(n.id, {}).get("cho_duyet", 0) + ht.get(n.id, {}).get("nd_cho", 0)
+        ra.append({"id": n.id, "ma": n.ma, "ten": n.ten, "tinh_thanh": n.tinh_thanh, "hien_cong": n.hien_cong, "diem": d["diem"],
+                   "muc_do": _muc_do(d["diem"]), "muc": [{k: m[k] for k in ("ma", "dat", "diem", "diem_toi_da", "chi_tiet")} for m in d["muc"]],
+                   "nguoi": b.nguoi if b else "", "han": b.han.isoformat() if b and b.han else None,
+                   "qua_han": bool(b and b.han and b.han < hn and d["diem"] < NGUONG_DU), "cho_duyet": cho,
+                   "cot": _cot(d["diem"], b, cho)})
+    ra.sort(key=lambda o: (o["diem"], o["ten"]))
+    dem = {k: sum(1 for o in ra if o["muc_do"] == k) for k in ("du", "dang", "thieu")}
+    nguoi_nhan = [{"username": x.username, "ten": x.full_name, "role": x.role} for x in
+                  db.execute(select(User).where(User.role.in_(VAI_NHAN_BIEN_TAP), User.active.is_(True)).order_by(User.full_name)).scalars()]
+    return {"nha_hang": ra, "dem": dem, "chua_giao": sum(1 for o in ra if not o["nguoi"]), "cot": COT_HT,
+            "muc_ten": {ma: ten for ma, ten, _w, _t in MUC_HT}, "nguong": {"du": NGUONG_DU, "thieu": NGUONG_THIEU},
+            "duoc_giao": u.role in VAI_GIAO_BIEN_TAP, "nguoi_nhan": nguoi_nhan if u.role in VAI_GIAO_BIEN_TAP else []}
+
+
+def giao_bien_tap(db: Session, u: User, ids: list[int], nguoi: str, han, now: datetime | None = None) -> int:
+    """Chủ tịch giao (hoặc đổi người / bỏ giao khi nguoi rỗng) nhiều nhà hàng một lần."""
+    if u.role not in VAI_GIAO_BIEN_TAP:
+        raise LoiNhaHang("Chỉ Chủ tịch giao việc biên tập nhà hàng")
+    now = now or datetime.now()
+    nguoi = (nguoi or "").strip()
+    if nguoi:
+        x = db.execute(select(User).where(User.username == nguoi)).scalars().first()
+        if x is None or not x.active or x.role not in VAI_NHAN_BIEN_TAP:
+            raise LoiNhaHang("Người biên tập phải là NV Điều hành hoặc NV Marketing đang làm việc")
+    hn = _ngay(han)
+    if nguoi and hn is not None and hn < _hom_nay():
+        raise LoiNhaHang("Hạn phải từ hôm nay trở đi")
+    n = 0
+    for nid in ids[:500]:
+        if db.get(NhaHang, int(nid)) is None:
+            continue
+        b = db.execute(select(BienTapNhaHang).where(BienTapNhaHang.nha_hang_id == int(nid))).scalars().first()
+        if b is None:
+            b = BienTapNhaHang(nha_hang_id=int(nid)); db.add(b)
+        b.nguoi, b.han, b.giao_boi, b.giao_luc = nguoi, hn if nguoi else None, u.username, now
+        n += 1
+    db.commit()
+    return n
+
+
+def ghi_da_xin(db: Session, u: User, nid: int, now: datetime | None = None) -> BienTapNhaHang:
+    if not _co(u, VAI_ANH_NH):
+        raise LoiNhaHang("Chỉ Điều hành / Marketing ghi đã xin nhà hàng")
+    if db.get(NhaHang, nid) is None:
+        raise LoiNhaHang("Không có nhà hàng này")
+    b = db.execute(select(BienTapNhaHang).where(BienTapNhaHang.nha_hang_id == nid)).scalars().first()
+    if b is None:
+        b = BienTapNhaHang(nha_hang_id=nid); db.add(b)
+    b.da_xin_boi, b.da_xin_luc = u.username, now or datetime.now()
+    db.commit(); db.refresh(b)
+    return b
+
+
+def _tin_xin(n: NhaHang, d: dict) -> str:
+    """Soạn sẵn tin xin nhà hàng bổ sung (người biên tập tự gửi — máy không gửi)."""
+    can = []
+    for m in d["muc"]:
+        if m["dat"]:
+            continue
+        if m["ma"] == "bia":
+            can.append("Một ảnh mặt tiền hoặc không gian để làm ảnh bìa (kèm xác nhận cho phép Vietourist sử dụng)")
+        elif m["ma"] == "album":
+            can.append(f"Thêm ảnh không gian, phòng riêng, món ăn (cần ít nhất {ALBUM_TOI_THIEU} ảnh) kèm xác nhận quyền sử dụng")
+        elif m["ma"] == "mon":
+            can.append(f"Ảnh và tên của {MON_TOI_THIEU} món nên thử, kèm thành phần dễ dị ứng nếu có")
+        elif m["ma"] == "thuc_don":
+            can.append("Thực đơn mới nhất (ảnh hoặc PDF) và ngày bắt đầu áp dụng")
+        elif m["ma"] == "lien_he":
+            can.append("Xác nhận địa chỉ, giờ mở cửa và số điện thoại liên hệ")
+    if not can:
+        return ""
+    return f"Chào anh/chị, Vietourist cần bổ sung cho trang giới thiệu {n.ten}:\n" + \
+        "\n".join(f"{i}. {t}." for i, t in enumerate(can, 1)) + "\nCảm ơn anh/chị."
+
+
+def hoan_thien_mot(db: Session, u: User, nid: int) -> dict:
+    if not _co(u, VAI_XEM):
+        raise LoiNhaHang("Không có quyền")
+    n = db.get(NhaHang, nid)
+    if n is None:
+        raise LoiNhaHang("Không có nhà hàng này")
+    d = diem_hoan_thien(db, [nid])[nid]
+    b = db.execute(select(BienTapNhaHang).where(BienTapNhaHang.nha_hang_id == nid)).scalars().first()
+    nk = []
+    for a in db.execute(select(AnhNhaHang).where(AnhNhaHang.nha_hang_id == nid)).scalars():
+        nk.append((a.tai_luc, f"{a.tai_boi} tải ảnh #{a.id}"))
+        if a.duyet_luc:
+            nk.append((a.duyet_luc, f"{a.duyet_boi} duyệt ảnh #{a.id}"))
+    for m in db.execute(select(MonNhaHang).where(MonNhaHang.nha_hang_id == nid)).scalars():
+        nk.append((m.tao_luc, f"{m.tao_boi} thêm món {m.ten}"))
+        if m.duyet_luc:
+            nk.append((m.duyet_luc, f"{m.duyet_boi} duyệt món {m.ten}"))
+    for t in db.execute(select(ThucDonBan).where(ThucDonBan.nha_hang_id == nid)).scalars():
+        nk.append((t.tai_luc, f"{t.tai_boi} tải thực đơn {LOAI_THUC_DON.get(t.loai, t.loai)} {_ten_ban(t.so)}"))
+        if t.duyet_luc:
+            nk.append((t.duyet_luc, f"{t.duyet_boi} duyệt thực đơn {_ten_ban(t.so)}"))
+    if b and b.giao_luc:
+        nk.append((b.giao_luc, f"{b.giao_boi} giao cho {b.nguoi or '(bỏ giao)'}"))
+    if b and b.da_xin_luc:
+        nk.append((b.da_xin_luc, f"{b.da_xin_boi} ghi đã xin nhà hàng bổ sung"))
+    nk = [x for x in nk if x[0]]
+    nk.sort(key=lambda x: x[0], reverse=True)
+    return {**d, "muc_do": _muc_do(d["diem"]), "nguong": {"du": NGUONG_DU, "thieu": NGUONG_THIEU},
+            "nguoi": b.nguoi if b else "", "han": b.han.isoformat() if b and b.han else None,
+            "da_xin_luc": b.da_xin_luc.isoformat(timespec="minutes") if b and b.da_xin_luc else None,
+            "tin_xin": _tin_xin(n, d), "nhat_ky": [{"luc": x[0].isoformat(timespec="minutes"), "viec": x[1]} for x in nk[:15]]}
+
+
+def xuat_thieu_xlsx(db: Session, u: User) -> bytes:
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    b = bang_hoan_thien(db, u)
+    wb = Workbook(); ws = wb.active; ws.title = "Thiếu"
+    ws.append(["Mã", "Nhà hàng", "Thành phố", "Điểm %"] + [b["muc_ten"][ma] for ma, *_r in MUC_HT] + ["Người biên tập", "Hạn"])
+    for c in ws[1]:
+        c.font = Font(bold=True)
+    for o in b["nha_hang"]:
+        if o["diem"] >= NGUONG_DU:
+            continue
+        ws.append([o["ma"], o["ten"], o["tinh_thanh"], o["diem"]] + ["✓" if m["dat"] else m["chi_tiet"] for m in o["muc"]] + [o["nguoi"], o["han"] or ""])
+    for col, w in zip("ABCDEFGHIJKL", (9, 32, 18, 8, 26, 26, 26, 26, 30, 30, 16, 12)):
+        ws.column_dimensions[col].width = w
+    o = BytesIO(); wb.save(o)
+    return o.getvalue()
