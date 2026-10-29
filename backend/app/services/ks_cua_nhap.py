@@ -194,6 +194,8 @@ CUA_TAY = (
     "bien_tap_nha_hang",
     # AT-3 (29/10/2026): khách tự viết qua cổng (Đơn của tôi › Đánh giá); nhà hàng trả lời qua cổng NCC.
     "danh_gia_nha_hang",
+    # KS-13 (30/10/2026): Điều hành nhập khách sạn, ảnh, loại phòng, gói và mùa giá ở màn /khach-san-vtd.
+    "khach_san_vtd", "anh_khach_san_vtd", "loai_phong_vtd", "goi_gia_vtd", "mua_gia_vtd",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

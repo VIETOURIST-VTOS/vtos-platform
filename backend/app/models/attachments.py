@@ -53,6 +53,8 @@ DOI_TUONG_DAY_DU = {
     "nha_cung_cap":  ("Nhà cung cấp", "dieu_hanh", "07_Hop_dong", True),
     # AT-1c (28/10/2026): ảnh món / nhà hàng / thành phố trên trang Khám phá ẩm thực web VTD — nội dung đối ngoại.
     "am_thuc":       ("Ảnh ẩm thực (web VTD)", "mkt", "10_Marketing", True),
+    # KS-13 (30/10/2026): ảnh khách sạn hợp tác trên cổng khách — nội dung đối ngoại, Điều hành tải.
+    "khach_san_vtd": ("Ảnh khách sạn (web VTD)", "dieu_hanh", "10_Marketing", True),
     "don_dich_vu":   ("Đơn đặt dịch vụ", "dieu_hanh", "05_Tour", True),
     "tour":          ("Tour", "dieu_hanh", "05_Tour", True),
     # Đ-11 (13/9/2026) – CHỨNG TỪ GẮN VÀO TỪNG DÒNG CHI, không phải vào cả chuyến.

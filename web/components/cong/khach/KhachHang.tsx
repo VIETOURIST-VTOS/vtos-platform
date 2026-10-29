@@ -16,6 +16,7 @@ import DatBanCuaToi from "../DatBanCuaToi";
 import { useDiem, DiemUuDai, HangThanhVien, YeuThich } from "./RewardsKhach";
 import { DanhGiaKhach, GopYKhach, HoTroKhach } from "./ChamSocKhach";
 import KhachSanOta from "../KhachSanOta";
+import KhachSanVtd from "../KhachSanVtd";
 import VeMayBayOta from "../VeMayBayOta";
 
 type Tab = "home" | "deals" | "tour" | "request" | "bookings" | "booking" | "rewards" | "tier" | "favorites" | "reviews" | "feedback" | "support" | "profile";
@@ -176,7 +177,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
             <button type="button" className="cursor-interaction" aria-pressed={dv === "khach_san"} onClick={() => setDv("khach_san")}><I n="hotel" /><span>Khách sạn</span></button>
             <button type="button" className="cursor-interaction" aria-pressed={dv === "ve_may_bay"} onClick={() => setDv("ve_may_bay")}><I n="plane" /><span>Vé máy bay</span></button>
             <button type="button" className="cursor-interaction" aria-pressed={dv === "nha_hang"} onClick={() => setDv("nha_hang")}><I n="utensils" /><span>Nhà hàng & ẩm thực</span></button></nav>
-          {dv === "khach_san" ? <section className="v31-service-content" aria-label="Khách sạn"><KhachSanOta /></section>
+          {dv === "khach_san" ? <section className="v31-service-content" aria-label="Khách sạn"><KhachSanVtd ten={ten} lienHe={lienHe} /><h3 className="ksv-ota-dau">Hoặc đặt qua đối tác OTA của Vietourist</h3><KhachSanOta /></section>
           : dv === "ve_may_bay" ? <section className="v31-service-content" aria-label="Vé máy bay"><VeMayBayOta /></section>
           : dv === "nha_hang" ? <section className="v31-service-content" aria-label="Nhà hàng & ẩm thực">
             <NhaHangKhach ten={ten} lienHe={lienHe} coSdt={coSdt} sdtCho={toi.dien_thoai} daGui={(m) => { setDon(null); di("bookings"); setMsg(m); }} /></section>
