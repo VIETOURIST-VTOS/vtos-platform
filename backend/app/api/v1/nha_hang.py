@@ -517,3 +517,62 @@ def noi_dung_cho_duyet(u: User = Depends(require_roles(*N.VAI_XEM)), db: Session
         return N.cho_duyet_noi_dung(db, u)
     except N.LoiNhaHang as ex:
         _loi(ex)
+
+
+# ══ AT-2c · biên tập và mức hoàn thiện ═══════════════════════════════════════════════════════════
+@router.get("/hoan-thien")
+def bang_hoan_thien(u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        return N.bang_hoan_thien(db, u)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+@router.get("/hoan-thien.xlsx")
+def xuat_thieu(u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        data = N.xuat_thieu_xlsx(db, u)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="nha_hang_thieu_{date.today():%Y%m%d}.xlsx"'})
+
+
+@router.get("/viec-cua-toi")
+def viec_cua_toi(u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        return N.bang_hoan_thien(db, u, chi_cua=u.username)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+class GiaoIn(BaseModel):
+    ids: list[int]
+    nguoi: str = ""
+    han: date | None = None
+
+
+@router.post("/bien-tap/giao")
+def giao_bien_tap(data: GiaoIn, u: User = Depends(require_roles(*N.VAI_GIAO_BIEN_TAP)), db: Session = Depends(get_db)):
+    try:
+        n = N.giao_bien_tap(db, u, data.ids, data.nguoi, data.han)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"so": n, "message": (f"Đã giao {n} nhà hàng cho {data.nguoi}" if data.nguoi else f"Đã bỏ giao {n} nhà hàng")}
+
+
+@router.get("/{nid:int}/hoan-thien")
+def hoan_thien_mot(nid: int, u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    try:
+        return N.hoan_thien_mot(db, u, nid)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+@router.post("/{nid:int}/da-xin")
+def da_xin(nid: int, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    try:
+        N.ghi_da_xin(db, u, nid)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"message": "Đã ghi: đã xin nhà hàng bổ sung"}
