@@ -7,6 +7,7 @@ import AlbumNhaHang, { AnhChoDuyet } from "@/components/nha-hang/AlbumNhaHang";
 import { MonAnNhaHang, ThucDonNhaHangTab, NoiDungChoDuyet } from "@/components/nha-hang/MonThucDon";
 import { BangHoanThien, ViecCuaToi, HoSoHoanThien } from "@/components/nha-hang/HoanThien";
 import DanhGiaNoiBo from "@/components/nha-hang/DanhGiaNoiBo";
+import { BangPhanLoai, HoSoPhanLoai } from "@/components/nha-hang/PhanLoai";
 
 /** KH-2 · NHÀ HÀNG (CỔNG KHÁCH) — Chủ tịch duyệt bản xem thử 26/10/2026.
  *  Điều hành nhập nhà hàng + thực đơn (chỉ GIÁ BÁN). TP Điều hành bật «Hiện trên cổng» (DT-2b, Chủ tịch 28/10/2026);
@@ -39,7 +40,7 @@ function Trang() {
   const bat = ["tp_dh", "chutich", "tgd"].includes(role);
   const mkt = ["nv_mkt", "ptgd_mkt", "nv_dh", "tp_dh", "chutich", "tgd"].includes(role);   // 29/10/2026: Điều hành cũng viết nội dung
   const xemHd = nhap || ["ketoan", "bks"].includes(role);
-  const [tab, setTab] = useState<"nh" | "nd" | "cd" | "ht" | "vct" | "dg">(["nv_mkt", "ptgd_mkt"].includes(role) ? "nd" : "nh");
+  const [tab, setTab] = useState<"nh" | "nd" | "cd" | "ht" | "vct" | "dg" | "pl">(["nv_mkt", "ptgd_mkt"].includes(role) ? "nd" : "nh");
   const [tim, setTim] = useState(""); const [locTinh, setLocTinh] = useState(""); const [locAnh, setLocAnh] = useState("");
   const [chon, setChon] = useState<number[]>([]);
   const [tep, setTep] = useState<File | null>(null); const [nguon, setNguon] = useState(""); const [thu, setThu] = useState<any>(null);
@@ -53,7 +54,7 @@ function Trang() {
   const [f, setF] = useState<any>(NH_TRONG);
   const [td, setTd] = useState<any>(null);         // {id?, ...} gói đang sửa
   const [busy, setBusy] = useState(false);
-  const [tabNh, setTabNh] = useState<"album" | "mon" | "tdnh" | "td" | "gt" | "hd" | "tt" | "dg">("album");   // AT-2a: hồ sơ nội dung theo tab
+  const [tabNh, setTabNh] = useState<"album" | "mon" | "tdnh" | "td" | "gt" | "hd" | "tt" | "dg" | "pl">("album");   // AT-2a: hồ sơ nội dung theo tab
   const [lan, setLan] = useState(0);   // AT-2c: làm mới danh mục kiểm sau mỗi lần dữ liệu đổi
   const load = useCallback(() => { setLan((v) => v + 1); api("/nha-hang").then(setX).catch((e) => toast(errMsg(e), true)); }, [toast]);
   useEffect(() => { load(); }, [load]);
@@ -128,9 +129,11 @@ function Trang() {
       <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Chờ duyệt ({x.so_anh_cho_duyet ?? 0})</button>
       <button className={`act ${tab === "ht" ? "teal" : "grey"}`} onClick={() => setTab("ht")}>Hoàn thiện</button>
       <button className={`act ${tab === "dg" ? "teal" : "grey"}`} onClick={() => setTab("dg")}>Đánh giá</button>
+      <button className={`act ${tab === "pl" ? "teal" : "grey"}`} onClick={() => setTab("pl")}>Phân loại</button>
       {["nv_dh", "nv_mkt"].includes(role) && <button className={`act ${tab === "vct" ? "teal" : "grey"}`} onClick={() => setTab("vct")}>Việc của tôi</button>}</div>
     {tab === "ht" && <BangHoanThien toast={toast} onMo={moHoSo} />}
     {tab === "dg" && <DanhGiaNoiBo toast={toast} />}
+    {tab === "pl" && <BangPhanLoai toast={toast} onMo={moHoSo} />}
     {tab === "vct" && <ViecCuaToi toast={toast} onMo={moHoSo} ten={user?.username || ""} />}
     {tab === "cd" && <><AnhChoDuyet toast={toast} onDoi={load} /><NoiDungChoDuyet toast={toast} onDoi={load} /></>}
 
@@ -247,7 +250,7 @@ function Trang() {
           <span style={{ flex: 1 }} />{dang.mo_dat ? <Tag cls="ok">Đang mở đặt bàn</Tag> : <Tag cls="warn">Chưa mở đặt bàn · {dang.dieu_kien.filter((c: any) => c.ok).length}/5</Tag>}</div>
         <HoSoHoanThien nid={dang.id} toast={toast} onTab={(t) => setTabNh(t as any)} lamMoi={lan} />
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--line, #2a3b4d)", marginBottom: 10 }}>
-          {([["album", "Album ảnh"], ["mon", "Món ăn"], ["tdnh", "Thực đơn"], ["td", "Gói đặt bàn"], ["gt", "Giới thiệu"], ["hd", "Hợp đồng & đặt bàn"], ["tt", "Thông tin"], ["dg", "Đánh giá"]] as const).map(([k, t]) =>
+          {([["album", "Album ảnh"], ["mon", "Món ăn"], ["tdnh", "Thực đơn"], ["td", "Gói đặt bàn"], ["gt", "Giới thiệu"], ["hd", "Hợp đồng & đặt bàn"], ["tt", "Thông tin"], ["pl", "Phân loại"], ["dg", "Đánh giá"]] as const).map(([k, t]) =>
             <button key={k} className={`act ${tabNh === k ? "teal" : "grey"}`} onClick={() => setTabNh(k)}>{t}</button>)}</div>
       </> : <h2>Thêm nhà hàng</h2>}
       {(!dang || tabNh === "tt") && <>
@@ -269,6 +272,7 @@ function Trang() {
         {tabNh === "mon" && <MonAnNhaHang nid={dang.id} toast={toast} onDoi={load} />}
         {tabNh === "tdnh" && <ThucDonNhaHangTab nid={dang.id} toast={toast} onDoi={load} />}
         {tabNh === "dg" && <DanhGiaNoiBo toast={toast} nid={dang.id} />}
+        {tabNh === "pl" && <HoSoPhanLoai nid={dang.id} toast={toast} onDoi={load} />}
         {tabNh === "td" && <>
         <h3 style={{ marginTop: 14 }}>Gói đặt bàn qua VTD</h3>
         <p className="muted">Giá BÁN cho khách đặt qua Vietourist. Khác thực đơn nhà hàng (tab «Thực đơn», chỉ để tham khảo).</p>
