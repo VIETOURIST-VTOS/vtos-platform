@@ -280,6 +280,7 @@ def _nh_cong(db: Session, n: NhaHang, tds: list[ThucDonNhaHang], hn: date, anh: 
     return {"id": n.id, "ten": n.ten, "tinh_thanh": n.tinh_thanh, "khu_vuc": n.khu_vuc, "am_thuc": n.am_thuc,
             "gio_phuc_vu": n.gio_phuc_vu, "tien_ich": n.tien_ich, "mo_ta": n.mo_ta, "mon_noi_bat": n.mon_noi_bat,
             "dia_danh_nguon": n.dia_danh_nguon, "mo_dat": dat, "da_xac_minh": bool(n.lien_he_xac_minh),
+            "mien": THANH_PHO.get(n.tinh_thanh, ("",))[0],      # AT-2d: màu ô khi chưa có ảnh
             # AT-2a: ảnh chỉ từ album đã duyệt (ảnh đơn cũ nha_hang.anh_id không ra cổng nữa)
             "anh": bia["hien"] if bia else None, "anh_nho": bia["nho"] if bia else None,
             "anh_alt": bia["alt"] if bia else "", "anh_nguon": bia["credit"] if bia else "", "so_anh": len(anh),
