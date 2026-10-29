@@ -11,12 +11,24 @@ import { Tag, errMsg } from "@/components/ui";
 const CHK: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, marginTop: 4, fontSize: 14, color: "var(--ink)", cursor: "pointer" };
 const O_TICK: React.CSSProperties = { width: 18, height: 18, flex: "none", margin: 0, padding: 0, accentColor: "var(--teal)" };
 const TT_TAG: Record<string, string> = { da_duyet: "ok", cho_duyet: "warn", chua_dang_ky: "", tam_dung: "red" };
+// KS-8: ba môi trường của KS-5. Ghi ở đây cho ô chọn có chữ tiếng Việt; MÁY CHỦ vẫn là nơi
+// quyết — gõ mã ngoài ba cái này thì nó trả 400, màn hình không tự cho qua được.
+const MT: Record<string, string> = { tat: "Tắt", thu: "Sandbox", that: "Chạy thật" };
+const MT_TAG: Record<string, string> = { tat: "", thu: "warn", that: "ok" };
 
 function SuaOta({ o, tt, xong }: { o: any; tt: Record<string, string>; xong: (d: any) => void }) {
   const { toast } = useShell();
   const [f, setF] = useState({ loai_link: o.loai_link, trang_thai: o.trang_thai, link: o.link, ten_mien: o.ten_mien, duong_dan: o.duong_dan,
     da_kiem_link: o.da_kiem_link, duoc_dung_web: o.duoc_dung_web, bang_chung: o.bang_chung, ghi_chu: o.ghi_chu,
-    subid_cho_phep: o.subid_cho_phep, subid_tham_so: o.subid_tham_so || "" });
+    subid_cho_phep: o.subid_cho_phep, subid_tham_so: o.subid_tham_so || "",
+    quyen: (o.quyen || []).join(","), moi_truong: o.moi_truong || "tat" });
+  // KS-8: bật / tắt một quyền. Danh mục lấy từ MÁY CHỦ (o.quyen_danh_muc), không chép tay —
+  // chép tay thì ngày nguồn thêm quyền mới, màn hình thiếu mà không ai biết.
+  const doiQuyen = (q: string, b: boolean) => {
+    const co = new Set(f.quyen.split(",").filter(Boolean));
+    if (b) co.add(q); else co.delete(q);
+    setF({ ...f, quyen: Object.keys(o.quyen_danh_muc || {}).filter((k) => co.has(k)).join(",") });
+  };
   const doiLink = f.link !== o.link || f.ten_mien !== o.ten_mien || f.duong_dan !== o.duong_dan || f.loai_link !== o.loai_link;
   const ck = f.loai_link === "cong_khai";   // VB-1: trang công khai — không có hợp tác / SubID
   const luu = async () => {
@@ -38,6 +50,21 @@ function SuaOta({ o, tt, xong }: { o: any; tt: Record<string, string>; xong: (d:
       {o2("duong_dan", "Đường dẫn link bắt đầu bằng (không bắt buộc)", "/affiliate/")}
       {o2("bang_chung", "Bằng chứng (thư duyệt, số vụ hỗ trợ…)")}
       {o2("ghi_chu", "Ghi chú")}
+      <label style={{ display: "grid", gap: 4 }}><span className="muted">Môi trường</span>
+        <select value={f.moi_truong} onChange={(e) => setF({ ...f, moi_truong: e.target.value })}>
+          {Object.entries(MT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+    </div>
+    {f.moi_truong === "that" && !String(f.bang_chung || "").trim() &&
+      <div style={{ color: "var(--red)" }}>Mở «Chạy thật» thì phải ghi bằng chứng: thư duyệt / hợp đồng / certification.</div>}
+    <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, display: "grid", gap: 6 }}>
+      <b>Quyền nguồn ĐÃ CẤP</b>
+      <div className="muted">Có tài khoản Affiliate KHÔNG mặc nhiên cho quyền gọi API giá, đặt phòng, huỷ hay dùng ảnh. Chỉ tick khi nguồn đã cấp bằng văn bản — và ghi văn bản ấy vào ô Bằng chứng.</div>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 4 }}>
+        {Object.entries((o.quyen_danh_muc || {}) as Record<string, string>).map(([k, v]) =>
+          <label key={k} style={CHK}><input type="checkbox" style={O_TICK}
+            checked={f.quyen.split(",").includes(k)} onChange={(e) => doiQuyen(k, e.target.checked)} />
+            <span><span className="mono">{k}</span> — {v}</span></label>)}
+      </div>
     </div>
     {doiLink && o.link && <div className="muted">Đổi link / tên miền / đường dẫn = phiên bản mới: OTA tự tắt, phải kiểm lại link.</div>}
     {/* Ô tick phải tự đặt rộng: globals.css cho mọi input width:100%, ô tick sẽ chiếm hết dòng và đẩy chữ đi. */}
@@ -92,7 +119,7 @@ function Trang() {
         <button key={k} className={`act ${sp === k ? "teal" : "grey"}`} style={{ margin: 0 }} onClick={() => { setSp(k); setMo(null); }}>{t}</button>)}</div>
     {sp === "ve_may_bay" && <p className="muted">Vé máy bay (Chủ tịch duyệt 28/10/2026): chỉ OTA, hiện ở cổng Khách hàng và Cổ đông. Trang công khai bật được khi link đúng tên miền và đã kiểm; link hoa hồng cần đủ bốn điều như khách sạn.</p>}
     <div className="panel wrap"><b>Đối tác OTA · {sp === "khach_san" ? "khách sạn" : "vé máy bay"}</b>
-      <table><thead><tr><th>OTA</th><th>Pháp nhân</th><th>{sp === "ve_may_bay" ? "Loại link / hợp tác" : "Hợp tác"}</th><th>Link</th><th>Đã kiểm</th><th>Dùng trên web</th><th>Lượt 7 ngày</th><th>Hiện cho khách</th><th></th></tr></thead>
+      <table><thead><tr><th>OTA</th><th>Pháp nhân</th><th>{sp === "ve_may_bay" ? "Loại link / hợp tác" : "Hợp tác"}</th><th>Link</th><th>Đã kiểm</th><th>Dùng trên web</th><th>Quyền nguồn cấp</th><th>Môi trường</th><th>Lượt 7 ngày</th><th>Hiện cho khách</th><th></th></tr></thead>
         <tbody>{d?.ota?.filter((o: any) => (o.san_pham || "khach_san") === sp).map((o: any) => <>
           <tr key={o.id}>
             <td><b>{o.ten}</b><div className="muted">phiên bản link {o.phien_ban}</div></td>
@@ -101,13 +128,15 @@ function Trang() {
             <td className="mono" style={{ maxWidth: 260, overflowWrap: "anywhere" }}>{o.link || <span className="muted">chưa nhập</span>}{o.loi_link && <div style={{ color: "var(--red)" }}>{o.loi_link}</div>}</td>
             <td>{o.da_kiem_link ? <Tag cls="ok">✓</Tag> : "—"}</td>
             <td>{o.duoc_dung_web ? <Tag cls="ok">✓</Tag> : "—"}</td>
+            <td className="mono" style={{ maxWidth: 180, overflowWrap: "anywhere" }}>{(o.quyen || []).length ? (o.quyen || []).join(", ") : <span className="muted">chưa cấp gì</span>}</td>
+            <td><Tag cls={MT_TAG[o.moi_truong] || ""}>{o.moi_truong_ten || MT[o.moi_truong] || "—"}</Tag></td>
             <td className="mono">{o.luot_7_ngay}</td>
             <td>{o.dang_mo ? <Tag cls="ok">Đang hiện</Tag> : <><Tag cls="">Tắt</Tag>{o.thieu.length > 0 && <div className="muted" style={{ fontSize: 12 }}>Thiếu: {o.thieu.join("; ")}</div>}</>}</td>
             <td style={{ whiteSpace: "nowrap" }}>{o.sua_duoc && <>
               <button className="act grey" style={{ margin: 0 }} onClick={() => setMo(mo === o.id ? null : o.id)}>{mo === o.id ? "Đóng" : "Sửa"}</button>{" "}
               {o.bat ? <button className="act orange" style={{ margin: 0 }} onClick={() => bat(o, false)}>Tắt</button>
                 : <button className="act teal" style={{ margin: 0 }} disabled={o.thieu.length > 0} title={o.thieu.join("; ")} onClick={() => bat(o, true)}>Bật</button>}</>}</td></tr>
-          {mo === o.id && <tr key={o.id + "s"}><td colSpan={9}><SuaOta o={o} tt={d.trang_thai} xong={(r) => { setD(r); setMo(null); }} /></td></tr>}
+          {mo === o.id && <tr key={o.id + "s"}><td colSpan={11}><SuaOta o={o} tt={d.trang_thai} xong={(r) => { setD(r); setMo(null); }} /></td></tr>}
         </>)}</tbody></table>
       {d && !d.sua_duoc && <div className="muted">Chỉ Chủ tịch nhập link và bật OTA; vai của bạn chỉ xem.</div>}
     </div>
