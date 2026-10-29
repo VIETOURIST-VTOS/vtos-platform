@@ -48,12 +48,25 @@ export function OTrongNh({ n, mien, tl = "4/3" }: { n: any; mien?: string; tl?: 
 
 const Ghim = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" /></svg>;
 
-type Loc = { tinh: string; q: string; chi_dat: string; trang: string };
+type Loc = { tinh: string; q: string; chi_dat: string; trang: string; loai: string; bac: string };
+
+/* PL-1 (Chủ tịch duyệt bản xem thử 30/10/2026): nhãn bậc ĐÃ CHỐT, hạng Michelin, «Đặc sản địa phương» trên thẻ. */
+const MAU_BAC: Record<string, [string, string]> = { binh_dan: ["#e6f0ea", "#1f5a3a"], tam_trung: ["#fdf1dc", "#7a4f0c"],
+  cao_cap: ["#e8eef6", "#1f3f6b"], sang_trong: ["#1d2b3a", "#ffffff"] };
+export function NhanPl({ n, boDs }: { n: any; boDs?: boolean }) {
+  const c = MAU_BAC[n.bac];
+  if (!c && !n.michelin && !(n.dac_san && !boDs)) return null;
+  const s = { fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 6, lineHeight: 1.5 } as const;
+  return <div className="at-pl" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+    {c && <span style={{ ...s, background: c[0], color: c[1] }}>{n.bac_ten}</span>}
+    {n.michelin && <span style={{ ...s, background: "#f6e6e6", color: "#8a1f1f" }}>{n.michelin}</span>}
+    {n.dac_san && !boDs && <span style={{ ...s, background: "#fbeee0", color: "#7a4a22" }}>Đặc sản địa phương</span>}</div>;
+}
 
 export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
   const [ds, setDs] = useState<any>(null);
   const [loi, setLoi] = useState("");
-  const [loc, setLoc] = useState<Loc>({ tinh: "", q: "", chi_dat: "", trang: "1" });
+  const [loc, setLoc] = useState<Loc>({ tinh: "", q: "", chi_dat: "", trang: "1", loai: "", bac: "" });
   const [mien, setMien] = useState("");
   const [nhom, setNhom] = useState("");
   const [moMon, setMoMon] = useState(12);
@@ -107,7 +120,7 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
     <AlbumKhach album={nh.album} ten={nh.ten} coTab mon={nh.mon} thucDon={nh.thuc_don_nh} danhGia={nh.danh_gia} nhId={nh.id}
       oTrong={<OTrongNh n={nh} mien={mienCua[nh.tinh_thanh]} tl="16/9" />}
       dong2={[[nh.khu_vuc, nh.tinh_thanh].filter(Boolean).join(", ") || nh.dia_danh_nguon, nh.am_thuc ? `Ẩm thực ${nh.am_thuc}` : ""].filter(Boolean).join(" · ")}
-      nhan={<div style={{ marginTop: 8 }}><span className="at-chua">Chưa mở đặt bàn qua Vietourist</span></div>}
+      nhan={<div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><span className="at-chua">Chưa mở đặt bàn qua Vietourist</span><NhanPl n={nh} /></div>}
       gioiThieu={<div className="at-mon-chu at-the-gt">
         <h3>Câu chuyện nhà hàng</h3>
         {nh.mon_noi_bat && <p><b>Nổi tiếng với:</b> {nh.mon_noi_bat}</p>}
@@ -119,7 +132,8 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
   </div>);
 
   const muc = [["at-tp", "Thành phố ẩm thực"], ["at-mon", "Món ăn Việt Nam", mons.length || nd.some((x: any) => x.loai === "mon")],
-    ["at-ds", "Đặc sản mang về", dacSan.length], ["at-goiy", "Danh sách gợi ý", dsGoiY.length], ["at-nh", "Nhà hàng"], ["at-bd", "Bản đồ ẩm thực"]]
+    ["at-ds", "Đặc sản mang về", dacSan.length], ["at-goiy", "Danh sách gợi ý", dsGoiY.length], ["at-dsdp", "Đặc sản địa phương", (ds.dac_san_noi_bat || []).length],
+    ["at-nh", "Nhà hàng"], ["at-bd", "Bản đồ ẩm thực"]]
     .filter((m) => m[2] === undefined || m[2]) as [string, string][];
   const tong = ds.tong_nha_hang ?? ds.tong;
 
@@ -177,12 +191,28 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
           <div className="at-luoi3">{dsGoiY.map((x: any) => <button key={x.id} type="button" className="at-goiy cursor-interaction" onClick={() => { setMon(x); window.scrollTo(0, 0); }}>
             <Anh src={x.anh} nguon={x.anh_nguon} ten={x.ten} tl="16/10" /><b>{x.ten}</b>{x.tom_tat && <small>{x.tom_tat}</small>}</button>)}</div></section>}
 
+        {(ds.dac_san_noi_bat || []).length > 0 && <section className="at-khoi at-dsdp" id="at-dsdp">
+          <div className="at-dsdp-dau"><div><h2>Đặc sản địa phương</h2><div className="at-phu">Quán và nhà hàng nổi tiếng với món đặc trưng của vùng</div></div>
+            <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => { doi({ loai: "dac_san", bac: "", tinh: "" }); document.getElementById("at-nh")?.scrollIntoView(); }}><span>Xem cả {ds.so_dac_san} →</span></button></div>
+          <div className="at-luoi">{ds.dac_san_noi_bat.slice(0, 4).map((n: any) => <article key={n.id} className="at-the">
+            <button type="button" className="at-the-anh cursor-interaction" onClick={() => xemNh(n.id)} aria-label={`Xem ${n.ten}`}>{n.anh_nho || n.anh ? <Anh src={n.anh_nho || n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /> : <OTrongNh n={n} mien={mienCua[n.tinh_thanh]} />}</button>
+            <h3>{n.ten}</h3><div className="at-noi-o"><span className="at-ghim"><Ghim /></span>{n.tinh_thanh || n.dia_danh_nguon}</div>
+            {n.mon_noi_bat && <div className="at-phu">Nổi tiếng với: <b>{n.mon_noi_bat}</b></div>}<NhanPl n={n} boDs /></article>)}</div>
+        </section>}
+
         <section className="at-khoi" id="at-nh">
-          <h2>Nhà hàng{loc.tinh ? ` ở ${loc.tinh}` : ""}</h2>
+          <h2>Nhà hàng{loc.tinh ? ` ở ${loc.tinh}` : ""}{loc.loai === "dac_san" ? " · Đặc sản địa phương" : loc.loai === "michelin" ? " · Michelin" : ""}{loc.bac ? ` · ${ds.bac?.[loc.bac] || ""}` : ""}</h2>
           <div className="at-tim"><input type="search" aria-label="Tìm nhà hàng, món" placeholder="Tìm món, nhà hàng…" value={loc.q}
             onChange={(e) => setLoc({ ...loc, q: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") doi({}); }} />
             <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => doi({})}><span>Tìm</span></button>
             <label className="at-chk"><input type="checkbox" checked={loc.chi_dat === "true"} onChange={(e) => doi({ chi_dat: e.target.checked ? "true" : "" })} />Chỉ nơi đặt qua Vietourist</label></div>
+          <div className="at-loc-pl">
+            <div className="at-tabs" role="group" aria-label="Loại nhà hàng"><span className="at-loc-ten">Loại</span>
+              {[["", "Tất cả"], ["dac_san", `Đặc sản địa phương${ds.so_dac_san ? ` ${ds.so_dac_san}` : ""}`], ["michelin", `Michelin${ds.so_michelin ? ` ${ds.so_michelin}` : ""}`]].map(([k, t]) =>
+                <button key={k} type="button" className="at-tab cursor-interaction" aria-pressed={loc.loai === k} onClick={() => doi({ loai: k })}>{t}</button>)}</div>
+            <div className="at-tabs" role="group" aria-label="Mức sang trọng"><span className="at-loc-ten">Mức</span>
+              {[["", "Mọi mức"], ...Object.entries(ds.bac || {})].map(([k, t]: any) =>
+                <button key={k} type="button" className="at-tab cursor-interaction" aria-pressed={loc.bac === k} onClick={() => doi({ bac: k })}>{t}{k && ds.dem_bac?.[k] ? ` ${ds.dem_bac[k]}` : ""}</button>)}</div></div>
           <div className="at-tabs" role="group" aria-label="Thành phố">
             <button type="button" className="at-tab cursor-interaction" aria-pressed={!loc.tinh} onClick={() => doi({ tinh: "" })}>Tất cả {tong}</button>
             {Object.entries(dem).sort((a, b) => b[1] - a[1]).map(([t, c]) => <button key={t} type="button" className="at-tab cursor-interaction" aria-pressed={loc.tinh === t} onClick={() => doi({ tinh: t })}>{t} {c}</button>)}</div>
@@ -190,12 +220,13 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
             <button type="button" className="at-the-anh cursor-interaction" onClick={() => xemNh(n.id)} aria-label={`Xem ${n.ten}`}>{n.anh_nho || n.anh ? <Anh src={n.anh_nho || n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /> : <OTrongNh n={n} mien={mienCua[n.tinh_thanh]} />}</button>
             <h3>{n.ten}</h3><div className="at-noi-o"><span className="at-ghim"><Ghim /></span>{[n.khu_vuc, n.tinh_thanh].filter(Boolean).join(", ") || n.dia_danh_nguon}</div>
             {n.mon_noi_bat && <div className="at-phu">Nổi tiếng với: <b>{n.mon_noi_bat}</b></div>}
+            <NhanPl n={n} />
             <SaoThe sao={n.sao} />
             {n.mo_dat ? <><span className="at-vtd">★ Đặt qua Vietourist · tích điểm</span><div className="at-phu">Thực đơn từ <b>{tien(n.gia_tu)}</b>/người</div>
               <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => xemNh(n.id)}><span>Đặt bàn qua Vietourist</span></button></>
               : <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => xemNh(n.id)}><span>Xem nhà hàng</span></button>}
           </article>)}</div>
-          {!ds.nha_hang.length && <p className="at-phu">Chưa có nhà hàng{loc.tinh || loc.q || loc.chi_dat ? " khớp bộ lọc" : ""}. Vietourist đang bổ sung danh mục.</p>}
+          {!ds.nha_hang.length && <p className="at-phu">Chưa có nhà hàng{loc.tinh || loc.q || loc.chi_dat || loc.loai || loc.bac ? " khớp bộ lọc" : ""}. Vietourist đang bổ sung danh mục.</p>}
           {soTrang > 1 && <div className="at-trang">
             <button type="button" className="v3-button v3-quiet cursor-interaction" disabled={ds.trang <= 1} onClick={() => doi({ trang: String(ds.trang - 1) })}><span>‹ Trước</span></button>
             <span>Trang {ds.trang}/{soTrang} · {ds.tong} kết quả</span>
@@ -288,6 +319,10 @@ const CSS = `
 .at-chua{font-size:12px;font-weight:600;color:var(--at-muted);border:1px solid var(--at-line);border-radius:999px;padding:2px 9px;width:max-content}
 .at-them{align-self:center;border:1px solid var(--at-line);background:#fff;border-radius:999px;padding:9px 32px;font-weight:600;cursor:pointer}
 .at-goiy{all:unset;display:flex;flex-direction:column;gap:6px;cursor:pointer;min-width:0}.at-goiy small{color:var(--at-muted)}
+.at-dsdp{background:#fbf3ea;border-radius:14px;padding:18px;border-bottom:0!important}
+.at-dsdp-dau{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap}.at-dsdp h2{color:#5e3818}
+.at-loc-pl{display:flex;flex-direction:column;gap:6px}
+.at-loc-ten{font-size:13px;color:var(--at-muted);align-self:center;min-width:42px}
 .at-tim{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .at .at-tim input[type=search]{flex:1 1 220px;min-width:0;border:1px solid var(--at-line);border-radius:999px;padding:8px 14px;font-size:14px;background:#fff;color:var(--at-ink)}
 .at-chk{display:flex;gap:6px;align-items:center;font-size:14px}

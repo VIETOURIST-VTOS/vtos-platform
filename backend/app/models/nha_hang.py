@@ -54,6 +54,25 @@ class NhaHang(Base):
     # AT-1c: ảnh nhà hàng (tệp trong kho, đối tượng «am_thuc») + nguồn ảnh bắt buộc ghi
     anh_id: Mapped[int | None] = mapped_column(ForeignKey("attachments.id"), nullable=True)
     anh_nguon: Mapped[str] = mapped_column(String(200), default="")
+    # PL-1 (Chủ tịch duyệt bản xem thử 30/10/2026): phân loại. «Đặc sản địa phương»: máy tự gắn khi nguồn là
+    # TasteAtlas; Điều hành đổi tay qua đề xuất → chốt. Bậc sang trọng: máy GỢI Ý (thực đơn đang bán, hoặc hạng / mức
+    # giá Michelin Điều hành nhập), NV ĐH đề xuất, TP ĐH chốt (Chủ tịch / TGĐ chốt ngay). Cổng chỉ hiện bậc ĐÃ CHỐT.
+    dac_san_tay: Mapped[str] = mapped_column(String(4), default="")          # "" theo máy | gan | go
+    dac_san_ly_do: Mapped[str] = mapped_column(String(200), default="")
+    dac_san_de_xuat: Mapped[str] = mapped_column(String(4), default="")      # "" không có | gan | go | may
+    dac_san_de_xuat_ly_do: Mapped[str] = mapped_column(String(200), default="")
+    dac_san_de_xuat_boi: Mapped[str] = mapped_column(String(50), default="")
+    dac_san_de_xuat_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    michelin_hang: Mapped[str] = mapped_column(String(10), default="")       # "" chưa ghi | sao3 sao2 sao1 bib selected khong
+    michelin_gia: Mapped[int] = mapped_column(Integer, default=0)            # 0 chưa ghi · 1–4 = ₫ … ₫₫₫₫
+    michelin_boi: Mapped[str] = mapped_column(String(50), default="")
+    michelin_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    bac: Mapped[str] = mapped_column(String(12), default="")                 # ĐÃ CHỐT: binh_dan tam_trung cao_cap sang_trong
+    bac_chot_boi: Mapped[str] = mapped_column(String(50), default="")
+    bac_chot_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    bac_de_xuat: Mapped[str] = mapped_column(String(12), default="")
+    bac_de_xuat_boi: Mapped[str] = mapped_column(String(50), default="")
+    bac_de_xuat_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class HopDongNhaHang(Base):

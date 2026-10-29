@@ -624,3 +624,102 @@ def xem_lai_danh_gia(gid: int, data: XemLaiIn, u: User = Depends(require_roles("
     from app.services import danh_gia_nh as DG
     _dg(DG.xem_lai, db, u, gid, data.giu, data.ghi_chu)
     return {"message": "Đã xem lại: giữ ẩn" if data.giu else "Đã xem lại: hiện lại bài"}
+
+
+# ══ PL-1 · phân loại: «Đặc sản địa phương» + bậc sang trọng (Chủ tịch duyệt 30/10/2026) ═══════════════════
+@router.get("/phan-loai")
+def ds_phan_loai(u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    from app.services import phan_loai_nh as PL
+    return PL.ds(db, u)
+
+
+@router.get("/phan-loai/mau-michelin.xlsx")
+def mau_michelin(u: User = Depends(require_roles(*N.VAI_NHAP)), db: Session = Depends(get_db)):
+    from app.services import phan_loai_nh as PL
+    return Response(content=PL.mau_xlsx(db), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="michelin_hang_gia_{date.today():%Y%m%d}.xlsx"'})
+
+
+@router.post("/phan-loai/nhap-michelin")
+async def nhap_michelin(tep: UploadFile = File(...), thu: bool = Form(True),
+                        u: User = Depends(require_roles(*N.VAI_NHAP)), db: Session = Depends(get_db)):
+    """Đọc thử (thu=true, không ghi) rồi ghi. Ô trống giữ nguyên."""
+    from app.services import phan_loai_nh as PL
+    data = await _doc(tep)
+    try:
+        return PL.nhap_xlsx(db, u, tep.filename or "", data, thu)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+@router.get("/{nid:int}/phan-loai")
+def mot_phan_loai(nid: int, u: User = Depends(require_roles(*N.VAI_XEM)), db: Session = Depends(get_db)):
+    from app.services import phan_loai_nh as PL
+    try:
+        return PL.chi_tiet(db, u, nid)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+class MichelinIn(BaseModel):
+    hang: str = ""
+    gia: int = 0
+
+
+@router.post("/{nid:int}/phan-loai/michelin")
+def ghi_michelin(nid: int, data: MichelinIn, u: User = Depends(require_roles(*N.VAI_NHAP)), db: Session = Depends(get_db)):
+    from app.services import phan_loai_nh as PL
+    try:
+        n = PL.ghi_michelin(db, u, nid, data.hang, data.gia)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"message": f"{n.ten}: đã ghi hạng / mức giá Michelin"}
+
+
+class BacIn(BaseModel):
+    bac: str
+
+
+@router.post("/{nid:int}/phan-loai/bac")
+def de_xuat_bac(nid: int, data: BacIn, u: User = Depends(require_roles(*N.VAI_NHAP)), db: Session = Depends(get_db)):
+    from app.services import phan_loai_nh as PL
+    try:
+        return PL.de_xuat_bac(db, u, nid, data.bac)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+class ChotIn(BaseModel):
+    dong_y: bool = True
+
+
+@router.post("/{nid:int}/phan-loai/bac/chot")
+def chot_bac(nid: int, data: ChotIn, u: User = Depends(require_roles(*N.VAI_BAT)), db: Session = Depends(get_db)):
+    from app.services import phan_loai_nh as PL
+    try:
+        return PL.chot_bac(db, u, nid, data.dong_y)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+class DacSanIn(BaseModel):
+    tay: str
+    ly_do: str = ""
+
+
+@router.post("/{nid:int}/phan-loai/dac-san")
+def de_xuat_dac_san(nid: int, data: DacSanIn, u: User = Depends(require_roles(*N.VAI_NHAP)), db: Session = Depends(get_db)):
+    from app.services import phan_loai_nh as PL
+    try:
+        return PL.de_xuat_dac_san(db, u, nid, data.tay, data.ly_do)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+
+
+@router.post("/{nid:int}/phan-loai/dac-san/chot")
+def chot_dac_san(nid: int, data: ChotIn, u: User = Depends(require_roles(*N.VAI_BAT)), db: Session = Depends(get_db)):
+    from app.services import phan_loai_nh as PL
+    try:
+        return PL.chot_dac_san(db, u, nid, data.dong_y)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
