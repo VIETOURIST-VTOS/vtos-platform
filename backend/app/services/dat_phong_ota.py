@@ -25,8 +25,9 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.don_khach_san_ota import (BUOC_DON, DON_DONG, KIEU_THANH_TOAN, LY_DO_HUY,
-                                          TRANG_THAI_DON, TRANG_THAI_NGUON, BuocDonOta,
+from app.models.don_khach_san_ota import (BUOC_DON, CONG_GUI, DON_DONG, DON_SANG_KHACH,
+                                          KIEU_THANH_TOAN, LY_DO_HUY, TRANG_THAI_DON,
+                                          TRANG_THAI_KHACH, TRANG_THAI_NGUON, BuocDonOta,
                                           DonKhachSanOta)
 from app.models.khach_san_ota import MOI_TRUONG_OTA, DoiTacOta
 from app.services import don_khach_san_ota as D
