@@ -584,6 +584,9 @@ MAN_HINH_API = {
     "/yeu-cau-khach": ("/api/v1/yeu-cau-khach",),
     "/gop-y-lanh-dao": ("/api/v1/gop-y-lanh-dao",),
     "/khach-san-ota": ("/api/v1/khach-san-ota",),
+    # KS-10 (29/10/2026) — đơn phòng qua OTA, sáu bước Agoda. Nhóm API RIÊNG: màn Khách sạn OTA
+    # là cửa của Chủ tịch nhập link và cấp quyền nguồn, không phải chỗ Điều hành chạy đơn.
+    "/don-khach-san-ota": ("/api/v1/don-khach-san-ota",),
     "/doi-soat-ota": ("/api/v1/doi-soat-ota",),
     # CD-1 (28/10/2026) — IR – Pháp chế quản lý cổng cổ đông. Phía ngoài (/api/v1/cong/co-dong,
     # /api/v1/cong/ir-cong-khai) không thuộc màn hình nào — cùng lẽ với CG-1.
@@ -980,6 +983,9 @@ MENU_ROLES = {
     "/dat-ban-nha-hang": BASE_VIEW + ("ketoan", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "sales_admin"),   # DT-2: tiền vào, đối soát thẻ, hủy & hoàn, chốt doanh số
     "/ir-cong-co-dong": BASE_VIEW + ("ir_phapche",),   # CD-1: IR – Pháp chế đưa tài liệu, sự kiện, trả lời; Chủ tịch, TGĐ gỡ
     "/khach-san-ota": BASE_VIEW,     # KS-1: Chủ tịch nhập và bật; TGĐ, BKS, robot KS xem
+    # KS-10: Điều hành là người chạy sáu bước với nguồn, nên tp_dh vào được màn đơn — nhưng KHÔNG
+    # vào màn /khach-san-ota, vì nhập link và cấp quyền nguồn vẫn là việc của Chủ tịch.
+    "/don-khach-san-ota": BASE_VIEW + ("tp_dh",),
     # TC-75 - gop tai khoan trung. HEP: khong co vai Kinh doanh nao. Doc bang cap trung thi HCNS
     # va Ke toan can (ho la nguoi phat hien ra trung), nhung nut gop thi chi cntt va Ban TGD -
     # khai rieng o api/v1/gop_tai_khoan.py. Gop la viec mot chieu: chuyen 290 booking sang nham
