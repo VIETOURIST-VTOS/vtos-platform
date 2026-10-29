@@ -281,6 +281,7 @@ def _nh_cong(db: Session, n: NhaHang, tds: list[ThucDonNhaHang], hn: date, anh: 
             "gio_phuc_vu": n.gio_phuc_vu, "tien_ich": n.tien_ich, "mo_ta": n.mo_ta, "mon_noi_bat": n.mon_noi_bat,
             "dia_danh_nguon": n.dia_danh_nguon, "mo_dat": dat, "da_xac_minh": bool(n.lien_he_xac_minh),
             "mien": THANH_PHO.get(n.tinh_thanh, ("",))[0],      # AT-2d: màu ô khi chưa có ảnh
+            **_pl_cong(n),                                       # PL-1: nhãn đặc sản, bậc ĐÃ CHỐT, hạng Michelin
             # AT-2a: ảnh chỉ từ album đã duyệt (ảnh đơn cũ nha_hang.anh_id không ra cổng nữa)
             "anh": bia["hien"] if bia else None, "anh_nho": bia["nho"] if bia else None,
             "anh_alt": bia["alt"] if bia else "", "anh_nguon": bia["credit"] if bia else "", "so_anh": len(anh),
@@ -288,6 +289,12 @@ def _nh_cong(db: Session, n: NhaHang, tds: list[ThucDonNhaHang], hn: date, anh: 
                 "danh_gia": _dg_cong(db, n.id)}
                if du_album else {}),
             "gia_tu": min(int(t.gia_nguoi_lon or 0) for t in ban) if ban else None, "thuc_don": [_td_out(t, False) for t in ban]}
+
+
+def _pl_cong(n: NhaHang) -> dict:
+    from app.services import phan_loai_nh as PL
+    return {"dac_san": PL.dac_san(n), "bac": n.bac or "", "bac_ten": PL.BAC.get(n.bac or "", ""),
+            "michelin": PL.nhan_michelin(n), "la_michelin": PL.la_michelin(n)}
 
 
 def _dg_cong(db: Session, nid: int) -> dict:
@@ -313,7 +320,7 @@ def _nh_hien(db: Session, hn: date) -> list[dict]:
 
 
 def danh_sach_cong(db: Session, tinh: str = "", am_thuc: str = "", gia_toi_da: int = 0, q: str = "", chi_dat: bool = False,
-                   trang: int = 1, so: int = 24) -> dict:
+                   trang: int = 1, so: int = 24, loai: str = "", bac: str = "") -> dict:
     """Trang Khám phá ẩm thực: mọi nhà hàng đang hiện giới thiệu (chỉ nơi mở đặt mới có thực đơn, giá), thành phố,
     nội dung Marketing đã bật. Nhà hàng xếp: nơi đặt được qua Vietourist lên trước, rồi theo tên."""
     hn = _hom_nay()
@@ -330,6 +337,12 @@ def danh_sach_cong(db: Session, tinh: str = "", am_thuc: str = "", gia_toi_da: i
         if chi_dat and not o["mo_dat"]:
             continue
         if gia_toi_da and (o["gia_tu"] is None or o["gia_tu"] > gia_toi_da):
+            continue
+        if loai == "dac_san" and not o["dac_san"]:              # PL-1: bộ lọc loại / bậc (chỉ bậc đã chốt)
+            continue
+        if loai == "michelin" and not o["la_michelin"]:
+            continue
+        if bac and o["bac"] != bac:
             continue
         ra.append(o)
     # AT-2c (Chủ tịch 29/10/2026): nơi dưới 50% hoàn thiện xếp xuống cuối, không ẩn.
@@ -350,7 +363,13 @@ def danh_sach_cong(db: Session, tinh: str = "", am_thuc: str = "", gia_toi_da: i
     tp = [{"ten": t, "mien": m, "mien_ten": MIEN[m], "so_nha_hang": dem.get(t, 0),
            "tom_tat": gioi.get(t, {}).get("tom_tat", ""), "anh": gioi.get(t, {}).get("anh")}
           for t, (m, _k) in THANH_PHO.items()]
+    # PL-1: mục riêng «Đặc sản địa phương» — nơi có ảnh lên trước, rồi nơi đặt được, rồi theo tên
+    ds_ds = sorted([o for _n, o in tat_ca if o["dac_san"]], key=lambda o: (not o["anh"], not o["mo_dat"], o["ten"]))
+    from app.services import phan_loai_nh as PL
+    dem_bac = {k: sum(1 for _n, o in tat_ca if o["bac"] == k) for k in PL.BAC}
     return {"nha_hang": ra[(trang - 1) * so: trang * so], "tong": len(ra), "trang": trang, "so": so,
+            "dac_san_noi_bat": ds_ds[:8], "so_dac_san": len(ds_ds), "bac": PL.BAC, "dem_bac": dem_bac,
+            "so_michelin": sum(1 for _n, o in tat_ca if o["la_michelin"]),
             "tinh_thanh": sorted(dem), "dem_tinh": dem, "thanh_pho": tp, "mien": MIEN, "nhom_mon": list(NHOM_MON),
             "so_mo_dat": sum(1 for _n, o in tat_ca if o["mo_dat"]), "tong_nha_hang": len(tat_ca),
             "am_thuc": list(AM_THUC), "noi_dung": nd}
