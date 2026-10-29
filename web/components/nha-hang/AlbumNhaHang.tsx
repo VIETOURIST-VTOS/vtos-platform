@@ -5,7 +5,7 @@ import { Tag, errMsg } from "@/components/ui";
 
 /** AT-2a · ALBUM ẢNH NHÀ HÀNG (Chủ tịch + Điều hành chốt 29/10/2026).
  *  Chỉ ảnh của chính nhà hàng · 10 MB/ảnh · 60 ảnh/nhà hàng · máy tạo ảnh nhẹ, giữ bản gốc · 5 nhóm ảnh.
- *  Mỗi ảnh ghi CĂN CỨ QUYỀN DÙNG; «Chưa xác minh» không duyệt được, không ra cổng khách.
+ *  Nguồn / căn cứ quyền dùng chỉ là ghi chú NỘI BỘ (Chủ tịch bỏ chặn 29/10/2026): không chặn duyệt, không ra cổng khách.
  *  Ảnh mới «Nháp» → «Gửi duyệt» → TP Điều hành duyệt (người tải / sửa không tự duyệt). */
 
 const MB = 1024 * 1024;
@@ -74,8 +74,6 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
   };
   const capNhat = (k: string, p: Partial<Dong>) => setHang((h) => h.map((d) => (d.k === k ? { ...d, ...p } : d)));
   const taiHet = async (chiK?: string) => {
-    if (lo.can_cu !== "vtd_chup" && lo.can_cu !== "chua_xac_minh" && lo.can_cu_ghi_chu.trim().length < 5 && !chiK)
-      toast("Nên ghi chú căn cứ (ai cấp quyền, ngày, qua kênh nào) — thiếu thì TP Điều hành không duyệt được", true);
     setBusy(true);
     let so = 0;
     for (const d of hang) {
@@ -134,7 +132,7 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
       <div className="grid" style={{ marginTop: 6 }}>
         <label>Nhóm ảnh cho lô này<select value={loNhom} onChange={(e) => setLoNhom(e.target.value)}>
           {Object.entries(a.nhom_anh).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
-        <label>Căn cứ quyền dùng (bắt buộc)<select value={lo.can_cu} onChange={(e) => setLo({ ...lo, can_cu: e.target.value })}>
+        <label>Nguồn / căn cứ (không bắt buộc · chỉ lưu nội bộ)<select value={lo.can_cu} onChange={(e) => setLo({ ...lo, can_cu: e.target.value })}>
           {Object.entries(a.can_cu_anh).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label>Ghi chú căn cứ<input value={lo.can_cu_ghi_chu} placeholder="Email chị Lan, quản lý, 28/10/2026" onChange={(e) => setLo({ ...lo, can_cu_ghi_chu: e.target.value })} /></label>
         <label>Tác giả / credit (nếu nhà hàng yêu cầu)<input value={lo.credit} onChange={(e) => setLo({ ...lo, credit: e.target.value })} /></label></div>
@@ -176,7 +174,6 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
           <b style={{ fontSize: 16 }}>{x.chu_thich || <span className="muted">(chưa có chú thích)</span>}</b>
           <div className="muted">{x.nhom_ten}</div>
           <div><Tag cls={MAU_TT[x.trang_thai]}>{x.trang_thai_ten}</Tag></div>
-          {x.can_cu === "chua_xac_minh" && <div style={{ color: "var(--red, #e5484d)", fontSize: 13 }}>Căn cứ quyền dùng: Chưa xác minh</div>}
           {x.ly_do_tra_lai && <div style={{ color: "var(--red, #e5484d)", fontSize: 13 }}>Trả lại: {x.ly_do_tra_lai}</div>}
           <div style={{ flex: 1 }} />
           {a.duoc_tai && <div style={{ borderTop: "1px solid var(--line, #2a3b4d)", paddingTop: 10, display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
@@ -211,7 +208,7 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
             <label>Nhóm<select value={chon.nhom} disabled={!a.duoc_tai} onChange={(e) => setChon({ ...chon, nhom: e.target.value })}>
               {!chon.nhom && <option value="">— chọn —</option>}
               {Object.entries(a.nhom_anh).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
-            <label>Căn cứ quyền dùng<select value={chon.can_cu} disabled={!a.duoc_tai} onChange={(e) => setChon({ ...chon, can_cu: e.target.value })}>
+            <label>Nguồn / căn cứ (nội bộ)<select value={chon.can_cu} disabled={!a.duoc_tai} onChange={(e) => setChon({ ...chon, can_cu: e.target.value })}>
               {Object.entries(a.can_cu_anh).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
             <label>Ghi chú căn cứ<input value={chon.can_cu_ghi_chu} disabled={!a.duoc_tai} onChange={(e) => setChon({ ...chon, can_cu_ghi_chu: e.target.value })} /></label>
             <label>Tác giả / credit<input value={chon.credit} disabled={!a.duoc_tai} onChange={(e) => setChon({ ...chon, credit: e.target.value })} /></label></div>

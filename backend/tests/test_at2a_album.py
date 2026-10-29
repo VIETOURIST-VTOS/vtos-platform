@@ -4,7 +4,7 @@
   1. Chỉ Điều hành / Marketing tải; 10 MB/ảnh, 60 ảnh/nhà hàng; chỉ JPG/PNG/WEBP; tải lại đúng tệp cũ không tạo bản trùng.
   2. Máy tạo bản hiển thị + ảnh nhỏ (WEBP, bỏ EXIF), giữ bản gốc; cổng không bao giờ trả bản gốc.
   3. Ảnh mới «Nháp» → «Gửi duyệt» → TP Điều hành duyệt. Người tải / sửa không tự duyệt (trừ Chủ tịch, TGĐ).
-     «Chưa xác minh» không duyệt được; «Nhà hàng cấp quyền» / «Bên thứ ba» phải ghi chú căn cứ.
+     (Chủ tịch 29/10/2026: căn cứ quyền dùng chỉ còn là ghi chú nội bộ — không chặn duyệt, không chặn ra cổng.)
   4. Chỉ ảnh «Đã duyệt» của nhà hàng đang hiện ra cổng. Sửa chữ / căn cứ của ảnh đã duyệt → về «Chờ duyệt».
   5. Ảnh đơn cũ chuyển vào album: ảnh bìa, «Chờ duyệt», «Chưa xác minh» — thôi hiện, không tắt nhà hàng.
 """
@@ -108,16 +108,16 @@ def test_duyet_hai_nguoi_va_can_cu(db):
         N.duyet_anh(db, _u(db, "dh"), [a.id], True)                                         # NV ĐH không duyệt
     r = N.duyet_anh(db, tp, [a.id, b.id, c.id], True)
     ly = {x["id"]: x["ly_do"] for x in r["bo_qua"]}
-    assert r["da_doi"] == 0 and "không tự duyệt" in ly[a.id] and "Chưa xác minh" in ly[b.id] and "Ghi chú căn cứ" in ly[c.id]
+    assert r["da_doi"] == 2 and list(ly) == [a.id] and "không tự duyệt" in ly[a.id]           # b (chưa xác minh), c duyệt được
     r = N.duyet_anh(db, _u(db, "tp2"), [a.id], True)                                        # TP ĐH khác duyệt được
     assert r["da_doi"] == 1
-    N.sua_anh(db, _u(db, "dh"), c.id, {"can_cu_ghi_chu": "Email chị Lan quản lý 28/10/2026"})
     with pytest.raises(N.LoiNhaHang, match="lý do"):
         N.duyet_anh(db, tp, [b.id], False)
-    N.duyet_anh(db, tp, [b.id], False, "Chưa có căn cứ quyền dùng")
+    N.duyet_anh(db, tp, [b.id], False, "Ảnh mờ")                                            # trả lại vẫn được
     db.refresh(b)
-    assert b.trang_thai == "nhap" and b.ly_do_tra_lai == "Chưa có căn cứ quyền dùng"
-    assert N.duyet_anh(db, tp, [c.id], True)["da_doi"] == 1
+    assert b.trang_thai == "nhap" and b.ly_do_tra_lai == "Ảnh mờ"
+    x, _ = N.tai_anh_album(db, _u(db, "dh"), nh.id, "d.jpg", "image/jpeg", anh(4), {"nhom": "mon_an"})   # căn cứ không bắt buộc
+    assert x.can_cu == "chua_xac_minh"
     cd = N.anh_cho_duyet(db, _u(db, "mkt"))
     assert cd["anh"] == [] and cd["duoc_duyet"] is False
 
@@ -220,4 +220,4 @@ def test_chuyen_anh_don_cu_khong_tu_duyet(db):
     assert db.get(NhaHang, nh.id).hien_cong                                                # nhà hàng không bị tắt
     with pytest.raises(N.LoiNhaHang):
         N.anh_cong(db, a.id)                                                               # đường ảnh đơn cũ đóng
-    assert "Chưa xác minh" in N.duyet_anh(db, _u(db, "tp"), [al[0]["id"]], True)["bo_qua"][0]["ly_do"]
+    assert "nhóm" in N.duyet_anh(db, _u(db, "tp"), [al[0]["id"]], True)["bo_qua"][0]["ly_do"]   # 29/10: chỉ còn chặn vì chưa chọn nhóm

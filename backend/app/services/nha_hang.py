@@ -930,7 +930,7 @@ def tai_anh_album(db: Session, u: User, nid: int, ten_tep: str, kieu: str, data:
     if nh is None:
         raise LoiNhaHang("Không có nhà hàng này")
     duoi = _kiem_tep_anh(ten_tep, data)
-    nhom, can_cu = (d.get("nhom") or "").strip(), (d.get("can_cu") or "").strip()
+    nhom, can_cu = (d.get("nhom") or "").strip(), (d.get("can_cu") or "").strip() or "chua_xac_minh"   # không bắt buộc
     if not nhom:
         raise LoiNhaHang("Chọn nhóm ảnh cho lô này")
     _kiem_can_cu(can_cu, nhom)
@@ -1017,10 +1017,8 @@ def gui_duyet(db: Session, u: User, nid: int, ids: list[int] | None = None, now:
 def _ly_do_khong_duyet(u: User, x: AnhNhaHang) -> str:
     if x.trang_thai != "cho_duyet":
         return "Ảnh không ở trạng thái chờ duyệt"
-    if x.can_cu == "chua_xac_minh":
-        return "Ảnh «Chưa xác minh» quyền dùng — Điều hành ghi căn cứ trước"
-    if x.can_cu in ("nha_hang", "ben_thu_ba") and len(x.can_cu_ghi_chu.strip()) < 5:
-        return "Ghi chú căn cứ (ai cấp quyền, ngày, qua kênh nào) còn trống"
+    # Chủ tịch 29/10/2026: bỏ chặn theo «căn cứ quyền dùng» — căn cứ / nguồn chỉ còn là ghi chú nội bộ, không
+    # chặn duyệt, không chặn ra cổng. Vẫn giữ quy tắc hai người (người tải / sửa không tự duyệt).
     if not x.nhom:
         return "Chưa chọn nhóm ảnh"
     if u.role not in TOAN_QUYEN and u.username in {x.tai_boi, x.sua_boi} - {""}:
@@ -1133,8 +1131,7 @@ def album_cong(db: Session, nids: list[int]) -> dict[int, list[AnhNhaHang]]:
     if not nids:
         return {}
     ra: dict[int, list] = {}
-    for x in db.execute(select(AnhNhaHang).where(AnhNhaHang.nha_hang_id.in_(nids), AnhNhaHang.trang_thai == "da_duyet",
-                                                AnhNhaHang.can_cu != "chua_xac_minh")
+    for x in db.execute(select(AnhNhaHang).where(AnhNhaHang.nha_hang_id.in_(nids), AnhNhaHang.trang_thai == "da_duyet")
                         .order_by(AnhNhaHang.thu_tu, AnhNhaHang.id)).scalars():
         ra.setdefault(x.nha_hang_id, []).append(x)
     for v in ra.values():
@@ -1157,7 +1154,7 @@ def tep_album(db: Session, u: User | None, pid: int, co: str):
         raise LoiNhaHang("Không có ảnh này")
     if u is None:
         nh = db.get(NhaHang, x.nha_hang_id)
-        if co == "goc" or x.trang_thai != "da_duyet" or x.can_cu == "chua_xac_minh" or nh is None or not nh.hien_cong or nh.ngung:
+        if co == "goc" or x.trang_thai != "da_duyet" or nh is None or not nh.hien_cong or nh.ngung:
             raise LoiNhaHang("Không có ảnh này")
     elif not _co(u, VAI_XEM):
         raise LoiNhaHang("Không có quyền")
@@ -1180,7 +1177,7 @@ def _mon_out(x: MonNhaHang, anh: AnhNhaHang | None, cong: bool = False) -> dict:
          "mo_ta": x.mo_ta, "di_ung": list(x.di_ung or []), "di_ung_ten": [DI_UNG[k] for k in (x.di_ung or []) if k in DI_UNG],
          "cay": x.cay, "chay": x.chay, "noi_bat": x.noi_bat, "thu_tu": x.thu_tu}
     if cong:
-        ok = anh is not None and anh.trang_thai == "da_duyet" and anh.can_cu != "chua_xac_minh"
+        ok = anh is not None and anh.trang_thai == "da_duyet"
         o["anh"] = f"/api/v1/am-thuc/anh/nh/{anh.id}/hien" if ok else None
         o["anh_nho"] = f"/api/v1/am-thuc/anh/nh/{anh.id}/nho" if ok else None
     else:
@@ -1546,7 +1543,7 @@ DANH_GIA_TOI_THIEU = 3          # chấm theo SỐ bài đang hiện, không the
 
 def _cham(n: NhaHang, anh: list, mons: list, co_td: bool, so_dg: int = 0) -> dict:
     """Chấm MỘT nhà hàng từ dữ liệu đã duyệt. Trả {"diem", "muc": [...]}."""
-    duyet = [a for a in anh if a.trang_thai == "da_duyet" and a.can_cu != "chua_xac_minh"]
+    duyet = [a for a in anh if a.trang_thai == "da_duyet"]
     nhom = {a.nhom for a in duyet if a.nhom}
     co_bia = any(a.la_bia for a in duyet)
     so_mon = sum(1 for m in mons if m["anh_ok"])
@@ -1559,7 +1556,7 @@ def _cham(n: NhaHang, anh: list, mons: list, co_td: bool, so_dg: int = 0) -> dic
           "gioi_thieu": (0.5 if gt_dai >= GIOI_THIEU_TOI_THIEU else min(gt_dai, GIOI_THIEU_TOI_THIEU) / GIOI_THIEU_TOI_THIEU * 0.5) + (0.5 if co_mnb else 0.0),
           "lien_he": sum(lh) / 3,
           "danh_gia": min(so_dg, DANH_GIA_TOI_THIEU) / DANH_GIA_TOI_THIEU}
-    chi_tiet = {"bia": "Có ảnh bìa đã duyệt" if co_bia else ("Ảnh bìa chưa duyệt / chưa xác minh" if any(a.la_bia for a in anh) else "Chưa chọn ảnh bìa"),
+    chi_tiet = {"bia": "Có ảnh bìa đã duyệt" if co_bia else ("Ảnh bìa chưa duyệt" if any(a.la_bia for a in anh) else "Chưa chọn ảnh bìa"),
                 "album": f"{len(duyet)}/{ALBUM_TOI_THIEU} ảnh đã duyệt · {len(nhom)} nhóm",
                 "mon": f"{so_mon}/{MON_TOI_THIEU} món đã duyệt có ảnh",
                 "thuc_don": "Có thực đơn đang dùng" if co_td else "Chưa có thực đơn đang dùng",
@@ -1587,7 +1584,7 @@ def diem_hoan_thien(db: Session, nids: list[int] | None = None) -> dict[int, dic
     anh: dict[int, list] = {}
     for a in db.execute(select(AnhNhaHang).where(AnhNhaHang.nha_hang_id.in_(ids))).scalars():
         anh.setdefault(a.nha_hang_id, []).append(a)
-    ok_anh = {a.id for v in anh.values() for a in v if a.trang_thai == "da_duyet" and a.can_cu != "chua_xac_minh"}
+    ok_anh = {a.id for v in anh.values() for a in v if a.trang_thai == "da_duyet"}
     mons: dict[int, list] = {}
     for m in db.execute(select(MonNhaHang).where(MonNhaHang.nha_hang_id.in_(ids), MonNhaHang.trang_thai == "da_duyet")).scalars():
         mons.setdefault(m.nha_hang_id, []).append({"anh_ok": m.anh_id in ok_anh})
