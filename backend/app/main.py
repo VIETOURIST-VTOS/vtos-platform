@@ -100,6 +100,7 @@ from app.api.v1.don_khach_san_ota import router_vtos as don_khach_san_ota_router
 from app.api.v1.don_khach_san_ota import router_cong as don_khach_san_cong_router
 from app.api.v1.khach_san_vtd import router_vtos as ks_vtd_router, router_cong as ks_vtd_cong_router, router_anh as ks_vtd_anh_router   # KS-13
 from app.api.v1.don_ks_vtd import router_vtos as don_ks_vtd_router, router_cong as don_ks_vtd_cong_router   # KS-14
+from app.api.v1.sepay_pg import router as sepay_pg_router   # SP-1 cổng thanh toán SePay (IPN)
 from app.api.v1.doi_tac_cong import router as cong_doi_tac_router, router_noi as noi_doi_tac_router   # DT-1 cổng đối tác
 from app.api.v1.cong_ngoai import router as cong_ngoai_router, router_vtos as tai_khoan_ngoai_router   # CG-1 cổng kết nối VTD
 from app.api.v1.cong_bo import router as cong_bo_router
@@ -410,6 +411,7 @@ app.include_router(noi_doi_tac_router)
 app.include_router(cong_khach_san_router)
 app.include_router(khach_san_ota_router)
 app.include_router(don_khach_san_ota_router)
+app.include_router(sepay_pg_router)
 app.include_router(don_ks_vtd_router)
 app.include_router(don_ks_vtd_cong_router)
 app.include_router(ks_vtd_router)

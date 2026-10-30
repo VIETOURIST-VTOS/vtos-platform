@@ -81,7 +81,7 @@ def qr(ma: str, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depe
 def the(ma: str, request: Request, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach(tk)
     ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "") or "").split(",")[0].strip()
-    return {"url": _goi(S.onepay_bat_dau, db, tk, ma, _goc(request), ip)}
+    return _goi(S.the_bat_dau, db, tk, ma, _goc(request), ip)   # SP-1: {"form"} (SePay) hoặc {"url"} (OnePay)
 
 
 class HuyIn(BaseModel):

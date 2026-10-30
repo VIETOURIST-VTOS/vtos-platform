@@ -72,6 +72,10 @@ CONG_KHAI: dict[str, str] = {
     "POST /api/v1/sepay/webhook": (
         "SePay gọi vào, xác thực bằng header Authorization: Apikey <SEPAY_WEBHOOK_KEY>. Không có "
         "người dùng nào ở đầu kia nên không có vai trò để khai."),
+    "POST /api/v1/sepay-pg/ipn": (
+        "SP-1 (29/10/2026): cổng thanh toán SePay gọi IPN sau khi khách trả thẻ. Xác thực bằng đầu đề "
+        "X-Secret-Key so (compare_digest) với SEPAY_PG_IPN_KEY; sai khóa → 401, không đổi gì. Chỉ khớp được "
+        "khoản thẻ VTOS đã tạo trước (mã giao dịch) và đúng số tiền; có phanh lượt theo địa chỉ."),
     "POST /api/v1/khao-sat/{ma}": (
         "Trang khách TỰ CHẤM ĐIỂM sau tour (đề xuất CSKH 25/9/2026). Khác mọi dòng còn lại của "
         "danh sách này: đầu kia KHÔNG phải máy của đối tác mà là MỘT NGƯỜI THẬT — khách hàng, và "
@@ -295,7 +299,10 @@ TRAN = {
     # 8 → 9 ngày 26/10/2026 (CG-1): cổng kết nối VTD mở đăng nhập cho người KHÔNG có tài khoản VTOS —
     # khách hàng, đối tác, cổ đông — bằng mã một lần. Đó là quy tắc mới được nói ra ở đây, không phải
     # ngoại lệ lén lớn lên: hai cửa gửi mã + xác thực, cùng hình với POST /auth/login.
-    "CONG_KHAI": 9,
+    # 9 → 10 ngày 29/10/2026 (SP-1): Chủ tịch chốt dùng cổng thanh toán SePay cho thẻ. Cổng thanh toán
+    # gọi IPN bằng POST từ máy của nó — cùng loại với /sepay/webhook (máy đối tác, xác thực bằng khóa bí
+    # mật trong đầu đề). OnePay trước đây gọi bằng GET nên không nằm trong bảng ghi này.
+    "CONG_KHAI": 10,
     "TOKEN_VIET_TAY": 6,
     "CHAN_TAI_CHO": 10,
     "TU_PHUC_VU": 10,

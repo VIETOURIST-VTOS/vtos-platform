@@ -24,3 +24,13 @@ export async function goiCong(path: string, json?: any): Promise<any> {
   if (!r.ok) { const x = d?.detail; throw { status: r.status, message: typeof x === "string" ? x : x?.message || `Lỗi ${r.status}`, ma: x?.ma || "" }; }
   return d;
 }
+
+/* SP-1 · sang cổng thẻ. Máy chủ trả {form} (SePay: biểu mẫu POST đã ký, gửi đúng thứ tự trường) hoặc {url} (OnePay). */
+export function diCongThe(r: { url?: string; form?: { action: string; fields: [string, string][] } }) {
+  if (r.url) { window.location.href = r.url; return; }
+  if (!r.form) throw { message: "Cổng thẻ chưa mở — dùng QR chuyển khoản" };
+  const f = document.createElement("form");
+  f.method = "POST"; f.action = r.form.action; f.style.display = "none";
+  for (const [k, v] of r.form.fields) { const i = document.createElement("input"); i.type = "hidden"; i.name = k; i.value = v; f.appendChild(i); }
+  document.body.appendChild(f); f.submit();
+}

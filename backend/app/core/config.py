@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     SEPAY_ACCOUNT_NUMBER: str = ""
     # DT-2 · cổng thẻ OnePay (Visa / Master / JCB) cho đặt bàn nhà hàng. Chủ tịch tự nhập sau khi ký hợp đồng.
     # Thiếu một trong ba thì nút trả bằng thẻ KHÔNG hiện — chỉ còn QR. Khóa băm là chuỗi HEX OnePay cấp.
+    # SP-1 (29/10/2026): cổng thanh toán SePay THAY OnePay cho thẻ. Thiếu một trong ba khóa = cổng tắt.
+    SEPAY_PG_MERCHANT_ID: str = ""         # my.sepay.vn › Cổng thanh toán › Thông tin tích hợp › MERCHANT ID
+    SEPAY_PG_SECRET_KEY: str = ""          # … › SECRET KEY (ký biểu mẫu thanh toán)
+    SEPAY_PG_IPN_KEY: str = ""             # khóa IPN (kiểu xác thực SECRET_KEY) — SePay gửi ở đầu đề X-Secret-Key
+    SEPAY_PG_ENV: str = "sandbox"          # sandbox | production
     ONEPAY_MERCHANT: str = ""
     ONEPAY_ACCESS_CODE: str = ""
     ONEPAY_HASH_KEY: str = ""

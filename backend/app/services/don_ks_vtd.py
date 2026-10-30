@@ -24,6 +24,7 @@ from app.models.khach_san_vtd import GoiGiaVtd, KhachSanVtd, LoaiPhongVtd
 from app.models.payments import BankTransaction
 from app.services import khach_san_vtd as S
 from app.services import onepay as OP
+from app.services import sepay_pg as SP
 from app.services import rules as R
 
 GIU_PHUT = 15                       # phòng giữ cho khách trong lúc trả tiền
@@ -360,7 +361,7 @@ def ra_khach(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
             "ly_do_huy": d.ly_do_huy, "so_hoan": int(d.so_hoan), "hoan_tt": d.hoan_tt, "hoan_tt_ten": HOAN_TT_KS.get(d.hoan_tt, ""),
             "da_hoan_tien": int(d.da_hoan_tien), "co_the_tra": d.trang_thai == "cho_tra" and tra < int(d.tong),
             "co_the_huy": huy_duoc, "hoan_neu_huy": so_hoan_neu_huy(d, tra, now.date()) if huy_duoc else 0,
-            "the_bat": OP.bat(), "tao_luc": d.tao_luc.isoformat(timespec="minutes") if d.tao_luc else None}
+            "the_bat": SP.cong_the_bat(), "tao_luc": d.tao_luc.isoformat(timespec="minutes") if d.tao_luc else None}
 
 
 def ds_cua(db: Session, tk, now: datetime | None = None) -> list[dict]:
@@ -415,6 +416,53 @@ def onepay_bat_dau(db: Session, tk, ma: str, goc: str, ip: str, now: datetime | 
     url = OP.duong_thanh_toan(t.ma_gd, con, f"Dat phong {d.ma}", f"{goc}/api/v1/onepay/tra-ve", ip, f"{goc}/cong")
     db.commit()
     return url
+
+
+def the_bat_dau(db: Session, tk, ma: str, goc: str, ip: str, now: datetime | None = None) -> dict:
+    """SP-1: cổng thẻ SePay (ưu tiên) → {"form": biểu mẫu POST}; SePay chưa có khóa mà OnePay có → {"url": …}."""
+    now = now or datetime.now()
+    if not SP.bat():
+        return {"url": onepay_bat_dau(db, tk, ma, goc, ip, now)}
+    d = cap_nhat(db, _cua(db, tk, ma), now)
+    con = int(d.tong) - da_tra(db, d)
+    if d.trang_thai != "cho_tra" or con <= 0:
+        db.commit()
+        raise LoiDon(f"Đơn đang «{TRANG_THAI_DON.get(d.trang_thai, d.trang_thai)}» — không thanh toán", 409)
+    t = ThanhToanKsVtd(don_id=d.id, kenh="sepay", so_tien=con, trang_thai="cho", luc=now, goc=goc[:80])
+    db.add(t)
+    db.flush()
+    t.ma_gd = f"{d.ma}T{t.id}"
+    ve = f"{goc}/cong?ks_vtd={d.ma}&the="
+    f = SP.bieu_mau(t.ma_gd, con, f"Dat phong {d.ma}", ve + "cho", ve + "loi", ve + "huy")
+    db.commit()
+    return {"form": f}
+
+
+def sepay_ket_qua(db: Session, kq: dict, now: datetime | None = None) -> tuple[DonKsVtd, ThanhToanKsVtd] | None:
+    """IPN SePay đã qua khóa: chạy lại không ghi thêm. ORDER_PAID + APPROVED + đúng số tiền → thành công."""
+    now = now or datetime.now()
+    t = db.execute(select(ThanhToanKsVtd).where(ThanhToanKsVtd.ma_gd == kq["ma_gd"], ThanhToanKsVtd.kenh == "sepay")).scalars().first()
+    if t is None:
+        return None
+    d = db.get(DonKsVtd, t.don_id)
+    if kq["loai"] == "TRANSACTION_VOID":
+        t.ghi_chu = (f"SePay báo hủy giao dịch {kq['so_gd']} — Kế toán kiểm tra" + (f" · {t.ghi_chu}" if t.ghi_chu else ""))[:300]
+        R.audit(db, "sepay", "sepay", "ks_vtd_the_huy_gd", f"don_ks_vtd:{d.ma}", after={"so_gd": kq["so_gd"], "trang_thai": t.trang_thai})
+        db.commit()
+        return d, t
+    if t.trang_thai in ("cho", "that_bai"):
+        t.ket_qua, t.so_gd_cong = kq["ma_kq"], kq["so_gd"]
+        if kq["thanh_cong"] and kq["so_tien"] == int(t.so_tien):
+            t.trang_thai = "thanh_cong"
+            t.ghi_chu = " · ".join(x for x in (kq["cach"], kq["the"]) if x)[:300]
+            R.audit(db, "sepay", "sepay", "ks_vtd_the_thanh_cong", f"don_ks_vtd:{d.ma}", after={"so_tien": int(t.so_tien), "so_gd": kq["so_gd"]})
+        else:
+            t.trang_thai = "that_bai"
+            t.ghi_chu = "Số tiền không khớp" if kq["thanh_cong"] else f"SePay: {kq['loai']} {kq['ma_kq']}"[:300]
+        cap_nhat(db, d, now)
+        _sau_khi_tra(db, d, now)
+        db.commit()
+    return d, t
 
 
 def cua_minh(p: dict) -> bool:
@@ -715,12 +763,12 @@ def kt_doi_soat(db: Session, u: User, tt_id: int, phi: int | None, now: datetime
     now = now or datetime.now()
     _quyen(u, VAI_KE_TOAN, "đối soát thẻ (Kế toán)")
     t = db.get(ThanhToanKsVtd, tt_id)
-    if t is None or t.kenh != "onepay":
+    if t is None or t.kenh not in ("onepay", "sepay"):
         raise LoiDon("Không có giao dịch thẻ này", 404)
     if t.trang_thai != "thanh_cong":
-        raise LoiDon("Chỉ đối soát giao dịch OnePay báo thành công", 409)
+        raise LoiDon("Chỉ đối soát giao dịch cổng thẻ báo thành công", 409)
     if phi is None or int(phi) < 0 or int(phi) >= int(t.so_tien):
-        raise LoiDon("Ghi phí thẻ theo sao kê OnePay (0 nếu không trừ phí)")
+        raise LoiDon("Ghi phí thẻ theo sao kê cổng thẻ (0 nếu không trừ phí)")
     d = db.get(DonKsVtd, t.don_id)
     ten, ma_dt = _doi_tuong_ks(db, d)
     dong = [{"account": TK_TIEN, "debit": int(t.so_tien) - int(phi), "note": t.so_gd_cong or d.ma}]

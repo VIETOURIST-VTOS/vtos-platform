@@ -5,7 +5,7 @@
    · Hủy: hiện trước số bị giữ theo chính sách, người đặt xác nhận rồi mới hủy.
    · Đối tác thấy thêm tên khách và doanh số D06 Kế toán đã chốt. */
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { goiCong, phienCong } from "@/lib/cong";
+import { goiCong, phienCong, diCongThe } from "@/lib/cong";
 import QrThanhToan from "./khach/QrThanhToan";
 
 const tien = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString("vi-VN")} đ` : "—");
@@ -43,13 +43,15 @@ export default function DatBanCuaToi({ doiTac = false, moMa = "" }: { doiTac?: b
     try {
       const q = new URLSearchParams(window.location.search);
       if (q.get("the") === "ok") setMsg(`Thanh toán thẻ thành công — đơn ${q.get("dat_ban") || ""} đã giữ bàn.`);
+      if (q.get("the") === "cho") setMsg(`Đã trả qua cổng thẻ — đơn ${q.get("dat_ban") || ""} chuyển «Đã giữ bàn» ngay khi cổng thẻ báo về (thường vài giây).`);
+      if (q.get("the") === "huy") setLoi("Bạn đã thoát trang thanh toán thẻ — đơn chưa được trả.");
       if (q.get("the") === "loi") setLoi("Thanh toán thẻ không thành công — bạn có thể thử lại hoặc dùng QR chuyển khoản.");
       if (q.get("the")) window.history.replaceState(null, "", window.location.pathname);
     } catch { /* bỏ qua */ }
   }, [tai]);
   const the = async (ma: string) => {
     setBusy(true); setLoi("");
-    try { const r = await goiCong(`/dat-ban/${encodeURIComponent(ma)}/the`, {}); window.location.href = r.url; } catch (x: any) { setLoi(x.message); setBusy(false); }
+    try { diCongThe(await goiCong(`/dat-ban/${encodeURIComponent(ma)}/the`, {})); } catch (x: any) { setLoi(x.message); setBusy(false); }
   };
   const guiDoi = async () => {
     setBusy(true); setLoi(""); setMsg("");
@@ -108,8 +110,8 @@ export default function DatBanCuaToi({ doiTac = false, moMa = "" }: { doiTac?: b
 
     {ds && ds.filter((d) => d.ma === mo && d.co_the_tra).map((d) => <div key={d.ma} className="v3-panel" style={{ marginTop: 12 }}>
       <div className="v3-section-title"><h3>Thanh toán {d.ma} · {tien(d.con_phai_tra_truoc)}</h3></div>
-      {d.the_bat && <><button type="button" className="v3-button v3-primary cursor-interaction" disabled={busy} onClick={() => the(d.ma)}><span>Trả bằng thẻ Visa / Master / JCB</span></button>
-        <small>Mở trang thanh toán OnePay. Vietourist không thấy và không lưu số thẻ. Phí thẻ Vietourist chịu.</small></>}
+      {d.the_bat && <><button type="button" className="v3-button v3-primary cursor-interaction" disabled={busy} onClick={() => the(d.ma)}><span>Trả bằng thẻ Visa / Master / JCB / ATM</span></button>
+        <small>Mở trang thanh toán của cổng thẻ (SePay). Vietourist không thấy và không lưu số thẻ. Phí thẻ Vietourist chịu.</small></>}
       <QrThanhToan ma={d.ma} duong="/dat-ban" />
     </div>)}
 
