@@ -8,7 +8,10 @@ import { AnhNoiBo } from "@/components/nha-hang/AlbumNhaHang";
 /** KS-13 · KHÁCH SẠN HỢP TÁC (CỔNG KHÁCH) — Chủ tịch duyệt bản demo 30/10/2026.
  *  NV / TP Điều hành nhập khách sạn, ảnh, loại phòng, gói giá và mùa giá (chỉ GIÁ BÁN, chưa thuế phí).
  *  TP Điều hành duyệt ảnh và giá — người nhập không tự duyệt (trừ Chủ tịch, TGĐ). Sửa gói đã duyệt → về Nháp, thôi hiện.
- *  TP Điều hành bật «Hiện trên cổng» khi đủ điều kiện; người vừa sửa hồ sơ không tự bật. */
+ *  TP Điều hành bật «Hiện trên cổng» khi đủ điều kiện; người vừa sửa hồ sơ không tự bật.
+ *  KS-14 (Chủ tịch duyệt bản xem thử 30/10/2026): khách trả ngay 100%. Điều hành sửa số phòng bán mỗi đêm (tab «Phòng trống»),
+ *  chốt đơn đã trả với khách sạn hoặc báo hết phòng (tab «Đơn đặt phòng»); Sales xác nhận hoàn, Kế toán ghi sổ thu hộ,
+ *  đối soát thẻ, hoàn tiền, chốt hoa hồng (tab «Tiền & hoàn»). */
 const tien = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("vi-VN") : "");
 const KS0 = { ten: "", tinh_thanh: "", khu_vuc: "", dia_chi: "", sao: 0, loai: "khach_san", km_trung_tam: "", gan: "", noi_bat: "", mo_ta: "",
   tien_ich: [] as string[], gio_nhan: "14:00", gio_tra: "12:00", cs_tre_em: "", cs_giuong_phu: "", cs_vat_nuoi: "", cs_khac: "", thue_phi_pt: 0,
@@ -29,7 +32,9 @@ async function guiTep(path: string, fd: FormData) {
 function Trang() {
   const { toast } = useShell();
   const [x, setX] = useState<any>(null);
-  const [tab, setTab] = useState<"ds" | "cd">("ds");
+  const [tab, setTab] = useState<"ds" | "cd" | "don" | "tien">("ds");
+  const [demDon, setDemDon] = useState<any>({});
+  useEffect(() => { api<any>("/khach-san-vtd/don?loc=cho_chot").then((r) => setDemDon(r.dem || {})).catch(() => {}); }, [tab]);
   const [mo, setMo] = useState<number | "moi" | null>(null);
   const [tim, setTim] = useState("");
   const load = useCallback(() => { api("/khach-san-vtd").then(setX).catch((e) => toast(errMsg(e), true)); }, [toast]);
@@ -40,12 +45,17 @@ function Trang() {
   return (<>
     <h1>Khách sạn (cổng khách)</h1>
     <p className="muted">Khách sạn VTD có hợp đồng trực tiếp. Điều hành nhập khách sạn, ảnh, loại phòng và GIÁ BÁN theo mùa (chưa thuế phí); TP Điều hành duyệt
-      ảnh, giá và bật «Hiện trên cổng». Người nhập không tự duyệt / tự bật (trừ Chủ tịch, TGĐ). Khách xem như Agoda và gửi yêu cầu giữ phòng — yêu cầu vào màn
-      «Đơn khách sạn OTA › Yêu cầu của khách». Giá vốn / hoa hồng theo hợp đồng NCC, không nhập ở đây.</p>
+      ảnh, giá và bật «Hiện trên cổng». Người nhập không tự duyệt / tự bật (trừ Chủ tịch, TGĐ). Gói đã duyệt: khách đặt và trả ngay 100% (QR / thẻ),
+      Điều hành chốt với khách sạn ở tab «Đơn đặt phòng»; chưa có giá thì khách gửi yêu cầu vào màn «Đơn khách sạn OTA › Yêu cầu của khách».
+      Tiền phòng là tiền thu hộ khách sạn; hoa hồng Kế toán chốt ở tab «Tiền &amp; hoàn».</p>
     <div style={{ display: "flex", gap: 6, margin: "10px 0" }}>
       <button className={`act ${tab === "ds" ? "teal" : "grey"}`} onClick={() => setTab("ds")}>Khách sạn ({x.khach_san.length})</button>
-      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Chờ duyệt ({x.cho_duyet.anh} ảnh · {x.cho_duyet.goi} gói giá)</button></div>
+      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Chờ duyệt ({x.cho_duyet.anh} ảnh · {x.cho_duyet.goi} gói giá)</button>
+      <button className={`act ${tab === "don" ? "teal" : "grey"}`} onClick={() => setTab("don")}>Đơn đặt phòng{demDon.da_tra ? ` (${demDon.da_tra} chờ chốt)` : ""}</button>
+      <button className={`act ${tab === "tien" ? "teal" : "grey"}`} onClick={() => setTab("tien")}>Tiền &amp; hoàn</button></div>
     {tab === "cd" && <ChoDuyet toast={toast} onDoi={load} />}
+    {tab === "don" && <DonDat toast={toast} />}
+    {tab === "tien" && <TienHoan toast={toast} />}
     {tab === "ds" && mo === null && <section className="panel">
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <input value={tim} onChange={(e) => setTim(e.target.value)} placeholder="Tìm tên, mã, thành phố" aria-label="Tìm khách sạn" style={{ maxWidth: 260 }} />
@@ -69,7 +79,7 @@ function Trang() {
 function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "moi"; toast: (m: string, l?: boolean) => void; onDong: () => void; onMoi: (id: number) => void; onDoi: () => void }) {
   const [h, setH] = useState<any>(null);
   const [f, setF] = useState<any>(KS0);
-  const [t, setT] = useState<"tt" | "anh" | "phong" | "hien">("tt");
+  const [t, setT] = useState<"tt" | "anh" | "phong" | "trong" | "hien">("tt");
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => {
     if (kid === "moi") { setH(null); setF(KS0); return; }
@@ -95,7 +105,7 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
       {h && <span className="muted">{h.khach_san.ma}</span>}{h && (h.khach_san.hien_cong ? <Tag cls="ok">Đang hiện trên cổng</Tag> : <Tag cls="warn">Chưa hiện</Tag>)}
       <span style={{ flex: 1 }} /><button className="act grey" onClick={onDong}>Đóng</button></div>
     {kid !== "moi" && <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--line, #2a3b4d)", margin: "10px 0" }}>
-      {([["tt", "Thông tin"], ["anh", `Album ảnh (${h?.anh.length ?? 0})`], ["phong", `Loại phòng & giá (${h?.loai_phong.length ?? 0})`], ["hien", "Hiện trên cổng"]] as const).map(([k2, t2]) =>
+      {([["tt", "Thông tin"], ["anh", `Album ảnh (${h?.anh.length ?? 0})`], ["phong", `Loại phòng & giá (${h?.loai_phong.length ?? 0})`], ["trong", "Phòng trống"], ["hien", "Hiện trên cổng"]] as const).map(([k2, t2]) =>
         <button key={k2} className={`act ${t === k2 ? "teal" : "grey"}`} onClick={() => setT(k2)}>{t2}</button>)}</div>}
     {(kid === "moi" || t === "tt") && <>
       <div className="grid">
@@ -122,6 +132,7 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
     </>}
     {h && t === "anh" && <Album h={h} x={x} toast={toast} onDoi={() => { load(); onDoi(); }} />}
     {h && t === "phong" && <Phong h={h} x={x} toast={toast} goi={goi} busy={busy} />}
+    {h && t === "trong" && <PhongTrong kid={h.khach_san.id} toast={toast} />}
     {h && t === "hien" && <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <b>Điều kiện bật «Hiện trên cổng»</b>
       {h.dieu_kien.map((c: any) => <span key={c.ma} style={{ color: c.ok ? "#2bb39a" : "#d99a2b" }}>{c.ok ? "✓" : "✗"} {c.ten}</span>)}
@@ -295,4 +306,163 @@ function ChoDuyet({ toast, onDoi }: { toast: (m: string, l?: boolean) => void; o
   </section>;
 }
 
+/* ── KS-14 · Phòng trống, Đơn đặt phòng, Tiền & hoàn ─────────────────────────────────────────────── */
+const hom = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const THU2 = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+const dm = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().slice(0, 2).join("/") : "");
+const gio = (s?: string | null) => (s ? `${s.slice(11, 16)} ${dm(s)}` : "");
+const MAU_DON: Record<string, string> = { cho_tra: "warn", het_han: "", da_tra: "warn", da_xac_nhan: "ok", da_huy: "bad" };
+
+function PhongTrong({ kid, toast }: { kid: number; toast: (m: string, l?: boolean) => void }) {
+  const [tu, setTu] = useState(hom());
+  const [b, setB] = useState<any>(null);
+  const [sua, setSua] = useState<any>(null);   // {lid, ten, ngay:[...], so_ban, dong}
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => { api<any>(`/khach-san-vtd/don/phong-trong/${kid}?tu=${tu}&so_ngay=14`).then(setB).catch((e) => toast(errMsg(e), true)); }, [kid, tu, toast]);
+  useEffect(() => { load(); }, [load]);
+  const luu = async (dong: boolean, veMacDinh = false) => {
+    setBusy(true);
+    try { const r = await api<any>(`/khach-san-vtd/don/phong-trong/${sua.lid}`, { method: "POST",
+      json: { ngay: sua.ngay, so_ban: veMacDinh || sua.so_ban === "" ? null : Number(sua.so_ban), dong } }); toast(r.message); setSua(null); load(); }
+    catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
+  };
+  if (!b) return <p className="muted">Đang tải…</p>;
+  const chonO = (p: any, o: any) => {
+    if (!b.duoc_sua) return;
+    if (sua && sua.lid === p.id) { const ngay = sua.ngay.includes(o.ngay) ? sua.ngay.filter((x: string) => x !== o.ngay) : [...sua.ngay, o.ngay]; setSua(ngay.length ? { ...sua, ngay } : null); }
+    else setSua({ lid: p.id, ten: p.ten, ngay: [o.ngay], so_ban: o.da_sua ? String(o.ban) : "", dong: o.dong });
+  };
+  return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <p className="muted" style={{ margin: 0 }}>Số phòng VTD được bán mỗi đêm. Mặc định = «số phòng / đêm» ở hồ sơ loại phòng; bấm ô để sửa hoặc đóng bán (chọn nhiều ô cùng loại phòng rồi lưu một lần).
+      Ô ghi <b>còn / tổng</b>; «đã nhận» gồm đơn đang giữ 15 phút chờ trả tiền, đã trả và đã xác nhận.</p>
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <button className="act grey" onClick={() => { const d = new Date(tu + "T00:00:00"); d.setDate(d.getDate() - 14); const s2 = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); setTu(s2 < hom() ? hom() : s2); }}>← 14 ngày</button>
+      <input type="date" value={tu} min={hom()} onChange={(e) => e.target.value && setTu(e.target.value)} aria-label="Từ ngày" style={{ maxWidth: 170 }} />
+      <button className="act grey" onClick={() => { const d = new Date(tu + "T00:00:00"); d.setDate(d.getDate() + 14); setTu(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)); }}>14 ngày →</button></div>
+    <div style={{ overflowX: "auto" }}><table className="ksv-lich"><thead><tr><th style={{ textAlign: "left" }}>Loại phòng</th>
+      {b.ngay.map((n: string) => { const d = new Date(n + "T00:00:00"); return <th key={n} style={{ textAlign: "center", whiteSpace: "nowrap" }}>{THU2[d.getDay()]}<br />{dm(n)}</th>; })}</tr></thead>
+      <tbody>{b.phong.map((p: any) => <tr key={p.id}><td><b>{p.ten}</b><div className="muted">{p.so_phong} phòng / đêm{p.dang_ban ? "" : " · ngừng bán"}</div></td>
+        {p.o.map((o: any) => { const on = sua && sua.lid === p.id && sua.ngay.includes(o.ngay);
+          return <td key={o.ngay} style={{ padding: 3 }}><button type="button" disabled={!b.duoc_sua} onClick={() => chonO(p, o)} aria-pressed={!!on}
+            aria-label={`${p.ten} đêm ${dm(o.ngay)}: ${o.dong ? "đóng bán" : `còn ${o.con} trên ${o.ban}`}`}
+            className={`ksv-o ${o.dong ? "dong" : o.con === 0 ? "het" : ""} ${on ? "chon" : ""}`}>
+            {o.dong ? "Đóng" : <>{o.con}<span className="muted">/{o.ban}</span></>}{o.da_sua && !o.dong ? <i>•</i> : null}</button></td>; })}</tr>)}
+        {!b.phong.length && <tr><td colSpan={15} className="muted">Chưa có loại phòng.</td></tr>}</tbody></table></div>
+    {sua && <div className="panel" style={{ margin: 0 }}><b>{sua.ten} · {sua.ngay.length} đêm: {[...sua.ngay].sort().map(dm).join(", ")}</b>
+      <div className="grid"><label>Số phòng bán mỗi đêm (để trống = theo hồ sơ)<input inputMode="numeric" value={sua.so_ban} onChange={(e) => setSua({ ...sua, so_ban: e.target.value.replace(/\D/g, "") })} /></label></div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <button className="act teal" disabled={busy} onClick={() => luu(false)}>Lưu số phòng</button>
+        <button className="act grey" disabled={busy} onClick={() => luu(true)}>Đóng bán các đêm này</button>
+        <button className="act grey" disabled={busy} onClick={() => luu(false, true)}>Về theo hồ sơ</button>
+        <button className="act grey" onClick={() => setSua(null)}>Thôi</button></div></div>}
+    <style>{`.ksv-lich td,.ksv-lich th{padding:6px}.ksv-o{min-width:46px;min-height:44px;border-radius:6px;border:1px solid transparent;background:#1c3d5e;color:inherit;font:inherit;cursor:pointer;position:relative}
+      .ksv-o.het{background:#5a4614;color:#ffe08a}.ksv-o.dong{background:#4a2330;color:#ffb4bf;font-weight:700}.ksv-o.chon{border-color:#4cc38a;box-shadow:0 0 0 2px #4cc38a}
+      .ksv-o i{position:absolute;top:2px;right:4px;font-style:normal;color:#7fc4ff}.ksv-o:disabled{cursor:default}`}</style>
+  </div>;
+}
+
+function DongDon({ d }: { d: any }) {
+  return <><td><b>{d.ma}</b><div className="muted">{d.ho_ten} · {d.lien_he}</div></td>
+    <td>{d.khach_san?.ten}<div className="muted">{d.dong.map((x: any) => `${x.so} × ${x.loai_phong} · ${x.goi}`).join("; ")}</div></td>
+    <td style={{ whiteSpace: "nowrap" }}>{dm(d.vao)} – {dm(d.ra)}<div className="muted">{d.dem} đêm · {d.nguoi_lon} NL{d.tre_em ? ` + ${d.tre_em} TE` : ""}</div></td>
+    <td style={{ whiteSpace: "nowrap" }}>₫ {tien(d.tong)}<div className="muted">đã trả {tien(d.da_tra)}{d.thanh_toan?.length ? ` · ${d.thanh_toan.map((t: any) => t.kenh === "qr" ? "QR" : "thẻ").join(", ")}` : ""}</div></td></>;
+}
+
+function DonDat({ toast }: { toast: (m: string, l?: boolean) => void }) {
+  const [loc, setLoc] = useState("cho_chot");
+  const [x, setX] = useState<any>(null);
+  const [o, setO] = useState<Record<number, { ma: string; ly: string }>>({});
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => { api<any>(`/khach-san-vtd/don?loc=${loc}`).then(setX).catch((e) => toast(errMsg(e), true)); }, [loc, toast]);
+  useEffect(() => { load(); }, [load]);
+  const goi = async (path: string, json: any) => {
+    setBusy(true);
+    try { await api<any>(path, { method: "POST", json }); toast("Đã lưu"); load(); } catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
+  };
+  if (!x) return <p className="muted">Đang tải…</p>;
+  const v = (id: number) => o[id] || { ma: "", ly: "" };
+  return <section className="panel">
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+      {([["cho_chot", `Chờ chốt với khách sạn (${x.dem.da_tra || 0})`], ["da_xac_nhan", `Đã xác nhận (${x.dem.da_xac_nhan || 0})`], ["cho_tra", `Chờ thanh toán (${x.dem.cho_tra || 0})`],
+        ["da_huy", `Đã hủy (${x.dem.da_huy || 0})`], ["", "Tất cả"]] as const).map(([k, t]) =>
+        <button key={k} className={`act ${loc === k ? "teal" : "grey"}`} onClick={() => setLoc(k)}>{t}</button>)}</div>
+    <p className="muted" style={{ margin: "0 0 8px" }}>Đơn khách đã trả 100%. Điều hành gọi khách sạn chốt phòng trong 2 giờ làm việc rồi nhập mã xác nhận của khách sạn — khách nhận phiếu ngay.
+      Khách sạn không giữ được phòng → bấm «KS hết phòng»: đơn hủy, hoàn 100% qua Sales → Kế toán.</p>
+    <div style={{ overflowX: "auto" }}><table><thead><tr><th>Mã · khách</th><th>Khách sạn · phòng</th><th>Ngày ở</th><th>Tiền</th><th>Trạng thái</th><th>Việc</th></tr></thead>
+      <tbody>{x.don.map((d: any) => <tr key={d.id}><DongDon d={d} />
+        <td><Tag cls={MAU_DON[d.trang_thai]}>{d.trang_thai_ten}</Tag>
+          {d.trang_thai === "da_tra" && <div style={{ color: d.qua_han_chot ? "#ff8a9a" : undefined, fontWeight: d.qua_han_chot ? 700 : 400 }}>{d.qua_han_chot ? "Quá hạn chốt" : "Hạn chốt"} {gio(d.han_chot)}</div>}
+          {d.trang_thai === "da_xac_nhan" && <div className="muted">mã KS {d.ma_xac_nhan_ks} · {d.xac_nhan_boi}</div>}
+          {d.trang_thai === "da_huy" && <div className="muted">{d.ly_do_huy}{d.so_hoan ? ` · hoàn ${tien(d.so_hoan)} (${d.hoan_tt_ten || "xong"})` : ""}</div>}
+          {d.yeu_cau && <div className="muted">Yêu cầu: {d.yeu_cau}</div>}</td>
+        <td style={{ minWidth: 230 }}>{x.vai.dh && ["da_tra"].includes(d.trang_thai) && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label>Mã xác nhận của khách sạn<input value={v(d.id).ma} onChange={(e) => setO({ ...o, [d.id]: { ...v(d.id), ma: e.target.value } })} /></label>
+          <button className="act teal" disabled={busy || v(d.id).ma.trim().length < 3} onClick={() => goi(`/khach-san-vtd/don/${d.id}/xac-nhan`, { ma_ks: v(d.id).ma })}>Đã xác nhận → gửi phiếu</button></div>}
+          {x.vai.dh && ["da_tra", "da_xac_nhan"].includes(d.trang_thai) && <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
+            <label>Lý do (khi khách sạn hết phòng)<input value={v(d.id).ly} onChange={(e) => setO({ ...o, [d.id]: { ...v(d.id), ly: e.target.value } })} placeholder="KS báo hết Deluxe ngày 6/11" /></label>
+            <button className="act grey" style={{ color: "#ffb4bf" }} disabled={busy || v(d.id).ly.trim().length < 5} onClick={() => goi(`/khach-san-vtd/don/${d.id}/het-phong`, { ly_do: v(d.id).ly })}>KS hết phòng → hoàn 100%</button></div>}
+          {x.vai.mien_phat && d.trang_thai === "da_huy" && d.giu_lai > 0 && d.hoa_hong === null && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label>Lý do miễn phạt<input value={v(d.id).ly} onChange={(e) => setO({ ...o, [d.id]: { ...v(d.id), ly: e.target.value } })} /></label>
+            <button className="act grey" disabled={busy || v(d.id).ly.trim().length < 5} onClick={() => goi(`/khach-san-vtd/don/${d.id}/mien-phat`, { ly_do: v(d.id).ly })}>Miễn phạt · hoàn đủ {tien(d.da_tra)}</button></div>}
+        </td></tr>)}
+        {!x.don.length && <tr><td colSpan={6} className="muted">Không có đơn.</td></tr>}</tbody></table></div>
+  </section>;
+}
+
+function TienHoan({ toast }: { toast: (m: string, l?: boolean) => void }) {
+  const [x, setX] = useState<any>(null);
+  const [o, setO] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => { api<any>("/khach-san-vtd/don/tien").then(setX).catch((e) => toast(errMsg(e), true)); }, [toast]);
+  useEffect(() => { load(); }, [load]);
+  const goi = async (path: string, json: any) => {
+    setBusy(true);
+    try { const r = await api<any>(path, { method: "POST", json }); toast(r?.message || "Đã lưu"); load(); } catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
+  };
+  if (!x) return <p className="muted">Đang tải…</p>;
+  const nhap = (k: string, ph = "", so = false) => <input value={o[k] || ""} placeholder={ph} inputMode={so ? "numeric" : undefined}
+    onChange={(e) => setO({ ...o, [k]: so ? e.target.value.replace(/\D/g, "") : e.target.value })} style={{ minWidth: 150 }} />;
+  const kt = x.vai.kt, sales = x.vai.sales;
+  return <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <p className="muted" style={{ margin: 0 }}>Tiền phòng khách sạn VTD là tiền THU HỘ khách sạn (như đặt bàn DT-3): tiền vào Nợ 1121 / Có 3388, phí thẻ 6428, hoàn Nợ 3388 / Có 1121.
+      Doanh thu Vietourist là hoa hồng Kế toán gõ theo hợp đồng sau khi khách trả phòng; phần còn lại trả khách sạn qua đề nghị chi NCC. Không ô nào gõ số tiền khách trả / số hoàn.</p>
+    <section className="panel" style={{ margin: 0 }}><h3 style={{ marginTop: 0 }}>1 · Tiền vào chờ ghi sổ ({x.tien_cho.length})</h3>
+      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Đơn</th><th>Cách trả</th><th>Số tiền</th><th>Trạng thái</th><th>Việc</th></tr></thead>
+        <tbody>{x.tien_cho.map((t: any) => <tr key={t.id}><td><b>{t.ma}</b></td><td>{t.kenh_ten}{t.so_gd_cong ? ` · GD ${t.so_gd_cong}` : ""}</td><td>₫ {tien(t.so_tien)}</td><td>{t.trang_thai_ten}<div className="muted">{gio(t.luc)}</div></td>
+          <td>{kt && (t.trang_thai === "tu_khop" ? <button className="act teal" disabled={busy} onClick={() => goi(`/khach-san-vtd/don/tt/${t.id}/xac-nhan`, {})}>Xác nhận · ghi sổ</button>
+            : <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}><label>Phí thẻ theo sao kê{nhap(`phi${t.id}`, "0", true)}</label>
+              <button className="act teal" disabled={busy || o[`phi${t.id}`] === undefined || o[`phi${t.id}`] === ""} onClick={() => goi(`/khach-san-vtd/don/tt/${t.id}/doi-soat`, { phi: Number(o[`phi${t.id}`]) })}>Đối soát</button></span>)}</td></tr>)}
+          {!x.tien_cho.length && <tr><td colSpan={5} className="muted">Không có khoản chờ.</td></tr>}</tbody></table></div>
+      {kt && <><h3>Giao dịch có mã đặt phòng chưa khớp ({x.giao_dich_cho.length})</h3>
+        <div style={{ overflowX: "auto" }}><table><thead><tr><th>Lúc</th><th>Nội dung</th><th>Số tiền</th><th>Đơn</th><th>Việc</th></tr></thead>
+          <tbody>{x.giao_dich_cho.map((g: any) => <tr key={g.txn_id}><td>{gio(g.luc)}</td><td>{g.noi_dung}<div className="muted">{g.ghi_chu}</div></td><td>₫ {tien(g.so_tien)}</td>
+            <td><b>{g.ma}</b><div className="muted">{g.trang_thai_ten}{g.con_phai_tra != null ? ` · còn phải trả ${tien(g.con_phai_tra)}` : ""}</div></td>
+            <td>{g.don_id && <button className="act teal" disabled={busy} onClick={() => goi(`/khach-san-vtd/don/${g.don_id}/gan-qr`, { txn_id: g.txn_id })}>Gán vào đơn · ghi sổ</button>}</td></tr>)}
+            {!x.giao_dich_cho.length && <tr><td colSpan={5} className="muted">Không có giao dịch chờ.</td></tr>}</tbody></table></div></>}
+      {x.thieu.length > 0 && <><h3>Đơn có tiền nhưng chưa đủ / đã hết giờ giữ ({x.thieu.length})</h3>
+        <table><tbody>{x.thieu.map((d: any) => <tr key={d.id}><DongDon d={d} /><td>{kt && <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>{nhap(`cv${d.id}`, "Lý do")}
+          <button className="act grey" disabled={busy || (o[`cv${d.id}`] || "").trim().length < 5} onClick={() => goi(`/khach-san-vtd/don/${d.id}/chuyen-hoan`, { ly_do: o[`cv${d.id}`] })}>Hủy · hoàn đủ {tien(d.da_tra)}</button></span>}</td></tr>)}</tbody></table></>}
+    </section>
+    <section className="panel" style={{ margin: 0 }}><h3 style={{ marginTop: 0 }}>2 · Hoàn tiền — Sales xác nhận → Kế toán chuyển ({x.hoan.length})</h3>
+      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Mã · khách</th><th>Khách sạn</th><th>Ngày ở</th><th>Tiền</th><th>Lý do · số hoàn</th><th>Việc</th></tr></thead>
+        <tbody>{x.hoan.map((d: any) => <tr key={d.id}><DongDon d={d} /><td>{d.ly_do_huy}<div><b>Hoàn ₫ {tien(d.so_hoan - d.da_hoan_tien)}</b> · <Tag cls="warn">{d.hoan_tt_ten}</Tag></div>
+          {d.hoan_ghi_chu && <div className="muted" style={{ whiteSpace: "pre-line" }}>{d.hoan_ghi_chu}</div>}</td>
+          <td>{d.hoan_tt === "cho_sales" && (sales ? <button className="act teal" disabled={busy} onClick={() => goi(`/khach-san-vtd/don/${d.id}/sales-hoan`, {})}>Xác nhận số hoàn</button> : <span className="muted">chờ Sales</span>)}
+            {d.hoan_tt === "cho_chi" && (kt ? <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>{nhap(`ct${d.id}`, "Số UNC / mã hoàn OnePay")}
+              <button className="act teal" disabled={busy || (o[`ct${d.id}`] || "").trim().length < 3} onClick={() => goi(`/khach-san-vtd/don/${d.id}/da-hoan`, { ghi_chu: o[`ct${d.id}`] })}>Đã hoàn · ghi sổ</button></span> : <span className="muted">chờ Kế toán</span>)}</td></tr>)}
+          {!x.hoan.length && <tr><td colSpan={6} className="muted">Không có khoản hoàn chờ.</td></tr>}</tbody></table></div></section>
+    <section className="panel" style={{ margin: 0 }}><h3 style={{ marginTop: 0 }}>3 · Sau khi khách trả phòng — chốt hoa hồng ({x.cho_chot.length})</h3>
+      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Mã · khách</th><th>Khách sạn</th><th>Ngày ở</th><th>Tiền</th><th>Giữ lại</th><th>Hoa hồng theo hợp đồng</th></tr></thead>
+        <tbody>{x.cho_chot.map((d: any) => { const giu = d.da_tra - d.so_hoan; return <tr key={d.id}><DongDon d={d} /><td>₫ {tien(giu)}{d.trang_thai === "da_huy" ? <div className="muted">đơn hủy, giữ theo gói</div> : null}</td>
+          <td>{kt ? <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>{nhap(`hh${d.id}`, "số tiền", true)}
+            <button className="act teal" disabled={busy || !o[`hh${d.id}`]} onClick={() => goi(`/khach-san-vtd/don/${d.id}/chot`, { hoa_hong: Number(o[`hh${d.id}`]) })}>Chốt</button>
+            {o[`hh${d.id}`] ? <span className="muted">→ trả khách sạn ₫ {tien(giu - Number(o[`hh${d.id}`]))}</span> : null}</span> : <span className="muted">Kế toán chốt</span>}</td></tr>; })}
+          {!x.cho_chot.length && <tr><td colSpan={6} className="muted">Không có đơn chờ chốt.</td></tr>}</tbody></table></div>
+      <h3>Phải trả từng khách sạn (đã chốt)</h3>
+      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Khách sạn</th><th>Số đơn</th><th>Tiền giữ lại</th><th>Hoa hồng VTD</th><th>Phải trả khách sạn</th></tr></thead>
+        <tbody>{x.phai_tra_ks.map((k: any) => <tr key={k.ma}><td><b>{k.khach_san}</b><div className="muted">{k.ma}</div></td><td>{k.so_don}</td><td>₫ {tien(k.giu_lai)}</td><td>₫ {tien(k.hoa_hong)}</td><td><b>₫ {tien(k.phai_tra)}</b></td></tr>)}
+          {!x.phai_tra_ks.length && <tr><td colSpan={5} className="muted">Chưa có đơn đã chốt.</td></tr>}</tbody></table></div>
+      <p className="muted" style={{ fontSize: 12 }}>Lập đề nghị chi NCC cho khoản «Phải trả khách sạn» ở màn Đề nghị chi như mọi khoản trả nhà cung cấp (Giám đốc duyệt chi).</p></section>
+  </div>;
+}
 export default function Page() { return <Shell><Trang /></Shell>; }

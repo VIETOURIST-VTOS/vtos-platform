@@ -110,6 +110,8 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
   const [dv, setDv] = useState<DV>("tour");
   // DT-2: quay về từ trang thẻ OnePay (?dat_ban=…) → mở thẳng Ưu đãi · Nhà hàng, nơi có «Đặt bàn của tôi».
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get("dat_ban")) { setTab("perks"); setDv("nha_hang"); } } catch { /* bỏ qua */ } }, []);
+  // KS-14: quay về từ trang thẻ OnePay (?ks_vtd=…) → mở thẳng Ưu đãi › Khách sạn.
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get("ks_vtd") !== null) { setTab("perks"); setDv("khach_san"); } } catch { /* bỏ qua */ } }, []);
   const [sh, setSh] = useState<any>(null);
   const [quyen, setQuyen] = useState<any[] | null>(null);
   const [xm, setXm] = useState<{ noi_dung: string; tep: File | null }>({ noi_dung: "", tep: null });

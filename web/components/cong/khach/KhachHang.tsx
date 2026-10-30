@@ -16,7 +16,7 @@ import DatBanCuaToi from "../DatBanCuaToi";
 import { useDiem, DiemUuDai, HangThanhVien, YeuThich } from "./RewardsKhach";
 import { DanhGiaKhach, GopYKhach, HoTroKhach } from "./ChamSocKhach";
 import KhachSanOta from "../KhachSanOta";
-import KhachSanVtd from "../KhachSanVtd";
+import KhachSanVtd, { PhongCuaToi } from "../KhachSanVtd";
 import VeMayBayOta from "../VeMayBayOta";
 
 type Tab = "home" | "deals" | "tour" | "request" | "bookings" | "booking" | "rewards" | "tier" | "favorites" | "reviews" | "feedback" | "support" | "profile";
@@ -80,6 +80,8 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
   const [home, setHome] = useState<any>(null);
   const [ds, setDs] = useState<any>(null);
   const [dv, setDv] = useState<"tour" | "nha_hang" | "khach_san" | "ve_may_bay">("tour");
+  // KS-14: quay về từ trang thẻ OnePay (?ks_vtd=…) → mở thẳng Đặt dịch vụ › Khách sạn, nơi có trang đơn.
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get("ks_vtd") !== null) { setTab("deals"); setDv("khach_san"); } } catch { /* bỏ qua */ } }, []);
   const [loc, setLoc] = useState({ q: "", tu_ngay: "", noi: "", ngan_sach: "", nhom: "" });
   const [tourMo, setTourMo] = useState<any>(null);
   const [loaiYc, setLoaiYc] = useState<"tour" | "tour_doan">("tour");
@@ -261,6 +263,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
               : <p>Chưa có đơn nào gắn với {lienHe}. Đơn hiện ở đây khi số điện thoại hoặc email trên booking trùng liên hệ bạn đã xác thực.</p>}
           </section>
           <DatBanCuaToi />
+          <PhongCuaToi />
           <section className="v3-panel"><div className="v3-section-title"><h3>Yêu cầu đã gửi</h3></div>
             {don?.yeu_cau?.length ? <div className="v3-table-wrap"><table>
               <thead><tr><th scope="col">Yêu cầu</th><th scope="col">Số khách</th><th scope="col">Gửi lúc</th><th scope="col">Trạng thái</th></tr></thead>

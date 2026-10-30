@@ -19,6 +19,7 @@ TOAN_QUYEN = ("chutich", "tgd")
 VAI_NHAP = ("tp_dh", "nv_dh") + TOAN_QUYEN
 VAI_DUYET = ("tp_dh",) + TOAN_QUYEN
 VAI_XEM = tuple(dict.fromkeys(VAI_NHAP + ("bks", "robot_ks", "gd_kd", "tp_kd", "nv_mkt", "ptgd_mkt")))
+VAI_XEM = tuple(dict.fromkeys(VAI_XEM + ("ketoan", "tn_kd", "nv_kd", "sales_admin")))   # KS-14: Kế toán, Sales đọc danh mục để xử lý đơn
 ANH_TOI_DA = 80
 DEM_TOI_DA = 30
 NGAY_CUOI_TUAN = (4, 5)       # đêm thứ Sáu, thứ Bảy
@@ -618,6 +619,8 @@ def _phong_ban_duoc(db: Session, kids: list[int], vao: date, ra: date, nl: int, 
                      .order_by(LoaiPhongVtd.thu_tu, LoaiPhongVtd.id)).scalars().all()
     goi = _goi_cua(db, [x.id for x in lps])
     mua = _mua_cua(db, [g.id for v in goi.values() for g in v])
+    from app.services import don_ks_vtd as KV   # KS-14: số phòng còn bán cho cả kỳ ở
+    con = KV.con_phong(db, lps, vao, ra)
     can_nl, can_te = math.ceil(nl / max(1, so_phong)), math.ceil(te / max(1, so_phong))
     ra_: dict[int, list] = {}
     for x in lps:
@@ -631,17 +634,18 @@ def _phong_ban_duoc(db: Session, kids: list[int], vao: date, ra: date, nl: int, 
             hh = han_huy(g, vao)
             gs.append({"id": g.id, "ten": g.ten, "bua_sang": g.bua_sang, "huy_truoc_ngay": g.huy_truoc_ngay,
                        "huy_han": hh.isoformat() if hh else None, "mien_phi_huy": g.huy_truoc_ngay is not None,
-                       **p, "con": x.so_phong})
+                       **p, "con": con.get(x.id, 0)})
         gs.sort(key=lambda o: o["tong"])
         ra_.setdefault(x.khach_san_id, []).append({
             "id": x.id, "ten": x.ten, "dien_tich": x.dien_tich, "giuong": x.giuong, "mo_ta": x.mo_ta,
             "toi_da_nguoi_lon": x.toi_da_nguoi_lon, "toi_da_tre_em": x.toi_da_tre_em, "so_phong": x.so_phong,
-            "vua": can_nl <= x.toi_da_nguoi_lon and can_te <= x.toi_da_tre_em, "goi": gs})
+            "vua": can_nl <= x.toi_da_nguoi_lon and can_te <= x.toi_da_tre_em, "goi": gs, "con": con.get(x.id, 0)})
     return ra_
 
 
 def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict]) -> dict:
-    goi = [g for p in phong if p["vua"] for g in p["goi"]]
+    co_gia = [g for p in phong if p["vua"] for g in p["goi"]]
+    goi = [g for p in phong if p["vua"] and p.get("con", 1) > 0 for g in p["goi"]]   # KS-14: bỏ loại phòng đã hết
     re_nhat = min(goi, key=lambda g: g["gia_dem"]) if goi else None
     return {"id": k.id, "ten": k.ten, "sao": k.sao, "loai": k.loai, "loai_ten": LOAI_CHO_O.get(k.loai, k.loai),
             "tinh_thanh": k.tinh_thanh, "khu_vuc": k.khu_vuc, "km_trung_tam": k.km_trung_tam, "gan": k.gan,
@@ -652,6 +656,7 @@ def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict]) -> d
                         "mien_phi_huy": re_nhat["mien_phi_huy"]} if re_nhat else None),
             "co_mien_phi_huy": any(g["mien_phi_huy"] for g in goi), "co_bua_sang": any(g["bua_sang"] for g in goi),
             "thue_phi_pt": k.thue_phi_pt,
+            "het_phong": bool(co_gia) and not goi,
             # KS-14: điểm đánh giá của khách đã ở. Chưa có đơn đặt nên chưa có bài nào.
             "danh_gia": {"so_bai": 0, "diem_tb": None}}
 
