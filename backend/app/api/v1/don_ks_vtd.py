@@ -49,6 +49,7 @@ class DatIn(BaseModel):
     email: str = ""
     yeu_cau: str = ""
     dong_y: bool = False
+    ma_voucher: str = ""            # KS-16: voucher VTD Rewards khách tự nhập (tối đa 5% đơn)
 
 
 @router_cong.get("")
@@ -63,6 +64,23 @@ def dat(kid: int, data: DatIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db:
     d = _goi(S.dat, db, tk, kid, data.model_dump())
     db.commit()
     return {"don": S.ra_khach(db, d), "message": f"Đã giữ phòng {S.GIU_PHUT} phút — thanh toán để hoàn tất"}
+
+
+class KiemVoucherIn(BaseModel):
+    ma: str
+    tong: int
+
+
+@router_cong.post("/kiem-voucher")
+def kiem_voucher(data: KiemVoucherIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    """KS-16: nút «Áp dụng» ở bước thanh toán — chỉ kiểm, chưa giữ voucher (giữ khi bấm Đặt và thanh toán)."""
+    from app.services import rewards as RW
+    _khach(tk)
+    try:
+        v = RW.kiem_voucher_ks(db, tk, data.ma, max(0, int(data.tong)))
+    except RW.LoiDiem as ex:
+        raise HTTPException(400, str(ex))
+    return {"ma": v.ma, "gia_tri": int(v.gia_tri), "tran": int(int(data.tong) * RW.TRAN_VOUCHER)}
 
 
 @router_cong.get("/{ma}")

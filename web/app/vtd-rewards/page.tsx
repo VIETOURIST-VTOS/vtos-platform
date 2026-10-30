@@ -49,6 +49,9 @@ function Trang() {
           <p>Khả dụng <b>{d(kq.kha_dung)}</b> điểm · đang giữ {d(kq.dang_giu)}</p>
           {kq.voucher.length > 0 && <div className="panel wrap"><table><thead><tr><th>Voucher chưa dùng</th><th className="num">Giá trị</th><th>Hạn</th></tr></thead>
             <tbody>{kq.voucher.map((x: any) => <tr key={x.ma}><td className="mono">{x.ma}</td><td className="num">{d(x.gia_tri)} đ</td><td>{x.han_dung.split("-").reverse().join("/")}</td></tr>)}</tbody></table></div>}
+          {kq.khoan?.length > 0 && <div className="panel wrap"><table><thead><tr><th>Khoản</th><th>Loại</th><th className="num">Giá trị tính điểm</th><th>Trạng thái</th><th className="num">Điểm</th></tr></thead>
+            <tbody>{kq.khoan.map((x: any) => <tr key={x.loai + x.ma}><td className="mono">{x.ma}</td><td>{x.loai}</td><td className="num">{x.du_dieu_kien ? `${d(x.co_so)} đ` : "—"}</td>
+              <td>{x.huy ? "Đã hủy" : x.du_dieu_kien ? "Đủ điều kiện" : "Chưa đủ điều kiện (chưa xong / chưa chốt)"}</td><td className="num">{x.diem ? (x.diem > 0 ? "+" : "") + d(x.diem) : "chưa cộng"}</td></tr>)}</tbody></table></div>}
         </>}
       </section>
     </div>

@@ -106,6 +106,9 @@ NGHIEP_VU: dict[str, tuple[str, str]] = {
     "tra_goc_vay":              ("Trả gốc khoản vay (chân trả của đáo hạn)",           "PKT"),
     "nhan_giai_ngan_vay":       ("Nhận giải ngân khoản vay (chân nhận của đáo hạn)",   "PKT"),
     "khe_uoc_tai_chinh":        ("Khế ước tài chính khác – đầu tư, ký quỹ, đặt cọc",   "PKT"),
+    # KS-16 (30/10/2026): khách dùng voucher VTD Rewards trên đơn thu hộ khách sạn — Vietourist chịu phần giảm,
+    # khách sạn vẫn nhận đủ: Nợ 641 / Có 3388 lúc Kế toán chốt đơn.
+    "khuyen_mai_rewards":       ("Voucher VTD Rewards – Vietourist chịu thay khách",   "PKT"),
 }
 
 # ════════════════════════════════════════════════════════════════════════════════════════════════

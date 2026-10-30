@@ -295,14 +295,16 @@ def anh_vtos(pid: int, co: str, u: User = Depends(require_roles(*S.VAI_XEM)), db
 def tim(tinh: str = "", vao: str = "", ra: str = "", nguoi_lon: int = 2, tre_em: int = 0, so_phong: int = 1,
         tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach(tk)
-    return _goi(S.tim, db, tinh, vao, ra, nguoi_lon, tre_em, so_phong)
+    from app.services import rewards as RW
+    return {**_goi(S.tim, db, tinh, vao, ra, nguoi_lon, tre_em, so_phong), "diem": RW.he_so_cua(db, tk)}   # KS-16
 
 
 @router_cong.get("/{kid:int}")
 def chi_tiet(kid: int, vao: str = "", ra: str = "", nguoi_lon: int = 2, tre_em: int = 0, so_phong: int = 1,
              tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach(tk)
-    return _goi(S.chi_tiet_cong, db, kid, vao, ra, nguoi_lon, tre_em, so_phong)
+    from app.services import rewards as RW
+    return {**_goi(S.chi_tiet_cong, db, kid, vao, ra, nguoi_lon, tre_em, so_phong), "diem": RW.he_so_cua(db, tk)}   # KS-16
 
 
 class ChonIn(BaseModel):

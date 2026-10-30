@@ -27,6 +27,8 @@ class SoDiem(Base):
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True, index=True)
     # AT-1c (Chủ tịch 28/10/2026): điểm từ đơn đặt bàn nhà hàng qua Vietourist — tính như tour
     dat_ban_id: Mapped[int | None] = mapped_column(ForeignKey("don_dat_ban.id"), nullable=True, index=True)
+    # KS-16 (Chủ tịch 30/10/2026): đơn khách sạn VTD tích điểm như tour
+    don_ks_id: Mapped[int | None] = mapped_column(ForeignKey("don_ks_vtd.id"), nullable=True, index=True)
     voucher_id: Mapped[int | None] = mapped_column(ForeignKey("voucher_rewards.id"), nullable=True)
     het_han: Mapped[date | None] = mapped_column(Date, nullable=True)    # chỉ dòng cộng (CONG, TRA_GIU)
     co_so: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # B đủ điều kiện lúc tính
@@ -47,6 +49,7 @@ class VoucherRewards(Base):
     han_diem_goc: Mapped[date | None] = mapped_column(Date, nullable=True)
     trang_thai: Mapped[str] = mapped_column(String(10), default="cho_dung")
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True)
+    don_ks_id: Mapped[int | None] = mapped_column(ForeignKey("don_ks_vtd.id"), nullable=True)   # KS-16: khách tự áp
     ap_boi: Mapped[str] = mapped_column(String(50), default="")
     ap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
