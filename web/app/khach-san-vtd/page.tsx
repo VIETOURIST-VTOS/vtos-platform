@@ -368,7 +368,8 @@ function DongDon({ d }: { d: any }) {
   return <><td><b>{d.ma}</b><div className="muted">{d.ho_ten} · {d.lien_he}</div></td>
     <td>{d.khach_san?.ten}<div className="muted">{d.dong.map((x: any) => `${x.so} × ${x.loai_phong} · ${x.goi}`).join("; ")}</div></td>
     <td style={{ whiteSpace: "nowrap" }}>{dm(d.vao)} – {dm(d.ra)}<div className="muted">{d.dem} đêm · {d.nguoi_lon} NL{d.tre_em ? ` + ${d.tre_em} TE` : ""}</div></td>
-    <td style={{ whiteSpace: "nowrap" }}>₫ {tien(d.tong)}<div className="muted">đã trả {tien(d.da_tra)}{d.thanh_toan?.length ? ` · ${d.thanh_toan.map((t: any) => t.kenh === "qr" ? "QR" : "thẻ").join(", ")}` : ""}</div></td></>;
+    <td style={{ whiteSpace: "nowrap" }}>₫ {tien(d.tong)}<div className="muted">đã trả {tien(d.da_tra)}{d.thanh_toan?.length ? ` · ${d.thanh_toan.map((t: any) => t.kenh === "qr" ? "QR" : "thẻ").join(", ")}` : ""}</div>
+      {d.giam_voucher > 0 && <div className="muted" style={{ color: "#ffcf7a" }}>voucher {d.voucher?.ma} −{tien(d.giam_voucher)}{d.voucher?.trang_thai === "da_hoan" ? " · đã trả điểm" : " · VTD chịu"}</div>}</td></>;
 }
 
 function DonDat({ toast }: { toast: (m: string, l?: boolean) => void }) {
@@ -456,15 +457,15 @@ function TienHoan({ toast }: { toast: (m: string, l?: boolean) => void }) {
           {!x.hoan.length && <tr><td colSpan={6} className="muted">Không có khoản hoàn chờ.</td></tr>}</tbody></table></div></section>
     <section className="panel" style={{ margin: 0 }}><h3 style={{ marginTop: 0 }}>3 · Sau khi khách trả phòng — chốt hoa hồng ({x.cho_chot.length})</h3>
       <div style={{ overflowX: "auto" }}><table><thead><tr><th>Mã · khách</th><th>Khách sạn</th><th>Ngày ở</th><th>Tiền</th><th>Giữ lại</th><th>Hoa hồng theo hợp đồng</th></tr></thead>
-        <tbody>{x.cho_chot.map((d: any) => { const giu = d.da_tra - d.so_hoan; return <tr key={d.id}><DongDon d={d} /><td>₫ {tien(giu)}{d.trang_thai === "da_huy" ? <div className="muted">đơn hủy, giữ theo gói</div> : null}</td>
+        <tbody>{x.cho_chot.map((d: any) => { const giu = d.da_tra - d.so_hoan + (d.khuyen_mai || 0); return <tr key={d.id}><DongDon d={d} /><td>₫ {tien(giu)}{d.khuyen_mai > 0 ? <div className="muted">gồm voucher VTD chịu {tien(d.khuyen_mai)} — chốt ghi Nợ 641 / Có 3388</div> : null}{d.trang_thai === "da_huy" ? <div className="muted">đơn hủy, giữ theo gói</div> : null}</td>
           <td>{kt ? <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>{nhap(`hh${d.id}`, "số tiền", true)}
             <button className="act teal" disabled={busy || !o[`hh${d.id}`]} onClick={() => goi(`/khach-san-vtd/don/${d.id}/chot`, { hoa_hong: Number(o[`hh${d.id}`]) })}>Chốt</button>
             {o[`hh${d.id}`] ? <span className="muted">→ trả khách sạn ₫ {tien(giu - Number(o[`hh${d.id}`]))}</span> : null}</span> : <span className="muted">Kế toán chốt</span>}</td></tr>; })}
           {!x.cho_chot.length && <tr><td colSpan={6} className="muted">Không có đơn chờ chốt.</td></tr>}</tbody></table></div>
       <h3>Phải trả từng khách sạn (đã chốt)</h3>
-      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Khách sạn</th><th>Số đơn</th><th>Tiền giữ lại</th><th>Hoa hồng VTD</th><th>Phải trả khách sạn</th></tr></thead>
-        <tbody>{x.phai_tra_ks.map((k: any) => <tr key={k.ma}><td><b>{k.khach_san}</b><div className="muted">{k.ma}</div></td><td>{k.so_don}</td><td>₫ {tien(k.giu_lai)}</td><td>₫ {tien(k.hoa_hong)}</td><td><b>₫ {tien(k.phai_tra)}</b></td></tr>)}
-          {!x.phai_tra_ks.length && <tr><td colSpan={5} className="muted">Chưa có đơn đã chốt.</td></tr>}</tbody></table></div>
+      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Khách sạn</th><th>Số đơn</th><th>Tiền giữ lại</th><th>Voucher VTD chịu</th><th>Hoa hồng VTD</th><th>Phải trả khách sạn</th></tr></thead>
+        <tbody>{x.phai_tra_ks.map((k: any) => <tr key={k.ma}><td><b>{k.khach_san}</b><div className="muted">{k.ma}</div></td><td>{k.so_don}</td><td>₫ {tien(k.giu_lai)}</td><td>₫ {tien(k.khuyen_mai || 0)}</td><td>₫ {tien(k.hoa_hong)}</td><td><b>₫ {tien(k.phai_tra)}</b></td></tr>)}
+          {!x.phai_tra_ks.length && <tr><td colSpan={6} className="muted">Chưa có đơn đã chốt.</td></tr>}</tbody></table></div>
       <p className="muted" style={{ fontSize: 12 }}>Lập đề nghị chi NCC cho khoản «Phải trả khách sạn» ở màn Đề nghị chi như mọi khoản trả nhà cung cấp (Giám đốc duyệt chi).</p></section>
   </div>;
 }

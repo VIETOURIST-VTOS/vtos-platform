@@ -91,6 +91,11 @@ class DonKsVtd(Base):
     chot_boi: Mapped[str] = mapped_column(String(50), default="")
     chot_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    # KS-16 (Chủ tịch duyệt 30/10/2026): khách tự nhập voucher VTD Rewards lúc đặt — tối đa 5% đơn, VTD chịu.
+    # `tong` = số khách phải trả (đã trừ voucher); khách sạn vẫn nhận như không có voucher.
+    voucher_id: Mapped[int | None] = mapped_column(Integer, nullable=True)   # voucher_rewards.id (khoá ngoại ở phía voucher)
+    giam_voucher: Mapped[float] = mapped_column(TIEN, default=0)
+    km_but_toan: Mapped[str] = mapped_column(String(30), default="")   # bút toán Nợ 641 / Có 3388 lúc chốt
 
 
 class ThanhToanKsVtd(Base):

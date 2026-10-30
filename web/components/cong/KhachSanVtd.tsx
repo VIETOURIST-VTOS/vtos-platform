@@ -55,6 +55,9 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
   const [lamMoi, setLamMoi] = useState(0);
   const [don, setDon] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [vc, setVc] = useState<{ ma: string; ap: any; loi: string }>({ ma: "", ap: null, loi: "" });   // KS-16
+  const diem = ks?.diem || ds?.diem;
+  const duKien = (tien: number) => diem?.dang_bat && tien > 0 ? Math.floor(tien / (diem.dong_moi_diem || 10000) * diem.he_so) : 0;
   const dem = Math.max(1, Math.round((new Date(q.ra).getTime() - new Date(q.vao).getTime()) / 864e5));
 
   const tim = async (qq: Q = q) => {
@@ -130,6 +133,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     setLoi(""); setBusy(true);
     try {
       setTinh(await goiCong(`/ks-vtd/${ks.id}/tinh`, { vao: q.vao, ra: q.ra, chon: dongChon.map((x: any) => ({ goi_id: x.g.id, so: x.n })) }));
+      setVc({ ma: "", ap: null, loi: "" });
       setBuoc("gui"); window.scrollTo(0, 0);
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
@@ -147,6 +151,14 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
 
+  const apVoucher = async () => {
+    if (!vc.ma.trim()) { setVc({ ...vc, loi: "Ghi mã voucher" }); return; }
+    setBusy(true);
+    try { setVc({ ...vc, ap: await goiCong(`/ks-vtd/don/kiem-voucher`, { ma: vc.ma.trim(), tong: tinh.tong }), loi: "" }); }
+    catch (x: any) { setVc({ ...vc, ap: null, loi: x.message }); } finally { setBusy(false); }
+  };
+  const giam = vc.ap?.gia_tri || 0;
+
   const datNgay = async () => {
     if (kh.ten.trim().split(/\s+/).length < 2) { setLoi("Ghi đủ họ và tên khách nhận phòng"); return; }
     if (kh.lien_he.replace(/\D/g, "").length < 9) { setLoi("Ghi số điện thoại / Zalo để Vietourist báo xác nhận"); return; }
@@ -156,7 +168,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     try {
       const r = await goiCong(`/ks-vtd/don/dat/${ks.id}`, { vao: q.vao, ra: q.ra, nguoi_lon: q.nl, tre_em: q.te,
         chon: dongChon.map((x: any) => ({ goi_id: x.g.id, so: x.n })), ho_ten: kh.ten, lien_he: kh.lien_he, email: kh.email,
-        yeu_cau: [kh.yc.join(", "), kh.ghi].filter(Boolean).join(" · "), dong_y: kh.dongy });
+        yeu_cau: [kh.yc.join(", "), kh.ghi].filter(Boolean).join(" · "), dong_y: kh.dongy, ma_voucher: vc.ap?.ma || "" });
       setDonKs(r.don);
       if (tt === "the") {
         diCongThe(await goiCong(`/ks-vtd/don/${encodeURIComponent(r.don.ma)}/the`, {})); return;
@@ -227,15 +239,23 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
           <small className="ksv-muted">Phòng được giữ 15 phút sau khi bấm thanh toán. Trả đủ 100%; hủy theo chính sách của gói đã chọn.</small></section>
           : <section className="ksv-panel" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 18 }}>Thanh toán</h2>
           <span className="ksv-muted">Vietourist giữ phòng với khách sạn rồi gửi hướng dẫn thanh toán cho bạn. Trang này không nhận số thẻ.</span></section>}
+        {coGia && diem?.dang_bat && <section className="ksv-panel" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 18 }}>Mã voucher VTD Rewards</h2>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <input className="ksv-vc" value={vc.ma} onChange={(e) => setVc({ ma: e.target.value.toUpperCase(), ap: null, loi: "" })} placeholder="VTD-XXXXXX" aria-label="Mã voucher" />
+            {vc.ap ? <button type="button" className="ksv-btn line" onClick={() => setVc({ ma: "", ap: null, loi: "" })}>Bỏ voucher</button>
+              : <button type="button" className="ksv-btn line" disabled={busy} onClick={apVoucher}>Áp dụng</button>}</div>
+          {vc.ap && <span className="ksv-okc">Đã áp {vc.ap.ma} · giảm ₫ {vnd(vc.ap.gia_tri)} (tối đa 5% đơn = ₫ {vnd(vc.ap.tran)})</span>}
+          {vc.loi && <span className="ksv-loi" style={{ padding: "8px 12px" }}>{vc.loi}</span>}
+          <small className="ksv-muted">Đổi điểm lấy voucher ở mục «Điểm VTD Rewards». Hủy đơn được hoàn tiền thì điểm của voucher trả lại.</small></section>}
         {loi && <div className="ksv-loi">{loi}</div>}
         <div className="ksv-panel" style={{ flexDirection: "row", alignItems: "center", gap: 14, flexWrap: "wrap", padding: "16px 20px" }}>
           <label className="ksv-chk" style={{ flex: 1, minWidth: 220, alignItems: "flex-start" }}><input type="checkbox" checked={kh.dongy} onChange={(e) => setKh({ ...kh, dongy: e.target.checked })} />
             <span style={{ fontSize: 13 }}>{coGia ? "Tôi đã đọc và đồng ý chính sách hủy phòng của gói đã chọn và điều kiện đặt phòng của khách sạn và Vietourist."
               : "Tôi đồng ý để Vietourist liên hệ giữ phòng theo thông tin trên. Giá và chính sách hủy theo gói đã chọn."}</span></label>
-          {coGia ? <button type="button" className="ksv-btn" style={{ minHeight: 52, padding: "0 28px", fontSize: 16 }} disabled={busy} onClick={datNgay}>Thanh toán ₫ {vnd(tinh.tong)}</button>
+          {coGia ? <button type="button" className="ksv-btn" style={{ minHeight: 52, padding: "0 28px", fontSize: 16 }} disabled={busy} onClick={datNgay}>Thanh toán ₫ {vnd(tinh.tong - giam)}</button>
             : <button type="button" className="ksv-btn" style={{ minHeight: 52, padding: "0 28px", fontSize: 16 }} disabled={busy} onClick={gui}>Gửi yêu cầu giữ phòng</button>}</div>
       </div>
-      <TomTat ks={ks} q={q} tinh={tinh} />
+      <TomTat ks={ks} q={q} tinh={tinh} giam={giam} maVc={vc.ap?.ma} hang={diem?.dang_bat ? diem : null} diemDk={duKien(tinh.tong - giam)} />
     </div></div>;
 
   if (buoc === "ks" && ks) return <div className="ksv">{css}
@@ -314,6 +334,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
           <button type="button" className="ksv-btn line" onClick={() => setLoc(LOC0)}>Xóa bộ lọc</button></div>
       </aside>
       <main style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+        {ds.diem?.dang_bat && <div className="ksv-hv">Hội viên <b>{ds.diem.hang}</b> · điểm ×{String(ds.diem.he_so).replace(".", ",")} — mỗi kỳ ở qua Vietourist được tích điểm VTD Rewards</div>}
         <div className="ksv-rhead"><h2 style={{ margin: 0, fontSize: 22 }}>{loc2.length} chỗ ở{q.tinh ? ` tại ${q.tinh}` : ""}</h2>
           <div style={{ display: "flex", gap: 8 }}><button type="button" className="ksv-btn line ksv-fbtn" onClick={() => setMoLoc(true)}>Bộ lọc</button>
             <select className="ksv-sel" value={sx} onChange={(e) => setSx(e.target.value)} aria-label="Sắp xếp">
@@ -344,6 +365,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
                 {g ? <>{g.niem_yet_dem && <span style={{ marginTop: "auto" }}><span className="ksv-old">{vnd(g.niem_yet_dem)}</span> <span className="ksv-pct">-{Math.round((1 - g.gia_dem / g.niem_yet_dem) * 100)}%</span></span>}
                   <span className="ksv-big" style={g.niem_yet_dem ? undefined : { marginTop: "auto" }}><small>₫</small> {vnd(g.gia_dem)}</span><small className="ksv-muted">Mỗi đêm, chưa gồm thuế và phí</small>
                   {k.co_mien_phi_huy && <span className="ksv-free">+ MIỄN PHÍ HỦY</span>}
+                  {duKien(g.gia_dem * dem * q.phong) > 0 && <span className="ksv-diem">+ khoảng {vnd(duKien(g.gia_dem * dem * q.phong))} điểm sau kỳ ở</span>}
                   <button type="button" className="ksv-btn wide" onClick={() => moKs(k.id)}>Chọn phòng</button></>
                   : k.het_phong ? <><b style={{ marginTop: "auto", color: "var(--ksv-price)" }}>Hết phòng ngày này</b><small className="ksv-muted">Đổi ngày để xem phòng trống</small>
                     <button type="button" className="ksv-btn line wide" onClick={() => moKs(k.id)}>Xem khách sạn</button></>
@@ -366,7 +388,8 @@ function TomTatDon({ d }: { d: any }) {
       {d.dong.map((x: any, i: number) => <span key={i}><b>{x.so} × {x.loai_phong}</b> · {x.goi}<br />{x.huy_han ? <span className="ksv-okc">✓ Miễn phí hủy trước {x.huy_han.split("-").reverse().join("/")}</span> : <span className="ksv-muted">Không hoàn tiền</span>}</span>)}
       <span className="ksv-sum"><span>Giá phòng</span><span>₫ {vnd(d.tien_phong)}</span></span>
       <span className="ksv-sum"><span>Thuế và phí</span><span>₫ {vnd(d.thue_phi)}</span></span>
-      <span className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 10, alignItems: "baseline" }}><b style={{ fontSize: 16 }}>Tổng</b><b className="ksv-big" style={{ fontSize: 22 }}>₫ {vnd(d.tong)}</b></span>
+      {d.giam_voucher > 0 && <span className="ksv-sum ksv-okc"><span>Voucher {d.voucher?.ma}{d.voucher?.trang_thai === "da_hoan" ? " · đã trả điểm" : ""}</span><span>− ₫ {vnd(d.giam_voucher)}</span></span>}
+      <span className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 10, alignItems: "baseline" }}><b style={{ fontSize: 16 }}>{d.giam_voucher > 0 ? "Bạn trả" : "Tổng"}</b><b className="ksv-big" style={{ fontSize: 22 }}>₫ {vnd(d.tong)}</b></span>
       {d.da_tra > 0 && <span className="ksv-sum"><span>Đã trả</span><b>₫ {vnd(d.da_tra)}</b></span>}</div></aside>;
 }
 
@@ -514,7 +537,7 @@ export function PhongCuaToi({ gon = false, lamMoi = 0, onMo }: { gon?: boolean; 
           <button type="button" className="ksv-btn line" onClick={() => xem(d)}>{d.co_the_tra ? "Thanh toán" : d.danh_gia?.duoc_viet ? "Viết đánh giá" : "Xem"}</button></div>)}</section>}</div>;
 }
 
-function TomTat({ ks, q, tinh }: { ks: any; q: Q; tinh: any }) {
+function TomTat({ ks, q, tinh, giam = 0, maVc, hang, diemDk = 0 }: { ks: any; q: Q; tinh: any; giam?: number; maVc?: string; hang?: any; diemDk?: number }) {
   return <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
     <div className="ksv-panel" style={{ padding: 0, overflow: "hidden" }}>
       <div style={{ display: "flex", gap: 12, padding: 14 }}>{ks.anh?.[0] ? <img src={ks.anh[0].nho} alt="" style={{ width: 92, height: 76, objectFit: "cover", borderRadius: 8 }} /> : null}
@@ -528,7 +551,9 @@ function TomTat({ ks, q, tinh }: { ks: any; q: Q; tinh: any }) {
           : <span>{tinh.loai_phong ? `Loại phòng: ${tinh.loai_phong} · ` : ""}{q.phong} phòng · {q.nl} người lớn · Vietourist báo giá</span>}</div></div>
     {tinh.tong > 0 && <div className="ksv-panel"><span className="ksv-sum"><span>Giá phòng ({tinh.so_phong} phòng × {tinh.dem} đêm)</span><span>₫ {vnd(tinh.tien_phong)}</span></span>
       <span className="ksv-sum"><span>Thuế và phí ({ks.thue_phi_pt || 0}%)</span><span>₫ {vnd(tinh.thue_phi)}</span></span>
-      <span className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 10, alignItems: "baseline" }}><b style={{ fontSize: 16 }}>Tổng cộng</b><b className="ksv-big" style={{ fontSize: 22 }}>₫ {vnd(tinh.tong)}</b></span>
+      {giam > 0 && <span className="ksv-sum ksv-okc"><span>Voucher {maVc}</span><span>− ₫ {vnd(giam)}</span></span>}
+      <span className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 10, alignItems: "baseline" }}><b style={{ fontSize: 16 }}>{giam > 0 ? "Bạn trả" : "Tổng cộng"}</b><b className="ksv-big" style={{ fontSize: 22 }}>₫ {vnd(tinh.tong - giam)}</b></span>
+      {hang && diemDk > 0 && <span className="ksv-diem-box"><b>+ {vnd(diemDk)} điểm</b> sau khi trả phòng và Vietourist chốt đơn ({vnd(tinh.tong - giam)} ÷ {vnd(hang.dong_moi_diem)} × {String(hang.he_so).replace(".", ",")} hạng {hang.hang}). Kỳ ở này cũng tính vào chi tiêu xét hạng.</span>}
       <small className="ksv-muted">{tinh.dong?.length ? "Đã gồm thuế phí. Giá do máy chủ tính lại lúc giữ phòng. Trả xong, Điều hành chốt với khách sạn trong 2 giờ làm việc — khách sạn hết phòng thì hoàn 100%."
         : "Giá Vietourist tính lúc bạn chọn. Điều hành xác nhận lại với khách sạn trước khi bạn trả tiền."}</small></div>}
   </aside>;
@@ -542,6 +567,10 @@ const CSS = `
 .ksv button{cursor:pointer;font:inherit}
 .ksv :focus-visible{outline:2px solid var(--ksv-accent);outline-offset:2px}
 .ksv-band{background:var(--ksv-band);border-radius:12px;padding:12px}
+.ksv-hv{background:#fff4dc;color:#6d4300;border-radius:10px;padding:10px 14px;font-size:14px}
+.ksv-diem{color:var(--ksv-ok);font-size:12px;font-weight:600}
+.ksv-diem-box{background:var(--ksv-oksoft);color:#14562f;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.5}
+.ksv-vc,#vtd-access .ksv .ksv-vc{flex:1 1 200px;min-height:44px;border:1px solid var(--ksv-line);border-radius:8px;padding:0 12px;font:inherit;background:#fff;color:var(--ksv-fg);text-transform:uppercase}
 .ksv-search{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.4fr) minmax(0,1fr) auto;gap:8px}
 .ksv-sbox{background:#fff;color:#23252c;border-radius:8px;display:flex;align-items:center;gap:10px;padding:6px 12px;min-height:54px;min-width:0}
 .ksv-sbox small{display:block;font-size:11px;color:#5f6472}.ksv-sbox select,.ksv-sbox input,#vtd-access .ksv .ksv-sbox select,#vtd-access .ksv .ksv-sbox input{border:0;background:transparent;font-weight:600;font-size:15px;width:100%;outline:none;padding:0;color:#23252c;min-width:0}
