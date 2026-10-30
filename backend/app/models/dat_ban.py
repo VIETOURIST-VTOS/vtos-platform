@@ -92,6 +92,13 @@ class DonDatBan(Base):
     huy_mien_phi: Mapped[bool] = mapped_column(Boolean, default=False)       # nhà hàng từ chối lịch mới → hủy hoàn đủ
     da_hoan_tien: Mapped[float] = mapped_column(TIEN, default=0)              # tổng đã hoàn (hoàn được nhiều lần)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    # KS-16b (Chủ tịch 30/10/2026): khách tự nhập voucher VTD Rewards ở bước trả trước — trừ vào số phải trả trước
+    # (tối đa 5% tạm tính, không quá số trả trước). `phai_tra_truoc` = phần khách trả bằng tiền; nhà hàng coi như
+    # đã nhận đủ trước. VTD chịu phần voucher (`km_vtd`, ghi Nợ 641 / Có 3388) khi voucher đã dùng hẳn.
+    voucher_id: Mapped[int | None] = mapped_column(Integer, nullable=True)   # voucher_rewards.id (khoá ngoại ở phía voucher)
+    giam_voucher: Mapped[float] = mapped_column(TIEN, default=0)
+    km_vtd: Mapped[float] = mapped_column(TIEN, default=0)
+    km_but_toan: Mapped[str] = mapped_column(String(30), default="")
 
 
 class ThanhToanDatBan(Base):

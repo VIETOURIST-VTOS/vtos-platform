@@ -30,6 +30,7 @@ function Trang() {
   const Q = d.quyen;
   const hoan = d.don.filter((x: any) => x.hoan_tt === "cho_sales" || x.hoan_tt === "cho_chi");
   const chot = d.don.filter((x: any) => x.trang_thai === "da_dung");   // AT-1c: chốt cả đơn khách tự đặt để cộng điểm
+  const kmCho = d.don.filter((x: any) => x.km_vtd > 0 && !x.km_but_toan && ["huy", "khong_den"].includes(x.trang_thai));   // KS-16b
   const cho_tien = d.don.filter((x: any) => ["cho_nhan", "cho_tra", "het_han", "huy", "tu_choi"].includes(x.trang_thai));
   const TABS: [Tab, string, number][] = [["tien", "Tiền QR chờ gán", d.giao_dich_cho.length], ["the", "Thẻ chờ đối soát", d.the_cho_doi_soat.length],
     ["hoan", "Hủy & hoàn", hoan.length], ["chot", "Chốt doanh số", chot.filter((x: any) => x.doanh_so == null).length], ["don", "Tất cả đơn", 0]];
@@ -75,13 +76,18 @@ function Trang() {
           <input placeholder={x.hoan_tt === "cho_chi" ? "Mã hoàn OnePay / số UNC" : "Ghi chú"} value={q[`h${x.id}`] || ""} onChange={(e) => setQ({ ...q, [`h${x.id}`]: e.target.value })} style={{ width: 150 }} />
           {x.hoan_tt === "cho_sales" && Q.sales && <button className="act teal" style={{ margin: "0 0 0 6px" }} disabled={busy} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/xac-nhan-hoan`, { ghi_chu: q[`h${x.id}`] || "" })}>Xác nhận hoàn</button>}
           {x.hoan_tt === "cho_chi" && Q.ke_toan && <button className="act teal" style={{ margin: "0 0 0 6px" }} disabled={busy || (q[`h${x.id}`] || "").trim().length < 3} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/da-hoan`, { ghi_chu: q[`h${x.id}`] })}>Đã hoàn</button>}</td></tr>)}</tbody></table>}
+      {kmCho.length > 0 && <><h3>Voucher VTD chịu — đơn hủy / không đến chưa ghi sổ ({kmCho.length})</h3>
+        <table><thead><tr><th>Đơn</th><th>Voucher</th><th>Thuộc nhà hàng</th><th></th></tr></thead><tbody>{kmCho.map((x: any) => <tr key={x.id}>
+          <td>{x.ma}<div className="muted" style={{ fontSize: 12 }}>{x.nha_hang} · {x.trang_thai_ten}</div></td><td>{x.voucher?.ma} · {vnd(x.giam_voucher)}</td><td><b>{vnd(x.km_vtd)}</b></td>
+          <td>{Q.ke_toan ? <button className="act teal" disabled={busy} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/ghi-km`, {})}>Ghi Nợ 641 / Có 3388</button> : <span className="muted">Kế toán ghi</span>}</td></tr>)}</tbody></table></>}
       <div className="muted">Hoàn thẻ: làm trên trang quản trị cổng thẻ (tiền về thẻ khách). Hoàn QR: chuyển khoản lại. «Đã hoàn» là máy ghi sổ Nợ 3388 / Có 1121. Phần giữ lại thuộc nhà hàng. Bớt khách cũng sinh khoản hoàn (hoàn được nhiều lần).</div></div>}
 
     {tab === "chot" && <div className="card"><h3>Chốt doanh số đơn đã dùng</h3><div className="muted">Đơn qua đại lý / CTV → vào D06. Đơn khách / cổ đông tự đặt → cộng điểm thành viên trên số đã trả qua Vietourist.</div>
       {!chot.length ? <div className="muted">Chưa có đơn đã dùng.</div>
       : <table><thead><tr><th>Đơn</th><th>Tiền</th><th>Nhà hàng báo</th><th>Doanh số</th></tr></thead><tbody>{chot.map((x: any) => <tr key={x.id}>
         <td>{x.ma}<div className="muted" style={{ fontSize: 12 }}>{x.nguon} · {x.nha_hang} · {fmtD(x.ngay)}</div></td>
-        <td>Trả trước {vnd(x.da_tra)}<div className="muted" style={{ fontSize: 12 }}>{x.thanh_toan.map((t: any) => `${t.kenh}: ${t.trang_thai_ten}`).join("; ")}</div></td>
+        <td>Trả trước {vnd(x.da_tra)}<div className="muted" style={{ fontSize: 12 }}>{x.thanh_toan.map((t: any) => `${t.kenh}: ${t.trang_thai_ten}`).join("; ")}</div>
+          {x.km_vtd > 0 && <div className="muted" style={{ fontSize: 12 }}>+ voucher {x.voucher?.ma} {vnd(x.km_vtd)} VTD chịu{x.km_but_toan ? ` · đã ghi ${x.km_but_toan}` : " · chốt sẽ ghi Nợ 641 / Có 3388"}</div>}</td>
         <td>Bill {vnd(x.bill_thuc_te || 0)}<div className="muted" style={{ fontSize: 12 }}>thu tại bàn {vnd(x.thu_tai_ban || 0)}{x.co_bill ? " · có ảnh bill" : " · không ảnh bill"}{x.dung_ghi_chu ? ` · ${x.dung_ghi_chu}` : ""}</div></td>
         <td>{x.doanh_so != null ? <><b>{vnd(x.doanh_so)}</b><div className="muted" style={{ fontSize: 12 }}>kỳ {x.ky_d06} · {x.chot_boi} · khóa</div></>
           : Q.ke_toan ? <><input type="number" placeholder={String(x.bill_thuc_te || "")} value={q[`c${x.id}`] || ""} onChange={(e) => setQ({ ...q, [`c${x.id}`]: e.target.value })} style={{ width: 120 }} />

@@ -50,6 +50,7 @@ class VoucherRewards(Base):
     trang_thai: Mapped[str] = mapped_column(String(10), default="cho_dung")
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True)
     don_ks_id: Mapped[int | None] = mapped_column(ForeignKey("don_ks_vtd.id"), nullable=True)   # KS-16: khách tự áp
+    dat_ban_id: Mapped[int | None] = mapped_column(ForeignKey("don_dat_ban.id"), nullable=True)  # KS-16b: đặt bàn
     ap_boi: Mapped[str] = mapped_column(String(50), default="")
     ap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

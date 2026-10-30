@@ -37,6 +37,12 @@ export default function DatBanCuaToi({ doiTac = false, moMa = "" }: { doiTac?: b
   const [lyDo, setLyDo] = useState("");
   const [dg, setDg] = useState<any>(null);     // AT-3: form đánh giá {ma, diem, ..., nhan_xet, dong_y, giu: number[], tep: File[], cu: []}
   const [msg, setMsg] = useState(""); const [loi, setLoi] = useState(""); const [busy, setBusy] = useState(false);
+  const [vc, setVc] = useState("");             // KS-16b: mã voucher VTD Rewards đang gõ
+  const voucher = async (ma: string, bo = false) => {
+    setBusy(true); setLoi(""); setMsg("");
+    try { const r = await goiCong(`/dat-ban/${encodeURIComponent(ma)}/${bo ? "bo-voucher" : "voucher"}`, bo ? {} : { ma_voucher: vc.trim() }); setDs(r.dat_ban); setMsg(r.message); setVc(""); }
+    catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
+  };
   const tai = useCallback(() => goiCong("/dat-ban").then((r) => setDs(r.dat_ban)).catch((x) => setLoi(x.message)), []);
   useEffect(() => {
     tai();
@@ -91,7 +97,8 @@ export default function DatBanCuaToi({ doiTac = false, moMa = "" }: { doiTac?: b
       <tbody>{ds.map((d: any) => <tr key={d.ma}>
         <th scope="row">{d.ma}<small>{d.nha_hang} · {d.thuc_don}{doiTac && d.ten_khach ? ` · ${d.ten_khach}` : ""}</small></th>
         <td>{ngay(d.ngay)} {d.gio}<small>{d.nguoi_lon} NL{d.tre_em ? ` + ${d.tre_em} TE` : ""}{d.la_doan ? " · đoàn" : ""}</small></td>
-        <td>{d.cach_tt_ten} · {tien(d.phai_tra_truoc)}<small>đã trả {tien(d.da_tra)} · tại nhà hàng ~{tien(d.tra_tai_ban_du_kien)}</small></td>
+        <td>{d.cach_tt_ten} · {tien(d.phai_tra_truoc)}<small>đã trả {tien(d.da_tra)} · tại nhà hàng ~{tien(d.tra_tai_ban_du_kien)}</small>
+          {d.voucher && <small>Voucher {d.voucher.ma} −{tien(d.giam_voucher)}{d.voucher.trang_thai === "da_hoan" ? " · đã trả điểm" : ""}</small>}</td>
         <td><span className={`v3-badge ${MAU[d.trang_thai] || "neutral"}`}>{d.trang_thai_ten}</span>
           {d.ly_do_tu_choi && <small>{d.ly_do_tu_choi}</small>}
           {d.co_the_tra && d.han_tra && <small>Hạn trả {gio(d.han_tra)}</small>}
@@ -110,9 +117,15 @@ export default function DatBanCuaToi({ doiTac = false, moMa = "" }: { doiTac?: b
 
     {ds && ds.filter((d) => d.ma === mo && d.co_the_tra).map((d) => <div key={d.ma} className="v3-panel" style={{ marginTop: 12 }}>
       <div className="v3-section-title"><h3>Thanh toán {d.ma} · {tien(d.con_phai_tra_truoc)}</h3></div>
+      {!doiTac && d.dung_voucher && (d.voucher ? <div className="v3-notice info"><span>Đã áp voucher {d.voucher.ma} · trừ {tien(d.giam_voucher)} vào số trả trước.</span>
+          <button type="button" className="v3-button v3-quiet cursor-interaction" disabled={busy} onClick={() => voucher(d.ma, true)}><span>Bỏ voucher</span></button></div>
+        : <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <label className="v3-field" style={{ flex: "1 1 200px" }}>Mã voucher VTD Rewards (không bắt buộc)<input value={vc} placeholder="VTD-XXXXXX" onChange={(e) => setVc(e.target.value.toUpperCase())} /></label>
+          <button type="button" className="v3-button v3-quiet cursor-interaction" disabled={busy || !vc.trim()} onClick={() => voucher(d.ma)}><span>Áp dụng</span></button>
+          <small style={{ flexBasis: "100%" }}>Trừ vào tiền trả trước, tối đa 5% tạm tính. Hủy được hoàn tiền thì điểm của voucher trả lại.</small></div>)}
       {d.the_bat && <><button type="button" className="v3-button v3-primary cursor-interaction" disabled={busy} onClick={() => the(d.ma)}><span>Trả bằng thẻ Visa / Master / JCB / ATM</span></button>
         <small>Mở trang thanh toán của cổng thẻ (SePay). Vietourist không thấy và không lưu số thẻ. Phí thẻ Vietourist chịu.</small></>}
-      <QrThanhToan ma={d.ma} duong="/dat-ban" />
+      <QrThanhToan key={`${d.ma}-${d.con_phai_tra_truoc}`} ma={d.ma} duong="/dat-ban" />
     </div>)}
 
     {dg && <div className="v3-panel" style={{ marginTop: 12 }} id="dg-form">

@@ -262,7 +262,7 @@ export default function CongNcc({ toi, thoat }: { toi: any; thoat: () => void })
             <small>{d.no.ghi_chu}</small></section>
           {d.no.dat_ban_thu_ho?.length > 0 && <section className="v3-panel"><div className="v3-section-title"><h3>Đặt bàn — Vietourist thu hộ</h3></div>
             <Bang cot={["Đơn", "Ngày", "Đã thu hộ", "Hoàn khách", "Thuộc nhà hàng"]}>{d.no.dat_ban_thu_ho.map((x: any) => <tr key={x.ma}>
-              <th scope="row">{x.ma}<small>{x.nha_hang} · {x.trang_thai_ten}</small></th><td>{ngay(x.ngay)}</td><td>{tien(x.da_thu_ho)}</td><td>{tien(x.hoan_khach)}</td><td>{tien(x.thuoc_nha_hang)}</td></tr>)}</Bang>
+              <th scope="row">{x.ma}<small>{x.nha_hang} · {x.trang_thai_ten}</small></th><td>{ngay(x.ngay)}</td><td>{tien(x.da_thu_ho)}</td><td>{tien(x.hoan_khach)}</td><td>{tien(x.thuoc_nha_hang)}{x.voucher_vtd ? <small>gồm voucher VTD trả thay khách {tien(x.voucher_vtd)}</small> : null}</td></tr>)}</Bang>
             <small>Tiền khách trả trước qua Vietourist. Vietourist chi cho nhà hàng theo đề nghị chi; trạng thái chi xem ở Đề nghị.</small></section>}</>}
 
         {tab === "bk" && d.bk && (d.bk.ban_ke.length ? d.bk.ban_ke.map((b: any) => <section key={b.id} className="v3-panel">
